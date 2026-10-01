@@ -1,0 +1,55 @@
+@import "tailwindcss";
+
+@font-face {
+  font-family: "Xiaban Display";
+  src: url("/fonts/xiaban-display.woff2") format("woff2");
+  font-display: swap;
+}
+
+@theme {
+  --color-dusk: #2f3a7a;
+  --color-dusk-deep: #1f2758;
+  --color-dusk-soft: #3d4a94;
+  --color-lamp: #ffb938;
+  --color-lamp-deep: #d98a00;
+  --color-fur: #f7a65a;
+  --color-window: #fff1c9;
+  --color-ink: #1e1a2e;
+  --color-blush: #ff7e79;
+  --font-display: "Xiaban Display", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  --font-sans: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", system-ui, sans-serif;
+}
+
+:root {
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  color-scheme: dark;
+}
+
+html,
+body {
+  background: var(--color-dusk-deep);
+  color: var(--color-window);
+  -webkit-tap-highlight-color: transparent;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  font-family: var(--font-sans);
+  min-height: 100dvh;
+}
+
+:focus-visible {
+  outline: 3px solid var(--color-lamp);
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
