@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import type { Checkin, Tip } from '../../api/types.ts'
 import { moodFace, moodLabel } from '../../cat/moods.ts'
-import { CatWindow, FieldError, QuietButton } from '../../components/ui.tsx'
+import { useLocation } from 'wouter'
+import { CatWindow, FieldError, PrimaryButton, QuietButton } from '../../components/ui.tsx'
 import { useProfile } from '../../lib/session.tsx'
 import { countdown } from '../../lib/time.ts'
 import { titleTheme } from '../../lib/titleTheme.ts'
@@ -31,6 +32,7 @@ export function ResultView({ checkin, tips, fresh, busy, error, onUndo }: Result
   const profile = useProfile()
   const theme = titleTheme[checkin.title.code]
   const undoLeft = useUndoLeft(checkin.undoUntil)
+  const [, navigate] = useLocation()
 
   return (
     <div className="flex flex-1 flex-col">
@@ -56,7 +58,8 @@ export function ResultView({ checkin, tips, fresh, busy, error, onUndo }: Result
       <ReplyBubble checkin={checkin} />
       <TonightInfo checkin={checkin} tips={tips} />
 
-      <div className="mt-auto pt-10 text-center">
+      <div className="mt-auto pt-8 text-center">
+        <PrimaryButton onClick={() => navigate('/card')}>生成今日下班卡</PrimaryButton>
         {undoLeft > 0 && (
           <QuietButton disabled={busy} onClick={onUndo}>
             按错了？撤销打卡（还剩 {countdown(undoLeft)}）

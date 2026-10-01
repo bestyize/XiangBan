@@ -24,7 +24,12 @@ data class User(
     val personality: Personality,
     val nickname: String?,
     val payday: Int?,
+    val inviteCode: String,
+    val showCityOnCard: Boolean,
 )
+
+/** Where a new account came from: the inviter's code and the entry point, both from the QR link. */
+data class Referral(val inviteCode: String?, val source: String?)
 
 data class ProfileChanges(
     val companionName: String? = null,
@@ -36,6 +41,7 @@ data class ProfileChanges(
     val workEnd: LocalTime? = null,
     val paydayChanged: Boolean = false,
     val payday: Int? = null,
+    val showCityOnCard: Boolean? = null,
     val markOnboarded: Boolean = false,
 )
 
@@ -46,12 +52,18 @@ fun personalityOf(code: String): Personality = Personality.entries.firstOrNull {
 class UserRepository(private val db: Db) {
 
     /** Serialised per device so concurrent first visits from one browser create a single account. */
-    suspend fun findOrCreate(deviceHash: String, timezone: String): Long = db.tx { c ->
+    suspend fun findOrCreate(deviceHash: String, timezone: String, referral: Referral? = null): Long = db.tx { c ->
         c.queryOne("select pg_advisory_xact_lock(hashtext(?))", deviceHash) { }
         c.queryOne("update devices set last_seen_at = now() where device_hash = ? returning user_id", deviceHash) {
             it.getLong(1)
         } ?: run {
-            val id = c.queryOne("insert into users (timezone) values (?) returning id", timezone) { it.getLong(1) }!!
+            val referrer = referral?.inviteCode?.let { code ->
+                c.queryOne("select id from users where invite_code = ?", code) { it.getLong(1) }
+            }
+            val id = c.queryOne(
+                "insert into users (timezone, invite_code, referred_by, ref_source) values (?, ?, ?, ?) returning id",
+                timezone, newInviteCode(), referrer, referral?.source,
+            ) { it.getLong(1) }!!
             c.execute("insert into companions (user_id) values (?)", id)
             c.execute("insert into devices (device_hash, user_id) values (?, ?)", deviceHash, id)
             id
@@ -80,6 +92,7 @@ class UserRepository(private val db: Db) {
             changes.workStart?.let { add("work_start = ?" to it) }
             changes.workEnd?.let { add("work_end = ?" to it) }
             if (changes.paydayChanged) add("payday = ?" to changes.payday)
+            changes.showCityOnCard?.let { add("show_city_on_card = ?" to it) }
             if (changes.markOnboarded) add("onboarded_at = coalesce(onboarded_at, now())" to null)
         }
         val companionSets = buildList {
@@ -111,14 +124,22 @@ class UserRepository(private val db: Db) {
         personality = personalityOf(rs.getString("personality")),
         nickname = rs.getString("nickname"),
         payday = rs.intOrNull("payday"),
+        inviteCode = rs.getString("invite_code"),
+        showCityOnCard = rs.getBoolean("show_city_on_card"),
     )
 
     companion object {
         val DEFAULT_ZONE: ZoneId = ZoneId.of("Asia/Shanghai")
 
+        private const val INVITE_ALPHABET = "23456789abcdefghjkmnpqrstuvwxyz"
+        private val random = java.security.SecureRandom()
+
+        /** 10 characters from 31 symbols (~49 bits): collisions stay negligible at millions of users. */
+        fun newInviteCode(): String = (1..10).map { INVITE_ALPHABET[random.nextInt(INVITE_ALPHABET.length)] }.joinToString("")
+
         private const val SELECT_USER = """
             select u.id, u.city_code, u.timezone, u.work_start, u.work_end, u.payday, u.onboarded_at, u.created_at,
-                   c.name, c.personality, c.nickname
+                   u.invite_code, u.show_city_on_card, c.name, c.personality, c.nickname
             from users u join companions c on c.user_id = u.id
         """
     }

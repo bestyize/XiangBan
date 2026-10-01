@@ -104,7 +104,7 @@ class Services(
         stats = stats,
         tips = TipsService(weather, traffic, calendar, cities),
         percentiles = percentiles,
-        views = CheckinViews(checkinRepository, percentiles),
+        views = CheckinViews(checkinRepository, percentiles, calendar),
         clock = clock,
     )
 

@@ -43,6 +43,7 @@ class ProfileService(private val users: UserRepository, private val cities: Citi
             workEnd = req.workEnd?.let(::parseTime),
             paydayChanged = req.payday != null,
             payday = req.payday?.takeIf { it != 0 }?.also { if (it !in 1..31) badRequest("发薪日是每月 1–31 号", "invalid_payday") },
+            showCityOnCard = req.showCityOnCard,
             markOnboarded = req.onboarded == true,
         )
         users.update(userId, changes)
@@ -59,6 +60,8 @@ class ProfileService(private val users: UserRepository, private val cities: Citi
         workStart = user.workStart.format(HHMM),
         workEnd = user.workEnd.format(HHMM),
         payday = user.payday,
+        showCityOnCard = user.showCityOnCard,
+        inviteCode = user.inviteCode,
         onboarded = user.onboardedAt != null,
         createdAt = user.createdAt.toEpochMilli(),
     )

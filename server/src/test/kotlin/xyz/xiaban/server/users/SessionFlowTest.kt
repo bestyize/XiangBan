@@ -8,6 +8,7 @@ import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.contentType
+import xyz.xiaban.server.db.queryOne
 import xyz.xiaban.server.support.apiTest
 import xyz.xiaban.shared.ApiPaths
 import xyz.xiaban.shared.MetaResponse
@@ -95,6 +96,24 @@ class SessionFlowTest {
 
         val cleared = put(ApiPaths.PROFILE, token, ProfileUpdate(nickname = "")).body<ProfileView>()
         assertNull(cleared.nickname)
+    }
+
+    @Test
+    fun `a share-card visit records who invited the new account`() = apiTest {
+        val inviter = session().profile
+        val invited = client.post(ApiPaths.SESSION) {
+            contentType(ContentType.Application.Json)
+            setBody(SessionRequest(newDeviceId(), "Asia/Shanghai", ref = inviter.inviteCode, from = "card"))
+        }.body<SessionResponse>()
+        assertTrue(invited.profile.inviteCode != inviter.inviteCode)
+        val (referredBy, source) = services.db.read { c ->
+            c.queryOne("select referred_by, ref_source from users where invite_code = ?", invited.profile.inviteCode) {
+                it.getLong(1) to it.getString(2)
+            }!!
+        }
+        assertEquals("card", source)
+        assertTrue(referredBy > 0)
+        assertFalse(invited.profile.showCityOnCard, "city stays off the card by default")
     }
 
     @Test

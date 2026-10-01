@@ -28,7 +28,11 @@ class SessionService(
             users.linkDevice(deviceHash, existing.id)
             existing.id
         } else {
-            users.findOrCreate(deviceHash, timezone ?: UserRepository.DEFAULT_ZONE.id)
+            val referral = Referral(
+                inviteCode = req.ref?.takeIf { invitePattern.matches(it) },
+                source = req.from?.takeIf { sourcePattern.matches(it) },
+            )
+            users.findOrCreate(deviceHash, timezone ?: UserRepository.DEFAULT_ZONE.id, referral)
         }
         if (timezone != null) users.setTimezone(userId, timezone)
 
@@ -37,6 +41,8 @@ class SessionService(
 
     companion object {
         private val deviceIdPattern = Regex("^[A-Za-z0-9_-]{16,128}$")
+        private val invitePattern = Regex("^[a-z0-9]{6,16}$")
+        private val sourcePattern = Regex("^[a-z_]{1,32}$")
 
         fun isValidDeviceId(value: String) = deviceIdPattern.matches(value)
 

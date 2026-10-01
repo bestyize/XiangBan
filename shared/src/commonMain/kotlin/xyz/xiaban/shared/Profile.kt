@@ -12,7 +12,14 @@ enum class Personality(val label: String) {
 }
 
 @Serializable
-data class SessionRequest(val deviceId: String, val timezone: String? = null)
+data class SessionRequest(
+    val deviceId: String,
+    val timezone: String? = null,
+    /** Invite code from a share-card QR link (`inv`), recorded for brand-new accounts only. */
+    val ref: String? = null,
+    /** Entry point such as `card` (`from`). */
+    val from: String? = null,
+)
 
 @Serializable
 data class SessionResponse(val token: String, val deviceId: String, val profile: ProfileView)
@@ -31,6 +38,9 @@ data class ProfileView(
     val workEnd: String,
     /** Day of month the salary arrives, for the payday countdown */
     val payday: Int?,
+    val showCityOnCard: Boolean,
+    /** Goes into the share-card QR link instead of the user id. */
+    val inviteCode: String,
     val onboarded: Boolean,
     val createdAt: Long,
 )
@@ -45,6 +55,7 @@ data class ProfileUpdate(
     val workStart: String? = null,
     val workEnd: String? = null,
     val payday: Int? = null,
+    val showCityOnCard: Boolean? = null,
     val onboarded: Boolean? = null,
 )
 

@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 import { api, onUnauthorized, setToken } from '../api/client.ts'
 import type { Profile, ProfileUpdate, SessionResponse } from '../api/types.ts'
 import { browserTimezone, getDeviceId, setDeviceId } from './device.ts'
+import { captureReferral } from './env.ts'
 
 type Status = 'loading' | 'ready' | 'error'
 
@@ -22,7 +23,7 @@ function openSession(): Promise<SessionResponse> {
   // The session endpoint never answers 401, so skip the re-auth hook (it would wait on itself).
   inflight ??= api<SessionResponse>(
     '/api/session',
-    { method: 'POST', body: { deviceId: getDeviceId(), timezone: browserTimezone() } },
+    { method: 'POST', body: { deviceId: getDeviceId(), timezone: browserTimezone(), ...captureReferral() } },
     true,
   ).then((res) => {
     setToken(res.token)

@@ -10,6 +10,8 @@ export interface Profile {
   workStart: string
   workEnd: string
   payday: number | null
+  showCityOnCard: boolean
+  inviteCode: string
   onboarded: boolean
   createdAt: number
 }
@@ -24,6 +26,7 @@ export interface ProfileUpdate {
   workEnd?: string
   /** 0 clears it. */
   payday?: number
+  showCityOnCard?: boolean
   onboarded?: boolean
 }
 
@@ -83,6 +86,7 @@ export interface Checkin {
   careMode: boolean
   undoUntil: number | null
   stats: CheckinStats
+  holiday: { code: string; name: string } | null
 }
 
 export interface Percentile {

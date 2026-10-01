@@ -66,7 +66,12 @@ data class CheckinView(
     /** Epoch millis until which the check-in can be undone; null once that is no longer possible. */
     val undoUntil: Long?,
     val stats: CheckinStats,
+    /** Set when the 下班日 falls in a statutory holiday, for the holiday card style. */
+    val holiday: HolidayTag? = null,
 )
+
+@Serializable
+data class HolidayTag(val code: String, val name: String)
 
 @Serializable
 enum class GreetingKind {
