@@ -25,10 +25,18 @@ export function QuietButton({ className = '', ...rest }: ButtonProps) {
 }
 
 /** The lit window at home where 小伴 waits; used wherever the cat speaks. */
-export function CatWindow({ spec, label, size = 208, className = '' }: { spec: CatSpec; label: string; size?: number; className?: string }) {
+interface CatWindowProps {
+  spec: CatSpec
+  label: string
+  size?: number
+  centered?: boolean
+  className?: string
+}
+
+export function CatWindow({ spec, label, size = 208, centered = true, className = '' }: CatWindowProps) {
   const arch = size / 2
   return (
-    <div className={`mx-auto flex w-fit flex-col items-center ${className}`}>
+    <div className={`flex w-fit shrink-0 flex-col items-center ${centered ? 'mx-auto' : ''} ${className}`}>
       <div
         className="relative overflow-hidden bg-[radial-gradient(circle_at_50%_38%,#ffe9ad,#ffb938_62%,#e89a12)] shadow-[0_0_80px_rgba(255,185,56,0.32)]"
         style={{ width: size, height: size * 1.08, borderRadius: `${arch}px ${arch}px 14px 14px` }}
@@ -42,10 +50,12 @@ export function CatWindow({ spec, label, size = 208, className = '' }: { spec: C
   )
 }
 
-export function Bubble({ children, className = '' }: { children: ReactNode; className?: string }) {
+/** Speech bubble whose tail points up at the cat: centered under it, or under a cat on the left. */
+export function Bubble({ children, align = 'center', className = '' }: { children: ReactNode; align?: 'center' | 'left'; className?: string }) {
+  const layout = align === 'center' ? 'mx-auto max-w-[22rem] text-center before:left-1/2' : 'text-left before:left-16'
   return (
     <div
-      className={`relative mx-auto max-w-[22rem] rounded-[22px] bg-window px-5 py-4 text-center text-[17px] leading-relaxed text-ink before:absolute before:-top-2.5 before:left-1/2 before:-translate-x-1/2 before:border-x-[10px] before:border-b-[11px] before:border-x-transparent before:border-b-window before:content-[''] ${className}`}
+      className={`relative rounded-[22px] bg-window px-5 py-4 text-[17px] leading-relaxed text-ink before:absolute before:-top-2.5 before:-translate-x-1/2 before:border-x-[10px] before:border-b-[11px] before:border-x-transparent before:border-b-window before:content-[''] ${layout} ${className}`}
     >
       {children}
     </div>

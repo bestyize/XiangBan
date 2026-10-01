@@ -32,15 +32,18 @@ object TestEnv {
         ),
     )
 
-    private val shared: Services by lazy { Services.create(config) }
+    val clock = MutableClock()
 
-    /** Returns services backed by an emptied database and Redis. */
+    private val shared: Services by lazy { Services.create(config, clock) }
+
+    /** Returns services backed by an emptied database and Redis, with the clock reset to now. */
     fun services(): Services {
         val reachable = reachable(dbUrl.removePrefix("jdbc:")) && reachable(redisUrl)
         if (!reachable) {
             check(!required) { "PostgreSQL ($dbUrl) or Redis ($redisUrl) is not reachable" }
             Assumptions.assumeTrue(false, "PostgreSQL/Redis not reachable, skipping integration test")
         }
+        clock.now = java.time.Instant.now()
         reset(shared)
         return shared
     }

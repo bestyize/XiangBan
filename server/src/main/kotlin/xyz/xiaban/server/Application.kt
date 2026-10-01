@@ -6,9 +6,11 @@ import io.ktor.server.engine.embeddedServer
 import io.ktor.server.netty.Netty
 import io.ktor.server.routing.routing
 import xyz.xiaban.server.auth.installAuth
+import xyz.xiaban.server.checkin.checkinRoutes
 import xyz.xiaban.server.config.AppConfig
 import xyz.xiaban.server.http.healthRoutes
 import xyz.xiaban.server.http.installHttp
+import xyz.xiaban.server.http.installRateLimits
 import xyz.xiaban.server.users.userRoutes
 
 fun main() {
@@ -23,8 +25,10 @@ fun main() {
 fun Application.xiaban(services: Services) {
     installHttp(services.config)
     installAuth(services.tokens)
+    installRateLimits()
     routing {
         healthRoutes(services)
         userRoutes(services)
+        checkinRoutes(services)
     }
 }

@@ -1,0 +1,15 @@
+[
+  {
+    "year": 2026,
+    "source": "国务院办公厅关于2026年部分节假日安排的通知",
+    "holidays": [
+      {"code": "new_year", "name": "元旦", "start": "2026-01-01", "end": "2026-01-03", "makeup": ["2026-01-04"]},
+      {"code": "spring_festival", "name": "春节", "start": "2026-02-15", "end": "2026-02-23", "makeup": ["2026-02-14", "2026-02-28"]},
+      {"code": "qingming", "name": "清明节", "start": "2026-04-04", "end": "2026-04-06", "makeup": []},
+      {"code": "labor_day", "name": "劳动节", "start": "2026-05-01", "end": "2026-05-05", "makeup": ["2026-05-09"]},
+      {"code": "dragon_boat", "name": "端午节", "start": "2026-06-19", "end": "2026-06-21", "makeup": []},
+      {"code": "mid_autumn", "name": "中秋节", "start": "2026-09-25", "end": "2026-09-27", "makeup": []},
+      {"code": "national_day", "name": "国庆节", "start": "2026-10-01", "end": "2026-10-07", "makeup": ["2026-09-20", "2026-10-10"]}
+    ]
+  }
+]

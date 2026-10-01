@@ -47,3 +47,40 @@ export interface Meta {
   cities: City[]
   personalities: PersonalityInfo[]
 }
+
+export type Mood =
+  | 'idle' | 'smug' | 'happy' | 'welcome' | 'heartache' | 'sleepy'
+  | 'worried' | 'sparkle' | 'shocked' | 'aggrieved' | 'excited' | 'care'
+
+export type TitleCode =
+  | 'exact_on_time' | 'weekend_work' | 'borrowed_weekend' | 'holiday_countdown'
+  | 'early_leaver' | 'on_time' | 'normal_human' | 'overtime_hero' | 'night_owl' | 'immortal'
+
+export interface TitleView {
+  code: TitleCode
+  name: string
+  rare: boolean
+  mood: Mood
+}
+
+export interface ReplyView {
+  text: string
+  source: 'library' | 'llm'
+  pending: boolean
+}
+
+export interface Checkin {
+  id: string
+  workDay: string
+  checkedAt: number
+  localTime: string
+  title: TitleView
+  mood: Mood
+  reply: ReplyView
+  undoUntil: number | null
+}
+
+export interface TodayResponse {
+  workDay: string
+  checkin: Checkin | null
+}

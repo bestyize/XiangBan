@@ -5,4 +5,6 @@ object ApiPaths {
     const val SESSION = "/api/session"
     const val PROFILE = "/api/profile"
     const val META = "/api/meta"
+    const val CHECKIN = "/api/checkin"
+    const val CHECKIN_TODAY = "/api/checkin/today"
 }
