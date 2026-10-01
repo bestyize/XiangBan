@@ -49,6 +49,13 @@ fun Route.userRoutes(services: Services) {
 
     authenticate(AUTH_USER) {
         get(ApiPaths.PROFILE) { call.respond(services.profiles.view(call.userId())) }
-        put(ApiPaths.PROFILE) { call.respond(services.profiles.update(call.userId(), call.receive<ProfileUpdate>())) }
+        put(ApiPaths.PROFILE) {
+            val userId = call.userId()
+            val req = call.receive<ProfileUpdate>()
+            val profile = services.profiles.update(userId, req)
+            if (req.onboarded == true) services.unlocks.grant(userId, setOf("named"))
+            call.respond(profile)
+        }
+        get(ApiPaths.UNLOCKS) { call.respond(services.unlocks.list(call.userId())) }
     }
 }

@@ -87,6 +87,21 @@ export interface Checkin {
   undoUntil: number | null
   stats: CheckinStats
   holiday: { code: string; name: string } | null
+  newUnlocks: Unlock[]
+}
+
+export interface Unlock {
+  id: string
+  name: string
+  hint: string
+  unlockedAt: number | null
+}
+
+export interface UnlocksResponse {
+  appTotal: number
+  webTotal: number
+  unlockedCount: number
+  items: Unlock[]
 }
 
 export interface Percentile {

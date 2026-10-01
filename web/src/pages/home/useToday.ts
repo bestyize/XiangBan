@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api } from '../../api/client.ts'
-import type { Checkin, Tip, TodayResponse } from '../../api/types.ts'
+import type { Checkin, Tip, TodayResponse, Unlock } from '../../api/types.ts'
 
 type Status = 'loading' | 'ready' | 'error'
 
@@ -16,6 +16,9 @@ export function useToday() {
   const [busy, setBusy] = useState(false)
   /** True only right after tapping the button, so the stamp animation does not replay on reload. */
   const [fresh, setFresh] = useState(false)
+  /** Expressions the last check-in unlocked, shown once */
+  const [unlocked, setUnlocked] = useState<Unlock[]>([])
+  const dismissUnlocked = useCallback(() => setUnlocked([]), [])
 
   /** Second request after check-in: tips (weather may be slow) and, if pending, the model rewrite. */
   const fillIn = useCallback(async (checkin: Checkin) => {
@@ -55,6 +58,8 @@ export function useToday() {
       setFresh(true)
       setTips(null)
       setToday({ workDay: checkin.workDay, checkin, greeting: null, tips: [] })
+      // Let the title stamp land before the unlock celebration covers it.
+      if (checkin.newUnlocks.length > 0) setTimeout(() => setUnlocked(checkin.newUnlocks), 900)
       void fillIn(checkin)
     } catch (e) {
       setError((e as Error).message)
@@ -77,5 +82,5 @@ export function useToday() {
     }
   }, [load])
 
-  return { status, today, tips, error, busy, fresh, checkIn, undo, reload: load }
+  return { status, today, tips, unlocked, dismissUnlocked, error, busy, fresh, checkIn, undo, reload: load }
 }

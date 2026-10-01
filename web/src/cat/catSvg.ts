@@ -1,12 +1,14 @@
 import { drawEyes, mouths, type Eyes, type Mouth } from './face.ts'
 import { C, stroke } from './palette.ts'
-import { props as propArt, type Prop } from './props.ts'
+import { badge, props as propArt, type Prop } from './props.ts'
 
 export interface CatSpec {
   eyes: Eyes
   mouth: Mouth
   blush?: boolean
   props?: Prop[]
+  /** Short milestone number, e.g. "7" */
+  badge?: string
 }
 
 const outline = `stroke="${C.ink}" stroke-width="6" stroke-linejoin="round"`
@@ -39,6 +41,7 @@ export function catSvg(spec: CatSpec): string {
     mouths[spec.mouth],
     whiskers,
     ...(spec.props ?? []).map((p) => propArt[p]),
+    spec.badge ? badge(spec.badge) : '',
   ]
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" width="100%" height="100%">${parts.join('')}</svg>`
 }

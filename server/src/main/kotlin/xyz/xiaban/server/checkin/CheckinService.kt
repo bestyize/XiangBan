@@ -10,6 +10,9 @@ import xyz.xiaban.server.meta.Cities
 import xyz.xiaban.server.stats.PercentileService
 import xyz.xiaban.server.stats.StatsService
 import xyz.xiaban.server.stats.TipsService
+import xyz.xiaban.server.unlocks.UnlockContext
+import xyz.xiaban.server.unlocks.UnlockRules
+import xyz.xiaban.server.unlocks.UnlockService
 import xyz.xiaban.server.users.ProfileService
 import xyz.xiaban.server.users.User
 import xyz.xiaban.server.weather.WeatherInsights
@@ -20,6 +23,7 @@ import java.time.Clock
 import java.time.Duration
 import java.time.Instant
 import java.time.LocalDateTime
+import java.time.temporal.ChronoUnit
 
 class CheckinService(
     private val profiles: ProfileService,
@@ -34,6 +38,7 @@ class CheckinService(
     private val tips: TipsService,
     private val percentiles: PercentileService,
     private val views: CheckinViews,
+    private val unlocks: UnlockService,
     private val clock: Clock,
 ) {
     suspend fun checkIn(userId: Long): CheckinView {
@@ -56,9 +61,27 @@ class CheckinService(
             ?: return view(checkins.active(userId, workDay)!!, user, now)
 
         percentiles.record(workDay, WorkDay.minuteOf(local), user.cityCode)
-        remember(created, plan, enteredCare = plan.careMode && history.firstOrNull()?.careMode != true)
+        val previous = history.firstOrNull()
+        remember(created, plan, enteredCare = plan.careMode && previous?.careMode != true)
         city?.let { weather.prefetch(it) }
-        return view(created, user, now, pending = polisher.request(created))
+
+        val snapshot = stats.snapshot(user, now)
+        val newUnlocks = unlocks.grant(
+            userId,
+            UnlockRules.earned(
+                UnlockContext(
+                    workDay = workDay,
+                    title = title,
+                    totalDays = snapshot.totalDays,
+                    streak = snapshot.currentStreak,
+                    weatherTag = weatherTag,
+                    holidayCode = calendar.holidayOn(workDay)?.code,
+                    daysSincePrevious = previous?.let { ChronoUnit.DAYS.between(it.workDay, workDay) },
+                    previousWasCare = previous?.careMode == true,
+                ),
+            ),
+        )
+        return views.view(created, user, now, snapshot, pending = polisher.request(created)).copy(newUnlocks = newUnlocks)
     }
 
     /** With [waitMs] the call holds until the model rewrite lands or the wait runs out. */

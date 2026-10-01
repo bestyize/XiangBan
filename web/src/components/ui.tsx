@@ -1,8 +1,9 @@
-import type { ButtonHTMLAttributes, ReactNode } from 'react'
+import type { ComponentProps, ReactNode } from 'react'
 import type { CatSpec } from '../cat/catSvg.ts'
 import { Cat } from './Cat.tsx'
 
-type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement>
+/** Includes `ref`, which React 19 passes to function components as a plain prop. */
+type ButtonProps = ComponentProps<'button'>
 
 export function PrimaryButton({ className = '', ...rest }: ButtonProps) {
   return (

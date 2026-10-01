@@ -1,7 +1,9 @@
 import { Redirect, Route, Switch } from 'wouter'
 import { CatWindow, PrimaryButton, Screen } from './components/ui.tsx'
 import { SessionProvider, useSession } from './lib/session.tsx'
+import { TabBar } from './components/TabBar.tsx'
 import CardPreview from './pages/CardPreview.tsx'
+import Dex from './pages/Dex.tsx'
 import Home from './pages/Home.tsx'
 import Onboarding from './pages/onboarding/Onboarding.tsx'
 
@@ -30,7 +32,20 @@ function Gate() {
     <Switch>
       <Route path="/hello" component={Onboarding} />
       <Route path="/card" component={CardPreview} />
-      <Route path="/">{profile.onboarded ? <Home /> : <Redirect to="/hello" replace />}</Route>
+      <Route path="/dex">
+        <Dex />
+        <TabBar />
+      </Route>
+      <Route path="/">
+        {profile.onboarded ? (
+          <>
+            <Home />
+            <TabBar />
+          </>
+        ) : (
+          <Redirect to="/hello" replace />
+        )}
+      </Route>
       <Route>
         <Redirect to="/" replace />
       </Route>

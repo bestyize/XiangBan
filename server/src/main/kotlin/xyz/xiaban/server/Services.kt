@@ -31,6 +31,7 @@ import xyz.xiaban.server.stats.PercentileService
 import xyz.xiaban.server.stats.StatsService
 import xyz.xiaban.server.stats.TipsService
 import xyz.xiaban.server.traffic.TrafficRules
+import xyz.xiaban.server.unlocks.UnlockService
 import xyz.xiaban.server.users.ProfileService
 import xyz.xiaban.server.users.SessionService
 import xyz.xiaban.server.users.UserRepository
@@ -79,6 +80,7 @@ class Services(
     val memories = MemoryService(db)
     val checkinRepository = CheckinRepository(db)
     val stats = StatsService(checkinRepository, calendar)
+    val unlocks = UnlockService(db)
     val percentiles = PercentileService(redis, cities, config.percentileCityMin, config.percentileGlobalMin)
     val polisher = Polisher(
         checkins = checkinRepository,
@@ -105,6 +107,7 @@ class Services(
         tips = TipsService(weather, traffic, calendar, cities),
         percentiles = percentiles,
         views = CheckinViews(checkinRepository, percentiles, calendar),
+        unlocks = unlocks,
         clock = clock,
     )
 

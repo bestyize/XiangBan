@@ -68,6 +68,8 @@ data class CheckinView(
     val stats: CheckinStats,
     /** Set when the 下班日 falls in a statutory holiday, for the holiday card style. */
     val holiday: HolidayTag? = null,
+    /** Expressions this check-in unlocked; only filled in the check-in response itself. */
+    val newUnlocks: List<UnlockView> = emptyList(),
 )
 
 @Serializable
