@@ -16,4 +16,8 @@ object ApiPaths {
     const val GUARDIAN = "/api/guardian"
     const val GUARDIAN_PAUSE = "/api/guardian/pause"
     const val UNSUBSCRIBE = "/api/mail/unsubscribe"
+    const val ACCOUNT = "/api/account"
+    const val ACCOUNT_EXPORT = "/api/account/export"
+    const val CONSENT = "/api/consent"
+    const val EVENTS = "/api/events"
 }

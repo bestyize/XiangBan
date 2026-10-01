@@ -1,16 +1,34 @@
-import { Redirect, Route, Switch } from 'wouter'
-import { CatWindow, PrimaryButton, Screen } from './components/ui.tsx'
-import { SessionProvider, useSession } from './lib/session.tsx'
+import { useEffect } from 'react'
+import { Redirect, Route, Switch, useLocation } from 'wouter'
 import { TabBar } from './components/TabBar.tsx'
+import { CatWindow, PrimaryButton, Screen } from './components/ui.tsx'
+import { TERMS_VERSION } from './lib/consent.ts'
+import { SessionProvider, useSession } from './lib/session.tsx'
+import { track } from './lib/track.ts'
 import CardPreview from './pages/CardPreview.tsx'
+import ConsentScreen from './pages/ConsentScreen.tsx'
 import Dex from './pages/Dex.tsx'
 import Home from './pages/Home.tsx'
+import LegalPage from './pages/LegalPage.tsx'
 import GuardianPage from './pages/me/GuardianPage.tsx'
 import Me from './pages/me/Me.tsx'
+import ProfileEdit from './pages/me/ProfileEdit.tsx'
 import Onboarding from './pages/onboarding/Onboarding.tsx'
+
+function usePageViews() {
+  const [location] = useLocation()
+  useEffect(() => {
+    track('page_view', { path: location })
+  }, [location])
+}
 
 function Gate() {
   const { status, error, profile, retry } = useSession()
+  const [location] = useLocation()
+  usePageViews()
+
+  if (location === '/privacy') return <LegalPage doc="privacy" />
+  if (location === '/terms') return <LegalPage doc="terms" />
 
   if (status === 'loading') {
     return (
@@ -29,33 +47,19 @@ function Gate() {
       </Screen>
     )
   }
+  if (profile.onboarded && profile.termsVersion !== TERMS_VERSION) return <ConsentScreen />
+  if (!profile.onboarded && location !== '/hello') return <Redirect to="/hello" replace />
 
   return (
     <Switch>
       <Route path="/hello" component={Onboarding} />
       <Route path="/card" component={CardPreview} />
-      <Route path="/dex">
-        <Dex />
-        <TabBar />
-      </Route>
       <Route path="/me/guardian" component={GuardianPage} />
-      <Route path="/me">
-        <Me />
-        <TabBar />
-      </Route>
-      <Route path="/">
-        {profile.onboarded ? (
-          <>
-            <Home />
-            <TabBar />
-          </>
-        ) : (
-          <Redirect to="/hello" replace />
-        )}
-      </Route>
-      <Route>
-        <Redirect to="/" replace />
-      </Route>
+      <Route path="/me/profile" component={ProfileEdit} />
+      <Route path="/dex"><Dex /><TabBar /></Route>
+      <Route path="/me"><Me /><TabBar /></Route>
+      <Route path="/"><Home /><TabBar /></Route>
+      <Route><Redirect to="/" replace /></Route>
     </Switch>
   )
 }

@@ -28,6 +28,7 @@ class AccountMerge(private val db: Db) {
         c.execute("update memories set user_id = ? where user_id = ?", target, source)
         c.execute("update devices set user_id = ? where user_id = ?", target, source)
         c.execute("update copy_reports set user_id = ? where user_id = ?", target, source)
+        c.execute("update events set user_id = ? where user_id = ?", target, source)
         c.execute("update users set referred_by = ? where referred_by = ?", target, source)
         c.execute("delete from users where id = ?", source)
     }

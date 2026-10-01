@@ -44,6 +44,8 @@ data class ProfileView(
     /** Bound email, masked; null while the account is anonymous */
     val email: String?,
     val recallOptIn: Boolean,
+    /** Version of the terms the user accepted; ask again when it differs from the current one */
+    val termsVersion: String?,
     val onboarded: Boolean,
     val createdAt: Long,
 )

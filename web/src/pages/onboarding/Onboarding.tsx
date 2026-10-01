@@ -1,6 +1,10 @@
 import { useState } from 'react'
 import { useLocation } from 'wouter'
+import { api } from '../../api/client.ts'
 import type { ProfileUpdate } from '../../api/types.ts'
+import { ConsentChecks, consentComplete, type ConsentState } from '../../components/ConsentChecks.tsx'
+import { TERMS_VERSION } from '../../lib/consent.ts'
+import { track } from '../../lib/track.ts'
 import { Bubble, CatWindow, FieldError, PrimaryButton, QuietButton, Screen } from '../../components/ui.tsx'
 import { useMeta } from '../../lib/meta.ts'
 import { useProfile, useSession } from '../../lib/session.tsx'
@@ -40,15 +44,20 @@ export default function Onboarding() {
     workEnd: profile.workEnd,
   }))
 
+  const [consent, setConsent] = useState<ConsentState>({ terms: false, overseas: false })
   const step = STEPS[index]
   const isLast = index === STEPS.length - 1
 
-  async function advance(changes: ProfileUpdate, finish: boolean) {
+  async function advance(changes: ProfileUpdate, finish: boolean, skipped: boolean) {
     setSaving(true)
     setError(null)
     try {
+      if (step === 'hello') {
+        await api('/api/consent', { method: 'PUT', body: { termsVersion: TERMS_VERSION, overseas: consent.overseas } })
+      }
       const patch = finish ? { ...changes, onboarded: true } : changes
       if (Object.keys(patch).length > 0) await updateProfile(patch)
+      track('onboarding_step', { step, action: skipped ? 'skip' : 'next' })
       if (finish) navigate('/', { replace: true })
       else setIndex((i) => i + 1)
     } catch (e) {
@@ -59,6 +68,7 @@ export default function Onboarding() {
   }
 
   const nameInvalid = step === 'name' && [...draft.companionName.trim()].length < 2
+  const blocked = saving || nameInvalid || (step === 'hello' && !consentComplete(consent))
 
   return (
     <Screen>
@@ -68,7 +78,7 @@ export default function Onboarding() {
             <li key={s} className={`h-1.5 rounded-full transition-all ${i === index ? 'w-6 bg-lamp' : i < index ? 'w-1.5 bg-lamp/70' : 'w-1.5 bg-window/25'}`} />
           ))}
         </ol>
-        <QuietButton disabled={saving} onClick={() => advance({}, step === 'hello' || isLast)}>
+        <QuietButton disabled={saving || (step === 'hello' && !consentComplete(consent))} onClick={() => advance({}, step === 'hello' || isLast, true)}>
           {step === 'hello' ? '全部跳过' : '跳过'}
         </QuietButton>
       </div>
@@ -78,12 +88,13 @@ export default function Onboarding() {
         <Bubble className="mt-5">{stepLine(step, draft)}</Bubble>
         <div className="mt-6">
           <StepBody step={step} draft={draft} meta={meta} update={(patch) => setDraft((d) => ({ ...d, ...patch }))} />
+          {step === 'hello' && <div className="mt-5"><ConsentChecks value={consent} onChange={setConsent} /></div>}
           <FieldError message={error} />
         </div>
       </section>
 
       <div className="mt-6">
-        <PrimaryButton disabled={saving || nameInvalid} onClick={() => advance(changesFor(step, draft), isLast)}>
+        <PrimaryButton disabled={blocked} onClick={() => advance(changesFor(step, draft), isLast, false)}>
           {step === 'hello' ? '是我' : isLast ? '开始陪我下班' : '下一步'}
         </PrimaryButton>
       </div>

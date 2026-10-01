@@ -68,6 +68,7 @@ class ProfileService(private val users: UserRepository, private val cities: Citi
         inviteCode = user.inviteCode,
         email = user.email?.let(::maskEmail),
         recallOptIn = user.recallOptIn,
+        termsVersion = user.termsVersion,
         onboarded = user.onboardedAt != null,
         createdAt = user.createdAt.toEpochMilli(),
     )

@@ -15,6 +15,7 @@ export interface Profile {
   /** Masked; null while anonymous */
   email: string | null
   recallOptIn: boolean
+  termsVersion: string | null
   onboarded: boolean
   createdAt: number
 }

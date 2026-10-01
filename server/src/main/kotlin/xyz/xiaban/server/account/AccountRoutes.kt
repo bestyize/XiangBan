@@ -1,11 +1,17 @@
 package xyz.xiaban.server.account
 
 import io.ktor.http.ContentType
+import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.auth.authenticate
 import io.ktor.server.request.receive
+import io.ktor.server.response.header
 import io.ktor.server.response.respond
 import io.ktor.server.response.respondText
+import kotlinx.serialization.json.JsonObject
+import xyz.xiaban.server.http.AppJson
+import xyz.xiaban.shared.ConsentUpdate
+import xyz.xiaban.shared.EventBatch
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.delete
 import io.ktor.server.routing.get
@@ -49,11 +55,33 @@ fun Route.accountRoutes(services: Services) {
             val userId = call.userId()
             val view = services.guardian.set(userId, call.receive<GuardianUpdate>())
             services.unlocks.grant(userId, setOf("guardian"))
+            services.events.server(userId, "guardian_set", mapOf("days" to view.thresholdDays.toString()))
             call.respond(view)
         }
         put(ApiPaths.GUARDIAN_PAUSE) { call.respond(services.guardian.pause(call.userId(), call.receive<GuardianPause>().paused)) }
         delete(ApiPaths.GUARDIAN) {
             services.guardian.remove(call.userId())
+            call.respond(OkResponse())
+        }
+    }
+
+    authenticate(AUTH_USER) {
+        get(ApiPaths.ACCOUNT_EXPORT) {
+            call.response.header(HttpHeaders.ContentDisposition, "attachment; filename=\"xiaban-export.json\"")
+            call.respondText(AppJson.encodeToString(JsonObject.serializer(), services.account.export(call.userId())), ContentType.Application.Json)
+        }
+        delete(ApiPaths.ACCOUNT) {
+            services.account.delete(call.userId())
+            call.respond(OkResponse())
+        }
+        put(ApiPaths.CONSENT) {
+            val req = call.receive<ConsentUpdate>()
+            services.account.consent(call.userId(), req.termsVersion, req.overseas)
+            call.respond(services.profiles.view(call.userId()))
+        }
+        post(ApiPaths.EVENTS) {
+            val batch = call.receive<EventBatch>()
+            services.events.record(call.userId(), batch.events, call.request.headers[HttpHeaders.UserAgent])
             call.respond(OkResponse())
         }
     }

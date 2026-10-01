@@ -6,6 +6,7 @@ import { renderCard } from '../card/renderCard.ts'
 import { cardStyles } from '../card/styles.ts'
 import { FieldError, PrimaryButton, QuietButton, Screen } from '../components/ui.tsx'
 import { isWeChat, publicUrl } from '../lib/env.ts'
+import { track } from '../lib/track.ts'
 import { useProfile, useSession } from '../lib/session.tsx'
 
 interface CardImage {
@@ -41,6 +42,7 @@ export default function CardPreview() {
         if (cancelled) return
         const file = new File([blob], `下班卡-${checkin.workDay}.png`, { type: 'image/png' })
         setImage({ url: URL.createObjectURL(blob), file })
+        track('card_generate', { style: style.id, title: checkin.title.code })
       })
       .catch((e: Error) => setError(e.message))
     return () => {
@@ -99,11 +101,11 @@ export default function CardPreview() {
       {!wechat && image && (
         <div className="mt-auto flex gap-3 pt-6">
           {canShare && (
-            <PrimaryButton onClick={() => navigator.share({ files: [image.file], title: '下班了么', text: '你下班了么？' }).catch(() => undefined)}>
+            <PrimaryButton onClick={() => navigator.share({ files: [image.file], title: '下班了么', text: '你下班了么？' }).then(() => track('card_share', { via: 'web_share' })).catch(() => undefined)}>
               分享给朋友
             </PrimaryButton>
           )}
-          <a href={image.url} download={image.file.name}
+          <a href={image.url} download={image.file.name} onClick={() => track('card_save', { via: 'download' })}
             className={`grid w-full place-items-center rounded-full border-2 border-lamp px-6 py-3 font-bold ${canShare ? 'text-lamp' : 'bg-lamp text-ink'}`}>
             保存图片
           </a>

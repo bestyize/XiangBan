@@ -138,6 +138,8 @@ class Services(
     val unsubscribeLinks = UnsubscribeLinks(config.jwtSecret, config.publicBaseUrl)
     val recall = RecallJob(db, users, CopySelector(copyLibrary), mail, unsubscribeLinks, config.publicBaseUrl, clock)
     val emailBinding = EmailBinding(redis, users, profiles, tokens, AccountMerge(db), mail) { guardian.reschedule(it) }
+    val events = xyz.xiaban.server.events.EventService(db)
+    val account = xyz.xiaban.server.account.AccountService(db, profiles, guardian)
 
     /** Background work tied to the application lifecycle. */
     fun startWorkers(scope: CoroutineScope) {

@@ -29,6 +29,7 @@ data class User(
     /** Only set once verified */
     val email: String?,
     val recallOptIn: Boolean,
+    val termsVersion: String?,
 )
 
 /** Where a new account came from: the inviter's code and the entry point, both from the QR link. */
@@ -148,6 +149,7 @@ class UserRepository(private val db: Db) {
         showCityOnCard = rs.getBoolean("show_city_on_card"),
         email = rs.getString("email"),
         recallOptIn = rs.getBoolean("recall_opt_in"),
+        termsVersion = rs.getString("terms_version"),
     )
 
     companion object {
@@ -161,7 +163,8 @@ class UserRepository(private val db: Db) {
 
         private const val SELECT_USER = """
             select u.id, u.city_code, u.timezone, u.work_start, u.work_end, u.payday, u.onboarded_at, u.created_at,
-                   u.invite_code, u.show_city_on_card, u.email, u.recall_opt_in, c.name, c.personality, c.nickname
+                   u.invite_code, u.show_city_on_card, u.email, u.recall_opt_in, u.terms_version,
+                   c.name, c.personality, c.nickname
             from users u join companions c on c.user_id = u.id
         """
     }

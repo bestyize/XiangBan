@@ -21,8 +21,19 @@ import java.time.LocalDateTime
 fun Route.checkinRoutes(services: Services) {
     authenticate(AUTH_USER) {
         rateLimit(RateLimits.CHECKIN) {
-            post(ApiPaths.CHECKIN) { call.respond(services.checkins.checkIn(call.userId())) }
-            delete(ApiPaths.CHECKIN_TODAY) { call.respond(services.checkins.undo(call.userId())) }
+            post(ApiPaths.CHECKIN) {
+                val userId = call.userId()
+                val view = services.checkins.checkIn(userId)
+                services.events.server(userId, "checkin", mapOf("title" to view.title.code.code, "id" to view.id))
+                view.newUnlocks.forEach { services.events.server(userId, "unlock", mapOf("id" to it.id)) }
+                call.respond(view)
+            }
+            delete(ApiPaths.CHECKIN_TODAY) {
+                val userId = call.userId()
+                val today = services.checkins.undo(userId)
+                services.events.server(userId, "checkin_undo")
+                call.respond(today)
+            }
         }
         get(ApiPaths.CHECKIN_TODAY) {
             val wait = call.request.queryParameters["wait"]?.toLongOrNull() ?: 0

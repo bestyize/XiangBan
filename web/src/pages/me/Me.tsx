@@ -5,7 +5,11 @@ import type { Profile } from '../../api/types.ts'
 import { TAB_BAR_SPACE } from '../../components/TabBar.tsx'
 import { FieldError, Screen } from '../../components/ui.tsx'
 import { useProfile, useSession } from '../../lib/session.tsx'
+import { AccountActions } from './AccountActions.tsx'
 import { EmailBind } from './EmailBind.tsx'
+import { MeStats } from './MeStats.tsx'
+
+const personalityName = { toxic: '毒舌心软', gentle: '温柔治愈', chatty: '元气话痨', tsundere: '高冷傲娇' } as const
 
 export function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
@@ -45,6 +49,17 @@ export default function Me() {
       <div style={{ paddingBottom: TAB_BAR_SPACE }}>
         <h1 className="pt-2 font-display text-4xl text-lamp">我的</h1>
 
+        <Section title="统计">
+          <MeStats companionName={profile.companionName} />
+        </Section>
+
+        <Section title="小伴档案">
+          <RowLink href="/me/profile" label={`${profile.companionName}，${personalityName[profile.personality]}`} detail="修改" />
+          <p className="mt-1 text-sm text-window/60">
+            {profile.workStart}–{profile.workEnd}{profile.cityName ? `，${profile.cityName}` : ''}{profile.payday ? `，每月 ${profile.payday} 号发薪` : ''}
+          </p>
+        </Section>
+
         <Section title="账号">
           {profile.email ? (
             <p className="text-window">
@@ -71,6 +86,14 @@ export default function Me() {
           </label>
           {!profile.email && <p className="mt-2 text-xs text-window/50">绑定邮箱后才能打开。</p>}
           <FieldError message={error} />
+        </Section>
+
+        <Section title="隐私">
+          <RowLink href="/privacy" label="隐私政策" detail="查看" />
+          <RowLink href="/terms" label="用户协议" detail="查看" />
+          <div className="mt-2 border-t border-window/10 pt-2">
+            <AccountActions />
+          </div>
         </Section>
       </div>
     </Screen>

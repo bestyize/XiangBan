@@ -1,13 +1,19 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { api } from '../../api/client.ts'
 import type { Checkin } from '../../api/types.ts'
 import { Bubble, QuietButton } from '../../components/ui.tsx'
+import { track } from '../../lib/track.ts'
 
 type ReportState = 'idle' | 'confirm' | 'sending' | 'done' | 'error'
 
 export function ReplyBubble({ checkin }: { checkin: Checkin }) {
   const [report, setReport] = useState<ReportState>('idle')
   const [message, setMessage] = useState<string | null>(null)
+
+  // One event per line actually shown, so each line's share rate can be measured (PRD 10).
+  useEffect(() => {
+    if (!checkin.reply.pending) track('reply_shown', { checkin: checkin.id, source: checkin.reply.source })
+  }, [checkin.id, checkin.reply.source, checkin.reply.pending])
 
   async function send() {
     setReport('sending')
