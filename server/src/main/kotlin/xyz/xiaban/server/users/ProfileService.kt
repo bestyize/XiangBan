@@ -41,6 +41,8 @@ class ProfileService(private val users: UserRepository, private val cities: Citi
             cityCode = req.cityCode?.also { if (cities.find(it) == null) badRequest("没有这个城市", "invalid_city") },
             workStart = req.workStart?.let(::parseTime),
             workEnd = req.workEnd?.let(::parseTime),
+            paydayChanged = req.payday != null,
+            payday = req.payday?.takeIf { it != 0 }?.also { if (it !in 1..31) badRequest("发薪日是每月 1–31 号", "invalid_payday") },
             markOnboarded = req.onboarded == true,
         )
         users.update(userId, changes)
@@ -56,6 +58,7 @@ class ProfileService(private val users: UserRepository, private val cities: Citi
         timezone = user.timezone.id,
         workStart = user.workStart.format(HHMM),
         workEnd = user.workEnd.format(HHMM),
+        payday = user.payday,
         onboarded = user.onboardedAt != null,
         createdAt = user.createdAt.toEpochMilli(),
     )

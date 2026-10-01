@@ -28,6 +28,10 @@ fun Route.checkinRoutes(services: Services) {
             val wait = call.request.queryParameters["wait"]?.toLongOrNull() ?: 0
             call.respond(services.checkins.today(call.userId(), wait))
         }
+        get(ApiPaths.STATS) {
+            val user = services.profiles.user(call.userId())
+            call.respond(services.stats.snapshot(user, services.clock.instant()).toView())
+        }
         post(ApiPaths.REPORTS) {
             val userId = call.userId()
             val req = call.receive<ReportRequest>()

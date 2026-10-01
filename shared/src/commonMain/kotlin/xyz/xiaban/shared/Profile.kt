@@ -29,11 +29,13 @@ data class ProfileView(
     val workStart: String,
     /** "HH:mm" */
     val workEnd: String,
+    /** Day of month the salary arrives, for the payday countdown */
+    val payday: Int?,
     val onboarded: Boolean,
     val createdAt: Long,
 )
 
-/** Omitted fields stay unchanged; an empty [nickname] clears it. */
+/** Omitted fields stay unchanged; an empty [nickname] or a [payday] of 0 clears it. */
 @Serializable
 data class ProfileUpdate(
     val companionName: String? = null,
@@ -42,6 +44,7 @@ data class ProfileUpdate(
     val cityCode: String? = null,
     val workStart: String? = null,
     val workEnd: String? = null,
+    val payday: Int? = null,
     val onboarded: Boolean? = null,
 )
 

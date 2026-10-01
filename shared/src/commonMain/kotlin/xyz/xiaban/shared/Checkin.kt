@@ -65,6 +65,7 @@ data class CheckinView(
     val careMode: Boolean,
     /** Epoch millis until which the check-in can be undone; null once that is no longer possible. */
     val undoUntil: Long?,
+    val stats: CheckinStats,
 )
 
 @Serializable
@@ -82,4 +83,6 @@ data class TodayResponse(
     val checkin: CheckinView?,
     /** Shown before checking in. */
     val greeting: GreetingView? = null,
+    /** Practical info for tonight, once checked in. */
+    val tips: List<TipView> = emptyList(),
 )

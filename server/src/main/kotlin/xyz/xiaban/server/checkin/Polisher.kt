@@ -11,6 +11,8 @@ import xyz.xiaban.server.memory.MemoryService
 import xyz.xiaban.server.meta.Cities
 import xyz.xiaban.server.users.HHMM
 import xyz.xiaban.server.users.ProfileService
+import xyz.xiaban.server.weather.WeatherInsights
+import xyz.xiaban.server.weather.WeatherService
 import java.time.Clock
 import java.time.Duration
 import java.time.LocalDateTime
@@ -25,6 +27,7 @@ class Polisher(
     private val flags: FeatureFlags,
     private val quota: LlmQuota,
     private val queue: PolishQueue,
+    private val weather: WeatherService,
     private val clock: Clock,
 ) {
     /** Returns true when a rewrite has been queued for this fresh check-in. */
@@ -44,6 +47,8 @@ class Polisher(
         if (clock.millis() - enqueuedAt > STALE_MS) return
         val row = checkins.find(checkinId)?.takeIf { it.revokedAt == null } ?: return
         val user = profiles.user(row.userId)
+        val city = cities.find(user.cityCode)?.takeIf { it.lat != null }
+        val forecast = city?.let { weather.cached(it) }
         val rewritten = service.polish(
             PolishInput(
                 original = row.libraryReply,
@@ -52,8 +57,8 @@ class Polisher(
                 nickname = user.nickname,
                 titleLabel = row.title.label,
                 localTime = LocalDateTime.ofInstant(row.checkedAt, user.timezone).format(HHMM),
-                cityName = cities.find(user.cityCode)?.takeIf { it.lat != null }?.name,
-                weather = null,
+                cityName = city?.name,
+                weather = forecast?.let { WeatherInsights.summary(it, clock.instant(), user.timezone) },
                 memories = memories.recent(user.id),
             ),
         )

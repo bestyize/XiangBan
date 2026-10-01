@@ -36,9 +36,10 @@ object TestEnv {
 
     val clock = MutableClock()
     val llm = FakeLlm()
+    val weather = FakeWeather()
     const val ADMIN_TOKEN = "test-admin-token"
 
-    private val shared: Services by lazy { Services.create(config, clock, listOf(llm)) }
+    private val shared: Services by lazy { Services.create(config, clock, listOf(llm), weather) }
 
     /** Returns services backed by an emptied database and Redis, with the clock reset to now. */
     fun services(): Services {
@@ -49,6 +50,7 @@ object TestEnv {
         }
         clock.now = java.time.Instant.now()
         llm.reset()
+        weather.reset()
         reset(shared)
         return shared
     }

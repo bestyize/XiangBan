@@ -1,14 +1,16 @@
 import { useEffect, useState } from 'react'
-import type { Checkin } from '../../api/types.ts'
+import type { Checkin, Tip } from '../../api/types.ts'
 import { moodFace, moodLabel } from '../../cat/moods.ts'
 import { CatWindow, FieldError, QuietButton } from '../../components/ui.tsx'
 import { useProfile } from '../../lib/session.tsx'
 import { countdown } from '../../lib/time.ts'
 import { titleTheme } from '../../lib/titleTheme.ts'
 import { ReplyBubble } from './ReplyBubble.tsx'
+import { TonightInfo } from './TonightInfo.tsx'
 
 interface ResultViewProps {
   checkin: Checkin
+  tips: Tip[] | null
   fresh: boolean
   busy: boolean
   error: string | null
@@ -25,7 +27,7 @@ function useUndoLeft(until: number | null) {
   return until ? left : 0
 }
 
-export function ResultView({ checkin, fresh, busy, error, onUndo }: ResultViewProps) {
+export function ResultView({ checkin, tips, fresh, busy, error, onUndo }: ResultViewProps) {
   const profile = useProfile()
   const theme = titleTheme[checkin.title.code]
   const undoLeft = useUndoLeft(checkin.undoUntil)
@@ -52,6 +54,7 @@ export function ResultView({ checkin, fresh, busy, error, onUndo }: ResultViewPr
       </section>
 
       <ReplyBubble checkin={checkin} />
+      <TonightInfo checkin={checkin} tips={tips} />
 
       <div className="mt-auto pt-10 text-center">
         {undoLeft > 0 && (

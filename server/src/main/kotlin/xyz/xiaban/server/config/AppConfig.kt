@@ -24,6 +24,12 @@ data class AppConfig(
     val llm: LlmConfig,
     /** Enables /api/admin when set. */
     val adminToken: String?,
+    /** 和风天气 API Host and key; weather tips are skipped when either is missing. */
+    val qweatherHost: String?,
+    val qweatherKey: String?,
+    /** Average daily sample needed before showing a city-level or site-wide percentile (PRD 5.6). */
+    val percentileCityMin: Int,
+    val percentileGlobalMin: Int,
 ) {
     val isProd: Boolean get() = env == "prod"
 
@@ -54,6 +60,10 @@ data class AppConfig(
                     timeoutMs = env.int("LLM_TIMEOUT_MS", 3000).toLong(),
                 ),
                 adminToken = env.optional("ADMIN_TOKEN"),
+                qweatherHost = env.optional("QWEATHER_API_HOST"),
+                qweatherKey = env.optional("QWEATHER_API_KEY"),
+                percentileCityMin = env.int("PERCENTILE_CITY_MIN", 100),
+                percentileGlobalMin = env.int("PERCENTILE_GLOBAL_MIN", 50),
             )
         }
 

@@ -45,6 +45,10 @@ class HolidayCalendar(holidays: List<Holiday>, private val coveredYears: Set<Int
         return null
     }
 
+    /** The next holiday starting strictly after [from] and at most [days] days away. */
+    fun nextHolidayStart(from: LocalDate, days: Long): Holiday? =
+        (1..days).map { from.plusDays(it) }.firstNotNullOfOrNull { d -> holidayDays[d]?.takeIf { it.start == d } }
+
     /** First make-up workday strictly after [from] and at most [days] days away. */
     fun nextMakeupDay(from: LocalDate, days: Long): LocalDate? =
         (1..days).map { from.plusDays(it) }.firstOrNull { it in makeupDays }

@@ -5,7 +5,7 @@ import { ResultView } from './home/ResultView.tsx'
 import { useToday } from './home/useToday.ts'
 
 export default function Home() {
-  const { status, today, error, busy, fresh, checkIn, undo, reload } = useToday()
+  const { status, today, tips, error, busy, fresh, checkIn, undo, reload } = useToday()
 
   return (
     <Screen>
@@ -22,7 +22,7 @@ export default function Home() {
         </div>
       )}
       {status === 'ready' && today && (today.checkin ? (
-        <ResultView checkin={today.checkin} fresh={fresh} busy={busy} error={error} onUndo={undo} />
+        <ResultView checkin={today.checkin} tips={tips} fresh={fresh} busy={busy} error={error} onUndo={undo} />
       ) : (
         <IdleView greeting={today.greeting} busy={busy} error={error} onCheckIn={checkIn} />
       ))}

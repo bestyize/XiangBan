@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api } from '../../api/client.ts'
-import type { Checkin, TodayResponse } from '../../api/types.ts'
+import type { Checkin, Tip, TodayResponse } from '../../api/types.ts'
 
 type Status = 'loading' | 'ready' | 'error'
 
@@ -10,17 +10,23 @@ const POLISH_WAIT_MS = 3000
 export function useToday() {
   const [status, setStatus] = useState<Status>('loading')
   const [today, setToday] = useState<TodayResponse | null>(null)
+  /** null while the practical info is still on its way */
+  const [tips, setTips] = useState<Tip[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   /** True only right after tapping the button, so the stamp animation does not replay on reload. */
   const [fresh, setFresh] = useState(false)
 
-  const awaitPolish = useCallback(async (checkinId: string) => {
+  /** Second request after check-in: tips (weather may be slow) and, if pending, the model rewrite. */
+  const fillIn = useCallback(async (checkin: Checkin) => {
     try {
-      const next = await api<TodayResponse>(`/api/checkin/today?wait=${POLISH_WAIT_MS}`)
-      setToday((prev) => (prev?.checkin?.id === checkinId && next.checkin?.id === checkinId ? next : prev))
+      const wait = checkin.reply.pending ? `?wait=${POLISH_WAIT_MS}` : ''
+      const next = await api<TodayResponse>(`/api/checkin/today${wait}`)
+      if (next.checkin?.id !== checkin.id) return
+      setToday((prev) => (prev?.checkin?.id === checkin.id ? next : prev))
+      setTips(next.tips)
     } catch {
-      // Keep showing the library line.
+      setTips([])
     }
   }, [])
 
@@ -28,13 +34,14 @@ export function useToday() {
     try {
       const next = await api<TodayResponse>('/api/checkin/today')
       setToday(next)
+      setTips(next.tips)
       setStatus('ready')
-      if (next.checkin?.reply.pending) void awaitPolish(next.checkin.id)
+      if (next.checkin?.reply.pending) void fillIn(next.checkin)
     } catch (e) {
       setError((e as Error).message)
       setStatus('error')
     }
-  }, [awaitPolish])
+  }, [fillIn])
 
   useEffect(() => {
     void load()
@@ -46,14 +53,15 @@ export function useToday() {
     try {
       const checkin = await api<Checkin>('/api/checkin', { method: 'POST' })
       setFresh(true)
-      setToday({ workDay: checkin.workDay, checkin, greeting: null })
-      if (checkin.reply.pending) void awaitPolish(checkin.id)
+      setTips(null)
+      setToday({ workDay: checkin.workDay, checkin, greeting: null, tips: [] })
+      void fillIn(checkin)
     } catch (e) {
       setError((e as Error).message)
     } finally {
       setBusy(false)
     }
-  }, [awaitPolish])
+  }, [fillIn])
 
   const undo = useCallback(async () => {
     setBusy(true)
@@ -69,5 +77,5 @@ export function useToday() {
     }
   }, [load])
 
-  return { status, today, error, busy, fresh, checkIn, undo, reload: load }
+  return { status, today, tips, error, busy, fresh, checkIn, undo, reload: load }
 }

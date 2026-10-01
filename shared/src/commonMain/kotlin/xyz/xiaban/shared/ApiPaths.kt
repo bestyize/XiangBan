@@ -8,4 +8,5 @@ object ApiPaths {
     const val CHECKIN = "/api/checkin"
     const val CHECKIN_TODAY = "/api/checkin/today"
     const val REPORTS = "/api/reports"
+    const val STATS = "/api/stats"
 }

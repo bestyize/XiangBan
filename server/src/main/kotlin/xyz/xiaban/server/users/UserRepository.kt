@@ -3,6 +3,7 @@ package xyz.xiaban.server.users
 import xyz.xiaban.server.db.Db
 import xyz.xiaban.server.db.execute
 import xyz.xiaban.server.db.instant
+import xyz.xiaban.server.db.intOrNull
 import xyz.xiaban.server.db.localTime
 import xyz.xiaban.server.db.queryOne
 import xyz.xiaban.shared.Personality
@@ -22,6 +23,7 @@ data class User(
     val companionName: String,
     val personality: Personality,
     val nickname: String?,
+    val payday: Int?,
 )
 
 data class ProfileChanges(
@@ -32,6 +34,8 @@ data class ProfileChanges(
     val cityCode: String? = null,
     val workStart: LocalTime? = null,
     val workEnd: LocalTime? = null,
+    val paydayChanged: Boolean = false,
+    val payday: Int? = null,
     val markOnboarded: Boolean = false,
 )
 
@@ -75,6 +79,7 @@ class UserRepository(private val db: Db) {
             changes.cityCode?.let { add("city_code = ?" to it) }
             changes.workStart?.let { add("work_start = ?" to it) }
             changes.workEnd?.let { add("work_end = ?" to it) }
+            if (changes.paydayChanged) add("payday = ?" to changes.payday)
             if (changes.markOnboarded) add("onboarded_at = coalesce(onboarded_at, now())" to null)
         }
         val companionSets = buildList {
@@ -105,13 +110,14 @@ class UserRepository(private val db: Db) {
         companionName = rs.getString("name"),
         personality = personalityOf(rs.getString("personality")),
         nickname = rs.getString("nickname"),
+        payday = rs.intOrNull("payday"),
     )
 
     companion object {
         val DEFAULT_ZONE: ZoneId = ZoneId.of("Asia/Shanghai")
 
         private const val SELECT_USER = """
-            select u.id, u.city_code, u.timezone, u.work_start, u.work_end, u.onboarded_at, u.created_at,
+            select u.id, u.city_code, u.timezone, u.work_start, u.work_end, u.payday, u.onboarded_at, u.created_at,
                    c.name, c.personality, c.nickname
             from users u join companions c on c.user_id = u.id
         """

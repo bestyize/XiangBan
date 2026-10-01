@@ -9,6 +9,7 @@ export interface Profile {
   timezone: string
   workStart: string
   workEnd: string
+  payday: number | null
   onboarded: boolean
   createdAt: number
 }
@@ -21,6 +22,8 @@ export interface ProfileUpdate {
   cityCode?: string
   workStart?: string
   workEnd?: string
+  /** 0 clears it. */
+  payday?: number
   onboarded?: boolean
 }
 
@@ -79,6 +82,39 @@ export interface Checkin {
   reply: ReplyView
   careMode: boolean
   undoUntil: number | null
+  stats: CheckinStats
+}
+
+export interface Percentile {
+  percent: number
+  scope: 'city' | 'all'
+  cityName: string | null
+}
+
+export interface CheckinStats {
+  streak: number
+  totalDays: number
+  percentile: Percentile | null
+}
+
+export type TipKind = 'rain' | 'cold' | 'traffic' | 'holiday' | 'makeup' | 'morning' | 'duty' | 'week' | 'month' | 'payday'
+
+export interface Tip {
+  kind: TipKind
+  text: string
+}
+
+export interface Stats {
+  totalDays: number
+  currentStreak: number
+  lastStreak: number | null
+  bestStreak: number
+  todayOnDutyMinutes: number | null
+  weekAvgOffTime: string | null
+  weekCount: number
+  monthOvertimeMinutes: number
+  monthCount: number
+  titleCounts: Partial<Record<TitleCode, number>>
 }
 
 export interface Greeting {
@@ -91,4 +127,5 @@ export interface TodayResponse {
   workDay: string
   checkin: Checkin | null
   greeting: Greeting | null
+  tips: Tip[]
 }

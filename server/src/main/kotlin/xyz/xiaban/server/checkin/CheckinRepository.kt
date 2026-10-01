@@ -94,6 +94,11 @@ class CheckinRepository(private val db: Db) {
         c.execute("update checkins set revoked_at = ? where id = ? and revoked_at is null", at, id) == 1
     }
 
+    /** Every active check-in, newest first. */
+    suspend fun allActive(userId: Long): List<CheckinRow> = db.read { c ->
+        c.query("$SELECT where user_id = ? and revoked_at is null order by work_day desc", userId, map = ::map)
+    }
+
     /** Active check-ins from [since] on, newest first. */
     suspend fun since(userId: Long, since: LocalDate): List<CheckinRow> = db.read { c ->
         c.query("$SELECT where user_id = ? and work_day >= ? and revoked_at is null order by work_day desc", userId, since, map = ::map)
