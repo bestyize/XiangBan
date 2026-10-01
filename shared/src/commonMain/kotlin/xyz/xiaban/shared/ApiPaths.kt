@@ -10,4 +10,10 @@ object ApiPaths {
     const val REPORTS = "/api/reports"
     const val STATS = "/api/stats"
     const val UNLOCKS = "/api/unlocks"
+    const val BIND_CODE = "/api/account/bind/code"
+    const val BIND = "/api/account/bind"
+    const val SUBSCRIPTION = "/api/subscription"
+    const val GUARDIAN = "/api/guardian"
+    const val GUARDIAN_PAUSE = "/api/guardian/pause"
+    const val UNSUBSCRIBE = "/api/mail/unsubscribe"
 }

@@ -1,5 +1,7 @@
 package xyz.xiaban.server.config
 
+import xyz.xiaban.server.mail.SmtpConfig
+
 data class DbConfig(val url: String, val user: String, val password: String, val poolSize: Int)
 
 /** An OpenAI-compatible chat endpoint, e.g. 豆包 (Volcengine Ark) or 通义千问 (DashScope compatible mode). */
@@ -30,6 +32,8 @@ data class AppConfig(
     /** Average daily sample needed before showing a city-level or site-wide percentile (PRD 5.6). */
     val percentileCityMin: Int,
     val percentileGlobalMin: Int,
+    /** Outgoing mail; without it mail is only logged, which is not acceptable in production. */
+    val smtp: SmtpConfig?,
 ) {
     val isProd: Boolean get() = env == "prod"
 
@@ -64,6 +68,17 @@ data class AppConfig(
                 qweatherKey = env.optional("QWEATHER_API_KEY"),
                 percentileCityMin = env.int("PERCENTILE_CITY_MIN", 100),
                 percentileGlobalMin = env.int("PERCENTILE_GLOBAL_MIN", 50),
+                smtp = env.optional("SMTP_HOST")?.let { host ->
+                    SmtpConfig(
+                        host = host,
+                        port = env.int("SMTP_PORT", 465),
+                        user = env.str("SMTP_USER", ""),
+                        password = env.str("SMTP_PASSWORD", ""),
+                        from = env.optional("SMTP_FROM") ?: error("SMTP_FROM is required with SMTP_HOST"),
+                        fromName = env.str("SMTP_FROM_NAME", "下班了么"),
+                        ssl = env.bool("SMTP_SSL", true),
+                    )
+                },
             )
         }
 

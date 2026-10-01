@@ -3,6 +3,7 @@ import { Link, useLocation } from 'wouter'
 const TABS = [
   { href: '/', label: '下班' },
   { href: '/dex', label: '图鉴' },
+  { href: '/me', label: '我的' },
 ] as const
 
 export function TabBar() {

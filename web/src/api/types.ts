@@ -12,8 +12,36 @@ export interface Profile {
   payday: number | null
   showCityOnCard: boolean
   inviteCode: string
+  /** Masked; null while anonymous */
+  email: string | null
+  recallOptIn: boolean
   onboarded: boolean
   createdAt: number
+}
+
+export interface BindResponse {
+  token: string
+  merged: boolean
+  profile: Profile
+}
+
+export interface Guardian {
+  contactName: string
+  contactEmailMasked: string
+  selfName: string
+  thresholdDays: number
+  paused: boolean
+  nextRemindAt: number | null
+  nextNotifyAt: number | null
+}
+
+export interface GuardianUpdate {
+  contactName: string
+  contactEmail: string
+  selfName: string
+  thresholdDays: number
+  consent: boolean
+  informedContact: boolean
 }
 
 export interface ProfileUpdate {

@@ -41,6 +41,9 @@ data class ProfileView(
     val showCityOnCard: Boolean,
     /** Goes into the share-card QR link instead of the user id. */
     val inviteCode: String,
+    /** Bound email, masked; null while the account is anonymous */
+    val email: String?,
+    val recallOptIn: Boolean,
     val onboarded: Boolean,
     val createdAt: Long,
 )

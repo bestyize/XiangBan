@@ -7,6 +7,8 @@ import xyz.xiaban.server.Services
 import xyz.xiaban.server.config.AppConfig
 import xyz.xiaban.server.db.execute
 import xyz.xiaban.server.db.query
+import xyz.xiaban.server.mail.LogMailer
+import xyz.xiaban.server.mail.Mail
 import java.net.InetSocketAddress
 import java.net.Socket
 import java.net.URI
@@ -37,9 +39,22 @@ object TestEnv {
     val clock = MutableClock()
     val llm = FakeLlm()
     val weather = FakeWeather()
+    val mailer = LogMailer()
     const val ADMIN_TOKEN = "test-admin-token"
 
-    private val shared: Services by lazy { Services.create(config, clock, listOf(llm), weather) }
+    private val shared: Services by lazy { Services.create(config, clock, listOf(llm), weather, mailer) }
+
+    /** Waits for the mail worker to deliver a matching message. */
+    fun awaitMail(timeoutMs: Long = 5_000, predicate: (Mail) -> Boolean): Mail {
+        val end = System.currentTimeMillis() + timeoutMs
+        while (System.currentTimeMillis() < end) {
+            synchronized(mailer.sent) { mailer.sent.firstOrNull(predicate) }?.let { return it }
+            Thread.sleep(50)
+        }
+        error("no matching mail within $timeoutMs ms; sent: ${synchronized(mailer.sent) { mailer.sent.map { it.subject } }}")
+    }
+
+    fun sentMails(predicate: (Mail) -> Boolean): List<Mail> = synchronized(mailer.sent) { mailer.sent.filter(predicate) }
 
     /** Returns services backed by an emptied database and Redis, with the clock reset to now. */
     fun services(): Services {
@@ -51,6 +66,7 @@ object TestEnv {
         clock.now = java.time.Instant.now()
         llm.reset()
         weather.reset()
+        synchronized(mailer.sent) { mailer.sent.clear() }
         reset(shared)
         return shared
     }

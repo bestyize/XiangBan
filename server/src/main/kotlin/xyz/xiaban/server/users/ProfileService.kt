@@ -1,7 +1,9 @@
 package xyz.xiaban.server.users
 
+import io.ktor.http.HttpStatusCode
+import xyz.xiaban.server.http.ApiException
 import xyz.xiaban.server.http.badRequest
-import xyz.xiaban.server.http.notFound
+import xyz.xiaban.server.mail.maskEmail
 import xyz.xiaban.server.meta.Cities
 import xyz.xiaban.shared.MetaResponse
 import xyz.xiaban.shared.Personality
@@ -28,7 +30,9 @@ class ProfileService(private val users: UserRepository, private val cities: Citi
 
     fun meta(): MetaResponse = meta
 
-    suspend fun user(userId: Long): User = users.find(userId) ?: notFound("找不到这个账号", "user_not_found")
+    /** A token whose account was merged away or deleted answers 401, so the client starts over from its device. */
+    suspend fun user(userId: Long): User = users.find(userId)
+        ?: throw ApiException(HttpStatusCode.Unauthorized, "unauthorized", "登录状态过期了，刷新一下页面")
 
     suspend fun view(userId: Long): ProfileView = toView(user(userId))
 
@@ -62,6 +66,8 @@ class ProfileService(private val users: UserRepository, private val cities: Citi
         payday = user.payday,
         showCityOnCard = user.showCityOnCard,
         inviteCode = user.inviteCode,
+        email = user.email?.let(::maskEmail),
+        recallOptIn = user.recallOptIn,
         onboarded = user.onboardedAt != null,
         createdAt = user.createdAt.toEpochMilli(),
     )

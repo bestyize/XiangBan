@@ -26,6 +26,9 @@ data class User(
     val payday: Int?,
     val inviteCode: String,
     val showCityOnCard: Boolean,
+    /** Only set once verified */
+    val email: String?,
+    val recallOptIn: Boolean,
 )
 
 /** Where a new account came from: the inviter's code and the entry point, both from the QR link. */
@@ -82,6 +85,23 @@ class UserRepository(private val db: Db) {
 
     suspend fun find(userId: Long): User? = db.read { c -> c.queryOne("$SELECT_USER where u.id = ?", userId, map = ::mapUser) }
 
+    suspend fun findIdByEmail(email: String): Long? = db.read { c ->
+        c.queryOne("select id from users where email = ?", email) { it.getLong(1) }
+    }
+
+    suspend fun setEmail(userId: Long, email: String) = db.read { c ->
+        c.execute("update users set email = ?, email_verified_at = now() where id = ?", email, userId)
+    }
+
+    suspend fun setRecallOptIn(userId: Long, enabled: Boolean) = db.read { c ->
+        c.execute("update users set recall_opt_in = ?, recall_count = 0 where id = ?", enabled, userId)
+    }
+
+    /** A check-in ends the lapse, so the next one may again get up to two reminders. */
+    suspend fun resetRecall(userId: Long) = db.read { c ->
+        c.execute("update users set recall_count = 0 where id = ? and recall_count <> 0", userId)
+    }
+
     suspend fun setTimezone(userId: Long, timezone: String) = db.read { c ->
         c.execute("update users set timezone = ? where id = ? and timezone <> ?", timezone, userId, timezone)
     }
@@ -126,6 +146,8 @@ class UserRepository(private val db: Db) {
         payday = rs.intOrNull("payday"),
         inviteCode = rs.getString("invite_code"),
         showCityOnCard = rs.getBoolean("show_city_on_card"),
+        email = rs.getString("email"),
+        recallOptIn = rs.getBoolean("recall_opt_in"),
     )
 
     companion object {
@@ -139,7 +161,7 @@ class UserRepository(private val db: Db) {
 
         private const val SELECT_USER = """
             select u.id, u.city_code, u.timezone, u.work_start, u.work_end, u.payday, u.onboarded_at, u.created_at,
-                   u.invite_code, u.show_city_on_card, c.name, c.personality, c.nickname
+                   u.invite_code, u.show_city_on_card, u.email, u.recall_opt_in, c.name, c.personality, c.nickname
             from users u join companions c on c.user_id = u.id
         """
     }

@@ -84,6 +84,12 @@ class CheckinRepository(private val db: Db) {
         ) { it.getObject(1, LocalDate::class.java) }
     }
 
+    suspend fun latestDay(userId: Long): LocalDate? = db.read { c ->
+        c.queryOne("select max(work_day) from checkins where user_id = ? and revoked_at is null", userId) {
+            it.getObject(1, LocalDate::class.java)
+        }
+    }
+
     suspend fun isFirst(userId: Long, id: Long): Boolean = db.read { c ->
         c.queryOne("select not exists (select 1 from checkins where user_id = ? and id <> ? and revoked_at is null)", userId, id) {
             it.getBoolean(1)

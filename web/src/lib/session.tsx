@@ -12,6 +12,9 @@ interface SessionValue {
   profile: Profile | null
   retry: () => void
   updateProfile: (patch: ProfileUpdate) => Promise<Profile>
+  /** After binding an email, possibly into another account: adopt its token and profile. */
+  adopt: (token: string, profile: Profile) => void
+  setProfile: (profile: Profile) => void
 }
 
 const SessionContext = createContext<SessionValue | null>(null)
@@ -76,9 +79,14 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     return next
   }, [])
 
+  const adopt = useCallback((token: string, next: Profile) => {
+    setToken(token)
+    setProfile(next)
+  }, [])
+
   const value = useMemo(
-    () => ({ status, error, profile, retry, updateProfile }),
-    [status, error, profile, retry, updateProfile],
+    () => ({ status, error, profile, retry, updateProfile, adopt, setProfile }),
+    [status, error, profile, retry, updateProfile, adopt],
   )
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>
 }

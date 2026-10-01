@@ -5,6 +5,7 @@ import io.ktor.server.application.ApplicationStopped
 import io.ktor.server.engine.embeddedServer
 import io.ktor.server.netty.Netty
 import io.ktor.server.routing.routing
+import xyz.xiaban.server.account.accountRoutes
 import xyz.xiaban.server.admin.adminRoutes
 import xyz.xiaban.server.auth.installAuth
 import xyz.xiaban.server.checkin.checkinRoutes
@@ -31,7 +32,8 @@ fun Application.xiaban(services: Services) {
         healthRoutes(services)
         userRoutes(services)
         checkinRoutes(services)
+        accountRoutes(services)
         adminRoutes(services)
     }
-    services.polisher.start(this)
+    services.startWorkers(this)
 }

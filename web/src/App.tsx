@@ -5,6 +5,8 @@ import { TabBar } from './components/TabBar.tsx'
 import CardPreview from './pages/CardPreview.tsx'
 import Dex from './pages/Dex.tsx'
 import Home from './pages/Home.tsx'
+import GuardianPage from './pages/me/GuardianPage.tsx'
+import Me from './pages/me/Me.tsx'
 import Onboarding from './pages/onboarding/Onboarding.tsx'
 
 function Gate() {
@@ -34,6 +36,11 @@ function Gate() {
       <Route path="/card" component={CardPreview} />
       <Route path="/dex">
         <Dex />
+        <TabBar />
+      </Route>
+      <Route path="/me/guardian" component={GuardianPage} />
+      <Route path="/me">
+        <Me />
         <TabBar />
       </Route>
       <Route path="/">

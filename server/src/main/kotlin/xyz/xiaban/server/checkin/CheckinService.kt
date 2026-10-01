@@ -40,6 +40,8 @@ class CheckinService(
     private val views: CheckinViews,
     private val unlocks: UnlockService,
     private val clock: Clock,
+    /** Runs after a check-in or an undo: the guardian deadline and recall count depend on it. */
+    private val afterChange: suspend (userId: Long) -> Unit = {},
 ) {
     suspend fun checkIn(userId: Long): CheckinView {
         val user = profiles.user(userId)
@@ -61,6 +63,7 @@ class CheckinService(
             ?: return view(checkins.active(userId, workDay)!!, user, now)
 
         percentiles.record(workDay, WorkDay.minuteOf(local), user.cityCode)
+        afterChange(userId)
         val previous = history.firstOrNull()
         remember(created, plan, enteredCare = plan.careMode && previous?.careMode != true)
         city?.let { weather.prefetch(it) }
@@ -113,6 +116,7 @@ class CheckinService(
         checkins.revoke(active.id, now)
         percentiles.record(workDay, WorkDay.minuteOf(LocalDateTime.ofInstant(active.checkedAt, user.timezone)), user.cityCode, -1)
         memories.forget(userId, sourceRef(active))
+        afterChange(userId)
         return today(userId)
     }
 

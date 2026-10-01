@@ -30,6 +30,18 @@ import xyz.xiaban.server.redis.Redis
 import xyz.xiaban.server.stats.PercentileService
 import xyz.xiaban.server.stats.StatsService
 import xyz.xiaban.server.stats.TipsService
+import kotlinx.coroutines.CoroutineScope
+import xyz.xiaban.server.account.AccountMerge
+import xyz.xiaban.server.account.EmailBinding
+import xyz.xiaban.server.guardian.GuardianRepository
+import xyz.xiaban.server.guardian.GuardianScheduler
+import xyz.xiaban.server.guardian.GuardianService
+import xyz.xiaban.server.mail.LogMailer
+import xyz.xiaban.server.mail.MailQueue
+import xyz.xiaban.server.mail.Mailer
+import xyz.xiaban.server.mail.SmtpMailer
+import xyz.xiaban.server.recall.RecallJob
+import xyz.xiaban.server.recall.UnsubscribeLinks
 import xyz.xiaban.server.traffic.TrafficRules
 import xyz.xiaban.server.unlocks.UnlockService
 import xyz.xiaban.server.users.ProfileService
@@ -49,6 +61,7 @@ class Services(
     val clock: Clock = Clock.systemUTC(),
     llmProviders: List<LlmProvider>? = null,
     weatherSource: WeatherSource? = null,
+    mailer: Mailer? = null,
 ) : AutoCloseable {
     val http = HttpClient(CIO) {
         expectSuccess = false
@@ -109,7 +122,30 @@ class Services(
         views = CheckinViews(checkinRepository, percentiles, calendar),
         unlocks = unlocks,
         clock = clock,
+        afterChange = { userId ->
+            guardian.reschedule(userId)
+            users.resetRecall(userId)
+        },
     )
+
+    val mailer: Mailer = mailer ?: config.smtp?.let(::SmtpMailer) ?: LogMailer().also {
+        if (config.isProd) org.slf4j.LoggerFactory.getLogger(Services::class.java).error("SMTP is not configured: emails are only logged")
+    }
+    val mail = MailQueue(redis, db, this.mailer, clock)
+    val guardianRepository = GuardianRepository(db)
+    val guardian: GuardianService by lazy { GuardianService(guardianRepository, users, checkinRepository, calendar, redis, clock) }
+    val guardianScheduler = GuardianScheduler(guardian, guardianRepository, users, mail, redis, config.publicBaseUrl, clock)
+    val unsubscribeLinks = UnsubscribeLinks(config.jwtSecret, config.publicBaseUrl)
+    val recall = RecallJob(db, users, CopySelector(copyLibrary), mail, unsubscribeLinks, config.publicBaseUrl, clock)
+    val emailBinding = EmailBinding(redis, users, profiles, tokens, AccountMerge(db), mail) { guardian.reschedule(it) }
+
+    /** Background work tied to the application lifecycle. */
+    fun startWorkers(scope: CoroutineScope) {
+        polisher.start(scope)
+        mail.start(scope)
+        guardianScheduler.start(scope)
+        recall.start(scope)
+    }
 
     override fun close() {
         weather.close()
@@ -124,10 +160,11 @@ class Services(
             clock: Clock = Clock.systemUTC(),
             llmProviders: List<LlmProvider>? = null,
             weatherSource: WeatherSource? = null,
+            mailer: Mailer? = null,
         ): Services {
             val db = Db.connect(config.db)
             val redis = Redis.connect(config.redisUrl)
-            return Services(config, db, redis, clock, llmProviders, weatherSource)
+            return Services(config, db, redis, clock, llmProviders, weatherSource, mailer)
         }
     }
 }
