@@ -6,6 +6,7 @@ import { CatWindow, FieldError, PrimaryButton, QuietButton } from '../../compone
 import { useProfile } from '../../lib/session.tsx'
 import { countdown } from '../../lib/time.ts'
 import { titleTheme } from '../../lib/titleTheme.ts'
+import { GoHome } from './GoHome.tsx'
 import { ReplyBubble } from './ReplyBubble.tsx'
 import { TonightInfo } from './TonightInfo.tsx'
 
@@ -57,6 +58,7 @@ export function ResultView({ checkin, tips, fresh, busy, error, onUndo }: Result
 
       <ReplyBubble checkin={checkin} />
       <TonightInfo checkin={checkin} tips={tips} />
+      <GoHome checkin={checkin} />
 
       <div className="mt-auto pt-8 text-center">
         <PrimaryButton onClick={() => navigate('/card')}>生成今日下班卡</PrimaryButton>

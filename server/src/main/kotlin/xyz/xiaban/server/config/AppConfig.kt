@@ -34,6 +34,9 @@ data class AppConfig(
     val percentileGlobalMin: Int,
     /** Outgoing mail; without it mail is only logged, which is not acceptable in production. */
     val smtp: SmtpConfig?,
+    /** 带小伴回家 default (PRD 8.4, phase three) and where the button sends people */
+    val goHomeEnabled: Boolean,
+    val appDownloadUrl: String?,
 ) {
     val isProd: Boolean get() = env == "prod"
 
@@ -79,6 +82,8 @@ data class AppConfig(
                         ssl = env.bool("SMTP_SSL", true),
                     )
                 },
+                goHomeEnabled = env.bool("GO_HOME_ENABLED", false),
+                appDownloadUrl = env.optional("APP_DOWNLOAD_URL"),
             )
         }
 

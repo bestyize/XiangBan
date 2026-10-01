@@ -59,10 +59,16 @@ export interface ProfileUpdate {
   onboarded?: boolean
 }
 
+export interface Features {
+  goHome: boolean
+  appDownloadUrl: string | null
+}
+
 export interface SessionResponse {
   token: string
   deviceId: string
   profile: Profile
+  features: Features
 }
 
 export interface City {
@@ -117,6 +123,8 @@ export interface Checkin {
   stats: CheckinStats
   holiday: { code: string; name: string } | null
   newUnlocks: Unlock[]
+  /** Day 7 of a streak with 带小伴回家 switched on */
+  goHome: boolean
 }
 
 export interface Unlock {

@@ -33,6 +33,7 @@ object TestEnv {
             "REDIS_URL" to redisUrl,
             "ADMIN_TOKEN" to ADMIN_TOKEN,
             "LLM_DAILY_LIMIT" to "1",
+            "APP_DOWNLOAD_URL" to "https://example.com/xiangban",
         ),
     )
 

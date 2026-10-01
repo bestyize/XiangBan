@@ -1,6 +1,7 @@
 package xyz.xiaban.server.checkin
 
 import xyz.xiaban.server.calendar.HolidayCalendar
+import xyz.xiaban.server.flags.FeatureFlags
 import xyz.xiaban.server.stats.PercentileService
 import xyz.xiaban.server.stats.StatsSnapshot
 import xyz.xiaban.server.users.HHMM
@@ -20,9 +21,11 @@ class CheckinViews(
     private val checkins: CheckinRepository,
     private val percentiles: PercentileService,
     private val calendar: HolidayCalendar,
+    private val flags: FeatureFlags,
 ) {
 
     suspend fun view(row: CheckinRow, user: User, now: Instant, stats: StatsSnapshot, pending: Boolean): CheckinView {
+        val goHome = stats.currentStreak == GO_HOME_STREAK && flags.goHomeEnabled()
         val local = LocalDateTime.ofInstant(row.checkedAt, user.timezone)
         val undoDeadline = row.checkedAt.plus(UNDO_WINDOW)
         val canUndo = now.isBefore(undoDeadline) && !checkins.undoUsed(row.userId, row.workDay)
@@ -42,10 +45,14 @@ class CheckinViews(
                 percentile = percentiles.percentile(row.workDay, WorkDay.minuteOf(local), user.cityCode),
             ),
             holiday = calendar.holidayOn(row.workDay)?.let { HolidayTag(it.code, it.name) },
+            goHome = goHome,
         )
     }
 
     companion object {
         val UNDO_WINDOW: Duration = Duration.ofMinutes(10)
+
+        /** "我们认识一周了" */
+        private const val GO_HOME_STREAK = 7
     }
 }

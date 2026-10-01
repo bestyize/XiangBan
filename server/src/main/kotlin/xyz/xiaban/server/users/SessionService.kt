@@ -1,6 +1,7 @@
 package xyz.xiaban.server.users
 
 import xyz.xiaban.server.auth.Tokens
+import xyz.xiaban.server.flags.FeatureFlags
 import xyz.xiaban.server.http.badRequest
 import xyz.xiaban.shared.SessionRequest
 import xyz.xiaban.shared.SessionResponse
@@ -11,6 +12,7 @@ class SessionService(
     private val users: UserRepository,
     private val profiles: ProfileService,
     private val tokens: Tokens,
+    private val flags: FeatureFlags,
 ) {
     /**
      * Resolves the caller to an account: a valid token wins (e.g. issued by the 相伴 App), then the device
@@ -36,7 +38,7 @@ class SessionService(
         }
         if (timezone != null) users.setTimezone(userId, timezone)
 
-        return SessionResponse(token = tokens.issue(userId), deviceId = deviceId, profile = profiles.view(userId))
+        return SessionResponse(tokens.issue(userId), deviceId, profiles.view(userId), flags.features())
     }
 
     companion object {

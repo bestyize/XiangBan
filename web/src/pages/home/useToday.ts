@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { api } from '../../api/client.ts'
 import type { Checkin, Tip, TodayResponse, Unlock } from '../../api/types.ts'
+import { send } from '../../lib/bridge.ts'
 
 type Status = 'loading' | 'ready' | 'error'
 
@@ -58,6 +59,8 @@ export function useToday() {
       setFresh(true)
       setTips(null)
       setToday({ workDay: checkin.workDay, checkin, greeting: null, tips: [] })
+      // Inside the App the native cat reacts with the same face and line.
+      send('checkin_done', { title: checkin.title.code, titleName: checkin.title.name, mood: checkin.mood, text: checkin.reply.text })
       // Let the title stamp land before the unlock celebration covers it.
       if (checkin.newUnlocks.length > 0) setTimeout(() => setUnlocked(checkin.newUnlocks), 900)
       void fillIn(checkin)

@@ -22,7 +22,7 @@ data class SessionRequest(
 )
 
 @Serializable
-data class SessionResponse(val token: String, val deviceId: String, val profile: ProfileView)
+data class SessionResponse(val token: String, val deviceId: String, val profile: ProfileView, val features: Features)
 
 @Serializable
 data class ProfileView(

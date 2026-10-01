@@ -70,6 +70,8 @@ data class CheckinView(
     val holiday: HolidayTag? = null,
     /** Expressions this check-in unlocked; only filled in the check-in response itself. */
     val newUnlocks: List<UnlockView> = emptyList(),
+    /** Day 7 of a streak with 带小伴回家 switched on (PRD 8.4) */
+    val goHome: Boolean = false,
 )
 
 @Serializable

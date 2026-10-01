@@ -76,11 +76,11 @@ class Services(
     val tokens = Tokens(config.jwtSecret)
     val cities = Cities.load()
     val calendar = HolidayCalendar.load()
-    val flags = FeatureFlags(redis, config.llm.enabledByDefault)
+    val flags = FeatureFlags(redis, config.llm.enabledByDefault, config.goHomeEnabled, config.appDownloadUrl)
 
     val users = UserRepository(db)
     val profiles = ProfileService(users, cities)
-    val sessions = SessionService(users, profiles, tokens)
+    val sessions = SessionService(users, profiles, tokens, flags)
 
     val weather = WeatherService(
         source = weatherSource ?: config.qweatherHost?.let { host -> config.qweatherKey?.let { QWeatherSource(host, it, http, clock) } },
@@ -119,7 +119,7 @@ class Services(
         stats = stats,
         tips = TipsService(weather, traffic, calendar, cities),
         percentiles = percentiles,
-        views = CheckinViews(checkinRepository, percentiles, calendar),
+        views = CheckinViews(checkinRepository, percentiles, calendar, flags),
         unlocks = unlocks,
         clock = clock,
         afterChange = { userId ->

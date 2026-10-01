@@ -5,6 +5,7 @@ import type { Checkin, TodayResponse } from '../api/types.ts'
 import { renderCard } from '../card/renderCard.ts'
 import { cardStyles } from '../card/styles.ts'
 import { FieldError, PrimaryButton, QuietButton, Screen } from '../components/ui.tsx'
+import { blobToBase64, inApp, send } from '../lib/bridge.ts'
 import { isWeChat, publicUrl } from '../lib/env.ts'
 import { track } from '../lib/track.ts'
 import { useProfile, useSession } from '../lib/session.tsx'
@@ -64,6 +65,20 @@ export default function CardPreview() {
 
   const canShare = image !== null && typeof navigator.canShare === 'function' && navigator.canShare({ files: [image.file] })
   const wechat = isWeChat()
+  const app = inApp()
+
+  /** Inside the 相伴 App saving and sharing go through native code (PRD 8.3). */
+  async function nativeSend(type: 'save_image' | 'share') {
+    if (!image) return
+    const base64 = await blobToBase64(image.file)
+    if (type === 'save_image') {
+      send('save_image', { base64, mime: 'image/png' })
+      track('card_save', { via: 'app' })
+    } else {
+      send('share', { base64, mime: 'image/png', text: '你下班了么？', url: `${publicUrl()}/?from=card&inv=${profile.inviteCode}` })
+      track('card_share', { via: 'app' })
+    }
+  }
 
   return (
     <Screen>
@@ -98,7 +113,14 @@ export default function CardPreview() {
       )}
       <FieldError message={error} />
 
-      {!wechat && image && (
+      {app && image && (
+        <div className="mt-auto flex gap-3 pt-6">
+          <PrimaryButton onClick={() => void nativeSend('share')}>分享</PrimaryButton>
+          <button type="button" onClick={() => void nativeSend('save_image')}
+            className="w-full rounded-full border-2 border-lamp px-6 py-3 font-bold text-lamp">保存到相册</button>
+        </div>
+      )}
+      {!app && !wechat && image && (
         <div className="mt-auto flex gap-3 pt-6">
           {canShare && (
             <PrimaryButton onClick={() => navigator.share({ files: [image.file], title: '下班了么', text: '你下班了么？' }).then(() => track('card_share', { via: 'web_share' })).catch(() => undefined)}>
