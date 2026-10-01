@@ -28,3 +28,6 @@ web/dev-dist/
 # Local dev data
 .dev/
 *.log
+
+# Local tool config
+.claude/launch.json

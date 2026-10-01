@@ -1,9 +1,12 @@
 package xyz.xiaban.server.http
 
+import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.Application
+import io.ktor.server.application.createApplicationPlugin
 import io.ktor.server.application.install
+import io.ktor.server.response.header
 import io.ktor.server.application.log
 import io.ktor.server.plugins.BadRequestException
 import io.ktor.server.plugins.calllogging.CallLogging
@@ -24,13 +27,20 @@ val AppJson = Json {
     encodeDefaults = true
 }
 
+/** API responses carry personal data; only routes that opt in with their own Cache-Control are cacheable. */
+private val NoStoreByDefault = createApplicationPlugin("NoStoreByDefault") {
+    onCallRespond { call, _ ->
+        if (!call.response.headers.contains(HttpHeaders.CacheControl)) {
+            call.response.header(HttpHeaders.CacheControl, "no-store")
+        }
+    }
+}
+
 fun Application.installHttp(config: AppConfig) {
     install(ContentNegotiation) { json(AppJson) }
     if (config.trustProxy) install(XForwardedHeaders)
-    install(DefaultHeaders) {
-        header("X-Content-Type-Options", "nosniff")
-        header("Cache-Control", "no-store")
-    }
+    install(DefaultHeaders) { header("X-Content-Type-Options", "nosniff") }
+    install(NoStoreByDefault)
     install(CallLogging) {
         level = Level.INFO
         filter { it.request.path().startsWith("/api") }

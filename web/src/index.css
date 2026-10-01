@@ -20,28 +20,30 @@
   --font-sans: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", system-ui, sans-serif;
 }
 
-:root {
-  --safe-top: env(safe-area-inset-top, 0px);
-  --safe-bottom: env(safe-area-inset-bottom, 0px);
-  color-scheme: dark;
-}
+@layer base {
+  :root {
+    --safe-top: env(safe-area-inset-top, 0px);
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+    color-scheme: dark;
+  }
 
-html,
-body {
-  background: var(--color-dusk-deep);
-  color: var(--color-window);
-  -webkit-tap-highlight-color: transparent;
-  -webkit-text-size-adjust: 100%;
-}
+  html,
+  body {
+    background: var(--color-dusk-deep);
+    color: var(--color-window);
+    -webkit-tap-highlight-color: transparent;
+    -webkit-text-size-adjust: 100%;
+  }
 
-body {
-  font-family: var(--font-sans);
-  min-height: 100dvh;
-}
+  body {
+    font-family: var(--font-sans);
+    min-height: 100dvh;
+  }
 
-:focus-visible {
-  outline: 3px solid var(--color-lamp);
-  outline-offset: 3px;
+  :focus-visible {
+    outline: 3px solid var(--color-lamp);
+    outline-offset: 3px;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

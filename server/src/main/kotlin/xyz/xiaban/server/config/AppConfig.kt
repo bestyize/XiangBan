@@ -9,14 +9,16 @@ data class AppConfig(
     val trustProxy: Boolean,
     val db: DbConfig,
     val redisUrl: String,
+    val jwtSecret: String,
 ) {
     val isProd: Boolean get() = env == "prod"
 
     companion object {
         fun fromEnv(source: Map<String, String> = System.getenv()): AppConfig {
             val env = EnvReader(source)
+            val name = env.str("XIABAN_ENV", "dev")
             return AppConfig(
-                env = env.str("XIABAN_ENV", "dev"),
+                env = name,
                 port = env.int("PORT", 8080),
                 publicBaseUrl = env.str("PUBLIC_BASE_URL", "http://localhost:5173").trimEnd('/'),
                 trustProxy = env.bool("TRUST_PROXY", false),
@@ -27,6 +29,10 @@ data class AppConfig(
                     poolSize = env.int("DATABASE_POOL_SIZE", 10),
                 ),
                 redisUrl = env.str("REDIS_URL", "redis://localhost:6379/0"),
+                jwtSecret = env.optional("JWT_SECRET") ?: run {
+                    check(name != "prod") { "JWT_SECRET is required when XIABAN_ENV=prod" }
+                    "dev-only-secret-${java.util.UUID.randomUUID()}"
+                },
             )
         }
     }
