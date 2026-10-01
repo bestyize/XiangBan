@@ -2,6 +2,17 @@ package xyz.xiaban.server.config
 
 data class DbConfig(val url: String, val user: String, val password: String, val poolSize: Int)
 
+/** An OpenAI-compatible chat endpoint, e.g. 豆包 (Volcengine Ark) or 通义千问 (DashScope compatible mode). */
+data class LlmEndpoint(val name: String, val baseUrl: String, val apiKey: String, val model: String)
+
+data class LlmConfig(
+    /** Initial state of the global switch; the admin API overrides it at runtime. */
+    val enabledByDefault: Boolean,
+    val endpoints: List<LlmEndpoint>,
+    val dailyLimitPerUser: Int,
+    val timeoutMs: Long,
+)
+
 data class AppConfig(
     val env: String,
     val port: Int,
@@ -10,6 +21,9 @@ data class AppConfig(
     val db: DbConfig,
     val redisUrl: String,
     val jwtSecret: String,
+    val llm: LlmConfig,
+    /** Enables /api/admin when set. */
+    val adminToken: String?,
 ) {
     val isProd: Boolean get() = env == "prod"
 
@@ -33,6 +47,23 @@ data class AppConfig(
                     check(name != "prod") { "JWT_SECRET is required when XIABAN_ENV=prod" }
                     "dev-only-secret-${java.util.UUID.randomUUID()}"
                 },
+                llm = LlmConfig(
+                    enabledByDefault = env.bool("LLM_ENABLED", false),
+                    endpoints = listOfNotNull(env.llmEndpoint("PRIMARY"), env.llmEndpoint("BACKUP")),
+                    dailyLimitPerUser = env.int("LLM_DAILY_LIMIT", 3),
+                    timeoutMs = env.int("LLM_TIMEOUT_MS", 3000).toLong(),
+                ),
+                adminToken = env.optional("ADMIN_TOKEN"),
+            )
+        }
+
+        private fun EnvReader.llmEndpoint(slot: String): LlmEndpoint? {
+            val baseUrl = optional("LLM_${slot}_BASE_URL") ?: return null
+            return LlmEndpoint(
+                name = str("LLM_${slot}_NAME", slot.lowercase()),
+                baseUrl = baseUrl,
+                apiKey = optional("LLM_${slot}_API_KEY") ?: error("LLM_${slot}_API_KEY is required with LLM_${slot}_BASE_URL"),
+                model = optional("LLM_${slot}_MODEL") ?: error("LLM_${slot}_MODEL is required with LLM_${slot}_BASE_URL"),
             )
         }
     }

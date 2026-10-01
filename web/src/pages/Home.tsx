@@ -1,14 +1,11 @@
 import { PrimaryButton, Screen } from '../components/ui.tsx'
-import { useProfile } from '../lib/session.tsx'
 import { formatDay } from '../lib/time.ts'
 import { IdleView } from './home/IdleView.tsx'
 import { ResultView } from './home/ResultView.tsx'
 import { useToday } from './home/useToday.ts'
 
 export default function Home() {
-  const profile = useProfile()
   const { status, today, error, busy, fresh, checkIn, undo, reload } = useToday()
-  const name = profile.nickname ?? '你'
 
   return (
     <Screen>
@@ -27,7 +24,7 @@ export default function Home() {
       {status === 'ready' && today && (today.checkin ? (
         <ResultView checkin={today.checkin} fresh={fresh} busy={busy} error={error} onUndo={undo} />
       ) : (
-        <IdleView greeting={`${name}，今天也辛苦了。下班了就按一下。`} busy={busy} error={error} onCheckIn={checkIn} />
+        <IdleView greeting={today.greeting} busy={busy} error={error} onCheckIn={checkIn} />
       ))}
     </Screen>
   )

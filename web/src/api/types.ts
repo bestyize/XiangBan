@@ -77,10 +77,18 @@ export interface Checkin {
   title: TitleView
   mood: Mood
   reply: ReplyView
+  careMode: boolean
   undoUntil: number | null
+}
+
+export interface Greeting {
+  text: string
+  mood: Mood
+  kind: 'idle' | 'return'
 }
 
 export interface TodayResponse {
   workDay: string
   checkin: Checkin | null
+  greeting: Greeting | null
 }

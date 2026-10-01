@@ -61,9 +61,25 @@ data class CheckinView(
     val title: TitleView,
     val mood: Mood,
     val reply: ReplyView,
+    /** Three late nights in a row: softer lines and a caring face. */
+    val careMode: Boolean,
     /** Epoch millis until which the check-in can be undone; null once that is no longer possible. */
     val undoUntil: Long?,
 )
 
 @Serializable
-data class TodayResponse(val workDay: String, val checkin: CheckinView?)
+enum class GreetingKind {
+    @SerialName("idle") Idle,
+    @SerialName("return") Return,
+}
+
+@Serializable
+data class GreetingView(val text: String, val mood: Mood, val kind: GreetingKind)
+
+@Serializable
+data class TodayResponse(
+    val workDay: String,
+    val checkin: CheckinView?,
+    /** Shown before checking in. */
+    val greeting: GreetingView? = null,
+)

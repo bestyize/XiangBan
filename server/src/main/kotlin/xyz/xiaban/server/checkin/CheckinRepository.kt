@@ -22,6 +22,7 @@ data class CheckinRow(
     val libraryReply: String,
     val finalReply: String?,
     val replySource: ReplySource,
+    val careMode: Boolean,
     val revokedAt: Instant?,
 ) {
     val reply: String get() = finalReply ?: libraryReply
@@ -34,6 +35,7 @@ data class NewCheckin(
     val title: TitleCode,
     val copyId: String,
     val libraryReply: String,
+    val careMode: Boolean,
 )
 
 class CheckinRepository(private val db: Db) {
@@ -53,14 +55,39 @@ class CheckinRepository(private val db: Db) {
     suspend fun insert(new: NewCheckin): CheckinRow? = db.read { c ->
         c.queryOne(
             """
-            insert into checkins (user_id, work_day, checked_at, title, copy_id, library_reply)
-            values (?, ?, ?, ?, ?, ?)
+            insert into checkins (user_id, work_day, checked_at, title, copy_id, library_reply, care_mode)
+            values (?, ?, ?, ?, ?, ?, ?)
             on conflict do nothing
             returning $COLUMNS
             """,
-            new.userId, new.workDay, new.checkedAt, new.title.code, new.copyId, new.libraryReply,
+            new.userId, new.workDay, new.checkedAt, new.title.code, new.copyId, new.libraryReply, new.careMode,
             map = ::map,
         )
+    }
+
+    suspend fun find(id: Long): CheckinRow? = db.read { c -> c.queryOne("$SELECT where id = ?", id, map = ::map) }
+
+    /** Only lands on a check-in that has not been undone in the meantime. */
+    suspend fun setPolished(id: Long, text: String) = db.read { c ->
+        c.execute("update checkins set final_reply = ?, reply_source = 'llm' where id = ? and revoked_at is null", text, id)
+    }
+
+    /** Copy ids used since [since], undone check-ins included, for the 30-day no-repeat rule. */
+    suspend fun copyIdsSince(userId: Long, since: LocalDate): Set<String> = db.read { c ->
+        c.query("select copy_id from checkins where user_id = ? and work_day >= ?", userId, since) { it.getString(1) }.toSet()
+    }
+
+    suspend fun lastDayBefore(userId: Long, workDay: LocalDate): LocalDate? = db.read { c ->
+        c.queryOne(
+            "select max(work_day) from checkins where user_id = ? and work_day < ? and revoked_at is null",
+            userId, workDay,
+        ) { it.getObject(1, LocalDate::class.java) }
+    }
+
+    suspend fun isFirst(userId: Long, id: Long): Boolean = db.read { c ->
+        c.queryOne("select not exists (select 1 from checkins where user_id = ? and id <> ? and revoked_at is null)", userId, id) {
+            it.getBoolean(1)
+        } ?: true
     }
 
     suspend fun revoke(id: Long, at: Instant): Boolean = db.read { c ->
@@ -82,11 +109,13 @@ class CheckinRepository(private val db: Db) {
         libraryReply = rs.getString("library_reply"),
         finalReply = rs.getString("final_reply"),
         replySource = if (rs.getString("reply_source") == "llm") ReplySource.Llm else ReplySource.Library,
+        careMode = rs.getBoolean("care_mode"),
         revokedAt = rs.instant("revoked_at"),
     )
 
     private companion object {
-        const val COLUMNS = "id, user_id, work_day, checked_at, title, copy_id, library_reply, final_reply, reply_source, revoked_at"
+        const val COLUMNS =
+            "id, user_id, work_day, checked_at, title, copy_id, library_reply, final_reply, reply_source, care_mode, revoked_at"
         const val SELECT = "select $COLUMNS from checkins"
     }
 }

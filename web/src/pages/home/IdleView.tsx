@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import type { Greeting } from '../../api/types.ts'
 import { PunchButton } from '../../components/PunchButton.tsx'
 import { Bubble, CatWindow, FieldError } from '../../components/ui.tsx'
 import { moodFace } from '../../cat/moods.ts'
@@ -6,7 +7,7 @@ import { useProfile } from '../../lib/session.tsx'
 import { formatDuration, minutesPastWorkEnd } from '../../lib/time.ts'
 
 interface IdleViewProps {
-  greeting: string
+  greeting: Greeting | null
   busy: boolean
   error: string | null
   onCheckIn: () => void
@@ -33,8 +34,8 @@ export function IdleView({ greeting, busy, error, onCheckIn }: IdleViewProps) {
 
   return (
     <div className="flex flex-1 flex-col">
-      <CatWindow className="mt-4" spec={moodFace.idle} label={`${profile.companionName}在窗台上等你`} size={188} />
-      <Bubble className="mt-5">{greeting}</Bubble>
+      <CatWindow className="mt-4" spec={moodFace[greeting?.mood ?? 'idle']} label={`${profile.companionName}在窗台上等你`} size={188} />
+      <Bubble className="mt-5">{greeting?.text ?? '今天也辛苦了。下班了就按一下。'}</Bubble>
       <div className="mt-auto pt-10 pb-4">
         <PunchButton onPress={onCheckIn} busy={busy} />
         <p className="mt-8 text-center text-sm text-window/65">{status}</p>

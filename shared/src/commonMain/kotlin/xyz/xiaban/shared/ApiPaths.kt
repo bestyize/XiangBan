@@ -7,4 +7,5 @@ object ApiPaths {
     const val META = "/api/meta"
     const val CHECKIN = "/api/checkin"
     const val CHECKIN_TODAY = "/api/checkin/today"
+    const val REPORTS = "/api/reports"
 }

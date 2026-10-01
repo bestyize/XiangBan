@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react'
 import type { Checkin } from '../../api/types.ts'
 import { moodFace, moodLabel } from '../../cat/moods.ts'
-import { Bubble, CatWindow, FieldError, QuietButton } from '../../components/ui.tsx'
+import { CatWindow, FieldError, QuietButton } from '../../components/ui.tsx'
 import { useProfile } from '../../lib/session.tsx'
 import { countdown } from '../../lib/time.ts'
 import { titleTheme } from '../../lib/titleTheme.ts'
+import { ReplyBubble } from './ReplyBubble.tsx'
 
 interface ResultViewProps {
   checkin: Checkin
@@ -50,7 +51,7 @@ export function ResultView({ checkin, fresh, busy, error, onUndo }: ResultViewPr
         </div>
       </section>
 
-      <Bubble align="left" className="mt-5">{checkin.reply.text}</Bubble>
+      <ReplyBubble checkin={checkin} />
 
       <div className="mt-auto pt-10 text-center">
         {undoLeft > 0 && (

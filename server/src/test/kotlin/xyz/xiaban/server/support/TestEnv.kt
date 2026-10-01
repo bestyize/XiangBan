@@ -29,12 +29,16 @@ object TestEnv {
             "DATABASE_PASSWORD" to (env["XIABAN_TEST_DATABASE_PASSWORD"] ?: "xiaban"),
             "DATABASE_POOL_SIZE" to "4",
             "REDIS_URL" to redisUrl,
+            "ADMIN_TOKEN" to ADMIN_TOKEN,
+            "LLM_DAILY_LIMIT" to "1",
         ),
     )
 
     val clock = MutableClock()
+    val llm = FakeLlm()
+    const val ADMIN_TOKEN = "test-admin-token"
 
-    private val shared: Services by lazy { Services.create(config, clock) }
+    private val shared: Services by lazy { Services.create(config, clock, listOf(llm)) }
 
     /** Returns services backed by an emptied database and Redis, with the clock reset to now. */
     fun services(): Services {
@@ -44,6 +48,7 @@ object TestEnv {
             Assumptions.assumeTrue(false, "PostgreSQL/Redis not reachable, skipping integration test")
         }
         clock.now = java.time.Instant.now()
+        llm.reset()
         reset(shared)
         return shared
     }
