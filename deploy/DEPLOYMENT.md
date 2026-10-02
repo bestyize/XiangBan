@@ -6,15 +6,17 @@ The deployment workflow is manual and only deploys the `main` branch. It sends a
 
 Use a supported Linux server with Docker Engine and the Docker Compose plugin installed. The SSH account must be able to run `docker compose` without an interactive password prompt.
 
-Choose a writable deployment directory, for example `/home/ubuntu/xiaban`. Create it and place the server-only environment file there:
+Choose a writable deployment directory, for example `/home/ubuntu/xiaban`. Set the GitHub Variable `DEPLOY_PATH` to this exact path. The deployment workflow expects the server-only environment file at `$DEPLOY_PATH/.env`; it is separate from the repository and is never uploaded by the workflow.
+
+From your computer, in the repository root, upload the example template (replace the SSH user and host):
 
 ```sh
-mkdir -p /home/ubuntu/xiaban
-cp deploy/.env.production.example /home/ubuntu/xiaban/.env
-chmod 600 /home/ubuntu/xiaban/.env
+ssh ubuntu@YOUR_SERVER_HOST "mkdir -p /home/ubuntu/xiaban"
+scp deploy/.env.production.example ubuntu@YOUR_SERVER_HOST:/home/ubuntu/xiaban/.env
+ssh ubuntu@YOUR_SERVER_HOST "chmod 600 /home/ubuntu/xiaban/.env && nano /home/ubuntu/xiaban/.env"
 ```
 
-Edit `/home/ubuntu/xiaban/.env`, set strong unique values for `DATABASE_PASSWORD` and `JWT_SECRET`, and set `XIABAN_DOMAIN` to the domain pointed at this server. Open inbound TCP ports 22, 80, and 443 in the Tencent Cloud security group. Do not expose PostgreSQL or Redis ports publicly.
+In that server-side file, set strong unique values for `DATABASE_PASSWORD` and `JWT_SECRET`, and set `XIABAN_DOMAIN` to the domain pointed at this server. Open inbound TCP ports 22, 80, and 443 in the Tencent Cloud security group. Do not expose PostgreSQL or Redis ports publicly.
 
 The first deployment creates persistent Docker volumes for PostgreSQL, Redis, and Caddy certificates. Configure separate database backups before using real user data; Docker volumes alone are not backups.
 
