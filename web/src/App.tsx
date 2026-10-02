@@ -14,6 +14,8 @@ import GuardianPage from './pages/me/GuardianPage.tsx'
 import Me from './pages/me/Me.tsx'
 import ProfileEdit from './pages/me/ProfileEdit.tsx'
 import Onboarding from './pages/onboarding/Onboarding.tsx'
+import GameHub from './pages/games/GameHub.tsx'
+import GamePlayer from './pages/games/GamePlayer.tsx'
 
 function usePageViews() {
   const [location] = useLocation()
@@ -54,6 +56,8 @@ function Gate() {
     <Switch>
       <Route path="/hello" component={Onboarding} />
       <Route path="/card" component={CardPreview} />
+      <Route path="/games"><GameHub /><TabBar /></Route>
+      <Route path="/games/:gameId" component={GamePlayer} />
       <Route path="/me/guardian" component={GuardianPage} />
       <Route path="/me/profile" component={ProfileEdit} />
       <Route path="/dex"><Dex /><TabBar /></Route>
