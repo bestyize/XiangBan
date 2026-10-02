@@ -8,6 +8,7 @@ import { useProfile, useSession } from '../../lib/session.tsx'
 import { AccountActions } from './AccountActions.tsx'
 import { EmailBind } from './EmailBind.tsx'
 import { MeStats } from './MeStats.tsx'
+import { AfterworkSummary } from './AfterworkSummary.tsx'
 
 const personalityName = { toxic: '毒舌心软', gentle: '温柔治愈', chatty: '元气话痨', tsundere: '高冷傲娇' } as const
 
@@ -51,6 +52,10 @@ export default function Me() {
 
         <Section title="统计">
           <MeStats companionName={profile.companionName} />
+        </Section>
+
+        <Section title="下班后的习惯">
+          <AfterworkSummary timeZone={profile.timezone} />
         </Section>
 
         <Section title="小伴档案">
