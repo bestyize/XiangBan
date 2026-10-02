@@ -92,32 +92,14 @@ services:
     restart: unless-stopped
     depends_on:
       - server
-    networks:
-      - frontend
-
-  caddy:
-    image: caddy:2-alpine
-    restart: unless-stopped
-    environment:
-      XIABAN_DOMAIN: ${XIABAN_DOMAIN:?Set XIABAN_DOMAIN in the server-side .env file}
     ports:
-      - "80:80"
-      - "443:443"
-      - "443:443/udp"
-    volumes:
-      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy_data:/data
-      - caddy_config:/config
-    depends_on:
-      - web
+      - "127.0.0.1:18080:80"
     networks:
       - frontend
 
 volumes:
   postgres_data:
   redis_data:
-  caddy_data:
-  caddy_config:
 
 networks:
   backend:
