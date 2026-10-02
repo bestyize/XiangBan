@@ -1,0 +1,109 @@
+name: Deploy to Tencent Cloud
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: xiaban-production-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy XiangBan
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Check out main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Validate deployment settings
+        env:
+          DEPLOY_HOST: ${{ vars.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ vars.DEPLOY_USER }}
+          DEPLOY_PATH: ${{ vars.DEPLOY_PATH }}
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          for name in DEPLOY_HOST DEPLOY_USER DEPLOY_PATH DEPLOY_SSH_KEY DEPLOY_KNOWN_HOSTS; do
+            if [ -z "${!name}" ]; then
+              echo "::error::Missing GitHub variable/secret: $name"
+              exit 1
+            fi
+          done
+          [[ "$DEPLOY_PATH" =~ ^/[a-zA-Z0-9._/-]+$ ]] || {
+            echo "::error::DEPLOY_PATH must be an absolute path containing only letters, numbers, dots, underscores, slashes, or hyphens."
+            exit 1
+          }
+          [[ "$DEPLOY_USER" =~ ^[a-zA-Z_][a-zA-Z0-9._-]*$ ]] || {
+            echo "::error::DEPLOY_USER has an invalid format."
+            exit 1
+          }
+
+      - name: Configure SSH
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$DEPLOY_SSH_KEY" > "$HOME/.ssh/xiaban_deploy"
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/xiaban_deploy" "$HOME/.ssh/known_hosts"
+          ssh-keygen -y -f "$HOME/.ssh/xiaban_deploy" >/dev/null
+
+      - name: Package source
+        run: |
+          set -euo pipefail
+          tar -czf "$RUNNER_TEMP/xiaban-source.tar.gz" \
+            --exclude='.git' \
+            --exclude='.env' \
+            --exclude='.env.*' \
+            --exclude='web/node_modules' \
+            --exclude='web/dist' \
+            --exclude='**/node_modules' \
+            --exclude='**/.DS_Store' \
+            .
+
+      - name: Upload source and deploy
+        env:
+          DEPLOY_HOST: ${{ vars.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ vars.DEPLOY_USER }}
+          DEPLOY_PORT: ${{ vars.DEPLOY_PORT }}
+          DEPLOY_PATH: ${{ vars.DEPLOY_PATH }}
+          RELEASE_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          port="${DEPLOY_PORT:-22}"
+          target="$DEPLOY_USER@$DEPLOY_HOST"
+          ssh_args=(-i "$HOME/.ssh/xiaban_deploy" -p "$port" -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$HOME/.ssh/known_hosts")
+          ssh "${ssh_args[@]}" "$target" bash -s -- "$DEPLOY_PATH" "$RELEASE_SHA" <<'REMOTE'
+          set -euo pipefail
+          root="$1"
+          sha="$2"
+          mkdir -p "$root/releases/$sha"
+          test -f "$root/.env" || {
+            echo "Missing $root/.env. Create it from deploy/.env.production.example before deploying."
+            exit 1
+          }
+          REMOTE
+          scp -i "$HOME/.ssh/xiaban_deploy" -P "$port" -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$HOME/.ssh/known_hosts" \
+            "$RUNNER_TEMP/xiaban-source.tar.gz" "$target:/tmp/xiaban-$RELEASE_SHA.tar.gz"
+          ssh "${ssh_args[@]}" "$target" bash -s -- "$DEPLOY_PATH" "$RELEASE_SHA" <<'REMOTE'
+          set -euo pipefail
+          root="$1"
+          sha="$2"
+          release="$root/releases/$sha"
+          tar -xzf "/tmp/xiaban-$sha.tar.gz" -C "$release"
+          rm -f "/tmp/xiaban-$sha.tar.gz"
+          docker compose version >/dev/null
+          docker compose -p xiaban --env-file "$root/.env" -f "$release/compose.yaml" build
+          docker compose -p xiaban --env-file "$root/.env" -f "$release/compose.yaml" up -d --remove-orphans
+          docker compose -p xiaban --env-file "$root/.env" -f "$release/compose.yaml" ps
+          REMOTE
