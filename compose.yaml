@@ -1,0 +1,124 @@
+name: xiaban
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: xiaban
+      POSTGRES_USER: xiaban
+      POSTGRES_PASSWORD: \${DATABASE_PASSWORD:?Set DATABASE_PASSWORD in the server-side .env file}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U xiaban -d xiaban"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - backend
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes", "--save", "60", "1000"]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+    networks:
+      - backend
+
+  server:
+    image: xiaban-server:latest
+    build:
+      context: .
+      dockerfile: server/Dockerfile
+    restart: unless-stopped
+    environment:
+      XIABAN_ENV: prod
+      PORT: "8080"
+      PUBLIC_BASE_URL: https://\${XIABAN_DOMAIN:?Set XIABAN_DOMAIN in the server-side .env file}
+      TRUST_PROXY: "true"
+      DATABASE_URL: jdbc:postgresql://postgres:5432/xiaban
+      DATABASE_USER: xiaban
+      DATABASE_PASSWORD: \${DATABASE_PASSWORD:?Set DATABASE_PASSWORD in the server-side .env file}
+      DATABASE_POOL_SIZE: \${DATABASE_POOL_SIZE:-10}
+      REDIS_URL: redis://redis:6379/0
+      JWT_SECRET: \${JWT_SECRET:?Set JWT_SECRET in the server-side .env file}
+      LLM_ENABLED: \${LLM_ENABLED:-false}
+      LLM_PRIMARY_NAME: \${LLM_PRIMARY_NAME:-}
+      LLM_PRIMARY_BASE_URL: \${LLM_PRIMARY_BASE_URL:-}
+      LLM_PRIMARY_API_KEY: \${LLM_PRIMARY_API_KEY:-}
+      LLM_PRIMARY_MODEL: \${LLM_PRIMARY_MODEL:-}
+      LLM_BACKUP_NAME: \${LLM_BACKUP_NAME:-}
+      LLM_BACKUP_BASE_URL: \${LLM_BACKUP_BASE_URL:-}
+      LLM_BACKUP_API_KEY: \${LLM_BACKUP_API_KEY:-}
+      LLM_BACKUP_MODEL: \${LLM_BACKUP_MODEL:-}
+      LLM_DAILY_LIMIT: \${LLM_DAILY_LIMIT:-3}
+      LLM_TIMEOUT_MS: \${LLM_TIMEOUT_MS:-3000}
+      ADMIN_TOKEN: \${ADMIN_TOKEN:-}
+      QWEATHER_API_HOST: \${QWEATHER_API_HOST:-}
+      QWEATHER_API_KEY: \${QWEATHER_API_KEY:-}
+      SMTP_HOST: \${SMTP_HOST:-}
+      SMTP_PORT: \${SMTP_PORT:-465}
+      SMTP_USER: \${SMTP_USER:-}
+      SMTP_PASSWORD: \${SMTP_PASSWORD:-}
+      SMTP_FROM: \${SMTP_FROM:-}
+      SMTP_FROM_NAME: \${SMTP_FROM_NAME:-下班了么}
+      SMTP_SSL: \${SMTP_SSL:-true}
+      GO_HOME_ENABLED: \${GO_HOME_ENABLED:-false}
+      APP_DOWNLOAD_URL: \${APP_DOWNLOAD_URL:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - backend
+      - frontend
+
+  web:
+    image: xiaban-web:latest
+    build:
+      context: .
+      dockerfile: web/Dockerfile
+      args:
+        VITE_PUBLIC_URL: https://\${XIABAN_DOMAIN:?Set XIABAN_DOMAIN in the server-side .env file}
+        VITE_DATA_OVERSEAS: \${VITE_DATA_OVERSEAS:-true}
+    restart: unless-stopped
+    depends_on:
+      - server
+    networks:
+      - frontend
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    environment:
+      XIABAN_DOMAIN: \${XIABAN_DOMAIN:?Set XIABAN_DOMAIN in the server-side .env file}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - web
+    networks:
+      - frontend
+
+volumes:
+  postgres_data:
+  redis_data:
+  caddy_data:
+  caddy_config:
+
+networks:
+  backend:
+  frontend:
