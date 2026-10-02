@@ -24,15 +24,15 @@ jobs:
 
       - name: Validate deployment settings
         env:
-          DEPLOY_HOST: \${{ vars.DEPLOY_HOST }}
-          DEPLOY_USER: \${{ vars.DEPLOY_USER }}
-          DEPLOY_PATH: \${{ vars.DEPLOY_PATH }}
-          DEPLOY_SSH_KEY: \${{ secrets.DEPLOY_SSH_KEY }}
-          DEPLOY_KNOWN_HOSTS: \${{ secrets.DEPLOY_KNOWN_HOSTS }}
+          DEPLOY_HOST: ${{ vars.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ vars.DEPLOY_USER }}
+          DEPLOY_PATH: ${{ vars.DEPLOY_PATH }}
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
         run: |
           set -euo pipefail
           for name in DEPLOY_HOST DEPLOY_USER DEPLOY_PATH DEPLOY_SSH_KEY DEPLOY_KNOWN_HOSTS; do
-            if [ -z "\${!name}" ]; then
+            if [ -z "${!name}" ]; then
               echo "::error::Missing GitHub variable/secret: $name"
               exit 1
             fi
@@ -48,8 +48,8 @@ jobs:
 
       - name: Configure SSH
         env:
-          DEPLOY_SSH_KEY: \${{ secrets.DEPLOY_SSH_KEY }}
-          DEPLOY_KNOWN_HOSTS: \${{ secrets.DEPLOY_KNOWN_HOSTS }}
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
         run: |
           set -euo pipefail
           install -m 700 -d "$HOME/.ssh"
@@ -73,17 +73,17 @@ jobs:
 
       - name: Upload source and deploy
         env:
-          DEPLOY_HOST: \${{ vars.DEPLOY_HOST }}
-          DEPLOY_USER: \${{ vars.DEPLOY_USER }}
-          DEPLOY_PORT: \${{ vars.DEPLOY_PORT }}
-          DEPLOY_PATH: \${{ vars.DEPLOY_PATH }}
-          RELEASE_SHA: \${{ github.sha }}
+          DEPLOY_HOST: ${{ vars.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ vars.DEPLOY_USER }}
+          DEPLOY_PORT: ${{ vars.DEPLOY_PORT }}
+          DEPLOY_PATH: ${{ vars.DEPLOY_PATH }}
+          RELEASE_SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
-          port="\${DEPLOY_PORT:-22}"
+          port="${DEPLOY_PORT:-22}"
           target="$DEPLOY_USER@$DEPLOY_HOST"
           ssh_args=(-i "$HOME/.ssh/xiaban_deploy" -p "$port" -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$HOME/.ssh/known_hosts")
-          ssh "\${ssh_args[@]}" "$target" bash -s -- "$DEPLOY_PATH" "$RELEASE_SHA" <<'REMOTE'
+          ssh "${ssh_args[@]}" "$target" bash -s -- "$DEPLOY_PATH" "$RELEASE_SHA" <<'REMOTE'
           set -euo pipefail
           root="$1"
           sha="$2"
@@ -95,7 +95,7 @@ jobs:
           REMOTE
           scp -i "$HOME/.ssh/xiaban_deploy" -P "$port" -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$HOME/.ssh/known_hosts" \
             "$RUNNER_TEMP/xiaban-source.tar.gz" "$target:/tmp/xiaban-$RELEASE_SHA.tar.gz"
-          ssh "\${ssh_args[@]}" "$target" bash -s -- "$DEPLOY_PATH" "$RELEASE_SHA" <<'REMOTE'
+          ssh "${ssh_args[@]}" "$target" bash -s -- "$DEPLOY_PATH" "$RELEASE_SHA" <<'REMOTE'
           set -euo pipefail
           root="$1"
           sha="$2"
