@@ -2,6 +2,7 @@ import { TAB_BAR_SPACE } from '../components/TabBar.tsx'
 import { UnlockOverlay } from '../components/UnlockOverlay.tsx'
 import { PrimaryButton, Screen } from '../components/ui.tsx'
 import { formatDay } from '../lib/time.ts'
+import { Link } from 'wouter'
 import { IdleView } from './home/IdleView.tsx'
 import { ResultView } from './home/ResultView.tsx'
 import { useToday } from './home/useToday.ts'
@@ -14,7 +15,10 @@ export default function Home() {
       <div className="flex flex-1 flex-col" style={{ paddingBottom: TAB_BAR_SPACE }}>
         <header className="flex h-10 items-center justify-between">
           <span className="font-display text-2xl text-lamp">下班了么</span>
-          <span className="text-sm text-window/70">{formatDay(new Date())}</span>
+          <div className="flex items-center gap-3">
+            <span className="text-sm text-window/70">{formatDay(new Date())}</span>
+            <Link href="/games" className="rounded-full border border-lamp/35 px-3 py-1 text-xs text-lamp">玩一局</Link>
+          </div>
         </header>
 
         {status === 'loading' && <p className="mt-24 text-center text-window/60">小伴在翻今天的记录…</p>}
