@@ -64,6 +64,7 @@
       message.type !== 'host.init' ||
       message.nonce !== HOST_NONCE
     ) return
+    document.body.classList.add('hosted')
     hostReady = true
     postToHost('game.ready')
   })
@@ -124,7 +125,7 @@
   }
 
   function draw() {
-    boardContext.fillStyle = '#111936'
+    boardContext.fillStyle = '#111b2b'
     boardContext.fillRect(0, 0, COLS * CELL, ROWS * CELL)
     boardContext.strokeStyle = 'rgba(255,255,255,0.055)'
     boardContext.lineWidth = 1
@@ -155,7 +156,7 @@
 
   function drawNext() {
     nextContext.clearRect(0, 0, nextCanvas.width, nextCanvas.height)
-    nextContext.fillStyle = 'rgba(17,25,54,0.45)'
+    nextContext.fillStyle = 'rgba(17,27,43,0.55)'
     nextContext.fillRect(0, 0, nextCanvas.width, nextCanvas.height)
     if (!nextType) return
     const matrix = SHAPES[nextType].matrix
