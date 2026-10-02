@@ -1,4 +1,4 @@
-import type { ComponentProps, ReactNode } from 'react'
+import type { ComponentProps, CSSProperties, ReactNode } from 'react'
 import type { CatSpec } from '../cat/catSvg.ts'
 import { Cat } from './Cat.tsx'
 
@@ -39,7 +39,7 @@ export function CatWindow({ spec, label, size = 208, centered = true, className 
   return (
     <div className={`flex w-fit shrink-0 flex-col items-center ${centered ? 'mx-auto' : ''} ${className}`}>
       <div
-        className="relative overflow-hidden bg-[radial-gradient(circle_at_50%_38%,#ffe9ad,#ffb938_62%,#e89a12)] shadow-[0_0_80px_rgba(255,185,56,0.32)]"
+        className="relative overflow-hidden bg-[radial-gradient(circle_at_50%_38%,#f6e4bb,var(--color-lamp)_62%,#c18b52)] shadow-[0_0_64px_rgba(237,189,118,0.25)]"
         style={{ width: size, height: size * 1.08, borderRadius: `${arch}px ${arch}px 14px 14px` }}
       >
         <div className="absolute inset-y-0 left-1/2 w-1.5 -translate-x-1/2 bg-dusk-deep/45" />
@@ -63,11 +63,15 @@ export function Bubble({ children, align = 'center', className = '' }: { childre
   )
 }
 
-export function Screen({ children, className = '' }: { children: ReactNode; className?: string }) {
+export function Screen({ children, className = '', style }: { children: ReactNode; className?: string; style?: CSSProperties }) {
   return (
     <main
       className={`mx-auto flex min-h-dvh w-full max-w-[480px] flex-col px-5 ${className}`}
-      style={{ paddingTop: 'calc(var(--safe-top) + 16px)', paddingBottom: 'calc(var(--safe-bottom) + 16px)' }}
+      style={{
+        paddingTop: 'calc(var(--safe-top) + 16px)',
+        paddingBottom: 'calc(var(--safe-bottom) + 16px)',
+        ...style,
+      }}
     >
       {children}
     </main>

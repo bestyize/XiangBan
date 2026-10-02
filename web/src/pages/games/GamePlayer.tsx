@@ -72,8 +72,8 @@ export default function GamePlayer() {
   }
 
   return (
-    <Screen className="px-3">
-      <div className="flex flex-1 flex-col">
+    <Screen className="px-3" style={{ height: "100dvh", minHeight: 0, overflow: "hidden", paddingBottom: "var(--safe-bottom)" }}>
+      <div className="flex min-h-0 flex-1 flex-col">
         <header className="flex h-10 shrink-0 items-center justify-between">
           <button type="button" onClick={() => navigate('/games')} className="text-sm text-window/70">
             ‹ 退出游戏
@@ -90,7 +90,7 @@ export default function GamePlayer() {
             </button>
           </div>
         ) : pack ? (
-          <div className="relative mt-2 flex-1 overflow-hidden rounded-2xl border border-window/10 bg-dusk-deep">
+          <div className="relative mt-2 min-h-0 flex-1 overflow-hidden rounded-2xl border border-window/10 bg-dusk-deep">
             {!ready && (
               <div className="absolute inset-0 z-10 flex items-center justify-center bg-dusk-deep text-sm text-window/65">
                 正在加载游戏…
@@ -102,8 +102,7 @@ export default function GamePlayer() {
               src={gameEntryUrl(pack, nonce)}
               sandbox="allow-scripts"
               onLoad={initializeGame}
-              className="block w-full border-0"
-              style={{ height: 'calc(100dvh - var(--safe-top) - var(--safe-bottom) - 104px)', minHeight: 520 }}
+              className="absolute inset-0 block h-full w-full border-0"
             />
           </div>
         ) : (

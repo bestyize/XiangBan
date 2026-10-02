@@ -7,15 +7,15 @@
 }
 
 @theme {
-  --color-dusk: #2f3a7a;
-  --color-dusk-deep: #1f2758;
-  --color-dusk-soft: #3d4a94;
-  --color-lamp: #ffb938;
-  --color-lamp-deep: #d98a00;
-  --color-fur: #f7a65a;
-  --color-window: #fff1c9;
-  --color-ink: #1e1a2e;
-  --color-blush: #ff7e79;
+  --color-dusk: #2b3b52;
+  --color-dusk-deep: #182338;
+  --color-dusk-soft: #3d5069;
+  --color-lamp: #edbd76;
+  --color-lamp-deep: #b9854d;
+  --color-fur: #d9976c;
+  --color-window: #f3eee4;
+  --color-ink: #202a39;
+  --color-blush: #df8e89;
   --font-display: "Xiaban Display", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
   --font-sans: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", system-ui, sans-serif;
 
