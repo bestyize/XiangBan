@@ -9,6 +9,7 @@ import { titleTheme } from '../../lib/titleTheme.ts'
 import { GoHome } from './GoHome.tsx'
 import { ReplyBubble } from './ReplyBubble.tsx'
 import { TonightInfo } from './TonightInfo.tsx'
+import { AfterworkChoice } from './AfterworkChoice.tsx'
 
 interface ResultViewProps {
   checkin: Checkin
@@ -58,6 +59,7 @@ export function ResultView({ checkin, tips, fresh, busy, error, onUndo }: Result
 
       <ReplyBubble checkin={checkin} />
       <TonightInfo checkin={checkin} tips={tips} />
+      <AfterworkChoice workDay={checkin.workDay} localTime={checkin.localTime} tips={tips} />
       <GoHome checkin={checkin} />
 
       <div className="mt-auto pt-8 text-center">
