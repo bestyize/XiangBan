@@ -4,6 +4,7 @@ export interface GamePackManifest {
   name: string
   description: string
   entry: string
+  cover?: string
   runtimeProtocol: number
 }
 
@@ -47,6 +48,7 @@ export async function loadGameManifest(id: string, signal?: AbortSignal): Promis
     typeof value.name !== 'string' ||
     typeof value.description !== 'string' ||
     !safeEntryPath(value.entry) ||
+    (value.cover !== undefined && !safeEntryPath(value.cover)) ||
     value.runtimeProtocol !== GAME_RUNTIME_PROTOCOL
   ) {
     throw new Error('游戏包清单格式不支持')
@@ -58,6 +60,7 @@ export async function loadGameManifest(id: string, signal?: AbortSignal): Promis
     name: value.name,
     description: value.description,
     entry: value.entry,
+    cover: typeof value.cover === 'string' ? value.cover : undefined,
     runtimeProtocol: GAME_RUNTIME_PROTOCOL,
   }
 }
@@ -81,5 +84,5 @@ export function gameEntryUrl(pack: GamePackManifest, nonce: string): string {
 }
 
 export function gamePackThumbnailUrl(pack: GamePackManifest): string {
-  return packAssetUrl(pack.id, 'cover.svg')
+  return pack.cover ? packAssetUrl(pack.id, pack.cover) : ''
 }

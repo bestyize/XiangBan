@@ -25,6 +25,9 @@ export default function GamePlayer() {
   const iframeRef = useRef<HTMLIFrameElement>(null)
 
   useEffect(() => {
+    setPack(null)
+    setError(null)
+    setReady(false)
     if (!gameId) {
       setError('没有找到这款游戏')
       return

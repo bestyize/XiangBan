@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'wouter'
 import { TAB_BAR_SPACE } from '../../components/TabBar.tsx'
 import { Screen } from '../../components/ui.tsx'
-import { loadGameCatalog, type GamePackManifest } from '../../games/packLoader.ts'
+import { gamePackThumbnailUrl, loadGameCatalog, type GamePackManifest } from '../../games/packLoader.ts'
 
 export default function GameHub() {
   const [games, setGames] = useState<GamePackManifest[] | null>(null)
@@ -45,7 +45,11 @@ export default function GameHub() {
               href={'/games/' + game.id}
               className="flex items-center gap-4 rounded-2xl border border-window/10 bg-dusk-soft/35 p-4 transition hover:bg-dusk-soft/60"
             >
-              <span className="flex size-14 shrink-0 items-center justify-center rounded-2xl bg-lamp/15 text-3xl" aria-hidden="true">🧩</span>
+              {game.cover ? (
+                <img src={gamePackThumbnailUrl(game)} alt="" className="size-14 shrink-0 rounded-2xl object-cover" />
+              ) : (
+                <span className="flex size-14 shrink-0 items-center justify-center rounded-2xl bg-lamp/15 text-3xl" aria-hidden="true">🧩</span>
+              )}
               <span className="min-w-0 flex-1">
                 <span className="block font-bold text-window">{game.name}</span>
                 <span className="mt-1 block text-sm text-window/60">{game.description}</span>

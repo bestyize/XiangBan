@@ -56,8 +56,8 @@ function Gate() {
     <Switch>
       <Route path="/hello" component={Onboarding} />
       <Route path="/card" component={CardPreview} />
-      <Route path="/games"><GameHub /><TabBar /></Route>
       <Route path="/games/:gameId" component={GamePlayer} />
+      <Route path="/games"><GameHub /><TabBar /></Route>
       <Route path="/me/guardian" component={GuardianPage} />
       <Route path="/me/profile" component={ProfileEdit} />
       <Route path="/dex"><Dex /><TabBar /></Route>
