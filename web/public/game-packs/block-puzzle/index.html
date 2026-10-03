@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#182338">
+    <title>小伴消方块 · 下班了么</title>
+    <link rel="stylesheet" href="./game.css">
+    <script src="./rules.js" defer></script>
+    <script src="./game.js" defer></script>
+  </head>
+  <body>
+    <main class="game">
+      <header class="topbar">
+        <div><p class="eyebrow">单人 · 摆一摆，消一消</p><h1>小伴消方块</h1></div>
+        <button id="exitButton" class="quiet-button" type="button">回游戏广场</button>
+      </header>
+      <section class="stats" aria-label="本局数据">
+        <div class="stat"><span>本局得分</span><strong id="score">0</strong></div>
+        <div class="stat"><span>本次最高分</span><strong id="best">0</strong></div>
+        <div class="stat"><span>消除行列</span><strong id="lines">0</strong></div>
+      </section>
+      <p class="intro">填满整行或整列就消除，一次消多条有加分。</p>
+      <section class="board-stage" aria-label="游戏区域">
+        <div class="board-shell">
+          <div id="board" class="board" role="grid" aria-label="八行八列棋盘。选方块后，方向键移动，回车放置。" aria-describedby="help"></div>
+          <div id="overlay" class="overlay" role="dialog" aria-modal="true" aria-labelledby="resultTitle" aria-describedby="resultScore" hidden>
+            <div class="result-card">
+              <p class="eyebrow">这一局结束啦</p>
+              <h2 id="resultTitle">歇一会，再来一局？</h2>
+              <p id="resultScore"></p>
+              <button id="restartOverlay" class="primary-button" type="button">再来一局</button>
+            </div>
+          </div>
+        </div>
+      </section>
+      <section id="tray" class="tray" aria-label="待放置方块">
+        <button class="piece-button" type="button" data-slot="0" aria-pressed="false"><span class="piece-art"></span><span class="piece-label"></span></button>
+        <button class="piece-button" type="button" data-slot="1" aria-pressed="false"><span class="piece-art"></span><span class="piece-label"></span></button>
+        <button class="piece-button" type="button" data-slot="2" aria-pressed="false"><span class="piece-art"></span><span class="piece-label"></span></button>
+      </section>
+      <p id="status" class="status" role="status" aria-live="polite">拖方块到棋盘，或选方块后点空格。</p>
+      <footer class="footer">
+        <p id="help" class="help">拖动 / 选中后点棋盘<br>键盘 1–3 选块 · 方向键 · 回车</p>
+        <button id="restartButton" class="quiet-button" type="button">重新开始</button>
+      </footer>
+    </main>
+    <div id="dragGhost" class="drag-ghost" aria-hidden="true" hidden></div>
+  </body>
+</html>

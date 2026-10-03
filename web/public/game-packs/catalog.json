@@ -2,6 +2,8 @@
   "version": 1,
   "games": [
     "falling-blocks",
-    "merge-2048"
+    "merge-2048",
+    "block-puzzle",
+    "water-sort"
   ]
 }

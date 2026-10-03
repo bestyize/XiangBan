@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="400" viewBox="0 0 640 400">
+  <defs>
+    <radialGradient id="bg" cx=".5" cy="0" r="1"><stop stop-color="#364457"/><stop offset="1" stop-color="#132237"/></radialGradient>
+    <linearGradient id="light" x2="0" y2="1"><stop stop-color="#f4d58d" stop-opacity=".28"/><stop offset="1" stop-color="#f4d58d" stop-opacity="0"/></linearGradient>
+    <clipPath id="a"><path d="M170 113h74v168a22 22 0 0 1-22 22h-30a22 22 0 0 1-22-22z"/></clipPath>
+    <clipPath id="b"><path d="M282 113h74v168a22 22 0 0 1-22 22h-30a22 22 0 0 1-22-22z"/></clipPath>
+    <clipPath id="c"><path d="M394 113h74v168a22 22 0 0 1-22 22h-30a22 22 0 0 1-22-22z"/></clipPath>
+  </defs>
+  <rect width="640" height="400" rx="30" fill="url(#bg)"/>
+  <path d="M255 0h130l85 305H170z" fill="url(#light)"/>
+  <ellipse cx="320" cy="317" rx="188" ry="13" fill="#081322" opacity=".45"/>
+  <g clip-path="url(#a)"><path fill="#e4889a" d="M170 208h74v100h-74z"/><path fill="#eed173" d="M170 163h74v45h-74z"/></g>
+  <g clip-path="url(#b)"><path fill="#eed173" d="M282 163h74v145h-74z"/></g>
+  <g clip-path="url(#c)"><path fill="#e4889a" d="M394 118h74v190h-74z"/></g>
+  <g fill="none" stroke="#bdd0e0" stroke-width="4" opacity=".85"><path d="M170 111v170a22 22 0 0 0 22 22h30a22 22 0 0 0 22-22V111"/><path d="M282 111v170a22 22 0 0 0 22 22h30a22 22 0 0 0 22-22V111"/><path d="M394 111v170a22 22 0 0 0 22 22h30a22 22 0 0 0 22-22V111"/></g>
+  <g font-family="sans-serif" font-weight="700" font-size="24" fill="#203044" text-anchor="middle"><text x="207" y="193">A</text><text x="207" y="260">B</text><text x="319" y="241">A</text><text x="431" y="226">B</text></g>
+  <path d="M253 78h37m-9-9 10 9-10 9" fill="none" stroke="#f2ce88" stroke-linecap="round" stroke-width="4"/>
+  <g fill="#f2ce88"><path d="m482 69 3 10 10 3-10 3-3 10-3-10-10-3 10-3z"/><circle cx="157" cy="80" r="3"/></g>
+  <text x="320" y="360" text-anchor="middle" fill="#f5e0b5" font-size="23" font-family="'Microsoft YaHei',sans-serif" letter-spacing="3">下班调饮料</text>
+</svg>

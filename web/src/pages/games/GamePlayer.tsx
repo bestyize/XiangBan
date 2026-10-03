@@ -68,6 +68,7 @@ export default function GamePlayer() {
       catch { if (round === roundRef.current) setRecordError('游戏记录暂未保存，网络恢复后可继续重试。') }
     }
     function finish(round: Round) {
+      if (round.finished) return
       if (round.timer) clearTimeout(round.timer)
       round.timer = null; round.finished = true
       void persist(round, true)

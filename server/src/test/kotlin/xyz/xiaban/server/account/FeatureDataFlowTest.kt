@@ -9,6 +9,22 @@ import xyz.xiaban.shared.*
 import kotlin.test.*
 
 class FeatureDataFlowTest {
+    @Test fun `new puzzle game records are stored independently and reject unknown games`() = apiTest {
+        val player = session()
+        for ((gameId, score) in listOf("block-puzzle" to 96L, "water-sort" to 300L)) {
+            val game = post("/api/games/sessions", player.token, GameStart(gameId)).body<GameSessionView>()
+            assertEquals(gameId, game.gameId)
+            val result = put("/api/games/sessions/${game.id}", player.token, GameProgress(score = score, finished = true)).body<GameSessionView>()
+            assertEquals(score, result.score)
+            assertNotNull(result.finishedAt)
+        }
+        val summaries = get("/api/games/summary", player.token).body<List<GameSummary>>().associateBy { it.gameId }
+        assertEquals(setOf("block-puzzle", "water-sort"), summaries.keys)
+        assertEquals(96L, summaries.getValue("block-puzzle").bestScore)
+        assertEquals(300L, summaries.getValue("water-sort").bestScore)
+        assertEquals(HttpStatusCode.BadRequest, post("/api/games/sessions", player.token, GameStart("unknown-game")).status)
+    }
+
     @Test fun `game and afterwork data belong to numeric IDs in their own stores`() = apiTest {
         val a = session(); val b = session()
         val game = post("/api/games/sessions", a.token, GameStart("merge-2048")).body<GameSessionView>()
