@@ -13,6 +13,13 @@ game-packs/
     game.js
     game.css
     cover.svg
+  merge-2048/
+    manifest.json
+    index.html
+    rules.js
+    game.js
+    game.css
+    cover.svg
 ```
 
 Add a game by creating a package directory with its own entry and manifest, then add its ID to the catalog. The hub and player use the same loader for every package.

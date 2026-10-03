@@ -1,6 +1,7 @@
 {
   "version": 1,
   "games": [
-    "falling-blocks"
+    "falling-blocks",
+    "merge-2048"
   ]
 }
