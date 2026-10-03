@@ -55,7 +55,7 @@ function Gate() {
   if (location === '/login') return <EmailLogin />
   if (location === '/me') return <><Me key={profile.userId} /><TabBar /></>
   if (location === '/me/account') return <AccountProfile key={profile.userId} />
-  if (profile.onboarded && profile.termsVersion !== TERMS_VERSION) return <ConsentScreen />
+  if (profile.accountType === 'registered' && profile.onboarded && profile.termsVersion !== TERMS_VERSION) return <ConsentScreen />
   if (!profile.onboarded && location !== '/hello') return <Redirect to="/hello" replace />
 
   return (

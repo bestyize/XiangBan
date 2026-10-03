@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { api } from '../api/client.ts'
+import { api, getToken } from '../api/client.ts'
 import type { Profile } from '../api/types.ts'
 import { ConsentChecks, consentComplete, type ConsentState } from '../components/ConsentChecks.tsx'
 import { Bubble, CatWindow, FieldError, PrimaryButton, Screen } from '../components/ui.tsx'
@@ -8,7 +8,7 @@ import { useSession } from '../lib/session.tsx'
 
 /** Shown to existing users when the terms change, before anything else. */
 export default function ConsentScreen() {
-  const { setProfile } = useSession()
+  const { setProfile, updateProfile } = useSession()
   const [consent, setConsent] = useState<ConsentState>({ terms: false, overseas: false })
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -17,7 +17,11 @@ export default function ConsentScreen() {
     setBusy(true)
     setError(null)
     try {
-      setProfile(await api<Profile>('/api/consent', { method: 'PUT', body: { termsVersion: TERMS_VERSION, overseas: consent.overseas } }))
+      if (getToken()) {
+        setProfile(await api<Profile>('/api/consent', { method: 'PUT', body: { termsVersion: TERMS_VERSION, overseas: consent.overseas } }))
+      } else {
+        await updateProfile({ termsVersion: TERMS_VERSION })
+      }
     } catch (e) {
       setError((e as Error).message)
       setBusy(false)

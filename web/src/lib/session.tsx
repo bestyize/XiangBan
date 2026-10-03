@@ -153,6 +153,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         payday: patch.payday !== undefined ? (patch.payday || null) : current.payday,
         showCityOnCard: patch.showCityOnCard ?? current.showCityOnCard,
         onboarded: patch.onboarded ?? current.onboarded,
+        termsVersion: patch.termsVersion ?? current.termsVersion,
       }
       storage.set(GUEST_PROFILE_KEY, JSON.stringify(next))
       setProfile(next)

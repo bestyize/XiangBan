@@ -60,6 +60,7 @@ export interface ProfileUpdate {
   payday?: number
   showCityOnCard?: boolean
   onboarded?: boolean
+  termsVersion?: string
 }
 
 export interface Features {
