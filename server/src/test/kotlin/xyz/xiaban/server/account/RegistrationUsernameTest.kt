@@ -14,13 +14,10 @@ class RegistrationUsernameTest {
         val mail = TestEnv.awaitMail { it.to == "required@example.com" }
         val code = Regex("\\d{6}").find(mail.subject)!!.value
         fun request(name: String? = null) = EmailLoginRequest("required@example.com", code, guest.deviceId, username = name)
-        val missing = post(ApiPaths.EMAIL_LOGIN, guest.token, request())
-        assertEquals(HttpStatusCode.BadRequest, missing.status)
-        assertEquals("username_required", missing.body<ApiError>().error)
-        assertEquals("guest", get(ApiPaths.PROFILE, guest.token).body<ProfileView>().accountType)
         assertEquals(HttpStatusCode.BadRequest, post(ApiPaths.EMAIL_LOGIN, guest.token, request("1234")).status)
-        val registered = post(ApiPaths.EMAIL_LOGIN, guest.token, request("NewUser")).body<BindResponse>()
-        assertEquals("NewUser", registered.profile.nickname)
+        assertEquals("guest", get(ApiPaths.PROFILE, guest.token).body<ProfileView>().accountType)
+        val registered = post(ApiPaths.EMAIL_LOGIN, guest.token, request()).body<BindResponse>()
+        assertTrue(registered.profile.nickname!!.isNotBlank())
         assertEquals(guest.profile.userId, registered.profile.userId)
         assertEquals("registered", registered.profile.accountType)
     }

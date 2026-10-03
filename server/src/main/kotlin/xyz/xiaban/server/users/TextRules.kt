@@ -30,6 +30,23 @@ object TextRules {
     fun nicknameKey(value: String) = Normalizer.normalize(value, Normalizer.Form.NFKC).lowercase(Locale.ROOT)
     fun contactName(raw: String): String? = raw.trim().ifEmpty { null }?.let { clean(it, min = 1, max = 8, what = "称呼") }
 
+    private val adjectives = listOf(
+        "准点的", "下班的", "摸鱼的", "快乐的", "发呆的", "散步的", "悠闲的", "看云的",
+        "元气的", "清爽的", "喝茶的", "吹风的", "慢吞吞的", "早睡的", "吃饱饱的", "打瞌睡的",
+        "惬意的", "随性的", "认真的", "好奇的",
+    )
+    private val animals = listOf(
+        "小猫", "小橘", "小柴", "松鼠", "海獭", "考拉", "白鸽", "刺猬",
+        "小熊", "企鹅", "兔子", "海豚", "狐狸", "小鹿", "熊猫", "小雀",
+    )
+
+    fun randomChineseNickname(): String {
+        val adj = adjectives.random()
+        val animal = animals.random()
+        val num = (100..999).random()
+        return "$adj$animal$num"
+    }
+
     private fun clean(raw: String, min: Int, max: Int, what: String): String {
         val text = raw.replace(control, "").trim().replace(Regex("""\s+"""), " ")
         val length = text.codePointCount(0, text.length)

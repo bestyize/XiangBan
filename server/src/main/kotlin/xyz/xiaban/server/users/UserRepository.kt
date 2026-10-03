@@ -8,6 +8,7 @@ import xyz.xiaban.server.db.localTime
 import xyz.xiaban.server.db.queryOne
 import xyz.xiaban.shared.Personality
 import java.sql.ResultSet
+import java.sql.Connection
 import java.time.Instant
 import java.time.LocalTime
 import java.time.ZoneId
@@ -113,11 +114,27 @@ class UserRepository(private val db: Db) {
         c.execute("update users set email = ?, email_verified_at = now() where id = ?", email, userId)
     }
 
+    private fun generateUniqueChineseNickname(c: Connection): String {
+        repeat(100) {
+            val candidate = TextRules.randomChineseNickname()
+            val taken = c.queryOne("select exists(select 1 from user_profiles where nickname_key = ?)", TextRules.nicknameKey(candidate)) { it.getBoolean(1) } == true
+            if (!taken) return candidate
+        }
+        return "下班小伴" + (1000..9999).random()
+    }
+
     /** Serialise first registrations for an address so its unique constraint is never raced. */
     suspend fun claimEmail(userId: Long, email: String, username: String?, consumeCode: () -> Unit): Long = try { db.tx { c ->
         c.queryOne("select pg_advisory_xact_lock(hashtext(?))", "email:$email") { }
         val target = c.queryOne("select id from users where email = ?", email) { it.getLong(1) } ?: run {
-            val name = TextRules.nickname(username.orEmpty()) ?: badRequest("邮箱验证成功，请设置用户名完成注册", "username_required")
+            val name = if (!username.isNullOrBlank()) {
+                val explicit = TextRules.nickname(username) ?: generateUniqueChineseNickname(c)
+                val taken = c.queryOne("select exists(select 1 from user_profiles where nickname_key = ?)", TextRules.nicknameKey(explicit)) { it.getBoolean(1) } == true
+                if (taken) conflict("这个用户名已有人使用，换一个吧", "nickname_taken")
+                explicit
+            } else {
+                generateUniqueChineseNickname(c)
+            }
             val id = if (userId > 0 && c.queryOne("select exists(select 1 from users where id = ?)", userId) { it.getBoolean(1) } == true) {
                 c.execute("update user_profiles set nickname=?,nickname_key=?,updated_at=now() where user_id=?", name, TextRules.nicknameKey(name), userId)
                 c.execute("update users set email = ?, email_verified_at = now() where id = ?", email, userId)

@@ -136,7 +136,6 @@ class EmailBinding(
                 if ARGV[3]=='1' then redis.call('DEL',KEYS[1]) end
                 return 'ok'
             end
-            end
             local n=tonumber(attempts)+1
             if n>=5 then redis.call('DEL',KEYS[1])
             else redis.call('SET',KEYS[1],expected..':'..owner..':'..n,'KEEPTTL') end
