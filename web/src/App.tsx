@@ -16,6 +16,9 @@ import ProfileEdit from './pages/me/ProfileEdit.tsx'
 import Onboarding from './pages/onboarding/Onboarding.tsx'
 import GameHub from './pages/games/GameHub.tsx'
 import GamePlayer from './pages/games/GamePlayer.tsx'
+import EmailLogin from './pages/EmailLogin.tsx'
+import AdminPage from './pages/AdminPage.tsx'
+import AccountProfile from './pages/me/AccountProfile.tsx'
 
 function usePageViews() {
   const [location] = useLocation()
@@ -49,14 +52,17 @@ function Gate() {
       </Screen>
     )
   }
+  if (location === '/login') return <EmailLogin />
+  if (location === '/me') return <><Me key={profile.userId} /><TabBar /></>
+  if (location === '/me/account') return <AccountProfile key={profile.userId} />
   if (profile.onboarded && profile.termsVersion !== TERMS_VERSION) return <ConsentScreen />
   if (!profile.onboarded && location !== '/hello') return <Redirect to="/hello" replace />
 
   return (
-    <Switch>
+    <Switch key={profile.userId}>
       <Route path="/hello" component={Onboarding} />
       <Route path="/card" component={CardPreview} />
-      <Route path="/games/:gameId" component={GamePlayer} />
+      <Route path="/games/:gameId"><GamePlayer key={profile.userId} /></Route>
       <Route path="/games"><GameHub /><TabBar /></Route>
       <Route path="/me/guardian" component={GuardianPage} />
       <Route path="/me/profile" component={ProfileEdit} />
@@ -69,6 +75,8 @@ function Gate() {
 }
 
 export default function App() {
+  const [location] = useLocation()
+  if (location === '/admin' || location.startsWith('/admin/')) return <AdminPage />
   return (
     <SessionProvider>
       <Gate />

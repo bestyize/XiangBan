@@ -1,0 +1,9 @@
+# Optional VMware preview overlay. Build server/build/install/server on the host first.
+services:
+  server:
+    build:
+      dockerfile: server/Dockerfile.runtime
+  web:
+    build:
+      args:
+        NPM_REGISTRY: ${NPM_REGISTRY:-https://registry.npmjs.org}

@@ -29,6 +29,9 @@ class AccountMerge(private val db: Db) {
         c.execute("update devices set user_id = ? where user_id = ?", target, source)
         c.execute("update copy_reports set user_id = ? where user_id = ?", target, source)
         c.execute("update events set user_id = ? where user_id = ?", target, source)
+        c.execute("update game_sessions set user_id=? where user_id=?", target, source)
+        c.execute("insert into afterwork_choices(user_id,work_day,activity_id,selected_at) select ?,work_day,activity_id,selected_at from afterwork_choices where user_id=? on conflict do nothing", target, source)
+        c.execute("insert into afterwork_preferences(user_id,preferred_activity_id,prompt_dismissed_at) select ?,preferred_activity_id,prompt_dismissed_at from afterwork_preferences where user_id=? on conflict do nothing", target, source)
         c.execute("update users set referred_by = ? where referred_by = ?", target, source)
         c.execute("delete from users where id = ?", source)
     }

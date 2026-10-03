@@ -56,7 +56,7 @@ export default function ProfileEdit() {
           <label className="block"><span className="mb-1.5 block text-sm text-window/70">小伴的名字</span>
             <input className={input} value={draft.companionName} maxLength={8} onChange={(e) => set({ companionName: e.target.value })} /></label>
           <label className="block"><span className="mb-1.5 block text-sm text-window/70">小伴怎么叫你</span>
-            <input className={input} value={draft.nickname} maxLength={8} placeholder="不填就叫你「你」" onChange={(e) => set({ nickname: e.target.value })} /></label>
+            <input className={input} value={draft.nickname} maxLength={24} placeholder="昵称至少 2 字，英文至少 4 字" onChange={(e) => set({ nickname: e.target.value })} /></label>
         </div>
         <fieldset>
           <legend className="mb-1.5 text-sm text-window/70">性格</legend>

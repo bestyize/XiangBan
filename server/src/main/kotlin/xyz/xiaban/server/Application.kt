@@ -33,6 +33,7 @@ fun Application.xiaban(services: Services) {
         userRoutes(services)
         checkinRoutes(services)
         accountRoutes(services)
+        featureRoutes(services)
         adminRoutes(services)
     }
     services.startWorkers(this)

@@ -19,8 +19,7 @@ class RecallFlowTest {
 
     @Test
     fun `recall emails go out at most twice per lapse and can be unsubscribed`() = apiTest {
-        val token = session().token
-        bind(token, "me@example.com")
+        val token = bind(session().token, "me@example.com").token
         put(ApiPaths.SUBSCRIPTION, token, SubscriptionUpdate(true))
         clock.setBeijing("2026-10-12T20:00")
         post(ApiPaths.CHECKIN, token)

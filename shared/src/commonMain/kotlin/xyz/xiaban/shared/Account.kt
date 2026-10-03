@@ -6,7 +6,13 @@ import kotlinx.serialization.Serializable
 data class EmailCodeRequest(val email: String)
 
 @Serializable
-data class BindEmailRequest(val email: String, val code: String)
+data class BindEmailRequest(val email: String, val code: String, val username: String? = null)
+
+@Serializable
+data class EmailLoginRequest(val email: String, val code: String, val deviceId: String, val mergeGuest: Boolean = false, val username: String? = null)
+
+@Serializable
+data class LogoutRequest(val deviceId: String)
 
 /** When the email already belongs to another account, this device's data moves into it ([merged]). */
 @Serializable

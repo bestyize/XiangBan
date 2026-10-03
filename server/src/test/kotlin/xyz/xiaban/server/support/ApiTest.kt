@@ -36,7 +36,7 @@ class ApiScope(val client: HttpClient, val services: Services) {
     fun newDeviceId(): String = UUID.randomUUID().toString().replace("-", "")
 
     suspend fun session(deviceId: String = newDeviceId(), timezone: String = "Asia/Shanghai"): SessionResponse =
-        client.post(ApiPaths.SESSION) { json(SessionRequest(deviceId, timezone)) }.body()
+        client.post(ApiPaths.SESSION) { json(SessionRequest(deviceId, timezone, materialize = true)) }.body()
 
     suspend fun get(path: String, token: String?): HttpResponse = client.get(path) { auth(token) }
 

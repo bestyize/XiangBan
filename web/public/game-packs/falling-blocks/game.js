@@ -44,13 +44,14 @@
   let timer = null
   let hostReady = false
 
-  function postToHost(type) {
+  function postToHost(type, payload = {}) {
     if (!hostReady || !HOST_NONCE || window.parent === window) return
     window.parent.postMessage({
       channel: PACK_CHANNEL,
       protocol: PROTOCOL,
       type,
       nonce: HOST_NONCE,
+      ...payload,
     }, '*')
   }
 
@@ -67,6 +68,8 @@
     document.body.classList.add('hosted')
     hostReady = true
     postToHost('game.ready')
+    postToHost('game.start')
+    postToHost('game.progress', { score, lines })
   })
 
   function shuffle(items) {
@@ -167,6 +170,7 @@
     scoreNode.textContent = String(score)
     linesNode.textContent = String(lines)
     levelNode.textContent = String(level)
+    postToHost('game.progress', { score, lines })
   }
 
   function dropInterval() {
@@ -192,6 +196,7 @@
   }
 
   function endGame() {
+    postToHost('game.result', { score, lines })
     finished = true
     paused = false
     if (timer !== null) window.clearInterval(timer)
@@ -304,6 +309,7 @@
     level = 1
     paused = false
     finished = false
+    postToHost('game.start')
     pauseButton.textContent = '暂停'
     gameOver.hidden = true
     updateStats()

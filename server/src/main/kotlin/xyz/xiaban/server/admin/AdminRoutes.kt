@@ -1,48 +1,145 @@
 package xyz.xiaban.server.admin
 
+import io.ktor.http.Cookie
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.ApplicationCall
+import io.ktor.server.plugins.origin
 import io.ktor.server.request.receive
+import io.ktor.server.request.httpMethod
 import io.ktor.server.response.respond
-import io.ktor.server.routing.Route
-import io.ktor.server.routing.delete
-import io.ktor.server.routing.get
-import io.ktor.server.routing.put
-import io.ktor.server.routing.route
+import io.ktor.server.routing.*
+import kotlinx.serialization.Serializable
 import xyz.xiaban.server.Services
 import xyz.xiaban.server.http.ApiException
+import xyz.xiaban.server.http.badRequest
+import xyz.xiaban.server.http.tooMany
+import xyz.xiaban.server.mail.Mail
 import xyz.xiaban.shared.FlagsUpdate
 import xyz.xiaban.shared.OkResponse
+import kotlinx.coroutines.future.await
 import java.security.MessageDigest
+import java.net.URI
 
-/** Operator endpoints, enabled only when ADMIN_TOKEN is set; called with the X-Admin-Token header. */
+@Serializable data class AdminLogin(val username: String, val password: String)
+@Serializable data class AdminSession(val username: String)
+@Serializable data class AdminPassword(val oldPassword: String, val newPassword: String)
+@Serializable data class TestEmail(val email: String)
+
+private const val COOKIE = "xb_admin_session"
+
 fun Route.adminRoutes(services: Services) {
-    val token = services.config.adminToken ?: return
     route("/api/admin") {
-        get("/flags") {
-            call.requireAdmin(token)
-            call.respond(services.flags.view())
+        post("/login") {
+            call.checkOrigin()
+            val req = call.receive<AdminLogin>()
+            val token = services.administrators.login(req.username.trim(), req.password, call.request.origin.remoteHost)
+            call.adminCookie(services, token, 8 * 3600)
+            call.respond(AdminSession(req.username.trim()))
         }
-        put("/flags") {
-            call.requireAdmin(token)
-            call.respond(services.flags.update(call.receive<FlagsUpdate>()))
+        get("/session") { call.respond(AdminSession(call.requireAdmin(services))) }
+        get("/overview") { call.requireAdmin(services); call.respond(services.adminUsers.overview()) }
+        get("/users") {
+            call.requireAdmin(services)
+            val query = call.request.queryParameters
+            call.respond(services.adminUsers.list(call.pageParameter("page", 1), call.pageParameter("pageSize", 20),
+                query["q"].orEmpty(), query["type"] ?: "all", query["onboarding"] ?: "all", query["sort"] ?: "newest",
+                query["from"].orEmpty(), query["to"].orEmpty()))
         }
+        get("/users/{id}") { call.requireAdmin(services); call.respond(services.adminUsers.detail(call.userParameter())) }
+        put("/users/{id}") {
+            val actor = call.requireAdmin(services)
+            val id = call.userParameter()
+            services.adminUsers.update(id, call.receive<AdminUserUpdate>(), actor)
+            services.guardian.reschedule(id)
+            call.respond(services.adminUsers.detail(id))
+        }
+        delete("/users/{id}") {
+            val actor = call.requireAdmin(services)
+            val id = call.userParameter()
+            services.adminUsers.delete(id, call.receive<AdminUserDelete>().confirmUserId, actor)
+            services.guardian.reschedule(id)
+            call.respond(OkResponse())
+        }
+        put("/users/{id}/note") {
+            val actor = call.requireAdmin(services)
+            services.adminUsers.saveNote(call.userParameter(), call.receive<AdminNoteUpdate>().note, actor)
+            call.respond(OkResponse())
+        }
+        get("/audit") {
+            call.requireAdmin(services)
+            call.respond(services.adminUsers.auditPage(call.pageParameter("page", 1), call.pageParameter("pageSize", 20)))
+        }
+        post("/logout") {
+            call.checkOrigin()
+            services.administrators.logout(call.request.cookies[COOKIE])
+            call.adminCookie(services, "", 0)
+            call.respond(OkResponse())
+        }
+        put("/password") {
+            val username = call.requireAdmin(services)
+            val req = call.receive<AdminPassword>()
+            services.administrators.changePassword(username, req.oldPassword, req.newPassword)
+            call.adminCookie(services, "", 0)
+            call.respond(OkResponse())
+        }
+        get("/email") {
+            call.requireAdmin(services)
+            call.respond(services.emailSettings.current().redacted())
+        }
+        put("/email") {
+            val actor = call.requireAdmin(services)
+            val saved = services.emailSettings.save(call.receive<EmailSettings>(), actor)
+            call.respond(saved)
+        }
+        post("/email/test") {
+            val username = call.requireAdmin(services)
+            val req = call.receive<TestEmail>()
+            val email = xyz.xiaban.server.account.EmailBinding.normalize(req.email)
+            if (services.redis.cmd.set("xb:admin:testmail:$username", "1", io.lettuce.core.SetArgs.Builder.nx().ex(30)).await() != "OK") {
+                tooMany("请等 30 秒再发送测试邮件")
+            }
+            try { services.mailer.send(Mail(email, "下班了么 · 邮件服务测试", "这是一封由管理后台请求发送的测试邮件。收到它说明 SMTP 发信链路已接通。")) }
+            catch (_: Exception) { throw ApiException(HttpStatusCode.ServiceUnavailable, "mail_send_failed", "测试邮件发送失败，请检查主机、端口、授权码与 TLS 设置") }
+            call.respond(OkResponse())
+        }
+        get("/flags") { call.requireAdmin(services); call.respond(services.flags.view()) }
+        put("/flags") { call.requireAdmin(services); call.respond(services.flags.update(call.receive<FlagsUpdate>())) }
         get("/reports") {
-            call.requireAdmin(token)
+            call.requireAdmin(services)
             val limit = call.request.queryParameters["limit"]?.toIntOrNull()?.coerceIn(1, 200) ?: 50
             call.respond(services.moderation.reports(limit))
         }
         delete("/copies/{id}/disabled") {
-            call.requireAdmin(token)
+            call.requireAdmin(services)
             services.moderation.restore(call.parameters["id"]!!)
             call.respond(OkResponse())
         }
     }
 }
 
-private fun ApplicationCall.requireAdmin(token: String) {
-    val given = request.headers["X-Admin-Token"]?.toByteArray() ?: ByteArray(0)
-    if (!MessageDigest.isEqual(given, token.toByteArray())) {
-        throw ApiException(HttpStatusCode.NotFound, "not_found", "这里什么都没有")
-    }
+private fun ApplicationCall.pageParameter(name: String, default: Int): Int = request.queryParameters[name]?.let {
+    it.toIntOrNull() ?: badRequest("分页参数必须为整数")
+} ?: default
+
+private fun ApplicationCall.userParameter(): Long = parameters["id"]?.toLongOrNull()?.takeIf { it > 0 }
+    ?: badRequest("用户编号不正确")
+
+private fun ApplicationCall.checkOrigin() {
+    val origin = request.headers["Origin"] ?: return
+    val host = request.headers["Host"]
+    if (runCatching { URI(origin).rawAuthority }.getOrNull() != host) badRequest("请从本站管理后台提交请求", "invalid_origin")
+}
+
+private fun ApplicationCall.adminCookie(services: Services, token: String, age: Int) {
+    response.cookies.append(Cookie(COOKIE, token, maxAge = age, path = "/api/admin", httpOnly = true,
+        secure = services.config.publicBaseUrl.startsWith("https://"), extensions = mapOf("SameSite" to "Strict")))
+}
+
+private suspend fun ApplicationCall.requireAdmin(services: Services): String {
+    if (request.httpMethod.value != "GET") checkOrigin()
+    val expected = services.config.adminToken
+    val given = request.headers["X-Admin-Token"]
+    if (expected != null && given != null && MessageDigest.isEqual(expected.toByteArray(), given.toByteArray())) return "legacy-token"
+    return services.administrators.username(request.cookies[COOKIE])
+        ?: throw ApiException(HttpStatusCode.Unauthorized, "admin_unauthorized", "请先登录管理员账号")
 }

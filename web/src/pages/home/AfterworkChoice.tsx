@@ -1,16 +1,12 @@
-import { useEffect, useState } from 'react'
 import type { Tip } from '../../api/types.ts'
 import {
   AFTERWORK_ACTIVITIES,
-  dismissAfterworkHabitPrompt,
   getAfterworkActivityLabel,
   getRecentAfterworkActivityCount,
-  loadAfterworkData,
-  recordAfterworkChoice,
-  setPreferredAfterworkActivity,
   type AfterworkActivityId,
-  type AfterworkData,
 } from '../../lib/afterwork.ts'
+import { useAfterwork } from '../../lib/useAfterwork.ts'
+import { FieldError } from '../../components/ui.tsx'
 
 interface AfterworkChoiceProps {
   workDay: string
@@ -26,11 +22,7 @@ function tonightSuggestion(localTime: string, tips: Tip[] | null): string {
 }
 
 export function AfterworkChoice({ workDay, localTime, tips }: AfterworkChoiceProps) {
-  const [data, setData] = useState<AfterworkData>(() => loadAfterworkData())
-
-  useEffect(() => {
-    setData(loadAfterworkData())
-  }, [workDay])
+  const { data, choose: saveChoice, remember: savePreference, dismiss: saveDismissal, busy, loading, error } = useAfterwork()
 
   const selected = data.entries.find((entry) => entry.workDay === workDay)?.activityId ?? null
   const selectedCount = selected ? getRecentAfterworkActivityCount(data, selected, workDay) : 0
@@ -44,15 +36,15 @@ export function AfterworkChoice({ workDay, localTime, tips }: AfterworkChoicePro
   )
 
   function choose(activityId: AfterworkActivityId) {
-    setData(recordAfterworkChoice(workDay, activityId))
+    void saveChoice(workDay, activityId)
   }
 
   function remember(activityId: AfterworkActivityId) {
-    setData(setPreferredAfterworkActivity(activityId))
+    void savePreference(activityId)
   }
 
   function dismiss(activityId: AfterworkActivityId) {
-    setData(dismissAfterworkHabitPrompt(activityId, selectedCount))
+    void saveDismissal(activityId, selectedCount)
   }
 
   return (
@@ -66,11 +58,12 @@ export function AfterworkChoice({ workDay, localTime, tips }: AfterworkChoicePro
         )}
       </div>
       <p className="mt-1 text-sm text-window/70">{tonightSuggestion(localTime, tips)}</p>
-      <p className="mt-2 text-xs text-window/45">想选就选，今天不安排也可以。选择只保存在这台设备，不会上服务器。</p>
+      <p className="mt-2 text-xs text-window/45">{loading ? '正在读取当前账号的安排…' : busy ? '正在保存…' : '安排会保存在当前用户 ID 下，登录后可跨设备找回。'}</p><FieldError message={error} />
 
       {data.preferredActivityId && !selected && (
         <button
           type="button"
+          disabled={busy || loading}
           className="mt-3 rounded-full border border-lamp/40 px-3 py-1.5 text-sm text-lamp"
           onClick={() => choose(data.preferredActivityId!)}
         >
@@ -85,6 +78,7 @@ export function AfterworkChoice({ workDay, localTime, tips }: AfterworkChoicePro
             <button
               key={activity.id}
               type="button"
+              disabled={busy || loading}
               aria-pressed={active}
               onClick={() => choose(activity.id)}
               className={[
@@ -119,8 +113,8 @@ export function AfterworkChoice({ workDay, localTime, tips }: AfterworkChoicePro
             近两周你有 {selectedCount} 天下班后选了「{getAfterworkActivityLabel(selected)}」。要把它记成常做安排吗？
           </p>
           <div className="mt-2 flex gap-3">
-            <button type="button" className="text-sm text-lamp" onClick={() => remember(selected)}>记下来</button>
-            <button type="button" className="text-sm text-window/55" onClick={() => dismiss(selected)}>下次再说</button>
+            <button type="button" disabled={busy || loading} className="text-sm text-lamp" onClick={() => remember(selected)}>记下来</button>
+            <button type="button" disabled={busy || loading} className="text-sm text-window/55" onClick={() => dismiss(selected)}>下次再说</button>
           </div>
         </div>
       )}

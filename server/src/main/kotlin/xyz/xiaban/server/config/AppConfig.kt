@@ -37,6 +37,9 @@ data class AppConfig(
     /** 带小伴回家 default (PRD 8.4, phase three) and where the button sends people */
     val goHomeEnabled: Boolean,
     val appDownloadUrl: String?,
+    val adminUsername: String = "admin",
+    val adminBootstrapPassword: String? = null,
+    val settingsEncryptionKey: String? = null,
 ) {
     val isProd: Boolean get() = env == "prod"
 
@@ -84,6 +87,9 @@ data class AppConfig(
                 },
                 goHomeEnabled = env.bool("GO_HOME_ENABLED", false),
                 appDownloadUrl = env.optional("APP_DOWNLOAD_URL"),
+                adminUsername = env.str("ADMIN_USERNAME", "admin"),
+                adminBootstrapPassword = env.optional("ADMIN_BOOTSTRAP_PASSWORD"),
+                settingsEncryptionKey = env.optional("SETTINGS_ENCRYPTION_KEY"),
             )
         }
 

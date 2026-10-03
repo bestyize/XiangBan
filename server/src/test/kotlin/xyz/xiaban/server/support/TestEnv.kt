@@ -34,6 +34,9 @@ object TestEnv {
             "ADMIN_TOKEN" to ADMIN_TOKEN,
             "LLM_DAILY_LIMIT" to "1",
             "APP_DOWNLOAD_URL" to "https://example.com/xiangban",
+            "ADMIN_USERNAME" to "testadmin",
+            "ADMIN_BOOTSTRAP_PASSWORD" to "test-admin-password-2026",
+            "SETTINGS_ENCRYPTION_KEY" to "test-settings-encryption-key",
         ),
     )
 

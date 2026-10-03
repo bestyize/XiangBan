@@ -23,6 +23,8 @@ import java.time.Clock
 import java.time.Duration
 import java.time.Instant
 import java.time.LocalDateTime
+import java.time.LocalTime
+import java.time.ZoneId
 import java.time.temporal.ChronoUnit
 
 class CheckinService(
@@ -104,6 +106,42 @@ class CheckinService(
         val row = checkins.find(active.id) ?: active
         val view = views.view(row, user, now, snapshot, pending = polisher.isPending(row.id))
         TodayResponse(workDay.toString(), view, tips = tipList.await())
+    }
+
+    suspend fun visitorToday(timezone: String): TodayResponse {
+        val vis = profiles.visitor(timezone)
+        val user = User(
+            id = 0, cityCode = vis.cityCode, timezone = ZoneId.of(timezone),
+            workStart = LocalTime.parse(vis.workStart), workEnd = LocalTime.parse(vis.workEnd),
+            onboardedAt = clock.instant(), createdAt = clock.instant(), companionName = vis.companionName,
+            personality = vis.personality, nickname = vis.nickname, payday = vis.payday,
+            inviteCode = "", showCityOnCard = false, email = null, recallOptIn = false, termsVersion = null,
+            emailVerifiedAt = null, avatarKey = null,
+        )
+        val now = clock.instant()
+        val local = LocalDateTime.ofInstant(now, user.timezone)
+        val workDay = WorkDay.of(local)
+        val greeting = planner.greeting(user, workDay, local, null)
+        return TodayResponse(workDay.toString(), null, greeting, tips = emptyList())
+    }
+
+    suspend fun visitorCheckIn(timezone: String): CheckinView {
+        val vis = profiles.visitor(timezone)
+        val user = User(
+            id = 0, cityCode = vis.cityCode, timezone = ZoneId.of(timezone),
+            workStart = LocalTime.parse(vis.workStart), workEnd = LocalTime.parse(vis.workEnd),
+            onboardedAt = clock.instant(), createdAt = clock.instant(), companionName = vis.companionName,
+            personality = vis.personality, nickname = vis.nickname, payday = vis.payday,
+            inviteCode = "", showCityOnCard = false, email = null, recallOptIn = false, termsVersion = null,
+            emailVerifiedAt = null, avatarKey = null,
+        )
+        val now = clock.instant()
+        val local = LocalDateTime.ofInstant(now, user.timezone)
+        val workDay = WorkDay.of(local)
+        val title = TitleRules.compute(local, workDay, user.workEnd, calendar)
+        val plan = planner.plan(user, workDay, title, emptyList(), emptySet(), null)
+        val row = CheckinRow(0, 0, workDay, now, title, plan.copyId, plan.text, null, xyz.xiaban.shared.ReplySource.Library, plan.careMode, null)
+        return views.view(row, user, now, stats.snapshot(user, now), pending = false)
     }
 
     suspend fun undo(userId: Long): TodayResponse {

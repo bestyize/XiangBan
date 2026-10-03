@@ -28,16 +28,51 @@ import xyz.xiaban.shared.GuardianPause
 import xyz.xiaban.shared.GuardianUpdate
 import xyz.xiaban.shared.OkResponse
 import xyz.xiaban.shared.SubscriptionUpdate
+import xyz.xiaban.shared.EmailLoginRequest
+import xyz.xiaban.shared.LogoutRequest
+import xyz.xiaban.server.users.DEVICE_COOKIE
+import xyz.xiaban.server.users.SessionService
+import io.ktor.http.Cookie
+import io.ktor.server.plugins.origin
 
 fun Route.accountRoutes(services: Services) {
+    get("/api/account/email/status") {
+        val settings = services.emailSettings.current()
+        call.respond(xyz.xiaban.server.admin.EmailServiceStatus(settings.enabled, services.emailAvailable()))
+    }
+    post(ApiPaths.EMAIL_LOGIN_CODE) {
+        val bearer = call.request.headers[HttpHeaders.Authorization]?.removePrefix("Bearer ")?.trim()
+        val userId = bearer?.let { services.tokens.userIdOrNull(it) }
+        services.emailBinding.sendCode(userId, call.receive<EmailCodeRequest>().email, login = true, ip = call.request.origin.remoteHost)
+        call.respond(OkResponse())
+    }
+    post(ApiPaths.EMAIL_LOGIN) {
+        val bearer = call.request.headers[HttpHeaders.Authorization]?.removePrefix("Bearer ")?.trim()
+        val userId = bearer?.let { services.tokens.userIdOrNull(it) }
+        val req = call.receive<EmailLoginRequest>()
+        val result = services.emailBinding.login(userId, req.email, req.code, req.deviceId, req.mergeGuest, req.username)
+        bearer?.let { services.tokens.revoke(it) }
+        call.respond(result)
+    }
     authenticate(AUTH_USER) {
+        post(ApiPaths.LOGOUT) {
+            val req = call.receive<LogoutRequest>()
+            val ids = listOfNotNull(req.deviceId, call.request.cookies[DEVICE_COOKIE]).filter(SessionService::isValidDeviceId).distinct()
+            call.request.headers[HttpHeaders.Authorization]?.removePrefix("Bearer ")?.trim()?.let { services.tokens.revoke(it) }
+            for (id in ids) services.users.unlinkDevice(call.userId(), SessionService.sha256(id))
+            call.response.cookies.append(Cookie(DEVICE_COOKIE, "", maxAge = 0, path = "/api", httpOnly = true,
+                secure = services.config.publicBaseUrl.startsWith("https://"), extensions = mapOf("SameSite" to "Lax")))
+            call.respond(OkResponse())
+        }
         post(ApiPaths.BIND_CODE) {
-            services.emailBinding.sendCode(call.userId(), call.receive<EmailCodeRequest>().email)
+            services.emailBinding.sendCode(call.userId(), call.receive<EmailCodeRequest>().email, ip = call.request.origin.remoteHost)
             call.respond(OkResponse())
         }
         post(ApiPaths.BIND) {
             val req = call.receive<BindEmailRequest>()
-            call.respond(services.emailBinding.bind(call.userId(), req.email, req.code))
+            val result = services.emailBinding.bind(call.userId(), req.email, req.code, req.username)
+            call.request.headers[HttpHeaders.Authorization]?.removePrefix("Bearer ")?.trim()?.let { services.tokens.revoke(it) }
+            call.respond(result)
         }
         put(ApiPaths.SUBSCRIPTION) {
             val userId = call.userId()

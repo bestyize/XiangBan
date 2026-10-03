@@ -11,6 +11,9 @@ import java.sql.ResultSet
 import java.time.Instant
 import java.time.LocalTime
 import java.time.ZoneId
+import java.sql.SQLException
+import xyz.xiaban.server.http.conflict
+import xyz.xiaban.server.http.badRequest
 
 data class User(
     val id: Long,
@@ -30,6 +33,8 @@ data class User(
     val email: String?,
     val recallOptIn: Boolean,
     val termsVersion: String?,
+    val emailVerifiedAt: Instant?,
+    val avatarKey: String?,
 )
 
 /** Where a new account came from: the inviter's code and the entry point, both from the QR link. */
@@ -56,8 +61,9 @@ fun personalityOf(code: String): Personality = Personality.entries.firstOrNull {
 class UserRepository(private val db: Db) {
 
     /** Serialised per device so concurrent first visits from one browser create a single account. */
-    suspend fun findOrCreate(deviceHash: String, timezone: String, referral: Referral? = null): Long = db.tx { c ->
+    suspend fun findOrCreate(deviceHash: String, timezone: String, referral: Referral? = null, guestOnly: Boolean = false): Long = db.tx { c ->
         c.queryOne("select pg_advisory_xact_lock(hashtext(?))", deviceHash) { }
+        if (guestOnly) c.execute("delete from devices where device_hash=? and user_id in (select id from users where email_verified_at is not null)", deviceHash)
         c.queryOne("update devices set last_seen_at = now() where device_hash = ? returning user_id", deviceHash) {
             it.getLong(1)
         } ?: run {
@@ -69,6 +75,7 @@ class UserRepository(private val db: Db) {
                 timezone, newInviteCode(), referrer, referral?.source,
             ) { it.getLong(1) }!!
             c.execute("insert into companions (user_id) values (?)", id)
+            c.execute("insert into user_profiles (user_id) values (?)", id)
             c.execute("insert into devices (device_hash, user_id) values (?, ?)", deviceHash, id)
             id
         }
@@ -86,12 +93,52 @@ class UserRepository(private val db: Db) {
 
     suspend fun find(userId: Long): User? = db.read { c -> c.queryOne("$SELECT_USER where u.id = ?", userId, map = ::mapUser) }
 
+    suspend fun exists(userId: Long): Boolean = db.read { c ->
+        c.queryOne("select exists(select 1 from users where id = ?)", userId) { it.getBoolean(1) }!!
+    }
+
+    suspend fun guestForDevice(deviceHash: String): Long? = db.read { c ->
+        c.queryOne("select d.user_id from devices d join users u on u.id=d.user_id where d.device_hash=? and u.email_verified_at is null", deviceHash) { it.getLong(1) }
+    }
+
+    suspend fun authState(userId: Long): Boolean? = db.read { c ->
+        c.queryOne("select email is not null and email_verified_at is not null from users where id=?", userId) { it.getBoolean(1) }
+    }
+
     suspend fun findIdByEmail(email: String): Long? = db.read { c ->
         c.queryOne("select id from users where email = ?", email) { it.getLong(1) }
     }
 
     suspend fun setEmail(userId: Long, email: String) = db.read { c ->
         c.execute("update users set email = ?, email_verified_at = now() where id = ?", email, userId)
+    }
+
+    /** Serialise first registrations for an address so its unique constraint is never raced. */
+    suspend fun claimEmail(userId: Long, email: String, username: String?, consumeCode: () -> Unit): Long = try { db.tx { c ->
+        c.queryOne("select pg_advisory_xact_lock(hashtext(?))", "email:$email") { }
+        val target = c.queryOne("select id from users where email = ?", email) { it.getLong(1) } ?: run {
+            val name = TextRules.nickname(username.orEmpty()) ?: badRequest("邮箱验证成功，请设置用户名完成注册", "username_required")
+            val id = if (userId > 0 && c.queryOne("select exists(select 1 from users where id = ?)", userId) { it.getBoolean(1) } == true) {
+                c.execute("update user_profiles set nickname=?,nickname_key=?,updated_at=now() where user_id=?", name, TextRules.nicknameKey(name), userId)
+                c.execute("update users set email = ?, email_verified_at = now() where id = ?", email, userId)
+                userId
+            } else {
+                val newId = c.queryOne(
+                    "insert into users (email, email_verified_at, timezone, invite_code) values (?, now(), ?, ?) returning id",
+                    email, DEFAULT_ZONE.id, newInviteCode(),
+                ) { it.getLong(1) }!!
+                c.execute("insert into companions (user_id) values (?)", newId)
+                c.execute("insert into user_profiles (user_id, nickname, nickname_key) values (?, ?, ?)", newId, name, TextRules.nicknameKey(name))
+                newId
+            }
+            id
+        }
+        consumeCode()
+        target
+    } } catch (e: SQLException) { if (e.sqlState == "23505") conflict("这个用户名已有人使用，换一个吧", "nickname_taken"); throw e }
+
+    suspend fun unlinkDevice(userId: Long, deviceHash: String) = db.read { c ->
+        c.execute("delete from devices where user_id = ? and device_hash = ?", userId, deviceHash)
     }
 
     suspend fun setRecallOptIn(userId: Long, enabled: Boolean) = db.read { c ->
@@ -107,7 +154,7 @@ class UserRepository(private val db: Db) {
         c.execute("update users set timezone = ? where id = ? and timezone <> ?", timezone, userId, timezone)
     }
 
-    suspend fun update(userId: Long, changes: ProfileChanges) = db.tx { c ->
+    suspend fun update(userId: Long, changes: ProfileChanges) = try { db.tx { c ->
         val userSets = buildList {
             changes.cityCode?.let { add("city_code = ?" to it) }
             changes.workStart?.let { add("work_start = ?" to it) }
@@ -119,12 +166,16 @@ class UserRepository(private val db: Db) {
         val companionSets = buildList {
             changes.companionName?.let { add("name = ?" to it) }
             changes.personality?.let { add("personality = ?" to it.code) }
-            if (changes.nicknameChanged) add("nickname = ?" to changes.nickname)
         }
         c.applySets("users", "id", userId, userSets)
+        if (changes.nicknameChanged) c.execute("update user_profiles set nickname=?,nickname_key=?,updated_at=now() where user_id=?",
+            changes.nickname, changes.nickname?.let(TextRules::nicknameKey), userId)
         if (companionSets.isNotEmpty()) {
             c.applySets("companions", "user_id", userId, companionSets + ("updated_at = now()" to null))
         }
+    } } catch (e: SQLException) {
+        if (e.sqlState == "23505") conflict("这个昵称已有人使用，换一个吧", "nickname_taken")
+        throw e
     }
 
     private fun java.sql.Connection.applySets(table: String, key: String, id: Long, sets: List<Pair<String, Any?>>) {
@@ -150,6 +201,8 @@ class UserRepository(private val db: Db) {
         email = rs.getString("email"),
         recallOptIn = rs.getBoolean("recall_opt_in"),
         termsVersion = rs.getString("terms_version"),
+        emailVerifiedAt = rs.instant("email_verified_at"),
+        avatarKey = rs.getString("avatar_key"),
     )
 
     companion object {
@@ -164,8 +217,10 @@ class UserRepository(private val db: Db) {
         private const val SELECT_USER = """
             select u.id, u.city_code, u.timezone, u.work_start, u.work_end, u.payday, u.onboarded_at, u.created_at,
                    u.invite_code, u.show_city_on_card, u.email, u.recall_opt_in, u.terms_version,
-                   c.name, c.personality, c.nickname
+                   c.name, c.personality, p.nickname, u.email_verified_at, a.asset_key as avatar_key
             from users u join companions c on c.user_id = u.id
+            join user_profiles p on p.user_id=u.id
+            left join user_avatars a on a.user_id=u.id
         """
     }
 }

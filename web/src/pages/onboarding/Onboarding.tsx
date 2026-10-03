@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { useLocation } from 'wouter'
-import { api } from '../../api/client.ts'
+import { Link, useLocation } from 'wouter'
+import { api, getToken } from '../../api/client.ts'
 import type { ProfileUpdate } from '../../api/types.ts'
 import { ConsentChecks, consentComplete, type ConsentState } from '../../components/ConsentChecks.tsx'
 import { TERMS_VERSION } from '../../lib/consent.ts'
@@ -52,7 +52,7 @@ export default function Onboarding() {
     setSaving(true)
     setError(null)
     try {
-      if (step === 'hello') {
+      if (step === 'hello' && getToken()) {
         await api('/api/consent', { method: 'PUT', body: { termsVersion: TERMS_VERSION, overseas: consent.overseas } })
       }
       const patch = finish ? { ...changes, onboarded: true } : changes
@@ -97,6 +97,7 @@ export default function Onboarding() {
         <PrimaryButton disabled={blocked} onClick={() => advance(changesFor(step, draft), isLast, false)}>
           {step === 'hello' ? '是我' : isLast ? '开始陪我下班' : '下一步'}
         </PrimaryButton>
+        {step === 'hello' && <Link href="/login" className="mt-5 block text-center text-sm text-window/70 underline">已有记录？邮箱登录 / 注册</Link>}
       </div>
     </Screen>
   )

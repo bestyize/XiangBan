@@ -10,6 +10,8 @@ import { GoHome } from './GoHome.tsx'
 import { ReplyBubble } from './ReplyBubble.tsx'
 import { TonightInfo } from './TonightInfo.tsx'
 import { AfterworkChoice } from './AfterworkChoice.tsx'
+import { useSession } from '../../lib/session.tsx'
+import { GuestNotice } from '../../components/GuestNotice.tsx'
 
 interface ResultViewProps {
   checkin: Checkin
@@ -32,6 +34,7 @@ function useUndoLeft(until: number | null) {
 
 export function ResultView({ checkin, tips, fresh, busy, error, onUndo }: ResultViewProps) {
   const profile = useProfile()
+  const { isLoggedIn } = useSession()
   const theme = titleTheme[checkin.title.code]
   const undoLeft = useUndoLeft(checkin.undoUntil)
   const [, navigate] = useLocation()
@@ -60,6 +63,7 @@ export function ResultView({ checkin, tips, fresh, busy, error, onUndo }: Result
       <ReplyBubble checkin={checkin} />
       <TonightInfo checkin={checkin} tips={tips} />
       <AfterworkChoice workDay={checkin.workDay} localTime={checkin.localTime} tips={tips} />
+      {!isLoggedIn && <GuestNotice className="mt-5" />}
       <GoHome checkin={checkin} />
 
       <div className="mt-auto pt-8 text-center">

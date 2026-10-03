@@ -36,17 +36,16 @@ class GuardianFlowTest {
 
     @Test
     fun `setting up needs a bound email and consent`() = apiTest {
-        val token = session().token
+        var token = session().token
         assertEquals(HttpStatusCode.Conflict, put(ApiPaths.GUARDIAN, token, request).status)
-        bind(token, "me@example.com")
+        token = bind(token, "me@example.com").token
         assertEquals(HttpStatusCode.BadRequest, put(ApiPaths.GUARDIAN, token, request.copy(informedContact = false)).status)
         assertEquals(HttpStatusCode.OK, put(ApiPaths.GUARDIAN, token, request).status)
     }
 
     @Test
     fun `reminds the user, then tells the contact once, and a check-in resets the clock`() = apiTest {
-        val token = session().token
-        bind(token, "me@example.com")
+        val token = bind(session().token, "me@example.com").token
         clock.setBeijing("2026-10-12T20:00")
         post(ApiPaths.CHECKIN, token)
         val view = put(ApiPaths.GUARDIAN, token, request).body<GuardianView>()

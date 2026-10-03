@@ -19,6 +19,8 @@ data class SessionRequest(
     val ref: String? = null,
     /** Entry point such as `card` (`from`). */
     val from: String? = null,
+    /** Allocate a persistent visitor only after an explicit user action. */
+    val materialize: Boolean = false,
 )
 
 @Serializable
@@ -48,6 +50,10 @@ data class ProfileView(
     val termsVersion: String?,
     val onboarded: Boolean,
     val createdAt: Long,
+    val userId: Long = 0,
+    /** Server-confirmed identity; an anonymous session is still a guest even though it has a JWT. */
+    val accountType: String = "guest",
+    val avatarUrl: String? = null,
 )
 
 /** Omitted fields stay unchanged; an empty [nickname] or a [payday] of 0 clears it. */

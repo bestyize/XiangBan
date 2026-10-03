@@ -26,7 +26,7 @@ The host Nginx must have a virtual host for `XIABAN_DOMAIN` that proxies to `htt
 location / {
     proxy_pass http://127.0.0.1:18080;
     proxy_http_version 1.1;
-    proxy_set_header Host $host;
+    proxy_set_header Host $http_host;
     proxy_set_header X-Real-IP $remote_addr;
     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
     proxy_set_header X-Forwarded-Proto $scheme;
@@ -36,6 +36,37 @@ location / {
 If the certificate for this domain has not been issued yet, first make sure DNS points to this server and the host Nginx serves the domain over HTTP, then use the existing Certbot Nginx workflow to issue it. Test the Nginx configuration before reloading Nginx. Do not add another reverse proxy that binds ports 80 or 443.
 
 The first deployment creates persistent Docker volumes for PostgreSQL and Redis. Configure separate database backups before using real user data; Docker volumes alone are not backups.
+
+### Local VMware preview
+
+For a quick preview from the Windows host without a domain or HTTPS proxy, set these values in the server-side `.env` file (replace the example IP with the VM's current VMware NAT address):
+
+```dotenv
+XIABAN_DOMAIN=192.168.164.128
+PUBLIC_BASE_URL=http://192.168.164.128:18080
+WEB_BIND_ADDRESS=192.168.164.128
+VITE_DATA_OVERSEAS=false
+```
+
+Open `http://192.168.164.128:18080` from the host. This is intended for a local preview; other physical LAN devices cannot reach a VMware NAT address unless the VM network is changed to bridged mode or a host port forward is configured.
+
+To avoid compiling the Kotlin backend on the VM, build its install distribution on the host with `gradlew.bat :server:installDist -x test`, then run Compose with `-f compose.yaml -f deploy/compose.vmware-prebuilt.yaml`. The overlay uses the runtime-only server Dockerfile and copies that prebuilt output into the image.
+
+## Administrator and email configuration
+
+The website provides `/admin` for administrators and `/login` for passwordless email registration and login. SMTP settings can be saved from the admin page and take effect immediately for verification codes and background mail workers. Use the saved configuration's test-mail button to confirm delivery before inviting users to register.
+
+The admin UI uses a left navigation sidebar and separate pages for overview, user management (`/admin/users`), email settings, operation logs, and account security. User management loads server-side pages of up to 100 rows and supports literal searches across ID, email, nickname, companion name, and invite code. Filters include email/guest account type, onboarding status, and account creation dates in Asia/Shanghai. Account creation and email verification timestamps are shown separately because visitors are initially anonymous accounts.
+
+User details show registration source, consent timestamps, associated-browser dates, and recent valid check-ins. Internal operator notes are limited to 2,000 characters. Note updates and their audit records are committed together. Email-setting and admin-password changes are also audited, without recording their credentials. The CSV button exports only the loaded page and neutralizes spreadsheet formulas in user-provided fields. These endpoints require an administrator session; ordinary user JWTs do not grant access.
+
+User management also supports editing nickname, companion name/personality, city, timezone, working hours, and payday. The editor sends only changed fields, and updates are validated and audited in one transaction. Registration timestamps and verified-email identity remain part of the account's verification flow. Permanent deletion requires entering the target user ID in the UI and matching `confirmUserId` on the API. Account-dependent rows are removed through database cascades, guardian schedules are cleared, and deleted accounts fail JWT authentication. Deletion audit records retain the user number in their summary.
+
+On first setup, set `ADMIN_USERNAME`, a unique `ADMIN_BOOTSTRAP_PASSWORD` of at least 12 characters, and a stable random `SETTINGS_ENCRYPTION_KEY` in the server-only `.env`, then recreate the server container. The bootstrap password creates the first administrator on the first login; later logins use the password hash stored in PostgreSQL. Change the initial password from the admin page. Once the account exists, the bootstrap password can be removed from `.env`.
+
+Administrator sessions expire after eight hours. Changing the administrator password invalidates all existing administrator sessions. The web UI never receives stored SMTP passwords; leaving the SMTP password field empty preserves the saved value. SMTP configuration is encrypted in PostgreSQL. Preserve `SETTINGS_ENCRYPTION_KEY` alongside database backups: replacing it makes previously saved credentials unreadable.
+
+Without SMTP configuration, sending a verification code returns an explicit service-unavailable response rather than reporting a logged email as delivered. Codes expire after ten minutes, are scoped to their device account and operation, allow five wrong guesses, and can be consumed only once. Resends are limited per email, account, and IP address. Existing-email login merges guest records only when the user chooses to do so; binding a guest from the account page retains its original merge behavior.
 
 ## 2. Create a dedicated deploy key
 

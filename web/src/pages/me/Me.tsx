@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { Link } from 'wouter'
 import { api } from '../../api/client.ts'
 import type { Profile } from '../../api/types.ts'
@@ -9,6 +9,8 @@ import { AccountActions } from './AccountActions.tsx'
 import { EmailBind } from './EmailBind.tsx'
 import { MeStats } from './MeStats.tsx'
 import { AfterworkSummary } from './AfterworkSummary.tsx'
+import { logout } from '../../lib/logout.ts'
+import { GuestNotice } from '../../components/GuestNotice.tsx'
 
 const personalityName = { toxic: '毒舌心软', gentle: '温柔治愈', chatty: '元气话痨', tsundere: '高冷傲娇' } as const
 
@@ -32,7 +34,9 @@ export function RowLink({ href, label, detail }: { href: string; label: string; 
 
 export default function Me() {
   const profile = useProfile()
-  const { setProfile } = useSession()
+  const { setProfile, isLoggedIn, refresh } = useSession()
+  const [loggingOut, setLoggingOut] = useState(false)
+  useEffect(() => { void refresh().catch(() => undefined) }, [refresh])
   const [merged, setMerged] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -49,6 +53,21 @@ export default function Me() {
     <Screen>
       <div style={{ paddingBottom: TAB_BAR_SPACE }}>
         <h1 className="pt-2 font-display text-4xl text-lamp">我的</h1>
+
+        <section className="mt-5 rounded-3xl border border-lamp/25 bg-dusk-soft/35 p-5" aria-label="账号和登录状态">
+          <div className="flex items-center gap-4"><Link href="/me/account" aria-label="编辑头像" className="flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-full bg-lamp/15 text-2xl text-lamp">
+            {profile.avatarUrl ? <img src={profile.avatarUrl} alt="我的头像" className="size-full object-cover" /> : (isLoggedIn ? '☀' : '🐾')}
+          </Link><div className="min-w-0"><h2 className="truncate text-xl font-bold">{profile.nickname ?? (profile.userId ? `${isLoggedIn ? '用户' : '游客'} #${profile.userId}` : '游客')}</h2>
+            <p className="mt-1 text-sm text-lamp">{isLoggedIn ? '已登录 · 邮箱账号' : '未登录 · 游客模式'}</p><p className="mt-1 text-xs text-window/50">{profile.userId ? `用户 ID：${profile.userId}` : '浏览状态 · 尚未创建账号'}</p></div></div>
+          {isLoggedIn ? <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-sm"><span className="text-window/60">{profile.email}</span><button disabled={loggingOut} className="text-window/70 underline" onClick={async () => {
+            setLoggingOut(true); setError(null)
+            try { await logout('/me') } catch (e) { setError((e as Error).message); setLoggingOut(false) }
+          }}>{loggingOut ? '正在退出…' : '退出登录'}</button></div> : <div className="mt-4"><p className="mb-3 text-xs leading-relaxed text-window/60">登录后，换设备也能找回你的打卡、游戏和下班记录。</p>
+            <Link href="/login" className="block w-full rounded-full bg-lamp px-5 py-3 text-center font-bold text-ink">登录 / 注册</Link></div>}
+          <Link href="/me/account" className="mt-4 block text-center text-sm text-lamp underline">编辑昵称和头像</Link>
+        </section>
+
+        {!isLoggedIn && <GuestNotice className="mt-4" />}
 
         <Section title="统计">
           <MeStats companionName={profile.companionName} />
@@ -72,7 +91,7 @@ export default function Me() {
               {merged && <span className="mt-1 block text-sm text-lamp">找回了你的账号，这台设备上的记录也合并进去了。</span>}
             </p>
           ) : (
-            <EmailBind onDone={setMerged} />
+            <div className="space-y-3"><RowLink href="/login" label="邮箱登录 / 注册" detail="保存或找回账号" /><EmailBind onDone={setMerged} /></div>
           )}
         </Section>
 
@@ -96,9 +115,11 @@ export default function Me() {
         <Section title="隐私">
           <RowLink href="/privacy" label="隐私政策" detail="查看" />
           <RowLink href="/terms" label="用户协议" detail="查看" />
-          <div className="mt-2 border-t border-window/10 pt-2">
-            <AccountActions />
-          </div>
+          {isLoggedIn && (
+            <div className="mt-2 border-t border-window/10 pt-2">
+              <AccountActions />
+            </div>
+          )}
         </Section>
       </div>
     </Screen>

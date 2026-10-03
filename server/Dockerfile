@@ -6,7 +6,7 @@ COPY gradle gradle
 COPY shared/build.gradle.kts shared/
 COPY server/build.gradle.kts server/
 # Resolve Gradle and plugins in their own layer so code changes do not re-download them.
-RUN ./gradlew --no-daemon -q help
+RUN chmod +x gradlew && ./gradlew --no-daemon -q help
 COPY shared shared
 COPY server server
 RUN ./gradlew --no-daemon -q :server:installDist -x test

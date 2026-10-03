@@ -1,6 +1,9 @@
 export type Personality = 'toxic' | 'gentle' | 'chatty' | 'tsundere'
 
 export interface Profile {
+  userId: number
+  accountType: 'guest' | 'registered'
+  avatarUrl: string | null
   companionName: string
   personality: Personality
   nickname: string | null

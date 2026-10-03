@@ -45,9 +45,9 @@ class GuardianService(
         if (contactEmail == user.email) badRequest("联系人的邮箱不能是你自己的", "invalid_contact")
         guardians.upsert(
             userId = userId,
-            contactName = TextRules.nickname(req.contactName) ?: badRequest("写一下联系人的称呼", "invalid_text"),
+            contactName = TextRules.contactName(req.contactName) ?: badRequest("写一下联系人的称呼", "invalid_text"),
             contactEmail = contactEmail,
-            selfName = TextRules.nickname(req.selfName) ?: badRequest("写一下联系人怎么称呼你", "invalid_text"),
+            selfName = TextRules.contactName(req.selfName) ?: badRequest("写一下联系人怎么称呼你", "invalid_text"),
             thresholdDays = req.thresholdDays,
             now = clock.instant(),
         )

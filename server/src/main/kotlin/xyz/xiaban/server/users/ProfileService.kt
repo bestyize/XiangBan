@@ -30,6 +30,11 @@ class ProfileService(private val users: UserRepository, private val cities: Citi
 
     fun meta(): MetaResponse = meta
 
+    fun visitor(timezone: String) = ProfileView(companionName = "小伴", personality = Personality.Toxic, nickname = null,
+        cityCode = null, cityName = null, timezone = timezone, workStart = "09:00", workEnd = "18:00", payday = null,
+        showCityOnCard = false, inviteCode = "", email = null, recallOptIn = false, termsVersion = null,
+        onboarded = false, createdAt = 0, userId = 0, accountType = "guest", avatarUrl = null)
+
     /** A token whose account was merged away or deleted answers 401, so the client starts over from its device. */
     suspend fun user(userId: Long): User = users.find(userId)
         ?: throw ApiException(HttpStatusCode.Unauthorized, "unauthorized", "登录状态过期了，刷新一下页面")
@@ -71,6 +76,9 @@ class ProfileService(private val users: UserRepository, private val cities: Citi
         termsVersion = user.termsVersion,
         onboarded = user.onboardedAt != null,
         createdAt = user.createdAt.toEpochMilli(),
+        userId = user.id,
+        accountType = if (user.email != null && user.emailVerifiedAt != null) "registered" else "guest",
+        avatarUrl = user.avatarKey?.let { "/api/avatars/$it" },
     )
 
     private fun parseTime(value: String): LocalTime = try {

@@ -32,9 +32,9 @@
   let pointerStart = null
   let hostReady = false
 
-  function postToHost(type) {
+  function postToHost(type, payload = {}) {
     if (!hostReady || !HOST_NONCE || window.parent === window) return
-    window.parent.postMessage({ channel: PACK_CHANNEL, protocol: PROTOCOL, type, nonce: HOST_NONCE }, '*')
+    window.parent.postMessage({ channel: PACK_CHANNEL, protocol: PROTOCOL, type, nonce: HOST_NONCE, ...payload }, '*')
   }
 
   window.addEventListener('message', (event) => {
@@ -47,6 +47,8 @@
     document.body.classList.add('hosted')
     hostReady = true
     postToHost('game.ready')
+    postToHost('game.start')
+    postToHost('game.progress', { score, maxTile: Math.max(...board.flat()) })
     boardNode.focus({ preventScroll: true })
   })
 
@@ -68,6 +70,7 @@
     scoreNode.textContent = String(score)
     bestNode.textContent = String(best)
     largestNode.textContent = String(Math.max(...board.flat()))
+    postToHost('game.progress', { score, maxTile: Math.max(...board.flat()) })
   }
 
   function setControlsDisabled(disabled) {
@@ -77,6 +80,7 @@
   }
 
   function showResult(mode) {
+    if (mode !== 'won') postToHost('game.result', { score, maxTile: Math.max(...board.flat()) })
     overlayMode = mode
     pointerStart = null
     const isWin = mode === 'won'
@@ -128,6 +132,7 @@
     won = false
     pointerStart = null
     hideResult()
+    postToHost('game.start')
     render()
     statusNode.textContent = '滑动棋盘，或者按方向键，开始合数字。'
     boardNode.focus({ preventScroll: true })

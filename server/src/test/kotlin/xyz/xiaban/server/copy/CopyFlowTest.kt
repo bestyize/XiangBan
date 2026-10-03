@@ -104,7 +104,7 @@ class CopyFlowTest {
 
     @Test
     fun `admin switch needs the token`() = apiTest {
-        assertEquals(HttpStatusCode.NotFound, get("/api/admin/flags", null).status)
+        assertEquals(HttpStatusCode.Unauthorized, get("/api/admin/flags", null).status)
         val updated = client.put("/api/admin/flags") {
             header("X-Admin-Token", TestEnv.ADMIN_TOKEN)
             contentType(ContentType.Application.Json)

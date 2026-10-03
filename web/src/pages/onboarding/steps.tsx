@@ -78,8 +78,8 @@ export function StepBody({ step, draft, meta, update }: BodyProps) {
     case 'nickname':
       return (
         <label className="block">
-          <span className="mb-2 block text-sm text-window/70">不填的话，我就叫你「你」</span>
-          <input className={inputClass} value={draft.nickname} maxLength={8} placeholder="比如：阿明、打工人" autoFocus
+          <span className="mb-2 block text-sm text-window/70">至少 2 字；英文或英文加数字至少 4 字，不能是纯数字</span>
+          <input className={inputClass} value={draft.nickname} maxLength={24} placeholder="比如：阿明、打工人（可跳过）" autoFocus
             onChange={(e) => update({ nickname: e.target.value })} />
         </label>
       )

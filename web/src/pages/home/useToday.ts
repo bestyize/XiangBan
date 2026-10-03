@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useState } from 'react'
-import { api } from '../../api/client.ts'
+import { api, getToken } from '../../api/client.ts'
 import type { Checkin, Tip, TodayResponse, Unlock } from '../../api/types.ts'
 import { send } from '../../lib/bridge.ts'
+import { storage } from '../../lib/storage.ts'
+import { browserTimezone } from '../../lib/device.ts'
 
 type Status = 'loading' | 'ready' | 'error'
 
@@ -36,7 +38,22 @@ export function useToday() {
 
   const load = useCallback(async () => {
     try {
-      const next = await api<TodayResponse>('/api/checkin/today')
+      const tz = browserTimezone() ?? 'Asia/Shanghai'
+      const next = await api<TodayResponse>(`/api/checkin/today?timezone=${encodeURIComponent(tz)}`)
+      if (!getToken()) {
+        const localCheckinRaw = storage.get('xb_guest_checkin')
+        if (localCheckinRaw) {
+          try {
+            const localCheckin = JSON.parse(localCheckinRaw) as Checkin
+            if (localCheckin.workDay === next.workDay) {
+              setToday({ ...next, checkin: localCheckin, greeting: null })
+              setTips(next.tips)
+              setStatus('ready')
+              return
+            }
+          } catch {}
+        }
+      }
       setToday(next)
       setTips(next.tips)
       setStatus('ready')
@@ -55,7 +72,11 @@ export function useToday() {
     setBusy(true)
     setError(null)
     try {
-      const checkin = await api<Checkin>('/api/checkin', { method: 'POST' })
+      const tz = browserTimezone() ?? 'Asia/Shanghai'
+      const checkin = await api<Checkin>(`/api/checkin?timezone=${encodeURIComponent(tz)}`, { method: 'POST' })
+      if (!getToken()) {
+        storage.set('xb_guest_checkin', JSON.stringify(checkin))
+      }
       setFresh(true)
       setTips(null)
       setToday({ workDay: checkin.workDay, checkin, greeting: null, tips: [] })
@@ -63,7 +84,7 @@ export function useToday() {
       send('checkin_done', { title: checkin.title.code, titleName: checkin.title.name, mood: checkin.mood, text: checkin.reply.text })
       // Let the title stamp land before the unlock celebration covers it.
       if (checkin.newUnlocks.length > 0) setTimeout(() => setUnlocked(checkin.newUnlocks), 900)
-      void fillIn(checkin)
+      if (checkin.reply.pending) void fillIn(checkin)
     } catch (e) {
       setError((e as Error).message)
     } finally {
@@ -75,7 +96,13 @@ export function useToday() {
     setBusy(true)
     setError(null)
     try {
-      setToday(await api<TodayResponse>('/api/checkin/today', { method: 'DELETE' }))
+      if (!getToken()) {
+        storage.remove('xb_guest_checkin')
+        const tz = browserTimezone() ?? 'Asia/Shanghai'
+        setToday(await api<TodayResponse>(`/api/checkin/today?timezone=${encodeURIComponent(tz)}`))
+      } else {
+        setToday(await api<TodayResponse>('/api/checkin/today', { method: 'DELETE' }))
+      }
       setFresh(false)
     } catch (e) {
       setError((e as Error).message)

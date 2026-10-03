@@ -29,16 +29,19 @@ class SessionService(
         val userId = if (existing != null) {
             users.linkDevice(deviceHash, existing.id)
             existing.id
-        } else {
+        } else if (req.materialize) {
             val referral = Referral(
                 inviteCode = req.ref?.takeIf { invitePattern.matches(it) },
                 source = req.from?.takeIf { sourcePattern.matches(it) },
             )
-            users.findOrCreate(deviceHash, timezone ?: UserRepository.DEFAULT_ZONE.id, referral)
+            users.findOrCreate(deviceHash, timezone ?: UserRepository.DEFAULT_ZONE.id, referral, guestOnly = true)
+        } else {
+            return SessionResponse("", deviceId, profiles.visitor(timezone ?: UserRepository.DEFAULT_ZONE.id), flags.features())
         }
         if (timezone != null) users.setTimezone(userId, timezone)
 
-        return SessionResponse(tokens.issue(userId), deviceId, profiles.view(userId), flags.features())
+        val profile = profiles.view(userId)
+        return SessionResponse(tokens.issue(userId, authenticated = profile.accountType == "registered"), deviceId, profile, flags.features())
     }
 
     companion object {

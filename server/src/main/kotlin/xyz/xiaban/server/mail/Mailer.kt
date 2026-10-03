@@ -5,6 +5,8 @@ import jakarta.mail.Message
 import jakarta.mail.PasswordAuthentication
 import jakarta.mail.Session
 import jakarta.mail.Transport
+import jakarta.mail.internet.MimeBodyPart
+import jakarta.mail.internet.MimeMultipart
 import jakarta.mail.internet.InternetAddress
 import jakarta.mail.internet.MimeMessage
 import kotlinx.coroutines.Dispatchers
@@ -12,7 +14,7 @@ import kotlinx.coroutines.withContext
 import org.slf4j.LoggerFactory
 import java.util.Properties
 
-data class Mail(val to: String, val subject: String, val text: String)
+data class Mail(val to: String, val subject: String, val text: String, val html: String? = null)
 
 interface Mailer {
     suspend fun send(mail: Mail)
@@ -36,6 +38,8 @@ class SmtpMailer(private val config: SmtpConfig) : Mailer {
             put("mail.smtp.port", config.port.toString())
             put("mail.smtp.auth", "true")
             put(if (config.ssl) "mail.smtp.ssl.enable" else "mail.smtp.starttls.enable", "true")
+            if (!config.ssl) put("mail.smtp.starttls.required", "true")
+            put("mail.smtp.ssl.checkserveridentity", "true")
             put("mail.smtp.connectiontimeout", "5000")
             put("mail.smtp.timeout", "10000")
             put("mail.smtp.writetimeout", "10000")
@@ -50,7 +54,12 @@ class SmtpMailer(private val config: SmtpConfig) : Mailer {
             setFrom(InternetAddress(config.from, config.fromName, "UTF-8"))
             setRecipients(Message.RecipientType.TO, InternetAddress.parse(mail.to))
             setSubject(mail.subject, "UTF-8")
-            setText(mail.text, "UTF-8")
+            if (mail.html == null) setText(mail.text, "UTF-8") else {
+                val alternative = MimeMultipart("alternative")
+                alternative.addBodyPart(MimeBodyPart().apply { setText(mail.text, "UTF-8") })
+                alternative.addBodyPart(MimeBodyPart().apply { setText(mail.html, "UTF-8", "html") })
+                setContent(alternative)
+            }
         }
         Transport.send(message)
     }

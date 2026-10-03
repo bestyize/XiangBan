@@ -20,6 +20,10 @@ export function setDeviceId(id: string) {
   storage.set(DEVICE_KEY, id)
 }
 
+export function resetDeviceId() {
+  storage.remove(DEVICE_KEY)
+}
+
 export function browserTimezone(): string | undefined {
   try {
     return Intl.DateTimeFormat().resolvedOptions().timeZone

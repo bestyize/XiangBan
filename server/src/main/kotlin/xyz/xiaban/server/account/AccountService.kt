@@ -26,6 +26,11 @@ class AccountService(private val db: Db, private val profiles: ProfileService, p
             buildJsonObject {
                 put("exportedFormatVersion", 1)
                 put("profile", profile)
+                put("identity", rows("select user_id,nickname,updated_at from user_profiles where user_id=?").firstOrNull() ?: JsonNull)
+                put("avatar", rows("select user_id,encode(image,'base64') as jpeg_base64,updated_at from user_avatars where user_id=?").firstOrNull() ?: JsonNull)
+                put("gameSessions", rows("select id,game_id,started_at,finished_at,score,lines,max_tile from game_sessions where user_id=? order by started_at"))
+                put("afterworkChoices", rows("select work_day,activity_id,selected_at from afterwork_choices where user_id=? order by work_day"))
+                put("afterworkPreferences", rows("select preferred_activity_id,prompt_dismissed_at::text from afterwork_preferences where user_id=?").firstOrNull() ?: JsonNull)
                 put("account", rows("select email, created_at, terms_version, terms_accepted_at, overseas_consent_at, recall_opt_in, timezone from users where id = ?").firstOrNull() ?: JsonNull)
                 put("checkins", rows("select work_day, checked_at, title, coalesce(final_reply, library_reply) as reply, reply_source, care_mode, revoked_at from checkins where user_id = ? order by work_day"))
                 put("memories", rows("select kind, content, source, created_at from memories where user_id = ? order by created_at"))

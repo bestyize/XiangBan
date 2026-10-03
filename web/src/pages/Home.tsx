@@ -6,6 +6,7 @@ import { Link } from 'wouter'
 import { IdleView } from './home/IdleView.tsx'
 import { ResultView } from './home/ResultView.tsx'
 import { useToday } from './home/useToday.ts'
+import { AccountBadge } from '../components/AccountBadge.tsx'
 
 export default function Home() {
   const { status, today, tips, unlocked, dismissUnlocked, error, busy, fresh, checkIn, undo, reload } = useToday()
@@ -16,7 +17,8 @@ export default function Home() {
         <header className="flex h-10 items-center justify-between">
           <span className="font-display text-2xl text-lamp">下班了么</span>
           <div className="flex items-center gap-3">
-            <span className="text-sm text-window/70">{formatDay(new Date())}</span>
+            <span className="hidden text-sm text-window/70 sm:block">{formatDay(new Date())}</span>
+            <AccountBadge />
             <Link href="/games" className="rounded-full border border-lamp/35 px-3 py-1 text-xs text-lamp">玩一局</Link>
           </div>
         </header>

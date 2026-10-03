@@ -24,7 +24,7 @@ fun Route.userRoutes(services: Services) {
     post(ApiPaths.SESSION) {
         val bearer = call.request.headers[HttpHeaders.Authorization]?.removePrefix("Bearer ")?.trim()
         val response = services.sessions.open(
-            tokenUserId = bearer?.let(services.tokens::userIdOrNull),
+            tokenUserId = bearer?.let { services.tokens.userIdOrNull(it) },
             cookieDeviceId = call.request.cookies[DEVICE_COOKIE],
             req = call.receive<SessionRequest>(),
         )
@@ -34,7 +34,7 @@ fun Route.userRoutes(services: Services) {
                 value = response.deviceId,
                 maxAge = 400 * 24 * 3600,
                 path = "/api",
-                secure = services.config.isProd,
+                secure = services.config.publicBaseUrl.startsWith("https://"),
                 httpOnly = true,
                 extensions = mapOf("SameSite" to "Lax"),
             ),

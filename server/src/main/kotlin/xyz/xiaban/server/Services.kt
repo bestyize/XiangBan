@@ -73,13 +73,16 @@ class Services(
         install(ContentEncoding) { gzip() }
     }
 
-    val tokens = Tokens(config.jwtSecret)
+    val users = UserRepository(db)
+    val tokens = Tokens(config.jwtSecret, redis = redis, accountState = users::authState)
     val cities = Cities.load()
     val calendar = HolidayCalendar.load()
     val flags = FeatureFlags(redis, config.llm.enabledByDefault, config.goHomeEnabled, config.appDownloadUrl)
 
-    val users = UserRepository(db)
     val profiles = ProfileService(users, cities)
+    val avatars = xyz.xiaban.server.users.AvatarService(db)
+    val games = xyz.xiaban.server.games.GameRecords(db)
+    val afterwork = xyz.xiaban.server.afterwork.AfterworkRecords(db)
     val sessions = SessionService(users, profiles, tokens, flags)
 
     val weather = WeatherService(
@@ -128,16 +131,21 @@ class Services(
         },
     )
 
-    val mailer: Mailer = mailer ?: config.smtp?.let(::SmtpMailer) ?: LogMailer().also {
-        if (config.isProd) org.slf4j.LoggerFactory.getLogger(Services::class.java).error("SMTP is not configured: emails are only logged")
-    }
+    val emailSettings = xyz.xiaban.server.admin.EmailSettingsStore(db, config)
+    val administrators = xyz.xiaban.server.admin.AdminAccounts(db, redis, config)
+    val adminUsers = xyz.xiaban.server.admin.AdminUsers(db, clock, cities)
+    private val runtimeMailer = xyz.xiaban.server.mail.RuntimeMailer(emailSettings)
+    private val suppliedMailer = mailer
+    val mailer: Mailer = mailer ?: runtimeMailer
+    val emailAvailable: suspend () -> Boolean = { suppliedMailer != null || runtimeMailer.available() }
     val mail = MailQueue(redis, db, this.mailer, clock)
     val guardianRepository = GuardianRepository(db)
     val guardian: GuardianService by lazy { GuardianService(guardianRepository, users, checkinRepository, calendar, redis, clock) }
     val guardianScheduler = GuardianScheduler(guardian, guardianRepository, users, mail, redis, config.publicBaseUrl, clock)
     val unsubscribeLinks = UnsubscribeLinks(config.jwtSecret, config.publicBaseUrl)
     val recall = RecallJob(db, users, CopySelector(copyLibrary), mail, unsubscribeLinks, config.publicBaseUrl, clock)
-    val emailBinding = EmailBinding(redis, users, profiles, tokens, AccountMerge(db), mail) { guardian.reschedule(it) }
+    val emailBinding = EmailBinding(redis, users, profiles, tokens, AccountMerge(db), emailAvailable,
+        { this.mailer.send(it) }, { guardian.reschedule(it) })
     val events = xyz.xiaban.server.events.EventService(db)
     val account = xyz.xiaban.server.account.AccountService(db, profiles, guardian)
 

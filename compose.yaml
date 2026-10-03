@@ -41,7 +41,7 @@ services:
     environment:
       XIABAN_ENV: prod
       PORT: "8080"
-      PUBLIC_BASE_URL: https://${XIABAN_DOMAIN:?Set XIABAN_DOMAIN in the server-side .env file}
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-https://${XIABAN_DOMAIN:?Set XIABAN_DOMAIN in the server-side .env file}}
       TRUST_PROXY: "true"
       DATABASE_URL: jdbc:postgresql://postgres:5432/xiaban
       DATABASE_USER: xiaban
@@ -61,6 +61,9 @@ services:
       LLM_DAILY_LIMIT: ${LLM_DAILY_LIMIT:-3}
       LLM_TIMEOUT_MS: ${LLM_TIMEOUT_MS:-3000}
       ADMIN_TOKEN: ${ADMIN_TOKEN:-}
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+      ADMIN_BOOTSTRAP_PASSWORD: ${ADMIN_BOOTSTRAP_PASSWORD:-}
+      SETTINGS_ENCRYPTION_KEY: ${SETTINGS_ENCRYPTION_KEY:-}
       QWEATHER_API_HOST: ${QWEATHER_API_HOST:-}
       QWEATHER_API_KEY: ${QWEATHER_API_KEY:-}
       SMTP_HOST: ${SMTP_HOST:-}
@@ -87,13 +90,13 @@ services:
       context: .
       dockerfile: web/Dockerfile
       args:
-        VITE_PUBLIC_URL: https://${XIABAN_DOMAIN:?Set XIABAN_DOMAIN in the server-side .env file}
+        VITE_PUBLIC_URL: ${PUBLIC_BASE_URL:-https://${XIABAN_DOMAIN:?Set XIABAN_DOMAIN in the server-side .env file}}
         VITE_DATA_OVERSEAS: ${VITE_DATA_OVERSEAS:-true}
     restart: unless-stopped
     depends_on:
       - server
     ports:
-      - "127.0.0.1:18080:80"
+      - "${WEB_BIND_ADDRESS:-127.0.0.1}:18080:80"
     networks:
       - frontend
 

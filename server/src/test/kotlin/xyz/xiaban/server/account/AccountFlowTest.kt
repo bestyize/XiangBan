@@ -47,24 +47,26 @@ class AccountFlowTest {
     @Test
     fun `wrong codes are refused and recall emails need a bound email`() = apiTest {
         val token = session().token
+        put(ApiPaths.CONSENT, token, xyz.xiaban.shared.ConsentUpdate("0.1", false))
         post(ApiPaths.BIND_CODE, token, EmailCodeRequest("me@example.com"))
         assertEquals(HttpStatusCode.BadRequest, post(ApiPaths.BIND, token, BindEmailRequest("me@example.com", "000000x")).status)
         assertEquals(HttpStatusCode.TooManyRequests, post(ApiPaths.BIND_CODE, token, EmailCodeRequest("me@example.com")).status)
 
         val other = session().token
         assertEquals(HttpStatusCode.Conflict, put(ApiPaths.SUBSCRIPTION, other, SubscriptionUpdate(true)).status)
-        bind(other, "other@example.com")
-        assertTrue(put(ApiPaths.SUBSCRIPTION, other, SubscriptionUpdate(true)).body<ProfileView>().recallOptIn)
+        val boundOther = bind(other, "other@example.com")
+        assertTrue(put(ApiPaths.SUBSCRIPTION, boundOther.token, SubscriptionUpdate(true)).body<ProfileView>().recallOptIn)
     }
 }
 
 /** Requests a code, reads it from the logged mail and binds. */
 suspend fun ApiScope.bind(token: String, email: String): BindResponse {
+    put(ApiPaths.CONSENT, token, xyz.xiaban.shared.ConsentUpdate("0.1", false))
     post(ApiPaths.BIND_CODE, token, EmailCodeRequest(email))
     val mail = TestEnv.awaitMail { it.to == email.lowercase() && it.subject.startsWith("下班了么验证码") }
     val code = Regex("\\d{6}").find(mail.subject)!!.value
     synchronized(TestEnv.mailer.sent) { TestEnv.mailer.sent.remove(mail) }
     // Lift the one-minute resend cooldown so a test can bind the same address again right away.
     services.redis.cmd.del("xb:code:cool:${SessionService.sha256(email.lowercase())}").await()
-    return post(ApiPaths.BIND, token, BindEmailRequest(email, code)).body()
+    return post(ApiPaths.BIND, token, BindEmailRequest(email, code, "User${services.tokens.userIdOrNull(token)}")).body()
 }

@@ -2,9 +2,12 @@ import { useState } from 'react'
 import { api, getToken, setToken } from '../../api/client.ts'
 import { FieldError, QuietButton } from '../../components/ui.tsx'
 import { storage } from '../../lib/storage.ts'
+import { useProfile } from '../../lib/session.tsx'
+import { logout } from '../../lib/logout.ts'
 
 /** 导出数据 and 注销账号 (PRD 6, 《个人信息保护法》). */
 export function AccountActions() {
+  const profile = useProfile()
   const [confirming, setConfirming] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -41,6 +44,11 @@ export function AccountActions() {
 
   return (
     <div className="space-y-1">
+      {profile.email && <div><QuietButton className="px-0!" disabled={busy} onClick={async () => {
+        setBusy(true)
+        setError(null)
+        try { await logout() } catch (e) { setError((e as Error).message); setBusy(false) }
+      }}>退出登录 / 切换账号</QuietButton></div>}
       <QuietButton className="px-0!" onClick={exportData}>导出我的数据（JSON）</QuietButton>
       {!confirming ? (
         <div><QuietButton className="px-0! text-blush!" onClick={() => setConfirming(true)}>注销账号</QuietButton></div>
