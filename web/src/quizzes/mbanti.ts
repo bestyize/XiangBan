@@ -157,7 +157,7 @@ const items: WorkItem[] = [
   ]],
 ]
 
-export const mbantiQuestions: QuizQuestion[] = items.map(([prompt, options], i) => {
+export const legacyMbantiQuestions: QuizQuestion[] = items.map(([prompt, options], i) => {
   const offset = i % 4
   const rotated = [...options.slice(offset), ...options.slice(0, offset)]
   return {
@@ -165,6 +165,10 @@ export const mbantiQuestions: QuizQuestion[] = items.map(([prompt, options], i) 
     options: rotated.map(([mode, label]) => ({ value: workModes.indexOf(mode), label })),
   }
 })
+
+// Remove one item missing each mode, preserving equal exposure and the closing scene.
+const removedIds = new Set([6, 7, 13, 14, 15].map((id) => `mbanti-${id}`))
+export const mbantiQuestions = legacyMbantiQuestions.filter((question) => !removedIds.has(question.id))
 
 export const workProfiles: Record<WorkMode, {
   title: string; quote: string; description: string; tags: string[]

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, Route, Switch, useLocation } from 'wouter'
-import { findQuiz, quizCatalog } from './catalog.ts'
+import { findQuiz, findSharedQuiz, quizCatalog } from './catalog.ts'
 import { loadAttempt } from './progress.ts'
 import { isComplete, makeReport, scoreAnswers } from './scoring.ts'
 import { readSharedScores } from './share.ts'
@@ -16,7 +16,7 @@ function Hub() {
     <section className="quiz-hub-heading">
       <span className="quiz-eyebrow">AFTER HOURS LAB <span className="quiz-tiny-star" aria-hidden="true">✦</span></span>
       <h1>工作先放一放，<br /><span>来认识一下自己。</span></h1>
-      <p>认真了解性格，或者痛快吐个槽。<br />总有一种答案，让你觉得“对，就是我”。</p>
+      <p>遇见内心的小动物，找回下班后的自己。<br />总有一种答案，让你觉得“对，就是我”。</p>
       <div className="quiz-hub-meta"><span>趣味测试</span><span>无需登录 · 结果可分享</span></div>
     </section>
     <div className="quiz-catalog" aria-label="趣味测试合集">
@@ -24,8 +24,8 @@ function Hub() {
         const attempt = loadAttempt(quiz)
         const count = attempt?.answers.filter((answer) => answer !== null).length ?? 0
         return <Link key={quiz.id} href={`/tests/${quiz.id}`} className={`quiz-catalog-card quiz-theme-${quiz.id}`}>
-          <div className="quiz-card-top"><span className="quiz-card-category">{i === 0 ? '认识自己' : '下班回血'}</span><span className="quiz-card-number">0{i + 1}</span></div>
-          <div className="quiz-card-body"><div><h2>{quiz.name}</h2><h3>{quiz.subtitle}</h3><p>{quiz.description}</p></div><QuizArt kind={quiz.id} /></div>
+          <div className="quiz-card-top"><span className="quiz-card-category">{quiz.category}</span><span className="quiz-card-number">{String(i + 1).padStart(2, '0')}</span></div>
+          <div className="quiz-card-body"><div><h2 className={quiz.name.length > 4 ? 'quiz-name-long' : undefined}>{quiz.name}</h2><h3>{quiz.subtitle}</h3><p>{quiz.description}</p></div><QuizArt kind={quiz.id} /></div>
           <div className="quiz-card-footer"><span>{quiz.questions.length} 题 · {quiz.duration}{count > 0 && <small>{attempt?.completedAt ? '报告已生成' : `已答 ${count} 题`}</small>}</span><span className="quiz-card-arrow" aria-hidden="true">↗</span></div>
         </Link>
       })}
@@ -57,10 +57,10 @@ function useFragment() {
 function Report({ quiz, report, scores, shared }: { quiz: QuizDefinition; report: QuizReport; scores: number[]; shared: boolean }) {
   return <main className={`quiz-shell quiz-report quiz-theme-${quiz.id}`}>
     <header className="quiz-header"><Link href="/tests" className="quiz-back">← 测试合集</Link><span className="quiz-mini-brand">{quiz.name} 报告</span></header>
-    {shared && <div className="quiz-shared-note">这是朋友分享的结果。<Link href={`/tests/${quiz.id}`}>我也测一测 ↗</Link></div>}
-    <section className="quiz-report-hero">
-      <div className="quiz-report-top"><span className="quiz-eyebrow">{quiz.id === 'mbti' ? 'YOUR PERSONALITY NOTE' : 'YOUR WORK SURVIVAL NOTE'}</span><span className="quiz-report-seal">下班<br />认证</span></div>
-      <QuizArt kind={quiz.id} />
+    {shared && <div className="quiz-shared-note">{quiz.version !== findQuiz(quiz.id)?.version ? '这是朋友分享的 25 题旧版结果。' : '这是朋友分享的结果。'}<Link href={`/tests/${quiz.id}`}>我也测一测 ↗</Link></div>}
+    <section className={`quiz-report-hero${quiz.persona ? ' quiz-character-hero' : ''}`}>
+      <div className="quiz-report-top"><span className="quiz-eyebrow">{quiz.eyebrow}</span><span className="quiz-report-seal">此刻<br />名片</span></div>
+      <QuizArt kind={quiz.id} code={report.code} />
       <div className="quiz-result-code">{report.code}</div>
       <h1>{report.title}</h1>
       <p className="quiz-result-quote">{report.quote}</p>
@@ -68,10 +68,10 @@ function Report({ quiz, report, scores, shared }: { quiz: QuizDefinition; report
       <p className="quiz-report-description">{report.description}</p>
       <div className="quiz-report-hero-footer"><span>此刻的你 · 值得被看见</span><span aria-hidden="true">✦</span></div>
     </section>
-    <p className="quiz-report-disclaimer">{quiz.id === 'mbti' ? 'MBTI 风格探索 · 非官方量表 · 偏好没有高低' : '原创职场娱乐画像 · 不评价工作表现或心理状态'}</p>
+    <p className="quiz-report-disclaimer">{quiz.shortCaveat}</p>
     <section className="quiz-report-metrics">
-      <div className="quiz-section-heading"><span>01</span><h2>{quiz.id === 'mbti' ? '你的四组性格偏好' : '你的职场续航配方'}</h2></div>
-      <p className="quiz-subtle">{quiz.id === 'mbti' ? '偏好没有高低。两边接近时，把更多空间留给情境。' : '每一种生存技能都有用，比例来自你这次的 25 个选择。'}</p>
+      <div className="quiz-section-heading"><span>01</span><h2>{quiz.metricsTitle}</h2></div>
+      <p className="quiz-subtle">{quiz.metricsIntro}</p>
       {report.metrics.map((metric) => <div className="quiz-metric" key={metric.label}>
         <h3>{metric.label}</h3>
         <div className="quiz-metric-labels"><span>{metric.left} {metric.percent}%</span><span>{metric.right ? `${metric.right} ${100 - metric.percent}%` : ''}</span></div>
@@ -92,8 +92,9 @@ function Report({ quiz, report, scores, shared }: { quiz: QuizDefinition; report
 }
 
 function ReportRoute({ id }: { id: string }) {
-  const quiz = findQuiz(id)
   const fragment = useFragment()
+  const currentQuiz = findQuiz(id)
+  const quiz = fragment ? findSharedQuiz(id, new URLSearchParams(fragment.slice(1)).get('v')) : currentQuiz
   const scores = useMemo(() => {
     if (!quiz) return null
     if (fragment) return readSharedScores(quiz, fragment)
@@ -101,7 +102,8 @@ function ReportRoute({ id }: { id: string }) {
     return attempt?.completedAt && isComplete(quiz, attempt.answers) ? scoreAnswers(quiz, attempt.answers) : null
   }, [quiz, fragment])
   const report = useMemo(() => quiz && scores ? makeReport(quiz, scores) : null, [quiz, scores])
-  if (!quiz) return <Missing />
+  if (!currentQuiz) return <Missing />
+  if (!quiz) return <Missing report invalid />
   if (!scores || !report) return <Missing report invalid={Boolean(fragment)} />
   return <Report key={`${id}-${fragment}`} quiz={quiz} report={report} scores={scores} shared={Boolean(fragment)} />
 }

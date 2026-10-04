@@ -1,4 +1,4 @@
-export type QuizId = 'mbti' | 'mbanti'
+export type QuizId = 'mbti' | 'mbanti' | 'animal' | 'afterhours'
 export type Axis = 0 | 1 | 2 | 3
 
 export interface QuizOption {
@@ -24,7 +24,33 @@ export interface QuizDefinition {
   duration: string
   instructions: string
   caveat: string
+  category: string
+  eyebrow: string
+  reportLabel: string
+  metricsTitle: string
+  metricsIntro: string
+  shortCaveat: string
+  persona?: PersonaDefinition
   questions: readonly QuizQuestion[]
+}
+
+export interface PersonaProfile {
+  pattern: string
+  code: string
+  title: string
+  quote: string
+  description: string
+  tags: readonly string[]
+  strength: string
+  drain: string
+  connection: string
+  recharge: string
+}
+
+export interface PersonaDefinition {
+  axes: readonly { label: string; left: string; right: string }[]
+  profiles: readonly PersonaProfile[]
+  mixed: { title: string; quote: string; description: string }
 }
 
 export interface QuizAttempt {

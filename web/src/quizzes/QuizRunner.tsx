@@ -67,7 +67,7 @@ export function QuizRunner({ quiz }: { quiz: QuizDefinition }) {
   if (!started) return <main className={`quiz-shell quiz-theme-${quiz.id}`}>
     <header className="quiz-header"><Link href="/tests" className="quiz-back">← 测试合集</Link><span className="quiz-mini-brand">下班了么</span></header>
     <div className="quiz-intro">
-      <span className="quiz-eyebrow">{quiz.id === 'mbti' ? 'PERSONALITY NOTE' : 'WORK SURVIVAL NOTE'}</span>
+      <span className="quiz-eyebrow">{quiz.eyebrow}</span>
       <QuizArt kind={quiz.id} />
       <h1>{quiz.name}<span>{quiz.subtitle}</span></h1>
       <p className="quiz-intro-description">{quiz.description}</p>
@@ -101,7 +101,7 @@ export function QuizRunner({ quiz }: { quiz: QuizDefinition }) {
     <section className="quiz-question" key={question.id}>
       <span className="quiz-eyebrow">QUESTION {String(attempt.cursor + 1).padStart(2, '0')} <span>/ {total}</span></span>
       <h1 ref={heading} tabIndex={-1} id="quiz-question-title">{question.prompt}</h1>
-      <p className="quiz-question-hint">{quiz.id === 'mbti' ? '这句话有多像平时的你？' : '哪一句最像你的内心弹幕？'}</p>
+      <p className="quiz-question-hint">{quiz.id === 'mbti' ? '这句话有多像平时的你？' : quiz.persona ? '哪一种状态，让你觉得最像自己？' : '哪一句最像你的内心弹幕？'}</p>
       <fieldset className="quiz-options" aria-labelledby="quiz-question-title">
         <legend className="quiz-sr-only">请选择一个答案</legend>
         {question.options.map((option, i) => <label className={`quiz-option ${selected === option.value ? 'is-selected' : ''}`} key={option.value}>
