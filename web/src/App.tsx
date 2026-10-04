@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { lazy, Suspense, useEffect } from 'react'
 import { Redirect, Route, Switch, useLocation } from 'wouter'
 import { TabBar } from './components/TabBar.tsx'
 import { CatWindow, PrimaryButton, Screen } from './components/ui.tsx'
@@ -19,6 +19,8 @@ import GamePlayer from './pages/games/GamePlayer.tsx'
 import EmailLogin from './pages/EmailLogin.tsx'
 import AdminPage from './pages/AdminPage.tsx'
 import AccountProfile from './pages/me/AccountProfile.tsx'
+
+const Tests = lazy(() => import('./quizzes/Tests.tsx'))
 
 function usePageViews() {
   const [location] = useLocation()
@@ -77,6 +79,9 @@ function Gate() {
 export default function App() {
   const [location] = useLocation()
   if (location === '/admin' || location.startsWith('/admin/')) return <AdminPage />
+  if (location === '/tests' || location.startsWith('/tests/')) {
+    return <Suspense fallback={<Screen className="items-center justify-center"><p>正在打开趣味测试…</p></Screen>}><Tests /></Suspense>
+  }
   return (
     <SessionProvider>
       <Gate />
