@@ -106,8 +106,9 @@ export function QuizRunner({ quiz }: { quiz: QuizDefinition }) {
         <legend className="quiz-sr-only">请选择一个答案</legend>
         {question.options.map((option, i) => <label className={`quiz-option ${selected === option.value ? 'is-selected' : ''}`} key={option.value}>
           <input type="radio" name={question.id} value={option.value} checked={selected === option.value} onChange={() => choose(option.value)} />
-          <span className="quiz-option-key" aria-hidden="true">{quiz.id === 'mbti' ? i + 1 : String.fromCharCode(65 + i)}</span>
-          <span>{option.label}</span><span className="quiz-option-check" aria-hidden="true">{selected === option.value ? '✓' : ''}</span>
+          <span className="quiz-option-key" aria-hidden="true">{quiz.id === 'mbti' ? String(i + 1).padStart(2, '0') : String.fromCharCode(65 + i)}</span>
+          <span className="quiz-option-text">{option.label}</span>
+          <span className="quiz-option-check" aria-hidden="true">{selected === option.value && <svg viewBox="0 0 16 16" fill="none"><path d="m3.5 8 3 3 6-6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>}</span>
         </label>)}
       </fieldset>
       <p className="quiz-message" role="status">{message}</p>
