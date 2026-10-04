@@ -78,7 +78,8 @@ class EmailLoginFlowTest {
         services.redis.cmd.del("xb:code:cool:${SessionService.sha256("codes@example.com")}").await()
         val next = loginCode(guest, "codes@example.com")
         assertEquals(HttpStatusCode.OK, post(ApiPaths.EMAIL_LOGIN, guest.token, EmailLoginRequest("codes@example.com", next, guest.deviceId, username = "CodeUser")).status)
-        assertEquals(HttpStatusCode.Unauthorized, post(ApiPaths.EMAIL_LOGIN, guest.token, EmailLoginRequest("codes@example.com", next, guest.deviceId)).status)
+        // A consumed code is rejected like an expired one.
+        assertEquals(HttpStatusCode.BadRequest, post(ApiPaths.EMAIL_LOGIN, guest.token, EmailLoginRequest("codes@example.com", next, guest.deviceId)).status)
     }
 
     @Test fun `logging in can explicitly merge guest records but cannot overwrite a bound email`() = apiTest {
