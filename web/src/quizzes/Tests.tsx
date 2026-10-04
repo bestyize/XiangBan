@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, Route, Switch, useLocation } from 'wouter'
+import { TabBar, TAB_BAR_SPACE } from '../components/TabBar.tsx'
 import { findQuiz, findSharedQuiz, quizCatalog } from './catalog.ts'
 import { loadAttempt } from './progress.ts'
 import { isComplete, makeReport, scoreAnswers } from './scoring.ts'
@@ -12,7 +13,7 @@ import type { QuizDefinition, QuizReport } from './types.ts'
 import './quizzes.css'
 
 function Hub() {
-  return <main className="quiz-shell quiz-hub">
+  return <><main className="quiz-shell quiz-hub" style={{ paddingBottom: TAB_BAR_SPACE }}>
     <header className="quiz-header"><Link href="/" className="quiz-back">← 回到首页</Link><span className="quiz-mini-brand">下班了么</span></header>
     <section className="quiz-hub-heading">
       <span className="quiz-eyebrow">AFTER HOURS LAB <span className="quiz-tiny-star" aria-hidden="true">✦</span></span>
@@ -32,7 +33,7 @@ function Hub() {
       })}
     </div>
     <footer className="quiz-hub-footer">结果是一面小镜子。定义你的人，始终是你。</footer>
-  </main>
+  </main><TabBar /></>
 }
 
 function Missing({ report = false, invalid = false }: { report?: boolean; invalid?: boolean }) {

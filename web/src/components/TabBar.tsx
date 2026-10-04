@@ -1,8 +1,9 @@
 import { Link, useLocation } from 'wouter'
 
 const TABS = [
-  { href: '/', label: '下班' },
-  { href: '/dex', label: '图鉴' },
+  { href: '/', label: '首页' },
+  { href: '/games', label: '玩一局' },
+  { href: '/tests', label: '趣味测试' },
   { href: '/me', label: '我的' },
 ] as const
 
@@ -15,7 +16,9 @@ export function TabBar() {
       style={{ paddingBottom: 'var(--safe-bottom)' }}
     >
       {TABS.map((tab) => {
-        const active = tab.href === '/' ? location === '/' : location.startsWith(tab.href)
+        const active = tab.href === '/'
+          ? location === '/' || location === '/dex'
+          : location === tab.href || location.startsWith(`${tab.href}/`)
         return (
           <Link
             key={tab.href}
