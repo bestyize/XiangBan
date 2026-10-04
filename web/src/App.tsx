@@ -2,11 +2,9 @@ import { lazy, Suspense, useEffect } from 'react'
 import { Redirect, Route, Switch, useLocation } from 'wouter'
 import { TabBar } from './components/TabBar.tsx'
 import { CatWindow, PrimaryButton, Screen } from './components/ui.tsx'
-import { TERMS_VERSION } from './lib/consent.ts'
 import { SessionProvider, useSession } from './lib/session.tsx'
 import { track } from './lib/track.ts'
 import CardPreview from './pages/CardPreview.tsx'
-import ConsentScreen from './pages/ConsentScreen.tsx'
 import Dex from './pages/Dex.tsx'
 import Home from './pages/Home.tsx'
 import LegalPage from './pages/LegalPage.tsx'
@@ -57,7 +55,6 @@ function Gate() {
   if (location === '/login') return <EmailLogin />
   if (location === '/me') return <><Me key={profile.userId} /><TabBar /></>
   if (location === '/me/account') return <AccountProfile key={profile.userId} />
-  if (profile.accountType === 'registered' && profile.onboarded && profile.termsVersion !== TERMS_VERSION) return <ConsentScreen />
   if (!profile.onboarded && location !== '/hello') return <Redirect to="/hello" replace />
 
   return (

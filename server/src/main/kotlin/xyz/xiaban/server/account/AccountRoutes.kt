@@ -21,6 +21,7 @@ import xyz.xiaban.server.Services
 import xyz.xiaban.server.auth.AUTH_USER
 import xyz.xiaban.server.auth.userId
 import xyz.xiaban.server.http.conflict
+import xyz.xiaban.server.http.badRequest
 import xyz.xiaban.shared.ApiPaths
 import xyz.xiaban.shared.BindEmailRequest
 import xyz.xiaban.shared.EmailCodeRequest
@@ -50,9 +51,16 @@ fun Route.accountRoutes(services: Services) {
         val bearer = call.request.headers[HttpHeaders.Authorization]?.removePrefix("Bearer ")?.trim()
         val userId = bearer?.let { services.tokens.userIdOrNull(it) }
         val req = call.receive<EmailLoginRequest>()
+        val termsVersion = req.termsVersion?.trim()?.also {
+            if (it.isEmpty() || it.length > 20) badRequest("协议版本无效", "invalid_terms_version")
+        }
         val result = services.emailBinding.login(userId, req.email, req.code, req.deviceId, req.mergeGuest, req.username)
+        val profile = if (termsVersion != null) {
+            services.account.consent(result.profile.userId, termsVersion, false)
+            services.profiles.view(result.profile.userId)
+        } else result.profile
         bearer?.let { services.tokens.revoke(it) }
-        call.respond(result)
+        call.respond(result.copy(profile = profile))
     }
     authenticate(AUTH_USER) {
         post(ApiPaths.LOGOUT) {

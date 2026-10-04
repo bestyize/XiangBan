@@ -9,7 +9,15 @@ data class EmailCodeRequest(val email: String)
 data class BindEmailRequest(val email: String, val code: String, val username: String? = null)
 
 @Serializable
-data class EmailLoginRequest(val email: String, val code: String, val deviceId: String, val mergeGuest: Boolean = false, val username: String? = null)
+data class EmailLoginRequest(
+    val email: String,
+    val code: String,
+    val deviceId: String,
+    val mergeGuest: Boolean = false,
+    val username: String? = null,
+    /** Accepted on the login page; optional for older clients. */
+    val termsVersion: String? = null,
+)
 
 @Serializable
 data class LogoutRequest(val deviceId: String)

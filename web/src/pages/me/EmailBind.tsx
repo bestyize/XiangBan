@@ -10,10 +10,11 @@ const input =
   'w-full rounded-2xl border-2 border-dusk-soft bg-dusk-deep/60 px-4 py-3 text-window placeholder:text-window/40 focus:border-lamp focus:outline-none'
 
 /** Binding an email keeps the account across devices; an email that already has one brings it back. */
-export function EmailBind({ onDone, mode = 'bind', disabled = false, beforeSend }: {
+export function EmailBind({ onDone, mode = 'bind', disabled = false, termsVersion, beforeSend }: {
   onDone?: (merged: boolean) => void
   mode?: 'bind' | 'login'
   disabled?: boolean
+  termsVersion?: string
   beforeSend?: () => Promise<void>
 }) {
   const { adopt } = useSession()
@@ -66,7 +67,7 @@ export function EmailBind({ onDone, mode = 'bind', disabled = false, beforeSend 
     try {
       const preferredUsername = profile.nickname ? normalizeNickname(profile.nickname) : undefined
       const res = await api<BindResponse>(mode === 'login' ? '/api/account/login' : '/api/account/bind', {
-        method: 'POST', body: mode === 'login' ? { email, code, deviceId: getDeviceId(), mergeGuest, username: preferredUsername } : { email, code, username: preferredUsername },
+        method: 'POST', body: mode === 'login' ? { email, code, deviceId: getDeviceId(), mergeGuest, username: preferredUsername, termsVersion } : { email, code, username: preferredUsername },
       })
       adopt(res.token, res.profile)
       onDone?.(res.merged)
