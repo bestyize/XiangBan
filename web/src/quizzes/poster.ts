@@ -1,4 +1,5 @@
 import QRCode from 'qrcode'
+import { personaArtSvg, quizPalette } from './art.ts'
 import type { QuizDefinition, QuizReport } from './types.ts'
 
 export const POSTER_WIDTH = 1080
@@ -56,7 +57,7 @@ function textLines(ctx: CanvasRenderingContext2D, text: string, x: number, y: nu
   lines.slice(0, maxLines).forEach((value, i) => ctx.fillText(value, x, y + i * lineHeight))
 }
 
-function drawTags(ctx: CanvasRenderingContext2D, tags: readonly string[], accent: string) {
+function drawTags(ctx: CanvasRenderingContext2D, tags: readonly string[], accent: string, top = 295) {
   font(ctx, 9.5, 500)
   const rows: { label: string; width: number }[][] = [[]]
   let used = 0
@@ -71,7 +72,7 @@ function drawTags(ctx: CanvasRenderingContext2D, tags: readonly string[], accent
   }
   rows.slice(0, 2).forEach((row, i) => {
     let x = 180 - (row.reduce((sum, tag) => sum + tag.width, 0) + (row.length - 1) * 6) / 2
-    const y = 295 + i * 28
+    const y = top + i * 28
     for (const tag of row) {
       ctx.fillStyle = accent + '30'
       rounded(ctx, x, y, tag.width, 22, 11)
@@ -92,8 +93,8 @@ export async function renderQuizPoster(quiz: QuizDefinition, report: QuizReport,
 
   // Lay out a phone-sized portrait, then render at 3x without stretching content.
   ctx.scale(3, 3)
-  const accent = quiz.id === 'mbti' ? '#a6cdb5' : '#bfb2e2'
-  const inkAccent = quiz.id === 'mbti' ? '#668574' : '#9480b6'
+  const { accent, ink: inkAccent } = quizPalette[quiz.id]
+  const character = Boolean(quiz.persona)
   const background = ctx.createLinearGradient(0, 0, 360, 780)
   background.addColorStop(0, '#2c3d54')
   background.addColorStop(1, '#182338')
@@ -133,36 +134,45 @@ export async function renderQuizPoster(quiz: QuizDefinition, report: QuizReport,
   ctx.textAlign = 'left'
   ctx.fillStyle = '#718077'
   font(ctx, 9, 600)
-  ctx.fillText(quiz.name + ' / ' + (quiz.id === 'mbti' ? '性格偏好报告' : '职场续航报告'), 40, 115)
+  ctx.fillText(quiz.name + ' / ' + quiz.reportLabel, 40, 115)
   ctx.textAlign = 'right'
   ctx.fillStyle = '#9aa299'
   font(ctx, 8)
   ctx.fillText('RESULT NOTE', 320, 115)
 
+  if (character) {
+    const art = new Image()
+    await new Promise<void>((resolve, reject) => {
+      art.onload = () => resolve()
+      art.onerror = () => reject(new Error('插画没画好，请重试。'))
+      art.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(personaArtSvg(quiz.id, report.code))
+    })
+    ctx.drawImage(art, 113, 123, 134, 112)
+  }
   ctx.textAlign = 'center'
   ctx.fillStyle = '#243143'
-  fitFont(ctx, report.code, 62, 278, 800)
-  ctx.fillText(report.code, 180, 183)
+  fitFont(ctx, report.code, character ? 12 : 62, 278, character ? 600 : 800)
+  ctx.fillText(report.code, 180, character ? 244 : 183)
   fitFont(ctx, report.title, 23, 276, 700)
-  ctx.fillText(report.title, 180, 222)
+  ctx.fillText(report.title, 180, character ? 276 : 222)
   ctx.fillStyle = '#657064'
   font(ctx, 13)
-  textLines(ctx, report.quote, 180, 254, 268, 20)
-  drawTags(ctx, report.tags, accent)
+  textLines(ctx, report.quote, 180, character ? 307 : 254, 268, 20)
+  drawTags(ctx, report.tags, accent, character ? 350 : 295)
 
   ctx.fillStyle = '#deddd3'
-  ctx.fillRect(40, 350, 280, 0.7)
+  ctx.fillRect(40, character ? 410 : 350, 280, 0.7)
   ctx.textAlign = 'left'
   ctx.fillStyle = '#344352'
   font(ctx, 12, 600)
-  ctx.fillText(quiz.id === 'mbti' ? '你的四组性格偏好' : '你的职场续航配方', 40, 376)
+  ctx.fillText(quiz.metricsTitle, 40, character ? 436 : 376)
   ctx.fillStyle = '#849085'
   ctx.textAlign = 'right'
   font(ctx, 8)
-  ctx.fillText('此刻的你', 320, 375)
+  ctx.fillText('此刻的你', 320, character ? 435 : 375)
 
   report.metrics.forEach((metric, i) => {
-    const y = 407 + i * 44
+    const y = (character ? 467 : 407) + i * 44
     ctx.textAlign = 'left'
     ctx.fillStyle = '#43505b'
     font(ctx, 10.5, 500)
@@ -207,7 +217,8 @@ export async function renderQuizPoster(quiz: QuizDefinition, report: QuizReport,
   ctx.textAlign = 'center'
   ctx.fillStyle = '#bdc6d0'
   font(ctx, 8.3)
-  ctx.fillText(quiz.id === 'mbti' ? 'MBTI 风格探索 · 非官方量表 · 结果仅供参考' : 'M班TI · 原创趣味测试 · 不代表工作或心理状态评估', 180, 752)
+  fitFont(ctx, quiz.shortCaveat, 8.3, 316, 400)
+  ctx.fillText(quiz.shortCaveat, 180, 752)
   ctx.fillStyle = '#899bad'
   font(ctx, 8)
   ctx.fillText('分享不包含逐题答案或账号信息', 180, 769)

@@ -1,10 +1,11 @@
 import type { QuizId } from './types.ts'
+import { personaArt } from './art.ts'
 
-export function QuizArt({ kind }: { kind: QuizId }) {
+export function QuizArt({ kind, code }: { kind: QuizId; code?: string }) {
   return <svg className="quiz-art" viewBox="0 0 240 200" fill="none" aria-hidden="true">
     <circle cx="125" cy="105" r="76" fill="currentColor" opacity=".08" />
     <circle cx="125" cy="105" r="92" stroke="currentColor" strokeDasharray="2 8" opacity=".3" />
-    {kind === 'mbti' ? <>
+    {kind === 'animal' || kind === 'afterhours' ? <g dangerouslySetInnerHTML={{ __html: personaArt(kind, code) }} /> : kind === 'mbti' ? <>
       <path d="m126 35 22 48 53 22-53 22-22 48-22-48-53-22 53-22z" fill="currentColor" opacity=".9" />
       <path d="m126 35 1 70 74 0-53 22-22 48-1-70-74 0 53-22z" fill="#182338" opacity=".18" />
       <circle cx="126" cy="105" r="22" fill="#f3eee4" />

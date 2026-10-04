@@ -18,10 +18,10 @@ export function scoreAnswers(quiz: QuizDefinition, answers: unknown): number[] {
     answers.forEach((answer) => { counts[answer] += 1 })
     return counts
   }
-  const scores = [0, 0, 0, 0]
+  const scores = quiz.persona ? quiz.persona.axes.map(() => 0) : [0, 0, 0, 0]
   quiz.questions.forEach((question, i) => {
     if (question.axis === undefined || question.direction === undefined) throw new Error('题目配置不完整。')
-    scores[question.axis] += (answers[i] - 3) * question.direction
+    scores[question.axis] += (answers[i] - (quiz.persona ? 0 : 3)) * question.direction
   })
   return scores
 }
@@ -29,7 +29,13 @@ export function scoreAnswers(quiz: QuizDefinition, answers: unknown): number[] {
 export function validScores(quiz: QuizDefinition, scores: unknown): scores is number[] {
   if (!Array.isArray(scores) || !Array.from(scores).every(Number.isInteger)) return false
   if (quiz.id === 'mbti') return scores.length === 4 && scores.every((score) => score >= -20 && score <= 20)
-  return scores.length === 5 && scores.every((score) => score >= 0 && score <= 20) && scores.reduce((a, b) => a + b, 0) === 25
+  if (quiz.persona) return scores.length === quiz.persona.axes.length && scores.every((score, i) => Math.abs(score) <= axisLimit(quiz, i))
+  return scores.length === workModes.length && scores.every((score, i) => score >= 0 && score <= quiz.questions.filter((q) => q.options.some((o) => o.value === i)).length) && scores.reduce((a, b) => a + b, 0) === quiz.questions.length
+}
+
+function axisLimit(quiz: QuizDefinition, axis: number): number {
+  return quiz.questions.filter((question) => question.axis === axis)
+    .reduce((total, question) => total + Math.max(...question.options.map((option) => Math.abs(option.value))), 0)
 }
 
 const axes = [
@@ -91,8 +97,8 @@ function workReport(quiz: QuizDefinition, counts: number[]): QuizReport {
     description: solo?.description ?? `${profiles.map((profile) => profile.title).join('、')}并列第一。你会按不同场景切换续航方式，这次不强行选一个冠军。`,
     tags: solo?.tags ?? profiles.map((profile) => profile.title),
     metrics: workModes.map((mode, i) => ({
-      label: workProfiles[mode].title, left: mode, percent: counts[i] * 4,
-      note: `${counts[i]} / 25 次选择 · ${workProfiles[mode].tags[0]}`,
+      label: workProfiles[mode].title, left: mode, percent: Math.round(counts[i] / quiz.questions.length * 100),
+      note: `${counts[i]} / ${quiz.questions.length} 次选择 · ${workProfiles[mode].tags[0]}`,
     })),
     sections: [
       { title: '你的职场生存技能', text: solo?.strength ?? profiles.map((profile) => `${profile.title}：${profile.strength}`).join('\n\n') },
@@ -100,11 +106,34 @@ function workReport(quiz: QuizDefinition, counts: number[]): QuizReport {
       { title: '给明天留一句好用的话', text: solo?.connection ?? '“我们先确认最重要的一件，我把它处理好，再继续下一件。”不用一次用上所有技能，给今天选一个够用的就好。' },
     ],
     recharge: { title: '今晚的下班处方签', text: solo?.recharge ?? '从今天的多种技能里选一个：关掉通知、安静十分钟、吃点喜欢的、笑完换个话题，或放下优化冲动。只做一件就好。' },
-    caveat: `比例只表示你在这 25 题中选择各类答案的次数，不是人格强度或压力诊断。${quiz.caveat}`,
+    caveat: `比例只表示你在这 ${quiz.questions.length} 题中选择各类答案的次数，不是人格强度或压力诊断。${quiz.caveat}`,
+  }
+}
+
+function personaReport(quiz: QuizDefinition, scores: number[]): QuizReport {
+  const persona = quiz.persona!
+  const pattern = scores.map((score) => score === 0 ? 'X' : score > 0 ? '1' : '0').join('')
+  const profile = persona.profiles.find((candidate) => candidate.pattern === pattern)
+  const mixed = persona.mixed
+  return {
+    quizId: quiz.id, code: profile?.code ?? 'MIX', title: profile?.title ?? mixed.title,
+    quote: profile?.quote ?? mixed.quote, description: profile?.description ?? mixed.description,
+    tags: profile?.tags ?? ['保留多面', '按需切换', '舒服就好'],
+    metrics: persona.axes.map((axis, i) => ({
+      ...axis, percent: Math.round(50 + scores[i] / axisLimit(quiz, i) * 50),
+      note: scores[i] === 0 ? '本次两边平衡，保留切换空间，不强行归类。' : `这次更靠近“${scores[i] > 0 ? axis.left : axis.right}”；${Math.abs(scores[i]) <= 2 ? '两边较接近，场景可能影响选择' : '这是你的本次生活偏好'}。`,
+    })),
+    sections: [
+      { title: quiz.id === 'animal' ? '你自带的小小光芒' : '下班后的你，带来了什么', text: profile?.strength ?? '你能按不同场景调整自己的相处和生活方式。不固定在一个角色里，也是在认真感受当下的需要。' },
+      { title: '什么会悄悄耗电', text: profile?.drain ?? '一直追问自己到底属于哪一型，可能比选择本身更累。先留意今天需要安静、陪伴、放空还是动手。' },
+      { title: '让别人更懂你一点', text: profile?.connection ?? '把“我今天需要什么”直接说出来。别人不用猜中你的标签，也可以和你相处得舒服。' },
+    ],
+    recharge: { title: quiz.id === 'animal' ? '给小动物留一点舒服的时间' : '今晚，切换回自己的频道', text: profile?.recharge ?? '只选一件当下会让你轻松的小事，散步、听歌、独处或短聚都可以。不必同时照顾自己的每一面。' },
+    caveat: `三个百分比是本次答案的归一化偏好分，不是人群排名或准确率。${pattern.includes('X') ? '部分维度平衡，因此保留多面结果。' : ''}${quiz.caveat}`,
   }
 }
 
 export function makeReport(quiz: QuizDefinition, scores: unknown): QuizReport {
   if (!validScores(quiz, scores)) throw new Error('报告数据不完整，请重新测试。')
-  return quiz.id === 'mbti' ? personalityReport(quiz, scores) : workReport(quiz, scores)
+  return quiz.persona ? personaReport(quiz, scores) : quiz.id === 'mbti' ? personalityReport(quiz, scores) : workReport(quiz, scores)
 }
