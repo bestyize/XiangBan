@@ -5,6 +5,7 @@ import { loadAttempt } from './progress.ts'
 import { isComplete, makeReport, scoreAnswers } from './scoring.ts'
 import { readSharedScores } from './share.ts'
 import { QuizArt } from './QuizArt.tsx'
+import { QuizCover } from './QuizCover.tsx'
 import { QuizRunner } from './QuizRunner.tsx'
 import { ReportShare } from './ReportShare.tsx'
 import type { QuizDefinition, QuizReport } from './types.ts'
@@ -15,22 +16,21 @@ function Hub() {
     <header className="quiz-header"><Link href="/" className="quiz-back">← 回到首页</Link><span className="quiz-mini-brand">下班了么</span></header>
     <section className="quiz-hub-heading">
       <span className="quiz-eyebrow">AFTER HOURS LAB <span className="quiz-tiny-star" aria-hidden="true">✦</span></span>
-      <h1>工作先放一放，<br /><span>来认识一下自己。</span></h1>
-      <p>遇见内心的小动物，找回下班后的自己。<br />总有一种答案，让你觉得“对，就是我”。</p>
-      <div className="quiz-hub-meta"><span>趣味测试</span><span>无需登录 · 结果可分享</span></div>
+      <h1>发现自己的<span>另一面。</span></h1>
+      <p>选个小测试，给此刻的自己一张名片。</p>
+      <div className="quiz-hub-meta"><span>{quizCatalog.length} 个小测试</span><span>无需登录 · 结果可分享</span></div>
     </section>
     <div className="quiz-catalog" aria-label="趣味测试合集">
-      {quizCatalog.map((quiz, i) => {
+      {quizCatalog.map((quiz) => {
         const attempt = loadAttempt(quiz)
         const count = attempt?.answers.filter((answer) => answer !== null).length ?? 0
         return <Link key={quiz.id} href={`/tests/${quiz.id}`} className={`quiz-catalog-card quiz-theme-${quiz.id}`}>
-          <div className="quiz-card-top"><span className="quiz-card-category">{quiz.category}</span><span className="quiz-card-number">{String(i + 1).padStart(2, '0')}</span></div>
-          <div className="quiz-card-body"><div><h2 className={quiz.name.length > 4 ? 'quiz-name-long' : undefined}>{quiz.name}</h2><h3>{quiz.subtitle}</h3><p>{quiz.description}</p></div><QuizArt kind={quiz.id} /></div>
-          <div className="quiz-card-footer"><span>{quiz.questions.length} 题 · {quiz.duration}{count > 0 && <small>{attempt?.completedAt ? '报告已生成' : `已答 ${count} 题`}</small>}</span><span className="quiz-card-arrow" aria-hidden="true">↗</span></div>
+          <div className="quiz-card-cover"><QuizCover kind={quiz.id} /><span className="quiz-card-category">{quiz.category}</span>{count > 0 && <span className="quiz-card-status">{attempt?.completedAt ? '报告已生成' : `已答 ${count} / ${quiz.questions.length}`}</span>}</div>
+          <div className="quiz-card-body"><h2>{quiz.name}</h2><p>{quiz.subtitle}</p></div>
+          <div className="quiz-card-footer"><span><strong>{quiz.questions.length} 题</strong><small>{quiz.duration}</small></span><span className="quiz-card-arrow" aria-hidden="true">↗</span></div>
         </Link>
       })}
     </div>
-    <div className="quiz-coming"><span aria-hidden="true">＋</span><div><strong>下一种玩法，正在酝酿</strong><p>把不同的自己，慢慢收集起来。</p></div></div>
     <footer className="quiz-hub-footer">结果是一面小镜子。定义你的人，始终是你。</footer>
   </main>
 }
