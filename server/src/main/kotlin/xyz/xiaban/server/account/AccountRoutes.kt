@@ -9,7 +9,10 @@ import io.ktor.server.response.header
 import io.ktor.server.response.respond
 import io.ktor.server.response.respondText
 import kotlinx.serialization.json.JsonObject
+import io.ktor.server.plugins.ratelimit.rateLimit
+import xyz.xiaban.server.events.Actor
 import xyz.xiaban.server.http.AppJson
+import xyz.xiaban.server.http.RateLimits
 import xyz.xiaban.shared.ConsentUpdate
 import xyz.xiaban.shared.EventBatch
 import io.ktor.server.routing.Route
@@ -122,9 +125,16 @@ fun Route.accountRoutes(services: Services) {
             services.account.consent(call.userId(), req.termsVersion, req.overseas)
             call.respond(services.profiles.view(call.userId()))
         }
+    }
+
+    // Open to guests too: they are counted by a hash of their anonymous device id (PRD 10, admin metrics).
+    rateLimit(RateLimits.EVENTS) {
         post(ApiPaths.EVENTS) {
             val batch = call.receive<EventBatch>()
-            services.events.record(call.userId(), batch.events, call.request.headers[HttpHeaders.UserAgent])
+            val bearer = call.request.headers[HttpHeaders.Authorization]?.removePrefix("Bearer ")?.trim()
+            val userId = bearer?.let { services.tokens.userIdOrNull(it) }
+            val actor = userId?.let { Actor.Registered(it) } ?: batch.deviceId?.let(Actor::guest)
+            if (actor != null) services.events.record(actor, batch.events, call.request.headers[HttpHeaders.UserAgent])
             call.respond(OkResponse())
         }
     }

@@ -5,6 +5,7 @@ import { isComplete } from './scoring.ts'
 import { useLoginReminder } from '../components/LoginReminder.tsx'
 import { NavBar } from '../components/SubPage.tsx'
 import { readLoginReturn, clearLoginReturn } from '../lib/loginReturn.ts'
+import { track } from '../lib/track.ts'
 import { useSession } from '../lib/session.tsx'
 import { QuizArt } from './QuizArt.tsx'
 import type { QuizAttempt, QuizDefinition } from './types.ts'
@@ -34,7 +35,7 @@ export function QuizRunner({ quiz }: { quiz: QuizDefinition }) {
 
   useEffect(() => {
     const intent = readLoginReturn()
-    if (intent?.path === `/tests/${quiz.id}` && intent.start) { setStarted(true); clearLoginReturn() }
+    if (intent?.path === `/tests/${quiz.id}` && intent.start) { start('new'); clearLoginReturn() }
   }, [quiz.id])
 
   useEffect(() => {
@@ -63,11 +64,16 @@ export function QuizRunner({ quiz }: { quiz: QuizDefinition }) {
     setMessage('')
   }
 
+  function start(mode: 'new' | 'resume' | 'review' | 'retake') {
+    track('quiz_start', { quiz: quiz.id, mode })
+    setStarted(true)
+  }
+
   function restart() {
     if (answered > 0 && !window.confirm('要清空这套测试的答案，重新开始吗？')) return
     clearAttempt(quiz)
     setAttempt(newAttempt(quiz))
-    setStarted(true)
+    start('retake')
     setMessage('')
     setOverview(false)
   }
@@ -81,6 +87,7 @@ export function QuizRunner({ quiz }: { quiz: QuizDefinition }) {
     }
     const complete = { ...attempt, completedAt: Date.now() }
     saveAttempt(quiz, complete)
+    track('quiz_complete', { quiz: quiz.id })
     navigate(`/tests/${quiz.id}/report`)
   }
 
@@ -97,11 +104,11 @@ export function QuizRunner({ quiz }: { quiz: QuizDefinition }) {
       {attempt.completedAt ? <>
         <p className="quiz-resume-note">这套测试你已完成，报告还在这里。</p>
         <Link className="quiz-button" href={`/tests/${quiz.id}/report`}>查看我的报告 <span aria-hidden="true">↗</span></Link>
-        <button type="button" className="quiz-text-button" onClick={() => ask(() => setStarted(true))}>回看 / 修改答案</button>
+        <button type="button" className="quiz-text-button" onClick={() => ask(() => start('review'))}>回看 / 修改答案</button>
         <button type="button" className="quiz-text-button" onClick={() => ask(restart)}>重新测一次</button>
       </> : <>
         {answered > 0 && <p className="quiz-resume-note">已经答了 {answered} / {total} 题，接着上次的进度。</p>}
-        <button type="button" className="quiz-button" onClick={() => ask(() => setStarted(true))}>{answered > 0 ? '继续测试' : '开始测试'} <span aria-hidden="true">→</span></button>
+        <button type="button" className="quiz-button" onClick={() => ask(() => start(answered > 0 ? 'resume' : 'new'))}>{answered > 0 ? '继续测试' : '开始测试'} <span aria-hidden="true">→</span></button>
         {answered > 0 && <button type="button" className="quiz-text-button" onClick={() => ask(restart)}>重新开始</button>}
       </>}
       <details className="quiz-method"><summary>题目来源与结果说明</summary><p>{quiz.caveat}</p>{quiz.id === 'mbti' && <p>公共领域题目参考 <a href="https://ipip.ori.org/newBigFive5broadKey.htm" target="_blank" rel="noreferrer">IPIP 条目</a>，四组偏好框架参考 Myers &amp; Briggs Foundation；其余题目与报告为原创。</p>}</details>

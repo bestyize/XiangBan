@@ -12,6 +12,7 @@ import io.ktor.server.routing.post
 import xyz.xiaban.server.Services
 import xyz.xiaban.server.auth.userId
 import xyz.xiaban.server.auth.AUTH_USER
+import xyz.xiaban.server.events.Actor
 import xyz.xiaban.server.http.RateLimits
 import xyz.xiaban.server.http.notFound
 import xyz.xiaban.server.users.SessionService
@@ -45,6 +46,10 @@ fun Route.checkinRoutes(services: Services) {
             } else {
                 val tz = call.request.queryParameters["timezone"]?.takeIf(SessionService::isValidZone) ?: UserRepository.DEFAULT_ZONE.id
                 val view = services.checkins.visitorCheckIn(tz)
+                // Guest check-ins are not stored, but they still count as people who checked in that day.
+                call.request.queryParameters["deviceId"]?.let(Actor::guest)?.let { guest ->
+                    services.events.server(guest, "checkin", mapOf("title" to view.title.code.code))
+                }
                 call.respond(view)
             }
         }

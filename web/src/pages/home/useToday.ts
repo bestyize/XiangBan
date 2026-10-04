@@ -3,7 +3,7 @@ import { api, getToken } from '../../api/client.ts'
 import type { Checkin, Tip, TodayResponse, Unlock } from '../../api/types.ts'
 import { send } from '../../lib/bridge.ts'
 import { clearGuestCheckin, loadGuestCheckin, saveGuestCheckin } from '../../lib/guestCheckin.ts'
-import { browserTimezone } from '../../lib/device.ts'
+import { browserTimezone, getDeviceId } from '../../lib/device.ts'
 
 type Status = 'loading' | 'ready' | 'error'
 
@@ -67,7 +67,10 @@ export function useToday(active = true) {
     setError(null)
     try {
       const tz = browserTimezone() ?? 'Asia/Shanghai'
-      const checkin = await api<Checkin>(`/api/checkin?timezone=${encodeURIComponent(tz)}`, { method: 'POST' })
+      // deviceId lets a guest check-in count once in the admin metrics without storing anything server-side.
+      const params = new URLSearchParams({ timezone: tz })
+      if (!getToken()) params.set('deviceId', getDeviceId())
+      const checkin = await api<Checkin>(`/api/checkin?${params}`, { method: 'POST' })
       if (!getToken()) {
         saveGuestCheckin(checkin)
       }

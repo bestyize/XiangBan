@@ -31,6 +31,9 @@ import xyz.xiaban.server.stats.PercentileService
 import xyz.xiaban.server.stats.StatsService
 import xyz.xiaban.server.stats.TipsService
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 import xyz.xiaban.server.account.AccountMerge
 import xyz.xiaban.server.account.EmailBinding
 import xyz.xiaban.server.guardian.GuardianRepository
@@ -147,7 +150,8 @@ class Services(
     val recall = RecallJob(db, users, CopySelector(copyLibrary), mail, unsubscribeLinks, config.publicBaseUrl, clock)
     val emailBinding = EmailBinding(redis, users, profiles, tokens, AccountMerge(db), emailAvailable,
         { this.mailer.send(it) }, { guardian.reschedule(it) })
-    val events = xyz.xiaban.server.events.EventService(db)
+    val events = xyz.xiaban.server.events.EventService(db, clock)
+    val metrics = xyz.xiaban.server.events.MetricsService(db, clock)
     val account = xyz.xiaban.server.account.AccountService(db, profiles, guardian)
 
     /** Background work tied to the application lifecycle. */
@@ -156,6 +160,13 @@ class Services(
         mail.start(scope)
         guardianScheduler.start(scope)
         recall.start(scope)
+        // Guest events have no account to be deleted with; drop them after the retention period, once a day.
+        scope.launch {
+            while (isActive) {
+                runCatching { events.purgeGuestEvents() }
+                delay(24 * 3600 * 1000L)
+            }
+        }
     }
 
     override fun close() {

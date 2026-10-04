@@ -27,6 +27,14 @@ import java.net.URI
 
 private const val COOKIE = "xb_admin_session"
 
+/** Rows on the dashboard, in display order; ids match web/public/game-packs and web/src/quizzes/catalog.ts. */
+private val METRIC_GAMES = linkedMapOf(
+    "falling-blocks" to "下班方块", "merge-2048" to "2048", "block-puzzle" to "小伴消方块", "water-sort" to "下班调饮料",
+)
+private val METRIC_QUIZZES = linkedMapOf(
+    "mbti" to "MBTI", "mbanti" to "M班TI", "animal" to "精神小动物", "afterhours" to "下班第二人格",
+)
+
 fun Route.adminRoutes(services: Services) {
     route("/api/admin") {
         post("/login") {
@@ -38,6 +46,11 @@ fun Route.adminRoutes(services: Services) {
         }
         get("/session") { call.respond(AdminSession(call.requireAdmin(services))) }
         get("/overview") { call.requireAdmin(services); call.respond(services.adminUsers.overview()) }
+        get("/metrics") {
+            call.requireAdmin(services)
+            val days = call.request.queryParameters["days"]?.toIntOrNull() ?: 7
+            call.respond(services.metrics.daily(days, METRIC_GAMES, METRIC_QUIZZES))
+        }
         get("/users") {
             call.requireAdmin(services)
             val query = call.request.queryParameters

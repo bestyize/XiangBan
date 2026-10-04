@@ -12,6 +12,7 @@ import kotlin.time.Duration.Companion.minutes
 /** Per-instance limits keyed by user (falling back to IP); Nginx adds the per-IP limit in front. */
 object RateLimits {
     val CHECKIN = RateLimitName("checkin")
+    val EVENTS = RateLimitName("events")
 }
 
 fun Application.installRateLimits() {
@@ -19,6 +20,11 @@ fun Application.installRateLimits() {
         register(RateLimits.CHECKIN) {
             rateLimiter(limit = 20, refillPeriod = 1.minutes)
             requestKey { call -> call.principal<UserPrincipal>()?.userId ?: call.request.origin.remoteHost }
+        }
+        // The events endpoint is public, so it is limited per IP; a normal page sends a batch every few seconds.
+        register(RateLimits.EVENTS) {
+            rateLimiter(limit = 60, refillPeriod = 1.minutes)
+            requestKey { call -> call.request.origin.remoteHost }
         }
     }
 }

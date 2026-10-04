@@ -5,11 +5,13 @@ import { Alerts, Button, Field, input, TextButton, useAdminAction } from './admi
 import AdminEmail from './admin/AdminEmail.tsx'
 import AdminSecurity from './admin/AdminSecurity.tsx'
 import AdminOverview from './admin/AdminOverview.tsx'
+import AdminMetrics from './admin/AdminMetrics.tsx'
 import AdminUsers from './admin/AdminUsers.tsx'
 import AdminAudit from './admin/AdminAudit.tsx'
 
 const menu = [
   { href: '/admin', label: '统计概览', icon: 'overview', description: '查看账号增长、活跃情况和服务状态。' },
+  { href: '/admin/metrics', label: '数据监控', icon: 'metrics', description: '每日访问、注册、打卡、分享、游戏与测试人数。' },
   { href: '/admin/users', label: '用户管理', icon: 'users', description: '搜索用户、查看注册信息与记录，管理运营备注。' },
   { href: '/admin/email', label: '邮箱设置', icon: 'email', description: '配置发信服务，并确认邮件送达。' },
   { href: '/admin/audit', label: '操作日志', icon: 'audit', description: '查看用户备注、邮件配置和管理员密码的修改记录。' },
@@ -19,6 +21,7 @@ const menu = [
 function Icon({ name }: { name: string }) {
   const paths: Record<string, string> = {
     overview: 'M3 3h7v7H3z M14 3h7v7h-7z M3 14h7v7H3z M14 14h7v7h-7z',
+    metrics: 'M3 19h18 M7 17V9 M12 17V5 M17 17v-6',
     users: 'M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2 M16 3a4 4 0 0 1 0 8 M22 21v-2a4 4 0 0 0-3-3.87 M13 7a4 4 0 1 1-8 0 4 4 0 0 1 8 0',
     email: 'M3 5h18v14H3z M3 6l9 7 9-7',
     audit: 'M8 3h8v4H8z M8 5H5v16h14V5h-3 M8 12h8 M8 16h5',
@@ -92,6 +95,7 @@ export default function AdminPage() {
         <Alerts error={error} message={message} />
         {current.href === '/admin' && <AdminOverview />}
         {current.href === '/admin/users' && <AdminUsers />}
+        {current.href === '/admin/metrics' && <AdminMetrics />}
         {current.href === '/admin/email' && <AdminEmail />}
         {current.href === '/admin/audit' && <AdminAudit />}
         {current.href === '/admin/security' && <AdminSecurity onChanged={() => { setUsername(null); setMessage('密码已更新，请使用新密码重新登录。') }} />}

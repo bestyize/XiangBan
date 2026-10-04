@@ -23,3 +23,12 @@ export interface Overview {
 }
 export interface AuditRow { id: number; actor: string; action: string; targetUserId: number | null; summary: string; createdAt: number }
 export interface AuditPage { items: AuditRow[]; total: number; page: number; pageSize: number; totalPages: number }
+
+/** People counted on one statistics day, split by account type. */
+export interface MetricPoint { day: string; total: number; registered: number; guest: number }
+export interface MetricSeries { key: string; label: string; points: MetricPoint[] }
+export interface MetricsResponse {
+  days: string[]; dayNote: string
+  visits: MetricSeries[]; growth: MetricSeries[]; product: MetricSeries[]
+  games: MetricSeries[]; quizzes: MetricSeries[]
+}

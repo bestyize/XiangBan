@@ -6,6 +6,7 @@ import { Screen } from '../../components/ui.tsx'
 import { GAME_RUNTIME_PROTOCOL, gameEntryUrl, loadGameManifest, type GamePackManifest } from '../../games/packLoader.ts'
 import { api, getToken } from '../../api/client.ts'
 import { storage } from '../../lib/storage.ts'
+import { track } from '../../lib/track.ts'
 
 interface Round { id: string | null; score: number; lines: number; maxTile: number; finished: boolean; timer: ReturnType<typeof setTimeout> | null }
 
@@ -80,6 +81,7 @@ export default function GamePlayer() {
       if (round.finished) return
       if (round.timer) clearTimeout(round.timer)
       round.timer = null; round.finished = true
+      track('game_finish', { game: gameId, score: String(round.score) })
       void persist(round, true)
     }
     function receiveMessage(event: MessageEvent) {
@@ -98,6 +100,7 @@ export default function GamePlayer() {
         if (roundRef.current) finish(roundRef.current)
         const round: Round = { id: null, score: 0, lines: 0, maxTile: 0, finished: false, timer: null }
         roundRef.current = round; setRecordError(null)
+        track('game_start', { game: gameId })
         if (!getToken()) {
           round.id = `guest_${Date.now()}`
         } else {

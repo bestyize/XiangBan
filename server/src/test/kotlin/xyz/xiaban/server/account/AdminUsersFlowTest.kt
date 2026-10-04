@@ -54,7 +54,7 @@ class AdminUsersFlowTest {
         services.db.read { c ->
             c.execute("insert into checkins(user_id,work_day,checked_at,title,copy_id,library_reply) values (?,'2026-10-02',now(),'测试','test','reply')", id)
             c.execute("insert into memories(user_id,kind,content,source) values (?,'event','fixture','test')", id)
-            c.execute("insert into events(user_id,name) values (?,'page_view')", id)
+            c.execute("insert into events(user_id,name,actor,user_type,work_day) values (?,'page_view',?,'registered','2026-10-02')", id, "u:$id")
             c.execute("insert into guardians(user_id,contact_name,contact_email,self_name,threshold_days,base_at,consented_at,informed_at) values (?,'fixture','contact@example.com','fixture',1,now(),now(),now())", id)
         }
         services.guardian.reschedule(id)
