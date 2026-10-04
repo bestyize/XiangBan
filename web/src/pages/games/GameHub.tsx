@@ -5,11 +5,12 @@ import { Screen } from '../../components/ui.tsx'
 import { gamePackThumbnailUrl, loadGameCatalog, type GamePackManifest } from '../../games/packLoader.ts'
 import { api, getToken } from '../../api/client.ts'
 import { useProfile, useSession } from '../../lib/session.tsx'
+import { PageHeader } from '../../components/PageHeader.tsx'
 import { AccountBadge } from '../../components/AccountBadge.tsx'
 import { storage } from '../../lib/storage.ts'
 import { GuestNotice } from '../../components/GuestNotice.tsx'
 
-export default function GameHub() {
+export default function GameHub({ active = true }: { active?: boolean }) {
   const [games, setGames] = useState<GamePackManifest[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [summaries, setSummaries] = useState<{ gameId: string; sessions: number; bestScore: number; bestTile: number }[]>([])
@@ -31,7 +32,7 @@ export default function GameHub() {
     }
     try { setSummaries(await api('/api/games/summary')); setRecordError(null) } catch (e) { setRecordError((e as Error).message) }
   }
-  useEffect(() => { void refreshRecords() }, [profile.userId])
+  useEffect(() => { if (active) void refreshRecords() }, [profile.userId, active])
 
   useEffect(() => {
     const controller = new AbortController()
@@ -47,11 +48,7 @@ export default function GameHub() {
   return (
     <Screen>
       <div className="flex-1" style={{ paddingBottom: TAB_BAR_SPACE }}>
-        <header className="flex items-center justify-between pt-2">
-          <Link href="/" className="text-sm text-window/60">‹ 回到首页</Link>
-          <AccountBadge />
-        </header>
-        <h1 className="mt-5 font-display text-4xl text-lamp">小游戏广场</h1>
+        <PageHeader title="玩一局"><AccountBadge compact /></PageHeader>
         <p className="mt-2 text-sm text-window/65">下班后，轻松玩一局。</p>
 
         {games === null && !error && (
@@ -68,7 +65,7 @@ export default function GameHub() {
             <Link
               key={game.id}
               href={'/games/' + game.id}
-              className="flex items-center gap-4 rounded-2xl border border-window/10 bg-dusk-soft/35 p-4 transition hover:bg-dusk-soft/60"
+              className="flex items-center gap-4 rounded-2xl border border-window/10 bg-dusk-soft/35 p-4 transition hover:bg-dusk-soft/60 active:scale-[0.98] active:bg-dusk-soft/60"
             >
               {game.cover ? (
                 <img src={gamePackThumbnailUrl(game)} alt="" className="size-14 shrink-0 rounded-2xl object-cover" />

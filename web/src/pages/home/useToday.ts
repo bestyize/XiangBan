@@ -10,7 +10,7 @@ type Status = 'loading' | 'ready' | 'error'
 /** The server holds this request until the model rewrite lands, capped at 3 s (PRD 5.4). */
 const POLISH_WAIT_MS = 3000
 
-export function useToday() {
+export function useToday(active = true) {
   const [status, setStatus] = useState<Status>('loading')
   const [today, setToday] = useState<TodayResponse | null>(null)
   /** null while the practical info is still on its way */
@@ -55,18 +55,19 @@ export function useToday() {
         }
       }
       setToday(next)
+      setError(null)
       setTips(next.tips)
       setStatus('ready')
       if (next.checkin?.reply.pending) void fillIn(next.checkin)
     } catch (e) {
       setError((e as Error).message)
-      setStatus('error')
+      setStatus((previous) => previous === 'ready' ? previous : 'error')
     }
   }, [fillIn])
 
   useEffect(() => {
-    void load()
-  }, [load])
+    if (active) void load()
+  }, [active, load])
 
   const checkIn = useCallback(async () => {
     setBusy(true)

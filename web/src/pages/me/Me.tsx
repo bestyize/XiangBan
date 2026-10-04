@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactNode } from 'react'
 import { Link } from 'wouter'
 import { api } from '../../api/client.ts'
 import type { Profile } from '../../api/types.ts'
+import { PageHeader } from '../../components/PageHeader.tsx'
 import { TAB_BAR_SPACE } from '../../components/TabBar.tsx'
 import { FieldError, Screen } from '../../components/ui.tsx'
 import { useProfile, useSession } from '../../lib/session.tsx'
@@ -24,7 +25,7 @@ export function Section({ title, children }: { title: string; children: ReactNod
 
 export function RowLink({ href, label, detail }: { href: string; label: string; detail?: string }) {
   return (
-    <Link href={href} className="flex items-center justify-between py-1 text-window">
+    <Link href={href} className="flex min-h-11 items-center justify-between gap-3 rounded-lg px-1 text-window transition active:bg-window/5">
       <span>{label}</span>
       <span className="text-sm text-window/60">{detail ?? '去设置'}</span>
     </Link>
@@ -50,7 +51,7 @@ export default function Me() {
   return (
     <Screen>
       <div style={{ paddingBottom: TAB_BAR_SPACE }}>
-        <h1 className="pt-2 font-display text-4xl text-lamp">我的</h1>
+        <PageHeader title="我的" />
 
         <section className="mt-5 rounded-3xl border border-lamp/25 bg-dusk-soft/35 p-5" aria-label="账号和登录状态">
           <div className="flex items-center gap-4"><Link href="/me/account" aria-label="编辑头像" className="flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-full bg-lamp/15 text-2xl text-lamp">

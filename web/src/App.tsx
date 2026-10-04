@@ -1,5 +1,6 @@
-import { lazy, Suspense, useEffect } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 import { Redirect, Route, Switch, useLocation } from 'wouter'
+import { KeepAlivePage } from './components/KeepAlivePage.tsx'
 import { TabBar } from './components/TabBar.tsx'
 import { CatWindow, PrimaryButton, Screen } from './components/ui.tsx'
 import { SessionProvider, useSession } from './lib/session.tsx'
@@ -19,18 +20,34 @@ import AdminPage from './pages/AdminPage.tsx'
 import AccountProfile from './pages/me/AccountProfile.tsx'
 
 const Tests = lazy(() => import('./quizzes/Tests.tsx'))
+const QuizHub = lazy(() => import('./quizzes/Tests.tsx').then((module) => ({ default: module.QuizHub })))
+
+function AccountTabs({ location }: { location: string }) {
+  const { profile } = useSession()
+  return <>
+    {profile?.onboarded && <>
+      <KeepAlivePage active={location === '/'}><Home active={location === '/'} /></KeepAlivePage>
+      <KeepAlivePage active={location === '/games'}><GameHub active={location === '/games'} /></KeepAlivePage>
+    </>}
+    <KeepAlivePage active={location === '/me'}><Me /></KeepAlivePage>
+  </>
+}
 
 function usePageViews() {
   const [location] = useLocation()
   useEffect(() => {
-    track('page_view', { path: location })
+    if (location !== '/tests' && !location.startsWith('/tests/')) track('page_view', { path: location })
   }, [location])
 }
 
-function Gate() {
+function SessionRoutes() {
   const { status, error, profile, retry } = useSession()
   const [location] = useLocation()
-  usePageViews()
+
+  // Public tests never wait for an account or the onboarding gate.
+  if (location === '/tests' || location.startsWith('/tests/')) {
+    return null
+  }
 
   if (location === '/privacy') return <LegalPage doc="privacy" />
   if (location === '/terms') return <LegalPage doc="terms" />
@@ -53,35 +70,60 @@ function Gate() {
     )
   }
   if (location === '/login') return <EmailLogin />
-  if (location === '/me') return <><Me key={profile.userId} /><TabBar /></>
-  if (location === '/me/account') return <AccountProfile key={profile.userId} />
-  if (!profile.onboarded && location !== '/hello') return <Redirect to="/hello" replace />
+  if (!profile.onboarded && !['/hello', '/me', '/me/account'].includes(location)) return <Redirect to="/hello" replace />
 
   return (
     <Switch key={profile.userId}>
       <Route path="/hello" component={Onboarding} />
       <Route path="/card" component={CardPreview} />
       <Route path="/games/:gameId"><GamePlayer key={profile.userId} /></Route>
-      <Route path="/games"><GameHub /><TabBar /></Route>
+      <Route path="/games">{null}</Route>
+      <Route path="/me/account"><AccountProfile /></Route>
       <Route path="/me/guardian" component={GuardianPage} />
       <Route path="/me/profile" component={ProfileEdit} />
-      <Route path="/dex"><Dex /><TabBar /></Route>
-      <Route path="/me"><Me /><TabBar /></Route>
-      <Route path="/"><Home /><TabBar /></Route>
+      <Route path="/dex"><Dex /></Route>
+      <Route path="/me">{null}</Route>
+      <Route path="/">{null}</Route>
       <Route><Redirect to="/" replace /></Route>
     </Switch>
   )
 }
 
+function Gate() {
+  const [location] = useLocation()
+  const { status, profile } = useSession()
+  return <>
+    {status === 'ready' && profile && <AccountTabs key={profile.userId} location={location} />}
+    <SessionRoutes />
+  </>
+}
+
+function AppPages() {
+  const [location] = useLocation()
+  const { profile } = useSession()
+  const tests = location === '/tests' || location.startsWith('/tests/')
+  const primary = ['/', '/games', '/tests', '/me', '/dex'].includes(location)
+  usePageViews()
+  useEffect(() => {
+    const titles: Record<string, string> = { '/': '下班了么', '/games': '玩一局', '/tests': '趣味测试', '/me': '我的', '/dex': '表情图鉴' }
+    if (titles[location]) document.title = `${titles[location]}｜下班了么`
+  }, [location])
+  return <>
+    <Gate />
+    <KeepAlivePage active={location === '/tests'}>
+      <Suspense fallback={<Screen><p className="mt-8 text-window/60">正在打开趣味测试…</p></Screen>}><QuizHub active={location === '/tests'} /></Suspense>
+    </KeepAlivePage>
+    {tests && location !== '/tests' && <Suspense fallback={<Screen><p className="mt-8 text-window/60">正在打开趣味测试…</p></Screen>}><Tests /></Suspense>}
+    {primary && (location === '/tests' || location === '/me' || profile?.onboarded) && <TabBar />}
+  </>
+}
+
 export default function App() {
   const [location] = useLocation()
-  if (location === '/admin' || location.startsWith('/admin/')) return <AdminPage />
-  if (location === '/tests' || location.startsWith('/tests/')) {
-    return <Suspense fallback={<Screen className="items-center justify-center"><p>正在打开趣味测试…</p></Screen>}><Tests /></Suspense>
-  }
-  return (
-    <SessionProvider>
-      <Gate />
-    </SessionProvider>
-  )
+  const publicTests = location === '/tests' || location.startsWith('/tests/')
+  const admin = location === '/admin' || location.startsWith('/admin/')
+  const [sessionStarted, setSessionStarted] = useState(!publicTests && !admin)
+  useEffect(() => { if (!publicTests && !admin) setSessionStarted(true) }, [publicTests, admin])
+  if (admin) return <AdminPage />
+  return <SessionProvider enabled={sessionStarted || !publicTests}><AppPages /></SessionProvider>
 }
