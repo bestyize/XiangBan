@@ -6,7 +6,6 @@ import { TAB_BAR_SPACE } from '../../components/TabBar.tsx'
 import { FieldError, Screen } from '../../components/ui.tsx'
 import { useProfile, useSession } from '../../lib/session.tsx'
 import { AccountActions } from './AccountActions.tsx'
-import { EmailBind } from './EmailBind.tsx'
 import { MeStats } from './MeStats.tsx'
 import { AfterworkSummary } from './AfterworkSummary.tsx'
 import { logout } from '../../lib/logout.ts'
@@ -37,7 +36,6 @@ export default function Me() {
   const { setProfile, isLoggedIn, refresh } = useSession()
   const [loggingOut, setLoggingOut] = useState(false)
   useEffect(() => { void refresh().catch(() => undefined) }, [refresh])
-  const [merged, setMerged] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   async function toggleRecall() {
@@ -88,10 +86,9 @@ export default function Me() {
           {profile.email ? (
             <p className="text-window">
               已绑定邮箱 {profile.email}
-              {merged && <span className="mt-1 block text-sm text-lamp">找回了你的账号，这台设备上的记录也合并进去了。</span>}
             </p>
           ) : (
-            <div className="space-y-3"><RowLink href="/login" label="邮箱登录 / 注册" detail="保存或找回账号" /><EmailBind onDone={setMerged} /></div>
+            <RowLink href="/login" label="邮箱登录 / 注册" detail="保存或找回账号" />
           )}
         </Section>
 
@@ -112,15 +109,7 @@ export default function Me() {
           <FieldError message={error} />
         </Section>
 
-        <Section title="隐私">
-          <RowLink href="/privacy" label="隐私政策" detail="查看" />
-          <RowLink href="/terms" label="用户协议" detail="查看" />
-          {isLoggedIn && (
-            <div className="mt-2 border-t border-window/10 pt-2">
-              <AccountActions />
-            </div>
-          )}
-        </Section>
+        {isLoggedIn && <Section title="数据管理"><AccountActions /></Section>}
       </div>
     </Screen>
   )

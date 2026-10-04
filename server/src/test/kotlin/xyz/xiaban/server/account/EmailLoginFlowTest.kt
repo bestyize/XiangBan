@@ -12,6 +12,33 @@ import xyz.xiaban.shared.*
 import kotlin.test.*
 
 class EmailLoginFlowTest {
+    @Test fun `login records the accepted document version on the restored account`() = apiTest {
+        val original = session()
+        val registered = emailLogin(original, "consent@example.com")
+        services.redis.cmd.del("xb:code:cool:${SessionService.sha256("consent@example.com")}").await()
+        val guest = session()
+        val code = loginCode(guest, "consent@example.com")
+        val restored = post(ApiPaths.EMAIL_LOGIN, guest.token,
+            EmailLoginRequest("consent@example.com", code, guest.deviceId, termsVersion = "0.3")).body<BindResponse>()
+        assertEquals(registered.profile.userId, restored.profile.userId)
+        assertFalse(restored.merged)
+        assertEquals("0.3", restored.profile.termsVersion)
+        assertEquals("0.3", get(ApiPaths.PROFILE, restored.token).body<ProfileView>().termsVersion)
+        assertEquals("0.1", services.profiles.view(guest.profile.userId).termsVersion)
+    }
+
+    @Test fun `invalid document versions do not consume the verification code`() = apiTest {
+        val guest = session()
+        val code = loginCode(guest, "invalid-version@example.com")
+        for (version in listOf("   ", "x".repeat(21))) {
+            assertEquals(HttpStatusCode.BadRequest, post(ApiPaths.EMAIL_LOGIN, guest.token,
+                EmailLoginRequest("invalid-version@example.com", code, guest.deviceId, termsVersion = version)).status)
+        }
+        val registered = post(ApiPaths.EMAIL_LOGIN, guest.token,
+            EmailLoginRequest("invalid-version@example.com", code, guest.deviceId, termsVersion = "0.3")).body<BindResponse>()
+        assertEquals("0.3", registered.profile.termsVersion)
+    }
+
     @Test fun `new email registers and logout removes device association and revokes bearer`() = apiTest {
         val guest = session()
         val registered = emailLogin(guest, "new@example.com")
@@ -95,13 +122,14 @@ class EmailLoginFlowTest {
 
         val regRes = client.post(ApiPaths.EMAIL_LOGIN) {
             contentType(ContentType.Application.Json)
-            setBody(EmailLoginRequest("visitor-direct@example.com", code, "visitor-device-id-1234", username = "DirectRegUser"))
+            setBody(EmailLoginRequest("visitor-direct@example.com", code, "visitor-device-id-1234", username = "DirectRegUser", termsVersion = "0.3"))
         }
         assertEquals(HttpStatusCode.OK, regRes.status)
         val registered = regRes.body<BindResponse>()
         assertTrue(registered.token.isNotEmpty())
         assertEquals("DirectRegUser", registered.profile.nickname)
         assertEquals("registered", registered.profile.accountType)
+        assertEquals("0.3", registered.profile.termsVersion)
         assertTrue(registered.profile.userId > 0L)
         val userCountAfterReg = services.db.read { c -> c.queryOne("select count(*) from users") { it.getLong(1) } }!!
         assertEquals(userCountBefore + 1, userCountAfterReg)

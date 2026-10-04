@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { Link, useLocation } from 'wouter'
 import { api, getToken } from '../api/client.ts'
-import { ConsentChecks, consentComplete, type ConsentState } from '../components/ConsentChecks.tsx'
 import { CatWindow, Screen, QuietButton, FieldError } from '../components/ui.tsx'
 import { TERMS_VERSION } from '../lib/consent.ts'
 import { useProfile } from '../lib/session.tsx'
@@ -11,7 +10,7 @@ import { EmailBind } from './me/EmailBind.tsx'
 export default function EmailLogin() {
   const profile = useProfile()
   const [, navigate] = useLocation()
-  const [consent, setConsent] = useState<ConsentState>({ terms: false, overseas: false })
+  const [agreed, setAgreed] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   return <Screen className="justify-center">
@@ -27,10 +26,15 @@ export default function EmailLogin() {
       <FieldError message={error} />
     </div> : <div className="mt-6 space-y-5">
       <p className="text-sm leading-relaxed text-window/70">输入邮箱，用验证码登录。第一次来，也可以在这里注册。</p>
-      <ConsentChecks value={consent} onChange={setConsent} />
-      <EmailBind mode="login" disabled={!consentComplete(consent)} beforeSend={async () => {
+      <label className="flex gap-2.5 text-left text-[13px] leading-relaxed text-window/80">
+        <input type="checkbox" className="mt-0.5 size-4 shrink-0 accent-[var(--color-lamp)]" checked={agreed}
+          onChange={(e) => setAgreed(e.target.checked)} />
+        <span>我同意<Link href="/terms" className="text-lamp underline">《用户协议》</Link>和
+          <Link href="/privacy" className="text-lamp underline">《隐私政策》</Link>，继续登录即表示接受。</span>
+      </label>
+      <EmailBind mode="login" disabled={!agreed} termsVersion={TERMS_VERSION} beforeSend={async () => {
         if (getToken()) {
-          await api('/api/consent', { method: 'PUT', body: { termsVersion: TERMS_VERSION, overseas: consent.overseas } })
+          await api('/api/consent', { method: 'PUT', body: { termsVersion: TERMS_VERSION } })
         }
       }} onDone={() => navigate('/', { replace: true })} />
     </div>}

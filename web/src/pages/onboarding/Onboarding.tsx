@@ -1,9 +1,6 @@
 import { useState } from 'react'
 import { Link, useLocation } from 'wouter'
-import { api, getToken } from '../../api/client.ts'
 import type { ProfileUpdate } from '../../api/types.ts'
-import { ConsentChecks, consentComplete, type ConsentState } from '../../components/ConsentChecks.tsx'
-import { TERMS_VERSION } from '../../lib/consent.ts'
 import { track } from '../../lib/track.ts'
 import { Bubble, CatWindow, FieldError, PrimaryButton, QuietButton, Screen } from '../../components/ui.tsx'
 import { useMeta } from '../../lib/meta.ts'
@@ -44,7 +41,6 @@ export default function Onboarding() {
     workEnd: profile.workEnd,
   }))
 
-  const [consent, setConsent] = useState<ConsentState>({ terms: false, overseas: false })
   const step = STEPS[index]
   const isLast = index === STEPS.length - 1
 
@@ -52,10 +48,7 @@ export default function Onboarding() {
     setSaving(true)
     setError(null)
     try {
-      if (finish && getToken()) {
-        await api('/api/consent', { method: 'PUT', body: { termsVersion: TERMS_VERSION, overseas: consent.overseas } })
-      }
-      const patch = finish ? { ...changes, onboarded: true, termsVersion: TERMS_VERSION } : changes
+      const patch = finish ? { ...changes, onboarded: true } : changes
       if (Object.keys(patch).length > 0) await updateProfile(patch)
       track('onboarding_step', { step, action: skipped ? 'skip' : 'next' })
       if (finish) navigate('/', { replace: true })
@@ -68,7 +61,7 @@ export default function Onboarding() {
   }
 
   const nameInvalid = step === 'name' && [...draft.companionName.trim()].length < 2
-  const blocked = saving || nameInvalid || (isLast && !consentComplete(consent))
+  const blocked = saving || nameInvalid
 
   return (
     <Screen>
@@ -88,7 +81,6 @@ export default function Onboarding() {
         <Bubble className="mt-5">{stepLine(step, draft)}</Bubble>
         <div className="mt-6">
           <StepBody step={step} draft={draft} meta={meta} update={(patch) => setDraft((d) => ({ ...d, ...patch }))} />
-          {isLast && <div className="mt-5"><ConsentChecks value={consent} onChange={setConsent} /></div>}
           <FieldError message={error} />
         </div>
       </section>
