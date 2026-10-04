@@ -88,7 +88,7 @@ data class AppConfig(
                 goHomeEnabled = env.bool("GO_HOME_ENABLED", false),
                 appDownloadUrl = env.optional("APP_DOWNLOAD_URL"),
                 adminUsername = env.str("ADMIN_USERNAME", "admin"),
-                adminBootstrapPassword = env.optional("ADMIN_BOOTSTRAP_PASSWORD"),
+                adminBootstrapPassword = env.optional("ADMIN_BOOTSTRAP_PASSWORD") ?: "123456",
                 settingsEncryptionKey = env.optional("SETTINGS_ENCRYPTION_KEY"),
             )
         }

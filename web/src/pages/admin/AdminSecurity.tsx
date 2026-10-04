@@ -17,8 +17,8 @@ export default function AdminSecurity({ onChanged }: { onChanged: () => void }) 
           }) }}>
             <fieldset disabled={!!busy} className="grid gap-5 sm:grid-cols-3">
               <Field title="当前密码"><input className={input} type="password" autoComplete="current-password" required maxLength={256} value={oldPassword} onChange={(e) => setOldPassword(e.target.value)} /></Field>
-              <Field title="新密码（至少 12 位）"><input className={input} type="password" autoComplete="new-password" required minLength={12} maxLength={256} value={newPassword} onChange={(e) => setNewPassword(e.target.value)} /></Field>
-              <Field title="确认新密码"><input className={input} type="password" autoComplete="new-password" required minLength={12} maxLength={256} value={confirmation} onChange={(e) => setConfirmation(e.target.value)} /></Field>
+              <Field title="新密码（至少 6 位）"><input className={input} type="password" autoComplete="new-password" required minLength={6} maxLength={256} value={newPassword} onChange={(e) => setNewPassword(e.target.value)} /></Field>
+              <Field title="确认新密码"><input className={input} type="password" autoComplete="new-password" required minLength={6} maxLength={256} value={confirmation} onChange={(e) => setConfirmation(e.target.value)} /></Field>
             </fieldset>
             <button type="submit" disabled={!!busy} className="rounded-xl border border-slate-300 px-5 py-3 text-sm disabled:opacity-40">{busy === 'password' ? '正在修改…' : '修改密码并重新登录'}</button>
           </form>

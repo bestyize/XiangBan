@@ -49,7 +49,7 @@ class AdminAccounts(private val db: Db, private val redis: Redis, private val co
     suspend fun logout(token: String?) { token?.let { redis.cmd.del(sessionKey(it)).await() } }
 
     suspend fun changePassword(username: String, old: String, next: String) {
-        if (next.length !in 12..256) badRequest("新密码需为 12–256 个字符")
+        if (next.length !in 6..256) badRequest("新密码需为 6–256 个字符")
         val previous = db.read { c -> c.queryOne("select password_hash from administrators where username = ?", username) { it.getString(1) } }
         if (previous == null || old.length > 256 || !verify(old, previous)) badRequest("当前密码不正确")
         val replacement = hash(next)
@@ -62,7 +62,7 @@ class AdminAccounts(private val db: Db, private val redis: Redis, private val co
 
     private suspend fun bootstrap() {
         val password = config.adminBootstrapPassword ?: return
-        if (password.length < 12 || !Regex("^[A-Za-z0-9_-]{1,40}$").matches(config.adminUsername)) return
+        if (password.length < 6 || !Regex("^[A-Za-z0-9_-]{1,40}$").matches(config.adminUsername)) return
         if (db.read { c -> c.queryOne("select username from administrators limit 1") { it.getString(1) } } != null) return
         val encoded = hash(password)
         db.read { c -> c.execute("insert into administrators(username,password_hash) values (?,?) on conflict do nothing", config.adminUsername, encoded) }
