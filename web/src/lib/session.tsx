@@ -80,7 +80,7 @@ function openSession(): Promise<SessionResult> {
   return request
 }
 
-export function SessionProvider({ children }: { children: ReactNode }) {
+export function SessionProvider({ children, enabled = true }: { children: ReactNode; enabled?: boolean }) {
   const [status, setStatus] = useState<Status>('loading')
   const [error, setError] = useState<string | null>(null)
   const [profile, setProfile] = useState<Profile | null>(null)
@@ -88,6 +88,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [attempt, setAttempt] = useState(0)
 
   useEffect(() => {
+    if (!enabled) return
     let alive = true
     const apply = (res: SessionResult) => {
       if (!alive || res.epoch !== epoch) return
@@ -126,7 +127,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       offAuth()
       onUnauthorized(null)
     }
-  }, [attempt])
+  }, [attempt, enabled])
 
   const retry = useCallback(() => {
     setStatus('loading')
@@ -180,11 +181,12 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     setFeatures(result.features)
   }, [])
   useEffect(() => {
+    if (!enabled) return
     const check = () => { if (document.visibilityState === 'visible') void refresh().catch(() => undefined) }
     window.addEventListener('focus', check)
     document.addEventListener('visibilitychange', check)
     return () => { window.removeEventListener('focus', check); document.removeEventListener('visibilitychange', check) }
-  }, [refresh])
+  }, [refresh, enabled])
 
   const value = useMemo(
     () => ({ status, isLoggedIn: status === 'ready' && profile?.accountType === 'registered', error, profile, features, retry, refresh, updateProfile, adopt, setProfile }),

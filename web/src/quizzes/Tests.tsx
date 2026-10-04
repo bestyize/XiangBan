@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, Route, Switch, useLocation } from 'wouter'
-import { TabBar, TAB_BAR_SPACE } from '../components/TabBar.tsx'
+import { TAB_BAR_SPACE } from '../components/TabBar.tsx'
+import { PageHeader } from '../components/PageHeader.tsx'
 import { findQuiz, findSharedQuiz, quizCatalog } from './catalog.ts'
 import { loadAttempt } from './progress.ts'
 import { isComplete, makeReport, scoreAnswers } from './scoring.ts'
@@ -12,9 +13,11 @@ import { ReportShare } from './ReportShare.tsx'
 import type { QuizDefinition, QuizReport } from './types.ts'
 import './quizzes.css'
 
-function Hub() {
-  return <><main className="quiz-shell quiz-hub" style={{ paddingBottom: TAB_BAR_SPACE }}>
-    <header className="quiz-header"><Link href="/" className="quiz-back">← 回到首页</Link><span className="quiz-mini-brand">下班了么</span></header>
+export function QuizHub({ active = true }: { active?: boolean }) {
+  const [, refresh] = useState(0)
+  useEffect(() => { if (active) refresh((value) => value + 1) }, [active])
+  return <main className="quiz-shell quiz-hub" style={{ paddingBottom: TAB_BAR_SPACE }}>
+    <PageHeader title="趣味测试"><span className="app-header-note">无需登录</span></PageHeader>
     <section className="quiz-hub-heading">
       <span className="quiz-eyebrow">AFTER HOURS LAB <span className="quiz-tiny-star" aria-hidden="true">✦</span></span>
       <h1>发现自己的<span>另一面。</span></h1>
@@ -33,7 +36,7 @@ function Hub() {
       })}
     </div>
     <footer className="quiz-hub-footer">结果是一面小镜子。定义你的人，始终是你。</footer>
-  </main><TabBar /></>
+  </main>
 }
 
 function Missing({ report = false, invalid = false }: { report?: boolean; invalid?: boolean }) {
@@ -128,7 +131,7 @@ export default function Tests() {
   return <Switch>
     <Route path="/tests/:quizId/report">{(params) => <ReportRoute key={params.quizId} id={params.quizId} />}</Route>
     <Route path="/tests/:quizId">{(params) => <QuizRoute id={params.quizId} />}</Route>
-    <Route path="/tests"><Hub /></Route>
+    <Route path="/tests"><QuizHub /></Route>
     <Route><Missing /></Route>
   </Switch>
 }
