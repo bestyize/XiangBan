@@ -38,7 +38,7 @@ private val METRIC_QUIZZES = linkedMapOf(
 fun Route.adminRoutes(services: Services) {
     route("/api/admin") {
         post("/login") {
-            call.checkOrigin()
+            call.checkOrigin(services)
             val req = call.receive<AdminLogin>()
             val token = services.administrators.login(req.username.trim(), req.password, call.request.origin.remoteHost)
             call.adminCookie(services, token, 8 * 3600)
@@ -83,7 +83,7 @@ fun Route.adminRoutes(services: Services) {
             call.respond(services.adminUsers.auditPage(call.pageParameter("page", 1), call.pageParameter("pageSize", 20)))
         }
         post("/logout") {
-            call.checkOrigin()
+            call.checkOrigin(services)
             services.administrators.logout(call.request.cookies[COOKIE])
             call.adminCookie(services, "", 0)
             call.respond(OkResponse())
@@ -137,10 +137,25 @@ private fun ApplicationCall.pageParameter(name: String, default: Int): Int = req
 private fun ApplicationCall.userParameter(): Long = parameters["id"]?.toLongOrNull()?.takeIf { it > 0 }
     ?: badRequest("用户编号不正确")
 
-private fun ApplicationCall.checkOrigin() {
+/**
+ * CSRF defence-in-depth: non-GET admin requests must come from our own pages.
+ *
+ * The Origin is compared against the Host header and the canonical site address. Comparing hostname only
+ * (port ignored) keeps local development working: the Vite dev proxy rewrites Host to the backend port
+ * (localhost:8080) while the browser's Origin is the app (localhost:5173). X-Forwarded-Host covers
+ * reverse proxies. A browser on evil.com can never claim our hostname.
+ */
+private fun ApplicationCall.checkOrigin(services: Services) {
     val origin = request.headers["Origin"] ?: return
-    val host = request.headers["Host"]
-    if (runCatching { URI(origin).rawAuthority }.getOrNull() != host) badRequest("请从本站管理后台提交请求", "invalid_origin")
+    val originHost = runCatching { URI(origin).host }?.getOrNull() ?: badRequest("请从本站管理后台提交请求", "invalid_origin")
+    val hosts = listOfNotNull(
+        request.headers["Host"],
+        request.headers["X-Forwarded-Host"],
+        runCatching { URI(services.config.publicBaseUrl).authority }.getOrNull(),
+    )
+    if (hosts.none { it.removeSuffix(":80").removeSuffix(":443").substringBefore(':').equals(originHost, ignoreCase = true) }) {
+        badRequest("请从本站管理后台提交请求", "invalid_origin")
+    }
 }
 
 private fun ApplicationCall.adminCookie(services: Services, token: String, age: Int) {
@@ -149,7 +164,7 @@ private fun ApplicationCall.adminCookie(services: Services, token: String, age: 
 }
 
 private suspend fun ApplicationCall.requireAdmin(services: Services): String {
-    if (request.httpMethod.value != "GET") checkOrigin()
+    if (request.httpMethod.value != "GET") checkOrigin(services)
     val expected = services.config.adminToken
     val given = request.headers["X-Admin-Token"]
     if (expected != null && given != null && MessageDigest.isEqual(expected.toByteArray(), given.toByteArray())) return "legacy-token"

@@ -43,6 +43,24 @@ class AdminFlowTest {
         assertEquals(HttpStatusCode.Unauthorized, client.get("/api/admin/email") { header(HttpHeaders.Cookie, cookie) }.status)
     }
 
+    @Test fun `same-site origins pass even when a dev proxy rewrote the host header`() = apiTest {
+        // The Vite dev proxy forwards with Host: localhost:8080 while the browser's Origin is localhost:5173.
+        val login = client.post("/api/admin/login") {
+            header(HttpHeaders.Origin, "http://localhost:5173"); header(HttpHeaders.Host, "localhost:8080")
+            contentType(ContentType.Application.Json); setBody(AdminLogin("testadmin", "test-admin-password-2026"))
+        }
+        assertEquals(HttpStatusCode.OK, login.status)
+        val cookie = login.headers[HttpHeaders.SetCookie]!!.substringBefore(';')
+        assertEquals(HttpStatusCode.OK, client.post("/api/admin/logout") {
+            header(HttpHeaders.Cookie, cookie); header(HttpHeaders.Origin, "http://localhost:5173")
+        }.status)
+        // A different hostname is still refused.
+        assertEquals(HttpStatusCode.BadRequest, client.post("/api/admin/login") {
+            header(HttpHeaders.Origin, "https://evil.example.com")
+            contentType(ContentType.Application.Json); setBody(AdminLogin("testadmin", "test-admin-password-2026"))
+        }.status)
+    }
+
     @Test fun `changing administrator password revokes all existing admin sessions`() = apiTest {
         val response = client.post("/api/admin/login") {
             contentType(ContentType.Application.Json); setBody(AdminLogin("testadmin", "test-admin-password-2026"))
