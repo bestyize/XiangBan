@@ -140,3 +140,21 @@
 @media (prefers-reduced-motion: reduce) {
   .app-tab, .app-tab-icon, .app-page-actions a { transition: none; }
 }
+
+.login-reminder {
+  position: fixed; inset: auto 0 0; margin: 0 auto; width: min(100%, 480px);
+  max-height: calc(100dvh - var(--safe-top) - 24px); overflow-y: auto;
+  padding: 12px 26px calc(var(--safe-bottom) + 18px); border: 1px solid #edbd7626;
+  border-bottom: 0; border-radius: 28px 28px 0 0; background: #223149; color: var(--color-window); text-align: center;
+  box-shadow: 0 -12px 60px #08112166;
+}
+.login-reminder::backdrop { background: #080f1bb3; }
+.login-reminder-handle { width: 32px; height: 4px; margin: 0 auto 20px; border-radius: 4px; background: #f3eee433; }
+.login-reminder h2 { margin: 16px 0 12px; font-size: 22px; font-weight: 700; }
+.login-reminder p { font-size: 14px; line-height: 1.9; color: #c3cbd5; }
+.login-reminder-primary, .login-reminder-skip { width: 100%; min-height: 48px; border-radius: 24px; font-size: 14px; transition: transform 150ms; }
+.login-reminder-primary { margin-top: 24px; background: var(--color-lamp); color: var(--color-ink); font-weight: 700; }
+.login-reminder-skip { margin-top: 6px; color: #c3cbd5; }
+.login-reminder button:active { transform: scale(.98); }
+.login-reminder small { display: block; margin-top: 4px; font-size: 10px; color: #94a4b6; }
+@media (prefers-reduced-motion: reduce) { .login-reminder button { transition: none; } }

@@ -1,5 +1,7 @@
 import { lazy, Suspense, useEffect, useState } from 'react'
 import { Redirect, Route, Switch, useLocation } from 'wouter'
+import { getToken } from './api/client.ts'
+import { useAccountProgress } from './quizzes/useAccountProgress.ts'
 import { KeepAlivePage } from './components/KeepAlivePage.tsx'
 import { TabBar } from './components/TabBar.tsx'
 import { CatWindow, PrimaryButton, Screen } from './components/ui.tsx'
@@ -102,6 +104,7 @@ function AppPages() {
   const [location] = useLocation()
   const { profile } = useSession()
   const tests = location === '/tests' || location.startsWith('/tests/')
+  const quizSync = useAccountProgress(tests)
   const primary = ['/', '/games', '/tests', '/me', '/dex'].includes(location)
   usePageViews()
   useEffect(() => {
@@ -111,9 +114,12 @@ function AppPages() {
   return <>
     <Gate />
     <KeepAlivePage active={location === '/tests'}>
-      <Suspense fallback={<Screen><p className="mt-8 text-window/60">正在打开趣味测试…</p></Screen>}><QuizHub active={location === '/tests'} /></Suspense>
+      {quizSync.pending ? <Screen><p className="mt-8 text-window/60">正在找回你的测试进度…</p></Screen> : <>
+        {quizSync.error && <p role="status" className="mx-auto max-w-[480px] px-5 pt-3 text-xs text-window/60">{quizSync.error}</p>}
+        <Suspense fallback={<Screen><p className="mt-8 text-window/60">正在打开趣味测试…</p></Screen>}><QuizHub key={profile?.accountType === 'registered' ? profile.userId : 'guest'} active={location === '/tests'} /></Suspense>
+      </>}
     </KeepAlivePage>
-    {tests && location !== '/tests' && <Suspense fallback={<Screen><p className="mt-8 text-window/60">正在打开趣味测试…</p></Screen>}><Tests /></Suspense>}
+    {tests && location !== '/tests' && (quizSync.pending ? <Screen><p className="mt-8 text-window/60">正在找回你的测试进度…</p></Screen> : <><p role="status" className="mx-auto max-w-[480px] px-5 text-xs text-window/60">{quizSync.error}</p><Suspense fallback={<Screen><p className="mt-8 text-window/60">正在打开趣味测试…</p></Screen>}><Tests key={profile?.accountType === 'registered' ? profile.userId : 'guest'} /></Suspense></>)}
     {primary && (location === '/tests' || location === '/me' || profile?.onboarded) && <TabBar />}
   </>
 }
@@ -122,7 +128,7 @@ export default function App() {
   const [location] = useLocation()
   const publicTests = location === '/tests' || location.startsWith('/tests/')
   const admin = location === '/admin' || location.startsWith('/admin/')
-  const [sessionStarted, setSessionStarted] = useState(!publicTests && !admin)
+  const [sessionStarted, setSessionStarted] = useState((!publicTests && !admin) || Boolean(getToken()))
   useEffect(() => { if (!publicTests && !admin) setSessionStarted(true) }, [publicTests, admin])
   if (admin) return <AdminPage />
   return <SessionProvider enabled={sessionStarted || !publicTests}><AppPages /></SessionProvider>

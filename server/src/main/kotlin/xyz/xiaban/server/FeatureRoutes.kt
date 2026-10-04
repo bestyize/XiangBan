@@ -12,6 +12,8 @@ import xyz.xiaban.server.auth.AUTH_USER
 import xyz.xiaban.server.auth.userId
 import xyz.xiaban.server.afterwork.*
 import xyz.xiaban.server.games.*
+import xyz.xiaban.server.quizzes.QuizAttemptRecord
+import xyz.xiaban.server.http.ApiException
 import xyz.xiaban.server.http.notFound
 import xyz.xiaban.server.users.AvatarService
 import xyz.xiaban.shared.OkResponse
@@ -31,6 +33,16 @@ fun Route.featureRoutes(services: Services) {
         delete("/api/account/avatar") { services.avatars.remove(call.userId()); call.respond(services.profiles.view(call.userId())) }
         post("/api/games/sessions") { call.respond(services.games.start(call.userId(), call.receive<GameStart>().gameId)) }
         put("/api/games/sessions/{id}") { call.respond(services.games.progress(call.userId(), call.parameters["id"].orEmpty(), call.receive<GameProgress>())) }
+        get("/api/quizzes/progress") {
+            if (services.profiles.view(call.userId()).accountType != "registered")
+                throw ApiException(HttpStatusCode.Forbidden, "login_required", "登录后可以保存测试进度")
+            call.respond(services.quizzes.all(call.userId()))
+        }
+        put("/api/quizzes/progress") {
+            if (services.profiles.view(call.userId()).accountType != "registered")
+                throw ApiException(HttpStatusCode.Forbidden, "login_required", "登录后可以保存测试进度")
+            call.respond(services.quizzes.save(call.userId(), call.receive<QuizAttemptRecord>()))
+        }
         get("/api/games/summary") { call.respond(services.games.summaries(call.userId())) }
         get("/api/afterwork") { call.respond(services.afterwork.data(call.userId())) }
         put("/api/afterwork/choices") { call.respond(services.afterwork.choose(call.userId(), call.receive<AfterworkChoice>())) }

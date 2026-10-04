@@ -28,6 +28,7 @@ class AccountService(private val db: Db, private val profiles: ProfileService, p
                 put("profile", profile)
                 put("identity", rows("select user_id,nickname,updated_at from user_profiles where user_id=?").firstOrNull() ?: JsonNull)
                 put("avatar", rows("select user_id,encode(image,'base64') as jpeg_base64,updated_at from user_avatars where user_id=?").firstOrNull() ?: JsonNull)
+                put("quizAttempts", rows("select quiz_id,version,answers::text,cursor,completed_at,client_updated_at,updated_at from quiz_attempts where user_id=?"))
                 put("gameSessions", rows("select id,game_id,started_at,finished_at,score,lines,max_tile from game_sessions where user_id=? order by started_at"))
                 put("afterworkChoices", rows("select work_day,activity_id,selected_at from afterwork_choices where user_id=? order by work_day"))
                 put("afterworkPreferences", rows("select preferred_activity_id,prompt_dismissed_at::text from afterwork_preferences where user_id=?").firstOrNull() ?: JsonNull)
