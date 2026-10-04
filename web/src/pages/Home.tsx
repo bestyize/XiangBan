@@ -1,7 +1,6 @@
 import { TAB_BAR_SPACE } from '../components/TabBar.tsx'
 import { UnlockOverlay } from '../components/UnlockOverlay.tsx'
 import { PrimaryButton, Screen } from '../components/ui.tsx'
-import { formatDay } from '../lib/time.ts'
 import { Link } from 'wouter'
 import { IdleView } from './home/IdleView.tsx'
 import { ResultView } from './home/ResultView.tsx'
@@ -14,12 +13,12 @@ export default function Home() {
   return (
     <Screen>
       <div className="flex flex-1 flex-col" style={{ paddingBottom: TAB_BAR_SPACE }}>
-        <header className="flex h-10 items-center justify-between">
-          <span className="font-display text-2xl text-lamp">下班了么</span>
-          <div className="flex items-center gap-3">
-            <span className="hidden text-sm text-window/70 sm:block">{formatDay(new Date())}</span>
-            <AccountBadge />
-            <Link href="/games" className="rounded-full border border-lamp/35 px-3 py-1 text-xs text-lamp">玩一局</Link>
+        <header className="flex min-h-11 items-center justify-between gap-2">
+          <span className="shrink-0 font-display text-[19px] text-lamp min-[400px]:text-2xl">下班了么</span>
+          <div className="flex items-center gap-1.5 min-[400px]:gap-2">
+            <Link href="/games" className="flex min-h-11 shrink-0 items-center rounded-full border border-lamp/35 px-2 text-[11px] text-lamp min-[400px]:px-3 min-[400px]:text-xs">玩一局</Link>
+            <Link href="/tests" className="flex min-h-11 shrink-0 items-center rounded-full border border-lamp/35 bg-lamp/10 px-2 text-[11px] text-lamp min-[400px]:px-3 min-[400px]:text-xs">趣味测试</Link>
+            <AccountBadge compact />
           </div>
         </header>
 
