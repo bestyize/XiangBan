@@ -1,118 +1,217 @@
 import QRCode from 'qrcode'
 import type { QuizDefinition, QuizReport } from './types.ts'
 
+export const POSTER_WIDTH = 1080
+export const POSTER_HEIGHT = 2340
+const FONT = '"PingFang SC", "Microsoft YaHei", "Noto Sans SC", sans-serif'
+
+function font(ctx: CanvasRenderingContext2D, size: number, weight = 400) {
+  ctx.font = weight + ' ' + size + 'px ' + FONT
+}
+
 function rounded(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number) {
   ctx.beginPath()
   ctx.roundRect(x, y, w, h, r)
   ctx.fill()
 }
 
-function textLines(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, width: number, lineHeight: number) {
+function fitFont(ctx: CanvasRenderingContext2D, text: string, size: number, width: number, weight: number) {
+  font(ctx, size, weight)
+  while (size > 12 && ctx.measureText(text).width > width) font(ctx, --size, weight)
+}
+
+function textLines(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, width: number, lineHeight: number, maxLines = 2) {
+  const lines: string[] = []
   let line = ''
-  let row = 0
   for (const char of text) {
     if (ctx.measureText(line + char).width > width && line) {
-      ctx.fillText(line, x, y + row * lineHeight)
-      row += 1
+      lines.push(line)
       line = char
     } else line += char
   }
-  if (line) ctx.fillText(line, x, y + row * lineHeight)
+  if (line) lines.push(line)
+  // Balance a short two-line quote instead of leaving a few lonely characters.
+  if (lines.length === 2) {
+    const chars = Array.from(text)
+    let best = Infinity
+    for (let i = 1; i < chars.length; i++) {
+      const left = chars.slice(0, i).join('')
+      const right = chars.slice(i).join('')
+      const a = ctx.measureText(left).width
+      const b = ctx.measureText(right).width
+      if (a > width || b > width) continue
+      const cost = Math.abs(a - b) + (/[，。；！？]/.test(chars[i - 1]) ? 0 : width * 0.15)
+      if (cost < best) {
+        best = cost
+        lines[0] = left
+        lines[1] = right
+      }
+    }
+  }
+  if (lines.length > maxLines) {
+    let last = lines[maxLines - 1]
+    while (last && ctx.measureText(last + '…').width > width) last = last.slice(0, -1)
+    lines[maxLines - 1] = last + '…'
+  }
+  lines.slice(0, maxLines).forEach((value, i) => ctx.fillText(value, x, y + i * lineHeight))
+}
+
+function drawTags(ctx: CanvasRenderingContext2D, tags: readonly string[], accent: string) {
+  font(ctx, 9.5, 500)
+  const rows: { label: string; width: number }[][] = [[]]
+  let used = 0
+  for (const label of tags) {
+    const width = ctx.measureText(label).width + 20
+    if (used > 0 && used + 6 + width > 280) {
+      rows.push([])
+      used = 0
+    }
+    rows[rows.length - 1].push({ label, width })
+    used += width + (used > 0 ? 6 : 0)
+  }
+  rows.slice(0, 2).forEach((row, i) => {
+    let x = 180 - (row.reduce((sum, tag) => sum + tag.width, 0) + (row.length - 1) * 6) / 2
+    const y = 295 + i * 28
+    for (const tag of row) {
+      ctx.fillStyle = accent + '30'
+      rounded(ctx, x, y, tag.width, 22, 11)
+      ctx.fillStyle = '#53645e'
+      ctx.fillText(tag.label, x + tag.width / 2, y + 14.5)
+      x += tag.width + 6
+    }
+  })
 }
 
 export async function renderQuizPoster(quiz: QuizDefinition, report: QuizReport, link: string): Promise<Blob> {
   if (document.fonts) await document.fonts.ready
   const canvas = document.createElement('canvas')
-  canvas.width = 1080
-  canvas.height = 1560
+  canvas.width = POSTER_WIDTH
+  canvas.height = POSTER_HEIGHT
   const ctx = canvas.getContext('2d')
   if (!ctx) throw new Error('当前浏览器暂时无法生成图片，可以先复制报告链接。')
+
+  // Lay out a phone-sized portrait, then render at 3x without stretching content.
+  ctx.scale(3, 3)
   const accent = quiz.id === 'mbti' ? '#a6cdb5' : '#bfb2e2'
-  const font = '"PingFang SC", "Microsoft YaHei", "Noto Sans SC", sans-serif'
-  const background = ctx.createLinearGradient(0, 0, 1080, 1560)
-  background.addColorStop(0, '#344760')
+  const inkAccent = quiz.id === 'mbti' ? '#668574' : '#9480b6'
+  const background = ctx.createLinearGradient(0, 0, 360, 780)
+  background.addColorStop(0, '#2c3d54')
   background.addColorStop(1, '#182338')
   ctx.fillStyle = background
-  ctx.fillRect(0, 0, 1080, 1560)
-  ctx.strokeStyle = '#edbd7640'
-  ctx.lineWidth = 2
-  for (let radius = 130; radius < 560; radius += 100) {
-    ctx.beginPath(); ctx.arc(1040, 70, radius, 0, Math.PI * 2); ctx.stroke()
+  ctx.fillRect(0, 0, 360, 780)
+
+  ctx.strokeStyle = '#edbd7614'
+  ctx.lineWidth = 0.7
+  for (const radius of [54, 84, 114]) {
+    ctx.beginPath()
+    ctx.arc(356, 36, radius, 0, Math.PI * 2)
+    ctx.stroke()
   }
   ctx.fillStyle = '#edbd76'
-  ctx.font = `600 35px ${font}`
-  ctx.fillText('下班了么', 72, 96)
-  ctx.fillStyle = '#e1ded6'
-  ctx.font = `24px ${font}`
+  font(ctx, 16, 600)
+  ctx.fillText('下班了么', 24, 43)
+  ctx.fillStyle = '#b9c4d1'
+  font(ctx, 9)
   ctx.textAlign = 'right'
-  ctx.fillText('趣味测试 · 给自己一张新名片', 1008, 96)
-  ctx.textAlign = 'left'
-  ctx.fillStyle = '#f3eee4'
-  rounded(ctx, 64, 164, 952, 1184, 40)
-  ctx.fillStyle = '#69776f'
-  ctx.font = `600 24px ${font}`
-  ctx.fillText(`${quiz.name} / ${quiz.id === 'mbti' ? '性格偏好报告' : '打工人续航报告'}`, 112, 244)
+  ctx.fillText('趣味测试 / 分享名片', 336, 42)
+
+  ctx.save()
+  ctx.shadowColor = '#0a13264d'
+  ctx.shadowBlur = 24
+  ctx.shadowOffsetY = 10
+  ctx.fillStyle = '#f4f0e7'
+  rounded(ctx, 20, 80, 320, 650, 23)
+  ctx.restore()
+  ctx.save()
+  ctx.beginPath()
+  ctx.roundRect(20, 80, 320, 650, 23)
+  ctx.clip()
   ctx.fillStyle = accent
-  ctx.beginPath(); ctx.arc(928, 224, 27, 0, Math.PI * 2); ctx.fill()
-  ctx.fillStyle = '#202a39'
-  let codeSize = quiz.id === 'mbti' ? 144 : 114
-  do { ctx.font = `800 ${codeSize--}px ${font}` } while (ctx.measureText(report.code).width > 840)
-  ctx.fillText(report.code, 104, 401)
-  ctx.font = `700 62px ${font}`
-  ctx.fillText(report.title, 112, 484)
-  ctx.fillStyle = '#586272'
-  ctx.font = `36px ${font}`
-  textLines(ctx, report.quote, 112, 558, 856, 50)
-  ctx.font = `24px ${font}`
-  let tagX = 112
-  for (const tag of report.tags.slice(0, 4)) {
-    const width = ctx.measureText(tag).width + 36
-    if (tagX + width > 968) break
-    ctx.fillStyle = `${accent}70`
-    rounded(ctx, tagX, 646, width, 46, 23)
-    ctx.fillStyle = '#344352'
-    ctx.fillText(tag, tagX + 18, 677)
-    tagX += width + 12
-  }
-  ctx.fillStyle = '#ddd9ce'
-  ctx.fillRect(112, 727, 856, 1)
+  ctx.fillRect(20, 80, 320, 4)
+  ctx.restore()
+
+  ctx.textAlign = 'left'
+  ctx.fillStyle = '#718077'
+  font(ctx, 9, 600)
+  ctx.fillText(quiz.name + ' / ' + (quiz.id === 'mbti' ? '性格偏好报告' : '职场续航报告'), 40, 115)
+  ctx.textAlign = 'right'
+  ctx.fillStyle = '#9aa299'
+  font(ctx, 8)
+  ctx.fillText('RESULT NOTE', 320, 115)
+
+  ctx.textAlign = 'center'
+  ctx.fillStyle = '#243143'
+  fitFont(ctx, report.code, 62, 278, 800)
+  ctx.fillText(report.code, 180, 183)
+  fitFont(ctx, report.title, 23, 276, 700)
+  ctx.fillText(report.title, 180, 222)
+  ctx.fillStyle = '#657064'
+  font(ctx, 13)
+  textLines(ctx, report.quote, 180, 254, 268, 20)
+  drawTags(ctx, report.tags, accent)
+
+  ctx.fillStyle = '#deddd3'
+  ctx.fillRect(40, 350, 280, 0.7)
+  ctx.textAlign = 'left'
+  ctx.fillStyle = '#344352'
+  font(ctx, 12, 600)
+  ctx.fillText(quiz.id === 'mbti' ? '你的四组性格偏好' : '你的职场续航配方', 40, 376)
+  ctx.fillStyle = '#849085'
+  ctx.textAlign = 'right'
+  font(ctx, 8)
+  ctx.fillText('此刻的你', 320, 375)
+
   report.metrics.forEach((metric, i) => {
-    const y = 772 + i * 76
-    ctx.fillStyle = '#202a39'
-    ctx.font = `600 25px ${font}`
-    ctx.fillText(metric.label, 112, y)
-    ctx.textAlign = 'right'
-    ctx.fillStyle = '#566171'
-    ctx.font = `23px ${font}`
-    ctx.fillText(metric.right ? `${metric.left} ${metric.percent}% / ${metric.right} ${100 - metric.percent}%` : metric.note, 968, y)
+    const y = 407 + i * 44
     ctx.textAlign = 'left'
-    ctx.fillStyle = metric.right ? '#a798c0' : '#dedbd3'
-    rounded(ctx, 112, y + 17, 856, 12, 6)
+    ctx.fillStyle = '#43505b'
+    font(ctx, 10.5, 500)
+    ctx.fillText(metric.label, 40, y)
+    ctx.textAlign = 'right'
+    ctx.fillStyle = '#6b766d'
+    font(ctx, 9)
+    const value = metric.right
+      ? metric.left.split(' · ')[0] + ' ' + metric.percent + '%  /  ' + metric.right.split(' · ')[0] + ' ' + (100 - metric.percent) + '%'
+      : metric.percent + '%'
+    ctx.fillText(value, 320, y)
+    ctx.fillStyle = metric.right ? '#d5cfdf' : '#e0dfd6'
+    rounded(ctx, 40, y + 11, 280, 5, 2.5)
     if (metric.percent > 0) {
-      ctx.fillStyle = accent
-      rounded(ctx, 112, y + 17, 856 * metric.percent / 100, 12, 6)
+      ctx.fillStyle = inkAccent
+      rounded(ctx, 40, y + 11, 280 * metric.percent / 100, 5, 2.5)
     }
   })
-  const qrUrl = await QRCode.toDataURL(link, { width: 152, margin: 1, errorCorrectionLevel: 'M', color: { dark: '#202a39', light: '#f3eee4' } })
+
+  ctx.fillStyle = '#deddd3'
+  ctx.fillRect(40, 617, 280, 0.7)
+  const qrUrl = await QRCode.toDataURL(link, {
+    width: 246, margin: 4, errorCorrectionLevel: 'M',
+    color: { dark: '#243143', light: '#f4f0e7' },
+  })
   const qr = new Image()
   await new Promise<void>((resolve, reject) => {
     qr.onload = () => resolve()
     qr.onerror = () => reject(new Error('二维码生成失败，请重试或复制报告链接。'))
     qr.src = qrUrl
   })
-  ctx.drawImage(qr, 810, 1160, 152, 152)
-  ctx.fillStyle = '#202a39'
-  ctx.font = `600 32px ${font}`
-  ctx.fillText('今天，也请站在自己这边。', 112, 1205)
-  ctx.fillStyle = '#66706e'
-  ctx.font = `25px ${font}`
-  ctx.fillText('扫码看完整报告 · 测测你是哪一型', 112, 1256)
-  ctx.fillStyle = '#d6d8da'
-  ctx.font = `25px ${font}`
-  ctx.fillText(quiz.id === 'mbti' ? 'MBTI 风格探索 · 非官方量表 · 结果仅供参考' : 'M班TI · 原创趣味测试 · 不代表工作或心理状态评估', 72, 1420)
-  ctx.fillStyle = '#aeb7c2'
-  ctx.font = `23px ${font}`
-  ctx.fillText('这张名片不包含逐题答案或账号信息。', 72, 1472)
+  ctx.drawImage(qr, 238, 633, 82, 82)
+  ctx.textAlign = 'left'
+  ctx.fillStyle = '#43534a'
+  font(ctx, 11.5, 600)
+  ctx.fillText('今天，也请站在自己这边。', 40, 660)
+  ctx.fillStyle = '#7c877c'
+  font(ctx, 9.5)
+  ctx.fillText('扫码看完整报告', 40, 682)
+  ctx.fillText('也给自己一张新名片。', 40, 697)
+
+  ctx.textAlign = 'center'
+  ctx.fillStyle = '#bdc6d0'
+  font(ctx, 8.3)
+  ctx.fillText(quiz.id === 'mbti' ? 'MBTI 风格探索 · 非官方量表 · 结果仅供参考' : 'M班TI · 原创趣味测试 · 不代表工作或心理状态评估', 180, 752)
+  ctx.fillStyle = '#899bad'
+  font(ctx, 8)
+  ctx.fillText('分享不包含逐题答案或账号信息', 180, 769)
+
   return new Promise((resolve, reject) => {
     canvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error('图片生成失败，请重试。')), 'image/png')
   })
