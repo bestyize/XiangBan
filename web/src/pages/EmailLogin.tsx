@@ -4,6 +4,7 @@ import { api, getToken } from '../api/client.ts'
 import { CatWindow, Screen, QuietButton, FieldError } from '../components/ui.tsx'
 import { TERMS_VERSION } from '../lib/consent.ts'
 import { useProfile } from '../lib/session.tsx'
+import { readLoginReturn } from '../lib/loginReturn.ts'
 import { logout } from '../lib/logout.ts'
 import { EmailBind } from './me/EmailBind.tsx'
 
@@ -36,8 +37,8 @@ export default function EmailLogin() {
         if (getToken()) {
           await api('/api/consent', { method: 'PUT', body: { termsVersion: TERMS_VERSION } })
         }
-      }} onDone={() => navigate('/', { replace: true })} />
+      }} onDone={() => navigate(readLoginReturn()?.path ?? '/', { replace: true })} />
     </div>}
-    <Link href={profile.onboarded ? '/' : '/hello'} className="mt-6 text-center text-sm text-window/60 underline">返回网站，先体验一下</Link>
+    <Link href={readLoginReturn()?.path ?? (profile.onboarded ? '/' : '/hello')} className="mt-6 text-center text-sm text-window/60 underline">返回网站，先体验一下</Link>
   </Screen>
 }

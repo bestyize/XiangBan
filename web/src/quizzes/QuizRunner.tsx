@@ -2,11 +2,16 @@ import { useEffect, useRef, useState } from 'react'
 import { Link, useLocation } from 'wouter'
 import { clearAttempt, loadAttempt, newAttempt, saveAttempt } from './progress.ts'
 import { isComplete } from './scoring.ts'
+import { useLoginReminder } from '../components/LoginReminder.tsx'
+import { readLoginReturn, clearLoginReturn } from '../lib/loginReturn.ts'
+import { useSession } from '../lib/session.tsx'
 import { QuizArt } from './QuizArt.tsx'
 import type { QuizAttempt, QuizDefinition } from './types.ts'
 
 export function QuizRunner({ quiz }: { quiz: QuizDefinition }) {
   const [attempt, setAttempt] = useState<QuizAttempt>(() => loadAttempt(quiz) ?? newAttempt(quiz))
+  const { ask, modal } = useLoginReminder('quiz')
+  const { isLoggedIn } = useSession()
   const [started, setStarted] = useState(false)
   const [overview, setOverview] = useState(false)
   const [message, setMessage] = useState('')
@@ -16,6 +21,20 @@ export function QuizRunner({ quiz }: { quiz: QuizDefinition }) {
   const answered = attempt.answers.filter((answer) => answer !== null).length
   const question = quiz.questions[attempt.cursor]
   const selected = attempt.answers[attempt.cursor]
+
+  useEffect(() => {
+    const update = () => {
+      const next = loadAttempt(quiz)
+      if (next) setAttempt((previous) => JSON.stringify(previous) === JSON.stringify(next) ? previous : next)
+    }
+    window.addEventListener('xb-quiz-progress', update)
+    return () => window.removeEventListener('xb-quiz-progress', update)
+  }, [quiz])
+
+  useEffect(() => {
+    const intent = readLoginReturn()
+    if (intent?.path === `/tests/${quiz.id}` && intent.start) { setStarted(true); clearLoginReturn() }
+  }, [quiz.id])
 
   useEffect(() => {
     if (started) saveAttempt(quiz, attempt)
@@ -73,19 +92,20 @@ export function QuizRunner({ quiz }: { quiz: QuizDefinition }) {
       <p className="quiz-intro-description">{quiz.description}</p>
       <div className="quiz-intro-facts"><span>{total} 道选择题</span><span>{quiz.duration}</span><span>无需登录</span></div>
       {quiz.id === 'mbti' && <p className="quiz-subtle">MBTI 风格探索 · 非官方量表 · 结果仅供参考</p>}
-      <div className="quiz-paper"><h2>把答案留给真实的你</h2><p>{quiz.instructions}</p><p className="quiz-subtle">进度自动保存在当前浏览器，随时可以回来继续。浏览器清理数据后进度会消失。</p></div>
+      <div className="quiz-paper"><h2>把答案留给真实的你</h2><p>{quiz.instructions}</p><p className="quiz-subtle">{isLoggedIn ? '进度和报告会保存到账号，换设备也能找回。' : '进度暂存在当前浏览器。登录后可保存到账号，换设备接着答。'}</p></div>
       {attempt.completedAt ? <>
         <p className="quiz-resume-note">这套测试你已完成，报告还在这里。</p>
         <Link className="quiz-button" href={`/tests/${quiz.id}/report`}>查看我的报告 <span aria-hidden="true">↗</span></Link>
-        <button type="button" className="quiz-text-button" onClick={() => setStarted(true)}>回看 / 修改答案</button>
-        <button type="button" className="quiz-text-button" onClick={restart}>重新测一次</button>
+        <button type="button" className="quiz-text-button" onClick={() => ask(() => setStarted(true))}>回看 / 修改答案</button>
+        <button type="button" className="quiz-text-button" onClick={() => ask(restart)}>重新测一次</button>
       </> : <>
         {answered > 0 && <p className="quiz-resume-note">已经答了 {answered} / {total} 题，接着上次的进度。</p>}
-        <button type="button" className="quiz-button" onClick={() => setStarted(true)}>{answered > 0 ? '继续测试' : '开始测试'} <span aria-hidden="true">→</span></button>
-        {answered > 0 && <button type="button" className="quiz-text-button" onClick={restart}>重新开始</button>}
+        <button type="button" className="quiz-button" onClick={() => ask(() => setStarted(true))}>{answered > 0 ? '继续测试' : '开始测试'} <span aria-hidden="true">→</span></button>
+        {answered > 0 && <button type="button" className="quiz-text-button" onClick={() => ask(restart)}>重新开始</button>}
       </>}
       <details className="quiz-method"><summary>题目来源与结果说明</summary><p>{quiz.caveat}</p>{quiz.id === 'mbti' && <p>公共领域题目参考 <a href="https://ipip.ori.org/newBigFive5broadKey.htm" target="_blank" rel="noreferrer">IPIP 条目</a>，四组偏好框架参考 Myers &amp; Briggs Foundation；其余题目与报告为原创。</p>}</details>
     </div>
+    {modal}
   </main>
 
   return <main className={`quiz-shell quiz-runner quiz-theme-${quiz.id}`}>
@@ -120,5 +140,6 @@ export function QuizRunner({ quiz }: { quiz: QuizDefinition }) {
       </div>
       <p>答案会自动保存 · 可以回看修改</p>
     </footer>
+    {modal}
   </main>
 }

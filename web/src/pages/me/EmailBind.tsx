@@ -4,6 +4,9 @@ import type { BindResponse } from '../../api/types.ts'
 import { FieldError, PrimaryButton } from '../../components/ui.tsx'
 import { useProfile, useSession } from '../../lib/session.tsx'
 import { normalizeNickname } from '../../lib/nickname.ts'
+import { readLoginReturn } from '../../lib/loginReturn.ts'
+import { importGuestAttempts } from '../../quizzes/progress.ts'
+import { quizCatalog } from '../../quizzes/catalog.ts'
 import { getDeviceId } from '../../lib/device.ts'
 
 const input =
@@ -70,6 +73,8 @@ export function EmailBind({ onDone, mode = 'bind', disabled = false, termsVersio
         method: 'POST', body: mode === 'login' ? { email, code, deviceId: getDeviceId(), mergeGuest, username: preferredUsername, termsVersion } : { email, code, username: preferredUsername },
       })
       adopt(res.token, res.profile)
+      const selected = readLoginReturn()?.path.split('/')[2]
+      if (mergeGuest || selected) importGuestAttempts(quizCatalog.filter((quiz) => mergeGuest || quiz.id === selected), res.profile.userId)
       onDone?.(res.merged)
     } catch (e) {
       setError((e as Error).message)

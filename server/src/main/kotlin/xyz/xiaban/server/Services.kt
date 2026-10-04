@@ -81,6 +81,7 @@ class Services(
 
     val profiles = ProfileService(users, cities)
     val avatars = xyz.xiaban.server.users.AvatarService(db)
+    val quizzes = xyz.xiaban.server.quizzes.QuizRecords(db)
     val games = xyz.xiaban.server.games.GameRecords(db)
     val afterwork = xyz.xiaban.server.afterwork.AfterworkRecords(db)
     val sessions = SessionService(users, profiles, tokens, flags)

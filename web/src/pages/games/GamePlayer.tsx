@@ -1,3 +1,5 @@
+import { useLoginReminder } from '../../components/LoginReminder.tsx'
+import { clearLoginReturn, readLoginReturn } from '../../lib/loginReturn.ts'
 import { useEffect, useRef, useState } from 'react'
 import { useLocation, useRoute } from 'wouter'
 import { Screen } from '../../components/ui.tsx'
@@ -23,12 +25,19 @@ export default function GamePlayer() {
   const [, navigate] = useLocation()
   const gameId = params?.gameId ?? ''
   const [nonce] = useState(createNonce)
+  const { ask, modal } = useLoginReminder('game')
+  const [allowed, setAllowed] = useState(false)
   const [pack, setPack] = useState<GamePackManifest | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [ready, setReady] = useState(false)
   const iframeRef = useRef<HTMLIFrameElement>(null)
   const roundRef = useRef<Round | null>(null)
   const [recordError, setRecordError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (readLoginReturn()?.path === `/games/${gameId}`) clearLoginReturn()
+    ask(() => setAllowed(true))
+  }, [gameId])
 
   useEffect(() => {
     setPack(null)
@@ -146,7 +155,7 @@ export default function GamePlayer() {
               返回游戏广场
             </button>
           </div>
-        ) : pack ? (
+        ) : pack && allowed ? (
           <div className="relative mt-2 min-h-0 flex-1 overflow-hidden rounded-2xl border border-window/10 bg-dusk-deep">
             {!ready && (
               <div className="absolute inset-0 z-10 flex items-center justify-center bg-dusk-deep text-sm text-window/65">
@@ -166,6 +175,7 @@ export default function GamePlayer() {
           <p className="mt-8 text-sm text-window/55">正在读取游戏包…</p>
         )}
       </div>
+      {modal}
     </Screen>
   )
 }

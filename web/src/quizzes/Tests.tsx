@@ -3,7 +3,8 @@ import { Link, Route, Switch, useLocation } from 'wouter'
 import { TAB_BAR_SPACE } from '../components/TabBar.tsx'
 import { PageHeader } from '../components/PageHeader.tsx'
 import { findQuiz, findSharedQuiz, quizCatalog } from './catalog.ts'
-import { loadAttempt } from './progress.ts'
+import { importGuestAttempts, loadAttempt, readSavedAttempt } from './progress.ts'
+import { useSession } from '../lib/session.tsx'
 import { isComplete, makeReport, scoreAnswers } from './scoring.ts'
 import { readSharedScores } from './share.ts'
 import { QuizArt } from './QuizArt.tsx'
@@ -14,8 +15,18 @@ import type { QuizDefinition, QuizReport } from './types.ts'
 import './quizzes.css'
 
 export function QuizHub({ active = true }: { active?: boolean }) {
+  const { isLoggedIn, profile } = useSession()
   const [, refresh] = useState(0)
   useEffect(() => { if (active) refresh((value) => value + 1) }, [active])
+  useEffect(() => {
+    const update = () => refresh((value) => value + 1)
+    window.addEventListener('xb-quiz-progress', update)
+    return () => window.removeEventListener('xb-quiz-progress', update)
+  }, [])
+  const localProgress = isLoggedIn && profile ? quizCatalog.filter((quiz) => {
+    const guest = readSavedAttempt(quiz, null)
+    return guest?.answers.some((answer) => answer !== null) && !readSavedAttempt(quiz, profile.userId)
+  }) : []
   return <main className="quiz-shell quiz-hub" style={{ paddingBottom: TAB_BAR_SPACE }}>
     <PageHeader title="趣味测试"><span className="app-header-note">无需登录</span></PageHeader>
     <section className="quiz-hub-heading">
@@ -24,6 +35,12 @@ export function QuizHub({ active = true }: { active?: boolean }) {
       <p>选个小测试，给此刻的自己一张名片。</p>
       <div className="quiz-hub-meta"><span>{quizCatalog.length} 个小测试</span><span>无需登录 · 结果可分享</span></div>
     </section>
+    {localProgress.length > 0 && <div className="mb-4 rounded-2xl border border-lamp/20 bg-lamp/5 p-3 text-xs leading-relaxed text-window/70">
+      本机还有 {localProgress.length} 套游客测试进度。
+      <button type="button" className="ml-2 min-h-11 text-lamp underline" onClick={() => {
+        importGuestAttempts(localProgress, profile!.userId); refresh((value) => value + 1)
+      }}>保存到当前账号</button>
+    </div>}
     <div className="quiz-catalog" aria-label="趣味测试合集">
       {quizCatalog.map((quiz) => {
         const attempt = loadAttempt(quiz)
