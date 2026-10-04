@@ -56,7 +56,7 @@ class SessionFlowTest {
         val restored = client.post(ApiPaths.SESSION) {
             header(HttpHeaders.Cookie, "$DEVICE_COOKIE=$original")
             contentType(ContentType.Application.Json)
-            setBody(SessionRequest(newDeviceId()))
+            setBody(SessionRequest(newDeviceId(), materialize = true))
         }.body<SessionResponse>()
         assertEquals(original, restored.deviceId)
         assertEquals("阿明", restored.profile.nickname)
@@ -69,7 +69,7 @@ class SessionFlowTest {
         val restored = client.post(ApiPaths.SESSION) {
             header(HttpHeaders.Authorization, "Bearer not-a-valid-token")
             contentType(ContentType.Application.Json)
-            setBody(SessionRequest(deviceId))
+            setBody(SessionRequest(deviceId, materialize = true))
         }
         assertEquals(HttpStatusCode.OK, restored.status)
         assertEquals(first.profile.createdAt, restored.body<SessionResponse>().profile.createdAt)
@@ -103,7 +103,7 @@ class SessionFlowTest {
         val inviter = session().profile
         val invited = client.post(ApiPaths.SESSION) {
             contentType(ContentType.Application.Json)
-            setBody(SessionRequest(newDeviceId(), "Asia/Shanghai", ref = inviter.inviteCode, from = "card"))
+            setBody(SessionRequest(newDeviceId(), "Asia/Shanghai", ref = inviter.inviteCode, from = "card", materialize = true))
         }.body<SessionResponse>()
         assertTrue(invited.profile.inviteCode != inviter.inviteCode)
         val (referredBy, source) = services.db.read { c ->
