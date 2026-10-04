@@ -1,5 +1,7 @@
 import { lazy, Suspense, useEffect, useState } from 'react'
 import { Redirect, Route, Switch, useLocation } from 'wouter'
+import Habits from './pages/me/Habits.tsx'
+import Settings from './pages/me/Settings.tsx'
 import { getToken } from './api/client.ts'
 import { useAccountProgress } from './quizzes/useAccountProgress.ts'
 import { KeepAlivePage } from './components/KeepAlivePage.tsx'
@@ -8,7 +10,6 @@ import { CatWindow, PrimaryButton, Screen } from './components/ui.tsx'
 import { SessionProvider, useSession } from './lib/session.tsx'
 import { track } from './lib/track.ts'
 import CardPreview from './pages/CardPreview.tsx'
-import Dex from './pages/Dex.tsx'
 import Home from './pages/Home.tsx'
 import LegalPage from './pages/LegalPage.tsx'
 import GuardianPage from './pages/me/GuardianPage.tsx'
@@ -72,7 +73,7 @@ function SessionRoutes() {
     )
   }
   if (location === '/login') return <EmailLogin />
-  if (!profile.onboarded && !['/hello', '/me', '/me/account'].includes(location)) return <Redirect to="/hello" replace />
+  if (!profile.onboarded && !['/hello', '/me', '/me/account', '/me/settings'].includes(location)) return <Redirect to="/hello" replace />
 
   return (
     <Switch key={profile.userId}>
@@ -83,7 +84,8 @@ function SessionRoutes() {
       <Route path="/me/account"><AccountProfile /></Route>
       <Route path="/me/guardian" component={GuardianPage} />
       <Route path="/me/profile" component={ProfileEdit} />
-      <Route path="/dex"><Dex /></Route>
+      <Route path="/me/settings" component={Settings} />
+      <Route path="/me/habits" component={Habits} />
       <Route path="/me">{null}</Route>
       <Route path="/">{null}</Route>
       <Route><Redirect to="/" replace /></Route>
@@ -105,10 +107,10 @@ function AppPages() {
   const { profile } = useSession()
   const tests = location === '/tests' || location.startsWith('/tests/')
   const quizSync = useAccountProgress(tests)
-  const primary = ['/', '/games', '/tests', '/me', '/dex'].includes(location)
+  const primary = ['/', '/games', '/tests', '/me'].includes(location)
   usePageViews()
   useEffect(() => {
-    const titles: Record<string, string> = { '/': '下班了么', '/games': '玩一局', '/tests': '趣味测试', '/me': '我的', '/dex': '表情图鉴' }
+    const titles: Record<string, string> = { '/': '下班了么', '/games': '玩一局', '/tests': '趣味测试', '/me': '我的' }
     if (titles[location]) document.title = `${titles[location]}｜下班了么`
   }, [location])
   return <>
@@ -130,6 +132,8 @@ export default function App() {
   const admin = location === '/admin' || location.startsWith('/admin/')
   const [sessionStarted, setSessionStarted] = useState((!publicTests && !admin) || Boolean(getToken()))
   useEffect(() => { if (!publicTests && !admin) setSessionStarted(true) }, [publicTests, admin])
+  // The phone-width desktop frame (index.css) is for the app only, not the admin console.
+  useEffect(() => { document.documentElement.dataset.surface = admin ? 'admin' : 'app' }, [admin])
   if (admin) return <AdminPage />
   return <SessionProvider enabled={sessionStarted || !publicTests}><AppPages /></SessionProvider>
 }

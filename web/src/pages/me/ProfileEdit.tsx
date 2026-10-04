@@ -2,7 +2,8 @@ import { useState } from 'react'
 import { useLocation } from 'wouter'
 import type { Personality, ProfileUpdate } from '../../api/types.ts'
 import { CityPicker } from '../../components/CityPicker.tsx'
-import { FieldError, PrimaryButton, QuietButton, Screen } from '../../components/ui.tsx'
+import { SubPage } from '../../components/SubPage.tsx'
+import { FieldError, PrimaryButton } from '../../components/ui.tsx'
 import { useMeta } from '../../lib/meta.ts'
 import { useProfile, useSession } from '../../lib/session.tsx'
 
@@ -46,12 +47,8 @@ export default function ProfileEdit() {
   }
 
   return (
-    <Screen>
-      <header className="flex h-10 items-center">
-        <QuietButton className="px-0!" onClick={() => navigate('/me')}>返回</QuietButton>
-      </header>
-      <h1 className="mt-2 text-2xl font-bold text-window">小伴档案和作息</h1>
-      <div className="mt-5 space-y-5 pb-8">
+    <SubPage title="小伴档案和作息" back="/me">
+      <div className="mt-2 space-y-5 pb-8">
         <div className="grid grid-cols-2 gap-3">
           <label className="block"><span className="mb-1.5 block text-sm text-window/70">小伴的名字</span>
             <input className={input} value={draft.companionName} maxLength={8} onChange={(e) => set({ companionName: e.target.value })} /></label>
@@ -90,6 +87,6 @@ export default function ProfileEdit() {
         <FieldError message={error} />
         <PrimaryButton disabled={busy} onClick={save}>保存</PrimaryButton>
       </div>
-    </Screen>
+    </SubPage>
   )
 }

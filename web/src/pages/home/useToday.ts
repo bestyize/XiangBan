@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { api, getToken } from '../../api/client.ts'
 import type { Checkin, Tip, TodayResponse, Unlock } from '../../api/types.ts'
 import { send } from '../../lib/bridge.ts'
-import { storage } from '../../lib/storage.ts'
+import { clearGuestCheckin, loadGuestCheckin, saveGuestCheckin } from '../../lib/guestCheckin.ts'
 import { browserTimezone } from '../../lib/device.ts'
 
 type Status = 'loading' | 'ready' | 'error'
@@ -40,19 +40,12 @@ export function useToday(active = true) {
     try {
       const tz = browserTimezone() ?? 'Asia/Shanghai'
       const next = await api<TodayResponse>(`/api/checkin/today?timezone=${encodeURIComponent(tz)}`)
-      if (!getToken()) {
-        const localCheckinRaw = storage.get('xb_guest_checkin')
-        if (localCheckinRaw) {
-          try {
-            const localCheckin = JSON.parse(localCheckinRaw) as Checkin
-            if (localCheckin.workDay === next.workDay) {
-              setToday({ ...next, checkin: localCheckin, greeting: null })
-              setTips(next.tips)
-              setStatus('ready')
-              return
-            }
-          } catch {}
-        }
+      const localCheckin = getToken() ? null : loadGuestCheckin(next.workDay)
+      if (localCheckin) {
+        setToday({ ...next, checkin: localCheckin, greeting: null })
+        setTips(next.tips)
+        setStatus('ready')
+        return
       }
       setToday(next)
       setError(null)
@@ -76,7 +69,7 @@ export function useToday(active = true) {
       const tz = browserTimezone() ?? 'Asia/Shanghai'
       const checkin = await api<Checkin>(`/api/checkin?timezone=${encodeURIComponent(tz)}`, { method: 'POST' })
       if (!getToken()) {
-        storage.set('xb_guest_checkin', JSON.stringify(checkin))
+        saveGuestCheckin(checkin)
       }
       setFresh(true)
       setTips(null)
@@ -98,7 +91,7 @@ export function useToday(active = true) {
     setError(null)
     try {
       if (!getToken()) {
-        storage.remove('xb_guest_checkin')
+        clearGuestCheckin()
         const tz = browserTimezone() ?? 'Asia/Shanghai'
         setToday(await api<TodayResponse>(`/api/checkin/today?timezone=${encodeURIComponent(tz)}`))
       } else {

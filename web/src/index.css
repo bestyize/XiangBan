@@ -87,12 +87,29 @@
     color: var(--color-window);
     -webkit-tap-highlight-color: transparent;
     -webkit-text-size-adjust: 100%;
+    /* App feel: no rubber-band page bounce, no double-tap zoom delay (pinch zoom still works). */
+    overscroll-behavior: none;
+    touch-action: manipulation;
+    scrollbar-width: none;
   }
+  html::-webkit-scrollbar { display: none; }
 
   body {
     font-family: var(--font-sans);
     min-height: 100dvh;
+    /* Long-pressing controls should not select text or pop up the browser menu. */
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
   }
+
+  /* Places where people do read, type or copy; images keep long-press save (WeChat share cards). */
+  input, textarea, select, [contenteditable], article, .selectable {
+    -webkit-user-select: text;
+    user-select: text;
+  }
+  img { -webkit-touch-callout: default; }
+  a, button, img, svg { -webkit-user-drag: none; }
 
   :focus-visible {
     outline: 3px solid var(--color-lamp);
@@ -111,7 +128,8 @@
 }
 
 /* Each primary screen retains its own scroll position between tab visits. */
-.app-tab-page { height: 100dvh; overflow-y: auto; overscroll-behavior-y: contain; }
+.app-tab-page { height: 100dvh; overflow-y: auto; overscroll-behavior-y: contain; scrollbar-width: none; }
+.app-tab-page::-webkit-scrollbar { display: none; }
 .app-tab-page[hidden] { display: none; }
 .app-page-header {
   position: sticky; top: var(--safe-top); z-index: 20;
@@ -139,6 +157,88 @@
 .app-tab:active { transform: scale(.93); }
 @media (prefers-reduced-motion: reduce) {
   .app-tab, .app-tab-icon, .app-page-actions a { transition: none; }
+}
+
+/* On a desktop the app sits in a phone-width column, framed against a darker backdrop. */
+@media (min-width: 600px) {
+  html[data-surface="app"] body { background: #0f1726; }
+  html[data-surface="app"] #root {
+    max-width: 480px; min-height: 100dvh; margin: 0 auto;
+    background: var(--color-dusk-deep);
+    box-shadow: 0 0 0 1px #f3eee40d, 0 30px 80px #0008;
+  }
+}
+
+/* Pushed screens: navigation bar with back arrow, sliding in from the right. */
+.app-subpage { animation: page-in 260ms cubic-bezier(.2, .8, .2, 1) both; }
+@keyframes page-in { from { opacity: 0; transform: translateX(28px); } to { opacity: 1; transform: none; } }
+.app-nav-bar {
+  position: sticky; top: var(--safe-top); z-index: 20;
+  display: grid; grid-template-columns: 44px 1fr 44px; align-items: center;
+  min-height: 52px; margin: -8px -8px 8px; background: var(--color-dusk-deep);
+}
+.app-nav-bar h1 { text-align: center; font-size: 17px; font-weight: 700; color: var(--color-window); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.app-nav-back { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 12px; color: var(--color-window); transition: background 150ms; }
+.app-nav-back svg { width: 24px; height: 24px; }
+.app-nav-back:active { background: #f3eee414; }
+.app-nav-action { display: flex; justify-content: flex-end; }
+
+/* Grouped list rows. */
+.app-list-group { margin-top: 20px; }
+.app-list-title { margin: 0 4px 8px; font-size: 13px; font-weight: 600; color: #f3eee499; }
+.app-list { overflow: hidden; border-radius: 18px; background: #3d506959; }
+.app-list-footer { margin: 8px 4px 0; font-size: 12px; line-height: 1.6; color: #f3eee470; }
+.app-row {
+  display: flex; align-items: center; gap: 12px; width: 100%; min-height: 54px;
+  padding: 12px 16px; text-align: left; color: var(--color-window);
+}
+.app-row + .app-row { box-shadow: inset 0 1px 0 #f3eee412; }
+.app-row.is-pressable { transition: background 120ms; }
+.app-row.is-pressable:active { background: #f3eee40f; }
+.app-row:disabled, .app-row.is-disabled { opacity: .5; }
+.app-row-label { flex: 1; min-width: 0; font-size: 15px; }
+.app-row-label.is-danger { color: var(--color-blush); }
+.app-row-label.is-accent { color: var(--color-lamp); text-align: center; font-weight: 600; }
+.app-row-hint { display: block; margin-top: 2px; font-size: 12px; color: #f3eee470; }
+.app-row-detail { flex-shrink: 0; max-width: 55%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; color: #f3eee480; }
+.app-row-chevron { flex-shrink: 0; width: 16px; height: 16px; color: #f3eee455; }
+
+/* Native-style switch on a checkbox, so keyboard and screen readers keep working. */
+.app-switch {
+  appearance: none; position: relative; flex-shrink: 0; width: 48px; height: 28px; border-radius: 14px;
+  background: #f3eee42b; cursor: pointer; transition: background 180ms;
+}
+.app-switch::after {
+  content: ''; position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; border-radius: 50%;
+  background: #fff; box-shadow: 0 1px 3px #0006; transition: transform 180ms;
+}
+.app-switch:checked { background: var(--color-lamp); }
+.app-switch:checked::after { transform: translateX(20px); }
+.app-switch:disabled { cursor: not-allowed; }
+
+/* Bottom sheet. */
+.app-sheet {
+  position: fixed; inset: auto 0 0; margin: 0 auto; width: min(100%, 480px); max-width: none;
+  max-height: calc(100dvh - var(--safe-top) - 40px); padding: 0; overflow: hidden;
+  border: 1px solid #edbd7626; border-bottom: 0; border-radius: 26px 26px 0 0;
+  background: #223149; color: var(--color-window); box-shadow: 0 -12px 60px #08112166;
+}
+.app-sheet[open] { display: flex; flex-direction: column; animation: sheet-in 300ms cubic-bezier(.2, .8, .2, 1) both; }
+.app-sheet::backdrop { background: #080f1bb3; animation: backdrop-in 200ms ease-out both; }
+@keyframes sheet-in { from { transform: translateY(100%); } to { transform: none; } }
+@keyframes backdrop-in { from { opacity: 0; } to { opacity: 1; } }
+.app-sheet-handle { flex-shrink: 0; width: 36px; height: 4px; margin: 10px auto 0; border-radius: 4px; background: #f3eee433; }
+.app-sheet-header { flex-shrink: 0; display: flex; align-items: center; gap: 12px; padding: 10px 12px 10px 20px; }
+.app-sheet-header h2 { flex: 1; font-size: 18px; font-weight: 700; }
+.app-sheet-close { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 50%; color: #f3eee4b3; }
+.app-sheet-close:active { background: #f3eee414; }
+.app-sheet-close svg { width: 20px; height: 20px; }
+.app-sheet-body { overflow-y: auto; overscroll-behavior: contain; padding: 4px 20px calc(var(--safe-bottom) + 24px); scrollbar-width: none; }
+.app-sheet-body::-webkit-scrollbar { display: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .app-subpage, .app-sheet[open], .app-sheet::backdrop { animation: none; }
+  .app-switch, .app-switch::after, .app-row, .app-nav-back { transition: none; }
 }
 
 .login-reminder {

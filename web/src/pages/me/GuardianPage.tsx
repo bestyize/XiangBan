@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
-import { useLocation } from 'wouter'
 import { api } from '../../api/client.ts'
 import type { Guardian, GuardianUpdate } from '../../api/types.ts'
-import { FieldError, QuietButton, Screen } from '../../components/ui.tsx'
+import { SubPage } from '../../components/SubPage.tsx'
+import { FieldError, QuietButton } from '../../components/ui.tsx'
 import { useProfile } from '../../lib/session.tsx'
 import { GuardianForm } from './GuardianForm.tsx'
 
@@ -13,7 +13,6 @@ function when(ms: number) {
 
 export default function GuardianPage() {
   const profile = useProfile()
-  const [, navigate] = useLocation()
   const [guardian, setGuardian] = useState<Guardian | null | undefined>(undefined)
   const [editing, setEditing] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -41,11 +40,7 @@ export default function GuardianPage() {
   const remove = () => run(async () => (await api('/api/guardian', { method: 'DELETE' }), null))
 
   return (
-    <Screen>
-      <header className="flex h-10 items-center">
-        <QuietButton className="px-0!" onClick={() => navigate('/me')}>返回</QuietButton>
-      </header>
-      <h1 className="mt-2 text-2xl font-bold text-window">平安守护</h1>
+    <SubPage title="平安守护" back="/me">
       <p className="mt-2 text-sm leading-relaxed text-window/70">一个人住也有人惦记：连续几个工作日没打卡，小伴会先提醒你，再发邮件告诉你指定的联系人。</p>
       <p role="note" className="mt-3 rounded-2xl border border-blush/60 px-4 py-3 text-sm text-window">
         平安守护不是急救服务。紧急情况请拨打 120 或 110。
@@ -84,6 +79,6 @@ export default function GuardianPage() {
           </div>
         )}
       </section>
-    </Screen>
+    </SubPage>
   )
 }

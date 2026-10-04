@@ -111,7 +111,6 @@ export function EmailBind({ onDone, mode = 'bind', disabled = false, termsVersio
         </button>
         {sent && <PrimaryButton type="submit" disabled={busy || disabled || code.length !== 6}>{busy ? '正在验证…' : '验证并进入'}</PrimaryButton>}
       </div>
-      <p className="text-xs leading-relaxed text-window/50">无需密码。已有账号直接找回，新用户自动注册并分配小伴昵称（可随时在「我的」中修改）。</p>
     </form>
   )
 }

@@ -34,7 +34,6 @@ export function useLoginReminder(kind: 'quiz' | 'game') {
       dismiss(); rememberLoginReturn({ path: location, start: true }); setOpen(false); navigate('/login')
     }}>登录 / 注册</button>
     <button type="button" className="login-reminder-skip" onClick={proceed}>先体验一下</button>
-    <small>游客也能玩 · 进度暂存在当前浏览器</small>
   </dialog>
   return { ask, modal }
 }

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, Route, Switch, useLocation } from 'wouter'
 import { TAB_BAR_SPACE } from '../components/TabBar.tsx'
 import { PageHeader } from '../components/PageHeader.tsx'
+import { NavBar } from '../components/SubPage.tsx'
 import { findQuiz, findSharedQuiz, quizCatalog } from './catalog.ts'
 import { importGuestAttempts, loadAttempt, readSavedAttempt } from './progress.ts'
 import { useSession } from '../lib/session.tsx'
@@ -28,13 +29,8 @@ export function QuizHub({ active = true }: { active?: boolean }) {
     return guest?.answers.some((answer) => answer !== null) && !readSavedAttempt(quiz, profile.userId)
   }) : []
   return <main className="quiz-shell quiz-hub" style={{ paddingBottom: TAB_BAR_SPACE }}>
-    <PageHeader title="趣味测试"><span className="app-header-note">无需登录</span></PageHeader>
-    <section className="quiz-hub-heading">
-      <span className="quiz-eyebrow">AFTER HOURS LAB <span className="quiz-tiny-star" aria-hidden="true">✦</span></span>
-      <h1>发现自己的<span>另一面。</span></h1>
-      <p>选个小测试，给此刻的自己一张名片。</p>
-      <div className="quiz-hub-meta"><span>{quizCatalog.length} 个小测试</span><span>无需登录 · 结果可分享</span></div>
-    </section>
+    <PageHeader title="趣味测试" />
+    <p className="quiz-hub-intro">选个小测试，给此刻的自己一张名片。</p>
     {localProgress.length > 0 && <div className="mb-4 rounded-2xl border border-lamp/20 bg-lamp/5 p-3 text-xs leading-relaxed text-window/70">
       本机还有 {localProgress.length} 套游客测试进度。
       <button type="button" className="ml-2 min-h-11 text-lamp underline" onClick={() => {
@@ -76,8 +72,8 @@ function useFragment() {
 }
 
 function Report({ quiz, report, scores, shared }: { quiz: QuizDefinition; report: QuizReport; scores: number[]; shared: boolean }) {
-  return <main className={`quiz-shell quiz-report quiz-theme-${quiz.id}`}>
-    <header className="quiz-header"><Link href="/tests" className="quiz-back">← 测试合集</Link><span className="quiz-mini-brand">{quiz.name} 报告</span></header>
+  return <main className={`quiz-shell app-subpage quiz-report quiz-theme-${quiz.id}`}>
+    <NavBar title={`${quiz.name} 报告`} back="/tests" />
     {shared && <div className="quiz-shared-note">{quiz.version !== findQuiz(quiz.id)?.version ? '这是朋友分享的 25 题旧版结果。' : '这是朋友分享的结果。'}<Link href={`/tests/${quiz.id}`}>我也测一测 ↗</Link></div>}
     <section className={`quiz-report-hero${quiz.persona ? ' quiz-character-hero' : ''}`}>
       <div className="quiz-report-top"><span className="quiz-eyebrow">{quiz.eyebrow}</span><span className="quiz-report-seal">此刻<br />名片</span></div>

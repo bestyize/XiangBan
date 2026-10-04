@@ -1,13 +1,10 @@
 import { privacyPolicy, userAgreement } from '../content/legal.ts'
-import { QuietButton, Screen } from '../components/ui.tsx'
+import { SubPage } from '../components/SubPage.tsx'
 
 export default function LegalPage({ doc }: { doc: 'privacy' | 'terms' }) {
   const content = doc === 'privacy' ? privacyPolicy : userAgreement
   return (
-    <Screen>
-      <header className="flex h-10 items-center">
-        <QuietButton className="px-0!" onClick={() => history.back()}>返回</QuietButton>
-      </header>
+    <SubPage title={doc === 'privacy' ? '隐私政策' : '用户协议'}>
       <article className="pb-10 text-[15px] leading-[1.85] text-window/85">
         <h1 className="mt-2 text-2xl font-bold text-window">{content.title}</h1>
         <p className="mt-1 text-xs text-window/50">版本 {content.version}，更新于 {content.updatedAt}</p>
@@ -19,6 +16,6 @@ export default function LegalPage({ doc }: { doc: 'privacy' | 'terms' }) {
           </section>
         ))}
       </article>
-    </Screen>
+    </SubPage>
   )
 }

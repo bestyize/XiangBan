@@ -4,11 +4,10 @@ import { TAB_BAR_SPACE } from '../../components/TabBar.tsx'
 import { Screen } from '../../components/ui.tsx'
 import { gamePackThumbnailUrl, loadGameCatalog, type GamePackManifest } from '../../games/packLoader.ts'
 import { api, getToken } from '../../api/client.ts'
-import { useProfile, useSession } from '../../lib/session.tsx'
+import { useProfile } from '../../lib/session.tsx'
 import { PageHeader } from '../../components/PageHeader.tsx'
 import { AccountBadge } from '../../components/AccountBadge.tsx'
 import { storage } from '../../lib/storage.ts'
-import { GuestNotice } from '../../components/GuestNotice.tsx'
 
 export default function GameHub({ active = true }: { active?: boolean }) {
   const [games, setGames] = useState<GamePackManifest[] | null>(null)
@@ -16,7 +15,6 @@ export default function GameHub({ active = true }: { active?: boolean }) {
   const [summaries, setSummaries] = useState<{ gameId: string; sessions: number; bestScore: number; bestTile: number }[]>([])
   const [recordError, setRecordError] = useState<string | null>(null)
   const profile = useProfile()
-  const { isLoggedIn } = useSession()
   async function refreshRecords() {
     if (!getToken()) {
       try {
@@ -82,12 +80,9 @@ export default function GameHub({ active = true }: { active?: boolean }) {
         </div>
 
         <section className="mt-6 rounded-2xl bg-dusk-soft/35 p-4"><div className="flex items-center justify-between"><h2 className="font-bold">我的游戏记录</h2><button className="text-xs text-lamp underline" onClick={() => void refreshRecords()}>刷新</button></div>
-          <p className="mt-2 text-xs text-window/50">{isLoggedIn ? `用户 ID ${profile.userId} · 已登录，可跨设备找回` : '游客模式 · 数据保存在当前浏览器'}</p>
           {recordError && <p role="alert" className="mt-2 text-xs text-blush">{recordError}</p>}
           {summaries.length ? summaries.map((record) => <div key={record.gameId} className="mt-3 flex justify-between gap-3 text-sm"><span>{games?.find((game) => game.id === record.gameId)?.name ?? record.gameId}</span><span className="text-window/65">{record.sessions} 局 · 最高 {record.bestScore} 分</span></div>) : <p className="mt-3 text-sm text-window/50">还没有游戏记录，轻松开一局吧。</p>}
         </section>
-        {!isLoggedIn && <GuestNotice className="mt-4" />}
-        <p className="mt-6 text-xs text-window/40">每款游戏独立加载，成绩与对局记录按数字用户 ID 保存在独立游戏表中。</p>
       </div>
     </Screen>
   )

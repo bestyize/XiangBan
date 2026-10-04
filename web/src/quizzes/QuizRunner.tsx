@@ -3,6 +3,7 @@ import { Link, useLocation } from 'wouter'
 import { clearAttempt, loadAttempt, newAttempt, saveAttempt } from './progress.ts'
 import { isComplete } from './scoring.ts'
 import { useLoginReminder } from '../components/LoginReminder.tsx'
+import { NavBar } from '../components/SubPage.tsx'
 import { readLoginReturn, clearLoginReturn } from '../lib/loginReturn.ts'
 import { useSession } from '../lib/session.tsx'
 import { QuizArt } from './QuizArt.tsx'
@@ -83,14 +84,14 @@ export function QuizRunner({ quiz }: { quiz: QuizDefinition }) {
     navigate(`/tests/${quiz.id}/report`)
   }
 
-  if (!started) return <main className={`quiz-shell quiz-theme-${quiz.id}`}>
-    <header className="quiz-header"><Link href="/tests" className="quiz-back">← 测试合集</Link><span className="quiz-mini-brand">下班了么</span></header>
+  if (!started) return <main className={`quiz-shell app-subpage quiz-theme-${quiz.id}`}>
+    <NavBar title={quiz.name} back="/tests" />
     <div className="quiz-intro">
       <span className="quiz-eyebrow">{quiz.eyebrow}</span>
       <QuizArt kind={quiz.id} />
       <h1>{quiz.name}<span>{quiz.subtitle}</span></h1>
       <p className="quiz-intro-description">{quiz.description}</p>
-      <div className="quiz-intro-facts"><span>{total} 道选择题</span><span>{quiz.duration}</span><span>无需登录</span></div>
+      <div className="quiz-intro-facts"><span>{total} 道选择题</span><span>{quiz.duration}</span></div>
       {quiz.id === 'mbti' && <p className="quiz-subtle">MBTI 风格探索 · 非官方量表 · 结果仅供参考</p>}
       <div className="quiz-paper"><h2>把答案留给真实的你</h2><p>{quiz.instructions}</p><p className="quiz-subtle">{isLoggedIn ? '进度和报告会保存到账号，换设备也能找回。' : '进度暂存在当前浏览器。登录后可保存到账号，换设备接着答。'}</p></div>
       {attempt.completedAt ? <>
@@ -109,7 +110,7 @@ export function QuizRunner({ quiz }: { quiz: QuizDefinition }) {
   </main>
 
   return <main className={`quiz-shell quiz-runner quiz-theme-${quiz.id}`}>
-    <header className="quiz-header"><Link href="/tests" className="quiz-back">← 测试合集</Link><span className="quiz-mini-brand">{quiz.name}</span></header>
+    <NavBar title={quiz.name} back="/tests" />
     <div className="quiz-progress-area">
       <div className="quiz-progress-label"><span>已完成 {answered} / {total}</span><button className="quiz-text-button" type="button" aria-expanded={overview} aria-controls="quiz-overview" onClick={() => setOverview(!overview)}>答题一览</button></div>
       <div className="quiz-progress-track" role="progressbar" aria-label="答题进度" aria-valuemin={0} aria-valuemax={total} aria-valuenow={answered}><span style={{ width: `${answered / total * 100}%` }} /></div>

@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
-import { Link } from 'wouter'
 import { api, ApiError, getToken } from '../../api/client.ts'
 import type { Profile } from '../../api/types.ts'
-import { FieldError, PrimaryButton, QuietButton, Screen } from '../../components/ui.tsx'
+import { SubPage } from '../../components/SubPage.tsx'
+import { FieldError, PrimaryButton, QuietButton } from '../../components/ui.tsx'
 import { compressAvatar, uploadAvatar } from '../../lib/avatar.ts'
 import { nicknameError, normalizeNickname } from '../../lib/nickname.ts'
 import { useProfile, useSession } from '../../lib/session.tsx'
@@ -36,9 +36,8 @@ export default function AccountProfile() {
       if (e instanceof ApiError && e.status === 401) void refresh().catch(() => undefined)
     } finally { setBusy(null) }
   }
-  return <Screen><Link href="/me" className="mb-6 text-sm text-window/60">← 返回我的</Link>
-    <h1 className="text-2xl font-bold text-window">昵称和头像</h1><p className="mt-2 text-xs text-window/55">用户 ID：{profile.userId} · {isLoggedIn ? '已登录' : '游客模式'}</p>
-    <div className="mt-6 space-y-6">
+  return <SubPage title="昵称和头像" back="/me">
+    <div className="mt-2 space-y-6">
       <FieldError message={error} />{message && <p role="status" className="text-sm text-lamp">{message}</p>}
       <section className="rounded-2xl bg-dusk-soft/35 p-5"><h2 className="font-bold">我的头像</h2><div className="mt-4 flex items-center gap-5">
         <div className="flex size-24 shrink-0 items-center justify-center overflow-hidden rounded-full bg-lamp/15 text-3xl text-lamp">{preview || profile.avatarUrl ? <img src={preview ?? profile.avatarUrl!} alt="头像预览" className="size-full object-cover" /> : '🐾'}</div>
@@ -61,5 +60,5 @@ export default function AccountProfile() {
         <FieldError message={invalidNickname} /><PrimaryButton className="mt-5" type="submit" disabled={!!busy || !!invalidNickname || normalizeNickname(nickname) === (profile.nickname ?? '')}>{busy === 'nickname' ? '正在保存…' : '保存昵称'}</PrimaryButton>
       </form>
     </div>
-  </Screen>
+  </SubPage>
 }

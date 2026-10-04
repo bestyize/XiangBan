@@ -12,7 +12,7 @@ export function TabBar() {
   return <nav aria-label="主导航" className="app-tab-bar">
     {TABS.map((tab) => {
       const active = tab.href === '/'
-        ? location === '/' || location === '/dex'
+        ? location === '/'
         : location === tab.href || location.startsWith(`${tab.href}/`)
       return <Link key={tab.href} href={tab.href} aria-current={active ? 'page' : undefined} className={`app-tab${active ? ' is-active' : ''}`}>
         <span className="app-tab-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? '1.9' : '1.6'} strokeLinecap="round" strokeLinejoin="round"><path d={tab.icon} /></svg></span>

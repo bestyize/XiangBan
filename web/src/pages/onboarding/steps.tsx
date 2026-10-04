@@ -66,7 +66,7 @@ interface BodyProps {
 export function StepBody({ step, draft, meta, update }: BodyProps) {
   switch (step) {
     case 'hello':
-      return <p className="text-center text-sm text-window/70">不用注册，回答几个小问题就好，后面每一步都能跳过。</p>
+      return null
     case 'name':
       return (
         <label className="block">

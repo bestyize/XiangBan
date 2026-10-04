@@ -58,7 +58,7 @@ export function AfterworkChoice({ workDay, localTime, tips }: AfterworkChoicePro
         )}
       </div>
       <p className="mt-1 text-sm text-window/70">{tonightSuggestion(localTime, tips)}</p>
-      <p className="mt-2 text-xs text-window/45">{loading ? '正在读取当前账号的安排…' : busy ? '正在保存…' : '安排会保存在当前用户 ID 下，登录后可跨设备找回。'}</p><FieldError message={error} />
+      {(loading || busy) && <p className="mt-2 text-xs text-window/45">{loading ? '正在读取安排…' : '正在保存…'}</p>}<FieldError message={error} />
 
       {data.preferredActivityId && !selected && (
         <button

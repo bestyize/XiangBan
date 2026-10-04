@@ -16,9 +16,10 @@ export default defineConfig({
         short_name: '下班了么',
         description: '每天下班打一次卡，小伴在家等你。',
         lang: 'zh-CN',
-        theme_color: '#2f3a7a',
-        background_color: '#1f2758',
+        theme_color: '#182338',
+        background_color: '#182338',
         display: 'standalone',
+        orientation: 'portrait',
         start_url: '/',
         icons: [
           { src: 'pwa-64x64.png', sizes: '64x64', type: 'image/png' },

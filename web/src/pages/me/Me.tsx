@@ -1,116 +1,107 @@
-import { useEffect, useState, type ReactNode } from 'react'
-import { Link } from 'wouter'
+import { useEffect, useState } from 'react'
+import { Link, useLocation } from 'wouter'
 import { api } from '../../api/client.ts'
-import type { Profile } from '../../api/types.ts'
+import type { Guardian, Profile } from '../../api/types.ts'
+import { Cat } from '../../components/Cat.tsx'
+import { LinkRow, ListGroup, SwitchRow } from '../../components/List.tsx'
 import { PageHeader } from '../../components/PageHeader.tsx'
 import { TAB_BAR_SPACE } from '../../components/TabBar.tsx'
 import { FieldError, Screen } from '../../components/ui.tsx'
+import { getWeeklyAfterworkSummary } from '../../lib/afterwork.ts'
 import { useProfile, useSession } from '../../lib/session.tsx'
-import { AccountActions } from './AccountActions.tsx'
+import { useAfterwork } from '../../lib/useAfterwork.ts'
 import { MeStats } from './MeStats.tsx'
-import { AfterworkSummary } from './AfterworkSummary.tsx'
-import { logout } from '../../lib/logout.ts'
-import { GuestNotice } from '../../components/GuestNotice.tsx'
 
 const personalityName = { toxic: '毒舌心软', gentle: '温柔治愈', chatty: '元气话痨', tsundere: '高冷傲娇' } as const
 
-export function Section({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <section className="mt-6">
-      <h2 className="mb-2 text-sm font-bold text-window/60">{title}</h2>
-      <div className="rounded-2xl bg-dusk-soft/35 p-4">{children}</div>
-    </section>
-  )
+/** null: not loaded yet; undefined: not set up. */
+function useGuardian(enabled: boolean, active: boolean) {
+  const [guardian, setGuardian] = useState<Guardian | undefined | null>(null)
+  useEffect(() => {
+    if (!enabled || !active) return
+    api<Guardian | undefined>('/api/guardian').then(setGuardian).catch(() => setGuardian(null))
+  }, [enabled, active])
+  if (!enabled) return '未开启'
+  if (guardian === null) return ''
+  if (!guardian) return '未开启'
+  return guardian.paused ? '已暂停' : '已开启'
 }
 
-export function RowLink({ href, label, detail }: { href: string; label: string; detail?: string }) {
-  return (
-    <Link href={href} className="flex min-h-11 items-center justify-between gap-3 rounded-lg px-1 text-window transition active:bg-window/5">
-      <span>{label}</span>
-      <span className="text-sm text-window/60">{detail ?? '去设置'}</span>
-    </Link>
-  )
-}
-
+/** 我的: who I am, a few numbers, and a short list of things to set. Account and data controls live in 设置. */
 export default function Me() {
   const profile = useProfile()
   const { setProfile, isLoggedIn, refresh } = useSession()
-  const [loggingOut, setLoggingOut] = useState(false)
-  useEffect(() => { void refresh().catch(() => undefined) }, [refresh])
+  const [location] = useLocation()
+  // The tab stays mounted, so refresh whenever it is shown again.
+  const active = location === '/me'
   const [error, setError] = useState<string | null>(null)
+  const guardian = useGuardian(Boolean(profile.email), active)
+  const { data: habits } = useAfterwork()
+  const weekHabits = getWeeklyAfterworkSummary(habits, profile.timezone).count
 
-  async function toggleRecall() {
+  useEffect(() => {
+    if (active) void refresh().catch(() => undefined)
+  }, [active, refresh])
+
+  async function toggleRecall(enabled: boolean) {
     setError(null)
     try {
-      setProfile(await api<Profile>('/api/subscription', { method: 'PUT', body: { enabled: !profile.recallOptIn } }))
+      setProfile(await api<Profile>('/api/subscription', { method: 'PUT', body: { enabled } }))
     } catch (e) {
       setError((e as Error).message)
     }
   }
 
+  const name = profile.nickname ?? (isLoggedIn ? '下班了么用户' : '游客')
+
   return (
     <Screen>
       <div style={{ paddingBottom: TAB_BAR_SPACE }}>
-        <PageHeader title="我的" />
+        <PageHeader title="我的">
+          <Link href="/me/settings" aria-label="设置" className="grid size-11 place-items-center rounded-full text-window/80">
+            <svg viewBox="0 0 24 24" className="size-6" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" />
+              <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z" />
+            </svg>
+          </Link>
+        </PageHeader>
 
-        <section className="mt-5 rounded-3xl border border-lamp/25 bg-dusk-soft/35 p-5" aria-label="账号和登录状态">
-          <div className="flex items-center gap-4"><Link href="/me/account" aria-label="编辑头像" className="flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-full bg-lamp/15 text-2xl text-lamp">
-            {profile.avatarUrl ? <img src={profile.avatarUrl} alt="我的头像" className="size-full object-cover" /> : (isLoggedIn ? '☀' : '🐾')}
-          </Link><div className="min-w-0"><h2 className="truncate text-xl font-bold">{profile.nickname ?? (profile.userId ? `${isLoggedIn ? '用户' : '游客'} #${profile.userId}` : '游客')}</h2>
-            <p className="mt-1 text-sm text-lamp">{isLoggedIn ? '已登录 · 邮箱账号' : '未登录 · 游客模式'}</p><p className="mt-1 text-xs text-window/50">{profile.userId ? `用户 ID：${profile.userId}` : '浏览状态 · 尚未创建账号'}</p></div></div>
-          {isLoggedIn ? <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-sm"><span className="text-window/60">{profile.email}</span><button disabled={loggingOut} className="text-window/70 underline" onClick={async () => {
-            setLoggingOut(true); setError(null)
-            try { await logout('/me') } catch (e) { setError((e as Error).message); setLoggingOut(false) }
-          }}>{loggingOut ? '正在退出…' : '退出登录'}</button></div> : <div className="mt-4"><p className="mb-3 text-xs leading-relaxed text-window/60">登录后，换设备也能找回你的打卡、游戏和下班记录。</p>
-            <Link href="/login" className="block w-full rounded-full bg-lamp px-5 py-3 text-center font-bold text-ink">登录 / 注册</Link></div>}
-          <Link href="/me/account" className="mt-4 block text-center text-sm text-lamp underline">编辑昵称和头像</Link>
+        <section aria-label="账号" className="mt-2 rounded-3xl bg-dusk-soft/35 p-4">
+          <Link href="/me/account" className="flex items-center gap-4 rounded-2xl transition active:opacity-70">
+            <span className="flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-full bg-lamp/15 text-2xl text-lamp">
+              {profile.avatarUrl
+                ? <img src={profile.avatarUrl} alt="" className="size-full object-cover" />
+                : <Cat spec={{ eyes: 'open', mouth: 'cat', blush: true }} label="默认头像" size={56} className="mt-3" />}
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-xl font-bold text-window">{name}</span>
+              <span className="mt-0.5 block truncate text-sm text-window/55">{isLoggedIn ? profile.email : '未登录'}</span>
+            </span>
+            <svg viewBox="0 0 24 24" className="size-5 shrink-0 text-window/40" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 5l7 7-7 7" /></svg>
+          </Link>
+          {!isLoggedIn && (
+            <Link href="/login" className="mt-4 block w-full rounded-full bg-lamp px-5 py-3 text-center font-bold text-ink transition active:scale-[.98]">登录 / 注册</Link>
+          )}
         </section>
 
-        {!isLoggedIn && <GuestNotice className="mt-4" />}
+        <MeStats companionName={profile.companionName} active={active} />
 
-        <Section title="统计">
-          <MeStats companionName={profile.companionName} />
-        </Section>
+        <ListGroup>
+          <LinkRow href="/me/profile" label="小伴档案" detail={`${profile.companionName}，${personalityName[profile.personality]}`} />
+          <LinkRow href="/me/habits" label="下班习惯" detail={weekHabits > 0 ? `本周 ${weekHabits} 次` : undefined} />
+          <LinkRow href="/me/guardian" label="平安守护" detail={guardian} />
+        </ListGroup>
 
-        <Section title="下班后的习惯">
-          <AfterworkSummary timeZone={profile.timezone} />
-        </Section>
-
-        <Section title="小伴档案">
-          <RowLink href="/me/profile" label={`${profile.companionName}，${personalityName[profile.personality]}`} detail="修改" />
-          <p className="mt-1 text-sm text-window/60">
-            {profile.workStart}–{profile.workEnd}{profile.cityName ? `，${profile.cityName}` : ''}{profile.payday ? `，每月 ${profile.payday} 号发薪` : ''}
-          </p>
-        </Section>
-
-        <Section title="账号">
-          {profile.email ? (
-            <p className="text-window">
-              已绑定邮箱 {profile.email}
-            </p>
-          ) : (
-            <RowLink href="/login" label="邮箱登录 / 注册" detail="保存或找回账号" />
-          )}
-        </Section>
-
-        <Section title="平安守护">
-          <RowLink href="/me/guardian" label="没打卡时通知联系人" />
-        </Section>
-
-        <Section title="提醒邮件">
-          <label className="flex items-center justify-between gap-4 text-window">
-            <span>
-              好几天没来的时候，发邮件叫我回来
-              <span className="mt-0.5 block text-xs text-window/50">每次最多两封，邮件里随时可以退订</span>
-            </span>
-            <input type="checkbox" role="switch" className="size-5 shrink-0 accent-[var(--color-lamp)]"
-              checked={profile.recallOptIn} disabled={!profile.email} onChange={toggleRecall} aria-label="回归提醒邮件" />
-          </label>
-          {!profile.email && <p className="mt-2 text-xs text-window/50">绑定邮箱后才能打开。</p>}
-          <FieldError message={error} />
-        </Section>
-
-        {isLoggedIn && <Section title="数据管理"><AccountActions /></Section>}
+        <ListGroup>
+          <SwitchRow
+            label="回归提醒邮件"
+            hint={profile.email ? '好几天没来时，发邮件叫你回来' : '绑定邮箱后可用'}
+            checked={profile.recallOptIn}
+            disabled={!profile.email}
+            onChange={(next) => void toggleRecall(next)}
+          />
+        </ListGroup>
+        <div className="mt-3"><FieldError message={error} /></div>
       </div>
     </Screen>
   )

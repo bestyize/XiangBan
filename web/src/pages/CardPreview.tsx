@@ -1,10 +1,13 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useLocation } from 'wouter'
-import { api } from '../api/client.ts'
+import { api, getToken } from '../api/client.ts'
 import type { Checkin, TodayResponse } from '../api/types.ts'
+import { browserTimezone } from '../lib/device.ts'
+import { loadGuestCheckin } from '../lib/guestCheckin.ts'
 import { renderCard } from '../card/renderCard.ts'
 import { cardStyles } from '../card/styles.ts'
-import { FieldError, PrimaryButton, QuietButton, Screen } from '../components/ui.tsx'
+import { SubPage } from '../components/SubPage.tsx'
+import { FieldError, PrimaryButton } from '../components/ui.tsx'
 import { blobToBase64, inApp, send } from '../lib/bridge.ts'
 import { isWeChat, publicUrl } from '../lib/env.ts'
 import { track } from '../lib/track.ts'
@@ -28,8 +31,14 @@ export default function CardPreview() {
   const canShowCity = Boolean(profile.cityName) && profile.cityCode !== 'other'
 
   useEffect(() => {
-    api<TodayResponse>('/api/checkin/today')
-      .then((t) => (t.checkin ? setCheckin(t.checkin) : navigate('/', { replace: true })))
+    const tz = browserTimezone() ?? 'Asia/Shanghai'
+    api<TodayResponse>(`/api/checkin/today?timezone=${encodeURIComponent(tz)}`)
+      .then((t) => {
+        // Guests have no server-side check-in; theirs lives in this browser.
+        const today = t.checkin ?? (getToken() ? null : loadGuestCheckin(t.workDay))
+        if (today) setCheckin(today)
+        else navigate('/', { replace: true })
+      })
       .catch((e: Error) => setError(e.message))
   }, [navigate])
 
@@ -37,7 +46,7 @@ export default function CardPreview() {
     if (!checkin || styles.length === 0) return
     let cancelled = false
     const style = styles.find((s) => s.id === styleId) ?? styles[0]
-    const link = `${publicUrl()}/?from=card&inv=${profile.inviteCode}`
+    const link = `${publicUrl()}/?from=card${profile.inviteCode ? `&inv=${profile.inviteCode}` : ''}`
     renderCard({ checkin, profile, style, showCity: showCity && canShowCity, link })
       .then((blob) => {
         if (cancelled) return
@@ -57,6 +66,9 @@ export default function CardPreview() {
     }
   }, [image])
 
+  // Guests have no invite code yet; the link then just brings friends to the site.
+  const shareLink = `${publicUrl()}/?from=card${profile.inviteCode ? `&inv=${profile.inviteCode}` : ''}`
+
   function toggleCity() {
     const next = !showCity
     setShowCity(next)
@@ -75,18 +87,13 @@ export default function CardPreview() {
       send('save_image', { base64, mime: 'image/png' })
       track('card_save', { via: 'app' })
     } else {
-      send('share', { base64, mime: 'image/png', text: '你下班了么？', url: `${publicUrl()}/?from=card&inv=${profile.inviteCode}` })
+      send('share', { base64, mime: 'image/png', text: '你下班了么？', url: shareLink })
       track('card_share', { via: 'app' })
     }
   }
 
   return (
-    <Screen>
-      <header className="flex h-10 items-center justify-between">
-        <QuietButton className="px-0!" onClick={() => navigate('/')}>返回</QuietButton>
-        <h1 className="text-base font-bold text-window">今日下班卡</h1>
-        <span className="w-10" />
-      </header>
+    <SubPage title="今日下班卡" back="/">
 
       <div className="mt-3 flex justify-center">
         {image ? (
@@ -133,6 +140,6 @@ export default function CardPreview() {
           </a>
         </div>
       )}
-    </Screen>
+    </SubPage>
   )
 }
