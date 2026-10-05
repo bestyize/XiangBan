@@ -9,7 +9,7 @@ const series = (totals: number[]): MetricSeries => ({
 })
 
 const empty: MetricsResponse = {
-  days: [], dayNote: '', visits: [], growth: [], product: [], games: [], quizzes: [],
+  days: [], dayNote: '', isLatest: true, visits: [], growth: [], product: [], games: [], quizzes: [],
 }
 
 describe('metrics helpers', () => {
