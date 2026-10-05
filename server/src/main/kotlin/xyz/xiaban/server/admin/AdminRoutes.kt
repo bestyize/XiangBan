@@ -7,6 +7,7 @@ import io.ktor.server.plugins.origin
 import io.ktor.server.request.receive
 import io.ktor.server.request.httpMethod
 import io.ktor.server.response.respond
+import io.ktor.server.response.header
 import io.ktor.server.routing.*
 import kotlinx.serialization.Serializable
 import xyz.xiaban.server.Services
@@ -15,6 +16,7 @@ import xyz.xiaban.server.http.badRequest
 import xyz.xiaban.server.http.tooMany
 import xyz.xiaban.server.mail.Mail
 import xyz.xiaban.shared.FlagsUpdate
+import xyz.xiaban.shared.DisplaySettings
 import xyz.xiaban.shared.OkResponse
 import kotlinx.coroutines.future.await
 import java.security.MessageDigest
@@ -46,6 +48,15 @@ fun Route.adminRoutes(services: Services) {
         }
         get("/session") { call.respond(AdminSession(call.requireAdmin(services))) }
         get("/overview") { call.requireAdmin(services); call.respond(services.adminUsers.overview()) }
+        get("/display") {
+            call.requireAdmin(services)
+            call.response.header(io.ktor.http.HttpHeaders.CacheControl, "no-store")
+            call.respond(services.displaySettings.current())
+        }
+        put("/display") {
+            val actor = call.requireAdmin(services)
+            call.respond(services.displaySettings.save(call.receive<DisplaySettings>(), actor))
+        }
         get("/metrics") {
             call.requireAdmin(services)
             val days = call.request.queryParameters["days"]?.toIntOrNull() ?: 7

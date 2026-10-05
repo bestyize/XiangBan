@@ -1,4 +1,5 @@
 import { Link, useLocation } from 'wouter'
+import { useDisplaySettings } from '../lib/displaySettings.tsx'
 
 const TABS = [
   { href: '/', label: '首页', icon: 'M3 10.5 12 3l9 7.5M5 9v11h5v-6h4v6h5V9' },
@@ -10,8 +11,10 @@ const TABS = [
 
 export function TabBar() {
   const [location] = useLocation()
+  const { settings, loading } = useDisplaySettings()
+  if (loading) return null
   return <nav aria-label="主导航" className="app-tab-bar">
-    {TABS.map((tab) => {
+    {TABS.filter(tab => tab.href !== '/chat' || settings.chatTabVisible).map((tab) => {
       const active = tab.href === '/'
         ? location === '/'
         : location === tab.href || location.startsWith(`${tab.href}/`)

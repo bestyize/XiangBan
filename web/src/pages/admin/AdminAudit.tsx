@@ -3,7 +3,7 @@ import { adminRequest } from './api.ts'
 import type { AuditPage } from './types.ts'
 import { Alerts, Badge, formatTime, Pagination, TextButton } from './ui.tsx'
 
-const actionNames: Record<string, string> = { user_note: '用户备注', user_edit: '编辑用户', user_delete: '删除用户', email_settings: '邮件配置', admin_password: '管理员密码' }
+const actionNames: Record<string, string> = { user_note: '用户备注', user_edit: '编辑用户', user_delete: '删除用户', email_settings: '邮件配置', admin_password: '管理员密码', display_settings: '展示配置' }
 export default function AdminAudit() {
   const [data, setData] = useState<AuditPage | null>(null)
   const [page, setPage] = useState(1)

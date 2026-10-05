@@ -86,6 +86,7 @@ class Services(
         initialEnabled = { FeatureFlags.legacyLlmEnabled(redis, config.llm.enabledByDefault) },
     )
     val flags = FeatureFlags(redis, config.llm.enabledByDefault, config.goHomeEnabled, config.appDownloadUrl, llmSettings)
+    val displaySettings = xyz.xiaban.server.admin.DisplaySettingsStore(db)
 
     val profiles = ProfileService(users, cities)
     val avatars = xyz.xiaban.server.users.AvatarService(db)

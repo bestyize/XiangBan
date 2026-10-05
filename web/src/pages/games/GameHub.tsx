@@ -8,6 +8,8 @@ import { useProfile } from '../../lib/session.tsx'
 import { PageHeader } from '../../components/PageHeader.tsx'
 import { AccountBadge } from '../../components/AccountBadge.tsx'
 import { storage } from '../../lib/storage.ts'
+import { useDisplaySettings } from '../../lib/displaySettings.tsx'
+import { visibleDisplayItems } from '../../lib/display.ts'
 
 export default function GameHub({ active = true }: { active?: boolean }) {
   const [games, setGames] = useState<GamePackManifest[] | null>(null)
@@ -15,6 +17,8 @@ export default function GameHub({ active = true }: { active?: boolean }) {
   const [summaries, setSummaries] = useState<{ gameId: string; sessions: number; bestScore: number; bestTile: number }[]>([])
   const [recordError, setRecordError] = useState<string | null>(null)
   const profile = useProfile()
+  const { settings, loading: displayLoading } = useDisplaySettings()
+  const visibleGames = games ? visibleDisplayItems(games, settings.games) : null
   async function refreshRecords() {
     if (!getToken()) {
       try {
@@ -49,17 +53,17 @@ export default function GameHub({ active = true }: { active?: boolean }) {
         <PageHeader title="玩一局"><AccountBadge compact /></PageHeader>
         <p className="mt-2 text-sm text-window/65">下班后，轻松玩一局。</p>
 
-        {games === null && !error && (
+        {(games === null || displayLoading) && !error && (
           <p className="mt-8 text-sm text-window/55">小伴正在摆好游戏…</p>
         )}
         {error && <p role="alert" className="mt-8 text-sm text-blush">{error}</p>}
 
-        {games && games.length === 0 && (
+        {!displayLoading && visibleGames && visibleGames.length === 0 && (
           <p className="mt-8 text-sm text-window/55">新游戏还在路上。</p>
         )}
 
         <div className="game-grid">
-          {games?.map((game) => {
+          {!displayLoading && visibleGames?.map((game) => {
             const record = summaries.find((item) => item.gameId === game.id)
             return (
               <Link key={game.id} href={'/games/' + game.id} className="game-card">

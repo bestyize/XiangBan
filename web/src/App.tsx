@@ -26,6 +26,7 @@ import { lazyPage } from './lib/lazyPage.ts'
 import AdminPage from './pages/AdminPage.tsx'
 import AccountProfile from './pages/me/AccountProfile.tsx'
 import { GAME_SHARE_PATH } from './games/resultShare.ts'
+import { DisplaySettingsProvider } from './lib/displaySettings.tsx'
 
 const Tests = lazyPage(() => import('./quizzes/Tests.tsx'))
 const GameShare = lazyPage(() => import('./pages/games/GameShare.tsx'))
@@ -157,10 +158,10 @@ export default function App() {
   // The phone-width desktop frame (index.css) is for the app only, not the admin console.
   useEffect(() => { document.documentElement.dataset.surface = admin ? 'admin' : 'app' }, [admin])
   if (admin) return <AdminPage />
-  return <SessionProvider enabled={sessionStarted || !publicTests}>
+  return <DisplaySettingsProvider><SessionProvider enabled={sessionStarted || !publicTests}>
     <LoginModalContext.Provider value={login}>
       <AppPages />
       <LoginModal open={loginOpen} onClose={() => setLoginOpen(false)} />
     </LoginModalContext.Provider>
-  </SessionProvider>
+  </SessionProvider></DisplaySettingsProvider>
 }

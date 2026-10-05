@@ -15,9 +15,13 @@ import { QuizRunner } from './QuizRunner.tsx'
 import { ReportShare } from './ReportShare.tsx'
 import type { QuizDefinition, QuizReport } from './types.ts'
 import './quizzes.css'
+import { useDisplaySettings } from '../lib/displaySettings.tsx'
+import { visibleDisplayItems } from '../lib/display.ts'
 
 export function QuizHub({ active = true }: { active?: boolean }) {
   const { isLoggedIn, profile } = useSession()
+  const { settings, loading: displayLoading } = useDisplaySettings()
+  const visibleQuizzes = visibleDisplayItems(quizCatalog, settings.quizzes)
   const [, refresh] = useState(0)
   useEffect(() => { if (active) refresh((value) => value + 1) }, [active])
   useEffect(() => {
@@ -39,7 +43,7 @@ export function QuizHub({ active = true }: { active?: boolean }) {
       }}>保存到当前账号</button>
     </div>}
     <div className="quiz-catalog" aria-label="趣味测试合集">
-      {quizCatalog.map((quiz) => {
+      {!displayLoading && visibleQuizzes.map((quiz) => {
         const attempt = loadAttempt(quiz)
         const count = attempt?.answers.filter((answer) => answer !== null).length ?? 0
         return <Link key={quiz.id} href={`/tests/${quiz.id}`} className={`quiz-catalog-card quiz-theme-${quiz.id}`}>
@@ -49,6 +53,8 @@ export function QuizHub({ active = true }: { active?: boolean }) {
         </Link>
       })}
     </div>
+    {displayLoading && <p className="py-6 text-sm text-window/60">小伴正在摆好测试…</p>}
+    {!displayLoading && visibleQuizzes.length === 0 && <p className="py-6 text-sm text-window/60">小测试正在准备中，过会儿再来看看。</p>}
     <footer className="quiz-hub-footer">结果是一面小镜子。定义你的人，始终是你。</footer>
   </main>
 }

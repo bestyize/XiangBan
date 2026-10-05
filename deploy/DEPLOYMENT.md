@@ -68,6 +68,14 @@ Administrator sessions expire after eight hours. Changing the administrator pass
 
 Without SMTP configuration, sending a verification code returns an explicit service-unavailable response rather than reporting a logged email as delivered. Codes expire after ten minutes, are scoped to their device account and operation, allow five wrong guesses, and can be consumed only once. Resends are limited per email, account, and IP address. Existing-email login merges guest records only when the user chooses to do so; binding a guest from the account page retains its original merge behavior.
 
+## Navigation and catalog presentation
+
+`/admin/display` controls the companion entry in the bottom navigation and the visibility/order of game and quiz cards. Up/down/top buttons edit a draft; `保存展示配置` commits the complete configuration. Restore-default also edits the draft and requires saving. Changes and their audit record are committed together.
+
+The backend persists these public settings in `site_display_settings`, created automatically by Flyway migration `V16`. Deploy both backend and frontend for this feature. `/api/display` is a public, non-cached read endpoint; `/api/admin/display` requires an administrator for both reads and writes. No existing game records or quiz attempts are changed. Hiding controls discovery in lists, while existing direct game/report/share links remain available.
+
+The original companion entry, five games and four quizzes are visible by default. New catalog entries append after existing configured entries. Developers adding games/quizzes should update `DisplayCatalog` along with the game/quiz registration. The user-facing app refreshes public settings on load and when returning to the page; cached last-known settings retain the original experience during temporary network failures.
+
 ## Model service switch
 
 The switch on `/admin/llm` is the authoritative switch for both companion chat and check-in AI rewrites. Once model settings are saved, their `enabled` value takes precedence over `LLM_ENABLED` and the old Redis `xb:flags / llm` value. Enabling a configured provider from the admin page therefore does not require a second environment or Redis switch.

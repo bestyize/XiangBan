@@ -19,6 +19,10 @@ import xyz.xiaban.server.users.AvatarService
 import xyz.xiaban.shared.OkResponse
 
 fun Route.featureRoutes(services: Services) {
+    get("/api/display") {
+        call.response.header(HttpHeaders.CacheControl, "no-store")
+        call.respond(services.displaySettings.current())
+    }
     get("/api/avatars/{key}") {
         val bytes = services.avatars.image(call.parameters["key"].orEmpty()) ?: notFound("没有找到头像")
         call.response.header(HttpHeaders.CacheControl, "private, max-age=300")
