@@ -142,14 +142,14 @@ function DataTable({ title, rows }: { title: string; rows: (MetricSeries | undef
           <thead>
             <tr className="bg-[#fafafa] text-xs text-[#999]">
               <th className="border-b border-[#f2f2f2] px-4 py-2.5 text-left font-normal">日期</th>
-              {rows.map((s) => <th key={s?.key} className="border-b border-[#f2f2f2] px-4 py-2.5 text-right font-normal">{s?.label}</th>)}
+              {rows.map((s, ri) => <th key={s?.key ?? ri} className="border-b border-[#f2f2f2] px-4 py-2.5 text-right font-normal">{s?.label}</th>)}
             </tr>
           </thead>
           <tbody className="tabular-nums text-[#353535]">
             {(rows[0]?.points ?? []).map((p, i) => (
               <tr key={p.day} className="transition-colors hover:bg-[#f7f8fa]">
                 <td className="border-b border-[#f2f2f2] px-4 py-2.5 text-[#7f7f7f]">{p.day.slice(5)}</td>
-                {rows.map((s) => <td key={s?.key} className="border-b border-[#f2f2f2] px-4 py-2.5 text-right">{s?.points[i]?.total ?? 0}</td>)}
+                {rows.map((s, ri) => <td key={s?.key ?? ri} className="border-b border-[#f2f2f2] px-4 py-2.5 text-right">{s?.points[i]?.total ?? 0}</td>)}
               </tr>
             ))}
           </tbody>
