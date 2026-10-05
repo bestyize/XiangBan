@@ -54,10 +54,10 @@ The host saves guest records in the current browser and signed-in records throug
 
 | ID | Game | Rules |
 | --- | --- | --- |
-| `falling-blocks` | 下班方块 | Falling blocks and row clearing |
+| `falling-blocks` | 俄罗斯方块 | Falling blocks and row clearing |
 | `merge-2048` | 2048 | Slide and merge matching numbers |
 | `block-puzzle` | 小伴消方块 | Place three pieces per batch on an 8×8 board and clear full rows/columns |
-| `water-sort` | 下班调饮料 | Pour matching colors into tubes, with undo and progressively harder levels |
+| `water-sort` | 调饮料大师 | Pour matching colors into tubes, with undo and progressively harder levels |
 
 ## Hosting packages separately
 

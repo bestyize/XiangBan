@@ -1,4 +1,4 @@
-# 下班调饮料
+# 调饮料大师
 
 `water-sort` is a self-contained, dependency-free classic-script game pack for the version 1 Xiaban host. Serve this directory as static files. All artwork, rules, and styling are local; the sandbox only needs `allow-scripts`, with no storage or external services.
 

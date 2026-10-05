@@ -16,5 +16,5 @@
   <g font-family="sans-serif" font-weight="700" font-size="24" fill="#203044" text-anchor="middle"><text x="207" y="193">A</text><text x="207" y="260">B</text><text x="319" y="241">A</text><text x="431" y="226">B</text></g>
   <path d="M253 78h37m-9-9 10 9-10 9" fill="none" stroke="#f2ce88" stroke-linecap="round" stroke-width="4"/>
   <g fill="#f2ce88"><path d="m482 69 3 10 10 3-10 3-3 10-3-10-10-3 10-3z"/><circle cx="157" cy="80" r="3"/></g>
-  <text x="320" y="360" text-anchor="middle" fill="#f5e0b5" font-size="23" font-family="'Microsoft YaHei',sans-serif" letter-spacing="3">下班调饮料</text>
+  <text x="320" y="360" text-anchor="middle" fill="#f5e0b5" font-size="23" font-family="'Microsoft YaHei',sans-serif" letter-spacing="3">调饮料大师</text>
 </svg>

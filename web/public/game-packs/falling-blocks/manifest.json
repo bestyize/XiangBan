@@ -1,7 +1,7 @@
 {
   "id": "falling-blocks",
   "version": "1.0.0",
-  "name": "下班方块",
+  "name": "俄罗斯方块",
   "description": "单人下落方块，移动和旋转，填满一行就能消除。",
   "entry": "index.html",
   "cover": "cover.svg",
