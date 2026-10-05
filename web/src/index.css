@@ -239,7 +239,12 @@
 @media (prefers-reduced-motion: reduce) {
   .app-subpage, .app-sheet[open], .app-sheet::backdrop { animation: none; }
   .app-switch, .app-switch::after, .app-row, .app-nav-back { transition: none; }
+  .login-modal-in { animation: none; }
 }
+
+/* 管理后台登录卡片：从稍小、略透明的状态浮现，呼应 App 弹窗的进场手感。 */
+.login-modal-in { animation: login-modal-in 320ms cubic-bezier(.2, .8, .2, 1) both; }
+@keyframes login-modal-in { from { opacity: 0; transform: translateY(10px) scale(.97); } to { opacity: 1; transform: none; } }
 
 .login-reminder {
   position: fixed; inset: auto 0 0; margin: 0 auto; width: min(100%, 480px);

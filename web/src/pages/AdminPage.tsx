@@ -56,18 +56,26 @@ export default function AdminPage() {
     return () => window.removeEventListener('keydown', close)
   }, [])
 
-  if (checking) return <main style={{ colorScheme: 'light' }} className="flex min-h-dvh items-center justify-center bg-slate-50 text-slate-500">正在打开管理后台…</main>
-  if (!username) return <main style={{ colorScheme: 'light' }} className="flex min-h-dvh items-center justify-center bg-slate-50 px-5 py-12 text-slate-800">
-    <div className="w-full max-w-sm"><p className="text-center text-xs font-semibold tracking-widest text-slate-400">下班了么 · 管理控制台</p>
-      <h1 className="mt-4 mb-8 text-center text-2xl font-semibold">管理员登录</h1><Alerts error={error} message={message} />
-      <form className="space-y-5 rounded-xl border border-slate-200 bg-white p-6 shadow-sm" onSubmit={(e) => { e.preventDefault(); void action('login', async () => {
-        const session = await adminRequest<{ username: string }>('/login', 'POST', { username: loginName, password })
-        setPassword(''); setUsername(session.username)
-      }) }}>
-        <Field title="管理员账号"><input className={input} autoComplete="username" required maxLength={40} value={loginName} onChange={(e) => setLoginName(e.target.value)} /></Field>
-        <Field title="密码"><input className={input} type="password" autoComplete="current-password" required maxLength={256} value={password} onChange={(e) => setPassword(e.target.value)} /></Field>
-        <Button className="w-full" type="submit" disabled={!!busy}>{busy ? '正在登录…' : '登录管理后台'}</Button>
-      </form><Link href="/" className="mt-6 block text-center text-sm text-slate-500 underline">返回网站</Link>
+  if (checking) return <main style={{ colorScheme: 'light' }} className="flex min-h-dvh items-center justify-center bg-[#0f1726] text-slate-400">正在打开管理后台…</main>
+  if (!username) return <main style={{ colorScheme: 'light' }} className="relative flex min-h-dvh items-center justify-center overflow-hidden bg-[#0f1726] px-5 py-12 text-slate-800">
+    <div aria-hidden="true" className="pointer-events-none absolute -top-32 left-1/2 size-96 -translate-x-1/2 rounded-full bg-[#edbd76] opacity-15 blur-3xl" />
+    <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/40 to-transparent" />
+    <div className="login-modal-in relative w-full max-w-sm">
+      <div className="mb-7 text-center"><span className="inline-flex size-12 items-center justify-center rounded-2xl bg-amber-200 text-xl font-bold text-slate-900 shadow-lg shadow-black/20">伴</span>
+        <p className="mt-4 text-xs font-semibold tracking-widest text-white/50">下班了么 · 管理控制台</p></div>
+      <div className="rounded-[22px] bg-white p-7 shadow-[0_24px_60px_-12px_rgba(0,0,0,0.5)] sm:p-8">
+        <h1 className="mb-6 text-center text-xl font-semibold text-slate-900">管理员登录</h1>
+        <Alerts error={error} message={message} />
+        <form className="space-y-5" onSubmit={(e) => { e.preventDefault(); void action('login', async () => {
+          const session = await adminRequest<{ username: string }>('/login', 'POST', { username: loginName, password })
+          setPassword(''); setUsername(session.username)
+        }) }}>
+          <Field title="管理员账号"><input className={input} autoComplete="username" required maxLength={40} value={loginName} onChange={(e) => setLoginName(e.target.value)} /></Field>
+          <Field title="密码"><input className={input} type="password" autoComplete="current-password" required maxLength={256} value={password} onChange={(e) => setPassword(e.target.value)} /></Field>
+          <Button className="w-full" type="submit" disabled={!!busy}>{busy ? '正在登录…' : '登录管理后台'}</Button>
+        </form>
+      </div>
+      <Link href="/" className="mt-6 block text-center text-sm text-white/50 hover:text-white/80">返回网站</Link>
     </div>
   </main>
 
