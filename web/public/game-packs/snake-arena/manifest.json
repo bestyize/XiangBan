@@ -1,6 +1,6 @@
 {
   "id": "snake-arena",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "name": "小伴贪吃蛇",
   "description": "横屏吃点心，和 AI 蛇抢食、围堵。三分钟，长成快乐的小巨蛇。",
   "entry": "index.html",

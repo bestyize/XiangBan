@@ -2,7 +2,9 @@
   'use strict'
 
   const rules = globalThis.XiabanSnakeArena
+  const viewport = globalThis.XiabanSnakeViewport
   const $ = (id) => document.getElementById(id)
+  const gameNode = $('game')
   const canvas = $('arena'), ctx = canvas.getContext('2d', { alpha: false })
   const map = $('map'), mapCtx = map.getContext('2d')
   const nonce = new URLSearchParams(location.search).get('hostNonce')
@@ -17,6 +19,8 @@
   let joystickPointer = null, boostPointer = null, joystickBase = null
   let direction = null, boost = false, keyboardBoost = false, peakMass = 60
   let needsDraw = true
+  let view = null, preferredRotation = 1
+  const hostSafeArea = { top: 0, right: 0, bottom: 0, left: 0 }
   const keys = new Set(), particles = [], floats = []
 
   function postToHost(type, payload = {}) {
@@ -37,8 +41,9 @@
     if (data.safeArea && typeof data.safeArea === 'object') {
       for (const side of ['top', 'right', 'bottom', 'left']) {
         const value = data.safeArea[side]
-        if (Number.isFinite(value) && value >= 0 && value <= 160) document.documentElement.style.setProperty('--safe-' + side, 'max(env(safe-area-inset-' + side + ', 0px), ' + value + 'px)')
+        if (Number.isFinite(value) && value >= 0 && value <= 160) hostSafeArea[side] = value
       }
+      applySafeArea()
     }
     if (data.type === 'host.layout') return
     if (hostReady) { postToHost('game.ready'); return }
@@ -88,8 +93,7 @@
     const root = document.documentElement
     const request = root.requestFullscreen || root.webkitRequestFullscreen
     if (!request || document.fullscreenEnabled === false) {
-      if (feedback) toast('横持手机也能玩；这个浏览器暂不支持游戏全屏。', 3400)
-      $('rotateNote').textContent = '当前浏览器请手动横持，记得关闭竖屏锁定。'
+      if (feedback) toast('当前浏览器暂不支持全屏，画面已自动适配横玩。', 3400)
       return
     }
     try {
@@ -104,7 +108,6 @@
 
   const fullscreenAvailable = Boolean(document.documentElement.requestFullscreen || document.documentElement.webkitRequestFullscreen) && document.fullscreenEnabled !== false
   $('fullscreenButton').hidden = !fullscreenAvailable
-  $('rotateFullscreen').hidden = !fullscreenAvailable
 
   function fullscreenChange() {
     const active = Boolean(document.fullscreenElement || document.webkitFullscreenElement)
@@ -128,11 +131,6 @@
     $('boostButton').setAttribute('aria-pressed', 'false')
   }
 
-  function focusIn(node) {
-    const button = [...node.querySelectorAll('button')].find((entry) => entry.getBoundingClientRect().width > 0)
-    button?.focus({ preventScroll: true })
-  }
-
   function pause(message = '喝口水，再回来继续长大。') {
     if (phase !== 'playing') return
     phase = 'paused'
@@ -144,26 +142,38 @@
     $('toast').hidden = true
     accumulator = 0
     syncRound()
-    if ($('rotateOverlay').hidden) $('resumeButton').focus({ preventScroll: true })
+    $('resumeButton').focus({ preventScroll: true })
+  }
+
+  function applySafeArea() {
+    if (!view) return
+    const style = getComputedStyle(document.documentElement)
+    const physical = {}
+    for (const side of ['top', 'right', 'bottom', 'left']) {
+      const local = Math.max(0, Math.min(160, parseFloat(style.getPropertyValue('--viewport-safe-' + side)) || 0))
+      physical[side] = Math.max(local, hostSafeArea[side])
+    }
+    const logical = viewport.safeArea(view, physical)
+    for (const side of ['top', 'right', 'bottom', 'left']) gameNode.style.setProperty('--safe-' + side, logical[side] + 'px')
   }
 
   function resize() {
     needsDraw = true
-    width = window.innerWidth; height = window.innerHeight
+    const previous = view
+    view = viewport.layout(window.innerWidth, window.innerHeight, preferredRotation)
+    width = view.width; height = view.height
+    gameNode.style.width = width + 'px'; gameNode.style.height = height + 'px'
+    gameNode.style.transform = viewport.transform(view)
+    gameNode.dataset.rotation = String(view.rotation)
+    for (const id of ['flipButton', 'welcomeFlip']) $(id).hidden = view.rotation === 0
+    applySafeArea()
     // Cap backing pixels on high density phones; small sprites stay sharp without a 3x fill cost.
     dpr = Math.min(2, window.devicePixelRatio || 1)
     canvas.width = Math.round(width * dpr); canvas.height = Math.round(height * dpr)
-    const portrait = width / height < 1.2
-    const wasPortrait = !$('rotateOverlay').hidden
-    $('rotateOverlay').hidden = !portrait
-    if (portrait) {
-      pause('手机横过来后，点继续即可接着玩。')
-      if (!wasPortrait) focusIn($('rotateOverlay'))
-    } else if (wasPortrait) {
+    if (previous && (previous.physicalWidth !== view.physicalWidth || previous.physicalHeight !== view.physicalHeight || previous.rotation !== view.rotation)) {
       resetInput()
-      if (phase === 'paused') $('resumeButton').focus({ preventScroll: true })
-      else if (phase === 'welcome') $('startButton').focus({ preventScroll: true })
-      else if (phase === 'result') $('restartButton').focus({ preventScroll: true })
+      // Native fullscreen may change orientation during the countdown; let the first start continue.
+      if (previous.rotation !== view.rotation && state.time > 0) pause('画面方向已调整，准备好后继续这一局。')
     }
   }
   window.addEventListener('resize', resize)
@@ -223,16 +233,21 @@
   $('startButton').addEventListener('click', startRound)
   $('restartButton').addEventListener('click', startRound)
   $('resumeButton').addEventListener('click', () => {
-    if (width / height < 1.2 || document.hidden) return
+    if (document.hidden) return
     unlockAudio(); resetInput(); phase = 'playing'; accumulator = 0
     $('pauseOverlay').hidden = true; $('controls').hidden = false
     $('resumeButton').blur()
     if (countdown > 0) toast(String(Math.ceil(countdown / 0.8)), 800)
     else toast('继续长大吧', 1200)
   })
-  for (const id of ['exitButton', 'welcomeExit', 'pauseExit', 'resultExit', 'rotateExit']) $(id).addEventListener('click', () => { void exitGame() })
+  for (const id of ['exitButton', 'welcomeExit', 'pauseExit', 'resultExit']) $(id).addEventListener('click', () => { void exitGame() })
   $('pauseButton').addEventListener('click', () => pause())
-  $('rotateFullscreen').addEventListener('click', () => { void requestImmersive() })
+  for (const id of ['flipButton', 'welcomeFlip']) $(id).addEventListener('click', () => {
+    if (!view.rotation) return
+    pause('画面已换到另一边，准备好后继续。')
+    preferredRotation *= -1
+    resize()
+  })
   $('fullscreenButton').addEventListener('click', () => {
     if (document.fullscreenElement || document.webkitFullscreenElement) {
       const exit = document.exitFullscreen || document.webkitExitFullscreen
@@ -250,13 +265,14 @@
 
   function joystickDown(event, node) {
     if (phase !== 'playing' || joystickPointer !== null || event.button !== 0) return
-    if (node === canvas && (event.pointerType === 'mouse' || event.clientX > width * 0.65)) return
+    const point = viewport.point(view, event.clientX, event.clientY)
+    if (node === canvas && (event.pointerType === 'mouse' || point.x > width * 0.65)) return
     event.preventDefault()
     joystickPointer = { id: event.pointerId, node }
     node.setPointerCapture(event.pointerId)
     const stickSize = $('joystick').offsetWidth
     const rect = $('joystick').getBoundingClientRect()
-    joystickBase = node === canvas ? { x: event.clientX, y: event.clientY } : { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 }
+    joystickBase = node === canvas ? point : viewport.point(view, rect.left + rect.width / 2, rect.top + rect.height / 2)
     if (node === canvas) {
       $('joystick').style.left = (joystickBase.x - stickSize / 2) + 'px'
       $('joystick').style.top = (joystickBase.y - stickSize / 2) + 'px'
@@ -269,7 +285,8 @@
   function joystickMove(event) {
     if (joystickPointer?.id !== event.pointerId || !joystickBase) return
     event.preventDefault()
-    const dx = event.clientX - joystickBase.x, dy = event.clientY - joystickBase.y
+    const point = viewport.point(view, event.clientX, event.clientY)
+    const dx = point.x - joystickBase.x, dy = point.y - joystickBase.y
     const distance = Math.hypot(dx, dy), limit = $('joystick').offsetWidth * 0.29
     const factor = distance > limit ? limit / distance : 1
     $('stick').style.transform = 'translate(' + dx * factor + 'px,' + dy * factor + 'px)'
@@ -293,7 +310,8 @@
     const player = state.snakes[0]
     const x = width / 2 + (player.x - camera.x) * camera.zoom
     const y = height / 2 + (player.y - camera.y) * camera.zoom
-    if (Math.hypot(event.clientX - x, event.clientY - y) > 16) direction = Math.atan2(event.clientY - y, event.clientX - x)
+    const point = viewport.point(view, event.clientX, event.clientY)
+    if (Math.hypot(point.x - x, point.y - y) > 16) direction = Math.atan2(point.y - y, point.x - x)
   })
 
   $('boostButton').addEventListener('pointerdown', (event) => {
@@ -313,7 +331,7 @@
   document.addEventListener('keydown', (event) => {
     if (event.ctrlKey || event.altKey || event.metaKey) return
     if (event.key === 'Tab') {
-      const dialog = !$('rotateOverlay').hidden ? $('rotateOverlay') : phase === 'paused' ? $('pauseOverlay') : phase === 'result' ? $('resultOverlay') : phase === 'welcome' ? $('welcome') : null
+      const dialog = phase === 'paused' ? $('pauseOverlay') : phase === 'result' ? $('resultOverlay') : phase === 'welcome' ? $('welcome') : null
       if (dialog) {
         const buttons = [...dialog.querySelectorAll('button')].filter((button) => !button.disabled && button.getBoundingClientRect().width > 0)
         const index = buttons.indexOf(document.activeElement)

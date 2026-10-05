@@ -20,7 +20,7 @@ function runtime({ portrait = false, fullscreen = false } = {}) {
     classes = new Set<string>()
     children: Node[] = []
     cssProperties = new Map<string, any>()
-    style = { left: '', top: '', bottom: '', transform: '', opacity: '', background: '', setProperty: (key: string, value: any) => { this.cssProperties.set(key, value) } }
+    style = { left: '', top: '', bottom: '', width: '', height: '', transform: '', opacity: '', background: '', setProperty: (key: string, value: any) => { this.cssProperties.set(key, value) } }
     classList = { add: (value: string) => this.classes.add(value), remove: (value: string) => this.classes.delete(value), toggle: (value: string, active: boolean) => active ? this.classes.add(value) : this.classes.delete(value) }
     id: string
     constructor(id = '') { this.id = id }
@@ -32,7 +32,13 @@ function runtime({ portrait = false, fullscreen = false } = {}) {
     setPointerCapture(id: number) { this.captures.add(id) }
     hasPointerCapture(id: number) { return this.captures.has(id) }
     releasePointerCapture(id: number) { this.captures.delete(id) }
-    getBoundingClientRect() { return { x: 30, y: 260, top: 260, left: 30, width: this.hidden ? 0 : 96, height: 96 } }
+    getBoundingClientRect() {
+      const rotation = Number(nodes.get('game')?.dataset.rotation || 0)
+      let left = 30, top = 260
+      if (this.id === 'joystick' && rotation === 1) { left = win.innerWidth - 260 - 96; top = 30 }
+      if (this.id === 'joystick' && rotation === -1) { left = 260; top = win.innerHeight - 30 - 96 }
+      return { x: left, y: top, top, left, width: this.hidden ? 0 : 96, height: 96 }
+    }
     append(...children: Node[]) { this.children.push(...children) }
     replaceChildren(...children: Node[]) { this.children = children }
     querySelectorAll() { return [nodes.get('resumeButton')!, nodes.get('restartButton')!] }
@@ -67,10 +73,12 @@ function runtime({ portrait = false, fullscreen = false } = {}) {
     window: win, document: doc, location: win.location, screen: { orientation: { unlock() {} } },
     URLSearchParams, HTMLButtonElement: Node,
     matchMedia: (query: string) => ({ matches: query === '(pointer: coarse)' }),
+    getComputedStyle: (element: Node) => ({ getPropertyValue: (name: string) => element.cssProperties.get(name) || '0px' }),
     requestAnimationFrame: (callback: (time: number) => void) => { frame = callback },
     setTimeout: () => 1, clearTimeout() {}, performance: { now: () => now },
   }
   runInNewContext(readFileSync(new URL('../../public/game-packs/snake-arena/rules.js', import.meta.url), 'utf8'), context)
+  runInNewContext(readFileSync(new URL('../../public/game-packs/snake-arena/viewport.js', import.meta.url), 'utf8'), context)
   let model: any
   const original = context.XiabanSnakeArena.createGame
   context.XiabanSnakeArena.createGame = (options: any) => { model = original({ seed: 42, ...options }); return model }
@@ -87,10 +95,10 @@ describe('snake arena mobile controller and host protocol', () => {
   it('applies verified host safe areas and updates them after rotation without starting a round', () => {
     const game = runtime()
     game.init({ safeArea: { top: 0, right: 47, bottom: 21, left: 47 } })
-    expect(game.doc.documentElement.cssProperties.get('--safe-right')).toBe('max(env(safe-area-inset-right, 0px), 47px)')
+    expect(game.node('game').cssProperties.get('--safe-right')).toBe('47px')
     game.init({ type: 'host.layout', safeArea: { right: 0, left: 0, bottom: 34, top: -10 } })
-    expect(game.doc.documentElement.cssProperties.get('--safe-bottom')).toBe('max(env(safe-area-inset-bottom, 0px), 34px)')
-    expect(game.doc.documentElement.cssProperties.get('--safe-top')).toBe('max(env(safe-area-inset-top, 0px), 0px)')
+    expect(game.node('game').cssProperties.get('--safe-bottom')).toBe('34px')
+    expect(game.node('game').cssProperties.get('--safe-top')).toBe('0px')
     expect(game.messages.filter((message) => message.type === 'game.start')).toHaveLength(0)
   })
   it('acknowledges readiness without creating a phantom welcome-screen round', () => {
@@ -139,12 +147,12 @@ describe('snake arena mobile controller and host protocol', () => {
     game.start()
     game.win.innerWidth = 390; game.win.innerHeight = 844; game.win.fire('resize')
     const time = game.state().time
-    expect(game.node('rotateOverlay').hidden).toBe(false)
+    expect(game.node('game').dataset.rotation).toBe('1')
     expect(game.node('pauseOverlay').hidden).toBe(false)
     game.advance(120)
     expect(game.state().time).toBe(time)
     game.win.innerWidth = 844; game.win.innerHeight = 390; game.win.fire('resize')
-    expect(game.node('rotateOverlay').hidden).toBe(true)
+    expect(game.node('game').dataset.rotation).toBe('0')
     game.advance(30)
     expect(game.state().time).toBe(time)
     game.node('resumeButton').fire('click'); game.advance(30)
@@ -166,15 +174,91 @@ describe('snake arena mobile controller and host protocol', () => {
     expect(game.state().snakes[0].boosting).toBe(false)
   })
 
-  it('keeps manual landscape play available when the fullscreen API is unavailable', () => {
+  it('plays immediately in a portrait browser when fullscreen and orientation locking are unavailable', () => {
     const game = runtime({ portrait: true })
-    expect(game.node('rotateOverlay').hidden).toBe(false)
-    expect(game.node('rotateFullscreen').hidden).toBe(true)
-    game.win.innerWidth = 844; game.win.innerHeight = 390; game.win.fire('resize')
+    expect(game.node('game').dataset.rotation).toBe('1')
+    expect(game.node('game').style.width).toBe('844px')
+    expect(game.node('game').style.height).toBe('390px')
+    expect(game.node('fullscreenButton').hidden).toBe(true)
     game.start()
-    expect(game.node('rotateOverlay').hidden).toBe(true)
     expect(game.state().time).toBeGreaterThan(0)
+    expect(game.node('pauseOverlay').hidden).toBe(true)
     expect(game.node('arena').width).toBe(844 * 2)
+  })
+
+  it.each([
+    { rotation: 1, startX: 120, startY: 180, endX: 180, endY: 180, boostX: 85, boostY: 775 },
+    { rotation: -1, startX: 270, startY: 664, endX: 210, endY: 664, boostX: 305, boostY: 69 },
+  ])('maps two-finger steering and boost correctly in rotation $rotation', (gesture) => {
+    const game = runtime({ portrait: true })
+    if (gesture.rotation === -1) game.node('welcomeFlip').fire('click')
+    game.start()
+    const player = game.state().snakes[0], angle = player.angle
+    expect(game.node('game').dataset.rotation).toBe(String(gesture.rotation))
+    game.node('arena').fire('pointerdown', { pointerId: 1, pointerType: 'touch', clientX: gesture.startX, clientY: gesture.startY })
+    game.node('arena').fire('pointermove', { pointerId: 1, pointerType: 'touch', clientX: gesture.endX, clientY: gesture.endY })
+    game.node('boostButton').fire('pointerdown', { pointerId: 2, pointerType: 'touch', clientX: gesture.boostX, clientY: gesture.boostY })
+    game.advance(15)
+    expect(player.angle).toBeLessThan(angle - 0.3)
+    expect(player.boosting).toBe(true)
+    expect(game.node('joystick').style.left).toBe('132px')
+    expect(game.node('joystick').style.top).toBe('222px')
+    game.node('boostButton').fire('pointercancel', { pointerId: 2 })
+    game.advance(2)
+    expect(player.boosting).toBe(false)
+  })
+
+  it.each([
+    { rotation: 1, startX: 82, startY: 78, endX: 142, endY: 78 },
+    { rotation: -1, startX: 308, startY: 766, endX: 248, endY: 766 },
+  ])('converts the fixed joystick center correctly in rotation $rotation', (gesture) => {
+    const game = runtime({ portrait: true })
+    if (gesture.rotation === -1) game.node('welcomeFlip').fire('click')
+    game.start()
+    const player = game.state().snakes[0], angle = player.angle
+    game.node('joystick').fire('pointerdown', { pointerId: 1, pointerType: 'touch', clientX: gesture.startX, clientY: gesture.startY })
+    game.node('joystick').fire('pointermove', { pointerId: 1, pointerType: 'touch', clientX: gesture.endX, clientY: gesture.endY })
+    game.advance(15)
+    expect(player.angle).toBeLessThan(angle - 0.3)
+  })
+
+  it('remaps host safe areas for both rotation directions', () => {
+    const game = runtime({ portrait: true })
+    game.init({ safeArea: { top: 44, right: 0, bottom: 34, left: 0 } })
+    expect(game.node('game').cssProperties.get('--safe-left')).toBe('44px')
+    expect(game.node('game').cssProperties.get('--safe-right')).toBe('34px')
+    game.node('welcomeFlip').fire('click')
+    expect(game.node('game').cssProperties.get('--safe-top')).toBe('0px')
+    expect(game.node('game').cssProperties.get('--safe-left')).toBe('34px')
+    expect(game.node('game').cssProperties.get('--safe-right')).toBe('44px')
+  })
+
+  it('pauses a running round when flipping and releases captured fingers before resuming', () => {
+    const game = runtime({ portrait: true })
+    game.start()
+    game.node('arena').fire('pointerdown', { pointerId: 1, pointerType: 'touch', clientX: 120, clientY: 180 })
+    game.node('boostButton').fire('pointerdown', { pointerId: 2, pointerType: 'touch' })
+    game.node('flipButton').fire('click')
+    expect(game.node('game').dataset.rotation).toBe('-1')
+    expect(game.node('pauseOverlay').hidden).toBe(false)
+    expect(game.node('arena').captures.size).toBe(0)
+    expect(game.node('boostButton').captures.size).toBe(0)
+    const time = game.state().time
+    game.advance(60)
+    expect(game.state().time).toBe(time)
+    game.node('resumeButton').fire('click'); game.advance(2)
+    expect(game.state().time).toBeGreaterThan(time)
+    expect(game.state().snakes[0].boosting).toBe(false)
+  })
+
+  it('continues the initial countdown when native fullscreen changes the viewport orientation', () => {
+    const game = runtime({ portrait: true })
+    game.node('startButton').fire('click')
+    game.state().snakes = [game.state().snakes[0]]; game.state().food = []
+    game.win.innerWidth = 844; game.win.innerHeight = 390; game.win.fire('resize')
+    expect(game.node('pauseOverlay').hidden).toBe(true)
+    game.advance(180)
+    expect(game.state().time).toBeGreaterThan(0)
   })
 
   it('submits a single final score and shows a playable restart on elimination', () => {
