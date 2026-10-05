@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest'
 type Listener = (event: Record<string, any>) => void
 
 // Drive the shipped controller with DOM/pointer adapters; simulation and controller are not duplicated.
-function runtime({ portrait = false, fullscreen = false } = {}) {
+function runtime({ portrait = false, fullscreen = false, standalone = false, search = '?hostNonce=test-round' } = {}) {
   class Node {
     hidden = false
     disabled = false
@@ -56,18 +56,22 @@ function runtime({ portrait = false, fullscreen = false } = {}) {
   }
   const modes = [new Node('cozy'), new Node('lively')]
   modes[0].dataset.mode = 'cozy'; modes[1].dataset.mode = 'lively'
+  const roundChoices = [node('timedModeButton'), node('endlessModeButton')]
+  roundChoices[0].dataset.roundType = 'timed'; roundChoices[1].dataset.roundType = 'endless'
   const messages: Record<string, any>[] = []
+  const navigations: string[] = []
   const doc = Object.assign(new Node('document'), {
     hidden: false, activeElement: null as Node | null, documentElement: new Node('root'), fullscreenEnabled: fullscreen,
     getElementById: node, querySelector: (selector: string) => node(selector),
-    querySelectorAll: (_selector: string) => modes, createElement: (tag: string) => new Node(tag),
+    querySelectorAll: (selector: string) => selector === '[data-round-type]' ? roundChoices : modes, createElement: (tag: string) => new Node(tag),
     exitFullscreen: () => Promise.resolve(),
   })
   const win = Object.assign(new Node('window'), {
     innerWidth: portrait ? 390 : 844, innerHeight: portrait ? 844 : 390, devicePixelRatio: 3,
     parent: { postMessage: (message: Record<string, any>) => messages.push(message) },
-    location: { search: '?hostNonce=test-round', assign: () => {} },
+    location: { search, assign: (url: string) => { navigations.push(url) } },
   })
+  if (standalone) win.parent = win as any
   let frame: ((time: number) => void) | null = null, now = 0
   const context: Record<string, any> = {
     window: win, document: doc, location: win.location, screen: { orientation: { unlock() {} } },
@@ -88,10 +92,99 @@ function runtime({ portrait = false, fullscreen = false } = {}) {
     win.fire('message', { source: win.parent, data: { channel: 'xiaban.game-host', protocol: 1, nonce: 'test-round', type: 'host.init', ...overrides } })
   }
   function start() { node('startButton').fire('click'); model.snakes = [model.snakes[0]]; model.food = []; advance(150) }
-  return { node, doc, win, init, messages, advance, start, state: () => model }
+  return { node, doc, win, init, messages, navigations, advance, start, difficultyChoices: modes, state: () => model }
 }
 
 describe('snake arena mobile controller and host protocol', () => {
+  it('shares only completed rounds and does not add another result or score update', () => {
+    const game = runtime()
+    game.init(); game.start()
+    game.node('shareResultButton').fire('click')
+    expect(game.messages.some(message => message.type === 'game.share')).toBe(false)
+    game.state().snakes[0].x = 2399; game.state().snakes[0].score = 450
+    game.advance(3)
+    const count = game.messages.length
+    game.node('shareResultButton').fire('click')
+    expect(game.messages[count].type).toBe('game.share')
+    expect(game.messages[count].result).toMatchObject({ score: 450, roundType: 'timed', difficulty: 'cozy' })
+    expect(game.messages.filter(message => message.type === 'game.result')).toHaveLength(1)
+    game.node('restartButton').fire('click')
+    const shared = game.messages.filter(message => message.type === 'game.share').length
+    game.node('shareResultButton').fire('click')
+    expect(game.messages.filter(message => message.type === 'game.share')).toHaveLength(shared)
+  })
+  it('opens the public result-page route when the pack is played directly', () => {
+    const game = runtime({ standalone: true })
+    game.start()
+    game.state().snakes[0].x = 2399
+    game.advance(3); game.node('shareResultButton').fire('click')
+    expect(game.navigations).toHaveLength(1)
+    expect(game.navigations[0]).toMatch(/^\/games\/snake-arena\/share\?own=1#v=1&/)
+    expect(game.navigations[0]).not.toContain('hostNonce')
+  })
+  it('starts a friend challenge with the original round type and difficulty', () => {
+    const game = runtime({ search: '?hostNonce=test-round&round=endless&difficulty=lively' })
+    game.start()
+    expect(game.state().roundType).toBe('endless')
+    expect(game.state().mode).toBe('lively')
+    expect(game.node('endlessModeButton').attrs.get('aria-pressed')).toBe('true')
+    expect(game.difficultyChoices[1].attrs.get('aria-pressed')).toBe('true')
+  })
+  it('starts endless rounds with an elapsed clock and no automatic result after three minutes', () => {
+    const game = runtime({ portrait: true })
+    game.init()
+    game.node('endlessModeButton').fire('click')
+    expect(game.node('roundSummary').textContent).toBe('不限时，活着就继续')
+    game.start()
+    game.state().time = 180.1
+    game.advance(20)
+    expect(game.state().roundType).toBe('endless')
+    expect(game.state().phase).toBe('playing')
+    expect(game.node('clockLabel').textContent).toBe('无尽生存')
+    expect(game.node('time').textContent).toBe('3:00')
+    expect(game.node('.clock').classes.has('urgent')).toBe(false)
+    expect(game.messages.filter(message => message.type === 'game.result')).toHaveLength(0)
+    game.doc.hidden = true; game.doc.fire('visibilitychange')
+    const time = game.state().time
+    game.advance(30)
+    expect(game.state().time).toBe(time)
+  })
+
+  it('retains endless mode and difficulty on restart and posts results only on elimination', () => {
+    const game = runtime()
+    game.init()
+    game.node('endlessModeButton').fire('click')
+    game.difficultyChoices[1].fire('click')
+    game.start()
+    expect(game.state().mode).toBe('lively')
+    expect(game.node('endlessModeButton').attrs.get('aria-pressed')).toBe('true')
+    game.state().snakes[0].x = 2399; game.state().snakes[0].score = 450
+    game.advance(3)
+    expect(game.state().reason).toBe('wall')
+    expect(game.node('resultBadge').textContent).toContain('无尽生存')
+    const results = game.messages.filter(message => message.type === 'game.result')
+    expect(results).toHaveLength(1)
+    expect(results[0].score).toBe(450)
+    game.node('restartButton').fire('click')
+    expect(game.state().roundType).toBe('endless')
+    expect(game.state().remaining).toBeNull()
+    expect(game.state().mode).toBe('lively')
+    expect(game.node('clockLabel').textContent).toBe('无尽生存')
+    expect(game.node('time').textContent).toBe('0:00')
+    expect(game.messages.filter(message => message.type === 'game.start')).toHaveLength(2)
+  })
+
+  it('switches back to timed competition independently of the difficulty', () => {
+    const game = runtime()
+    game.node('endlessModeButton').fire('click')
+    game.difficultyChoices[1].fire('click')
+    game.node('timedModeButton').fire('click')
+    game.start()
+    expect(game.state().roundType).toBe('timed')
+    expect(game.state().mode).toBe('lively')
+    expect(game.state().remaining).not.toBeNull()
+    expect(game.node('clockLabel').textContent).toBe('三分钟竞技')
+  })
   it('applies verified host safe areas and updates them after rotation without starting a round', () => {
     const game = runtime()
     game.init({ safeArea: { top: 0, right: 47, bottom: 21, left: 47 } })

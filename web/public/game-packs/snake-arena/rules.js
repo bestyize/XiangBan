@@ -64,9 +64,10 @@
     }
   }
 
-  function createGame({ seed = Date.now(), mode = 'cozy' } = {}) {
+  function createGame({ seed = Date.now(), mode = 'cozy', roundType = 'timed' } = {}) {
+    roundType = roundType === 'endless' ? 'endless' : 'timed'
     const state = {
-      random: seededRandom(seed), mode, time: 0, remaining: DURATION, phase: 'playing', reason: null,
+      random: seededRandom(seed), mode, roundType, time: 0, remaining: roundType === 'endless' ? null : DURATION, phase: 'playing', reason: null,
       food: [], snakes: [], events: [], nextFoodId: 1, foodTimer: 0,
     }
     state.snakes.push(makeSnake(0, WORLD.width / 2, WORLD.height / 2, -0.2))
@@ -220,7 +221,7 @@
     if (state.phase !== 'playing' || !Number.isFinite(dt) || dt <= 0) return state.events
     dt = Math.min(dt, 1 / 30)
     state.time += dt
-    state.remaining = Math.max(0, DURATION - state.time)
+    state.remaining = state.roundType === 'endless' ? null : Math.max(0, DURATION - state.time)
     const before = buildBodyGrid(state.snakes, true)
     for (const snake of state.snakes) {
       if (!snake.alive) { if (snake.id !== 0 && state.time >= snake.respawnAt) respawn(state, snake); continue }
@@ -281,7 +282,7 @@
     }
     state.foodTimer += dt
     if (state.foodTimer > 1) { state.foodTimer = 0; scatterFood(state, Math.min(22, Math.max(0, 620 - state.food.length))) }
-    if (state.remaining === 0 && state.phase === 'playing') { state.phase = 'over'; state.reason = 'timeout'; state.events.push({ type: 'finish' }) }
+    if (state.roundType !== 'endless' && state.remaining === 0 && state.phase === 'playing') { state.phase = 'over'; state.reason = 'timeout'; state.events.push({ type: 'finish' }) }
     return state.events
   }
 

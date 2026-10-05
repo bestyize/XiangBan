@@ -6,6 +6,8 @@ import { GAME_RUNTIME_PROTOCOL, gameEntryUrl, loadGameManifest, type GamePackMan
 import { api, getToken } from '../../api/client.ts'
 import { storage } from '../../lib/storage.ts'
 import { track } from '../../lib/track.ts'
+import { useProfile } from '../../lib/session.tsx'
+import { canShareFinishedRound, localResultPath, parseSnakeResult } from '../../games/resultShare.ts'
 
 interface Round { id: string | null; score: number; lines: number; maxTile: number; finished: boolean; timer: ReturnType<typeof setTimeout> | null }
 
@@ -31,6 +33,7 @@ export default function GamePlayer() {
   const [, params] = useRoute('/games/:gameId')
   const [, navigate] = useLocation()
   const gameId = params?.gameId ?? ''
+  const profile = useProfile()
   const [nonce] = useState(createNonce)
   const { ask, modal } = useLoginReminder('game')
   const [allowed, setAllowed] = useState(false)
@@ -40,6 +43,8 @@ export default function GamePlayer() {
   const iframeRef = useRef<HTMLIFrameElement>(null)
   const roundRef = useRef<Round | null>(null)
   const [recordError, setRecordError] = useState<string | null>(null)
+
+  useEffect(() => { if (pack) document.title = `${pack.name}｜下班了么` }, [pack])
 
   useEffect(() => {
     if (pack?.orientation === 'landscape') document.documentElement.dataset.gameLayout = 'landscape'
@@ -61,7 +66,8 @@ export default function GamePlayer() {
 
   useEffect(() => {
     if (readLoginReturn()?.path === `/games/${gameId}`) clearLoginReturn()
-    ask(() => setAllowed(true))
+    if (gameId === 'snake-arena' && ['game_share', 'game-share'].includes(new URLSearchParams(location.search).get('from') || '')) setAllowed(true)
+    else ask(() => setAllowed(true))
   }, [gameId])
 
   useEffect(() => {
@@ -120,6 +126,18 @@ export default function GamePlayer() {
       ) return
 
       if (data.type === 'game.ready') setReady(true)
+      if (data.type === 'game.share' && gameId === 'snake-arena') {
+        const result = parseSnakeResult(data.result)
+        if (canShareFinishedRound(result, roundRef.current)) {
+          const path = localResultPath(result, profile.inviteCode)
+          const open = async () => {
+            try { if (document.fullscreenElement) await document.exitFullscreen() } catch { /* Sharing still works outside fullscreen. */ }
+            navigate(path)
+          }
+          void open()
+        }
+        return
+      }
       if (data.type === 'game.start') {
         if (roundRef.current) finish(roundRef.current)
         const round: Round = { id: null, score: 0, lines: 0, maxTile: 0, finished: false, timer: null }
@@ -152,7 +170,7 @@ export default function GamePlayer() {
     const hide = () => { if (document.visibilityState === 'hidden' && roundRef.current) void persist(roundRef.current, true) }
     document.addEventListener('visibilitychange', hide)
     return () => { window.removeEventListener('message', receiveMessage); document.removeEventListener('visibilitychange', hide); if (roundRef.current) finish(roundRef.current) }
-  }, [navigate, nonce, gameId])
+  }, [navigate, nonce, gameId, profile.inviteCode])
 
   function initializeGame() {
     iframeRef.current?.contentWindow?.postMessage({
@@ -179,7 +197,7 @@ export default function GamePlayer() {
           <iframe
             ref={iframeRef}
             title={pack.name}
-            src={gameEntryUrl(pack, nonce)}
+            src={gameEntryUrl(pack, nonce, { roundType: new URLSearchParams(location.search).get('round') || undefined, difficulty: new URLSearchParams(location.search).get('difficulty') || undefined })}
             sandbox="allow-scripts allow-orientation-lock"
             allow="fullscreen"
             allowFullScreen

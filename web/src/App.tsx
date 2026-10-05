@@ -25,8 +25,10 @@ import { readLoginReturn } from './lib/loginReturn.ts'
 import { lazyPage } from './lib/lazyPage.ts'
 import AdminPage from './pages/AdminPage.tsx'
 import AccountProfile from './pages/me/AccountProfile.tsx'
+import { GAME_SHARE_PATH } from './games/resultShare.ts'
 
 const Tests = lazyPage(() => import('./quizzes/Tests.tsx'))
+const GameShare = lazyPage(() => import('./pages/games/GameShare.tsx'))
 const QuizHub = lazyPage<{ active?: boolean }>(() => import('./quizzes/Tests.tsx').then((module) => ({ default: module.QuizHub })))
 
 function AccountTabs({ location }: { location: string }) {
@@ -62,7 +64,7 @@ function SessionRoutes() {
   const [location] = useLocation()
 
   // Public tests never wait for an account or the onboarding gate.
-  if (location === '/tests' || location.startsWith('/tests/')) {
+  if (location === '/tests' || location.startsWith('/tests/') || location === GAME_SHARE_PATH) {
     return null
   }
 
@@ -87,6 +89,7 @@ function SessionRoutes() {
     )
   }
   if (location === '/login') return <LoginRoute />
+  if (location === '/games/snake-arena') return <GamePlayer key={profile.userId} />
   if (!profile.onboarded && !['/hello', '/me', '/me/account', '/me/settings'].includes(location)) return <Redirect to="/hello" replace />
 
   return (
@@ -130,6 +133,7 @@ function AppPages() {
   }, [location])
   return <>
     <Gate />
+    {location === GAME_SHARE_PATH && <Suspense fallback={<Screen><p className="mt-8 text-window/60">正在打开战绩卡…</p></Screen>}><GameShare /></Suspense>}
     <KeepAlivePage active={location === '/tests'}>
       {quizSync.pending ? <Screen><p className="mt-8 text-window/60">正在找回你的测试进度…</p></Screen> : <>
         {quizSync.error && <p role="status" className="mx-auto max-w-[480px] px-5 pt-3 text-xs text-window/60">{quizSync.error}</p>}
@@ -143,7 +147,7 @@ function AppPages() {
 
 export default function App() {
   const [location] = useLocation()
-  const publicTests = location === '/tests' || location.startsWith('/tests/')
+  const publicTests = location === '/tests' || location.startsWith('/tests/') || location === GAME_SHARE_PATH
   const admin = location === '/admin' || location.startsWith('/admin/')
   const [sessionStarted, setSessionStarted] = useState((!publicTests && !admin) || Boolean(getToken()))
   const [loginOpen, setLoginOpen] = useState(false)

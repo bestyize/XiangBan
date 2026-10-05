@@ -45,6 +45,7 @@ Protocol version 1 uses `postMessage`:
 - Host to game: `xiaban.game-host / host.init`, with a one-time nonce.
 - Game to host: `xiaban.game-pack / game.ready` and `game.exit`, echoing that nonce.
 - Records: `game.start` starts a round, `game.progress` updates its nonnegative integer `score` (and optional `lines` / `maxTile`), and `game.result` finishes it. A game sends its current round once after the first valid host initialization, then starts a new round when restarted or when entering another level.
+- Snake result sharing: `game.share` carries final aggregate metrics. The host accepts it only from the verified snake iframe for its completed current round and matching score, then opens the public result page. The page shares a QR-coded PNG or result link and offers a guest-play challenge entry; it never imports shared metrics as account records.
 
 The host verifies both the message source window and nonce. It does not pass account tokens, profile data, or website API clients to a game.
 
@@ -58,7 +59,7 @@ The host saves guest records in the current browser and signed-in records throug
 | `merge-2048` | 2048 | Slide and merge matching numbers |
 | `block-puzzle` | 小伴消方块 | Place three pieces per batch on an 8×8 board and clear full rows/columns |
 | `water-sort` | 调饮料大师 | Pour matching colors into tubes, with undo and progressively harder levels |
-| `snake-arena` | 小伴贪吃蛇 | Landscape, mobile-first arena with local AI snakes, boost energy and three-minute rounds |
+| `snake-arena` | 小伴贪吃蛇 | Landscape, mobile-first arena with local AI snakes, boost energy and three-minute or endless rounds |
 
 Packs may set `orientation: "landscape"` to use the full viewport instead of the phone-width host. The host permits fullscreen and orientation locking; the game must retain manual-rotation play when those APIs are unavailable. The site's PWA orientation is `any` so a landscape pack can also rotate when launched from the home screen.
 

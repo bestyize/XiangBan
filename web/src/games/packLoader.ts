@@ -82,8 +82,13 @@ export async function loadGameCatalog(signal?: AbortSignal): Promise<GamePackMan
   return Promise.all([...new Set(ids as string[])].map((id) => loadGameManifest(id, signal)))
 }
 
-export function gameEntryUrl(pack: GamePackManifest, nonce: string): string {
-  return packAssetUrl(pack.id, pack.entry) + '?hostNonce=' + encodeURIComponent(nonce)
+export function gameEntryUrl(pack: GamePackManifest, nonce: string, options: { roundType?: string; difficulty?: string } = {}): string {
+  const params = new URLSearchParams({ hostNonce: nonce })
+  if (pack.id === 'snake-arena') {
+    if (options.roundType === 'endless') params.set('round', 'endless')
+    if (options.difficulty === 'lively') params.set('difficulty', 'lively')
+  }
+  return packAssetUrl(pack.id, pack.entry) + '?' + params
 }
 
 export function gamePackThumbnailUrl(pack: GamePackManifest): string {

@@ -7,11 +7,14 @@
   const gameNode = $('game')
   const canvas = $('arena'), ctx = canvas.getContext('2d', { alpha: false })
   const map = $('map'), mapCtx = map.getContext('2d')
-  const nonce = new URLSearchParams(location.search).get('hostNonce')
+  const entryParams = new URLSearchParams(location.search)
+  const nonce = entryParams.get('hostNonce')
   const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches
   const coarsePointer = matchMedia('(pointer: coarse)').matches
   const foodColors = ['#ff4e6a', '#ffc72c', '#a65cec', '#28b9f5', '#71ce36']
-  let state = rules.createGame(), mode = 'cozy', phase = 'welcome'
+  let mode = entryParams.get('difficulty') === 'lively' ? 'lively' : 'cozy'
+  let roundType = entryParams.get('round') === 'endless' ? 'endless' : 'timed'
+  let state = rules.createGame({ mode, roundType }), phase = 'welcome', lastResult = null
   let width = 0, height = 0, dpr = 1, camera = { x: 1200, y: 850, zoom: 1 }
   let hostReady = false, roundStarted = false, roundPosted = false, resultPosted = false
   let best = 0, countdown = 0, lastFrame = 0, accumulator = 0, elapsedUI = 0, lastProgress = 0
@@ -182,7 +185,9 @@
   function startRound() {
     unlockAudio()
     if (coarsePointer && !document.fullscreenElement) void requestImmersive(false)
-    state = rules.createGame({ mode })
+    state = rules.createGame({ mode, roundType })
+    lastResult = null
+    $('shareResultButton').disabled = false
     phase = 'playing'; roundStarted = true; roundPosted = false; resultPosted = false
     peakMass = state.snakes[0].mass
     resetInput(); particles.length = 0; floats.length = 0
@@ -200,6 +205,7 @@
     phase = 'result'
     resetInput()
     const player = state.snakes[0]
+    lastResult = { score: player.score, mass: Math.floor(player.mass), kills: player.kills, seconds: Math.floor(state.time), roundType: state.roundType, difficulty: state.mode }
     const rank = rules.rankings(state).findIndex((entry) => entry.id === 0) + 1
     const isBest = player.score > best
     best = Math.max(best, player.score)
@@ -208,13 +214,32 @@
     $('resultKills').textContent = player.kills
     $('resultTime').textContent = formatTime(Math.floor(state.time))
     $('bestLabel').textContent = isBest ? '✦ 刷新了本次游玩的最高积分' : '本次游玩最高积分 ' + best
-    $('resultBadge').textContent = state.reason === 'timeout' ? '三分钟完成 · 长度第 ' + rank + ' 名' : '快乐收集完成'
+    $('resultBadge').textContent = state.roundType === 'endless' ? '无尽生存 · 长度第 ' + rank + ' 名' : state.reason === 'timeout' ? '三分钟完成 · 长度第 ' + rank + ' 名' : '快乐收集完成'
     $('resultTitle').textContent = state.reason === 'timeout' && rank === 1 ? '今晚，你是快乐小巨蛇' : player.kills > 0 ? '小小一条，也能漂亮反杀' : '今天也有好好长大'
     $('resultDescription').textContent = state.reason === 'wall' ? '小伴：边界有点硬，下次记得转弯。' : state.reason === 'collision' ? '小伴：快乐没白吃，下局绕开它。' : '小伴：吃到的快乐，都算数。'
     $('resultOverlay').hidden = false; $('controls').hidden = true; $('tutorial').hidden = true; $('toast').hidden = true
     syncRound(); updateHUD(); needsDraw = true
     tone(392, 0.13); tone(523, 0.15, 0.03, 0.12)
     $('restartButton').focus({ preventScroll: true })
+  }
+
+  async function shareResult() {
+    if (phase !== 'result' || !lastResult) return
+    if (window.parent !== window && !hostReady) { toast('战绩页还在连接，请稍后再试。'); return }
+    $('shareResultButton').disabled = true
+    try {
+      try { screen.orientation?.unlock?.() } catch { /* Sharing uses the ordinary portrait page. */ }
+      try {
+        const exit = document.exitFullscreen || document.webkitExitFullscreen
+        if (exit && (document.fullscreenElement || document.webkitFullscreenElement)) await exit.call(document)
+      } catch { /* Fullscreen failure must not prevent opening the result page. */ }
+      if (hostReady && window.parent !== window) postToHost('game.share', { result: lastResult })
+      else {
+        const result = lastResult
+        const fragment = new URLSearchParams({ v: '1', s: String(result.score), l: String(result.mass), k: String(result.kills), t: String(result.seconds), r: result.roundType, d: result.difficulty })
+        window.location.assign('/games/snake-arena/share?own=1#' + fragment)
+      }
+    } finally { $('shareResultButton').disabled = false }
   }
 
   async function exitGame() {
@@ -232,6 +257,7 @@
 
   $('startButton').addEventListener('click', startRound)
   $('restartButton').addEventListener('click', startRound)
+  $('shareResultButton').addEventListener('click', () => { void shareResult() })
   $('resumeButton').addEventListener('click', () => {
     if (document.hidden) return
     unlockAudio(); resetInput(); phase = 'playing'; accumulator = 0
@@ -262,6 +288,23 @@
       entry.classList.toggle('active', active); entry.setAttribute('aria-pressed', String(active))
     }
   })
+  for (const button of document.querySelectorAll('[data-mode]')) {
+    const active = button.dataset.mode === mode
+    button.classList.toggle('active', active); button.setAttribute('aria-pressed', String(active))
+  }
+  for (const button of document.querySelectorAll('[data-round-type]')) button.addEventListener('click', () => {
+    roundType = button.dataset.roundType
+    for (const entry of document.querySelectorAll('[data-round-type]')) {
+      const active = entry === button
+      entry.classList.toggle('active', active); entry.setAttribute('aria-pressed', String(active))
+    }
+    $('roundSummary').textContent = roundType === 'endless' ? '不限时，活着就继续' : '三分钟一局'
+  })
+  for (const button of document.querySelectorAll('[data-round-type]')) {
+    const active = button.dataset.roundType === roundType
+    button.classList.toggle('active', active); button.setAttribute('aria-pressed', String(active))
+  }
+  $('roundSummary').textContent = roundType === 'endless' ? '不限时，活着就继续' : '三分钟一局'
 
   function joystickDown(event, node) {
     if (phase !== 'playing' || joystickPointer !== null || event.button !== 0) return
@@ -368,8 +411,10 @@
     const player = state.snakes[0]
     $('score').textContent = player.score
     $('mass').textContent = Math.floor(player.mass)
-    $('time').textContent = formatTime(Math.ceil(state.remaining))
-    document.querySelector('.clock').classList.toggle('urgent', state.remaining < 30)
+    const endless = state.roundType === 'endless'
+    $('time').textContent = formatTime(endless ? Math.floor(state.time) : Math.ceil(state.remaining))
+    $('clockLabel').textContent = endless ? '无尽生存' : '三分钟竞技'
+    document.querySelector('.clock').classList.toggle('urgent', !endless && state.remaining < 30)
     $('boostButton').style.setProperty('--energy', player.energy)
     $('boostButton').classList.toggle('exhausted', player.energy < 5 || player.mass <= rules.MIN_MASS)
     const ranked = rules.rankings(state)

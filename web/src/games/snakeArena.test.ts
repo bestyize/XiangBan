@@ -11,12 +11,12 @@ interface Snake extends Point {
 interface Food extends Point { id: number; value: number; remains: boolean; color: number; phase: number }
 interface GameEvent { type: string; id?: number; killerId?: number | null }
 interface State {
-  snakes: Snake[]; food: Food[]; phase: string; time: number; remaining: number
+  snakes: Snake[]; food: Food[]; phase: string; time: number; remaining: number | null; roundType: string
   reason: string | null; events: GameEvent[]
 }
 interface Rules {
   WORLD: { width: number; height: number }; MIN_MASS: number
-  createGame(options?: { seed?: number; mode?: string }): State
+  createGame(options?: { seed?: number; mode?: string; roundType?: string }): State
   step(state: State, input?: { angle?: number | null; boost?: boolean }, dt?: number): GameEvent[]
   bodyPoints(snake: Snake): Point[]
   segmentDistanceSq(point: Point, a: Point, b: Point): number
@@ -207,6 +207,46 @@ describe('snake arena shipped simulation', () => {
     state.phase = 'over'
     rules.step(state)
     expect(state.time).toBe(before)
+  })
+
+  it('keeps endless survival running beyond three minutes and ends only when the player dies', () => {
+    const state = rules.createGame({ seed: 42, roundType: 'endless' })
+    state.snakes = [state.snakes[0]]
+    for (let frame = 0; frame < 360 * 30; frame += 1) {
+      rules.step(state, { angle: -0.2 + state.time * 0.6 }, 1 / 30)
+    }
+    expect(state.time).toBeGreaterThan(359)
+    expect(state.phase).toBe('playing')
+    expect(state.remaining).toBeNull()
+    expect(state.reason).toBeNull()
+    expect(state.snakes[0].score).toBeGreaterThan(0)
+    expect(state.food.length).toBeGreaterThan(0)
+    expect(state.food.length).toBeLessThanOrEqual(1100)
+
+    position(state.snakes[0], 2399, 850, 0)
+    rules.step(state)
+    expect(state.phase).toBe('over')
+    expect(state.reason).toBe('wall')
+    expect(state.events.filter(event => event.type === 'death')).toHaveLength(1)
+  })
+
+  it('keeps AI respawns available after the timed-round boundary in endless survival', () => {
+    const state = rules.createGame({ seed: 12, roundType: 'endless', mode: 'lively' })
+    expect(state.snakes).toHaveLength(12)
+    state.time = 300
+    const dead = state.snakes[1]
+    dead.alive = false; dead.respawnAt = 290
+    rules.step(state)
+    expect(state.phase).toBe('playing')
+    expect(state.snakes[1]).not.toBe(dead)
+    expect(state.snakes[1].alive).toBe(true)
+    expect(state.remaining).toBeNull()
+  })
+
+  it('defaults to timed rules for unknown round types', () => {
+    const state = rules.createGame({ roundType: 'unknown' })
+    expect(state.roundType).toBe('timed')
+    expect(state.remaining).toBe(180)
   })
 
   it('respawns AI away from all living bodies and gives it a grace period', () => {

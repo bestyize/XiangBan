@@ -72,6 +72,11 @@ h1 { font-size: clamp(36px, 4.8vw, 62px); line-height: 1.2; letter-spacing: -1px
 h1 > span { display: inline-block; margin-left: 12px; position: relative; color: #66966e; }
 h1 > span svg { position: absolute; left: 0; width: 100%; bottom: -8px; height: 12px; color: #c9ddb2; stroke-width: 7px; }
 .welcome-description { font-size: 13px; line-height: 1.9; color: #7b9280; margin: 0 0 22px; }
+.round-picker { display: flex; gap: 8px; margin-bottom: 10px; }
+.round-mode { display: flex; flex: 1; align-items: center; justify-content: center; gap: 6px; min-height: 44px; padding: 6px 8px; border: 1.5px solid #dbe5d6; border-radius: 12px; background: #fffef58a; font-size: 11px; font-weight: 600; white-space: nowrap; color: #82937b; }
+.round-mode.active { border-color: #90b286; color: #517c54; background: #fffef5; }
+.round-mode svg { width: 16px; height: 16px; }
+.round-mode > span { font-size: 23px; line-height: 1; font-weight: 500; }
 .mode-picker { display: flex; gap: 9px; margin: 0 0 13px; }
 .mode { display: flex; flex: 1; flex-direction: column; align-items: flex-start; gap: 5px; padding: 12px; border: 1.5px solid #dbe5d6; border-radius: 15px; background: #fffef58a; text-align: left; }
 .mode b { font-size: 12px; color: #69806a; }
@@ -116,6 +121,9 @@ h1 > span svg { position: absolute; left: 0; width: 100%; bottom: -8px; height: 
 .result-stats b { font-size: 18px; color: #7e9172; font-variant-numeric: tabular-nums; }
 .result-stats span { font-size: 9px; color: #a0ad93; }
 .dialog-card > .best-label { margin: 7px 0 12px; font-size: 9px; color: #b4955b; min-height: 16px; }
+.result-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.result-actions .primary-button { font-size: 12px; gap: 5px; padding-left: 7px; padding-right: 7px; letter-spacing: 0; }
+.result-actions .secondary-button { background: #fffef2; color: #799367; border-color: #c7d5b8; box-shadow: none; }
 .touch-copy { display: none; }
 @media (pointer: coarse) { .touch-copy { display: inline; } .desktop-copy { display: none; } }
 @media (pointer: fine) { .joystick { opacity: .5; } .boost-note { color: #81967b; } }
@@ -156,6 +164,7 @@ h1 > span svg { position: absolute; left: 0; width: 100%; bottom: -8px; height: 
   .tutorial { font-size: 9px; bottom: max(12px, var(--safe-bottom)); }
 }
 @media (max-height: 340px) and (orientation: landscape), (max-width: 340px) and (orientation: portrait) {
+  .welcome-foot, .welcome-guide { display: none; }
   .welcome-card { width: 83%; gap: 20px; }
   h1 { font-size: 30px; margin: 7px 0 9px; }
   .welcome-description { margin-bottom: 9px; font-size: 10px; }
@@ -170,9 +179,10 @@ h1 > span svg { position: absolute; left: 0; width: 100%; bottom: -8px; height: 
   .result-score { grid-column: 1; grid-row: 4 / 6; }
   .result-stats { grid-column: 2; }
   .result-card .best-label { grid-column: 2; }
-  .result-card .primary-button, .result-card .text-button { grid-column: 1 / -1; }
+  .result-card > .result-actions, .result-card > .text-button { grid-column: 1 / -1; }
 }
 @media (max-height: 290px) and (orientation: landscape), (max-width: 290px) and (orientation: portrait) {
+  .welcome-description { display: none; }
   .welcome-card { width: 85%; gap: 18px; }
   h1 { font-size: 26px; margin: 5px 0 7px; }
   .welcome-description { font-size: 9px; line-height: 1.6; margin-bottom: 7px; }
