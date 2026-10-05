@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { Link } from 'wouter'
 import { blobToBase64, inApp, send } from '../lib/bridge.ts'
 import { isWeChat, publicUrl } from '../lib/env.ts'
 import { POSTER_HEIGHT, POSTER_WIDTH, renderQuizPoster } from './poster.ts'
@@ -7,7 +8,7 @@ import type { QuizDefinition, QuizReport } from './types.ts'
 
 interface PosterImage { url: string; file: File }
 
-export function ReportShare({ quiz, report, scores }: { quiz: QuizDefinition; report: QuizReport; scores: number[] }) {
+export function ReportShare({ quiz, report, scores, shared }: { quiz: QuizDefinition; report: QuizReport; scores: number[]; shared: boolean }) {
   const [open, setOpen] = useState(false)
   const [image, setImage] = useState<PosterImage | null>(null)
   const [message, setMessage] = useState('')
@@ -79,17 +80,18 @@ export function ReportShare({ quiz, report, scores }: { quiz: QuizDefinition; re
     } catch { setMessage('暂时无法保存，请长按海报保存图片。') }
   }
 
-  return <section className="quiz-share" aria-label="分享测试结果">
-    <h2>这张名片，想送给谁看？</h2>
-    <p>分享内容不包含逐题答案或账号信息。</p>
-    <div className="quiz-share-actions">
-      <button className="quiz-button" type="button" disabled={busy} onClick={() => void share()}>{busy ? '正在分享…' : '分享给朋友'} <span aria-hidden="true">↗</span></button>
-      <button className="quiz-button quiz-button-outline" type="button" onClick={() => setOpen(true)}>保存分享海报</button>
-    </div>
-    <button className="quiz-text-button" type="button" onClick={() => void copy()}>复制报告链接</button>
-    <p className="quiz-message" role="status">{message}</p>
-    {message.includes('下方链接') && <input className="quiz-copy-link" aria-label="可复制的报告链接" value={link} readOnly onFocus={(event) => event.currentTarget.select()} />}
-    <dialog ref={dialog} className="quiz-poster-dialog" onClose={() => setOpen(false)} aria-labelledby="poster-title">
+  return <>
+    <section className={`quiz-action-bar quiz-theme-${quiz.id}`} aria-label="分享测试结果">
+      {/* The dialog shows its own status while open. */}
+      <p className="quiz-action-status" role="status">{open ? '' : message}</p>
+      <div className="quiz-action-row">
+        {shared
+          ? <Link className="quiz-button" href={`/tests/${quiz.id}`}>我也测一测</Link>
+          : <button className="quiz-button" type="button" disabled={busy} onClick={() => void share()}>{busy ? '正在分享…' : '分享给朋友'}</button>}
+        <button className="quiz-button quiz-button-outline" type="button" onClick={() => setOpen(true)}>{shared ? '分享海报' : '保存海报'}</button>
+      </div>
+    </section>
+    <dialog ref={dialog} className="quiz-poster-dialog" onClose={() => setOpen(false)} onClick={(event) => { if (event.target === event.currentTarget) setOpen(false) }} aria-labelledby="poster-title">
       <div className={`quiz-poster-panel quiz-theme-${quiz.id}`}>
         <header className="quiz-dialog-header"><h2 id="poster-title">你的分享海报</h2><button type="button" className="quiz-text-button" onClick={() => setOpen(false)} aria-label="关闭海报">关闭 ×</button></header>
         <div className="quiz-poster-stage">
@@ -102,12 +104,12 @@ export function ReportShare({ quiz, report, scores }: { quiz: QuizDefinition; re
             {inApp() ? <button className="quiz-button" type="button" onClick={() => void nativeSave()}>保存到相册</button> : <a className="quiz-button" href={image.url} download={image.file.name}>保存图片</a>}
             <button className="quiz-button quiz-button-outline" type="button" disabled={busy} onClick={() => void share()}>分享</button>
           </div>}
-          <p className="quiz-dialog-hint">如浏览器未直接保存，可长按海报保存图片。</p>
+          <p className="quiz-dialog-hint">没有直接保存的话，长按海报就能存图。分享内容不含逐题答案和账号信息。</p>
           <button className="quiz-text-button" type="button" onClick={() => void copy()}>复制报告链接</button>
-          <p className="quiz-message" role="status">{message}</p>
+          <p className="quiz-message" role="status">{open ? message : ''}</p>
           {message.includes('下方链接') && <input className="quiz-copy-link" aria-label="可复制的报告链接" value={link} readOnly onFocus={(event) => event.currentTarget.select()} />}
         </div>
       </div>
     </dialog>
-  </section>
+  </>
 }

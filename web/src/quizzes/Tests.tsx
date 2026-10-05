@@ -57,7 +57,6 @@ function Missing({ report = false, invalid = false }: { report?: boolean; invali
   return <main className="quiz-shell quiz-empty-shell app-subpage">
     <NavBar title="趣味测试" back="/tests" />
     <div className="quiz-empty">
-      <span className="quiz-eyebrow">AFTER HOURS LAB</span>
       <h1>{report ? (invalid ? '这份分享链接不完整' : '报告还在等你的答案') : '还没有这套测试'}</h1>
       <p>{report ? (invalid ? '链接可能被截断，向朋友要一份完整链接，或自己测一次吧。' : '先完成一套测试，你的结果名片就会出现在这里。') : '回合集看看，挑一个现在想玩的。'}</p>
       <Link className="quiz-button" href="/tests">去测试合集 →</Link>
@@ -75,10 +74,13 @@ function useFragment() {
   return fragment
 }
 
+const chevron = <svg className="quiz-fold-chevron" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6" /></svg>
+
 function Report({ quiz, report, scores, shared }: { quiz: QuizDefinition; report: QuizReport; scores: number[]; shared: boolean }) {
-  return <main className={`quiz-shell app-subpage quiz-report quiz-theme-${quiz.id}`}>
+  return <>
+  <main className={`quiz-shell app-subpage quiz-report quiz-theme-${quiz.id}`}>
     <NavBar title={`${quiz.name} 报告`} back="/tests" />
-    {shared && <div className="quiz-shared-note">{quiz.version !== findQuiz(quiz.id)?.version ? '这是朋友分享的 25 题旧版结果。' : '这是朋友分享的结果。'}<Link href={`/tests/${quiz.id}`}>我也测一测 ↗</Link></div>}
+    {shared && <p className="quiz-shared-note">{quiz.version !== findQuiz(quiz.id)?.version ? '这是朋友分享的 25 题旧版结果。' : '这是朋友分享的结果。'}</p>}
     <section className={`quiz-report-hero${quiz.persona ? ' quiz-character-hero' : ''}`}>
       <div className="quiz-report-top"><span className="quiz-eyebrow">{quiz.eyebrow}</span><span className="quiz-report-seal">此刻<br />名片</span></div>
       <QuizArt kind={quiz.id} code={report.code} />
@@ -90,26 +92,37 @@ function Report({ quiz, report, scores, shared }: { quiz: QuizDefinition; report
       <div className="quiz-report-hero-footer"><span>此刻的你 · 值得被看见</span><span aria-hidden="true">✦</span></div>
     </section>
     <p className="quiz-report-disclaimer">{quiz.shortCaveat}</p>
-    <section className="quiz-report-metrics">
-      <div className="quiz-section-heading"><span>01</span><h2>{quiz.metricsTitle}</h2></div>
-      <p className="quiz-subtle">{quiz.metricsIntro}</p>
-      {report.metrics.map((metric) => <div className="quiz-metric" key={metric.label}>
-        <h3>{metric.label}</h3>
-        <div className="quiz-metric-labels"><span>{metric.left} {metric.percent}%</span><span>{metric.right ? `${metric.right} ${100 - metric.percent}%` : ''}</span></div>
-        <div className="quiz-metric-track" aria-label={`${metric.label}，${metric.left} ${metric.percent}%${metric.right ? `，${metric.right} ${100 - metric.percent}%` : ''}`}><span style={{ width: `${metric.percent}%` }} /></div>
-        <p>{metric.note}</p>
-      </div>)}
-    </section>
-    <section className="quiz-report-notes">
-      <div className="quiz-section-heading"><span>02</span><h2>比标签更重要的，是你</h2></div>
-      {report.sections.map((section, i) => <article className="quiz-note" key={section.title}><span className="quiz-note-icon" aria-hidden="true">{['✦', '◐', '↗'][i]}</span><div><h3>{section.title}</h3><p>{section.text}</p></div></article>)}
-    </section>
-    <section className="quiz-recharge"><span className="quiz-eyebrow">OFF THE CLOCK</span><h2>{report.recharge.title}</h2><p>{report.recharge.text}</p><span className="quiz-recharge-sign">小伴给你留的，今晚小纸条。</span></section>
-    <ReportShare quiz={quiz} report={report} scores={scores} />
+    <div className="quiz-folds">
+      <details className="quiz-fold" open>
+        <summary><span className="quiz-fold-index">01</span><h2>{quiz.metricsTitle}</h2>{chevron}</summary>
+        <div className="quiz-fold-body">
+          <p className="quiz-subtle">{quiz.metricsIntro}</p>
+          {report.metrics.map((metric) => <div className="quiz-metric" key={metric.label}>
+            <h3>{metric.label}</h3>
+            <div className="quiz-metric-labels"><span>{metric.left} {metric.percent}%</span><span>{metric.right ? `${metric.right} ${100 - metric.percent}%` : ''}</span></div>
+            <div className="quiz-metric-track" aria-label={`${metric.label}，${metric.left} ${metric.percent}%${metric.right ? `，${metric.right} ${100 - metric.percent}%` : ''}`}><span style={{ width: `${metric.percent}%` }} /></div>
+            <p>{metric.note}</p>
+          </div>)}
+        </div>
+      </details>
+      <details className="quiz-fold">
+        <summary><span className="quiz-fold-index">02</span><h2>比标签更重要的，是你</h2>{chevron}</summary>
+        <div className="quiz-fold-body">
+          {report.sections.map((section, i) => <article className="quiz-note" key={section.title}><span className="quiz-note-icon" aria-hidden="true">{['✦', '◐', '↗'][i]}</span><div><h3>{section.title}</h3><p>{section.text}</p></div></article>)}
+        </div>
+      </details>
+      <details className="quiz-fold">
+        <summary><span className="quiz-fold-index">03</span><h2>{report.recharge.title}</h2>{chevron}</summary>
+        <div className="quiz-fold-body quiz-recharge"><p>{report.recharge.text}</p><span className="quiz-recharge-sign">小伴给你留的，今晚小纸条。</span></div>
+      </details>
+    </div>
     <div className="quiz-report-links"><Link href={`/tests/${quiz.id}`}>{shared ? '测测我是哪一型' : '回看答案 / 再测一次'}</Link><Link href="/tests">看看其他测试</Link></div>
     <details className="quiz-method"><summary>怎么看待这份结果？</summary><p>{report.caveat}</p></details>
     <footer className="quiz-hub-footer">你可以变化，你不止这一面。</footer>
   </main>
+  {/* Outside <main> so the slide-in transform doesn't carry this fixed bar along. */}
+  <ReportShare quiz={quiz} report={report} scores={scores} shared={shared} />
+  </>
 }
 
 function ReportRoute({ id }: { id: string }) {
