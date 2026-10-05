@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useLocation } from 'wouter'
 import { quizAccountId } from '../quizzes/progress.ts'
 import { useSession } from '../lib/session.tsx'
+import { useLoginModal } from '../lib/loginModal.ts'
 import { rememberLoginReturn } from '../lib/loginReturn.ts'
 import { Cat } from './Cat.tsx'
 
@@ -12,7 +13,8 @@ function dismiss() { seen = true; try { sessionStorage.setItem(DISMISSED, '1') }
 
 export function useLoginReminder(kind: 'quiz' | 'game') {
   const { isLoggedIn, status } = useSession()
-  const [location, navigate] = useLocation()
+  const [location] = useLocation()
+  const { openLogin } = useLoginModal()
   const [open, setOpen] = useState(false)
   const next = useRef<(() => void) | null>(null)
   const dialog = useRef<HTMLDialogElement>(null)
@@ -31,7 +33,7 @@ export function useLoginReminder(kind: 'quiz' | 'game') {
     <h2 id="login-reminder-title">给这次体验留个位置</h2>
     <p>{kind === 'quiz' ? '登录后，测试进度和结果会跟着账号保存。换设备，也能接着认识自己。' : '登录后，游戏成绩和记录会跟着账号保存。换设备，也能找回来。'}</p>
     <button type="button" className="login-reminder-primary" onClick={() => {
-      dismiss(); rememberLoginReturn({ path: location, start: true }); setOpen(false); navigate('/login')
+      dismiss(); rememberLoginReturn({ path: location, start: true }); setOpen(false); openLogin()
     }}>登录 / 注册</button>
     <button type="button" className="login-reminder-skip" onClick={proceed}>先体验一下</button>
   </dialog>

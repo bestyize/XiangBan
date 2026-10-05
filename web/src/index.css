@@ -236,10 +236,37 @@
 .app-sheet-body { overflow-y: auto; overscroll-behavior: contain; padding: 4px 20px calc(var(--safe-bottom) + 24px); scrollbar-width: none; }
 .app-sheet-body::-webkit-scrollbar { display: none; }
 
+/* Centered dialog over a dimmed, blurred page — the classic app login popup. */
+.app-modal {
+  position: fixed; inset: 0; margin: auto; width: min(calc(100% - 40px), 360px); max-width: none;
+  max-height: calc(100dvh - var(--safe-top) - 48px); padding: 0; overflow: visible;
+  border: 0; background: transparent; color: var(--color-window);
+}
+.app-modal[open] { display: block; animation: modal-in 260ms cubic-bezier(.2, .8, .2, 1) both; }
+.app-modal::backdrop { background: #080f1b99; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); animation: backdrop-in 200ms ease-out both; }
+@keyframes modal-in { from { opacity: 0; transform: translateY(12px) scale(.94); } to { opacity: 1; transform: none; } }
+.app-modal-card {
+  position: relative; margin-top: 38px; padding: 50px 22px 20px; border-radius: 26px;
+  max-height: calc(100dvh - var(--safe-top) - 86px); overflow-y: auto; overscroll-behavior: contain; scrollbar-width: none;
+  border: 1px solid #edbd7626; background: #223149; box-shadow: 0 24px 64px #050a1499;
+}
+.app-modal-card::-webkit-scrollbar { display: none; }
+.app-modal-avatar {
+  position: absolute; z-index: 1; left: 50%; top: 0; transform: translateX(-50%);
+  display: grid; place-items: center; width: 84px; height: 84px; border-radius: 50%;
+  background: #223149; border: 1px solid #edbd7626; box-shadow: 0 8px 24px #050a1466;
+}
+.app-modal-close {
+  position: absolute; top: 10px; right: 10px; display: grid; place-items: center; width: 36px; height: 36px;
+  border-radius: 50%; color: #f3eee499;
+}
+.app-modal-close:active { background: #f3eee414; }
+.app-modal-close svg { width: 18px; height: 18px; }
+
 @media (prefers-reduced-motion: reduce) {
   .app-subpage, .app-sheet[open], .app-sheet::backdrop { animation: none; }
   .app-switch, .app-switch::after, .app-row, .app-nav-back { transition: none; }
-  .login-modal-in { animation: none; }
+  .login-modal-in, .app-modal[open], .app-modal::backdrop { animation: none; }
 }
 
 /* 管理后台登录卡片：从稍小、略透明的状态浮现，呼应 App 弹窗的进场手感。 */

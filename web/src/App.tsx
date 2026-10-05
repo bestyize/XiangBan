@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
 import { Redirect, Route, Switch, useLocation } from 'wouter'
 import Habits from './pages/me/Habits.tsx'
 import Settings from './pages/me/Settings.tsx'
@@ -18,7 +18,9 @@ import ProfileEdit from './pages/me/ProfileEdit.tsx'
 import Onboarding from './pages/onboarding/Onboarding.tsx'
 import GameHub from './pages/games/GameHub.tsx'
 import GamePlayer from './pages/games/GamePlayer.tsx'
-import EmailLogin from './pages/EmailLogin.tsx'
+import { LoginModal } from './components/LoginModal.tsx'
+import { LoginModalContext, useLoginModal } from './lib/loginModal.ts'
+import { readLoginReturn } from './lib/loginReturn.ts'
 import AdminPage from './pages/AdminPage.tsx'
 import AccountProfile from './pages/me/AccountProfile.tsx'
 
@@ -41,6 +43,15 @@ function usePageViews() {
   useEffect(() => {
     if (location !== '/tests' && !location.startsWith('/tests/')) track('page_view', { path: location })
   }, [location])
+}
+
+/** /login stays linkable (logout lands here): show the page it should sit over, with the dialog open. */
+function LoginRoute() {
+  const { isLoggedIn, profile } = useSession()
+  const { openLogin } = useLoginModal()
+  useEffect(() => { if (!isLoggedIn) openLogin() }, [isLoggedIn, openLogin])
+  const background = isLoggedIn ? '/me' : readLoginReturn()?.path ?? (profile?.onboarded ? '/' : '/hello')
+  return <Redirect to={background} replace />
 }
 
 function SessionRoutes() {
@@ -72,7 +83,7 @@ function SessionRoutes() {
       </Screen>
     )
   }
-  if (location === '/login') return <EmailLogin />
+  if (location === '/login') return <LoginRoute />
   if (!profile.onboarded && !['/hello', '/me', '/me/account', '/me/settings'].includes(location)) return <Redirect to="/hello" replace />
 
   return (
@@ -131,9 +142,17 @@ export default function App() {
   const publicTests = location === '/tests' || location.startsWith('/tests/')
   const admin = location === '/admin' || location.startsWith('/admin/')
   const [sessionStarted, setSessionStarted] = useState((!publicTests && !admin) || Boolean(getToken()))
+  const [loginOpen, setLoginOpen] = useState(false)
+  // Public test pages run without a session; logging in from them has to start one.
+  const login = useMemo(() => ({ openLogin: () => { setSessionStarted(true); setLoginOpen(true) } }), [])
   useEffect(() => { if (!publicTests && !admin) setSessionStarted(true) }, [publicTests, admin])
   // The phone-width desktop frame (index.css) is for the app only, not the admin console.
   useEffect(() => { document.documentElement.dataset.surface = admin ? 'admin' : 'app' }, [admin])
   if (admin) return <AdminPage />
-  return <SessionProvider enabled={sessionStarted || !publicTests}><AppPages /></SessionProvider>
+  return <SessionProvider enabled={sessionStarted || !publicTests}>
+    <LoginModalContext.Provider value={login}>
+      <AppPages />
+      <LoginModal open={loginOpen} onClose={() => setLoginOpen(false)} />
+    </LoginModalContext.Provider>
+  </SessionProvider>
 }

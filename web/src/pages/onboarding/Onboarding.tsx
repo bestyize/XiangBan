@@ -1,8 +1,9 @@
 import { useState } from 'react'
-import { Link, useLocation } from 'wouter'
+import { useLocation } from 'wouter'
 import type { ProfileUpdate } from '../../api/types.ts'
 import { track } from '../../lib/track.ts'
 import { Bubble, CatWindow, FieldError, PrimaryButton, QuietButton, Screen } from '../../components/ui.tsx'
+import { useLoginModal } from '../../lib/loginModal.ts'
 import { useMeta } from '../../lib/meta.ts'
 import { useProfile, useSession } from '../../lib/session.tsx'
 import { STEPS, StepBody, stepFace, stepLine, type Draft, type Step } from './steps.tsx'
@@ -27,6 +28,7 @@ function changesFor(step: Step, draft: Draft): ProfileUpdate {
 export default function Onboarding() {
   const profile = useProfile()
   const { updateProfile } = useSession()
+  const { openLogin } = useLoginModal()
   const meta = useMeta()
   const [, navigate] = useLocation()
   const [index, setIndex] = useState(0)
@@ -89,7 +91,7 @@ export default function Onboarding() {
         <PrimaryButton disabled={blocked} onClick={() => advance(changesFor(step, draft), isLast, false)}>
           {step === 'hello' ? '是我' : isLast ? '开始陪我下班' : '下一步'}
         </PrimaryButton>
-        {step === 'hello' && <Link href="/login" className="mt-5 block text-center text-sm text-window/70 underline">已有记录？邮箱登录 / 注册</Link>}
+        {step === 'hello' && <button type="button" onClick={openLogin} className="mt-5 block w-full text-center text-sm text-window/70 underline">已有记录？邮箱登录 / 注册</button>}
       </div>
     </Screen>
   )

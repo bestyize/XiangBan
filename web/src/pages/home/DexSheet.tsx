@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react'
-import { Link } from 'wouter'
 import { api, getToken } from '../../api/client.ts'
 import type { Unlock, UnlocksResponse } from '../../api/types.ts'
 import { expressions, fallbackExpression } from '../../cat/expressions.ts'
 import { Cat } from '../../components/Cat.tsx'
 import { Sheet } from '../../components/Sheet.tsx'
 import { PrimaryButton } from '../../components/ui.tsx'
+import { useLoginModal } from '../../lib/loginModal.ts'
 
 function Tile({ item }: { item: Unlock }) {
   const art = expressions[item.id] ?? fallbackExpression
@@ -25,6 +25,7 @@ function Tile({ item }: { item: Unlock }) {
 
 /** 表情图鉴 (PRD 5.8) as a sheet over the home screen; reloads each time it opens. */
 export function DexSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const { openLogin } = useLoginModal()
   const [data, setData] = useState<UnlocksResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -58,7 +59,7 @@ export function DexSheet({ open, onClose }: { open: boolean; onClose: () => void
         <div className="mt-8 flex flex-col items-center text-center">
           <Cat spec={{ eyes: 'open', mouth: 'smile', blush: true }} label="小伴" size={96} />
           <p className="mt-4 text-[15px] text-window/85">登录后，打卡解锁的表情会收进这里。</p>
-          <Link href="/login" onClick={onClose} className="mt-6 w-full rounded-full bg-lamp px-6 py-3.5 text-center font-bold text-ink transition active:scale-[.98]">登录 / 注册</Link>
+          <button type="button" onClick={() => { onClose(); openLogin() }} className="mt-6 w-full rounded-full bg-lamp px-6 py-3.5 text-center font-bold text-ink transition active:scale-[.98]">登录 / 注册</button>
         </div>
       )}
       {!guest && !data && !error && <p className="mt-10 text-center text-sm text-window/50">正在翻图鉴…</p>}

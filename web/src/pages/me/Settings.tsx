@@ -4,6 +4,7 @@ import { ButtonRow, InfoRow, LinkRow, ListGroup } from '../../components/List.ts
 import { Sheet } from '../../components/Sheet.tsx'
 import { SubPage } from '../../components/SubPage.tsx'
 import { FieldError, QuietButton } from '../../components/ui.tsx'
+import { useLoginModal } from '../../lib/loginModal.ts'
 import { logout } from '../../lib/logout.ts'
 import { useProfile, useSession } from '../../lib/session.tsx'
 import { storage } from '../../lib/storage.ts'
@@ -12,6 +13,7 @@ import { storage } from '../../lib/storage.ts'
 export default function Settings() {
   const profile = useProfile()
   const { isLoggedIn } = useSession()
+  const { openLogin } = useLoginModal()
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [confirmDelete, setConfirmDelete] = useState(false)
@@ -52,7 +54,7 @@ export default function Settings() {
         {isLoggedIn ? (
           <InfoRow label="登录邮箱" detail={profile.email ?? '未绑定'} />
         ) : (
-          <LinkRow href="/login" label="登录 / 注册" />
+          <ButtonRow onClick={openLogin} label="登录 / 注册" tone="accent" />
         )}
         <LinkRow href="/me/account" label="昵称和头像" />
         {profile.userId > 0 && <InfoRow label="用户 ID" detail={<span className="selectable">{profile.userId}</span>} />}

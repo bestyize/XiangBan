@@ -8,6 +8,7 @@ import { PageHeader } from '../../components/PageHeader.tsx'
 import { TAB_BAR_SPACE } from '../../components/TabBar.tsx'
 import { FieldError, Screen } from '../../components/ui.tsx'
 import { getWeeklyAfterworkSummary } from '../../lib/afterwork.ts'
+import { useLoginModal } from '../../lib/loginModal.ts'
 import { useProfile, useSession } from '../../lib/session.tsx'
 import { useAfterwork } from '../../lib/useAfterwork.ts'
 import { MeStats } from './MeStats.tsx'
@@ -31,6 +32,7 @@ function useGuardian(enabled: boolean, active: boolean) {
 export default function Me() {
   const profile = useProfile()
   const { setProfile, isLoggedIn, refresh } = useSession()
+  const { openLogin } = useLoginModal()
   const [location] = useLocation()
   // The tab stays mounted, so refresh whenever it is shown again.
   const active = location === '/me'
@@ -80,7 +82,7 @@ export default function Me() {
             <svg viewBox="0 0 24 24" className="size-5 shrink-0 text-window/40" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 5l7 7-7 7" /></svg>
           </Link>
           {!isLoggedIn && (
-            <Link href="/login" className="mt-4 block w-full rounded-full bg-lamp px-5 py-3 text-center font-bold text-ink transition active:scale-[.98]">登录 / 注册</Link>
+            <button type="button" onClick={openLogin} className="mt-4 block w-full rounded-full bg-lamp px-5 py-3 text-center font-bold text-ink transition active:scale-[.98]">登录 / 注册</button>
           )}
         </section>
 
