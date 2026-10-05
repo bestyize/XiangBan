@@ -1,23 +1,62 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="640" height="400" viewBox="0 0 640 400">
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400" viewBox="0 0 400 400">
   <defs>
-    <radialGradient id="bg" cx="25%" cy="15%" r="90%"><stop stop-color="#354962"/><stop offset="1" stop-color="#172236"/></radialGradient>
-    <pattern id="grid" width="29" height="29" patternUnits="userSpaceOnUse"><rect width="25" height="25" rx="4" fill="#2b3b52"/></pattern>
+    <radialGradient id="bg" cx="25%" cy="15%" r="90%">
+      <stop stop-color="#354962"/>
+      <stop offset="1" stop-color="#172236"/>
+    </radialGradient>
+    <pattern id="grid" width="29" height="29" patternUnits="userSpaceOnUse">
+      <rect width="25" height="25" rx="4" fill="#2b3b52"/>
+    </pattern>
   </defs>
-  <rect width="640" height="400" rx="28" fill="url(#bg)"/>
-  <circle cx="558" cy="52" r="84" fill="#edbd76" opacity=".08"/>
-  <text x="40" y="110" fill="#edbd76" font-size="40" font-weight="700" font-family="system-ui, sans-serif">小伴消方块</text>
-  <text x="42" y="152" fill="#bcc5cf" font-size="20" font-family="system-ui, sans-serif">摆一摆，消一消</text>
-  <text x="42" y="322" fill="#bcc5cf" font-size="17" font-family="system-ui, sans-serif">慢慢摆好，下班放松</text>
-  <g transform="translate(363 86)">
-    <rect x="-11" y="-11" width="251" height="251" rx="16" fill="#111d30" stroke="#50617a"/>
+  <rect width="400" height="400" rx="60" fill="url(#bg)"/>
+  <circle cx="350" cy="50" r="80" fill="#edbd76" opacity=".08"/>
+  <g transform="translate(84 48)">
+    <rect x="-11" y="-11" width="254" height="254" rx="16" fill="#111d30" stroke="#50617a" stroke-width="1.5"/>
     <rect width="232" height="232" fill="url(#grid)"/>
-    <g fill="#edbd76"><rect x="0" y="145" width="25" height="25" rx="4"/><rect x="29" y="145" width="25" height="25" rx="4"/><rect x="58" y="145" width="25" height="25" rx="4"/><rect x="87" y="145" width="25" height="25" rx="4"/><rect x="116" y="145" width="25" height="25" rx="4"/><rect x="145" y="145" width="25" height="25" rx="4"/><rect x="174" y="145" width="25" height="25" rx="4"/><rect x="203" y="145" width="25" height="25" rx="4"/></g>
-    <g fill="#8ebbc2"><rect x="29" y="87" width="25" height="25" rx="4"/><rect x="58" y="87" width="25" height="25" rx="4"/><rect x="29" y="116" width="25" height="25" rx="4"/><rect x="58" y="116" width="25" height="25" rx="4"/></g>
-    <g fill="#aa9bc5"><rect x="145" y="29" width="25" height="25" rx="4"/><rect x="145" y="58" width="25" height="25" rx="4"/><rect x="145" y="87" width="25" height="25" rx="4"/><rect x="174" y="87" width="25" height="25" rx="4"/></g>
-    <g fill="#dd9c91"><rect x="174" y="174" width="25" height="25" rx="4"/><rect x="203" y="174" width="25" height="25" rx="4"/><rect x="174" y="203" width="25" height="25" rx="4"/><rect x="203" y="203" width="25" height="25" rx="4"/></g>
-    <path d="M-8 157h248" stroke="#fff3cd" stroke-width="2" opacity=".5"/>
+    <g fill="#edbd76">
+      <rect x="0" y="145" width="25" height="25" rx="4"/>
+      <rect x="29" y="145" width="25" height="25" rx="4"/>
+      <rect x="58" y="145" width="25" height="25" rx="4"/>
+      <rect x="87" y="145" width="25" height="25" rx="4"/>
+      <rect x="116" y="145" width="25" height="25" rx="4"/>
+      <rect x="145" y="145" width="25" height="25" rx="4"/>
+      <rect x="174" y="145" width="25" height="25" rx="4"/>
+      <rect x="203" y="145" width="25" height="25" rx="4"/>
+    </g>
+    <g fill="#8ebbc2">
+      <rect x="29" y="87" width="25" height="25" rx="4"/>
+      <rect x="58" y="87" width="25" height="25" rx="4"/>
+      <rect x="29" y="116" width="25" height="25" rx="4"/>
+      <rect x="58" y="116" width="25" height="25" rx="4"/>
+    </g>
+    <g fill="#aa9bc5">
+      <rect x="145" y="29" width="25" height="25" rx="4"/>
+      <rect x="145" y="58" width="25" height="25" rx="4"/>
+      <rect x="145" y="87" width="25" height="25" rx="4"/>
+      <rect x="174" y="87" width="25" height="25" rx="4"/>
+    </g>
+    <g fill="#dd9c91">
+      <rect x="174" y="174" width="25" height="25" rx="4"/>
+      <rect x="203" y="174" width="25" height="25" rx="4"/>
+      <rect x="174" y="203" width="25" height="25" rx="4"/>
+      <rect x="203" y="203" width="25" height="25" rx="4"/>
+    </g>
+    <path d="M-8 157h248" stroke="#fff3cd" stroke-width="2.5" opacity=".7"/>
   </g>
-  <g transform="translate(48 202)" fill="#edbd76"><rect width="27" height="27" rx="5"/><rect x="32" width="27" height="27" rx="5"/><rect x="64" width="27" height="27" rx="5"/></g>
-  <g transform="translate(177 202)" fill="#8ebbc2"><rect width="27" height="27" rx="5"/><rect y="32" width="27" height="27" rx="5"/><rect x="32" y="32" width="27" height="27" rx="5"/></g>
-  <g transform="translate(269 202)" fill="#aa9bc5"><rect width="27" height="27" rx="5"/><rect x="32" width="27" height="27" rx="5"/><rect y="32" width="27" height="27" rx="5"/><rect x="32" y="32" width="27" height="27" rx="5"/></g>
+  <g transform="translate(54 322)" fill="#edbd76">
+    <rect width="24" height="24" rx="4"/>
+    <rect x="28" width="24" height="24" rx="4"/>
+    <rect x="56" width="24" height="24" rx="4"/>
+  </g>
+  <g transform="translate(178 316)" fill="#8ebbc2">
+    <rect width="24" height="24" rx="4"/>
+    <rect y="28" width="24" height="24" rx="4"/>
+    <rect x="28" y="28" width="24" height="24" rx="4"/>
+  </g>
+  <g transform="translate(276 316)" fill="#aa9bc5">
+    <rect width="24" height="24" rx="4"/>
+    <rect x="28" width="24" height="24" rx="4"/>
+    <rect y="28" width="24" height="24" rx="4"/>
+    <rect x="28" y="28" width="24" height="24" rx="4"/>
+  </g>
 </svg>
