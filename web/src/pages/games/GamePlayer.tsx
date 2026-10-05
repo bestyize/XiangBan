@@ -8,6 +8,7 @@ import { storage } from '../../lib/storage.ts'
 import { track } from '../../lib/track.ts'
 import { useProfile } from '../../lib/session.tsx'
 import { canShareFinishedRound, localResultPath, parseSnakeResult } from '../../games/resultShare.ts'
+import { canShareOtherResult, otherResultPath, parseOtherResult } from '../../games/otherResultShare.ts'
 
 interface Round { id: string | null; score: number; lines: number; maxTile: number; finished: boolean; timer: ReturnType<typeof setTimeout> | null }
 
@@ -66,7 +67,7 @@ export default function GamePlayer() {
 
   useEffect(() => {
     if (readLoginReturn()?.path === `/games/${gameId}`) clearLoginReturn()
-    if (gameId === 'snake-arena' && ['game_share', 'game-share'].includes(new URLSearchParams(location.search).get('from') || '')) setAllowed(true)
+    if (['game_share', 'game-share'].includes(new URLSearchParams(location.search).get('from') || '')) setAllowed(true)
     else ask(() => setAllowed(true))
   }, [gameId])
 
@@ -126,10 +127,13 @@ export default function GamePlayer() {
       ) return
 
       if (data.type === 'game.ready') setReady(true)
-      if (data.type === 'game.share' && gameId === 'snake-arena') {
-        const result = parseSnakeResult(data.result)
-        if (canShareFinishedRound(result, roundRef.current)) {
-          const path = localResultPath(result, profile.inviteCode)
+      if (data.type === 'game.share') {
+        const result = gameId === 'snake-arena' ? parseSnakeResult(data.result) : null
+        const other = parseOtherResult(data.result)
+        const round = roundRef.current
+        const path = canShareFinishedRound(result, round) ? localResultPath(result, profile.inviteCode)
+          : canShareOtherResult(other, gameId, round) ? otherResultPath(other, profile.inviteCode) : null
+        if (path) {
           const open = async () => {
             try { if (document.fullscreenElement) await document.exitFullscreen() } catch { /* Sharing still works outside fullscreen. */ }
             navigate(path)
@@ -153,7 +157,7 @@ export default function GamePlayer() {
       }
       if (data.type === 'game.progress' || data.type === 'game.result') {
         const round = roundRef.current
-        if (!round) return
+        if (!round || round.finished) return
         const score = Number(data.score); const lines = Number(data.lines ?? 0); const tile = Number(data.maxTile ?? 0)
         if (!Number.isInteger(score) || score < 0 || score > 1e9 || !Number.isInteger(lines) || lines < 0 || lines > 1e6 || !Number.isInteger(tile) || tile < 0 || tile > 1073741824) return
         round.score = score; round.lines = lines; round.maxTile = tile

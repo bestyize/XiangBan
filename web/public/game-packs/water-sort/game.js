@@ -126,6 +126,7 @@
   }
 
   function startLevel(index, focus = true) {
+    window.XiabanResultShare?.reset()
     const level = rules.getLevel(index)
     if (!level || index > highestUnlocked) return
     levelIndex = index
@@ -143,6 +144,7 @@
   }
 
   function showWin() {
+    window.XiabanResultShare?.finish({ gameId: 'water-sort', score: score(), level: levelIndex + 1, steps })
     won = true
     selected = null
     completed.add(levelIndex)
@@ -230,7 +232,11 @@
     if (!overlay.hidden) {
       if (event.key === 'Tab') {
         event.preventDefault()
-        ;(document.activeElement === nextButton ? replayButton : nextButton).focus({ preventScroll: true })
+        const buttons = [nextButton, replayButton]
+        const shareButton = document.getElementById('shareResultButton')
+        if (shareButton && !shareButton.hidden) buttons.unshift(shareButton)
+        const index = buttons.indexOf(document.activeElement)
+        buttons[(index + (event.shiftKey ? buttons.length - 1 : 1)) % buttons.length].focus({ preventScroll: true })
       }
       return
     }

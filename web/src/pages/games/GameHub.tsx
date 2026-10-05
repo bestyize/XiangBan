@@ -6,7 +6,6 @@ import { gamePackThumbnailUrl, loadGameCatalog, type GamePackManifest } from '..
 import { api, getToken } from '../../api/client.ts'
 import { useProfile } from '../../lib/session.tsx'
 import { PageHeader } from '../../components/PageHeader.tsx'
-import { AccountBadge } from '../../components/AccountBadge.tsx'
 import { storage } from '../../lib/storage.ts'
 import { useDisplaySettings } from '../../lib/displaySettings.tsx'
 import { visibleDisplayItems } from '../../lib/display.ts'
@@ -50,7 +49,7 @@ export default function GameHub({ active = true }: { active?: boolean }) {
   return (
     <Screen>
       <div className="flex-1" style={{ paddingBottom: TAB_BAR_SPACE }}>
-        <PageHeader title="玩一局"><AccountBadge compact /></PageHeader>
+        <PageHeader title="玩一局" />
         <p className="mt-2 text-sm text-window/65">下班后，轻松玩一局。</p>
 
         {(games === null || displayLoading) && !error && (

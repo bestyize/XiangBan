@@ -6,7 +6,9 @@
     <meta name="theme-color" content="#182338">
     <title>小伴消方块 · 下班啦</title>
     <link rel="stylesheet" href="./game.css">
+    <link rel="stylesheet" href="../result-share.css">
     <script src="./rules.js" defer></script>
+    <script src="../result-share.js" defer></script>
     <script src="./game.js" defer></script>
   </head>
   <body>
@@ -29,6 +31,7 @@
               <p class="eyebrow">这一局结束啦</p>
               <h2 id="resultTitle">歇一会，再来一局？</h2>
               <p id="resultScore"></p>
+              <button id="shareResultButton" class="result-share-button" type="button" hidden>分享战绩，邀请朋友挑战</button>
               <button id="restartOverlay" class="primary-button" type="button">再来一局</button>
             </div>
           </div>

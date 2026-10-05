@@ -44,11 +44,13 @@
       message.channel !== HOST_CHANNEL || message.protocol !== PROTOCOL ||
       message.type !== 'host.init' || message.nonce !== HOST_NONCE
     ) return
+    if (hostReady) { postToHost('game.ready'); return }
     document.body.classList.add('hosted')
     hostReady = true
     postToHost('game.ready')
     postToHost('game.start')
     postToHost('game.progress', { score, maxTile: Math.max(...board.flat()) })
+    if (overlayMode === 'lost') postToHost('game.result', { score, maxTile: Math.max(...board.flat()) })
     boardNode.focus({ preventScroll: true })
   })
 
@@ -80,6 +82,8 @@
   }
 
   function showResult(mode) {
+    window.XiabanResultShare?.reset()
+    if (mode !== 'won') window.XiabanResultShare?.finish({ gameId: 'merge-2048', score, maxTile: Math.max(...board.flat()) })
     if (mode !== 'won') postToHost('game.result', { score, maxTile: Math.max(...board.flat()) })
     overlayMode = mode
     pointerStart = null
@@ -127,6 +131,7 @@
   }
 
   function resetGame() {
+    window.XiabanResultShare?.reset()
     board = rules.addTile(rules.addTile(rules.createBoard()).board).board
     score = 0
     won = false
@@ -153,6 +158,8 @@
     if (overlayMode) {
       if (event.key === 'Tab') {
         const buttons = continueButton.hidden ? [restartOverlay] : [continueButton, restartOverlay]
+        const shareButton = document.getElementById('shareResultButton')
+        if (shareButton && !shareButton.hidden) buttons.unshift(shareButton)
         const index = buttons.indexOf(document.activeElement)
         const next = event.shiftKey ? (index - 1 + buttons.length) % buttons.length : (index + 1) % buttons.length
         event.preventDefault()

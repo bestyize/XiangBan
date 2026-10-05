@@ -153,6 +153,7 @@
   }
 
   function showResult() {
+    window.XiabanResultShare?.finish({ gameId: 'block-puzzle', score: state.score, lines: state.lines })
     stopDrag()
     overlay.hidden = false
     restartButton.disabled = true
@@ -276,7 +277,11 @@
     if (event.ctrlKey || event.altKey || event.metaKey) return
     if (event.key === 'Escape') { event.preventDefault(); stopDrag(); exitGame(); return }
     if (state.over) {
-      if (event.key === 'Tab') { event.preventDefault(); restartOverlay.focus() }
+      if (event.key === 'Tab') {
+        const shareButton = document.getElementById('shareResultButton')
+        event.preventDefault()
+        ;(shareButton && !shareButton.hidden && document.activeElement !== shareButton ? shareButton : restartOverlay).focus()
+      }
       return
     }
     if (['1', '2', '3'].includes(event.key)) {
@@ -296,6 +301,7 @@
   })
 
   function resetGame() {
+    window.XiabanResultShare?.reset()
     if (state) stopDrag()
     state = rules.createGame()
     selected = null

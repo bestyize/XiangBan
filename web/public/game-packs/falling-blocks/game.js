@@ -65,11 +65,13 @@
       message.type !== 'host.init' ||
       message.nonce !== HOST_NONCE
     ) return
+    if (hostReady) { postToHost('game.ready'); return }
     document.body.classList.add('hosted')
     hostReady = true
     postToHost('game.ready')
     postToHost('game.start')
     postToHost('game.progress', { score, lines })
+    if (finished) postToHost('game.result', { score, lines })
   })
 
   function shuffle(items) {
@@ -196,6 +198,7 @@
   }
 
   function endGame() {
+    window.XiabanResultShare?.finish({ gameId: 'falling-blocks', score, lines })
     postToHost('game.result', { score, lines })
     finished = true
     paused = false
@@ -205,6 +208,7 @@
     resultScore.textContent = '本局得分 ' + score + '，消除 ' + lines + ' 行'
     gameOver.hidden = false
     setStatus('这一局结束啦。')
+    document.getElementById('shareResultButton')?.focus({ preventScroll: true })
   }
 
   function clearFullRows() {
@@ -299,6 +303,7 @@
   }
 
   function resetGame() {
+    window.XiabanResultShare?.reset()
     if (timer !== null) window.clearInterval(timer)
     timer = null
     board = emptyBoard()
@@ -331,6 +336,13 @@
   })
 
   document.addEventListener('keydown', (event) => {
+    if (finished && event.key === 'Tab') {
+      const shareButton = document.getElementById('shareResultButton')
+      const restart = document.getElementById('restartOverlay')
+      event.preventDefault()
+      ;(shareButton && !shareButton.hidden && document.activeElement !== shareButton ? shareButton : restart).focus({ preventScroll: true })
+      return
+    }
     const actionByKey = {
       ArrowLeft: 'left',
       ArrowRight: 'right',

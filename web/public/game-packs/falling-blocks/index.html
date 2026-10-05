@@ -6,6 +6,8 @@
     <meta name="theme-color" content="#182338">
     <title>俄罗斯方块</title>
     <link rel="stylesheet" href="./game.css">
+    <link rel="stylesheet" href="../result-share.css">
+    <script src="../result-share.js" defer></script>
     <script src="./game.js" defer></script>
   </head>
   <body>
@@ -33,11 +35,12 @@
       <section class="board-stage" aria-label="游戏区域">
         <div class="board-wrap">
           <canvas id="board" width="250" height="500" role="img" aria-label="下落方块游戏区域"></canvas>
-          <div class="game-over" id="gameOver" hidden>
+          <div class="game-over" id="gameOver" role="dialog" aria-modal="true" aria-labelledby="resultTitle" aria-describedby="resultScore" hidden>
             <div class="result-card">
               <p class="eyebrow">这一局结束啦</p>
               <h2 id="resultTitle">再来一局？</h2>
               <p id="resultScore">本局得分 0</p>
+              <button id="shareResultButton" class="result-share-button" type="button" hidden>分享战绩，邀请朋友挑战</button>
               <button class="primary-button" id="restartOverlay" type="button">重新开始</button>
             </div>
           </div>

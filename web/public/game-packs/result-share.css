@@ -1,0 +1,3 @@
+.result-share-button { display: block; width: 100%; min-height: 44px; margin: 12px 0 0; padding: 10px 14px; border: 1px solid #edbd76; border-radius: 12px; background: #edbd76; color: #182338; font: inherit; font-weight: 650; cursor: pointer; touch-action: manipulation; }
+.result-share-button[hidden] { display: none; }
+.result-share-button:focus-visible { outline: 3px solid #fff; outline-offset: 3px; }

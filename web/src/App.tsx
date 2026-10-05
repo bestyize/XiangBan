@@ -25,7 +25,7 @@ import { readLoginReturn } from './lib/loginReturn.ts'
 import { lazyPage } from './lib/lazyPage.ts'
 import AdminPage from './pages/AdminPage.tsx'
 import AccountProfile from './pages/me/AccountProfile.tsx'
-import { GAME_SHARE_PATH } from './games/resultShare.ts'
+import { sharePageGameId, RESULT_GAMES } from './games/otherResultShare.ts'
 import { DisplaySettingsProvider } from './lib/displaySettings.tsx'
 
 const Tests = lazyPage(() => import('./quizzes/Tests.tsx'))
@@ -65,7 +65,7 @@ function SessionRoutes() {
   const [location] = useLocation()
 
   // Public tests never wait for an account or the onboarding gate.
-  if (location === '/tests' || location.startsWith('/tests/') || location === GAME_SHARE_PATH) {
+  if (location === '/tests' || location.startsWith('/tests/') || sharePageGameId(location)) {
     return null
   }
 
@@ -90,7 +90,7 @@ function SessionRoutes() {
     )
   }
   if (location === '/login') return <LoginRoute />
-  if (location === '/games/snake-arena') return <GamePlayer key={profile.userId} />
+  if (location === '/games/snake-arena' || (Object.keys(RESULT_GAMES).some(id => location === `/games/${id}`) && ['game_share', 'game-share'].includes(new URLSearchParams(window.location.search).get('from') || ''))) return <GamePlayer key={profile.userId} />
   if (!profile.onboarded && !['/hello', '/me', '/me/account', '/me/settings'].includes(location)) return <Redirect to="/hello" replace />
 
   return (
@@ -127,6 +127,7 @@ function AppPages() {
   const tests = location === '/tests' || location.startsWith('/tests/')
   const quizSync = useAccountProgress(tests)
   const primary = ['/', '/chat', '/games', '/tests', '/me'].includes(location)
+  const shareGameId = sharePageGameId(location)
   usePageViews()
   useEffect(() => {
     const titles: Record<string, string> = { '/': '下班啦', '/chat': '小伴', '/games': '玩一局', '/tests': '趣味测试', '/me': '我的' }
@@ -134,7 +135,7 @@ function AppPages() {
   }, [location])
   return <>
     <Gate />
-    {location === GAME_SHARE_PATH && <Suspense fallback={<Screen><p className="mt-8 text-window/60">正在打开战绩卡…</p></Screen>}><GameShare /></Suspense>}
+    {shareGameId && <Suspense fallback={<Screen><p className="mt-8 text-window/60">正在打开战绩卡…</p></Screen>}><GameShare key={shareGameId} gameId={shareGameId} /></Suspense>}
     <KeepAlivePage active={location === '/tests'}>
       {quizSync.pending ? <Screen><p className="mt-8 text-window/60">正在找回你的测试进度…</p></Screen> : <>
         {quizSync.error && <p role="status" className="mx-auto max-w-[480px] px-5 pt-3 text-xs text-window/60">{quizSync.error}</p>}
@@ -148,7 +149,7 @@ function AppPages() {
 
 export default function App() {
   const [location] = useLocation()
-  const publicTests = location === '/tests' || location.startsWith('/tests/') || location === GAME_SHARE_PATH
+  const publicTests = location === '/tests' || location.startsWith('/tests/') || Boolean(sharePageGameId(location))
   const admin = location === '/admin' || location.startsWith('/admin/')
   const [sessionStarted, setSessionStarted] = useState((!publicTests && !admin) || Boolean(getToken()))
   const [loginOpen, setLoginOpen] = useState(false)
