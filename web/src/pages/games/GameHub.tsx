@@ -68,7 +68,7 @@ export default function GameHub({ active = true }: { active?: boolean }) {
                     ? <img src={gamePackThumbnailUrl(game)} alt="" />
                     : <span aria-hidden="true">🧩</span>}
                 </span>
-                <span className="game-card-name">{game.name}</span>
+                <span className="game-card-name">{game.name}{game.orientation === 'landscape' && <small className="game-card-orientation">横屏</small>}</span>
                 <span className="game-card-desc">{game.description}</span>
                 <span className="game-card-foot">
                   {record && record.sessions > 0

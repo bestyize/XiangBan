@@ -20,6 +20,13 @@ function createNonce(): string {
   }
 }
 
+function gameSafeArea() {
+  const style = getComputedStyle(document.documentElement)
+  return Object.fromEntries(['top', 'right', 'bottom', 'left'].map((side) => [
+    side, Math.max(0, Math.min(160, parseFloat(style.getPropertyValue('--safe-' + side)) || 0)),
+  ]))
+}
+
 export default function GamePlayer() {
   const [, params] = useRoute('/games/:gameId')
   const [, navigate] = useLocation()
@@ -33,6 +40,24 @@ export default function GamePlayer() {
   const iframeRef = useRef<HTMLIFrameElement>(null)
   const roundRef = useRef<Round | null>(null)
   const [recordError, setRecordError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (pack?.orientation === 'landscape') document.documentElement.dataset.gameLayout = 'landscape'
+    return () => { delete document.documentElement.dataset.gameLayout }
+  }, [pack?.orientation])
+
+  useEffect(() => {
+    if (pack?.orientation !== 'landscape') return
+    const sendLayout = () => iframeRef.current?.contentWindow?.postMessage({
+      channel: HOST_CHANNEL, protocol: GAME_RUNTIME_PROTOCOL, type: 'host.layout', nonce, safeArea: gameSafeArea(),
+    }, '*')
+    window.addEventListener('resize', sendLayout)
+    document.addEventListener('fullscreenchange', sendLayout)
+    return () => {
+      window.removeEventListener('resize', sendLayout)
+      document.removeEventListener('fullscreenchange', sendLayout)
+    }
+  }, [pack?.orientation, nonce])
 
   useEffect(() => {
     if (readLoginReturn()?.path === `/games/${gameId}`) clearLoginReturn()
@@ -135,11 +160,12 @@ export default function GamePlayer() {
       protocol: GAME_RUNTIME_PROTOCOL,
       type: 'host.init',
       nonce,
+      safeArea: gameSafeArea(),
     }, '*')
   }
 
   return (
-    <div className="game-stage">
+    <div className={'game-stage' + (pack?.orientation === 'landscape' ? ' game-stage-landscape' : '')}>
       {error ? (
         <main className="game-stage-message">
           <p role="alert" className="text-sm text-blush">{error}</p>
@@ -154,7 +180,9 @@ export default function GamePlayer() {
             ref={iframeRef}
             title={pack.name}
             src={gameEntryUrl(pack, nonce)}
-            sandbox="allow-scripts"
+            sandbox="allow-scripts allow-orientation-lock"
+            allow="fullscreen"
+            allowFullScreen
             onLoad={initializeGame}
             className="game-stage-frame"
           />

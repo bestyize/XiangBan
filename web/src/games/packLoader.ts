@@ -6,6 +6,7 @@ export interface GamePackManifest {
   entry: string
   cover?: string
   runtimeProtocol: number
+  orientation?: 'landscape'
 }
 
 export const GAME_RUNTIME_PROTOCOL = 1
@@ -49,6 +50,7 @@ export async function loadGameManifest(id: string, signal?: AbortSignal): Promis
     typeof value.description !== 'string' ||
     !safeEntryPath(value.entry) ||
     (value.cover !== undefined && !safeEntryPath(value.cover)) ||
+    (value.orientation !== undefined && value.orientation !== 'landscape') ||
     value.runtimeProtocol !== GAME_RUNTIME_PROTOCOL
   ) {
     throw new Error('游戏包清单格式不支持')
@@ -62,6 +64,7 @@ export async function loadGameManifest(id: string, signal?: AbortSignal): Promis
     entry: value.entry,
     cover: typeof value.cover === 'string' ? value.cover : undefined,
     runtimeProtocol: GAME_RUNTIME_PROTOCOL,
+    orientation: value.orientation as 'landscape' | undefined,
   }
 }
 

@@ -13,7 +13,7 @@ import java.util.UUID
 
 class GameRecords(private val db: Db) {
     suspend fun start(userId: Long, gameId: String): GameSessionView {
-        if (gameId !in setOf("merge-2048", "falling-blocks", "block-puzzle", "water-sort")) badRequest("没有找到这款游戏")
+        if (gameId !in setOf("merge-2048", "falling-blocks", "block-puzzle", "water-sort", "snake-arena")) badRequest("没有找到这款游戏")
         val id = UUID.randomUUID()
         return db.read { c -> c.queryOne("insert into game_sessions(id,user_id,game_id) values (?,?,?) returning *", id, userId, gameId, map = ::view)!! }
     }

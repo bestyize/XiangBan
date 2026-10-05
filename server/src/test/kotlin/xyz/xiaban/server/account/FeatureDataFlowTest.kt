@@ -9,9 +9,9 @@ import xyz.xiaban.shared.*
 import kotlin.test.*
 
 class FeatureDataFlowTest {
-    @Test fun `new puzzle game records are stored independently and reject unknown games`() = apiTest {
+    @Test fun `game packs store independent records and reject unknown games`() = apiTest {
         val player = session()
-        for ((gameId, score) in listOf("block-puzzle" to 96L, "water-sort" to 300L)) {
+        for ((gameId, score) in listOf("block-puzzle" to 96L, "water-sort" to 300L, "snake-arena" to 1250L)) {
             val game = post("/api/games/sessions", player.token, GameStart(gameId)).body<GameSessionView>()
             assertEquals(gameId, game.gameId)
             val result = put("/api/games/sessions/${game.id}", player.token, GameProgress(score = score, finished = true)).body<GameSessionView>()
@@ -19,9 +19,10 @@ class FeatureDataFlowTest {
             assertNotNull(result.finishedAt)
         }
         val summaries = get("/api/games/summary", player.token).body<List<GameSummary>>().associateBy { it.gameId }
-        assertEquals(setOf("block-puzzle", "water-sort"), summaries.keys)
+        assertEquals(setOf("block-puzzle", "water-sort", "snake-arena"), summaries.keys)
         assertEquals(96L, summaries.getValue("block-puzzle").bestScore)
         assertEquals(300L, summaries.getValue("water-sort").bestScore)
+        assertEquals(1250L, summaries.getValue("snake-arena").bestScore)
         assertEquals(HttpStatusCode.BadRequest, post("/api/games/sessions", player.token, GameStart("unknown-game")).status)
     }
 
