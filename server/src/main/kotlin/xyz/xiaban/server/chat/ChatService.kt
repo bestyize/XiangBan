@@ -59,7 +59,7 @@ class ChatService(
         }
 
         if (!available || !flags.llmEnabled()) {
-            val fallback = "小伴正在打盹呢，等它醒来再陪你聊吧～"
+            val fallback = "小伴的聊天暂时关闭了，稍后再来找它吧。"
             if (userId != null) repository.append(userId, "assistant", fallback)
             onChunk(fallback)
             return fallback

@@ -68,6 +68,14 @@ Administrator sessions expire after eight hours. Changing the administrator pass
 
 Without SMTP configuration, sending a verification code returns an explicit service-unavailable response rather than reporting a logged email as delivered. Codes expire after ten minutes, are scoped to their device account and operation, allow five wrong guesses, and can be consumed only once. Resends are limited per email, account, and IP address. Existing-email login merges guest records only when the user chooses to do so; binding a guest from the account page retains its original merge behavior.
 
+## Model service switch
+
+The switch on `/admin/llm` is the authoritative switch for both companion chat and check-in AI rewrites. Once model settings are saved, their `enabled` value takes precedence over `LLM_ENABLED` and the old Redis `xb:flags / llm` value. Enabling a configured provider from the admin page therefore does not require a second environment or Redis switch.
+
+Before any admin model settings exist, the server preserves the old Redis switch if present, otherwise uses `LLM_ENABLED` as the initial default. The legacy `/api/admin/flags` endpoint remains supported: its model switch reads and writes the same saved model settings, preserving providers, API keys and search configuration. Other Redis feature flags retain their original behavior.
+
+Disabling the model service prevents environment-provider fallback as well as configured-provider calls. Unreadable encrypted model settings also leave calls disabled; preserve `SETTINGS_ENCRYPTION_KEY` when deploying or restoring backups. This change needs an updated backend deployment but no database schema migration.
+
 ## 2. Create a dedicated deploy key
 
 On your own computer, generate a key pair specifically for this workflow:

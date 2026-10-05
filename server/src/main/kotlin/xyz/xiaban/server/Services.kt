@@ -80,7 +80,12 @@ class Services(
     val tokens = Tokens(config.jwtSecret, redis = redis, accountState = users::authState)
     val cities = Cities.load()
     val calendar = HolidayCalendar.load()
-    val flags = FeatureFlags(redis, config.llm.enabledByDefault, config.goHomeEnabled, config.appDownloadUrl)
+    val defaultLlmProviders: List<LlmProvider> = llmProviders ?: config.llm.endpoints.map { OpenAiCompatibleProvider(it, http) }
+    val llmSettings = xyz.xiaban.server.admin.LlmSettingsStore(
+        db, config, http, defaultLlmProviders,
+        initialEnabled = { FeatureFlags.legacyLlmEnabled(redis, config.llm.enabledByDefault) },
+    )
+    val flags = FeatureFlags(redis, config.llm.enabledByDefault, config.goHomeEnabled, config.appDownloadUrl, llmSettings)
 
     val profiles = ProfileService(users, cities)
     val avatars = xyz.xiaban.server.users.AvatarService(db)
@@ -98,8 +103,6 @@ class Services(
     val copyLibrary = CopyLibrary.load()
     val moderation = CopyModeration(db, redis)
     val memories = MemoryService(db)
-    val defaultLlmProviders: List<LlmProvider> = llmProviders ?: config.llm.endpoints.map { OpenAiCompatibleProvider(it, http) }
-    val llmSettings = xyz.xiaban.server.admin.LlmSettingsStore(db, config, http, defaultLlmProviders)
     val dynamicLlm = xyz.xiaban.server.llm.DynamicLlmProvider { llmSettings.activeProvider() }
     val activeLlmProviders = listOf(dynamicLlm)
     val checkinRepository = CheckinRepository(db)

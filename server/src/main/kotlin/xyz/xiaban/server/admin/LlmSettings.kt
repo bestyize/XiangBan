@@ -3,6 +3,7 @@ package xyz.xiaban.server.admin
 import io.ktor.client.HttpClient
 import io.ktor.http.HttpStatusCode
 import kotlinx.serialization.Serializable
+import org.slf4j.LoggerFactory
 import xyz.xiaban.server.config.AppConfig
 import xyz.xiaban.server.config.LlmEndpoint
 import xyz.xiaban.server.db.Db
@@ -13,6 +14,7 @@ import xyz.xiaban.server.http.AppJson
 import xyz.xiaban.server.http.badRequest
 import xyz.xiaban.server.llm.LlmProvider
 import xyz.xiaban.server.llm.OpenAiCompatibleProvider
+import xyz.xiaban.server.flags.LlmSwitch
 import java.security.MessageDigest
 import java.security.SecureRandom
 import java.time.Duration
@@ -67,7 +69,8 @@ class LlmSettingsStore(
     private val config: AppConfig,
     private val http: HttpClient,
     private val defaultProviders: List<LlmProvider>,
-) {
+    private val initialEnabled: suspend () -> Boolean = { config.llm.enabledByDefault },
+) : LlmSwitch {
     private val key = SecretKeySpec(
         MessageDigest.getInstance("SHA-256").digest(
             ("xiaban-settings:" + (config.settingsEncryptionKey ?: config.jwtSecret)).toByteArray()
@@ -83,7 +86,10 @@ class LlmSettingsStore(
         if (saved != null) {
             return runCatching {
                 AppJson.decodeFromString(LlmSettings.serializer(), decrypt(saved))
-            }.getOrElse { LlmSettings() }
+            }.getOrElse {
+                log.warn("Saved LLM settings could not be decoded; model calls remain disabled")
+                LlmSettings(enabled = false)
+            }
         }
         // Fallback to environment variables if present
         val envProviders = config.llm.endpoints.map {
@@ -97,7 +103,7 @@ class LlmSettingsStore(
             )
         }
         return LlmSettings(
-            enabled = config.llm.enabledByDefault,
+            enabled = initialEnabled(),
             activeProviderId = envProviders.firstOrNull()?.id.orEmpty(),
             providers = envProviders,
         )
@@ -152,6 +158,12 @@ class LlmSettingsStore(
         return next.redacted()
     }
 
+    override suspend fun enabled(): Boolean = current().enabled
+
+    override suspend fun setEnabled(enabled: Boolean) {
+        save(current().copy(enabled = enabled))
+    }
+
     suspend fun test(request: LlmTestRequest): String {
         val currentSettings = current()
         val existingApiKey = request.id?.let { id ->
@@ -182,17 +194,7 @@ class LlmSettingsStore(
     }
 
     suspend fun activeProvider(): LlmProvider? {
-        val settings = current()
-        val target = settings.providers.find { it.id == settings.activeProviderId }
-            ?: settings.providers.firstOrNull()
-        if (target != null && target.configured()) {
-            if (!settings.enabled) return null
-            return OpenAiCompatibleProvider(
-                LlmEndpoint(target.name, target.baseUrl, target.apiKey, target.model),
-                http
-            )
-        }
-        return defaultProviders.firstOrNull()
+        return resolveLlmProvider(current(), defaultProviders, http)
     }
 
     private fun encrypt(value: String): String {
@@ -210,4 +212,17 @@ class LlmSettingsStore(
         cipher.updateAAD("llm".toByteArray())
         return String(cipher.doFinal(bytes.copyOfRange(12, bytes.size)), Charsets.UTF_8)
     }
+
+    private companion object {
+        val log = LoggerFactory.getLogger(LlmSettingsStore::class.java)
+    }
+}
+
+/** Apply the switch before any provider or environment fallback can be selected. */
+internal fun resolveLlmProvider(settings: LlmSettings, defaults: List<LlmProvider>, http: HttpClient): LlmProvider? {
+    if (!settings.enabled) return null
+    val target = settings.providers.find { it.id == settings.activeProviderId } ?: settings.providers.firstOrNull()
+    return if (target != null && target.configured()) {
+        OpenAiCompatibleProvider(LlmEndpoint(target.name, target.baseUrl, target.apiKey, target.model), http)
+    } else defaults.firstOrNull()
 }
