@@ -58,31 +58,30 @@ export default function GameHub({ active = true }: { active?: boolean }) {
           <p className="mt-8 text-sm text-window/55">新游戏还在路上。</p>
         )}
 
-        <div className="mt-6 space-y-3">
-          {games?.map((game) => (
-            <Link
-              key={game.id}
-              href={'/games/' + game.id}
-              className="flex items-center gap-4 rounded-2xl border border-window/10 bg-dusk-soft/35 p-4 transition hover:bg-dusk-soft/60 active:scale-[0.98] active:bg-dusk-soft/60"
-            >
-              {game.cover ? (
-                <img src={gamePackThumbnailUrl(game)} alt="" className="size-14 shrink-0 rounded-2xl object-cover" />
-              ) : (
-                <span className="flex size-14 shrink-0 items-center justify-center rounded-2xl bg-lamp/15 text-3xl" aria-hidden="true">🧩</span>
-              )}
-              <span className="min-w-0 flex-1">
-                <span className="block font-bold text-window">{game.name}</span>
-                <span className="mt-1 block text-sm text-window/60">{game.description}</span>
-              </span>
-              <span className="shrink-0 text-sm text-lamp">开一局 ›</span>
-            </Link>
-          ))}
+        <div className="game-grid">
+          {games?.map((game) => {
+            const record = summaries.find((item) => item.gameId === game.id)
+            return (
+              <Link key={game.id} href={'/games/' + game.id} className="game-card">
+                <span className="game-card-cover">
+                  {game.cover
+                    ? <img src={gamePackThumbnailUrl(game)} alt="" />
+                    : <span aria-hidden="true">🧩</span>}
+                </span>
+                <span className="game-card-name">{game.name}</span>
+                <span className="game-card-desc">{game.description}</span>
+                <span className="game-card-foot">
+                  {record && record.sessions > 0
+                    ? <><b>{record.bestScore}</b><small>最高分 · {record.sessions} 局</small></>
+                    : <small>还没玩过</small>}
+                  <span className="game-card-play" aria-hidden="true">▶</span>
+                </span>
+              </Link>
+            )
+          })}
         </div>
 
-        <section className="mt-6 rounded-2xl bg-dusk-soft/35 p-4"><div className="flex items-center justify-between"><h2 className="font-bold">我的游戏记录</h2><button className="text-xs text-lamp underline" onClick={() => void refreshRecords()}>刷新</button></div>
-          {recordError && <p role="alert" className="mt-2 text-xs text-blush">{recordError}</p>}
-          {summaries.length ? summaries.map((record) => <div key={record.gameId} className="mt-3 flex justify-between gap-3 text-sm"><span>{games?.find((game) => game.id === record.gameId)?.name ?? record.gameId}</span><span className="text-window/65">{record.sessions} 局 · 最高 {record.bestScore} 分</span></div>) : <p className="mt-3 text-sm text-window/50">还没有游戏记录，轻松开一局吧。</p>}
-        </section>
+        {recordError && <p role="alert" className="mt-4 text-xs text-blush">{recordError}</p>}
       </div>
     </Screen>
   )

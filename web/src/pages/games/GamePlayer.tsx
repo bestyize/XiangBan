@@ -2,7 +2,6 @@ import { useLoginReminder } from '../../components/LoginReminder.tsx'
 import { clearLoginReturn, readLoginReturn } from '../../lib/loginReturn.ts'
 import { useEffect, useRef, useState } from 'react'
 import { useLocation, useRoute } from 'wouter'
-import { Screen } from '../../components/ui.tsx'
 import { GAME_RUNTIME_PROTOCOL, gameEntryUrl, loadGameManifest, type GamePackManifest } from '../../games/packLoader.ts'
 import { api, getToken } from '../../api/client.ts'
 import { storage } from '../../lib/storage.ts'
@@ -140,45 +139,31 @@ export default function GamePlayer() {
   }
 
   return (
-    <Screen className="px-3" style={{ height: "100dvh", minHeight: 0, overflow: "hidden", paddingBottom: "var(--safe-bottom)" }}>
-      <div className="flex min-h-0 flex-1 flex-col">
-        <header className="flex h-10 shrink-0 items-center justify-between">
-          <button type="button" onClick={() => navigate('/games')} className="text-sm text-window/70">
-            ‹ 退出游戏
+    <div className="game-stage">
+      {error ? (
+        <main className="game-stage-message">
+          <p role="alert" className="text-sm text-blush">{error}</p>
+          <button type="button" className="mt-4 text-sm text-lamp" onClick={() => navigate('/games')}>
+            返回游戏广场
           </button>
-          <span className="text-sm text-lamp">{pack?.name ?? '游戏'}</span>
-          <span className="w-16" aria-hidden="true" />
-        </header>
-        {recordError && <p role="status" className="text-[11px] text-window/50">{recordError}</p>}
-
-        {error ? (
-          <div className="mt-8 rounded-2xl bg-dusk-soft/35 p-5">
-            <p role="alert" className="text-sm text-blush">{error}</p>
-            <button type="button" className="mt-4 text-sm text-lamp" onClick={() => navigate('/games')}>
-              返回游戏广场
-            </button>
-          </div>
-        ) : pack && allowed ? (
-          <div className="relative mt-2 min-h-0 flex-1 overflow-hidden rounded-2xl border border-window/10 bg-dusk-deep">
-            {!ready && (
-              <div className="absolute inset-0 z-10 flex items-center justify-center bg-dusk-deep text-sm text-window/65">
-                正在加载游戏…
-              </div>
-            )}
-            <iframe
-              ref={iframeRef}
-              title={pack.name}
-              src={gameEntryUrl(pack, nonce)}
-              sandbox="allow-scripts"
-              onLoad={initializeGame}
-              className="absolute inset-0 block h-full w-full border-0"
-            />
-          </div>
-        ) : (
-          <p className="mt-8 text-sm text-window/55">正在读取游戏包…</p>
-        )}
-      </div>
+        </main>
+      ) : pack && allowed ? (
+        <>
+          {!ready && <div className="game-stage-loading" role="status">正在加载游戏…</div>}
+          <iframe
+            ref={iframeRef}
+            title={pack.name}
+            src={gameEntryUrl(pack, nonce)}
+            sandbox="allow-scripts"
+            onLoad={initializeGame}
+            className="game-stage-frame"
+          />
+        </>
+      ) : (
+        <p className="game-stage-message text-sm text-window/55">正在读取游戏包…</p>
+      )}
+      {recordError && <p role="status" className="game-stage-notice">{recordError}</p>}
       {modal}
-    </Screen>
+    </div>
   )
 }

@@ -33,8 +33,24 @@ button[hidden], .overlay[hidden] { display: none; }
   flex-direction: column;
   gap: 12px;
 }
-body.hosted .game { padding-top: 12px; padding-bottom: 12px; }
-body.hosted #exitButton { display: none; }
+body.hosted .game { padding-top: max(8px, env(safe-area-inset-top, 0px)); padding-bottom: max(10px, env(safe-area-inset-bottom, 0px)); gap: 10px; }
+.exit-arrow { display: none; }
+/* Embedded in the app: a slim HUD instead of a web page. Back arrow + three numbers, then the board. */
+body.hosted .topbar { display: contents; }
+body.hosted .topbar > div, body.hosted .intro, body.hosted .help, body.hosted .status { display: none; }
+body.hosted .game { display: grid; grid-template-columns: 44px minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr) auto; align-content: stretch; align-items: center; }
+body.hosted #exitButton { grid-column: 1; grid-row: 1; width: 44px; min-height: 44px; padding: 0; border: 0; background: transparent; border-radius: 12px; display: grid; place-items: center; }
+body.hosted #exitButton:active { background: rgba(243, 238, 228, 0.08); }
+body.hosted .exit-arrow { display: block; font-size: 38px; line-height: 1; margin-top: -4px; }
+body.hosted .exit-label { display: none; }
+body.hosted .stats { grid-column: 2; grid-row: 1; gap: 6px; }
+body.hosted .stat { display: flex; flex-direction: column; justify-content: center; padding: 5px 6px; border-radius: 12px; }
+body.hosted .stat span { font-size: 12px; }
+body.hosted .stat strong { margin-top: 0; font-size: 20px; }
+body.hosted .board-stage { grid-column: 1 / -1; grid-row: 2; align-self: stretch; }
+body.hosted .board-shell { width: min(100cqw, 100cqh); }
+body.hosted .controls { grid-column: 1 / -1; grid-row: 3; width: 100%; }
+body.hosted .footer { display: none; }
 .topbar { display: flex; align-items: center; justify-content: space-between; gap: 8px; flex: 0 0 auto; }
 .eyebrow { margin: 0 0 4px; color: var(--muted); font-size: 11px; letter-spacing: 0.06em; }
 h1 { margin: 0; color: var(--lamp); font-size: 36px; line-height: 1.15; letter-spacing: -0.04em; }

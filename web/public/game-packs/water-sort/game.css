@@ -20,7 +20,33 @@ h1 { margin: 0; font-size: clamp(23px, 4vw, 31px); letter-spacing: .04em; }
 .quiet-button { background: #ffffff08; color: #e4e9ed; border: 1px solid #ffffff20; border-radius: 11px; min-height: 42px; padding: 8px 14px; white-space: nowrap; }
 .quiet-button:hover:enabled { background: #ffffff14; }
 .exit-button { font-size: 12px; padding-inline: 12px; }
-.hosted .exit-button { display: none; }
+.exit-arrow { display: none; }
+/* Embedded in the app: fixed to the screen. Slim HUD on top, the cups fill the middle, undo/reset at the bottom. */
+.hosted, .hosted body { height: 100dvh; }
+body.hosted { overflow: hidden; }
+.hosted .game { width: min(100%, 480px); height: 100dvh; padding: max(8px, env(safe-area-inset-top, 0px)) 14px max(10px, env(safe-area-inset-bottom, 0px)); display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; grid-template-rows: auto minmax(0, 1fr) auto auto; align-items: center; gap: 10px; }
+.hosted .topbar { display: contents; }
+.hosted .topbar > div, .hosted .intro, .hosted .help, .hosted .level-bar label { display: none; }
+.hosted .exit-button { grid-column: 1; grid-row: 1; width: 44px; min-height: 44px; padding: 0; border: 0; background: transparent; display: grid; place-items: center; }
+.hosted .exit-button:active { background: #ffffff14; }
+.hosted .exit-arrow { display: block; font-size: 38px; line-height: 1; margin-top: -4px; }
+.hosted .exit-label { display: none; }
+.hosted .stats { grid-column: 2; grid-row: 1; margin: 0; gap: 6px; }
+.hosted .stats > div { padding: 5px 8px; border-radius: 12px; }
+.hosted .stats span { font-size: 12px; }
+.hosted .stats strong { margin-top: 0; font-size: 18px; }
+.hosted .level-bar { grid-column: 3; grid-row: 1; }
+.hosted select { min-height: 44px; max-width: 96px; font-size: 14px; }
+.hosted .stage { grid-column: 1 / -1; grid-row: 2; align-self: stretch; min-height: 0; display: flex; align-items: center; padding: 14px 10px; }
+.hosted .board { width: 100%; row-gap: clamp(14px, 4dvh, 34px); align-content: center; }
+.hosted .tube-button { min-height: 0; }
+.hosted .glass { width: min(100%, 78px); height: clamp(112px, 17dvh, 150px); }
+.hosted .segment { font-size: 12px; }
+.hosted .tube-number { font-size: 12px; }
+.hosted .status { grid-column: 1 / -1; grid-row: 3; min-height: 20px; margin: 0 4px; font-size: 13px; text-align: center; }
+.hosted .footer { grid-column: 1 / -1; grid-row: 4; }
+.hosted .actions { width: 100%; }
+.hosted .actions button { flex: 1; min-height: 46px; font-size: 14px; }
 .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 19px 0 14px; }
 .stats > div { padding: 10px 14px; background: #ffffff05; border: 1px solid #ffffff0d; border-radius: 12px; }
 .stats span { display: block; font-size: 11px; color: var(--muted); }
