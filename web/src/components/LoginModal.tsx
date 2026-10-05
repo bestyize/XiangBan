@@ -5,7 +5,6 @@ import { TERMS_VERSION } from '../lib/consent.ts'
 import { clearLoginReturn, readLoginReturn } from '../lib/loginReturn.ts'
 import { useSession } from '../lib/session.tsx'
 import { EmailBind } from '../pages/me/EmailBind.tsx'
-import { Cat } from './Cat.tsx'
 
 /** Centered login dialog over a dimmed page, opened from anywhere via useLoginModal(). */
 export function LoginModal({ open, onClose }: { open: boolean; onClose: () => void }) {
@@ -58,7 +57,6 @@ export function LoginModal({ open, onClose }: { open: boolean; onClose: () => vo
           <span>已阅读并同意<Link href="/terms" onClick={dismiss} className="text-lamp">《用户协议》</Link>和<Link href="/privacy" onClick={dismiss} className="text-lamp">《隐私政策》</Link></span>
         </label>
       </div>
-      <div className="app-modal-avatar" aria-hidden="true"><Cat spec={{ eyes: 'open', mouth: 'smile', blush: true }} label="小伴" size={76} /></div>
     </dialog>
   )
 }
