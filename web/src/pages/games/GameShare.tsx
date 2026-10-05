@@ -28,7 +28,7 @@ export default function GameShare() {
   }, [])
 
   useEffect(() => {
-    document.title = '贪吃蛇战绩｜下班了么'
+    document.title = '贪吃蛇战绩｜下班啦'
     if (!own) captureReferral()
   }, [own, context.search])
   useEffect(() => {

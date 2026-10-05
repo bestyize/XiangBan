@@ -81,7 +81,7 @@ data class AppConfig(
                         user = env.str("SMTP_USER", ""),
                         password = env.str("SMTP_PASSWORD", ""),
                         from = env.optional("SMTP_FROM") ?: error("SMTP_FROM is required with SMTP_HOST"),
-                        fromName = env.str("SMTP_FROM_NAME", "下班了么"),
+                        fromName = env.str("SMTP_FROM_NAME", "下班啦"),
                         ssl = env.bool("SMTP_SSL", true),
                     )
                 },

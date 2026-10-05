@@ -129,8 +129,8 @@ function AppPages() {
   const primary = ['/', '/chat', '/games', '/tests', '/me'].includes(location)
   usePageViews()
   useEffect(() => {
-    const titles: Record<string, string> = { '/': '下班了么', '/chat': '小伴', '/games': '玩一局', '/tests': '趣味测试', '/me': '我的' }
-    if (titles[location]) document.title = `${titles[location]}｜下班了么`
+    const titles: Record<string, string> = { '/': '下班啦', '/chat': '小伴', '/games': '玩一局', '/tests': '趣味测试', '/me': '我的' }
+    if (titles[location]) document.title = `${titles[location]}｜下班啦`
   }, [location])
   return <>
     <Gate />

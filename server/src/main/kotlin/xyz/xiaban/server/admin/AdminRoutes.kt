@@ -123,7 +123,7 @@ fun Route.adminRoutes(services: Services) {
             if (services.redis.cmd.set("xb:admin:testmail:$username", "1", io.lettuce.core.SetArgs.Builder.nx().ex(30)).await() != "OK") {
                 tooMany("请等 30 秒再发送测试邮件")
             }
-            try { services.mailer.send(Mail(email, "下班了么 · 邮件服务测试", "这是一封由管理后台请求发送的测试邮件。收到它说明 SMTP 发信链路已接通。")) }
+            try { services.mailer.send(Mail(email, "下班啦 · 邮件服务测试", "这是一封由管理后台请求发送的测试邮件。收到它说明 SMTP 发信链路已接通。")) }
             catch (_: Exception) { throw ApiException(HttpStatusCode.ServiceUnavailable, "mail_send_failed", "测试邮件发送失败，请检查主机、端口、授权码与 TLS 设置") }
             call.respond(OkResponse())
         }

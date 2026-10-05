@@ -54,7 +54,7 @@ export function GuardianForm({ initial, busy, error, onSubmit }: GuardianFormPro
 
       <label className="flex gap-3 text-sm text-window/85">
         <input type="checkbox" className="mt-0.5 size-4 shrink-0 accent-[var(--color-lamp)]" checked={value.consent} onChange={(e) => set({ consent: e.target.checked })} />
-        我知道这不是急救服务，邮件可能延迟或被拦截；同意下班了么在我没打卡时给联系人发邮件。
+        我知道这不是急救服务，邮件可能延迟或被拦截；同意下班啦在我没打卡时给联系人发邮件。
       </label>
       <label className="flex gap-3 text-sm text-window/85">
         <input type="checkbox" className="mt-0.5 size-4 shrink-0 accent-[var(--color-lamp)]" checked={value.informedContact} onChange={(e) => set({ informedContact: e.target.checked })} />

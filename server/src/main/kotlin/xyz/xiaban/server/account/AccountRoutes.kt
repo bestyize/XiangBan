@@ -146,7 +146,7 @@ fun Route.accountRoutes(services: Services) {
         if (ok) services.users.setRecallOptIn(userId!!, false)
         val message = if (ok) "已经退订，小伴不会再发这类邮件打扰你了。" else "这个退订链接不对，可以在「我的」里关掉提醒邮件。"
         call.respondText(
-            "<!doctype html><meta charset=utf-8><meta name=viewport content=\"width=device-width\"><title>下班了么</title>" +
+            "<!doctype html><meta charset=utf-8><meta name=viewport content=\"width=device-width\"><title>下班啦</title>" +
                 "<body style=\"font-family:sans-serif;background:#1f2758;color:#fff1c9;padding:48px 24px;text-align:center\"><p>$message</p></body>",
             ContentType.Text.Html,
             if (ok) HttpStatusCode.OK else HttpStatusCode.BadRequest,

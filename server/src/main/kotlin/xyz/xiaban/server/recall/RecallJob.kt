@@ -70,7 +70,7 @@ class RecallJob(
                     kind = "recall",
                     to = email,
                     subject = "${user.companionName}有点想你",
-                    text = "$line\n\n回来打个卡：$publicBaseUrl\n\n不想再收到这类邮件，点这里退订：${links.link(userId)}\n— 下班了么",
+                    text = "$line\n\n回来打个卡：$publicBaseUrl\n\n不想再收到这类邮件，点这里退订：${links.link(userId)}\n— 下班啦",
                 ),
             )
             db.read { c -> c.execute("update users set recall_count = recall_count + 1, last_recall_at = ? where id = ?", now, userId) }

@@ -97,7 +97,7 @@ class GuardianScheduler(
             在休假的话，可以在「我的 → 平安守护」里暂停。
 
             本服务不是急救服务，紧急情况请拨打 120 或 110。
-            — 下班了么
+            — 下班啦
         """.trimIndent(),
     )
 
@@ -105,16 +105,16 @@ class GuardianScheduler(
         kind = "guardian_notify",
         to = g.contactEmail,
         ref = "$REF_PREFIX$alertId",
-        subject = "${g.selfName}已经 ${g.thresholdDays} 个工作日没有在下班了么报平安",
+        subject = "${g.selfName}已经 ${g.thresholdDays} 个工作日没有在下班啦报平安",
         text = """
             ${g.contactName}你好：
 
-            ${g.selfName}在「下班了么」里开启了平安守护，并把你设为联系人。
+            ${g.selfName}在「下班啦」里开启了平安守护，并把你设为联系人。
             ta 已经连续 ${g.thresholdDays} 个工作日没有打卡了。可能只是忘了，也可能在休假。
             方便的话，给 ta 打个电话或发条消息问问。
 
             本服务不是急救服务，紧急情况请拨打 120 或 110。
-            — 下班了么 xiaban.xyz
+            — 下班啦 xiaban.xyz
         """.trimIndent(),
     )
 

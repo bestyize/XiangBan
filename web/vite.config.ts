@@ -12,8 +12,8 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.ico', 'apple-touch-icon-180x180.png', 'fonts/xiaban-display.woff2'],
       manifest: {
-        name: '下班了么',
-        short_name: '下班了么',
+        name: '下班啦',
+        short_name: '下班啦',
         description: '每天下班打一次卡，小伴在家等你。',
         lang: 'zh-CN',
         theme_color: '#182338',

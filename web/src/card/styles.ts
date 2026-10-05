@@ -36,7 +36,7 @@ export function cardStatLine(checkin: Checkin, companionName: string): string {
   const { percentile, streak, totalDays } = checkin.stats
   if (percentile && percentile.percent >= 20) {
     const where = percentile.scope === 'city' && percentile.cityName ? percentile.cityName : ''
-    return `比${where} ${percentile.percent}% 的下班了么用户下班早`
+    return `比${where} ${percentile.percent}% 的下班啦用户下班早`
   }
   if (streak >= 2) return `已经连续打卡 ${streak} 天`
   return `和${companionName}相伴的第 ${totalDays} 天`

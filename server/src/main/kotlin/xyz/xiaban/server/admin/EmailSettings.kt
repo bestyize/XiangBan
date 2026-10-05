@@ -26,7 +26,7 @@ data class EmailSettings(
     val user: String = "",
     val password: String = "",
     val from: String = "",
-    val fromName: String = "下班了么",
+    val fromName: String = "下班啦",
     val ssl: Boolean = true,
     val passwordConfigured: Boolean = false,
 ) {

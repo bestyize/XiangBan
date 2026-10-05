@@ -103,7 +103,7 @@ async function drawFooter(ctx: CanvasRenderingContext2D, style: CardStyle, link:
   ctx.textAlign = 'left'
   ctx.fillStyle = style.accent
   ctx.font = `80px ${DISPLAY}`
-  ctx.fillText('你下班了么？', 396, 1700)
+  ctx.fillText('你下班啦？', 396, 1700)
   ctx.fillStyle = WINDOW
   ctx.font = `46px ${SANS}`
   ctx.fillText('xiaban.xyz', 398, 1772)
@@ -130,7 +130,7 @@ export async function renderCard({ checkin, profile, style, showCity, link }: Ca
   ctx.textAlign = 'left'
   ctx.fillStyle = style.accent
   ctx.font = `64px ${DISPLAY}`
-  ctx.fillText('下班了么', 90, 170)
+  ctx.fillText('下班啦', 90, 170)
   const date = formatDay(new Date(checkin.checkedAt))
   const city = showCity && profile.cityName && profile.cityCode !== 'other' ? `${profile.cityName}  ` : ''
   ctx.textAlign = 'right'

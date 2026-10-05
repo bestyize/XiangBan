@@ -71,7 +71,7 @@ services:
       SMTP_USER: ${SMTP_USER:-}
       SMTP_PASSWORD: ${SMTP_PASSWORD:-}
       SMTP_FROM: ${SMTP_FROM:-}
-      SMTP_FROM_NAME: ${SMTP_FROM_NAME:-下班了么}
+      SMTP_FROM_NAME: ${SMTP_FROM_NAME:-下班啦}
       SMTP_SSL: ${SMTP_SSL:-true}
       GO_HOME_ENABLED: ${GO_HOME_ENABLED:-false}
       APP_DOWNLOAD_URL: ${APP_DOWNLOAD_URL:-}

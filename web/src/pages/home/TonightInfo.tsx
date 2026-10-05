@@ -10,7 +10,7 @@ function percentileLine(checkin: Checkin): string | null {
   const p = checkin.stats.percentile
   if (!p) return null
   const where = p.scope === 'city' && p.cityName ? p.cityName : ''
-  return `你比${where} ${p.percent}% 的下班了么用户下班早`
+  return `你比${where} ${p.percent}% 的下班啦用户下班早`
 }
 
 /** PRD 5.5 practical info plus the day's numbers; tips arrive a moment after the title. */

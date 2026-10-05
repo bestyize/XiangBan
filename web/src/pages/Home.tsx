@@ -16,7 +16,7 @@ export default function Home({ active = true }: { active?: boolean }) {
   return (
     <Screen>
       <div className="flex flex-1 flex-col" style={{ paddingBottom: TAB_BAR_SPACE }}>
-        <PageHeader title="下班了么">
+        <PageHeader title="下班啦">
             <button type="button" onClick={() => setDexOpen(true)} aria-haspopup="dialog"
               className="flex min-h-11 shrink-0 items-center gap-1.5 rounded-full border border-lamp/35 bg-lamp/10 px-2 text-[11px] text-lamp transition active:scale-95 min-[400px]:px-3 min-[400px]:text-xs">
               <svg aria-hidden="true" viewBox="0 0 24 24" className="size-4" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v15M12 5C9 3 5 3 3 4v15c2-1 6-1 9 1 3-2 7-2 9-1V4c-2-1-6-1-9 1Z" /></svg>

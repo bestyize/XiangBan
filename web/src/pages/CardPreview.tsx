@@ -87,7 +87,7 @@ export default function CardPreview() {
       send('save_image', { base64, mime: 'image/png' })
       track('card_save', { via: 'app' })
     } else {
-      send('share', { base64, mime: 'image/png', text: '你下班了么？', url: shareLink })
+      send('share', { base64, mime: 'image/png', text: '你下班啦？', url: shareLink })
       track('card_share', { via: 'app' })
     }
   }
@@ -130,7 +130,7 @@ export default function CardPreview() {
       {!app && !wechat && image && (
         <div className="mt-auto flex gap-3 pt-6">
           {canShare && (
-            <PrimaryButton onClick={() => navigator.share({ files: [image.file], title: '下班了么', text: '你下班了么？' }).then(() => track('card_share', { via: 'web_share' })).catch(() => undefined)}>
+            <PrimaryButton onClick={() => navigator.share({ files: [image.file], title: '下班啦', text: '你下班啦？' }).then(() => track('card_share', { via: 'web_share' })).catch(() => undefined)}>
               分享给朋友
             </PrimaryButton>
           )}
