@@ -98,6 +98,10 @@ class Services(
     val copyLibrary = CopyLibrary.load()
     val moderation = CopyModeration(db, redis)
     val memories = MemoryService(db)
+    val defaultLlmProviders: List<LlmProvider> = llmProviders ?: config.llm.endpoints.map { OpenAiCompatibleProvider(it, http) }
+    val llmSettings = xyz.xiaban.server.admin.LlmSettingsStore(db, config, http, defaultLlmProviders)
+    val dynamicLlm = xyz.xiaban.server.llm.DynamicLlmProvider { llmSettings.activeProvider() }
+    val activeLlmProviders = listOf(dynamicLlm)
     val checkinRepository = CheckinRepository(db)
     val stats = StatsService(checkinRepository, calendar)
     val unlocks = UnlockService(db)
@@ -107,13 +111,15 @@ class Services(
         profiles = profiles,
         cities = cities,
         memories = memories,
-        service = PolishService(llmProviders ?: config.llm.endpoints.map { OpenAiCompatibleProvider(it, http) }, Duration.ofMillis(config.llm.timeoutMs)),
+        service = PolishService(activeLlmProviders, Duration.ofMillis(config.llm.timeoutMs)),
         flags = flags,
         quota = LlmQuota(redis, config.llm.dailyLimitPerUser),
         queue = PolishQueue(redis, clock),
         weather = weather,
         clock = clock,
     )
+    val chatRepository = xyz.xiaban.server.chat.ChatRepository(db)
+    val chat = xyz.xiaban.server.chat.ChatService(chatRepository, profiles, memories, activeLlmProviders, flags)
     val checkins = CheckinService(
         profiles = profiles,
         checkins = checkinRepository,

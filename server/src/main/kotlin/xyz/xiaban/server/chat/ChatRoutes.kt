@@ -1,0 +1,68 @@
+package xyz.xiaban.server.chat
+
+import io.ktor.http.ContentType
+import io.ktor.http.HttpHeaders
+import io.ktor.server.auth.authenticate
+import io.ktor.server.plugins.ratelimit.rateLimit
+import io.ktor.server.request.receive
+import io.ktor.server.response.respond
+import io.ktor.server.response.respondTextWriter
+import io.ktor.server.routing.Route
+import io.ktor.server.routing.delete
+import io.ktor.server.routing.get
+import io.ktor.server.routing.post
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
+import xyz.xiaban.server.Services
+import xyz.xiaban.server.auth.AUTH_USER
+import xyz.xiaban.server.auth.userId
+import xyz.xiaban.server.http.AppJson
+import xyz.xiaban.server.http.RateLimits
+import xyz.xiaban.server.http.badRequest
+import xyz.xiaban.shared.ApiPaths
+import xyz.xiaban.shared.ChatHistoryResponse
+import xyz.xiaban.shared.ChatMessageView
+import xyz.xiaban.shared.ChatStreamRequest
+import xyz.xiaban.shared.OkResponse
+
+fun Route.chatRoutes(services: Services) {
+    get(ApiPaths.CHAT_MESSAGES) {
+        val bearer = call.request.headers[HttpHeaders.Authorization]?.removePrefix("Bearer ")?.trim()
+        val userId = bearer?.let { services.tokens.userIdOrNull(it) }
+        val messages = if (userId != null) services.chat.list(userId) else emptyList()
+        call.respond(ChatHistoryResponse(messages))
+    }
+
+    rateLimit(RateLimits.CHAT) {
+        post(ApiPaths.CHAT_STREAM) {
+            val req = runCatching { call.receive<ChatStreamRequest>() }.getOrElse {
+                badRequest("请求格式不对")
+            }
+            if (req.message.isBlank()) {
+                badRequest("消息内容不能为空")
+            }
+
+            val bearer = call.request.headers[HttpHeaders.Authorization]?.removePrefix("Bearer ")?.trim()
+            val userId = bearer?.let { services.tokens.userIdOrNull(it) }
+
+            call.respondTextWriter(contentType = ContentType.Text.EventStream) {
+                services.chat.stream(userId, req.message, req.guestHistory) { delta ->
+                    val obj = buildJsonObject { put("delta", delta) }
+                    write("data: ${obj}\n\n")
+                    flush()
+                }
+                write("data: [DONE]\n\n")
+                flush()
+            }
+        }
+    }
+
+    delete(ApiPaths.CHAT_MESSAGES) {
+        val bearer = call.request.headers[HttpHeaders.Authorization]?.removePrefix("Bearer ")?.trim()
+        val userId = bearer?.let { services.tokens.userIdOrNull(it) }
+        if (userId != null) {
+            services.chat.clear(userId)
+        }
+        call.respond(OkResponse())
+    }
+}

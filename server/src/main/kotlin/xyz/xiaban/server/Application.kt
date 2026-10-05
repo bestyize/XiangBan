@@ -8,6 +8,7 @@ import io.ktor.server.routing.routing
 import xyz.xiaban.server.account.accountRoutes
 import xyz.xiaban.server.admin.adminRoutes
 import xyz.xiaban.server.auth.installAuth
+import xyz.xiaban.server.chat.chatRoutes
 import xyz.xiaban.server.checkin.checkinRoutes
 import xyz.xiaban.server.config.AppConfig
 import xyz.xiaban.server.http.healthRoutes
@@ -32,6 +33,7 @@ fun Application.xiaban(services: Services) {
         healthRoutes(services)
         userRoutes(services)
         checkinRoutes(services)
+        chatRoutes(services)
         accountRoutes(services)
         featureRoutes(services)
         adminRoutes(services)

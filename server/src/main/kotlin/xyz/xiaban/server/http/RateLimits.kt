@@ -13,6 +13,7 @@ import kotlin.time.Duration.Companion.minutes
 object RateLimits {
     val CHECKIN = RateLimitName("checkin")
     val EVENTS = RateLimitName("events")
+    val CHAT = RateLimitName("chat")
 }
 
 fun Application.installRateLimits() {
@@ -25,6 +26,10 @@ fun Application.installRateLimits() {
         register(RateLimits.EVENTS) {
             rateLimiter(limit = 60, refillPeriod = 1.minutes)
             requestKey { call -> call.request.origin.remoteHost }
+        }
+        register(RateLimits.CHAT) {
+            rateLimiter(limit = 30, refillPeriod = 1.minutes)
+            requestKey { call -> call.principal<UserPrincipal>()?.userId ?: call.request.origin.remoteHost }
         }
     }
 }

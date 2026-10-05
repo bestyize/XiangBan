@@ -32,3 +32,19 @@ export interface MetricsResponse {
   visits: MetricSeries[]; growth: MetricSeries[]; product: MetricSeries[]
   games: MetricSeries[]; quizzes: MetricSeries[]
 }
+
+export interface LlmProviderConfig {
+  id: string
+  name: string
+  baseUrl: string
+  apiKey: string
+  model: string
+  apiKeyConfigured: boolean
+}
+
+export interface LlmSettings {
+  enabled: boolean
+  activeProviderId: string
+  providers: LlmProviderConfig[]
+}
+

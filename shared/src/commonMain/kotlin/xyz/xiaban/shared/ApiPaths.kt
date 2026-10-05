@@ -23,4 +23,6 @@ object ApiPaths {
     const val ACCOUNT_EXPORT = "/api/account/export"
     const val CONSENT = "/api/consent"
     const val EVENTS = "/api/events"
+    const val CHAT_MESSAGES = "/api/chat/messages"
+    const val CHAT_STREAM = "/api/chat/stream"
 }

@@ -116,6 +116,21 @@ fun Route.adminRoutes(services: Services) {
             catch (_: Exception) { throw ApiException(HttpStatusCode.ServiceUnavailable, "mail_send_failed", "测试邮件发送失败，请检查主机、端口、授权码与 TLS 设置") }
             call.respond(OkResponse())
         }
+        get("/llm") {
+            call.requireAdmin(services)
+            call.respond(services.llmSettings.current().redacted())
+        }
+        put("/llm") {
+            val actor = call.requireAdmin(services)
+            val saved = services.llmSettings.save(call.receive<LlmSettings>(), actor)
+            call.respond(saved)
+        }
+        post("/llm/test") {
+            call.requireAdmin(services)
+            val req = call.receive<LlmTestRequest>()
+            val reply = services.llmSettings.test(req)
+            call.respond(LlmTestResponse(reply))
+        }
         get("/flags") { call.requireAdmin(services); call.respond(services.flags.view()) }
         put("/flags") { call.requireAdmin(services); call.respond(services.flags.update(call.receive<FlagsUpdate>())) }
         get("/reports") {

@@ -18,6 +18,7 @@ import ProfileEdit from './pages/me/ProfileEdit.tsx'
 import Onboarding from './pages/onboarding/Onboarding.tsx'
 import GameHub from './pages/games/GameHub.tsx'
 import GamePlayer from './pages/games/GamePlayer.tsx'
+import CompanionRoom from './pages/chat/CompanionRoom.tsx'
 import { LoginModal } from './components/LoginModal.tsx'
 import { LoginModalContext, useLoginModal } from './lib/loginModal.ts'
 import { readLoginReturn } from './lib/loginReturn.ts'
@@ -33,6 +34,7 @@ function AccountTabs({ location }: { location: string }) {
   return <>
     {profile?.onboarded && <>
       <KeepAlivePage active={location === '/'}><Home active={location === '/'} /></KeepAlivePage>
+      <KeepAlivePage active={location === '/chat'}><CompanionRoom active={location === '/chat'} /></KeepAlivePage>
       <KeepAlivePage active={location === '/games'}><GameHub active={location === '/games'} /></KeepAlivePage>
     </>}
     <KeepAlivePage active={location === '/me'}><Me /></KeepAlivePage>
@@ -93,6 +95,7 @@ function SessionRoutes() {
       <Route path="/card" component={CardPreview} />
       <Route path="/games/:gameId"><GamePlayer key={profile.userId} /></Route>
       <Route path="/games">{null}</Route>
+      <Route path="/chat">{null}</Route>
       <Route path="/me/account"><AccountProfile /></Route>
       <Route path="/me/guardian" component={GuardianPage} />
       <Route path="/me/profile" component={ProfileEdit} />
@@ -119,10 +122,10 @@ function AppPages() {
   const { profile } = useSession()
   const tests = location === '/tests' || location.startsWith('/tests/')
   const quizSync = useAccountProgress(tests)
-  const primary = ['/', '/games', '/tests', '/me'].includes(location)
+  const primary = ['/', '/chat', '/games', '/tests', '/me'].includes(location)
   usePageViews()
   useEffect(() => {
-    const titles: Record<string, string> = { '/': '下班了么', '/games': '玩一局', '/tests': '趣味测试', '/me': '我的' }
+    const titles: Record<string, string> = { '/': '下班了么', '/chat': '小伴', '/games': '玩一局', '/tests': '趣味测试', '/me': '我的' }
     if (titles[location]) document.title = `${titles[location]}｜下班了么`
   }, [location])
   return <>
