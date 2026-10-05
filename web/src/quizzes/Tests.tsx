@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, Route, Switch, useLocation } from 'wouter'
 import { TAB_BAR_SPACE } from '../components/TabBar.tsx'
+import { AccountBadge } from '../components/AccountBadge.tsx'
 import { PageHeader } from '../components/PageHeader.tsx'
 import { NavBar } from '../components/SubPage.tsx'
 import { findQuiz, findSharedQuiz, quizCatalog } from './catalog.ts'
@@ -29,7 +30,7 @@ export function QuizHub({ active = true }: { active?: boolean }) {
     return guest?.answers.some((answer) => answer !== null) && !readSavedAttempt(quiz, profile.userId)
   }) : []
   return <main className="quiz-shell quiz-hub" style={{ paddingBottom: TAB_BAR_SPACE }}>
-    <PageHeader title="趣味测试" />
+    <PageHeader title="趣味测试"><AccountBadge compact /></PageHeader>
     <p className="quiz-hub-intro">选个小测试，给此刻的自己一张名片。</p>
     {localProgress.length > 0 && <div className="mb-4 rounded-2xl border border-lamp/20 bg-lamp/5 p-3 text-xs leading-relaxed text-window/70">
       本机还有 {localProgress.length} 套游客测试进度。
@@ -53,11 +54,14 @@ export function QuizHub({ active = true }: { active?: boolean }) {
 }
 
 function Missing({ report = false, invalid = false }: { report?: boolean; invalid?: boolean }) {
-  return <main className="quiz-shell quiz-empty">
-    <span className="quiz-eyebrow">AFTER HOURS LAB</span>
-    <h1>{report ? (invalid ? '这份分享链接不完整' : '报告还在等你的答案') : '还没有这套测试'}</h1>
-    <p>{report ? (invalid ? '链接可能被截断，向朋友要一份完整链接，或自己测一次吧。' : '先完成一套测试，你的结果名片就会出现在这里。') : '回合集看看，挑一个现在想玩的。'}</p>
-    <Link className="quiz-button" href="/tests">去测试合集 →</Link>
+  return <main className="quiz-shell quiz-empty-shell app-subpage">
+    <NavBar title="趣味测试" back="/tests" />
+    <div className="quiz-empty">
+      <span className="quiz-eyebrow">AFTER HOURS LAB</span>
+      <h1>{report ? (invalid ? '这份分享链接不完整' : '报告还在等你的答案') : '还没有这套测试'}</h1>
+      <p>{report ? (invalid ? '链接可能被截断，向朋友要一份完整链接，或自己测一次吧。' : '先完成一套测试，你的结果名片就会出现在这里。') : '回合集看看，挑一个现在想玩的。'}</p>
+      <Link className="quiz-button" href="/tests">去测试合集 →</Link>
+    </div>
   </main>
 }
 

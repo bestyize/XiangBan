@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
+import { Suspense, useEffect, useMemo, useState } from 'react'
 import { Redirect, Route, Switch, useLocation } from 'wouter'
 import Habits from './pages/me/Habits.tsx'
 import Settings from './pages/me/Settings.tsx'
@@ -21,11 +21,12 @@ import GamePlayer from './pages/games/GamePlayer.tsx'
 import { LoginModal } from './components/LoginModal.tsx'
 import { LoginModalContext, useLoginModal } from './lib/loginModal.ts'
 import { readLoginReturn } from './lib/loginReturn.ts'
+import { lazyPage } from './lib/lazyPage.ts'
 import AdminPage from './pages/AdminPage.tsx'
 import AccountProfile from './pages/me/AccountProfile.tsx'
 
-const Tests = lazy(() => import('./quizzes/Tests.tsx'))
-const QuizHub = lazy(() => import('./quizzes/Tests.tsx').then((module) => ({ default: module.QuizHub })))
+const Tests = lazyPage(() => import('./quizzes/Tests.tsx'))
+const QuizHub = lazyPage<{ active?: boolean }>(() => import('./quizzes/Tests.tsx').then((module) => ({ default: module.QuizHub })))
 
 function AccountTabs({ location }: { location: string }) {
   const { profile } = useSession()
