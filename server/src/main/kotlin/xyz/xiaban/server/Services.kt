@@ -123,6 +123,14 @@ class Services(
         clock = clock,
     )
     val searchService = xyz.xiaban.server.search.SearchService(http)
+    // Speech needs its own client: the shared one has no WebSocket support and 2s/5s timeouts.
+    private val ttsHttp = xyz.xiaban.server.tts.edgeTtsHttpClient()
+    val tts = xyz.xiaban.server.tts.TtsService(
+        client = xyz.xiaban.server.tts.EdgeTtsClient(ttsHttp),
+        redis = redis,
+        enabled = { llmSettings.current().voiceEnabled },
+        configuredVoice = { llmSettings.current().voice },
+    )
     val chatRepository = xyz.xiaban.server.chat.ChatRepository(db)
     val chat = xyz.xiaban.server.chat.ChatService(
         chatRepository,
@@ -191,6 +199,7 @@ class Services(
 
     override fun close() {
         weather.close()
+        ttsHttp.close()
         http.close()
         redis.close()
         db.close()

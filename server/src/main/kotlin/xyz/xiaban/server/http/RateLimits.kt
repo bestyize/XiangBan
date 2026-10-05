@@ -14,6 +14,7 @@ object RateLimits {
     val CHECKIN = RateLimitName("checkin")
     val EVENTS = RateLimitName("events")
     val CHAT = RateLimitName("chat")
+    val TTS = RateLimitName("tts")
 }
 
 fun Application.installRateLimits() {
@@ -29,6 +30,11 @@ fun Application.installRateLimits() {
         }
         register(RateLimits.CHAT) {
             rateLimiter(limit = 30, refillPeriod = 1.minutes)
+            requestKey { call -> call.principal<UserPrincipal>()?.userId ?: call.request.origin.remoteHost }
+        }
+        // Each miss calls an unofficial upstream service, so speech is throttled harder than chat.
+        register(RateLimits.TTS) {
+            rateLimiter(limit = 20, refillPeriod = 1.minutes)
             requestKey { call -> call.principal<UserPrincipal>()?.userId ?: call.request.origin.remoteHost }
         }
     }

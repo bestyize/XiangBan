@@ -43,6 +43,9 @@ data class LlmSettings(
     val providers: List<LlmProviderConfig> = emptyList(),
     val webSearchEnabled: Boolean = false,
     val webSearchBaseUrl: String = "",
+    val voiceEnabled: Boolean = false,
+    /** Voice used when the user has no personality-specific mapping, e.g. "zh-CN-XiaoxiaoNeural". */
+    val voice: String = "zh-CN-XiaoxiaoNeural",
 ) {
     fun redacted() = copy(providers = providers.map { it.redacted() })
 }
@@ -52,6 +55,13 @@ data class SearchTestRequest(val baseUrl: String)
 
 @Serializable
 data class SearchTestResponse(val success: Boolean, val count: Int, val sampleTitle: String)
+
+/** One selectable speech voice in the admin console. */
+@Serializable
+data class VoiceOption(val shortName: String, val gender: String, val locale: String)
+
+@Serializable
+data class VoiceTestRequest(val voice: String, val text: String = "")
 
 @Serializable
 data class LlmTestRequest(
@@ -132,11 +142,18 @@ class LlmSettingsStore(
             if (p.model.isBlank()) badRequest("模型名称不能为空")
         }
 
+        val voice = request.voice.trim()
+        if (voice.isNotEmpty() && !voice.matches(Regex("^[A-Za-z0-9-]{1,64}$"))) {
+            badRequest("音色名称格式不正确")
+        }
+
         val next = request.copy(
             activeProviderId = request.activeProviderId.trim(),
             providers = sanitizedProviders,
             webSearchEnabled = request.webSearchEnabled,
             webSearchBaseUrl = request.webSearchBaseUrl.trim().trimEnd('/'),
+            // Empty means "follow the companion personality"; the field is only a pin.
+            voice = voice,
         )
 
         val encrypted = encrypt(AppJson.encodeToString(LlmSettings.serializer(), next))

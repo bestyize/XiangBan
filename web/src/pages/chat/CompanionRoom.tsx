@@ -5,6 +5,7 @@ import { useProfile } from '../../lib/session.tsx'
 import type { Eyes, Mouth } from '../../cat/face.ts'
 import { getScenario } from './ChatScenarios.ts'
 import { useChat } from './useChat.ts'
+import { useSpeech } from './useSpeech.ts'
 
 const personalityName = {
   toxic: '毒舌心软',
@@ -13,9 +14,15 @@ const personalityName = {
   tsundere: '高冷傲娇',
 } as const
 
+/** Stable key for a message row, used to track which reply is being spoken. */
+function messageId(message: { id?: number }, index: number): string {
+  return message.id != null ? `id-${message.id}` : `idx-${index}`
+}
+
 export default function CompanionRoom({ active = true }: { active?: boolean }) {
   const profile = useProfile()
   const { messages, streamingText, isStreaming, error, send, clear } = useChat(active)
+  const { speak, speakingId, loadingId } = useSpeech()
   const [input, setInput] = useState('')
   const [toast, setToast] = useState<string | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -132,6 +139,33 @@ export default function CompanionRoom({ active = true }: { active?: boolean }) {
                 }`}
               >
                 {m.content}
+                {m.role === 'assistant' && (
+                  <button
+                    type="button"
+                    onClick={() => void speak(messageId(m, i), m.content)}
+                    aria-label={speakingId === messageId(m, i) ? '停止朗读' : '朗读这条回复'}
+                    className="mt-2 flex min-h-8 items-center gap-1.5 rounded-full px-2 text-xs text-window/55 transition active:scale-95 hover:bg-window/10 hover:text-window"
+                  >
+                    {loadingId === messageId(m, i) ? (
+                      <>
+                        <span className="inline-block size-3 animate-spin rounded-full border border-current border-t-transparent" aria-hidden="true" />
+                        正在生成…
+                      </>
+                    ) : speakingId === messageId(m, i) ? (
+                      <>
+                        <svg viewBox="0 0 24 24" className="size-3.5" fill="currentColor" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1" /><rect x="14" y="5" width="4" height="14" rx="1" /></svg>
+                        停止
+                      </>
+                    ) : (
+                      <>
+                        <svg viewBox="0 0 24 24" className="size-3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                          <path d="M11 5 6 9H3v6h3l5 4V5Z" /><path d="M16 9a4 4 0 0 1 0 6" />
+                        </svg>
+                        听小伴念
+                      </>
+                    )}
+                  </button>
+                )}
               </div>
             </div>
           ))}

@@ -1,12 +1,15 @@
 package xyz.xiaban.server.admin
 
+import io.ktor.http.ContentType
 import io.ktor.http.Cookie
+import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.ApplicationCall
 import io.ktor.server.plugins.origin
 import io.ktor.server.request.receive
 import io.ktor.server.request.httpMethod
 import io.ktor.server.response.respond
+import io.ktor.server.response.respondBytes
 import io.ktor.server.response.header
 import io.ktor.server.routing.*
 import kotlinx.serialization.Serializable
@@ -147,6 +150,18 @@ fun Route.adminRoutes(services: Services) {
             val req = call.receive<SearchTestRequest>()
             val res = services.searchService.test(req.baseUrl)
             call.respond(res)
+        }
+        get("/llm/voices") {
+            call.requireAdmin(services)
+            call.respond(services.tts.voices().map { VoiceOption(it.shortName, it.gender, it.locale) })
+        }
+        post("/llm/test-voice") {
+            call.requireAdmin(services)
+            val req = call.receive<VoiceTestRequest>()
+            val audio = services.tts.preview(req.voice, req.text.ifBlank { "你好，我是小伴，今天也辛苦啦。" })
+                ?: throw ApiException(HttpStatusCode.ServiceUnavailable, "tts_unavailable", "语音合成失败，请检查服务器网络或稍后再试")
+            call.response.header(HttpHeaders.CacheControl, "no-store")
+            call.respondBytes(audio.bytes, ContentType.parse(audio.mimeType))
         }
         get("/flags") { call.requireAdmin(services); call.respond(services.flags.view()) }
         put("/flags") { call.requireAdmin(services); call.respond(services.flags.update(call.receive<FlagsUpdate>())) }

@@ -48,5 +48,8 @@ export interface LlmSettings {
   providers: LlmProviderConfig[]
   webSearchEnabled: boolean
   webSearchBaseUrl: string
+  voiceEnabled: boolean
+  /** Empty means the voice follows the user's companion personality. */
+  voice: string
 }
 

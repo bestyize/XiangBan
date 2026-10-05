@@ -20,3 +20,7 @@ data class ChatStreamRequest(
     val message: String,
     val guestHistory: List<ChatMessageView> = emptyList(),
 )
+
+/** Text to speak aloud; the server picks the voice from the user's companion personality. */
+@Serializable
+data class ChatSpeakRequest(val text: String)

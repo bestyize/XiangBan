@@ -63,7 +63,7 @@ class AccountFlowTest {
 suspend fun ApiScope.bind(token: String, email: String): BindResponse {
     put(ApiPaths.CONSENT, token, xyz.xiaban.shared.ConsentUpdate("0.1", false))
     post(ApiPaths.BIND_CODE, token, EmailCodeRequest(email))
-    val mail = TestEnv.awaitMail { it.to == email.lowercase() && it.subject.startsWith("下班了么验证码") }
+    val mail = TestEnv.awaitMail { it.to == email.lowercase() && it.subject.startsWith("下班啦验证码") }
     val code = Regex("\\d{6}").find(mail.subject)!!.value
     synchronized(TestEnv.mailer.sent) { TestEnv.mailer.sent.remove(mail) }
     // Lift the one-minute resend cooldown so a test can bind the same address again right away.

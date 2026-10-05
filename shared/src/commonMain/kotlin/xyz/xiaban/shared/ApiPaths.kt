@@ -25,4 +25,5 @@ object ApiPaths {
     const val EVENTS = "/api/events"
     const val CHAT_MESSAGES = "/api/chat/messages"
     const val CHAT_STREAM = "/api/chat/stream"
+    const val CHAT_SPEAK = "/api/chat/speak"
 }

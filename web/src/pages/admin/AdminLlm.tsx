@@ -11,6 +11,9 @@ interface Preset {
   hint: string
 }
 
+/** Sample line used by the voice preview button. */
+const PREVIEW_TEXT = '你好，我是小伴，今天也辛苦啦。'
+
 const PRESETS: Preset[] = [
   { id: 'deepseek', name: 'DeepSeek (深度求索)', baseUrl: 'https://api.deepseek.com/v1', model: 'deepseek-chat', hint: '国内性价比之选，支持自然对话与思考' },
   { id: 'qwen', name: '阿里云通义千问 (Qwen)', baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1', model: 'qwen-plus', hint: '阿里云兼容接口，生态稳定' },
@@ -29,6 +32,10 @@ export default function AdminLlm() {
   const [searchUrlInput, setSearchUrlInput] = useState('')
   const [testingSearch, setTestingSearch] = useState(false)
   const [searchTestFeedback, setSearchTestFeedback] = useState<{ count?: number; title?: string; error?: string } | null>(null)
+  const [voices, setVoices] = useState<{ shortName: string; gender: string; locale: string }[]>([])
+  const [loadingVoices, setLoadingVoices] = useState(false)
+  const [previewingVoice, setPreviewingVoice] = useState(false)
+  const [voiceFeedback, setVoiceFeedback] = useState<{ error?: string } | null>(null)
   const { busy, error, message, setMessage, setError, action } = useAdminAction()
 
   useEffect(() => {
@@ -37,6 +44,7 @@ export default function AdminLlm() {
       .then((s) => {
         setSettings(s)
         setSearchUrlInput(s.webSearchBaseUrl || '')
+        if (s.voiceEnabled) void loadVoices()
       })
       .catch((e: Error) => { if (e.name !== 'AbortError') setError(e.message) })
     return () => controller.abort()
@@ -165,6 +173,42 @@ export default function AdminLlm() {
       setSearchTestFeedback({ error: (e as Error).message })
     } finally {
       setTestingSearch(false)
+    }
+  }
+
+  async function loadVoices() {
+    setLoadingVoices(true)
+    try {
+      setVoices(await request<{ shortName: string; gender: string; locale: string }[]>('/llm/voices', 'GET'))
+    } catch (e) {
+      setVoiceFeedback({ error: (e as Error).message })
+    } finally {
+      setLoadingVoices(false)
+    }
+  }
+
+  /** Fetches the sample line as MP3 and plays it in the browser so the choice can be heard. */
+  async function previewVoice() {
+    setPreviewingVoice(true)
+    setVoiceFeedback(null)
+    try {
+      const token = settings?.voice ?? ''
+      const response = await fetch('/api/admin/llm/test-voice', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify({ voice: token, text: PREVIEW_TEXT }),
+      })
+      if (!response.ok) throw new Error('试听失败，请检查服务器能否访问 Edge 语音服务')
+      const url = URL.createObjectURL(await response.blob())
+      const audio = new Audio(url)
+      audio.onended = () => URL.revokeObjectURL(url)
+      await audio.play()
+      setVoiceFeedback({})
+    } catch (e) {
+      setVoiceFeedback({ error: (e as Error).message })
+    } finally {
+      setPreviewingVoice(false)
     }
   }
 
@@ -395,6 +439,98 @@ export default function AdminLlm() {
                 </div>
               )}
             </form>
+          </section>
+
+          {/* Speech (Edge TTS) Panel */}
+          <section className={panel}>
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-4">
+              <div>
+                <h3 className="text-base font-semibold text-slate-900">小伴发音（Edge 语音合成）</h3>
+                <p className="mt-1 text-xs text-slate-500">
+                  使用微软 Edge 朗读服务的在线语音合成，无需 API Key。开启后，小伴的回复可以点「听小伴念」播放。
+                </p>
+              </div>
+              <label className="flex cursor-pointer items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3.5 py-1.5">
+                <input
+                  type="checkbox"
+                  className="size-4 accent-emerald-500"
+                  checked={settings.voiceEnabled}
+                  disabled={!!busy}
+                  onChange={(e) => {
+                    const next = { ...settings, voiceEnabled: e.target.checked }
+                    void action('toggleVoice', async () => {
+                      const saved = await request<LlmSettings>('/llm', 'PUT', next)
+                      setSettings(saved)
+                      setMessage(e.target.checked ? '小伴发音已开启' : '小伴发音已停用')
+                    })
+                  }}
+                />
+                <span className="text-xs font-medium text-slate-700">
+                  {settings.voiceEnabled ? '已开启发音' : '已停用发音'}
+                </span>
+              </label>
+            </div>
+
+            <div className="mt-5 space-y-4">
+              <Field
+                title="音色"
+                hint="留空表示按用户的小伴性格自动选音色（温柔→晓晓、元气→晓伊、毒舌/高冷→云希）；选择具体音色则所有用户统一使用。"
+              >
+                <div className="flex flex-wrap gap-2">
+                  <select
+                    className={input}
+                    value={settings.voice}
+                    disabled={!!busy || voices.length === 0}
+                    onChange={(e) => {
+                      const next = { ...settings, voice: e.target.value }
+                      void action('saveVoice', async () => {
+                        const saved = await request<LlmSettings>('/llm', 'PUT', next)
+                        setSettings(saved)
+                        setMessage('音色已更新')
+                      })
+                    }}
+                  >
+                    <option value="">跟随性格自动选择（推荐）</option>
+                    {voices.map((v) => (
+                      <option key={v.shortName} value={v.shortName}>
+                        {v.shortName}（{v.gender === 'Female' ? '女声' : '男声'} · {v.locale}）
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    onClick={() => void loadVoices()}
+                    disabled={loadingVoices}
+                    className="shrink-0 rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs text-slate-600 transition hover:bg-slate-100 active:scale-95 disabled:opacity-50"
+                  >
+                    {loadingVoices ? '加载中…' : '刷新音色列表'}
+                  </button>
+                </div>
+              </Field>
+
+              <div className="flex flex-wrap items-center gap-3">
+                <PrimaryButton
+                  type="button"
+                  disabled={previewingVoice}
+                  onClick={() => void previewVoice()}
+                >
+                  {previewingVoice ? '正在生成…' : '试听这句话'}
+                </PrimaryButton>
+                <span className="text-xs text-slate-500">
+                  试听文本：{PREVIEW_TEXT}
+                </span>
+              </div>
+
+              {voiceFeedback && (
+                <div
+                  className={`rounded-lg p-3 text-xs leading-relaxed ${
+                    voiceFeedback.error ? 'bg-rose-50 text-rose-700' : 'bg-emerald-50 text-emerald-800'
+                  }`}
+                >
+                  {voiceFeedback.error ?? '试听成功，音频已在后台播放（若浏览器拦截，请再点一次）。'}
+                </div>
+              )}
+            </div>
           </section>
 
           {/* Edit / Add Modal or Inline Form */}
