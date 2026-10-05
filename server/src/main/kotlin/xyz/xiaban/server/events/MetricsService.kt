@@ -19,6 +19,8 @@ data class MetricsResponse(
     val days: List<String>,
     /** How the day is cut, shown on the dashboard */
     val dayNote: String,
+    /** Whether [MetricsService.daily]'s `end` already reached today; the dashboard disables "next page" then. */
+    val isLatest: Boolean,
     val visits: List<MetricSeries>,
     val growth: List<MetricSeries>,
     val product: List<MetricSeries>,
@@ -32,9 +34,11 @@ data class MetricsResponse(
  */
 class MetricsService(private val db: Db, private val clock: Clock) {
 
-    suspend fun daily(rangeDays: Int, games: Map<String, String>, quizzes: Map<String, String>): MetricsResponse {
+    /** [end] pages the window back in time (operators accumulate more days than fit on one screen); null means today. */
+    suspend fun daily(rangeDays: Int, end: LocalDate?, games: Map<String, String>, quizzes: Map<String, String>): MetricsResponse {
         val days = rangeDays.coerceIn(1, 90)
-        val to = EventService.metricsDay(clock.instant())
+        val today = EventService.metricsDay(clock.instant())
+        val to = (end ?: today).coerceAtMost(today)
         val from = to.minusDays(days - 1L)
         val dayList = (0 until days).map { from.plusDays(it.toLong()) }
 
@@ -63,6 +67,7 @@ class MetricsService(private val db: Db, private val clock: Clock) {
             MetricsResponse(
                 days = dayList.map(LocalDate::toString),
                 dayNote = "按北京时间统计，每天从凌晨 05:00 开始，与打卡的下班日一致",
+                isLatest = to >= today,
                 visits = listOf(
                     peopleSeries("uv", "访客数（UV）", "visit"),
                     series("pv", "页面访问次数（PV）") { pageViews[it] },

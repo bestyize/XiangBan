@@ -28,7 +28,7 @@ export interface AuditPage { items: AuditRow[]; total: number; page: number; pag
 export interface MetricPoint { day: string; total: number; registered: number; guest: number }
 export interface MetricSeries { key: string; label: string; points: MetricPoint[] }
 export interface MetricsResponse {
-  days: string[]; dayNote: string
+  days: string[]; dayNote: string; isLatest: boolean
   visits: MetricSeries[]; growth: MetricSeries[]; product: MetricSeries[]
   games: MetricSeries[]; quizzes: MetricSeries[]
 }

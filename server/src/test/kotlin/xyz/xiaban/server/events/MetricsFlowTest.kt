@@ -79,9 +79,26 @@ class MetricsFlowTest {
             c.query("insert into users (timezone, invite_code, email, email_verified_at) values ('Asia/Shanghai', 'metricsa01', 'a@example.com', '2026-10-12T22:00:00+08:00'), ('Asia/Shanghai', 'metricsb01', 'b@example.com', '2026-10-13T03:00:00+08:00') returning id") { it.getLong(1) }
         }
         clock.setBeijing("2026-10-13T09:00")
-        val metrics = services.metrics.daily(3, emptyMap(), emptyMap())
+        val metrics = services.metrics.daily(3, null, emptyMap(), emptyMap())
         assertEquals(2L, metrics.row("signup", "2026-10-12").total, "03:00 on the 13th is still the 12th")
         assertEquals(0L, metrics.row("signup", "2026-10-13").total)
+    }
+
+    @Test
+    fun `the end parameter pages the window into the past, clamped to today`() = apiTest {
+        clock.setBeijing("2026-10-05T09:00")
+        val latest = services.metrics.daily(3, null, emptyMap(), emptyMap())
+        assertEquals(listOf("2026-10-03", "2026-10-04", "2026-10-05"), latest.days)
+        assertTrue(latest.isLatest)
+
+        val previousPage = services.metrics.daily(3, LocalDate.parse("2026-10-02"), emptyMap(), emptyMap())
+        assertEquals(listOf("2026-09-30", "2026-10-01", "2026-10-02"), previousPage.days)
+        assertFalse(previousPage.isLatest, "an older page is not the latest")
+
+        // Paging past today lands back on today instead of showing a window into the future.
+        val future = services.metrics.daily(3, LocalDate.parse("2026-12-25"), emptyMap(), emptyMap())
+        assertEquals(latest.days, future.days)
+        assertTrue(future.isLatest)
     }
 
     @Test

@@ -49,7 +49,8 @@ fun Route.adminRoutes(services: Services) {
         get("/metrics") {
             call.requireAdmin(services)
             val days = call.request.queryParameters["days"]?.toIntOrNull() ?: 7
-            call.respond(services.metrics.daily(days, METRIC_GAMES, METRIC_QUIZZES))
+            val end = call.request.queryParameters["end"]?.let { runCatching { java.time.LocalDate.parse(it) }.getOrNull() ?: badRequest("日期格式不对") }
+            call.respond(services.metrics.daily(days, end, METRIC_GAMES, METRIC_QUIZZES))
         }
         get("/users") {
             call.requireAdmin(services)

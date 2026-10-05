@@ -163,6 +163,8 @@ function DataTable({ title, rows }: { title: string; rows: (MetricSeries | undef
 
 export default function AdminMetrics() {
   const [range, setRange] = useState<Range>(7)
+  /** The window's last day; null means "today" and follows along as days pass. */
+  const [end, setEnd] = useState<string | null>(null)
   const [data, setData] = useState<MetricsResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -171,12 +173,22 @@ export default function AdminMetrics() {
   useEffect(() => {
     const controller = new AbortController()
     setLoading(true); setError(null)
-    adminRequest<MetricsResponse>(`/metrics?days=${range}`, 'GET', undefined, controller.signal)
+    const query = end ? `/metrics?days=${range}&end=${end}` : `/metrics?days=${range}`
+    adminRequest<MetricsResponse>(query, 'GET', undefined, controller.signal)
       .then(setData)
       .catch((e: Error) => { if (e.name !== 'AbortError') setError(e.message) })
       .finally(() => { if (!controller.signal.aborted) setLoading(false) })
     return () => controller.abort()
-  }, [range, revision])
+  }, [range, end, revision])
+
+  /** Step one window's worth of days backward (older, positive) or forward (newer); clamped to today by the server. */
+  function page(direction: 1 | -1) {
+    const anchor = end ? new Date(`${end}T00:00:00Z`) : new Date(`${data?.days[data.days.length - 1]}T00:00:00Z`)
+    anchor.setUTCDate(anchor.getUTCDate() + direction * range)
+    const next = anchor.toISOString().slice(0, 10)
+    const today = new Date().toISOString().slice(0, 10)
+    setEnd(next >= today ? null : next)
+  }
 
   const groups = useMemo(
     () => [data?.visits ?? [], data?.growth ?? [], data?.product ?? [], data?.games ?? [], data?.quizzes ?? []],
@@ -195,11 +207,22 @@ export default function AdminMetrics() {
       <div className="flex items-center gap-5">
         <div className="flex items-center gap-4 text-sm">
           {RANGES.map((n) => (
-            <button key={n} type="button" onClick={() => setRange(n)}
+            <button key={n} type="button" onClick={() => { setRange(n); setEnd(null) }}
               className={`border-b-2 pb-1 ${range === n ? 'border-[#07c160] font-medium text-[#07c160]' : 'border-transparent text-[#7f7f7f] hover:text-[#353535]'}`}>
               近 {n} 天
             </button>
           ))}
+        </div>
+        <div className="flex items-center gap-1 rounded-md border border-[#ededed] bg-white p-0.5">
+          <button type="button" aria-label="上一段" disabled={loading} onClick={() => page(-1)}
+            className="rounded px-2 py-1 text-[#7f7f7f] hover:bg-[#f7f8fa] disabled:opacity-40">‹</button>
+          <button type="button" disabled={loading || !!data?.isLatest} onClick={() => page(1)}
+            className="rounded px-2 py-1 text-[#7f7f7f] hover:bg-[#f7f8fa] disabled:opacity-40" aria-label="下一段">›</button>
+          {!data?.isLatest && (
+            <button type="button" onClick={() => setEnd(null)} className="rounded px-2 py-1 text-xs text-[#07c160] hover:bg-[#f0faf4]">
+              回到最新
+            </button>
+          )}
         </div>
         <TextButton disabled={loading} onClick={() => setRevision((n) => n + 1)}>{loading ? '正在刷新…' : '刷新数据'}</TextButton>
       </div>
