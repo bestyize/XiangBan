@@ -39,9 +39,17 @@ data class LlmSettings(
     val enabled: Boolean = true,
     val activeProviderId: String = "",
     val providers: List<LlmProviderConfig> = emptyList(),
+    val webSearchEnabled: Boolean = false,
+    val webSearchBaseUrl: String = "",
 ) {
     fun redacted() = copy(providers = providers.map { it.redacted() })
 }
+
+@Serializable
+data class SearchTestRequest(val baseUrl: String)
+
+@Serializable
+data class SearchTestResponse(val success: Boolean, val count: Int, val sampleTitle: String)
 
 @Serializable
 data class LlmTestRequest(
@@ -121,6 +129,8 @@ class LlmSettingsStore(
         val next = request.copy(
             activeProviderId = request.activeProviderId.trim(),
             providers = sanitizedProviders,
+            webSearchEnabled = request.webSearchEnabled,
+            webSearchBaseUrl = request.webSearchBaseUrl.trim().trimEnd('/'),
         )
 
         val encrypted = encrypt(AppJson.encodeToString(LlmSettings.serializer(), next))

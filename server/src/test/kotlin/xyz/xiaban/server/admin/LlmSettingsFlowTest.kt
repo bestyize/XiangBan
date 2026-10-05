@@ -39,6 +39,8 @@ class LlmSettingsFlowTest {
         val newSettings = LlmSettings(
             enabled = true,
             activeProviderId = "deepseek",
+            webSearchEnabled = true,
+            webSearchBaseUrl = "http://43.155.99.113:50001",
             providers = listOf(
                 LlmProviderConfig(
                     id = "deepseek",
@@ -57,6 +59,8 @@ class LlmSettingsFlowTest {
         }.body<LlmSettings>()
 
         assertEquals("deepseek", saved.activeProviderId)
+        assertTrue(saved.webSearchEnabled)
+        assertEquals("http://43.155.99.113:50001", saved.webSearchBaseUrl)
         assertEquals("", saved.providers[0].apiKey)
         assertTrue(saved.providers[0].apiKeyConfigured)
 
@@ -65,6 +69,8 @@ class LlmSettingsFlowTest {
         }.body<LlmSettings>()
         assertEquals("", fetched.providers[0].apiKey)
         assertTrue(fetched.providers[0].apiKeyConfigured)
+        assertTrue(fetched.webSearchEnabled)
+        assertEquals("http://43.155.99.113:50001", fetched.webSearchBaseUrl)
 
         // Updating without sending apiKey preserves the existing key
         val updateWithoutKey = fetched.copy(

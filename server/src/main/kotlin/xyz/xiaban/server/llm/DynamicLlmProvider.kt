@@ -23,4 +23,26 @@ class DynamicLlmProvider(
         val active = supplier() ?: error("当前未启用或未配置可用的大模型供应商")
         return active.stream(messages, timeout, maxTokens, temperature, onChunk)
     }
+
+    override suspend fun streamMessages(
+        messages: List<ChatMessage>,
+        timeout: Duration,
+        maxTokens: Int,
+        temperature: Double,
+        onChunk: suspend (String) -> Unit,
+    ): String {
+        val active = supplier() ?: error("当前未启用或未配置可用的大模型供应商")
+        return active.streamMessages(messages, timeout, maxTokens, temperature, onChunk)
+    }
+
+    override suspend fun chatWithTools(
+        messages: List<ChatMessage>,
+        tools: List<ToolDefinition>,
+        timeout: Duration,
+        maxTokens: Int,
+        temperature: Double,
+    ): LlmChatResult {
+        val active = supplier() ?: error("当前未启用或未配置可用的大模型供应商")
+        return active.chatWithTools(messages, tools, timeout, maxTokens, temperature)
+    }
 }

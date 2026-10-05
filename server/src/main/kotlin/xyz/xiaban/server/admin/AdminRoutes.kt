@@ -131,6 +131,12 @@ fun Route.adminRoutes(services: Services) {
             val reply = services.llmSettings.test(req)
             call.respond(LlmTestResponse(reply))
         }
+        post("/llm/test-search") {
+            call.requireAdmin(services)
+            val req = call.receive<SearchTestRequest>()
+            val res = services.searchService.test(req.baseUrl)
+            call.respond(res)
+        }
         get("/flags") { call.requireAdmin(services); call.respond(services.flags.view()) }
         put("/flags") { call.requireAdmin(services); call.respond(services.flags.update(call.receive<FlagsUpdate>())) }
         get("/reports") {

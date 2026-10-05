@@ -26,12 +26,18 @@ export default function AdminLlm() {
   const [editingProvider, setEditingProvider] = useState<LlmProviderConfig | null>(null)
   const [testResult, setTestResult] = useState<{ id: string; reply?: string; error?: string } | null>(null)
   const [testingId, setTestingId] = useState<string | null>(null)
+  const [searchUrlInput, setSearchUrlInput] = useState('')
+  const [testingSearch, setTestingSearch] = useState(false)
+  const [searchTestFeedback, setSearchTestFeedback] = useState<{ count?: number; title?: string; error?: string } | null>(null)
   const { busy, error, message, setMessage, setError, action } = useAdminAction()
 
   useEffect(() => {
     const controller = new AbortController()
     request<LlmSettings>('/llm', 'GET', undefined, controller.signal)
-      .then(setSettings)
+      .then((s) => {
+        setSettings(s)
+        setSearchUrlInput(s.webSearchBaseUrl || '')
+      })
       .catch((e: Error) => { if (e.name !== 'AbortError') setError(e.message) })
     return () => controller.abort()
   }, [])
@@ -129,6 +135,36 @@ export default function AdminLlm() {
       setTestResult({ id: provider.id, error: (e as Error).message })
     } finally {
       setTestingId(null)
+    }
+  }
+
+  function handleSaveSearchUrl(e: React.FormEvent) {
+    e.preventDefault()
+    if (!settings) return
+    const nextSettings: LlmSettings = {
+      ...settings,
+      webSearchBaseUrl: searchUrlInput.trim(),
+    }
+    void action('saveSearch', async () => {
+      const saved = await request<LlmSettings>('/llm', 'PUT', nextSettings)
+      setSettings(saved)
+      setMessage('已保存 SearXNG 网络搜索服务配置')
+    })
+  }
+
+  async function handleTestSearch() {
+    if (!searchUrlInput.trim()) return
+    setTestingSearch(true)
+    setSearchTestFeedback(null)
+    try {
+      const res = await request<{ success: boolean; count: number; sampleTitle: string }>('/llm/test-search', 'POST', {
+        baseUrl: searchUrlInput.trim(),
+      })
+      setSearchTestFeedback({ count: res.count, title: res.sampleTitle })
+    } catch (e) {
+      setSearchTestFeedback({ error: (e as Error).message })
+    } finally {
+      setTestingSearch(false)
     }
   }
 
@@ -278,6 +314,87 @@ export default function AdminLlm() {
                 })}
               </div>
             )}
+          </section>
+
+          {/* Real-time Web Search (SearXNG) Panel */}
+          <section className={panel}>
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-4">
+              <div>
+                <h3 className="text-base font-semibold text-slate-900">实时网络搜索服务 (Web Search / SearXNG)</h3>
+                <p className="mt-1 text-xs text-slate-500">
+                  基于 SearXNG 开源元搜索引擎。开启后，小伴在被问到最新时事、新闻热点、电影或当下生活资讯时将自动触发搜索。
+                </p>
+              </div>
+              <label className="flex cursor-pointer items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3.5 py-1.5">
+                <input
+                  type="checkbox"
+                  className="size-4 accent-emerald-500"
+                  checked={settings.webSearchEnabled}
+                  disabled={!!busy}
+                  onChange={(e) => {
+                    const next = { ...settings, webSearchEnabled: e.target.checked }
+                    void action('toggleSearch', async () => {
+                      const saved = await request<LlmSettings>('/llm', 'PUT', next)
+                      setSettings(saved)
+                      setMessage(e.target.checked ? '实时联网搜索已开启' : '实时联网搜索已停用')
+                    })
+                  }}
+                />
+                <span className="text-xs font-medium text-slate-700">
+                  {settings.webSearchEnabled ? '已开启搜索' : '已停用搜索'}
+                </span>
+              </label>
+            </div>
+
+            <form className="mt-5 space-y-4" onSubmit={handleSaveSearchUrl}>
+              <Field
+                title="SearXNG 服务地址 (Base URL)"
+                hint="SearXNG 容器访问根地址。如你部署在香港服务器上，填入 http://43.155.99.113:50001"
+              >
+                <div className="flex gap-2">
+                  <input
+                    className={input}
+                    value={searchUrlInput}
+                    onChange={(e) => setSearchUrlInput(e.target.value)}
+                    placeholder="http://43.155.99.113:50001"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setSearchUrlInput('http://43.155.99.113:50001')}
+                    className="shrink-0 rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs text-slate-600 transition hover:bg-slate-100 active:scale-95"
+                  >
+                    填入香港服务器
+                  </button>
+                </div>
+              </Field>
+
+              <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
+                <TextButton
+                  type="button"
+                  disabled={testingSearch || !searchUrlInput.trim()}
+                  onClick={() => void handleTestSearch()}
+                  className="border border-slate-200 text-xs text-slate-700 hover:bg-slate-50"
+                >
+                  {testingSearch ? '测试中…' : '测试搜索连通性'}
+                </TextButton>
+
+                <PrimaryButton type="submit" disabled={busy === 'saveSearch'}>
+                  {busy === 'saveSearch' ? '正在保存…' : '保存搜索地址'}
+                </PrimaryButton>
+              </div>
+
+              {searchTestFeedback && (
+                <div
+                  className={`rounded-lg p-3 text-xs leading-relaxed ${
+                    searchTestFeedback.error ? 'bg-rose-50 text-rose-700' : 'bg-emerald-50 text-emerald-800'
+                  }`}
+                >
+                  {searchTestFeedback.error
+                    ? `测试失败: ${searchTestFeedback.error}`
+                    : `测试成功！SearXNG 响应正常，返回 ${searchTestFeedback.count} 条结果，第一条：【${searchTestFeedback.title}】`}
+                </div>
+              )}
+            </form>
           </section>
 
           {/* Edit / Add Modal or Inline Form */}

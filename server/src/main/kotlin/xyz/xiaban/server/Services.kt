@@ -118,8 +118,18 @@ class Services(
         weather = weather,
         clock = clock,
     )
+    val searchService = xyz.xiaban.server.search.SearchService(http)
     val chatRepository = xyz.xiaban.server.chat.ChatRepository(db)
-    val chat = xyz.xiaban.server.chat.ChatService(chatRepository, profiles, memories, activeLlmProviders, flags)
+    val chat = xyz.xiaban.server.chat.ChatService(
+        chatRepository,
+        profiles,
+        memories,
+        activeLlmProviders,
+        flags,
+        searchService,
+        llmSettings,
+        clock,
+    )
     val checkins = CheckinService(
         profiles = profiles,
         checkins = checkinRepository,

@@ -46,5 +46,7 @@ export interface LlmSettings {
   enabled: boolean
   activeProviderId: string
   providers: LlmProviderConfig[]
+  webSearchEnabled: boolean
+  webSearchBaseUrl: string
 }
 

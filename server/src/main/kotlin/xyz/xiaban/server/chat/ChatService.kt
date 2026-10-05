@@ -1,13 +1,31 @@
 package xyz.xiaban.server.chat
 
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.add
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
+import kotlinx.serialization.json.putJsonArray
+import kotlinx.serialization.json.putJsonObject
 import org.slf4j.LoggerFactory
+import xyz.xiaban.server.admin.LlmSettingsStore
 import xyz.xiaban.server.flags.FeatureFlags
+import xyz.xiaban.server.http.AppJson
+import xyz.xiaban.server.llm.ChatMessage
+import xyz.xiaban.server.llm.FunctionDefinition
+import xyz.xiaban.server.llm.LlmChatResult
 import xyz.xiaban.server.llm.LlmProvider
+import xyz.xiaban.server.llm.ToolDefinition
 import xyz.xiaban.server.memory.MemoryService
+import xyz.xiaban.server.search.SearchService
 import xyz.xiaban.server.users.ProfileService
 import xyz.xiaban.shared.ChatMessageView
 import xyz.xiaban.shared.Personality
+import java.time.Clock
 import java.time.Duration
+import java.time.LocalDateTime
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 class ChatService(
     private val repository: ChatRepository,
@@ -15,6 +33,9 @@ class ChatService(
     private val memories: MemoryService,
     private val providers: List<LlmProvider>,
     private val flags: FeatureFlags,
+    private val searchService: SearchService,
+    private val llmSettings: LlmSettingsStore,
+    private val clock: Clock = Clock.systemUTC(),
 ) {
     val available: Boolean get() = providers.isNotEmpty()
 
@@ -66,22 +87,92 @@ class ChatService(
         }
 
         val systemPrompt = buildSystemPrompt(companionName, personality, nickname, memoryNotes)
-        val messages = mutableListOf<Pair<String, String>>()
-        messages.add("system" to systemPrompt)
-        for (h in history.dropLast(1)) {
-            if (h.content.isNotBlank()) messages.add(h.role to h.content)
-        }
-        messages.add("user" to trimmed)
-
         val provider = providers.first()
+        val llmConf = llmSettings.current()
+        val webSearchEnabled = llmConf.webSearchEnabled && llmConf.webSearchBaseUrl.isNotBlank()
+
         val full = try {
-            provider.stream(
-                messages = messages,
-                timeout = STREAM_TIMEOUT,
-                maxTokens = 300,
-                temperature = 0.8,
-                onChunk = onChunk,
-            )
+            if (webSearchEnabled) {
+                val tools = listOf(
+                    ToolDefinition(
+                        function = FunctionDefinition(
+                            name = "web_search",
+                            description = "进行实时网络搜索。当用户询问最新时事、新闻热点、今天/当下发生的事情、近期上映的电影或外部生活资讯时必须调用此工具获取最新客观事实。",
+                            parameters = buildJsonObject {
+                                put("type", "object")
+                                putJsonObject("properties") {
+                                    putJsonObject("query") {
+                                        put("type", "string")
+                                        put("description", "要搜索的关键词或简短搜索短语，例如「2026年最近热门电影」")
+                                    }
+                                }
+                                putJsonArray("required") {
+                                    add("query")
+                                }
+                            },
+                        ),
+                    ),
+                )
+                val chatMessages = mutableListOf<ChatMessage>()
+                chatMessages.add(ChatMessage("system", systemPrompt))
+                for (h in history.dropLast(1)) {
+                    if (h.content.isNotBlank()) chatMessages.add(ChatMessage(h.role, h.content))
+                }
+                chatMessages.add(ChatMessage("user", trimmed))
+
+                val turn = provider.chatWithTools(
+                    messages = chatMessages,
+                    tools = tools,
+                    timeout = STREAM_TIMEOUT,
+                    maxTokens = 300,
+                    temperature = 0.8,
+                )
+
+                when (turn) {
+                    is LlmChatResult.NeedToolCalls -> {
+                        chatMessages.add(turn.rawAssistantMessage)
+                        for (call in turn.toolCalls) {
+                            if (call.function.name == "web_search") {
+                                val query = extractQuery(call.function.arguments)
+                                onChunk("🔍 小伴正在帮你搜「$query」…\n\n")
+                                val searchResults = searchService.search(llmConf.webSearchBaseUrl, query)
+                                chatMessages.add(
+                                    ChatMessage(
+                                        role = "tool",
+                                        toolCallId = call.id,
+                                        content = searchResults,
+                                    ),
+                                )
+                            }
+                        }
+                        provider.streamMessages(
+                            messages = chatMessages,
+                            timeout = STREAM_TIMEOUT,
+                            maxTokens = 300,
+                            temperature = 0.8,
+                            onChunk = onChunk,
+                        )
+                    }
+                    is LlmChatResult.Content -> {
+                        onChunk(turn.text)
+                        turn.text
+                    }
+                }
+            } else {
+                val messages = mutableListOf<Pair<String, String>>()
+                messages.add("system" to systemPrompt)
+                for (h in history.dropLast(1)) {
+                    if (h.content.isNotBlank()) messages.add(h.role to h.content)
+                }
+                messages.add("user" to trimmed)
+                provider.stream(
+                    messages = messages,
+                    timeout = STREAM_TIMEOUT,
+                    maxTokens = 300,
+                    temperature = 0.8,
+                    onChunk = onChunk,
+                )
+            }
         } catch (e: Exception) {
             log.warn("Chat stream failed from {}: {}", provider.name, e.message)
             val errReply = "小伴晃了晃脑袋，刚才走神了，再说一遍好不好？"
@@ -96,6 +187,14 @@ class ChatService(
         return full
     }
 
+    private fun extractQuery(arguments: String): String {
+        val parsed = runCatching { AppJson.decodeFromString<JsonObject>(arguments) }.getOrNull()
+        val q = parsed?.get("query")?.toString()?.trim('"')
+        if (!q.isNullOrBlank()) return q
+        val match = Regex(""""query"\s*:\s*"([^"]+)"""").find(arguments)
+        return match?.groupValues?.get(1)?.trim() ?: arguments.trim().take(30)
+    }
+
     private fun buildSystemPrompt(
         companionName: String,
         personality: Personality,
@@ -104,6 +203,9 @@ class ChatService(
     ): String = buildString {
         appendLine("你是「$companionName」，一只住在用户家里的猫，是家里的一员，不是AI工具，也不是客服。")
         appendLine("你的性格是「${personality.label}」：${style(personality)}")
+        val now = LocalDateTime.ofInstant(clock.instant(), ZoneId.of("Asia/Shanghai"))
+        val dateStr = now.format(DateTimeFormatter.ofPattern("yyyy年M月d日 EEEE HH:mm", Locale.CHINESE))
+        appendLine("当前现实世界时间是：$dateStr。")
         if (!nickname.isNullOrBlank()) {
             appendLine("用户的称呼是「$nickname」。")
         }
@@ -114,9 +216,10 @@ class ChatService(
         appendLine()
         appendLine("对话规则：")
         appendLine("1. 像真实室友发消息一样口语化、生活化。多用暖心自然的短句，不用说教，少用感叹号，绝不用官方腔和网络烂梗。")
-        appendLine("2. 每次回复控制在 30 ~ 120 字，不要长篇大论。")
+        appendLine("2. 每次回复控制在 30 ~ 140 字，不要长篇大论。")
         appendLine("3. 如果用户感到疲惫、工作受挫或向你倾诉，优先提供温柔的情绪价值与同理心，坚定地站在用户这一边。")
         appendLine("4. 适当自然地融入猫猫的小习惯（如蹭蹭、伸懒腰、趴在身边打呼噜），但不要每句都刻意喵喵叫。")
+        appendLine("5. 若调用了网络搜索，请用小伴自己的口吻自然分享找到的事实，不要生硬复制粘贴网址或网页源代码。")
     }
 
     private fun style(p: Personality) = when (p) {
