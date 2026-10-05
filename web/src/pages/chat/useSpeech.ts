@@ -11,6 +11,7 @@ import { getToken } from '../../api/client.ts'
 export function useSpeech() {
   const [speakingId, setSpeakingId] = useState<string | null>(null)
   const [loadingId, setLoadingId] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const urlRef = useRef<string | null>(null)
 
@@ -38,6 +39,7 @@ export function useSpeech() {
       return
     }
     stop()
+    setError(null)
     setLoadingId(id)
     try {
       const token = getToken()
@@ -49,7 +51,7 @@ export function useSpeech() {
         headers,
         body: JSON.stringify({ text }),
       })
-      if (!response.ok) throw new Error('语音暂时发不出来')
+      if (!response.ok) throw new Error('语音暂时发不出来，稍后再试')
 
       const blob = await response.blob()
       const url = URL.createObjectURL(blob)
@@ -57,15 +59,21 @@ export function useSpeech() {
 
       const audio = new Audio(url)
       audioRef.current = audio
+      // A blocked or undecodable source surfaces here; without this the button would
+      // just silently do nothing.
       audio.onended = () => stop()
-      audio.onerror = () => stop()
+      audio.onerror = () => {
+        stop()
+        setError('这段语音播放不了，请检查浏览器的媒体权限或网络')
+      }
       setLoadingId(null)
       setSpeakingId(id)
       await audio.play()
-    } catch {
+    } catch (e) {
       stop()
+      setError(e instanceof Error ? e.message : '语音暂时发不出来，稍后再试')
     }
   }, [speakingId, stop])
 
-  return { speak, stop, speakingId, loadingId }
+  return { speak, stop, speakingId, loadingId, error }
 }

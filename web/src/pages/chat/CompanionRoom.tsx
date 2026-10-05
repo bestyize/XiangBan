@@ -22,7 +22,7 @@ function messageId(message: { id?: number }, index: number): string {
 export default function CompanionRoom({ active = true }: { active?: boolean }) {
   const profile = useProfile()
   const { messages, streamingText, isStreaming, error, send, clear } = useChat(active)
-  const { speak, speakingId, loadingId } = useSpeech()
+  const { speak, speakingId, loadingId, error: speechError } = useSpeech()
   const [input, setInput] = useState('')
   const [toast, setToast] = useState<string | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -187,6 +187,11 @@ export default function CompanionRoom({ active = true }: { active?: boolean }) {
         {error && (
           <p role="alert" className="mt-3 text-center text-xs text-blush">
             {error}
+          </p>
+        )}
+        {speechError && (
+          <p role="alert" className="mt-3 text-center text-xs text-blush">
+            {speechError}
           </p>
         )}
       </div>
