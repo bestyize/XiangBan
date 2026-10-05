@@ -181,12 +181,9 @@ export function QuizRunner({ quiz }: { quiz: QuizDefinition }) {
       <p className="quiz-message" role="status">{message}</p>
     </section>
     <footer className="quiz-question-footer">
-      <div className={`quiz-question-navigation${last ? ' is-final' : ''}`}>
-        <button className={`quiz-button quiz-button-outline${attempt.cursor === 0 ? ' is-hidden' : ''}`} type="button" onClick={() => go(attempt.cursor - 1)}>上一题</button>
-        {last
-          ? <button className="quiz-button" type="button" disabled={selected === null} onClick={finish}>生成我的报告</button>
-          // Tapping an answer advances by itself; this is for coming back through answered questions (and keyboard use).
-          : <button className={`quiz-button quiz-button-outline${selected === null ? ' is-hidden' : ''}`} type="button" onClick={() => go(attempt.cursor + 1)}>下一题</button>}
+      <div className="quiz-question-navigation">
+        <button className="quiz-button quiz-button-outline" type="button" disabled={attempt.cursor === 0} onClick={() => go(attempt.cursor - 1)}>上一题</button>
+        <button className="quiz-button" type="button" disabled={selected === null} onClick={() => last ? finish() : go(attempt.cursor + 1)}>{last ? '生成我的报告' : '下一题'}</button>
       </div>
     </footer>
     {modal}
