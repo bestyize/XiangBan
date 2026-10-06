@@ -1,5 +1,5 @@
 import type { Meta, Personality } from '../../api/types.ts'
-import type { CatSpec } from '../../cat/catSvg.ts'
+import type { RobotInput } from '../../robot/expressions.ts'
 import { CityPicker } from '../../components/CityPicker.tsx'
 
 export const STEPS = ['hello', 'name', 'personality', 'nickname', 'city', 'hours'] as const
@@ -14,25 +14,27 @@ export interface Draft {
   workEnd: string
 }
 
-export const personalityFace: Record<Personality, CatSpec> = {
-  toxic: { eyes: 'smug', mouth: 'smirk', blush: true },
-  gentle: { eyes: 'closed', mouth: 'smile', blush: true },
-  chatty: { eyes: 'happy', mouth: 'open', blush: true, props: ['sparkles'] },
-  tsundere: { eyes: 'closed', mouth: 'flat', blush: true },
+export const personalityFace: Record<Personality, RobotInput> = {
+  toxic: 'proud',
+  gentle: 'happy',
+  chatty: 'excited',
+  tsundere: { expression: 'annoyed', symbol: null },
 }
 
-export function stepFace(step: Step, draft: Draft): CatSpec {
+export function stepFace(step: Step, draft: Draft): RobotInput {
   switch (step) {
     case 'hello':
-      return { eyes: 'smug', mouth: 'smirk' }
+      return 'greeting'
     case 'personality':
       return personalityFace[draft.personality]
     case 'nickname':
-      return { eyes: 'open', mouth: 'smile', blush: true }
+      return 'shy'
+    case 'city':
+      return 'curious'
     case 'hours':
-      return { eyes: 'worried', mouth: 'wavy' }
+      return 'worried'
     default:
-      return { eyes: 'open', mouth: 'cat', blush: true }
+      return 'idle'
   }
 }
 

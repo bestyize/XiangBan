@@ -2,7 +2,8 @@ import { useState } from 'react'
 import { useLocation } from 'wouter'
 import type { ProfileUpdate } from '../../api/types.ts'
 import { track } from '../../lib/track.ts'
-import { Bubble, CatWindow, FieldError, PrimaryButton, QuietButton, Screen } from '../../components/ui.tsx'
+import { takeAfterOnboarding } from '../../lib/activity.ts'
+import { Bubble, RobotStage, FieldError, PrimaryButton, QuietButton, Screen } from '../../components/ui.tsx'
 import { useLoginModal } from '../../lib/loginModal.ts'
 import { useMeta } from '../../lib/meta.ts'
 import { useProfile, useSession } from '../../lib/session.tsx'
@@ -53,7 +54,7 @@ export default function Onboarding() {
       const patch = finish ? { ...changes, onboarded: true } : changes
       if (Object.keys(patch).length > 0) await updateProfile(patch)
       track('onboarding_step', { step, action: skipped ? 'skip' : 'next' })
-      if (finish) navigate('/', { replace: true })
+      if (finish) navigate(takeAfterOnboarding() ?? '/', { replace: true })
       else setIndex((i) => i + 1)
     } catch (e) {
       setError((e as Error).message)
@@ -79,7 +80,7 @@ export default function Onboarding() {
       </div>
 
       <section className="mt-6 flex flex-1 flex-col" aria-live="polite">
-        <CatWindow spec={stepFace(step, draft)} label={`${draft.companionName || '小伴'}在窗台上看着你`} size={step === 'city' || step === 'personality' ? 150 : 200} />
+        <RobotStage spec={stepFace(step, draft)} interactive label={`${draft.companionName || '小伴'}在看着你`} size={step === 'city' || step === 'personality' ? 150 : 200} />
         <Bubble className="mt-5">{stepLine(step, draft)}</Bubble>
         <div className="mt-6">
           <StepBody step={step} draft={draft} meta={meta} update={(patch) => setDraft((d) => ({ ...d, ...patch }))} />

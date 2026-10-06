@@ -68,7 +68,7 @@ export default function AdminPage() {
     <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-black/40 to-transparent" />
     <div className="login-modal-in relative w-full max-w-sm">
       <div className="mb-7 text-center"><span className="inline-flex size-12 items-center justify-center rounded-2xl bg-amber-200 text-xl font-bold text-slate-900 shadow-lg shadow-black/20">伴</span>
-        <p className="mt-4 text-xs font-semibold tracking-widest text-white/50">下班啦 · 管理控制台</p></div>
+        <p className="mt-4 text-xs font-semibold tracking-widest text-white/50">相伴 · 管理控制台</p></div>
       <div className="rounded-[22px] bg-white p-7 shadow-[0_24px_60px_-12px_rgba(0,0,0,0.5)] sm:p-8">
         <h1 className="mb-6 text-center text-xl font-semibold text-slate-900">管理员登录</h1>
         <Alerts error={error} message={message} />
@@ -89,12 +89,12 @@ export default function AdminPage() {
     {mobileMenu && <button aria-label="关闭导航" className="fixed inset-0 z-30 bg-slate-950/40 md:hidden" onClick={() => setMobileMenu(false)} />}
     <aside id="admin-sidebar" className={`fixed inset-y-0 left-0 z-40 flex w-60 flex-col bg-[#182338] text-slate-300 transition-transform md:translate-x-0 ${mobileMenu ? 'translate-x-0' : '-translate-x-full'}`}>
       <div className="border-b border-white/10 px-6 py-7"><div className="flex items-center gap-3"><span className="flex size-9 items-center justify-center rounded-xl bg-amber-200 text-lg font-bold text-slate-900">伴</span>
-        <div><p className="font-semibold text-white">下班啦</p><p className="mt-0.5 text-xs text-slate-400">网站管理后台</p></div></div></div>
+        <div><p className="font-semibold text-white">相伴</p><p className="mt-0.5 text-xs text-slate-400">网站管理后台</p></div></div></div>
       <p className="px-6 pt-7 pb-3 text-[11px] tracking-widest text-slate-500">工作台</p>
       <nav aria-label="后台导航" className="space-y-1 px-3">{menu.map((item) => <Link key={item.href} href={item.href} aria-current={item.href === current.href ? 'page' : undefined}
         className={`flex items-center gap-3 rounded-lg px-4 py-3 text-sm transition ${item.href === current.href ? 'bg-amber-200/10 font-medium text-amber-200' : 'hover:bg-white/5 hover:text-white'}`}>
         <Icon name={item.icon} />{item.label}</Link>)}</nav>
-      <div className="mt-auto border-t border-white/10 px-6 py-5"><Link href="/" className="text-sm text-slate-400 hover:text-white">← 返回网站</Link><p className="mt-3 text-xs text-slate-500">下班啦 · 运营控制台</p></div>
+      <div className="mt-auto border-t border-white/10 px-6 py-5"><Link href="/" className="text-sm text-slate-400 hover:text-white">← 返回网站</Link><p className="mt-3 text-xs text-slate-500">相伴 · 运营控制台</p></div>
     </aside>
     <div className="min-w-0 md:ml-60">
       <header className="sticky top-0 z-20 flex h-18 items-center justify-between gap-4 border-b border-slate-200 bg-white/95 px-5 backdrop-blur sm:px-8">

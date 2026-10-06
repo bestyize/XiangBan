@@ -161,7 +161,7 @@ export default function Tests() {
   }, [])
   useEffect(() => {
     const quiz = findQuiz(location.split('/')[2] ?? '')
-    document.title = `${quiz ? `${quiz.name}${location.endsWith('/report') ? ' · 测试报告' : ' · 趣味测试'}` : '趣味测试'}｜下班啦`
+    document.title = `${quiz ? `${quiz.name}${location.endsWith('/report') ? ' · 测试报告' : ' · 趣味测试'}` : '趣味测试'}｜相伴`
     window.scrollTo({ top: 0, behavior: 'instant' })
   }, [location])
   return <Switch>

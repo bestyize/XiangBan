@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useLocation } from 'wouter'
 import { api } from '../../api/client.ts'
 import type { Guardian, Profile } from '../../api/types.ts'
-import { Cat } from '../../components/Cat.tsx'
+import { Robot } from '../../components/Robot.tsx'
 import { LinkRow, ListGroup, SwitchRow } from '../../components/List.tsx'
 import { PageHeader } from '../../components/PageHeader.tsx'
 import { TAB_BAR_SPACE } from '../../components/TabBar.tsx'
@@ -54,7 +54,7 @@ export default function Me() {
     }
   }
 
-  const name = profile.nickname ?? (isLoggedIn ? '下班啦用户' : '游客')
+  const name = profile.nickname ?? (isLoggedIn ? '相伴用户' : '游客')
 
   return (
     <Screen>
@@ -73,7 +73,7 @@ export default function Me() {
             <span className="flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-full bg-lamp/15 text-2xl text-lamp">
               {profile.avatarUrl
                 ? <img src={profile.avatarUrl} alt="" className="size-full object-cover" />
-                : <Cat spec={{ eyes: 'open', mouth: 'cat', blush: true }} label="默认头像" size={56} className="mt-3" />}
+                : <Robot spec="idle" alive={false} label="默认头像" size={60} className="mt-3" />}
             </span>
             <span className="min-w-0 flex-1">
               <span className="block truncate text-xl font-bold text-window">{name}</span>

@@ -41,7 +41,7 @@ export default function AdminDisplay() {
     <Alerts error={error} message={message} />
     <section className={panel}>
       <div className="flex flex-wrap items-center justify-between gap-4"><div><h2 className="text-lg font-semibold text-slate-900">底部导航 · 小伴</h2><p className="mt-2 text-sm text-slate-500">控制底部 TAB 中的小伴入口。</p></div>
-        <label className="flex min-h-11 cursor-pointer items-center gap-3 rounded-full border border-slate-200 bg-slate-50 px-4 text-sm font-medium"><input className="size-4 accent-emerald-600" aria-label="底部小伴入口展示" type="checkbox" disabled={!!busy} checked={draft.chatTabVisible} onChange={event => change({ ...draft, chatTabVisible: event.target.checked })} />{draft.chatTabVisible ? '展示小伴' : '隐藏小伴'}</label>
+        <label className="flex min-h-11 cursor-pointer items-center gap-3 rounded-full border border-slate-200 bg-slate-50 px-4 text-sm font-medium"><input className="size-4 accent-emerald-600" aria-label="首页聊天展示" type="checkbox" disabled={!!busy} checked={draft.chatTabVisible} onChange={event => change({ ...draft, chatTabVisible: event.target.checked })} />{draft.chatTabVisible ? '首页可聊天' : '首页不聊天'}</label>
       </div>
     </section>
     <div className="grid gap-5 xl:grid-cols-2">

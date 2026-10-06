@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { ACTIVITY_PATH } from '../lib/activity.ts'
 import { useLocation } from 'wouter'
 import { api, getToken } from '../api/client.ts'
 import type { Checkin, TodayResponse } from '../api/types.ts'
@@ -37,7 +38,7 @@ export default function CardPreview() {
         // Guests have no server-side check-in; theirs lives in this browser.
         const today = t.checkin ?? (getToken() ? null : loadGuestCheckin(t.workDay))
         if (today) setCheckin(today)
-        else navigate('/', { replace: true })
+        else navigate(ACTIVITY_PATH, { replace: true })
       })
       .catch((e: Error) => setError(e.message))
   }, [navigate])
@@ -46,7 +47,7 @@ export default function CardPreview() {
     if (!checkin || styles.length === 0) return
     let cancelled = false
     const style = styles.find((s) => s.id === styleId) ?? styles[0]
-    const link = `${publicUrl()}/?from=card${profile.inviteCode ? `&inv=${profile.inviteCode}` : ''}`
+    const link = `${publicUrl()}${ACTIVITY_PATH}?from=card${profile.inviteCode ? `&inv=${profile.inviteCode}` : ''}`
     renderCard({ checkin, profile, style, showCity: showCity && canShowCity, link })
       .then((blob) => {
         if (cancelled) return
@@ -67,7 +68,7 @@ export default function CardPreview() {
   }, [image])
 
   // Guests have no invite code yet; the link then just brings friends to the site.
-  const shareLink = `${publicUrl()}/?from=card${profile.inviteCode ? `&inv=${profile.inviteCode}` : ''}`
+  const shareLink = `${publicUrl()}${ACTIVITY_PATH}?from=card${profile.inviteCode ? `&inv=${profile.inviteCode}` : ''}`
 
   function toggleCity() {
     const next = !showCity

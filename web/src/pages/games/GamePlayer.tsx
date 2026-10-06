@@ -45,7 +45,7 @@ export default function GamePlayer() {
   const roundRef = useRef<Round | null>(null)
   const [recordError, setRecordError] = useState<string | null>(null)
 
-  useEffect(() => { if (pack) document.title = `${pack.name}｜下班啦` }, [pack])
+  useEffect(() => { if (pack) document.title = `${pack.name}｜相伴` }, [pack])
 
   useEffect(() => {
     if (pack?.orientation === 'landscape') document.documentElement.dataset.gameLayout = 'landscape'

@@ -110,7 +110,7 @@ export async function renderQuizPoster(quiz: QuizDefinition, report: QuizReport,
   }
   ctx.fillStyle = '#edbd76'
   font(ctx, 16, 600)
-  ctx.fillText('下班啦', 24, 43)
+  ctx.fillText('相伴', 24, 43)
   ctx.fillStyle = '#b9c4d1'
   font(ctx, 9)
   ctx.textAlign = 'right'
