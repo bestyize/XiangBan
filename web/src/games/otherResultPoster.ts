@@ -21,7 +21,17 @@ export async function renderOtherResultPoster(result: OtherResult, link: string)
   ctx.textAlign = 'right'; text('下班啦 · 玩一局', 324, 50, 9, '#4f655a')
   ctx.textAlign = 'center'; text('这一局，玩得漂亮', 180, 95, 22)
   const colors = result.gameId === 'merge-2048' ? ['#f2eee1', '#ffd12b', '#ff607a', '#526bd5'] : ['#ffd12b', '#00b9f5', '#42d34f', '#ff4f76']
-  if (result.gameId === 'water-sort') {
+  if (result.gameId === 'ink-blade') {
+    // A brushed crescent sword stroke with a cinnabar seal, echoing the game's ink style.
+    ctx.lineCap = 'round'
+    for (let i = 0; i < 9; i++) {
+      ctx.strokeStyle = `rgba(27,27,29,${0.35 + (i % 3) * 0.2})`
+      ctx.lineWidth = 2.6
+      ctx.beginPath(); ctx.arc(180, 214, 70 + i * 2.2, Math.PI * 1.12 + i * 0.02, Math.PI * 1.9 - i * 0.015); ctx.stroke()
+    }
+    rect(160, 140, 40, 40, 5, '#b8322a')
+    text(result.level > 0 ? '胜' : '剑', 180, 168, 22, '#fbefe2', 700)
+  } else if (result.gameId === 'water-sort') {
     for (let i = 0; i < 4; i++) {
       rect(89 + i * 48, 127, 38, 70, 11, '#e3eee6')
       rect(93 + i * 48, 137, 30, 56, 8, colors[i])

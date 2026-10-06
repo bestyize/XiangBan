@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" fill="none">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#dcd3bd"/><stop offset=".75" stop-color="#f0e8d5"/></linearGradient>
+    <linearGradient id="far" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#4f5a68" stop-opacity=".55"/><stop offset="1" stop-color="#4f5a68" stop-opacity="0"/></linearGradient>
+    <linearGradient id="mid" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2c3036" stop-opacity=".75"/><stop offset="1" stop-color="#2c3036" stop-opacity="0"/></linearGradient>
+    <radialGradient id="sun"><stop offset=".62" stop-color="#bf3a2c" stop-opacity=".92"/><stop offset="1" stop-color="#bf3a2c" stop-opacity="0"/></radialGradient>
+    <linearGradient id="ground" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1b1b1d" stop-opacity=".3"/><stop offset="1" stop-color="#1b1b1d" stop-opacity="0"/></linearGradient>
+  </defs>
+  <rect width="400" height="400" rx="28" fill="url(#sky)"/>
+  <circle cx="292" cy="104" r="48" fill="url(#sun)"/>
+  <path d="M0 250 L18 196 Q30 150 44 192 L60 232 Q76 120 96 170 L112 214 Q130 96 150 160 L170 226 Q188 150 206 204 L226 238 Q250 132 272 190 L290 230 Q312 160 334 210 L352 236 Q372 176 400 214 V300 H0 Z" fill="url(#far)"/>
+  <path d="M0 290 Q40 232 86 262 Q120 220 168 256 Q214 224 260 262 Q306 236 350 260 Q378 244 400 254 V320 H0 Z" fill="url(#mid)"/>
+  <g stroke="#1b1b1d" stroke-linecap="round">
+    <path d="M56 400 V0" stroke-width="10" stroke-opacity=".8"/>
+    <path d="M51 70 h10 M51 150 h10 M51 230 h10 M51 310 h10" stroke="#efe7d4" stroke-width="2"/>
+    <path d="M354 400 V20" stroke-width="7" stroke-opacity=".45"/>
+    <path d="M350 98 h8 M350 180 h8 M350 262 h8" stroke="#efe7d4" stroke-width="1.6"/>
+  </g>
+  <g fill="#1b1b1d" fill-opacity=".8">
+    <path d="M50 300 q-24-20-50-18 q26 6 50 18Z"/><path d="M50 290 q-18-24-40-30 q20 14 40 30Z"/>
+    <path d="M350 140 q-30-12-54 0 q28-4 54 0Z" fill-opacity=".45"/><path d="M350 146 q-22 6-38 26 q20-18 38-26Z" fill-opacity=".45"/>
+  </g>
+  <rect y="306" width="400" height="94" fill="url(#ground)"/>
+  <path d="M0 307 Q100 302 200 307 T400 306" stroke="#1b1b1d" stroke-width="5" stroke-linecap="round" stroke-dasharray="70 4 120 3 200"/>
+  <g transform="translate(212 306)">
+    <path d="M-12 0 L-6 -26 L4 -26 L13 0 L8 0 L1 -18 L-6 0Z" fill="#141416"/>
+    <path d="M-10 -24 Q-14 -48 -4 -60 L10 -60 Q18 -44 22 -22 Q4 -14 -10 -24Z" fill="#141416"/>
+    <path d="M-12 -40 L22 -40" stroke="#b8322a" stroke-width="4" stroke-linecap="round"/>
+    <path d="M-8 -62 Q-40 -66 -72 -48 Q-90 -40 -104 -46" stroke="#b8322a" stroke-width="5" stroke-linecap="round"/>
+    <circle cx="4" cy="-68" r="8" fill="#141416"/>
+    <path d="M-24 -66 Q-4 -76 4 -86 Q14 -76 32 -67 Q4 -62 -24 -66Z" fill="#141416"/>
+    <path d="M18 -50 L30 -46 L84 -88" stroke="#141416" stroke-width="3" stroke-linecap="round"/>
+    <path d="M30 -46 L84 -88" stroke="#efe7d4" stroke-width=".9" stroke-linecap="round"/>
+  </g>
+  <path d="M96 236 Q190 150 316 206" stroke="#141416" stroke-width="7" stroke-linecap="round" stroke-opacity=".88"/>
+  <path d="M110 230 Q190 166 300 204" stroke="#141416" stroke-width="2" stroke-linecap="round" stroke-dasharray="30 6 50 4 80" stroke-opacity=".6"/>
+  <g transform="translate(94 46)">
+    <text font-family="'Kaiti SC','STKaiti','KaiTi','Songti SC',serif" font-size="40" font-weight="600" fill="#1b1b1d" writing-mode="tb" letter-spacing="4">水墨剑客</text>
+  </g>
+  <g transform="translate(76 238) rotate(-4)">
+    <rect width="36" height="36" rx="4" fill="#b8322a"/>
+    <text x="18" y="25" text-anchor="middle" font-family="'Kaiti SC','STKaiti','KaiTi','Songti SC',serif" font-size="20" fill="#fbefe2">墨</text>
+  </g>
+</svg>

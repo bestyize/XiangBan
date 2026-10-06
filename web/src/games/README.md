@@ -71,6 +71,7 @@ The host saves guest records in the current browser and signed-in records throug
 | `block-puzzle` | 消失高手 | Place three pieces per batch on an 8×8 board and clear full rows/columns |
 | `water-sort` | 奶茶大师 | Pour matching colors into tubes, with undo and progressively harder levels |
 | `snake-arena` | 小伴贪吃蛇 | Landscape, mobile-first arena with local AI snakes, boost energy and three-minute or endless rounds |
+| `ink-blade` | 水墨剑客 | Landscape ink-wash side-scrolling action: parries, executions, five painted areas and a boss duel, all drawn by code |
 
 Packs may set `orientation: "landscape"` to use the full viewport instead of the phone-width host. The host permits fullscreen and orientation locking; the game must retain manual-rotation play when those APIs are unavailable. The site's PWA orientation is `any` so a landscape pack can also rotate when launched from the home screen.
 
