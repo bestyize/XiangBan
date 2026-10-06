@@ -1,0 +1,69 @@
+name: Xiaoban desktop prototype
+
+on:
+  pull_request:
+    paths:
+      - 'client/xiaoban-desktop-wallpaper/**'
+      - 'web/src/robot/**'
+      - '.github/workflows/xiaoban-desktop.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: xiaoban-desktop-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  macos-arm64:
+    runs-on: macos-15
+    timeout-minutes: 35
+    defaults:
+      run:
+        working-directory: client/xiaoban-desktop-wallpaper
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: |
+            web/package-lock.json
+            client/xiaoban-desktop-wallpaper/package-lock.json
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: client/xiaoban-desktop-wallpaper/src-tauri
+      - name: Install frontend dependencies
+        run: |
+          npm ci
+          npm --prefix ../../web ci
+      - name: Validate shared character and coordinates
+        run: |
+          npm test
+          cargo test --manifest-path src-tauri/Cargo.toml --locked
+      - name: Build Apple silicon app
+        run: npm run desktop:macos:build
+      - name: Verify native mode switching
+        run: npm run test:macos
+      - name: Package app and measure size
+        run: |
+          mkdir -p artifacts
+          app='src-tauri/target/aarch64-apple-darwin/release/bundle/macos/小伴.app'
+          ditto -c -k --sequesterRsrc --keepParent "$app" artifacts/XiaoBan-macOS-arm64.zip
+          du -sk "$app" > artifacts/macos-size.txt
+          ls -lh artifacts/XiaoBan-macOS-arm64.zip >> artifacts/macos-size.txt
+          cat artifacts/macos-size.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: XiaoBan-macOS-arm64
+          path: |
+            client/xiaoban-desktop-wallpaper/artifacts/XiaoBan-macOS-arm64.zip
+            client/xiaoban-desktop-wallpaper/artifacts/smoke-macos.json
+            client/xiaoban-desktop-wallpaper/artifacts/macos-size.txt
+          if-no-files-found: warn
+          retention-days: 14

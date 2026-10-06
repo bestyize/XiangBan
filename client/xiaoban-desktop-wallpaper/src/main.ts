@@ -45,6 +45,8 @@ async function update(patch: Partial<Settings>) {
 }
 
 async function init() {
+  const platform = desktop ? await invoke<string>('get_platform') : 'preview'
+  const platformLabel = platform === 'macos' ? 'MACOS' : platform === 'windows' ? 'WINDOWS' : '浏览器'
   if (mode) {
     document.body.className = mode
     app.innerHTML = mode === 'wallpaper'
@@ -83,7 +85,7 @@ async function init() {
   } else {
     document.body.className = 'control'
     app.innerHTML = `<div class="dashboard">
-      <header class="header"><div class="brand"><span class="brand-icon">伴</span><div><h1>小伴</h1><p>桌面上的一点温暖</p></div></div><span class="prototype">WINDOWS · 原型</span></header>
+      <header class="header"><div class="brand"><span class="brand-icon">伴</span><div><h1>小伴</h1><p>桌面上的一点温暖</p></div></div><span class="prototype">${platformLabel} · 原型</span></header>
       <div class="workspace"><section class="preview-column"><div class="preview scene">${sceneMarkup}<div class="preview-pet"></div><div class="preview-label"><span class="live-dot"></span>实时互动预览</div></div>
         <div class="preview-note"><span id="pet-status">平静</span><p>戳一下，看看小伴的反应。<br>停下来，它也会慢慢打个盹。</p></div>
         <div class="detail"><span>原版 SVG</span><span>弹簧动画</span><span>鼠标跟随</span></div></section>
@@ -127,8 +129,9 @@ async function init() {
     document.querySelector('#quit')!.addEventListener('click', () => invoke('quit').catch(error))
     document.querySelector('#diagnostics')!.addEventListener('click', async () => {
       try {
-        const data = await invoke<{ platform: string; wallpaper?: { parentClass: string; width: number; height: number }; floating?: { width: number; height: number } }>('get_diagnostics')
-        const text = data.wallpaper ? `壁纸已嵌入 ${data.wallpaper.parentClass} · ${data.wallpaper.width} × ${data.wallpaper.height}` : `悬浮窗口 · ${data.floating?.width} × ${data.floating?.height}`
+        const data = await invoke<{ platform: string; error?: string; wallpaper?: { parentClass?: string; host?: string; width: number; height: number }; floating?: { width: number; height: number } }>('get_diagnostics')
+        if (data.error) throw new Error(data.error)
+        const text = data.wallpaper ? `壁纸已嵌入 ${data.wallpaper.parentClass ?? data.wallpaper.host} · ${data.wallpaper.width} × ${data.wallpaper.height}` : `悬浮窗口 · ${data.floating?.width} × ${data.floating?.height}`
         const message = document.querySelector<HTMLElement>('#message')!; message.textContent = text; message.dataset.error = 'false'
       } catch (failure) { error(failure) }
     })
