@@ -10,13 +10,13 @@
   const PROTOCOL = 1
 
   const SHAPES = {
-    I: { color: '#73d4e8', matrix: [[0,0,0,0],[1,1,1,1],[0,0,0,0],[0,0,0,0]] },
-    J: { color: '#87a6ff', matrix: [[1,0,0,0],[1,1,1,0],[0,0,0,0],[0,0,0,0]] },
-    L: { color: '#ffbd69', matrix: [[0,0,1,0],[1,1,1,0],[0,0,0,0],[0,0,0,0]] },
-    O: { color: '#ffe17a', matrix: [[0,1,1,0],[0,1,1,0],[0,0,0,0],[0,0,0,0]] },
-    S: { color: '#83dc9b', matrix: [[0,1,1,0],[1,1,0,0],[0,0,0,0],[0,0,0,0]] },
-    T: { color: '#c59bff', matrix: [[0,1,0,0],[1,1,1,0],[0,0,0,0],[0,0,0,0]] },
-    Z: { color: '#ff8e96', matrix: [[1,1,0,0],[0,1,1,0],[0,0,0,0],[0,0,0,0]] },
+    I: { color: '#00b9f5', matrix: [[0,0,0,0],[1,1,1,1],[0,0,0,0],[0,0,0,0]] },
+    J: { color: '#4169ff', matrix: [[1,0,0,0],[1,1,1,0],[0,0,0,0],[0,0,0,0]] },
+    L: { color: '#ff8a16', matrix: [[0,0,1,0],[1,1,1,0],[0,0,0,0],[0,0,0,0]] },
+    O: { color: '#ffd12b', matrix: [[0,1,1,0],[0,1,1,0],[0,0,0,0],[0,0,0,0]] },
+    S: { color: '#42d34f', matrix: [[0,1,1,0],[1,1,0,0],[0,0,0,0],[0,0,0,0]] },
+    T: { color: '#a34dff', matrix: [[0,1,0,0],[1,1,1,0],[0,0,0,0],[0,0,0,0]] },
+    Z: { color: '#ff4f76', matrix: [[1,1,0,0],[0,1,1,0],[0,0,0,0],[0,0,0,0]] },
   }
 
   const boardCanvas = document.getElementById('board')
@@ -117,9 +117,14 @@
   function drawBlock(context, x, y, color, size, alpha = 1) {
     context.globalAlpha = alpha
     context.fillStyle = color
-    context.fillRect(x * size + 1, y * size + 1, size - 2, size - 2)
-    context.fillStyle = 'rgba(255,255,255,0.19)'
-    context.fillRect(x * size + 2, y * size + 2, size - 4, Math.max(2, size * 0.12))
+    context.beginPath()
+    context.roundRect(x * size + 1.5, y * size + 1.5, size - 3, size - 3, size * .14)
+    if (alpha < 1) {
+      context.globalAlpha = .5
+      context.strokeStyle = color
+      context.lineWidth = 1.3
+      context.stroke()
+    } else context.fill()
     context.globalAlpha = 1
   }
 
@@ -130,9 +135,9 @@
   }
 
   function draw() {
-    boardContext.fillStyle = '#111b2b'
+    boardContext.fillStyle = '#fffdf5'
     boardContext.fillRect(0, 0, COLS * CELL, ROWS * CELL)
-    boardContext.strokeStyle = 'rgba(255,255,255,0.055)'
+    boardContext.strokeStyle = '#e7eee0'
     boardContext.lineWidth = 1
     for (let x = 1; x < COLS; x += 1) {
       boardContext.beginPath()
@@ -161,11 +166,13 @@
 
   function drawNext() {
     nextContext.clearRect(0, 0, nextCanvas.width, nextCanvas.height)
-    nextContext.fillStyle = 'rgba(17,27,43,0.55)'
-    nextContext.fillRect(0, 0, nextCanvas.width, nextCanvas.height)
     if (!nextType) return
     const matrix = SHAPES[nextType].matrix
-    drawMatrix(nextContext, matrix, 0.5, 0.25, SHAPES[nextType].color, 17)
+    const cells = matrix.flatMap((row, y) => row.flatMap((cell, x) => cell ? [{ x, y }] : []))
+    const minX = Math.min(...cells.map(cell => cell.x)), maxX = Math.max(...cells.map(cell => cell.x))
+    const minY = Math.min(...cells.map(cell => cell.y)), maxY = Math.max(...cells.map(cell => cell.y))
+    const size = 20
+    drawMatrix(nextContext, matrix, (nextCanvas.width / size - (maxX - minX + 1)) / 2 - minX, (nextCanvas.height / size - (maxY - minY + 1)) / 2 - minY, SHAPES[nextType].color, size)
   }
 
   function updateStats() {
@@ -297,6 +304,7 @@
   function togglePause() {
     if (finished) return
     paused = !paused
+    document.body.classList.toggle('paused', paused)
     pauseButton.textContent = paused ? '继续' : '暂停'
     setStatus(paused ? '已暂停，歇好再继续。' : '方向键移动，↑旋转，空格快速下落。')
     startTimer()
@@ -313,6 +321,7 @@
     lines = 0
     level = 1
     paused = false
+    document.body.classList.remove('paused')
     finished = false
     postToHost('game.start')
     pauseButton.textContent = '暂停'
@@ -379,4 +388,15 @@
   })
 
   resetGame()
+  if (typeof ResizeObserver === 'function') {
+    const resize = new ResizeObserver(([entry]) => {
+      const pixels = Math.max(1, Math.round(entry.contentRect.width * Math.min(window.devicePixelRatio || 1, 3)))
+      if (boardCanvas.width === pixels) return
+      boardCanvas.width = pixels
+      boardCanvas.height = pixels * 2
+      boardContext.setTransform(pixels / (COLS * CELL), 0, 0, pixels / (COLS * CELL), 0, 0)
+      draw()
+    })
+    resize.observe(boardCanvas)
+  }
 })()

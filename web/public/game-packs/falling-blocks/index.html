@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-    <meta name="theme-color" content="#182338">
+    <meta name="theme-color" content="#e9f3e9">
     <title>俄罗斯方块</title>
     <link rel="stylesheet" href="./game.css">
     <link rel="stylesheet" href="../result-share.css">
@@ -35,8 +35,10 @@
       <section class="board-stage" aria-label="游戏区域">
         <div class="board-wrap">
           <canvas id="board" width="250" height="500" role="img" aria-label="下落方块游戏区域"></canvas>
+          <div class="pause-label" aria-hidden="true">休息一下<small>点右上角继续</small></div>
           <div class="game-over" id="gameOver" role="dialog" aria-modal="true" aria-labelledby="resultTitle" aria-describedby="resultScore" hidden>
             <div class="result-card">
+              <svg class="result-mark" viewBox="0 0 50 43" aria-hidden="true"><rect x="0" y="22" width="20" height="20" rx="4" fill="#00b9f5"/><rect x="23" y="22" width="20" height="20" rx="4" fill="#ffd12b"/><rect x="23" y="0" width="20" height="20" rx="4" fill="#42d34f"/></svg>
               <p class="eyebrow">这一局结束啦</p>
               <h2 id="resultTitle">再来一局？</h2>
               <p id="resultScore">本局得分 0</p>
