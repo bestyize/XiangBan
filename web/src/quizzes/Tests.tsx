@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, Route, Switch, useLocation } from 'wouter'
 import { TAB_BAR_SPACE } from '../components/TabBar.tsx'
 import { AccountBadge } from '../components/AccountBadge.tsx'
+import { CompanionNote } from '../components/CompanionNote.tsx'
 import { PageHeader } from '../components/PageHeader.tsx'
 import { NavBar } from '../components/SubPage.tsx'
 import { findQuiz, findSharedQuiz, quizCatalog } from './catalog.ts'
@@ -35,7 +36,9 @@ export function QuizHub({ active = true }: { active?: boolean }) {
   }) : []
   return <main className="quiz-shell quiz-hub" style={{ paddingBottom: TAB_BAR_SPACE }}>
     <PageHeader title="趣味测试"><AccountBadge compact /></PageHeader>
-    <p className="quiz-hub-intro">选个小测试，给此刻的自己一张名片。</p>
+    <CompanionNote className="mb-4" spec="curious" name={profile?.companionName || '小伴'}>
+      测一测此刻的你？结果只是一面小镜子，我陪你一起看。
+    </CompanionNote>
     {localProgress.length > 0 && <div className="mb-4 rounded-2xl border border-lamp/20 bg-lamp/5 p-3 text-xs leading-relaxed text-window/70">
       本机还有 {localProgress.length} 套游客测试进度。
       <button type="button" className="ml-2 min-h-11 text-lamp underline" onClick={() => {
