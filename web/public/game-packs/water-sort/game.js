@@ -18,6 +18,7 @@
   const overlay = document.getElementById('overlay')
   const nextButton = document.getElementById('nextButton')
   const replayButton = document.getElementById('replayButton')
+  const stageNode = document.querySelector('.stage')
   const completed = new Set()
   let hostReady = false
   let levelIndex = 0
@@ -72,6 +73,7 @@
       if (selected !== null && rules.getPour(board, selected, index).valid) button.classList.add('can-receive')
       const sorted = tube.length === rules.CAPACITY && tube.every((color) => color === tube[0])
       if (sorted) button.classList.add('sorted')
+      if (!tube.length) button.classList.add('empty')
       if (index === flashIndex) button.classList.add('flash')
       const glass = document.createElement('span')
       glass.className = 'glass'
@@ -80,7 +82,13 @@
         const segment = document.createElement('span')
         segment.className = 'segment'
         segment.dataset.color = String(color)
-        segment.textContent = flavors[color].symbol + '·' + flavors[color].short
+        const label = document.createElement('span')
+        label.className = 'flavor-label'
+        const short = document.createElement('span')
+        short.className = 'flavor-short'
+        short.textContent = '·' + flavors[color].short
+        label.append(document.createTextNode(flavors[color].symbol), short)
+        segment.append(label)
         glass.append(segment)
       })
       if (!tube.length) {
@@ -99,11 +107,35 @@
     })
     boardNode.style.setProperty('--columns', String(Math.min(board.length, 5)))
     boardNode.replaceChildren(...buttons)
+    updateTubeLayout()
     document.getElementById('moves').textContent = String(steps)
-    document.getElementById('levelNumber').textContent = (levelIndex + 1) + ' / ' + rules.levelCount
-    document.getElementById('completed').textContent = completed.size + ' / ' + rules.levelCount
+    document.getElementById('levelNumber').textContent = (levelIndex + 1) + '/' + rules.levelCount
+    document.getElementById('completed').textContent = completed.size + '/' + rules.levelCount
     undoButton.disabled = won || history.length === 0
     if (focusIndex !== null && !won) buttons[focusIndex].focus({ preventScroll: true })
+  }
+
+  function updateTubeLayout() {
+    if (!board.length) return
+    const style = getComputedStyle(stageNode)
+    const width = stageNode.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight)
+    const height = document.body.classList.contains('hosted')
+      ? stageNode.clientHeight - parseFloat(style.paddingTop) - parseFloat(style.paddingBottom)
+      : window.innerHeight - (document.querySelector('.game').getBoundingClientRect().height - stageNode.getBoundingClientRect().height) - 20
+    const minPanelHeight = board.length > 5 ? 320 : 220
+    const layout = globalThis.XiabanWaterSortLayout.getTubeLayout(board.length, width - 2, Math.max(minPanelHeight, height) - 2)
+    if (!layout) return
+    boardNode.style.setProperty('--columns', String(layout.columns))
+    boardNode.style.setProperty('--tracks', String(layout.columns * 2))
+    boardNode.classList.toggle('compact-labels', layout.tubeWidth < 46)
+    for (const name of ['tubeWidth', 'tubeHeight', 'gap', 'rowGap', 'paddingX', 'paddingTop', 'paddingBottom']) {
+      const property = '--' + name.replace(/[A-Z]/g, letter => '-' + letter.toLowerCase())
+      boardNode.style.setProperty(property, layout[name] + 'px')
+    }
+    Array.from(boardNode.children).forEach((button, index) => {
+      button.style.gridColumn = layout.startColumns[index] + ' / span 2'
+      button.style.gridRow = String(Math.floor(index / layout.columns) + 1)
+    })
   }
 
   function updateMenu() {
@@ -250,4 +282,6 @@
   })
 
   startLevel(0, false)
+  window.addEventListener('resize', updateTubeLayout)
+  if (typeof ResizeObserver === 'function') new ResizeObserver(updateTubeLayout).observe(stageNode)
 })()

@@ -1,7 +1,7 @@
 import { gamePublicBase } from './resultShare.ts'
 
 export const RESULT_GAMES: Record<string, string> = {
-  'falling-blocks': '俄罗斯方块', 'merge-2048': '2048', 'block-puzzle': '小伴消方块', 'water-sort': '调饮料大师',
+  'falling-blocks': '俄罗斯方块', 'merge-2048': '2048', 'block-puzzle': '消失高手', 'water-sort': '奶茶大师',
 }
 export interface OtherResult { gameId: string; score: number; lines: number; maxTile: number; level: number; steps: number }
 export function parseOtherResult(value: unknown): OtherResult | null {

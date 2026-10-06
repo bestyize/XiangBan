@@ -3,15 +3,16 @@
   <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-    <meta name="theme-color" content="#182338">
+    <meta name="theme-color" content="#f2f8f5">
     <title>2048 · 下班啦</title>
     <link rel="stylesheet" href="./game.css">
+    <link rel="stylesheet" href="../fresh-theme.css">
     <link rel="stylesheet" href="../result-share.css">
     <script src="./rules.js" defer></script>
     <script src="../result-share.js" defer></script>
     <script src="./game.js" defer></script>
   </head>
-  <body>
+  <body class="fresh-game" data-game="merge-2048">
     <main class="game">
       <header class="topbar">
         <div>
@@ -22,8 +23,8 @@
       </header>
 
       <section class="stats" aria-label="本局数据">
-        <div class="stat"><span>本局得分</span><strong id="score">0</strong></div>
-        <div class="stat"><span>本次最高分</span><strong id="best">0</strong></div>
+        <div class="stat"><span>得分</span><strong id="score">0</strong></div>
+        <div class="stat"><span>最高分</span><strong id="best">0</strong></div>
         <div class="stat"><span>最大方块</span><strong id="largest">2</strong></div>
       </section>
 

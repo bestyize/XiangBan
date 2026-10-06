@@ -3,23 +3,24 @@
   <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-    <meta name="theme-color" content="#182338">
-    <title>小伴消方块 · 下班啦</title>
+    <meta name="theme-color" content="#f2f8f5">
+    <title>消失高手 · 下班啦</title>
     <link rel="stylesheet" href="./game.css">
+    <link rel="stylesheet" href="../fresh-theme.css">
     <link rel="stylesheet" href="../result-share.css">
     <script src="./rules.js" defer></script>
     <script src="../result-share.js" defer></script>
     <script src="./game.js" defer></script>
   </head>
-  <body>
+  <body class="fresh-game" data-game="block-puzzle">
     <main class="game">
       <header class="topbar">
-        <div><p class="eyebrow">单人 · 摆一摆，消一消</p><h1>小伴消方块</h1></div>
+        <div><p class="eyebrow">单人 · 摆一摆，消一消</p><h1>消失高手</h1></div>
         <button id="exitButton" class="quiet-button" type="button" aria-label="返回游戏广场"><span class="exit-arrow" aria-hidden="true">‹</span><span class="exit-label">回游戏广场</span></button>
       </header>
       <section class="stats" aria-label="本局数据">
-        <div class="stat"><span>本局得分</span><strong id="score">0</strong></div>
-        <div class="stat"><span>本次最高分</span><strong id="best">0</strong></div>
+        <div class="stat"><span>得分</span><strong id="score">0</strong></div>
+        <div class="stat"><span>最高分</span><strong id="best">0</strong></div>
         <div class="stat"><span>消除行列</span><strong id="lines">0</strong></div>
       </section>
       <p class="intro">填满整行或整列就消除，一次消多条有加分。</p>
@@ -37,7 +38,8 @@
           </div>
         </div>
       </section>
-      <section id="tray" class="tray" aria-label="待放置方块">
+      <p id="trayHint" class="tray-hint">拖动下面方块到方格</p>
+      <section id="tray" class="tray" aria-label="待放置方块" aria-describedby="trayHint">
         <button class="piece-button" type="button" data-slot="0" aria-pressed="false"><span class="piece-art"></span><span class="piece-label"></span></button>
         <button class="piece-button" type="button" data-slot="1" aria-pressed="false"><span class="piece-art"></span><span class="piece-label"></span></button>
         <button class="piece-button" type="button" data-slot="2" aria-pressed="false"><span class="piece-art"></span><span class="piece-label"></span></button>

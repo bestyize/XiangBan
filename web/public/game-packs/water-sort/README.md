@@ -1,6 +1,10 @@
-# 调饮料大师
+# 奶茶大师
 
-`water-sort` is a self-contained, dependency-free classic-script game pack for the version 1 Xiaban host. Serve this directory as static files. All artwork, rules, and styling are local; the sandbox only needs `allow-scripts`, with no storage or external services.
+`water-sort` is a dependency-free classic-script game pack for the version 1 Xiaban host. Serve this directory as static files together with the parent directory's shared `fresh-theme.css`, `result-share.js`, and `result-share.css`. All artwork, rules, and styling are local; the sandbox only needs `allow-scripts`, with no storage or external services.
+
+The theme uses a neutral gray-white background, white panels, dark gray UI text, restrained borders and shadows, blue interaction accents, and vivid flavor colors. Empty glasses and unfilled space are white. Flavor identifiers are plain white text without a badge background; narrow cups retain the letter and expose the complete flavor name in the button's accessible label. Load `fresh-theme.css` after `game.css` and before `result-share.css`; the body class `fresh-game` and `data-game="water-sort"` select the game's skin.
+
+`layout.js` is loaded before `game.js` and exposes `XiabanWaterSortLayout.getTubeLayout`. Cup height and width adapt to both cup count and available screen area. Four or five cups use one tall row; six to ten cups use balanced rows, with a shorter last row centered. Wide screens may use one row. Very short areas scroll instead of compressing liquid layers into unreadable strips. Layout dimensions update when the stage resizes; tests use the same published script.
 
 ## Play
 
@@ -9,6 +13,8 @@ Select a filled glass, then another glass. Its top flavor must match the source 
 There are eight fixed levels with 2, 3, 4, 5, 6, 6, 7, and 8 flavors. Undo restores the previous board and step count; reset restarts the current level. Finishing unlocks the next level. The menu can replay unlocked levels. There is no timer. Level unlocks and the completed-level count last for this loaded game session.
 
 Native buttons support Tab / Shift+Tab and Enter / Space. Escape cancels a selected source. The completion dialog traps focus until the player selects its next-level or replay action. Small portrait and short landscape layouts are supported, as is reduced motion.
+
+Every completed level shows a result dialog with Share results, Next level, and Replay actions. Sharing uses a version 1 `game.share` message when hosted; standalone play opens the public result share page. Keep the flavor letters and labels visible when adjusting the palette so players do not depend on color alone.
 
 ## Rules and verification
 

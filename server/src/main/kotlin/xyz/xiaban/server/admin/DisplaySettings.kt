@@ -13,8 +13,8 @@ object DisplayCatalog {
     val games = listOf(
         DisplayItem("falling-blocks", true, "俄罗斯方块"),
         DisplayItem("merge-2048", true, "2048"),
-        DisplayItem("block-puzzle", true, "小伴消方块"),
-        DisplayItem("water-sort", true, "调饮料大师"),
+        DisplayItem("block-puzzle", true, "消失高手"),
+        DisplayItem("water-sort", true, "奶茶大师"),
         DisplayItem("snake-arena", true, "小伴贪吃蛇"),
     )
     val quizzes = listOf(

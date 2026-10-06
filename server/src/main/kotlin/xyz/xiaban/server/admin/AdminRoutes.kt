@@ -34,7 +34,7 @@ private const val COOKIE = "xb_admin_session"
 
 /** Rows on the dashboard, in display order; ids match web/public/game-packs and web/src/quizzes/catalog.ts. */
 private val METRIC_GAMES = linkedMapOf(
-    "falling-blocks" to "俄罗斯方块", "merge-2048" to "2048", "block-puzzle" to "小伴消方块", "water-sort" to "调饮料大师",
+    "falling-blocks" to "俄罗斯方块", "merge-2048" to "2048", "block-puzzle" to "消失高手", "water-sort" to "奶茶大师",
 )
 private val METRIC_QUIZZES = linkedMapOf(
     "mbti" to "MBTI", "mbanti" to "M班TI", "animal" to "精神小动物", "afterhours" to "下班第二人格",
