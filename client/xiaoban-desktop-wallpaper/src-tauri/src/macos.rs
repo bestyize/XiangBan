@@ -206,15 +206,19 @@ pub fn start_cursor_bridge(app: tauri::AppHandle) {
 
 pub fn diagnostics(app: &tauri::AppHandle) -> serde_json::Value {
     let handle = app.clone();
-    on_main(app, move |_| {
+    on_main(app, move |mtm| {
         let desktop_level = CGWindowLevelForKey(CGWindowLevelKey::DesktopWindowLevelKey) as i64;
         let icon_level = CGWindowLevelForKey(CGWindowLevelKey::DesktopIconWindowLevelKey) as i64;
         let describe = |label| -> Result<Option<serde_json::Value>, String> {
             let Some(window) = handle.get_webview_window(label) else { return Ok(None); };
             let ns = native(&window)?;
+            let frame = ns.frame();
+            let screen = NSScreen::screens(mtm).firstObject().ok_or("没有找到 macOS 主显示器")?.frame();
             let size = ns.contentView().map(|view| view.bounds().size).unwrap_or(ns.frame().size);
             let level = ns.level() as i64;
             Ok(Some(serde_json::json!({"windowNumber": ns.windowNumber(), "visible": ns.isVisible(),
+                "x": frame.origin.x, "y": frame.origin.y,
+                "screenFrame": {"x": screen.origin.x, "y": screen.origin.y, "width": screen.size.width, "height": screen.size.height},
                 "width": size.width, "height": size.height, "scaleFactor": ns.backingScaleFactor(),
                 "level": level, "desktopLevel": desktop_level, "desktopIconLevel": icon_level,
                 "isDesktopLayer": is_desktop_level(level, desktop_level, icon_level),

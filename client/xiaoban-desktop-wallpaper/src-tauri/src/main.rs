@@ -97,8 +97,18 @@ fn open_scene(app: &tauri::AppHandle, mode: &str) -> Result<(), String> {
     .focused(false)
     .inner_size(scene_w, scene_h)
     .position(
-        monitor.position().x as f64 / scale + width - scene_w - 70.0,
-        monitor.position().y as f64 / scale + height - scene_h - 100.0,
+        monitor.position().x as f64 / scale
+            + if wallpaper {
+                0.0
+            } else {
+                width - scene_w - 70.0
+            },
+        monitor.position().y as f64 / scale
+            + if wallpaper {
+                0.0
+            } else {
+                height - scene_h - 100.0
+            },
     );
     #[cfg(target_os = "macos")]
     let builder =
@@ -251,7 +261,11 @@ fn poke(app: tauri::AppHandle) {
 fn scene_ready(window: tauri::WebviewWindow) -> Result<(), String> {
     window.show().map_err(|e| e.to_string())?;
     #[cfg(target_os = "macos")]
-    macos::configure_scene(&window, window.label() == "wallpaper", false)?;
+    macos::configure_scene(
+        &window,
+        window.label() == "wallpaper",
+        window.label() == "wallpaper",
+    )?;
     window
         .app_handle()
         .state::<DesktopState>()
@@ -398,12 +412,17 @@ fn setup_tray(app: &tauri::App) -> tauri::Result<()> {
 }
 
 fn main() {
-    tauri::Builder::default().manage(DesktopState::default())
+    let mut state = DesktopState::default();
+    if std::env::args().any(|argument| argument == "--wallpaper") {
+        state.settings.get_mut().unwrap().mode = "wallpaper".into();
+    }
+    tauri::Builder::default().manage(state)
         .invoke_handler(tauri::generate_handler![get_platform, get_settings, set_mode, update_settings, poke,
             scene_ready, set_hit_test, start_drag, minimize_control, show_control, quit, get_diagnostics])
         .setup(|app| {
             setup_tray(app)?;
-            open_scene(app.handle(), "floating").map_err(std::io::Error::other)?;
+            let initial_mode = settings(app.handle()).mode;
+            open_scene(app.handle(), &initial_mode).map_err(std::io::Error::other)?;
             #[cfg(windows)] windows::start_cursor_bridge(app.handle().clone());
             #[cfg(target_os = "macos")] macos::start_cursor_bridge(app.handle().clone());
             if std::env::args().any(|a| a == "--smoke-test") {

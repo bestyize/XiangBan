@@ -34,6 +34,10 @@ try {
     assert.ok(scene.joinsAllSpaces, '窗口未配置桌面空间行为')
   }
   const wallpaper = result.wallpaper.wallpaper
+  for (const dimension of ['x', 'y', 'width', 'height']) {
+    assert.ok(Math.abs(wallpaper[dimension] - wallpaper.screenFrame[dimension]) < 1,
+      `壁纸 ${dimension} 没有对齐主屏幕：${wallpaper[dimension]} vs ${wallpaper.screenFrame[dimension]}`)
+  }
   assert.ok(wallpaper.level > wallpaper.desktopLevel && wallpaper.level < wallpaper.desktopIconLevel, '壁纸不在桌面背景和图标之间')
   assert.ok(wallpaper.ignoresMouseEvents, '壁纸拦截了桌面输入')
   assert.equal(result.floatingBefore.floating.opaque, false, '悬浮窗不透明')
