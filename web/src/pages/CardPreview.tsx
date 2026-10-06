@@ -7,6 +7,7 @@ import { browserTimezone } from '../lib/device.ts'
 import { loadGuestCheckin } from '../lib/guestCheckin.ts'
 import { renderCard } from '../card/renderCard.ts'
 import { cardStyles } from '../card/styles.ts'
+import { loadPosterTheme, savePosterTheme } from '../poster/theme.ts'
 import { SubPage } from '../components/SubPage.tsx'
 import { FieldError, PrimaryButton } from '../components/ui.tsx'
 import { blobToBase64, inApp, send } from '../lib/bridge.ts'
@@ -24,7 +25,7 @@ export default function CardPreview() {
   const { updateProfile } = useSession()
   const [, navigate] = useLocation()
   const [checkin, setCheckin] = useState<Checkin | null>(null)
-  const [styleId, setStyleId] = useState('default')
+  const [styleId, setStyleId] = useState<string>(loadPosterTheme)
   const [showCity, setShowCity] = useState(profile.showCityOnCard)
   const [image, setImage] = useState<CardImage | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -107,7 +108,7 @@ export default function CardPreview() {
 
       <div className="mt-4 flex flex-wrap justify-center gap-2" role="radiogroup" aria-label="卡片样式">
         {styles.map((s) => (
-          <button key={s.id} type="button" role="radio" aria-checked={s.id === styleId} onClick={() => setStyleId(s.id)}
+          <button key={s.id} type="button" role="radio" aria-checked={s.id === styleId} onClick={() => { setStyleId(s.id); if (s.id === 'night' || s.id === 'day') savePosterTheme(s.id) }}
             className={`rounded-full border-2 px-4 py-1.5 text-sm ${s.id === styleId ? 'border-lamp bg-lamp font-bold text-ink' : 'border-dusk-soft text-window/80'}`}>
             {s.name}
           </button>
