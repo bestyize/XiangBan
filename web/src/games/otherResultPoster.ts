@@ -18,7 +18,7 @@ export async function renderOtherResultPoster(result: OtherResult, link: string)
   ctx.fillStyle = '#f2f8f5'; ctx.fillRect(0, 0, 360, 480)
   rect(18, 16, 324, 448, 24, '#ffffff')
   text(RESULT_GAMES[result.gameId], 36, 51, 16)
-  ctx.textAlign = 'right'; text('下班啦 · 玩一局', 324, 50, 9, '#4f655a')
+  ctx.textAlign = 'right'; text('相伴 · 玩一局', 324, 50, 9, '#4f655a')
   ctx.textAlign = 'center'; text('这一局，玩得漂亮', 180, 95, 22)
   const colors = result.gameId === 'merge-2048' ? ['#f2eee1', '#ffd12b', '#ff607a', '#526bd5'] : ['#ffd12b', '#00b9f5', '#42d34f', '#ff4f76']
   if (result.gameId === 'water-sort') {

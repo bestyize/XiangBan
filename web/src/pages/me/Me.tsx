@@ -54,7 +54,7 @@ export default function Me() {
     }
   }
 
-  const name = profile.nickname ?? (isLoggedIn ? '下班啦用户' : '游客')
+  const name = profile.nickname ?? (isLoggedIn ? '相伴用户' : '游客')
 
   return (
     <Screen>

@@ -34,7 +34,7 @@ export function RobotStage({ size = 208, centered = true, className = '', ...rob
   return (
     <div className={`relative flex w-fit shrink-0 flex-col items-center ${centered ? 'mx-auto' : ''} ${className}`}>
       <div aria-hidden="true" className="pointer-events-none absolute left-1/2 top-[42%] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(circle,rgba(255,196,110,0.32),rgba(255,196,110,0.08)_52%,transparent_70%)]"
-        style={{ width: size * 1.45, height: size * 1.25 }} />
+        style={{ width: size * 1.4, height: size * 1.05 }} />
       <Robot {...robot} size={size} className="relative" />
     </div>
   )

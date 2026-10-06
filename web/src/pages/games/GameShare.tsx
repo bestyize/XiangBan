@@ -35,7 +35,7 @@ export default function GameShare({ gameId = 'snake-arena' }: { gameId?: string 
   }, [])
 
   useEffect(() => {
-    document.title = `${name}战绩｜下班啦`
+    document.title = `${name}战绩｜相伴`
     if (!own) captureReferral()
   }, [own, context.search, name])
   useEffect(() => {

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useLocation } from 'wouter'
 import type { ProfileUpdate } from '../../api/types.ts'
 import { track } from '../../lib/track.ts'
+import { takeAfterOnboarding } from '../../lib/activity.ts'
 import { Bubble, RobotStage, FieldError, PrimaryButton, QuietButton, Screen } from '../../components/ui.tsx'
 import { useLoginModal } from '../../lib/loginModal.ts'
 import { useMeta } from '../../lib/meta.ts'
@@ -53,7 +54,7 @@ export default function Onboarding() {
       const patch = finish ? { ...changes, onboarded: true } : changes
       if (Object.keys(patch).length > 0) await updateProfile(patch)
       track('onboarding_step', { step, action: skipped ? 'skip' : 'next' })
-      if (finish) navigate('/', { replace: true })
+      if (finish) navigate(takeAfterOnboarding() ?? '/', { replace: true })
       else setIndex((i) => i + 1)
     } catch (e) {
       setError((e as Error).message)

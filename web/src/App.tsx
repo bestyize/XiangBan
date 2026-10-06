@@ -11,6 +11,7 @@ import { SessionProvider, useSession } from './lib/session.tsx'
 import { track } from './lib/track.ts'
 import CardPreview from './pages/CardPreview.tsx'
 import Home from './pages/Home.tsx'
+import CheckinActivity from './pages/xiaban/CheckinActivity.tsx'
 import LegalPage from './pages/LegalPage.tsx'
 import GuardianPage from './pages/me/GuardianPage.tsx'
 import Me from './pages/me/Me.tsx'
@@ -18,11 +19,11 @@ import ProfileEdit from './pages/me/ProfileEdit.tsx'
 import Onboarding from './pages/onboarding/Onboarding.tsx'
 import GameHub from './pages/games/GameHub.tsx'
 import GamePlayer from './pages/games/GamePlayer.tsx'
-import CompanionRoom from './pages/chat/CompanionRoom.tsx'
 import { LoginModal } from './components/LoginModal.tsx'
 import { LoginModalContext, useLoginModal } from './lib/loginModal.ts'
 import { readLoginReturn } from './lib/loginReturn.ts'
 import { lazyPage } from './lib/lazyPage.ts'
+import { ACTIVITY_PATH, rememberAfterOnboarding } from './lib/activity.ts'
 import AdminPage from './pages/AdminPage.tsx'
 import AccountProfile from './pages/me/AccountProfile.tsx'
 import { sharePageGameId, RESULT_GAMES } from './games/otherResultShare.ts'
@@ -38,7 +39,6 @@ function AccountTabs({ location }: { location: string }) {
   return <>
     {profile?.onboarded && <>
       <KeepAlivePage active={location === '/'}><Home active={location === '/'} /></KeepAlivePage>
-      <KeepAlivePage active={location === '/chat'}><CompanionRoom active={location === '/chat'} /></KeepAlivePage>
       <KeepAlivePage active={location === '/games'}><GameHub active={location === '/games'} /></KeepAlivePage>
     </>}
     <KeepAlivePage active={location === '/me'}><Me /></KeepAlivePage>
@@ -92,15 +92,19 @@ function SessionRoutes() {
   }
   if (location === '/login') return <LoginRoute />
   if (location === '/games/snake-arena' || (Object.keys(RESULT_GAMES).some(id => location === `/games/${id}`) && ['game_share', 'game-share'].includes(new URLSearchParams(window.location.search).get('from') || ''))) return <GamePlayer key={profile.userId} />
-  if (!profile.onboarded && !['/hello', '/me', '/me/account', '/me/settings'].includes(location)) return <Redirect to="/hello" replace />
+  if (!profile.onboarded && !['/hello', '/me', '/me/account', '/me/settings'].includes(location)) {
+    if (location === ACTIVITY_PATH) rememberAfterOnboarding(`${location}${window.location.search}`)
+    return <Redirect to="/hello" replace />
+  }
 
   return (
     <Switch key={profile.userId}>
       <Route path="/hello" component={Onboarding} />
       <Route path="/card" component={CardPreview} />
+      <Route path={ACTIVITY_PATH} component={CheckinActivity} />
+      <Route path="/chat"><Redirect to="/" replace /></Route>
       <Route path="/games/:gameId"><GamePlayer key={profile.userId} /></Route>
       <Route path="/games">{null}</Route>
-      <Route path="/chat">{null}</Route>
       <Route path="/me/account"><AccountProfile /></Route>
       <Route path="/me/guardian" component={GuardianPage} />
       <Route path="/me/profile" component={ProfileEdit} />
@@ -127,12 +131,12 @@ function AppPages() {
   const { profile } = useSession()
   const tests = location === '/tests' || location.startsWith('/tests/')
   const quizSync = useAccountProgress(tests)
-  const primary = ['/', '/chat', '/games', '/tests', '/me'].includes(location)
+  const primary = ['/', '/games', '/tests', '/me'].includes(location)
   const shareGameId = sharePageGameId(location)
   usePageViews()
   useEffect(() => {
-    const titles: Record<string, string> = { '/': '下班啦', '/chat': '小伴', '/games': '玩一局', '/tests': '趣味测试', '/me': '我的' }
-    if (titles[location]) document.title = `${titles[location]}｜下班啦`
+    const titles: Record<string, string> = { '/': '相伴', '/games': '玩一局｜相伴', '/tests': '趣味测试｜相伴', '/me': '我的｜相伴' }
+    if (titles[location]) document.title = titles[location]
   }, [location])
   return <>
     <Gate />
