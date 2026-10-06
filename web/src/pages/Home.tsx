@@ -28,6 +28,12 @@ const periodFace: Record<string, RobotInput> = {
   白天时光: 'idle',
 }
 
+const ROBOT_SIZE = 212
+const ROBOT_COMPACT_SCALE = 0.5
+/** Pinned 小伴 area: robot (size × 0.875 tall) plus the status line below it. */
+const ROBOT_FULL_H = 236
+const ROBOT_COMPACT_H = 136
+
 /** Stable key for a message row, used to track which reply is being spoken. */
 function messageId(message: { id?: number }, index: number): string {
   return message.id != null ? `id-${message.id}` : `idx-${index}`
@@ -60,9 +66,21 @@ export default function Home({ active = true }: { active?: boolean }) {
   const scrollRef = useRef<HTMLDivElement>(null)
   const sentRef = useRef(false)
   const scenario = useMemo(() => getScenario(), [])
+  const [scrolled, setScrolled] = useState(false)
+  const [typing, setTyping] = useState(false)
+  // 小伴 stays pinned above the conversation and steps back to a smaller size while you read or type.
+  const compact = scrolled || typing
 
   const companionName = profile.companionName || '小伴'
   const personalityLabel = personalityName[profile.personality] || '温柔治愈'
+  const thinking = isStreaming && !streamingText
+  const talking = (isStreaming && Boolean(streamingText)) || speakingId !== null
+  const listening = !isStreaming && input.trim().length > 0
+  const status = thinking ? `${companionName}正在想…`
+    : isStreaming ? `${companionName}正在回你`
+      : speakingId !== null ? `${companionName}在念给你听`
+        : listening ? `${companionName}在听`
+          : null
 
   // Follow the conversation once the user starts talking; opening the page keeps 小伴 in view.
   useEffect(() => {
@@ -95,15 +113,28 @@ export default function Home({ active = true }: { active?: boolean }) {
         </PageHeader>
       </div>
 
-      <div ref={scrollRef} className="flex-1 overflow-y-auto overscroll-contain px-5 pb-4">
-        <section aria-label={companionName} className="pt-6 text-center">
-          <RobotStage spec={periodFace[scenario.periodName] ?? 'idle'} label={`${companionName}在家等你`} size={212}
-            interactive autoSleep thinking={isStreaming && !streamingText}
-            speaking={(isStreaming && Boolean(streamingText)) || speakingId !== null} />
-          <p className="mt-3 text-[13px] text-window/55">
-            <b className="font-bold text-window/85">{companionName}</b> · {personalityLabel} · {scenario.periodName}
-          </p>
-          <Bubble className="mt-4">{scenario.greeting}</Bubble>
+      <section aria-label={companionName}
+        className="relative shrink-0 transition-[height] duration-300 ease-out motion-reduce:transition-none"
+        style={{ height: compact ? ROBOT_COMPACT_H : ROBOT_FULL_H }}>
+        <div className="absolute left-1/2 top-4 origin-top transition-transform duration-300 ease-out motion-reduce:transition-none"
+          style={{ transform: `translateX(-50%) scale(${compact ? ROBOT_COMPACT_SCALE : 1})` }}>
+          <RobotStage spec={periodFace[scenario.periodName] ?? 'idle'} label={`${companionName}在家等你`} size={ROBOT_SIZE}
+            interactive autoSleep thinking={thinking} speaking={talking} listening={listening} />
+        </div>
+        <p aria-live="polite" className="absolute inset-x-0 bottom-1.5 text-center text-[13px] text-window/55">
+          {status ?? <><b className="font-bold text-window/85">{companionName}</b> · {personalityLabel} · {scenario.periodName}</>}
+        </p>
+      </section>
+
+      <div ref={scrollRef} className="flex-1 overflow-y-auto overscroll-contain px-5 pb-4"
+        onScroll={(e) => {
+          const top = e.currentTarget.scrollTop
+          setScrolled((was) => (was ? top > 2 : top > 24))
+        }}>
+        {/* Room to scroll even when the content is short, so shrinking 小伴 can't bounce the page back to the top. */}
+        <div style={{ minHeight: `calc(100% + ${ROBOT_FULL_H - ROBOT_COMPACT_H}px)` }}>
+        <section aria-label="小伴在说" className="pt-5 text-center">
+          <Bubble>{scenario.greeting}</Bubble>
           {chatOn && (
             <div className="mt-4 flex flex-wrap justify-center gap-2">
               {scenario.chips.map((chip) => (
@@ -171,12 +202,14 @@ export default function Home({ active = true }: { active?: boolean }) {
           </section>
         )}
         {(error || speechError) && <p role="alert" className="mt-3 text-center text-xs text-blush">{error || speechError}</p>}
+        </div>
       </div>
 
       {chatOn && (
         <form className="flex shrink-0 items-center gap-2 border-t border-window/10 bg-dusk-deep/95 px-3 py-2 backdrop-blur"
           onSubmit={(e) => { e.preventDefault(); handleSend() }}>
           <input type="text" value={input} disabled={isStreaming} onChange={(e) => setInput(e.target.value)}
+            onFocus={() => setTyping(true)} onBlur={() => setTyping(false)}
             placeholder={`跟${companionName}说说话…`} aria-label={`跟${companionName}说话`}
             className="h-11 flex-1 rounded-full border border-window/15 bg-dusk-soft/50 px-4 text-[15px] text-window placeholder:text-window/40 focus:border-lamp focus:outline-none disabled:opacity-60" />
           <button type="submit" disabled={!input.trim() || isStreaming}
