@@ -1,0 +1,32 @@
+.scene { position: relative; background: linear-gradient(155deg, #223748 0%, #172632 45%, #131e28 100%); }
+.full-scene { width: 100%; height: 100%; }
+.room { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+.room-glow { position: absolute; width: 80%; height: 110%; left: 22%; top: -12%; background: radial-gradient(ellipse, #e5b67a17 0%, transparent 65%); animation: lamplight 8s ease-in-out infinite alternate; }
+.room-window { position: absolute; width: 38%; height: 48%; right: 12%; top: 13%; background: linear-gradient(#102333, #263e4d); border: 9px solid #38454b; border-radius: 90px 90px 3px 3px; box-shadow: 0 0 0 1px #ffffff07, -15px 12px 50px #00000020; overflow: hidden; }
+.room-window::before { content: ''; position: absolute; top: 0; bottom: 0; width: 5px; left: 49%; background: #38454b; z-index: 3; }
+.room-window::after { content: ''; position: absolute; height: 5px; width: 100%; top: 58%; background: #38454b; z-index: 3; }
+.moon { position: absolute; width: 24%; aspect-ratio: 1; background: #dfdebf; border-radius: 50%; right: 19%; top: 17%; box-shadow: 0 0 35px #f5e6b820; animation: moonlight 12s ease-in-out infinite alternate; }
+.stars { position: absolute; inset: 0; background-image: radial-gradient(circle at 16% 23%, #becad5 0 1px, transparent 1.5px), radial-gradient(circle at 41% 14%, #becad5 0 1px, transparent 1.5px), radial-gradient(circle at 82% 50%, #becad5 0 1px, transparent 1.5px), radial-gradient(circle at 25% 46%, #becad5 0 1px, transparent 1.5px); opacity: .6; animation: moonlight 5s ease-in-out infinite alternate; }
+.skyline { position: absolute; bottom: 0; width: 100%; height: 28%; background: #122b38; clip-path: polygon(0 55%,12% 55%,12% 30%,26% 30%,26% 60%,40% 60%,40% 0,57% 0,57% 41%,66% 41%,66% 20%,82% 20%,82% 50%,100% 50%,100% 100%,0 100%); }
+.desk { position: absolute; left: 0; right: 0; height: 18%; bottom: 11%; background: linear-gradient(175deg,#685949 0%,#514d43 15%,#333737 100%); border-top: 1px solid #b79c6d40; transform: perspective(800px) rotateX(25deg); transform-origin: bottom; }
+.room-floor { position: absolute; bottom: 0; width: 100%; height: 11%; background: linear-gradient(#1b252b,#111c24); }
+.plant { position: absolute; width: 16%; height: 33%; left: 8%; bottom: 22%; }
+.plant b { position: absolute; width: 67%; height: 30%; bottom: 0; left: 16%; background: linear-gradient(90deg,#8b785b,#b19771,#7c6c54); border-radius: 4px 4px 35% 35%; }
+.plant::before { content: ''; position: absolute; height: 80%; width: 3px; background: #4a6251; left: 50%; bottom: 14%; }
+.plant i { position: absolute; width: 55%; height: 27%; background: #496452; border-radius: 90% 0 90% 0; left: 1%; top: 16%; transform: rotate(10deg); }
+.plant i:nth-child(2) { left: 48%; top: 0; transform: rotate(80deg); background: #5a7157; }
+.plant i:nth-child(3) { top: 43%; width: 48%; background: #3f594b; }
+.plant i:nth-child(4) { left: 49%; top: 30%; transform: rotate(85deg); background: #52694f; }
+.full-scene .room-window { width: 29%; height: 50%; right: 13%; top: 11%; border-width: 16px; border-radius: 180px 180px 4px 4px; }
+.full-scene .plant { left: 81%; bottom: 24%; width: 9%; height: 25%; }
+.full-scene .desk { bottom: 10%; height: 22%; }
+.full-scene .room-floor { height: 10%; }
+body[data-theme=dawn] .scene { background: linear-gradient(135deg,#657879,#72857f 50%,#4d6468); }
+body[data-theme=dawn] .room-window { background: linear-gradient(#abc8cd,#ebdbb9); border-color: #657779; }
+body[data-theme=dawn] .room-window::before, body[data-theme=dawn] .room-window::after { background: #657779; }
+body[data-theme=dawn] .moon { background: #fff2c2; box-shadow: 0 0 55px #ffedb780; }
+body[data-theme=dawn] .skyline { background: #729a9e; }
+body[data-theme=dawn] .scene-caption { color: #eee8d6; }
+body[data-theme=dawn] .scene-caption p { color: #d4d9cd; }
+@keyframes moonlight { from { opacity: .65; } to { opacity: 1; } }
+@keyframes lamplight { from { opacity: .5; transform: translateY(-1%); } to { opacity: 1; transform: translateY(1%); } }

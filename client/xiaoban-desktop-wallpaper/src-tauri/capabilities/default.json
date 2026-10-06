@@ -1,0 +1,6 @@
+{
+  "identifier": "desktop",
+  "description": "Local control and scene events",
+  "windows": ["control", "pet", "wallpaper"],
+  "permissions": ["core:default", "core:window:allow-start-dragging"]
+}
