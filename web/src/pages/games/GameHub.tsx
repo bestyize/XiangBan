@@ -3,35 +3,23 @@ import { Link } from 'wouter'
 import { TAB_BAR_SPACE } from '../../components/TabBar.tsx'
 import { Screen } from '../../components/ui.tsx'
 import { gamePackThumbnailUrl, loadGameCatalog, type GamePackManifest } from '../../games/packLoader.ts'
-import { api, getToken } from '../../api/client.ts'
+import { loadGameSummaries, type GameSummary } from '../../games/summaries.ts'
+import { CompanionNote } from '../../components/CompanionNote.tsx'
 import { useProfile } from '../../lib/session.tsx'
 import { PageHeader } from '../../components/PageHeader.tsx'
-import { storage } from '../../lib/storage.ts'
 import { useDisplaySettings } from '../../lib/displaySettings.tsx'
 import { visibleDisplayItems } from '../../lib/display.ts'
 
 export default function GameHub({ active = true }: { active?: boolean }) {
   const [games, setGames] = useState<GamePackManifest[] | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [summaries, setSummaries] = useState<{ gameId: string; sessions: number; bestScore: number; bestTile: number }[]>([])
+  const [summaries, setSummaries] = useState<GameSummary[]>([])
   const [recordError, setRecordError] = useState<string | null>(null)
   const profile = useProfile()
   const { settings, loading: displayLoading } = useDisplaySettings()
   const visibleGames = games ? visibleDisplayItems(games, settings.games) : null
   async function refreshRecords() {
-    if (!getToken()) {
-      try {
-        const raw = storage.get('xb_guest_games') || '{}'
-        const records = JSON.parse(raw) as Record<string, { sessions: number; bestScore: number; bestTile: number }>
-        const list = Object.entries(records).map(([gameId, val]) => ({ gameId, sessions: val.sessions, bestScore: val.bestScore, bestTile: val.bestTile }))
-        setSummaries(list)
-        setRecordError(null)
-      } catch {
-        setSummaries([])
-      }
-      return
-    }
-    try { setSummaries(await api('/api/games/summary')); setRecordError(null) } catch (e) { setRecordError((e as Error).message) }
+    try { setSummaries(await loadGameSummaries()); setRecordError(null) } catch (e) { setRecordError((e as Error).message) }
   }
   useEffect(() => { if (active) void refreshRecords() }, [profile.userId, active])
 
@@ -50,7 +38,9 @@ export default function GameHub({ active = true }: { active?: boolean }) {
     <Screen>
       <div className="flex-1" style={{ paddingBottom: TAB_BAR_SPACE }}>
         <PageHeader title="玩一局" />
-        <p className="mt-2 text-sm text-window/65">下班后，轻松玩一局。</p>
+        <CompanionNote className="mt-1" spec="excited" name={profile.companionName || '小伴'}>
+          陪我玩一局吧。挑个顺手的，输了也不许不开心。
+        </CompanionNote>
 
         {(games === null || displayLoading) && !error && (
           <p className="mt-8 text-sm text-window/55">小伴正在摆好游戏…</p>
