@@ -1,7 +1,8 @@
 import QRCode from 'qrcode'
 import type { Checkin, Profile } from '../api/types.ts'
-import { catDataUrl } from '../cat/catSvg.ts'
-import { moodFace } from '../cat/moods.ts'
+import { stillFrame } from '../robot/expressions.ts'
+import { moodFace } from '../robot/moods.ts'
+import { robotDataUrl } from '../robot/render.ts'
 import { formatDay } from '../lib/time.ts'
 import { drawDecoration } from './decorations.ts'
 import { cardStatLine, type CardStyle } from './styles.ts'
@@ -32,45 +33,21 @@ function loadImage(src: string): Promise<HTMLImageElement> {
   })
 }
 
-function archPath(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number) {
-  ctx.beginPath()
-  ctx.moveTo(x, y + h)
-  ctx.lineTo(x, y + w / 2)
-  ctx.arc(x + w / 2, y + w / 2, w / 2, Math.PI, 0)
-  ctx.lineTo(x + w, y + h)
-  ctx.closePath()
-}
-
-// Vertical budget: title and time to ~600, window 620–1124, bubble from 1170 (≤3 lines, ends by 1490),
+// Vertical budget: title and time to ~600, robot 640–1124, bubble from 1170 (≤3 lines, ends by 1490),
 // one stat line, then the QR footer from 1600.
-async function drawWindow(ctx: CanvasRenderingContext2D, checkin: Checkin) {
-  const [x, y, w, h] = [320, 620, 440, 480]
-  const glow = ctx.createRadialGradient(x + w / 2, y + h * 0.38, 0, x + w / 2, y + h * 0.38, w * 0.8)
-  glow.addColorStop(0, '#ffe9ad')
-  glow.addColorStop(0.62, '#ffb938')
-  glow.addColorStop(1, '#e89a12')
-  ctx.save()
-  ctx.shadowColor = 'rgba(255, 185, 56, 0.45)'
-  ctx.shadowBlur = 90
-  archPath(ctx, x, y, w, h)
+async function drawRobot(ctx: CanvasRenderingContext2D, checkin: Checkin) {
+  const [cx, cy] = [540, 880]
+  const glow = ctx.createRadialGradient(cx, cy, 0, cx, cy, 330)
+  glow.addColorStop(0, 'rgba(255, 205, 120, 0.42)')
+  glow.addColorStop(0.55, 'rgba(255, 185, 90, 0.14)')
+  glow.addColorStop(1, 'rgba(255, 185, 90, 0)')
   ctx.fillStyle = glow
-  ctx.fill()
-  ctx.restore()
+  ctx.fillRect(cx - 340, cy - 340, 680, 680)
 
-  ctx.save()
-  archPath(ctx, x, y, w, h)
-  ctx.clip()
-  ctx.fillStyle = 'rgba(31, 39, 88, 0.45)'
-  ctx.fillRect(x + w / 2 - 6, y, 12, h)
-  ctx.fillRect(x, y + h * 0.44, w, 12)
-  const cat = await loadImage(catDataUrl(moodFace[checkin.mood]))
-  ctx.drawImage(cat, x + 20, y + h - 390, 400, 400)
-  ctx.restore()
-
-  ctx.fillStyle = '#3d4a94'
-  ctx.beginPath()
-  ctx.roundRect(x - 30, y + h, w + 60, 26, 13)
-  ctx.fill()
+  const robot = await loadImage(robotDataUrl(stillFrame(moodFace[checkin.mood])))
+  const w = 520
+  const h = w * 0.875
+  ctx.drawImage(robot, cx - w / 2, 1124 - h, w, h)
 }
 
 function drawBubble(ctx: CanvasRenderingContext2D, text: string, top: number): number {
@@ -157,7 +134,7 @@ export async function renderCard({ checkin, profile, style, showCity, link }: Ca
   ctx.fillStyle = 'rgba(255, 241, 201, 0.8)'
   ctx.fillText('下班', 90 + timeWidth + 24, 576)
 
-  await drawWindow(ctx, checkin)
+  await drawRobot(ctx, checkin)
   const bubbleBottom = drawBubble(ctx, checkin.reply.text, 1170)
 
   ctx.textAlign = 'center'

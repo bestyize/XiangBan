@@ -1,6 +1,5 @@
 import type { ComponentProps, CSSProperties, ReactNode } from 'react'
-import type { CatSpec } from '../cat/catSvg.ts'
-import { Cat } from './Cat.tsx'
+import { Robot, type RobotProps } from './Robot.tsx'
 
 /** Includes `ref`, which React 19 passes to function components as a plain prop. */
 type ButtonProps = ComponentProps<'button'>
@@ -25,33 +24,23 @@ export function QuietButton({ className = '', ...rest }: ButtonProps) {
   )
 }
 
-/** The lit window at home where 小伴 waits; used wherever the cat speaks. */
-interface CatWindowProps {
-  spec: CatSpec
-  label: string
+/** 小伴 at home under its own warm light; used wherever it speaks. */
+interface RobotStageProps extends Omit<RobotProps, 'size'> {
   size?: number
   centered?: boolean
-  className?: string
 }
 
-export function CatWindow({ spec, label, size = 208, centered = true, className = '' }: CatWindowProps) {
-  const arch = size / 2
+export function RobotStage({ size = 208, centered = true, className = '', ...robot }: RobotStageProps) {
   return (
-    <div className={`flex w-fit shrink-0 flex-col items-center ${centered ? 'mx-auto' : ''} ${className}`}>
-      <div
-        className="relative overflow-hidden bg-[radial-gradient(circle_at_50%_38%,#f6e4bb,var(--color-lamp)_62%,#c18b52)] shadow-[0_0_64px_rgba(237,189,118,0.25)]"
-        style={{ width: size, height: size * 1.08, borderRadius: `${arch}px ${arch}px 14px 14px` }}
-      >
-        <div className="absolute inset-y-0 left-1/2 w-1.5 -translate-x-1/2 bg-dusk-deep/45" />
-        <div className="absolute inset-x-0 top-[44%] h-1.5 bg-dusk-deep/45" />
-        <Cat spec={spec} label={label} size={size * 0.86} className="absolute bottom-0 left-1/2 -translate-x-1/2" />
-      </div>
-      <div className="h-3 rounded-full bg-dusk-soft" style={{ width: size + 28 }} />
+    <div className={`relative flex w-fit shrink-0 flex-col items-center ${centered ? 'mx-auto' : ''} ${className}`}>
+      <div aria-hidden="true" className="pointer-events-none absolute left-1/2 top-[42%] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(circle,rgba(255,196,110,0.32),rgba(255,196,110,0.08)_52%,transparent_70%)]"
+        style={{ width: size * 1.45, height: size * 1.25 }} />
+      <Robot {...robot} size={size} className="relative" />
     </div>
   )
 }
 
-/** Speech bubble whose tail points up at the cat: centered under it, or under a cat on the left. */
+/** Speech bubble whose tail points up at 小伴: centered under it, or under one on the left. */
 export function Bubble({ children, align = 'center', className = '' }: { children: ReactNode; align?: 'center' | 'left'; className?: string }) {
   const layout = align === 'center' ? 'mx-auto max-w-[22rem] text-center before:left-1/2' : 'text-left before:left-16'
   return (

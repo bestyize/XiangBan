@@ -6,7 +6,7 @@ import { getToken } from './api/client.ts'
 import { useAccountProgress } from './quizzes/useAccountProgress.ts'
 import { KeepAlivePage } from './components/KeepAlivePage.tsx'
 import { TabBar } from './components/TabBar.tsx'
-import { CatWindow, PrimaryButton, Screen } from './components/ui.tsx'
+import { RobotStage, PrimaryButton, Screen } from './components/ui.tsx'
 import { SessionProvider, useSession } from './lib/session.tsx'
 import { track } from './lib/track.ts'
 import CardPreview from './pages/CardPreview.tsx'
@@ -29,6 +29,7 @@ import { sharePageGameId, RESULT_GAMES } from './games/otherResultShare.ts'
 import { DisplaySettingsProvider } from './lib/displaySettings.tsx'
 
 const Tests = lazyPage(() => import('./quizzes/Tests.tsx'))
+const RobotLab = lazyPage(() => import('./pages/lab/RobotLab.tsx'))
 const GameShare = lazyPage(() => import('./pages/games/GameShare.tsx'))
 const QuizHub = lazyPage<{ active?: boolean }>(() => import('./quizzes/Tests.tsx').then((module) => ({ default: module.QuizHub })))
 
@@ -75,7 +76,7 @@ function SessionRoutes() {
   if (status === 'loading') {
     return (
       <Screen className="items-center justify-center">
-        <CatWindow spec={{ eyes: 'sleepy', mouth: 'cat' }} label="小伴正在开门" size={160} />
+        <RobotStage spec="waiting" label="小伴正在开门" size={170} />
         <p className="mt-6 text-window/70">小伴正在开门…</p>
       </Screen>
     )
@@ -83,7 +84,7 @@ function SessionRoutes() {
   if (status === 'error' || !profile) {
     return (
       <Screen className="items-center justify-center text-center">
-        <CatWindow spec={{ eyes: 'worried', mouth: 'wavy' }} label="小伴没接到你" size={160} />
+        <RobotStage spec="offline" label="小伴没接到你" size={170} />
         <p className="mt-6 text-window/80">{error ?? '小伴没接到你。'}</p>
         <PrimaryButton className="mt-6 max-w-60" onClick={retry}>再试一次</PrimaryButton>
       </Screen>
@@ -151,14 +152,16 @@ export default function App() {
   const [location] = useLocation()
   const publicTests = location === '/tests' || location.startsWith('/tests/') || Boolean(sharePageGameId(location))
   const admin = location === '/admin' || location.startsWith('/admin/')
+  const lab = location === '/lab/robot'
   const [sessionStarted, setSessionStarted] = useState((!publicTests && !admin) || Boolean(getToken()))
   const [loginOpen, setLoginOpen] = useState(false)
   // Public test pages run without a session; logging in from them has to start one.
   const login = useMemo(() => ({ openLogin: () => { setSessionStarted(true); setLoginOpen(true) } }), [])
   useEffect(() => { if (!publicTests && !admin) setSessionStarted(true) }, [publicTests, admin])
   // The phone-width desktop frame (index.css) is for the app only, not the admin console.
-  useEffect(() => { document.documentElement.dataset.surface = admin ? 'admin' : 'app' }, [admin])
+  useEffect(() => { document.documentElement.dataset.surface = admin || lab ? 'admin' : 'app' }, [admin, lab])
   if (admin) return <AdminPage />
+  if (lab) return <Suspense fallback={null}><RobotLab /></Suspense>
   return <DisplaySettingsProvider><SessionProvider enabled={sessionStarted || !publicTests}>
     <LoginModalContext.Provider value={login}>
       <AppPages />

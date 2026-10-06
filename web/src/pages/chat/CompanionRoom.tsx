@@ -1,8 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Cat } from '../../components/Cat.tsx'
+import { Robot } from '../../components/Robot.tsx'
 import { TAB_BAR_SPACE } from '../../components/TabBar.tsx'
 import { useProfile } from '../../lib/session.tsx'
-import type { Eyes, Mouth } from '../../cat/face.ts'
 import { getScenario } from './ChatScenarios.ts'
 import { useChat } from './useChat.ts'
 import { useSpeech } from './useSpeech.ts'
@@ -30,14 +29,6 @@ export default function CompanionRoom({ active = true }: { active?: boolean }) {
 
   const companionName = profile.companionName || '小伴'
   const personalityLabel = personalityName[profile.personality] || '温柔治愈'
-
-  // Dynamic Cat expression based on conversation status
-  const catSpec = useMemo<{ eyes: Eyes; mouth: Mouth; blush: boolean }>(() => {
-    if (isStreaming) {
-      return { eyes: 'happy', mouth: 'open', blush: true }
-    }
-    return { eyes: 'open', mouth: 'smile', blush: true }
-  }, [isStreaming])
 
   // Auto-scroll to bottom on new messages or streaming chunk
   useEffect(() => {
@@ -96,7 +87,8 @@ export default function CompanionRoom({ active = true }: { active?: boolean }) {
         {/* Companion Hero & Scenario Greeting */}
         <div className="my-2 rounded-2xl border border-lamp/20 bg-gradient-to-b from-dusk to-dusk-deep p-4 text-center">
           <div className="flex justify-center">
-            <Cat spec={catSpec} size={76} label={companionName} />
+            <Robot spec="greeting" size={96} label={companionName} interactive autoSleep
+              thinking={isStreaming && !streamingText} speaking={(isStreaming && Boolean(streamingText)) || speakingId !== null} />
           </div>
           <div className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-lamp/15 px-2.5 py-0.5 text-[11px] font-medium text-lamp">
             <span>🌙 {scenario.periodName}</span>
@@ -128,7 +120,7 @@ export default function CompanionRoom({ active = true }: { active?: boolean }) {
             >
               {m.role === 'assistant' && (
                 <div className="mt-0.5 size-7 shrink-0 overflow-hidden rounded-full bg-lamp/20">
-                  <Cat spec={{ eyes: 'open', mouth: 'smile' }} size={28} label={companionName} />
+                  <Robot spec="idle" alive={false} size={28} label={companionName} />
                 </div>
               )}
               <div
@@ -174,7 +166,7 @@ export default function CompanionRoom({ active = true }: { active?: boolean }) {
           {isStreaming && (
             <div className="flex justify-start gap-2.5">
               <div className="mt-0.5 size-7 shrink-0 overflow-hidden rounded-full bg-lamp/20">
-                <Cat spec={{ eyes: 'happy', mouth: 'open', blush: true }} size={28} label={companionName} />
+                <Robot spec="speaking" alive={false} size={28} label={companionName} />
               </div>
               <div className="max-w-[78%] rounded-2xl rounded-tl-xs border border-lamp/30 bg-dusk-soft/80 px-3.5 py-2.5 text-sm leading-relaxed text-window shadow-xs">
                 {streamingText || '小伴正在想…'}

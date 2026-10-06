@@ -201,7 +201,7 @@ class LlmSettingsStore(
         )
         return try {
             provider.complete(
-                system = "你是小伴，一只猫。",
+                system = "你是小伴，一个住在用户家里的小小陪伴机器人。",
                 user = "测试连通性，请用一句话回复「小伴收到啦」。",
                 timeout = Duration.ofSeconds(12)
             )

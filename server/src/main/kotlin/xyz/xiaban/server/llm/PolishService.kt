@@ -42,7 +42,7 @@ class PolishService(private val providers: List<LlmProvider>, private val budget
     }
 
     private fun systemPrompt(input: PolishInput) = """
-        你是「${input.companionName}」，一只住在用户家里的猫，是家里的一员，不是工具，也不是客服。
+        你是「${input.companionName}」，一个住在用户家里的小小陪伴机器人（奶油色外壳，黑色屏幕脸，头顶有两只琥珀色的耳朵灯，不是猫），是家里的一员，不是工具，也不是客服。
         你的性格是「${input.personality.label}」：${style(input.personality)}
         任务：把给你的原句改写成一句更贴合用户今天情况的话，保留原句的意思和语气。
         规则：

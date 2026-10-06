@@ -1,20 +1,20 @@
 import { useEffect, useState } from 'react'
 import { api, getToken } from '../../api/client.ts'
 import type { Unlock, UnlocksResponse } from '../../api/types.ts'
-import { expressions, fallbackExpression } from '../../cat/expressions.ts'
-import { Cat } from '../../components/Cat.tsx'
+import { dexArt, fallbackArt } from '../../robot/moods.ts'
+import { Robot } from '../../components/Robot.tsx'
 import { Sheet } from '../../components/Sheet.tsx'
 import { PrimaryButton } from '../../components/ui.tsx'
 import { useLoginModal } from '../../lib/loginModal.ts'
 
 function Tile({ item }: { item: Unlock }) {
-  const art = expressions[item.id] ?? fallbackExpression
+  const art = dexArt[item.id] ?? fallbackArt
   const unlocked = item.unlockedAt !== null
   return (
     <li className="flex flex-col items-center text-center">
       <div className="grid aspect-square w-full place-items-center rounded-3xl"
         style={{ background: unlocked ? art.tint : 'rgba(61, 80, 105, 0.45)' }}>
-        <Cat spec={art.spec} label={unlocked ? item.name : '还没解锁的表情'} size={76}
+        <Robot spec={art.spec} alive={false} label={unlocked ? item.name : '还没解锁的表情'} size={84}
           className={unlocked ? '' : 'opacity-25 brightness-0 invert'} />
       </div>
       <p className={`mt-2 text-sm ${unlocked ? 'font-bold text-window' : 'text-window/60'}`}>{unlocked ? item.name : '？？？'}</p>
@@ -57,7 +57,7 @@ export function DexSheet({ open, onClose }: { open: boolean; onClose: () => void
       )}
       {guest && (
         <div className="mt-8 flex flex-col items-center text-center">
-          <Cat spec={{ eyes: 'open', mouth: 'smile', blush: true }} label="小伴" size={96} />
+          <Robot spec="greeting" label="小伴" size={110} />
           <p className="mt-4 text-[15px] text-window/85">登录后，打卡解锁的表情会收进这里。</p>
           <button type="button" onClick={() => { onClose(); openLogin() }} className="mt-6 w-full rounded-full bg-lamp px-6 py-3.5 text-center font-bold text-ink transition active:scale-[.98]">登录 / 注册</button>
         </div>
