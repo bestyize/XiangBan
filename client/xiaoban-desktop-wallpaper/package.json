@@ -8,6 +8,8 @@
     "build": "tsc --noEmit && vite build",
     "desktop": "tauri dev",
     "desktop:build": "tauri build --no-bundle",
+    "desktop:macos:build": "tauri build --target aarch64-apple-darwin --bundles app",
+    "test:macos": "node scripts/smoke-test.mjs",
     "test": "node scripts/test.mjs"
   },
   "devDependencies": {

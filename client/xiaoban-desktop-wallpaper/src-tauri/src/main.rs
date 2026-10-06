@@ -1,10 +1,18 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+#[cfg(any(target_os = "macos", test))]
+mod coordinates;
+#[cfg(target_os = "macos")]
+mod macos;
 #[cfg(windows)]
 mod windows;
 
 use serde::{Deserialize, Serialize};
-use std::{sync::Mutex, time::Duration};
+use std::{
+    collections::HashSet,
+    sync::Mutex,
+    time::{Duration, Instant},
+};
 use tauri::{Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
 
 #[derive(Clone, Serialize, Deserialize)]
@@ -35,6 +43,7 @@ impl Default for Settings {
 struct DesktopState {
     settings: Mutex<Settings>,
     wallpaper_parent: Mutex<Option<usize>>,
+    ready_scenes: Mutex<HashSet<String>>,
 }
 
 fn settings(app: &tauri::AppHandle) -> Settings {
@@ -91,6 +100,9 @@ fn open_scene(app: &tauri::AppHandle, mode: &str) -> Result<(), String> {
         monitor.position().x as f64 / scale + width - scene_w - 70.0,
         monitor.position().y as f64 / scale + height - scene_h - 100.0,
     );
+    #[cfg(target_os = "macos")]
+    let builder =
+        builder.background_throttling(tauri::utils::config::BackgroundThrottlingPolicy::Disabled);
     // Register the parent with Tao itself. Reparenting only with SetParent would
     // be undone when Tao rewrites window styles on show/cursor-state changes.
     #[cfg(windows)]
@@ -114,16 +126,26 @@ fn open_scene(app: &tauri::AppHandle, mode: &str) -> Result<(), String> {
                 }
             }
         }
-        #[cfg(not(windows))]
+        #[cfg(not(any(windows, target_os = "macos")))]
         {
             let _ = window.destroy();
-            return Err("壁纸桌面接入目前仅实现 Windows".into());
+            return Err("壁纸桌面接入支持 Windows 和 macOS".into());
         }
         window
             .set_ignore_cursor_events(true)
             .map_err(|e| e.to_string())?;
     }
+    #[cfg(target_os = "macos")]
+    if let Err(error) = macos::configure_scene(&window, wallpaper, true) {
+        let _ = window.destroy();
+        return Err(error);
+    }
     Ok(())
+}
+
+#[tauri::command]
+fn get_platform() -> &'static str {
+    std::env::consts::OS
 }
 
 #[tauri::command]
@@ -145,6 +167,11 @@ async fn set_mode(app: tauri::AppHandle, mode: String) -> Result<Settings, Strin
     if let Some(old) = app.get_webview_window(old_label) {
         old.destroy().map_err(|e| e.to_string())?;
     }
+    app.state::<DesktopState>()
+        .ready_scenes
+        .lock()
+        .unwrap()
+        .remove(old_label);
     if mode == "floating" {
         *app.state::<DesktopState>().wallpaper_parent.lock().unwrap() = None;
     }
@@ -222,7 +249,17 @@ fn poke(app: tauri::AppHandle) {
 
 #[tauri::command]
 fn scene_ready(window: tauri::WebviewWindow) -> Result<(), String> {
-    window.show().map_err(|e| e.to_string())
+    window.show().map_err(|e| e.to_string())?;
+    #[cfg(target_os = "macos")]
+    macos::configure_scene(&window, window.label() == "wallpaper", false)?;
+    window
+        .app_handle()
+        .state::<DesktopState>()
+        .ready_scenes
+        .lock()
+        .unwrap()
+        .insert(window.label().into());
+    Ok(())
 }
 
 #[tauri::command]
@@ -232,6 +269,10 @@ fn set_hit_test(window: tauri::WebviewWindow, hit: bool) -> Result<(), String> {
     }
     #[cfg(windows)]
     if windows::left_button_down() {
+        return Ok(());
+    }
+    #[cfg(target_os = "macos")]
+    if macos::left_button_down() {
         return Ok(());
     }
     window
@@ -271,13 +312,41 @@ fn quit(app: tauri::AppHandle) {
 #[tauri::command]
 fn get_diagnostics(app: tauri::AppHandle) -> serde_json::Value {
     #[cfg(windows)]
-    {
-        windows::diagnostics(&app)
+    let mut report = windows::diagnostics(&app);
+    #[cfg(target_os = "macos")]
+    let mut report = macos::diagnostics(&app);
+    #[cfg(not(any(windows, target_os = "macos")))]
+    let mut report =
+        serde_json::json!({"platform": std::env::consts::OS, "wallpaperSupported": false});
+    let state = app.state::<DesktopState>();
+    let ready = state.ready_scenes.lock().unwrap();
+    for (key, label) in [("floating", "pet"), ("wallpaper", "wallpaper")] {
+        if let Some(scene) = report.get_mut(key).filter(|value| value.is_object()) {
+            scene["frontendReady"] = serde_json::json!(ready.contains(label));
+        }
     }
-    #[cfg(not(windows))]
-    {
-        serde_json::json!({"platform": std::env::consts::OS, "wallpaperSupported": false})
+    report
+}
+
+fn wait_for_scene(app: &tauri::AppHandle, label: &str) -> Result<(), String> {
+    let deadline = Instant::now() + Duration::from_secs(20);
+    while Instant::now() < deadline {
+        let ready = app
+            .state::<DesktopState>()
+            .ready_scenes
+            .lock()
+            .unwrap()
+            .contains(label);
+        if ready
+            && app
+                .get_webview_window(label)
+                .is_some_and(|window| window.is_visible().unwrap_or(false))
+        {
+            return Ok(());
+        }
+        std::thread::sleep(Duration::from_millis(100));
     }
+    Err(format!("场景 {label} 没有在 20 秒内完成前端挂载并显示"))
 }
 
 fn setup_tray(app: &tauri::App) -> tauri::Result<()> {
@@ -330,27 +399,29 @@ fn setup_tray(app: &tauri::App) -> tauri::Result<()> {
 
 fn main() {
     tauri::Builder::default().manage(DesktopState::default())
-        .invoke_handler(tauri::generate_handler![get_settings, set_mode, update_settings, poke,
+        .invoke_handler(tauri::generate_handler![get_platform, get_settings, set_mode, update_settings, poke,
             scene_ready, set_hit_test, start_drag, minimize_control, show_control, quit, get_diagnostics])
         .setup(|app| {
             setup_tray(app)?;
             open_scene(app.handle(), "floating").map_err(std::io::Error::other)?;
             #[cfg(windows)] windows::start_cursor_bridge(app.handle().clone());
+            #[cfg(target_os = "macos")] macos::start_cursor_bridge(app.handle().clone());
             if std::env::args().any(|a| a == "--smoke-test") {
                 let handle = app.handle().clone();
                 tauri::async_runtime::spawn(async move {
-                    // Wait for the frontend to mount before exercising native transitions.
-                    std::thread::sleep(Duration::from_secs(3));
+                    // Synchronize on the actual frontend handshake, including
+                    // cold WKWebView startup on a CI Mac.
+                    let startup_result = wait_for_scene(&handle, "pet");
                     let floating_before = get_diagnostics(handle.clone());
-                    let wallpaper_result = set_mode(handle.clone(), "wallpaper".into()).await;
-                    std::thread::sleep(Duration::from_secs(3));
+                    let wallpaper_result = set_mode(handle.clone(), "wallpaper".into()).await
+                        .and_then(|_| wait_for_scene(&handle, "wallpaper"));
                     let wallpaper = get_diagnostics(handle.clone());
-                    let floating_result = set_mode(handle.clone(), "floating".into()).await;
-                    std::thread::sleep(Duration::from_secs(2));
+                    let floating_result = set_mode(handle.clone(), "floating".into()).await
+                        .and_then(|_| wait_for_scene(&handle, "pet"));
                     let floating_after = get_diagnostics(handle.clone());
                     let report = serde_json::json!({"floatingBefore": floating_before, "wallpaper": wallpaper,
                         "floatingAfter": floating_after, "wallpaperResult": wallpaper_result.map(|_| "ok"),
-                        "floatingResult": floating_result.map(|_| "ok")});
+                        "floatingResult": floating_result.map(|_| "ok"), "startupResult": startup_result.map(|_| "ok")});
                     if let Ok(path) = std::env::var("XIAOBAN_SMOKE_REPORT") {
                         let _ = std::fs::write(path, serde_json::to_string_pretty(&report).unwrap());
                     }
