@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
 import { Link, useLocation } from 'wouter'
 import { api } from '../../api/client.ts'
-import type { Guardian, Profile } from '../../api/types.ts'
-import { Cat } from '../../components/Cat.tsx'
+import type { Guardian, Profile, Stats } from '../../api/types.ts'
+import { ACTIVITY_PATH } from '../../lib/activity.ts'
+import { Robot } from '../../components/Robot.tsx'
 import { LinkRow, ListGroup, SwitchRow } from '../../components/List.tsx'
 import { PageHeader } from '../../components/PageHeader.tsx'
 import { TAB_BAR_SPACE } from '../../components/TabBar.tsx'
@@ -28,6 +29,17 @@ function useGuardian(enabled: boolean, active: boolean) {
   return guardian.paused ? '已暂停' : '已开启'
 }
 
+/** The 下班啦 row's detail: current streak, otherwise how many days in total. */
+function useCheckinDetail(active: boolean) {
+  const [stats, setStats] = useState<Stats | null>(null)
+  useEffect(() => {
+    if (active) api<Stats>('/api/stats').then(setStats).catch(() => undefined)
+  }, [active])
+  if (!stats) return undefined
+  if (stats.currentStreak > 0) return `连续 ${stats.currentStreak} 天`
+  return stats.totalDays > 0 ? `打过 ${stats.totalDays} 天` : '去打卡'
+}
+
 /** 我的: who I am, a few numbers, and a short list of things to set. Account and data controls live in 设置. */
 export default function Me() {
   const profile = useProfile()
@@ -38,6 +50,7 @@ export default function Me() {
   const active = location === '/me'
   const [error, setError] = useState<string | null>(null)
   const guardian = useGuardian(Boolean(profile.email), active)
+  const checkinDetail = useCheckinDetail(active)
   const { data: habits } = useAfterwork()
   const weekHabits = getWeeklyAfterworkSummary(habits, profile.timezone).count
 
@@ -54,7 +67,7 @@ export default function Me() {
     }
   }
 
-  const name = profile.nickname ?? (isLoggedIn ? '下班啦用户' : '游客')
+  const name = profile.nickname ?? (isLoggedIn ? '相伴用户' : '游客')
 
   return (
     <Screen>
@@ -73,7 +86,7 @@ export default function Me() {
             <span className="flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-full bg-lamp/15 text-2xl text-lamp">
               {profile.avatarUrl
                 ? <img src={profile.avatarUrl} alt="" className="size-full object-cover" />
-                : <Cat spec={{ eyes: 'open', mouth: 'cat', blush: true }} label="默认头像" size={56} className="mt-3" />}
+                : <Robot spec="idle" alive={false} label="默认头像" size={60} className="mt-3" />}
             </span>
             <span className="min-w-0 flex-1">
               <span className="block truncate text-xl font-bold text-window">{name}</span>
@@ -86,10 +99,11 @@ export default function Me() {
           )}
         </section>
 
-        <MeStats companionName={profile.companionName} active={active} />
+        <MeStats companionName={profile.companionName} createdAt={profile.createdAt} active={active} />
 
         <ListGroup>
           <LinkRow href="/me/profile" label="小伴档案" detail={`${profile.companionName}，${personalityName[profile.personality]}`} />
+          <LinkRow href={ACTIVITY_PATH} label="下班打卡" detail={checkinDetail} />
           <LinkRow href="/me/habits" label="下班习惯" detail={weekHabits > 0 ? `本周 ${weekHabits} 次` : undefined} />
           <LinkRow href="/me/guardian" label="平安守护" detail={guardian} />
         </ListGroup>

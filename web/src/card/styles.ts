@@ -1,32 +1,38 @@
 import type { Checkin } from '../api/types.ts'
 import { titleTheme } from '../lib/titleTheme.ts'
+import type { PosterThemeId } from '../poster/theme.ts'
 
 export type Decoration = 'stars' | 'confetti' | 'lanterns' | 'moon'
 
 export interface CardStyle {
   id: string
   name: string
-  sky: [string, string]
-  accent: string
-  decoration: Decoration
+  /** Base look shared with every other poster */
+  theme: PosterThemeId
+  /** Night-only variants paint their own sky and title color */
+  sky?: [string, string]
+  accent?: string
+  decoration: Decoration | null
 }
 
-const DEFAULT: CardStyle = { id: 'default', name: '默认', sky: ['#2f3a7a', '#141a45'], accent: '#ffb938', decoration: 'stars' }
-
-const HOLIDAY: Record<string, Omit<CardStyle, 'id' | 'name'>> = {
+const HOLIDAY: Record<string, Pick<CardStyle, 'sky' | 'accent' | 'decoration'>> = {
   spring_festival: { sky: ['#9b1c1c', '#3d0707'], accent: '#ffd76a', decoration: 'lanterns' },
   mid_autumn: { sky: ['#1b2f6b', '#070d26'], accent: '#ffe6a3', decoration: 'moon' },
 }
 
-/** PRD 5.7: a default style, one per title, and a limited style for rare titles and holidays. */
+/** PRD 5.7: the two shared looks, one per title, and a limited style for rare titles and holidays. */
 export function cardStyles(checkin: Checkin): CardStyle[] {
   const theme = titleTheme[checkin.title.code]
-  const styles: CardStyle[] = [DEFAULT, { id: 'title', name: `${checkin.title.name}配色`, sky: theme.sky, accent: theme.accent, decoration: 'stars' }]
+  const styles: CardStyle[] = [
+    { id: 'night', name: '深夜', theme: 'night', decoration: 'stars' },
+    { id: 'day', name: '暖光', theme: 'day', decoration: null },
+    { id: 'title', name: `${checkin.title.name}配色`, theme: 'night', sky: theme.sky, accent: theme.accent, decoration: 'stars' },
+  ]
   if (checkin.holiday) {
     const look = HOLIDAY[checkin.holiday.code] ?? { sky: ['#8a2318', '#2e0a05'], accent: '#ffd76a', decoration: 'confetti' }
-    styles.push({ id: 'holiday', name: `${checkin.holiday.name}限定`, ...look })
+    styles.push({ id: 'holiday', name: `${checkin.holiday.name}限定`, theme: 'night', ...look })
   } else if (checkin.title.rare) {
-    styles.push({ id: 'rare', name: '稀有限定', sky: ['#5b3d0c', '#1c1203'], accent: '#ffd76a', decoration: 'confetti' })
+    styles.push({ id: 'rare', name: '稀有限定', theme: 'night', sky: ['#5b3d0c', '#1c1203'], accent: '#ffd76a', decoration: 'confetti' })
   }
   return styles
 }

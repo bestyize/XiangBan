@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { ACTIVITY_PATH } from '../lib/activity.ts'
 import { useLocation } from 'wouter'
 import { api, getToken } from '../api/client.ts'
 import type { Checkin, TodayResponse } from '../api/types.ts'
@@ -6,6 +7,7 @@ import { browserTimezone } from '../lib/device.ts'
 import { loadGuestCheckin } from '../lib/guestCheckin.ts'
 import { renderCard } from '../card/renderCard.ts'
 import { cardStyles } from '../card/styles.ts'
+import { loadPosterTheme, savePosterTheme } from '../poster/theme.ts'
 import { SubPage } from '../components/SubPage.tsx'
 import { FieldError, PrimaryButton } from '../components/ui.tsx'
 import { blobToBase64, inApp, send } from '../lib/bridge.ts'
@@ -23,7 +25,7 @@ export default function CardPreview() {
   const { updateProfile } = useSession()
   const [, navigate] = useLocation()
   const [checkin, setCheckin] = useState<Checkin | null>(null)
-  const [styleId, setStyleId] = useState('default')
+  const [styleId, setStyleId] = useState<string>(loadPosterTheme)
   const [showCity, setShowCity] = useState(profile.showCityOnCard)
   const [image, setImage] = useState<CardImage | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -37,7 +39,7 @@ export default function CardPreview() {
         // Guests have no server-side check-in; theirs lives in this browser.
         const today = t.checkin ?? (getToken() ? null : loadGuestCheckin(t.workDay))
         if (today) setCheckin(today)
-        else navigate('/', { replace: true })
+        else navigate(ACTIVITY_PATH, { replace: true })
       })
       .catch((e: Error) => setError(e.message))
   }, [navigate])
@@ -46,7 +48,7 @@ export default function CardPreview() {
     if (!checkin || styles.length === 0) return
     let cancelled = false
     const style = styles.find((s) => s.id === styleId) ?? styles[0]
-    const link = `${publicUrl()}/?from=card${profile.inviteCode ? `&inv=${profile.inviteCode}` : ''}`
+    const link = `${publicUrl()}${ACTIVITY_PATH}?from=card${profile.inviteCode ? `&inv=${profile.inviteCode}` : ''}`
     renderCard({ checkin, profile, style, showCity: showCity && canShowCity, link })
       .then((blob) => {
         if (cancelled) return
@@ -67,7 +69,7 @@ export default function CardPreview() {
   }, [image])
 
   // Guests have no invite code yet; the link then just brings friends to the site.
-  const shareLink = `${publicUrl()}/?from=card${profile.inviteCode ? `&inv=${profile.inviteCode}` : ''}`
+  const shareLink = `${publicUrl()}${ACTIVITY_PATH}?from=card${profile.inviteCode ? `&inv=${profile.inviteCode}` : ''}`
 
   function toggleCity() {
     const next = !showCity
@@ -106,7 +108,7 @@ export default function CardPreview() {
 
       <div className="mt-4 flex flex-wrap justify-center gap-2" role="radiogroup" aria-label="卡片样式">
         {styles.map((s) => (
-          <button key={s.id} type="button" role="radio" aria-checked={s.id === styleId} onClick={() => setStyleId(s.id)}
+          <button key={s.id} type="button" role="radio" aria-checked={s.id === styleId} onClick={() => { setStyleId(s.id); if (s.id === 'night' || s.id === 'day') savePosterTheme(s.id) }}
             className={`rounded-full border-2 px-4 py-1.5 text-sm ${s.id === styleId ? 'border-lamp bg-lamp font-bold text-ink' : 'border-dusk-soft text-window/80'}`}>
             {s.name}
           </button>

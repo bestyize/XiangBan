@@ -1,38 +1,44 @@
 import { useEffect, useState } from 'react'
-import { api } from '../../api/client.ts'
-import type { Stats } from '../../api/types.ts'
-import { formatDuration } from '../../lib/time.ts'
+import { loadGameSummaries } from '../../games/summaries.ts'
+import { quizCatalog } from '../../quizzes/catalog.ts'
+import { readSavedAttempt } from '../../quizzes/progress.ts'
 
-function Figure({ value, label }: { value: number; label: string }) {
+function Figure({ value, unit, label }: { value: number; unit: string; label: string }) {
   return (
     <div className="text-center">
-      <p className="font-display text-3xl leading-none text-lamp">{value}</p>
+      <p className="leading-none text-lamp"><span className="font-display text-3xl">{value}</span><span className="ml-0.5 text-xs">{unit}</span></p>
       <p className="mt-1.5 text-xs text-window/60">{label}</p>
     </div>
   )
 }
 
-/** PRD 5.5/5.9 numbers: 相伴天数 never resets, a broken streak shows as "上次连续" without blame. */
-export function MeStats({ companionName, active }: { companionName: string; active: boolean }) {
-  const [stats, setStats] = useState<Stats | null>(null)
+const DAY = 86_400_000
+
+/** Days since you first met 小伴, counting the first day as day 1. */
+export function daysTogether(createdAt: number, now = Date.now()) {
+  if (!Number.isFinite(createdAt) || createdAt <= 0) return 1
+  const start = new Date(createdAt)
+  start.setHours(0, 0, 0, 0)
+  return Math.max(1, Math.floor((now - start.getTime()) / DAY) + 1)
+}
+
+/** What you and 小伴 have done together. Check-in streaks live with the 下班啦 campaign now. */
+export function MeStats({ companionName, createdAt, active }: { companionName: string; createdAt: number; active: boolean }) {
+  const [rounds, setRounds] = useState(0)
+  const [tests, setTests] = useState(0)
   useEffect(() => {
-    if (active) api<Stats>('/api/stats').then(setStats).catch(() => undefined)
+    if (!active) return
+    loadGameSummaries().then((list) => setRounds(list.reduce((sum, game) => sum + (game.sessions || 0), 0))).catch(() => undefined)
+    setTests(quizCatalog.filter((quiz) => readSavedAttempt(quiz)?.completedAt).length)
   }, [active])
 
-  const streakLabel = stats && stats.currentStreak === 0 && stats.lastStreak ? `上次连续 ${stats.lastStreak} 天` : '连续打卡'
-  const detail = stats && [
-    stats.weekAvgOffTime && `本周平均 ${stats.weekAvgOffTime} 下班`,
-    stats.monthOvertimeMinutes > 0 && `本月加班 ${formatDuration(stats.monthOvertimeMinutes)}`,
-  ].filter(Boolean).join('，')
-
   return (
-    <section aria-label="统计" className="mt-4 rounded-3xl bg-dusk-soft/35 px-4 py-5">
+    <section aria-label="一起做过的事" className="mt-4 rounded-3xl bg-dusk-soft/35 px-4 py-5">
       <div className="grid grid-cols-3 divide-x divide-window/10">
-        <Figure value={stats?.totalDays ?? 0} label={`和${companionName}相伴`} />
-        <Figure value={stats?.currentStreak ?? 0} label={streakLabel} />
-        <Figure value={stats?.bestStreak ?? 0} label="最长连续" />
+        <Figure value={daysTogether(createdAt)} unit="天" label={`和${companionName}相识`} />
+        <Figure value={rounds} unit="局" label="一起玩过" />
+        <Figure value={tests} unit="个" label="测过的测试" />
       </div>
-      {detail && <p className="mt-4 text-center text-xs text-window/55">{detail}</p>}
     </section>
   )
 }

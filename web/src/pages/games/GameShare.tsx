@@ -4,10 +4,12 @@ import { blobToBase64, inApp, send } from '../../lib/bridge.ts'
 import { captureReferral, isWeChat, publicUrl } from '../../lib/env.ts'
 import { track } from '../../lib/track.ts'
 import { gameChallengePath, gameShareLink, gameShareText, readSharedResult } from '../../games/resultShare.ts'
-import { renderResultPoster, RESULT_POSTER_HEIGHT, RESULT_POSTER_WIDTH } from '../../games/resultPoster.ts'
+import { renderGamePoster, RESULT_POSTER_HEIGHT, RESULT_POSTER_WIDTH } from '../../games/resultPoster.ts'
+import { otherPosterCopy, snakePosterCopy } from '../../games/posterCopy.ts'
+import { PosterThemeToggle } from '../../components/PosterThemeToggle.tsx'
+import { usePosterTheme } from '../../poster/theme.ts'
 import { shareGameToSystem } from '../../games/shareAction.ts'
 import { otherChallengePath, otherShareLink, otherShareText, readOtherResult, RESULT_GAMES } from '../../games/otherResultShare.ts'
-import { renderOtherResultPoster } from '../../games/otherResultPoster.ts'
 import './gameShare.css'
 
 export default function GameShare({ gameId = 'snake-arena' }: { gameId?: string }) {
@@ -24,6 +26,7 @@ export default function GameShare({ gameId = 'snake-arena' }: { gameId?: string 
   const [manualCopy, setManualCopy] = useState(false)
   const [retry, setRetry] = useState(0)
   const [busy, setBusy] = useState(false)
+  const [theme, setTheme] = usePosterTheme()
   const link = snake ? gameShareLink(snake, publicUrl(), inviteCode) : other ? otherShareLink(other, publicUrl(), inviteCode) : ''
   const challengePath = gameId === 'snake-arena' ? gameChallengePath(snake, inviteCode) : otherChallengePath(gameId, inviteCode)
   const shareText = snake ? gameShareText(snake) : other ? otherShareText(other) : ''
@@ -35,20 +38,20 @@ export default function GameShare({ gameId = 'snake-arena' }: { gameId?: string 
   }, [])
 
   useEffect(() => {
-    document.title = `${name}战绩｜下班啦`
+    document.title = `${name}战绩｜相伴`
     if (!own) captureReferral()
   }, [own, context.search, name])
   useEffect(() => {
     if (!snake && !other) return
     let cancelled = false
     setError(''); setImage(null); setMessage(''); setManualCopy(false)
-    const poster = snake ? renderResultPoster(snake, link) : renderOtherResultPoster(other!, link)
+    const poster = renderGamePoster(snake ? snakePosterCopy(snake) : otherPosterCopy(other!), link, theme)
     poster.then(blob => {
       if (cancelled) return
       setImage({ url: URL.createObjectURL(blob), file: new File([blob], `${name}-${(snake || other)!.score}分.png`, { type: 'image/png' }) })
     }).catch(() => { if (!cancelled) setError('战绩卡暂时没画好，可以重试或先复制链接。') })
     return () => { cancelled = true }
-  }, [snake, other, link, retry, name])
+  }, [snake, other, link, retry, name, theme])
   useEffect(() => () => { if (image) URL.revokeObjectURL(image.url) }, [image])
 
   async function share() {
@@ -90,6 +93,7 @@ export default function GameShare({ gameId = 'snake-arena' }: { gameId?: string 
       <div className="game-share-poster">
         {image ? <img src={image.url} width={RESULT_POSTER_WIDTH} height={RESULT_POSTER_HEIGHT} alt={`${shareText} 扫码来挑战。`} /> : <div className="game-share-placeholder" role="status">{error || '正在画你的快乐战绩…'}</div>}
       </div>
+      <PosterThemeToggle value={theme} onChange={setTheme} tone="light" className="mb-4" />
       {error && <button className="game-share-link-button" onClick={() => setRetry(value => value + 1)}>重新生成战绩卡</button>}
       <div className="game-share-actions">
         <button className="game-share-button" disabled={busy} onClick={() => void share()}>{busy ? '正在分享…' : '分享给朋友'}</button>

@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
 import type { Checkin, Tip } from '../../api/types.ts'
-import { moodFace, moodLabel } from '../../cat/moods.ts'
+import { moodFace, moodLabel } from '../../robot/moods.ts'
 import { useLocation } from 'wouter'
-import { CatWindow, FieldError, PrimaryButton, QuietButton } from '../../components/ui.tsx'
+import { RobotStage, FieldError, PrimaryButton, QuietButton } from '../../components/ui.tsx'
 import { useProfile } from '../../lib/session.tsx'
 import { countdown } from '../../lib/time.ts'
 import { titleTheme } from '../../lib/titleTheme.ts'
@@ -49,7 +49,7 @@ export function ResultView({ checkin, tips, fresh, busy, error, onUndo }: Result
           {checkin.title.name}
         </h1>
         <div className="mt-5 flex items-end gap-4">
-          <CatWindow spec={moodFace[checkin.mood]} label={`${profile.companionName}${moodLabel[checkin.mood]}`} size={120} centered={false} />
+          <RobotStage spec={moodFace[checkin.mood]} label={`${profile.companionName}${moodLabel[checkin.mood]}`} size={128} centered={false} interactive />
           <p className="pb-5 text-window/80">
             <span className="font-display text-4xl text-window">{checkin.localTime}</span>
             <span className="ml-1.5">下班</span>

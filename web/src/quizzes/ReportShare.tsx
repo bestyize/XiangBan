@@ -3,6 +3,8 @@ import { Link } from 'wouter'
 import { blobToBase64, inApp, send } from '../lib/bridge.ts'
 import { isWeChat, publicUrl } from '../lib/env.ts'
 import { POSTER_HEIGHT, POSTER_WIDTH, renderQuizPoster } from './poster.ts'
+import { PosterThemeToggle } from '../components/PosterThemeToggle.tsx'
+import { usePosterTheme } from '../poster/theme.ts'
 import { shareLink } from './share.ts'
 import type { QuizDefinition, QuizReport } from './types.ts'
 
@@ -15,6 +17,7 @@ export function ReportShare({ quiz, report, scores, shared }: { quiz: QuizDefini
   const [posterError, setPosterError] = useState('')
   const [retry, setRetry] = useState(0)
   const [busy, setBusy] = useState(false)
+  const [theme, setTheme] = usePosterTheme()
   const dialog = useRef<HTMLDialogElement>(null)
   const link = shareLink(quiz, scores, publicUrl())
 
@@ -30,14 +33,14 @@ export function ReportShare({ quiz, report, scores, shared }: { quiz: QuizDefini
     let cancelled = false
     setPosterError('')
     setImage(null)
-    renderQuizPoster(quiz, report, link).then((blob) => {
+    renderQuizPoster(quiz, report, link, theme).then((blob) => {
       if (cancelled) return
       setImage({ url: URL.createObjectURL(blob), file: new File([blob], `${quiz.name}-${report.code.replace(/[^A-Z]/g, '')}.png`, { type: 'image/png' }) })
     }).catch(() => {
       if (!cancelled) setPosterError('海报没画好，可以重试，或先复制报告链接。')
     })
     return () => { cancelled = true }
-  }, [open, quiz, report, link, retry])
+  }, [open, quiz, report, link, retry, theme])
 
   useEffect(() => () => { if (image) URL.revokeObjectURL(image.url) }, [image])
 
@@ -98,6 +101,7 @@ export function ReportShare({ quiz, report, scores, shared }: { quiz: QuizDefini
           {image ? <img className="quiz-poster-preview" src={image.url} width={POSTER_WIDTH} height={POSTER_HEIGHT} alt={`${quiz.name} 测试报告：${report.code}，${report.title}。${report.quote}`} /> : <div className="quiz-poster-placeholder" role="status">{posterError || '正在画你的结果名片…'}</div>}
         </div>
         <div className="quiz-dialog-footer">
+          <PosterThemeToggle value={theme} onChange={setTheme} />
           {posterError && <button className="quiz-button" type="button" onClick={() => setRetry((value) => value + 1)}>重新生成海报</button>}
           {isWeChat() && <p className="quiz-dialog-hint">长按海报保存，再发给朋友或朋友圈。</p>}
           {image && <div className="quiz-share-actions">
