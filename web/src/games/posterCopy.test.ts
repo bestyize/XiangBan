@@ -24,4 +24,15 @@ describe('game poster copy', () => {
     }
     expect(otherPosterCopy({ gameId: 'merge-2048', score: 1, lines: 0, maxTile: 256, level: 0, steps: 0 }).cheer).toContain('256')
   })
+
+  it('reacts to whether the ink blade scroll was cleared', () => {
+    const cleared = otherPosterCopy({ gameId: 'ink-blade', score: 8120, lines: 24, maxTile: 31, level: 1, steps: 14 })
+    expect(cleared.mode).toBe('一卷终了')
+    expect(cleared.face).toBe('proud')
+    expect(cleared.cheer).toContain('14')
+    expect(cleared.stats.map(([, label]) => label)).toEqual(['击败', '最高连击', '弹反'])
+    const fallen = otherPosterCopy({ gameId: 'ink-blade', score: 900, lines: 3, maxTile: 4, level: 0, steps: 1 })
+    expect(fallen.mode).toBe('画卷未完')
+    expect(fallen.cheer).toBe('提剑再入，画卷还在等你')
+  })
 })

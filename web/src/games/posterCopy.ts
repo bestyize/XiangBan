@@ -31,6 +31,14 @@ export function otherPosterCopy(result: OtherResult): GamePosterCopy {
       ? result.maxTile >= 2048 ? ['laughing', '合出 2048 了！我要给你鼓掌'] : ['excited', `合到了 ${result.maxTile}，下次冲 2048`]
       : result.gameId === 'water-sort'
         ? ['happy', `调完 ${result.level} 关，一滴都没洒`]
+        : result.gameId === 'ink-blade' ? inkBladeCheer(result)
         : result.lines >= 20 ? ['laughing', `一口气消了 ${result.lines} 行，好解压`] : ['excited', '这一局，玩得漂亮']
-  return { gameId: result.gameId, name, mode: '轻松玩一局', cheer, face, score: result.score, stats: otherResultStats(result) }
+  const mode = result.gameId === 'ink-blade' ? (result.level > 0 ? '一卷终了' : '画卷未完') : '轻松玩一局'
+  return { gameId: result.gameId, name, mode, cheer, face, score: result.score, stats: otherResultStats(result) }
+}
+
+// Ink blade packs kills into `lines`, parries into `steps` and a clear flag into `level`.
+function inkBladeCheer(result: OtherResult): [RobotInput, string] {
+  if (result.level > 0) return result.steps >= 10 ? ['proud', `弹反 ${result.steps} 次，一剑破无常`] : ['laughing', '月下一剑，无常也拦不住你']
+  return result.lines >= 10 ? ['excited', `斩了 ${result.lines} 个墨影，差一点就到头了`] : ['happy', '提剑再入，画卷还在等你']
 }

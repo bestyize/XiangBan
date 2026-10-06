@@ -1,7 +1,7 @@
 import { gamePublicBase } from './resultShare.ts'
 
 export const RESULT_GAMES: Record<string, string> = {
-  'falling-blocks': '俄罗斯方块', 'merge-2048': '2048', 'block-puzzle': '消失高手', 'water-sort': '奶茶大师',
+  'falling-blocks': '俄罗斯方块', 'merge-2048': '2048', 'block-puzzle': '消失高手', 'water-sort': '奶茶大师', 'ink-blade': '水墨剑客',
 }
 export interface OtherResult { gameId: string; score: number; lines: number; maxTile: number; level: number; steps: number }
 export function parseOtherResult(value: unknown): OtherResult | null {
@@ -46,10 +46,13 @@ export function sharePageGameId(path: string): string | null {
 }
 export function otherResultStats(result: OtherResult): [string, string][] {
   if (result.gameId === 'water-sort') return [[String(result.level), '完成关卡'], [String(result.steps), '倒水步数']]
+  // Ink blade packs kills into `lines`, best combo into `maxTile`, parries into `steps` and a clear flag into `level`.
+  if (result.gameId === 'ink-blade') return [[String(result.lines), '击败'], [String(result.maxTile), '最高连击'], [String(result.steps), '弹反']]
   if (result.gameId === 'merge-2048') return [[String(result.maxTile), '最大方块']]
   return [[String(result.lines), result.gameId === 'block-puzzle' ? '消除行列' : '消除行数']]
 }
 export function otherShareText(result: OtherResult): string {
   const stats = otherResultStats(result).map(([value, label]) => `${label} ${value}`).join('，')
-  return `我在${RESULT_GAMES[result.gameId]}拿了 ${result.score} 分，${stats}。你能超过我吗？`
+  const cleared = result.gameId === 'ink-blade' && result.level > 0 ? '一剑破无常，' : ''
+  return `我在${RESULT_GAMES[result.gameId]}${cleared}拿了 ${result.score} 分，${stats}。你能超过我吗？`
 }

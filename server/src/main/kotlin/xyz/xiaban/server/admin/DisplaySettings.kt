@@ -16,6 +16,7 @@ object DisplayCatalog {
         DisplayItem("block-puzzle", true, "消失高手"),
         DisplayItem("water-sort", true, "奶茶大师"),
         DisplayItem("snake-arena", true, "小伴贪吃蛇"),
+        DisplayItem("ink-blade", true, "水墨剑客"),
     )
     val quizzes = listOf(
         DisplayItem("mbti", true, "MBTI"), DisplayItem("mbanti", true, "M班TI"),

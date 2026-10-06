@@ -11,7 +11,7 @@ class DisplaySettingsTest {
         val store = DisplaySettingsStore(read = { null }, write = { _, _ -> error("must not write defaults") })
         val defaults = store.current()
         assertTrue(defaults.chatTabVisible)
-        assertEquals(listOf("falling-blocks", "merge-2048", "block-puzzle", "water-sort", "snake-arena"), defaults.games.map { it.id })
+        assertEquals(listOf("falling-blocks", "merge-2048", "block-puzzle", "water-sort", "snake-arena", "ink-blade"), defaults.games.map { it.id })
         assertEquals(listOf("mbti", "mbanti", "animal", "afterhours"), defaults.quizzes.map { it.id })
         assertTrue((defaults.games + defaults.quizzes).all { it.visible })
     }
@@ -39,7 +39,7 @@ class DisplaySettingsTest {
         val normalized = DisplayCatalog.normalize(saved)
         assertEquals("water-sort", normalized.games.first().id)
         assertFalse(normalized.games.first().visible)
-        assertEquals(5, normalized.games.size)
+        assertEquals(DisplayCatalog.games.size, normalized.games.size)
         assertFalse(normalized.games.any { it.id == "removed-pack" })
         assertEquals(4, normalized.quizzes.size)
     }
@@ -59,7 +59,7 @@ class DisplaySettingsTest {
     @Test fun `all items can be hidden without losing their configuration positions`() = runTest {
         val request = DisplayCatalog.defaults().let { it.copy(games = it.games.map { item -> item.copy(visible = false) }, quizzes = it.quizzes.map { item -> item.copy(visible = false) }) }
         val saved = DisplaySettingsStore(read = { null }, write = { _, _ -> }).save(request, "operator")
-        assertEquals(5, saved.games.size)
+        assertEquals(DisplayCatalog.games.size, saved.games.size)
         assertEquals(4, saved.quizzes.size)
         assertTrue((saved.games + saved.quizzes).none { it.visible })
     }
