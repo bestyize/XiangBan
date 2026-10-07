@@ -289,6 +289,8 @@ describe('snake arena shipped simulation', () => {
     expect(player.score).toBe(30)
   })
 
+  // 1500 steps at near-MAX_MASS body length is the heaviest case here: ~2.5 s locally, so the 5 s default is too
+  // tight for a slower CI runner.
   it('grows beyond 1000 while keeping mass, physical radius and sampled body work bounded', () => {
     const state = solo(), player = state.snakes[0]
     player.mass = 999
@@ -307,7 +309,7 @@ describe('snake arena shipped simulation', () => {
     expect(player.trail.length).toBeLessThanOrEqual(519)
     expect(rules.bodyLength(player)).toBeLessThanOrEqual(3105)
     expect(rules.radius(player)).toBeLessThanOrEqual(42)
-  })
+  }, 30000)
 
   it('gives larger opponents proportionally valuable remains and bounded food even on a full map', () => {
     function eliminate(mass: number, full = false) {

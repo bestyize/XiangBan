@@ -36,6 +36,7 @@
     <div class="prompt" id="prompt" role="status" aria-live="polite" hidden></div>
     <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
     <div class="hold-ring" id="holdRing" aria-hidden="true"></div>
+    <button class="icon-button help-button" id="helpButton" type="button" aria-label="怎么玩" title="怎么玩" hidden><svg viewBox="0 0 24 24"><path d="M12 17h.01M9.1 9a3 3 0 1 1 4 2.8c-.7.3-1.1.9-1.1 1.7v.5" /></svg></button>
 
     <section id="welcome" class="overlay welcome" aria-labelledby="welcomeTitle">
       <button class="welcome-exit icon-button" id="welcomeExit" type="button" aria-label="返回游戏广场"><svg viewBox="0 0 24 24"><path d="m14 6-6 6 6 6" /></svg></button>
@@ -43,32 +44,16 @@
       <div class="welcome-card">
         <p class="welcome-kicker">一只纸鸟 · 一片群岛 · 一场日落</p>
         <h1 id="welcomeTitle">暮色滑翔</h1>
-        <p class="welcome-description">在太阳落进海里之前，飞到更远的岛。<br>只需要一根手指：按住，或者松开。</p>
-        <ol class="howto" aria-label="玩法三步">
-          <li>
-            <svg viewBox="0 0 64 40" aria-hidden="true"><path class="hill" d="M4 8C24 8 32 30 60 32" /><circle class="press" cx="20" cy="15" r="5" /><path class="chev" d="M30 20l5 3-5 3M38 23l5 3-5 3" /></svg>
-            <b>下坡按住</b><span>金色路段 加速</span>
-          </li>
-          <li>
-            <svg viewBox="0 0 64 40" aria-hidden="true"><path class="hill" d="M4 22C14 36 26 36 36 26S52 8 60 8" /><circle class="free" cx="20" cy="31" r="5" /><path class="fly" d="M40 20C48 6 56 4 62 10" /></svg>
-            <b>坡底松开</b><span>借上坡飞起</span>
-          </li>
-          <li>
-            <svg viewBox="0 0 64 40" aria-hidden="true"><path class="hill" d="M4 16L60 36" /><path class="fly" d="M6 4C26 -2 40 8 46 24" /><ellipse class="target" cx="46" cy="29" rx="9" ry="3.6" /></svg>
-            <b>顺坡落地</b><span>金圈 = 完美</span>
-          </li>
-        </ol>
+        <p class="welcome-description">天黑之前，飞到更远的岛。<br>按住俯冲，松开滑翔。</p>
         <div class="welcome-actions">
           <button id="startButton" class="primary-button" type="button">起飞 <svg viewBox="0 0 24 24"><path d="M5 12h14m-6-6 6 6-6 6" /></svg></button>
-          <button id="welcomeAssist" class="text-toggle" type="button" aria-pressed="true">引导 · 开</button>
-          <button id="welcomeSound" class="text-toggle" type="button" aria-pressed="false">声音 · 关</button>
         </div>
-        <p class="welcome-foot"><span class="touch-copy">任意位置按住 = 俯冲 · 松开 = 滑翔</span><span class="desktop-copy">按住空格 / ↓ / 鼠标 = 俯冲 · 松开 = 滑翔 · P 暂停</span></p>
+        <p class="welcome-foot"><span class="touch-copy">按住 = 俯冲 · 松开 = 滑翔</span><span class="desktop-copy">按住空格 / ↓ / 鼠标 = 俯冲 · 松开 = 滑翔</span></p>
       </div>
     </section>
 
     <section id="pauseOverlay" class="overlay scrim" role="dialog" aria-modal="true" aria-labelledby="pauseTitle" hidden>
-      <div class="dialog-card"><h2 id="pauseTitle">落在云上歇一歇</h2><p id="pauseDescription">太阳也替你停住了，随时可以接着飞。</p><button id="resumeButton" class="primary-button" type="button">继续 <span aria-hidden="true">→</span></button><button id="pauseAssist" class="text-toggle pause-toggle" type="button" aria-pressed="true">引导 · 开</button><button id="pauseExit" class="text-button" type="button">返回游戏广场</button></div>
+      <div class="dialog-card"><h2 id="pauseTitle">落在云上歇一歇</h2><p id="pauseDescription">太阳也替你停住了，随时可以接着飞。</p><button id="resumeButton" class="primary-button" type="button">继续 <span aria-hidden="true">→</span></button><button id="pauseHelp" class="text-button" type="button">怎么玩</button><button id="pauseExit" class="text-button" type="button">返回游戏广场</button></div>
     </section>
 
     <section id="resultOverlay" class="overlay scrim" role="dialog" aria-modal="true" aria-labelledby="resultTitle" hidden>
@@ -88,6 +73,33 @@
         <button id="shareResultButton" class="result-share-button" type="button" hidden>分享战绩 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17 17 7m-8 0h8v8" /></svg></button>
         <div class="result-actions"><button id="restartButton" class="primary-button" type="button">再飞一次</button></div>
         <button id="resultExit" class="text-button" type="button">返回游戏广场</button>
+      </div>
+    </section>
+
+    <section id="helpOverlay" class="overlay scrim help-overlay" role="dialog" aria-modal="true" aria-labelledby="helpTitle" hidden>
+      <div class="dialog-card help-card">
+        <h2 id="helpTitle">怎么玩</h2>
+        <ol class="howto" aria-label="玩法三步">
+          <li>
+            <svg viewBox="0 0 64 40" aria-hidden="true"><path class="hill" d="M4 8C24 8 32 30 60 32" /><circle class="press" cx="20" cy="15" r="5" /><path class="chev" d="M30 20l5 3-5 3M38 23l5 3-5 3" /></svg>
+            <b>下坡按住</b><span>金色路段 加速</span>
+          </li>
+          <li>
+            <svg viewBox="0 0 64 40" aria-hidden="true"><path class="hill" d="M4 22C14 36 26 36 36 26S52 8 60 8" /><circle class="free" cx="20" cy="31" r="5" /><path class="fly" d="M40 20C48 6 56 4 62 10" /></svg>
+            <b>坡底松开</b><span>借上坡飞起</span>
+          </li>
+          <li>
+            <svg viewBox="0 0 64 40" aria-hidden="true"><path class="hill" d="M4 16L60 36" /><path class="fly" d="M6 4C26 -2 40 8 46 24" /><ellipse class="target" cx="46" cy="29" rx="9" ry="3.6" /></svg>
+            <b>顺坡落地</b><span>白圈是普通，金圈才是完美，连三次进顺风</span>
+          </li>
+        </ol>
+        <p class="help-extra">赶上日光：每飞到一座新岛会补一段余晖，天黑就结束了。</p>
+        <div class="help-toggles">
+          <button id="helpAssist" class="text-toggle" type="button" aria-pressed="true">引导 · 开</button>
+          <button id="helpSound" class="text-toggle" type="button" aria-pressed="true">声音 · 开</button>
+        </div>
+        <button id="helpClose" class="primary-button" type="button">知道了</button>
+        <button id="helpRestart" class="text-button" type="button" hidden>重新开始一局</button>
       </div>
     </section>
 
