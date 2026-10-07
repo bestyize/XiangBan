@@ -13,6 +13,7 @@ interface Rules {
   evaluate(state: Any): { seals: number; grade: number }
   challenge(state: Any): { value: number; goal: number; met: boolean }
   spawnEnemy(state: Any, spec: Any): Any
+  windSpeed(state: Any, x: number): number
 }
 interface Levels { LEVELS: Any[]; level(id: string): Any; volume(id: number): Any; levelByCode(code: number): Any }
 const context: { XiabanInkBlade?: Rules; XiabanInkLevels?: Levels } = {}
@@ -330,6 +331,180 @@ describe('ink blade rules', () => {
     expect(r.level).toBe('2-6')
     expect(r.cleared).toBe(true)
     expect(r.kills).toBe(1)
+  })
+
+  it('keeps the arenas playable: at most 680 wide, archers on real platforms, challenge stats tracked', () => {
+    for (const level of levels.LEVELS) {
+      const world = levels.volume(level.volume)
+      const state = rules.createGame({ level: level.id })
+      if (level.challenge.stat !== 'time') expect(Object.keys(state.player)).toContain(level.challenge.stat)
+      for (const id of level.encounters) {
+        const encounter = world.encounters[id]
+        expect(encounter.lock[1] - encounter.lock[0] - 80).toBeLessThanOrEqual(680)
+        for (const spec of encounter.waves.flat()) {
+          if (spec.y === undefined || spec.y >= rules.GROUND) continue
+          const platform = world.platforms.find((p: Any) => Math.abs(p.y - spec.y) < 1 && spec.x >= p.x && spec.x <= p.x + p.w)
+          expect(platform, `${level.id} ${id} ${spec.type}@${spec.x}`).toBeTruthy()
+        }
+      }
+    }
+  })
+
+  it('drops an icicle when a slash cuts it and crushes the enemy beneath', () => {
+    const s = rules.createGame({ level: '2-1', seed: 1 })
+    s.lock = [720, 1460]; s.encounter = 99; s.player.x = 960
+    const ronin = place(s, 'ronin', 1030, { facing: -1 })
+    const events = run(s, 40, (i) => ({ slashPressed: i === 0 }))
+    expect(events.some((e) => e.type === 'icicleFall')).toBe(true)
+    expect(events.some((e) => e.type === 'iceHit')).toBe(true)
+    expect(ronin.alive).toBe(false)
+    expect(s.player.icicleKills).toBe(1)
+    expect(s.player.airKills).toBe(0)
+    expect(events.some((e) => e.type === 'iceShatter')).toBe(true)
+    expect(s.icicles.filter((ice: Any) => ice.state === 'hang')).toHaveLength(3)
+  })
+
+  it('cracks thin ice under a player who stands still, swallowing rooted enemies, and lets a dash escape', () => {
+    const s = rules.createGame({ level: '2-2', seed: 1 })
+    s.lock = [1380, 2100]; s.encounter = 99; s.player.x = 1700
+    const ronin = place(s, 'ronin', 1772, { facing: -1, state: 'tele', t: 9, teleTotal: 9 })
+    const events = run(s, 60 * 2.2)
+    expect(events.filter((e) => e.type === 'crackTell')).toHaveLength(1)
+    expect(events.some((e) => e.type === 'crackBurst')).toBe(true)
+    expect(ronin.alive).toBe(false)
+    expect(s.player.crackKills).toBe(1)
+    expect(s.player.hp).toBe(s.player.maxHp - 1)
+
+    const dodge = rules.createGame({ level: '2-2', seed: 1 })
+    dodge.lock = [1380, 2100]; dodge.encounter = 99; dodge.player.x = 1700
+    const wasted = run(dodge, 70)
+    expect(wasted.some((e) => e.type === 'crackTell')).toBe(true)
+    const escape = run(dodge, 60, (i) => (i === 0 ? { dashPressed: true, move: 1 } : { move: 1 }))
+    expect(escape.some((e) => e.type === 'crackBurst')).toBe(true)
+    expect(dodge.player.hp).toBe(dodge.player.maxHp)
+
+    const moving = rules.createGame({ level: '2-2', seed: 1 })
+    moving.lock = [1380, 2100]; moving.encounter = 99; moving.player.x = 1560
+    expect(run(moving, 60 * 3, (i) => ({ move: Math.floor(i / 40) % 2 === 0 ? 1 : -1 })).some((e) => e.type === 'crackTell')).toBe(false)
+  })
+
+  it('counts kills made while sliding on ice but not on plain snow', () => {
+    const ice = rules.createGame({ level: '2-3', seed: 1 })
+    ice.lock = [2400, 3140]; ice.encounter = 99; ice.player.x = 2500
+    place(ice, 'ronin', 2570, { facing: -1, hp: 1 })
+    run(ice, 30, (i) => ({ slashPressed: i === 0 }))
+    expect(ice.player.slideKills).toBe(1)
+
+    const snow = rules.createGame({ level: '2-1', seed: 1 })
+    snow.lock = [720, 1460]; snow.encounter = 99; snow.player.x = 780
+    place(snow, 'ronin', 850, { facing: -1, hp: 1 })
+    run(snow, 30, (i) => ({ slashPressed: i === 0 }))
+    expect(snow.player.kills).toBe(1)
+    expect(snow.player.slideKills).toBe(0)
+  })
+
+  it('hides a still player in the reeds, silences archers and rewards an ambush', () => {
+    const s = rules.createGame({ level: '2-4', seed: 1 })
+    s.lock = [3360, 4120]; s.encounter = 99; s.player.x = 3520
+    const archer = place(s, 'archer', 3900, { facing: -1 })
+    const settle = run(s, 30)
+    archer.cd = 0
+    const hidden = [...settle, ...run(s, 60)]
+    expect(s.player.hidden).toBe(true)
+    expect(hidden.some((e) => e.type === 'hide')).toBe(true)
+    expect(archer.state).toBe('idle')
+    s.player.x = 3300
+    run(s, 10)
+    expect(s.player.hidden).toBe(false)
+    expect(archer.state).toBe('tele')
+
+    const ambush = rules.createGame({ level: '2-4', seed: 1 })
+    ambush.lock = [3360, 4120]; ambush.encounter = 99; ambush.player.x = 3520
+    const ronin = place(ambush, 'ronin', 3590, { facing: -1 })
+    run(ambush, 30)
+    expect(ambush.player.hidden).toBe(true)
+    expect(ronin.state).not.toBe('tele')
+    const events = run(ambush, 20, (i) => ({ slashPressed: i === 0 }))
+    expect(events.some((e) => e.type === 'ambush')).toBe(true)
+    expect(ambush.player.ambushes).toBe(1)
+    expect(ronin.alive).toBe(false)
+    expect(ambush.player.hidden).toBe(false)
+  })
+
+  it('gives the hiding place away after four seconds, or when an enemy is at arm\'s length', () => {
+    const s = rules.createGame({ level: '2-4', seed: 1 })
+    s.lock = [3360, 4120]; s.encounter = 99; s.player.x = 3520
+    run(s, 60 * 4.6)
+    expect(s.player.spottedT).toBeGreaterThan(0)
+    expect(s.player.hidden).toBe(false)
+
+    const near = rules.createGame({ level: '2-4', seed: 1 })
+    near.lock = [3360, 4120]; near.encounter = 99; near.player.x = 3520
+    place(near, 'dummy', 3550)
+    run(near, 60)
+    expect(near.player.hidden).toBe(false)
+  })
+
+  it('warns before a gust, then pushes the player and unbraced enemies only inside the zone', () => {
+    const s = rules.createGame({ level: '2-5', seed: 1 })
+    s.player.x = 4300
+    const early = run(s, 60 * 3.4)
+    expect(early.some((e) => e.type === 'gust')).toBe(true)
+    expect(s.wind.phase).toBe('tele')
+    expect(rules.windSpeed(s, 4300)).toBe(0)
+    run(s, 60 * 1.2)
+    expect(s.wind.phase).toBe('blow')
+    expect(rules.windSpeed(s, 4300)).toBeGreaterThan(100)
+    expect(rules.windSpeed(s, 3000)).toBe(0)
+    run(s, 40)
+    expect(s.player.vx).toBeGreaterThan(40)
+
+    const calm = rules.createGame({ level: '2-1', seed: 1 })
+    expect(run(calm, 60 * 8).some((e) => e.type === 'gust')).toBe(false)
+  })
+
+  it('shows terrain prompts only inside their own 幅', () => {
+    const keys = (events: Any[]) => events.filter((e) => e.type === 'prompt').map((e) => e.key)
+    const late = keys(run(rules.createGame({ level: '2-5', seed: 1 }), 5))
+    for (const key of ['icicle', 'thin', 'ice', 'reed']) expect(late).not.toContain(key)
+    expect(keys(run(rules.createGame({ level: '2-4', seed: 1 }), 60, { move: 1 }))).toContain('reed')
+    const ferry = keys(run(rules.createGame({ level: '2-2', seed: 1 }), 60 * 1.5, { move: 1 }))
+    expect(ferry).toContain('thin')
+    expect(ferry).not.toContain('icicle')
+  })
+
+  it('lets icicles and cracks hurt a shield bearer from the front, and does not count a blocked slash as an ambush', () => {
+    const crack = rules.createGame({ level: '2-2', seed: 1 })
+    crack.lock = [1380, 2100]; crack.encounter = 99; crack.player.x = 1700
+    const shield = place(crack, 'shield', 1772, { facing: -1, state: 'tele', t: 9, teleTotal: 9 })
+    run(crack, 60 * 2.2)
+    expect(shield.hp).toBe(1)
+    expect(shield.state).toBe('stagger')
+
+    const blocked = rules.createGame({ level: '2-4', seed: 1 })
+    blocked.lock = [3360, 4120]; blocked.encounter = 99; blocked.player.x = 3520
+    const bearer = place(blocked, 'shield', 3595, { facing: -1 })
+    run(blocked, 30)
+    expect(blocked.player.hidden).toBe(true)
+    run(blocked, 20, (i) => ({ slashPressed: i === 0 }))
+    expect(bearer.hp).toBe(5)
+    expect(blocked.player.ambushes).toBe(0)
+  })
+
+  it('pushes unbraced enemies in a gust but not archers standing on a platform', () => {
+    const windy = rules.createGame({ level: '2-5', seed: 1 })
+    windy.lock = [4300, 5060]; windy.encounter = 99; windy.player.x = 4400
+    const drifter = place(windy, 'ronin', 4700, { state: 'stagger', t: 99 })
+    const perched = rules.spawnEnemy(windy, { type: 'archer', x: 4640, y: 234 })
+    Object.assign(perched, { state: 'idle', t: 0, cd: 99 })
+    const calm = rules.createGame({ level: '2-1', seed: 1 })
+    calm.lock = [720, 1460]; calm.encounter = 99; calm.player.x = 800
+    const still = place(calm, 'ronin', 1100, { state: 'stagger', t: 99 })
+    run(windy, 60 * 6.5)
+    run(calm, 60 * 6.5)
+    expect(drifter.x).toBeGreaterThan(4700 + 40)
+    expect(still.x).toBeCloseTo(1100, 0)
+    expect(perched.x).toBeCloseTo(4640, 0)
   })
 
   it('ends the round when the swordsman falls', () => {

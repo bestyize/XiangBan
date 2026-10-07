@@ -279,17 +279,33 @@
       }
       if (o.pavilions) for (const px of o.pavilions) if (px > a - 40 && px < b + 40) pavilion(g, px, ridge(px) + 2, o.pavilionScale || 1, o.color, Math.min(1, o.alpha * 1.6))
       if (o.snow) {
-        g.fillStyle = 'rgba(252,252,255,' + o.snow + ')'
+        // Snowfields are left as bare paper (留白): a ragged cap that sinks deeper on higher peaks, with ink hatching only on the shaded flank.
+        const from = o.snowFrom ?? 40, cap = o.snowDepth ?? o.depth * 1.3
+        const edge = []
         for (let i = 0; i < ys.length; i += 2) {
           const x = a + i
-          const sn = n(x / 16 + 23)
-          if (sn > 0.35) {
-            const h = (sn - 0.35) * 14 * (1 + n2(x / 8))
-            g.beginPath()
-            g.moveTo(x - 2, ys[i] + 0.5)
-            g.quadraticCurveTo(x + 1, ys[i] - h, x + 3.5, ys[i] + 0.5)
-            g.fill()
-          }
+          const over = Math.max(0, o.base - ys[i] - from)
+          const lump = 0.45 + 0.9 * n2(x / 6 + 40) + 0.35 * n(x / 19 + 70)
+          edge.push(Math.min(cap, over * 0.9) * lump + 1.2 + 1.8 * n(x / 5 + 11))
+        }
+        g.beginPath(); g.moveTo(a, ys[0])
+        for (let i = 0; i < edge.length; i++) g.lineTo(a + i * 2, ys[i * 2] ?? ys[ys.length - 1])
+        for (let i = edge.length - 1; i >= 0; i--) g.lineTo(a + i * 2, (ys[i * 2] ?? ys[ys.length - 1]) + edge[i])
+        g.closePath()
+        g.fillStyle = 'rgba(250,250,252,' + o.snow + ')'; g.fill()
+        for (let i = 1; i < edge.length - 1; i++) {
+          const x = a + i * 2, slope = (ys[i * 2 + 2] ?? ys[i * 2]) - (ys[i * 2 - 2] ?? ys[i * 2])
+          if (slope < 1.2 || edge[i] < 5 || hash(i + Math.floor(a), o.seed + 90) > 0.6) continue
+          g.strokeStyle = rgba(o.color, o.alpha * (0.35 + 0.4 * n2(x / 5)))
+          g.lineWidth = 0.6 + 0.8 * n(x / 8)
+          const y0 = ys[i * 2] + edge[i] * 0.35
+          g.beginPath(); g.moveTo(x, y0); g.lineTo(x + slope * 0.6, y0 + edge[i] * (0.5 + 0.5 * n2(x / 3))); g.stroke()
+        }
+        g.strokeStyle = rgba(o.color, o.alpha * 0.7); g.lineWidth = 0.7
+        for (let i = 0; i < edge.length - 1; i += 3) {
+          if (edge[i] < 6) continue
+          const x = a + i * 2
+          g.beginPath(); g.moveTo(x, ys[i * 2] + edge[i]); g.lineTo(x + 2.5, ys[i * 2] + edge[i] + 2.5 + 4 * n2(x / 4)); g.stroke()
         }
       }
       // Fade the base into the mist below.
@@ -429,37 +445,53 @@
     })
   }
 
-  // Snow-covered ground with trampled tracks and crisp white snow surface.
+  // Snow-covered ground: a bright field lit from the horizon, blue-grey drifts, tracks and dry grass breaking through.
   function snowGround(o) {
     const n = noise(o.seed, 64)
+    const random = rng(o.seed + 3)
     const lineY = (x) => o.line + (n((x / o.period) * 64) - 0.5) * 4
+    const drifts = []
+    for (let i = 0; i < o.period / 55; i++) drifts.push({ x: random() * o.period, y: 10 + random() * (o.depth - 24), rx: 26 + random() * 60, ry: 2 + random() * 3.5 })
+    const tufts = []
+    for (let i = 0; i < o.period / 70; i++) tufts.push({ x: random() * o.period, n: 3 + Math.floor(random() * 4), h: 5 + random() * 11 })
     return strip(o.period, o.line - 20, o.depth + 20, o.res, (g, u0, u1) => {
-      const wash = g.createLinearGradient(0, o.line, 0, o.line + o.depth)
-      wash.addColorStop(0, 'rgba(40,42,50,0.22)')
-      wash.addColorStop(0.35, 'rgba(40,42,50,0.08)')
-      wash.addColorStop(1, 'rgba(40,42,50,0.02)')
-      g.fillStyle = wash
+      const field = g.createLinearGradient(0, o.line, 0, o.line + o.depth)
+      field.addColorStop(0, 'rgba(255,255,255,1)')
+      field.addColorStop(0.25, 'rgba(246,248,252,1)')
+      field.addColorStop(1, 'rgba(222,229,241,1)')
+      g.fillStyle = field
       g.beginPath(); g.moveTo(u0 - 2, o.line + o.depth)
       for (let x = u0 - 2; x <= u1 + 2; x += 2) g.lineTo(x, lineY(x))
       g.lineTo(u1 + 2, o.line + o.depth); g.closePath(); g.fill()
 
-      g.fillStyle = 'rgba(250,250,255,0.92)'
-      g.beginPath(); g.moveTo(u0 - 2, lineY(u0 - 2))
-      for (let x = u0 - 2; x <= u1 + 2; x += 2) g.lineTo(x, lineY(x))
-      for (let x = u1 + 2; x >= u0 - 2; x -= 4) g.lineTo(x, lineY(x) + 4 + Math.sin(x * 0.1) * 2)
-      g.closePath(); g.fill()
-
       for (const shift of [-o.period, 0, o.period]) {
+        for (const d of drifts) {
+          const x = d.x + shift
+          if (x + d.rx < u0 || x - d.rx > u1) continue
+          const y = o.line + d.y
+          g.fillStyle = 'rgba(138,154,184,0.16)'
+          g.beginPath(); g.ellipse(x, y + d.ry * 0.7, d.rx, d.ry, 0, 0, Math.PI * 2); g.fill()
+          g.fillStyle = 'rgba(255,255,255,0.95)'
+          g.beginPath(); g.ellipse(x - d.rx * 0.08, y - d.ry * 0.25, d.rx * 0.92, d.ry * 0.75, 0, 0, Math.PI * 2); g.fill()
+        }
         dryBrush(g, (t) => {
           const x = shift + t * o.period
-          return [x, lineY(x) + 3.5, 0, 1]
-        }, 3, 6, [30, 32, 38], 0.75, o.seed + 5, 200)
-        for (let i = 0; i < o.period / 24; i++) {
-          const px = shift + (i * 27 + 13) % o.period
+          return [x, lineY(x) + 1.5, 0, 1]
+        }, 3, 6, [30, 32, 38], 0.8, o.seed + 5, 200)
+        for (const tuft of tufts) {
+          const x = tuft.x + shift
+          if (x < u0 - 16 || x > u1 + 16) continue
+          for (let k = 0; k < tuft.n; k++) {
+            g.strokeStyle = 'rgba(40,36,34,' + (0.5 + 0.35 * hash(k + tuft.n, o.seed)) + ')'; g.lineWidth = 0.9
+            const h = tuft.h * (0.55 + 0.6 * hash(k, o.seed + 8)), lean = (k - tuft.n / 2) * 2.4
+            g.beginPath(); g.moveTo(x + k * 1.6, lineY(x) + 2); g.quadraticCurveTo(x + k * 1.6 + lean * 0.4, lineY(x) - h * 0.6, x + k * 1.6 + lean, lineY(x) - h); g.stroke()
+          }
+        }
+        for (let i = 0; i < o.period / 30; i++) {
+          const px = shift + (i * 29 + 11) % o.period
           if (px < u0 - 10 || px > u1 + 10) continue
-          const py = lineY(px) + 2
-          g.fillStyle = 'rgba(50,55,65,0.18)'
-          g.beginPath(); g.ellipse(px, py, 3.5, 1.4, 0.1, 0, Math.PI * 2); g.fill()
+          g.fillStyle = 'rgba(70,84,110,0.2)'
+          g.beginPath(); g.ellipse(px, lineY(px) + 6 + (i * 7) % (o.depth - 20), 3.4, 1.2, 0.1, 0, Math.PI * 2); g.fill()
         }
       }
     })
@@ -492,6 +524,68 @@
       }
       dryBrush(g, (t) => [t * o.period, o.line + 1, 0, 1], 2, 4, [170, 195, 225], 0.7, o.seed + 2, 180)
     })
+  }
+
+  // Thin ice: a translucent sheet over dark water, crazed with fractures. Features are fixed before drawing so the tile wraps seamlessly.
+  function thinIce(o) {
+    const random = rng(o.seed)
+    const plates = []
+    for (let i = 0; i < o.period / 38; i++) {
+      plates.push({ x: random() * o.period, y: o.line + 3 + random() * (o.depth - 14), rx: 18 + random() * 44, ry: 3 + random() * 6, tilt: (random() - 0.5) * 0.12, alpha: 0.26 + random() * 0.3 })
+    }
+    const fractures = []
+    for (let i = 0; i < o.period / 90; i++) {
+      const cx = random() * o.period, cy = o.line + 8 + random() * (o.depth - 24)
+      const arms = []
+      const count = 5 + Math.floor(random() * 3)
+      for (let k = 0; k < count; k++) {
+        const angle = random() * Math.PI * 2, len = 14 + random() * 30
+        const pts = [[0, 0]]
+        let x = 0, y = 0
+        for (let seg = 0; seg < 4; seg++) { x += Math.cos(angle + (random() - 0.5) * 0.9) * len / 4; y += Math.sin(angle + (random() - 0.5) * 0.9) * len / 4 * 0.5; pts.push([x, y]) }
+        arms.push(pts)
+      }
+      fractures.push({ cx, cy, arms })
+    }
+    return strip(o.period, o.line - 4, o.depth + 4, o.res, (g, u0, u1) => {
+      const water = g.createLinearGradient(0, o.line, 0, o.line + o.depth)
+      water.addColorStop(0, 'rgba(46,66,98,0.62)'); water.addColorStop(0.5, 'rgba(70,92,126,0.4)'); water.addColorStop(1, 'rgba(96,120,152,0.14)')
+      g.fillStyle = water; g.fillRect(u0 - 2, o.line, u1 - u0 + 4, o.depth)
+      for (const shift of [-o.period, 0, o.period]) {
+        for (const plate of plates) {
+          g.fillStyle = 'rgba(232,240,250,' + plate.alpha + ')'
+          g.beginPath(); g.ellipse(plate.x + shift, plate.y, plate.rx, plate.ry, plate.tilt, 0, Math.PI * 2); g.fill()
+        }
+      }
+      g.fillStyle = 'rgba(244,248,255,0.86)'; g.fillRect(u0 - 2, o.line, u1 - u0 + 4, 2.4)
+      for (const shift of [-o.period, 0, o.period]) {
+        for (const crack of fractures) {
+          for (const pts of crack.arms) {
+            const ox = crack.cx + shift, oy = crack.cy
+            g.strokeStyle = 'rgba(24,36,60,0.5)'; g.lineWidth = 0.9
+            g.beginPath(); g.moveTo(ox, oy); for (const [x, y] of pts) g.lineTo(ox + x, oy + y); g.stroke()
+            g.strokeStyle = 'rgba(255,255,255,0.7)'; g.lineWidth = 0.5
+            g.beginPath(); g.moveTo(ox, oy - 0.8); for (const [x, y] of pts) g.lineTo(ox + x, oy + y - 0.8); g.stroke()
+          }
+        }
+      }
+    })
+  }
+
+  // A hanging icicle: origin is where it joins the rock, pointing down.
+  function icicleSprite(res) {
+    return sprite(28, 44, res, (g) => {
+      const body = g.createLinearGradient(-7, 0, 7, 0)
+      body.addColorStop(0, 'rgba(176,200,230,0.92)'); body.addColorStop(0.45, 'rgba(244,250,255,0.98)'); body.addColorStop(1, 'rgba(150,176,212,0.9)')
+      g.fillStyle = body
+      g.beginPath(); g.moveTo(-7, 0); g.lineTo(7, 0); g.lineTo(3.2, 18); g.lineTo(1.2, 38); g.lineTo(0, 43); g.lineTo(-1.6, 36); g.lineTo(-4.2, 16); g.closePath(); g.fill()
+      g.strokeStyle = rgba(INK, 0.55); g.lineWidth = 0.9
+      g.beginPath(); g.moveTo(7, 0); g.lineTo(3.2, 18); g.lineTo(1.2, 38); g.lineTo(0, 43); g.stroke()
+      g.strokeStyle = 'rgba(255,255,255,0.95)'; g.lineWidth = 0.9
+      g.beginPath(); g.moveTo(-3.6, 3); g.lineTo(-1.8, 24); g.stroke()
+      g.strokeStyle = 'rgba(120,146,184,0.5)'; g.lineWidth = 0.6
+      g.beginPath(); g.moveTo(2, 4); g.lineTo(1, 28); g.stroke()
+    }, 14, 0)
   }
 
   // Winter reeds (枯芦 / 雪苇) swaying in wind.
@@ -676,15 +770,24 @@
     }, 15, 60)
   }
 
-  function deadTree(res, seed, scale = 1) {
+  function deadTree(res, seed, scale = 1, opts = {}) {
     const random = rng(seed)
-    return sprite(220 * scale, 260 * scale, res, (g) => {
+    const half = opts.wide ? 170 : 110
+    return sprite(half * 2 * scale, 260 * scale, res, (g) => {
       g.scale(scale, scale)
       g.translate(-110, -258)
       const branch = (x, y, angle, len, width, depth) => {
         const x2 = x + Math.cos(angle) * len, y2 = y + Math.sin(angle) * len
         g.fillStyle = rgba(INK, 0.85)
         ribbon(g, [[x, y], [(x + x2) / 2 + (random() - 0.5) * len * 0.2, (y + y2) / 2], [x2, y2]], (t) => width * (1 - t * 0.55))
+        if (opts.snow && width > 2 && Math.abs(Math.cos(angle)) > 0.45) {
+          g.fillStyle = 'rgba(252,252,255,0.96)'
+          g.beginPath(); g.ellipse((x + x2) / 2, (y + y2) / 2 - width * 0.4, len * 0.34, Math.max(1.4, width * 0.34), Math.atan2(y2 - y, x2 - x), 0, Math.PI * 2); g.fill()
+        }
+        if (opts.blossom && depth <= 1) {
+          const count = 2 + Math.floor(random() * 3)
+          for (let k = 0; k < count; k++) blossom(g, x2 + (random() - 0.5) * 18, y2 + (random() - 0.5) * 14, 2 + random() * 1.5, random)
+        }
         if (depth <= 0 || width < 0.8) return
         const count = depth > 2 ? 2 : 1 + Math.floor(random() * 2)
         for (let i = 0; i < count; i++) branch(x2, y2, angle + (random() - 0.5) * 1.3 - 0.1, len * (0.55 + random() * 0.25), width * 0.62, depth - 1)
@@ -692,7 +795,7 @@
       branch(110, 258, -Math.PI / 2 + 0.05, 90, 12, 5)
       branch(110, 200, -Math.PI / 2 - 0.7, 50, 5, 3)
       g.fillStyle = rgba(INK, 0.15); g.beginPath(); g.ellipse(110, 258, 40, 3, 0, 0, Math.PI * 2); g.fill()
-    }, 110 * scale, 258 * scale)
+    }, half * scale, 258 * scale)
   }
 
   function pine(res, seed) {
@@ -758,16 +861,17 @@
         ribbon(g, [p, [(p[0] + end[0]) / 2, p[1] - 10], end], (u) => 8 * (1 - u * 0.7))
         for (let k = 0; k < 4; k++) {
           const cx = p[0] + side * len * (0.45 + k * 0.18), cy = p[1] - 26 - k * 4 - random() * 8
-          g.fillStyle = rgba(INK, 0.55 + random() * 0.3)
-          g.beginPath(); g.ellipse(cx, cy, 26 + random() * 10, 8 + random() * 4, (random() - 0.5) * 0.2, 0, Math.PI * 2); g.fill()
-          g.strokeStyle = rgba(INK, 0.6); g.lineWidth = 0.6
-          for (let m = 0; m < 22; m++) {
-            const a = -Math.PI + random() * Math.PI, r = 18 + random() * 14
-            g.beginPath(); g.moveTo(cx, cy + 2); g.lineTo(cx + Math.cos(a) * r, cy + Math.sin(a) * r * 0.5); g.stroke()
+          g.fillStyle = rgba(INK, 0.3 + random() * 0.2)
+          g.beginPath(); g.ellipse(cx, cy + 2, 22 + random() * 8, 6 + random() * 3, (random() - 0.5) * 0.2, 0, Math.PI * 2); g.fill()
+          g.strokeStyle = rgba(INK, 0.72); g.lineWidth = 0.7
+          for (let m = 0; m < 34; m++) {
+            const a = -Math.PI * 0.95 + random() * Math.PI * 0.9, r = 14 + random() * 18
+            g.beginPath(); g.moveTo(cx, cy); g.quadraticCurveTo(cx + Math.cos(a) * r * 0.6, cy + Math.sin(a) * r * 0.2, cx + Math.cos(a) * r, cy + Math.sin(a) * r * 0.55 + r * 0.3); g.stroke()
           }
-          // Thick snow cushion on top of needles
-          g.fillStyle = 'rgba(252,252,255,0.92)'
-          g.beginPath(); g.ellipse(cx, cy - 3.5, 23 + random() * 8, 5.5 + random() * 2, (random() - 0.5) * 0.15, 0, Math.PI * 2); g.fill()
+          g.fillStyle = 'rgba(252,252,255,0.95)'
+          for (let m = 0; m < 3; m++) {
+            g.beginPath(); g.ellipse(cx + (m - 1) * 10 + (random() - 0.5) * 4, cy - 3.5 - (m === 1 ? 1.5 : 0), 8 + random() * 6, 3 + random() * 1.6, (random() - 0.5) * 0.3, 0, Math.PI * 2); g.fill()
+          }
         }
       }
     }, 150, 328)
@@ -789,27 +893,37 @@
     }, 80, 85)
   }
 
-  function pillar(res, seed) {
+  function pillar(res, seed, snowy = false) {
     const random = rng(seed)
     return sprite(40, 120, res, (g) => {
       g.fillStyle = rgba(INK, 0.75)
       g.beginPath(); g.moveTo(-9, 0); g.lineTo(-8, -88); g.lineTo(-2, -94); g.lineTo(3, -86); g.lineTo(8, -97); g.lineTo(9, 0); g.closePath(); g.fill()
       for (let i = 0; i < 12; i++) { g.fillStyle = rgba(PAPER, 0.18 + random() * 0.2); g.fillRect(-6 + random() * 10, -random() * 85, 1, 6 + random() * 10) }
       g.fillStyle = rgba(INK, 0.15); g.beginPath(); g.ellipse(0, 0, 16, 2.5, 0, 0, Math.PI * 2); g.fill()
+      if (snowy) {
+        g.fillStyle = 'rgba(252,252,255,0.96)'
+        g.beginPath(); g.moveTo(-8.5, -86); g.lineTo(-8, -88); g.lineTo(-2, -95); g.lineTo(3, -88); g.lineTo(8, -99); g.lineTo(9.5, -88); g.quadraticCurveTo(0, -83, -8.5, -86); g.fill()
+        g.beginPath(); g.ellipse(0, -1, 17, 3.6, 0, 0, Math.PI * 2); g.fill()
+      }
     }, 20, 116)
   }
 
-  function stele(res) {
+  function stele(res, snowy = false) {
     return sprite(40, 70, res, (g) => {
       g.fillStyle = rgba(INK, 0.72)
       g.beginPath(); g.moveTo(-11, 0); g.lineTo(-10, -44); g.quadraticCurveTo(0, -54, 10, -44); g.lineTo(11, 0); g.closePath(); g.fill()
       g.fillStyle = rgba(INK, 0.5); g.fillRect(-15, -4, 30, 4)
       g.fillStyle = rgba(PAPER, 0.55)
       for (let i = 0; i < 4; i++) g.fillRect(-1.2, -38 + i * 8, 2.4, 5)
+      if (snowy) {
+        g.fillStyle = 'rgba(252,252,255,0.97)'
+        g.beginPath(); g.moveTo(-11.5, -43); g.quadraticCurveTo(0, -59, 11.5, -43); g.quadraticCurveTo(6, -46, 0, -44.5); g.quadraticCurveTo(-6, -47, -11.5, -43); g.fill()
+        g.beginPath(); g.ellipse(0, -2, 19, 3.6, 0, 0, Math.PI * 2); g.fill()
+      }
     }, 20, 66)
   }
 
-  function shrine(res) {
+  function shrine(res, snowy = false) {
     return sprite(164, 140, res, (g) => {
       g.translate(-75, -138)
       g.fillStyle = rgba(INK, 0.55)
@@ -819,7 +933,168 @@
       g.beginPath(); g.moveTo(-6, 58); g.quadraticCurveTo(30, 52, 75, 22); g.quadraticCurveTo(120, 52, 156, 58); g.quadraticCurveTo(140, 66, 128, 64); g.lineTo(22, 64); g.quadraticCurveTo(10, 66, -6, 58); g.fill()
       g.fillStyle = 'rgba(214,120,62,0.45)'; g.fillRect(60, 86, 30, 22)
       g.fillStyle = rgba(INK, 0.5); g.fillRect(60, 84, 30, 3); g.fillRect(74, 86, 2, 22)
+      if (snowy) {
+        g.fillStyle = 'rgba(252,252,255,0.96)'
+        g.beginPath(); g.moveTo(-6, 57); g.quadraticCurveTo(30, 49, 75, 18); g.quadraticCurveTo(120, 49, 156, 57); g.quadraticCurveTo(122, 55, 75, 28); g.quadraticCurveTo(28, 55, -6, 57); g.fill()
+        g.beginPath(); g.ellipse(75, 130, 74, 6, 0, 0, Math.PI * 2); g.fill()
+      }
     }, 75, 138)
+  }
+
+  function blossom(g, x, y, rad, random) {
+    const rot = random() * Math.PI * 2
+    g.fillStyle = rgba(CINNABAR, 0.9)
+    for (let k = 0; k < 5; k++) {
+      const a = rot + k * 1.2566
+      g.beginPath(); g.ellipse(x + Math.cos(a) * rad * 0.8, y + Math.sin(a) * rad * 0.8, rad * 0.62, rad * 0.5, a, 0, Math.PI * 2); g.fill()
+    }
+    g.fillStyle = 'rgba(250,226,156,0.95)'
+    g.beginPath(); g.arc(x, y, rad * 0.3, 0, Math.PI * 2); g.fill()
+  }
+
+  // Snow-laden boulder used as a platform: ink body, a thick overhanging cap of bare paper, icicles and a drift at the foot.
+  function snowRock(w, topY, groundY, seed, res) {
+    const random = rng(seed)
+    const h = groundY - topY
+    const pad = 16
+    return sprite(w + pad * 2, h + 36, res, (g) => {
+      const pts = []
+      const steps = 14
+      for (let i = 0; i <= steps; i++) pts.push([lerp(2, w - 2, i / steps), -1 + (random() - 0.5) * 2.4])
+      const right = [[w + 4 + random() * 6, h * 0.35], [w + 8 + random() * 6, h * 0.75], [w + 10, h + 4]]
+      const left = [[-10, h + 4], [-7 - random() * 6, h * 0.7], [-3 - random() * 4, h * 0.3]]
+      const outline = [[0, 2], ...pts, [w, 2], ...right, ...left]
+      const body = g.createLinearGradient(0, 0, 0, h)
+      body.addColorStop(0, rgba(INK, 0.82)); body.addColorStop(0.3, rgba([40, 48, 66], 0.6)); body.addColorStop(1, rgba([70, 84, 110], 0.3))
+      g.beginPath(); g.moveTo(outline[0][0], outline[0][1])
+      for (let i = 1; i < outline.length; i++) {
+        const p = outline[i], q = outline[i - 1]
+        g.quadraticCurveTo(q[0], q[1], (p[0] + q[0]) / 2, (p[1] + q[1]) / 2)
+      }
+      g.closePath()
+      g.fillStyle = 'rgba(216,224,238,0.97)'; g.fill()
+      g.fillStyle = body; g.fill()
+      for (let i = 0; i < w * h / 190; i++) {
+        const x = random() * w, y = 8 + random() * (h - 10)
+        g.fillStyle = rgba(INK, 0.1 + random() * 0.3)
+        g.beginPath()
+        g.moveTo(x, y); g.lineTo(x + 3 + random() * 6, y + 2 + random() * 10); g.lineTo(x + 1 + random() * 2, y + 1); g.closePath(); g.fill()
+      }
+      for (const side of [left, right]) {
+        g.strokeStyle = rgba(INK, 0.6); g.lineWidth = 1.5
+        g.beginPath(); g.moveTo(side[0][0], side[0][1])
+        for (const p of side) g.lineTo(p[0], p[1])
+        g.stroke()
+      }
+      const cap = 16
+      g.fillStyle = 'rgba(253,253,255,0.98)'
+      g.beginPath(); g.moveTo(-7, 4)
+      for (let i = 0; i <= cap; i++) g.lineTo(lerp(-7, w + 7, i / cap), -0.5 - 2 * Math.sin((i / cap) * Math.PI) - random() * 0.8)
+      for (let i = cap; i >= 0; i--) g.lineTo(lerp(-7, w + 7, i / cap), 6 + 4 * random() + (i % 2 ? 4 * random() : 0))
+      g.closePath(); g.fill()
+      g.strokeStyle = 'rgba(130,148,182,0.35)'; g.lineWidth = 0.8
+      g.beginPath()
+      for (let i = 1; i < cap; i += 1) { const x = lerp(-7, w + 7, i / cap); g.moveTo(x, 7 + random() * 3); g.lineTo(x + 3, 8 + random() * 4) }
+      g.stroke()
+      g.fillStyle = 'rgba(253,253,255,0.95)'
+      g.beginPath(); g.ellipse(w / 2, h + 3, w * 0.62, 4.5, 0, 0, Math.PI * 2); g.fill()
+      g.fillStyle = 'rgba(138,154,184,0.22)'
+      g.beginPath(); g.ellipse(w / 2 + 6, h + 6, w * 0.55, 2.4, 0, 0, Math.PI * 2); g.fill()
+    }, pad, 8)
+  }
+
+  // Distant snow pines in layered drooping tiers, each tier carrying its own cap of snow.
+  function snowForest(o) {
+    const random = rng(o.seed)
+    const trees = []
+    for (let i = 0; i < o.count; i++) {
+      trees.push({ x: random() * o.period, h: lerp(o.height[0], o.height[1], random()), tiers: 4 + Math.floor(random() * 3), lean: (random() - 0.5) * 0.08, w: lerp(0.26, 0.38, random()) })
+    }
+    return strip(o.period, o.top, o.base - o.top + 4, o.res, (g, u0, u1) => {
+      for (const shift of [-o.period, 0, o.period]) for (const t of trees) {
+        const x0 = t.x + shift
+        if (x0 + t.h * t.w < u0 || x0 - t.h * t.w > u1) continue
+        g.strokeStyle = rgba(o.color, Math.min(1, o.alpha * 1.1)); g.lineWidth = Math.max(0.8, t.h * 0.024)
+        g.beginPath(); g.moveTo(x0, o.base); g.lineTo(x0 + t.lean * t.h, o.base - t.h); g.stroke()
+        for (let k = 0; k < t.tiers; k++) {
+          const f = k / t.tiers
+          const y = o.base - t.h * (0.16 + 0.8 * f)
+          const half = t.h * t.w * (1 - f * 0.82) * (0.8 + 0.2 * hash(k, o.seed))
+          const cx = x0 + t.lean * (o.base - y)
+          g.fillStyle = rgba(o.color, o.alpha * (0.75 + 0.25 * hash(k + 1, o.seed + 2)))
+          g.beginPath()
+          g.moveTo(cx - half, y + half * 0.35)
+          g.quadraticCurveTo(cx - half * 0.35, y - half * 0.05, cx, y - half * 0.3)
+          g.quadraticCurveTo(cx + half * 0.35, y - half * 0.05, cx + half, y + half * 0.35)
+          g.quadraticCurveTo(cx, y + half * 0.12, cx - half, y + half * 0.35)
+          g.fill()
+          g.fillStyle = 'rgba(252,252,255,' + (o.snow ?? 0.92) + ')'
+          g.beginPath()
+          g.moveTo(cx - half * 0.78, y + half * 0.2)
+          g.quadraticCurveTo(cx - half * 0.3, y - half * 0.1, cx, y - half * 0.3)
+          g.quadraticCurveTo(cx + half * 0.3, y - half * 0.1, cx + half * 0.78, y + half * 0.2)
+          g.quadraticCurveTo(cx + half * 0.2, y + half * 0.04, cx, y - half * 0.06)
+          g.quadraticCurveTo(cx - half * 0.2, y + half * 0.06, cx - half * 0.78, y + half * 0.2)
+          g.fill()
+        }
+      }
+    })
+  }
+
+  // Foreground: heavy plum boughs hanging in from the top edge, snow on their backs and cinnabar blossoms at the tips.
+  function plumBranches(o) {
+    const random = rng(o.seed)
+    const items = []
+    for (let i = 0; i < o.count; i++) items.push({ x: (i + 0.2 + random() * 0.6) * (o.period / o.count), seed: Math.floor(random() * 1e6) + 1, dir: random() < 0.5 ? -1 : 1, len: 150 + random() * 60 })
+    return strip(o.period, o.top, o.height, o.res, (g, u0, u1) => {
+      for (const shift of [-o.period, 0, o.period]) for (const it of items) {
+        const x0 = it.x + shift
+        if (x0 + 280 < u0 || x0 - 280 > u1) continue
+        const r = rng(it.seed)
+        const bough = (x, y, angle, len, width, depth) => {
+          const N = 6, pts = [[x, y]]
+          let heading = angle, cx = x, cy = y
+          for (let i = 0; i < N; i++) {
+            heading += (Math.PI / 2 - heading) * 0.16 + (r() - 0.5) * 0.35
+            cx += Math.cos(heading) * len / N; cy += Math.sin(heading) * len / N
+            pts.push([cx, cy])
+          }
+          g.fillStyle = rgba(INK, 0.82)
+          ribbon(g, pts, (t) => width * (1 - t * 0.65))
+          for (let i = 1; i <= N; i++) {
+            const [px, py] = pts[i - 1], [qx, qy] = pts[i]
+            const seg = Math.atan2(qy - py, qx - px), w = width * (1 - (i / N) * 0.65)
+            if (w > 2.2 && Math.abs(Math.cos(seg)) > 0.4) {
+              g.fillStyle = 'rgba(252,252,255,0.96)'
+              g.beginPath(); g.ellipse((px + qx) / 2, (py + qy) / 2 - w * 0.4, len / N * 0.62, Math.max(1.5, w * 0.36), seg, 0, Math.PI * 2); g.fill()
+            }
+            if (depth > 0 && i > 1 && i < N && r() < 0.55) bough(qx, qy, seg + (r() < 0.5 ? -1 : 1) * (0.6 + r() * 0.5), len * 0.5, width * 0.5, depth - 1)
+          }
+          if (depth <= 1) {
+            for (const [bx, by] of [pts[N], pts[N - 1], pts[N - 2]]) {
+              const count = 2 + Math.floor(r() * 3)
+              for (let k = 0; k < count; k++) blossom(g, bx + (r() - 0.5) * 20, by + (r() - 0.5) * 16, 2.2 + r() * 1.6, r)
+            }
+          }
+        }
+        bough(x0, o.top + 112, Math.PI / 2 + it.dir * 0.85, it.len, 12, 2)
+      }
+    })
+  }
+
+  // A drifting band of pale ink wash for a winter sky.
+  function inkCloud(seed) {
+    const random = rng(seed)
+    const node = canvas(512, 128)
+    const g = node.getContext('2d')
+    for (let i = 0; i < 8; i++) {
+      const cx = 70 + random() * 372, cy = 50 + random() * 36, rx = 60 + random() * 90, ry = 18 + random() * 22
+      g.save(); g.translate(cx, cy); g.scale(1, ry / rx)
+      const gradient = g.createRadialGradient(0, 0, 0, 0, 0, rx)
+      gradient.addColorStop(0, 'rgba(92,104,128,0.14)'); gradient.addColorStop(0.6, 'rgba(92,104,128,0.06)'); gradient.addColorStop(1, 'rgba(92,104,128,0)')
+      g.fillStyle = gradient; g.fillRect(-rx, -rx, rx * 2, rx * 2); g.restore()
+    }
+    return node
   }
 
   // ------------------------------------------------------------ effects sprites
@@ -951,21 +1226,21 @@
     }, 40, 50)
   }
 
-  function snowflakeSprite(size = 20) {
+  function snowflakeSprite(size = 24) {
     const node = canvas(size, size)
     const g = node.getContext('2d')
     const c = size / 2
-    g.fillStyle = 'rgba(255,255,255,0.92)'
-    g.beginPath(); g.arc(c, c, size * 0.28, 0, Math.PI * 2); g.fill()
-    g.fillStyle = 'rgba(235,242,255,0.45)'
-    g.beginPath(); g.arc(c, c, size * 0.46, 0, Math.PI * 2); g.fill()
+    const gradient = g.createRadialGradient(c, c, 0, c, c, c)
+    gradient.addColorStop(0, 'rgba(255,255,255,1)'); gradient.addColorStop(0.42, 'rgba(255,255,255,0.96)')
+    gradient.addColorStop(0.6, 'rgba(120,138,170,0.34)'); gradient.addColorStop(1, 'rgba(120,138,170,0)')
+    g.fillStyle = gradient; g.fillRect(0, 0, size, size)
     return node
   }
 
   globalThis.XiabanInkArt = {
     PAPER, INK, CINNABAR, rgba, rng, hash, noise, fbm, canvas, strip, drawStrip, paperGrain, vignette,
     ribbon, dryBrush, leaf, leafCluster, mountains, bamboo, ground, snowGround, iceSurface, reeds, water,
-    sprite, drawSprite, rock, bridge, gate, lantern, deadTree, pine, snowPine, snowPier, pillar, stele, shrine,
+    sprite, drawSprite, rock, bridge, gate, lantern, deadTree, pine, snowPine, snowPier, snowRock, snowForest, plumBranches, inkCloud, blossom, thinIce, icicleSprite, pillar, stele, shrine,
     splat, softDisc, sun, moon, mist, leafSprite, petalSprite, waveSprite, iceSpikeSprite, snowflakeSprite, clamp, lerp,
   }
 })()

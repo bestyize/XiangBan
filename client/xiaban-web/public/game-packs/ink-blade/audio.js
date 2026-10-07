@@ -3,8 +3,8 @@
   'use strict'
 
   const SCALE = [146.83, 164.81, 185, 220, 246.94, 293.66, 329.63, 369.99, 440, 493.88, 587.33]
-  let ac = null, master = null, wet = null, noise = null, rain = null, rainGain = null
-  let enabled = false, nextNote = 0, nextDrum = 0, lastNote = 5
+  let ac = null, master = null, wet = null, noise = null, rain = null, rainGain = null, wind = null, windGain = null, windFilter = null
+  let enabled = false, nextNote = 0, nextDrum = 0, nextChime = 0, lastNote = 5
 
   function init() {
     if (ac) return true
@@ -114,6 +114,27 @@
     gong: () => { bell(196, 0.12, 2.6); drum(55, 0.35) },
     victory: () => { [293.66, 369.99, 440, 587.33].forEach((f, i) => pluck(f, 0.08, i * 0.16)); bell(1174, 0.05, 2.4, 0.7) },
     defeat: () => { [220, 185, 146.83].forEach((f, i) => pluck(f, 0.07, i * 0.3)) },
+    snowstep: () => {
+      hiss({ dur: 0.06, vol: 0.05, freq: 3600, to: 2200, q: 0.9, type: 'bandpass', send: 0.05 })
+      hiss({ dur: 0.1, vol: 0.035, freq: 700, to: 260, type: 'lowpass', delay: 0.025, send: 0.05 })
+    },
+    iceslide: () => { hiss({ dur: 0.22, vol: 0.045, freq: 5200, to: 6800, q: 4, send: 0.2 }); tone(1900, { dur: 0.12, vol: 0.006, bend: 1.15, send: 0.3 }) },
+    icecrack: () => {
+      hiss({ dur: 0.07, vol: 0.12, freq: 6500, to: 3000, type: 'highpass', send: 0.3 })
+      tone(2400, { type: 'square', dur: 0.09, vol: 0.018, bend: 0.3, send: 0.4 })
+      tone(1500, { type: 'triangle', dur: 0.18, vol: 0.02, bend: 0.5, delay: 0.05, send: 0.5 })
+      bell(3100, 0.03, 0.6, 0.04)
+    },
+    icicrack: () => { hiss({ dur: 0.06, vol: 0.1, freq: 7000, to: 3500, type: 'highpass', send: 0.3 }); tone(2900, { type: 'square', dur: 0.05, vol: 0.012, bend: 0.4, send: 0.3 }) },
+    iceshatter: () => { bell(3000, 0.03, 0.4); bell(3900, 0.022, 0.35, 0.05); hiss({ dur: 0.22, vol: 0.06, freq: 6500, to: 2500, type: 'highpass', send: 0.3 }) },
+    creak: () => {
+      tone(92, { type: 'sawtooth', dur: 0.7, vol: 0.028, bend: 1.5, send: 0.4 })
+      hiss({ dur: 0.7, vol: 0.04, freq: 300, to: 900, q: 3, send: 0.3 })
+      for (const d of [0.18, 0.34, 0.5]) hiss({ dur: 0.04, vol: 0.05, freq: 5200, to: 3000, type: 'highpass', delay: d, send: 0.2 })
+    },
+    hide: () => hiss({ dur: 0.28, vol: 0.035, freq: 2000, to: 900, q: 0.8 }),
+    ambush: () => { hiss({ dur: 0.14, vol: 0.14, freq: 3000, to: 600, q: 0.9 }); drum(110, 0.18); bell(1500, 0.05, 0.7, 0.04) },
+    gust: () => hiss({ dur: 1.7, vol: 0.085, freq: 300, to: 1400, q: 0.5, send: 0.5 }),
     ui: () => pluck(440, 0.06),
     ink: () => bell(1760, 0.05, 0.8),
   }
@@ -141,12 +162,26 @@
       rain.connect(filter); filter.connect(rainGain); rainGain.connect(master); rain.start()
     }
     rainGain.gain.setTargetAtTime(mood.rain * 0.05, now, 0.6)
+    if (!wind) {
+      wind = ac.createBufferSource(); wind.buffer = noise; wind.loop = true
+      windFilter = ac.createBiquadFilter(); windFilter.type = 'bandpass'; windFilter.frequency.value = 420; windFilter.Q.value = 0.7
+      windGain = ac.createGain(); windGain.gain.value = 0
+      wind.connect(windFilter); windFilter.connect(windGain); windGain.connect(master); wind.start()
+    }
+    const gale = mood.gale || 0, snow = mood.snow || 0
+    windGain.gain.setTargetAtTime(snow * 0.014 + gale * 0.06, now, 0.8)
+    windFilter.frequency.setTargetAtTime(380 + gale * 520 + Math.sin(now * 0.7) * 120 * (0.4 + gale), now, 0.4)
+    if (snow > 0.1 && now >= nextChime) {
+      bell(SCALE[2 + Math.floor(Math.random() * 6)] * 2, 0.012 + 0.01 * snow, 2.2)
+      nextChime = now + 5 + Math.random() * 8
+    }
   }
 
   function setEnabled(value) {
     enabled = value
     if (value && init() && ac.state === 'suspended') void ac.resume().catch(() => {})
     if (!value && rainGain) rainGain.gain.setTargetAtTime(0, ac.currentTime, 0.1)
+    if (!value && windGain) windGain.gain.setTargetAtTime(0, ac.currentTime, 0.1)
   }
 
   function resume() { if (enabled && ac?.state === 'suspended') void ac.resume().catch(() => {}) }

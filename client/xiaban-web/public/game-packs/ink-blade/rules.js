@@ -62,6 +62,8 @@
       lock: null, encounter: 0, wave: 0, waveDelay: 0,
       area: -1, promptsShown, nextId: 1, enemies: [], projectiles: [],
       bonus: null, victoryT: 0, events: [],
+      icicles: (world.icicles || []).map((spec, index) => ({ id: index, x: spec.x, top: spec.y, len: spec.len || 24, y: spec.y + (spec.len || 24), state: 'hang', vy: 0, hits: [], hitPlayer: false })),
+      cracks: [], nextCrack: 0, wind: { phase: 'calm', dir: 0, power: 0, cycle: -1 },
       player: {
         x: level.start, y: GROUND, vx: 0, vy: 0, w: 13, h: 54, facing: 1,
         onGround: true, coyote: 0, airJumps: 1, airDash: 1,
@@ -70,6 +72,7 @@
         hp: diff.hp, maxHp: diff.hp, iframes: 0, hurt: 0, dead: false, deadT: 0,
         ink: 0, combo: 0, comboTimer: 0, maxCombo: 0, kills: 0, parries: 0, executions: 0,
         score: 0, damageTaken: 0, airTime: 0, airKills: 0, deflectKills: 0, bossExecutions: 0, strikes: 0,
+        icicleKills: 0, crackKills: 0, slideKills: 0, ambushes: 0, standT: 0, coverT: 0, hideT: 0, spottedT: 0, hidden: false,
       },
     }
     state.random = mulberry(state.seed)
@@ -126,9 +129,42 @@
     return [state.level.range[0] + 16, state.level.range[1] - 16]
   }
 
-  function onIceZone(state, x) {
-    const zones = state.world.iceZones || []
-    return zones.some(([x0, x1]) => x >= x0 && x <= x1)
+  const inZones = (zones, x) => Boolean(zones) && zones.some(([x0, x1]) => x >= x0 && x <= x1)
+  function onIceZone(state, x) { return inZones(state.world.iceZones, x) }
+  function onThinIce(state, x) { return inZones(state.world.thinIce, x) }
+  function inReeds(state, x) { return inZones(state.world.reeds, x) }
+
+  /** Gusts in 雪江卷: a calm spell, a one-second warning, then a push that alternates direction. Returns px/s at x. */
+  function updateWind(state) {
+    const wind = state.world.wind
+    if (!wind) return
+    const [calm, tele, blow] = wind.cycle
+    const total = calm + tele + blow
+    const cycle = Math.floor(state.clock / total)
+    const t = state.clock - cycle * total
+    const next = state.wind
+    const dir = cycle % 2 === 0 ? 1 : -1
+    let phase = 'calm', power = 0
+    if (t >= calm + tele) {
+      phase = 'blow'
+      const into = t - calm - tele
+      power = Math.min(1, into / 0.4, (blow - into) / 0.4)
+    } else if (t >= calm) {
+      phase = 'tele'
+      power = (t - calm) / tele * 0.35
+    }
+    if (phase !== next.phase) {
+      const inside = state.player.x >= wind.zone[0] && state.player.x <= wind.zone[1]
+      if (phase === 'tele' && inside) { emit(state, 'gust', { dir, phase }); prompt(state, 'gust') }
+      if (phase === 'calm' && next.phase === 'blow' && inside) emit(state, 'gustEnd', {})
+    }
+    state.wind = { phase, dir, power: Math.max(0, power), cycle }
+  }
+
+  function windSpeed(state, x) {
+    const wind = state.world.wind
+    if (!wind || state.wind.phase !== 'blow' || x < wind.zone[0] || x > wind.zone[1]) return 0
+    return state.wind.dir * wind.force * state.wind.power
   }
 
   // ---------------------------------------------------------------- player
@@ -139,7 +175,7 @@
     const current = player.action?.type === 'slash' ? player.action : null
     let stage = current ? (current.stage + 1) % STAGES.length : state.clock - player.slashEndClock < 0.3 ? player.nextStage : 0
     if (air && stage === 2) stage = 0
-    player.action = { type: 'slash', stage, t: 0, hits: [], air }
+    player.action = { type: 'slash', stage, t: 0, hits: [], air, ambush: player.hidden }
     player.slashStartClock = state.clock
     player.slashBuffer = 0
     if (air && player.vy > -80) player.vy = Math.min(player.vy, 40)
@@ -248,7 +284,7 @@
       const stage = STAGES[action.stage]
       const onIce = player.onGround && onIceZone(state, player.x)
       if (action.air) {
-        player.vx += (move * RUN - player.vx) * Math.min(1, dt * 4)
+        player.vx += (move * RUN + windSpeed(state, player.x) - player.vx) * Math.min(1, dt * 4)
       } else if (action.t < stage.a1) {
         player.vx = player.facing * stage.lunge * (1 - action.t / stage.a1 * 0.6)
       } else {
@@ -261,7 +297,7 @@
         player.nextStage = (action.stage + 1) % STAGES.length
       }
     } else if (player.hurt <= 0) {
-      const target = move * RUN
+      const target = move * RUN + windSpeed(state, player.x) * (player.onGround ? 0.55 : 1)
       const onIce = player.onGround && onIceZone(state, player.x)
       const accel = onIce ? 680 : (player.onGround ? 2600 : 1700)
       const delta = target - player.vx
@@ -306,7 +342,18 @@
       if (!enemy.alive || enemy.delay > 0 || enemy.state === 'spawn' || action.hits.includes(enemy.id)) continue
       if (!overlaps(box, enemyBox(enemy))) continue
       action.hits.push(enemy.id)
-      hitEnemy(state, enemy, stage.damage, action.stage === 2 ? 'heavy' : 'slash')
+      const unaware = action.ambush && enemy.type !== 'boss' && enemy.type !== 'angler' && (enemy.state === 'idle' || enemy.state === 'walk')
+      const before = enemy.hp
+      hitEnemy(state, enemy, stage.damage + (unaware ? 2 : 0), action.stage === 2 ? 'heavy' : 'slash')
+      if (unaware && !action.ambushed && enemy.hp < before) {
+        action.ambushed = true
+        player.ambushes += 1
+        addScore(state, 120)
+        emit(state, 'ambush', { x: enemy.x, y: enemy.y - enemy.h / 2 })
+      }
+    }
+    for (const ice of state.icicles) {
+      if (ice.state === 'hang' && overlaps(box, iceBox(ice))) dropIcicle(state, ice)
     }
     for (const shot of state.projectiles) {
       if (shot.owner !== 'enemy' || shot.dead || action.hits.includes('p' + shot.id)) continue
@@ -416,7 +463,7 @@
     const player = state.player
     if (!enemy.alive || enemy.state === 'spawn' || enemy.state === 'dying') return
     const fromFront = sign(player.x - enemy.x) === enemy.facing
-    if (enemy.type === 'shield' && enemy.state !== 'stagger' && fromFront && source !== 'strike') {
+    if (enemy.type === 'shield' && enemy.state !== 'stagger' && fromFront && source !== 'strike' && source !== 'icicle' && source !== 'crack') {
       state.hitstop = Math.max(state.hitstop, 0.05)
       if (source !== 'arrow') player.vx = -player.facing * 150
       emit(state, 'block', { x: enemy.x + enemy.facing * 18, y: enemy.y - 34 })
@@ -506,7 +553,12 @@
     enemy.state = 'dead'
     killScore(state, enemy)
     if (how === 'arrow') player.deflectKills += 1
-    else if (how !== 'strike' && !player.onGround) player.airKills += 1
+    else if (how === 'icicle') player.icicleKills += 1
+    else if (how === 'crack') player.crackKills += 1
+    else if (how !== 'strike') {
+      if (!player.onGround) player.airKills += 1
+      else if (onIceZone(state, player.x) && Math.abs(player.vx) >= 70) player.slideKills += 1
+    }
     emit(state, 'kill', { id: enemy.id, kind: enemy.type, x: enemy.x, y: enemy.y, facing: enemy.facing, how })
   }
 
@@ -545,9 +597,16 @@
     return count
   }
 
+  /** Cover from 芦丛 stops new attacks, so ranged and waiting enemies lose the player until they are spotted. */
+  function mayAttack(state) { return attackers(state) < state.diff.tokens && !state.player.hidden }
+
+  const WIND_MASS = { hammer: 0.15, spearman: 0.4, shield: 0.3 }
+
   function moveGround(state, enemy, dt) {
     const [min, max] = state.lock ? state.lock : [0, state.world.length]
-    enemy.x = clamp(enemy.x + enemy.vx * dt, min + enemy.w, max - enemy.w)
+    const braced = enemy.state === 'tele' || enemy.state === 'attack'
+    const push = braced || enemy.onPlatform ? 0 : windSpeed(state, enemy.x) * (WIND_MASS[enemy.type] ?? 0.5)
+    enemy.x = clamp(enemy.x + (enemy.vx + push) * dt, min + enemy.w, max - enemy.w)
     if (enemy.y < enemy.homeY || enemy.vy < 0) {
       enemy.vy = Math.min(900, enemy.vy + GRAVITY * dt)
       const previous = enemy.y
@@ -599,7 +658,7 @@
           enemy.state = 'idle'
           enemy.vx *= Math.pow(0.02, dt)
           if (distance < 34) enemy.vx = -enemy.facing * 60
-          if (enemy.cd <= 0 && facingPlayer && attackers(state) < state.diff.tokens) {
+          if (enemy.cd <= 0 && facingPlayer && mayAttack(state)) {
             telegraph(state, enemy, kind.tele)
             prompt(state, 'parry')
           }
@@ -663,7 +722,7 @@
         if (!enemy.onPlatform && Math.abs(dx) < 120 && enemy.hopCd <= 0 && enemy.y >= GROUND - 0.5) {
           enemy.state = 'hop'; enemy.vx = -enemy.facing * 290; enemy.vy = -440; enemy.hopCd = 2
           emit(state, 'hop', { id: enemy.id, x: enemy.x, y: enemy.y })
-        } else if (enemy.cd <= 0 && Math.abs(dx) < 640) {
+        } else if (enemy.cd <= 0 && Math.abs(dx) < 640 && !player.hidden) {
           telegraph(state, enemy, 0.8)
         }
         break
@@ -710,7 +769,7 @@
         const ay = player.y - 150 + Math.sin(state.clock * 2.3 + enemy.seed) * 18
         approach(ax, ay, 175, 3)
         enemy.facing = sign(player.x - enemy.x) || enemy.facing
-        if (!player.dead && enemy.cd <= 0 && attackers(state) < state.diff.tokens) telegraph(state, enemy, 0.48)
+        if (!player.dead && enemy.cd <= 0 && mayAttack(state)) telegraph(state, enemy, 0.48)
         break
       }
       case 'tele':
@@ -770,7 +829,7 @@
         } else {
           enemy.state = 'idle'
           enemy.vx *= Math.pow(0.02, dt)
-          if (enemy.cd <= 0 && attackers(state) < state.diff.tokens) {
+          if (enemy.cd <= 0 && mayAttack(state)) {
             enemy.facing = sign(dx) || enemy.facing
             const unblockable = state.random() < 0.6
             enemy.move = unblockable ? 'thrust' : 'sweep'
@@ -826,7 +885,7 @@
       case 'walk':
         if (!player.dead) enemy.facing = sign(dx) || enemy.facing
         if (player.dead) { enemy.vx *= 0.8; break }
-        if (distance > 135 && distance < 220 && enemy.cd <= 0 && state.random() < 0.45 && attackers(state) < state.diff.tokens) {
+        if (distance > 135 && distance < 220 && enemy.cd <= 0 && state.random() < 0.45 && mayAttack(state)) {
           shootDart(state, enemy)
           enemy.cd = 1.6 / state.diff.aggression
           enemy.vx = -enemy.facing * 180
@@ -838,7 +897,7 @@
         } else {
           enemy.state = 'idle'
           enemy.vx *= Math.pow(0.02, dt)
-          if (enemy.cd <= 0 && attackers(state) < state.diff.tokens) {
+          if (enemy.cd <= 0 && mayAttack(state)) {
             enemy.facing = sign(dx) || enemy.facing
             telegraph(state, enemy, 0.44)
           }
@@ -897,7 +956,7 @@
         } else {
           enemy.state = 'idle'
           enemy.vx *= Math.pow(0.02, dt)
-          if (enemy.cd <= 0 && attackers(state) < state.diff.tokens) {
+          if (enemy.cd <= 0 && mayAttack(state)) {
             enemy.facing = sign(dx) || enemy.facing
             const isSlam = state.random() < 0.5
             enemy.move = isSlam ? 'slam' : 'swing'
@@ -1370,6 +1429,7 @@
       if (shot.dead) continue
       shot.life -= dt
       shot.x += shot.vx * dt
+      if (shot.owner === 'enemy' && (shot.type === 'arrow' || shot.type === 'dart')) shot.x += windSpeed(state, shot.x) * 0.5 * dt
       if (shot.type === 'arrow') { shot.vy += ARROW_GRAVITY * dt; shot.y += shot.vy * dt }
       if (shot.life <= 0 || shot.y > GROUND + 4 || shot.x < 0 || shot.x > state.world.length) {
         if (shot.type === 'arrow' && shot.y > GROUND - 4) emit(state, 'stick', { x: shot.x, y: GROUND, vx: shot.vx, vy: shot.vy })
@@ -1397,6 +1457,9 @@
           }
         }
       } else {
+        for (const ice of state.icicles) {
+          if (ice.state === 'hang' && overlaps({ x0: shot.x - 8, x1: shot.x + 8, y0: shot.y - 6, y1: shot.y + 6 }, iceBox(ice))) dropIcicle(state, ice)
+        }
         for (const enemy of state.enemies) {
           if (!enemy.alive || enemy.delay > 0 || enemy.state === 'spawn') continue
           if (overlaps({ x0: shot.x - 8, x1: shot.x + 8, y0: shot.y - 6, y1: shot.y + 6 }, enemyBox(enemy))) {
@@ -1422,9 +1485,97 @@
         if (!enemy.alive || enemy.delay > 0 || enemy.state === 'spawn' || Math.abs(enemy.x - player.x) > 470) continue
         hitEnemy(state, enemy, 4, 'strike')
       }
+      for (const ice of state.icicles) if (ice.state === 'hang' && Math.abs(ice.x - player.x) <= 470) dropIcicle(state, ice)
       emit(state, 'strikeHit', { x: player.x, y: player.y })
     }
     if (strike.t >= 1.15) state.strike = null
+  }
+
+  // ------------------------------------------------------------ terrain: icicles, thin ice, reeds
+
+  function iceBox(ice) { return { x0: ice.x - 9, x1: ice.x + 9, y0: ice.top, y1: ice.y } }
+
+  function dropIcicle(state, ice) {
+    if (ice.state !== 'hang') return
+    ice.state = 'fall'
+    emit(state, 'icicleFall', { x: ice.x, y: ice.y, id: ice.id })
+  }
+
+  function updateIcicles(state, dt) {
+    const player = state.player
+    for (const ice of state.icicles) {
+      if (ice.state !== 'fall') continue
+      ice.vy = Math.min(900, ice.vy + GRAVITY * dt)
+      ice.y += ice.vy * dt
+      const box = { x0: ice.x - 16, x1: ice.x + 16, y0: ice.y - 30, y1: ice.y + 6 }
+      for (const enemy of state.enemies) {
+        if (!enemy.alive || enemy.delay > 0 || enemy.state === 'spawn' || enemy.state === 'dying' || ice.hits.includes(enemy.id)) continue
+        if (!overlaps(box, enemyBox(enemy))) continue
+        ice.hits.push(enemy.id)
+        hitEnemy(state, enemy, 3, 'icicle')
+        emit(state, 'iceHit', { x: ice.x, y: enemy.y - enemy.h / 2 })
+      }
+      if (!ice.hitPlayer && !player.dead && overlaps(box, playerBox(player))) {
+        ice.hitPlayer = true
+        if (player.iframes <= 0 && !state.strike) hurtPlayer(state, 1, ice.x)
+      }
+      if (ice.y >= GROUND) {
+        ice.state = 'gone'
+        emit(state, 'iceShatter', { x: ice.x, y: GROUND })
+      }
+    }
+  }
+
+  const CRACK_WIDTH = 230, CRACK_STAND = 1.0, CRACK_TELE = 0.8, CRACK_OPEN = 3
+
+  /** Standing still on 薄冰 cracks it open under the player; a rooted enemy beside you falls in with you. */
+  function updateThinIce(state, dt) {
+    const player = state.player
+    const grounded = !player.dead && player.onGround && player.y >= GROUND - 1
+    const standing = grounded && onThinIce(state, player.x) && Math.abs(player.vx) < 90 && !state.strike
+    player.standT = standing ? player.standT + dt : Math.max(0, player.standT - dt * 2)
+    if (player.standT >= CRACK_STAND && state.clock >= state.nextCrack && !state.cracks.some((crack) => crack.state === 'tele')) {
+      player.standT = 0
+      const tele = CRACK_TELE * state.diff.tele
+      state.nextCrack = state.clock + tele + 1.2
+      state.cracks.push({ id: state.nextId++, x: player.x, w: CRACK_WIDTH, state: 'tele', t: 0, tele })
+      emit(state, 'crackTell', { x: player.x, w: CRACK_WIDTH, tele })
+      prompt(state, 'crack')
+    }
+    for (const crack of state.cracks) {
+      crack.t += dt
+      if (crack.state === 'tele' && crack.t >= crack.tele) {
+        crack.state = 'open'; crack.t = 0
+        emit(state, 'crackBurst', { x: crack.x, w: crack.w })
+        const half = crack.w / 2
+        if (grounded && Math.abs(player.x - crack.x) <= half && player.iframes <= 0 && !state.strike) hurtPlayer(state, 1, crack.x)
+        for (const enemy of state.enemies) {
+          if (!enemy.alive || enemy.delay > 0 || enemy.state === 'spawn' || enemy.state === 'dying') continue
+          if (enemy.type === 'crow' || enemy.type === 'boss' || enemy.type === 'angler' || enemy.y < GROUND - 4 || Math.abs(enemy.x - crack.x) > half) continue
+          hitEnemy(state, enemy, 4, 'crack')
+          if (enemy.alive) {
+            enemy.state = 'stagger'; enemy.openedAt = state.clock; enemy.t = 1.4; enemy.vx = 0
+            emit(state, 'stagger', { id: enemy.id, x: enemy.x, y: enemy.y - enemy.h })
+          }
+        }
+      } else if (crack.state === 'open' && crack.t >= CRACK_OPEN) crack.state = 'gone'
+    }
+    state.cracks = state.cracks.filter((crack) => crack.state !== 'gone')
+  }
+
+  /** Crouching still in 芦丛 for a moment hides the player; an enemy at arm's length, or too long a stay, gives it away. */
+  function updateCover(state, dt) {
+    const player = state.player
+    const spotted = state.enemies.some((enemy) => enemy.alive && enemy.delay <= 0 && enemy.state !== 'spawn' && enemy.type !== 'crow' && Math.abs(enemy.x - player.x) < 48 && Math.abs(enemy.y - player.y) < 40)
+    const eligible = !player.dead && player.onGround && inReeds(state, player.x) && !player.action && player.hurt <= 0 && Math.abs(player.vx) < 70 && !spotted && player.spottedT <= 0
+    player.spottedT = Math.max(0, player.spottedT - dt)
+    player.coverT = eligible ? Math.min(0.6, player.coverT + dt) : 0
+    const hidden = player.coverT >= 0.35
+    player.hideT = hidden ? player.hideT + dt : 0
+    if (hidden && player.hideT > 4) { player.spottedT = 1.5; player.hideT = 0; player.coverT = 0 }
+    const now = player.coverT >= 0.35
+    if (now !== player.hidden) emit(state, now ? 'hide' : 'reveal', { x: player.x, y: player.y })
+    player.hidden = now
   }
 
   function updateEncounters(state, dt) {
@@ -1482,7 +1633,11 @@
   function updateFlags(state) {
     const player = state.player
     const areas = state.world.areas
-    for (const entry of state.world.prompts) if (player.x >= entry.x) prompt(state, entry.key)
+    const [from, to] = state.level.range
+    for (const entry of state.world.prompts) {
+      if (entry.local && (entry.x < from - 150 || entry.x > to)) continue
+      if (player.x >= entry.x) prompt(state, entry.key)
+    }
     let area = state.area
     while (area + 1 < areas.length && player.x >= areas[area + 1].x) area += 1
     if (area !== state.area) { state.area = area; emit(state, 'area', { index: area, name: areas[area].name, sub: areas[area].sub }) }
@@ -1528,9 +1683,13 @@
       updateStrike(state, dt)
       return state.events
     }
+    updateWind(state)
+    updateCover(state, sdt)
     updatePlayer(state, input, sdt)
     updateEnemies(state, sdt)
     updateProjectiles(state, sdt)
+    updateIcicles(state, sdt)
+    updateThinIce(state, sdt)
     state.enemies = state.enemies.filter((enemy) => enemy.alive || enemy.state === 'dying')
     updateEncounters(state, dt)
     updateFlags(state)
@@ -1550,6 +1709,6 @@
 
   globalThis.XiabanInkBlade = {
     GROUND, GRAVITY, STAGES, ENEMY, DIFFICULTIES,
-    createGame, step, result, evaluate, challenge, spawnEnemy, slashBox, enemyBox, overlaps,
+    createGame, step, result, evaluate, challenge, spawnEnemy, slashBox, enemyBox, overlaps, windSpeed,
   }
 })()

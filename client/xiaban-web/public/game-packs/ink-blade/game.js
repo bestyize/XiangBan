@@ -43,7 +43,7 @@
   let assets = null, assetKey = '', rebuildTimer = 0, quality = 1, frameCost = 0, frameSamples = 0
   let hostReady = false, roundStarted = false, roundPosted = false, resultPosted = false
   let lastFrame = 0, accumulator = 0, clock = 0, lastProgress = 0, leaving = false, wasFullscreen = false
-  let toastTimer = 0, promptTimer = 0, dashImage = 0, phantomImage = 0
+  let toastTimer = 0, promptTimer = 0, dashImage = 0, phantomImage = 0, footClock = 0, coverMix = 0
   const shown = new Set()
   const camera = { x: 400 }
   const fx = FX.create()
@@ -321,6 +321,12 @@
     execute: ['敌人失衡，此刻出剑即可处决', '敌人失衡，此刻按 J 即可处决'],
     broken: ['无常架势已破，速速出剑处决', '无常架势已破，速按 J 处决'],
     danger: ['「危」字为不可弹反之招，跳起或闪身躲开', '「危」字为不可弹反之招，跳起或闪身躲开'],
+    icicle: ['出剑斩向悬冰，冰凌坠落可砸倒下方的敌人', '出剑斩向悬冰，冰凌坠落可砸倒下方的敌人'],
+    thin: ['此处冰薄：在冰上久立不动，脚下便会开裂', '此处冰薄：在冰上久立不动，脚下便会开裂'],
+    crack: ['冰裂将至：跳起或闪身躲开，裂口里的敌人会一同落冰', '冰裂将至：跳起或闪身躲开，裂口里的敌人会一同落冰'],
+    ice: ['冰面无摩擦：提早收步，出剑也会顺势滑出去', '冰面无摩擦：提早收步，出剑也会顺势滑出去'],
+    reed: ['静立芦丛片刻即可隐身，射手失去目标；隐身时出剑为伏击', '静立芦丛片刻即可隐身，射手失去目标；隐身时出剑为伏击'],
+    gust: ['风起：行走与起跳会被风推着走，冲刺不受影响', '风起：行走与起跳会被风推着走，冲刺不受影响'],
   }
 
   function showPrompt(key) {
@@ -703,16 +709,16 @@
           break
         }
         case 'jump':
-          FX.puff(fx, e.x, e.y, e.double ? 6 : 4, { speed: 40, size: 5, alpha: 0.28 })
+          FX.puff(fx, e.x, e.y, e.double ? 6 : 4, { speed: 40, size: 5, alpha: 0.28, ...snowPuff() })
           if (e.double) { anim('p', p).flip = 1; FX.ring(fx, e.x, e.y - 6, 4, 24, 0.3, 'rgba(20,20,22,0.5)', 2) }
           audio.play('jump')
           break
         case 'land':
-          if (e.impact > 380) { FX.puff(fx, e.x, e.y, 6, { angle: Math.PI, spread: 0.9, speed: 70, size: 4, alpha: 0.3 }); FX.puff(fx, e.x, e.y, 6, { angle: 0, spread: 0.9, speed: 70, size: 4, alpha: 0.3 }) }
+          if (e.impact > 380) { FX.puff(fx, e.x, e.y, 6, { angle: Math.PI, spread: 0.9, speed: 70, size: 4, alpha: 0.3, ...snowPuff() }); FX.puff(fx, e.x, e.y, 6, { angle: 0, spread: 0.9, speed: 70, size: 4, alpha: 0.3, ...snowPuff() }) }
           audio.play('land')
           break
         case 'dash':
-          FX.puff(fx, e.x - e.facing * 8, e.y - 4, 8, { angle: e.facing > 0 ? Math.PI : 0, spread: 0.6, speed: 90, size: 5, alpha: 0.32 })
+          FX.puff(fx, e.x - e.facing * 8, e.y - 4, 8, { angle: e.facing > 0 ? Math.PI : 0, spread: 0.6, speed: 90, size: 5, alpha: 0.32, ...snowPuff() })
           dashImage = 0.21
           audio.play('dash')
           break
@@ -904,6 +910,7 @@
           audio.play('slam')
           break
         case 'wave':
+          if (isSnowVolume()) audio.play('icecrack')
           audio.play('wave')
           break
         case 'vanish':
@@ -917,6 +924,51 @@
           break
         case 'wave2':
           toast('又有墨影聚来', 1400)
+          break
+        case 'icicleFall':
+          FX.sparks(fx, e.x, e.y, 6, '#dfeaf8', { len: 8, speed: 170 })
+          FX.drops(fx, e.x, e.y - 6, 6, { speed: 90, size: 1.2, color: '#d6e4f4', stain: false })
+          audio.play('icicrack')
+          break
+        case 'iceHit':
+          FX.sparks(fx, e.x, e.y, 10, '#eef5fc', { len: 14, speed: 330 })
+          FX.drops(fx, e.x, e.y, 14, { speed: 300, size: 1.5, color: '#cfe0f2', stain: false })
+          FX.seal(fx, '坠', e.x, e.y - 26, 15)
+          FX.shake(fx, 3)
+          audio.play('hit')
+          break
+        case 'iceShatter':
+          FX.drops(fx, e.x, e.y - 3, 12, { speed: 240, size: 1.5, color: '#dce9f7', stain: false })
+          FX.puff(fx, e.x, e.y - 2, 4, { speed: 40, size: 4, alpha: 0.7, light: true, life: 0.4 })
+          audio.play('iceshatter')
+          break
+        case 'crackTell':
+          FX.shake(fx, 1.5)
+          audio.play('creak')
+          break
+        case 'crackBurst':
+          FX.shake(fx, 8)
+          FX.flash(fx, 0.1)
+          FX.ring(fx, e.x, rules.GROUND - 2, 8, e.w / 2, 0.38, 'rgba(236,244,252,0.9)', 3)
+          FX.drops(fx, e.x, rules.GROUND - 4, 34, { speed: 440, size: 1.7, color: '#dce9f7', stain: false, spread: 2.4 })
+          FX.sparks(fx, e.x, rules.GROUND - 6, 14, '#eef5fc', { len: 20, speed: 420 })
+          FX.puff(fx, e.x, rules.GROUND - 4, 12, { speed: 70, size: 8, alpha: 0.7, light: true, life: 0.9, w: e.w * 0.7 })
+          audio.play('icecrack')
+          break
+        case 'hide':
+          FX.puff(fx, e.x, e.y - 4, 6, { speed: 34, size: 5, alpha: 0.55, light: true, life: 0.5, w: 30 })
+          audio.play('hide')
+          break
+        case 'ambush':
+          FX.splat(fx, assets.splats, e.x, e.y, 70, { life: 0.6 })
+          FX.sparks(fx, e.x, e.y, 12, CINNABAR, { len: 22, speed: 380 })
+          FX.seal(fx, '袭', e.x, e.y - 34, 26, 1)
+          FX.shake(fx, 6)
+          audio.play('ambush')
+          break
+        case 'gust':
+          toast(e.dir > 0 ? '风起 · 自左向右 →' : '← 风起 · 自右向左', 1700)
+          audio.play('gust')
           break
         case 'over':
           resultDelay = e.reason === 'clear' ? 2.2 : 1.2
@@ -1019,8 +1071,22 @@
     ctx.restore()
   }
 
+  const isSnowVolume = () => (state.level ? state.level.volume : selectedVolume) === 2
+  const snowPuff = () => (isSnowVolume() ? { light: true, alpha: 0.75 } : {})
+
+  function footsteps(p, dt) {
+    if (dt <= 0 || !isSnowVolume() || p.dead || !p.onGround || Math.abs(p.vx) < 70) { footClock = Math.min(footClock, 0.06); return }
+    footClock -= dt * Math.min(1.7, Math.abs(p.vx) / 200 + 0.4)
+    if (footClock > 0) return
+    footClock = 0.3
+    const onIce = [...(state.world.iceZones || []), ...(state.world.thinIce || [])].some(([x0, x1]) => p.x >= x0 && p.x <= x1)
+    audio.play(onIce ? 'iceslide' : 'snowstep')
+    if (!onIce) FX.puff(fx, p.x - p.facing * 5, rules.GROUND - 1, 2, { speed: 36, size: 3, alpha: 0.7, light: true, angle: -Math.PI / 2 - p.facing * 0.7, spread: 1.1, life: 0.4 })
+  }
+
   function drawPlayer(dt) {
     const p = state.player
+    footsteps(p, dt)
     const a = anim('p', p)
     const pose = fig.updatePose('player', p, a, dt, clock, rules)
     const s = fig.skeleton(fig.KINDS.player, pose)
@@ -1033,7 +1099,7 @@
       FX.ghost(fx, (c, alpha) => fig.drawHumanoid(c, 'player', copy, x, y, facing, { alpha: alpha * 0.32, color: '#2a2a2e' }, clock), 0.24, 0)
     }
     const blink = p.iframes > 0 && p.hurt <= 0 && !p.action && Math.sin(clock * 40) > 0.3
-    const look = { halo: 0.28, alpha: blink ? 0.45 : 1, edge: state.strike ? CINNABAR : undefined }
+    const look = { halo: 0.28 * (1 - coverMix), alpha: (blink ? 0.45 : 1) * (1 - 0.5 * coverMix), edge: state.strike ? CINNABAR : undefined }
     fig.drawHumanoid(ctx, 'player', pose, p.x, p.y, p.facing, look, clock, 0, { scarf: a.scarf })
     const isWater = scene.WATER[0] < p.x && p.x < scene.WATER[1] && (state.level ? state.level.volume === 1 : selectedVolume === 1)
     const onIce = (state.world.iceZones || []).some(([x0, x1]) => p.x >= x0 && p.x <= x1)
@@ -1043,6 +1109,107 @@
       fig.drawHumanoid(ctx, 'player', pose, p.x, p.y, p.facing, { alpha: onIce ? 0.22 : 0.13, color: onIce ? '#1a2230' : '#2a3038', flash: true }, clock)
       ctx.restore()
       if (Math.abs(p.vx) > 60 && Math.random() < dt * 14) FX.drops(fx, p.x - p.facing * 6, rules.GROUND - 2, 2, { speed: 120, size: 1, stain: false, color: onIce ? '#e0ecf8' : '#3a4450' })
+    }
+  }
+
+  // ------------------------------------------------------------ terrain: icicles, cracks, cover
+
+  function drawIcicle(ice, topY) {
+    const s = assets.icicle
+    if (!s) return
+    ctx.save()
+    ctx.translate(ice.x, topY)
+    ctx.scale(0.8 + ice.len / 110, ice.len / 43)
+    ctx.drawImage(s.node, -s.ox, -s.oy, s.width, s.height)
+    ctx.restore()
+  }
+
+  function drawHangingIcicles() {
+    for (const ice of state.icicles) {
+      if (ice.state !== 'hang') continue
+      drawIcicle(ice, ice.top)
+      const phase = (clock * 0.45 + ice.id * 0.31) % 1
+      if (phase < 0.1) {
+        const q = Math.sin(phase / 0.1 * Math.PI)
+        ctx.save()
+        ctx.translate(ice.x - 1, ice.y - 6); ctx.globalAlpha = q
+        ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 1
+        ctx.beginPath(); ctx.moveTo(-4 * q, 0); ctx.lineTo(4 * q, 0); ctx.moveTo(0, -4 * q); ctx.lineTo(0, 4 * q); ctx.stroke()
+        ctx.restore()
+      }
+    }
+  }
+
+  function drawFallingIcicles() {
+    for (const ice of state.icicles) {
+      if (ice.state !== 'fall') continue
+      ctx.save()
+      ctx.globalAlpha = 0.35
+      ctx.strokeStyle = '#e8f1fb'; ctx.lineWidth = 3
+      ctx.beginPath(); ctx.moveTo(ice.x, ice.y - ice.len - 22); ctx.lineTo(ice.x, ice.y - ice.len); ctx.stroke()
+      ctx.restore()
+      drawIcicle(ice, ice.y - ice.len)
+    }
+  }
+
+  function drawCracks() {
+    const G = rules.GROUND
+    for (const crack of state.cracks) {
+      const half = crack.w / 2
+      ctx.save()
+      ctx.translate(crack.x, G)
+      ctx.lineCap = 'round'; ctx.lineJoin = 'round'
+      if (crack.state === 'tele') {
+        const q = Math.min(1, crack.t / crack.tele)
+        const pulse = 0.5 + 0.5 * Math.sin(clock * (14 + q * 20))
+        ctx.fillStyle = 'rgba(184,50,42,' + (0.1 + q * 0.2 + pulse * 0.05).toFixed(3) + ')'
+        ctx.beginPath(); ctx.ellipse(0, 7, half * (0.25 + 0.75 * q), 8, 0, 0, Math.PI * 2); ctx.fill()
+        for (let i = 0; i < 9; i++) {
+          const dir = i % 2 ? 1 : -1
+          const reach = half * (0.55 + 0.45 * art.hash(i, crack.id)) * q
+          const yEnd = 4 + 20 * art.hash(i + 11, crack.id)
+          const pts = [[0, 2]]
+          for (let k = 1; k <= 5; k++) {
+            const t = k / 5
+            pts.push([dir * reach * t + (art.hash(k + i * 7, crack.id) - 0.5) * 7, 2 + (yEnd - 2) * t + (art.hash(k + i * 5, crack.id + 3) - 0.5) * 5])
+          }
+          const draw = (style, width) => { ctx.strokeStyle = style; ctx.lineWidth = width; ctx.beginPath(); ctx.moveTo(pts[0][0], pts[0][1]); for (const p of pts) ctx.lineTo(p[0], p[1]); ctx.stroke() }
+          draw('rgba(18,26,44,0.78)', 1.9)
+          draw(i < 2 ? 'rgba(200,62,50,0.9)' : 'rgba(255,255,255,0.88)', 0.8)
+        }
+        if (q > 0.12) drawSeal('危', 0, -86 - pulse * 2, 16 + pulse)
+      } else if (crack.state === 'open') {
+        const fade = crack.t < 2.2 ? 1 : Math.max(0, 1 - (crack.t - 2.2) / 0.8)
+        ctx.globalAlpha = fade
+        const hole = ctx.createLinearGradient(0, 0, 0, 26)
+        hole.addColorStop(0, 'rgba(16,28,50,0.94)'); hole.addColorStop(1, 'rgba(44,66,98,0.62)')
+        ctx.fillStyle = hole
+        ctx.beginPath()
+        const n = 14
+        for (let i = 0; i <= n; i++) {
+          const t = i / n
+          ctx.lineTo(-half * 0.9 + half * 1.8 * t, 1 + (i % 2 ? 3.5 : 0.5) * art.hash(i, crack.id + 2))
+        }
+        for (let i = n; i >= 0; i--) {
+          const t = i / n
+          const sag = Math.sin(t * Math.PI) * 15 + 4
+          ctx.lineTo(-half * 0.9 + half * 1.8 * t, sag + (i % 2 ? 3 : -2) * art.hash(i + 7, crack.id))
+        }
+        ctx.closePath(); ctx.fill()
+        ctx.fillStyle = 'rgba(244,249,255,0.96)'
+        for (let i = 0; i < 9; i++) {
+          const t = (i + 0.5) / 9
+          const x0 = -half * 0.9 + half * 1.8 * t, w0 = 6 + art.hash(i, crack.id + 5) * 7
+          ctx.beginPath(); ctx.moveTo(x0 - w0 / 2, 0.5); ctx.lineTo(x0 + w0 / 2, 0.5); ctx.lineTo(x0 + (art.hash(i, crack.id + 6) - 0.5) * 5, 4 + art.hash(i + 2, crack.id) * 6); ctx.closePath(); ctx.fill()
+        }
+        for (let i = 0; i < 6; i++) {
+          const fx0 = (art.hash(i, crack.id + 9) - 0.5) * half * 1.5 + Math.sin(clock * 1.1 + i) * 3
+          ctx.fillStyle = 'rgba(236,244,252,0.9)'
+          ctx.beginPath(); ctx.ellipse(fx0, 10 + art.hash(i + 3, crack.id) * 7, 8 + art.hash(i + 5, crack.id) * 9, 2.4, 0, 0, Math.PI * 2); ctx.fill()
+        }
+        if (Math.random() < 0.18 * fade) FX.puff(fx, crack.x + (Math.random() - 0.5) * half, G + 2, 1, { speed: 18, size: 5, alpha: 0.4, light: true, life: 0.9 })
+      }
+      ctx.restore()
     }
   }
 
@@ -1131,6 +1298,12 @@
       sx: (Math.random() - 0.5) * amount * P, sy: (Math.random() - 0.5) * amount * P,
     }
     const env = scene.environment(camera.x, state.level ? state.level.volume : selectedVolume)
+    if (state.enemies.some((en) => en.type === 'angler' && en.alive && en.phase2)) env.blizzard = Math.max(env.blizzard || 0, 0.65)
+    const wind = state.world.wind
+    if (wind && camera.x >= wind.zone[0] - 200 && camera.x <= wind.zone[1] + 200) {
+      env.blizzard = Math.max(env.blizzard || 0, state.wind.power)
+      env.windDir = state.wind.dir
+    }
     const night = env.moon > 0.5
     if (night !== gameNode.classList.contains('night')) gameNode.classList.toggle('night', night)
     scene.updateWeather(weather, cam, env, dt, clock)
@@ -1141,18 +1314,28 @@
     scene.layer(ctx, cam, 1)
     ctx.lineCap = 'round'; ctx.lineJoin = 'round'
     FX.drawDecals(ctx, fx)
+    drawCracks()
+    drawHangingIcicles()
     drawBarrier()
     FX.drawGhosts(ctx, fx)
     const simDt = phase === 'playing' && !state.strike && state.hitstop <= 0 ? fxDt : 0
     for (const enemy of state.enemies) drawEnemy(enemy, simDt)
     drawProjectiles()
+    drawFallingIcicles()
     drawPlayer(phase === 'welcome' ? dt : simDt)
     FX.drawFront(ctx, fx, assets)
+    coverMix += ((state.player.hidden ? 1 : 0) - coverMix) * Math.min(1, dt * 9)
+    if (coverMix > 0.05) {
+      ctx.save(); ctx.globalAlpha = Math.min(0.9, coverMix)
+      drawSeal('隐', state.player.x, state.player.y - 88 + Math.sin(clock * 2) * 1.5, 13)
+      ctx.restore()
+    }
+    scene.drawCover(ctx, assets, cam, env, clock, coverMix)
     scene.drawForeground(ctx, assets, cam, env, clock)
     scene.drawWeather(ctx, assets, cam, weather, env)
     scene.drawPost(ctx, assets, cam, env, quality)
     FX.drawScreen(ctx, fx, cam)
-    audio.update({ combat: phase === 'playing' && Boolean(state.lock) && state.plan[state.encounter]?.id !== 'gate', boss: phase === 'playing' && inBossFight(), rain: env.rain })
+    audio.update({ combat: phase === 'playing' && Boolean(state.lock) && state.plan[state.encounter]?.id !== 'gate', boss: phase === 'playing' && inBossFight(), rain: env.rain, snow: env.snow, gale: weather.gale })
   }
 
   // ------------------------------------------------------------ HUD
