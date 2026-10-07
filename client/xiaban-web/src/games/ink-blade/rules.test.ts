@@ -283,6 +283,55 @@ describe('ink blade rules', () => {
     expect(state.bonus.hp).toBe(state.player.hp * 150)
   })
 
+  it('makes the player slide on ice zones in Volume 2', () => {
+    const groundState = rules.createGame({ level: '2-1', seed: 1 })
+    groundState.player.x = 520
+    run(groundState, 20, { move: 1 })
+    const groundSpeed = groundState.player.vx
+    run(groundState, 15, { move: 0 })
+    expect(groundState.player.vx).toBeLessThan(groundSpeed * 0.1)
+
+    const iceState = rules.createGame({ level: '2-3', seed: 1 })
+    iceState.player.x = 2500
+    run(iceState, 20, { move: 1 })
+    run(iceState, 15, { move: 0 })
+    expect(iceState.player.vx).toBeGreaterThan(groundState.player.vx * 5)
+  })
+
+  it('tests Volume 2 enemies: spearman thrust vs sweep', () => {
+    const s = rules.createGame({ level: '2-2', seed: 1 })
+    s.lock = [1000, 2000]; s.encounter = 99; s.player.x = 1400
+    const spear = place(s, 'spearman', 1480, { facing: -1 })
+    spear.state = 'tele'; spear.move = 'thrust'; spear.t = 0.01; spear.teleTotal = 0.5
+    rules.step(s, { slashPressed: true }, DT)
+    const thrustEvents = run(s, 10)
+    expect(thrustEvents.some((e) => e.type === 'hurt')).toBe(true)
+
+    s.player.iframes = 0; s.player.hurt = 0; s.player.hp = 5
+    spear.state = 'tele'; spear.move = 'sweep'; spear.t = 0.005; spear.teleTotal = 0.5
+    rules.step(s, { slashPressed: true }, DT)
+    const sweepEvents = run(s, 10)
+    expect(sweepEvents.some((e) => e.type === 'parry')).toBe(true)
+    expect(spear.state).toBe('stagger')
+  })
+
+  it('clears Volume 2 boss angler with scripted parries and executions', () => {
+    const s = rules.createGame({ level: '2-6', difficulty: 'easy', seed: 7 })
+    for (let i = 0; i < 60 * 200 && s.phase === 'playing'; i++) {
+      const p = s.player
+      const b = s.enemies.find((e: Any) => e.type === 'angler' && e.alive)
+      const move = b ? (Math.abs(b.x - p.x) > 60 ? Math.sign(b.x - p.x) : 0) : 1
+      rules.step(s, { move, slashPressed: Boolean(b) && i % 9 === 0, inkPressed: p.ink >= 100 }, DT)
+      p.hp = Math.max(p.hp, 1)
+    }
+    expect(s.phase).toBe('over')
+    expect(s.reason).toBe('clear')
+    const r = rules.result(s)
+    expect(r.level).toBe('2-6')
+    expect(r.cleared).toBe(true)
+    expect(r.kills).toBe(1)
+  })
+
   it('ends the round when the swordsman falls', () => {
     const state = arena()
     state.player.hp = 1

@@ -5,7 +5,7 @@
   const LV = globalThis.XiabanInkLevels
   const VERSION = 1
 
-  function empty() { return { v: VERSION, levels: {}, prompts: [], difficulty: 'normal' } }
+  function empty() { return { v: VERSION, volume: 1, levels: {}, prompts: [], difficulty: 'normal' } }
 
   const int = (value, max) => (Number.isInteger(value) && value >= 0 && value <= max ? value : 0)
   const bits = (mask) => (mask & 1) + ((mask >> 1) & 1) + ((mask >> 2) & 1)
@@ -15,6 +15,7 @@
     const save = empty()
     if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return save
     if (raw.difficulty === 'easy') save.difficulty = 'easy'
+    if (raw.volume === 2) save.volume = 2
     if (Array.isArray(raw.prompts)) {
       save.prompts = [...new Set(raw.prompts.filter((key) => typeof key === 'string' && /^[a-z]{1,16}$/.test(key)))].slice(0, 32)
     }
@@ -73,9 +74,15 @@
 
   function maxSeals(volume) { return LV.volumeLevels(volume).length * 3 }
 
+  function volumeUnlocked(save, volumeId) {
+    if (volumeId === 1) return true
+    if (volumeId === 2) return true
+    return false
+  }
+
   function rememberPrompt(save, key) {
     return save.prompts.includes(key) ? save : { ...save, prompts: [...save.prompts, key].slice(0, 32) }
   }
 
-  globalThis.XiabanInkProgress = { VERSION, empty, normalize, record, cleared, unlocked, next, sealCount, maxSeals, rememberPrompt, bits }
+  globalThis.XiabanInkProgress = { VERSION, empty, normalize, record, cleared, unlocked, next, sealCount, maxSeals, volumeUnlocked, rememberPrompt, bits }
 })()

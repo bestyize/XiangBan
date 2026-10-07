@@ -27,6 +27,10 @@
     archer: { hp: 2, w: 14, h: 52, score: 120 },
     crow: { hp: 1, w: 14, h: 12, score: 60 },
     boss: { hp: 36, w: 21, h: 72, score: 2000 },
+    ronin: { hp: 3, w: 15, h: 52, score: 180, speed: 130, reach: 85, tele: 0.44, active: 0.12, recover: 0.5, lunge: 360, damage: 1 },
+    spearman: { hp: 4, w: 16, h: 56, score: 220, speed: 78, reach: 130, tele: 0.52, active: 0.14, recover: 0.65, lunge: 280, damage: 1 },
+    hammer: { hp: 7, w: 22, h: 66, score: 320, speed: 52, reach: 105, tele: 0.68, active: 0.18, recover: 0.85, lunge: 190, damage: 1 },
+    angler: { hp: 48, w: 20, h: 68, score: 2500 },
   }
 
   function mulberry(seed) {
@@ -120,6 +124,11 @@
   function bounds(state) {
     if (state.lock) return state.lock
     return [state.level.range[0] + 16, state.level.range[1] - 16]
+  }
+
+  function onIceZone(state, x) {
+    const zones = state.world.iceZones || []
+    return zones.some(([x0, x1]) => x >= x0 && x <= x1)
   }
 
   // ---------------------------------------------------------------- player
@@ -233,15 +242,17 @@
     if (action?.type === 'dash') {
       player.vx = player.facing * 640
       player.vy = 0
-      if (action.t >= action.dur) { player.action = null; player.vx = player.facing * RUN * 0.8 }
+      const onIce = player.onGround && onIceZone(state, player.x)
+      if (action.t >= action.dur) { player.action = null; player.vx = player.facing * RUN * (onIce ? 1.25 : 0.8) }
     } else if (action?.type === 'slash') {
       const stage = STAGES[action.stage]
+      const onIce = player.onGround && onIceZone(state, player.x)
       if (action.air) {
         player.vx += (move * RUN - player.vx) * Math.min(1, dt * 4)
       } else if (action.t < stage.a1) {
         player.vx = player.facing * stage.lunge * (1 - action.t / stage.a1 * 0.6)
       } else {
-        player.vx *= Math.pow(0.0005, dt)
+        player.vx *= Math.pow(onIce ? 0.08 : 0.0005, dt)
       }
       if (action.t >= stage.a0 && action.t <= stage.a1 + 0.02) slashHits(state, action)
       if (action.t >= stage.dur) {
@@ -251,7 +262,8 @@
       }
     } else if (player.hurt <= 0) {
       const target = move * RUN
-      const accel = player.onGround ? 2600 : 1700
+      const onIce = player.onGround && onIceZone(state, player.x)
+      const accel = onIce ? 680 : (player.onGround ? 2600 : 1700)
       const delta = target - player.vx
       player.vx += clamp(delta, -accel * dt, accel * dt)
       if (move) player.facing = sign(move)
@@ -312,9 +324,9 @@
     player.parries += 1
     addCombo(state)
     addScore(state, 50)
-    addInk(state, shot.type === 'wave' ? 12 : 16)
+    addInk(state, (shot.type === 'wave' || shot.type === 'iceWave') ? 12 : 16)
     state.hitstop = Math.max(state.hitstop, 0.06)
-    if (shot.type === 'wave') {
+    if (shot.type === 'wave' || shot.type === 'iceWave') {
       shot.dead = true
       emit(state, 'cut', { x: shot.x, y: GROUND - 20 })
       return
@@ -413,7 +425,7 @@
     const melee = source === 'slash' || source === 'heavy'
     // Only a swing begun after the opening can execute; the parrying swing itself never does.
     const fresh = melee && player.slashStartClock > (enemy.openedAt ?? Infinity)
-    if (enemy.type === 'boss') {
+    if (enemy.type === 'boss' || enemy.type === 'angler') {
       if (enemy.state === 'broken' && fresh) {
         enemy.hp -= 10
         enemy.posture = 0
@@ -514,8 +526,8 @@
       state: 'spawn', t: spec.type === 'boss' ? 0.9 : 0.75, cd: 0.4 + state.random() * 0.8, hopCd: 0, flash: 0,
       hitDone: false, side, seed: state.random() * 10, combo: null, move: null,
     }
-    if (spec.type === 'boss') {
-      enemy.hp = enemy.maxHp = state.diff.bossHp
+    if (spec.type === 'boss' || spec.type === 'angler') {
+      enemy.hp = enemy.maxHp = spec.type === 'angler' ? (state.difficulty === 'easy' ? 36 : 50) : state.diff.bossHp
       enemy.posture = 0; enemy.postureMax = 100; enemy.postureClock = 0; enemy.phase2 = false
       enemy.moves = 0
     }
@@ -528,7 +540,7 @@
   function attackers(state) {
     let count = 0
     for (const enemy of state.enemies) {
-      if (enemy.alive && enemy.type !== 'boss' && (enemy.state === 'tele' || enemy.state === 'attack' || enemy.state === 'dive')) count += 1
+      if (enemy.alive && enemy.type !== 'boss' && enemy.type !== 'angler' && (enemy.state === 'tele' || enemy.state === 'attack' || enemy.state === 'dive')) count += 1
     }
     return count
   }
@@ -730,6 +742,387 @@
     const [min, max] = state.lock ? state.lock : [0, state.world.length]
     enemy.x = clamp(enemy.x + enemy.vx * dt, min + 10, max - 10)
     enemy.y = clamp(enemy.y + enemy.vy * dt, 40, GROUND - 12)
+  }
+
+  function shootDart(state, enemy) {
+    const sx = enemy.x + enemy.facing * 16, sy = enemy.y - 28
+    const vx = enemy.facing * 520
+    state.projectiles.push({ id: state.nextId++, type: 'dart', owner: 'enemy', x: sx, y: sy, vx, vy: 0, life: 1.8, source: enemy.id, dead: false })
+    emit(state, 'dart', { id: enemy.id, x: sx, y: sy })
+  }
+
+  function spawnIceWave(state, boss, direction, speed, life = 1.2) {
+    state.projectiles.push({ id: state.nextId++, type: 'iceWave', owner: 'enemy', x: boss.x + direction * 28, y: GROUND, vx: direction * speed, vy: 0, life, source: boss.id, dead: false })
+  }
+
+  function updateSpearman(state, enemy, dt) {
+    const player = state.player
+    const dx = player.x - enemy.x
+    const distance = Math.abs(dx)
+    switch (enemy.state) {
+      case 'idle':
+      case 'walk':
+        if (!player.dead) enemy.facing = sign(dx) || enemy.facing
+        if (player.dead) { enemy.vx *= 0.8; break }
+        if (distance > 130 * 0.85) {
+          enemy.state = 'walk'
+          enemy.vx += (enemy.facing * 78 - enemy.vx) * Math.min(1, dt * 8)
+        } else {
+          enemy.state = 'idle'
+          enemy.vx *= Math.pow(0.02, dt)
+          if (enemy.cd <= 0 && attackers(state) < state.diff.tokens) {
+            enemy.facing = sign(dx) || enemy.facing
+            const unblockable = state.random() < 0.6
+            enemy.move = unblockable ? 'thrust' : 'sweep'
+            telegraph(state, enemy, unblockable ? 0.54 : 0.48, unblockable)
+          }
+        }
+        break
+      case 'tele':
+        enemy.vx *= Math.pow(0.001, dt)
+        if (enemy.t <= 0) {
+          enemy.state = 'attack'; enemy.t = 0.14; enemy.hitDone = false
+          enemy.vx = enemy.facing * (enemy.move === 'thrust' ? 280 : 180)
+          emit(state, 'enemySwing', { id: enemy.id, x: enemy.x, y: enemy.y, facing: enemy.facing, kind: enemy.type })
+        }
+        break
+      case 'attack':
+        if (!enemy.hitDone) {
+          const reach = enemy.move === 'thrust' ? 140 : 115
+          const reachBox = enemy.facing > 0
+            ? { x0: enemy.x, x1: enemy.x + reach, y0: enemy.y - enemy.h - 8, y1: enemy.y + 4 }
+            : { x0: enemy.x - reach, x1: enemy.x, y0: enemy.y - enemy.h - 8, y1: enemy.y + 4 }
+          if (overlaps(reachBox, playerBox(player))) {
+            enemy.hitDone = true
+            const outcome = enemyStrike(state, enemy, 1, enemy.move === 'thrust' ? 'unblockable' : 'melee')
+            if (outcome === 'parry') break
+          }
+        }
+        enemy.vx *= Math.pow(0.02, dt)
+        if (enemy.t <= 0) { enemy.state = 'recover'; enemy.t = 0.65 }
+        break
+      case 'recover':
+        enemy.vx *= Math.pow(0.01, dt)
+        if (enemy.t <= 0) { enemy.state = 'idle'; enemy.cd = (0.8 + state.random() * 1.0) / state.diff.aggression }
+        break
+      case 'hurt':
+        enemy.vx *= Math.pow(0.004, dt)
+        if (enemy.t <= 0) { enemy.state = 'idle'; enemy.cd = 0.4 }
+        break
+      case 'stagger':
+        enemy.vx *= Math.pow(0.01, dt)
+        if (enemy.t <= 0) { enemy.state = 'idle'; enemy.cd = 0.5 }
+        break
+    }
+    moveGround(state, enemy, dt)
+  }
+
+  function updateRonin(state, enemy, dt) {
+    const player = state.player
+    const dx = player.x - enemy.x
+    const distance = Math.abs(dx)
+    switch (enemy.state) {
+      case 'idle':
+      case 'walk':
+        if (!player.dead) enemy.facing = sign(dx) || enemy.facing
+        if (player.dead) { enemy.vx *= 0.8; break }
+        if (distance > 135 && distance < 220 && enemy.cd <= 0 && state.random() < 0.45 && attackers(state) < state.diff.tokens) {
+          shootDart(state, enemy)
+          enemy.cd = 1.6 / state.diff.aggression
+          enemy.vx = -enemy.facing * 180
+          break
+        }
+        if (distance > 85 * 0.85) {
+          enemy.state = 'walk'
+          enemy.vx += (enemy.facing * 130 - enemy.vx) * Math.min(1, dt * 8)
+        } else {
+          enemy.state = 'idle'
+          enemy.vx *= Math.pow(0.02, dt)
+          if (enemy.cd <= 0 && attackers(state) < state.diff.tokens) {
+            enemy.facing = sign(dx) || enemy.facing
+            telegraph(state, enemy, 0.44)
+          }
+        }
+        break
+      case 'tele':
+        enemy.vx *= Math.pow(0.001, dt)
+        if (enemy.t <= 0) {
+          enemy.state = 'attack'; enemy.t = 0.12; enemy.hitDone = false
+          enemy.vx = enemy.facing * 360
+          emit(state, 'enemySwing', { id: enemy.id, x: enemy.x, y: enemy.y, facing: enemy.facing, kind: enemy.type })
+        }
+        break
+      case 'attack':
+        if (!enemy.hitDone) {
+          const reachBox = enemy.facing > 0
+            ? { x0: enemy.x, x1: enemy.x + 85, y0: enemy.y - enemy.h - 8, y1: enemy.y + 4 }
+            : { x0: enemy.x - 85, x1: enemy.x, y0: enemy.y - enemy.h - 8, y1: enemy.y + 4 }
+          if (overlaps(reachBox, playerBox(player))) {
+            enemy.hitDone = true
+            const outcome = enemyStrike(state, enemy, 1)
+            if (outcome === 'parry') break
+          }
+        }
+        enemy.vx *= Math.pow(0.02, dt)
+        if (enemy.t <= 0) { enemy.state = 'recover'; enemy.t = 0.48 }
+        break
+      case 'recover':
+        enemy.vx *= Math.pow(0.01, dt)
+        if (enemy.t <= 0) { enemy.state = 'idle'; enemy.cd = (0.6 + state.random() * 0.9) / state.diff.aggression }
+        break
+      case 'hurt':
+        enemy.vx *= Math.pow(0.004, dt)
+        if (enemy.t <= 0) { enemy.state = 'idle'; enemy.cd = 0.35 }
+        break
+      case 'stagger':
+        enemy.vx *= Math.pow(0.01, dt)
+        if (enemy.t <= 0) { enemy.state = 'idle'; enemy.cd = 0.5 }
+        break
+    }
+    moveGround(state, enemy, dt)
+  }
+
+  function updateHammer(state, enemy, dt) {
+    const player = state.player
+    const dx = player.x - enemy.x
+    const distance = Math.abs(dx)
+    switch (enemy.state) {
+      case 'idle':
+      case 'walk':
+        if (!player.dead) enemy.facing = sign(dx) || enemy.facing
+        if (player.dead) { enemy.vx *= 0.8; break }
+        if (distance > 105 * 0.85) {
+          enemy.state = 'walk'
+          enemy.vx += (enemy.facing * 52 - enemy.vx) * Math.min(1, dt * 6)
+        } else {
+          enemy.state = 'idle'
+          enemy.vx *= Math.pow(0.02, dt)
+          if (enemy.cd <= 0 && attackers(state) < state.diff.tokens) {
+            enemy.facing = sign(dx) || enemy.facing
+            const isSlam = state.random() < 0.5
+            enemy.move = isSlam ? 'slam' : 'swing'
+            telegraph(state, enemy, isSlam ? 0.72 : 0.65, isSlam)
+          }
+        }
+        break
+      case 'tele':
+        enemy.vx *= Math.pow(0.001, dt)
+        if (enemy.t <= 0) {
+          enemy.state = 'attack'; enemy.t = 0.18; enemy.hitDone = false
+          enemy.vx = enemy.facing * (enemy.move === 'slam' ? 120 : 190)
+          emit(state, 'enemySwing', { id: enemy.id, x: enemy.x, y: enemy.y, facing: enemy.facing, kind: enemy.type })
+          if (enemy.move === 'slam') emit(state, 'slam', { id: enemy.id, x: enemy.x, y: GROUND })
+        }
+        break
+      case 'attack':
+        if (!enemy.hitDone) {
+          const reach = enemy.move === 'slam' ? 95 : 105
+          const reachBox = enemy.facing > 0
+            ? { x0: enemy.x, x1: enemy.x + reach, y0: GROUND - 48, y1: GROUND + 4 }
+            : { x0: enemy.x - reach, x1: enemy.x, y0: GROUND - 48, y1: GROUND + 4 }
+          if (overlaps(reachBox, playerBox(player))) {
+            enemy.hitDone = true
+            const outcome = enemyStrike(state, enemy, 1, enemy.move === 'slam' ? 'unblockable' : 'melee')
+            if (outcome === 'parry') break
+          }
+        }
+        enemy.vx *= Math.pow(0.02, dt)
+        if (enemy.t <= 0) { enemy.state = 'recover'; enemy.t = 0.85 }
+        break
+      case 'recover':
+        enemy.vx *= Math.pow(0.01, dt)
+        if (enemy.t <= 0) { enemy.state = 'idle'; enemy.cd = (0.9 + state.random() * 1.2) / state.diff.aggression }
+        break
+      case 'hurt':
+        enemy.vx *= Math.pow(0.004, dt)
+        if (enemy.t <= 0) { enemy.state = 'idle'; enemy.cd = 0.45 }
+        break
+      case 'stagger':
+        enemy.vx *= Math.pow(0.01, dt)
+        if (enemy.t <= 0) { enemy.state = 'idle'; enemy.cd = 0.5 }
+        break
+    }
+    moveGround(state, enemy, dt)
+  }
+
+  function chooseAnglerMove(state, boss) {
+    const player = state.player
+    const distance = Math.abs(player.x - boss.x)
+    const roll = state.random()
+    boss.moves += 1
+    if (boss.phase2 && boss.moves % 4 === 0) return startAnglerPhantom(state, boss)
+    if (distance > 220) {
+      if (roll < 0.42) return startAnglerIceSlam(state, boss)
+      if (roll < 0.78) return startAnglerHook(state, boss)
+      boss.state = 'walk'; boss.t = 1.1
+      return
+    }
+    if (roll < 0.6) return startAnglerCombo(state, boss)
+    if (roll < 0.82) return startAnglerIceSlam(state, boss)
+    boss.state = 'backstep'; boss.t = 0.35
+    boss.vx = -boss.facing * 390; boss.vy = -340
+  }
+
+  function startAnglerCombo(state, boss) {
+    boss.state = 'combo'
+    boss.combo = { i: 0, phase: 'tele' }
+    boss.t = (boss.phase2 ? 0.34 : 0.42) * state.diff.tele
+    boss.teleTotal = boss.t
+    emit(state, 'tell', { id: boss.id, x: boss.x, y: boss.y - boss.h, facing: boss.facing })
+  }
+
+  function startAnglerHook(state, boss) {
+    boss.state = 'hookTell'
+    boss.t = 0.55 * state.diff.tele
+    boss.teleTotal = boss.t
+    emit(state, 'danger', { id: boss.id, x: boss.x, y: boss.y - boss.h, facing: boss.facing })
+  }
+
+  function startAnglerIceSlam(state, boss) {
+    boss.state = 'slamTell'
+    boss.t = 0.54 * state.diff.tele
+    boss.teleTotal = boss.t
+    emit(state, 'tell', { id: boss.id, x: boss.x, y: boss.y - boss.h, facing: boss.facing })
+  }
+
+  function startAnglerPhantom(state, boss) {
+    const player = state.player
+    const [min, max] = state.lock
+    const middle = (min + max) / 2
+    emit(state, 'vanish', { id: boss.id, x: boss.x, y: boss.y - 36 })
+    boss.x = player.x < middle ? max - 60 : min + 60
+    boss.y = GROUND; boss.vy = 0; boss.vx = 0
+    boss.facing = sign(player.x - boss.x) || -1
+    emit(state, 'appear', { id: boss.id, x: boss.x, y: boss.y - 36 })
+    boss.state = 'phantomTell'
+    boss.t = 0.88 * state.diff.tele
+    boss.teleTotal = boss.t
+    emit(state, 'danger', { id: boss.id, x: boss.x, y: boss.y - boss.h, facing: boss.facing })
+  }
+
+  function updateAngler(state, boss, dt) {
+    const player = state.player
+    const dx = player.x - boss.x
+    const faster = boss.phase2 ? 0.82 : 1
+    if (boss.state !== 'broken' && state.clock - boss.postureClock > 2) boss.posture = Math.max(0, boss.posture - 7 * dt)
+    const facePlayer = () => { if (!player.dead) boss.facing = sign(dx) || boss.facing }
+    switch (boss.state) {
+      case 'intro':
+        boss.vx = 0
+        if (boss.t <= 0) { boss.state = 'idle'; boss.t = 0.4 }
+        break
+      case 'idle':
+        facePlayer()
+        boss.vx *= Math.pow(0.01, dt)
+        if (boss.t <= 0 && !player.dead) chooseAnglerMove(state, boss)
+        break
+      case 'walk':
+        facePlayer()
+        boss.vx += (boss.facing * 140 - boss.vx) * Math.min(1, dt * 6)
+        if (Math.abs(dx) < 120 || boss.t <= 0) startAnglerCombo(state, boss)
+        break
+      case 'backstep':
+        if (boss.t <= 0 && boss.y >= GROUND - 0.5) { boss.vx = 0; startAnglerIceSlam(state, boss) }
+        break
+      case 'combo': {
+        const combo = boss.combo
+        if (combo.phase === 'tele') {
+          boss.vx *= Math.pow(0.001, dt)
+          if (boss.t <= 0) {
+            combo.phase = 'active'; boss.t = 0.13; boss.hitDone = false
+            boss.vx = boss.facing * 260
+            emit(state, 'enemySwing', { id: boss.id, x: boss.x, y: boss.y, facing: boss.facing, kind: 'angler', step: combo.i })
+          }
+        } else if (combo.phase === 'active') {
+          if (!boss.hitDone && overlaps(bossReachBox(boss, 115), playerBox(player))) {
+            boss.hitDone = true
+            enemyStrike(state, boss, 1)
+            if (boss.state !== 'combo') break
+          }
+          boss.vx *= Math.pow(0.02, dt)
+          if (boss.t <= 0) {
+            combo.i += 1
+            const maxSteps = boss.phase2 ? 3 : 2
+            if (combo.i >= maxSteps) { boss.state = 'recover'; boss.t = 0.75; boss.combo = null }
+            else {
+              combo.phase = 'tele'; facePlayer()
+              boss.t = (combo.i === 2 ? 0.44 : 0.32) * faster * state.diff.tele
+              boss.teleTotal = boss.t
+              emit(state, 'tell', { id: boss.id, x: boss.x, y: boss.y - boss.h, facing: boss.facing })
+            }
+          }
+        }
+        break
+      }
+      case 'hookTell':
+        boss.vx = 0
+        if (boss.t <= 0) {
+          facePlayer()
+          boss.state = 'hook'; boss.t = 0.14
+          state.projectiles.push({ id: state.nextId++, type: 'hook', owner: 'enemy', x: boss.x + boss.facing * 24, y: boss.y - 30, vx: boss.facing * 750, vy: 0, life: 0.6, source: boss.id, dead: false })
+          emit(state, 'hook', { id: boss.id, x: boss.x, y: boss.y - 30 })
+        }
+        break
+      case 'hook':
+        boss.vx *= Math.pow(0.02, dt)
+        if (boss.t <= 0) { boss.state = 'recover'; boss.t = 0.7 }
+        break
+      case 'slamTell':
+        boss.vx = 0
+        if (boss.t <= 0) {
+          boss.state = 'slam'; boss.t = 0.15
+          emit(state, 'slam', { id: boss.id, x: boss.x, y: GROUND })
+          spawnIceWave(state, boss, -1, 380, 1.2)
+          spawnIceWave(state, boss, 1, 380, 1.2)
+        }
+        break
+      case 'slam':
+        boss.vx = 0
+        if (boss.t <= 0) { boss.state = 'recover'; boss.t = 0.8 }
+        break
+      case 'phantomTell':
+        boss.vx = 0
+        if (boss.t <= 0) {
+          boss.state = 'phantom'; boss.hitDone = false; boss.t = 1.1
+          boss.vx = boss.facing * 1100
+          emit(state, 'phantom', { id: boss.id, x: boss.x, y: boss.y, facing: boss.facing })
+        }
+        break
+      case 'phantom': {
+        const [min, max] = state.lock
+        if (!boss.hitDone && overlaps({ x0: boss.x - 24, x1: boss.x + 24, y0: GROUND - 58, y1: GROUND }, playerBox(player))) {
+          boss.hitDone = true
+          enemyStrike(state, boss, 1, 'unblockable')
+        }
+        if ((boss.facing > 0 && boss.x >= max - 62) || (boss.facing < 0 && boss.x <= min + 62) || boss.t <= 0) {
+          boss.vx = 0; boss.state = 'recover'; boss.t = 0.85
+        }
+        break
+      }
+      case 'roar':
+        boss.vx = 0
+        if (Math.abs(dx) < 150 && !player.dead && boss.t > 1.1) { player.vx = sign(dx) * 360; player.vy = Math.min(player.vy, -200); player.onGround = false }
+        if (boss.t <= 0) { boss.state = 'idle'; boss.t = 0.3 }
+        break
+      case 'broken':
+        boss.vx = 0
+        if (boss.t <= 0) { boss.state = 'recover'; boss.t = 0.3; boss.posture = 40 }
+        break
+      case 'recover':
+        boss.vx *= Math.pow(0.01, dt)
+        if (boss.t <= 0) { boss.state = 'idle'; boss.t = (0.42 + state.random() * 0.4) * (boss.phase2 ? 0.78 : 1) / state.diff.aggression }
+        break
+      case 'dying':
+        boss.vx = 0
+        break
+    }
+    const [min, max] = state.lock || [0, state.world.length]
+    boss.x = clamp(boss.x + boss.vx * dt, min + boss.w, max - boss.w)
+    if (boss.y < GROUND || boss.vy < 0) {
+      boss.vy = Math.min(1100, boss.vy + GRAVITY * dt)
+      boss.y = Math.min(GROUND, boss.y + boss.vy * dt)
+      if (boss.y >= GROUND) boss.vy = 0
+    }
   }
 
   // ------------------------------------------------------------------ boss
@@ -944,7 +1337,7 @@
       enemy.flash = Math.max(0, enemy.flash - dt)
       if (enemy.state === 'spawn') {
         if (enemy.t <= 0) {
-          if (enemy.type === 'boss') { enemy.state = 'intro'; enemy.t = 2.2; emit(state, 'bossIntro', { id: enemy.id, x: enemy.x, y: enemy.y }) }
+          if (enemy.type === 'boss' || enemy.type === 'angler') { enemy.state = 'intro'; enemy.t = 2.2; emit(state, 'bossIntro', { id: enemy.id, kind: enemy.type, x: enemy.x, y: enemy.y }) }
           else enemy.state = 'idle'
         }
         continue
@@ -955,7 +1348,16 @@
           continue
         }
         updateBoss(state, enemy, dt)
-      } else if (enemy.type === 'crow') updateCrow(state, enemy, dt)
+      } else if (enemy.type === 'angler') {
+        if (enemy.state === 'dying') {
+          if (enemy.t <= 0) { enemy.alive = false; enemy.state = 'dead'; emit(state, 'kill', { id: enemy.id, kind: 'angler', x: enemy.x, y: enemy.y, facing: enemy.facing, how: 'boss' }) }
+          continue
+        }
+        updateAngler(state, enemy, dt)
+      } else if (enemy.type === 'spearman') updateSpearman(state, enemy, dt)
+      else if (enemy.type === 'ronin') updateRonin(state, enemy, dt)
+      else if (enemy.type === 'hammer') updateHammer(state, enemy, dt)
+      else if (enemy.type === 'crow') updateCrow(state, enemy, dt)
       else if (enemy.type === 'archer') updateArcher(state, enemy, dt)
       else if (enemy.type === 'dummy') updateDummy(state, enemy)
       else updateMelee(state, enemy, dt)
@@ -975,14 +1377,21 @@
         continue
       }
       if (shot.owner === 'enemy') {
-        const box = shot.type === 'wave'
-          ? { x0: shot.x - 16, x1: shot.x + 16, y0: GROUND - 34, y1: GROUND }
-          : { x0: shot.x - 6, x1: shot.x + 6, y0: shot.y - 4, y1: shot.y + 4 }
+        const box = (shot.type === 'wave' || shot.type === 'iceWave')
+          ? { x0: shot.x - 18, x1: shot.x + 18, y0: GROUND - 36, y1: GROUND }
+          : { x0: shot.x - 8, x1: shot.x + 8, y0: shot.y - 6, y1: shot.y + 6 }
         if (!player.dead && overlaps(box, playerBox(player))) {
           const action = player.action
           const facing = sign(-shot.vx) === player.facing
-          if (action?.type === 'slash' && facing && state.clock - player.slashStartClock <= state.diff.parry) deflect(state, shot)
-          else if (player.iframes <= 0 && !state.strike) {
+          if (shot.type === 'hook') {
+            if (player.iframes <= 0 && !state.strike) {
+              shot.dead = true
+              hurtPlayer(state, 1, shot.x)
+              player.vx = -player.facing * 340
+            }
+          } else if (action?.type === 'slash' && facing && state.clock - player.slashStartClock <= state.diff.parry) {
+            deflect(state, shot)
+          } else if (player.iframes <= 0 && !state.strike) {
             shot.dead = true
             hurtPlayer(state, 1, shot.x - shot.vx)
           }

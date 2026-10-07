@@ -278,6 +278,20 @@
         }
       }
       if (o.pavilions) for (const px of o.pavilions) if (px > a - 40 && px < b + 40) pavilion(g, px, ridge(px) + 2, o.pavilionScale || 1, o.color, Math.min(1, o.alpha * 1.6))
+      if (o.snow) {
+        g.fillStyle = 'rgba(252,252,255,' + o.snow + ')'
+        for (let i = 0; i < ys.length; i += 2) {
+          const x = a + i
+          const sn = n(x / 16 + 23)
+          if (sn > 0.35) {
+            const h = (sn - 0.35) * 14 * (1 + n2(x / 8))
+            g.beginPath()
+            g.moveTo(x - 2, ys[i] + 0.5)
+            g.quadraticCurveTo(x + 1, ys[i] - h, x + 3.5, ys[i] + 0.5)
+            g.fill()
+          }
+        }
+      }
       // Fade the base into the mist below.
       g.globalCompositeOperation = 'destination-out'
       const mist = g.createLinearGradient(0, bottom - o.fadeH, 0, bottom)
@@ -412,6 +426,111 @@
         }
       }
       dryBrush(g, (t) => [t * o.period, o.line + 0.5, 0, 1], 2.5, 5, [40, 48, 58], 0.5, o.seed + 1, 200)
+    })
+  }
+
+  // Snow-covered ground with trampled tracks and crisp white snow surface.
+  function snowGround(o) {
+    const n = noise(o.seed, 64)
+    const lineY = (x) => o.line + (n((x / o.period) * 64) - 0.5) * 4
+    return strip(o.period, o.line - 20, o.depth + 20, o.res, (g, u0, u1) => {
+      const wash = g.createLinearGradient(0, o.line, 0, o.line + o.depth)
+      wash.addColorStop(0, 'rgba(40,42,50,0.22)')
+      wash.addColorStop(0.35, 'rgba(40,42,50,0.08)')
+      wash.addColorStop(1, 'rgba(40,42,50,0.02)')
+      g.fillStyle = wash
+      g.beginPath(); g.moveTo(u0 - 2, o.line + o.depth)
+      for (let x = u0 - 2; x <= u1 + 2; x += 2) g.lineTo(x, lineY(x))
+      g.lineTo(u1 + 2, o.line + o.depth); g.closePath(); g.fill()
+
+      g.fillStyle = 'rgba(250,250,255,0.92)'
+      g.beginPath(); g.moveTo(u0 - 2, lineY(u0 - 2))
+      for (let x = u0 - 2; x <= u1 + 2; x += 2) g.lineTo(x, lineY(x))
+      for (let x = u1 + 2; x >= u0 - 2; x -= 4) g.lineTo(x, lineY(x) + 4 + Math.sin(x * 0.1) * 2)
+      g.closePath(); g.fill()
+
+      for (const shift of [-o.period, 0, o.period]) {
+        dryBrush(g, (t) => {
+          const x = shift + t * o.period
+          return [x, lineY(x) + 3.5, 0, 1]
+        }, 3, 6, [30, 32, 38], 0.75, o.seed + 5, 200)
+        for (let i = 0; i < o.period / 24; i++) {
+          const px = shift + (i * 27 + 13) % o.period
+          if (px < u0 - 10 || px > u1 + 10) continue
+          const py = lineY(px) + 2
+          g.fillStyle = 'rgba(50,55,65,0.18)'
+          g.beginPath(); g.ellipse(px, py, 3.5, 1.4, 0.1, 0, Math.PI * 2); g.fill()
+        }
+      }
+    })
+  }
+
+  // Smooth frozen ice lake with crystal reflection and hairline fractures.
+  function iceSurface(o) {
+    const random = rng(o.seed)
+    return strip(o.period, o.line - 6, o.depth + 6, o.res, (g) => {
+      const wash = g.createLinearGradient(0, o.line, 0, o.line + o.depth)
+      wash.addColorStop(0, 'rgba(215,228,245,0.55)')
+      wash.addColorStop(0.2, 'rgba(195,212,235,0.35)')
+      wash.addColorStop(1, 'rgba(160,180,210,0.08)')
+      g.fillStyle = wash; g.fillRect(0, o.line, o.period, o.depth)
+
+      g.fillStyle = 'rgba(255,255,255,0.65)'
+      g.fillRect(0, o.line, o.period, 2)
+
+      g.strokeStyle = 'rgba(255,255,255,0.55)'; g.lineWidth = 0.8
+      for (let i = 0; i < o.period / 45; i++) {
+        const x = random() * o.period, y = o.line + 2 + random() * (o.depth - 15)
+        const len = 15 + random() * 35, a = 0.3 + (random() - 0.5) * 0.8
+        for (const shift of [-o.period, 0, o.period]) {
+          g.beginPath()
+          g.moveTo(x + shift, y)
+          g.lineTo(x + shift + Math.cos(a) * len * 0.5, y + Math.sin(a) * len * 0.5 + 1)
+          g.lineTo(x + shift + Math.cos(a) * len, y + Math.sin(a) * len)
+          g.stroke()
+        }
+      }
+      dryBrush(g, (t) => [t * o.period, o.line + 1, 0, 1], 2, 4, [170, 195, 225], 0.7, o.seed + 2, 180)
+    })
+  }
+
+  // Winter reeds (枯芦 / 雪苇) swaying in wind.
+  function reeds(o) {
+    const random = rng(o.seed)
+    const period = o.period || 900
+    const clumps = []
+    for (let i = 0; i < o.count; i++) {
+      const x = random() * period
+      const h = (o.height || 70) * (0.75 + random() * 0.5)
+      const count = 3 + Math.floor(random() * 5)
+      const stalks = []
+      for (let k = 0; k < count; k++) {
+        stalks.push({
+          dx: (k - count / 2) * 3 + (random() - 0.5) * 2,
+          h: h * (0.8 + random() * 0.4),
+          lean: 0.18 + (random() - 0.5) * 0.15,
+          a: (o.alpha || 0.6) * (0.6 + random() * 0.4),
+        })
+      }
+      clumps.push({ x, stalks })
+    }
+    const top = o.top, bottom = o.bottom
+    return strip(period, top, bottom - top, o.res, (g, u0, u1) => {
+      for (const clump of clumps) for (const shift of [-period, 0, period]) {
+        const cx = clump.x + shift
+        if (cx + 50 < u0 || cx - 50 > u1) continue
+        for (const s of clump.stalks) {
+          const sx = cx + s.dx
+          const tx = sx + (bottom - (bottom - s.h)) * s.lean
+          const ty = bottom - s.h
+          g.strokeStyle = 'rgba(45,42,40,' + s.a + ')'; g.lineWidth = 1.1
+          g.beginPath(); g.moveTo(sx, bottom); g.quadraticCurveTo((sx + tx) / 2, (bottom + ty) / 2 + 5, tx, ty); g.stroke()
+          g.fillStyle = 'rgba(225,220,215,' + (s.a * 0.85) + ')'
+          g.beginPath()
+          g.ellipse(tx + 4, ty - 3, 11, 3.2, 0.45, 0, Math.PI * 2)
+          g.fill()
+        }
+      }
     })
   }
 
@@ -614,6 +733,62 @@
     }, 150, 328)
   }
 
+  function snowPine(res, seed) {
+    const random = rng(seed)
+    return sprite(420, 330, res, (g) => {
+      g.translate(-150, -328)
+      g.fillStyle = rgba(INK, 0.9)
+      const trunk = []
+      for (let i = 0; i <= 14; i++) {
+        const t = i / 14
+        trunk.push([150 + Math.sin(t * 3.2) * 34 + t * 60, 328 - t * 240])
+      }
+      ribbon(g, trunk, (t) => 22 * (1 - t * 0.7))
+      for (let i = 0; i < 40; i++) {
+        const t = 0.2 + random() * 0.75
+        const p = trunk[Math.floor(t * 14)]
+        g.fillStyle = rgba(PAPER, 0.25)
+        g.beginPath(); g.ellipse(p[0] + (random() - 0.5) * 8, p[1], 2 + random() * 3, 1, random(), 0, Math.PI * 2); g.fill()
+      }
+      const arms = [[0.45, -1, 150], [0.62, 1, 160], [0.8, -1, 120], [0.93, 1, 100], [0.98, -1, 70]]
+      for (const [t, side, len] of arms) {
+        const p = trunk[Math.round(t * 14)]
+        const end = [p[0] + side * len, p[1] - 22 - random() * 20]
+        g.fillStyle = rgba(INK, 0.9)
+        ribbon(g, [p, [(p[0] + end[0]) / 2, p[1] - 10], end], (u) => 8 * (1 - u * 0.7))
+        for (let k = 0; k < 4; k++) {
+          const cx = p[0] + side * len * (0.45 + k * 0.18), cy = p[1] - 26 - k * 4 - random() * 8
+          g.fillStyle = rgba(INK, 0.55 + random() * 0.3)
+          g.beginPath(); g.ellipse(cx, cy, 26 + random() * 10, 8 + random() * 4, (random() - 0.5) * 0.2, 0, Math.PI * 2); g.fill()
+          g.strokeStyle = rgba(INK, 0.6); g.lineWidth = 0.6
+          for (let m = 0; m < 22; m++) {
+            const a = -Math.PI + random() * Math.PI, r = 18 + random() * 14
+            g.beginPath(); g.moveTo(cx, cy + 2); g.lineTo(cx + Math.cos(a) * r, cy + Math.sin(a) * r * 0.5); g.stroke()
+          }
+          // Thick snow cushion on top of needles
+          g.fillStyle = 'rgba(252,252,255,0.92)'
+          g.beginPath(); g.ellipse(cx, cy - 3.5, 23 + random() * 8, 5.5 + random() * 2, (random() - 0.5) * 0.15, 0, Math.PI * 2); g.fill()
+        }
+      }
+    }, 150, 328)
+  }
+
+  function snowPier(res) {
+    return sprite(160, 90, res, (g) => {
+      g.translate(-80, -85)
+      g.fillStyle = 'rgba(210,225,240,0.3)'; g.fillRect(0, 85, 160, 5)
+      for (const [px, ph, pw] of [[30, 68, 12], [65, 54, 10], [100, 72, 13], [130, 48, 9]]) {
+        g.fillStyle = rgba(INK, 0.85); g.fillRect(px - pw / 2, 85 - ph, pw, ph)
+        g.fillStyle = 'rgba(252,252,255,0.95)'
+        g.beginPath(); g.ellipse(px, 85 - ph - 2, pw * 0.7, 4, 0, 0, Math.PI * 2); g.fill()
+        g.strokeStyle = 'rgba(220,210,195,0.5)'; g.lineWidth = 1.4
+        g.beginPath(); g.moveTo(px - pw / 2 - 1, 85 - ph + 16); g.lineTo(px + pw / 2 + 1, 85 - ph + 18); g.stroke()
+      }
+      g.fillStyle = rgba(INK, 0.78); g.fillRect(20, 48, 120, 8)
+      g.fillStyle = 'rgba(252,252,255,0.92)'; g.fillRect(22, 45, 116, 4)
+    }, 80, 85)
+  }
+
   function pillar(res, seed) {
     const random = rng(seed)
     return sprite(40, 120, res, (g) => {
@@ -760,9 +935,37 @@
     }, 34, 46)
   }
 
+  function iceSpikeSprite(res) {
+    return sprite(80, 54, res, (g) => {
+      g.fillStyle = 'rgba(225,238,252,0.92)'
+      g.beginPath()
+      g.moveTo(-36, 0); g.lineTo(-24, -36); g.lineTo(-12, -8)
+      g.lineTo(0, -48); g.lineTo(12, -18); g.lineTo(26, -38); g.lineTo(36, 0)
+      g.closePath(); g.fill()
+      g.fillStyle = rgba(INK, 0.75)
+      g.beginPath()
+      g.moveTo(-24, -36); g.lineTo(-12, -8); g.lineTo(0, -48); g.lineTo(4, 0); g.lineTo(-16, 0)
+      g.closePath(); g.fill()
+      g.strokeStyle = 'rgba(255,255,255,0.85)'; g.lineWidth = 1.2
+      g.beginPath(); g.moveTo(-24, -36); g.lineTo(-24, 0); g.moveTo(0, -48); g.lineTo(0, 0); g.moveTo(26, -38); g.lineTo(26, 0); g.stroke()
+    }, 40, 50)
+  }
+
+  function snowflakeSprite(size = 20) {
+    const node = canvas(size, size)
+    const g = node.getContext('2d')
+    const c = size / 2
+    g.fillStyle = 'rgba(255,255,255,0.92)'
+    g.beginPath(); g.arc(c, c, size * 0.28, 0, Math.PI * 2); g.fill()
+    g.fillStyle = 'rgba(235,242,255,0.45)'
+    g.beginPath(); g.arc(c, c, size * 0.46, 0, Math.PI * 2); g.fill()
+    return node
+  }
+
   globalThis.XiabanInkArt = {
     PAPER, INK, CINNABAR, rgba, rng, hash, noise, fbm, canvas, strip, drawStrip, paperGrain, vignette,
-    ribbon, dryBrush, leaf, leafCluster, mountains, bamboo, ground, water, sprite, drawSprite, rock, bridge,
-    gate, lantern, deadTree, pine, pillar, stele, shrine, splat, softDisc, sun, moon, mist, leafSprite, petalSprite, waveSprite, clamp, lerp,
+    ribbon, dryBrush, leaf, leafCluster, mountains, bamboo, ground, snowGround, iceSurface, reeds, water,
+    sprite, drawSprite, rock, bridge, gate, lantern, deadTree, pine, snowPine, snowPier, pillar, stele, shrine,
+    splat, softDisc, sun, moon, mist, leafSprite, petalSprite, waveSprite, iceSpikeSprite, snowflakeSprite, clamp, lerp,
   }
 })()
