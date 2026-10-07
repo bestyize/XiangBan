@@ -25,7 +25,9 @@ backend → api-contracts。接口库用 14 个业务包组织 52 个定义，�
 
 ## 构建与发布
 
-客户端独立 npm 锁文件，Rust 留在桌宠 src-tauri。根 Gradle 当前只包含 api-contracts 与 backend，规划 App 未接入。镜像、服务、数据卷和 URL 不因物理路径迁移更名。
+客户端独立 npm 锁文件，Rust 留在桌宠 src-tauri。根 Gradle 当前只包含 api-contracts 与 backend，规划 App 未接入。
+
+services/server-pan 是独立的网盘服务：backend 为 Cargo 工程，frontend 为独立 npm 工程，构建产物由后端单端口托管。它自带账号、JWT 与 SQLite，不依赖 api-contracts，也不接入主 API 的鉴权与数据库；运行时数据目录 pandown_data 不入库。目前没有 Docker、Compose 与 CI 配置，接入部署时再补充。镜像、服务、数据卷和 URL 不因物理路径迁移更名。
 
 Docker、手动部署工作流和桌宠 CI 使用新路径。桌宠 CI 只安装桌宠依赖，网页改动不触发桌宠构建。
 

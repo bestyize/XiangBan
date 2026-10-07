@@ -505,6 +505,8 @@
   }
 
   function formatTime(seconds) { return Math.floor(seconds / 60) + ':' + String(seconds % 60).padStart(2, '0') }
+  const rankingRows = []
+  let rankingCount = 0
   function updateHUD() {
     const player = state.snakes[0]
     $('score').textContent = player.score
@@ -518,16 +520,28 @@
     const ranked = rules.rankings(state)
     const playerRank = ranked.findIndex((entry) => entry.id === 0) + 1
     $('rankLabel').textContent = '第 ' + playerRank + ' 名'
-    $('rankings').replaceChildren(...ranked.slice(0, height < 500 ? 3 : 5).map((entry, index) => {
-      const row = document.createElement('li')
-      if (entry.id === 0) row.className = 'mine'
-      const number = document.createElement('span'); number.className = 'rank-number'; number.textContent = index + 1
-      const dot = document.createElement('span'); dot.className = 'rank-dot'; dot.style.background = entry.color
-      const name = document.createElement('span'); name.className = 'rank-name'; name.textContent = entry.name + (entry.id === 0 ? ' · 我' : '')
-      const mass = document.createElement('span'); mass.className = 'rank-mass'; mass.textContent = Math.floor(entry.mass)
-      row.append(number, dot, name, mass)
-      return row
-    }))
+    const count = Math.min(ranked.length, height < 500 ? 3 : 5)
+    for (let index = 0; index < count; index += 1) {
+      const entry = ranked[index]
+      let cached = rankingRows[index]
+      if (!cached) {
+        const row = document.createElement('li')
+        const number = document.createElement('span'); number.className = 'rank-number'; number.textContent = index + 1
+        const dot = document.createElement('span'); dot.className = 'rank-dot'
+        const name = document.createElement('span'); name.className = 'rank-name'
+        const mass = document.createElement('span'); mass.className = 'rank-mass'
+        row.append(number, dot, name, mass)
+        cached = rankingRows[index] = { row, dot, name, mass }
+      }
+      cached.row.className = entry.id === 0 ? 'mine' : ''
+      cached.dot.style.background = entry.color
+      cached.name.textContent = entry.name + (entry.id === 0 ? ' · 我' : '')
+      cached.mass.textContent = Math.floor(entry.mass)
+    }
+    if (rankingCount !== count) {
+      $('rankings').replaceChildren(...rankingRows.slice(0, count).map(entry => entry.row))
+      rankingCount = count
+    }
     mapCtx.fillStyle = '#dcead6'; mapCtx.fillRect(0, 0, 180, 128)
     const sx = 180 / rules.WORLD.width, sy = 128 / rules.WORLD.height
     mapCtx.fillStyle = '#eff5e9'
@@ -624,12 +638,36 @@
     return sprite
   }
   const skins = new Map(rules.COLORS.map((color) => [color, skinSprite(color)]))
+  // Reuse coordinates across frames; only visible beads reach the canvas.
+  const beadBuffers = new WeakMap()
 
   function drawSnake(snake) {
     if (!snake.alive) return
-    const points = rules.bodyPoints(snake), r = rules.radius(snake)
+    const r = rules.radius(snake)
     const halfW = width / camera.zoom / 2 + 55, halfH = height / camera.zoom / 2 + 55
-    if (points.every((point) => Math.abs(point.x - camera.x) > halfW || Math.abs(point.y - camera.y) > halfH)) return
+    const headVisible = Math.abs(snake.x - camera.x) <= halfW && Math.abs(snake.y - camera.y) <= halfH
+    let beads = beadBuffers.get(snake)
+    if (!beads) { beads = []; beadBuffers.set(snake, beads) }
+    const spacing = r * 1.3
+    let travelled = 0, nextBead = spacing, count = 0, a = snake
+    for (const b of snake.trail) {
+      const distance = Math.hypot(b.x - a.x, b.y - a.y)
+      while (distance > 0 && nextBead <= travelled + distance) {
+        const t = (nextBead - travelled) / distance
+        const x = a.x + (b.x - a.x) * t, y = a.y + (b.y - a.y) * t
+        if (Math.abs(x - camera.x) <= halfW && Math.abs(y - camera.y) <= halfH) {
+          beads[count++] = x; beads[count++] = y
+        }
+        nextBead += spacing
+      }
+      travelled += distance; a = b
+    }
+    if (!headVisible && !count) return
+    const skin = skins.get(snake.color), size = r * 64 / 24
+    for (let index = count - 2; index >= 0; index -= 2) {
+      ctx.drawImage(skin, beads[index] - size / 2, beads[index + 1] - size / 2, size, size)
+    }
+    if (!headVisible) return
     ctx.save()
     ctx.lineCap = 'round'; ctx.lineJoin = 'round'
     // Crisp speed marks keep boosted snakes readable against the bright dots.
@@ -642,25 +680,6 @@
       }
       ctx.restore()
     }
-    const skin = skins.get(snake.color)
-    const spacing = r * 1.3, beads = []
-    let travelled = 0, nextBead = spacing
-    for (let index = 1; index < points.length; index += 1) {
-      const a = points[index - 1], b = points[index]
-      const distance = Math.hypot(b.x - a.x, b.y - a.y)
-      while (distance > 0 && nextBead <= travelled + distance) {
-        const t = (nextBead - travelled) / distance
-        beads.push({ x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t })
-        nextBead += spacing
-      }
-      travelled += distance
-    }
-    for (let index = beads.length - 1; index >= 0; index -= 1) {
-      const size = r * 64 / 24
-      const point = beads[index]
-      ctx.drawImage(skin, point.x - size / 2, point.y - size / 2, size, size)
-    }
-
     ctx.translate(snake.x, snake.y); ctx.rotate(snake.angle)
     ctx.fillStyle = snake.color; ctx.beginPath(); ctx.arc(0, 0, r * 1.06, 0, Math.PI * 2); ctx.fill()
     const look = Math.max(-1.6, Math.min(1.6, rules.angleDelta(snake.angle, snake.targetAngle) * 2))

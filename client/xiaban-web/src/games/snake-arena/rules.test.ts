@@ -60,10 +60,15 @@ describe('snake arena shipped simulation', () => {
     expect(lively.food).toEqual(a.food)
     expect(a.snakes[0].invulnerable).toBe(2)
     expect(lively.snakes[0].invulnerable).toBe(2)
-    expect(a.snakes.filter(snake => snake.id && snake.mass < 150)).toHaveLength(4)
-    expect(a.snakes.filter(snake => snake.id && snake.mass >= 150 && snake.mass < 500)).toHaveLength(4)
-    expect(a.snakes.filter(snake => snake.id && snake.mass >= 500)).toHaveLength(2)
-    for (const bot of a.snakes.slice(1)) expect(Math.hypot(bot.x - a.snakes[0].x, bot.y - a.snakes[0].y)).toBeGreaterThan(500)
+    expect(rules.radius(a.snakes[0])).toBe(8)
+    expect(rules.bodyLength(a.snakes[0])).toBe(159)
+    expect(a.snakes.filter(snake => snake.id && snake.mass >= 35 && snake.mass < 75)).toHaveLength(6)
+    expect(a.snakes.filter(snake => snake.id && snake.mass >= 85 && snake.mass < 150)).toHaveLength(3)
+    expect(a.snakes.filter(snake => snake.id && snake.mass >= 180 && snake.mass < 260)).toHaveLength(1)
+    for (const bot of a.snakes.slice(1)) {
+      const minimumDistance = bot.id <= 6 ? 380 : bot.id <= 9 ? 480 : 620
+      expect(Math.hypot(bot.x - a.snakes[0].x, bot.y - a.snakes[0].y)).toBeGreaterThan(minimumDistance)
+    }
     a.snakes[0].trail[0].x = -10
     expect(b.snakes[0].trail[0].x).toBeGreaterThan(0)
     for (const snake of b.snakes) for (const point of rules.bodyPoints(snake)) {
@@ -179,7 +184,7 @@ describe('snake arena shipped simulation', () => {
   it('resolves head-on collisions simultaneously and emits only one death per snake', () => {
     const state = rules.createGame({ seed: 5 })
     const a = position(state.snakes[0], 500, 500, 0)
-    const b = position(state.snakes[1], 525, 500, Math.PI)
+    const b = position(state.snakes[1], 515, 500, Math.PI)
     state.snakes = [a, b]; state.food = []
     const events = rules.step(state, {}, 1 / 30)
     expect(a.alive).toBe(false)
@@ -196,7 +201,7 @@ describe('snake arena shipped simulation', () => {
 
   it('makes the visible border lethal and handles the exact three-minute finish', () => {
     const wall = solo()
-    position(wall.snakes[0], 2387, 500, 0)
+    position(wall.snakes[0], rules.WORLD.width - rules.radius(wall.snakes[0]) - 1, 500, 0)
     rules.step(wall)
     expect(wall.reason).toBe('wall')
     const timed = solo()
@@ -306,8 +311,8 @@ describe('snake arena shipped simulation', () => {
     expect(player.mass).toBe(rules.MAX_MASS)
     for (let frame = 0; frame < 1500; frame += 1) rules.step(state, { angle: frame * 0.015 })
     expect(player.alive).toBe(true)
-    expect(player.trail.length).toBeLessThanOrEqual(519)
-    expect(rules.bodyLength(player)).toBeLessThanOrEqual(3105)
+    expect(player.trail.length).toBeLessThanOrEqual(514)
+    expect(rules.bodyLength(player)).toBeLessThanOrEqual(3075)
     expect(rules.radius(player)).toBeLessThanOrEqual(42)
   }, 30000)
 
@@ -330,12 +335,14 @@ describe('snake arena shipped simulation', () => {
     const remains = large.food.filter(entry => entry.remains)
     expect(remains.length).toBeLessThanOrEqual(110)
     expect(remains.every(entry => entry.ownerId === 1 && rules.FOOD_SHAPES.includes(entry.shape!))).toBe(true)
+    expect(new Set(remains.map(entry => entry.shape)).size).toBe(5)
   })
 
-  it('creates every food shape and keeps AI respawns mixed, safe and inside the world', () => {
+  it('creates all ordinary food shapes and keeps mature AI respawns mixed, safe and inside the world', () => {
     const state = rules.createGame({ seed: 33, roundType: 'endless' })
     expect(new Set(state.food.map(entry => entry.shape)).size).toBe(5)
     expect(state.food.every(entry => entry.ownerId === null)).toBe(true)
+    state.time = 90
     const masses: number[] = []
     for (let frame = 0; frame < 30; frame += 1) {
       const dead = state.snakes[1]
@@ -561,5 +568,63 @@ describe('snake arena shipped simulation', () => {
     expect(Number.isSafeInteger(player.score)).toBe(true)
     expect(player.kills).toBe(1)
     expect(bot.alive).toBe(false)
+  })
+
+  it.each([
+    { edge: 0, x: 700, y: 750 },
+    { edge: 1, x: 650, y: 800 },
+    { edge: 2, x: 600, y: 700 },
+    { edge: 3, x: 650, y: 600 },
+    { edge: 4, x: 700, y: 550 },
+  ])('detects exact bent-body edge $edge even inside a four-edge group or partial final group', ({ x, y }) => {
+    const state = solo()
+    position(state.snakes[0], x, y, 0)
+    const bot = position(rules.createGame({ seed: 45 }).snakes[1], 700, 700, 0)
+    bot.trail = [{ x: 700, y: 800 }, { x: 600, y: 800 }, { x: 600, y: 600 }, { x: 700, y: 600 }, { x: 700, y: 500 }]
+    state.snakes.push(bot)
+    rules.step(state)
+    expect(state.snakes[0].alive).toBe(false)
+    expect(state.reason).toBe('collision')
+    expect(bot.alive).toBe(true)
+    expect(bot.kills).toBe(1)
+  })
+
+  it('does not replace a bent group with a lethal chord across its empty interior', () => {
+    const state = solo()
+    position(state.snakes[0], 700, 650, 0)
+    const bot = position(rules.createGame({ seed: 46 }).snakes[1], 700, 700, 0)
+    // The first-to-last chord crosses the player, but each real body edge is
+    // at least 50 units away. Broad-phase bounds must never become hitboxes.
+    bot.trail = [{ x: 700, y: 800 }, { x: 600, y: 800 }, { x: 600, y: 600 }, { x: 700, y: 600 }]
+    state.snakes.push(bot)
+    rules.step(state)
+    expect(state.snakes[0].alive).toBe(true)
+    expect(bot.alive).toBe(true)
+    expect(state.events.some(event => event.type === 'death')).toBe(false)
+  })
+
+  it('introduces mature NPC mass progressively with elapsed time or player growth, rather than at initial spawn', () => {
+    function respawnMasses(time: number, playerMass: number) {
+      const state = rules.createGame({ seed: 47, roundType: 'endless' })
+      state.time = time
+      state.snakes[0].mass = playerMass
+      const masses: number[] = []
+      for (let i = 0; i < 24; i += 1) {
+        const dead = state.snakes[1]
+        dead.alive = false; dead.respawnAt = state.time
+        rules.step(state)
+        expect(state.snakes[1]).not.toBe(dead)
+        masses.push(state.snakes[1].mass)
+      }
+      return masses
+    }
+    const early = respawnMasses(0, 60)
+    const later = respawnMasses(90, 60)
+    const grown = respawnMasses(0, 1000)
+    expect(Math.max(...early)).toBeLessThan(320)
+    expect(later.some(mass => mass >= 650)).toBe(true)
+    expect(grown.some(mass => mass >= 650)).toBe(true)
+    expect(later.every(mass => mass >= 45 && mass <= 1100)).toBe(true)
+    expect(grown.every(mass => mass >= 45 && mass <= 1100)).toBe(true)
   })
 })
