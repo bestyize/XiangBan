@@ -41,6 +41,28 @@ game-packs/
 
 Add a game by creating a package directory with its own entry and manifest, then add its ID to the catalog. The hub and player use the same loader for every package.
 
+## Website-side layout (`src/games`)
+
+This directory holds the website's code for each game: results, sharing, the poster line and the tests. The playable packs stay in `public/game-packs` and keep their URLs.
+
+```text
+src/games/
+  index.ts           registry of every game descriptor; share-page and direct-entry routing
+  common/            shared by all games
+    types.ts         ResultGame contract and poster copy type
+    packedResult.ts  result-share.js payload codec and the packedResultGame() factory
+    share.ts         public base, referrals, own / share / challenge URLs
+    packLoader.ts    catalog and manifest loading, pack entry URL
+    resultPoster.ts  the poster drawn on the shared 相伴 frame
+    shareAction.ts   native share sheet
+    summaries.ts     per-game records for the hub and 我的
+  <game-id>/
+    index.ts         the game's descriptor: name, result labels, share text, 小伴's poster line
+    *.test.ts        tests that run the shipped pack scripts
+```
+
+Each `<game-id>/index.ts` exports one `ResultGame`. Games that report through `result-share.js` use `packedResultGame()` and only declare their name, stats labels, 小伴's expression and line, and optionally a poster mode and a share-text lead. Snake keeps its own payload, so `snake-arena/` implements the contract directly and adds launch and challenge options. Common modules never import a game directory; only `index.ts` registers them.
+
 ## Runtime protocol
 
 Protocol version 1 uses `postMessage`:
@@ -56,7 +78,7 @@ Every game must automatically show a result dialog when the player dies, loses, 
 
 For portrait packs, include `../result-share.css` and load `../result-share.js` before `game.js`. Add a hidden `shareResultButton` with `result-share-button` styling inside the existing result dialog. On a real round ending, call `window.XiabanResultShare?.finish({ gameId, score, lines: 0, maxTile: 0, level: 0, steps: 0 })` with applicable final metrics and send `game.result` with matching score / lines / maxTile. Call `reset()` when starting another round. Snake retains its landscape-specific result dialog and protocol payload. A 2048 milestone that allows continued play is not a finished round; share when no valid moves remain.
 
-Register each new game's name and allowed result metrics in `otherResultShare.ts`, and 小伴's reaction line and expression in `posterCopy.ts`. Every result poster is drawn by `resultPoster.ts` on the shared poster frame (`src/poster/`), so it gets the 相伴 header, 小伴 and the QR footer in both looks (深夜 / 暖光). The result page must work without login, carry a public challenge URL and QR code, and offer image saving and link copying when native sharing is unavailable. Share only final aggregate game data and an optional public invitation code; never include account IDs, tokens or the host nonce. Validate the iframe source, nonce, game ID, completed-round state and recorded results before accepting a share request. Include the share button in dialog keyboard focus handling, use at least 44px touch targets, and keep restart / next level reachable on phone screens.
+Give each new game a `src/games/<game-id>/index.ts` descriptor (its name, result labels, share text and 小伴's reaction line and expression) and add it to `RESULT_GAMES` in `src/games/index.ts`; a registry test fails until every catalog ID is registered. Every result poster is drawn by `common/resultPoster.ts` on the shared poster frame (`src/poster/`), so it gets the 相伴 header, 小伴 and the QR footer in both looks (深夜 / 暖光). The result page must work without login, carry a public challenge URL and QR code, and offer image saving and link copying when native sharing is unavailable. Share only final aggregate game data and an optional public invitation code; never include account IDs, tokens or the host nonce. Validate the iframe source, nonce, game ID, completed-round state and recorded results before accepting a share request. Include the share button in dialog keyboard focus handling, use at least 44px touch targets, and keep restart / next level reachable on phone screens.
 
 The host verifies both the message source window and nonce. It does not pass account tokens, profile data, or website API clients to a game.
 

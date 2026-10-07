@@ -40,7 +40,7 @@ interface Rules {
 
 // Run the same classic script shipped to the iframe, with no duplicate rules.
 const context: { XiabanBlockPuzzle?: Rules } = {}
-runInNewContext(readFileSync(new URL('../../public/game-packs/block-puzzle/rules.js', import.meta.url), 'utf8'), context)
+runInNewContext(readFileSync(new URL('../../../public/game-packs/block-puzzle/rules.js', import.meta.url), 'utf8'), context)
 const rules = context.XiabanBlockPuzzle!
 const shape = (id: string) => rules.SHAPES.find((entry) => entry.id === id)!
 

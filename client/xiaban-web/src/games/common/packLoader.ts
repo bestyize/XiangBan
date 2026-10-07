@@ -82,12 +82,9 @@ export async function loadGameCatalog(signal?: AbortSignal): Promise<GamePackMan
   return Promise.all([...new Set(ids as string[])].map((id) => loadGameManifest(id, signal)))
 }
 
-export function gameEntryUrl(pack: GamePackManifest, nonce: string, options: { roundType?: string; difficulty?: string } = {}): string {
-  const params = new URLSearchParams({ hostNonce: nonce })
-  if (pack.id === 'snake-arena') {
-    if (options.roundType === 'endless') params.set('round', 'endless')
-    if (options.difficulty === 'lively') params.set('difficulty', 'lively')
-  }
+/** `launch` comes from the game's own `launchParams`; the host nonce always wins over it. */
+export function gameEntryUrl(pack: GamePackManifest, nonce: string, launch: Record<string, string> = {}): string {
+  const params = new URLSearchParams({ ...launch, hostNonce: nonce })
   return packAssetUrl(pack.id, pack.entry) + '?' + params
 }
 

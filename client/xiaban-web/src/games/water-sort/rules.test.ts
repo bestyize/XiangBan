@@ -22,7 +22,7 @@ interface Rules {
 
 // Test the exact non-module script served inside the host's sandbox.
 const context: { XiabanWaterSort?: Rules } = {}
-runInNewContext(readFileSync(new URL('../../public/game-packs/water-sort/rules.js', import.meta.url), 'utf8'), context)
+runInNewContext(readFileSync(new URL('../../../public/game-packs/water-sort/rules.js', import.meta.url), 'utf8'), context)
 const rules = context.XiabanWaterSort!
 
 // Concrete forward witnesses from the offline reverse-pour construction.

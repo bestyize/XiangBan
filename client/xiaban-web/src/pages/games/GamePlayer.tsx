@@ -2,13 +2,13 @@ import { useLoginReminder } from '../../components/LoginReminder.tsx'
 import { clearLoginReturn, readLoginReturn } from '../../lib/loginReturn.ts'
 import { useEffect, useRef, useState } from 'react'
 import { useLocation, useRoute } from 'wouter'
-import { GAME_RUNTIME_PROTOCOL, gameEntryUrl, loadGameManifest, type GamePackManifest } from '../../games/packLoader.ts'
+import { GAME_RUNTIME_PROTOCOL, gameEntryUrl, loadGameManifest, type GamePackManifest } from '../../games/common/packLoader.ts'
 import { api, getToken } from '../../api/client.ts'
 import { storage } from '../../lib/storage.ts'
 import { track } from '../../lib/track.ts'
 import { useProfile } from '../../lib/session.tsx'
-import { canShareFinishedRound, localResultPath, parseSnakeResult } from '../../games/resultShare.ts'
-import { canShareOtherResult, otherResultPath, parseOtherResult } from '../../games/otherResultShare.ts'
+import { ownResultPath } from '../../games/common/share.ts'
+import { resultGame } from '../../games/index.ts'
 
 interface Round { id: string | null; score: number; lines: number; maxTile: number; finished: boolean; timer: ReturnType<typeof setTimeout> | null }
 
@@ -128,11 +128,9 @@ export default function GamePlayer() {
 
       if (data.type === 'game.ready') setReady(true)
       if (data.type === 'game.share') {
-        const result = gameId === 'snake-arena' ? parseSnakeResult(data.result) : null
-        const other = parseOtherResult(data.result)
-        const round = roundRef.current
-        const path = canShareFinishedRound(result, round) ? localResultPath(result, profile.inviteCode)
-          : canShareOtherResult(other, gameId, round) ? otherResultPath(other, profile.inviteCode) : null
+        const game = resultGame(gameId)
+        const result = game?.parse(data.result) ?? null
+        const path = game && result && game.canShare(result, roundRef.current) ? ownResultPath(game, result, profile.inviteCode) : null
         if (path) {
           const open = async () => {
             try { if (document.fullscreenElement) await document.exitFullscreen() } catch { /* Sharing still works outside fullscreen. */ }
@@ -201,7 +199,7 @@ export default function GamePlayer() {
           <iframe
             ref={iframeRef}
             title={pack.name}
-            src={gameEntryUrl(pack, nonce, { roundType: new URLSearchParams(location.search).get('round') || undefined, difficulty: new URLSearchParams(location.search).get('difficulty') || undefined })}
+            src={gameEntryUrl(pack, nonce, resultGame(gameId)?.launchParams?.(new URLSearchParams(location.search)))}
             sandbox="allow-scripts allow-orientation-lock"
             allow="fullscreen"
             allowFullScreen

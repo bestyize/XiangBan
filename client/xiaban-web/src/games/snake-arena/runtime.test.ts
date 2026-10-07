@@ -81,12 +81,12 @@ function runtime({ portrait = false, fullscreen = false, standalone = false, sea
     requestAnimationFrame: (callback: (time: number) => void) => { frame = callback },
     setTimeout: () => 1, clearTimeout() {}, performance: { now: () => now },
   }
-  runInNewContext(readFileSync(new URL('../../public/game-packs/snake-arena/rules.js', import.meta.url), 'utf8'), context)
-  runInNewContext(readFileSync(new URL('../../public/game-packs/snake-arena/viewport.js', import.meta.url), 'utf8'), context)
+  runInNewContext(readFileSync(new URL('../../../public/game-packs/snake-arena/rules.js', import.meta.url), 'utf8'), context)
+  runInNewContext(readFileSync(new URL('../../../public/game-packs/snake-arena/viewport.js', import.meta.url), 'utf8'), context)
   let model: any
   const original = context.XiabanSnakeArena.createGame
   context.XiabanSnakeArena.createGame = (options: any) => { model = original({ seed: 42, ...options }); return model }
-  runInNewContext(readFileSync(new URL('../../public/game-packs/snake-arena/game.js', import.meta.url), 'utf8'), context)
+  runInNewContext(readFileSync(new URL('../../../public/game-packs/snake-arena/game.js', import.meta.url), 'utf8'), context)
   function advance(count: number) { for (let i = 0; i < count; i += 1) { now += 1000 / 60; frame!(now) } }
   function init(overrides: Record<string, any> = {}) {
     win.fire('message', { source: win.parent, data: { channel: 'xiaban.game-host', protocol: 1, nonce: 'test-round', type: 'host.init', ...overrides } })

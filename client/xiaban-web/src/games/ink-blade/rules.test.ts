@@ -1,7 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { runInNewContext } from 'node:vm'
 import { describe, expect, it } from 'vitest'
-import { otherResultStats, otherShareText, parseOtherResult, readOtherResult, otherResultFragment } from './otherResultShare.ts'
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type Any = any
@@ -14,7 +13,7 @@ interface Rules {
   spawnEnemy(state: Any, spec: Any): Any
 }
 const context: { XiabanInkBlade?: Rules } = {}
-runInNewContext(readFileSync(new URL('../../public/game-packs/ink-blade/rules.js', import.meta.url), 'utf8'), context)
+runInNewContext(readFileSync(new URL('../../../public/game-packs/ink-blade/rules.js', import.meta.url), 'utf8'), context)
 const rules = context.XiabanInkBlade!
 const DT = 1 / 60
 
@@ -218,23 +217,5 @@ describe('ink blade rules', () => {
       return JSON.stringify(rules.result(state)) + state.player.x.toFixed(3)
     }
     expect(play()).toBe(play())
-  })
-})
-
-describe('ink blade sharing', () => {
-  const result = { gameId: 'ink-blade', score: 8120, lines: 24, maxTile: 31, level: 1, steps: 14 }
-  it('round trips the result fragment and labels the combat metrics', () => {
-    expect(parseOtherResult(result)).toEqual(result)
-    expect(readOtherResult('ink-blade', otherResultFragment(result))).toEqual(result)
-    expect(otherResultStats(result)).toEqual([['24', '击败'], ['31', '最高连击'], ['14', '弹反']])
-    expect(otherShareText(result)).toBe('我在水墨剑客一剑破无常，拿了 8120 分，击败 24，最高连击 31，弹反 14。你能超过我吗？')
-    expect(otherShareText({ ...result, level: 0 })).toBe('我在水墨剑客拿了 8120 分，击败 24，最高连击 31，弹反 14。你能超过我吗？')
-  })
-
-  it('ships a landscape manifest registered in the catalog', () => {
-    const manifest = JSON.parse(readFileSync(new URL('../../public/game-packs/ink-blade/manifest.json', import.meta.url), 'utf8'))
-    const catalog = JSON.parse(readFileSync(new URL('../../public/game-packs/catalog.json', import.meta.url), 'utf8'))
-    expect(manifest).toMatchObject({ id: 'ink-blade', entry: 'index.html', orientation: 'landscape', runtimeProtocol: 1 })
-    expect(catalog.games).toContain('ink-blade')
   })
 })

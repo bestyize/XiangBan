@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { loadGameSummaries } from '../../games/summaries.ts'
+import { loadGameSummaries } from '../../games/common/summaries.ts'
 import { quizCatalog } from '../../quizzes/catalog.ts'
 import { readSavedAttempt } from '../../quizzes/progress.ts'
 

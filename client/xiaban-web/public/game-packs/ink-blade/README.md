@@ -13,7 +13,7 @@ A landscape side-scrolling action game painted entirely by code in an ink-wash s
 
 ## Files
 
-- `rules.js` — the deterministic simulation (`XiabanInkBlade`): player physics, combat, enemy and boss AI, encounters and scoring. It has no DOM access. `src/games/inkBlade.test.ts` runs this exact file.
+- `rules.js` — the deterministic simulation (`XiabanInkBlade`): player physics, combat, enemy and boss AI, encounters and scoring. It has no DOM access. `client/xiaban-web/src/games/ink-blade/rules.test.ts` runs this exact file.
 - `art.js` — procedural painting: paper grain, ink-wash mountains with 皴 texture strokes and 点苔 tree dots, bamboo, ground, water, props, splashes, sun and moon. Long parallax layers are split into chunks no wider than 2048 px.
 - `figures.js` — skeletal ink figures with smoothed poses, two-bone sword arms, fluttering robes, the Verlet scarf, crows and straw dummies.
 - `scene.js` — scene composition: time-of-day keyframes along the scroll, parallax layers with bamboo sway, mist, weather (leaves, petals, rain and ripples) and paper post-processing.
@@ -23,6 +23,6 @@ A landscape side-scrolling action game painted entirely by code in an ink-wash s
 
 ## Host
 
-The manifest sets `orientation: "landscape"`, and `viewport.js` rotates the game when the phone is held in portrait, exactly like the snake pack. The game reports `game.progress` / `game.result` with `score`, `lines` (kills) and `maxTile` (best combo). The shared `result-share.js` sends `{ score, lines: kills, maxTile: maxCombo, level: cleared ? 1 : 0, steps: parries }`, and `otherResultShare.ts` labels these as 击败 / 最高连击 / 弹反.
+The manifest sets `orientation: "landscape"`, and `viewport.js` rotates the game when the phone is held in portrait, exactly like the snake pack. The game reports `game.progress` / `game.result` with `score`, `lines` (kills) and `maxTile` (best combo). The shared `result-share.js` sends `{ score, lines: kills, maxTile: maxCombo, level: cleared ? 1 : 0, steps: parries }`, and `client/xiaban-web/src/games/ink-blade/index.ts` labels these as 击败 / 最高连击 / 弹反 and gives 小伴 its poster line.
 
 Rendering targets about 2.4 megapixels of backing store. If frames stay slow, the game drops the paper-grain pass and lowers resolution once.
