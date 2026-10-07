@@ -14,8 +14,8 @@ local.properties
 
 # Node
 node_modules/
-client/xiaban-web/dist/
-client/xiaban-web/dev-dist/
+dist/
+dev-dist/
 *.tsbuildinfo
 
 # Env & secrets
