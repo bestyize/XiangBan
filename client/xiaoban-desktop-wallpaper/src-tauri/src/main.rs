@@ -44,6 +44,8 @@ struct DesktopState {
     settings: Mutex<Settings>,
     wallpaper_parent: Mutex<Option<usize>>,
     ready_scenes: Mutex<HashSet<String>>,
+    #[cfg(target_os = "macos")]
+    reopen_count: std::sync::atomic::AtomicU32,
 }
 
 fn settings(app: &tauri::AppHandle) -> Settings {
@@ -310,12 +312,19 @@ fn minimize_control(app: tauri::AppHandle) {
 }
 
 #[tauri::command]
-fn show_control(app: tauri::AppHandle) {
-    if let Some(w) = app.get_webview_window("control") {
-        let _ = w.show();
-        let _ = w.unminimize();
-        let _ = w.set_focus();
-    }
+fn show_control(app: tauri::AppHandle) -> Result<(), String> {
+    present_control(&app)
+}
+
+fn present_control(app: &tauri::AppHandle) -> Result<(), String> {
+    #[cfg(target_os = "macos")]
+    app.show().map_err(|error| error.to_string())?;
+    let window = app
+        .get_webview_window("control")
+        .ok_or("没有找到小伴设置面板")?;
+    window.unminimize().map_err(|error| error.to_string())?;
+    window.show().map_err(|error| error.to_string())?;
+    window.set_focus().map_err(|error| error.to_string())
 }
 
 #[tauri::command]
@@ -395,11 +404,7 @@ fn setup_tray(app: &tauri::App) -> tauri::Result<()> {
         .menu(&menu)
         .on_menu_event(|app, event| match event.id.as_ref() {
             "control" => {
-                if let Some(w) = app.get_webview_window("control") {
-                    let _ = w.show();
-                    let _ = w.unminimize();
-                    let _ = w.set_focus();
-                }
+                let _ = present_control(app);
             }
             "poke" => {
                 let _ = app.emit("pet-poke", ());
@@ -416,7 +421,7 @@ fn main() {
     if std::env::args().any(|argument| argument == "--wallpaper") {
         state.settings.get_mut().unwrap().mode = "wallpaper".into();
     }
-    tauri::Builder::default().manage(state)
+    let app = tauri::Builder::default().manage(state)
         .invoke_handler(tauri::generate_handler![get_platform, get_settings, set_mode, update_settings, poke,
             scene_ready, set_hit_test, start_drag, minimize_control, show_control, quit, get_diagnostics])
         .setup(|app| {
@@ -435,12 +440,17 @@ fn main() {
                     let wallpaper_result = set_mode(handle.clone(), "wallpaper".into()).await
                         .and_then(|_| wait_for_scene(&handle, "wallpaper"));
                     let wallpaper = get_diagnostics(handle.clone());
+                    #[cfg(target_os = "macos")]
+                    let dock_reopen = macos::smoke_dock_reopen(&handle);
                     let floating_result = set_mode(handle.clone(), "floating".into()).await
                         .and_then(|_| wait_for_scene(&handle, "pet"));
                     let floating_after = get_diagnostics(handle.clone());
-                    let report = serde_json::json!({"floatingBefore": floating_before, "wallpaper": wallpaper,
+                    #[allow(unused_mut)]
+                    let mut report = serde_json::json!({"floatingBefore": floating_before, "wallpaper": wallpaper,
                         "floatingAfter": floating_after, "wallpaperResult": wallpaper_result.map(|_| "ok"),
                         "floatingResult": floating_result.map(|_| "ok"), "startupResult": startup_result.map(|_| "ok")});
+                    #[cfg(target_os = "macos")]
+                    { report["dockReopen"] = serde_json::to_value(dock_reopen).unwrap(); }
                     if let Ok(path) = std::env::var("XIAOBAN_SMOKE_REPORT") {
                         let _ = std::fs::write(path, serde_json::to_string_pretty(&report).unwrap());
                     }
@@ -456,5 +466,19 @@ fn main() {
                 }
             }
         })
-        .run(tauri::generate_context!()).expect("小伴启动失败");
+        .build(tauri::generate_context!()).expect("小伴启动失败");
+    app.run(|_handle, _event| {
+        #[cfg(target_os = "macos")]
+        if matches!(_event, tauri::RunEvent::Reopen { .. }) {
+            // A visible wallpaper also makes has_visible_windows true. Dock
+            // clicks must restore the settings panel regardless of that flag.
+            _handle
+                .state::<DesktopState>()
+                .reopen_count
+                .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            if let Err(error) = present_control(_handle) {
+                eprintln!("无法打开小伴设置面板：{error}");
+            }
+        }
+    });
 }

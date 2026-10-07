@@ -3,7 +3,9 @@
 //! it does not install event taps or request screen recording/accessibility.
 use crate::coordinates::{content_point_to_css, is_desktop_level};
 use objc2::{rc::autoreleasepool, MainThreadMarker};
-use objc2_app_kit::{NSColor, NSEvent, NSScreen, NSWindow, NSWindowCollectionBehavior};
+use objc2_app_kit::{
+    NSApplication, NSColor, NSEvent, NSScreen, NSWindow, NSWindowCollectionBehavior,
+};
 use objc2_core_foundation::{CFArray, CFDictionary, CFNumber, CFRetained, CFString, CFType};
 use objc2_core_graphics::{
     kCGWindowLayer, CGWindowLevelForKey, CGWindowLevelKey, CGWindowListCopyWindowInfo,
@@ -228,4 +230,96 @@ pub fn diagnostics(app: &tauri::AppHandle) -> serde_json::Value {
         Ok(serde_json::json!({"platform": "macos", "wallpaperSupported": true,
             "mode": super::settings(&handle).mode, "floating": describe("pet")?, "wallpaper": describe("wallpaper")?}))
     }).unwrap_or_else(|error| serde_json::json!({"platform":"macos", "error":error}))
+}
+
+fn control_state(app: &tauri::AppHandle) -> Result<serde_json::Value, String> {
+    let handle = app.clone();
+    on_main(app, move |mtm| {
+        let control = handle
+            .get_webview_window("control")
+            .ok_or("没有找到设置面板")?;
+        let ns = native(&control)?;
+        let wallpaper = handle
+            .get_webview_window("wallpaper")
+            .ok_or("没有找到壁纸窗口")?;
+        let wall = native(&wallpaper)?;
+        Ok(
+            serde_json::json!({"visible":ns.isVisible(), "minimized":ns.isMiniaturized(),
+            "focused":ns.isKeyWindow(), "applicationHidden":NSApplication::sharedApplication(mtm).isHidden(),
+            "wallpaperWindowNumber":wall.windowNumber(), "wallpaperVisible":wall.isVisible(),
+            "mode":super::settings(&handle).mode,
+            "reopenCount":handle.state::<super::DesktopState>().reopen_count.load(std::sync::atomic::Ordering::Relaxed)}),
+        )
+    })
+}
+
+fn wait_control(
+    app: &tauri::AppHandle,
+    matches: impl Fn(&serde_json::Value) -> bool,
+) -> Result<serde_json::Value, String> {
+    let deadline = std::time::Instant::now() + Duration::from_secs(10);
+    while std::time::Instant::now() < deadline {
+        let state = control_state(app)?;
+        if matches(&state) {
+            return Ok(state);
+        }
+        std::thread::sleep(Duration::from_millis(100));
+    }
+    Err(format!(
+        "Dock 重新打开未恢复设置面板：{}",
+        control_state(app)?
+    ))
+}
+
+/// Exercise the real LaunchServices reopen event, not a direct call to the
+/// handler. The wallpaper remains present in all three panel states.
+pub fn smoke_dock_reopen(app: &tauri::AppHandle) -> Result<serde_json::Value, String> {
+    let executable = std::env::current_exe().map_err(|error| error.to_string())?;
+    let bundle = executable
+        .parent()
+        .and_then(|path| path.parent())
+        .and_then(|path| path.parent())
+        .filter(|path| path.extension().is_some_and(|extension| extension == "app"))
+        .ok_or("Dock 测试需要从 .app 运行")?;
+    let baseline = control_state(app)?;
+    let mut cases = Vec::new();
+    for kind in ["minimized", "hidden_window", "hidden_application"] {
+        let before = control_state(app)?["reopenCount"].as_u64().unwrap_or(0);
+        let window = app
+            .get_webview_window("control")
+            .ok_or("没有找到设置面板")?;
+        match kind {
+            "minimized" => window.minimize().map_err(|error| error.to_string())?,
+            "hidden_window" => window.hide().map_err(|error| error.to_string())?,
+            _ => app.hide().map_err(|error| error.to_string())?,
+        }
+        let hidden = wait_control(app, |state| match kind {
+            "minimized" => state["minimized"] == true,
+            "hidden_window" => state["visible"] == false,
+            _ => state["applicationHidden"] == true,
+        })?;
+        let status = std::process::Command::new("/usr/bin/open")
+            .arg("-a")
+            .arg(bundle)
+            .status()
+            .map_err(|error| error.to_string())?;
+        if !status.success() {
+            return Err("LaunchServices 无法重新打开小伴".into());
+        }
+        let restored = wait_control(app, |state| {
+            state["reopenCount"].as_u64().unwrap_or(0) > before
+                && state["visible"] == true
+                && state["minimized"] == false
+                && state["focused"] == true
+                && state["applicationHidden"] == false
+        })?;
+        if restored["wallpaperWindowNumber"] != baseline["wallpaperWindowNumber"]
+            || restored["mode"] != "wallpaper"
+            || restored["wallpaperVisible"] != true
+        {
+            return Err("Dock 唤起设置面板时改变了壁纸窗口或模式".into());
+        }
+        cases.push(serde_json::json!({"case":kind, "beforeReopen":hidden, "afterReopen":restored}));
+    }
+    Ok(serde_json::json!({"cases":cases, "wallpaperPreserved":true}))
 }
