@@ -15,6 +15,53 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  windows-x64:
+    runs-on: windows-latest
+    timeout-minutes: 35
+    defaults:
+      run:
+        working-directory: client/xiaoban-desktop-wallpaper
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: client/xiaoban-desktop-wallpaper/package-lock.json
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: client/xiaoban-desktop-wallpaper/src-tauri
+      - name: Validate character and runtime gate
+        run: |
+          npm ci
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          npm test
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          cargo test --manifest-path src-tauri/Cargo.toml --locked
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          cargo build --manifest-path src-tauri/Cargo.toml --locked
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Verify native preparation without installing a runtime
+        run: ./scripts/smoke-runtime.ps1
+      - name: Build Windows portable app
+        run: npm run desktop:build
+      - name: Package app and measure size
+        run: |
+          $exe = Get-Item src-tauri/target/release/xiaoban-desktop-wallpaper.exe
+          if ($exe.Length -gt 60MB) { throw 'Windows app exceeds the 60 MB package limit' }
+          Compress-Archive -LiteralPath $exe.FullName -DestinationPath artifacts/XiaoBan-Windows-x64.zip
+          $exe.Length | Set-Content artifacts/windows-size.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: XiaoBan-Windows-x64
+          path: |
+            client/xiaoban-desktop-wallpaper/artifacts/XiaoBan-Windows-x64.zip
+            client/xiaoban-desktop-wallpaper/artifacts/runtime-ui-smoke.json
+            client/xiaoban-desktop-wallpaper/artifacts/windows-size.txt
+          if-no-files-found: warn
+          retention-days: 14
   macos-arm64:
     runs-on: macos-15
     timeout-minutes: 35

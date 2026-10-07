@@ -6,6 +6,8 @@ mod coordinates;
 mod macos;
 #[cfg(windows)]
 mod windows;
+#[cfg(any(windows, test))]
+mod runtime;
 
 use serde::{Deserialize, Serialize};
 use std::{
@@ -417,6 +419,11 @@ fn setup_tray(app: &tauri::App) -> tauri::Result<()> {
 }
 
 fn main() {
+    // This must run before Builder::build: even the settings window needs WebView2.
+    #[cfg(windows)]
+    if !runtime::windows::before_start() {
+        return;
+    }
     let mut state = DesktopState::default();
     if std::env::args().any(|argument| argument == "--wallpaper") {
         state.settings.get_mut().unwrap().mode = "wallpaper".into();
@@ -466,7 +473,17 @@ fn main() {
                 }
             }
         })
-        .build(tauri::generate_context!()).expect("小伴启动失败");
+        .build(tauri::generate_context!());
+    #[cfg(windows)]
+    let app = match app {
+        Ok(app) => app,
+        Err(error) => {
+            runtime::windows::show_startup_error(&error.to_string());
+            return;
+        }
+    };
+    #[cfg(not(windows))]
+    let app = app.expect("小伴启动失败");
     app.run(|_handle, _event| {
         #[cfg(target_os = "macos")]
         if matches!(_event, tauri::RunEvent::Reopen { .. }) {
