@@ -13,6 +13,11 @@ interface Rules {
   terrain(state: Any, x: number): { h: number; d: number; dd: number }
   islandAt(state: Any, x: number): Any
   ensure(state: Any, x: number): void
+  PERFECT: number; PERFECT_EASY: number
+  perfectWindow(islandIndex: number): number
+  predictLanding(state: Any, hold: boolean, seconds?: number): Any
+  advice(state: Any): Any
+  nextIsland(state: Any): Any
 }
 const context: { XiabanDuskGlider?: Rules } = {}
 // Exercise the exact classic script shipped in the sandboxed game pack.
@@ -200,5 +205,118 @@ describe('dusk glider rounds', () => {
     expect(result.distance).toBeGreaterThan(300)
     for (const value of Object.values(result)) expect(Number.isInteger(value) && (value as number) >= 0).toBe(true)
     expect(rules.step(state, { hold: true }, DT)).toEqual([])
+  })
+})
+
+describe('dusk glider guidance', () => {
+  const KIND_OF_EVENT: Record<string, string> = { perfect: 'perfect', land: 'good', thud: 'thud', splash: 'water', skip: 'skip' }
+  const RANK: Record<string, number> = { perfect: 5, good: 3, skip: 3, hop: 2, far: 2, thud: 1, water: 0 }
+
+  // A small deterministic generator, so the sampled flights are the same on every run.
+  function lcg(seed: number) {
+    let s = seed
+    return () => { s = (Math.imul(s, 1664525) + 1013904223) >>> 0; return s / 4294967296 }
+  }
+
+  it('previews exactly the landing that the simulation then produces', () => {
+    const random = lcg(42)
+    let checked = 0
+    const kinds = new Set<string>()
+    for (let i = 0; i < 160; i++) {
+      const seed = 1 + Math.floor(random() * 50), hold = random() < 0.5
+      const x = 20 + random() * 900, angle = (random() - 0.5) * 1.6, speed = 8 + random() * 40, air = random() * 1.2, lift = random() * 6
+      // The world is generated from its seed alone, so two games with the same seed share the same terrain.
+      const make = () => { const s = rules.createGame({ seed }); airborne(s, x, angle, speed, air); s.bird.y += lift; return s }
+      const base = make(), live = make()
+      const preview = rules.predictLanding(base, hold)
+
+      let landed: Any = null
+      for (let f = 0; f < 60 * 7 && !landed && live.phase === 'playing'; f++) {
+        const events = rules.step(live, { hold }, DT)
+        const hit = events.find((e) => e.type in KIND_OF_EVENT)
+        if (hit) landed = { kind: KIND_OF_EVENT[hit.type], x: hit.x }
+        else if (live.bird.ground) landed = { kind: 'hop', x: live.bird.x }
+      }
+      if (!landed) { expect(preview.kind).toBe('far'); continue }
+      expect(preview.kind).toBe(landed.kind)
+      expect(preview.x).toBeCloseTo(landed.x, 6)
+      kinds.add(preview.kind)
+      checked += 1
+    }
+    expect(checked).toBeGreaterThan(100)
+    // The sample has to cover the interesting outcomes, otherwise the comparison proves little.
+    for (const kind of ['perfect', 'good', 'thud']) expect([...kinds]).toContain(kind)
+  })
+
+  it('returns no preview on the ground, and marks flights that never land as far', () => {
+    const state = rules.createGame({ seed: 2 })
+    run(state, 240)
+    expect(state.bird.ground).toBe(true)
+    expect(rules.predictLanding(state, true)).toBeNull()
+    const x = findSlope(state, (d) => Math.abs(d) < 0.05)
+    airborne(state, x, 1.2, 40)
+    expect(rules.predictLanding(state, false, 0.5).kind).toBe('far')
+  })
+
+  it('tells the player to hold on a downslope and release when the hill rises', () => {
+    const state = rules.createGame({ seed: 3 })
+    const down = findSlope(state, (d) => d < -0.3)
+    const up = findSlope(state, (d) => d > 0.3)
+    Object.assign(state.bird, { x: down, y: rules.sample(state, down).h, ground: true })
+    expect(rules.advice(state)).toMatchObject({ phase: 'ground', hold: true, reason: 'downhill' })
+    Object.assign(state.bird, { x: up, y: rules.sample(state, up).h, ground: true })
+    expect(rules.advice(state)).toMatchObject({ phase: 'ground', hold: false, reason: 'rise' })
+    const strait = (state.world.islands[0].x1 + state.world.islands[0].end) / 2
+    Object.assign(state.bird, { x: strait, y: 0, ground: true })
+    expect(rules.advice(state)).toMatchObject({ phase: 'water', hold: false })
+  })
+
+  it('advises the input with the better preview while airborne', () => {
+    const random = lcg(7)
+    let holds = 0
+    for (let i = 0; i < 80; i++) {
+      const state = rules.createGame({ seed: 1 + Math.floor(random() * 30) })
+      airborne(state, 30 + random() * 600, (random() - 0.4) * 1.4, 10 + random() * 36, random())
+      state.bird.y += random() * 8
+      const tip = rules.advice(state)
+      expect(tip.phase).toBe('air')
+      const chosen = tip.hold ? tip.dive : tip.glide
+      const other = tip.hold ? tip.glide : tip.dive
+      expect(tip.kind).toBe(chosen.kind)
+      expect(RANK[chosen.kind]).toBeGreaterThanOrEqual(RANK[other.kind])
+      if (tip.hold) holds += 1
+    }
+    // Neither answer may dominate, otherwise the preview would not be teaching anything.
+    expect(holds).toBeGreaterThan(5)
+    expect(holds).toBeLessThan(75)
+  })
+
+  it('reaches several islands with perfect landings when the player simply follows the advice', () => {
+    const played = (follow: boolean) => {
+      const state = rules.createGame({ seed: 9 })
+      for (let i = 0; i < 60 * 300 && state.phase === 'playing'; i++) rules.step(state, { hold: follow ? rules.advice(state).hold : false }, DT)
+      return rules.result(state)
+    }
+    const coached = played(true), idle = played(false)
+    expect(coached.islands).toBeGreaterThanOrEqual(3)
+    expect(coached.perfects).toBeGreaterThanOrEqual(5)
+    expect(coached.score).toBeGreaterThan(idle.score * 3)
+  })
+
+  it('forgives wider landings on the first island and tightens to the normal window by the fourth', () => {
+    const windows = [0, 1, 2, 3, 9].map((island) => rules.perfectWindow(island))
+    expect(windows[0]).toBeCloseTo(rules.PERFECT_EASY)
+    expect(windows[3]).toBeCloseTo(rules.PERFECT)
+    expect(windows[4]).toBeCloseTo(rules.PERFECT)
+    for (let i = 1; i < windows.length; i++) expect(windows[i]).toBeLessThanOrEqual(windows[i - 1])
+  })
+
+  it('points at the next island and counts the distance down as the bird advances', () => {
+    const state = rules.createGame({ seed: 4 })
+    const first = rules.nextIsland(state)
+    expect(first.index).toBe(1)
+    expect(first.x).toBe(state.world.islands[1].x0)
+    state.bird.x += 100
+    expect(rules.nextIsland(state).distance).toBe(first.distance - 100)
   })
 })

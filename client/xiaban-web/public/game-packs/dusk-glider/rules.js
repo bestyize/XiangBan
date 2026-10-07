@@ -13,6 +13,7 @@
   const SEABED = -7
   const DAY_START = 56
   const PERFECT = 0.25 // radians between flight path and slope for a perfect slide
+  const PERFECT_EASY = 0.4 // the first island forgives more, easing back to PERFECT by the fourth
   const GOOD = 0.6
   const JUDGE_AIR = 0.32 // shorter hops re-attach silently
   const FLIGHT_AIR = 0.6
@@ -20,6 +21,7 @@
   const FEVER_CHAIN = 3
   const START_X = 8
   const SKIP_SPEED = 24
+  const HOLD_SLOPE = -0.03 // steeper downhill than this is where a good player keeps the finger down
 
   function rng(seed) {
     let s = (seed >>> 0) || 1
@@ -143,14 +145,36 @@
     state.score = Math.floor(state.scoreF)
   }
 
+  /** The window depends on the island being landed on, so a flight across the strait is judged where it ends. */
+  function perfectWindow(islandIndex) {
+    return PERFECT + (PERFECT_EASY - PERFECT) * Math.max(0, 1 - islandIndex / 3)
+  }
+
+  /**
+   * What a touchdown at `x` with this velocity counts as. Shared by the real landing and the landing preview,
+   * so the marker the player sees can never disagree with what happens.
+   */
+  function judge(state, x, vx, vy, air) {
+    const s = sample(state, x)
+    const theta = Math.atan(s.d)
+    const v = Math.hypot(vx, vy)
+    const diff = Math.abs(Math.atan2(vy, vx) - theta)
+    let kind
+    if (s.water && v > SKIP_SPEED && -vy < v * 0.42) kind = 'skip'
+    else if (air < JUDGE_AIR) kind = 'hop'
+    else if (s.water) kind = 'water'
+    else if (theta < -0.1 && diff < perfectWindow(islandAt(state, x).index)) kind = 'perfect'
+    else if (diff < GOOD) kind = 'good'
+    else kind = 'thud'
+    return { kind, diff, theta, v, h: s.h, water: s.water }
+  }
+
   function land(state, events) {
     const b = state.bird
     const s = sample(state, b.x)
-    const theta = Math.atan(s.d)
-    const v = Math.hypot(b.vx, b.vy)
-    const diff = Math.abs(Math.atan2(b.vy, b.vx) - theta)
-    const along = v * Math.max(0, Math.cos(diff))
     const air = b.air
+    const { kind, theta, v, diff } = judge(state, b.x, b.vx, b.vy, air)
+    const along = v * Math.max(0, Math.cos(diff))
     b.ground = true
     b.y = s.h
     if (air >= FLIGHT_AIR) {
@@ -159,7 +183,7 @@
       award(state, points)
       events.push({ type: 'flight', air, points, apex: b.apex })
     }
-    if (s.water && v > SKIP_SPEED && -b.vy < v * 0.42) {
+    if (kind === 'skip') {
       // A fast, shallow touch skips off the sea like a stone and keeps the chain.
       b.ground = false
       b.y = SEA + 0.01
@@ -171,20 +195,20 @@
       events.push({ type: 'skip', x: b.x, y: SEA, speed: v })
       return
     }
-    if (air < JUDGE_AIR) {
+    if (kind === 'hop') {
       b.speed = Math.max(along, s.water ? 0 : b.speed * 0.9)
-    } else if (s.water) {
+    } else if (kind === 'water') {
       b.speed = along * 0.6
       state.chain = 0; state.splashes += 1
       events.push({ type: 'splash', x: b.x, y: SEA, speed: v })
-    } else if (theta < -0.1 && diff < PERFECT) {
+    } else if (kind === 'perfect') {
       state.chain += 1; state.perfects += 1
       state.maxChain = Math.max(state.maxChain, state.chain)
       b.speed = along * 1.08 + 1.5
       const points = (60 + 15 * Math.min(state.chain, 8)) * mult(state)
       award(state, points)
       events.push({ type: 'perfect', x: b.x, y: b.y, chain: state.chain, points })
-    } else if (diff < GOOD) {
+    } else if (kind === 'good') {
       b.speed = along
       events.push({ type: 'land', x: b.x, y: b.y, speed: v })
     } else {
@@ -291,6 +315,61 @@
     return events
   }
 
+  // ------------------------------------------------------------ guidance
+
+  const RANK = { perfect: 5, good: 3, skip: 3, hop: 2, far: 2, thud: 1, water: 0 }
+
+  /**
+   * Where and how the airborne bird would touch down if `hold` stayed as given. It steps the exact flight
+   * integration of `step` without touching the state. Returns null on the ground.
+   */
+  function predictLanding(state, hold, seconds = 6) {
+    const b = state.bird
+    if (b.ground) return null
+    const dt = 1 / 60
+    const g = hold ? G + DIVE : AIR_G
+    let { x, y, vx, vy, air } = b
+    for (let t = 0; t < seconds; t += dt) {
+      vy -= g * dt
+      const keep = 1 - DRAG * Math.hypot(vx, vy) * dt
+      vx *= keep; vy *= keep
+      x += vx * dt; y += vy * dt
+      air += dt
+      const s = sample(state, x)
+      if (y <= s.h) {
+        const j = judge(state, x, vx, vy, air)
+        return { kind: j.kind, diff: j.diff, x, y: s.h, t: air - b.air, hold }
+      }
+    }
+    return { kind: 'far', diff: Math.PI, x, y, t: seconds, hold }
+  }
+
+  /**
+   * What a good player would do right now: hold while sliding downhill, release at the bottom and on the way up,
+   * and in the air pick whichever input makes the better landing. `glide` and `dive` are the two previews.
+   */
+  function advice(state) {
+    const b = state.bird
+    if (b.ground) {
+      const s = sample(state, b.x)
+      if (s.water) return { phase: 'water', hold: false, reason: 'water', kind: null, glide: null, dive: null }
+      const down = s.d < HOLD_SLOPE
+      return { phase: 'ground', hold: down, reason: down ? 'downhill' : 'rise', kind: null, glide: null, dive: null }
+    }
+    const glide = predictLanding(state, false), dive = predictLanding(state, true)
+    const value = (p) => RANK[p.kind] * 10 - p.diff
+    const best = value(dive) > value(glide) + 0.02 ? dive : glide
+    return { phase: 'air', hold: best.hold, reason: best.hold ? 'dive' : 'glide', kind: best.kind, glide, dive }
+  }
+
+  /** The next island the bird has not reached yet, with the distance to its beach. */
+  function nextIsland(state) {
+    const index = state.island + 1
+    ensure(state, state.bird.x + 1800)
+    const isle = state.world.islands[index]
+    return isle ? { index, x: isle.x0, distance: Math.max(0, Math.round(isle.x0 - state.bird.x)) } : null
+  }
+
   function result(state) {
     return {
       score: state.score, perfects: state.perfects, maxChain: state.maxChain, islands: state.island + 1,
@@ -300,7 +379,7 @@
   }
 
   globalThis.XiabanDuskGlider = {
-    G, AIR_G, DIVE, SEA, SEABED, DAY_START, PERFECT, GOOD, CLOUD, FEVER_CHAIN, START_X, MAX_SPEED,
-    createGame, step, result, sample, terrain, ensure, islandAt, islands,
+    G, AIR_G, DIVE, SEA, SEABED, DAY_START, PERFECT, PERFECT_EASY, HOLD_SLOPE, GOOD, CLOUD, FEVER_CHAIN, START_X, MAX_SPEED,
+    createGame, step, result, sample, terrain, ensure, islandAt, islands, perfectWindow, judge, predictLanding, advice, nextIsland,
   }
 })()

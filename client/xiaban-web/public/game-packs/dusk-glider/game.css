@@ -146,8 +146,43 @@ h1 { margin: 0; font-size: clamp(40px, 6vw, 68px); line-height: 1.1; font-weight
 .game.touch .touch-copy { display: inline; }
 .game.touch .desktop-copy { display: none; }
 
+/* Teaching aids: the live coach, the distance to the next island and the three-step how-to. */
+.score-block .next-island { margin-top: 3px; font-size: 11px; letter-spacing: .08em; }
+.score-block .next-island b { font-weight: 600; font-variant-numeric: tabular-nums; }
+.chain { top: calc(max(10px, var(--safe-top)) + 84px); }
+.coach { position: absolute; z-index: 3; left: 50%; bottom: calc(max(16px, var(--safe-bottom)) + 10px); transform: translateX(-50%); display: flex; align-items: center; gap: 12px; padding: 8px 24px 8px 10px; border-radius: 999px; background: var(--hud-glass); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); box-shadow: 0 8px 26px rgba(120, 60, 50, .2), inset 0 0 0 1.5px var(--hud-edge); pointer-events: none; transition: opacity .35s; animation: prompt-in .4s ease-out; }
+.coach-icon { flex: none; width: 40px; height: 40px; border-radius: 50%; }
+.coach.hold .coach-icon { background: radial-gradient(circle at 40% 35%, #ffe08a, var(--gold) 60%, #ff9a5c); box-shadow: 0 0 0 4px rgba(255, 200, 97, .35), 0 0 16px rgba(255, 184, 90, .7); }
+.coach.release .coach-icon { background: rgba(255, 255, 255, .55); box-shadow: inset 0 0 0 4px var(--sky), 0 0 14px rgba(143, 201, 255, .7); }
+.coach-text { display: flex; flex-direction: column; line-height: 1.25; }
+.coach-text strong { font-size: 22px; font-weight: 700; letter-spacing: .2em; color: var(--hud-ink); }
+.coach-text small { font-size: 12px; letter-spacing: .08em; color: var(--hud-muted); }
+.coach.mismatch .coach-icon { animation: coach-call .7s ease-in-out infinite; }
+.coach.match { opacity: .72; }
+.coach.match .coach-text small::after { content: ' ✓'; color: #3fae7a; font-weight: 700; }
+@keyframes coach-call { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.22); } }
+.game.coaching .prompt { bottom: calc(max(16px, var(--safe-bottom)) + 72px); }
+.howto { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 0 0 16px; padding: 0; list-style: none; }
+.howto li { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 4px 7px; border-radius: 14px; background: rgba(255, 255, 255, .5); text-align: center; }
+.howto svg { width: 100%; max-width: 64px; height: auto; fill: none; stroke-width: 2.4; overflow: visible; }
+.howto .hill { stroke: var(--indigo); opacity: .55; }
+.howto .press { fill: var(--gold); stroke: #e8a53a; stroke-width: 1.5; }
+.howto .free { stroke: var(--sea); }
+.howto .chev { stroke: #e8a53a; }
+.howto .fly { stroke: var(--coral-deep); stroke-dasharray: 3 4; }
+.howto .target { stroke: #e8a53a; fill: rgba(255, 200, 97, .35); }
+.howto b { font-size: 13px; font-weight: 600; letter-spacing: .06em; color: var(--indigo); }
+.howto span { font-size: 11px; color: var(--muted); }
+.pause-toggle { margin-top: 2px; }
+
 @media (max-height: 520px) and (orientation: landscape), (max-width: 520px) and (orientation: portrait) {
   :root { --dl-w: 200px; }
+  .howto { margin-bottom: 12px; }
+  .howto li { padding: 5px 2px 4px; }
+  .howto svg { max-width: 52px; }
+  .coach-icon { width: 34px; height: 34px; }
+  .coach-text strong { font-size: 19px; }
+  .game.coaching .prompt { bottom: calc(max(16px, var(--safe-bottom)) + 64px); }
   h1 { font-size: 44px; }
   .welcome-card { padding: 18px 22px 12px; }
   .welcome-description { margin: 8px 0 14px; font-size: 13px; line-height: 1.75; }
@@ -157,7 +192,7 @@ h1 { margin: 0; font-size: clamp(40px, 6vw, 68px); line-height: 1.1; font-weight
   .island-title strong { font-size: 46px; }
   .callout strong { font-size: 22px; }
   .callout.fever strong { font-size: 34px; }
-  .chain { top: calc(max(10px, var(--safe-top)) + 54px); }
+  .chain { top: calc(max(10px, var(--safe-top)) + 72px); }
   .chain strong { font-size: 26px; }
 }
 @media (max-height: 430px) and (orientation: landscape), (max-width: 430px) and (orientation: portrait) {
@@ -184,6 +219,7 @@ h1 { margin: 0; font-size: clamp(40px, 6vw, 68px); line-height: 1.1; font-weight
   .welcome-card { width: min(380px, 52%); padding: 14px 20px 8px; }
   .welcome-description { font-size: 12px; margin: 6px 0 10px; }
   .welcome-foot { display: none; }
+  .howto span { display: none; }
   .island-title strong { font-size: 38px; }
   .prompt { font-size: 13px; padding: 8px 16px; }
 }

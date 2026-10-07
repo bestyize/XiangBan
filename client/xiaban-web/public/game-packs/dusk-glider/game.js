@@ -8,6 +8,7 @@
   const Bird = globalThis.XiabanGliderBird
   const audio = globalThis.XiabanGliderAudio
   const viewport = globalThis.XiabanGliderViewport
+  const Guide = globalThis.XiabanGliderGuide
   const $ = (id) => document.getElementById(id)
   const gameNode = $('game')
   const canvas = $('scene')
@@ -47,7 +48,7 @@
 
   const scene = new THREE.Scene()
   const camera = new THREE.PerspectiveCamera(34, 16 / 9, 0.5, 3200)
-  let world = null, bird = null
+  let world = null, bird = null, guide = null
   if (renderer) {
     renderer.toneMapping = THREE.ACESFilmicToneMapping
     renderer.toneMappingExposure = 1.18
@@ -56,6 +57,7 @@
     renderer.shadowMap.type = THREE.PCFShadowMap
     world = World.create(THREE, { scene, rules, state, quality, props: globalThis.XiabanGliderProps })
     bird = Bird.create(THREE, scene, { quality })
+    guide = Guide.create(THREE, scene, rules)
     bird.reset(state)
   }
 
@@ -217,9 +219,6 @@
   }
 
   const PROMPTS = {
-    dive: ['按住屏幕，纸鸟变重，顺着下坡俯冲', '按住空格（或鼠标），纸鸟变重，顺着下坡俯冲'],
-    release: ['到了谷底就松开，借上坡飞上天', '到了谷底就松开，借上坡飞上天'],
-    land: ['落地时顺着下坡贴下去，就是完美落地', '落地时顺着下坡贴下去，就是完美落地'],
     fever: ['连续三次完美，乘着顺风积分翻倍', '连续三次完美，乘着顺风积分翻倍'],
     thud: ['别撞上坡：在空中按住，提前落到下坡', '别撞上坡：在空中按住，提前落到下坡'],
     sea: ['冲得够快，掠过海面还能打水漂', '冲得够快，掠过海面还能打水漂'],
@@ -275,6 +274,75 @@
   $('soundButton').addEventListener('click', toggleSound)
   $('welcomeSound').addEventListener('click', toggleSound)
 
+  // ------------------------------------------------------------ guidance
+
+  const COACH_PERFECTS = 4 // the coach retires once the player has landed this many perfects...
+  const COACH_SECONDS = 100 // ...or after this many seconds, whichever comes first
+  const COACH_TEXT = {
+    downhill: ['按住', '下坡：越压越快'],
+    rise: ['松开', '上坡：借势飞起'],
+    water: ['松开', '落水了：慢慢游回岸上'],
+    diveGold: ['按住', '压低身子，落进金圈'],
+    glideGold: ['松开', '保持滑翔，落进金圈'],
+    dive: ['按住', '俯冲：别撞上坡'],
+    glide: ['松开', '滑翔：飞得更远'],
+  }
+  let assist = true, guideOn = true
+  let coachHold = null, coachPending = null, coachText = COACH_TEXT.downhill, coachKey = ''
+
+  function updateAssistButtons() {
+    for (const id of ['welcomeAssist', 'pauseAssist']) {
+      $(id).setAttribute('aria-pressed', String(assist))
+      $(id).textContent = assist ? '引导 · 开' : '引导 · 关'
+    }
+  }
+
+  function hideCoach() {
+    $('coach').hidden = true
+    gameNode.classList.remove('coaching')
+    coachHold = null; coachPending = null; coachKey = ''
+  }
+
+  function toggleAssist() {
+    assist = !assist
+    updateAssistButtons()
+    audio?.play('ui')
+    if (!assist) hideCoach()
+  }
+  $('welcomeAssist').addEventListener('click', toggleAssist)
+  $('pauseAssist').addEventListener('click', toggleAssist)
+
+  function coachLine(tip) {
+    if (tip.phase === 'ground') return COACH_TEXT[tip.reason]
+    if (tip.phase === 'water') return COACH_TEXT.water
+    return COACH_TEXT[(tip.hold ? 'dive' : 'glide') + (tip.kind === 'perfect' ? 'Gold' : '')]
+  }
+
+  // The coach says what to do right now (hold or release) and whether the player already does it.
+  function updateCoach(tip, dt) {
+    const live = assist && phase === 'playing' && state.perfects < COACH_PERFECTS && state.time < COACH_SECONDS && !state.night
+    if (!live) { if (!$('coach').hidden) hideCoach(); return }
+    // A changed answer has to persist briefly, so a preview wobbling at a threshold never makes the banner flicker.
+    if (coachHold === null) coachHold = tip.hold
+    else if (tip.hold === coachHold) coachPending = null
+    else {
+      if (coachPending?.hold !== tip.hold) coachPending = { hold: tip.hold, t: 0 }
+      coachPending.t += dt
+      if (coachPending.t >= 0.15) { coachHold = tip.hold; coachPending = null }
+    }
+    if (coachHold === tip.hold) coachText = coachLine(tip)
+    const match = holding() === coachHold
+    const key = coachHold + '|' + coachText[1] + '|' + match
+    if (key === coachKey) return
+    coachKey = key
+    const node = $('coach')
+    node.hidden = false
+    node.className = 'coach ' + (coachHold ? 'hold' : 'release') + (match ? ' match' : ' mismatch')
+    $('coachAction').textContent = coachText[0]
+    $('coachReason').textContent = coachText[1]
+    gameNode.classList.add('coaching')
+  }
+
   async function requestImmersive(feedback = true) {
     const root = document.documentElement
     const request = root.requestFullscreen || root.webkitRequestFullscreen
@@ -321,6 +389,8 @@
     state = rules.createGame()
     world.reset(state)
     bird.reset(state)
+    guide.reset()
+    hideCoach()
     resultDelay = 0
     globalThis.XiabanResultShare?.reset()
     phase = 'playing'; roundStarted = true; roundPosted = false; resultPosted = false
@@ -332,7 +402,6 @@
     for (const id of ['startButton', 'restartButton']) $(id).blur()
     updateHUD(true)
     showIsland(0, 0)
-    setTimeout(() => { if (phase === 'playing') promptOnce('dive') }, 900)
     syncRound()
     audio?.play('ui')
   }
@@ -417,10 +486,6 @@
         case 'launch':
           bird.burst('launch', e.x, e.y, { dust: dustColor() })
           audio?.play('launch', { speed: e.speed })
-          if (state.flights === 0) promptOnce('release')
-          break
-        case 'flight':
-          if (e.air > 1.2 && !shown.has('land')) promptOnce('land')
           break
         case 'perfect':
           bird.burst('perfect', e.x, e.y, { chain: e.chain })
@@ -523,10 +588,17 @@
 
   // ------------------------------------------------------------ HUD
 
-  const hud = { score: -1, distance: -1, day: -1, chain: -1, fever: null, low: null, dark: null }
+  const hud = { score: -1, distance: -1, next: -2, day: -1, chain: -1, fever: null, low: null, dark: null }
   function updateHUD(force = false) {
     if (force || state.score !== hud.score) { $('score').textContent = state.score; hud.score = state.score }
     if (force || state.distance !== hud.distance) { $('distance').textContent = state.distance; hud.distance = state.distance }
+    const next = rules.nextIsland(state)
+    const near = next ? Math.round(next.distance / 5) * 5 : -1
+    if (force || near !== hud.next) {
+      $('nextIsland').hidden = !next
+      if (next) $('nextIslandDistance').textContent = near
+      hud.next = near
+    }
     const day = Math.round(Math.min(DAY_SCALE, state.daylight) * 10)
     if (force || day !== hud.day) {
       const pct = day / 10 / DAY_SCALE * 100
@@ -556,13 +628,8 @@
 
   // ------------------------------------------------------------ attract mode
 
-  // Behind the welcome card the bird flies itself: weight on downhill ground, glide otherwise.
-  function autopilot() {
-    const b = state.bird
-    if (b.ground) return rules.sample(state, b.x).d < 0.02
-    const ahead = rules.sample(state, b.x + b.vx * 0.3)
-    return b.vy < 0 && ahead.d < -0.08 && Math.atan2(b.vy, b.vx) > Math.atan(ahead.d) + 0.05
-  }
+  // Behind the welcome card the bird flies itself, following the same advice that coaches the player.
+  function autopilot() { return rules.advice(state).hold }
 
   // ------------------------------------------------------------ loop
 
@@ -602,9 +669,14 @@
       }
     }
     const frameDt = phase === 'paused' ? 0 : dt
+    const tip = rules.advice(state)
+    const guiding = assist && phase !== 'result'
+    if (guiding !== guideOn) { guideOn = guiding; guide.setVisible(guiding) }
+    if (phase === 'playing') updateCoach(tip, dt)
     updateCamera(frameDt || 0.0001)
     world.update(camera, state.bird, frameDt, clock)
     bird.update(state, frameDt, clock, world.env, world.heightAt, height * renderer.getPixelRatio(), camera.fov * Math.PI / 180)
+    guide.update(state, tip, clock, cam.dist, world.env.night)
     // The HUD switches to light text once the sky behind it has darkened past sunset.
     const dark = world.env.light < 0.26
     if (dark !== gameNode.classList.contains('night')) gameNode.classList.toggle('night', dark)
@@ -618,6 +690,7 @@
     let fake = 0
     globalThis.__glider = {
       get state() { return state }, get phase() { return phase }, camera, cam, renderer, world, bird, scene, get quality() { return quality },
+      guide, get assist() { return assist }, get tip() { return rules.advice(state) },
       start: startRound, hold(on) { keyHold = on },
       // Drives the loop by hand for headless checks, where requestAnimationFrame does not fire.
       advance(seconds, hold) {
@@ -631,6 +704,7 @@
 
   resize()
   updateSoundButtons()
+  updateAssistButtons()
   updateHUD(true)
   if (renderer) {
     snapCamera()
