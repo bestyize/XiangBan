@@ -1,10 +1,11 @@
 {
   "id": "ink-blade",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "name": "水墨剑客",
-  "description": "横屏水墨动作：一卷山水，一人一剑。朱光一闪时出剑弹反，斩破月下无常。",
+  "description": "横屏水墨动作：一卷六幅，逐幅解锁、集三印、求逸品。朱光一闪时出剑弹反，斩破月下无常。",
   "entry": "index.html",
   "cover": "cover.svg",
   "runtimeProtocol": 1,
-  "orientation": "landscape"
+  "orientation": "landscape",
+  "save": true
 }

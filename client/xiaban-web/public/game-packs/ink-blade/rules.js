@@ -4,11 +4,9 @@
 
   const GROUND = 300
   const GRAVITY = 1900
-  const LEVEL_END = 6120
   const RUN = 240
   const ARROW_GRAVITY = 260
-  const BOSS_START = 5180
-  const START_X = 520
+  const LEVELS = globalThis.XiabanInkLevels
 
   const DIFFICULTIES = {
     easy: { hp: 7, parry: 0.24, aggression: 0.7, tokens: 1, tele: 1.2, bossHp: 34 },
@@ -31,47 +29,6 @@
     boss: { hp: 36, w: 21, h: 72, score: 2000 },
   }
 
-  const PLATFORMS = [
-    { x: 2210, y: 246, w: 124 },
-    { x: 2400, y: 202, w: 112 },
-    { x: 2590, y: 242, w: 132 },
-    { x: 3560, y: 224, w: 210 },
-    { x: 3880, y: 238, w: 142 },
-    { x: 4560, y: 238, w: 152 },
-  ]
-
-  const AREAS = [
-    { x: 0, name: '山门', sub: '第一幅' },
-    { x: 1440, name: '竹林', sub: '第二幅' },
-    { x: 2330, name: '鸦岭', sub: '第三幅' },
-    { x: 3290, name: '断桥', sub: '第四幅' },
-    { x: 4230, name: '夜雨', sub: '第五幅' },
-    { x: 5230, name: '无常', sub: '终幅' },
-  ]
-
-  const PROMPTS = [{ x: 0, key: 'move' }, { x: 760, key: 'jump' }, { x: 1410, key: 'dash' }]
-
-  const ENCOUNTERS = [
-    { id: 'gate', trigger: 900, lock: [640, 1400], waves: [[{ type: 'dummy', x: 1110 }, { type: 'dummy', x: 1220, delay: 0.2 }]] },
-    { id: 'grove', trigger: 1580, lock: [1330, 2090], waves: [
-      [{ type: 'puppet', side: 1 }, { type: 'puppet', side: -1, delay: 0.3 }],
-      [{ type: 'puppet', side: 1 }, { type: 'puppet', side: -1 }, { type: 'puppet', side: 1, delay: 1.1 }],
-    ] },
-    { id: 'crows', trigger: 2780, lock: [2410, 3170], waves: [
-      [{ type: 'crow', side: 1 }, { type: 'crow', side: -1, delay: 0.4 }, { type: 'crow', side: 1, delay: 0.8 }],
-      [{ type: 'puppet', side: -1 }, { type: 'crow', side: 1 }, { type: 'puppet', side: 1, delay: 0.6 }, { type: 'crow', side: -1, delay: 1.2 }],
-    ] },
-    { id: 'bridge', trigger: 3700, lock: [3360, 4120], waves: [
-      [{ type: 'archer', x: 3672, y: 224 }, { type: 'archer', x: 4060, delay: 0.3 }, { type: 'puppet', side: -1, delay: 0.5 }],
-      [{ type: 'shield', side: 1 }, { type: 'puppet', side: -1 }, { type: 'puppet', side: 1, delay: 1.2 }],
-    ] },
-    { id: 'rain', trigger: 4560, lock: [4300, 5060], waves: [
-      [{ type: 'shield', side: -1 }, { type: 'crow', side: 1 }, { type: 'archer', x: 4640, y: 238, delay: 0.3 }, { type: 'crow', side: -1, delay: 0.9 }],
-      [{ type: 'puppet', side: 1 }, { type: 'puppet', side: -1 }, { type: 'archer', x: 5020, delay: 0.4 }, { type: 'puppet', side: 1, delay: 1.2 }],
-    ] },
-    { id: 'boss', trigger: 5560, lock: [5300, 6060], waves: [[{ type: 'boss', x: 5910 }]] },
-  ]
-
   function mulberry(seed) {
     let value = seed >>> 0
     return () => {
@@ -86,32 +43,32 @@
   const clamp = (value, min, max) => Math.max(min, Math.min(max, value))
   const sign = (value) => (value > 0 ? 1 : value < 0 ? -1 : 0)
 
+  /** options.level is a 幅 id such as '1-3' (default: the whole first scroll); `start: 'boss'` is kept as '1-6'. */
   function createGame(options = {}) {
     const difficulty = options.difficulty === 'easy' ? 'easy' : 'normal'
     const diff = DIFFICULTIES[difficulty]
-    const start = options.start === 'boss' ? 'boss' : 'scroll'
+    const level = LEVELS.level(options.start === 'boss' ? '1-6' : options.level) || LEVELS.level('1-scroll')
+    const world = LEVELS.volume(level.volume)
+    const promptsShown = {}
+    for (const key of options.seenPrompts || []) if (typeof key === 'string') promptsShown[key] = true
     const state = {
-      difficulty, diff, start, seed: options.seed ?? 20261006,
+      difficulty, diff, level, world, plan: level.encounters.map((id) => world.encounters[id]), seed: options.seed ?? 20261006,
       phase: 'playing', reason: null, time: 0, clock: 0,
       hitstop: 0, slow: 0, slowScale: 1, strike: null,
-      lock: null, encounter: start === 'boss' ? ENCOUNTERS.length - 1 : 0, wave: 0, waveDelay: 0,
-      area: -1, promptsShown: {}, nextId: 1, enemies: [], projectiles: [],
+      lock: null, encounter: 0, wave: 0, waveDelay: 0,
+      area: -1, promptsShown, nextId: 1, enemies: [], projectiles: [],
       bonus: null, victoryT: 0, events: [],
       player: {
-        x: start === 'boss' ? BOSS_START : START_X, y: GROUND, vx: 0, vy: 0, w: 13, h: 54, facing: 1,
+        x: level.start, y: GROUND, vx: 0, vy: 0, w: 13, h: 54, facing: 1,
         onGround: true, coyote: 0, airJumps: 1, airDash: 1,
         jumpBuffer: 0, slashBuffer: 0, dashBuffer: 0, inkBuffer: 0, jumpHeld: false, jumpCut: false,
         action: null, slashStartClock: -9, slashEndClock: -9, nextStage: 0, dashCd: 0,
         hp: diff.hp, maxHp: diff.hp, iframes: 0, hurt: 0, dead: false, deadT: 0,
         ink: 0, combo: 0, comboTimer: 0, maxCombo: 0, kills: 0, parries: 0, executions: 0,
-        score: 0, damageTaken: 0, airTime: 0,
+        score: 0, damageTaken: 0, airTime: 0, airKills: 0, deflectKills: 0, bossExecutions: 0, strikes: 0,
       },
     }
     state.random = mulberry(state.seed)
-    if (start === 'boss') {
-      state.area = AREAS.length - 2
-      state.promptsShown = { move: true, jump: true, dash: true, slash: true, parry: true, deflect: true, shield: true }
-    }
     return state
   }
 
@@ -145,24 +102,24 @@
     emit(state, 'prompt', { key })
   }
 
-  function platformUnder(x, halfWidth, previousFeet, feet) {
+  function platformUnder(platforms, x, halfWidth, previousFeet, feet) {
     let landing = feet >= GROUND ? GROUND : null
-    for (const platform of PLATFORMS) {
+    for (const platform of platforms) {
       if (x + halfWidth * 0.5 < platform.x || x - halfWidth * 0.5 > platform.x + platform.w) continue
       if (previousFeet <= platform.y + 0.5 && feet >= platform.y && (landing === null || platform.y < landing)) landing = platform.y
     }
     return landing
   }
 
-  function supported(x, halfWidth, feet) {
+  function supported(platforms, x, halfWidth, feet) {
     if (feet >= GROUND - 0.5) return true
-    return PLATFORMS.some((platform) => Math.abs(feet - platform.y) < 0.6 && x + halfWidth * 0.5 >= platform.x && x - halfWidth * 0.5 <= platform.x + platform.w)
+    return platforms.some((platform) => Math.abs(feet - platform.y) < 0.6 && x + halfWidth * 0.5 >= platform.x && x - halfWidth * 0.5 <= platform.x + platform.w)
   }
 
+  /** Walkable span: the locked arena during a fight, otherwise this 幅's window of the scroll. */
   function bounds(state) {
-    const min = state.lock ? state.lock[0] : 16
-    const max = state.lock ? state.lock[1] : LEVEL_END - 16
-    return [min, max]
+    if (state.lock) return state.lock
+    return [state.level.range[0] + 16, state.level.range[1] - 16]
   }
 
   // ---------------------------------------------------------------- player
@@ -196,6 +153,7 @@
     const player = state.player
     player.ink = 0
     player.inkBuffer = 0
+    player.strikes += 1
     player.action = null
     player.iframes = Math.max(player.iframes, 1.4)
     state.strike = { t: 0, applied: false, x: player.x, facing: player.facing }
@@ -315,16 +273,16 @@
     const previousFeet = player.y
     player.y += player.vy * dt
     if (player.vy >= 0) {
-      const landing = platformUnder(player.x, player.w * 2, previousFeet, player.y)
+      const landing = platformUnder(state.world.platforms, player.x, player.w * 2, previousFeet, player.y)
       if (landing !== null) {
         if (!player.onGround) emit(state, 'land', { x: player.x, y: landing, impact: player.vy })
         player.y = landing; player.vy = 0; player.onGround = true; player.airJumps = 1; player.airDash = 1; player.airTime = 0
         if (player.action?.type === 'slash' && player.action.air) player.action.air = false
-      } else if (player.onGround && !supported(player.x, player.w * 2, player.y)) {
+      } else if (player.onGround && !supported(state.world.platforms, player.x, player.w * 2, player.y)) {
         player.onGround = false; player.coyote = 0.1
       }
     }
-    if (player.onGround && !supported(player.x, player.w * 2, player.y)) { player.onGround = false; player.coyote = 0.1 }
+    if (player.onGround && !supported(state.world.platforms, player.x, player.w * 2, player.y)) { player.onGround = false; player.coyote = 0.1 }
     if (!player.onGround) player.airTime += dt
   }
 
@@ -462,6 +420,7 @@
         enemy.state = 'recover'; enemy.t = 1
         enemy.vx = sign(enemy.x - player.x) * 260
         player.executions += 1
+        player.bossExecutions += 1
         addCombo(state); addScore(state, 300); addInk(state, 15)
         state.hitstop = Math.max(state.hitstop, 0.16); state.slow = 0.7; state.slowScale = 0.25
         emit(state, 'execute', { id: enemy.id, x: enemy.x, y: enemy.y - 40, boss: true })
@@ -530,9 +489,12 @@
   }
 
   function kill(state, enemy, how) {
+    const player = state.player
     enemy.alive = false
     enemy.state = 'dead'
     killScore(state, enemy)
+    if (how === 'arrow') player.deflectKills += 1
+    else if (how !== 'strike' && !player.onGround) player.airKills += 1
     emit(state, 'kill', { id: enemy.id, kind: enemy.type, x: enemy.x, y: enemy.y, facing: enemy.facing, how })
   }
 
@@ -572,7 +534,7 @@
   }
 
   function moveGround(state, enemy, dt) {
-    const [min, max] = state.lock ? state.lock : [0, LEVEL_END]
+    const [min, max] = state.lock ? state.lock : [0, state.world.length]
     enemy.x = clamp(enemy.x + enemy.vx * dt, min + enemy.w, max - enemy.w)
     if (enemy.y < enemy.homeY || enemy.vy < 0) {
       enemy.vy = Math.min(900, enemy.vy + GRAVITY * dt)
@@ -627,7 +589,7 @@
           if (distance < 34) enemy.vx = -enemy.facing * 60
           if (enemy.cd <= 0 && facingPlayer && attackers(state) < state.diff.tokens) {
             telegraph(state, enemy, kind.tele)
-            if (state.encounter === 1) prompt(state, 'parry')
+            prompt(state, 'parry')
           }
         }
         break
@@ -765,7 +727,7 @@
         }
         break
     }
-    const [min, max] = state.lock ? state.lock : [0, LEVEL_END]
+    const [min, max] = state.lock ? state.lock : [0, state.world.length]
     enemy.x = clamp(enemy.x + enemy.vx * dt, min + 10, max - 10)
     enemy.y = clamp(enemy.y + enemy.vy * dt, 40, GROUND - 12)
   }
@@ -960,7 +922,7 @@
         boss.vx = 0
         break
     }
-    const [min, max] = state.lock || [0, LEVEL_END]
+    const [min, max] = state.lock || [0, state.world.length]
     boss.x = clamp(boss.x + boss.vx * dt, min + boss.w, max - boss.w)
     if (boss.y < GROUND || boss.vy < 0) {
       boss.vy = Math.min(1100, boss.vy + GRAVITY * dt)
@@ -1007,7 +969,7 @@
       shot.life -= dt
       shot.x += shot.vx * dt
       if (shot.type === 'arrow') { shot.vy += ARROW_GRAVITY * dt; shot.y += shot.vy * dt }
-      if (shot.life <= 0 || shot.y > GROUND + 4 || shot.x < 0 || shot.x > LEVEL_END) {
+      if (shot.life <= 0 || shot.y > GROUND + 4 || shot.x < 0 || shot.x > state.world.length) {
         if (shot.type === 'arrow' && shot.y > GROUND - 4) emit(state, 'stick', { x: shot.x, y: GROUND, vx: shot.vx, vy: shot.vy })
         shot.dead = true
         continue
@@ -1059,7 +1021,7 @@
   function updateEncounters(state, dt) {
     const player = state.player
     if (!state.lock) {
-      const encounter = ENCOUNTERS[state.encounter]
+      const encounter = state.plan[state.encounter]
       if (encounter && player.x >= encounter.trigger) {
         // Inset arenas so both ink curtains stay on a typical phone screen with some margin.
         state.lock = [encounter.lock[0] + 40, encounter.lock[1] - 40]
@@ -1070,7 +1032,7 @@
       }
       return
     }
-    const encounter = ENCOUNTERS[state.encounter]
+    const encounter = state.plan[state.encounter]
     if (!encounter || state.enemies.some((enemy) => enemy.alive)) return
     if (state.waveDelay > 0) {
       state.waveDelay -= dt
@@ -1088,19 +1050,20 @@
     state.encounter += 1
     addScore(state, 100 * state.encounter)
     emit(state, 'clear', { id: encounter.id })
-    if (encounter.id === 'boss') finish(state, 'clear')
+    if (state.encounter >= state.plan.length) finish(state, 'clear')
   }
 
   function finish(state, reason) {
     if (state.phase === 'over') return
     const player = state.player
+    const level = state.level
     state.phase = 'over'
     state.reason = reason
     if (reason === 'clear') {
       state.bonus = {
-        time: Math.max(0, Math.round((state.start === 'boss' ? 150 : 330) - state.time) * 6),
+        time: Math.max(0, Math.round(level.par - state.time) * 6),
         hp: player.hp * 150,
-        flawless: player.damageTaken === 0 ? 1000 : 0,
+        flawless: player.damageTaken === 0 ? (level.scroll ? 1500 : level.boss ? 1000 : 600) : 0,
       }
       player.score += state.bonus.time + state.bonus.hp + state.bonus.flawless
     }
@@ -1109,10 +1072,31 @@
 
   function updateFlags(state) {
     const player = state.player
-    for (const entry of PROMPTS) if (player.x >= entry.x) prompt(state, entry.key)
+    const areas = state.world.areas
+    for (const entry of state.world.prompts) if (player.x >= entry.x) prompt(state, entry.key)
     let area = state.area
-    while (area + 1 < AREAS.length && player.x >= AREAS[area + 1].x) area += 1
-    if (area !== state.area) { state.area = area; emit(state, 'area', { index: area, name: AREAS[area].name, sub: AREAS[area].sub }) }
+    while (area + 1 < areas.length && player.x >= areas[area + 1].x) area += 1
+    if (area !== state.area) { state.area = area; emit(state, 'area', { index: area, name: areas[area].name, sub: areas[area].sub }) }
+  }
+
+  // ------------------------------------------------------------ seals & grade
+
+  /** Current value of the 幅's 技 challenge, and whether it is met right now. */
+  function challenge(state) {
+    const goal = state.level.challenge
+    const value = goal.stat === 'time' ? Math.floor(state.time) : state.player[goal.stat] || 0
+    return { value, goal: goal.goal, met: goal.at === 'most' ? value <= goal.goal : value >= goal.goal, text: goal.text, stat: goal.stat }
+  }
+
+  /** Seals are a bitmask (1 过 通关, 2 全 少伤, 4 技 绝技); grade 0 means not cleared, 1–4 能 / 妙 / 神 / 逸品. */
+  function evaluate(state) {
+    const cleared = state.reason === 'clear'
+    if (!cleared) return { seals: 0, grade: 0 }
+    let seals = 1
+    if (state.player.damageTaken <= state.level.hurt) seals |= 2
+    if (challenge(state).met) seals |= 4
+    const grade = 1 + state.level.grades.filter((score) => state.player.score >= score).length
+    return { seals, grade }
   }
 
   function step(state, input = {}, dt = 1 / 60) {
@@ -1147,14 +1131,16 @@
 
   function result(state) {
     const player = state.player
+    const { seals, grade } = evaluate(state)
     return {
-      score: player.score, kills: player.kills, maxCombo: player.maxCombo, parries: player.parries,
-      cleared: state.reason === 'clear', seconds: Math.floor(state.time), executions: player.executions,
+      level: state.level.id, code: state.level.code, score: player.score, kills: player.kills, maxCombo: player.maxCombo,
+      parries: player.parries, cleared: state.reason === 'clear', seconds: Math.floor(state.time), executions: player.executions,
+      damageTaken: player.damageTaken, seals, grade,
     }
   }
 
   globalThis.XiabanInkBlade = {
-    GROUND, GRAVITY, LEVEL_END, BOSS_START, START_X, STAGES, ENEMY, PLATFORMS, AREAS, ENCOUNTERS, DIFFICULTIES,
-    createGame, step, result, spawnEnemy, slashBox, enemyBox, overlaps,
+    GROUND, GRAVITY, STAGES, ENEMY, DIFFICULTIES,
+    createGame, step, result, evaluate, challenge, spawnEnemy, slashBox, enemyBox, overlaps,
   }
 })()

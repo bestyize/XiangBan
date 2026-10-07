@@ -54,6 +54,7 @@ src/games/
     share.ts         public base, referrals, own / share / challenge URLs
     packLoader.ts    catalog and manifest loading, pack entry URL
     resultPoster.ts  the poster drawn on the shared 相伴 frame
+    saves.ts         opt-in pack saves: browser storage for guests, the account for registered users
     shareAction.ts   native share sheet
     summaries.ts     per-game records for the hub and 我的
   <game-id>/
@@ -71,6 +72,7 @@ Protocol version 1 uses `postMessage`:
 - Game to host: `xiaban.game-pack / game.ready` and `game.exit`, echoing that nonce.
 - Records: `game.start` starts a round, `game.progress` updates its nonnegative integer `score` (and optional `lines` / `maxTile`), and `game.result` finishes it. A game sends its current round once after the first valid host initialization, then starts a new round when restarted or when entering another level.
 - Result sharing: `game.share` carries final aggregate metrics. The host accepts it only from the verified current game's iframe for its completed current round and matching recorded metrics, then opens `/games/<gameId>/share`. The page shares a QR-coded PNG or result link and offers a guest-play challenge entry; it never imports shared metrics as account records.
+- Saves (opt-in): a pack whose manifest sets `"save": true` receives its progress document as `host.init.save` (an object, or `null` for a new player) and sends `game.save` with `data` (a plain JSON object of at most 32 KB) whenever progress changes. The host never interprets the document. It debounces writes, stores guest saves in this browser (`xb_game_saves`) and registered saves at `GET/PUT /api/games/saves/{gameId}`, uploads a guest save into an account that has none yet, and does not open the pack until the save has loaded, so a failed read never starts the game on an empty save. The server keeps the newest write by client clock, so a stale tab cannot roll progress back. The sandboxed iframe has no storage of its own; packs must not try to keep progress themselves.
 
 ## Required end-of-round experience for every new game
 
@@ -82,7 +84,7 @@ Give each new game a `src/games/<game-id>/index.ts` descriptor (its name, result
 
 The host verifies both the message source window and nonce. It does not pass account tokens, profile data, or website API clients to a game.
 
-The host saves guest records in the current browser and signed-in records through the game's session API. Packs do not read account or local-storage data directly. New package IDs must also be allowed by `services/xiaban-api/backend/src/main/kotlin/xyz/xiaban/server/games/GameRecords.kt`.
+The host saves guest records in the current browser and signed-in records through the game's session API. Packs do not read account or local-storage data directly. New package IDs must also be allowed by `services/xiaban-api/backend/src/main/kotlin/xyz/xiaban/server/games/GameRecords.kt`; packs with saves are also listed in `SAVE_GAMES` in `GameSaves.kt`.
 
 ## Included games
 
@@ -93,7 +95,7 @@ The host saves guest records in the current browser and signed-in records throug
 | `block-puzzle` | 消失高手 | Place three pieces per batch on an 8×8 board and clear full rows/columns |
 | `water-sort` | 奶茶大师 | Pour matching colors into tubes, with undo and progressively harder levels |
 | `snake-arena` | 小伴贪吃蛇 | Landscape, mobile-first arena with local AI snakes, boost energy and three-minute or endless rounds |
-| `ink-blade` | 水墨剑客 | Landscape ink-wash side-scrolling action: parries, executions, five painted areas and a boss duel, all drawn by code |
+| `ink-blade` | 水墨剑客 | Landscape ink-wash side-scrolling action, all drawn by code: six 幅 unlocked one by one with three seals and a grade each, plus the whole 长卷; parries, executions and a boss duel; saves progress |
 | `dusk-glider` | 暮色滑翔 | Landscape 3D glide over a sunset archipelago (three.js): hold to dive, release to launch, perfect landings chain into a 2× fever, islands extend the daylight |
 
 Packs may set `orientation: "landscape"` to use the full viewport instead of the phone-width host. The host permits fullscreen and orientation locking; the game must retain manual-rotation play when those APIs are unavailable. The site's PWA orientation is `any` so a landscape pack can also rotate when launched from the home screen.

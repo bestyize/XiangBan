@@ -6,15 +6,19 @@ import { describe, expect, it } from 'vitest'
 type Any = any
 interface Input { move?: number; jump?: boolean; jumpPressed?: boolean; slashPressed?: boolean; dashPressed?: boolean; inkPressed?: boolean }
 interface Rules {
-  GROUND: number; START_X: number; BOSS_START: number; ENCOUNTERS: Any[]; DIFFICULTIES: Any; STAGES: Any[]
-  createGame(options?: { difficulty?: string; start?: string; seed?: number }): Any
+  GROUND: number; DIFFICULTIES: Any; STAGES: Any[]
+  createGame(options?: { difficulty?: string; start?: string; level?: string; seed?: number; seenPrompts?: string[] }): Any
   step(state: Any, input?: Input, dt?: number): Any[]
   result(state: Any): Any
+  evaluate(state: Any): { seals: number; grade: number }
+  challenge(state: Any): { value: number; goal: number; met: boolean }
   spawnEnemy(state: Any, spec: Any): Any
 }
-const context: { XiabanInkBlade?: Rules } = {}
-runInNewContext(readFileSync(new URL('../../../public/game-packs/ink-blade/rules.js', import.meta.url), 'utf8'), context)
+interface Levels { LEVELS: Any[]; level(id: string): Any; volume(id: number): Any; levelByCode(code: number): Any }
+const context: { XiabanInkBlade?: Rules; XiabanInkLevels?: Levels } = {}
+for (const file of ['levels.js', 'rules.js']) runInNewContext(readFileSync(new URL(`../../../public/game-packs/ink-blade/${file}`, import.meta.url), 'utf8'), context)
 const rules = context.XiabanInkBlade!
+const levels = context.XiabanInkLevels!
 const DT = 1 / 60
 
 function run(state: Any, frames: number, input: Input | ((i: number) => Input) = {}) {
@@ -39,18 +43,47 @@ function place(state: Any, type: string, x: number, extra: Any = {}) {
 }
 
 describe('ink blade rules', () => {
-  it('starts on the scroll or directly at the boss with difficulty-specific health', () => {
+  it('starts the whole scroll by default or a single 幅, with difficulty-specific health', () => {
     const easy = rules.createGame({ difficulty: 'easy' })
     const normal = rules.createGame({ difficulty: 'anything' })
     expect([easy.player.hp, normal.player.hp]).toEqual([7, 5])
     expect(normal.difficulty).toBe('normal')
-    expect(normal.player.x).toBe(rules.START_X)
+    expect(normal.level.id).toBe('1-scroll')
+    expect(normal.plan.map((encounter: Any) => encounter.id)).toEqual(['gate', 'grove', 'crows', 'bridge', 'rain', 'boss'])
     const boss = rules.createGame({ start: 'boss' })
-    expect(boss.player.x).toBe(rules.BOSS_START)
-    expect(boss.encounter).toBe(rules.ENCOUNTERS.length - 1)
+    expect(boss.level.id).toBe('1-6')
+    expect(boss.player.x).toBe(levels.level('1-6').start)
+    expect(boss.plan.map((encounter: Any) => encounter.id)).toEqual(['boss'])
+    expect(rules.createGame({ level: 'missing' }).level.id).toBe('1-scroll')
   })
 
-  it('moves, jumps with a double jump, and locks the gate encounter until both dummies fall', () => {
+  it('keeps every 幅 inside its window of the scroll with its encounters inside that window', () => {
+    for (const level of levels.LEVELS) {
+      const world = levels.volume(level.volume)
+      expect(level.start).toBeGreaterThan(level.range[0])
+      expect(level.start).toBeLessThan(level.range[1])
+      for (const id of level.encounters) {
+        const encounter = world.encounters[id]
+        expect(encounter.lock[0] + 40).toBeGreaterThanOrEqual(level.range[0])
+        expect(encounter.lock[1] - 40).toBeLessThanOrEqual(level.range[1])
+        expect(encounter.trigger).toBeGreaterThanOrEqual(level.start)
+      }
+      expect(level.grades).toEqual([...level.grades].sort((a: number, b: number) => a - b))
+      expect(levels.levelByCode(level.code)).toBe(level)
+    }
+    const state = rules.createGame({ level: '1-3', seed: 2 })
+    run(state, 60 * 3, { move: -1 })
+    expect(state.player.x).toBeGreaterThanOrEqual(levels.level('1-3').range[0] + 16 - 0.01)
+  })
+
+  it('skips tutorial prompts the player has already seen', () => {
+    const fresh = run(rules.createGame({ level: '1-1' }), 2)
+    expect(fresh.some((e) => e.type === 'prompt' && e.key === 'move')).toBe(true)
+    const seen = run(rules.createGame({ level: '1-1', seenPrompts: ['move'] }), 2)
+    expect(seen.some((e) => e.type === 'prompt' && e.key === 'move')).toBe(false)
+  })
+
+  it('moves, jumps with a double jump, and locks the gate encounter until every dummy falls', () => {
     const state = rules.createGame({ seed: 1 })
     const jumps = run(state, 2, (i) => ({ move: 1, jump: true, jumpPressed: i === 0 }))
     expect(jumps.some((e) => e.type === 'jump' && !e.double)).toBe(true)
@@ -67,8 +100,60 @@ describe('ink blade rules', () => {
       rules.step(state, { move, slashPressed: Boolean(target) && i % 10 === 0 }, DT)
     }
     expect(state.lock).toBeNull()
-    expect(state.player.kills).toBe(2)
+    expect(state.player.kills).toBe(5)
     expect(state.encounter).toBe(1)
+    expect(state.phase).toBe('playing')
+  })
+
+  it('ends a single 幅 when its last encounter is cleared and awards seals and a grade', () => {
+    const state = rules.createGame({ level: '1-1', seed: 1 })
+    for (let i = 0; i < 60 * 30 && state.phase === 'playing'; i++) {
+      const target = state.enemies.find((e: Any) => e.alive && e.delay <= 0)
+      const move = target ? (Math.abs(target.x - state.player.x) > 40 ? Math.sign(target.x - state.player.x) : 0) : 1
+      rules.step(state, { move, slashPressed: Boolean(target) && i % 10 === 0 }, DT)
+    }
+    expect(state.reason).toBe('clear')
+    const result = rules.result(state)
+    expect(result).toMatchObject({ level: '1-1', code: 101, cleared: true, kills: 5 })
+    expect(result.seals & 3).toBe(3)
+    expect(result.grade).toBeGreaterThanOrEqual(1)
+    expect(state.bonus.flawless).toBe(600)
+  })
+
+  it('awards each seal only for its own condition and grades by score', () => {
+    const state = rules.createGame({ level: '1-2' })
+    expect(rules.evaluate(state)).toEqual({ seals: 0, grade: 0 })
+    state.reason = 'clear'
+    state.player.damageTaken = 2
+    state.player.score = 0
+    expect(rules.evaluate(state)).toEqual({ seals: 1, grade: 1 })
+    state.player.damageTaken = 1
+    state.player.executions = 3
+    state.player.score = levels.level('1-2').grades[1]
+    expect(rules.evaluate(state)).toEqual({ seals: 7, grade: 3 })
+    expect(rules.challenge(state)).toMatchObject({ value: 3, goal: 3, met: true })
+    const scroll = rules.createGame({ level: '1-scroll' })
+    scroll.reason = 'clear'; scroll.time = 400
+    expect(rules.evaluate(scroll).seals & 4).toBe(0)
+    scroll.time = 300
+    expect(rules.evaluate(scroll).seals & 4).toBe(4)
+  })
+
+  it('counts air kills, arrow kills and boss executions for challenges', () => {
+    const state = arena()
+    const crow = place(state, 'crow', 1440)
+    crow.y = state.player.y - 40
+    state.player.onGround = false; state.player.y -= 40; state.player.vy = -200
+    run(state, 14, (i) => ({ slashPressed: i === 0 }))
+    expect(crow.alive).toBe(false)
+    expect(state.player.airKills).toBe(1)
+    const shooter = arena()
+    const archer = place(shooter, 'archer', 1700, { facing: -1 })
+    shooter.projectiles.push({ id: 900, type: 'arrow', owner: 'enemy', x: 1450, y: shooter.player.y - 30, vx: -470, vy: 0, life: 2, source: archer.id, dead: false })
+    run(shooter, 1, { slashPressed: true })
+    run(shooter, 60)
+    expect(archer.alive).toBe(false)
+    expect(shooter.player.deflectKills).toBe(1)
   })
 
   it('chains three slash stages and resets after a pause', () => {

@@ -19,12 +19,12 @@ describe('game registry', () => {
     for (const game of packedGames) {
       const value = packed(game.id)
       const parsed = game.parse({ ...value, token: 'secret', nonce: 'private' })!
-      expect(parsed).toEqual(value)
+      expect(parsed).toMatchObject(value)
       const url = new URL(resultShareLink(game, parsed, 'http://localhost:5173', 'friend-code'))
       expect(url.origin).toBe('https://xiaban.xyz')
       expect(url.pathname).toBe(`/games/${game.id}/share`)
       expect(url.searchParams.get('inv')).toBe('friend-code')
-      expect(game.read(url.hash)).toEqual(value)
+      expect(game.read(url.hash)).toMatchObject(value)
       expect(url.toString()).not.toMatch(/secret|private|own=/)
       expect(game.shareText(parsed)).toContain(game.name)
     }
@@ -32,7 +32,7 @@ describe('game registry', () => {
 
   it('gives every game a poster line and a real expression', () => {
     for (const game of packedGames) {
-      const copy = game.poster(packed(game.id))
+      const copy = game.poster(game.parse(packed(game.id))!)
       expect(copy.name).toBe(game.name)
       expect(copy.cheer.length).toBeGreaterThan(4)
       expect(EXPRESSION_NAMES).toContain(toSpec(copy.face).expression)

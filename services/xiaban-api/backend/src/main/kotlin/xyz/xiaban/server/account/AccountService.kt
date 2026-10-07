@@ -30,6 +30,7 @@ class AccountService(private val db: Db, private val profiles: ProfileService, p
                 put("avatar", rows("select user_id,encode(image,'base64') as jpeg_base64,updated_at from user_avatars where user_id=?").firstOrNull() ?: JsonNull)
                 put("quizAttempts", rows("select quiz_id,version,answers::text,cursor,completed_at,client_updated_at,updated_at from quiz_attempts where user_id=?"))
                 put("gameSessions", rows("select id,game_id,started_at,finished_at,score,lines,max_tile from game_sessions where user_id=? order by started_at"))
+                put("gameSaves", rows("select game_id,data::text as data,client_updated_at,updated_at from game_saves where user_id=? order by game_id"))
                 put("afterworkChoices", rows("select work_day,activity_id,selected_at from afterwork_choices where user_id=? order by work_day"))
                 put("afterworkPreferences", rows("select preferred_activity_id,prompt_dismissed_at::text from afterwork_preferences where user_id=?").firstOrNull() ?: JsonNull)
                 put("account", rows("select email, created_at, terms_version, terms_accepted_at, overseas_consent_at, recall_opt_in, timezone from users where id = ?").firstOrNull() ?: JsonNull)
