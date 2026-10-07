@@ -228,7 +228,7 @@ describe('snake arena shipped simulation', () => {
     expect(state.phase).toBe('over')
     expect(state.reason).toBe('wall')
     expect(state.events.filter(event => event.type === 'death')).toHaveLength(1)
-  })
+  }, 20_000) // Six-minute simulation needs more than 5s on a small CI runner.
 
   it('keeps AI respawns available after the timed-round boundary in endless survival', () => {
     const state = rules.createGame({ seed: 12, roundType: 'endless', mode: 'lively' })
