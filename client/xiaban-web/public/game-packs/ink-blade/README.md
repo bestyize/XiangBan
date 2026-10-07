@@ -2,6 +2,8 @@
 
 A landscape side-scrolling action game painted entirely by code in an ink-wash style. Each run is one scroll of about three minutes: 山门 → 竹林 → 鸦岭 → 断桥 → 夜雨 → a moonlit duel with the boss 无常. The pack loads no image, font or audio files.
 
+The design baseline (art style, gameplay, level layout, tuning values and the consistency rules for new content) is [PRD_水墨剑客.md](../../../../../docs/product/PRD_水墨剑客.md). Read it before changing the game, and keep its tables in sync with the code.
+
 ## Play
 
 - Touch: drag left/right anywhere on the left 44% of the screen to walk. On the right, 斩 slashes (press repeatedly for a three-stage combo), 跳 jumps (holding gives a higher jump, and you can jump again in the air), 闪 dashes with brief invulnerability, and 一笔 unleashes a full-screen stroke once 墨意 is full.
