@@ -12,7 +12,7 @@
   const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches
   const coarsePointer = matchMedia('(pointer: coarse)').matches
   const foodColors = ['#ff4e6a', '#ffc72c', '#a65cec', '#28b9f5', '#71ce36']
-  let mode = entryParams.get('difficulty') === 'lively' ? 'lively' : 'cozy'
+  const mode = 'cozy' // Old links remain valid; the arena now has one balanced difficulty.
   let roundType = entryParams.get('round') === 'endless' ? 'endless' : 'timed'
   let state = rules.createGame({ mode, roundType }), phase = 'welcome', lastResult = null
   let width = 0, height = 0, dpr = 1, camera = { x: 1200, y: 850, zoom: 1 }
@@ -25,6 +25,61 @@
   let view = null, preferredRotation = 1
   const hostSafeArea = { top: 0, right: 0, bottom: 0, left: 0 }
   const keys = new Set(), particles = [], floats = []
+  const memoryWallet = globalThis.XiabanSnakeEconomy.createMemoryWallet()
+  let wallet = null, walletBusy = false, requestCounter = 0, roundKey = '', settled = false
+  const walletRequests = new Map()
+
+  function refreshWalletUI() {
+    $('coinBalance').textContent = wallet ? wallet.coins : '…'
+    $('walletHint').textContent = wallet ? `已有 ${wallet.shields} 张保护卡${wallet.startShieldSeconds ? ' · 下局开局保护5秒' : ''}` : '糖果币连接中'
+    for (const id of ['buyShieldButton', 'buyResultShieldButton']) {
+      $(id).disabled = walletBusy || !wallet || wallet.coins < wallet.prices.shield
+    }
+    $('shieldPrice').textContent = `${wallet?.prices.shield ?? 20} 糖果币 · 3秒保护`
+    $('shieldCount').textContent = wallet?.shields ?? 0
+    $('shieldButton').disabled = walletBusy || !wallet?.shields
+    $('reviveButton').disabled = walletBusy || !wallet || wallet.coins < wallet.prices.revive
+    $('reviveButton').textContent = wallet ? `${wallet.prices.revive} 糖果币续命 · 余额 ${wallet.coins}` : '正在连接糖果币…'
+    $('finishButton').disabled = walletBusy
+    $('startButton').disabled = walletBusy
+    $('restartButton').disabled = walletBusy
+  }
+  function acceptWallet(value) {
+    if (!value || !Number.isSafeInteger(value.coins) || value.coins < 0 || !Number.isSafeInteger(value.shields) || value.shields < 0 || ![0, 5].includes(value.startShieldSeconds) || !value.prices) return
+    wallet = value; refreshWalletUI()
+  }
+  function requestWallet(action) {
+    const requestId = Date.now().toString(36) + '_' + (++requestCounter).toString(36)
+    if (window.parent === window) {
+      return (action === 'read' ? memoryWallet.read().then(value => ({ wallet: value, coinsEarned: 0, protectionSeconds: 0 })) : memoryWallet.act(action, { requestId, sessionId: roundKey || undefined, score: state.snakes[0].score, finished: phase === 'result' })).then(response => { acceptWallet(response.wallet); return response })
+    }
+    if (!hostReady) return Promise.reject(new Error('糖果币还在连接，请稍后再试'))
+    return new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => { walletRequests.delete(requestId); reject(new Error('糖果币暂未连接，请重试')) }, 10000)
+      walletRequests.set(requestId, { resolve, reject, timeout })
+      postToHost('game.wallet', { requestId, action, roundKey })
+    })
+  }
+  async function buyShield() {
+    if (walletBusy) return
+    walletBusy = true; refreshWalletUI()
+    try { await requestWallet('buy_shield'); toast('保护卡准备好了，局内点一下就能保护3秒') }
+    catch (cause) { toast(cause.message || '兑换暂未完成，请重试') }
+    finally { walletBusy = false; refreshWalletUI() }
+  }
+  async function useShield() {
+    if (phase !== 'playing' || countdown > 0 || walletBusy || !wallet?.shields) return
+    walletBusy = true; phase = 'action'; refreshWalletUI()
+    const rotation = view?.rotation
+    try {
+      const response = await requestWallet('use_shield')
+      rules.activateShield(state, response.protectionSeconds); needsDraw = true; toast('保护开启，3秒内放心转向')
+    } catch (cause) { toast(cause.message || '保护卡暂未启用') }
+    finally {
+      walletBusy = false; phase = 'playing'; accumulator = 0; refreshWalletUI()
+      if (document.hidden || view?.rotation !== rotation) pause('准备好后，继续这一局。')
+    }
+  }
 
   function postToHost(type, payload = {}) {
     if (!hostReady || !nonce || window.parent === window) return
@@ -33,14 +88,22 @@
 
   function syncRound() {
     if (!hostReady || !roundStarted || resultPosted) return
-    if (!roundPosted) { roundPosted = true; postToHost('game.start') }
+    if (!roundPosted) { roundPosted = true; postToHost('game.start', { roundKey }) }
     postToHost('game.progress', { score: state.snakes[0].score })
-    if (state.phase === 'over' && !resultPosted) { resultPosted = true; postToHost('game.result', { score: state.snakes[0].score }) }
+    if ((phase === 'result' || leaving) && !resultPosted) { resultPosted = true; postToHost('game.result', { score: state.snakes[0].score }) }
   }
 
   window.addEventListener('message', (event) => {
     const data = event.data
-    if (!nonce || event.source !== window.parent || !data || data.channel !== 'xiaban.game-host' || data.protocol !== 1 || data.nonce !== nonce || !['host.init', 'host.layout'].includes(data.type)) return
+    if (!nonce || event.source !== window.parent || !data || data.channel !== 'xiaban.game-host' || data.protocol !== 1 || data.nonce !== nonce || !['host.init', 'host.layout', 'host.wallet'].includes(data.type)) return
+    if (data.type === 'host.wallet') {
+      const pending = walletRequests.get(data.requestId)
+      if (!pending) return
+      walletRequests.delete(data.requestId); clearTimeout(pending.timeout)
+      if (data.error) pending.reject(new Error(data.error))
+      else { acceptWallet(data.wallet); pending.resolve(data) }
+      return
+    }
     if (data.safeArea && typeof data.safeArea === 'object') {
       for (const side of ['top', 'right', 'bottom', 'left']) {
         const value = data.safeArea[side]
@@ -53,6 +116,11 @@
     hostReady = true
     postToHost('game.ready')
     syncRound()
+    void requestWallet('read').catch(() => { $('walletHint').textContent = '糖果币暂未连接，仍可正常玩' })
+    if (roundStarted && state.time === 0 && countdown > 0) {
+      const startingState = state
+      void requestWallet('consume_start_shield').then(response => { if (state === startingState && response.protectionSeconds) rules.activateShield(state, response.protectionSeconds) }).catch(() => {})
+    }
   })
 
   function tone(frequency, duration = 0.08, volume = 0.035, delay = 0) {
@@ -183,9 +251,12 @@
   window.visualViewport?.addEventListener('resize', resize)
 
   function startRound() {
+    if (walletBusy) return
     unlockAudio()
     if (coarsePointer && !document.fullscreenElement) void requestImmersive(false)
     state = rules.createGame({ mode, roundType })
+    roundKey = 'snake_' + Date.now().toString(36) + '_' + (++requestCounter).toString(36)
+    settled = false
     lastResult = null
     $('shareResultButton').disabled = false
     phase = 'playing'; roundStarted = true; roundPosted = false; resultPosted = false
@@ -193,11 +264,13 @@
     resetInput(); particles.length = 0; floats.length = 0
     camera = { x: state.snakes[0].x, y: state.snakes[0].y, zoom: desiredZoom() }
     countdown = 2.4; accumulator = 0; lastProgress = 0; elapsedUI = 1
-    $('welcome').hidden = true; $('pauseOverlay').hidden = true; $('resultOverlay').hidden = true
+    $('welcome').hidden = true; $('pauseOverlay').hidden = true; $('resultOverlay').hidden = true; $('reviveOverlay').hidden = true
     for (const id of ['hud', 'leaderboard', 'mapPanel', 'controls', 'tutorial']) $(id).hidden = false
     $('tutorial').style.opacity = '1'
     $('startButton').blur(); $('restartButton').blur()
     syncRound(); updateHUD(); resize()
+    const startingState = state
+    void requestWallet('consume_start_shield').then(response => { if (state === startingState && response.protectionSeconds) rules.activateShield(state, response.protectionSeconds) }).catch(() => {})
     if (phase === 'playing') toast('3', 800)
   }
 
@@ -214,13 +287,40 @@
     $('resultKills').textContent = player.kills
     $('resultTime').textContent = formatTime(Math.floor(state.time))
     $('bestLabel').textContent = isBest ? '✦ 刷新了本次游玩的最高积分' : '本次游玩最高积分 ' + best
-    $('resultBadge').textContent = state.roundType === 'endless' ? '无尽生存 · 长度第 ' + rank + ' 名' : state.reason === 'timeout' ? '三分钟完成 · 长度第 ' + rank + ' 名' : '快乐收集完成'
+    $('resultBadge').textContent = state.roundType === 'endless' ? '无尽成长 · 长度第 ' + rank + ' 名' : state.reason === 'timeout' ? '三分钟完成 · 长度第 ' + rank + ' 名' : '快乐收集完成'
     $('resultTitle').textContent = state.reason === 'timeout' && rank === 1 ? '今晚，你是快乐小巨蛇' : player.kills > 0 ? '小小一条，也能漂亮反杀' : '今天也有好好长大'
     $('resultDescription').textContent = state.reason === 'wall' ? '小伴：边界有点硬，下次记得转弯。' : state.reason === 'collision' ? '小伴：快乐没白吃，下局绕开它。' : '小伴：吃到的快乐，都算数。'
-    $('resultOverlay').hidden = false; $('controls').hidden = true; $('tutorial').hidden = true; $('toast').hidden = true
+    $('reviveOverlay').hidden = true; $('resultOverlay').hidden = false; $('controls').hidden = true; $('tutorial').hidden = true; $('toast').hidden = true
     syncRound(); updateHUD(); needsDraw = true
     tone(392, 0.13); tone(523, 0.15, 0.03, 0.12)
     $('restartButton').focus({ preventScroll: true })
+    if (!settled) {
+      settled = true; $('coinsEarned').disabled = true; $('coinsEarned').textContent = '正在结算糖果币…'
+      const finishedKey = roundKey
+      void requestWallet('settle').then(response => { if (roundKey === finishedKey) $('coinsEarned').textContent = `本局 +${response.coinsEarned} 糖果币 · 余额 ${response.wallet.coins}` }).catch(() => { if (roundKey === finishedKey) { settled = false; $('coinsEarned').disabled = false; $('coinsEarned').textContent = '糖果币暂未结算，点此重试' } })
+    }
+  }
+  function eliminated() {
+    if (state.reason === 'timeout' || state.reviveUsed) { finishRound(); return }
+    phase = 'fallen'; resetInput(); accumulator = 0
+    $('reviveScore').textContent = state.snakes[0].score
+    $('reviveOverlay').hidden = false; $('controls').hidden = true; $('tutorial').hidden = true; $('toast').hidden = true
+    refreshWalletUI(); needsDraw = true; $('finishButton').focus({ preventScroll: true })
+  }
+  async function revive() {
+    if (phase !== 'fallen' || walletBusy || state.reviveUsed || !wallet || wallet.coins < wallet.prices.revive) return
+    walletBusy = true; refreshWalletUI()
+    try {
+      await requestWallet('revive')
+      if (rules.revivePlayer(state)) {
+        phase = 'playing'; accumulator = 0; resetInput(); countdown = .8
+        camera = { x: state.snakes[0].x, y: state.snakes[0].y, zoom: desiredZoom() }
+        $('reviveOverlay').hidden = true; $('controls').hidden = false; needsDraw = true
+        toast('接着长大吧，5秒保护已开启')
+        if (document.hidden) pause('准备好后，继续这一局。')
+      }
+    } catch (cause) { toast(cause.message || '续命暂未完成，可以结束本局') }
+    finally { walletBusy = false; refreshWalletUI() }
   }
 
   async function shareResult() {
@@ -246,6 +346,10 @@
     leaving = true
     resetInput()
     if (roundStarted) syncRound()
+    if (roundStarted && !settled) {
+      settled = true; phase = 'result'
+      void requestWallet('settle').catch(() => {})
+    }
     try { screen.orientation?.unlock?.() } catch { /* Browser may not expose orientation controls. */ }
     try {
       const exit = document.exitFullscreen || document.webkitExitFullscreen
@@ -266,6 +370,11 @@
     if (countdown > 0) toast(String(Math.ceil(countdown / 0.8)), 800)
     else toast('继续长大吧', 1200)
   })
+  for (const id of ['buyShieldButton', 'buyResultShieldButton']) $(id).addEventListener('click', () => { void buyShield() })
+  $('shieldButton').addEventListener('click', () => { void useShield() })
+  $('reviveButton').addEventListener('click', () => { void revive() })
+  $('finishButton').addEventListener('click', () => { if (!walletBusy && phase === 'fallen') finishRound() })
+  $('coinsEarned').addEventListener('click', () => { if (phase === 'result' && !settled) finishRound() })
   for (const id of ['exitButton', 'welcomeExit', 'pauseExit', 'resultExit']) $(id).addEventListener('click', () => { void exitGame() })
   $('pauseButton').addEventListener('click', () => pause())
   for (const id of ['flipButton', 'welcomeFlip']) $(id).addEventListener('click', () => {
@@ -281,17 +390,6 @@
     } else void requestImmersive()
   })
   $('soundButton').addEventListener('click', () => { sound = !sound; unlockAudio(); updateSoundButton(); tone(660) })
-  for (const button of document.querySelectorAll('[data-mode]')) button.addEventListener('click', () => {
-    mode = button.dataset.mode
-    for (const entry of document.querySelectorAll('[data-mode]')) {
-      const active = entry === button
-      entry.classList.toggle('active', active); entry.setAttribute('aria-pressed', String(active))
-    }
-  })
-  for (const button of document.querySelectorAll('[data-mode]')) {
-    const active = button.dataset.mode === mode
-    button.classList.toggle('active', active); button.setAttribute('aria-pressed', String(active))
-  }
   for (const button of document.querySelectorAll('[data-round-type]')) button.addEventListener('click', () => {
     roundType = button.dataset.roundType
     for (const entry of document.querySelectorAll('[data-round-type]')) {
@@ -374,7 +472,7 @@
   document.addEventListener('keydown', (event) => {
     if (event.ctrlKey || event.altKey || event.metaKey) return
     if (event.key === 'Tab') {
-      const dialog = phase === 'paused' ? $('pauseOverlay') : phase === 'result' ? $('resultOverlay') : phase === 'welcome' ? $('welcome') : null
+      const dialog = phase === 'paused' ? $('pauseOverlay') : phase === 'fallen' ? $('reviveOverlay') : phase === 'result' ? $('resultOverlay') : phase === 'welcome' ? $('welcome') : null
       if (dialog) {
         const buttons = [...dialog.querySelectorAll('button')].filter((button) => !button.disabled && button.getBoundingClientRect().width > 0)
         const index = buttons.indexOf(document.activeElement)
@@ -413,7 +511,7 @@
     $('mass').textContent = Math.floor(player.mass)
     const endless = state.roundType === 'endless'
     $('time').textContent = formatTime(endless ? Math.floor(state.time) : Math.ceil(state.remaining))
-    $('clockLabel').textContent = endless ? '无尽生存' : '三分钟竞技'
+    $('clockLabel').textContent = endless ? '无尽成长' : '三分钟冲分'
     document.querySelector('.clock').classList.toggle('urgent', !endless && state.remaining < 30)
     $('boostButton').style.setProperty('--energy', player.energy)
     $('boostButton').classList.toggle('exhausted', player.energy < 5 || player.mass <= rules.MIN_MASS)
@@ -460,11 +558,16 @@
       if (event.type === 'death') {
         addParticles(event.x, event.y, event.color, 17, 95)
         if (event.killerId === 0 && event.id !== 0) {
-          toast('漂亮！' + state.snakes.find((entry) => entry.id === event.id).name + ' 撞上了你的身体 · +80', 2600)
-          floats.push({ x: event.x, y: event.y, text: '+80 反杀', age: 0, color: '#7b9b63' })
+          toast('漂亮反杀！去收下它留下的糖果 · +' + event.reward, 2300)
+          floats.push({ x: event.x, y: event.y, text: '+' + event.reward + ' 反杀', age: 0, color: '#527b44' })
           tone(660, 0.1); tone(880, 0.13, 0.03, 0.09)
         }
         if (event.id === 0) { tone(330, 0.16, 0.035); tone(220, 0.18, 0.025, 0.12) }
+      }
+      if (event.type === 'milestone') {
+        const names = { 'first-kill': '首次反杀！小蛇也能逆袭', 'giant-slayer': '以小搏大！吃成一条大蛇', 'top-3': '冲进前三啦', 'first-place': '你登上榜首了！' }
+        toast(names[event.key] || ('成长突破 · 长度 ' + event.value), 1900)
+        tone(784, .1); tone(1046, .12, .03, .08)
       }
     }
     const player = state.snakes[0]
@@ -474,7 +577,7 @@
 
   function desiredZoom() {
     const base = Math.max(0.58, Math.min(1.1, height / 510))
-    return base * Math.max(0.77, 1 - Math.max(0, state.snakes[0].mass - 100) / 1500)
+    return base * Math.max(0.84, 1 - Math.log2(1 + Math.max(0, state.snakes[0].mass - 100) / 300) * .035)
   }
 
   const tile = document.createElement('canvas')
@@ -486,17 +589,33 @@
   for (const x of [24, 72]) for (const y of [24, 72]) { tileCtx.fillStyle = '#b8d1ac47'; tileCtx.beginPath(); tileCtx.arc(x, y, 1.1, 0, Math.PI * 2); tileCtx.fill() }
   const pattern = ctx.createPattern(tile, 'repeat')
 
-  function foodSprite(color, special) {
+  function foodSprite(color, shape) {
     const sprite = document.createElement('canvas'); sprite.width = 64; sprite.height = 64
     const c = sprite.getContext('2d')
     c.save(); c.translate(32, 32)
-    const radius = special ? 8 : 5.8
-    // Each food dot is a single solid color, with no gloss or shaded edge.
-    c.fillStyle = color; c.beginPath(); c.arc(0, 0, radius, 0, Math.PI * 2); c.fill()
+    // Original flat geometric treats, each face one vivid color and no glow.
+    c.fillStyle = color; c.beginPath()
+    if (shape === 'star') {
+      for (let point = 0; point < 10; point++) {
+        const angle = -Math.PI / 2 + point * Math.PI / 5, r = point % 2 ? 5.2 : 11
+        if (point) c.lineTo(Math.cos(angle) * r, Math.sin(angle) * r)
+        else c.moveTo(Math.cos(angle) * r, Math.sin(angle) * r)
+      }
+      c.closePath()
+    } else if (shape === 'gem') {
+      c.moveTo(0, -11); c.lineTo(10, 0); c.lineTo(0, 11); c.lineTo(-10, 0); c.closePath()
+    } else if (shape === 'candy') {
+      c.roundRect(-7, -6, 14, 12, 4)
+      c.moveTo(-7, 0); c.lineTo(-12, -6); c.lineTo(-12, 6); c.closePath()
+      c.moveTo(7, 0); c.lineTo(12, -6); c.lineTo(12, 6); c.closePath()
+    } else if (shape === 'fruit') {
+      c.arc(0, 1, 8, 0, Math.PI * 2)
+      c.moveTo(0, -6); c.lineTo(6, -11); c.lineTo(6, -5); c.closePath()
+    } else c.arc(0, 0, 5.8, 0, Math.PI * 2)
+    c.fill()
     c.restore(); return sprite
   }
-  const snacks = foodColors.map((color) => foodSprite(color, false))
-  const treats = foodColors.map((color) => foodSprite(color, true))
+  const foodSprites = Object.fromEntries(['dot', 'candy', 'star', 'fruit', 'gem'].map(shape => [shape, foodColors.map(color => foodSprite(color, shape))]))
 
   function skinSprite(color) {
     const sprite = document.createElement('canvas'); sprite.width = 64; sprite.height = 64
@@ -583,8 +702,8 @@
     }
     for (const food of state.food) {
       if (food.x < left - 25 || food.x > right + 25 || food.y < top - 25 || food.y > bottom + 25) continue
-      const sprite = food.value > 1 ? treats[food.color] : snacks[food.color]
-      const size = food.value > 1 ? 60 : 52
+      const sprite = (foodSprites[food.shape] || foodSprites.dot)[food.color]
+      const size = food.value >= 12 ? 76 : food.value > 1 ? 64 : 52
       ctx.drawImage(sprite, food.x - size / 2, food.y - size / 2, size, size)
     }
     for (const snake of state.snakes) if (snake.id !== 0) drawSnake(snake)
@@ -614,7 +733,7 @@
         const before = Math.ceil(countdown / 0.8)
         countdown = Math.max(0, countdown - dt)
         const after = Math.ceil(countdown / 0.8)
-        if (before !== after) { toast(after ? String(after) : '出发！开局有 ' + (mode === 'cozy' ? 5 : 3) + ' 秒保护，先试试转向。', after ? 800 : 2800); tone(after ? 440 : 660) }
+        if (before !== after) { toast(after ? String(after) : '出发！吃糖果、拦截对手，快乐长大。', after ? 800 : 1800); tone(after ? 440 : 660) }
       } else {
         accumulator += dt
         const input = { angle: inputAngle(), boost: boost || keyboardBoost }
@@ -623,14 +742,14 @@
           handleEvents(rules.step(state, input, 1 / 60)); accumulator -= 1 / 60; ticks += 1
         }
         if (ticks === 4) accumulator = Math.min(accumulator, 1 / 60)
-        if (state.phase === 'over') finishRound()
+        if (state.phase === 'over') eliminated()
         if (state.time > 10 && !$('tutorial').hidden) { $('tutorial').style.opacity = '0'; if (state.time > 12) $('tutorial').hidden = true }
         if (state.time - lastProgress >= 1.5) { lastProgress = state.time; syncRound() }
       }
       elapsedUI += dt
       if (elapsedUI > 0.22) { updateHUD(); elapsedUI = 0 }
     }
-    if (!document.hidden && (phase === 'playing' || needsDraw || (phase === 'result' && particles.length))) {
+    if (!document.hidden && (phase === 'playing' || needsDraw || ((phase === 'result' || phase === 'fallen') && particles.length))) {
       draw(phase === 'paused' ? 0 : dt)
       needsDraw = false
     }
@@ -638,6 +757,8 @@
   }
 
   resize(); updateSoundButton(); updateHUD()
+  refreshWalletUI()
+  if (window.parent === window) void requestWallet('read').catch(() => {})
   camera.zoom = desiredZoom()
   requestAnimationFrame(frame)
 })()

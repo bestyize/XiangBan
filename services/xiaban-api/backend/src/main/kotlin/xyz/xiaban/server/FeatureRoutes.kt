@@ -9,6 +9,10 @@ import io.ktor.server.routing.*
 import io.ktor.utils.io.readBuffer
 import kotlinx.io.readByteArray
 import xyz.xiaban.contracts.common.OkResponse
+import xyz.xiaban.contracts.afterwork.games.SnakeWalletAction
+import xyz.xiaban.contracts.afterwork.games.SnakeWalletApiPaths
+import xyz.xiaban.server.http.badRequest
+import java.net.URI
 import xyz.xiaban.server.afterwork.*
 import xyz.xiaban.server.auth.AUTH_USER
 import xyz.xiaban.server.auth.userId
@@ -37,6 +41,22 @@ fun Route.featureRoutes(services: Services) {
         delete("/api/account/avatar") { services.avatars.remove(call.userId()); call.respond(services.profiles.view(call.userId())) }
         post("/api/games/sessions") { call.respond(services.games.start(call.userId(), call.receive<GameStart>().gameId)) }
         put("/api/games/sessions/{id}") { call.respond(services.games.progress(call.userId(), call.parameters["id"].orEmpty(), call.receive<GameProgress>())) }
+        get(SnakeWalletApiPaths.WALLET) {
+            call.response.header(HttpHeaders.CacheControl, "no-store")
+            call.respond(services.snakeWallet.read(call.userId()))
+        }
+        post(SnakeWalletApiPaths.ACTIONS) {
+            // User routes use bearer authentication; match the admin origin check as defence in depth.
+            val origin = call.request.headers[HttpHeaders.Origin]
+            if (origin != null) {
+                val originHost = runCatching { URI(origin).host }.getOrNull() ?: badRequest("请从本站提交请求", "invalid_origin")
+                val hosts = listOfNotNull(call.request.headers[HttpHeaders.Host], call.request.headers["X-Forwarded-Host"],
+                    runCatching { URI(services.config.publicBaseUrl).authority }.getOrNull())
+                if (hosts.none { it.substringBefore(':').equals(originHost, ignoreCase = true) }) badRequest("请从本站提交请求", "invalid_origin")
+            }
+            call.response.header(HttpHeaders.CacheControl, "no-store")
+            call.respond(services.snakeWallet.act(call.userId(), call.receive<SnakeWalletAction>()))
+        }
         get("/api/quizzes/progress") {
             if (services.profiles.view(call.userId()).accountType != "registered")
                 throw ApiException(HttpStatusCode.Forbidden, "login_required", "登录后可以保存测试进度")

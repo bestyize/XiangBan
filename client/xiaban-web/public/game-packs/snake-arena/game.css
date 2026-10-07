@@ -193,3 +193,51 @@ h1 > span svg { position: absolute; left: 0; width: 100%; bottom: -8px; height: 
   .welcome-art { max-height: 180px; }
 }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+
+/* One arena, two round types; the wallet stays outside the action. */
+.candy-wallet { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 12px 0 14px; padding: 10px 12px; border: 1px solid #e4eadb; border-radius: 16px; background: #fffdf5; color: #45664b; }
+.candy-wallet > div { display: grid; grid-template-columns: auto auto; align-items: baseline; gap: 2px 8px; }
+.candy-wallet > div > span { font-size: 10px; color: #6e8464; }
+.candy-wallet strong { font-size: 22px; font-variant-numeric: tabular-nums; }
+.candy-wallet > div > small { grid-column: 1 / -1; font-size: 9px; color: #6e8464; }
+.candy-wallet button { min-height: 44px; display: flex; align-items: center; gap: 7px; padding: 6px 9px; border: 1px solid #edcf7c; border-radius: 12px; background: #fff3c5; color: #755c23; font-size: 11px; text-align: left; }
+.candy-wallet button svg { width: 20px; height: 20px; flex: none; }
+.candy-wallet button small { display: block; margin-top: 3px; font-size: 9px; }
+.shield-button { position: absolute; z-index: 4; right: max(138px, calc(var(--safe-right) + 126px)); bottom: max(30px, calc(var(--safe-bottom) + 24px)); min-width: 86px; min-height: 48px; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 9px 10px; border: 1px solid #abc5dd; border-radius: 16px; background: #f6fbff; color: #537ba2; font-size: 11px; pointer-events: auto; }
+.shield-button b { padding: 2px 5px; border-radius: 6px; background: #e3eef7; font-size: 11px; }
+.shield-button:disabled { opacity: .6; }
+.result-wallet { grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between; gap: 8px; border-top: 1px solid #e4eadb; padding-top: 8px; margin: 6px 0 10px; color: #5e774f; font-size: 10px; }
+.wallet-link { min-height: 44px; padding: 5px 8px; border: 1px solid #dce6ce; border-radius: 10px; background: #f4f7eb; color: #5e774f; font-size: 10px; }
+.result-card { max-height: calc(100% - 12px); overflow-y: auto; }
+.revive-card { width: 360px; max-height: calc(100% - 12px); overflow-y: auto; padding: 24px; }
+.revive-card > p { margin-bottom: 10px; }
+.revive-score { display: flex; align-items: baseline; justify-content: center; gap: 8px; margin: 12px 0 18px; }
+.revive-score b { color: #527b44; font-size: 32px; font-variant-numeric: tabular-nums; }
+.revive-score span { color: #6e8464; font-size: 10px; }
+@media (max-height: 540px) and (orientation: landscape), (max-width: 540px) and (orientation: portrait) {
+  .candy-wallet { margin: 8px 0 10px; padding: 6px 9px; }
+  .candy-wallet strong { font-size: 19px; }
+  .revive-card { padding: 18px 22px; }
+  .revive-card h2 { font-size: 19px; margin: 10px 0 6px; }
+  .revive-card > p { font-size: 10px; }
+  .revive-score { margin: 8px 0 12px; }
+}
+@media (max-height: 420px) { .result-wallet { grid-column: 1 / -1; margin-top: 0; } }
+.coins-earned { min-height: 44px; padding: 0; background: none; color: #5e774f; font-size: 10px; text-align: left; }
+.coins-earned:disabled { opacity: 1; cursor: default; }
+@media (max-height: 460px) and (orientation: landscape), (max-width: 460px) and (orientation: portrait) {
+  .result-card { width: min(550px, 90%); display: grid; grid-template-columns: 1fr 1fr; grid-template-areas: "badge stats" "title stats" "desc stats" "score wallet" "best wallet" "actions actions" "exit exit"; gap: 5px 18px; padding: 18px 24px 10px; }
+  #resultBadge { grid-area: badge; justify-self: start; }
+  .result-card #resultTitle { grid-area: title; margin: 0; text-align: left; font-size: 20px; }
+  .result-card #resultDescription { grid-area: desc; margin: 0; text-align: left; font-size: 10px; }
+  .result-card .result-score { grid-area: score; margin: 5px 0; }
+  .result-card .result-score strong { font-size: 43px; }
+  .result-card .result-stats { grid-area: stats; flex-direction: row; align-self: stretch; margin: 0; padding: 12px 0; }
+  .result-card .result-stats > div { justify-content: center; }
+  .result-card #bestLabel { grid-area: best; text-align: left; margin: 0; }
+  .result-card .result-wallet { grid-area: wallet; flex-direction: column; justify-content: center; align-items: stretch; gap: 4px; padding-top: 8px; margin: 0; }
+  .result-wallet .coins-earned { min-height: 24px; text-align: center; }
+  .result-card .result-actions { grid-area: actions; }
+  .result-card .result-actions .primary-button { min-height: 44px; }
+  #resultExit { grid-area: exit; margin: 0; padding-top: 6px; min-height: 44px; }
+}

@@ -93,6 +93,7 @@ class Services(
     val quizzes = xyz.xiaban.server.quizzes.QuizRecords(db)
     val games = xyz.xiaban.server.games.GameRecords(db)
     val gameSaves = xyz.xiaban.server.games.GameSaves(db)
+    val snakeWallet = xyz.xiaban.server.games.SnakeWallet(db, clock)
     val afterwork = xyz.xiaban.server.afterwork.AfterworkRecords(db)
     val sessions = SessionService(users, profiles, tokens, flags)
 
@@ -177,7 +178,7 @@ class Services(
     val guardianScheduler = GuardianScheduler(guardian, guardianRepository, users, mail, redis, config.publicBaseUrl, clock)
     val unsubscribeLinks = UnsubscribeLinks(config.jwtSecret, config.publicBaseUrl)
     val recall = RecallJob(db, users, CopySelector(copyLibrary), mail, unsubscribeLinks, config.publicBaseUrl, clock)
-    val emailBinding = EmailBinding(redis, users, profiles, tokens, AccountMerge(db), emailAvailable,
+    val emailBinding = EmailBinding(redis, users, profiles, tokens, AccountMerge(db, clock), emailAvailable,
         { this.mailer.send(it) }, { guardian.reschedule(it) })
     val events = xyz.xiaban.server.events.EventService(db, clock)
     val metrics = xyz.xiaban.server.events.MetricsService(db, clock)

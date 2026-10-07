@@ -6,15 +6,12 @@ export const snakeArena: ResultGame<SnakeResult> = {
   id: 'snake-arena',
   name: '小伴贪吃蛇',
   openDirectly: true,
-  launchParams: (search) => ({
-    ...(search.get('round') === 'endless' ? { round: 'endless' } : {}),
-    ...(search.get('difficulty') === 'lively' ? { difficulty: 'lively' } : {}),
-  }),
+  launchParams: (search): Record<string, string> => search.get('round') === 'endless' ? { round: 'endless' } : {},
   parse: parseSnakeResult,
   canShare: (result, round) => Boolean(round?.finished && result.score === round.score),
   fragment: snakeFragment,
   read: readSnakeResult,
-  challengeQuery: (result): Record<string, string> => result ? { round: result.roundType, difficulty: result.difficulty } : {},
+  challengeQuery: (result): Record<string, string> => result ? { round: result.roundType } : {},
   subtitle: (result) => `${snakeMode(result)} · ${result.score} 分`,
   shareText: (result) => `我在小伴贪吃蛇拿了 ${result.score} 分，存活 ${survivalTime(result.seconds)}，淘汰 ${result.kills} 条 AI 蛇。你能超过我吗？`,
   poster: (result) => {

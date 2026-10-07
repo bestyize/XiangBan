@@ -12,7 +12,7 @@ export function parseSnakeResult(value: unknown): SnakeResult | null {
   if (!value || typeof value !== 'object') return null
   const data = value as Record<string, unknown>
   const integer = (key: string, min: number, max: number) => typeof data[key] === 'number' && Number.isInteger(data[key]) && data[key] >= min && data[key] <= max
-  if (!integer('score', 0, 1e9) || !integer('mass', 32, 1000) || !integer('kills', 0, 1e6) || !integer('seconds', 0, 1e7) ||
+  if (!integer('score', 0, 1e9) || !integer('mass', 32, 1e7) || !integer('kills', 0, 1e6) || !integer('seconds', 0, 1e7) ||
     (data.roundType !== 'timed' && data.roundType !== 'endless') || (data.difficulty !== 'cozy' && data.difficulty !== 'lively')) return null
   return { score: data.score as number, mass: data.mass as number, kills: data.kills as number, seconds: data.seconds as number, roundType: data.roundType as SnakeResult['roundType'], difficulty: data.difficulty as SnakeResult['difficulty'] }
 }
@@ -34,5 +34,5 @@ export function readSnakeResult(fragment: string): SnakeResult | null {
 export function survivalTime(seconds: number): string { return Math.floor(seconds / 60) + ':' + String(seconds % 60).padStart(2, '0') }
 
 export function snakeMode(result: Pick<SnakeResult, 'roundType' | 'difficulty'>): string {
-  return `${result.roundType === 'endless' ? '无尽生存' : '三分钟竞技'} · ${result.difficulty === 'lively' ? '热闹难度' : '轻松难度'}`
+  return result.roundType === 'endless' ? '无尽成长' : '三分钟冲分'
 }
