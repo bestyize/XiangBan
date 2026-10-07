@@ -118,4 +118,6 @@ Obtain the host key from a trusted network and verify its fingerprint against th
 
 Open **Actions → Deploy to Tencent Cloud → Run workflow**, select `main`, and start it. The workflow checks SSH host keys, copies the source archive, builds the images on the server, and runs `docker compose up -d`.
 
+The image build explicitly targets only `server` and `web`: the backend runs `:backend:installDist -x test` (including its JVM API-contract dependency), and the web runs its own `npm run build`. Desktop pets, mobile apps, iOS targets, and planned capability services are not compiled. PostgreSQL and Redis use published images. The archive contains the repository source; uploading another project's source does not build it.
+
 The workflow fails before updating services if the server-side `.env` file or Docker Compose is missing. After deployment, check that the Compose web service is listening on `127.0.0.1:18080`, then test the domain through the existing host Nginx and Certbot-managed HTTPS setup.

@@ -107,7 +107,7 @@ jobs:
           tar -xzf "/tmp/xiaban-$sha.tar.gz" -C "$release"
           rm -f "/tmp/xiaban-$sha.tar.gz"
           docker compose version >/dev/null
-          docker compose -p xiaban --env-file "$root/.env" -f "$release/infra/compose.yaml" build
+          docker compose -p xiaban --env-file "$root/.env" -f "$release/infra/compose.yaml" build server web
           docker compose -p xiaban --env-file "$root/.env" -f "$release/infra/compose.yaml" up -d --remove-orphans
           docker compose -p xiaban --env-file "$root/.env" -f "$release/infra/compose.yaml" ps
           REMOTE
