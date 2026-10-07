@@ -9,7 +9,10 @@ const root = fileURLToPath(new URL('../', import.meta.url))
 const binary = process.argv[2] || path.join(root, 'src-tauri/target/aarch64-apple-darwin/release/bundle/macos/小伴.app/Contents/MacOS/xiaoban-desktop-wallpaper')
 await mkdir(path.join(root, 'artifacts'), { recursive: true })
 const report = path.join(root, `artifacts/smoke-macos-${Date.now()}.json`)
-const child = spawn(binary, ['--smoke-test'], {
+const bundle = path.resolve(binary, '../../..')
+// LaunchServices registration ensures the subsequent open -a calls target the
+// same application, exactly as activating its Dock icon does.
+const child = spawn('/usr/bin/open', ['-W', '-n', bundle, '--env', `XIAOBAN_SMOKE_REPORT=${report}`, '--args', '--smoke-test'], {
   env: { ...process.env, XIAOBAN_SMOKE_REPORT: report }, stdio: ['ignore', 'pipe', 'pipe'],
 })
 let output = ''
@@ -34,10 +37,23 @@ try {
     assert.ok(scene.joinsAllSpaces, '窗口未配置桌面空间行为')
   }
   const wallpaper = result.wallpaper.wallpaper
+  for (const dimension of ['x', 'y', 'width', 'height']) {
+    assert.ok(Math.abs(wallpaper[dimension] - wallpaper.screenFrame[dimension]) < 1,
+      `壁纸 ${dimension} 没有对齐主屏幕：${wallpaper[dimension]} vs ${wallpaper.screenFrame[dimension]}`)
+  }
   assert.ok(wallpaper.level > wallpaper.desktopLevel && wallpaper.level < wallpaper.desktopIconLevel, '壁纸不在桌面背景和图标之间')
   assert.ok(wallpaper.ignoresMouseEvents, '壁纸拦截了桌面输入')
   assert.equal(result.floatingBefore.floating.opaque, false, '悬浮窗不透明')
   assert.equal(result.wallpaper.floating, null, '进入壁纸后残留悬浮窗')
   assert.equal(result.floatingAfter.wallpaper, null, '返回悬浮后残留壁纸窗')
-  console.log(`PASS: macOS 悬浮 → 桌面背景层壁纸 → 悬浮。报告：${report}`)
+  assert.ok(result.dockReopen?.Ok, JSON.stringify(result.dockReopen))
+  assert.equal(result.dockReopen.Ok.cases.length, 3)
+  assert.ok(result.dockReopen.Ok.wallpaperPreserved)
+  for (const state of result.dockReopen.Ok.cases) {
+    assert.ok(state.afterReopen.visible && state.afterReopen.focused)
+    assert.equal(state.afterReopen.minimized, false)
+    assert.equal(state.afterReopen.applicationHidden, false)
+    assert.ok(state.afterReopen.reopenCount > state.beforeReopen.reopenCount)
+  }
+  console.log(`PASS: macOS 模式切换与 Dock 唤起（最小化/窗口隐藏/应用隐藏）。报告：${report}`)
 } finally { clearTimeout(timeout) }
