@@ -43,6 +43,13 @@ select { appearance: auto; width: 100%; height: 37px; border: 1px solid #ffffff1
 input[type=range] { width: 100%; accent-color: #efc17c; height: 15px; margin: 3px 0 0; }
 .range-label { display: flex; justify-content: space-between; font-size: 9px; color: #62717b; }
 .field-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.settings-column { min-height: 0; overflow-y: auto; padding-right: 4px; scrollbar-width: thin; scrollbar-color: #52616d transparent; }
+.settings-column::-webkit-scrollbar { width: 4px; }
+.settings-column::-webkit-scrollbar-thumb { background: #52616d; border-radius: 4px; }
+.settings-column::-webkit-scrollbar-track { background: transparent; }
+.startup-field { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 15px; font-size: 11px; color: #d3d9dc; cursor: pointer; }
+.startup-field small { display: block; margin-top: 4px; color: #81909c; font-size: 9px; }
+.startup-field input { width: 17px; height: 17px; accent-color: #efc17c; cursor: pointer; }
 .actions { display: flex; gap: 10px; margin-top: 23px; }
 .actions button { height: 39px; flex: 1; border-radius: 10px; font-size: 12px; font-weight: 600; }
 .primary { background: #efc17c; border: 1px solid #efc17c; color: #242c34; }
