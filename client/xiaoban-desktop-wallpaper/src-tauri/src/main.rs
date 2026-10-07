@@ -8,44 +8,33 @@ mod macos;
 mod windows;
 #[cfg(any(windows, test))]
 mod runtime;
+mod preferences;
+mod startup;
 
-use serde::{Deserialize, Serialize};
+use preferences::{Preferences, Settings};
+use serde::Serialize;
 use std::{
     collections::HashSet,
-    sync::Mutex,
+    path::PathBuf,
+    sync::{Mutex, atomic::{AtomicBool, Ordering}},
     time::{Duration, Instant},
 };
 use tauri::{Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
-
-#[derive(Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct Settings {
-    mode: String,
-    expression: String,
-    size: f64,
-    theme: String,
-    paused: bool,
-    fps: u32,
-}
-
-impl Default for Settings {
-    fn default() -> Self {
-        Self {
-            mode: "floating".into(),
-            expression: "idle".into(),
-            size: 260.0,
-            theme: "night".into(),
-            paused: false,
-            fps: 60,
-        }
-    }
-}
 
 #[derive(Default)]
 struct DesktopState {
     settings: Mutex<Settings>,
     wallpaper_parent: Mutex<Option<usize>>,
     ready_scenes: Mutex<HashSet<String>>,
+    preferences_path: Mutex<Option<PathBuf>>,
+    preferences_io: Mutex<()>,
+    update_lock: Mutex<()>,
+    autostart_initialized: AtomicBool,
+    startup_name: String,
+    startup_allowed: bool,
+    startup_error: Mutex<Option<String>>,
+    startup_menu: Mutex<Option<tauri::menu::CheckMenuItem<tauri::Wry>>>,
+    isolated: bool,
     #[cfg(target_os = "macos")]
     reopen_count: std::sync::atomic::AtomicU32,
 }
@@ -55,7 +44,103 @@ fn settings(app: &tauri::AppHandle) -> Settings {
 }
 
 fn publish(app: &tauri::AppHandle) {
-    let _ = app.emit("settings-changed", settings(app));
+    let settings = settings(app);
+    let item = app.state::<DesktopState>().startup_menu.lock().unwrap().clone();
+    if let Some(item) = item { let _ = item.set_checked(settings.autostart); }
+    let _ = app.emit("settings-changed", settings);
+}
+
+fn persist(app: &tauri::AppHandle, settings: &Settings) -> Result<(), String> {
+    let state = app.state::<DesktopState>();
+    let _write = state.preferences_io.lock().unwrap();
+    let path = state.preferences_path.lock().unwrap().clone().ok_or("无法找到设置目录")?;
+    preferences::save(&path, &Preferences { settings: settings.clone(),
+        autostart_initialized: state.autostart_initialized.load(Ordering::Relaxed) })
+        .map_err(|error| format!("无法保存设置：{error}"))
+}
+
+fn initialize_preferences(app: &tauri::AppHandle) -> Result<(), String> {
+    let state = app.state::<DesktopState>();
+    let directory = if state.isolated {
+        std::env::var_os("XIAOBAN_TEST_CONFIG_DIR").map(PathBuf::from)
+            .unwrap_or_else(|| std::env::temp_dir().join(format!("xiaoban-smoke-{}", std::process::id())))
+    } else {
+        app.path().app_config_dir().map_err(|e| e.to_string())?
+    };
+    let path = directory.join("preferences.json");
+    let prefs = match preferences::load(&path) {
+        Ok(prefs) => prefs,
+        Err(error) => {
+            *state.startup_error.lock().unwrap() = Some(format!("设置读取失败，已使用默认场景：{error}"));
+            // An unreadable file must never silently turn startup back on.
+            Preferences { autostart_initialized: true, ..Default::default() }
+        }
+    };
+    *state.preferences_path.lock().unwrap() = Some(path);
+    *state.settings.lock().unwrap() = prefs.settings;
+    state.autostart_initialized.store(prefs.autostart_initialized, Ordering::Relaxed);
+    if state.startup_allowed {
+        let result = if !prefs.autostart_initialized {
+            state.autostart_initialized.store(true, Ordering::Relaxed);
+            startup::set(app, settings(app).autostart)
+        } else {
+            match startup::enabled(app) {
+                Ok(true) => startup::refresh(app),
+                Ok(false) => Ok(()),
+                Err(error) => Err(error),
+            }
+        };
+        if let Err(error) = result {
+            *state.startup_error.lock().unwrap() = Some(format!("开机自动启动未能设置：{error}"));
+        }
+        match startup::enabled(app) {
+            Ok(enabled) => state.settings.lock().unwrap().autostart = enabled,
+            Err(error) => {
+                state.settings.lock().unwrap().autostart = false;
+                *state.startup_error.lock().unwrap() = Some(format!("无法读取系统启动设置：{error}"));
+            }
+        }
+        if let Err(error) = persist(app, &settings(app)) {
+            *state.startup_error.lock().unwrap() = Some(error);
+        }
+    } else {
+        state.settings.lock().unwrap().autostart = false;
+    }
+    if std::env::args().any(|argument| argument == "--wallpaper") {
+        state.settings.lock().unwrap().mode = "wallpaper".into();
+    }
+    Ok(())
+}
+
+#[derive(Serialize)]
+struct StartupStatus { available: bool, error: Option<String> }
+
+#[tauri::command]
+fn get_startup_status(app: tauri::AppHandle) -> StartupStatus {
+    let state = app.state::<DesktopState>();
+    let error = state.startup_error.lock().unwrap().clone();
+    StartupStatus { available: state.startup_allowed, error }
+}
+
+#[tauri::command]
+fn set_autostart(app: tauri::AppHandle, enabled: bool) -> Result<Settings, String> {
+    let state = app.state::<DesktopState>();
+    let _update = state.update_lock.lock().unwrap();
+    if !state.startup_allowed { return Err("开发预览不登记开机启动，请使用正式应用设置。".into()); }
+    let previous = settings(&app);
+    startup::set(&app, enabled)?;
+    let mut next = previous.clone();
+    next.autostart = startup::enabled(&app)?;
+    if next.autostart != enabled { return Err("系统未能应用开机启动设置，请在系统设置中检查。".into()); }
+    state.autostart_initialized.store(true, Ordering::Relaxed);
+    if let Err(error) = persist(&app, &next) {
+        let _ = startup::set(&app, previous.autostart);
+        return Err(error);
+    }
+    *state.settings.lock().unwrap() = next;
+    *state.startup_error.lock().unwrap() = None;
+    publish(&app);
+    Ok(settings(&app))
 }
 
 fn open_scene(app: &tauri::AppHandle, mode: &str) -> Result<(), String> {
@@ -164,15 +249,27 @@ fn get_platform() -> &'static str {
 
 #[tauri::command]
 fn get_settings(app: tauri::AppHandle) -> Settings {
+    if app.state::<DesktopState>().startup_allowed {
+        if let Ok(enabled) = startup::enabled(&app) { app.state::<DesktopState>().settings.lock().unwrap().autostart = enabled; }
+    }
     settings(&app)
 }
 
 #[tauri::command]
 async fn set_mode(app: tauri::AppHandle, mode: String) -> Result<Settings, String> {
+    let state = app.state::<DesktopState>();
+    let _update = state.update_lock.lock().unwrap();
     if !["floating", "wallpaper"].contains(&mode.as_str()) {
         return Err("不支持的显示模式".into());
     }
-    open_scene(&app, &mode)?;
+    let previous = settings(&app);
+    let mut next = previous.clone();
+    next.mode = mode.clone();
+    persist(&app, &next)?;
+    if let Err(error) = open_scene(&app, &mode) {
+        let _ = persist(&app, &previous);
+        return Err(error);
+    }
     let old_label = if mode == "wallpaper" {
         "pet"
     } else {
@@ -203,34 +300,9 @@ fn update_settings(
     paused: bool,
     fps: u32,
 ) -> Result<Settings, String> {
-    let expressions = [
-        "idle",
-        "happy",
-        "excited",
-        "laughing",
-        "proud",
-        "curious",
-        "surprised",
-        "shy",
-        "love",
-        "sad",
-        "crying",
-        "annoyed",
-        "angry",
-        "sleepy",
-        "sleeping",
-        "thinking",
-        "speaking",
-        "listening",
-        "waiting",
-        "confused",
-        "greeting",
-        "worried",
-        "charging",
-        "offline",
-        "embarrassed",
-    ];
-    if !expressions.contains(&expression.as_str()) {
+    let state = app.state::<DesktopState>();
+    let _update = state.update_lock.lock().unwrap();
+    if !preferences::EXPRESSIONS.contains(&expression.as_str()) {
         return Err("不支持的表情".into());
     }
     if !size.is_finite() || !(160.0..=420.0).contains(&size) {
@@ -239,19 +311,21 @@ fn update_settings(
     if !["night", "dawn"].contains(&theme.as_str()) || ![30, 60].contains(&fps) {
         return Err("不支持的场景设置".into());
     }
-    {
-        let state = app.state::<DesktopState>();
-        let mut s = state.settings.lock().unwrap();
-        s.expression = expression;
-        s.size = size;
-        s.theme = theme;
-        s.paused = paused;
-        s.fps = fps;
-    }
+    let previous = settings(&app);
+    let mut next = previous.clone();
+    next.expression = expression;
+    next.size = size;
+    next.theme = theme;
+    next.paused = paused;
+    next.fps = fps;
+    persist(&app, &next)?;
     if let Some(pet) = app.get_webview_window("pet") {
-        pet.set_size(tauri::LogicalSize::new(size * 1.5, size * 1.22))
-            .map_err(|e| e.to_string())?;
+        if let Err(error) = pet.set_size(tauri::LogicalSize::new(size * 1.5, size * 1.22)) {
+            let _ = persist(&app, &previous);
+            return Err(error.to_string());
+        }
     }
+    *state.settings.lock().unwrap() = next;
     publish(&app);
     Ok(settings(&app))
 }
@@ -307,10 +381,8 @@ fn start_drag(window: tauri::WebviewWindow) -> Result<(), String> {
 }
 
 #[tauri::command]
-fn minimize_control(app: tauri::AppHandle) {
-    if let Some(w) = app.get_webview_window("control") {
-        let _ = w.minimize();
-    }
+fn hide_control(app: tauri::AppHandle) -> Result<(), String> {
+    app.get_webview_window("control").ok_or("没有找到设置面板")?.hide().map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -326,7 +398,10 @@ fn present_control(app: &tauri::AppHandle) -> Result<(), String> {
         .ok_or("没有找到小伴设置面板")?;
     window.unminimize().map_err(|error| error.to_string())?;
     window.show().map_err(|error| error.to_string())?;
-    window.set_focus().map_err(|error| error.to_string())
+    window.set_focus().map_err(|error| error.to_string())?;
+    get_settings(app.clone());
+    publish(app);
+    Ok(())
 }
 
 #[tauri::command]
@@ -374,15 +449,82 @@ fn wait_for_scene(app: &tauri::AppHandle, label: &str) -> Result<(), String> {
     Err(format!("场景 {label} 没有在 20 秒内完成前端挂载并显示"))
 }
 
+fn wait_control(app: &tauri::AppHandle, visible: bool) -> Result<serde_json::Value, String> {
+    let window = app.get_webview_window("control").ok_or("没有找到设置面板")?;
+    let deadline = Instant::now() + Duration::from_secs(10);
+    loop {
+        let shown = window.is_visible().map_err(|e| e.to_string())?;
+        let minimized = window.is_minimized().map_err(|e| e.to_string())?;
+        if shown == visible && (!visible || !minimized) {
+            return Ok(serde_json::json!({"visible": shown, "minimized": minimized,
+                "focused": window.is_focused().unwrap_or(false)}));
+        }
+        if Instant::now() >= deadline { return Err("设置面板没有完成隐藏或恢复".into()); }
+        std::thread::sleep(Duration::from_millis(100));
+    }
+}
+
+fn smoke_lifecycle(app: &tauri::AppHandle) -> Result<serde_json::Value, String> {
+    let background_start = std::env::args().any(|arg| arg == "--autostart");
+    let initial_control = wait_control(app, !background_start)?;
+    if app.tray_by_id("xiaoban-tray").is_none() { return Err("没有找到托盘图标".into()); }
+    // Launch a real second process. It must focus this process rather than create another pet.
+    let mut process = std::process::Command::new(std::env::current_exe().map_err(|e| e.to_string())?)
+        .arg("--smoke-single-instance").spawn().map_err(|e| e.to_string())?;
+    let deadline = Instant::now() + Duration::from_secs(10);
+    loop {
+        if let Some(status) = process.try_wait().map_err(|e| e.to_string())? {
+            if !status.success() { return Err("第二个小伴进程未正常退出".into()); }
+            break;
+        }
+        if Instant::now() >= deadline {
+            let _ = process.kill(); let _ = process.wait();
+            return Err("单实例检查超时".into());
+        }
+        std::thread::sleep(Duration::from_millis(100));
+    }
+    let second_instance = wait_control(app, true)?;
+    app.get_webview_window("control").ok_or("没有找到设置面板")?.close().map_err(|e| e.to_string())?;
+    let after_close = wait_control(app, false)?;
+    let pet = app.get_webview_window("pet").ok_or("关闭设置时销毁了桌宠")?;
+    if !pet.is_visible().map_err(|e| e.to_string())? { return Err("关闭设置时隐藏了桌宠".into()); }
+    present_control(app)?;
+    let after_restore = wait_control(app, true)?;
+    let initially_enabled = startup::enabled(app)?;
+    if !initially_enabled { return Err("首次启动没有默认开启自启动".into()); }
+    set_autostart(app.clone(), false)?;
+    let path = app.state::<DesktopState>().preferences_path.lock().unwrap().clone().ok_or("没有设置路径")?;
+    let disabled = preferences::load(&path).map_err(|e| e.to_string())?;
+    if disabled.settings.autostart || !disabled.autostart_initialized || startup::enabled(app)? {
+        return Err("关闭自启动后没有保存或移除系统启动项".into());
+    }
+    set_autostart(app.clone(), true)?;
+    if !startup::enabled(app)? { return Err("无法重新开启自启动".into()); }
+    set_autostart(app.clone(), false)?;
+    let previous = settings(app);
+    update_settings(app.clone(), "happy".into(), 300.0, "dawn".into(), false, 30)?;
+    let restored = preferences::load(&path).map_err(|e| e.to_string())?;
+    if restored.settings != settings(app) { return Err("场景设置没有正确持久化".into()); }
+    update_settings(app.clone(), previous.expression, previous.size, previous.theme, previous.paused, previous.fps)?;
+    Ok(serde_json::json!({"initialControl": initial_control, "secondInstance": second_instance,
+        "afterClose": after_close, "afterRestore": after_restore, "trayPresent": true,
+        "petPreserved": true, "autostartDefaultEnabled": initially_enabled,
+        "autostartToggleAndPersistence": true, "scenePersistence": true,
+        "testStartupName": app.state::<DesktopState>().startup_name}))
+}
+
 fn setup_tray(app: &tauri::App) -> tauri::Result<()> {
     use tauri::{
-        menu::{Menu, MenuItem},
+        menu::{CheckMenuItem, Menu, MenuItem},
         tray::TrayIconBuilder,
     };
-    let control = MenuItem::with_id(app, "control", "打开小伴控制台", true, None::<&str>)?;
+    let control = MenuItem::with_id(app, "control", "打开小伴设置", true, None::<&str>)?;
     let poke = MenuItem::with_id(app, "poke", "戳戳小伴", true, None::<&str>)?;
+    let autostart = CheckMenuItem::with_id(app, "autostart", "开机自动启动",
+        app.state::<DesktopState>().startup_allowed, settings(app.handle()).autostart, None::<&str>)?;
     let exit = MenuItem::with_id(app, "exit", "退出小伴", true, None::<&str>)?;
-    let menu = Menu::with_items(app, &[&control, &poke, &exit])?;
+    let menu = Menu::with_items(app, &[&control, &poke, &autostart, &exit])?;
+    *app.state::<DesktopState>().startup_menu.lock().unwrap() = Some(autostart);
     // A small built-in icon keeps this prototype independent of image assets.
     let mut rgba = vec![0u8; 32 * 32 * 4];
     for y in 3usize..29 {
@@ -400,7 +542,7 @@ fn setup_tray(app: &tauri::App) -> tauri::Result<()> {
             rgba[idx..idx + 4].copy_from_slice(&color);
         }
     }
-    TrayIconBuilder::new()
+    let builder = TrayIconBuilder::with_id("xiaoban-tray")
         .icon(tauri::image::Image::new_owned(rgba, 32, 32))
         .tooltip("小伴 · 桌面陪伴")
         .menu(&menu)
@@ -411,10 +553,22 @@ fn setup_tray(app: &tauri::App) -> tauri::Result<()> {
             "poke" => {
                 let _ = app.emit("pet-poke", ());
             }
+            "autostart" => {
+                if let Err(error) = set_autostart(app.clone(), !get_settings(app.clone()).autostart) {
+                    let _ = present_control(app);
+                    let _ = app.emit("desktop-error", error);
+                }
+            }
             "exit" => app.exit(0),
             _ => {}
-        })
-        .build(app)?;
+        });
+    #[cfg(windows)]
+    let builder = builder.show_menu_on_left_click(false).on_tray_icon_event(|tray, event| {
+        if matches!(event, tauri::tray::TrayIconEvent::Click {
+            button: tauri::tray::MouseButton::Left, button_state: tauri::tray::MouseButtonState::Up, ..
+        }) { let _ = present_control(tray.app_handle()); }
+    });
+    builder.build(app)?;
     Ok(())
 }
 
@@ -424,17 +578,36 @@ fn main() {
     if !runtime::windows::before_start() {
         return;
     }
-    let mut state = DesktopState::default();
-    if std::env::args().any(|argument| argument == "--wallpaper") {
-        state.settings.get_mut().unwrap().mode = "wallpaper".into();
-    }
-    let app = tauri::Builder::default().manage(state)
+    let isolated = std::env::args().any(|argument| ["--smoke-test", "--smoke-single-instance"].contains(&argument.as_str()));
+    let startup_id = std::env::var("XIAOBAN_TEST_STARTUP_ID").ok()
+        .filter(|value| !value.is_empty() && value.bytes().all(|c| c.is_ascii_digit()))
+        .unwrap_or_else(|| std::process::id().to_string());
+    let startup_name = if isolated { format!("XiaoBanStartupSmoke-{startup_id}") }
+        else { "XiaoBanDesktop".into() };
+    let _test_cleanup = startup::TestEntryGuard(isolated.then(|| startup_name.clone()));
+    let state = DesktopState { startup_name: startup_name.clone(), isolated,
+        startup_allowed: !cfg!(debug_assertions) || isolated, ..Default::default() };
+    let mut context = tauri::generate_context!();
+    if isolated { context.config_mut().identifier.push_str(".smoke"); }
+    else if cfg!(debug_assertions) { context.config_mut().identifier.push_str(".development"); }
+    let builder = tauri::Builder::default()
+        .plugin(tauri_plugin_single_instance::init(|app, arguments, _| {
+            if !arguments.iter().any(|arg| arg == "--autostart") { let _ = present_control(app); }
+        }));
+    #[cfg(target_os = "macos")]
+    let builder = builder.plugin(tauri_plugin_autostart::Builder::new().app_name(startup_name).arg("--autostart").build());
+    let app = builder.manage(state)
         .invoke_handler(tauri::generate_handler![get_platform, get_settings, set_mode, update_settings, poke,
-            scene_ready, set_hit_test, start_drag, minimize_control, show_control, quit, get_diagnostics])
+            scene_ready, set_hit_test, start_drag, hide_control, show_control, quit, get_diagnostics,
+            get_startup_status, set_autostart])
         .setup(|app| {
+            initialize_preferences(app.handle()).map_err(std::io::Error::other)?;
             setup_tray(app)?;
             let initial_mode = settings(app.handle()).mode;
             open_scene(app.handle(), &initial_mode).map_err(std::io::Error::other)?;
+            if !std::env::args().any(|argument| argument == "--autostart") {
+                present_control(app.handle()).map_err(std::io::Error::other)?;
+            }
             #[cfg(windows)] windows::start_cursor_bridge(app.handle().clone());
             #[cfg(target_os = "macos")] macos::start_cursor_bridge(app.handle().clone());
             if std::env::args().any(|a| a == "--smoke-test") {
@@ -443,6 +616,7 @@ fn main() {
                     // Synchronize on the actual frontend handshake, including
                     // cold WKWebView startup on a CI Mac.
                     let startup_result = wait_for_scene(&handle, "pet");
+                    let lifecycle = smoke_lifecycle(&handle);
                     let floating_before = get_diagnostics(handle.clone());
                     let wallpaper_result = set_mode(handle.clone(), "wallpaper".into()).await
                         .and_then(|_| wait_for_scene(&handle, "wallpaper"));
@@ -455,7 +629,8 @@ fn main() {
                     #[allow(unused_mut)]
                     let mut report = serde_json::json!({"floatingBefore": floating_before, "wallpaper": wallpaper,
                         "floatingAfter": floating_after, "wallpaperResult": wallpaper_result.map(|_| "ok"),
-                        "floatingResult": floating_result.map(|_| "ok"), "startupResult": startup_result.map(|_| "ok")});
+                        "floatingResult": floating_result.map(|_| "ok"), "startupResult": startup_result.map(|_| "ok"),
+                        "lifecycle": lifecycle});
                     #[cfg(target_os = "macos")]
                     { report["dockReopen"] = serde_json::to_value(dock_reopen).unwrap(); }
                     if let Ok(path) = std::env::var("XIAOBAN_SMOKE_REPORT") {
@@ -469,11 +644,11 @@ fn main() {
         .on_window_event(|window, event| {
             if window.label() == "control" {
                 if let tauri::WindowEvent::CloseRequested { api, .. } = event {
-                    api.prevent_close(); window.app_handle().exit(0);
+                    api.prevent_close(); let _ = hide_control(window.app_handle().clone());
                 }
             }
         })
-        .build(tauri::generate_context!());
+        .build(context);
     #[cfg(windows)]
     let app = match app {
         Ok(app) => app,
@@ -485,6 +660,9 @@ fn main() {
     #[cfg(not(windows))]
     let app = app.expect("小伴启动失败");
     app.run(|_handle, _event| {
+        if matches!(_event, tauri::RunEvent::Exit) && _handle.state::<DesktopState>().isolated {
+            let _ = startup::set(_handle, false);
+        }
         #[cfg(target_os = "macos")]
         if matches!(_event, tauri::RunEvent::Reopen { .. }) {
             // A visible wallpaper also makes has_visible_windows true. Dock

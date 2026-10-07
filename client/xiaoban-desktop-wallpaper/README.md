@@ -2,7 +2,7 @@
 
 Windows / macOS 原型：一个可拖动、透明处点击穿透的悬浮小伴，也可以切换成位于桌面图标下方的动态壁纸。无聊天、账户或业务服务器连接。Windows 缺少运行组件时会联网补齐；组件可用后可离线运行。角色、场景、控制台与互动逻辑共用，桌面宿主分平台接入。
 
-本机生产构建实测：Windows x64 EXE 为 3,632,128 字节（约 3.63MB），内嵌前端与两套程序背景，不包含系统 WebView2。原生切换测试已在主屏 2880×1800、175% 缩放下通过，确认壁纸为 WorkerW 子窗口；验证报告位于本地 `artifacts/smoke-*.json`。本地试用文件为 `artifacts/XiaoBan-Windows-x64.exe`，ZIP 包为 `artifacts/XiaoBan-Windows-x64.zip`。
+本机生产构建实测：Windows x64 EXE 为 3,707,904 字节（约 3.71MB），内嵌前端与两套程序背景，不包含系统 WebView2。原生切换测试已在主屏 2880×1800、175% 缩放下通过，确认壁纸为 WorkerW 子窗口；验证报告位于本地 `artifacts/smoke-*.json`。本地试用文件为 `artifacts/XiaoBan-Windows-x64.exe`，ZIP 包为 `artifacts/XiaoBan-Windows-x64.zip`。
 
 角色核心在本工程的 `src/companion` 内维护，最初从网页纯角色代码原样复制，保留既有 SVG、发光、表情、弹簧参数和互动行为。允许独立演进，不再导入另一个客户端源码。`src/pet.ts` 适配 DOM 与桌面输入；暖光维持原 RobotStage 的尺寸与渐变。
 
@@ -68,10 +68,16 @@ macOS 悬浮窗口使用 AppKit 浮动层；壁纸使用 Core Graphics 的 deskt
 - 壁纸模式：小伴在背景的桌面上，角色上方的桌面点击可以触发反应。应用不拦截桌面鼠标消息，桌面图标继续由 Explorer / Finder 处理。其他窗口遮挡角色时不触发壁纸点击反应。
 - 鼠标位置由平台原生层以约 30Hz 采样，即使离开角色窗口也能跟随。无鼠标/键盘钩子、键盘采集或屏幕录制。
 - 40 秒无鼠标活动后困倦，90 秒后睡觉；这是原版逻辑，鼠标活动会唤醒。
-- 收起控制台后通过任务栏、Dock 或托盘/菜单栏菜单打开。关闭控制台或点“退出小伴”会退出全部窗口，恢复原本可见的壁纸。
+- 关闭设置窗口或点“收起设置”只隐藏设置面板，小伴继续运行。Windows 左键点击托盘图标打开设置，右键显示菜单；macOS 点击菜单栏图标后选择“打开小伴设置”，也可以通过 Dock 唤起。
+- 托盘/菜单栏和设置面板均有“开机自动启动”开关。首次正式运行默认开启；关闭后保存选择，下次启动不会自动重新开启。登录启动时恢复上次的悬浮/壁纸模式、表情、大小、背景、暂停和帧率，只显示小伴，不弹出设置面板。
+- 再次打开程序会唤起已有实例的设置，不创建第二只小伴；“退出小伴”才退出全部窗口，恢复原本可见的壁纸。
 - macOS 点击 Dock 中的小伴图标会显示、取消最小化并聚焦设置面板。壁纸模式中同样有效，不会切换角色模式或重建壁纸窗口。
 
 ## 验证
+
+设置写入当前用户配置目录的 `preferences.json`，通过临时文件替换保存。Windows 使用当前用户 `Run` 启动项 `XiaoBanDesktop`，兼容带空格/中文的 EXE 路径，并识别任务管理器中的禁用状态；macOS 使用 `~/Library/LaunchAgents/XiaoBanDesktop.plist`，随用户登录启动。便携 EXE 或 `.app` 移动后，手动打开一次可刷新已启用的启动路径；macOS 建议放到 Applications，避免下载目录或临时路径失效。登记失败会在设置中提示，不阻止桌宠运行。
+
+开发预览不自动登记自启动，使用独立配置目录。原生 smoke test 使用独立应用标识、独立配置与 `XiaoBanStartupSmoke-<测试标识>` 启动项；Rust 注册测试使用 `XiaoBanStartupTest-<PID>`。结束时仅清理自己的测试项，不修改正式启动项。
 
 ```powershell
 npm run build
@@ -103,7 +109,7 @@ Mac 实机还需检查：原角色的发光与连续表情、桌宠拖动、空�
 启动流程另有四个 Rust 测试，覆盖已安装时不调用安装器、安装后重新检测、虚假成功退出码与失败重试。Windows CI 构建便携包并执行原生准备窗口成功/失败/取消模拟；本地 `-VerifyDownload` 还验证内嵌下载工具、进程清理及真实微软签名，不执行安装。真实缺组件的首次安装需在干净 Windows 虚拟机上验证。
 
 - 提供 Windows 与 macOS 的原生接入；macOS 包面向 Apple 芯片，Intel / Universal 打包未纳入此原型。
-- 壁纸只覆盖主显示器；未实现多显示器管理、开机自启、设置持久化、背景素材导入或签名安装包。
+- 壁纸只覆盖主显示器；未实现多显示器管理、背景素材导入或签名安装包。
 - Windows 壁纸窗口作为 Explorer 背景 WorkerW 子窗口；macOS 壁纸使用 AppKit 桌面层窗口。未修改系统壁纸路径或偏好，退出后原壁纸恢复显示。
 - 模式切换会重新挂载角色，当前的随机动画/睡眠进度会重置。
 - Explorer 重启、显示器热插拔、macOS Stage Manager / 全屏空间等恢复策略需要进一步实机完善。Windows 背景父窗口异常会提示重新切换模式。
@@ -115,6 +121,7 @@ Mac 实机还需检查：原角色的发光与连续表情、桌宠拖动、空�
 - `src/companion`：本应用角色引擎、SVG 和测试；`src/pet.ts`：DOM 帧更新与 SVG 轮廓命中测试。
 - `src/scene.css`：程序绘制的轻量动态背景，无视频资源。
 - `src-tauri/src/main.rs`：控制台、两种窗口生命周期、托盘、命令与诊断。
+- `src-tauri/src/preferences.rs`：本应用设置、兼容旧字段、参数修复与文件保存；`src-tauri/src/startup.rs`：Windows 当前用户注册、macOS 登录启动与测试项清理。
 - `src-tauri/src/runtime`：Windows 启动前检测、原生准备窗口、官方引导程序下载与签名验证。成功/失败/取消的 UI 模拟仅在 debug 构建中启用，不会安装组件；真实缺组件的首次安装还需干净虚拟机验证。
 - `src-tauri/src/windows.rs`：WorkerW 接入、DPI 坐标转换、只读鼠标采样。
 - `src-tauri/src/macos.rs`：AppKit 窗口层级、空间行为、鼠标逻辑点与桌面点击判断。

@@ -14,7 +14,7 @@
     "macOSPrivateApi": true,
     "windows": [{
       "label": "control", "title": "小伴 · 桌面陪伴", "width": 940, "height": 740,
-      "minWidth": 820, "minHeight": 640, "center": true, "backgroundColor": "#111820"
+      "minWidth": 820, "minHeight": 640, "center": true, "visible": false, "backgroundColor": "#111820"
     }],
     "security": {
       "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src ipc: http://ipc.localhost http://127.0.0.1:1420 ws://127.0.0.1:1420"

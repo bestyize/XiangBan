@@ -31,6 +31,7 @@ function apply(settings: Settings) {
     document.querySelector('#size-value')!.textContent = `${config.size}px`
     document.querySelector<HTMLSelectElement>('#theme')!.value = config.theme
     document.querySelector<HTMLSelectElement>('#fps')!.value = String(config.fps)
+    document.querySelector<HTMLInputElement>('#autostart')!.checked = config.autostart
     document.querySelector('#pause')!.textContent = config.paused ? '继续陪伴' : '暂停动画'
     document.querySelector('#current-mode')!.textContent = config.mode === 'floating' ? '悬浮桌宠' : '动态壁纸'
   }
@@ -94,10 +95,11 @@ async function init() {
         <div class="field"><label for="expression">小伴的心情</label><select id="expression">${EXPRESSION_NAMES.map(name => `<option value="${name}">${EXPRESSIONS[name].label}</option>`).join('')}</select></div>
         <div class="field size-field"><label for="size">角色大小 <span id="size-value">260px</span></label><input id="size" type="range" min="160" max="420" step="10" value="260"><div class="range-label"><span>小巧</span><span>醒目</span></div></div>
         <div class="field-pair"><div class="field"><label for="theme">壁纸氛围</label><select id="theme"><option value="night">深夜暖灯</option><option value="dawn">晨光微亮</option></select></div><div class="field"><label for="fps">动画帧率</label><select id="fps"><option value="60">60 FPS · 流畅</option><option value="30">30 FPS · 节能</option></select></div></div>
+        <label class="startup-field" for="autostart"><span>开机自动启动<small id="startup-hint">登录电脑时，让小伴自动出现</small></span><input id="autostart" type="checkbox" checked disabled></label>
         <div class="actions"><button id="poke" class="primary">戳戳小伴</button><button id="pause" class="secondary">暂停动画</button></div>
-        <p id="message" role="status">${desktop ? '悬浮小伴已在桌面上，拖动可以换个位置。' : '这是浏览器预览，请启动桌面程序体验两种模式。'}</p>
+        <p id="message" role="status">${desktop ? '关闭设置后，小伴会继续陪伴。可以从托盘或菜单栏重新打开设置。' : '这是浏览器预览，请启动桌面程序体验两种模式。'}</p>
         <div class="help"><span class="help-dot">i</span><p>悬浮时，透明处可点击穿透；右键小伴打开控制台。<br>壁纸时，桌面图标和应用窗口保持正常操作。</p></div>
-      </section></div><footer><span><i></i>正在陪伴 · <b id="current-mode">悬浮桌宠</b></span><div><button id="diagnostics">运行状态</button><button id="hide">收起控制台</button><button id="quit">退出小伴</button></div></footer>
+      </section></div><footer><span><i></i>正在陪伴 · <b id="current-mode">悬浮桌宠</b></span><div><button id="diagnostics">运行状态</button><button id="hide">收起设置</button><button id="quit">退出小伴</button></div></footer>
     </div>`
     pet = new PetView(document.querySelector<HTMLElement>('.preview-pet')!, { ...config, size: 224 }, state => {
       document.querySelector('#pet-status')!.textContent = EXPRESSIONS[state as keyof typeof EXPRESSIONS]?.label ?? state
@@ -125,7 +127,23 @@ async function init() {
     document.querySelector<HTMLSelectElement>('#fps')!.addEventListener('change', event => update({ fps: Number((event.target as HTMLSelectElement).value) as 30 | 60 }))
     document.querySelector('#pause')!.addEventListener('click', () => update({ paused: !config.paused }))
     document.querySelector('#poke')!.addEventListener('click', () => { if (desktop) invoke('poke').catch(error); else pet.poke() })
-    document.querySelector('#hide')!.addEventListener('click', () => invoke('minimize_control').catch(error))
+    document.querySelector('#hide')!.addEventListener('click', () => invoke('hide_control').catch(error))
+    const startupInput = document.querySelector<HTMLInputElement>('#autostart')!
+    if (desktop) {
+      const status = await invoke<{ available: boolean; error: string | null }>('get_startup_status')
+      startupInput.disabled = !status.available
+      if (!status.available) document.querySelector('#startup-hint')!.textContent = '请在正式桌面应用中设置'
+      if (status.error) error(status.error)
+    } else document.querySelector('#startup-hint')!.textContent = '请在桌面应用中设置'
+    startupInput.addEventListener('change', async () => {
+      startupInput.disabled = true
+      try { apply(await invoke<Settings>('set_autostart', { enabled: startupInput.checked })) }
+      catch (failure) {
+        apply(await invoke<Settings>('get_settings').catch(() => config))
+        error(failure)
+      } finally { startupInput.disabled = false }
+    })
+    window.addEventListener('focus', () => { if (desktop) invoke<Settings>('get_settings').then(apply).catch(error) })
     document.querySelector('#quit')!.addEventListener('click', () => invoke('quit').catch(error))
     document.querySelector('#diagnostics')!.addEventListener('click', async () => {
       try {

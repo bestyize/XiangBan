@@ -1,5 +1,6 @@
 import { spawn } from 'node:child_process'
-import { mkdir, readFile, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, writeFile, unlink } from 'node:fs/promises'
+import os from 'node:os'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 import assert from 'node:assert/strict'
@@ -10,10 +11,12 @@ const binary = process.argv[2] || path.join(root, 'src-tauri/target/aarch64-appl
 await mkdir(path.join(root, 'artifacts'), { recursive: true })
 const report = path.join(root, `artifacts/smoke-macos-${Date.now()}.json`)
 const bundle = path.resolve(binary, '../../..')
+const startupId = Date.now().toString()
+const startupFile = path.join(os.homedir(), 'Library/LaunchAgents', `XiaoBanStartupSmoke-${startupId}.plist`)
 // LaunchServices registration ensures the subsequent open -a calls target the
 // same application, exactly as activating its Dock icon does.
-const child = spawn('/usr/bin/open', ['-W', '-n', bundle, '--env', `XIAOBAN_SMOKE_REPORT=${report}`, '--args', '--smoke-test'], {
-  env: { ...process.env, XIAOBAN_SMOKE_REPORT: report }, stdio: ['ignore', 'pipe', 'pipe'],
+const child = spawn('/usr/bin/open', ['-W', '-n', bundle, '--env', `XIAOBAN_SMOKE_REPORT=${report}`, '--env', `XIAOBAN_TEST_STARTUP_ID=${startupId}`, '--args', '--smoke-test', '--autostart'], {
+  env: { ...process.env, XIAOBAN_SMOKE_REPORT: report, XIAOBAN_TEST_STARTUP_ID: startupId }, stdio: ['ignore', 'pipe', 'pipe'],
 })
 let output = ''
 child.stdout.on('data', data => { output = (output + data).slice(-16000) })
@@ -27,6 +30,12 @@ try {
   const raw = await readFile(report, 'utf8')
   await writeFile(path.join(root, 'artifacts/smoke-macos.json'), raw)
   const result = JSON.parse(raw)
+  assert.ok(result.lifecycle?.Ok, JSON.stringify(result.lifecycle))
+  const lifecycle = result.lifecycle.Ok
+  assert.equal(lifecycle.initialControl.visible, false, '自启动时设置面板不应显示')
+  assert.equal(lifecycle.afterClose.visible, false, '关闭设置应隐藏窗口')
+  assert.ok(lifecycle.afterRestore.visible && lifecycle.secondInstance.visible, '设置未恢复 / 单实例未唤起面板')
+  assert.ok(lifecycle.trayPresent && lifecycle.petPreserved && lifecycle.autostartToggleAndPersistence && lifecycle.scenePersistence)
   assert.equal(result.startupResult.Ok, 'ok', JSON.stringify(result.startupResult))
   assert.equal(result.wallpaperResult.Ok, 'ok', JSON.stringify(result.wallpaperResult))
   assert.equal(result.floatingResult.Ok, 'ok', JSON.stringify(result.floatingResult))
@@ -56,4 +65,7 @@ try {
     assert.ok(state.afterReopen.reopenCount > state.beforeReopen.reopenCount)
   }
   console.log(`PASS: macOS 模式切换与 Dock 唤起（最小化/窗口隐藏/应用隐藏）。报告：${report}`)
-} finally { clearTimeout(timeout) }
+} finally {
+  clearTimeout(timeout)
+  await unlink(startupFile).catch(error => { if (error.code !== 'ENOENT') throw error })
+}
