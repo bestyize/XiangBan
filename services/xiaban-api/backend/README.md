@@ -11,6 +11,9 @@
 - src/main/resources/db/migration：Flyway 迁移；已有迁移不改，追加新迁移。
 - checkin/TitleCatalog.kt、companion/PersonalityCatalog.kt：服务端显示配置。
 - events/EventNames.kt：允许事件与访客策略，属于后端业务规则。
+- games/SnakeWallet.kt：贪吃蛇糖果币与道具策略，V18 追加钱包、每局状态和幂等请求记录。钱包初始 40 币；保护卡 20 币、续命 30 币，每局只能续命一次。结束的本人贪吃蛇记录可结算，每日最多 300 币；分享参与奖励每日一次赠送下一局 5 秒开局保护，不代表验证了真实转发。每日边界统一为 Asia/Shanghai。`GET /api/games/snake-arena/wallet` 与 `POST /api/games/snake-arena/wallet/actions` 使用账户鉴权，事务锁保证余额和道具扣减，成绩与结束状态读取服务器记录。
+
+贪吃蛇钱包随服务器游客账号的数据合并转移：只有一方有钱包时原样保留，双方都有时余额相加后扣除一份 40 币新手赠送，最低为零；不追溯已消耗道具，也不产生欠额。保护卡库存相加，待领取开局保护取较长值；当日结算额度相加封顶 300，分享已领取状态保留。每局消费标记与游戏记录保持原 session ID，已结算局不可二次领奖。同名幂等请求保留目标账号记录，其余随源账号转移。账号导出包含钱包、每局道具状态与操作记录；删除账号时由外键级联清除。
 
 ## 开发与验证
 
