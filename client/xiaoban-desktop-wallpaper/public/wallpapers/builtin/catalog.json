@@ -1,0 +1,83 @@
+{
+  "schemaVersion": 1,
+  "revision": "builtin-1",
+  "items": [
+    {
+      "id": "builtin-soft-hills",
+      "version": "1.0.0",
+      "title": "晴山",
+      "description": "把柔和的绿意，留在每一个日常。",
+      "author": "小伴",
+      "kind": "image",
+      "resource": {
+        "url": "builtin://soft-hills.svg",
+        "sha256": "9918263a6927ff1fe166fd16dde778b580f998b92ec61411a452d32801df9262",
+        "bytes": 962,
+        "mime": "image/svg+xml"
+      },
+      "cover": {
+        "url": "builtin://soft-hills.svg",
+        "sha256": "9918263a6927ff1fe166fd16dde778b580f998b92ec61411a452d32801df9262",
+        "bytes": 962,
+        "mime": "image/svg+xml"
+      }
+    },
+    {
+      "id": "builtin-sea-breeze",
+      "version": "1.0.0",
+      "title": "晨潮",
+      "description": "轻盈流动的晨蓝，给桌面一点呼吸。",
+      "author": "小伴",
+      "kind": "video",
+      "resource": {
+        "url": "builtin://sea-breeze.mp4",
+        "sha256": "7d826966fa300a1a2984ebc6507326e689b32e2e83aef9ad96e6fab5a3d99c7f",
+        "bytes": 77031,
+        "mime": "video/mp4"
+      },
+      "cover": {
+        "url": "builtin://sea-cover.svg",
+        "sha256": "fd3131aaab96ff05748f9a519c8ff4a34e9525233a327b9b3dfd2dd82152edf2",
+        "bytes": 464,
+        "mime": "image/svg+xml"
+      }
+    },
+    {
+      "id": "builtin-mint-orbits",
+      "version": "1.0.0",
+      "title": "浮光",
+      "description": "薄荷色的光晕，在桌面缓缓游弋。",
+      "author": "小伴",
+      "kind": "canvas",
+      "resource": {
+        "url": "builtin://mint-orbits.js",
+        "sha256": "10f5772986faebc1ae58fa43d754c30faca6c78a76cd6074a9b2be9abb76d4dc",
+        "bytes": 972,
+        "mime": "application/javascript"
+      },
+      "cover": {
+        "url": "builtin://orbits-cover.svg",
+        "sha256": "90e5968587211d230cd8bdd0e9bb696a5c219e618f368d236ffd2746ff0a59f3",
+        "bytes": 633,
+        "mime": "image/svg+xml"
+      },
+      "controls": [
+        {
+          "key": "accent",
+          "label": "光晕颜色",
+          "type": "color",
+          "default": "#78b8a4"
+        },
+        {
+          "key": "speed",
+          "label": "流动速度",
+          "type": "range",
+          "default": 0.6,
+          "min": 0.1,
+          "max": 1.5,
+          "step": 0.1
+        }
+      ]
+    }
+  ]
+}

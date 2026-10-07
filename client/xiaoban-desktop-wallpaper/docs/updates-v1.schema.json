@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:xiaoban:desktop:updates:v1",
+  "title": "小伴桌面更新清单 v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "version", "platforms"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?$"
+    },
+    "notes": { "type": "string", "maxLength": 16000 },
+    "publishedAt": { "type": "string", "maxLength": 64 },
+    "platforms": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "windows-x86_64": { "$ref": "#/$defs/artifact" },
+        "darwin-aarch64": { "$ref": "#/$defs/artifact" },
+        "darwin-x86_64": { "$ref": "#/$defs/artifact" }
+      }
+    }
+  },
+  "$defs": {
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["url", "sha256", "bytes", "mime"],
+      "properties": {
+        "url": {
+          "type": "string",
+          "format": "uri",
+          "maxLength": 4096,
+          "pattern": "^(https://|http://(localhost|127\\.0\\.0\\.1|\\[::1\\])(?::[0-9]+)?/)"
+        },
+        "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "bytes": { "type": "integer", "minimum": 1, "maximum": 62914560 },
+        "mime": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}

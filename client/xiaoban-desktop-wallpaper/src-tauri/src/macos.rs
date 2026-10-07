@@ -161,9 +161,9 @@ pub fn start_cursor_bridge(app: tauri::AppHandle) {
                 let pressed = down && !previous_down;
                 let released = !down && previous_down;
                 let desktop = pressed
-                    && handle.get_webview_window("wallpaper").is_some()
+                    && ["wallpaper", "media-a", "media-b"].iter().any(|label| handle.get_webview_window(label).is_some())
                     && desktop_at_point(point, mtm);
-                for label in ["pet", "wallpaper"] {
+                for label in ["pet", "wallpaper", "media-a", "media-b"] {
                     let Some(window) = handle.get_webview_window(label) else {
                         continue;
                     };
@@ -181,17 +181,16 @@ pub fn start_cursor_bridge(app: tauri::AppHandle) {
                         bounds.size.height,
                         view.isFlipped(),
                     );
-                    let _ = window.emit(
-                        "desktop-cursor",
-                        CursorSample {
+                    let sample = CursorSample {
                             x,
                             y,
                             moved,
                             pressed,
                             released,
                             desktop,
-                        },
-                    );
+                        };
+                    if crate::content::media_label(label) { crate::content::send_cursor(&window, &sample); }
+                    else { let _ = window.emit("desktop-cursor", sample); }
                 }
                 Ok(((point.x, point.y), down))
             });

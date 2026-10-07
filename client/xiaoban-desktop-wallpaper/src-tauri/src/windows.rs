@@ -161,7 +161,7 @@ pub fn start_cursor_bridge(app: tauri::AppHandle) {
             let under = unsafe { WindowFromPoint(cursor) };
             let desktop = ["WorkerW", "Progman", "SysListView32", "SHELLDLL_DefView"]
                 .contains(&class_name(under).as_str());
-            for label in ["pet", "wallpaper"] {
+            for label in ["pet", "wallpaper", "media-a", "media-b"] {
                 let Some(window) = app.get_webview_window(label) else {
                     continue;
                 };
@@ -182,7 +182,8 @@ pub fn start_cursor_bridge(app: tauri::AppHandle) {
                     released,
                     desktop: desktop || under == hwnd,
                 };
-                let _ = window.emit("desktop-cursor", sample);
+                if crate::content::media_label(label) { crate::content::send_cursor(&window, &sample); }
+                else { let _ = window.emit("desktop-cursor", sample); }
                 if label == "wallpaper" && ticks % 60 == 0 {
                     let parent = unsafe { GetParent(hwnd) };
                     if parent.is_null() || unsafe { IsWindow(parent) } == 0 {

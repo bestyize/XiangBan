@@ -10,6 +10,8 @@ mod windows;
 mod runtime;
 mod preferences;
 mod startup;
+mod library;
+mod content;
 
 use preferences::{Preferences, Settings};
 use serde::Serialize;
@@ -48,6 +50,7 @@ fn publish(app: &tauri::AppHandle) {
     let item = app.state::<DesktopState>().startup_menu.lock().unwrap().clone();
     if let Some(item) = item { let _ = item.set_checked(settings.autostart); }
     let _ = app.emit("settings-changed", settings);
+    content::sync(app);
 }
 
 fn persist(app: &tauri::AppHandle, settings: &Settings) -> Result<(), String> {
@@ -266,6 +269,14 @@ async fn set_mode(app: tauri::AppHandle, mode: String) -> Result<Settings, Strin
     let mut next = previous.clone();
     next.mode = mode.clone();
     persist(&app, &next)?;
+    if previous.wallpaper_id != "companion" {
+        if mode == "floating" {
+            if let Err(error) = open_scene(&app, "floating") { let _ = persist(&app, &previous); return Err(error); }
+        } else if let Some(window) = app.get_webview_window("pet") { window.destroy().map_err(|e|e.to_string())?; }
+        *state.settings.lock().unwrap() = next;
+        publish(&app);
+        return Ok(settings(&app));
+    }
     if let Err(error) = open_scene(&app, &mode) {
         let _ = persist(&app, &previous);
         return Err(error);
@@ -333,16 +344,29 @@ fn update_settings(
 #[tauri::command]
 fn poke(app: tauri::AppHandle) {
     let _ = app.emit("pet-poke", ());
+    for label in ["media-a", "media-b"] {
+        if let Some(window) = app.get_webview_window(label) {
+            let _ = window.eval("window.dispatchEvent(new Event('content-poke'));".to_string());
+        }
+    }
 }
 
 #[tauri::command]
-fn scene_ready(window: tauri::WebviewWindow) -> Result<(), String> {
+fn scene_ready(window: tauri::WebviewWindow, report: Option<serde_json::Value>) -> Result<(), String> {
+    if content::media_label(window.label()) {
+        if let Some(report) = report {
+            if report.to_string().len() > 16384 { return Err("场景报告过大".into()); }
+            let failed = report.get("error").is_some();
+            window.app_handle().state::<content::ContentState>().reports.lock().unwrap().insert(window.label().into(), report);
+            if failed { return Ok(()); }
+        }
+    }
     window.show().map_err(|e| e.to_string())?;
     #[cfg(target_os = "macos")]
     macos::configure_scene(
         &window,
-        window.label() == "wallpaper",
-        window.label() == "wallpaper",
+        window.label() == "wallpaper" || ["media-a", "media-b"].contains(&window.label()),
+        window.label() == "wallpaper" || ["media-a", "media-b"].contains(&window.label()),
     )?;
     window
         .app_handle()
@@ -425,6 +449,7 @@ fn get_diagnostics(app: tauri::AppHandle) -> serde_json::Value {
             scene["frontendReady"] = serde_json::json!(ready.contains(label));
         }
     }
+    report["contentReports"] = serde_json::to_value(app.state::<content::ContentState>().reports.lock().unwrap().clone()).unwrap();
     report
 }
 
@@ -596,15 +621,35 @@ fn main() {
         }));
     #[cfg(target_os = "macos")]
     let builder = builder.plugin(tauri_plugin_autostart::Builder::new().app_name(startup_name).arg("--autostart").build());
-    let app = builder.manage(state)
-        .invoke_handler(tauri::generate_handler![get_platform, get_settings, set_mode, update_settings, poke,
+    let command_handler: Box<dyn Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Sync> = Box::new(tauri::generate_handler![get_platform, get_settings, set_mode, update_settings, poke,
             scene_ready, set_hit_test, start_drag, hide_control, show_control, quit, get_diagnostics,
-            get_startup_status, set_autostart])
+            get_startup_status, set_autostart, content::get_wallpaper_library, content::import_wallpaper_catalog,
+            content::subscribe_wallpapers, content::apply_wallpaper, content::get_app_info, content::set_update_source,
+            content::check_updates, content::open_download_url]);
+    let app = builder.manage(state).manage(content::ContentState::default())
+        .register_uri_scheme_protocol("wallpaper-asset", |context, request| library::serve(context.app_handle(), request))
+        .invoke_handler(move |invoke| {
+            if !content::permitted(invoke.message.webview_ref().label(), invoke.message.command()) {
+                invoke.resolver.reject("壁纸内容没有桌面控制或系统操作权限");
+                return true;
+            }
+            command_handler(invoke)
+        })
         .setup(|app| {
             initialize_preferences(app.handle()).map_err(std::io::Error::other)?;
             setup_tray(app)?;
             let initial_mode = settings(app.handle()).mode;
-            open_scene(app.handle(), &initial_mode).map_err(std::io::Error::other)?;
+            let media_active = match content::restore(app.handle()) {
+                Ok(active) => active,
+                Err(error) => {
+                    *app.state::<DesktopState>().startup_error.lock().unwrap() = Some(error);
+                    app.state::<DesktopState>().settings.lock().unwrap().wallpaper_id = "companion".into();
+                    false
+                }
+            };
+            if !media_active || initial_mode == "floating" {
+                open_scene(app.handle(), &initial_mode).map_err(std::io::Error::other)?;
+            }
             if !std::env::args().any(|argument| argument == "--autostart") {
                 present_control(app.handle()).map_err(std::io::Error::other)?;
             }
@@ -623,6 +668,9 @@ fn main() {
                     let wallpaper = get_diagnostics(handle.clone());
                     #[cfg(target_os = "macos")]
                     let dock_reopen = macos::smoke_dock_reopen(&handle);
+                    let media = if std::env::var_os("XIAOBAN_WALLPAPER_TEST_URL").is_some() {
+                        Some(content::smoke(&handle).await)
+                    } else { None };
                     let floating_result = set_mode(handle.clone(), "floating".into()).await
                         .and_then(|_| wait_for_scene(&handle, "pet"));
                     let floating_after = get_diagnostics(handle.clone());
@@ -630,7 +678,7 @@ fn main() {
                     let mut report = serde_json::json!({"floatingBefore": floating_before, "wallpaper": wallpaper,
                         "floatingAfter": floating_after, "wallpaperResult": wallpaper_result.map(|_| "ok"),
                         "floatingResult": floating_result.map(|_| "ok"), "startupResult": startup_result.map(|_| "ok"),
-                        "lifecycle": lifecycle});
+                        "lifecycle": lifecycle,"media":media});
                     #[cfg(target_os = "macos")]
                     { report["dockReopen"] = serde_json::to_value(dock_reopen).unwrap(); }
                     if let Ok(path) = std::env::var("XIAOBAN_SMOKE_REPORT") {
