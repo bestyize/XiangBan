@@ -44,8 +44,8 @@
     return Math.min(segmentDistanceSq(a, c, d), segmentDistanceSq(b, c, d), segmentDistanceSq(c, a, b), segmentDistanceSq(d, a, b))
   }
 
-  function radius(snake) { return 13 + Math.min(29, Math.sqrt(Math.max(0, snake.mass)) * 0.7) }
-  function bodyLength(snake) { return 105 + Math.min(3000, Math.max(0, snake.mass) * 2.6) }
+  function radius(snake) { return 8 + Math.min(34, Math.sqrt(Math.max(0, snake.mass - 60)) * 0.65) }
+  function bodyLength(snake) { return 75 + Math.min(3000, Math.max(0, snake.mass) * 1.4) }
   function bodyPoints(snake) { return [snake, ...snake.trail] }
 
   function makeSnake(id, x, y, angle, mass = 60) {
@@ -85,8 +85,9 @@
     state.snakes[0].invulnerable = 2
     const count = 10
     for (let id = 1; id <= count; id += 1) {
-      const mass = opponentMass(state, id <= 4 ? 0 : id <= 8 ? 1 : 2)
-      const snake = findSpawn(state, id, mass, mass >= 650 ? 700 : 600)
+      const tier = id <= 6 ? 0 : id <= 9 ? 1 : 2
+      const mass = opponentMass(state, tier, true)
+      const snake = findSpawn(state, id, mass, [380, 480, 620][tier])
       if (snake) state.snakes.push(snake)
     }
     scatterFood(state, 600)
@@ -98,35 +99,61 @@
   }
 
   function buildBodyGrid(snakes, includeGhosts = false) {
-    const size = 72
+    const size = 96
     const grid = new Map()
     for (const snake of snakes) {
       if (!snake.alive || (snake.invulnerable > 0 && !includeGhosts)) continue
-      const points = bodyPoints(snake)
-      for (let i = 1; i < points.length; i += 1) {
-        const a = points[i - 1], b = points[i]
-        const padding = radius(snake)
-        const entry = { snake, a, b }
-        for (let x = Math.floor((Math.min(a.x, b.x) - padding) / size); x <= Math.floor((Math.max(a.x, b.x) + padding) / size); x += 1) {
-          for (let y = Math.floor((Math.min(a.y, b.y) - padding) / size); y <= Math.floor((Math.max(a.y, b.y) + padding) / size); y += 1) {
-            const key = x + ':' + y
+      const points = snake.trail, padding = radius(snake)
+      // Index four edges as a bounded group; collision still checks every exact
+      // constituent edge, so sharp turns do not become shortcut hitboxes.
+      for (let i = 0; i < points.length; i += 4) {
+        const a = i === 0 ? snake : points[i - 1], b = points[i]
+        const c = points[i + 1] || null, d = points[i + 2] || null, e = points[i + 3] || null
+        let minX = Math.min(a.x, b.x), maxX = Math.max(a.x, b.x), minY = Math.min(a.y, b.y), maxY = Math.max(a.y, b.y)
+        if (c) { minX = Math.min(minX, c.x); maxX = Math.max(maxX, c.x); minY = Math.min(minY, c.y); maxY = Math.max(maxY, c.y) }
+        if (d) { minX = Math.min(minX, d.x); maxX = Math.max(maxX, d.x); minY = Math.min(minY, d.y); maxY = Math.max(maxY, d.y) }
+        if (e) { minX = Math.min(minX, e.x); maxX = Math.max(maxX, e.x); minY = Math.min(minY, e.y); maxY = Math.max(maxY, e.y) }
+        const entry = { snake, a, b, c, d, e, radius: padding, minX, maxX, minY, maxY, stamp: 0 }
+        for (let x = Math.floor((minX - padding) / size); x <= Math.floor((maxX + padding) / size); x += 1) {
+          for (let y = Math.floor((minY - padding) / size); y <= Math.floor((maxY + padding) / size); y += 1) {
+            const key = x + y * 64
             if (!grid.has(key)) grid.set(key, [])
             grid.get(key).push(entry)
           }
         }
       }
     }
-    return { grid, size }
+    return { grid, size, query: 0 }
   }
 
   function nearbyBodies(index, point, reach) {
-    const entries = new Set()
+    const entries = [], stamp = ++index.query
     for (let x = Math.floor((point.x - reach) / index.size); x <= Math.floor((point.x + reach) / index.size); x += 1) {
       for (let y = Math.floor((point.y - reach) / index.size); y <= Math.floor((point.y + reach) / index.size); y += 1) {
-        for (const entry of index.grid.get(x + ':' + y) || []) entries.add(entry)
+        const bucket = index.grid.get(x + y * 64)
+        if (!bucket) continue
+        for (const entry of bucket) {
+          if (entry.stamp === stamp) continue
+          entry.stamp = stamp; entries.push(entry)
+        }
       }
     }
     return entries
+  }
+  function bodyDistanceSq(point, entry) {
+    let distance = segmentDistanceSq(point, entry.a, entry.b)
+    if (entry.c) distance = Math.min(distance, segmentDistanceSq(point, entry.b, entry.c))
+    if (entry.d) distance = Math.min(distance, segmentDistanceSq(point, entry.c, entry.d))
+    if (entry.e) distance = Math.min(distance, segmentDistanceSq(point, entry.d, entry.e))
+    return distance
+  }
+  function hitsBody(previous, head, entry, reach) {
+    if (entry.maxX < Math.min(previous.x, head.x) - reach || entry.minX > Math.max(previous.x, head.x) + reach || entry.maxY < Math.min(previous.y, head.y) - reach || entry.minY > Math.max(previous.y, head.y) + reach) return false
+    const squared = reach * reach
+    return segmentsDistanceSq(previous, head, entry.a, entry.b) < squared
+      || (entry.c && segmentsDistanceSq(previous, head, entry.b, entry.c) < squared)
+      || (entry.d && segmentsDistanceSq(previous, head, entry.c, entry.d) < squared)
+      || (entry.e && segmentsDistanceSq(previous, head, entry.d, entry.e) < squared)
   }
 
   function decideAI(state, snake, index, dt) {
@@ -153,6 +180,7 @@
       desired = Math.atan2(player.y + Math.sin(player.angle) * 95 - snake.y, player.x + Math.cos(player.angle) * 95 - snake.x)
     }
     const obstacles = nearbyBodies(index, snake, 190)
+    const snakeRadius = radius(snake)
     let bestHeading = snake.angle, bestCost = Infinity
     for (const turn of [-1.4, -0.95, -0.55, 0, 0.55, 0.95, 1.4]) {
       const heading = snake.angle + turn
@@ -170,7 +198,10 @@
         }
         for (const entry of obstacles) {
           if (entry.snake.id === snake.id) continue
-          const gap = Math.sqrt(segmentDistanceSq(point, entry.a, entry.b)) - radius(entry.snake) - radius(snake)
+          const clearance = entry.radius + snakeRadius + 55
+          const dx = Math.max(entry.minX - point.x, 0, point.x - entry.maxX), dy = Math.max(entry.minY - point.y, 0, point.y - entry.maxY)
+          if (dx * dx + dy * dy >= clearance * clearance) continue
+          const gap = Math.sqrt(bodyDistanceSq(point, entry)) - entry.radius - snakeRadius
           if (gap < 55) cost += (55 - gap) * (ahead === 40 ? 8 : 3)
         }
       }
@@ -238,9 +269,11 @@
     if (snake.id === 0) { state.phase = 'over'; state.reason = reason }
   }
 
-  function opponentMass(state, tier = Math.floor(state.random() * 3)) {
-    const ranges = [[45, 110], [180, 420], [650, 1100]]
-    const [min, max] = ranges[tier]
+  function opponentMass(state, tier = Math.floor(state.random() * 3), initial = false) {
+    const start = [[35, 75], [85, 150], [180, 260]], grown = [[45, 110], [180, 420], [650, 1100]]
+    const progress = initial ? 0 : clamp(Math.max(state.time / 90, state.snakes[0].mass / 1000), 0, 1)
+    const min = start[tier][0] + (grown[tier][0] - start[tier][0]) * progress
+    const max = start[tier][1] + (grown[tier][1] - start[tier][1]) * progress
     return Math.floor(min + state.random() * (max - min))
   }
 
@@ -262,7 +295,7 @@
         if (point.x < r + 24 || point.y < r + 24 || point.x > WORLD.width - r - 24 || point.y > WORLD.height - r - 24) { clear = false; break }
         if (reserveOpening && segmentDistanceSq(point, player, openingEnd) < (r + 170) ** 2) { clear = false; break }
         for (const entry of nearbyBodies(index, point, r + 75)) {
-          if (segmentDistanceSq(point, entry.a, entry.b) < (r + radius(entry.snake) + 42) ** 2) { clear = false; break }
+          if (bodyDistanceSq(point, entry) < (r + entry.radius + 42) ** 2) { clear = false; break }
         }
         if (!clear) break
       }
@@ -327,7 +360,8 @@
     dt = Math.min(dt, 1 / 30)
     state.time += dt
     state.remaining = state.roundType === 'endless' ? null : Math.max(0, DURATION - state.time)
-    const before = buildBodyGrid(state.snakes, true)
+    const aiDue = state.snakes.some(snake => snake.alive && snake.id !== 0 && !(snake.aiTimer > dt))
+    const before = aiDue ? buildBodyGrid(state.snakes, true) : null
     for (const snake of state.snakes) {
       if (!snake.alive) { if (snake.id !== 0 && state.time >= snake.respawnAt) respawn(state, snake); continue }
       if (snake.id !== 0) decideAI(state, snake, before, dt)
@@ -363,8 +397,8 @@
       const candidates = nearbyBodies(index, snake, r + 12)
       for (const entry of candidates) {
         if (entry.snake.id === snake.id) continue
-        const reach = r + radius(entry.snake) - 2
-        if (segmentsDistanceSq(snake.previous, snake, entry.a, entry.b) < reach * reach) {
+        const reach = r + entry.radius - 2
+        if (hitsBody(snake.previous, snake, entry, reach)) {
           deaths.push({ snake, reason: 'collision', killerId: entry.snake.id }); break
         }
       }
@@ -380,18 +414,21 @@
     const uniqueDeaths = new Map(deaths.map((entry) => [entry.snake.id, entry]))
     for (const entry of uniqueDeaths.values()) killSnake(state, entry.snake, entry.killerId, entry.reason)
 
+    const eaters = state.snakes.filter(snake => snake.alive).map(snake => ({ snake, reach: Math.max(34, radius(snake) + 19) ** 2 }))
     for (let i = state.food.length - 1; i >= 0; i -= 1) {
       const food = state.food[i]
       let eater = null, nearest = Infinity
-      for (const snake of state.snakes) {
-        if (!snake.alive) continue
+      for (const candidate of eaters) {
+        const snake = candidate.snake
         const distance = distanceSq(snake, food)
-        if (distance < (radius(snake) + 19) ** 2 && distance < nearest) { eater = snake; nearest = distance }
+        if (distance < candidate.reach && distance < nearest) { eater = candidate; nearest = distance }
       }
       if (!eater) continue
-      eater.mass = Math.min(MAX_MASS, eater.mass + food.value)
-      eater.score = Math.min(MAX_SCORE, eater.score + food.value * 10)
-      if (eater.id === 0) state.events.push({ type: 'eat', x: food.x, y: food.y, value: food.value, color: food.color })
+      const snake = eater.snake
+      snake.mass = Math.min(MAX_MASS, snake.mass + food.value)
+      snake.score = Math.min(MAX_SCORE, snake.score + food.value * 10)
+      eater.reach = Math.max(34, radius(snake) + 19) ** 2
+      if (snake.id === 0) state.events.push({ type: 'eat', x: food.x, y: food.y, value: food.value, color: food.color })
       state.food.splice(i, 1)
     }
     state.foodTimer += dt
