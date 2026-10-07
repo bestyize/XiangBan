@@ -1,4 +1,4 @@
-param([string]$ExecutablePath)
+﻿param([string]$ExecutablePath)
 $ErrorActionPreference = 'Stop'
 $taskRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $taskExe = if ($ExecutablePath) { [IO.Path]::GetFullPath($ExecutablePath) } else { Join-Path $taskRoot 'src-tauri/target/release/xiaoban-desktop-wallpaper.exe' }
