@@ -11,7 +11,7 @@ class DisplaySettingsTest {
         val store = DisplaySettingsStore(read = { null }, write = { _, _ -> error("must not write defaults") })
         val defaults = store.current()
         assertTrue(defaults.chatTabVisible)
-        assertEquals(listOf("falling-blocks", "merge-2048", "block-puzzle", "water-sort", "snake-arena", "ink-blade"), defaults.games.map { it.id })
+        assertEquals(listOf("falling-blocks", "merge-2048", "block-puzzle", "water-sort", "snake-arena", "ink-blade", "dusk-glider"), defaults.games.map { it.id })
         assertEquals(listOf("mbti", "mbanti", "animal", "afterhours"), defaults.quizzes.map { it.id })
         assertTrue((defaults.games + defaults.quizzes).all { it.visible })
     }
