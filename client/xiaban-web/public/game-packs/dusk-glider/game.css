@@ -1,6 +1,6 @@
 :root {
   color-scheme: light;
-  --cream: #fff6e8; --glass: rgba(255, 248, 238, .72); --coral: #ff8a63; --coral-deep: #e4604a; --gold: #ffc861; --indigo: #2a2850; --muted: #6d6683;
+  --cream: #fff6e8; --glass: rgba(255, 248, 238, .38); --coral: #ff8a63; --coral-deep: #e4604a; --gold: #ffc861; --indigo: #2a2850; --muted: #5b5470;
   --sea: #4aa8d8; --sky: #8fc9ff; --dl-w: 260px;
   --share-accent: #ffc861; --share-ink: #2a2850; --share-hover: #ffd47f; --share-outline: rgba(42, 40, 80, .16); --share-secondary: #fff6e8; --share-secondary-ink: #2a2850; --share-secondary-hover: #ffeed8; --share-focus: #e4604a;
   font-family: "PingFang SC", "HarmonyOS Sans SC", "MiSans", system-ui, sans-serif; color: var(--indigo); background: #f3d9b5;
@@ -91,14 +91,15 @@ svg { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round
 .hold-ring.active { opacity: 1; transform: translate(-50%, -50%) scale(1); }
 
 .overlay { position: absolute; z-index: 10; inset: 0; }
-.welcome { display: flex; align-items: center; padding: max(20px, var(--safe-top)) max(30px, var(--safe-right)) max(20px, var(--safe-bottom)) max(48px, calc(var(--safe-left) + 30px)); background: linear-gradient(90deg, rgba(255, 236, 212, .86) 0%, rgba(255, 226, 198, .6) 34%, rgba(255, 214, 180, .16) 60%, transparent 78%); }
+.welcome { display: flex; align-items: center; padding: max(20px, var(--safe-top)) max(30px, var(--safe-right)) max(20px, var(--safe-bottom)) max(48px, calc(var(--safe-left) + 30px)); background: linear-gradient(90deg, rgba(255, 236, 212, .5) 0%, rgba(255, 226, 198, .26) 32%, rgba(255, 214, 180, .06) 56%, transparent 72%); }
 .welcome-exit { position: absolute; top: max(14px, var(--safe-top)); left: max(14px, var(--safe-left)); z-index: 2; }
 .welcome-flip { position: absolute; top: max(14px, var(--safe-top)); right: max(14px, var(--safe-right)); z-index: 2; }
-.welcome-card { width: min(400px, 48%); max-height: calc(100% - 8px); overflow: auto; padding: 24px 26px 18px; border-radius: 28px; background: var(--glass); -webkit-backdrop-filter: blur(14px) saturate(1.2); backdrop-filter: blur(14px) saturate(1.2); box-shadow: 0 20px 60px rgba(120, 60, 50, .2), inset 0 0 0 1px rgba(255, 255, 255, .7); animation: welcome-in .9s ease-out; }
+.welcome-card { width: min(400px, 48%); max-height: calc(100% - 8px); overflow: auto; padding: 24px 26px 18px; border-radius: 28px; background: var(--glass); -webkit-backdrop-filter: blur(7px) saturate(1.15); backdrop-filter: blur(7px) saturate(1.15); box-shadow: 0 20px 60px rgba(120, 60, 50, .2), inset 0 0 0 1px rgba(255, 255, 255, .55); animation: welcome-in .9s ease-out; }
 @keyframes welcome-in { from { opacity: 0; filter: blur(6px); translate: -12px 0; } }
-.welcome-kicker { margin: 0 0 8px; font-size: 11px; letter-spacing: .3em; color: var(--coral-deep); }
-h1 { margin: 0; font-size: clamp(40px, 6vw, 68px); line-height: 1.1; font-weight: 300; letter-spacing: .26em; color: var(--indigo); text-shadow: 0 2px 20px rgba(255, 200, 97, .55); white-space: nowrap; }
-.welcome-description { margin: 12px 0 20px; font-size: 14px; line-height: 1.9; color: var(--muted); }
+.welcome-kicker { margin: 0 0 8px; font-size: 11px; letter-spacing: .3em; color: var(--coral-deep); text-shadow: 0 1px 6px rgba(255, 248, 238, .9), 0 0 2px rgba(255, 248, 238, .95); }
+h1 { margin: 0; font-size: clamp(30px, 4.2vw, 44px); line-height: 1.15; font-weight: 300; letter-spacing: .24em; color: var(--indigo); text-shadow: 0 1px 8px rgba(255, 248, 238, .95), 0 0 3px rgba(255, 248, 238, .9), 0 2px 20px rgba(255, 200, 97, .45); white-space: nowrap; }
+/* The card is deliberately translucent, so every label carries a soft paper halo to stay legible over the terrain. */
+.welcome-description { margin: 12px 0 20px; font-size: 14px; line-height: 1.9; color: var(--muted); text-shadow: 0 1px 6px rgba(255, 248, 238, .92), 0 0 2px rgba(255, 248, 238, .9); }
 .welcome-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
 .primary-button { display: flex; align-items: center; justify-content: center; gap: 10px; min-height: 50px; padding: 10px 28px; border-radius: 999px; background: linear-gradient(180deg, #ff9b74, var(--coral-deep)); color: #fff; font-size: 19px; font-weight: 600; letter-spacing: .2em; text-indent: .2em; white-space: nowrap; box-shadow: 0 8px 22px rgba(228, 96, 74, .42), inset 0 1px 0 rgba(255, 255, 255, .45); transition: transform .12s, box-shadow .12s; }
 .primary-button svg { width: 20px; height: 20px; stroke-width: 2.2; }
@@ -163,7 +164,7 @@ h1 { margin: 0; font-size: clamp(40px, 6vw, 68px); line-height: 1.1; font-weight
 @keyframes coach-call { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.22); } }
 .game.coaching .prompt { bottom: calc(max(16px, var(--safe-bottom)) + 72px); }
 .howto { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 0 0 16px; padding: 0; list-style: none; }
-.howto li { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 4px 7px; border-radius: 14px; background: rgba(255, 255, 255, .5); text-align: center; }
+.howto li { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 8px 4px 7px; border-radius: 14px; background: rgba(255, 250, 242, .62); text-align: center; }
 .howto svg { width: 100%; max-width: 64px; height: auto; fill: none; stroke-width: 2.4; overflow: visible; }
 .howto .hill { stroke: var(--indigo); opacity: .55; }
 .howto .press { fill: var(--gold); stroke: #e8a53a; stroke-width: 1.5; }
@@ -172,8 +173,7 @@ h1 { margin: 0; font-size: clamp(40px, 6vw, 68px); line-height: 1.1; font-weight
 .howto .fly { stroke: var(--coral-deep); stroke-dasharray: 3 4; }
 .howto .target { stroke: #e8a53a; fill: rgba(255, 200, 97, .35); }
 .howto b { font-size: 13px; font-weight: 600; letter-spacing: .06em; color: var(--indigo); }
-.howto span { font-size: 11px; color: var(--muted); }
-.pause-toggle { margin-top: 2px; }
+.howto span { font-size: 11px; color: var(--muted); }.pause-toggle { margin-top: 2px; }
 
 @media (max-height: 520px) and (orientation: landscape), (max-width: 520px) and (orientation: portrait) {
   :root { --dl-w: 200px; }
@@ -181,10 +181,10 @@ h1 { margin: 0; font-size: clamp(40px, 6vw, 68px); line-height: 1.1; font-weight
   .coach-text strong { font-size: 19px; }
   .game.coaching .prompt { bottom: calc(max(16px, var(--safe-bottom)) + 64px); }
   /* Phones: the card is a compact strip in the corner, so the sunset stays visible behind it. */
-  .welcome { padding-left: max(16px, calc(var(--safe-left) + 12px)); background: linear-gradient(90deg, rgba(255, 236, 212, .6) 0%, rgba(255, 226, 198, .24) 26%, rgba(255, 214, 180, .05) 48%, transparent 62%); }
-  .welcome-card { width: min(280px, 33%); padding: 11px 13px 9px; border-radius: 18px; --glass: rgba(255, 248, 238, .58); }
+  .welcome { padding-left: max(16px, calc(var(--safe-left) + 12px)); background: linear-gradient(90deg, rgba(255, 236, 212, .44) 0%, rgba(255, 226, 198, .16) 24%, rgba(255, 214, 180, .03) 46%, transparent 58%); }
+  .welcome-card { width: min(280px, 33%); padding: 11px 13px 9px; border-radius: 18px; --glass: rgba(255, 248, 238, .34); }
   .welcome-kicker { margin-bottom: 3px; font-size: 9px; letter-spacing: .18em; }
-  h1 { font-size: 26px; letter-spacing: .14em; }
+  h1 { font-size: 21px; letter-spacing: .16em; }
   .welcome-description { margin: 4px 0 8px; font-size: 11px; line-height: 1.55; }
   .welcome-description br { display: none; }
   .welcome-actions { gap: 6px; flex-wrap: nowrap; }
@@ -234,7 +234,7 @@ h1 { margin: 0; font-size: clamp(40px, 6vw, 68px); line-height: 1.1; font-weight
 }
 @media (max-height: 360px) and (orientation: landscape), (max-width: 360px) and (orientation: portrait) {
   /* Shortest screens keep the same grid but with a wider card, so the description never wraps into a column. */
-  h1 { font-size: 22px; }
+  h1 { font-size: 18px; }
   .welcome-kicker { display: none; }
   .welcome-card { width: min(560px, 62%); grid-template-columns: 1fr auto; }
   .welcome-description { font-size: 10px; margin: 6px 0 0; max-width: none; }

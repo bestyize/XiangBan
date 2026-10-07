@@ -256,23 +256,42 @@
     islandTimer = setTimeout(() => { node.hidden = true }, 3300)
   }
 
+  // Sound is on by default. Browsers only allow audio to start inside a user gesture, so the switch shows the
+  // player's intent ("声音 · 开") while the audio engine is actually unlocked on the first tap or key press.
+  let soundWanted = true
+
   function updateSoundButtons() {
-    const on = Boolean(audio?.enabled)
+    const on = soundWanted
     $('soundButton').setAttribute('aria-pressed', String(on))
     $('soundButton').setAttribute('aria-label', on ? '关闭声音' : '开启声音')
     $('soundWaves').setAttribute('d', on ? 'M15 8q4 4 0 8m3-11q7 7 0 14' : 'm16 9 5 6m0-6-5 6')
     $('welcomeSound').setAttribute('aria-pressed', String(on))
     $('welcomeSound').textContent = on ? '声音 · 开' : '声音 · 关'
   }
-  function toggleSound() {
+
+  function applySound() {
     if (!audio) return
-    audio.setEnabled(!audio.enabled)
-    audio.resume()
+    audio.setEnabled(soundWanted)
+    if (soundWanted) audio.resume()
     updateSoundButtons()
-    audio.play('ui')
+  }
+
+  function toggleSound() {
+    soundWanted = !soundWanted
+    applySound()
+    audio?.play('ui')
   }
   $('soundButton').addEventListener('click', toggleSound)
   $('welcomeSound').addEventListener('click', toggleSound)
+
+  // Unlock the audio context on the first gesture, wherever it happens, when sound is still wanted.
+  // The sound controls are skipped: their own handler decides the new state.
+  function unlockSound(event) {
+    if (!soundWanted || audio?.enabled) return
+    if (event?.target instanceof Element && event.target.closest('#soundButton, #welcomeSound')) return
+    applySound()
+  }
+  for (const type of ['pointerdown', 'keydown', 'touchstart']) window.addEventListener(type, unlockSound, { passive: true })
 
   // ------------------------------------------------------------ guidance
 
@@ -384,7 +403,7 @@
 
   function startRound() {
     if (!renderer) return
-    audio?.resume()
+    applySound()
     if (touchUI && !document.fullscreenElement) void requestImmersive(false)
     state = rules.createGame()
     world.reset(state)
@@ -419,7 +438,7 @@
 
   function resume() {
     if (document.hidden || phase !== 'paused') return
-    audio?.resume(); resetInput()
+    applySound(); resetInput()
     phase = 'playing'; lastFrame = 0
     setOverlays('playing')
     $('resumeButton').blur()
