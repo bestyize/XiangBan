@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { runInNewContext } from 'node:vm'
 import { describe, expect, it } from 'vitest'
 
-const code = readFileSync(new URL('../../public/game-packs/result-share.js', import.meta.url), 'utf8')
+const code = readFileSync(new URL('../../../public/game-packs/result-share.js', import.meta.url), 'utf8')
 function runtime(embedded: boolean) {
   const events: Record<string, (event?: unknown) => void> = {}
   const messages: unknown[] = []

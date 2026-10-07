@@ -24,7 +24,7 @@ interface Rules {
   rankings(state: State): Snake[]
 }
 const context: { XiabanSnakeArena?: Rules } = {}
-runInNewContext(readFileSync(new URL('../../public/game-packs/snake-arena/rules.js', import.meta.url), 'utf8'), context)
+runInNewContext(readFileSync(new URL('../../../public/game-packs/snake-arena/rules.js', import.meta.url), 'utf8'), context)
 const rules = context.XiabanSnakeArena!
 
 function solo() {

@@ -20,7 +20,7 @@ interface LayoutApi {
 
 // Execute the same classic script used by the game, with no duplicate layout algorithm.
 const context: { XiabanWaterSortLayout?: LayoutApi } = {}
-runInNewContext(readFileSync(new URL('../../public/game-packs/water-sort/layout.js', import.meta.url), 'utf8'), context)
+runInNewContext(readFileSync(new URL('../../../public/game-packs/water-sort/layout.js', import.meta.url), 'utf8'), context)
 const { getTubeLayout } = context.XiabanWaterSortLayout!
 
 function expectFits(count: number, width: number, height: number) {

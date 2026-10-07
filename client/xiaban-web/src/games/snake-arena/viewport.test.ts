@@ -11,7 +11,7 @@ interface Viewport {
   safeArea(view: View, insets: Insets): Insets
 }
 const context: { XiabanSnakeViewport?: Viewport } = {}
-runInNewContext(readFileSync(new URL('../../public/game-packs/snake-arena/viewport.js', import.meta.url), 'utf8'), context)
+runInNewContext(readFileSync(new URL('../../../public/game-packs/snake-arena/viewport.js', import.meta.url), 'utf8'), context)
 const viewport = context.XiabanSnakeViewport!
 
 describe('snake arena rotated viewport', () => {

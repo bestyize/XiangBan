@@ -1,9 +1,9 @@
 import {
   createPoster, DISPLAY, drawBackground, drawBubble, drawFooter, drawHeader, drawPanel, drawRobot, drawStat, fitText,
   loadImage, MARGIN, PAGE_W, POSTER_SCALE, POSTER_W, prepareFonts, setFont, toBlob, type Poster,
-} from '../poster/frame.ts'
-import type { PosterThemeId } from '../poster/theme.ts'
-import type { GamePosterCopy } from './posterCopy.ts'
+} from '../../poster/frame.ts'
+import type { PosterThemeId } from '../../poster/theme.ts'
+import type { GamePosterCopy } from './types.ts'
 
 /** 3:4, what Xiaohongshu shows uncropped in its feed. */
 const PAGE_H = 480

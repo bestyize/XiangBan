@@ -18,7 +18,7 @@ Every completed level shows a result dialog with Share results, Next level, and 
 
 ## Rules and verification
 
-`rules.js` exposes `globalThis.XiabanWaterSort`. Boards are arrays of glasses; each glass lists flavors from bottom to top. Moves return a fresh board without mutating the input. The game uses the same rules that `client/xiaban-web/src/games/waterSort.test.ts` loads through `node:vm`.
+`rules.js` exposes `globalThis.XiabanWaterSort`. Boards are arrays of glasses; each glass lists flavors from bottom to top. Moves return a fresh board without mutating the input. The game uses the same rules that `client/xiaban-web/src/games/water-sort/rules.test.ts` loads through `node:vm`.
 
 The fixed puzzles were constructed offline by reversing pours from fully sorted glasses with two spare glasses. Reverse moves never uncover a different flavor in the original source and never add to an already matching target top, so each reverse move has a legal forward inverse. Tests replay an explicit solution witness for all eight boards and independently search for solutions with a bounded solver. No solver or random generator runs during play.
 

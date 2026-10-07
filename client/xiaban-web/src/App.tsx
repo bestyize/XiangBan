@@ -26,7 +26,7 @@ import { lazyPage } from './lib/lazyPage.ts'
 import { ACTIVITY_PATH, rememberAfterOnboarding } from './lib/activity.ts'
 import AdminPage from './pages/AdminPage.tsx'
 import AccountProfile from './pages/me/AccountProfile.tsx'
-import { sharePageGameId, RESULT_GAMES } from './games/otherResultShare.ts'
+import { opensGameDirectly, sharePageGameId } from './games/index.ts'
 import { DisplaySettingsProvider } from './lib/displaySettings.tsx'
 
 const Tests = lazyPage(() => import('./quizzes/Tests.tsx'))
@@ -91,7 +91,7 @@ function SessionRoutes() {
     )
   }
   if (location === '/login') return <LoginRoute />
-  if (location === '/games/snake-arena' || (Object.keys(RESULT_GAMES).some(id => location === `/games/${id}`) && ['game_share', 'game-share'].includes(new URLSearchParams(window.location.search).get('from') || ''))) return <GamePlayer key={profile.userId} />
+  if (opensGameDirectly(location, window.location.search)) return <GamePlayer key={profile.userId} />
   if (!profile.onboarded && !['/hello', '/me', '/me/account', '/me/settings'].includes(location)) {
     if (location === ACTIVITY_PATH) rememberAfterOnboarding(`${location}${window.location.search}`)
     return <Redirect to="/hello" replace />

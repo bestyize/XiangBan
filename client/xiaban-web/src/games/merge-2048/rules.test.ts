@@ -15,7 +15,7 @@ interface Rules {
 
 // Exercise the exact classic script shipped in the sandboxed game package.
 const context: { Xiaban2048?: Rules } = {}
-runInNewContext(readFileSync(new URL('../../public/game-packs/merge-2048/rules.js', import.meta.url), 'utf8'), context)
+runInNewContext(readFileSync(new URL('../../../public/game-packs/merge-2048/rules.js', import.meta.url), 'utf8'), context)
 const rules = context.Xiaban2048!
 
 function withRow(row: number[]): Board {

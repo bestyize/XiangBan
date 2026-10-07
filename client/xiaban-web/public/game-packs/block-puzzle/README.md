@@ -27,4 +27,4 @@
 
 ## 规则验证
 
-`rules.js` 以 `globalThis.XiabanBlockPuzzle` 暴露纯规则。`client/xiaban-web/src/games/blockPuzzle.test.ts` 用 Node VM 执行实际发布脚本，验证放置、越界、重叠、同时消行列、计分、三块补充和结束条件。
+`rules.js` 以 `globalThis.XiabanBlockPuzzle` 暴露纯规则。`client/xiaban-web/src/games/block-puzzle/rules.test.ts` 用 Node VM 执行实际发布脚本，验证放置、越界、重叠、同时消行列、计分、三块补充和结束条件。

@@ -1,5 +1,5 @@
-import { api, getToken } from '../api/client.ts'
-import { storage } from '../lib/storage.ts'
+import { api, getToken } from '../../api/client.ts'
+import { storage } from '../../lib/storage.ts'
 
 export interface GameSummary { gameId: string; sessions: number; bestScore: number; bestTile: number }
 
