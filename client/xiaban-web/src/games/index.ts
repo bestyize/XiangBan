@@ -1,5 +1,6 @@
 import { blockPuzzle } from './block-puzzle/index.ts'
 import type { ResultGame } from './common/types.ts'
+import { duskGlider } from './dusk-glider/index.ts'
 import { fallingBlocks } from './falling-blocks/index.ts'
 import { inkBlade } from './ink-blade/index.ts'
 import { merge2048 } from './merge-2048/index.ts'
@@ -7,7 +8,7 @@ import { snakeArena } from './snake-arena/index.ts'
 import { waterSort } from './water-sort/index.ts'
 
 /** Every game whose results the website can share. Add a new game's descriptor here. */
-export const RESULT_GAMES: readonly ResultGame[] = [fallingBlocks, merge2048, blockPuzzle, waterSort, snakeArena, inkBlade]
+export const RESULT_GAMES: readonly ResultGame[] = [fallingBlocks, merge2048, blockPuzzle, waterSort, snakeArena, inkBlade, duskGlider]
 
 const byId = new Map(RESULT_GAMES.map(game => [game.id, game]))
 

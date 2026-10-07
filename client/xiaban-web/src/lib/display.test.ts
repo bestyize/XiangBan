@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { quizCatalog } from '../quizzes/catalog.ts'
 import { defaultDisplaySettings, isDisplaySettings, moveDisplayItem, visibleDisplayItems, type DisplayItem, type DisplaySettings } from './display.ts'
 
-const catalog = ['falling-blocks', 'merge-2048', 'block-puzzle', 'water-sort', 'snake-arena', 'ink-blade'].map(id => ({ id, visible: true, name: id }))
+const catalog = ['falling-blocks', 'merge-2048', 'block-puzzle', 'water-sort', 'snake-arena', 'ink-blade', 'dusk-glider'].map(id => ({ id, visible: true, name: id }))
 const settings: DisplaySettings = { chatTabVisible: true, games: catalog, quizzes: quizCatalog.map(quiz => ({ id: quiz.id, name: quiz.name, visible: true })) }
 
 describe('catalog presentation configuration', () => {
@@ -14,13 +14,13 @@ describe('catalog presentation configuration', () => {
   })
   it('orders by admin configuration, hides disabled entries and appends new entries', () => {
     const configured = [{ ...catalog[4], visible: true }, { ...catalog[1], visible: false }]
-    expect(visibleDisplayItems(catalog, configured).map(item => item.id)).toEqual(['snake-arena', 'falling-blocks', 'block-puzzle', 'water-sort', 'ink-blade'])
+    expect(visibleDisplayItems(catalog, configured).map(item => item.id)).toEqual(['snake-arena', 'falling-blocks', 'block-puzzle', 'water-sort', 'ink-blade', 'dusk-glider'])
     expect(catalog[1].visible).toBe(true)
   })
   it('handles all hidden items, stale entries and duplicate entries predictably', () => {
     expect(visibleDisplayItems(catalog, catalog.map(item => ({ ...item, visible: false })))).toEqual([])
     const configured = [{ id: 'old-pack', name: 'old', visible: false }, catalog[4], { ...catalog[4], visible: false }]
-    expect(visibleDisplayItems(catalog, configured).map(item => item.id)).toEqual(['snake-arena', 'falling-blocks', 'merge-2048', 'block-puzzle', 'water-sort', 'ink-blade'])
+    expect(visibleDisplayItems(catalog, configured).map(item => item.id)).toEqual(['snake-arena', 'falling-blocks', 'merge-2048', 'block-puzzle', 'water-sort', 'ink-blade', 'dusk-glider'])
   })
   it('moves up, down and to the top without mutating visibility or the original list', () => {
     const hidden = catalog.map(item => ({ ...item, visible: item.id !== 'snake-arena' }))
