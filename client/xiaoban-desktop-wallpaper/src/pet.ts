@@ -1,8 +1,8 @@
-// Import the original engine rather than maintaining a second copy of the character.
-import { Animator } from '../../../web/src/robot/animator.ts'
-import { Mind } from '../../../web/src/robot/mind.ts'
-import { toSpec, stillFrame, type RobotInput } from '../../../web/src/robot/expressions.ts'
-import { bodyTransform, earLight, earTransform, faceMarkup, faceOpacity, robotMarkup, shadowAttrs } from '../../../web/src/robot/render.ts'
+// Desktop-owned character core, initially copied without changing art or motion.
+import { Animator } from './companion/animator.ts'
+import { Mind } from './companion/mind.ts'
+import { toSpec, stillFrame, type RobotInput } from './companion/expressions.ts'
+import { bodyTransform, earLight, earTransform, faceMarkup, faceOpacity, robotMarkup, shadowAttrs } from './companion/render.ts'
 import type { Settings } from './bridge.ts'
 
 export class PetView {

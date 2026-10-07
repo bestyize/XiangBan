@@ -1,5 +1,5 @@
 import './style.css'
-import { EXPRESSIONS, EXPRESSION_NAMES } from '../../../web/src/robot/expressions.ts'
+import { EXPRESSIONS, EXPRESSION_NAMES } from './companion/expressions.ts'
 import { desktop, defaults, invoke, listen, type CursorSample, type Settings } from './bridge.ts'
 import { PetView } from './pet.ts'
 

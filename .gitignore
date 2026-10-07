@@ -14,14 +14,15 @@ local.properties
 
 # Node
 node_modules/
-web/dist/
-web/dev-dist/
+client/xiaban-web/dist/
+client/xiaban-web/dev-dist/
 *.tsbuildinfo
 
 # Env & secrets
 .env
 .env.*
 !.env.example
+!.env.production.example
 *.pem
 *.key
 
