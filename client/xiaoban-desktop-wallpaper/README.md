@@ -2,7 +2,7 @@
 
 Windows / macOS 原型：一个可拖动、透明处点击穿透的悬浮小伴，也可以切换成位于桌面图标下方的动态壁纸。无聊天、账户或业务服务器连接。Windows 缺少运行组件时会联网补齐；组件可用后可离线运行。角色、场景、控制台与互动逻辑共用，桌面宿主分平台接入。
 
-本机生产构建实测：Windows x64 EXE 为 3,707,904 字节（约 3.71MB），内嵌前端与两套程序背景，不包含系统 WebView2。原生切换测试已在主屏 2880×1800、175% 缩放下通过，确认壁纸为 WorkerW 子窗口；验证报告位于本地 `artifacts/smoke-*.json`。本地试用文件为 `artifacts/XiaoBan-Windows-x64.exe`，ZIP 包为 `artifacts/XiaoBan-Windows-x64.zip`。
+本机生产构建实测：Windows x64 EXE 约 4.60MB，内嵌前端与两套程序背景，不包含系统 WebView2。原生切换测试已在主屏 2880×1800、175% 缩放下通过，确认壁纸为 WorkerW 子窗口；验证报告位于本地 `artifacts/smoke-*.json`。本地试用文件为 `artifacts/XiaoBan-Windows-x64.exe`，ZIP 包为 `artifacts/XiaoBan-Windows-x64.zip`。
 
 角色核心在本工程的 `src/companion` 内维护，最初从网页纯角色代码原样复制，保留既有 SVG、发光、表情、弹簧参数和互动行为。允许独立演进，不再导入另一个客户端源码。`src/pet.ts` 适配 DOM 与桌面输入；暖光维持原 RobotStage 的尺寸与渐变。
 
@@ -63,6 +63,12 @@ macOS 悬浮窗口使用 AppKit 浮动层；壁纸使用 Core Graphics 的 deskt
 
 ## 使用
 
+设置界面为奶白/暖粉色的左侧导航布局，分为“小伴设置”“动态壁纸”“关于小伴”三页。小伴页保留原 SVG、表情和互动，壁纸页管理内置与订阅内容，关于页展示真实程序版本并检查已配置的更新服务。
+
+动态壁纸支持图片、静音循环 H.264 MP4 与自包含 Canvas/WebGL ES module。可添加 HTTPS 订阅或导入 JSON 清单；下载后的内容校验 SHA-256 并缓存，离线可继续使用。小伴悬浮时可与通用壁纸并存，融入壁纸时叠在所选内容上；“小伴房间”恢复原先的房间场景或系统桌面。下发协议、SDK、限制和更新 JSON 示例见 [delivery-protocol.md](docs/delivery-protocol.md)，Schema 为 [壁纸](docs/wallpapers-v1.schema.json) 和 [更新](docs/updates-v1.schema.json)。
+
+Canvas 运行在独立的低权限壁纸窗口和 opaque-origin iframe 中，不能调用设置、自启动、退出或下载等桌面命令。控制页只展示封面，执行预览使用另一低权限窗口。视频缓存协议支持 byte ranges。更新功能目前为版本/说明检查和打开下载页；未配置更新源会显示未接入，不伪造最新状态，未实现无签名自动安装。
+
 - 控制台切换“悬浮桌宠 / 动态壁纸”，调整 25 种表情、160–420px 尺寸、深夜/晨光背景、30/60 FPS，或暂停动画。
 - 悬浮模式：点击角色触发反应，拖动角色移动窗口，右键角色打开控制台。角色实际 SVG 填充区域接收点击，暖光与空白处穿透。
 - 壁纸模式：小伴在背景的桌面上，角色上方的桌面点击可以触发反应。应用不拦截桌面鼠标消息，桌面图标继续由 Explorer / Finder 处理。其他窗口遮挡角色时不触发壁纸点击反应。
@@ -85,9 +91,10 @@ npm test
 powershell -ExecutionPolicy Bypass -File .\scripts\smoke-test.ps1
 cargo build --manifest-path src-tauri/Cargo.toml --locked
 powershell -ExecutionPolicy Bypass -File .\scripts\smoke-runtime.ps1 -VerifyDownload
+node scripts/verify-media.mjs
 ```
 
-角色测试运行本工程的 12 个行为测试，独立于网页与后端业务目录。原生 smoke test 启动生产程序，在悬浮、壁纸、返回悬浮三个阶段检查窗口存在性、前端显示、背景父窗口类别、WS_CHILD 标记和旧窗口清理，输出 `artifacts/smoke-*.json`。桌面 parenting 使用 Explorer 的非公开 WorkerW 协议，需要在不同 Windows 版本上继续验证。
+角色测试运行本工程的 12 个行为测试，独立于网页与后端业务目录。原生 smoke test 启动生产程序，在悬浮、壁纸、返回悬浮三个阶段检查窗口存在性、前端显示、背景父窗口类别、WS_CHILD 标记和旧窗口清理，输出 `artifacts/smoke-*.json`。Windows 的小伴房间与六种媒体壁纸用例同时检查实际客户区的物理尺寸和屏幕原点，要求与主显示器完全一致；壁纸窗口关闭系统阴影，避免无标题栏窗口的边框占用绘图区。桌面 parenting 使用 Explorer 的非公开 WorkerW 协议，需要在不同 Windows 版本上继续验证。
 
 macOS 验证：
 
@@ -109,7 +116,7 @@ Mac 实机还需检查：原角色的发光与连续表情、桌宠拖动、空�
 启动流程另有四个 Rust 测试，覆盖已安装时不调用安装器、安装后重新检测、虚假成功退出码与失败重试。Windows CI 构建便携包并执行原生准备窗口成功/失败/取消模拟；本地 `-VerifyDownload` 还验证内嵌下载工具、进程清理及真实微软签名，不执行安装。真实缺组件的首次安装需在干净 Windows 虚拟机上验证。
 
 - 提供 Windows 与 macOS 的原生接入；macOS 包面向 Apple 芯片，Intel / Universal 打包未纳入此原型。
-- 壁纸只覆盖主显示器；未实现多显示器管理、背景素材导入或签名安装包。
+- 壁纸只覆盖主显示器；未实现多显示器管理、本地原始媒体文件导入或签名安装包。
 - Windows 壁纸窗口作为 Explorer 背景 WorkerW 子窗口；macOS 壁纸使用 AppKit 桌面层窗口。未修改系统壁纸路径或偏好，退出后原壁纸恢复显示。
 - 模式切换会重新挂载角色，当前的随机动画/睡眠进度会重置。
 - Explorer 重启、显示器热插拔、macOS Stage Manager / 全屏空间等恢复策略需要进一步实机完善。Windows 背景父窗口异常会提示重新切换模式。
@@ -119,9 +126,10 @@ Mac 实机还需检查：原角色的发光与连续表情、桌宠拖动、空�
 ## 代码
 
 - `src/companion`：本应用角色引擎、SVG 和测试；`src/pet.ts`：DOM 帧更新与 SVG 轮廓命中测试。
-- `src/scene.css`：程序绘制的轻量动态背景，无视频资源。
+- `src/scene.css`：原小伴房间的程序背景；内置图片、视频和 Canvas 样例位于 public/wallpapers。
 - `src-tauri/src/main.rs`：控制台、两种窗口生命周期、托盘、命令与诊断。
 - `src-tauri/src/preferences.rs`：本应用设置、兼容旧字段、参数修复与文件保存；`src-tauri/src/startup.rs`：Windows 当前用户注册、macOS 登录启动与测试项清理。
+- `src/control.ts`：三页设置界面；`src/content.ts` 与 `public/wallpapers/sandbox.html`：图片/视频与 Canvas 沙箱宿主；`src-tauri/src/library.rs`：目录、资源完整性、缓存协议和更新验证；`src-tauri/src/content.rs`：窗口切换、权限边界和交付命令。
 - `src-tauri/src/runtime`：Windows 启动前检测、原生准备窗口、官方引导程序下载与签名验证。成功/失败/取消的 UI 模拟仅在 debug 构建中启用，不会安装组件；真实缺组件的首次安装还需干净虚拟机验证。
 - `src-tauri/src/windows.rs`：WorkerW 接入、DPI 坐标转换、只读鼠标采样。
 - `src-tauri/src/macos.rs`：AppKit 窗口层级、空间行为、鼠标逻辑点与桌面点击判断。

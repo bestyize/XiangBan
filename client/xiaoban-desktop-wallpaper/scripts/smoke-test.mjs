@@ -4,6 +4,7 @@ import os from 'node:os'
 import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 import assert from 'node:assert/strict'
+import {startWallpaperFixture} from './wallpaper-fixture.mjs'
 
 if (process.platform !== 'darwin') throw new Error('这个脚本需要在 macOS 上执行')
 const root = fileURLToPath(new URL('../', import.meta.url))
@@ -12,11 +13,12 @@ await mkdir(path.join(root, 'artifacts'), { recursive: true })
 const report = path.join(root, `artifacts/smoke-macos-${Date.now()}.json`)
 const bundle = path.resolve(binary, '../../..')
 const startupId = Date.now().toString()
+const fixture = await startWallpaperFixture()
 const startupFile = path.join(os.homedir(), 'Library/LaunchAgents', `XiaoBanStartupSmoke-${startupId}.plist`)
 // LaunchServices registration ensures the subsequent open -a calls target the
 // same application, exactly as activating its Dock icon does.
-const child = spawn('/usr/bin/open', ['-W', '-n', bundle, '--env', `XIAOBAN_SMOKE_REPORT=${report}`, '--env', `XIAOBAN_TEST_STARTUP_ID=${startupId}`, '--args', '--smoke-test', '--autostart'], {
-  env: { ...process.env, XIAOBAN_SMOKE_REPORT: report, XIAOBAN_TEST_STARTUP_ID: startupId }, stdio: ['ignore', 'pipe', 'pipe'],
+const child = spawn('/usr/bin/open', ['-W', '-n', bundle, '--env', `XIAOBAN_SMOKE_REPORT=${report}`, '--env', `XIAOBAN_TEST_STARTUP_ID=${startupId}`, '--env', `XIAOBAN_WALLPAPER_TEST_URL=${fixture.catalogUrl}`, '--args', '--smoke-test', '--autostart'], {
+  env: { ...process.env, XIAOBAN_SMOKE_REPORT: report, XIAOBAN_TEST_STARTUP_ID: startupId, XIAOBAN_WALLPAPER_TEST_URL: fixture.catalogUrl }, stdio: ['ignore', 'pipe', 'pipe'],
 })
 let output = ''
 child.stdout.on('data', data => { output = (output + data).slice(-16000) })
@@ -36,6 +38,10 @@ try {
   assert.equal(lifecycle.afterClose.visible, false, '关闭设置应隐藏窗口')
   assert.ok(lifecycle.afterRestore.visible && lifecycle.secondInstance.visible, '设置未恢复 / 单实例未唤起面板')
   assert.ok(lifecycle.trayPresent && lifecycle.petPreserved && lifecycle.autostartToggleAndPersistence && lifecycle.scenePersistence)
+  assert.ok(result.media?.Ok,JSON.stringify(result.media))
+  assert.equal(result.media.Ok.cases.length,6)
+  assert.ok(result.media.Ok.cacheOffline&&result.media.Ok.hashFailurePreserved&&result.media.Ok.updateChecked)
+  for(const scene of result.media.Ok.cases){assert.ok(scene.report.width>0&&scene.report.height>0);assert.equal(scene.report.privilegedIpcBlocked,true)}
   assert.equal(result.startupResult.Ok, 'ok', JSON.stringify(result.startupResult))
   assert.equal(result.wallpaperResult.Ok, 'ok', JSON.stringify(result.wallpaperResult))
   assert.equal(result.floatingResult.Ok, 'ok', JSON.stringify(result.floatingResult))
@@ -68,4 +74,5 @@ try {
 } finally {
   clearTimeout(timeout)
   await unlink(startupFile).catch(error => { if (error.code !== 'ENOENT') throw error })
+  await fixture.close()
 }

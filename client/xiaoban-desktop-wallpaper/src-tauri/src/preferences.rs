@@ -43,6 +43,10 @@ pub struct Settings {
     pub paused: bool,
     pub fps: u32,
     pub autostart: bool,
+    pub wallpaper_id: String,
+    pub wallpaper_options: crate::library::Options,
+    pub catalog_url: String,
+    pub update_url: String,
 }
 
 impl Default for Settings {
@@ -55,6 +59,10 @@ impl Default for Settings {
             paused: false,
             fps: 60,
             autostart: true,
+            wallpaper_id: "companion".into(),
+            wallpaper_options: Default::default(),
+            catalog_url: String::new(),
+            update_url: String::new(),
         }
     }
 }

@@ -1,0 +1,201 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:xiaoban:desktop:wallpapers:v1",
+  "title": "小伴桌面壁纸目录 v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "items"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "revision": { "type": "string", "maxLength": 160 },
+    "items": {
+      "type": "array",
+      "maxItems": 100,
+      "items": { "$ref": "#/$defs/wallpaper" }
+    }
+  },
+  "$defs": {
+    "resource": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["url", "sha256", "bytes", "mime"],
+      "properties": {
+        "url": {
+          "type": "string",
+          "format": "uri",
+          "maxLength": 4096,
+          "pattern": "^(https://|http://(localhost|127\\.0\\.0\\.1|\\[::1\\])(?::[0-9]+)?/)"
+        },
+        "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "bytes": { "type": "integer", "minimum": 1, "maximum": 268435456 },
+        "mime": {
+          "enum": [
+            "image/png",
+            "image/jpeg",
+            "image/webp",
+            "image/avif",
+            "video/mp4",
+            "application/javascript",
+            "application/json",
+            "application/octet-stream"
+          ]
+        }
+      }
+    },
+    "control": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["key", "label", "type", "default"],
+      "properties": {
+        "key": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_.-]{1,64}$",
+          "not": { "enum": ["__proto__", "constructor", "prototype"] }
+        },
+        "label": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "type": { "enum": ["range", "color", "boolean", "select"] },
+        "default": { "type": ["number", "string", "boolean"] },
+        "min": { "type": "number" },
+        "max": { "type": "number" },
+        "step": { "type": "number", "exclusiveMinimum": 0 },
+        "options": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 16,
+          "items": { "type": "string", "minLength": 1, "maxLength": 160 }
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "type": { "const": "range" } } },
+          "then": {
+            "required": ["min", "max", "step"],
+            "properties": { "default": { "type": "number" } }
+          }
+        },
+        {
+          "if": { "properties": { "type": { "const": "color" } } },
+          "then": {
+            "properties": {
+              "default": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "type": { "const": "boolean" } } },
+          "then": { "properties": { "default": { "type": "boolean" } } }
+        },
+        {
+          "if": { "properties": { "type": { "const": "select" } } },
+          "then": {
+            "required": ["options"],
+            "properties": { "default": { "type": "string" } }
+          }
+        }
+      ]
+    },
+    "wallpaper": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "version", "title", "kind", "resource"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_.-]{1,64}$",
+          "not": {
+            "anyOf": [{ "const": "companion" }, { "pattern": "^builtin-" }]
+          }
+        },
+        "version": {
+          "type": "string",
+          "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(?:-[0-9A-Za-z.-]+)?(?:\\+[0-9A-Za-z.-]+)?$"
+        },
+        "title": { "type": "string", "minLength": 1, "maxLength": 160 },
+        "description": { "type": "string", "maxLength": 2048 },
+        "author": { "type": "string", "maxLength": 160 },
+        "kind": { "enum": ["image", "video", "canvas"] },
+        "resource": { "$ref": "#/$defs/resource" },
+        "cover": {
+          "allOf": [
+            { "$ref": "#/$defs/resource" },
+            {
+              "properties": {
+                "mime": {
+                  "enum": [
+                    "image/png",
+                    "image/jpeg",
+                    "image/webp",
+                    "image/avif"
+                  ]
+                },
+                "bytes": { "maximum": 2097152 }
+              }
+            }
+          ]
+        },
+        "assets": {
+          "type": "object",
+          "maxProperties": 32,
+          "propertyNames": {
+            "pattern": "^[a-zA-Z0-9_.-]{1,64}$",
+            "not": { "enum": ["__proto__", "constructor", "prototype"] }
+          },
+          "additionalProperties": { "$ref": "#/$defs/resource" }
+        },
+        "controls": {
+          "type": "array",
+          "maxItems": 16,
+          "items": { "$ref": "#/$defs/control" }
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "kind": { "const": "image" } } },
+          "then": {
+            "properties": {
+              "resource": {
+                "properties": {
+                  "mime": {
+                    "enum": [
+                      "image/png",
+                      "image/jpeg",
+                      "image/webp",
+                      "image/avif"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "kind": { "const": "video" } } },
+          "then": {
+            "properties": {
+              "resource": { "properties": { "mime": { "const": "video/mp4" } } }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "kind": { "const": "canvas" } } },
+          "then": {
+            "properties": {
+              "resource": {
+                "properties": {
+                  "mime": { "const": "application/javascript" },
+                  "bytes": { "maximum": 2097152 }
+                }
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "assets": { "maxProperties": 0 },
+              "controls": { "maxItems": 0 }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

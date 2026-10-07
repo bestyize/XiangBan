@@ -13,11 +13,11 @@
     "withGlobalTauri": true,
     "macOSPrivateApi": true,
     "windows": [{
-      "label": "control", "title": "小伴 · 桌面陪伴", "width": 940, "height": 740,
-      "minWidth": 820, "minHeight": 640, "center": true, "visible": false, "backgroundColor": "#111820"
+      "label": "control", "title": "小伴桌面", "width": 1140, "height": 800,
+      "minWidth": 900, "minHeight": 680, "center": true, "visible": false, "backgroundColor": "#ffffff"
     }],
     "security": {
-      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src ipc: http://ipc.localhost http://127.0.0.1:1420 ws://127.0.0.1:1420"
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: wallpaper-asset: http://wallpaper-asset.localhost; media-src 'self' blob: wallpaper-asset: http://wallpaper-asset.localhost; frame-src 'self' wallpaper-asset: http://wallpaper-asset.localhost; connect-src 'self' ipc: http://ipc.localhost wallpaper-asset: http://wallpaper-asset.localhost http://127.0.0.1:1420 ws://127.0.0.1:1420"
     }
   },
   "bundle": {

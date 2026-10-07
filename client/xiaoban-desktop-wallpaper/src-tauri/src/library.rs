@@ -1,0 +1,711 @@
+//! Wallpaper delivery v1. Files are content-addressed, never arbitrary local paths.
+use serde::{Deserialize, Serialize};
+use serde_json::{json, Value};
+use sha2::{Digest, Sha256};
+use std::{
+    collections::{BTreeMap, HashSet},
+    fs,
+    io::{Read, Seek, SeekFrom, Write},
+    path::Path,
+    time::Duration,
+};
+use tauri::Emitter;
+
+pub const MAX_JSON: usize = 1024 * 1024;
+pub const MAX_FILE: u64 = 256 * 1024 * 1024;
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct Resource {
+    pub url: String,
+    pub sha256: String,
+    pub bytes: u64,
+    pub mime: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct Control {
+    pub key: String,
+    pub label: String,
+    #[serde(rename = "type")]
+    pub kind: String,
+    pub default: Value,
+    #[serde(default)]
+    pub min: Option<f64>,
+    #[serde(default)]
+    pub max: Option<f64>,
+    #[serde(default)]
+    pub step: Option<f64>,
+    #[serde(default)]
+    pub options: Vec<String>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct Wallpaper {
+    pub id: String,
+    pub version: String,
+    pub title: String,
+    #[serde(default)]
+    pub description: String,
+    #[serde(default)]
+    pub author: String,
+    pub kind: String,
+    pub resource: Resource,
+    #[serde(default)]
+    pub cover: Option<Resource>,
+    #[serde(default)]
+    pub assets: BTreeMap<String, Resource>,
+    #[serde(default)]
+    pub controls: Vec<Control>,
+}
+
+#[derive(Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct Catalog {
+    pub schema_version: u32,
+    #[serde(default)]
+    pub revision: String,
+    pub items: Vec<Wallpaper>,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(default, rename_all = "camelCase", deny_unknown_fields)]
+pub struct Options {
+    pub fit: String,
+    pub playback_rate: f64,
+    pub background: String,
+    pub values: BTreeMap<String, Value>,
+}
+impl Default for Options {
+    fn default() -> Self {
+        Self {
+            fit: "cover".into(),
+            playback_rate: 1.0,
+            background: "#edf5f0".into(),
+            values: BTreeMap::new(),
+        }
+    }
+}
+
+pub fn identifier(value: &str) -> bool {
+    !value.is_empty()
+        && value.len() <= 64
+        && value
+            .bytes()
+            .all(|c| c.is_ascii_alphanumeric() || matches!(c, b'-' | b'_' | b'.'))
+}
+pub fn safe_key(value: &str) -> bool {
+    identifier(value) && !["__proto__", "prototype", "constructor"].contains(&value)
+}
+pub fn hash_name(value: &str) -> bool {
+    value.len() == 64
+        && value
+            .bytes()
+            .all(|c| c.is_ascii_hexdigit() && !c.is_ascii_uppercase())
+}
+pub fn color(value: &str) -> bool {
+    value.len() == 7
+        && value.starts_with('#')
+        && value.as_bytes()[1..].iter().all(u8::is_ascii_hexdigit)
+}
+
+pub fn network_url(value: &str) -> Result<url::Url, String> {
+    let url = url::Url::parse(value).map_err(|_| "地址格式不正确")?;
+    let loopback = match url.host() {
+        Some(url::Host::Domain(host)) => host == "localhost",
+        Some(url::Host::Ipv4(ip)) => ip.is_loopback(),
+        Some(url::Host::Ipv6(ip)) => ip.is_loopback(),
+        _ => false,
+    };
+    if value.len() > 4096
+        || !url.username().is_empty()
+        || url.password().is_some()
+        || url.fragment().is_some()
+        || !(url.scheme() == "https" || (url.scheme() == "http" && loopback))
+    {
+        return Err(
+            "地址需使用 HTTPS；本机调试可使用 localhost HTTP，不接受文件地址或账户密码。".into(),
+        );
+    }
+    Ok(url)
+}
+
+fn validate_resource(resource: &Resource, builtin: bool) -> Result<(), String> {
+    if !hash_name(&resource.sha256) || resource.bytes == 0 || resource.bytes > MAX_FILE {
+        return Err("资源校验值或大小不合法".into());
+    }
+    if builtin && resource.url.starts_with("builtin://") {
+        let filename = &resource.url[10..];
+        if !identifier(filename) {
+            return Err("内置资源路径不合法".into());
+        }
+    } else {
+        network_url(&resource.url)?;
+    }
+    if ![
+        "image/png",
+        "image/jpeg",
+        "image/webp",
+        "image/avif",
+        "video/mp4",
+        "application/javascript",
+        "application/json",
+        "application/octet-stream",
+    ]
+    .contains(&resource.mime.as_str())
+        && !(builtin && resource.mime == "image/svg+xml")
+    {
+        return Err("不支持的资源类型".into());
+    }
+    if resource.mime == "application/javascript" && resource.bytes > 2 * 1024 * 1024 {
+        return Err("动画脚本不能超过 2 MB，请预先打包压缩。".into());
+    }
+    Ok(())
+}
+
+pub fn validate_item(item: &Wallpaper, builtin: bool) -> Result<(), String> {
+    if !identifier(&item.id)
+        || item.id == "companion"
+        || (!builtin && item.id.starts_with("builtin-"))
+    {
+        return Err("壁纸 ID 不合法或使用了保留名称".into());
+    }
+    semver::Version::parse(&item.version).map_err(|_| "壁纸版本需使用 SemVer，如 1.0.0")?;
+    if item.title.trim().is_empty()
+        || item.title.len() > 160
+        || item.description.len() > 2048
+        || item.author.len() > 160
+    {
+        return Err("壁纸名称或介绍长度不合法".into());
+    }
+    validate_resource(&item.resource, builtin)?;
+    let mime = &item.resource.mime;
+    if !match item.kind.as_str() {
+        "image" => mime.starts_with("image/"),
+        "video" => mime == "video/mp4",
+        "canvas" => mime == "application/javascript",
+        _ => false,
+    } {
+        return Err("壁纸类型与资源 MIME 不匹配".into());
+    }
+    if let Some(cover) = &item.cover {
+        validate_resource(cover, builtin)?;
+        if !cover.mime.starts_with("image/") || cover.bytes > 2 * 1024 * 1024 {
+            return Err("封面需为不超过 2 MB 的图片".into());
+        }
+    }
+    if item.assets.len() > 32
+        || item.controls.len() > 16
+        || (item.kind != "canvas" && (!item.assets.is_empty() || !item.controls.is_empty()))
+    {
+        return Err("附属资源或参数数量不合法".into());
+    }
+    let mut total = item.resource.bytes;
+    for (key, resource) in &item.assets {
+        if !safe_key(key) {
+            return Err("动画资源名称不合法".into());
+        }
+        validate_resource(resource, builtin)?;
+        total = total.checked_add(resource.bytes).ok_or("资源大小溢出")?;
+    }
+    if total > MAX_FILE {
+        return Err("单张壁纸资源总量不能超过 256 MB".into());
+    }
+    let mut keys = HashSet::new();
+    for control in &item.controls {
+        if !safe_key(&control.key)
+            || !keys.insert(&control.key)
+            || control.label.is_empty()
+            || control.label.len() > 100
+        {
+            return Err("动画参数名称不合法或重复".into());
+        }
+        match control.kind.as_str() {
+            "range" => {
+                let (min, max, step) = (
+                    control.min.ok_or("滑块缺少最小值")?,
+                    control.max.ok_or("滑块缺少最大值")?,
+                    control.step.ok_or("滑块缺少步长")?,
+                );
+                if !min.is_finite()
+                    || !max.is_finite()
+                    || !step.is_finite()
+                    || min >= max
+                    || step <= 0.0
+                    || step > max - min
+                {
+                    return Err("滑块范围不合法".into());
+                }
+            }
+            "color" | "boolean" => {}
+            "select"
+                if !control.options.is_empty()
+                    && control.options.len() <= 16
+                    && control
+                        .options
+                        .iter()
+                        .all(|s| !s.is_empty() && s.len() <= 160) => {}
+            _ => return Err("不支持的动画参数类型".into()),
+        }
+        validate_value(control, &control.default)?;
+    }
+    Ok(())
+}
+
+fn validate_value(control: &Control, value: &Value) -> Result<(), String> {
+    let valid = match control.kind.as_str() {
+        "range" => value.as_f64().is_some_and(|v| {
+            v.is_finite()
+                && v >= control.min.unwrap_or(f64::INFINITY)
+                && v <= control.max.unwrap_or(f64::NEG_INFINITY)
+        }),
+        "color" => value.as_str().is_some_and(color),
+        "boolean" => value.is_boolean(),
+        "select" => value
+            .as_str()
+            .is_some_and(|v| control.options.iter().any(|s| s == v)),
+        _ => false,
+    };
+    if valid {
+        Ok(())
+    } else {
+        Err(format!("参数“{}”的值不合法", control.label))
+    }
+}
+
+pub fn validate_options(item: &Wallpaper, mut options: Options) -> Result<Options, String> {
+    if !["cover", "contain", "fill"].contains(&options.fit.as_str())
+        || !options.playback_rate.is_finite()
+        || !(0.25..=2.0).contains(&options.playback_rate)
+        || !color(&options.background)
+    {
+        return Err("壁纸显示设置不合法".into());
+    }
+    for key in options.values.keys() {
+        if !item.controls.iter().any(|c| &c.key == key) {
+            return Err("壁纸含未知参数".into());
+        }
+    }
+    for control in &item.controls {
+        let value = options
+            .values
+            .entry(control.key.clone())
+            .or_insert_with(|| control.default.clone());
+        validate_value(control, value)?;
+    }
+    Ok(options)
+}
+
+pub fn parse_catalog(text: &str) -> Result<Catalog, String> {
+    if text.len() > MAX_JSON {
+        return Err("壁纸清单不能超过 1 MB".into());
+    }
+    let catalog: Catalog =
+        serde_json::from_str(text).map_err(|e| format!("清单格式不正确：{e}"))?;
+    if catalog.schema_version != 1 || catalog.items.len() > 100 || catalog.revision.len() > 160 {
+        return Err("不支持的清单版本或数量".into());
+    }
+    let mut ids = HashSet::new();
+    for item in &catalog.items {
+        validate_item(item, false)?;
+        if !ids.insert(&item.id) {
+            return Err("清单壁纸 ID 重复".into());
+        }
+    }
+    Ok(catalog)
+}
+
+pub fn builtins() -> Vec<Wallpaper> {
+    let catalog: Catalog =
+        serde_json::from_str(include_str!("../../public/wallpapers/builtin/catalog.json"))
+            .expect("内置目录必须有效");
+    catalog.items
+}
+pub fn assets(item: &Wallpaper) -> Vec<&Resource> {
+    let mut result = vec![&item.resource];
+    result.extend(item.assets.values());
+    result
+}
+pub fn asset_url(resource: &Resource) -> String {
+    if let Some(filename) = resource.url.strip_prefix("builtin://") {
+        return format!("/wallpapers/builtin/{filename}");
+    }
+    if cfg!(windows) {
+        format!("http://wallpaper-asset.localhost/{}", resource.sha256)
+    } else {
+        format!("wallpaper-asset://localhost/{}", resource.sha256)
+    }
+}
+pub fn cached(root: &Path, resource: &Resource) -> bool {
+    if resource.url.starts_with("builtin://") {
+        return true;
+    }
+    let path = root.join("cache").join(&resource.sha256);
+    fs::metadata(path).is_ok_and(|m| m.is_file() && m.len() == resource.bytes)
+}
+pub fn read_catalog(root: &Path) -> Catalog {
+    fs::read(root.join("catalog.json"))
+        .ok()
+        .and_then(|data| serde_json::from_slice(&data).ok())
+        .unwrap_or_default()
+}
+pub fn all_items(root: &Path) -> Vec<Wallpaper> {
+    let mut items = builtins();
+    items.extend(
+        read_catalog(root)
+            .items
+            .into_iter()
+            .filter(|item| validate_item(item, false).is_ok()),
+    );
+    items
+}
+pub fn save_json(path: &Path, value: &impl Serialize) -> Result<(), String> {
+    fs::create_dir_all(path.parent().ok_or("无效保存路径")?).map_err(|e| e.to_string())?;
+    let temporary = path.with_extension(format!("{}.tmp", std::process::id()));
+    let result = (|| {
+        fs::write(
+            &temporary,
+            serde_json::to_vec_pretty(value).map_err(|e| e.to_string())?,
+        )
+        .map_err(|e| e.to_string())?;
+        fs::rename(&temporary, path).map_err(|e| e.to_string())
+    })();
+    if result.is_err() {
+        let _ = fs::remove_file(temporary);
+    }
+    result
+}
+
+fn client() -> Result<reqwest::blocking::Client, String> {
+    reqwest::blocking::Client::builder()
+        .timeout(Duration::from_secs(120))
+        .connect_timeout(Duration::from_secs(10))
+        .user_agent(concat!("XiaoBanDesktop/", env!("CARGO_PKG_VERSION")))
+        .redirect(reqwest::redirect::Policy::custom(|attempt| {
+            if attempt.previous().len() > 4 || network_url(attempt.url().as_str()).is_err() {
+                attempt.error("资源重定向不合法")
+            } else {
+                attempt.follow()
+            }
+        }))
+        .build()
+        .map_err(|e| e.to_string())
+}
+pub fn fetch_json(value: &str) -> Result<Option<String>, String> {
+    network_url(value)?;
+    let response = client()?
+        .get(value)
+        .header("Accept-Encoding", "identity")
+        .send()
+        .map_err(|e| format!("网络连接失败：{e}"))?;
+    if response.status().as_u16() == 204 {
+        return Ok(None);
+    }
+    let response = response.error_for_status().map_err(|e| e.to_string())?;
+    let mut data = Vec::new();
+    response
+        .take((MAX_JSON + 1) as u64)
+        .read_to_end(&mut data)
+        .map_err(|e| e.to_string())?;
+    if data.len() > MAX_JSON {
+        return Err("服务返回的清单超过 1 MB".into());
+    }
+    Ok(Some(
+        String::from_utf8(data).map_err(|_| "清单需为 UTF-8 JSON")?,
+    ))
+}
+
+fn verify_file(path: &Path, resource: &Resource) -> Result<bool, String> {
+    let mut file = match fs::File::open(path) {
+        Ok(file) => file,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(false),
+        Err(e) => return Err(e.to_string()),
+    };
+    if file.metadata().map_err(|e| e.to_string())?.len() != resource.bytes {
+        return Ok(false);
+    }
+    let mut digest = Sha256::new();
+    let mut buffer = [0u8; 65536];
+    loop {
+        let n = file.read(&mut buffer).map_err(|e| e.to_string())?;
+        if n == 0 {
+            break;
+        }
+        digest.update(&buffer[..n]);
+    }
+    Ok(format!("{:x}", digest.finalize()) == resource.sha256)
+}
+pub fn download(
+    root: &Path,
+    resource: &Resource,
+    mut progress: impl FnMut(u64),
+) -> Result<(), String> {
+    if resource.url.starts_with("builtin://") {
+        return Ok(());
+    }
+    validate_resource(resource, false)?;
+    let cache = root.join("cache");
+    fs::create_dir_all(&cache).map_err(|e| e.to_string())?;
+    let target = cache.join(&resource.sha256);
+    if verify_file(&target, resource)? {
+        progress(resource.bytes);
+        return Ok(());
+    }
+    let temporary = cache.join(format!("{}.{}.part", resource.sha256, std::process::id()));
+    let result = (|| {
+        let mut response = client()?
+            .get(&resource.url)
+            .header("Accept-Encoding", "identity")
+            .send()
+            .map_err(|e| e.to_string())?
+            .error_for_status()
+            .map_err(|e| e.to_string())?;
+        let mut file = fs::File::create(&temporary).map_err(|e| e.to_string())?;
+        let mut digest = Sha256::new();
+        let mut buffer = [0u8; 65536];
+        let mut count = 0;
+        loop {
+            let n = response.read(&mut buffer).map_err(|e| e.to_string())?;
+            if n == 0 {
+                break;
+            }
+            count += n as u64;
+            if count > resource.bytes {
+                return Err("下载资源超出声明大小".into());
+            }
+            digest.update(&buffer[..n]);
+            file.write_all(&buffer[..n]).map_err(|e| e.to_string())?;
+            progress(count);
+        }
+        if count != resource.bytes || format!("{:x}", digest.finalize()) != resource.sha256 {
+            return Err("资源完整性校验失败，请联系壁纸提供方".into());
+        }
+        file.sync_all().map_err(|e| e.to_string())?;
+        drop(file);
+        if resource.mime == "application/javascript" {
+            String::from_utf8(fs::read(&temporary).map_err(|e| e.to_string())?)
+                .map_err(|_| "动画脚本需使用 UTF-8")?;
+        }
+        fs::rename(&temporary, target).map_err(|e| e.to_string())
+    })();
+    if result.is_err() {
+        let _ = fs::remove_file(temporary);
+    }
+    result
+}
+
+pub fn prepare(app: &tauri::AppHandle, root: &Path, item: &Wallpaper) -> Result<(), String> {
+    let list = assets(item);
+    let total: u64 = list.iter().map(|r| r.bytes).sum();
+    let mut completed = 0;
+    for resource in list {
+        let mut last = 0u64;
+        download(root, resource, |bytes| {
+            if bytes.saturating_sub(last) >= 256 * 1024 || bytes == resource.bytes {
+                last = bytes;
+                let _ = app.emit_to(
+                    "control",
+                    "wallpaper-progress",
+                    json!({"id":item.id,"received":completed+bytes,"total":total}),
+                );
+            }
+        })?;
+        completed += resource.bytes;
+    }
+    Ok(())
+}
+
+pub fn serve(
+    app: &tauri::AppHandle,
+    request: tauri::http::Request<Vec<u8>>,
+) -> tauri::http::Response<Vec<u8>> {
+    let error = |status| {
+        tauri::http::Response::builder()
+            .status(status)
+            .body(Vec::new())
+            .unwrap()
+    };
+    if request.uri().path() == "/sandbox" {
+        return tauri::http::Response::builder().header("Content-Type","text/html; charset=utf-8")
+            .header("Content-Security-Policy","default-src 'none'; script-src 'nonce-Y2FudmFzLXNhbmRib3g=' blob:; style-src 'unsafe-inline'; img-src blob: data:; media-src blob:; connect-src blob:; worker-src 'none'; child-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'")
+            .body(include_bytes!("../../public/wallpapers/sandbox.html").to_vec()).unwrap();
+    }
+    let name = request.uri().path().trim_start_matches('/');
+    if !hash_name(name) {
+        return error(404);
+    }
+    let root = match crate::content::root(app) {
+        Ok(root) => root,
+        Err(_) => return error(404),
+    };
+    let mut items = all_items(&root);
+    if let Ok(data) = fs::read(root.join("active.json")) {
+        if let Ok(item) = serde_json::from_slice::<Wallpaper>(&data) {
+            items.push(item);
+        }
+    }
+    let resource = items
+        .iter()
+        .flat_map(|item| assets(item).into_iter().chain(item.cover.iter()))
+        .find(|r| r.sha256 == name);
+    let Some(resource) = resource else {
+        return error(404);
+    };
+    let mut file = match fs::File::open(root.join("cache").join(name)) {
+        Ok(f) => f,
+        Err(_) => return error(404),
+    };
+    let length = match file.metadata() {
+        Ok(m) if m.len() == resource.bytes => m.len(),
+        _ => return error(404),
+    };
+    let range = request.headers().get("range").and_then(|v| v.to_str().ok());
+    let (start, end, partial) = match byte_range(range, length) {
+        Ok(v) => v,
+        Err(_) => {
+            return tauri::http::Response::builder()
+                .status(416)
+                .header("Content-Range", format!("bytes */{length}"))
+                .body(Vec::new())
+                .unwrap()
+        }
+    };
+    if file.seek(SeekFrom::Start(start)).is_err() {
+        return error(500);
+    }
+    let mut body = Vec::new();
+    if file.take(end - start + 1).read_to_end(&mut body).is_err() {
+        return error(500);
+    }
+    let mut response = tauri::http::Response::builder()
+        .status(if partial { 206 } else { 200 })
+        .header("Content-Type", &resource.mime)
+        .header("Content-Length", body.len())
+        .header("Accept-Ranges", "bytes")
+        .header("Access-Control-Allow-Origin", "*")
+        .header("X-Content-Type-Options", "nosniff")
+        .header("Cache-Control", "public, max-age=31536000, immutable");
+    if partial {
+        response = response.header("Content-Range", format!("bytes {start}-{end}/{length}"));
+    }
+    response.body(body).unwrap()
+}
+
+pub fn byte_range(header: Option<&str>, length: u64) -> Result<(u64, u64, bool), String> {
+    if length == 0 {
+        return Err("空资源".into());
+    }
+    let Some(header) = header else {
+        return Ok((0, length - 1, false));
+    };
+    let value = header.strip_prefix("bytes=").ok_or("不支持的范围")?;
+    let (a, b) = value.split_once('-').ok_or("范围不合法")?;
+    if a.is_empty() {
+        let suffix: u64 = b.parse().map_err(|_| "范围不合法")?;
+        if suffix == 0 {
+            return Err("范围不合法".into());
+        }
+        return Ok((length.saturating_sub(suffix), length - 1, true));
+    }
+    let start: u64 = a.parse().map_err(|_| "范围不合法")?;
+    let end = if b.is_empty() {
+        length - 1
+    } else {
+        b.parse::<u64>().map_err(|_| "范围不合法")?.min(length - 1)
+    };
+    if start >= length || end < start {
+        return Err("范围超出资源".into());
+    }
+    Ok((start, end, true))
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct UpdateManifest {
+    schema_version: u32,
+    version: String,
+    #[serde(default)]
+    notes: String,
+    #[serde(default)]
+    published_at: String,
+    platforms: BTreeMap<String, Resource>,
+}
+pub fn update_result(text: &str, current: &str, platform: &str) -> Result<Value, String> {
+    let manifest: UpdateManifest =
+        serde_json::from_str(text).map_err(|e| format!("更新清单不合法：{e}"))?;
+    if manifest.schema_version != 1
+        || manifest.notes.len() > 16000
+        || manifest.published_at.len() > 64
+    {
+        return Err("不支持的更新清单版本".into());
+    }
+    let latest = semver::Version::parse(&manifest.version).map_err(|_| "服务版本号不合法")?;
+    let running = semver::Version::parse(current).map_err(|_| "当前版本号不合法")?;
+    let artifact = manifest.platforms.get(platform);
+    if latest > running && artifact.is_none() {
+        return Err("新版本尚未提供当前平台的安装包".into());
+    }
+    if let Some(artifact) = artifact {
+        network_url(&artifact.url)?;
+        if !hash_name(&artifact.sha256) || artifact.bytes == 0 || artifact.bytes > 60 * 1024 * 1024
+        {
+            return Err("更新包校验信息不合法".into());
+        }
+    }
+    Ok(
+        json!({"available":latest>running,"version":manifest.version,"notes":manifest.notes,"publishedAt":manifest.published_at,"downloadUrl":artifact.map(|r|&r.url)}),
+    )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn scheme_and_resource_paths_are_constrained() {
+        assert!(network_url("https://example.test/catalog.json").is_ok());
+        assert!(network_url("http://127.0.0.1:8123/a").is_ok());
+        for value in [
+            "file:///etc/passwd",
+            "javascript:alert(1)",
+            "https://user:pass@host.test/a",
+            "http://example.test/a",
+        ] {
+            assert!(network_url(value).is_err());
+        }
+        assert!(!hash_name("../preferences.json"));
+        assert!(!safe_key("__proto__"));
+    }
+    #[test]
+    fn all_builtin_wallpapers_are_valid() {
+        for item in builtins() {
+            validate_item(&item, true).unwrap();
+            validate_options(&item, Options::default()).unwrap();
+        }
+    }
+    #[test]
+    fn video_ranges_support_seeking_and_reject_invalid_ranges() {
+        assert_eq!(
+            byte_range(Some("bytes=10-19"), 100).unwrap(),
+            (10, 19, true)
+        );
+        assert_eq!(byte_range(Some("bytes=-10"), 100).unwrap(), (90, 99, true));
+        assert_eq!(byte_range(Some("bytes=80-"), 100).unwrap(), (80, 99, true));
+        assert!(byte_range(Some("bytes=200-"), 100).is_err());
+        assert!(byte_range(Some("bytes=1-2,3-4"), 100).is_err());
+    }
+    #[test]
+    fn update_versions_are_compared_semantically() {
+        let text=json!({"schemaVersion":1,"version":"0.1.10","platforms":{"windows-x86_64":{"url":"https://example.test/app.zip","sha256":"a".repeat(64),"bytes":20,"mime":"application/zip"}}}).to_string();
+        assert_eq!(
+            update_result(&text, "0.1.9", "windows-x86_64").unwrap()["available"],
+            true
+        );
+        assert_eq!(
+            update_result(&text, "0.2.0", "windows-x86_64").unwrap()["available"],
+            false
+        );
+        assert!(update_result(&text, "0.1.9", "darwin-aarch64").is_err());
+    }
+}

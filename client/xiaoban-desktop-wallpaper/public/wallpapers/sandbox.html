@@ -1,0 +1,24 @@
+<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'nonce-Y2FudmFzLXNhbmRib3g=' blob:; style-src 'unsafe-inline'; img-src blob: data:; media-src blob:; connect-src blob:; worker-src 'none'; child-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'"><style>html,body,canvas{margin:0;width:100%;height:100%;display:block;overflow:hidden}body{background:#edf8f1}</style></head><body><canvas></canvas><script type="module" nonce="Y2FudmFzLXNhbmRib3g=">
+const canvas=document.querySelector('canvas');let controller,frame=0,last=0,started=false,config={paused:false,fps:60},urls=[];
+function resize(width,height,dpr){canvas.width=Math.max(1,Math.round(width*dpr));canvas.height=Math.max(1,Math.round(height*dpr));controller?.resize?.({width,height,dpr})}
+function tick(now){frame=requestAnimationFrame(tick);if(config.paused){last=0;return}if(last&&now-last<1000/config.fps-1)return;const dt=last?Math.min((now-last)/1000,.1):1/60;last=now;try{controller.render({time:now/1000,dt})}catch(error){cancelAnimationFrame(frame);parent.postMessage({type:'canvas-error',message:String(error)},'*')}}
+addEventListener('message',async event=>{
+  if(event.source!==parent||!event.data||typeof event.data!=='object')return;
+  const data=event.data;
+  if(data.type==='canvas-init'&&!started){
+    started=true;config=data.config;
+    try{
+      const assets={};for(const [key,asset]of Object.entries(data.assets)){const blob=new Blob([asset.bytes],{type:asset.mime});const url=URL.createObjectURL(blob);urls.push(url);assets[key]={url,mime:asset.mime,bytes:asset.bytes}}
+      const moduleUrl=URL.createObjectURL(new Blob([data.code],{type:'application/javascript'}));urls.push(moduleUrl);
+      const module=await import(moduleUrl);if(typeof module.default!=='function')throw new Error('动画需要导出 default create 函数');
+      controller=await module.default({canvas,width:data.width,height:data.height,dpr:data.dpr,settings:data.settings,assets});
+      if(!controller||typeof controller.render!=='function')throw new Error('动画需要提供 render 方法');
+      resize(data.width,data.height,data.dpr);controller.render({time:0,dt:0});frame=requestAnimationFrame(tick);
+      parent.postMessage({type:'canvas-ready',width:canvas.width,height:canvas.height},'*');
+    }catch(error){parent.postMessage({type:'canvas-error',message:String(error)},'*')}
+  }else if(data.type==='canvas-config'){config=data.config;controller?.update?.(data.settings)}
+  else if(data.type==='canvas-resize'){resize(data.width,data.height,data.dpr)}
+});
+addEventListener('pagehide',()=>{cancelAnimationFrame(frame);controller?.destroy?.();urls.forEach(url=>URL.revokeObjectURL(url))});
+parent.postMessage({type:'canvas-shell-ready'},'*');
+</script></body></html>
