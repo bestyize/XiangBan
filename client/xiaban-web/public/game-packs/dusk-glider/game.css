@@ -1,6 +1,8 @@
 :root {
   color-scheme: light;
   --cream: #fff6e8; --glass: rgba(255, 250, 242, .42); --coral: #ff8a63; --coral-deep: #e4604a; --gold: #ffc861; --indigo: #2a2850; --muted: #5b5470;
+  /* Panel palette: warm paper with ink-brown text, so the dialogs belong to the sunset world rather than a cold UI. */
+  --panel: #fdf8f0; --panel-ink: #3b2f28; --panel-text: #7a6555; --panel-tint: rgba(120, 84, 60, .07); --panel-edge: rgba(120, 84, 60, .16);
   --sea: #4aa8d8; --sky: #8fc9ff; --dl-w: 260px;
   --share-accent: #ffc861; --share-ink: #2a2850; --share-hover: #ffd47f; --share-outline: rgba(42, 40, 80, .16); --share-secondary: #fff6e8; --share-secondary-ink: #2a2850; --share-secondary-hover: #ffeed8; --share-focus: #e4604a;
   font-family: "PingFang SC", "HarmonyOS Sans SC", "MiSans", system-ui, sans-serif; color: var(--indigo); background: #f3d9b5;
@@ -11,7 +13,7 @@
 html, body, .game { width: 100%; height: 100%; margin: 0; overflow: hidden; overscroll-behavior: none; }
 body { height: 100dvh; background: linear-gradient(180deg, #2a2850, #e4604a 62%, #ffc861); -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; font-variant-numeric: tabular-nums; }
 button { font: inherit; color: inherit; cursor: pointer; border: 0; background: none; -webkit-tap-highlight-color: transparent; touch-action: manipulation; }
-button:focus-visible { outline: 2px solid var(--coral-deep); outline-offset: 3px; }
+button:focus-visible { outline: 2px solid rgba(59, 47, 40, .5); outline-offset: 3px; }
 button:disabled { cursor: default; }
 [hidden] { display: none !important; }
 svg { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
@@ -96,53 +98,53 @@ svg { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round
 .welcome-card { width: min(310px, 34%); max-height: calc(100% - 8px); overflow: auto; padding: 20px 22px 16px; border-radius: 24px; background: var(--glass); box-shadow: 0 20px 60px rgba(120, 60, 50, .2), inset 0 0 0 1px rgba(255, 255, 255, .55); animation: welcome-in .9s ease-out; }
 @keyframes welcome-in { from { opacity: 0; filter: blur(6px); translate: -12px 0; } }
 .welcome-kicker { margin: 0 0 8px; font-size: 11px; letter-spacing: .3em; color: var(--coral-deep); }
-h1 { margin: 0; font-size: clamp(30px, 4.2vw, 44px); line-height: 1.15; font-weight: 300; letter-spacing: .24em; color: var(--indigo); white-space: nowrap; }
+h1 { margin: 0; font-size: clamp(30px, 4.2vw, 44px); line-height: 1.15; font-weight: 300; letter-spacing: .24em; color: var(--panel-ink); white-space: nowrap; }
 /* The card is deliberately translucent, so every label carries a soft paper halo to stay legible over the terrain. */
-.welcome-description { margin: 12px 0 20px; font-size: 14px; line-height: 1.9; color: var(--muted); }
+.welcome-description { margin: 12px 0 20px; font-size: 14px; line-height: 1.9; color: var(--panel-text); }
 .welcome-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
-.primary-button { display: flex; align-items: center; justify-content: center; gap: 10px; min-height: 50px; padding: 10px 28px; border-radius: 999px; background: linear-gradient(180deg, #ff9b74, var(--coral-deep)); color: #fff; font-size: 19px; font-weight: 600; letter-spacing: .2em; text-indent: .2em; white-space: nowrap; box-shadow: 0 8px 22px rgba(228, 96, 74, .42), inset 0 1px 0 rgba(255, 255, 255, .45); transition: transform .12s, box-shadow .12s; }
+.primary-button { display: flex; align-items: center; justify-content: center; gap: 10px; min-height: 50px; padding: 10px 28px; border-radius: 999px; background: var(--coral-deep); color: #fff8f0; font-size: 19px; font-weight: 600; letter-spacing: .2em; text-indent: .2em; white-space: nowrap; box-shadow: 0 8px 20px rgba(198, 74, 54, .3); transition: transform .12s, background-color .12s, box-shadow .12s; }
 .primary-button svg { width: 20px; height: 20px; stroke-width: 2.2; }
-.primary-button:active { transform: translateY(1px) scale(.98); box-shadow: 0 4px 12px rgba(228, 96, 74, .4), inset 0 1px 0 rgba(255, 255, 255, .45); }
-.primary-button:focus-visible { outline: 3px solid rgba(255, 200, 97, .9); outline-offset: 3px; }
-@media (hover: hover) { .primary-button:hover { box-shadow: 0 10px 26px rgba(228, 96, 74, .52), inset 0 1px 0 rgba(255, 255, 255, .5); } }
+.primary-button:active { transform: translateY(1px) scale(.985); background: #cf5642; box-shadow: 0 4px 12px rgba(198, 74, 54, .28); }
+.primary-button:focus-visible { outline: 3px solid rgba(59, 47, 40, .45); outline-offset: 3px; }
+@media (hover: hover) { .primary-button:hover { background: #ec6d55; box-shadow: 0 10px 24px rgba(198, 74, 54, .38); } }
 /* 起飞 takes a full row; the two state toggles share the row below it. */
 #startButton { flex: 1 0 100%; }
 #welcomeAssist, #welcomeSound { flex: 1 1 0; text-align: center; }
-.text-toggle { min-height: 44px; padding: 0 8px; font-size: 14px; color: var(--muted); border-bottom: 1px solid rgba(42, 40, 80, .2); border-radius: 0; white-space: nowrap; }
-.text-toggle[aria-pressed="true"] { color: var(--coral-deep); border-color: var(--coral-deep); }
-.welcome-foot { margin: 14px 0 0; font-size: 11px; letter-spacing: .08em; color: var(--muted); }
+.text-toggle { min-height: 44px; padding: 0 8px; font-size: 14px; color: var(--panel-text); border-bottom: 1px solid var(--panel-edge); border-radius: 0; white-space: nowrap; }
+.text-toggle[aria-pressed="true"] { color: #a9702f; border-color: rgba(169, 112, 47, .55); }
+.welcome-foot { margin: 14px 0 0; font-size: 11px; letter-spacing: .08em; color: var(--panel-text); opacity: .85; }
 
 /* A warm dusk dim that matches the sunset world, instead of a cold UI purple. */
-.scrim { display: grid; place-items: center; padding: max(12px, var(--safe-top)) max(18px, var(--safe-right)) max(12px, var(--safe-bottom)) max(18px, var(--safe-left)); background: radial-gradient(ellipse at 50% 40%, rgba(122, 62, 66, .34), rgba(58, 30, 52, .62)); }
-.dialog-card { position: relative; width: 340px; max-width: 100%; max-height: 100%; overflow-y: auto; text-align: center; padding: 28px 28px 12px; border-radius: 24px; background: linear-gradient(180deg, rgba(255, 251, 244, .95), rgba(255, 243, 228, .92)); box-shadow: 0 24px 70px rgba(42, 40, 80, .38), inset 0 0 0 1px rgba(255, 255, 255, .8); }
-.dialog-card h2 { margin: 0 0 8px; font-size: 24px; font-weight: 400; letter-spacing: .14em; color: var(--indigo); }
-.dialog-card > p { margin: 0 0 20px; font-size: 13px; line-height: 1.8; color: var(--muted); }
+.scrim { display: grid; place-items: center; padding: max(12px, var(--safe-top)) max(18px, var(--safe-right)) max(12px, var(--safe-bottom)) max(18px, var(--safe-left)); background: radial-gradient(ellipse at 50% 40%, rgba(86, 54, 58, .34), rgba(44, 28, 40, .6)); }
+.dialog-card { position: relative; width: 340px; max-width: 100%; max-height: 100%; overflow-y: auto; text-align: center; padding: 28px 28px 12px; border-radius: 24px; background: var(--panel); box-shadow: 0 22px 60px rgba(40, 24, 20, .34), inset 0 0 0 1px rgba(255, 255, 255, .7); }
+.dialog-card h2 { margin: 0 0 8px; font-size: 24px; font-weight: 400; letter-spacing: .14em; color: var(--panel-ink); }
+.dialog-card > p { margin: 0 0 20px; font-size: 13px; line-height: 1.8; color: var(--panel-text); }
 .dialog-card .primary-button { width: 100%; }
-.text-button { min-height: 44px; padding: 10px 20px 0; margin-top: 4px; color: var(--muted); font-size: 12px; letter-spacing: .08em; }
+.text-button { min-height: 44px; padding: 10px 20px 0; margin-top: 4px; color: var(--panel-text); font-size: 12px; letter-spacing: .08em; }
 @media (hover: hover) { .text-button:hover { color: var(--coral-deep); } }
 
 .result-card { width: 400px; padding: 22px 26px 8px; }
-.result-badge { display: inline-block; padding: 4px 14px; border-radius: 999px; background: rgba(255, 138, 99, .16); color: var(--coral-deep); font-size: 11px; font-weight: 600; letter-spacing: .16em; }
+.result-badge { display: inline-block; padding: 4px 14px; border-radius: 999px; background: var(--panel-tint); color: #a8503f; font-size: 11px; font-weight: 600; letter-spacing: .16em; }
 .result-card h2 { margin: 10px 0 4px; }
-.result-card > #resultDescription { margin: 0 0 2px; font-size: 13px; line-height: 1.6; color: var(--muted); }
+.result-card > #resultDescription { margin: 0 0 2px; font-size: 13px; line-height: 1.6; color: var(--panel-text); }
 .result-score { display: flex; flex-direction: column; align-items: center; margin: 4px 0 12px; }
-.result-score strong { font-size: 56px; line-height: 1.1; font-weight: 300; letter-spacing: .02em; font-variant-numeric: tabular-nums; color: var(--indigo); }
-.result-score span { font-size: 10px; letter-spacing: .3em; padding-left: .3em; color: var(--muted); }
+.result-score strong { font-size: 56px; line-height: 1.1; font-weight: 300; letter-spacing: .02em; font-variant-numeric: tabular-nums; color: var(--panel-ink); }
+.result-score span { font-size: 10px; letter-spacing: .3em; padding-left: .3em; color: var(--panel-text); }
 .result-stats { display: grid; grid-template-columns: repeat(4, 1fr); padding: 10px 0; border-top: 1px solid rgba(42, 40, 80, .1); border-bottom: 1px solid rgba(42, 40, 80, .1); }
 .result-stats > div { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
 .result-stats > div + div { border-left: 1px solid rgba(42, 40, 80, .08); }
-.result-stats b { font-size: 20px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--indigo); }
-.result-stats span { font-size: 10px; color: var(--muted); white-space: nowrap; }
-.result-card > .result-bonus { margin: 8px 0 0; min-height: 16px; font-size: 11px; color: var(--muted); }
-.result-card > .best-label { margin: 2px 0 0; min-height: 16px; font-size: 12px; font-weight: 600; color: var(--coral-deep); }
+.result-stats b { font-size: 20px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--panel-ink); }
+.result-stats span { font-size: 10px; color: var(--panel-text); white-space: nowrap; }
+.result-card > .result-bonus { margin: 8px 0 0; min-height: 16px; font-size: 11px; color: var(--panel-text); }
+.result-card > .best-label { margin: 2px 0 0; min-height: 16px; font-size: 12px; font-weight: 600; color: #b9503c; }
 .result-card .result-share-button { margin: 10px 0 8px; font-size: 15px; font-weight: 600; letter-spacing: .1em; border-radius: 999px; }
 .result-actions { display: flex; gap: 8px; }
 .result-actions .primary-button { flex: 1; min-height: 46px; padding: 8px; font-size: 16px; }
 /* Keep 再飞一次 coral even when the shared stylesheet restyles result buttons as secondary. */
-.result-card:has(.result-share-button:not([hidden])) .result-actions > button.primary-button:not([hidden]) { border: 0; border-radius: 999px; background: linear-gradient(180deg, #ff9b74, var(--coral-deep)); color: #fff; font-size: 16px; font-weight: 600; letter-spacing: .2em; box-shadow: 0 8px 22px rgba(228, 96, 74, .42), inset 0 1px 0 rgba(255, 255, 255, .45); }
+.result-card:has(.result-share-button:not([hidden])) .result-actions > button.primary-button:not([hidden]) { border: 0; border-radius: 999px; background: var(--coral-deep); color: #fff8f0; font-size: 16px; font-weight: 600; letter-spacing: .2em; box-shadow: 0 8px 20px rgba(198, 74, 54, .3); }
 
 .fallback { position: absolute; z-index: 20; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; padding: 24px; background: linear-gradient(180deg, #2a2850, #e4604a 62%, #ffc861); text-align: center; }
-.fallback p { margin: 0; max-width: 360px; padding: 24px 28px; border-radius: 24px; background: linear-gradient(180deg, rgba(255, 251, 244, .95), rgba(255, 243, 228, .92)); box-shadow: 0 24px 70px rgba(42, 40, 80, .38); font-size: 15px; line-height: 1.8; color: var(--indigo); }
+.fallback p { margin: 0; max-width: 360px; padding: 24px 28px; border-radius: 24px; background: var(--panel); box-shadow: 0 22px 60px rgba(40, 24, 20, .34); font-size: 15px; line-height: 1.8; color: var(--panel-ink); }
 
 .touch-copy { display: none; }
 .desktop-copy { display: inline; }
@@ -167,21 +169,21 @@ h1 { margin: 0; font-size: clamp(30px, 4.2vw, 44px); line-height: 1.15; font-wei
 .game.coaching .prompt { bottom: calc(max(16px, var(--safe-bottom)) + 72px); }
 /* A single narrow column: small icon on the left, the label and its hint stacked beside it. */
 .howto { display: flex; flex-direction: column; gap: 5px; margin: 0 0 14px; padding: 0; list-style: none; }
-.howto li { display: grid; grid-template-columns: 34px 1fr; grid-template-rows: auto auto; align-items: center; column-gap: 8px; padding: 4px 8px; border-radius: 11px; background: rgba(255, 250, 242, .62); text-align: left; }
+.howto li { display: grid; grid-template-columns: 34px 1fr; grid-template-rows: auto auto; align-items: center; column-gap: 8px; padding: 4px 8px; border-radius: 11px; background: var(--panel-tint); text-align: left; }
 .howto svg { grid-column: 1; grid-row: 1 / 3; width: 34px; height: 22px; fill: none; stroke-width: 2.6; overflow: visible; }
-.howto b { grid-column: 2; grid-row: 1; font-size: 12px; font-weight: 600; letter-spacing: .04em; color: var(--indigo); white-space: nowrap; }
-.howto span { grid-column: 2; grid-row: 2; font-size: 11px; line-height: 1.3; color: var(--muted); }
+.howto b { grid-column: 2; grid-row: 1; font-size: 12px; font-weight: 600; letter-spacing: .04em; color: var(--panel-ink); white-space: nowrap; }
+.howto span { grid-column: 2; grid-row: 2; font-size: 11px; line-height: 1.3; color: var(--panel-text); }
 /* In-game help: a small corner button that opens the how-to whenever the player needs it. */
 .help-button { position: absolute; z-index: 6; left: max(14px, var(--safe-left)); bottom: max(14px, var(--safe-bottom)); width: 38px; height: 38px; opacity: .86; }
 .help-button svg { width: 19px; height: 19px; stroke-width: 2; }
 .help-overlay { z-index: 11; }
 .help-card { width: 320px; padding: 18px 20px 12px; text-align: left; }
 .help-card h2 { margin: 0 0 10px; font-size: 20px; font-weight: 400; letter-spacing: .1em; text-align: center; }
-.help-card .howto li { background: rgba(214, 122, 84, .11); }
-.help-extra { margin: 0 0 12px; font-size: 12px; line-height: 1.7; color: var(--muted); }
+.help-card .howto li { background: var(--panel-tint); }
+.help-extra { margin: 0 0 12px; font-size: 12px; line-height: 1.7; color: var(--panel-text); }
 .help-toggles { display: flex; gap: 8px; justify-content: center; margin-bottom: 10px; }
 .help-card > .primary-button { width: 100%; }
-.howto .hill { stroke: var(--indigo); opacity: .55; }
+.howto .hill { stroke: var(--panel-ink); opacity: .5; }
 .howto .press { fill: var(--gold); stroke: #e8a53a; stroke-width: 1.5; }
 .howto .free { stroke: var(--sea); }
 .howto .chev { stroke: #e8a53a; }
