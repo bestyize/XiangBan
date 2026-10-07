@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host 127.0.0.1 --port 1420 --strictPort",
-    "build": "tsc --noEmit && vite build",
+    "build": "node scripts/check-builtin-assets.mjs && tsc --noEmit && vite build",
     "desktop": "tauri dev",
     "desktop:build": "tauri build --no-bundle",
     "desktop:macos:build": "tauri build --target aarch64-apple-darwin --bundles app",

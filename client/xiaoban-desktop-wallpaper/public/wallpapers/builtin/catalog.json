@@ -51,8 +51,8 @@
       "kind": "canvas",
       "resource": {
         "url": "builtin://mint-orbits.js",
-        "sha256": "10f5772986faebc1ae58fa43d754c30faca6c78a76cd6074a9b2be9abb76d4dc",
-        "bytes": 972,
+        "sha256": "19f5710e9e7e3e65a9807f606c8e7a6205a7da03c7f6eeb17fd9149daa17f1dc",
+        "bytes": 952,
         "mime": "application/javascript"
       },
       "cover": {
