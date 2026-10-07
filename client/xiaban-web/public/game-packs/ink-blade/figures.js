@@ -15,6 +15,10 @@
     shield: { thigh: 13, shin: 12, torso: 21, upper: 11, fore: 10, head: 6.6, limbs: [7.2, 6.2, 6.4, 5.2], blade: 27, bladeW: 5.5, color: '#2b2e33', robe: 'rags', headStyle: 'blob', shield: true },
     archer: { thigh: 13, shin: 13, torso: 18, upper: 10, fore: 10, head: 5.2, limbs: [4.6, 3.9, 3.6, 3.1], blade: 0, color: '#33373d', robe: 'hood', headStyle: 'hood', bow: true },
     boss: { thigh: 17, shin: 17, torso: 25, upper: 13, fore: 12, head: 6.2, limbs: [7, 5.8, 6, 4.8], blade: 56, bladeW: 3.2, color: '#0f1012', robe: 'long', hat: 'veil', mask: true, sleeves: true },
+    ronin: { thigh: 13, shin: 13, torso: 18, upper: 10, fore: 9.5, head: 5.6, limbs: [5.4, 4.4, 4.2, 3.6], blade: 32, bladeW: 3.2, color: '#24262b', robe: 'straw', hat: 'douli' },
+    spearman: { thigh: 14, shin: 14, torso: 22, upper: 12, fore: 11, head: 5.6, limbs: [6.2, 5.2, 5.2, 4.2], blade: 0, color: '#1b1d22', robe: 'armor', hat: 'helmet', spear: true },
+    hammer: { thigh: 16, shin: 15, torso: 26, upper: 14, fore: 13, head: 7.2, limbs: [8.5, 7.2, 7.5, 6.2], blade: 0, color: '#202228', robe: 'vest', headStyle: 'blob', hammer: true },
+    angler: { thigh: 16, shin: 16, torso: 24, upper: 12, fore: 11, head: 6.2, limbs: [6.2, 5.2, 5.4, 4.4], blade: 0, color: '#121316', robe: 'straw', hat: 'douli', beard: true, rod: true },
   }
 
   const POSE_KEYS = ['lean', 'crouch', 'l1', 'b1', 'l2', 'b2', 'ou', 'of', 'sw', 'reach', 'head', 'rot', 'bob', 'draw', 'air', 'flutter']
@@ -111,6 +115,9 @@
     const progress = e.teleTotal ? 1 - Math.max(0, e.t) / e.teleTotal : 0
     if (e.type === 'archer') { t.lean = 0.08; t.ou = 1.5; t.of = 1.52; t.sw = 0 }
     if (e.type === 'shield') { t.ou = 0.95; t.of = 1.45; t.lean = 0.22 }
+    if (e.type === 'spearman') { t.sw = -0.15; t.reach = 1.1; t.lean = 0.28 }
+    if (e.type === 'hammer') { t.sw = -0.6; t.reach = 0.95; t.lean = 0.25; t.crouch = 4 }
+    if (e.type === 'ronin') { t.lean = 0.42; t.crouch = 3.5 }
     switch (e.state) {
       case 'spawn':
         t.crouch = 8; t.lean = 0.6
@@ -118,19 +125,36 @@
       case 'walk':
         runLegs(t, anim.phase, clamp(speed / 150, 0.3, 0.8))
         t.lean += 0.06
+        if (e.type === 'hammer') t.bob = Math.abs(Math.cos(anim.phase)) * 2.8
         break
       case 'tele':
         if (e.type === 'archer') { t.draw = ease(progress); t.lean = 0.02 }
-        else telePose(t, progress, e.type === 'shield' ? -2.6 : -2.35)
+        else if (e.type === 'spearman') {
+          if (e.move === 'thrust') { t.sw = -0.05; t.reach = 1.25; t.lean = 0.6; t.crouch = 5 }
+          else { t.sw = lerp(0.8, -2.4, ease(progress * 1.4)); t.reach = 1.1; t.lean = 0.1 }
+        } else if (e.type === 'hammer') {
+          t.sw = lerp(-0.5, -2.85, ease(progress * 1.5)); t.reach = 1.1; t.crouch = 6; t.lean = -0.25
+        } else {
+          telePose(t, progress, e.type === 'shield' ? -2.6 : -2.35)
+        }
         break
       case 'attack':
-        t.sw = 0.85; t.reach = 1; t.lean = 0.55; t.crouch = 5
-        Object.assign(t, { l1: 0.75, b1: 0.4, l2: -0.75, b2: 0.1 })
+        if (e.type === 'spearman') {
+          if (e.move === 'thrust') { t.sw = 0.05; t.reach = 1.45; t.lean = 0.8; t.crouch = 6 }
+          else { t.sw = 1.2; t.reach = 1.25; t.lean = 0.55; t.crouch = 4 }
+        } else if (e.type === 'hammer') {
+          t.sw = 1.25; t.reach = 1.2; t.lean = 0.75; t.crouch = 8
+        } else {
+          t.sw = 0.85; t.reach = 1; t.lean = 0.55; t.crouch = 5
+          Object.assign(t, { l1: 0.75, b1: 0.4, l2: -0.75, b2: 0.1 })
+        }
         anim.snap = true
         break
       case 'recover':
         t.sw = 0.95; t.lean = 0.6; t.crouch = 5
         if (e.type === 'archer') { t.lean = 0.05; t.draw = 0 }
+        if (e.type === 'spearman') { t.sw = -0.1; t.reach = 0.95 }
+        if (e.type === 'hammer') { t.sw = 0.8; t.crouch = 6 }
         break
       case 'hurt':
         t.lean = -0.38; t.sw = -1.8; t.ou = 2; t.of = 2.4; t.crouch = 2; t.head = -0.3
@@ -147,6 +171,7 @@
   }
 
   function bossPose(e, anim, time) {
+    if (e.type === 'angler') return anglerPose(e, anim, time)
     const t = basePose()
     const speed = Math.abs(e.vx)
     t.flutter = clamp(speed / 260, 0, 1)
@@ -220,12 +245,77 @@
     return t
   }
 
+  function anglerPose(e, anim, time) {
+    const t = basePose()
+    const speed = Math.abs(e.vx)
+    t.flutter = clamp(speed / 240, 0, 1)
+    anim.snap = false
+    const progress = e.teleTotal ? 1 - Math.max(0, e.t) / e.teleTotal : 0
+    t.lean = 0.14; t.sw = 0.6; t.reach = 0.95; t.ou = -0.2; t.of = -0.5; t.crouch = 2
+    const breathe = Math.sin(time * 1.5)
+    switch (e.state) {
+      case 'spawn':
+      case 'intro':
+        t.sw = 1.1; t.reach = 0.85; t.lean = 0.05 + breathe * 0.03
+        break
+      case 'idle':
+        t.crouch = 3 + breathe; t.sw = 0.45 + breathe * 0.08; t.lean = 0.16
+        Object.assign(t, { l1: 0.38, b1: 0.38, l2: -0.36, b2: 0.15 })
+        break
+      case 'walk':
+        runLegs(t, anim.phase, 0.72); t.lean = 0.32; t.sw = 0.8
+        break
+      case 'combo': {
+        const step = e.combo ? e.combo.i : 0
+        const whip = [0.85, -1.2, 1.15][step]
+        if (e.combo?.phase === 'tele') {
+          t.sw = lerp(t.sw, -2.2, ease(progress * 1.5)); t.reach = 1.1; t.lean = -0.1; t.crouch = 4
+        } else {
+          t.sw = whip; t.reach = 1.25; t.lean = 0.58; t.crouch = 5; anim.snap = true
+        }
+        break
+      }
+      case 'hookTell':
+        t.sw = -1.95; t.reach = 1.1; t.lean = -0.2; t.crouch = 5
+        break
+      case 'hook':
+        t.sw = 0.05; t.reach = 1.45; t.lean = 0.75; t.crouch = 6; anim.snap = true
+        break
+      case 'slamTell':
+        t.sw = -2.7; t.reach = 1; t.crouch = 7; t.lean = 0.45
+        break
+      case 'slam':
+        t.sw = 1.2; t.reach = 1.1; t.crouch = 8; t.lean = 0.7; anim.snap = true
+        break
+      case 'phantomTell':
+        t.sw = -1.5; t.reach = 1.2; t.crouch = 5; t.lean = 0.5
+        break
+      case 'phantom':
+        t.sw = 0.3; t.reach = 1.1; t.lean = 0.85; t.crouch = 6; t.flutter = 1; anim.snap = true
+        break
+      case 'roar':
+        t.lean = -0.4; t.sw = -2.3; t.reach = 1; t.ou = 2.6; t.of = 2.9; t.head = -0.4; t.crouch = 3
+        break
+      case 'broken':
+        t.lean = 0.8; t.crouch = 15; t.sw = 0.3; t.reach = 1; t.head = 0.3
+        Object.assign(t, { l1: 1.1, b1: 2.1, l2: -0.2, b2: 1.5 })
+        break
+      case 'recover':
+        t.lean = 0.38; t.sw = 0.75; t.crouch = 5
+        break
+      case 'dying':
+        t.lean = 0.85; t.crouch = 18; t.sw = 0.2; t.head = 0.5
+        break
+    }
+    return t
+  }
+
   function updatePose(kind, entity, anim, dt, time, rules) {
     const speed = Math.abs(entity.vx)
-    anim.phase += speed * dt * (kind === 'boss' ? 0.06 : 0.085)
+    anim.phase += speed * dt * (kind === 'boss' || kind === 'angler' ? 0.06 : 0.085)
     anim.flip = Math.max(0, anim.flip - dt / 0.42)
     anim.parry = Math.max(0, anim.parry - dt)
-    const target = kind === 'player' ? playerPose(entity, anim, time, rules) : kind === 'boss' ? bossPose(entity, anim, time) : enemyPose(entity, anim, time)
+    const target = kind === 'player' ? playerPose(entity, anim, time, rules) : (kind === 'boss' || kind === 'angler') ? bossPose(entity, anim, time) : enemyPose(entity, anim, time)
     const rate = anim.snap ? 1 : 1 - Math.exp(-dt * 16)
     for (const key of POSE_KEYS) {
       if (key === 'rot' && (anim.flip > 0 || entity.dead)) { anim.pose.rot = target.rot; continue }
@@ -312,7 +402,33 @@
     ctx.quadraticCurveTo(neck[0], neck[1] - 2, sf[0], sf[1])
     ctx.quadraticCurveTo(wf[0] + 1.5, wf[1] - 4, wf[0], wf[1])
     ctx.quadraticCurveTo(hf[0] - 1, (wf[1] + hf[1]) / 2, hf[0], hf[1])
-    if (spec.robe === 'rags' || spec.robe === 'long') {
+    if (spec.robe === 'straw') {
+      ctx.quadraticCurveTo((hf[0] + hb[0]) / 2, hip[1] + hemDepth + 4, hb[0], hb[1])
+      ctx.quadraticCurveTo(wb[0] - 3, (wb[1] + hb[1]) / 2, wb[0], wb[1])
+      ctx.quadraticCurveTo(sb[0] - 1.5, (sb[1] + wb[1]) / 2, sb[0], sb[1])
+      ctx.closePath(); ctx.fill()
+      for (let i = 0; i < 8; i++) {
+        const t = i / 7
+        const sx = lerp(sf[0] - 2, sb[0] - 4, t), sy = lerp(sf[1] + 5, sb[1] + 5, t)
+        const ex = sx - 5 - flutter * 7 - (i % 3) * 3, ey = sy + 16 + (i % 2) * 5
+        ctx.strokeStyle = 'rgba(20,20,22,0.82)'; ctx.lineWidth = 1.3
+        ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(ex, ey); ctx.stroke()
+      }
+    } else if (spec.robe === 'armor') {
+      ctx.quadraticCurveTo((hf[0] + hb[0]) / 2, hip[1] + hemDepth, hb[0], hb[1])
+      ctx.quadraticCurveTo(wb[0] - 3, (wb[1] + hb[1]) / 2, wb[0], wb[1])
+      ctx.quadraticCurveTo(sb[0] - 1.5, (sb[1] + wb[1]) / 2, sb[0], sb[1])
+      ctx.closePath(); ctx.fill()
+      ctx.strokeStyle = 'rgba(235,225,210,0.32)'; ctx.lineWidth = 0.8
+      for (let y = sf[1] + 6; y < hf[1]; y += 5) {
+        ctx.beginPath(); ctx.moveTo(sb[0] + 2, y); ctx.lineTo(sf[0] - 2, y); ctx.stroke()
+      }
+    } else if (spec.robe === 'vest') {
+      ctx.quadraticCurveTo((hf[0] + hb[0]) / 2, hip[1] + hemDepth - 4, hb[0], hb[1] - 4)
+      ctx.quadraticCurveTo(wb[0] - 2, (wb[1] + hb[1]) / 2, wb[0], wb[1])
+      ctx.quadraticCurveTo(sb[0] - 1, (sb[1] + wb[1]) / 2, sb[0], sb[1])
+      ctx.closePath(); ctx.fill()
+    } else if (spec.robe === 'rags' || spec.robe === 'long') {
       const teeth = spec.robe === 'long' ? 7 : 5
       for (let i = 1; i <= teeth; i++) {
         const t = i / teeth
@@ -351,6 +467,14 @@
       ctx.quadraticCurveTo(hx - r * 1.2, hy + r * 0.2, hx - r * 0.4, hy + r)
       ctx.closePath(); ctx.fill()
     }
+    if (spec.beard) {
+      ctx.fillStyle = '#f0ebe0'
+      ctx.beginPath()
+      ctx.moveTo(hx - r * 0.3, hy + r * 0.5)
+      ctx.quadraticCurveTo(hx + r * 0.2, hy + r * 2.2, hx + r * 0.8, hy + r * 2.6)
+      ctx.quadraticCurveTo(hx + r * 1.1, hy + r * 1.3, hx + r * 0.6, hy + r * 0.2)
+      ctx.closePath(); ctx.fill()
+    }
     if (spec.headStyle && !look.flash) eyes(ctx, hx + r * 0.42, hy - r * 0.1, look.eyeGlow || 0, spec.head)
   }
 
@@ -366,6 +490,18 @@
 
   function drawHat(ctx, spec, s, pose, time, look, seed) {
     const [hx, hy] = s.head
+    if (spec.hat === 'helmet') {
+      ctx.save(); ctx.translate(hx, hy - spec.head * 0.65); ctx.rotate(s.headTilt * 0.7)
+      ctx.fillStyle = look.flash ? look.color : '#22252a'
+      ctx.beginPath(); ctx.arc(0, 0, spec.head * 1.15, Math.PI, 0); ctx.fill()
+      ctx.fillRect(-spec.head * 1.15, -1, spec.head * 2.3, 5)
+      if (!look.flash) {
+        ctx.fillStyle = CINNABAR
+        ctx.beginPath(); ctx.moveTo(0, -spec.head * 1.15); ctx.quadraticCurveTo(-4, -spec.head * 2.1, -8, -spec.head * 2.5); ctx.quadraticCurveTo(0, -spec.head * 1.7, 0, -spec.head * 1.15); ctx.fill()
+      }
+      ctx.restore()
+      return
+    }
     const big = spec.hat === 'veil' ? 1.35 : 1
     ctx.save()
     ctx.translate(hx, hy - spec.head * 0.55)
@@ -483,6 +619,74 @@
     return pull
   }
 
+  function drawSpear(ctx, spec, s, look, out) {
+    const [hx, hy] = s.hand
+    const [dx, dy] = s.swordDir
+    const len = 74, shaftLen = 56
+    const nx = -dy, ny = dx
+    const tip = [hx + dx * len, hy + dy * len]
+    out.tip = tip
+    ctx.save()
+    ctx.strokeStyle = '#28201a'; ctx.lineWidth = 2.4
+    ctx.beginPath(); ctx.moveTo(hx - dx * 16, hy - dy * 16); ctx.lineTo(hx + dx * shaftLen, hy + dy * shaftLen); ctx.stroke()
+    if (!look.flash) {
+      ctx.fillStyle = CINNABAR
+      ctx.beginPath()
+      ctx.moveTo(hx + dx * (shaftLen - 2), hy + dy * (shaftLen - 2))
+      ctx.quadraticCurveTo(hx + dx * (shaftLen + 6) + nx * 5, hy + dy * (shaftLen + 6) + ny * 5, hx + dx * (shaftLen + 10), hy + dy * (shaftLen + 10))
+      ctx.quadraticCurveTo(hx + dx * (shaftLen + 4) - nx * 4, hy + dy * (shaftLen + 4) - ny * 4, hx + dx * (shaftLen - 2), hy + dy * (shaftLen - 2))
+      ctx.fill()
+    }
+    ctx.fillStyle = look.flash ? look.color : '#e5dfd2'
+    ctx.beginPath()
+    ctx.moveTo(hx + dx * shaftLen + nx * 3.5, hy + dy * shaftLen + ny * 3.5)
+    ctx.lineTo(tip[0], tip[1])
+    ctx.lineTo(hx + dx * shaftLen - nx * 3.5, hy + dy * shaftLen - ny * 3.5)
+    ctx.closePath(); ctx.fill()
+    ctx.restore()
+  }
+
+  function drawHammer(ctx, spec, s, look, out) {
+    const [hx, hy] = s.hand
+    const [dx, dy] = s.swordDir
+    const len = 44
+    const headX = hx + dx * len, headY = hy + dy * len
+    out.tip = [headX + dx * 14, headY + dy * 14]
+    ctx.save()
+    ctx.strokeStyle = '#322c26'; ctx.lineWidth = 3.6
+    ctx.beginPath(); ctx.moveTo(hx - dx * 10, hy - dy * 10); ctx.lineTo(headX, headY); ctx.stroke()
+    ctx.translate(headX, headY)
+    const angle = Math.atan2(dy, dx)
+    ctx.rotate(angle)
+    ctx.fillStyle = look.flash ? look.color : '#40434a'
+    ctx.beginPath(); ctx.roundRect(-6, -18, 22, 36, 3); ctx.fill()
+    if (!look.flash) {
+      ctx.strokeStyle = 'rgba(235,228,215,0.3)'; ctx.lineWidth = 0.8
+      ctx.beginPath(); ctx.moveTo(2, -16); ctx.lineTo(14, -16); ctx.moveTo(2, 16); ctx.lineTo(14, 16); ctx.stroke()
+    }
+    ctx.restore()
+  }
+
+  function drawRod(ctx, spec, s, look, out) {
+    const [hx, hy] = s.hand
+    const [dx, dy] = s.swordDir
+    const rodLen = 58
+    const tipX = hx + dx * rodLen - dy * 6, tipY = hy + dy * rodLen + dx * 6
+    out.tip = [tipX + dx * 40, tipY + dy * 20]
+    ctx.save()
+    ctx.strokeStyle = '#2b3322'; ctx.lineWidth = 1.8
+    ctx.beginPath()
+    ctx.moveTo(hx - dx * 6, hy - dy * 6)
+    ctx.quadraticCurveTo(hx + dx * rodLen * 0.6, hy + dy * rodLen * 0.6, tipX, tipY)
+    ctx.stroke()
+    ctx.strokeStyle = look.flash ? look.color : 'rgba(235,230,220,0.7)'; ctx.lineWidth = 0.8
+    const hookX = out.tip[0], hookY = out.tip[1]
+    ctx.beginPath(); ctx.moveTo(tipX, tipY); ctx.quadraticCurveTo((tipX + hookX) / 2 + 5, (tipY + hookY) / 2 + 8, hookX, hookY); ctx.stroke()
+    ctx.fillStyle = CINNABAR
+    ctx.beginPath(); ctx.arc(hookX, hookY, 2.2, 0, TAU); ctx.fill()
+    ctx.restore()
+  }
+
   function drawSleeve(ctx, from, to, pose, time, seed, back) {
     const flutter = pose.flutter
     const dx = to[0] - from[0], dy = to[1] - from[1]
@@ -555,7 +759,10 @@
       if (spec.sleeves) drawSleeve(ctx, s.shoulder, s.elbow, pose, time, seed, false)
       ctx.lineWidth = af
       ctx.beginPath(); ctx.moveTo(s.elbow[0], s.elbow[1]); ctx.lineTo(s.hand[0], s.hand[1]); ctx.stroke()
-      drawBlade(ctx, spec, s, look, out)
+      if (spec.spear) drawSpear(ctx, spec, s, look, out)
+      else if (spec.hammer) drawHammer(ctx, spec, s, look, out)
+      else if (spec.rod) drawRod(ctx, spec, s, look, out)
+      else drawBlade(ctx, spec, s, look, out)
     }
     ctx.restore()
     const map = (p) => p && [x + p[0] * facing, y + p[1]]

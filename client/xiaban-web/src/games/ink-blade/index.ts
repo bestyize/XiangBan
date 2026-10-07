@@ -20,6 +20,13 @@ const STAGES: Record<number, { name: string; sub: string }> = {
   104: { name: '断桥', sub: '竹林卷 · 第四幅' },
   105: { name: '夜雨', sub: '竹林卷 · 第五幅' },
   106: { name: '无常', sub: '竹林卷 · 终幅' },
+  200: { name: '长卷', sub: '雪江卷 · 长卷' },
+  201: { name: '寒峰', sub: '雪江卷 · 第一幅' },
+  202: { name: '古渡', sub: '雪江卷 · 第二幅' },
+  203: { name: '冰泽', sub: '雪江卷 · 第三幅' },
+  204: { name: '芦荡', sub: '雪江卷 · 第四幅' },
+  205: { name: '夜雪', sub: '雪江卷 · 第五幅' },
+  206: { name: '独钓', sub: '雪江卷 · 终幅' },
 }
 const SEAL_NAMES = ['', '一印', '一印', '二印', '一印', '二印', '二印', '三印']
 
@@ -70,6 +77,7 @@ function cheer(result: InkBladeResult): [RobotInput, string] {
   const where = stageName(result)
   if (!cleared(result)) return result.lines >= 10 ? ['excited', `斩了 ${result.lines} 个墨影，差一点就到头了`] : ['happy', '提剑再入，画卷还在等你']
   if (result.seals === 7) return ['proud', `「${where}」三印齐落，一笔不差`]
+  if (result.stage === 206 || result.stage === 200) return result.steps >= 10 ? ['proud', `弹反 ${result.steps} 次，钓叟也教冰魄折断`] : ['laughing', '雪夜一剑，钓叟也称快哉']
   if (result.stage === 106 || result.stage === 100) return result.steps >= 10 ? ['proud', `弹反 ${result.steps} 次，一剑破无常`] : ['laughing', '月下一剑，无常也拦不住你']
   return result.grade >= 3 ? ['laughing', `「${where}」画出了${GRADES[result.grade]}`] : ['excited', `过了「${where}」，下一幅等你`]
 }

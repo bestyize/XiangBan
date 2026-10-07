@@ -28,7 +28,7 @@
 
     <div class="combo" id="combo" aria-live="off" hidden><strong id="comboCount">0</strong><span>连</span></div>
     <div class="boss-bar" id="bossBar" hidden>
-      <div class="boss-name"><b>无常</b><span>斗笠客</span></div>
+      <div class="boss-name"><b id="bossTitle">无常</b><span id="bossSub">斗笠客</span></div>
       <div class="boss-hp"><span id="bossHp"></span></div>
       <div class="boss-posture"><span id="bossPosture"></span></div>
     </div>
@@ -68,7 +68,11 @@
     <section id="selectOverlay" class="overlay select" role="dialog" aria-modal="true" aria-labelledby="selectTitle" hidden>
       <header class="select-head">
         <button class="icon-button" id="selectBack" type="button" aria-label="返回卷首"><svg viewBox="0 0 24 24"><path d="m14 6-6 6 6 6" /></svg></button>
-        <div class="select-title"><h2 id="selectTitle">竹林卷</h2><span id="selectProgress">0 / 21 印</span></div>
+        <div class="volume-tabs" role="tablist" aria-label="选择卷轴">
+          <button type="button" class="volume-tab active" id="volTab1" data-vol="1" role="tab" aria-selected="true">竹林卷</button>
+          <button type="button" class="volume-tab" id="volTab2" data-vol="2" role="tab" aria-selected="false">雪江卷</button>
+        </div>
+        <div class="select-title"><span id="selectProgress">0 / 21 印</span></div>
         <div class="difficulty" role="group" aria-label="选择难度">
           <button type="button" class="mode" data-difficulty="easy" aria-pressed="false"><b>入门</b><span>七滴墨血</span></button>
           <button type="button" class="mode active" data-difficulty="normal" aria-pressed="true"><b>江湖</b><span>五滴墨血</span></button>

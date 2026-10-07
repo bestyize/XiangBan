@@ -50,6 +50,53 @@
     },
   }
 
+  const SNOW_RIVER = {
+    id: 2, name: '雪江卷', length: 6120,
+    areas: [
+      { x: 0, name: '寒峰', sub: '第一幅' },
+      { x: 1440, name: '古渡', sub: '第二幅' },
+      { x: 2330, name: '冰泽', sub: '第三幅' },
+      { x: 3290, name: '芦荡', sub: '第四幅' },
+      { x: 4230, name: '夜雪', sub: '第五幅' },
+      { x: 5230, name: '独钓', sub: '终幅' },
+    ],
+    platforms: [
+      { x: 800, y: 242, w: 150 },
+      { x: 1820, y: 244, w: 180 },
+      { x: 2100, y: 206, w: 130 },
+      { x: 2620, y: 246, w: 140 },
+      { x: 2950, y: 240, w: 150 },
+      { x: 3620, y: 236, w: 160 },
+      { x: 3950, y: 242, w: 150 },
+      { x: 4620, y: 234, w: 150 },
+    ],
+    iceZones: [[2290, 3290]],
+    prompts: [{ x: 0, key: 'move' }, { x: 760, key: 'jump' }, { x: 1410, key: 'dash' }],
+    encounters: {
+      snow_peak: { id: 'snow_peak', trigger: 900, lock: [640, 1400], waves: [
+        [{ type: 'ronin', x: 1110 }, { type: 'ronin', x: 1220, delay: 0.2 }],
+        [{ type: 'ronin', side: 1 }, { type: 'ronin', side: -1, delay: 0.3 }, { type: 'archer', x: 875, y: 242, delay: 0.5 }],
+      ] },
+      ferry: { id: 'ferry', trigger: 1580, lock: [1330, 2090], waves: [
+        [{ type: 'spearman', side: 1 }, { type: 'ronin', side: -1, delay: 0.3 }],
+        [{ type: 'spearman', side: 1 }, { type: 'spearman', side: -1, delay: 0.4 }, { type: 'ronin', side: 1, delay: 0.9 }],
+      ] },
+      ice_lake: { id: 'ice_lake', trigger: 2780, lock: [2410, 3170], waves: [
+        [{ type: 'ronin', side: 1 }, { type: 'ronin', side: -1, delay: 0.3 }, { type: 'archer', x: 2690, y: 246, delay: 0.5 }],
+        [{ type: 'spearman', side: 1 }, { type: 'spearman', side: -1, delay: 0.3 }, { type: 'ronin', side: 1, delay: 0.8 }, { type: 'ronin', side: -1, delay: 1.2 }],
+      ] },
+      reeds: { id: 'reeds', trigger: 3700, lock: [3360, 4120], waves: [
+        [{ type: 'spearman', side: 1 }, { type: 'archer', x: 3700, y: 236, delay: 0.2 }, { type: 'archer', x: 4025, delay: 0.4 }],
+        [{ type: 'hammer', side: 1 }, { type: 'ronin', side: -1, delay: 0.3 }, { type: 'ronin', side: 1, delay: 1.1 }],
+      ] },
+      blizzard: { id: 'blizzard', trigger: 4560, lock: [4300, 5060], waves: [
+        [{ type: 'hammer', side: -1 }, { type: 'spearman', side: 1 }, { type: 'crow', side: 1, delay: 0.3 }, { type: 'crow', side: -1, delay: 0.7 }],
+        [{ type: 'hammer', side: 1 }, { type: 'spearman', side: -1, delay: 0.4 }, { type: 'ronin', side: 1, delay: 0.8 }, { type: 'ronin', side: -1, delay: 1.2 }],
+      ] },
+      angler: { id: 'angler', trigger: 5560, lock: [5300, 6060], waves: [[{ type: 'angler', x: 5910 }]] },
+    },
+  }
+
   // Challenge stats: maxCombo, executions, airKills, deflectKills, parries, bossExecutions, time (seconds, at most).
   // grades: scores for 妙品 / 神品 / 逸品; any clear is at least 能品.
   const LEVELS = [
@@ -68,6 +115,22 @@
     { id: '1-scroll', code: 100, volume: 1, name: '长卷', sub: '全卷连战', range: [0, 6120], start: 520,
       encounters: ['gate', 'grove', 'crows', 'bridge', 'rain', 'boss'], par: 420, hurt: 3, scroll: true,
       challenge: { stat: 'time', goal: 360, at: 'most', text: '6 分钟内一气呵成' }, grades: [14000, 18000, 22000] },
+    // 卷二 · 雪江卷
+    { id: '2-1', code: 201, volume: 2, name: '寒峰', sub: '第一幅', range: [0, 1440], start: 520, encounters: ['snow_peak'],
+      par: 55, hurt: 1, challenge: { stat: 'executions', goal: 2, text: '处决 2 名敌人' }, grades: [1800, 2400, 3000] },
+    { id: '2-2', code: 202, volume: 2, name: '古渡', sub: '第二幅', range: [1340, 2330], start: 1460, encounters: ['ferry'],
+      par: 90, hurt: 1, challenge: { stat: 'parries', goal: 5, text: '弹反长枪横扫 5 次' }, grades: [2200, 3000, 3800] },
+    { id: '2-3', code: 203, volume: 2, name: '冰泽', sub: '第三幅', range: [2290, 3290], start: 2340, encounters: ['ice_lake'],
+      par: 95, hurt: 2, challenge: { stat: 'maxCombo', goal: 10, text: '在冰上达成 10 连击' }, grades: [2400, 3200, 4200] },
+    { id: '2-4', code: 204, volume: 2, name: '芦荡', sub: '第四幅', range: [3250, 4230], start: 3300, encounters: ['reeds'],
+      par: 100, hurt: 2, challenge: { stat: 'airKills', goal: 3, text: '在空中击败 3 名敌人' }, grades: [2600, 3500, 4500] },
+    { id: '2-5', code: 205, volume: 2, name: '夜雪', sub: '第五幅', range: [4200, 5230], start: 4250, encounters: ['blizzard'],
+      par: 110, hurt: 2, challenge: { stat: 'parries', goal: 8, text: '弹反 8 次' }, grades: [3600, 4800, 6200] },
+    { id: '2-6', code: 206, volume: 2, name: '独钓', sub: '终幅', range: [5190, 6120], start: 5240, encounters: ['angler'],
+      par: 130, hurt: 2, boss: true, challenge: { stat: 'bossExecutions', goal: 2, text: '破势处决钓叟 2 次' }, grades: [4800, 6200, 7800] },
+    { id: '2-scroll', code: 200, volume: 2, name: '长卷', sub: '全卷连战', range: [0, 6120], start: 520,
+      encounters: ['snow_peak', 'ferry', 'ice_lake', 'reeds', 'blizzard', 'angler'], par: 450, hurt: 4, scroll: true,
+      challenge: { stat: 'time', goal: 380, at: 'most', text: '6 分 20 秒内踏雪通卷' }, grades: [15000, 20000, 25000] },
   ]
 
   const GRADES = ['', '能品', '妙品', '神品', '逸品']
@@ -75,10 +138,10 @@
   const byId = new Map(LEVELS.map((level) => [level.id, level]))
   const byCode = new Map(LEVELS.map((level) => [level.code, level]))
 
-  function volume(id) { return [BAMBOO].find((entry) => entry.id === id) || null }
+  function volume(id) { return [BAMBOO, SNOW_RIVER].find((entry) => entry.id === id) || null }
   function level(id) { return byId.get(id) || null }
   function levelByCode(code) { return byCode.get(code) || null }
   function volumeLevels(id) { return LEVELS.filter((entry) => entry.volume === id) }
 
-  globalThis.XiabanInkLevels = { VOLUMES: [BAMBOO], LEVELS, GRADES, SEALS, volume, level, levelByCode, volumeLevels }
+  globalThis.XiabanInkLevels = { VOLUMES: [BAMBOO, SNOW_RIVER], LEVELS, GRADES, SEALS, volume, level, levelByCode, volumeLevels }
 })()

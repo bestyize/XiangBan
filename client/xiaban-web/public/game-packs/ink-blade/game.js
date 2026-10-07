@@ -34,6 +34,7 @@
 
   let touchUI = matchMedia('(any-pointer: coarse)').matches
   gameNode.classList.toggle('touch', touchUI)
+  let selectedVolume = (duel && duel.level.startsWith('2-')) ? 2 : 1
   let save = PROGRESS.empty(), saveApplied = false, currentLevel = duel ? duel.level : '1-1'
   let difficulty = params.get('difficulty') === 'easy' ? 'easy' : 'normal'
   let state = rules.createGame({ difficulty, level: currentLevel }), phase = 'welcome'
@@ -94,6 +95,7 @@
     saveApplied = true
     save = PROGRESS.normalize(raw)
     if (!params.has('difficulty')) difficulty = save.difficulty
+    if (save.volume && !duel) selectedVolume = save.volume
     syncDifficulty()
     refreshWelcome()
     if (phase === 'select') renderSelect()
@@ -101,7 +103,7 @@
 
   /** Hosted packs hand the save to the website, which keeps it in the account or this browser. */
   function persistSave() {
-    save = { ...save, difficulty }
+    save = { ...save, difficulty, volume: selectedVolume }
     if (hosted) { postToHost('game.save', { data: save }); return }
     try { localStorage.setItem(LOCAL_SAVE, JSON.stringify(save)) } catch { /* Opened directly without storage. */ }
   }
@@ -128,7 +130,8 @@
 
   function buildAssets(key) {
     assetKey = key
-    assets = scene.build({ P: k * dpr, viewW, width: canvas.width, height: canvas.height })
+    const vol = state.level ? state.level.volume : selectedVolume
+    assets = scene.build({ P: k * dpr, viewW, width: canvas.width, height: canvas.height, volumeId: vol })
   }
 
   function resize() {
@@ -149,8 +152,9 @@
     k = Math.min(height / 360, width / 560)
     viewW = width / k; viewH = height / k
     worldTop = rules.GROUND + 62 - viewH
-    const key = Math.round(k * dpr * 16) + ':' + Math.round(viewW / 60)
-    if (!assets) buildAssets(key)
+    const vol = state.level ? state.level.volume : selectedVolume
+    const key = vol + ':' + Math.round(k * dpr * 16) + ':' + Math.round(viewW / 60)
+    if (!assets || assets.volumeId !== vol) buildAssets(key)
     else {
       assets.vignette = art.vignette(canvas.width, canvas.height)
       if (key !== assetKey) { clearTimeout(rebuildTimer); rebuildTimer = setTimeout(() => buildAssets(key), 200) }
@@ -395,9 +399,14 @@
   function startRound(levelId = currentLevel, asDuel = false) {
     audio.resume()
     if (touchUI && !document.fullscreenElement) void requestImmersive(false)
-    currentLevel = LV.level(levelId) ? levelId : '1-1'
+    currentLevel = LV.level(levelId) ? levelId : (selectedVolume === 2 ? '2-1' : '1-1')
+    const lvl = LV.level(currentLevel)
+    if (lvl) selectedVolume = lvl.volume
     duelRound = asDuel && Boolean(duel) && duel.level === currentLevel
     state = rules.createGame({ difficulty, level: currentLevel, seenPrompts: save.prompts })
+    const vol = state.level ? state.level.volume : selectedVolume
+    const key = vol + ':' + Math.round(k * dpr * 16) + ':' + Math.round(viewW / 60)
+    if (!assets || assets.volumeId !== vol) buildAssets(key)
     resultDelay = 0
     globalThis.XiabanResultShare?.reset()
     phase = 'playing'; roundStarted = true; roundPosted = false; resultPosted = false
@@ -416,11 +425,15 @@
 
   // ------------------------------------------------------------ welcome & scroll select
 
-  function levelLabel(level) { return level.scroll ? WORLD.name + ' · 长卷' : WORLD.name + ' · ' + level.sub }
+  function levelLabel(level) {
+    const world = LV.volume(level.volume) || WORLD
+    return level.scroll ? world.name + ' · 长卷' : world.name + ' · ' + level.sub
+  }
   function hurtText(level) { return level.hurt === 0 ? '无伤' : '受伤不超过 ' + level.hurt + ' 次' }
 
   function refreshWelcome() {
-    $('welcomeProgress').textContent = WORLD.name + ' · 已得 ' + PROGRESS.sealCount(save, WORLD.id) + ' / ' + PROGRESS.maxSeals(WORLD.id) + ' 印'
+    const world = LV.volume(selectedVolume) || WORLD
+    $('welcomeProgress').textContent = world.name + ' · 已得 ' + PROGRESS.sealCount(save, world.id) + ' / ' + PROGRESS.maxSeals(world.id) + ' 印'
     const level = duel && LV.level(duel.level)
     $('duelBanner').hidden = !level
     if (level) $('duelText').textContent = '朋友邀你切磋「' + level.name + '」' + (duel.target ? '：超过 ' + duel.target + ' 分' : '')
@@ -446,6 +459,20 @@
     $('startButton').focus({ preventScroll: true })
   }
 
+  function selectVolume(vol) {
+    selectedVolume = vol
+    save = { ...save, volume: vol }
+    persistSave()
+    const firstLevel = vol === 2 ? '2-1' : '1-1'
+    if (LV.level(currentLevel)?.volume !== vol) currentLevel = firstLevel
+    state = rules.createGame({ difficulty, level: currentLevel })
+    const key = vol + ':' + Math.round(k * dpr * 16) + ':' + Math.round(viewW / 60)
+    if (!assets || assets.volumeId !== vol) buildAssets(key)
+    camera.x = cameraTarget()
+    renderSelect()
+    audio.play('ui')
+  }
+
   const el = (tag, className, text) => {
     const node = document.createElement(tag)
     if (className) node.className = className
@@ -464,10 +491,17 @@
   }
 
   function renderSelect() {
-    const total = PROGRESS.sealCount(save, WORLD.id), max = PROGRESS.maxSeals(WORLD.id)
-    $('selectTitle').textContent = WORLD.name
+    const world = LV.volume(selectedVolume) || WORLD
+    const total = PROGRESS.sealCount(save, world.id), max = PROGRESS.maxSeals(world.id)
     $('selectProgress').textContent = total + ' / ' + max + ' 印'
-    const cards = LV.volumeLevels(WORLD.id).map((level) => {
+    for (const tab of [$('volTab1'), $('volTab2')]) {
+      if (!tab) continue
+      const vol = Number(tab.dataset.vol)
+      const active = vol === selectedVolume
+      tab.classList.toggle('active', active)
+      tab.setAttribute('aria-selected', String(active))
+    }
+    const cards = LV.volumeLevels(world.id).map((level) => {
       const open = PROGRESS.unlocked(save, level.id)
       const entry = save.levels[level.id]
       const card = el('button', 'level-card' + (open ? '' : ' locked') + (entry ? ' cleared' : '') + (level.scroll ? ' scroll' : ''))
@@ -489,7 +523,7 @@
         card.addEventListener('click', () => startRound(level.id))
         queueMicrotask(() => drawThumb(thumb, level, Boolean(entry)))
       } else {
-        card.append(el('span', 'level-lock', level.scroll ? '通过「无常」后展开' : '通过上一幅后展开'))
+        card.append(el('span', 'level-lock', level.scroll ? (level.volume === 2 ? '通过「独钓」后展开' : '通过「无常」后展开') : '通过上一幅后展开'))
         card.setAttribute('aria-label', level.sub + level.name + '，尚未展开')
       }
       return card
@@ -499,16 +533,17 @@
 
   // A finished 幅 is painted in full; an open one is a pale draft; a locked one stays blank paper (CSS only).
   function drawThumb(node, level, cleared) {
-    if (!assets) return
+    const world = LV.volume(level.volume) || WORLD
     const g = node.getContext('2d')
     const P = node.height / 360
     const viewWidth = node.width / P
-    const left = Math.max(0, Math.min(WORLD.length - viewWidth, (level.boss ? level.start + 220 : level.start + 260) - viewWidth / 2))
+    const left = Math.max(0, Math.min(world.length - viewWidth, (level.boss ? level.start + 220 : level.start + 260) - viewWidth / 2))
     const cam = { left, top: rules.GROUND + 62 - 360, viewW: viewWidth, viewH: 360, P, width: node.width, height: node.height, sx: 0, sy: 0 }
-    const env = scene.environment(left + viewWidth / 2)
-    scene.drawBackground(g, assets, cam, env, 4)
-    scene.drawGround(g, assets, cam, env, 4)
-    scene.drawPost(g, assets, cam, env, 0)
+    const env = scene.environment(left + viewWidth / 2, level.volume)
+    const thumbAssets = (assets && assets.volumeId === level.volume) ? assets : scene.build({ P, viewW: viewWidth, width: node.width, height: node.height, volumeId: level.volume })
+    scene.drawBackground(g, thumbAssets, cam, env, 4)
+    scene.drawGround(g, thumbAssets, cam, env, 4)
+    scene.drawPost(g, thumbAssets, cam, env, 0)
     node.classList.toggle('draft', !cleared)
   }
 
@@ -543,17 +578,18 @@
     const outcome = PROGRESS.record(save, result)
     save = outcome.save
     persistSave()
-    const area = WORLD.areas[Math.max(0, state.area)]
+    const area = (state.world ? state.world.areas : WORLD.areas)[Math.max(0, state.area)]
     const nextId = result.cleared ? PROGRESS.next(level.id) : null
+    const isV2 = level.volume === 2
     $('resultSeal').textContent = result.cleared ? '品' : '败'
     $('resultSeal').classList.toggle('lose', !result.cleared)
     $('resultBadge').textContent = (difficulty === 'easy' ? '入门 · ' : '江湖 · ') + levelLabel(level)
     $('resultTitle').textContent = result.cleared
-      ? (level.boss || level.scroll ? (p.damageTaken === 0 ? '片墨不沾身' : '一剑破无常') : level.name + ' · ' + (outcome.firstClear ? '入画' : '再临'))
+      ? (level.boss || level.scroll ? (p.damageTaken === 0 ? '片墨不沾身' : (isV2 ? '一剑断寒江' : '一剑破无常')) : level.name + ' · ' + (outcome.firstClear ? '入画' : '再临'))
       : result.kills >= 12 ? '墨尽，意未尽' : '画卷未完'
     $('resultDescription').textContent = result.cleared
-      ? (level.boss || level.scroll ? '斗笠客化作一池淡墨，竹林重归寂静。' : outcome.firstClear && nextId ? '下一幅「' + LV.level(nextId).name + '」已经展开。' : '墨迹未干，可再求更高一品。')
-      : level.boss ? '无常仍立在月下。朱光一闪，便是出剑之时。' : '提剑再入，' + area.name + '还在等你。'
+      ? (level.boss || level.scroll ? (isV2 ? '钓叟收竿踏雪而去，江面重归沉寂。' : '斗笠客化作一池淡墨，竹林重归寂静。') : outcome.firstClear && nextId ? '下一幅「' + LV.level(nextId).name + '」已经展开。' : '墨迹未干，可再求更高一品。')
+      : level.boss ? (isV2 ? '钓叟仍立在雪岸。朱光一闪，便是出剑之时。' : '无常仍立在月下。朱光一闪，便是出剑之时。') : '提剑再入，' + (area ? area.name : '江岸') + '还在等你。'
     $('resultScore').textContent = result.score
     $('resultGrade').textContent = result.cleared ? LV.GRADES[result.grade] + (outcome.newGrade && !outcome.firstClear ? ' · 新品' : '') : '本局积分'
     $('resultGrade').classList.toggle('graded', result.cleared)
@@ -598,6 +634,8 @@
 
   $('startButton').addEventListener('click', () => { if (duel) startRound(duel.level, true); else openSelect() })
   $('selectBack').addEventListener('click', backToWelcome)
+  $('volTab1')?.addEventListener('click', () => selectVolume(1))
+  $('volTab2')?.addEventListener('click', () => selectVolume(2))
   $('restartButton').addEventListener('click', () => startRound(currentLevel, duelRound))
   $('nextButton').addEventListener('click', () => { const nextId = PROGRESS.next(currentLevel); if (nextId) startRound(nextId) })
   $('mapButton').addEventListener('click', openSelect)
@@ -776,6 +814,14 @@
           FX.puff(fx, e.x, e.y, 3, { speed: 30, size: 3, alpha: 0.25 })
           audio.play('shoot')
           break
+        case 'dart':
+          FX.puff(fx, e.x, e.y, 2, { speed: 20, size: 2.2, alpha: 0.2 })
+          audio.play('shoot')
+          break
+        case 'hook':
+          FX.sparks(fx, e.x, e.y, 6, CINNABAR, { len: 14, speed: 280 })
+          audio.play('danger')
+          break
         case 'caw': audio.play('caw'); break
         case 'hop': FX.puff(fx, e.x, e.y, 5, { speed: 50, size: 4, alpha: 0.28 }); break
         case 'hurt':
@@ -817,19 +863,25 @@
         case 'inkReady':
           audio.play('ink')
           break
-        case 'bossIntro':
+        case 'bossIntro': {
           FX.letterbox(fx, 2.2)
           $('bossBar').hidden = false
+          const isAngler = e.kind === 'angler' || (state.level.boss && state.level.volume === 2)
+          $('bossTitle').textContent = isAngler ? '苏寒江' : '无常'
+          $('bossSub').textContent = isAngler ? '寒江钓叟' : '斗笠客'
           audio.play('gong')
           break
-        case 'bossPhase':
+        }
+        case 'bossPhase': {
           FX.invert(fx, 0.7)
           FX.shake(fx, 9)
           FX.ring(fx, e.x, e.y, 10, 220, 0.8, 'rgba(15,16,18,0.7)', 10)
           FX.ring(fx, e.x, e.y, 10, 160, 0.6, CINNABAR, 3)
-          toast('无常怒 · 墨气翻涌', 2000)
+          const anglerPhase = e.kind === 'angler' || (state.level.boss && state.level.volume === 2)
+          toast(anglerPhase ? '断竿化剑 · 风雪大作' : '无常怒 · 墨气翻涌', 2000)
           audio.play('roar')
           break
+        }
         case 'broken':
           FX.seal(fx, '破', e.x, e.y - 18, 26, 1.2)
           FX.sparks(fx, e.x, e.y + 20, 16, CINNABAR, { len: 20, speed: 320 })
@@ -936,20 +988,22 @@
       out = fig.drawDummy(ctx, enemy, enemy.x, enemy.y, look, a, clock)
     } else {
       const pose = fig.updatePose(enemy.type, enemy, a, dt, clock, rules)
-      shadow(enemy.x, enemy.y, enemy.type === 'boss' ? 26 : 16)
-      if (enemy.type === 'boss' && enemy.phase2 && enemy.state !== 'dying' && Math.random() < 0.5) FX.smoke(fx, enemy.x, enemy.y - 40, { w: 30, h: 60, alpha: 0.2, red: Math.random() < 0.25 })
-      if (enemy.type === 'boss' && enemy.state === 'phantom' && phantomImage > 0) {
+      const isBoss = enemy.type === 'boss' || enemy.type === 'angler'
+      shadow(enemy.x, enemy.y, isBoss ? 26 : 16)
+      if (isBoss && enemy.phase2 && enemy.state !== 'dying' && Math.random() < 0.5) FX.smoke(fx, enemy.x, enemy.y - 40, { w: 30, h: 60, alpha: 0.2, red: Math.random() < 0.25 })
+      if (isBoss && enemy.state === 'phantom' && phantomImage > 0) {
         const copy = { ...pose }, x = enemy.x, y = enemy.y, facing = enemy.facing
-        FX.ghost(fx, (c, alpha) => fig.drawHumanoid(c, 'boss', copy, x, y, facing, { alpha: alpha * 0.4, color: '#2a2a2e' }, clock, enemy.seed), 0.3, 0)
+        FX.ghost(fx, (c, alpha) => fig.drawHumanoid(c, enemy.type, copy, x, y, facing, { alpha: alpha * 0.4, color: '#2a2a2e' }, clock, enemy.seed), 0.3, 0)
       }
       out = fig.drawHumanoid(ctx, enemy.type, pose, enemy.x, enemy.y, enemy.facing, look, clock, enemy.seed)
-      if (enemy.type !== 'boss' && Math.random() < dt * 1.8) FX.drops(fx, enemy.x + (Math.random() - 0.5) * 16, enemy.y - 20 - Math.random() * 20, 1, { speed: 20, size: 1.1 })
+      if (!isBoss && Math.random() < dt * 1.8) FX.drops(fx, enemy.x + (Math.random() - 0.5) * 16, enemy.y - 20 - Math.random() * 20, 1, { speed: 20, size: 1.1 })
     }
-    if (progress >= 0 && out.tip && enemy.state !== 'crouch' && enemy.state !== 'phantomTell') glint(out.tip[0], out.tip[1], Math.pow(progress, 2.2), enemy.type === 'boss' ? 1.25 : 1)
+    const isBoss = enemy.type === 'boss' || enemy.type === 'angler'
+    if (progress >= 0 && out.tip && enemy.state !== 'crouch' && enemy.state !== 'phantomTell') glint(out.tip[0], out.tip[1], Math.pow(progress, 2.2), isBoss ? 1.25 : 1)
     if (enemy.state === 'stagger' || enemy.state === 'broken') {
       const pulse = 1 + Math.sin(clock * 10) * 0.08
-      const top = out.head ? out.head[1] - (enemy.type === 'boss' ? 30 : 22) : enemy.y - 70
-      drawSeal('斩', enemy.x, top, 15 * pulse * (enemy.type === 'boss' ? 1.3 : 1))
+      const top = out.head ? out.head[1] - (isBoss ? 30 : 22) : enemy.y - 70
+      drawSeal('斩', enemy.x, top, 15 * pulse * (isBoss ? 1.3 : 1))
     }
   }
 
@@ -981,13 +1035,14 @@
     const blink = p.iframes > 0 && p.hurt <= 0 && !p.action && Math.sin(clock * 40) > 0.3
     const look = { halo: 0.28, alpha: blink ? 0.45 : 1, edge: state.strike ? CINNABAR : undefined }
     fig.drawHumanoid(ctx, 'player', pose, p.x, p.y, p.facing, look, clock, 0, { scarf: a.scarf })
-    if (scene.WATER[0] < p.x && p.x < scene.WATER[1] && p.onGround && p.y >= rules.GROUND - 1) {
-      // Reflection on the stream.
+    const isWater = scene.WATER[0] < p.x && p.x < scene.WATER[1] && (state.level ? state.level.volume === 1 : selectedVolume === 1)
+    const onIce = (state.world.iceZones || []).some(([x0, x1]) => p.x >= x0 && p.x <= x1)
+    if ((isWater || onIce) && p.onGround && p.y >= rules.GROUND - 1) {
       ctx.save()
       ctx.translate(0, rules.GROUND * 1.55 + 2); ctx.scale(1, -0.55)
-      fig.drawHumanoid(ctx, 'player', pose, p.x, p.y, p.facing, { alpha: 0.13, color: '#2a3038', flash: true }, clock)
+      fig.drawHumanoid(ctx, 'player', pose, p.x, p.y, p.facing, { alpha: onIce ? 0.22 : 0.13, color: onIce ? '#1a2230' : '#2a3038', flash: true }, clock)
       ctx.restore()
-      if (Math.abs(p.vx) > 60 && Math.random() < dt * 14) FX.drops(fx, p.x - p.facing * 6, rules.GROUND - 2, 2, { speed: 120, size: 1, stain: false, color: '#3a4450' })
+      if (Math.abs(p.vx) > 60 && Math.random() < dt * 14) FX.drops(fx, p.x - p.facing * 6, rules.GROUND - 2, 2, { speed: 120, size: 1, stain: false, color: onIce ? '#e0ecf8' : '#3a4450' })
     }
   }
 
@@ -1006,6 +1061,31 @@
         ctx.beginPath(); ctx.moveTo(-22, 0); ctx.lineTo(-17, -3); ctx.lineTo(-15, 0); ctx.lineTo(-17, 3); ctx.fill()
         ctx.restore()
         if (mine && Math.random() < 0.5) FX.drops(fx, shot.x, shot.y, 1, { speed: 20, size: 1, color: CINNABAR, stain: false, gravity: 200 })
+      } else if (shot.type === 'dart') {
+        const angle = Math.atan2(shot.vy, shot.vx)
+        const mine = shot.owner === 'player'
+        ctx.save(); ctx.translate(shot.x, shot.y); ctx.rotate(angle)
+        if (mine) { ctx.globalAlpha = 0.5; ctx.drawImage(assets.glow, -14, -6, 20, 12); ctx.globalAlpha = 1 }
+        ctx.strokeStyle = mine ? CINNABAR : '#181a1e'; ctx.lineWidth = 1.4
+        ctx.beginPath(); ctx.moveTo(-10, 0); ctx.lineTo(6, 0); ctx.stroke()
+        ctx.fillStyle = CINNABAR
+        ctx.beginPath(); ctx.moveTo(8, 0); ctx.lineTo(3, -2); ctx.lineTo(3, 2); ctx.fill()
+        ctx.restore()
+      } else if (shot.type === 'hook') {
+        const dir = Math.sign(shot.vx) || 1
+        ctx.save(); ctx.translate(shot.x, shot.y)
+        ctx.strokeStyle = 'rgba(235,225,210,0.6)'; ctx.lineWidth = 0.9
+        ctx.beginPath(); ctx.moveTo(-dir * 36, 0); ctx.lineTo(0, 0); ctx.stroke()
+        ctx.fillStyle = CINNABAR
+        ctx.beginPath(); ctx.arc(0, 0, 3, 0, Math.PI * 2); ctx.fill()
+        ctx.restore()
+      } else if (shot.type === 'iceWave') {
+        const dir = Math.sign(shot.vx) || 1
+        const s = assets.iceSpike || assets.wave
+        ctx.save(); ctx.translate(shot.x, rules.GROUND); ctx.scale(dir, 1 + Math.sin(clock * 25 + shot.id) * 0.08)
+        ctx.drawImage(s.node, -s.ox, -s.oy, s.width, s.height)
+        ctx.restore()
+        if (Math.random() < 0.7) FX.drops(fx, shot.x - dir * 10, rules.GROUND - 24, 2, { speed: 160, size: 1.4, angle: dir > 0 ? -2.2 : -0.9, spread: 0.8, stain: false, color: '#b0c4de' })
       } else if (shot.type === 'wave') {
         const dir = Math.sign(shot.vx) || 1
         const s = assets.wave
@@ -1050,7 +1130,7 @@
       left: camera.x - viewW / 2, top: worldTop, viewW, viewH, P, width: canvas.width, height: canvas.height,
       sx: (Math.random() - 0.5) * amount * P, sy: (Math.random() - 0.5) * amount * P,
     }
-    const env = scene.environment(camera.x)
+    const env = scene.environment(camera.x, state.level ? state.level.volume : selectedVolume)
     const night = env.moon > 0.5
     if (night !== gameNode.classList.contains('night')) gameNode.classList.toggle('night', night)
     scene.updateWeather(weather, cam, env, dt, clock)

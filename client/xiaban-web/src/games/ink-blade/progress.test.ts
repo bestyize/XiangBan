@@ -46,9 +46,13 @@ describe('ink blade progress', () => {
       v: 1, difficulty: 'easy', prompts: ['move', 'move', 'Bad Key!', 7, 'jump'], extra: { evil: true },
       levels: { '1-1': { clears: 2, best: 1900, grade: 9, seals: 15, time: -3 }, '1-2': { clears: 0, best: 5 }, '1-9': { clears: 1 }, toString: 1 },
     })
-    expect(save).toEqual({ v: 1, difficulty: 'easy', prompts: ['move', 'jump'], levels: { '1-1': { clears: 2, best: 1900, grade: 1, seals: 1, time: 0 } } })
+    expect(save).toEqual({ v: 1, volume: 1, difficulty: 'easy', prompts: ['move', 'jump'], levels: { '1-1': { clears: 2, best: 1900, grade: 1, seals: 1, time: 0 } } })
     for (const junk of [null, 'save', [], 42]) expect(P.normalize(junk)).toEqual(P.empty())
     expect(P.rememberPrompt(save, 'jump')).toBe(save)
     expect(P.rememberPrompt(save, 'dash').prompts).toEqual(['move', 'jump', 'dash'])
+    expect(P.volumeUnlocked(save, 1)).toBe(true)
+    expect(P.volumeUnlocked(save, 2)).toBe(true)
+    expect(P.unlocked(save, '2-1')).toBe(true)
+    expect(P.unlocked(save, '2-2')).toBe(false)
   })
 })
