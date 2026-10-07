@@ -2,7 +2,7 @@
 
 Windows / macOS 原型：一个可拖动、透明处点击穿透的悬浮小伴，也可以切换成位于桌面图标下方的动态壁纸。无聊天、账户或业务服务器连接。Windows 缺少运行组件时会联网补齐；组件可用后可离线运行。角色、场景、控制台与互动逻辑共用，桌面宿主分平台接入。
 
-本机生产构建实测：Windows x64 EXE 约 4.59MB，内嵌前端与两套程序背景，不包含系统 WebView2。原生切换测试已在主屏 2880×1800、175% 缩放下通过，确认壁纸为 WorkerW 子窗口；验证报告位于本地 `artifacts/smoke-*.json`。本地试用文件为 `artifacts/XiaoBan-Windows-x64.exe`，ZIP 包为 `artifacts/XiaoBan-Windows-x64.zip`。
+本机生产构建实测：Windows x64 EXE 约 4.60MB，内嵌前端与两套程序背景，不包含系统 WebView2。原生切换测试已在主屏 2880×1800、175% 缩放下通过，确认壁纸为 WorkerW 子窗口；验证报告位于本地 `artifacts/smoke-*.json`。本地试用文件为 `artifacts/XiaoBan-Windows-x64.exe`，ZIP 包为 `artifacts/XiaoBan-Windows-x64.zip`。
 
 角色核心在本工程的 `src/companion` 内维护，最初从网页纯角色代码原样复制，保留既有 SVG、发光、表情、弹簧参数和互动行为。允许独立演进，不再导入另一个客户端源码。`src/pet.ts` 适配 DOM 与桌面输入；暖光维持原 RobotStage 的尺寸与渐变。
 
@@ -63,7 +63,7 @@ macOS 悬浮窗口使用 AppKit 浮动层；壁纸使用 Core Graphics 的 deskt
 
 ## 使用
 
-设置界面为白色/薄荷绿的左侧导航布局，分为“小伴设置”“动态壁纸”“关于小伴”三页。小伴页保留原 SVG、表情和互动，壁纸页管理内置与订阅内容，关于页展示真实程序版本并检查已配置的更新服务。
+设置界面为奶白/暖粉色的左侧导航布局，分为“小伴设置”“动态壁纸”“关于小伴”三页。小伴页保留原 SVG、表情和互动，壁纸页管理内置与订阅内容，关于页展示真实程序版本并检查已配置的更新服务。
 
 动态壁纸支持图片、静音循环 H.264 MP4 与自包含 Canvas/WebGL ES module。可添加 HTTPS 订阅或导入 JSON 清单；下载后的内容校验 SHA-256 并缓存，离线可继续使用。小伴悬浮时可与通用壁纸并存，融入壁纸时叠在所选内容上；“小伴房间”恢复原先的房间场景或系统桌面。下发协议、SDK、限制和更新 JSON 示例见 [delivery-protocol.md](docs/delivery-protocol.md)，Schema 为 [壁纸](docs/wallpapers-v1.schema.json) 和 [更新](docs/updates-v1.schema.json)。
 
