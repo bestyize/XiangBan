@@ -16,6 +16,7 @@ A landscape 3D glide game over a sunset archipelago, rendered with three.js. A p
 - `world.js` — the 3D world: streamed low-poly heightfield chunks around the track line (z = 0), distant ranges, a shader sea with sky reflection and sun glitter, a gradient sky with sun, moon and stars, clouds, sun / fill / hemisphere lights with a shadow map following the bird, and time-of-day keyframes driven by the remaining daylight. Seven biomes cycle by island.
 - `props.js` — per-chunk props for each biome (trees, houses, windmills, lighthouses, lanterns, fences, flowers…) merged into one or two meshes per chunk, plus ambient sailboats, balloons, flocks and night fireflies.
 - `bird.js` — the origami bird with pitch, wing fold and flap poses, its wind ribbon, a contact shadow and the particle effects.
+- `guide.js` — visual guidance: gold chevrons on downhill hold-zones, a dynamic 3D landing marker with light beam and feedback labels (完美 / 普通 / 太陡 会磕 / 打水漂 / 落水), and integration with the live coach banner.
 - `audio.js` — Web Audio synthesis: wind by speed, a generative pentatonic music bed that thins out at night, and event sounds. Sound is off by default.
 - `game.js` — the controller: host protocol, input, round lifecycle, camera, HUD and quality scaling. `?debug=1` exposes `__glider` with a manual frame stepper for headless checks.
 

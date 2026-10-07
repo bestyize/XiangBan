@@ -79,7 +79,8 @@
       }
       const t = -z
       const biome = biomeFor(rules.islandAt(state, x).index)
-      const follow = Math.exp(-t / 7)
+      // Flat across the track line itself (|z| < 1.5), so guides laid on it sit exactly on the ground.
+      const follow = Math.exp(-Math.max(0, t - 1.5) / 7)
       const rolling = fbm(x * 0.017, t * 0.021, seed + 3)
       const ridge = 1 - Math.abs(2 * fbm(x * 0.011 + 40, t * 0.013, seed + 5) - 1)
       // Keep the near backdrop lower than the track's peaks; the taller range sits further back so the sky shows.
