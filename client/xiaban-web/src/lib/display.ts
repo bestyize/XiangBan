@@ -3,7 +3,7 @@ export interface DisplaySettings { chatTabVisible: boolean; games: DisplayItem[]
 export const DISPLAY_STORAGE_KEY = 'xb_display_settings'
 export const DEFAULT_DISPLAY_SETTINGS: DisplaySettings = { chatTabVisible: true, games: [], quizzes: [] }
 const defaultIds = {
-  games: ['falling-blocks', 'merge-2048', 'block-puzzle', 'water-sort', 'snake-arena', 'ink-blade'],
+  games: ['falling-blocks', 'merge-2048', 'block-puzzle', 'water-sort', 'snake-arena', 'ink-blade', 'dusk-glider'],
   quizzes: ['mbti', 'mbanti', 'animal', 'afterhours'],
 }
 

@@ -12,7 +12,7 @@
 
 ## 开发与验证
 
-在本目录运行 npm ci、npm run dev、npm test、npm run build、npm run lint。开发代理见 vite.config.ts，需要后端时从仓库根运行 gradlew :backend:run。
+在本目录运行 npm ci、npm run dev、npm test、npm run build、npm run lint。开发代理见 vite.config.ts，需要后端时从仓库根运行 gradlew :backend:run。暮色滑翔游戏包内置的 three.js 子集由 npm run build:glider-three 重新生成（见 [游戏包说明](public/game-packs/dusk-glider/README.md)）。
 
 Dockerfile 的上下文是仓库根，使用 infra/deploy/nginx 配置。不要直接把本目录作为 Docker 构建上下文。
 

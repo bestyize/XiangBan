@@ -7,14 +7,20 @@ $taskArtifacts = Join-Path $taskRoot 'artifacts'
 New-Item -ItemType Directory -Path $taskArtifacts -Force | Out-Null
 $taskReport = Join-Path $taskArtifacts ('smoke-' + [DateTime]::Now.ToString('yyyyMMdd-HHmmss') + '.json')
 $env:XIAOBAN_SMOKE_REPORT = $taskReport
+$env:XIAOBAN_TEST_STARTUP_ID = [DateTime]::UtcNow.Ticks.ToString()
+$taskStartupName = 'XiaoBanStartupSmoke-' + $env:XIAOBAN_TEST_STARTUP_ID
 try {
-    $taskProcess = Start-Process -FilePath $taskExe -ArgumentList '--smoke-test' -PassThru -WindowStyle Hidden
+    $taskProcess = Start-Process -FilePath $taskExe -ArgumentList '--smoke-test', '--autostart' -PassThru -WindowStyle Hidden
     if (!$taskProcess.WaitForExit(45000)) {
         Stop-Process -Id $taskProcess.Id
         throw '原型在 45 秒内未完成模式切换'
     }
     if (!(Test-Path -LiteralPath $taskReport)) { throw '程序未生成原生窗口验证报告' }
     $taskResult = Get-Content -LiteralPath $taskReport -Raw | ConvertFrom-Json
+    if (!$taskResult.lifecycle.Ok) { throw ('Lifecycle test failed: ' + ($taskResult.lifecycle | ConvertTo-Json -Compress)) }
+    if ($taskResult.lifecycle.Ok.initialControl.visible -or $taskResult.lifecycle.Ok.afterClose.visible) { throw 'Control must stay hidden during autostart and after close.' }
+    if (!$taskResult.lifecycle.Ok.afterRestore.visible -or !$taskResult.lifecycle.Ok.secondInstance.visible) { throw 'Control did not reopen from the tray handler or second instance.' }
+    if (!$taskResult.lifecycle.Ok.autostartToggleAndPersistence -or !$taskResult.lifecycle.Ok.petPreserved) { throw 'Startup or pet persistence check failed.' }
     if ($taskResult.wallpaperResult.Ok -ne 'ok') { throw ('壁纸模式失败: ' + ($taskResult.wallpaperResult | ConvertTo-Json -Compress)) }
     if ($taskResult.floatingResult.Ok -ne 'ok') { throw '无法从壁纸切回悬浮模式' }
     if (!$taskResult.floatingBefore.floating.visible -or !$taskResult.floatingAfter.floating.visible) { throw '悬浮窗口的前端没有正常显示' }
@@ -23,5 +29,12 @@ try {
     if ($taskResult.wallpaper.floating -or $taskResult.floatingAfter.wallpaper) { throw '切换模式后残留了旧窗口' }
     Write-Output ('PASS: 悬浮 → 壁纸（WorkerW 子窗口）→ 悬浮，三个阶段的前端均已显示。报告: ' + $taskReport)
 } finally {
+    foreach ($taskRegistryPath in @('Software\Microsoft\Windows\CurrentVersion\Run', 'Software\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\Run')) {
+        $taskRegistryKey = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey($taskRegistryPath, $true)
+        if ($taskRegistryKey) {
+            try { $taskRegistryKey.DeleteValue($taskStartupName, $false) } finally { $taskRegistryKey.Dispose() }
+        }
+    }
+    Remove-Item Env:XIAOBAN_TEST_STARTUP_ID -ErrorAction SilentlyContinue
     Remove-Item Env:XIAOBAN_SMOKE_REPORT -ErrorAction SilentlyContinue
 }

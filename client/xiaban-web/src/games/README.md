@@ -94,6 +94,7 @@ The host saves guest records in the current browser and signed-in records throug
 | `water-sort` | 奶茶大师 | Pour matching colors into tubes, with undo and progressively harder levels |
 | `snake-arena` | 小伴贪吃蛇 | Landscape, mobile-first arena with local AI snakes, boost energy and three-minute or endless rounds |
 | `ink-blade` | 水墨剑客 | Landscape ink-wash side-scrolling action: parries, executions, five painted areas and a boss duel, all drawn by code |
+| `dusk-glider` | 暮色滑翔 | Landscape 3D glide over a sunset archipelago (three.js): hold to dive, release to launch, perfect landings chain into a 2× fever, islands extend the daylight |
 
 Packs may set `orientation: "landscape"` to use the full viewport instead of the phone-width host. The host permits fullscreen and orientation locking; the game must retain manual-rotation play when those APIs are unavailable. The site's PWA orientation is `any` so a landscape pack can also rotate when launched from the home screen.
 

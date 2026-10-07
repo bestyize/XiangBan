@@ -5,6 +5,7 @@ export interface Settings {
   theme: 'night' | 'dawn'
   paused: boolean
   fps: 30 | 60
+  autostart: boolean
 }
 
 export interface CursorSample {
@@ -21,7 +22,7 @@ declare global {
 }
 
 export const desktop = Boolean(window.__TAURI__)
-export const defaults: Settings = { mode: 'floating', expression: 'idle', size: 260, theme: 'night', paused: false, fps: 60 }
+export const defaults: Settings = { mode: 'floating', expression: 'idle', size: 260, theme: 'night', paused: false, fps: 60, autostart: true }
 export function invoke<T>(command: string, args?: Record<string, unknown>): Promise<T> {
   if (!window.__TAURI__) return Promise.reject(new Error('请通过桌面程序运行这个功能'))
   return window.__TAURI__.core.invoke<T>(command, args)
