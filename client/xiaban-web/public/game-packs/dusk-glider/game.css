@@ -103,7 +103,7 @@ h1 { margin: 0; font-size: clamp(30px, 4.2vw, 44px); line-height: 1.15; font-wei
 .primary-button { display: flex; align-items: center; justify-content: center; gap: 10px; min-height: 50px; padding: 10px 28px; border-radius: 999px; background: linear-gradient(180deg, #ff9b74, var(--coral-deep)); color: #fff; font-size: 19px; font-weight: 600; letter-spacing: .2em; text-indent: .2em; white-space: nowrap; box-shadow: 0 8px 22px rgba(228, 96, 74, .42), inset 0 1px 0 rgba(255, 255, 255, .45); transition: transform .12s, box-shadow .12s; }
 .primary-button svg { width: 20px; height: 20px; stroke-width: 2.2; }
 .primary-button:active { transform: translateY(1px) scale(.98); box-shadow: 0 4px 12px rgba(228, 96, 74, .4), inset 0 1px 0 rgba(255, 255, 255, .45); }
-.primary-button:focus-visible { outline-color: var(--indigo); }
+.primary-button:focus-visible { outline: 3px solid rgba(255, 200, 97, .9); outline-offset: 3px; }
 @media (hover: hover) { .primary-button:hover { box-shadow: 0 10px 26px rgba(228, 96, 74, .52), inset 0 1px 0 rgba(255, 255, 255, .5); } }
 /* 起飞 takes a full row; the two state toggles share the row below it. */
 #startButton { flex: 1 0 100%; }
@@ -112,7 +112,8 @@ h1 { margin: 0; font-size: clamp(30px, 4.2vw, 44px); line-height: 1.15; font-wei
 .text-toggle[aria-pressed="true"] { color: var(--coral-deep); border-color: var(--coral-deep); }
 .welcome-foot { margin: 14px 0 0; font-size: 11px; letter-spacing: .08em; color: var(--muted); }
 
-.scrim { display: grid; place-items: center; padding: max(12px, var(--safe-top)) max(18px, var(--safe-right)) max(12px, var(--safe-bottom)) max(18px, var(--safe-left)); background: radial-gradient(ellipse at 50% 40%, rgba(74, 58, 110, .34), rgba(42, 40, 80, .58)); }
+/* A warm dusk dim that matches the sunset world, instead of a cold UI purple. */
+.scrim { display: grid; place-items: center; padding: max(12px, var(--safe-top)) max(18px, var(--safe-right)) max(12px, var(--safe-bottom)) max(18px, var(--safe-left)); background: radial-gradient(ellipse at 50% 40%, rgba(122, 62, 66, .34), rgba(58, 30, 52, .62)); }
 .dialog-card { position: relative; width: 340px; max-width: 100%; max-height: 100%; overflow-y: auto; text-align: center; padding: 28px 28px 12px; border-radius: 24px; background: linear-gradient(180deg, rgba(255, 251, 244, .95), rgba(255, 243, 228, .92)); box-shadow: 0 24px 70px rgba(42, 40, 80, .38), inset 0 0 0 1px rgba(255, 255, 255, .8); }
 .dialog-card h2 { margin: 0 0 8px; font-size: 24px; font-weight: 400; letter-spacing: .14em; color: var(--indigo); }
 .dialog-card > p { margin: 0 0 20px; font-size: 13px; line-height: 1.8; color: var(--muted); }
@@ -170,13 +171,22 @@ h1 { margin: 0; font-size: clamp(30px, 4.2vw, 44px); line-height: 1.15; font-wei
 .howto svg { grid-column: 1; grid-row: 1 / 3; width: 34px; height: 22px; fill: none; stroke-width: 2.6; overflow: visible; }
 .howto b { grid-column: 2; grid-row: 1; font-size: 12px; font-weight: 600; letter-spacing: .04em; color: var(--indigo); white-space: nowrap; }
 .howto span { grid-column: 2; grid-row: 2; font-size: 11px; line-height: 1.3; color: var(--muted); }
+/* In-game help: a small corner button that opens the how-to whenever the player needs it. */
+.help-button { position: absolute; z-index: 6; left: max(14px, var(--safe-left)); bottom: max(14px, var(--safe-bottom)); width: 38px; height: 38px; opacity: .86; }
+.help-button svg { width: 19px; height: 19px; stroke-width: 2; }
+.help-overlay { z-index: 11; }
+.help-card { width: 320px; padding: 18px 20px 12px; text-align: left; }
+.help-card h2 { margin: 0 0 10px; font-size: 20px; font-weight: 400; letter-spacing: .1em; text-align: center; }
+.help-card .howto li { background: rgba(214, 122, 84, .11); }
+.help-extra { margin: 0 0 12px; font-size: 12px; line-height: 1.7; color: var(--muted); }
+.help-toggles { display: flex; gap: 8px; justify-content: center; margin-bottom: 10px; }
+.help-card > .primary-button { width: 100%; }
 .howto .hill { stroke: var(--indigo); opacity: .55; }
 .howto .press { fill: var(--gold); stroke: #e8a53a; stroke-width: 1.5; }
 .howto .free { stroke: var(--sea); }
 .howto .chev { stroke: #e8a53a; }
 .howto .fly { stroke: var(--coral-deep); stroke-dasharray: 3 4; }
 .howto .target { stroke: #e8a53a; fill: rgba(255, 200, 97, .35); }
-.pause-toggle { margin-top: 2px; }
 
 @media (max-height: 520px) and (orientation: landscape), (max-width: 520px) and (orientation: portrait) {
   :root { --dl-w: 200px; }
@@ -200,6 +210,14 @@ h1 { margin: 0; font-size: clamp(30px, 4.2vw, 44px); line-height: 1.15; font-wei
   .howto { gap: 3px; margin-bottom: 8px; }
   .howto li { grid-template-columns: 26px 1fr; gap: 5px; padding: 2px 6px; border-radius: 8px; }
   .howto svg { width: 26px; height: 16px; }
+  /* Inside the help panel the hint line must stay visible on phones too. */
+  .help-card { width: min(400px, 92%); padding: 16px 16px 10px; }
+  .help-card .howto li { grid-template-columns: 30px 1fr; gap: 7px; padding: 4px 8px; }
+  .help-card .howto svg { width: 30px; height: 19px; }
+  .help-card .howto span { display: block; }
+  .help-card h2 { font-size: 18px; margin-bottom: 8px; }
+  .help-extra { font-size: 11px; }
+  .help-card > .primary-button { min-height: 40px; font-size: 16px; }
   .howto b { font-size: 10px; }
   .howto span { display: none; }
   /* The how-to carries the instructions, so the footer hint is dropped on phones. */
