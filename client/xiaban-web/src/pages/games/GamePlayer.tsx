@@ -10,8 +10,10 @@ import { useProfile } from '../../lib/session.tsx'
 import { loadGameSave, storeGameSave, validSave, type GameSave } from '../../games/common/saves.ts'
 import { ownResultPath } from '../../games/common/share.ts'
 import { resultGame } from '../../games/index.ts'
+import { actSnakeWallet, readSnakeWallet, type SnakeWalletAction } from '../../games/snake-arena/economy.ts'
+import { rememberSnakeShareRound } from '../../games/snake-arena/shareReward.ts'
 
-interface Round { id: string | null; score: number; lines: number; maxTile: number; finished: boolean; timer: ReturnType<typeof setTimeout> | null }
+interface Round { id: string | null; score: number; lines: number; maxTile: number; finished: boolean; timer: ReturnType<typeof setTimeout> | null; key: string; start: Promise<string | null>; finalSave: Promise<boolean> | null; guestCounted: boolean }
 
 const HOST_CHANNEL = 'xiaban.game-host'
 const PACK_CHANNEL = 'xiaban.game-pack'
@@ -122,29 +124,33 @@ export default function GamePlayer() {
       })
     }
     async function persist(round: Round, keepalive = false) {
-      if (!round.id) return
+      if (!round.id) return false
       if (!getToken()) {
         try {
           const raw = storage.get('xb_guest_games') || '{}'
           const records = JSON.parse(raw) as Record<string, { sessions: number; bestScore: number; bestTile: number }>
           const current = records[gameId] || { sessions: 0, bestScore: 0, bestTile: 0 }
-          if (round.finished) current.sessions += 1
+          if (round.finished && !round.guestCounted) { current.sessions += 1; round.guestCounted = true }
           if (round.score > current.bestScore) current.bestScore = round.score
           if (round.maxTile > current.bestTile) current.bestTile = round.maxTile
           records[gameId] = current
           storage.set('xb_guest_games', JSON.stringify(records))
         } catch {}
-        return
+        return true
       }
-      try { await api(`/api/games/sessions/${round.id}`, { method: 'PUT', keepalive, body: { score: round.score, lines: round.lines, maxTile: round.maxTile, finished: round.finished } }) }
-      catch { if (round === roundRef.current) setRecordError('游戏记录暂未保存，网络恢复后可继续重试。') }
+      try { await api(`/api/games/sessions/${round.id}`, { method: 'PUT', keepalive, body: { score: round.score, lines: round.lines, maxTile: round.maxTile, finished: round.finished } }); return true }
+      catch { if (round === roundRef.current) setRecordError('游戏记录暂未保存，网络恢复后可继续重试。'); return false }
     }
     function finish(round: Round) {
       if (round.finished) return
       if (round.timer) clearTimeout(round.timer)
       round.timer = null; round.finished = true
       track('game_finish', { game: gameId, score: String(round.score) })
-      void persist(round, true)
+      round.finalSave = round.start.then(() => persist(round, true))
+    }
+    let walletQueue: Promise<unknown> = Promise.resolve()
+    function walletReply(requestId: string, payload: Record<string, unknown>) {
+      iframeRef.current?.contentWindow?.postMessage({ channel: HOST_CHANNEL, protocol: GAME_RUNTIME_PROTOCOL, type: 'host.wallet', nonce, requestId, ...payload }, '*')
     }
     function receiveMessage(event: MessageEvent) {
       if (event.source !== iframeRef.current?.contentWindow) return
@@ -164,12 +170,47 @@ export default function GamePlayer() {
         if (!saveTimerRef.current) saveTimerRef.current = setTimeout(() => flushSave(), 800)
         return
       }
+
+      if (data.type === 'game.wallet' && gameId === 'snake-arena') {
+        if (typeof data.requestId !== 'string' || !/^[a-zA-Z0-9_-]{1,80}$/.test(data.requestId)) return
+        const requestId = data.requestId
+        const round = roundRef.current
+        const run = async () => {
+          try {
+            if (data.action === 'read') { walletReply(requestId, { wallet: await readSnakeWallet(), coinsEarned: 0, protectionSeconds: 0 }); return }
+            const actions: SnakeWalletAction[] = ['buy_shield', 'use_shield', 'revive', 'consume_start_shield', 'settle', 'share_reward']
+            if (!actions.includes(data.action as SnakeWalletAction)) throw new Error('没有找到这个道具操作')
+            const action = data.action as SnakeWalletAction
+            const terminal = action === 'settle' || action === 'share_reward'
+            if (action !== 'buy_shield' && (!round || data.roundKey !== round.key || (!terminal && round !== roundRef.current))) throw new Error('这一局已经切换，请重试')
+            if (round && action !== 'buy_shield') {
+              await round.start
+              if (!round.id) throw new Error('这一局记录暂未建立')
+              const final = terminal
+              if (round.finished !== final) throw new Error(final ? '请先结束这一局' : '这一局已经结束')
+              if (final && !(await round.finalSave)) {
+                if (!(await persist(round))) throw new Error('战绩暂未保存，请稍后重试领取')
+              }
+            }
+            const response = await actSnakeWallet(action, { requestId, sessionId: round?.id ?? undefined, score: round?.score, finished: round?.finished })
+            walletReply(requestId, response as unknown as Record<string, unknown>)
+          } catch (cause) { walletReply(requestId, { error: cause instanceof Error ? cause.message : '糖果币暂未连接，请重试' }) }
+        }
+        walletQueue = walletQueue.then(run, run)
+        return
+      }
       if (data.type === 'game.share') {
         const game = resultGame(gameId)
         const result = game?.parse(data.result) ?? null
         const path = game && result && game.canShare(result, roundRef.current) ? ownResultPath(game, result, profile.inviteCode) : null
         if (path) {
           const open = async () => {
+            const round = roundRef.current
+            if (gameId === 'snake-arena' && round) {
+              await round.start
+              if (round.finalSave) await round.finalSave
+              if (round.id) rememberSnakeShareRound(round.id, round.score)
+            }
             try { if (document.fullscreenElement) await document.exitFullscreen() } catch { /* Sharing still works outside fullscreen. */ }
             navigate(path)
           }
@@ -179,15 +220,16 @@ export default function GamePlayer() {
       }
       if (data.type === 'game.start') {
         if (roundRef.current) finish(roundRef.current)
-        const round: Round = { id: null, score: 0, lines: 0, maxTile: 0, finished: false, timer: null }
+        const round: Round = { id: null, score: 0, lines: 0, maxTile: 0, finished: false, timer: null, key: typeof data.roundKey === 'string' ? data.roundKey : '', start: Promise.resolve(null), finalSave: null, guestCounted: false }
         roundRef.current = round; setRecordError(null)
         track('game_start', { game: gameId })
         if (!getToken()) {
-          round.id = `guest_${Date.now()}`
+          round.id = `guest_${Date.now()}_${createNonce().slice(0, 8)}`
+          round.start = Promise.resolve(round.id)
         } else {
-          void api<{ id: string }>('/api/games/sessions', { method: 'POST', body: { gameId } }).then((session) => {
-            round.id = session.id; void persist(round)
-          }).catch(() => { if (round === roundRef.current) setRecordError('对局记录暂未建立，请检查网络。') })
+          round.start = api<{ id: string }>('/api/games/sessions', { method: 'POST', body: { gameId } }).then((session) => {
+            round.id = session.id; void persist(round); return session.id
+          }).catch(() => { if (round === roundRef.current) setRecordError('对局记录暂未建立，请检查网络。'); return null })
         }
       }
       if (data.type === 'game.progress' || data.type === 'game.result') {

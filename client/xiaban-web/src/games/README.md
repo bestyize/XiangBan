@@ -94,7 +94,7 @@ The host saves guest records in the current browser and signed-in records throug
 | `merge-2048` | 2048 | Slide and merge matching numbers |
 | `block-puzzle` | 消失高手 | Place three pieces per batch on an 8×8 board and clear full rows/columns |
 | `water-sort` | 奶茶大师 | Pour matching colors into tubes, with undo and progressively harder levels |
-| `snake-arena` | 小伴贪吃蛇 | Landscape, mobile-first arena with local AI snakes, boost energy and three-minute or endless rounds |
+| `snake-arena` | 小伴贪吃蛇 | Landscape, mobile-first arena with mixed-size local AI, boost, three-minute/endless growth, candy coins, protection cards and one optional revive |
 | `ink-blade` | 水墨剑客 | Landscape ink-wash side-scrolling action, all drawn by code: six 幅 unlocked one by one with three seals and a grade each, plus the whole 长卷; parries, executions and a boss duel; saves progress |
 | `dusk-glider` | 暮色滑翔 | Landscape 3D glide over a sunset archipelago (three.js): hold to dive, release to launch, perfect landings chain into a 2× fever, islands extend the daylight |
 

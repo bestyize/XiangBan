@@ -75,7 +75,7 @@ function runtime({ portrait = false, fullscreen = false, standalone = false, sea
   let frame: ((time: number) => void) | null = null, now = 0
   const context: Record<string, any> = {
     window: win, document: doc, location: win.location, screen: { orientation: { unlock() {} } },
-    URLSearchParams, HTMLButtonElement: Node,
+    URLSearchParams, HTMLButtonElement: Node, structuredClone,
     matchMedia: (query: string) => ({ matches: query === '(pointer: coarse)' }),
     getComputedStyle: (element: Node) => ({ getPropertyValue: (name: string) => element.cssProperties.get(name) || '0px' }),
     requestAnimationFrame: (callback: (time: number) => void) => { frame = callback },
@@ -83,6 +83,7 @@ function runtime({ portrait = false, fullscreen = false, standalone = false, sea
   }
   runInNewContext(readFileSync(new URL('../../../public/game-packs/snake-arena/rules.js', import.meta.url), 'utf8'), context)
   runInNewContext(readFileSync(new URL('../../../public/game-packs/snake-arena/viewport.js', import.meta.url), 'utf8'), context)
+  runInNewContext(readFileSync(new URL('../../../public/game-packs/snake-arena/economy.js', import.meta.url), 'utf8'), context)
   let model: any
   const original = context.XiabanSnakeArena.createGame
   context.XiabanSnakeArena.createGame = (options: any) => { model = original({ seed: 42, ...options }); return model }
@@ -91,8 +92,19 @@ function runtime({ portrait = false, fullscreen = false, standalone = false, sea
   function init(overrides: Record<string, any> = {}) {
     win.fire('message', { source: win.parent, data: { channel: 'xiaban.game-host', protocol: 1, nonce: 'test-round', type: 'host.init', ...overrides } })
   }
-  function start() { node('startButton').fire('click'); model.snakes = [model.snakes[0]]; model.food = []; advance(150) }
-  return { node, doc, win, init, messages, navigations, advance, start, difficultyChoices: modes, state: () => model }
+  function start({ clearProtection = true } = {}) {
+    node('startButton').fire('click'); model.snakes = [model.snakes[0]]; model.food = []; advance(150)
+    if (clearProtection) model.snakes[0].invulnerable = 0
+  }
+  function walletReply(action: string, response: Record<string, any> = {}, envelope: Record<string, any> = {}) {
+    const request = [...messages].reverse().find(message => message.type === 'game.wallet' && message.action === action)
+    if (!request) throw new Error(`No ${action} wallet request`)
+    win.fire('message', { source: win.parent, ...envelope, data: { channel: 'xiaban.game-host', protocol: 1, nonce: 'test-round', type: 'host.wallet', requestId: request.requestId,
+      wallet: { coins: 40, shields: 0, startShieldSeconds: 0, prices: { shield: 20, revive: 30 } }, coinsEarned: 0, protectionSeconds: 0, ...response } })
+    return request
+  }
+  async function flush() { for (let i = 0; i < 12; i += 1) await Promise.resolve() }
+  return { node, doc, win, init, messages, navigations, advance, start, walletReply, flush, difficultyChoices: modes, state: () => model }
 }
 
 describe('snake arena mobile controller and host protocol', () => {
@@ -103,6 +115,7 @@ describe('snake arena mobile controller and host protocol', () => {
     expect(game.messages.some(message => message.type === 'game.share')).toBe(false)
     game.state().snakes[0].x = 2399; game.state().snakes[0].score = 450
     game.advance(3)
+    game.node('finishButton').fire('click')
     const count = game.messages.length
     game.node('shareResultButton').fire('click')
     expect(game.messages[count].type).toBe('game.share')
@@ -117,18 +130,17 @@ describe('snake arena mobile controller and host protocol', () => {
     const game = runtime({ standalone: true })
     game.start()
     game.state().snakes[0].x = 2399
-    game.advance(3); game.node('shareResultButton').fire('click')
+    game.advance(3); game.node('finishButton').fire('click'); game.node('shareResultButton').fire('click')
     expect(game.navigations).toHaveLength(1)
     expect(game.navigations[0]).toMatch(/^\/games\/snake-arena\/share\?own=1#v=1&/)
     expect(game.navigations[0]).not.toContain('hostNonce')
   })
-  it('starts a friend challenge with the original round type and difficulty', () => {
+  it('starts a legacy friend challenge with its round type and the unified difficulty', () => {
     const game = runtime({ search: '?hostNonce=test-round&round=endless&difficulty=lively' })
     game.start()
     expect(game.state().roundType).toBe('endless')
-    expect(game.state().mode).toBe('lively')
+    expect(game.state().mode).toBe('cozy')
     expect(game.node('endlessModeButton').attrs.get('aria-pressed')).toBe('true')
-    expect(game.difficultyChoices[1].attrs.get('aria-pressed')).toBe('true')
   })
   it('starts endless rounds with an elapsed clock and no automatic result after three minutes', () => {
     const game = runtime({ portrait: true })
@@ -140,7 +152,7 @@ describe('snake arena mobile controller and host protocol', () => {
     game.advance(20)
     expect(game.state().roundType).toBe('endless')
     expect(game.state().phase).toBe('playing')
-    expect(game.node('clockLabel').textContent).toBe('无尽生存')
+    expect(game.node('clockLabel').textContent).toBe('无尽成长')
     expect(game.node('time').textContent).toBe('3:00')
     expect(game.node('.clock').classes.has('urgent')).toBe(false)
     expect(game.messages.filter(message => message.type === 'game.result')).toHaveLength(0)
@@ -150,26 +162,27 @@ describe('snake arena mobile controller and host protocol', () => {
     expect(game.state().time).toBe(time)
   })
 
-  it('retains endless mode and difficulty on restart and posts results only on elimination', () => {
+  it('retains endless mode on restart and posts a result only after the player finishes the elimination choice', () => {
     const game = runtime()
     game.init()
     game.node('endlessModeButton').fire('click')
     game.difficultyChoices[1].fire('click')
     game.start()
-    expect(game.state().mode).toBe('lively')
+    expect(game.state().mode).toBe('cozy')
     expect(game.node('endlessModeButton').attrs.get('aria-pressed')).toBe('true')
     game.state().snakes[0].x = 2399; game.state().snakes[0].score = 450
     game.advance(3)
     expect(game.state().reason).toBe('wall')
-    expect(game.node('resultBadge').textContent).toContain('无尽生存')
+    game.node('finishButton').fire('click')
+    expect(game.node('resultBadge').textContent).toContain('无尽成长')
     const results = game.messages.filter(message => message.type === 'game.result')
     expect(results).toHaveLength(1)
     expect(results[0].score).toBe(450)
     game.node('restartButton').fire('click')
     expect(game.state().roundType).toBe('endless')
     expect(game.state().remaining).toBeNull()
-    expect(game.state().mode).toBe('lively')
-    expect(game.node('clockLabel').textContent).toBe('无尽生存')
+    expect(game.state().mode).toBe('cozy')
+    expect(game.node('clockLabel').textContent).toBe('无尽成长')
     expect(game.node('time').textContent).toBe('0:00')
     expect(game.messages.filter(message => message.type === 'game.start')).toHaveLength(2)
   })
@@ -181,9 +194,9 @@ describe('snake arena mobile controller and host protocol', () => {
     game.node('timedModeButton').fire('click')
     game.start()
     expect(game.state().roundType).toBe('timed')
-    expect(game.state().mode).toBe('lively')
+    expect(game.state().mode).toBe('cozy')
     expect(game.state().remaining).not.toBeNull()
-    expect(game.node('clockLabel').textContent).toBe('三分钟竞技')
+    expect(game.node('clockLabel').textContent).toBe('三分钟冲分')
   })
   it('applies verified host safe areas and updates them after rotation without starting a round', () => {
     const game = runtime()
@@ -199,7 +212,7 @@ describe('snake arena mobile controller and host protocol', () => {
     game.init({ nonce: 'wrong' })
     expect(game.messages).toHaveLength(0)
     game.init()
-    expect(game.messages.map((message) => message.type)).toEqual(['game.ready'])
+    expect(game.messages.filter(message => message.type !== 'game.wallet').map((message) => message.type)).toEqual(['game.ready'])
     game.start()
     expect(game.messages.filter((message) => message.type === 'game.start')).toHaveLength(1)
     game.init()
@@ -360,6 +373,7 @@ describe('snake arena mobile controller and host protocol', () => {
     const player = game.state().snakes[0]
     player.x = 2399; player.score = 450
     game.advance(3)
+    game.node('finishButton').fire('click')
     const results = game.messages.filter((message) => message.type === 'game.result')
     expect(results).toHaveLength(1)
     expect(results[0].score).toBe(450)
@@ -371,5 +385,214 @@ describe('snake arena mobile controller and host protocol', () => {
     expect(game.messages.filter((message) => message.type === 'game.progress')).toHaveLength(progressCount)
     game.win.fire('pagehide')
     expect(game.messages.filter((message) => message.type === 'game.progress')).toHaveLength(progressCount)
+  })
+
+  it('keeps a death choice open without finishing the host round, and finishing sends exactly one result', () => {
+    const game = runtime()
+    game.init(); game.start()
+    game.state().snakes[0].x = 2399; game.state().snakes[0].score = 765
+    game.advance(3)
+    expect(game.node('reviveOverlay').hidden).toBe(false)
+    expect(game.node('resultOverlay').hidden).toBe(true)
+    expect(game.messages.filter(message => message.type === 'game.result')).toHaveLength(0)
+    game.node('shareResultButton').fire('click')
+    expect(game.messages.filter(message => message.type === 'game.share')).toHaveLength(0)
+    const clock = game.state().time
+    game.advance(60); game.init()
+    expect(game.state().time).toBe(clock)
+    expect(game.messages.filter(message => message.type === 'game.start')).toHaveLength(1)
+    game.node('finishButton').fire('click'); game.node('finishButton').fire('click')
+    game.advance(60); game.init()
+    expect(game.messages.filter(message => message.type === 'game.result')).toEqual([expect.objectContaining({ score: 765 })])
+    expect(game.node('reviveOverlay').hidden).toBe(true)
+    expect(game.node('resultOverlay').hidden).toBe(false)
+  })
+
+  it('revives through a trusted wallet reply without opening or settling another round, then directly finishes a second death', async () => {
+    const game = runtime()
+    game.init(); game.walletReply('read'); await game.flush()
+    game.start(); game.walletReply('consume_start_shield'); await game.flush()
+    game.state().snakes[0].mass = 500; game.state().snakes[0].score = 900; game.state().snakes[0].x = 2399
+    game.advance(3)
+    const time = game.state().time, remaining = game.state().remaining
+    game.node('reviveButton').fire('click'); game.node('reviveButton').fire('click')
+    expect(game.messages.filter(message => message.type === 'game.wallet' && message.action === 'revive')).toHaveLength(1)
+    expect(game.node('finishButton').disabled).toBe(true)
+    game.advance(30)
+    expect(game.state().time).toBe(time)
+    game.walletReply('revive', { wallet: { coins: 10, shields: 0, startShieldSeconds: 0, prices: { shield: 20, revive: 30 } }, protectionSeconds: 5 })
+    await game.flush()
+    expect(game.state().phase).toBe('playing')
+    expect(game.state().reviveUsed).toBe(true)
+    expect(game.state().snakes[0].mass).toBe(300)
+    expect(game.state().snakes[0].score).toBe(900)
+    expect(game.state().time).toBe(time)
+    expect(game.state().remaining).toBe(remaining)
+    expect(game.node('reviveOverlay').hidden).toBe(true)
+    expect(game.messages.filter(message => message.type === 'game.start')).toHaveLength(1)
+    expect(game.messages.some(message => message.type === 'game.result' || message.action === 'settle')).toBe(false)
+    game.advance(55)
+    game.state().snakes[0].invulnerable = 0; game.state().snakes[0].x = 2399
+    game.advance(3)
+    expect(game.node('resultOverlay').hidden).toBe(false)
+    expect(game.node('reviveOverlay').hidden).toBe(true)
+    expect(game.messages.filter(message => message.type === 'game.result')).toHaveLength(1)
+    expect(game.messages.filter(message => message.action === 'settle')).toHaveLength(1)
+  })
+
+  it('accepts wallet replies only from the current parent with its nonce and matching pending request', async () => {
+    const game = runtime()
+    game.init()
+    const request = game.messages.find(message => message.type === 'game.wallet' && message.action === 'read')!
+    const response = { channel: 'xiaban.game-host', protocol: 1, nonce: 'test-round', type: 'host.wallet', requestId: request.requestId,
+      wallet: { coins: 77, shields: 1, startShieldSeconds: 0, prices: { shield: 20, revive: 30 } }, coinsEarned: 0, protectionSeconds: 0 }
+    for (const [source, change] of [[{}, {}], [game.win.parent, { nonce: 'wrong' }], [game.win.parent, { requestId: 'not-requested' }], [game.win.parent, { protocol: 2 }]] as const) {
+      game.win.fire('message', { source, data: { ...response, ...change } })
+      await game.flush()
+      expect(game.node('coinBalance').textContent).toBe('…')
+    }
+    game.win.fire('message', { source: game.win.parent, data: response })
+    await game.flush()
+    expect(game.node('coinBalance').textContent).toBe(77)
+    game.win.fire('message', { source: game.win.parent, data: { ...response, wallet: { ...response.wallet, coins: 999 } } })
+    expect(game.node('coinBalance').textContent).toBe(77)
+  })
+
+  it('consumes a five-second start protection reward during the countdown and consumes a normal three-second card separately', async () => {
+    const game = runtime()
+    game.init()
+    game.walletReply('read', { wallet: { coins: 40, shields: 1, startShieldSeconds: 5, prices: { shield: 20, revive: 30 } } })
+    await game.flush()
+    game.node('startButton').fire('click')
+    game.state().snakes = [game.state().snakes[0]]; game.state().food = []
+    expect(game.state().time).toBe(0)
+    game.walletReply('consume_start_shield', { wallet: { coins: 40, shields: 1, startShieldSeconds: 0, prices: { shield: 20, revive: 30 } }, protectionSeconds: 5 })
+    await game.flush()
+    expect(game.state().snakes[0].invulnerable).toBe(5)
+    expect(game.state().time).toBe(0)
+    game.advance(150)
+    expect(game.state().snakes[0].invulnerable).toBeGreaterThan(4.8)
+    expect(game.node('walletHint').textContent).not.toContain('下局开局保护')
+    game.state().snakes[0].invulnerable = 0
+    game.node('shieldButton').fire('click')
+    const clock = game.state().time
+    game.advance(20)
+    expect(game.state().time).toBe(clock)
+    game.walletReply('use_shield', { wallet: { coins: 40, shields: 0, startShieldSeconds: 0, prices: { shield: 20, revive: 30 } }, protectionSeconds: 3 })
+    await game.flush()
+    expect(game.state().snakes[0].invulnerable).toBe(3)
+    expect(game.node('shieldCount').textContent).toBe(0)
+    expect(game.node('shieldButton').disabled).toBe(true)
+    game.advance(3)
+    expect(game.state().time).toBeGreaterThan(clock)
+    expect(game.messages.filter(message => message.type === 'game.start')).toHaveLength(1)
+  })
+
+  it('allows ending a round with insufficient coins and never requires sharing or a revive purchase', async () => {
+    const game = runtime()
+    game.init(); game.walletReply('read', { wallet: { coins: 10, shields: 0, startShieldSeconds: 0, prices: { shield: 20, revive: 30 } } })
+    await game.flush(); game.start()
+    game.state().snakes[0].x = 2399; game.advance(3)
+    expect(game.node('reviveButton').disabled).toBe(true)
+    expect(game.node('finishButton').disabled).toBe(false)
+    game.node('reviveButton').fire('click')
+    expect(game.messages.some(message => message.action === 'revive')).toBe(false)
+    game.node('finishButton').fire('click')
+    expect(game.node('resultOverlay').hidden).toBe(false)
+    expect(game.messages.filter(message => message.type === 'game.result')).toHaveLength(1)
+    expect(game.messages.some(message => message.type === 'game.share')).toBe(false)
+    expect(game.node('restartButton').disabled).toBe(false)
+  })
+
+  it('keeps the death choice usable when a wallet revive request is rejected', async () => {
+    const game = runtime()
+    game.init(); game.walletReply('read'); await game.flush(); game.start()
+    game.state().snakes[0].x = 2399; game.advance(3)
+    game.node('reviveButton').fire('click')
+    game.walletReply('revive', { error: '糖果币不够啦' }); await game.flush()
+    expect(game.state().reviveUsed).toBe(false)
+    expect(game.node('reviveOverlay').hidden).toBe(false)
+    expect(game.node('finishButton').disabled).toBe(false)
+    expect(game.messages.filter(message => message.type === 'game.result')).toHaveLength(0)
+    game.node('finishButton').fire('click')
+    expect(game.messages.filter(message => message.type === 'game.result')).toHaveLength(1)
+  })
+
+  it('uses the real standalone memory wallet to revive and settle without a host or automatic sharing', async () => {
+    const game = runtime({ standalone: true })
+    await game.flush()
+    expect(game.node('coinBalance').textContent).toBe(40)
+    game.start(); await game.flush()
+    game.state().snakes[0].x = 2399; game.state().snakes[0].score = 450; game.advance(3)
+    game.node('reviveButton').fire('click'); await game.flush()
+    expect(game.state().reviveUsed).toBe(true)
+    expect(game.state().snakes[0].alive).toBe(true)
+    expect(game.node('coinBalance').textContent).toBe(10)
+    game.advance(55)
+    game.state().snakes[0].invulnerable = 0; game.state().snakes[0].x = 2399; game.advance(3)
+    await game.flush()
+    expect(game.node('resultOverlay').hidden).toBe(false)
+    expect(game.node('coinBalance').textContent).toBe(18)
+    expect(game.node('coinsEarned').textContent).toContain('+8')
+    expect(game.messages).toHaveLength(0)
+    expect(game.navigations).toHaveLength(0)
+  })
+
+  it('settles a timed finish immediately without offering a revive', () => {
+    const game = runtime()
+    game.init(); game.start(); game.state().time = 179.99
+    game.advance(3)
+    expect(game.state().reason).toBe('timeout')
+    expect(game.node('reviveOverlay').hidden).toBe(true)
+    expect(game.node('resultOverlay').hidden).toBe(false)
+    expect(game.messages.filter(message => message.type === 'game.result')).toHaveLength(1)
+  })
+
+  it('queues a final result and wallet settlement before exiting, without duplicates on repeated exit', async () => {
+    const game = runtime()
+    game.init(); game.walletReply('read'); await game.flush()
+    game.start(); game.state().snakes[0].score = 450
+    const time = game.state().time
+    game.node('exitButton').fire('click'); game.node('exitButton').fire('click')
+    const resultIndex = game.messages.findIndex(message => message.type === 'game.result')
+    const settleIndex = game.messages.findIndex(message => message.type === 'game.wallet' && message.action === 'settle')
+    const exitIndex = game.messages.findIndex(message => message.type === 'game.exit')
+    expect(resultIndex).toBeGreaterThanOrEqual(0)
+    expect(settleIndex).toBeGreaterThan(resultIndex)
+    expect(exitIndex).toBeGreaterThan(settleIndex)
+    expect(game.messages.filter(message => message.type === 'game.result')).toEqual([expect.objectContaining({ score: 450 })])
+    expect(game.messages.filter(message => message.action === 'settle')).toHaveLength(1)
+    game.advance(60)
+    expect(game.state().time).toBe(time)
+    expect(game.messages.filter(message => message.type === 'game.start')).toHaveLength(1)
+  })
+
+  it.each([false, true])('ignores the prior round settlement display/flag after a quick restart (error=%s)', async (error) => {
+    const game = runtime()
+    game.init(); game.walletReply('read'); await game.flush(); game.start()
+    game.state().snakes[0].x = 2399; game.state().snakes[0].score = 450
+    game.advance(3); game.node('finishButton').fire('click')
+    const priorSettlement = game.messages.find(message => message.action === 'settle')!
+    game.start()
+    game.state().snakes[0].x = 2399; game.state().snakes[0].score = 900
+    game.advance(3); game.node('finishButton').fire('click')
+    const currentSettlement = [...game.messages].reverse().find(message => message.action === 'settle')!
+    expect(priorSettlement.roundKey).not.toBe(currentSettlement.roundKey)
+    expect(game.node('coinsEarned').textContent).toBe('正在结算糖果币…')
+    expect(game.node('coinsEarned').disabled).toBe(true)
+    game.win.fire('message', { source: game.win.parent, data: { channel: 'xiaban.game-host', protocol: 1, nonce: 'test-round', type: 'host.wallet', requestId: priorSettlement.requestId,
+      ...(error ? { error: '上一局结算暂不可用' } : { wallet: { coins: 48, shields: 0, startShieldSeconds: 0, prices: { shield: 20, revive: 30 } }, coinsEarned: 8, protectionSeconds: 0 }) } })
+    await game.flush()
+    expect(game.node('coinsEarned').textContent).toBe('正在结算糖果币…')
+    expect(game.node('coinsEarned').disabled).toBe(true)
+    game.node('coinsEarned').fire('click')
+    expect(game.messages.filter(message => message.action === 'settle')).toHaveLength(2)
+    expect(game.messages.filter(message => message.type === 'game.start')).toHaveLength(2)
+    expect(game.messages.filter(message => message.type === 'game.result')).toHaveLength(2)
+    game.walletReply('settle', { wallet: { coins: 60, shields: 0, startShieldSeconds: 0, prices: { shield: 20, revive: 30 } }, coinsEarned: 12 })
+    await game.flush()
+    expect(game.node('coinsEarned').textContent).toContain('本局 +12')
+    game.node('coinsEarned').fire('click')
+    expect(game.messages.filter(message => message.action === 'settle')).toHaveLength(2)
   })
 })

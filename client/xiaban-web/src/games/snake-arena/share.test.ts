@@ -29,7 +29,7 @@ describe('snake result sharing', () => {
 
   it.each([
     { score: -1 }, { score: 1.5 }, { score: Infinity }, { score: 1e9 + 1 }, { score: '1250' },
-    { mass: 0 }, { mass: 1001 }, { kills: -1 }, { seconds: NaN }, { roundType: 'unknown' }, { difficulty: 'unknown' }, { roundType: ['timed'] }, { difficulty: ['cozy'] },
+    { mass: 0 }, { mass: 1e7 + 1 }, { mass: 1000.5 }, { kills: -1 }, { seconds: NaN }, { roundType: 'unknown' }, { difficulty: 'unknown' }, { roundType: ['timed'] }, { difficulty: ['cozy'] },
   ])('rejects malformed or out-of-range payload %j', (change) => {
     expect(parseSnakeResult({ ...result, ...change })).toBeNull()
   })
@@ -46,19 +46,19 @@ describe('snake result sharing', () => {
     expect(snakeArena.canShare(result, null)).toBe(false)
   })
 
-  it('opens a local result page but makes challenge links retain the round type, difficulty and referral', () => {
+  it('opens a local result page and makes challenge links retain the round type and referral with unified difficulty', () => {
     expect(ownResultPath(snakeArena, result, 'friend-code')).toContain('?own=1&inv=friend-code#')
     expect(resultShareLink(snakeArena, result, 'https://xiaban.xyz')).not.toContain('own=')
     const challenge = new URL(challengePath(snakeArena, result, 'friend-code'), 'https://xiaban.xyz')
     expect(challenge.pathname).toBe('/games/snake-arena')
     expect(challenge.searchParams.get('round')).toBe('endless')
-    expect(challenge.searchParams.get('difficulty')).toBe('lively')
+    expect(challenge.searchParams.has('difficulty')).toBe(false)
     expect(challenge.searchParams.get('inv')).toBe('friend-code')
     expect(resultShareLink(snakeArena, result, 'https://xiaban.xyz', 'email@example.com')).not.toContain('inv=')
   })
 
   it('forwards only supported challenge options to the pack', () => {
-    expect(snakeArena.launchParams!(new URLSearchParams('round=endless&difficulty=lively'))).toEqual({ round: 'endless', difficulty: 'lively' })
+    expect(snakeArena.launchParams!(new URLSearchParams('round=endless&difficulty=lively'))).toEqual({ round: 'endless' })
     expect(snakeArena.launchParams!(new URLSearchParams('round=unknown&difficulty=unknown&hostNonce=x'))).toEqual({})
   })
 
@@ -70,6 +70,17 @@ describe('snake result sharing', () => {
     expect(hunter.cheer).toContain('4')
     expect(snakeArena.poster({ ...snake, roundType: 'endless', seconds: 200 }).cheer).toContain('3:20')
     expect(snakeArena.poster(snake).stats.map(([, label]) => label)).toEqual(['最终长度', '淘汰 AI', '存活时长'])
-    expect(snakeArena.subtitle(result)).toBe('无尽生存 · 热闹难度 · 1250 分')
+    expect(snakeArena.subtitle(result)).toBe('无尽成长 · 1250 分')
+  })
+
+  it('accepts grown snakes up to the new safety cap and still decodes historical difficulty links', () => {
+    for (const mass of [1001, 5000, 1e7]) {
+      const data = { ...result, mass }
+      expect(readSnakeResult('#' + snakeFragment(data))).toEqual(data)
+    }
+    const old = '#v=1&s=1250&l=160&k=3&t=245&r=endless&d=lively'
+    expect(readSnakeResult(old)).toEqual(result)
+    const legacy = readSnakeResult(old)!
+    expect(snakeArena.challengeQuery!(legacy)).toEqual({ round: 'endless' })
   })
 })

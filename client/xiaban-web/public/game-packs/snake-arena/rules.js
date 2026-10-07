@@ -5,6 +5,13 @@
   const SPACING = 6
   const DURATION = 180
   const MIN_MASS = 32
+  const MAX_MASS = 1e7
+  const MAX_SCORE = 1e9
+  const MAX_FOOD = 1100
+  const BASE_SPEED = 152
+  const BOOST_SPEED = 280
+  const TURN_SPEED = 5.6
+  const FOOD_SHAPES = ['dot', 'candy', 'star', 'fruit', 'gem']
   const COLORS = ['#ffca28', '#20b8f5', '#ff5b85', '#aa55ef', '#54cc45', '#ff852b', '#5685f5', '#d6cb20']
   const NAMES = ['小伴', '奶盖', '桃桃', '糯米', '薄荷', '布丁', '晚风', '小满', '泡芙', '团子', '阿橘', '米粒']
   const clamp = (value, min, max) => Math.max(min, Math.min(max, value))
@@ -37,8 +44,8 @@
     return Math.min(segmentDistanceSq(a, c, d), segmentDistanceSq(b, c, d), segmentDistanceSq(c, a, b), segmentDistanceSq(d, a, b))
   }
 
-  function radius(snake) { return 14 + Math.min(7, snake.mass * 0.009) }
-  function bodyLength(snake) { return 105 + Math.min(1800, snake.mass * 2.05) }
+  function radius(snake) { return 13 + Math.min(29, Math.sqrt(Math.max(0, snake.mass)) * 0.7) }
+  function bodyLength(snake) { return 105 + Math.min(3000, Math.max(0, snake.mass) * 2.6) }
   function bodyPoints(snake) { return [snake, ...snake.trail] }
 
   function makeSnake(id, x, y, angle, mass = 60) {
@@ -48,18 +55,22 @@
       boosting: false, boostLocked: false, invulnerable: 2.5, respawnAt: 0, aiTimer: 0,
       carry: 0, boostDrop: 0, trail: [], previous: { x, y },
     }
-    for (let distance = 0; distance <= bodyLength(snake); distance += SPACING) {
-      snake.trail.push({ x: x - Math.cos(angle) * distance, y: y - Math.sin(angle) * distance })
+    // New opponents start with a readable curved tail, then grow their traveled
+    // path to the full mass-based length. A bounded start fits safely in the map.
+    const length = id === 0 ? bodyLength(snake) : Math.min(480, bodyLength(snake))
+    for (let distance = 0; distance <= length; distance += SPACING) {
+      const bend = distance / 180
+      snake.trail.push({ x: x - 180 * (Math.sin(angle + bend) - Math.sin(angle)), y: y + 180 * (Math.cos(angle + bend) - Math.cos(angle)) })
     }
     return snake
   }
 
-  function makeFood(state, x, y, value = 1, remains = false) {
-    return { id: state.nextFoodId++, x, y, value, remains, color: Math.floor(state.random() * 5), phase: state.random() * Math.PI * 2 }
+  function makeFood(state, x, y, value = 1, remains = false, ownerId = null) {
+    return { id: state.nextFoodId++, x, y, value, remains, ownerId, shape: FOOD_SHAPES[Math.floor(state.random() * FOOD_SHAPES.length)], color: Math.floor(state.random() * 5), phase: state.random() * Math.PI * 2 }
   }
 
   function scatterFood(state, count) {
-    for (let i = 0; i < count; i += 1) {
+    for (let i = 0; i < count && state.food.length < MAX_FOOD; i += 1) {
       state.food.push(makeFood(state, 45 + state.random() * (WORLD.width - 90), 45 + state.random() * (WORLD.height - 90), state.random() < 0.09 ? 3 : 1))
     }
   }
@@ -68,18 +79,15 @@
     roundType = roundType === 'endless' ? 'endless' : 'timed'
     const state = {
       random: seededRandom(seed), mode, roundType, time: 0, remaining: roundType === 'endless' ? null : DURATION, phase: 'playing', reason: null,
-      food: [], snakes: [], events: [], nextFoodId: 1, foodTimer: 0,
+      food: [], snakes: [], events: [], nextFoodId: 1, foodTimer: 0, reviveUsed: false, milestones: Object.create(null),
     }
     state.snakes.push(makeSnake(0, WORLD.width / 2, WORLD.height / 2, -0.2))
-    state.snakes[0].invulnerable = mode === 'cozy' ? 5 : 3
-    const count = mode === 'lively' ? 11 : 8
+    state.snakes[0].invulnerable = 2
+    const count = 10
     for (let id = 1; id <= count; id += 1) {
-      const theta = id * Math.PI * 2 / count + 0.35
-      const range = (mode === 'cozy' ? 530 : 390) + (id % 3) * 100
-      const x = WORLD.width / 2 + Math.cos(theta) * range
-      const y = WORLD.height / 2 + Math.sin(theta) * range
-      // Tangential starts keep whole bodies inside the map and give a safe first move.
-      state.snakes.push(makeSnake(id, x, y, theta + Math.PI / 2, 55 + state.random() * 65))
+      const mass = opponentMass(state, id <= 4 ? 0 : id <= 8 ? 1 : 2)
+      const snake = findSpawn(state, id, mass, mass >= 650 ? 700 : 600)
+      if (snake) state.snakes.push(snake)
     }
     scatterFood(state, 600)
     // A short, visible trail of snacks makes the first movement immediately rewarding.
@@ -125,18 +133,23 @@
     snake.aiTimer -= dt
     if (snake.aiTimer > 0) return
     snake.aiTimer = 0.13 + state.random() * 0.06
+    const player = state.snakes[0]
+    const gentleOpening = state.time < 12 && player.alive
     let target = null, foodCost = Infinity
     for (const food of state.food) {
       const distance = distanceSq(snake, food)
       if (distance > 450 * 450) continue
+      // Let beginners collect nearby snacks instead of competing for the exact
+      // same head space during their first few turns.
+      if (gentleOpening && distanceSq(food, player) < 170 ** 2) continue
       const bearing = Math.atan2(food.y - snake.y, food.x - snake.x)
       const cost = distance * (1 + Math.abs(angleDelta(snake.angle, bearing)) * 0.8) / Math.sqrt(food.value)
       if (cost < foodCost) { foodCost = cost; target = food }
     }
     let desired = target ? Math.atan2(target.y - snake.y, target.x - snake.x) : Math.atan2(WORLD.height / 2 - snake.y, WORLD.width / 2 - snake.x)
-    const player = state.snakes[0]
-    // Some lively bots attempt a cut-off, but use the same movement and collisions as the player.
-    if (state.mode === 'lively' && snake.id % 3 === 0 && player.alive && distanceSq(snake, player) < 270 ** 2) {
+    // The legacy difficulty argument remains compatible, but all rounds use
+    // one consistent opponent behavior and movement model.
+    if (state.time >= 20 && snake.id % 3 === 0 && player.alive && player.invulnerable <= 0 && distanceSq(snake, player) < 270 ** 2) {
       desired = Math.atan2(player.y + Math.sin(player.angle) * 95 - snake.y, player.x + Math.cos(player.angle) * 95 - snake.x)
     }
     const obstacles = nearbyBodies(index, snake, 190)
@@ -148,6 +161,13 @@
         const point = { x: snake.x + Math.cos(heading) * ahead, y: snake.y + Math.sin(heading) * ahead }
         const wall = Math.min(point.x, point.y, WORLD.width - point.x, WORLD.height - point.y)
         if (wall < 80) cost += (80 - wall) * 4
+        if (gentleOpening) {
+          const playerGap = Math.sqrt(distanceSq(point, player))
+          if (playerGap < 170) cost += (170 - playerGap) * 14
+          const aheadPlayer = { x: player.x + Math.cos(player.angle) * 300, y: player.y + Math.sin(player.angle) * 300 }
+          const forwardGap = Math.sqrt(segmentDistanceSq(point, player, aheadPlayer))
+          if (forwardGap < 170) cost += (170 - forwardGap) * 14
+        }
         for (const entry of obstacles) {
           if (entry.snake.id === snake.id) continue
           const gap = Math.sqrt(segmentDistanceSq(point, entry.a, entry.b)) - radius(entry.snake) - radius(snake)
@@ -157,18 +177,18 @@
       if (cost < bestCost) { bestCost = cost; bestHeading = heading }
     }
     snake.targetAngle = bestHeading
-    snake.aiBoost = state.mode === 'lively' && bestCost < 30 && foodCost < 180 ** 2 && snake.energy > 45
+    snake.aiBoost = state.time >= 20 && bestCost < 30 && foodCost < 180 ** 2 && snake.energy > 45
   }
 
   function moveSnake(snake, target, boost, dt) {
     snake.previous = { x: snake.x, y: snake.y }
     if (Number.isFinite(target)) snake.targetAngle = target
-    snake.angle += clamp(angleDelta(snake.angle, snake.targetAngle), -3.1 * dt, 3.1 * dt)
+    snake.angle += clamp(angleDelta(snake.angle, snake.targetAngle), -TURN_SPEED * dt, TURN_SPEED * dt)
     if (snake.energy <= 1) snake.boostLocked = true
     if (snake.energy >= 25) snake.boostLocked = false
     snake.boosting = Boolean(boost && !snake.boostLocked && snake.energy > 1 && snake.mass > MIN_MASS)
     snake.energy = clamp(snake.energy + (snake.boosting ? -31 : 22) * dt, 0, 100)
-    const speed = snake.boosting ? 218 : 118
+    const speed = snake.boosting ? BOOST_SPEED : BASE_SPEED
     const distance = speed * dt
     snake.x += Math.cos(snake.angle) * distance
     snake.y += Math.sin(snake.angle) * distance
@@ -188,32 +208,117 @@
     snake.alive = false
     snake.boosting = false
     snake.respawnAt = state.time + 3.5
-    const count = Math.min(65, Math.max(12, Math.ceil(snake.mass / 3)))
+    const count = Math.min(110, Math.max(12, Math.ceil(Math.sqrt(snake.mass) * 3)))
+    // Replace ordinary snacks when the map is full, rather than losing the
+    // large snake's reward merely because food density hit its safety cap.
+    while (state.food.length + count > MAX_FOOD) {
+      const ordinary = state.food.findIndex(food => !food.remains)
+      if (ordinary < 0) break
+      state.food.splice(ordinary, 1)
+    }
+    const available = MAX_FOOD - state.food.length
+    const drops = Math.min(count, available)
+    const totalValue = Math.max(36, Math.floor(snake.mass * 0.65))
     const points = bodyPoints(snake)
-    for (let i = 0; i < count && state.food.length < 1100; i += 1) {
-      const point = points[Math.min(points.length - 1, Math.floor(i * points.length / count))]
-      state.food.push(makeFood(state, clamp(point.x + (state.random() - 0.5) * 16, 20, WORLD.width - 20), clamp(point.y + (state.random() - 0.5) * 16, 20, WORLD.height - 20), 3, true))
+    for (let i = 0; i < drops; i += 1) {
+      const point = points[Math.min(points.length - 1, Math.floor(i * points.length / drops))]
+      const value = Math.floor(totalValue / drops) + (i < totalValue % drops ? 1 : 0)
+      state.food.push(makeFood(state, clamp(point.x + (state.random() - 0.5) * 16, 20, WORLD.width - 20), clamp(point.y + (state.random() - 0.5) * 16, 20, WORLD.height - 20), Math.max(1, value), true, snake.id))
     }
     const killer = state.snakes.find((entry) => entry.id === killerId)
-    if (killer) { killer.kills += 1; killer.score += 80 }
-    state.events.push({ type: 'death', id: snake.id, killerId, x: snake.x, y: snake.y, color: snake.color, reason })
+    const reward = Math.min(1e6, 80 + Math.floor(snake.mass * 0.25))
+    if (killer) {
+      killer.kills += 1; killer.score = Math.min(MAX_SCORE, killer.score + reward)
+      if (killer.id === 0) {
+        milestone(state, 'first-kill', killer.kills)
+        if (snake.mass >= 200 && snake.mass >= killer.mass * 1.8) milestone(state, 'giant-slayer', Math.floor(snake.mass))
+      }
+    }
+    state.events.push({ type: 'death', id: snake.id, killerId, x: snake.x, y: snake.y, color: snake.color, reason, reward: killer ? reward : 0, victimMass: snake.mass })
     if (snake.id === 0) { state.phase = 'over'; state.reason = reason }
   }
 
-  function respawn(state, dead) {
-    for (let attempt = 0; attempt < 25; attempt += 1) {
-      const x = 260 + state.random() * (WORLD.width - 520)
-      const y = 260 + state.random() * (WORLD.height - 520)
-      const clear = state.snakes.every((other) => !other.alive || bodyPoints(other).every((point) => distanceSq(point, { x, y }) > 230 ** 2))
-      if (clear) {
-        const angle = Math.atan2(WORLD.height / 2 - y, WORLD.width / 2 - x)
-        const snake = makeSnake(dead.id, x, y, angle, 55 + state.random() * 30)
-        // Spawn with a short tail so the head's clear area also contains the entire body.
-        snake.trail.length = Math.min(25, snake.trail.length)
-        state.snakes[state.snakes.indexOf(dead)] = snake
-        return
+  function opponentMass(state, tier = Math.floor(state.random() * 3)) {
+    const ranges = [[45, 110], [180, 420], [650, 1100]]
+    const [min, max] = ranges[tier]
+    return Math.floor(min + state.random() * (max - min))
+  }
+
+  function findSpawn(state, id, mass, playerDistance = 350) {
+    const index = buildBodyGrid(state.snakes.filter(snake => snake.id !== id), true)
+    for (let attempt = 0; attempt < 180; attempt += 1) {
+      const x = 100 + state.random() * (WORLD.width - 200)
+      const y = 100 + state.random() * (WORLD.height - 200)
+      const snake = makeSnake(id, x, y, state.random() * Math.PI * 2, mass)
+      const player = state.snakes[0]
+      if (id !== 0 && player?.alive && distanceSq(snake, player) < playerDistance ** 2) continue
+      const reserveOpening = id !== 0 && state.time === 0
+      const openingEnd = { x: WORLD.width / 2 + Math.cos(-0.2) * 800, y: WORLD.height / 2 + Math.sin(-0.2) * 800 }
+      const r = radius(snake)
+      const points = bodyPoints(snake)
+      let clear = true
+      for (let i = 0; i < points.length; i += 3) {
+        const point = points[i]
+        if (point.x < r + 24 || point.y < r + 24 || point.x > WORLD.width - r - 24 || point.y > WORLD.height - r - 24) { clear = false; break }
+        if (reserveOpening && segmentDistanceSq(point, player, openingEnd) < (r + 170) ** 2) { clear = false; break }
+        for (const entry of nearbyBodies(index, point, r + 75)) {
+          if (segmentDistanceSq(point, entry.a, entry.b) < (r + radius(entry.snake) + 42) ** 2) { clear = false; break }
+        }
+        if (!clear) break
       }
+      if (clear) return snake
     }
+    return null
+  }
+
+  function respawn(state, dead) {
+    const snake = findSpawn(state, dead.id, opponentMass(state))
+    if (snake) state.snakes[state.snakes.indexOf(dead)] = snake
+    else dead.respawnAt = state.time + 0.5
+  }
+
+  function milestone(state, key, value) {
+    if (state.milestones[key]) return
+    state.milestones[key] = true
+    state.events.push({ type: 'milestone', key, value })
+  }
+
+  function activateShield(state, seconds = 3) {
+    const player = state.snakes[0]
+    if (state.phase !== 'playing' || !player?.alive || !Number.isFinite(seconds) || seconds <= 0) return false
+    player.invulnerable = Math.max(player.invulnerable, Math.min(5, seconds))
+    state.events.push({ type: 'shield', seconds: player.invulnerable })
+    return true
+  }
+
+  function revivePlayer(state) {
+    const player = state.snakes[0]
+    if (state.phase !== 'over' || player?.alive || state.reviveUsed || !['wall', 'collision'].includes(state.reason) || (state.roundType !== 'endless' && state.remaining <= 0)) return false
+    const mass = Math.max(60, Math.floor(player.mass * 0.6))
+    let replacement = findSpawn(state, 0, mass)
+    if (!replacement) {
+      // A purchased revive must not fail merely because late-game bodies fill
+      // the arena. Select an in-bounds fallback far from heads; its short tail
+      // and nonattacking five-second shield let the player escape overlapping bodies.
+      let safest = { x: WORLD.width / 2, y: WORLD.height / 2 }, bestClearance = -1
+      for (let row = 0; row < 5; row += 1) for (let col = 0; col < 7; col += 1) {
+        const point = { x: 200 + col * (WORLD.width - 400) / 6, y: 200 + row * (WORLD.height - 400) / 4 }
+        const heads = state.snakes.filter(snake => snake.id !== 0 && snake.alive)
+        const clearance = heads.length ? Math.min(...heads.map(snake => distanceSq(point, snake))) : Infinity
+        if (clearance > bestClearance) { safest = point; bestClearance = clearance }
+      }
+      replacement = makeSnake(0, safest.x, safest.y, Math.atan2(WORLD.height / 2 - safest.y, WORLD.width / 2 - safest.x), mass)
+      replacement.trail.length = Math.min(23, replacement.trail.length)
+    }
+    replacement.score = player.score
+    replacement.kills = player.kills
+    replacement.invulnerable = 5
+    // Resuming never opens a new round: score, elapsed active time and milestones survive.
+    state.snakes[0] = replacement
+    state.food = state.food.filter(food => !(food.remains && food.ownerId === 0))
+    state.phase = 'playing'; state.reason = null; state.reviveUsed = true
+    state.events.push({ type: 'revive', mass, seconds: 5 })
+    return true
   }
 
   function step(state, input = {}, dt = 1 / 60) {
@@ -233,7 +338,7 @@
           snake.boostDrop -= 0.22
           snake.mass = Math.max(MIN_MASS, snake.mass - 1)
           const tail = snake.trail[snake.trail.length - 1]
-          if (tail && state.food.length < 1100) state.food.push(makeFood(state, tail.x, tail.y))
+          if (tail && state.food.length < MAX_FOOD) state.food.push(makeFood(state, clamp(tail.x, 20, WORLD.width - 20), clamp(tail.y, 20, WORLD.height - 20)))
         }
       }
     }
@@ -242,10 +347,19 @@
     for (const snake of state.snakes) {
       if (!snake.alive) continue
       const r = radius(snake)
+      if (snake.invulnerable > 0) {
+        // A shield also covers boundaries, without letting the snake escape the map.
+        snake.x = clamp(snake.x, r, WORLD.width - r)
+        snake.y = clamp(snake.y, r, WORLD.height - r)
+        for (const point of snake.trail) {
+          point.x = clamp(point.x, r, WORLD.width - r)
+          point.y = clamp(point.y, r, WORLD.height - r)
+        }
+        continue
+      }
       if (snake.x < r || snake.y < r || snake.x > WORLD.width - r || snake.y > WORLD.height - r) {
         deaths.push({ snake, reason: 'wall', killerId: null }); continue
       }
-      if (snake.invulnerable > 0) continue
       const candidates = nearbyBodies(index, snake, r + 12)
       for (const entry of candidates) {
         if (entry.snake.id === snake.id) continue
@@ -272,16 +386,23 @@
       for (const snake of state.snakes) {
         if (!snake.alive) continue
         const distance = distanceSq(snake, food)
-        if (distance < (radius(snake) + 13) ** 2 && distance < nearest) { eater = snake; nearest = distance }
+        if (distance < (radius(snake) + 19) ** 2 && distance < nearest) { eater = snake; nearest = distance }
       }
       if (!eater) continue
-      eater.mass = Math.min(1000, eater.mass + food.value)
-      eater.score += food.value * 10
+      eater.mass = Math.min(MAX_MASS, eater.mass + food.value)
+      eater.score = Math.min(MAX_SCORE, eater.score + food.value * 10)
       if (eater.id === 0) state.events.push({ type: 'eat', x: food.x, y: food.y, value: food.value, color: food.color })
       state.food.splice(i, 1)
     }
     state.foodTimer += dt
     if (state.foodTimer > 1) { state.foodTimer = 0; scatterFood(state, Math.min(22, Math.max(0, 620 - state.food.length))) }
+    const player = state.snakes[0]
+    if (player.alive) {
+      for (const mass of [100, 250, 500, 1000, 2500, 5000]) if (player.mass >= mass) milestone(state, 'growth-' + mass, mass)
+      const rank = rankings(state).findIndex(snake => snake.id === 0) + 1
+      if (rank <= 3) milestone(state, 'top-3', rank)
+      if (rank === 1) milestone(state, 'first-place', rank)
+    }
     if (state.roundType !== 'endless' && state.remaining === 0 && state.phase === 'playing') { state.phase = 'over'; state.reason = 'timeout'; state.events.push({ type: 'finish' }) }
     return state.events
   }
@@ -290,5 +411,5 @@
     return state.snakes.filter((snake) => snake.alive || snake.id === 0).sort((a, b) => b.mass - a.mass || b.score - a.score || a.id - b.id)
   }
 
-  globalThis.XiabanSnakeArena = { WORLD, DURATION, MIN_MASS, COLORS, createGame, step, radius, bodyLength, bodyPoints, rankings, angleDelta, segmentDistanceSq, segmentsDistanceSq, seededRandom }
+  globalThis.XiabanSnakeArena = { WORLD, DURATION, MIN_MASS, MAX_MASS, MAX_FOOD, BASE_SPEED, BOOST_SPEED, TURN_SPEED, FOOD_SHAPES, COLORS, createGame, step, activateShield, revivePlayer, radius, bodyLength, bodyPoints, rankings, angleDelta, segmentDistanceSq, segmentsDistanceSq, seededRandom }
 })()

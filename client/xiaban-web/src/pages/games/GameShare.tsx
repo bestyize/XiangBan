@@ -9,6 +9,8 @@ import { shareGameToSystem } from '../../games/common/shareAction.ts'
 import { resultGame } from '../../games/index.ts'
 import { PosterThemeToggle } from '../../components/PosterThemeToggle.tsx'
 import { usePosterTheme } from '../../poster/theme.ts'
+import { claimSnakeShareReward, snakeShareRound } from '../../games/snake-arena/shareReward.ts'
+import { readSnakeWallet } from '../../games/snake-arena/economy.ts'
 import './gameShare.css'
 
 export default function GameShare({ gameId = 'snake-arena' }: { gameId?: string }) {
@@ -24,10 +26,27 @@ export default function GameShare({ gameId = 'snake-arena' }: { gameId?: string 
   const [manualCopy, setManualCopy] = useState(false)
   const [retry, setRetry] = useState(0)
   const [busy, setBusy] = useState(false)
+  const [rewardAvailable, setRewardAvailable] = useState(false)
+  const [rewardMessage, setRewardMessage] = useState('')
+  const [rewardRetry, setRewardRetry] = useState(false)
   const [theme, setTheme] = usePosterTheme()
   const link = game && result ? resultShareLink(game, result, publicUrl(), inviteCode) : ''
   const challengePath = game ? gameChallengePath(game, result, inviteCode) : '/games'
   const shareText = game && result ? game.shareText(result) : ''
+  useEffect(() => {
+    let cancelled = false
+    if (gameId === 'snake-arena' && own && result && snakeShareRound(result.score)) {
+      void readSnakeWallet().then(wallet => { if (!cancelled) setRewardAvailable(wallet.shareAvailable) }).catch(() => {})
+    }
+    return () => { cancelled = true }
+  }, [gameId, own, result])
+  async function shareReward() {
+    if (!rewardAvailable || !result) return
+    try {
+      const granted = await claimSnakeShareReward(result.score)
+      setRewardAvailable(false); setRewardRetry(false); setRewardMessage(granted ? '分享奖励已领取，下局开局保护5秒。' : '今日分享奖励已领取。')
+    } catch { setRewardRetry(true); setRewardMessage('分享奖励暂未领取，可以重试。') }
+  }
 
   useEffect(() => {
     const update = () => setContext({ hash: location.hash, search: location.search })
@@ -66,13 +85,14 @@ export default function GameShare({ gameId = 'snake-arena' }: { gameId?: string 
         setMessage('已完成系统分享。')
       }
       track('card_share', { game: gameId, kind: 'result' })
+      await shareReward()
     } catch (cause) {
       if (!(cause && typeof cause === 'object' && 'name' in cause && cause.name === 'AbortError')) setMessage('系统分享暂未完成，也可以保存图片或复制链接。')
     } finally { setBusy(false) }
   }
 
   async function copyLink() {
-    try { await navigator.clipboard.writeText(link); setMessage('战绩链接已复制，发给朋友就能一起玩。'); track('card_share', { game: gameId, kind: 'link' }) }
+    try { await navigator.clipboard.writeText(link); setMessage('战绩链接已复制，发给朋友就能一起玩。'); track('card_share', { game: gameId, kind: 'link' }); await shareReward() }
     catch { setManualCopy(true); setMessage('请长按或选中链接复制。') }
   }
   async function saveImage() {
@@ -99,6 +119,9 @@ export default function GameShare({ gameId = 'snake-arena' }: { gameId?: string 
       {image && <p className="game-share-hint">长按战绩卡也可以保存图片，发给朋友或朋友圈。</p>}
       <button className="game-share-link-button" onClick={() => void copyLink()}>复制战绩链接</button>
       <p className="game-share-status" role="status">{message}</p>
+      {rewardAvailable && <p className="game-share-hint">今日首次参与分享，可领下一局5秒开局保护。</p>}
+      {rewardMessage && <p className="game-share-status" role="status">{rewardMessage}</p>}
+      {rewardRetry && <button className="game-share-link-button" onClick={() => void shareReward()}>重试领取分享奖励</button>}
       {manualCopy && <input className="game-share-copy" aria-label="可复制的战绩链接" readOnly value={link} onFocus={event => event.currentTarget.select()} />}
       {isWeChat() && !image && <p className="game-share-hint">战绩卡生成后，可以长按保存，再发给朋友或朋友圈。</p>}
       <Link className="game-share-button play" href={challengePath}>{own ? '再玩一局，刷新战绩' : '我也来玩一局'}</Link>

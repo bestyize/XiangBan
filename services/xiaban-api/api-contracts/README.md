@@ -19,6 +19,7 @@
 | afterwork/checkin | 打卡、称号编码、回复、问候 |
 | afterwork/stats | 统计、百分比、提示 |
 | afterwork/unlocks | 解锁记录 |
+| afterwork/games | 贪吃蛇钱包和道具操作传输格式与路径 |
 | admin/settings | 管理与展示配置 DTO |
 | admin/reports | 举报传输数据，权限仍由路由决定 |
 | telemetry | 事件格式与批次 |
