@@ -10,6 +10,7 @@ on:
       - 'tools/**'
       - 'README.md'
       - 'AGENTS.md'
+      - '.github/workflows/deploy.yml'
       - '*.gradle.kts'
       - 'gradle/**'
       - 'gradle.properties'
@@ -38,6 +39,8 @@ jobs:
         run: |
           docker compose -p xiaban --file infra/compose.yaml config --quiet
           docker compose -p xiaban --file infra/compose.yaml --file infra/deploy/compose.vmware-prebuilt.yaml config --quiet
+      - name: Build web deployment image
+        run: docker build --tag xiaban-web:ci --file client/xiaban-web/Dockerfile .
   web:
     runs-on: ubuntu-latest
     defaults:

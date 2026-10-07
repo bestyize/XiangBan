@@ -16,5 +16,5 @@ FROM nginx:1.28-alpine
 COPY infra/deploy/nginx/nginx.conf /etc/nginx/nginx.conf
 COPY infra/deploy/nginx/security-headers.conf /etc/nginx/security-headers.conf
 COPY infra/deploy/nginx/busy.html /usr/share/nginx/html/busy.html
-COPY --from=build /client/xiaban-web/dist /usr/share/nginx/html
+COPY --from=build /web/dist /usr/share/nginx/html
 EXPOSE 80
