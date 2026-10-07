@@ -1,0 +1,51 @@
+@import "tailwindcss";
+
+@layer base {
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", "Plus Jakarta Sans", "Helvetica Neue", sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    background-color: #F5F5F7;
+    color: #1D1D1F;
+  }
+}
+
+/* 苹果系统交通灯圆点 */
+.apple-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 9999px;
+  display: inline-block;
+  transition: transform 0.15s ease;
+}
+.apple-dot:hover {
+  transform: scale(1.15);
+}
+.apple-dot-red {
+  background-color: #FF5F56;
+  border: 1px solid #E0443E;
+}
+.apple-dot-yellow {
+  background-color: #FFBD2E;
+  border: 1px solid #DEA123;
+}
+.apple-dot-green {
+  background-color: #27C93F;
+  border: 1px solid #1AAB29;
+}
+
+/* 滚动条美化 */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #D1D1D6;
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #AEAEB2;
+}

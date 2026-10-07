@@ -22,6 +22,7 @@ entrypoints = {
     'client/xiaoban-desktop-wallpaper': 'src-tauri/Cargo.toml',
     'services/xiaban-api/backend': 'build.gradle.kts',
     'services/xiaban-api/api-contracts': 'build.gradle.kts',
+    'services/server-pan': 'backend/Cargo.toml',
 }
 planned = ['client/xiaoban-multiplatform', 'client/xiaoban-realbot',
            'services/server-asr', 'services/server-edgetts', 'services/server-websearch']

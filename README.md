@@ -12,6 +12,7 @@
 | [client/xiaoban-realbot](client/xiaoban-realbot/README.md) | 规划 | 实体机器人客户端，平台与硬件待定 |
 | [services/xiaban-api/backend](services/xiaban-api/backend/README.md) | 已实现 | Ktor 后端、业务、数据与后台任务 |
 | [services/xiaban-api/api-contracts](services/xiaban-api/api-contracts/README.md) | 已实现 | 原 shared，按业务分包的 KMP 接口库 |
+| [services/server-pan](services/server-pan/README.md) | 已实现 | PanDown 自托管网盘，Rust Axum + SQLite 后端与 React 前端，独立于主 API |
 | [services/server-asr](services/server-asr/README.md) | 规划 | 语音识别服务 |
 | [services/server-edgetts](services/server-edgetts/README.md) | 规划 | Edge TTS 服务，现有语音功能仍在主后端 |
 | [services/server-websearch](services/server-websearch/README.md) | 规划 | 搜索能力服务 |
@@ -20,7 +21,8 @@
 client/                         面向用户的独立应用
 services/xiaban-api/backend/     Gradle :backend
 services/xiaban-api/api-contracts/ Gradle :api-contracts，JVM + iOS
-services/server-*/               规划中的独立能力服务
+services/server-pan/             独立网盘服务：backend（Cargo）+ frontend（npm）
+services/server-*/               其余规划中的独立能力服务
 infra/                          Compose、Nginx 与环境模板
 tools/                          仓库开发辅助工具
 docs/                           产品、架构、部署与设计资料
@@ -43,10 +45,13 @@ npm --prefix client/xiaoban-desktop-wallpaper run desktop
 ./gradlew :api-contracts:jvmTest :backend:test
 ./gradlew :backend:run
 ./gradlew :backend:installDist
+npm --prefix services/server-pan/frontend ci
+npm --prefix services/server-pan/frontend run build
+cargo build --release --manifest-path services/server-pan/backend/Cargo.toml
 python -X utf8 tools/check-layout.py
 ```
 
-Windows 使用 gradlew.bat；Kotlin 服务需要 JDK 21。后端分发输出在 services/xiaban-api/backend/build/install/backend。集成测试使用独立测试数据库和 Redis 第 15 号库；默认在依赖不可用时跳过，XIABAN_REQUIRE_INTEGRATION=true 可要求必须执行，详见后端 README。
+Windows 使用 gradlew.bat；Kotlin 服务需要 JDK 21。网盘服务需要 Rust 1.80+ 与 Node.js 18+，默认端口 55005，运行方式与数据目录要求见其 README；它不接入根 Gradle，也不依赖主 API 的账户与数据库。后端分发输出在 services/xiaban-api/backend/build/install/backend。集成测试使用独立测试数据库和 Redis 第 15 号库；默认在依赖不可用时跳过，XIABAN_REQUIRE_INTEGRATION=true 可要求必须执行，详见后端 README。
 
 部署配置在 [infra](infra/README.md)，说明在 [docs/deployment](docs/deployment/README.md)。容器命令显式指定文件：
 
