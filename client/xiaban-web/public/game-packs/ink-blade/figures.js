@@ -16,15 +16,15 @@
     archer: { thigh: 13, shin: 13, torso: 18, upper: 10, fore: 10, head: 5.2, limbs: [4.6, 3.9, 3.6, 3.1], blade: 0, color: '#33373d', robe: 'hood', headStyle: 'hood', bow: true },
     boss: { thigh: 17, shin: 17, torso: 25, upper: 13, fore: 12, head: 6.2, limbs: [7, 5.8, 6, 4.8], blade: 56, bladeW: 3.2, color: '#0f1012', robe: 'long', hat: 'veil', mask: true, sleeves: true },
     ronin: { thigh: 13, shin: 13, torso: 18, upper: 10, fore: 9.5, head: 5.6, limbs: [5.4, 4.4, 4.2, 3.6], blade: 32, bladeW: 3.2, color: '#24262b', robe: 'straw', hat: 'douli' },
-    spearman: { thigh: 14, shin: 14, torso: 22, upper: 12, fore: 11, head: 5.6, limbs: [6.2, 5.2, 5.2, 4.2], blade: 0, color: '#1b1d22', robe: 'armor', hat: 'helmet', spear: true },
-    hammer: { thigh: 16, shin: 15, torso: 26, upper: 14, fore: 13, head: 7.2, limbs: [8.5, 7.2, 7.5, 6.2], blade: 0, color: '#202228', robe: 'vest', headStyle: 'blob', hammer: true },
-    angler: { thigh: 16, shin: 16, torso: 24, upper: 12, fore: 11, head: 6.2, limbs: [6.2, 5.2, 5.4, 4.4], blade: 0, color: '#121316', robe: 'straw', hat: 'douli', beard: true, rod: true },
+    spearman: { thigh: 14, shin: 14, torso: 22, upper: 12, fore: 11, head: 5.6, limbs: [6.2, 5.2, 5.2, 4.2], blade: 0, color: '#1b1d22', robe: 'armor', hat: 'helmet', spear: true, grip: { span: 13 } },
+    hammer: { thigh: 16, shin: 15, torso: 26, upper: 14, fore: 13, head: 7.2, limbs: [8.5, 7.2, 7.5, 6.2], blade: 0, color: '#202228', robe: 'vest', headStyle: 'blob', hammer: true, grip: { span: 11 } },
+    angler: { thigh: 16, shin: 16, torso: 24, upper: 12, fore: 11, head: 6.2, limbs: [6.2, 5.2, 5.4, 4.4], blade: 0, color: '#121316', robe: 'straw', hat: 'douli', beard: true, rod: true, grip: { span: 12 } },
   }
 
-  const POSE_KEYS = ['lean', 'crouch', 'l1', 'b1', 'l2', 'b2', 'ou', 'of', 'sw', 'reach', 'head', 'rot', 'bob', 'draw', 'air', 'flutter']
+  const POSE_KEYS = ['lean', 'crouch', 'l1', 'b1', 'l2', 'b2', 'ou', 'of', 'sw', 'reach', 'head', 'rot', 'bob', 'draw', 'air', 'flutter', 'wrist']
 
   function basePose() {
-    return { lean: 0.06, crouch: 1, l1: 0.18, b1: 0.3, l2: -0.16, b2: 0.22, ou: 0.1, of: -0.4, sw: 2.45, reach: 0.75, head: 0, rot: 0, bob: 0, draw: 0, air: 0, flutter: 0 }
+    return { lean: 0.06, crouch: 1, l1: 0.18, b1: 0.3, l2: -0.16, b2: 0.22, ou: 0.1, of: -0.4, sw: 2.45, reach: 0.75, head: 0, rot: 0, bob: 0, draw: 0, air: 0, flutter: 0, wrist: 0 }
   }
 
   function createAnim(entity) {
@@ -77,8 +77,8 @@
     }
     if (!p.onGround) {
       t.air = 1
-      if (p.vy < 0) Object.assign(t, { lean: 0.14, l1: 0.75, b1: 1.35, l2: -0.12, b2: 0.85, sw: 3.3, reach: 0.85, ou: -0.5, of: -1 })
-      else Object.assign(t, { lean: 0.05, l1: 0.35, b1: 0.75, l2: -0.32, b2: 0.55, sw: 2.85, reach: 0.85, ou: 2.1, of: 2.5 })
+      if (p.vy < 0) Object.assign(t, { lean: 0.14, l1: 0.75, b1: 1.35, l2: -0.12, b2: 0.85, sw: 3.0, reach: 0.85, ou: -0.5, of: -1, wrist: -0.35 })
+      else Object.assign(t, { lean: 0.05, l1: 0.35, b1: 0.75, l2: -0.32, b2: 0.55, sw: 2.6, reach: 0.85, ou: 2.1, of: 2.5, wrist: -0.5 })
       if (anim.flip > 0) t.rot = (1 - anim.flip) * TAU
       if (anim.parry > 0) { t.sw = -1.25; t.reach = 1 }
       return t
@@ -87,12 +87,13 @@
       runLegs(t, anim.phase, clamp(speed / 240, 0.35, 1))
       t.lean = 0.24 + t.flutter * 0.12
       t.crouch = 2
-      t.sw = 2.78; t.reach = 0.85
+      t.sw = 2.55; t.reach = 0.85; t.wrist = -0.42
       t.ou = -Math.sin(anim.phase) * 0.9; t.of = t.ou - 0.9
     } else {
       const breathe = Math.sin(time * 1.8)
       t.lean = 0.06 + breathe * 0.02
       t.crouch = 1.2 + breathe * 0.6
+      t.sw = 0.95; t.reach = 0.9; t.wrist = -0.28
     }
     if (anim.parry > 0) { t.sw = -1.25; t.reach = 1; t.lean = -0.12 }
     return t
@@ -117,7 +118,8 @@
     if (e.type === 'shield') { t.ou = 0.95; t.of = 1.45; t.lean = 0.22 }
     if (e.type === 'spearman') { t.sw = -0.15; t.reach = 1.1; t.lean = 0.28 }
     if (e.type === 'hammer') { t.sw = -0.6; t.reach = 0.95; t.lean = 0.25; t.crouch = 4 }
-    if (e.type === 'ronin') { t.lean = 0.42; t.crouch = 3.5 }
+    if (e.type === 'ronin') { t.lean = 0.42; t.crouch = 3.5; t.sw = 1.2; t.wrist = -0.35 }
+    if (e.type === 'puppet' || e.type === 'shield') t.wrist = -0.25
     switch (e.state) {
       case 'spawn':
         t.crouch = 8; t.lean = 0.6
@@ -365,12 +367,22 @@
     const target = [shoulder[0] + swordDir[0] * armLen * 0.85 + fwd[0] * 2, shoulder[1] + swordDir[1] * armLen * 0.85 + 3]
     const [ex, ey, hx, hy] = ik(shoulder[0], shoulder[1], target[0], target[1], spec.upper, spec.fore)
     const [ox1, oy1] = dir(pose.ou)
-    const offElbow = [shoulder[0] - fwd[0] * 1.5 + ox1 * spec.upper, shoulder[1] + oy1 * spec.upper]
+    const offShoulder = [shoulder[0] - fwd[0] * 1.5, shoulder[1]]
+    let offElbow = [shoulder[0] - fwd[0] * 1.5 + ox1 * spec.upper, shoulder[1] + oy1 * spec.upper]
     const [ox2, oy2] = dir(pose.of)
-    const offHand = [offElbow[0] + ox2 * spec.fore, offElbow[1] + oy2 * spec.fore]
+    let offHand = [offElbow[0] + ox2 * spec.fore, offElbow[1] + oy2 * spec.fore]
+    // One-handed blades hang from a bent wrist; spears, hammers and rods run through both fists.
+    const angle = pose.sw + (pose.wrist || 0)
+    const axis = [Math.cos(angle), Math.sin(angle)]
+    let rear = null
+    if (spec.grip) {
+      rear = [hx - axis[0] * spec.grip.span, hy - axis[1] * spec.grip.span]
+      const [bx, by, rx, ry] = ik(offShoulder[0], offShoulder[1], rear[0], rear[1], spec.upper, spec.fore)
+      offElbow = [bx, by]; offHand = [rx, ry]
+    }
     return {
       hip, neck, shoulder, head, headTilt, up, fwd, front: leg(pose.l1, pose.b1), back: leg(pose.l2, pose.b2),
-      elbow: [ex, ey], hand: [hx, hy], offElbow, offHand, swordDir,
+      elbow: [ex, ey], hand: [hx, hy], offElbow, offHand, offShoulder, swordDir, axis,
     }
   }
 
@@ -548,34 +560,61 @@
     ctx.restore()
   }
 
+  const WRAP = 'rgba(232,224,204,0.82)'
+
+  function fist(ctx, p, r, look, color) {
+    ctx.save()
+    ctx.fillStyle = color
+    ctx.beginPath(); ctx.arc(p[0], p[1], r, 0, TAU); ctx.fill()
+    ctx.restore()
+  }
+
+  // Pale cloth binding on a haft, just ahead of a fist.
+  function binding(ctx, p, axis, look, width, at = 3.2, len = 4.2) {
+    if (look.flash) return
+    ctx.save()
+    ctx.strokeStyle = WRAP; ctx.lineWidth = width
+    ctx.lineCap = 'butt'
+    ctx.beginPath(); ctx.moveTo(p[0] + axis[0] * at, p[1] + axis[1] * at); ctx.lineTo(p[0] + axis[0] * (at + len), p[1] + axis[1] * (at + len)); ctx.stroke()
+    ctx.restore()
+  }
+
   function drawBlade(ctx, spec, s, look, out) {
     if (!spec.blade) return
     const [hx, hy] = s.hand
-    const [dx, dy] = s.swordDir
+    const [dx, dy] = s.axis
     const len = spec.blade, w = spec.bladeW
     const nx = -dy, ny = dx
     const tip = [hx + dx * len, hy + dy * len]
     out.tip = tip
     ctx.save()
-    ctx.lineWidth = 1.6
-    ctx.beginPath(); ctx.moveTo(hx - dx * 5, hy - dy * 5); ctx.lineTo(hx + dx * 1.5, hy + dy * 1.5); ctx.stroke()
-    ctx.lineWidth = 1.4
-    ctx.beginPath(); ctx.moveTo(hx + dx * 1.6 + nx * 3.4, hy + dy * 1.6 + ny * 3.4); ctx.lineTo(hx + dx * 1.6 - nx * 3.4, hy + dy * 1.6 - ny * 3.4); ctx.stroke()
+    // Hilt: a hand-and-a-half grip with its pommel behind the fist and a wrapped middle.
+    ctx.strokeStyle = look.flash ? look.color : '#46392d'; ctx.lineWidth = 2.5
+    ctx.beginPath(); ctx.moveTo(hx - dx * 5, hy - dy * 5); ctx.lineTo(hx + dx * 2.6, hy + dy * 2.6); ctx.stroke()
+    if (!look.flash) {
+      ctx.strokeStyle = WRAP; ctx.lineWidth = 0.8
+      for (let k = -4.6; k <= -2; k += 1.5) { ctx.beginPath(); ctx.moveTo(hx + dx * k + nx * 1.3, hy + dy * k + ny * 1.3); ctx.lineTo(hx + dx * (k + 1.1) - nx * 1.3, hy + dy * (k + 1.1) - ny * 1.3); ctx.stroke() }
+    }
+    ctx.strokeStyle = look.color || spec.color
+    ctx.lineWidth = 1.5
+    ctx.beginPath(); ctx.moveTo(hx + dx * 2.8 + nx * 3.6, hy + dy * 2.8 + ny * 3.6); ctx.lineTo(hx + dx * 2.8 - nx * 3.6, hy + dy * 2.8 - ny * 3.6); ctx.stroke()
+    ctx.fillStyle = look.color || spec.color
     ctx.beginPath()
-    ctx.moveTo(hx + dx * 2 + nx * w / 2, hy + dy * 2 + ny * w / 2)
+    ctx.moveTo(hx + dx * 3.4 + nx * w / 2, hy + dy * 3.4 + ny * w / 2)
     ctx.lineTo(hx + dx * len * 0.86 + nx * w * 0.45, hy + dy * len * 0.86 + ny * w * 0.45)
     ctx.lineTo(tip[0], tip[1])
-    ctx.lineTo(hx + dx * 2 - nx * w / 2, hy + dy * 2 - ny * w / 2)
+    ctx.lineTo(hx + dx * 3.4 - nx * w / 2, hy + dy * 3.4 - ny * w / 2)
     ctx.closePath(); ctx.fill()
     if (!look.flash) {
       ctx.strokeStyle = look.edge || 'rgba(239,231,212,0.75)'
       ctx.lineWidth = 0.55
-      ctx.beginPath(); ctx.moveTo(hx + dx * 4 + nx * w * 0.18, hy + dy * 4 + ny * w * 0.18); ctx.lineTo(hx + dx * len * 0.9, hy + dy * len * 0.9); ctx.stroke()
+      ctx.beginPath(); ctx.moveTo(hx + dx * 5 + nx * w * 0.18, hy + dy * 5 + ny * w * 0.18); ctx.lineTo(hx + dx * len * 0.9, hy + dy * len * 0.9); ctx.stroke()
     }
     if (spec.mask && !look.flash) {
       ctx.strokeStyle = CINNABAR; ctx.lineWidth = 1.2
-      ctx.beginPath(); ctx.moveTo(hx - dx * 5, hy - dy * 5); ctx.quadraticCurveTo(hx - dx * 7, hy - dy * 7 + 5, hx - dx * 6 - 2, hy - dy * 6 + 9); ctx.stroke()
+      ctx.beginPath(); ctx.moveTo(hx - dx * 5, hy - dy * 5); ctx.quadraticCurveTo(hx - dx * 6, hy - dy * 6 + 5, hx - dx * 5 - 2, hy - dy * 5 + 10); ctx.stroke()
     }
+    fist(ctx, [hx - dx * 0.5, hy - dy * 0.5], Math.max(2.1, spec.limbs[3] * 0.62), look, look.color || spec.color)
     ctx.restore()
   }
 
@@ -619,16 +658,17 @@
     return pull
   }
 
+  // Two-handed weapons are drawn before the arms so both fists sit on top of the haft.
   function drawSpear(ctx, spec, s, look, out) {
     const [hx, hy] = s.hand
-    const [dx, dy] = s.swordDir
-    const len = 74, shaftLen = 56
+    const [dx, dy] = s.axis
+    const len = 76, shaftLen = 58, butt = spec.grip.span + 4
     const nx = -dy, ny = dx
     const tip = [hx + dx * len, hy + dy * len]
     out.tip = tip
     ctx.save()
-    ctx.strokeStyle = '#28201a'; ctx.lineWidth = 2.4
-    ctx.beginPath(); ctx.moveTo(hx - dx * 16, hy - dy * 16); ctx.lineTo(hx + dx * shaftLen, hy + dy * shaftLen); ctx.stroke()
+    ctx.strokeStyle = look.flash ? look.color : '#3a2d22'; ctx.lineWidth = 2.5
+    ctx.beginPath(); ctx.moveTo(hx - dx * butt, hy - dy * butt); ctx.lineTo(hx + dx * shaftLen, hy + dy * shaftLen); ctx.stroke()
     if (!look.flash) {
       ctx.fillStyle = CINNABAR
       ctx.beginPath()
@@ -648,35 +688,36 @@
 
   function drawHammer(ctx, spec, s, look, out) {
     const [hx, hy] = s.hand
-    const [dx, dy] = s.swordDir
-    const len = 44
+    const [dx, dy] = s.axis
+    const len = 38, butt = spec.grip.span + 4
     const headX = hx + dx * len, headY = hy + dy * len
-    out.tip = [headX + dx * 14, headY + dy * 14]
+    out.tip = [headX + dx * 10, headY + dy * 10]
     ctx.save()
-    ctx.strokeStyle = '#322c26'; ctx.lineWidth = 3.6
-    ctx.beginPath(); ctx.moveTo(hx - dx * 10, hy - dy * 10); ctx.lineTo(headX, headY); ctx.stroke()
+    ctx.strokeStyle = look.flash ? look.color : '#3b3128'; ctx.lineWidth = 3.4
+    ctx.beginPath(); ctx.moveTo(hx - dx * butt, hy - dy * butt); ctx.lineTo(headX, headY); ctx.stroke()
     ctx.translate(headX, headY)
-    const angle = Math.atan2(dy, dx)
-    ctx.rotate(angle)
-    ctx.fillStyle = look.flash ? look.color : '#40434a'
-    ctx.beginPath(); ctx.roundRect(-6, -18, 22, 36, 3); ctx.fill()
+    ctx.rotate(Math.atan2(dy, dx))
+    ctx.fillStyle = look.flash ? look.color : '#43464d'
+    ctx.beginPath(); ctx.roundRect(-5, -14, 16, 28, 2.5); ctx.fill()
     if (!look.flash) {
-      ctx.strokeStyle = 'rgba(235,228,215,0.3)'; ctx.lineWidth = 0.8
-      ctx.beginPath(); ctx.moveTo(2, -16); ctx.lineTo(14, -16); ctx.moveTo(2, 16); ctx.lineTo(14, 16); ctx.stroke()
+      ctx.fillStyle = 'rgba(30,31,36,0.55)'
+      ctx.fillRect(-5, -14, 3, 28)
+      ctx.strokeStyle = 'rgba(235,228,215,0.32)'; ctx.lineWidth = 0.8
+      ctx.beginPath(); ctx.moveTo(1, -12.5); ctx.lineTo(9.5, -12.5); ctx.moveTo(1, 12.5); ctx.lineTo(9.5, 12.5); ctx.stroke()
     }
     ctx.restore()
   }
 
   function drawRod(ctx, spec, s, look, out) {
     const [hx, hy] = s.hand
-    const [dx, dy] = s.swordDir
-    const rodLen = 58
-    const tipX = hx + dx * rodLen - dy * 6, tipY = hy + dy * rodLen + dx * 6
-    out.tip = [tipX + dx * 40, tipY + dy * 20]
+    const [dx, dy] = s.axis
+    const rodLen = 62, butt = spec.grip.span + 3
+    const tipX = hx + dx * rodLen - dy * 7, tipY = Math.min(1, hy + dy * rodLen + dx * 7)
+    out.tip = [tipX + dx * 40, Math.min(2, tipY + dy * 20)]
     ctx.save()
-    ctx.strokeStyle = '#2b3322'; ctx.lineWidth = 1.8
+    ctx.strokeStyle = look.flash ? look.color : '#3a4630'; ctx.lineWidth = 2
     ctx.beginPath()
-    ctx.moveTo(hx - dx * 6, hy - dy * 6)
+    ctx.moveTo(hx - dx * butt, hy - dy * butt)
     ctx.quadraticCurveTo(hx + dx * rodLen * 0.6, hy + dy * rodLen * 0.6, tipX, tipY)
     ctx.stroke()
     ctx.strokeStyle = look.flash ? look.color : 'rgba(235,230,220,0.7)'; ctx.lineWidth = 0.8
@@ -729,7 +770,7 @@
       ctx.fillStyle = color
     }
 
-    limb(ctx, [s.shoulder, s.offElbow, s.offHand], au * 0.92)
+    if (!spec.grip) limb(ctx, [s.offShoulder, s.offElbow, s.offHand], au * 0.92)
     if (spec.sleeves) drawSleeve(ctx, s.shoulder, s.offElbow, pose, time, seed, true)
     limb(ctx, [s.hip, s.back.knee, s.back.foot], lu)
     ctx.lineWidth = lf
@@ -754,15 +795,27 @@
     if (spec.bow) {
       const pull = drawBow(ctx, s, pose, look, out)
       limb(ctx, [s.shoulder, [lerp(s.shoulder[0], pull[0], 0.5) - 2, lerp(s.shoulder[1], pull[1], 0.5) + 3], pull], af)
+    } else if (spec.grip) {
+      if (spec.spear) drawSpear(ctx, spec, s, look, out)
+      else if (spec.hammer) drawHammer(ctx, spec, s, look, out)
+      else drawRod(ctx, spec, s, look, out)
+      ctx.fillStyle = color; ctx.strokeStyle = color
+      limb(ctx, [s.offShoulder, s.offElbow, s.offHand], au * 0.92)
+      limb(ctx, [s.shoulder, s.elbow, s.hand], au)
+      ctx.lineWidth = af
+      ctx.beginPath(); ctx.moveTo(s.offElbow[0], s.offElbow[1]); ctx.lineTo(s.offHand[0], s.offHand[1]); ctx.stroke()
+      ctx.beginPath(); ctx.moveTo(s.elbow[0], s.elbow[1]); ctx.lineTo(s.hand[0], s.hand[1]); ctx.stroke()
+      binding(ctx, s.hand, s.axis, look, spec.hammer ? 3.8 : 2.8)
+      binding(ctx, s.offHand, s.axis, look, spec.hammer ? 3.8 : 2.8)
+      const r = af * 0.62
+      fist(ctx, s.offHand, r, look, color)
+      fist(ctx, s.hand, r, look, color)
     } else {
       limb(ctx, [s.shoulder, s.elbow, s.hand], au)
       if (spec.sleeves) drawSleeve(ctx, s.shoulder, s.elbow, pose, time, seed, false)
       ctx.lineWidth = af
       ctx.beginPath(); ctx.moveTo(s.elbow[0], s.elbow[1]); ctx.lineTo(s.hand[0], s.hand[1]); ctx.stroke()
-      if (spec.spear) drawSpear(ctx, spec, s, look, out)
-      else if (spec.hammer) drawHammer(ctx, spec, s, look, out)
-      else if (spec.rod) drawRod(ctx, spec, s, look, out)
-      else drawBlade(ctx, spec, s, look, out)
+      drawBlade(ctx, spec, s, look, out)
     }
     ctx.restore()
     const map = (p) => p && [x + p[0] * facing, y + p[1]]

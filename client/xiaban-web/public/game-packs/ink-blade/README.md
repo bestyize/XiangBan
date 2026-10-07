@@ -11,19 +11,20 @@ The design baseline (art style, gameplay, level layout, tuning values and the co
 - Combat: an enemy blade glints cinnabar just before it strikes. Starting a slash inside the parry window (0.16 s on 江湖, 0.24 s on 入门) parries the blow. Ordinary enemies stagger and a fresh slash executes them. Arrows are knocked back and can kill their archer. Shield bearers block frontal hits, so parry them or dash behind them. Moves marked 「危」 cannot be parried; jump or dash through them.
 - The boss has health and posture. Parries fill posture fastest. Once posture breaks, a new slash deals a heavy execution. At half health a second phase adds a phantom dash. Hitting it while it stands guard provokes a fast counter combo.
 - Encounters lock the screen behind ink curtains until every wave is defeated. Score comes from hits, kills, parries and executions, multiplied by the combo, plus clear bonuses for time, remaining health and a flawless run. Score never decreases.
+- 雪江卷 gives every 幅 its own terrain. 寒峰: slash hanging icicles to drop them on enemies below. 古渡: thin ice cracks open under anyone who stands still, so jump or dash out, or leave a rooted enemy in the crack. 冰泽: three runs of slick ice. 芦荡: crouch still in a reed bed to hide, which silences archers, and slash from hiding to ambush. 夜雪: timed gusts push the player, unbraced enemies and arrows after a one-second warning. 独钓: the arena is frozen. See the PRD, section 3.15.
 - Each 幅 awards up to three seals: 过 for clearing, 全 for taking no more than that 幅's hits, and 技 for its own challenge (shown in the HUD while playing). A clear is graded 能品, 妙品, 神品 or 逸品 by score. The select screen paints a cleared 幅 in full, shows the next one as a pale draft and leaves locked ones blank.
 - Death or clearing ends the round and opens the result dialog with the seals, the grade, 分享战绩, 下一幅, 再来一次 and 返回画卷. A shared result's challenge link opens the same 幅 directly as a duel (`?stage=<code>&target=<score>`); beating the score shows 破帖.
 
 ## Files
 
-- `levels.js` — level data (`XiabanInkLevels`): each 卷's world (areas, platforms, tutorial prompts, encounters and their waves) and each 幅 (its window of the world, start, encounters, par time, hit budget, 技 challenge and grade thresholds).
+- `levels.js` — level data (`XiabanInkLevels`): each 卷's world (areas, platforms, tutorial prompts, encounters and their waves, and in 雪江卷 its `icicles`, `thinIce`, `iceZones`, `reeds` and `wind`) and each 幅 (its window of the world, start, encounters, par time, hit budget, 技 challenge and grade thresholds).
 - `rules.js` — the deterministic simulation (`XiabanInkBlade`): player physics, combat, enemy and boss AI, encounters, scoring, seals and grades. It has no DOM access. `client/xiaban-web/src/games/ink-blade/rules.test.ts` runs this exact file.
 - `progress.js` — the save document (`XiabanInkProgress`): validates untrusted saves, records clears and unlocks 幅. Tested by `progress.test.ts`.
-- `art.js` — procedural painting: paper grain, ink-wash mountains with 皴 texture strokes and 点苔 tree dots, bamboo, ground, water, props, splashes, sun and moon. Long parallax layers are split into chunks no wider than 2048 px.
-- `figures.js` — skeletal ink figures with smoothed poses, two-bone sword arms, fluttering robes, the Verlet scarf, crows and straw dummies.
-- `scene.js` — scene composition: time-of-day keyframes along the scroll, parallax layers with bamboo sway, mist, weather (leaves, petals, rain and ripples) and paper post-processing.
+- `art.js` — procedural painting: paper grain, ink-wash mountains with 皴 texture strokes and 点苔 tree dots, bamboo, ground, water, props, splashes, sun and moon. For 雪江卷 it also paints snowfields left as bare paper, snow pine forests, snow-laden rocks, plum boughs and ink clouds. Long parallax layers are split into chunks no wider than 2048 px.
+- `figures.js` — skeletal ink figures with smoothed poses, a bent-wrist one-handed sword grip, two-handed spears, hammers and rods, fluttering robes, the Verlet scarf, crows and straw dummies.
+- `scene.js` — scene composition: time-of-day keyframes along the scroll, parallax layers with bamboo sway, mist, weather (leaves, petals, rain and ripples; depth-layered snow and the blizzard in 雪江卷) and paper post-processing.
 - `fx.js` — effects: dry-brush sword trails, splats, ground stains, seals, rings, sparks, ghosts and the 一笔 stroke.
-- `audio.js` — Web Audio synthesis: steel and ink effects, a generative pentatonic pluck line, combat drums and rain. Sound is off by default.
+- `audio.js` — Web Audio synthesis: steel and ink effects, a generative pentatonic pluck line, combat drums, rain, and in 雪江卷 a wind bed, ice chimes, footsteps on snow and ice, and the crack of the ice wave. Sound is off by default.
 - `game.js` — the controller: host protocol, input, round lifecycle, event-driven effects, rendering and HUD.
 
 ## Host
