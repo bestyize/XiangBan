@@ -106,7 +106,8 @@ h1 { margin: 0; font-size: clamp(30px, 4.2vw, 44px); line-height: 1.15; font-wei
 .primary-button:active { transform: translateY(1px) scale(.98); box-shadow: 0 4px 12px rgba(228, 96, 74, .4), inset 0 1px 0 rgba(255, 255, 255, .45); }
 .primary-button:focus-visible { outline-color: var(--indigo); }
 @media (hover: hover) { .primary-button:hover { box-shadow: 0 10px 26px rgba(228, 96, 74, .52), inset 0 1px 0 rgba(255, 255, 255, .5); } }
-#startButton { flex: 1; }
+/* All three buttons keep their natural width and sit together as one tidy row. */
+#startButton { flex: 0 0 auto; }
 .text-toggle { min-height: 44px; padding: 0 8px; font-size: 14px; color: var(--muted); border-bottom: 1px solid rgba(42, 40, 80, .2); border-radius: 0; white-space: nowrap; }
 .text-toggle[aria-pressed="true"] { color: var(--coral-deep); border-color: var(--coral-deep); }
 .welcome-foot { margin: 14px 0 0; font-size: 11px; letter-spacing: .08em; color: var(--muted); }
@@ -188,7 +189,7 @@ h1 { margin: 0; font-size: clamp(30px, 4.2vw, 44px); line-height: 1.15; font-wei
   .welcome-description { margin: 4px 0 8px; font-size: 11px; line-height: 1.55; }
   .welcome-description br { display: none; }
   .welcome-actions { gap: 6px; flex-wrap: nowrap; }
-  #startButton { flex: 1 1 auto; padding: 6px 12px; white-space: nowrap; }
+  #startButton { flex: 0 0 auto; padding: 6px 12px; white-space: nowrap; }
   #welcomeAssist, #welcomeSound { flex: 0 0 auto; min-width: 0; }
   /* Compact grid: title across the top, description beside the how-to, buttons across the bottom. */
   .welcome-card { display: grid; grid-template-columns: 1fr auto; grid-template-areas: 'kicker kicker' 'title title' 'desc howto' 'actions actions'; column-gap: 12px; row-gap: 0; align-content: center; width: min(470px, 54%); }
