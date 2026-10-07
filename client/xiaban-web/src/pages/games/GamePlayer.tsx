@@ -7,6 +7,7 @@ import { api, getToken } from '../../api/client.ts'
 import { storage } from '../../lib/storage.ts'
 import { track } from '../../lib/track.ts'
 import { useProfile } from '../../lib/session.tsx'
+import { loadGameSave, storeGameSave, validSave, type GameSave } from '../../games/common/saves.ts'
 import { ownResultPath } from '../../games/common/share.ts'
 import { resultGame } from '../../games/index.ts'
 
@@ -44,6 +45,25 @@ export default function GamePlayer() {
   const iframeRef = useRef<HTMLIFrameElement>(null)
   const roundRef = useRef<Round | null>(null)
   const [recordError, setRecordError] = useState<string | null>(null)
+  const registered = profile.accountType === 'registered'
+  // Packs that keep progress only start once their save is loaded, so an empty save never overwrites real progress.
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle')
+  const [saveAttempt, setSaveAttempt] = useState(0)
+  const saveRef = useRef<GameSave | null>(null)
+  const pendingSaveRef = useRef<GameSave | null>(null)
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const packRef = useRef<GamePackManifest | null>(null)
+  packRef.current = pack
+
+  useEffect(() => {
+    if (!pack?.save || !allowed) return
+    let cancelled = false
+    setSaveStatus('loading')
+    loadGameSave(gameId, registered)
+      .then((data) => { if (!cancelled) { saveRef.current = data; setSaveStatus('ready') } })
+      .catch(() => { if (!cancelled) setSaveStatus('error') })
+    return () => { cancelled = true }
+  }, [pack?.save, allowed, gameId, registered, saveAttempt])
 
   useEffect(() => { if (pack) document.title = `${pack.name}｜相伴` }, [pack])
 
@@ -90,6 +110,17 @@ export default function GamePlayer() {
   }, [gameId])
 
   useEffect(() => {
+    function flushSave(keepalive = false) {
+      if (saveTimerRef.current) { clearTimeout(saveTimerRef.current); saveTimerRef.current = null }
+      const data = pendingSaveRef.current
+      if (!data) return
+      pendingSaveRef.current = null
+      saveRef.current = data
+      void storeGameSave(gameId, registered, data, keepalive).catch(() => {
+        pendingSaveRef.current ??= data
+        setRecordError('游戏存档暂未同步，网络恢复后会自动重试。')
+      })
+    }
     async function persist(round: Round, keepalive = false) {
       if (!round.id) return
       if (!getToken()) {
@@ -127,6 +158,12 @@ export default function GamePlayer() {
       ) return
 
       if (data.type === 'game.ready') setReady(true)
+      if (data.type === 'game.save') {
+        if (!packRef.current?.save || !validSave(data.data)) return
+        pendingSaveRef.current = data.data
+        if (!saveTimerRef.current) saveTimerRef.current = setTimeout(() => flushSave(), 800)
+        return
+      }
       if (data.type === 'game.share') {
         const game = resultGame(gameId)
         const result = game?.parse(data.result) ?? null
@@ -169,10 +206,18 @@ export default function GamePlayer() {
     }
 
     window.addEventListener('message', receiveMessage)
-    const hide = () => { if (document.visibilityState === 'hidden' && roundRef.current) void persist(roundRef.current, true) }
+    const hide = () => {
+      if (document.visibilityState !== 'hidden') return
+      if (roundRef.current) void persist(roundRef.current, true)
+      flushSave(true)
+    }
     document.addEventListener('visibilitychange', hide)
-    return () => { window.removeEventListener('message', receiveMessage); document.removeEventListener('visibilitychange', hide); if (roundRef.current) finish(roundRef.current) }
-  }, [navigate, nonce, gameId, profile.inviteCode])
+    return () => {
+      window.removeEventListener('message', receiveMessage); document.removeEventListener('visibilitychange', hide)
+      if (roundRef.current) finish(roundRef.current)
+      flushSave(true)
+    }
+  }, [navigate, nonce, gameId, profile.inviteCode, registered])
 
   function initializeGame() {
     iframeRef.current?.contentWindow?.postMessage({
@@ -181,8 +226,11 @@ export default function GamePlayer() {
       type: 'host.init',
       nonce,
       safeArea: gameSafeArea(),
+      ...(pack?.save ? { save: saveRef.current } : {}),
     }, '*')
   }
+
+  const waitingForSave = Boolean(pack?.save) && saveStatus !== 'ready'
 
   return (
     <div className={'game-stage' + (pack?.orientation === 'landscape' ? ' game-stage-landscape' : '')}>
@@ -193,6 +241,15 @@ export default function GamePlayer() {
             返回游戏广场
           </button>
         </main>
+      ) : pack && allowed && saveStatus === 'error' ? (
+        <main className="game-stage-message">
+          <p role="alert" className="text-sm text-blush">游戏存档暂时读不到，为免覆盖进度，先不开局。</p>
+          <button type="button" className="mt-4 text-sm text-lamp" onClick={() => setSaveAttempt((value) => value + 1)}>
+            重新读取存档
+          </button>
+        </main>
+      ) : pack && allowed && waitingForSave ? (
+        <p className="game-stage-message text-sm text-window/55" role="status">正在读取存档…</p>
       ) : pack && allowed ? (
         <>
           {!ready && <div className="game-stage-loading" role="status">正在加载游戏…</div>}

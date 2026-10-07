@@ -4,6 +4,7 @@
 
   const art = globalThis.XiabanInkArt
   const rules = globalThis.XiabanInkBlade
+  const WORLD = globalThis.XiabanInkLevels.volume(1)
   const { INK } = art
   const GROUND = rules.GROUND
   const WATER = [3330, 4230]
@@ -66,7 +67,7 @@
   function build(o) {
     const { P, viewW } = o
     const r = (f) => Math.max(0.6, P * f)
-    const span = (f) => rules.LEVEL_END * f + viewW + 260
+    const span = (f) => WORLD.length * f + viewW + 260
     const a = { P, viewW }
     a.grain = art.paperGrain(256)
     a.vignette = art.vignette(o.width, o.height)
@@ -82,7 +83,7 @@
     a.gate = art.gate(r(1)); a.lantern = art.lantern(r(1)); a.stele = art.stele(r(1)); a.shrine = art.shrine(r(0.9))
     a.tree0 = art.deadTree(r(0.9), 3, 1); a.tree1 = art.deadTree(r(0.9), 8, 0.8); a.tree2 = art.deadTree(r(0.9), 13, 1.15)
     a.pine = art.pine(r(0.9), 21); a.pillar = art.pillar(r(1), 4)
-    a.platforms = rules.PLATFORMS.map((p, i) => p.x >= WATER[0] && p.x < WATER[1]
+    a.platforms = WORLD.platforms.map((p, i) => p.x >= WATER[0] && p.x < WATER[1]
       ? { p, s: art.bridge(p.w, p.y, GROUND, r(1), 30 + i) }
       : { p, s: art.rock(p.w, p.y, GROUND, 40 + i, r(1)) })
     a.splats = [0, 1, 2, 3, 4, 5].map((i) => art.splat(100 + i, 128))
@@ -127,7 +128,7 @@
     if (e.sun > 0.01) {
       const size = 96 * P
       const x = (cam.viewW * 0.74 - cam.left * 0.03) * P
-      const y = (64 + cam.left / rules.LEVEL_END * 70 - cam.top) * P
+      const y = (64 + cam.left / WORLD.length * 70 - cam.top) * P
       ctx.globalAlpha = e.sun * 0.92
       ctx.drawImage(a.sun, x - size / 2, y - size / 2, size, size)
     }

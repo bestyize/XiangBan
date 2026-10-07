@@ -15,16 +15,29 @@
   const params = new URLSearchParams(location.search)
   const nonce = params.get('hostNonce')
   const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches
+  const LV = globalThis.XiabanInkLevels
+  const PROGRESS = globalThis.XiabanInkProgress
+  const WORLD = LV.volume(1)
   const GAME_ID = 'ink-blade'
   const STEP = 1 / 60
   const CINNABAR = '#b8322a'
-  const BOSS_ENCOUNTER = rules.ENCOUNTERS.length - 1
+  const LOCAL_SAVE = 'xiaban.ink-blade.save'
+  const hosted = Boolean(nonce) && window.parent !== window
+
+  // A shared result can open one 幅 as a duel ("切磋帖"), with the friend's score to beat.
+  const duel = (() => {
+    const code = Number(params.get('stage'))
+    const level = Number.isInteger(code) ? LV.levelByCode(code) : null
+    const target = Number(params.get('target'))
+    return level ? { level: level.id, target: Number.isInteger(target) && target > 0 && target <= 1e9 ? target : 0 } : null
+  })()
 
   let touchUI = matchMedia('(any-pointer: coarse)').matches
   gameNode.classList.toggle('touch', touchUI)
+  let save = PROGRESS.empty(), saveApplied = false, currentLevel = duel ? duel.level : '1-1'
   let difficulty = params.get('difficulty') === 'easy' ? 'easy' : 'normal'
-  let state = rules.createGame({ difficulty }), phase = 'welcome'
-  let best = 0, reachedBoss = false, resultDelay = 0
+  let state = rules.createGame({ difficulty, level: currentLevel }), phase = 'welcome'
+  let resultDelay = 0, duelRound = false
   let view = null, preferredRotation = 1, width = 0, height = 0, dpr = 1, k = 1, viewW = 0, viewH = 0, worldTop = 0
   let assets = null, assetKey = '', rebuildTimer = 0, quality = 1, frameCost = 0, frameSamples = 0
   let hostReady = false, roundStarted = false, roundPosted = false, resultPosted = false
@@ -69,9 +82,35 @@
     if (data.type === 'host.layout') return
     if (hostReady) { postToHost('game.ready'); return }
     hostReady = true
+    if (Object.hasOwn(data, 'save')) applySave(data.save)
     postToHost('game.ready')
     syncRound()
   })
+
+  // ------------------------------------------------------------ save
+
+  function applySave(raw) {
+    if (saveApplied) return
+    saveApplied = true
+    save = PROGRESS.normalize(raw)
+    if (!params.has('difficulty')) difficulty = save.difficulty
+    syncDifficulty()
+    refreshWelcome()
+    if (phase === 'select') renderSelect()
+  }
+
+  /** Hosted packs hand the save to the website, which keeps it in the account or this browser. */
+  function persistSave() {
+    save = { ...save, difficulty }
+    if (hosted) { postToHost('game.save', { data: save }); return }
+    try { localStorage.setItem(LOCAL_SAVE, JSON.stringify(save)) } catch { /* Opened directly without storage. */ }
+  }
+
+  if (!hosted) {
+    let stored = null
+    try { stored = JSON.parse(localStorage.getItem(LOCAL_SAVE) || 'null') } catch { /* Storage is optional. */ }
+    queueMicrotask(() => applySave(stored))
+  }
 
   // ------------------------------------------------------------ layout
 
@@ -212,7 +251,7 @@
   }
 
   function activeDialog() {
-    return phase === 'paused' ? $('pauseOverlay') : phase === 'result' ? $('resultOverlay') : phase === 'welcome' ? $('welcome') : null
+    return { paused: $('pauseOverlay'), result: $('resultOverlay'), welcome: $('welcome'), select: $('selectOverlay') }[phase] || null
   }
 
   document.addEventListener('keydown', (event) => {
@@ -228,6 +267,7 @@
       return
     }
     const key = event.key.toLowerCase()
+    if (key === 'escape' && phase === 'select') { event.preventDefault(); backToWelcome(); return }
     if (key === 'escape' || key === 'p') { if (phase === 'playing') { event.preventDefault(); pause() } return }
     if (phase !== 'playing') return
     const action = KEYS[key]
@@ -343,18 +383,21 @@
 
   function setOverlays(name) {
     $('welcome').hidden = name !== 'welcome'
+    $('selectOverlay').hidden = name !== 'select'
     $('pauseOverlay').hidden = name !== 'paused'
     $('resultOverlay').hidden = name !== 'result'
     const playing = name === 'playing'
-    $('hud').hidden = name === 'welcome'
+    $('hud').hidden = name === 'welcome' || name === 'select'
     $('controls').hidden = !playing
     if (!playing) { $('prompt').hidden = true; $('toast').hidden = true }
   }
 
-  function startRound(start = 'scroll') {
+  function startRound(levelId = currentLevel, asDuel = false) {
     audio.resume()
     if (touchUI && !document.fullscreenElement) void requestImmersive(false)
-    state = rules.createGame({ difficulty, start })
+    currentLevel = LV.level(levelId) ? levelId : '1-1'
+    duelRound = asDuel && Boolean(duel) && duel.level === currentLevel
+    state = rules.createGame({ difficulty, level: currentLevel, seenPrompts: save.prompts })
     resultDelay = 0
     globalThis.XiabanResultShare?.reset()
     phase = 'playing'; roundStarted = true; roundPosted = false; resultPosted = false
@@ -364,11 +407,109 @@
     setOverlays('playing')
     $('bossBar').hidden = true
     $('areaTitle').hidden = true
-    for (const id of ['startButton', 'restartButton', 'bossButton']) $(id).blur()
-    if (start === 'boss') { reachedBoss = true; toast('直面无常 · 积分从零计起', 2200) }
+    if (document.activeElement instanceof HTMLElement) document.activeElement.blur()
+    if (duelRound && duel.target) toast('切磋 · 超过 ' + duel.target + ' 分即破帖', 2400)
     updateHUD(true)
     syncRound()
     audio.play('ui')
+  }
+
+  // ------------------------------------------------------------ welcome & scroll select
+
+  function levelLabel(level) { return level.scroll ? WORLD.name + ' · 长卷' : WORLD.name + ' · ' + level.sub }
+  function hurtText(level) { return level.hurt === 0 ? '无伤' : '受伤不超过 ' + level.hurt + ' 次' }
+
+  function refreshWelcome() {
+    $('welcomeProgress').textContent = WORLD.name + ' · 已得 ' + PROGRESS.sealCount(save, WORLD.id) + ' / ' + PROGRESS.maxSeals(WORLD.id) + ' 印'
+    const level = duel && LV.level(duel.level)
+    $('duelBanner').hidden = !level
+    if (level) $('duelText').textContent = '朋友邀你切磋「' + level.name + '」' + (duel.target ? '：超过 ' + duel.target + ' 分' : '')
+    $('startLabel').textContent = level ? '应战' : '入卷'
+  }
+
+  function openSelect() {
+    phase = 'select'
+    resetInput()
+    setOverlays('select')
+    renderSelect()
+    const target = $('levelStrip').querySelector('[data-current="true"]') || $('levelStrip').querySelector('button:not(:disabled)')
+    target?.scrollIntoView({ inline: 'center', block: 'nearest' })
+    target?.focus({ preventScroll: true })
+  }
+
+  function backToWelcome() {
+    phase = 'welcome'
+    state = rules.createGame({ difficulty, level: currentLevel })
+    camera.x = cameraTarget()
+    setOverlays('welcome')
+    refreshWelcome()
+    $('startButton').focus({ preventScroll: true })
+  }
+
+  const el = (tag, className, text) => {
+    const node = document.createElement(tag)
+    if (className) node.className = className
+    if (text !== undefined) node.textContent = text
+    return node
+  }
+
+  function sealRow(mask, fresh = 0) {
+    const row = el('span', 'seal-row')
+    for (const seal of LV.SEALS) {
+      const mark = el('i', 'mini-seal' + (mask & seal.bit ? ' on' : '') + (fresh & seal.bit ? ' fresh' : ''), seal.char)
+      mark.setAttribute('aria-hidden', 'true')
+      row.append(mark)
+    }
+    return row
+  }
+
+  function renderSelect() {
+    const total = PROGRESS.sealCount(save, WORLD.id), max = PROGRESS.maxSeals(WORLD.id)
+    $('selectTitle').textContent = WORLD.name
+    $('selectProgress').textContent = total + ' / ' + max + ' 印'
+    const cards = LV.volumeLevels(WORLD.id).map((level) => {
+      const open = PROGRESS.unlocked(save, level.id)
+      const entry = save.levels[level.id]
+      const card = el('button', 'level-card' + (open ? '' : ' locked') + (entry ? ' cleared' : '') + (level.scroll ? ' scroll' : ''))
+      card.type = 'button'
+      card.dataset.level = level.id
+      card.disabled = !open
+      card.setAttribute('role', 'listitem')
+      if (level.id === currentLevel) card.dataset.current = 'true'
+      const thumb = el('canvas', 'level-thumb')
+      thumb.width = 300; thumb.height = 170
+      thumb.setAttribute('aria-hidden', 'true')
+      card.append(thumb, el('small', 'level-sub', level.sub), el('strong', 'level-name', level.name))
+      if (open) {
+        card.append(sealRow(entry ? entry.seals : 0))
+        card.append(el('span', 'level-best', entry ? LV.GRADES[entry.grade] + ' · ' + entry.best + ' 分' : '未曾入画'))
+        card.append(el('span', 'level-goal', '全 · ' + hurtText(level) + '　技 · ' + level.challenge.text))
+        const seals = entry ? LV.SEALS.filter((seal) => entry.seals & seal.bit).length : 0
+        card.setAttribute('aria-label', level.sub + level.name + '，已得 ' + seals + ' 枚印' + (entry ? '，最佳' + LV.GRADES[entry.grade] + ' ' + entry.best + ' 分' : '，尚未通过'))
+        card.addEventListener('click', () => startRound(level.id))
+        queueMicrotask(() => drawThumb(thumb, level, Boolean(entry)))
+      } else {
+        card.append(el('span', 'level-lock', level.scroll ? '通过「无常」后展开' : '通过上一幅后展开'))
+        card.setAttribute('aria-label', level.sub + level.name + '，尚未展开')
+      }
+      return card
+    })
+    $('levelStrip').replaceChildren(...cards)
+  }
+
+  // A finished 幅 is painted in full; an open one is a pale draft; a locked one stays blank paper (CSS only).
+  function drawThumb(node, level, cleared) {
+    if (!assets) return
+    const g = node.getContext('2d')
+    const P = node.height / 360
+    const viewWidth = node.width / P
+    const left = Math.max(0, Math.min(WORLD.length - viewWidth, (level.boss ? level.start + 220 : level.start + 260) - viewWidth / 2))
+    const cam = { left, top: rules.GROUND + 62 - 360, viewW: viewWidth, viewH: 360, P, width: node.width, height: node.height, sx: 0, sy: 0 }
+    const env = scene.environment(left + viewWidth / 2)
+    scene.drawBackground(g, assets, cam, env, 4)
+    scene.drawGround(g, assets, cam, env, 4)
+    scene.drawPost(g, assets, cam, env, 0)
+    node.classList.toggle('draft', !cleared)
   }
 
   function pause(message = '画卷停在此处，随时可以接着走。') {
@@ -397,31 +538,53 @@
     phase = 'result'
     resetInput()
     const result = rules.result(state)
+    const level = state.level
     const p = state.player
-    const isBest = result.score > best
-    best = Math.max(best, result.score)
-    if (state.encounter >= BOSS_ENCOUNTER) reachedBoss = true
-    const area = rules.AREAS[Math.max(0, state.area)]
-    $('resultSeal').textContent = result.cleared ? '胜' : '败'
+    const outcome = PROGRESS.record(save, result)
+    save = outcome.save
+    persistSave()
+    const area = WORLD.areas[Math.max(0, state.area)]
+    const nextId = result.cleared ? PROGRESS.next(level.id) : null
+    $('resultSeal').textContent = result.cleared ? '品' : '败'
     $('resultSeal').classList.toggle('lose', !result.cleared)
-    $('resultBadge').textContent = (difficulty === 'easy' ? '入门' : '江湖') + (state.start === 'boss' ? ' · 直面无常' : '') + (result.cleared ? ' · 一卷终了' : ' · 止步' + area.name)
-    $('resultTitle').textContent = result.cleared ? (p.damageTaken === 0 ? '片墨不沾身' : result.parries >= 12 ? '剑下无常' : '一剑破无常') : result.kills >= 12 ? '墨尽，意未尽' : '画卷未完'
-    $('resultDescription').textContent = result.cleared ? '斗笠客化作一池淡墨，竹林重归寂静。' : state.encounter >= BOSS_ENCOUNTER ? '无常仍立在月下。朱光一闪，便是出剑之时。' : '提剑再入，' + area.name + '还在等你。'
+    $('resultBadge').textContent = (difficulty === 'easy' ? '入门 · ' : '江湖 · ') + levelLabel(level)
+    $('resultTitle').textContent = result.cleared
+      ? (level.boss || level.scroll ? (p.damageTaken === 0 ? '片墨不沾身' : '一剑破无常') : level.name + ' · ' + (outcome.firstClear ? '入画' : '再临'))
+      : result.kills >= 12 ? '墨尽，意未尽' : '画卷未完'
+    $('resultDescription').textContent = result.cleared
+      ? (level.boss || level.scroll ? '斗笠客化作一池淡墨，竹林重归寂静。' : outcome.firstClear && nextId ? '下一幅「' + LV.level(nextId).name + '」已经展开。' : '墨迹未干，可再求更高一品。')
+      : level.boss ? '无常仍立在月下。朱光一闪，便是出剑之时。' : '提剑再入，' + area.name + '还在等你。'
     $('resultScore').textContent = result.score
+    $('resultGrade').textContent = result.cleared ? LV.GRADES[result.grade] + (outcome.newGrade && !outcome.firstClear ? ' · 新品' : '') : '本局积分'
+    $('resultGrade').classList.toggle('graded', result.cleared)
+    const seals = LV.SEALS.map((seal) => {
+      const item = el('li', 'seal-slot' + (result.seals & seal.bit ? ' on' : '') + (outcome.gained & seal.bit ? ' fresh' : ''))
+      const caption = seal.bit === 1 ? '通关' : seal.bit === 2 ? hurtText(level) : level.challenge.text
+      item.append(el('i', 'mini-seal', seal.char), el('span', 'seal-caption', caption))
+      if (outcome.gained & seal.bit) item.append(el('b', 'seal-new', '新'))
+      return item
+    })
+    $('resultSeals').replaceChildren(...seals)
     $('resultKills').textContent = result.kills
     $('resultCombo').textContent = result.maxCombo
     $('resultParries').textContent = result.parries
     $('resultTime').textContent = formatTime(result.seconds)
     const bonus = state.bonus
     $('resultBonus').textContent = bonus ? '用时 +' + bonus.time + ' · 余血 +' + bonus.hp + (bonus.flawless ? ' · 无伤 +' + bonus.flawless : '') : result.executions ? '处决 ' + result.executions + ' 次' : ''
-    $('bestLabel').textContent = isBest && result.score > 0 ? '本次游玩新高' : '本次游玩最高 ' + best
-    $('bossButton').hidden = !reachedBoss
+    const entry = save.levels[level.id]
+    const duelLine = duelRound && duel.target ? (result.score > duel.target ? '破帖！超过朋友 ' + (result.score - duel.target) + ' 分 · ' : '距破帖还差 ' + (duel.target - result.score + 1) + ' 分 · ') : ''
+    $('bestLabel').textContent = duelLine + (!entry ? '' : outcome.newBest && !outcome.firstClear ? '刷新本幅最佳' : '本幅最佳 ' + LV.GRADES[entry.grade] + ' ' + entry.best + ' 分')
+    $('nextButton').hidden = !nextId
+    if (nextId) $('nextButton').textContent = '下一幅 · ' + LV.level(nextId).name
     setOverlays('result')
     $('hud').hidden = false
-    globalThis.XiabanResultShare?.finish({ gameId: GAME_ID, score: result.score, lines: result.kills, maxTile: result.maxCombo, level: result.cleared ? 1 : 0, steps: result.parries })
+    globalThis.XiabanResultShare?.finish({
+      gameId: GAME_ID, score: result.score, lines: result.kills, maxTile: result.maxCombo, level: result.cleared ? 1 : 0, steps: result.parries,
+      stage: level.code, seals: result.seals, grade: result.grade,
+    })
     syncRound()
     audio.play(result.cleared ? 'victory' : 'defeat')
-    $('restartButton').focus({ preventScroll: true })
+    ;(nextId ? $('nextButton') : $('restartButton')).focus({ preventScroll: true })
   }
 
   async function exitGame() {
@@ -433,9 +596,11 @@
     else window.location.assign('/games')
   }
 
-  $('startButton').addEventListener('click', () => startRound('scroll'))
-  $('restartButton').addEventListener('click', () => startRound('scroll'))
-  $('bossButton').addEventListener('click', () => startRound('boss'))
+  $('startButton').addEventListener('click', () => { if (duel) startRound(duel.level, true); else openSelect() })
+  $('selectBack').addEventListener('click', backToWelcome)
+  $('restartButton').addEventListener('click', () => startRound(currentLevel, duelRound))
+  $('nextButton').addEventListener('click', () => { const nextId = PROGRESS.next(currentLevel); if (nextId) startRound(nextId) })
+  $('mapButton').addEventListener('click', openSelect)
   $('resumeButton').addEventListener('click', resume)
   $('pauseButton').addEventListener('click', () => pause())
   // The shared share script posts to the host; leaving landscape first keeps the portrait page tidy.
@@ -456,9 +621,11 @@
   for (const button of document.querySelectorAll('[data-difficulty]')) button.addEventListener('click', () => {
     difficulty = button.dataset.difficulty === 'easy' ? 'easy' : 'normal'
     syncDifficulty()
+    persistSave()
     audio.play('ui')
   })
   syncDifficulty()
+  refreshWelcome()
 
   // ------------------------------------------------------------ events → ink, sound, HUD
 
@@ -645,6 +812,7 @@
           break
         case 'prompt':
           promptOnce(e.key)
+          save = PROGRESS.rememberPrompt(save, e.key)
           break
         case 'inkReady':
           audio.play('ink')
@@ -709,21 +877,23 @@
 
   function cameraTarget() {
     const half = viewW / 2
-    if (phase === 'welcome') return Math.max(half, state.player.x - viewW * 0.24) + Math.sin(clock * 0.12) * 18
+    if (phase === 'welcome' || phase === 'select') return Math.max(half, state.player.x - viewW * 0.24) + Math.sin(clock * 0.12) * 18
     const p = state.player
     let x = p.x + p.facing * 62 + p.vx * 0.12
     if (state.lock) {
       const [a, b] = state.lock
       x = b - a >= viewW ? Math.max(a + half, Math.min(b - half, x)) : (a + b) / 2
     }
-    return Math.max(half, Math.min(rules.LEVEL_END - half, x))
+    return Math.max(half, Math.min(WORLD.length - half, x))
   }
 
   function surfaceBelow(x, y) {
     let best = rules.GROUND
-    for (const platform of rules.PLATFORMS) if (x >= platform.x && x <= platform.x + platform.w && platform.y >= y - 1 && platform.y < best) best = platform.y
+    for (const platform of WORLD.platforms) if (x >= platform.x && x <= platform.x + platform.w && platform.y >= y - 1 && platform.y < best) best = platform.y
     return best
   }
+
+  const inBossFight = () => Boolean(state.lock) && state.plan[state.encounter]?.id === 'boss'
 
   function shadow(x, y, size) {
     const ground = surfaceBelow(x, y)
@@ -902,14 +1072,26 @@
     scene.drawWeather(ctx, assets, cam, weather, env)
     scene.drawPost(ctx, assets, cam, env, quality)
     FX.drawScreen(ctx, fx, cam)
-    audio.update({ combat: phase === 'playing' && Boolean(state.lock) && state.encounter > 0, boss: phase === 'playing' && Boolean(state.lock) && state.encounter === BOSS_ENCOUNTER, rain: env.rain })
+    audio.update({ combat: phase === 'playing' && Boolean(state.lock) && state.plan[state.encounter]?.id !== 'gate', boss: phase === 'playing' && inBossFight(), rain: env.rain })
   }
 
   // ------------------------------------------------------------ HUD
 
   const hud = { hp: -1, max: -1, ink: -1, score: -1, combo: -1, boss: -1, posture: -1 }
+  function goalText() {
+    const goal = rules.challenge(state)
+    if (goal.stat === 'time') return '技 · ' + formatTime(goal.value) + ' / ' + formatTime(goal.goal)
+    return '技 · ' + state.level.challenge.text + ' ' + Math.min(goal.value, goal.goal) + '/' + goal.goal
+  }
+
   function updateHUD(force = false) {
     const p = state.player
+    const goal = goalText()
+    if (force || goal !== hud.goal) {
+      $('goal').textContent = goal
+      $('goal').classList.toggle('met', rules.challenge(state).met && state.level.challenge.stat !== 'time')
+      hud.goal = goal
+    }
     if (force || p.hp !== hud.hp || p.maxHp !== hud.max) {
       const lost = hud.hp > p.hp && !force ? p.hp : -1
       const pips = []
@@ -945,7 +1127,7 @@
       const hp = Math.round(boss.hp / boss.maxHp * 1000), posture = Math.round(boss.posture)
       if (hp !== hud.boss) { $('bossHp').style.width = hp / 10 + '%'; hud.boss = hp }
       if (posture !== hud.posture) { $('bossPosture').style.width = posture + '%'; hud.posture = posture }
-    } else if (!$('bossBar').hidden && state.encounter !== BOSS_ENCOUNTER) $('bossBar').hidden = true
+    } else if (!$('bossBar').hidden && !inBossFight()) $('bossBar').hidden = true
     gameNode.classList.toggle('boss-fight', !$('bossBar').hidden)
   }
 
@@ -977,7 +1159,21 @@
         if (frameSamples > 180 && frameCost > 14) { quality = 0; resize() }
       }
     }
-    requestAnimationFrame(frame)
+    if (!stepping) requestAnimationFrame(frame)
+  }
+
+  // ?debug=1 exposes a frame stepper, because hidden preview tabs do not run animation frames.
+  let stepping = false
+  if (params.get('debug') === '1') {
+    let debugClock = 0
+    globalThis.__ink = {
+      get state() { return state }, get phase() { return phase }, get save() { return save }, input,
+      freeze: false,
+      advance(seconds, each) {
+        debugClock = Math.max(debugClock, lastFrame)
+        for (let t = 0; t < seconds; t += STEP) { debugClock += STEP * 1000; stepping = true; frame(debugClock); stepping = false; each?.() }
+      },
+    }
   }
 
   resize()

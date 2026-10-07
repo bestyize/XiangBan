@@ -48,6 +48,16 @@ fun Route.featureRoutes(services: Services) {
             call.respond(services.quizzes.save(call.userId(), call.receive<QuizAttemptRecord>()))
         }
         get("/api/games/summary") { call.respond(services.games.summaries(call.userId())) }
+        get("/api/games/saves/{gameId}") {
+            if (services.profiles.view(call.userId()).accountType != "registered")
+                throw ApiException(HttpStatusCode.Forbidden, "login_required", "登录后可以把游戏进度存到账号")
+            call.respond(services.gameSaves.get(call.userId(), call.parameters["gameId"].orEmpty()))
+        }
+        put("/api/games/saves/{gameId}") {
+            if (services.profiles.view(call.userId()).accountType != "registered")
+                throw ApiException(HttpStatusCode.Forbidden, "login_required", "登录后可以把游戏进度存到账号")
+            call.respond(services.gameSaves.put(call.userId(), call.parameters["gameId"].orEmpty(), call.receive<GameSaveRequest>()))
+        }
         get("/api/afterwork") { call.respond(services.afterwork.data(call.userId())) }
         put("/api/afterwork/choices") { call.respond(services.afterwork.choose(call.userId(), call.receive<AfterworkChoice>())) }
         put("/api/afterwork/preferences") { call.respond(services.afterwork.preference(call.userId(), call.receive<AfterworkPreference>())) }

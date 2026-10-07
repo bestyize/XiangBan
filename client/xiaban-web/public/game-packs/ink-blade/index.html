@@ -17,7 +17,7 @@
         <div class="hp" id="hp" role="img" aria-label="墨血"></div>
         <div class="ink-meter" id="inkMeter" role="progressbar" aria-label="墨意" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span class="ink-fill" id="inkFill"></span><small>墨意</small></div>
       </div>
-      <div class="score-block"><strong id="score">0</strong><span id="areaLabel">山门</span></div>
+      <div class="score-block"><strong id="score">0</strong><span id="areaLabel">山门</span><small class="goal" id="goal"></small></div>
       <div class="hud-actions">
         <button class="icon-button" id="flipButton" type="button" aria-label="切换横持方向" title="换一边横持" hidden><svg viewBox="0 0 24 24"><path d="M5 9a7 7 0 0 1 12-3l2 2m0-5v5h-5M19 15a7 7 0 0 1-12 3l-2-2m0 5v-5h5" /></svg></button>
         <button class="icon-button" id="soundButton" type="button" aria-label="开启声音" aria-pressed="false" title="声音"><svg viewBox="0 0 24 24"><path d="M11 5 6 9H3v6h3l5 4V5Z" /><path id="soundWaves" d="m16 9 5 6m0-6-5 6" /></svg></button>
@@ -55,16 +55,27 @@
           <i class="seal big" aria-hidden="true">墨<br>侠</i>
         </div>
         <p class="welcome-description">一卷山水，一人一剑。<br>朱光一闪时出剑，斩断来势。</p>
-        <div class="difficulty" role="group" aria-label="选择难度">
-          <button type="button" class="mode" data-difficulty="easy" aria-pressed="false"><b>入门</b><span>七滴墨血 · 弹反更宽</span></button>
-          <button type="button" class="mode active" data-difficulty="normal" aria-pressed="true"><b>江湖</b><span>五滴墨血 · 原汁原味</span></button>
-        </div>
+        <p class="duel-banner" id="duelBanner" hidden><i class="seal" aria-hidden="true">帖</i><span id="duelText"></span></p>
+        <p class="welcome-progress" id="welcomeProgress">竹林卷 · 已得 0 / 21 印</p>
         <div class="welcome-actions">
-          <button id="startButton" class="primary-button" type="button">入卷 <svg viewBox="0 0 24 24"><path d="M5 12h14m-6-6 6 6-6 6" /></svg></button>
+          <button id="startButton" class="primary-button" type="button"><span id="startLabel">入卷</span> <svg viewBox="0 0 24 24"><path d="M5 12h14m-6-6 6 6-6 6" /></svg></button>
           <button id="welcomeSound" class="text-toggle" type="button" aria-pressed="false">声音 · 关</button>
         </div>
         <p class="welcome-foot"><span class="touch-copy">左手拖动移动 · 右手 斩 跳 闪</span><span class="desktop-copy">A D 移动 · J 斩 · K 跳 · L 闪 · I 一笔</span></p>
       </div>
+    </section>
+
+    <section id="selectOverlay" class="overlay select" role="dialog" aria-modal="true" aria-labelledby="selectTitle" hidden>
+      <header class="select-head">
+        <button class="icon-button" id="selectBack" type="button" aria-label="返回卷首"><svg viewBox="0 0 24 24"><path d="m14 6-6 6 6 6" /></svg></button>
+        <div class="select-title"><h2 id="selectTitle">竹林卷</h2><span id="selectProgress">0 / 21 印</span></div>
+        <div class="difficulty" role="group" aria-label="选择难度">
+          <button type="button" class="mode" data-difficulty="easy" aria-pressed="false"><b>入门</b><span>七滴墨血</span></button>
+          <button type="button" class="mode active" data-difficulty="normal" aria-pressed="true"><b>江湖</b><span>五滴墨血</span></button>
+        </div>
+      </header>
+      <div class="level-strip" id="levelStrip" role="list" aria-label="六幅画与长卷"></div>
+      <p class="select-foot">每幅三枚印：<b>过</b> 通关 · <b>全</b> 少受伤 · <b>技</b> 完成本幅绝技</p>
     </section>
 
     <section id="pauseOverlay" class="overlay scrim" role="dialog" aria-modal="true" aria-labelledby="pauseTitle" hidden>
@@ -73,22 +84,27 @@
 
     <section id="resultOverlay" class="overlay scrim" role="dialog" aria-modal="true" aria-labelledby="resultTitle" hidden>
       <div class="dialog-card result-card">
-        <i class="seal result-seal" id="resultSeal" aria-hidden="true">胜</i>
-        <span class="result-badge" id="resultBadge">一卷终了</span>
-        <h2 id="resultTitle">一剑破无常</h2>
+        <i class="seal result-seal" id="resultSeal" aria-hidden="true">品</i>
+        <span class="result-badge" id="resultBadge">竹林卷 · 第一幅</span>
+        <h2 id="resultTitle">山门</h2>
         <p id="resultDescription"></p>
-        <div class="result-score"><strong id="resultScore">0</strong><span>本局积分</span></div>
+        <div class="result-main">
+          <div class="result-score"><strong id="resultScore">0</strong><span id="resultGrade">本局积分</span></div>
+          <ol class="result-seals" id="resultSeals" aria-label="本幅三枚印"></ol>
+        </div>
         <div class="result-stats"><div><b id="resultKills">0</b><span>击败</span></div><div><b id="resultCombo">0</b><span>最高连击</span></div><div><b id="resultParries">0</b><span>弹反</span></div><div><b id="resultTime">0:00</b><span>用时</span></div></div>
         <p id="resultBonus" class="result-bonus"></p>
         <p id="bestLabel" class="best-label"></p>
         <button id="shareResultButton" class="result-share-button" type="button" hidden>分享战绩 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17 17 7m-8 0h8v8" /></svg></button>
-        <div class="result-actions"><button id="restartButton" class="primary-button secondary-button" type="button">再入画卷</button><button id="bossButton" class="primary-button secondary-button" type="button" hidden>直面无常</button></div>
+        <div class="result-actions"><button id="nextButton" class="primary-button secondary-button" type="button" hidden>下一幅</button><button id="restartButton" class="primary-button secondary-button" type="button">再来一次</button><button id="mapButton" class="primary-button secondary-button" type="button">返回画卷</button></div>
         <button id="resultExit" class="text-button" type="button">返回游戏广场</button>
       </div>
     </section>
   </main>
   <script src="viewport.js"></script>
+  <script src="levels.js"></script>
   <script src="rules.js"></script>
+  <script src="progress.js"></script>
   <script src="art.js"></script>
   <script src="figures.js"></script>
   <script src="scene.js"></script>
