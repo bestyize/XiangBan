@@ -26,6 +26,7 @@ try {
     if (!$taskResult.floatingBefore.floating.visible -or !$taskResult.floatingAfter.floating.visible) { throw '悬浮窗口的前端没有正常显示' }
     if (!$taskResult.wallpaper.wallpaper.isChild -or $taskResult.wallpaper.wallpaper.parentClass -ne 'WorkerW') { throw '壁纸没有挂到 Explorer 的背景窗口' }
     if (!$taskResult.wallpaper.wallpaper.visible) { throw '壁纸前端没有正常显示' }
+    if (!$taskResult.wallpaper.wallpaperGeometry.fillsMonitor) { throw ('壁纸实际绘图区未铺满主屏幕: ' + ($taskResult.wallpaper.wallpaperGeometry | ConvertTo-Json -Compress)) }
     if ($taskResult.wallpaper.floating -or $taskResult.floatingAfter.wallpaper) { throw '切换模式后残留了旧窗口' }
     Write-Output ('PASS: 悬浮 → 壁纸（WorkerW 子窗口）→ 悬浮，三个阶段的前端均已显示。报告: ' + $taskReport)
 } finally {

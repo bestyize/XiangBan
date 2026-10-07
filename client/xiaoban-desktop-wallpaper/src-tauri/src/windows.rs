@@ -4,7 +4,7 @@ use std::{ptr::null_mut, time::Duration};
 use tauri::{Emitter, Manager};
 use windows_sys::Win32::{
     Foundation::{GetLastError, SetLastError, HWND, LPARAM, POINT, RECT},
-    Graphics::Gdi::ScreenToClient,
+    Graphics::Gdi::{ClientToScreen, ScreenToClient},
     UI::{
         HiDpi::GetDpiForWindow,
         Input::KeyboardAndMouse::{GetAsyncKeyState, VK_LBUTTON},
@@ -195,6 +195,28 @@ pub fn start_cursor_bridge(app: tauri::AppHandle) {
     });
 }
 
+// Check the client area in physical screen pixels, not merely the outer HWND
+// rectangle: an undecorated shadow can occupy part of an otherwise full-size window.
+pub fn wallpaper_geometry(window: &tauri::WebviewWindow) -> Result<serde_json::Value, String> {
+    let monitor = window.app_handle().primary_monitor().map_err(|e| e.to_string())?
+        .ok_or("没有主显示器")?;
+    let hwnd = window.hwnd().map_err(|e| e.to_string())?.0 as HWND;
+    let mut client = RECT::default();
+    let mut origin = POINT::default();
+    unsafe {
+        if GetClientRect(hwnd, &mut client) == 0 || ClientToScreen(hwnd, &mut origin) == 0 {
+            return Err(format!("读取壁纸绘图区失败（Windows 错误 {}）", GetLastError()));
+        }
+    }
+    let width = client.right - client.left;
+    let height = client.bottom - client.top;
+    let fills = origin.x == monitor.position().x && origin.y == monitor.position().y
+        && width == monitor.size().width as i32 && height == monitor.size().height as i32;
+    Ok(serde_json::json!({"x":origin.x,"y":origin.y,"width":width,"height":height,
+        "monitor":{"x":monitor.position().x,"y":monitor.position().y,
+        "width":monitor.size().width,"height":monitor.size().height},"fillsMonitor":fills}))
+}
+
 pub fn diagnostics(app: &tauri::AppHandle) -> serde_json::Value {
     let describe = |label| {
         app.get_webview_window(label)
@@ -210,6 +232,8 @@ pub fn diagnostics(app: &tauri::AppHandle) -> serde_json::Value {
                 "isChild": GetWindowLongPtrW(hwnd, GWL_STYLE) & WS_CHILD as isize != 0 })
             })
     };
+    let geometry = app.get_webview_window("wallpaper").and_then(|w| wallpaper_geometry(&w).ok());
     serde_json::json!({"platform": "windows", "wallpaperSupported": true,
-        "mode": super::settings(app).mode, "floating": describe("pet"), "wallpaper": describe("wallpaper")})
+        "mode": super::settings(app).mode, "floating": describe("pet"), "wallpaper": describe("wallpaper"),
+        "wallpaperGeometry":geometry})
 }

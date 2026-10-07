@@ -93,6 +93,9 @@ fn open(
         "小伴 · 动态壁纸"
     })
     .decorations(preview)
+    // Undecorated Windows shadows reserve a non-client frame even as a
+    // WorkerW child, shrinking and offsetting the wallpaper's WebView.
+    .shadow(preview)
     .resizable(preview)
     .skip_taskbar(!preview)
     .visible(false)
@@ -534,7 +537,17 @@ pub async fn smoke(app: &tauri::AppHandle) -> Result<Value, String> {
         if report.get("privilegedIpcBlocked") != Some(&Value::Bool(true)) {
             return Err("壁纸窗口没有隔离桌面接口".into());
         }
-        cases.push(json!({"id":id,"report":report}));
+        let mut case = json!({"id":id,"report":report});
+        #[cfg(windows)]
+        {
+            let window = app.get_webview_window(&label).ok_or("没有背景窗口")?;
+            let geometry = crate::windows::wallpaper_geometry(&window)?;
+            if geometry.get("fillsMonitor") != Some(&Value::Bool(true)) {
+                return Err(format!("壁纸实际绘图区没有铺满主屏幕：{id} {geometry}"));
+            }
+            case["geometry"] = geometry;
+        }
+        cases.push(case);
     }
     let previous = settings(app).wallpaper_id;
     let rejected = apply_wallpaper(

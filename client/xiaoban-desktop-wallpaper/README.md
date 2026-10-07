@@ -94,7 +94,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\smoke-runtime.ps1 -VerifyDown
 node scripts/verify-media.mjs
 ```
 
-角色测试运行本工程的 12 个行为测试，独立于网页与后端业务目录。原生 smoke test 启动生产程序，在悬浮、壁纸、返回悬浮三个阶段检查窗口存在性、前端显示、背景父窗口类别、WS_CHILD 标记和旧窗口清理，输出 `artifacts/smoke-*.json`。桌面 parenting 使用 Explorer 的非公开 WorkerW 协议，需要在不同 Windows 版本上继续验证。
+角色测试运行本工程的 12 个行为测试，独立于网页与后端业务目录。原生 smoke test 启动生产程序，在悬浮、壁纸、返回悬浮三个阶段检查窗口存在性、前端显示、背景父窗口类别、WS_CHILD 标记和旧窗口清理，输出 `artifacts/smoke-*.json`。Windows 的小伴房间与六种媒体壁纸用例同时检查实际客户区的物理尺寸和屏幕原点，要求与主显示器完全一致；壁纸窗口关闭系统阴影，避免无标题栏窗口的边框占用绘图区。桌面 parenting 使用 Explorer 的非公开 WorkerW 协议，需要在不同 Windows 版本上继续验证。
 
 macOS 验证：
 
