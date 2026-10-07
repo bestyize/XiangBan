@@ -4,11 +4,11 @@ Windows / macOS 原型：一个可拖动、透明处点击穿透的悬浮小伴�
 
 本机生产构建实测：Windows x64 EXE 为 3,597,312 字节（约 3.60MB），内嵌前端与两套程序背景，不包含系统 WebView2。原生切换测试已在主屏 2880×1800、175% 缩放下通过，确认壁纸为 WorkerW 子窗口；验证报告位于本地 `artifacts/smoke-*.json`。本地试用文件为 `artifacts/XiaoBan-Windows-x64.exe`，ZIP 包为 `artifacts/XiaoBan-Windows-x64.zip`。
 
-角色直接导入仓库 `web/src/robot` 中的 SVG 渲染器、Animator 和 Mind，保留原来的渐变、发光、连续表情、呼吸、眨眼、耳朵抖动、鼠标跟随、随机点击反应和自动睡眠。`src/pet.ts` 仅适配 DOM 与桌面输入；未复制或重新设计角色。暖光使用原 RobotStage 的尺寸与渐变。
+角色核心在本工程的 `src/companion` 内维护，最初从网页纯角色代码原样复制，保留既有 SVG、发光、表情、弹簧参数和互动行为。允许独立演进，不再导入另一个客户端源码。`src/pet.ts` 适配 DOM 与桌面输入；暖光维持原 RobotStage 的尺寸与渐变。
 
 ## 在 Windows 上运行
 
-需要 Node.js 22.12+（或 24）、Rust MSVC 工具链、Visual Studio C++ 构建工具和 WebView2 Runtime。已有仓库安装依赖的情况下：
+需要 Node.js 22.12+（或 24）、Rust MSVC 工具链、Visual Studio C++ 构建工具和 WebView2 Runtime。在仓库根执行：
 
 ```powershell
 cd client/xiaoban-desktop-wallpaper
@@ -29,7 +29,7 @@ npm run desktop:build
 
 ## 在 macOS 上运行（Apple 芯片）
 
-目标为 macOS 12+、Apple silicon arm64。构建需要 Node.js 24、Rust 和 Xcode Command Line Tools。先安装仓库 `web` 目录的 npm 依赖以运行共用角色测试，然后在本目录执行：
+目标为 macOS 12+、Apple silicon arm64。构建需要 Node.js 24、Rust 和 Xcode Command Line Tools。无需安装网页依赖。在本目录执行：
 
 ```sh
 npm ci
@@ -68,7 +68,7 @@ npm test
 powershell -ExecutionPolicy Bypass -File .\scripts\smoke-test.ps1
 ```
 
-角色测试运行原项目的 13 个行为测试。原生 smoke test 启动生产程序，在悬浮、壁纸、返回悬浮三个阶段检查窗口存在性、前端显示、背景父窗口类别、WS_CHILD 标记和旧窗口清理，输出 `artifacts/smoke-*.json`。桌面 parenting 使用 Explorer 的非公开 WorkerW 协议，需要在不同 Windows 版本上继续验证。
+角色测试运行本工程的 12 个行为测试，独立于网页与后端业务目录。原生 smoke test 启动生产程序，在悬浮、壁纸、返回悬浮三个阶段检查窗口存在性、前端显示、背景父窗口类别、WS_CHILD 标记和旧窗口清理，输出 `artifacts/smoke-*.json`。桌面 parenting 使用 Explorer 的非公开 WorkerW 协议，需要在不同 Windows 版本上继续验证。
 
 macOS 验证：
 
@@ -97,9 +97,13 @@ Mac 实机还需检查：原角色的发光与连续表情、桌宠拖动、空�
 
 ## 代码
 
-- `src/pet.ts`：复用现有角色引擎，DOM 帧更新、真实 SVG 轮廓命中测试。
+- `src/companion`：本应用角色引擎、SVG 和测试；`src/pet.ts`：DOM 帧更新与 SVG 轮廓命中测试。
 - `src/scene.css`：程序绘制的轻量动态背景，无视频资源。
 - `src-tauri/src/main.rs`：控制台、两种窗口生命周期、托盘、命令与诊断。
 - `src-tauri/src/windows.rs`：WorkerW 接入、DPI 坐标转换、只读鼠标采样。
 - `src-tauri/src/macos.rs`：AppKit 窗口层级、空间行为、鼠标逻辑点与桌面点击判断。
 - `src-tauri/src/coordinates.rs`：坐标转换和桌面层判断的独立测试。
+
+## 大仓开发边界
+
+本项目是桌面客户端，不承担网页、账户或后端业务。角色可以有自己的实现，修改角色行为时运行本地 npm test；不引用 client/xiaban-web 或主后端的私有文件。两种窗口模式共用本应用场景，Windows/macOS 接入分文件。新增能力按本次需求，当前无聊天/账号/云端依赖。

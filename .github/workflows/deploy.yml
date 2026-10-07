@@ -65,9 +65,13 @@ jobs:
             --exclude='.git' \
             --exclude='.env' \
             --exclude='.env.*' \
-            --exclude='web/node_modules' \
-            --exclude='web/dist' \
+            --exclude='client/xiaban-web/node_modules' \
+            --exclude='client/xiaban-web/dist' \
             --exclude='**/node_modules' \
+            --exclude='**/target' \
+            --exclude='**/build' \
+            --exclude='**/dist' \
+            --exclude='**/artifacts' \
             --exclude='**/.DS_Store' \
             .
 
@@ -89,7 +93,7 @@ jobs:
           sha="$2"
           mkdir -p "$root/releases/$sha"
           test -f "$root/.env" || {
-            echo "Missing $root/.env. Create it from deploy/.env.production.example before deploying."
+            echo "Missing $root/.env. Create it from infra/deploy/.env.production.example before deploying."
             exit 1
           }
           REMOTE
@@ -103,7 +107,7 @@ jobs:
           tar -xzf "/tmp/xiaban-$sha.tar.gz" -C "$release"
           rm -f "/tmp/xiaban-$sha.tar.gz"
           docker compose version >/dev/null
-          docker compose -p xiaban --env-file "$root/.env" -f "$release/compose.yaml" build
-          docker compose -p xiaban --env-file "$root/.env" -f "$release/compose.yaml" up -d --remove-orphans
-          docker compose -p xiaban --env-file "$root/.env" -f "$release/compose.yaml" ps
+          docker compose -p xiaban --env-file "$root/.env" -f "$release/infra/compose.yaml" build
+          docker compose -p xiaban --env-file "$root/.env" -f "$release/infra/compose.yaml" up -d --remove-orphans
+          docker compose -p xiaban --env-file "$root/.env" -f "$release/infra/compose.yaml" ps
           REMOTE

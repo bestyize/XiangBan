@@ -17,4 +17,6 @@ dependencyResolutionManagement {
 
 rootProject.name = "xiaban"
 
-include(":shared", ":server")
+include(":api-contracts", ":backend")
+project(":api-contracts").projectDir = file("services/xiaban-api/api-contracts")
+project(":backend").projectDir = file("services/xiaban-api/backend")

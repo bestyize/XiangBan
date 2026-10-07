@@ -4,7 +4,6 @@ on:
   pull_request:
     paths:
       - 'client/xiaoban-desktop-wallpaper/**'
-      - 'web/src/robot/**'
       - '.github/workflows/xiaoban-desktop.yml'
   workflow_dispatch:
 
@@ -28,9 +27,7 @@ jobs:
         with:
           node-version: '24'
           cache: npm
-          cache-dependency-path: |
-            web/package-lock.json
-            client/xiaoban-desktop-wallpaper/package-lock.json
+          cache-dependency-path: client/xiaoban-desktop-wallpaper/package-lock.json
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: aarch64-apple-darwin
@@ -41,8 +38,7 @@ jobs:
       - name: Install frontend dependencies
         run: |
           npm ci
-          npm --prefix ../../web ci
-      - name: Validate shared character and coordinates
+      - name: Validate desktop character and coordinates
         run: |
           npm test
           cargo test --manifest-path src-tauri/Cargo.toml --locked

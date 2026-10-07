@@ -10,11 +10,12 @@
     "desktop:build": "tauri build --no-bundle",
     "desktop:macos:build": "tauri build --target aarch64-apple-darwin --bundles app",
     "test:macos": "node scripts/smoke-test.mjs",
-    "test": "node scripts/test.mjs"
+    "test": "vitest run"
   },
   "devDependencies": {
     "@tauri-apps/cli": "2.12.1",
     "typescript": "6.0.3",
-    "vite": "8.3.2"
+    "vite": "8.3.2",
+    "vitest": "5.0.3"
   }
 }
