@@ -103,7 +103,7 @@
           "type": "string",
           "pattern": "^[a-zA-Z0-9_.-]{1,64}$",
           "not": {
-            "anyOf": [{ "const": "companion" }, { "pattern": "^builtin-" }]
+            "anyOf": [{ "const": "companion" }, { "pattern": "^builtin-" }, { "pattern": "^local-" }]
           }
         },
         "version": {

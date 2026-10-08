@@ -291,15 +291,38 @@ export async function mountControl() {
       draft.values[c.key] ??= c.default;
     renderWallpapers();
   }
+  async function importLocal() {
+    if (!desktop) { toast("请在桌面应用中导入图片或视频"); return; }
+    if (busy) return;
+    busy = true;
+    const button = body.querySelector<HTMLButtonElement>("#import-local")!;
+    button.disabled = true;
+    button.textContent = "正在导入…";
+    try {
+      const result = await invoke<{ id: string; library: WallpaperLibrary } | null>("import_local_wallpaper");
+      if (result) {
+        library = result.library;
+        filter = "local";
+        chosen = result.id;
+        draft = clone(wallpaperDefaults);
+        navigate("wallpaper");
+        toast("已保存到我的壁纸，可以预览或应用到桌面");
+      }
+    } finally {
+      busy = false;
+      if (button.isConnected) { button.disabled = false; button.innerHTML = `${icon("folder")}导入图片 / 视频`; }
+    }
+  }
   function renderWallpapers() {
     const entries = library.items.filter(
-      (entry) => filter === "all" || entry.definition.kind === filter,
+      (entry) => filter === "all" || (filter === "local" ? entry.source === "local" : entry.definition.kind === filter),
     );
     body.innerHTML = `<div class="wallpaper-toolbar"><div class="filter-tabs">${[
       ["all", "全部"],
       ["image", "图片"],
       ["video", "视频"],
       ["canvas", "动画"],
+      ["local", "我的导入"],
     ]
       .map(
         ([id, label]) =>
@@ -307,7 +330,7 @@ export async function mountControl() {
       )
       .join(
         "",
-      )}</div><div class="toolbar-actions"><button class="icon-button" id="refresh-library" title="刷新订阅">${icon("refresh")}</button><button class="secondary-button" id="import-manifest">${icon("folder")}导入清单</button><button class="primary-button" id="subscribe">${icon("plus")}添加订阅</button></div></div><div class="wallpaper-layout"><div class="wallpaper-gallery">${filter === "all" ? `<button class="wallpaper-card ${chosen === "companion" ? "selected" : ""}" data-wallpaper="companion"><div class="wallpaper-cover room-cover"><span class="cover-window"></span><span class="cover-moon"></span><span class="cover-desk"></span><span class="wallpaper-type">默认</span>${chosen === "companion" ? `<span class="selection-check">${icon("check")}</span>` : ""}</div><div class="wallpaper-card-info"><b>小伴房间</b><small>跟随小伴的陪伴方式</small></div></button>` : ""}${entries.map((entry) => `<button class="wallpaper-card ${chosen === entry.definition.id ? "selected" : ""}" data-wallpaper="${esc(entry.definition.id)}"><div class="wallpaper-cover ${entry.definition.kind}">${entry.coverUrl ? `<img src="${esc(entry.coverUrl)}" alt="${esc(entry.definition.title)}">` : '<span class="fallback-art">✧</span>'}<span class="wallpaper-type">${kindLabel(entry.definition.kind)}</span>${chosen === entry.definition.id ? `<span class="selection-check">${icon("check")}</span>` : ""}${entry.definition.kind === "video" ? `<span class="video-mark">${icon("play")}</span>` : ""}</div><div class="wallpaper-card-info"><b>${esc(entry.definition.title)}</b><small>${esc(entry.definition.author || "壁纸提供方")}<em>${entry.installed ? "本地可用" : "可下载"}</em></small></div></button>`).join("")}${entries.length === 0 ? '<div class="empty-gallery">暂时没有这一类壁纸，添加订阅或导入清单试试。</div>' : ""}<div class="gallery-note">${icon("download")}下载后的壁纸可离线使用，切换时不打扰桌面图标。</div></div><aside class="wallpaper-inspector" id="wallpaper-inspector"></aside></div>`;
+      )}</div><div class="toolbar-actions"><button class="icon-button" id="refresh-library" title="刷新订阅">${icon("refresh")}</button><button class="icon-button" id="import-manifest" title="导入 JSON 清单" aria-label="导入 JSON 清单">${icon("folder")}</button><button class="secondary-button" id="subscribe">${icon("plus")}添加订阅</button><button class="primary-button" id="import-local">${icon("folder")}导入图片 / 视频</button></div></div><div class="wallpaper-layout"><div class="wallpaper-gallery">${filter === "all" ? `<button class="wallpaper-card ${chosen === "companion" ? "selected" : ""}" data-wallpaper="companion"><div class="wallpaper-cover room-cover"><span class="cover-window"></span><span class="cover-moon"></span><span class="cover-desk"></span><span class="wallpaper-type">默认</span>${chosen === "companion" ? `<span class="selection-check">${icon("check")}</span>` : ""}</div><div class="wallpaper-card-info"><b>小伴房间</b><small>跟随小伴的陪伴方式</small></div></button>` : ""}${entries.map((entry) => `<button class="wallpaper-card ${chosen === entry.definition.id ? "selected" : ""}" data-wallpaper="${esc(entry.definition.id)}"><div class="wallpaper-cover ${entry.definition.kind}">${entry.coverUrl ? `<img src="${esc(entry.coverUrl)}" alt="${esc(entry.definition.title)}">` : '<span class="fallback-art">✧</span>'}<span class="wallpaper-type">${kindLabel(entry.definition.kind)}</span>${chosen === entry.definition.id ? `<span class="selection-check">${icon("check")}</span>` : ""}${entry.definition.kind === "video" ? `<span class="video-mark">${icon("play")}</span>` : ""}</div><div class="wallpaper-card-info"><b>${esc(entry.definition.title)}</b><small>${esc(entry.definition.author || "壁纸提供方")}<em>${entry.installed ? "本地可用" : "可下载"}</em></small></div></button>`).join("")}${entries.length === 0 ? '<div class="empty-gallery">还没有这一类壁纸，导入喜欢的图片、视频，或添加壁纸订阅。</div>' : ""}<div class="gallery-note">${icon("download")}导入会保存原文件副本；推荐 H.264 MP4，壁纸可离线使用。</div></div><aside class="wallpaper-inspector" id="wallpaper-inspector"></aside></div>`;
     body.querySelectorAll<HTMLButtonElement>("[data-filter]").forEach((b) =>
       b.addEventListener("click", () => {
         filter = b.dataset.filter!;
@@ -322,6 +345,7 @@ export async function mountControl() {
     body
       .querySelector("#subscribe")!
       .addEventListener("click", () => sourceDialog("catalog"));
+    body.querySelector("#import-local")!.addEventListener("click", () => task(importLocal));
     body
       .querySelector("#import-manifest")!
       .addEventListener("click", () =>
@@ -423,7 +447,7 @@ export async function mountControl() {
     library.source = url;
     config = await invoke<Settings>("get_settings");
     renderWallpapers();
-    toast(`已同步 ${Math.max(0, library.items.length - 3)} 张订阅壁纸`);
+    toast(`已同步 ${library.items.filter((entry) => entry.source === "subscription").length} 张订阅壁纸`);
   }
   function renderAbout() {
     const platform =
@@ -433,6 +457,10 @@ export async function mountControl() {
           ? "macOS"
           : "浏览器预览";
     body.innerHTML = `<section class="about-hero"><div class="about-art"><div class="about-orbit"></div><div class="about-mark">${icon("pet")}</div><span class="about-star one">✧</span><span class="about-star two">✦</span></div><span class="soft-pill">陪伴，就在桌面上</span><h2>小伴桌面</h2><p>让日常多一点温暖，让桌面多一点喜欢。</p><span class="version-pill">v${esc(info.version)}<i></i>${platform}${info.arch === "aarch64" ? " · Apple 芯片" : info.arch === "x86_64" ? " · 64 位" : ""}</span></section><div class="about-features"><article>${icon("heart")}<h3>随时相伴</h3><p>会回应的小伙伴，安静陪你工作与休息。</p></article><article>${icon("wallpaper")}<h3>桌面里的风景</h3><p>图片、视频与流动的动画，换个心情再出发。</p></article><article>${icon("pet")}<h3>轻盈，不打扰</h3><p>无须注册账号，下载后的壁纸也能离线使用。</p></article></div><section class="update-card"><div class="update-icon">${icon("refresh")}</div><div class="update-copy"><h3>${lastUpdate?.available ? `发现新版本 v${esc(lastUpdate.version)}` : lastUpdate ? "当前版本已是最新" : "让小伴保持新鲜"}</h3><p>${lastUpdate?.available ? "新版本已经准备好了，看看有哪些变化。" : config.updateUrl ? "手动检查更新，继续享受新的陪伴。" : "更新服务地址稍后接入；当前版本已展示在上方。"}</p></div><button class="primary-button" id="check-update">${icon("refresh")}检查更新</button><button class="icon-button" id="update-settings" title="更新服务设置">${icon("settings")}</button></section>${lastUpdate?.available ? `<section class="release-card"><h3>这次更新</h3><p>${esc(lastUpdate.publishedAt ?? "")}</p><pre>${esc(lastUpdate.notes || "新版本体验优化。")}</pre><button class="primary-button" id="download-update">${icon("download")}前往下载</button></section>` : ""}<div class="about-footer"><span>认真陪伴，慢慢变好。</span><span>小伴桌面 · ${esc(info.version)}</span></div>`;
+    if (info.dataDirectory) {
+      body.insertAdjacentHTML("beforeend", `<section class="data-location"><div><b>用户数据目录</b><code title="${esc(info.dataDirectory)}">${esc(info.dataDirectory)}</code><small>设置、导入的壁纸与缓存保存在这里。</small></div><button class="secondary-button" id="open-data">${icon("folder")}打开目录</button></section>`);
+      body.querySelector("#open-data")!.addEventListener("click", () => task(() => invoke("open_data_directory")));
+    }
     body
       .querySelector("#update-settings")!
       .addEventListener("click", () => sourceDialog("update"));
@@ -521,11 +549,16 @@ export async function mountControl() {
             "选一种喜欢的陪伴方式，把日常交给一点温暖。",
           ]
         : page === "wallpaper"
-          ? ["WALLPAPERS", "动态壁纸", "把喜欢的风景，留在你的桌面。"]
+          ? ["", "动态壁纸", ""]
           : ["ABOUT", "关于小伴", "认识你的桌面小伙伴，一起慢慢变好。"];
-    document.querySelector("#eyebrow")!.textContent = text[0];
+    const eyebrow = document.querySelector<HTMLElement>("#eyebrow")!;
+    eyebrow.textContent = text[0];
+    eyebrow.hidden = !text[0];
     document.querySelector("#page-title")!.textContent = text[1];
-    document.querySelector("#page-description")!.textContent = text[2];
+    const description = document.querySelector<HTMLElement>("#page-description")!;
+    description.textContent = text[2];
+    description.hidden = !text[2];
+    document.querySelector(".page-heading")!.classList.toggle("compact", page === "wallpaper");
     if (page === "pet") renderPet();
     else if (page === "wallpaper") renderWallpapers();
     else renderAbout();

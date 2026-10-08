@@ -12,6 +12,8 @@ mod preferences;
 mod startup;
 mod library;
 mod content;
+mod storage;
+mod local_media;
 
 use preferences::{Preferences, Settings};
 use serde::Serialize;
@@ -29,6 +31,7 @@ struct DesktopState {
     wallpaper_parent: Mutex<Option<usize>>,
     ready_scenes: Mutex<HashSet<String>>,
     preferences_path: Mutex<Option<PathBuf>>,
+    data_root: Mutex<Option<PathBuf>>,
     preferences_io: Mutex<()>,
     update_lock: Mutex<()>,
     autostart_initialized: AtomicBool,
@@ -64,13 +67,10 @@ fn persist(app: &tauri::AppHandle, settings: &Settings) -> Result<(), String> {
 
 fn initialize_preferences(app: &tauri::AppHandle) -> Result<(), String> {
     let state = app.state::<DesktopState>();
-    let directory = if state.isolated {
-        std::env::var_os("XIAOBAN_TEST_CONFIG_DIR").map(PathBuf::from)
-            .unwrap_or_else(|| std::env::temp_dir().join(format!("xiaoban-smoke-{}", std::process::id())))
-    } else {
-        app.path().app_config_dir().map_err(|e| e.to_string())?
-    };
-    let path = directory.join("preferences.json");
+    let directory = storage::root(app)?;
+    let legacy = if state.isolated { None } else { Some(app.path().app_config_dir().map_err(|e| e.to_string())?) };
+    storage::initialize(&directory, legacy.as_deref()).map_err(|e| format!("用户数据迁移失败，原数据已保留：{e}"))?;
+    let path = directory.join("config/preferences.json");
     let prefs = match preferences::load(&path) {
         Ok(prefs) => prefs,
         Err(error) => {
@@ -204,9 +204,11 @@ fn open_scene(app: &tauri::AppHandle, mode: &str) -> Result<(), String> {
     );
     #[cfg(target_os = "macos")]
     let builder =
-        builder.background_throttling(tauri::utils::config::BackgroundThrottlingPolicy::Disabled);
+        builder.incognito(true).background_throttling(tauri::utils::config::BackgroundThrottlingPolicy::Disabled);
     // Register the parent with Tao itself. Reparenting only with SetParent would
     // be undone when Tao rewrites window styles on show/cursor-state changes.
+    #[cfg(windows)]
+    let builder = builder.data_directory(storage::webview(&storage::root(app)?));
     #[cfg(windows)]
     let builder = if let Some(parent) = parent {
         builder.parent_raw(::windows::Win32::Foundation::HWND(parent as _))
@@ -610,12 +612,21 @@ fn main() {
     let startup_name = if isolated { format!("XiaoBanStartupSmoke-{startup_id}") }
         else { "XiaoBanDesktop".into() };
     let _test_cleanup = startup::TestEntryGuard(isolated.then(|| startup_name.clone()));
+    let data_root = storage::location(isolated).expect("无法找到用户数据目录");
     let state = DesktopState { startup_name: startup_name.clone(), isolated,
+        data_root: Mutex::new(Some(data_root.clone())),
         startup_allowed: !cfg!(debug_assertions) || isolated, ..Default::default() };
     let mut context = tauri::generate_context!();
     if isolated { context.config_mut().identifier.push_str(".smoke"); }
     else if cfg!(debug_assertions) { context.config_mut().identifier.push_str(".development"); }
+    #[cfg(windows)]
+    for window in &mut context.config_mut().app.windows {
+        window.data_directory = Some(storage::webview(&data_root));
+    }
+    #[cfg(target_os = "macos")]
+    for window in &mut context.config_mut().app.windows { window.incognito = true; }
     let builder = tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_single_instance::init(|app, arguments, _| {
             if !arguments.iter().any(|arg| arg == "--autostart") { let _ = present_control(app); }
         }));
@@ -625,7 +636,7 @@ fn main() {
             scene_ready, set_hit_test, start_drag, hide_control, show_control, quit, get_diagnostics,
             get_startup_status, set_autostart, content::get_wallpaper_library, content::import_wallpaper_catalog,
             content::subscribe_wallpapers, content::apply_wallpaper, content::get_app_info, content::set_update_source,
-            content::check_updates, content::open_download_url]);
+            content::check_updates, content::open_download_url, local_media::import_local_wallpaper, storage::open_data_directory]);
     let app = builder.manage(state).manage(content::ContentState::default())
         .register_uri_scheme_protocol("wallpaper-asset", |context, request| library::serve(context.app_handle(), request))
         .invoke_handler(move |invoke| {

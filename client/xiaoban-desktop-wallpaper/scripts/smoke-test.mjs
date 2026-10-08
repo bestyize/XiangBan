@@ -17,8 +17,8 @@ const fixture = await startWallpaperFixture()
 const startupFile = path.join(os.homedir(), 'Library/LaunchAgents', `XiaoBanStartupSmoke-${startupId}.plist`)
 // LaunchServices registration ensures the subsequent open -a calls target the
 // same application, exactly as activating its Dock icon does.
-const child = spawn('/usr/bin/open', ['-W', '-n', bundle, '--env', `XIAOBAN_SMOKE_REPORT=${report}`, '--env', `XIAOBAN_TEST_STARTUP_ID=${startupId}`, '--env', `XIAOBAN_WALLPAPER_TEST_URL=${fixture.catalogUrl}`, '--args', '--smoke-test', '--autostart'], {
-  env: { ...process.env, XIAOBAN_SMOKE_REPORT: report, XIAOBAN_TEST_STARTUP_ID: startupId, XIAOBAN_WALLPAPER_TEST_URL: fixture.catalogUrl }, stdio: ['ignore', 'pipe', 'pipe'],
+const child = spawn('/usr/bin/open', ['-W', '-n', bundle, '--env', `XIAOBAN_SMOKE_REPORT=${report}`, '--env', `XIAOBAN_TEST_STARTUP_ID=${startupId}`, '--env', `XIAOBAN_WALLPAPER_TEST_URL=${fixture.catalogUrl}`, '--env', `XIAOBAN_LOCAL_WALLPAPER_TEST_DIR=${fixture.localDirectory}`, '--args', '--smoke-test', '--autostart'], {
+  env: { ...process.env, XIAOBAN_SMOKE_REPORT: report, XIAOBAN_TEST_STARTUP_ID: startupId, XIAOBAN_WALLPAPER_TEST_URL: fixture.catalogUrl, XIAOBAN_LOCAL_WALLPAPER_TEST_DIR:fixture.localDirectory }, stdio: ['ignore', 'pipe', 'pipe'],
 })
 let output = ''
 child.stdout.on('data', data => { output = (output + data).slice(-16000) })
@@ -42,6 +42,9 @@ try {
   assert.equal(result.media.Ok.cases.length,6)
   assert.ok(result.media.Ok.cacheOffline&&result.media.Ok.hashFailurePreserved&&result.media.Ok.updateChecked)
   for(const scene of result.media.Ok.cases){assert.ok(scene.report.width>0&&scene.report.height>0);assert.equal(scene.report.privilegedIpcBlocked,true)}
+  assert.equal(result.media.Ok.localImports.cases.length,2)
+  assert.ok(result.media.Ok.localImports.sourceDeleted&&result.media.Ok.localImports.deduplicated&&result.media.Ok.localImports.restored)
+  for(const scene of result.media.Ok.localImports.cases){assert.ok(scene.report.width>0&&scene.report.height>0);assert.equal(scene.report.privilegedIpcBlocked,true)}
   assert.equal(result.startupResult.Ok, 'ok', JSON.stringify(result.startupResult))
   assert.equal(result.wallpaperResult.Ok, 'ok', JSON.stringify(result.wallpaperResult))
   assert.equal(result.floatingResult.Ok, 'ok', JSON.stringify(result.floatingResult))

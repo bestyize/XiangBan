@@ -45,6 +45,7 @@ export interface WallpaperEntry {
   definition: WallpaperDefinition;
   installed: boolean;
   coverUrl: string | null;
+  source?: "builtin" | "subscription" | "local";
 }
 export interface WallpaperOptions {
   fit: "cover" | "contain" | "fill";
@@ -64,6 +65,7 @@ export interface AppInfo {
   arch: string;
   updateTarget: string;
   updateUrl: string;
+  dataDirectory?: string;
 }
 export const wallpaperDefaults: WallpaperOptions = {
   fit: "cover",

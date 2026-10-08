@@ -38,7 +38,7 @@
 
 | 字段 | 约束 |
 | --- | --- |
-| id | 1–64 个 ASCII 字母、数字、`-`、`_`、`.`；清单内唯一；`companion` 和 `builtin-` 前缀保留 |
+| id | 1–64 个 ASCII 字母、数字、`-`、`_`、`.`；清单内唯一；`companion`、`builtin-` 和 `local-` 前缀保留 |
 | version | SemVer，例如 `1.0.0`；同一内容更新时增加版本，改变资源校验值 |
 | title / description / author | 纯文本；客户端会转义，不接收 HTML |
 | kind | `image`、`video`、`canvas` |
@@ -50,6 +50,8 @@
 每个资源包含 `url`、`sha256`、`bytes`、`mime`。SHA-256 为实际文件完整内容的 64 位小写十六进制；`bytes` 为实际文件字节数，不是字符数。单张壁纸入口及附属资源总量不超过 256 MiB；动画 JS 每个文件不超过 2 MiB。HTTPS 重定向最多 4 次，不接受 `file:`、`javascript:`、URL 内的账户密码或片段。本机接口测试可使用 `http://localhost`、`http://127.0.0.1`、`http://[::1]`。
 
 资源建议返回 `Content-Type`、`Content-Length`，保持 `Accept-Encoding: identity` 的原始文件内容，以免文件大小及 SHA-256 与服务端压缩传输不一致。文件下载到应用自己的缓存目录，校验完成后才发布到缓存；不把下发路径作为本地文件路径。失败时保留之前正在使用的壁纸。资源缓存在本机后，离线仍可应用和播放。
+
+应用的本地文件导入独立于下发协议：从原生文件选择器选择图片或视频，复制到用户目录 `.xiaobanwallpaper/wallpapers/imports`，元数据保存在 `local.json`。内部 `local://<sha256>` 和 `local-` ID 仅由应用生成，服务清单不可使用，也不接受本地文件路径。正式数据目录与迁移规则见 [user-data.md](user-data.md)。
 
 ### 图片和视频
 

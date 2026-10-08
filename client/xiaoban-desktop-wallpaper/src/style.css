@@ -344,6 +344,9 @@ nav {
   margin-bottom: 9px;
   font-weight: 600;
 }
+.page-heading.compact {
+  margin-bottom: 18px;
+}
 h1 {
   font-size: 25px;
   letter-spacing: 0.5px;
@@ -821,6 +824,7 @@ h1 {
   align-items: center;
   margin-bottom: 22px;
   gap: 14px;
+  flex-wrap: wrap;
 }
 .filter-tabs {
   display: flex;
@@ -846,7 +850,15 @@ h1 {
 .toolbar-actions {
   display: flex;
   gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
 }
+.data-location { display:flex; align-items:center; gap:16px; justify-content:space-between; padding:20px; margin-top:16px; border:1px solid var(--line); border-radius:14px; background:#faf7f8; }
+.data-location > div { display:grid; gap:7px; min-width:0; }
+.data-location b { font-size:13px; }
+.data-location code { font-size:11px; color:#956776; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.data-location small { font-size:11px; color:var(--muted); }
+.data-location button { flex-shrink:0; }
 .wallpaper-layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 235px;
