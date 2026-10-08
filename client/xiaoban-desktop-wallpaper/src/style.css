@@ -344,6 +344,9 @@ nav {
   margin-bottom: 9px;
   font-weight: 600;
 }
+.page-heading.compact {
+  margin-bottom: 18px;
+}
 h1 {
   font-size: 25px;
   letter-spacing: 0.5px;

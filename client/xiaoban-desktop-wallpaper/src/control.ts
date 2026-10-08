@@ -549,11 +549,16 @@ export async function mountControl() {
             "选一种喜欢的陪伴方式，把日常交给一点温暖。",
           ]
         : page === "wallpaper"
-          ? ["WALLPAPERS", "动态壁纸", "把喜欢的风景，留在你的桌面。"]
+          ? ["", "动态壁纸", ""]
           : ["ABOUT", "关于小伴", "认识你的桌面小伙伴，一起慢慢变好。"];
-    document.querySelector("#eyebrow")!.textContent = text[0];
+    const eyebrow = document.querySelector<HTMLElement>("#eyebrow")!;
+    eyebrow.textContent = text[0];
+    eyebrow.hidden = !text[0];
     document.querySelector("#page-title")!.textContent = text[1];
-    document.querySelector("#page-description")!.textContent = text[2];
+    const description = document.querySelector<HTMLElement>("#page-description")!;
+    description.textContent = text[2];
+    description.hidden = !text[2];
+    document.querySelector(".page-heading")!.classList.toggle("compact", page === "wallpaper");
     if (page === "pet") renderPet();
     else if (page === "wallpaper") renderWallpapers();
     else renderAbout();
