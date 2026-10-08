@@ -20,6 +20,11 @@ use axum::{
 
 pub fn create_api_router(state: AppState) -> Router {
     Router::new()
+        .route("/api/v1/desktop/product", get(crate::desktop::product))
+        .route("/api/v1/desktop/updates", get(crate::desktop::updates))
+        .route("/api/v1/desktop/announcements", get(crate::desktop::announcements))
+        .route("/api/v1/desktop/wallpapers/{id}", get(crate::desktop::wallpaper))
+        .route_layer(axum::middleware::map_response(crate::desktop::no_store))
         // Wallpaper endpoints
         .route("/api/v1/wallpapers/search", get(search_wallpapers))
         .route("/api/v1/wallpapers/curated", get(get_curated_wallpapers))

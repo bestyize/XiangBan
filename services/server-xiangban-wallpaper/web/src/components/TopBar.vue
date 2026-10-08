@@ -9,6 +9,7 @@ const tab = computed(() => route.meta.tab as string)
 const links = [
   { to: '/', tab: 'home', label: '图片' },
   { to: '/videos', tab: 'videos', label: '视频' },
+  { to: '/desktop', tab: 'desktop', label: '小伴桌面' },
 ]
 </script>
 

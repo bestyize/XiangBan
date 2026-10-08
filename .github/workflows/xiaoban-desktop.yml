@@ -1,6 +1,11 @@
 name: Xiaoban desktop prototype
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - 'client/xiaoban-desktop-wallpaper/**'
+      - '.github/workflows/xiaoban-desktop.yml'
   pull_request:
     paths:
       - 'client/xiaoban-desktop-wallpaper/**'

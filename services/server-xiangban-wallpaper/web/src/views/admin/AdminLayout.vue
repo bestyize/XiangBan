@@ -14,6 +14,7 @@ const NAV: { to: string; label: string; icon: IconName }[] = [
   { to: '/admin/collector', label: '采集工作台', icon: 'download' },
   { to: '/admin/wallpapers', label: '壁纸图库', icon: 'image' },
   { to: '/admin/upload', label: '自定义上架', icon: 'upload' },
+  { to: '/admin/desktop', label: '小伴桌面', icon: 'device' },
   { to: '/admin/keys', label: '供应商密钥', icon: 'key' },
   { to: '/admin/proxies', label: '代理池', icon: 'network' },
   { to: '/admin/cache', label: '搜索缓存', icon: 'database' },

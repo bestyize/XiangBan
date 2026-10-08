@@ -1,4 +1,7 @@
 import { ApiError } from '@/api'
+import type { DesktopConfig } from '@/desktop'
+export const getDesktopConfig = () => request<DesktopConfig>('/desktop')
+export const saveDesktopConfig = (config: DesktopConfig) => request<DesktopConfig>('/desktop', 'PUT', config)
 import type {
   AdminUser,
   CacheOverview,

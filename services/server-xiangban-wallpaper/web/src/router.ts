@@ -7,6 +7,7 @@ export const router = createRouter({
   // Scroll is restored per page in the guards below, because pages are kept alive between tabs.
   scrollBehavior: () => false,
   routes: [
+    { path: '/desktop', name: 'desktop', component: () => import('./views/DesktopView.vue'), meta: { tab: 'desktop' } },
     { path: '/', name: 'home', component: () => import('./views/BrowseView.vue'), meta: { tab: 'home' } },
     { path: '/c/:id', name: 'category', component: () => import('./views/BrowseView.vue'), meta: { tab: 'home' } },
     { path: '/videos', name: 'videos', component: () => import('./views/BrowseView.vue'), meta: { tab: 'videos' } },
@@ -32,6 +33,7 @@ export const router = createRouter({
       meta: { admin: true },
       redirect: '/admin/collector',
       children: [
+        { path: 'desktop', name: 'admin-desktop', component: () => import('./views/admin/DesktopAdminView.vue') },
         { path: 'collector', name: 'admin-collector', component: () => import('./views/admin/CollectorView.vue') },
         { path: 'wallpapers', name: 'admin-wallpapers', component: () => import('./views/admin/WallpapersView.vue') },
         { path: 'upload', name: 'admin-upload', component: () => import('./views/admin/UploadView.vue') },

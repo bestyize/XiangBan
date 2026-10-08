@@ -33,4 +33,6 @@ services/server-xiaoban-wallpaper 是独立的小伴桌面网站与内容管理�
 
 Docker、手动部署工作流和桌宠 CI 使用新路径。桌宠 CI 只安装桌宠依赖，网页改动不触发桌宠构建。
 
+正式壁纸网站使用 `services/server-xiangban-wallpaper`（与旧项目 `server-xiaoban-wallpaper` 并存）。网站域名为 `wallpaper.xiangban.xyz`，拥有独立采集、上架与媒体上传功能，同时管理桌面下载版本与公告。桌面客户端以此网站的 `/api/v1` 接口浏览公开图片/视频，并通过单项交付清单下载经 SHA-256 校验的不可变资源；已选资源缓存后可离线播放。版本发布、公告展示策略和内容上架策略均归网站后端，客户端维护自己的协议类型与缓存实现，无跨项目源码导入。配置复用网站现有 `app_settings`，不增加历史数据迁移。
+
 移动目录时检查 README 链接、Gradle projectDir、DTO 导入、Docker COPY/ENTRYPOINT、Compose 上下文、CI 路径和测试资产位置。

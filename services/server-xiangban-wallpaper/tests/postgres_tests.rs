@@ -401,6 +401,113 @@ fn session_cookie(reply: &Reply) -> String {
     set_cookie.split(';').next().unwrap().to_string()
 }
 
+async fn public_call(app: &Router, path: &str) -> Reply {
+    let response=app.clone().oneshot(Request::builder().uri(path).body(Body::empty()).unwrap()).await.unwrap();
+    let status=response.status();let headers=response.headers().clone();
+    let bytes=axum::body::to_bytes(response.into_body(),1024*1024).await.unwrap();
+    Reply {status,headers,body:serde_json::from_slice(&bytes).unwrap_or(Value::Null)}
+}
+
+#[tokio::test]
+async fn desktop_releases_announcements_and_admin_configuration_share_one_source() {
+    let Some(db)=TestDb::connect().await else{return};
+    let (app,_)=build_app(&db).await;
+    assert_eq!(call(&app,"PUT","/desktop",None,Some(json!({}))).await.status,StatusCode::UNAUTHORIZED);
+    let cookie=session_cookie(&sign_in(&app,"admin","123456").await);
+    let mut config=call(&app,"GET","/desktop",Some(&cookie),None).await.body;
+    config["releases"]=json!([
+        {"version":"1.9.0","notes":"Old","publishedAt":"2026-01-01T00:00:00Z","published":true,"platforms":{"windows-x86_64":{"url":"https://example.com/old.zip"}}},
+        {"version":"1.10.0","notes":"New","publishedAt":"2026-01-02T00:00:00Z","published":true,"platforms":{"windows-x86_64":{"url":"https://example.com/new.zip"}}},
+        {"version":"2.0.0","notes":"Mac","publishedAt":"2026-01-02T00:00:00Z","published":true,"platforms":{"darwin-aarch64":{"url":"https://example.com/mac.zip"}}},
+        {"version":"3.0.0","notes":"Draft","publishedAt":"2026-01-02T00:00:00Z","published":false,"platforms":{"windows-x86_64":{"url":"https://example.com/draft.zip"}}}
+    ]);
+    config["announcements"]=json!([
+        {"id":"notice","title":"公告","body":"桌面与网站","published":true,"audience":["desktop","website"],"startsAt":null,"endsAt":null},
+        {"id":"private","title":"草稿","body":"隐藏","published":false,"audience":["desktop"],"startsAt":null,"endsAt":null},
+        {"id":"expired","title":"过期","body":"隐藏","published":true,"audience":["desktop"],"startsAt":null,"endsAt":"2026-01-01T00:00:00Z"}
+    ]);
+    let saved=call(&app,"PUT","/desktop",Some(&cookie),Some(config.clone())).await;
+    assert_eq!(saved.status,StatusCode::OK,"{}",saved.body);
+    let product=public_call(&app,"/api/v1/desktop/product").await;
+    assert_eq!(product.headers[header::CACHE_CONTROL],"no-store");
+    assert_eq!(product.body["downloads"]["windows-x86_64"]["version"],"1.10.0");
+    assert_eq!(product.body["downloads"]["darwin-aarch64"]["version"],"2.0.0");
+    assert_eq!(product.body["announcements"].as_array().unwrap().len(),1);
+    let update=public_call(&app,"/api/v1/desktop/updates?currentVersion=1.9.0&target=windows-x86_64").await;
+    assert_eq!(update.status,StatusCode::OK);assert_eq!(update.body["version"],"1.10.0");
+    assert_eq!(public_call(&app,"/api/v1/desktop/updates?currentVersion=1.10.0&target=windows-x86_64").await.status,StatusCode::NO_CONTENT);
+    assert_eq!(public_call(&app,"/api/v1/desktop/updates?currentVersion=0.1.0&target=darwin-x86_64").await.status,StatusCode::NO_CONTENT);
+    assert_eq!(public_call(&app,"/api/v1/desktop/updates?currentVersion=invalid&target=windows-x86_64").await.status,StatusCode::BAD_REQUEST);
+    let notices=public_call(&app,"/api/v1/desktop/announcements").await;
+    assert_eq!(notices.body["items"].as_array().unwrap().len(),1);
+    let revision=notices.body["items"][0]["revision"].clone();
+    config["announcements"][0]["body"]=json!("修改后的内容");
+    assert_eq!(call(&app,"PUT","/desktop",Some(&cookie),Some(config.clone())).await.status,StatusCode::OK);
+    assert_ne!(public_call(&app,"/api/v1/desktop/announcements").await.body["items"][0]["revision"],revision);
+    let (restarted,_)=build_app(&db).await;
+    assert_eq!(public_call(&restarted,"/api/v1/desktop/product").await.body["downloads"]["windows-x86_64"]["version"],"1.10.0");
+    config["announcements"][0]["published"]=json!(false);
+    call(&app,"PUT","/desktop",Some(&cookie),Some(config.clone())).await;
+    assert!(public_call(&app,"/api/v1/desktop/announcements").await.body["items"].as_array().unwrap().is_empty());
+    config["releases"][0]["platforms"]["windows-x86_64"]["url"]=json!("javascript:alert(1)");
+    assert_eq!(call(&app,"PUT","/desktop",Some(&cookie),Some(config)).await.status,StatusCode::BAD_REQUEST);
+    db.cleanup().await;
+}
+
+#[tokio::test]
+async fn desktop_manifest_materialises_only_published_media_with_real_hash_and_size() {
+    use sha2::{Digest,Sha256};
+    let Some(db)=TestDb::connect().await else{return};
+    let (app,state)=build_app(&db).await;
+    let cookie=session_cookie(&sign_in(&app,"admin","123456").await);
+    let mut config=call(&app,"GET","/desktop",Some(&cookie),None).await.body;
+    config["siteUrl"]=json!("http://localhost:8080");
+    call(&app,"PUT","/desktop",Some(&cookie),Some(config)).await;
+    let marker=uuid::Uuid::new_v4().simple().to_string();
+    tokio::fs::create_dir_all("uploads").await.unwrap();
+    for (kind,extension) in [("image","png"),("video","mp4")] {
+        let bytes=format!("test-{kind}-{marker}").into_bytes();
+        let name=format!("test-{marker}.{extension}");
+        tokio::fs::write(format!("uploads/{name}"),&bytes).await.unwrap();
+        let url=format!("/uploads/{name}");
+        let created=call(&app,"POST","/wallpapers/custom",Some(&cookie),Some(json!({"title":"真实文件校验","media_type":kind,"preview_url":url,"regular_url":url,"video_url":url,"status":"pending"}))).await;
+        assert_eq!(created.status,StatusCode::OK);
+        let id=created.body["item"]["id"].as_str().unwrap();
+        let path=format!("/api/v1/desktop/wallpapers/{id}");
+        assert_eq!(public_call(&app,&path).await.status,StatusCode::NOT_FOUND);
+        state.db.update_status(id,"published").await.unwrap();
+        let manifest=public_call(&app,&path).await;
+        assert_eq!(manifest.status,StatusCode::OK,"{}",manifest.body);
+        let item=&manifest.body["items"][0];
+        assert_eq!(item["kind"],kind);assert!(item["id"].as_str().unwrap().len()<=64);
+        assert_eq!(item["resource"]["sha256"],format!("{:x}",Sha256::digest(&bytes)));
+        assert_eq!(item["resource"]["bytes"],bytes.len());
+        let resource=item["resource"]["url"].as_str().unwrap().strip_prefix("http://localhost:8080/").unwrap();
+        assert_eq!(tokio::fs::read(resource).await.unwrap(),bytes);
+        assert_eq!(public_call(&app,&path).await.body,manifest.body,"second request uses immutable resource cache");
+        state.db.update_status(id,"offline").await.unwrap();
+        assert_eq!(public_call(&app,&path).await.status,StatusCode::NOT_FOUND);
+        tokio::fs::remove_file(resource).await.unwrap();tokio::fs::remove_file(format!("uploads/{name}")).await.unwrap();
+    }
+    db.cleanup().await;
+}
+
+#[tokio::test]
+async fn media_upload_accepts_a_video_larger_than_the_default_json_body_limit() {
+    let Some(db)=TestDb::connect().await else{return};
+    let (app,_)=build_app(&db).await;
+    let cookie=session_cookie(&sign_in(&app,"admin","123456").await);
+    let boundary=uuid::Uuid::new_v4().simple().to_string();
+    let mut body=format!("--{boundary}\r\nContent-Disposition: form-data; name=\"file\"; filename=\"test.mp4\"\r\nContent-Type: video/mp4\r\n\r\n").into_bytes();
+    let size=3*1024*1024;body.extend(std::iter::repeat_n(0u8,size));body.extend(format!("\r\n--{boundary}--\r\n").as_bytes());
+    let response=app.oneshot(Request::builder().method("POST").uri("/api/v1/admin/wallpapers/upload").header(header::HOST,"localhost:8081").header(header::COOKIE,cookie).header(header::CONTENT_TYPE,format!("multipart/form-data; boundary={boundary}")).body(Body::from(body)).unwrap()).await.unwrap();
+    assert_eq!(response.status(),StatusCode::OK);
+    let bytes=axum::body::to_bytes(response.into_body(),1024*1024).await.unwrap();let payload:Value=serde_json::from_slice(&bytes).unwrap();
+    let path=payload["file"]["url"].as_str().unwrap().trim_start_matches('/');
+    assert_eq!(tokio::fs::metadata(path).await.unwrap().len(),size as u64);tokio::fs::remove_file(path).await.unwrap();
+    db.cleanup().await;
+}
+
 #[tokio::test]
 async fn admin_routes_require_a_session_and_login_uses_the_default_account() {
     let Some(db) = TestDb::connect().await else { return };

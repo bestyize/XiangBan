@@ -20,6 +20,7 @@ async fn no_store(mut response: Response) -> Response {
 /// added to the protected group is private by default.
 pub fn admin_router(state: AppState) -> Router<AppState> {
     let protected = Router::new()
+        .route("/desktop", get(crate::desktop::admin_get).put(crate::desktop::admin_save))
         .route("/auth/logout", post(logout))
         .route("/auth/me", get(me))
         .route("/account", put(update_account))
@@ -40,7 +41,7 @@ pub fn admin_router(state: AppState) -> Router<AppState> {
         // 图库管理与自定义上架
         .route("/wallpapers", get(admin_list_wallpapers))
         .route("/wallpapers/custom", post(admin_create_custom_wallpaper))
-        .route("/wallpapers/upload", post(admin_upload_file))
+        .route("/wallpapers/upload", post(admin_upload_file).layer(axum::extract::DefaultBodyLimit::max(257 * 1024 * 1024)))
         .route("/wallpapers/{id}", put(admin_update_wallpaper).delete(admin_delete_wallpaper))
         .route("/wallpapers/{id}/status", put(admin_update_wallpaper_status))
         .route_layer(from_fn_with_state(state, require_admin));

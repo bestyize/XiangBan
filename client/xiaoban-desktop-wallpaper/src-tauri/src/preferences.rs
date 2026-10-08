@@ -47,6 +47,8 @@ pub struct Settings {
     pub wallpaper_options: crate::library::Options,
     pub catalog_url: String,
     pub update_url: String,
+    pub website_url: String,
+    pub automatic_updates: bool,
 }
 
 impl Default for Settings {
@@ -62,7 +64,9 @@ impl Default for Settings {
             wallpaper_id: "companion".into(),
             wallpaper_options: Default::default(),
             catalog_url: String::new(),
-            update_url: String::new(),
+            update_url: format!("{}/api/v1/desktop/updates", crate::website::DEFAULT_SITE),
+            website_url: crate::website::DEFAULT_SITE.into(),
+            automatic_updates: true,
         }
     }
 }
@@ -84,6 +88,12 @@ impl Settings {
         }
         if ![30, 60].contains(&self.fps) {
             self.fps = defaults.fps;
+        }
+        if crate::website::site_url(&self.website_url).is_err() {
+            self.website_url = crate::website::DEFAULT_SITE.into();
+        }
+        if self.update_url.is_empty() {
+            self.update_url = format!("{}/api/v1/desktop/updates", self.website_url);
         }
     }
 }

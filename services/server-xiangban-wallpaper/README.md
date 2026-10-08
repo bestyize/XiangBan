@@ -9,6 +9,14 @@
 > 基于 **Rust (Axum)** + **Vue 3 (Vite + TypeScript)** 构建的高颜值、高性能壁纸与动态视频系统。  
 > 采用 **「对内选品采集 / 自主上传 ➔ 人工审核入库 ➔ 对外权威发布」** 的精品自建库架构，彻底解决第三方图库质量与合规性无法把控的痛点。
 
+## 小伴桌面官网与客户端服务
+
+正式域名 `wallpaper.xiangban.xyz`。主导航依次为“图片 / 视频 / 小伴桌面”，`/desktop` 展示桌面产品介绍、分平台下载与公告。后台 `/admin/desktop` 配置官网介绍、网站源站、Windows/macOS 下载版本、发布状态、更新说明和公告有效时间。
+
+桌面客户端 `client/xiaoban-desktop-wallpaper` 直接使用本网站的公开图库、分类、更新和公告接口；资源按真实大小与 SHA-256 校验后缓存，支持离线使用。启动及每 30 分钟后台检查消息，可以手动刷新或关闭自动检查。接口、运行时目录与端到端验证详见[桌面 API](docs/desktop-api.md)。配置复用现有 `app_settings`，未新增历史数据迁移。
+
+验证命令（本目录）：`npm --prefix web ci`、`npm --prefix web run build`、`cargo test --locked`、`cargo build --release --locked`。真实数据库集成测试设置 `TEST_DATABASE_URL`，每例使用独立临时 schema。Node.js 使用 24，Rust 使用 stable。本机运行见 [LOCAL_SETUP.md](LOCAL_SETUP.md)。
+
 ---
 
 ## 🏛️ 系统业务架构

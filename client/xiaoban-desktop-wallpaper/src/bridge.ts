@@ -10,6 +10,8 @@ export interface Settings {
   wallpaperOptions: WallpaperOptions;
   catalogUrl: string;
   updateUrl: string;
+  websiteUrl: string;
+  automaticUpdates: boolean;
 }
 
 export type WallpaperKind = "image" | "video" | "canvas";
@@ -114,7 +116,9 @@ export const defaults: Settings = {
   wallpaperId: "companion",
   wallpaperOptions: wallpaperDefaults,
   catalogUrl: "",
-  updateUrl: "",
+  updateUrl: "https://wallpaper.xiangban.xyz/api/v1/desktop/updates",
+  websiteUrl: "https://wallpaper.xiangban.xyz",
+  automaticUpdates: true,
 };
 export function invoke<T>(
   command: string,

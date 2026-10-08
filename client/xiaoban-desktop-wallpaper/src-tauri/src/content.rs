@@ -24,6 +24,7 @@ pub fn root(app: &tauri::AppHandle) -> Result<PathBuf, String> {
     Ok(crate::storage::root(app)?.join("wallpapers"))
 }
 pub fn permitted(label: &str, command: &str) -> bool {
+    if command.contains("website") || command.starts_with("fetch_site_") || command == "select_site_wallpaper" { return label == "control"; }
     if ["import_local_wallpaper", "open_data_directory"].contains(&command) { return label == "control"; }
     if ["control", "pet", "wallpaper"].contains(&label) {
         return true;
@@ -58,6 +59,13 @@ fn open(
     };
     if let Some(old) = app.get_webview_window(label) {
         old.destroy().map_err(|e| e.to_string())?;
+        // Destruction is dispatched to the UI thread; wait until Tauri removes the label before
+        // reusing the preview window for the next online wallpaper.
+        let deadline = Instant::now() + Duration::from_secs(3);
+        while app.get_webview_window(label).is_some() {
+            if Instant::now() >= deadline { return Err("上一个壁纸预览仍在关闭，请稍后重试。".into()); }
+            std::thread::sleep(Duration::from_millis(10));
+        }
     }
     app.state::<DesktopState>()
         .ready_scenes
@@ -248,7 +256,7 @@ pub fn get_wallpaper_library(app: tauri::AppHandle) -> Result<Value, String> {
                 .as_ref()
                 .filter(|r| library::cached(&root, r))
                 .map(library::asset_url)
-                .or_else(|| (local && item.kind == "image" && installed).then(|| library::asset_url(&item.resource)));
+                .or_else(|| (item.kind == "image" && installed).then(|| library::asset_url(&item.resource)));
             let source = if local { "local" } else if item.id.starts_with("builtin-") { "builtin" } else { "subscription" };
             json!({"definition":item,"installed":installed,"coverUrl":cover,"source":source})
         })
@@ -496,6 +504,10 @@ mod tests {
                 "import_wallpaper_catalog",
                 "import_local_wallpaper",
                 "open_data_directory",
+                "configure_website",
+                "fetch_site_wallpapers",
+                "check_website",
+                "dismiss_website_message",
             ] {
                 assert!(!permitted(label, command));
             }
@@ -505,7 +517,7 @@ mod tests {
     }
 }
 
-fn smoke_render_report(app: &tauri::AppHandle, id: &str) -> Result<Value, String> {
+pub(crate) fn smoke_render_report(app: &tauri::AppHandle, id: &str) -> Result<Value, String> {
     let label = app.state::<ContentState>().label.lock().unwrap().clone().ok_or("没有背景窗口")?;
     let report = app.state::<ContentState>().reports.lock().unwrap().get(&label).cloned().ok_or("没有渲染报告")?;
     if report.get("privilegedIpcBlocked") != Some(&Value::Bool(true)) { return Err("壁纸窗口没有隔离桌面接口".into()); }

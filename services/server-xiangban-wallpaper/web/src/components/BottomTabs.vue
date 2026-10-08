@@ -9,6 +9,7 @@ const tab = computed(() => route.meta.tab as string)
 const tabs: { to: string; tab: string; label: string; icon: IconName }[] = [
   { to: '/', tab: 'home', label: '图片', icon: 'image' },
   { to: '/videos', tab: 'videos', label: '视频', icon: 'play' },
+  { to: '/desktop', tab: 'desktop', label: '小伴桌面', icon: 'device' },
 ]
 </script>
 

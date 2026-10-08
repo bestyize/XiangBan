@@ -11,6 +11,7 @@ mod runtime;
 mod preferences;
 mod startup;
 mod library;
+mod website;
 mod content;
 mod storage;
 mod local_media;
@@ -636,8 +637,10 @@ fn main() {
             scene_ready, set_hit_test, start_drag, hide_control, show_control, quit, get_diagnostics,
             get_startup_status, set_autostart, content::get_wallpaper_library, content::import_wallpaper_catalog,
             content::subscribe_wallpapers, content::apply_wallpaper, content::get_app_info, content::set_update_source,
-            content::check_updates, content::open_download_url, local_media::import_local_wallpaper, storage::open_data_directory]);
-    let app = builder.manage(state).manage(content::ContentState::default())
+            content::check_updates, content::open_download_url, local_media::import_local_wallpaper, storage::open_data_directory,
+            website::configure_website, website::fetch_site_wallpapers, website::fetch_site_categories,
+            website::select_site_wallpaper, website::check_website, website::get_website_status, website::dismiss_website_message]);
+    let app = builder.manage(state).manage(content::ContentState::default()).manage(website::WebsiteState::default())
         .register_uri_scheme_protocol("wallpaper-asset", |context, request| library::serve(context.app_handle(), request))
         .invoke_handler(move |invoke| {
             if !content::permitted(invoke.message.webview_ref().label(), invoke.message.command()) {
@@ -649,6 +652,7 @@ fn main() {
         .setup(|app| {
             initialize_preferences(app.handle()).map_err(std::io::Error::other)?;
             setup_tray(app)?;
+            website::start(app.handle());
             let initial_mode = settings(app.handle()).mode;
             let media_active = match content::restore(app.handle()) {
                 Ok(active) => active,
@@ -682,6 +686,9 @@ fn main() {
                     let media = if std::env::var_os("XIAOBAN_WALLPAPER_TEST_URL").is_some() {
                         Some(content::smoke(&handle).await)
                     } else { None };
+                    let website = if std::env::var_os("XIAOBAN_WEBSITE_TEST_URL").is_some() {
+                        Some(website::smoke(&handle).await)
+                    } else { None };
                     let floating_result = set_mode(handle.clone(), "floating".into()).await
                         .and_then(|_| wait_for_scene(&handle, "pet"));
                     let floating_after = get_diagnostics(handle.clone());
@@ -689,7 +696,7 @@ fn main() {
                     let mut report = serde_json::json!({"floatingBefore": floating_before, "wallpaper": wallpaper,
                         "floatingAfter": floating_after, "wallpaperResult": wallpaper_result.map(|_| "ok"),
                         "floatingResult": floating_result.map(|_| "ok"), "startupResult": startup_result.map(|_| "ok"),
-                        "lifecycle": lifecycle,"media":media});
+                        "lifecycle": lifecycle,"media":media,"website":website});
                     #[cfg(target_os = "macos")]
                     { report["dockReopen"] = serde_json::to_value(dock_reopen).unwrap(); }
                     if let Ok(path) = std::env::var("XIAOBAN_SMOKE_REPORT") {

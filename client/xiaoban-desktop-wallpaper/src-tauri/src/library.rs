@@ -149,7 +149,10 @@ fn validate_resource(resource: &Resource, builtin: bool) -> Result<(), String> {
         "image/jpeg",
         "image/webp",
         "image/avif",
+        "image/gif",
+        "image/bmp",
         "video/mp4",
+        "video/webm",
         "application/javascript",
         "application/json",
         "application/octet-stream",
@@ -184,7 +187,7 @@ pub fn validate_item(item: &Wallpaper, builtin: bool) -> Result<(), String> {
     let mime = &item.resource.mime;
     if !match item.kind.as_str() {
         "image" => mime.starts_with("image/"),
-        "video" => mime == "video/mp4",
+        "video" => ["video/mp4", "video/webm"].contains(&mime.as_str()),
         "canvas" => mime == "application/javascript",
         _ => false,
     } {
@@ -654,7 +657,18 @@ struct UpdateManifest {
     notes: String,
     #[serde(default)]
     published_at: String,
-    platforms: BTreeMap<String, Resource>,
+    platforms: BTreeMap<String, UpdatePackage>,
+}
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct UpdatePackage {
+    url: String,
+    #[serde(default)]
+    sha256: Option<String>,
+    #[serde(default)]
+    bytes: Option<u64>,
+    #[serde(default, rename = "mime")]
+    _mime: Option<String>,
 }
 pub fn update_result(text: &str, current: &str, platform: &str) -> Result<Value, String> {
     let manifest: UpdateManifest =
@@ -673,7 +687,7 @@ pub fn update_result(text: &str, current: &str, platform: &str) -> Result<Value,
     }
     if let Some(artifact) = artifact {
         network_url(&artifact.url)?;
-        if !hash_name(&artifact.sha256) || artifact.bytes == 0 || artifact.bytes > 60 * 1024 * 1024
+        if artifact.sha256.as_deref().is_some_and(|h| !hash_name(h)) || artifact.bytes.is_some_and(|n| n == 0)
         {
             return Err("更新包校验信息不合法".into());
         }
@@ -739,5 +753,12 @@ mod tests {
             false
         );
         assert!(update_result(&text, "0.1.9", "darwin-aarch64").is_err());
+    }
+    #[test]
+    fn website_download_links_need_no_fake_package_hash() {
+        let text=json!({"schemaVersion":1,"version":"1.10.0","platforms":{"windows-x86_64":{"url":"https://wallpaper.xiangban.xyz/download/app.zip"}}}).to_string();
+        assert_eq!(update_result(&text,"1.9.0","windows-x86_64").unwrap()["available"],true);
+        let invalid=text.replace("https://wallpaper.xiangban.xyz/download/app.zip","javascript:alert(1)");
+        assert!(update_result(&invalid,"1.9.0","windows-x86_64").is_err());
     }
 }

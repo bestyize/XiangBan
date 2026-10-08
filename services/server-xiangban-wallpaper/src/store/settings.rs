@@ -4,6 +4,9 @@ use sqlx::Row;
 use std::collections::HashMap;
 
 impl Store {
+    pub async fn get_setting(&self, key: &str) -> Result<Option<String>, AppError> {
+        Ok(sqlx::query_scalar("SELECT value FROM app_settings WHERE key = $1").bind(key).fetch_optional(&self.pool).await?)
+    }
     pub async fn all_settings(&self) -> Result<HashMap<String, String>, AppError> {
         let rows = sqlx::query("SELECT key, value FROM app_settings").fetch_all(&self.pool).await?;
         Ok(rows

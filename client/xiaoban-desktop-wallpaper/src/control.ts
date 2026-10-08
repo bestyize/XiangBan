@@ -1,3 +1,4 @@
+import { WebsiteUi } from "./website-ui.ts";
 import { EXPRESSIONS, EXPRESSION_NAMES } from "./companion/expressions.ts";
 import { PetView } from "./pet.ts";
 import {
@@ -120,6 +121,15 @@ export async function mountControl() {
   const failure = (error: unknown) =>
     toast(error instanceof Error ? error.message : error, true);
   const task = (fn: () => Promise<unknown>) => void fn().catch(failure);
+  const website = new WebsiteUi({
+    config: () => config,
+    configure: (next) => { config = next; lastUpdate = null; if (page === "about") renderAbout(); },
+    toast,
+    local: () => { filter = "all"; renderWallpapers(); },
+    about: () => navigate("about"),
+    selected: (next, id) => { library = next; filter = "all"; pick(id); },
+    status: (status) => { lastUpdate = status.update; if (page === "about" && !["website-url", "website-auto"].includes(document.activeElement?.id ?? "")) renderAbout(); },
+  });
   const current = (id = chosen) =>
     library.items.find((entry) => entry.definition.id === id);
   const activeName = () =>
@@ -314,11 +324,13 @@ export async function mountControl() {
     }
   }
   function renderWallpapers() {
+    if (filter === "online") { void website.open(body); return; }
     const entries = library.items.filter(
       (entry) => filter === "all" || (filter === "local" ? entry.source === "local" : entry.definition.kind === filter),
     );
     body.innerHTML = `<div class="wallpaper-toolbar"><div class="filter-tabs">${[
       ["all", "全部"],
+      ["online", "在线壁纸"],
       ["image", "图片"],
       ["video", "视频"],
       ["canvas", "动画"],
@@ -478,8 +490,7 @@ export async function mountControl() {
         button.disabled = true;
         button.textContent = "正在检查…";
         try {
-          lastUpdate = await invoke("check_updates");
-          renderAbout();
+          await website.refresh();
         } finally {
           if (button.isConnected) {
             button.disabled = false;
@@ -495,6 +506,7 @@ export async function mountControl() {
           invoke("open_download_url", { url: lastUpdate!.downloadUrl }),
         ),
       );
+    website.appendAbout(body);
   }
   function sourceDialog(type: "catalog" | "update") {
     const host = document.querySelector<HTMLElement>("#modal-root")!;
@@ -631,6 +643,7 @@ export async function mountControl() {
   );
   navigate("pet");
   settingsApply(config);
+  await website.start();
   if (desktop) {
     const status = await invoke<{ error: string | null }>("get_startup_status");
     if (status.error) failure(status.error);

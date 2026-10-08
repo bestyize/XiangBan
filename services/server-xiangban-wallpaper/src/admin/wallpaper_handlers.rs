@@ -211,6 +211,9 @@ pub async fn admin_upload_file(mut multipart: Multipart) -> ApiResult {
         let data = field.bytes().await.map_err(|e| {
             AppError::BadRequest(format!("读取上传数据失败: {e}"))
         })?;
+        if data.len() > 256 * 1024 * 1024 {
+            return Err(AppError::BadRequest("单个壁纸文件不能超过 256 MiB".into()));
+        }
 
         tokio::fs::write(&file_path, &data).await.map_err(|e| {
             AppError::Internal(format!("保存文件失败: {e}"))

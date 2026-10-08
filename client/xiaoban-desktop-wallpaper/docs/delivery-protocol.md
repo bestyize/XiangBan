@@ -1,6 +1,6 @@
 # 壁纸与更新下发协议 v1
 
-本协议属于 `client/xiaoban-desktop-wallpaper`，供内容提供方实现 HTTP 接口。当前支持 Windows/macOS，使用 UTF-8 JSON；地址在应用的“动态壁纸 → 添加订阅”和“关于小伴 → 更新服务设置”中配置。服务地址尚未确定，不内置假地址，也不把“没有配置服务”当成“已是最新版本”。
+本协议属于 `client/xiaoban-desktop-wallpaper`，供内容提供方实现 HTTP 接口。当前支持 Windows/macOS，使用 UTF-8 JSON；地址在应用的“动态壁纸 → 添加订阅”和“关于小伴 → 更新服务设置”中配置。默认连接 `https://wallpaper.xiangban.xyz`。在线图库使用网站的分页检索与单项交付接口；订阅清单仍可独立配置。网站接口与公告协议见[网站接口文档](../../../services/server-xiangban-wallpaper/docs/desktop-api.md)，也不把网络失败当成“已是最新版本”。
 
 ## 壁纸目录
 
@@ -55,8 +55,8 @@
 
 ### 图片和视频
 
-- 图片：`kind: "image"`，推荐 PNG、JPEG、WebP。`resource.mime` 使用 `image/png`、`image/jpeg`、`image/webp`。不要下发 SVG 作为外部资源。
-- 视频：`kind: "video"`，`mime: "video/mp4"`，推荐 H.264、`yuv420p`、MP4 fast-start。版本 1 固定静音、循环播放；不支持音频控制、播放列表或 HLS。
+- 图片：`kind: "image"`，支持 PNG、JPEG、WebP、AVIF、GIF、BMP，推荐 PNG、JPEG、WebP。`resource.mime` 使用 `image/png`、`image/jpeg`、`image/webp`。不要下发 SVG 作为外部资源。
+- 视频：`kind: "video"`，`mime: "video/mp4"` 或 `video/webm`，推荐 H.264、`yuv420p`、MP4 fast-start。版本 1 固定静音、循环播放；不支持音频控制、播放列表或 HLS。
 - 图片/视频的客户端选项为 `fit: "cover" | "contain" | "fill"`、`background: "#RRGGBB"`；视频速度 `playbackRate` 范围为 `0.25–2`。服务提供内容，用户的显示选择独立保存在本地。
 - 本机缓存协议实现 HTTP byte ranges，视频可以分段读取和寻址。视频是否可解码仍取决于系统的媒体能力；失败会报告解码错误，不显示成功状态。
 
@@ -127,7 +127,7 @@ HTTP 204 表示没有更新；HTTP 200 返回如下 JSON，版本按 SemVer 比�
 }
 ```
 
-字段约束同资源对象；更新包最多 60 MiB。比当前版本更新时，必须提供当前平台的包，否则提示未提供安装包。`notes` 为纯文本，最多 16000 字节。
+更新包 `url` 必填，必须是 HTTPS（本机 HTTP 开发例外）；`sha256`、`bytes` 和 `mime` 为可选信息，提供时必须是真实合法值。当前只打开下载链接，不下载或执行安装包，因此不为单纯跳转要求伪造校验信息。比当前版本更新时，必须提供当前平台的链接，否则提示未提供安装包。`notes` 为纯文本，最多 16000 字节。
 
 版本 1 实现“检查更新 → 展示版本/说明 → 在浏览器打开下载地址”，**不会静默执行安装包或覆盖程序**。如需自动升级，另行接入带公钥、签名校验和正式签名安装包的更新机制；仅有 SHA-256 不等于发布者签名。当前 Windows 便携 EXE 与 macOS ad-hoc `.app` 的打包状态不改变。
 

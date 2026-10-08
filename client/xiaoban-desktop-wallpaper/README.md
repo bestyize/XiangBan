@@ -1,6 +1,6 @@
 # 小伴桌宠 / 动态壁纸原型
 
-Windows / macOS 原型：一个可拖动、透明处点击穿透的悬浮小伴，也可以切换成位于桌面图标下方的动态壁纸。无聊天、账户或业务服务器连接。Windows 缺少运行组件时会联网补齐；组件可用后可离线运行。角色、场景、控制台与互动逻辑共用，桌面宿主分平台接入。
+Windows / macOS 桌面应用：一个可拖动、透明处点击穿透的悬浮小伴，也可以切换成位于桌面图标下方的动态壁纸。无聊天或账户；默认连接 `https://wallpaper.xiangban.xyz` 获取在线图片、动态视频、版本与公告。Windows 缺少运行组件时会联网补齐；组件与缓存可用后可离线运行。角色、场景、控制台与互动逻辑共用，桌面宿主分平台接入。
 
 本机生产构建实测：Windows x64 EXE 约 4.80MB，内嵌前端、背景和原生文件选择器，不包含系统 WebView2、转码器或用户导入媒体。原生切换测试已在主屏 2880×1800、175% 缩放下通过，确认壁纸为 WorkerW 子窗口；验证报告位于本地 `artifacts/smoke-*.json`。本地试用文件为 `artifacts/XiaoBan-Windows-x64.exe`，ZIP 包为 `artifacts/XiaoBan-Windows-x64.zip`。
 
@@ -62,6 +62,10 @@ macOS 悬浮窗口使用 AppKit 浮动层；壁纸使用 Core Graphics 的 deskt
 配置 `CanJoinAllSpaces` 使角色与壁纸参与各桌面空间；AppKit 窗口操作都在主线程执行。macOS 14+ 会关闭 WKWebView 的后台调度限流以保留可见桌宠动画，旧系统的后台表现需要实机验证。
 
 ## 使用
+
+“动态壁纸 → 在线壁纸”使用网站相同的搜索、分类和分页接口；选中壁纸后准备资源，再通过已有预览 / 应用流程下载、校验与缓存。“关于小伴 → 壁纸网站”可修改网站源站、关闭自动检查或手动获取版本与公告。正式源站默认为 `wallpaper.xiangban.xyz`。原生后台在启动及每 30 分钟检查消息，控制台关闭时也继续运行；消息在控制台和托盘提示中展示，关闭同一修订后不再重复提醒。修改后的公告和新版本重新提示。配置、消息与已读状态保存在用户目录，网络失败保留已有内容，手动同步显示失败原因。
+
+网站对接协议见[网站接口文档](../../services/server-xiangban-wallpaper/docs/desktop-api.md)，本应用维护自身的类型与解析，不引用网站源码。原生联调测试 `scripts/verify-website.mjs` 使用隔离测试网站和桌面数据目录，验证真实图片 / 视频下载渲染、更新接口与公告已读状态。
 
 设置界面为奶白/暖粉色的左侧导航布局，分为“小伴设置”“动态壁纸”“关于小伴”三页。小伴页保留原 SVG、表情和互动，壁纸页管理内置与订阅内容，关于页展示真实程序版本并检查已配置的更新服务。
 
@@ -132,7 +136,7 @@ Mac 实机还需检查：原角色的发光与连续表情、桌宠拖动、空�
 - `src-tauri/src/main.rs`：控制台、两种窗口生命周期、托盘、命令与诊断。
 - `src-tauri/src/preferences.rs`：本应用设置、兼容旧字段、参数修复与文件保存；`src-tauri/src/startup.rs`：Windows 当前用户注册、macOS 登录启动与测试项清理。
 - `src-tauri/src/storage.rs`：正式/开发/测试数据目录、旧数据迁移与备份；`src-tauri/src/local_media.rs`：原生选择器、媒体格式检查、流式复制、去重与本地目录元数据。持久导入副本与可重新下载的缓存不能混用。
-- `src/control.ts`：三页设置界面；`src/content.ts` 与 `public/wallpapers/sandbox.html`：图片/视频与 Canvas 沙箱宿主；`src-tauri/src/library.rs`：目录、资源完整性、缓存协议和更新验证；`src-tauri/src/content.rs`：窗口切换、权限边界和交付命令。
+- `src/control.ts`：三页设置界面；`src/website-ui.ts`：在线图库、官网设置和消息；`src-tauri/src/website.rs`：网站原生 HTTP、后台检查与公告已读状态；`src/content.ts` 与 `public/wallpapers/sandbox.html`：图片/视频与 Canvas 沙箱宿主；`src-tauri/src/library.rs`：目录、资源完整性、缓存协议和更新验证；`src-tauri/src/content.rs`：窗口切换、权限边界和交付命令。
 - `src-tauri/src/runtime`：Windows 启动前检测、原生准备窗口、官方引导程序下载与签名验证。成功/失败/取消的 UI 模拟仅在 debug 构建中启用，不会安装组件；真实缺组件的首次安装还需干净虚拟机验证。
 - `src-tauri/src/windows.rs`：WorkerW 接入、DPI 坐标转换、只读鼠标采样。
 - `src-tauri/src/macos.rs`：AppKit 窗口层级、空间行为、鼠标逻辑点与桌面点击判断。
