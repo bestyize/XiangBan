@@ -1,0 +1,52 @@
+name: Xiaoban wallpaper service
+on:
+  pull_request:
+    paths:
+      - 'services/server-xiaoban-wallpaper/**'
+      - '.github/workflows/xiaoban-wallpaper-server.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: wallpaper-service-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: xiaoban_wallpaper_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: ci-test-password
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres -d xiaoban_wallpaper_test"
+          --health-interval 5s --health-timeout 5s --health-retries 12
+    env:
+      XIAOBAN_TEST_DATABASE_URL: postgres://postgres:ci-test-password@127.0.0.1:5432/xiaoban_wallpaper_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: services/server-xiaoban-wallpaper/frontend/package-lock.json
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: services/server-xiaoban-wallpaper/backend
+      - run: cargo test --locked
+        working-directory: services/server-xiaoban-wallpaper/backend
+      - run: cargo build --release --locked
+        working-directory: services/server-xiaoban-wallpaper/backend
+      - run: npm ci && npm run build
+        working-directory: services/server-xiaoban-wallpaper/frontend
+      - run: python3 tools/check-layout.py
+      - name: Validate standalone Compose and image
+        env:
+          POSTGRES_PASSWORD: ci-only-db-password
+        run: |
+          docker compose -f services/server-xiaoban-wallpaper/compose.yaml config --quiet
+          docker build -t xiaoban-wallpaper:ci services/server-xiaoban-wallpaper
