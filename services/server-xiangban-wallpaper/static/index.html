@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WallpaperCollect - 聚合壁纸与动态视频搜索服务</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🖼️</text></svg>">
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet">
+</head>
+<body class="dark-theme">
+  <!-- Top Navigation Bar -->
+  <header class="app-header">
+    <div class="header-container">
+      <div class="brand" onclick="app.resetHome()">
+        <div class="brand-logo">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+            <circle cx="8.5" cy="8.5" r="1.5"></circle>
+            <polyline points="21 15 16 10 5 21"></polyline>
+          </svg>
+        </div>
+        <div class="brand-text">
+          <span class="brand-name">WallpaperCollect</span>
+          <span class="brand-badge">Rust Axum</span>
+        </div>
+      </div>
+
+      <!-- Center Tabs -->
+      <nav class="nav-tabs">
+        <button class="tab-btn active" data-tab="all" onclick="app.switchTab('all')">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+          全部壁纸
+        </button>
+        <button class="tab-btn" data-tab="videos" onclick="app.switchTab('videos')">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="23 7 16 12 23 17 23 7"></polygon><rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect></svg>
+          动态视频壁纸
+        </button>
+        <button class="tab-btn" data-tab="favorites" onclick="app.switchTab('favorites')">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>
+          我的收藏 <span id="fav-count-badge" class="badge-count">0</span>
+        </button>
+      </nav>
+
+      <!-- Right Actions -->
+      <div class="header-actions">
+        <button class="btn-icon" onclick="app.openSettingsModal()" title="数据源与采集控制">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+        </button>
+        <a href="https://github.com/bestyize/WallpaperCollect" target="_blank" class="btn-icon" title="查看 GitHub 仓库">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"></path></svg>
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <!-- Hero & Search Section -->
+  <section class="hero-section">
+    <div class="hero-container">
+      <h1 class="hero-title">
+        探索并采集 <span class="gradient-text">全网超高清</span> 壁纸与动态视频
+      </h1>
+      <p class="hero-subtitle">
+        基于 Rust 统一聚合 Pixabay、Unsplash、Pexels 等顶级多源接口，提供 4K/8K 桌面壁纸、手机竖屏与 Live 动态壁纸
+      </p>
+
+      <!-- Search Box -->
+      <div class="search-box-wrapper">
+        <form class="search-form" onsubmit="app.handleSearchSubmit(event)">
+          <div class="search-input-group">
+            <svg class="search-icon" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="11" cy="11" r="8"></circle>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            </svg>
+            <input type="text" id="search-input" placeholder="输入关键词，例如：4K、赛博朋克、深空星系、自然、日落、极简..." autocomplete="off">
+            <button type="button" id="clear-search-btn" class="clear-btn" onclick="app.clearSearch()" style="display: none;">
+              &times;
+            </button>
+          </div>
+
+          <div class="filter-dropdowns">
+            <!-- Provider Selector -->
+            <select id="provider-select" onchange="app.triggerSearch()">
+              <option value="all">全部数据源</option>
+              <option value="unsplash">Unsplash</option>
+              <option value="pixabay">Pixabay (含视频)</option>
+              <option value="pexels">Pexels (含视频)</option>
+              <option value="demo">官方精选 / Demo</option>
+            </select>
+
+            <!-- Orientation Selector -->
+            <select id="orientation-select" onchange="app.triggerSearch()">
+              <option value="all">所有画幅</option>
+              <option value="landscape">横屏 (PC/桌面 16:9/21:9)</option>
+              <option value="portrait">竖屏 (手机/移动端 9:16)</option>
+              <option value="squarish">方形画幅</option>
+            </select>
+          </div>
+
+          <button type="submit" class="submit-search-btn">
+            <span>搜索壁纸</span>
+          </button>
+        </form>
+      </div>
+
+      <!-- Quick Tag Pills -->
+      <div class="quick-tags">
+        <span class="tags-label">热门推荐：</span>
+        <div class="tag-chips">
+          <button class="chip" onclick="app.searchTag('4K')">4K 超高清</button>
+          <button class="chip" onclick="app.searchTag('赛博朋克')">赛博朋克</button>
+          <button class="chip" onclick="app.searchTag('nature')">自然风光</button>
+          <button class="chip" onclick="app.searchTag('space')">深空星系</button>
+          <button class="chip" onclick="app.searchTag('anime')">二次元动漫</button>
+          <button class="chip" onclick="app.searchTag('minimalist')">极简美学</button>
+          <button class="chip" onclick="app.searchTag('city')">城市霓虹</button>
+          <button class="chip" onclick="app.searchTag('ocean')">海洋浪花</button>
+          <button class="chip" onclick="app.searchTag('dark')">深色暗黑</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Main Content & Grid Area -->
+  <main class="content-container">
+    <!-- Meta Bar -->
+    <div class="results-meta-bar">
+      <div class="meta-left">
+        <h2 id="section-title">今日精选壁纸</h2>
+        <span id="results-count" class="meta-badge">加载中...</span>
+      </div>
+      <div class="meta-right">
+        <span id="exec-time" class="meta-time"></span>
+        <button class="refresh-btn" onclick="app.refreshCurrentView()" title="刷新">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+          刷新
+        </button>
+      </div>
+    </div>
+
+    <!-- Wallpapers Masonry Grid -->
+    <div id="wallpapers-grid" class="wallpapers-grid">
+      <!-- Cards rendered via JS -->
+    </div>
+
+    <!-- Empty / Loading / Error States -->
+    <div id="state-loading" class="state-container" style="display: none;">
+      <div class="spinner"></div>
+      <p>正在聚合多源壁纸数据...</p>
+    </div>
+
+    <div id="state-empty" class="state-container" style="display: none;">
+      <div class="empty-icon">🔍</div>
+      <h3>未找到相关壁纸</h3>
+      <p>尝试更换关键词、取消画幅限制，或切换数据源</p>
+      <button class="btn-primary" onclick="app.resetHome()">返回推荐精选</button>
+    </div>
+
+    <!-- Pagination / Load More -->
+    <div id="load-more-wrapper" class="load-more-wrapper" style="display: none;">
+      <button id="load-more-btn" class="load-more-btn" onclick="app.loadMore()">
+        加载更多壁纸
+      </button>
+    </div>
+  </main>
+
+  <!-- Detail Lightbox Modal -->
+  <div id="detail-modal" class="modal-backdrop" onclick="app.closeModalOnBackdrop(event)">
+    <div class="modal-card">
+      <button class="modal-close-btn" onclick="app.closeModal()">&times;</button>
+
+      <div class="modal-body">
+        <!-- Media Preview Area -->
+        <div class="modal-media-area" id="modal-media-container">
+          <!-- Dynamic Image or Video -->
+        </div>
+
+        <!-- Meta & Actions Sidebar -->
+        <div class="modal-meta-sidebar">
+          <div class="modal-header-info">
+            <div class="provider-pill" id="modal-provider-pill">Unsplash</div>
+            <h2 id="modal-title" class="modal-item-title">Wallpaper Title</h2>
+            <p id="modal-desc" class="modal-item-desc"></p>
+          </div>
+
+          <!-- Tags Cloud -->
+          <div class="modal-section">
+            <span class="section-label">相关标签</span>
+            <div id="modal-tags" class="tag-chips modal-tags-list"></div>
+          </div>
+
+          <!-- Parameters Spec Grid -->
+          <div class="modal-section specs-grid">
+            <div class="spec-item">
+              <span class="spec-label">媒体类型</span>
+              <span id="modal-media-type" class="spec-value">图像 (4K)</span>
+            </div>
+            <div class="spec-item">
+              <span class="spec-label">原始分辨率</span>
+              <span id="modal-resolution" class="spec-value">3840 × 2160</span>
+            </div>
+            <div class="spec-item">
+              <span class="spec-label">画幅比例</span>
+              <span id="modal-aspect" class="spec-value">16:9</span>
+            </div>
+            <div class="spec-item">
+              <span class="spec-label">摄影/作者</span>
+              <a id="modal-author-link" href="#" target="_blank" class="spec-value author-link">Author</a>
+            </div>
+          </div>
+
+          <!-- Download Action Buttons -->
+          <div class="modal-section download-actions">
+            <span class="section-label">高速下载与分辨率</span>
+            <div class="download-buttons-group" id="modal-download-buttons">
+              <!-- Rendered via JS -->
+            </div>
+          </div>
+
+          <!-- Footer Actions -->
+          <div class="modal-footer-actions">
+            <button id="modal-fav-btn" class="btn-fav-large" onclick="app.toggleModalFavorite()">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>
+              <span>加入收藏</span>
+            </button>
+            <a id="modal-source-btn" href="#" target="_blank" class="btn-source">
+              查看原网站
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Settings & Providers Modal -->
+  <div id="settings-modal" class="modal-backdrop" onclick="app.closeSettingsOnBackdrop(event)">
+    <div class="modal-card modal-settings-card">
+      <div class="settings-header">
+        <h2>数据源接入与后台采集控制</h2>
+        <button class="modal-close-btn" onclick="app.closeSettingsModal()">&times;</button>
+      </div>
+
+      <div class="settings-body">
+        <div class="settings-section">
+          <h3>多源服务状态</h3>
+          <div id="providers-list" class="providers-status-list">
+            <!-- Rendered via JS -->
+          </div>
+        </div>
+
+        <div class="settings-section">
+          <h3>数据库配置说明 (PostgreSQL)</h3>
+          <p class="settings-hint">
+            后端全面支持 PostgreSQL 持久化存储。若配置了 <code>DATABASE_URL=postgres://...</code>，系统将自动执行迁移脚本建表，并持久化采集的壁纸与用户收藏。若未配置，后端自动运行于极速内存缓存模式，开箱即用。
+          </p>
+        </div>
+
+        <div class="settings-section">
+          <h3>手动触发壁纸采集 (Crawler & Collector)</h3>
+          <p class="settings-hint">
+            立即对 Unsplash、Pixabay、Pexels 各大分类（4K、赛博朋克、深空、自然风光等）发起全量采集任务并写入存储：
+          </p>
+          <button id="trigger-sync-btn" class="btn-primary" onclick="app.triggerCollectorSync()">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+            立即执行一键采集
+          </button>
+          <div id="sync-result" class="sync-result-box" style="display: none;"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification -->
+  <div id="toast" class="toast"></div>
+
+  <script src="/js/app.js"></script>
+</body>
+</html>

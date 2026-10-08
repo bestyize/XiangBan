@@ -1,0 +1,32 @@
+{
+  "name": "wallpaper-collect-web",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vue-tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "vue-tsc --noEmit",
+    "generate-pwa-assets": "pwa-assets-generator"
+  },
+  "dependencies": {
+    "@fontsource-variable/geist": "5.3.0",
+    "@fontsource/instrument-serif": "5.3.0",
+    "@vueuse/core": "15.0.0",
+    "pinia": "4.0.3",
+    "vue": "3.5.43",
+    "vue-router": "5.4.0"
+  },
+  "devDependencies": {
+    "@types/node": "26.6.4",
+    "@vite-pwa/assets-generator": "2.0.0",
+    "@vitejs/plugin-vue": "6.0.9",
+    "typescript": "5.9.3",
+    "vite": "8.3.3",
+    "vite-plugin-pwa": "2.0.0",
+    "vue-tsc": "3.3.12",
+    "workbox-build": "7.4.1",
+    "workbox-window": "7.4.1"
+  }
+}

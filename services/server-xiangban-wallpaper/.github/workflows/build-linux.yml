@@ -1,0 +1,120 @@
+name: Build Ubuntu 64-bit Binary
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*'
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      create_release:
+        description: 'Publish as GitHub Release if tagged'
+        required: false
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+
+jobs:
+  build-ubuntu:
+    name: Build Linux x86_64
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+          cache-dependency-path: 'web/package-lock.json'
+
+      - name: Build Web Frontend
+        run: |
+          cd web
+          npm ci
+          npm run build
+          cd ..
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-unknown-linux-gnu
+
+      - name: Rust Cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: ubuntu-x86_64
+
+      - name: Run Tests
+        run: cargo test --release --target x86_64-unknown-linux-gnu
+
+      - name: Build Release Binary
+        run: cargo build --release --target x86_64-unknown-linux-gnu
+
+      - name: Package Release
+        id: package
+        run: |
+          BIN_PATH="target/x86_64-unknown-linux-gnu/release/wallpaper_collect"
+          strip "$BIN_PATH"
+
+          # Determine version name
+          if [[ "${{ github.ref_type }}" == "tag" ]]; then
+            VERSION="${{ github.ref_name }}"
+          else
+            VERSION="git-$(git rev-parse --short HEAD)"
+          fi
+
+          DIST_DIR="wallpaper_collect-${VERSION}-linux-x86_64"
+          mkdir -p "$DIST_DIR"
+
+          # Copy executable and supporting files
+          cp "$BIN_PATH" "$DIST_DIR/"
+          cp README.md LICENSE .env.example docker-compose.yml "$DIST_DIR/"
+          cp -r migrations "$DIST_DIR/"
+
+          # Archive
+          ARCHIVE_TAR="${DIST_DIR}.tar.gz"
+          ARCHIVE_ZIP="${DIST_DIR}.zip"
+          tar -czf "$ARCHIVE_TAR" "$DIST_DIR"
+          zip -r "$ARCHIVE_ZIP" "$DIST_DIR"
+
+          # Compute SHA-256 Checksums
+          sha256sum "$ARCHIVE_TAR" > "${ARCHIVE_TAR}.sha256"
+          sha256sum "$ARCHIVE_ZIP" > "${ARCHIVE_ZIP}.sha256"
+
+          echo "archive_tar=$ARCHIVE_TAR" >> $GITHUB_OUTPUT
+          echo "archive_zip=$ARCHIVE_ZIP" >> $GITHUB_OUTPUT
+          echo "dist_dir=$DIST_DIR" >> $GITHUB_OUTPUT
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.package.outputs.dist_dir }}
+          path: |
+            ${{ steps.package.outputs.archive_tar }}
+            ${{ steps.package.outputs.archive_tar }}.sha256
+            ${{ steps.package.outputs.archive_zip }}
+            ${{ steps.package.outputs.archive_zip }}.sha256
+          retention-days: 30
+
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            ${{ steps.package.outputs.archive_tar }}
+            ${{ steps.package.outputs.archive_tar }}.sha256
+            ${{ steps.package.outputs.archive_zip }}
+            ${{ steps.package.outputs.archive_zip }}.sha256
+          generate_release_notes: true
+          draft: false
+          prerelease: false

@@ -1,0 +1,33 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "live-server",
+      "url": "http://localhost:8080",
+      "port": 8080
+    },
+    {
+      "name": "backend",
+      "runtimeExecutable": "env",
+      "runtimeArgs": ["SERVER_PORT=8081", "cargo", "run"],
+      "port": 8081
+    },
+    {
+      "name": "backend-pg",
+      "runtimeExecutable": "env",
+      "runtimeArgs": [
+        "SERVER_PORT=8081",
+        "DATABASE_URL=postgres://postgres:password123@localhost:5432/wallpaper_collect",
+        "cargo",
+        "run"
+      ],
+      "port": 8081
+    },
+    {
+      "name": "web-dev",
+      "runtimeExecutable": "env",
+      "runtimeArgs": ["API_TARGET=http://127.0.0.1:8081", "npm", "--prefix", "web", "run", "dev"],
+      "port": 5173
+    }
+  ]
+}

@@ -1,0 +1,46 @@
+[package]
+name = "wallpaper_collect"
+version = "0.1.0"
+edition = "2021"
+description = "A unified wallpaper collection, search, and aggregation service in Rust."
+authors = ["bestyize"]
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+# Web framework
+axum = { version = "0.8", features = ["macros", "multipart"] }
+tower = { version = "0.5" }
+tower-http = { version = "0.6", features = ["cors", "trace", "fs", "compression-full"] }
+tokio = { version = "1.40", features = ["full"] }
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# HTTP client
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "socks"] }
+
+# Database (PostgreSQL optional/support)
+sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio", "tls-rustls", "postgres", "macros", "chrono", "uuid", "json"] }
+
+# Admin password hashing
+argon2 = "=0.6.0"
+
+# Static asset embedding
+rust-embed = { version = "8.5", features = ["interpolate-folder-path"] }
+mime_guess = "2.0"
+
+# Caching and Utilities
+futures = "0.3"
+async-trait = "0.1"
+chrono = { version = "0.4", features = ["serde"] }
+uuid = { version = "1.10", features = ["v4", "serde"] }
+dotenvy = "0.15"
+
+# Logging and Tracing
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+thiserror = "2.0"
+
+[dev-dependencies]
+tower = { version = "0.5", features = ["util"] }
