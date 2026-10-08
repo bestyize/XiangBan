@@ -13,6 +13,7 @@ concurrency:
 jobs:
   verify:
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     services:
       postgres:
         image: postgres:17-alpine
@@ -37,7 +38,9 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: services/server-xiaoban-wallpaper/backend
-      - run: cargo test --locked
+      - run: |
+          cargo clippy --all-targets --locked -- -D warnings
+          cargo test --locked
         working-directory: services/server-xiaoban-wallpaper/backend
       - run: cargo build --release --locked
         working-directory: services/server-xiaoban-wallpaper/backend
@@ -50,3 +53,20 @@ jobs:
         run: |
           docker compose -f services/server-xiaoban-wallpaper/compose.yaml config --quiet
           docker build -t xiaoban-wallpaper:ci services/server-xiaoban-wallpaper
+      - name: Verify container startup and public endpoints
+        run: |
+          docker run --rm -d --network host --name xiaoban-wallpaper-smoke \
+            -e DATABASE_URL="$XIAOBAN_TEST_DATABASE_URL" \
+            -e PUBLIC_ORIGIN=http://127.0.0.1:55006 \
+            xiaoban-wallpaper:ci > /dev/null
+          trap 'docker rm -f xiaoban-wallpaper-smoke > /dev/null 2>&1 || true' EXIT
+          ready=false
+          for attempt in $(seq 1 30); do
+            if curl --silent --fail http://127.0.0.1:55006/api/health > /dev/null; then ready=true; break; fi
+            sleep 1
+          done
+          if [ "$ready" != true ]; then docker logs xiaoban-wallpaper-smoke; exit 1; fi
+          curl --silent --fail http://127.0.0.1:55006/api/catalog > /tmp/xiaoban-catalog.json
+          python3 -c 'import json; c=json.load(open("/tmp/xiaoban-catalog.json")); assert c["schemaVersion"] == 1 and isinstance(c["items"], list)'
+          curl --silent --fail http://127.0.0.1:55006/ > /tmp/xiaoban-home.html
+          python3 -c 's=open("/tmp/xiaoban-home.html").read(); assert "小伴桌面" in s and "/assets/" in s'
