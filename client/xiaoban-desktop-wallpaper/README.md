@@ -2,7 +2,7 @@
 
 Windows / macOS 原型：一个可拖动、透明处点击穿透的悬浮小伴，也可以切换成位于桌面图标下方的动态壁纸。无聊天、账户或业务服务器连接。Windows 缺少运行组件时会联网补齐；组件可用后可离线运行。角色、场景、控制台与互动逻辑共用，桌面宿主分平台接入。
 
-本机生产构建实测：Windows x64 EXE 约 4.60MB，内嵌前端与两套程序背景，不包含系统 WebView2。原生切换测试已在主屏 2880×1800、175% 缩放下通过，确认壁纸为 WorkerW 子窗口；验证报告位于本地 `artifacts/smoke-*.json`。本地试用文件为 `artifacts/XiaoBan-Windows-x64.exe`，ZIP 包为 `artifacts/XiaoBan-Windows-x64.zip`。
+本机生产构建实测：Windows x64 EXE 约 4.80MB，内嵌前端、背景和原生文件选择器，不包含系统 WebView2、转码器或用户导入媒体。原生切换测试已在主屏 2880×1800、175% 缩放下通过，确认壁纸为 WorkerW 子窗口；验证报告位于本地 `artifacts/smoke-*.json`。本地试用文件为 `artifacts/XiaoBan-Windows-x64.exe`，ZIP 包为 `artifacts/XiaoBan-Windows-x64.zip`。
 
 角色核心在本工程的 `src/companion` 内维护，最初从网页纯角色代码原样复制，保留既有 SVG、发光、表情、弹簧参数和互动行为。允许独立演进，不再导入另一个客户端源码。`src/pet.ts` 适配 DOM 与桌面输入；暖光维持原 RobotStage 的尺寸与渐变。
 
@@ -67,6 +67,8 @@ macOS 悬浮窗口使用 AppKit 浮动层；壁纸使用 Core Graphics 的 deskt
 
 动态壁纸支持图片、静音循环 H.264 MP4 与自包含 Canvas/WebGL ES module。可添加 HTTPS 订阅或导入 JSON 清单；下载后的内容校验 SHA-256 并缓存，离线可继续使用。小伴悬浮时可与通用壁纸并存，融入壁纸时叠在所选内容上；“小伴房间”恢复原先的房间场景或系统桌面。下发协议、SDK、限制和更新 JSON 示例见 [delivery-protocol.md](docs/delivery-protocol.md)，Schema 为 [壁纸](docs/wallpapers-v1.schema.json) 和 [更新](docs/updates-v1.schema.json)。
 
+“导入图片 / 视频”通过 Windows/macOS 原生文件选择器添加自定义壁纸，“我的导入”筛选自己的内容。支持 PNG/JPEG/WebP/GIF/BMP 图片（最多 64 MiB）与 MP4/M4V/WebM 视频（最多 1 GiB），视频推荐 H.264 MP4，其他编码由系统 WebView 决定。导入保存副本并按内容去重，移动原文件后仍能使用；可预览、应用、选择画面适配和调整视频速度，不需要制作 JSON 清单，不内置转码器。
+
 Canvas 运行在独立的低权限壁纸窗口和 opaque-origin iframe 中，不能调用设置、自启动、退出或下载等桌面命令。控制页只展示封面，执行预览使用另一低权限窗口。视频缓存协议支持 byte ranges。更新功能目前为版本/说明检查和打开下载页；未配置更新源会显示未接入，不伪造最新状态，未实现无签名自动安装。
 
 - 控制台切换“悬浮桌宠 / 动态壁纸”，调整 25 种表情、160–420px 尺寸、深夜/晨光背景、30/60 FPS，或暂停动画。
@@ -81,9 +83,9 @@ Canvas 运行在独立的低权限壁纸窗口和 opaque-origin iframe 中，不
 
 ## 验证
 
-设置写入当前用户配置目录的 `preferences.json`，通过临时文件替换保存。Windows 使用当前用户 `Run` 启动项 `XiaoBanDesktop`，兼容带空格/中文的 EXE 路径，并识别任务管理器中的禁用状态；macOS 使用 `~/Library/LaunchAgents/XiaoBanDesktop.plist`，随用户登录启动。便携 EXE 或 `.app` 移动后，手动打开一次可刷新已启用的启动路径；macOS 建议放到 Applications，避免下载目录或临时路径失效。登记失败会在设置中提示，不阻止桌宠运行。
+正式用户数据固定在 `~/.xiaobanwallpaper`。`config/preferences.json` 保存设置，`wallpapers/imports` 保存自定义媒体的持久副本，`wallpapers/local.json` 保存本地壁纸元数据，`wallpapers/cache` 保存订阅资源，`cache/webview` 是 Windows 浏览器运行数据。“关于小伴”提供打开目录按钮；首次迁移复制旧配置与缓存、保留原数据和备份，不覆盖已有新配置。完整子目录职责和迁移约束见 [user-data.md](docs/user-data.md)。设置通过临时文件替换保存。Windows 使用当前用户 `Run` 启动项 `XiaoBanDesktop`，兼容带空格/中文的 EXE 路径，并识别任务管理器中的禁用状态；macOS 使用 `~/Library/LaunchAgents/XiaoBanDesktop.plist`，随用户登录启动。便携 EXE 或 `.app` 移动后，手动打开一次可刷新已启用的启动路径；macOS 建议放到 Applications，避免下载目录或临时路径失效。登记失败会在设置中提示，不阻止桌宠运行。
 
-开发预览不自动登记自启动，使用独立配置目录。原生 smoke test 使用独立应用标识、独立配置与 `XiaoBanStartupSmoke-<测试标识>` 启动项；Rust 注册测试使用 `XiaoBanStartupTest-<PID>`。结束时仅清理自己的测试项，不修改正式启动项。
+开发预览不自动登记自启动，使用 `.xiaobanwallpaper/development` 独立数据根。原生 smoke test 使用独立应用标识、临时数据根与 `XiaoBanStartupSmoke-<测试标识>` 启动项；Rust 注册测试使用 `XiaoBanStartupTest-<PID>`。结束时仅清理自己的测试项，不修改正式启动项。两端媒体测试额外导入真实 PNG 与超过 16 MiB 的 MP4，删除测试源文件后验证播放、去重与重新加载；不读取用户图片或视频。
 
 ```powershell
 npm run build
@@ -116,7 +118,7 @@ Mac 实机还需检查：原角色的发光与连续表情、桌宠拖动、空�
 启动流程另有四个 Rust 测试，覆盖已安装时不调用安装器、安装后重新检测、虚假成功退出码与失败重试。Windows CI 构建便携包并执行原生准备窗口成功/失败/取消模拟；本地 `-VerifyDownload` 还验证内嵌下载工具、进程清理及真实微软签名，不执行安装。真实缺组件的首次安装需在干净 Windows 虚拟机上验证。
 
 - 提供 Windows 与 macOS 的原生接入；macOS 包面向 Apple 芯片，Intel / Universal 打包未纳入此原型。
-- 壁纸只覆盖主显示器；未实现多显示器管理、本地原始媒体文件导入或签名安装包。
+- 壁纸只覆盖主显示器；未实现多显示器管理、视频转码或签名安装包。
 - Windows 壁纸窗口作为 Explorer 背景 WorkerW 子窗口；macOS 壁纸使用 AppKit 桌面层窗口。未修改系统壁纸路径或偏好，退出后原壁纸恢复显示。
 - 模式切换会重新挂载角色，当前的随机动画/睡眠进度会重置。
 - Explorer 重启、显示器热插拔、macOS Stage Manager / 全屏空间等恢复策略需要进一步实机完善。Windows 背景父窗口异常会提示重新切换模式。
@@ -129,6 +131,7 @@ Mac 实机还需检查：原角色的发光与连续表情、桌宠拖动、空�
 - `src/scene.css`：原小伴房间的程序背景；内置图片、视频和 Canvas 样例位于 public/wallpapers。
 - `src-tauri/src/main.rs`：控制台、两种窗口生命周期、托盘、命令与诊断。
 - `src-tauri/src/preferences.rs`：本应用设置、兼容旧字段、参数修复与文件保存；`src-tauri/src/startup.rs`：Windows 当前用户注册、macOS 登录启动与测试项清理。
+- `src-tauri/src/storage.rs`：正式/开发/测试数据目录、旧数据迁移与备份；`src-tauri/src/local_media.rs`：原生选择器、媒体格式检查、流式复制、去重与本地目录元数据。持久导入副本与可重新下载的缓存不能混用。
 - `src/control.ts`：三页设置界面；`src/content.ts` 与 `public/wallpapers/sandbox.html`：图片/视频与 Canvas 沙箱宿主；`src-tauri/src/library.rs`：目录、资源完整性、缓存协议和更新验证；`src-tauri/src/content.rs`：窗口切换、权限边界和交付命令。
 - `src-tauri/src/runtime`：Windows 启动前检测、原生准备窗口、官方引导程序下载与签名验证。成功/失败/取消的 UI 模拟仅在 debug 构建中启用，不会安装组件；真实缺组件的首次安装还需干净虚拟机验证。
 - `src-tauri/src/windows.rs`：WorkerW 接入、DPI 坐标转换、只读鼠标采样。

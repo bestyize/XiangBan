@@ -1,5 +1,6 @@
 import http from 'node:http'
-import {readFile} from 'node:fs/promises'
+import {readFile,mkdtemp,writeFile,rm} from 'node:fs/promises'
+import os from 'node:os'
 import {createHash} from 'node:crypto'
 import {deflateSync} from 'node:zlib'
 import {fileURLToPath} from 'node:url'
@@ -26,7 +27,16 @@ export async function startWallpaperFixture(){
  })
  await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve))
  base=`http://127.0.0.1:${server.address().port}`
- return {base,catalogUrl:`${base}/catalog.json`,close:()=>new Promise(resolve=>server.close(resolve))}
+ const localDirectory=await mkdtemp(path.join(os.tmpdir(),'xiaoban-local-media-'))
+ await writeFile(path.join(localDirectory,'本地图 image.png'),files.get('fixture.png').data)
+ // A valid top-level MP4 free box exercises large-file byte ranges without a long video.
+ const padding=Buffer.alloc(16*1024*1024);padding.writeUInt32BE(padding.length);padding.write('free',4)
+ await writeFile(path.join(localDirectory,'本地视频.mp4'),Buffer.concat([files.get('sea-breeze.mp4').data,padding]))
+ return {base,localDirectory,catalogUrl:`${base}/catalog.json`,close:async()=>{
+  await new Promise(resolve=>server.close(resolve))
+  if(path.resolve(path.dirname(localDirectory))!==path.resolve(os.tmpdir())||!path.basename(localDirectory).startsWith('xiaoban-local-media-'))throw new Error('Unexpected local fixture directory')
+  await rm(localDirectory,{recursive:true,force:true})
+ }}
 }
 if(process.argv.includes('--server')){
  const fixture=await startWallpaperFixture();console.log(fixture.catalogUrl)

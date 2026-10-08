@@ -168,7 +168,7 @@ fn validate_resource(resource: &Resource, builtin: bool) -> Result<(), String> {
 pub fn validate_item(item: &Wallpaper, builtin: bool) -> Result<(), String> {
     if !identifier(&item.id)
         || item.id == "companion"
-        || (!builtin && item.id.starts_with("builtin-"))
+        || (!builtin && (item.id.starts_with("builtin-") || item.id.starts_with("local-")))
     {
         return Err("壁纸 ID 不合法或使用了保留名称".into());
     }
@@ -342,7 +342,7 @@ pub fn cached(root: &Path, resource: &Resource) -> bool {
     if resource.url.starts_with("builtin://") {
         return true;
     }
-    let path = root.join("cache").join(&resource.sha256);
+    let path = crate::local_media::resource_path(root, resource);
     fs::metadata(path).is_ok_and(|m| m.is_file() && m.len() == resource.bytes)
 }
 pub fn read_catalog(root: &Path) -> Catalog {
@@ -359,7 +359,12 @@ pub fn all_items(root: &Path) -> Vec<Wallpaper> {
             .into_iter()
             .filter(|item| validate_item(item, false).is_ok()),
     );
+    items.extend(crate::local_media::read(root).map(|c| c.items).unwrap_or_default());
     items
+}
+pub fn validate_stored(item: &Wallpaper) -> Result<(), String> {
+    if crate::local_media::is_local(item) { crate::local_media::validate(item) }
+    else { validate_item(item, item.id.starts_with("builtin-")) }
 }
 pub fn save_json(path: &Path, value: &impl Serialize) -> Result<(), String> {
     fs::create_dir_all(path.parent().ok_or("无效保存路径")?).map_err(|e| e.to_string())?;
@@ -417,7 +422,7 @@ pub fn fetch_json(value: &str) -> Result<Option<String>, String> {
     ))
 }
 
-fn verify_file(path: &Path, resource: &Resource) -> Result<bool, String> {
+pub fn verify_file(path: &Path, resource: &Resource) -> Result<bool, String> {
     let mut file = match fs::File::open(path) {
         Ok(file) => file,
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(false),
@@ -443,6 +448,16 @@ pub fn download(
     mut progress: impl FnMut(u64),
 ) -> Result<(), String> {
     if resource.url.starts_with("builtin://") {
+        return Ok(());
+    }
+    if crate::local_media::resource_local(resource) {
+        if resource.url != format!("local://{}", resource.sha256) || !hash_name(&resource.sha256) {
+            return Err("本地资源标识不合法".into());
+        }
+        if !verify_file(&crate::local_media::resource_path(root, resource), resource)? {
+            return Err("导入的壁纸副本不存在或已损坏，请重新导入原文件。".into());
+        }
+        progress(resource.bytes);
         return Ok(());
     }
     validate_resource(resource, false)?;
@@ -543,7 +558,7 @@ pub fn serve(
     let mut items = all_items(&root);
     if let Ok(data) = fs::read(root.join("active.json")) {
         if let Ok(item) = serde_json::from_slice::<Wallpaper>(&data) {
-            items.push(item);
+            if validate_stored(&item).is_ok() { items.push(item); }
         }
     }
     let resource = items
@@ -553,7 +568,7 @@ pub fn serve(
     let Some(resource) = resource else {
         return error(404);
     };
-    let mut file = match fs::File::open(root.join("cache").join(name)) {
+    let mut file = match fs::File::open(crate::local_media::resource_path(&root, resource)) {
         Ok(f) => f,
         Err(_) => return error(404),
     };
@@ -562,7 +577,7 @@ pub fn serve(
         _ => return error(404),
     };
     let range = request.headers().get("range").and_then(|v| v.to_str().ok());
-    let (start, end, partial) = match byte_range(range, length) {
+    let (start, end, partial) = match playback_range(range, length, &resource.mime) {
         Ok(v) => v,
         Err(_) => {
             return tauri::http::Response::builder()
@@ -591,6 +606,15 @@ pub fn serve(
         response = response.header("Content-Range", format!("bytes {start}-{end}/{length}"));
     }
     response.body(body).unwrap()
+}
+
+fn playback_range(header: Option<&str>, length: u64, mime: &str) -> Result<(u64, u64, bool), String> {
+    let (start, end, partial) = byte_range(header, length)?;
+    // Tauri custom-protocol responses own a Vec, so limit video chunks instead
+    // of allocating a potentially 1 GB response for a bytes=0- request.
+    if mime.starts_with("video/") && end - start >= 8 * 1024 * 1024 {
+        Ok((start, start + 8 * 1024 * 1024 - 1, true))
+    } else { Ok((start, end, partial)) }
 }
 
 pub fn byte_range(header: Option<&str>, length: u64) -> Result<(u64, u64, bool), String> {
@@ -662,6 +686,14 @@ pub fn update_result(text: &str, current: &str, platform: &str) -> Result<Value,
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn large_video_requests_have_bounded_response_memory() {
+        let chunk = 8 * 1024 * 1024;
+        assert_eq!(playback_range(Some("bytes=0-"), 1024 * 1024 * 1024, "video/mp4").unwrap(), (0, chunk-1, true));
+        assert_eq!(playback_range(None, chunk*3, "video/webm").unwrap(), (0, chunk-1, true));
+        assert_eq!(playback_range(Some("bytes=100-199"), chunk*3, "video/mp4").unwrap(), (100,199,true));
+        assert_eq!(playback_range(None, 1024, "video/mp4").unwrap(), (0,1023,false));
+    }
     #[test]
     fn scheme_and_resource_paths_are_constrained() {
         assert!(network_url("https://example.test/catalog.json").is_ok());

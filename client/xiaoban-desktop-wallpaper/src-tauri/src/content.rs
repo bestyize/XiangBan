@@ -21,16 +21,10 @@ pub struct ContentState {
     pub io: Mutex<()>,
 }
 pub fn root(app: &tauri::AppHandle) -> Result<PathBuf, String> {
-    let path = app
-        .state::<DesktopState>()
-        .preferences_path
-        .lock()
-        .unwrap()
-        .clone()
-        .ok_or("设置目录未就绪")?;
-    Ok(path.parent().ok_or("设置目录不合法")?.join("wallpapers"))
+    Ok(crate::storage::root(app)?.join("wallpapers"))
 }
 pub fn permitted(label: &str, command: &str) -> bool {
+    if ["import_local_wallpaper", "open_data_directory"].contains(&command) { return label == "control"; }
     if ["control", "pet", "wallpaper"].contains(&label) {
         return true;
     }
@@ -126,7 +120,9 @@ fn open(
     }
     #[cfg(target_os = "macos")]
     let builder =
-        builder.background_throttling(tauri::utils::config::BackgroundThrottlingPolicy::Disabled);
+        builder.incognito(true).background_throttling(tauri::utils::config::BackgroundThrottlingPolicy::Disabled);
+    #[cfg(windows)]
+    let builder = builder.data_directory(crate::storage::webview(&crate::storage::root(app)?));
     #[cfg(windows)]
     let builder = if let Some(parent) = parent {
         builder.parent_raw(::windows::Win32::Foundation::HWND(parent as _))
@@ -192,7 +188,7 @@ pub fn restore(app: &tauri::AppHandle) -> Result<bool, String> {
     let data = fs::read(root(app)?.join("active.json"))
         .map_err(|_| "已选壁纸资源不可用，请在动态壁纸页重新应用。")?;
     let item: Wallpaper = serde_json::from_slice(&data).map_err(|e| e.to_string())?;
-    library::validate_item(&item, item.id.starts_with("builtin-"))?;
+    library::validate_stored(&item)?;
     if item.id != config.wallpaper_id
         || !library::assets(&item)
             .iter()
@@ -246,12 +242,15 @@ pub fn get_wallpaper_library(app: tauri::AppHandle) -> Result<Value, String> {
             let installed = library::assets(&item)
                 .iter()
                 .all(|r| library::cached(&root, r));
+            let local = crate::local_media::is_local(&item);
             let cover = item
                 .cover
                 .as_ref()
                 .filter(|r| library::cached(&root, r))
-                .map(library::asset_url);
-            json!({"definition":item,"installed":installed,"coverUrl":cover})
+                .map(library::asset_url)
+                .or_else(|| (local && item.kind == "image" && installed).then(|| library::asset_url(&item.resource)));
+            let source = if local { "local" } else if item.id.starts_with("builtin-") { "builtin" } else { "subscription" };
+            json!({"definition":item,"installed":installed,"coverUrl":cover,"source":source})
         })
         .collect::<Vec<_>>();
     Ok(json!({"items":items,"source":config.catalog_url,"activeId":config.wallpaper_id}))
@@ -335,7 +334,7 @@ pub async fn apply_wallpaper(
         .into_iter()
         .find(|item| item.id == id)
         .ok_or("没有找到这张壁纸")?;
-    library::validate_item(&item, item.id.starts_with("builtin-"))?;
+    library::validate_stored(&item)?;
     let options = library::validate_options(&item, options)?;
     let handle = app.clone();
     let prepared = item.clone();
@@ -411,7 +410,8 @@ pub fn get_app_info(app: tauri::AppHandle) -> Value {
         "windows"
     };
     json!({"name":"小伴桌面","version":app.package_info().version.to_string(),"platform":std::env::consts::OS,
-        "arch":std::env::consts::ARCH,"updateTarget":format!("{os}-{}",std::env::consts::ARCH),"updateUrl":settings(&app).update_url})
+        "arch":std::env::consts::ARCH,"updateTarget":format!("{os}-{}",std::env::consts::ARCH),"updateUrl":settings(&app).update_url,
+        "dataDirectory":crate::storage::root(&app).ok()})
 }
 #[tauri::command]
 pub fn set_update_source(app: tauri::AppHandle, url: String) -> Result<crate::Settings, String> {
@@ -494,6 +494,8 @@ mod tests {
                 "get_settings",
                 "open_download_url",
                 "import_wallpaper_catalog",
+                "import_local_wallpaper",
+                "open_data_directory",
             ] {
                 assert!(!permitted(label, command));
             }
@@ -501,6 +503,24 @@ mod tests {
         assert!(permitted("media-a", "scene_ready"));
         assert!(permitted("control", "set_autostart"));
     }
+}
+
+fn smoke_render_report(app: &tauri::AppHandle, id: &str) -> Result<Value, String> {
+    let label = app.state::<ContentState>().label.lock().unwrap().clone().ok_or("没有背景窗口")?;
+    let report = app.state::<ContentState>().reports.lock().unwrap().get(&label).cloned().ok_or("没有渲染报告")?;
+    if report.get("privilegedIpcBlocked") != Some(&Value::Bool(true)) { return Err("壁纸窗口没有隔离桌面接口".into()); }
+    #[allow(unused_mut)]
+    let mut case = json!({"id":id,"report":report});
+    #[cfg(windows)]
+    {
+        let window = app.get_webview_window(&label).ok_or("没有背景窗口")?;
+        let geometry = crate::windows::wallpaper_geometry(&window)?;
+        if geometry.get("fillsMonitor") != Some(&Value::Bool(true)) {
+            return Err(format!("壁纸实际绘图区没有铺满主屏幕：{id} {geometry}"));
+        }
+        case["geometry"] = geometry;
+    }
+    Ok(case)
 }
 
 pub async fn smoke(app: &tauri::AppHandle) -> Result<Value, String> {
@@ -519,35 +539,7 @@ pub async fn smoke(app: &tauri::AppHandle) -> Result<Value, String> {
         "test-canvas",
     ] {
         apply_wallpaper(app.clone(), id.into(), Options::default(), false).await?;
-        let label = app
-            .state::<ContentState>()
-            .label
-            .lock()
-            .unwrap()
-            .clone()
-            .ok_or("没有背景窗口")?;
-        let report = app
-            .state::<ContentState>()
-            .reports
-            .lock()
-            .unwrap()
-            .get(&label)
-            .cloned()
-            .ok_or("没有渲染报告")?;
-        if report.get("privilegedIpcBlocked") != Some(&Value::Bool(true)) {
-            return Err("壁纸窗口没有隔离桌面接口".into());
-        }
-        let mut case = json!({"id":id,"report":report});
-        #[cfg(windows)]
-        {
-            let window = app.get_webview_window(&label).ok_or("没有背景窗口")?;
-            let geometry = crate::windows::wallpaper_geometry(&window)?;
-            if geometry.get("fillsMonitor") != Some(&Value::Bool(true)) {
-                return Err(format!("壁纸实际绘图区没有铺满主屏幕：{id} {geometry}"));
-            }
-            case["geometry"] = geometry;
-        }
-        cases.push(case);
+        cases.push(smoke_render_report(app, id)?);
     }
     let previous = settings(app).wallpaper_id;
     let rejected = apply_wallpaper(
@@ -572,8 +564,27 @@ pub async fn smoke(app: &tauri::AppHandle) -> Result<Value, String> {
         .await
         .map_err(|e| e.to_string())??;
     apply_wallpaper(app.clone(), "test-canvas".into(), Options::default(), false).await?;
+    let local_directory = PathBuf::from(std::env::var_os("XIAOBAN_LOCAL_WALLPAPER_TEST_DIR").ok_or("缺少本地壁纸测试目录")?);
+    let mut local_cases = Vec::new();
+    for filename in ["本地图 image.png", "本地视频.mp4"] {
+        let source = local_directory.join(filename);
+        let item = crate::local_media::import_file(&root(app)?, &source)?;
+        let duplicate = crate::local_media::import_file(&root(app)?, &source)?;
+        if item.id != duplicate.id { return Err("重复导入没有去重".into()); }
+        fs::remove_file(&source).map_err(|e| e.to_string())?;
+        apply_wallpaper(app.clone(), item.id.clone(), Options::default(), false).await?;
+        local_cases.push(smoke_render_report(app, &item.id)?);
+    }
+    if crate::local_media::read(&root(app)?)?.items.len() != 2 { return Err("本地导入重复保存了元数据".into()); }
+    close_active(app);
+    if !restore(app)? { return Err("无法恢复本地壁纸".into()); }
+    let restored_label = app.state::<ContentState>().label.lock().unwrap().clone().ok_or("没有恢复窗口")?;
+    let handle = app.clone();
+    tauri::async_runtime::spawn_blocking(move || wait(&handle, &restored_label)).await.map_err(|e| e.to_string())??;
+    smoke_render_report(app, &settings(app).wallpaper_id)?;
     apply_wallpaper(app.clone(), "companion".into(), Options::default(), false).await?;
     Ok(
-        json!({"cases":cases,"cacheOffline":true,"hashFailurePreserved":preserved,"updateChecked":true}),
+        json!({"cases":cases,"cacheOffline":true,"hashFailurePreserved":preserved,"updateChecked":true,
+            "localImports":{"cases":local_cases,"sourceDeleted":true,"deduplicated":true,"restored":true}}),
     )
 }
