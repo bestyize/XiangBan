@@ -15,6 +15,7 @@
 | [services/xiaban-api/api-contracts](services/xiaban-api/api-contracts/README.md) | 已实现 | 原 shared，按业务分包的 KMP 接口库 |
 | [services/server-pan](services/server-pan/README.md) | 已实现 | PanDown 自托管网盘，Rust Axum + SQLite 后端与 React 前端，独立于主 API |
 | [services/server-xiangban-wallpaper](services/server-xiangban-wallpaper/README.md) | 已实现 | 正式壁纸网站 wallpaper.xiangban.xyz，图片/视频采集与上传、小伴桌面下载、版本与公告；桌面客户端接入此服务 |
+| [services/server-xiaoban-appstore](services/server-xiaoban-appstore/README.md) | 已实现 | 小伴优质应用商店，Rust Axum + PostgreSQL 后端与 Vue 3 + Vite 前端，腾讯柠檬精选美学与管理后台 |
 | [services/server-asr](services/server-asr/README.md) | 规划 | 语音识别服务 |
 | [services/server-edgetts](services/server-edgetts/README.md) | 规划 | Edge TTS 服务，现有语音功能仍在主后端 |
 | [services/server-websearch](services/server-websearch/README.md) | 规划 | 搜索能力服务 |
@@ -55,9 +56,11 @@ python -X utf8 tools/check-layout.py
 npm --prefix services/server-xiangban-wallpaper/web ci
 npm --prefix services/server-xiangban-wallpaper/web run build
 cargo test --locked --manifest-path services/server-xiangban-wallpaper/Cargo.toml
+npm --prefix services/server-xiaoban-appstore/web run build
+cargo check --manifest-path services/server-xiaoban-appstore/Cargo.toml
 ```
 
-Windows 使用 gradlew.bat；Kotlin 服务需要 JDK 21。Android 壁纸需要 JDK 17+ 与 Android SDK，并自带 Gradle wrapper。网盘服务需要 Rust 1.80+ 与 Node.js 18+，默认端口 55005，运行方式与数据目录要求见其 README；它不接入根 Gradle，也不依赖主 API 的账户与数据库。后端分发输出在 services/xiaban-api/backend/build/install/backend。集成测试使用独立测试数据库和 Redis 第 15 号库；默认在依赖不可用时跳过，XIABAN_REQUIRE_INTEGRATION=true 可要求必须执行，详见后端 README。
+Windows 使用 gradlew.bat；Kotlin 服务需要 JDK 21。Android 壁纸需要 JDK 17+ 与 Android SDK，并自带 Gradle wrapper。网盘服务需要 Rust 1.80+ 与 Node.js 18+，默认端口 55005，运行方式与数据目录要求见其 README；它不接入根 Gradle，也不依赖主 API 的账户与数据库。应用商店服务位于 `services/server-xiaoban-appstore`，使用 Rust Axum、PostgreSQL 与 Vue 3 + Vite，默认端口 55008，包含腾讯柠檬精选美学前台与经典管理后台（支持一键上下架）。后端分发输出在 services/xiaban-api/backend/build/install/backend。集成测试使用独立测试数据库和 Redis 第 15 号库；默认在依赖不可用时跳过，XIABAN_REQUIRE_INTEGRATION=true 可要求必须执行，详见后端 README。
 
 正式壁纸网站位于 `services/server-xiangban-wallpaper`，使用 Node.js 24、Rust stable 和独立 PostgreSQL，默认端口 8080。桌面客户端默认连接 `https://wallpaper.xiangban.xyz`；它的数据库集成测试使用 `TEST_DATABASE_URL`，每个测试创建并清理独立 schema，不更改已有数据。
 
