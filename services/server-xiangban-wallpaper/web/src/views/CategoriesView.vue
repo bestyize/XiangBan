@@ -41,7 +41,7 @@ function tint(c: Category) {
       <RouterLink
         v-for="c in catalog.categories"
         :key="c.id"
-        :to="kind === 'video' ? `/videos/c/${c.id}` : `/c/${c.id}`"
+        :to="kind === 'video' ? `/videos/c/${c.id}` : `/images/c/${c.id}`"
         class="tile"
         :style="{ background: tint(c) }"
         @pointerenter="setAmbient(tint(c), 120)"

@@ -1,6 +1,6 @@
 # 小伴桌面与网站对接
 
-正式源站：`https://wallpaper.xiangban.xyz`。客户端“关于小伴 → 壁纸网站”可以修改网站源站；本机联调使用 `http://localhost:8080`。前台入口 `/desktop`，后台入口 `/admin/desktop`。后台配置复用现有 PostgreSQL `app_settings`，不新增历史数据迁移。
+正式源站：`https://wallpaper.xiangban.xyz`。客户端“关于小伴 → 壁纸网站”可以修改网站源站；本机联调使用 `http://localhost:8080`。介绍页首页入口 `/`（旧 `/desktop` 重定向），图片入口 `/images`、视频入口 `/videos`，后台入口 `/admin/desktop`。后台配置复用现有 PostgreSQL `app_settings`，不新增历史数据迁移。
 
 ## 公开接口
 
@@ -78,4 +78,4 @@ node client/xiaoban-desktop-wallpaper/scripts/verify-website.mjs client/xiaoban-
 
 脚本使用测试网站默认管理员，写入测试版本 / 公告，上传测试图片 / 视频，通过隔离桌面实例实际检索、下载、渲染和检查消息。客户端使用独立数据目录和测试自启动项，不读取或修改正式桌面设置；报告位于客户端 `artifacts/website-smoke-*.json`。测试网站数据随后整体清理。
 
-客户端第一层为“在线壁纸 / 我的壁纸”，第二层为图片 / 视频（本地也支持动画）。在线保存会实际下载、校验并留在当前页面，应用是独立按钮。官网 `/desktop` 使用同一猫脸 SVG 与实际 MP4 演示，可切换悬浮 / 融入壁纸并播放 / 暂停。
+客户端第一层为“在线壁纸 / 我的壁纸”，第二层为图片 / 视频（本地也支持动画）。在线保存会实际下载、校验并留在当前页面，应用是独立按钮。官网首页 `/` 使用同一猫脸 SVG 与实际 MP4 演示，可切换悬浮 / 融入壁纸并播放 / 暂停。

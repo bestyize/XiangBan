@@ -24,7 +24,7 @@ const NAV: { to: string; label: string; icon: IconName }[] = [
 const previousTitle = document.title
 
 onMounted(() => {
-  document.title = '管理后台 · Wallpaper Collect'
+  document.title = '管理后台 · 小伴桌面'
   // A session that expired while the page was open sends the user back to sign in.
   setUnauthorizedHandler(() => {
     admin.clear()
@@ -47,7 +47,7 @@ async function signOut() {
   <div class="admin shell">
     <aside class="side">
       <div class="brand">
-        <RouterLink to="/admin/keys" class="display name" aria-label="管理后台首页">Wallpapers</RouterLink>
+        <RouterLink to="/admin/keys" class="display name" aria-label="管理后台首页">小伴桌面</RouterLink>
         <span class="role">管理后台</span>
       </div>
 

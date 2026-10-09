@@ -7,16 +7,15 @@ const route = useRoute()
 const tab = computed(() => route.meta.tab as string)
 
 const links = [
-  { to: '/', tab: 'home', label: '图片' },
+  { to: '/images', tab: 'home', label: '图片' },
   { to: '/videos', tab: 'videos', label: '视频' },
-  { to: '/desktop', tab: 'desktop', label: '小伴桌面' },
 ]
 </script>
 
 <template>
   <header class="topbar">
     <div class="inner">
-      <RouterLink to="/" class="brand display" aria-label="Wallpaper Collect 首页">Wallpapers</RouterLink>
+      <RouterLink to="/" class="brand" aria-label="小伴桌面首页" :aria-current="tab === 'desktop' ? 'page' : undefined"><img src="/xiaoban.svg" alt=""><span>小伴桌面</span></RouterLink>
 
       <nav class="links" aria-label="主导航">
         <RouterLink
@@ -64,9 +63,16 @@ const links = [
 }
 
 .brand {
-  font-size: 28px;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  flex-shrink: 0;
+  font-size: 22px;
+  font-weight: 650;
   line-height: 1;
 }
+
+.brand img { width: 42px; height: 37px; object-fit: contain; }
 
 .links {
   display: flex;
@@ -133,7 +139,7 @@ const links = [
 
   .brand {
     margin-right: auto;
-    font-size: 26px;
+    font-size: 21px;
   }
 
   .links {

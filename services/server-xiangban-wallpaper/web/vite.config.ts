@@ -15,9 +15,9 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg', 'apple-touch-icon-180x180.png'],
       manifest: {
-        name: 'Wallpaper Collect',
-        short_name: 'Wallpapers',
-        description: '多平台壁纸聚合：图片与动态壁纸',
+        name: '小伴桌面',
+        short_name: '小伴桌面',
+        description: '小伴桌面：桌宠陪伴、图片与动态壁纸',
         lang: 'zh-CN',
         start_url: '/',
         scope: '/',

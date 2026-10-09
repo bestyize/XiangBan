@@ -41,7 +41,7 @@ function open(item: WallpaperItem) {
       title="还没有收藏"
       hint="点壁纸上的心形图标，喜欢的会出现在这里。"
       action="去逛逛"
-      @action="router.push('/')"
+      @action="router.push('/images')"
     />
     <WallpaperGrid v-else skeleton />
   </main>

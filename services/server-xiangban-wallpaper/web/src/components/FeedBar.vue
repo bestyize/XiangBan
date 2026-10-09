@@ -68,13 +68,13 @@ watch(
   <div class="feedbar">
     <div class="row">
       <nav v-if="rail" ref="railEl" class="rail hide-scrollbar" aria-label="分类">
-        <RouterLink :to="media === 'video' ? '/videos' : '/'" class="chip" :class="{ 'is-active': !activeCategory }">
+        <RouterLink :to="media === 'video' ? '/videos' : '/images'" class="chip" :class="{ 'is-active': !activeCategory }">
           {{ media === 'video' ? '全部' : '精选' }}
         </RouterLink>
         <RouterLink
           v-for="c in catalog.categories"
           :key="c.id"
-          :to="media === 'video' ? `/videos/c/${c.id}` : `/c/${c.id}`"
+          :to="media === 'video' ? `/videos/c/${c.id}` : `/images/c/${c.id}`"
           class="chip"
           :class="{ 'is-active': activeCategory === c.id }"
         >

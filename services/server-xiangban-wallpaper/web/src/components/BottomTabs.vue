@@ -7,9 +7,9 @@ const route = useRoute()
 const tab = computed(() => route.meta.tab as string)
 
 const tabs: { to: string; tab: string; label: string; icon: IconName }[] = [
-  { to: '/', tab: 'home', label: '图片', icon: 'image' },
+  { to: '/', tab: 'desktop', label: '小伴桌面', icon: 'device' },
+  { to: '/images', tab: 'home', label: '图片', icon: 'image' },
   { to: '/videos', tab: 'videos', label: '视频', icon: 'play' },
-  { to: '/desktop', tab: 'desktop', label: '小伴桌面', icon: 'device' },
 ]
 </script>
 
@@ -22,13 +22,15 @@ const tabs: { to: string; tab: string; label: string; icon: IconName }[] = [
       :class="{ active: tab === t.tab }"
       :aria-current="tab === t.tab ? 'page' : undefined"
     >
-      <span class="glyph"><Icon :name="t.icon" :size="24" /></span>
+      <span class="glyph"><img v-if="t.tab === 'desktop'" src="/xiaoban.svg" alt="" class="home-mark"><Icon v-else :name="t.icon" :size="24" /></span>
       <span class="label">{{ t.label }}</span>
     </RouterLink>
   </nav>
 </template>
 
 <style scoped>
+.home-mark { width: 28px; height: 24px; object-fit: contain; }
+
 .tabs {
   display: none;
 }

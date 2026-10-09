@@ -33,7 +33,7 @@ async function submit() {
 <template>
   <main class="admin login">
     <div class="panel">
-      <h1 class="display">Wallpapers</h1>
+      <h1 class="display">小伴桌面</h1>
       <p class="sub">管理后台</p>
 
       <div v-if="admin.unavailable" class="a-banner" role="alert">{{ admin.unavailable }}</div>
