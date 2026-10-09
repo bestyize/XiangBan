@@ -20,7 +20,9 @@ async function request(route,body,method=body?'POST':'GET') {
 try {
  await request('/admin/auth/login',{username:'admin',password:'123456'})
  const config=await request('/admin/desktop')
- config.siteUrl=base
+ // Deliberately retain the production origin: the client must use its configured local
+ // website for that website's immutable uploads, including the generated video poster.
+ config.siteUrl='https://wallpaper.xiangban.xyz'
  config.releases=[{version:'99.0.0',notes:'测试更新，不执行安装。',published:true,publishedAt:'2026-01-01T00:00:00Z',platforms:{'windows-x86_64':{url:'https://example.com/test-only.zip'},'darwin-aarch64':{url:'https://example.com/test-only.zip'}}}]
  config.announcements=[{id:'website-smoke',title:'网站联调公告',body:'验证公告接入与已读状态。',published:true,audience:['desktop','website'],startsAt:null,endsAt:null}]
  await request('/admin/desktop',config,'PUT')

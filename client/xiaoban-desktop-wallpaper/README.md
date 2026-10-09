@@ -63,7 +63,7 @@ macOS 悬浮窗口使用 AppKit 浮动层；壁纸使用 Core Graphics 的 deskt
 
 ## 使用
 
-“动态壁纸 → 在线壁纸”使用网站相同的搜索、分类和分页接口；选中壁纸后准备资源，再通过已有预览 / 应用流程下载、校验与缓存。“关于小伴 → 壁纸网站”可修改网站源站、关闭自动检查或手动获取版本与公告。正式源站默认为 `wallpaper.xiangban.xyz`。原生后台在启动及每 30 分钟检查消息，控制台关闭时也继续运行；消息在控制台和托盘提示中展示，关闭同一修订后不再重复提醒。修改后的公告和新版本重新提示。配置、消息与已读状态保存在用户目录，网络失败保留已有内容，手动同步显示失败原因。
+“动态壁纸 → 在线壁纸”使用网站相同的搜索、分类和分页接口；图片与动态视频作为第二层类型筛选。点击卡片在当前页右侧查看预览与适配 / 速度设置，不跳回本地页；“保存到我的壁纸”实际下载并校验后可离线使用，不更换桌面；“应用到桌面”独立执行，未保存时先完成下载。视频无图片封面时显示真实首帧，悬停静音播放。“关于小伴 → 壁纸网站”可修改网站源站、关闭自动检查或手动获取版本与公告。正式源站默认为 `wallpaper.xiangban.xyz`。原生后台在启动及每 30 分钟检查消息，控制台关闭时也继续运行；消息在控制台和托盘提示中展示，关闭同一修订后不再重复提醒。修改后的公告和新版本重新提示。配置、消息与已读状态保存在用户目录，网络失败保留已有内容，手动同步显示失败原因。
 
 网站对接协议见[网站接口文档](../../services/server-xiangban-wallpaper/docs/desktop-api.md)，本应用维护自身的类型与解析，不引用网站源码。原生联调测试 `scripts/verify-website.mjs` 使用隔离测试网站和桌面数据目录，验证真实图片 / 视频下载渲染、更新接口与公告已读状态。
 
@@ -136,7 +136,7 @@ Mac 实机还需检查：原角色的发光与连续表情、桌宠拖动、空�
 - `src-tauri/src/main.rs`：控制台、两种窗口生命周期、托盘、命令与诊断。
 - `src-tauri/src/preferences.rs`：本应用设置、兼容旧字段、参数修复与文件保存；`src-tauri/src/startup.rs`：Windows 当前用户注册、macOS 登录启动与测试项清理。
 - `src-tauri/src/storage.rs`：正式/开发/测试数据目录、旧数据迁移与备份；`src-tauri/src/local_media.rs`：原生选择器、媒体格式检查、流式复制、去重与本地目录元数据。持久导入副本与可重新下载的缓存不能混用。
-- `src/control.ts`：三页设置界面；`src/website-ui.ts`：在线图库、官网设置和消息；`src-tauri/src/website.rs`：网站原生 HTTP、后台检查与公告已读状态；`src/content.ts` 与 `public/wallpapers/sandbox.html`：图片/视频与 Canvas 沙箱宿主；`src-tauri/src/library.rs`：目录、资源完整性、缓存协议和更新验证；`src-tauri/src/content.rs`：窗口切换、权限边界和交付命令。
+- `src/control.ts`：三页设置界面；`src/website-ui.ts`：在线图库、保存 / 应用、官网设置和消息；`src/wallpaper-media.ts`：视频与图片预览、首帧回退和可见卡片加载；`src-tauri/src/website.rs`：网站原生 HTTP、后台检查与公告已读状态；`src/content.ts` 与 `public/wallpapers/sandbox.html`：图片/视频与 Canvas 沙箱宿主；`src-tauri/src/library.rs`：目录、资源完整性、缓存协议和更新验证；`src-tauri/src/content.rs`：窗口切换、权限边界和交付命令。
 - `src-tauri/src/runtime`：Windows 启动前检测、原生准备窗口、官方引导程序下载与签名验证。成功/失败/取消的 UI 模拟仅在 debug 构建中启用，不会安装组件；真实缺组件的首次安装还需干净虚拟机验证。
 - `src-tauri/src/windows.rs`：WorkerW 接入、DPI 坐标转换、只读鼠标采样。
 - `src-tauri/src/macos.rs`：AppKit 窗口层级、空间行为、鼠标逻辑点与桌面点击判断。
@@ -145,3 +145,5 @@ Mac 实机还需检查：原角色的发光与连续表情、桌宠拖动、空�
 ## 大仓开发边界
 
 本项目是桌面客户端，不承担网页、账户或后端业务。角色可以有自己的实现，修改角色行为时运行本地 npm test；不引用 client/xiaban-web 或主后端的私有文件。两种窗口模式共用本应用场景，Windows/macOS 接入分文件。新增能力按本次需求，当前无聊天/账号/云端依赖。
+
+品牌插画使用 `public/xiaoban.svg`，由本工程原有猫脸角色 `robotMarkup(stillFrame("idle"))` 导出；网站维护一份相同的静态 SVG，不导入客户端源码。

@@ -142,11 +142,13 @@ impl WallpaperCollector {
                         sort: Some("popular".to_string()),
                     };
 
-                    if let Ok(videos) = prov.videos(&v_query).await {
-                        let v_count = videos.len();
-                        if v_count > 0 {
-                            let _ = self.db.upsert_wallpapers(&videos).await;
-                            total_collected += v_count;
+                    if let (Ok(videos),Some(pool)) = (prov.videos(&v_query).await,self.db.pg_pool()) {
+                        let store=crate::store::Store::from_pool(pool);
+                        for mut video in videos {
+                            match crate::desktop::prepare_wallpaper(&store,&mut video).await {
+                                Ok(())=>{if self.db.upsert_wallpapers(&[video]).await.is_ok(){total_collected+=1;}},
+                                Err(error)=>error!("Video materialisation failed for {}: {error}",video.id),
+                            }
                         }
                     }
                 }

@@ -47,6 +47,7 @@ export interface WallpaperEntry {
   definition: WallpaperDefinition;
   installed: boolean;
   coverUrl: string | null;
+  previewUrl?: string | null;
   source?: "builtin" | "subscription" | "local";
 }
 export interface WallpaperOptions {

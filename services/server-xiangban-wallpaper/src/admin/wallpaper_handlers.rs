@@ -52,6 +52,7 @@ pub async fn collector_import(
     }
     item.source_type = "collected".to_string();
     item.collected_at = Some(chrono::Utc::now());
+    crate::desktop::prepare_wallpaper(state.admin.store()?,&mut item).await?;
 
     state.db.upsert_wallpapers(&[item.clone()]).await?;
     Ok(Json(json!({
@@ -135,6 +136,12 @@ pub async fn admin_update_wallpaper_status(
     Path(id): Path<String>,
     Json(body): Json<UpdateStatusBody>,
 ) -> ApiResult {
+    if body.status=="published" {
+        let mut item=state.db.get_wallpaper(&id).await?.ok_or_else(||AppError::NotFound("壁纸不存在".into()))?;
+        crate::desktop::prepare_wallpaper(state.admin.store()?,&mut item).await?;
+        item.status=body.status.clone();state.db.upsert_wallpapers(&[item]).await?;
+        return Ok(Json(json!({"success":true})));
+    }
     let ok = state.db.update_status(&id, &body.status).await?;
     if !ok {
         return Err(AppError::NotFound("壁纸不存在".to_string()));
@@ -158,6 +165,12 @@ pub async fn admin_update_wallpaper(
     Path(id): Path<String>,
     Json(body): Json<UpdateWallpaperMetaBody>,
 ) -> ApiResult {
+    if body.status=="published" {
+        let mut item=state.db.get_wallpaper(&id).await?.ok_or_else(||AppError::NotFound("壁纸不存在".into()))?;
+        crate::desktop::prepare_wallpaper(state.admin.store()?,&mut item).await?;
+        item.title=body.title;item.category=body.category;item.tags=body.tags;item.status=body.status;
+        state.db.upsert_wallpapers(&[item]).await?;return Ok(Json(json!({"success":true})));
+    }
     let ok = state
         .db
         .update_wallpaper_meta(
@@ -305,7 +318,7 @@ pub async fn admin_create_custom_wallpaper(
         None
     };
 
-    let item = WallpaperItem {
+    let mut item = WallpaperItem {
         id,
         provider: "custom".to_string(),
         source_id: uid,
@@ -335,7 +348,7 @@ pub async fn admin_create_custom_wallpaper(
         local_path: None,
         collected_at: Some(chrono::Utc::now()),
     };
-
+    crate::desktop::prepare_wallpaper(state.admin.store()?,&mut item).await?;
     state.db.upsert_wallpapers(&[item.clone()]).await?;
 
     Ok(Json(json!({

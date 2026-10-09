@@ -1,5 +1,21 @@
 <script setup lang="ts">
 import { onActivated, ref } from "vue";
+const demoMode = ref("wallpaper"),
+  demoPlaying = ref(true),
+  demoVideo = ref<HTMLVideoElement | null>(null);
+function toggleDemo() {
+  const video = demoVideo.value;
+  if (!video) return;
+  if (video.paused) {
+    video
+      .play()
+      .then(() => (demoPlaying.value = true))
+      .catch(() => (demoPlaying.value = false));
+  } else {
+    video.pause();
+    demoPlaying.value = false;
+  }
+}
 import Icon from "@/components/Icon.vue";
 import { getDesktopProduct, targets, type DesktopProduct } from "@/desktop";
 const product = ref<DesktopProduct | null>(null);
@@ -35,11 +51,52 @@ onActivated(load);
           ><Icon name="download" />下载小伴桌面</a
         ><span class="support">Windows / macOS · 无须注册账户</span>
       </div>
-      <div class="room" aria-label="小伴桌面示意插画">
-        <div class="window"><span>✦</span></div>
-        <div class="companion"><i /><i /><b>⌣</b></div>
-        <div class="desk" />
-        <span class="room-caption">今天，也有小伴陪着你。</span>
+      <div class="demo-stage">
+        <div class="demo-modes" aria-label="陪伴方式演示">
+          <button
+            :class="{ active: demoMode === 'floating' }"
+            @click="demoMode = 'floating'"
+          >
+            悬浮桌宠</button
+          ><button
+            :class="{ active: demoMode === 'wallpaper' }"
+            @click="demoMode = 'wallpaper'"
+          >
+            融入动态壁纸
+          </button>
+        </div>
+        <div
+          class="room"
+          :class="demoMode"
+          aria-label="小伴猫脸与动态壁纸效果演示"
+        >
+          <video
+            ref="demoVideo"
+            class="demo-wallpaper"
+            src="/xiaoban-demo.mp4"
+            poster="/xiaoban-demo.jpg"
+            autoplay
+            muted
+            loop
+            playsinline
+            @playing="demoPlaying = true"
+            @pause="demoPlaying = false"
+          />
+          <div class="demo-shortcuts" aria-hidden="true">
+            <span>▣<small>文件</small></span
+            ><span>▧<small>照片</small></span>
+          </div>
+          <img class="companion" src="/xiaoban.svg" alt="小伴猫脸桌宠" />
+          <span class="demo-pill">{{
+            demoMode === "wallpaper" ? "小伴融入视频壁纸" : "小伴悬浮在桌面上"
+          }}</span>
+          <button class="demo-play" @click="toggleDemo">
+            {{ demoPlaying ? "暂停动态壁纸" : "播放动态壁纸" }}
+          </button>
+        </div>
+        <p class="demo-caption">
+          真实循环视频演示 · 静音播放 · 桌宠与动态壁纸可以一起使用
+        </p>
       </div>
     </section>
     <section class="features">
@@ -188,30 +245,90 @@ onActivated(load);
 }
 .companion {
   position: absolute;
-  z-index: 1;
-  left: 25%;
-  bottom: 72px;
-  width: 110px;
-  height: 120px;
-  border-radius: 48% 48% 40% 40%;
-  background: #ffedd1;
-  box-shadow: 0 0 80px #ffd99b66;
+  z-index: 2;
+  width: 190px;
+  height: auto;
+  left: 30%;
+  bottom: 30px;
+  filter: drop-shadow(0 10px 22px #7bddeb35);
+  transition: all 0.5s;
+}
+.floating .companion {
+  width: 130px;
+  left: 67%;
+  bottom: 40px;
+}
+.demo-stage {
+  min-width: 0;
+}
+.demo-modes {
   display: flex;
-  align-items: center;
   justify-content: center;
-  gap: 26px;
+  gap: 8px;
+  margin-bottom: 16px;
 }
-.companion i {
-  width: 9px;
-  height: 12px;
-  border-radius: 50%;
-  background: #665447;
+.demo-modes button {
+  padding: 8px 16px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--text-2);
 }
-.companion b {
+.demo-modes .active {
+  background: var(--surface-2);
+  color: var(--text);
+}
+.demo-wallpaper {
   position: absolute;
-  bottom: 28px;
-  color: #a98065;
-  font-size: 26px;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.demo-shortcuts {
+  position: absolute;
+  left: 22px;
+  top: 26px;
+  display: grid;
+  gap: 22px;
+  color: #fff;
+  filter: drop-shadow(0 2px 5px #0007);
+}
+.demo-shortcuts span {
+  display: grid;
+  text-align: center;
+  font-size: 24px;
+  gap: 4px;
+}
+.demo-shortcuts small {
+  font-size: 10px;
+}
+.demo-pill {
+  position: absolute;
+  left: 20px;
+  bottom: 16px;
+  z-index: 3;
+  padding: 8px 12px;
+  border-radius: 20px;
+  background: #172b38a8;
+  font-size: 11px;
+  color: #fff;
+}
+.demo-play {
+  position: absolute;
+  right: 16px;
+  bottom: 16px;
+  z-index: 3;
+  padding: 8px 12px;
+  border-radius: 20px;
+  background: #fffdf0;
+  font-size: 11px;
+  color: #303d41;
+}
+.demo-caption {
+  font-size: 12px;
+  color: var(--text-3);
+  text-align: center;
+  margin-top: 14px;
 }
 .room-caption {
   position: absolute;

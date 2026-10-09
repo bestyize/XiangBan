@@ -1,3 +1,4 @@
+import { mediaMarkup, bindMedia } from "./wallpaper-media.ts";
 import { WebsiteUi } from "./website-ui.ts";
 import { EXPRESSIONS, EXPRESSION_NAMES } from "./companion/expressions.ts";
 import { PetView } from "./pet.ts";
@@ -31,7 +32,7 @@ const paths: Record<string, string> = {
   settings: "M5 7h14M5 17h14M9 4v6M15 14v6",
 };
 const icon = (name: string) =>
-  `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${paths[name] ?? paths.pet}"/></svg>`;
+  name === "pet" ? '<img class="xiaoban-mark" src="/xiaoban.svg" alt="小伴猫脸">' : `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${paths[name] ?? paths.pet}"/></svg>`;
 const esc = (value: unknown) =>
   String(value ?? "").replace(
     /[&<>"']/g,
@@ -48,7 +49,7 @@ export async function mountControl() {
     page = "pet",
     pet: PetView | null = null,
     chosen = "companion",
-    filter = "all",
+    filter = "online",
     busy = false,
     startupAvailable = false;
   let library: WallpaperLibrary = {
@@ -127,7 +128,9 @@ export async function mountControl() {
     toast,
     local: () => { filter = "all"; renderWallpapers(); },
     about: () => navigate("about"),
-    selected: (next, id) => { library = next; filter = "all"; pick(id); },
+    library: (next) => { library = next; },
+    applied: (next) => { chosen = next.wallpaperId; draft = clone(next.wallpaperOptions); settingsApply(next); },
+    importLocal: () => { filter = "all"; navigate("wallpaper"); task(importLocal); },
     status: (status) => { lastUpdate = status.update; if (page === "about" && !["website-url", "website-auto"].includes(document.activeElement?.id ?? "")) renderAbout(); },
   });
   const current = (id = chosen) =>
@@ -312,7 +315,7 @@ export async function mountControl() {
       const result = await invoke<{ id: string; library: WallpaperLibrary } | null>("import_local_wallpaper");
       if (result) {
         library = result.library;
-        filter = "local";
+        filter = "all";
         chosen = result.id;
         draft = clone(wallpaperDefaults);
         navigate("wallpaper");
@@ -323,18 +326,19 @@ export async function mountControl() {
       if (button.isConnected) { button.disabled = false; button.innerHTML = `${icon("folder")}导入图片 / 视频`; }
     }
   }
+  let localMediaCleanup: (() => void) | null = null;
   function renderWallpapers() {
+    localMediaCleanup?.(); localMediaCleanup = null;
     if (filter === "online") { void website.open(body); return; }
+    website.detach();
     const entries = library.items.filter(
       (entry) => filter === "all" || (filter === "local" ? entry.source === "local" : entry.definition.kind === filter),
     );
-    body.innerHTML = `<div class="wallpaper-toolbar"><div class="filter-tabs">${[
+    body.innerHTML = `<div class="wallpaper-sourcebar"><div class="filter-tabs source-tabs"><button id="browse-online">在线壁纸</button><button class="selected" aria-pressed="true">我的壁纸</button></div><button class="primary-button" id="import-local">${icon("folder")}导入图片 / 视频</button></div><div class="wallpaper-toolbar"><div class="filter-tabs">${[
       ["all", "全部"],
-      ["online", "在线壁纸"],
       ["image", "图片"],
       ["video", "视频"],
       ["canvas", "动画"],
-      ["local", "我的导入"],
     ]
       .map(
         ([id, label]) =>
@@ -342,7 +346,9 @@ export async function mountControl() {
       )
       .join(
         "",
-      )}</div><div class="toolbar-actions"><button class="icon-button" id="refresh-library" title="刷新订阅">${icon("refresh")}</button><button class="icon-button" id="import-manifest" title="导入 JSON 清单" aria-label="导入 JSON 清单">${icon("folder")}</button><button class="secondary-button" id="subscribe">${icon("plus")}添加订阅</button><button class="primary-button" id="import-local">${icon("folder")}导入图片 / 视频</button></div></div><div class="wallpaper-layout"><div class="wallpaper-gallery">${filter === "all" ? `<button class="wallpaper-card ${chosen === "companion" ? "selected" : ""}" data-wallpaper="companion"><div class="wallpaper-cover room-cover"><span class="cover-window"></span><span class="cover-moon"></span><span class="cover-desk"></span><span class="wallpaper-type">默认</span>${chosen === "companion" ? `<span class="selection-check">${icon("check")}</span>` : ""}</div><div class="wallpaper-card-info"><b>小伴房间</b><small>跟随小伴的陪伴方式</small></div></button>` : ""}${entries.map((entry) => `<button class="wallpaper-card ${chosen === entry.definition.id ? "selected" : ""}" data-wallpaper="${esc(entry.definition.id)}"><div class="wallpaper-cover ${entry.definition.kind}">${entry.coverUrl ? `<img src="${esc(entry.coverUrl)}" alt="${esc(entry.definition.title)}">` : '<span class="fallback-art">✧</span>'}<span class="wallpaper-type">${kindLabel(entry.definition.kind)}</span>${chosen === entry.definition.id ? `<span class="selection-check">${icon("check")}</span>` : ""}${entry.definition.kind === "video" ? `<span class="video-mark">${icon("play")}</span>` : ""}</div><div class="wallpaper-card-info"><b>${esc(entry.definition.title)}</b><small>${esc(entry.definition.author || "壁纸提供方")}<em>${entry.installed ? "本地可用" : "可下载"}</em></small></div></button>`).join("")}${entries.length === 0 ? '<div class="empty-gallery">还没有这一类壁纸，导入喜欢的图片、视频，或添加壁纸订阅。</div>' : ""}<div class="gallery-note">${icon("download")}导入会保存原文件副本；推荐 H.264 MP4，壁纸可离线使用。</div></div><aside class="wallpaper-inspector" id="wallpaper-inspector"></aside></div>`;
+      )}</div><details class="wallpaper-advanced"><summary>订阅与清单</summary><div class="toolbar-actions"><button class="icon-button" id="refresh-library" title="刷新订阅">${icon("refresh")}</button><button class="secondary-button" id="import-manifest">导入 JSON</button><button class="secondary-button" id="subscribe">${icon("plus")}添加订阅</button></div></details></div><div class="wallpaper-layout"><div class="wallpaper-gallery">${filter === "all" ? `<button class="wallpaper-card ${chosen === "companion" ? "selected" : ""}" data-wallpaper="companion"><div class="wallpaper-cover room-cover"><span class="cover-window"></span><span class="cover-moon"></span><span class="cover-desk"></span><span class="wallpaper-type">默认</span>${chosen === "companion" ? `<span class="selection-check">${icon("check")}</span>` : ""}</div><div class="wallpaper-card-info"><b>小伴房间</b><small>跟随小伴的陪伴方式</small></div></button>` : ""}${entries.map((entry) => `<button class="wallpaper-card ${chosen === entry.definition.id ? "selected" : ""}" data-wallpaper="${esc(entry.definition.id)}"><div class="wallpaper-cover ${entry.definition.kind}">${mediaMarkup(entry.definition.kind,entry.previewUrl ?? "",entry.coverUrl ?? "",entry.definition.title)}<span class="wallpaper-type">${kindLabel(entry.definition.kind)}</span>${chosen === entry.definition.id ? `<span class="selection-check">${icon("check")}</span>` : ""}${entry.definition.kind === "video" ? `<span class="video-mark">${icon("play")}</span>` : ""}</div><div class="wallpaper-card-info"><b>${esc(entry.definition.title)}</b><small>${esc(entry.definition.author || "壁纸提供方")}<em>${entry.installed ? "本地可用" : "可下载"}</em></small></div></button>`).join("")}${entries.length === 0 ? '<div class="empty-gallery">还没有这一类壁纸，导入喜欢的图片、视频，或添加壁纸订阅。</div>' : ""}<div class="gallery-note">${icon("download")}导入会保存原文件副本；推荐 H.264 MP4，壁纸可离线使用。</div></div><aside class="wallpaper-inspector" id="wallpaper-inspector"></aside></div>`;
+    body.querySelector("#browse-online")!.addEventListener("click", () => { filter = "online"; renderWallpapers(); });
+    localMediaCleanup = bindMedia(body);
     body.querySelectorAll<HTMLButtonElement>("[data-filter]").forEach((b) =>
       b.addEventListener("click", () => {
         filter = b.dataset.filter!;
@@ -380,19 +386,23 @@ export async function mountControl() {
         .addEventListener("click", () => task(() => apply(false)));
       return;
     }
-    inspector.innerHTML = `<span class="inspector-eyebrow">${kindLabel(item.kind)}壁纸</span><h2>${esc(item.title)}</h2><p>${esc(item.description || "为桌面留下一点喜欢的风景。")}</p><div class="inspector-meta"><span>来自 ${esc(item.author || "壁纸提供方")}</span><span>v${esc(item.version)}</span></div><div class="inspector-divider"></div>${item.kind !== "canvas" ? `<div class="compact-field"><label for="fit">画面适配</label><select id="fit"><option value="cover">铺满屏幕</option><option value="contain">完整显示</option><option value="fill">拉伸适配</option></select></div>` : ""}${item.kind === "video" ? `<div class="compact-field"><label for="playback">播放速度 <span id="playback-value">${draft.playbackRate}×</span></label><input id="playback" type="range" min="0.25" max="2" step="0.25" value="${draft.playbackRate}"><small>静音循环播放，让画面自然流动。</small></div>` : ""}${(item.controls ?? []).map((c) => `<div class="compact-field"><label for="property-${esc(c.key)}">${esc(c.label)}${c.type === "range" ? `<span id="value-${esc(c.key)}">${esc(draft.values[c.key])}</span>` : ""}</label>${c.type === "range" ? `<input data-property="${esc(c.key)}" id="property-${esc(c.key)}" type="range" min="${c.min}" max="${c.max}" step="${c.step}" value="${esc(draft.values[c.key])}">` : c.type === "color" ? `<input data-property="${esc(c.key)}" id="property-${esc(c.key)}" type="color" value="${esc(draft.values[c.key])}">` : c.type === "boolean" ? `<input data-property="${esc(c.key)}" id="property-${esc(c.key)}" type="checkbox" ${draft.values[c.key] ? "checked" : ""}>` : `<select data-property="${esc(c.key)}" id="property-${esc(c.key)}">${(c.options ?? []).map((v) => `<option ${draft.values[c.key] === v ? "selected" : ""}>${esc(v)}</option>`).join("")}</select>`}</div>`).join("")}<div class="wallpaper-actions"><button class="secondary-button wide" id="preview-wallpaper">${icon("play")}单独预览</button><button class="primary-button wide" id="apply-wallpaper">${icon("check")}${chosen === config.wallpaperId ? "更新壁纸设置" : entry!.installed ? "应用到桌面" : "下载并应用"}</button></div><div class="download-progress" id="download-progress" hidden><span></span><progress max="1" value="0"></progress></div><div class="inspector-tip">${item.kind === "canvas" ? "动画在独立画面中运行，不连接网络。" : "保留桌面图标的正常操作。"}${config.mode === "floating" ? " 小伴仍会悬浮陪伴。" : " 小伴会融入这张壁纸。"}</div>`;
+    inspector.innerHTML = `${item.kind !== "canvas" ? `<div class="inspector-preview">${mediaMarkup(item.kind,entry?.previewUrl ?? "",entry?.coverUrl ?? "",item.title,true)}</div>` : ""}<span class="inspector-eyebrow">${kindLabel(item.kind)}壁纸</span><h2>${esc(item.title)}</h2><p>${esc(item.description || "为桌面留下一点喜欢的风景。")}</p><div class="inspector-meta"><span>来自 ${esc(item.author || "壁纸提供方")}</span><span>v${esc(item.version)}</span></div><div class="inspector-divider"></div>${item.kind !== "canvas" ? `<div class="compact-field"><label for="fit">画面适配</label><select id="fit"><option value="cover">铺满屏幕</option><option value="contain">完整显示</option><option value="fill">拉伸适配</option></select></div>` : ""}${item.kind === "video" ? `<div class="compact-field"><label for="playback">播放速度 <span id="playback-value">${draft.playbackRate}×</span></label><input id="playback" type="range" min="0.25" max="2" step="0.25" value="${draft.playbackRate}"><small>静音循环播放，让画面自然流动。</small></div>` : ""}${(item.controls ?? []).map((c) => `<div class="compact-field"><label for="property-${esc(c.key)}">${esc(c.label)}${c.type === "range" ? `<span id="value-${esc(c.key)}">${esc(draft.values[c.key])}</span>` : ""}</label>${c.type === "range" ? `<input data-property="${esc(c.key)}" id="property-${esc(c.key)}" type="range" min="${c.min}" max="${c.max}" step="${c.step}" value="${esc(draft.values[c.key])}">` : c.type === "color" ? `<input data-property="${esc(c.key)}" id="property-${esc(c.key)}" type="color" value="${esc(draft.values[c.key])}">` : c.type === "boolean" ? `<input data-property="${esc(c.key)}" id="property-${esc(c.key)}" type="checkbox" ${draft.values[c.key] ? "checked" : ""}>` : `<select data-property="${esc(c.key)}" id="property-${esc(c.key)}">${(c.options ?? []).map((v) => `<option ${draft.values[c.key] === v ? "selected" : ""}>${esc(v)}</option>`).join("")}</select>`}</div>`).join("")}<div class="wallpaper-actions"><button class="secondary-button wide" id="preview-wallpaper">${icon("play")}单独预览</button><button class="primary-button wide" id="apply-wallpaper">${icon("check")}${chosen === config.wallpaperId ? "更新壁纸设置" : entry!.installed ? "应用到桌面" : "下载并应用"}</button></div><div class="download-progress" id="download-progress" hidden><span></span><progress max="1" value="0"></progress></div><div class="inspector-tip">${item.kind === "canvas" ? "动画在独立画面中运行，不连接网络。" : "保留桌面图标的正常操作。"}${config.mode === "floating" ? " 小伴仍会悬浮陪伴。" : " 小伴会融入这张壁纸。"}</div>`;
+    const cleanupCards = localMediaCleanup;
+    const cleanupInspector = bindMedia(inspector);
+    localMediaCleanup = () => { cleanupCards?.(); cleanupInspector(); };
     const fit = inspector.querySelector<HTMLSelectElement>("#fit");
     if (fit) {
       fit.value = draft.fit;
       fit.addEventListener(
         "change",
-        () => (draft.fit = fit.value as WallpaperOptions["fit"]),
+        () => { draft.fit = fit.value as WallpaperOptions["fit"]; const media=inspector.querySelector<HTMLElement>("img,video"); if(media)media.style.objectFit=fit.value; },
       );
     }
     inspector
       .querySelector<HTMLInputElement>("#playback")
       ?.addEventListener("input", (e) => {
         draft.playbackRate = Number((e.target as HTMLInputElement).value);
+        const video=inspector.querySelector("video"); if(video)video.playbackRate=draft.playbackRate;
         inspector.querySelector("#playback-value")!.textContent =
           `${draft.playbackRate}×`;
       });
@@ -545,6 +555,7 @@ export async function mountControl() {
     host.querySelector<HTMLInputElement>("#source-url")!.focus();
   }
   function navigate(next: string) {
+    website.detach(); localMediaCleanup?.(); localMediaCleanup = null;
     pet?.destroy();
     pet = null;
     page = next;

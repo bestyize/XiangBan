@@ -2,6 +2,7 @@
 use crate::{content, library, settings, DesktopState};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use sha2::{Digest, Sha256};
 use std::{collections::BTreeMap, sync::Mutex, time::Duration};
 use tauri::{Emitter, Manager};
 
@@ -105,7 +106,28 @@ pub async fn fetch_site_wallpapers(
     if ["image", "video"].contains(&media.as_str()) {
         url.query_pairs_mut().append_pair("media_type", &media);
     }
-    serde_json::from_str(&get(url.to_string()).await?).map_err(|e| format!("网站壁纸数据无效: {e}"))
+    let mut feed: Value = serde_json::from_str(&get(url.to_string()).await?)
+        .map_err(|e| format!("网站壁纸数据无效: {e}"))?;
+    let root = content::root(&app)?;
+    let items = library::all_items(&root);
+    if let Some(entries) = feed["items"].as_array_mut() {
+        for entry in entries {
+            if let Some(id) = entry["id"].as_str() {
+                let id = format!(
+                    "site-{}",
+                    &format!("{:x}", Sha256::digest(id.as_bytes()))[..40]
+                );
+                let downloaded = items.iter().find(|item| item.id == id).is_some_and(|item| {
+                    library::assets(item)
+                        .iter()
+                        .all(|r| library::cached(&root, r))
+                });
+                entry["desktop_id"] = Value::String(id);
+                entry["downloaded"] = Value::Bool(downloaded);
+            }
+        }
+    }
+    Ok(feed)
 }
 #[tauri::command]
 pub async fn fetch_site_categories(app: tauri::AppHandle) -> Result<Value, String> {
@@ -114,16 +136,61 @@ pub async fn fetch_site_categories(app: tauri::AppHandle) -> Result<Value, Strin
 }
 #[tauri::command]
 pub async fn select_site_wallpaper(app: tauri::AppHandle, id: String) -> Result<Value, String> {
+    let origin = settings(&app).website_url;
     let mut url = library::network_url(&endpoint(&app, "/api/v1/desktop/wallpapers/")?)?;
     url.path_segments_mut()
         .map_err(|_| "网站地址无效")?
         .pop_if_empty()
         .push(&id);
     let text = get(url.to_string()).await?;
-    let catalog = library::parse_catalog(&text)?;
+    let mut catalog = library::parse_catalog(&text)?;
+    for item in &mut catalog.items {
+        site_resource(&mut item.resource, &origin)?;
+        if let Some(cover) = &mut item.cover {
+            site_resource(cover, &origin)?;
+        }
+    }
     let id = catalog.items.first().ok_or("网站没有返回壁纸")?.id.clone();
+    let text = serde_json::to_string(&catalog).map_err(|e| e.to_string())?;
     let library = content::import_wallpaper_catalog(app, text).await?;
     Ok(serde_json::json!({"library":library,"id":id}))
+}
+// The local website preview uses the same unconfigured product defaults as production.
+// Only its own content-addressed uploads may be rebased; CDN URLs and public sites retain
+// the addresses supplied by the service. Size/hash verification remains mandatory.
+fn site_resource(resource: &mut library::Resource, origin: &str) -> Result<(), String> {
+    let base = library::network_url(origin)?;
+    let url = library::network_url(&resource.url)?;
+    if library::hash_name(&resource.sha256)
+        && url
+            .path()
+            .starts_with(&format!("/uploads/desktop-{}.", resource.sha256))
+    {
+        resource.url = base
+            .join(url.path())
+            .map_err(|e| e.to_string())?
+            .to_string();
+    }
+    Ok(())
+}
+#[tauri::command]
+pub async fn download_site_wallpaper(app: tauri::AppHandle, id: String) -> Result<Value, String> {
+    let selected = select_site_wallpaper(app.clone(), id).await?;
+    let id = selected["id"].as_str().ok_or("网站未返回壁纸")?.to_string();
+    let root = content::root(&app)?;
+    let item = library::all_items(&root)
+        .into_iter()
+        .find(|item| item.id == id)
+        .ok_or("壁纸记录不存在")?;
+    let handle = app.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let state = handle.state::<content::ContentState>();
+        let _io = state.io.lock().unwrap();
+        library::prepare(&handle, &root, &item)
+    })
+    .await
+    .map_err(|e| e.to_string())??;
+    Ok(serde_json::json!({"id":id,"library":content::get_wallpaper_library(app)?}))
 }
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -272,6 +339,27 @@ mod tests {
             .unwrap()
             .is_empty());
     }
+    #[test]
+    fn localhost_preview_keeps_immutable_downloads_on_the_connected_website() {
+        let hash = "a".repeat(64);
+        let mut resource = library::Resource {
+            url: format!("https://wallpaper.xiangban.xyz/uploads/desktop-{hash}.mp4"),
+            sha256: hash,
+            bytes: 10,
+            mime: "video/mp4".into(),
+        };
+        let original = resource.url.clone();
+        site_resource(&mut resource, "https://other.example").unwrap();
+        assert!(resource.url.starts_with("https://other.example/uploads/"));
+        resource.url = original;
+        site_resource(&mut resource, "http://127.0.0.1:8087").unwrap();
+        assert!(resource
+            .url
+            .starts_with("http://127.0.0.1:8087/uploads/desktop-"));
+        resource.url = "https://cdn.example/video.mp4".into();
+        site_resource(&mut resource, "http://127.0.0.1:8087").unwrap();
+        assert_eq!(resource.url, "https://cdn.example/video.mp4");
+    }
 }
 
 pub async fn smoke(app: &tauri::AppHandle) -> Result<Value, String> {
@@ -300,7 +388,21 @@ pub async fn smoke(app: &tauri::AppHandle) -> Result<Value, String> {
             .as_str()
             .ok_or("网站检索没有返回测试壁纸")?
             .to_string();
-        let selected = select_site_wallpaper(app.clone(), id).await?;
+        let previous_wallpaper = settings(app).wallpaper_id;
+        let selected = download_site_wallpaper(app.clone(), id).await?;
+        if settings(app).wallpaper_id != previous_wallpaper {
+            return Err("保存到我的壁纸不应更换桌面".into());
+        }
+        if !selected["library"]["items"]
+            .as_array()
+            .is_some_and(|items| {
+                items.iter().any(|item| {
+                    item["definition"]["id"] == selected["id"] && item["installed"] == true
+                })
+            })
+        {
+            return Err("保存后素材应已缓存，不应再次手动下载".into());
+        }
         let id = selected["id"]
             .as_str()
             .ok_or("网站未返回交付 ID")?

@@ -20,6 +20,7 @@ pub struct Store {
 }
 
 impl Store {
+    pub fn from_pool(pool: PgPool) -> Self { Self { pool } }
     pub async fn init(pool: PgPool) -> Result<Self, AppError> {
         let sql = include_str!("../../migrations/20261009000000_admin.sql");
         sqlx::raw_sql(sql).execute(&pool).await?;

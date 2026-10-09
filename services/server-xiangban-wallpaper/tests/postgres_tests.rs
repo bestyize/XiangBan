@@ -466,12 +466,14 @@ async fn desktop_manifest_materialises_only_published_media_with_real_hash_and_s
     let marker=uuid::Uuid::new_v4().simple().to_string();
     tokio::fs::create_dir_all("uploads").await.unwrap();
     for (kind,extension) in [("image","png"),("video","mp4")] {
-        let bytes=format!("test-{kind}-{marker}").into_bytes();
+        let mut bytes=if kind=="video" {include_bytes!("fixtures/sea-breeze.mp4").to_vec()} else {format!("test-{kind}-{marker}").into_bytes()};
+        if kind=="video" {bytes.extend(marker.as_bytes());}
         let name=format!("test-{marker}.{extension}");
         tokio::fs::write(format!("uploads/{name}"),&bytes).await.unwrap();
         let url=format!("/uploads/{name}");
         let created=call(&app,"POST","/wallpapers/custom",Some(&cookie),Some(json!({"title":"真实文件校验","media_type":kind,"preview_url":url,"regular_url":url,"video_url":url,"status":"pending"}))).await;
-        assert_eq!(created.status,StatusCode::OK);
+        assert_eq!(created.status,StatusCode::OK,"{}",created.body);
+        if kind=="video" {assert!(created.body["item"]["video"]["preview_url"].as_str().unwrap().starts_with("/uploads/"));let cover=created.body["item"]["preview_url"].as_str().unwrap();let image=tokio::fs::read(cover.trim_start_matches('/')).await.unwrap();assert_eq!(&image[..2],&[0xff,0xd8]);}
         let id=created.body["item"]["id"].as_str().unwrap();
         let path=format!("/api/v1/desktop/wallpapers/{id}");
         assert_eq!(public_call(&app,&path).await.status,StatusCode::NOT_FOUND);
@@ -488,6 +490,10 @@ async fn desktop_manifest_materialises_only_published_media_with_real_hash_and_s
         state.db.update_status(id,"offline").await.unwrap();
         assert_eq!(public_call(&app,&path).await.status,StatusCode::NOT_FOUND);
         tokio::fs::remove_file(resource).await.unwrap();tokio::fs::remove_file(format!("uploads/{name}")).await.unwrap();
+        let mut covers=std::collections::HashSet::new();
+        if let Some(value)=created.body["item"]["preview_url"].as_str(){if kind=="video"{covers.insert(value.trim_start_matches('/').to_string());}}
+        if let Some(value)=item["cover"]["url"].as_str(){covers.insert(value.strip_prefix("http://localhost:8080/").unwrap().to_string());}
+        for cover in covers {let _=tokio::fs::remove_file(cover).await;}
     }
     db.cleanup().await;
 }

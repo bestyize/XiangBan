@@ -486,10 +486,11 @@ fn source(item: &WallpaperItem) -> Result<(&str, &str), AppError> {
                 v.qualities
                     .iter()
                     .filter(|q| {
-                        q.url
-                            .split('?')
-                            .next()
-                            .is_some_and(|p| p.ends_with(".mp4") || p.ends_with(".webm"))
+                        q.size_bytes.is_none_or(|bytes| bytes <= 256 * 1024 * 1024)
+                            && q.url
+                                .split('?')
+                                .next()
+                                .is_some_and(|p| p.ends_with(".mp4") || p.ends_with(".webm"))
                     })
                     .max_by_key(|q| q.width)
             })
@@ -498,25 +499,175 @@ fn source(item: &WallpaperItem) -> Result<(&str, &str), AppError> {
         _ => Err(bad("该媒体类型暂不支持桌面播放")),
     }
 }
+fn ffmpeg() -> std::path::PathBuf {
+    if let Some(value) = std::env::var_os("FFMPEG_BIN") {
+        return value.into();
+    }
+    let local = std::path::PathBuf::from(if cfg!(windows) {
+        "target/media-tools/node_modules/ffmpeg-static/ffmpeg.exe"
+    } else {
+        "target/media-tools/node_modules/ffmpeg-static/ffmpeg"
+    });
+    if local.is_file() {
+        local
+    } else {
+        "ffmpeg".into()
+    }
+}
+async fn first_frame(media: &Resource) -> Result<Resource, AppError> {
+    let temporary = std::path::PathBuf::from(format!("uploads/frame-{}.jpg", uuid::Uuid::new_v4()));
+    let mut command = tokio::process::Command::new(ffmpeg());
+    command
+        .args([
+            "-nostdin",
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-y",
+            "-i",
+            media.url.trim_start_matches('/'),
+            "-frames:v",
+            "1",
+            "-vf",
+            "scale=640:-2",
+            "-q:v",
+            "3",
+        ])
+        .arg(&temporary)
+        .kill_on_drop(true);
+    #[cfg(windows)]
+    command.creation_flags(0x08000000);
+    let result = async {
+        let output = tokio::time::timeout(Duration::from_secs(30), command.output())
+            .await
+            .map_err(|_| bad("视频首帧处理超时"))?
+            .map_err(|_| {
+                AppError::ServiceUnavailable(
+                    "生成视频首帧需要 FFmpeg，请安装或设置 FFMPEG_BIN".into(),
+                )
+            })?;
+        if !output.status.success() {
+            return Err(bad(&format!(
+                "无法读取视频首帧：{}",
+                String::from_utf8_lossy(&output.stderr)
+                    .chars()
+                    .take(500)
+                    .collect::<String>()
+            )));
+        }
+        let bytes = tokio::fs::read(&temporary)
+            .await
+            .map_err(|e| AppError::Internal(e.to_string()))?;
+        if bytes.is_empty() || bytes.len() > 2 * 1024 * 1024 {
+            return Err(bad("视频首帧大小无效"));
+        }
+        let sha256 = hash(&bytes);
+        let name = format!("desktop-{sha256}.jpg");
+        let target = std::path::PathBuf::from("uploads").join(&name);
+        if tokio::fs::metadata(&target).await.is_err() {
+            tokio::fs::rename(&temporary, &target)
+                .await
+                .map_err(|e| AppError::Internal(e.to_string()))?;
+        }
+        Ok(Resource {
+            url: format!("/uploads/{name}"),
+            sha256,
+            bytes: bytes.len() as u64,
+            mime: "image/jpeg".into(),
+        })
+    }
+    .await;
+    let _ = tokio::fs::remove_file(&temporary).await;
+    result
+}
+pub async fn prepare_wallpaper(store: &Store, item: &mut WallpaperItem) -> Result<(), AppError> {
+    if item.media_type != MediaType::Video {
+        return Ok(());
+    }
+    let (url, kind) = source(item)?;
+    let media = resource(store, url, kind, "").await?;
+    let has_cover = !item.preview_url.is_empty()
+        && !item.preview_url.split('?').next().is_some_and(|v| {
+            v.to_ascii_lowercase().ends_with(".mp4") || v.to_ascii_lowercase().ends_with(".webm")
+        });
+    let cover = if has_cover {
+        resource(store, &item.preview_url, "image", "").await?
+    } else {
+        let key = format!("desktop.cover.{}", media.sha256);
+        if let Some(value) = store.get_setting(&key).await? {
+            let cover: Resource =
+                serde_json::from_str(&value).map_err(|e| AppError::Internal(e.to_string()))?;
+            if tokio::fs::metadata(cover.url.trim_start_matches('/'))
+                .await
+                .is_ok()
+            {
+                cover
+            } else {
+                first_frame(&media).await?
+            }
+        } else {
+            first_frame(&media).await?
+        }
+    };
+    store
+        .set_setting(
+            &format!("desktop.cover.{}", media.sha256),
+            &serde_json::to_string(&cover).unwrap(),
+        )
+        .await?;
+    item.preview_url = cover.url.clone();
+    item.regular_url = media.url.clone();
+    item.local_path = Some(media.url.clone());
+    item.downloads.original = media.url.clone();
+    item.downloads.large = Some(media.url.clone());
+    item.downloads.medium = Some(media.url.clone());
+    item.downloads.small = Some(cover.url.clone());
+    item.downloads.thumb = cover.url;
+    if let Some(video) = &mut item.video {
+        video.preview_url = media.url.clone();
+        video.qualities = vec![crate::models::wallpaper::VideoQuality {
+            quality: format!("{}p", item.resolution.height),
+            url: media.url,
+            width: item.resolution.width,
+            height: item.resolution.height,
+            size_bytes: Some(media.bytes),
+        }];
+    }
+    Ok(())
+}
 pub async fn wallpaper(
     State(state): State<AppState>,
     Path(id): Path<String>,
 ) -> Result<Json<Value>, AppError> {
-    let item = state
+    let mut item = state
         .db
         .get_wallpaper(&id)
         .await?
         .filter(|w| w.status == "published")
         .ok_or_else(|| AppError::NotFound("壁纸未上架或不存在".into()))?;
     let store = state.admin.store()?;
+    if item.media_type == MediaType::Video
+        && (item.local_path.is_none() || item.preview_url.is_empty())
+    {
+        prepare_wallpaper(store, &mut item).await?;
+        state.db.upsert_wallpapers(&[item.clone()]).await?;
+    }
     let config = config(store).await?;
     let (url, kind) = source(&item)?;
-    let resource = resource(store, url, kind, &config.site_url).await?;
+    let media = resource(store, url, kind, &config.site_url).await?;
     // Remote thumbnails are fetched by the client only for gallery display; the manifest retains
     // the strict resource format and does not turn video URLs into image covers.
-    let definition = json!({"id":format!("site-{}", &hash(item.id.as_bytes())[..40]),"version":"1.0.0","title":clip(&item.title,160),"description":clip(item.description.as_deref().unwrap_or(""),2048),"author":clip(&item.author.name,160),"kind":kind,"resource":resource});
+    let cover = if item.media_type == MediaType::Video {
+        Some(resource(store, &item.preview_url, "image", &config.site_url).await?)
+    } else {
+        None
+    };
+    let mut definition = json!({"id":format!("site-{}", &hash(item.id.as_bytes())[..40]),"version":"1.0.0","title":clip(&item.title,160),"description":clip(item.description.as_deref().unwrap_or(""),2048),"author":clip(&item.author.name,160),"kind":kind,"resource":media});
+    if let Some(cover) = cover {
+        definition["cover"] = serde_json::to_value(cover).unwrap();
+    }
     Ok(Json(
-        json!({"schemaVersion":1,"revision":resource.sha256,"items":[definition]}),
+        json!({"schemaVersion":1,"revision":media.sha256,"items":[definition]}),
     ))
 }
 fn clip(value: &str, max: usize) -> &str {

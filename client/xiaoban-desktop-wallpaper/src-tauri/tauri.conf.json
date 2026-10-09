@@ -17,7 +17,7 @@
       "minWidth": 900, "minHeight": 680, "center": true, "visible": false, "backgroundColor": "#ffffff"
     }],
     "security": {
-      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' https: http://localhost:* http://127.0.0.1:* data: blob: wallpaper-asset: http://wallpaper-asset.localhost; media-src 'self' blob: wallpaper-asset: http://wallpaper-asset.localhost; frame-src 'self' wallpaper-asset: http://wallpaper-asset.localhost; connect-src 'self' ipc: http://ipc.localhost wallpaper-asset: http://wallpaper-asset.localhost http://127.0.0.1:1420 ws://127.0.0.1:1420"
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' https: http://localhost:* http://127.0.0.1:* data: blob: wallpaper-asset: http://wallpaper-asset.localhost; media-src 'self' https: http://localhost:* http://127.0.0.1:* blob: wallpaper-asset: http://wallpaper-asset.localhost; frame-src 'self' wallpaper-asset: http://wallpaper-asset.localhost; connect-src 'self' ipc: http://ipc.localhost wallpaper-asset: http://wallpaper-asset.localhost http://127.0.0.1:1420 ws://127.0.0.1:1420"
     }
   },
   "bundle": {

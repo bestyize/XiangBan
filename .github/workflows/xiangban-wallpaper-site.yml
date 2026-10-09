@@ -38,6 +38,8 @@ jobs:
           workspaces: services/server-xiangban-wallpaper
       - run: npm ci && npm run build
         working-directory: services/server-xiangban-wallpaper/web
+      - name: Install video thumbnail runtime
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
       - run: cargo test --locked && cargo build --release --locked
         working-directory: services/server-xiangban-wallpaper
       - run: python3 tools/check-layout.py
