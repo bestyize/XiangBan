@@ -49,6 +49,8 @@ pub struct Settings {
     pub update_url: String,
     pub website_url: String,
     pub automatic_updates: bool,
+    pub game_desktop_double_click: bool,
+    pub companion_enabled: bool,
 }
 
 impl Default for Settings {
@@ -67,6 +69,8 @@ impl Default for Settings {
             update_url: format!("{}/api/v1/desktop/updates", crate::website::DEFAULT_SITE),
             website_url: crate::website::DEFAULT_SITE.into(),
             automatic_updates: true,
+            game_desktop_double_click: false,
+            companion_enabled: true,
         }
     }
 }
@@ -153,6 +157,9 @@ mod tests {
                 .unwrap();
         assert_eq!(value.settings.mode, "wallpaper");
         assert!(value.settings.autostart);
+        assert!(!value.settings.game_desktop_double_click);
+        assert!(value.settings.companion_enabled);
+        assert!(!value.settings.wallpaper_options.effects.rain.enabled);
     }
     #[test]
     fn invalid_scene_values_are_normalized_but_disabled_autostart_is_preserved() {

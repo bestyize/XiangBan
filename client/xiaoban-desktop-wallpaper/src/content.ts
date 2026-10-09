@@ -7,6 +7,7 @@ import {
   defaults,
 } from "./bridge.ts";
 import { PetView } from "./pet.ts";
+import { WallpaperEffects } from "./wallpaper-effects.ts";
 
 interface Payload {
   item: {
@@ -64,6 +65,10 @@ export async function mountContent() {
   document.body.innerHTML =
     '<main class="content-stage"></main><div class="wallpaper-pet content-pet"></div><div class="content-error" role="alert" hidden></div>';
   const host = document.querySelector<HTMLElement>(".content-stage")!;
+  const lifecycle = new AbortController();
+  const eventOptions = { signal: lifecycle.signal };
+  let disposed = false;
+  const effects = new WallpaperEffects(host, state.item.kind, state.options.effects, state.config);
   let pet: PetView | null = null,
     video: HTMLVideoElement | null = null,
     frame: HTMLIFrameElement | null = null;
@@ -71,7 +76,9 @@ export async function mountContent() {
     options: WallpaperOptions;
     config: Payload["config"];
   }) => {
+    if (disposed) return;
     state = { ...state, ...detail };
+    effects.update(state.item.kind, state.options.effects, state.config);
     host.style.background = state.options.background;
     const media = host.querySelector<HTMLImageElement | HTMLVideoElement>(
       "img,video",
@@ -107,6 +114,7 @@ export async function mountContent() {
     }
   };
   const ready = async (report: Record<string, unknown>) => {
+    if (disposed) return;
     if (state.test && desktop) {
       let blocked = false;
       try {
@@ -118,11 +126,12 @@ export async function mountContent() {
     }
     if (desktop)
       await invoke("scene_ready", {
-        report: { kind: state.item.kind, ...report },
+        report: { kind: state.item.kind, effects: effects.snapshot(), ...report },
       });
     else document.body.dataset.ready = "true";
   };
   const fail = (error: unknown) => {
+    if (disposed) return;
     const message = String(error).slice(0, 2000),
       view = document.querySelector<HTMLElement>(".content-error")!;
     view.hidden = false;
@@ -131,15 +140,26 @@ export async function mountContent() {
       invoke("scene_ready", { report: { error: message } }).catch(() => {});
   };
   window.addEventListener("content-config", (event) =>
-    update((event as CustomEvent).detail),
-  );
+    update((event as CustomEvent).detail), eventOptions);
   window.addEventListener("content-cursor", (event) => {
     const cursor = (event as CustomEvent<CursorSample>).detail;
     pet?.look(cursor.x, cursor.y, cursor.moved);
     if (cursor.pressed && cursor.desktop && pet?.hit(cursor.x, cursor.y))
       pet.poke();
-  });
-  window.addEventListener("content-poke", () => pet?.poke());
+  }, eventOptions);
+  window.addEventListener("content-poke", () => pet?.poke(), eventOptions);
+  const dispose = () => {
+    if (disposed) return;
+    disposed = true;
+    lifecycle.abort();
+    effects.destroy();
+    pet?.destroy(); pet = null;
+    video?.pause();
+    if (video) { video.removeAttribute("src"); video.load(); }
+    frame?.remove(); frame = null;
+  };
+  window.addEventListener("pagehide", dispose, eventOptions);
+  window.addEventListener("beforeunload", dispose, eventOptions);
   try {
     if (state.item.kind === "image") {
       const image = new Image();
@@ -224,11 +244,12 @@ export async function mountContent() {
               reject,
             );
           } else if (event.data.type === "canvas-error") {
+            window.removeEventListener("message", listener);
             fail(event.data.message);
             reject(new Error(event.data.message));
           }
         };
-        window.addEventListener("message", listener);
+        window.addEventListener("message", listener, eventOptions);
       });
       host.append(frame);
       await pending;
@@ -241,15 +262,11 @@ export async function mountContent() {
             dpr: Math.min(devicePixelRatio, 2),
           },
           "*",
-        ),
+        ), eventOptions,
       );
     }
     update(state);
   } catch (error) {
     fail(error);
   }
-  window.addEventListener("beforeunload", () => {
-    pet?.destroy();
-    video?.pause();
-  });
 }

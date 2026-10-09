@@ -1,0 +1,43 @@
+<script setup lang="ts">
+import { computed, onBeforeUnmount, ref, watch } from 'vue';
+import { NAlert, NButton, NSelect, NSlider, NSwitch, NTag } from 'naive-ui';
+import { Bot, Check, Hand, Monitor, Move, Palette, Sparkles } from 'lucide-vue-next';
+import { EXPRESSIONS, EXPRESSION_NAMES } from '../../companion/expressions.ts';
+import { invoke } from '../../bridge.ts';
+import type { ControlStore } from '../control-types.ts';
+import PetPreview from '../components/PetPreview.vue';
+const props = defineProps<{ store: ControlStore }>();
+const preview = ref<InstanceType<typeof PetPreview>>();
+const busy = ref('');
+const size = ref(props.store.settings.size);
+let sizeTimer: ReturnType<typeof setTimeout> | null = null;
+watch(() => props.store.settings.size, value => { if (!sizeTimer) size.value = value; });
+function resize(value: number) {
+  size.value = value;
+  if (sizeTimer) clearTimeout(sizeTimer);
+  sizeTimer = setTimeout(() => { sizeTimer = null; void act('size', () => props.store.updateAppearance({ size: value })); }, 180);
+}
+onBeforeUnmount(() => {
+  if (sizeTimer) { clearTimeout(sizeTimer); void props.store.updateAppearance({ size: size.value }).catch(error => props.store.notify(error, 'error')); }
+});
+const expressions = EXPRESSION_NAMES.map(value => ({ value, label: EXPRESSIONS[value].label }));
+const mood = computed(() => EXPRESSIONS[props.store.settings.expression as keyof typeof EXPRESSIONS]?.label ?? '平静');
+async function act(key: string, action: () => Promise<void>) { busy.value = key; try { await action(); } catch (error) { props.store.notify(error, 'error'); } finally { busy.value = ''; } }
+async function poke() { preview.value?.poke(); if (props.store.desktop) await invoke('poke'); }
+</script>
+<template>
+  <section class="ui-page companion-page" data-testid="companion-page">
+    <header class="page-header"><div><div class="page-eyebrow">COMPANION</div><h1>桌面小伴</h1><p class="page-subtitle">选择陪伴方式，调整小伴的外观与心情。</p></div><NTag :type="store.settings.companionEnabled ? 'success' : 'default'" :bordered="false" round>{{ store.settings.companionEnabled ? '正在显示' : '已隐藏' }}</NTag></header>
+    <div class="companion-grid">
+      <div class="surface companion-portrait"><div class="portrait-header"><span><Sparkles :size="15" />互动预览</span><NTag :bordered="false" size="small">{{ mood }}</NTag></div><div class="portrait-stage"><div class="portrait-orbit"></div><PetPreview ref="preview" :settings="store.settings" /><div class="portrait-ground"></div></div><h2>今天，也有小伴陪着你。</h2><p>移动鼠标，它会望向你。点一下，看看它的反应。</p><NButton secondary type="primary" @click="act('poke', poke)"><template #icon><Hand :size="16" /></template>戳戳小伴</NButton><div class="portrait-tip"><Move :size="14" />悬浮模式下，可拖动小伴调整位置。</div></div>
+      <div class="companion-options">
+        <section class="surface"><div class="section-heading"><div><h2>陪伴方式</h2><p>显示状态与所在位置</p></div><Bot :size="20" /></div><div class="setting-row"><div><b>在桌面上显示小伴</b><p>关闭后壁纸继续运行，关怀提醒暂缓展示。</p></div><NSwitch data-testid="companion-enabled" :value="store.settings.companionEnabled" :loading="busy === 'visible'" :disabled="!!busy" @update:value="value => act('visible', () => store.setCompanion(value))" /></div><div class="placement-grid"><button :class="{ selected: store.settings.mode === 'floating' }" :disabled="!!busy" data-testid="mode-floating" @click="act('mode', () => store.setMode('floating'))"><span class="placement-preview floating-example"><Monitor :size="52" :stroke-width="1" /><img src="/xiaoban.svg" alt=""></span><b>悬浮桌宠</b><small>自由拖动，随时陪伴</small><Check v-if="store.settings.mode === 'floating'" :size="15" class="placement-check" /></button><button :class="{ selected: store.settings.mode === 'wallpaper' }" :disabled="!!busy" data-testid="mode-wallpaper" @click="act('mode', () => store.setMode('wallpaper'))"><span class="placement-preview wallpaper-example"><Monitor :size="52" :stroke-width="1" /><img src="/xiaoban.svg" alt=""></span><b>融入壁纸</b><small>住进背景，安静相伴</small><Check v-if="store.settings.mode === 'wallpaper'" :size="15" class="placement-check" /></button></div></section>
+        <section class="surface"><div class="section-heading"><div><h2>外观与心情</h2><p>设置会即时保存</p></div><Palette :size="20" /></div><div class="setting-row"><div><b>小伴的心情</b><p>选择一种喜欢的表情。</p></div><NSelect style="width:150px" :value="store.settings.expression" :options="expressions" :disabled="!!busy" @update:value="value => act('expression', () => store.updateAppearance({ expression: value }))" /></div><div class="size-field"><div><b>角色大小</b><span>{{ size }} px</span></div><NSlider :value="size" :min="160" :max="420" :step="10" :disabled="!!busy && busy !== 'size'" @update:value="resize" /><div><small>小巧</small><small>醒目</small></div></div><div class="setting-row"><div><b>小伴房间</b><p>仅影响内置房间的氛围。</p></div><div class="theme-choices"><NButton :type="store.settings.theme === 'night' ? 'primary' : 'default'" :secondary="store.settings.theme === 'night'" :disabled="!!busy" @click="act('theme', () => store.updateAppearance({ theme: 'night' }))">深夜</NButton><NButton :type="store.settings.theme === 'dawn' ? 'primary' : 'default'" :secondary="store.settings.theme === 'dawn'" :disabled="!!busy" @click="act('theme', () => store.updateAppearance({ theme: 'dawn' }))">晨光</NButton></div></div></section>
+        <div class="companion-links"><button @click="store.navigate('care')"><span>想让小伴提醒喝水、休息或下班？</span><b>设置关怀提醒 →</b></button><button @click="store.navigate('settings')"><span>动画暂停、帧率与开机启动</span><b>前往设置 →</b></button></div>
+      </div>
+    </div>
+  </section>
+</template>
+<style scoped>
+.companion-grid{display:grid;grid-template-columns:minmax(280px,.85fr) minmax(360px,1.15fr);gap:24px}.companion-portrait{text-align:center;padding:24px;align-self:start;position:sticky;top:0}.portrait-header{display:flex;align-items:center;justify-content:space-between}.portrait-header>span{display:flex;gap:7px;align-items:center;font-size:12px;color:var(--ui-muted)}.portrait-stage{height:300px;display:grid;place-items:center;position:relative;margin:16px -10px;background:radial-gradient(ellipse at 50% 65%,#dceaff80,transparent 67%)}.portrait-orbit{position:absolute;width:210px;height:210px;border:1px dashed #d9e5f5;border-radius:50%;top:24px}.portrait-ground{position:absolute;bottom:36px;left:20%;right:20%;height:12px;border-radius:50%;background:#c4d6ec35;filter:blur(6px)}.portrait-stage :deep(.control-pet-preview){z-index:1}.companion-portrait h2{font-size:19px;margin:0 0 9px}.companion-portrait>p{color:var(--ui-muted);font-size:12px;line-height:1.8;margin-bottom:20px}.portrait-tip{display:flex;align-items:center;justify-content:center;gap:6px;border-top:1px solid var(--ui-line);margin-top:25px;padding-top:18px;font-size:11px;color:var(--ui-muted)}.companion-options{display:flex;flex-direction:column;gap:20px}.companion-options>.surface{padding:24px}.placement-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:20px}.placement-grid>button{position:relative;border:1px solid var(--ui-line);background:#fbfcfe;border-radius:11px;text-align:left;padding:14px;cursor:pointer;display:grid;gap:5px;color:var(--ui-text);transition:border-color .15s}.placement-grid>button.selected{border-color:var(--ui-primary);background:#f0f6ff;box-shadow:0 0 0 2px #2563eb0b}.placement-grid>button:hover{border-color:#a7c5ef}.placement-grid small{font-size:11px;color:var(--ui-muted)}.placement-preview{height:66px;display:flex;align-items:center;position:relative;color:#9eb1c9;margin-bottom:5px}.placement-preview img{position:absolute;width:27px;height:27px;left:37px;top:36px}.wallpaper-example img{left:14px;top:23px;width:22px;height:22px}.placement-check{position:absolute;right:12px;top:14px;color:var(--ui-primary)}.size-field{padding:20px 0;border-bottom:1px solid var(--ui-line)}.size-field>div{display:flex;justify-content:space-between;align-items:center}.size-field span{font-size:12px;color:var(--ui-primary);font-weight:600}.size-field :deep(.n-slider){margin:18px 0 10px}.size-field small{font-size:11px;color:var(--ui-muted)}.theme-choices{display:flex;gap:8px}.companion-links{display:grid;gap:10px}.companion-links button{border:0;background:transparent;display:flex;justify-content:space-between;gap:10px;font-size:12px;padding:6px 4px;cursor:pointer;text-align:left;color:var(--ui-muted)}.companion-links b{color:var(--ui-primary);white-space:nowrap}@media(max-width:1000px){.companion-grid{grid-template-columns:1fr}.companion-portrait{position:static}.portrait-stage{height:240px}.portrait-tip{margin-top:18px}}
+</style>

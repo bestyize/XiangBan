@@ -1,4 +1,3 @@
-import "./style.css";
 import {
   desktop,
   defaults,
@@ -8,18 +7,29 @@ import {
   type CursorSample,
 } from "./bridge.ts";
 import { PetView } from "./pet.ts";
-import { mountControl } from "./control.ts";
-import { mountContent } from "./content.ts";
 const room =
   '<div class="room"><div class="room-glow"></div><div class="room-window"><div class="moon"></div><div class="stars"></div><div class="skyline"></div></div><div class="plant"><i></i><i></i><i></i><i></i><b></b></div><div class="desk"></div><div class="room-floor"></div></div>';
 async function init() {
   const mode = new URLSearchParams(location.search).get("scene");
-  if (mode === "content") {
-    await mountContent();
+  if (!mode) {
+    const { mountControl } = await import("./control.ts");
+    await mountControl();
     return;
   }
-  if (!mode) {
-    await mountControl();
+  await import("./style.css");
+  if (mode === "games") {
+    const { mountGameSpace } = await import("./games.ts");
+    await mountGameSpace();
+    return;
+  }
+  if (mode === "care") {
+    const { mountCareBubble } = await import("./care-bubble.ts");
+    await mountCareBubble();
+    return;
+  }
+  if (mode === "content") {
+    const { mountContent } = await import("./content.ts");
+    await mountContent();
     return;
   }
   let config = { ...defaults };
@@ -67,6 +77,7 @@ async function init() {
     invoke("show_control").catch(console.error);
   });
   await listen<CursorSample>("desktop-cursor", (sample) => {
+    if (!config.companionEnabled) return;
     pet.look(sample.x, sample.y, sample.moved);
     const hit = pet.hit(sample.x, sample.y);
     if (mode === "floating" && hit !== hovering) {
@@ -80,7 +91,8 @@ async function init() {
     config = settings;
     document.body.dataset.theme = config.theme;
     document.body.dataset.paused = String(config.paused);
-    pet.update(config);
+    pet.host.hidden = !config.companionEnabled;
+    pet.update({ ...config, paused: config.paused || !config.companionEnabled });
   };
   await listen<Settings>("settings-changed", apply);
   await listen("pet-poke", () => pet.poke());

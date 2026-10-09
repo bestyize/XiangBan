@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head><script src="../desktop-host.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#e9f3e9">
+    <title>俄罗斯方块</title>
+    <link rel="stylesheet" href="./game.css">
+    <link rel="stylesheet" href="../result-share.css">
+    <script src="../result-share.js" defer></script>
+    <script src="./game.js" defer></script>
+  </head>
+  <body>
+    <main class="game">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">单人 · 经典下落方块</p>
+          <h1>俄罗斯方块</h1>
+        </div>
+        <button class="quiet-button" id="exitButton" type="button" aria-label="返回游戏广场"><span class="exit-arrow" aria-hidden="true">‹</span><span class="exit-label">回游戏角</span></button>
+      </header>
+
+      <section class="dashboard" aria-label="本局数据">
+        <div class="stats">
+          <div class="stat"><span>分数</span><strong id="score">0</strong></div>
+          <div class="stat"><span>消行</span><strong id="lines">0</strong></div>
+          <div class="stat"><span>等级</span><strong id="level">1</strong></div>
+        </div>
+        <div class="next">
+          <span>下一个</span>
+          <canvas id="next" width="112" height="80" aria-label="下一个方块"></canvas>
+        </div>
+      </section>
+
+      <section class="board-stage" aria-label="游戏区域">
+        <div class="board-wrap">
+          <canvas id="board" width="250" height="500" role="img" aria-label="下落方块游戏区域"></canvas>
+          <div class="pause-label" aria-hidden="true">休息一下<small>点右上角继续</small></div>
+          <div class="game-over" id="gameOver" role="dialog" aria-modal="true" aria-labelledby="resultTitle" aria-describedby="resultScore" hidden>
+            <div class="result-card">
+              <svg class="result-mark" viewBox="0 0 50 43" aria-hidden="true"><rect x="0" y="22" width="20" height="20" rx="4" fill="#00b9f5"/><rect x="23" y="22" width="20" height="20" rx="4" fill="#ffd12b"/><rect x="23" y="0" width="20" height="20" rx="4" fill="#42d34f"/></svg>
+              <p class="eyebrow">这一局结束啦</p>
+              <h2 id="resultTitle">再来一局？</h2>
+              <p id="resultScore">本局得分 0</p>
+              <button id="shareResultButton" class="result-share-button" type="button" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V3m-4 4 4-4 4 4M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7" /></svg><span>分享战绩</span></button>
+              <button class="primary-button" id="restartOverlay" type="button">重新开始</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <p class="status" id="status" role="status" aria-live="polite">方向键移动，↑旋转，空格快速下落。</p>
+
+      <div class="action-row">
+        <button class="quiet-button" id="pauseButton" type="button">暂停</button>
+        <button class="quiet-button" id="restartButton" type="button">重新开始</button>
+      </div>
+
+      <p class="help">手机点按下方按钮；电脑使用方向键、空格和 P 键。</p>
+
+      <div class="controls" aria-label="触控操作">
+        <button type="button" data-action="left" aria-label="向左移动">←</button>
+        <button type="button" data-action="rotate" aria-label="旋转方块">↻</button>
+        <button type="button" data-action="right" aria-label="向右移动">→</button>
+        <button type="button" data-action="down" aria-label="加速下落">↓</button>
+        <button class="drop-button" type="button" data-action="drop" aria-label="直接落到底">落到底</button>
+      </div>
+    </main>
+  </body>
+</html>

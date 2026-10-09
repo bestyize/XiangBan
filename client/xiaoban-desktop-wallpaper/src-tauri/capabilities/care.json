@@ -1,0 +1,6 @@
+{
+  "identifier": "care",
+  "description": "The local care bubble can only listen to and remove native event subscriptions. Custom care actions remain guarded by its window label.",
+  "windows": ["care"],
+  "permissions": ["core:event:allow-listen", "core:event:allow-unlisten"]
+}

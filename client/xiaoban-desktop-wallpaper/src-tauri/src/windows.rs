@@ -1,5 +1,5 @@
-//! Windows desktop hosting and read-only cursor sampling. No hooks, keyboard capture,
-//! wallpaper registry changes, or Explorer window destruction are used.
+//! Windows desktop hosting, cursor sampling, and a read-only desktop double-click hook.
+//! No mouse input is consumed; icon clicks remain with Explorer.
 use std::{ptr::null_mut, time::Duration};
 use tauri::{Emitter, Manager};
 use windows_sys::Win32::{
@@ -7,7 +7,7 @@ use windows_sys::Win32::{
     Graphics::Gdi::{ClientToScreen, ScreenToClient},
     UI::{
         HiDpi::GetDpiForWindow,
-        Input::KeyboardAndMouse::{GetAsyncKeyState, VK_LBUTTON},
+        Input::KeyboardAndMouse::{GetAsyncKeyState, GetDoubleClickTime, VK_LBUTTON},
         WindowsAndMessaging::*,
     },
 };
@@ -236,4 +236,139 @@ pub fn diagnostics(app: &tauri::AppHandle) -> serde_json::Value {
     serde_json::json!({"platform": "windows", "wallpaperSupported": true,
         "mode": super::settings(app).mode, "floating": describe("pet"), "wallpaper": describe("wallpaper"),
         "wallpaperGeometry":geometry})
+}
+
+#[derive(Clone, Copy)]
+struct DesktopClick { x: i32, y: i32, time: u32, under: usize, released: bool }
+static GAME_CLICKS: std::sync::OnceLock<std::sync::mpsc::SyncSender<DesktopClick>> = std::sync::OnceLock::new();
+static GAME_CLICK_OVERFLOW: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+static GAME_HIT_TEST_TIMEOUTS: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+static GAME_POINTER_DOWN: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+static GAME_POINTER_X: std::sync::atomic::AtomicI32 = std::sync::atomic::AtomicI32::new(0);
+static GAME_POINTER_Y: std::sync::atomic::AtomicI32 = std::sync::atomic::AtomicI32::new(0);
+unsafe extern "system" fn game_mouse_hook(code: i32, wparam: usize, lparam: isize) -> isize {
+    use std::sync::atomic::Ordering;
+    if code>=0 && wparam as u32==WM_MOUSEMOVE && GAME_POINTER_DOWN.load(Ordering::Relaxed) {
+        let event=&*(lparam as *const MSLLHOOKSTRUCT);
+        if (event.pt.x as i64-GAME_POINTER_X.load(Ordering::Relaxed) as i64).abs()>GetSystemMetrics(SM_CXDRAG) as i64/2 || (event.pt.y as i64-GAME_POINTER_Y.load(Ordering::Relaxed) as i64).abs()>GetSystemMetrics(SM_CYDRAG) as i64/2 {
+            GAME_CLICK_OVERFLOW.store(true,Ordering::Relaxed);
+        }
+    }
+    if code >= 0 && [WM_LBUTTONDOWN,WM_LBUTTONUP].contains(&(wparam as u32)) {
+        let event = &*(lparam as *const MSLLHOOKSTRUCT);
+        if event.flags & LLMHF_INJECTED == 0 {
+            GAME_POINTER_DOWN.store(wparam as u32==WM_LBUTTONDOWN,Ordering::Relaxed);
+            if wparam as u32==WM_LBUTTONDOWN { GAME_POINTER_X.store(event.pt.x,Ordering::Relaxed); GAME_POINTER_Y.store(event.pt.y,Ordering::Relaxed); }
+            if let Some(queue) = GAME_CLICKS.get() {
+                // Never block the hook: all Explorer IPC and window creation happen on the worker.
+                let click=DesktopClick{x:event.pt.x,y:event.pt.y,time:event.time,under:WindowFromPoint(event.pt) as usize,released:wparam as u32==WM_LBUTTONUP};
+                if queue.try_send(click).is_err() { GAME_CLICK_OVERFLOW.store(true,std::sync::atomic::Ordering::Relaxed); }
+            }
+        }
+    }
+    CallNextHookEx(null_mut(),code,wparam,lparam)
+}
+/// LVM_HITTEST has a pointer-bearing payload: Explorer is a separate process.
+/// Allocate the fixed-layout, pointer-free LVHITTESTINFO in Explorer and fail closed on any error.
+fn desktop_blank(click: DesktopClick) -> bool {
+    use windows_sys::Win32::{Foundation::CloseHandle, System::{Memory::*, Threading::*, Diagnostics::Debug::{ReadProcessMemory, WriteProcessMemory}}};
+    #[repr(C)] struct HitTest { point: POINT, flags: u32, item: i32, subitem: i32, group: i32 }
+    unsafe {
+        if GAME_HIT_TEST_TIMEOUTS.load(std::sync::atomic::Ordering::Relaxed)>=16 { return false; }
+        let under=click.under as HWND;
+        if under.is_null() || WindowFromPoint(POINT{x:click.x,y:click.y}) != under || class_name(under)!="SysListView32" { return false; }
+        let defview=GetParent(under);
+        if class_name(defview)!="SHELLDLL_DefView" || !["Progman","WorkerW"].contains(&class_name(GetAncestor(defview,GA_ROOT)).as_str()) { return false; }
+        let mut pid=0; GetWindowThreadProcessId(under,&mut pid);
+        let mut shell_pid=0; GetWindowThreadProcessId(GetShellWindow(),&mut shell_pid);
+        if shell_pid==0 || pid!=shell_pid { return false; }
+        let process=OpenProcess(PROCESS_VM_OPERATION|PROCESS_VM_READ|PROCESS_VM_WRITE,false as i32,pid);
+        if process.is_null() { return false; }
+        let remote=VirtualAllocEx(process,std::ptr::null(),std::mem::size_of::<HitTest>(),MEM_COMMIT|MEM_RESERVE,PAGE_READWRITE);
+        if remote.is_null() { CloseHandle(process); return false; }
+        let mut info=HitTest{point:POINT{x:click.x,y:click.y},flags:0,item:-2,subitem:0,group:0};
+        let mut bytes=0; let mut result=0;
+        let written=ScreenToClient(under,&mut info.point)!=0
+            && WriteProcessMemory(process,remote,&info as *const _ as _,std::mem::size_of::<HitTest>(),&mut bytes)!=0
+            && bytes==std::mem::size_of::<HitTest>();
+        let sent=written && SendMessageTimeoutW(under,0x1012,0,remote as isize,SMTO_ABORTIFHUNG|SMTO_BLOCK,100,&mut result)!=0;
+        let blank=sent
+            && ReadProcessMemory(process,remote,&mut info as *mut _ as _,std::mem::size_of::<HitTest>(),&mut bytes)!=0
+            && bytes==std::mem::size_of::<HitTest>() && info.item==-1 && info.flags & 1!=0;
+        if sent || !written { VirtualFreeEx(process,remote,0,MEM_RELEASE); }
+        else {
+            // A timed-out message could still be touching its payload. Keep these tiny buffers
+            // until Explorer exits rather than leave it a dangling pointer; bound failures to 16.
+            GAME_HIT_TEST_TIMEOUTS.fetch_add(1,std::sync::atomic::Ordering::Relaxed);
+        }
+        CloseHandle(process); blank
+    }
+}
+fn over_companion(app:&tauri::AppHandle,click:DesktopClick)->bool{
+    let config=crate::settings(app);
+    if !config.companion_enabled{return false;}
+    let contains=|rect:RECT|click.x>=rect.left&&click.x<rect.right&&click.y>=rect.top&&click.y<rect.bottom;
+    if let Some(pet)=app.get_webview_window("pet").and_then(|w|w.hwnd().ok()){
+        let mut rect=RECT::default();let hwnd=pet.0 as HWND;
+        if unsafe{IsWindowVisible(hwnd)!=0&&GetWindowRect(hwnd,&mut rect)!=0}&&contains(rect){return true;}
+    }
+    if config.mode!="wallpaper"{return false;}
+    // The trusted wallpaper .wallpaper-pet is centered at left:58%, bottom:14%.
+    // Exclude its entire art/glow region, with animation margin, instead of relying on
+    // the sampled SVG hover state. Keep these bounds aligned with style.css/PetView.
+    for label in ["wallpaper","media-a","media-b"]{
+        let Some(native)=app.get_webview_window(label).and_then(|w|w.hwnd().ok())else{continue;};
+        let hwnd=native.0 as HWND;let mut client=RECT::default();let mut origin=POINT::default();
+        if unsafe{IsWindowVisible(hwnd)==0||GetClientRect(hwnd,&mut client)==0||ClientToScreen(hwnd,&mut origin)==0}{continue;}
+        let size=config.size*unsafe{GetDpiForWindow(hwnd)}.max(96) as f64/96.0;
+        let center_x=origin.x as f64+(client.right-client.left) as f64*0.58;
+        let art_bottom=origin.y as f64+(client.bottom-client.top) as f64*0.86;
+        let rect=RECT{left:(center_x-size*0.75).floor() as i32,right:(center_x+size*0.75).ceil() as i32,top:(art_bottom-size*1.05).floor() as i32,bottom:(art_bottom+size*0.18).ceil() as i32};
+        if contains(rect){return true;}
+    }
+    false
+}
+pub fn start_desktop_game_entry(app: tauri::AppHandle) {
+    use std::sync::atomic::Ordering;
+    let (sender,receiver)=std::sync::mpsc::sync_channel::<DesktopClick>(64);
+    if GAME_CLICKS.set(sender).is_err() { return; }
+    let hook_app=app.clone();
+    std::thread::spawn(move || unsafe {
+        let hook=SetWindowsHookExW(WH_MOUSE_LL,Some(game_mouse_hook),null_mut(),0);
+        let state=hook_app.state::<crate::games::GameState>();
+        if hook.is_null() { *state.desktop_entry_error.lock().unwrap()=Some(format!("桌面双击入口初始化失败（{}），请使用玩一玩按钮",GetLastError())); return; }
+        state.desktop_entry_ready.store(true,Ordering::Relaxed);
+        let mut message=MSG::default();
+        while GetMessageW(&mut message,null_mut(),0,0)>0 { TranslateMessage(&message); DispatchMessageW(&message); }
+        UnhookWindowsHookEx(hook);
+        state.desktop_entry_ready.store(false,Ordering::Relaxed);
+    });
+    std::thread::spawn(move || {
+        let mut previous: Option<DesktopClick>=None;
+        while let Ok(click)=receiver.recv() {
+            if GAME_HIT_TEST_TIMEOUTS.load(Ordering::Relaxed)>=16 {
+                let state=app.state::<crate::games::GameState>();
+                if state.desktop_entry_ready.swap(false,Ordering::Relaxed) {
+                    let error="Explorer 桌面判断连续超时，已停用双击入口，请使用玩一玩按钮";
+                    *state.desktop_entry_error.lock().unwrap()=Some(error.into());let _=app.emit("desktop-error",error);
+                }
+            }
+            if GAME_CLICK_OVERFLOW.swap(false,Ordering::Relaxed) { previous=None; }
+            if !crate::settings(&app).game_desktop_double_click || crate::games::is_active(&app) || over_companion(&app,click) || !desktop_blank(click) { previous=None; continue; }
+            if click.released {
+                if let Some(mut p)=previous {
+                    if p.under==click.under && (p.x as i64-click.x as i64).abs()<=unsafe{GetSystemMetrics(SM_CXDOUBLECLK)} as i64/2 && (p.y as i64-click.y as i64).abs()<=unsafe{GetSystemMetrics(SM_CYDOUBLECLK)} as i64/2 { p.released=true; previous=Some(p); } else { previous=None; }
+                }
+                continue;
+            }
+            let double=previous.is_some_and(|p| p.released && p.under==click.under
+                && click.time.wrapping_sub(p.time)<=unsafe{GetDoubleClickTime()}
+                && (click.x as i64-p.x as i64).abs()<=unsafe{GetSystemMetrics(SM_CXDOUBLECLK)} as i64 / 2
+                && (click.y as i64-p.y as i64).abs()<=unsafe{GetSystemMetrics(SM_CYDOUBLECLK)} as i64 / 2);
+            if double {
+                previous=None; let handle=app.clone();
+                tauri::async_runtime::spawn(async move { if let Err(error)=crate::games::open(&handle).await { let _=handle.emit("desktop-error",error); } });
+            } else { previous=Some(click); }
+        }
+    });
 }

@@ -78,6 +78,8 @@ pub struct Options {
     pub playback_rate: f64,
     pub background: String,
     pub values: BTreeMap<String, Value>,
+    #[serde(deserialize_with = "deserialize_effects")]
+    pub effects: WallpaperEffectsOptions,
 }
 impl Default for Options {
     fn default() -> Self {
@@ -86,8 +88,52 @@ impl Default for Options {
             playback_rate: 1.0,
             background: "#edf5f0".into(),
             values: BTreeMap::new(),
+            effects: WallpaperEffectsOptions::default(),
         }
     }
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(default, rename_all = "camelCase", deny_unknown_fields)]
+pub struct EffectOptions {
+    pub enabled: bool,
+    pub intensity: f64,
+    pub speed: f64,
+}
+impl Default for EffectOptions {
+    fn default() -> Self { Self { enabled: false, intensity: 0.5, speed: 1.0 } }
+}
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[serde(default, rename_all = "camelCase", deny_unknown_fields)]
+pub struct WallpaperEffectsOptions {
+    pub rain: EffectOptions,
+    pub snow: EffectOptions,
+    pub fireflies: EffectOptions,
+}
+impl WallpaperEffectsOptions {
+    pub fn normalize(&mut self) {
+        let mut selected = false;
+        for effect in [&mut self.rain, &mut self.snow, &mut self.fireflies] {
+            effect.intensity = if effect.intensity.is_finite() { effect.intensity.clamp(0.0, 1.0) } else { 0.5 };
+            effect.speed = if effect.speed.is_finite() { effect.speed.clamp(0.25, 3.0) } else { 1.0 };
+            effect.enabled = effect.enabled && !selected;
+            selected |= effect.enabled;
+        }
+    }
+}
+fn deserialize_effects<'de, D: serde::Deserializer<'de>>(deserializer: D) -> Result<WallpaperEffectsOptions, D::Error> {
+    let value = Value::deserialize(deserializer)?;
+    let read = |name: &str| {
+        let effect = &value[name];
+        EffectOptions {
+            enabled: effect["enabled"].as_bool().unwrap_or(false),
+            intensity: effect["intensity"].as_f64().unwrap_or(0.5),
+            speed: effect["speed"].as_f64().unwrap_or(1.0),
+        }
+    };
+    let mut effects = WallpaperEffectsOptions { rain: read("rain"), snow: read("snow"), fireflies: read("fireflies") };
+    effects.normalize();
+    Ok(effects)
 }
 
 pub fn identifier(value: &str) -> bool {
@@ -280,6 +326,8 @@ fn validate_value(control: &Control, value: &Value) -> Result<(), String> {
 }
 
 pub fn validate_options(item: &Wallpaper, mut options: Options) -> Result<Options, String> {
+    // Host effects are independent of manifest controls and retained for non-image selections.
+    options.effects.normalize();
     if !["cover", "contain", "fill"].contains(&options.fit.as_str())
         || !options.playback_rate.is_finite()
         || !(0.25..=2.0).contains(&options.playback_rate)
@@ -403,16 +451,53 @@ fn client() -> Result<reqwest::blocking::Client, String> {
         .map_err(|e| e.to_string())
 }
 pub fn fetch_json(value: &str) -> Result<Option<String>, String> {
+    fetch_json_with_backoff(value, [Duration::from_millis(250), Duration::from_millis(750)])
+}
+
+fn metadata_client() -> Result<reqwest::blocking::Client, String> {
+    static CLIENT: std::sync::Mutex<Option<reqwest::blocking::Client>> = std::sync::Mutex::new(None);
+    let mut shared = CLIENT.lock().map_err(|_| "网络客户端初始化失败")?;
+    if let Some(client) = shared.as_ref() {
+        return Ok(client.clone());
+    }
+    // Only successful initialization is cached. Media downloads retain their own client/timeouts.
+    let client = client()?;
+    *shared = Some(client.clone());
+    Ok(client)
+}
+
+fn fetch_json_with_backoff(value: &str, backoff: [Duration; 2]) -> Result<Option<String>, String> {
     network_url(value)?;
-    let response = client()?
-        .get(value)
-        .header("Accept-Encoding", "identity")
-        .send()
-        .map_err(|e| format!("网络连接失败：{e}"))?;
+    let client = metadata_client()?;
+    // Three 8-second attempts plus 1 second of backoff fit within 26 seconds.
+    let deadline = std::time::Instant::now() + Duration::from_secs(26);
+    let mut attempt = 0;
+    let response = loop {
+        let timeout = deadline.saturating_duration_since(std::time::Instant::now())
+            .min(Duration::from_secs(8));
+        let result = client.get(value)
+            .timeout(timeout)
+            .header("Accept-Encoding", "identity")
+            .send();
+        let retry = match &result {
+            Ok(response) => matches!(response.status().as_u16(), 502 | 503 | 504),
+            // Do not retry redirect failures, body reads or generic connection failures.
+            Err(error) => error.is_connect() && error.is_timeout(),
+        };
+        if retry && attempt < backoff.len()
+            && deadline.saturating_duration_since(std::time::Instant::now()) > backoff[attempt]
+        {
+            drop(result);
+            std::thread::sleep(backoff[attempt]);
+            attempt += 1;
+            continue;
+        }
+        break result.map_err(|e| format!("网络连接失败：{e}"))?;
+    };
     if response.status().as_u16() == 204 {
         return Ok(None);
     }
-    let response = response.error_for_status().map_err(|e| e.to_string())?;
+    let response = response.error_for_status().map_err(|e| format!("服务请求失败：{e}"))?;
     let mut data = Vec::new();
     response
         .take((MAX_JSON + 1) as u64)
@@ -826,6 +911,8 @@ pub(crate) mod test_http {
         Body(u16, &'static str, Vec<u8>),
         /// Same, but without Content-Length (body ends when the connection closes).
         Streamed(u16, &'static str, Vec<u8>),
+        /// Per-route responses consumed in order, then repeats the last response.
+        Sequence(Mutex<std::collections::VecDeque<(u16, Vec<u8>)>>),
         /// Closes the connection without answering.
         Drop,
     }
@@ -866,9 +953,20 @@ pub(crate) mod test_http {
                         .to_string();
                     log.lock().unwrap().push(path.clone());
                     let route = path.split('?').next().unwrap_or("/");
+                    let sequence_body;
                     let (status, kind, body, length) = match routes.get(route) {
                         Some(Reply::Body(s, k, b)) => (*s, *k, b, true),
                         Some(Reply::Streamed(s, k, b)) => (*s, *k, b, false),
+                        Some(Reply::Sequence(replies)) => {
+                            let mut replies = replies.lock().unwrap();
+                            let (status, body) = if replies.len() > 1 {
+                                replies.pop_front().unwrap()
+                            } else {
+                                replies.front().unwrap().clone()
+                            };
+                            sequence_body = body;
+                            (status, "application/json", &sequence_body, true)
+                        }
                         Some(Reply::Drop) => return,
                         None => (404, "text/plain", &Vec::new(), true),
                     };
@@ -890,6 +988,103 @@ pub(crate) mod test_http {
 mod tests {
     use super::*;
     use test_http::{serve, temp_root, Reply};
+
+    fn metadata_sequence(statuses: &[u16]) -> test_http::Server {
+        serve(vec![("/json", Reply::Sequence(std::sync::Mutex::new(
+            statuses.iter().map(|status| (*status, b"{\"ok\":true}".to_vec())).collect()
+        )))])
+    }
+
+    fn metadata_get(server: &test_http::Server) -> Result<Option<String>, String> {
+        fetch_json_with_backoff(&format!("{}/json", server.base), [Duration::ZERO; 2])
+    }
+
+    #[test]
+    fn metadata_recovers_from_a_transient_gateway_response() {
+        for status in [502, 503, 504] {
+            let server = metadata_sequence(&[status, 200]);
+            assert_eq!(metadata_get(&server).unwrap().as_deref(), Some("{\"ok\":true}"));
+            assert_eq!(server.hits.lock().unwrap().len(), 2);
+        }
+    }
+
+    #[test]
+    fn metadata_gateway_retries_are_bounded_and_preserve_failure_status() {
+        let server = metadata_sequence(&[502]);
+        let error = metadata_get(&server).unwrap_err();
+        assert!(error.contains("服务请求失败") && error.contains("502"), "{error}");
+        assert_eq!(server.hits.lock().unwrap().len(), 3);
+    }
+
+    #[test]
+    fn metadata_does_not_retry_client_errors_or_oversized_bodies() {
+        let missing = metadata_sequence(&[404, 200]);
+        assert!(metadata_get(&missing).unwrap_err().contains("404"));
+        assert_eq!(missing.hits.lock().unwrap().len(), 1);
+        for reply in [
+            Reply::Body(200, "application/json", vec![b' '; MAX_JSON + 1]),
+            Reply::Streamed(200, "application/json", vec![b' '; MAX_JSON + 1]),
+        ] {
+            let server = serve(vec![("/json", reply)]);
+            assert!(metadata_get(&server).unwrap_err().contains("超过 1 MB"));
+            assert_eq!(server.hits.lock().unwrap().len(), 1);
+        }
+    }
+
+    #[test]
+    fn metadata_requests_share_client_without_sharing_retry_state() {
+        let servers: Vec<_> = (0..8).map(|_| metadata_sequence(&[502, 200])).collect();
+        std::thread::scope(|scope| {
+            let handles: Vec<_> = servers.iter().map(|server| scope.spawn(move || {
+                assert!(metadata_get(server).unwrap().is_some());
+            })).collect();
+            for handle in handles { handle.join().unwrap(); }
+        });
+        for server in servers { assert_eq!(server.hits.lock().unwrap().len(), 2); }
+    }
+
+    #[test]
+    fn metadata_preserves_no_content_and_does_not_retry_invalid_utf8() {
+        let empty = metadata_sequence(&[204]);
+        assert_eq!(metadata_get(&empty).unwrap(), None);
+        let invalid = serve(vec![("/json", Reply::Body(200, "application/json", vec![255]))]);
+        assert!(metadata_get(&invalid).unwrap_err().contains("UTF-8"));
+        assert_eq!(invalid.hits.lock().unwrap().len(), 1);
+    }
+
+    #[test]
+    fn effects_are_backward_compatible_and_normalize_invalid_preferences() {
+        let legacy: Options = serde_json::from_value(json!({"fit":"contain","values":{}})).unwrap();
+        assert_eq!(legacy.effects, WallpaperEffectsOptions::default());
+        let corrupted: Options = serde_json::from_value(json!({"effects":null})).unwrap();
+        assert_eq!(corrupted.effects, WallpaperEffectsOptions::default());
+        let options: Options = serde_json::from_value(json!({"effects":{
+            "rain":{"enabled":true,"intensity":4,"speed":0},
+            "snow":{"enabled":true,"intensity":"invalid","speed":9},
+            "fireflies":{"enabled":true,"intensity":0.7,"speed":1.5}
+        }})).unwrap();
+        assert!(options.effects.rain.enabled);
+        assert!(!options.effects.snow.enabled);
+        assert!(!options.effects.fireflies.enabled);
+        assert_eq!(options.effects.rain.intensity, 1.0);
+        assert_eq!(options.effects.rain.speed, 0.25);
+        assert_eq!(options.effects.snow.intensity, 0.5);
+        assert_eq!(options.effects.snow.speed, 3.0);
+    }
+    #[test]
+    fn effects_survive_validation_persistence_and_non_image_switches() {
+        let mut options = Options::default();
+        options.effects.fireflies = EffectOptions { enabled: true, intensity: 0.8, speed: 2.0 };
+        for kind in ["image", "video", "canvas"] {
+            let mut item = builtins().remove(0);
+            item.kind = kind.into();
+            let valid = validate_options(&item, options.clone()).unwrap();
+            assert_eq!(valid.effects, options.effects);
+            assert!(!valid.values.contains_key("effects"));
+            let persisted = serde_json::to_vec(&valid).unwrap();
+            assert_eq!(serde_json::from_slice::<Options>(&persisted).unwrap(), valid);
+        }
+    }
 
     fn png(tag: &str) -> Vec<u8> {
         [b"\x89PNG\r\n\x1a\n".as_slice(), tag.as_bytes()].concat()

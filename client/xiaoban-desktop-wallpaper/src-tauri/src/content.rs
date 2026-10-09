@@ -40,7 +40,7 @@ fn payload(app: &tauri::AppHandle, item: &Wallpaper, options: &Options, preview:
     json!({"item":{"id":item.id,"title":item.title,"kind":item.kind,"resourceUrl":library::asset_url(&item.resource),
         "assets":item.assets.iter().map(|(key,r)|(key.clone(),json!({"url":library::asset_url(r),"mime":r.mime}))).collect::<BTreeMap<_,_>>()},
         "options":options,"config":{"expression":config.expression,"size":config.size,"theme":config.theme,"paused":config.paused,
-        "fps":config.fps,"overlay":!preview && config.mode=="wallpaper"},"test":app.state::<DesktopState>().isolated})
+        "fps":config.fps,"overlay":!preview && config.mode=="wallpaper" && config.companion_enabled},"test":app.state::<DesktopState>().isolated})
 }
 
 fn open(
@@ -189,6 +189,7 @@ fn wait(app: &tauri::AppHandle, label: &str) -> Result<(), String> {
 }
 
 pub fn restore(app: &tauri::AppHandle) -> Result<bool, String> {
+    if crate::games::is_active(app) { return Ok(false); }
     let config = settings(app);
     if config.wallpaper_id == "companion" {
         return Ok(false);
@@ -212,11 +213,12 @@ pub fn restore(app: &tauri::AppHandle) -> Result<bool, String> {
 }
 
 pub fn sync(app: &tauri::AppHandle) {
+    if crate::games::is_active(app) { return; }
     let config = settings(app);
     for label in ["media-a", "media-b"] {
         if let Some(window) = app.get_webview_window(label) {
             let value = json!({"options":config.wallpaper_options,"config":{"expression":config.expression,"size":config.size,
-                "theme":config.theme,"paused":config.paused,"fps":config.fps,"overlay":config.mode=="wallpaper"}});
+                "theme":config.theme,"paused":config.paused,"fps":config.fps,"overlay":config.mode=="wallpaper" && config.companion_enabled}});
             let _ = window.eval(format!(
                 "window.dispatchEvent(new CustomEvent('content-config',{{detail:{value}}}));"
             ));
@@ -319,6 +321,9 @@ pub async fn apply_wallpaper(
 ) -> Result<Value, String> {
     let operation = app.state::<ContentState>();
     let _selection = operation.operation.lock().await;
+    if crate::games::is_active(&app) {
+        return Err("请先退出游戏空间，再预览或应用壁纸。".into());
+    }
     if id == "companion" {
         if preview {
             return Err("小伴房间可在小伴页直接预览。".into());
@@ -354,6 +359,9 @@ pub async fn apply_wallpaper(
     })
     .await
     .map_err(|e| e.to_string())??;
+    if crate::games::is_active(&app) {
+        return Err("请先退出游戏空间，再预览或应用壁纸。".into());
+    }
     let label = open(&app, &item, &options, preview)?;
     let handle = app.clone();
     let waiting = label.clone();
@@ -365,6 +373,10 @@ pub async fn apply_wallpaper(
             let _ = window.destroy();
         }
         return Err(error);
+    }
+    if crate::games::is_active(&app) {
+        if let Some(window) = app.get_webview_window(&label) { let _ = window.destroy(); }
+        return Err("请先退出游戏空间，再预览或应用壁纸。".into());
     }
     if preview {
         return Ok(json!({"preview":true}));
@@ -418,9 +430,11 @@ pub fn get_app_info(app: tauri::AppHandle) -> Value {
     } else {
         "windows"
     };
-    json!({"name":"小伴桌面","version":app.package_info().version.to_string(),"platform":std::env::consts::OS,
+    let mut info = json!({"name":"小伴桌面","version":app.package_info().version.to_string(),"platform":std::env::consts::OS,
         "arch":std::env::consts::ARCH,"updateTarget":format!("{os}-{}",std::env::consts::ARCH),"updateUrl":settings(&app).update_url,
-        "dataDirectory":crate::storage::root(&app).ok()})
+        "dataDirectory":crate::storage::root(&app).ok()});
+    if crate::ui_smoke_enabled(&app) { info["uiSmoke"] = json!(true); }
+    info
 }
 #[tauri::command]
 pub fn set_update_source(app: tauri::AppHandle, url: String) -> Result<crate::Settings, String> {
@@ -516,6 +530,23 @@ mod tests {
         assert!(permitted("media-a", "scene_ready"));
         assert!(permitted("control", "set_autostart"));
     }
+    #[test]
+    fn effect_reports_compare_numeric_values_across_javascript_json_encoding() {
+        let mut expected = library::WallpaperEffectsOptions::default();
+        expected.rain = library::EffectOptions { enabled: true, intensity: 0.8, speed: 1.75 };
+        // Actual WebView report: JSON.stringify emits the default 1.0 speeds as integer 1.
+        let actual: Value = serde_json::from_str(r#"{
+            "rain":{"enabled":true,"intensity":0.8,"speed":1.75},
+            "snow":{"enabled":false,"intensity":0.5,"speed":1},
+            "fireflies":{"enabled":false,"intensity":0.5,"speed":1}
+        }"#).unwrap();
+        assert_ne!(actual, serde_json::to_value(&expected).unwrap());
+        assert!(smoke_effect_options_match(&actual, &expected));
+        let mut changed = actual.clone(); changed["rain"]["speed"] = json!(2);
+        assert!(!smoke_effect_options_match(&changed, &expected));
+        changed = actual; changed["rain"]["enabled"] = json!("true");
+        assert!(!smoke_effect_options_match(&changed, &expected));
+    }
 }
 
 pub(crate) fn smoke_render_report(app: &tauri::AppHandle, id: &str) -> Result<Value, String> {
@@ -534,6 +565,119 @@ pub(crate) fn smoke_render_report(app: &tauri::AppHandle, id: &str) -> Result<Va
         case["geometry"] = geometry;
     }
     Ok(case)
+}
+
+fn smoke_effect_options_match(value: &Value, expected: &library::WallpaperEffectsOptions) -> bool {
+    // serde_json::Value distinguishes Number::Float(1.0) from Number::PosInt(1),
+    // but both encode the same effect speed. Typed f64 comparison preserves semantics.
+    serde_json::from_value::<library::WallpaperEffectsOptions>(value.clone()).ok().as_ref() == Some(expected)
+}
+
+fn smoke_effects_report(
+    app: &tauri::AppHandle,
+    label: &str,
+    supported: bool,
+    expected: &library::WallpaperEffectsOptions,
+) -> Result<Value, String> {
+    let report = app.state::<ContentState>().reports.lock().unwrap().get(label).cloned()
+        .ok_or_else(|| format!("特效验证没有收到场景报告：{label}"))?;
+    let effects = &report["effects"];
+    let config = settings(app);
+    let enabled = [(&expected.rain, "rain"), (&expected.snow, "snow"), (&expected.fireflies, "fireflies")];
+    let canvas = supported && enabled.iter().any(|(effect, _)| effect.enabled && effect.intensity > 0.0);
+    if report["privilegedIpcBlocked"] != true || effects["supported"] != supported
+        || effects["canvasPresent"] != canvas || !smoke_effect_options_match(&effects["options"], expected)
+        || effects["paused"] != config.paused || effects["fps"].as_u64() != Some(config.fps as u64) {
+        return Err(format!("原生图片特效配置或隔离报告不一致：{label} {report}"));
+    }
+    if canvas && (effects["canvasWidth"].as_u64().unwrap_or(0) == 0 || effects["canvasHeight"].as_u64().unwrap_or(0) == 0) {
+        return Err(format!("原生特效 Canvas 绘图区为空：{label}"));
+    }
+    for (effect, name) in enabled {
+        let count = effects["particles"][name].as_u64().ok_or_else(|| format!("缺少{name}粒子报告"))?;
+        if (canvas && effect.enabled && effect.intensity > 0.0) != (count > 0) {
+            return Err(format!("特效粒子未按图片类型和开关正确启停：{label} {name} {count}"));
+        }
+    }
+    // The window is hidden until scene_ready; running is deliberately diagnostic only.
+    Ok(report)
+}
+
+fn smoke_effects_persisted(app: &tauri::AppHandle, expected: &library::WallpaperEffectsOptions) -> Result<(), String> {
+    let disk = crate::preferences::load(&crate::storage::root(app)?.join("config/preferences.json"))
+        .map_err(|e| format!("特效持久化配置无法读取：{e}"))?;
+    if disk.settings.wallpaper_options.effects != *expected || settings(app).wallpaper_options.effects != *expected {
+        return Err("已应用的特效参数没有同时写入内存和用户配置".into());
+    }
+    Ok(())
+}
+
+async fn smoke_effects(app: &tauri::AppHandle, local_image_id: &str) -> Result<Value, String> {
+    if !app.state::<DesktopState>().isolated { return Err("图片特效验证只能使用隔离配置".into()); }
+    let mut cases = Vec::new();
+    let mut options = Options::default();
+    for (name, intensity, speed) in [("rain", 0.8, 1.75), ("snow", 0.65, 0.75), ("fireflies", 0.9, 2.25)] {
+        options.effects = library::WallpaperEffectsOptions::default();
+        let effect = match name { "rain" => &mut options.effects.rain, "snow" => &mut options.effects.snow, _ => &mut options.effects.fireflies };
+        *effect = library::EffectOptions { enabled: true, intensity, speed };
+        apply_wallpaper(app.clone(), "test-image".into(), options.clone(), false).await?;
+        let label = app.state::<ContentState>().label.lock().unwrap().clone().ok_or("没有特效图片窗口")?;
+        let report = smoke_effects_report(app, &label, true, &options.effects)?;
+        smoke_effects_persisted(app, &options.effects)?;
+        cases.push(json!({"effect":name,"report":report,"persisted":true}));
+    }
+    let mut sources = Vec::new();
+    for (source, id) in [("builtin", "builtin-soft-hills"), ("downloaded", "test-image"), ("local", local_image_id)] {
+        apply_wallpaper(app.clone(), id.into(), options.clone(), false).await?;
+        let label = app.state::<ContentState>().label.lock().unwrap().clone().ok_or("没有图片来源验证窗口")?;
+        sources.push(json!({"source":source,"id":id,"report":smoke_effects_report(app, &label, true, &options.effects)?}));
+    }
+    let mut non_image = Vec::new();
+    for id in ["test-video", "test-canvas"] {
+        apply_wallpaper(app.clone(), id.into(), options.clone(), false).await?;
+        let label = app.state::<ContentState>().label.lock().unwrap().clone().ok_or("没有非图片验证窗口")?;
+        let report = smoke_effects_report(app, &label, false, &options.effects)?;
+        smoke_effects_persisted(app, &options.effects)?;
+        non_image.push(json!({"id":id,"report":report,"parametersRetained":true}));
+    }
+    apply_wallpaper(app.clone(), "test-image".into(), options.clone(), false).await?;
+    let label = app.state::<ContentState>().label.lock().unwrap().clone().ok_or("没有切回图片窗口")?;
+    let image_restored = smoke_effects_report(app, &label, true, &options.effects)?;
+
+    let applied = settings(app);
+    let applied_label = app.state::<ContentState>().label.lock().unwrap().clone();
+    let path = crate::storage::root(app)?.join("config/preferences.json");
+    let persisted = fs::read(&path).map_err(|e| e.to_string())?;
+    let mut draft = Options::default();
+    draft.fit = "contain".into();
+    draft.effects.rain = library::EffectOptions { enabled: true, intensity: 0.35, speed: 0.5 };
+    apply_wallpaper(app.clone(), "test-image".into(), draft.clone(), true).await?;
+    let preview_report = smoke_effects_report(app, "media-preview", true, &draft.effects)?;
+    if settings(app) != applied || app.state::<ContentState>().label.lock().unwrap().clone() != applied_label
+        || fs::read(&path).map_err(|e| e.to_string())? != persisted {
+        return Err("图片特效预览修改了已应用桌面或长期配置".into());
+    }
+    if let Some(preview) = app.get_webview_window("media-preview") { preview.destroy().map_err(|e| e.to_string())?; }
+    let handle = app.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let deadline = Instant::now() + Duration::from_secs(5);
+        while handle.get_webview_window("media-preview").is_some() {
+            if Instant::now() >= deadline { return Err("特效预览窗口关闭后未释放".to_string()); }
+            std::thread::sleep(Duration::from_millis(20));
+        }
+        Ok(())
+    }).await.map_err(|e| e.to_string())??;
+    close_active(app);
+    if !restore(app)? { return Err("关闭后无法恢复已应用图片特效".into()); }
+    let restored_label = app.state::<ContentState>().label.lock().unwrap().clone().ok_or("没有恢复后的特效窗口")?;
+    let handle = app.clone(); let waiting = restored_label.clone();
+    tauri::async_runtime::spawn_blocking(move || wait(&handle, &waiting)).await.map_err(|e| e.to_string())??;
+    let restored_report = smoke_effects_report(app, &restored_label, true, &options.effects)?;
+    smoke_effects_persisted(app, &options.effects)?;
+    if settings(app) != applied { return Err("特效恢复更改了已应用设置".into()); }
+    Ok(json!({"cases":cases,"sources":sources,"nonImage":non_image,"imageRestored":image_restored,
+        "preview":{"report":preview_report,"settingsPreserved":true,"closed":true},
+        "persistence":{"diskConfigMatch":true,"restored":true,"report":restored_report},"cacheOffline":true}))
 }
 
 pub async fn smoke(app: &tauri::AppHandle) -> Result<Value, String> {
@@ -595,9 +739,13 @@ pub async fn smoke(app: &tauri::AppHandle) -> Result<Value, String> {
     let handle = app.clone();
     tauri::async_runtime::spawn_blocking(move || wait(&handle, &restored_label)).await.map_err(|e| e.to_string())??;
     smoke_render_report(app, &settings(app).wallpaper_id)?;
+    let effects = if std::env::var("XIAOBAN_EFFECTS_SMOKE").ok().as_deref() == Some("1") {
+        let local_image_id = local_cases.first().and_then(|case| case["id"].as_str()).ok_or("缺少本地图片特效测试来源")?;
+        Some(smoke_effects(app, local_image_id).await?)
+    } else { None };
     apply_wallpaper(app.clone(), "companion".into(), Options::default(), false).await?;
     Ok(
         json!({"cases":cases,"cacheOffline":true,"hashFailurePreserved":preserved,"updateChecked":true,
-            "localImports":{"cases":local_cases,"sourceDeleted":true,"deduplicated":true,"restored":true}}),
+            "localImports":{"cases":local_cases,"sourceDeleted":true,"deduplicated":true,"restored":true},"effects":effects}),
     )
 }

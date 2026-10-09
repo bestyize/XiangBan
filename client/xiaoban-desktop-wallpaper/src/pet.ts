@@ -16,6 +16,9 @@ export class PetView {
   private config: Settings
   private lastExpression = ''
   private lastStatus = ''
+  private careExpression = (event: Event) => {
+    if (event instanceof CustomEvent && event.detail === 'happy') this.temporaryExpression('happy')
+  }
 
   constructor(parent: HTMLElement, settings: Settings, private status?: (text: string) => void) {
     this.config = settings
@@ -23,6 +26,7 @@ export class PetView {
     this.host.className = 'pet-stage'
     this.host.innerHTML = `<div class="pet-lamp"></div><div class="pet-art" role="img" aria-label="小伴" tabindex="0">${robotMarkup(stillFrame('idle'), this.id)}</div>`
     parent.append(this.host)
+    window.addEventListener('care-expression', this.careExpression)
     this.update(settings)
     const art = this.host.querySelector('.pet-art')!
     const q = (selector: string) => this.host.querySelector<SVGElement>(selector)
@@ -62,6 +66,7 @@ export class PetView {
     this.host.style.setProperty('--pet-size', `${settings.size}px`)
     if (settings.expression !== this.lastExpression) {
       this.lastExpression = settings.expression
+      this.mind.play([])
       this.mind.setBase(settings.expression as RobotInput)
       this.mind.activity()
     }
@@ -92,5 +97,10 @@ export class PetView {
   }
 
   poke() { this.mind.poke() }
-  destroy() { cancelAnimationFrame(this.frameId); clearTimeout(this.lookTimer); this.host.remove() }
+  temporaryExpression(expression: RobotInput, seconds = 10) {
+    if (this.config.paused) return
+    this.mind.activity()
+    this.mind.play([{ expr: expression, hold: Math.max(0.5, Math.min(seconds, 10)) }])
+  }
+  destroy() { cancelAnimationFrame(this.frameId); clearTimeout(this.lookTimer); window.removeEventListener('care-expression', this.careExpression); this.host.remove() }
 }

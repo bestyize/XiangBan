@@ -15,6 +15,10 @@ mod website;
 mod content;
 mod storage;
 mod local_media;
+mod games;
+mod reminders;
+mod care_system;
+mod care_weather;
 
 use preferences::{Preferences, Settings};
 use serde::Serialize;
@@ -41,12 +45,37 @@ struct DesktopState {
     startup_error: Mutex<Option<String>>,
     startup_menu: Mutex<Option<tauri::menu::CheckMenuItem<tauri::Wry>>>,
     isolated: bool,
+    ui_report: Mutex<Option<serde_json::Value>>,
     #[cfg(target_os = "macos")]
     reopen_count: std::sync::atomic::AtomicU32,
 }
 
 fn settings(app: &tauri::AppHandle) -> Settings {
     app.state::<DesktopState>().settings.lock().unwrap().clone()
+}
+
+fn ui_smoke_enabled(app: &tauri::AppHandle) -> bool {
+    app.state::<DesktopState>().isolated && std::env::var("XIAOBAN_UI_SMOKE").as_deref() == Ok("1")
+}
+
+#[tauri::command]
+fn ui_smoke_report(app: tauri::AppHandle, window: tauri::WebviewWindow, report: serde_json::Value) -> Result<(), String> {
+    if window.label() != "control" || !ui_smoke_enabled(&app) { return Err("UI smoke is only available to the isolated control window".into()); }
+    if serde_json::to_vec(&report).map_err(|error| error.to_string())?.len() > 16 * 1024 { return Err("UI smoke report exceeds 16 KiB".into()); }
+    *app.state::<DesktopState>().ui_report.lock().unwrap() = Some(report);
+    Ok(())
+}
+
+async fn wait_ui_smoke(app: &tauri::AppHandle) -> Result<serde_json::Value, String> {
+    let deadline = Instant::now() + Duration::from_secs(20);
+    loop {
+        if let Some(report) = app.state::<DesktopState>().ui_report.lock().unwrap().clone() {
+            if report["ok"] == true { return Ok(report); }
+            return Err(report["error"].as_str().unwrap_or("UI smoke reported failure without details").to_string());
+        }
+        if Instant::now() >= deadline { return Err("Vue control UI did not report within 20 seconds; check CSP, IPC, or frontend initialization".into()); }
+        tauri::async_runtime::spawn_blocking(|| std::thread::sleep(Duration::from_millis(100))).await.map_err(|error| error.to_string())?;
+    }
 }
 
 fn publish(app: &tauri::AppHandle) {
@@ -148,6 +177,7 @@ fn set_autostart(app: tauri::AppHandle, enabled: bool) -> Result<Settings, Strin
 }
 
 fn open_scene(app: &tauri::AppHandle, mode: &str) -> Result<(), String> {
+    if mode == "floating" && !settings(app).companion_enabled { return Ok(()); }
     let wallpaper = mode == "wallpaper";
     let label = if wallpaper { "wallpaper" } else { "pet" };
     if let Some(window) = app.get_webview_window(label) {
@@ -263,6 +293,7 @@ fn get_settings(app: tauri::AppHandle) -> Settings {
 
 #[tauri::command]
 async fn set_mode(app: tauri::AppHandle, mode: String) -> Result<Settings, String> {
+    if games::is_active(&app) { return Err("请先退出游戏空间，再切换桌面模式".into()); }
     let state = app.state::<DesktopState>();
     let _update = state.update_lock.lock().unwrap();
     if !["floating", "wallpaper"].contains(&mode.as_str()) {
@@ -342,6 +373,21 @@ fn update_settings(
     *state.settings.lock().unwrap() = next;
     publish(&app);
     Ok(settings(&app))
+}
+
+#[tauri::command]
+async fn set_companion_enabled(app:tauri::AppHandle,enabled:bool)->Result<Settings,String>{
+    if games::is_active(&app){return Err("请先退出游戏空间，再更改小伴显示".into());}
+    let state=app.state::<DesktopState>(); let _update=state.update_lock.lock().unwrap();
+    let previous=settings(&app); let mut next=previous.clone(); next.companion_enabled=enabled;
+    persist(&app,&next)?; *state.settings.lock().unwrap()=next.clone();
+    if !enabled {
+        if let Some(pet)=app.get_webview_window("pet"){let _=pet.destroy();}
+        state.ready_scenes.lock().unwrap().remove("pet");
+    } else if next.mode=="floating" {
+        if let Err(error)=open_scene(&app,"floating"){*state.settings.lock().unwrap()=previous.clone();let _=persist(&app,&previous);return Err(error);}
+    }
+    publish(&app);Ok(next)
 }
 
 #[tauri::command]
@@ -453,6 +499,7 @@ fn get_diagnostics(app: tauri::AppHandle) -> serde_json::Value {
         }
     }
     report["contentReports"] = serde_json::to_value(app.state::<content::ContentState>().reports.lock().unwrap().clone()).unwrap();
+    report["games"] = games::get_game_status(app.clone());
     report
 }
 
@@ -548,10 +595,11 @@ fn setup_tray(app: &tauri::App) -> tauri::Result<()> {
     };
     let control = MenuItem::with_id(app, "control", "打开小伴设置", true, None::<&str>)?;
     let poke = MenuItem::with_id(app, "poke", "戳戳小伴", true, None::<&str>)?;
+    let games = MenuItem::with_id(app, "games", "玩一玩", true, None::<&str>)?;
     let autostart = CheckMenuItem::with_id(app, "autostart", "开机自动启动",
         app.state::<DesktopState>().startup_allowed, settings(app.handle()).autostart, None::<&str>)?;
     let exit = MenuItem::with_id(app, "exit", "退出小伴", true, None::<&str>)?;
-    let menu = Menu::with_items(app, &[&control, &poke, &autostart, &exit])?;
+    let menu = Menu::with_items(app, &[&control, &games, &poke, &autostart, &exit])?;
     *app.state::<DesktopState>().startup_menu.lock().unwrap() = Some(autostart);
     // A small built-in icon keeps this prototype independent of image assets.
     let mut rgba = vec![0u8; 32 * 32 * 4];
@@ -580,6 +628,10 @@ fn setup_tray(app: &tauri::App) -> tauri::Result<()> {
             }
             "poke" => {
                 let _ = app.emit("pet-poke", ());
+            }
+            "games" => {
+                let handle=app.clone();
+                tauri::async_runtime::spawn(async move { if let Err(error)=games::open(&handle).await { let _=handle.emit("desktop-error",error); } });
             }
             "autostart" => {
                 if let Err(error) = set_autostart(app.clone(), !get_settings(app.clone()).autostart) {
@@ -633,17 +685,32 @@ fn main() {
         }));
     #[cfg(target_os = "macos")]
     let builder = builder.plugin(tauri_plugin_autostart::Builder::new().app_name(startup_name).arg("--autostart").build());
-    let command_handler: Box<dyn Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Sync> = Box::new(tauri::generate_handler![get_platform, get_settings, set_mode, update_settings, poke,
-            scene_ready, set_hit_test, start_drag, hide_control, show_control, quit, get_diagnostics,
+    let command_handler: Box<dyn Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Sync> = Box::new(tauri::generate_handler![get_platform, get_settings, set_mode, update_settings, set_companion_enabled, poke,
+            scene_ready, set_hit_test, start_drag, hide_control, show_control, quit, get_diagnostics, ui_smoke_report,
             get_startup_status, set_autostart, content::get_wallpaper_library, content::import_wallpaper_catalog,
+            games::open_game_space, games::close_game_space, games::get_game_catalog, games::load_game_save,
+            games::save_game_save, games::get_game_status, games::set_game_desktop_double_click,
+            games::game_smoke_report,
+            reminders::get_care_settings, reminders::configure_care, reminders::upsert_care_rule, reminders::delete_care_rule,
+            reminders::preview_care_rule, reminders::get_care_delivery, reminders::care_ready, reminders::dismiss_care,
+            reminders::snooze_care, reminders::search_care_cities, reminders::check_care_weather,
             content::subscribe_wallpapers, content::apply_wallpaper, content::get_app_info, content::set_update_source,
             content::check_updates, content::open_download_url, local_media::import_local_wallpaper, storage::open_data_directory,
             website::configure_website, website::fetch_site_wallpapers, website::fetch_site_categories,
             website::select_site_wallpaper, website::download_site_wallpaper, website::check_website, website::get_website_status, website::dismiss_website_message]);
     let app = builder.manage(state).manage(content::ContentState::default()).manage(website::WebsiteState::default())
+        .manage(games::GameState::default()).manage(reminders::ReminderState::default())
         .register_uri_scheme_protocol("wallpaper-asset", |context, request| library::serve(context.app_handle(), request))
         .invoke_handler(move |invoke| {
-            if !content::permitted(invoke.message.webview_ref().label(), invoke.message.command()) {
+            let label=invoke.message.webview_ref().label(); let command=invoke.message.command();
+            let allowed=games::permitted(label,command).unwrap_or_else(|| {
+                if command=="ui_smoke_report" {return label=="control";}
+                if command=="set_companion_enabled" {return label=="control";}
+                if label=="care" { return ["get_care_delivery","care_ready","dismiss_care","snooze_care"].contains(&command); }
+                if command.contains("care") { return label=="control"; }
+                content::permitted(label,command)
+            });
+            if !allowed {
                 invoke.resolver.reject("壁纸内容没有桌面控制或系统操作权限");
                 return true;
             }
@@ -651,6 +718,8 @@ fn main() {
         })
         .setup(|app| {
             initialize_preferences(app.handle()).map_err(std::io::Error::other)?;
+            reminders::start(app.handle());
+            games::start(app.handle());
             setup_tray(app)?;
             website::start(app.handle());
             let initial_mode = settings(app.handle()).mode;
@@ -692,11 +761,14 @@ fn main() {
                     let floating_result = set_mode(handle.clone(), "floating".into()).await
                         .and_then(|_| wait_for_scene(&handle, "pet"));
                     let floating_after = get_diagnostics(handle.clone());
+                    let games_report=if std::env::var_os("XIAOBAN_GAMES_SMOKE").is_some(){Some(games::smoke(&handle).await)}else{None};
+                    let care_report=if std::env::var_os("XIAOBAN_CARE_SMOKE").is_some(){Some(reminders::smoke(&handle).await)}else{None};
+                    let ui_report=if ui_smoke_enabled(&handle){Some(wait_ui_smoke(&handle).await)}else{None};
                     #[allow(unused_mut)]
                     let mut report = serde_json::json!({"floatingBefore": floating_before, "wallpaper": wallpaper,
                         "floatingAfter": floating_after, "wallpaperResult": wallpaper_result.map(|_| "ok"),
                         "floatingResult": floating_result.map(|_| "ok"), "startupResult": startup_result.map(|_| "ok"),
-                        "lifecycle": lifecycle,"media":media,"website":website});
+                        "lifecycle": lifecycle,"media":media,"website":website,"games":games_report,"care":care_report,"ui":ui_report});
                     #[cfg(target_os = "macos")]
                     { report["dockReopen"] = serde_json::to_value(dock_reopen).unwrap(); }
                     if let Ok(path) = std::env::var("XIAOBAN_SMOKE_REPORT") {
@@ -708,6 +780,19 @@ fn main() {
             Ok(())
         })
         .on_window_event(|window, event| {
+            if window.label()=="care" && matches!(event,tauri::WindowEvent::Destroyed){reminders::window_closed(window.app_handle());}
+            if window.label()=="games" {
+                if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                    api.prevent_close();
+                    // Ask the trusted host to flush pending saves before requesting native close.
+                    if window.app_handle().get_webview_window("games").is_none_or(|webview|webview.eval("{const button=document.getElementById('games-close');if(button)button.click();else window.__TAURI__?.core.invoke('close_game_space',{hostToken:window.__XIAOBAN_GAME_TOKEN__});}".to_string()).is_err()) {
+                        let handle=window.app_handle().clone(); tauri::async_runtime::spawn(async move { let _=games::close(&handle).await; });
+                    }
+                }
+                if matches!(event,tauri::WindowEvent::Destroyed) && games::is_active(window.app_handle()) {
+                    let handle=window.app_handle().clone(); tauri::async_runtime::spawn(async move { let _=games::close(&handle).await; });
+                }
+            }
             if window.label() == "control" {
                 if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                     api.prevent_close(); let _ = hide_control(window.app_handle().clone());

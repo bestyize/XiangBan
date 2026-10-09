@@ -1,0 +1,6 @@
+{
+  "identifier": "games",
+  "description": "The trusted game host receives only explicitly guarded custom commands; sandbox packs have no core capabilities.",
+  "windows": ["games"],
+  "permissions": []
+}

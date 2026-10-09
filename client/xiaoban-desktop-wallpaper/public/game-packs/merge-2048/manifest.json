@@ -1,0 +1,9 @@
+{
+  "id": "merge-2048",
+  "version": "1.0.0",
+  "name": "2048",
+  "description": "滑动合并相同数字，慢慢合出 2048。手机和电脑都能玩。",
+  "entry": "index.html",
+  "cover": "cover.svg",
+  "runtimeProtocol": 1
+}

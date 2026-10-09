@@ -1,0 +1,51 @@
+.result-share-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 46px;
+  margin: 16px 0 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--share-accent, #edbd76);
+  border-radius: 13px;
+  background: var(--share-accent, #edbd76);
+  color: var(--share-ink, #202a39);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 650;
+  line-height: 1.4;
+  white-space: nowrap;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: transform .12s, background-color .12s;
+}
+.result-share-button svg { width: 17px; height: 17px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.result-share-button[hidden] { display: none; }
+.result-share-button:active { transform: scale(.97); }
+.result-card:has(.result-share-button:not([hidden])) > #restartOverlay,
+.result-card:has(.result-share-button:not([hidden])) .result-actions > button:not([hidden]) {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 8px;
+  border: 1px solid var(--share-outline, #ffffff26);
+  border-radius: 13px;
+  background: var(--share-secondary, #ffffff05);
+  color: var(--share-secondary-ink, #d4deea);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.4;
+  touch-action: manipulation;
+}
+.result-card:has(.result-share-button:not([hidden])) .result-actions { display: flex; gap: 8px; }
+.result-card:has(.result-share-button:not([hidden])) .result-actions > button:not([hidden]) { flex: 1; }
+.result-share-button:focus-visible,
+.result-card:has(.result-share-button:not([hidden])) button:focus-visible { outline: 2px solid var(--share-focus, #edbd76); outline-offset: 3px; }
+@media (hover: hover) {
+  .result-share-button:hover { background: var(--share-hover, #f3c987); }
+  .result-card:has(.result-share-button:not([hidden])) > #restartOverlay:hover,
+  .result-card:has(.result-share-button:not([hidden])) .result-actions > button:not([hidden]):hover { background: var(--share-secondary-hover, #ffffff0c); }
+}

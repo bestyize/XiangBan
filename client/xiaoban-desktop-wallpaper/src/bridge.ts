@@ -1,3 +1,5 @@
+import { wallpaperEffectsDefaults, type WallpaperEffectsOptions } from "./wallpaper-effects.ts";
+
 export interface Settings {
   mode: "floating" | "wallpaper";
   expression: string;
@@ -12,6 +14,8 @@ export interface Settings {
   updateUrl: string;
   websiteUrl: string;
   automaticUpdates: boolean;
+  gameDesktopDoubleClick: boolean;
+  companionEnabled: boolean;
 }
 
 export type WallpaperKind = "image" | "video" | "canvas";
@@ -55,6 +59,7 @@ export interface WallpaperOptions {
   playbackRate: number;
   background: string;
   values: Record<string, string | number | boolean>;
+  effects: WallpaperEffectsOptions;
 }
 export interface WallpaperLibrary {
   items: WallpaperEntry[];
@@ -69,12 +74,14 @@ export interface AppInfo {
   updateTarget: string;
   updateUrl: string;
   dataDirectory?: string;
+  uiSmoke?: boolean;
 }
 export const wallpaperDefaults: WallpaperOptions = {
   fit: "cover",
   playbackRate: 1,
   background: "#edf5f0",
   values: {},
+  effects: structuredClone(wallpaperEffectsDefaults),
 };
 
 export interface CursorSample {
@@ -120,6 +127,8 @@ export const defaults: Settings = {
   updateUrl: "https://wallpaper.xiangban.xyz/api/v1/desktop/updates",
   websiteUrl: "https://wallpaper.xiangban.xyz",
   automaticUpdates: true,
+  gameDesktopDoubleClick: false,
+  companionEnabled: true,
 };
 export function invoke<T>(
   command: string,
