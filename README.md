@@ -14,7 +14,6 @@
 | [services/xiaban-api/backend](services/xiaban-api/backend/README.md) | 已实现 | Ktor 后端、业务、数据与后台任务 |
 | [services/xiaban-api/api-contracts](services/xiaban-api/api-contracts/README.md) | 已实现 | 原 shared，按业务分包的 KMP 接口库 |
 | [services/server-pan](services/server-pan/README.md) | 已实现 | PanDown 自托管网盘，Rust Axum + SQLite 后端与 React 前端，独立于主 API |
-| [services/server-xiaoban-wallpaper](services/server-xiaoban-wallpaper/README.md) | 已实现 | 小伴桌面产品网站与壁纸元数据后台，Rust + PostgreSQL、Vue 3 + Vite，不存储壁纸媒体 |
 | [services/server-xiangban-wallpaper](services/server-xiangban-wallpaper/README.md) | 已实现 | 正式壁纸网站 wallpaper.xiangban.xyz，图片/视频采集与上传、小伴桌面下载、版本与公告；桌面客户端接入此服务 |
 | [services/server-asr](services/server-asr/README.md) | 规划 | 语音识别服务 |
 | [services/server-edgetts](services/server-edgetts/README.md) | 规划 | Edge TTS 服务，现有语音功能仍在主后端 |
@@ -52,9 +51,6 @@ npm --prefix client/xiaoban-desktop-wallpaper run desktop
 npm --prefix services/server-pan/frontend ci
 npm --prefix services/server-pan/frontend run build
 cargo build --release --manifest-path services/server-pan/backend/Cargo.toml
-npm --prefix services/server-xiaoban-wallpaper/frontend ci
-npm --prefix services/server-xiaoban-wallpaper/frontend run build
-cargo build --release --manifest-path services/server-xiaoban-wallpaper/backend/Cargo.toml
 python -X utf8 tools/check-layout.py
 npm --prefix services/server-xiangban-wallpaper/web ci
 npm --prefix services/server-xiangban-wallpaper/web run build
@@ -63,9 +59,7 @@ cargo test --locked --manifest-path services/server-xiangban-wallpaper/Cargo.tom
 
 Windows 使用 gradlew.bat；Kotlin 服务需要 JDK 21。Android 壁纸需要 JDK 17+ 与 Android SDK，并自带 Gradle wrapper。网盘服务需要 Rust 1.80+ 与 Node.js 18+，默认端口 55005，运行方式与数据目录要求见其 README；它不接入根 Gradle，也不依赖主 API 的账户与数据库。后端分发输出在 services/xiaban-api/backend/build/install/backend。集成测试使用独立测试数据库和 Redis 第 15 号库；默认在依赖不可用时跳过，XIABAN_REQUIRE_INTEGRATION=true 可要求必须执行，详见后端 README。
 
-小伴桌面网站服务需要 Rust 1.88+、Node.js 24 与独立 PostgreSQL 17+，默认端口 55006。其集成测试必须配置 `XIAOBAN_TEST_DATABASE_URL`，不读取主 API 的生产或测试数据库；接口与部署见该子项目 README。
-
-新接入的正式壁纸网站位于 `services/server-xiangban-wallpaper`（注意与上述旧项目拼写不同），使用 Node.js 24、Rust stable 和独立 PostgreSQL，默认端口 8080。桌面客户端默认连接 `https://wallpaper.xiangban.xyz`；它的数据库集成测试使用 `TEST_DATABASE_URL`，每个测试创建并清理独立 schema，不更改已有数据。
+正式壁纸网站位于 `services/server-xiangban-wallpaper`，使用 Node.js 24、Rust stable 和独立 PostgreSQL，默认端口 8080。桌面客户端默认连接 `https://wallpaper.xiangban.xyz`；它的数据库集成测试使用 `TEST_DATABASE_URL`，每个测试创建并清理独立 schema，不更改已有数据。
 
 部署配置在 [infra](infra/README.md)，说明在 [docs/deployment](docs/deployment/README.md)。容器命令显式指定文件：
 

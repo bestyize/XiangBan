@@ -29,10 +29,8 @@ client/xiaoban-mobile-wallpaper 是 Android 壁纸浏览与下载 App（Compose�
 
 services/server-pan 是独立的网盘服务：backend 为 Cargo 工程，frontend 为独立 npm 工程，构建产物由后端单端口托管。它自带账号、JWT 与 SQLite，不依赖 api-contracts，也不接入主 API 的鉴权与数据库；运行时数据目录 pandown_data 不入库。目前没有 Docker、Compose 与 CI 配置，接入部署时再补充。镜像、服务、数据卷和 URL 不因物理路径迁移更名。
 
-services/server-xiaoban-wallpaper 是独立的小伴桌面网站与内容管理服务：backend 为 Rust/Axum/SQLx，数据库仅使用独立 PostgreSQL，frontend 为 Vue 3/Vite。服务只存壁纸及发布元数据，外部图片、视频、动画与安装包不上传、不落盘。自带管理员会话、目录 JSON 与桌面更新接口，拥有独立 Docker、Compose 和 CI，不接入根 Gradle或主 API 的腾讯云部署流程。
+正式壁纸网站使用 `services/server-xiangban-wallpaper`。网站域名为 `wallpaper.xiangban.xyz`，拥有独立采集、上架与媒体上传功能，同时管理桌面下载版本与公告。桌面客户端以此网站的 `/api/v1` 接口浏览公开图片/视频，并通过单项交付清单下载经 SHA-256 校验的不可变资源；已选资源缓存后可离线播放。版本发布、公告展示策略和内容上架策略均归网站后端，客户端维护自己的协议类型与缓存实现，无跨项目源码导入。配置复用网站现有 `app_settings`，不增加历史数据迁移。
 
 Docker、手动部署工作流和桌宠 CI 使用新路径。桌宠 CI 只安装桌宠依赖，网页改动不触发桌宠构建。
-
-正式壁纸网站使用 `services/server-xiangban-wallpaper`（与旧项目 `server-xiaoban-wallpaper` 并存）。网站域名为 `wallpaper.xiangban.xyz`，拥有独立采集、上架与媒体上传功能，同时管理桌面下载版本与公告。桌面客户端以此网站的 `/api/v1` 接口浏览公开图片/视频，并通过单项交付清单下载经 SHA-256 校验的不可变资源；已选资源缓存后可离线播放。版本发布、公告展示策略和内容上架策略均归网站后端，客户端维护自己的协议类型与缓存实现，无跨项目源码导入。配置复用网站现有 `app_settings`，不增加历史数据迁移。
 
 移动目录时检查 README 链接、Gradle projectDir、DTO 导入、Docker COPY/ENTRYPOINT、Compose 上下文、CI 路径和测试资产位置。
