@@ -24,6 +24,7 @@ pub fn create_api_router(state: AppState) -> Router {
         .route("/api/v1/desktop/updates", get(crate::desktop::updates))
         .route("/api/v1/desktop/announcements", get(crate::desktop::announcements))
         .route("/api/v1/desktop/wallpapers/{id}", get(crate::desktop::wallpaper))
+        .route("/api/v1/desktop/downloads/{id}", get(crate::app_packages::download))
         .route_layer(axum::middleware::map_response(crate::desktop::no_store))
         // Wallpaper endpoints
         .route("/api/v1/wallpapers/search", get(search_wallpapers))

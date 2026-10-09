@@ -135,7 +135,9 @@ impl DesktopConfig {
                 if !TARGETS.contains(&target.as_str()) {
                     return Err(bad("不支持的平台"));
                 }
-                network_url(&package.url)?;
+                if !crate::app_packages::is_owned_url(&package.url) {
+                    network_url(&package.url)?;
+                }
                 if package.sha256.as_deref().is_some_and(|h| !valid_hash(h))
                     || package.bytes.is_some_and(|n| n == 0)
                 {
@@ -185,34 +187,41 @@ impl DesktopConfig {
             .map(|a| json!({"id":a.id,"title":a.title,"body":a.body,"revision":hash(serde_json::to_string(a).unwrap().as_bytes())})).collect()
     }
 }
-async fn config(store: &Store) -> Result<DesktopConfig, AppError> {
+pub(crate) async fn load_config(store: &Store) -> Result<DesktopConfig, AppError> {
     match store.get_setting("desktop.config").await? {
         Some(value) => serde_json::from_str(&value).map_err(|e| AppError::Internal(e.to_string())),
         None => Ok(DesktopConfig::default()),
     }
 }
 pub async fn admin_get(State(state): State<AppState>) -> Result<Json<DesktopConfig>, AppError> {
-    Ok(Json(config(state.admin.store()?).await?))
+    Ok(Json(load_config(state.admin.store()?).await?))
 }
 pub async fn admin_save(
     State(state): State<AppState>,
     Json(mut value): Json<DesktopConfig>,
 ) -> Result<Json<DesktopConfig>, AppError> {
     value.site_url = value.site_url.trim().trim_end_matches('/').to_string();
+    for release in &mut value.releases {
+        crate::app_packages::normalize_release(&state, release).await?;
+    }
     value.validate()?;
     state
         .admin
         .store()?
-        .set_setting(
-            "desktop.config",
-            &serde_json::to_string(&value).map_err(|e| AppError::Internal(e.to_string()))?,
-        )
+        .update_desktop_config(|config| {
+            *config = value.clone();
+            Ok(())
+        })
         .await?;
     Ok(Json(value))
 }
-pub async fn product(State(state): State<AppState>) -> Result<Json<Value>, AppError> {
-    let config = config(state.admin.store()?).await?;
-    let downloads: BTreeMap<_,_> = TARGETS.iter().filter_map(|target| config.latest(Some(target), false).map(|r| (*target, json!({"version":r.version,"notes":r.notes,"publishedAt":r.published_at,"url":r.platforms[*target].url})))).collect();
+pub async fn product(
+    State(state): State<AppState>,
+    headers: axum::http::HeaderMap,
+) -> Result<Json<Value>, AppError> {
+    let config = load_config(state.admin.store()?).await?;
+    let origin = crate::app_packages::origin(&headers, &config.site_url);
+    let downloads: BTreeMap<_,_> = TARGETS.iter().filter_map(|target| config.latest(Some(target), false).map(|r| {let platforms=crate::app_packages::public_platforms(r,&origin);(*target, json!({"version":r.version,"notes":r.notes,"publishedAt":r.published_at,"url":platforms[*target].url}))})).collect();
     Ok(Json(
         json!({"schemaVersion":1,"introduction":config.introduction,"downloads":downloads,"announcements":config.notices("website")}),
     ))
@@ -226,21 +235,23 @@ pub struct UpdateQuery {
 pub async fn updates(
     State(state): State<AppState>,
     Query(query): Query<UpdateQuery>,
+    headers: axum::http::HeaderMap,
 ) -> Result<Response, AppError> {
     let current =
         semver::Version::parse(&query.current_version).map_err(|_| bad("当前版本号无效"))?;
     if !TARGETS.contains(&query.target.as_str()) {
         return Err(bad("不支持的平台"));
     }
-    let config = config(state.admin.store()?).await?;
+    let config = load_config(state.admin.store()?).await?;
+    let origin = crate::app_packages::origin(&headers, &config.site_url);
     match config.latest(Some(&query.target), !current.pre.is_empty()) {
-        Some(r) if semver::Version::parse(&r.version).unwrap() > current => Ok(Json(json!({"schemaVersion":1,"version":r.version,"notes":r.notes,"publishedAt":r.published_at,"platforms":r.platforms})).into_response()),
+        Some(r) if semver::Version::parse(&r.version).unwrap() > current => Ok(Json(json!({"schemaVersion":1,"version":r.version,"notes":r.notes,"publishedAt":r.published_at,"platforms":crate::app_packages::public_platforms(r,&origin)})).into_response()),
         _ => Ok(StatusCode::NO_CONTENT.into_response()),
     }
 }
 pub async fn announcements(State(state): State<AppState>) -> Result<Json<Value>, AppError> {
     Ok(Json(
-        json!({"schemaVersion":1,"items":config(state.admin.store()?).await?.notices("desktop")}),
+        json!({"schemaVersion":1,"items":load_config(state.admin.store()?).await?.notices("desktop")}),
     ))
 }
 
@@ -652,7 +663,7 @@ pub async fn wallpaper(
         prepare_wallpaper(store, &mut item).await?;
         state.db.upsert_wallpapers(&[item.clone()]).await?;
     }
-    let config = config(store).await?;
+    let config = load_config(store).await?;
     let (url, kind) = source(&item)?;
     let media = resource(store, url, kind, &config.site_url).await?;
     // Remote thumbnails are fetched by the client only for gallery display; the manifest retains
@@ -763,4 +774,28 @@ mod tests {
         config.releases = vec![release("bad", "windows-x86_64")];
         assert!(config.validate().is_err());
     }
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SiteConfig {
+    site_url: String,
+    introduction: String,
+    announcements: Vec<Announcement>,
+}
+pub async fn admin_save_site(
+    State(state): State<AppState>,
+    Json(value): Json<SiteConfig>,
+) -> Result<Json<DesktopConfig>, AppError> {
+    let config = state
+        .admin
+        .store()?
+        .update_desktop_config(|config| {
+            config.site_url = value.site_url.trim().trim_end_matches('/').to_string();
+            config.introduction = value.introduction;
+            config.announcements = value.announcements;
+            Ok(())
+        })
+        .await?;
+    Ok(Json(config))
 }

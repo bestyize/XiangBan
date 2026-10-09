@@ -1,7 +1,21 @@
 import { ApiError } from '@/api'
 import type { DesktopConfig } from '@/desktop'
+import type { DesktopRelease } from '@/desktop'
 export const getDesktopConfig = () => request<DesktopConfig>('/desktop')
-export const saveDesktopConfig = (config: DesktopConfig) => request<DesktopConfig>('/desktop', 'PUT', config)
+export const saveDesktopConfig = (config: DesktopConfig) => request<DesktopConfig>('/desktop', 'PATCH', {siteUrl:config.siteUrl,introduction:config.introduction,announcements:config.announcements})
+export const listAppReleases = async () => (await request<{releases:DesktopRelease[]}>('/desktop/releases')).releases
+export const saveAppRelease = (release:DesktopRelease) => request<DesktopRelease>(`/desktop/releases/${encodeURIComponent(release.version)}`, 'PUT', release)
+export const deleteAppRelease = (version:string) => request<{success:boolean}>(`/desktop/releases/${encodeURIComponent(version)}`, 'DELETE')
+export function uploadAppPackage(target:string,file:File,progress:(percent:number)=>void,signal?:AbortSignal):Promise<{id:string;url:string;fileName:string;sha256:string;bytes:number}> {
+  return new Promise((resolve,reject)=>{
+    const xhr=new XMLHttpRequest();const abort=()=>xhr.abort();signal?.addEventListener('abort',abort,{once:true});const cleanup=()=>signal?.removeEventListener('abort',abort);xhr.open('POST','/api/v1/admin/desktop/packages');xhr.withCredentials=true;
+    xhr.upload.onprogress=event=>{if(event.lengthComputable)progress(Math.round(event.loaded/event.total*100))};
+    xhr.onerror=()=>{cleanup();reject(new Error('安装包上传连接失败，请重试'))};
+    xhr.onabort=()=>{cleanup();reject(new Error('安装包上传已取消'))};
+    xhr.onload=()=>{cleanup();let body;try{body=JSON.parse(xhr.responseText)}catch{reject(new Error(`上传失败 (${xhr.status})`));return;}if(xhr.status>=200 && xhr.status<300){resolve(body)}else{if(xhr.status===401)onUnauthorized?.();reject(new ApiError(xhr.status,body.error ?? `上传失败 (${xhr.status})`))}};
+    const form=new FormData();form.append('target',target);form.append('file',file);xhr.send(form);
+  })
+}
 import type {
   AdminUser,
   CacheOverview,

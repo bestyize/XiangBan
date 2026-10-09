@@ -1,5 +1,6 @@
 /target
 /uploads
+/app-packages
 /web/node_modules
 /web/dist
 .env

@@ -408,6 +408,58 @@ async fn public_call(app: &Router, path: &str) -> Reply {
     Reply {status,headers,body:serde_json::from_slice(&bytes).unwrap_or(Value::Null)}
 }
 
+async fn upload_package(app:&Router,cookie:Option<&str>,target:&str,name:&str,content:&[u8])->Reply{
+    let boundary=uuid::Uuid::new_v4().simple().to_string();
+    let mut body=format!("--{boundary}\r\nContent-Disposition: form-data; name=\"target\"\r\n\r\n{target}\r\n--{boundary}\r\nContent-Disposition: form-data; name=\"file\"; filename=\"{name}\"\r\nContent-Type: application/octet-stream\r\n\r\n").into_bytes();
+    body.extend_from_slice(content);body.extend(format!("\r\n--{boundary}--\r\n").as_bytes());
+    let mut request=Request::builder().method("POST").uri("/api/v1/admin/desktop/packages").header(header::HOST,"localhost:8081").header(header::CONTENT_TYPE,format!("multipart/form-data; boundary={boundary}"));
+    if let Some(cookie)=cookie{request=request.header(header::COOKIE,cookie);}
+    let response=app.clone().oneshot(request.body(Body::from(body)).unwrap()).await.unwrap();let status=response.status();let headers=response.headers().clone();
+    let bytes=axum::body::to_bytes(response.into_body(),1024*1024).await.unwrap();Reply{status,headers,body:serde_json::from_slice(&bytes).unwrap_or(Value::Null)}
+}
+
+#[tokio::test]
+async fn app_upload_publication_download_and_withdrawal_share_the_release_record(){
+    use sha2::{Digest,Sha256};
+    let Some(db)=TestDb::connect().await else{return};let (app,_)=build_app(&db).await;
+    let mut content=format!("test installer {}",uuid::Uuid::new_v4()).into_bytes();content.resize(3*1024*1024,b'x');
+    assert_eq!(upload_package(&app,None,"windows-x86_64","test.zip",&content).await.status,StatusCode::UNAUTHORIZED);
+    let cookie=session_cookie(&sign_in(&app,"admin","123456").await);
+    let uploaded=upload_package(&app,Some(&cookie),"windows-x86_64","小伴-Windows.zip",&content).await;
+    assert_eq!(uploaded.status,StatusCode::CREATED,"{}",uploaded.body);
+    assert_eq!(uploaded.body["sha256"],format!("{:x}",Sha256::digest(&content)));assert_eq!(uploaded.body["bytes"],content.len());
+    let url=uploaded.body["url"].as_str().unwrap();assert_eq!(public_call(&app,url).await.status,StatusCode::NOT_FOUND);
+    let mut release=json!({"version":"1.2.0","notes":"新版本","publishedAt":"2026-01-01T00:00:00Z","published":false,"platforms":{"windows-x86_64":{"url":url,"sha256":"0".repeat(64),"bytes":1}}});
+    let saved=call(&app,"PUT","/desktop/releases/1.2.0",Some(&cookie),Some(release.clone())).await;
+    assert_eq!(saved.status,StatusCode::OK,"{}",saved.body);assert_eq!(saved.body["platforms"]["windows-x86_64"]["sha256"],uploaded.body["sha256"]);
+    assert_eq!(public_call(&app,url).await.status,StatusCode::NOT_FOUND);
+    release["published"]=json!(true);release["publishedAt"]=json!("2100-01-01T00:00:00Z");
+    assert_eq!(call(&app,"PUT","/desktop/releases/1.2.0",Some(&cookie),Some(release.clone())).await.status,StatusCode::OK);
+    assert_eq!(public_call(&app,url).await.status,StatusCode::NOT_FOUND);
+    release["publishedAt"]=json!("2026-01-01T00:00:00Z");
+    release["published"]=json!(true);release["platforms"]["windows-x86_64"]["url"]=json!(format!("http://localhost:8087{url}"));assert_eq!(call(&app,"PUT","/desktop/releases/1.2.0",Some(&cookie),Some(release.clone())).await.status,StatusCode::OK);
+    let response=app.clone().oneshot(Request::builder().uri(url).header(header::HOST,"127.0.0.1:8087").body(Body::empty()).unwrap()).await.unwrap();
+    assert_eq!(response.status(),StatusCode::OK);assert!(response.headers()[header::CONTENT_DISPOSITION].to_str().unwrap().contains("filename*=UTF-8''"));assert_eq!(response.headers()[header::CACHE_CONTROL],"no-store");
+    assert_eq!(axum::body::to_bytes(response.into_body(),5*1024*1024).await.unwrap().as_ref(),content);
+    let response=app.clone().oneshot(Request::builder().uri(url).header(header::RANGE,"bytes=0-3").body(Body::empty()).unwrap()).await.unwrap();assert_eq!(response.status(),StatusCode::PARTIAL_CONTENT);assert_eq!(axum::body::to_bytes(response.into_body(),1024).await.unwrap().as_ref(),&content[..4]);
+    let response=app.clone().oneshot(Request::builder().uri("/api/v1/desktop/updates?currentVersion=0.1.0&target=windows-x86_64").header(header::HOST,"127.0.0.1:8087").body(Body::empty()).unwrap()).await.unwrap();
+    let update:Value=serde_json::from_slice(&axum::body::to_bytes(response.into_body(),1024*1024).await.unwrap()).unwrap();assert_eq!(update["platforms"]["windows-x86_64"]["url"],format!("http://127.0.0.1:8087{url}"));
+    let config=call(&app,"GET","/desktop",Some(&cookie),None).await.body;
+    let patched=call(&app,"PATCH","/desktop",Some(&cookie),Some(json!({"siteUrl":config["siteUrl"],"introduction":"修改介绍","announcements":[]}))).await;assert_eq!(patched.status,StatusCode::OK);assert_eq!(patched.body["releases"][0]["version"],"1.2.0");
+    release["published"]=json!(false);call(&app,"PUT","/desktop/releases/1.2.0",Some(&cookie),Some(release)).await;assert_eq!(public_call(&app,url).await.status,StatusCode::NOT_FOUND);
+    assert_eq!(call(&app,"DELETE","/desktop/releases/1.2.0",Some(&cookie),None).await.status,StatusCode::OK);assert!(call(&app,"GET","/desktop/releases",Some(&cookie),None).await.body["releases"].as_array().unwrap().is_empty());
+    tokio::fs::remove_file(format!("app-packages/{}.zip",uploaded.body["id"].as_str().unwrap())).await.unwrap();db.cleanup().await;
+}
+
+#[tokio::test]
+async fn app_upload_rejects_bad_file_names_platforms_and_empty_files(){
+    let Some(db)=TestDb::connect().await else{return};let (app,_)=build_app(&db).await;let cookie=session_cookie(&sign_in(&app,"admin","123456").await);
+    for (target,name,data) in [("windows-x86_64","../escape.exe",b"MZ".as_slice()),("windows-x86_64","app.dmg",b"data".as_slice()),("darwin-aarch64","app.exe",b"MZ".as_slice()),("windows-x86_64","empty.zip",b"".as_slice())]{assert_eq!(upload_package(&app,Some(&cookie),target,name,data).await.status,StatusCode::BAD_REQUEST);}
+    let uploaded=upload_package(&app,Some(&cookie),"darwin-aarch64","app.dmg",b"test dmg").await;assert_eq!(uploaded.status,StatusCode::CREATED);
+    let wrong=json!({"version":"2.0.0","notes":"","publishedAt":"2026-01-01T00:00:00Z","published":true,"platforms":{"windows-x86_64":{"url":uploaded.body["url"]}}});assert_eq!(call(&app,"PUT","/desktop/releases/2.0.0",Some(&cookie),Some(wrong)).await.status,StatusCode::BAD_REQUEST);
+    tokio::fs::remove_file(format!("app-packages/{}.dmg",uploaded.body["id"].as_str().unwrap())).await.unwrap();db.cleanup().await;
+}
+
 #[tokio::test]
 async fn desktop_releases_announcements_and_admin_configuration_share_one_source() {
     let Some(db)=TestDb::connect().await else{return};
@@ -784,4 +836,13 @@ async fn settings_survive_a_restart() {
     assert_eq!(sign_in(&restarted, "admin", "123456").await.status, StatusCode::UNAUTHORIZED);
     assert_eq!(sign_in(&restarted, "owner", "stays-after-restart").await.status, StatusCode::OK);
     db.cleanup().await;
+}
+
+#[tokio::test]
+async fn concurrent_app_releases_and_site_settings_do_not_overwrite_each_other(){
+    let Some(db)=TestDb::connect().await else{return};let (app,_)=build_app(&db).await;let cookie=session_cookie(&sign_in(&app,"admin","123456").await);
+    let release=|version:&str|json!({"version":version,"notes":"","publishedAt":"2026-01-01T00:00:00Z","published":false,"platforms":{"windows-x86_64":{"url":"https://example.com/app.zip"}}});
+    let (first,second,site)=tokio::join!(call(&app,"PUT","/desktop/releases/1.0.0",Some(&cookie),Some(release("1.0.0"))),call(&app,"PUT","/desktop/releases/2.0.0",Some(&cookie),Some(release("2.0.0"))),call(&app,"PATCH","/desktop",Some(&cookie),Some(json!({"siteUrl":"https://wallpaper.xiangban.xyz","introduction":"保留官网设置","announcements":[]}))));
+    assert_eq!(first.status,StatusCode::OK);assert_eq!(second.status,StatusCode::OK);assert_eq!(site.status,StatusCode::OK);
+    let config=call(&app,"GET","/desktop",Some(&cookie),None).await.body;assert_eq!(config["introduction"],"保留官网设置");assert_eq!(config["releases"].as_array().unwrap().len(),2);db.cleanup().await;
 }

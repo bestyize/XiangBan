@@ -1,17 +1,11 @@
 <script setup lang="ts">
 import { onMounted, ref } from "vue";
 import { getDesktopConfig, saveDesktopConfig } from "@/admin/api";
-import {
-  targets,
-  type DesktopConfig,
-  type DesktopRelease,
-  type Announcement,
-} from "@/desktop";
+import { type DesktopConfig, type Announcement } from "@/desktop";
 const config = ref<DesktopConfig | null>(null),
   error = ref(""),
   message = ref(""),
   busy = ref(false);
-const newTarget = ref("windows-x86_64");
 async function load() {
   try {
     config.value = await getDesktopConfig();
@@ -21,15 +15,6 @@ async function load() {
   }
 }
 onMounted(load);
-function addRelease() {
-  config.value?.releases.unshift({
-    version: "",
-    notes: "",
-    publishedAt: new Date().toISOString(),
-    published: false,
-    platforms: { "windows-x86_64": { url: "" } },
-  });
-}
 function addNotice() {
   config.value?.announcements.unshift({
     id: crypto.randomUUID(),
@@ -49,7 +34,7 @@ function date(value: string | null) {
     .slice(0, 16);
 }
 function setDate(
-  record: DesktopRelease | Announcement,
+  record: Announcement,
   field: "publishedAt" | "startsAt" | "endsAt",
   event: Event,
 ) {
@@ -77,7 +62,9 @@ async function save() {
   <div class="a-page">
     <header class="a-head">
       <h1>小伴桌面</h1>
-      <p>管理官网介绍、各平台下载版本和网站 / 客户端公告。</p>
+      <p>
+        管理官网介绍和网站 / 客户端公告。安装包与版本使用独立的 App 上架入口。
+      </p>
     </header>
     <p v-if="error" class="error" role="alert">
       {{ error }}
@@ -103,105 +90,13 @@ async function save() {
           </label>
         </section>
         <section class="a-section">
-          <div class="a-section-head">
-            <h2>版本与下载</h2>
-            <button type="button" class="a-btn" @click="addRelease">
-              添加版本
-            </button>
-          </div>
-          <p class="a-small">
-            草稿不展示；未来的发布时间用于定时发布。每个平台独立选择已发布的最新稳定版本。
+          <h2>App 安装包与版本</h2>
+          <p class="a-note">
+            上传安装包、保存草稿、上架和下架版本，请进入 App 上架。
           </p>
-          <article
-            v-for="(release, index) in config.releases"
-            :key="index"
-            class="editor"
+          <RouterLink class="a-link" to="/admin/apps"
+            >前往 App 上架 →</RouterLink
           >
-            <div class="row">
-              <label
-                >版本号<input
-                  v-model="release.version"
-                  required
-                  placeholder="1.0.0" /></label
-              ><label
-                >发布时间<input
-                  type="datetime-local"
-                  :value="date(release.publishedAt)"
-                  required
-                  @change="setDate(release, 'publishedAt', $event)"
-              /></label>
-            </div>
-            <label>更新说明<textarea v-model="release.notes" rows="3" /></label>
-            <div
-              v-for="(pkg, target) in release.platforms"
-              :key="target"
-              class="package"
-            >
-              <div class="row">
-                <b>{{ targets.find((t) => t.id === target)?.label }}</b
-                ><button
-                  type="button"
-                  class="a-btn"
-                  @click="delete release.platforms[target]"
-                >
-                  移除平台
-                </button>
-              </div>
-              <label
-                >下载链接<input
-                  v-model="pkg.url"
-                  type="url"
-                  required
-                  placeholder="https://…/XiaoBan.zip"
-              /></label>
-              <details>
-                <summary>可选的包校验信息</summary>
-                <label
-                  >SHA-256<input
-                    v-model="pkg.sha256"
-                    placeholder="64 位小写十六进制"
-                    @change="!pkg.sha256 && delete pkg.sha256" /></label
-                ><label
-                  >文件字节数<input
-                    v-model.number="pkg.bytes"
-                    type="number"
-                    min="1"
-                    @change="!pkg.bytes && delete pkg.bytes"
-                /></label>
-              </details>
-            </div>
-            <div class="row">
-              <select v-model="newTarget">
-                <option
-                  v-for="target in targets"
-                  :key="target.id"
-                  :value="target.id"
-                >
-                  {{ target.label }}
-                </option></select
-              ><button
-                type="button"
-                class="a-btn"
-                @click="release.platforms[newTarget] ??= { url: '' }"
-              >
-                添加平台
-              </button>
-            </div>
-            <div class="row">
-              <label class="toggle"
-                ><input
-                  v-model="release.published"
-                  type="checkbox"
-                />发布这个版本</label
-              ><button
-                type="button"
-                class="a-btn"
-                @click="config.releases.splice(index, 1)"
-              >
-                删除版本
-              </button>
-            </div>
-          </article>
         </section>
         <section class="a-section">
           <div class="a-section-head">
