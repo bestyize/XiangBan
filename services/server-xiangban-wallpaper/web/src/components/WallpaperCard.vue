@@ -4,7 +4,6 @@ import { useIntersectionObserver } from '@vueuse/core'
 import Icon from './Icon.vue'
 import { setAmbient } from '@/composables/ambient'
 import { pauseVideo, playExclusive } from '@/composables/autoplay'
-import { useFavorites } from '@/stores/favorites'
 import type { WallpaperItem } from '@/types'
 import { badgeOf, cardImage, colorOf, providerName, tileRatio } from '@/utils'
 
@@ -24,7 +23,6 @@ const emit = defineEmits<{
   collect: [item: WallpaperItem]
 }>()
 
-const favorites = useFavorites()
 const root = ref<HTMLElement>()
 const video = ref<HTMLVideoElement>()
 const loaded = ref(false)
@@ -36,7 +34,6 @@ const hoverCapable = window.matchMedia('(hover: hover) and (pointer: fine)').mat
 const isVideo = computed(() => props.item.media_type === 'video' && !!props.item.video)
 const color = computed(() => colorOf(props.item))
 const badge = computed(() => badgeOf(props.item))
-const isFavorite = computed(() => favorites.has(props.item.id))
 
 async function startPreview() {
   if (!isVideo.value || !video.value) return
@@ -132,17 +129,6 @@ useIntersectionObserver(
         <span>采集</span>
       </button>
     </template>
-    <button
-      v-else
-      class="fav"
-      type="button"
-      :class="{ on: isFavorite }"
-      :aria-pressed="isFavorite"
-      :aria-label="isFavorite ? '取消收藏' : '收藏'"
-      @click.stop="favorites.toggle(item)"
-    >
-      <Icon :name="isFavorite ? 'heart-fill' : 'heart'" :size="18" />
-    </button>
   </article>
 </template>
 
@@ -282,52 +268,11 @@ video {
   transform: scale(1.05);
 }
 
-.fav {
-  position: absolute;
-  right: 8px;
-  top: 8px;
-  z-index: 3;
-  display: grid;
-  place-items: center;
-  width: 34px;
-  height: 34px;
-  border-radius: 50%;
-  background: rgba(10, 10, 12, 0.5);
-  -webkit-backdrop-filter: blur(10px);
-  backdrop-filter: blur(10px);
-  opacity: 0;
-  transition:
-    opacity 0.2s,
-    transform 0.15s var(--ease);
-}
-
-.fav:active {
-  transform: scale(0.88);
-}
-
-.fav.on {
-  opacity: 1;
-  color: var(--heart);
-}
-
 @media (hover: hover) and (pointer: fine) {
   .card:hover .caption,
   .card:focus-within .caption {
     opacity: 1;
     transform: none;
-  }
-
-  .card:hover .fav,
-  .card:focus-within .fav {
-    opacity: 1;
-  }
-}
-
-/* Touch screens show no overlay text; the favorite mark appears only once set. */
-@media (hover: none) {
-  .fav {
-    width: 32px;
-    height: 32px;
   }
 }
 </style>

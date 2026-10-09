@@ -65,23 +65,6 @@ export async function listProviders(): Promise<ProviderInfo[]> {
   return body.providers
 }
 
-export async function listFavorites(): Promise<WallpaperItem[]> {
-  const body = await request<{ items: WallpaperItem[] }>('/favorites')
-  return body.items
-}
-
-export function addFavorite(item: WallpaperItem): Promise<unknown> {
-  return request('/favorites', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(item),
-  })
-}
-
-export function removeFavorite(id: string): Promise<unknown> {
-  return request(`/favorites/${encodeURIComponent(id)}`, { method: 'DELETE' })
-}
-
 export async function runCollectorSync(): Promise<SyncReport> {
   const body = await request<{ report: SyncReport }>('/collector/sync', { method: 'POST' })
   return body.report

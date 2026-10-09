@@ -20,7 +20,7 @@ export const router = createRouter({
     },
     { path: '/search', name: 'search', component: () => import('./views/BrowseView.vue'), meta: { tab: 'search' } },
     { path: '/categories', name: 'categories', component: () => import('./views/CategoriesView.vue'), meta: { tab: 'categories' } },
-    { path: '/favorites', name: 'favorites', component: () => import('./views/FavoritesView.vue'), meta: { tab: 'favorites' } },
+    { path: '/favorites', redirect: '/images' },
     { path: '/me', name: 'me', component: () => import('./views/SettingsView.vue'), meta: { tab: 'me' } },
     {
       path: '/admin/login',

@@ -6,7 +6,6 @@ import { getWallpaper } from '@/api'
 import { setAmbient } from '@/composables/ambient'
 import { toast } from '@/composables/toast'
 import { closeViewer, stepViewer, viewerSource } from '@/composables/viewer'
-import { useFavorites } from '@/stores/favorites'
 import type { WallpaperItem } from '@/types'
 import {
   cardImage,
@@ -28,7 +27,6 @@ interface Variant {
 
 const route = useRoute()
 const router = useRouter()
-const favorites = useFavorites()
 
 const currentId = computed(() => (typeof route.query.w === 'string' ? route.query.w : null))
 const list = computed<readonly WallpaperItem[]>(() => viewerSource.value?.items.value ?? [])
@@ -50,12 +48,10 @@ const chrome = ref(true)
 const preview = ref(false)
 const muted = ref(true)
 const downloading = ref(false)
-const burst = ref(false)
 const variantIndex = ref(0)
 const fullReady = reactive<Record<string, boolean>>({})
 const closeBtn = ref<HTMLButtonElement>()
 
-const isFavorite = computed(() => !!item.value && favorites.has(item.value.id))
 /** Plays the best clip that is no larger than 1080p; 4K files are for downloading, not for a phone screen. */
 function viewVideoUrl(it: WallpaperItem) {
   const clips = [...(it.video?.qualities ?? [])].sort((a, b) => b.width - a.width)
@@ -78,7 +74,6 @@ const variants = computed<Variant[]>(() => {
   return out
 })
 
-// Also re-runs when the item leaves its list (e.g. unfavorited while viewing the favorites list).
 watch(
   [currentId, index],
   async ([id, idx]) => {
@@ -144,7 +139,6 @@ function go(delta: 1 | -1) {
 onKeyStroke('ArrowRight', () => currentId.value && go(1))
 onKeyStroke('ArrowLeft', () => currentId.value && go(-1))
 onKeyStroke('Escape', () => currentId.value && close())
-onKeyStroke('f', () => item.value && favorites.toggle(item.value))
 
 /* ---- touch gestures: swipe sideways to switch, drag down to close, tap to hide the controls ---- */
 
@@ -154,7 +148,6 @@ let startY = 0
 let startAt = 0
 let axis: 'x' | 'y' | null = null
 let pointerType = 'mouse'
-let lastTapAt = 0
 
 const layerStyle = computed(() => ({
   transform: `translate3d(${drag.x}px, ${drag.y}px, 0) scale(${1 - Math.min(drag.y / 1400, 0.1)})`,
@@ -209,16 +202,8 @@ function onCancel() {
   drag.y = 0
 }
 
-/** A tap toggles the controls; two quick taps toggle them twice (net zero) and add a favorite. */
 function onTap() {
   chrome.value = !chrome.value
-  const now = performance.now()
-  if (now - lastTapAt < 300 && item.value) {
-    if (!isFavorite.value) favorites.toggle(item.value)
-    burst.value = true
-    setTimeout(() => (burst.value = false), 700)
-  }
-  lastTapAt = now
 }
 
 function onStageClick(e: MouseEvent) {
@@ -323,10 +308,6 @@ async function share() {
           </div>
         </Transition>
 
-        <Transition name="burst">
-          <span v-if="burst" class="burst" aria-hidden="true"><Icon name="heart-fill" :size="96" /></span>
-        </Transition>
-
         <button v-if="prev" class="nav left" type="button" aria-label="上一张" @click.stop="go(-1)">
           <Icon name="chevron-left" :size="26" />
         </button>
@@ -387,16 +368,6 @@ async function share() {
           <button class="btn btn-primary grow" type="button" :disabled="downloading" @click="download">
             <Icon name="download" :size="20" />
             {{ downloading ? '下载中…' : '下载' }}
-          </button>
-          <button
-            class="btn icon"
-            :class="{ fav: isFavorite }"
-            type="button"
-            :aria-pressed="isFavorite"
-            :aria-label="isFavorite ? '取消收藏' : '收藏'"
-            @click="favorites.toggle(item)"
-          >
-            <Icon :name="isFavorite ? 'heart-fill' : 'heart'" :size="22" />
           </button>
           <button
             class="btn icon"
@@ -704,10 +675,6 @@ async function share() {
   background: rgba(241, 239, 234, 0.16);
 }
 
-.btn.icon.fav {
-  color: var(--heart);
-}
-
 .fine {
   font-size: 12px;
   color: var(--text-3);
@@ -723,44 +690,6 @@ async function share() {
 
 .fine a:hover {
   color: var(--text);
-}
-
-.burst {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  z-index: 6;
-  color: var(--heart);
-  pointer-events: none;
-  transform: translate(-50%, -50%);
-  filter: drop-shadow(0 8px 30px rgba(0, 0, 0, 0.45));
-}
-
-.burst-enter-active {
-  animation: pop 0.6s var(--ease);
-}
-
-.burst-leave-active {
-  transition: opacity 0.2s;
-}
-
-.burst-leave-to {
-  opacity: 0;
-}
-
-@keyframes pop {
-  0% {
-    opacity: 0;
-    transform: translate(-50%, -50%) scale(0.4);
-  }
-  40% {
-    opacity: 1;
-    transform: translate(-50%, -50%) scale(1.15);
-  }
-  100% {
-    opacity: 1;
-    transform: translate(-50%, -50%) scale(1);
-  }
 }
 
 /* Desktop: the artwork gets the stage, details live in a side panel. */
