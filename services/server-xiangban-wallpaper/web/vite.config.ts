@@ -53,6 +53,7 @@ export default defineConfig({
     proxy: {
       '/api': apiTarget,
       '/health': apiTarget,
+      '/uploads': apiTarget,
     },
   },
 })

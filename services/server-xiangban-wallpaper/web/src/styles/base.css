@@ -6,6 +6,8 @@
 
 :root {
   --bg: #0f0f11;
+  --header-bg: rgba(15,15,17,.9);
+  --tabs-bg: rgba(15,15,17,.78);
   --surface: #1a1a1e;
   --surface-2: #25252b;
   --line: rgba(241, 239, 234, 0.1);
@@ -205,3 +207,15 @@ h3 {
     scroll-behavior: auto !important;
   }
 }
+
+/* Product tab changes the whole public surface; gallery tabs restore their dark palette. */
+:root[data-site-theme="light"] {
+  --bg:#fcfaf8; --surface:#fff; --surface-2:#f2e9ec;
+  --line:rgba(72,44,53,.10); --line-strong:rgba(72,44,53,.22);
+  --text:#3f2c33; --text-2:#8a737c; --text-3:#a9949b;
+  --header-bg:rgba(252,250,248,.88); --tabs-bg:rgba(252,250,248,.9);
+  color-scheme:light;
+}
+html,body{transition:background-color .45s ease,color .35s ease}
+:root[data-site-theme="light"] .ambient{opacity:0}
+.ambient{transition:opacity .45s ease}

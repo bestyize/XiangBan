@@ -1,22 +1,7 @@
 <script setup lang="ts">
 import { onActivated, ref } from "vue";
-const demoMode = ref("wallpaper"),
-  demoPlaying = ref(true),
-  demoVideo = ref<HTMLVideoElement | null>(null);
-function toggleDemo() {
-  const video = demoVideo.value;
-  if (!video) return;
-  if (video.paused) {
-    video
-      .play()
-      .then(() => (demoPlaying.value = true))
-      .catch(() => (demoPlaying.value = false));
-  } else {
-    video.pause();
-    demoPlaying.value = false;
-  }
-}
 import Icon from "@/components/Icon.vue";
+import WindowsDesktopDemo from "@/components/WindowsDesktopDemo.vue";
 import { getDesktopProduct, targets, type DesktopProduct } from "@/desktop";
 const product = ref<DesktopProduct | null>(null);
 const error = ref("");
@@ -51,53 +36,7 @@ onActivated(load);
           ><Icon name="download" />下载小伴桌面</a
         ><span class="support">Windows / macOS · 无须注册账户</span>
       </div>
-      <div class="demo-stage">
-        <div class="demo-modes" aria-label="陪伴方式演示">
-          <button
-            :class="{ active: demoMode === 'floating' }"
-            @click="demoMode = 'floating'"
-          >
-            悬浮桌宠</button
-          ><button
-            :class="{ active: demoMode === 'wallpaper' }"
-            @click="demoMode = 'wallpaper'"
-          >
-            融入动态壁纸
-          </button>
-        </div>
-        <div
-          class="room"
-          :class="demoMode"
-          aria-label="小伴猫脸与动态壁纸效果演示"
-        >
-          <video
-            ref="demoVideo"
-            class="demo-wallpaper"
-            src="/xiaoban-demo.mp4"
-            poster="/xiaoban-demo.jpg"
-            autoplay
-            muted
-            loop
-            playsinline
-            @playing="demoPlaying = true"
-            @pause="demoPlaying = false"
-          />
-          <div class="demo-shortcuts" aria-hidden="true">
-            <span>▣<small>文件</small></span
-            ><span>▧<small>照片</small></span>
-          </div>
-          <img class="companion" src="/xiaoban.svg" alt="小伴猫脸桌宠" />
-          <span class="demo-pill">{{
-            demoMode === "wallpaper" ? "小伴融入视频壁纸" : "小伴悬浮在桌面上"
-          }}</span>
-          <button class="demo-play" @click="toggleDemo">
-            {{ demoPlaying ? "暂停动态壁纸" : "播放动态壁纸" }}
-          </button>
-        </div>
-        <p class="demo-caption">
-          真实循环视频演示 · 静音播放 · 桌宠与动态壁纸可以一起使用
-        </p>
-      </div>
+      <WindowsDesktopDemo />
     </section>
     <section class="features">
       <article>
@@ -182,12 +121,12 @@ onActivated(load);
 }
 .hero {
   display: grid;
-  grid-template-columns: 1.1fr 1fr;
-  gap: 60px;
+  grid-template-columns: 0.85fr 1.35fr;
+  gap: 48px;
   align-items: center;
 }
 .eyebrow {
-  color: #eac7a0;
+  color: #ad7084;
   font-size: 14px;
   letter-spacing: 0.14em;
 }
@@ -207,137 +146,6 @@ onActivated(load);
   margin-top: 16px;
   font-size: 13px;
 }
-.room {
-  height: 360px;
-  position: relative;
-  overflow: hidden;
-  border: 1px solid #ffffff16;
-  border-radius: 28px;
-  background: linear-gradient(140deg, #302e47, #403840 65%, #675446);
-  box-shadow: 0 20px 100px #e2ac7330;
-}
-.window {
-  position: absolute;
-  top: 38px;
-  right: 38px;
-  width: 106px;
-  height: 136px;
-  border: 8px solid #736357;
-  border-radius: 60px 60px 0 0;
-  background: #1b253d;
-  box-shadow: 0 0 80px #dec79530;
-}
-.window span {
-  position: absolute;
-  right: 16px;
-  top: 24px;
-  color: #f5d6a4;
-  font-size: 28px;
-}
-.desk {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 60px;
-  height: 12px;
-  background: #9d7a60;
-  box-shadow: 0 20px 50px #0005;
-}
-.companion {
-  position: absolute;
-  z-index: 2;
-  width: 190px;
-  height: auto;
-  left: 30%;
-  bottom: 30px;
-  filter: drop-shadow(0 10px 22px #7bddeb35);
-  transition: all 0.5s;
-}
-.floating .companion {
-  width: 130px;
-  left: 67%;
-  bottom: 40px;
-}
-.demo-stage {
-  min-width: 0;
-}
-.demo-modes {
-  display: flex;
-  justify-content: center;
-  gap: 8px;
-  margin-bottom: 16px;
-}
-.demo-modes button {
-  padding: 8px 16px;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  color: var(--text-2);
-}
-.demo-modes .active {
-  background: var(--surface-2);
-  color: var(--text);
-}
-.demo-wallpaper {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-.demo-shortcuts {
-  position: absolute;
-  left: 22px;
-  top: 26px;
-  display: grid;
-  gap: 22px;
-  color: #fff;
-  filter: drop-shadow(0 2px 5px #0007);
-}
-.demo-shortcuts span {
-  display: grid;
-  text-align: center;
-  font-size: 24px;
-  gap: 4px;
-}
-.demo-shortcuts small {
-  font-size: 10px;
-}
-.demo-pill {
-  position: absolute;
-  left: 20px;
-  bottom: 16px;
-  z-index: 3;
-  padding: 8px 12px;
-  border-radius: 20px;
-  background: #172b38a8;
-  font-size: 11px;
-  color: #fff;
-}
-.demo-play {
-  position: absolute;
-  right: 16px;
-  bottom: 16px;
-  z-index: 3;
-  padding: 8px 12px;
-  border-radius: 20px;
-  background: #fffdf0;
-  font-size: 11px;
-  color: #303d41;
-}
-.demo-caption {
-  font-size: 12px;
-  color: var(--text-3);
-  text-align: center;
-  margin-top: 14px;
-}
-.room-caption {
-  position: absolute;
-  bottom: 22px;
-  width: 100%;
-  text-align: center;
-  color: #efd9c4;
-  font-size: 13px;
-}
 .features {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -353,7 +161,7 @@ onActivated(load);
   background: var(--surface);
 }
 .features svg {
-  color: #eac7a0;
+  color: #ad7084;
 }
 .features h2 {
   font-size: 19px;
@@ -382,7 +190,7 @@ onActivated(load);
   margin: 18px 0;
 }
 .version {
-  color: #eac7a0;
+  color: #ad7084;
 }
 .requirements {
   margin-top: 20px;
@@ -404,7 +212,7 @@ pre {
   margin-top: 12px;
 }
 .error {
-  color: #ffb2a0;
+  color: #b04b50;
   margin-bottom: 20px;
 }
 summary {
@@ -418,9 +226,6 @@ summary {
   .hero {
     grid-template-columns: 1fr;
     gap: 30px;
-  }
-  .room {
-    height: 290px;
   }
   .features {
     grid-template-columns: 1fr;

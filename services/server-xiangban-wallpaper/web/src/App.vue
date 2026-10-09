@@ -14,6 +14,10 @@ const catalog = useCatalog()
 const favorites = useFavorites()
 
 // The admin console has its own layout; the public site's navigation and viewer stay out of it.
+watch(() => route.meta.tab, tab => {
+  document.documentElement.dataset.siteTheme = tab === 'desktop' ? 'light' : 'dark'
+}, { immediate: true })
+
 const isAdmin = computed(() => route.meta.admin === true)
 
 const glow = computed(() => ({ '--ambient': ambientColor.value ?? '#2b2b33' }))

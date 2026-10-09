@@ -42,7 +42,8 @@ const tabs: { to: string; tab: string; label: string; icon: IconName }[] = [
     grid-auto-flow: column;
     grid-auto-columns: 1fr;
     padding-bottom: var(--safe-bottom);
-    background: rgba(15, 15, 17, 0.78);
+    background: var(--tabs-bg);
+    transition: background-color .45s ease, border-color .35s ease;
     -webkit-backdrop-filter: blur(22px) saturate(1.6);
     backdrop-filter: blur(22px) saturate(1.6);
     border-top: 1px solid var(--line);

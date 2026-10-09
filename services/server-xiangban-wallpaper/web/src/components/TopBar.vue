@@ -46,7 +46,8 @@ const links = [
   top: 0;
   z-index: 40;
   padding-top: var(--safe-top);
-  background: linear-gradient(to bottom, rgba(15, 15, 17, 0.92), rgba(15, 15, 17, 0.7));
+  background: var(--header-bg);
+  transition: background-color .45s ease, border-color .35s ease;
   -webkit-backdrop-filter: blur(18px) saturate(1.4);
   backdrop-filter: blur(18px) saturate(1.4);
   border-bottom: 1px solid var(--line);
