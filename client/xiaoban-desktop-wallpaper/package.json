@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host 127.0.0.1 --port 1420 --strictPort",
-    "build": "node scripts/check-builtin-assets.mjs && tsc --noEmit && vite build",
+    "build": "node scripts/check-builtin-assets.mjs && node scripts/check-game-assets.mjs && vue-tsc --noEmit && vite build",
     "desktop": "tauri dev",
     "desktop:build": "tauri build --no-bundle",
     "desktop:macos:build": "tauri build --target aarch64-apple-darwin --bundles app",
@@ -14,8 +14,17 @@
   },
   "devDependencies": {
     "@tauri-apps/cli": "2.12.1",
+    "@vitejs/plugin-vue": "6.0.9",
+    "@vue/test-utils": "2.4.6",
+    "happy-dom": "20.14.6",
     "typescript": "6.0.3",
     "vite": "8.3.2",
-    "vitest": "5.0.3"
+    "vitest": "5.0.3",
+    "vue-tsc": "3.3.12"
+  },
+  "dependencies": {
+    "lucide-vue-next": "0.577.0",
+    "naive-ui": "2.45.3",
+    "vue": "3.5.43"
   }
 }

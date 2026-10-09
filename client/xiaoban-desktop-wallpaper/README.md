@@ -2,7 +2,9 @@
 
 Windows / macOS 桌面应用：一个可拖动、透明处点击穿透的悬浮小伴，也可以切换成位于桌面图标下方的动态壁纸。无聊天或账户；默认连接 `https://wallpaper.xiangban.xyz` 获取在线图片、动态视频、版本与公告。Windows 缺少运行组件时会联网补齐；组件与缓存可用后可离线运行。角色、场景、控制台与互动逻辑共用，桌面宿主分平台接入。
 
-本机生产构建实测：Windows x64 EXE 约 4.80MB，内嵌前端、背景和原生文件选择器，不包含系统 WebView2、转码器或用户导入媒体。原生切换测试已在主屏 2880×1800、175% 缩放下通过，确认壁纸为 WorkerW 子窗口；验证报告位于本地 `artifacts/smoke-*.json`。本地试用文件为 `artifacts/XiaoBan-Windows-x64.exe`，ZIP 包为 `artifacts/XiaoBan-Windows-x64.zip`。
+2026-10-10 最新 Windows x64 网络恢复修复包：XiaoBan-UI-NetworkFix-Windows-x64.exe（本地：`artifacts/XiaoBan-UI-NetworkFix-Windows-x64.exe`）（6,017,024 bytes，约 5.74 MiB；SHA-256 `AC52792F39CAF2B239867E0B4AD84EB07C90A632A785F46332F0B0E528E58454`）。若先前版本仍在托盘运行，请退出旧实例再启动新版；单实例行为可能会唤起旧进程。此前 UI 版和 P0 版作为历史包保留：UI 版（本地：`artifacts/XiaoBan-UI-Windows-x64.exe`）（6,014,464 bytes；SHA-256 `7EF780BABBA7F2D545EDBF56D7018D3F80E1E58E65CE0DD0CDE1A388B2420278`）、P0 版（本地：`artifacts/XiaoBan-P0-Windows-x64.exe`）（5,814,272 bytes；SHA-256 `71AC7CFDB01BC65A2949400D047503F3B86D2F58739D542ABD1A452B3E8D04D0`）。2026-10-10 Rust 测试 60 项通过；本轮 UI 前端测试此前 51 tests / 11 files 通过，本次网络修复未修改前端且未重跑。自动化及人工验收状态见 [功能验证清单](docs/feature-validation.md)。
+
+历史原型构建记录：早期 Windows x64 EXE 约 4.80MB，原生切换测试曾在主屏 2880×1800、175% 缩放下通过。该体积和验证报告只描述早期原型，不代表本轮构建或人工验收结果。
 
 角色核心在本工程的 `src/companion` 内维护，最初从网页纯角色代码原样复制，保留既有 SVG、发光、表情、弹簧参数和互动行为。允许独立演进，不再导入另一个客户端源码。`src/pet.ts` 适配 DOM 与桌面输入；暖光维持原 RobotStage 的尺寸与渐变。
 
@@ -67,9 +69,22 @@ macOS 悬浮窗口使用 AppKit 浮动层；壁纸使用 Core Graphics 的 deskt
 
 网站对接协议见[网站接口文档](../../services/server-xiangban-wallpaper/docs/desktop-api.md)，本应用维护自身的类型与解析，不引用网站源码。原生联调测试 `scripts/verify-website.mjs` 使用隔离测试网站和桌面数据目录，验证真实图片 / 视频下载渲染、更新接口与公告已读状态。
 
-设置界面为奶白/暖粉色的左侧导航布局，分为“小伴设置”“动态壁纸”“关于小伴”三页。小伴页保留原 SVG、表情和互动，壁纸页管理内置与订阅内容，关于页展示真实程序版本并检查已配置的更新服务。
+在线壁纸目录等 JSON 元数据请求遇到短暂网关错误时，客户端会有限重试，改善首次访问时偶发的瞬时失败。媒体下载仍沿用 120 秒超时及 SHA-256 校验；重试策略不改变媒体传输路径。
+
+桌面控制台使用 Vue 3.5.43、Naive UI 2.45.3、Vite 8 和 Lucide Vue Next。蓝白浅灰侧栏布局分为壁纸库、桌面小伴、游戏空间、关怀提醒四个主分区，设置入口固定在侧栏底部。桌面小伴保留原 SVG、表情和互动；游戏页提供明确的“进入游戏空间”入口，Windows 桌面双击快捷入口在该页独立显示状态并配置。控制台使用 `#2563eb` 强调蓝、`#f5f7fb` 背景与 `#e5eaf1` 边线；游戏空间和关怀气泡采用协调的蓝白浅灰配色。桌面小伴和壁纸页预览见小伴截图（本地：`artifacts/ui/companion-blue.jpg`）及壁纸截图（本地：`artifacts/ui/wallpapers-blue.jpg`）。
+
+开关类偏好即时生效并反馈结果；壁纸在页面内预览，用户确认“应用到桌面”后才更换桌面。关怀提醒通过明确的保存动作提交编辑。控制台入口由 `src/main.ts` 动态载入 `src/control.ts`；`control.ts` 负责挂载 `src/ui/App.vue`，控制台页面、状态与组件分别位于 `src/ui/pages/`、`src/ui/control-store.ts` 和 `src/ui/components/`。它们与宠物窗口、游戏沙箱的入口分离。
 
 动态壁纸支持图片、静音循环 H.264 MP4 与自包含 Canvas/WebGL ES module。可添加 HTTPS 订阅或导入 JSON 清单；下载后的内容校验 SHA-256 并缓存，离线可继续使用。小伴悬浮时可与通用壁纸并存，融入壁纸时叠在所选内容上；“小伴房间”恢复原先的房间场景或系统桌面。下发协议、SDK、限制和更新 JSON 示例见 [delivery-protocol.md](docs/delivery-protocol.md)，Schema 为 [壁纸](docs/wallpapers-v1.schema.json) 和 [更新](docs/updates-v1.schema.json)。
+
+### 本轮已实现能力（1–3，尚未发布）
+
+- **游戏空间**：设置页和托盘/菜单栏的“玩一玩”打开主屏沉浸窗口，离线展示七款本地游戏包。资源协议沿用网页发布包的 manifest 与 v1 消息格式；桌面使用自己的宿主，iframe 仅授予脚本权限并校验消息来源、nonce、游戏 ID 和回合状态。桌面不接账户分享；网页专属分享和钱包入口由本地 adapter 隐藏。只有水墨剑客保存进度，位于用户数据目录 `games/saves/ink-blade.json`，上限 32 KiB；读取或保存失败会保留原文件并提示处理。Windows 原生 smoke 已验证七包 ready、存档往返、Esc、IPC 隔离和桌面状态恢复。桌面空白双击入口仅 Windows 可用，默认关闭；只读低级鼠标钩子将事件交给异步队列并判断 Explorer 桌面列表空白区域，不吞鼠标输入。Windows 真实图标交互尚待人工验收。macOS 暂无可靠桌面空白双击判断，使用显式入口。
+- **小伴显示**：小伴设置中可单独关闭角色显示，默认开启。关闭时仍可使用壁纸与图片特效；关怀气泡因要求小伴可见而延后，重新开启后可继续展示有效期内的提醒。
+- **关怀提醒**：控制台提供关怀规则编辑，气泡由独立的 `mountCareBubble` 窗口展示；规则和调度在原生宿主运行，控制台隐藏时仍可触发。下班/自定义按本地时间一次、每天或指定星期调度；休息规则只在平台活跃时间可读、未锁屏且空闲少于 60 秒时累计。提醒存于 `config/care-reminders.json`，支持预览、稍后、免打扰和游戏期间暂缓。Windows care smoke 已检查配置持久化、气泡焦点、关闭/稍后、游戏延后与过期处理。系统通知目前不可用；提醒依赖小伴可见，应用完全退出后不承诺后台触发。天气默认关闭，用户手动选城市并启用 Open-Meteo（个人非商业使用）或自有兼容 HTTPS API 后才联网；live 天气查询尚未验收。
+- **图片特效**：静态图片可叠加雨、雪或萤火虫，支持开关、强度和速度，并提供预览；应用设置随壁纸配置保存。Windows effects smoke 已检查三种特效、三种静态图片来源、视频/Canvas停用、预览取消、参数持久化及离线缓存。实际视觉效果、图标操作、性能和 macOS 实机表现仍待验收。
+
+PRD 第 1–3 项已实现并通过 Windows 自动化检查，尚未发布。专注、玩具互动、场景收藏、昼夜变化和音乐联动（第 4–8 项）仍是规划。真实图标双击、天气 live 查询、网站服务联调、视觉与性能验收仍待完成；逐项结果见 [feature-validation.md](docs/feature-validation.md)。
 
 “导入图片 / 视频”通过 Windows/macOS 原生文件选择器添加自定义壁纸，“我的导入”筛选自己的内容。支持 PNG/JPEG/WebP/GIF/BMP 图片（最多 64 MiB）与 MP4/M4V/WebM 视频（最多 1 GiB），视频推荐 H.264 MP4，其他编码由系统 WebView 决定。导入保存副本并按内容去重，移动原文件后仍能使用；可预览、应用、选择画面适配和调整视频速度，不需要制作 JSON 清单，不内置转码器。
 
@@ -78,7 +93,7 @@ Canvas 运行在独立的低权限壁纸窗口和 opaque-origin iframe 中，不
 - 控制台切换“悬浮桌宠 / 动态壁纸”，调整 25 种表情、160–420px 尺寸、深夜/晨光背景、30/60 FPS，或暂停动画。
 - 悬浮模式：点击角色触发反应，拖动角色移动窗口，右键角色打开控制台。角色实际 SVG 填充区域接收点击，暖光与空白处穿透。
 - 壁纸模式：小伴在背景的桌面上，角色上方的桌面点击可以触发反应。应用不拦截桌面鼠标消息，桌面图标继续由 Explorer / Finder 处理。其他窗口遮挡角色时不触发壁纸点击反应。
-- 鼠标位置由平台原生层以约 30Hz 采样，即使离开角色窗口也能跟随。无鼠标/键盘钩子、键盘采集或屏幕录制。
+- 角色视线的鼠标位置由平台原生层以约 30Hz 采样，即使离开角色窗口也能跟随；该采样不使用鼠标/键盘钩子，也不采集键盘输入或屏幕图像。若用户在 Windows 开启“桌面空白双击打开”，游戏入口另使用只读 `WH_MOUSE_LL` 钩子判断桌面点击，不吞输入；默认关闭。macOS 不安装该钩子。
 - 40 秒无鼠标活动后困倦，90 秒后睡觉；这是原版逻辑，鼠标活动会唤醒。
 - 关闭设置窗口或点“收起设置”只隐藏设置面板，小伴继续运行。Windows 左键点击托盘图标打开设置，右键显示菜单；macOS 点击菜单栏图标后选择“打开小伴设置”，也可以通过 Dock 唤起。
 - 托盘/菜单栏和设置面板均有“开机自动启动”开关。首次正式运行默认开启；关闭后保存选择，下次启动不会自动重新开启。登录启动时恢复上次的悬浮/壁纸模式、表情、大小、背景、暂停和帧率，只显示小伴，不弹出设置面板。
@@ -119,6 +134,8 @@ Mac 实机还需检查：原角色的发光与连续表情、桌宠拖动、空�
 
 ## 当前范围与限制
 
+新增功能规划见 [小伴桌面 PRD](../../docs/product/PRD_小伴桌面.md)。本轮第 1–3 项已实现并通过 Windows 自动化检查，尚未发布；第 4–8 项仍规划中。实际能力及平台限制以本文和代码为准。
+
 启动流程另有四个 Rust 测试，覆盖已安装时不调用安装器、安装后重新检测、虚假成功退出码与失败重试。Windows CI 构建便携包并执行原生准备窗口成功/失败/取消模拟；本地 `-VerifyDownload` 还验证内嵌下载工具、进程清理及真实微软签名，不执行安装。真实缺组件的首次安装需在干净 Windows 虚拟机上验证。
 
 - 提供 Windows 与 macOS 的原生接入；macOS 包面向 Apple 芯片，Intel / Universal 打包未纳入此原型。
@@ -136,7 +153,7 @@ Mac 实机还需检查：原角色的发光与连续表情、桌宠拖动、空�
 - `src-tauri/src/main.rs`：控制台、两种窗口生命周期、托盘、命令与诊断。
 - `src-tauri/src/preferences.rs`：本应用设置、兼容旧字段、参数修复与文件保存；`src-tauri/src/startup.rs`：Windows 当前用户注册、macOS 登录启动与测试项清理。
 - `src-tauri/src/storage.rs`：正式/开发/测试数据目录、旧数据迁移与备份；`src-tauri/src/local_media.rs`：原生选择器、媒体格式检查、流式复制、去重与本地目录元数据。持久导入副本与可重新下载的缓存不能混用。
-- `src/control.ts`：三页设置界面；`src/website-ui.ts`：在线图库、保存 / 应用、官网设置和消息；`src/wallpaper-media.ts`：视频与图片预览、首帧回退和可见卡片加载；`src-tauri/src/website.rs`：网站原生 HTTP、后台检查与公告已读状态；`src/content.ts` 与 `public/wallpapers/sandbox.html`：图片/视频与 Canvas 沙箱宿主；`src-tauri/src/library.rs`：目录、资源完整性、缓存协议和更新验证；`src-tauri/src/content.rs`：窗口切换、权限边界和交付命令。
+- `src/main.ts` 按窗口场景动态载入入口；`src/control.ts` 仅负责控制台 Vue 应用挂载。`src/ui/ControlShell.vue`、`src/ui/pages/`、`src/ui/components/`、`src/ui/control-store.ts`：控制台布局、分区页面、展示组件与状态；`src/ui/wallpaper/`：壁纸页面状态逻辑；`src/ui/website-types.ts`：网站 API 类型；`src/ui/control.css` 和 `src/ui/theme.ts`：控制台主题；`src/style.css`：宠物、游戏和气泡等原生场景宿主样式；`src/wallpaper-media.ts`：视频与图片预览、首帧回退和可见卡片加载；`src-tauri/src/website.rs`：网站原生 HTTP、后台检查与公告已读状态；`src/content.ts` 与 `public/wallpapers/sandbox.html`：图片/视频与 Canvas 沙箱宿主；`src-tauri/src/library.rs`：目录、资源完整性、缓存协议和更新验证；`src-tauri/src/content.rs`：窗口切换、权限边界和交付命令。
 - `src-tauri/src/runtime`：Windows 启动前检测、原生准备窗口、官方引导程序下载与签名验证。成功/失败/取消的 UI 模拟仅在 debug 构建中启用，不会安装组件；真实缺组件的首次安装还需干净虚拟机验证。
 - `src-tauri/src/windows.rs`：WorkerW 接入、DPI 坐标转换、只读鼠标采样。
 - `src-tauri/src/macos.rs`：AppKit 窗口层级、空间行为、鼠标逻辑点与桌面点击判断。

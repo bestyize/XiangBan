@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head><script src="../desktop-host.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#f2f8f5">
+    <title>2048 · 下班啦</title>
+    <link rel="stylesheet" href="./game.css">
+    <link rel="stylesheet" href="../fresh-theme.css">
+    <link rel="stylesheet" href="../result-share.css">
+    <script src="./rules.js" defer></script>
+    <script src="../result-share.js" defer></script>
+    <script src="./game.js" defer></script>
+  </head>
+  <body class="fresh-game" data-game="merge-2048">
+    <main class="game">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">单人 · 数字合合乐</p>
+          <h1>2048<span>慢慢合，也能赢。</span></h1>
+        </div>
+        <button class="quiet-button" id="exitButton" type="button" aria-label="返回游戏广场"><span class="exit-arrow" aria-hidden="true">‹</span><span class="exit-label">回游戏广场</span></button>
+      </header>
+
+      <section class="stats" aria-label="本局数据">
+        <div class="stat"><span>得分</span><strong id="score">0</strong></div>
+        <div class="stat"><span>最高分</span><strong id="best">0</strong></div>
+        <div class="stat"><span>最大方块</span><strong id="largest">2</strong></div>
+      </section>
+
+      <p class="intro">相同数字碰一起，就会合成两倍。</p>
+
+      <section class="board-stage" aria-label="游戏区域">
+        <div class="board-shell">
+          <div id="board" class="board" role="group" aria-label="2048 棋盘，使用方向键或滑动移动方块" tabindex="0"></div>
+          <div class="overlay" id="overlay" role="dialog" aria-modal="true" aria-labelledby="resultTitle" aria-describedby="resultScore" hidden>
+            <div class="result-card">
+              <p class="eyebrow" id="resultEyebrow">这一局结束啦</p>
+              <h2 id="resultTitle">再来一局？</h2>
+              <p id="resultScore">本局得分 0</p>
+              <button id="shareResultButton" class="result-share-button" type="button" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V3m-4 4 4-4 4 4M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7" /></svg><span>分享战绩</span></button>
+              <div class="result-actions">
+                <button class="primary-button" id="continueButton" type="button" hidden>继续挑战</button>
+                <button class="quiet-button" id="restartOverlay" type="button">再来一局</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <p class="status" id="status" role="status" aria-live="polite">滑动棋盘，或者按方向键，开始合数字。</p>
+
+      <div class="controls" aria-label="移动方向">
+        <button type="button" data-direction="left" aria-label="向左移动">←</button>
+        <button type="button" data-direction="up" aria-label="向上移动">↑</button>
+        <button type="button" data-direction="down" aria-label="向下移动">↓</button>
+        <button type="button" data-direction="right" aria-label="向右移动">→</button>
+      </div>
+
+      <footer class="footer">
+        <p class="help">手机滑动或点箭头<br>电脑方向键 / WASD</p>
+        <button class="quiet-button" id="restartButton" type="button">重新开始</button>
+      </footer>
+    </main>
+  </body>
+</html>

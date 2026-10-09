@@ -1,0 +1,133 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const desktop = path.join(root, 'public/game-packs');
+const web = path.resolve(root, '../xiaban-web/public/game-packs');
+const errors = [];
+// Deliberate desktop-only adaptations. Each normalizer removes only the exact
+// adapter change, then the remaining resource is still compared byte-for-byte.
+const desktopSharedAdaptations = {
+  'result-share.js': {
+    reason: 'keep the website share button hidden in desktop-hosted games',
+    normalize(text) {
+      const withFlag = "  const desktop = new URLSearchParams(location.search).get('desktop') === '1'\n";
+      const withBehavior = 'if (button) button.hidden = desktop';
+      if (!text.includes(withFlag) || !text.includes(withBehavior)) return null;
+      return text.replace(withFlag, '').replace(withBehavior, 'if (button) button.hidden = false');
+    },
+  },
+};
+const desktopPackageAdaptations = {
+  '*/index.html': {
+    reason: 'load the desktop host adapter for Escape and desktop-only controls',
+    normalize(text) {
+      const tag = '<script src="../desktop-host.js"></script>';
+      if (text.split(tag).length !== 2) return null;
+      return text.replace(tag, '');
+    },
+  },
+  'falling-blocks/game.js': {
+    reason: 'move result focus to restart when the unavailable desktop share action is hidden',
+    normalize(text) {
+      const desktopFocus = ";(new URLSearchParams(location.search).get('desktop') === '1' ? document.getElementById('restartOverlay') : document.getElementById('shareResultButton'))?.focus({ preventScroll: true })";
+      const webFocus = "document.getElementById('shareResultButton')?.focus({ preventScroll: true })";
+      return text.includes(desktopFocus) ? text.replace(desktopFocus, webFocus) : null;
+    },
+  },
+};
+const readJson = file => JSON.parse(fs.readFileSync(file, 'utf8'));
+const exists = file => fs.existsSync(file) && fs.statSync(file).isFile();
+const sourceText = file => fs.readFileSync(file, 'utf8').replace(/^\uFEFF/, '').replace(/\r\n?/g, '\n').replace(/\s+$/, '\n');
+const localPath = (from, ref) => {
+  const clean = ref.split(/[?#]/, 1)[0];
+  if (!clean || clean.startsWith('#') || /^(data:|blob:|https?:|\/\/|javascript:|mailto:|tel:)/i.test(clean)) return null;
+  return path.resolve(path.dirname(from), decodeURIComponent(clean.replace(/^\//, '')));
+};
+const within = (base, file) => file === base || file.startsWith(base + path.sep);
+function checkRef(file, ref, base, label) {
+  const target = localPath(file, ref);
+  if (!target) return;
+  if (!within(base, target)) { errors.push(`${label}: 引用越出 game-packs：${ref}`); return; }
+  if (!exists(target)) errors.push(`${label}: 本地资源不存在：${ref}`);
+}
+function checkFile(file, base, label) {
+  const text = fs.readFileSync(file, 'utf8');
+  if (!/\.(?:html?|m?js|css)$/i.test(file)) return;
+  if (/client[\\/]xiaban-web[\\/]src|(?:\.\.[/\\])+src[/\\]/i.test(text)) errors.push(`${label}: 发现跨项目源码引用`);
+  if (/\.html?$/i.test(file)) {
+    for (const match of text.matchAll(/\b(?:src|href)\s*=\s*["']([^"']+)["']/gi)) checkRef(file, match[1], base, label);
+  }
+  if (/\.m?js$/i.test(file)) {
+    for (const match of text.matchAll(/\bimport\s*(?:[^'";]*?\s+from\s*)?["']([^"']+)["']/g)) checkRef(file, match[1], base, label);
+    for (const match of text.matchAll(/\bimport\s*\(\s*["']([^"']+)["']\s*\)/g)) checkRef(file, match[1], base, label);
+  }
+  if (/\.css$/i.test(file)) {
+    for (const match of text.matchAll(/url\(\s*["']?([^"')]+)["']?\s*\)/gi)) checkRef(file, match[1].trim(), base, label);
+    for (const match of text.matchAll(/@import\s+["']([^"']+)["']/gi)) checkRef(file, match[1], base, label);
+  }
+}
+function walk(dir) {
+  return fs.readdirSync(dir, { withFileTypes: true }).flatMap(item => {
+    const file = path.join(dir, item.name);
+    return item.isDirectory() ? walk(file) : [file];
+  });
+}
+function filesUnder(dir) {
+  return walk(dir).map(file => path.relative(dir, file).split(path.sep).join('/')).sort();
+}
+function normalizeWithAdaptation(text, adaptation, label) {
+  if (!adaptation) return text;
+  const normalized = adaptation.normalize(text);
+  if (normalized === null) errors.push(`${label}: 登记的桌面适配差异缺失或已改变（${adaptation.reason}）`);
+  return normalized;
+}
+
+for (const packRoot of [desktop, web]) if (!fs.existsSync(packRoot)) errors.push(`游戏资源目录不存在：${packRoot}`);
+if (!errors.length) {
+  const desktopCatalog = readJson(path.join(desktop, 'catalog.json'));
+  const webCatalog = readJson(path.join(web, 'catalog.json'));
+  if (desktopCatalog.version !== webCatalog.version || JSON.stringify(desktopCatalog.games) !== JSON.stringify(webCatalog.games)) errors.push('桌面 catalog 与网页 catalog 不一致');
+  if (!Array.isArray(desktopCatalog.games) || desktopCatalog.games.length !== 7 || new Set(desktopCatalog.games).size !== 7) errors.push('catalog 必须列出七个唯一游戏包');
+  for (const id of desktopCatalog.games) {
+    for (const [base, side] of [[desktop, '桌面'], [web, '网页']]) {
+      const dir = path.join(base, id);
+      const manifestFile = path.join(dir, 'manifest.json');
+      if (!exists(manifestFile)) { errors.push(`${side}/${id}: 缺少 manifest.json`); continue; }
+      let manifest;
+      try { manifest = readJson(manifestFile); } catch { errors.push(`${side}/${id}: manifest.json 不是有效 JSON`); continue; }
+      if (manifest.id !== id || manifest.runtimeProtocol !== 1) errors.push(`${side}/${id}: manifest id 或 runtimeProtocol 不匹配`);
+      for (const key of ['entry', 'cover']) {
+        if (typeof manifest[key] !== 'string' || !exists(path.resolve(dir, manifest[key]))) errors.push(`${side}/${id}: manifest ${key} 不存在`);
+        else if (!within(dir, path.resolve(dir, manifest[key]))) errors.push(`${side}/${id}: manifest ${key} 越出游戏目录`);
+      }
+      if (side === '桌面') {
+        for (const file of walk(dir)) checkFile(file, base, `${id}/${path.relative(dir, file)}`);
+        const webManifestFile = path.join(web, id, 'manifest.json');
+        if (exists(webManifestFile) && sourceText(manifestFile) !== sourceText(webManifestFile)) errors.push(`${id}: 桌面与网页 manifest 不一致`);
+      }
+    }
+    const desktopFiles = filesUnder(path.join(desktop, id));
+    const webFiles = filesUnder(path.join(web, id));
+    for (const relative of new Set([...desktopFiles, ...webFiles])) {
+      const desktopFile = path.join(desktop, id, relative);
+      const webFile = path.join(web, id, relative);
+      if (!exists(desktopFile) || !exists(webFile)) { errors.push(`${id}/${relative}: 桌面与网页资源清单不一致`); continue; }
+      const adaptation = relative === 'index.html' ? desktopPackageAdaptations['*/index.html'] : desktopPackageAdaptations[`${id}/${relative}`];
+      const desktopText = sourceText(desktopFile);
+      const normalized = normalizeWithAdaptation(desktopText, adaptation, `${id}/${relative}`);
+      if (normalized !== sourceText(webFile)) errors.push(`${id}/${relative}: 桌面与网页资源存在未登记的内容差异`);
+    }
+  }
+  for (const shared of ['fresh-theme.css', 'result-share.css', 'result-share.js']) {
+    if (!exists(path.join(desktop, shared)) || !exists(path.join(web, shared))) errors.push(`共享依赖缺失：${shared}`);
+    else {
+      const normalized = normalizeWithAdaptation(sourceText(path.join(desktop, shared)), desktopSharedAdaptations[shared], shared);
+      if (normalized !== sourceText(path.join(web, shared))) errors.push(`共享依赖与网页版本存在未登记的内容差异：${shared}`);
+    }
+  }
+  if (!exists(path.join(desktop, 'desktop-host.js'))) errors.push('桌面适配器缺失：desktop-host.js');
+}
+if (errors.length) { console.error(errors.map(error => `✗ ${error}`).join('\n')); process.exitCode = 1; }
+else console.log('✓ 桌面七款游戏包、manifest、入口、封面、本地引用及网页共享依赖均通过只读校验。');

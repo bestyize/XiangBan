@@ -5,7 +5,8 @@
 ```text
 .xiaobanwallpaper/
 ├── config/
-│   └── preferences.json       角色、布局、自启动、壁纸与服务地址设置
+│   ├── preferences.json       角色、布局、自启动、壁纸与服务地址设置
+│   └── care-reminders.json    关怀规则、天气来源与结果、待展示提醒及去重状态
 ├── wallpapers/
 │   ├── catalog.json           订阅或导入 JSON 清单的元数据
 │   ├── local.json             用户导入图片、视频的元数据
@@ -14,12 +15,17 @@
 │   └── cache/<sha256>         订阅下载缓存，可重新从资源地址获取；网站来源链接下载的文件同样按本地计算的 SHA-256 保存
 ├── cache/
 │   └── webview/               Windows WebView2 配置与运行缓存
+├── games/
+│   └── saves/
+│       └── ink-blade.json     水墨剑客的本地进度（可选，最多 32 KiB）
 ├── backups/
 │   └── legacy-v1/             首次迁移的旧设置、目录元数据与迁移来源记录
 └── development/              开发预览的独立数据根，内部结构相同
 ```
 
 `backups/legacy-v1` 只在存在旧版本数据、执行迁移时创建。内置壁纸仍打包在程序中，不重复复制到用户目录。Windows 的设置、桌宠、壁纸和预览窗口共用上述 WebView2 目录；macOS 使用非持久 WKWebView 数据存储，应用设置与壁纸资源仍由上述目录持久化，WebKit 临时文件由系统管理。系统自启动项依然位于 Windows 注册表或 macOS `Library/LaunchAgents`。
+
+游戏包没有文件系统或浏览器存储权限。桌面宿主仅允许水墨剑客使用 `games/saves/ink-blade.json`；规则配置和提醒状态由原生宿主写入 `config/care-reminders.json`。天气城市由用户手动选择，不读取系统定位；查询天气需用户启用来源并联网。天气缓存和提醒去重账本属于关怀配置。备份时复制 `config`、`wallpapers` 与需要保留的 `games`；游戏存档损坏或读写失败时应用不会用空进度覆盖它。
 
 ## 本地图片、视频
 
@@ -30,7 +36,7 @@
 - 文件先检查真实格式，再流式复制、计算 SHA-256、发布元数据。同内容重复导入只保留一份；取消选择器不改变壁纸库。非法或不支持的文件不进入库。
 - `imports` 保存程序管理的原始字节副本。源文件被移动或删除后仍可播放。设置和元数据不保存原始绝对路径，渲染端只获得按哈希访问的只读资源地址。
 - 大视频的原生资源响应按最多 8 MiB 的块提供 byte ranges，避免为一条请求把整个视频读进内存。
-- `local.json`、`imports` 是用户内容；不能当作可随意清理的缓存。需要备份时同时复制 `config` 和 `wallpapers`，无需备份 `cache/webview`。不要在应用运行时手动修改这些文件。
+- `local.json`、`imports` 是用户内容；不能当作可随意清理的缓存。需要备份时复制 `config`、`wallpapers`，以及需要保留的 `games`，无需备份 `cache/webview`。不要在应用运行时手动修改这些文件。
 
 ## 旧版本迁移
 

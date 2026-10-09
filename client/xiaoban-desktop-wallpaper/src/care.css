@@ -1,0 +1,15 @@
+body.care-bubble-scene { margin: 0; padding: 0; background: transparent !important; overflow: hidden; }
+.care-bubble-scene #app { width: 340px; height: 180px; padding: 0; background: transparent; }
+.care-bubble { box-sizing: border-box; height: 178px; margin: 1px; border: 1px solid #ecd4d9; border-radius: 18px; background: rgba(255, 250, 245, .98); padding: 14px 16px 10px; color: #5b4750; font-family: system-ui, sans-serif; }
+.care-bubble-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 12px; color: #a07b89; }
+.care-close { border: 0; padding: 0 4px; background: transparent; font-size: 23px; color: #ac8792; line-height: 1; cursor: pointer; }
+.care-bubble-text { white-space: pre-line; font-size: 14px; line-height: 1.55; margin: 10px 0 8px; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; overflow: hidden; height: 65px; }
+.care-bubble-bottom { display: flex; align-items: center; gap: 8px; justify-content: space-between; }
+.care-bubble-bottom small { color: #b0989e; font-size: 10px; }
+.care-snooze { border: 1px solid #ebd2d9; border-radius: 8px; background: #f7e7ec; padding: 5px 7px; color: #926174; font-size: 11px; cursor: pointer; }
+.care-bubble-error { font-size: 10px; color: #a94a5c; margin: 3px 0 0; max-height: 15px; overflow: hidden; }
+/* The lightweight native bubble shares the settings console's palette. */
+.care-bubble{border-color:#dce6f5;background:rgba(255,255,255,.98);border-radius:14px;color:#34445e}
+.care-bubble-top,.care-close{color:#7d91af}
+.care-bubble-bottom small{color:#99a7ba}
+.care-snooze{border-color:#d9e6fa;background:#edf4ff;color:#2563eb}
