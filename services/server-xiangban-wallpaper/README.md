@@ -17,6 +17,8 @@
 
 桌面客户端 `client/xiaoban-desktop-wallpaper` 直接使用本网站的公开图库、分类、更新和公告接口；资源按真实大小与 SHA-256 校验后缓存，支持离线使用。启动及每 30 分钟后台检查消息，可以手动刷新或关闭自动检查。接口、运行时目录与端到端验证详见[桌面 API](docs/desktop-api.md)。配置复用现有 `app_settings`，未新增历史数据迁移。
 
+**来源链接优先。** 采集始终保留供应商的原始链接（`preview_url`、`regular_url`、`downloads`、`video`），本站保存的文件只是后备，其路径、SHA-256、大小记录在 `wallpapers.local_copy`（可空 JSONB，启动时 `ADD COLUMN IF NOT EXISTS`）。每个供应商按图片 / 视频各有策略 `provider.<id>.hotlink.image|video`（`source` 或 `copy`，后台“供应商密钥”页可改）：默认 Pexels / Unsplash / okslop 图片与视频都是 `source`，Pixabay 图片 `copy`、视频 `source`；自定义上传与 demo 始终 `copy`。Pixabay 图片默认 `copy` 是因为其 API 文档写明“permanent hotlinking of images (using Pixabay URLs in your app) is not allowed ... please download them to your server first. Videos may be embedded directly in your applications”，且 `webformatURL` 只有 24 小时有效。策略为 `source` 的条目采集时不下载素材；公开检索 / 详情 JSON 在有本站副本且与主链接不同时增加可选 `fallback`；`GET /api/v1/desktop/wallpapers/{id}?prefer=source` 返回 `source` 链接且不下载，客户端失败再回退到 `resource` 或不带 `prefer` 的接口。更早采集的视频已被改写成本地路径、丢失了原始链接，保持 `copy`。详见[桌面 API](docs/desktop-api.md)。
+
 验证命令（本目录）：`npm --prefix web ci`、`npm --prefix web run build`、`cargo test --locked`、`cargo build --release --locked`。真实数据库集成测试设置 `TEST_DATABASE_URL`，每例使用独立临时 schema。Node.js 使用 24，Rust 使用 stable。本机运行见 [LOCAL_SETUP.md](LOCAL_SETUP.md)。
 
 ---
@@ -84,7 +86,7 @@
   - 自动通过浏览器底层媒体 API 探测文件真实宽度、高度与横竖屏画幅；
   - 支持为视频上传独立海报图，后端自动保存至 `uploads/` 目录并由静态文件服务器分发。
 - **供应商多密钥轮换与代理池 (`/admin/keys` & `/admin/proxies`)**：
-  - Unsplash / Pixabay / Pexels 多 API Key 轮询管理，自动熔断冷却；
+  - Unsplash / Pixabay / Pexels / okslop 多 API Key 轮询管理，自动熔断冷却；
   - 支持 HTTP / HTTPS / SOCKS5 出网代理池配置与一键测速。
 
 ---
@@ -115,7 +117,7 @@ WallpaperCollect/
     ├── config.rs             # 配置解析
     ├── db/                   # PostgreSQL 数据访问层 Repository
     ├── models/               # 数据模型（WallpaperItem, SearchQuery 等）
-    ├── providers/            # 外部数据源适配层（Unsplash, Pixabay, Pexels, Demo）
+    ├── providers/            # 外部数据源适配层（Unsplash, Pixabay, Pexels, okslop, Demo）
     ├── admin/                # 管理后台鉴权与接口（图库、上传、采集、代理）
     ├── api/                  # 前台公开 API 路由与处理器
     ├── services/             # 供应商并发聚合器与后台同步器
@@ -153,7 +155,29 @@ DATABASE_URL=postgres://postgres:password123@localhost:5432/wallpaper_collect
 # UNSPLASH_ACCESS_KEY=your_key
 # PIXABAY_API_KEY=your_key
 # PEXELS_API_KEY=your_key
+# OKSLOP_API_KEY=your_key
 ```
+
+### okslop（AI 生成图片）
+
+配置 `OKSLOP_API_KEY`（或在后台“供应商密钥”页添加）后，okslop 加入检索和采集；没有密钥时不参与。只有图片，没有视频。服务端用 `reqwest` 直接发 HTTP 请求，不依赖它的 SDK。
+
+**已核对（2026-10-09，依据官方文档 okslop.com/developers/docs 与对线上接口的少量实测）**
+- 基地址 `https://api.okslop.com/api/v1`（`https://okslop.com/api/v1` 返回同样内容）；认证 `Authorization: Bearer <key>`；响应格式与 Unsplash 一致。
+- 搜索 `GET /search/photos?query=&page=&per_page=&orientation=`，列表 `GET /photos?page=&per_page=`，详情 `GET /photos/{id}`。
+- **每页最多 10 条**（免费层；`per_page=24` 会被截成 10）。我们每页给 24 条，所以一页由连续的 3 个上游页拼成（`page_plan`），逐个请求、不并发，库见底时提前停止。
+- **`orientation` 取 `landscape` / `portrait` / `square`**；传 `squarish` 会让接口 500，所以内部的 `squarish` 要发成 `square`。
+- 搜索结果最多 200 条（`total_pages` 封顶）；列表 `/photos` 约 3.7 万张，可翻 3700 多页。
+- 限制：免费层每分钟 30 次、每天 1000 次；Pro 100/10000；响应头带 `X-Ratelimit-Limit/Remaining/Reset`；超限返回 429（已有的密钥冷却逻辑会处理）。
+- 图片：`urls.raw`/`full` 在 `okslop.com/img/<id>/original|full`，`regular`/`small`/`thumb` 在 `source.okslop.com`，全是 WebP，无需签名即可直接取。抽样 20 张长边都是 1024 像素以内（原图也不更大），**不适合直接当高清手机壁纸**。
+- 文档说下载走 `links.download_location` 换 10 分钟有效的签名链接，无密钥返回 401；本实现不调用它（直链 `urls.*` 已可取），如 okslop 要求统计下载需另行接入。
+- `is_design` 为 true 的是版式设计图（海报、徽标），不当壁纸，采集时过滤。
+
+**条款（okslop.com/license 与 /developers/terms，2026-03-16 版）里与本站有关的几条**
+- 可商用、免署名；不得训练 AI 模型；不得“不加实质修改地转卖”；不得用来复制或搭建竞争服务。
+- API 条款：访问需注册并持有密钥；**密钥不得放进客户端代码**（本站只在服务端使用）；**不得系统性缓存、存储或下载图库的全部或相当一部分**；不得抓取；应用须在开发者门户登记，可能被审核；不得搭建“图库/素材市场类的竞争服务”。
+- 对本站的含义：okslop 默认策略是 `source`（直链），我们自存的副本只在有人下载时才生成，不做批量；**不要对 okslop 开启定时自动同步或大批量采集**（定时同步对每个关键词逐页取，容易触碰“系统性缓存”和每日 1000 次的限额）。“壁纸聚合站”是否算“竞争服务”是个需要向 okslop（api@okslop.com）确认的判断，拿到密钥时顺便登记应用并问清。
+- 请求被拒绝或限流时，沿用已有的密钥冷却。
 
 ### 3. 构建前端资源
 ```bash

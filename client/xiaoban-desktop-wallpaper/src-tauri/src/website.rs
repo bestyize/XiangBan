@@ -3,7 +3,11 @@ use crate::{content, library, settings, DesktopState};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
-use std::{collections::BTreeMap, sync::Mutex, time::Duration};
+use std::{
+    collections::{BTreeMap, HashSet},
+    sync::Mutex,
+    time::Duration,
+};
 use tauri::{Emitter, Manager};
 
 pub const DEFAULT_SITE: &str = "https://wallpaper.xiangban.xyz";
@@ -134,26 +138,192 @@ pub async fn fetch_site_categories(app: tauri::AppHandle) -> Result<Value, Strin
     serde_json::from_str(&get(endpoint(&app, "/api/v1/categories")?).await?)
         .map_err(|e| e.to_string())
 }
-#[tauri::command]
-pub async fn select_site_wallpaper(app: tauri::AppHandle, id: String) -> Result<Value, String> {
-    let origin = settings(&app).website_url;
-    let mut url = library::network_url(&endpoint(&app, "/api/v1/desktop/wallpapers/")?)?;
+/// Delivery manifest of one wallpaper. `prefer_source` asks the website to hand out the
+/// provider's own link when its hotlink policy allows; without it the answer is our verified copy.
+fn manifest_url(app: &tauri::AppHandle, id: &str, prefer_source: bool) -> Result<String, String> {
+    let mut url = library::network_url(&endpoint(app, "/api/v1/desktop/wallpapers/")?)?;
     url.path_segments_mut()
         .map_err(|_| "网站地址无效")?
         .pop_if_empty()
-        .push(&id);
-    let text = get(url.to_string()).await?;
-    let mut catalog = library::parse_catalog(&text)?;
+        .push(id);
+    if prefer_source {
+        url.query_pairs_mut().append_pair("prefer", "source");
+    }
+    Ok(url.to_string())
+}
+/// Imports a resolved catalog into the library. Items in `local` already carry a locally
+/// verified resource (source download or existing cache hit) and keep their own url.
+async fn import_site_catalog(
+    app: tauri::AppHandle,
+    origin: &str,
+    mut catalog: library::Catalog,
+    local: &HashSet<String>,
+) -> Result<Value, String> {
     for item in &mut catalog.items {
-        site_resource(&mut item.resource, &origin)?;
+        if !local.contains(&item.id) {
+            site_resource(&mut item.resource, origin)?;
+        }
         if let Some(cover) = &mut item.cover {
-            site_resource(cover, &origin)?;
+            site_resource(cover, origin)?;
         }
     }
     let id = catalog.items.first().ok_or("网站没有返回壁纸")?.id.clone();
     let text = serde_json::to_string(&catalog).map_err(|e| e.to_string())?;
     let library = content::import_wallpaper_catalog(app, text).await?;
     Ok(serde_json::json!({"library":library,"id":id}))
+}
+#[tauri::command]
+pub async fn select_site_wallpaper(app: tauri::AppHandle, id: String) -> Result<Value, String> {
+    let origin = settings(&app).website_url;
+    let text = get(manifest_url(&app, &id, false)?).await?;
+    let catalog = library::parse_catalog(&text)?;
+    import_site_catalog(app, &origin, catalog, &HashSet::new()).await
+}
+
+// "Source first, our copy as fallback". A `?prefer=source` manifest may carry
+// `source: {url, mime}` per item; `resource` is then present only if the website already has
+// a copy. A manifest without any `source` is what the plain endpoint returns and is handled
+// by the unchanged verified-copy path.
+struct SiteEntry {
+    item: serde_json::Map<String, Value>,
+    source: Option<Value>,
+}
+struct SiteManifest {
+    revision: String,
+    entries: Vec<SiteEntry>,
+}
+struct Resolved {
+    catalog: library::Catalog,
+    /// Items whose resource is already stored and verified locally, so nothing else is fetched.
+    local: HashSet<String>,
+}
+/// `None` means "no item asks for a source link": the caller then treats the text exactly like
+/// a plain manifest (including its errors for malformed input).
+fn parse_site_manifest(text: &str) -> Option<SiteManifest> {
+    if text.len() > library::MAX_JSON {
+        return None;
+    }
+    let Value::Object(root) = serde_json::from_str(text).ok()? else {
+        return None;
+    };
+    if root.keys().any(|k| !["schemaVersion", "revision", "items"].contains(&k.as_str()))
+        || root.get("schemaVersion") != Some(&Value::from(1))
+    {
+        return None;
+    }
+    let revision = match root.get("revision") {
+        None => String::new(),
+        Some(Value::String(value)) => value.clone(),
+        Some(_) => return None,
+    };
+    let Some(Value::Array(items)) = root.get("items") else {
+        return None;
+    };
+    if !items
+        .iter()
+        .any(|item| item.get("source").is_some_and(|source| !source.is_null()))
+    {
+        return None;
+    }
+    let mut entries = Vec::new();
+    for item in items {
+        let Value::Object(item) = item else {
+            return None;
+        };
+        let mut item = item.clone();
+        let source = item.remove("source").filter(|source| !source.is_null());
+        entries.push(SiteEntry { item, source });
+    }
+    Some(SiteManifest { revision, entries })
+}
+fn with_resource(
+    mut item: serde_json::Map<String, Value>,
+    resource: Value,
+) -> Result<library::Wallpaper, String> {
+    item.insert("resource".into(), resource);
+    serde_json::from_value(Value::Object(item)).map_err(|e| format!("清单格式不正确：{e}"))
+}
+/// Decides, per item, which file the client uses:
+/// 1. already saved with the same version: keep it (no network);
+/// 2. `source` present: `fetch_source(id, kind, url)` downloads and registers the provider file
+///    (no hash comparison with the manifest);
+/// 3. on any failure: the manifest's `resource` (verified later with sha256/bytes as always);
+/// 4. no `resource` either: the plain endpoint (`fetch_plain`, called at most once) and its copy.
+fn resolve_manifest(
+    manifest: SiteManifest,
+    cached: impl Fn(&str, &str) -> Option<library::Resource>,
+    mut fetch_source: impl FnMut(&str, &str, &str) -> Result<library::Resource, String>,
+    fetch_plain: impl FnOnce() -> Result<String, String>,
+) -> Result<Resolved, String> {
+    let mut fetch_plain = Some(fetch_plain);
+    let mut plain: Option<library::Catalog> = None;
+    let mut items = Vec::new();
+    let mut local = HashSet::new();
+    for entry in manifest.entries {
+        let mut item = entry.item;
+        let text = |key: &str| item.get(key).and_then(Value::as_str).unwrap_or("").to_string();
+        let (id, version, kind) = (text("id"), text("version"), text("kind"));
+        let declared = item.remove("resource");
+        let mut resolved = None;
+        if let Some(source) = entry.source {
+            let stored = cached(&id, &version);
+            let outcome = match stored {
+                Some(resource) => Ok(resource),
+                None => source
+                    .get("url")
+                    .and_then(Value::as_str)
+                    .ok_or_else(|| "来源链接缺失".to_string())
+                    .and_then(|url| fetch_source(&id, &kind, url)),
+            };
+            match outcome.and_then(|resource| {
+                with_resource(item.clone(), serde_json::to_value(resource).map_err(|e| e.to_string())?)
+            }) {
+                Ok(wallpaper) => {
+                    local.insert(id.clone());
+                    resolved = Some(wallpaper);
+                }
+                Err(error) => eprintln!("来源链接不可用，改用网站副本：{error}"),
+            }
+        }
+        let wallpaper = match (resolved, declared) {
+            (Some(wallpaper), _) => wallpaper,
+            (None, Some(resource)) => with_resource(item, resource)?,
+            (None, None) => {
+                if plain.is_none() {
+                    let fetch = fetch_plain.take().ok_or("网站没有返回壁纸")?;
+                    plain = Some(library::parse_catalog(&fetch()?)?);
+                }
+                plain
+                    .iter()
+                    .flat_map(|catalog| &catalog.items)
+                    .find(|wallpaper| wallpaper.id == id)
+                    .cloned()
+                    .ok_or("网站没有返回壁纸")?
+            }
+        };
+        items.push(wallpaper);
+    }
+    let catalog = library::Catalog {
+        schema_version: 1,
+        revision: manifest.revision,
+        items,
+    };
+    let catalog = library::parse_catalog(&serde_json::to_string(&catalog).map_err(|e| e.to_string())?)?;
+    Ok(Resolved { catalog, local })
+}
+/// The saved copy of a website wallpaper, if the same version is fully cached and intact.
+fn saved_resource(root: &std::path::Path, id: &str, version: &str) -> Option<library::Resource> {
+    let item = library::read_catalog(root)
+        .items
+        .into_iter()
+        .find(|item| item.id == id && item.version == version)?;
+    library::assets(&item)
+        .iter()
+        .all(|r| library::cached(root, r))
+        .then(|| item.resource.clone())
+        .filter(|r| {
+            library::verify_file(&crate::local_media::resource_path(root, r), r).unwrap_or(false)
+        })
 }
 // The local website preview uses the same unconfigured product defaults as production.
 // Only its own content-addressed uploads may be rebased; CDN URLs and public sites retain
@@ -175,21 +345,71 @@ fn site_resource(resource: &mut library::Resource, origin: &str) -> Result<(), S
 }
 #[tauri::command]
 pub async fn download_site_wallpaper(app: tauri::AppHandle, id: String) -> Result<Value, String> {
-    let selected = select_site_wallpaper(app.clone(), id).await?;
-    let id = selected["id"].as_str().ok_or("网站未返回壁纸")?.to_string();
+    let origin = settings(&app).website_url;
     let root = content::root(&app)?;
-    let item = library::all_items(&root)
-        .into_iter()
-        .find(|item| item.id == id)
-        .ok_or("壁纸记录不存在")?;
-    let handle = app.clone();
-    tauri::async_runtime::spawn_blocking(move || {
-        let state = handle.state::<content::ContentState>();
-        let _io = state.io.lock().unwrap();
-        library::prepare(&handle, &root, &item)
-    })
-    .await
-    .map_err(|e| e.to_string())??;
+    let text = get(manifest_url(&app, &id, true)?).await?;
+    let (selected, local) = match parse_site_manifest(&text) {
+        // No source link: exactly the verified-copy flow (also for servers without `prefer`).
+        None => (
+            import_site_catalog(
+                app.clone(),
+                &origin,
+                library::parse_catalog(&text)?,
+                &HashSet::new(),
+            )
+            .await?,
+            HashSet::new(),
+        ),
+        Some(manifest) => {
+            let (handle, directory) = (app.clone(), root.clone());
+            let plain = manifest_url(&app, &id, false)?;
+            let resolved = tauri::async_runtime::spawn_blocking(move || {
+                let state = handle.state::<content::ContentState>();
+                let _io = state.io.lock().unwrap();
+                resolve_manifest(
+                    manifest,
+                    |id, version| saved_resource(&directory, id, version),
+                    |id, kind, url| {
+                        let mut last = 0u64;
+                        library::download_source(&directory, url, kind, |received, total| {
+                            let Some(total) = total else { return };
+                            if received.saturating_sub(last) >= 256 * 1024 || received >= total {
+                                last = received;
+                                let _ = handle.emit_to(
+                                    "control",
+                                    "wallpaper-progress",
+                                    serde_json::json!({"id":id,"received":received,"total":total}),
+                                );
+                            }
+                        })
+                    },
+                    || library::fetch_json(&plain)?.ok_or("网站没有返回数据".into()),
+                )
+            })
+            .await
+            .map_err(|e| e.to_string())??;
+            (
+                import_site_catalog(app.clone(), &origin, resolved.catalog, &resolved.local)
+                    .await?,
+                resolved.local,
+            )
+        }
+    };
+    let id = selected["id"].as_str().ok_or("网站未返回壁纸")?.to_string();
+    if !local.contains(&id) {
+        let item = library::all_items(&root)
+            .into_iter()
+            .find(|item| item.id == id)
+            .ok_or("壁纸记录不存在")?;
+        let handle = app.clone();
+        tauri::async_runtime::spawn_blocking(move || {
+            let state = handle.state::<content::ContentState>();
+            let _io = state.io.lock().unwrap();
+            library::prepare(&handle, &root, &item)
+        })
+        .await
+        .map_err(|e| e.to_string())??;
+    }
     Ok(serde_json::json!({"id":id,"library":content::get_wallpaper_library(app)?}))
 }
 #[derive(Deserialize)]
@@ -359,6 +579,218 @@ mod tests {
         resource.url = "https://cdn.example/video.mp4".into();
         site_resource(&mut resource, "http://127.0.0.1:8087").unwrap();
         assert_eq!(resource.url, "https://cdn.example/video.mp4");
+    }
+
+    use crate::library::test_http::{serve, Reply};
+    use std::cell::{Cell, RefCell};
+
+    fn png(tag: &str) -> Vec<u8> {
+        [b"\x89PNG\r\n\x1a\n".as_slice(), tag.as_bytes()].concat()
+    }
+    fn hex(data: &[u8]) -> String {
+        format!("{:x}", Sha256::digest(data))
+    }
+    fn copy_resource(data: &[u8]) -> Value {
+        serde_json::json!({"url":"https://wallpaper.example/uploads/copy.png","sha256":hex(data),
+            "bytes":data.len(),"mime":"image/png"})
+    }
+    fn item(kind: &str, resource: Option<Value>, source: Option<&str>) -> Value {
+        let mut value = serde_json::json!({"id":"site-one","version":"1.0.0","title":"测试","kind":kind});
+        if let Some(resource) = resource {
+            value["resource"] = resource;
+        }
+        if let Some(url) = source {
+            value["source"] = serde_json::json!({"url":url,"mime":"image/jpeg"});
+        }
+        value
+    }
+    fn manifest(items: Vec<Value>) -> String {
+        serde_json::json!({"schemaVersion":1,"revision":"r1","items":items}).to_string()
+    }
+    fn plain_manifest(data: &[u8]) -> String {
+        manifest(vec![item("image", Some(copy_resource(data)), None)])
+    }
+    fn unexpected_source(_: &str, _: &str, _: &str) -> Result<library::Resource, String> {
+        panic!("source must not be fetched")
+    }
+    fn no_saved(_: &str, _: &str) -> Option<library::Resource> {
+        None
+    }
+    fn no_plain() -> Result<String, String> {
+        panic!("plain endpoint must not be requested")
+    }
+
+    #[test]
+    fn manifest_without_source_takes_the_unchanged_verified_copy_path() {
+        let copy = png("ours");
+        assert!(parse_site_manifest(&plain_manifest(&copy)).is_none());
+        // A null source also counts as "no source".
+        let mut with_null = item("image", Some(copy_resource(&copy)), None);
+        with_null["source"] = Value::Null;
+        assert!(parse_site_manifest(&manifest(vec![with_null])).is_none());
+        // Malformed input is left to the plain parser, which reports the same errors as before.
+        for text in ["not json", "[]", r#"{"schemaVersion":2,"items":[{"source":{}}]}"#] {
+            assert!(parse_site_manifest(text).is_none());
+        }
+        assert!(library::parse_catalog(&plain_manifest(&copy)).is_ok());
+    }
+
+    #[test]
+    fn working_source_is_used_without_hash_check_or_our_copy() {
+        let provider = png("provider");
+        let server = serve(vec![("/p.png", Reply::Body(200, "text/html", provider.clone()))]);
+        let root = library::test_http::temp_root("site-ok");
+        let url = format!("{}/p.png", server.base);
+        // The manifest hash describes our copy and differs from the provider file.
+        let copy = png("ours-is-different");
+        let text = manifest(vec![item("image", Some(copy_resource(&copy)), Some(&url))]);
+        let resolved = resolve_manifest(
+            parse_site_manifest(&text).unwrap(),
+            no_saved,
+            |_, kind, url| library::download_source(&root, url, kind, |_, _| {}),
+            no_plain,
+        )
+        .unwrap();
+        let resource = &resolved.catalog.items[0].resource;
+        assert_eq!(resource.sha256, hex(&provider));
+        assert_eq!(resource.url, url);
+        assert!(resolved.local.contains("site-one"));
+        assert!(library::cached(&root, resource));
+        // No file is stored for our copy's hash: it was never fetched.
+        assert!(!root.join("cache").join(hex(&copy)).exists());
+        assert_eq!(server.hits.lock().unwrap().len(), 1);
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn broken_sources_fall_back_to_the_copy_in_the_manifest() {
+        let copy = png("ours");
+        let server = serve(vec![
+            ("/html", Reply::Body(200, "image/png", b"<html>hotlink denied</html>".to_vec())),
+            ("/gone", Reply::Body(404, "text/plain", b"x".to_vec())),
+            ("/drop", Reply::Drop),
+            ("/jpg-as-video", Reply::Body(200, "video/mp4", b"\xff\xd8\xff\xe0jpeg".to_vec())),
+        ]);
+        for path in ["html", "gone", "drop", "jpg-as-video"] {
+            let root = library::test_http::temp_root("site-fallback");
+            let url = format!("{}/{path}", server.base);
+            let kind = if path == "jpg-as-video" { "video" } else { "image" };
+            let mut entry = item(kind, Some(copy_resource(&copy)), Some(&url));
+            if kind == "video" {
+                entry["resource"]["mime"] = "video/mp4".into();
+            }
+            let resolved = resolve_manifest(
+                parse_site_manifest(&manifest(vec![entry])).unwrap(),
+                no_saved,
+                |_, kind, url| library::download_source(&root, url, kind, |_, _| {}),
+                no_plain,
+            )
+            .unwrap();
+            let resource = &resolved.catalog.items[0].resource;
+            // Our copy is used and still needs the usual sha256/bytes verification.
+            assert_eq!(resource.url, "https://wallpaper.example/uploads/copy.png", "{path}");
+            assert_eq!(resource.sha256, hex(&copy));
+            assert!(resolved.local.is_empty());
+            assert!(!root.join("cache").exists() || std::fs::read_dir(root.join("cache")).unwrap().next().is_none());
+            std::fs::remove_dir_all(root).unwrap();
+        }
+    }
+
+    #[test]
+    fn without_a_copy_a_failed_source_requests_the_plain_endpoint_once() {
+        let copy = png("ours");
+        let plain_calls = Cell::new(0);
+        let text = manifest(vec![item("image", None, Some("https://cdn.example/denied.png"))]);
+        let resolved = resolve_manifest(
+            parse_site_manifest(&text).unwrap(),
+            no_saved,
+            |_, _, _| Err("403".to_string()),
+            || {
+                plain_calls.set(plain_calls.get() + 1);
+                Ok(plain_manifest(&copy))
+            },
+        )
+        .unwrap();
+        assert_eq!(plain_calls.get(), 1);
+        assert_eq!(resolved.catalog.items[0].resource.sha256, hex(&copy));
+        assert!(resolved.local.is_empty());
+        // The plain endpoint failing, or not knowing the wallpaper, is an error.
+        let failing = resolve_manifest(
+            parse_site_manifest(&text).unwrap(),
+            no_saved,
+            |_, _, _| Err("403".to_string()),
+            || Err("网络连接失败".to_string()),
+        );
+        assert!(failing.is_err());
+        let other = manifest(vec![{
+            let mut value = item("image", Some(copy_resource(&copy)), None);
+            value["id"] = "site-other".into();
+            value
+        }]);
+        assert!(resolve_manifest(
+            parse_site_manifest(&text).unwrap(),
+            no_saved,
+            |_, _, _| Err("403".to_string()),
+            || Ok(other.clone()),
+        )
+        .is_err());
+    }
+
+    #[test]
+    fn saved_wallpaper_is_reused_and_a_missing_source_url_falls_back() {
+        let copy = png("ours");
+        let saved = library::Resource {
+            url: "https://cdn.example/saved.png".into(),
+            sha256: hex(b"saved"),
+            bytes: 5,
+            mime: "image/png".into(),
+        };
+        let text = manifest(vec![item("image", Some(copy_resource(&copy)), Some("https://cdn.example/a.png"))]);
+        let seen = RefCell::new(Vec::new());
+        let resolved = resolve_manifest(
+            parse_site_manifest(&text).unwrap(),
+            |id, version| {
+                seen.borrow_mut().push((id.to_string(), version.to_string()));
+                Some(saved.clone())
+            },
+            unexpected_source,
+            no_plain,
+        )
+        .unwrap();
+        assert_eq!(seen.borrow().as_slice(), [("site-one".to_string(), "1.0.0".to_string())]);
+        assert_eq!(resolved.catalog.items[0].resource.sha256, saved.sha256);
+        assert!(resolved.local.contains("site-one"));
+        let mut broken = item("image", Some(copy_resource(&copy)), None);
+        broken["source"] = serde_json::json!({"mime":"image/png"});
+        let resolved = resolve_manifest(
+            parse_site_manifest(&manifest(vec![broken])).unwrap(),
+            no_saved,
+            unexpected_source,
+            no_plain,
+        )
+        .unwrap();
+        assert_eq!(resolved.catalog.items[0].resource.sha256, hex(&copy));
+    }
+
+    #[test]
+    fn saved_resource_requires_same_version_and_intact_file() {
+        let root = library::test_http::temp_root("site-saved");
+        let data = png("saved");
+        std::fs::create_dir_all(root.join("cache")).unwrap();
+        std::fs::write(root.join("cache").join(hex(&data)), &data).unwrap();
+        let catalog = library::parse_catalog(&manifest(vec![item(
+            "image",
+            Some(copy_resource(&data)),
+            None,
+        )]))
+        .unwrap();
+        library::save_json(&root.join("catalog.json"), &catalog).unwrap();
+        assert!(saved_resource(&root, "site-one", "1.0.0").is_some());
+        assert!(saved_resource(&root, "site-one", "1.0.1").is_none());
+        assert!(saved_resource(&root, "site-two", "1.0.0").is_none());
+        std::fs::write(root.join("cache").join(hex(&data)), png("tampered")[..data.len()].to_vec()).unwrap();
+        assert!(saved_resource(&root, "site-one", "1.0.0").is_none());
+        std::fs::remove_dir_all(root).unwrap();
     }
 }
 

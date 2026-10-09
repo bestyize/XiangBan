@@ -32,6 +32,9 @@ ALTER TABLE wallpapers ADD COLUMN IF NOT EXISTS status VARCHAR(32) NOT NULL DEFA
 ALTER TABLE wallpapers ADD COLUMN IF NOT EXISTS source_type VARCHAR(32) NOT NULL DEFAULT 'collected';
 ALTER TABLE wallpapers ADD COLUMN IF NOT EXISTS category VARCHAR(64);
 ALTER TABLE wallpapers ADD COLUMN IF NOT EXISTS local_path TEXT;
+-- Our own stored copy of the media: {"media": {path, sha256, bytes, mime}, "cover": {...}}.
+-- The provider's links stay in the URL columns.
+ALTER TABLE wallpapers ADD COLUMN IF NOT EXISTS local_copy JSONB;
 
 CREATE INDEX IF NOT EXISTS idx_wallpapers_status ON wallpapers(status);
 CREATE INDEX IF NOT EXISTS idx_wallpapers_source_type ON wallpapers(source_type);

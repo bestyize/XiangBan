@@ -18,8 +18,10 @@ pub async fn list_favorites(State(state): State<AppState>) -> Result<Json<Value>
 /// POST /api/v1/favorites
 pub async fn add_favorite(
     State(state): State<AppState>,
-    Json(item): Json<WallpaperItem>,
+    Json(mut item): Json<WallpaperItem>,
 ) -> Result<Json<Value>, AppError> {
+    // This route is public: the stored-copy record is written by the server only.
+    item.local_copy = None;
     state.db.add_favorite(&item).await?;
     Ok(Json(json!({
         "success": true,

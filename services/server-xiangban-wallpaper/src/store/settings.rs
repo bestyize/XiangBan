@@ -48,6 +48,27 @@ impl Store {
             .collect())
     }
 
+    /// Settings whose key matches a SQL `LIKE` pattern. Used for small, fixed key families so the
+    /// whole table (which also holds one row per cached media file) is never loaded.
+    pub async fn settings_matching(&self, pattern: &str) -> Result<HashMap<String, String>, AppError> {
+        let rows = sqlx::query("SELECT key, value FROM app_settings WHERE key LIKE $1")
+            .bind(pattern)
+            .fetch_all(&self.pool)
+            .await?;
+        Ok(rows
+            .into_iter()
+            .map(|r| (r.get::<String, _>("key"), r.get::<String, _>("value")))
+            .collect())
+    }
+
+    pub async fn delete_setting(&self, key: &str) -> Result<(), AppError> {
+        sqlx::query("DELETE FROM app_settings WHERE key = $1")
+            .bind(key)
+            .execute(&self.pool)
+            .await?;
+        Ok(())
+    }
+
     pub async fn set_setting(&self, key: &str, value: &str) -> Result<(), AppError> {
         sqlx::query(
             "INSERT INTO app_settings (key, value) VALUES ($1, $2)

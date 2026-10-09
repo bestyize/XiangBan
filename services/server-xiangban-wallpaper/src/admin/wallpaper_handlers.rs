@@ -51,6 +51,8 @@ pub async fn collector_import(
         item.category = body.category;
     }
     item.source_type = "collected".to_string();
+    // The stored copy is recorded by the server only, never taken from the browser.
+    item.local_copy = None;
     item.collected_at = Some(chrono::Utc::now());
     crate::desktop::prepare_wallpaper(state.admin.store()?,&mut item).await?;
 
@@ -346,6 +348,7 @@ pub async fn admin_create_custom_wallpaper(
         source_type: "custom".to_string(),
         category: body.category,
         local_path: None,
+        local_copy: None,
         collected_at: Some(chrono::Utc::now()),
     };
     crate::desktop::prepare_wallpaper(state.admin.store()?,&mut item).await?;

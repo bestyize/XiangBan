@@ -13,6 +13,11 @@ function png(){const width=320,height=200,raw=Buffer.alloc((width*3+1)*height);f
 export async function startWallpaperFixture(){
  const root=fileURLToPath(new URL('../public/wallpapers/builtin/',import.meta.url))
  const files=new Map([['fixture.png',{data:png(),mime:'image/png'}],['mint-orbits.js',{data:await readFile(path.join(root,'mint-orbits.js')),mime:'application/javascript'}],['sea-breeze.mp4',{data:await readFile(path.join(root,'sea-breeze.mp4')),mime:'video/mp4'}],['update.zip',{data:Buffer.from('test-only-update-not-an-installer'),mime:'application/zip'}]])
+ // "Source first" fixtures: a provider file that differs from our copy (so a hash check against
+ // the manifest would fail), served with a misleading Content-Type, and one blocked by hotlink protection.
+ files.set('source-ok.png',{data:Buffer.concat([files.get('fixture.png').data,Buffer.from('provider-file')]),mime:'text/plain'})
+ files.set('source-blocked.png',{data:Buffer.from('<html>hotlink denied</html>'),mime:'image/png'})
+ const requests=[]
  let base='',offline=false
  const resource=name=>{const file=files.get(name);return {url:`${base}/${name}`,sha256:createHash('sha256').update(file.data).digest('hex'),bytes:file.data.length,mime:file.mime}}
  const server=http.createServer((request,response)=>{
@@ -22,7 +27,24 @@ export async function startWallpaperFixture(){
   const send=value=>{const data=Buffer.from(JSON.stringify(value));response.writeHead(200,{'Content-Type':'application/json','Content-Length':data.length});response.end(data)}
   if(url.pathname==='/catalog.json'){send({schemaVersion:1,revision:'test-1',items:[['image','fixture.png'],['video','sea-breeze.mp4'],['canvas','mint-orbits.js']].map(([kind,name])=>({id:`test-${kind}`,version:'1.0.0',title:`测试 ${kind}`,kind,resource:resource(name)})).concat([{id:'test-bad-hash',version:'1.0.0',title:'完整性失败测试',kind:'image',resource:{...resource('fixture.png'),sha256:'0'.repeat(64)}}])});return}
   if(url.pathname==='/updates.json'){send({schemaVersion:1,version:'99.0.0',notes:'本地接口检查，没有实际安装。',publishedAt:'2026-10-08T00:00:00Z',platforms:Object.fromEntries(['windows-x86_64','darwin-aarch64','darwin-x86_64'].map(target=>[target,resource('update.zip')]))});return}
+  // Mirrors GET /api/v1/desktop/wallpapers/{id}[?prefer=source] of the website for delivery tests.
+  const delivery=url.pathname.match(/^\/api\/v1\/desktop\/wallpapers\/([^/]+)$/)
+  if(delivery){
+   requests.push(`${url.pathname}${url.search}`)
+   // source: provider link (served below, or missing); copy: whether the website already has our copy.
+   const plans={'fixture-plain':{},'fixture-source-ok':{source:'source-ok.png',copy:false},'fixture-source-copy':{source:'source-ok.png',copy:true},
+    'fixture-source-blocked':{source:'source-blocked.png',copy:true},'fixture-source-blocked-nocopy':{source:'source-blocked.png',copy:false},
+    'fixture-source-missing':{source:'source-missing.png',copy:true}}
+   const plan=plans[delivery[1]];if(!plan){response.writeHead(404);response.end();return}
+   const wantsSource=url.searchParams.get('prefer')==='source'&&plan.source
+   const item={id:delivery[1],version:'1.0.0',title:`交付测试 ${delivery[1]}`,kind:'image'}
+   if(!wantsSource||plan.copy)item.resource=resource('fixture.png')
+   if(wantsSource)item.source={url:`${base}/${plan.source}`,mime:'image/jpeg'}
+   send({schemaVersion:1,revision:'delivery-1',items:[item]});return
+  }
+  if(url.pathname==='/requests'){send(requests);return}
   const file=files.get(url.pathname.slice(1));if(!file){response.writeHead(404);response.end();return}
+  requests.push(url.pathname)
   response.writeHead(200,{'Content-Type':file.mime,'Content-Length':file.data.length});response.end(file.data)
  })
  await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve))
@@ -32,7 +54,7 @@ export async function startWallpaperFixture(){
  // A valid top-level MP4 free box exercises large-file byte ranges without a long video.
  const padding=Buffer.alloc(16*1024*1024);padding.writeUInt32BE(padding.length);padding.write('free',4)
  await writeFile(path.join(localDirectory,'本地视频.mp4'),Buffer.concat([files.get('sea-breeze.mp4').data,padding]))
- return {base,localDirectory,catalogUrl:`${base}/catalog.json`,close:async()=>{
+ return {base,localDirectory,requests,catalogUrl:`${base}/catalog.json`,close:async()=>{
   await new Promise(resolve=>server.close(resolve))
   if(path.resolve(path.dirname(localDirectory))!==path.resolve(os.tmpdir())||!path.basename(localDirectory).startsWith('xiaoban-local-media-'))throw new Error('Unexpected local fixture directory')
   await rm(localDirectory,{recursive:true,force:true})

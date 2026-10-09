@@ -11,7 +11,8 @@
 | `/api/v1/desktop/announcements` | 客户端有效公告 |
 | `/api/v1/wallpapers/search?q=&category=&media_type=image&page=1&per_page=24` | 与网页相同的公开图库检索、分类和分页；`media_type=video` 获取动态壁纸 |
 | `/api/v1/categories` | 与网页相同的分类 |
-| `/api/v1/desktop/wallpapers/{id}` | 单项交付清单，供客户端下载、校验、缓存与应用 |
+| `/api/v1/desktop/wallpapers/{id}` | 单项交付清单，供客户端下载、校验、缓存与应用；阻塞并生成本站副本 |
+| `/api/v1/desktop/wallpapers/{id}?prefer=source` | 同一清单，优先给出来源原始链接（`source`），不下载、不阻塞，见下文“直链优先” |
 
 桌面专用接口使用 `Cache-Control: no-store`。未知平台或非法版本号返回 400，未上架 / 已下架的单项内容返回 404；数据库不可用返回 503，不假装已是最新版本。
 
@@ -52,11 +53,78 @@
 
 检索列表直接使用网站现有 snake_case 字段和 `has_more` 分页语义。客户端执行保存或应用时根据列表中的 `id` 请求单项清单，其格式遵循[客户端资源协议](../../../client/xiaoban-desktop-wallpaper/docs/delivery-protocol.md)。
 
-视频在管理员采集 / 自定义创建、重新上架与后台采集时先流式保存到服务器 `uploads/`；没有图片封面时用 FFmpeg 生成真实首帧 JPEG，再将本地视频与封面链接入库。处理失败时不将视频发布为可用内容。已有记录在首次下载请求时按需补齐，不执行全库迁移。图片在首次准备时生成不可变副本。素材最多 256 MiB；计算真实 SHA-256 与字节数后保存不可变副本，后续复用。外部源限制公开网络地址，逐跳校验并固定 DNS 解析结果，不允许访问内部网络。清单包含绝对资源 URL，网站自有内容寻址资源由客户端按已配置的网站源站解析（保留路径、SHA-256 与大小），避免本机地址配置后下载仍指向默认正式域名；外部 CDN 资源地址不改变。
+采集只保留来源链接，本站副本是后备（见下文“直链优先”）。策略为 `copy` 的视频（含自定义上传）在管理员采集 / 自定义创建、重新上架与后台采集时先流式保存到服务器 `uploads/`；没有图片封面时用 FFmpeg 生成真实首帧 JPEG，副本信息写入 `local_copy`，来源链接不被改写（自定义上传没有来源链接，其本地路径仍按旧方式换成不可变副本）。处理失败时不将视频发布为可用内容。策略为 `source` 的内容采集时不下载任何素材，只检查存在可播放的 MP4/WebM 链接。已有记录在首次执行不带 `prefer` 的清单请求时按需补齐副本，不执行全库迁移；图片同样在该请求中生成不可变副本，并记录到 `local_copy`。素材最多 256 MiB；计算真实 SHA-256 与字节数后保存不可变副本，后续复用。外部源限制公开网络地址，逐跳校验并固定 DNS 解析结果，不允许访问内部网络。清单包含绝对资源 URL，网站自有内容寻址资源由客户端按已配置的网站源站解析（保留路径、SHA-256 与大小），避免本机地址配置后下载仍指向默认正式域名；外部 CDN 资源地址不改变。
 
 图片支持 PNG/JPEG/WebP/AVIF/GIF/BMP，视频支持 MP4/WebM；跨平台推荐 JPEG/PNG/WebP 与 H.264 MP4。解码能力由客户端系统决定，失败会报告错误并保留正在使用的壁纸。清单中不下发脚本或本地路径，客户端下载完成并通过大小、SHA-256 校验后才应用；随后可离线播放。
 
 `uploads/` 包含用户上传媒体和桌面不可变副本，需要作为持久目录备份，不加入 Git。源文件发生变化应上传为新 URL；对相同 URL 的外部媒体按首次选中时的快照交付。安装包可以在后台 `/admin/apps` 上传到网站服务器，也可以使用自己的对象存储 / 下载服务器链接。站内安装包保存在 `app-packages/`，该目录不作为静态目录公开，需持久化并备份；通过专用下载接口按版本发布状态开放。
+
+## 直链优先（来源链接优先，本站副本后备）
+
+术语：**来源链接**是供应商（Pexels、Pixabay 等）在采集时给出的 URL；**本站副本**是我们下载后保存在 `uploads/`（如 `/uploads/desktop-<sha256>.<ext>`）的文件，有已知的 SHA-256 / 字节数 / MIME。
+
+### 每个供应商的策略
+
+策略保存在 `app_settings` 的 `provider.<id>.hotlink.image` 与 `provider.<id>.hotlink.video`，值为 `source`（客户端先用来源链接，本站副本仅作后备）或 `copy`（使用本站副本，与旧行为一致）。未设置时的默认值（`src/hotlink.rs`）：
+
+| 供应商 | 图片 | 视频 |
+| --- | --- | --- |
+| pexels | source | source |
+| pixabay | **copy** | source |
+| unsplash | source | source |
+| okslop | source | source |
+
+`source_type` 不是 `collected` 的内容（自定义 / 后台上传）和 `demo` 供应商始终为 `copy`，因为没有可优先使用的外部链接。其他未知供应商按 `copy` 处理。
+
+Pixabay 图片默认 `copy` 的原因是官方 API 文档写明：“permanent hotlinking of images (using Pixabay URLs in your app) is not allowed ... please download them to your server first. Videos may be embedded directly in your applications”，并且 `webformatURL` 链接只有 24 小时有效。所以图片需要本站保存，视频可以直接嵌入来源链接。
+
+后台读写：`GET /api/v1/admin/providers` 每个供应商增加 `hotlink: {image, video}`，各含 `policy`（当前生效）、`default`（默认值）、`custom`（是否被修改）。`PUT /api/v1/admin/providers/{provider}/settings` 接受 `{"hotlink": {"image": "source|copy|default", "video": "..."}}`，`default` 删除覆盖；仍可只传 `{"use_proxy": bool}`，两类字段可同时传，全空返回 400。沿用管理员 Session 与同源检查。后台页面“供应商密钥”每个供应商下有“素材链接”下拉。
+
+### 采集不销毁来源链接
+
+`preview_url`、`regular_url`、`downloads`、`video` 始终保留供应商链接。本站副本信息写入 `wallpapers` 表新增的可空 JSONB 列 `local_copy`：
+
+```json
+{"media": {"path": "/uploads/desktop-<sha>.mp4", "sha256": "…", "bytes": 123, "mime": "video/mp4"},
+ "cover": {"path": "/uploads/desktop-<sha>.jpg", "sha256": "…", "bytes": 45, "mime": "image/jpeg"}}
+```
+
+两个键都可省略。列由 `ALTER TABLE … ADD COLUMN IF NOT EXISTS` 添加（无迁移执行器，启动时随 `migrations/*init.sql` 执行），既有 `local_path` 保留。再次采集同一条目不会清掉已记录的 `local_copy`。该列只由服务端写入：采集导入和公开收藏接口会忽略客户端提交的值，公开 JSON 不返回它。策略为 `source` 的条目在管理员导入、定时同步、后台视频采集、上架 / 元数据编辑时不下载素材，速度快。不带 `prefer` 的清单请求创建副本后会记录到 `local_copy`。
+
+### 公开检索 / 详情 JSON
+
+`/api/v1/wallpapers/search`、`curated`、`videos` 与单项接口保留所有原字段。`source` 策略下 URL 字段是来源链接；`copy` 策略下，有副本时是本站副本路径，没有时仍是来源链接。仅当本站副本存在且与主链接不同时，增加可选对象 `fallback`，只包含有副本的键：
+
+```json
+"fallback": {"preview_url": "/uploads/…", "regular_url": "/uploads/…",
+             "downloads": {"original": "/uploads/…", "large": "…", "medium": "…", "small": "…", "thumb": "…"}}
+```
+
+视频的 `fallback` 沿用站内一直使用的布局：封面对应 `preview_url` / `small` / `thumb`，视频文件对应 `regular_url` / `original` / `large` / `medium`；`video.qualities` 不含后备，播放用清单。已被旧版本改写为 `/uploads/` 的记录没有 `local_copy`，原样返回，也没有 `fallback`。
+
+### 清单 `?prefer=source`
+
+`GET /api/v1/desktop/wallpapers/{id}` 不变：阻塞、必要时创建本站副本，`resource` 带副本的 `sha256` / `bytes`。新增 `?prefer=source`，响应结构相同（`schemaVersion` 1、`revision`、`items[]`），条目可额外包含：
+
+```json
+"source": {"url": "https://…（来源 https 链接）", "mime": "video/mp4（由链接后缀推断，未知则省略）"}
+```
+
+仅当该条目对应媒体类型的策略为 `source` 且存在可用 https 来源链接时才返回 `source`。此时服务器**不下载任何内容**：`resource` 只在本站副本已经存在时返回（含 `sha256` / `bytes` / `mime`），否则省略；`cover` 同理，不会为此生成。`revision` 为来源链接的 SHA-256，不会因日后生成副本而变化。策略为 `copy` 或没有可用来源链接（包括已被旧版本改写为本地路径的视频）时，响应与不带 `prefer` 完全相同。`prefer` 其他取值等同未传。
+
+### 客户端流程
+
+1. 请求 `?prefer=source`。
+2. 有 `source` 时直接下载：只允许 https，≤ 256 MiB，按前几个字节判断真实类型（不信任 `Content-Type`），拒绝不支持的类型，并确认系统能解码。**不要**用清单中的 `sha256` 校验——该值描述的是本站副本。
+3. 任一步失败：有 `resource` 就使用它（照常校验 `sha256` / `bytes`）；没有就请求不带 `prefer` 的接口取得经校验的本站副本。
+
+### 清单失败信息
+
+不带 `prefer` 的接口生成副本失败仍返回 400，信息更具体：来源 HTTP 状态（`媒体源 host 返回 HTTP 403`）、响应或下载超时、无法解析 / 连接、以及不支持的格式（附带实际 MIME 与大小）。
+
+### 历史数据
+
+引入 `local_copy` 之前采集的视频已经被改写成 `/uploads/` 路径，原始视频链接已丢失，这些条目保持 `copy` 行为（没有来源链接，`prefer=source` 返回普通清单）。再次采集到同一条目会恢复其来源链接。此前由清单请求生成的图片副本按来源链接记录在 `desktop.media.*` 设置中，`prefer=source` 能识别并作为 `resource` 返回，下次不带 `prefer` 的请求会补写 `local_copy`。Pixabay 图片默认 `copy`，副本仍在首次不带 `prefer` 的清单请求时生成，采集时不预先下载图片。
 
 ## 视频首帧运行依赖
 
@@ -68,7 +136,7 @@
 
 ## 验证
 
-在网站目录先执行 `npm --prefix web ci`、`npm --prefix web run build`、`cargo test --locked`。设置独立 `TEST_DATABASE_URL` 后，数据库测试为每例创建并清理临时 schema，覆盖后台鉴权、配置持久化、版本选择、公告过滤、上下架与资源实际校验。
+在网站目录先执行 `npm --prefix web ci`、`npm --prefix web run build`、`cargo test --locked`。设置独立 `TEST_DATABASE_URL` 后，数据库测试为每例创建并清理临时 schema，覆盖后台鉴权、配置持久化、版本选择、公告过滤、上下架与资源实际校验，以及直链策略（后台读写、`local_copy` 列往返、`prefer=source` 不下载、`fallback`）。直链策略默认值、公开 JSON 的 `fallback` 与 `prefer=source` 清单也有不依赖数据库的单元测试。
 
 原生端到端测试需要临时网站数据库 / schema，不应指向正式数据库。启动该网站后设置 `XIAOBAN_WEBSITE_TEST_URL=http://127.0.0.1:8087`，在仓库根运行：
 

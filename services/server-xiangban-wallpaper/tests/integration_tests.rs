@@ -5,7 +5,7 @@ use wallpaper_collect::{
     error::AppError,
     models::{MediaType, Orientation, ProviderInfo, Resolution, SearchQuery, WallpaperItem},
     providers::{
-        DemoProvider, PexelsProvider, PixabayProvider, ProviderRegistry, UnsplashProvider,
+        DemoProvider, OkslopProvider, PexelsProvider, PixabayProvider, ProviderRegistry, UnsplashProvider,
         WallpaperProvider,
     },
     runtime::Runtime,
@@ -95,9 +95,14 @@ async fn test_providers_decoupled_creation() {
     assert!(pexels.supported_media_types().contains(&MediaType::Video));
     assert!(pexels.supported_media_types().contains(&MediaType::Image));
 
+    let okslop = OkslopProvider::new(&runtime);
+    assert_eq!(okslop.id(), "okslop");
+    assert!(!okslop.is_configured(), "without a key it stays out of searches");
+    assert_eq!(okslop.supported_media_types(), vec![MediaType::Image]);
+
     let registry = ProviderRegistry::new(&runtime, true);
     let list = registry.list_info();
-    assert_eq!(list.len(), 4);
+    assert_eq!(list.len(), 5);
 }
 
 #[tokio::test]

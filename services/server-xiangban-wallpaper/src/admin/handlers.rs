@@ -2,6 +2,7 @@ use super::auth::{AdminSession, SESSION_COOKIE, SESSION_COOKIE_MAX_AGE};
 use crate::{
     api::state::AppState,
     error::AppError,
+    hotlink::{self, Kind, Overrides, Policy},
     runtime::{self, is_known_provider, CacheSettings, ProxyStrategy, PROVIDER_IDS},
     store::{KeyRow, ProxyRow},
 };
@@ -24,6 +25,7 @@ fn provider_name(id: &str) -> &'static str {
         "unsplash" => "Unsplash",
         "pixabay" => "Pixabay",
         "pexels" => "Pexels",
+        "okslop" => "okslop",
         _ => "",
     }
 }
@@ -212,6 +214,7 @@ pub async fn update_account(
 
 pub async fn list_providers(State(state): State<AppState>) -> ApiResult {
     let rows = state.admin.store()?.list_keys().await?;
+    let hotlink = Overrides::load(state.admin.store()?).await?;
     let providers: Vec<Value> = PROVIDER_IDS
         .iter()
         .map(|id| {
@@ -224,11 +227,24 @@ pub async fn list_providers(State(state): State<AppState>) -> ApiResult {
                 "id": id,
                 "name": provider_name(id),
                 "use_proxy": state.runtime.uses_proxy(id),
+                "hotlink": hotlink_view(&hotlink, id),
                 "keys": keys,
             })
         })
         .collect();
     Ok(Json(json!({ "providers": providers })))
+}
+
+/// Per media type: the policy in force, the provider's default and whether it was changed.
+fn hotlink_view(overrides: &Overrides, provider: &str) -> Value {
+    let one = |kind: Kind| {
+        json!({
+            "policy": overrides.provider_policy(provider, kind).as_str(),
+            "default": hotlink::default_policy(provider, kind).as_str(),
+            "custom": overrides.configured(provider, kind).and_then(Policy::parse).is_some(),
+        })
+    };
+    json!({ "image": one(Kind::Image), "video": one(Kind::Video) })
 }
 
 #[derive(Debug, Deserialize)]
@@ -289,9 +305,27 @@ pub async fn delete_key(State(state): State<AppState>, Path((provider, id)): Pat
     Ok(Json(json!({ "success": true })))
 }
 
+/// `source` / `copy` set the provider's policy; `default` removes the override.
+#[derive(Debug, Default, Deserialize)]
+pub struct HotlinkBody {
+    image: Option<String>,
+    video: Option<String>,
+}
+
 #[derive(Debug, Deserialize)]
 pub struct ProviderSettingsBody {
-    use_proxy: bool,
+    use_proxy: Option<bool>,
+    hotlink: Option<HotlinkBody>,
+}
+
+/// `None` clears the override, `Some` sets it.
+fn parse_hotlink_choice(raw: &str) -> Result<Option<Policy>, AppError> {
+    match raw {
+        "default" => Ok(None),
+        other => Policy::parse(other).map(Some).ok_or_else(|| {
+            AppError::BadRequest("直链策略只能是 source、copy 或 default".to_string())
+        }),
+    }
 }
 
 pub async fn set_provider_settings(
@@ -300,8 +334,28 @@ pub async fn set_provider_settings(
     Json(body): Json<ProviderSettingsBody>,
 ) -> ApiResult {
     require_provider(&provider)?;
-    runtime::save_use_proxy(state.admin.store()?, &provider, body.use_proxy).await?;
-    apply_changes(&state, false).await?;
+    let hotlink_changes = match &body.hotlink {
+        Some(h) => [(Kind::Image, h.image.as_deref()), (Kind::Video, h.video.as_deref())]
+            .into_iter()
+            .filter_map(|(kind, raw)| raw.map(|r| parse_hotlink_choice(r).map(|choice| (kind, choice))))
+            .collect::<Result<Vec<_>, _>>()?,
+        None => Vec::new(),
+    };
+    if body.use_proxy.is_none() && hotlink_changes.is_empty() {
+        return Err(AppError::BadRequest("没有需要修改的内容".to_string()));
+    }
+    let store = state.admin.store()?;
+    for (kind, choice) in hotlink_changes {
+        let key = hotlink::setting_key(&provider, kind);
+        match choice {
+            Some(policy) => store.set_setting(&key, policy.as_str()).await?,
+            None => store.delete_setting(&key).await?,
+        }
+    }
+    if let Some(use_proxy) = body.use_proxy {
+        runtime::save_use_proxy(store, &provider, use_proxy).await?;
+        apply_changes(&state, false).await?;
+    }
     Ok(Json(json!({ "success": true })))
 }
 

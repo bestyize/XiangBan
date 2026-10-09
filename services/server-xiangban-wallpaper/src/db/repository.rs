@@ -2,7 +2,9 @@ use crate::{
     error::AppError,
     models::{
         query::{SearchQuery, SearchResult},
-        wallpaper::{Author, DownloadUrls, MediaType, Orientation, Resolution, Stats, VideoMeta},
+        wallpaper::{
+            Author, DownloadUrls, LocalCopy, MediaType, Orientation, Resolution, Stats, VideoMeta,
+        },
         WallpaperItem,
     },
 };
@@ -76,6 +78,11 @@ fn row_to_wallpaper(r: &PgRow) -> WallpaperItem {
         source_type: r.try_get("source_type").unwrap_or_else(|_| "collected".to_string()),
         category: r.try_get("category").ok(),
         local_path: r.try_get("local_path").ok(),
+        local_copy: r
+            .try_get::<Option<serde_json::Value>, _>("local_copy")
+            .ok()
+            .flatten()
+            .and_then(|v| serde_json::from_value(v).ok()),
         collected_at: r.get("collected_at"),
     }
 }
@@ -156,7 +163,12 @@ impl Database {
         {
             let mut mem = self.mem_wallpapers.write().await;
             for item in items {
-                mem.insert(item.id.clone(), item.clone());
+                let mut stored = item.clone();
+                // Like the SQL below, an upsert without copy information keeps the known copy.
+                if stored.local_copy.is_none() {
+                    stored.local_copy = mem.get(&item.id).and_then(|old| old.local_copy.clone());
+                }
+                mem.insert(item.id.clone(), stored);
             }
         }
 
@@ -180,6 +192,11 @@ impl Database {
                 let video_json = item.video.as_ref().and_then(|v| serde_json::to_value(v).ok());
                 let author_json = serde_json::to_value(&item.author).unwrap_or_default();
                 let stats_json = serde_json::to_value(&item.stats).unwrap_or_default();
+                let local_copy_json = item
+                    .local_copy
+                    .as_ref()
+                    .filter(|c| !c.is_empty())
+                    .and_then(|c| serde_json::to_value(c).ok());
 
                 let res = sqlx::query(
                     r#"
@@ -187,12 +204,12 @@ impl Database {
                         id, provider, source_id, media_type, title, description, tags,
                         width, height, aspect_ratio, orientation, dominant_color,
                         preview_url, regular_url, downloads, video, author, stats,
-                        source_page_url, license, status, source_type, category, local_path, updated_at
+                        source_page_url, license, status, source_type, category, local_path, local_copy, updated_at
                     ) VALUES (
                         $1, $2, $3, $4, $5, $6, $7,
                         $8, $9, $10, $11, $12,
                         $13, $14, $15, $16, $17, $18,
-                        $19, $20, $21, $22, $23, $24, NOW()
+                        $19, $20, $21, $22, $23, $24, $25, NOW()
                     )
                     ON CONFLICT (id) DO UPDATE SET
                         title = EXCLUDED.title,
@@ -207,6 +224,7 @@ impl Database {
                         status = EXCLUDED.status,
                         category = COALESCE(EXCLUDED.category, wallpapers.category),
                         local_path = COALESCE(EXCLUDED.local_path, wallpapers.local_path),
+                        local_copy = COALESCE(EXCLUDED.local_copy, wallpapers.local_copy),
                         updated_at = NOW()
                     "#
                 )
@@ -234,6 +252,7 @@ impl Database {
                 .bind(&item.source_type)
                 .bind(&item.category)
                 .bind(&item.local_path)
+                .bind(local_copy_json)
                 .execute(pool)
                 .await;
 
@@ -268,6 +287,25 @@ impl Database {
         }
 
         Ok(None)
+    }
+
+    /// Records our stored copy of an item's media without touching its other fields.
+    pub async fn update_local_copy(&self, id: &str, copy: &LocalCopy) -> Result<(), AppError> {
+        {
+            let mut mem = self.mem_wallpapers.write().await;
+            if let Some(item) = mem.get_mut(id) {
+                item.local_copy = Some(copy.clone());
+            }
+        }
+
+        if let Some(pool) = &self.pool {
+            sqlx::query("UPDATE wallpapers SET local_copy = $1, updated_at = NOW() WHERE id = $2")
+                .bind(serde_json::to_value(copy).unwrap_or_default())
+                .bind(id)
+                .execute(pool)
+                .await?;
+        }
+        Ok(())
     }
 
     pub async fn add_favorite(&self, item: &WallpaperItem) -> Result<(), AppError> {

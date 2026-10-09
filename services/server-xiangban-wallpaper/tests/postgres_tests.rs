@@ -18,7 +18,10 @@ use wallpaper_collect::{
     api::{create_api_router, AppState},
     config::AppConfig,
     db::Database,
-    models::{MediaType, SearchQuery},
+    models::{
+        Author, CopyFile, DownloadUrls, LocalCopy, MediaType, Orientation, Resolution, SearchQuery,
+        Stats, VideoMeta, VideoQuality, WallpaperItem,
+    },
     providers::ProviderRegistry,
     runtime::{self, CacheSettings, Runtime},
     services::{CachedSearch, SearchCache, WallpaperAggregator, WallpaperCollector},
@@ -84,6 +87,7 @@ fn config() -> AppConfig {
         unsplash_access_key: None,
         pixabay_api_key: None,
         pexels_api_key: None,
+        okslop_api_key: None,
         enable_demo_data: true,
         cache_ttl_secs: 3600,
         auto_sync_interval_mins: 0,
@@ -296,18 +300,24 @@ async fn env_keys_are_imported_once_and_then_managed_in_the_database() {
     let store = db.store().await;
     let mut cfg = config();
     cfg.pexels_api_key = Some("env-pexels-key-1234".into());
+    cfg.okslop_api_key = Some("env-okslop-key-5678".into());
 
     let runtime = Runtime::load(&store, &cfg).await.unwrap();
     assert!(runtime.has_keys("pexels"));
+    assert!(runtime.has_keys("okslop"), "OKSLOP_API_KEY is imported like the other providers' keys");
     let keys = store.list_keys().await.unwrap();
-    assert_eq!(keys.len(), 1);
-    assert_eq!(keys[0].provider, "pexels");
+    assert_eq!(keys.len(), 2);
+    let pexels = keys.iter().find(|k| k.provider == "pexels").expect("pexels key");
+    assert!(keys.iter().any(|k| k.provider == "okslop"));
 
-    // Deleting it in the console must stick across restarts.
-    assert!(store.delete_key("pexels", keys[0].id).await.unwrap());
+    // Deleting one in the console must stick across restarts.
+    assert!(store.delete_key("pexels", pexels.id).await.unwrap());
     let runtime = Runtime::load(&store, &cfg).await.unwrap();
     assert!(!runtime.has_keys("pexels"));
-    assert!(store.list_keys().await.unwrap().is_empty());
+    assert!(runtime.has_keys("okslop"), "the other provider's key is untouched");
+    let left = store.list_keys().await.unwrap();
+    assert_eq!(left.len(), 1);
+    assert_eq!(left[0].provider, "okslop");
     db.cleanup().await;
 }
 
@@ -539,6 +549,9 @@ async fn desktop_manifest_materialises_only_published_media_with_real_hash_and_s
         let resource=item["resource"]["url"].as_str().unwrap().strip_prefix("http://localhost:8080/").unwrap();
         assert_eq!(tokio::fs::read(resource).await.unwrap(),bytes);
         assert_eq!(public_call(&app,&path).await.body,manifest.body,"second request uses immutable resource cache");
+        assert!(manifest.body["items"][0].get("source").is_none(),"plain endpoint never offers a source link");
+        let recorded=state.db.get_wallpaper(id).await.unwrap().unwrap().local_copy.expect("the copy is recorded").media.expect("media copy");
+        assert_eq!((recorded.sha256.as_str(),recorded.bytes),(item["resource"]["sha256"].as_str().unwrap(),bytes.len() as u64));
         state.db.update_status(id,"offline").await.unwrap();
         assert_eq!(public_call(&app,&path).await.status,StatusCode::NOT_FOUND);
         tokio::fs::remove_file(resource).await.unwrap();tokio::fs::remove_file(format!("uploads/{name}")).await.unwrap();
@@ -677,7 +690,7 @@ async fn provider_keys_are_managed_and_never_returned_in_full() {
 
     let listed = call(&app, "GET", "/providers", Some(&cookie), None).await;
     let ids: Vec<&str> = listed.body["providers"].as_array().unwrap().iter().map(|p| p["id"].as_str().unwrap()).collect();
-    assert_eq!(ids, vec!["unsplash", "pixabay", "pexels"]);
+    assert_eq!(ids, vec!["unsplash", "pixabay", "pexels", "okslop"]);
 
     let added = call(&app, "POST", "/providers/pexels/keys", Some(&cookie), Some(json!({ "label": "main", "key": secret }))).await;
     assert_eq!(added.status, StatusCode::OK, "{}", added.body);
@@ -845,4 +858,249 @@ async fn concurrent_app_releases_and_site_settings_do_not_overwrite_each_other()
     let (first,second,site)=tokio::join!(call(&app,"PUT","/desktop/releases/1.0.0",Some(&cookie),Some(release("1.0.0"))),call(&app,"PUT","/desktop/releases/2.0.0",Some(&cookie),Some(release("2.0.0"))),call(&app,"PATCH","/desktop",Some(&cookie),Some(json!({"siteUrl":"https://wallpaper.xiangban.xyz","introduction":"保留官网设置","announcements":[]}))));
     assert_eq!(first.status,StatusCode::OK);assert_eq!(second.status,StatusCode::OK);assert_eq!(site.status,StatusCode::OK);
     let config=call(&app,"GET","/desktop",Some(&cookie),None).await.body;assert_eq!(config["introduction"],"保留官网设置");assert_eq!(config["releases"].as_array().unwrap().len(),2);db.cleanup().await;
+}
+
+/* ---------------------------- hotlink policy and source-first delivery ---------------------------- */
+
+fn media_item(provider: &str, id: &str, media_type: MediaType, original: &str, preview: &str) -> WallpaperItem {
+    let video = media_type == MediaType::Video;
+    WallpaperItem {
+        id: id.into(),
+        provider: provider.into(),
+        source_id: id.into(),
+        media_type,
+        title: "Source link test".into(),
+        description: None,
+        tags: vec![],
+        resolution: Resolution::new(1920, 1080),
+        orientation: Orientation::Landscape,
+        dominant_color: None,
+        preview_url: preview.into(),
+        regular_url: if video { preview.into() } else { original.into() },
+        downloads: DownloadUrls {
+            original: original.into(),
+            large: Some(original.into()),
+            medium: None,
+            small: None,
+            thumb: preview.into(),
+        },
+        video: video.then(|| VideoMeta {
+            duration_secs: 5,
+            preview_url: original.into(),
+            qualities: vec![VideoQuality { quality: "1080p".into(), url: original.into(), width: 1920, height: 1080, size_bytes: None }],
+        }),
+        author: Author { name: "tester".into(), username: "tester".into(), avatar_url: None, profile_url: None },
+        stats: Stats::default(),
+        source_page_url: String::new(),
+        license: "test".into(),
+        status: "published".into(),
+        source_type: "collected".into(),
+        category: None,
+        local_path: None,
+        local_copy: None,
+        collected_at: Some(chrono::Utc::now()),
+    }
+}
+
+#[tokio::test]
+async fn hotlink_policy_is_shown_and_changed_through_the_admin_api() {
+    let Some(db) = TestDb::connect().await else { return };
+    let (app, _) = build_app(&db).await;
+    assert_eq!(call(&app, "PUT", "/providers/pixabay/settings", None, Some(json!({"hotlink": {"image": "source"}}))).await.status, StatusCode::UNAUTHORIZED);
+    let cookie = session_cookie(&sign_in(&app, "admin", "123456").await);
+
+    let listed = call(&app, "GET", "/providers", Some(&cookie), None).await.body;
+    let provider = |body: &Value, id: &str| body["providers"].as_array().unwrap().iter().find(|p| p["id"] == id).unwrap().clone();
+    assert_eq!(provider(&listed, "pixabay")["hotlink"]["image"], json!({"policy": "copy", "default": "copy", "custom": false}));
+    assert_eq!(provider(&listed, "pixabay")["hotlink"]["video"]["policy"], "source");
+    assert_eq!(provider(&listed, "pexels")["hotlink"]["image"]["policy"], "source");
+
+    let set = |body: Value| call(&app, "PUT", "/providers/pixabay/settings", Some(&cookie), Some(body));
+    assert_eq!(set(json!({"hotlink": {"image": "source"}})).await.status, StatusCode::OK);
+    let after = provider(&call(&app, "GET", "/providers", Some(&cookie), None).await.body, "pixabay");
+    assert_eq!(after["hotlink"]["image"], json!({"policy": "source", "default": "copy", "custom": true}));
+    assert_eq!(after["hotlink"]["video"]["custom"], false);
+
+    for bad in [json!({"hotlink": {"image": "hotlink"}}), json!({}), json!({"hotlink": {}})] {
+        assert_eq!(set(bad).await.status, StatusCode::BAD_REQUEST);
+    }
+    assert_eq!(call(&app, "PUT", "/providers/nobody/settings", Some(&cookie), Some(json!({"hotlink": {"image": "copy"}}))).await.status, StatusCode::NOT_FOUND);
+    let foreign = call_from(&app, "PUT", "/providers/pixabay/settings", Some(&cookie), Some("https://evil.example"), Some(json!({"hotlink": {"image": "copy"}}))).await;
+    assert_eq!(foreign.status, StatusCode::FORBIDDEN);
+
+    // `use_proxy` alone keeps working, and `default` removes the override.
+    assert_eq!(set(json!({"use_proxy": true})).await.status, StatusCode::OK);
+    assert_eq!(set(json!({"hotlink": {"image": "default"}})).await.status, StatusCode::OK);
+    let reset = provider(&call(&app, "GET", "/providers", Some(&cookie), None).await.body, "pixabay");
+    assert_eq!(reset["hotlink"]["image"], json!({"policy": "copy", "default": "copy", "custom": false}));
+    assert_eq!(reset["use_proxy"], true);
+    db.cleanup().await;
+}
+#[tokio::test]
+async fn source_first_manifest_downloads_nothing_and_offers_our_copy_only_when_it_exists() {
+    use sha2::{Digest, Sha256};
+    let Some(db) = TestDb::connect().await else { return };
+    let (app, state) = build_app(&db).await;
+    let cookie = session_cookie(&sign_in(&app, "admin", "123456").await);
+    // `.invalid` never resolves, so any attempt to download from this "provider" would fail loudly.
+    let link = "https://media.invalid/photos/1/pexels-photo-1.jpeg?w=2000";
+    let id = format!("pexels_{}", uuid::Uuid::new_v4().simple());
+    state.db.upsert_wallpapers(&[media_item("pexels", &id, MediaType::Image, link, "https://media.invalid/photos/1/small.jpeg")]).await.unwrap();
+    let path = format!("/api/v1/desktop/wallpapers/{id}");
+    let store = state.admin.store().unwrap();
+
+    // 1. prefer=source with no copy: the source link, no resource, nothing stored.
+    let first = public_call(&app, &format!("{path}?prefer=source")).await;
+    assert_eq!(first.status, StatusCode::OK, "{}", first.body);
+    let entry = &first.body["items"][0];
+    assert_eq!(first.body["schemaVersion"], 1);
+    assert_eq!(entry["source"], json!({"url": link, "mime": "image/jpeg"}));
+    assert!(entry.get("resource").is_none() && entry.get("cover").is_none());
+    assert!(first.body["revision"].as_str().is_some());
+    assert!(store.settings_matching("desktop.media.%").await.unwrap().is_empty(), "no copy was made");
+
+    // 2. The plain endpoint and unknown `prefer` values are the blocking path and report the failure.
+    for plain in [path.clone(), format!("{path}?prefer=copy"), format!("{path}?prefer=")] {
+        let reply = public_call(&app, &plain).await;
+        assert_eq!(reply.status, StatusCode::BAD_REQUEST, "{plain}");
+        assert!(reply.body["error"].as_str().unwrap().contains("media.invalid"), "{}", reply.body);
+    }
+
+    // 3. Search shows the provider link and, without a copy, no fallback.
+    let found = public_call(&app, "/api/v1/wallpapers/search?media_type=image").await;
+    let listed = found.body["items"].as_array().unwrap().iter().find(|i| i["id"] == id.as_str()).unwrap().clone();
+    assert_eq!(listed["downloads"]["original"], link);
+    assert!(listed.get("fallback").is_none() && listed.get("local_copy").is_none());
+
+    // 4. Once a copy exists it is offered as `resource` next to `source`, and as the search fallback.
+    tokio::fs::create_dir_all("uploads").await.unwrap();
+    let bytes = format!("pretend-jpeg-{id}").into_bytes();
+    let sha = format!("{:x}", Sha256::digest(&bytes));
+    let name = format!("desktop-{sha}.jpg");
+    tokio::fs::write(format!("uploads/{name}"), &bytes).await.unwrap();
+    let copy = LocalCopy {
+        media: Some(CopyFile { path: format!("/uploads/{name}"), sha256: sha.clone(), bytes: bytes.len() as u64, mime: "image/jpeg".into() }),
+        cover: None,
+    };
+    state.db.update_local_copy(&id, &copy).await.unwrap();
+    let second = public_call(&app, &format!("{path}?prefer=source")).await;
+    let entry = &second.body["items"][0];
+    assert_eq!(entry["source"]["url"], link);
+    assert_eq!(entry["resource"]["sha256"], sha.as_str());
+    assert_eq!(entry["resource"]["bytes"], bytes.len());
+    assert_eq!(entry["resource"]["mime"], "image/jpeg");
+    assert!(entry["resource"]["url"].as_str().unwrap().ends_with(&format!("/uploads/{name}")));
+    assert_eq!(second.body["revision"], first.body["revision"], "the revision names the source, not the copy");
+    let found = public_call(&app, "/api/v1/wallpapers/search?media_type=image").await;
+    let listed = found.body["items"].as_array().unwrap().iter().find(|i| i["id"] == id.as_str()).unwrap().clone();
+    assert_eq!(listed["downloads"]["original"], link, "source policy keeps the provider link as primary");
+    assert_eq!(listed["fallback"]["downloads"]["original"], format!("/uploads/{name}"));
+    assert_eq!(listed["fallback"]["regular_url"], format!("/uploads/{name}"));
+
+    // 5. Policy copy: the plain manifest (served from the recorded copy, no network), no `source`,
+    //    and the catalogue switches its primary links to our copy.
+    let set = call(&app, "PUT", "/providers/pexels/settings", Some(&cookie), Some(json!({"hotlink": {"image": "copy"}}))).await;
+    assert_eq!(set.status, StatusCode::OK);
+    let forced = public_call(&app, &format!("{path}?prefer=source")).await;
+    assert_eq!(forced.status, StatusCode::OK, "{}", forced.body);
+    let entry = &forced.body["items"][0];
+    assert!(entry.get("source").is_none());
+    assert_eq!(entry["resource"]["sha256"], sha.as_str());
+    assert_eq!(forced.body["revision"], sha.as_str(), "plain revision is the copy's hash");
+    assert_eq!(forced.body, public_call(&app, &path).await.body, "same as the plain endpoint");
+    let found = public_call(&app, "/api/v1/wallpapers/search?media_type=image").await;
+    let listed = found.body["items"].as_array().unwrap().iter().find(|i| i["id"] == id.as_str()).unwrap().clone();
+    assert_eq!(listed["downloads"]["original"], format!("/uploads/{name}"));
+    assert!(listed.get("fallback").is_none());
+
+    tokio::fs::remove_file(format!("uploads/{name}")).await.unwrap();
+    db.cleanup().await;
+}
+
+#[tokio::test]
+async fn local_copy_column_round_trips_and_survives_a_recollection() {
+    let Some(db) = TestDb::connect().await else { return };
+    // A Database on the real wallpapers table (inside this test's schema), reopened to bypass its memory cache.
+    let url = std::env::var("TEST_DATABASE_URL").unwrap();
+    let url = format!("{url}{}options=-c%20search_path%3D{}", if url.contains('?') { "&" } else { "?" }, db.schema);
+    let first = Database::init(Some(&url)).await;
+    assert!(first.is_postgres_connected());
+    assert!(Database::init(Some(&url)).await.is_postgres_connected(), "migrations are repeatable");
+
+    let id = format!("pexels_{}", uuid::Uuid::new_v4().simple());
+    let mut item = media_item("pexels", &id, MediaType::Image, "https://media.invalid/o.jpg", "https://media.invalid/t.jpg");
+    first.upsert_wallpapers(&[item.clone()]).await.unwrap();
+    let reopen = || async { Database::init(Some(&url)).await.get_wallpaper(&id).await.unwrap().unwrap() };
+    assert!(reopen().await.local_copy.is_none());
+
+    let copy = LocalCopy {
+        media: Some(CopyFile { path: "/uploads/desktop-a.jpg".into(), sha256: "a".repeat(64), bytes: 10, mime: "image/jpeg".into() }),
+        cover: Some(CopyFile { path: "/uploads/desktop-b.jpg".into(), sha256: "b".repeat(64), bytes: 5, mime: "image/jpeg".into() }),
+    };
+    first.update_local_copy(&id, &copy).await.unwrap();
+    assert_eq!(reopen().await.local_copy, Some(copy.clone()));
+
+    // Collecting the same item again (no copy info) rewrites the provider links but keeps the copy.
+    item.title = "re-collected".into();
+    item.downloads.original = "https://media.invalid/o2.jpg".into();
+    Database::init(Some(&url)).await.upsert_wallpapers(&[item]).await.unwrap();
+    let again = reopen().await;
+    assert_eq!(again.title, "re-collected");
+    assert_eq!(again.downloads.original, "https://media.invalid/o2.jpg");
+    assert_eq!(again.local_copy, Some(copy.clone()));
+
+    // Search and the raw JSONB shape.
+    let found = Database::init(Some(&url)).await.search_published_wallpapers(&SearchQuery { media_type: Some(MediaType::Image), ..Default::default() }).await.unwrap();
+    assert_eq!(found.items.iter().find(|i| i.id == id).unwrap().local_copy, Some(copy));
+    let raw: Value = sqlx::query_scalar("SELECT local_copy FROM wallpapers WHERE id = $1").bind(&id).fetch_one(&db.pool).await.unwrap();
+    assert_eq!(raw["media"]["path"], "/uploads/desktop-a.jpg");
+    assert_eq!(raw["cover"]["bytes"], 5);
+    db.cleanup().await;
+}
+
+#[tokio::test]
+async fn pixabay_videos_default_to_source_and_collection_does_not_download_them() {
+    let Some(db) = TestDb::connect().await else { return };
+    let (app, state) = build_app(&db).await;
+    let cookie = session_cookie(&sign_in(&app, "admin", "123456").await);
+    let video = "https://media.invalid/video/2020/clip_large.mp4";
+    let poster = "https://media.invalid/video/poster_640x360.jpg";
+    let id = format!("pixabay_v_{}", uuid::Uuid::new_v4().simple());
+
+    // Admin import of a source-policy video: fast, keeps every provider link, makes no copy.
+    let item = media_item("pixabay", &id, MediaType::Video, video, poster);
+    let imported = call(&app, "POST", "/collector/import", Some(&cookie), Some(json!({"item": item, "status": "published"}))).await;
+    assert_eq!(imported.status, StatusCode::OK, "{}", imported.body);
+    let saved = &imported.body["item"];
+    assert_eq!(saved["preview_url"], poster);
+    assert_eq!(saved["downloads"]["original"], video);
+    assert_eq!(saved["video"]["qualities"][0]["url"], video);
+    assert!(saved.get("local_path").is_none() && saved.get("local_copy").is_none());
+    let stored = state.db.get_wallpaper(&id).await.unwrap().unwrap();
+    assert!(stored.local_copy.is_none() && stored.local_path.is_none());
+
+    // The client manifest: source only. No resource, no cover, nothing generated.
+    let path = format!("/api/v1/desktop/wallpapers/{id}?prefer=source");
+    let manifest = public_call(&app, &path).await;
+    assert_eq!(manifest.status, StatusCode::OK, "{}", manifest.body);
+    let entry = &manifest.body["items"][0];
+    assert_eq!(entry["kind"], "video");
+    assert_eq!(entry["source"], json!({"url": video, "mime": "video/mp4"}));
+    assert!(entry.get("resource").is_none() && entry.get("cover").is_none());
+
+    // Publish and meta-edit paths keep the links too.
+    let edited = call(&app, "PUT", &format!("/wallpapers/{id}"), Some(&cookie), Some(json!({"title": "改名", "status": "published", "tags": []}))).await;
+    assert_eq!(edited.status, StatusCode::OK, "{}", edited.body);
+    let stored = state.db.get_wallpaper(&id).await.unwrap().unwrap();
+    assert_eq!(stored.video.unwrap().qualities[0].url, video);
+    assert_eq!(stored.title, "改名");
+
+    // A client cannot plant a copy record through the import or the public favourites route.
+    let mut forged = media_item("pexels", &format!("pexels_{}", uuid::Uuid::new_v4().simple()), MediaType::Image, "https://media.invalid/a.jpg", "https://media.invalid/b.jpg");
+    forged.local_copy = Some(LocalCopy { media: Some(CopyFile { path: "//evil.example/x".into(), sha256: "0".repeat(64), bytes: 1, mime: "image/jpeg".into() }), cover: None });
+    let forged_id = forged.id.clone();
+    let favourite = Request::builder().method("POST").uri("/api/v1/favorites").header(header::CONTENT_TYPE, "application/json").body(Body::from(serde_json::to_string(&forged).unwrap())).unwrap();
+    assert_eq!(app.clone().oneshot(favourite).await.unwrap().status(), StatusCode::OK);
+    assert!(state.db.get_wallpaper(&forged_id).await.unwrap().unwrap().local_copy.is_none());
+    db.cleanup().await;
 }

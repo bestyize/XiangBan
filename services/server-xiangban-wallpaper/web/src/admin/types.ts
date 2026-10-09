@@ -16,12 +16,22 @@ export interface KeyInfo {
   cooldown_secs: number | null
 }
 
-export type ProviderId = 'unsplash' | 'pixabay' | 'pexels'
+export type ProviderId = 'unsplash' | 'pixabay' | 'pexels' | 'okslop'
+
+export type HotlinkPolicyValue = 'source' | 'copy'
+
+/** Whether clients use the provider's own link first (`source`) or our stored copy (`copy`). */
+export interface HotlinkSetting {
+  policy: HotlinkPolicyValue
+  default: HotlinkPolicyValue
+  custom: boolean
+}
 
 export interface ProviderConfig {
   id: ProviderId
   name: string
   use_proxy: boolean
+  hotlink: { image: HotlinkSetting; video: HotlinkSetting }
   keys: KeyInfo[]
 }
 

@@ -21,11 +21,11 @@ backend → api-contracts。接口库用 14 个业务包组织 52 个定义，�
 
 网页维护自己的 React 角色与 TS API 类型。桌宠 src/companion 初始复制原网页纯角色核心，SVG/弹簧/状态机参数不变，测试在桌宠内部执行。需要同步行为时明确比较与验证，不隐式跨应用导入。
 
-未来 App 可使用 KMP 接口库或独立模型，实体机器人自行确定设备协议。services 下的规划目录不表示主后端已经拆成微服务。
+client/xiaoban-mobile-wallpaper 是 Android 壁纸浏览与下载 App（Compose），把壁纸网站的图片和视频保存到手机相册，收藏只存本机；自带 Kotlin 版小伴角色（从桌宠 src/companion 移植，不导入其源码），只访问壁纸网站的公开接口，不连接主 API。未来 App 可使用 KMP 接口库或独立模型，实体机器人自行确定设备协议。services 下的规划目录不表示主后端已经拆成微服务。
 
 ## 构建与发布
 
-客户端独立 npm 锁文件，桌宠和独立 Rust 服务各自维护 Cargo 工程。根 Gradle 当前只包含 api-contracts 与 backend，规划 App 未接入。
+客户端独立 npm 锁文件，桌宠和独立 Rust 服务各自维护 Cargo 工程。根 Gradle 当前只包含 api-contracts 与 backend；Android App 有自己的 Gradle 工程与 wrapper，不接入根 Gradle，规划中的多端 App 同样未接入。
 
 services/server-pan 是独立的网盘服务：backend 为 Cargo 工程，frontend 为独立 npm 工程，构建产物由后端单端口托管。它自带账号、JWT 与 SQLite，不依赖 api-contracts，也不接入主 API 的鉴权与数据库；运行时数据目录 pandown_data 不入库。目前没有 Docker、Compose 与 CI 配置，接入部署时再补充。镜像、服务、数据卷和 URL 不因物理路径迁移更名。
 

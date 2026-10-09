@@ -72,7 +72,7 @@ pub fn validate(item: &Wallpaper) -> Result<(), String> {
     library::validate_item(&remote, false)
 }
 
-fn media_type(data: &[u8]) -> Result<(&'static str, &'static str), String> {
+pub(crate) fn media_type(data: &[u8]) -> Result<(&'static str, &'static str), String> {
     if data.starts_with(b"\x89PNG\r\n\x1a\n") {
         return Ok(("image", "image/png"));
     }

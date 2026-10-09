@@ -11,7 +11,7 @@
 │   ├── local.json             用户导入图片、视频的元数据
 │   ├── active.json            当前壁纸定义快照，用于离线与重启恢复
 │   ├── imports/<sha256>       导入媒体的持久副本，属于用户内容
-│   └── cache/<sha256>         订阅下载缓存，可重新从资源地址获取
+│   └── cache/<sha256>         订阅下载缓存，可重新从资源地址获取；网站来源链接下载的文件同样按本地计算的 SHA-256 保存
 ├── cache/
 │   └── webview/               Windows WebView2 配置与运行缓存
 ├── backups/

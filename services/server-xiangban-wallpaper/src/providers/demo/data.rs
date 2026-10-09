@@ -53,6 +53,7 @@ pub fn get_demo_wallpapers() -> Vec<WallpaperItem> {
             source_type: "collected".to_string(),
             category: None,
             local_path: None,
+            local_copy: None,
             collected_at: Some(chrono::Utc::now()),
         },
 
@@ -91,6 +92,7 @@ pub fn get_demo_wallpapers() -> Vec<WallpaperItem> {
             source_type: "collected".to_string(),
             category: None,
             local_path: None,
+            local_copy: None,
             collected_at: Some(chrono::Utc::now()),
         },
 
@@ -129,6 +131,7 @@ pub fn get_demo_wallpapers() -> Vec<WallpaperItem> {
             source_type: "collected".to_string(),
             category: None,
             local_path: None,
+            local_copy: None,
             collected_at: Some(chrono::Utc::now()),
         },
 
@@ -193,6 +196,7 @@ pub fn get_demo_wallpapers() -> Vec<WallpaperItem> {
             source_type: "collected".to_string(),
             category: None,
             local_path: None,
+            local_copy: None,
             collected_at: Some(chrono::Utc::now()),
         },
 
@@ -250,6 +254,7 @@ pub fn get_demo_wallpapers() -> Vec<WallpaperItem> {
             source_type: "collected".to_string(),
             category: None,
             local_path: None,
+            local_copy: None,
             collected_at: Some(chrono::Utc::now()),
         },
 
@@ -288,6 +293,7 @@ pub fn get_demo_wallpapers() -> Vec<WallpaperItem> {
             source_type: "collected".to_string(),
             category: None,
             local_path: None,
+            local_copy: None,
             collected_at: Some(chrono::Utc::now()),
         },
     ]

@@ -20,7 +20,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-pub const PROVIDER_IDS: [&str; 3] = ["unsplash", "pixabay", "pexels"];
+pub const PROVIDER_IDS: [&str; 4] = ["unsplash", "pixabay", "pexels", "okslop"];
 
 pub fn is_known_provider(id: &str) -> bool {
     PROVIDER_IDS.contains(&id)
@@ -449,6 +449,7 @@ fn env_keys(config: &AppConfig) -> Vec<(&'static str, String)> {
         ("unsplash", &config.unsplash_access_key),
         ("pixabay", &config.pixabay_api_key),
         ("pexels", &config.pexels_api_key),
+        ("okslop", &config.okslop_api_key),
     ]
     .into_iter()
     .filter_map(|(provider, key)| key.as_ref().map(|k| (provider, k.clone())))
@@ -486,10 +487,11 @@ pub struct ProxyProbe {
 /// Requests each provider's API host through the proxy. Any HTTP answer, even a 401, proves the
 /// proxy can reach that host; only a connection failure or timeout counts as a failed probe.
 pub async fn probe_proxy(url: &str) -> Vec<ProxyProbe> {
-    const TARGETS: [(&str, &str); 3] = [
+    const TARGETS: [(&str, &str); 4] = [
         ("Unsplash", "https://api.unsplash.com/"),
         ("Pixabay", "https://pixabay.com/api/"),
         ("Pexels", "https://api.pexels.com/v1/"),
+        ("okslop", "https://api.okslop.com/api/v1/"),
     ];
 
     let client = match build_client(Some(url)) {

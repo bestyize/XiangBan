@@ -144,8 +144,12 @@ impl WallpaperCollector {
 
                     if let (Ok(videos),Some(pool)) = (prov.videos(&v_query).await,self.db.pg_pool()) {
                         let store=crate::store::Store::from_pool(pool);
+                        // Under the `source` policy this keeps the provider's links and downloads
+                        // nothing, so a sync round stays fast.
+                        let overrides=crate::hotlink::Overrides::load(&store).await.unwrap_or_default();
                         for mut video in videos {
-                            match crate::desktop::prepare_wallpaper(&store,&mut video).await {
+                            let policy=overrides.policy(&video);
+                            match crate::desktop::prepare_with_policy(&store,&mut video,policy).await {
                                 Ok(())=>{if self.db.upsert_wallpapers(&[video]).await.is_ok(){total_collected+=1;}},
                                 Err(error)=>error!("Video materialisation failed for {}: {error}",video.id),
                             }

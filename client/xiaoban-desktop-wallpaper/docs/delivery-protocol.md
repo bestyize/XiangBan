@@ -60,6 +60,22 @@
 - 图片/视频的客户端选项为 `fit: "cover" | "contain" | "fill"`、`background: "#RRGGBB"`；视频速度 `playbackRate` 范围为 `0.25–2`。服务提供内容，用户的显示选择独立保存在本地。
 - 本机缓存协议实现 HTTP byte ranges，视频可以分段读取和寻址。视频是否可解码仍取决于系统的媒体能力；失败会报告解码错误，不显示成功状态。
 
+### 来源链接优先，站内副本兜底（网站单项交付）
+
+在线图库保存壁纸时，客户端请求 `GET <site>/api/v1/desktop/wallpapers/{id}?prefer=source`。是否直接使用提供方链接由网站按提供方 / 媒体类型的策略决定，客户端只根据清单内容反应。清单结构不变，条目可额外带有：
+
+```json
+"source": { "url": "https://provider.example/photo.jpg", "mime": "image/jpeg" }
+```
+
+`source` 存在时表示网站希望客户端直接使用该链接，此时 `resource` 仅在网站已经有副本时出现；没有 `source` 时响应与不带 `prefer` 的接口完全一致（`resource` 必有，需做完整校验）。不带 `prefer` 的接口始终返回网站自己的已校验副本。
+
+客户端流程（`src-tauri/src/website.rs` 的 `resolve_manifest`、`library.rs` 的 `download_source`）：
+
+1. 带 `prefer=source` 请求清单；整份清单没有任何 `source` 时按原有流程处理，对不认识该参数的旧网站行为不变。
+2. 有 `source`：先看本机是否已保存同一 ID 与版本且文件完整，是则直接复用；否则下载来源链接。只接受 HTTPS（本机调试 HTTP 例外），最多 256 MiB，重定向规则同上。**真实类型只由文件开头字节判定**，不信任 `Content-Type` 或清单里的 `mime`；必须是受支持的图片 / 视频且与条目 `kind` 一致，Canvas 不走来源链接。**不拿清单的 sha256 / bytes 校验**，因为它们描述的是网站副本；下载完成后本地计算 sha256 与大小，以 `cache/<sha256>` 原子发布，库里的资源记录使用本地计算值和来源链接，与普通下载一样可离线使用。成功后不再获取网站副本。
+3. 来源下载任何一步失败（网络、HTTP 错误、类型不符、过大、文件不可用）：清单有 `resource` 就使用它，并按 sha256 / bytes 完整校验；没有 `resource` 则请求不带 `prefer` 的接口，使用网站的已校验副本。
+
 ## Canvas SDK
 
 入口是自包含的 JavaScript ES module，默认导出 `create(context)`，允许返回 Promise。Canvas 可使用 2D 或 WebGL。入口预先打包，不从网络加载 npm/CDN 依赖；图片、JSON、二进制或附属 JS 通过 `assets` 下发。
@@ -141,4 +157,4 @@ JSON Schema：[壁纸目录](wallpapers-v1.schema.json)、[更新清单](updates
 4. 断开网络后检查已下载内容；替换资源但不改校验值应被拒绝。
 5. 更新接口分别检查 Windows 与 Apple silicon 目标，未提供的目标不要伪造下载地址。
 
-协议解析、资源约束与版本比较的实现见 `src-tauri/src/library.rs`；交付窗口与权限边界见 `src-tauri/src/content.rs`；可运行本地测试服务见 `scripts/wallpaper-fixture.mjs`。
+协议解析、资源约束与版本比较的实现见 `src-tauri/src/library.rs`；交付窗口与权限边界见 `src-tauri/src/content.rs`；可运行本地测试服务见 `scripts/wallpaper-fixture.mjs`（同时模拟 `/api/v1/desktop/wallpapers/{id}` 的 `prefer=source` 清单、可用来源、被防盗链拦截的来源和缺失来源）。

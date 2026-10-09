@@ -8,6 +8,7 @@
 | --- | --- | --- |
 | [client/xiaban-web](client/xiaban-web/README.md) | 已实现 | 相伴网页/PWA，包含管理后台 |
 | [client/xiaoban-desktop-wallpaper](client/xiaoban-desktop-wallpaper/README.md) | 可运行原型 | Windows/macOS 桌宠与动态壁纸，无聊天和账户 |
+| [client/xiaoban-mobile-wallpaper](client/xiaoban-mobile-wallpaper/README.md) | 可运行原型 | Android 壁纸浏览与下载，Compose 双列瀑布流，收藏只存本机，无账户 |
 | [client/xiaoban-multiplatform](client/xiaoban-multiplatform/README.md) | 规划 | 未来 App，固定保留此目录 |
 | [client/xiaoban-realbot](client/xiaoban-realbot/README.md) | 规划 | 实体机器人客户端，平台与硬件待定 |
 | [services/xiaban-api/backend](services/xiaban-api/backend/README.md) | 已实现 | Ktor 后端、业务、数据与后台任务 |
@@ -44,6 +45,7 @@ npm --prefix client/xiaban-web run build
 npm --prefix client/xiaoban-desktop-wallpaper ci
 npm --prefix client/xiaoban-desktop-wallpaper test
 npm --prefix client/xiaoban-desktop-wallpaper run desktop
+(cd client/xiaoban-mobile-wallpaper && ./gradlew :app:testDebugUnitTest :app:assembleDebug)
 ./gradlew :api-contracts:jvmTest :backend:test
 ./gradlew :backend:run
 ./gradlew :backend:installDist
@@ -59,7 +61,7 @@ npm --prefix services/server-xiangban-wallpaper/web run build
 cargo test --locked --manifest-path services/server-xiangban-wallpaper/Cargo.toml
 ```
 
-Windows 使用 gradlew.bat；Kotlin 服务需要 JDK 21。网盘服务需要 Rust 1.80+ 与 Node.js 18+，默认端口 55005，运行方式与数据目录要求见其 README；它不接入根 Gradle，也不依赖主 API 的账户与数据库。后端分发输出在 services/xiaban-api/backend/build/install/backend。集成测试使用独立测试数据库和 Redis 第 15 号库；默认在依赖不可用时跳过，XIABAN_REQUIRE_INTEGRATION=true 可要求必须执行，详见后端 README。
+Windows 使用 gradlew.bat；Kotlin 服务需要 JDK 21。Android 壁纸需要 JDK 17+ 与 Android SDK，并自带 Gradle wrapper。网盘服务需要 Rust 1.80+ 与 Node.js 18+，默认端口 55005，运行方式与数据目录要求见其 README；它不接入根 Gradle，也不依赖主 API 的账户与数据库。后端分发输出在 services/xiaban-api/backend/build/install/backend。集成测试使用独立测试数据库和 Redis 第 15 号库；默认在依赖不可用时跳过，XIABAN_REQUIRE_INTEGRATION=true 可要求必须执行，详见后端 README。
 
 小伴桌面网站服务需要 Rust 1.88+、Node.js 24 与独立 PostgreSQL 17+，默认端口 55006。其集成测试必须配置 `XIAOBAN_TEST_DATABASE_URL`，不读取主 API 的生产或测试数据库；接口与部署见该子项目 README。
 

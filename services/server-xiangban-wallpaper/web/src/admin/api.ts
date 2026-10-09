@@ -20,6 +20,7 @@ import type {
   AdminUser,
   CacheOverview,
   CacheSettings,
+  HotlinkPolicyValue,
   ProviderConfig,
   ProxyInfo,
   ProxyProbe,
@@ -84,6 +85,12 @@ export const deleteKey = (provider: string, id: number) =>
 
 export const setProviderProxy = (provider: string, useProxy: boolean) =>
   request<unknown>(`/providers/${provider}/settings`, 'PUT', { use_proxy: useProxy })
+
+/** `default` removes the override and returns the provider to its built-in policy. */
+export const setProviderHotlink = (
+  provider: string,
+  change: { image?: HotlinkPolicyValue | 'default'; video?: HotlinkPolicyValue | 'default' },
+) => request<unknown>(`/providers/${provider}/settings`, 'PUT', { hotlink: change })
 
 /* ---- proxy pool ---- */
 

@@ -4,6 +4,7 @@ import * as api from '@/admin/api'
 import { formatDuration } from '@/admin/format'
 import type { KeyInfo, ProviderConfig } from '@/admin/types'
 import ConfirmButton from '@/components/admin/ConfirmButton.vue'
+import HotlinkPolicy from '@/components/admin/HotlinkPolicy.vue'
 import InlineEdit from '@/components/admin/InlineEdit.vue'
 import ToggleSwitch from '@/components/admin/ToggleSwitch.vue'
 import { toast } from '@/composables/toast'
@@ -12,6 +13,7 @@ const GUIDE: Record<string, { name: string; docs: string }> = {
   unsplash: { name: 'Access Key', docs: 'https://unsplash.com/developers' },
   pixabay: { name: 'API Key', docs: 'https://pixabay.com/api/docs/' },
   pexels: { name: 'API Key', docs: 'https://www.pexels.com/api/' },
+  okslop: { name: 'API Key', docs: 'https://okslop.com/developers' },
 }
 
 interface Draft {
@@ -132,6 +134,8 @@ function enabledCount(provider: ProviderConfig) {
           />
         </label>
       </div>
+
+      <HotlinkPolicy :provider="provider" @changed="load" />
 
       <ul v-if="provider.keys.length" class="a-rows">
         <li v-for="key in provider.keys" :key="key.id" class="a-row">

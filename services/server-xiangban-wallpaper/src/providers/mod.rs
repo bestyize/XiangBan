@@ -1,4 +1,5 @@
 pub mod demo;
+pub mod okslop;
 pub mod pexels;
 pub mod pixabay;
 pub mod traits;
@@ -6,6 +7,7 @@ pub mod unsplash;
 
 use std::sync::Arc;
 pub use demo::DemoProvider;
+pub use okslop::OkslopProvider;
 pub use pexels::PexelsProvider;
 pub use pixabay::PixabayProvider;
 pub use traits::WallpaperProvider;
@@ -31,7 +33,10 @@ impl ProviderRegistry {
         // 3. Pexels provider
         providers.push(Arc::new(PexelsProvider::new(runtime)));
 
-        // 4. Demo / Built-in fallback provider
+        // 4. okslop provider
+        providers.push(Arc::new(OkslopProvider::new(runtime)));
+
+        // 5. Demo / Built-in fallback provider
         if enable_demo {
             providers.push(Arc::new(DemoProvider::new()));
         }

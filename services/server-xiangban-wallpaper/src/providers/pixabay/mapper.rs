@@ -67,6 +67,7 @@ pub fn map_pixabay_image(hit: PixabayImageHit) -> WallpaperItem {
         source_type: "collected".to_string(),
         category: None,
         local_path: None,
+        local_copy: None,
         collected_at: Some(chrono::Utc::now()),
     }
 }
@@ -198,6 +199,7 @@ pub fn map_pixabay_video(hit: PixabayVideoHit) -> WallpaperItem {
         source_type: "collected".to_string(),
         category: None,
         local_path: None,
+        local_copy: None,
         collected_at: Some(chrono::Utc::now()),
     }
 }

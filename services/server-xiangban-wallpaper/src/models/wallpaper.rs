@@ -133,6 +133,46 @@ pub struct Stats {
     pub downloads: u64,
 }
 
+/// A file we downloaded and stored under `uploads/`. The hash and size describe this stored file,
+/// never the provider's original.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CopyFile {
+    /// Site-relative path such as `/uploads/desktop-<sha256>.mp4`.
+    pub path: String,
+    pub sha256: String,
+    pub bytes: u64,
+    pub mime: String,
+}
+
+impl CopyFile {
+    /// Only plain file names directly under `/uploads/` are ever handed to clients. Rows are
+    /// written by this service, but the check keeps a bad value from becoming an off-site URL.
+    pub fn is_safe(&self) -> bool {
+        self.path.strip_prefix("/uploads/").is_some_and(|name| {
+            !name.is_empty()
+                && !name.contains("..")
+                && name
+                    .bytes()
+                    .all(|c| c.is_ascii_alphanumeric() || matches!(c, b'-' | b'_' | b'.'))
+        })
+    }
+}
+
+/// Our own stored copy of an item's media, kept next to (never instead of) the provider's links.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct LocalCopy {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub media: Option<CopyFile>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cover: Option<CopyFile>,
+}
+
+impl LocalCopy {
+    pub fn is_empty(&self) -> bool {
+        self.media.is_none() && self.cover.is_none()
+    }
+}
+
 fn default_status() -> String {
     "published".to_string()
 }
@@ -172,6 +212,8 @@ pub struct WallpaperItem {
     pub category: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub local_path: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub local_copy: Option<LocalCopy>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub collected_at: Option<DateTime<Utc>>,
 }

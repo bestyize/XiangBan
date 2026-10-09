@@ -7,6 +7,7 @@ use std::{
     fs,
     io::{Read, Seek, SeekFrom, Write},
     path::Path,
+    sync::atomic::{AtomicU64, Ordering},
     time::Duration,
 };
 use tauri::Emitter;
@@ -514,6 +515,106 @@ pub fn download(
     result
 }
 
+static SOURCE_PARTS: AtomicU64 = AtomicU64::new(0);
+
+/// Downloads a provider link the website handed out ("source first"). The manifest hash
+/// describes the website's own copy, so nothing is compared against it: the real type is read
+/// from the first bytes (Content-Type and the manifest mime are not trusted), the size is
+/// capped, and sha256/bytes are computed locally. The file is then published as
+/// `cache/<sha256>` like any verified download, so the library and offline use work the same.
+pub fn download_source(
+    root: &Path,
+    url: &str,
+    kind: &str,
+    progress: impl FnMut(u64, Option<u64>),
+) -> Result<Resource, String> {
+    download_source_limited(root, url, kind, MAX_FILE, progress)
+}
+
+fn download_source_limited(
+    root: &Path,
+    url: &str,
+    kind: &str,
+    limit: u64,
+    mut progress: impl FnMut(u64, Option<u64>),
+) -> Result<Resource, String> {
+    network_url(url)?;
+    if !["image", "video"].contains(&kind) {
+        return Err("只有图片和视频可以直接使用来源链接".into());
+    }
+    let cache = root.join("cache");
+    fs::create_dir_all(&cache).map_err(|e| e.to_string())?;
+    let temporary = cache.join(format!(
+        "source-{}-{}.part",
+        std::process::id(),
+        SOURCE_PARTS.fetch_add(1, Ordering::Relaxed)
+    ));
+    let result = (|| {
+        let mut response = client()?
+            .get(url)
+            .header("Accept-Encoding", "identity")
+            .send()
+            .map_err(|e| format!("来源链接连接失败：{e}"))?
+            .error_for_status()
+            .map_err(|e| e.to_string())?;
+        let total = response.content_length().filter(|n| *n > 0);
+        if total.is_some_and(|n| n > limit) {
+            return Err("来源文件超过大小上限".to_string());
+        }
+        // The type check needs the start of the file, and a network read may return fewer
+        // bytes than the ftyp box, so fill the head buffer before looking at it.
+        let mut buffer = vec![0u8; 65536];
+        let mut head = 0;
+        while head < buffer.len() {
+            let n = response.read(&mut buffer[head..]).map_err(|e| e.to_string())?;
+            if n == 0 {
+                break;
+            }
+            head += n;
+        }
+        let (found, mime) = crate::local_media::media_type(&buffer[..head])
+            .map_err(|_| "来源文件不是受支持的图片或视频".to_string())?;
+        if found != kind {
+            return Err("来源文件类型与壁纸类型不一致".to_string());
+        }
+        let mut file = fs::File::create(&temporary).map_err(|e| e.to_string())?;
+        let mut digest = Sha256::new();
+        let mut count = 0u64;
+        let mut n = head;
+        while n > 0 {
+            count += n as u64;
+            if count > limit {
+                return Err("来源文件超过大小上限".to_string());
+            }
+            digest.update(&buffer[..n]);
+            file.write_all(&buffer[..n]).map_err(|e| e.to_string())?;
+            progress(count, total);
+            n = response.read(&mut buffer).map_err(|e| e.to_string())?;
+        }
+        file.sync_all().map_err(|e| e.to_string())?;
+        drop(file);
+        let resource = Resource {
+            url: url.to_string(),
+            sha256: format!("{:x}", digest.finalize()),
+            bytes: count,
+            mime: mime.into(),
+        };
+        validate_resource(&resource, false)?;
+        // Cache files are immutable and content-addressed: keep an identical existing file.
+        let target = cache.join(&resource.sha256);
+        if verify_file(&target, &resource)? {
+            fs::remove_file(&temporary).map_err(|e| e.to_string())?;
+        } else {
+            fs::rename(&temporary, target).map_err(|e| e.to_string())?;
+        }
+        Ok(resource)
+    })();
+    if result.is_err() {
+        let _ = fs::remove_file(temporary);
+    }
+    result
+}
+
 pub fn prepare(app: &tauri::AppHandle, root: &Path, item: &Wallpaper) -> Result<(), String> {
     let list = assets(item);
     let total: u64 = list.iter().map(|r| r.bytes).sum();
@@ -697,9 +798,197 @@ pub fn update_result(text: &str, current: &str, platform: &str) -> Result<Value,
     )
 }
 
+/// Loopback HTTP server for tests; no internet is involved.
+#[cfg(test)]
+pub(crate) mod test_http {
+    use std::{
+        collections::HashMap,
+        io::{Read, Write},
+        net::TcpListener,
+        sync::{Arc, Mutex},
+    };
+
+    pub fn temp_root(name: &str) -> std::path::PathBuf {
+        use std::sync::atomic::{AtomicU64, Ordering};
+        static N: AtomicU64 = AtomicU64::new(0);
+        let root = std::env::temp_dir().join(format!(
+            "xiaoban-source-test-{name}-{}-{}",
+            std::process::id(),
+            N.fetch_add(1, Ordering::Relaxed)
+        ));
+        let _ = std::fs::remove_dir_all(&root);
+        std::fs::create_dir_all(&root).unwrap();
+        root
+    }
+
+    pub enum Reply {
+        /// status, content type, body; sends Content-Length.
+        Body(u16, &'static str, Vec<u8>),
+        /// Same, but without Content-Length (body ends when the connection closes).
+        Streamed(u16, &'static str, Vec<u8>),
+        /// Closes the connection without answering.
+        Drop,
+    }
+    pub struct Server {
+        pub base: String,
+        pub hits: Arc<Mutex<Vec<String>>>,
+    }
+    pub fn serve(routes: Vec<(&'static str, Reply)>) -> Server {
+        // reqwest reads the system proxy environment; loopback test traffic must never use it.
+        static DIRECT: std::sync::Once = std::sync::Once::new();
+        DIRECT.call_once(|| {
+            std::env::set_var("NO_PROXY", "127.0.0.1,localhost");
+            std::env::set_var("no_proxy", "127.0.0.1,localhost");
+        });
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let base = format!("http://127.0.0.1:{}", listener.local_addr().unwrap().port());
+        let routes: Arc<HashMap<&'static str, Reply>> = Arc::new(routes.into_iter().collect());
+        let hits = Arc::new(Mutex::new(Vec::new()));
+        let log = hits.clone();
+        std::thread::spawn(move || {
+            for stream in listener.incoming() {
+                let Ok(mut stream) = stream else { continue };
+                let (routes, log) = (routes.clone(), log.clone());
+                std::thread::spawn(move || {
+                    let mut request = Vec::new();
+                    let mut chunk = [0u8; 1024];
+                    while !request.windows(4).any(|w| w == b"\r\n\r\n") {
+                        match stream.read(&mut chunk) {
+                            Ok(0) | Err(_) => return,
+                            Ok(n) => request.extend_from_slice(&chunk[..n]),
+                        }
+                    }
+                    let text = String::from_utf8_lossy(&request).to_string();
+                    let path = text
+                        .split_whitespace()
+                        .nth(1)
+                        .unwrap_or("/")
+                        .to_string();
+                    log.lock().unwrap().push(path.clone());
+                    let route = path.split('?').next().unwrap_or("/");
+                    let (status, kind, body, length) = match routes.get(route) {
+                        Some(Reply::Body(s, k, b)) => (*s, *k, b, true),
+                        Some(Reply::Streamed(s, k, b)) => (*s, *k, b, false),
+                        Some(Reply::Drop) => return,
+                        None => (404, "text/plain", &Vec::new(), true),
+                    };
+                    let mut head =
+                        format!("HTTP/1.1 {status} X\r\nContent-Type: {kind}\r\nConnection: close\r\n");
+                    if length {
+                        head += &format!("Content-Length: {}\r\n", body.len());
+                    }
+                    let _ = stream.write_all(format!("{head}\r\n").as_bytes());
+                    let _ = stream.write_all(body);
+                });
+            }
+        });
+        Server { base, hits }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use test_http::{serve, temp_root, Reply};
+
+    fn png(tag: &str) -> Vec<u8> {
+        [b"\x89PNG\r\n\x1a\n".as_slice(), tag.as_bytes()].concat()
+    }
+    fn mp4() -> Vec<u8> {
+        [b"\0\0\0\x18ftypisom\0\0\0\0isomiso2".as_slice(), &[7u8; 100]].concat()
+    }
+    fn hex(data: &[u8]) -> String {
+        format!("{:x}", Sha256::digest(data))
+    }
+    fn leftovers(root: &Path) -> Vec<String> {
+        fs::read_dir(root.join("cache"))
+            .map(|d| d.map(|e| e.unwrap().file_name().to_string_lossy().to_string()).collect())
+            .unwrap_or_default()
+    }
+
+    #[test]
+    fn source_download_registers_the_file_under_its_own_hash() {
+        let body = png("provider-file");
+        // Content-Type is wrong on purpose: only the first bytes decide the type.
+        let server = serve(vec![("/a.png", Reply::Body(200, "text/html", body.clone()))]);
+        let root = temp_root("ok");
+        let url = format!("{}/a.png", server.base);
+        let mut seen = 0;
+        let resource = download_source(&root, &url, "image", |n, total| {
+            seen = n;
+            assert_eq!(total, Some(body.len() as u64));
+        })
+        .unwrap();
+        assert_eq!(seen, body.len() as u64);
+        assert_eq!(resource.sha256, hex(&body));
+        assert_eq!(resource.bytes, body.len() as u64);
+        assert_eq!(resource.mime, "image/png");
+        assert_eq!(resource.url, url);
+        assert!(cached(&root, &resource));
+        assert!(verify_file(&root.join("cache").join(&resource.sha256), &resource).unwrap());
+        validate_resource(&resource, false).unwrap();
+        // A second download keeps the immutable file and leaves no temporary files.
+        let again = download_source(&root, &url, "image", |_, _| {}).unwrap();
+        assert_eq!(again.sha256, resource.sha256);
+        assert_eq!(leftovers(&root), vec![resource.sha256.clone()]);
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn source_video_is_detected_from_bytes() {
+        let server = serve(vec![("/v", Reply::Body(200, "application/octet-stream", mp4()))]);
+        let root = temp_root("video");
+        let url = format!("{}/v", server.base);
+        assert_eq!(download_source(&root, &url, "video", |_, _| {}).unwrap().mime, "video/mp4");
+        // A video must not be accepted as an image wallpaper, nor the other way around.
+        assert!(download_source(&root, &url, "image", |_, _| {}).is_err());
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn source_download_rejects_unusable_responses_without_leaving_files() {
+        let server = serve(vec![
+            ("/html", Reply::Body(200, "image/png", b"<html>blocked</html>".to_vec())),
+            ("/svg", Reply::Body(200, "image/svg+xml", b"<svg onload='x'/>".to_vec())),
+            ("/empty", Reply::Body(200, "image/png", Vec::new())),
+            ("/missing", Reply::Body(404, "text/plain", b"no".to_vec())),
+            ("/drop", Reply::Drop),
+            ("/png", Reply::Body(200, "image/png", png("x"))),
+        ]);
+        let root = temp_root("bad");
+        for path in ["html", "svg", "empty", "missing", "drop"] {
+            let url = format!("{}/{path}", server.base);
+            assert!(download_source(&root, &url, "image", |_, _| {}).is_err(), "{path}");
+        }
+        assert!(download_source(&root, &format!("{}/png", server.base), "canvas", |_, _| {}).is_err());
+        assert!(leftovers(&root).is_empty());
+        // Only https (or loopback http) links are accepted.
+        assert!(download_source(&root, "http://example.test/a.png", "image", |_, _| {}).is_err());
+        assert!(download_source(&root, "file:///etc/passwd", "image", |_, _| {}).is_err());
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn oversized_source_is_rejected_by_header_and_by_stream() {
+        let big = [png("big"), vec![1u8; 5000]].concat();
+        let server = serve(vec![
+            ("/declared", Reply::Body(200, "image/png", big.clone())),
+            ("/streamed", Reply::Streamed(200, "image/png", big.clone())),
+            ("/exact", Reply::Streamed(200, "image/png", big.clone())),
+        ]);
+        let root = temp_root("big");
+        for path in ["declared", "streamed"] {
+            let url = format!("{}/{path}", server.base);
+            assert!(download_source_limited(&root, &url, "image", 1000, |_, _| {}).is_err());
+        }
+        assert!(leftovers(&root).is_empty());
+        // The limit is inclusive.
+        let url = format!("{}/exact", server.base);
+        assert!(download_source_limited(&root, &url, "image", big.len() as u64, |_, _| {}).is_ok());
+        assert_eq!(MAX_FILE, 256 * 1024 * 1024);
+        fs::remove_dir_all(root).unwrap();
+    }
+
     #[test]
     fn large_video_requests_have_bounded_response_memory() {
         let chunk = 8 * 1024 * 1024;

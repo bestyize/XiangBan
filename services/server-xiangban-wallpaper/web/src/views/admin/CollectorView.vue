@@ -197,6 +197,7 @@ async function confirmImport() {
               <option value="unsplash">Unsplash</option>
               <option value="pixabay">Pixabay</option>
               <option value="pexels">Pexels</option>
+              <option value="okslop">okslop（AI 生成图片）</option>
               <option value="demo">Demo 示例</option>
             </select>
           </div>
