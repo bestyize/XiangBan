@@ -5,6 +5,7 @@ const PROVIDER_NAMES: Record<string, string> = {
   pixabay: 'Pixabay',
   pexels: 'Pexels',
   okslop: 'okslop',
+  bing: 'Bing 必应壁纸',
   demo: '精选',
 }
 

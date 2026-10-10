@@ -16,7 +16,7 @@ export interface KeyInfo {
   cooldown_secs: number | null
 }
 
-export type ProviderId = 'unsplash' | 'pixabay' | 'pexels' | 'okslop'
+export type ProviderId = 'unsplash' | 'pixabay' | 'pexels' | 'okslop' | 'bing'
 
 export type HotlinkPolicyValue = 'source' | 'copy'
 

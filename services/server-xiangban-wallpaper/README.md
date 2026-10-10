@@ -17,7 +17,7 @@
 
 桌面客户端 `client/xiaoban-desktop-wallpaper` 直接使用本网站的公开图库、分类、更新和公告接口；资源按真实大小与 SHA-256 校验后缓存，支持离线使用。启动及每 30 分钟后台检查消息，可以手动刷新或关闭自动检查。接口、运行时目录与端到端验证详见[桌面 API](docs/desktop-api.md)。配置复用现有 `app_settings`，未新增历史数据迁移。
 
-**来源链接优先。** 采集始终保留供应商的原始链接（`preview_url`、`regular_url`、`downloads`、`video`），本站保存的文件只是后备，其路径、SHA-256、大小记录在 `wallpapers.local_copy`（可空 JSONB，启动时 `ADD COLUMN IF NOT EXISTS`）。每个供应商按图片 / 视频各有策略 `provider.<id>.hotlink.image|video`（`source` 或 `copy`，后台“供应商密钥”页可改）：默认 Pexels / Unsplash / okslop 图片与视频都是 `source`，Pixabay 图片 `copy`、视频 `source`；自定义上传与 demo 始终 `copy`。Pixabay 图片默认 `copy` 是因为其 API 文档写明“permanent hotlinking of images (using Pixabay URLs in your app) is not allowed ... please download them to your server first. Videos may be embedded directly in your applications”，且 `webformatURL` 只有 24 小时有效。策略为 `source` 的条目采集时不下载素材；公开检索 / 详情 JSON 在有本站副本且与主链接不同时增加可选 `fallback`；`GET /api/v1/desktop/wallpapers/{id}?prefer=source` 返回 `source` 链接且不下载，客户端失败再回退到 `resource` 或不带 `prefer` 的接口。更早采集的视频已被改写成本地路径、丢失了原始链接，保持 `copy`。详见[桌面 API](docs/desktop-api.md)。
+**来源链接优先。** 采集始终保留供应商的原始链接（`preview_url`、`regular_url`、`downloads`、`video`），本站保存的文件只是后备，其路径、SHA-256、大小记录在 `wallpapers.local_copy`（可空 JSONB，启动时 `ADD COLUMN IF NOT EXISTS`）。每个供应商按图片 / 视频各有策略 `provider.<id>.hotlink.image|video`（`source` 或 `copy`，后台“供应商密钥”页可改）：默认 Pexels / Unsplash / okslop / Bing 图片与视频都是 `source`，Pixabay 图片 `copy`、视频 `source`；自定义上传与 demo 始终 `copy`。Pixabay 图片默认 `copy` 是因为其 API 文档写明“permanent hotlinking of images (using Pixabay URLs in your app) is not allowed ... please download them to your server first. Videos may be embedded directly in your applications”，且 `webformatURL` 只有 24 小时有效。策略为 `source` 的条目采集时不下载素材；公开检索 / 详情 JSON 在有本站副本且与主链接不同时增加可选 `fallback`；`GET /api/v1/desktop/wallpapers/{id}?prefer=source` 返回 `source` 链接且不下载，客户端失败再回退到 `resource` 或不带 `prefer` 的接口。更早采集的视频已被改写成本地路径、丢失了原始链接，保持 `copy`。详见[桌面 API](docs/desktop-api.md)。
 
 验证命令（本目录）：`npm --prefix web ci`、`npm --prefix web run build`、`cargo test --locked`、`cargo build --release --locked`。真实数据库集成测试设置 `TEST_DATABASE_URL`，每例使用独立临时 schema。Node.js 使用 24，Rust 使用 stable。本机运行见 [LOCAL_SETUP.md](LOCAL_SETUP.md)。
 
@@ -86,7 +86,7 @@
   - 自动通过浏览器底层媒体 API 探测文件真实宽度、高度与横竖屏画幅；
   - 支持为视频上传独立海报图，后端自动保存至 `uploads/` 目录并由静态文件服务器分发。
 - **供应商多密钥轮换与代理池 (`/admin/keys` & `/admin/proxies`)**：
-  - Unsplash / Pixabay / Pexels / okslop 多 API Key 轮询管理，自动熔断冷却；
+  - Unsplash / Pixabay / Pexels / okslop / Bing 多 API Key 轮询管理，自动熔断冷却；
   - 支持 HTTP / HTTPS / SOCKS5 出网代理池配置与一键测速。
 
 ---
@@ -117,7 +117,7 @@ WallpaperCollect/
     ├── config.rs             # 配置解析
     ├── db/                   # PostgreSQL 数据访问层 Repository
     ├── models/               # 数据模型（WallpaperItem, SearchQuery 等）
-    ├── providers/            # 外部数据源适配层（Unsplash, Pixabay, Pexels, okslop, Demo）
+    ├── providers/            # 外部数据源适配层（Unsplash, Pixabay, Pexels, okslop, Bing, Demo）
     ├── admin/                # 管理后台鉴权与接口（图库、上传、采集、代理）
     ├── api/                  # 前台公开 API 路由与处理器
     ├── services/             # 供应商并发聚合器与后台同步器

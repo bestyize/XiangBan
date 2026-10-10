@@ -20,7 +20,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-pub const PROVIDER_IDS: [&str; 4] = ["unsplash", "pixabay", "pexels", "okslop"];
+pub const PROVIDER_IDS: [&str; 5] = ["unsplash", "pixabay", "pexels", "okslop", "bing"];
 
 pub fn is_known_provider(id: &str) -> bool {
     PROVIDER_IDS.contains(&id)
@@ -414,6 +414,18 @@ impl Runtime {
         }
     }
 
+    pub(crate) fn record_proxy_response(&self, proxy_id: i64, status: u16) {
+        let mut state = lock(&self.inner.state);
+        let proxy = state.proxies.entry(proxy_id).or_default();
+        proxy.requests += 1;
+        if (500..=599).contains(&status) {
+            proxy.failures += 1;
+        } else {
+            proxy.last_error = None;
+            proxy.cooldown_until = None;
+        }
+    }
+
     pub(crate) fn record_network_error(&self, proxy_id: Option<i64>, message: &str) {
         let Some(id) = proxy_id else {
             return;
@@ -450,6 +462,7 @@ fn env_keys(config: &AppConfig) -> Vec<(&'static str, String)> {
         ("pixabay", &config.pixabay_api_key),
         ("pexels", &config.pexels_api_key),
         ("okslop", &config.okslop_api_key),
+        ("bing", &config.bing_api_key),
     ]
     .into_iter()
     .filter_map(|(provider, key)| key.as_ref().map(|k| (provider, k.clone())))

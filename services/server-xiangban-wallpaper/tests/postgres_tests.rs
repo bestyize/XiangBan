@@ -88,6 +88,7 @@ fn config() -> AppConfig {
         pixabay_api_key: None,
         pexels_api_key: None,
         okslop_api_key: None,
+        bing_api_key: None,
         enable_demo_data: true,
         cache_ttl_secs: 3600,
         auto_sync_interval_mins: 0,
@@ -697,7 +698,7 @@ async fn provider_keys_are_managed_and_never_returned_in_full() {
 
     let listed = call(&app, "GET", "/providers", Some(&cookie), None).await;
     let ids: Vec<&str> = listed.body["providers"].as_array().unwrap().iter().map(|p| p["id"].as_str().unwrap()).collect();
-    assert_eq!(ids, vec!["unsplash", "pixabay", "pexels", "okslop"]);
+    assert_eq!(ids, vec!["unsplash", "pixabay", "pexels", "okslop", "bing"]);
 
     let added = call(&app, "POST", "/providers/pexels/keys", Some(&cookie), Some(json!({ "label": "main", "key": secret }))).await;
     assert_eq!(added.status, StatusCode::OK, "{}", added.body);

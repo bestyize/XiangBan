@@ -82,6 +82,46 @@ impl Upstream {
 
         Err(last_error.unwrap_or_else(|| self.error("Request failed")))
     }
+
+    /// Sends an unauthenticated or public request, routing through the provider's proxy if
+    /// configured, or direct client otherwise. Retries across proxies on network error.
+    pub async fn send_public<F>(&self, build: F) -> Result<reqwest::Response, AppError>
+    where
+        F: Fn(&reqwest::Client) -> reqwest::RequestBuilder,
+    {
+        let mut last_error: Option<AppError> = None;
+
+        for attempt in 1..=MAX_ATTEMPTS {
+            let proxy = self.runtime.pick_proxy(self.provider);
+            let proxy_id = proxy.as_ref().map(|p| p.id);
+            let client = match &proxy {
+                Some(p) => p.client.clone(),
+                None => self.runtime.direct_client(),
+            };
+
+            match build(&client).send().await {
+                Ok(response) => {
+                    let status = response.status().as_u16();
+                    if let Some(id) = proxy_id {
+                        self.runtime.record_proxy_response(id, status);
+                    }
+                    return Ok(response);
+                }
+                Err(e) => {
+                    let message = describe(e);
+                    self.runtime.record_network_error(proxy_id, &message);
+                    let error = self.error(format!("Request failed: {message}"));
+                    if proxy_id.is_some() && attempt < MAX_ATTEMPTS {
+                        last_error = Some(error);
+                        continue;
+                    }
+                    return Err(error);
+                }
+            }
+        }
+
+        Err(last_error.unwrap_or_else(|| self.error("Request failed")))
+    }
 }
 
 fn retry_after(response: &reqwest::Response) -> Option<Duration> {

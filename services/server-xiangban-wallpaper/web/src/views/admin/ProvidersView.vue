@@ -14,6 +14,7 @@ const GUIDE: Record<string, { name: string; docs: string }> = {
   pixabay: { name: 'API Key', docs: 'https://pixabay.com/api/docs/' },
   pexels: { name: 'API Key', docs: 'https://www.pexels.com/api/' },
   okslop: { name: 'API Key', docs: 'https://okslop.com/developers' },
+  bing: { name: 'API Key (可选)', docs: 'https://www.bing.com' },
 }
 
 interface Draft {

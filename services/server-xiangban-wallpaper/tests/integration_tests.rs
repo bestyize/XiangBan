@@ -5,8 +5,8 @@ use wallpaper_collect::{
     error::AppError,
     models::{MediaType, Orientation, ProviderInfo, Resolution, SearchQuery, WallpaperItem},
     providers::{
-        DemoProvider, OkslopProvider, PexelsProvider, PixabayProvider, ProviderRegistry, UnsplashProvider,
-        WallpaperProvider,
+        BingProvider, DemoProvider, OkslopProvider, PexelsProvider, PixabayProvider, ProviderRegistry,
+        UnsplashProvider, WallpaperProvider,
     },
     runtime::Runtime,
     services::{SearchCache, WallpaperAggregator},
@@ -100,9 +100,14 @@ async fn test_providers_decoupled_creation() {
     assert!(!okslop.is_configured(), "without a key it stays out of searches");
     assert_eq!(okslop.supported_media_types(), vec![MediaType::Image]);
 
+    let bing = BingProvider::new(&runtime);
+    assert_eq!(bing.id(), "bing");
+    assert!(bing.is_configured(), "Bing public daily wallpapers are ready out of the box");
+    assert_eq!(bing.supported_media_types(), vec![MediaType::Image]);
+
     let registry = ProviderRegistry::new(&runtime, true);
     let list = registry.list_info();
-    assert_eq!(list.len(), 5);
+    assert_eq!(list.len(), 6);
 }
 
 #[tokio::test]

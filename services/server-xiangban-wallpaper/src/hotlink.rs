@@ -71,7 +71,7 @@ pub fn default_policy(provider: &str, kind: Kind) -> Policy {
     match (provider, kind) {
         // Pixabay forbids permanent hotlinking of images and its image links expire after 24 h.
         ("pixabay", Kind::Image) => Policy::Copy,
-        ("pixabay" | "pexels" | "unsplash" | "okslop", _) => Policy::Source,
+        ("pixabay" | "pexels" | "unsplash" | "okslop" | "bing", _) => Policy::Source,
         // Unknown providers: keep serving our own copy, the safe choice.
         _ => Policy::Copy,
     }
@@ -133,6 +133,8 @@ mod tests {
         assert_eq!(default_policy("unsplash", Kind::Video), Policy::Source);
         assert_eq!(default_policy("okslop", Kind::Image), Policy::Source);
         assert_eq!(default_policy("okslop", Kind::Video), Policy::Source);
+        assert_eq!(default_policy("bing", Kind::Image), Policy::Source);
+        assert_eq!(default_policy("bing", Kind::Video), Policy::Source);
         assert_eq!(default_policy("something-new", Kind::Image), Policy::Copy);
     }
 

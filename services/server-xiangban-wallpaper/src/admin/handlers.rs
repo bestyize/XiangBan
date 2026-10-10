@@ -26,6 +26,7 @@ fn provider_name(id: &str) -> &'static str {
         "pixabay" => "Pixabay",
         "pexels" => "Pexels",
         "okslop" => "okslop",
+        "bing" => "Bing",
         _ => "",
     }
 }
