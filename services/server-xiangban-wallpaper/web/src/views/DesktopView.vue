@@ -34,7 +34,7 @@ onActivated(load);
         </p>
         <a class="btn btn-primary" href="#desktop-downloads"
           ><Icon name="download" />下载小伴桌面</a
-        ><span class="support">Windows / macOS · 无须注册账户</span>
+        ><span class="support">Windows / macOS / Android · 无须注册账户</span>
       </div>
       <WindowsDesktopDemo />
     </section>
@@ -101,7 +101,7 @@ onActivated(load);
       </div>
       <p class="requirements">
         Windows 需要 WebView2，缺少时程序会引导准备。macOS 当前面向 Apple
-        芯片。视频能否播放取决于系统解码支持。
+        芯片。Android 支持 Android 10 及以上系统。视频能否播放取决于系统解码支持。
       </p>
     </section>
     <section v-if="product?.announcements.length" class="notices">

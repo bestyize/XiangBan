@@ -76,11 +76,12 @@ fn extension(target: &str, name: &str) -> Result<String, AppError> {
     let allowed = match target {
         "windows-x86_64" => ["exe", "msi", "zip"].contains(&ext.as_str()),
         "darwin-aarch64" | "darwin-x86_64" => ["dmg", "pkg", "zip"].contains(&ext.as_str()),
+        "android-arm64" | "android" => ["apk", "zip"].contains(&ext.as_str()),
         _ => false,
     };
     if !allowed {
         return Err(bad(
-            "Windows 支持 EXE/MSI/ZIP，macOS 支持 DMG/PKG/ZIP；请检查平台与文件格式",
+            "Windows 支持 EXE/MSI/ZIP，macOS 支持 DMG/PKG/ZIP，Android 支持 APK/ZIP；请检查平台与文件格式",
         ));
     }
     Ok(ext)
@@ -145,7 +146,14 @@ pub async fn upload(
                     bytes.extend_from_slice(&chunk);
                 }
                 let value = String::from_utf8(bytes).map_err(|_| bad("平台字段无效"))?;
-                if !["windows-x86_64", "darwin-aarch64", "darwin-x86_64"].contains(&value.as_str())
+                if ![
+                    "windows-x86_64",
+                    "darwin-aarch64",
+                    "darwin-x86_64",
+                    "android-arm64",
+                    "android",
+                ]
+                .contains(&value.as_str())
                 {
                     return Err(bad("不支持的平台"));
                 }

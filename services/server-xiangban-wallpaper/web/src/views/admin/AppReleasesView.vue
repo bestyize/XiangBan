@@ -205,7 +205,7 @@ async function remove(release: DesktopRelease) {
   <div class="a-page app-page">
     <header class="a-head">
       <h1>App 上架</h1>
-      <p>上传小伴桌面 Windows / macOS 安装包，管理版本、更新说明和上架状态。</p>
+      <p>上传小伴客户端 Windows / macOS / Android 安装包，管理版本、更新说明和上架状态。</p>
     </header>
     <p v-if="error" class="error" role="alert">{{ error }}</p>
     <p v-if="message" class="success" role="status">{{ message }}</p>
@@ -272,7 +272,9 @@ async function remove(release: DesktopRelease) {
               :accept="
                 target === 'windows-x86_64'
                   ? '.exe,.msi,.zip'
-                  : '.dmg,.pkg,.zip'
+                  : target.startsWith('android')
+                    ? '.apk,.zip'
+                    : '.dmg,.pkg,.zip'
               "
               @change="upload(target, $event)"
           /></label>
@@ -290,7 +292,7 @@ async function remove(release: DesktopRelease) {
               >下载链接<input
                 type="url"
                 :value="managed(pkg.url) ? '' : pkg.url"
-                placeholder="https://…/XiaoBan.zip"
+                :placeholder="target.startsWith('android') ? 'https://…/XiaoBan.apk' : 'https://…/XiaoBan.zip'"
                 @input="external(pkg, $event)"
             /></label>
             <p class="a-small">

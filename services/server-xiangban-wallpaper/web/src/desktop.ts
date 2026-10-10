@@ -2,6 +2,7 @@ export const targets = [
   { id: "windows-x86_64", label: "Windows 10 / 11 · 64 位" },
   { id: "darwin-aarch64", label: "macOS 12+ · Apple 芯片" },
   { id: "darwin-x86_64", label: "macOS · Intel" },
+  { id: "android-arm64", label: "Android 10+ · 手机版" },
 ] as const;
 export interface DesktopPackage {
   url: string;

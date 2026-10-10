@@ -150,10 +150,10 @@ node client/xiaoban-desktop-wallpaper/scripts/verify-website.mjs client/xiaoban-
 
 ## App 上架管理
 
-后台 `/admin/apps` 管理小伴桌面 Windows / macOS 版本，官网和公告设置仍在 `/admin/desktop`。
+后台 `/admin/apps` 管理小伴客户端 Windows / macOS / Android 版本，官网和公告设置仍在 `/admin/desktop`。
 
 1. 新建版本，填写 SemVer、更新说明和发布时间。
-2. 每个平台上传一个安装包或填写外部下载链接。Windows 支持 EXE/MSI/ZIP，macOS 支持 DMG/PKG/ZIP；单包最多 512 MiB，上传有进度与取消按钮。
+2. 每个平台上传一个安装包或填写外部下载链接。Windows 支持 EXE/MSI/ZIP，macOS 支持 DMG/PKG/ZIP，Android 支持 APK/ZIP；单包最多 512 MiB，上传有进度与取消按钮。
 3. 保存草稿后安装包不开放下载；保存并上架后官网与客户端版本接口同步生效。未来发布时间为定时上架，下架关闭站内下载。
 4. 已有版本可编辑、下架或删除版本记录。删除版本不直接删除安装包文件，避免影响其他引用或正在进行的下载。
 

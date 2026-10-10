@@ -73,7 +73,13 @@ impl Default for DesktopConfig {
         }
     }
 }
-const TARGETS: &[&str] = &["windows-x86_64", "darwin-aarch64", "darwin-x86_64"];
+const TARGETS: &[&str] = &[
+    "windows-x86_64",
+    "darwin-aarch64",
+    "darwin-x86_64",
+    "android-arm64",
+    "android",
+];
 pub async fn no_store(mut response: Response) -> Response {
     response.headers_mut().insert(
         axum::http::header::CACHE_CONTROL,

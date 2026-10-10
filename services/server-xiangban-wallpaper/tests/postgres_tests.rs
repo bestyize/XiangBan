@@ -464,10 +464,12 @@ async fn app_upload_publication_download_and_withdrawal_share_the_release_record
 #[tokio::test]
 async fn app_upload_rejects_bad_file_names_platforms_and_empty_files(){
     let Some(db)=TestDb::connect().await else{return};let (app,_)=build_app(&db).await;let cookie=session_cookie(&sign_in(&app,"admin","123456").await);
-    for (target,name,data) in [("windows-x86_64","../escape.exe",b"MZ".as_slice()),("windows-x86_64","app.dmg",b"data".as_slice()),("darwin-aarch64","app.exe",b"MZ".as_slice()),("windows-x86_64","empty.zip",b"".as_slice())]{assert_eq!(upload_package(&app,Some(&cookie),target,name,data).await.status,StatusCode::BAD_REQUEST);}
+    for (target,name,data) in [("windows-x86_64","../escape.exe",b"MZ".as_slice()),("windows-x86_64","app.dmg",b"data".as_slice()),("darwin-aarch64","app.exe",b"MZ".as_slice()),("android-arm64","app.exe",b"MZ".as_slice()),("windows-x86_64","empty.zip",b"".as_slice())]{assert_eq!(upload_package(&app,Some(&cookie),target,name,data).await.status,StatusCode::BAD_REQUEST);}
     let uploaded=upload_package(&app,Some(&cookie),"darwin-aarch64","app.dmg",b"test dmg").await;assert_eq!(uploaded.status,StatusCode::CREATED);
     let wrong=json!({"version":"2.0.0","notes":"","publishedAt":"2026-01-01T00:00:00Z","published":true,"platforms":{"windows-x86_64":{"url":uploaded.body["url"]}}});assert_eq!(call(&app,"PUT","/desktop/releases/2.0.0",Some(&cookie),Some(wrong)).await.status,StatusCode::BAD_REQUEST);
-    tokio::fs::remove_file(format!("app-packages/{}.dmg",uploaded.body["id"].as_str().unwrap())).await.unwrap();db.cleanup().await;
+    tokio::fs::remove_file(format!("app-packages/{}.dmg",uploaded.body["id"].as_str().unwrap())).await.unwrap();
+    let android_uploaded=upload_package(&app,Some(&cookie),"android-arm64","app.apk",b"test apk").await;assert_eq!(android_uploaded.status,StatusCode::CREATED);
+    tokio::fs::remove_file(format!("app-packages/{}.apk",android_uploaded.body["id"].as_str().unwrap())).await.unwrap();db.cleanup().await;
 }
 
 #[tokio::test]
@@ -481,6 +483,7 @@ async fn desktop_releases_announcements_and_admin_configuration_share_one_source
         {"version":"1.9.0","notes":"Old","publishedAt":"2026-01-01T00:00:00Z","published":true,"platforms":{"windows-x86_64":{"url":"https://example.com/old.zip"}}},
         {"version":"1.10.0","notes":"New","publishedAt":"2026-01-02T00:00:00Z","published":true,"platforms":{"windows-x86_64":{"url":"https://example.com/new.zip"}}},
         {"version":"2.0.0","notes":"Mac","publishedAt":"2026-01-02T00:00:00Z","published":true,"platforms":{"darwin-aarch64":{"url":"https://example.com/mac.zip"}}},
+        {"version":"0.3.0","notes":"Android","publishedAt":"2026-01-02T00:00:00Z","published":true,"platforms":{"android-arm64":{"url":"https://example.com/android.apk"}}},
         {"version":"3.0.0","notes":"Draft","publishedAt":"2026-01-02T00:00:00Z","published":false,"platforms":{"windows-x86_64":{"url":"https://example.com/draft.zip"}}}
     ]);
     config["announcements"]=json!([
@@ -494,10 +497,14 @@ async fn desktop_releases_announcements_and_admin_configuration_share_one_source
     assert_eq!(product.headers[header::CACHE_CONTROL],"no-store");
     assert_eq!(product.body["downloads"]["windows-x86_64"]["version"],"1.10.0");
     assert_eq!(product.body["downloads"]["darwin-aarch64"]["version"],"2.0.0");
+    assert_eq!(product.body["downloads"]["android-arm64"]["version"],"0.3.0");
     assert_eq!(product.body["announcements"].as_array().unwrap().len(),1);
     let update=public_call(&app,"/api/v1/desktop/updates?currentVersion=1.9.0&target=windows-x86_64").await;
     assert_eq!(update.status,StatusCode::OK);assert_eq!(update.body["version"],"1.10.0");
     assert_eq!(public_call(&app,"/api/v1/desktop/updates?currentVersion=1.10.0&target=windows-x86_64").await.status,StatusCode::NO_CONTENT);
+    let android_update=public_call(&app,"/api/v1/desktop/updates?currentVersion=0.2.0&target=android-arm64").await;
+    assert_eq!(android_update.status,StatusCode::OK);assert_eq!(android_update.body["version"],"0.3.0");
+    assert_eq!(public_call(&app,"/api/v1/desktop/updates?currentVersion=0.3.0&target=android-arm64").await.status,StatusCode::NO_CONTENT);
     assert_eq!(public_call(&app,"/api/v1/desktop/updates?currentVersion=0.1.0&target=darwin-x86_64").await.status,StatusCode::NO_CONTENT);
     assert_eq!(public_call(&app,"/api/v1/desktop/updates?currentVersion=invalid&target=windows-x86_64").await.status,StatusCode::BAD_REQUEST);
     let notices=public_call(&app,"/api/v1/desktop/announcements").await;
