@@ -7,13 +7,24 @@ use std::{
     fs,
     io::{Read, Seek, SeekFrom, Write},
     path::Path,
-    sync::atomic::{AtomicU64, Ordering},
+    sync::atomic::{AtomicBool, AtomicU64, Ordering},
     time::Duration,
 };
 use tauri::Emitter;
 
 pub const MAX_JSON: usize = 1024 * 1024;
 pub const MAX_FILE: u64 = 256 * 1024 * 1024;
+/// Error text of a download the user stopped; callers match on it, so it must not fall back.
+pub const CANCELLED: &str = "已取消下载";
+static NEVER: AtomicBool = AtomicBool::new(false);
+
+fn check_cancel(cancel: &AtomicBool) -> Result<(), String> {
+    if cancel.load(Ordering::Relaxed) {
+        Err(CANCELLED.into())
+    } else {
+        Ok(())
+    }
+}
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -490,9 +501,14 @@ pub fn verify_file(path: &Path, resource: &Resource) -> Result<bool, String> {
     }
     Ok(format!("{:x}", digest.finalize()) == resource.sha256)
 }
-pub fn download(
+pub fn download(root: &Path, resource: &Resource, progress: impl FnMut(u64)) -> Result<(), String> {
+    download_cancellable(root, resource, &NEVER, progress)
+}
+
+fn download_cancellable(
     root: &Path,
     resource: &Resource,
+    cancel: &AtomicBool,
     mut progress: impl FnMut(u64),
 ) -> Result<(), String> {
     if resource.url.starts_with("builtin://") {
@@ -518,6 +534,7 @@ pub fn download(
     }
     let temporary = cache.join(format!("{}.{}.part", resource.sha256, std::process::id()));
     let result = (|| {
+        check_cancel(cancel)?;
         let mut response = client()?
             .get(&resource.url)
             .header("Accept-Encoding", "identity")
@@ -530,6 +547,7 @@ pub fn download(
         let mut buffer = [0u8; 65536];
         let mut count = 0;
         loop {
+            check_cancel(cancel)?;
             let n = response.read(&mut buffer).map_err(|e| e.to_string())?;
             if n == 0 {
                 break;
@@ -566,13 +584,25 @@ static SOURCE_PARTS: AtomicU64 = AtomicU64::new(0);
 /// from the first bytes (Content-Type and the manifest mime are not trusted), the size is
 /// capped, and sha256/bytes are computed locally. The file is then published as
 /// `cache/<sha256>` like any verified download, so the library and offline use work the same.
+#[cfg(test)]
 pub fn download_source(
     root: &Path,
     url: &str,
     kind: &str,
     progress: impl FnMut(u64, Option<u64>),
 ) -> Result<Resource, String> {
-    download_source_limited(root, url, kind, MAX_FILE, progress)
+    download_source_limited(root, url, kind, MAX_FILE, &NEVER, progress)
+}
+
+/// `download_source` that stops with `CANCELLED` once `cancel` is set; the partial file is removed.
+pub fn download_source_cancellable(
+    root: &Path,
+    url: &str,
+    kind: &str,
+    cancel: &AtomicBool,
+    progress: impl FnMut(u64, Option<u64>),
+) -> Result<Resource, String> {
+    download_source_limited(root, url, kind, MAX_FILE, cancel, progress)
 }
 
 fn download_source_limited(
@@ -580,6 +610,7 @@ fn download_source_limited(
     url: &str,
     kind: &str,
     limit: u64,
+    cancel: &AtomicBool,
     mut progress: impl FnMut(u64, Option<u64>),
 ) -> Result<Resource, String> {
     network_url(url)?;
@@ -594,6 +625,7 @@ fn download_source_limited(
         SOURCE_PARTS.fetch_add(1, Ordering::Relaxed)
     ));
     let result = (|| {
+        check_cancel(cancel)?;
         let mut response = client()?
             .get(url)
             .header("Accept-Encoding", "identity")
@@ -610,6 +642,7 @@ fn download_source_limited(
         let mut buffer = vec![0u8; 65536];
         let mut head = 0;
         while head < buffer.len() {
+            check_cancel(cancel)?;
             let n = response.read(&mut buffer[head..]).map_err(|e| e.to_string())?;
             if n == 0 {
                 break;
@@ -633,6 +666,7 @@ fn download_source_limited(
             digest.update(&buffer[..n]);
             file.write_all(&buffer[..n]).map_err(|e| e.to_string())?;
             progress(count, total);
+            check_cancel(cancel)?;
             n = response.read(&mut buffer).map_err(|e| e.to_string())?;
         }
         file.sync_all().map_err(|e| e.to_string())?;
@@ -660,12 +694,21 @@ fn download_source_limited(
 }
 
 pub fn prepare(app: &tauri::AppHandle, root: &Path, item: &Wallpaper) -> Result<(), String> {
+    prepare_cancellable(app, root, item, &NEVER)
+}
+
+pub fn prepare_cancellable(
+    app: &tauri::AppHandle,
+    root: &Path,
+    item: &Wallpaper,
+    cancel: &AtomicBool,
+) -> Result<(), String> {
     let list = assets(item);
     let total: u64 = list.iter().map(|r| r.bytes).sum();
     let mut completed = 0;
     for resource in list {
         let mut last = 0u64;
-        download(root, resource, |bytes| {
+        download_cancellable(root, resource, cancel, |bytes| {
             if bytes.saturating_sub(last) >= 256 * 1024 || bytes == resource.bytes {
                 last = bytes;
                 let _ = app.emit_to(
@@ -1115,13 +1158,47 @@ mod tests {
         let root = temp_root("big");
         for path in ["declared", "streamed"] {
             let url = format!("{}/{path}", server.base);
-            assert!(download_source_limited(&root, &url, "image", 1000, |_, _| {}).is_err());
+            assert!(download_source_limited(&root, &url, "image", 1000, &NEVER, |_, _| {}).is_err());
         }
         assert!(leftovers(&root).is_empty());
         // The limit is inclusive.
         let url = format!("{}/exact", server.base);
-        assert!(download_source_limited(&root, &url, "image", big.len() as u64, |_, _| {}).is_ok());
+        assert!(download_source_limited(&root, &url, "image", big.len() as u64, &NEVER, |_, _| {}).is_ok());
         assert_eq!(MAX_FILE, 256 * 1024 * 1024);
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn a_cancelled_download_stops_with_the_cancel_error_and_leaves_no_files() {
+        let big = [png("big"), vec![7u8; 400 * 1024]].concat();
+        let server = serve(vec![("/big", Reply::Body(200, "image/png", big.clone()))]);
+        let root = temp_root("cancel");
+        let url = format!("{}/big", server.base);
+        let cancel = AtomicBool::new(false);
+        let error = download_source_cancellable(&root, &url, "image", &cancel, |received, _| {
+            if received > 0 {
+                cancel.store(true, Ordering::Relaxed);
+            }
+        })
+        .unwrap_err();
+        assert_eq!(error, CANCELLED);
+        let resource = Resource { url: url.clone(), sha256: hex(&big), bytes: big.len() as u64, mime: "image/png".into() };
+        let cancel = AtomicBool::new(false);
+        let error = download_cancellable(&root, &resource, &cancel, |received| {
+            if received > 0 {
+                cancel.store(true, Ordering::Relaxed);
+            }
+        })
+        .unwrap_err();
+        assert_eq!(error, CANCELLED);
+        assert!(leftovers(&root).is_empty(), "{:?}", leftovers(&root));
+        // Set before the request: nothing is fetched at all.
+        let hits = server.hits.lock().unwrap().len();
+        assert_eq!(download_source_cancellable(&root, &url, "image", &cancel, |_, _| {}).unwrap_err(), CANCELLED);
+        assert_eq!(server.hits.lock().unwrap().len(), hits);
+        // Without cancellation the same file still downloads.
+        download_cancellable(&root, &resource, &NEVER, |_| {}).unwrap();
+        assert!(cached(&root, &resource));
         fs::remove_dir_all(root).unwrap();
     }
 

@@ -5,7 +5,10 @@ use serde_json::Value;
 use sha2::{Digest, Sha256};
 use std::{
     collections::{BTreeMap, HashSet},
-    sync::Mutex,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc, Mutex,
+    },
     time::Duration,
 };
 use tauri::{Emitter, Manager};
@@ -31,6 +34,39 @@ pub struct Status {
 pub struct WebsiteState {
     operation: tauri::async_runtime::Mutex<()>,
     status: Mutex<Status>,
+    /// Cancel flag of the wallpaper download in progress, if any.
+    download: Mutex<Option<Arc<AtomicBool>>>,
+}
+
+/// Registers a new download as the current one and clears it again when dropped, unless a
+/// newer download has replaced it in the meantime.
+struct DownloadGuard<'a> {
+    state: &'a WebsiteState,
+    cancel: Arc<AtomicBool>,
+}
+impl<'a> DownloadGuard<'a> {
+    fn start(state: &'a WebsiteState) -> Self {
+        let cancel = Arc::new(AtomicBool::new(false));
+        if let Some(previous) = state.download.lock().unwrap().replace(cancel.clone()) {
+            previous.store(true, Ordering::Relaxed);
+        }
+        Self { state, cancel }
+    }
+    fn check(&self) -> Result<(), String> {
+        if self.cancel.load(Ordering::Relaxed) {
+            Err(library::CANCELLED.into())
+        } else {
+            Ok(())
+        }
+    }
+}
+impl Drop for DownloadGuard<'_> {
+    fn drop(&mut self) {
+        let mut current = self.state.download.lock().unwrap();
+        if current.as_ref().is_some_and(|flag| Arc::ptr_eq(flag, &self.cancel)) {
+            *current = None;
+        }
+    }
 }
 pub fn site_url(value: &str) -> Result<String, String> {
     let value = value.trim().trim_end_matches('/');
@@ -282,6 +318,8 @@ fn resolve_manifest(
                     local.insert(id.clone());
                     resolved = Some(wallpaper);
                 }
+                // A stop requested by the user is not a broken link: do not start the copy.
+                Err(error) if error == library::CANCELLED => return Err(error),
                 Err(error) => eprintln!("来源链接不可用，改用网站副本：{error}"),
             }
         }
@@ -345,9 +383,12 @@ fn site_resource(resource: &mut library::Resource, origin: &str) -> Result<(), S
 }
 #[tauri::command]
 pub async fn download_site_wallpaper(app: tauri::AppHandle, id: String) -> Result<Value, String> {
+    let state = app.state::<WebsiteState>();
+    let guard = DownloadGuard::start(state.inner());
     let origin = settings(&app).website_url;
     let root = content::root(&app)?;
     let text = get(manifest_url(&app, &id, true)?).await?;
+    guard.check()?;
     let (selected, local) = match parse_site_manifest(&text) {
         // No source link: exactly the verified-copy flow (also for servers without `prefer`).
         None => (
@@ -361,7 +402,7 @@ pub async fn download_site_wallpaper(app: tauri::AppHandle, id: String) -> Resul
             HashSet::new(),
         ),
         Some(manifest) => {
-            let (handle, directory) = (app.clone(), root.clone());
+            let (handle, directory, cancel) = (app.clone(), root.clone(), guard.cancel.clone());
             let plain = manifest_url(&app, &id, false)?;
             let resolved = tauri::async_runtime::spawn_blocking(move || {
                 let state = handle.state::<content::ContentState>();
@@ -371,7 +412,7 @@ pub async fn download_site_wallpaper(app: tauri::AppHandle, id: String) -> Resul
                     |id, version| saved_resource(&directory, id, version),
                     |id, kind, url| {
                         let mut last = 0u64;
-                        library::download_source(&directory, url, kind, |received, total| {
+                        library::download_source_cancellable(&directory, url, kind, &cancel, |received, total| {
                             let Some(total) = total else { return };
                             if received.saturating_sub(last) >= 256 * 1024 || received >= total {
                                 last = received;
@@ -395,22 +436,35 @@ pub async fn download_site_wallpaper(app: tauri::AppHandle, id: String) -> Resul
             )
         }
     };
+    guard.check()?;
     let id = selected["id"].as_str().ok_or("网站未返回壁纸")?.to_string();
     if !local.contains(&id) {
         let item = library::all_items(&root)
             .into_iter()
             .find(|item| item.id == id)
             .ok_or("壁纸记录不存在")?;
-        let handle = app.clone();
+        let (handle, cancel) = (app.clone(), guard.cancel.clone());
         tauri::async_runtime::spawn_blocking(move || {
             let state = handle.state::<content::ContentState>();
             let _io = state.io.lock().unwrap();
-            library::prepare(&handle, &root, &item)
+            library::prepare_cancellable(&handle, &root, &item, &cancel)
         })
         .await
         .map_err(|e| e.to_string())??;
     }
-    Ok(serde_json::json!({"id":id,"library":content::get_wallpaper_library(app)?}))
+    Ok(serde_json::json!({"id":id,"library":content::get_wallpaper_library(app.clone())?}))
+}
+/// Stops the wallpaper download in progress; it then fails with `library::CANCELLED`.
+/// Returns whether there was one to stop.
+#[tauri::command]
+pub fn cancel_site_download(app: tauri::AppHandle) -> bool {
+    match app.state::<WebsiteState>().download.lock().unwrap().as_ref() {
+        Some(flag) => {
+            flag.store(true, Ordering::Relaxed);
+            true
+        }
+        None => false,
+    }
 }
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -660,6 +714,39 @@ mod tests {
         assert!(!root.join("cache").join(hex(&copy)).exists());
         assert_eq!(server.hits.lock().unwrap().len(), 1);
         std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn a_cancelled_source_download_does_not_fall_back_to_the_copy() {
+        let copy = png("ours");
+        let text = manifest(vec![item("image", Some(copy_resource(&copy)), Some("https://cdn.example.test/a.png"))]);
+        let plain_called = std::cell::Cell::new(false);
+        let result = resolve_manifest(
+            parse_site_manifest(&text).unwrap(),
+            no_saved,
+            |_, _, _| Err(library::CANCELLED.to_string()),
+            || {
+                plain_called.set(true);
+                no_plain()
+            },
+        );
+        assert_eq!(result.err().as_deref(), Some(library::CANCELLED));
+        assert!(!plain_called.get());
+    }
+
+    #[test]
+    fn the_download_guard_is_cleared_only_by_its_own_download() {
+        let state = WebsiteState::default();
+        let first = DownloadGuard::start(&state);
+        let first_flag = first.cancel.clone();
+        let second = DownloadGuard::start(&state);
+        assert!(first_flag.load(Ordering::Relaxed), "a newer download stops the older one");
+        drop(first);
+        assert!(state.download.lock().unwrap().is_some(), "the older guard leaves the newer flag in place");
+        state.download.lock().unwrap().as_ref().unwrap().store(true, Ordering::Relaxed);
+        assert_eq!(second.check(), Err(library::CANCELLED.to_string()));
+        drop(second);
+        assert!(state.download.lock().unwrap().is_none());
     }
 
     #[test]

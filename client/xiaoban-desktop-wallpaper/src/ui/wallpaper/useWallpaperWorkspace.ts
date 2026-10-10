@@ -2,6 +2,8 @@ import { computed, reactive, ref, watch, onScopeDispose } from "vue";
 import { invoke, listen, wallpaperDefaults, type WallpaperEntry, type WallpaperLibrary, type WallpaperOptions } from "../../bridge.ts";
 import type { SiteWallpaper } from "../../wallpaper-media.ts";
 import type { ControlStore } from "../control-types.ts";
+/** Error text of a download the user stopped; matches `library::CANCELLED` in the native host. */
+export const DOWNLOAD_CANCELLED = "已取消下载";
 export type Selection = { source: "local"; item: WallpaperEntry } | { source: "online"; item: SiteWallpaper };
 export function cloneOptions(options: WallpaperOptions) { return JSON.parse(JSON.stringify(options)) as WallpaperOptions; }
 export function useWallpaperWorkspace(store: ControlStore) {
@@ -9,6 +11,8 @@ export function useWallpaperWorkspace(store: ControlStore) {
   const selection = ref<Selection | null>(null), draft = ref(cloneOptions(store.settings.wallpaperOptions)), busy = ref(false), loading = ref(false), error = ref("");
   const feed = reactive<{items: SiteWallpaper[]; has_more: boolean; total: number}>({items: [], has_more: false,total: 0});
   const progress = ref<{id:string;received:number;total:number} | null>(null);
+  /** True only while files are being fetched from the website, the part that can be cancelled. */
+  const downloading = ref(false), cancelling = ref(false);
   let progressId:string | undefined, disposed=false, unlisten:(()=>void) | undefined;
   const progressPercent=computed(()=>progress.value ? Math.max(0,Math.min(100,Math.round(progress.value.received/progress.value.total*100))) : null);
   if(store.desktop) void listen<{id:string;received:number;total:number}>("wallpaper-progress", event=>{if(!disposed && busy.value && event.id===progressId && Number.isFinite(event.received) && Number.isFinite(event.total) && event.total>0) progress.value=event;}).then(cleanup=>{if(disposed)cleanup();else unlisten=cleanup;}).catch(e=>store.notify(e,"error"));
@@ -21,7 +25,12 @@ export function useWallpaperWorkspace(store: ControlStore) {
     draft.value = cloneOptions(id === store.settings.wallpaperId ? store.settings.wallpaperOptions : wallpaperDefaults);
     if (value.source === "local") for (const control of value.item.definition.controls ?? []) draft.value.values[control.key] ??= control.default;
   }
-  function cancel() { if(!busy.value) selection.value = null; }
+  function cancel() { if(downloading.value) cancelDownload(); else if(!busy.value) selection.value = null; }
+  function cancelDownload() {
+    if(!downloading.value || cancelling.value) return;
+    cancelling.value = true;
+    invoke<boolean>("cancel_site_download").catch(e=>{cancelling.value=false;store.notify(e,"error");});
+  }
   async function load() {
     const token = ++generation, site = store.settings.websiteUrl;
     if (!store.desktop) return;
@@ -47,7 +56,10 @@ export function useWallpaperWorkspace(store: ControlStore) {
     if(value.source === "local") return value.item.definition.id;
     const site = store.settings.websiteUrl, key = value.item.id;
     const cached = prepared.get(key); if(cached && store.library.items.some(item => item.definition.id === cached && item.installed)) return cached;
-    const result = await invoke<{library:WallpaperLibrary;id:string}>("download_site_wallpaper", {id:key});
+    downloading.value = true;
+    let result: {library:WallpaperLibrary;id:string};
+    try { result = await invoke<{library:WallpaperLibrary;id:string}>("download_site_wallpaper", {id:key}); }
+    finally { downloading.value = false; cancelling.value = false; }
     if(site !== store.settings.websiteUrl) throw new Error("网站已切换，请重新选择壁纸");
     if(!result.library.items.some(item=>item.definition.id === result.id && item.installed)) throw new Error("下载未完成校验，请重试");
     store.library=result.library; prepared.set(key,result.id); return result.id;
@@ -56,9 +68,9 @@ export function useWallpaperWorkspace(store: ControlStore) {
     const chosen=selection.value; if(!chosen || busy.value) return;
     const options=cloneOptions(draft.value); progress.value=null; progressId=chosen.source === "local" ? chosen.item.definition.id : prepared.get(chosen.item.id) || chosen.item.desktop_id; busy.value=true;
     try { const id=await prepare(chosen); progressId=id; if(apply) await store.applyWallpaper(id,options,preview); else store.notify("已保存到我的壁纸","success"); }
-    catch(e) {store.notify(e,"error");} finally {busy.value=false;progress.value=null;progressId=undefined;}
+    catch(e) {if(String(e)===DOWNLOAD_CANCELLED) store.notify(DOWNLOAD_CANCELLED,"info"); else store.notify(e,"error");} finally {busy.value=false;progress.value=null;progressId=undefined;}
   }
   if(store.desktop && !store.info?.uiSmoke) {void load();void loadCategories();}
   const saved = computed(() => { const chosen=selection.value; if(chosen?.source!=="online") return false; const id=prepared.get(chosen.item.id) || chosen.item.desktop_id; return store.library.items.some(item=>item.definition.id===id && item.installed); });
-  return {progress,progressPercent,saved,tab,media,query,category,page,localSource,selection,draft,busy,loading,error,feed,categories,kind,select,cancel,load,localItems,action};
+  return {progress,progressPercent,saved,tab,media,query,category,page,localSource,selection,draft,busy,downloading,cancelling,loading,error,feed,categories,kind,select,cancel,cancelDownload,load,localItems,action};
 }

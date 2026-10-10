@@ -24,7 +24,7 @@ pub fn root(app: &tauri::AppHandle) -> Result<PathBuf, String> {
     Ok(crate::storage::root(app)?.join("wallpapers"))
 }
 pub fn permitted(label: &str, command: &str) -> bool {
-    if command.contains("website") || command.starts_with("fetch_site_") || ["select_site_wallpaper","download_site_wallpaper"].contains(&command) { return label == "control"; }
+    if command.contains("website") || command.starts_with("fetch_site_") || ["select_site_wallpaper","download_site_wallpaper","cancel_site_download"].contains(&command) { return label == "control"; }
     if ["import_local_wallpaper", "open_data_directory"].contains(&command) { return label == "control"; }
     if ["control", "pet", "wallpaper"].contains(&label) {
         return true;

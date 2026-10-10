@@ -172,7 +172,11 @@ pub fn start_cursor_bridge(app: tauri::AppHandle) {
                     let Some(window) = handle.get_webview_window(label) else {
                         continue;
                     };
-                    let ns = native(&window)?;
+                    // A window that is being created or closed has no AppKit window yet; skip it
+                    // for this tick instead of failing the whole sample.
+                    let Ok(ns) = native(&window) else {
+                        continue;
+                    };
                     let Some(view) = ns.contentView() else {
                         continue;
                     };
@@ -204,7 +208,10 @@ pub fn start_cursor_bridge(app: tauri::AppHandle) {
                     previous = point;
                     previous_down = down;
                 }
-                Err(_) => break, // The event loop has exited; do not keep queuing work.
+                // A busy main thread (timeout) must not end the bridge: the pet would stay
+                // click-through for the rest of the session. Once the event loop has exited,
+                // run_on_main_thread fails without queuing anything and the process is ending.
+                Err(_) => continue,
             }
         }
     });
