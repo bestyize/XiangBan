@@ -106,12 +106,10 @@ impl Settings {
         if ![30, 60].contains(&self.fps) {
             self.fps = defaults.fps;
         }
-        if crate::website::site_url(&self.website_url).is_err() {
-            self.website_url = crate::website::DEFAULT_SITE.into();
-        }
-        if self.update_url.is_empty() {
-            self.update_url = format!("{}/api/v1/desktop/updates", self.website_url);
-        }
+        // The website and its update service are built into the app; addresses saved by older
+        // versions, which let users change them, are reset on load.
+        self.website_url = defaults.website_url;
+        self.update_url = defaults.update_url;
         // Effects used to be saved with each wallpaper. The choice that was in use becomes the desktop-wide
         // one, once; the old copy is emptied here and never written again.
         let legacy = std::mem::take(&mut self.wallpaper_options.effects);
@@ -251,6 +249,15 @@ mod tests {
         assert_eq!(value.size, 260.0);
         assert_eq!(value.fps, 60);
         assert!(!value.autostart);
+    }
+    #[test]
+    fn a_saved_custom_website_is_replaced_by_the_built_in_one() {
+        let mut value: Preferences = serde_json::from_str(r#"{"settings":{
+            "websiteUrl":"https://other.example","updateUrl":"https://other.example/updates.json","automaticUpdates":false}}"#).unwrap();
+        value.settings.normalize();
+        assert_eq!(value.settings.website_url, crate::website::DEFAULT_SITE);
+        assert_eq!(value.settings.update_url, format!("{}/api/v1/desktop/updates", crate::website::DEFAULT_SITE));
+        assert!(!value.settings.automatic_updates, "turning automatic checks off is still the user's choice");
     }
     #[test]
     fn saves_replace_old_preferences_and_survive_restart() {

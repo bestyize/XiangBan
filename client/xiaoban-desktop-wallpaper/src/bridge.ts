@@ -24,6 +24,31 @@ export interface Settings {
   effects: EffectsChoice;
 }
 
+export interface AccountUser {
+  uid: string;
+  nickname: string;
+  avatarUrl?: string | null;
+  email: string;
+}
+
+export interface AccountSession {
+  accessToken: string;
+  refreshToken: string;
+  expiresAt: number;
+  user: AccountUser;
+}
+
+export interface SendCodeResult {
+  ok: boolean;
+  cooldownSeconds: number;
+  expiresIn: number;
+}
+
+export interface LoginResult {
+  isNewUser: boolean;
+  session: AccountSession;
+}
+
 export type WallpaperKind = "image" | "video" | "canvas";
 export interface Resource {
   url: string;

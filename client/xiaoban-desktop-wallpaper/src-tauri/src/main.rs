@@ -13,6 +13,7 @@ mod startup;
 mod library;
 mod website;
 mod content;
+mod account;
 mod storage;
 mod local_media;
 mod games;
@@ -632,12 +633,13 @@ fn main() {
             reminders::get_care_settings, reminders::configure_care, reminders::upsert_care_rule, reminders::delete_care_rule,
             reminders::preview_care_rule, reminders::get_care_delivery, reminders::care_ready, reminders::dismiss_care,
             reminders::snooze_care, reminders::search_care_cities, reminders::detect_care_city, reminders::check_care_weather,
-            content::subscribe_wallpapers, content::apply_wallpaper, content::get_app_info, content::set_update_source,
+            content::subscribe_wallpapers, content::apply_wallpaper, content::get_app_info,
             content::check_updates, content::open_download_url, local_media::import_local_wallpaper, storage::open_data_directory,
-            website::configure_website, website::fetch_site_wallpapers, website::fetch_site_categories,
-            website::select_site_wallpaper, website::download_site_wallpaper, website::cancel_site_download, website::check_website, website::get_website_status, website::dismiss_website_message]);
+            website::set_automatic_updates, website::open_official_site, website::fetch_site_wallpapers, website::fetch_site_categories,
+            website::select_site_wallpaper, website::download_site_wallpaper, website::cancel_site_download, website::check_website, website::get_website_status, website::dismiss_website_message,
+            account::send_account_code, account::login_account_with_code, account::get_account_session, account::logout_account]);
     let app = builder.manage(state).manage(content::ContentState::default()).manage(website::WebsiteState::default())
-        .manage(games::GameState::default()).manage(reminders::ReminderState::default())
+        .manage(games::GameState::default()).manage(reminders::ReminderState::default()).manage(account::AccountState::default())
         .register_uri_scheme_protocol("wallpaper-asset", |context, request| library::serve(context.app_handle(), request))
         .invoke_handler(move |invoke| {
             let label=invoke.message.webview_ref().label(); let command=invoke.message.command();
@@ -656,6 +658,9 @@ fn main() {
         })
         .setup(|app| {
             initialize_preferences(app.handle()).map_err(std::io::Error::other)?;
+            if let Some(session) = account::load_session(app.handle()) {
+                *app.state::<account::AccountState>().session.lock().unwrap() = Some(session);
+            }
             reminders::start(app.handle());
             games::start(app.handle());
             setup_tray(app)?;

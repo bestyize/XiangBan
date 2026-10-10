@@ -24,8 +24,9 @@ pub fn root(app: &tauri::AppHandle) -> Result<PathBuf, String> {
     Ok(crate::storage::root(app)?.join("wallpapers"))
 }
 pub fn permitted(label: &str, command: &str) -> bool {
+    if command.contains("account") { return label == "control"; }
     if command.contains("website") || command.starts_with("fetch_site_") || ["select_site_wallpaper","download_site_wallpaper","cancel_site_download"].contains(&command) { return label == "control"; }
-    if ["import_local_wallpaper", "open_data_directory"].contains(&command) { return label == "control"; }
+    if ["import_local_wallpaper", "open_data_directory", "set_automatic_updates", "open_official_site"].contains(&command) { return label == "control"; }
     if ["control", "pet", "wallpaper"].contains(&label) {
         return true;
     }
@@ -430,8 +431,12 @@ pub fn get_app_info(app: tauri::AppHandle) -> Value {
     if crate::ui_smoke_enabled(&app) { info["uiSmoke"] = json!(true); }
     info
 }
-#[tauri::command]
-pub fn set_update_source(app: tauri::AppHandle, url: String) -> Result<crate::Settings, String> {
+/// Points update checks at a test service. Only the isolated smoke test uses this; loading the
+/// settings resets the address to the built-in one.
+fn set_update_source(app: tauri::AppHandle, url: String) -> Result<crate::Settings, String> {
+    if !app.state::<DesktopState>().isolated {
+        return Err("只有隔离测试可以更换更新服务".into());
+    }
     if !url.is_empty() {
         library::network_url(&url)?;
     }
@@ -513,10 +518,14 @@ mod tests {
                 "import_wallpaper_catalog",
                 "import_local_wallpaper",
                 "open_data_directory",
-                "configure_website",
+                "set_automatic_updates",
+                "open_official_site",
                 "fetch_site_wallpapers",
                 "check_website",
                 "dismiss_website_message",
+                "send_account_code",
+                "login_account_with_code",
+                "logout_account",
             ] {
                 assert!(!permitted(label, command));
             }

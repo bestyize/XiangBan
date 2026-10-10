@@ -29,6 +29,26 @@ pub struct Status {
     pub update: Option<Value>,
     pub dismissed: BTreeMap<String, String>,
     pub errors: Vec<String>,
+    /// Unix seconds of the last check in which both versions and announcements were fetched.
+    pub last_checked: Option<i64>,
+}
+/// Automatic checks run at most once a day; a failed check is retried on the next wake-up.
+const CHECK_EVERY_SECS: i64 = 24 * 60 * 60;
+/// The background thread wakes this often to see whether a check is due. The day is measured
+/// on the wall clock, so time spent asleep or with the app closed counts.
+const WAKE_EVERY: Duration = Duration::from_secs(60 * 60);
+fn now_secs() -> i64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs() as i64)
+        .unwrap_or(0)
+}
+/// A clock set back before the last check also counts as due, so a wrong date cannot stop checks.
+fn check_due(last_checked: Option<i64>, now: i64) -> bool {
+    match last_checked {
+        None => true,
+        Some(last) => now < last || now - last >= CHECK_EVERY_SECS,
+    }
 }
 #[derive(Default)]
 pub struct WebsiteState {
@@ -102,11 +122,27 @@ pub fn get_website_status(app: tauri::AppHandle) -> Value {
     snapshot(&app)
 }
 #[tauri::command]
-pub async fn configure_website(
-    app: tauri::AppHandle,
-    url: String,
-    automatic: bool,
-) -> Result<crate::Settings, String> {
+pub fn set_automatic_updates(app: tauri::AppHandle, enabled: bool) -> Result<crate::Settings, String> {
+    let desktop_state = app.state::<DesktopState>();
+    let _update = desktop_state.update_lock.lock().unwrap();
+    let mut config = settings(&app);
+    config.automatic_updates = enabled;
+    crate::persist(&app, &config)?;
+    *desktop_state.settings.lock().unwrap() = config;
+    crate::publish(&app);
+    Ok(settings(&app))
+}
+/// Opens the official website in the system browser. The address lives here, not in the WebView.
+#[tauri::command]
+pub fn open_official_site() -> Result<(), String> {
+    content::open_download_url(DEFAULT_SITE.into())
+}
+/// Points the running app at another website. Only the isolated smoke test uses this; the
+/// address is not saved across restarts because loading resets it to `DEFAULT_SITE`.
+async fn use_test_website(app: tauri::AppHandle, url: String) -> Result<crate::Settings, String> {
+    if !app.state::<DesktopState>().isolated {
+        return Err("只有隔离测试可以更换网站".into());
+    }
     let url = site_url(&url)?;
     let state = app.state::<WebsiteState>();
     let desktop_state = app.state::<DesktopState>();
@@ -114,7 +150,7 @@ pub async fn configure_website(
     let mut config = settings(&app);
     let changed = config.website_url != url;
     config.website_url = url.clone();
-    config.automatic_updates = automatic;
+    config.automatic_updates = false;
     config.update_url = format!("{url}/api/v1/desktop/updates");
     crate::persist(&app, &config)?;
     *app.state::<DesktopState>().settings.lock().unwrap() = config;
@@ -519,6 +555,9 @@ pub async fn check_website(app: tauri::AppHandle) -> Result<Value, String> {
             Ok(value) => status.update = Some(value),
             Err(e) => status.errors.push(format!("更新: {e}")),
         }
+        if status.errors.is_empty() {
+            status.last_checked = Some(now_secs());
+        }
         // Entries disappear when withdrawn/expired. Retain dismissals to avoid repeating a
         // temporarily unavailable notice; revisions cause edited notices to become unread.
         save(&app, &status)?;
@@ -591,15 +630,28 @@ pub fn start(app: &tauri::AppHandle) {
     let handle = app.clone();
     update_tray(app);
     std::thread::spawn(move || loop {
-        if settings(&handle).automatic_updates {
+        let last_checked = handle.state::<WebsiteState>().status.lock().unwrap().last_checked;
+        if settings(&handle).automatic_updates && check_due(last_checked, now_secs()) {
             let _ = tauri::async_runtime::block_on(check_website(handle.clone()));
         }
-        std::thread::sleep(Duration::from_secs(30 * 60));
+        std::thread::sleep(WAKE_EVERY);
     });
 }
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn automatic_checks_run_once_a_day() {
+        let day = CHECK_EVERY_SECS;
+        let now = 1_800_000_000;
+        assert!(check_due(None, now), "never checked: check now");
+        assert!(!check_due(Some(now - 60), now), "checked a minute ago");
+        assert!(!check_due(Some(now - day + 1), now), "just under a day");
+        assert!(check_due(Some(now - day), now), "a full day has passed");
+        assert!(check_due(Some(now + 3600), now), "clock set back before the last check");
+        let status: Status = serde_json::from_str(r#"{"announcements":[],"dismissed":{}}"#).unwrap();
+        assert_eq!(status.last_checked, None, "files from older versions load and check right away");
+    }
     #[test]
     fn source_and_notice_protocol_are_checked() {
         assert_eq!(
@@ -886,7 +938,7 @@ pub async fn smoke(app: &tauri::AppHandle) -> Result<Value, String> {
         return Err("网站联调只能在隔离测试中运行".into());
     }
     let base = std::env::var("XIAOBAN_WEBSITE_TEST_URL").map_err(|_| "没有网站测试服务")?;
-    configure_website(app.clone(), base, false).await?;
+    use_test_website(app.clone(), base).await?;
     if fetch_site_categories(app.clone()).await?["categories"]
         .as_array()
         .is_none_or(|c| c.is_empty())

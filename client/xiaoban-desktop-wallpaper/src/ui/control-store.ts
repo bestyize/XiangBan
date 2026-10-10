@@ -1,5 +1,5 @@
 import { reactive } from "vue";
-import { desktop, defaults, invoke, listen, type Settings, type WallpaperEntry, type WallpaperLibrary, type AppInfo } from "../bridge.ts";
+import { desktop, defaults, invoke, listen, type Settings, type WallpaperEntry, type WallpaperLibrary, type AppInfo, type AccountSession, type SendCodeResult, type LoginResult } from "../bridge.ts";
 import type { WebsiteStatus } from "./website-types.ts";
 import { loadBuiltinPacks, noPacks, readList } from "../effects/catalog.ts";
 import type { ControlStore } from "./control-types.ts";
@@ -20,8 +20,12 @@ export function createControlStore(notify: ControlStore["notify"]): ControlStore
     startup: { available: false, error: null },
     game: { active: false, desktopDoubleClickSupported: false, desktopEntryError: null },
     effectList: noPacks(),
+    account: null,
+    showLoginModal: false,
     page: "wallpapers", ready: false, initialError: "", desktop, notify,
     navigate(page) { store.page = page; },
+    openLogin() { store.showLoginModal = true; },
+    closeLogin() { store.showLoginModal = false; },
     async initialize() {
       store.initialError = "";
       store.ready = false;
@@ -42,6 +46,7 @@ export function createControlStore(notify: ControlStore["notify"]): ControlStore
         const subscriptions = await Promise.all([
           listen<Settings>("settings-changed", (settings) => { if (!disposed) store.settings = settings; }),
           listen<WebsiteStatus>("website-status", (website) => { if (!disposed) store.website = website; }),
+          listen<AccountSession | null>("account-changed", (account) => { if (!disposed) store.account = account; }),
           listen<boolean>("games-active", (active) => { if (!disposed) store.game.active = active; }),
           listen<string>("desktop-error", (error) => notify(error, "error")),
         ]);
@@ -49,6 +54,7 @@ export function createControlStore(notify: ControlStore["notify"]): ControlStore
         unsubscribers.push(...subscriptions);
         const initial = await Promise.allSettled([
           invoke<Settings>("get_settings"), invoke<AppInfo>("get_app_info"), invoke<WallpaperLibrary>("get_wallpaper_library"),
+          invoke<AccountSession | null>("get_account_session"),
         ]);
         if (disposed) return;
         if (initial[0].status === "rejected") throw initial[0].reason;
@@ -57,6 +63,7 @@ export function createControlStore(notify: ControlStore["notify"]): ControlStore
         else notify(`应用信息读取失败：${initial[1].reason}`, "error");
         if (initial[2].status === "fulfilled") store.library = initial[2].value;
         else notify(`本地壁纸目录读取失败：${initial[2].reason}`, "error");
+        if (initial[3].status === "fulfilled") store.account = initial[3].value;
         const secondary = await Promise.allSettled([
           invoke<ControlStore["startup"]>("get_startup_status"), invoke<ControlStore["game"]>("get_game_status"), invoke<WebsiteStatus>("get_website_status"),
         ]);
@@ -131,14 +138,50 @@ export function createControlStore(notify: ControlStore["notify"]): ControlStore
       store.library = result.library;
       return result.id;
     },
-    async configureWebsite(url, automatic) {
-      if (!desktop) throw new Error("请在桌面应用中设置壁纸来源");
-      store.settings = await invoke<Settings>("configure_website", { url, automatic });
-      store.website = await invoke<WebsiteStatus>("get_website_status");
+    async setAutomaticUpdates(enabled) {
+      if (!desktop) {
+        store.settings.automaticUpdates = enabled;
+        return;
+      }
+      store.settings = await invoke<Settings>("set_automatic_updates", { enabled });
     },
     async checkWebsite() {
       if (!desktop) throw new Error("请在桌面应用中检查版本与公告");
       store.website = await invoke<WebsiteStatus>("check_website");
+    },
+    async sendAccountCode(email) {
+      if (!desktop) {
+        return { ok: true, cooldownSeconds: 60, expiresIn: 300 };
+      }
+      return await invoke<SendCodeResult>("send_account_code", { email });
+    },
+    async loginAccount(email, code) {
+      if (!desktop) {
+        const isNew = email.includes("new");
+        const mockSession: AccountSession = {
+          accessToken: "mock.access.token",
+          refreshToken: "mock.refresh.token",
+          expiresAt: Math.floor(Date.now() / 1000) + 1800,
+          user: {
+            uid: "mock-uid-1234",
+            nickname: email.split("@")[0] || "小伴伙伴",
+            email,
+          },
+        };
+        store.account = mockSession;
+        return { isNewUser: isNew, session: mockSession };
+      }
+      const result = await invoke<LoginResult>("login_account_with_code", { email, code });
+      store.account = result.session;
+      return result;
+    },
+    async logoutAccount() {
+      if (!desktop) {
+        store.account = null;
+        return;
+      }
+      await invoke("logout_account");
+      store.account = null;
     },
   } as ControlStore);
   return store;

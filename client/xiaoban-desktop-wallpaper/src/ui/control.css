@@ -24,11 +24,29 @@ body.desktop-control{background:var(--ui-app-bg);color:var(--ui-text-primary);ov
 .brand-copy{display:grid;gap:1px;white-space:nowrap}
 .brand-copy strong{font-size:17px;font-weight:700;letter-spacing:.02em}
 .brand-copy span{font-size:12px;color:var(--ui-text-tertiary)}
+
+/* Sidebar Account */
+.sidebar-account-box{margin:0 2px 18px;display:grid}
+.account-login-card{display:flex;align-items:center;gap:10px;width:100%;padding:10px 12px;border:1px solid var(--ui-border);background:var(--ui-surface-alt);border-radius:14px;cursor:pointer;color:var(--ui-text-primary);text-align:left;transition:all .15s}
+.account-login-card:hover{border-color:var(--ui-primary);background:var(--ui-primary-soft)}
+.account-avatar-placeholder{width:32px;height:32px;border-radius:10px;background:color-mix(in srgb, var(--ui-primary) 18%, transparent);color:var(--ui-primary);display:grid;place-items:center;flex-shrink:0}
+.account-copy{display:grid;gap:2px;min-width:0;flex:1}
+.account-copy strong{font-size:13px;font-weight:650;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.account-copy span{font-size:11px;color:var(--ui-text-tertiary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.login-arrow{color:var(--ui-text-tertiary);margin-left:auto;flex-shrink:0}
+.account-login-card:hover .login-arrow{color:var(--ui-primary)}
+
+.account-profile-card{display:flex;align-items:center;gap:10px;width:100%;padding:8px 10px 8px 12px;border:1px solid var(--ui-border);background:var(--ui-surface-alt);border-radius:14px}
+.account-avatar{width:32px;height:32px;border-radius:10px;background:var(--ui-primary);color:#fff;display:grid;place-items:center;font-weight:700;font-size:14px;flex-shrink:0;overflow:hidden}
+.account-avatar img{width:100%;height:100%;object-fit:cover}
+.account-logout-btn{border:0;background:transparent;color:var(--ui-text-tertiary);width:28px;height:28px;border-radius:8px;display:grid;place-items:center;cursor:pointer;margin-left:auto;flex-shrink:0;transition:all .15s}
+.account-logout-btn:hover{background:color-mix(in srgb, #ef4444 15%, transparent);color:#ef4444}
+
 .sidebar-group-label{font-size:12px;color:var(--ui-text-tertiary);padding:0 12px 10px}
 .control-navigation{display:grid;gap:6px}
-.control-navigation>button,.settings-nav{display:flex;align-items:center;gap:12px;width:100%;text-align:left;border:0;background:transparent;border-radius:13px;padding:0 14px;cursor:pointer;color:var(--ui-text-secondary);min-height:46px;font-size:14px}
-.control-navigation>button:hover,.settings-nav:hover{background:var(--ui-surface-alt);color:var(--ui-text-primary)}
-.control-navigation>button:active,.settings-nav:active{transform:scale(.98)}
+.control-navigation>button,.settings-nav,.website-nav{display:flex;align-items:center;gap:12px;width:100%;text-align:left;border:0;background:transparent;border-radius:13px;padding:0 14px;cursor:pointer;color:var(--ui-text-secondary);min-height:46px;font-size:14px}
+.control-navigation>button:hover,.settings-nav:hover,.website-nav:hover{background:var(--ui-surface-alt);color:var(--ui-text-primary)}
+.control-navigation>button:active,.settings-nav:active,.website-nav:active{transform:scale(.98)}
 .control-navigation>button.selected,.settings-nav.selected{background:var(--ui-primary);color:#fff}
 .control-navigation>button>span{display:grid;gap:3px;min-width:0}
 .control-navigation b{font-size:14px;font-weight:650}
@@ -39,8 +57,10 @@ body.desktop-control{background:var(--ui-app-bg);color:var(--ui-text-primary);ov
 .state-dot{display:inline-block;width:8px;height:8px;flex-shrink:0;border-radius:50%;background:var(--ui-accent)}
 .state-dot.idle{background:var(--ui-text-tertiary)}
 .state-dot.small{width:6px;height:6px}
-.sidebar-bottom{margin-top:auto;padding-top:16px}
-.settings-nav{font-weight:600}
+.sidebar-bottom{margin-top:auto;padding-top:16px;display:grid;gap:2px}
+.settings-nav,.website-nav{font-weight:600}
+.website-nav .external-icon{margin-left:auto;color:var(--ui-text-tertiary);opacity:.85}
+.website-nav:hover .external-icon{color:var(--ui-text-primary);opacity:1}
 .notice-dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--ui-primary);flex-shrink:0}
 .settings-nav .notice-dot{margin-left:auto}
 .settings-nav.selected .notice-dot{background:#fff}
@@ -79,7 +99,9 @@ body.desktop-control{background:var(--ui-app-bg);color:var(--ui-text-primary);ov
 .is-collapsed{grid-template-columns:var(--ui-sidebar-collapsed) minmax(0,1fr)}
 .is-collapsed .control-sidebar{padding-left:10px;padding-right:10px}
 .is-collapsed .control-brand{padding-left:6px;padding-bottom:24px}
-.is-collapsed .brand-copy,.is-collapsed .sidebar-group-label,.is-collapsed .control-navigation>button>span,.is-collapsed .nav-arrow,.is-collapsed .sidebar-desktop-state,.is-collapsed .settings-nav>span,.is-collapsed .sidebar-meta>span{display:none}
-.is-collapsed .control-navigation>button,.is-collapsed .settings-nav{justify-content:center;padding:0 8px;min-height:46px}
+.is-collapsed .brand-copy,.is-collapsed .sidebar-group-label,.is-collapsed .control-navigation>button>span,.is-collapsed .nav-arrow,.is-collapsed .sidebar-desktop-state,.is-collapsed .settings-nav>span,.is-collapsed .website-nav>span,.is-collapsed .website-nav>.external-icon,.is-collapsed .sidebar-meta>span,.is-collapsed .account-copy,.is-collapsed .login-arrow,.is-collapsed .account-logout-btn{display:none}
+.is-collapsed .control-navigation>button,.is-collapsed .settings-nav,.is-collapsed .website-nav{justify-content:center;padding:0 8px;min-height:46px}
+.is-collapsed .sidebar-account-box{margin:0 0 16px}
+.is-collapsed .account-login-card,.is-collapsed .account-profile-card{justify-content:center;padding:6px 0;border-radius:12px}
 .is-collapsed .sidebar-meta{justify-content:center;padding:12px 0 0}
 @media(prefers-reduced-motion:reduce){.desktop-control *,.desktop-control *::before,.desktop-control *::after{transition:none!important;animation:none!important}}
