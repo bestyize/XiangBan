@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import xyz.xiaban.wallpaper.data.MediaKind
+import xyz.xiaban.wallpaper.data.Orientation
 import xyz.xiaban.wallpaper.data.SiteClient
 import xyz.xiaban.wallpaper.data.SiteItem
 
@@ -34,6 +35,8 @@ class FeedViewModel(private val site: SiteClient, val kind: MediaKind) : ViewMod
         private set
     var category = ""
         private set
+    var orientation = Orientation.ALL
+        private set
 
     private var page = 0
     private var generation = 0
@@ -46,6 +49,12 @@ class FeedViewModel(private val site: SiteClient, val kind: MediaKind) : ViewMod
     fun select(categoryId: String) {
         if (categoryId == category) return
         category = categoryId
+        reload()
+    }
+
+    fun selectOrientation(value: Orientation) {
+        if (value == orientation) return
+        orientation = value
         reload()
     }
 
@@ -78,7 +87,7 @@ class FeedViewModel(private val site: SiteClient, val kind: MediaKind) : ViewMod
             base.copy(loading = true, refreshing = pull, error = null)
         }
         job = viewModelScope.launch {
-            val result = runCatching { withContext(Dispatchers.IO) { site.search(query, category, kind, target) } }
+            val result = runCatching { withContext(Dispatchers.IO) { site.search(query, category, kind, target, orientation) } }
             if (mine != generation) return@launch
             result.onSuccess { fetched ->
                 page = fetched.page

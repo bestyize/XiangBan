@@ -4,9 +4,23 @@ import org.json.JSONException
 import org.json.JSONObject
 import java.net.URI
 
+/**
+ * The site words its refusals for the desktop app ("桌面壁纸不能超过 256 MiB"). This phone saves to the gallery and
+ * sets no wallpaper, so the same reasons are put in terms that fit it. Anything not recognised is shown as sent.
+ */
+fun phoneReason(reason: String): String = when {
+    "不能超过 256" in reason -> "文件超过 256 MB，网站暂时无法提供下载"
+    reason.startsWith("媒体格式不适用于桌面壁纸") -> reason.replaceFirst("不适用于桌面壁纸", "暂不支持下载")
+    else -> reason
+}
+
 /** Allowed media types and size limits, from the desktop delivery protocol. */
 object MediaRules {
+    /** Our own stored copy: the site refuses to make or serve one larger than this. */
     const val MAX_SITE_BYTES = 256L * 1024 * 1024
+
+    /** A provider's file, fetched straight from them: some 4K videos are several hundred MB, and the site holds no copy of those. */
+    const val MAX_SOURCE_BYTES = 2L * 1024 * 1024 * 1024
 
     private val EXTENSIONS = mapOf(
         "image/png" to "png",

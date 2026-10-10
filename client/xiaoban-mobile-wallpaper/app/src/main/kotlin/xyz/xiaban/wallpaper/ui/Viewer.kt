@@ -257,7 +257,7 @@ private fun VideoViewer(item: Viewable, onClose: () -> Unit) {
                 Spacer(Modifier.height(16.dp))
                 Text(
                     "重试",
-                    Modifier.clip(RoundedCornerShape(18.dp)).background(Palette.Red).clickable {
+                    Modifier.clip(RoundedCornerShape(18.dp)).background(Palette.Brand).clickable {
                         error = null
                         player.prepare()
                         player.play()

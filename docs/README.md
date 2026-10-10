@@ -1,6 +1,7 @@
 # 项目文档
 
 - [architecture/monorepo.md](architecture/monorepo.md)：当前边界与迁移映射。
+- [architecture/account-center.md](architecture/account-center.md)：统一账号中心设计取舍。
 - [product](product/README.md)：需求与商业规划。
 - [deployment](deployment/README.md)：部署、数据模型、交接。
 - [design-preview](design-preview/README.md)：设计参考，不是运行入口。

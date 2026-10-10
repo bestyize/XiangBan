@@ -25,6 +25,7 @@ import xyz.xiaban.wallpaper.data.SiteItem
 import xyz.xiaban.wallpaper.data.SiteParser
 import xyz.xiaban.wallpaper.data.Verified
 import xyz.xiaban.wallpaper.data.parseHexColor
+import xyz.xiaban.wallpaper.data.phoneReason
 import xyz.xiaban.wallpaper.data.resolveLink
 import java.util.concurrent.CancellationException
 
@@ -467,6 +468,35 @@ class GalleryNamingTest {
     fun picksTheAlbumFolderByKind() {
         assertEquals("Pictures/小伴壁纸", GalleryNaming.folder(MediaKind.IMAGE))
         assertEquals("Movies/小伴壁纸", GalleryNaming.folder(MediaKind.VIDEO))
+    }
+}
+
+class SizeLimitTest {
+    @Test
+    fun aProvidersFileMayBeLargerThanOurOwnCopyCanBe() {
+        val largestSeen = 693L * 1024 * 1024
+        assertTrue(largestSeen > MediaRules.MAX_SITE_BYTES)
+        assertTrue(largestSeen < MediaRules.MAX_SOURCE_BYTES)
+    }
+}
+
+class PhoneReasonTest {
+    @Test
+    fun theDesktopSizeRefusalIsRestatedForThePhone() {
+        assertEquals("文件超过 256 MB，网站暂时无法提供下载", phoneReason("桌面壁纸不能超过 256 MiB"))
+    }
+
+    @Test
+    fun theFormatRefusalKeepsItsDetailButDropsTheDesktopWording() {
+        assertEquals(
+            "媒体格式暂不支持下载（video/quicktime，1024 字节）",
+            phoneReason("媒体格式不适用于桌面壁纸（video/quicktime，1024 字节）"),
+        )
+    }
+
+    @Test
+    fun otherReasonsAreShownAsSent() {
+        assertEquals("媒体源 example.com 返回 HTTP 403", phoneReason("媒体源 example.com 返回 HTTP 403"))
     }
 }
 

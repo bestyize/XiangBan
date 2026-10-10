@@ -13,11 +13,12 @@ import java.net.UnknownHostException
 class SiteClient(private val origin: String = DEFAULT_ORIGIN) : Remote {
     fun categories(): List<Category> = SiteParser.categories(text("$origin/api/v1/categories", READ_MS))
 
-    fun search(query: String, category: String, kind: MediaKind?, page: Int): SitePage {
+    fun search(query: String, category: String, kind: MediaKind?, page: Int, orientation: Orientation = Orientation.ALL): SitePage {
         val params = buildString {
             append("page=").append(page.coerceAtLeast(1)).append("&per_page=").append(PAGE_SIZE)
             append("&q=").append(enc(query)).append("&category=").append(enc(category))
             if (kind != null) append("&media_type=").append(kind.wire)
+            if (orientation != Orientation.ALL) append("&orientation=").append(orientation.wire)
         }
         return SiteParser.page(text("$origin/api/v1/wallpapers/search?$params", READ_MS), origin)
     }
@@ -54,9 +55,11 @@ class SiteClient(private val origin: String = DEFAULT_ORIGIN) : Remote {
         val conn = open(source.url, DOWNLOAD_MS, identity = true)
         try {
             val total = conn.contentLengthLong
-            if (total > MediaRules.MAX_SITE_BYTES) throw SiteException("文件超出大小限制")
+            if (total > MediaRules.MAX_SOURCE_BYTES) throw SiteException("文件超出大小限制")
+            // The download and its copy in the gallery exist side by side until the download is deleted.
+            if (total > 0 && target.parentFile?.usableSpace?.let { it < total * 2 } == true) throw SiteException("手机存储空间不足，需要至少 ${sizeMb(total * 2)} 可用空间")
             if (total > 0) onTotal(total)
-            conn.inputStream.use { Verified.copy(it, target, MediaRules.MAX_SITE_BYTES, { done -> progress(done, total) }, cancelled) }
+            conn.inputStream.use { Verified.copy(it, target, MediaRules.MAX_SOURCE_BYTES, { done -> progress(done, total) }, cancelled) }
         } finally {
             conn.disconnect()
         }
@@ -117,7 +120,7 @@ class SiteClient(private val origin: String = DEFAULT_ORIGIN) : Remote {
     }
 
     private fun reasonOf(conn: HttpURLConnection): String? = try {
-        conn.errorStream?.bufferedReader()?.use { JSONObject(it.readText()).optString("error") }?.takeIf { it.isNotBlank() }
+        conn.errorStream?.bufferedReader()?.use { JSONObject(it.readText()).optString("error") }?.takeIf { it.isNotBlank() }?.let(::phoneReason)
     } catch (_: Exception) {
         null
     }
@@ -133,6 +136,8 @@ class SiteClient(private val origin: String = DEFAULT_ORIGIN) : Remote {
     } catch (e: IOException) {
         throw SiteException("网络出错：${e.message ?: "连接中断"}")
     }
+
+    private fun sizeMb(bytes: Long) = "${bytes / (1024 * 1024)} MB"
 
     private fun enc(value: String) = URLEncoder.encode(value, "UTF-8")
 

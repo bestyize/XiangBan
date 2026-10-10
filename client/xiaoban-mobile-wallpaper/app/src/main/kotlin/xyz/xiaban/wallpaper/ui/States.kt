@@ -1,6 +1,6 @@
 package xyz.xiaban.wallpaper.ui
 
-import androidx.compose.foundation.border
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -15,6 +15,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -24,7 +26,7 @@ import xyz.xiaban.wallpaper.companion.Expression
 @Composable
 fun Center(expression: Expression, message: String, action: String? = null, onAction: () -> Unit = {}) {
     Column(
-        Modifier.fillMaxSize().padding(horizontal = 32.dp),
+        Modifier.fillMaxSize().padding(start = 32.dp, end = 32.dp, bottom = tabBarClearance()),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
@@ -36,11 +38,11 @@ fun Center(expression: Expression, message: String, action: String? = null, onAc
             Text(
                 action,
                 Modifier
-                    .clip(RoundedCornerShape(18.dp))
-                    .border(1.dp, Palette.Red, RoundedCornerShape(18.dp))
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(Palette.Brand)
                     .clickable(onClick = onAction)
-                    .padding(horizontal = 24.dp, vertical = 8.dp),
-                color = Palette.Red, fontSize = 14.sp,
+                    .padding(horizontal = 28.dp, vertical = 10.dp),
+                color = Color.White, fontSize = 14.sp, fontWeight = FontWeight.Medium,
             )
         }
     }

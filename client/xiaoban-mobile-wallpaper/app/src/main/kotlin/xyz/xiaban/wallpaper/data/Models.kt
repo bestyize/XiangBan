@@ -16,6 +16,13 @@ enum class MediaKind(val wire: String) {
 class Category(val id: String, val name: String)
 
 /** One card of the website's public search: everything needed to draw it, open it and favourite it. */
+/** Shape filter understood by the site's search: `orientation=portrait|landscape`. */
+enum class Orientation(val wire: String, val label: String) {
+    ALL("", "全部"),
+    PORTRAIT("portrait", "竖版"),
+    LANDSCAPE("landscape", "横版"),
+}
+
 data class SiteItem(
     val id: String,
     val kind: MediaKind,
