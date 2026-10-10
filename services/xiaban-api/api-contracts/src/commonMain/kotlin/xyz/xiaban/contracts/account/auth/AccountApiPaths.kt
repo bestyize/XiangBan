@@ -5,6 +5,7 @@ object AccountApiPaths {
     const val BIND = "/api/account/bind"
     const val EMAIL_LOGIN_CODE = "/api/account/login/code"
     const val EMAIL_LOGIN = "/api/account/login"
+    const val ACCOUNT_CENTER_LOGIN = "/api/account/center/login"
     const val LOGOUT = "/api/account/logout"
     const val ACCOUNT = "/api/account"
     const val ACCOUNT_EXPORT = "/api/account/export"

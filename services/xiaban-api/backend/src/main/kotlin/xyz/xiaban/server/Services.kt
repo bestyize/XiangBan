@@ -34,7 +34,10 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import xyz.xiaban.server.account.AccountCenter
+import xyz.xiaban.server.account.AccountCenterLogin
 import xyz.xiaban.server.account.AccountMerge
+import xyz.xiaban.server.account.RemoteAccountCenter
 import xyz.xiaban.server.account.EmailBinding
 import xyz.xiaban.server.guardian.GuardianRepository
 import xyz.xiaban.server.guardian.GuardianScheduler
@@ -65,6 +68,7 @@ class Services(
     llmProviders: List<LlmProvider>? = null,
     weatherSource: WeatherSource? = null,
     mailer: Mailer? = null,
+    accountCenter: AccountCenter? = null,
 ) : AutoCloseable {
     val http = HttpClient(CIO) {
         expectSuccess = false
@@ -180,6 +184,10 @@ class Services(
     val recall = RecallJob(db, users, CopySelector(copyLibrary), mail, unsubscribeLinks, config.publicBaseUrl, clock)
     val emailBinding = EmailBinding(redis, users, profiles, tokens, AccountMerge(db, clock), emailAvailable,
         { this.mailer.send(it) }, { guardian.reschedule(it) })
+    val accountCenterLogin = AccountCenterLogin(
+        accountCenter ?: RemoteAccountCenter(http, config.accountIssuer, config.accountBaseUrl, config.accountAudiences, clock),
+        users, profiles, tokens, AccountMerge(db, clock), { guardian.reschedule(it) },
+    )
     val events = xyz.xiaban.server.events.EventService(db, clock)
     val metrics = xyz.xiaban.server.events.MetricsService(db, clock)
     val account = xyz.xiaban.server.account.AccountService(db, profiles, guardian)
@@ -214,10 +222,11 @@ class Services(
             llmProviders: List<LlmProvider>? = null,
             weatherSource: WeatherSource? = null,
             mailer: Mailer? = null,
+            accountCenter: AccountCenter? = null,
         ): Services {
             val db = Db.connect(config.db)
             val redis = Redis.connect(config.redisUrl)
-            return Services(config, db, redis, clock, llmProviders, weatherSource, mailer)
+            return Services(config, db, redis, clock, llmProviders, weatherSource, mailer, accountCenter)
         }
     }
 }

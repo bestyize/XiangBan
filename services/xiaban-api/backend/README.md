@@ -4,7 +4,7 @@
 
 ## 代码归属
 
-- users/account/auth：会话、账户、资料、身份与权限。
+- users/account/auth：会话、账户、资料、身份与权限。统一账号中心登录见 account/AccountCenter*.kt：`POST /api/account/center/login` 验签账号中心令牌并换成本站令牌，配置 `ACCOUNT_ISSUER`（默认 https://account.xiangban.xyz）、`ACCOUNT_BASE_URL`（默认同签发者，取 JWKS 与 /api/me）、`ACCOUNT_AUDIENCES`（默认 xiaban-web,xiaban-api）；迁移 V19 增加 `users.account_uid`。
 - checkin/stats/unlocks：打卡、称号、统计、解锁规则。
 - chat/memory/llm/tts：聊天、记忆、模型与语音，当前仍在本服务。
 - guardian/mail/events/admin：守护、通知、埋点、管理。

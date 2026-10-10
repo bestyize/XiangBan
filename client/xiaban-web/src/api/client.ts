@@ -44,7 +44,7 @@ interface RequestOptions {
 
 export async function api<T>(path: string, options: RequestOptions = {}, retried = false): Promise<T> {
   const publicPath = path === '/api/session' || path === '/api/meta' || path === '/api/health'
-    || path === '/api/account/email/status' || path === '/api/account/login/code' || path === '/api/account/login'
+    || path === '/api/account/email/status' || path === '/api/account/login/code' || path === '/api/account/login' || path === '/api/account/center/login'
     || path.startsWith('/api/checkin') || path.startsWith('/api/events') || path.startsWith('/api/chat') || path.startsWith('/api/avatars/') || path.startsWith('/api/admin/')
   if (!token && !publicPath && options.method && options.method !== 'GET') await requireUserSession()
   const requestToken = token

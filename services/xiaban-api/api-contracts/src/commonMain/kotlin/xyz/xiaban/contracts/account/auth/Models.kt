@@ -20,6 +20,16 @@ data class EmailLoginRequest(
     val termsVersion: String? = null,
 )
 
+/** Exchanges an access token issued by the unified account center for this service's own session. */
+@Serializable
+data class AccountCenterLoginRequest(
+    val accountToken: String,
+    val deviceId: String,
+    val mergeGuest: Boolean = false,
+    val username: String? = null,
+    val termsVersion: String? = null,
+)
+
 @Serializable
 data class LogoutRequest(val deviceId: String)
 

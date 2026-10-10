@@ -51,6 +51,7 @@ cargo run --manifest-path services/server-account/Cargo.toml -- gen-keys
 | `ACCOUNT_DAILY_PER_IDENTIFIER` / `ACCOUNT_DAILY_PER_IP` | `10` / `30` | 每日发送上限，防短信被刷 |
 | `ACCOUNT_TRUST_PROXY` | `false` | 为 true 时用反向代理设置的 `X-Real-IP` 作为来源 IP；Nginx 需 `proxy_set_header X-Real-IP $remote_addr;`，且不能让外部直连本服务 |
 | `ACCOUNT_CORS_ORIGINS` | 空（允许任意来源） | 逗号分隔的允许来源。凭证只走 Authorization 头、不用 Cookie |
+| `ACCOUNT_EMAIL_CLIENTS` | `xiaban-web,xiaban-api` | 令牌 `aud` 属于这些应用时，`GET /api/me` 额外返回已验证邮箱明文 `email`，供主后端按邮箱关联旧账号；其他应用只能看到掩码 |
 | `ACCOUNT_ADMIN_USER` / `ACCOUNT_ADMIN_PASSWORD` | 空 | 仅在数据库里还没有任何管理员时用来创建初始管理员（密码至少 8 位）；已有管理员时被忽略，不会覆盖密码。首次登录后请在后台改密码并移除 `ACCOUNT_ADMIN_PASSWORD` |
 | `ACCOUNT_ADMIN_TOKEN_TTL_SECS` | `28800` | 管理员登录有效期（8 小时） |
 | `ACCOUNT_WEB_DIR` | `services/server-account/web/dist` | 管理后台静态文件目录，相对启动时的工作目录；容器里请设为绝对路径。目录不存在时只提供 API |

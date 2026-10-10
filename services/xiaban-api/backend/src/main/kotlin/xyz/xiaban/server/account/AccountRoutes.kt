@@ -18,6 +18,7 @@ import io.ktor.server.routing.post
 import io.ktor.server.routing.put
 import kotlinx.serialization.json.JsonObject
 import xyz.xiaban.contracts.account.auth.AccountApiPaths
+import xyz.xiaban.contracts.account.auth.AccountCenterLoginRequest
 import xyz.xiaban.contracts.account.auth.BindEmailRequest
 import xyz.xiaban.contracts.account.auth.EmailCodeRequest
 import xyz.xiaban.contracts.account.auth.EmailLoginRequest
@@ -62,6 +63,21 @@ fun Route.accountRoutes(services: Services) {
             if (it.isEmpty() || it.length > 20) badRequest("协议版本无效", "invalid_terms_version")
         }
         val result = services.emailBinding.login(userId, req.email, req.code, req.deviceId, req.mergeGuest, req.username)
+        val profile = if (termsVersion != null) {
+            services.account.consent(result.profile.userId, termsVersion, false)
+            services.profiles.view(result.profile.userId)
+        } else result.profile
+        bearer?.let { services.tokens.revoke(it) }
+        call.respond(result.copy(profile = profile))
+    }
+    post(AccountApiPaths.ACCOUNT_CENTER_LOGIN) {
+        val bearer = call.request.headers[HttpHeaders.Authorization]?.removePrefix("Bearer ")?.trim()
+        val userId = bearer?.let { services.tokens.userIdOrNull(it) }
+        val req = call.receive<AccountCenterLoginRequest>()
+        val termsVersion = req.termsVersion?.trim()?.also {
+            if (it.isEmpty() || it.length > 20) badRequest("协议版本无效", "invalid_terms_version")
+        }
+        val result = services.accountCenterLogin.login(userId, req)
         val profile = if (termsVersion != null) {
             services.account.consent(result.profile.userId, termsVersion, false)
             services.profiles.view(result.profile.userId)

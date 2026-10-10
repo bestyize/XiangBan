@@ -47,7 +47,7 @@ export function LoginModal({ open, onClose }: { open: boolean; onClose: () => vo
         <p className="mt-1.5 text-center text-[13px] text-window/55">邮箱验证码登录，新邮箱自动注册</p>
         <div className="mt-6">
           {open && (status === 'ready'
-            ? <EmailBind mode="login" disabled={!agreed} termsVersion={TERMS_VERSION} onDone={done} beforeSend={async () => {
+            ? <EmailBind disabled={!agreed} termsVersion={TERMS_VERSION} onDone={done} beforeSend={async () => {
               if (getToken()) await api('/api/consent', { method: 'PUT', body: { termsVersion: TERMS_VERSION } })
             }} />
             : <p className="py-6 text-center text-sm text-window/60">{status === 'error' ? '小伴没接到你，关掉再试一次吧。' : '小伴正在开门…'}</p>)}

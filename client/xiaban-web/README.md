@@ -14,6 +14,8 @@
 
 在本目录运行 npm ci、npm run dev、npm test、npm run build、npm run lint。开发代理见 vite.config.ts，需要后端时从仓库根运行 gradlew :backend:run。暮色滑翔游戏包内置的 three.js 子集由 npm run build:glider-three 重新生成（见 [游戏包说明](public/game-packs/dusk-glider/README.md)）。
 
+登录走统一账号中心：浏览器直接向 `VITE_ACCOUNT_URL`（默认 https://account.xiangban.xyz）要邮箱验证码并登录，再交给主后端换票（src/api/accountCenter.ts）。该域名必须在 infra/deploy/nginx/security-headers.conf 的 CSP `connect-src` 中放行；本地联调账号中心时在 `.env.local` 设置 `VITE_ACCOUNT_URL`。
+
 Dockerfile 的上下文是仓库根，使用 infra/deploy/nginx 配置。不要直接把本目录作为 Docker 构建上下文。
 
 ## 边界

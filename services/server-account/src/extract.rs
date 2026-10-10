@@ -13,6 +13,7 @@ use uuid::Uuid;
 
 pub struct AuthUser {
     pub uid: Uuid,
+    pub client_id: String,
 }
 
 impl FromRequestParts<AppState> for AuthUser {
@@ -27,7 +28,7 @@ impl FromRequestParts<AppState> for AuthUser {
             .ok_or_else(|| AppError::Unauthorized("缺少登录凭证".into()))?;
         let claims = tokens::verify_access(&state.keys, &state.config.issuer, token)?;
         let uid = Uuid::parse_str(&claims.sub).map_err(|_| AppError::Unauthorized("登录凭证无效".into()))?;
-        Ok(AuthUser { uid })
+        Ok(AuthUser { uid, client_id: claims.aud })
     }
 }
 

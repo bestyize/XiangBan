@@ -44,9 +44,10 @@ object TestEnv {
     val llm = FakeLlm()
     val weather = FakeWeather()
     val mailer = LogMailer()
+    val accountCenter = FakeAccountCenter()
     const val ADMIN_TOKEN = "test-admin-token"
 
-    private val shared: Services by lazy { Services.create(config, clock, listOf(llm), weather, mailer) }
+    private val shared: Services by lazy { Services.create(config, clock, listOf(llm), weather, mailer, accountCenter) }
 
     /** Waits for the mail worker to deliver a matching message. */
     fun awaitMail(timeoutMs: Long = 5_000, predicate: (Mail) -> Boolean): Mail {
@@ -70,6 +71,7 @@ object TestEnv {
         clock.now = java.time.Instant.now()
         llm.reset()
         weather.reset()
+        accountCenter.reset()
         synchronized(mailer.sent) { mailer.sent.clear() }
         reset(shared)
         return shared

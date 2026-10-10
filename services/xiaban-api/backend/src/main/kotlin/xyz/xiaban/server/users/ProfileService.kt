@@ -78,7 +78,7 @@ class ProfileService(private val users: UserRepository, private val cities: Citi
         onboarded = user.onboardedAt != null,
         createdAt = user.createdAt.toEpochMilli(),
         userId = user.id,
-        accountType = if (user.email != null && user.emailVerifiedAt != null) "registered" else "guest",
+        accountType = if (user.accountUid != null || (user.email != null && user.emailVerifiedAt != null)) "registered" else "guest",
         avatarUrl = user.avatarKey?.let { "/api/avatars/$it" },
     )
 

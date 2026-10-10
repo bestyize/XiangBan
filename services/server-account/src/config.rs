@@ -48,6 +48,7 @@ pub struct AppConfig {
     pub daily_per_ip: i64,
     pub trust_proxy: bool,
     pub cors_origins: Vec<String>,
+    pub email_clients: Vec<String>,
     pub clients: Vec<(String, String)>,
     pub sender: SenderConfig,
     pub admin_user: Option<String>,
@@ -129,6 +130,10 @@ impl AppConfig {
             daily_per_ip: num("ACCOUNT_DAILY_PER_IP", 30),
             trust_proxy: get("ACCOUNT_TRUST_PROXY").map(|v| v == "true" || v == "1").unwrap_or(false),
             cors_origins: list("ACCOUNT_CORS_ORIGINS"),
+            email_clients: match get("ACCOUNT_EMAIL_CLIENTS") {
+                Some(_) => list("ACCOUNT_EMAIL_CLIENTS"),
+                None => vec!["xiaban-web".into(), "xiaban-api".into()],
+            },
             clients,
             sender,
             admin_user: get("ACCOUNT_ADMIN_USER"),

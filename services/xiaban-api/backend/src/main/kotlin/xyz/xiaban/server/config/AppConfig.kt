@@ -40,6 +40,10 @@ data class AppConfig(
     val adminUsername: String = "admin",
     val adminBootstrapPassword: String? = null,
     val settingsEncryptionKey: String? = null,
+    /** Unified account center: token issuer (`iss`), base URL for JWKS and /api/me, accepted `aud` values. */
+    val accountIssuer: String = "https://account.xiangban.xyz",
+    val accountBaseUrl: String = accountIssuer,
+    val accountAudiences: Set<String> = setOf("xiaban-web", "xiaban-api"),
 ) {
     val isProd: Boolean get() = env == "prod"
 
@@ -90,6 +94,9 @@ data class AppConfig(
                 adminUsername = env.str("ADMIN_USERNAME", "admin"),
                 adminBootstrapPassword = env.optional("ADMIN_BOOTSTRAP_PASSWORD") ?: "123456",
                 settingsEncryptionKey = env.optional("SETTINGS_ENCRYPTION_KEY"),
+                accountIssuer = env.str("ACCOUNT_ISSUER", "https://account.xiangban.xyz").trimEnd('/'),
+                accountBaseUrl = (env.optional("ACCOUNT_BASE_URL") ?: env.str("ACCOUNT_ISSUER", "https://account.xiangban.xyz")).trimEnd('/'),
+                accountAudiences = env.str("ACCOUNT_AUDIENCES", "xiaban-web,xiaban-api").split(',').map { it.trim() }.filter { it.isNotEmpty() }.toSet(),
             )
         }
 

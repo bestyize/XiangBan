@@ -150,6 +150,30 @@ async fn code_login_registers_then_reuses_the_same_user() {
 }
 
 #[tokio::test]
+async fn me_reveals_verified_email_only_to_allowlisted_clients() {
+    let h = harness!(&[]);
+    let first = h.login("Alice@Example.com").await;
+    let (status, me) = h.call(Method::GET, "/api/me", first["access_token"].as_str(), Value::Null).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(me["email"], "alice@example.com");
+
+    let (status, _) = h.post("/api/auth/code/send", None, json!({ "identifier": "alice@example.com" })).await;
+    assert_eq!(status, StatusCode::OK);
+    let (status, other) = h
+        .post(
+            "/api/auth/code/login",
+            None,
+            json!({ "identifier": "alice@example.com", "code": h.last_code(), "client_id": "xiangban-wallpaper-web" }),
+        )
+        .await;
+    assert_eq!(status, StatusCode::OK, "{other}");
+    let (status, me) = h.call(Method::GET, "/api/me", other["access_token"].as_str(), Value::Null).await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(me.get("email").is_none(), "{me}");
+    h.cleanup().await;
+}
+
+#[tokio::test]
 async fn wrong_codes_exhaust_attempts_and_lock_out_the_real_code() {
     let h = harness!(&[]);
     h.post("/api/auth/code/send", None, json!({ "identifier": "13800138000" })).await;

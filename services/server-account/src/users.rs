@@ -22,6 +22,9 @@ pub struct UserView {
     pub has_password: bool,
     pub identities: Vec<IdentityView>,
     pub created_at: DateTime<Utc>,
+    /// 已验证邮箱明文，仅 `GET /api/me` 且令牌属于 `ACCOUNT_EMAIL_CLIENTS` 时返回，供业务服务按邮箱关联旧账号。
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub email: Option<String>,
 }
 
 pub async fn find_uid(state: &AppState, ident: &Identifier) -> Result<Option<Uuid>, AppError> {
@@ -112,5 +115,14 @@ pub async fn view(state: &AppState, uid: Uuid) -> Result<UserView, AppError> {
         identities.push(IdentityView { kind, masked: identifier::mask(parsed, &value) });
     }
 
-    Ok(UserView { uid, nickname, avatar_url, has_password, identities, created_at })
+    Ok(UserView { uid, nickname, avatar_url, has_password, identities, created_at, email: None })
+}
+
+pub async fn verified_email(state: &AppState, uid: Uuid) -> Result<Option<String>, AppError> {
+    let row: Option<(Vec<u8>,)> =
+        sqlx::query_as("SELECT identifier_enc FROM identities WHERE uid = $1 AND kind = 'email' AND verified_at IS NOT NULL")
+            .bind(uid)
+            .fetch_optional(&state.pool)
+            .await?;
+    row.map(|(enc,)| state.keys.sub.decrypt("email", &enc)).transpose()
 }

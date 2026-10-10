@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { api } from '../../api/client.ts'
+import { dropAccountSession, loginWithCode, sendLoginCode, type AccountCenterLogin } from '../../api/accountCenter.ts'
 import type { BindResponse } from '../../api/types.ts'
 import { FieldError, PrimaryButton } from '../../components/ui.tsx'
 import { useProfile, useSession } from '../../lib/session.tsx'
@@ -12,10 +13,9 @@ import { getDeviceId } from '../../lib/device.ts'
 const input =
   'w-full rounded-2xl border-2 border-dusk-soft bg-dusk-deep/60 px-4 py-3 text-window placeholder:text-window/40 focus:border-lamp focus:outline-none'
 
-/** Binding an email keeps the account across devices; an email that already has one brings it back. */
-export function EmailBind({ onDone, mode = 'bind', disabled = false, termsVersion, beforeSend }: {
+/** Passwordless login through the unified account center; an email that already has an account brings it back. */
+export function EmailBind({ onDone, disabled = false, termsVersion, beforeSend }: {
   onDone?: (merged: boolean) => void
-  mode?: 'bind' | 'login'
   disabled?: boolean
   termsVersion?: string
   beforeSend?: () => Promise<void>
@@ -29,19 +29,8 @@ export function EmailBind({ onDone, mode = 'bind', disabled = false, termsVersio
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [mergeGuest, setMergeGuest] = useState(false)
-  const [available, setAvailable] = useState<boolean | null>(null)
-
-  useEffect(() => {
-    let alive = true
-    const refresh = () => {
-      api<{ enabled: boolean; configured: boolean }>('/api/account/email/status')
-        .then((s) => { if (alive) setAvailable(s.enabled && s.configured) })
-        .catch(() => { if (alive) setAvailable(null) })
-    }
-    refresh()
-    window.addEventListener('focus', refresh)
-    return () => { alive = false; window.removeEventListener('focus', refresh) }
-  }, [])
+  // The code is single-use, so keep the account center's answer until this site accepts it; a retry must not ask for a new code.
+  const verified = useRef<AccountCenterLogin | null>(null)
 
   useEffect(() => {
     if (cooldown <= 0) return
@@ -54,7 +43,7 @@ export function EmailBind({ onDone, mode = 'bind', disabled = false, termsVersio
     setError(null)
     try {
       await beforeSend?.()
-      await api(mode === 'login' ? '/api/account/login/code' : '/api/account/bind/code', { method: 'POST', body: { email } })
+      await sendLoginCode(email.trim())
       setSent(true)
       setCooldown(60)
     } catch (e) {
@@ -64,14 +53,19 @@ export function EmailBind({ onDone, mode = 'bind', disabled = false, termsVersio
     }
   }
 
-  async function bind() {
+  async function login() {
     setBusy(true)
     setError(null)
     try {
+      verified.current ??= await loginWithCode(email.trim(), code)
+      const accountCenter = verified.current
       const preferredUsername = profile.nickname ? normalizeNickname(profile.nickname) : undefined
-      const res = await api<BindResponse>(mode === 'login' ? '/api/account/login' : '/api/account/bind', {
-        method: 'POST', body: mode === 'login' ? { email, code, deviceId: getDeviceId(), mergeGuest, username: preferredUsername, termsVersion } : { email, code, username: preferredUsername },
+      const res = await api<BindResponse>('/api/account/center/login', {
+        method: 'POST',
+        body: { accountToken: accountCenter.access_token, deviceId: getDeviceId(), mergeGuest, username: preferredUsername, termsVersion },
       })
+      dropAccountSession(accountCenter.refresh_token)
+      verified.current = null
       adopt(res.token, res.profile)
       const selected = readLoginReturn()?.path.split('/')[2]
       if (mergeGuest || selected) importGuestAttempts(quizCatalog.filter((quiz) => mergeGuest || quiz.id === selected), res.profile.userId)
@@ -84,11 +78,11 @@ export function EmailBind({ onDone, mode = 'bind', disabled = false, termsVersio
   }
 
   return (
-    <form className="space-y-3" onSubmit={(e) => { e.preventDefault(); if (sent && code.length === 6 && !busy && !disabled) void bind() }}>
+    <form className="space-y-3" onSubmit={(e) => { e.preventDefault(); if (sent && code.length === 6 && !busy && !disabled) void login() }}>
       <label className="block">
         <span className="mb-1.5 block text-sm text-window/70">邮箱</span>
         <input className={input} type="email" inputMode="email" autoComplete="email" value={email}
-          disabled={busy} onChange={(e) => { setEmail(e.target.value); setSent(false); setCode(''); setError(null) }} placeholder="you@example.com" />
+          disabled={busy} onChange={(e) => { setEmail(e.target.value); setSent(false); setCode(''); setError(null); verified.current = null }} placeholder="you@example.com" />
       </label>
       {sent && (
         <label className="block">
@@ -97,15 +91,14 @@ export function EmailBind({ onDone, mode = 'bind', disabled = false, termsVersio
             onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))} />
         </label>
       )}
-      {sent && <p role="status" className="text-sm text-lamp">验证码已发出，10 分钟内有效。没收到时请检查垃圾邮件。</p>}
-      {mode === 'login' && <label className="flex gap-2 text-sm text-window/70">
+      {sent && <p role="status" className="text-sm text-lamp">验证码已发出，5 分钟内有效。没收到时请检查垃圾邮件。</p>}
+      <label className="flex gap-2 text-sm text-window/70">
         <input type="checkbox" checked={mergeGuest} disabled={busy} onChange={(e) => setMergeGuest(e.target.checked)} />
         同时将当前游客的打卡、游戏和安排记录合并到该账号
-      </label>}
-      {available === false && <p role="status" className="text-sm text-window/60">邮箱服务暂未开通，你可以先以游客身份体验。</p>}
+      </label>
       <FieldError message={error} />
       <div className="flex gap-3">
-        <button type="button" disabled={busy || disabled || available === false || cooldown > 0 || !email.includes('@')} onClick={sendCode}
+        <button type="button" disabled={busy || disabled || cooldown > 0 || !email.includes('@')} onClick={sendCode}
           className="shrink-0 rounded-full border-2 border-lamp px-4 py-3 text-sm font-bold text-lamp disabled:opacity-50">
           {cooldown > 0 ? `${cooldown} 秒后重发` : sent ? '重发验证码' : '发送验证码'}
         </button>

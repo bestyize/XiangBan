@@ -6,6 +6,7 @@ import java.sql.SQLException
 import java.time.Instant
 import java.time.LocalTime
 import java.time.ZoneId
+import java.util.UUID
 import xyz.xiaban.contracts.companion.personality.Personality
 import xyz.xiaban.server.db.Db
 import xyz.xiaban.server.db.execute
@@ -36,6 +37,8 @@ data class User(
     val termsVersion: String?,
     val emailVerifiedAt: Instant?,
     val avatarKey: String?,
+    /** `sub` of the unified account center; set for every account created or linked through it. */
+    val accountUid: UUID? = null,
 )
 
 /** Where a new account came from: the inviter's code and the entry point, both from the QR link. */
@@ -64,7 +67,7 @@ class UserRepository(private val db: Db) {
     /** Serialised per device so concurrent first visits from one browser create a single account. */
     suspend fun findOrCreate(deviceHash: String, timezone: String, referral: Referral? = null, guestOnly: Boolean = false): Long = db.tx { c ->
         c.queryOne("select pg_advisory_xact_lock(hashtext(?))", deviceHash) { }
-        if (guestOnly) c.execute("delete from devices where device_hash=? and user_id in (select id from users where email_verified_at is not null)", deviceHash)
+        if (guestOnly) c.execute("delete from devices where device_hash=? and user_id in (select id from users where email_verified_at is not null or account_uid is not null)", deviceHash)
         c.queryOne("update devices set last_seen_at = now() where device_hash = ? returning user_id", deviceHash) {
             it.getLong(1)
         } ?: run {
@@ -99,11 +102,15 @@ class UserRepository(private val db: Db) {
     }
 
     suspend fun guestForDevice(deviceHash: String): Long? = db.read { c ->
-        c.queryOne("select d.user_id from devices d join users u on u.id=d.user_id where d.device_hash=? and u.email_verified_at is null", deviceHash) { it.getLong(1) }
+        c.queryOne("select d.user_id from devices d join users u on u.id=d.user_id where d.device_hash=? and u.email_verified_at is null and u.account_uid is null", deviceHash) { it.getLong(1) }
     }
 
     suspend fun authState(userId: Long): Boolean? = db.read { c ->
-        c.queryOne("select email is not null and email_verified_at is not null from users where id=?", userId) { it.getBoolean(1) }
+        c.queryOne("select (email is not null and email_verified_at is not null) or account_uid is not null from users where id=?", userId) { it.getBoolean(1) }
+    }
+
+    suspend fun findIdByAccountUid(uid: UUID): Long? = db.read { c ->
+        c.queryOne("select id from users where account_uid = ?", uid) { it.getLong(1) }
     }
 
     suspend fun findIdByEmail(email: String): Long? = db.read { c ->
@@ -153,6 +160,46 @@ class UserRepository(private val db: Db) {
         consumeCode()
         target
     } } catch (e: SQLException) { if (e.sqlState == "23505") conflict("这个用户名已有人使用，换一个吧", "nickname_taken"); throw e }
+
+    /**
+     * Resolves the local account for an account-center uid, in order: already linked; an older account that
+     * registered the same (account-center verified) email; the caller's own guest account, which becomes the
+     * registered one; otherwise a new account. A taken or invalid [username] falls back to a generated name,
+     * because the login proof is already spent when this runs.
+     */
+    suspend fun claimAccount(ownerId: Long, uid: UUID, email: String?, username: String?): Long = db.tx { c ->
+        c.queryOne("select pg_advisory_xact_lock(hashtext(?))", "account:$uid") { }
+        email?.let { c.queryOne("select pg_advisory_xact_lock(hashtext(?))", "email:$it") { } }
+
+        c.queryOne("select id from users where account_uid = ?", uid) { it.getLong(1) }?.let { return@tx it }
+
+        if (email != null) {
+            val legacy = c.queryOne("select id, account_uid from users where email = ?", email) { it.getLong(1) to it.getObject(2) }
+            if (legacy != null) {
+                if (legacy.second != null) conflict("这个邮箱已关联另一个统一账号，请联系客服处理", "account_conflict")
+                c.execute("update users set account_uid = ?, email_verified_at = coalesce(email_verified_at, now()) where id = ?", uid, legacy.first)
+                return@tx legacy.first
+            }
+        }
+
+        val name = username?.let { runCatching { TextRules.nickname(it) }.getOrNull() }
+            ?.takeUnless { c.queryOne("select exists(select 1 from user_profiles where nickname_key = ?)", TextRules.nicknameKey(it)) { rs -> rs.getBoolean(1) } == true }
+            ?: generateUniqueChineseNickname(c)
+        val guest = ownerId > 0 && c.queryOne("select exists(select 1 from users where id = ? and account_uid is null and email_verified_at is null)", ownerId) { it.getBoolean(1) } == true
+        if (guest) {
+            c.execute("update user_profiles set nickname=?,nickname_key=?,updated_at=now() where user_id=?", name, TextRules.nicknameKey(name), ownerId)
+            c.execute("update users set account_uid = ?, email = ?, email_verified_at = case when ?::text is null then null else now() end where id = ?", uid, email, email, ownerId)
+            ownerId
+        } else {
+            val id = c.queryOne(
+                "insert into users (account_uid, email, email_verified_at, timezone, invite_code) values (?, ?, case when ?::text is null then null else now() end, ?, ?) returning id",
+                uid, email, email, DEFAULT_ZONE.id, newInviteCode(),
+            ) { it.getLong(1) }!!
+            c.execute("insert into companions (user_id) values (?)", id)
+            c.execute("insert into user_profiles (user_id, nickname, nickname_key) values (?, ?, ?)", id, name, TextRules.nicknameKey(name))
+            id
+        }
+    }
 
     suspend fun unlinkDevice(userId: Long, deviceHash: String) = db.read { c ->
         c.execute("delete from devices where user_id = ? and device_hash = ?", userId, deviceHash)
@@ -220,6 +267,7 @@ class UserRepository(private val db: Db) {
         termsVersion = rs.getString("terms_version"),
         emailVerifiedAt = rs.instant("email_verified_at"),
         avatarKey = rs.getString("avatar_key"),
+        accountUid = rs.getObject("account_uid", UUID::class.java),
     )
 
     companion object {
@@ -234,7 +282,7 @@ class UserRepository(private val db: Db) {
         private const val SELECT_USER = """
             select u.id, u.city_code, u.timezone, u.work_start, u.work_end, u.payday, u.onboarded_at, u.created_at,
                    u.invite_code, u.show_city_on_card, u.email, u.recall_opt_in, u.terms_version,
-                   c.name, c.personality, p.nickname, u.email_verified_at, a.asset_key as avatar_key
+                   c.name, c.personality, p.nickname, u.email_verified_at, a.asset_key as avatar_key, u.account_uid
             from users u join companions c on c.user_id = u.id
             join user_profiles p on p.user_id=u.id
             left join user_avatars a on a.user_id=u.id

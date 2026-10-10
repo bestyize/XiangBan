@@ -13,7 +13,11 @@ use serde_json::{json, Value};
 
 pub async fn get_me(State(state): State<AppState>, user: AuthUser) -> Result<Json<UserView>, AppError> {
     users::ensure_active(&state, user.uid).await?;
-    users::view(&state, user.uid).await.map(Json)
+    let mut view = users::view(&state, user.uid).await?;
+    if state.config.email_clients.contains(&user.client_id) {
+        view.email = users::verified_email(&state, user.uid).await?;
+    }
+    Ok(Json(view))
 }
 
 #[derive(Deserialize)]
