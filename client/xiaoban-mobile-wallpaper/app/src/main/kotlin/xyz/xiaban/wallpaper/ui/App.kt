@@ -38,6 +38,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -80,6 +81,8 @@ fun App(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit) {
 
     val detail by app.detail.collectAsState()
     val viewing by app.viewer.collectAsState()
+    val loginOpen by app.loginOpen.collectAsState()
+    val notice by app.announcement.collectAsState()
     // Keep showing the last page while it slides out, after the selection has already been cleared.
     var lastDetail by remember { mutableStateOf<SiteItem?>(null) }
     if (detail != null) lastDetail = detail
@@ -113,6 +116,11 @@ fun App(themeMode: ThemeMode, onThemeMode: (ThemeMode) -> Unit) {
             viewing?.let { Viewer(it, onClose = app::closeViewer) }
         }
         SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(bottom = 104.dp))
+        if (loginOpen) LoginDialog(app, onDismiss = app::closeLogin)
+        notice?.let {
+            // Keyed so a second notice starts at the top of its text instead of inheriting the first one's scroll.
+            key(it.id) { AnnouncementDialog(it, onConfirm = rememberAnnouncementConfirm(app, it), onCancel = app::dismissAnnouncement) }
+        }
     }
     }
 }

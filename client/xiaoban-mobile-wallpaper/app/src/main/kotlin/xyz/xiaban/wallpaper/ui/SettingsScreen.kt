@@ -29,6 +29,7 @@ import androidx.compose.material.icons.outlined.Place
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.remember
@@ -39,6 +40,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -53,6 +56,7 @@ fun SettingsScreen(app: AppViewModel, themeMode: ThemeMode, onThemeMode: (ThemeM
     val loader = SingletonImageLoader.get(context)
     var cacheBytes by remember { mutableLongStateOf((loader.diskCache?.size ?: 0L) + VideoCache.sizeBytes(context)) }
     val version = remember { context.packageManager.getPackageInfo(context.packageName, 0).versionName.orEmpty() }
+    val update by app.update.collectAsState()
 
     BackHandler(onBack = onClose)
 
@@ -79,7 +83,14 @@ fun SettingsScreen(app: AppViewModel, themeMode: ThemeMode, onThemeMode: (ThemeM
             Spacer(Modifier.height(20.dp))
             SettingsGroup("关于") {
                 SettingRow(Icons.Outlined.Home, Palette.Sky, Palette.SkySoft, "壁纸来源", "wallpaper.xiangban.xyz")
-                SettingRow(Icons.Outlined.Info, Palette.Sub, Palette.Field, "版本", version, last = true)
+                // With a newer release a red dot sits by the title and the row opens the website's download section.
+                SettingRow(
+                    Icons.Outlined.Info, Palette.Sub, Palette.Field, "版本",
+                    update?.let { "$version → ${it.version}" } ?: version,
+                    last = true,
+                    dot = update != null,
+                    onClick = update?.let { { openLink(context, app.downloadsLink) { app.say("没有找到可以打开链接的应用") } } },
+                )
             }
         }
     }
@@ -142,6 +153,7 @@ private fun SettingRow(
     title: String,
     value: String,
     last: Boolean = false,
+    dot: Boolean = false,
     onClick: (() -> Unit)? = null,
 ) {
     Row(
@@ -152,8 +164,15 @@ private fun SettingRow(
     ) {
         IconTile(icon, tint, soft)
         Spacer(Modifier.width(12.dp))
-        Text(title, Modifier.weight(1f), color = Palette.Text, fontSize = 15.sp)
-        Text(value, color = Palette.Sub, fontSize = 13.sp)
+        Text(title, color = Palette.Text, fontSize = 15.sp)
+        if (dot) {
+            Box(
+                Modifier.padding(start = 6.dp).size(8.dp).clip(CircleShape).background(Palette.Brand)
+                    .semantics { contentDescription = "有新版本" },
+            )
+        }
+        Spacer(Modifier.weight(1f))
+        Text(value, color = if (dot) Palette.Brand else Palette.Sub, fontSize = 13.sp)
     }
     if (!last) Box(Modifier.fillMaxWidth().padding(start = 64.dp).height(0.5.dp).background(Palette.Line))
 }

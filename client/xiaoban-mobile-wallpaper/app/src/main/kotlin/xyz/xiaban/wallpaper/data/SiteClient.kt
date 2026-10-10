@@ -10,7 +10,7 @@ import java.net.URLEncoder
 import java.net.UnknownHostException
 
 /** Talks to the wallpaper website's public API. Downloads are verified before they are ever used. */
-class SiteClient(private val origin: String = DEFAULT_ORIGIN) : Remote {
+class SiteClient(val origin: String = DEFAULT_ORIGIN) : Remote {
     fun categories(): List<Category> = SiteParser.categories(text("$origin/api/v1/categories", READ_MS))
 
     fun search(query: String, category: String, kind: MediaKind?, page: Int, orientation: Orientation = Orientation.ALL): SitePage {
@@ -22,6 +22,16 @@ class SiteClient(private val origin: String = DEFAULT_ORIGIN) : Remote {
         }
         return SiteParser.page(text("$origin/api/v1/wallpapers/search?$params", READ_MS), origin)
     }
+
+    /** The release newer than [currentVersion] for this app, or null when this is the newest (the site answers 204). */
+    fun update(currentVersion: String): AppUpdate? {
+        val url = "$origin/api/v1/desktop/updates?currentVersion=${enc(currentVersion)}&target=${UpdateRules.TARGET}"
+        return optionalText(url, READ_MS)?.let(UpdateRules::update)
+    }
+
+    /** Notices for this app. A site that predates them answers without naming the audience, which is refused. */
+    fun announcements(): List<Announcement> =
+        UpdateRules.announcements(text("$origin/api/v1/desktop/announcements?audience=${UpdateRules.AUDIENCE}", READ_MS))
 
     /** Without [preferSource] the site builds and hashes its own copy first, which can take a while. */
     override fun delivery(id: String, preferSource: Boolean): Delivery {
@@ -93,7 +103,17 @@ class SiteClient(private val origin: String = DEFAULT_ORIGIN) : Remote {
         }
     }
 
-    private fun open(start: String, readMs: Int, identity: Boolean): HttpURLConnection {
+    /** Like [text], but a 204 (nothing to report) gives null. */
+    private fun optionalText(url: String, readMs: Int): String? = guard {
+        val conn = open(url, readMs, identity = false, allowNoContent = true)
+        try {
+            if (conn.responseCode == 204) null else conn.inputStream.bufferedReader().use { it.readText() }
+        } finally {
+            conn.disconnect()
+        }
+    }
+
+    private fun open(start: String, readMs: Int, identity: Boolean, allowNoContent: Boolean = false): HttpURLConnection {
         var current = start
         repeat(MAX_REDIRECTS + 1) {
             if (!MediaRules.isHttps(current)) throw SiteException("只允许使用 HTTPS 地址")
@@ -108,7 +128,7 @@ class SiteClient(private val origin: String = DEFAULT_ORIGIN) : Remote {
                 val next = conn.getHeaderField("Location")
                 conn.disconnect()
                 current = URL(URL(current), next ?: throw SiteException("重定向缺少地址")).toString()
-            } else if (code == 200) {
+            } else if (code == 200 || (allowNoContent && code == 204)) {
                 return conn
             } else {
                 val reason = reasonOf(conn)
