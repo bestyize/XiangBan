@@ -51,6 +51,8 @@ pub struct Settings {
     pub automatic_updates: bool,
     pub game_desktop_double_click: bool,
     pub companion_enabled: bool,
+    /// The companion reacts to the desktop effect (and later, to local presence) with expressions only.
+    pub companion_links: bool,
     /// The particle effect over the desktop, whatever wallpaper (or plain system desktop) is behind it.
     pub effects: crate::effect_choice::EffectsChoice,
 }
@@ -73,6 +75,7 @@ impl Default for Settings {
             automatic_updates: true,
             game_desktop_double_click: false,
             companion_enabled: true,
+            companion_links: true,
             effects: Default::default(),
         }
     }
@@ -168,7 +171,19 @@ mod tests {
         assert!(value.settings.autostart);
         assert!(!value.settings.game_desktop_double_click);
         assert!(value.settings.companion_enabled);
+        assert!(value.settings.companion_links);
         assert_eq!(value.settings.effects, Default::default());
+    }
+    #[test]
+    fn companion_links_default_on_and_an_explicit_off_survives_reload() {
+        assert!(Settings::default().companion_links);
+        let mut value: Preferences = serde_json::from_str(r#"{"settings":{"companionLinks":false}}"#).unwrap();
+        value.settings.normalize();
+        assert!(!value.settings.companion_links);
+        let saved = serde_json::to_string(&value).unwrap();
+        assert!(saved.contains(r#""companionLinks":false"#), "{saved}");
+        let again: Preferences = serde_json::from_str(&saved).unwrap();
+        assert!(!again.settings.companion_links);
     }
     #[test]
     fn effects_chosen_per_wallpaper_become_the_desktop_wide_choice_once() {

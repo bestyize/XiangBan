@@ -46,6 +46,17 @@ describe('control state with native settings', () => {
     await store.setEffects({ selected: '', params: choice.params });
     expect(store.settings.effects.selected).toBe('');
   });
+  it('sends the companion links switch to the host and keeps the acknowledged value', async () => {
+    const store = createControlStore(vi.fn());
+    expect(store.settings.companionLinks).toBe(true);
+    ipc.mockImplementation(async (_command, args) => ({ ...clone(defaults), companionLinks: args?.enabled } as never));
+    await store.setCompanionLinks(false);
+    expect(ipc).toHaveBeenCalledWith('set_companion_links', { enabled: false });
+    expect(store.settings.companionLinks).toBe(false);
+    ipc.mockRejectedValueOnce(new Error('保存失败'));
+    await expect(store.setCompanionLinks(true)).rejects.toThrow('保存失败');
+    expect(store.settings.companionLinks).toBe(false);
+  });
   it('lists the effects through the host, keeping the usable ones and naming the rest', async () => {
     const store = createControlStore(vi.fn());
     const good = { schemaVersion: 1, id: 'glitter', name: '星尘', layers: [{ count: 5, shape: { kind: 'circle' }, colors: ['#fff'] }], source: 'user' };

@@ -16,6 +16,8 @@ export interface Settings {
   automaticUpdates: boolean;
   gameDesktopDoubleClick: boolean;
   companionEnabled: boolean;
+  /** Lets the companion answer the desktop effect with expressions only; no popups or sound. */
+  companionLinks: boolean;
   /** The particle effect over the desktop, whatever wallpaper is behind it. */
   effects: EffectsChoice;
 }
@@ -129,6 +131,7 @@ export const defaults: Settings = {
   automaticUpdates: true,
   gameDesktopDoubleClick: false,
   companionEnabled: true,
+  companionLinks: true,
   effects: { selected: "", params: {} },
 };
 export function invoke<T>(

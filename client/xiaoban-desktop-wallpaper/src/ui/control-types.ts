@@ -24,6 +24,7 @@ export interface ControlStore {
   updateAppearance(patch: Partial<Settings>): Promise<void>;
   setMode(mode: Settings["mode"]): Promise<void>;
   setCompanion(enabled: boolean): Promise<void>;
+  setCompanionLinks(enabled: boolean): Promise<void>;
   /** The effects that can be chosen: the built-in ones and the user's own files. */
   effectList: LoadedPacks;
   loadEffects(): Promise<void>;

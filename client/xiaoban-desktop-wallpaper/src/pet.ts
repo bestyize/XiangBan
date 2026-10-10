@@ -1,6 +1,7 @@
 // Desktop-owned character core, initially copied without changing art or motion.
 import { Animator } from './companion/animator.ts'
-import { Mind } from './companion/mind.ts'
+import { Mind, type Beat } from './companion/mind.ts'
+import { Reactions } from './companion/reactions.ts'
 import { toSpec, stillFrame, type RobotInput } from './companion/expressions.ts'
 import { bodyTransform, earLight, earTransform, faceMarkup, faceOpacity, robotMarkup, shadowAttrs } from './companion/render.ts'
 import type { Settings } from './bridge.ts'
@@ -16,6 +17,13 @@ export class PetView {
   private config: Settings
   private lastExpression = ''
   private lastStatus = ''
+  private interactUntil = 0
+  readonly reactions = new Reactions({
+    play: beats => this.mind.play(beats),
+    stop: () => this.mind.play([]),
+    lookAt: target => { this.animator.lookAt = target },
+    busy: () => this.busy(),
+  })
   private careExpression = (event: Event) => {
     if (event instanceof CustomEvent && event.detail === 'happy') this.temporaryExpression('happy')
   }
@@ -44,6 +52,7 @@ export class PetView {
       if (this.last && now - this.last < 1000 / this.config.fps - 1) return
       const dt = this.last ? (now - this.last) / 1000 : 1 / 60
       this.last = now
+      this.reactions.tick(dt)
       this.mind.tick(dt)
       const frame = this.animator.step(dt)
       body?.setAttribute('transform', bodyTransform(frame))
@@ -96,11 +105,27 @@ export class PetView {
     })
   }
 
-  poke() { this.mind.poke() }
+  /** Direct handling (click, drag) or a care expression: effect reactions stay out of the way. */
+  interact(seconds = 4) { this.interactUntil = Math.max(this.interactUntil, performance.now() + seconds * 1000) }
+  private busy() { return this.config.paused || this.mind.dozing || performance.now() < this.interactUntil }
+
+  playBeats(beats: Beat[]) {
+    if (this.config.paused || this.mind.dozing) return
+    this.mind.activity()
+    this.interact(beats.reduce((sum, beat) => sum + beat.hold, 0))
+    this.mind.play(beats)
+  }
+
+  poke() {
+    this.interact()
+    if (!this.mind.dozing && this.reactions.wish()) { this.mind.activity(); this.animator.twitchEar(0, 0.8); return }
+    this.mind.poke()
+  }
   temporaryExpression(expression: RobotInput, seconds = 10) {
     if (this.config.paused) return
     this.mind.activity()
+    this.interact(Math.min(seconds, 10))
     this.mind.play([{ expr: expression, hold: Math.max(0.5, Math.min(seconds, 10)) }])
   }
-  destroy() { cancelAnimationFrame(this.frameId); clearTimeout(this.lookTimer); window.removeEventListener('care-expression', this.careExpression); this.host.remove() }
+  destroy() { this.reactions.destroy(); cancelAnimationFrame(this.frameId); clearTimeout(this.lookTimer); window.removeEventListener('care-expression', this.careExpression); this.host.remove() }
 }

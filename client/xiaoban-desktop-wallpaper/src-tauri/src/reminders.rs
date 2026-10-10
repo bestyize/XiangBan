@@ -96,6 +96,7 @@ pub struct ReminderState {
     game: AtomicBool,
     started: AtomicBool,
     smoke_running: AtomicBool,
+    presence: Mutex<crate::presence::Presence>,
 }
 
 fn control(window: &tauri::WebviewWindow) -> Result<(), String> {
@@ -520,6 +521,23 @@ fn tick(app: &tauri::AppHandle, elapsed: f64, checkpoint: bool) {
         publish(app);
     } else if changed { publish(app); }
 }
+fn presence_path(app: &tauri::AppHandle) -> Option<std::path::PathBuf> {
+    crate::storage::root(app).ok().map(|root| root.join("config/presence.json"))
+}
+/// Reuses the care idle/lock sample and its quiet/game gates; the only output is one event to the pet window.
+fn presence_tick(app: &tauri::AppHandle, elapsed: f64) {
+    let state = app.state::<ReminderState>(); let activity = care_system::activity(); let now = Local::now();
+    let silenced = { let store = state.store.lock().unwrap(); !store.config.enabled || quiet(&store.config, now.time()) }
+        || state.runtime.lock().unwrap().focus || !companion_visible(app);
+    let input = crate::presence::Input { local: now.naive_local(), unix: now.timestamp(), idle_seconds: activity.idle_seconds, elapsed,
+        locked: activity.locked, available: activity.available, quiet: silenced, game: state.game.load(Ordering::Relaxed) };
+    let (kind, greeted) = {
+        let mut presence = state.presence.lock().unwrap(); let before = presence.first_today_date();
+        let kind = presence.step(input); (kind, presence.first_today_date().filter(|day| Some(*day) != before))
+    };
+    if let (Some(day), Some(path)) = (greeted, presence_path(app)) { let _ = crate::presence::save_first_today(&path, day); }
+    if let Some(kind) = kind { let _ = app.emit_to("pet", "companion-presence", serde_json::json!({"kind": kind.as_str()})); }
+}
 pub fn start(app: &tauri::AppHandle) {
     let state = app.state::<ReminderState>();
     if state.started.swap(true, Ordering::Relaxed) { return; }
@@ -543,6 +561,9 @@ pub fn start(app: &tauri::AppHandle) {
             state.runtime.lock().unwrap().read_error = true;
         },
     }
+    if let Some(path) = presence_path(app) {
+        *state.presence.lock().unwrap() = crate::presence::Presence::with_first_today(crate::presence::load_first_today(&path, Local::now().date_naive()));
+    }
     let app = app.clone();
     std::thread::spawn(move || {
         let mut previous = Instant::now(); let mut wall = Local::now().timestamp(); let mut checkpoint = Instant::now();
@@ -553,7 +574,7 @@ pub fn start(app: &tauri::AppHandle) {
             let elapsed = if seconds <= 15.0 && ((timestamp - wall) as f64 - seconds).abs() < 15.0 { seconds } else { 0.0 };
             previous = instant; wall = timestamp;
             let save_elapsed = checkpoint.elapsed() >= Duration::from_secs(60);
-            if !app.state::<ReminderState>().smoke_running.load(Ordering::Relaxed) { tick(&app, elapsed, save_elapsed); }
+            if !app.state::<ReminderState>().smoke_running.load(Ordering::Relaxed) { tick(&app, elapsed, save_elapsed); presence_tick(&app, elapsed); }
             if save_elapsed { checkpoint = Instant::now(); }
             std::thread::sleep(Duration::from_secs(5));
         }

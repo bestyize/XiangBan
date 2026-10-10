@@ -7,6 +7,7 @@ import {
   type CursorSample,
 } from "./bridge.ts";
 import { PetView } from "./pet.ts";
+import { listenPresence } from "./companion/presence.ts";
 async function init() {
   const mode = new URLSearchParams(location.search).get("scene");
   if (!mode) {
@@ -48,6 +49,7 @@ async function init() {
     )
       return;
     pointer = { x: event.clientX, y: event.clientY, dragged: false };
+    pet.interact();
     pet.host.setPointerCapture(event.pointerId);
   });
   pet.host.addEventListener("pointermove", (event) => {
@@ -57,6 +59,7 @@ async function init() {
       Math.hypot(event.clientX - pointer.x, event.clientY - pointer.y) > 5
     ) {
       pointer.dragged = true;
+      pet.interact(8);
       invoke("start_drag").catch(console.error);
     }
   });
@@ -85,9 +88,13 @@ async function init() {
     document.body.dataset.paused = String(config.paused);
     pet.host.hidden = !config.companionEnabled;
     pet.update({ ...config, paused: config.paused || !config.companionEnabled });
+    pet.reactions.setEnabled(config.companionLinks !== false);
+    pet.reactions.setPaused(config.paused || !config.companionEnabled);
+    pet.reactions.setEffect(config.effects.selected);
   };
   await listen<Settings>("settings-changed", apply);
   await listen("pet-poke", () => pet.poke());
+  await listenPresence(listen, (beats) => pet.playBeats(beats), () => config.companionLinks !== false && config.companionEnabled);
   if (desktop) {
     apply(await invoke<Settings>("get_settings"));
     await invoke("scene_ready");
