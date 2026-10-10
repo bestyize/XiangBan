@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>小伴</title>
+  <style>
+    :root { color-scheme: light dark; --bg: #f7f7f7; --fg: #262626; --accent: #e51b3e; }
+    @media (prefers-color-scheme: dark) { :root { --bg: #141414; --fg: #f2f2f2; --accent: #ff6b81; } }
+    html, body { height: 100%; margin: 0; background: var(--bg); color: var(--fg); font: 16px system-ui, "PingFang SC", "Microsoft YaHei", sans-serif; }
+    main { height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; padding: 32px; text-align: center; }
+    button { border: 0; border-radius: 999px; padding: 10px 28px; background: var(--accent); color: var(--bg); font: inherit; font-weight: 600; cursor: pointer; }
+    [hidden] { display: none; }
+  </style>
+</head>
+<body>
+  <main>
+    <p id="message">正在进入相伴…</p>
+    <button id="retry" type="button" hidden>重试</button>
+  </main>
+  <script>
+    // The site itself is the app; this page only covers the moment before it loads and the case where it cannot be reached.
+    const HOME = "https://xiaban.xyz";
+    const message = document.getElementById("message");
+    const retry = document.getElementById("retry");
+
+    async function enter() {
+      message.textContent = "正在进入相伴…";
+      retry.hidden = true;
+      try {
+        // no-cors: any HTTP answer counts as reachable, only a network failure rejects.
+        await fetch(HOME, { mode: "no-cors", cache: "no-store", signal: AbortSignal.timeout(8000) });
+        location.replace(HOME);
+      } catch {
+        message.textContent = "连不上相伴，检查一下网络再试";
+        retry.hidden = false;
+      }
+    }
+
+    retry.addEventListener("click", enter);
+    enter();
+  </script>
+</body>
+</html>

@@ -10,7 +10,7 @@
 | [client/xiaoban-desktop-wallpaper](client/xiaoban-desktop-wallpaper/README.md) | 可运行原型 | Windows/macOS 桌宠与动态壁纸，无聊天和账户 |
 | [client/xiaoban-pot-garden](client/xiaoban-pot-garden/README.md) | 可运行原型 | 表情盆栽的 3D 质感原型（Vite + three.js），花盆养成游戏的起点，目前只有表情和质感，没有玩法 |
 | [client/xiaoban-mobile-wallpaper](client/xiaoban-mobile-wallpaper/README.md) | 可运行原型 | Android 壁纸浏览与下载，Compose 双列瀑布流，收藏只存本机，无账户 |
-| [client/xiaoban-multiplatform](client/xiaoban-multiplatform/README.md) | 规划 | 未来 App，固定保留此目录 |
+| [client/xiaoban-multiplatform](client/xiaoban-multiplatform/README.md) | 可运行原型 | 把 xiaban.xyz 套进原生壳：Android/iOS 用 KMP + Compose，桌面用 Rust + Tauri（`desktopApp/`）；Android 与 macOS 已运行验证，iOS 仅编译 |
 | [client/xiaoban-realbot](client/xiaoban-realbot/README.md) | 规划 | 实体机器人客户端，平台与硬件待定 |
 | [services/xiaban-api/backend](services/xiaban-api/backend/README.md) | 已实现 | Ktor 后端、业务、数据与后台任务 |
 | [services/xiaban-api/api-contracts](services/xiaban-api/api-contracts/README.md) | 已实现 | 原 shared，按业务分包的 KMP 接口库 |
