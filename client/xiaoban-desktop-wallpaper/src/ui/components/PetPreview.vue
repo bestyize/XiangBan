@@ -7,7 +7,7 @@ const host = ref<HTMLElement>();
 let pet: PetView | null = null;
 const previewSettings = () => ({ ...props.settings, size: 250, paused: props.settings.paused });
 onMounted(() => { if (host.value) pet = new PetView(host.value, previewSettings()); });
-watch(() => [props.settings.expression, props.settings.paused, props.settings.theme], () => pet?.update(previewSettings()));
+watch(() => [props.settings.expression, props.settings.paused, props.settings.theme, props.settings.companionSkin],() => pet?.update(previewSettings()));
 onBeforeUnmount(() => { pet?.destroy(); pet = null; });
 defineExpose({ poke: () => pet?.poke() });
 </script>

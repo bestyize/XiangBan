@@ -3,6 +3,7 @@ import { Animator } from './animator.ts'
 import { EXPRESSION_NAMES, resolve, stillFrame } from './expressions.ts'
 import { Mind } from './mind.ts'
 import { robotMarkup, type Frame } from './render.ts'
+import { DEFAULT_SKIN, SKIN_IDS, SKINS, skinOf } from './skins.ts'
 import { SYMBOL_NAMES } from './symbols.ts'
 
 const run = (animator: Animator, seconds: number, onFrame?: (frame: Frame) => void) => {
@@ -24,6 +25,29 @@ describe('robot expressions', () => {
   it('renders every expression as clean markup', () => {
     expect(EXPRESSION_NAMES).toHaveLength(25)
     for (const name of EXPRESSION_NAMES) wellFormed(robotMarkup(stillFrame(name), 'x'))
+  })
+
+  it('renders every expression in every shell, with the same moving parts and screen', () => {
+    expect(SKIN_IDS).toEqual(['cat', 'bunny', 'pot'])
+    const parts = (svg: string) => [...svg.matchAll(/data-part="(\w+)"/g)].map(match => match[1]).sort()
+    const reference = parts(robotMarkup(stillFrame('idle'), 'x'))
+    for (const skin of SKIN_IDS) {
+      for (const name of EXPRESSION_NAMES) wellFormed(robotMarkup(stillFrame(name), 'x', undefined, skin))
+      const svg = robotMarkup(stillFrame('idle'), 'x', undefined, skin)
+      expect(parts(svg), skin).toEqual(reference)
+      expect(svg).toContain(SKINS[skin].earOuter)
+    }
+  })
+
+  it('falls back to the cat for an unknown shell, and keeps ear art inside the view', () => {
+    expect(skinOf('nonsense').id).toBe(DEFAULT_SKIN)
+    expect(robotMarkup(stillFrame('idle'), 'x', undefined, 'nonsense')).toBe(robotMarkup(stillFrame('idle'), 'x'))
+    for (const skin of Object.values(SKINS)) {
+      const numbers = (skin.earOuter.match(/-?\d+(\.\d+)?/g) ?? []).map(Number)
+      const top = 246 + (Math.min(...numbers) - 246) * skin.scale
+      expect(top, skin.id).toBeGreaterThanOrEqual(0)
+      expect(Math.max(...numbers), skin.id).toBeLessThanOrEqual(320)
+    }
   })
 
   it('renders every screen symbol', () => {

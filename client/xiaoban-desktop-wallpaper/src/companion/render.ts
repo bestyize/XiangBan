@@ -3,6 +3,7 @@ import {
 } from './geometry.ts'
 import type { Eye, EyeGlyph, Face, Mouth, SymbolName } from './params.ts'
 import { heartPath, renderSymbol } from './symbols.ts'
+import { skinOf, type Skin, type SkinId } from './skins.ts'
 
 /** Everything needed to draw one moment of the robot. */
 export interface Frame {
@@ -182,9 +183,9 @@ export function bodyTransform(frame: Frame) {
   return `translate(0 ${f(frame.face.lift)}) rotate(${f(frame.face.tilt)} ${x} ${y}) translate(${x} ${y}) scale(${(2 - s).toFixed(4)} ${s.toFixed(4)}) translate(${-x} ${-y})`
 }
 
-export function earTransform(frame: Frame, side: -1 | 1) {
+export function earTransform(frame: Frame, side: -1 | 1, pivot: readonly [number, number] = [104, 98]) {
   const angle = side === -1 ? frame.face.earL : frame.face.earR
-  const rotate = `rotate(${f(-angle)} 104 98)`
+  const rotate = `rotate(${f(-angle)} ${pivot[0]} ${pivot[1]})`
   return side === -1 ? rotate : `translate(${VIEW.w} 0) scale(-1 1) ${rotate}`
 }
 
@@ -198,35 +199,32 @@ export function shadowAttrs(frame: Frame) {
   return { rx: f(104 * (1 - up * 0.008)), opacity: (0.3 * (1 - up * 0.015)).toFixed(3) }
 }
 
-const EAR_OUTER = 'M48 124C43 94 52 52 69 22Q75 12 84 17C106 32 128 56 145 88L122 114Z'
-const EAR_INNER = 'M58 114C55 90 62 58 74 33Q78 26 84 30C102 44 119 64 133 92L112 110Z'
-
-function ear(id: string, side: -1 | 1, frame: Frame) {
+function ear(id: string, side: -1 | 1, frame: Frame, skin: Skin) {
   const light = earLight(frame)
-  return `<g data-part="ear${side === -1 ? 'L' : 'R'}" transform="${earTransform(frame, side)}">` +
-    `<ellipse cx="92" cy="62" rx="56" ry="52" fill="url(#${id}halo)" data-part="halo" opacity="${f(light)}"/>` +
-    `<path d="${EAR_OUTER}" fill="url(#${id}earShell)" stroke="#d8bb94" stroke-width="1.2"/>` +
-    `<path d="${EAR_INNER}" fill="#a8641f"/>` +
-    `<path d="${EAR_INNER}" fill="url(#${id}earLight)" data-part="earLight" opacity="${f(0.25 + 0.75 * light)}"/>` +
-    `<path d="M66 100C64 80 69 58 78 40" fill="none" stroke="#fffbe8" stroke-width="3" stroke-linecap="round" opacity="0.55"/>` +
+  return `<g data-part="ear${side === -1 ? 'L' : 'R'}" transform="${earTransform(frame, side, skin.earPivot)}">` +
+    `<ellipse cx="${skin.haloAt[0]}" cy="${skin.haloAt[1]}" rx="${skin.haloAt[2]}" ry="${skin.haloAt[3]}" fill="url(#${id}halo)" data-part="halo" opacity="${f(light)}"/>` +
+    `<path d="${skin.earOuter}" fill="url(#${id}earShell)" stroke="${skin.earStroke}" stroke-width="1.2"/>` +
+    `<path d="${skin.earInner}" fill="${skin.earBase}"/>` +
+    `<path d="${skin.earInner}" fill="url(#${id}earLight)" data-part="earLight" opacity="${f(0.25 + 0.75 * light)}"/>` +
+    `<path d="${skin.earHighlight}" fill="none" stroke="#fffbe8" stroke-width="3" stroke-linecap="round" opacity="0.55"/>` +
     `</g>`
 }
 
-function defs(id: string) {
+function defs(id: string, skin: Skin) {
   const s = SCREEN
   return `<defs>` +
-    `<radialGradient id="${id}shell" cx="0.36" cy="0.2" r="0.95"><stop offset="0" stop-color="#fffdf8"/><stop offset="0.45" stop-color="#f6ebdb"/><stop offset="0.82" stop-color="#e4cfae"/><stop offset="1" stop-color="#c9aa80"/></radialGradient>` +
-    `<linearGradient id="${id}shade" x1="0" y1="0" x2="0" y2="1"><stop offset="0.5" stop-color="#6e4c27" stop-opacity="0"/><stop offset="1" stop-color="#6e4c27" stop-opacity="0.24"/></linearGradient>` +
-    `<linearGradient id="${id}bezel" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f4e2c3"/><stop offset="0.5" stop-color="#d9b682"/><stop offset="1" stop-color="#b98c55"/></linearGradient>` +
+    `<radialGradient id="${id}shell" cx="0.36" cy="0.2" r="0.95"><stop offset="0" stop-color="${skin.shell[0]}"/><stop offset="0.45" stop-color="${skin.shell[1]}"/><stop offset="0.82" stop-color="${skin.shell[2]}"/><stop offset="1" stop-color="${skin.shell[3]}"/></radialGradient>` +
+    `<linearGradient id="${id}shade" x1="0" y1="0" x2="0" y2="1"><stop offset="0.5" stop-color="${skin.shade}" stop-opacity="0"/><stop offset="1" stop-color="${skin.shade}" stop-opacity="0.24"/></linearGradient>` +
+    `<linearGradient id="${id}bezel" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${skin.bezel[0]}"/><stop offset="0.5" stop-color="${skin.bezel[1]}"/><stop offset="1" stop-color="${skin.bezel[2]}"/></linearGradient>` +
     `<radialGradient id="${id}screen" cx="0.5" cy="0.18" r="0.95"><stop offset="0" stop-color="#1d222c"/><stop offset="0.55" stop-color="#090a0e"/><stop offset="1" stop-color="#020203"/></radialGradient>` +
     `<linearGradient id="${id}gloss" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity="0.09"/><stop offset="0.38" stop-color="#fff" stop-opacity="0"/></linearGradient>` +
-    `<linearGradient id="${id}pod" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#d9bf98"/><stop offset="0.45" stop-color="#fbf4e8"/><stop offset="1" stop-color="#dcc29c"/></linearGradient>` +
-    `<linearGradient id="${id}podCore" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#c9a87b"/><stop offset="0.5" stop-color="#efe0c8"/><stop offset="1" stop-color="#c49f70"/></linearGradient>` +
-    `<linearGradient id="${id}earShell" x1="0.3" y1="0" x2="0.6" y2="1"><stop offset="0" stop-color="#fbf3e6"/><stop offset="1" stop-color="#e2c9a4"/></linearGradient>` +
-    `<radialGradient id="${id}earLight" gradientUnits="userSpaceOnUse" cx="98" cy="96" r="78"><stop offset="0" stop-color="#fffbe0"/><stop offset="0.3" stop-color="#ffe08a"/><stop offset="0.62" stop-color="#ffb43f"/><stop offset="1" stop-color="#f28a1c"/></radialGradient>` +
-    `<radialGradient id="${id}halo"><stop offset="0" stop-color="#ffbe55" stop-opacity="0.5"/><stop offset="1" stop-color="#ffbe55" stop-opacity="0"/></radialGradient>` +
+    `<linearGradient id="${id}pod" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="${skin.pod[0]}"/><stop offset="0.45" stop-color="${skin.pod[1]}"/><stop offset="1" stop-color="${skin.pod[2]}"/></linearGradient>` +
+    `<linearGradient id="${id}podCore" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="${skin.podCore[0]}"/><stop offset="0.5" stop-color="${skin.podCore[1]}"/><stop offset="1" stop-color="${skin.podCore[2]}"/></linearGradient>` +
+    `<linearGradient id="${id}earShell" x1="0.3" y1="0" x2="0.6" y2="1"><stop offset="0" stop-color="${skin.earShell[0]}"/><stop offset="1" stop-color="${skin.earShell[1]}"/></linearGradient>` +
+    `<radialGradient id="${id}earLight" gradientUnits="userSpaceOnUse" cx="${skin.lightAt[0]}" cy="${skin.lightAt[1]}" r="${skin.lightAt[2]}"><stop offset="0" stop-color="${skin.light[0]}"/><stop offset="0.3" stop-color="${skin.light[1]}"/><stop offset="0.62" stop-color="${skin.light[2]}"/><stop offset="1" stop-color="${skin.light[3]}"/></radialGradient>` +
+    `<radialGradient id="${id}halo"><stop offset="0" stop-color="${skin.halo}" stop-opacity="0.5"/><stop offset="1" stop-color="${skin.halo}" stop-opacity="0"/></radialGradient>` +
     `<radialGradient id="${id}ground"><stop offset="0" stop-color="#000" stop-opacity="1"/><stop offset="1" stop-color="#000" stop-opacity="0"/></radialGradient>` +
-    `<clipPath id="${id}headClip"><rect x="${HEAD.x}" y="${HEAD.y}" width="${HEAD.w}" height="${HEAD.h}" rx="${HEAD.r}"/></clipPath>` +
+    `<clipPath id="${id}headClip">${skin.art ? `<path d="${skin.art.head}"/>` : `<rect x="${HEAD.x}" y="${HEAD.y}" width="${HEAD.w}" height="${HEAD.h}" rx="${HEAD.r}"/>`}</clipPath>` +
     `<clipPath id="${id}screenClip"><rect x="${s.x}" y="${s.y}" width="${s.w}" height="${s.h}" rx="${s.r}"/></clipPath>` +
     `<filter id="${id}glow" filterUnits="userSpaceOnUse" x="${s.x}" y="${s.y}" width="${s.w}" height="${s.h}" color-interpolation-filters="sRGB">` +
     `<feGaussianBlur in="SourceGraphic" stdDeviation="5.5" result="blur"/>` +
@@ -236,16 +234,25 @@ function defs(id: string) {
     `</defs>`
 }
 
-function shell(id: string) {
+function shell(id: string, skin: Skin) {
   const h = HEAD
   const b = BEZEL
   const s = SCREEN
   const pod = (x: number) =>
-    `<rect x="${x}" y="120" width="36" height="88" rx="18" fill="url(#${id}pod)" stroke="#c9a273" stroke-width="1.4"/>` +
+    `<rect x="${x}" y="120" width="36" height="88" rx="18" fill="url(#${id}pod)" stroke="${skin.podStroke}" stroke-width="1.4"/>` +
     `<rect x="${x + 6}" y="129" width="24" height="70" rx="12" fill="url(#${id}podCore)" opacity="0.9"/>`
   const foot = (x: number) => `<rect x="${x}" y="226" width="40" height="24" rx="10" fill="#3a3029"/><rect x="${x + 6}" y="240" width="28" height="4" rx="2" fill="#5a4a3e"/>`
+  const bezelAndScreen =
+    `<rect x="${b.x}" y="${b.y}" width="${b.w}" height="${b.h}" rx="${b.r}" fill="url(#${id}bezel)"/>` +
+    `<rect x="${s.x}" y="${s.y}" width="${s.w}" height="${s.h}" rx="${s.r}" fill="url(#${id}screen)" stroke="#000" stroke-opacity="0.7" stroke-width="1.6"/>`
+  if (skin.art) {
+    return skin.art.feet +
+      `<path d="${skin.art.head}" fill="url(#${id}shell)" stroke="${skin.stroke}" stroke-width="1.5" stroke-linejoin="round"/>` +
+      `<path d="${skin.art.head}" fill="url(#${id}shade)"/>` +
+      `<g clip-path="url(#${id}headClip)">${skin.art.trim}</g>` + skin.art.front + bezelAndScreen
+  }
   return foot(98) + foot(182) + pod(19) + pod(265) +
-    `<rect x="${h.x}" y="${h.y}" width="${h.w}" height="${h.h}" rx="${h.r}" fill="url(#${id}shell)" stroke="#d2b085" stroke-width="1.5"/>` +
+    `<rect x="${h.x}" y="${h.y}" width="${h.w}" height="${h.h}" rx="${h.r}" fill="url(#${id}shell)" stroke="${skin.stroke}" stroke-width="1.5"/>` +
     `<g clip-path="url(#${id}headClip)"><rect x="${h.x}" y="${h.y}" width="${h.w}" height="${h.h}" fill="url(#${id}shade)"/>` +
     `<ellipse cx="118" cy="84" rx="70" ry="9" fill="#fff" opacity="0.55"/></g>` +
     `<rect x="${b.x}" y="${b.y}" width="${b.w}" height="${b.h}" rx="${b.r}" fill="url(#${id}bezel)"/>` +
@@ -262,21 +269,26 @@ function gloss(id: string) {
  * Full SVG markup. Pure string so the same art renders inline, as an <img> data URL and onto the share-card canvas.
  * Parts that animate carry data-part attributes; the live component updates them in place.
  */
-export function robotMarkup(frame: Frame, id: string, label?: string) {
+const scaleOpen = (skin: Skin) =>
+  skin.scale === 1 ? '' : `<g transform="translate(${BODY_PIVOT.x} ${BODY_PIVOT.y}) scale(${skin.scale}) translate(${-BODY_PIVOT.x} ${-BODY_PIVOT.y})">`
+
+export function robotMarkup(frame: Frame, id: string, label?: string, skinId?: SkinId | string) {
+  const skin = skinOf(skinId)
   const shadow = shadowAttrs(frame)
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${VIEW.w} ${VIEW.h}" width="100%" height="100%"${label ? ` role="img" aria-label="${label.replace(/[<>&"]/g, '')}"` : ''}>` +
-    defs(id) +
+    defs(id, skin) +
+    scaleOpen(skin) +
     `<ellipse data-part="shadow" cx="160" cy="250" rx="${shadow.rx}" ry="11" fill="url(#${id}ground)" opacity="${shadow.opacity}"/>` +
     `<g data-part="body" transform="${bodyTransform(frame)}">` +
-    ear(id, -1, frame) + ear(id, 1, frame) +
-    shell(id) +
+    ear(id, -1, frame, skin) + ear(id, 1, frame, skin) +
+    shell(id, skin) +
     `<g clip-path="url(#${id}screenClip)"><g data-part="face" filter="url(#${id}glow)" opacity="${f(faceOpacity(frame))}">${faceMarkup(frame, id)}</g></g>` +
     gloss(id) +
-    `</g></svg>`
+    `</g>` + (skin.scale === 1 ? '' : '</g>') + `</svg>`
 }
 
 /** As an image source. An explicit pixel size keeps canvas drawing sharp, since an <img> SVG has no intrinsic size otherwise. */
-export function robotDataUrl(frame: Frame, width = 640) {
-  const svg = robotMarkup(frame, 'rb').replace('width="100%" height="100%"', `width="${width}" height="${Math.round((width * VIEW.h) / VIEW.w)}"`)
+export function robotDataUrl(frame: Frame, width = 640, skinId?: SkinId | string) {
+  const svg = robotMarkup(frame, 'rb', undefined, skinId).replace('width="100%" height="100%"', `width="${width}" height="${Math.round((width * VIEW.h) / VIEW.w)}"`)
   return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`
 }

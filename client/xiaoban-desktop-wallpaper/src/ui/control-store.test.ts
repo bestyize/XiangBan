@@ -57,6 +57,17 @@ describe('control state with native settings', () => {
     await expect(store.setCompanionLinks(true)).rejects.toThrow('保存失败');
     expect(store.settings.companionLinks).toBe(false);
   });
+  it('sends the chosen shell to the host and keeps the acknowledged one', async () => {
+    const store = createControlStore(vi.fn());
+    expect(store.settings.companionSkin).toBe('cat');
+    ipc.mockImplementation(async (_command, args) => ({ ...clone(defaults), companionSkin: args?.skin } as never));
+    await store.setCompanionSkin('bunny');
+    expect(ipc).toHaveBeenCalledWith('set_companion_skin', { skin: 'bunny' });
+    expect(store.settings.companionSkin).toBe('bunny');
+    ipc.mockRejectedValueOnce(new Error('没有这个外壳：x'));
+    await expect(store.setCompanionSkin('x')).rejects.toThrow('没有这个外壳');
+    expect(store.settings.companionSkin).toBe('bunny');
+  });
   it('lists the effects through the host, keeping the usable ones and naming the rest', async () => {
     const store = createControlStore(vi.fn());
     const good = { schemaVersion: 1, id: 'glitter', name: '星尘', layers: [{ count: 5, shape: { kind: 'circle' }, colors: ['#fff'] }], source: 'user' };

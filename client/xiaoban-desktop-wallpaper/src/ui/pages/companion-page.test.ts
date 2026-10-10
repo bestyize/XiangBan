@@ -13,10 +13,29 @@ function setup(companionLinks = true) {
     notify: vi.fn(), navigate: vi.fn(),
     updateAppearance: vi.fn(async () => {}), setMode: vi.fn(async () => {}), setCompanion: vi.fn(async () => {}),
     setCompanionLinks: vi.fn(async (enabled: boolean) => { store.settings.companionLinks = enabled; }),
+    setCompanionSkin: vi.fn(async (skin: string) => { store.settings.companionSkin = skin; }),
   }) as unknown as ControlStore;
   const wrapper = mount(CompanionPage, { props: { store }, global: { stubs: { PetPreview: true } } });
   return { wrapper, store };
 }
+
+describe('companion page shell choice', () => {
+  it('offers every shell with the cat chosen first, and switches through the store', async () => {
+    const { wrapper, store } = setup();
+    for (const id of ['cat', 'bunny', 'pot']) expect(wrapper.find(`[data-testid="skin-${id}"]`).exists(), id).toBe(true);
+    expect(wrapper.get('[data-testid="skin-cat"]').attributes('aria-pressed')).toBe('true');
+    await wrapper.get('[data-testid="skin-bunny"]').trigger('click');
+    await flushPromises();
+    expect(store.setCompanionSkin).toHaveBeenCalledWith('bunny');
+    expect(wrapper.get('[data-testid="skin-bunny"]').attributes('aria-pressed')).toBe('true');
+    expect(wrapper.get('[data-testid="skin-cat"]').attributes('aria-pressed')).toBe('false');
+  });
+  it('shows an unknown saved shell as the cat', () => {
+    const { wrapper, store } = setup();
+    store.settings.companionSkin = 'gone';
+    return wrapper.vm.$nextTick().then(() => expect(wrapper.get('[data-testid="skin-cat"]').attributes('aria-pressed')).toBe('true'));
+  });
+});
 
 describe('companion page links switch', () => {
   it('shows the switch on by default with its explanation', () => {

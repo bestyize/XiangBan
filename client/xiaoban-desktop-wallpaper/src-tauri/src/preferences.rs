@@ -5,6 +5,7 @@ use std::{
     path::Path,
 };
 
+pub const SKINS: &[&str] = &["cat", "bunny", "pot"];
 pub const EXPRESSIONS: &[&str] = &[
     "idle",
     "happy",
@@ -53,6 +54,8 @@ pub struct Settings {
     pub companion_enabled: bool,
     /// The companion reacts to the desktop effect (and later, to local presence) with expressions only.
     pub companion_links: bool,
+    /// Official shell of the companion; an unknown name falls back to the cat.
+    pub companion_skin: String,
     /// The particle effect over the desktop, whatever wallpaper (or plain system desktop) is behind it.
     pub effects: crate::effect_choice::EffectsChoice,
 }
@@ -76,6 +79,7 @@ impl Default for Settings {
             game_desktop_double_click: false,
             companion_enabled: true,
             companion_links: true,
+            companion_skin: "cat".into(),
             effects: Default::default(),
         }
     }
@@ -86,6 +90,9 @@ impl Settings {
         let defaults = Self::default();
         if !["floating", "wallpaper"].contains(&self.mode.as_str()) {
             self.mode = defaults.mode;
+        }
+        if !SKINS.contains(&self.companion_skin.as_str()) {
+            self.companion_skin = defaults.companion_skin;
         }
         if !EXPRESSIONS.contains(&self.expression.as_str()) {
             self.expression = defaults.expression;
@@ -184,6 +191,22 @@ mod tests {
         assert!(saved.contains(r#""companionLinks":false"#), "{saved}");
         let again: Preferences = serde_json::from_str(&saved).unwrap();
         assert!(!again.settings.companion_links);
+    }
+    #[test]
+    fn the_shell_defaults_to_the_cat_keeps_a_known_choice_and_drops_an_unknown_one() {
+        assert_eq!(Settings::default().companion_skin, "cat");
+        let mut older: Preferences = serde_json::from_str(r#"{"settings":{"mode":"wallpaper"}}"#).unwrap();
+        older.settings.normalize();
+        assert_eq!(older.settings.companion_skin, "cat");
+        let mut bunny: Preferences = serde_json::from_str(r#"{"settings":{"companionSkin":"bunny"}}"#).unwrap();
+        bunny.settings.normalize();
+        assert_eq!(bunny.settings.companion_skin, "bunny");
+        let mut bear: Preferences = serde_json::from_str(r#"{"settings":{"companionSkin":"bear"}}"#).unwrap();
+        bear.settings.normalize();
+        assert_eq!(bear.settings.companion_skin, "cat");
+        let mut odd: Preferences = serde_json::from_str(r#"{"settings":{"companionSkin":"<script>"}}"#).unwrap();
+        odd.settings.normalize();
+        assert_eq!(odd.settings.companion_skin, "cat");
     }
     #[test]
     fn effects_chosen_per_wallpaper_become_the_desktop_wide_choice_once() {

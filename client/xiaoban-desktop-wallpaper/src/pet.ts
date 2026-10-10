@@ -4,6 +4,7 @@ import { Mind, type Beat } from './companion/mind.ts'
 import { Reactions } from './companion/reactions.ts'
 import { toSpec, stillFrame, type RobotInput } from './companion/expressions.ts'
 import { bodyTransform, earLight, earTransform, faceMarkup, faceOpacity, robotMarkup, shadowAttrs } from './companion/render.ts'
+import { skinOf, type SkinId } from './companion/skins.ts'
 import type { Settings } from './bridge.ts'
 
 export class PetView {
@@ -18,6 +19,8 @@ export class PetView {
   private lastExpression = ''
   private lastStatus = ''
   private interactUntil = 0
+  private skin: SkinId
+  private parts!: { body: SVGElement | null; face: SVGElement | null; shadow: SVGElement | null; ears: { group: SVGElement | null; halo: Element | null | undefined; light: Element | null | undefined }[] }
   readonly reactions = new Reactions({
     play: beats => this.mind.play(beats),
     stop: () => this.mind.play([]),
@@ -30,19 +33,15 @@ export class PetView {
 
   constructor(parent: HTMLElement, settings: Settings, private status?: (text: string) => void) {
     this.config = settings
+    this.skin = skinOf(settings.companionSkin).id
     this.host = document.createElement('div')
     this.host.className = 'pet-stage'
-    this.host.innerHTML = `<div class="pet-lamp"></div><div class="pet-art" role="img" aria-label="小伴" tabindex="0">${robotMarkup(stillFrame('idle'), this.id)}</div>`
+    this.host.innerHTML = `<div class="pet-lamp"></div><div class="pet-art" role="img" aria-label="小伴" tabindex="0">${robotMarkup(stillFrame('idle'), this.id, undefined, this.skin)}</div>`
     parent.append(this.host)
     window.addEventListener('care-expression', this.careExpression)
+    this.bind()
     this.update(settings)
     const art = this.host.querySelector('.pet-art')!
-    const q = (selector: string) => this.host.querySelector<SVGElement>(selector)
-    const body = q('[data-part="body"]'), face = q('[data-part="face"]'), shadow = q('[data-part="shadow"]')
-    const ears = (['L', 'R'] as const).map(side => {
-      const group = q(`[data-part="ear${side}"]`)
-      return { group, halo: group?.querySelector('[data-part="halo"]'), light: group?.querySelector('[data-part="earLight"]') }
-    })
     art.addEventListener('keydown', event => {
       if (event instanceof KeyboardEvent && ['Enter', ' '].includes(event.key)) { event.preventDefault(); this.poke() }
     })
@@ -55,11 +54,12 @@ export class PetView {
       this.reactions.tick(dt)
       this.mind.tick(dt)
       const frame = this.animator.step(dt)
+      const { body, face, shadow, ears } = this.parts
       body?.setAttribute('transform', bodyTransform(frame))
       if (face) { face.innerHTML = faceMarkup(frame, this.id); face.setAttribute('opacity', faceOpacity(frame).toFixed(2)) }
       const light = earLight(frame)
       ears.forEach(({ group, halo, light: inner }, i) => {
-        group?.setAttribute('transform', earTransform(frame, i === 0 ? -1 : 1))
+        group?.setAttribute('transform', earTransform(frame, i === 0 ? -1 : 1, skinOf(this.skin).earPivot))
         halo?.setAttribute('opacity', light.toFixed(2))
         inner?.setAttribute('opacity', (0.25 + 0.75 * light).toFixed(2))
       })
@@ -70,8 +70,23 @@ export class PetView {
     this.frameId = requestAnimationFrame(tick)
   }
 
+  private bind() {
+    const q = (selector: string) => this.host.querySelector<SVGElement>(selector)
+    const ears = (['L', 'R'] as const).map(side => {
+      const group = q(`[data-part="ear${side}"]`)
+      return { group, halo: group?.querySelector('[data-part="halo"]'), light: group?.querySelector('[data-part="earLight"]') }
+    })
+    this.parts = { body: q('[data-part="body"]'), face: q('[data-part="face"]'), shadow: q('[data-part="shadow"]'), ears }
+  }
+
   update(settings: Settings) {
     this.config = settings
+    const skin = skinOf(settings.companionSkin).id
+    if (skin !== this.skin) {
+      this.skin = skin
+      this.host.querySelector('.pet-art')!.innerHTML = robotMarkup(stillFrame('idle'), this.id, undefined, skin)
+      this.bind()
+    }
     this.host.style.setProperty('--pet-size', `${settings.size}px`)
     if (settings.expression !== this.lastExpression) {
       this.lastExpression = settings.expression

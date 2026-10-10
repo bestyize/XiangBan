@@ -88,6 +88,7 @@ export function createControlStore(notify: ControlStore["notify"]): ControlStore
     },
     async setMode(mode) { store.settings = desktop ? await invoke<Settings>("set_mode", { mode }) : { ...store.settings, mode }; },
     async setCompanion(enabled) { store.settings = desktop ? await invoke<Settings>("set_companion_enabled", { enabled }) : { ...store.settings, companionEnabled: enabled }; },
+    async setCompanionSkin(skin) { store.settings = desktop ? await invoke<Settings>("set_companion_skin", { skin }) : { ...store.settings, companionSkin: skin }; },
     async setCompanionLinks(enabled) { store.settings = desktop ? await invoke<Settings>("set_companion_links", { enabled }) : { ...store.settings, companionLinks: enabled }; },
     async loadEffects() {
       store.effectList = desktop ? readList(await invoke("list_desktop_effects")) : await loadBuiltinPacks();

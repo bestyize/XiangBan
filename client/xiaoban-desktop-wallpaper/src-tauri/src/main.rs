@@ -331,6 +331,19 @@ fn set_companion_links(app: tauri::AppHandle, enabled: bool) -> Result<Settings,
 }
 
 #[tauri::command]
+fn set_companion_skin(app: tauri::AppHandle, skin: String) -> Result<Settings, String> {
+    if !preferences::SKINS.contains(&skin.as_str()) { return Err(format!("没有这个外壳：{skin}")); }
+    let state = app.state::<DesktopState>();
+    let _update = state.update_lock.lock().unwrap();
+    let mut next = settings(&app);
+    next.companion_skin = skin;
+    persist(&app, &next)?;
+    *state.settings.lock().unwrap() = next.clone();
+    publish(&app);
+    Ok(next)
+}
+
+#[tauri::command]
 fn poke(app: tauri::AppHandle) {
     let _ = app.emit("pet-poke", ());
     for label in ["media-a", "media-b"] {
@@ -610,7 +623,7 @@ fn main() {
         }));
     #[cfg(target_os = "macos")]
     let builder = builder.plugin(tauri_plugin_autostart::Builder::new().app_name(startup_name).arg("--autostart").build());
-    let command_handler: Box<dyn Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Sync> = Box::new(tauri::generate_handler![get_platform, get_settings, set_mode, update_settings, set_desktop_effects, effects::list_desktop_effects, effects::open_effects_directory, set_companion_enabled, set_companion_links, poke,
+    let command_handler: Box<dyn Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Sync> = Box::new(tauri::generate_handler![get_platform, get_settings, set_mode, update_settings, set_desktop_effects, effects::list_desktop_effects, effects::open_effects_directory, set_companion_enabled, set_companion_links, set_companion_skin, poke,
             scene_ready, set_hit_test, start_drag, hide_control, show_control, quit, get_diagnostics, ui_smoke_report,
             get_startup_status, set_autostart, content::get_wallpaper_library, content::import_wallpaper_catalog,
             games::open_game_space, games::close_game_space, games::get_game_catalog, games::load_game_save,
@@ -630,7 +643,7 @@ fn main() {
             let label=invoke.message.webview_ref().label(); let command=invoke.message.command();
             let allowed=games::permitted(label,command).unwrap_or_else(|| {
                 if command=="ui_smoke_report" {return label=="control";}
-                if command=="set_companion_enabled" || command=="set_companion_links" || command=="set_desktop_effects" || command=="list_desktop_effects" || command=="open_effects_directory" {return label=="control";}
+                if command=="set_companion_enabled" || command=="set_companion_links" || command=="set_companion_skin" || command=="set_desktop_effects" || command=="list_desktop_effects" || command=="open_effects_directory" {return label=="control";}
                 if label=="care" { return ["get_care_delivery","care_ready","dismiss_care","snooze_care"].contains(&command); }
                 if command.contains("care") { return label=="control"; }
                 content::permitted(label,command)

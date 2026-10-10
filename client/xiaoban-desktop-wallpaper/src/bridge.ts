@@ -18,6 +18,8 @@ export interface Settings {
   companionEnabled: boolean;
   /** Lets the companion answer the desktop effect with expressions only; no popups or sound. */
   companionLinks: boolean;
+  /** Which official shell the companion wears: cat, bear or bunny. */
+  companionSkin: string;
   /** The particle effect over the desktop, whatever wallpaper is behind it. */
   effects: EffectsChoice;
 }
@@ -132,6 +134,7 @@ export const defaults: Settings = {
   gameDesktopDoubleClick: false,
   companionEnabled: true,
   companionLinks: true,
+  companionSkin: "cat",
   effects: { selected: "", params: {} },
 };
 export function invoke<T>(
