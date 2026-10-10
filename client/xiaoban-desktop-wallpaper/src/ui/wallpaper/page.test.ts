@@ -9,6 +9,23 @@ import type {ControlStore} from '../control-types.ts';
 vi.mock('./MediaPreview.vue',()=>({default:{template:'<div />'}}));
 const stub={props:['value','options'],template:'<div><slot /></div>'};
 describe('wallpaper page interaction',()=>{
+ it('opens the preview full screen and Esc closes only the viewer',async()=>{
+ const store=reactive({desktop:false,settings:JSON.parse(JSON.stringify(defaults)),library:{items:[{definition:{id:'actual-image',title:'真实图片',kind:'image',version:'1',resource:{url:'',sha256:'',bytes:0,mime:'image/png'}},installed:true,coverUrl:'/wallpapers/image.svg',source:'builtin'}],source:'',activeId:''},applyWallpaper:vi.fn(),notify:vi.fn()} as unknown as ControlStore);
+ const wrapper=mount(WallpaperPage,{attachTo:document.body,props:{store},global:{stubs:{NButton:{template:'<button><slot /></button>'},NInput:stub,NSelect:stub,NSlider:stub,NSwitch:stub,NTabs:stub,NTabPane:stub,NModal:stub,NEmpty:stub,NAlert:stub,NPagination:stub,NCollapse:stub,NCollapseItem:stub,NColorPicker:stub,NSpin:stub}}});
+ const viewer=()=>document.body.querySelector('[data-testid="fullscreen-viewer"]');
+ await wrapper.get('[data-testid="wallpaper-card-actual-image"]').trigger('click');await flushPromises();
+ expect(viewer()).toBeNull();
+ await wrapper.get('[data-testid="open-fullscreen"]').trigger('click');await flushPromises();
+ expect(viewer()).not.toBeNull();expect(viewer()!.getAttribute('aria-label')).toContain('真实图片');
+ expect(document.activeElement?.getAttribute('data-testid')).toBe('close-fullscreen');
+ window.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape'}));await flushPromises();
+ expect(viewer()).toBeNull();expect(wrapper.find('[data-testid="wallpaper-inspector"]').exists()).toBe(true);
+ await wrapper.get('[data-testid="inspector-preview"]').trigger('click');await flushPromises();
+ expect(viewer()).not.toBeNull();
+ (document.body.querySelector('[data-testid="close-fullscreen"]') as HTMLButtonElement).click();await flushPromises();
+ expect(viewer()).toBeNull();expect(wrapper.find('[data-testid="wallpaper-inspector"]').exists()).toBe(true);
+ wrapper.unmount();
+ });
  it('keeps selecting and cancelling local previews away from native writes',async()=>{
  const apply=vi.fn();const store=reactive({desktop:false,settings:JSON.parse(JSON.stringify(defaults)),library:{items:[{definition:{id:'actual-image',title:'真实图片',kind:'image',version:'1',resource:{url:'',sha256:'',bytes:0,mime:'image/png'}},installed:true,coverUrl:'/wallpapers/image.svg',source:'builtin'}],source:'',activeId:''},applyWallpaper:apply,notify:vi.fn()} as unknown as ControlStore);
  const wrapper=mount(WallpaperPage,{attachTo:document.body,props:{store},global:{stubs:{NButton:{template:'<button><slot /></button>'},NInput:stub,NSelect:stub,NSlider:stub,NSwitch:stub,NTabs:stub,NTabPane:stub,NModal:stub,NEmpty:stub,NAlert:stub,NPagination:stub,NCollapse:stub,NCollapseItem:stub,NColorPicker:stub,NSpin:stub}}});

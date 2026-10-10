@@ -6,7 +6,7 @@ export interface SiteWallpaper {
   downloaded?: boolean;
   media_type: string;
   preview_url: string;
-  downloads: { thumb: string; original?: string };
+  downloads: { thumb: string; original?: string; large?: string; medium?: string };
   author: { name: string };
   resolution?: { width: number; height: number };
   video?: {
@@ -58,6 +58,30 @@ export function siteMedia(item: SiteWallpaper, site: string) {
           .find(Boolean) ?? "")
       : "";
   return { poster, video };
+}
+/** Widest video rendition still shown at full size; 4K files are too heavy for a preview. */
+const FULL_VIDEO_WIDTH = 2560;
+/**
+ * Media for viewing a website wallpaper full screen: the large rendition instead of the card
+ * thumbnail, and the sharpest video up to `FULL_VIDEO_WIDTH`. Falls back to `siteMedia`.
+ */
+export function siteFullMedia(item: SiteWallpaper, site: string) {
+  const preview = siteMedia(item, site);
+  if (item.media_type === "image") {
+    const image = [item.downloads.large, item.downloads.original, item.downloads.medium]
+      .map((url) => mediaUrl(url, site))
+      .find(Boolean);
+    return { poster: image || preview.poster, video: "" };
+  }
+  if (item.media_type === "video") {
+    const sharp = [...(item.video?.qualities ?? [])]
+      .filter((q) => q.width > 0 && q.width <= FULL_VIDEO_WIDTH)
+      .sort((a, b) => b.width - a.width)
+      .map((q) => mediaUrl(q.url, site))
+      .find(Boolean);
+    return { poster: preview.poster, video: sharp || preview.video };
+  }
+  return preview;
 }
 export function mediaMarkup(
   kind: string,

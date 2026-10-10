@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import {computed,ref,watch,onBeforeUnmount} from "vue";
+import {computed,ref,watch,nextTick,onBeforeUnmount} from "vue";
 import {NButton,NInput,NSelect,NSlider,NSwitch,NTabs,NTabPane,NModal,NEmpty,NAlert,NPagination,NCollapse,NCollapseItem,NColorPicker,NSpin} from "naive-ui";
-import {Search} from "lucide-vue-next";
+import {Search,Maximize2,X} from "lucide-vue-next";
 import {invoke,type WallpaperLibrary,type WallpaperOptions} from "../../bridge.ts";
-import {siteMedia} from "../../wallpaper-media.ts";
+import {siteMedia,siteFullMedia} from "../../wallpaper-media.ts";
 import type {ControlStore} from "../control-types.ts";
 import {useWallpaperWorkspace,type Selection} from "../wallpaper/useWallpaperWorkspace.ts";
 import MediaPreview from "../wallpaper/MediaPreview.vue";
@@ -19,6 +19,13 @@ const cardTitle=(card:Selection)=>card.source==='local'?card.item.definition.tit
 const cardKind=(card:Selection)=>card.source==='local'?card.item.definition.kind:card.item.media_type;
 const sources=(card:Selection)=>card.source==='online'?siteMedia(card.item,props.store.settings.websiteUrl):{poster:card.item.coverUrl || (card.item.definition.kind==='image'?card.item.previewUrl || '':''),video:card.item.previewUrl || ''};
 const preview=computed(()=>selection.value?sources(selection.value):{poster:'',video:''});
+const viewer=ref(false);
+const fullMedia=computed(()=>selection.value?.source==='online'?siteFullMedia(selection.value.item,props.store.settings.websiteUrl):preview.value);
+const canView=computed(()=>Boolean(preview.value.poster || preview.value.video));
+const closeViewer=ref<HTMLButtonElement>();let viewerOpener:HTMLElement|null=null;
+function openViewer(){if(!canView.value)return;viewerOpener=document.activeElement instanceof HTMLElement?document.activeElement:null;viewer.value=true;}
+watch(selection,()=>{viewer.value=false;});
+watch(viewer,async open=>{await nextTick();if(open)closeViewer.value?.focus();else{viewerOpener?.focus();viewerOpener=null;}});
 const types=[{label:'全部',value:''},{label:'图片',value:'image'},{label:'视频',value:'video'},{label:'动画',value:'canvas'}];
 const typeOptions=computed(()=>tab.value==='online'?types.filter(type=>type.value!=='canvas'):types);
 const sourceOptions=[{label:'全部来源',value:''},{label:'我的导入',value:'local'},{label:'内置壁纸',value:'builtin'},{label:'订阅壁纸',value:'subscription'}];
@@ -54,7 +61,7 @@ async function openContext(event:MouseEvent,card:Selection){
   catch(e){props.store.notify(e,'error');}
   context.value={x:Math.max(4,Math.min(event.clientX,window.innerWidth-214)),y:Math.max(4,Math.min(event.clientY,window.innerHeight-items.length*34-16)),card,items};
 }
-function onKey(event:KeyboardEvent){if(event.key==="Escape"){if(context.value)context.value=null;else cancel();}}
+function onKey(event:KeyboardEvent){if(event.key==="Escape"){if(viewer.value)viewer.value=false;else if(context.value)context.value=null;else cancel();}}
 window.addEventListener("keydown",onKey);
 onBeforeUnmount(()=>{nativeContext.dispose();window.removeEventListener("keydown",onKey);});
 </script>
@@ -67,12 +74,13 @@ onBeforeUnmount(()=>{nativeContext.dispose();window.removeEventListener("keydown
 <NAlert v-if="error" type="error" class="feed-alert">{{error}}<NButton size="small" @click="load">重试</NButton></NAlert>
 <NAlert v-if="tab==='online'&&!store.desktop" type="info">在线资源需要桌面应用连接真实网站。浏览器预览可查看我的壁纸。</NAlert>
 <div class="workspace" :class="{'has-selection':selection}"><div class="gallery-area"><div class="gallery-scroll"><NSpin :show="loading"><div class="gallery"><button v-for="card in cards" :key="card.source+cardId(card)" class="wallpaper-card" :disabled="busy" :class="{selected:selection&&cardId(selection)===cardId(card)&&selection.source===card.source}" :data-testid="'wallpaper-card-'+cardId(card)" @click="select(card)" @contextmenu.prevent="openContext($event,card)"><div class="card-cover"><MediaPreview :kind="cardKind(card)" :source="sources(card).video" :poster="sources(card).poster" :title="cardTitle(card)"/><span class="type-badge">{{cardKind(card)==='video'?'视频':cardKind(card)==='canvas'?'动画':'图片'}}</span></div><div class="card-info"><strong>{{cardTitle(card)}}</strong><span class="muted">{{card.source==='online'?card.item.author.name:card.item.installed?'本地可用':'订阅资源'}}</span></div></button></div><NEmpty v-if="!cards.length&&!loading" :description="tab==='online'?'暂无匹配的在线资源':'还没有这一类壁纸'" class="empty-state"/></NSpin></div><div class="gallery-footer"><div v-if="tab==='online'" class="pagination"><span class="muted">共 {{feed.total}} 张</span><NPagination :disabled="busy" :page="page" :page-count="page+(feed.has_more?1:0)" @update:page="page=$event"/></div><p v-else class="gallery-note muted">{{cards.length}} 个素材</p></div></div>
-<Transition name="drawer"><aside v-if="selection" class="inspector" data-testid="wallpaper-inspector"><div class="inspector-heading"><span class="muted">预览与设置</span><NButton text data-testid="cancel-selection" :disabled="busy" @click="cancel">取消选择</NButton></div><div class="inspector-scroll" data-testid="inspector-scroll"><div class="inspector-preview"><MediaPreview :key="selection.source+cardId(selection)" :kind="kind || ''" :source="preview.video" :poster="preview.poster" :title="title" controls :fit="draft.fit" :rate="draft.playbackRate"/></div><h2>{{title}}</h2><p class="muted">{{selection.source==='local'?selection.item.definition.description:selection.item.description}}</p><div class="draft-note">修改后点击“应用到桌面”生效。</div>
+<Transition name="drawer"><aside v-if="selection" class="inspector" data-testid="wallpaper-inspector"><div class="inspector-heading"><span class="muted">预览与设置</span><NButton text data-testid="cancel-selection" :disabled="busy" @click="cancel">取消选择</NButton></div><div class="inspector-scroll" data-testid="inspector-scroll"><div class="inspector-preview" :class="{viewable:canView && kind!=='video'}" data-testid="inspector-preview" :title="canView && kind!=='video' ? '点击全屏查看' : undefined" @click="kind!=='video' && openViewer()"><MediaPreview :key="selection.source+cardId(selection)" :kind="kind || ''" :source="preview.video" :poster="preview.poster" :title="title" controls :fit="draft.fit" :rate="draft.playbackRate"/><button v-if="canView" type="button" class="preview-expand" data-testid="open-fullscreen" aria-label="全屏查看" title="全屏查看" @click.stop="openViewer"><Maximize2 :size="16"/></button></div><h2>{{title}}</h2><p class="muted">{{selection.source==='local'?selection.item.definition.description:selection.item.description}}</p><div class="draft-note">修改后点击“应用到桌面”生效。</div>
 <div v-if="kind!=='canvas'" class="field"><label>画面适配</label><NSelect :disabled="busy" :value="draft.fit" :options="fits" data-testid="wallpaper-fit" @update:value="setFit"/></div><div v-if="kind==='video'" class="field"><label>播放速度 <span>{{draft.playbackRate}}×</span></label><NSlider :disabled="busy" v-model:value="draft.playbackRate" :min="0.25" :max="2" :step="0.25"/><small class="muted">静音循环播放</small></div>
 <NCollapse v-if="current?.controls?.length"><NCollapseItem title="动画参数" name="controls"><div v-for="control in current.controls" :key="control.key" class="field"><label>{{control.label}}</label><NSlider :disabled="busy" v-if="control.type==='range'" :value="Number(draft.values[control.key])" :min="control.min" :max="control.max" :step="control.step" @update:value="draft.values[control.key]=$event"/><NSwitch :disabled="busy" v-else-if="control.type==='boolean'" :value="Boolean(draft.values[control.key])" @update:value="draft.values[control.key]=$event"/><NColorPicker :disabled="busy" v-else-if="control.type==='color'" :value="String(draft.values[control.key])" :show-alpha="false" @update:value="draft.values[control.key]=$event"/><NSelect :disabled="busy" v-else :value="String(draft.values[control.key])" :options="(control.options||[]).map(value=>({label:value,value}))" @update:value="draft.values[control.key]=$event"/></div></NCollapseItem></NCollapse>
 </div><footer class="inspector-actions" data-testid="inspector-actions"><div v-if="busy" class="download-feedback" role="status" data-testid="wallpaper-progress"><span>{{progressPercent===null ? "正在准备壁纸文件…" : progressPercent>=100 ? "下载完成，正在校验 / 应用…" : `正在下载 ${progressPercent}%`}}</span><progress v-if="progress" max="100" :value="progressPercent || 0"/><progress v-else max="100"/><NButton v-if="downloading" size="small" secondary data-testid="cancel-download" :loading="cancelling" :disabled="cancelling" @click="cancelDownload">{{cancelling?'正在取消…':'取消下载'}}</NButton></div><div class="actions"><NButton v-if="selection.source==='online'" block :loading="busy" :disabled="saved || busy" data-testid="save-wallpaper" @click="action(false)">{{saved?'已保存到我的壁纸':'保存到我的壁纸'}}</NButton><NButton v-if="kind==='canvas'" block :disabled="busy" @click="action(true,true)">独立窗口预览</NButton><NButton type="primary" size="large" block :loading="busy" data-testid="apply-wallpaper" :disabled="busy" @click="action(true)">应用到桌面</NButton></div></footer></aside></Transition>
 </div>
 <NModal v-model:show="advanced" preset="card" title="订阅与清单" class="advanced-modal" style="width:min(520px,90vw)"><p class="muted">订阅 HTTPS 清单，或导入已有的 JSON 壁纸清单。</p><div class="field"><label>订阅地址</label><NInput :disabled="busy" v-model:value="subscription" placeholder="https://…/wallpapers.json"/></div><div class="advanced-actions"><NButton :loading="advancedBusy" type="primary" @click="advancedAction('subscribe_wallpapers',{url:subscription})">添加订阅</NButton><NButton data-testid="refresh-subscription" :disabled="advancedBusy" @click="refreshSubscription">刷新订阅</NButton><NButton @click="file?.click()">导入 JSON</NButton></div><input ref="file" type="file" accept=".json,application/json" hidden @change="importJson"/></NModal>
+<Teleport to="body"><Transition name="viewer"><div v-if="viewer && selection" class="fullscreen-viewer" role="dialog" aria-modal="true" :aria-label="`全屏查看：${title}`" data-testid="fullscreen-viewer" @click.self="viewer=false"><div class="fullscreen-media" @click.self="viewer=false"><MediaPreview :key="'full'+selection.source+cardId(selection)" :kind="kind || ''" :source="fullMedia.video" :poster="fullMedia.poster" :title="title" controls fit="contain" :rate="draft.playbackRate"/></div><div class="fullscreen-bar"><span class="fullscreen-title">{{title}}</span><button ref="closeViewer" type="button" class="fullscreen-close" data-testid="close-fullscreen" aria-label="退出全屏" title="退出全屏（Esc）" @click="viewer=false"><X :size="20"/></button></div></div></Transition></Teleport>
 <Teleport to="body"><template v-if="context"><div class="context-dismiss" @pointerdown="context=null" @contextmenu.prevent="context=null"></div><div class="material-context" role="menu" data-testid="material-context-menu" :style="{left:context.x+'px',top:context.y+'px'}" @keydown.esc="context=null"><button v-for="item in context.items" :key="item.key" role="menuitem" :disabled="item.disabled" @click="chooseContext(item.key)">{{item.label}}</button></div></template></Teleport>
 </section>
 </template>
@@ -122,7 +130,21 @@ onBeforeUnmount(()=>{nativeContext.dispose();window.removeEventListener("keydown
 .drawer-enter-from,.drawer-leave-to{transform:translateX(48px);opacity:0}
 .inspector-heading{height:52px;flex:none;display:flex;justify-content:space-between;align-items:center;padding:0 20px;font-size:13px}
 .inspector-scroll{flex:1;min-height:0;overflow:auto;padding:0 20px 16px;overscroll-behavior:none;scroll-behavior:auto;scrollbar-width:thin}
-.inspector-preview{aspect-ratio:16/10;overflow:hidden;background:var(--ui-surface-alt);border-radius:16px}
+.inspector-preview{position:relative;aspect-ratio:16/10;overflow:hidden;background:var(--ui-surface-alt);border-radius:16px}
+.inspector-preview.viewable{cursor:zoom-in}
+.preview-expand{position:absolute;top:10px;right:10px;display:grid;place-items:center;width:32px;height:32px;padding:0;border:0;border-radius:10px;color:#fff;background:rgba(15,23,42,.55);cursor:pointer;opacity:.85;transition:opacity .15s,background .15s}
+.preview-expand:hover,.preview-expand:focus-visible{opacity:1;background:rgba(15,23,42,.75)}
+.preview-expand:focus-visible,.fullscreen-close:focus-visible{outline:2px solid #fff;outline-offset:2px}
+.fullscreen-viewer{position:fixed;inset:0;z-index:2500;display:flex;flex-direction:column;background:rgba(5,8,15,.94)}
+.fullscreen-media{flex:1;min-height:0;padding:56px 24px 24px}
+.fullscreen-media :deep(.media-preview){background:transparent}
+.fullscreen-bar{position:absolute;top:0;left:0;right:0;display:flex;align-items:center;gap:12px;padding:12px 16px;color:#f8fafc;background:linear-gradient(rgba(0,0,0,.5),transparent)}
+.fullscreen-title{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px}
+.fullscreen-close{display:grid;place-items:center;width:36px;height:36px;padding:0;border:0;border-radius:50%;color:#fff;background:rgba(255,255,255,.14);cursor:pointer}
+.fullscreen-close:hover{background:rgba(255,255,255,.26)}
+.viewer-enter-active,.viewer-leave-active{transition:opacity .18s ease}
+.viewer-enter-from,.viewer-leave-to{opacity:0}
+@media (prefers-reduced-motion:reduce){.viewer-enter-active,.viewer-leave-active{transition:none}}
 .inspector h2{font-size:20px;font-weight:700;margin:16px 0 6px}
 .inspector-scroll>p{font-size:13px;color:var(--ui-muted);line-height:1.6;margin:0;max-height:42px;overflow:hidden}
 .draft-note{font-size:12px;color:var(--ui-text-tertiary);margin:14px 0;background:var(--ui-surface-alt);padding:8px 12px;border-radius:10px}
