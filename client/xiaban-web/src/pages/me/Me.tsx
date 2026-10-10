@@ -95,7 +95,7 @@ export default function Me() {
             <svg viewBox="0 0 24 24" className="size-5 shrink-0 text-window/40" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 5l7 7-7 7" /></svg>
           </Link>
           {!isLoggedIn && (
-            <button type="button" onClick={openLogin} className="mt-4 block w-full rounded-full bg-lamp px-5 py-3 text-center font-bold text-ink transition active:scale-[.98]">登录 / 注册</button>
+            <button type="button" onClick={openLogin} className="mt-4 block w-full rounded-full bg-action px-5 py-3 text-center font-bold text-white transition active:scale-[.98]">登录 / 注册</button>
           )}
         </section>
 

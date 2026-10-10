@@ -8,12 +8,14 @@ import { useLoginModal } from '../../lib/loginModal.ts'
 import { logout } from '../../lib/logout.ts'
 import { useProfile, useSession } from '../../lib/session.tsx'
 import { storage } from '../../lib/storage.ts'
+import { THEME_OPTIONS, useTheme } from '../../lib/theme.tsx'
 
 /** Account, privacy and data controls (PRD 6, 《个人信息保护法》), kept off the main 我的 screen. */
 export default function Settings() {
   const profile = useProfile()
   const { isLoggedIn } = useSession()
   const { openLogin } = useLoginModal()
+  const { preference, setPreference } = useTheme()
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [confirmDelete, setConfirmDelete] = useState(false)
@@ -50,6 +52,16 @@ export default function Settings() {
 
   return (
     <SubPage title="设置" back="/me">
+      <ListGroup title="外观" footer="外观偏好保存在当前设备。跟随系统会自动切换深浅色。">
+        <div role="radiogroup" aria-label="外观模式">
+          {THEME_OPTIONS.map(option => <label key={option.value} className="app-row cursor-pointer">
+            <span className="app-row-label">{option.label}</span>
+            <input type="radio" name="appearance" value={option.value} checked={preference === option.value}
+              className="size-4 accent-lamp" onChange={() => setPreference(option.value)} />
+          </label>)}
+        </div>
+      </ListGroup>
+
       <ListGroup title="账号">
         {isLoggedIn ? (
           <InfoRow label="登录邮箱" detail={profile.email ?? '未绑定'} />
@@ -81,7 +93,7 @@ export default function Settings() {
       <Sheet open={confirmDelete} onClose={() => setConfirmDelete(false)} title="注销账号">
         <p className="text-[15px] leading-relaxed text-window/85">注销后，打卡记录、图鉴、平安守护等所有数据都会删除，不能恢复。</p>
         <button type="button" disabled={busy} onClick={deleteAccount}
-          className="mt-6 w-full rounded-full bg-blush px-6 py-3.5 font-bold text-ink transition active:scale-[.98] disabled:opacity-50">
+          className="mt-6 w-full rounded-full bg-action px-6 py-3.5 font-bold text-white transition active:scale-[.98] disabled:opacity-50">
           {busy ? '正在注销…' : '确认注销'}
         </button>
         <QuietButton className="mt-2 w-full" onClick={() => setConfirmDelete(false)}>再想想</QuietButton>

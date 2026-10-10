@@ -71,7 +71,7 @@ export default function Onboarding() {
       <div className="flex h-10 items-center justify-between">
         <ol className="flex gap-1.5" aria-label={`第 ${index + 1} 步，共 ${STEPS.length} 步`}>
           {STEPS.map((s, i) => (
-            <li key={s} className={`h-1.5 rounded-full transition-all ${i === index ? 'w-6 bg-lamp' : i < index ? 'w-1.5 bg-lamp/70' : 'w-1.5 bg-window/25'}`} />
+            <li key={s} className={`h-1.5 rounded-full transition-all ${i === index ? 'w-6 bg-action' : i < index ? 'w-1.5 bg-lamp/70' : 'w-1.5 bg-window/25'}`} />
           ))}
         </ol>
         <QuietButton disabled={saving} onClick={() => advance({}, step === 'hello' || isLast, true)}>

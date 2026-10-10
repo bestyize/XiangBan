@@ -99,7 +99,7 @@ export default function CardPreview() {
 
       <div className="mt-3 flex justify-center">
         {image ? (
-          <img src={image.url} alt="今日下班卡预览" className="max-h-[60vh] w-auto rounded-2xl shadow-[0_20px_60px_rgba(0,0,0,0.45)]" />
+          <img src={image.url} alt="今日下班卡预览" className="max-h-[60vh] w-auto rounded-2xl shadow-[0_20px_60px_rgba(0,0,0,0.10)]" />
         ) : (
           <div className="grid aspect-[9/16] h-[60vh] place-items-center rounded-2xl bg-dusk-soft/40 text-sm text-window/60">正在画卡片…</div>
         )}
@@ -109,7 +109,7 @@ export default function CardPreview() {
       <div className="mt-4 flex flex-wrap justify-center gap-2" role="radiogroup" aria-label="卡片样式">
         {styles.map((s) => (
           <button key={s.id} type="button" role="radio" aria-checked={s.id === styleId} onClick={() => { setStyleId(s.id); if (s.id === 'night' || s.id === 'day') savePosterTheme(s.id) }}
-            className={`rounded-full border-2 px-4 py-1.5 text-sm ${s.id === styleId ? 'border-lamp bg-lamp font-bold text-ink' : 'border-dusk-soft text-window/80'}`}>
+            className={`rounded-full border-2 px-4 py-1.5 text-sm ${s.id === styleId ? 'border-lamp bg-action font-bold text-white' : 'border-dusk-soft text-window/80'}`}>
             {s.name}
           </button>
         ))}
@@ -137,7 +137,7 @@ export default function CardPreview() {
             </PrimaryButton>
           )}
           <a href={image.url} download={image.file.name} onClick={() => track('card_save', { via: 'download' })}
-            className={`grid w-full place-items-center rounded-full border-2 border-lamp px-6 py-3 font-bold ${canShare ? 'text-lamp' : 'bg-lamp text-ink'}`}>
+            className={`grid w-full place-items-center rounded-full border-2 border-lamp px-6 py-3 font-bold ${canShare ? 'text-lamp' : 'bg-action text-white'}`}>
             保存图片
           </a>
         </div>

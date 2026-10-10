@@ -8,7 +8,7 @@ export function PrimaryButton({ className = '', ...rest }: ButtonProps) {
   return (
     <button
       type="button"
-      className={`w-full rounded-full bg-lamp px-6 py-3.5 text-base font-bold text-ink shadow-[0_6px_0_var(--color-lamp-deep)] transition active:translate-y-1 active:shadow-[0_2px_0_var(--color-lamp-deep)] disabled:opacity-50 ${className}`}
+      className={`w-full rounded-full bg-action px-6 py-3.5 text-base font-bold text-white shadow-[0_4px_12px_#e51b3e18] transition hover:bg-lamp-deep active:scale-[.98] disabled:opacity-50 ${className}`}
       {...rest}
     />
   )
@@ -24,7 +24,7 @@ export function QuietButton({ className = '', ...rest }: ButtonProps) {
   )
 }
 
-/** 小伴 at home under its own warm light; used wherever it speaks. */
+/** 小伴 at home under its own soft blush light; used wherever it speaks. */
 interface RobotStageProps extends Omit<RobotProps, 'size'> {
   size?: number
   centered?: boolean
@@ -33,7 +33,7 @@ interface RobotStageProps extends Omit<RobotProps, 'size'> {
 export function RobotStage({ size = 208, centered = true, className = '', ...robot }: RobotStageProps) {
   return (
     <div className={`relative flex w-fit shrink-0 flex-col items-center ${centered ? 'mx-auto' : ''} ${className}`}>
-      <div aria-hidden="true" className="pointer-events-none absolute left-1/2 top-[42%] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(circle,rgba(255,196,110,0.32),rgba(255,196,110,0.08)_52%,transparent_70%)]"
+      <div aria-hidden="true" className="pointer-events-none absolute left-1/2 top-[42%] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(circle,rgba(255,36,66,0.10),rgba(255,36,66,0.03)_52%,transparent_70%)]"
         style={{ width: size * 1.4, height: size * 1.05 }} />
       <Robot {...robot} size={size} className="relative" />
     </div>
@@ -45,7 +45,7 @@ export function Bubble({ children, align = 'center', className = '' }: { childre
   const layout = align === 'center' ? 'mx-auto max-w-[22rem] text-center before:left-1/2' : 'text-left before:left-16'
   return (
     <div
-      className={`relative rounded-[22px] bg-window px-5 py-4 text-[17px] leading-relaxed text-ink before:absolute before:-top-2.5 before:-translate-x-1/2 before:border-x-[10px] before:border-b-[11px] before:border-x-transparent before:border-b-window before:content-[''] ${layout} ${className}`}
+      className={`relative rounded-[22px] bg-surface px-5 py-4 text-[17px] leading-relaxed text-ink before:absolute before:-top-2.5 before:-translate-x-1/2 before:border-x-[10px] before:border-b-[11px] before:border-x-transparent before:border-b-surface before:content-[''] ${layout} ${className}`}
     >
       {children}
     </div>

@@ -27,7 +27,7 @@ export function GoHome({ checkin }: { checkin: Checkin }) {
       <a
         href={features.appDownloadUrl}
         onClick={() => track('go_home_click', { streak: String(checkin.stats.streak) })}
-        className="mt-3 block rounded-full bg-lamp px-5 py-3 text-center font-bold text-ink"
+        className="mt-3 block rounded-full bg-action px-5 py-3 text-center font-bold text-white"
       >
         带{profile.companionName}回家
       </a>

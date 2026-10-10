@@ -150,11 +150,11 @@ export default function Home({ active = true }: { active?: boolean }) {
         <section aria-labelledby="together" className="mt-7">
           <h2 id="together" className="text-[15px] font-bold text-window/85">今天一起做点什么</h2>
           <div className="mt-3 grid grid-cols-3 gap-2.5">
-            <Activity href="/xiaban" title="下班打卡" note="领今日称号，晒下班卡" tint="linear-gradient(160deg,#4a3a26,#2b3b52)"
+            <Activity href="/xiaban" title="下班打卡" note="领今日称号，晒下班卡" tint="var(--color-brand-soft)"
               icon={svg('M12 7v5l3 2M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z')} />
-            <Activity href="/games" title="玩一局" note="几分钟的小游戏" tint="linear-gradient(160deg,#263f4a,#2b3b52)"
+            <Activity href="/games" title="玩一局" note="几分钟的小游戏" tint="var(--color-surface)"
               icon={svg('M7 7h10c2 0 3 2 3.5 4l1 6c.4 2-1.6 3-3 1.5L16 16H8l-2.5 2.5C4 20 2 19 2.5 17l1-6C4 9 5 7 7 7ZM8 10v5m-2.5-2.5h5')} />
-            <Activity href="/tests" title="测一测" note="看看今天的你" tint="linear-gradient(160deg,#41304d,#2b3b52)"
+            <Activity href="/tests" title="测一测" note="看看今天的你" tint="var(--color-surface)"
               icon={svg('M12 3 14.8 9.2 21.5 10l-5 4.5 1.4 6.5-5.9-3.4-5.9 3.4 1.4-6.5-5-4.5 6.7-.8L12 3Z')} />
           </div>
         </section>
@@ -169,8 +169,8 @@ export default function Home({ active = true }: { active?: boolean }) {
                   </div>
                 )}
                 <div className={`max-w-[78%] rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed ${m.role === 'user'
-                  ? 'rounded-tr-xs bg-lamp font-medium text-ink'
-                  : 'rounded-tl-xs border border-window/10 bg-dusk-soft/60 text-window'}`}>
+                  ? 'rounded-tr-xs bg-action font-medium text-white'
+                  : 'rounded-tl-xs border border-window/10 bg-surface text-window'}`}>
                   {m.content}
                   {m.role === 'assistant' && (
                     <button type="button" onClick={() => void speak(messageId(m, i), m.content)}
@@ -193,7 +193,7 @@ export default function Home({ active = true }: { active?: boolean }) {
                 <div className="mt-0.5 grid size-8 shrink-0 place-items-center overflow-hidden rounded-full bg-lamp/15">
                   <Robot spec="speaking" alive={false} size={30} label={companionName} />
                 </div>
-                <div className="max-w-[78%] rounded-2xl rounded-tl-xs border border-lamp/30 bg-dusk-soft/80 px-3.5 py-2.5 text-sm leading-relaxed text-window">
+                <div className="max-w-[78%] rounded-2xl rounded-tl-xs border border-lamp/30 bg-surface px-3.5 py-2.5 text-sm leading-relaxed text-window">
                   {streamingText || `${companionName}正在想…`}
                   <span className="ml-1 inline-block animate-pulse text-lamp">▍</span>
                 </div>
@@ -213,7 +213,7 @@ export default function Home({ active = true }: { active?: boolean }) {
             placeholder={`跟${companionName}说说话…`} aria-label={`跟${companionName}说话`}
             className="h-11 flex-1 rounded-full border border-window/15 bg-dusk-soft/50 px-4 text-[15px] text-window placeholder:text-window/40 focus:border-lamp focus:outline-none disabled:opacity-60" />
           <button type="submit" disabled={!input.trim() || isStreaming}
-            className="flex h-11 items-center justify-center rounded-full bg-lamp px-4 text-sm font-bold text-ink transition active:scale-95 disabled:cursor-not-allowed disabled:opacity-40">
+            className="flex h-11 items-center justify-center rounded-full bg-action px-4 text-sm font-bold text-white transition active:scale-95 disabled:cursor-not-allowed disabled:opacity-40">
             发送
           </button>
         </form>

@@ -37,7 +37,7 @@ export function CityPicker({ cities, value, onChange }: CityPickerProps) {
               aria-checked={selected}
               onClick={() => onChange(c.code)}
               className={`rounded-full border-2 px-4 py-1.5 text-[15px] transition ${
-                selected ? 'border-lamp bg-lamp font-bold text-ink' : 'border-dusk-soft text-window/85 hover:border-window/60'
+                selected ? 'border-lamp bg-action font-bold text-white' : 'border-dusk-soft text-window/85 hover:border-window/60'
               }`}
             >
               {c.name}

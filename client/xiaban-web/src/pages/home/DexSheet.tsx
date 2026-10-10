@@ -13,9 +13,9 @@ function Tile({ item }: { item: Unlock }) {
   return (
     <li className="flex flex-col items-center text-center">
       <div className="grid aspect-square w-full place-items-center rounded-3xl"
-        style={{ background: unlocked ? art.tint : 'rgba(61, 80, 105, 0.45)' }}>
+        style={{ background: unlocked ? art.tint : 'var(--color-line)' }}>
         <Robot spec={art.spec} alive={false} label={unlocked ? item.name : '还没解锁的表情'} size={84}
-          className={unlocked ? '' : 'opacity-25 brightness-0 invert'} />
+          className={unlocked ? '' : 'opacity-25 brightness-0'} />
       </div>
       <p className={`mt-2 text-sm ${unlocked ? 'font-bold text-window' : 'text-window/60'}`}>{unlocked ? item.name : '？？？'}</p>
       <p className="mt-0.5 text-xs leading-snug text-window/50">{item.hint}</p>
@@ -59,7 +59,7 @@ export function DexSheet({ open, onClose }: { open: boolean; onClose: () => void
         <div className="mt-8 flex flex-col items-center text-center">
           <Robot spec="greeting" label="小伴" size={110} />
           <p className="mt-4 text-[15px] text-window/85">登录后，打卡解锁的表情会收进这里。</p>
-          <button type="button" onClick={() => { onClose(); openLogin() }} className="mt-6 w-full rounded-full bg-lamp px-6 py-3.5 text-center font-bold text-ink transition active:scale-[.98]">登录 / 注册</button>
+          <button type="button" onClick={() => { onClose(); openLogin() }} className="mt-6 w-full rounded-full bg-action px-6 py-3.5 text-center font-bold text-white transition active:scale-[.98]">登录 / 注册</button>
         </div>
       )}
       {!guest && !data && !error && <p className="mt-10 text-center text-sm text-window/50">正在翻图鉴…</p>}

@@ -44,7 +44,7 @@ export function GuardianForm({ initial, busy, error, onSubmit }: GuardianFormPro
         <div className="grid grid-cols-3 gap-2">
           {[1, 2, 3].map((n) => (
             <button key={n} type="button" aria-pressed={value.thresholdDays === n} onClick={() => set({ thresholdDays: n })}
-              className={`rounded-2xl border-2 py-2.5 ${value.thresholdDays === n ? 'border-lamp bg-lamp font-bold text-ink' : 'border-dusk-soft text-window/80'}`}>
+              className={`rounded-2xl border-2 py-2.5 ${value.thresholdDays === n ? 'border-lamp bg-action font-bold text-white' : 'border-dusk-soft text-window/80'}`}>
               {n} 天
             </button>
           ))}
