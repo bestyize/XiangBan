@@ -35,12 +35,12 @@ pub fn media_label(label: &str) -> bool {
     ["media-a", "media-b", "media-preview"].contains(&label)
 }
 
-fn payload(app: &tauri::AppHandle, item: &Wallpaper, options: &Options, preview: bool) -> Value {
+fn payload(app: &tauri::AppHandle, item: &Wallpaper, options: &Options, _preview: bool) -> Value {
     let config = settings(app);
     json!({"item":{"id":item.id,"title":item.title,"kind":item.kind,"resourceUrl":library::asset_url(&item.resource),
         "assets":item.assets.iter().map(|(key,r)|(key.clone(),json!({"url":library::asset_url(r),"mime":r.mime}))).collect::<BTreeMap<_,_>>()},
         "options":options,"config":{"expression":config.expression,"size":config.size,"theme":config.theme,"paused":config.paused,
-        "fps":config.fps,"overlay":!preview && config.mode=="wallpaper" && config.companion_enabled},"test":app.state::<DesktopState>().isolated})
+        "fps":config.fps,"overlay":false},"test":app.state::<DesktopState>().isolated})
 }
 
 fn open(
@@ -218,7 +218,7 @@ pub fn sync(app: &tauri::AppHandle) {
     for label in ["media-a", "media-b"] {
         if let Some(window) = app.get_webview_window(label) {
             let value = json!({"options":config.wallpaper_options,"config":{"expression":config.expression,"size":config.size,
-                "theme":config.theme,"paused":config.paused,"fps":config.fps,"overlay":config.mode=="wallpaper" && config.companion_enabled}});
+                "theme":config.theme,"paused":config.paused,"fps":config.fps,"overlay":false}});
             let _ = window.eval(format!(
                 "window.dispatchEvent(new CustomEvent('content-config',{{detail:{value}}}));"
             ));
@@ -326,18 +326,12 @@ pub async fn apply_wallpaper(
     }
     if id == "companion" {
         if preview {
-            return Err("小伴房间可在小伴页直接预览。".into());
+            return Err("系统桌面无需预览。".into());
         }
         let previous = settings(&app);
         let mut config = previous.clone();
         config.wallpaper_id = id;
         crate::persist(&app, &config)?;
-        if config.mode == "wallpaper" {
-            if let Err(error) = crate::open_scene(&app, "wallpaper") {
-                let _ = crate::persist(&app, &previous);
-                return Err(error);
-            }
-        }
         *app.state::<DesktopState>().settings.lock().unwrap() = config;
         close_active(&app);
         crate::publish(&app);
@@ -636,7 +630,7 @@ async fn smoke_effects(app: &tauri::AppHandle, local_image_id: &str) -> Result<V
     for id in ["test-video", "test-canvas"] {
         apply_wallpaper(app.clone(), id.into(), options.clone(), false).await?;
         let label = app.state::<ContentState>().label.lock().unwrap().clone().ok_or("没有非图片验证窗口")?;
-        let report = smoke_effects_report(app, &label, false, &options.effects)?;
+        let report = smoke_effects_report(app, &label, id == "test-video", &options.effects)?;
         smoke_effects_persisted(app, &options.effects)?;
         non_image.push(json!({"id":id,"report":report,"parametersRetained":true}));
     }

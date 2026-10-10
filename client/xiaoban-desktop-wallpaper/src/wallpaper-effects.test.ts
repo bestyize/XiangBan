@@ -64,7 +64,7 @@ describe("trusted overlay lifecycle", () => {
     host = { classList: { add: vi.fn(), remove: vi.fn() }, append: (node: unknown) => children.push(node),
       getBoundingClientRect: () => ({ width: 960, height: 600 }) } as unknown as HTMLElement;
     const context = { setTransform: vi.fn(), clearRect: draw, beginPath: vi.fn(), moveTo: vi.fn(),
-      lineTo: vi.fn(), stroke: vi.fn(), arc: vi.fn(), fill: vi.fn() };
+      lineTo: vi.fn(), stroke: vi.fn(), arc: vi.fn(), fill: vi.fn(), save: vi.fn(), restore: vi.fn(), translate: vi.fn(), rotate: vi.fn(), ellipse: vi.fn(), createLinearGradient: () => ({addColorStop: vi.fn()}), createRadialGradient: () => ({addColorStop: vi.fn()}) };
     canvas = { width: 0, height: 0, setAttribute: vi.fn(), getContext: () => context,
       remove: () => { children.length = 0; } } as typeof canvas;
     doc = Object.assign(new EventTarget(), { hidden: false, createElement: () => canvas });
@@ -90,12 +90,12 @@ describe("trusted overlay lifecycle", () => {
     effects.update("image", rain(), { paused: false, fps: 60 });
     expect(callbacks.size).toBe(1); effects.destroy(); expect(callbacks.size).toBe(0);
   });
-  it("releases non-image overlays and can restore the image effect without changing parameters", () => {
+  it("keeps the overlay on video and releases it on interactive canvas without losing parameters", () => {
     const options = rain(), effects = new WallpaperEffects(host, "image", options);
-    effects.update("video", options); expect(children).toHaveLength(0); expect(callbacks.size).toBe(0);
-    expect(effects.snapshot()).toMatchObject({ supported: false, canvasPresent: false, options });
+    effects.update("video", options); expect(children).toHaveLength(1); expect(callbacks.size).toBe(1);
+    expect(effects.snapshot()).toMatchObject({ supported: true, canvasPresent: true, options });
+    effects.update("canvas", options); expect(children).toHaveLength(0); expect(callbacks.size).toBe(0);
     expect(disconnect).toHaveBeenCalledOnce();
-    effects.update("canvas", options); expect(children).toHaveLength(0);
     effects.update("image", options); expect(children).toHaveLength(1); expect(callbacks.size).toBe(1);
     expect(effects.snapshot()).toMatchObject({ supported: true, canvasPresent: true, running: true, options });
     effects.update("image", normalizeWallpaperEffects()); expect(children).toHaveLength(0);

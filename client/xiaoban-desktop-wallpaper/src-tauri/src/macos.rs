@@ -57,7 +57,7 @@ pub fn configure_scene(
         let ns = native(&window)?;
         let desktop = CGWindowLevelForKey(CGWindowLevelKey::DesktopWindowLevelKey) as isize;
         let floating = CGWindowLevelForKey(CGWindowLevelKey::FloatingWindowLevelKey) as isize;
-        ns.setLevel(if wallpaper { desktop + 1 } else { floating });
+        ns.setLevel(if wallpaper { if window.label() == "pet" { 0 } else { desktop + 1 } } else { floating });
         let common = NSWindowCollectionBehavior::CanJoinAllSpaces
             | NSWindowCollectionBehavior::Stationary
             | NSWindowCollectionBehavior::IgnoresCycle;
@@ -73,7 +73,7 @@ pub fn configure_scene(
         ns.setCanHide(false);
         ns.setExcludedFromWindowsMenu(true);
         ns.setHasShadow(false);
-        if wallpaper {
+        if wallpaper && window.label() != "pet" {
             ns.setIgnoresMouseEvents(true);
         } else {
             ns.setOpaque(false);
@@ -239,8 +239,8 @@ fn control_state(app: &tauri::AppHandle) -> Result<serde_json::Value, String> {
             .ok_or("没有找到设置面板")?;
         let ns = native(&control)?;
         let wallpaper = handle
-            .get_webview_window("wallpaper")
-            .ok_or("没有找到壁纸窗口")?;
+            .get_webview_window("pet")
+            .ok_or("没有找到小伴窗口")?;
         let wall = native(&wallpaper)?;
         Ok(
             serde_json::json!({"visible":ns.isVisible(), "minimized":ns.isMiniaturized(),

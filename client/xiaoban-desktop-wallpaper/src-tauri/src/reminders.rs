@@ -257,15 +257,7 @@ pub fn delete_care_rule(window: tauri::WebviewWindow, id: String) -> Result<serd
 fn companion_visible(app: &tauri::AppHandle) -> bool {
     let settings = crate::settings(app);
     if !settings.companion_enabled { return false; }
-    // Media overlays are rendered in a low-permission host. The separate care
-    // window does not need to grant them event or command privileges.
-    if settings.mode == "wallpaper" {
-        if let Some(label) = app.state::<crate::content::ContentState>().label.lock().unwrap().clone() {
-            return app.get_webview_window(&label).is_some_and(|w| w.is_visible().unwrap_or(false));
-        }
-    }
-    let label = if settings.mode == "floating" { "pet" } else { "wallpaper" };
-    app.get_webview_window(label).is_some_and(|w| w.is_visible().unwrap_or(false))
+    app.get_webview_window("pet").is_some_and(|w| w.is_visible().unwrap_or(false))
 }
 fn blocked(app: &tauri::AppHandle, activity: &care_system::Activity) -> bool {
     let state = app.state::<ReminderState>();

@@ -24,7 +24,7 @@ export interface ControlStore {
   setCompanion(enabled: boolean): Promise<void>;
   setAutostart(enabled: boolean): Promise<void>;
   setDoubleClick(enabled: boolean): Promise<void>;
-  openGames(): Promise<void>;
+  openGames(gameId?: string): Promise<void>;
   applyWallpaper(id: string, options: WallpaperOptions, preview?: boolean): Promise<void>;
   importMedia(): Promise<string | null>;
   configureWebsite(url: string, automatic: boolean): Promise<void>;

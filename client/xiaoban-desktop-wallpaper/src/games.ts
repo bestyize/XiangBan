@@ -7,7 +7,7 @@ declare global { interface Window { __XIAOBAN_GAME_TOKEN__?: string; __XIAOBAN_G
 export async function mountGameSpace() {
   document.body.className = 'game-space';
   const app = document.querySelector<HTMLElement>('#app')!;
-  app.innerHTML = '<main class="games-shell"><header class="games-toolbar"><button id="games-back" hidden>← 返回游戏面板</button><div><strong>小伴 · 玩一玩</strong><span id="games-status" role="status">正在准备游戏目录…</span></div><button id="games-close">退出游戏空间 <kbd>Esc</kbd></button></header><section id="games-hub"><div class="games-intro"><p>给自己一小段轻松时光</p><h1>今天想玩点什么？</h1><span>七款本地小游戏，断网也能玩。水墨剑客进度保存在这台电脑。</span></div><div id="games-cards" class="games-grid"></div></section><section id="games-player" hidden><div id="game-stage"></div></section><div id="games-failure" class="games-failure" hidden><h2>游戏需要重试</h2><p id="games-error"></p><button id="games-retry">重试</button><button id="games-cancel">返回游戏面板</button><button id="games-force-close" hidden>放弃未保存进度并退出</button></div></main>';
+  app.innerHTML = '<main class="games-shell"><header class="games-toolbar"><button id="games-back" title="返回游戏面板" aria-label="返回游戏面板" hidden>←</button><div><span id="games-status" role="status">正在准备游戏目录…</span></div><button id="games-close" title="退出游戏空间（Esc）" aria-label="退出游戏空间">×</button></header><section id="games-hub"><div class="games-intro"><p>给自己一小段轻松时光</p><h1>今天想玩点什么？</h1><span>七款本地小游戏，断网也能玩。水墨剑客进度保存在这台电脑。</span></div><div id="games-cards" class="games-grid"></div></section><section id="games-player" hidden><div id="game-stage"></div></section><div id="games-failure" class="games-failure" hidden><h2>游戏需要重试</h2><p id="games-error"></p><button id="games-retry">重试</button><button id="games-cancel">返回游戏面板</button><button id="games-force-close" hidden>放弃未保存进度并退出</button></div></main>';
   const node = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
   let manifests: GameManifest[] = [];
   let session: GameSession | null = null;
@@ -109,10 +109,22 @@ export async function mountGameSpace() {
     } catch (e) { fail(e); }
   }
   await loadCatalog();
+  const launchId = async (id: unknown) => { const game = manifests.find(item => item.id === id); if (game) await launch(game); };
+  window.addEventListener('game-launch', event => { void launchId((event as CustomEvent).detail); });
+  await launchId(new URLSearchParams(location.search).get('game'));
   const smokeEscape = () => frame?.contentWindow?.postMessage({channel:'xiaban.game-host',protocol:1,type:'host.smoke.escape',nonce:session?.nonce}, '*');
   if (window.__XIAOBAN_GAME_SMOKE__) {
     const ready: string[] = [];
     try {
+      const selectedId = new URLSearchParams(location.search).get('game');
+      if (selectedId) {
+        const deadline = Date.now() + 18000;
+        while ((!session || !(session as GameSession).ready) && Date.now() < deadline) await new Promise(resolve => setTimeout(resolve, 40));
+        if ((current as GameManifest | null)?.id !== selectedId || !(session as GameSession | null)?.ready) throw new Error('指定游戏没有直接启动');
+      }
+      const stage = node('game-stage').getBoundingClientRect();
+      const fullViewport = Math.abs(stage.top) < 1 && Math.abs(stage.height - innerHeight) < 1 && Math.abs(stage.width - innerWidth) < 1;
+      if (selectedId && !fullViewport) throw new Error('游戏未占满窗口');
       for (const game of manifests) {
         await launch(game);
         const deadline = Date.now() + 18000;
@@ -131,7 +143,7 @@ export async function mountGameSpace() {
       let rejected = false;
       try { await invoke('get_settings'); } catch { rejected = true; }
       if (!rejected) throw new Error('游戏宿主越权命令未被拒绝');
-      await gameInvoke('game_smoke_report', { report: { ready, security: Object.fromEntries(security), escapeReturned: true, saveRoundTrip: true, controlRejected: true } });
+      await gameInvoke('game_smoke_report', { report: { ready, directLaunch: selectedId, fullViewport, security: Object.fromEntries(security), escapeReturned: true, saveRoundTrip: true, controlRejected: true } });
     } catch (error) { await gameInvoke('game_smoke_report', { report: { ready, error: String(error) } }); }
   }
 }

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
-import { ArrowRight, Gamepad2, MousePointer2, Save } from "lucide-vue-next";
+import { MousePointer2, Save } from "lucide-vue-next";
 import { NAlert, NButton, NSkeleton, NSwitch, NTag } from "naive-ui";
 import type { ControlStore } from "../control-types.ts";
 
@@ -30,7 +30,7 @@ const doubleClickLabel = computed(() => {
 
 const doubleClickDescription = computed(() => {
   if (!props.store.desktop) return "请在小伴桌面应用中使用此入口。浏览器预览不支持桌面空白处双击。";
-  if (!props.store.game.desktopDoubleClickSupported) return "当前桌面平台无法可靠识别桌面空白处的双击，请使用上方按钮进入游戏空间。";
+  if (!props.store.game.desktopDoubleClickSupported) return "当前桌面平台无法可靠识别桌面空白处的双击，请双击游戏卡片进入游戏。";
   return "在桌面空白处双击即可打开游戏空间。此快捷入口默认关闭，可随时在这里调整。";
 });
 
@@ -82,11 +82,11 @@ async function setShortcut(enabled: boolean) {
   }
 }
 
-async function openGameSpace() {
+async function openGameSpace(gameId?: string) {
   if (!props.store.desktop || opening.value) return;
   opening.value = true;
   try {
-    await props.store.openGames();
+    await props.store.openGames(gameId);
   } catch (error) {
     props.store.notify(error instanceof Error ? error.message : "游戏空间暂时无法打开。", "error");
   } finally {
@@ -99,25 +99,6 @@ onMounted(loadGames);
 
 <template>
   <main class="ui-page games-page" data-testid="games-page">
-    <header class="page-header">
-      <div>
-        <div class="eyebrow"><Gamepad2 :size="17" /> 小伴娱乐</div>
-        <h1>游戏空间</h1>
-        <p class="page-subtitle">挑一款轻松玩一会儿，游戏会在独立空间中打开。</p>
-      </div>
-      <NButton
-        data-testid="open-game-space"
-        type="primary"
-        size="large"
-        :loading="opening"
-        :disabled="!store.desktop"
-        @click="openGameSpace"
-      >
-        <template #icon><ArrowRight :size="18" /></template>
-        进入游戏空间
-      </NButton>
-    </header>
-
     <NAlert v-if="!store.desktop" class="browser-note" type="info" :bordered="false">
       浏览器预览只展示游戏资料；请在小伴桌面应用中进入游戏空间。
     </NAlert>
@@ -155,7 +136,7 @@ onMounted(loadGames);
       <div class="section-heading">
         <div>
           <h2 id="games-heading">本地游戏</h2>
-          <p class="muted">共 {{ games.length }} 款 · 无需登录</p>
+          <p class="muted">共 {{ games.length }} 款 · 双击开始游戏</p>
         </div>
         <NTag v-if="!loading" round :bordered="false" type="info">离线可玩</NTag>
       </div>
@@ -171,7 +152,7 @@ onMounted(loadGames);
         </article>
       </div>
       <div v-else-if="games.length" class="game-grid">
-        <article v-for="game in games" :key="game.id" class="surface game-card">
+        <article v-for="game in games" :key="game.id" class="surface game-card" role="button" tabindex="0" :aria-label="`开始${game.name}`" :aria-disabled="opening || !store.desktop" @dblclick="openGameSpace(game.id)" @keydown.enter.prevent="openGameSpace(game.id)" @keydown.space.prevent="openGameSpace(game.id)">
           <div class="game-cover">
             <img :src="`/game-packs/${game.id}/${game.cover}`" :alt="`${game.name}封面`" loading="lazy" />
             <NTag class="game-kind" round :bordered="false">{{ game.orientation === "landscape" ? "横屏" : "轻松益智" }}</NTag>
@@ -207,9 +188,10 @@ onMounted(loadGames);
 .section-heading { display: flex; align-items: center; justify-content: space-between; }
 .section-heading .muted { margin-top: 3px; }
 .game-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 15px; }
+.game-card{cursor:pointer}.game-card:focus-visible{outline:2px solid #2563eb;outline-offset:2px}
 .game-card, .game-card-skeleton { min-width: 0; overflow: hidden; border: 1px solid #e8eef6; border-radius: 14px; background: #fff; box-shadow: 0 4px 16px #27476a08; }
 .game-cover { position: relative; height: 145px; overflow: hidden; background: linear-gradient(135deg, #eef5ff, #f8fbff); }
-.game-cover img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.game-cover img { display: block; width: 100%; height: 100%; object-fit: contain; }
 .game-kind { position: absolute; right: 10px; bottom: 10px; background: #ffffffeb; color: #526980; }
 .game-content { padding: 13px 15px 15px; }
 .game-content h3 { margin: 0 0 5px; color: #2a3a50; font-size: 15px; font-weight: 680; }

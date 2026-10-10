@@ -48,22 +48,20 @@ try {
   assert.equal(result.startupResult.Ok, 'ok', JSON.stringify(result.startupResult))
   assert.equal(result.wallpaperResult.Ok, 'ok', JSON.stringify(result.wallpaperResult))
   assert.equal(result.floatingResult.Ok, 'ok', JSON.stringify(result.floatingResult))
-  for (const scene of [result.floatingBefore.floating, result.wallpaper.wallpaper, result.floatingAfter.floating]) {
+  for (const scene of [result.floatingBefore.floating, result.wallpaper.floating, result.floatingAfter.floating]) {
     assert.ok(scene?.visible, 'AppKit 窗口未显示 / 前端未完成挂载')
     assert.ok(scene.frontendReady, '前端没有报告挂载完成')
     assert.ok(scene.width > 0 && scene.height > 0)
     assert.ok(scene.joinsAllSpaces, '窗口未配置桌面空间行为')
   }
-  const wallpaper = result.wallpaper.wallpaper
+  const petDesktop = result.wallpaper.floating
+  assert.equal(petDesktop.level, 0, '融入壁纸时应取消置顶')
+  assert.equal(petDesktop.opaque, false)
   for (const dimension of ['x', 'y', 'width', 'height']) {
-    assert.ok(Math.abs(wallpaper[dimension] - wallpaper.screenFrame[dimension]) < 1,
-      `壁纸 ${dimension} 没有对齐主屏幕：${wallpaper[dimension]} vs ${wallpaper.screenFrame[dimension]}`)
+    assert.ok(Math.abs(petDesktop[dimension] - result.floatingBefore.floating[dimension]) < 1, `切换模式未保留 ${dimension}`)
   }
-  assert.ok(wallpaper.level > wallpaper.desktopLevel && wallpaper.level < wallpaper.desktopIconLevel, '壁纸不在桌面背景和图标之间')
-  assert.ok(wallpaper.ignoresMouseEvents, '壁纸拦截了桌面输入')
-  assert.equal(result.floatingBefore.floating.opaque, false, '悬浮窗不透明')
-  assert.equal(result.wallpaper.floating, null, '进入壁纸后残留悬浮窗')
-  assert.equal(result.floatingAfter.wallpaper, null, '返回悬浮后残留壁纸窗')
+  assert.equal(result.wallpaper.wallpaper, null, '不应创建房间壁纸')
+  assert.equal(result.floatingAfter.wallpaper, null)
   assert.ok(result.dockReopen?.Ok, JSON.stringify(result.dockReopen))
   assert.equal(result.dockReopen.Ok.cases.length, 3)
   assert.ok(result.dockReopen.Ok.wallpaperPreserved)

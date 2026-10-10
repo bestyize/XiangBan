@@ -16,7 +16,8 @@ try{
  await new Promise((resolve,reject)=>{child.on('error',reject);child.on('exit',(code,signal)=>code===0?resolve():reject(new Error(`App failed: ${code??signal}\n${output}`)))})
  const result=JSON.parse(await readFile(report,'utf8'));assert.ok(result.media?.Ok,JSON.stringify(result.media))
  assert.equal(result.media.Ok.cases.length,6);assert.ok(result.media.Ok.cacheOffline);assert.ok(result.media.Ok.hashFailurePreserved);assert.ok(result.media.Ok.updateChecked)
- assert.equal(result.wallpaper.wallpaperGeometry.fillsMonitor,true,'Companion wallpaper must fill the monitor')
+ assert.equal(result.wallpaper.wallpaper,null,'No special companion wallpaper should be created')
+ assert.ok(result.wallpaper.floating?.visible,'Desktop companion must remain visible')
  for(const state of result.media.Ok.cases){assert.ok(state.report.width>0&&state.report.height>0);assert.equal(state.report.privilegedIpcBlocked,true);assert.equal(state.geometry.fillsMonitor,true,`${state.id} must fill the monitor without a non-client border`)}
  assert.equal(result.media.Ok.localImports.cases.length,2)
  assert.ok(result.media.Ok.localImports.sourceDeleted&&result.media.Ok.localImports.deduplicated&&result.media.Ok.localImports.restored)
@@ -27,6 +28,8 @@ try{
   assert.equal(effects.cases?.length,3,'effects.cases')
   assert.equal(effects.sources?.length,3,'effects.sources')
   assert.equal(effects.nonImage?.length,2,'effects.nonImage')
+  assert.equal(effects.nonImage.find(item=>item.id==='test-video').report.effects.canvasPresent,true,'Video overlay must render')
+  assert.equal(effects.nonImage.find(item=>item.id==='test-canvas').report.effects.canvasPresent,false,'Interactive Canvas overlay stays disabled')
   for(const [index,state] of effects.cases.entries()) assert.equal(state.persisted,true,`effects.cases[${index}].persisted`)
   assert.equal(effects.preview?.settingsPreserved,true,'effects.preview.settingsPreserved')
   assert.equal(effects.preview?.closed,true,'effects.preview.closed')

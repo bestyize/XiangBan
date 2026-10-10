@@ -13,6 +13,15 @@ fn sized_rendition(raw: &str, width: u32) -> String {
     format!("{raw}{separator}w={width}&q=85&fm=jpg&fit=max")
 }
 
+fn short_title(description: &str) -> String {
+    let trimmed = description.trim();
+    if trimmed.chars().count() > 60 {
+        format!("{}...", trimmed.chars().take(57).collect::<String>())
+    } else {
+        trimmed.to_string()
+    }
+}
+
 pub fn map_unsplash_photo(photo: UnsplashPhoto) -> WallpaperItem {
     let orientation = Orientation::from_dimensions(photo.width, photo.height);
     let resolution = Resolution::new(photo.width, photo.height);
@@ -21,14 +30,7 @@ pub fn map_unsplash_photo(photo: UnsplashPhoto) -> WallpaperItem {
         .description
         .as_deref()
         .or(photo.alt_description.as_deref())
-        .map(|s| {
-            let trimmed = s.trim();
-            if trimmed.len() > 60 {
-                format!("{}...", &trimmed[..57])
-            } else {
-                trimmed.to_string()
-            }
-        })
+        .map(short_title)
         .unwrap_or_else(|| format!("Wallpaper by {}", photo.user.name));
 
     let tags = photo
@@ -90,6 +92,16 @@ pub fn map_unsplash_photo(photo: UnsplashPhoto) -> WallpaperItem {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn title_truncation_preserves_unicode_and_does_not_panic() {
+        let curved_quote = format!("{}’{}", "a".repeat(56), "b".repeat(8));
+        assert_eq!(short_title(&curved_quote), format!("{}’...", "a".repeat(56)));
+        assert_eq!(short_title(&"雪".repeat(61)), format!("{}...", "雪".repeat(57)));
+        assert_eq!(short_title(&"🌙".repeat(61)), format!("{}...", "🌙".repeat(57)));
+        assert_eq!(short_title(&format!("  {}  ", "雪".repeat(60))), "雪".repeat(60));
+        assert_eq!(short_title(&"a".repeat(61)), format!("{}...", "a".repeat(57)));
+    }
 
     #[test]
     fn rendition_url_caps_the_width_and_keeps_existing_query() {

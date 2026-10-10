@@ -95,10 +95,14 @@ pub fn save_game_save(app: tauri::AppHandle, game_id: String, data: Value, host_
     if result.is_err() { let _ = fs::remove_file(&temporary); }
     result.map_err(|e| format!("存档保存失败，已有进度已保留：{e}"))
 }
-pub async fn open(app: &tauri::AppHandle) -> Result<(), String> {
+pub async fn open(app: &tauri::AppHandle) -> Result<(), String> { open_selected(app, None).await }
+async fn open_selected(app: &tauri::AppHandle, game_id: Option<String>) -> Result<(), String> {
+    if game_id.as_deref().is_some_and(|id| !IDS.contains(&id)) { return Err("没有找到这款本地游戏".into()); }
     let state = app.state::<GameState>(); let _operation = state.operation.lock().await;
     let content_state = app.state::<crate::content::ContentState>(); let _content = content_state.operation.lock().await;
-    if let Some(window) = app.get_webview_window("games") { window.unminimize().map_err(|e|e.to_string())?; window.show().map_err(|e|e.to_string())?; return window.set_focus().map_err(|e|e.to_string()); }
+    if let Some(window) = app.get_webview_window("games") {
+        if let Some(id) = &game_id { window.eval(format!("window.dispatchEvent(new CustomEvent('game-launch',{{detail:{}}}));", json!(id))).map_err(|e|e.to_string())?; }
+        window.unminimize().map_err(|e|e.to_string())?; window.show().map_err(|e|e.to_string())?; return window.set_focus().map_err(|e|e.to_string()); }
     let monitor = app.primary_monitor().map_err(|e| e.to_string())?.ok_or("没有找到主显示器")?;
     let scale = monitor.scale_factor();
     let mut random=[0u8;32]; getrandom::fill(&mut random).map_err(|e|format!("安全宿主初始化失败：{e}"))?;
@@ -106,7 +110,7 @@ pub async fn open(app: &tauri::AppHandle) -> Result<(), String> {
     *state.host_token.lock().unwrap()=token.clone();
     let smoke=app.state::<crate::DesktopState>().isolated && std::env::var_os("XIAOBAN_GAMES_SMOKE").is_some();
     *state.smoke_report.lock().unwrap()=None;
-    let builder = WebviewWindowBuilder::new(app, "games", WebviewUrl::App("index.html?scene=games".into()))
+    let builder = WebviewWindowBuilder::new(app, "games", WebviewUrl::App(format!("index.html?scene=games{}", game_id.as_ref().map(|id|format!("&game={id}")).unwrap_or_default()).into()))
         .initialization_script(format!("if(window===window.top){{window.__XIAOBAN_GAME_TOKEN__={};window.__XIAOBAN_GAME_SMOKE__={smoke};}}",json!(token)))
         .title("小伴 · 游戏空间").decorations(false).shadow(false).resizable(false).visible(false).fullscreen(true)
         .always_on_top(false).skip_taskbar(false).focused(true)
@@ -135,8 +139,8 @@ fn restore_background(app: &tauri::AppHandle) {
     crate::reminders::set_game_active(app, false);
     let _ = app.emit("games-active", false);
     let config = crate::settings(app);
-    let media = match crate::content::restore(app) { Ok(media) => media, Err(e) => { let _=app.emit("desktop-error", format!("退出游戏后壁纸恢复失败：{e}")); false } };
-    if !media || config.mode == "floating" { if let Err(e) = crate::open_scene(app,&config.mode) { let _=app.emit("desktop-error",e); } }
+    let _media = match crate::content::restore(app) { Ok(media) => media, Err(e) => { let _=app.emit("desktop-error", format!("退出游戏后壁纸恢复失败：{e}")); false } };
+    if let Err(e) = crate::open_scene(app,&config.mode) { let _=app.emit("desktop-error",e); }
     if let Some(position) = app.state::<GameState>().pet_position.lock().unwrap().take() {
         if let Some(pet) = app.get_webview_window("pet") { let _ = pet.set_position(position); }
     }
@@ -150,7 +154,7 @@ pub async fn close(app: &tauri::AppHandle) -> Result<(), String> {
     Ok(())
 }
 #[tauri::command]
-pub async fn open_game_space(app: tauri::AppHandle) -> Result<(), String> { open(&app).await }
+pub async fn open_game_space(app: tauri::AppHandle, game_id: Option<String>) -> Result<(), String> { open_selected(&app, game_id).await }
 #[tauri::command]
 pub async fn close_game_space(app: tauri::AppHandle, window: tauri::WebviewWindow, host_token: Option<String>) -> Result<(), String> {
     if window.label()=="games" { authorize(&app,host_token.as_deref().unwrap_or(""))?; }
@@ -170,7 +174,7 @@ pub fn game_smoke_report(app:tauri::AppHandle,host_token:String,report:Value)->R
 pub async fn smoke(app:&tauri::AppHandle)->Result<Value,String>{
     let before=crate::settings(app);
     let position=app.get_webview_window("pet").and_then(|w|w.outer_position().ok());
-    open(app).await?;
+    open_selected(app, Some("falling-blocks".into())).await?;
     if !is_active(app) || app.get_webview_window("pet").is_some() || app.get_webview_window("wallpaper").is_some() || app.get_webview_window("media-a").is_some() || app.get_webview_window("media-b").is_some(){return Err("沉浸窗口未暂停背景".into());}
     let deadline=std::time::Instant::now()+std::time::Duration::from_secs(145);
     let report=loop {

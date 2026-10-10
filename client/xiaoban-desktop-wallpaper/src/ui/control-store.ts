@@ -93,9 +93,9 @@ export function createControlStore(notify: ControlStore["notify"]): ControlStore
       store.settings = await invoke<Settings>("set_game_desktop_double_click", { enabled });
       store.game = await invoke<ControlStore["game"]>("get_game_status");
     },
-    async openGames() {
-      if (!desktop) { window.open("/?scene=games", "_blank", "noopener"); return; }
-      await invoke("open_game_space");
+    async openGames(gameId?: string) {
+      if (!desktop) { window.open(`/?scene=games${gameId ? `&game=${encodeURIComponent(gameId)}` : ""}`, "_blank", "noopener"); return; }
+      await invoke("open_game_space", { gameId: gameId ?? null });
       store.game.active = true;
     },
     async applyWallpaper(id, options, preview = false) {

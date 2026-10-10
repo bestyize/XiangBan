@@ -20,8 +20,7 @@ const items = [
   { id: 'games', label: '游戏空间', hint: '给自己放个小假', icon: Gamepad2 },
   { id: 'care', label: '关怀提醒', hint: '照顾日常的小事', icon: Bell },
 ] as const;
-const current = computed(() => store.page === 'settings' ? '设置' : items.find(item => item.id === store.page)?.label ?? '壁纸库');
-const activeWallpaper = computed(() => store.settings.wallpaperId === 'companion' ? (store.settings.mode === 'wallpaper' ? '小伴房间' : '系统桌面') : store.library.items.find(item => item.definition.id === store.settings.wallpaperId)?.definition.title ?? '已保存的壁纸');
+const activeWallpaper = computed(() => store.settings.wallpaperId === 'companion' ? '系统桌面' : store.library.items.find(item => item.definition.id === store.settings.wallpaperId)?.definition.title ?? '已保存的壁纸');
 const unread = computed(() => store.website.announcements.filter(item => store.website.dismissed[item.id] !== item.revision).length);
 function navigate(page: ControlPage) { store.navigate(page); document.querySelector('.control-workspace')?.scrollTo(0, 0); }
 async function hide() { if (store.desktop) await invoke('hide_control'); else store.notify('浏览器预览不能收起到托盘', 'info'); }
@@ -31,7 +30,7 @@ onMounted(() => { void store.initialize().then(async () => { if (store.info.uiSm
 onBeforeUnmount(() => { store.dispose(); window.removeEventListener('focus', focus); });
 </script>
 <template>
-  <div class="control-app" :class="{ 'is-collapsed': collapsed }">
+  <div class="control-app" :class="{ 'is-collapsed': collapsed, 'is-wallpapers': store.page === 'wallpapers' }">
     <aside class="control-sidebar">
       <div class="control-brand"><div class="control-brand-mark"><img src="/xiaoban.svg" alt="小伴"></div><div class="brand-copy"><strong>小伴桌面</strong><span>你的桌面生活空间</span></div></div>
       <div class="sidebar-group-label">我的桌面</div>
@@ -42,10 +41,10 @@ onBeforeUnmount(() => { store.dispose(); window.removeEventListener('focus', foc
       <div class="sidebar-bottom"><button class="settings-nav" data-testid="nav-settings" :class="{ selected: store.page === 'settings' }" @click="navigate('settings')"><Settings2 :size="18" /><span>设置与关于</span><i v-if="unread || store.website.update?.available" class="notice-dot"></i></button><div class="sidebar-meta"><span>v{{ store.info.version }}</span><NButton quaternary size="tiny" title="收起导航" @click="collapsed = !collapsed"><PanelLeftClose :size="16" /></NButton></div></div>
     </aside>
     <div class="control-main">
-      <header class="control-topbar"><div class="breadcrumb"><span>我的桌面</span><ChevronRight :size="13" /><strong>{{ current }}</strong></div><div class="topbar-actions"><span v-if="!store.desktop" class="preview-label">浏览器预览</span><NButton quaternary size="small" title="收起到托盘" aria-label="收起到托盘" @click="hide"><Minus :size="17" /></NButton><NButton quaternary size="small" title="退出小伴" aria-label="退出小伴" @click="quit"><Power :size="15" /></NButton></div></header>
-      <main class="control-workspace">
+      <header class="control-topbar"><div class="topbar-actions"><span v-if="!store.desktop" class="preview-label">浏览器预览</span><NButton quaternary size="small" title="收起到托盘" aria-label="收起到托盘" @click="hide"><Minus :size="17" /></NButton><NButton quaternary size="small" title="退出小伴" aria-label="退出小伴" @click="quit"><Power :size="15" /></NButton></div></header>
+      <main class="control-workspace" :class="{'wallpaper-workspace':store.page==='wallpapers'}">
         <NAlert v-if="store.initialError" class="workspace-alert" type="error" title="桌面配置暂时无法读取">{{ store.initialError }} <NButton size="small" @click="store.initialize()">重试</NButton></NAlert>
-        <div v-if="store.website.update?.available && store.page !== 'settings'" class="update-strip"><span><span class="notice-dot"></span>小伴有新版本 v{{ store.website.update.version }}</span><button @click="navigate('settings')">查看更新<ArrowUpRight :size="14" /></button></div>
+        <div v-if="store.website.update?.available && store.page !== 'settings' && store.page !== 'wallpapers'" class="update-strip"><span><span class="notice-dot"></span>小伴有新版本 v{{ store.website.update.version }}</span><button @click="navigate('settings')">查看更新<ArrowUpRight :size="14" /></button></div>
         <div v-if="!store.ready" class="workspace-loading"><NSkeleton height="36px" width="220px" /><NSkeleton height="18px" width="320px" /><NSkeleton height="380px" :sharp="false" /></div>
         <template v-else-if="!store.initialError"><WallpaperPage v-if="store.page === 'wallpapers'" :store="store" /><CompanionPage v-else-if="store.page === 'companion'" :store="store" /><GamesPage v-else-if="store.page === 'games'" :store="store" /><CarePage v-else-if="store.page === 'care'" :store="store" /><SettingsPage v-else :store="store" /></template>
       </main>

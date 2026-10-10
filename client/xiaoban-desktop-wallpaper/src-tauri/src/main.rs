@@ -33,7 +33,6 @@ use tauri::{Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
 #[derive(Default)]
 struct DesktopState {
     settings: Mutex<Settings>,
-    wallpaper_parent: Mutex<Option<usize>>,
     ready_scenes: Mutex<HashSet<String>>,
     preferences_path: Mutex<Option<PathBuf>>,
     data_root: Mutex<Option<PathBuf>>,
@@ -177,104 +176,34 @@ fn set_autostart(app: tauri::AppHandle, enabled: bool) -> Result<Settings, Strin
 }
 
 fn open_scene(app: &tauri::AppHandle, mode: &str) -> Result<(), String> {
-    if mode == "floating" && !settings(app).companion_enabled { return Ok(()); }
-    let wallpaper = mode == "wallpaper";
-    let label = if wallpaper { "wallpaper" } else { "pet" };
-    if let Some(window) = app.get_webview_window(label) {
+    if !settings(app).companion_enabled { return Ok(()); }
+    if let Some(window) = app.get_webview_window("pet") {
+        window.set_always_on_top(mode == "floating").map_err(|e| e.to_string())?;
+        #[cfg(target_os = "macos")]
+        macos::configure_scene(&window, mode == "wallpaper", false)?;
         window.show().map_err(|e| e.to_string())?;
         return Ok(());
     }
-    let monitor = app
-        .primary_monitor()
-        .map_err(|e| e.to_string())?
-        .ok_or("没有找到主显示器")?;
+    let monitor = app.primary_monitor().map_err(|e| e.to_string())?.ok_or("没有找到主显示器")?;
     let scale = monitor.scale_factor();
-    let width = monitor.size().width as f64 / scale;
-    let height = monitor.size().height as f64 / scale;
     let s = settings(app);
-    let scene_w = if wallpaper { width } else { s.size * 1.5 };
-    let scene_h = if wallpaper { height } else { s.size * 1.22 };
-    #[cfg(windows)]
-    let parent = if wallpaper {
-        Some(windows::desktop_parent()?)
-    } else {
-        None
-    };
-    let builder = WebviewWindowBuilder::new(
-        app,
-        label,
-        WebviewUrl::App(format!("index.html?scene={mode}").into()),
-    )
-    .title(if wallpaper {
-        "小伴 · 动态壁纸"
-    } else {
-        "小伴 · 悬浮桌宠"
-    })
-    .decorations(false)
-    .shadow(false)
-    .resizable(false)
-    .skip_taskbar(true)
-    .always_on_top(!wallpaper)
-    .transparent(!wallpaper)
-    .visible(false)
-    .focused(false)
-    .inner_size(scene_w, scene_h)
-    .position(
-        monitor.position().x as f64 / scale
-            + if wallpaper {
-                0.0
-            } else {
-                width - scene_w - 70.0
-            },
-        monitor.position().y as f64 / scale
-            + if wallpaper {
-                0.0
-            } else {
-                height - scene_h - 100.0
-            },
-    );
+    let scene_w = s.size * 1.5;
+    let scene_h = s.size * 1.22;
+    let builder = WebviewWindowBuilder::new(app, "pet", WebviewUrl::App("index.html?scene=floating".into()))
+        .title("小伴 · 桌面小伴")
+        .decorations(false).shadow(false).resizable(false).skip_taskbar(true)
+        .always_on_top(mode == "floating").transparent(true).visible(false).focused(false)
+        .inner_size(scene_w, scene_h)
+        .position(monitor.position().x as f64 / scale + monitor.size().width as f64 / scale - scene_w - 70.0,
+                  monitor.position().y as f64 / scale + monitor.size().height as f64 / scale - scene_h - 100.0);
     #[cfg(target_os = "macos")]
-    let builder =
-        builder.incognito(true).background_throttling(tauri::utils::config::BackgroundThrottlingPolicy::Disabled);
-    // Register the parent with Tao itself. Reparenting only with SetParent would
-    // be undone when Tao rewrites window styles on show/cursor-state changes.
+    let builder = builder.incognito(true).background_throttling(tauri::utils::config::BackgroundThrottlingPolicy::Disabled);
     #[cfg(windows)]
     let builder = builder.data_directory(storage::webview(&storage::root(app)?));
-    #[cfg(windows)]
-    let builder = if let Some(parent) = parent {
-        builder.parent_raw(::windows::Win32::Foundation::HWND(parent as _))
-    } else {
-        builder
-    };
     let window = builder.build().map_err(|e| e.to_string())?;
-
-    if wallpaper {
-        #[cfg(windows)]
-        {
-            match windows::attach_wallpaper(&window, &monitor, parent.unwrap()) {
-                Ok(parent) => {
-                    *app.state::<DesktopState>().wallpaper_parent.lock().unwrap() = Some(parent)
-                }
-                Err(error) => {
-                    let _ = window.destroy();
-                    return Err(error);
-                }
-            }
-        }
-        #[cfg(not(any(windows, target_os = "macos")))]
-        {
-            let _ = window.destroy();
-            return Err("壁纸桌面接入支持 Windows 和 macOS".into());
-        }
-        window
-            .set_ignore_cursor_events(true)
-            .map_err(|e| e.to_string())?;
-    }
+    window.set_ignore_cursor_events(true).map_err(|e| e.to_string())?;
     #[cfg(target_os = "macos")]
-    if let Err(error) = macos::configure_scene(&window, wallpaper, true) {
-        let _ = window.destroy();
-        return Err(error);
-    }
+    macos::configure_scene(&window, mode == "wallpaper", false)?;
     Ok(())
 }
 
@@ -303,35 +232,11 @@ async fn set_mode(app: tauri::AppHandle, mode: String) -> Result<Settings, Strin
     let mut next = previous.clone();
     next.mode = mode.clone();
     persist(&app, &next)?;
-    if previous.wallpaper_id != "companion" {
-        if mode == "floating" {
-            if let Err(error) = open_scene(&app, "floating") { let _ = persist(&app, &previous); return Err(error); }
-        } else if let Some(window) = app.get_webview_window("pet") { window.destroy().map_err(|e|e.to_string())?; }
-        *state.settings.lock().unwrap() = next;
-        publish(&app);
-        return Ok(settings(&app));
-    }
     if let Err(error) = open_scene(&app, &mode) {
         let _ = persist(&app, &previous);
         return Err(error);
     }
-    let old_label = if mode == "wallpaper" {
-        "pet"
-    } else {
-        "wallpaper"
-    };
-    if let Some(old) = app.get_webview_window(old_label) {
-        old.destroy().map_err(|e| e.to_string())?;
-    }
-    app.state::<DesktopState>()
-        .ready_scenes
-        .lock()
-        .unwrap()
-        .remove(old_label);
-    if mode == "floating" {
-        *app.state::<DesktopState>().wallpaper_parent.lock().unwrap() = None;
-    }
-    app.state::<DesktopState>().settings.lock().unwrap().mode = mode;
+    *state.settings.lock().unwrap() = next;
     publish(&app);
     Ok(settings(&app))
 }
@@ -384,8 +289,8 @@ async fn set_companion_enabled(app:tauri::AppHandle,enabled:bool)->Result<Settin
     if !enabled {
         if let Some(pet)=app.get_webview_window("pet"){let _=pet.destroy();}
         state.ready_scenes.lock().unwrap().remove("pet");
-    } else if next.mode=="floating" {
-        if let Err(error)=open_scene(&app,"floating"){*state.settings.lock().unwrap()=previous.clone();let _=persist(&app,&previous);return Err(error);}
+    } else {
+        if let Err(error)=open_scene(&app,&next.mode){*state.settings.lock().unwrap()=previous.clone();let _=persist(&app,&previous);return Err(error);}
     }
     publish(&app);Ok(next)
 }
@@ -414,8 +319,8 @@ fn scene_ready(window: tauri::WebviewWindow, report: Option<serde_json::Value>) 
     #[cfg(target_os = "macos")]
     macos::configure_scene(
         &window,
-        window.label() == "wallpaper" || ["media-a", "media-b"].contains(&window.label()),
-        window.label() == "wallpaper" || ["media-a", "media-b"].contains(&window.label()),
+        (window.label() == "pet" && settings(window.app_handle()).mode == "wallpaper") || ["media-a", "media-b"].contains(&window.label()),
+        ["media-a", "media-b"].contains(&window.label()),
     )?;
     window
         .app_handle()
@@ -448,7 +353,7 @@ fn set_hit_test(window: tauri::WebviewWindow, hit: bool) -> Result<(), String> {
 #[tauri::command]
 fn start_drag(window: tauri::WebviewWindow) -> Result<(), String> {
     if window.label() != "pet" {
-        return Err("壁纸模式中的位置由场景决定".into());
+        return Err("只有小伴窗口可以拖动".into());
     }
     window.start_dragging().map_err(|e| e.to_string())
 }
@@ -723,7 +628,7 @@ fn main() {
             setup_tray(app)?;
             website::start(app.handle());
             let initial_mode = settings(app.handle()).mode;
-            let media_active = match content::restore(app.handle()) {
+            let _media_active = match content::restore(app.handle()) {
                 Ok(active) => active,
                 Err(error) => {
                     *app.state::<DesktopState>().startup_error.lock().unwrap() = Some(error);
@@ -731,9 +636,7 @@ fn main() {
                     false
                 }
             };
-            if !media_active || initial_mode == "floating" {
-                open_scene(app.handle(), &initial_mode).map_err(std::io::Error::other)?;
-            }
+            open_scene(app.handle(), &initial_mode).map_err(std::io::Error::other)?;
             if !std::env::args().any(|argument| argument == "--autostart") {
                 present_control(app.handle()).map_err(std::io::Error::other)?;
             }
@@ -748,7 +651,7 @@ fn main() {
                     let lifecycle = smoke_lifecycle(&handle);
                     let floating_before = get_diagnostics(handle.clone());
                     let wallpaper_result = set_mode(handle.clone(), "wallpaper".into()).await
-                        .and_then(|_| wait_for_scene(&handle, "wallpaper"));
+                        .and_then(|_| wait_for_scene(&handle, "pet"));
                     let wallpaper = get_diagnostics(handle.clone());
                     #[cfg(target_os = "macos")]
                     let dock_reopen = macos::smoke_dock_reopen(&handle);

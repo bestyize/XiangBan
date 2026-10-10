@@ -31,11 +31,11 @@ onMounted(() => { void care.initialize(); }); onUnmounted(care.dispose);
 
 <template>
   <main class="ui-page care-page" data-testid="care-page">
-    <header class="page-header"><div><h1>关怀提醒</h1><p class="page-subtitle">让小伴在合适的时候，提醒你照顾自己。</p></div><NButton type="primary" data-testid="care-add" @click="open()">新增提醒</NButton></header>
+
     <NAlert v-if="!store.desktop" type="info" :show-icon="false">浏览器预览：初始没有提醒。可临时添加并检查表单，本次预览不保存、不在后台触发。</NAlert>
     <NAlert v-if="!store.settings.companionEnabled" type="warning" :show-icon="false">小伴已隐藏，关怀提醒暂缓展示。<NButton text type="primary" @click="store.navigate('companion')">前往桌面小伴开启显示</NButton></NAlert>
     <NAlert v-if="status.error" type="error">{{ status.error }}</NAlert>
-    <section class="surface list-panel"><div class="section-heading"><h2>我的提醒 <span class="muted">{{ status.rules.length }}</span></h2><div class="quick-types"><NButton v-for="kind in kinds" :key="kind.value" size="small" :disabled="kind.value === 'weather' && !weatherEnabled" @click="open(kind.value as CareKind)">＋ {{ kind.label }}</NButton></div></div>
+    <section class="surface list-panel"><div class="section-heading"><h2>我的提醒 <span class="muted">{{ status.rules.length }}</span></h2><div class="quick-types"><NButton type="primary" data-testid="care-add" @click="open()">新增提醒</NButton><NButton v-for="kind in kinds" :key="kind.value" size="small" :disabled="kind.value === 'weather' && !weatherEnabled" @click="open(kind.value as CareKind)">＋ {{ kind.label }}</NButton></div></div>
       <p v-if="!weatherEnabled" class="muted">天气来源已关闭，暂不可搜索城市或添加天气提醒；本地提醒仍可使用。</p>
       <NEmpty v-if="!status.rules.length" description="还没有提醒，从一条喝水或休息提醒开始吧" class="empty" />
       <article v-for="rule in status.rules" :key="rule.id" class="reminder" :data-testid="`care-rule-${rule.id}`"><div class="reminder-copy"><NTag size="small" :bordered="false" type="info">{{ careNames[rule.kind] }}</NTag><strong>{{ rule.text || '根据真实天气生成提示' }}</strong><p>{{ describeCareRule(rule) }}</p><small v-if="rule.notBefore > Date.now()/1000" class="muted">稍后提醒：{{ new Date(rule.notBefore * 1000).toLocaleString() }}</small></div><div class="rule-actions"><NSwitch :value="rule.enabled" :disabled="busy" :aria-label="`启用${careNames[rule.kind]}提醒`" @update:value="care.toggle(rule, $event)"/><NButton size="small" :disabled="busy" @click="care.open(rule.kind, rule)">编辑</NButton><NButton size="small" :disabled="busy" @click="care.preview(rule)">预览</NButton><NPopconfirm @positive-click="care.remove(rule)"><template #trigger><NButton size="small" :disabled="busy">删除</NButton></template>删除这条提醒？待展示的任务也会取消。</NPopconfirm></div></article>

@@ -24,11 +24,16 @@ try {
     if ($taskResult.wallpaperResult.Ok -ne 'ok') { throw ('壁纸模式失败: ' + ($taskResult.wallpaperResult | ConvertTo-Json -Compress)) }
     if ($taskResult.floatingResult.Ok -ne 'ok') { throw '无法从壁纸切回悬浮模式' }
     if (!$taskResult.floatingBefore.floating.visible -or !$taskResult.floatingAfter.floating.visible) { throw '悬浮窗口的前端没有正常显示' }
-    if (!$taskResult.wallpaper.wallpaper.isChild -or $taskResult.wallpaper.wallpaper.parentClass -ne 'WorkerW') { throw '壁纸没有挂到 Explorer 的背景窗口' }
-    if (!$taskResult.wallpaper.wallpaper.visible) { throw '壁纸前端没有正常显示' }
-    if (!$taskResult.wallpaper.wallpaperGeometry.fillsMonitor) { throw ('壁纸实际绘图区未铺满主屏幕: ' + ($taskResult.wallpaper.wallpaperGeometry | ConvertTo-Json -Compress)) }
-    if ($taskResult.wallpaper.floating -or $taskResult.floatingAfter.wallpaper) { throw '切换模式后残留了旧窗口' }
-    Write-Output ('PASS: 悬浮 → 壁纸（WorkerW 子窗口）→ 悬浮，三个阶段的前端均已显示。报告: ' + $taskReport)
+    $taskPetBefore = $taskResult.floatingBefore.floating
+    $taskPetDesktop = $taskResult.wallpaper.floating
+    $taskPetAfter = $taskResult.floatingAfter.floating
+    if (!$taskPetDesktop.visible -or !$taskPetDesktop.frontendReady) { throw '融入壁纸时小伴未显示' }
+    if (!$taskPetBefore.topmost -or $taskPetDesktop.topmost -or !$taskPetAfter.topmost) { throw '两种模式的置顶状态错误' }
+    foreach ($taskPet in @($taskPetDesktop, $taskPetAfter)) {
+        if ($taskPet.hwnd -ne $taskPetBefore.hwnd -or $taskPet.x -ne $taskPetBefore.x -or $taskPet.y -ne $taskPetBefore.y) { throw '切换模式未保留小伴窗口或位置' }
+    }
+    if ($taskResult.wallpaper.wallpaper -or $taskResult.floatingAfter.wallpaper) { throw '仍然创建了特殊房间壁纸' }
+    Write-Output ('PASS: 两种模式共用透明小伴窗口，位置保持一致，置顶状态正确。报告: ' + $taskReport)
 } finally {
     foreach ($taskRegistryPath in @('Software\Microsoft\Windows\CurrentVersion\Run', 'Software\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\Run')) {
         $taskRegistryKey = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey($taskRegistryPath, $true)

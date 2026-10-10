@@ -7,8 +7,6 @@ import {
   type CursorSample,
 } from "./bridge.ts";
 import { PetView } from "./pet.ts";
-const room =
-  '<div class="room"><div class="room-glow"></div><div class="room-window"><div class="moon"></div><div class="stars"></div><div class="skyline"></div></div><div class="plant"><i></i><i></i><i></i><i></i><b></b></div><div class="desk"></div><div class="room-floor"></div></div>';
 async function init() {
   const mode = new URLSearchParams(location.search).get("scene");
   if (!mode) {
@@ -33,23 +31,14 @@ async function init() {
     return;
   }
   let config = { ...defaults };
-  document.body.className = mode;
-  document.querySelector<HTMLElement>("#app")!.innerHTML =
-    mode === "wallpaper"
-      ? `<section class="scene full-scene">${room}<div class="wallpaper-pet"></div><div class="scene-caption"><span>小伴</span><p>陪你，把日子过慢一点。</p></div></section>`
-      : '<section class="floating-stage"></section>';
-  const pet = new PetView(
-    document.querySelector<HTMLElement>(
-      mode === "wallpaper" ? ".wallpaper-pet" : ".floating-stage",
-    )!,
-    config,
-  );
+  document.body.className = "floating";
+  document.querySelector<HTMLElement>("#app")!.innerHTML = '<section class="floating-stage"></section>';
+  const pet = new PetView(document.querySelector<HTMLElement>(".floating-stage")!, config);
   let pointer: { x: number; y: number; dragged: boolean } | null = null,
     hovering: boolean | null = null;
   pet.host.addEventListener("pointerdown", (event) => {
     if (
       event.button !== 0 ||
-      mode !== "floating" ||
       !pet.hit(event.clientX, event.clientY)
     )
       return;
@@ -80,12 +69,10 @@ async function init() {
     if (!config.companionEnabled) return;
     pet.look(sample.x, sample.y, sample.moved);
     const hit = pet.hit(sample.x, sample.y);
-    if (mode === "floating" && hit !== hovering) {
+    if (hit !== hovering) {
       hovering = hit;
       invoke("set_hit_test", { hit }).catch(console.error);
     }
-    if (mode === "wallpaper" && sample.pressed && sample.desktop && hit)
-      pet.poke();
   });
   const apply = (settings: Settings) => {
     config = settings;

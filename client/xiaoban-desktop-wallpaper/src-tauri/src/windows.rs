@@ -226,9 +226,13 @@ pub fn diagnostics(app: &tauri::AppHandle) -> serde_json::Value {
                 let parent = GetParent(hwnd);
                 let mut rect = RECT::default();
                 GetClientRect(hwnd, &mut rect);
+                let mut outer = RECT::default();
+                GetWindowRect(hwnd, &mut outer);
                 serde_json::json!({ "hwnd": hwnd as usize, "parent": parent as usize,
                 "parentClass": class_name(parent), "visible": IsWindowVisible(hwnd) != 0,
                 "width": rect.right, "height": rect.bottom, "dpi": GetDpiForWindow(hwnd),
+                "x": outer.left, "y": outer.top,
+                "topmost": GetWindowLongPtrW(hwnd, GWL_EXSTYLE) & WS_EX_TOPMOST as isize != 0,
                 "isChild": GetWindowLongPtrW(hwnd, GWL_STYLE) & WS_CHILD as isize != 0 })
             })
     };
@@ -311,20 +315,6 @@ fn over_companion(app:&tauri::AppHandle,click:DesktopClick)->bool{
     if let Some(pet)=app.get_webview_window("pet").and_then(|w|w.hwnd().ok()){
         let mut rect=RECT::default();let hwnd=pet.0 as HWND;
         if unsafe{IsWindowVisible(hwnd)!=0&&GetWindowRect(hwnd,&mut rect)!=0}&&contains(rect){return true;}
-    }
-    if config.mode!="wallpaper"{return false;}
-    // The trusted wallpaper .wallpaper-pet is centered at left:58%, bottom:14%.
-    // Exclude its entire art/glow region, with animation margin, instead of relying on
-    // the sampled SVG hover state. Keep these bounds aligned with style.css/PetView.
-    for label in ["wallpaper","media-a","media-b"]{
-        let Some(native)=app.get_webview_window(label).and_then(|w|w.hwnd().ok())else{continue;};
-        let hwnd=native.0 as HWND;let mut client=RECT::default();let mut origin=POINT::default();
-        if unsafe{IsWindowVisible(hwnd)==0||GetClientRect(hwnd,&mut client)==0||ClientToScreen(hwnd,&mut origin)==0}{continue;}
-        let size=config.size*unsafe{GetDpiForWindow(hwnd)}.max(96) as f64/96.0;
-        let center_x=origin.x as f64+(client.right-client.left) as f64*0.58;
-        let art_bottom=origin.y as f64+(client.bottom-client.top) as f64*0.86;
-        let rect=RECT{left:(center_x-size*0.75).floor() as i32,right:(center_x+size*0.75).ceil() as i32,top:(art_bottom-size*1.05).floor() as i32,bottom:(art_bottom+size*0.18).ceil() as i32};
-        if contains(rect){return true;}
     }
     false
 }
