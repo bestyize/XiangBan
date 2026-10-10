@@ -1,0 +1,109 @@
+{
+ "schemaVersion": 1,
+ "id": "fireflies",
+ "name": "萤火虫",
+ "description": "夜里一闪一闪的微光",
+ "sky": [
+  "#0a1030",
+  "#1d2a55",
+  "#2c3153"
+ ],
+ "layers": [
+  {
+   "count": 100,
+   "shape": {
+    "kind": "glow",
+    "core": 0.2
+   },
+   "size": [
+    8,
+    14
+   ],
+   "speed": [
+    3,
+    10
+   ],
+   "direction": [
+    250,
+    290
+   ],
+   "wander": {
+    "amplitude": [
+     6,
+     14
+    ],
+    "frequency": [
+     0.05,
+     0.12
+    ]
+   },
+   "twinkle": {
+    "rate": [
+     0.2,
+     0.6
+    ],
+    "depth": 0.8
+   },
+   "alpha": [
+    0.25,
+    0.7
+   ],
+   "colors": [
+    [
+     "#e8ffa8",
+     "#9fdc3a"
+    ]
+   ]
+  },
+  {
+   "count": 60,
+   "shape": {
+    "kind": "glow",
+    "core": 0.12
+   },
+   "size": [
+    28,
+    56
+   ],
+   "speed": [
+    3,
+    10
+   ],
+   "direction": [
+    250,
+    290
+   ],
+   "wander": {
+    "amplitude": [
+     14,
+     34
+    ],
+    "frequency": [
+     0.04,
+     0.1
+    ]
+   },
+   "twinkle": {
+    "rate": [
+     0.25,
+     0.7
+    ],
+    "depth": 0.9
+   },
+   "alpha": [
+    0.5,
+    1
+   ],
+   "colors": [
+    [
+     "#f7ffc0",
+     "#b6ee45"
+    ],
+    [
+     "#fff3a8",
+     "#f0c43a"
+    ]
+   ]
+  }
+ ]
+}

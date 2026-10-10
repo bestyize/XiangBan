@@ -68,7 +68,7 @@ Windows 使用 gradlew.bat；Kotlin 服务需要 JDK 21。Android 壁纸需要 J
 
 正式壁纸网站位于 `services/server-xiangban-wallpaper`，使用 Node.js 24、Rust stable 和独立 PostgreSQL，默认端口 8080。桌面客户端默认连接 `https://wallpaper.xiangban.xyz`；它的数据库集成测试使用 `TEST_DATABASE_URL`，每个测试创建并清理独立 schema，不更改已有数据。
 
-统一账号中心位于 `services/server-account`，使用独立 PostgreSQL 库，默认端口 55009，管理后台在 `/admin/`；集成测试使用 `TEST_DATABASE_URL`，未设置时跳过。设计见 [docs/architecture/account-center.md](docs/architecture/account-center.md)。
+统一账号中心位于 `services/server-account`，使用独立 PostgreSQL 库，默认端口 55009，管理后台在 `/admin/`；集成测试使用 `TEST_DATABASE_URL`，未设置时跳过。设计见 [docs/architecture/account-center.md](docs/architecture/account-center.md)。 独立部署栈在 `infra/account`，打包与部署工作流为 `.github/workflows/account-center.yml`，流程见 [docs/deployment/ACCOUNT_CENTER_DEPLOYMENT.md](docs/deployment/ACCOUNT_CENTER_DEPLOYMENT.md)。
 
 部署配置在 [infra](infra/README.md)，说明在 [docs/deployment](docs/deployment/README.md)。容器命令显式指定文件：
 
@@ -76,6 +76,14 @@ Windows 使用 gradlew.bat；Kotlin 服务需要 JDK 21。Android 壁纸需要 J
 docker compose -p xiaban --env-file /absolute/path/to/.env -f infra/compose.yaml config
 docker compose -p xiaban --env-file /absolute/path/to/.env -f infra/compose.yaml up -d --build
 ```
+
+## 实现建议
+
+新建项目时的默认技术选型；已有项目不因此强制迁移，特殊场景可按任务偏离并在子项目 README 说明原因。
+
+- 后端服务：优先使用 Rust + PostgreSQL（参考 `server-xiaoban-appstore`、`server-account`）。
+- 网页与管理后台：UI 优先使用 Vue 3 + Vite。
+- 移动端应用：优先使用 Jetpack Compose（Compose Multiplatform 视跨平台需要选用）。
 
 ## AI 开发边界
 

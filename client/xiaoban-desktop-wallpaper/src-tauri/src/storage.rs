@@ -43,6 +43,11 @@ pub fn open_data_directory(window: tauri::WebviewWindow) -> Result<(), String> {
     }
     let directory = root(window.app_handle())?;
     fs::create_dir_all(&directory).map_err(|e| e.to_string())?;
+    show_in_file_manager(&directory)
+}
+
+/// Opens a directory in Explorer or Finder.
+pub fn show_in_file_manager(directory: &Path) -> Result<(), String> {
     #[cfg(windows)]
     unsafe {
         let operation: Vec<u16> = "open".encode_utf16().chain(Some(0)).collect();
@@ -61,7 +66,7 @@ pub fn open_data_directory(window: tauri::WebviewWindow) -> Result<(), String> {
             windows_sys::Win32::UI::WindowsAndMessaging::SW_SHOWNORMAL,
         );
         if result as isize <= 32 {
-            return Err("无法打开用户数据目录".into());
+            return Err("无法打开目录".into());
         }
     }
     #[cfg(target_os = "macos")]
@@ -71,8 +76,9 @@ pub fn open_data_directory(window: tauri::WebviewWindow) -> Result<(), String> {
         .map_err(|e| e.to_string())?
         .success()
     {
-        return Err("无法打开用户数据目录".into());
+        return Err("无法打开目录".into());
     }
+    let _ = directory;
     Ok(())
 }
 

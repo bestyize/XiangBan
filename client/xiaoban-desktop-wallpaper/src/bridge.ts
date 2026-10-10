@@ -1,4 +1,4 @@
-import { wallpaperEffectsDefaults, type WallpaperEffectsOptions } from "./wallpaper-effects.ts";
+import type { EffectsChoice } from "./effects/types.ts";
 
 export interface Settings {
   mode: "floating" | "wallpaper";
@@ -16,6 +16,8 @@ export interface Settings {
   automaticUpdates: boolean;
   gameDesktopDoubleClick: boolean;
   companionEnabled: boolean;
+  /** The particle effect over the desktop, whatever wallpaper is behind it. */
+  effects: EffectsChoice;
 }
 
 export type WallpaperKind = "image" | "video" | "canvas";
@@ -59,7 +61,6 @@ export interface WallpaperOptions {
   playbackRate: number;
   background: string;
   values: Record<string, string | number | boolean>;
-  effects: WallpaperEffectsOptions;
 }
 export interface WallpaperLibrary {
   items: WallpaperEntry[];
@@ -81,7 +82,6 @@ export const wallpaperDefaults: WallpaperOptions = {
   playbackRate: 1,
   background: "#edf5f0",
   values: {},
-  effects: structuredClone(wallpaperEffectsDefaults),
 };
 
 export interface CursorSample {
@@ -129,6 +129,7 @@ export const defaults: Settings = {
   automaticUpdates: true,
   gameDesktopDoubleClick: false,
   companionEnabled: true,
+  effects: { selected: "", params: {} },
 };
 export function invoke<T>(
   command: string,

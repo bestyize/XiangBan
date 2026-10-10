@@ -7,7 +7,6 @@ import {
   defaults,
 } from "./bridge.ts";
 import { PetView } from "./pet.ts";
-import { WallpaperEffects } from "./wallpaper-effects.ts";
 
 interface Payload {
   item: {
@@ -68,7 +67,6 @@ export async function mountContent() {
   const lifecycle = new AbortController();
   const eventOptions = { signal: lifecycle.signal };
   let disposed = false;
-  const effects = new WallpaperEffects(host, state.item.kind, state.options.effects, state.config);
   let pet: PetView | null = null,
     video: HTMLVideoElement | null = null,
     frame: HTMLIFrameElement | null = null;
@@ -78,7 +76,6 @@ export async function mountContent() {
   }) => {
     if (disposed) return;
     state = { ...state, ...detail };
-    effects.update(state.item.kind, state.options.effects, state.config);
     host.style.background = state.options.background;
     const media = host.querySelector<HTMLImageElement | HTMLVideoElement>(
       "img,video",
@@ -126,7 +123,7 @@ export async function mountContent() {
     }
     if (desktop)
       await invoke("scene_ready", {
-        report: { kind: state.item.kind, effects: effects.snapshot(), ...report },
+        report: { kind: state.item.kind, ...report },
       });
     else document.body.dataset.ready = "true";
   };
@@ -152,7 +149,6 @@ export async function mountContent() {
     if (disposed) return;
     disposed = true;
     lifecycle.abort();
-    effects.destroy();
     pet?.destroy(); pet = null;
     video?.pause();
     if (video) { video.removeAttribute("src"); video.load(); }

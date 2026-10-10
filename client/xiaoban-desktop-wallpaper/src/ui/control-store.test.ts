@@ -32,6 +32,33 @@ describe('control state with native settings', () => {
     expect(store.settings.size).toBe(360); expect(store.settings.expression).toBe('happy');
     expect(ipc.mock.calls[1][1]?.size).toBe(360);
   });
+  it('sends the chosen effect to the host and keeps the last acknowledged choice', async () => {
+    const store = createControlStore(vi.fn());
+    const choice = { selected: 'petals', params: { petals: { density: 1.6, speed: 1.5, size: 1.2 } } };
+    ipc.mockImplementation(async (_command, args) => ({ ...clone(defaults), effects: args?.effects } as never));
+    await store.setEffects(choice);
+    expect(ipc).toHaveBeenCalledWith('set_desktop_effects', { effects: choice });
+    expect(store.settings.effects).toEqual(choice);
+    ipc.mockRejectedValueOnce(new Error('没有找到特效'));
+    await expect(store.setEffects({ selected: 'gone', params: {} })).rejects.toThrow('没有找到特效');
+    expect(store.settings.effects.selected).toBe('petals');
+    ipc.mockImplementation(async (_command, args) => ({ ...clone(defaults), effects: args?.effects } as never));
+    await store.setEffects({ selected: '', params: choice.params });
+    expect(store.settings.effects.selected).toBe('');
+  });
+  it('lists the effects through the host, keeping the usable ones and naming the rest', async () => {
+    const store = createControlStore(vi.fn());
+    const good = { schemaVersion: 1, id: 'glitter', name: '星尘', layers: [{ count: 5, shape: { kind: 'circle' }, colors: ['#fff'] }], source: 'user' };
+    ipc.mockResolvedValue({ packs: [good, { id: 'bad' }], errors: ['x.json：JSON 格式错误'], directory: '/data/effects' } as never);
+    await store.loadEffects();
+    expect(ipc).toHaveBeenCalledWith('list_desktop_effects');
+    expect(store.effectList.packs.map((pack) => pack.id)).toEqual(['glitter']);
+    expect(store.effectList.packs[0].source).toBe('user');
+    expect(store.effectList.errors).toHaveLength(2);
+    expect(store.effectList.directory).toBe('/data/effects');
+    await store.openEffectsDirectory();
+    expect(ipc).toHaveBeenLastCalledWith('open_effects_directory');
+  });
   it('does not adopt preview settings or reload the active library when opening a wallpaper preview', async () => {
     const store = createControlStore(vi.fn()); const before = clone(store.settings);
     ipc.mockResolvedValue({ ...before, wallpaperId: 'preview-item' } as never);

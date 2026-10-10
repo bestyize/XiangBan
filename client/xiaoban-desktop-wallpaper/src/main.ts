@@ -15,6 +15,11 @@ async function init() {
     return;
   }
   await import("./style.css");
+  if (mode === "effects") {
+    const { mountEffects } = await import("./effects-scene.ts");
+    await mountEffects();
+    return;
+  }
   if (mode === "games") {
     const { mountGameSpace } = await import("./games.ts");
     await mountGameSpace();

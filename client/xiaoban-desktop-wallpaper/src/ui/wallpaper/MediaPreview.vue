@@ -1,13 +1,12 @@
 <script setup lang="ts">
 import { ref, watch, onBeforeUnmount, nextTick } from "vue";
 import { bindMedia, mediaMarkup } from "../../wallpaper-media.ts";
-import { WallpaperEffects, type WallpaperEffectsOptions } from "../../wallpaper-effects.ts";
-const props=defineProps<{kind:string;source:string;poster:string;title:string;controls?:boolean;fit?:string;rate?:number;effects?:WallpaperEffectsOptions;paused?:boolean;fps?:30|60}>();
-const host=ref<HTMLElement>();let generation=0;let disposed=false;let cleanup:(()=>void)|undefined;let renderer:WallpaperEffects|undefined;
-async function render() {const token=++generation;cleanup?.();renderer?.destroy();await nextTick();if(disposed || token!==generation || !host.value)return;host.value.innerHTML=mediaMarkup(props.kind,props.source,props.poster,props.title,props.controls);cleanup=bindMedia(host.value);renderer=new WallpaperEffects(host.value,props.kind,props.effects,{paused:props.paused??false,fps:props.fps??60});update();}
-function update(){ renderer?.update(props.kind,props.effects,{paused:props.paused??false,fps:props.fps??60}); const element=host.value?.querySelector<HTMLVideoElement>("video");if(element)element.playbackRate=props.rate??1; }
-watch(()=>[props.kind,props.source,props.poster,props.controls],render,{immediate:true});watch(()=>[props.effects,props.rate,props.paused,props.fps],update,{deep:true});
-onBeforeUnmount(()=>{disposed=true;generation++;cleanup?.();renderer?.destroy();});
+const props=defineProps<{kind:string;source:string;poster:string;title:string;controls?:boolean;fit?:string;rate?:number}>();
+const host=ref<HTMLElement>();let generation=0;let disposed=false;let cleanup:(()=>void)|undefined;
+async function render() {const token=++generation;cleanup?.();await nextTick();if(disposed || token!==generation || !host.value)return;host.value.innerHTML=mediaMarkup(props.kind,props.source,props.poster,props.title,props.controls);cleanup=bindMedia(host.value);update();}
+function update(){ const element=host.value?.querySelector<HTMLVideoElement>("video");if(element)element.playbackRate=props.rate??1; }
+watch(()=>[props.kind,props.source,props.poster,props.controls],render,{immediate:true});watch(()=>props.rate,update);
+onBeforeUnmount(()=>{disposed=true;generation++;cleanup?.();});
 </script>
 <template><div ref="host" class="media-preview" :style="{'--media-fit':fit || 'cover'}" /></template>
 <style scoped>

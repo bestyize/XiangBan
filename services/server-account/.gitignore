@@ -1,0 +1,6 @@
+target/
+.env
+account_data/
+*.log
+web/node_modules/
+web/dist/

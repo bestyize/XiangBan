@@ -51,6 +51,8 @@ pub struct Settings {
     pub automatic_updates: bool,
     pub game_desktop_double_click: bool,
     pub companion_enabled: bool,
+    /// The particle effect over the desktop, whatever wallpaper (or plain system desktop) is behind it.
+    pub effects: crate::effect_choice::EffectsChoice,
 }
 
 impl Default for Settings {
@@ -71,6 +73,7 @@ impl Default for Settings {
             automatic_updates: true,
             game_desktop_double_click: false,
             companion_enabled: true,
+            effects: Default::default(),
         }
     }
 }
@@ -98,6 +101,12 @@ impl Settings {
         }
         if self.update_url.is_empty() {
             self.update_url = format!("{}/api/v1/desktop/updates", self.website_url);
+        }
+        // Effects used to be saved with each wallpaper. The choice that was in use becomes the desktop-wide
+        // one, once; the old copy is emptied here and never written again.
+        let legacy = std::mem::take(&mut self.wallpaper_options.effects);
+        if self.effects == Default::default() && !legacy.is_null() {
+            self.effects = crate::effect_choice::EffectsChoice::from_value(&legacy);
         }
     }
 }
@@ -159,7 +168,36 @@ mod tests {
         assert!(value.settings.autostart);
         assert!(!value.settings.game_desktop_double_click);
         assert!(value.settings.companion_enabled);
-        assert!(!value.settings.wallpaper_options.effects.rain.enabled);
+        assert_eq!(value.settings.effects, Default::default());
+    }
+    #[test]
+    fn effects_chosen_per_wallpaper_become_the_desktop_wide_choice_once() {
+        let mut value: Preferences = serde_json::from_str(
+            r#"{"settings":{"wallpaperOptions":{"effects":{"leaves":{"enabled":true,"intensity":0.8,"speed":1.5}}}}}"#).unwrap();
+        value.settings.normalize();
+        assert_eq!(value.settings.effects.selected, "maple");
+        assert_eq!(value.settings.effects.params["maple"].density, 1.6);
+        assert!(value.settings.wallpaper_options.effects.is_null());
+        // Saving writes only the new place, so choosing "no effects" later is not undone by a stale copy.
+        let saved = serde_json::to_string(&value).unwrap();
+        let tree: serde_json::Value = serde_json::from_str(&saved).unwrap();
+        assert!(tree["settings"]["wallpaperOptions"].get("effects").is_none(), "{saved}");
+        assert_eq!(tree["settings"]["effects"]["selected"], "maple", "{saved}");
+        let mut again: Preferences = serde_json::from_str(&saved).unwrap();
+        again.settings.effects.selected.clear();
+        again.settings.normalize();
+        assert_eq!(again.settings.effects.selected, "");
+    }
+    #[test]
+    fn the_previous_global_shape_and_a_desktop_wide_choice_are_both_kept() {
+        let mut value: Preferences = serde_json::from_str(r#"{"settings":{
+            "effects":{"rain":{"enabled":true,"intensity":0.4,"speed":2},"snow":{"enabled":false}},
+            "wallpaperOptions":{"effects":{"snow":{"enabled":true}}}}}"#).unwrap();
+        value.settings.normalize();
+        assert_eq!(value.settings.effects.selected, "rain", "an existing desktop-wide choice is not replaced by an old per-wallpaper one");
+        assert_eq!(value.settings.effects.params["rain"].density, 0.8);
+        let broken: Preferences = serde_json::from_str(r#"{"settings":{"effects":"nonsense"}}"#).unwrap();
+        assert_eq!(broken.settings.effects, Default::default());
     }
     #[test]
     fn invalid_scene_values_are_normalized_but_disabled_autostart_is_preserved() {

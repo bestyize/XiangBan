@@ -1,0 +1,117 @@
+{
+ "schemaVersion": 1,
+ "id": "meteors",
+ "name": "流星划过",
+ "description": "每隔几秒划过一颗流星",
+ "sky": [
+  "#050818",
+  "#16224a",
+  "#2a2d4d"
+ ],
+ "layers": [
+  {
+   "count": 6,
+   "shape": {
+    "kind": "streak",
+    "length": [
+     200,
+     360
+    ],
+    "width": [
+     1.6,
+     3.2
+    ],
+    "head": 3
+   },
+   "size": 1,
+   "direction": [
+    145,
+    160
+   ],
+   "alpha": [
+    0.85,
+    1
+   ],
+   "colors": [
+    [
+     "#ffffff",
+     "#8fb8ff"
+    ]
+   ],
+   "burst": {
+    "duration": [
+     0.8,
+     1.4
+    ],
+    "rest": [
+     2,
+     6
+    ],
+    "x": [
+     0.35,
+     1.05
+    ],
+    "y": [
+     -0.05,
+     0.45
+    ],
+    "travel": [
+     600,
+     1100
+    ]
+   }
+  },
+  {
+   "count": 1,
+   "shape": {
+    "kind": "streak",
+    "length": [
+     300,
+     500
+    ],
+    "width": [
+     3,
+     5
+    ],
+    "head": 3.5
+   },
+   "size": 1,
+   "direction": [
+    148,
+    158
+   ],
+   "alpha": [
+    0.9,
+    1
+   ],
+   "colors": [
+    [
+     "#fff4d6",
+     "#ffb066"
+    ]
+   ],
+   "burst": {
+    "duration": [
+     1.3,
+     1.9
+    ],
+    "rest": [
+     9,
+     18
+    ],
+    "x": [
+     0.5,
+     1.0
+    ],
+    "y": [
+     -0.05,
+     0.3
+    ],
+    "travel": [
+     800,
+     1300
+    ]
+   }
+  }
+ ]
+}

@@ -86,6 +86,7 @@ struct Runtime {
     focus: bool,
     weather_attempt: i64,
     city_attempt: i64,
+    locate_attempt: i64,
     read_error: bool,
 }
 #[derive(Default)]
@@ -405,6 +406,17 @@ pub async fn search_care_cities(window: tauri::WebviewWindow, query: String) -> 
     { let mut runtime = state.runtime.lock().unwrap(); if now - runtime.city_attempt < 2 { return Err("城市查询太快，请稍后再试".into()); } runtime.city_attempt = now; }
     let source = state.store.lock().unwrap().config.weather_source.clone();
     tauri::async_runtime::spawn_blocking(move || care_weather::search(&source, &query)).await.map_err(|e| e.to_string())?
+}
+/// Pre-fills the city of a weather reminder from the network location. Only the control window may ask,
+/// and only while a weather source is on, so a user who switched weather off makes no extra request.
+#[tauri::command]
+pub async fn detect_care_city(window: tauri::WebviewWindow) -> Result<City, String> {
+    control(&window)?;
+    let state = window.app_handle().state::<ReminderState>();
+    if state.store.lock().unwrap().config.weather_source.provider == "disabled" { return Err("请先开启天气来源".into()); }
+    let now = chrono::Utc::now().timestamp();
+    { let mut runtime = state.runtime.lock().unwrap(); if now - runtime.locate_attempt < 5 { return Err("定位太快，请稍后再试".into()); } runtime.locate_attempt = now; }
+    tauri::async_runtime::spawn_blocking(care_weather::locate_by_ip).await.map_err(|e| e.to_string())?
 }
 #[tauri::command]
 pub async fn check_care_weather(window: tauri::WebviewWindow, city: City) -> Result<serde_json::Value, String> {

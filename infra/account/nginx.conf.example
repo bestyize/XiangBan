@@ -1,0 +1,57 @@
+# 宿主机 Nginx 反代示例，放进 /etc/nginx/conf.d/ 或 sites-available。
+# 把 account.xiangban.xyz 换成你的域名，并与 ACCOUNT_ISSUER 保持一致；证书用 certbot 签发。
+# limit_req_zone 必须位于 http 上下文，conf.d 下的文件已经在 http 里。
+
+limit_req_status 429;
+limit_req_zone $binary_remote_addr zone=account_api:10m rate=10r/s;
+limit_req_zone $binary_remote_addr zone=account_code:10m rate=6r/m;
+limit_req_zone $binary_remote_addr zone=account_admin:10m rate=2r/s;
+
+server {
+    listen 80;
+    server_name account.xiangban.xyz;
+    return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl;
+    http2 on;
+    server_name account.xiangban.xyz;
+
+    ssl_certificate     /etc/letsencrypt/live/account.xiangban.xyz/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/account.xiangban.xyz/privkey.pem;
+
+    server_tokens off;
+    client_max_body_size 64k;
+    add_header Strict-Transport-Security "max-age=31536000" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-Frame-Options "DENY" always;
+
+    # 账号中心按 X-Real-IP 做验证码的 IP 限额，这里必须覆盖客户端自带的同名请求头。
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_connect_timeout 5s;
+    proxy_read_timeout 30s;
+
+    # 发验证码：每个 IP 每分钟 6 次，叠加服务内的号码冷却与日上限，防止短信被刷。
+    location = /api/auth/code/send {
+        limit_req zone=account_code burst=3 nodelay;
+        proxy_pass http://127.0.0.1:55009;
+    }
+
+    # 管理后台与管理接口。公网不需要时，用 allow/deny 只放行办公网络或 VPN 出口。
+    location ~ ^/(admin/|api/admin/) {
+        # allow 203.0.113.0/24;
+        # deny all;
+        limit_req zone=account_admin burst=10 nodelay;
+        proxy_pass http://127.0.0.1:55009;
+    }
+
+    location / {
+        limit_req zone=account_api burst=30 nodelay;
+        proxy_pass http://127.0.0.1:55009;
+    }
+}

@@ -12,9 +12,13 @@ describe('care editor state', () => {
     expect(care.status.value.rules[0]?.text).toBe('后台规则');
     expect(care.draft.value.text).toBe('正在编辑'); expect(care.preferences.sound).toBe(true);
   });
+  it('uses Open-Meteo by default', () => {
+    expect(emptyCareStatus().config.weatherSource.provider).toBe('open-meteo');
+  });
   it('starts empty and refuses weather rules while source is disabled', async () => {
     const notify = vi.fn(); const care = createCareState(false, notify);
     await care.initialize(); expect(care.status.value.rules).toEqual([]);
+    care.status.value.config.weatherSource.provider = 'disabled';
     care.open('weather'); await care.save();
     expect(care.status.value.rules).toEqual([]); expect(notify).toHaveBeenCalledWith(expect.stringContaining('天气来源'), 'error');
   });

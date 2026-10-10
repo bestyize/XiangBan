@@ -1,6 +1,7 @@
 import { reactive } from "vue";
 import { desktop, defaults, invoke, listen, type Settings, type WallpaperEntry, type WallpaperLibrary, type AppInfo } from "../bridge.ts";
 import type { WebsiteStatus } from "./website-types.ts";
+import { loadBuiltinPacks, noPacks, readList } from "../effects/catalog.ts";
 import type { ControlStore } from "./control-types.ts";
 
 export const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value));
@@ -9,6 +10,8 @@ export function createControlStore(notify: ControlStore["notify"]): ControlStore
   const unsubscribers: (() => void)[] = [];
   // Serialize partial appearance updates so a fast sequence cannot overwrite another setting.
   let appearanceQueue = Promise.resolve();
+  // Same for the effect choice: sliders send many updates in a row, and only the last may win.
+  let effectsQueue = Promise.resolve();
   const store: ControlStore = reactive({
     settings: clone(defaults),
     info: { name: "小伴桌面", version: "0.1.0", platform: "preview", arch: "", updateTarget: "", updateUrl: "" },
@@ -16,6 +19,7 @@ export function createControlStore(notify: ControlStore["notify"]): ControlStore
     website: { announcements: [], update: null, dismissed: {}, errors: [] },
     startup: { available: false, error: null },
     game: { active: false, desktopDoubleClickSupported: false, desktopEntryError: null },
+    effectList: noPacks(),
     page: "wallpapers", ready: false, initialError: "", desktop, notify,
     navigate(page) { store.page = page; },
     async initialize() {
@@ -84,6 +88,21 @@ export function createControlStore(notify: ControlStore["notify"]): ControlStore
     },
     async setMode(mode) { store.settings = desktop ? await invoke<Settings>("set_mode", { mode }) : { ...store.settings, mode }; },
     async setCompanion(enabled) { store.settings = desktop ? await invoke<Settings>("set_companion_enabled", { enabled }) : { ...store.settings, companionEnabled: enabled }; },
+    async loadEffects() {
+      store.effectList = desktop ? readList(await invoke("list_desktop_effects")) : await loadBuiltinPacks();
+    },
+    async openEffectsDirectory() {
+      if (!desktop) throw new Error("请在桌面应用中打开特效文件夹");
+      await invoke("open_effects_directory");
+    },
+    setEffects(effects) {
+      const pending = effectsQueue.catch(() => {}).then(async () => {
+        const next = clone(effects);
+        store.settings = desktop ? await invoke<Settings>("set_desktop_effects", { effects: next }) : { ...store.settings, effects: next };
+      });
+      effectsQueue = pending;
+      return pending;
+    },
     async setAutostart(enabled) {
       if (!desktop) throw new Error("请在桌面应用中设置开机启动");
       store.settings = await invoke<Settings>("set_autostart", { enabled });

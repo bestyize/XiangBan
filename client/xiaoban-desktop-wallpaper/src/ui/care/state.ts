@@ -4,7 +4,7 @@ import { careRuleError, newCareRule, type CareConfig, type CareKind, type CareRu
 
 export const clone = <T>(value: T): T => JSON.parse(JSON.stringify(toRaw(value)));
 export function emptyCareStatus(): CareStatus {
-  return { config: { enabled: true, sound: false, quietEnabled: false, quietStart: '22:00', quietEnd: '08:00', weatherSource: { provider: 'disabled', forecastUrl: '', geocodingUrl: '' } }, rules: [], pendingCount: 0, weather: null, weatherError: null, error: null, systemNotificationsAvailable: false, activityAvailable: false };
+  return { config: { enabled: true, sound: false, quietEnabled: false, quietStart: '22:00', quietEnd: '08:00', weatherSource: { provider: 'open-meteo', forecastUrl: '', geocodingUrl: '' } }, rules: [], pendingCount: 0, weather: null, weatherError: null, error: null, systemNotificationsAvailable: false, activityAvailable: false };
 }
 export function createCareState(native: boolean, notify: (message: unknown, type?: 'success' | 'error' | 'info') => void) {
   const status = ref(emptyCareStatus());

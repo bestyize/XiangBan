@@ -29,7 +29,7 @@ export async function runUiSmoke(store: ControlStore): Promise<void> {
     const native = await invoke<Settings>('get_settings');
     if (typeof native.companionEnabled !== 'boolean' || native.fps !== store.settings.fps || native.size !== store.settings.size) throw new Error('Native settings were not bound to the Vue control store');
     if (!store.info.version || store.info.platform === 'preview') throw new Error('Native application identity missing');
-    for (const page of ['wallpapers', 'companion', 'games', 'care', 'settings'] as ControlPage[]) {
+    for (const page of ['wallpapers', 'effects', 'companion', 'games', 'care', 'settings'] as ControlPage[]) {
       store.navigate(page);
       await wait(() => !!document.querySelector(`[data-testid="${page}-page"]`), `mount ${page}`);
       mounted.push(page);

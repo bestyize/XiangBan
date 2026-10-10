@@ -53,7 +53,7 @@ node client/xiaoban-desktop-wallpaper/scripts/check-game-assets.mjs
 
 ```powershell
 cd client/xiaoban-desktop-wallpaper
-npm test -- src/wallpaper-effects.test.ts
+npm test -- src/effects
 npm exec vitest run src/care-model.test.ts
 cargo test --manifest-path src-tauri/Cargo.toml --locked games::tests
 cargo test --manifest-path src-tauri/Cargo.toml --locked reminders::tests
@@ -85,3 +85,11 @@ Remove-Item Env:XIAOBAN_EFFECTS_SMOKE
 - 图片特效：Windows smoke 已检查三种特效、内置/下载/本地图片、视频与 Canvas 不渲染、预览取消、参数保存/恢复、缓存离线。真实画面质量、强度速度的可见差异、桌面图标操作和性能（设备、系统、分辨率、缩放、CPU/GPU/内存及帧耗时）仍待人工验收；macOS 也待实机验收。
 
 人工结果需记录系统/设备、步骤、实际观察与通过/失败。Windows 双击的真实图标交互、macOS 实机表现、天气 live 查询、网站源联调和特效视觉/性能尚未验证；不代表小伴已正式发布。PRD 第 4–8 项仍属后续规划。
+
+## 桌面特效改版后的验证状态（2026-10-10）
+
+特效已从“每张壁纸一份”改为桌面上独立的一层覆盖窗口（见 README“桌面特效”）。上文中关于“三种特效”“内置/下载/本地图片来源”“视频与 Canvas 不渲染”“预览取消”的 Windows smoke 结果，是改版前的记录，对现在的行为不再成立。
+
+- 已通过：前端测试（特效包检查、模拟、绘制、画布生命周期、七个内置包的合法性与大小密度检查、特效页、覆盖窗口页面、控制台状态）、Rust 测试（旧配置迁移、选择的数据模型、特效包文件夹的加载与出错报告）、类型检查；macOS 开发版上确认覆盖窗口出现在桌面图标之下、动态壁纸窗口之上，铺满主屏，旧版保存的特效已迁移成全局选择，七个特效在 1920×1080 下逐个看过。
+- 已改写、尚未运行：`XIAOBAN_EFFECTS_SMOKE=1` 的原生 smoke 现在验证七个内置特效各自到达页面和磁盘、换四种壁纸（含系统桌面）后覆盖窗口仍在、选“无特效”后窗口关闭；`scripts/verify-media.mjs` 的断言已同步为七个特效。
+- 待验证：Windows 上覆盖窗口是否确实位于所有应用窗口之下并允许鼠标穿过；macOS 多显示器、全屏应用和 Mission Control 下的表现；长时间运行的 CPU/GPU 占用。

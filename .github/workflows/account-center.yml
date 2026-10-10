@@ -1,0 +1,263 @@
+name: Account center
+
+on:
+  pull_request:
+    paths: ['services/server-account/**', 'infra/account/**', '.github/workflows/account-center.yml']
+  push:
+    branches: [main]
+    paths: ['services/server-account/**', 'infra/account/**', '.github/workflows/account-center.yml']
+  workflow_dispatch:
+    inputs:
+      deploy:
+        description: '打包后部署到服务器（仅 main 分支生效）'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: account-center-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+# 固定 ubuntu-24.04：二进制动态链接 glibc，必须与 Dockerfile 的 ubuntu:24.04 运行时同代。
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: account_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: ci-only-test-password
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres -d account_test"
+          --health-interval 5s --health-timeout 5s --health-retries 12
+    env:
+      TEST_DATABASE_URL: postgres://postgres:ci-only-test-password@127.0.0.1:5432/account_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: services/server-account/web/package-lock.json
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: services/server-account
+      - run: npm ci && npm run build
+        working-directory: services/server-account/web
+      - run: cargo test --locked
+        working-directory: services/server-account
+      - name: Validate deployment configuration
+        env:
+          ACCOUNT_DB_PASSWORD: ci-only-password
+          ACCOUNT_ISSUER: https://account.example.test
+          ACCOUNT_JWT_PKCS8_BASE64: ci-only
+          ACCOUNT_MASTER_KEY_BASE64: ci-only
+        run: docker compose --file infra/account/compose.yaml config --quiet
+      - run: python3 tools/check-layout.py
+
+  package:
+    name: Package ubuntu x64 binary and image
+    needs: verify
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: account_smoke
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: ci-only-test-password
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres -d account_smoke"
+          --health-interval 5s --health-timeout 5s --health-retries 12
+    env:
+      IMAGE_NAME: xiangban-account
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: services/server-account/web/package-lock.json
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: services/server-account
+      - run: npm ci && npm run build
+        working-directory: services/server-account/web
+      - name: Build release binary
+        working-directory: services/server-account
+        run: |
+          set -euo pipefail
+          cargo build --release --locked
+          [ "$(uname -m)" = "x86_64" ]
+          file target/release/server-account | grep -q 'x86-64'
+
+      - name: Assemble image context
+        run: |
+          set -euo pipefail
+          stage="$RUNNER_TEMP/account-image"
+          mkdir -p "$stage"
+          install -m 0755 services/server-account/target/release/server-account "$stage/server-account"
+          cp -r services/server-account/web/dist "$stage/web"
+
+      - name: Build image
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_SHA::12}"
+          docker build --platform linux/amd64 \
+            --file services/server-account/Dockerfile \
+            --tag "$IMAGE_NAME:$tag" --tag "$IMAGE_NAME:latest" \
+            "$RUNNER_TEMP/account-image"
+
+      - name: Smoke-test the image
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_SHA::12}"
+          docker run --rm "$IMAGE_NAME:$tag" gen-keys > "$RUNNER_TEMP/keys.env"
+          docker run -d --name account-smoke --network host --read-only \
+            --env-file "$RUNNER_TEMP/keys.env" \
+            -e ACCOUNT_DATABASE_URL=postgres://postgres:ci-only-test-password@127.0.0.1:5432/account_smoke \
+            -e ACCOUNT_ISSUER=https://account.example.test \
+            -e ACCOUNT_SENDER=console \
+            -e ACCOUNT_ADMIN_USER=ci-admin \
+            -e ACCOUNT_ADMIN_PASSWORD=ci-only-admin-password \
+            "$IMAGE_NAME:$tag"
+          ok=0
+          for _ in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:55009/api/health >/dev/null; then ok=1; break; fi
+            sleep 1
+          done
+          if [ "$ok" != 1 ]; then docker logs account-smoke; exit 1; fi
+          curl -fsS http://127.0.0.1:55009/admin/ | grep -q '<div id="app">'
+          curl -fsS http://127.0.0.1:55009/.well-known/jwks.json | grep -q '"kty":"OKP"'
+          curl -fsS -X POST http://127.0.0.1:55009/api/admin/login \
+            -H 'content-type: application/json' \
+            -d '{"username":"ci-admin","password":"ci-only-admin-password"}' | grep -q '"token"'
+
+      - name: Stop smoke container
+        if: always()
+        run: docker rm -f account-smoke >/dev/null 2>&1 || true
+
+      - name: Export image and binary
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_SHA::12}"
+          mkdir -p out
+          docker save "$IMAGE_NAME:$tag" | gzip > "out/account-image-$tag.tar.gz"
+          tar -czf "out/server-account-linux-x64-$tag.tar.gz" \
+            -C "$PWD/services/server-account/target/release" server-account \
+            -C "$PWD/services/server-account/web" dist
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: account-image-linux-x64
+          path: out/account-image-*.tar.gz
+          retention-days: 14
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        with:
+          name: account-binary-linux-x64
+          path: out/server-account-linux-x64-*.tar.gz
+          retention-days: 14
+          if-no-files-found: error
+
+  deploy:
+    name: Deploy account center
+    needs: package
+    if: github.event_name == 'workflow_dispatch' && inputs.deploy && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    concurrency:
+      group: account-center-production
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: account-image-linux-x64
+          path: out
+
+      - name: Validate deployment settings
+        env:
+          DEPLOY_HOST: ${{ vars.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ vars.DEPLOY_USER }}
+          ACCOUNT_DEPLOY_PATH: ${{ vars.ACCOUNT_DEPLOY_PATH }}
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          for name in DEPLOY_HOST DEPLOY_USER ACCOUNT_DEPLOY_PATH DEPLOY_SSH_KEY DEPLOY_KNOWN_HOSTS; do
+            if [ -z "${!name}" ]; then
+              echo "::error::Missing GitHub variable/secret: $name"
+              exit 1
+            fi
+          done
+          [[ "$ACCOUNT_DEPLOY_PATH" =~ ^/[a-zA-Z0-9._/-]+$ ]] || {
+            echo "::error::ACCOUNT_DEPLOY_PATH must be an absolute path containing only letters, numbers, dots, underscores, slashes, or hyphens."
+            exit 1
+          }
+          [[ "$DEPLOY_USER" =~ ^[a-zA-Z_][a-zA-Z0-9._-]*$ ]] || {
+            echo "::error::DEPLOY_USER has an invalid format."
+            exit 1
+          }
+
+      - name: Configure SSH
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$DEPLOY_SSH_KEY" > "$HOME/.ssh/xiaban_deploy"
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/xiaban_deploy" "$HOME/.ssh/known_hosts"
+          ssh-keygen -y -f "$HOME/.ssh/xiaban_deploy" >/dev/null
+
+      - name: Upload image and update stack
+        env:
+          DEPLOY_HOST: ${{ vars.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ vars.DEPLOY_USER }}
+          DEPLOY_PORT: ${{ vars.DEPLOY_PORT }}
+          ACCOUNT_DEPLOY_PATH: ${{ vars.ACCOUNT_DEPLOY_PATH }}
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_SHA::12}"
+          port="${DEPLOY_PORT:-22}"
+          target="$DEPLOY_USER@$DEPLOY_HOST"
+          ssh_opts=(-o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$HOME/.ssh/known_hosts" -i "$HOME/.ssh/xiaban_deploy")
+
+          ssh -p "$port" "${ssh_opts[@]}" "$target" bash -s -- "$ACCOUNT_DEPLOY_PATH" <<'REMOTE'
+          set -euo pipefail
+          root="$1"
+          mkdir -p "$root"
+          test -f "$root/.env" || {
+            echo "Missing $root/.env. Create it from infra/account/.env.production.example before deploying."
+            exit 1
+          }
+          REMOTE
+
+          scp -P "$port" "${ssh_opts[@]}" \
+            "out/account-image-$tag.tar.gz" "infra/account/compose.yaml" \
+            "$target:$ACCOUNT_DEPLOY_PATH/"
+
+          ssh -p "$port" "${ssh_opts[@]}" "$target" bash -s -- "$ACCOUNT_DEPLOY_PATH" "$tag" <<'REMOTE'
+          set -euo pipefail
+          root="$1"
+          tag="$2"
+          cd "$root"
+          gunzip -c "account-image-$tag.tar.gz" | docker load
+          docker tag "xiangban-account:$tag" xiangban-account:latest
+          rm -f "account-image-$tag.tar.gz"
+          ACCOUNT_IMAGE_TAG="$tag" docker compose --env-file .env -f compose.yaml up -d --remove-orphans --wait --wait-timeout 120
+          docker compose --env-file .env -f compose.yaml ps
+          REMOTE

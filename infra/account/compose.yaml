@@ -1,0 +1,75 @@
+# 账号中心独立部署栈：自带 PostgreSQL，与主站 infra/compose.yaml 互不依赖，数据卷与备份各自独立。
+# 镜像由 .github/workflows/account-center.yml 构建并加载到服务器，这里不 build。
+name: xiangban-account
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: xiaban_account
+      POSTGRES_USER: account
+      POSTGRES_PASSWORD: ${ACCOUNT_DB_PASSWORD:?在服务器端 .env 中设置 ACCOUNT_DB_PASSWORD}
+    volumes:
+      - account_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U account -d xiaban_account"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - backend
+
+  account:
+    image: xiangban-account:${ACCOUNT_IMAGE_TAG:-latest}
+    restart: unless-stopped
+    environment:
+      ACCOUNT_DATABASE_URL: postgres://account:${ACCOUNT_DB_PASSWORD}@postgres:5432/xiaban_account
+      ACCOUNT_ISSUER: ${ACCOUNT_ISSUER:?设置 ACCOUNT_ISSUER，必须等于对外域名，例如 https://account.xiangban.xyz}
+      ACCOUNT_JWT_PKCS8_BASE64: ${ACCOUNT_JWT_PKCS8_BASE64:?用 gen-keys 生成并写入 .env}
+      ACCOUNT_MASTER_KEY_BASE64: ${ACCOUNT_MASTER_KEY_BASE64:?用 gen-keys 生成并写入 .env}
+      # 服务只绑定本机回环，唯一入口是宿主机 Nginx，由它写入 X-Real-IP。
+      ACCOUNT_TRUST_PROXY: "true"
+      # 生产默认走腾讯云；缺少密钥会启动失败，不会悄悄退化成只打日志的 console。
+      ACCOUNT_SENDER: ${ACCOUNT_SENDER:-tencent}
+      ACCOUNT_CORS_ORIGINS: ${ACCOUNT_CORS_ORIGINS:-}
+      ACCOUNT_CLIENTS: ${ACCOUNT_CLIENTS:-}
+      ACCOUNT_ADMIN_USER: ${ACCOUNT_ADMIN_USER:-}
+      ACCOUNT_ADMIN_PASSWORD: ${ACCOUNT_ADMIN_PASSWORD:-}
+      ACCOUNT_ACCESS_TTL_SECS: ${ACCOUNT_ACCESS_TTL_SECS:-1800}
+      ACCOUNT_REFRESH_TTL_DAYS: ${ACCOUNT_REFRESH_TTL_DAYS:-30}
+      ACCOUNT_DAILY_PER_IDENTIFIER: ${ACCOUNT_DAILY_PER_IDENTIFIER:-10}
+      ACCOUNT_DAILY_PER_IP: ${ACCOUNT_DAILY_PER_IP:-30}
+      TENCENT_SECRET_ID: ${TENCENT_SECRET_ID:-}
+      TENCENT_SECRET_KEY: ${TENCENT_SECRET_KEY:-}
+      TENCENT_SMS_SDK_APP_ID: ${TENCENT_SMS_SDK_APP_ID:-}
+      TENCENT_SMS_SIGN_NAME: ${TENCENT_SMS_SIGN_NAME:-}
+      TENCENT_SMS_TEMPLATE_ID: ${TENCENT_SMS_TEMPLATE_ID:-}
+      TENCENT_SMS_REGION: ${TENCENT_SMS_REGION:-}
+      TENCENT_SES_FROM: ${TENCENT_SES_FROM:-}
+      TENCENT_SES_TEMPLATE_ID: ${TENCENT_SES_TEMPLATE_ID:-}
+      TENCENT_SES_SUBJECT: ${TENCENT_SES_SUBJECT:-}
+      TENCENT_SES_REGION: ${TENCENT_SES_REGION:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "${ACCOUNT_BIND_ADDRESS:-127.0.0.1}:55009:55009"
+    # 密钥来自环境变量，服务运行期不写磁盘，因此根文件系统只读。
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - backend
+      - edge
+
+volumes:
+  account_pg_data:
+
+networks:
+  # 数据库所在网络不能出网；账号中心额外接入 edge 才能发布端口并访问腾讯云接口。
+  backend:
+    internal: true
+  edge:

@@ -1,5 +1,6 @@
-//! Optional weather transport; text reminders never leave the device.
-//! Open-Meteo's free endpoint is opt-in for personal/non-commercial use only.
+//! Weather transport for care reminders; text reminders never leave the device.
+//! Open-Meteo is the default source. Its free endpoint is for personal/non-commercial use only,
+//! and only the coordinates of the chosen city are sent to it.
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::{io::Read, time::Duration};
@@ -32,7 +33,7 @@ pub struct Source {
 }
 impl Default for Source {
     fn default() -> Self {
-        Self { provider: "disabled".into(), forecast_url: String::new(), geocoding_url: String::new() }
+        Self { provider: "open-meteo".into(), forecast_url: String::new(), geocoding_url: String::new() }
     }
 }
 pub fn endpoint(value: &str) -> Result<url::Url, String> {
@@ -72,6 +73,29 @@ fn get(url: url::Url) -> Result<Value, String> {
     let value: Value = serde_json::from_slice(&bytes).map_err(|_| "天气服务未返回有效 JSON")?;
     if value.get("error").and_then(Value::as_bool) == Some(true) { return Err("天气服务拒绝了本次查询".into()); }
     Ok(value)
+}
+/// City-level location from the public IP address, used only to pre-fill the city field.
+/// The IP address necessarily reaches the locator; nothing else is sent. Tried in order.
+const LOCATORS: [&str; 2] = [
+    "https://ipwho.is/?lang=zh-CN&fields=success,message,city,region,country,latitude,longitude",
+    "https://api.ip.sb/geoip",
+];
+pub fn locate_by_ip() -> Result<City, String> {
+    for locator in LOCATORS {
+        let Ok(url) = url::Url::parse(locator) else { continue };
+        if let Some(city) = get(url).ok().and_then(|value| city_from_ip(&value)) { return Ok(city); }
+    }
+    Err("暂时无法根据网络位置判断城市，请手动搜索".into())
+}
+fn city_from_ip(value: &Value) -> Option<City> {
+    if value.get("success").and_then(Value::as_bool) == Some(false) { return None; }
+    let text = |key: &str| value.get(key).and_then(Value::as_str).map(str::trim).filter(|s| !s.is_empty());
+    let name = text("city").or_else(|| text("region"))?;
+    // "上海" / "上海市" would read as a repeat, so the region is kept only when it adds information.
+    let region = text("region").filter(|r| !r.starts_with(name) && !name.starts_with(r)).unwrap_or("");
+    let city = City { name: name.into(), country: text("country").unwrap_or("").into(), admin1: region.into(),
+        latitude: value.get("latitude")?.as_f64()?, longitude: value.get("longitude")?.as_f64()? };
+    city.validate().ok().map(|_| city)
 }
 pub fn search(source: &Source, query: &str) -> Result<Vec<City>, String> {
     let query = query.trim();
@@ -122,7 +146,27 @@ fn parse_weather(value: &Value, source: &Source, city: &City, now: i64) -> Resul
 #[cfg(test)]
 mod tests {
     use super::*;
-    #[test] fn weather_source_defaults_to_no_network() { assert!(Source::default().url(false).is_err()); }
+    #[test] fn weather_source_defaults_to_open_meteo() {
+        let source = Source::default();
+        assert_eq!(source.provider, "open-meteo"); assert!(source.validate().is_ok());
+        assert_eq!(source.url(false).unwrap().host_str(), Some("api.open-meteo.com"));
+        assert_eq!(source.url(true).unwrap().host_str(), Some("geocoding-api.open-meteo.com"));
+        let off = Source { provider: "disabled".into(), ..Source::default() };
+        assert!(off.url(false).is_err());
+    }
+    #[test] fn ip_location_becomes_a_valid_city_and_rejects_unusable_answers() {
+        let shanghai = serde_json::json!({"success":true,"country":"中国","region":"上海市","city":"上海","latitude":31.22,"longitude":121.45});
+        let city = city_from_ip(&shanghai).unwrap();
+        assert_eq!((city.name.as_str(), city.admin1.as_str(), city.country.as_str()), ("上海", "", "中国"));
+        let hangzhou = serde_json::json!({"region":"浙江省","city":"杭州市","country":"中国","latitude":30.27,"longitude":120.15});
+        assert_eq!(city_from_ip(&hangzhou).unwrap().admin1, "浙江省");
+        let region_only = serde_json::json!({"region":"Zhejiang","latitude":30.0,"longitude":120.0});
+        assert_eq!(city_from_ip(&region_only).unwrap().name, "Zhejiang");
+        for bad in [serde_json::json!({"success":false,"message":"limit"}), serde_json::json!({"city":"X"}),
+            serde_json::json!({"city":"X","latitude":123.0,"longitude":10.0}), serde_json::json!({"city":"  ","latitude":1.0,"longitude":1.0})] {
+            assert!(city_from_ip(&bad).is_none(), "{bad}");
+        }
+    }
     #[test] fn no_credentials_or_query_keys_in_source() {
         assert!(endpoint("https://example.com/weather").is_ok());
         for value in ["http://example.com", "https://key:secret@example.com", "https://example.com/?apikey=secret"] { assert!(endpoint(value).is_err()); }

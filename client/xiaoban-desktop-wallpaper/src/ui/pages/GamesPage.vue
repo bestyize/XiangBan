@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
-import { MousePointer2, Save } from "lucide-vue-next";
-import { NAlert, NButton, NSkeleton, NSwitch, NTag } from "naive-ui";
+import { onMounted, ref } from "vue";
+import { Save } from "lucide-vue-next";
+import { NAlert, NSkeleton, NTag } from "naive-ui";
 import type { ControlStore } from "../control-types.ts";
 
 interface GameManifest {
@@ -18,21 +18,7 @@ const props = defineProps<{ store: ControlStore }>();
 const games = ref<GameManifest[]>([]);
 const loading = ref(true);
 const catalogError = ref("");
-const busy = ref(false);
-const toggleError = ref("");
 const opening = ref(false);
-
-const doubleClickLabel = computed(() => {
-  if (!props.store.desktop) return "桌面应用中可用";
-  if (!props.store.game.desktopDoubleClickSupported) return "当前平台不可用";
-  return props.store.settings.gameDesktopDoubleClick ? "已开启" : "未开启";
-});
-
-const doubleClickDescription = computed(() => {
-  if (!props.store.desktop) return "请在小伴桌面应用中使用此入口。浏览器预览不支持桌面空白处双击。";
-  if (!props.store.game.desktopDoubleClickSupported) return "当前桌面平台无法可靠识别桌面空白处的双击，请双击游戏卡片进入游戏。";
-  return "在桌面空白处双击即可打开游戏空间。此快捷入口默认关闭，可随时在这里调整。";
-});
 
 function descriptionFor(game: GameManifest) {
   if (game.id === "snake-arena") return "无尽成长或三分钟冲分，吃糖果长成大蛇，反击 AI。";
@@ -66,22 +52,6 @@ async function loadGames() {
   }
 }
 
-async function setShortcut(enabled: boolean) {
-  if (!props.store.desktop || !props.store.game.desktopDoubleClickSupported || busy.value) return;
-  busy.value = true;
-  toggleError.value = "";
-  try {
-    await props.store.setDoubleClick(enabled);
-  } catch (error) {
-    // A native failure must leave the displayed value tied to persisted store state.
-    toggleError.value = error instanceof Error ? error.message : "设置没有保存，请稍后重试。";
-    try { await props.store.refreshSettings(); } catch { /* Keep the last known setting. */ }
-    props.store.notify(toggleError.value, "error");
-  } finally {
-    busy.value = false;
-  }
-}
-
 async function openGameSpace(gameId?: string) {
   if (!props.store.desktop || opening.value) return;
   opening.value = true;
@@ -103,40 +73,11 @@ onMounted(loadGames);
       浏览器预览只展示游戏资料；请在小伴桌面应用中进入游戏空间。
     </NAlert>
 
-    <section class="surface shortcut-card" aria-labelledby="shortcut-title">
-      <div class="shortcut-icon"><MousePointer2 :size="20" /></div>
-      <div class="shortcut-copy">
-        <div class="shortcut-heading">
-          <h2 id="shortcut-title">桌面双击快捷入口</h2>
-          <NTag :type="!store.desktop || !store.game.desktopDoubleClickSupported ? 'default' : store.settings.gameDesktopDoubleClick ? 'success' : 'info'">
-            {{ doubleClickLabel }}
-          </NTag>
-        </div>
-        <p class="muted">{{ doubleClickDescription }}</p>
-        <NAlert v-if="store.game.desktopEntryError" class="native-error" type="warning" :bordered="false">
-          {{ store.game.desktopEntryError }}
-        </NAlert>
-        <NAlert v-if="toggleError" class="native-error" type="error" :bordered="false">
-          {{ toggleError }} 当前设置已恢复为上次保存的状态。
-        </NAlert>
-      </div>
-      <div class="shortcut-control">
-        <span class="switch-caption">{{ store.settings.gameDesktopDoubleClick ? "开启" : "关闭" }}</span>
-        <NSwitch
-          :value="store.settings.gameDesktopDoubleClick"
-          :loading="busy"
-          :disabled="!store.desktop || !store.game.desktopDoubleClickSupported || busy"
-          aria-label="桌面双击快捷入口"
-          @update:value="setShortcut"
-        />
-      </div>
-    </section>
-
     <section class="games-section" aria-labelledby="games-heading">
       <div class="section-heading">
         <div>
           <h2 id="games-heading">本地游戏</h2>
-          <p class="muted">共 {{ games.length }} 款 · 双击开始游戏</p>
+          <p class="muted">共 {{ games.length }} 款 · 点击开始游戏</p>
         </div>
         <NTag v-if="!loading" :bordered="false" type="info">离线可玩</NTag>
       </div>
@@ -152,7 +93,7 @@ onMounted(loadGames);
         </article>
       </div>
       <div v-else-if="games.length" class="game-grid">
-        <article v-for="game in games" :key="game.id" class="surface game-card" role="button" tabindex="0" :aria-label="`开始${game.name}`" :aria-disabled="opening || !store.desktop" @dblclick="openGameSpace(game.id)" @keydown.enter.prevent="openGameSpace(game.id)" @keydown.space.prevent="openGameSpace(game.id)">
+        <article v-for="game in games" :key="game.id" class="surface game-card" role="button" tabindex="0" :aria-label="`开始${game.name}`" :aria-disabled="opening || !store.desktop" @click="openGameSpace(game.id)" @keydown.enter.prevent="openGameSpace(game.id)" @keydown.space.prevent="openGameSpace(game.id)">
           <div class="game-cover">
             <img :src="`/game-packs/${game.id}/${game.cover}`" :alt="`${game.name}封面`" loading="lazy" />
             <NTag class="game-kind" :bordered="false">{{ game.orientation === "landscape" ? "横屏" : "轻松益智" }}</NTag>
@@ -173,33 +114,25 @@ onMounted(loadGames);
 .games-page { display: flex; flex-direction: column; gap:var(--ui-section-gap); color: var(--ui-text-primary); }
 .page-header { display: flex; align-items: center; justify-content: space-between; gap: 24px; margin-bottom: 5px; }
 .page-header h1 { margin: 7px 0 4px; font-size: 24px; letter-spacing: -.035em; }
-.eyebrow { display: flex; align-items: center; gap: 8px; color: var(--ui-primary-pressed); font-size: 13px; font-weight: 650; }
+.eyebrow { display: flex; align-items: center; gap: 8px; color: var(--ui-primary-text); font-size: 13px; font-weight: 650; }
 .page-subtitle, .muted { margin: 0; color: var(--ui-text-secondary); font-size:14px;line-height:1.65; }
-.shortcut-card { display: flex; align-items: flex-start; gap:var(--ui-card-gap); padding: 19px 20px; border: 1px solid var(--ui-border); border-radius:var(--ui-radius-card); background: var(--ui-surface); box-shadow:none; }
-.shortcut-icon { display: grid; width: 40px; height: 40px; flex: 0 0 auto; place-items: center; border-radius: 12px; color: var(--ui-primary-pressed); background: var(--ui-primary-soft); }
-.shortcut-copy { flex: 1; min-width: 0; }
-.shortcut-heading { display: flex; align-items: center; gap: 10px; margin: 1px 0 5px; }
-.shortcut-heading h2, .section-heading h2 { margin: 0; font-size: 18px; font-weight: 600; }
-.shortcut-control { display: flex; align-items: center; gap: 10px; padding: 5px 0 0 8px; }
-.switch-caption { color: var(--ui-text-secondary); font-size: 12px; }
-.native-error { margin-top: 10px; }
 .browser-note, .catalog-error { border-radius: 12px; }
 .games-section { display: flex; flex-direction: column; gap: 14px; }
 .section-heading { display: flex; align-items: center; justify-content: space-between; }
 .section-heading .muted { margin-top: 3px; }
 .game-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap:var(--ui-card-gap); }
-.game-card{cursor:pointer}.game-card:focus-visible{outline:2px solid var(--ui-primary);outline-offset:2px}
-.game-card, .game-card-skeleton { min-width: 0; overflow: hidden; border: 1px solid var(--ui-border); border-radius: 14px; background: var(--ui-surface); box-shadow:none; }
+.game-card{cursor:pointer;transition:transform 200ms cubic-bezier(.2,.8,.2,1),box-shadow 200ms}.game-card:hover{transform:translateY(-3px);box-shadow:0 14px 30px var(--ui-shadow-hover)}.game-card:focus-visible{outline:2px solid var(--ui-primary);outline-offset:2px}
+.game-card, .game-card-skeleton { min-width: 0; overflow: hidden; border: 0; border-radius: var(--ui-radius-card); background: var(--ui-surface); box-shadow:none; }
 .game-cover { position: relative; height: 145px; overflow: hidden; background: linear-gradient(135deg, var(--ui-primary-soft), var(--ui-border)); }
 .game-cover img { display: block; width: 100%; height: 100%; object-fit: contain; }
 .game-kind { position: absolute; right: 10px; bottom: 10px; background: color-mix(in srgb, var(--ui-surface) 92%, transparent); color: var(--ui-text-secondary); }
 .game-content { padding: 13px 15px 15px; }
 .game-content h3 { margin: 0 0 5px; color: var(--ui-text-primary); font-size: 14px; font-weight: 600; }
 .game-content .muted { min-height: 42px; }
-.game-footnote { display: flex; align-items: center; gap: 6px; margin-top: 9px; color: var(--ui-primary-pressed); font-size:12px; }
+.game-footnote { display: flex; align-items: center; gap: 6px; margin-top: 9px; color: var(--ui-primary-text); font-size:12px; }
 .game-card-skeleton { display: flex; flex-direction: column; gap: 12px; padding-bottom: 14px; }
 .game-card-skeleton :deep(.n-skeleton) { margin: 0 13px; }
 .game-card-skeleton :deep(.n-skeleton:first-child) { margin: 0; }
 @media (max-width: 900px) { .game-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (max-width: 580px) { .page-header { align-items: flex-start; flex-direction: column; gap:var(--ui-card-gap); } .shortcut-card { flex-wrap: wrap; padding: 15px; } .shortcut-copy { flex-basis: calc(100% - 55px); } .shortcut-control { width: 100%; justify-content: flex-end; } .game-grid { grid-template-columns: 1fr; } .game-cover { height: 175px; } }
+@media (max-width: 580px) { .game-grid { grid-template-columns: 1fr; } .game-cover { height: 175px; } }
 </style>

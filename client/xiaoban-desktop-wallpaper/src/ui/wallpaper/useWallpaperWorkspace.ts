@@ -1,6 +1,5 @@
 import { computed, reactive, ref, watch, onScopeDispose } from "vue";
 import { invoke, listen, wallpaperDefaults, type WallpaperEntry, type WallpaperLibrary, type WallpaperOptions } from "../../bridge.ts";
-import { effectNames, normalizeWallpaperEffects, type EffectName } from "../../wallpaper-effects.ts";
 import type { SiteWallpaper } from "../../wallpaper-media.ts";
 import type { ControlStore } from "../control-types.ts";
 export type Selection = { source: "local"; item: WallpaperEntry } | { source: "online"; item: SiteWallpaper };
@@ -16,14 +15,10 @@ export function useWallpaperWorkspace(store: ControlStore) {
   const categories = ref<{id: string; name: string}[]>([]);
   const prepared = reactive(new Map<string,string>()); let generation = 0;
   const kind = computed(() => selection.value?.source === "local" ? selection.value.item.definition.kind : selection.value?.item.media_type);
-  const selectedEffect = computed(() => effectNames.find(name => draft.value.effects[name].enabled) ?? "none");
-  function setEffect(value: string) { if(busy.value)return; for (const name of effectNames) draft.value.effects[name].enabled = name === value; }
   function select(value: Selection) {
     if(busy.value)return; selection.value = value;
     const id = value.source === "local" ? value.item.definition.id : value.item.desktop_id || prepared.get(value.item.id);
-    const effects = normalizeWallpaperEffects(draft.value.effects);
     draft.value = cloneOptions(id === store.settings.wallpaperId ? store.settings.wallpaperOptions : wallpaperDefaults);
-    if (id !== store.settings.wallpaperId) draft.value.effects = effects;
     if (value.source === "local") for (const control of value.item.definition.controls ?? []) draft.value.values[control.key] ??= control.default;
   }
   function cancel() { if(!busy.value) selection.value = null; }
@@ -65,6 +60,5 @@ export function useWallpaperWorkspace(store: ControlStore) {
   }
   if(store.desktop && !store.info?.uiSmoke) {void load();void loadCategories();}
   const saved = computed(() => { const chosen=selection.value; if(chosen?.source!=="online") return false; const id=prepared.get(chosen.item.id) || chosen.item.desktop_id; return store.library.items.some(item=>item.definition.id===id && item.installed); });
-  return {progress,progressPercent,saved,tab,media,query,category,page,localSource,selection,draft,busy,loading,error,feed,categories,kind,selectedEffect,setEffect,select,cancel,load,localItems,action};
+  return {progress,progressPercent,saved,tab,media,query,category,page,localSource,selection,draft,busy,loading,error,feed,categories,kind,select,cancel,load,localItems,action};
 }
-export type SelectedEffect = EffectName | "none";

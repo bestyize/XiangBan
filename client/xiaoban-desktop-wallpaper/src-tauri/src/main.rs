@@ -19,6 +19,10 @@ mod games;
 mod reminders;
 mod care_system;
 mod care_weather;
+mod effect_choice;
+mod effect_packs;
+mod effects;
+mod effects_smoke;
 
 use preferences::{Preferences, Settings};
 use serde::Serialize;
@@ -83,6 +87,7 @@ fn publish(app: &tauri::AppHandle) {
     if let Some(item) = item { let _ = item.set_checked(settings.autostart); }
     let _ = app.emit("settings-changed", settings);
     content::sync(app);
+    effects::sync(app);
 }
 
 fn persist(app: &tauri::AppHandle, settings: &Settings) -> Result<(), String> {
@@ -280,6 +285,23 @@ fn update_settings(
     Ok(settings(&app))
 }
 
+/// The desktop-wide particle effect: one effect at a time, applied at once and kept across restarts.
+#[tauri::command]
+fn set_desktop_effects(app: tauri::AppHandle, effects: serde_json::Value) -> Result<Settings, String> {
+    let state = app.state::<DesktopState>();
+    let _update = state.update_lock.lock().unwrap();
+    let previous = settings(&app);
+    let mut next = previous.clone();
+    next.effects = effect_choice::EffectsChoice::from_value(&effects);
+    if !next.effects.selected.is_empty() && !effects::exists(&app, &next.effects.selected) {
+        return Err(format!("没有找到特效“{}”，它可能已被移出特效文件夹", next.effects.selected));
+    }
+    persist(&app, &next)?;
+    *state.settings.lock().unwrap() = next;
+    publish(&app);
+    Ok(settings(&app))
+}
+
 #[tauri::command]
 async fn set_companion_enabled(app:tauri::AppHandle,enabled:bool)->Result<Settings,String>{
     if games::is_active(&app){return Err("请先退出游戏空间，再更改小伴显示".into());}
@@ -307,7 +329,7 @@ fn poke(app: tauri::AppHandle) {
 
 #[tauri::command]
 fn scene_ready(window: tauri::WebviewWindow, report: Option<serde_json::Value>) -> Result<(), String> {
-    if content::media_label(window.label()) {
+    if content::media_label(window.label()) || window.label() == effects::LABEL {
         if let Some(report) = report {
             if report.to_string().len() > 16384 { return Err("场景报告过大".into()); }
             let failed = report.get("error").is_some();
@@ -319,8 +341,8 @@ fn scene_ready(window: tauri::WebviewWindow, report: Option<serde_json::Value>) 
     #[cfg(target_os = "macos")]
     macos::configure_scene(
         &window,
-        (window.label() == "pet" && settings(window.app_handle()).mode == "wallpaper") || ["media-a", "media-b"].contains(&window.label()),
-        ["media-a", "media-b"].contains(&window.label()),
+        (window.label() == "pet" && settings(window.app_handle()).mode == "wallpaper") || ["media-a", "media-b", effects::LABEL].contains(&window.label()),
+        ["media-a", "media-b", effects::LABEL].contains(&window.label()),
     )?;
     window
         .app_handle()
@@ -506,25 +528,10 @@ fn setup_tray(app: &tauri::App) -> tauri::Result<()> {
     let exit = MenuItem::with_id(app, "exit", "退出小伴", true, None::<&str>)?;
     let menu = Menu::with_items(app, &[&control, &games, &poke, &autostart, &exit])?;
     *app.state::<DesktopState>().startup_menu.lock().unwrap() = Some(autostart);
-    // A small built-in icon keeps this prototype independent of image assets.
-    let mut rgba = vec![0u8; 32 * 32 * 4];
-    for y in 3usize..29 {
-        for x in 3usize..29 {
-            let idx = (y * 32 + x) * 4;
-            let screen = (7..25).contains(&x) && (11..24).contains(&y);
-            let eye = (11..14).contains(&y) && ((10..13).contains(&x) || (19..22).contains(&x));
-            let color = if eye {
-                [234, 249, 255, 255]
-            } else if screen {
-                [9, 10, 14, 255]
-            } else {
-                [246, 235, 219, 255]
-            };
-            rgba[idx..idx + 4].copy_from_slice(&color);
-        }
-    }
+    // The app icon at 64x64 as raw RGBA (icons/tray.rgba), so the tray needs no image decoder.
+    const TRAY_ICON: &[u8] = include_bytes!("../icons/tray.rgba");
     let builder = TrayIconBuilder::with_id("xiaoban-tray")
-        .icon(tauri::image::Image::new_owned(rgba, 32, 32))
+        .icon(tauri::image::Image::new(TRAY_ICON, 64, 64))
         .tooltip("小伴 · 桌面陪伴")
         .menu(&menu)
         .on_menu_event(|app, event| match event.id.as_ref() {
@@ -590,7 +597,7 @@ fn main() {
         }));
     #[cfg(target_os = "macos")]
     let builder = builder.plugin(tauri_plugin_autostart::Builder::new().app_name(startup_name).arg("--autostart").build());
-    let command_handler: Box<dyn Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Sync> = Box::new(tauri::generate_handler![get_platform, get_settings, set_mode, update_settings, set_companion_enabled, poke,
+    let command_handler: Box<dyn Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Sync> = Box::new(tauri::generate_handler![get_platform, get_settings, set_mode, update_settings, set_desktop_effects, effects::list_desktop_effects, effects::open_effects_directory, set_companion_enabled, poke,
             scene_ready, set_hit_test, start_drag, hide_control, show_control, quit, get_diagnostics, ui_smoke_report,
             get_startup_status, set_autostart, content::get_wallpaper_library, content::import_wallpaper_catalog,
             games::open_game_space, games::close_game_space, games::get_game_catalog, games::load_game_save,
@@ -598,7 +605,7 @@ fn main() {
             games::game_smoke_report,
             reminders::get_care_settings, reminders::configure_care, reminders::upsert_care_rule, reminders::delete_care_rule,
             reminders::preview_care_rule, reminders::get_care_delivery, reminders::care_ready, reminders::dismiss_care,
-            reminders::snooze_care, reminders::search_care_cities, reminders::check_care_weather,
+            reminders::snooze_care, reminders::search_care_cities, reminders::detect_care_city, reminders::check_care_weather,
             content::subscribe_wallpapers, content::apply_wallpaper, content::get_app_info, content::set_update_source,
             content::check_updates, content::open_download_url, local_media::import_local_wallpaper, storage::open_data_directory,
             website::configure_website, website::fetch_site_wallpapers, website::fetch_site_categories,
@@ -610,7 +617,7 @@ fn main() {
             let label=invoke.message.webview_ref().label(); let command=invoke.message.command();
             let allowed=games::permitted(label,command).unwrap_or_else(|| {
                 if command=="ui_smoke_report" {return label=="control";}
-                if command=="set_companion_enabled" {return label=="control";}
+                if command=="set_companion_enabled" || command=="set_desktop_effects" || command=="list_desktop_effects" || command=="open_effects_directory" {return label=="control";}
                 if label=="care" { return ["get_care_delivery","care_ready","dismiss_care","snooze_care"].contains(&command); }
                 if command.contains("care") { return label=="control"; }
                 content::permitted(label,command)
@@ -637,6 +644,7 @@ fn main() {
                 }
             };
             open_scene(app.handle(), &initial_mode).map_err(std::io::Error::other)?;
+            effects::sync(app.handle());
             if !std::env::args().any(|argument| argument == "--autostart") {
                 present_control(app.handle()).map_err(std::io::Error::other)?;
             }

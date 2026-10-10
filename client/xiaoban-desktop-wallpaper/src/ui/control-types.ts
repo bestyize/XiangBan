@@ -1,7 +1,9 @@
 import type { AppInfo, Settings, WallpaperLibrary, WallpaperOptions } from "../bridge.ts";
+import type { EffectsChoice } from "../effects/types.ts";
+import type { LoadedPacks } from "../effects/catalog.ts";
 import type { WebsiteStatus } from "./website-types.ts";
 
-export type ControlPage = "wallpapers" | "companion" | "games" | "care" | "settings";
+export type ControlPage = "wallpapers" | "effects" | "companion" | "games" | "care" | "settings";
 export interface ControlStore {
   settings: Settings;
   info: AppInfo;
@@ -22,6 +24,12 @@ export interface ControlStore {
   updateAppearance(patch: Partial<Settings>): Promise<void>;
   setMode(mode: Settings["mode"]): Promise<void>;
   setCompanion(enabled: boolean): Promise<void>;
+  /** The effects that can be chosen: the built-in ones and the user's own files. */
+  effectList: LoadedPacks;
+  loadEffects(): Promise<void>;
+  openEffectsDirectory(): Promise<void>;
+  /** Chooses the desktop-wide particle effect; it applies at once, whichever wallpaper is behind it. */
+  setEffects(effects: EffectsChoice): Promise<void>;
   setAutostart(enabled: boolean): Promise<void>;
   setDoubleClick(enabled: boolean): Promise<void>;
   openGames(gameId?: string): Promise<void>;

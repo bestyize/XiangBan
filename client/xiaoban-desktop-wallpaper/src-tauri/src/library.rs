@@ -78,8 +78,10 @@ pub struct Options {
     pub playback_rate: f64,
     pub background: String,
     pub values: BTreeMap<String, Value>,
-    #[serde(deserialize_with = "deserialize_effects")]
-    pub effects: WallpaperEffectsOptions,
+    /// Old preferences kept particle effects per wallpaper. The value is only read, so `Settings::normalize`
+    /// can move it to the desktop-wide setting; it is never written back.
+    #[serde(skip_serializing)]
+    pub effects: Value,
 }
 impl Default for Options {
     fn default() -> Self {
@@ -88,52 +90,9 @@ impl Default for Options {
             playback_rate: 1.0,
             background: "#edf5f0".into(),
             values: BTreeMap::new(),
-            effects: WallpaperEffectsOptions::default(),
+            effects: Value::Null,
         }
     }
-}
-
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-#[serde(default, rename_all = "camelCase", deny_unknown_fields)]
-pub struct EffectOptions {
-    pub enabled: bool,
-    pub intensity: f64,
-    pub speed: f64,
-}
-impl Default for EffectOptions {
-    fn default() -> Self { Self { enabled: false, intensity: 0.5, speed: 1.0 } }
-}
-#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
-#[serde(default, rename_all = "camelCase", deny_unknown_fields)]
-pub struct WallpaperEffectsOptions {
-    pub rain: EffectOptions,
-    pub snow: EffectOptions,
-    pub fireflies: EffectOptions,
-}
-impl WallpaperEffectsOptions {
-    pub fn normalize(&mut self) {
-        let mut selected = false;
-        for effect in [&mut self.rain, &mut self.snow, &mut self.fireflies] {
-            effect.intensity = if effect.intensity.is_finite() { effect.intensity.clamp(0.0, 1.0) } else { 0.5 };
-            effect.speed = if effect.speed.is_finite() { effect.speed.clamp(0.25, 3.0) } else { 1.0 };
-            effect.enabled = effect.enabled && !selected;
-            selected |= effect.enabled;
-        }
-    }
-}
-fn deserialize_effects<'de, D: serde::Deserializer<'de>>(deserializer: D) -> Result<WallpaperEffectsOptions, D::Error> {
-    let value = Value::deserialize(deserializer)?;
-    let read = |name: &str| {
-        let effect = &value[name];
-        EffectOptions {
-            enabled: effect["enabled"].as_bool().unwrap_or(false),
-            intensity: effect["intensity"].as_f64().unwrap_or(0.5),
-            speed: effect["speed"].as_f64().unwrap_or(1.0),
-        }
-    };
-    let mut effects = WallpaperEffectsOptions { rain: read("rain"), snow: read("snow"), fireflies: read("fireflies") };
-    effects.normalize();
-    Ok(effects)
 }
 
 pub fn identifier(value: &str) -> bool {
@@ -326,8 +285,8 @@ fn validate_value(control: &Control, value: &Value) -> Result<(), String> {
 }
 
 pub fn validate_options(item: &Wallpaper, mut options: Options) -> Result<Options, String> {
-    // Host effects are independent of manifest controls and retained for non-image selections.
-    options.effects.normalize();
+    // Effects belong to the desktop, not to a wallpaper; nothing a caller sends here is kept.
+    options.effects = Value::Null;
     if !["cover", "contain", "fill"].contains(&options.fit.as_str())
         || !options.playback_rate.is_finite()
         || !(0.25..=2.0).contains(&options.playback_rate)
@@ -1053,36 +1012,18 @@ mod tests {
     }
 
     #[test]
-    fn effects_are_backward_compatible_and_normalize_invalid_preferences() {
-        let legacy: Options = serde_json::from_value(json!({"fit":"contain","values":{}})).unwrap();
-        assert_eq!(legacy.effects, WallpaperEffectsOptions::default());
-        let corrupted: Options = serde_json::from_value(json!({"effects":null})).unwrap();
-        assert_eq!(corrupted.effects, WallpaperEffectsOptions::default());
-        let options: Options = serde_json::from_value(json!({"effects":{
-            "rain":{"enabled":true,"intensity":4,"speed":0},
-            "snow":{"enabled":true,"intensity":"invalid","speed":9},
-            "fireflies":{"enabled":true,"intensity":0.7,"speed":1.5}
-        }})).unwrap();
-        assert!(options.effects.rain.enabled);
-        assert!(!options.effects.snow.enabled);
-        assert!(!options.effects.fireflies.enabled);
-        assert_eq!(options.effects.rain.intensity, 1.0);
-        assert_eq!(options.effects.rain.speed, 0.25);
-        assert_eq!(options.effects.snow.intensity, 0.5);
-        assert_eq!(options.effects.snow.speed, 3.0);
-    }
-    #[test]
-    fn effects_survive_validation_persistence_and_non_image_switches() {
-        let mut options = Options::default();
-        options.effects.fireflies = EffectOptions { enabled: true, intensity: 0.8, speed: 2.0 };
+    fn a_wallpaper_still_reads_an_old_effects_key_but_never_writes_or_keeps_one() {
+        let old: Options = serde_json::from_value(json!({"fit":"contain","effects":{"rain":{"enabled":true}}})).unwrap();
+        assert_eq!(old.effects["rain"]["enabled"], true);
+        let fresh: Options = serde_json::from_value(json!({"fit":"contain"})).unwrap();
+        assert!(fresh.effects.is_null());
+        assert!(serde_json::to_value(&old).unwrap().get("effects").is_none());
         for kind in ["image", "video", "canvas"] {
             let mut item = builtins().remove(0);
             item.kind = kind.into();
-            let valid = validate_options(&item, options.clone()).unwrap();
-            assert_eq!(valid.effects, options.effects);
-            assert!(!valid.values.contains_key("effects"));
-            let persisted = serde_json::to_vec(&valid).unwrap();
-            assert_eq!(serde_json::from_slice::<Options>(&persisted).unwrap(), valid);
+            let valid = validate_options(&item, old.clone()).unwrap();
+            assert!(valid.effects.is_null(), "{kind}");
+            assert!(!String::from_utf8(serde_json::to_vec(&valid).unwrap()).unwrap().contains("effects"));
         }
     }
 

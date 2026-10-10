@@ -123,11 +123,11 @@ async fn open_selected(app: &tauri::AppHandle, game_id: Option<String>) -> Resul
     state.active.store(true, Ordering::SeqCst);
     crate::reminders::set_game_active(app, true);
     let _ = app.emit("games-active", true);
-    for label in ["pet", "wallpaper", "media-a", "media-b", "media-preview"] {
+    for label in ["pet", "wallpaper", "media-a", "media-b", "media-preview", crate::effects::LABEL] {
         app.state::<crate::DesktopState>().ready_scenes.lock().unwrap().remove(label);
         if let Some(background) = app.get_webview_window(label) { if let Err(e) = background.destroy() { state.active.store(false,Ordering::SeqCst); let _=window.destroy(); restore_background(app); return Err(e.to_string()); } }
     }
-    if let Err(error)=wait_gone(app,&["pet","wallpaper","media-a","media-b","media-preview"]).await {
+    if let Err(error)=wait_gone(app,&["pet","wallpaper","media-a","media-b","media-preview",crate::effects::LABEL]).await {
         state.active.store(false,Ordering::SeqCst); let _=window.destroy(); restore_background(app); return Err(error);
     }
     if let Err(e) = window.show().and_then(|_| window.set_focus()) {
@@ -141,6 +141,7 @@ fn restore_background(app: &tauri::AppHandle) {
     let config = crate::settings(app);
     let _media = match crate::content::restore(app) { Ok(media) => media, Err(e) => { let _=app.emit("desktop-error", format!("退出游戏后壁纸恢复失败：{e}")); false } };
     if let Err(e) = crate::open_scene(app,&config.mode) { let _=app.emit("desktop-error",e); }
+    crate::effects::sync(app);
     if let Some(position) = app.state::<GameState>().pet_position.lock().unwrap().take() {
         if let Some(pet) = app.get_webview_window("pet") { let _ = pet.set_position(position); }
     }

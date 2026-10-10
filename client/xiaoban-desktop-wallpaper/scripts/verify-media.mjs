@@ -25,17 +25,18 @@ try{
  if(effectsSmoke){
   const effects=result.media.Ok.effects
   assert.ok(effects,JSON.stringify(result.media.Ok))
-  assert.equal(effects.cases?.length,3,'effects.cases')
-  assert.equal(effects.sources?.length,3,'effects.sources')
-  assert.equal(effects.nonImage?.length,2,'effects.nonImage')
-  assert.equal(effects.nonImage.find(item=>item.id==='test-video').report.effects.canvasPresent,true,'Video overlay must render')
-  assert.equal(effects.nonImage.find(item=>item.id==='test-canvas').report.effects.canvasPresent,false,'Interactive Canvas overlay stays disabled')
-  for(const [index,state] of effects.cases.entries()) assert.equal(state.persisted,true,`effects.cases[${index}].persisted`)
-  assert.equal(effects.preview?.settingsPreserved,true,'effects.preview.settingsPreserved')
-  assert.equal(effects.preview?.closed,true,'effects.preview.closed')
+  assert.equal(effects.cases?.length,7,'effects.cases')
+  for(const [index,state] of effects.cases.entries()){
+   assert.equal(state.persisted,true,`effects.cases[${index}].persisted`)
+   assert.equal(state.report.effects.canvasPresent,true,`effects.cases[${index}] overlay canvas`)
+   assert.ok(state.report.effects.particles.length>0&&state.report.effects.particles.every(n=>n>0),`effects.cases[${index}] every layer has particles`)
+   assert.equal(state.report.privilegedIpcBlocked,true,`effects.cases[${index}] overlay must not reach desktop commands`)
+  }
+  assert.deepEqual(effects.cases.map(item=>item.effect),['rain','snow','fireflies','petals','maple','meteors','stars'])
+  assert.equal(effects.independent?.length,4,'effects.independent')
+  assert.ok(effects.independent.every(item=>item.overlayPresent===true),'The overlay must survive every wallpaper, including the plain system desktop')
+  assert.equal(effects.turnedOff,true,'effects.turnedOff')
   assert.equal(effects.persistence?.diskConfigMatch,true,'effects.persistence.diskConfigMatch')
-  assert.equal(effects.persistence?.restored,true,'effects.persistence.restored')
-  assert.equal(effects.cacheOffline,true,'effects.cacheOffline')
  }
- console.log(`PASS: image/video/Canvas, delivery, SHA-256, offline cache, unprivileged IPC and update check${effectsSmoke?'; effects: 3 cases, 3 sources, 2 non-image modes, preview and persistence':''}. ${report}`)
+ console.log(`PASS: image/video/Canvas, delivery, SHA-256, offline cache, unprivileged IPC and update check${effectsSmoke?'; effects: 7 effects, kept across 4 wallpapers, off and persistence':''}. ${report}`)
 }finally{clearTimeout(timeout);await fixture.close()}

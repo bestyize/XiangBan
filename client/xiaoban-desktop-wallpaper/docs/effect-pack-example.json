@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "id": "glitter",
+  "name": "星尘",
+  "description": "金色的亮粉缓缓飘落，示例特效包",
+  "sky": ["#1a1033", "#3b2a63", "#6b4a8f"],
+  "layers": [
+    {
+      "count": 120,
+      "shape": { "kind": "glow", "core": 0.2 },
+      "size": [8, 18],
+      "speed": [14, 40],
+      "direction": 90,
+      "wind": 20,
+      "sway": { "amplitude": [8, 20], "frequency": [0.1, 0.3] },
+      "twinkle": { "rate": [0.4, 1.2], "depth": 0.9 },
+      "alpha": [0.35, 0.95],
+      "colors": [["#fff4c2", "#ffc94d"], ["#ffffff", "#ffe08a"], ["#ffe9f1", "#ff9fc4"]]
+    },
+    {
+      "count": 14,
+      "shape": {
+        "kind": "path",
+        "d": "M0,-1 C0.06,-0.3 0.3,-0.06 1,0 C0.3,0.06 0.06,0.3 0,1 C-0.06,0.3 -0.3,0.06 -1,0 C-0.3,-0.06 -0.06,-0.3 0,-1 Z",
+        "style": "fill"
+      },
+      "size": [16, 34],
+      "speed": [24, 60],
+      "direction": 90,
+      "sway": { "amplitude": [10, 24], "frequency": [0.1, 0.25] },
+      "spin": [-0.8, 0.8],
+      "twinkle": { "rate": [0.3, 0.8], "depth": 0.85 },
+      "alpha": [0.6, 1],
+      "colors": [["#ffffff", "#ffe9a3"]]
+    }
+  ]
+}

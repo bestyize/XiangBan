@@ -5,7 +5,7 @@
 ```text
 .xiaobanwallpaper/
 ├── config/
-│   ├── preferences.json       角色、布局、自启动、壁纸与服务地址设置
+│   ├── preferences.json       角色、布局、自启动、壁纸、桌面特效选择与服务地址设置
 │   └── care-reminders.json    关怀规则、天气来源与结果、待展示提醒及去重状态
 ├── wallpapers/
 │   ├── catalog.json           订阅或导入 JSON 清单的元数据
@@ -13,6 +13,7 @@
 │   ├── active.json            当前壁纸定义快照，用于离线与重启恢复
 │   ├── imports/<sha256>       导入媒体的持久副本，属于用户内容
 │   └── cache/<sha256>         订阅下载缓存，可重新从资源地址获取；网站来源链接下载的文件同样按本地计算的 SHA-256 保存
+├── effects/                   用户自己的特效包（*.json），可选；首次从控制台打开该文件夹时创建并放入示例
 ├── cache/
 │   └── webview/               Windows WebView2 配置与运行缓存
 ├── games/

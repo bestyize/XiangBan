@@ -1,0 +1,113 @@
+// @vitest-environment happy-dom
+import { flushPromises, mount } from '@vue/test-utils';
+import { describe, expect, it, vi } from 'vitest';
+import { reactive } from 'vue';
+import EffectsPage from './EffectsPage.vue';
+import { defaults } from '../../bridge.ts';
+import { parsePack } from '../../effects/parse.ts';
+import type { EffectPack, EffectsChoice } from '../../effects/types.ts';
+import type { ControlStore } from '../control-types.ts';
+
+const slider = vi.hoisted(() => ({ name: 'SliderStub', props: ['value'], emits: ['update:value'], template: '<input class="slider" type="range" />' }));
+// The page imports Naive UI's slider directly, so it is replaced at the module, not through mount stubs.
+vi.mock('naive-ui', async (original) => ({ ...(await original<typeof import('naive-ui')>()), NSlider: slider }));
+
+const pack = (id: string, name: string, source: 'builtin' | 'user' = 'builtin'): EffectPack => {
+  const parsed = parsePack({ schemaVersion: 1, id, name, description: `${name}的说明`, layers: [{ count: 5, shape: { kind: 'circle' }, colors: ['#fff'] }], source });
+  if (!parsed.ok) throw new Error(parsed.error);
+  return parsed.pack;
+};
+const none: EffectsChoice = { selected: '', params: {} };
+
+function setup(effects: EffectsChoice = none, packs = [pack('rain', '下雨'), pack('maple', '枫叶飘落'), pack('glitter', '星尘', 'user')], errors: string[] = []) {
+  const sent: EffectsChoice[] = [];
+  const store = reactive({
+    settings: { ...JSON.parse(JSON.stringify(defaults)), effects: JSON.parse(JSON.stringify(effects)) },
+    game: { active: false }, notify: vi.fn(), effectList: { packs, errors, directory: '/data/effects' },
+    loadEffects: vi.fn(async () => {}), openEffectsDirectory: vi.fn(async () => {}),
+    setEffects: vi.fn(async (next: EffectsChoice) => { sent.push(JSON.parse(JSON.stringify(next))); store.settings.effects = JSON.parse(JSON.stringify(next)); }),
+  }) as unknown as ControlStore;
+  const wrapper = mount(EffectsPage, { props: { store }, global: { stubs: { EffectPreview: true } } });
+  return { wrapper, store, sent };
+}
+
+describe('desktop effects page', () => {
+  it('lists "no effects" and every effect it was given, the user\'s own marked, with nothing chosen at first', () => {
+    const { wrapper, store } = setup();
+    for (const id of ['none', 'rain', 'maple', 'glitter']) expect(wrapper.find(`[data-testid="effect-${id}"]`).exists(), id).toBe(true);
+    expect(wrapper.get('[data-testid="effect-none"]').attributes('aria-pressed')).toBe('true');
+    expect(wrapper.get('[data-testid="effect-glitter"]').text()).toContain('我的');
+    expect(wrapper.get('[data-testid="effect-rain"]').text()).not.toContain('我的');
+    expect(wrapper.find('[data-testid="effect-tuning"]').exists()).toBe(false);
+    expect(wrapper.find('h1').text()).toBe('桌面特效');
+    expect(store.loadEffects).toHaveBeenCalledOnce();
+    wrapper.unmount();
+  });
+  it('applies an effect at once, without any wallpaper being involved', async () => {
+    const { wrapper, store, sent } = setup();
+    await wrapper.get('[data-testid="effect-maple"]').trigger('click'); await flushPromises();
+    expect(store.setEffects).toHaveBeenCalledTimes(1);
+    expect(sent[0].selected).toBe('maple');
+    expect(wrapper.get('[data-testid="effect-maple"]').attributes('aria-pressed')).toBe('true');
+    expect(wrapper.find('[data-testid="effect-tuning"]').exists()).toBe(true);
+    wrapper.unmount();
+  });
+  it('each effect keeps its own settings when you switch, and "no effects" keeps them all', async () => {
+    const start: EffectsChoice = { selected: 'rain', params: { rain: { density: 1.8, speed: 2, size: 1 }, maple: { density: 0.5, speed: 1, size: 1.5 } } };
+    const { wrapper, sent } = setup(start);
+    expect(wrapper.get('[data-testid="effect-density-value"]').text()).toBe('×1.8');
+    await wrapper.get('[data-testid="effect-maple"]').trigger('click'); await flushPromises();
+    expect(sent[0]).toEqual({ selected: 'maple', params: start.params });
+    expect(wrapper.get('[data-testid="effect-density-value"]').text()).toBe('×0.5');
+    expect(wrapper.get('[data-testid="effect-size-value"]').text()).toBe('×1.5');
+    await wrapper.get('[data-testid="effect-none"]').trigger('click'); await flushPromises();
+    expect(sent[1]).toEqual({ selected: '', params: start.params });
+    expect(wrapper.find('[data-testid="effect-tuning"]').exists()).toBe(false);
+    wrapper.unmount();
+  });
+  it('sends slider changes once they settle, and the last values win', async () => {
+    vi.useFakeTimers();
+    try {
+      const { wrapper, sent } = setup({ selected: 'maple', params: {} });
+      const [density, speed, size] = wrapper.findAllComponents({ name: 'SliderStub' });
+      density.vm.$emit('update:value', 1.4); density.vm.$emit('update:value', 2.1); speed.vm.$emit('update:value', 2.5); size.vm.$emit('update:value', 1.6);
+      await vi.advanceTimersByTimeAsync(400);
+      expect(sent).toHaveLength(1);
+      expect(sent[0]).toEqual({ selected: 'maple', params: { maple: { density: 2.1, speed: 2.5, size: 1.6 } } });
+      wrapper.unmount();
+    } finally { vi.useRealTimers(); }
+  });
+  it('says so when the chosen effect has gone, and lists the files that could not be used', () => {
+    const gone = setup({ selected: 'removed', params: {} }, [pack('rain', '下雨')], ['broken.json：JSON 格式错误']);
+    expect(gone.wrapper.get('[data-testid="effect-missing"]').text()).toContain('removed');
+    expect(gone.wrapper.get('[data-testid="effect-errors"]').text()).toContain('broken.json');
+    expect(gone.wrapper.get('[data-testid="effect-none"]').attributes('aria-pressed')).toBe('true');
+    gone.wrapper.unmount();
+    const fine = setup({ selected: 'rain', params: {} });
+    expect(fine.wrapper.find('[data-testid="effect-missing"]').exists()).toBe(false);
+    expect(fine.wrapper.find('[data-testid="effect-errors"]').exists()).toBe(false);
+    fine.wrapper.unmount();
+  });
+  it('does not call an effect missing while the list is still loading', () => {
+    const { wrapper } = setup({ selected: 'maple', params: {} }, []);
+    expect(wrapper.find('[data-testid="effect-missing"]').exists()).toBe(false);
+    wrapper.unmount();
+  });
+  it('reloads the files and opens the folder on request', async () => {
+    const { wrapper, store } = setup();
+    await wrapper.get('[data-testid="effects-reload"]').trigger('click'); await flushPromises();
+    expect(store.loadEffects).toHaveBeenCalledTimes(2);
+    expect(store.notify).toHaveBeenCalledWith('已重新载入特效', 'success');
+    await wrapper.get('[data-testid="effects-folder"]').trigger('click'); await flushPromises();
+    expect(store.openEffectsDirectory).toHaveBeenCalledOnce();
+    wrapper.unmount();
+  });
+  it('reports a failure instead of pretending the effect was applied', async () => {
+    const { wrapper, store } = setup();
+    vi.mocked(store.setEffects).mockRejectedValueOnce(new Error('没有找到特效“rain”'));
+    await wrapper.get('[data-testid="effect-rain"]').trigger('click'); await flushPromises();
+    expect(store.notify).toHaveBeenCalledWith('没有找到特效“rain”', 'error');
+    expect(wrapper.get('[data-testid="effect-none"]').attributes('aria-pressed')).toBe('true');
+    wrapper.unmount();
+  });
+});
