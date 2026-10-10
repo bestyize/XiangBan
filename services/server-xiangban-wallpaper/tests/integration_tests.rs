@@ -131,19 +131,42 @@ async fn test_database_in_memory_fallback_and_favorites() {
 
     let item = &items[0];
 
-    // Add to favorite
-    db.add_favorite(item).await.expect("add favorite should succeed");
-
-    // List favorites
-    let favs = db.list_favorites().await.expect("list favorites should succeed");
+    // Guest favorite (None)
+    db.add_favorite(None, item).await.expect("add guest favorite should succeed");
+    let favs = db.list_favorites(None).await.expect("list guest favorites should succeed");
     assert!(favs.iter().any(|f| f.id == item.id));
 
-    // Remove favorite
-    let removed = db.remove_favorite(&item.id).await.expect("remove favorite should succeed");
-    assert!(removed);
+    // User favorite (Some(user_a))
+    let user_a = uuid::Uuid::new_v4();
+    let user_b = uuid::Uuid::new_v4();
+    db.add_favorite(Some(user_a), item).await.expect("add user favorite should succeed");
 
-    let favs_after = db.list_favorites().await.unwrap();
-    assert!(!favs_after.iter().any(|f| f.id == item.id));
+    // User A can see it, User B cannot
+    let favs_a = db.list_favorites(Some(user_a)).await.unwrap();
+    assert!(favs_a.iter().any(|f| f.id == item.id));
+    let favs_b = db.list_favorites(Some(user_b)).await.unwrap();
+    assert!(!favs_b.iter().any(|f| f.id == item.id));
+
+    // Check status
+    assert!(db.is_favorite(Some(user_a), &item.id).await.unwrap());
+    assert!(!db.is_favorite(Some(user_b), &item.id).await.unwrap());
+    assert_eq!(db.check_favorites(Some(user_a), &[item.id.clone()]).await.unwrap(), vec![item.id.clone()]);
+
+    // Remove user favorite
+    let removed_a = db.remove_favorite(Some(user_a), &item.id).await.expect("remove user favorite should succeed");
+    assert!(removed_a);
+    let favs_a_after = db.list_favorites(Some(user_a)).await.unwrap();
+    assert!(!favs_a_after.iter().any(|f| f.id == item.id));
+
+    // Guest favorite remains unaffected by user removal
+    let favs_guest = db.list_favorites(None).await.unwrap();
+    assert!(favs_guest.iter().any(|f| f.id == item.id));
+
+    // Remove guest favorite
+    let removed_guest = db.remove_favorite(None, &item.id).await.expect("remove guest favorite should succeed");
+    assert!(removed_guest);
+    let favs_guest_after = db.list_favorites(None).await.unwrap();
+    assert!(!favs_guest_after.iter().any(|f| f.id == item.id));
 }
 
 /// Without PostgreSQL there is nowhere to keep results, so every search goes to the providers.

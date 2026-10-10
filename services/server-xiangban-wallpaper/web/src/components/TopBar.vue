@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
+import { useAccount } from '@/stores/account'
 import Icon from './Icon.vue'
 
 const route = useRoute()
+const account = useAccount()
 const tab = computed(() => route.meta.tab as string)
 
 const links = [
@@ -34,6 +36,20 @@ const links = [
           <Icon name="search" :size="18" />
           <span>搜索壁纸</span>
         </RouterLink>
+        <RouterLink
+          v-if="account.user"
+          to="/me"
+          class="account"
+          :aria-label="`我的账号：${account.user.nickname}`"
+        >
+          <img v-if="account.user.avatar_url" :src="account.user.avatar_url" alt="" class="avatar">
+          <Icon v-else name="user" :size="18" />
+          <span class="label">{{ account.user.nickname }}</span>
+        </RouterLink>
+        <button v-else type="button" class="account" aria-label="登录或注册" @click="account.openLogin()">
+          <Icon name="user" :size="18" />
+          <span class="label">登录 / 注册</span>
+        </button>
       </div>
     </div>
   </header>
@@ -123,6 +139,37 @@ const links = [
   border-color: var(--line-strong);
 }
 
+.account {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 38px;
+  max-width: 180px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  color: var(--text-2);
+  white-space: nowrap;
+  transition: border-color 0.2s, color 0.2s;
+}
+
+.account:hover {
+  border-color: var(--line-strong);
+  color: var(--text);
+}
+
+.account .label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.avatar {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
 @media (max-width: 768px) {
   /* Scrolls away with the page so the category rail can take the sticky slot at the top. */
   .topbar {
@@ -156,6 +203,19 @@ const links = [
   }
 
   .search span {
+    display: none;
+  }
+
+  .account {
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    justify-content: center;
+    border-radius: 50%;
+    background: var(--surface);
+  }
+
+  .account .label {
     display: none;
   }
 }

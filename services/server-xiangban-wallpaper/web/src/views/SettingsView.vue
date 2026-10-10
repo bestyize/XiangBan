@@ -3,10 +3,17 @@ import { onActivated } from 'vue'
 import { setAmbient } from '@/composables/ambient'
 import { canInstall, isIOS, isStandalone, promptInstall } from '@/composables/install'
 import { toast } from '@/composables/toast'
+import { useAccount } from '@/stores/account'
 import { useCatalog } from '@/stores/catalog'
 import { providerName } from '@/utils'
 
 const catalog = useCatalog()
+const account = useAccount()
+
+async function logout() {
+  await account.logout()
+  toast('已退出登录')
+}
 
 onActivated(() => {
   setAmbient(null)
@@ -23,6 +30,21 @@ async function install() {
     <header class="heading">
       <h1 class="display">我的</h1>
     </header>
+
+    <section class="section">
+      <h2 class="display">相伴账号</h2>
+      <template v-if="account.user">
+        <p class="lead">
+          {{ account.user.nickname }}<span v-if="account.email" class="muted-inline"> · {{ account.email }}</span>
+        </p>
+        <p class="hint">同一个账号可登录小伴桌面、小伴手机壁纸和相伴其他产品。</p>
+        <button class="btn" type="button" @click="logout">退出登录</button>
+      </template>
+      <template v-else>
+        <p class="lead">用邮箱验证码登录，新邮箱会自动注册。登录后小伴桌面与手机端共用同一个账号。</p>
+        <button class="btn btn-primary" type="button" @click="account.openLogin()">登录 / 注册</button>
+      </template>
+    </section>
 
     <section v-if="!isStandalone && (canInstall || isIOS)" class="section">
       <h2 class="display">安装到手机</h2>
@@ -107,6 +129,10 @@ async function install() {
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.08);
   color: var(--text-2);
+}
+
+.muted-inline {
+  color: var(--text-3);
 }
 
 .hint {

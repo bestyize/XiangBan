@@ -5,11 +5,14 @@ import TopBar from './components/TopBar.vue'
 import BottomTabs from './components/BottomTabs.vue'
 import ToastHost from './components/ToastHost.vue'
 import Viewer from './components/Viewer.vue'
+import LoginModal from './components/LoginModal.vue'
 import { ambientColor } from './composables/ambient'
+import { useAccount } from './stores/account'
 import { useCatalog } from './stores/catalog'
 
 const route = useRoute()
 const catalog = useCatalog()
+const account = useAccount()
 
 // The admin console has its own layout; the public site's navigation and viewer stay out of it.
 watch(() => route.meta.tab, tab => {
@@ -27,6 +30,7 @@ watch(
     if (admin || publicDataLoaded) return
     publicDataLoaded = true
     catalog.load()
+    account.restore()
   },
   { immediate: true },
 )
@@ -44,6 +48,7 @@ watch(
     </RouterView>
     <BottomTabs />
     <Viewer />
+    <LoginModal />
   </template>
   <ToastHost />
 </template>

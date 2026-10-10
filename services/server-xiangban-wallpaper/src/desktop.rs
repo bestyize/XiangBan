@@ -53,7 +53,77 @@ pub struct Announcement {
     pub audience: Vec<String>,
     pub starts_at: Option<DateTime<Utc>>,
     pub ends_at: Option<DateTime<Utc>>,
+    /// Phone dialog only: a skippable notice has a cancel button and is shown once per revision; a
+    /// mandatory one has only the confirm button and is shown on every launch while it is published.
+    #[serde(default = "skippable_by_default")]
+    pub skippable: bool,
+    /// Phone dialog only: confirm button label. Blank means the client's default.
+    #[serde(default)]
+    pub confirm_text: Option<String>,
+    /// Phone dialog only: cancel button label, used when `skippable`. Blank means the client's default.
+    #[serde(default)]
+    pub cancel_text: Option<String>,
+    /// Phone dialog only: the confirm button opens this HTTPS address; blank means it only closes the dialog.
+    #[serde(default)]
+    pub confirm_url: Option<String>,
 }
+fn skippable_by_default() -> bool {
+    true
+}
+fn is_true(value: &bool) -> bool {
+    *value
+}
+/// What the revision is computed from. Fields added after the first release are left out while they hold
+/// their default, so notices written before them keep the revision clients have already marked as read.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct RevisionView<'a> {
+    id: &'a str,
+    title: &'a str,
+    body: &'a str,
+    published: bool,
+    audience: &'a [String],
+    starts_at: Option<DateTime<Utc>>,
+    ends_at: Option<DateTime<Utc>>,
+    #[serde(skip_serializing_if = "is_true")]
+    skippable: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    confirm_text: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    cancel_text: Option<&'a str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    confirm_url: Option<&'a str>,
+}
+impl Announcement {
+    fn revision(&self) -> String {
+        hash(
+            serde_json::to_string(&RevisionView {
+                id: &self.id,
+                title: &self.title,
+                body: &self.body,
+                published: self.published,
+                audience: &self.audience,
+                starts_at: self.starts_at,
+                ends_at: self.ends_at,
+                skippable: self.skippable,
+                confirm_text: self.confirm_text.as_deref(),
+                cancel_text: self.cancel_text.as_deref(),
+                confirm_url: self.confirm_url.as_deref(),
+            })
+            .unwrap()
+            .as_bytes(),
+        )
+    }
+    /// Trims the optional labels and turns blanks into `None`, so "empty" has one spelling.
+    fn normalize(&mut self) {
+        for field in [&mut self.confirm_text, &mut self.cancel_text, &mut self.confirm_url] {
+            *field = field.take().map(|v| v.trim().to_string()).filter(|v| !v.is_empty());
+        }
+    }
+}
+const AUDIENCES: &[&str] = &["website", "desktop", "android"];
+/// Button labels are short; the cap keeps the dialog from being stretched by a label.
+const MAX_BUTTON_CHARS: usize = 12;
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 pub struct DesktopConfig {
@@ -104,6 +174,16 @@ pub fn network_url(value: &str) -> Result<reqwest::Url, AppError> {
         ));
     }
     Ok(url)
+}
+/// A link the phone opens in the browser. Unlike a media address it may carry a fragment, which is how a
+/// notice points at a part of a page; it never needs a plain-HTTP or credentialed address.
+fn is_jump_link(value: &str) -> bool {
+    reqwest::Url::parse(value).is_ok_and(|url| {
+        url.scheme() == "https"
+            && url.host_str().is_some()
+            && url.username().is_empty()
+            && url.password().is_none()
+    })
 }
 fn hash(value: &[u8]) -> String {
     format!("{:x}", Sha256::digest(value))
@@ -170,10 +250,25 @@ impl DesktopConfig {
                 || notice
                     .audience
                     .iter()
-                    .any(|v| !["website", "desktop"].contains(&v.as_str()))
+                    .any(|v| !AUDIENCES.contains(&v.as_str()))
                 || matches!((notice.starts_at, notice.ends_at), (Some(start), Some(end)) if end <= start)
             {
                 return Err(bad("公告 ID、内容、展示位置或有效时间无效"));
+            }
+            if [&notice.confirm_text, &notice.cancel_text]
+                .into_iter()
+                .flatten()
+                .any(|label| label.chars().count() > MAX_BUTTON_CHARS)
+            {
+                return Err(bad("公告按钮文字最多 12 个字"));
+            }
+            if let Some(link) = &notice.confirm_url {
+                if link.len() > 2048 {
+                    return Err(bad("公告跳转链接过长"));
+                }
+                if !is_jump_link(link) {
+                    return Err(bad("公告跳转链接必须是 HTTPS 地址，且不能包含账号密码"));
+                }
             }
         }
         Ok(())
@@ -192,7 +287,15 @@ impl DesktopConfig {
         let now = Utc::now();
         self.announcements.iter().filter(|a| a.published && a.audience.iter().any(|v| v == audience)
             && a.starts_at.is_none_or(|s| s <= now) && a.ends_at.is_none_or(|e| e > now))
-            .map(|a| json!({"id":a.id,"title":a.title,"body":a.body,"revision":hash(serde_json::to_string(a).unwrap().as_bytes())})).collect()
+            .map(|a| {
+                let mut notice = json!({"id":a.id,"title":a.title,"body":a.body,"revision":a.revision(),"skippable":a.skippable});
+                for (key, value) in [("confirmText", &a.confirm_text), ("cancelText", &a.cancel_text), ("confirmUrl", &a.confirm_url)] {
+                    if let Some(value) = value {
+                        notice[key] = json!(value);
+                    }
+                }
+                notice
+            }).collect()
     }
 }
 pub(crate) async fn load_config(store: &Store) -> Result<DesktopConfig, AppError> {
@@ -209,6 +312,7 @@ pub async fn admin_save(
     Json(mut value): Json<DesktopConfig>,
 ) -> Result<Json<DesktopConfig>, AppError> {
     value.site_url = value.site_url.trim().trim_end_matches('/').to_string();
+    value.announcements.iter_mut().for_each(Announcement::normalize);
     for release in &mut value.releases {
         crate::app_packages::normalize_release(&state, release).await?;
     }
@@ -257,9 +361,22 @@ pub async fn updates(
         _ => Ok(StatusCode::NO_CONTENT.into_response()),
     }
 }
-pub async fn announcements(State(state): State<AppState>) -> Result<Json<Value>, AppError> {
+#[derive(Deserialize)]
+pub struct AnnouncementQuery {
+    audience: Option<String>,
+}
+/// Without `audience` this is the desktop list, as before. The answer names the audience it was built for,
+/// so a client can tell this server from an older one that ignores the parameter and always answers for desktop.
+pub async fn announcements(
+    State(state): State<AppState>,
+    Query(query): Query<AnnouncementQuery>,
+) -> Result<Json<Value>, AppError> {
+    let audience = query.audience.as_deref().unwrap_or("desktop");
+    if !["desktop", "android"].contains(&audience) {
+        return Err(bad("不支持的公告展示位置"));
+    }
     Ok(Json(
-        json!({"schemaVersion":1,"items":load_config(state.admin.store()?).await?.notices("desktop")}),
+        json!({"schemaVersion":1,"audience":audience,"items":load_config(state.admin.store()?).await?.notices(audience)}),
     ))
 }
 
@@ -960,6 +1077,7 @@ mod tests {
             audience: vec!["desktop".into()],
             starts_at: None,
             ends_at: None,
+            ..notice("hello")
         });
         assert!(config.notices("website").is_empty());
         let before = config.notices("desktop")[0]["revision"].clone();
@@ -967,6 +1085,81 @@ mod tests {
         assert_ne!(before, config.notices("desktop")[0]["revision"]);
         config.announcements[0].ends_at = Some(Utc::now() - chrono::Duration::seconds(1));
         assert!(config.notices("desktop").is_empty());
+    }
+    fn notice(id: &str) -> Announcement {
+        Announcement {
+            id: id.into(),
+            title: "你好".into(),
+            body: "公告".into(),
+            published: true,
+            audience: vec!["android".into()],
+            starts_at: None,
+            ends_at: None,
+            skippable: true,
+            confirm_text: None,
+            cancel_text: None,
+            confirm_url: None,
+        }
+    }
+    #[test]
+    fn revision_of_a_notice_written_before_the_phone_fields_is_unchanged() {
+        // The exact text the revision was computed from before skippable and the button fields existed.
+        let legacy = r#"{"id":"hello","title":"你好","body":"公告","published":true,"audience":["desktop"],"startsAt":null,"endsAt":null}"#;
+        let mut config = DesktopConfig::default();
+        config.announcements.push(Announcement { audience: vec!["desktop".into()], ..notice("hello") });
+        assert_eq!(config.notices("desktop")[0]["revision"], json!(hash(legacy.as_bytes())));
+        // A stored config from that time has none of the new keys and must read as a skippable notice.
+        let stored: Announcement = serde_json::from_str(legacy).unwrap();
+        assert!(stored.skippable && stored.confirm_url.is_none());
+        // Setting any of them is an edit, so clients show the notice again.
+        config.announcements[0].skippable = false;
+        assert_ne!(config.notices("desktop")[0]["revision"], json!(hash(legacy.as_bytes())));
+    }
+    #[test]
+    fn android_notices_carry_the_dialog_fields_and_only_set_ones() {
+        let mut config = DesktopConfig::default();
+        config.announcements.push(notice("plain"));
+        config.announcements.push(Announcement {
+            skippable: false,
+            confirm_text: Some("去更新".into()),
+            confirm_url: Some("https://wallpaper.xiangban.xyz/#desktop-downloads".into()),
+            ..notice("must")
+        });
+        config.announcements.push(Announcement { audience: vec!["desktop".into()], ..notice("desktop-only") });
+        config.validate().unwrap();
+        let items = config.notices("android");
+        assert_eq!(items.len(), 2);
+        assert_eq!(items[0]["skippable"], json!(true));
+        assert!(items[0].get("confirmText").is_none() && items[0].get("confirmUrl").is_none());
+        assert_eq!(items[1]["skippable"], json!(false));
+        assert_eq!(items[1]["confirmText"], json!("去更新"));
+        assert_eq!(items[1]["confirmUrl"], json!("https://wallpaper.xiangban.xyz/#desktop-downloads"));
+        assert!(config.notices("desktop").iter().all(|n| n["id"] == json!("desktop-only")));
+    }
+    #[test]
+    fn phone_notice_fields_are_validated_and_blanks_are_dropped() {
+        let valid = |change: fn(&mut Announcement)| {
+            let mut config = DesktopConfig::default();
+            let mut item = notice("n1");
+            change(&mut item);
+            config.announcements.push(item);
+            config.validate().is_ok()
+        };
+        assert!(valid(|_| {}));
+        assert!(!valid(|n| n.confirm_url = Some("javascript:alert(1)".into())));
+        assert!(!valid(|n| n.confirm_url = Some("http://example.com/a".into())));
+        assert!(!valid(|n| n.confirm_url = Some("intent://scan/#Intent;end".into())));
+        assert!(!valid(|n| n.confirm_url = Some("https://user:pw@example.com/".into())));
+        assert!(!valid(|n| n.confirm_text = Some("这个按钮文字实在是太长了没法放".into())));
+        assert!(!valid(|n| n.audience = vec!["ios".into()]));
+        let mut item = Announcement {
+            confirm_text: Some("  ".into()),
+            cancel_text: Some(" 稍后 ".into()),
+            confirm_url: Some("".into()),
+            ..notice("n2")
+        };
+        item.normalize();
+        assert_eq!((item.confirm_text, item.cancel_text.as_deref(), item.confirm_url), (None, Some("稍后"), None));
     }
     #[test]
     fn rejects_bad_configuration_and_private_media_addresses() {
@@ -1097,6 +1290,7 @@ pub async fn admin_save_site(
             config.site_url = value.site_url.trim().trim_end_matches('/').to_string();
             config.introduction = value.introduction;
             config.announcements = value.announcements;
+            config.announcements.iter_mut().for_each(Announcement::normalize);
             Ok(())
         })
         .await?;

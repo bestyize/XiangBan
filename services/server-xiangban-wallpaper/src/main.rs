@@ -91,6 +91,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     collector.clone().start_background_loop();
 
     // Build Application State
+    let verifier = Arc::new(wallpaper_collect::auth::JwksVerifier::new(&config));
     let state = AppState {
         aggregator,
         collector,
@@ -99,6 +100,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         runtime,
         cache,
         admin,
+        verifier,
         config: config.clone(),
     };
 

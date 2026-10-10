@@ -1,8 +1,9 @@
 use super::{
     handlers::{
+        auth::{get_auth_config, get_current_user},
         categories::list_categories,
         collector::trigger_collector_sync,
-        favorites::{add_favorite, list_favorites, remove_favorite},
+        favorites::{add_favorite, check_favorites, is_favorite, list_favorites, remove_favorite},
         health::health_check,
         providers::list_providers,
         wallpapers::{
@@ -26,6 +27,9 @@ pub fn create_api_router(state: AppState) -> Router {
         .route("/api/v1/desktop/wallpapers/{id}", get(crate::desktop::wallpaper))
         .route("/api/v1/desktop/downloads/{id}", get(crate::app_packages::download))
         .route_layer(axum::middleware::map_response(crate::desktop::no_store))
+        // Account & User endpoints
+        .route("/api/v1/auth/config", get(get_auth_config))
+        .route("/api/v1/user/me", get(get_current_user))
         // Wallpaper endpoints
         .route("/api/v1/wallpapers/search", get(search_wallpapers))
         .route("/api/v1/wallpapers/curated", get(get_curated_wallpapers))
@@ -36,7 +40,9 @@ pub fn create_api_router(state: AppState) -> Router {
         .route("/api/v1/categories", get(list_categories))
         // User favorites
         .route("/api/v1/favorites", get(list_favorites).post(add_favorite))
+        .route("/api/v1/favorites/check", get(check_favorites))
         .route("/api/v1/favorites/{id}", delete(remove_favorite))
+        .route("/api/v1/favorites/{id}/status", get(is_favorite))
         // Collector sync
         .route("/api/v1/collector/sync", post(trigger_collector_sync))
         // Admin console

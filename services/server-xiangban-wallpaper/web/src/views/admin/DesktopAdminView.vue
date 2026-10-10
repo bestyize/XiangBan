@@ -24,6 +24,7 @@ function addNotice() {
     audience: ["desktop", "website"],
     startsAt: null,
     endsAt: null,
+    skippable: true,
   });
 }
 function date(value: string | null) {
@@ -141,8 +142,44 @@ async function save() {
                   type="checkbox"
                   value="desktop"
                 />桌面客户端展示</label
+              ><label class="toggle"
+                ><input
+                  v-model="notice.audience"
+                  type="checkbox"
+                  value="android"
+                />Android 客户端弹窗</label
               >
             </div>
+            <template v-if="notice.audience.includes('android')">
+              <p class="a-small">
+                Android 弹窗：可跳过的公告有取消按钮，每次修改后只弹一次；不可跳过的公告只有确定按钮，每次启动都会弹，直到下架。
+              </p>
+              <div class="row">
+                <label class="toggle"
+                  ><input v-model="notice.skippable" type="checkbox" />允许跳过</label
+                >
+              </div>
+              <div class="row">
+                <label
+                  >确定按钮文字（可选，最多 12 字）<input
+                    v-model="notice.confirmText"
+                    maxlength="12"
+                    placeholder="默认：确定" /></label
+                ><label
+                  >取消按钮文字（可选，仅可跳过时显示）<input
+                    v-model="notice.cancelText"
+                    maxlength="12"
+                    :disabled="!notice.skippable"
+                    placeholder="默认：取消"
+                /></label>
+              </div>
+              <label
+                >确定按钮跳转链接（可选，须为 HTTPS；留空则只关闭弹窗）<input
+                  v-model="notice.confirmUrl"
+                  type="url"
+                  placeholder="https://wallpaper.xiangban.xyz/#desktop-downloads"
+              /></label>
+            </template>
             <div class="row">
               <label class="toggle"
                 ><input

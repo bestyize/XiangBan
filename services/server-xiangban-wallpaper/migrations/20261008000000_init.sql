@@ -49,10 +49,17 @@ CREATE INDEX IF NOT EXISTS idx_wallpapers_tags ON wallpapers USING GIN(tags);
 -- User Favorites / Bookmarks
 CREATE TABLE IF NOT EXISTS favorites (
     id SERIAL PRIMARY KEY,
+    user_id UUID,
     wallpaper_id VARCHAR(128) NOT NULL REFERENCES wallpapers(id) ON DELETE CASCADE,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    CONSTRAINT uq_favorite_wallpaper UNIQUE (wallpaper_id)
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+ALTER TABLE favorites ADD COLUMN IF NOT EXISTS user_id UUID;
+ALTER TABLE favorites DROP CONSTRAINT IF EXISTS uq_favorite_wallpaper;
+CREATE INDEX IF NOT EXISTS idx_favorites_user_id ON favorites(user_id);
+CREATE INDEX IF NOT EXISTS idx_favorites_user_created ON favorites(user_id, created_at DESC);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_favorites_user_wallpaper ON favorites(user_id, wallpaper_id) WHERE user_id IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_favorites_guest_wallpaper ON favorites(wallpaper_id) WHERE user_id IS NULL;
 
 -- Background Crawler & Collector Sync Task Logs
 CREATE TABLE IF NOT EXISTS sync_tasks (

@@ -24,6 +24,11 @@ export interface Announcement {
   audience: string[];
   startsAt: string | null;
   endsAt: string | null;
+  /** Android dialog only. The server always sends these; a blank label or link is stored as absent. */
+  skippable: boolean;
+  confirmText?: string | null;
+  cancelText?: string | null;
+  confirmUrl?: string | null;
 }
 export interface DesktopConfig {
   siteUrl: string;

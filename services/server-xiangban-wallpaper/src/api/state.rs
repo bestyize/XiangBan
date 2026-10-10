@@ -17,6 +17,7 @@ pub struct AppState {
     pub runtime: Runtime,
     pub cache: SearchCache,
     pub admin: AdminService,
+    pub verifier: Arc<crate::auth::JwksVerifier>,
     #[allow(dead_code)]
     pub config: AppConfig,
 }

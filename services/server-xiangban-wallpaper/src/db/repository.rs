@@ -15,6 +15,7 @@ use sqlx::{
 use std::{collections::HashMap, sync::Arc};
 use tokio::sync::RwLock;
 use tracing::{info, warn};
+use uuid::Uuid;
 
 fn row_to_wallpaper(r: &PgRow) -> WallpaperItem {
     let media_type = match r.get::<String, _>("media_type").as_str() {
@@ -91,13 +92,13 @@ fn row_to_wallpaper(r: &PgRow) -> WallpaperItem {
 pub struct Database {
     pool: Option<PgPool>,
     mem_wallpapers: Arc<RwLock<HashMap<String, WallpaperItem>>>,
-    mem_favorites: Arc<RwLock<Vec<String>>>,
+    mem_favorites: Arc<RwLock<HashMap<Option<Uuid>, Vec<String>>>>,
 }
 
 impl Database {
     pub async fn init(database_url: Option<&str>) -> Self {
         let mem_wallpapers = Arc::new(RwLock::new(HashMap::new()));
-        let mem_favorites = Arc::new(RwLock::new(Vec::new()));
+        let mem_favorites = Arc::new(RwLock::new(HashMap::new()));
 
         let pool = if let Some(url) = database_url {
             // Log where we connect, never the credentials embedded in the URL.
@@ -308,45 +309,74 @@ impl Database {
         Ok(())
     }
 
-    pub async fn add_favorite(&self, item: &WallpaperItem) -> Result<(), AppError> {
+    pub async fn add_favorite(&self, user_id: Option<Uuid>, item: &WallpaperItem) -> Result<(), AppError> {
         // Save wallpaper first
         self.upsert_wallpapers(&[item.clone()]).await?;
 
         // In-memory
         {
             let mut favs = self.mem_favorites.write().await;
-            if !favs.contains(&item.id) {
-                favs.push(item.id.clone());
+            let list = favs.entry(user_id).or_default();
+            if !list.contains(&item.id) {
+                list.push(item.id.clone());
             }
         }
 
         if let Some(pool) = &self.pool {
-            sqlx::query(
-                "INSERT INTO favorites (wallpaper_id) VALUES ($1) ON CONFLICT DO NOTHING"
-            )
-            .bind(&item.id)
-            .execute(pool)
-            .await?;
+            match user_id {
+                Some(uid) => {
+                    sqlx::query(
+                        "INSERT INTO favorites (user_id, wallpaper_id) VALUES ($1, $2)
+                         ON CONFLICT (user_id, wallpaper_id) WHERE user_id IS NOT NULL DO NOTHING"
+                    )
+                    .bind(uid)
+                    .bind(&item.id)
+                    .execute(pool)
+                    .await?;
+                }
+                None => {
+                    sqlx::query(
+                        "INSERT INTO favorites (user_id, wallpaper_id) VALUES (NULL, $1)
+                         ON CONFLICT (wallpaper_id) WHERE user_id IS NULL DO NOTHING"
+                    )
+                    .bind(&item.id)
+                    .execute(pool)
+                    .await?;
+                }
+            }
         }
 
         Ok(())
     }
 
-    pub async fn remove_favorite(&self, id: &str) -> Result<bool, AppError> {
+    pub async fn remove_favorite(&self, user_id: Option<Uuid>, id: &str) -> Result<bool, AppError> {
         let mut removed = false;
         {
             let mut favs = self.mem_favorites.write().await;
-            if let Some(pos) = favs.iter().position(|x| x == id) {
-                favs.remove(pos);
-                removed = true;
+            if let Some(list) = favs.get_mut(&user_id) {
+                if let Some(pos) = list.iter().position(|x| x == id) {
+                    list.remove(pos);
+                    removed = true;
+                }
             }
         }
 
         if let Some(pool) = &self.pool {
-            let res = sqlx::query("DELETE FROM favorites WHERE wallpaper_id = $1")
-                .bind(id)
-                .execute(pool)
-                .await?;
+            let res = match user_id {
+                Some(uid) => {
+                    sqlx::query("DELETE FROM favorites WHERE user_id = $1 AND wallpaper_id = $2")
+                        .bind(uid)
+                        .bind(id)
+                        .execute(pool)
+                        .await?
+                }
+                None => {
+                    sqlx::query("DELETE FROM favorites WHERE user_id IS NULL AND wallpaper_id = $1")
+                        .bind(id)
+                        .execute(pool)
+                        .await?
+                }
+            };
             if res.rows_affected() > 0 {
                 removed = true;
             }
@@ -355,17 +385,35 @@ impl Database {
         Ok(removed)
     }
 
-    pub async fn list_favorites(&self) -> Result<Vec<WallpaperItem>, AppError> {
+    pub async fn list_favorites(&self, user_id: Option<Uuid>) -> Result<Vec<WallpaperItem>, AppError> {
         if let Some(pool) = &self.pool {
-            let rows = sqlx::query(
-                r#"
-                SELECT w.* FROM wallpapers w
-                INNER JOIN favorites f ON w.id = f.wallpaper_id
-                ORDER BY f.created_at DESC
-                "#
-            )
-            .fetch_all(pool)
-            .await?;
+            let rows = match user_id {
+                Some(uid) => {
+                    sqlx::query(
+                        r#"
+                        SELECT w.* FROM wallpapers w
+                        INNER JOIN favorites f ON w.id = f.wallpaper_id
+                        WHERE f.user_id = $1
+                        ORDER BY f.created_at DESC
+                        "#
+                    )
+                    .bind(uid)
+                    .fetch_all(pool)
+                    .await?
+                }
+                None => {
+                    sqlx::query(
+                        r#"
+                        SELECT w.* FROM wallpapers w
+                        INNER JOIN favorites f ON w.id = f.wallpaper_id
+                        WHERE f.user_id IS NULL
+                        ORDER BY f.created_at DESC
+                        "#
+                    )
+                    .fetch_all(pool)
+                    .await?
+                }
+            };
 
             let results = rows.iter().map(row_to_wallpaper).collect();
             Ok(results)
@@ -373,12 +421,69 @@ impl Database {
             let favs = self.mem_favorites.read().await;
             let mem = self.mem_wallpapers.read().await;
             let mut list = Vec::new();
-            for id in favs.iter() {
-                if let Some(item) = mem.get(id) {
-                    list.push(item.clone());
+            if let Some(ids) = favs.get(&user_id) {
+                for id in ids.iter() {
+                    if let Some(item) = mem.get(id) {
+                        list.push(item.clone());
+                    }
                 }
             }
             Ok(list)
+        }
+    }
+
+    pub async fn is_favorite(&self, user_id: Option<Uuid>, id: &str) -> Result<bool, AppError> {
+        if let Some(pool) = &self.pool {
+            let row: (bool,) = match user_id {
+                Some(uid) => {
+                    sqlx::query_as("SELECT EXISTS(SELECT 1 FROM favorites WHERE user_id = $1 AND wallpaper_id = $2)")
+                        .bind(uid)
+                        .bind(id)
+                        .fetch_one(pool)
+                        .await?
+                }
+                None => {
+                    sqlx::query_as("SELECT EXISTS(SELECT 1 FROM favorites WHERE user_id IS NULL AND wallpaper_id = $1)")
+                        .bind(id)
+                        .fetch_one(pool)
+                        .await?
+                }
+            };
+            Ok(row.0)
+        } else {
+            let favs = self.mem_favorites.read().await;
+            Ok(favs.get(&user_id).map(|ids| ids.contains(&id.to_string())).unwrap_or(false))
+        }
+    }
+
+    pub async fn check_favorites(&self, user_id: Option<Uuid>, ids: &[String]) -> Result<Vec<String>, AppError> {
+        if ids.is_empty() {
+            return Ok(Vec::new());
+        }
+        if let Some(pool) = &self.pool {
+            let rows: Vec<(String,)> = match user_id {
+                Some(uid) => {
+                    sqlx::query_as("SELECT wallpaper_id FROM favorites WHERE user_id = $1 AND wallpaper_id = ANY($2)")
+                        .bind(uid)
+                        .bind(ids)
+                        .fetch_all(pool)
+                        .await?
+                }
+                None => {
+                    sqlx::query_as("SELECT wallpaper_id FROM favorites WHERE user_id IS NULL AND wallpaper_id = ANY($1)")
+                        .bind(ids)
+                        .fetch_all(pool)
+                        .await?
+                }
+            };
+            Ok(rows.into_iter().map(|(id,)| id).collect())
+        } else {
+            let favs = self.mem_favorites.read().await;
+            if let Some(list) = favs.get(&user_id) {
+                Ok(ids.iter().filter(|id| list.contains(id)).cloned().collect())
+            } else {
+                Ok(Vec::new())
+            }
         }
     }
 

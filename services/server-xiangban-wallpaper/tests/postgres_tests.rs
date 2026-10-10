@@ -92,6 +92,14 @@ fn config() -> AppConfig {
         enable_demo_data: true,
         cache_ttl_secs: 3600,
         auto_sync_interval_mins: 0,
+        account_issuer: "https://account.xiangban.xyz".into(),
+        account_jwks_url: None,
+        account_allowed_clients: vec![
+            "xiangban-wallpaper-web".into(),
+            "xiaoban-desktop-wallpaper".into(),
+            "xiaoban-mobile-wallpaper".into(),
+        ],
+        account_public_key: None,
     }
 }
 
@@ -362,6 +370,7 @@ async fn build_app(db: &TestDb) -> (Router, AppState) {
         runtime,
         cache,
         admin: AdminService::bootstrap(Some(store)).await.unwrap(),
+        verifier: Arc::new(wallpaper_collect::auth::JwksVerifier::new(&cfg)),
         config: cfg,
     };
     (create_api_router(state.clone()), state)
@@ -520,6 +529,51 @@ async fn desktop_releases_announcements_and_admin_configuration_share_one_source
     call(&app,"PUT","/desktop",Some(&cookie),Some(config.clone())).await;
     assert!(public_call(&app,"/api/v1/desktop/announcements").await.body["items"].as_array().unwrap().is_empty());
     config["releases"][0]["platforms"]["windows-x86_64"]["url"]=json!("javascript:alert(1)");
+    assert_eq!(call(&app,"PUT","/desktop",Some(&cookie),Some(config)).await.status,StatusCode::BAD_REQUEST);
+    db.cleanup().await;
+}
+
+#[tokio::test]
+async fn android_notices_are_a_separate_list_with_dialog_fields_and_validated_links() {
+    let Some(db)=TestDb::connect().await else{return};
+    let (app,_)=build_app(&db).await;
+    let cookie=session_cookie(&sign_in(&app,"admin","123456").await);
+    let mut config=call(&app,"GET","/desktop",Some(&cookie),None).await.body;
+    config["announcements"]=json!([
+        {"id":"desktop-only","title":"桌面","body":"仅桌面","published":true,"audience":["desktop"],"startsAt":null,"endsAt":null},
+        {"id":"tip","title":"提示","body":"可跳过","published":true,"audience":["android"],"startsAt":null,"endsAt":null},
+        {"id":"must","title":"必读","body":"不可跳过","published":true,"audience":["android","desktop"],"startsAt":null,"endsAt":null,
+         "skippable":false,"confirmText":" 去下载 ","cancelText":"  ","confirmUrl":"https://wallpaper.xiangban.xyz/#desktop-downloads"}
+    ]);
+    let saved=call(&app,"PUT","/desktop",Some(&cookie),Some(config.clone())).await;
+    assert_eq!(saved.status,StatusCode::OK,"{}",saved.body);
+    // Blanks are stored as absent, labels are trimmed, and a notice written without the new keys stays skippable.
+    assert_eq!(saved.body["announcements"][2]["confirmText"],"去下载");
+    assert!(saved.body["announcements"][2]["cancelText"].is_null());
+    assert_eq!(saved.body["announcements"][1]["skippable"],true);
+
+    let phone=public_call(&app,"/api/v1/desktop/announcements?audience=android").await;
+    assert_eq!(phone.status,StatusCode::OK);assert_eq!(phone.headers[header::CACHE_CONTROL],"no-store");
+    assert_eq!(phone.body["audience"],"android");
+    let items=phone.body["items"].as_array().unwrap();
+    assert_eq!(items.iter().map(|n|n["id"].as_str().unwrap()).collect::<Vec<_>>(),["tip","must"]);
+    assert_eq!(items[0]["skippable"],true);assert!(items[0].get("confirmUrl").is_none());
+    assert_eq!(items[1]["skippable"],false);assert_eq!(items[1]["confirmText"],"去下载");
+    assert_eq!(items[1]["confirmUrl"],"https://wallpaper.xiangban.xyz/#desktop-downloads");
+    assert!(items[1].get("cancelText").is_none());
+
+    // The desktop list is unchanged: same notices as before, now naming its audience.
+    let desktop=public_call(&app,"/api/v1/desktop/announcements").await;
+    assert_eq!(desktop.body["audience"],"desktop");
+    assert_eq!(desktop.body["items"].as_array().unwrap().iter().map(|n|n["id"].as_str().unwrap()).collect::<Vec<_>>(),["desktop-only","must"]);
+    assert_eq!(public_call(&app,"/api/v1/desktop/announcements?audience=website").await.status,StatusCode::BAD_REQUEST);
+
+    // The site-settings PATCH goes through the same normalisation and validation.
+    let mut notices=config["announcements"].clone();
+    notices[1]["confirmUrl"]=json!("javascript:alert(1)");
+    let body=json!({"siteUrl":config["siteUrl"],"introduction":"x","announcements":notices});
+    assert_eq!(call(&app,"PATCH","/desktop",Some(&cookie),Some(body)).await.status,StatusCode::BAD_REQUEST);
+    config["announcements"][1]["confirmUrl"]=json!("http://example.com/plain");
     assert_eq!(call(&app,"PUT","/desktop",Some(&cookie),Some(config)).await.status,StatusCode::BAD_REQUEST);
     db.cleanup().await;
 }

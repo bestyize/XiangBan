@@ -1,6 +1,7 @@
 pub mod admin;
 pub mod app_packages;
 pub mod api;
+pub mod auth;
 pub mod config;
 pub mod db;
 pub mod desktop;

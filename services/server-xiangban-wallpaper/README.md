@@ -13,7 +13,10 @@
 
 正式域名 `wallpaper.xiangban.xyz`。网站首页 `/` 展示小伴桌面介绍、分平台下载与公告，左侧猫脸品牌“小伴桌面”链接到首页；图片 `/images`、视频 `/videos` 保留独立导航。旧 `/desktop` 地址重定向到首页，旧图片分类 `/c/:id` 作为 `/images/c/:id` 的别名保留。后台 `/admin/apps` 支持 Windows/macOS/Android 安装包上传（EXE/MSI/DMG/PKG/APK/ZIP）、版本上架 / 下架和更新说明，官网与升级检测同步生效；`/admin/desktop` 配置官网介绍、网站源站和公告有效时间。站内包自动计算大小和 SHA-256，单包最多 512 MiB，草稿不公开，保存在独立的持久目录 `app-packages/`。
 
+首页在首屏演示之后依次介绍动态视频壁纸（macOS 实机录屏动图）、桌面特效、小伴桌宠和游戏空间，素材在 `web/public/desktop/`：`live-desktop.webp`（1280×720、15 帧/秒、约 6 MB 的动图，偏好减少动态效果时改用静帧 `live-desktop-still.webp`）和三张控制台截图。图片均为 WebP，不进 PWA 预缓存，但会随 `web/dist` 编入服务端程序。
 选中“小伴桌面”栏目时网站平滑切换为浅色，图片 / 视频栏目保持深色。官网使用独立维护的原有猫脸角色引擎，支持视线跟随、点击表情和桌面内拖动；Windows 风格演示包含图标、开始菜单、文件夹与任务栏，桌面显示区固定为 16:9 并响应缩放，背景为真实循环视频。视频入库先保存到服务器，缺少封面时截取首帧；运行环境需安装 FFmpeg（或配置 `FFMPEG_BIN`），本机开发工具安装见[桌面 API](docs/desktop-api.md)。
+
+**相伴账号。** 网站顶栏右侧有「登录 / 注册」，邮箱验证码登录，新邮箱自动注册；浏览器直接调用账号中心（`/api/v1/auth/config` 返回的 `issuer`，应用 ID `xiangban-wallpaper-web`），令牌存 `localStorage`，过期前用刷新令牌换新，「我的」页可退出。服务端用 JWKS 离线验签（`src/auth.rs`），收藏按 `uid` 隔离，未登录时仍是访客收藏。账号中心的 `ACCOUNT_CORS_ORIGINS` 必须包含本站域名。
 
 桌面客户端 `client/xiaoban-desktop-wallpaper` 直接使用本网站的公开图库、分类、更新和公告接口；资源按真实大小与 SHA-256 校验后缓存，支持离线使用。启动及每 30 分钟后台检查消息，可以手动刷新或关闭自动检查。接口、运行时目录与端到端验证详见[桌面 API](docs/desktop-api.md)。配置复用现有 `app_settings`，未新增历史数据迁移。
 
@@ -199,15 +202,20 @@ cargo run --release
 
 ## 📡 核心 API 接口概览
 
-### 1. 公开前台接口（纯查已审核上架内容）
+### 1. 公开与用户前台接口
 | 接口 | 方法 | 说明 |
 |---|---|---|
+| `/api/v1/auth/config` | `GET` | 统一账号中心对接配置（返回 `issuer`、`jwks_url`、`clients`） |
+| `/api/v1/user/me` | `GET` | 当前登录用户的认证信息（需携带 `Authorization: Bearer <token>`） |
 | `/api/v1/wallpapers/search` | `GET` | 本地库壁纸检索（支持 `q`, `category`, `orientation`, `media_type`, `page`, `per_page`） |
 | `/api/v1/wallpapers/curated` | `GET` | 本地已上架精选图片分页列表 |
 | `/api/v1/wallpapers/videos` | `GET` | 本地已上架 4K / HD 动态视频分页列表 |
 | `/api/v1/wallpapers/{provider}/{id}` | `GET` | 获取壁纸 / 视频详细信息 |
 | `/api/v1/categories` | `GET` | 系统预设分类列表 |
-| `/api/v1/favorites` | `GET` / `POST` | 用户收藏夹列表 / 添加收藏 |
+| `/api/v1/favorites` | `GET` / `POST` | 用户收藏夹列表 / 添加收藏（携带 Bearer 自动绑定当前用户；未登录走访客模式） |
+| `/api/v1/favorites/{id}` | `DELETE` | 取消收藏（自动匹配登录用户或访客） |
+| `/api/v1/favorites/{id}/status` | `GET` | 检查单项壁纸是否已被当前用户收藏 |
+| `/api/v1/favorites/check?ids=...` | `GET` | 批量检查指定壁纸列表中已被当前用户收藏的 ID 集合 |
 
 ### 2. 管理员私有接口（需管理员 Session Cookie 鉴权）
 | 接口 | 方法 | 说明 |
