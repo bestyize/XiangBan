@@ -1,7 +1,38 @@
+import java.io.File
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
 }
+
+val localProperties = Properties().apply {
+    val localFile = rootProject.file("local.properties")
+    if (localFile.exists()) {
+        localFile.inputStream().use { load(it) }
+    }
+    val rootLocalFile = rootProject.rootDir.resolve("../../local.properties")
+    if (rootLocalFile.exists()) {
+        rootLocalFile.inputStream().use { load(it) }
+    }
+}
+
+fun getProp(vararg keys: String): String? {
+    for (key in keys) {
+        val v = localProperties.getProperty(key) ?: System.getenv(key)
+        if (!v.isNullOrBlank()) return v
+    }
+    return null
+}
+
+val userHomeKeystore = File(System.getProperty("user.home"), "xiangbanmobile.jks")
+val keystoreFilePath = getProp("keystore.file", "KEYSTORE_FILE", "storeFile")
+val targetKeystoreFile = if (!keystoreFilePath.isNullOrBlank()) File(keystoreFilePath) else userHomeKeystore
+val targetStorePassword = getProp("keystore.password", "KEYSTORE_PASSWORD", "keystorePassword", "storePassword")
+val targetKeyAlias = getProp("keystore.alias", "key.alias", "KEY_ALIAS", "keyAlias") ?: "release-key"
+val targetKeyPassword = getProp("key.password", "KEY_PASSWORD", "keyPassword") ?: targetStorePassword
+
+val hasCustomSigning = targetKeystoreFile.exists() && !targetStorePassword.isNullOrBlank()
 
 android {
     namespace = "xyz.xiaban.wallpaper"
@@ -19,8 +50,35 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    signingConfigs {
+        create("release") {
+            if (hasCustomSigning) {
+                storeFile = targetKeystoreFile
+                storePassword = targetStorePassword
+                keyAlias = targetKeyAlias
+                keyPassword = targetKeyPassword
+            }
+        }
+        if (hasCustomSigning) {
+            getByName("debug") {
+                storeFile = targetKeystoreFile
+                storePassword = targetStorePassword
+                keyAlias = targetKeyAlias
+                keyPassword = targetKeyPassword
+            }
+        }
+    }
+
     buildTypes {
+        debug {
+            if (hasCustomSigning) {
+                signingConfig = signingConfigs.getByName("debug")
+            }
+        }
         release {
+            if (hasCustomSigning) {
+                signingConfig = signingConfigs.getByName("release")
+            }
             optimization {
                 enable = true
             }
