@@ -20,6 +20,7 @@ def source_files(directory, pattern):
 entrypoints = {
     'client/xiaban-web': 'package.json',
     'client/xiaoban-desktop-wallpaper': 'src-tauri/Cargo.toml',
+    'client/xiaoban-pot-garden': 'package.json',
     'client/xiaoban-mobile-wallpaper': 'app/build.gradle.kts',
     'services/xiaban-api/backend': 'build.gradle.kts',
     'services/xiaban-api/api-contracts': 'build.gradle.kts',

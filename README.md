@@ -8,6 +8,7 @@
 | --- | --- | --- |
 | [client/xiaban-web](client/xiaban-web/README.md) | 已实现 | 相伴网页/PWA，包含管理后台 |
 | [client/xiaoban-desktop-wallpaper](client/xiaoban-desktop-wallpaper/README.md) | 可运行原型 | Windows/macOS 桌宠与动态壁纸，无聊天和账户 |
+| [client/xiaoban-pot-garden](client/xiaoban-pot-garden/README.md) | 可运行原型 | 表情盆栽的 3D 质感原型（Vite + three.js），花盆养成游戏的起点，目前只有表情和质感，没有玩法 |
 | [client/xiaoban-mobile-wallpaper](client/xiaoban-mobile-wallpaper/README.md) | 可运行原型 | Android 壁纸浏览与下载，Compose 双列瀑布流，收藏只存本机，无账户 |
 | [client/xiaoban-multiplatform](client/xiaoban-multiplatform/README.md) | 规划 | 未来 App，固定保留此目录 |
 | [client/xiaoban-realbot](client/xiaoban-realbot/README.md) | 规划 | 实体机器人客户端，平台与硬件待定 |
@@ -46,6 +47,9 @@ npm --prefix client/xiaban-web run build
 npm --prefix client/xiaoban-desktop-wallpaper ci
 npm --prefix client/xiaoban-desktop-wallpaper test
 npm --prefix client/xiaoban-desktop-wallpaper run desktop
+npm --prefix client/xiaoban-pot-garden ci
+npm --prefix client/xiaoban-pot-garden test
+npm --prefix client/xiaoban-pot-garden run build
 (cd client/xiaoban-mobile-wallpaper && ./gradlew :app:testDebugUnitTest :app:assembleDebug)
 ./gradlew :api-contracts:jvmTest :backend:test
 ./gradlew :backend:run
