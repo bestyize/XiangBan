@@ -431,3 +431,172 @@ pub async fn audit_log(State(state): State<AppState>, _admin: AuthAdmin, Query(q
         .collect();
     Ok(Json(json!({ "items": items })))
 }
+
+use crate::sender::{SavedSenderConfig, SmtpConfig};
+
+#[derive(Serialize)]
+pub struct SmtpView {
+    pub host: String,
+    pub port: u16,
+    pub secure: bool,
+    pub username: String,
+    pub has_password: bool,
+    pub from_name: String,
+    pub from_email: String,
+}
+
+#[derive(Serialize)]
+pub struct SenderConfigView {
+    pub provider: String,
+    pub smtp: Option<SmtpView>,
+}
+
+pub async fn get_sender(
+    State(state): State<AppState>,
+    _admin: AuthAdmin,
+) -> Result<Json<SenderConfigView>, AppError> {
+    let provider = state.sender.current_type();
+    let smtp_cfg = state.sender.get_smtp_config();
+    let smtp = smtp_cfg.map(|s| SmtpView {
+        host: s.host,
+        port: s.port,
+        secure: s.secure,
+        username: s.username,
+        has_password: !s.password.is_empty(),
+        from_name: s.from_name,
+        from_email: s.from_email,
+    });
+    Ok(Json(SenderConfigView { provider, smtp }))
+}
+
+#[derive(Deserialize)]
+pub struct UpdateSmtpReq {
+    pub host: String,
+    pub port: u16,
+    pub secure: Option<bool>,
+    pub username: String,
+    pub password: Option<String>,
+    pub from_name: String,
+    pub from_email: String,
+}
+
+#[derive(Deserialize)]
+pub struct UpdateSenderReq {
+    pub provider: String,
+    pub smtp: Option<UpdateSmtpReq>,
+}
+
+pub async fn update_sender(
+    State(state): State<AppState>,
+    AuthAdmin(admin): AuthAdmin,
+    Json(req): Json<UpdateSenderReq>,
+) -> Result<Json<Value>, AppError> {
+    let provider = req.provider.trim().to_lowercase();
+    let smtp_config = if provider == "smtp" {
+        let smtp_req = req
+            .smtp
+            .ok_or_else(|| AppError::BadRequest("未提供 SMTP 配置信息".into()))?;
+        if smtp_req.host.trim().is_empty() {
+            return Err(AppError::BadRequest("SMTP 服务器地址不能为空".into()));
+        }
+        if smtp_req.from_email.trim().is_empty() {
+            return Err(AppError::BadRequest("发件人邮箱不能为空".into()));
+        }
+
+        let existing = state.sender.get_smtp_config();
+        let password = match smtp_req.password {
+            Some(pwd) if !pwd.trim().is_empty() => pwd.trim().to_string(),
+            _ => existing
+                .map(|e| e.password)
+                .ok_or_else(|| AppError::BadRequest("请输入发件人邮箱密码/授权码".into()))?,
+        };
+
+        Some(SmtpConfig {
+            host: smtp_req.host.trim().to_string(),
+            port: smtp_req.port,
+            secure: smtp_req.secure.unwrap_or(smtp_req.port == 465),
+            username: smtp_req.username.trim().to_string(),
+            password,
+            from_name: if smtp_req.from_name.trim().is_empty() {
+                "相伴".into()
+            } else {
+                smtp_req.from_name.trim().to_string()
+            },
+            from_email: smtp_req.from_email.trim().to_string(),
+        })
+    } else {
+        None
+    };
+
+    let saved = SavedSenderConfig {
+        provider: provider.clone(),
+        smtp: smtp_config,
+    };
+    let new_kind = saved.to_sender_kind(&state.config)?;
+
+    // 序列化并加密存储至数据库
+    let json_str = serde_json::to_string(&saved).map_err(|e| AppError::Internal(e.to_string()))?;
+    let enc = state.keys.sub.encrypt("sender_config", &json_str)?;
+
+    sqlx::query(
+        "INSERT INTO system_settings (key, value_enc, updated_at) VALUES ('sender_config', $1, now())
+         ON CONFLICT (key) DO UPDATE SET value_enc = EXCLUDED.value_enc, updated_at = now()",
+    )
+    .bind(enc)
+    .execute(&state.pool)
+    .await?;
+
+    // 热重载运行期发送器
+    state.sender.update(new_kind);
+
+    audit(&state, &admin, "sender.update", Some(&provider), None).await?;
+    Ok(Json(json!({ "ok": true })))
+}
+
+#[derive(Deserialize)]
+pub struct TestSenderReq {
+    pub recipient: String,
+    pub smtp: Option<UpdateSmtpReq>,
+}
+
+pub async fn test_sender(
+    State(state): State<AppState>,
+    _admin: AuthAdmin,
+    Json(req): Json<TestSenderReq>,
+) -> Result<Json<Value>, AppError> {
+    let recipient = req.recipient.trim();
+    if !recipient.contains('@') {
+        return Err(AppError::BadRequest("请输入有效的测试收件人邮箱".into()));
+    }
+
+    let temp_cfg = if let Some(smtp_req) = req.smtp {
+        let existing = state.sender.get_smtp_config();
+        let password = match smtp_req.password {
+            Some(pwd) if !pwd.trim().is_empty() => pwd.trim().to_string(),
+            _ => existing.map(|e| e.password).unwrap_or_default(),
+        };
+        Some(SmtpConfig {
+            host: smtp_req.host.trim().to_string(),
+            port: smtp_req.port,
+            secure: smtp_req.secure.unwrap_or(smtp_req.port == 465),
+            username: smtp_req.username.trim().to_string(),
+            password,
+            from_name: if smtp_req.from_name.trim().is_empty() {
+                "相伴测试".into()
+            } else {
+                smtp_req.from_name.trim().to_string()
+            },
+            from_email: smtp_req.from_email.trim().to_string(),
+        })
+    } else {
+        None
+    };
+
+    state
+        .sender
+        .send_test_email(recipient, temp_cfg.as_ref())
+        .await?;
+    Ok(Json(
+        json!({ "ok": true, "message": "测试邮件已发送，请检查收件箱或垃圾箱" }),
+    ))
+}

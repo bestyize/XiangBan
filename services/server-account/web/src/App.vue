@@ -5,6 +5,7 @@ import LoginView from './views/LoginView.vue';
 import DashboardView from './views/DashboardView.vue';
 import UsersView from './views/UsersView.vue';
 import ClientsView from './views/ClientsView.vue';
+import SenderView from './views/SenderView.vue';
 import AuditView from './views/AuditView.vue';
 import PasswordDialog from './components/PasswordDialog.vue';
 
@@ -12,6 +13,7 @@ const pages = [
   { key: 'dashboard', label: '概览', component: DashboardView },
   { key: 'users', label: '用户', component: UsersView },
   { key: 'clients', label: '应用', component: ClientsView },
+  { key: 'sender', label: '发信设置', component: SenderView },
   { key: 'audit', label: '操作日志', component: AuditView },
 ] as const;
 

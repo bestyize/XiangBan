@@ -69,3 +69,19 @@ export interface AuditRow {
   detail: string | null;
   created_at: string;
 }
+
+export interface SmtpConfig {
+  host: string;
+  port: number;
+  secure?: boolean;
+  username: string;
+  password?: string;
+  has_password?: boolean;
+  from_name: string;
+  from_email: string;
+}
+
+export interface SenderConfig {
+  provider: 'console' | 'smtp' | 'tencent';
+  smtp?: SmtpConfig | null;
+}

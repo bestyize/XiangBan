@@ -60,12 +60,14 @@ pub fn build_router(state: AppState) -> Router {
         .route("/admin/users/{uid}/revoke-sessions", post(admin::revoke_user_sessions))
         .route("/admin/clients", get(admin::list_clients).post(admin::create_client))
         .route("/admin/clients/{client_id}", patch(admin::update_client))
-        .route("/admin/audit", get(admin::audit_log));
+        .route("/admin/audit", get(admin::audit_log))
+        .route("/admin/sender", get(admin::get_sender).put(admin::update_sender))
+        .route("/admin/sender/test", post(admin::test_sender));
 
     // 凭证只走 Authorization 头，不使用 Cookie，因此跨域放开不构成 CSRF 面。
     let origins: Vec<HeaderValue> = state.config.cors_origins.iter().filter_map(|o| o.parse().ok()).collect();
     let cors = CorsLayer::new()
-        .allow_methods([Method::GET, Method::POST, Method::PATCH, Method::OPTIONS])
+        .allow_methods([Method::GET, Method::POST, Method::PATCH, Method::PUT, Method::OPTIONS])
         .allow_headers([header::AUTHORIZATION, header::CONTENT_TYPE]);
     let cors = if origins.is_empty() { cors.allow_origin(Any) } else { cors.allow_origin(origins) };
 
@@ -110,6 +112,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     db::migrate(&pool).await?;
     db::seed_clients(&pool, &config.clients).await?;
     admin_auth::seed(&pool, &config).await?;
+
+    if let Ok(Some((val_enc,))) = sqlx::query_as::<_, (Vec<u8>,)>("SELECT value_enc FROM system_settings WHERE key = 'sender_config'")
+        .fetch_optional(&pool)
+        .await
+    {
+        if let Ok(dec) = keys.sub.decrypt("sender_config", &val_enc) {
+            if let Ok(saved) = serde_json::from_str::<sender::SavedSenderConfig>(&dec) {
+                if let Ok(kind) = saved.to_sender_kind(&config) {
+                    sender.update(kind);
+                    info!("已从数据库加载发信配置 (provider={})", saved.provider);
+                }
+            }
+        }
+    }
 
     let dummy_password_hash = password::hash("dummy-password-for-timing".into()).await?;
     let addr: SocketAddr = format!("{}:{}", config.host, config.port).parse()?;

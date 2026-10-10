@@ -55,7 +55,7 @@ cargo run --manifest-path services/server-account/Cargo.toml -- gen-keys
 | `ACCOUNT_ADMIN_USER` / `ACCOUNT_ADMIN_PASSWORD` | 空 | 仅在数据库里还没有任何管理员时用来创建初始管理员（密码至少 8 位）；已有管理员时被忽略，不会覆盖密码。首次登录后请在后台改密码并移除 `ACCOUNT_ADMIN_PASSWORD` |
 | `ACCOUNT_ADMIN_TOKEN_TTL_SECS` | `28800` | 管理员登录有效期（8 小时） |
 | `ACCOUNT_WEB_DIR` | `services/server-account/web/dist` | 管理后台静态文件目录，相对启动时的工作目录；容器里请设为绝对路径。目录不存在时只提供 API |
-| `ACCOUNT_SENDER` | `console` | `console` 仅把验证码写入日志，只能用于开发；生产必须设为 `tencent` |
+| `ACCOUNT_SENDER` | `console` | 初始发信通道。`console` 仅把验证码写入日志，只能用于开发；生产设为 `tencent`，或在后台「发信设置」改用 SMTP（后台保存的配置优先） |
 
 `ACCOUNT_SENDER=tencent` 时：
 
@@ -107,6 +107,10 @@ cargo run --manifest-path services/server-account/Cargo.toml -- gen-keys
 | `GET /api/admin/clients` / `POST /api/admin/clients` | 应用列表（含有效会话数）/ 新增 `{client_id, name}` |
 | `PATCH /api/admin/clients/{client_id}` | `{name?, enabled?}`；停用的应用不能登录也不能刷新令牌 |
 | `GET /api/admin/audit` | 最近的操作日志，参数 `limit`（默认 50，最大 200） |
+| `GET /api/admin/sender` / `PUT /api/admin/sender` | 读取 / 保存发信通道 `{provider: console｜smtp｜tencent, smtp?}`；SMTP 密码只返回 `has_password`，保存时留空表示沿用已存密码 |
+| `POST /api/admin/sender/test` | `{recipient, smtp?}`，用表单里尚未保存的 SMTP 参数或当前通道发一封测试验证码邮件 |
+
+后台「发信设置」保存的通道用主密钥加密存进 `system_settings`，立即热切换，重启后优先于 `ACCOUNT_SENDER`。SMTP 通道只发邮件，手机号验证码会返回 400。
 
 停用用户、下线设备、应用增删改和管理员改密码都会写入 `admin_audit`。已发出的访问令牌无法撤回，停用后最长仍可在业务服务里再存活 `ACCOUNT_ACCESS_TTL_SECS`（默认 30 分钟）。
 

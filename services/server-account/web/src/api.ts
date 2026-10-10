@@ -47,6 +47,11 @@ export const api = {
   updateClient: (client_id: string, patch: { name?: string; enabled?: boolean }) =>
     request<{ ok: true }>('PATCH', `/admin/clients/${encodeURIComponent(client_id)}`, patch),
   audit: () => request<{ items: AuditRow[] }>('GET', '/admin/audit?limit=100'),
+  getSender: () => request<import('./types').SenderConfig>('GET', '/admin/sender'),
+  updateSender: (body: { provider: string; smtp?: import('./types').SmtpConfig }) =>
+    request<{ ok: true }>('PUT', '/admin/sender', body),
+  testSender: (body: { recipient: string; smtp?: import('./types').SmtpConfig }) =>
+    request<{ ok: true; message: string }>('POST', '/admin/sender/test', body),
 };
 
 export function formatTime(value: string | null): string {

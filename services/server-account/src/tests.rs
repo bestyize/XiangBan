@@ -11,7 +11,7 @@ use axum::{
 };
 use serde_json::{json, Value};
 use sqlx::PgPool;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use tower::ServiceExt;
 use uuid::Uuid;
 
@@ -53,7 +53,7 @@ impl Harness {
             pool,
             config: Arc::new(config),
             keys: Arc::new(Keys::ephemeral()),
-            sender: Arc::new(Sender::Capture(Mutex::new(Vec::new()))),
+            sender: Arc::new(Sender::capture()),
             dummy_password_hash: Arc::new(password::hash("dummy".into()).await.unwrap()),
         };
         Some(Self { app: build_router(state.clone()), state, admin, schema })
@@ -80,17 +80,11 @@ impl Harness {
     }
 
     fn last_code(&self) -> String {
-        match &*self.state.sender {
-            Sender::Capture(sent) => sent.lock().unwrap().last().expect("no code sent").code.clone(),
-            _ => unreachable!(),
-        }
+        self.state.sender.last_code().expect("no code sent")
     }
 
     fn sent_count(&self) -> usize {
-        match &*self.state.sender {
-            Sender::Capture(sent) => sent.lock().unwrap().len(),
-            _ => unreachable!(),
-        }
+        self.state.sender.sent_count()
     }
 
     async fn admin_token(&self) -> String {
@@ -604,5 +598,58 @@ async fn admin_can_manage_clients() {
     assert_eq!(name, "改名后");
     let missing = h.call(Method::PATCH, "/api/admin/clients/ghost", admin, json!({ "enabled": false })).await;
     assert_eq!(missing.0, StatusCode::NOT_FOUND);
+    h.cleanup().await;
+}
+
+#[tokio::test]
+async fn admin_can_configure_and_read_sender_settings() {
+    let h = harness!(&[]);
+    let admin = h.admin_token().await;
+    let admin = Some(admin.as_str());
+
+    // 1. 读取初始状态（capture）
+    let (status, cfg) = h.call(Method::GET, "/api/admin/sender", admin, Value::Null).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(cfg["provider"], "capture");
+
+    // 2. 更新为 SMTP
+    let update_body = json!({
+        "provider": "smtp",
+        "smtp": {
+            "host": "smtp.example.com",
+            "port": 465,
+            "secure": true,
+            "username": "mailer@example.com",
+            "password": "secret-auth-code",
+            "from_name": "相伴测试",
+            "from_email": "mailer@example.com"
+        }
+    });
+    let (status, resp) = h.call(Method::PUT, "/api/admin/sender", admin, update_body).await;
+    assert_eq!(status, StatusCode::OK, "{resp}");
+    assert_eq!(resp["ok"], true);
+
+    // 3. 读取更新后的状态，密码应被脱敏（has_password = true）
+    let (status, cfg) = h.call(Method::GET, "/api/admin/sender", admin, Value::Null).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(cfg["provider"], "smtp");
+    assert_eq!(cfg["smtp"]["host"], "smtp.example.com");
+    assert_eq!(cfg["smtp"]["has_password"], true);
+    assert!(cfg["smtp"].get("password").is_none());
+
+    // 4. 验证审计日志中记录了 sender.update
+    let (_, audit) = h.call(Method::GET, "/api/admin/audit?limit=1", admin, Value::Null).await;
+    assert_eq!(audit["items"][0]["action"], "sender.update");
+
+    // 5. 测试邮件接口校验
+    let (status, _) = h.post("/api/admin/sender/test", admin, json!({ "recipient": "invalid-email" })).await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+
+    // 6. 切换回 console
+    let (status, _) = h.call(Method::PUT, "/api/admin/sender", admin, json!({ "provider": "console" })).await;
+    assert_eq!(status, StatusCode::OK);
+    let (_, cfg) = h.call(Method::GET, "/api/admin/sender", admin, Value::Null).await;
+    assert_eq!(cfg["provider"], "console");
+
     h.cleanup().await;
 }

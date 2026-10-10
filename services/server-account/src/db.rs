@@ -87,6 +87,12 @@ CREATE TABLE IF NOT EXISTS admin_audit (
     detail         TEXT,
     created_at     TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+CREATE TABLE IF NOT EXISTS system_settings (
+    key        TEXT PRIMARY KEY,
+    value_enc  BYTEA NOT NULL,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
 CREATE INDEX IF NOT EXISTS users_created_idx ON users (created_at DESC);
 "#;
 

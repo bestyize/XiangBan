@@ -8,6 +8,7 @@ use ring::hmac;
 use serde_json::{json, Value};
 use std::time::Duration;
 
+#[derive(Clone)]
 pub struct TencentSender {
     client: reqwest::Client,
     secret_id: String,
