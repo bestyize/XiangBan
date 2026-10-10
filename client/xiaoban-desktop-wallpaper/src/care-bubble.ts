@@ -1,8 +1,10 @@
+import { applyUiTokens } from './ui/design-tokens';
 import { invoke, listen } from "./bridge.ts";
 import { deliverySummary, type CareDelivery } from "./care-model.ts";
 import "./care.css";
 
 export async function mountCareBubble(): Promise<void> {
+  applyUiTokens();
   document.body.className = "care-bubble-scene";
   const host = document.querySelector<HTMLElement>("#app")!;
   host.innerHTML = '<aside class="care-bubble" role="status" aria-live="polite" hidden><div class="care-bubble-top"><span>小伴的轻声提醒</span><button class="care-close" aria-label="关闭提醒">×</button></div><p class="care-bubble-text"></p><div class="care-bubble-bottom"><small class="care-bubble-count"></small><button class="care-snooze">10 分钟后提醒</button></div><p class="care-bubble-error" role="alert"></p></aside>';

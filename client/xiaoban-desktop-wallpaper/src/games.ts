@@ -1,3 +1,4 @@
+import { applyUiTokens } from './ui/design-tokens';
 import './games.css';
 import { desktop, invoke } from './bridge.ts';
 import { GAME_IDS, GameSession, validSave, sameJson, type GameManifest } from './games/protocol.ts';
@@ -5,6 +6,7 @@ import { GAME_IDS, GameSession, validSave, sameJson, type GameManifest } from '.
 declare global { interface Window { __XIAOBAN_GAME_TOKEN__?: string; __XIAOBAN_GAME_SMOKE__?: boolean } }
 
 export async function mountGameSpace() {
+  applyUiTokens();
   document.body.className = 'game-space';
   const app = document.querySelector<HTMLElement>('#app')!;
   app.innerHTML = '<main class="games-shell"><header class="games-toolbar"><button id="games-back" title="返回游戏面板" aria-label="返回游戏面板" hidden>←</button><div><span id="games-status" role="status">正在准备游戏目录…</span></div><button id="games-close" title="退出游戏空间（Esc）" aria-label="退出游戏空间">×</button></header><section id="games-hub"><div class="games-intro"><p>给自己一小段轻松时光</p><h1>今天想玩点什么？</h1><span>七款本地小游戏，断网也能玩。水墨剑客进度保存在这台电脑。</span></div><div id="games-cards" class="games-grid"></div></section><section id="games-player" hidden><div id="game-stage"></div></section><div id="games-failure" class="games-failure" hidden><h2>游戏需要重试</h2><p id="games-error"></p><button id="games-retry">重试</button><button id="games-cancel">返回游戏面板</button><button id="games-force-close" hidden>放弃未保存进度并退出</button></div></main>';
