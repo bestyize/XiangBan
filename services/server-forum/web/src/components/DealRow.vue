@@ -17,7 +17,7 @@ const soon = computed(() => expiringSoon(deal.value.expires_at, deal.value.long_
 </script>
 
 <template>
-  <article class="row" :class="{ expired: deal.deal_status === 'expired' }">
+  <article class="row" :class="{ expired: deal.deal_status === 'expired', 'is-pinned': topic.pinned }">
     <RouterLink :to="`/u/${topic.author.uid}`" class="avatar-link" :aria-label="topic.author.nickname">
       <UserAvatar :name="topic.author.nickname" :src="topic.author.avatar_url" :size="36" />
     </RouterLink>
@@ -54,6 +54,19 @@ const soon = computed(() => expiringSoon(deal.value.expires_at, deal.value.long_
   padding: 12px 4px;
   align-items: start;
 }
+/* 置顶高亮：整行淡红底 + 左侧红色竖条，底色向两侧多伸出 10px，文字位置不变。 */
+.row {
+  position: relative;
+  isolation: isolate;
+}
+.row.is-pinned::before {
+  content: '';
+  position: absolute;
+  inset: 0 -10px;
+  z-index: -1;
+  background: color-mix(in srgb, var(--brand) 6%, var(--surface));
+  box-shadow: inset 3px 0 0 var(--brand);
+}
 .body {
   min-width: 0;
 }
@@ -77,7 +90,13 @@ const soon = computed(() => expiringSoon(deal.value.expires_at, deal.value.long_
   margin-right: 6px;
 }
 .pin {
-  color: var(--danger);
+  background: var(--brand);
+  color: var(--brand-ink);
+  padding: 0 5px;
+  border-radius: 3px;
+  line-height: 18px;
+  display: inline-block;
+  vertical-align: 1px;
 }
 .feat {
   color: var(--suspect);

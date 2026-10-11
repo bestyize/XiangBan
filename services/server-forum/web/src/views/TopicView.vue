@@ -192,7 +192,7 @@ function goPosts(page: number) {
         <RouterLink v-if="parentCategory" :to="`/c/${parentCategory.slug}`">{{ parentCategory.name }}</RouterLink>
         <RouterLink :to="`/c/${topic.category.slug}`">{{ topic.category.name }}</RouterLink>
       </nav>
-      <h1 class="title">{{ topic.title }}</h1>
+      <h1 class="title"><span v-if="topic.pinned" class="pin-badge">置顶</span>{{ topic.title }}</h1>
       <div class="byline">
         <RouterLink :to="`/u/${topic.author.uid}`" class="who">
           <UserAvatar :name="topic.author.nickname" :src="topic.author.avatar_url" :size="28" />
@@ -312,6 +312,17 @@ function goPosts(page: number) {
   line-height: 1.35;
   font-weight: 800;
   overflow-wrap: anywhere;
+}
+.pin-badge {
+  display: inline-block;
+  margin-right: 8px;
+  padding: 0 7px;
+  border-radius: 4px;
+  background: var(--brand);
+  color: var(--brand-ink);
+  font-size: var(--fs-sm);
+  line-height: 22px;
+  vertical-align: 3px;
 }
 .byline {
   display: flex;

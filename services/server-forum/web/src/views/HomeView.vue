@@ -1,12 +1,11 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import ForumShell from '@/components/ForumShell.vue'
 import RightRail from '@/components/RightRail.vue'
 import TopicList from '@/components/TopicList.vue'
 import PagerNav from '@/components/PagerNav.vue'
 import { api } from '@/api/forum'
-import type { TopicItem } from '@/api/types'
 import { useTopicList } from '@/lib/useList'
 import { useHead } from '@/lib/head'
 
@@ -28,19 +27,6 @@ const tab = computed<Tab>(() => {
   return TABS.some(x => x.key === t) ? (t as Tab) : 'latest'
 })
 
-const fresh = ref<TopicItem[]>([])
-const activeDeals = ref(0)
-
-onMounted(async () => {
-  try {
-    const res = await api.deals({ sort: 'verified', deal_status: 'valid', page_size: 4 })
-    fresh.value = res.items
-    activeDeals.value = res.total
-  } catch {
-    // 「现在能领」加载失败不影响下面的列表
-  }
-})
-
 const list = useTopicList(
   p =>
     api.topics({
@@ -59,21 +45,7 @@ function setTab(t: Tab) {
 
 <template>
   <ForumShell active="home">
-    <section class="fresh" aria-labelledby="fresh-title">
-      <div class="fresh-head">
-        <h1 id="fresh-title">现在能领</h1>
-        <p class="muted">
-          {{ activeDeals ? `${activeDeals} 条羊毛在领，领不到的会被标出来` : '每条羊毛都有人复查，领不到的会被标出来' }}
-        </p>
-        <RouterLink to="/deals" class="btn btn-sm">去羊毛库</RouterLink>
-      </div>
-      <TopicList v-if="fresh.length" :items="fresh" />
-      <div v-else class="fresh-empty panel">
-        <p>还没有人分享羊毛。知道哪家在送额度？</p>
-        <RouterLink to="/new?category=deals-llm-api" class="btn btn-primary btn-sm">分享第一条</RouterLink>
-      </div>
-    </section>
-
+    <h1 class="sr-only">超级小伴</h1>
     <div class="tabs" role="tablist" aria-label="排序">
       <button
         v-for="t in TABS"
@@ -97,38 +69,6 @@ function setTab(t: Tab) {
 </template>
 
 <style scoped>
-.fresh {
-  margin-bottom: 22px;
-}
-.fresh-head {
-  display: flex;
-  align-items: baseline;
-  gap: 12px;
-  margin-bottom: 12px;
-}
-.fresh-head h1 {
-  margin: 0;
-  font-size: var(--fs-2xl);
-  font-weight: 800;
-  letter-spacing: 0.02em;
-}
-.fresh-head p {
-  margin: 0;
-  font-size: var(--fs-sm);
-  flex: 1;
-}
-.fresh-empty {
-  padding: 20px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  font-size: var(--fs-sm);
-  color: var(--ink-2);
-}
-.fresh-empty p {
-  margin: 0;
-}
 .tabs {
   display: flex;
   gap: 4px;
@@ -148,25 +88,5 @@ function setTab(t: Tab) {
 .tabs button.on {
   color: var(--ink);
   border-bottom-color: var(--ink);
-}
-@media (max-width: 767px) {
-  .fresh-head {
-    flex-wrap: wrap;
-    gap: 2px 10px;
-  }
-  .fresh-head h1 {
-    font-size: var(--fs-xl);
-  }
-  .fresh-head p {
-    order: 3;
-    flex-basis: 100%;
-  }
-  .fresh-head .btn {
-    margin-left: auto;
-  }
-  .fresh-empty {
-    flex-direction: column;
-    align-items: flex-start;
-  }
 }
 </style>

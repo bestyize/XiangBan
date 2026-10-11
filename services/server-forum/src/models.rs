@@ -305,8 +305,8 @@ pub async fn list_topics(pool: &PgPool, f: &ListFilter) -> Result<Page<TopicItem
 
     let mut qb = QueryBuilder::<Postgres>::new(SELECT);
     push_filters(&mut qb, f);
-    // 分类页置顶帖优先；首页和羊毛库不受置顶影响。
-    let pinned_first = if f.category.is_some() && !f.home { "t.pinned DESC, " } else { "" };
+    // 首页和分类页：管理员置顶的帖子排在最前面（不管按哪种方式排序）；搜索、标签、用户主页不受影响。
+    let pinned_first = if f.category.is_some() || f.home { "t.pinned DESC, " } else { "" };
     let order = match f.sort.as_deref() {
         Some("new") => "t.created_at DESC",
         Some("hot") => "t.hot_score DESC, t.created_at DESC",
