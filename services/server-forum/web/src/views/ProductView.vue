@@ -41,8 +41,13 @@ watch(
   { immediate: true },
 )
 
-const active = computed(() => deals.value.filter(d => d.deal?.deal_status !== 'expired'))
-const expired = computed(() => deals.value.filter(d => d.deal?.deal_status === 'expired'))
+/** 已到期：不是长期有效，且写了有效期并且已经过了。 */
+function isExpired(t: TopicItem) {
+  const d = t.deal
+  return !!d && !d.long_term && !!d.expires_at && new Date(d.expires_at).getTime() < Date.now()
+}
+const active = computed(() => deals.value.filter(d => !isExpired(d)))
+const expired = computed(() => deals.value.filter(isExpired))
 </script>
 
 <template>

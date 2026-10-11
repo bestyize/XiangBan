@@ -49,7 +49,7 @@ async function logout() {
 
       <nav class="nav" aria-label="主导航">
         <RouterLink to="/" :class="{ on: route.name === 'home' }">首页</RouterLink>
-        <RouterLink to="/deals" :class="{ on: route.name === 'deals' }">羊毛库</RouterLink>
+        <RouterLink to="/deals" :class="{ on: route.name === 'deals' }">福利羊毛</RouterLink>
         <RouterLink to="/products" :class="{ on: route.name === 'products' || route.name === 'product' }">产品</RouterLink>
       </nav>
 

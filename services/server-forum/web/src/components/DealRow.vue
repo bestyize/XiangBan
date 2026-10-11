@@ -2,22 +2,19 @@
 import { computed } from 'vue'
 import type { TopicItem } from '@/api/types'
 import UserAvatar from './UserAvatar.vue'
-import DealState from './DealState.vue'
-import { DEAL_TYPE_LABEL, REGION_LABEL, compactCount, conditionLabels, expiringSoon, expiryText, timeAgo } from '@/lib/format'
+import { compactCount, conditionLabels, expiringSoon, expiryText, timeAgo } from '@/lib/format'
 
 const props = defineProps<{ topic: TopicItem }>()
 const deal = computed(() => props.topic.deal!)
-const value = computed(() => deal.value.value_text.trim() || DEAL_TYPE_LABEL[deal.value.deal_type])
-const conditions = computed(() => {
-  const list = conditionLabels(deal.value.conditions)
-  return list.length ? list.join('、') : '无特殊条件'
-})
+const value = computed(() => deal.value.value_text.trim())
+const conditions = computed(() => conditionLabels(deal.value.conditions).join('、'))
+const hasExpiry = computed(() => deal.value.long_term || !!deal.value.expires_at)
 const expiry = computed(() => expiryText(deal.value.expires_at, deal.value.long_term))
 const soon = computed(() => expiringSoon(deal.value.expires_at, deal.value.long_term))
 </script>
 
 <template>
-  <article class="row" :class="{ expired: deal.deal_status === 'expired', 'is-pinned': topic.pinned }">
+  <article class="row" :class="{ 'is-pinned': topic.pinned }">
     <RouterLink :to="`/u/${topic.author.uid}`" class="avatar-link" :aria-label="topic.author.nickname">
       <UserAvatar :name="topic.author.nickname" :src="topic.author.avatar_url" :size="36" />
     </RouterLink>
@@ -27,14 +24,13 @@ const soon = computed(() => expiringSoon(deal.value.expires_at, deal.value.long_
         <span v-if="topic.featured" class="flag feat">精选</span>
         <RouterLink :to="`/t/${topic.id}`">{{ topic.title }}</RouterLink>
       </h3>
-      <!-- 羊毛信息就是普通的一行灰字，和普通帖的"分类 作者 时间"同一个位置 -->
+      <!-- 羊毛信息是选填的，填了哪项显示哪项，和普通帖的"分类 作者 时间"在同一个位置 -->
       <div class="meta">
-        <RouterLink :to="`/p/${deal.product.slug}`" class="cat">{{ deal.product.name }}</RouterLink>
-        <span>{{ value }}</span>
-        <span v-if="deal.region !== 'any'">{{ REGION_LABEL[deal.region] }}</span>
-        <span>{{ conditions }}</span>
-        <span :class="{ soon }">{{ expiry }}</span>
-        <DealState :deal="deal" />
+        <RouterLink v-if="deal.product" :to="`/p/${deal.product.slug}`" class="cat">{{ deal.product.name }}</RouterLink>
+        <RouterLink v-else :to="`/c/${topic.category.slug}`" class="cat">{{ topic.category.name }}</RouterLink>
+        <span v-if="value" class="gain">{{ value }}</span>
+        <span v-if="conditions">{{ conditions }}</span>
+        <span v-if="hasExpiry" :class="{ soon }">{{ expiry }}</span>
         <RouterLink :to="`/u/${topic.author.uid}`" class="author">{{ topic.author.nickname }}</RouterLink>
         <span>{{ topic.reply_count ? `${timeAgo(topic.last_reply_at)}回复` : timeAgo(topic.created_at) }}</span>
       </div>
@@ -117,6 +113,10 @@ const soon = computed(() => expiringSoon(deal.value.expires_at, deal.value.long_
 .cat:hover {
   color: var(--ink);
 }
+.gain {
+  color: var(--ink);
+  font-weight: 700;
+}
 .soon {
   color: var(--suspect);
   font-weight: 600;
@@ -134,9 +134,6 @@ const soon = computed(() => expiringSoon(deal.value.expires_at, deal.value.long_
 .count.zero {
   color: var(--ink-3);
   font-weight: 400;
-}
-.expired .title a {
-  color: var(--ink-3);
 }
 @media (max-width: 767px) {
   .row {

@@ -3,7 +3,7 @@
 - [xiaban-api](xiaban-api/README.md)：已实现的主 API，包含 backend 和 api-contracts。
 - [server-pan](server-pan/README.md)：已实现的自托管网盘（PanDown），Rust 后端 + React 前端，自带账号与 SQLite 存储。
 - [server-xiangban-wallpaper](server-xiangban-wallpaper/README.md)：正式壁纸网站 wallpaper.xiangban.xyz，图片/视频采集与上传、小伴桌面下载、版本与公告；桌面客户端接入此服务。
-- [server-forum](server-forum/README.md)：超级小伴论坛 chat.xiangban.xyz，AI 羊毛库与讨论区，一期网页版已实现，未部署。
+- [server-forum](server-forum/README.md)：超级小伴论坛 chat.xiangban.xyz，技术交流、资源分享、福利羊毛与闲聊的社区，一期网页版已实现，未部署。
 - [server-asr](server-asr/README.md)：规划的语音识别服务。
 - [server-edgetts](server-edgetts/README.md)：规划的 Edge TTS 服务。
 - [server-websearch](server-websearch/README.md)：规划的搜索服务。

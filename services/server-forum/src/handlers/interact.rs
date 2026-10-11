@@ -1,11 +1,10 @@
-//! 投票、点赞、收藏、举报。
+//! 点赞、收藏、举报。
 
 use crate::{
     auth::AuthUser,
     error::{AppError, AppResult},
-    models::{self, DEAL_STATUSES},
+    models,
     state::AppState,
-    users,
 };
 use axum::{
     extract::{Path, State},
@@ -13,110 +12,6 @@ use axum::{
 };
 use serde::Deserialize;
 use serde_json::{json, Value};
-
-#[derive(Deserialize)]
-pub struct VoteInput {
-    /// valid / invalid / none（撤销）
-    pub value: String,
-}
-
-async fn deal_snapshot(state: &AppState, topic_id: i64) -> AppResult<Value> {
-    let (status, valid, invalid, verified): (String, i32, i32, chrono::DateTime<chrono::Utc>) = sqlx::query_as(
-        "SELECT deal_status, valid_votes, invalid_votes, last_verified_at FROM deals WHERE topic_id = $1",
-    )
-    .bind(topic_id)
-    .fetch_one(&state.pool)
-    .await?;
-    Ok(json!({ "deal_status": status, "valid_votes": valid, "invalid_votes": invalid, "last_verified_at": verified }))
-}
-
-pub async fn vote(
-    State(state): State<AppState>,
-    auth: AuthUser,
-    Path(topic_id): Path<i64>,
-    Json(input): Json<VoteInput>,
-) -> AppResult<Json<Value>> {
-    let user = &auth.user;
-    users::ensure_can_write(user)?;
-    if user.trust_level < 1 {
-        return Err(AppError::Forbidden("信任等级 1 以上才能投票".into()));
-    }
-    let deal: Option<(String,)> = sqlx::query_as(
-        "SELECT t.status FROM deals d JOIN topics t ON t.id = d.topic_id WHERE d.topic_id = $1",
-    )
-    .bind(topic_id)
-    .fetch_optional(&state.pool)
-    .await?;
-    match deal {
-        Some((s,)) if s == "normal" => {}
-        _ => return Err(AppError::not_found("羊毛")),
-    }
-    let weight: i16 = if user.trust_level >= 2 { 2 } else { 1 };
-    match input.value.as_str() {
-        "none" => {
-            sqlx::query("DELETE FROM deal_votes WHERE topic_id = $1 AND uid = $2")
-                .bind(topic_id)
-                .bind(user.uid)
-                .execute(&state.pool)
-                .await?;
-        }
-        "valid" | "invalid" => {
-            let value: i16 = if input.value == "valid" { 1 } else { -1 };
-            sqlx::query(
-                "INSERT INTO deal_votes (topic_id, uid, value, weight) VALUES ($1, $2, $3, $4)
-                 ON CONFLICT (topic_id, uid) DO UPDATE SET value = EXCLUDED.value, weight = EXCLUDED.weight, updated_at = now()",
-            )
-            .bind(topic_id)
-            .bind(user.uid)
-            .bind(value)
-            .bind(weight)
-            .execute(&state.pool)
-            .await?;
-            if value == 1 {
-                sqlx::query("UPDATE deals SET last_verified_at = now() WHERE topic_id = $1")
-                    .bind(topic_id)
-                    .execute(&state.pool)
-                    .await?;
-            }
-        }
-        _ => return Err(AppError::BadRequest("投票只能是有效或失效".into())),
-    }
-    models::recompute_deal(&state.pool, topic_id).await?;
-    models::refresh_hot_scores(&state.pool, Some(topic_id)).await?;
-    let mut snapshot = deal_snapshot(&state, topic_id).await?;
-    snapshot["vote"] = json!(match input.value.as_str() { "valid" => 1, "invalid" => -1, _ => 0 });
-    Ok(Json(snapshot))
-}
-
-#[derive(Deserialize)]
-pub struct StatusInput {
-    pub status: String,
-}
-
-/// TL3 守护者直接标记羊毛状态。
-pub async fn set_deal_status(
-    State(state): State<AppState>,
-    auth: AuthUser,
-    Path(topic_id): Path<i64>,
-    Json(input): Json<StatusInput>,
-) -> AppResult<Json<Value>> {
-    if auth.user.trust_level < 3 {
-        return Err(AppError::Forbidden("需要守护者权限".into()));
-    }
-    if !DEAL_STATUSES.contains(&input.status.as_str()) {
-        return Err(AppError::BadRequest("状态无效".into()));
-    }
-    let done = sqlx::query("UPDATE deals SET deal_status = $2 WHERE topic_id = $1")
-        .bind(topic_id)
-        .bind(&input.status)
-        .execute(&state.pool)
-        .await?
-        .rows_affected();
-    if done == 0 {
-        return Err(AppError::not_found("羊毛"));
-    }
-    Ok(Json(deal_snapshot(&state, topic_id).await?))
-}
 
 async fn toggle_like(state: &AppState, auth: &AuthUser, target: &str, id: i64, on: bool) -> AppResult<Json<Value>> {
     let table = if target == "topic" { "topics" } else { "posts" };

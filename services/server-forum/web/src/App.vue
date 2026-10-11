@@ -46,7 +46,7 @@ watch(
         <RouterLink to="/privacy">隐私政策</RouterLink>
         <a href="mailto:support@xiangban.xyz">联系我们</a>
       </nav>
-      <p>超级小伴是开发者和 AI 用户的羊毛库。所有羊毛由用户分享，领取前请确认官方条款。</p>
+      <p>超级小伴是开发者和 AI 用户的社区。福利羊毛由用户分享，领取前请确认官方条款。</p>
     </footer>
     <TabBar />
   </template>

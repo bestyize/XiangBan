@@ -113,7 +113,7 @@ pub async fn maybe_promote(pool: &PgPool, rules: &TrustRules, uid: Uuid) -> Resu
     Ok(())
 }
 
-/// 禁言中的用户不能发帖、回复、投票。
+/// 禁言中的用户不能发帖、回复。
 pub fn ensure_can_write(user: &ForumUser) -> Result<(), AppError> {
     if user.status == "muted" && user.muted_until.is_none_or(|t| t > Utc::now()) {
         return Err(AppError::Forbidden(match user.muted_until {

@@ -44,10 +44,10 @@ const bookmarks = useTopicList(p => api.bookmarks(p), [() => session.user?.uid])
         <ol>
           <li :class="{ on: session.info.user.trust_level === 0 }"><strong>新人</strong>：可以浏览、点赞和少量回复，链接和图片显示为文字。</li>
           <li :class="{ on: session.info.user.trust_level === 1 }">
-            <strong>成员</strong>：注册满 {{ session.info.limits.tl1_days }} 天、读过 {{ session.info.limits.tl1_reads }} 个帖子后自动升级，可以发帖、发链接和图片、给羊毛投票。
+            <strong>成员</strong>：注册满 {{ session.info.limits.tl1_days }} 天、读过 {{ session.info.limits.tl1_reads }} 个帖子后自动升级，可以发帖、发链接和图片。
           </li>
-          <li :class="{ on: session.info.user.trust_level === 2 }"><strong>老用户</strong>：长期分享靠谱羊毛的成员，由管理员根据贡献升级，投票算两票。</li>
-          <li :class="{ on: session.info.user.trust_level === 3 }"><strong>守护者</strong>：由管理员邀请，可以直接标记羊毛失效、协助处理举报。</li>
+          <li :class="{ on: session.info.user.trust_level === 2 }"><strong>老用户</strong>：长期分享靠谱羊毛的成员，由管理员根据贡献升级。</li>
+          <li :class="{ on: session.info.user.trust_level === 3 }"><strong>守护者</strong>：由管理员邀请，协助处理举报。</li>
         </ol>
       </div>
     </section>

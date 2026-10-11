@@ -120,7 +120,6 @@ export interface AdminStats {
 
 export type ReportStatus = 'open' | 'resolved' | 'dismissed'
 export type ContentStatus = 'normal' | 'hidden' | 'deleted'
-export type DealStatus = 'valid' | 'suspect' | 'expired'
 export type UserStatus = 'active' | 'muted' | 'banned'
 
 export interface ReportTarget {
@@ -164,7 +163,7 @@ export interface AdminTopic {
   locked: boolean
   reply_count: number
   created_at: string
-  deal_status: DealStatus | null
+  is_deal: boolean
   open_reports: number
 }
 
@@ -275,8 +274,6 @@ export const adminApi = {
     request<TopicState>('POST', `/topics/${id}/moderate`, { action }),
   moveTopic: (id: number, category_id: number) =>
     request<{ id: number; category_id: number }>('POST', `/topics/${id}/move`, { category_id }),
-  setDealStatus: (topicId: number, status: DealStatus) =>
-    request<{ topic_id: number; deal_status: DealStatus }>('PUT', `/deals/${topicId}/status`, { status }),
   moderatePost: (id: number, action: 'hide' | 'restore') =>
     request<{ id: number; topic_id: number; status: string }>('POST', `/posts/${id}/moderate`, { action }),
 

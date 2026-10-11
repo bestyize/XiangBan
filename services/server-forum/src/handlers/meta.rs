@@ -17,7 +17,6 @@ pub async fn site_config(State(state): State<AppState>) -> Json<Value> {
         "site_name": c.site_name,
         "account_base": c.account_issuer,
         "client_id": c.account_client_id,
-        "conditions": models::CONDITIONS.iter().map(|(k, b)| json!({ "key": k, "bit": b })).collect::<Vec<_>>(),
     }))
 }
 
@@ -63,7 +62,7 @@ pub struct Product {
 
 const PRODUCT_SELECT: &str = "SELECT p.id, p.slug, p.name, p.vendor, p.website, p.description,
         COUNT(t.id) AS deal_count,
-        COUNT(t.id) FILTER (WHERE d.deal_status <> 'expired') AS active_deal_count
+        COUNT(t.id) FILTER (WHERE d.long_term OR d.expires_at IS NULL OR d.expires_at > now()) AS active_deal_count
     FROM products p
     LEFT JOIN deals d ON d.product_id = p.id
     LEFT JOIN topics t ON t.id = d.topic_id AND t.status = 'normal'";
@@ -86,7 +85,7 @@ pub async fn product(State(state): State<AppState>, Path(slug): Path<String>) ->
     // 产品页：在架的羊毛 + 提到这个产品的讨论（按标签匹配产品名）。
     let deals = models::list_topics(
         &state.pool,
-        &ListFilter { product: Some(slug.clone()), kind: Some("deal".into()), deal_status: Some("all".into()), sort: Some("new".into()), page_size: Some(50), ..Default::default() },
+        &ListFilter { product: Some(slug.clone()), kind: Some("deal".into()), include_expired: true, sort: Some("new".into()), page_size: Some(50), ..Default::default() },
     )
     .await?;
     let discussions = models::list_topics(

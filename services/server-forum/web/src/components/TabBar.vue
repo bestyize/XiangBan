@@ -30,7 +30,7 @@ function me() {
       <svg viewBox="0 0 24 24" aria-hidden="true">
         <path d="M4 6h16v4a2 2 0 0 0 0 4v4H4v-4a2 2 0 0 0 0-4z" /><path d="M14.5 6v12" stroke-dasharray="2 2" />
       </svg>
-      <span>羊毛库</span>
+      <span>福利羊毛</span>
     </RouterLink>
     <button type="button" class="compose" aria-label="发帖" @click="compose">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>

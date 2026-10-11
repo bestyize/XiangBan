@@ -1,6 +1,6 @@
 # server-forum：超级小伴论坛
 
-状态：一期（网页版）已实现，未部署。面向开发者和 AI 用户的社区：结构化的 AI 羊毛库，加上羊毛讨论、资源分享、技术交流、生活和站务板块。站点名「超级小伴」，计划域名 `chat.xiangban.xyz`。产品设计见 [docs/product/PRD_论坛.md](../../docs/product/PRD_论坛.md)。
+状态：一期（网页版）已实现，未部署。面向开发者和 AI 用户的社区：技术交流、资源分享、福利羊毛（羊毛帖的产品、能领到什么、领取条件、有效期、活动页都是选填，到期自动下架）、随便唠唠和站务板块。福利羊毛不作为主推，排在技术交流和资源分享之后。站点名「超级小伴」，计划域名 `chat.xiangban.xyz`。产品设计见 [docs/product/PRD_论坛.md](../../docs/product/PRD_论坛.md)。
 
 技术栈：Rust Axum 0.8 + PostgreSQL（SQLx），前端 Vue 3 + Vite + TypeScript（`web/`），由本服务直接托管。登录走[统一账号中心](../server-account/README.md)，本站不存密码，用 JWKS 公钥离线验签。默认端口 55010。
 
@@ -38,7 +38,7 @@ cargo test --manifest-path services/server-forum/Cargo.toml
 
 ## 页面与接口
 
-前台路由：`/` 首页、`/deals` 羊毛库（可按分类、产品、类型、地区、"我没有的条件"筛选）、`/c/{slug}` 分类、`/t/{id}` 帖子、`/new` 发帖、`/p/{slug}` 产品、`/products`、`/tag/{name}`、`/search`、`/u/{uid}`、`/settings`（收藏、昵称、等级说明）、`/rules` `/terms` `/privacy`，后台在 `/admin`。
+前台路由：`/` 首页、`/deals` 福利羊毛（顶部一行分类标签，可按最新、热门、快过期排序；已到期的默认不显示）、`/c/{slug}` 分类、`/t/{id}` 帖子、`/new` 发帖、`/p/{slug}` 产品、`/products`、`/tag/{name}`、`/search`、`/u/{uid}`、`/settings`（收藏、昵称、等级说明）、`/rules` `/terms` `/privacy`，后台在 `/admin`。
 
 服务端对 `/`、`/deals`、`/t/{id}`、`/c/{slug}`、`/p/{slug}`、`/products`、`/tag/{name}` 直接输出带标题、摘要、正文和 JSON-LD 的 HTML（填进 `#app`，Vue 挂载时替换），另有 `/sitemap.xml`、`/robots.txt`。实现在 `src/seo.rs`，依赖 `web/index.html` 保留 `<title>`、`<meta name="description">` 和空的 `<div id="app"></div>`。
 
@@ -52,9 +52,7 @@ cargo test --manifest-path services/server-forum/Cargo.toml
 | `GET /topics` `/deals` `/search` | 列表；参数见 `models::ListFilter` |
 | `GET/POST /topics`、`GET/PATCH/DELETE /topics/{id}` | 帖子；羊毛帖带 `deal` 字段 |
 | `GET/POST /topics/{id}/posts`、`PATCH/DELETE /posts/{id}` | 回复 |
-| `PUT /deals/{id}/vote` | `{value: valid｜invalid｜none}`；TL1 以上，TL2 权重 2 |
-| `PUT /deals/{id}/status` | TL3 守护者直接标记状态 |
-| `PUT/DELETE /topics/{id}/like`、`/posts/{id}/like`、`/topics/{id}/bookmark` | 点赞、收藏 |
+| | `PUT/DELETE /topics/{id}/like`、`/posts/{id}/like`、`/topics/{id}/bookmark` | 点赞、收藏 |
 | `POST /reports` | 举报帖子或回复 |
 | `POST /markdown/preview` | 发帖预览 |
 | `GET /users/{uid}`、`/users/{uid}/topics`、`/users/{uid}/posts`、`/me/bookmarks` | 用户主页、我的收藏 |
@@ -64,7 +62,7 @@ cargo test --manifest-path services/server-forum/Cargo.toml
 ## 业务规则
 
 - 正文是 Markdown，服务端用 pulldown-cmark 渲染、ammonia 清洗后存 `body_html`；外链加 `nofollow ugc`。新人（TL0）的链接和图片会被去掉，只留文字。
-- 羊毛状态：失效票（加权）占比 ≥ 40% 且总票数 ≥ 5 时变"疑似失效"，有效票重新占优后恢复；"已失效"只能由守护者、管理员或到期设置。每 10 分钟处理到期并重算最近 7 天的热度。
+- 羊毛帖：产品、能领到什么、领取条件、有效期、活动页全部选填，什么都不填也能发；没有投票和状态标记，写了有效期的到期后自动不再出现在福利羊毛、首页和分类列表（用户主页、搜索、标签页、产品页的历史仍保留）。每 10 分钟重算最近 7 天的热度。
 - 活动链接不允许带 `ref`、`aff`、`invite` 等个人推广参数。
 - 只做站内功能：没有系统推送、邮件提醒，也没有匿名发帖（按产品决定）。
 

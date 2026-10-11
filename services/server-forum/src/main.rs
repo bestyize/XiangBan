@@ -47,8 +47,6 @@ pub fn build_router(state: AppState) -> Router {
         .route("/topics/{id}/posts", get(posts::list).post(posts::create))
         .route("/topics/{id}/like", put(interact::like_topic).delete(interact::unlike_topic))
         .route("/topics/{id}/bookmark", put(interact::bookmark).delete(interact::unbookmark))
-        .route("/deals/{id}/vote", put(interact::vote))
-        .route("/deals/{id}/status", put(interact::set_deal_status))
         .route("/posts/{id}", axum::routing::patch(posts::update).delete(posts::delete))
         .route("/posts/{id}/source", get(posts::source))
         .route("/posts/{id}/like", put(interact::like_post).delete(interact::unlike_post))

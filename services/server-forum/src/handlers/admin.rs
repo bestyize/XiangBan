@@ -4,13 +4,13 @@
 use crate::{
     config::AppConfig,
     error::{AppError, AppResult},
-    models::{Page, DEAL_STATUSES},
+    models::Page,
     state::AppState,
 };
 use axum::{
     extract::{FromRequestParts, Path, Query, State},
     http::{header, request::Parts},
-    routing::{get, patch, post, put},
+    routing::{get, patch, post},
     Json, Router,
 };
 use chrono::{DateTime, Utc};
@@ -35,7 +35,6 @@ pub fn routes() -> Router<AppState> {
         .route("/topics", get(list_topics))
         .route("/topics/{id}/moderate", post(moderate_topic))
         .route("/topics/{id}/move", post(move_topic))
-        .route("/deals/{id}/status", put(set_deal_status))
         .route("/posts/{id}/moderate", post(moderate_post))
         .route("/users", get(list_users))
         .route("/users/{uid}/trust", post(set_trust))
@@ -385,7 +384,7 @@ async fn stats(State(state): State<AppState>, _admin: AuthAdmin) -> AppResult<Js
             (SELECT COUNT(*) FROM posts),
             (SELECT COUNT(*) FROM posts WHERE created_at > now() - interval '1 day'),
             (SELECT COUNT(*) FROM deals d JOIN topics t ON t.id = d.topic_id
-                WHERE d.deal_status <> 'expired' AND t.status = 'normal'),
+                WHERE (d.long_term OR d.expires_at IS NULL OR d.expires_at > now()) AND t.status = 'normal'),
             (SELECT COUNT(*) FROM reports WHERE status = 'open'),
             (SELECT COUNT(*) FROM users WHERE last_seen_at > now() - interval '1 day')",
     )
@@ -623,7 +622,7 @@ struct AdminTopic {
     locked: bool,
     reply_count: i32,
     created_at: DateTime<Utc>,
-    deal_status: Option<String>,
+    is_deal: bool,
     open_reports: i64,
 }
 
@@ -668,7 +667,7 @@ async fn list_topics(
 
     let mut qb = QueryBuilder::<Postgres>::new(format!(
         "SELECT t.id, t.title, t.status, t.category_id, c.name AS category_name, t.author_uid, u.nickname AS author_nickname,
-                t.pinned, t.featured, t.locked, t.reply_count, t.created_at, d.deal_status,
+                t.pinned, t.featured, t.locked, t.reply_count, t.created_at, (d.topic_id IS NOT NULL) AS is_deal,
                 (SELECT COUNT(*) FROM reports r WHERE r.target_type = 'topic' AND r.target_id = t.id AND r.status = 'open') AS open_reports{FROM}"
     ));
     filter(&mut qb);
@@ -758,32 +757,6 @@ async fn move_topic(
     audit(&mut tx, &admin, "topic.move", "topic", id, format!("{from_id} -> {} ({name})", input.category_id)).await?;
     tx.commit().await?;
     Ok(Json(json!({ "id": id, "category_id": input.category_id })))
-}
-
-#[derive(Deserialize)]
-struct DealStatusInput {
-    status: String,
-}
-
-async fn set_deal_status(
-    State(state): State<AppState>,
-    AuthAdmin(admin): AuthAdmin,
-    Path(topic_id): Path<i64>,
-    Json(input): Json<DealStatusInput>,
-) -> AppResult<Json<Value>> {
-    if !DEAL_STATUSES.contains(&input.status.as_str()) {
-        return Err(AppError::BadRequest("状态只能是 valid / suspect / expired".into()));
-    }
-    let mut tx = state.pool.begin().await?;
-    let old: Option<(String,)> = sqlx::query_as("SELECT deal_status FROM deals WHERE topic_id = $1 FOR UPDATE")
-        .bind(topic_id)
-        .fetch_optional(&mut *tx)
-        .await?;
-    let (old,) = old.ok_or_else(|| AppError::not_found("羊毛"))?;
-    sqlx::query("UPDATE deals SET deal_status = $2 WHERE topic_id = $1").bind(topic_id).bind(&input.status).execute(&mut *tx).await?;
-    audit(&mut tx, &admin, "deal.status", "topic", topic_id, format!("{old} -> {}", input.status)).await?;
-    tx.commit().await?;
-    Ok(Json(json!({ "topic_id": topic_id, "deal_status": input.status })))
 }
 
 /// 隐藏回复并同步楼主帖的回复数；已不是正常状态则什么都不做。返回受影响的帖子 id。
@@ -1331,7 +1304,7 @@ mod tests {
 
     #[test]
     fn slugs_are_validated() {
-        for ok in ["ab", "deals-llm-api", "a1", &"x".repeat(40)] {
+        for ok in ["ab", "deals-ai", "a1", &"x".repeat(40)] {
             assert!(validate_slug(ok).is_ok(), "{ok}");
         }
         for bad in ["", "a", "Ab", "has space", "under_score", "中文", &"x".repeat(41)] {

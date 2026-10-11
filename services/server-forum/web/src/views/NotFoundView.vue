@@ -10,7 +10,7 @@ useHead(() => ({ title: '页面不存在' }))
     <p class="muted">链接可能写错了，或者内容已经被删除。</p>
     <div class="go">
       <RouterLink to="/" class="btn btn-primary">回到首页</RouterLink>
-      <RouterLink to="/deals" class="btn">看看羊毛库</RouterLink>
+      <RouterLink to="/deals" class="btn">看看福利羊毛</RouterLink>
     </div>
   </div>
 </template>

@@ -1,7 +1,7 @@
 //! 前端单页的托管，以及给搜索引擎的服务端渲染页面。
 //!
 //! - 静态资源：从 `web_dir`（Vite 构建产物）用 ServeDir 托管，`/assets/` 下带哈希的文件强缓存。
-//! - SEO 页面：首页、羊毛库、帖子、分类、产品、标签直接输出带标题、摘要和正文的 HTML。
+//! - SEO 页面：首页、福利羊毛、帖子、分类、产品、标签直接输出带标题、摘要和正文的 HTML。
 //!   做法是把启动时读好的 index.html 里的 `<title>`、description、canonical、OG 标签换成页面自己的，
 //!   并把可读的语义 HTML 填进 `<div id="app"></div>`；浏览器里 Vue 挂载时会整体替换这块内容。
 //! - 兜底：其余 GET 路径都返回 index.html（200），交给前端路由；`/api/*`、`/assets/*` 未命中返回 404。
@@ -92,37 +92,6 @@ fn truncate_chars(s: &str, max: usize) -> String {
 fn cn_date(dt: DateTime<Utc>) -> String {
     let tz = FixedOffset::east_opt(8 * 3600).expect("固定时区");
     dt.with_timezone(&tz).format("%Y-%m-%d").to_string()
-}
-
-fn status_label(s: &str) -> &'static str {
-    match s {
-        "valid" => "有效",
-        "suspect" => "疑似失效",
-        "expired" => "已失效",
-        _ => "未知",
-    }
-}
-
-fn deal_type_label(s: &str) -> &'static str {
-    match s {
-        "free_credit" => "免费额度",
-        "signup_bonus" => "注册赠金",
-        "trial" => "试用",
-        "free_limited" => "限时免费",
-        "invite" => "邀请奖励",
-        "student" => "学生优惠",
-        "discount" => "折扣优惠",
-        "public_site" => "公益站",
-        _ => "其他",
-    }
-}
-
-fn region_label(s: &str) -> &'static str {
-    match s {
-        "cn" => "国内可用",
-        "intl" => "海外可用",
-        _ => "不限地区",
-    }
 }
 
 fn condition_labels(bits: i32) -> Vec<&'static str> {
@@ -348,8 +317,20 @@ type Res = Result<Response, AppError>;
 
 // ---------- HTML 片段 ----------
 
+/// 产品名和"能领到什么"，都是选填，有哪个写哪个（未转义的纯文本）。
+fn deal_plain_summary(d: &DealInfo) -> String {
+    let mut parts: Vec<&str> = Vec::new();
+    if let Some(p) = &d.product {
+        parts.push(&p.name);
+    }
+    if !d.value_text.trim().is_empty() {
+        parts.push(d.value_text.trim());
+    }
+    parts.join(" · ")
+}
+
 fn deal_summary(d: &DealInfo) -> String {
-    format!("{} · {} · {}", escape(&d.product.name), escape(&d.value_text), status_label(&d.deal_status))
+    escape(&deal_plain_summary(d))
 }
 
 /// 帖子列表：标题链接 + 羊毛摘要 + 分类和作者。
@@ -381,38 +362,41 @@ fn tag_links(tags: &[String]) -> String {
         .join(" ")
 }
 
-/// 帖子页里的羊毛信息卡。
+/// 帖子页里的羊毛信息：几项都是选填，填了哪项显示哪项。
 fn deal_block(d: &DealInfo) -> String {
-    let expiry = if d.long_term {
-        "长期有效".to_string()
-    } else {
-        d.expires_at.map(cn_date).unwrap_or_else(|| "未注明".into())
-    };
+    let mut rows = String::new();
+    if let Some(p) = &d.product {
+        rows.push_str(&format!(
+            "<dt>产品</dt><dd><a href=\"/p/{}\">{}</a></dd>\n",
+            percent_encode(&p.slug),
+            escape(&p.name)
+        ));
+    }
+    if !d.value_text.trim().is_empty() {
+        rows.push_str(&format!("<dt>羊毛</dt><dd>{}</dd>\n", escape(d.value_text.trim())));
+    }
     let conds = condition_labels(d.conditions);
-    let conds = if conds.is_empty() { "无特殊要求".to_string() } else { conds.join("、") };
-    format!(
-        "<dl>\n<dt>产品</dt><dd><a href=\"/p/{slug}\">{name}</a></dd>\n<dt>羊毛</dt><dd>{value}</dd>\n\
-         <dt>类型</dt><dd>{ty}</dd>\n<dt>领取条件</dt><dd>{conds}</dd>\n<dt>地区</dt><dd>{region}</dd>\n\
-         <dt>有效期</dt><dd>{expiry}</dd>\n<dt>状态</dt><dd>{status}（{valid} 人确认有效，{invalid} 人反馈失效，最近验证 {verified}）</dd>\n</dl>",
-        slug = percent_encode(&d.product.slug),
-        name = escape(&d.product.name),
-        value = escape(&d.value_text),
-        ty = deal_type_label(&d.deal_type),
-        region = region_label(&d.region),
-        status = status_label(&d.deal_status),
-        valid = d.valid_votes,
-        invalid = d.invalid_votes,
-        verified = cn_date(d.last_verified_at),
-    )
+    if !conds.is_empty() {
+        rows.push_str(&format!("<dt>领取条件</dt><dd>{}</dd>\n", conds.join("、")));
+    }
+    if d.long_term {
+        rows.push_str("<dt>有效期</dt><dd>长期有效</dd>\n");
+    } else if let Some(at) = d.expires_at {
+        rows.push_str(&format!("<dt>有效期</dt><dd>{} 截止</dd>\n", cn_date(at)));
+    }
+    if rows.is_empty() {
+        return String::new();
+    }
+    format!("<dl>\n{rows}</dl>")
 }
 
-/// 全站导航：羊毛库、产品库和分类树，让不跑 JS 的爬虫能顺着链接爬到各板块。
+/// 全站导航：福利羊毛、产品库和分类树，让不跑 JS 的爬虫能顺着链接爬到各板块。
 async fn category_nav(state: &AppState) -> Result<String, AppError> {
     let rows: Vec<(i32, Option<i32>, String, String)> =
         sqlx::query_as("SELECT id, parent_id, slug, name FROM categories ORDER BY sort_order, id")
             .fetch_all(&state.pool)
             .await?;
-    let mut s = String::from("<nav>\n<a href=\"/deals\">AI 羊毛库</a> <a href=\"/products\">产品库</a>\n<ul>\n");
+    let mut s = String::from("<nav>\n<a href=\"/deals\">福利羊毛</a> <a href=\"/products\">产品库</a>\n<ul>\n");
     for (id, _, slug, name) in rows.iter().filter(|r| r.1.is_none()) {
         s.push_str(&format!("<li><a href=\"/c/{}\">{}</a>", percent_encode(slug), escape(name)));
         let children: Vec<_> = rows.iter().filter(|r| r.1 == Some(*id)).collect();
@@ -441,16 +425,16 @@ async fn home(State(state): State<AppState>, Extension(index): Extension<Index>)
     .await?;
     let nav = category_nav(&state).await?;
     let body = format!(
-        "<h1>{name}：AI 羊毛与技术讨论社区</h1>\n\
-         <p>{name}收录各家大模型和 AI 工具的免费额度、新用户赠金、试用与优惠，每条羊毛都有人复查，失效会及时标记。也欢迎在这里交流 AI 应用开发、工具和生活。</p>\n\
+        "<h1>{name}：开发者和 AI 用户的社区</h1>\n\
+         <p>{name}是开发者和 AI 用户的社区：技术交流、资源分享、福利羊毛和随便唠唠。福利羊毛里是大家分享的免费额度、试用和优惠。</p>\n\
          {nav}\n<h2>最新讨论</h2>\n{list}",
         name = escape(cx.name),
         list = topic_list(&topics.items),
     );
     Ok(cx.ok(Page {
-        title: format!("{} - AI 羊毛与技术讨论社区", cx.name),
+        title: format!("{} - 开发者和 AI 用户的社区", cx.name),
         description: truncate_chars(
-            &format!("{}收录各家大模型和 AI 工具的免费额度、新用户赠金、试用与优惠，每条羊毛都有人复查，失效及时标记。", cx.name),
+            &format!("{}是开发者和 AI 用户的社区：技术交流、资源分享、福利羊毛和随便唠唠。", cx.name),
             150,
         ),
         path: "/".into(),
@@ -474,13 +458,13 @@ async fn deals_page(State(state): State<AppState>, Extension(index): Extension<I
     )
     .await?;
     let body = format!(
-        "<h1>AI 羊毛库</h1>\n<p>最新收录的 AI 免费额度、新用户赠金、试用和优惠，共 {} 条在架。</p>\n{}",
+        "<h1>福利羊毛</h1>\n<p>最新收录的免费额度、新用户赠金、试用和优惠，共 {} 条。</p>\n{}",
         deals.total,
         topic_list(&deals.items)
     );
     Ok(cx.ok(Page {
-        title: cx.full_title("AI 羊毛库"),
-        description: "最新的大模型 API、AI 对话、AI 编程工具免费额度与新用户赠金，标注领取条件、地区和有效状态，失效有人复查。".into(),
+        title: cx.full_title("福利羊毛"),
+        description: "最新的免费额度、新用户赠金和试用优惠，覆盖 AI、云服务和开发者工具，标注领取条件和有效期。".into(),
         path: "/deals".into(),
         og_type: "website",
         body,
@@ -574,7 +558,10 @@ async fn topic_page(
     let path = format!("/t/{id}");
     let mut desc = topic.excerpt.clone();
     if let Some(d) = &topic.deal {
-        desc = format!("【{} {}，{}】{desc}", d.product.name, d.value_text, status_label(&d.deal_status));
+        let summary = deal_plain_summary(d);
+        if !summary.is_empty() {
+            desc = format!("【{summary}】{desc}");
+        }
     }
     if desc.trim().is_empty() {
         desc = topic.title.clone();
@@ -686,7 +673,7 @@ async fn product_page(
         &ListFilter {
             product: Some(slug.clone()),
             kind: Some("deal".into()),
-            deal_status: Some("all".into()),
+            include_expired: true,
             sort: Some("new".into()),
             page_size: Some(50),
             ..Default::default()
@@ -709,7 +696,7 @@ async fn product_page(
         title: cx.full_title(&format!("{name} 免费额度与优惠")),
         description: truncate_chars(
             &if desc.is_empty() {
-                format!("{name}的免费额度、新用户赠金、试用和优惠汇总，共 {} 条，标注领取条件和有效状态。", deals.total)
+                format!("{name}的免费额度、新用户赠金、试用和优惠汇总，共 {} 条，标注领取条件和有效期。", deals.total)
             } else {
                 desc
             },

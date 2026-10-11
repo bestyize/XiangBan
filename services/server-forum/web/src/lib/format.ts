@@ -1,36 +1,11 @@
-import type { DealStatus, DealType, Region } from '@/api/types'
-
-export const DEAL_TYPE_LABEL: Record<DealType, string> = {
-  free_credit: '免费额度',
-  signup_bonus: '新用户赠金',
-  trial: '会员试用',
-  free_limited: '限时免费',
-  invite: '邀请码',
-  student: '学生优惠',
-  discount: '促销折扣',
-  public_site: '公益站',
-}
-
-export const DEAL_STATUS_LABEL: Record<DealStatus, string> = {
-  valid: '有效',
-  suspect: '疑似失效',
-  expired: '已失效',
-}
-
-export const REGION_LABEL: Record<Region, string> = {
-  any: '不限地区',
-  cn: '国内可用',
-  intl: '仅海外',
-}
-
 /** 领取条件位标志，与后端 models::CONDITIONS 一致。 */
 export const CONDITIONS = [
-  { key: 'card', bit: 1, label: '需要信用卡', without: '不要信用卡' },
-  { key: 'phone_cn', bit: 2, label: '需要国内手机号', without: '不要国内手机号' },
-  { key: 'phone_intl', bit: 4, label: '需要海外手机号', without: '不要海外手机号' },
-  { key: 'edu', bit: 8, label: '需要 edu 邮箱', without: '不要 edu 邮箱' },
-  { key: 'work_email', bit: 16, label: '需要企业邮箱', without: '不要企业邮箱' },
-  { key: 'realname', bit: 32, label: '需要实名', without: '不要实名' },
+  { key: 'card', bit: 1, label: '需要信用卡' },
+  { key: 'phone_cn', bit: 2, label: '需要国内手机号' },
+  { key: 'phone_intl', bit: 4, label: '需要海外手机号' },
+  { key: 'edu', bit: 8, label: '需要 edu 邮箱' },
+  { key: 'work_email', bit: 16, label: '需要企业邮箱' },
+  { key: 'realname', bit: 32, label: '需要实名' },
 ] as const
 
 export function conditionLabels(bits: number) {

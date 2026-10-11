@@ -33,7 +33,7 @@ const groups = computed<{ title: string; items: StatItem[] }[]>(() => {
         { label: '24 小时新帖', value: s.topics_24h },
         { label: '回复总数', value: s.posts_total },
         { label: '24 小时新回复', value: s.posts_24h },
-        { label: '在架羊毛', value: s.deals_active },
+        { label: '展示中的羊毛', value: s.deals_active },
       ],
     },
     {

@@ -46,31 +46,15 @@ export interface Product {
   active_deal_count: number
 }
 
-export type DealStatus = 'valid' | 'suspect' | 'expired'
-export type DealType =
-  | 'free_credit'
-  | 'signup_bonus'
-  | 'trial'
-  | 'free_limited'
-  | 'invite'
-  | 'student'
-  | 'discount'
-  | 'public_site'
-export type Region = 'any' | 'cn' | 'intl'
-
 export interface DealInfo {
-  product: { id: number; slug: string; name: string }
-  deal_type: DealType
+  /** 关联产品，发帖人可以不选 */
+  product: { id: number; slug: string; name: string } | null
   value_text: string
+  /** 领取条件位标志，见 lib/format 的 CONDITIONS */
   conditions: number
-  region: Region
   link_url: string
   expires_at: string | null
   long_term: boolean
-  deal_status: DealStatus
-  valid_votes: number
-  invalid_votes: number
-  last_verified_at: string
 }
 
 export interface TopicItem {
@@ -96,11 +80,8 @@ export interface TopicItem {
 export interface Viewer {
   liked: boolean
   bookmarked: boolean
-  vote: -1 | 0 | 1
   can_edit: boolean
   can_reply: boolean
-  can_vote: boolean
-  can_moderate: boolean
 }
 
 export interface TopicDetail extends TopicItem {
@@ -151,11 +132,9 @@ export interface UserReply {
 }
 
 export interface DealInput {
-  product_id: number
-  deal_type: DealType
+  product_id: number | null
   value_text: string
   conditions: number
-  region: Region
   link_url: string
   expires_at: string | null
   long_term: boolean

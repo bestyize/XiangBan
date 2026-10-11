@@ -7,11 +7,6 @@ use sqlx::{PgPool, Postgres, QueryBuilder};
 use std::collections::HashMap;
 use uuid::Uuid;
 
-pub const DEAL_TYPES: &[&str] =
-    &["free_credit", "signup_bonus", "trial", "free_limited", "invite", "student", "discount", "public_site"];
-pub const REGIONS: &[&str] = &["any", "cn", "intl"];
-pub const DEAL_STATUSES: &[&str] = &["valid", "suspect", "expired"];
-
 /// 领取条件位标志，和前端 `CONDITIONS` 保持一致。
 pub const CONDITIONS: &[(&str, i32)] = &[
     ("card", 1),
@@ -22,13 +17,6 @@ pub const CONDITIONS: &[(&str, i32)] = &[
     ("realname", 32),
 ];
 pub const CONDITION_MASK: i32 = 63;
-
-pub fn condition_bits(names: &str) -> i32 {
-    names
-        .split(',')
-        .filter_map(|n| CONDITIONS.iter().find(|(k, _)| *k == n.trim()).map(|(_, b)| *b))
-        .fold(0, |acc, b| acc | b)
-}
 
 #[derive(Debug, Clone, Serialize)]
 pub struct CategoryRef {
@@ -46,18 +34,13 @@ pub struct ProductRef {
 
 #[derive(Debug, Clone, Serialize)]
 pub struct DealInfo {
-    pub product: ProductRef,
-    pub deal_type: String,
+    /// 关联产品，发帖时可以不选。
+    pub product: Option<ProductRef>,
     pub value_text: String,
     pub conditions: i32,
-    pub region: String,
     pub link_url: String,
     pub expires_at: Option<DateTime<Utc>>,
     pub long_term: bool,
-    pub deal_status: String,
-    pub valid_votes: i32,
-    pub invalid_votes: i32,
-    pub last_verified_at: DateTime<Utc>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -106,42 +89,28 @@ struct TopicRow {
     product_id: Option<i32>,
     product_slug: Option<String>,
     product_name: Option<String>,
-    deal_type: Option<String>,
     value_text: Option<String>,
     conditions: Option<i32>,
-    region: Option<String>,
     link_url: Option<String>,
     expires_at: Option<DateTime<Utc>>,
     long_term: Option<bool>,
-    deal_status: Option<String>,
-    valid_votes: Option<i32>,
-    invalid_votes: Option<i32>,
-    last_verified_at: Option<DateTime<Utc>>,
 }
 
 impl TopicRow {
     fn into_item(self, tags: Vec<String>) -> TopicItem {
-        let deal = match (self.product_id, self.deal_type) {
-            (Some(pid), Some(deal_type)) => Some(DealInfo {
-                product: ProductRef {
-                    id: pid,
-                    slug: self.product_slug.unwrap_or_default(),
-                    name: self.product_name.unwrap_or_default(),
-                },
-                deal_type,
-                value_text: self.value_text.unwrap_or_default(),
-                conditions: self.conditions.unwrap_or(0),
-                region: self.region.unwrap_or_else(|| "any".into()),
-                link_url: self.link_url.unwrap_or_default(),
-                expires_at: self.expires_at,
-                long_term: self.long_term.unwrap_or(false),
-                deal_status: self.deal_status.unwrap_or_else(|| "valid".into()),
-                valid_votes: self.valid_votes.unwrap_or(0),
-                invalid_votes: self.invalid_votes.unwrap_or(0),
-                last_verified_at: self.last_verified_at.unwrap_or(self.created_at),
+        // 有 deals 记录（value_text 一定非空列）就是羊毛帖；产品可以没有。
+        let deal = self.value_text.map(|value_text| DealInfo {
+            product: self.product_id.map(|id| ProductRef {
+                id,
+                slug: self.product_slug.unwrap_or_default(),
+                name: self.product_name.unwrap_or_default(),
             }),
-            _ => None,
-        };
+            value_text,
+            conditions: self.conditions.unwrap_or(0),
+            link_url: self.link_url.unwrap_or_default(),
+            expires_at: self.expires_at,
+            long_term: self.long_term.unwrap_or(false),
+        });
         TopicItem {
             id: self.id,
             title: self.title,
@@ -174,8 +143,7 @@ const SELECT: &str = "SELECT t.id, t.title, t.excerpt, t.status, t.pinned, t.fea
         c.id AS category_id, c.slug AS category_slug, c.name AS category_name,
         u.uid AS author_uid, u.nickname AS author_nickname, u.avatar_url AS author_avatar, u.trust_level AS author_level,
         p.id AS product_id, p.slug AS product_slug, p.name AS product_name,
-        d.deal_type, d.value_text, d.conditions, d.region, d.link_url, d.expires_at, d.long_term,
-        d.deal_status, d.valid_votes, d.invalid_votes, d.last_verified_at
+        d.value_text, d.conditions, d.link_url, d.expires_at, d.long_term
     FROM topics t
     JOIN categories c ON c.id = t.category_id
     JOIN users u ON u.uid = t.author_uid
@@ -190,19 +158,16 @@ pub struct ListFilter {
     pub product: Option<String>,
     pub author: Option<Uuid>,
     pub q: Option<String>,
-    /// latest（最新回复）/ new（最新发布）/ hot / expiring（即将过期）/ verified（最近验证）
+    /// latest（最新回复）/ new（最新发布）/ hot / expiring（即将过期）
     pub sort: Option<String>,
     /// 只看首页可见分类（排除闲聊等）
     #[serde(default)]
     pub home: bool,
     /// deal：只看羊毛；normal：只看普通帖
     pub kind: Option<String>,
-    pub deal_type: Option<String>,
-    /// 逗号分隔的条件名，命中任意一个的羊毛会被排除，例如 `card,realname` 表示"不要信用卡、不要实名"
-    pub without: Option<String>,
-    pub region: Option<String>,
-    /// active（默认，有效 + 疑似失效）/ valid / all
-    pub deal_status: Option<String>,
+    /// 默认不返回已到期的羊毛；用户主页、搜索、标签页等需要完整历史时设为 true。
+    #[serde(default)]
+    pub include_expired: bool,
     #[serde(default)]
     pub featured: bool,
     pub page: Option<i64>,
@@ -268,27 +233,9 @@ fn push_filters(qb: &mut QueryBuilder<'_, Postgres>, f: &ListFilter) {
         }
         _ => {}
     }
-    if let Some(t) = f.deal_type.as_deref().filter(|t| DEAL_TYPES.contains(t)) {
-        qb.push(" AND d.deal_type = ").push_bind(t.to_string());
-    }
-    if let Some(without) = f.without.as_deref() {
-        let bits = condition_bits(without);
-        if bits != 0 {
-            qb.push(" AND (d.conditions & ").push_bind(bits).push(") = 0");
-        }
-    }
-    if let Some(region) = f.region.as_deref().filter(|r| *r == "cn" || *r == "intl") {
-        // 选"国内可用"时，"不限地区"的也算。
-        qb.push(" AND d.region IN ('any', ").push_bind(region.to_string()).push(")");
-    }
-    match f.deal_status.as_deref() {
-        Some("all") => {}
-        Some("valid") => {
-            qb.push(" AND (d.topic_id IS NULL OR d.deal_status = 'valid')");
-        }
-        _ => {
-            qb.push(" AND (d.topic_id IS NULL OR d.deal_status <> 'expired')");
-        }
+    if !f.include_expired {
+        // 到期时间已过的羊毛不再展示（长期有效或没写有效期的一直展示）。
+        qb.push(" AND (d.topic_id IS NULL OR d.long_term OR d.expires_at IS NULL OR d.expires_at > now())");
     }
     if f.featured {
         qb.push(" AND t.featured");
@@ -311,7 +258,6 @@ pub async fn list_topics(pool: &PgPool, f: &ListFilter) -> Result<Page<TopicItem
         Some("new") => "t.created_at DESC",
         Some("hot") => "t.hot_score DESC, t.created_at DESC",
         Some("expiring") => "d.expires_at ASC NULLS LAST, t.created_at DESC",
-        Some("verified") => "d.last_verified_at DESC NULLS LAST",
         _ => "t.last_reply_at DESC",
     };
     qb.push(format!(" ORDER BY {pinned_first}{order}, t.id DESC LIMIT "))
@@ -357,38 +303,14 @@ async fn attach_tags(pool: &PgPool, rows: Vec<TopicRow>) -> Result<Vec<TopicItem
     }).collect())
 }
 
-/// 重新统计羊毛的票数并更新状态：失效票（加权）占比 ≥ 40% 且总票数 ≥ 5 时转为"疑似失效"，
-/// 有效票重新占优后恢复"有效"；"已失效"只能由版主或到期设置，投票不会改回。
-pub async fn recompute_deal(pool: &PgPool, topic_id: i64) -> Result<(), AppError> {
-    sqlx::query(
-        "WITH v AS (
-            SELECT COALESCE(SUM(weight) FILTER (WHERE value = 1), 0)::int AS valid,
-                   COALESCE(SUM(weight) FILTER (WHERE value = -1), 0)::int AS invalid,
-                   COUNT(*)::int AS total
-            FROM deal_votes WHERE topic_id = $1
-         )
-         UPDATE deals d SET valid_votes = v.valid, invalid_votes = v.invalid,
-            deal_status = CASE
-                WHEN d.deal_status = 'expired' THEN 'expired'
-                WHEN v.total >= 5 AND v.invalid * 10 >= (v.valid + v.invalid) * 4 THEN 'suspect'
-                ELSE 'valid' END
-         FROM v WHERE d.topic_id = $1",
-    )
-    .bind(topic_id)
-    .execute(pool)
-    .await?;
-    Ok(())
-}
-
-/// 热度：(有效票×3 + 点赞×2 + 回复 − 失效票×3) / (发帖小时数 + 2)^1.5
-pub const HOT_SCORE_SQL: &str = "(COALESCE(d.valid_votes, 0) * 3 + t.like_count * 2 + t.reply_count - COALESCE(d.invalid_votes, 0) * 3)::float8
+/// 热度：(点赞×2 + 回复) / (发帖小时数 + 2)^1.5
+pub const HOT_SCORE_SQL: &str = "(t.like_count * 2 + t.reply_count)::float8
     / power(EXTRACT(EPOCH FROM (now() - t.created_at)) / 3600.0 + 2, 1.5)";
 
 pub async fn refresh_hot_scores(pool: &PgPool, topic_id: Option<i64>) -> Result<u64, AppError> {
     let sql = format!(
         "UPDATE topics t SET hot_score = {HOT_SCORE_SQL}
-         FROM topics t2 LEFT JOIN deals d ON d.topic_id = t2.id
-         WHERE t.id = t2.id AND {}",
+         WHERE {}",
         if topic_id.is_some() { "t.id = $1" } else { "t.created_at > now() - interval '7 days'" }
     );
     let mut q = sqlx::query(&sql);
@@ -396,27 +318,4 @@ pub async fn refresh_hot_scores(pool: &PgPool, topic_id: Option<i64>) -> Result<
         q = q.bind(id);
     }
     Ok(q.execute(pool).await?.rows_affected())
-}
-
-/// 到期的羊毛标为已失效。
-pub async fn expire_deals(pool: &PgPool) -> Result<u64, AppError> {
-    Ok(sqlx::query(
-        "UPDATE deals SET deal_status = 'expired'
-         WHERE deal_status <> 'expired' AND NOT long_term AND expires_at IS NOT NULL AND expires_at < now()",
-    )
-    .execute(pool)
-    .await?
-    .rows_affected())
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn condition_names_map_to_bits() {
-        assert_eq!(condition_bits("card,realname"), 33);
-        assert_eq!(condition_bits(" phone_cn , bogus"), 2);
-        assert_eq!(condition_bits(""), 0);
-    }
 }

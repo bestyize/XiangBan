@@ -5,7 +5,6 @@ import { AdminApiError, type AdminPage } from '@/api/admin'
 // ───────────────────────── 文案 ─────────────────────────
 
 export const TOPIC_STATUS: Record<string, string> = { normal: '正常', hidden: '已隐藏', deleted: '已删除' }
-export const DEAL_STATUS: Record<string, string> = { valid: '有效', suspect: '疑似失效', expired: '已失效' }
 export const USER_STATUS: Record<string, string> = { active: '正常', muted: '禁言中', banned: '已封禁' }
 export const TRUST_LEVELS = [
   { level: 0, name: '新人' },
@@ -69,9 +68,6 @@ export function trustName(level: number): string {
 /** 状态对应的标签色调，样式见 admin.css。 */
 export function topicTone(status: string): string {
   return status === 'normal' ? 'valid' : status === 'hidden' ? 'suspect' : 'expired'
-}
-export function dealTone(status: string): string {
-  return status // valid / suspect / expired 与样式类同名
 }
 export function userTone(status: string): string {
   return status === 'active' ? 'valid' : status === 'muted' ? 'suspect' : 'danger'

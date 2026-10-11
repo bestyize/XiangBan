@@ -31,7 +31,7 @@ const progress = computed(() => {
       <span class="muted">信任等级 {{ session.user.trust_level }}</span>
     </p>
     <template v-if="progress">
-      <p class="hint">再多看看帖子就能发帖和投票。</p>
+      <p class="hint">再多看看帖子就能发帖。</p>
       <div class="meter">
         <span>注册天数</span>
         <span class="num">{{ progress.days }} / {{ progress.needDays }}</span>
@@ -61,7 +61,7 @@ const progress = computed(() => {
     <ul class="rules">
       <li>只贴官方活动页，不带个人推广链接</li>
       <li>不分享、不交易 API Key 和账号</li>
-      <li>领不到了就投"失效"，帮后来的人省时间</li>
+      <li>写清楚领取条件和有效期，帮后来的人省时间</li>
     </ul>
     <RouterLink to="/rules" class="more">社区规则</RouterLink>
   </section>

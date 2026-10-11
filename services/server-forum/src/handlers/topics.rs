@@ -2,7 +2,7 @@ use crate::{
     auth::{AuthUser, MaybeUser},
     error::{AppError, AppResult},
     markdown,
-    models::{self, ListFilter, Page, TopicItem, CONDITION_MASK, DEAL_TYPES, REGIONS},
+    models::{self, ListFilter, Page, TopicItem, CONDITION_MASK},
     state::AppState,
     users,
 };
@@ -40,13 +40,8 @@ pub struct TopicDetail {
 pub struct Viewer {
     pub liked: bool,
     pub bookmarked: bool,
-    /// 1 有效、-1 失效、0 未投
-    pub vote: i16,
     pub can_edit: bool,
     pub can_reply: bool,
-    pub can_vote: bool,
-    /// TL3 守护者可以直接标记羊毛状态
-    pub can_moderate: bool,
 }
 
 pub async fn get(State(state): State<AppState>, MaybeUser(user): MaybeUser, Path(id): Path<i64>) -> AppResult<Json<TopicDetail>> {
@@ -73,10 +68,9 @@ pub async fn get(State(state): State<AppState>, MaybeUser(user): MaybeUser, Path
             sqlx::query("UPDATE users SET read_count = read_count + 1 WHERE uid = $1").bind(u.uid).execute(&state.pool).await?;
             users::maybe_promote(&state.pool, &state.config.trust, u.uid).await?;
         }
-        let (liked, bookmarked, vote): (bool, bool, Option<i16>) = sqlx::query_as(
+        let (liked, bookmarked): (bool, bool) = sqlx::query_as(
             "SELECT EXISTS(SELECT 1 FROM likes WHERE target_type = 'topic' AND target_id = $1 AND uid = $2),
-                    EXISTS(SELECT 1 FROM bookmarks WHERE topic_id = $1 AND uid = $2),
-                    (SELECT value FROM deal_votes WHERE topic_id = $1 AND uid = $2)",
+                    EXISTS(SELECT 1 FROM bookmarks WHERE topic_id = $1 AND uid = $2)",
         )
         .bind(id)
         .bind(u.uid)
@@ -86,26 +80,22 @@ pub async fn get(State(state): State<AppState>, MaybeUser(user): MaybeUser, Path
         viewer = Viewer {
             liked,
             bookmarked,
-            vote: vote.unwrap_or(0),
             can_edit: is_author && !topic.locked && writable,
             can_reply: !topic.locked && writable,
-            can_vote: topic.deal.is_some() && u.trust_level >= 1 && writable,
-            can_moderate: u.trust_level >= 3,
         };
     }
     Ok(Json(TopicDetail { topic, body_html, body_md, viewer }))
 }
 
-#[derive(Deserialize)]
+/// 羊毛信息，每一项发帖人都可以不填。
+#[derive(Deserialize, Default)]
 pub struct DealInput {
-    pub product_id: i32,
-    pub deal_type: String,
+    pub product_id: Option<i32>,
     #[serde(default)]
     pub value_text: String,
+    /// 领取条件位标志，0 表示没有特殊条件或没写。
     #[serde(default)]
     pub conditions: i32,
-    #[serde(default)]
-    pub region: Option<String>,
     #[serde(default)]
     pub link_url: String,
     pub expires_at: Option<DateTime<Utc>>,
@@ -204,19 +194,11 @@ fn clean_tags(raw: &[String]) -> AppResult<Vec<String>> {
 }
 
 fn clean_deal(d: &DealInput) -> AppResult<()> {
-    if !DEAL_TYPES.contains(&d.deal_type.as_str()) {
-        return Err(AppError::BadRequest("羊毛类型无效".into()));
-    }
     if d.value_text.chars().count() > 40 {
         return Err(AppError::BadRequest("价值描述最多 40 个字".into()));
     }
     if d.conditions & !CONDITION_MASK != 0 {
         return Err(AppError::BadRequest("领取条件无效".into()));
-    }
-    if let Some(r) = &d.region {
-        if !REGIONS.contains(&r.as_str()) {
-            return Err(AppError::BadRequest("地区无效".into()));
-        }
     }
     validate_link(d.link_url.trim())
 }
@@ -239,9 +221,11 @@ pub async fn save_tags(pool: &PgPool, topic_id: i64, tags: &[String]) -> AppResu
     Ok(())
 }
 
-async fn ensure_product(pool: &PgPool, id: i32) -> AppResult<()> {
+/// 产品可以不选；选了就必须是库里有的。
+async fn ensure_product(pool: &PgPool, id: Option<i32>) -> AppResult<()> {
+    let Some(id) = id else { return Ok(()) };
     let exists: Option<(i32,)> = sqlx::query_as("SELECT id FROM products WHERE id = $1").bind(id).fetch_optional(pool).await?;
-    exists.map(|_| ()).ok_or_else(|| AppError::BadRequest("请选择关联产品".into()))
+    exists.map(|_| ()).ok_or_else(|| AppError::BadRequest("关联产品不存在".into()))
 }
 
 pub async fn create(State(state): State<AppState>, auth: AuthUser, Json(input): Json<TopicInput>) -> AppResult<Json<Value>> {
@@ -262,14 +246,16 @@ pub async fn create(State(state): State<AppState>, auth: AuthUser, Json(input): 
     let title = clean_title(&input.title)?;
     let body = clean_body(&input.body, if cat.kind == "deal" { 0 } else { 10 })?;
     let tags = clean_tags(&input.tags)?;
+    let empty_deal = DealInput::default();
     let deal = match (cat.kind.as_str(), &input.deal) {
         ("deal", Some(d)) => {
             clean_deal(d)?;
             ensure_product(&state.pool, d.product_id).await?;
             Some(d)
         }
-        ("deal", None) => return Err(AppError::BadRequest("羊毛帖需要填写羊毛信息".into())),
-        (_, Some(_)) => return Err(AppError::BadRequest("只有羊毛库分类可以填写羊毛信息".into())),
+        // 羊毛信息全是选填，什么都没填也照样发成羊毛帖。
+        ("deal", None) => Some(&empty_deal),
+        (_, Some(_)) => return Err(AppError::BadRequest("只有福利羊毛分类可以填写羊毛信息".into())),
         _ => None,
     };
 
@@ -292,15 +278,13 @@ pub async fn create(State(state): State<AppState>, auth: AuthUser, Json(input): 
     .await?;
     if let Some(d) = deal {
         sqlx::query(
-            "INSERT INTO deals (topic_id, product_id, deal_type, value_text, conditions, region, link_url, expires_at, long_term)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)",
+            "INSERT INTO deals (topic_id, product_id, value_text, conditions, link_url, expires_at, long_term)
+             VALUES ($1, $2, $3, $4, $5, $6, $7)",
         )
         .bind(id)
         .bind(d.product_id)
-        .bind(&d.deal_type)
         .bind(d.value_text.trim())
         .bind(d.conditions)
-        .bind(d.region.as_deref().unwrap_or("any"))
         .bind(d.link_url.trim())
         .bind(if d.long_term { None } else { d.expires_at })
         .bind(d.long_term)
@@ -357,16 +341,13 @@ pub async fn update(
             clean_deal(d)?;
             ensure_product(&state.pool, d.product_id).await?;
             sqlx::query(
-                "UPDATE deals SET product_id = $2, deal_type = $3, value_text = $4, conditions = $5, region = $6,
-                    link_url = $7, expires_at = $8, long_term = $9
+                "UPDATE deals SET product_id = $2, value_text = $3, conditions = $4, link_url = $5, expires_at = $6, long_term = $7
                  WHERE topic_id = $1",
             )
             .bind(id)
             .bind(d.product_id)
-            .bind(&d.deal_type)
             .bind(d.value_text.trim())
             .bind(d.conditions)
-            .bind(d.region.as_deref().unwrap_or("any"))
             .bind(d.link_url.trim())
             .bind(if d.long_term { None } else { d.expires_at })
             .bind(d.long_term)

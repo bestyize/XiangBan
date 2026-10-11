@@ -6,11 +6,10 @@ import TopicList from '@/components/TopicList.vue'
 import PagerNav from '@/components/PagerNav.vue'
 import { api } from '@/api/forum'
 import { useMeta } from '@/stores/meta'
-import { CONDITIONS, DEAL_TYPE_LABEL } from '@/lib/format'
 import { useTopicList } from '@/lib/useList'
 import { useHead } from '@/lib/head'
 
-useHead(() => ({ title: 'AI 羊毛库' }))
+useHead(() => ({ title: '福利羊毛' }))
 
 const route = useRoute()
 const router = useRouter()
@@ -18,19 +17,13 @@ const meta = useMeta()
 
 const SORTS = [
   { key: 'new', label: '最新' },
-  { key: 'verified', label: '最近验证' },
   { key: 'hot', label: '热门' },
   { key: 'expiring', label: '快过期' },
 ] as const
 
 const str = (k: string) => (typeof route.query[k] === 'string' ? (route.query[k] as string) : '')
 const category = computed(() => str('category'))
-const product = computed(() => str('product'))
-const dealType = computed(() => str('type'))
-const region = computed(() => str('region'))
 const sort = computed(() => str('sort') || 'new')
-const without = computed(() => str('without').split(',').filter(Boolean))
-const showExpired = computed(() => str('expired') === '1')
 
 const dealRoot = computed(() => meta.tree.find(n => n.kind === 'deal'))
 
@@ -42,26 +35,11 @@ function update(patch: Record<string, string | undefined>) {
   router.replace({ query: next })
 }
 
-function toggleWithout(key: string) {
-  const set = new Set(without.value)
-  if (set.has(key)) set.delete(key)
-  else set.add(key)
-  update({ without: [...set].join(',') })
-}
-
-const filtersOn = computed(
-  () => !!(category.value || product.value || dealType.value || region.value || without.value.length || showExpired.value),
-)
-
+// 已到期的羊毛默认不显示；只按分类和排序取。
 const list = useTopicList(
   p =>
     api.deals({
       category: category.value || undefined,
-      product: product.value || undefined,
-      deal_type: dealType.value || undefined,
-      region: region.value || undefined,
-      without: without.value.join(',') || undefined,
-      deal_status: showExpired.value ? 'all' : 'active',
       sort: sort.value as 'new',
       page: p,
     }),
@@ -73,72 +51,24 @@ const list = useTopicList(
   <ForumShell active="deals" :rail="false">
     <header class="head">
       <div>
-        <h1>AI 羊毛库</h1>
-        <p class="muted">按条件筛出你能领的。失效的会自动沉底，也欢迎你帮忙投票。</p>
+        <h1>福利羊毛</h1>
+        <p class="muted">大家分享的免费额度、试用和优惠，到期后自动下架。</p>
       </div>
-      <RouterLink to="/new?category=deals-llm-api" class="btn btn-primary">分享羊毛</RouterLink>
+      <RouterLink to="/new?category=deals-ai" class="btn btn-primary">分享羊毛</RouterLink>
     </header>
 
-    <section class="filters panel" aria-label="筛选">
-      <div class="frow">
-        <span class="flabel">分类</span>
-        <div class="opts">
-          <button type="button" :class="{ on: !category }" @click="update({ category: undefined })">全部</button>
-          <button
-            v-for="c in dealRoot?.children ?? []"
-            :key="c.id"
-            type="button"
-            :class="{ on: category === c.slug }"
-            @click="update({ category: c.slug })"
-          >
-            {{ c.name }}
-          </button>
-        </div>
-      </div>
-      <div class="frow">
-        <span class="flabel">我没有</span>
-        <div class="opts">
-          <button
-            v-for="c in CONDITIONS"
-            :key="c.key"
-            type="button"
-            :class="{ on: without.includes(c.key) }"
-            :aria-pressed="without.includes(c.key)"
-            @click="toggleWithout(c.key)"
-          >
-            {{ c.label.replace('需要', '') }}
-          </button>
-        </div>
-      </div>
-      <div class="frow selects">
-        <label>
-          <span class="flabel">类型</span>
-          <select class="select" :value="dealType" @change="update({ type: ($event.target as HTMLSelectElement).value })">
-            <option value="">全部类型</option>
-            <option v-for="(label, key) in DEAL_TYPE_LABEL" :key="key" :value="key">{{ label }}</option>
-          </select>
-        </label>
-        <label>
-          <span class="flabel">产品</span>
-          <select class="select" :value="product" @change="update({ product: ($event.target as HTMLSelectElement).value })">
-            <option value="">全部产品</option>
-            <option v-for="p in meta.products" :key="p.id" :value="p.slug">{{ p.name }}</option>
-          </select>
-        </label>
-        <label>
-          <span class="flabel">地区</span>
-          <select class="select" :value="region" @change="update({ region: ($event.target as HTMLSelectElement).value })">
-            <option value="">不限</option>
-            <option value="cn">国内能用</option>
-            <option value="intl">海外能用</option>
-          </select>
-        </label>
-        <label class="check">
-          <input type="checkbox" :checked="showExpired" @change="update({ expired: showExpired ? undefined : '1' })" />
-          <span>显示已失效</span>
-        </label>
-      </div>
-    </section>
+    <nav class="cats" aria-label="分类">
+      <button type="button" :class="{ on: !category }" @click="update({ category: undefined })">全部</button>
+      <button
+        v-for="c in dealRoot?.children ?? []"
+        :key="c.id"
+        type="button"
+        :class="{ on: category === c.slug }"
+        @click="update({ category: c.slug })"
+      >
+        {{ c.name }}
+      </button>
+    </nav>
 
     <div class="bar">
       <div class="sorts" role="tablist" aria-label="排序">
@@ -155,12 +85,11 @@ const list = useTopicList(
         </button>
       </div>
       <span class="muted count">{{ list.total.value }} 条</span>
-      <button v-if="filtersOn" type="button" class="btn btn-ghost btn-sm" @click="router.replace({ query: {} })">清除筛选</button>
     </div>
 
     <TopicList :items="list.items.value" :loading="list.loading.value">
       <template #empty>
-        <p>{{ filtersOn ? '没有符合这些条件的羊毛，放宽一点试试。' : '羊毛库还是空的。' }}</p>
+        <p>{{ category ? '这个分类下还没有福利。' : '还没有人分享福利。' }}</p>
       </template>
     </TopicList>
     <PagerNav :page="list.page.value" :page-size="list.pageSize.value" :total="list.total.value" @go="list.go" />
@@ -184,72 +113,28 @@ h1 {
   margin: 0;
   font-size: var(--fs-sm);
 }
-.filters {
-  padding: 12px 14px;
-  display: grid;
-  gap: 10px;
-  margin-bottom: 14px;
-}
-.frow {
-  display: grid;
-  grid-template-columns: 56px minmax(0, 1fr);
-  gap: 10px;
-  align-items: start;
-}
-.flabel {
-  font-size: var(--fs-xs);
-  font-weight: 700;
-  color: var(--ink-3);
-  padding-top: 4px;
-}
-.opts {
+.cats {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
+  margin-bottom: 14px;
 }
-.opts button {
+.cats button {
   border: 1px solid var(--line);
   background: var(--surface);
   border-radius: 14px;
-  padding: 3px 11px;
-  font-size: var(--fs-xs);
+  padding: 4px 12px;
+  font-size: var(--fs-sm);
   font-weight: 600;
   color: var(--ink-2);
 }
-.opts button:hover {
+.cats button:hover {
   border-color: var(--line-strong);
 }
-.opts button.on {
+.cats button.on {
   background: var(--ink);
   border-color: var(--ink);
   color: var(--paper);
-}
-.selects {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px 16px;
-  align-items: center;
-  padding-top: 10px;
-  border-top: 1px solid var(--line);
-}
-.selects label {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.selects .flabel {
-  padding: 0;
-}
-.selects .select {
-  width: auto;
-  min-width: 120px;
-  padding: 4px 8px;
-  font-size: var(--fs-sm);
-}
-.check {
-  font-size: var(--fs-sm);
-  color: var(--ink-2);
-  margin-left: auto;
 }
 .bar {
   display: flex;
@@ -289,32 +174,19 @@ h1 {
   h1 {
     font-size: var(--fs-xl);
   }
-  .frow {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 6px;
-  }
-  .flabel {
-    padding: 0;
-  }
-  .opts {
+  /* 手机上分类标签单行横向滑动。 */
+  .cats {
     flex-wrap: nowrap;
     overflow-x: auto;
     scrollbar-width: none;
-    margin: 0 -14px;
-    padding: 0 14px;
+    margin-right: -12px;
+    padding-right: 12px;
   }
-  .opts button {
+  .cats::-webkit-scrollbar {
+    display: none;
+  }
+  .cats button {
     flex: none;
-  }
-  .selects label:not(.check) {
-    flex: 1 1 40%;
-  }
-  .selects .select {
-    min-width: 0;
-    flex: 1;
-  }
-  .check {
-    margin-left: 0;
   }
   .bar {
     flex-wrap: wrap;

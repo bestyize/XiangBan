@@ -10,7 +10,6 @@ import type {
   TopicInput,
   TopicItem,
   UserReply,
-  DealStatus,
 } from './types'
 
 export class ApiError extends Error {
@@ -83,13 +82,11 @@ export interface ListParams extends Query {
   tag?: string
   product?: string
   q?: string
-  sort?: 'latest' | 'new' | 'hot' | 'expiring' | 'verified'
+  sort?: 'latest' | 'new' | 'hot' | 'expiring'
   home?: boolean
   kind?: 'deal' | 'normal'
-  deal_type?: string
-  without?: string
-  region?: string
-  deal_status?: 'active' | 'valid' | 'all'
+  /** 默认不返回已到期的羊毛 */
+  include_expired?: boolean
   featured?: boolean
   page?: number
   page_size?: number
@@ -127,14 +124,6 @@ export const api = {
   likePost: (id: number, on: boolean) =>
     request<{ liked: boolean; like_count: number }>(on ? 'PUT' : 'DELETE', `/posts/${id}/like`),
   bookmark: (id: number, on: boolean) => request<{ bookmarked: boolean }>(on ? 'PUT' : 'DELETE', `/topics/${id}/bookmark`),
-  vote: (id: number, value: 'valid' | 'invalid' | 'none') =>
-    request<{ deal_status: DealStatus; valid_votes: number; invalid_votes: number; last_verified_at: string; vote: -1 | 0 | 1 }>(
-      'PUT',
-      `/deals/${id}/vote`,
-      { value },
-    ),
-  setDealStatus: (id: number, status: DealStatus) =>
-    request<{ deal_status: DealStatus }>('PUT', `/deals/${id}/status`, { status }),
   report: (target_type: 'topic' | 'post', target_id: number, reason: string, detail: string) =>
     request<unknown>('POST', '/reports', { target_type, target_id, reason, detail }),
 

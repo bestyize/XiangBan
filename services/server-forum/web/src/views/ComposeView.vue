@@ -3,11 +3,11 @@ import { computed, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import MarkdownEditor from '@/components/MarkdownEditor.vue'
 import { api } from '@/api/forum'
-import type { DealType, Region, TopicInput } from '@/api/types'
+import type { TopicInput } from '@/api/types'
 import { useMeta } from '@/stores/meta'
 import { useSession } from '@/stores/session'
 import { useToast } from '@/stores/toast'
-import { CONDITIONS, DEAL_TYPE_LABEL } from '@/lib/format'
+import { CONDITIONS } from '@/lib/format'
 import { useHead } from '@/lib/head'
 
 const route = useRoute()
@@ -25,11 +25,10 @@ const form = reactive({
   title: '',
   body: '',
   tags: [] as string[],
+  /** 0 表示没选 */
   productId: 0,
-  dealType: 'free_credit' as DealType,
   valueText: '',
   conditions: 0,
-  region: 'any' as Region,
   linkUrl: '',
   expiry: 'unknown' as 'unknown' | 'date' | 'long',
   expiresDate: '',
@@ -97,11 +96,9 @@ watch(
       form.tags = [...t.tags]
       loadedKind.value = t.deal ? 'deal' : 'normal'
       if (t.deal) {
-        form.productId = t.deal.product.id
-        form.dealType = t.deal.deal_type
+        form.productId = t.deal.product?.id ?? 0
         form.valueText = t.deal.value_text
         form.conditions = t.deal.conditions
-        form.region = t.deal.region
         form.linkUrl = t.deal.link_url
         form.expiry = t.deal.long_term ? 'long' : t.deal.expires_at ? 'date' : 'unknown'
         form.expiresDate = t.deal.expires_at ? t.deal.expires_at.slice(0, 10) : ''
@@ -141,15 +138,14 @@ function onTagKey(e: KeyboardEvent) {
 const titleLen = computed(() => Array.from(form.title.trim()).length)
 
 const titleHint = computed(() =>
-  isDeal.value ? '写清楚产品和能领到什么，比如：Claude API 新用户送 $5 额度，无需信用卡' : '一句话说清楚你想讨论什么',
+  isDeal.value ? '写清楚是什么福利，比如：Claude API 新用户送 $5 额度，无需信用卡' : '一句话说清楚你想讨论什么',
 )
 
 async function submit() {
   error.value = ''
   if (!form.categoryId) return (error.value = '请选择分类')
   if (titleLen.value < 4) return (error.value = '标题至少 4 个字')
-  if (isDeal.value && !form.productId) return (error.value = '请选择关联产品')
-  if (isDeal.value && form.expiry === 'date' && !form.expiresDate) return (error.value = '请选择截止日期，或改成"有效期未知"')
+  if (isDeal.value && form.expiry === 'date' && !form.expiresDate) return (error.value = '请选择截止日期，或改成"不清楚"')
   addTag()
   const input: TopicInput = {
     category_id: form.categoryId,
@@ -159,11 +155,9 @@ async function submit() {
   }
   if (isDeal.value) {
     input.deal = {
-      product_id: form.productId,
-      deal_type: form.dealType,
+      product_id: form.productId || null,
       value_text: form.valueText,
       conditions: form.conditions,
-      region: form.region,
       link_url: form.linkUrl.trim(),
       // 截止日期按北京时间当天结束算。
       expires_at: form.expiry === 'date' ? new Date(`${form.expiresDate}T23:59:59+08:00`).toISOString() : null,
@@ -188,7 +182,7 @@ const blocked = computed(() => {
   if (!session.info || editId.value) return ''
   if (u?.status === 'muted') return '你目前处于禁言中，暂时不能发帖。'
   if (session.info.limits.daily_topics <= 0) {
-    return `新人暂时不能发帖。注册满 ${session.info.limits.tl1_days} 天并读过 ${session.info.limits.tl1_reads} 个帖子后会自动升级为成员，到时候就能发帖和投票了。现在可以先回复和点赞。`
+    return `新人暂时不能发帖。注册满 ${session.info.limits.tl1_days} 天并读过 ${session.info.limits.tl1_reads} 个帖子后会自动升级为成员，到时候就能发帖了。现在可以先回复和点赞。`
   }
   return ''
 })
@@ -229,28 +223,20 @@ const today = new Date().toISOString().slice(0, 10)
       </section>
 
       <section v-if="isDeal" class="panel section deal">
-        <h2>羊毛信息</h2>
+        <h2>羊毛信息 <span class="optional">都是选填，不确定的可以不填</span></h2>
         <div class="grid">
           <label class="field">
             <span>关联产品</span>
-            <select v-model.number="form.productId" class="select" required>
-              <option :value="0" disabled>选择产品</option>
+            <select v-model.number="form.productId" class="select">
+              <option :value="0">不选</option>
               <option v-for="p in meta.products" :key="p.id" :value="p.id">{{ p.name }}{{ p.vendor && p.vendor !== p.name ? `（${p.vendor}）` : '' }}</option>
-            </select>
-            <small>没有你要的产品就选"其他"，并在标题里写清楚。</small>
-          </label>
-          <label class="field">
-            <span>羊毛类型</span>
-            <select v-model="form.dealType" class="select">
-              <option v-for="(label, key) in DEAL_TYPE_LABEL" :key="key" :value="key">{{ label }}</option>
             </select>
           </label>
           <label class="field">
             <span>能领到什么</span>
             <input v-model="form.valueText" class="input" maxlength="40" placeholder="$5 额度、首月 1 元、3 个月 Pro" />
-            <small>会高亮显示在列表里，数字放在最前面更醒目。</small>
           </label>
-          <label class="field">
+          <label class="field wide">
             <span>官方活动页</span>
             <input v-model="form.linkUrl" class="input" type="url" inputmode="url" maxlength="500" placeholder="https://" />
             <small>不要带 ref、aff、invite 这类个人推广参数。</small>
@@ -258,7 +244,7 @@ const today = new Date().toISOString().slice(0, 10)
         </div>
 
         <fieldset class="field conds">
-          <legend>领取条件（需要什么就勾什么）</legend>
+          <legend>领取条件</legend>
           <div class="checks">
             <label v-for="c in CONDITIONS" :key="c.key" class="check" :class="{ on: form.conditions & c.bit }">
               <input type="checkbox" :checked="!!(form.conditions & c.bit)" @change="toggleCondition(c.bit)" />
@@ -267,25 +253,15 @@ const today = new Date().toISOString().slice(0, 10)
           </div>
         </fieldset>
 
-        <div class="grid">
-          <fieldset class="field">
-            <legend>能在哪用</legend>
-            <div class="seg">
-              <label :class="{ on: form.region === 'any' }"><input v-model="form.region" type="radio" value="any" />不限</label>
-              <label :class="{ on: form.region === 'cn' }"><input v-model="form.region" type="radio" value="cn" />国内</label>
-              <label :class="{ on: form.region === 'intl' }"><input v-model="form.region" type="radio" value="intl" />仅海外</label>
-            </div>
-          </fieldset>
-          <fieldset class="field">
-            <legend>有效期</legend>
-            <div class="seg">
-              <label :class="{ on: form.expiry === 'unknown' }"><input v-model="form.expiry" type="radio" value="unknown" />不清楚</label>
-              <label :class="{ on: form.expiry === 'date' }"><input v-model="form.expiry" type="radio" value="date" />截止到</label>
-              <label :class="{ on: form.expiry === 'long' }"><input v-model="form.expiry" type="radio" value="long" />长期有效</label>
-            </div>
-            <input v-if="form.expiry === 'date'" v-model="form.expiresDate" class="input date" type="date" :min="today" aria-label="截止日期" />
-          </fieldset>
-        </div>
+        <fieldset class="field">
+          <legend>有效期</legend>
+          <div class="seg">
+            <label :class="{ on: form.expiry === 'unknown' }"><input v-model="form.expiry" type="radio" value="unknown" />不清楚</label>
+            <label :class="{ on: form.expiry === 'date' }"><input v-model="form.expiry" type="radio" value="date" />截止到</label>
+            <label :class="{ on: form.expiry === 'long' }"><input v-model="form.expiry" type="radio" value="long" />长期有效</label>
+          </div>
+          <input v-if="form.expiry === 'date'" v-model="form.expiresDate" class="input date" type="date" :min="today" aria-label="截止日期" />
+        </fieldset>
       </section>
 
       <section class="panel section">
@@ -379,6 +355,15 @@ h1 {
 .section h2 {
   margin: 0;
   font-size: var(--fs-md);
+}
+.optional {
+  margin-left: 8px;
+  font-size: var(--fs-xs);
+  font-weight: 400;
+  color: var(--ink-3);
+}
+.grid .wide {
+  grid-column: 1 / -1;
 }
 fieldset {
   border: 0;

@@ -1,9 +1,9 @@
 <script setup lang="ts">
 // 帖子管理：搜索与筛选，行内隐藏/删除/置顶/加精/锁定，移动分类，修改羊毛状态。
 import { computed, onMounted, ref } from 'vue'
-import { adminApi, type AdminCategory, type AdminTopic, type DealStatus, type TopicAction, type TopicState } from '@/api/admin'
+import { adminApi, type AdminCategory, type AdminTopic, type TopicAction, type TopicState } from '@/api/admin'
 import AdminPager from './AdminPager.vue'
-import { DEAL_STATUS, dealTone, fmtTime, perform, TOPIC_STATUS, topicTone, usePagedList } from './shared'
+import { fmtTime, perform, TOPIC_STATUS, topicTone, usePagedList } from './shared'
 
 const q = ref('')
 const status = ref('all')
@@ -52,15 +52,6 @@ async function move(t: AdminTopic, ev: Event) {
     t.category_id = target.id
     t.category_name = target.name
   }
-}
-
-async function setDeal(t: AdminTopic, ev: Event) {
-  const el = ev.target as HTMLSelectElement
-  const next = el.value as DealStatus
-  const prev = t.deal_status
-  const ok = await perform(() => adminApi.setDealStatus(t.id, next), `羊毛状态已改为${DEAL_STATUS[next]}`)
-  if (ok) t.deal_status = next
-  else el.value = prev ?? ''
 }
 
 onMounted(async () => {
@@ -134,9 +125,7 @@ onMounted(async () => {
           <td data-label="状态" class="shrink">
             <span class="adm-tags">
               <span class="adm-tag" :class="topicTone(t.status)">{{ TOPIC_STATUS[t.status] }}</span>
-              <span v-if="t.deal_status" class="adm-tag" :class="dealTone(t.deal_status)">
-                {{ DEAL_STATUS[t.deal_status] }}
-              </span>
+              <span v-if="t.is_deal" class="adm-tag">羊毛</span>
             </span>
           </td>
           <td data-label="回复" class="num">{{ t.reply_count }}</td>
@@ -166,15 +155,6 @@ onMounted(async () => {
               <select class="select is-sm" aria-label="移动到分类" @change="move(t, $event)">
                 <option value="">移动到分类</option>
                 <option v-for="c in moveTargets(t)" :key="c.id" :value="c.id">{{ categoryLabel(c) }}</option>
-              </select>
-              <select
-                v-if="t.deal_status"
-                class="select is-sm"
-                aria-label="羊毛状态"
-                :value="t.deal_status"
-                @change="setDeal(t, $event)"
-              >
-                <option v-for="(label, key) in DEAL_STATUS" :key="key" :value="key">羊毛{{ label }}</option>
               </select>
             </div>
           </td>

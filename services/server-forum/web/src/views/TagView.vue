@@ -13,7 +13,7 @@ const route = useRoute()
 const name = computed(() => String(route.params.name))
 useHead(() => ({ title: `#${name.value}` }))
 
-const list = useTopicList(p => api.topics({ tag: name.value, sort: 'new', deal_status: 'all', page: p }), [name])
+const list = useTopicList(p => api.topics({ tag: name.value, sort: 'new', include_expired: true, page: p }), [name])
 </script>
 
 <template>

@@ -17,7 +17,7 @@
 | [services/server-pan](services/server-pan/README.md) | 已实现 | PanDown 自托管网盘，Rust Axum + SQLite 后端与 React 前端，独立于主 API |
 | [services/server-xiangban-wallpaper](services/server-xiangban-wallpaper/README.md) | 已实现 | 正式壁纸网站 wallpaper.xiangban.xyz，图片/视频采集与上传、小伴桌面下载、版本与公告；桌面客户端接入此服务 |
 | [services/server-xiaoban-appstore](services/server-xiaoban-appstore/README.md) | 已实现 | 小伴优质应用商店，Rust Axum + PostgreSQL 后端与 Vue 3 + Vite 前端，腾讯柠檬精选美学与管理后台 |
-| [services/server-forum](services/server-forum/README.md) | 一期已实现，未部署 | 超级小伴论坛（chat.xiangban.xyz）：AI 羊毛库与讨论区，Rust Axum + PostgreSQL + Vue 3，登录走统一账号中心，带管理后台和 SEO 页面 |
+| [services/server-forum](services/server-forum/README.md) | 一期已实现，未部署 | 超级小伴论坛（chat.xiangban.xyz）：技术交流、资源分享、福利羊毛与闲聊的社区，Rust Axum + PostgreSQL + Vue 3，登录走统一账号中心，带管理后台和 SEO 页面 |
 | [services/server-account](services/server-account/README.md) | 已实现 | 统一账号中心与管理后台，邮箱/手机号验证码注册登录，Rust Axum + PostgreSQL + Vue 3，签发 EdDSA JWT；壁纸网站与相伴网页（xiaban.xyz，经主后端换票）已接入 |
 | [services/server-asr](services/server-asr/README.md) | 规划 | 语音识别服务 |
 | [services/server-edgetts](services/server-edgetts/README.md) | 规划 | Edge TTS 服务，现有语音功能仍在主后端 |

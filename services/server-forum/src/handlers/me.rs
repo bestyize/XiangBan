@@ -103,7 +103,7 @@ pub async fn user_topics(
     Query(mut f): Query<ListFilter>,
 ) -> AppResult<Json<Page<TopicItem>>> {
     f.author = Some(uid);
-    f.deal_status = Some("all".into());
+    f.include_expired = true;
     if f.sort.is_none() {
         f.sort = Some("new".into());
     }
@@ -149,7 +149,7 @@ pub async fn search(State(state): State<AppState>, Query(mut f): Query<ListFilte
     if f.sort.is_none() {
         f.sort = Some("new".into());
     }
-    f.deal_status = f.deal_status.or(Some("all".into()));
+    f.include_expired = true;
     let topics = models::list_topics(&state.pool, &f).await?;
     let pattern = format!("%{}%", q.replace('\\', "\\\\").replace('%', "\\%").replace('_', "\\_"));
     let products: Vec<(String, String, String)> = sqlx::query_as(

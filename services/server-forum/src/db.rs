@@ -72,22 +72,16 @@ CREATE INDEX IF NOT EXISTS topics_created_idx ON topics (created_at DESC);
 CREATE INDEX IF NOT EXISTS topics_author_idx ON topics (author_uid, created_at DESC);
 
 CREATE TABLE IF NOT EXISTS deals (
-    topic_id         BIGINT PRIMARY KEY REFERENCES topics(id) ON DELETE CASCADE,
-    product_id       INT NOT NULL REFERENCES products(id),
-    deal_type        TEXT NOT NULL,
-    value_text       TEXT NOT NULL DEFAULT '',
-    conditions       INT NOT NULL DEFAULT 0,
-    region           TEXT NOT NULL DEFAULT 'any',
-    link_url         TEXT NOT NULL DEFAULT '',
-    expires_at       TIMESTAMPTZ,
-    long_term        BOOLEAN NOT NULL DEFAULT false,
-    deal_status      TEXT NOT NULL DEFAULT 'valid',
-    valid_votes      INT NOT NULL DEFAULT 0,
-    invalid_votes    INT NOT NULL DEFAULT 0,
-    last_verified_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    topic_id   BIGINT PRIMARY KEY REFERENCES topics(id) ON DELETE CASCADE,
+    product_id INT REFERENCES products(id),
+    value_text TEXT NOT NULL DEFAULT '',
+    conditions INT NOT NULL DEFAULT 0,
+    link_url   TEXT NOT NULL DEFAULT '',
+    expires_at TIMESTAMPTZ,
+    long_term  BOOLEAN NOT NULL DEFAULT false
 );
 CREATE INDEX IF NOT EXISTS deals_product_idx ON deals (product_id);
-CREATE INDEX IF NOT EXISTS deals_status_idx ON deals (deal_status, expires_at);
+CREATE INDEX IF NOT EXISTS deals_expires_idx ON deals (expires_at);
 
 CREATE TABLE IF NOT EXISTS posts (
     id         BIGSERIAL PRIMARY KEY,
@@ -115,16 +109,6 @@ CREATE TABLE IF NOT EXISTS topic_tags (
     PRIMARY KEY (topic_id, tag_id)
 );
 CREATE INDEX IF NOT EXISTS topic_tags_tag_idx ON topic_tags (tag_id);
-
-CREATE TABLE IF NOT EXISTS deal_votes (
-    topic_id   BIGINT NOT NULL REFERENCES topics(id) ON DELETE CASCADE,
-    uid        UUID NOT NULL REFERENCES users(uid),
-    value      SMALLINT NOT NULL,
-    weight     SMALLINT NOT NULL DEFAULT 1,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-    PRIMARY KEY (topic_id, uid)
-);
 
 CREATE TABLE IF NOT EXISTS likes (
     target_type TEXT NOT NULL,
@@ -209,37 +193,31 @@ pub async fn migrate(pool: &PgPool) -> Result<(), AppError> {
 
 /// 分类种子：(slug, 名称, 说明, 类型, 父 slug, 最低发帖等级, 进首页, 加积分, 仅管理员)
 const CATEGORIES: &[(&str, &str, &str, &str, Option<&str>, i16, bool, bool, bool)] = &[
-    ("deals", "AI 羊毛库", "能领的免费额度、试用和优惠，每条都有人复查", "deal", None, 1, true, true, false),
-    ("deals-llm-api", "大模型 API", "免费额度、新用户赠金、学生优惠", "deal", Some("deals"), 1, true, true, false),
-    ("deals-ai-chat", "AI 对话产品", "会员试用、限免、邀请码", "deal", Some("deals"), 1, true, true, false),
-    ("deals-ai-coding", "AI 编程工具", "编程助手、IDE 插件的试用和优惠", "deal", Some("deals"), 1, true, true, false),
-    ("deals-media", "绘图 · 视频 · 音频", "生图、视频生成、语音合成", "deal", Some("deals"), 1, true, true, false),
-    ("deals-cloud", "云服务器 · GPU", "VPS 促销、GPU 试用、算力赠金", "deal", Some("deals"), 1, true, true, false),
-    ("deals-dev", "开发者福利", "域名、CDN、数据库、学生包", "deal", Some("deals"), 1, true, true, false),
-    ("deals-public", "公益站", "只收录信息，站方不做担保", "deal", Some("deals"), 1, true, true, false),
-    ("talk", "羊毛讨论", "领取求助、经验教程、失效反馈", "normal", None, 1, true, true, false),
-    ("talk-help", "求助问答", "领不到、被风控、怎么注册", "normal", Some("talk"), 1, true, true, false),
-    ("talk-guide", "教程经验", "领取步骤和使用技巧", "normal", Some("talk"), 1, true, true, false),
-    ("talk-expired", "失效反馈", "报告过期、条件变了", "normal", Some("talk"), 1, true, true, false),
-    ("talk-review", "测评对比", "同类工具横评", "normal", Some("talk"), 1, true, true, false),
+    // 板块顺序就是导航顺序：福利羊毛只是其中一个板块，不排在最前面。
+    ("tech", "技术交流", "开发、运维和模型部署", "normal", None, 1, true, true, false),
+    ("tech-ai-app", "AI 应用开发", "", "normal", Some("tech"), 1, true, true, false),
+    ("tech-dev", "前端 · 后端 · 移动端", "", "normal", Some("tech"), 1, true, true, false),
+    ("tech-ops", "服务器与运维", "", "normal", Some("tech"), 1, true, true, false),
+    ("tech-models", "模型部署", "本地跑模型、推理部署", "normal", Some("tech"), 1, true, true, false),
     ("share", "资源分享", "合规的开源项目、工具和学习资料", "normal", None, 1, true, true, false),
     ("share-oss", "开源项目", "", "normal", Some("share"), 1, true, true, false),
     ("share-tools", "工具软件", "免费软件和效率工具", "normal", Some("share"), 1, true, true, false),
     ("share-learn", "学习资料", "课程、电子书、文档", "normal", Some("share"), 1, true, true, false),
     ("share-prompts", "提示词 · 工作流", "Prompt、Agent 配置、自动化流程", "normal", Some("share"), 1, true, true, false),
     ("share-made", "自制作品", "自己做的工具和资源", "normal", Some("share"), 1, true, true, false),
-    ("tech", "技术交流", "开发、运维和模型部署", "normal", None, 1, true, true, false),
-    ("tech-ai-app", "AI 应用开发", "", "normal", Some("tech"), 1, true, true, false),
-    ("tech-dev", "前端 · 后端 · 移动端", "", "normal", Some("tech"), 1, true, true, false),
-    ("tech-ops", "服务器与运维", "", "normal", Some("tech"), 1, true, true, false),
-    ("tech-models", "模型部署", "本地跑模型、推理部署", "normal", Some("tech"), 1, true, true, false),
-    ("life", "生活", "工作之外的事", "normal", None, 1, true, false, false),
-    ("life-work", "职场", "加班、跳槽、远程办公", "normal", Some("life"), 1, true, false, false),
-    ("life-offwork", "下班了", "今日下班、打卡、吐槽", "normal", Some("life"), 1, true, false, false),
-    ("life-gear", "数码装备", "键盘、显示器、NAS", "normal", Some("life"), 1, true, false, false),
-    ("life-indie", "副业与独立开发", "", "normal", Some("life"), 1, true, false, false),
-    ("life-fun", "吃喝玩乐", "", "normal", Some("life"), 1, true, false, false),
-    ("life-chat", "闲聊灌水", "不进首页，不加积分", "normal", Some("life"), 1, false, false, false),
+    ("deals", "福利羊毛", "大家分享的免费额度、试用和优惠", "deal", None, 1, true, true, false),
+    ("deals-ai", "AI 羊毛", "大模型 API、AI 对话、编程工具、绘图视频音频的免费额度和优惠", "deal", Some("deals"), 1, true, true, false),
+    ("deals-cloud", "云服务器 · GPU", "VPS 促销、GPU 试用、算力赠金", "deal", Some("deals"), 1, true, true, false),
+    ("deals-dev", "开发者福利", "域名、CDN、数据库、学生包", "deal", Some("deals"), 1, true, true, false),
+    ("deals-public", "公益站", "只收录信息，站方不做担保", "deal", Some("deals"), 1, true, true, false),
+    ("deals-other", "其他福利", "不属于以上分类的福利和优惠", "deal", Some("deals"), 1, true, true, false),
+    ("casual", "随便唠唠", "什么都可以聊，别引战", "normal", None, 1, true, false, false),
+    ("casual-work", "职场", "加班、跳槽、远程办公", "normal", Some("casual"), 1, true, false, false),
+    ("casual-offwork", "下班了", "今日下班、打卡、吐槽", "normal", Some("casual"), 1, true, false, false),
+    ("casual-gear", "数码装备", "键盘、显示器、NAS", "normal", Some("casual"), 1, true, false, false),
+    ("casual-indie", "副业与独立开发", "", "normal", Some("casual"), 1, true, false, false),
+    ("casual-fun", "吃喝玩乐", "", "normal", Some("casual"), 1, true, false, false),
+    ("casual-chat", "闲聊灌水", "不进首页，不加积分", "normal", Some("casual"), 1, false, false, false),
     ("site", "站务", "公告、规则和反馈", "normal", None, 1, true, false, false),
     ("site-notice", "公告", "", "normal", Some("site"), 1, true, false, true),
     ("site-rules", "规则", "", "normal", Some("site"), 1, true, false, true),

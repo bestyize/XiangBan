@@ -22,7 +22,7 @@ function visibleChildren(node: (typeof meta.tree)[number]) {
   <nav class="side" aria-label="分类">
     <RouterLink to="/" class="item top" :class="{ on: active === 'home' }">首页</RouterLink>
     <div v-for="node in meta.tree" :key="node.id" class="group">
-      <!-- 羊毛库一级分类直接进可筛选的羊毛库 -->
+      <!-- 福利羊毛一级分类直接进可筛选的福利羊毛页 -->
       <RouterLink
         :to="node.kind === 'deal' ? '/deals' : `/c/${node.slug}`"
         class="item root"
