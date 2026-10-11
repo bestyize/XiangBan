@@ -3,7 +3,7 @@ import { EFFECT_REACTIONS, Reactions, type ReactionHost } from './reactions.ts'
 import { EXPRESSIONS, toSpec } from './expressions.ts'
 import type { Beat } from './mind.ts'
 
-const BUILTIN = ['rain', 'snow', 'fireflies', 'petals', 'maple', 'meteors', 'stars', 'butterfly-dream', 'lanterns', 'fireworks', 'ripples', 'aurora', 'galaxy']
+const BUILTIN = ['rain', 'snow', 'fireflies', 'petals', 'maple', 'meteors', 'stars', 'butterfly-dream', 'lanterns', 'fireworks', 'aurora', 'galaxy']
 
 function setup(options: { random?: () => number; hour?: number; busy?: boolean } = {}) {
   const state = { busy: options.busy ?? false }

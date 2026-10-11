@@ -17,7 +17,7 @@ describe("the effects shipped with the app", () => {
     for (const id of catalog) expect([...packs.get(id)!.name], id).toHaveLength(4);
     const onDisk = Object.keys(files).filter((path) => path.includes("/public/effects/") && !path.endsWith("/catalog.json")).map((path) => path.replace(/^.*\//, "").slice(0, -5)).sort();
     expect([...catalog].sort()).toEqual(onDisk);
-    expect(catalog).toEqual(["lanterns", "maple", "galaxy", "butterfly-dream", "fireworks", "snow", "rain", "fireflies", "petals", "meteors", "stars", "ripples", "aurora"]);
+    expect(catalog).toEqual(["lanterns", "maple", "galaxy", "butterfly-dream", "fireworks", "snow", "rain", "fireflies", "petals", "meteors", "stars", "aurora"]);
     for (const id of catalog) {
       const parsed = parsePack(read(`${id}.json`));
       expect(parsed.ok ? "" : parsed.error, id).toBe("");
@@ -63,7 +63,7 @@ describe("the effects shipped with the app", () => {
     }
     expect(packs.get("butterfly-dream")!.layers.filter((layer) => layer.flip !== null && layer.flip.rate[0] >= 1.5).length).toBeGreaterThanOrEqual(2);
   });
-  it("launch fireworks that burst into whole groups of sparks, and let ripples spread in rings", () => {
+  it("launch fireworks that burst into whole groups of sparks", () => {
     const fireworks = packs.get("fireworks")!;
     for (const layer of fireworks.layers) {
       expect(layer.burst!.group).toBeGreaterThanOrEqual(20); expect(layer.burst!.spread).toBe(360); expect(layer.burst!.launch).not.toBeNull();
@@ -72,10 +72,6 @@ describe("the effects shipped with the app", () => {
     expect(fireworks.layers.filter((layer) => layer.burst!.fill >= 0.8).length).toBeGreaterThanOrEqual(3);
     expect(fireworks.layers.some((layer) => layer.burst!.gravity >= 90 && layer.burst!.duration[0] >= 3)).toBe(true);
     expect(fireworks.layers.some((layer) => layer.burst!.flatten[1] < 1)).toBe(true);
-    const rings = packs.get("ripples")!.layers.filter((layer) => layer.shape.kind === "ring");
-    expect(rings.length).toBeGreaterThanOrEqual(2);
-    for (const layer of rings) { expect(layer.burst!.group).toBeGreaterThan(1); expect(layer.burst!.grow[0]).toBeLessThan(layer.burst!.grow[1]); }
-    expect(packs.get("ripples")!.layers.some((layer) => layer.orient === "motion")).toBe(true);
   });
   it("keep the aurora and the Milky Way in bands across the sky", () => {
     const curtains = packs.get("aurora")!.layers.filter((layer) => layer.shape.kind === "beam");
