@@ -49,9 +49,21 @@ try{
    assert.equal(native.effects.isChild,true,'Effects must be hosted below desktop icons')
    assert.ok(['WorkerW','Progman'].includes(native.effects.parentClass))
    assert.equal(native.effects.topmost,false)
-   assert.equal(native.effects.parent,native.floating.parent,'Effects and wallpaper companion must share the desktop host')
-   assert.deepEqual(native.desktopOrder.slice(0,2),['pet','effects'],'Companion must be above effects')
+   if(native.effects.visible){
+    assert.equal(native.effects.parent,native.floating.parent,'Effects and wallpaper companion must share the desktop host')
+    assert.deepEqual(native.desktopOrder.slice(0,2),['pet','effects'],'Companion must be above effects')
+   }
    for(const media of [native.mediaA,native.mediaB].filter(Boolean))assert.equal(media.parent,native.effects.parent,'Wallpaper must share the desktop host below effects')
+  }
+  if(result.wallpaper.platform==='windows')for(const item of effects.independent){
+   if(item.id==='companion')assert.equal(item.native.effects.visible,true,'Native wallpaper must keep standalone effects visible')
+   else{
+    assert.equal(item.native.effects.visible,false,'A transparent sibling must not cover the custom wallpaper')
+    assert.equal(item.native.floating.visible,false,'Wallpaper companion must be composed inside the wallpaper')
+    assert.equal(item.composition.effects.effect,'meteors')
+    assert.equal(item.composition.effects.canvasPresent,true)
+    assert.equal(item.composition.companionVisible,true)
+   }
   }
  }
  console.log(`PASS: image/video/Canvas, delivery, SHA-256, offline cache, unprivileged IPC and update check${effectsSmoke?'; effects: 13 effects, kept across 4 wallpapers, off and persistence':''}. ${report}`)

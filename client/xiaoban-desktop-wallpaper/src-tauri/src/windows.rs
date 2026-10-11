@@ -135,6 +135,14 @@ fn attach_desktop(
 /// Preserve the pet's screen position while moving it between Explorer's background
 /// and a floating top-level window. Turning off topmost alone does not put it below icons.
 pub fn configure_companion(window: &tauri::WebviewWindow, desktop: bool) -> Result<(), String> {
+    let (sender, receiver) = std::sync::mpsc::sync_channel(1);
+    let target = window.clone();
+    window.run_on_main_thread(move || { let _ = sender.send(configure_companion_on_main(&target, desktop)); })
+        .map_err(|e| e.to_string())?;
+    receiver.recv().map_err(|e| e.to_string())?
+}
+
+fn configure_companion_on_main(window: &tauri::WebviewWindow, desktop: bool) -> Result<(), String> {
     let hwnd = window.hwnd().map_err(|e| e.to_string())?.0 as HWND;
     let mut client = RECT::default();
     let mut origin = POINT::default();
@@ -150,13 +158,13 @@ pub fn configure_companion(window: &tauri::WebviewWindow, desktop: bool) -> Resu
             client.right - client.left, client.bottom - client.top)?;
     } else {
         unsafe {
+            let style = GetWindowLongPtrW(hwnd, GWL_STYLE);
+            // Clear child style before detaching; otherwise SetParent(NULL)
+            // leaves it hosted by the desktop and HWND_TOPMOST has no effect.
+            SetWindowLongPtrW(hwnd, GWL_STYLE, (style & !(WS_CHILD as isize)) | WS_POPUP as isize);
             SetLastError(0);
             SetParent(hwnd, null_mut());
             let error = GetLastError();
-            let style = GetWindowLongPtrW(hwnd, GWL_STYLE);
-            // SetParent(NULL) first uses the desktop HWND for a WS_CHILD window;
-            // clear that style before asking GetParent whether it is top-level.
-            SetWindowLongPtrW(hwnd, GWL_STYLE, (style & !(WS_CHILD as isize)) | WS_POPUP as isize);
             if !GetParent(hwnd).is_null() {
                 return Err(format!("小伴离开桌面背景层失败（Windows 错误 {error}）"));
             }
@@ -167,6 +175,14 @@ pub fn configure_companion(window: &tauri::WebviewWindow, desktop: bool) -> Resu
             }
         }
         window.set_always_on_top(true).map_err(|e| e.to_string())?;
+        // Showing a reparented Tao window can rebuild its styles from the old
+        // child state; set the final native z-order after those framework updates.
+        unsafe {
+            if SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0,
+                SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE) == 0 {
+                return Err(format!("恢复小伴置顶失败（Windows 错误 {}）", GetLastError()));
+            }
+        }
     }
     order_desktop_layers(window.app_handle())
 }
@@ -295,6 +311,7 @@ pub fn diagnostics(app: &tauri::AppHandle) -> serde_json::Value {
                 let mut outer = RECT::default();
                 GetWindowRect(hwnd, &mut outer);
                 serde_json::json!({ "hwnd": hwnd as usize, "parent": parent as usize,
+                "root": GetAncestor(hwnd, GA_ROOT) as usize, "owner": GetWindow(hwnd, GW_OWNER) as usize,
                 "parentClass": class_name(parent), "visible": IsWindowVisible(hwnd) != 0,
                 "width": rect.right, "height": rect.bottom, "dpi": GetDpiForWindow(hwnd),
                 "x": outer.left, "y": outer.top,

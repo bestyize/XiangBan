@@ -36,12 +36,29 @@ pub fn media_label(label: &str) -> bool {
     ["media-a", "media-b", "media-preview"].contains(&label)
 }
 
-fn payload(app: &tauri::AppHandle, item: &Wallpaper, options: &Options, _preview: bool) -> Value {
+pub fn composing(app: &tauri::AppHandle) -> bool {
+    cfg!(windows) && app.state::<ContentState>().label.lock().unwrap().as_ref()
+        .is_some_and(|label| app.get_webview_window(label).is_some())
+}
+
+fn composition(app: &tauri::AppHandle, preview: bool) -> Value {
     let config = settings(app);
+    let embedded = cfg!(windows) && !preview;
+    let mut value = json!(config);
+    value["overlay"] = json!(embedded && config.mode == "wallpaper" && config.companion_enabled);
+    let monitor = app.primary_monitor().ok().flatten();
+    let scale = monitor.as_ref().map(|m| m.scale_factor()).unwrap_or(1.0);
+    let position = app.get_webview_window("pet").and_then(|w| w.outer_position().ok());
+    let position = position.zip(monitor).map(|(p, m)| json!({"x":(p.x-m.position().x) as f64 / scale,"y":(p.y-m.position().y) as f64 / scale}));
+    json!({"config":value,"effects":if embedded { crate::effects::render_payload(app) } else { Value::Null },"petPosition":position})
+}
+
+fn payload(app: &tauri::AppHandle, item: &Wallpaper, options: &Options, preview: bool) -> Value {
+    let composition = composition(app, preview);
     json!({"item":{"id":item.id,"title":item.title,"kind":item.kind,"resourceUrl":library::asset_url(&item.resource),
         "assets":item.assets.iter().map(|(key,r)|(key.clone(),json!({"url":library::asset_url(r),"mime":r.mime}))).collect::<BTreeMap<_,_>>()},
-        "options":options,"config":{"expression":config.expression,"size":config.size,"theme":config.theme,"paused":config.paused,
-        "fps":config.fps,"overlay":false},"test":app.state::<DesktopState>().isolated})
+        "options":options,"config":composition["config"],"effects":composition["effects"],"petPosition":composition["petPosition"],
+        "test":app.state::<DesktopState>().isolated})
 }
 
 fn open(
@@ -218,11 +235,22 @@ pub fn sync(app: &tauri::AppHandle) {
     let config = settings(app);
     for label in ["media-a", "media-b"] {
         if let Some(window) = app.get_webview_window(label) {
-            let value = json!({"options":config.wallpaper_options,"config":{"expression":config.expression,"size":config.size,
-                "theme":config.theme,"paused":config.paused,"fps":config.fps,"overlay":false}});
+            let mut value = composition(app, false);
+            value["options"] = json!(config.wallpaper_options);
             let _ = window.eval(format!(
                 "window.dispatchEvent(new CustomEvent('content-config',{{detail:{value}}}));"
             ));
+        }
+    }
+    #[cfg(windows)]
+    if let Some(pet) = app.get_webview_window("pet") {
+        if composing(app) && config.mode == "wallpaper" { let _ = pet.hide(); }
+        else if config.companion_enabled {
+            let was_visible = pet.is_visible().unwrap_or(false);
+            let _ = pet.show();
+            if !was_visible && config.mode == "wallpaper" {
+                let _ = crate::windows::configure_companion(&pet, true);
+            }
         }
     }
 }

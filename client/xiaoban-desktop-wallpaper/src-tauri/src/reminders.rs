@@ -259,6 +259,10 @@ pub fn delete_care_rule(window: tauri::WebviewWindow, id: String) -> Result<serd
 fn companion_visible(app: &tauri::AppHandle) -> bool {
     let settings = crate::settings(app);
     if !settings.companion_enabled { return false; }
+    if settings.mode == "wallpaper" && crate::content::composing(app) {
+        return ["media-a", "media-b"].iter().any(|label| app.get_webview_window(label)
+            .is_some_and(|window| window.is_visible().unwrap_or(false)));
+    }
     app.get_webview_window("pet").is_some_and(|w| w.is_visible().unwrap_or(false))
 }
 fn blocked(app: &tauri::AppHandle, activity: &care_system::Activity) -> bool {
@@ -536,7 +540,17 @@ fn presence_tick(app: &tauri::AppHandle, elapsed: f64) {
         let kind = presence.step(input); (kind, presence.first_today_date().filter(|day| Some(*day) != before))
     };
     if let (Some(day), Some(path)) = (greeted, presence_path(app)) { let _ = crate::presence::save_first_today(&path, day); }
-    if let Some(kind) = kind { let _ = app.emit_to("pet", "companion-presence", serde_json::json!({"kind": kind.as_str()})); }
+    if let Some(kind) = kind {
+        let payload = serde_json::json!({"kind": kind.as_str()});
+        let _ = app.emit_to("pet", "companion-presence", payload.clone());
+        if crate::content::composing(app) {
+            for label in ["media-a", "media-b"] {
+                if let Some(window) = app.get_webview_window(label) {
+                    let _ = window.eval(format!("window.dispatchEvent(new CustomEvent('companion-presence',{{detail:{payload}}}))"));
+                }
+            }
+        }
+    }
 }
 pub fn start(app: &tauri::AppHandle) {
     let state = app.state::<ReminderState>();

@@ -60,6 +60,7 @@ pub async fn run(app: &tauri::AppHandle) -> Result<Value, String> {
     if !app.state::<DesktopState>().isolated { return Err("桌面特效验证只能使用隔离配置".into()); }
     let previous_mode = settings(app).mode;
     crate::set_mode(app.clone(), "wallpaper".into()).await?;
+    crate::content::apply_wallpaper(app.clone(), "companion".into(), Default::default(), false).await?;
     let mut cases = Vec::new();
     for id in SCENES {
         let handle = app.clone();
@@ -79,7 +80,14 @@ pub async fn run(app: &tauri::AppHandle) -> Result<Value, String> {
         if app.get_webview_window(LABEL).is_none() || settings(app).effects != kept { return Err(format!("应用壁纸 {id} 后桌面特效消失或被改动")); }
         let mut state = json!({"id": id, "overlayPresent": true});
         #[cfg(windows)]
-        { state["native"] = crate::windows::diagnostics(app); }
+        {
+            state["native"] = crate::windows::diagnostics(app);
+            let active = app.state::<crate::content::ContentState>().label.lock().unwrap().clone();
+            if let Some(label) = active {
+                state["composition"] = app.state::<crate::content::ContentState>().reports.lock().unwrap()
+                    .get(&label).cloned().unwrap_or(Value::Null);
+            }
+        }
         independent.push(state);
     }
     let off = choose(app, "", json!({}))?;

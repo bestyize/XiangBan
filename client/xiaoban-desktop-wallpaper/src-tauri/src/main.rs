@@ -185,13 +185,13 @@ fn set_autostart(app: tauri::AppHandle, enabled: bool) -> Result<Settings, Strin
 fn open_scene(app: &tauri::AppHandle, mode: &str) -> Result<(), String> {
     if !settings(app).companion_enabled { return Ok(()); }
     if let Some(window) = app.get_webview_window("pet") {
-        #[cfg(windows)]
-        windows::configure_companion(&window, mode == "wallpaper")?;
         #[cfg(not(windows))]
         window.set_always_on_top(mode == "floating").map_err(|e| e.to_string())?;
         #[cfg(target_os = "macos")]
         macos::configure_scene(&window, mode == "wallpaper", false)?;
         window.show().map_err(|e| e.to_string())?;
+        #[cfg(windows)]
+        windows::configure_companion(&window, mode == "wallpaper")?;
         return Ok(());
     }
     let monitor = app.primary_monitor().map_err(|e| e.to_string())?.ok_or("没有找到主显示器")?;
@@ -374,6 +374,11 @@ fn scene_ready(window: tauri::WebviewWindow, report: Option<serde_json::Value>) 
     }
     window.show().map_err(|e| e.to_string())?;
     #[cfg(windows)]
+    if window.label() == "pet" {
+        windows::configure_companion(&window, settings(window.app_handle()).mode == "wallpaper")?;
+        content::sync(window.app_handle());
+    }
+    #[cfg(windows)]
     windows::order_desktop_layers(window.app_handle())?;
     #[cfg(target_os = "macos")]
     macos::configure_scene(
@@ -396,6 +401,8 @@ fn set_hit_test(window: tauri::WebviewWindow, hit: bool) -> Result<(), String> {
     if window.label() != "pet" {
         return Ok(());
     }
+    #[cfg(windows)]
+    if settings(window.app_handle()).mode == "wallpaper" { return Ok(()); }
     #[cfg(windows)]
     if windows::left_button_down() {
         return Ok(());

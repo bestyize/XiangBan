@@ -84,6 +84,7 @@ svg { width: 20px; height: 20px; flex-shrink: 0; }
   position: absolute;
   inset: 0;
 }
+.content-pet { display: grid; place-items: center; z-index: 2; bottom: auto; transform: none; }
 .content-stage > img,
 .content-stage > video,
 .content-stage > iframe {

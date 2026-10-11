@@ -28,6 +28,11 @@ fn wanted(app: &tauri::AppHandle, config: &Settings) -> Option<Value> {
     effect_packs::find(&folder(app).ok()?, &config.effects.selected)
 }
 
+pub fn render_payload(app: &tauri::AppHandle) -> Value {
+    let config = settings(app);
+    wanted(app, &config).map(|pack| payload(app, &config, &pack)).unwrap_or(Value::Null)
+}
+
 /// Brings the overlay in line with the settings without blocking the caller (commands may run on the
 /// UI thread, which must stay free to process the window being created or destroyed).
 pub fn sync(app: &tauri::AppHandle) {
@@ -39,9 +44,17 @@ pub fn sync(app: &tauri::AppHandle) {
 pub fn reconcile(app: &tauri::AppHandle) {
     let _guard = RECONCILE.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
     let current = settings(app);
+    // HWND-backed transparent WebViews cannot alpha-compose over sibling WebViews
+    // on Windows. A custom wallpaper renders the same effect in its own page.
+    #[cfg(windows)]
+    if crate::content::composing(app) && wanted(app, &current).is_some() {
+        if let Some(window) = app.get_webview_window(LABEL) { let _ = window.hide(); }
+        return;
+    }
     match (app.get_webview_window(LABEL), wanted(app, &current)) {
         (Some(window), Some(pack)) => {
             let _ = window.eval(format!("window.dispatchEvent(new CustomEvent('effects-config',{{detail:{}}}));", payload(app, &current, &pack)));
+            let _ = window.show();
         }
         (Some(_), None) => { if let Err(error) = close(app) { let _ = app.emit("desktop-error", error); } }
         (None, Some(pack)) => {

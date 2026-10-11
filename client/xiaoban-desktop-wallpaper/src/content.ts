@@ -7,6 +7,10 @@ import {
   defaults,
 } from "./bridge.ts";
 import { PetView } from "./pet.ts";
+import { EffectsLayer } from "./effects/layer.ts";
+import { normalizeParams, parsePack } from "./effects/parse.ts";
+import type { EffectPack } from "./effects/types.ts";
+import { isPresenceKind, presenceBeats } from "./companion/presence.ts";
 
 interface Payload {
   item: {
@@ -17,14 +21,9 @@ interface Payload {
     assets: Record<string, { url: string; mime: string }>;
   };
   options: WallpaperOptions;
-  config: {
-    expression: string;
-    size: number;
-    theme: string;
-    paused: boolean;
-    fps: 30 | 60;
-    overlay: boolean;
-  };
+  config: Settings & { overlay: boolean };
+  effects?: { effect: unknown; params: unknown; paused: boolean; fps: 30 | 60 } | null;
+  petPosition?: { x: number; y: number } | null;
   test: boolean;
 }
 declare global {
@@ -64,16 +63,15 @@ export async function mountContent() {
   document.body.innerHTML =
     '<main class="content-stage"></main><div class="wallpaper-pet content-pet"></div><div class="content-error" role="alert" hidden></div>';
   const host = document.querySelector<HTMLElement>(".content-stage")!;
+  const effects = new EffectsLayer(host, null);
+  let effectKey = "", effectPack: EffectPack | null = null;
   const lifecycle = new AbortController();
   const eventOptions = { signal: lifecycle.signal };
   let disposed = false;
   let pet: PetView | null = null,
     video: HTMLVideoElement | null = null,
     frame: HTMLIFrameElement | null = null;
-  const update = (detail: {
-    options: WallpaperOptions;
-    config: Payload["config"];
-  }) => {
+  const update = (detail: Pick<Payload, "options" | "config" | "effects" | "petPosition">) => {
     if (disposed) return;
     state = { ...state, ...detail };
     host.style.background = state.options.background;
@@ -98,13 +96,28 @@ export async function mountContent() {
     document.body.dataset.theme = state.config.theme;
     document.body.dataset.paused = String(state.config.paused);
     const settings = { ...defaults, ...state.config } as Settings;
+    const nextKey = JSON.stringify(state.effects?.effect ?? null);
+    if (nextKey !== effectKey) {
+      effectKey = nextKey;
+      const parsed = parsePack(state.effects?.effect);
+      effectPack = parsed.ok ? parsed.pack : null;
+    }
+    effects.update(effectPack, normalizeParams(state.effects?.params), { paused: settings.paused, fps: settings.fps });
     if (state.config.overlay) {
+      const petHost = document.querySelector<HTMLElement>(".content-pet")!;
+      petHost.style.width = `${settings.size * 1.5}px`;
+      petHost.style.height = `${settings.size * 1.22}px`;
+      petHost.style.left = `${state.petPosition?.x ?? innerWidth - settings.size * 1.5 - 70}px`;
+      petHost.style.top = `${state.petPosition?.y ?? innerHeight - settings.size * 1.22 - 100}px`;
       if (!pet)
         pet = new PetView(
           document.querySelector<HTMLElement>(".content-pet")!,
           settings,
         );
       else pet.update(settings);
+      pet.reactions.setEnabled(settings.companionLinks !== false);
+      pet.reactions.setPaused(settings.paused);
+      pet.reactions.setEffect(settings.effects.selected);
     } else {
       pet?.destroy();
       pet = null;
@@ -112,6 +125,9 @@ export async function mountContent() {
   };
   const ready = async (report: Record<string, unknown>) => {
     if (disposed) return;
+    update(state);
+    report.effects = effects.snapshot();
+    report.companionVisible = state.config.overlay;
     if (state.test && desktop) {
       let blocked = false;
       try {
@@ -145,10 +161,15 @@ export async function mountContent() {
       pet.poke();
   }, eventOptions);
   window.addEventListener("content-poke", () => pet?.poke(), eventOptions);
+  window.addEventListener("companion-presence", event => {
+    const kind = (event as CustomEvent).detail?.kind;
+    if (isPresenceKind(kind) && state.config.companionLinks !== false) pet?.playBeats(presenceBeats(kind));
+  }, eventOptions);
   const dispose = () => {
     if (disposed) return;
     disposed = true;
     lifecycle.abort();
+    effects.destroy();
     pet?.destroy(); pet = null;
     video?.pause();
     if (video) { video.removeAttribute("src"); video.load(); }
