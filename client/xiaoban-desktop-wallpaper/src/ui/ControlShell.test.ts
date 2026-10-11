@@ -51,7 +51,7 @@ describe('ControlShell sidebar', () => {
     expect(websiteBtn.exists()).toBe(true);
     expect(settingsBtn.exists()).toBe(true);
     expect(websiteBtn.text()).toContain('小伴官网');
-    expect(settingsBtn.text()).toContain('设置与关于');
+    expect(settingsBtn.text()).toContain('设置');
 
     // Official website button is placed before the settings button
     const elements: Element[] = buttons.map((b) => b.element);
@@ -67,5 +67,33 @@ describe('ControlShell sidebar', () => {
     expect(invoke).toHaveBeenCalledWith('open_official_site');
 
     wrapper.unmount();
+  });
+
+  it('marks a new version with a 新版本 badge on the settings button and the about tab, and shows only a dot for unread notices', async () => {
+    const base = vi.mocked(invoke).getMockImplementation()!;
+    const website = (update: unknown, announcements: unknown[] = []) => vi.mocked(invoke).mockImplementation(((command: string, ...rest: unknown[]) =>
+      command === 'get_website_status' ? Promise.resolve({ announcements, update, dismissed: {}, errors: [] }) : base(command, ...(rest as []))) as typeof invoke);
+
+    website({ available: true, version: '0.2.0', notes: '', publishedAt: '', downloadUrl: 'https://example.com' });
+    const wrapper = mount(ControlShell);
+    await flushPromises();
+    const settingsBtn = wrapper.find('[data-testid="nav-settings"]');
+    expect(settingsBtn.find('[data-testid="nav-settings-new"]').text()).toBe('新版本');
+    expect(settingsBtn.find('.notice-dot').exists()).toBe(false);
+    await settingsBtn.trigger('click');
+    await import('./pages/SettingsPage.vue');
+    await vi.waitFor(async () => { await flushPromises(); expect(wrapper.find('[data-testid="settings-page"]').exists()).toBe(true); });
+    const page = wrapper.find('[data-testid="settings-page"]');
+    expect(page.find('[data-testid="about-tab-new"]').text()).toBe('新版本');
+    expect(page.find('.page-header').exists()).toBe(false);
+    expect(page.text()).not.toContain('管理运行偏好');
+    wrapper.unmount();
+
+    website(null, [{ id: 'n1', revision: '1', title: '公告', body: '' }]);
+    const quiet = mount(ControlShell);
+    await flushPromises();
+    expect(quiet.find('[data-testid="nav-settings-new"]').exists()).toBe(false);
+    expect(quiet.find('[data-testid="nav-settings"] .notice-dot').exists()).toBe(true);
+    quiet.unmount();
   });
 });

@@ -6,7 +6,7 @@ use serde_json::{json, Value};
 use std::time::{Duration, Instant};
 use tauri::Manager;
 
-const SCENES: [&str; 7] = ["rain", "snow", "fireflies", "petals", "maple", "meteors", "stars"];
+const SCENES: [&str; 13] = ["rain", "snow", "fireflies", "petals", "maple", "meteors", "stars", "butterfly-dream", "lanterns", "fireworks", "ripples", "aurora", "galaxy"];
 
 async fn settle(app: &tauri::AppHandle, expect_ready: bool) -> Result<(), String> {
     let handle = app.clone();

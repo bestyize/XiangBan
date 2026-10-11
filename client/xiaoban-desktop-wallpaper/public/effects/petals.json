@@ -1,7 +1,7 @@
 {
  "schemaVersion": 1,
  "id": "petals",
- "name": "花瓣飘落",
+ "name": "落英缤纷",
  "description": "樱花瓣翻转着慢慢落下",
  "sky": [
   "#cfe6f3",

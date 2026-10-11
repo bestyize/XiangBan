@@ -1,4 +1,4 @@
-import { defaultParams, limits, type Burst, type ColorPair, type EffectPack, type EffectParams, type EffectsChoice, type Layer, type Range, type Rgb, type Shape, type Vein } from "./types.ts";
+import { defaultParams, limits, type Burst, type ColorPair, type EffectPack, type EffectParams, type EffectsChoice, type Layer, type Range, type Rgb, type Shape, type Vein, type Band, type Halo } from "./types.ts";
 
 type Obj = Record<string, unknown>;
 const isObj = (value: unknown): value is Obj => typeof value === "object" && value !== null && !Array.isArray(value);
@@ -35,7 +35,9 @@ function shape(value: unknown): Shape | string {
   const raw = isObj(value) ? value : {};
   switch (raw.kind) {
     case "circle": return { kind: "circle" };
-    case "glow": return { kind: "glow", core: num(raw.core, 0, [0, 0.9]) };
+    case "glow": return { kind: "glow", core: num(raw.core, 0, [0, 0.9]), aspect: num(raw.aspect, 1, [0.1, 4]) };
+    case "ring": return { kind: "ring", width: range(raw.width, [1.5, 2.5], [0.3, 40]), aspect: num(raw.aspect, 1, [0.1, 1]) };
+    case "beam": return { kind: "beam", length: range(raw.length, [120, 240], [4, 1600]), focus: num(raw.focus, 0.5, [0, 0.9]) };
     case "streak": return { kind: "streak", length: range(raw.length, [20, 40], [2, 800]), width: range(raw.width, [1, 2], [0.3, 40]), head: num(raw.head, 0, [0, 8]) };
     case "path": {
       const d = pathData(raw.d);
@@ -46,10 +48,16 @@ function shape(value: unknown): Shape | string {
         if (!veinD || !color) return "vein 的路径或颜色无效";
         vein = { d: veinD, color, alpha: num(raw.vein.alpha, 0.5, [0, 1]), width: num(raw.vein.width, 0.06, [0.005, 0.5]) };
       }
+      let halo: Halo | null = null;
+      if (isObj(raw.halo)) {
+        const color = hexToRgb(raw.halo.color ?? "#ffffff");
+        if (!color) return "halo 的颜色无效";
+        halo = { scale: num(raw.halo.scale, 2, [1, 6]), y: num(raw.halo.y, 0, [-1, 1]), color, alpha: num(raw.halo.alpha, 0.4, [0, 1]) };
+      }
       const style = raw.style === "stroke" || raw.style === "both" ? raw.style : "fill";
-      return { kind: "path", d, style, lineWidth: num(raw.lineWidth, 0.08, [0.01, 0.5]), vein };
+      return { kind: "path", d, style, lineWidth: num(raw.lineWidth, 0.08, [0.01, 0.5]), vein, halo };
     }
-    default: return "shape.kind 只能是 circle、glow、path 或 streak";
+    default: return "shape.kind 只能是 circle、glow、path、streak、ring 或 beam";
   }
 }
 
@@ -66,7 +74,18 @@ function layer(value: unknown, index: number): Layer | string {
   if (isObj(value.burst)) {
     const raw = value.burst;
     burst = { duration: range(raw.duration, [1, 1.5], [0.2, 20]), rest: range(raw.rest, [2, 6], [0, 60]),
-      x: range(raw.x, [0, 1], [-1, 2]), y: range(raw.y, [0, 1], [-1, 2]), travel: range(raw.travel, [300, 600], [10, 6000]) };
+      x: range(raw.x, [0, 1], [-1, 2]), y: range(raw.y, [0, 1], [-1, 2]), travel: range(raw.travel, [300, 600], [0, 6000]),
+      group: Math.round(num(raw.group, 1, [1, 200])), spread: num(raw.spread, 0, [0, 360]), stagger: num(raw.stagger, 0, [0, 5]),
+      launch: raw.launch === undefined ? null : range(raw.launch, [1, 1.4], [0.2, 6]), gravity: num(raw.gravity, 0, [-2000, 2000]),
+      ease: raw.ease === "out" ? "out" : "linear", fade: raw.fade === "out" ? "out" : "in-out", grow: range(raw.grow, [1, 1], [0, 8]),
+      fill: num(raw.fill, 0, [0, 1]), flatten: range(raw.flatten, [1, 1], [0.05, 1]), flash: num(raw.flash, 0, [0, 2]), mix: num(raw.mix, 0, [0, 1]) };
+  }
+  let band: Band | null = null;
+  if (isObj(value.band) && !burst) {
+    const raw = value.band, wave = isObj(raw.wave) ? raw.wave : {};
+    band = { angle: num(raw.angle, 0, [-90, 90]), offset: num(raw.offset, 0, [-1, 1]), width: num(raw.width, 0.2, [0, 2]),
+      falloff: raw.falloff === "even" ? "even" : "gauss",
+      wave: { amplitude: num(wave.amplitude, 0, [0, 0.5]), count: num(wave.count, 1, [0, 12]), speed: num(wave.speed, 0, [-2, 2]) } };
   }
   const flip = isObj(value.flip) ? { rate: range(value.flip.rate, [1, 2], [0, 20]), min: num(value.flip.min, 0.2, [0.05, 1]) } : null;
   const twinkle = isObj(value.twinkle) ? { rate: range(value.twinkle.rate, [0.3, 0.8], [0, 10]), depth: num(value.twinkle.depth, 0.6, [0, 1]) } : null;
@@ -76,7 +95,8 @@ function layer(value: unknown, index: number): Layer | string {
     direction: range(value.direction, [90, 90], [-360, 720]), wind: num(value.wind, 0, [-600, 600]),
     sway: pair("sway", [0.15, 0.35], [0, 600]), wander: pair("wander", [0.05, 0.15], [0, 600]),
     spin: range(value.spin, [0, 0], [-20, 20]), pendulum: num(value.pendulum, 0, [0, 3]), scatter: num(value.scatter, 1, [0, 1]),
-    flip, alpha: range(value.alpha, [0.5, 1], [0, 1]), colors: palette, twinkle, burst,
+    flip, alpha: range(value.alpha, [0.5, 1], [0, 1]), colors: palette, twinkle, burst, band,
+    blend: value.blend === "add" ? "add" : "normal", orient: value.orient === "motion" ? "motion" : "fixed",
   };
 }
 

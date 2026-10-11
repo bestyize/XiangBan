@@ -1,7 +1,7 @@
 {
  "schemaVersion": 1,
  "id": "rain",
- "name": "下雨",
+ "name": "和风细雨",
  "description": "细雨斜斜落下，随风轻摆",
  "sky": [
   "#6a7e96",

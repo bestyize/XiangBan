@@ -114,7 +114,84 @@ export const EFFECT_REACTIONS: Record<string, EffectProfile> = {
       },
     ],
   },
+  'butterfly-dream': {
+    interval: [30, 60],
+    reactions: [
+      {
+        id: 'butterfly-follow',
+        beats: [{ expr: { expression: 'curious', symbol: 'sparkle' }, hold: 1.8 }, { expr: 'happy', hold: 1.2 }],
+        looks: [{ at: 0, look: { x: -0.6, y: -0.5 } }, { at: 1, look: { x: 0.2, y: -0.8 } }, { at: 2, look: { x: 0.7, y: -0.3 } }],
+      },
+      { id: 'butterfly-dream', beats: [{ expr: 'sleepy', hold: 2.2 }, { expr: { expression: 'thinking', symbol: 'question' }, hold: 1.8 }] },
+    ],
+  },
+  lanterns: {
+    interval: [30, 60],
+    reactions: [
+      {
+        id: 'lanterns-watch',
+        beats: [{ expr: { expression: 'curious', symbol: 'flame' }, hold: 2.4 }],
+        looks: [{ at: 0, look: { x: 0.2, y: 0.2 } }, { at: 0.8, look: { x: 0.1, y: -0.5 } }, { at: 1.8, look: { x: 0, y: -0.9 } }],
+      },
+      { id: 'lanterns-warm', beats: [{ expr: { expression: 'happy', symbol: 'heart' }, hold: 2.2 }], looks: [{ at: 0, look: { x: -0.4, y: -0.7 } }] },
+    ],
+  },
+  fireworks: {
+    interval: [20, 45],
+    reactions: [
+      {
+        id: 'fireworks-boom',
+        beats: [{ expr: 'surprised', hold: 0.5 }, { expr: { expression: 'excited', symbol: 'sparks' }, hold: 1.4 }],
+        looks: [{ at: 0, look: { x: 0.5, y: -0.8 } }],
+      },
+      {
+        id: 'fireworks-cheer',
+        beats: [{ expr: { expression: 'laughing', symbol: 'sparkle' }, hold: 1.8 }],
+        looks: [{ at: 0, look: { x: -0.5, y: -0.8 } }, { at: 1, look: { x: 0.3, y: -0.7 } }],
+      },
+    ],
+  },
+  ripples: {
+    interval: [30, 60],
+    reactions: [
+      {
+        id: 'ripples-koi',
+        beats: [{ expr: 'curious', hold: 2.4 }, { expr: 'happy', hold: 1 }],
+        looks: [{ at: 0, look: { x: -0.7, y: 0.6 } }, { at: 1.2, look: { x: 0.6, y: 0.5 } }],
+      },
+      { id: 'ripples-calm', beats: [{ expr: { expression: 'idle', symbol: 'wave' }, hold: 2.6 }], looks: [{ at: 0, look: { x: 0, y: 0.7 } }] },
+    ],
+  },
+  aurora: {
+    interval: [30, 60],
+    reactions: [
+      {
+        id: 'aurora-gaze',
+        beats: [{ expr: { expression: 'surprised', symbol: 'sparkle' }, hold: 0.8 }, { expr: 'love', hold: 2 }],
+        looks: [{ at: 0, look: { x: 0, y: -0.9 } }],
+      },
+      {
+        id: 'aurora-sweep',
+        beats: [{ expr: { expression: 'curious', symbol: 'moon' }, hold: 3 }],
+        looks: [{ at: 0, look: { x: -0.8, y: -0.8 } }, { at: 1.5, look: { x: 0.8, y: -0.8 } }],
+      },
+    ],
+  },
+  galaxy: {
+    interval: [30, 60],
+    reactions: [
+      {
+        id: 'galaxy-trace',
+        beats: [{ expr: { expression: 'curious', symbol: 'sparkle' }, hold: 3 }],
+        looks: [{ at: 0, look: { x: -0.8, y: 0.2 } }, { at: 1.5, look: { x: 0.8, y: -0.8 } }],
+      },
+      { id: 'galaxy-yawn', when: isNight, beats: [{ expr: { expression: 'sleepy', symbol: 'moon' }, hold: 2.6 }], looks: [{ at: 0, look: { x: 0.3, y: -0.8 } }] },
+      { id: 'galaxy-smile', when: hour => !isNight(hour), beats: [{ expr: { expression: 'happy', symbol: 'sparkle' }, hold: 2 }] },
+    ],
+  },
 }
+/** Effects where clicking the companion makes a wish: a falling star, a lantern rising. */
+const WISH_EFFECTS = new Set(['meteors', 'lanterns'])
 
 const WISH: Beat[] = [{ expr: { expression: 'happy', symbol: 'sparkle' }, hold: 2 }, { expr: 'proud', hold: 1 }]
 const COOLDOWN = 15
@@ -174,9 +251,9 @@ export class Reactions {
     this.schedule(0.5)
   }
 
-  /** Clicking the companion while meteors fall makes a wish. Returns false when the click should be handled as usual. */
+  /** Clicking the companion while meteors fall or lanterns rise makes a wish. Returns false when the click should be handled as usual. */
   wish(): boolean {
-    if (!this.live || this.effect !== 'meteors' || this.clock - this.lastWishAt < WISH_COOLDOWN) return false
+    if (!this.live || !WISH_EFFECTS.has(this.effect) || this.clock - this.lastWishAt < WISH_COOLDOWN) return false
     this.cancel()
     this.lastWishAt = this.clock
     this.lastFireAt = this.clock

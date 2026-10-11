@@ -1,7 +1,7 @@
 {
  "schemaVersion": 1,
  "id": "stars",
- "name": "繁星",
+ "name": "星罗棋布",
  "description": "满天繁星，一闪一闪地眨眼",
  "sky": [
   "#050818",

@@ -70,7 +70,7 @@ onBeforeUnmount(() => { if (timer) { clearTimeout(timer); commit(); } });
       <div class="field"><label>速度 <span data-testid="effect-speed-value">×{{ speed }}</span></label><NSlider v-model:value="speed" :min="limits.speed[0]" :max="limits.speed[1]" :step="0.25" @update:value="tune" /></div>
       <div class="field"><label>大小 <span data-testid="effect-size-value">×{{ size.toFixed(1) }}</span></label><NSlider v-model:value="size" :min="limits.size[0]" :max="limits.size[1]" :step="0.1" @update:value="tune" /></div>
     </section>
-    <p class="muted notes">特效显示在桌面图片之上、桌面图标和其他窗口之下，鼠标可以穿过它。想要自己的特效？打开特效文件夹，把特效包（一个 JSON 文件）放进去再点“重新载入”，格式见文件夹里的示例。{{ store.settings.paused ? '桌面动画目前已暂停，特效会静止，可在“设置与关于”里恢复。' : '' }}{{ store.game.active ? '游戏空间打开期间特效会先隐藏，退出后自动回来。' : '' }}</p>
+    <p class="muted notes">特效显示在桌面图片之上、桌面图标和其他窗口之下，鼠标可以穿过它。想要自己的特效？打开特效文件夹，把特效包（一个 JSON 文件）放进去再点“重新载入”，格式见文件夹里的示例。{{ store.settings.paused ? '桌面动画目前已暂停，特效会静止，可在“设置”里恢复。' : '' }}{{ store.game.active ? '游戏空间打开期间特效会先隐藏，退出后自动回来。' : '' }}</p>
   </section>
 </template>
 <style scoped>

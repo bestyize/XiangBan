@@ -3,7 +3,7 @@ import { EFFECT_REACTIONS, Reactions, type ReactionHost } from './reactions.ts'
 import { EXPRESSIONS, toSpec } from './expressions.ts'
 import type { Beat } from './mind.ts'
 
-const BUILTIN = ['rain', 'snow', 'fireflies', 'petals', 'maple', 'meteors', 'stars']
+const BUILTIN = ['rain', 'snow', 'fireflies', 'petals', 'maple', 'meteors', 'stars', 'butterfly-dream', 'lanterns', 'fireworks', 'ripples', 'aurora', 'galaxy']
 
 function setup(options: { random?: () => number; hour?: number; busy?: boolean } = {}) {
   const state = { busy: options.busy ?? false }
@@ -223,5 +223,13 @@ describe('companion reactions', () => {
     reactions.setPaused(true)
     expect(reactions.wish()).toBe(false)
     expect(host.play).toHaveBeenCalledTimes(2)
+  })
+
+  it('also makes a wish on a rising lantern', () => {
+    const { reactions } = setup()
+    reactions.setEffect('fireworks')
+    expect(reactions.wish()).toBe(false)
+    reactions.setEffect('lanterns')
+    expect(reactions.wish()).toBe(true)
   })
 })

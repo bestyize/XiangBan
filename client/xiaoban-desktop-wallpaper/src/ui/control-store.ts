@@ -14,7 +14,7 @@ export function createControlStore(notify: ControlStore["notify"]): ControlStore
   let effectsQueue = Promise.resolve();
   const store: ControlStore = reactive({
     settings: clone(defaults),
-    info: { name: "小伴桌面", version: "0.1.0", platform: "preview", arch: "", updateTarget: "", updateUrl: "" },
+    info: { name: "小伴桌面", version: "1.0.0", platform: "preview", arch: "", updateTarget: "", updateUrl: "" },
     library: { items: [], source: "", activeId: "companion" },
     website: { announcements: [], update: null, dismissed: {}, errors: [] },
     startup: { available: false, error: null },

@@ -5,14 +5,20 @@ use crate::effect_choice::valid_id;
 use serde_json::{json, Value};
 use std::{collections::HashSet, fs, path::Path};
 
-const BUILTIN: [(&str, &str); 7] = [
-    ("rain", include_str!("../../public/effects/rain.json")),
+const BUILTIN: [(&str, &str); 13] = [
+    ("lanterns", include_str!("../../public/effects/lanterns.json")),
+    ("maple", include_str!("../../public/effects/maple.json")),
+    ("galaxy", include_str!("../../public/effects/galaxy.json")),
+    ("butterfly-dream", include_str!("../../public/effects/butterfly-dream.json")),
+    ("fireworks", include_str!("../../public/effects/fireworks.json")),
     ("snow", include_str!("../../public/effects/snow.json")),
+    ("rain", include_str!("../../public/effects/rain.json")),
     ("fireflies", include_str!("../../public/effects/fireflies.json")),
     ("petals", include_str!("../../public/effects/petals.json")),
-    ("maple", include_str!("../../public/effects/maple.json")),
     ("meteors", include_str!("../../public/effects/meteors.json")),
     ("stars", include_str!("../../public/effects/stars.json")),
+    ("ripples", include_str!("../../public/effects/ripples.json")),
+    ("aurora", include_str!("../../public/effects/aurora.json")),
 ];
 #[cfg(test)]
 pub const CATALOG: &str = include_str!("../../public/effects/catalog.json");

@@ -56,6 +56,24 @@ describe("drawing the four kinds of shape", () => {
     expect(stroked).not.toContain("fill"); expect(stroked.filter((c) => c === "stroke")).toHaveLength(6);
     const veined = drawn(make({ kind: "path", d: "M0,-1 L1,1 L-1,1 Z", vein: { d: "M0,-1 L0,1", color: "#000000" } }));
     expect(veined.filter((c) => c === "stroke")).toHaveLength(6);
+    const lit = drawn(make({ kind: "path", d: "M0,-1 L1,1 L-1,1 Z", halo: { color: "#ffaa00" } }));
+    expect(lit.filter((c) => c === "createRadialGradient")).toHaveLength(6); expect(lit.filter((c) => c === "fillRect")).toHaveLength(6);
+  });
+  it("ring: a soft wide outline and a sharp one; beam: one tall gradient; glow can be flattened", () => {
+    const rings = drawn(make({ kind: "ring", aspect: 0.3 }));
+    expect(rings.filter((c) => c === "stroke")).toHaveLength(12); expect(rings).not.toContain("fill");
+    const beams = drawn(make({ kind: "beam", length: 200 }));
+    expect(beams.filter((c) => c === "createRadialGradient")).toHaveLength(6); expect(beams.filter((c) => c === "fillRect")).toHaveLength(6);
+    expect(drawn(make({ kind: "glow", aspect: 0.4 })).filter((c) => c === "scale")).toHaveLength(6);
+  });
+  it("adds light together only for layers that ask, and leaves the canvas in normal mode", () => {
+    const sim = new ParticleSystem(make({ kind: "glow" }, { blend: "add" }), () => 0.5);
+    sim.configure(1920, 1080, params); sim.advance(0.1);
+    const modes: string[] = [];
+    const { ctx } = recorder();
+    Object.defineProperty(ctx, "globalCompositeOperation", { set: (mode: string) => modes.push(mode), get: () => modes.at(-1) });
+    drawEffects(ctx, sim);
+    expect(modes).toEqual(["lighter", "source-over"]);
   });
   it("clears the canvas first and draws nothing for particles that are resting", () => {
     const resting = make({ kind: "circle" }, { burst: { duration: 1, rest: 100, x: 0.5, y: 0.5, travel: 100 }, count: 3 });

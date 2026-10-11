@@ -135,3 +135,125 @@ describe("a stopped or empty screen", () => {
     expect((first(sim).pool[0].v - before + 1) % 1).toBeLessThan(0.12);
   });
 });
+
+describe("groups that burst together", () => {
+  const fireworks = (burst: Record<string, unknown> = {}, extra: Record<string, unknown> = {}) => system({ count: 40, colors: ["#f00", "#0f0", "#00f"], shape: { kind: "streak", length: 20, width: 2 },
+    burst: { group: 20, spread: 360, duration: [2, 2], rest: [1, 1], x: [0.3, 0.7], y: [0.2, 0.4], travel: [200, 200], ...burst }, ...extra });
+  it("keeps whole groups when the density changes", () => {
+    expect(first(fireworks()).active).toBe(40);
+    expect(first(system({ count: 40, burst: { group: 20 } }, { density: 0.2 })).active).toBe(20);
+    expect(first(system({ count: 40, burst: { group: 20 } }, { density: 1.3 })).active).toBe(60);
+  });
+  it("starts every spark of a firework from one point, in one colour, fanned out all around", () => {
+    const sim = fireworks(), state = first(sim);
+    for (let i = 0; i < 200 && !state.pool.slice(0, 20).every((p) => p.visible); i++) sim.advance(0.02);
+    const sparks = state.pool.slice(0, 20), lead = sparks[0];
+    expect(new Set(sparks.map((p) => p.color)).size).toBe(1);
+    const cx = lead.sx * 1920, cy = lead.sy * 1080;
+    const angles = sparks.map((p) => Math.atan2(p.y - cy, p.x - cx));
+    expect(Math.max(...angles) - Math.min(...angles)).toBeGreaterThan(Math.PI * 1.6);
+    for (const p of sparks) expect(Math.hypot(p.x - cx, p.y - cy)).toBeLessThanOrEqual(201);
+  });
+  it("first sends a rocket up from the bottom, and only then bursts", () => {
+    const sim = fireworks({ launch: [1, 1] }), state = first(sim);
+    for (let i = 0; i < 400; i++) {
+      sim.advance(0.02);
+      const lead = state.pool[0];
+      if (lead.age < lead.launch) {
+        expect(state.pool.slice(1, 20).some((p) => p.visible)).toBe(false);
+        expect(lead.dy).toBe(-1); expect(lead.y).toBeGreaterThanOrEqual(lead.sy * 1080 - 0.5);
+      }
+    }
+  });
+  it("falls under gravity and fades out by the end of the turn", () => {
+    const sim = fireworks({ gravity: 300, fade: "out", ease: "out" }), state = first(sim);
+    const lead = state.pool[0];
+    for (let i = 0; i < 400 && !(lead.visible && lead.age > 1.85); i++) sim.advance(0.02);
+    expect(lead.dy).toBeGreaterThan(0.5);
+    expect(lead.alpha).toBeLessThan(0.3);
+  });
+  it("fills a shell like a sphere of sparks instead of a single ring", () => {
+    const radii = (fill: number) => {
+      const sim = fireworks({ fill }), state = first(sim), lead = state.pool[0];
+      for (let i = 0; i < 400 && !(lead.visible && lead.age - lead.launch > 1.5); i++) sim.advance(0.02);
+      const cx = lead.sx * 1920, cy = lead.sy * 1080;
+      const r = state.pool.slice(0, 20).filter((s) => s.visible).map((s) => Math.hypot(s.x - cx, s.y - cy));
+      return r.map((x) => x / Math.max(...r));
+    };
+    expect(Math.min(...radii(0))).toBeGreaterThan(0.6);
+    expect(radii(1).filter((x) => x < 0.55).length).toBeGreaterThanOrEqual(2);
+  });
+  it("draws a new pattern every turn, flashes where it bursts, and shortens the tails of slowing sparks", () => {
+    const sim = fireworks({ launch: [0.5, 0.5], flash: 0.3, fill: 1, ease: "out" }), state = first(sim), lead = state.pool[0];
+    const pattern = () => state.pool.slice(0, 20).map((s) => s.k[14].toFixed(4)).join();
+    const before = pattern();
+    let flashed = 0, after = Infinity;
+    for (let i = 0; i < 400; i++) {
+      sim.advance(0.02);
+      const since = lead.age - lead.launch;
+      if (lead.flash > 0) { flashed++; expect(since).toBeLessThan(0.3); expect([lead.fx, lead.fy]).toEqual([lead.sx * 1920, lead.sy * 1080]); }
+      if (since > 1.6 && lead.visible) after = Math.min(after, lead.stretch);
+    }
+    expect(flashed).toBeGreaterThan(0);
+    expect(after).toBeLessThan(0.5);
+    expect(pattern()).not.toBe(before);
+  });
+  it("squeezes a ring shell into a tilted ellipse", () => {
+    const sim = fireworks({ fill: 0, flatten: [0.2, 0.2], travel: [200, 200] }), state = first(sim), lead = state.pool[0];
+    for (let i = 0; i < 400 && !(lead.visible && lead.age - lead.launch > 1.5); i++) sim.advance(0.02);
+    const cx = lead.sx * 1920, cy = lead.sy * 1080, axis = [Math.cos(lead.tilt), Math.sin(lead.tilt)];
+    const sparks = state.pool.slice(0, 20).filter((s) => s.visible);
+    const across = sparks.map((s) => Math.abs(-(s.x - cx) * axis[1] + (s.y - cy) * axis[0]));
+    const along = sparks.map((s) => Math.abs((s.x - cx) * axis[0] + (s.y - cy) * axis[1]));
+    expect(Math.max(...across)).toBeLessThan(Math.max(...along) * 0.35);
+  });
+  it("gives some sparks of a two-colour shell the next colour", () => {
+    const sim = fireworks({ mix: 0.5 }), state = first(sim);
+    for (let i = 0; i < 400 && !state.pool[0].visible; i++) sim.advance(0.02);
+    expect(new Set(state.pool.slice(0, 20).map((s) => s.color)).size).toBe(2);
+  });
+  it("starts ripples one after another in the same place and lets them grow", () => {
+    const sim = system({ count: 3, shape: { kind: "ring", aspect: 0.3 }, size: [100, 100], direction: 0,
+      burst: { group: 3, stagger: 0.5, duration: [3, 3], rest: [2, 2], travel: 0, grow: [0.1, 1], ease: "out", fade: "out" } });
+    const [a, b, c] = first(sim).pool;
+    for (let i = 0; i < 400 && !(a.visible && !b.visible && a.age > 0.2); i++) sim.advance(0.02);
+    expect(c.visible).toBe(false);
+    const small = a.size;
+    for (let i = 0; i < 40; i++) sim.advance(0.02);
+    expect(a.size).toBeGreaterThan(small);
+    expect(b.visible).toBe(true);
+    expect([b.x, b.y]).toEqual([a.x, a.y]);
+  });
+});
+
+describe("bands across the screen", () => {
+  it("keeps particles near the band's middle line, which can tilt and wave", () => {
+    const sim = system({ count: 400, speed: [20, 40], direction: 0, band: { angle: -30, offset: 0, width: 0.1 } });
+    sim.advance(0.5);
+    const turn = -30 * Math.PI / 180;
+    for (const p of first(sim).pool) {
+      const across = -(p.x - 960) * Math.sin(turn) + (p.y - 540) * Math.cos(turn);
+      expect(Math.abs(across)).toBeLessThanOrEqual(54.5);
+    }
+    const flat = system({ count: 300, band: { offset: -0.3, width: 0, wave: { amplitude: 0.1, count: 1 } } });
+    const ys = first(flat).pool.map((p) => p.y);
+    expect(Math.min(...ys)).toBeGreaterThanOrEqual(540 - 324 - 108.5);
+    expect(Math.max(...ys)).toBeLessThanOrEqual(540 - 324 + 108.5);
+    expect(Math.max(...ys) - Math.min(...ys)).toBeGreaterThan(150);
+  });
+  it("moves along the band and loops around it", () => {
+    const sim = system({ count: 50, speed: [200, 200], direction: 0, band: { width: 0 } });
+    const before = first(sim).pool.map((p) => p.u);
+    for (let i = 0; i < 100; i++) sim.advance(0.1);
+    expect(first(sim).pool.map((p) => p.u)).not.toEqual(before);
+    expect(first(sim).pool.every((p) => p.u >= 0 && p.u < 1 && Math.abs(p.y - 540) < 1)).toBe(true);
+  });
+});
+
+describe("facing the way it swims", () => {
+  it("turns each particle to its direction of travel", () => {
+    const sim = system({ count: 20, speed: [50, 50], direction: [0, 360], orient: "motion", scatter: 1 });
+    sim.advance(0.1);
+    for (const p of first(sim).pool) expect(Math.cos(p.angle - Math.atan2(p.dy, p.dx))).toBeCloseTo(1, 6);
+  });
+});

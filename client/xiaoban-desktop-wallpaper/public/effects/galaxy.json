@@ -1,0 +1,171 @@
+{
+ "schemaVersion": 1,
+ "id": "galaxy",
+ "name": "星汉灿烂",
+ "description": "一道星河斜斜横过夜空，星云淡淡发光",
+ "sky": [
+  "#04050f",
+  "#11132e",
+  "#271a46",
+  "#3a2a52"
+ ],
+ "layers": [
+  {
+   "count": 260,
+   "shape": {
+    "kind": "circle"
+   },
+   "size": [
+    1.2,
+    2.6
+   ],
+   "twinkle": {
+    "rate": [
+     0.15,
+     0.6
+    ],
+    "depth": 0.6
+   },
+   "alpha": [
+    0.25,
+    0.7
+   ],
+   "colors": [
+    "#ffffff",
+    "#dfe8ff"
+   ]
+  },
+  {
+   "count": 60,
+   "shape": {
+    "kind": "glow",
+    "core": 0,
+    "aspect": 0.5
+   },
+   "size": [
+    180,
+    400
+   ],
+   "speed": [
+    2,
+    3
+   ],
+   "direction": -28,
+   "band": {
+    "angle": -28,
+    "width": 0.18
+   },
+   "scatter": 0.08,
+   "twinkle": {
+    "rate": [
+     0.02,
+     0.06
+    ],
+    "depth": 0.3
+   },
+   "alpha": [
+    0.12,
+    0.24
+   ],
+   "blend": "add",
+   "colors": [
+    [
+     "#c9b8ff",
+     "#5a3fb0"
+    ],
+    [
+     "#ffd9b8",
+     "#b0603f"
+    ],
+    [
+     "#b8e4ff",
+     "#3f6fb0"
+    ],
+    [
+     "#ffc7e6",
+     "#a03f80"
+    ]
+   ]
+  },
+  {
+   "count": 1300,
+   "shape": {
+    "kind": "circle"
+   },
+   "size": [
+    1,
+    2.6
+   ],
+   "speed": [
+    2,
+    4
+   ],
+   "direction": -28,
+   "band": {
+    "angle": -28,
+    "width": 0.3
+   },
+   "twinkle": {
+    "rate": [
+     0.1,
+     0.5
+    ],
+    "depth": 0.5
+   },
+   "alpha": [
+    0.3,
+    0.85
+   ],
+   "blend": "add",
+   "colors": [
+    "#ffffff",
+    "#ffe9cf",
+    "#d9e4ff"
+   ]
+  },
+  {
+   "count": 40,
+   "shape": {
+    "kind": "path",
+    "d": "M0,-1 C0.06,-0.3 0.3,-0.06 1,0 C0.3,0.06 0.06,0.3 0,1 C-0.06,0.3 -0.3,0.06 -1,0 C-0.3,-0.06 -0.06,-0.3 0,-1 Z",
+    "style": "fill"
+   },
+   "size": [
+    8,
+    16
+   ],
+   "speed": [
+    2,
+    4
+   ],
+   "direction": -28,
+   "band": {
+    "angle": -28,
+    "width": 0.3
+   },
+   "scatter": 0,
+   "twinkle": {
+    "rate": [
+     0.2,
+     0.6
+    ],
+    "depth": 0.7
+   },
+   "alpha": [
+    0.5,
+    0.95
+   ],
+   "blend": "add",
+   "colors": [
+    [
+     "#ffffff",
+     "#cfe0ff"
+    ],
+    [
+     "#ffffff",
+     "#ffe2b8"
+    ]
+   ]
+  }
+ ]
+}

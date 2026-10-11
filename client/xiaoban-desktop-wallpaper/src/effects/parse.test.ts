@@ -44,8 +44,24 @@ describe("effect pack check", () => {
   });
   it("describes meteors as bursts and keeps a flip from collapsing to nothing", () => {
     const first = ok(pack({ layers: [layer({ burst: { duration: [1, 2], rest: [3, 4], x: [0.2, 1.5], y: [-0.1, 0.3], travel: 800 }, flip: { rate: 1, min: 0 } })] })).layers[0];
-    expect(first.burst).toEqual({ duration: [1, 2], rest: [3, 4], x: [0.2, 1.5], y: [-0.1, 0.3], travel: [800, 800] });
+    expect(first.burst).toEqual({ duration: [1, 2], rest: [3, 4], x: [0.2, 1.5], y: [-0.1, 0.3], travel: [800, 800],
+      group: 1, spread: 0, stagger: 0, launch: null, gravity: 0, ease: "linear", fade: "in-out", grow: [1, 1], fill: 0, flatten: [1, 1], flash: 0, mix: 0 });
     expect(first.flip).toEqual({ rate: [1, 1], min: 0.05 });
+  });
+  it("reads firework groups, bands and the new shapes, clamped, and keeps a band off burst layers", () => {
+    const fireworks = ok(pack({ layers: [layer({ shape: { kind: "ring", width: 90, aspect: 3 }, blend: "add", orient: "motion",
+      burst: { group: 999, spread: 720, stagger: -1, launch: 1, gravity: 50, ease: "out", fade: "out", grow: [0.1, 1], fill: 3, flatten: [0, 2], flash: 9, mix: -1 }, band: { width: 0.2 } })] })).layers[0];
+    expect(fireworks.burst).toMatchObject({ group: 200, spread: 360, stagger: 0, launch: [1, 1], gravity: 50, ease: "out", fade: "out", grow: [0.1, 1], fill: 1, flatten: [0.05, 1], flash: 2, mix: 0 });
+    expect(fireworks.band).toBeNull();
+    expect(fireworks.shape).toEqual({ kind: "ring", width: [40, 40], aspect: 1 });
+    expect(fireworks.blend).toBe("add"); expect(fireworks.orient).toBe("motion");
+    const sky = ok(pack({ layers: [layer({ shape: { kind: "beam", length: 300, focus: 2 }, band: { angle: 120, offset: -0.3, width: 0.1, falloff: "even", wave: { amplitude: 1, count: 2 } } })] })).layers[0];
+    expect(sky.shape).toEqual({ kind: "beam", length: [300, 300], focus: 0.9 });
+    expect(sky.band).toEqual({ angle: 90, offset: -0.3, width: 0.1, falloff: "even", wave: { amplitude: 0.5, count: 2, speed: 0 } });
+    expect(sky.blend).toBe("normal"); expect(sky.orient).toBe("fixed");
+    const lantern = ok(pack({ layers: [layer({ shape: { kind: "path", d: "M0,0 L1,1 Z", halo: { scale: 9, color: "#ffaa00" } } })] })).layers[0];
+    expect(lantern.shape).toMatchObject({ halo: { scale: 6, y: 0, color: [255, 170, 0], alpha: 0.4 } });
+    expect(error(pack({ layers: [layer({ shape: { kind: "path", d: "M0,0 L1,1 Z", halo: { color: "red" } } })] }))).toContain("halo");
   });
   it("rejects packs that are not packs, with a reason the user can act on", () => {
     expect(error(null)).toContain("对象");

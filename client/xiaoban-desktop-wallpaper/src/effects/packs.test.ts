@@ -14,9 +14,10 @@ const biggest = (pack: EffectPack) => Math.max(...pack.layers.map((layer) => lay
 
 describe("the effects shipped with the app", () => {
   it("are exactly the files in the folder, each one valid, and their ids are their file names", () => {
+    for (const id of catalog) expect([...packs.get(id)!.name], id).toHaveLength(4);
     const onDisk = Object.keys(files).filter((path) => path.includes("/public/effects/") && !path.endsWith("/catalog.json")).map((path) => path.replace(/^.*\//, "").slice(0, -5)).sort();
     expect([...catalog].sort()).toEqual(onDisk);
-    expect(catalog).toEqual(["rain", "snow", "fireflies", "petals", "maple", "meteors", "stars"]);
+    expect(catalog).toEqual(["lanterns", "maple", "galaxy", "butterfly-dream", "fireworks", "snow", "rain", "fireflies", "petals", "meteors", "stars", "ripples", "aurora"]);
     for (const id of catalog) {
       const parsed = parsePack(read(`${id}.json`));
       expect(parsed.ok ? "" : parsed.error, id).toBe("");
@@ -26,7 +27,7 @@ describe("the effects shipped with the app", () => {
   it("show leaves as maple leaves and big enough to be seen", () => {
     expect(packs.has("leaves" as string)).toBe(false);
     const maple = packs.get("maple")!;
-    expect(maple.name).toBe("枫叶飘落");
+    expect(maple.name).toBe("层林尽染");
     expect(maple.layers.every((layer) => layer.shape.kind === "path")).toBe(true);
     expect(biggest(maple)).toBeGreaterThanOrEqual(60);
     expect(Math.min(...maple.layers.map((layer) => layer.size[0]))).toBeGreaterThanOrEqual(18);
@@ -42,7 +43,7 @@ describe("the effects shipped with the app", () => {
   });
   it("include a starry sky with stars of several kinds, twinkling", () => {
     const stars = packs.get("stars")!;
-    expect(stars.name).toBe("繁星");
+    expect(stars.name).toBe("星罗棋布");
     expect(stars.layers.length).toBeGreaterThanOrEqual(3);
     expect(new Set(stars.layers.map((layer) => layer.shape.kind)).size).toBeGreaterThanOrEqual(3);
     expect(stars.layers.every((layer) => layer.twinkle !== null)).toBe(true);
@@ -52,6 +53,36 @@ describe("the effects shipped with the app", () => {
     const meteors = packs.get("meteors")!;
     expect(meteors.layers.every((layer) => layer.burst !== null && layer.shape.kind === "streak")).toBe(true);
     expect(Math.min(...meteors.layers.map((layer) => layer.burst!.rest[0]))).toBeGreaterThan(1);
+  });
+  it("make lanterns rise upright with a warm glow, and butterflies flap their wings", () => {
+    const lanterns = packs.get("lanterns")!.layers.filter((layer) => layer.shape.kind === "path");
+    expect(lanterns.length).toBeGreaterThanOrEqual(2);
+    for (const layer of lanterns) {
+      expect(layer.scatter).toBe(0); expect(layer.direction[0]).toBeGreaterThan(240); expect(layer.direction[1]).toBeLessThan(300);
+      expect(layer.shape.kind === "path" && layer.shape.halo).toBeTruthy();
+    }
+    expect(packs.get("butterfly-dream")!.layers.filter((layer) => layer.flip !== null && layer.flip.rate[0] >= 1.5).length).toBeGreaterThanOrEqual(2);
+  });
+  it("launch fireworks that burst into whole groups of sparks, and let ripples spread in rings", () => {
+    const fireworks = packs.get("fireworks")!;
+    for (const layer of fireworks.layers) {
+      expect(layer.burst!.group).toBeGreaterThanOrEqual(20); expect(layer.burst!.spread).toBe(360); expect(layer.burst!.launch).not.toBeNull();
+      expect(layer.count % layer.burst!.group).toBe(0); expect(layer.blend).toBe("add"); expect(layer.burst!.flash).toBeGreaterThan(0);
+    }
+    expect(fireworks.layers.filter((layer) => layer.burst!.fill >= 0.8).length).toBeGreaterThanOrEqual(3);
+    expect(fireworks.layers.some((layer) => layer.burst!.gravity >= 90 && layer.burst!.duration[0] >= 3)).toBe(true);
+    expect(fireworks.layers.some((layer) => layer.burst!.flatten[1] < 1)).toBe(true);
+    const rings = packs.get("ripples")!.layers.filter((layer) => layer.shape.kind === "ring");
+    expect(rings.length).toBeGreaterThanOrEqual(2);
+    for (const layer of rings) { expect(layer.burst!.group).toBeGreaterThan(1); expect(layer.burst!.grow[0]).toBeLessThan(layer.burst!.grow[1]); }
+    expect(packs.get("ripples")!.layers.some((layer) => layer.orient === "motion")).toBe(true);
+  });
+  it("keep the aurora and the Milky Way in bands across the sky", () => {
+    const curtains = packs.get("aurora")!.layers.filter((layer) => layer.shape.kind === "beam");
+    expect(curtains.length).toBeGreaterThanOrEqual(2);
+    expect(curtains.every((layer) => layer.band !== null && layer.band.offset < 0 && layer.band.wave.amplitude > 0 && layer.blend === "add")).toBe(true);
+    const galaxy = packs.get("galaxy")!;
+    expect(galaxy.layers.filter((layer) => layer.band !== null && layer.band.angle !== 0).reduce((sum, layer) => sum + layer.count, 0)).toBeGreaterThanOrEqual(800);
   });
   it("come with an example for people who write their own, and it is valid", () => {
     const example = files["../../docs/effect-pack-example.json"] as { id: string };

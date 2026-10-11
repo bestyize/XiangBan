@@ -45,8 +45,8 @@ android {
         // Saving into the gallery through MediaStore needs no storage permission from Android 10.
         minSdk = 29
         targetSdk = 37
-        versionCode = 3
-        versionName = "0.3.0"
+        versionCode = 4
+        versionName = "1.0.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -78,6 +78,10 @@ android {
         release {
             if (hasCustomSigning) {
                 signingConfig = signingConfigs.getByName("release")
+            }
+            // Release builds ship for 64-bit ARM phones only; debug stays universal for x86_64 emulators.
+            ndk {
+                abiFilters += "arm64-v8a"
             }
             optimization {
                 enable = true

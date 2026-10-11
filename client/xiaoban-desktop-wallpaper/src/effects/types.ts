@@ -9,17 +9,61 @@ export type Rgb = [number, number, number];
 export interface ColorPair { base: Rgb; tip: Rgb }
 
 export interface Vein { d: string; color: Rgb; alpha: number; width: number }
+/** A soft light behind a path shape, in the shape's own -1 to 1 box: a lantern's glow. */
+export interface Halo { scale: number; y: number; color: Rgb; alpha: number }
 export type Shape =
   | { kind: "circle" }
   /** A soft disc of light; `core` is the radius of a small solid centre, as a fraction of the glow's radius. */
-  | { kind: "glow"; core: number }
+  | { kind: "glow"; core: number; aspect: number }
   /** An SVG path drawn in a box from -1 to 1, scaled to the particle's size. */
-  | { kind: "path"; d: string; style: "fill" | "stroke" | "both"; lineWidth: number; vein: Vein | null }
+  | { kind: "path"; d: string; style: "fill" | "stroke" | "both"; lineWidth: number; vein: Vein | null; halo: Halo | null }
+  /** An outline of a circle, flattened to `aspect` of its width (a ripple seen from the side). */
+  | { kind: "ring"; width: Range; aspect: number }
+  /** A tall soft ray of light, brightest near its lower end; `size` is its width (an aurora's curtain). */
+  | { kind: "beam"; length: Range; focus: number }
   /** A line along the direction of travel with a fading tail, such as a raindrop or a meteor. */
   | { kind: "streak"; length: Range; width: Range; head: number };
 
-/** Particles that appear somewhere, cross the screen in a short time and rest before the next turn (meteors). */
-export interface Burst { duration: Range; rest: Range; x: Range; y: Range; travel: Range }
+/**
+ * Particles that appear somewhere, cross the screen in a short time and rest before the next turn (meteors).
+ * With `group` above 1 that many particles share one start, one turn and one colour: a firework's sparks, or the
+ * rings of one ripple. `spread` fans their directions out, `stagger` starts them one after another, and `launch`
+ * first sends the group's first particle up from the bottom edge to where the others then burst out.
+ */
+export interface Burst {
+  duration: Range; rest: Range; x: Range; y: Range; travel: Range;
+  group: number; spread: number; stagger: number; launch: Range | null;
+  /** Pixels per second squared, pulling downwards. */
+  gravity: number;
+  /** `out` slows down towards the end instead of moving evenly. */
+  ease: "linear" | "out";
+  /** `in-out` fades in and out; `out` appears at once and fades away. */
+  fade: "in-out" | "out";
+  /** Size from the start of a turn to its end, as multiples. */
+  grow: Range;
+  /** 0 puts a group's particles on a ring; 1 spreads them like a sphere of sparks seen from the front. */
+  fill: number;
+  /** Squeezes the group's pattern to this share of its height, at a random tilt each turn (a ring seen at an angle). */
+  flatten: Range;
+  /** Seconds of a bright flash where the group bursts. */
+  flash: number;
+  /** Share of a group's particles that take the next colour of the palette (two-colour shells). */
+  mix: number;
+}
+
+/** Particles kept along a band across the screen instead of all over it (the Milky Way, an aurora). */
+export interface Band {
+  /** Degrees the band is turned from horizontal. */
+  angle: number;
+  /** Where its middle line sits, in screen heights from the centre (negative is up). */
+  offset: number;
+  /** How thick it is, in screen heights. */
+  width: number;
+  /** `gauss` gathers particles towards the middle line, `even` spreads them evenly. */
+  falloff: "gauss" | "even";
+  /** The middle line waves: amplitude in screen heights, waves along the band, waves per second. */
+  wave: { amplitude: number; count: number; speed: number };
+}
 
 export interface Layer {
   /** Particles at density 1 on a 1920x1080 screen. */
@@ -47,6 +91,11 @@ export interface Layer {
   colors: ColorPair[];
   twinkle: { rate: Range; depth: number } | null;
   burst: Burst | null;
+  band: Band | null;
+  /** `add` makes overlapping light brighter, for glows, fireworks and auroras. */
+  blend: "normal" | "add";
+  /** `motion` turns each particle to face the way it is moving (a fish); `fixed` uses spin and scatter. */
+  orient: "fixed" | "motion";
 }
 
 export interface EffectPack {

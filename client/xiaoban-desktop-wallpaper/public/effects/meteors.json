@@ -1,7 +1,7 @@
 {
  "schemaVersion": 1,
  "id": "meteors",
- "name": "流星划过",
+ "name": "流星赶月",
  "description": "每隔几秒划过一颗流星",
  "sky": [
   "#050818",
