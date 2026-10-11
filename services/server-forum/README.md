@@ -1,6 +1,6 @@
 # server-forum：超级小伴论坛
 
-状态：一期（网页版）已实现，未部署。面向开发者和 AI 用户的社区：技术交流、资源分享、福利羊毛（羊毛帖的产品、能领到什么、领取条件、有效期、活动页都是选填，到期自动下架）、随便唠唠和站务板块。福利羊毛不作为主推，排在技术交流和资源分享之后。站点名「超级小伴」，计划域名 `chat.xiangban.xyz`。产品设计见 [docs/product/PRD_论坛.md](../../docs/product/PRD_论坛.md)。
+状态：一期（网页版）已实现，2026-10-11 部署在香港机 chat.xiangban.xyz。面向开发者和 AI 用户的社区：技术交流、资源分享、福利羊毛（羊毛帖的产品、能领到什么、领取条件、有效期、活动页都是选填，到期自动下架）、随便唠唠和站务板块。福利羊毛不作为主推，排在技术交流和资源分享之后。站点名「超级小伴」，计划域名 `chat.xiangban.xyz`。产品设计见 [docs/product/PRD_论坛.md](../../docs/product/PRD_论坛.md)。
 
 技术栈：Rust Axum 0.8 + PostgreSQL（SQLx），前端 Vue 3 + Vite + TypeScript（`web/`），由本服务直接托管。登录走[统一账号中心](../server-account/README.md)，本站不存密码，用 JWKS 公钥离线验签。默认端口 55010。
 
@@ -71,4 +71,4 @@ cargo test --manifest-path services/server-forum/Cargo.toml
 - 二期（PRD 里的 M2 起）未做：站内通知和关键词订阅、积分规则、TL2 自动升级、屏蔽用户、敏感词、图片上传到腾讯云 COS、赞助位。现在帖子里的图片只能用外链。
 - 账号中心还没有用户自助注销，设置页提示发邮件处理。
 - SEO 页面只渲染第一页（30-50 条），sitemap 每次请求实时查询，没有进程内缓存。
-- 尚未部署：需要在账号中心后台新增应用 `forum-web`，`ACCOUNT_CORS_ORIGINS` 加上 `https://chat.xiangban.xyz`，再配置域名解析、Nginx 和数据库 `xiaban_forum`。
+- 部署：香港机 `/home/ubuntu/xiangban-forum`，systemd 服务 `server-forum`，监听 127.0.0.1:55010，Nginx 反代 chat.xiangban.xyz（Let's Encrypt），库 `xiaban_forum` 在 `wallpaper_postgres` 容器里，独立角色 `forum`。账号中心已登记 `forum-web` 并在 `ACCOUNT_CORS_ORIGINS` 加入 `https://chat.xiangban.xyz`。初始管理员密码在服务器 `.env` 的 `FORUM_ADMIN_PASSWORD`，登录 /admin 改密码后删掉它。更新时本地交叉编译后替换二进制和 `web/dist`，再重启服务（index.html 启动时读一次）。
