@@ -83,6 +83,34 @@ pub fn attach_wallpaper(
     attach_desktop(window, parent, *monitor.position(), monitor.size().width as i32, monitor.size().height as i32)
 }
 
+unsafe extern "system" fn find_icon_host(hwnd: HWND, data: LPARAM) -> i32 {
+    let host=FindWindowExW(hwnd,null_mut(),wide("SHELLDLL_DefView").as_ptr(),std::ptr::null());
+    if !host.is_null(){*(data as *mut HWND)=host;return 0;}1
+}
+pub fn widget_parent() -> Result<usize,String> {
+    unsafe { let mut host: HWND=null_mut();EnumWindows(Some(find_icon_host),&mut host as *mut HWND as LPARAM);
+        if host.is_null(){return Err("找不到桌面图标层，请确认 Explorer 正常运行".into());}Ok(host as usize) }
+}
+/// Host small interactive windows above Explorer's icon list, below application windows.
+pub fn attach_widget(window: &tauri::WebviewWindow) -> Result<(),String> {
+    let hwnd=window.hwnd().map_err(|e|e.to_string())?.0 as HWND;
+    unsafe {
+        let host=widget_parent()? as HWND;
+        let style=GetWindowLongPtrW(hwnd,GWL_STYLE);
+        SetWindowLongPtrW(hwnd,GWL_STYLE,(style&!(WS_POPUP as isize))|WS_CHILD as isize);
+        SetLastError(0);SetParent(hwnd,host);
+        if GetParent(hwnd)!=host{return Err(format!("组件嵌入桌面失败：{}",GetLastError()));}
+        if SetWindowPos(hwnd,HWND_TOP,0,0,0,0,SWP_NOMOVE|SWP_NOSIZE|SWP_NOACTIVATE|SWP_FRAMECHANGED)==0{return Err("组件层级设置失败".into());}
+    }Ok(())
+}
+pub fn place_widget(window:&tauri::WebviewWindow,position:tauri::PhysicalPosition<i32>,width:i32,height:i32)->Result<(),String>{
+    let hwnd=window.hwnd().map_err(|e|e.to_string())?.0 as HWND;
+    unsafe{let mut parent=GetParent(hwnd);if parent.is_null()||IsWindow(parent)==0{attach_widget(window)?;parent=GetParent(hwnd);}
+        let mut origin=POINT{x:position.x,y:position.y};ScreenToClient(parent,&mut origin);
+        if SetWindowPos(hwnd,HWND_TOP,origin.x,origin.y,width,height,SWP_NOACTIVATE)==0{return Err(format!("组件位置设置失败：{}",GetLastError()));}}
+    Ok(())
+}
+
 fn attach_desktop(
     window: &tauri::WebviewWindow,
     parent: usize,

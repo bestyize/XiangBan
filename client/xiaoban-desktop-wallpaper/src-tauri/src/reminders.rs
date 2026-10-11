@@ -445,6 +445,9 @@ fn weather_for(app: &tauri::AppHandle, city: &City) -> Result<Weather, String> {
     if let Err(error) = save(app, &store) { store.error = Some(error); }
     result
 }
+pub fn widget_weather_source(app: &tauri::AppHandle) -> care_weather::Source {
+    app.state::<ReminderState>().store.lock().unwrap().config.weather_source.clone()
+}
 pub fn set_game_active(app: &tauri::AppHandle, active: bool) {
     app.state::<ReminderState>().game.store(active, Ordering::Relaxed);
     if active { defer_active(app); }

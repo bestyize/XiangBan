@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import { computed, defineAsyncComponent, onMounted, onBeforeUnmount, ref } from 'vue';
 import { NAlert, NButton, NSkeleton, NTag, useMessage } from 'naive-ui';
-import { Images, Sparkles, Bot, Gamepad2, Bell, Settings2, PanelLeftClose, PanelLeftOpen, ArrowUpRight, Globe, User, LogIn, LogOut } from 'lucide-vue-next';
+import { Images, Sparkles, Hand, Bot, Gamepad2, Bell, Settings2, PanelLeftClose, PanelLeftOpen, ArrowUpRight, Globe, User, LogIn, LogOut } from 'lucide-vue-next';
 import { invoke } from '../bridge.ts';
 import { createControlStore } from './control-store.ts';
 import type { ControlPage } from './control-types.ts';
 const WallpaperPage = defineAsyncComponent(() => import('./pages/WallpaperPage.vue'));
 const EffectsPage = defineAsyncComponent(() => import('./pages/EffectsPage.vue'));
+const InteractivePage = defineAsyncComponent(() => import('./pages/InteractivePage.vue'));
+const WidgetsPage = defineAsyncComponent(() => import('./pages/WidgetsPage.vue'));
 const CompanionPage = defineAsyncComponent(() => import('./pages/CompanionPage.vue'));
 const GamesPage = defineAsyncComponent(() => import('./pages/GamesPage.vue'));
 const CarePage = defineAsyncComponent(() => import('./pages/CarePage.vue'));
@@ -18,6 +20,7 @@ const store = createControlStore((text, type = 'success') => message[type](Strin
 const collapsed = ref(false);
 const items = [
   { id: 'wallpapers', label: '壁纸库', hint: '发现喜欢的风景', icon: Images },
+  { id: 'widgets', label: '桌面组件', hint: '把小物件留在桌面上', icon: Hand },
   { id: 'effects', label: '桌面特效', hint: '雨雪花瓣与流星', icon: Sparkles },
   { id: 'companion', label: '桌面小伴', hint: '外观与陪伴方式', icon: Bot },
   { id: 'games', label: '游戏空间', hint: '给自己放个小假', icon: Gamepad2 },
@@ -45,9 +48,10 @@ async function handleLogout() {
     store.notify(error, 'error');
   }
 }
+const manageWidgets = () => navigate('widgets');
 const focus = () => store.refreshSettings().catch(error => store.notify(error, 'error'));
-onMounted(() => { void store.initialize().then(async () => { if (store.info.uiSmoke) await (await import('./ui-smoke.ts')).runUiSmoke(store); }); window.addEventListener('focus', focus); });
-onBeforeUnmount(() => { store.dispose(); window.removeEventListener('focus', focus); });
+onMounted(() => { void store.initialize().then(async () => { if (store.info.uiSmoke) await (await import('./ui-smoke.ts')).runUiSmoke(store); }); window.addEventListener('focus', focus); window.addEventListener('widgets-manage', manageWidgets); });
+onBeforeUnmount(() => { store.dispose(); window.removeEventListener('focus', focus); window.removeEventListener('widgets-manage', manageWidgets); });
 </script>
 <template>
   <div class="control-app" :class="{ 'is-collapsed': collapsed, 'is-wallpapers': store.page === 'wallpapers' }">
@@ -90,7 +94,7 @@ onBeforeUnmount(() => { store.dispose(); window.removeEventListener('focus', foc
         <NAlert v-if="store.initialError" class="workspace-alert" type="error" title="桌面配置暂时无法读取">{{ store.initialError }} <NButton size="small" @click="store.initialize()">重试</NButton></NAlert>
         <div v-if="store.website.update?.available && store.page !== 'settings' && store.page !== 'wallpapers'" class="update-strip"><span><span class="notice-dot"></span>小伴有新版本 v{{ store.website.update.version }}</span><button @click="navigate('settings')">查看更新<ArrowUpRight :size="14" /></button></div>
         <div v-if="!store.ready" class="workspace-loading"><NSkeleton height="36px" width="220px" /><NSkeleton height="18px" width="320px" /><NSkeleton height="380px" :sharp="false" /></div>
-        <template v-else-if="!store.initialError"><WallpaperPage v-if="store.page === 'wallpapers'" :store="store" /><EffectsPage v-else-if="store.page === 'effects'" :store="store" /><CompanionPage v-else-if="store.page === 'companion'" :store="store" /><GamesPage v-else-if="store.page === 'games'" :store="store" /><CarePage v-else-if="store.page === 'care'" :store="store" /><SettingsPage v-else :store="store" /></template>
+        <template v-else-if="!store.initialError"><WallpaperPage v-if="store.page === 'wallpapers'" :store="store" /><WidgetsPage v-else-if="store.page === 'widgets'" :store="store" /><InteractivePage v-else-if="store.page === 'interactive'" :store="store" /><EffectsPage v-else-if="store.page === 'effects'" :store="store" /><CompanionPage v-else-if="store.page === 'companion'" :store="store" /><GamesPage v-else-if="store.page === 'games'" :store="store" /><CarePage v-else-if="store.page === 'care'" :store="store" /><SettingsPage v-else :store="store" /></template>
       </main>
       <footer class="control-statusbar"><span><span class="state-dot small"></span>{{ store.desktop ? (store.info.platform === 'windows' ? 'Windows 桌面已连接' : '桌面已连接') : '正在预览界面，桌面操作需在应用内使用' }}</span><span>{{ store.library.items.filter(item => item.installed).length }} 个本地壁纸</span></footer>
     </div>

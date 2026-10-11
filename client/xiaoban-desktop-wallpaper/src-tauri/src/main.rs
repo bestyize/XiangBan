@@ -17,6 +17,8 @@ mod account;
 mod storage;
 mod local_media;
 mod games;
+mod rituals;
+mod widgets;
 mod reminders;
 mod presence;
 mod care_system;
@@ -646,7 +648,9 @@ fn main() {
             get_startup_status, set_autostart, content::get_wallpaper_library, content::import_wallpaper_catalog,
             games::open_game_space, games::close_game_space, games::get_game_catalog, games::load_game_save,
             games::save_game_save, games::get_game_status, games::set_game_desktop_double_click,
-            games::game_smoke_report,
+            games::game_smoke_report, rituals::open_ritual_space, rituals::close_ritual_space, rituals::read_ritual_journal, rituals::write_ritual_journal,
+            widgets::get_desktop_widgets, widgets::add_desktop_widget, widgets::update_desktop_widget, widgets::remove_desktop_widget,
+            widgets::set_widgets_editing, widgets::get_desktop_widget, widgets::move_desktop_widget, widgets::show_widget_settings, widgets::get_widget_weather,
             reminders::get_care_settings, reminders::configure_care, reminders::upsert_care_rule, reminders::delete_care_rule,
             reminders::preview_care_rule, reminders::get_care_delivery, reminders::care_ready, reminders::dismiss_care,
             reminders::snooze_care, reminders::search_care_cities, reminders::detect_care_city, reminders::check_care_weather,
@@ -658,11 +662,11 @@ fn main() {
             account::register_account, account::reset_account_password, account::check_account_username,
             account::get_account_session, account::logout_account]);
     let app = builder.manage(state).manage(content::ContentState::default()).manage(website::WebsiteState::default())
-        .manage(games::GameState::default()).manage(reminders::ReminderState::default()).manage(account::AccountState::default())
+        .manage(games::GameState::default()).manage(rituals::RitualState::default()).manage(widgets::WidgetState::default()).manage(reminders::ReminderState::default()).manage(account::AccountState::default())
         .register_uri_scheme_protocol("wallpaper-asset", |context, request| library::serve(context.app_handle(), request))
         .invoke_handler(move |invoke| {
             let label=invoke.message.webview_ref().label(); let command=invoke.message.command();
-            let allowed=games::permitted(label,command).unwrap_or_else(|| {
+            let allowed=widgets::permitted(label,command).or_else(|| rituals::permitted(label,command)).or_else(|| games::permitted(label,command)).unwrap_or_else(|| {
                 if command=="ui_smoke_report" {return label=="control";}
                 if command=="set_companion_enabled" || command=="set_companion_links" || command=="set_companion_skin" || command=="set_desktop_effects" || command=="list_desktop_effects" || command=="open_effects_directory" {return label=="control";}
                 if label=="care" { return ["get_care_delivery","care_ready","dismiss_care","snooze_care"].contains(&command); }
@@ -695,6 +699,7 @@ fn main() {
             };
             open_scene(app.handle(), &initial_mode).map_err(std::io::Error::other)?;
             effects::sync(app.handle());
+            widgets::start(app.handle());
             if !std::env::args().any(|argument| argument == "--autostart") {
                 present_control(app.handle()).map_err(std::io::Error::other)?;
             }

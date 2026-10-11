@@ -57,8 +57,20 @@ fn payload(app: &tauri::AppHandle, item: &Wallpaper, options: &Options, preview:
     let composition = composition(app, preview);
     json!({"item":{"id":item.id,"title":item.title,"kind":item.kind,"resourceUrl":library::asset_url(&item.resource),
         "assets":item.assets.iter().map(|(key,r)|(key.clone(),json!({"url":library::asset_url(r),"mime":r.mime}))).collect::<BTreeMap<_,_>>()},
-        "options":options,"config":composition["config"],"effects":composition["effects"],"petPosition":composition["petPosition"],
+        "options":render_options(app, &item.id, options),"config":composition["config"],"effects":composition["effects"],"petPosition":composition["petPosition"],
         "test":app.state::<DesktopState>().isolated})
+}
+
+fn render_options(app: &tauri::AppHandle, id: &str, options: &Options) -> Value {
+    let mut value = json!(options);
+    if id == "builtin-wish-pond" {
+        // Only positions cross into the wallpaper sandbox; the user's wish text stays in the trusted scene.
+        let positions = crate::rituals::read_ritual_journal(app.clone()).ok()
+            .and_then(|data| data["wishes"].as_array().map(|wishes| wishes.iter().map(|wish| json!({"x": wish["x"], "y": wish["y"]})).collect::<Vec<_>>()))
+            .unwrap_or_default();
+        value["values"]["_wishPositions"] = json!(serde_json::to_string(&positions).unwrap_or_default());
+    }
+    value
 }
 
 fn open(
@@ -236,7 +248,7 @@ pub fn sync(app: &tauri::AppHandle) {
     for label in ["media-a", "media-b"] {
         if let Some(window) = app.get_webview_window(label) {
             let mut value = composition(app, false);
-            value["options"] = json!(config.wallpaper_options);
+            value["options"] = render_options(app, &config.wallpaper_id, &config.wallpaper_options);
             let _ = window.eval(format!(
                 "window.dispatchEvent(new CustomEvent('content-config',{{detail:{value}}}));"
             ));

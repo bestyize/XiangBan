@@ -16,6 +16,16 @@ async function init() {
     return;
   }
   await import("./style.css");
+  if (mode === "widget") {
+    const { mountWidget } = await import("./widgets/mount.ts");
+    await mountWidget();
+    return;
+  }
+  if (mode === "ritual") {
+    const { mountRitual } = await import("./rituals/mount.ts");
+    mountRitual();
+    return;
+  }
   if (mode === "effects") {
     const { mountEffects } = await import("./effects-scene.ts");
     await mountEffects();

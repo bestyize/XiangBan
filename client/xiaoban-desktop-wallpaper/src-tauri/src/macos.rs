@@ -59,7 +59,8 @@ pub fn configure_scene(
         let floating = CGWindowLevelForKey(CGWindowLevelKey::FloatingWindowLevelKey) as isize;
         // Effects sit one level above the wallpaper window, still under the desktop icons.
         ns.setLevel(if wallpaper {
-            match window.label() { "pet" => 0, crate::effects::LABEL => desktop + 2, _ => desktop + 1 }
+            if crate::widgets::is_widget(window.label()) { CGWindowLevelForKey(CGWindowLevelKey::DesktopIconWindowLevelKey) as isize + 1 }
+            else { match window.label() { "pet" => 0, crate::effects::LABEL => desktop + 2, _ => desktop + 1 } }
         } else { floating });
         let common = NSWindowCollectionBehavior::CanJoinAllSpaces
             | NSWindowCollectionBehavior::Stationary
@@ -76,7 +77,7 @@ pub fn configure_scene(
         ns.setCanHide(false);
         ns.setExcludedFromWindowsMenu(true);
         ns.setHasShadow(false);
-        let click_through = wallpaper && window.label() != "pet";
+        let click_through = wallpaper && window.label() != "pet" && !crate::widgets::is_widget(window.label());
         if click_through {
             ns.setIgnoresMouseEvents(true);
         }

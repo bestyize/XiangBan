@@ -3,7 +3,7 @@ import type { EffectsChoice } from "../effects/types.ts";
 import type { LoadedPacks } from "../effects/catalog.ts";
 import type { WebsiteStatus } from "./website-types.ts";
 
-export type ControlPage = "wallpapers" | "effects" | "companion" | "games" | "care" | "settings";
+export type ControlPage = "wallpapers" | "widgets" | "interactive" | "effects" | "companion" | "games" | "care" | "settings";
 export interface ControlStore {
   settings: Settings;
   info: AppInfo;

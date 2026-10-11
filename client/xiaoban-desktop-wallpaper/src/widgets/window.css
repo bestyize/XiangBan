@@ -1,0 +1,1 @@
+html:has(body.widget-scene),body.widget-scene,body.widget-scene #app{background:transparent!important;overflow:hidden;margin:0;width:100%;height:100%}.widget-frame{position:absolute;top:8px;left:8px;transform-origin:top left}

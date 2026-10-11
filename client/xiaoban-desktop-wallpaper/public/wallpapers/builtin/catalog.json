@@ -78,6 +78,37 @@
           "step": 0.1
         }
       ]
+    },
+    {
+      "id": "builtin-wish-pond",
+      "version": "1.0.0",
+      "title": "一池心灯",
+      "description": "一灯一愿，岁岁长安。莲灯与月色，在水面轻轻相逢。",
+      "author": "小伴",
+      "kind": "canvas",
+      "resource": {
+        "url": "builtin://wish-pond.js",
+        "sha256": "42c448f0c201a61b347fa9ed403148f694be05cee45ccb1ac366e8b3de606684",
+        "bytes": 6889,
+        "mime": "application/javascript"
+      },
+      "cover": {
+        "url": "builtin://wish-pond-cover.svg",
+        "sha256": "42b255a5bade193710650b5250df34da798b3270537fa979c273e916b1f57d37",
+        "bytes": 1700,
+        "mime": "image/svg+xml"
+      },
+      "controls": [
+        {
+          "key": "speed",
+          "label": "水景速度",
+          "type": "range",
+          "default": 0.6,
+          "min": 0.1,
+          "max": 1.5,
+          "step": 0.1
+        }
+      ]
     }
   ]
 }

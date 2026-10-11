@@ -1,0 +1,6 @@
+{
+  "identifier": "rituals",
+  "description": "Trusted interactive scenes use explicitly guarded custom commands only.",
+  "windows": ["ritual"],
+  "permissions": []
+}
