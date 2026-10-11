@@ -7,9 +7,9 @@
 | 项目 | 状态 | 说明 |
 | --- | --- | --- |
 | [client/xiaban-web](client/xiaban-web/README.md) | 已实现 | 相伴网页/PWA，包含管理后台 |
-| [client/xiaoban-desktop-wallpaper](client/xiaoban-desktop-wallpaper/README.md) | 可运行原型 | Windows/macOS 桌宠与动态壁纸，无聊天和账户 |
+| [client/xiaoban-desktop-wallpaper](client/xiaoban-desktop-wallpaper/README.md) | 1.0.0 | 小伴壁纸桌面版：Windows/macOS 桌宠、动态壁纸、十三个桌面特效（数据驱动的特效包）、游戏空间与关怀提醒；接入壁纸网站的在线壁纸、版本与公告 |
 | [client/xiaoban-pot-garden](client/xiaoban-pot-garden/README.md) | 可运行原型 | 表情盆栽的 3D 质感原型（Vite + three.js），花盆养成游戏的起点，目前只有表情和质感，没有玩法 |
-| [client/xiaoban-mobile-wallpaper](client/xiaoban-mobile-wallpaper/README.md) | 可运行原型 | Android 壁纸浏览与下载，Compose 双列瀑布流，收藏只存本机，无账户 |
+| [client/xiaoban-mobile-wallpaper](client/xiaoban-mobile-wallpaper/README.md) | 1.0.0 | 小伴壁纸 Android 版：浏览与下载壁纸网站的图片和视频，Compose 瀑布流，可登录统一账号，收藏只存本机；release 只打 arm64-v8a |
 | [client/xiaoban-multiplatform](client/xiaoban-multiplatform/README.md) | 可运行原型 | 把 xiaban.xyz 套进原生壳：Android/iOS 用 KMP + Compose，桌面用 Rust + Tauri（`desktopApp/`）；Android 与 macOS 已运行验证，iOS 仅编译 |
 | [client/xiaoban-realbot](client/xiaoban-realbot/README.md) | 规划 | 实体机器人客户端，平台与硬件待定 |
 | [services/xiaban-api/backend](services/xiaban-api/backend/README.md) | 已实现 | Ktor 后端、业务、数据与后台任务 |
@@ -47,10 +47,12 @@ npm --prefix client/xiaban-web run build
 npm --prefix client/xiaoban-desktop-wallpaper ci
 npm --prefix client/xiaoban-desktop-wallpaper test
 npm --prefix client/xiaoban-desktop-wallpaper run desktop
+npm --prefix client/xiaoban-desktop-wallpaper run desktop:macos:build
 npm --prefix client/xiaoban-pot-garden ci
 npm --prefix client/xiaoban-pot-garden test
 npm --prefix client/xiaoban-pot-garden run build
 (cd client/xiaoban-mobile-wallpaper && ./gradlew :app:testDebugUnitTest :app:assembleDebug)
+(cd client/xiaoban-mobile-wallpaper && ./gradlew :app:assembleRelease)
 ./gradlew :api-contracts:jvmTest :backend:test
 ./gradlew :backend:run
 ./gradlew :backend:installDist
@@ -69,6 +71,8 @@ cargo test --locked --manifest-path services/server-account/Cargo.toml
 ```
 
 Windows 使用 gradlew.bat；Kotlin 服务需要 JDK 21。Android 壁纸需要 JDK 17+ 与 Android SDK，并自带 Gradle wrapper。网盘服务需要 Rust 1.80+ 与 Node.js 18+，默认端口 55005，运行方式与数据目录要求见其 README；它不接入根 Gradle，也不依赖主 API 的账户与数据库。应用商店服务位于 `services/server-xiaoban-appstore`，使用 Rust Axum、PostgreSQL 与 Vue 3 + Vite，默认端口 55008，包含腾讯柠檬精选美学前台与经典管理后台（支持一键上下架）。后端分发输出在 services/xiaban-api/backend/build/install/backend。集成测试使用独立测试数据库和 Redis 第 15 号库；默认在依赖不可用时跳过，XIABAN_REQUIRE_INTEGRATION=true 可要求必须执行，详见后端 README。
+
+小伴壁纸三端安装包由 `.github/workflows/build-xiaoban-wallpaper.yml`（BuildXiaoBanWallpaper）打包：Windows x64 便携 EXE、macOS aarch64 的 dmg 与 `.app`（ad-hoc 签名，未公证）、Android arm64-v8a release APK。在 Actions 页手动运行，或推送 `xiaoban-wallpaper-v*` 标签触发。Android 签名读取仓库 secret `XIAOBAN_ANDROID_KEYSTORE_BASE64`、`XIAOBAN_ANDROID_KEYSTORE_PASSWORD`、`XIAOBAN_ANDROID_KEY_ALIAS`、`XIAOBAN_ANDROID_KEY_PASSWORD`，缺少时产出未签名 APK。本地 Android release 需要 JDK 17+，GraalVM 在 jlink 步骤会失败，可改用 Android Studio 自带的 JBR。
 
 正式壁纸网站位于 `services/server-xiangban-wallpaper`，使用 Node.js 24、Rust stable 和独立 PostgreSQL，默认端口 8080。桌面客户端默认连接 `https://wallpaper.xiangban.xyz`；它的数据库集成测试使用 `TEST_DATABASE_URL`，每个测试创建并清理独立 schema，不更改已有数据。
 

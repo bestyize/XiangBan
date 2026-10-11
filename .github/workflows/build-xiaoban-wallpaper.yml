@@ -106,8 +106,13 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
-      # Accepts the SDK licences so the Android Gradle plugin can fetch the compile SDK it needs.
-      - uses: android-actions/setup-android@v3
+      # The runner ships an Android SDK; accepting its licences lets the Android Gradle plugin download the compile SDK it needs.
+      - name: Accept Android SDK licences
+        run: |
+          sdkmanager=$(ls -d "$ANDROID_HOME"/cmdline-tools/*/bin/sdkmanager | sort -V | tail -1)
+          echo "sdk.dir=$ANDROID_HOME" > local.properties
+          yes | "$sdkmanager" --licenses > /dev/null || true
+          echo "Using $sdkmanager"
       - uses: gradle/actions/setup-gradle@v4
       # Optional: with the four secrets below the APK is signed with the release key; without them it is unsigned.
       - name: Prepare signing key
