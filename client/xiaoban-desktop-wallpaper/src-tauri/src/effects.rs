@@ -1,5 +1,5 @@
 //! The desktop-wide particle layer: one transparent, click-through window laid over the desktop picture, so the
-//! effect works with any wallpaper (or the plain system desktop) behind it. It is a top-level window of its own
+//! effect works with any wallpaper (or the plain system desktop) behind it. It is a separate desktop window
 //! and not part of a wallpaper window, so changing the wallpaper never touches it.
 use crate::{effect_packs, preferences::Settings, settings, storage, DesktopState};
 use serde_json::{json, Value};
@@ -70,6 +70,8 @@ fn open(app: &tauri::AppHandle, current: &Settings, pack: &Value) -> Result<(), 
     app.state::<crate::content::ContentState>().reports.lock().unwrap().remove(LABEL);
     let monitor = app.primary_monitor().map_err(|e| e.to_string())?.ok_or("没有主显示器")?;
     let scale = monitor.scale_factor();
+    #[cfg(windows)]
+    let parent = crate::windows::desktop_parent()?;
     let builder = WebviewWindowBuilder::new(app, LABEL, WebviewUrl::App("index.html?scene=effects".into()))
         .title("小伴 · 桌面特效")
         .decorations(false).shadow(false).resizable(false).skip_taskbar(true)
@@ -80,10 +82,16 @@ fn open(app: &tauri::AppHandle, current: &Settings, pack: &Value) -> Result<(), 
     // macOS puts it at a desktop window level once the page reports ready (see `scene_ready`).
     #[cfg(target_os = "macos")]
     let builder = builder.incognito(true).background_throttling(tauri::utils::config::BackgroundThrottlingPolicy::Disabled);
-    // Windows keeps it beneath every application window; being click-through it never takes focus.
+    // Host it below Explorer's icons, beside the wallpaper and desktop companion.
     #[cfg(windows)]
-    let builder = builder.always_on_bottom(true).data_directory(storage::webview(&storage::root(app)?));
+    let builder = builder.parent_raw(::windows::Win32::Foundation::HWND(parent as _))
+        .data_directory(storage::webview(&storage::root(app)?));
     let window = builder.build().map_err(|e| e.to_string())?;
+    #[cfg(windows)]
+    if let Err(error) = crate::windows::attach_wallpaper(&window, &monitor, parent) {
+        let _ = window.destroy();
+        return Err(error);
+    }
     if let Err(error) = window.set_ignore_cursor_events(true) {
         let _ = window.destroy();
         return Err(error.to_string());

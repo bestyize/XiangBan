@@ -25,7 +25,7 @@ async fn settle(app: &tauri::AppHandle, expect_ready: bool) -> Result<(), String
 }
 
 fn report_of(app: &tauri::AppHandle, id: &str, expected: &EffectsChoice) -> Result<Value, String> {
-    let report = app.state::<crate::content::ContentState>().reports.lock().unwrap().get(LABEL).cloned().ok_or("特效验证没有收到场景报告")?;
+    let mut report = app.state::<crate::content::ContentState>().reports.lock().unwrap().get(LABEL).cloned().ok_or("特效验证没有收到场景报告")?;
     let effects = &report["effects"];
     let current = settings(app);
     let params = serde_json::to_value(expected.params_of(id)).map_err(|e| e.to_string())?;
@@ -39,6 +39,8 @@ fn report_of(app: &tauri::AppHandle, id: &str, expected: &EffectsChoice) -> Resu
     if !effects["particles"].as_array().is_some_and(|layers| !layers.is_empty() && layers.iter().all(|n| n.as_u64().unwrap_or(0) > 0)) {
         return Err(format!("特效没有为每一层生成粒子：{id}"));
     }
+    #[cfg(windows)]
+    { report["native"] = crate::windows::diagnostics(app); }
     Ok(report)
 }
 
@@ -56,6 +58,8 @@ fn choose(app: &tauri::AppHandle, selected: &str, params: Value) -> Result<Effec
 
 pub async fn run(app: &tauri::AppHandle) -> Result<Value, String> {
     if !app.state::<DesktopState>().isolated { return Err("桌面特效验证只能使用隔离配置".into()); }
+    let previous_mode = settings(app).mode;
+    crate::set_mode(app.clone(), "wallpaper".into()).await?;
     let mut cases = Vec::new();
     for id in SCENES {
         let handle = app.clone();
@@ -73,11 +77,15 @@ pub async fn run(app: &tauri::AppHandle) -> Result<Value, String> {
         crate::content::apply_wallpaper(app.clone(), id.into(), Default::default(), false).await?;
         settle(app, false).await?;
         if app.get_webview_window(LABEL).is_none() || settings(app).effects != kept { return Err(format!("应用壁纸 {id} 后桌面特效消失或被改动")); }
-        independent.push(json!({"id": id, "overlayPresent": true}));
+        let mut state = json!({"id": id, "overlayPresent": true});
+        #[cfg(windows)]
+        { state["native"] = crate::windows::diagnostics(app); }
+        independent.push(state);
     }
     let off = choose(app, "", json!({}))?;
     settle(app, false).await?;
     if app.get_webview_window(LABEL).is_some() { return Err("选择“无特效”后覆盖窗口没有关闭".into()); }
     persisted(app, &off)?;
+    crate::set_mode(app.clone(), previous_mode).await?;
     Ok(json!({"cases": cases, "independent": independent, "turnedOff": true, "persistence": {"diskConfigMatch": true}}))
 }

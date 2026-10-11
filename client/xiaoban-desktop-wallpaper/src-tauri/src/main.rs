@@ -185,6 +185,9 @@ fn set_autostart(app: tauri::AppHandle, enabled: bool) -> Result<Settings, Strin
 fn open_scene(app: &tauri::AppHandle, mode: &str) -> Result<(), String> {
     if !settings(app).companion_enabled { return Ok(()); }
     if let Some(window) = app.get_webview_window("pet") {
+        #[cfg(windows)]
+        windows::configure_companion(&window, mode == "wallpaper")?;
+        #[cfg(not(windows))]
         window.set_always_on_top(mode == "floating").map_err(|e| e.to_string())?;
         #[cfg(target_os = "macos")]
         macos::configure_scene(&window, mode == "wallpaper", false)?;
@@ -209,6 +212,11 @@ fn open_scene(app: &tauri::AppHandle, mode: &str) -> Result<(), String> {
     let builder = builder.data_directory(storage::webview(&storage::root(app)?));
     let window = builder.build().map_err(|e| e.to_string())?;
     window.set_ignore_cursor_events(true).map_err(|e| e.to_string())?;
+    #[cfg(windows)]
+    if let Err(error) = windows::configure_companion(&window, mode == "wallpaper") {
+        let _ = window.destroy();
+        return Err(error);
+    }
     #[cfg(target_os = "macos")]
     macos::configure_scene(&window, mode == "wallpaper", false)?;
     Ok(())
@@ -365,6 +373,8 @@ fn scene_ready(window: tauri::WebviewWindow, report: Option<serde_json::Value>) 
         }
     }
     window.show().map_err(|e| e.to_string())?;
+    #[cfg(windows)]
+    windows::order_desktop_layers(window.app_handle())?;
     #[cfg(target_os = "macos")]
     macos::configure_scene(
         &window,

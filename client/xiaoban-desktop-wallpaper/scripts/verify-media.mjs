@@ -18,6 +18,14 @@ try{
  assert.equal(result.media.Ok.cases.length,6);assert.ok(result.media.Ok.cacheOffline);assert.ok(result.media.Ok.hashFailurePreserved);assert.ok(result.media.Ok.updateChecked)
  assert.equal(result.wallpaper.wallpaper,null,'No special companion wallpaper should be created')
  assert.ok(result.wallpaper.floating?.visible,'Desktop companion must remain visible')
+ if(result.wallpaper.platform==='windows'){
+  assert.equal(result.wallpaper.floating.isChild,true,'Wallpaper companion must be hosted below desktop icons')
+  assert.ok(['WorkerW','Progman'].includes(result.wallpaper.floating.parentClass))
+  assert.equal(result.wallpaper.floating.topmost,false)
+  assert.equal(result.floatingAfter.floating.isChild,false,'Floating companion must leave the desktop host')
+  assert.equal(result.floatingAfter.floating.topmost,true)
+  for(const coordinate of ['x','y','width','height'])assert.equal(result.floatingAfter.floating[coordinate],result.floatingBefore.floating[coordinate],`Mode round trip must preserve ${coordinate}`)
+ }
  for(const state of result.media.Ok.cases){assert.ok(state.report.width>0&&state.report.height>0);assert.equal(state.report.privilegedIpcBlocked,true);assert.equal(state.geometry.fillsMonitor,true,`${state.id} must fill the monitor without a non-client border`)}
  assert.equal(result.media.Ok.localImports.cases.length,2)
  assert.ok(result.media.Ok.localImports.sourceDeleted&&result.media.Ok.localImports.deduplicated&&result.media.Ok.localImports.restored)
@@ -37,6 +45,14 @@ try{
   assert.ok(effects.independent.every(item=>item.overlayPresent===true),'The overlay must survive every wallpaper, including the plain system desktop')
   assert.equal(effects.turnedOff,true,'effects.turnedOff')
   assert.equal(effects.persistence?.diskConfigMatch,true,'effects.persistence.diskConfigMatch')
+  if(result.wallpaper.platform==='windows')for(const native of [...effects.cases.map(item=>item.report.native),...effects.independent.map(item=>item.native)]){
+   assert.equal(native.effects.isChild,true,'Effects must be hosted below desktop icons')
+   assert.ok(['WorkerW','Progman'].includes(native.effects.parentClass))
+   assert.equal(native.effects.topmost,false)
+   assert.equal(native.effects.parent,native.floating.parent,'Effects and wallpaper companion must share the desktop host')
+   assert.deepEqual(native.desktopOrder.slice(0,2),['pet','effects'],'Companion must be above effects')
+   for(const media of [native.mediaA,native.mediaB].filter(Boolean))assert.equal(media.parent,native.effects.parent,'Wallpaper must share the desktop host below effects')
+  }
  }
  console.log(`PASS: image/video/Canvas, delivery, SHA-256, offline cache, unprivileged IPC and update check${effectsSmoke?'; effects: 13 effects, kept across 4 wallpapers, off and persistence':''}. ${report}`)
 }finally{clearTimeout(timeout);await fixture.close()}

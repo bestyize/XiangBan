@@ -80,6 +80,16 @@ pub fn attach_wallpaper(
     monitor: &tauri::Monitor,
     parent: usize,
 ) -> Result<usize, String> {
+    attach_desktop(window, parent, *monitor.position(), monitor.size().width as i32, monitor.size().height as i32)
+}
+
+fn attach_desktop(
+    window: &tauri::WebviewWindow,
+    parent: usize,
+    position: tauri::PhysicalPosition<i32>,
+    width: i32,
+    height: i32,
+) -> Result<usize, String> {
     let parent = parent as HWND;
     let hwnd = window.hwnd().map_err(|e| e.to_string())?.0 as HWND;
     unsafe {
@@ -99,8 +109,8 @@ pub fn attach_wallpaper(
             ));
         }
         let mut origin = POINT {
-            x: monitor.position().x,
-            y: monitor.position().y,
+            x: position.x,
+            y: position.y,
         };
         ScreenToClient(parent, &mut origin);
         if SetWindowPos(
@@ -108,8 +118,8 @@ pub fn attach_wallpaper(
             null_mut(),
             origin.x,
             origin.y,
-            monitor.size().width as i32,
-            monitor.size().height as i32,
+            width,
+            height,
             SWP_NOACTIVATE | SWP_NOZORDER | SWP_FRAMECHANGED,
         ) == 0
         {
@@ -120,6 +130,62 @@ pub fn attach_wallpaper(
         }
     }
     Ok(parent as usize)
+}
+
+/// Preserve the pet's screen position while moving it between Explorer's background
+/// and a floating top-level window. Turning off topmost alone does not put it below icons.
+pub fn configure_companion(window: &tauri::WebviewWindow, desktop: bool) -> Result<(), String> {
+    let hwnd = window.hwnd().map_err(|e| e.to_string())?.0 as HWND;
+    let mut client = RECT::default();
+    let mut origin = POINT::default();
+    unsafe {
+        if GetClientRect(hwnd, &mut client) == 0 || ClientToScreen(hwnd, &mut origin) == 0 {
+            return Err("无法读取小伴窗口位置".into());
+        }
+    }
+    if desktop {
+        let parent = desktop_parent()?;
+        window.set_always_on_top(false).map_err(|e| e.to_string())?;
+        attach_desktop(window, parent, tauri::PhysicalPosition::new(origin.x, origin.y),
+            client.right - client.left, client.bottom - client.top)?;
+    } else {
+        unsafe {
+            SetLastError(0);
+            SetParent(hwnd, null_mut());
+            let error = GetLastError();
+            let style = GetWindowLongPtrW(hwnd, GWL_STYLE);
+            // SetParent(NULL) first uses the desktop HWND for a WS_CHILD window;
+            // clear that style before asking GetParent whether it is top-level.
+            SetWindowLongPtrW(hwnd, GWL_STYLE, (style & !(WS_CHILD as isize)) | WS_POPUP as isize);
+            if !GetParent(hwnd).is_null() {
+                return Err(format!("小伴离开桌面背景层失败（Windows 错误 {error}）"));
+            }
+            if SetWindowPos(hwnd, HWND_TOPMOST, origin.x, origin.y,
+                client.right - client.left, client.bottom - client.top,
+                SWP_NOACTIVATE | SWP_FRAMECHANGED) == 0 {
+                return Err(format!("恢复小伴悬浮位置失败（Windows 错误 {}）", GetLastError()));
+            }
+        }
+        window.set_always_on_top(true).map_err(|e| e.to_string())?;
+    }
+    order_desktop_layers(window.app_handle())
+}
+
+/// All desktop layers are siblings below Explorer's icon view. Reapply this order
+/// after a scene becomes visible, including when a newly downloaded wallpaper replaces one.
+pub fn order_desktop_layers(app: &tauri::AppHandle) -> Result<(), String> {
+    for label in ["media-a", "media-b", crate::effects::LABEL, "pet"] {
+        let Some(window) = app.get_webview_window(label) else { continue; };
+        let hwnd = window.hwnd().map_err(|e| e.to_string())?.0 as HWND;
+        unsafe {
+            if GetWindowLongPtrW(hwnd, GWL_STYLE) & WS_CHILD as isize == 0 { continue; }
+            if !["WorkerW", "Progman"].contains(&class_name(GetParent(hwnd)).as_str()) { continue; }
+            if SetWindowPos(hwnd, HWND_TOP, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE) == 0 {
+                return Err(format!("排列桌面图层失败：{label}（Windows 错误 {}）", GetLastError()));
+            }
+        }
+    }
+    Ok(())
 }
 
 pub fn left_button_down() -> bool {
@@ -237,9 +303,28 @@ pub fn diagnostics(app: &tauri::AppHandle) -> serde_json::Value {
             })
     };
     let geometry = app.get_webview_window("wallpaper").and_then(|w| wallpaper_geometry(&w).ok());
+    let mut desktop_order = Vec::new();
+    let layers: Vec<_> = ["pet", crate::effects::LABEL, "media-a", "media-b"].into_iter()
+        .filter_map(|label| app.get_webview_window(label).and_then(|w| w.hwnd().ok())
+            .map(|native| (label, native.0 as HWND)))
+        .collect();
+    if let Some((_, hwnd)) = layers.iter().find(|(_, hwnd)| unsafe {
+        GetWindowLongPtrW(*hwnd, GWL_STYLE) & WS_CHILD as isize != 0
+    }) {
+        unsafe {
+            let mut sibling = GetTopWindow(GetParent(*hwnd));
+            while !sibling.is_null() {
+                if let Some((label, _)) = layers.iter().find(|(_, hwnd)| *hwnd == sibling) {
+                    desktop_order.push(*label);
+                }
+                sibling = GetWindow(sibling, GW_HWNDNEXT);
+            }
+        }
+    }
     serde_json::json!({"platform": "windows", "wallpaperSupported": true,
         "mode": super::settings(app).mode, "floating": describe("pet"), "wallpaper": describe("wallpaper"),
-        "wallpaperGeometry":geometry})
+        "effects": describe(crate::effects::LABEL), "mediaA": describe("media-a"), "mediaB": describe("media-b"),
+        "desktopOrder": desktop_order, "wallpaperGeometry":geometry})
 }
 
 #[derive(Clone, Copy)]
