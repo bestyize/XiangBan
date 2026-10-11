@@ -1,6 +1,7 @@
 package xyz.xiaban.wallpaper.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -14,10 +15,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.CircularProgressIndicator
@@ -35,10 +38,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -93,6 +98,7 @@ fun LoginDialog(app: AppViewModel, onDismiss: () -> Unit) {
     var info by remember { mutableStateOf<String?>(null) }
     var availability by remember { mutableStateOf<Availability>(Availability.Idle) }
     val codeFocus = remember { FocusRequester() }
+    val focusManager = LocalFocusManager.current
 
     LaunchedEffect(cooldown > 0) {
         while (cooldown > 0) {
@@ -121,6 +127,15 @@ fun LoginDialog(app: AppViewModel, onDismiss: () -> Unit) {
         } catch (_: Exception) {
             Availability.Idle
         }
+    }
+
+    fun changeIdentifier() {
+        step = LoginStep.IDENTIFY
+        code = ""
+        password = ""
+        error = null
+        info = null
+        cooldown = 0
     }
 
     fun switchMode(next: LoginMode) {
@@ -232,7 +247,7 @@ fun LoginDialog(app: AppViewModel, onDismiss: () -> Unit) {
                 Icon(Icons.Default.Close, "关闭", Modifier.size(20.dp), tint = Palette.Sub)
             }
             Column(
-                Modifier.fillMaxWidth().padding(start = 24.dp, end = 24.dp, top = 28.dp, bottom = 24.dp),
+                Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(start = 24.dp, end = 24.dp, top = 28.dp, bottom = 24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 PetFace(Expression.HAPPY, Modifier.widthIn(max = 84.dp).fillMaxWidth())
@@ -247,6 +262,9 @@ fun LoginDialog(app: AppViewModel, onDismiss: () -> Unit) {
                 Spacer(Modifier.height(18.dp))
 
                 if (step != LoginStep.SETUP) {
+                    if (mode == LoginMode.RESET) {
+                        Text("重置密码：先验证邮箱或手机号，再设置新密码。", Modifier.fillMaxWidth().padding(bottom = 10.dp), color = Palette.Sub, fontSize = 13.sp, textAlign = TextAlign.Center)
+                    }
                     ModeTabs(mode != LoginMode.CODE, enabled = !submitting, onPassword = { switchMode(LoginMode.PASSWORD) }, onCode = { switchMode(LoginMode.CODE) })
                     Spacer(Modifier.height(14.dp))
                 }
@@ -258,7 +276,7 @@ fun LoginDialog(app: AppViewModel, onDismiss: () -> Unit) {
                         placeholder = "用户名（字母开头，4-20 位字母、数字或下划线）",
                         keyboardType = KeyboardType.Ascii,
                         imeAction = ImeAction.Next,
-                        onImeAction = {},
+                        onImeAction = { focusManager.moveFocus(FocusDirection.Down) },
                         enabled = !submitting,
                     )
                     val hint = when (val a = availability) {
@@ -277,8 +295,30 @@ fun LoginDialog(app: AppViewModel, onDismiss: () -> Unit) {
                         placeholder = if (mode == LoginMode.PASSWORD) "用户名、邮箱或手机号" else "邮箱或手机号",
                         keyboardType = KeyboardType.Email,
                         imeAction = if (mode == LoginMode.PASSWORD) ImeAction.Next else ImeAction.Done,
-                        onImeAction = { if (mode != LoginMode.PASSWORD) sendCode() },
+                        onImeAction = { if (mode != LoginMode.PASSWORD) sendCode() else focusManager.moveFocus(FocusDirection.Down) },
                         enabled = !submitting && !codeSent,
+                    )
+                    if (codeSent) {
+                        Text(
+                            "填错了？换一个邮箱 / 手机号",
+                            Modifier.fillMaxWidth().clickable(enabled = !submitting, interactionSource = remember { MutableInteractionSource() }, indication = null) { changeIdentifier() }
+                                .padding(top = 6.dp, start = 4.dp),
+                            color = Palette.Sub, fontSize = 12.sp,
+                        )
+                    }
+                }
+
+                if (mode != LoginMode.PASSWORD && codeSent) {
+                    Spacer(Modifier.height(12.dp))
+                    LoginField(
+                        value = code,
+                        onValueChange = { code = it.filter(Char::isDigit).take(AccountRules.CODE_LENGTH); error = null },
+                        placeholder = "验证码",
+                        keyboardType = KeyboardType.NumberPassword,
+                        imeAction = if (mode == LoginMode.RESET) ImeAction.Next else ImeAction.Done,
+                        onImeAction = { if (mode == LoginMode.RESET) focusManager.moveFocus(FocusDirection.Down) else submit() },
+                        enabled = !submitting,
+                        modifier = Modifier.focusRequester(codeFocus),
                     )
                 }
 
@@ -307,20 +347,6 @@ fun LoginDialog(app: AppViewModel, onDismiss: () -> Unit) {
                     }
                 }
 
-                if (mode != LoginMode.PASSWORD && codeSent) {
-                    Spacer(Modifier.height(12.dp))
-                    LoginField(
-                        value = code,
-                        onValueChange = { code = it.filter(Char::isDigit).take(AccountRules.CODE_LENGTH); error = null },
-                        placeholder = "验证码",
-                        keyboardType = KeyboardType.NumberPassword,
-                        imeAction = ImeAction.Done,
-                        onImeAction = ::submit,
-                        enabled = !submitting,
-                        modifier = Modifier.focusRequester(codeFocus),
-                    )
-                }
-
                 if (mode != LoginMode.PASSWORD && step != LoginStep.SETUP) {
                     Spacer(Modifier.height(8.dp))
                     val label = when {
@@ -329,13 +355,14 @@ fun LoginDialog(app: AppViewModel, onDismiss: () -> Unit) {
                         codeSent -> "重新发送"
                         else -> "获取验证码"
                     }
-                    Text(
-                        label,
-                        Modifier.fillMaxWidth().clickable(enabled = canSend, interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = ::sendCode)
-                            .padding(vertical = 8.dp),
-                        color = if (canSend) Palette.Brand else Palette.Hint,
-                        fontSize = 14.sp, fontWeight = FontWeight.Medium, textAlign = TextAlign.Center,
-                    )
+                    Box(
+                        Modifier.fillMaxWidth().height(44.dp).clip(CircleShape)
+                            .border(1.5.dp, if (canSend) Palette.Brand else Palette.Hint, CircleShape)
+                            .clickable(enabled = canSend, onClick = ::sendCode),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(label, color = if (canSend) Palette.Brand else Palette.Hint, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+                    }
                 }
 
                 Box(Modifier.fillMaxWidth().height(34.dp).padding(top = 8.dp), contentAlignment = Alignment.CenterStart) {

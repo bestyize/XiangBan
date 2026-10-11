@@ -72,6 +72,16 @@ export function LoginForm({ onDone, disabled = false, termsVersion, beforeSend }
     return () => { alive = false; clearTimeout(timer) }
   }, [username, step])
 
+  function changeIdentifier() {
+    setStep('identify')
+    setCode('')
+    setPassword('')
+    setError(null)
+    setNotice(null)
+    setCooldown(0)
+    verified.current = null
+  }
+
   function switchMode(next: Mode) {
     setMode(next)
     setStep('identify')
@@ -179,15 +189,19 @@ export function LoginForm({ onDone, disabled = false, termsVersion, beforeSend }
       {step !== 'setup' && (
         <div className="flex gap-2 rounded-full bg-dusk-soft/40 p-1" role="tablist">
           <button type="button" role="tab" aria-selected={mode !== 'code'} onClick={() => switchMode('password')}
-            className={`flex-1 rounded-full py-2 text-sm font-bold ${mode !== 'code' ? 'bg-lamp text-dusk-deep' : 'text-window/70'}`}>密码登录</button>
+            className={`flex-1 rounded-full py-2 text-sm font-bold ${mode !== 'code' ? 'bg-lamp text-white' : 'text-window/70'}`}>密码登录</button>
           <button type="button" role="tab" aria-selected={mode === 'code'} onClick={() => switchMode('code')}
-            className={`flex-1 rounded-full py-2 text-sm font-bold ${mode === 'code' ? 'bg-lamp text-dusk-deep' : 'text-window/70'}`}>验证码登录 / 注册</button>
+            className={`flex-1 rounded-full py-2 text-sm font-bold ${mode === 'code' ? 'bg-lamp text-white' : 'text-window/70'}`}>验证码登录 / 注册</button>
         </div>
+      )}
+
+      {mode === 'reset' && step !== 'setup' && (
+        <p className="text-sm text-window/70">重置密码：先验证邮箱或手机号，再设置新密码。</p>
       )}
 
       {step === 'setup' ? (
         <>
-          <p role="status" className="text-sm text-lamp">验证通过，设置你的账号。用户名是你的唯一账号，设置后不能修改。</p>
+          <p role="status" className="text-sm text-window/70">验证通过，设置你的账号。用户名是你的唯一账号，设置后不能修改。</p>
           <label className="block">
             <span className="mb-1.5 block text-sm text-window/70">用户名</span>
             <input className={input} autoComplete="username" autoCapitalize="none" spellCheck={false} maxLength={20}
@@ -202,6 +216,9 @@ export function LoginForm({ onDone, disabled = false, termsVersion, beforeSend }
           <input className={input} autoComplete="username" autoCapitalize="none" spellCheck={false} value={identifier} disabled={busy || codeSent}
             placeholder={mode === 'password' ? '用户名、邮箱或手机号' : 'you@example.com'}
             onChange={(e) => { setIdentifier(e.target.value); setError(null) }} />
+          {codeSent && (
+            <button type="button" className={`${link} mt-1.5`} disabled={busy} onClick={changeIdentifier}>填错了？换一个邮箱 / 手机号</button>
+          )}
         </label>
       )}
 
@@ -222,8 +239,8 @@ export function LoginForm({ onDone, disabled = false, termsVersion, beforeSend }
           busy={busy} autoComplete="new-password" error={passwordError(password, mode === 'reset' ? '' : username)} />
       )}
 
-      {codeSent && <p role="status" className="text-sm text-lamp">验证码已发出，5 分钟内有效。没收到时请检查垃圾邮件。</p>}
-      {notice && <p role="status" className="text-sm text-lamp">{notice}</p>}
+      {codeSent && <p role="status" className="text-sm text-window/70">验证码已发出，5 分钟内有效。没收到时请检查垃圾邮件。</p>}
+      {notice && <p role="status" className="text-sm text-window/70">{notice}</p>}
 
       {step !== 'setup' && mode !== 'reset' && (
         <label className="flex gap-2 text-sm text-window/70">
@@ -283,5 +300,6 @@ function PasswordField({ label, value, onChange, show, onToggle, busy, autoCompl
 function UsernameHint({ availability }: { availability: Availability }) {
   if (availability.kind === 'idle') return null
   const text = availability.kind === 'checking' ? '正在检查…' : availability.kind === 'ok' ? '可以使用' : availability.message
-  return <span role="status" className={`mt-1 block text-sm ${availability.kind === 'checking' ? 'text-window/60' : 'text-lamp'}`}>{text}</span>
+  const problem = availability.kind === 'taken' || availability.kind === 'invalid'
+  return <span role="status" className={`mt-1 block text-sm ${problem ? 'text-lamp' : 'text-window/70'}`}>{text}</span>
 }

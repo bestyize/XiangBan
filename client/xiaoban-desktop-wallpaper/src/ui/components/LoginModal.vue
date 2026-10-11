@@ -33,6 +33,7 @@ const identifierInput = ref<HTMLInputElement>();
 const codeInput = ref<HTMLInputElement>();
 
 const codeSent = computed(() => step.value === "verify");
+const codeValid = computed(() => /^\d{6}$/.test(code.value.trim()));
 
 function usernameProblem(raw: string): string {
   const value = raw.trim();
@@ -60,12 +61,12 @@ const hint = computed(() => {
 });
 const canSubmit = computed(() => {
   if (mode.value === "password") return !!identifier.value.trim() && !!password.value;
-  if (mode.value === "reset") return codeSent.value && !!code.value.trim() && !!password.value && !passwordProblem.value;
+  if (mode.value === "reset") return codeSent.value && codeValid.value && !!password.value && !passwordProblem.value;
   if (step.value === "setup") {
     const kind = availability.value.kind;
     return !!username.value.trim() && !["taken", "invalid", "checking"].includes(kind) && !!password.value && !passwordProblem.value;
   }
-  return codeSent.value && !!code.value.trim();
+  return codeSent.value && codeValid.value;
 });
 
 function clearCountdown() {
@@ -84,6 +85,15 @@ function switchMode(next: Mode) {
   errorMessage.value = "";
   noticeMessage.value = "";
   registrationToken = null;
+  clearCountdown();
+}
+
+function changeIdentifier() {
+  step.value = "identify";
+  code.value = "";
+  password.value = "";
+  errorMessage.value = "";
+  noticeMessage.value = "";
   clearCountdown();
 }
 
@@ -267,6 +277,8 @@ onBeforeUnmount(() => {
               <button type="button" role="tab" data-testid="tab-code" :aria-selected="mode === 'code'" :class="{ on: mode === 'code' }" @click="switchMode('code')">验证码登录 / 注册</button>
             </div>
 
+            <p v-if="mode === 'reset' && step !== 'setup'" class="reset-lead" data-testid="reset-lead">重置密码：先验证邮箱或手机号，再设置新密码。</p>
+
             <div v-if="errorMessage" class="error-banner" role="alert" data-testid="login-error-msg">
               {{ errorMessage }}
             </div>
@@ -310,6 +322,28 @@ onBeforeUnmount(() => {
                   :disabled="submitting || codeSent"
                 />
               </div>
+              <button v-if="codeSent" type="button" class="link-button" data-testid="change-identifier" :disabled="submitting" @click="changeIdentifier">
+                填错了？换一个邮箱 / 手机号
+              </button>
+            </div>
+
+            <div v-if="mode !== 'password' && codeSent" class="input-group">
+              <label for="login-code">验证码</label>
+              <div class="input-wrapper">
+                <ShieldCheck :size="18" class="input-icon" />
+                <input
+                  id="login-code"
+                  ref="codeInput"
+                  v-model="code"
+                  type="text"
+                  inputmode="numeric"
+                  data-testid="login-code-input"
+                  placeholder="请输入 6 位验证码"
+                  maxlength="6"
+                  autocomplete="one-time-code"
+                  :disabled="submitting"
+                />
+              </div>
             </div>
 
             <div v-if="mode === 'password' || step === 'setup' || (mode === 'reset' && codeSent)" class="input-group">
@@ -332,24 +366,6 @@ onBeforeUnmount(() => {
                 </button>
               </div>
               <small v-if="passwordProblem && mode !== 'password'" class="field-hint bad" data-testid="password-hint">{{ passwordProblem }}</small>
-            </div>
-
-            <div v-if="mode !== 'password' && codeSent" class="input-group">
-              <label for="login-code">验证码</label>
-              <div class="input-wrapper">
-                <ShieldCheck :size="18" class="input-icon" />
-                <input
-                  id="login-code"
-                  ref="codeInput"
-                  v-model="code"
-                  type="text"
-                  data-testid="login-code-input"
-                  placeholder="请输入 6 位验证码"
-                  maxlength="8"
-                  autocomplete="one-time-code"
-                  :disabled="submitting"
-                />
-              </div>
             </div>
 
             <button
@@ -716,6 +732,13 @@ onBeforeUnmount(() => {
 .code-send-btn.wide {
   width: 100%;
   justify-content: center;
+}
+
+.reset-lead {
+  margin: 0;
+  color: var(--ui-text-secondary);
+  font-size: 13px;
+  line-height: 1.4;
 }
 
 .link-button {

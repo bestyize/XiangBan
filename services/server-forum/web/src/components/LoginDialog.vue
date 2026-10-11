@@ -29,6 +29,7 @@ let timer: ReturnType<typeof setInterval> | null = null
 let checkTimer: ReturnType<typeof setTimeout> | null = null
 
 const codeSent = computed(() => step.value === 'verify')
+const codeValid = computed(() => /^\d{6}$/.test(code.value.trim()))
 const validId = computed(() => {
   const v = identifier.value.trim()
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v) || /^\+?\d{6,15}$/.test(v)
@@ -60,12 +61,12 @@ const hint = computed(() => {
 })
 const canSubmit = computed(() => {
   if (mode.value === 'password') return !!identifier.value.trim() && !!password.value
-  if (mode.value === 'reset') return codeSent.value && code.value.trim().length >= 4 && !!password.value && !passwordProblem.value
+  if (mode.value === 'reset') return codeSent.value && codeValid.value && !!password.value && !passwordProblem.value
   if (step.value === 'setup') {
     const k = availability.value.kind
     return !!username.value.trim() && k === 'ok' && !!password.value && !passwordProblem.value
   }
-  return codeSent.value && code.value.trim().length >= 4
+  return codeSent.value && codeValid.value
 })
 
 function startCooldown(secs: number) {
@@ -88,6 +89,17 @@ function switchMode(next: Mode) {
   error.value = ''
   notice.value = ''
   registrationToken = null
+  if (timer) clearInterval(timer)
+  timer = null
+  cooldown.value = 0
+}
+
+function changeIdentifier() {
+  step.value = 'identify'
+  code.value = ''
+  password.value = ''
+  error.value = ''
+  notice.value = ''
   if (timer) clearInterval(timer)
   timer = null
   cooldown.value = 0
@@ -199,6 +211,8 @@ async function submit() {
       <template v-else>已有相伴账号用密码登录；新用户用邮箱验证码注册，再设置用户名和密码。</template>
     </p>
 
+    <p v-if="mode === 'reset' && step !== 'setup'" class="lead">重置密码：先验证邮箱或手机号，再设置新密码。</p>
+
     <div v-if="step !== 'setup'" class="tabs" role="tablist">
       <button type="button" role="tab" :aria-selected="mode !== 'code'" :class="{ on: mode !== 'code' }" @click="switchMode('password')">密码登录</button>
       <button type="button" role="tab" :aria-selected="mode === 'code'" :class="{ on: mode === 'code' }" @click="switchMode('code')">验证码登录 / 注册</button>
@@ -222,6 +236,13 @@ async function submit() {
           :disabled="codeSent"
           :placeholder="mode === 'password' ? '用户名、邮箱或手机号' : 'name@example.com'"
         />
+        <small v-if="mode !== 'password' && !codeSent && identifier.trim() && !validId" class="hint">验证码只能发到完整的邮箱或手机号。</small>
+        <button v-if="codeSent" type="button" class="link start" :disabled="busy" @click="changeIdentifier">填错了？换一个邮箱 / 手机号</button>
+      </label>
+
+      <label v-if="mode !== 'password' && codeSent" class="field">
+        <span>验证码</span>
+        <input v-model="code" class="input code" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="6 位数字" />
       </label>
 
       <label v-if="mode === 'password' || step === 'setup' || (mode === 'reset' && codeSent)" class="field">
@@ -237,11 +258,6 @@ async function submit() {
           <button type="button" class="link" @click="showPassword = !showPassword">{{ showPassword ? '隐藏' : '显示' }}</button>
         </span>
         <small v-if="mode !== 'password' && passwordProblem" class="hint bad">{{ passwordProblem }}</small>
-      </label>
-
-      <label v-if="mode !== 'password' && codeSent" class="field">
-        <span>验证码</span>
-        <input v-model="code" class="input code" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="8" placeholder="6 位数字" />
       </label>
 
       <p v-if="notice" class="sent" role="status">{{ notice }}</p>
@@ -315,6 +331,10 @@ async function submit() {
   font-size: var(--fs-sm);
   text-decoration: underline;
   text-underline-offset: 3px;
+}
+.link.start {
+  align-self: flex-start;
+  justify-self: start;
 }
 .link:disabled {
   color: var(--ink-3);

@@ -80,6 +80,16 @@ function describe(e: unknown) {
   return e instanceof Error ? e.message : '操作失败，请稍后再试'
 }
 
+function changeIdentifier() {
+  step.value = 'identify'
+  code.value = ''
+  password.value = ''
+  error.value = ''
+  notice.value = ''
+  clearInterval(timer)
+  countdown.value = 0
+}
+
 function switchMode(next: Mode) {
   mode.value = next
   step.value = 'identify'
@@ -249,6 +259,8 @@ onBeforeUnmount(() => {
         <template v-else>已有账号用密码登录；新用户用邮箱验证码注册，再设置用户名和密码。小伴桌面与手机端通用。</template>
       </p>
 
+      <p v-if="mode === 'reset' && step !== 'setup'" class="desc">重置密码：先验证邮箱或手机号，再设置新密码。</p>
+
       <div v-if="step !== 'setup'" class="tabs" role="tablist">
         <button type="button" role="tab" :aria-selected="mode !== 'code'" :class="{ on: mode !== 'code' }" @click="switchMode('password')">密码登录</button>
         <button type="button" role="tab" :aria-selected="mode === 'code'" :class="{ on: mode === 'code' }" @click="switchMode('code')">验证码登录 / 注册</button>
@@ -282,6 +294,21 @@ onBeforeUnmount(() => {
           :placeholder="mode === 'password' ? '用户名、邮箱或手机号' : 'name@example.com'"
           :disabled="submitting || codeSent"
         >
+        <button v-if="codeSent" type="button" class="linkish start" :disabled="submitting" @click="changeIdentifier">填错了？换一个邮箱 / 手机号</button>
+      </label>
+
+      <label v-if="mode !== 'password' && codeSent" class="field">
+        <span>验证码</span>
+        <input
+          v-model="code"
+          class="input"
+          type="text"
+          inputmode="numeric"
+          autocomplete="one-time-code"
+          maxlength="6"
+          placeholder="6 位数字"
+          :disabled="submitting"
+        >
       </label>
 
       <label v-if="mode !== 'code' && (mode === 'password' || codeSent)" class="field">
@@ -314,20 +341,6 @@ onBeforeUnmount(() => {
           <button type="button" class="btn send" @click="showPassword = !showPassword">{{ showPassword ? '隐藏' : '显示' }}</button>
         </div>
         <small v-if="passwordProblem" class="field-hint bad">{{ passwordProblem }}</small>
-      </label>
-
-      <label v-if="mode !== 'password' && codeSent" class="field">
-        <span>验证码</span>
-        <input
-          v-model="code"
-          class="input"
-          type="text"
-          inputmode="numeric"
-          autocomplete="one-time-code"
-          maxlength="6"
-          placeholder="6 位数字"
-          :disabled="submitting"
-        >
       </label>
 
       <p v-if="notice" class="notice" role="status">{{ notice }}</p>
@@ -444,7 +457,7 @@ onBeforeUnmount(() => {
 
 .send {
   flex-shrink: 0;
-  min-width: 112px;
+  min-width: 64px;
   padding: 0 14px;
   font-size: 14px;
 }
