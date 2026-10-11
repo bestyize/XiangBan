@@ -1,0 +1,108 @@
+mod auth;
+mod config;
+mod db;
+mod error;
+mod handlers;
+mod jobs;
+mod markdown;
+mod models;
+mod seo;
+mod state;
+mod users;
+
+use axum::{
+    http::{header, HeaderValue, Method},
+    routing::{get, post, put},
+    Router,
+};
+use config::AppConfig;
+use handlers::{admin, interact, me, meta, posts, topics};
+use state::AppState;
+use std::{net::SocketAddr, sync::Arc, time::Duration};
+use tower_http::{
+    compression::CompressionLayer,
+    cors::{Any, CorsLayer},
+    trace::TraceLayer,
+};
+use tracing::info;
+
+pub fn build_router(state: AppState) -> Router {
+    let api = Router::new()
+        .route("/health", get(meta::health))
+        .route("/config", get(meta::site_config))
+        .route("/categories", get(meta::categories))
+        .route("/products", get(meta::products))
+        .route("/products/{slug}", get(meta::product))
+        .route("/tags", get(meta::popular_tags))
+        .route("/session", post(me::session))
+        .route("/me/bookmarks", get(me::bookmarks))
+        .route("/users/{uid}", get(me::profile))
+        .route("/users/{uid}/topics", get(me::user_topics))
+        .route("/users/{uid}/posts", get(me::user_posts))
+        .route("/search", get(me::search))
+        .route("/topics", get(topics::list).post(topics::create))
+        .route("/deals", get(topics::list_deals))
+        .route("/markdown/preview", post(topics::preview))
+        .route("/topics/{id}", get(topics::get).patch(topics::update).delete(topics::delete))
+        .route("/topics/{id}/posts", get(posts::list).post(posts::create))
+        .route("/topics/{id}/like", put(interact::like_topic).delete(interact::unlike_topic))
+        .route("/topics/{id}/bookmark", put(interact::bookmark).delete(interact::unbookmark))
+        .route("/deals/{id}/vote", put(interact::vote))
+        .route("/deals/{id}/status", put(interact::set_deal_status))
+        .route("/posts/{id}", axum::routing::patch(posts::update).delete(posts::delete))
+        .route("/posts/{id}/source", get(posts::source))
+        .route("/posts/{id}/like", put(interact::like_post).delete(interact::unlike_post))
+        .route("/reports", post(interact::report))
+        .nest("/admin", admin::routes());
+
+    // 凭证只走 Authorization 头，不用 Cookie，跨域放开不构成 CSRF 面。
+    let origins: Vec<HeaderValue> = state.config.cors_origins.iter().filter_map(|o| o.parse().ok()).collect();
+    let cors = CorsLayer::new()
+        .allow_methods([Method::GET, Method::POST, Method::PATCH, Method::PUT, Method::DELETE, Method::OPTIONS])
+        .allow_headers([header::AUTHORIZATION, header::CONTENT_TYPE]);
+    let cors = if origins.is_empty() { cors.allow_origin(Any) } else { cors.allow_origin(origins) };
+
+    Router::new()
+        .nest("/api", api)
+        .merge(seo::routes(&state))
+        .layer(cors)
+        .layer(CompressionLayer::new())
+        .layer(TraceLayer::new_for_http())
+        .with_state(state)
+}
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    tracing_subscriber::fmt()
+        .with_env_filter(
+            tracing_subscriber::EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| "server_forum=info,tower_http=info".into()),
+        )
+        .init();
+
+    let config = AppConfig::from_env();
+    let pool = db::connect(&config.database_url, None).await?;
+    db::migrate(&pool).await?;
+    db::seed(&pool).await?;
+    admin::seed_admin(&pool, &config).await?;
+
+    let addr: SocketAddr = format!("{}:{}", config.host, config.port).parse()?;
+    info!("server-forum issuer={} client={} listening on {addr}", config.account_issuer, config.account_client_id);
+
+    let verifier = auth::JwksVerifier::new(
+        config.account_issuer.clone(),
+        config.account_jwks_url.clone(),
+        config.account_client_id.clone(),
+    );
+    let state = AppState {
+        pool,
+        config: Arc::new(config),
+        verifier: Arc::new(verifier),
+        http: reqwest::Client::builder().timeout(Duration::from_secs(5)).build()?,
+    };
+    jobs::spawn(state.clone());
+
+    let listener = tokio::net::TcpListener::bind(addr).await?;
+    axum::serve(listener, build_router(state).into_make_service_with_connect_info::<SocketAddr>()).await?;
+    Ok(())
+}

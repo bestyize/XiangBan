@@ -1,0 +1,695 @@
+/* 管理后台样式：只用 .adm- 前缀的类，颜色与圆角全部取自全局设计令牌。 */
+
+.adm {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 216px minmax(0, 1fr);
+  background: var(--paper);
+  font-size: var(--fs-sm);
+}
+
+/* ───── 侧栏 ───── */
+.adm-side {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  padding: 16px 12px;
+  background: var(--surface);
+  border-right: 1px solid var(--line);
+}
+.adm-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px 18px;
+  font-family: var(--font-display);
+  font-size: var(--fs-lg);
+  font-weight: 700;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+.adm-brand-mark {
+  width: 10px;
+  height: 10px;
+  flex: none;
+  border-radius: 2px;
+  background: var(--brand);
+}
+.adm-brand small {
+  font-family: var(--font-sans);
+  font-size: var(--fs-xs);
+  font-weight: 500;
+  color: var(--ink-3);
+}
+.adm-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.adm-nav a {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 7px 10px;
+  border-radius: var(--r-sm);
+  color: var(--ink-2);
+  font-size: var(--fs-sm);
+  white-space: nowrap;
+}
+.adm-nav a:hover {
+  background: var(--surface-2);
+  color: var(--ink);
+}
+.adm-nav a.is-active {
+  background: var(--paper);
+  color: var(--ink);
+  font-weight: 600;
+}
+.adm-badge {
+  min-width: 18px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--danger);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 18px;
+  text-align: center;
+}
+.adm-side-foot {
+  margin-top: auto;
+  display: grid;
+  gap: 8px;
+  padding: 12px 8px 0;
+  border-top: 1px solid var(--line);
+  color: var(--ink-3);
+  font-size: var(--fs-xs);
+}
+.adm-side-foot b {
+  color: var(--ink);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.adm-side-links {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+/* ───── 主区域 ───── */
+.adm-main {
+  min-width: 0;
+  padding: 24px 28px 72px;
+  max-width: 1240px;
+  width: 100%;
+}
+.adm-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+.adm-head h1 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--fs-xl);
+  line-height: 1.3;
+}
+.adm-head p {
+  margin: 0;
+  color: var(--ink-3);
+}
+
+.adm-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.adm-toolbar form {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.adm .input,
+.adm .select {
+  height: 34px;
+  padding: 0 10px;
+  font-size: var(--fs-sm);
+}
+.adm .textarea {
+  font-size: var(--fs-sm);
+  min-height: 72px;
+}
+.adm .select {
+  width: auto;
+  max-width: 100%;
+}
+.adm-toolbar .input {
+  width: 240px;
+}
+.adm .btn {
+  height: 34px;
+}
+.adm .btn-sm {
+  height: 28px;
+  padding: 0 9px;
+  font-size: var(--fs-xs);
+}
+.adm .select.is-sm {
+  height: 28px;
+  font-size: var(--fs-xs);
+  padding: 0 6px;
+}
+.adm .input.is-sm {
+  height: 28px;
+  font-size: var(--fs-xs);
+  padding: 0 8px;
+}
+
+/* 分段筛选：一排互斥的小按钮 */
+.adm-seg {
+  display: inline-flex;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  overflow: hidden;
+}
+.adm-seg button {
+  height: 32px;
+  padding: 0 12px;
+  border: 0;
+  border-right: 1px solid var(--line);
+  background: transparent;
+  font-size: var(--fs-sm);
+  color: var(--ink-2);
+  white-space: nowrap;
+}
+.adm-seg button:last-child {
+  border-right: 0;
+}
+.adm-seg button.is-on {
+  background: var(--ink);
+  color: var(--paper);
+  font-weight: 600;
+}
+
+.adm-card {
+  overflow: hidden;
+}
+.adm-empty {
+  padding: 36px 16px;
+  text-align: center;
+  color: var(--ink-3);
+}
+.adm-state {
+  padding: 14px 16px;
+}
+
+/* ───── 表格 ───── */
+.adm-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.adm-table th {
+  padding: 9px 14px;
+  border-bottom: 1px solid var(--line-strong);
+  text-align: left;
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  color: var(--ink-3);
+  white-space: nowrap;
+}
+.adm-table td {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--line);
+  vertical-align: top;
+}
+.adm-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+.adm-table tbody tr:hover td {
+  background: color-mix(in srgb, var(--surface-2) 70%, transparent);
+}
+.adm-table .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.adm-table th.act,
+.adm-table td.act {
+  width: 360px;
+}
+.adm-table .shrink {
+  white-space: nowrap;
+}
+
+.adm-title {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.adm-title a:hover,
+.adm-link:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.adm-link {
+  color: var(--focus);
+}
+.adm-sub {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 14px;
+  margin-top: 3px;
+  color: var(--ink-3);
+  font-size: var(--fs-xs);
+}
+.adm-mono {
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  color: var(--ink-3);
+  overflow-wrap: anywhere;
+}
+.adm-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+/* ───── 状态标签 ───── */
+.adm-tag {
+  display: inline-block;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: var(--expired-soft);
+  color: var(--ink-2);
+  font-size: var(--fs-xs);
+  font-weight: 500;
+  line-height: 20px;
+  white-space: nowrap;
+}
+.adm-tag.valid {
+  background: var(--valid-soft);
+  color: var(--valid);
+}
+.adm-tag.suspect {
+  background: var(--suspect-soft);
+  color: var(--suspect);
+}
+.adm-tag.expired {
+  background: var(--expired-soft);
+  color: var(--expired);
+}
+.adm-tag.danger {
+  background: color-mix(in srgb, var(--danger) 13%, transparent);
+  color: var(--danger);
+}
+.adm-tag.line {
+  background: transparent;
+  box-shadow: inset 0 0 0 1px var(--line-strong);
+  color: var(--ink-2);
+}
+.adm-tags {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  vertical-align: middle;
+}
+
+/* ───── 分页 ───── */
+.adm-pager {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+  color: var(--ink-3);
+  font-size: var(--fs-xs);
+}
+.adm-pager div {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ───── 表单 ───── */
+.adm-form {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+}
+.adm-form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+}
+.adm-form-grid .wide {
+  grid-column: 1 / -1;
+}
+.adm-checks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+}
+.adm-checks label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.adm-form-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.adm .field > span {
+  font-size: var(--fs-xs);
+}
+
+/* ───── 举报 ───── */
+.adm-list > li {
+  display: grid;
+  gap: 8px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--line);
+}
+.adm-list > li:last-child {
+  border-bottom: 0;
+}
+.adm-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.adm-report-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+}
+.adm-quote {
+  margin: 0;
+  padding: 6px 0 6px 12px;
+  border-left: 2px solid var(--line-strong);
+  color: var(--ink-2);
+  overflow-wrap: anywhere;
+}
+.adm-target > * + * {
+  margin-left: 8px;
+}
+.adm-target blockquote {
+  margin-left: 0 !important;
+}
+.adm-wrap {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+.adm-note {
+  color: var(--ink-2);
+  overflow-wrap: anywhere;
+}
+.adm-report-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+.adm-report-actions .input {
+  flex: 1 1 200px;
+  max-width: 320px;
+}
+
+/* ───── 数字概览 ───── */
+.adm-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+}
+.adm-stat {
+  padding: 16px;
+  /* 用右边线和下边线分隔，多出的线被外层面板裁掉 */
+  border-right: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  margin: 0 -1px -1px 0;
+}
+.adm-stat b {
+  display: block;
+  font-family: var(--font-display);
+  font-size: var(--fs-2xl);
+  font-weight: 700;
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+}
+.adm-stat span {
+  color: var(--ink-3);
+  font-size: var(--fs-xs);
+}
+.adm-stat.is-alert b {
+  color: var(--danger);
+}
+.adm-section-title {
+  margin: 24px 0 8px;
+  font-size: var(--fs-md);
+  font-weight: 600;
+}
+
+/* ───── 分类树 ───── */
+.adm-tree-row {
+  display: grid;
+  gap: 8px;
+  padding: 11px 16px;
+  border-bottom: 1px solid var(--line);
+}
+.adm-tree-row:last-child {
+  border-bottom: 0;
+}
+.adm-tree-main {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.adm-tree-row.is-child {
+  padding-left: 40px;
+}
+.adm-tree-row.is-parent {
+  background: var(--surface-2);
+}
+.adm-tree-edit {
+  margin: 0 -16px -11px;
+  border-top: 1px solid var(--line);
+  background: var(--surface);
+}
+.adm-tree-row.is-child .adm-tree-edit {
+  margin-left: -40px;
+}
+
+/* ───── 登录页与提示 ───── */
+.adm-login {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px 16px;
+  background: var(--paper);
+}
+.adm-login-box {
+  width: 100%;
+  max-width: 340px;
+  padding: 28px 24px 24px;
+}
+.adm-login-box h1 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 4px;
+  font-family: var(--font-display);
+  font-size: var(--fs-xl);
+}
+.adm-login-box p {
+  margin: 0 0 20px;
+  color: var(--ink-3);
+}
+.adm-login-box form {
+  display: grid;
+  gap: 14px;
+}
+.adm-login-box .input {
+  height: 38px;
+  font-size: var(--fs-md);
+}
+.adm-login-box .btn {
+  height: 38px;
+}
+
+.adm-toasts {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 50;
+  display: grid;
+  gap: 8px;
+  max-width: calc(100vw - 32px);
+}
+.adm-toast {
+  padding: 9px 14px;
+  border-radius: var(--r-sm);
+  background: var(--ink);
+  color: var(--paper);
+  font-size: var(--fs-sm);
+  box-shadow: var(--shadow);
+}
+.adm-toast.error {
+  background: var(--danger);
+  color: #fff;
+}
+
+.adm-account {
+  max-width: 420px;
+}
+
+/* ───── 窄屏：侧栏变成顶部横向标签行，表格变成堆叠行 ───── */
+@media (max-width: 819px) {
+  .adm {
+    display: block;
+  }
+  .adm-side {
+    position: sticky;
+    z-index: 10;
+    height: auto;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    padding: 10px 12px 0;
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+  .adm-brand {
+    order: 1;
+    padding: 0;
+  }
+  .adm-side-foot {
+    order: 2;
+    margin: 0 0 0 auto;
+    padding: 0;
+    border: 0;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .adm-who {
+    display: none;
+  }
+  .adm-nav {
+    order: 3;
+    flex-direction: row;
+    width: calc(100% + 24px);
+    margin: 8px -12px 0;
+    padding: 0 12px;
+    gap: 2px;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .adm-nav::-webkit-scrollbar {
+    display: none;
+  }
+  .adm-nav a {
+    flex: none;
+    padding: 9px 12px;
+    border-radius: 0;
+    border-bottom: 2px solid transparent;
+  }
+  .adm-nav a.is-active {
+    background: transparent;
+    border-bottom-color: var(--ink);
+  }
+  .adm-main {
+    padding: 16px 12px 64px;
+  }
+  .adm-toolbar .input {
+    width: 100%;
+    flex: 1 1 160px;
+    font-size: 16px;
+  }
+  .adm-toolbar form {
+    width: 100%;
+  }
+  .adm-toolbar form .input {
+    flex: 1 1 140px;
+  }
+  .adm .input,
+  .adm .select,
+  .adm .textarea {
+    font-size: 16px;
+  }
+  .adm .select.is-sm,
+  .adm .input.is-sm {
+    font-size: 14px;
+  }
+
+  .adm-table,
+  .adm-table tbody,
+  .adm-table tr,
+  .adm-table td {
+    display: block;
+  }
+  .adm-table thead {
+    display: none;
+  }
+  .adm-table tr {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--line);
+  }
+  .adm-table tbody tr:last-child {
+    border-bottom: 0;
+  }
+  .adm-table td {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 3px 0;
+    border: 0;
+  }
+  .adm-table tbody tr:hover td {
+    background: transparent;
+  }
+  .adm-table td[data-label]::before {
+    content: attr(data-label);
+    flex: none;
+    min-width: 3.5em;
+    color: var(--ink-3);
+    font-size: var(--fs-xs);
+  }
+  .adm-table td.full {
+    display: block;
+  }
+  .adm-table th.act,
+  .adm-table td.act {
+    width: auto;
+  }
+  .adm-table td.num {
+    text-align: left;
+  }
+  .adm-table td.end {
+    justify-content: flex-start;
+  }
+  .adm-tree-row.is-child {
+    padding-left: 24px;
+  }
+  .adm-tree-row.is-child .adm-tree-edit {
+    margin-left: -24px;
+  }
+  .adm-seg {
+    max-width: 100%;
+    overflow-x: auto;
+  }
+  .adm-toasts {
+    left: 12px;
+    right: 12px;
+  }
+}
