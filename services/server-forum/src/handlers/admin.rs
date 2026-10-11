@@ -41,8 +41,6 @@ pub fn routes() -> Router<AppState> {
         .route("/users/{uid}/status", post(set_user_status))
         .route("/categories", get(list_categories).post(create_category))
         .route("/categories/{id}", patch(update_category))
-        .route("/products", get(list_products).post(create_product))
-        .route("/products/{id}", patch(update_product))
         .route("/audit", get(list_audit))
 }
 
@@ -237,18 +235,6 @@ fn validate_text(text: &str, what: &str, max: usize) -> AppResult<String> {
         return Err(AppError::BadRequest(format!("{what}最多 {max} 个字")));
     }
     Ok(text.to_string())
-}
-
-/// 官网地址：空，或 http(s) 开头且不含空白。
-fn validate_website(url: &str) -> AppResult<String> {
-    let url = url.trim();
-    if url.is_empty() {
-        return Ok(String::new());
-    }
-    if url.len() > 300 || !(url.starts_with("https://") || url.starts_with("http://")) || url.contains(char::is_whitespace) {
-        return Err(AppError::BadRequest("官网需要是 http(s) 地址".into()));
-    }
-    Ok(url.to_string())
 }
 
 /// 空串当作没传。
@@ -972,12 +958,13 @@ struct AdminCategory {
     on_home: bool,
     award_points: bool,
     admin_only: bool,
+    preset_tags: Vec<String>,
     /// 各状态的帖子总数（不含已删除）
     topic_count: i64,
 }
 
 const CATEGORY_SELECT: &str = "SELECT c.id, c.parent_id, c.slug, c.name, c.description, c.kind, c.sort_order,
-        c.min_post_level, c.on_home, c.award_points, c.admin_only,
+        c.min_post_level, c.on_home, c.award_points, c.admin_only, c.preset_tags,
         (SELECT COUNT(*) FROM topics t WHERE t.category_id = c.id AND t.status <> 'deleted') AS topic_count
     FROM categories c";
 
@@ -1011,6 +998,25 @@ struct CategoryInput {
     award_points: bool,
     #[serde(default)]
     admin_only: bool,
+    #[serde(default)]
+    preset_tags: Vec<String>,
+}
+
+/// 内置标签：和发帖时的标签用同一种写法，最多 20 个，每个最多 20 个字。
+fn validate_preset_tags(raw: &[String]) -> AppResult<Vec<String>> {
+    let mut tags: Vec<String> = Vec::new();
+    for t in raw.iter().filter_map(|t| super::topics::normalize_tag(t)) {
+        if t.chars().count() > 20 {
+            return Err(AppError::BadRequest("每个标签最多 20 个字".into()));
+        }
+        if !tags.contains(&t) {
+            tags.push(t);
+        }
+    }
+    if tags.len() > 20 {
+        return Err(AppError::BadRequest("内置标签最多 20 个".into()));
+    }
+    Ok(tags)
 }
 
 fn validate_level(level: i16) -> AppResult<()> {
@@ -1034,6 +1040,7 @@ async fn create_category(
         return Err(AppError::BadRequest("kind 只能是 deal 或 normal".into()));
     }
     validate_level(input.min_post_level)?;
+    let preset_tags = validate_preset_tags(&input.preset_tags)?;
 
     let mut tx = state.pool.begin().await?;
     if let Some(pid) = input.parent_id {
@@ -1048,8 +1055,8 @@ async fn create_category(
         }
     }
     let inserted: Result<(i32,), sqlx::Error> = sqlx::query_as(
-        "INSERT INTO categories (parent_id, slug, name, description, kind, sort_order, min_post_level, on_home, award_points, admin_only)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id",
+        "INSERT INTO categories (parent_id, slug, name, description, kind, sort_order, min_post_level, on_home, award_points, admin_only, preset_tags)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING id",
     )
     .bind(input.parent_id)
     .bind(&slug)
@@ -1061,6 +1068,7 @@ async fn create_category(
     .bind(input.on_home)
     .bind(input.award_points)
     .bind(input.admin_only)
+    .bind(&preset_tags)
     .fetch_one(&mut *tx)
     .await;
     let id = match inserted {
@@ -1083,6 +1091,7 @@ struct CategoryPatch {
     on_home: Option<bool>,
     award_points: Option<bool>,
     admin_only: Option<bool>,
+    preset_tags: Option<Vec<String>>,
 }
 
 async fn update_category(
@@ -1096,12 +1105,14 @@ async fn update_category(
     if let Some(level) = patch.min_post_level {
         validate_level(level)?;
     }
+    let preset_tags = patch.preset_tags.as_deref().map(validate_preset_tags).transpose()?;
     let mut tx = state.pool.begin().await?;
     let done = sqlx::query(
         "UPDATE categories SET
             name = COALESCE($2, name), description = COALESCE($3, description), sort_order = COALESCE($4, sort_order),
             min_post_level = COALESCE($5, min_post_level), on_home = COALESCE($6, on_home),
-            award_points = COALESCE($7, award_points), admin_only = COALESCE($8, admin_only)
+            award_points = COALESCE($7, award_points), admin_only = COALESCE($8, admin_only),
+            preset_tags = COALESCE($9, preset_tags)
          WHERE id = $1",
     )
     .bind(id)
@@ -1112,6 +1123,7 @@ async fn update_category(
     .bind(patch.on_home)
     .bind(patch.award_points)
     .bind(patch.admin_only)
+    .bind(&preset_tags)
     .execute(&mut *tx)
     .await?
     .rows_affected();
@@ -1121,7 +1133,7 @@ async fn update_category(
     let mut changed = json!({
         "name": name, "description": description.as_deref().map(|d| clip(d, 30)), "sort_order": patch.sort_order,
         "min_post_level": patch.min_post_level, "on_home": patch.on_home, "award_points": patch.award_points,
-        "admin_only": patch.admin_only,
+        "admin_only": patch.admin_only, "preset_tags": preset_tags,
     });
     // 日志里只记这次真正改动的字段
     if let Some(map) = changed.as_object_mut() {
@@ -1130,127 +1142,6 @@ async fn update_category(
     audit(&mut tx, &admin, "category.update", "category", id, changed.to_string()).await?;
     tx.commit().await?;
     let row = sqlx::query_as(&format!("{CATEGORY_SELECT} WHERE c.id = $1")).bind(id).fetch_one(&state.pool).await?;
-    Ok(Json(row))
-}
-
-// ───────────────────────── 产品库 ─────────────────────────
-
-#[derive(Serialize, sqlx::FromRow)]
-struct AdminProduct {
-    id: i32,
-    slug: String,
-    name: String,
-    vendor: String,
-    website: String,
-    description: String,
-    created_at: DateTime<Utc>,
-    deal_count: i64,
-}
-
-const PRODUCT_SELECT: &str = "SELECT p.id, p.slug, p.name, p.vendor, p.website, p.description, p.created_at,
-        (SELECT COUNT(*) FROM deals d JOIN topics t ON t.id = d.topic_id WHERE d.product_id = p.id AND t.status <> 'deleted') AS deal_count
-    FROM products p";
-
-async fn list_products(State(state): State<AppState>, _admin: AuthAdmin) -> AppResult<Json<Vec<AdminProduct>>> {
-    let rows = sqlx::query_as(&format!("{PRODUCT_SELECT} ORDER BY p.name, p.id")).fetch_all(&state.pool).await?;
-    Ok(Json(rows))
-}
-
-#[derive(Deserialize)]
-struct ProductInput {
-    slug: String,
-    name: String,
-    #[serde(default)]
-    vendor: String,
-    #[serde(default)]
-    website: String,
-    #[serde(default)]
-    description: String,
-}
-
-async fn create_product(
-    State(state): State<AppState>,
-    AuthAdmin(admin): AuthAdmin,
-    Json(input): Json<ProductInput>,
-) -> AppResult<Json<AdminProduct>> {
-    let slug = input.slug.trim().to_string();
-    validate_slug(&slug)?;
-    let name = validate_name(&input.name, "产品名", 40)?;
-    let vendor = validate_text(&input.vendor, "厂商", 40)?;
-    let website = validate_website(&input.website)?;
-    let description = validate_text(&input.description, "产品说明", 500)?;
-
-    let mut tx = state.pool.begin().await?;
-    let inserted: Result<(i32,), sqlx::Error> = sqlx::query_as(
-        "INSERT INTO products (slug, name, vendor, website, description) VALUES ($1, $2, $3, $4, $5) RETURNING id",
-    )
-    .bind(&slug)
-    .bind(&name)
-    .bind(&vendor)
-    .bind(&website)
-    .bind(&description)
-    .fetch_one(&mut *tx)
-    .await;
-    let id = match inserted {
-        Ok((id,)) => id,
-        Err(e) if is_unique_violation(&e) => return Err(AppError::Conflict("slug 已被使用".into())),
-        Err(e) => return Err(e.into()),
-    };
-    audit(&mut tx, &admin, "product.create", "product", id, format!("{slug} {name}")).await?;
-    tx.commit().await?;
-    let row = sqlx::query_as(&format!("{PRODUCT_SELECT} WHERE p.id = $1")).bind(id).fetch_one(&state.pool).await?;
-    Ok(Json(row))
-}
-
-/// slug 会出现在产品页地址里，创建后不允许修改。
-#[derive(Deserialize)]
-struct ProductPatch {
-    name: Option<String>,
-    vendor: Option<String>,
-    website: Option<String>,
-    description: Option<String>,
-}
-
-async fn update_product(
-    State(state): State<AppState>,
-    AuthAdmin(admin): AuthAdmin,
-    Path(id): Path<i32>,
-    Json(patch): Json<ProductPatch>,
-) -> AppResult<Json<AdminProduct>> {
-    let name = patch.name.as_deref().map(|n| validate_name(n, "产品名", 40)).transpose()?;
-    let vendor = patch.vendor.as_deref().map(|v| validate_text(v, "厂商", 40)).transpose()?;
-    let website = patch.website.as_deref().map(validate_website).transpose()?;
-    let description = patch.description.as_deref().map(|d| validate_text(d, "产品说明", 500)).transpose()?;
-
-    let mut tx = state.pool.begin().await?;
-    let done = sqlx::query(
-        "UPDATE products SET name = COALESCE($2, name), vendor = COALESCE($3, vendor),
-            website = COALESCE($4, website), description = COALESCE($5, description)
-         WHERE id = $1",
-    )
-    .bind(id)
-    .bind(&name)
-    .bind(&vendor)
-    .bind(&website)
-    .bind(&description)
-    .execute(&mut *tx)
-    .await?
-    .rows_affected();
-    if done == 0 {
-        return Err(AppError::not_found("产品"));
-    }
-    let fields: Vec<&str> = [
-        ("name", name.is_some()),
-        ("vendor", vendor.is_some()),
-        ("website", website.is_some()),
-        ("description", description.is_some()),
-    ]
-    .into_iter()
-    .filter_map(|(k, set)| set.then_some(k))
-    .collect();
-    audit(&mut tx, &admin, "product.update", "product", id, fields.join(",")).await?;
-    tx.commit().await?;
-    let row = sqlx::query_as(&format!("{PRODUCT_SELECT} WHERE p.id = $1")).bind(id).fetch_one(&state.pool).await?;
     Ok(Json(row))
 }
 
@@ -1314,11 +1205,7 @@ mod tests {
     }
 
     #[test]
-    fn website_and_username_rules() {
-        assert_eq!(validate_website("").unwrap(), "");
-        assert!(validate_website("https://openai.com").is_ok());
-        assert!(validate_website("ftp://x.com").is_err());
-        assert!(validate_website("https://a.com/ b").is_err());
+    fn username_rules() {
         assert_eq!(normalize_username(" Root.Admin ").unwrap(), "root.admin");
         assert!(normalize_username("ab").is_err());
     }

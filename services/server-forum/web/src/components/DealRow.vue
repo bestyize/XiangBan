@@ -27,8 +27,7 @@ const soon = computed(() => expiringSoon(deal.value.expires_at, deal.value.long_
       </h3>
       <!-- 羊毛信息是选填的，填了哪项显示哪项，和普通帖的"分类 作者 时间"在同一个位置 -->
       <div class="meta">
-        <RouterLink v-if="deal.product" :to="`/p/${deal.product.slug}`" class="cat">{{ deal.product.name }}</RouterLink>
-        <RouterLink v-else :to="`/c/${topic.category.slug}`" class="cat">{{ topic.category.name }}</RouterLink>
+        <RouterLink :to="`/c/${topic.category.slug}`" class="cat">{{ topic.category.name }}</RouterLink>
         <span v-if="value" class="gain">{{ value }}</span>
         <span v-if="conditions">{{ conditions }}</span>
         <span v-if="hasExpiry" :class="{ soon }">{{ expiry }}</span>

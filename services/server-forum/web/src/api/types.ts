@@ -32,23 +32,12 @@ export interface Category {
   on_home: boolean
   award_points: boolean
   admin_only: boolean
+  /** 内置标签：发帖时按这个分类给出的可一键选用的标签 */
+  preset_tags: string[]
   topic_count: number
 }
 
-export interface Product {
-  id: number
-  slug: string
-  name: string
-  vendor: string
-  website: string
-  description: string
-  deal_count: number
-  active_deal_count: number
-}
-
 export interface DealInfo {
-  /** 关联产品，发帖人可以不选 */
-  product: { id: number; slug: string; name: string } | null
   value_text: string
   /** 领取条件位标志，见 lib/format 的 CONDITIONS */
   conditions: number
@@ -134,7 +123,6 @@ export interface UserReply {
 }
 
 export interface DealInput {
-  product_id: number | null
   value_text: string
   conditions: number
   link_url: string

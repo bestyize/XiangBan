@@ -2,7 +2,6 @@ import type {
   Category,
   Page,
   PostItem,
-  Product,
   Profile,
   SessionInfo,
   SiteConfig,
@@ -80,7 +79,6 @@ async function request<T>(method: string, path: string, body?: unknown, auth = t
 export interface ListParams extends Query {
   category?: string
   tag?: string
-  product?: string
   q?: string
   sort?: 'latest' | 'new' | 'hot' | 'expiring'
   home?: boolean
@@ -94,9 +92,6 @@ export interface ListParams extends Query {
 
 export const api = {
   categories: () => request<Category[]>('GET', '/categories', undefined, false),
-  products: () => request<Product[]>('GET', '/products', undefined, false),
-  product: (slug: string) =>
-    request<{ product: Product; deals: TopicItem[]; discussions: TopicItem[] }>('GET', `/products/${encodeURIComponent(slug)}`, undefined, false),
   tags: () => request<{ name: string; count: number }[]>('GET', '/tags', undefined, false),
 
   session: () => request<SessionInfo>('POST', '/session'),
@@ -104,8 +99,7 @@ export const api = {
 
   topics: (p: ListParams) => request<Page<TopicItem>>('GET', `/topics${qs(p)}`),
   deals: (p: ListParams) => request<Page<TopicItem>>('GET', `/deals${qs(p)}`),
-  search: (p: ListParams) =>
-    request<{ topics: Page<TopicItem>; products: { slug: string; name: string; vendor: string }[] }>('GET', `/search${qs(p)}`),
+  search: (p: ListParams) => request<Page<TopicItem>>('GET', `/search${qs(p)}`),
   topic: (id: number) => request<TopicDetail>('GET', `/topics/${id}`),
   createTopic: (input: TopicInput) => request<{ id: number }>('POST', '/topics', input),
   updateTopic: (id: number, input: TopicInput) => request<{ id: number }>('PATCH', `/topics/${id}`, input),

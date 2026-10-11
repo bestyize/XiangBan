@@ -11,17 +11,13 @@ const conditions = computed(() => conditionLabels(deal.value.conditions).join('�
 const hasExpiry = computed(() => deal.value.long_term || !!deal.value.expires_at)
 /** 什么都没填时整块不显示。 */
 const empty = computed(
-  () => !deal.value.product && !value.value && !conditions.value && !hasExpiry.value && !deal.value.link_url,
+  () => !value.value && !conditions.value && !hasExpiry.value && !deal.value.link_url,
 )
 </script>
 
 <template>
   <section v-if="!empty" class="deal" aria-label="羊毛信息">
     <dl class="facts">
-      <div v-if="deal.product">
-        <dt>产品</dt>
-        <dd><RouterLink :to="`/p/${deal.product.slug}`" class="link">{{ deal.product.name }}</RouterLink></dd>
-      </div>
       <div v-if="value" class="gain">
         <dt>能领到</dt>
         <dd>{{ value }}</dd>
@@ -70,11 +66,6 @@ dt {
 dd {
   margin: 0;
   overflow-wrap: anywhere;
-}
-.link {
-  text-decoration: underline;
-  text-underline-offset: 3px;
-  text-decoration-thickness: 1px;
 }
 .gain dd {
   font-weight: 700;

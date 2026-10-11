@@ -1,7 +1,7 @@
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
 import { api } from '@/api/forum'
-import type { Category, Product } from '@/api/types'
+import type { Category } from '@/api/types'
 
 export interface CategoryNode extends Category {
   children: Category[]
@@ -12,7 +12,6 @@ export const SHOW_CHILD_THRESHOLD = 20
 
 export const useMeta = defineStore('meta', () => {
   const categories = ref<Category[]>([])
-  const products = ref<Product[]>([])
   let loading: Promise<void> | null = null
 
   const tree = computed<CategoryNode[]>(() => {
@@ -25,10 +24,10 @@ export const useMeta = defineStore('meta', () => {
 
   function load(force = false) {
     if (loading && !force) return loading
-    loading = Promise.all([api.categories(), api.products()])
-      .then(([c, p]) => {
+    loading = api
+      .categories()
+      .then(c => {
         categories.value = c
-        products.value = p
       })
       .catch(() => {
         loading = null
@@ -46,5 +45,5 @@ export const useMeta = defineStore('meta', () => {
     return node.topic_count + node.children.reduce((n, c) => n + c.topic_count, 0)
   }
 
-  return { categories, products, tree, bySlug, byId, load, parentOf, totalCount }
+  return { categories, tree, bySlug, byId, load, parentOf, totalCount }
 })

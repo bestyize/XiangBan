@@ -82,16 +82,7 @@ pub struct CategoryRef {
 }
 
 #[derive(Debug, Clone, Serialize)]
-pub struct ProductRef {
-    pub id: i32,
-    pub slug: String,
-    pub name: String,
-}
-
-#[derive(Debug, Clone, Serialize)]
 pub struct DealInfo {
-    /// 关联产品，发帖时可以不选。
-    pub product: Option<ProductRef>,
     pub value_text: String,
     pub conditions: i32,
     pub link_url: String,
@@ -145,9 +136,6 @@ struct TopicRow {
     author_nickname: String,
     author_avatar: Option<String>,
     author_level: i16,
-    product_id: Option<i32>,
-    product_slug: Option<String>,
-    product_name: Option<String>,
     value_text: Option<String>,
     conditions: Option<i32>,
     link_url: Option<String>,
@@ -159,11 +147,6 @@ impl TopicRow {
     fn into_item(self, tags: Vec<String>) -> TopicItem {
         // 有 deals 记录（value_text 一定非空列）就是羊毛帖；产品可以没有。
         let deal = self.value_text.map(|value_text| DealInfo {
-            product: self.product_id.map(|id| ProductRef {
-                id,
-                slug: self.product_slug.unwrap_or_default(),
-                name: self.product_name.unwrap_or_default(),
-            }),
             value_text,
             conditions: self.conditions.unwrap_or(0),
             link_url: self.link_url.unwrap_or_default(),
@@ -202,20 +185,17 @@ const SELECT: &str = "SELECT t.id, t.title, t.excerpt, t.status, t.pinned, t.fea
         t.reply_count, t.like_count, t.view_count, t.min_read_level, t.created_at, t.last_reply_at, t.edited_at,
         c.id AS category_id, c.slug AS category_slug, c.name AS category_name,
         u.uid AS author_uid, u.nickname AS author_nickname, u.avatar_url AS author_avatar, u.trust_level AS author_level,
-        p.id AS product_id, p.slug AS product_slug, p.name AS product_name,
         d.value_text, d.conditions, d.link_url, d.expires_at, d.long_term
     FROM topics t
     JOIN categories c ON c.id = t.category_id
     JOIN users u ON u.uid = t.author_uid
-    LEFT JOIN deals d ON d.topic_id = t.id
-    LEFT JOIN products p ON p.id = d.product_id";
+    LEFT JOIN deals d ON d.topic_id = t.id";
 
 #[derive(Debug, Default, Clone, Deserialize)]
 pub struct ListFilter {
     /// 分类 slug；一级分类会包含它的子分类。
     pub category: Option<String>,
     pub tag: Option<String>,
-    pub product: Option<String>,
     pub author: Option<Uuid>,
     pub q: Option<String>,
     /// latest（最新回复）/ new（最新发布）/ hot / expiring（即将过期）
@@ -274,9 +254,6 @@ fn push_filters(qb: &mut QueryBuilder<'_, Postgres>, f: &ListFilter) {
             .push_bind(tag.to_lowercase())
             .push(")");
     }
-    if let Some(product) = f.product.as_deref().filter(|s| !s.is_empty()) {
-        qb.push(" AND p.slug = ").push_bind(product.to_string());
-    }
     if let Some(author) = f.author {
         qb.push(" AND t.author_uid = ").push_bind(author);
     }
@@ -285,8 +262,6 @@ fn push_filters(qb: &mut QueryBuilder<'_, Postgres>, f: &ListFilter) {
         qb.push(" AND (t.title ILIKE ")
             .push_bind(pattern.clone())
             .push(" OR t.excerpt ILIKE ")
-            .push_bind(pattern.clone())
-            .push(" OR p.name ILIKE ")
             .push_bind(pattern)
             .push(")");
     }
@@ -314,7 +289,7 @@ fn push_filters(qb: &mut QueryBuilder<'_, Postgres>, f: &ListFilter) {
 pub async fn list_topics(pool: &PgPool, f: &ListFilter) -> Result<Page<TopicItem>, AppError> {
     let mut count = QueryBuilder::<Postgres>::new(
         "SELECT COUNT(*) FROM topics t JOIN categories c ON c.id = t.category_id
-         LEFT JOIN deals d ON d.topic_id = t.id LEFT JOIN products p ON p.id = d.product_id",
+         LEFT JOIN deals d ON d.topic_id = t.id",
     );
     push_filters(&mut count, f);
     let (total,): (i64,) = count.build_query_as().fetch_one(pool).await?;

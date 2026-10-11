@@ -1,6 +1,6 @@
 # server-forum：超级小伴论坛
 
-状态：一期（网页版）已实现，2026-10-11 部署在香港机 chat.xiangban.xyz。面向开发者和 AI 用户的社区：技术交流、资源分享、福利羊毛（羊毛帖的产品、能领到什么、领取条件、有效期、活动页都是选填，到期自动下架）、随便唠唠和站务板块。福利羊毛不作为主推，排在技术交流和资源分享之后。站点名「超级小伴」，计划域名 `chat.xiangban.xyz`。产品设计见 [docs/product/PRD_论坛.md](../../docs/product/PRD_论坛.md)。
+状态：一期（网页版）已实现，2026-10-11 部署在香港机 chat.xiangban.xyz。面向开发者和 AI 用户的社区：技术交流、资源分享、福利羊毛（羊毛帖的能领到什么、领取条件、有效期、活动页都是选填，到期自动下架）、随便唠唠和站务板块。福利羊毛不作为主推，排在技术交流和资源分享之后。站点名「超级小伴」，计划域名 `chat.xiangban.xyz`。产品设计见 [docs/product/PRD_论坛.md](../../docs/product/PRD_论坛.md)。
 
 技术栈：Rust Axum 0.8 + PostgreSQL（SQLx），前端 Vue 3 + Vite + TypeScript（`web/`），由本服务直接托管。登录走[统一账号中心](../server-account/README.md)，本站不存密码，用 JWKS 公钥离线验签。默认端口 55010。
 
@@ -14,7 +14,7 @@ cargo run --manifest-path services/server-forum/Cargo.toml
 cargo test --manifest-path services/server-forum/Cargo.toml
 ```
 
-数据库表、分类和产品种子在启动时自动创建（种子只在表为空时写入，后台改过的不会被覆盖）。数据库有 `pg_trgm` 扩展时会给标题建三元组索引，没有就退化为普通 ILIKE。
+数据库表和分类种子在启动时自动创建（种子只在表为空时写入，后台改过的不会被覆盖）。数据库有 `pg_trgm` 扩展时会给标题建三元组索引，没有就退化为普通 ILIKE。
 
 前端开发：`npm --prefix services/server-forum/web run dev`，默认端口 5185，`/api` 代理到 55010；可用 `FORUM_WEB_PORT`、`FORUM_API` 覆盖。
 
@@ -38,16 +38,16 @@ cargo test --manifest-path services/server-forum/Cargo.toml
 
 ## 页面与接口
 
-前台路由：`/` 首页、`/deals` 福利羊毛（顶部一行分类标签，可按最新、热门、快过期排序；已到期的默认不显示）、`/c/{slug}` 分类、`/t/{id}` 帖子、`/new` 发帖、`/p/{slug}` 产品、`/products`、`/tag/{name}`、`/search`、`/u/{uid}`、`/settings`（收藏、昵称、等级说明）、`/rules` `/terms` `/privacy`，后台在 `/admin`。
+前台路由：`/` 首页、`/deals` 福利羊毛（顶部一行分类标签，可按最新、热门、快过期排序；已到期的默认不显示）、`/c/{slug}` 分类、`/t/{id}` 帖子、`/new` 发帖、`/tag/{name}`、`/search`、`/u/{uid}`、`/settings`（收藏、昵称、等级说明）、`/rules` `/terms` `/privacy`，后台在 `/admin`。
 
-服务端对 `/`、`/deals`、`/t/{id}`、`/c/{slug}`、`/p/{slug}`、`/products`、`/tag/{name}` 直接输出带标题、摘要、正文和 JSON-LD 的 HTML（填进 `#app`，Vue 挂载时替换），另有 `/sitemap.xml`、`/robots.txt`。实现在 `src/seo.rs`，依赖 `web/index.html` 保留 `<title>`、`<meta name="description">` 和空的 `<div id="app"></div>`。
+服务端对 `/`、`/deals`、`/t/{id}`、`/c/{slug}`、`/tag/{name}` 直接输出带标题、摘要、正文和 JSON-LD 的 HTML（填进 `#app`，Vue 挂载时替换），另有 `/sitemap.xml`、`/robots.txt`。实现在 `src/seo.rs`，依赖 `web/index.html` 保留 `<title>`、`<meta name="description">` 和空的 `<div id="app"></div>`。
 
 前台接口（`/api`，写操作要带账号中心访问令牌）：
 
 | 接口 | 说明 |
 | --- | --- |
 | `GET /config` | 站点名、账号中心地址、client_id |
-| `GET /categories` `/products` `/products/{slug}` `/tags` | 分类树、产品库、产品页、热门标签 |
+| `GET /categories` `/tags` | 分类树、热门标签 |
 | `POST /session` | 登录后调用：同步昵称头像、记访问、检查自动升级，返回本站资料和每日上限 |
 | `GET /topics` `/deals` `/search` | 列表；参数见 `models::ListFilter` |
 | `GET/POST /topics`、`GET/PATCH/DELETE /topics/{id}` | 帖子；羊毛帖带 `deal` 字段 |
@@ -57,13 +57,17 @@ cargo test --manifest-path services/server-forum/Cargo.toml
 | `POST /markdown/preview` | 发帖预览 |
 | `GET /users/{uid}`、`/users/{uid}/topics`、`/users/{uid}/posts`、`/me/bookmarks` | 用户主页、我的收藏 |
 
-管理接口在 `/api/admin/*`（`src/handlers/admin.rs`）：管理员独立建表，HS256 令牌带 `token_version`，改密码后旧令牌失效，连续输错 5 次锁 15 分钟；包括概览、举报处理、帖子与回复管理、用户等级和禁言封禁、分类与产品库维护、操作日志，所有写操作都记审计。
+管理接口在 `/api/admin/*`（`src/handlers/admin.rs`）：管理员独立建表，HS256 令牌带 `token_version`，改密码后旧令牌失效，连续输错 5 次锁 15 分钟；包括概览、举报处理、帖子与回复管理、用户等级和禁言封禁、分类维护、操作日志，所有写操作都记审计。
 
 ## 业务规则
 
 - 正文是 Markdown，服务端用 pulldown-cmark 渲染、ammonia 清洗后存 `body_html`；外链加 `nofollow ugc`。新人（TL0）的链接和图片会被去掉，只留文字。
-- 羊毛帖：产品、能领到什么、领取条件、有效期、活动页全部选填，什么都不填也能发；没有投票和状态标记，写了有效期的到期后自动不再出现在福利羊毛、首页和分类列表（用户主页、搜索、标签页、产品页的历史仍保留）。每 10 分钟重算最近 7 天的热度。
-- 信任等级与阅读权限：用户分 TL0 新人、TL1 成员、TL2 老用户、TL3 守护者。每个帖子有 `min_read_level`（0 所有人含游客，1 成员以上，2 老用户以上，3 守护者），发帖人只能设到不超过自己的等级，编辑时可以保持或调低，不能调高到超过自己；不传按公开。读者按登录态确定（游客是 0 级），作者总能读自己的帖子。受限帖子在列表、搜索、标签页、用户主页（帖子、回复摘要、统计）、收藏夹、产品页和搜索引擎页面里对没权限的人完全不可见，直接打开返回 403 并说明需要什么等级；回复列表、回复、点赞、收藏、举报同样检查。分类、产品、标签上的帖子数只统计公开帖。`sitemap.xml` 不收录受限帖，受限帖的搜索引擎页面按不存在处理（404 + noindex）。后台能看到所有帖子及其阅读权限。读者身份在 `models::Reader`，`ListFilter.reader` 用 `serde(skip)` 防止被查询参数伪造，默认值是游客，所以忘记设置的查询只会看到公开内容。
+- 内置标签：二级分类可带一组内置标签（`categories.preset_tags`，追加列，已部署的库启动时自动补上）。发帖选了分类后标签栏下面出现"常用标签"，点一下加上；板块页顶部用同一组标签筛选（`GET /topics?category=&tag=`）。标签和用户自己输入的标签是同一种写法（小写、空白换成连字符，由 `topics::normalize_tag` 统一），后台分类表单可以改。种子里只给资源分享的四个二级板块配了标签。
+- 技术交流板块：AI 大模型、AI 提效、AI 硬件、AI 创意。随便唠唠下有「亏了吗」（板块说明和站规写明不荐股、不拉群、不带单）和「梦想和人生」。AI 大模型的板块说明和站规都写明：自建中转站的技术教程可以发，运营、出售、推广中转服务仍然禁止。
+- 板块调整的迁移：已部署的库里旧的二级板块由 `db::apply_board_migration` 在启动时一次性并入新板块，做完记进 `data_migrations` 表，不再重复，所以后台之后改过甚至重新建过同名 slug 的分类不会被动到。资源分享（`share-boards-v1`）、技术交流（`tech-boards-v1`、`tech-creative-v1`）、随便唠唠（`casual-loss-v1`、`casual-dream-v1`）各自一条；每条只写入自己列出的板块（名称、说明、标签按种子覆盖，已有分类的名称和说明不动），新板块插在种子里前一个板块的后面，其后的分类整体顺延一位，后台改过的排序保持相对顺序；技术交流里 AI 应用开发、前端·后端·移动端 → AI 提效，服务器与运维、模型部署 → AI 大模型。新库种子直接是最新结构并把这些迁移记为已完成。
+- 资源分享板块：精品软件、电影资源、音乐资源、学习资料，只收合法来源的内容（板块说明和站规里写明，禁止盗版下载）。已部署的库里旧的四个二级板块（开源项目、工具软件、提示词·工作流、自制作品）由上面的迁移并入：开源项目、工具软件、自制作品里的帖子归到精品软件，提示词·工作流归到学习资料；
+- 羊毛帖：能领到什么、领取条件、有效期、活动页全部选填，什么都不填也能发；没有投票和状态标记，写了有效期的到期后自动不再出现在福利羊毛、首页和分类列表（用户主页、搜索、标签页、产品页的历史仍保留）。每 10 分钟重算最近 7 天的热度。
+- 信任等级与阅读权限：用户分 TL0 新人、TL1 成员、TL2 老用户、TL3 守护者。每个帖子有 `min_read_level`（0 所有人含游客，1 成员以上，2 老用户以上，3 守护者），发帖人只能设到不超过自己的等级，编辑时可以保持或调低，不能调高到超过自己；不传按公开。读者按登录态确定（游客是 0 级），作者总能读自己的帖子。受限帖子在列表、搜索、标签页、用户主页（帖子、回复摘要、统计）、收藏夹和搜索引擎页面里对没权限的人完全不可见，直接打开返回 403 并说明需要什么等级；回复列表、回复、点赞、收藏、举报同样检查。分类、产品、标签上的帖子数只统计公开帖。`sitemap.xml` 不收录受限帖，受限帖的搜索引擎页面按不存在处理（404 + noindex）。后台能看到所有帖子及其阅读权限。读者身份在 `models::Reader`，`ListFilter.reader` 用 `serde(skip)` 防止被查询参数伪造，默认值是游客，所以忘记设置的查询只会看到公开内容。
 - 活动链接不允许带 `ref`、`aff`、`invite` 等个人推广参数。
 - 只做站内功能：没有系统推送、邮件提醒，也没有匿名发帖（按产品决定）。
 

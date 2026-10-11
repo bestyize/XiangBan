@@ -25,8 +25,6 @@ const form = reactive({
   title: '',
   body: '',
   tags: [] as string[],
-  /** 0 表示没选 */
-  productId: 0,
   valueText: '',
   conditions: 0,
   linkUrl: '',
@@ -52,6 +50,9 @@ const roots = computed(() =>
 const root = computed(() => roots.value.find(r => r.id === form.rootId))
 const leaves = computed(() => root.value?.children ?? [])
 const isDeal = computed(() => root.value?.kind === 'deal')
+const leaf = computed(() => leaves.value.find(l => l.id === form.categoryId))
+/** 选中的二级分类上的内置标签；已经加到帖子上的也留着，方便点第二次取消。 */
+const presetTags = computed(() => leaf.value?.preset_tags ?? [])
 
 // 从 ?category= 预选分类（可以是一级或二级）。
 watch(
@@ -64,8 +65,6 @@ watch(
     const parent = meta.parentOf(c)
     form.rootId = parent?.id ?? 0
     if (c.parent_id) form.categoryId = c.id
-    const product = meta.products.find(p => p.slug === route.query.product)
-    if (product) form.productId = product.id
   },
   { immediate: true },
 )
@@ -102,7 +101,6 @@ watch(
       originalReadLevel.value = t.min_read_level
       loadedKind.value = t.deal ? 'deal' : 'normal'
       if (t.deal) {
-        form.productId = t.deal.product?.id ?? 0
         form.valueText = t.deal.value_text
         form.conditions = t.deal.conditions
         form.linkUrl = t.deal.link_url
@@ -115,6 +113,12 @@ watch(
   },
   { immediate: true },
 )
+
+function togglePreset(tag: string) {
+  const i = form.tags.indexOf(tag)
+  if (i >= 0) form.tags.splice(i, 1)
+  else if (form.tags.length < 5) form.tags.push(tag)
+}
 
 function toggleCondition(bit: number) {
   form.conditions ^= bit
@@ -168,7 +172,6 @@ async function submit() {
   }
   if (isDeal.value) {
     input.deal = {
-      product_id: form.productId || null,
       value_text: form.valueText,
       conditions: form.conditions,
       link_url: form.linkUrl.trim(),
@@ -233,23 +236,17 @@ const today = new Date().toISOString().slice(0, 10)
             {{ l.name }}
           </label>
         </div>
+        <p v-if="leaf?.description" class="leaf-note">{{ leaf.description }}</p>
       </section>
 
       <section v-if="isDeal" class="panel section deal">
         <h2>羊毛信息 <span class="optional">都是选填，不确定的可以不填</span></h2>
-        <div class="grid">
-          <label class="field">
-            <span>关联产品</span>
-            <select v-model.number="form.productId" class="select">
-              <option :value="0">不选</option>
-              <option v-for="p in meta.products" :key="p.id" :value="p.id">{{ p.name }}{{ p.vendor && p.vendor !== p.name ? `（${p.vendor}）` : '' }}</option>
-            </select>
-          </label>
+        <div class="grid one">
           <label class="field">
             <span>能领到什么</span>
             <input v-model="form.valueText" class="input" maxlength="40" placeholder="$5 额度、首月 1 元、3 个月 Pro" />
           </label>
-          <label class="field wide">
+          <label class="field">
             <span>官方活动页</span>
             <input v-model="form.linkUrl" class="input" type="url" inputmode="url" maxlength="500" placeholder="https://" />
             <small>不要带 ref、aff、invite 这类个人推广参数。</small>
@@ -309,7 +306,22 @@ const today = new Date().toISOString().slice(0, 10)
               @blur="addTag"
             />
           </div>
-          <small>最多 5 个，产品名做标签能让帖子出现在产品页。</small>
+          <div v-if="presetTags.length" class="presets" role="group" aria-label="这个板块的常用标签">
+            <span class="presets-label">常用标签</span>
+            <button
+              v-for="t in presetTags"
+              :key="t"
+              type="button"
+              class="preset"
+              :class="{ on: form.tags.includes(t) }"
+              :aria-pressed="form.tags.includes(t)"
+              :disabled="!form.tags.includes(t) && form.tags.length >= 5"
+              @click="togglePreset(t)"
+            >
+              {{ t }}
+            </button>
+          </div>
+          <small>最多 5 个，方便别人按标签找到这个帖子。</small>
         </div>
         <fieldset class="field">
           <legend>谁能看</legend>
@@ -392,8 +404,8 @@ h1 {
   font-weight: 400;
   color: var(--ink-3);
 }
-.grid .wide {
-  grid-column: 1 / -1;
+.grid.one {
+  grid-template-columns: minmax(0, 1fr);
 }
 fieldset {
   border: 0;
@@ -471,6 +483,43 @@ legend {
   border: 1px solid var(--line);
   font-size: var(--fs-sm);
   cursor: pointer;
+}
+.leaf-note {
+  margin: 0;
+  font-size: var(--fs-xs);
+  color: var(--ink-3);
+}
+.presets {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.presets-label {
+  font-size: var(--fs-xs);
+  color: var(--ink-3);
+  margin-right: 2px;
+}
+.preset {
+  border: 1px solid var(--line);
+  background: var(--surface);
+  border-radius: 12px;
+  padding: 2px 10px;
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  color: var(--ink-2);
+}
+.preset:hover:not(:disabled) {
+  border-color: var(--line-strong);
+}
+.preset.on {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--paper);
+}
+.preset:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 .leaf.on {
   background: var(--ink);

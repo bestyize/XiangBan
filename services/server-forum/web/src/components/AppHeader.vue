@@ -50,13 +50,12 @@ async function logout() {
       <nav class="nav" aria-label="主导航">
         <RouterLink to="/" :class="{ on: route.name === 'home' }">首页</RouterLink>
         <RouterLink to="/deals" :class="{ on: route.name === 'deals' }">福利羊毛</RouterLink>
-        <RouterLink to="/products" :class="{ on: route.name === 'products' || route.name === 'product' }">产品</RouterLink>
       </nav>
 
       <form class="search" :class="{ open: searchOpen }" role="search" @submit.prevent="submit">
         <label class="sr-only" for="site-search">搜索</label>
         <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="9" cy="9" r="6" /><path d="M13.5 13.5 17 17" /></svg>
-        <input id="site-search" v-model="q" type="search" placeholder="搜产品、羊毛或帖子" maxlength="50" enterkeyhint="search" />
+        <input id="site-search" v-model="q" type="search" placeholder="搜羊毛或帖子" maxlength="50" enterkeyhint="search" />
       </form>
 
       <div class="actions">

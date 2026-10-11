@@ -1,7 +1,7 @@
 //! 前端单页的托管，以及给搜索引擎的服务端渲染页面。
 //!
 //! - 静态资源：从 `web_dir`（Vite 构建产物）用 ServeDir 托管，`/assets/` 下带哈希的文件强缓存。
-//! - SEO 页面：首页、福利羊毛、帖子、分类、产品、标签直接输出带标题、摘要和正文的 HTML。
+//! - SEO 页面：首页、福利羊毛、帖子、分类、标签直接输出带标题、摘要和正文的 HTML。
 //!   做法是把启动时读好的 index.html 里的 `<title>`、description、canonical、OG 标签换成页面自己的，
 //!   并把可读的语义 HTML 填进 `<div id="app"></div>`；浏览器里 Vue 挂载时会整体替换这块内容。
 //! - 兜底：其余 GET 路径都返回 index.html（200），交给前端路由；`/api/*`、`/assets/*` 未命中返回 404。
@@ -230,10 +230,8 @@ pub fn routes(state: &AppState) -> Router<AppState> {
     Router::new()
         .route("/", get(home))
         .route("/deals", get(deals_page))
-        .route("/products", get(products_page))
         .route("/t/{id}", get(topic_page))
         .route("/c/{slug}", get(category_page))
-        .route("/p/{slug}", get(product_page))
         .route("/tag/{name}", get(tag_page))
         .route("/sitemap.xml", get(sitemap))
         .route("/robots.txt", get(robots))
@@ -317,16 +315,9 @@ type Res = Result<Response, AppError>;
 
 // ---------- HTML 片段 ----------
 
-/// 产品名和"能领到什么"，都是选填，有哪个写哪个（未转义的纯文本）。
+/// "能领到什么"，选填；没写就是空串（未转义的纯文本）。
 fn deal_plain_summary(d: &DealInfo) -> String {
-    let mut parts: Vec<&str> = Vec::new();
-    if let Some(p) = &d.product {
-        parts.push(&p.name);
-    }
-    if !d.value_text.trim().is_empty() {
-        parts.push(d.value_text.trim());
-    }
-    parts.join(" · ")
+    d.value_text.trim().to_string()
 }
 
 fn deal_summary(d: &DealInfo) -> String {
@@ -365,13 +356,6 @@ fn tag_links(tags: &[String]) -> String {
 /// 帖子页里的羊毛信息：几项都是选填，填了哪项显示哪项。
 fn deal_block(d: &DealInfo) -> String {
     let mut rows = String::new();
-    if let Some(p) = &d.product {
-        rows.push_str(&format!(
-            "<dt>产品</dt><dd><a href=\"/p/{}\">{}</a></dd>\n",
-            percent_encode(&p.slug),
-            escape(&p.name)
-        ));
-    }
     if !d.value_text.trim().is_empty() {
         rows.push_str(&format!("<dt>羊毛</dt><dd>{}</dd>\n", escape(d.value_text.trim())));
     }
@@ -390,13 +374,13 @@ fn deal_block(d: &DealInfo) -> String {
     format!("<dl>\n{rows}</dl>")
 }
 
-/// 全站导航：福利羊毛、产品库和分类树，让不跑 JS 的爬虫能顺着链接爬到各板块。
+/// 全站导航：福利羊毛和分类树，让不跑 JS 的爬虫能顺着链接爬到各板块。
 async fn category_nav(state: &AppState) -> Result<String, AppError> {
     let rows: Vec<(i32, Option<i32>, String, String)> =
         sqlx::query_as("SELECT id, parent_id, slug, name FROM categories ORDER BY sort_order, id")
             .fetch_all(&state.pool)
             .await?;
-    let mut s = String::from("<nav>\n<a href=\"/deals\">福利羊毛</a> <a href=\"/products\">产品库</a>\n<ul>\n");
+    let mut s = String::from("<nav>\n<a href=\"/deals\">福利羊毛</a>\n<ul>\n");
     for (id, _, slug, name) in rows.iter().filter(|r| r.1.is_none()) {
         s.push_str(&format!("<li><a href=\"/c/{}\">{}</a>", percent_encode(slug), escape(name)));
         let children: Vec<_> = rows.iter().filter(|r| r.1 == Some(*id)).collect();
@@ -466,35 +450,6 @@ async fn deals_page(State(state): State<AppState>, Extension(index): Extension<I
         title: cx.full_title("福利羊毛"),
         description: "最新的免费额度、新用户赠金和试用优惠，覆盖 AI、云服务和开发者工具，标注领取条件和有效期。".into(),
         path: "/deals".into(),
-        og_type: "website",
-        body,
-        json_ld: None,
-    }))
-}
-
-async fn products_page(State(state): State<AppState>, Extension(index): Extension<Index>) -> Res {
-    let cx = Ctx::new(&state, &index);
-    let rows: Vec<(String, String, String, i64)> = sqlx::query_as(
-        "SELECT p.slug, p.name, p.vendor, COUNT(t.id) AS n FROM products p
-         LEFT JOIN deals d ON d.product_id = p.id
-         LEFT JOIN topics t ON t.id = d.topic_id AND t.status = 'normal'
-         GROUP BY p.id ORDER BY n DESC, p.name",
-    )
-    .fetch_all(&state.pool)
-    .await?;
-    let mut body = String::from("<h1>AI 产品库</h1>\n<p>按产品查看历史上所有羊毛和相关讨论。</p>\n<ul>\n");
-    for (slug, name, vendor, n) in &rows {
-        body.push_str(&format!("<li><a href=\"/p/{}\">{}</a>", percent_encode(slug), escape(name)));
-        if !vendor.is_empty() {
-            body.push_str(&format!(" <small>{}</small>", escape(vendor)));
-        }
-        body.push_str(&format!(" <small>{n} 条羊毛</small></li>\n"));
-    }
-    body.push_str("</ul>");
-    Ok(cx.ok(Page {
-        title: cx.full_title("AI 产品库"),
-        description: "OpenAI、Claude、Gemini、DeepSeek、Cursor 等 AI 产品的免费额度、试用和优惠汇总，按产品查看。".into(),
-        path: "/products".into(),
         og_type: "website",
         body,
         json_ld: None,
@@ -655,64 +610,6 @@ async fn category_page(
     }))
 }
 
-/// 只放行 http(s) 链接，避免后台误填 javascript: 之类的地址。
-fn safe_http_url(u: &str) -> bool {
-    u.starts_with("https://") || u.starts_with("http://")
-}
-
-async fn product_page(
-    State(state): State<AppState>,
-    Extension(index): Extension<Index>,
-    Path(slug): Path<String>,
-) -> Res {
-    let cx = Ctx::new(&state, &index);
-    let row: Option<(String, String, String, String)> =
-        sqlx::query_as("SELECT name, vendor, website, description FROM products WHERE slug = $1")
-            .bind(&slug)
-            .fetch_optional(&state.pool)
-            .await?;
-    let Some((name, vendor, website, desc)) = row else { return Ok(cx.not_found()) };
-    let deals = models::list_topics(
-        &state.pool,
-        &ListFilter {
-            product: Some(slug.clone()),
-            kind: Some("deal".into()),
-            include_expired: true,
-            sort: Some("new".into()),
-            page_size: Some(50),
-            ..Default::default()
-        },
-    )
-    .await?;
-
-    let mut body = format!("<h1>{}</h1>\n", escape(&name));
-    if !vendor.is_empty() {
-        body.push_str(&format!("<p>厂商：{}</p>\n", escape(&vendor)));
-    }
-    if safe_http_url(&website) {
-        body.push_str(&format!("<p>官网：<a href=\"{0}\" rel=\"nofollow noopener\">{0}</a></p>\n", escape(&website)));
-    }
-    if !desc.is_empty() {
-        body.push_str(&format!("<p>{}</p>\n", escape(&desc)));
-    }
-    body.push_str(&format!("<h2>{} 的羊毛（{}）</h2>\n{}", escape(&name), deals.total, topic_list(&deals.items)));
-    Ok(cx.ok(Page {
-        title: cx.full_title(&format!("{name} 免费额度与优惠")),
-        description: truncate_chars(
-            &if desc.is_empty() {
-                format!("{name}的免费额度、新用户赠金、试用和优惠汇总，共 {} 条，标注领取条件和有效期。", deals.total)
-            } else {
-                desc
-            },
-            150,
-        ),
-        path: format!("/p/{}", percent_encode(&slug)),
-        og_type: "website",
-        body,
-        json_ld: None,
-    }))
-}
-
 async fn tag_page(
     State(state): State<AppState>,
     Extension(index): Extension<Index>,
@@ -763,7 +660,6 @@ fn sitemap_entry(out: &mut String, loc: &str, lastmod: Option<&str>) {
 async fn sitemap(State(state): State<AppState>) -> Res {
     let base = state.config.public_url.as_str();
     let cats: Vec<(String,)> = sqlx::query_as("SELECT slug FROM categories ORDER BY sort_order, id").fetch_all(&state.pool).await?;
-    let prods: Vec<(String,)> = sqlx::query_as("SELECT slug FROM products ORDER BY id").fetch_all(&state.pool).await?;
     // GREATEST 会忽略 NULL，所以没编辑过的帖子取最后回复时间。
     let topics: Vec<(i64, DateTime<Utc>)> = sqlx::query_as(
         "SELECT id, GREATEST(last_reply_at, edited_at) AS m FROM topics WHERE status = 'normal' AND min_read_level = 0 ORDER BY m DESC LIMIT 5000",
@@ -774,14 +670,11 @@ async fn sitemap(State(state): State<AppState>) -> Res {
     let mut xml = String::from(
         "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">\n",
     );
-    for p in ["/", "/deals", "/products"] {
+    for p in ["/", "/deals"] {
         sitemap_entry(&mut xml, &format!("{base}{p}"), None);
     }
     for (s,) in &cats {
         sitemap_entry(&mut xml, &format!("{base}/c/{}", percent_encode(s)), None);
-    }
-    for (s,) in &prods {
-        sitemap_entry(&mut xml, &format!("{base}/p/{}", percent_encode(s)), None);
     }
     for (id, m) in &topics {
         sitemap_entry(&mut xml, &format!("{base}/t/{id}"), Some(&m.format("%Y-%m-%d").to_string()));
@@ -889,11 +782,5 @@ mod tests {
     #[test]
     fn fill_app_without_mount_point_is_noop() {
         assert_eq!(fill_app("<body></body>", "x"), "<body></body>");
-    }
-
-    #[test]
-    fn product_url_filter() {
-        assert!(safe_http_url("https://openai.com"));
-        assert!(!safe_http_url("javascript:alert(1)"));
     }
 }

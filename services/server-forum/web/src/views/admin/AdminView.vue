@@ -10,7 +10,6 @@ import ReportsPanel from './ReportsPanel.vue'
 import TopicsPanel from './TopicsPanel.vue'
 import UsersPanel from './UsersPanel.vue'
 import CategoriesPanel from './CategoriesPanel.vue'
-import ProductsPanel from './ProductsPanel.vue'
 import AuditPanel from './AuditPanel.vue'
 import AccountPanel from './AccountPanel.vue'
 import { openReports, toasts } from './shared'
@@ -22,7 +21,6 @@ const SECTIONS = [
   { key: 'topics', label: '帖子', comp: TopicsPanel },
   { key: 'users', label: '用户', comp: UsersPanel },
   { key: 'categories', label: '分类', comp: CategoriesPanel },
-  { key: 'products', label: '产品库', comp: ProductsPanel },
   { key: 'audit', label: '操作日志', comp: AuditPanel },
   { key: 'account', label: '账号', comp: AccountPanel },
 ] as const

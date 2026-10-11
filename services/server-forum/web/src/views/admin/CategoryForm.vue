@@ -26,6 +26,8 @@ const form = reactive({
   on_home: props.category?.on_home ?? true,
   award_points: props.category?.award_points ?? true,
   admin_only: props.category?.admin_only ?? false,
+  // 内置标签在表单里用逗号分隔的一行文字编辑。
+  preset_tags: (props.category?.preset_tags ?? []).join('，'),
 })
 
 // 选了父分类后，子分类类型必须和父分类一致。
@@ -47,6 +49,7 @@ function submit() {
     on_home: form.on_home,
     award_points: form.award_points,
     admin_only: form.admin_only,
+    preset_tags: form.preset_tags.split(/[,，、\s]+/).map(t => t.trim()).filter(Boolean),
   }
   if (!editing.value) {
     body.parent_id = form.parent_id
@@ -96,6 +99,11 @@ function submit() {
       <label class="field wide">
         <span>说明</span>
         <input v-model="form.description" class="input" maxlength="200" />
+      </label>
+      <label class="field wide">
+        <span>内置标签</span>
+        <input v-model="form.preset_tags" class="input" placeholder="用逗号或空格分隔，比如：windows，macos，开源" />
+        <small>发帖选了这个分类后，这些标签会出现在标签栏下面，点一下就加上；最多 20 个，每个最多 20 个字。只对二级分类有用。</small>
       </label>
     </div>
     <div class="adm-checks">

@@ -196,6 +196,7 @@ export interface AdminCategory {
   on_home: boolean
   award_points: boolean
   admin_only: boolean
+  preset_tags: string[]
   topic_count: number
 }
 
@@ -210,25 +211,7 @@ export interface CategoryInput {
   on_home: boolean
   award_points: boolean
   admin_only: boolean
-}
-
-export interface AdminProduct {
-  id: number
-  slug: string
-  name: string
-  vendor: string
-  website: string
-  description: string
-  created_at: string
-  deal_count: number
-}
-
-export interface ProductInput {
-  slug?: string
-  name: string
-  vendor: string
-  website: string
-  description: string
+  preset_tags: string[]
 }
 
 export interface AuditRow {
@@ -294,9 +277,6 @@ export const adminApi = {
   updateCategory: (id: number, body: Partial<CategoryInput>) =>
     request<AdminCategory>('PATCH', `/categories/${id}`, body),
 
-  products: () => request<AdminProduct[]>('GET', '/products'),
-  createProduct: (body: ProductInput) => request<AdminProduct>('POST', '/products', body),
-  updateProduct: (id: number, body: Partial<ProductInput>) => request<AdminProduct>('PATCH', `/products/${id}`, body),
 
   audit: (limit = 50) => request<AuditRow[]>('GET', `/audit${qs({ limit })}`),
 }

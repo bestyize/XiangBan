@@ -1,13 +1,9 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { useMeta } from '@/stores/meta'
 import { useSession } from '@/stores/session'
 import { TRUST_LABEL } from '@/lib/format'
 
-const meta = useMeta()
 const session = useSession()
-
-const topProducts = computed(() => meta.products.filter(p => p.slug !== 'other').slice(0, 10))
 
 /** 新人离自动升级还差什么。 */
 const progress = computed(() => {
@@ -43,17 +39,6 @@ const progress = computed(() => {
       </div>
       <div class="track"><i :style="{ width: `${(progress.reads / progress.needReads) * 100}%` }" /></div>
     </template>
-  </section>
-
-  <section class="panel box">
-    <h2>羊毛最多的产品</h2>
-    <ul class="products">
-      <li v-for="p in topProducts" :key="p.id">
-        <RouterLink :to="`/p/${p.slug}`">{{ p.name }}</RouterLink>
-        <span class="num">{{ p.active_deal_count || '' }}</span>
-      </li>
-    </ul>
-    <RouterLink to="/products" class="more">全部产品</RouterLink>
   </section>
 
   <section class="panel box">
@@ -116,22 +101,13 @@ h2 {
   color: var(--ink-3);
   font-size: 12px;
 }
-.products,
+
 .rules {
   list-style: none;
   margin: 0;
   padding: 0;
   display: grid;
   gap: 2px;
-}
-.products li {
-  display: flex;
-  justify-content: space-between;
-  padding: 4px 0;
-  font-size: var(--fs-sm);
-}
-.products a:hover {
-  text-decoration: underline;
 }
 .rules li {
   font-size: var(--fs-xs);

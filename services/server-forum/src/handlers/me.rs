@@ -164,12 +164,12 @@ pub async fn user_posts(
     Ok(Json(json!({ "items": rows, "page": q.page(), "page_size": q.page_size() })))
 }
 
-/// 搜索：帖子 + 产品。
+/// 搜索帖子（标题和摘要）。
 pub async fn search(
     State(state): State<AppState>,
     MaybeUser(viewer): MaybeUser,
     Query(mut f): Query<ListFilter>,
-) -> AppResult<Json<Value>> {
+) -> AppResult<Json<Page<TopicItem>>> {
     f.reader = Reader::from_user(viewer.as_ref());
     let q = f.q.clone().unwrap_or_default();
     let q = q.trim();
@@ -180,16 +180,5 @@ pub async fn search(
         f.sort = Some("new".into());
     }
     f.include_expired = true;
-    let topics = models::list_topics(&state.pool, &f).await?;
-    let pattern = format!("%{}%", q.replace('\\', "\\\\").replace('%', "\\%").replace('_', "\\_"));
-    let products: Vec<(String, String, String)> = sqlx::query_as(
-        "SELECT slug, name, vendor FROM products WHERE name ILIKE $1 OR vendor ILIKE $1 OR slug ILIKE $1 ORDER BY name LIMIT 6",
-    )
-    .bind(pattern)
-    .fetch_all(&state.pool)
-    .await?;
-    Ok(Json(json!({
-        "topics": topics,
-        "products": products.into_iter().map(|(slug, name, vendor)| json!({ "slug": slug, "name": name, "vendor": vendor })).collect::<Vec<_>>(),
-    })))
+    Ok(Json(models::list_topics(&state.pool, &f).await?))
 }

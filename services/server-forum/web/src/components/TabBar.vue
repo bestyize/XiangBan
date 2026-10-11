@@ -35,10 +35,6 @@ function me() {
     <button type="button" class="compose" aria-label="发帖" @click="compose">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
     </button>
-    <RouterLink to="/products" :class="{ on: route.name === 'products' || route.name === 'product' }">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="7" height="7" rx="1.5" /><rect x="13" y="4" width="7" height="7" rx="1.5" /><rect x="4" y="13" width="7" height="7" rx="1.5" /><rect x="13" y="13" width="7" height="7" rx="1.5" /></svg>
-      <span>产品</span>
-    </RouterLink>
     <button type="button" :class="{ on: route.name === 'user' || route.name === 'settings' }" @click="me">
       <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8.5" r="3.8" /><path d="M4.5 20c1-3.6 4-5.5 7.5-5.5s6.5 1.9 7.5 5.5" /></svg>
       <span>我的</span>
@@ -58,7 +54,7 @@ function me() {
     bottom: 0;
     z-index: 30;
     display: grid;
-    grid-template-columns: repeat(5, 1fr);
+    grid-template-columns: repeat(4, 1fr);
     align-items: center;
     height: calc(var(--tabbar-h) + env(safe-area-inset-bottom));
     padding-bottom: env(safe-area-inset-bottom);

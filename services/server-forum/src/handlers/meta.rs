@@ -1,8 +1,5 @@
-use crate::{auth::MaybeUser, error::{AppError, AppResult}, models::{self, ListFilter, Reader}, state::AppState};
-use axum::{
-    extract::{Path, State},
-    Json,
-};
+use crate::{error::AppResult, state::AppState};
+use axum::{extract::State, Json};
 use serde::Serialize;
 use serde_json::{json, Value};
 
@@ -33,72 +30,21 @@ pub struct Category {
     pub on_home: bool,
     pub award_points: bool,
     pub admin_only: bool,
+    /// 内置标签：发帖时按这个分类给出的可一键选用的标签。
+    pub preset_tags: Vec<String>,
     pub topic_count: i64,
 }
 
 pub async fn categories(State(state): State<AppState>) -> AppResult<Json<Vec<Category>>> {
     let rows = sqlx::query_as(
         "SELECT c.id, c.parent_id, c.slug, c.name, c.description, c.kind, c.sort_order, c.min_post_level,
-                c.on_home, c.award_points, c.admin_only,
+                c.on_home, c.award_points, c.admin_only, c.preset_tags,
                 (SELECT COUNT(*) FROM topics t WHERE t.category_id = c.id AND t.status = 'normal' AND t.min_read_level = 0) AS topic_count
          FROM categories c ORDER BY c.sort_order, c.id",
     )
     .fetch_all(&state.pool)
     .await?;
     Ok(Json(rows))
-}
-
-#[derive(Serialize, sqlx::FromRow)]
-pub struct Product {
-    pub id: i32,
-    pub slug: String,
-    pub name: String,
-    pub vendor: String,
-    pub website: String,
-    pub description: String,
-    pub deal_count: i64,
-    pub active_deal_count: i64,
-}
-
-const PRODUCT_SELECT: &str = "SELECT p.id, p.slug, p.name, p.vendor, p.website, p.description,
-        COUNT(t.id) AS deal_count,
-        COUNT(t.id) FILTER (WHERE d.long_term OR d.expires_at IS NULL OR d.expires_at > now()) AS active_deal_count
-    FROM products p
-    LEFT JOIN deals d ON d.product_id = p.id
-    LEFT JOIN topics t ON t.id = d.topic_id AND t.status = 'normal' AND t.min_read_level = 0";
-
-pub async fn products(State(state): State<AppState>) -> AppResult<Json<Vec<Product>>> {
-    let rows = sqlx::query_as(&format!(
-        "{PRODUCT_SELECT} GROUP BY p.id ORDER BY active_deal_count DESC, deal_count DESC, p.name"
-    ))
-    .fetch_all(&state.pool)
-    .await?;
-    Ok(Json(rows))
-}
-
-pub async fn product(
-    State(state): State<AppState>,
-    MaybeUser(viewer): MaybeUser,
-    Path(slug): Path<String>,
-) -> AppResult<Json<Value>> {
-    let reader = Reader::from_user(viewer.as_ref());
-    let product: Product = sqlx::query_as(&format!("{PRODUCT_SELECT} WHERE p.slug = $1 GROUP BY p.id"))
-        .bind(&slug)
-        .fetch_optional(&state.pool)
-        .await?
-        .ok_or_else(|| AppError::not_found("产品"))?;
-    // 产品页：在架的羊毛 + 提到这个产品的讨论（按标签匹配产品名）。
-    let deals = models::list_topics(
-        &state.pool,
-        &ListFilter { reader: reader.clone(), product: Some(slug.clone()), kind: Some("deal".into()), include_expired: true, sort: Some("new".into()), page_size: Some(50), ..Default::default() },
-    )
-    .await?;
-    let discussions = models::list_topics(
-        &state.pool,
-        &ListFilter { reader, tag: Some(product.name.to_lowercase()), kind: Some("normal".into()), page_size: Some(20), ..Default::default() },
-    )
-    .await?;
-    Ok(Json(json!({ "product": product, "deals": deals.items, "discussions": discussions.items })))
 }
 
 pub async fn popular_tags(State(state): State<AppState>) -> AppResult<Json<Vec<Value>>> {

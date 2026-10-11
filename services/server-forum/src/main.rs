@@ -31,8 +31,6 @@ pub fn build_router(state: AppState) -> Router {
         .route("/health", get(meta::health))
         .route("/config", get(meta::site_config))
         .route("/categories", get(meta::categories))
-        .route("/products", get(meta::products))
-        .route("/products/{slug}", get(meta::product))
         .route("/tags", get(meta::popular_tags))
         .route("/session", post(me::session))
         .route("/me/bookmarks", get(me::bookmarks))

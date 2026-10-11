@@ -102,7 +102,6 @@ pub async fn get(State(state): State<AppState>, MaybeUser(user): MaybeUser, Path
 /// 羊毛信息，每一项发帖人都可以不填。
 #[derive(Deserialize, Default)]
 pub struct DealInput {
-    pub product_id: Option<i32>,
     #[serde(default)]
     pub value_text: String,
     /// 领取条件位标志，0 表示没有特殊条件或没写。
@@ -188,13 +187,15 @@ fn clean_body(raw: &str, min: usize) -> AppResult<String> {
     Ok(body)
 }
 
+/// 标签的统一写法：去掉 #、小写、空白换成连字符。空串返回 None。
+pub fn normalize_tag(raw: &str) -> Option<String> {
+    let t = raw.trim().trim_start_matches('#').to_lowercase().split_whitespace().collect::<Vec<_>>().join("-");
+    (!t.is_empty()).then_some(t)
+}
+
 fn clean_tags(raw: &[String]) -> AppResult<Vec<String>> {
     let mut tags: Vec<String> = Vec::new();
-    for t in raw {
-        let t: String = t.trim().trim_start_matches('#').to_lowercase().split_whitespace().collect::<Vec<_>>().join("-");
-        if t.is_empty() {
-            continue;
-        }
+    for t in raw.iter().filter_map(|t| normalize_tag(t)) {
         if t.chars().count() > 20 {
             return Err(AppError::BadRequest("每个标签最多 20 个字".into()));
         }
@@ -255,13 +256,6 @@ fn clean_read_level(wanted: Option<i16>, user_level: i16, current: Option<i16>) 
     Ok(level)
 }
 
-/// 产品可以不选；选了就必须是库里有的。
-async fn ensure_product(pool: &PgPool, id: Option<i32>) -> AppResult<()> {
-    let Some(id) = id else { return Ok(()) };
-    let exists: Option<(i32,)> = sqlx::query_as("SELECT id FROM products WHERE id = $1").bind(id).fetch_optional(pool).await?;
-    exists.map(|_| ()).ok_or_else(|| AppError::BadRequest("关联产品不存在".into()))
-}
-
 pub async fn create(State(state): State<AppState>, auth: AuthUser, Json(input): Json<TopicInput>) -> AppResult<Json<Value>> {
     let user = &auth.user;
     users::ensure_can_write(user)?;
@@ -285,7 +279,6 @@ pub async fn create(State(state): State<AppState>, auth: AuthUser, Json(input): 
     let deal = match (cat.kind.as_str(), &input.deal) {
         ("deal", Some(d)) => {
             clean_deal(d)?;
-            ensure_product(&state.pool, d.product_id).await?;
             Some(d)
         }
         // 羊毛信息全是选填，什么都没填也照样发成羊毛帖。
@@ -314,11 +307,10 @@ pub async fn create(State(state): State<AppState>, auth: AuthUser, Json(input): 
     .await?;
     if let Some(d) = deal {
         sqlx::query(
-            "INSERT INTO deals (topic_id, product_id, value_text, conditions, link_url, expires_at, long_term)
-             VALUES ($1, $2, $3, $4, $5, $6, $7)",
+            "INSERT INTO deals (topic_id, value_text, conditions, link_url, expires_at, long_term)
+             VALUES ($1, $2, $3, $4, $5, $6)",
         )
         .bind(id)
-        .bind(d.product_id)
         .bind(d.value_text.trim())
         .bind(d.conditions)
         .bind(d.link_url.trim())
@@ -378,13 +370,11 @@ pub async fn update(
     if let Some(d) = &input.deal {
         if topic.deal.is_some() {
             clean_deal(d)?;
-            ensure_product(&state.pool, d.product_id).await?;
             sqlx::query(
-                "UPDATE deals SET product_id = $2, value_text = $3, conditions = $4, link_url = $5, expires_at = $6, long_term = $7
+                "UPDATE deals SET value_text = $2, conditions = $3, link_url = $4, expires_at = $5, long_term = $6
                  WHERE topic_id = $1",
             )
             .bind(id)
-            .bind(d.product_id)
             .bind(d.value_text.trim())
             .bind(d.conditions)
             .bind(d.link_url.trim())
@@ -463,6 +453,16 @@ mod tests {
         assert!(clean_read_level(Some(3), 1, Some(2)).is_err());
         // 往下调总是允许
         assert_eq!(clean_read_level(Some(0), 1, Some(2)).unwrap(), 0);
+    }
+
+    #[test]
+    fn normalize_tag_is_idempotent() {
+        assert_eq!(normalize_tag(" #Windows "), Some("windows".into()));
+        assert_eq!(normalize_tag("cc 授权"), Some("cc-授权".into()));
+        assert_eq!(normalize_tag("  "), None);
+        assert_eq!(normalize_tag("#"), None);
+        let once = normalize_tag("Open AI").unwrap();
+        assert_eq!(normalize_tag(&once), Some(once));
     }
 
     #[test]
