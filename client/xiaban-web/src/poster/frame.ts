@@ -89,10 +89,10 @@ export function drawBackground(p: Poster, options: { bg?: [string, string]; seed
   ctx.fillStyle = sky
   ctx.fillRect(0, 0, PAGE_W, h)
 
-  // A soft lamp glow in the upper part, the same on every poster.
+  // A soft brand glow in the upper part, the same on every poster.
   const glow = ctx.createRadialGradient(PAGE_W / 2, 150, 0, PAGE_W / 2, 150, 260)
-  glow.addColorStop(0, theme.id === 'night' ? 'rgba(255, 200, 120, 0.10)' : 'rgba(255, 214, 150, 0.35)')
-  glow.addColorStop(1, 'rgba(255, 200, 120, 0)')
+  glow.addColorStop(0, theme.glow)
+  glow.addColorStop(1, 'rgba(229, 27, 62, 0)')
   ctx.fillStyle = glow
   ctx.fillRect(0, 0, PAGE_W, h)
 
@@ -111,14 +111,14 @@ async function robotImage(spec: RobotInput, widthUnits: number) {
   return loadImage(robotDataUrl(stillFrame(spec), Math.round(widthUnits * POSTER_SCALE)))
 }
 
-/** 小伴 under its own warm light. Returns its bounding box. */
+/** 小伴 under its own soft light. Returns its bounding box. */
 export async function drawRobot(p: Poster, spec: RobotInput, cx: number, top: number, width: number) {
   const { ctx, theme } = p
   const height = (width * VIEW.h) / VIEW.w
   const cy = top + height * 0.45
   const glow = ctx.createRadialGradient(cx, cy, 0, cx, cy, width * 0.78)
   glow.addColorStop(0, theme.glow)
-  glow.addColorStop(1, 'rgba(255, 190, 100, 0)')
+  glow.addColorStop(1, 'rgba(229, 27, 62, 0)')
   ctx.fillStyle = glow
   ctx.fillRect(cx - width, cy - width, width * 2, width * 2)
   ctx.drawImage(await robotImage(spec, width), cx - width / 2, top, width, height)
@@ -167,7 +167,7 @@ export function drawBubble(p: Poster, text: string, o: BubbleOptions) {
   const r = Math.min(18, height / 2)
 
   ctx.save()
-  ctx.shadowColor = theme.id === 'night' ? 'rgba(5, 10, 25, 0.35)' : 'rgba(120, 88, 50, 0.14)'
+  ctx.shadowColor = theme.id === 'night' ? 'rgba(0, 0, 0, 0.25)' : 'rgba(0, 0, 0, 0.06)'
   ctx.shadowBlur = 14
   ctx.shadowOffsetY = 4
   ctx.fillStyle = theme.bubble
@@ -199,7 +199,7 @@ export function drawPanel(p: Poster, x: number, y: number, w: number, h: number,
   const { ctx, theme } = p
   ctx.save()
   if (theme.id === 'day') {
-    ctx.shadowColor = 'rgba(120, 88, 50, 0.10)'
+    ctx.shadowColor = 'rgba(0, 0, 0, 0.05)'
     ctx.shadowBlur = 18
     ctx.shadowOffsetY = 6
   }

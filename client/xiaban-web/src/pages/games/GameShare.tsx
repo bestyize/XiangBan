@@ -11,6 +11,8 @@ import { PosterThemeToggle } from '../../components/PosterThemeToggle.tsx'
 import { usePosterTheme } from '../../poster/theme.ts'
 import { claimSnakeShareReward, snakeShareRound } from '../../games/snake-arena/shareReward.ts'
 import { readSnakeWallet } from '../../games/snake-arena/economy.ts'
+import { NavBar } from '../../components/SubPage.tsx'
+import { ShareIcon, SharePreview, ShareStatus } from '../../components/SharePreview.tsx'
 import './gameShare.css'
 
 export default function GameShare({ gameId = 'snake-arena' }: { gameId?: string }) {
@@ -101,31 +103,36 @@ export default function GameShare({ gameId = 'snake-arena' }: { gameId?: string 
     catch { setMessage('可以长按战绩卡保存图片。') }
   }
 
-  return <main className="game-share-page">
-    <header className="game-share-header"><span>{name}</span><Link href={challengePath}>去玩一局 ↗</Link></header>
+  return <main className="game-share-page share-page">
+    <NavBar title="战绩分享" back="/games" />
     {game && result ? <>
-      <p className="game-share-eyebrow">{own ? '我的快乐战绩' : '朋友分享的战绩'}</p>
-      <h1>{own ? '把这份快乐，晒给朋友' : '这份战绩，等你来挑战'}</h1>
-      <p className="game-share-subtitle">{game.subtitle(result)}</p>
-      <div className="game-share-poster">
-        {image ? <img src={image.url} width={RESULT_POSTER_WIDTH} height={RESULT_POSTER_HEIGHT} alt={`${shareText} 扫码来挑战。`} /> : <div className="game-share-placeholder" role="status">{error || '正在画你的快乐战绩…'}</div>}
-      </div>
-      <PosterThemeToggle value={theme} onChange={setTheme} tone="light" className="mb-4" />
-      {error && <button className="game-share-link-button" onClick={() => setRetry(value => value + 1)}>重新生成战绩卡</button>}
-      <div className="game-share-actions">
-        <button className="game-share-button" disabled={busy} onClick={() => void share()}>{busy ? '正在分享…' : '分享给朋友'}</button>
-        {image && (inApp() ? <button className="game-share-button outline" onClick={() => void saveImage()}>保存到相册</button> : <a className="game-share-button outline" href={image.url} download={image.file.name}>保存战绩卡</a>)}
-      </div>
-      {image && <p className="game-share-hint">长按战绩卡也可以保存图片，发给朋友或朋友圈。</p>}
-      <button className="game-share-link-button" onClick={() => void copyLink()}>复制战绩链接</button>
-      <p className="game-share-status" role="status">{message}</p>
-      {rewardAvailable && <p className="game-share-hint">今日首次参与分享，可领下一局5秒开局保护。</p>}
-      {rewardMessage && <p className="game-share-status" role="status">{rewardMessage}</p>}
-      {rewardRetry && <button className="game-share-link-button" onClick={() => void shareReward()}>重试领取分享奖励</button>}
-      {manualCopy && <input className="game-share-copy" aria-label="可复制的战绩链接" readOnly value={link} onFocus={event => event.currentTarget.select()} />}
-      {isWeChat() && !image && <p className="game-share-hint">战绩卡生成后，可以长按保存，再发给朋友或朋友圈。</p>}
-      <Link className="game-share-button play" href={challengePath}>{own ? '再玩一局，刷新战绩' : '我也来玩一局'}</Link>
-      <p className="game-share-hint">分享内容只含本局数据，不含账号信息。战绩由分享者提供。</p>
-    </> : <section className="game-share-invalid"><h1>这份战绩暂时打不开</h1><p>链接可能不完整，来玩一局，生成自己的战绩吧。</p><Link className="game-share-button" href={challengePath}>去玩{name}</Link></section>}
+      <section className="share-intro">
+        <span className="share-eyebrow">{own ? '我的快乐战绩' : '朋友的挑战邀请'}</span>
+        <h1>{own ? '这局的快乐，值得分享' : '朋友的战绩，等你来挑战'}</h1>
+        <p>{game.subtitle(result)}</p>
+      </section>
+      <SharePreview image={image} width={RESULT_POSTER_WIDTH} height={RESULT_POSTER_HEIGHT}
+        alt={shareText + ' 扫码来挑战。'} error={error} onRetry={() => setRetry(value => value + 1)} />
+      <section className="share-settings" aria-label="海报样式">
+        <h2 className="share-settings-heading">选一个海报配色</h2>
+        <PosterThemeToggle value={theme} onChange={setTheme} />
+      </section>
+      <Link className="game-share-play" href={challengePath}>{own ? '再玩一局，刷新战绩' : '我也来玩一局'}<span aria-hidden="true">→</span></Link>
+      {rewardAvailable && <p className="share-note">今日首次参与分享，可领下一局 5 秒开局保护。</p>}
+      <ShareStatus message={rewardMessage} />
+      {rewardRetry && <button type="button" className="share-copy-button" onClick={() => void shareReward()}>重试领取分享奖励</button>}
+      <p className="share-note">{isWeChat() ? '长按海报保存，再发给朋友或朋友圈。' : '保存海报或复制链接，邀请朋友一起玩。'}<br />战绩由分享者提供，只含本局数据。</p>
+      <section className="share-actions-panel" aria-label="分享战绩">
+        <div className="share-actions">
+          <button type="button" className="share-action" disabled={busy || (!image && !error)} onClick={() => void share()}><ShareIcon kind="share" />{busy ? '正在分享…' : '分享给朋友'}</button>
+          {image ? (inApp() ? <button type="button" className="share-action secondary" disabled={busy} onClick={() => void saveImage()}><ShareIcon kind="save" />保存到相册</button>
+            : <a className="share-action secondary" href={image.url} download={image.file.name}><ShareIcon kind="save" />保存图片</a>)
+            : <button type="button" className="share-action secondary" disabled><ShareIcon kind="save" />保存图片</button>}
+        </div>
+        <button type="button" className="share-copy-button" disabled={busy} onClick={() => void copyLink()}><ShareIcon kind="link" />复制战绩链接</button>
+        <ShareStatus message={message} />
+        {manualCopy && <input className="share-manual-copy" aria-label="可复制的战绩链接" readOnly value={link} onFocus={event => event.currentTarget.select()} />}
+      </section>
+    </> : <section className="game-share-invalid"><span className="share-eyebrow">链接暂时失效</span><h1>这份战绩暂时打不开</h1><p>链接可能不完整，来玩一局，生成自己的战绩吧。</p><Link className="share-action" href={challengePath}>去玩{name}</Link></section>}
   </main>
 }

@@ -1,6 +1,7 @@
 import type { Checkin } from '../api/types.ts'
 import { titleTheme } from '../lib/titleTheme.ts'
 import type { PosterThemeId } from '../poster/theme.ts'
+import { POSTER_THEMES } from '../poster/theme.ts'
 
 export type Decoration = 'stars' | 'confetti' | 'lanterns' | 'moon'
 
@@ -24,8 +25,8 @@ const HOLIDAY: Record<string, Pick<CardStyle, 'sky' | 'accent' | 'decoration'>> 
 export function cardStyles(checkin: Checkin): CardStyle[] {
   const theme = titleTheme[checkin.title.code]
   const styles: CardStyle[] = [
-    { id: 'night', name: '深夜', theme: 'night', decoration: 'stars' },
-    { id: 'day', name: '暖光', theme: 'day', decoration: null },
+    { id: 'night', name: POSTER_THEMES.night.name, theme: 'night', decoration: null },
+    { id: 'day', name: POSTER_THEMES.day.name, theme: 'day', decoration: null },
     { id: 'title', name: `${checkin.title.name}配色`, theme: 'night', sky: theme.sky, accent: theme.accent, decoration: 'stars' },
   ]
   if (checkin.holiday) {

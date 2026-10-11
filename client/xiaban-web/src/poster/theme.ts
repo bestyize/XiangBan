@@ -8,12 +8,12 @@ export interface PosterTheme {
   name: string
   /** Background, top → bottom */
   bg: [string, string]
-  /** Warm lamp light behind 小伴 */
+  /** Soft blush light behind 小伴 */
   glow: string
   ink: string
   sub: string
   faint: string
-  /** Brand amber, tuned to stay readable on this background */
+  /** Brand red, tuned to stay readable on this background */
   accent: string
   /** The cool screen-light blue of 小伴's eyes, for small details */
   cool: string
@@ -28,27 +28,26 @@ export interface PosterTheme {
 }
 
 export const POSTER_THEMES: Record<PosterThemeId, PosterTheme> = {
-  // For WeChat moments and group chats: the lit window at night.
+  // Exported poster palettes stay independent of the app's appearance setting.
   night: {
-    id: 'night', name: '深夜',
-    bg: ['#2d3f58', '#141c2f'],
-    glow: 'rgba(255, 196, 110, 0.34)',
-    ink: '#f5f0e6', sub: 'rgba(245, 240, 230, 0.68)', faint: 'rgba(245, 240, 230, 0.42)',
-    accent: '#f0c07a', cool: '#8fd0ff',
-    panel: 'rgba(255, 255, 255, 0.06)', panelLine: 'rgba(245, 240, 230, 0.12)',
-    bubble: '#f7f0e3', bubbleInk: '#202a39',
-    chip: 'rgba(255, 255, 255, 0.07)', qrInk: '#182338', stars: true,
+    id: 'night', name: '深色',
+    bg: ['#242124', '#141414'],
+    glow: 'rgba(255, 107, 129, 0.14)',
+    ink: '#f2f2f2', sub: '#b8b8b8', faint: '#949494',
+    accent: '#ff6b81', cool: '#8fd0ff',
+    panel: '#292629', panelLine: 'rgba(255, 255, 255, 0.10)',
+    bubble: '#33282d', bubbleInk: '#f2f2f2',
+    chip: '#3a3035', qrInk: '#262626', stars: false,
   },
-  // For Xiaohongshu feeds: bright and warm, the same cream as 小伴's shell.
   day: {
-    id: 'day', name: '暖光',
-    bg: ['#f9f3ea', '#efe3d1'],
-    glow: 'rgba(255, 184, 88, 0.30)',
-    ink: '#2b2622', sub: '#7b6e61', faint: '#a99a89',
-    accent: '#b5712a', cool: '#2f86d6',
-    panel: '#fffaf3', panelLine: 'rgba(122, 92, 58, 0.12)',
-    bubble: '#ffffff', bubbleInk: '#2b2622',
-    chip: '#f5ecdf', qrInk: '#2b2622', stars: false,
+    id: 'day', name: '浅色',
+    bg: ['#fff9fa', '#f7f7f7'],
+    glow: 'rgba(229, 27, 62, 0.08)',
+    ink: '#262626', sub: '#666666', faint: '#737373',
+    accent: '#e51b3e', cool: '#2f86d6',
+    panel: '#ffffff', panelLine: 'rgba(38, 38, 38, 0.08)',
+    bubble: '#ffffff', bubbleInk: '#262626',
+    chip: '#fff0f3', qrInk: '#262626', stars: false,
   },
 }
 
@@ -56,9 +55,9 @@ const KEY = 'xb_poster_theme'
 
 export function loadPosterTheme(): PosterThemeId {
   try {
-    return localStorage.getItem(KEY) === 'day' ? 'day' : 'night'
+    return localStorage.getItem(KEY) === 'night' ? 'night' : 'day'
   } catch {
-    return 'night'
+    return 'day'
   }
 }
 

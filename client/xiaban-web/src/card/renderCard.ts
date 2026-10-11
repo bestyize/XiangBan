@@ -27,7 +27,7 @@ export interface CardInput {
 export async function renderCard({ checkin, profile, style, showCity, link }: CardInput): Promise<Blob> {
   const failure = '生成图片失败'
   await prepareFonts(checkin.title.name + checkin.localTime + '下班')
-  // Variants recolor the title only; the 相伴 brand keeps its own amber.
+  // Variants recolor the title only; the 相伴 brand keeps its own red.
   const theme = POSTER_THEMES[style.theme]
   const p = createPoster(PAGE_H, theme, failure)
   const { ctx } = p
