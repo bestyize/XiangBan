@@ -150,7 +150,7 @@ impl Database {
         self.pool.is_some()
     }
 
-    /// The shared connection pool, for the admin console and search cache.
+    /// The shell connection pool, for the admin console and search cache.
     pub fn pg_pool(&self) -> Option<PgPool> {
         self.pool.clone()
     }

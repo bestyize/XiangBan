@@ -50,7 +50,7 @@ impl WallpaperProvider for UnsplashProvider {
         ProviderInfo {
             id: self.id().to_string(),
             name: self.name().to_string(),
-            description: "Over 3 million free high-resolution photos and wallpapers shared by photographers worldwide.".to_string(),
+            description: "Over 3 million free high-resolution photos and wallpapers shell by photographers worldwide.".to_string(),
             is_configured: is_conf,
             supported_media_types: self.supported_media_types(),
             official_url: "https://unsplash.com".to_string(),
