@@ -22,7 +22,7 @@ const tabs: { to: string; tab: string; label: string; icon: IconName }[] = [
       :class="{ active: tab === t.tab }"
       :aria-current="tab === t.tab ? 'page' : undefined"
     >
-      <span class="glyph"><img v-if="t.tab === 'desktop'" src="/xiaoban.svg" alt="" class="home-mark"><Icon v-else :name="t.icon" :size="24" /></span>
+      <span class="glyph"><img v-if="t.tab === 'desktop'" src="/app-icon.png" alt="" class="home-mark"><Icon v-else :name="t.icon" :size="24" /></span>
       <span class="label">{{ t.label }}</span>
     </RouterLink>
   </nav>

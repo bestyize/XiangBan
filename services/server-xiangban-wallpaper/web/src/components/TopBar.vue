@@ -17,7 +17,7 @@ const links = [
 <template>
   <header class="topbar">
     <div class="inner">
-      <RouterLink to="/" class="brand" aria-label="小伴桌面首页" :aria-current="tab === 'desktop' ? 'page' : undefined"><img src="/xiaoban.svg" alt=""><span>小伴桌面</span></RouterLink>
+      <RouterLink to="/" class="brand" aria-label="小伴桌面首页" :aria-current="tab === 'desktop' ? 'page' : undefined"><img src="/app-icon.png" alt=""><span>小伴桌面</span></RouterLink>
 
       <nav class="links" aria-label="主导航">
         <RouterLink

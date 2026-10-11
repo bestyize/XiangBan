@@ -83,7 +83,7 @@ function openExplorer(name: string) {
     </div>
     <div class="desktop-frame">
       <div class="window-title">
-        <span><img src="/xiaoban.svg" alt="" />小伴桌面 · 互动演示</span>
+        <span><img src="/app-icon.png" alt="" />小伴桌面 · 互动演示</span>
         <div aria-hidden="true">—　▢　×</div>
       </div>
       <div
@@ -126,7 +126,7 @@ function openExplorer(name: string) {
               message = '戳一下猫脸，看看小伴的回应。';
             "
           >
-            <img src="/xiaoban.svg" alt="" /><small>小伴桌面</small>
+            <img src="/app-icon.png" alt="" /><small>小伴桌面</small>
           </button>
           <button
             :class="{ selected: selected === '回收站' }"
@@ -169,7 +169,7 @@ function openExplorer(name: string) {
                 message = '欢迎使用小伴，点击桌上的猫脸试试。';
               "
             >
-              <img src="/xiaoban.svg" alt="" />小伴桌面</button
+              <img src="/app-icon.png" alt="" />小伴桌面</button
             ><button @click="openExplorer('我的壁纸')">
               <span class="folder-icon"></span>文件管理器</button
             ><button
@@ -210,7 +210,7 @@ function openExplorer(name: string) {
               aria-label="查看小伴互动提示"
               @click="message = '小伴会跟着鼠标看，也会回应你的点击。'"
             >
-              <img src="/xiaoban.svg" alt="" />
+              <img src="/app-icon.png" alt="" />
             </button>
           </div>
           <div class="system-tray">

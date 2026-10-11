@@ -13,7 +13,7 @@ export default defineConfig({
     vue(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.svg', 'apple-touch-icon-180x180.png'],
+      includeAssets: ['favicon.ico', 'app-icon.png', 'apple-touch-icon-180x180.png'],
       manifest: {
         name: '小伴桌面',
         short_name: '小伴桌面',
