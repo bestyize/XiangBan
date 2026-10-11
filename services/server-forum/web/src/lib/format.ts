@@ -14,6 +14,14 @@ export function conditionLabels(bits: number) {
 
 export const TRUST_LABEL = ['新人', '成员', '老用户', '守护者']
 
+/**
+ * 发帖到某个分类需要的信任等级，和后端 `required_post_level` 一致：
+ * 「仅管理员可发」的分类要守护者（后台账号发不了帖），其余看分类的最低发帖等级。
+ */
+export function requiredPostLevel(c: { min_post_level: number; admin_only: boolean }) {
+  return c.admin_only ? 3 : Math.min(Math.max(c.min_post_level, 0), 3)
+}
+
 /** 阅读权限的选项，下标就是等级。 */
 export const READ_LEVELS = [
   { level: 0, label: '所有人', short: '' },

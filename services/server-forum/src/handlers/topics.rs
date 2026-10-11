@@ -127,6 +127,28 @@ pub struct TopicInput {
     pub min_read_level: Option<i16>,
 }
 
+/// 守护者（站务人员）的信任等级。
+const GUARDIAN_LEVEL: i16 = 3;
+
+/// 发帖到某个分类需要的信任等级：「仅管理员可发」的分类要守护者，其余看分类的最低发帖等级。
+///
+/// 论坛的管理后台账号和论坛用户是两套体系，后台账号发不了帖，所以「仅管理员可发」实际指的是守护者。
+pub fn required_post_level(min_post_level: i16, admin_only: bool) -> i16 {
+    if admin_only {
+        GUARDIAN_LEVEL
+    } else {
+        min_post_level.clamp(0, GUARDIAN_LEVEL)
+    }
+}
+
+fn level_error(admin_only: bool, need: i16) -> AppError {
+    AppError::Forbidden(if admin_only {
+        "这个分类只有守护者（站务人员）可以发帖".into()
+    } else {
+        format!("这个分类需要信任等级 {need} 才能发帖")
+    })
+}
+
 #[derive(sqlx::FromRow)]
 struct CategoryRules {
     id: i32,
@@ -263,11 +285,9 @@ pub async fn create(State(state): State<AppState>, auth: AuthUser, Json(input): 
     if cat.has_children {
         return Err(AppError::BadRequest("请选择具体的二级分类".into()));
     }
-    if cat.admin_only {
-        return Err(AppError::Forbidden("这个分类只有站务人员可以发帖".into()));
-    }
-    if user.trust_level < cat.min_post_level {
-        return Err(AppError::Forbidden(format!("这个分类需要信任等级 {} 才能发帖", cat.min_post_level)));
+    let need = required_post_level(cat.min_post_level, cat.admin_only);
+    if user.trust_level < need {
+        return Err(level_error(cat.admin_only, need));
     }
     users::ensure_daily_quota(&state.pool, user, "topics", &state.config.trust.daily_topics, "发帖").await?;
 
@@ -342,8 +362,16 @@ pub async fn update(
     }
     // 编辑不允许换到别的类型的分类，避免羊毛信息丢失。
     let cat = category_rules(&state.pool, input.category_id).await?;
-    if cat.has_children || cat.admin_only || (cat.kind == "deal") != topic.deal.is_some() {
+    if cat.has_children || (cat.kind == "deal") != topic.deal.is_some() {
         return Err(AppError::BadRequest("不能移动到这个分类".into()));
+    }
+    // 留在原分类总是允许（比如守护者后来被降级，仍然能改自己发的公告）；
+    // 换到别的分类要有和在那里发帖一样的等级，否则等于绕过发帖限制。
+    if cat.id != topic.category.id {
+        let need = required_post_level(cat.min_post_level, cat.admin_only);
+        if user.trust_level < need {
+            return Err(level_error(cat.admin_only, need));
+        }
     }
     let title = clean_title(&input.title)?;
     let body = clean_body(&input.body, if cat.kind == "deal" { 0 } else { 10 })?;
@@ -453,6 +481,29 @@ mod tests {
         assert!(clean_read_level(Some(3), 1, Some(2)).is_err());
         // 往下调总是允许
         assert_eq!(clean_read_level(Some(0), 1, Some(2)).unwrap(), 0);
+    }
+
+    #[test]
+    fn required_post_level_treats_admin_only_as_guardian() {
+        // 普通分类看最低发帖等级
+        assert_eq!(required_post_level(1, false), 1);
+        assert_eq!(required_post_level(0, false), 0);
+        assert_eq!(required_post_level(3, false), 3);
+        // 「仅管理员可发」= 守护者，不管最低发帖等级怎么设
+        assert_eq!(required_post_level(1, true), 3);
+        assert_eq!(required_post_level(0, true), 3);
+        // 越界的最低发帖等级被夹在 0..=3
+        assert_eq!(required_post_level(9, false), 3);
+        assert_eq!(required_post_level(-1, false), 0);
+        // 守护者能发，TL2 不能
+        assert!(3 >= required_post_level(1, true));
+        assert!(2 < required_post_level(1, true));
+    }
+
+    #[test]
+    fn level_error_names_the_right_requirement() {
+        assert!(level_error(true, 3).to_string().contains("守护者"));
+        assert!(level_error(false, 2).to_string().contains("等级 2"));
     }
 
     #[test]

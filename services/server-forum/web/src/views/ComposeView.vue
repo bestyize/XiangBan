@@ -7,7 +7,7 @@ import type { TopicInput } from '@/api/types'
 import { useMeta } from '@/stores/meta'
 import { useSession } from '@/stores/session'
 import { useToast } from '@/stores/toast'
-import { CONDITIONS, READ_LEVELS, TRUST_LABEL } from '@/lib/format'
+import { CONDITIONS, READ_LEVELS, TRUST_LABEL, requiredPostLevel } from '@/lib/format'
 import { useHead } from '@/lib/head'
 
 const route = useRoute()
@@ -40,11 +40,21 @@ const busy = ref(false)
 const error = ref('')
 const loadedKind = ref<'deal' | 'normal' | null>(null)
 
-/** 用户能发帖的分类：去掉站务专用的，一级分类下必须选到二级。 */
+/** 当前登录用户的信任等级；没登录按 0。 */
+const myLevel = computed(() => session.user?.trust_level ?? 0)
+
+/**
+ * 用户能发帖的分类：一级分类下必须选到二级；新发帖时去掉当前信任等级发不了的板块
+ * （比如只有守护者能发的「小伴产品」和站务公告）。游客会先被要求登录，这里按最低等级算。
+ * 编辑已有帖子时不过滤，免得作者被降级后没法改自己的帖子。
+ */
 const roots = computed(() =>
   meta.tree
-    .map(n => ({ ...n, children: n.children.filter(c => !c.admin_only) }))
-    .filter(n => n.children.length > 0 || !n.admin_only)
+    .map(n => ({
+      ...n,
+      children: n.children.filter(c => editId.value || requiredPostLevel(c) <= myLevel.value),
+    }))
+    .filter(n => editId.value || n.children.length > 0)
     .filter(n => !loadedKind.value || n.kind === loadedKind.value),
 )
 const root = computed(() => roots.value.find(r => r.id === form.rootId))
@@ -146,7 +156,6 @@ function onTagKey(e: KeyboardEvent) {
 }
 
 /** 阅读权限最高只能设到发帖人自己的信任等级。 */
-const myLevel = computed(() => session.user?.trust_level ?? 0)
 function readLevelDisabled(level: number) {
   return level > myLevel.value && level !== originalReadLevel.value
 }

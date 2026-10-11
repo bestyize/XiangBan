@@ -8,6 +8,7 @@ import PagerNav from '@/components/PagerNav.vue'
 import { api } from '@/api/forum'
 import { useMeta } from '@/stores/meta'
 import { useSession } from '@/stores/session'
+import { requiredPostLevel } from '@/lib/format'
 import { useTopicList } from '@/lib/useList'
 import { useHead } from '@/lib/head'
 
@@ -51,7 +52,10 @@ function withQuery(patch: { sort?: string; tag?: string }) {
 /** 能发帖的分类：叶子分类且不是站务专用。一级分类发帖时让用户再选子分类。 */
 const composeTarget = computed(() => {
   const c = category.value
-  if (!c || c.admin_only) return null
+  if (!c) return null
+  // 已登录但等级不够发帖的板块（比如只有守护者能发的「小伴产品」和站务公告）不显示按钮；没登录的先让他登录。
+  const level = session.user?.trust_level
+  if (level !== undefined && level < requiredPostLevel(c)) return null
   return `/new?category=${c.slug}`
 })
 

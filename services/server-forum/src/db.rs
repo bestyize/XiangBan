@@ -209,6 +209,10 @@ const CATEGORIES: &[(&str, &str, &str, &str, Option<&str>, i16, bool, bool, bool
     ("deals-dev", "开发者福利", "域名、CDN、数据库、学生包", "deal", Some("deals"), 1, true, true, false),
     ("deals-public", "公益站", "只收录信息，站方不做担保", "deal", Some("deals"), 1, true, true, false),
     ("deals-other", "其他福利", "不属于以上分类的福利和优惠", "deal", Some("deals"), 1, true, true, false),
+    ("xiaoban", "小伴产品", "小伴系列产品的官方介绍与更新：壁纸、游戏、App。由站方发布，欢迎在帖子下回复反馈", "normal", None, 3, true, false, false),
+    ("xiaoban-wallpaper", "小伴壁纸", "小伴壁纸的下载、更新和使用技巧（官方发布，欢迎回复反馈）", "normal", Some("xiaoban"), 3, true, false, false),
+    ("xiaoban-game", "小伴游戏", "小伴游戏的新玩法、攻略和更新（官方发布，欢迎回复反馈）", "normal", Some("xiaoban"), 3, true, false, false),
+    ("xiaoban-app", "小伴App", "小伴 App 的功能介绍、更新和使用教程（官方发布，欢迎回复反馈）", "normal", Some("xiaoban"), 3, true, false, false),
     ("casual", "随便唠唠", "什么都可以聊，别引战", "normal", None, 1, true, false, false),
     ("casual-work", "职场", "加班、跳槽、远程办公", "normal", Some("casual"), 1, true, false, false),
     ("casual-offwork", "下班了", "今日下班、打卡、吐槽", "normal", Some("casual"), 1, true, false, false),
@@ -230,6 +234,9 @@ const PRESET_TAGS: &[(&str, &[&str])] = &[
     ("share-software", &["windows", "macos", "linux", "android", "ios", "开源", "免费", "效率工具", "开发工具", "设计工具"]),
     ("share-movies", &["片单推荐", "影评", "纪录片", "动画", "科幻", "悬疑", "喜剧", "经典老片", "公版", "授权"]),
     ("share-music", &["歌单推荐", "乐评", "古典", "流行", "摇滚", "电子", "爵士", "纯音乐", "独立音乐", "公版"]),
+    ("xiaoban-wallpaper", &["更新日志", "下载", "使用教程", "桌面版", "手机版", "网站", "动态壁纸", "桌宠"]),
+    ("xiaoban-game", &["更新日志", "新游戏", "玩法介绍", "攻略", "水墨剑客", "暮色滑翔"]),
+    ("xiaoban-app", &["更新日志", "下载", "使用教程", "新功能", "相伴", "下班了么", "android", "桌面版"]),
     ("share-learn", &["编程", "ai", "英语", "考研", "考证", "设计", "数学", "电子书", "公开课", "笔记"]),
 ];
 
@@ -282,6 +289,8 @@ struct BoardMigration {
     name: &'static str,
     /// 一级分类的 slug。
     parent: &'static str,
+    /// 这个一级分类在库里还没有时，按种子新增它（插在种子里前一个一级分类的整棵子树后面）。
+    create_parent: bool,
     /// 这次要写入（新增或按种子覆盖名称、说明、标签）的板块 slug，都是 `parent` 下的二级板块。其余板块不动。
     boards: &'static [&'static str],
     /// (旧板块 slug, 帖子并入的新板块 slug)
@@ -293,6 +302,7 @@ const BOARD_MIGRATIONS: &[BoardMigration] = &[
     BoardMigration {
         name: "share-boards-v1",
         parent: "share",
+        create_parent: false,
         boards: &["share-software", "share-movies", "share-music", "share-learn"],
         moves: &[
             ("share-oss", "share-software"),
@@ -305,6 +315,7 @@ const BOARD_MIGRATIONS: &[BoardMigration] = &[
     BoardMigration {
         name: "tech-boards-v1",
         parent: "tech",
+        create_parent: false,
         boards: &["tech-llm", "tech-productivity", "tech-hardware"],
         moves: &[
             ("tech-ai-app", "tech-productivity"),
@@ -314,12 +325,73 @@ const BOARD_MIGRATIONS: &[BoardMigration] = &[
         ],
     },
     // 技术交流：新增"AI 创意"，放在最后
-    BoardMigration { name: "tech-creative-v1", parent: "tech", boards: &["tech-creative"], moves: &[] },
+    BoardMigration { name: "tech-creative-v1", parent: "tech", create_parent: false, boards: &["tech-creative"], moves: &[] },
     // 随便唠唠：新增"亏了吗"，放在"下班了"后面
-    BoardMigration { name: "casual-loss-v1", parent: "casual", boards: &["casual-loss"], moves: &[] },
+    BoardMigration { name: "casual-loss-v1", parent: "casual", create_parent: false, boards: &["casual-loss"], moves: &[] },
     // 随便唠唠：新增"梦想和人生"，放在"亏了吗"后面
-    BoardMigration { name: "casual-dream-v1", parent: "casual", boards: &["casual-dream"], moves: &[] },
+    BoardMigration { name: "casual-dream-v1", parent: "casual", create_parent: false, boards: &["casual-dream"], moves: &[] },
+    // 小伴产品：新增一级分类和 小伴壁纸 / 小伴游戏 / 小伴App，放在福利羊毛之后、随便唠唠之前
+    BoardMigration {
+        name: "xiaoban-boards-v1",
+        parent: "xiaoban",
+        create_parent: true,
+        boards: &["xiaoban-wallpaper", "xiaoban-game", "xiaoban-app"],
+        moves: &[],
+    },
 ];
+
+/// 新增一个一级分类：库里已经有同 slug 的（比如管理员自己建过）就不动。
+/// 插在种子里前一个一级分类的整棵子树后面，其后的分类整体顺延一位；前一个一级分类不在库里就追加到最后。
+async fn create_root_board(conn: &mut sqlx::PgConnection, slug: &str) -> Result<(), AppError> {
+    let exists: Option<(i32,)> = sqlx::query_as("SELECT id FROM categories WHERE slug = $1").bind(slug).fetch_optional(&mut *conn).await?;
+    if exists.is_some() {
+        return Ok(());
+    }
+    let Some(idx) = CATEGORIES.iter().position(|c| c.0 == slug && c.4.is_none()) else { return Ok(()) };
+    let (_, name, desc, kind, _, level, home, points, admin_only) = CATEGORIES[idx];
+    let pred_root = CATEGORIES[..idx].iter().rev().find(|c| c.4.is_none()).map(|c| c.0);
+
+    let pred_end: Option<i32> = match pred_root {
+        Some(pred) => {
+            let (end,): (i32,) = sqlx::query_as(
+                "SELECT COALESCE(MAX(c.sort_order), -1) FROM categories c
+                 WHERE c.slug = $1 OR c.parent_id = (SELECT id FROM categories WHERE slug = $1)",
+            )
+            .bind(pred)
+            .fetch_one(&mut *conn)
+            .await?;
+            (end >= 0).then_some(end)
+        }
+        None => None,
+    };
+    let order = match pred_end {
+        Some(end) => {
+            sqlx::query("UPDATE categories SET sort_order = sort_order + 1 WHERE sort_order > $1").bind(end).execute(&mut *conn).await?;
+            end + 1
+        }
+        None => {
+            let (max,): (i32,) = sqlx::query_as("SELECT COALESCE(MAX(sort_order), -1) FROM categories").fetch_one(&mut *conn).await?;
+            max + 1
+        }
+    };
+    sqlx::query(
+        "INSERT INTO categories (parent_id, slug, name, description, kind, sort_order, min_post_level, on_home, award_points, admin_only, preset_tags)
+         VALUES (NULL, $1, $2, $3, $4, $5, $6, $7, $8, $9, $10)",
+    )
+    .bind(slug)
+    .bind(name)
+    .bind(desc)
+    .bind(kind)
+    .bind(order)
+    .bind(level)
+    .bind(home)
+    .bind(points)
+    .bind(admin_only)
+    .bind(preset_tags_for(slug))
+    .execute(&mut *conn)
+    .await?;
+    Ok(())
+}
 
 /// 已部署的库执行一次板块调整：`boards` 里的板块用种子里的名称、说明和内置标签写入（已有的同 slug 板块被更新），
 /// 旧板块的帖子并入指定的新板块后删除旧板块，一级分类的说明也一起更新。新板块插在种子里前一个板块的后面，已有分类的排序不动。
@@ -333,6 +405,9 @@ async fn apply_board_migration(pool: &PgPool, m: &BoardMigration) -> Result<(), 
     }
 
     let mut tx = pool.begin().await?;
+    if m.create_parent {
+        create_root_board(&mut tx, m.parent).await?;
+    }
     let parent: Option<(i32, i32)> =
         sqlx::query_as("SELECT id, sort_order FROM categories WHERE slug = $1").bind(m.parent).fetch_optional(&mut *tx).await?;
     // 一级分类不在（被管理员删了）就没有可调整的，记一笔免得每次启动都查。
@@ -376,8 +451,12 @@ async fn apply_board_migration(pool: &PgPool, m: &BoardMigration) -> Result<(), 
             .execute(&mut *tx)
             .await?;
         }
-        if let Some(desc) = CATEGORIES.iter().find(|c| c.0 == m.parent).map(|c| c.2) {
-            sqlx::query("UPDATE categories SET description = $1 WHERE id = $2").bind(desc).bind(parent_id).execute(&mut *tx).await?;
+        // 调整已有一级分类下的板块时顺便刷新它的说明；新增一级分类的迁移不刷新（新建时已经是种子里的说明，
+        // 管理员事先自己建过同 slug 分类的话，说明也不该被覆盖）。
+        if !m.create_parent {
+            if let Some(desc) = CATEGORIES.iter().find(|c| c.0 == m.parent).map(|c| c.2) {
+                sqlx::query("UPDATE categories SET description = $1 WHERE id = $2").bind(desc).bind(parent_id).execute(&mut *tx).await?;
+            }
         }
         for (old, target) in m.moves {
             let old_id: Option<(i32,)> =
@@ -440,6 +519,22 @@ mod tests {
         let at = |n: &str| names.iter().position(|x| *x == n).unwrap_or_else(|| panic!("缺少板块 {n}"));
         assert_eq!(at("亏了吗"), at("下班了") + 1);
         assert_eq!(at("梦想和人生"), at("亏了吗") + 1);
+    }
+
+    #[test]
+    fn xiaoban_is_a_guardian_only_root_between_deals_and_casual() {
+        let roots: Vec<&str> = CATEGORIES.iter().filter(|c| c.4.is_none()).map(|c| c.0).collect();
+        assert_eq!(roots, ["tech", "share", "deals", "xiaoban", "casual", "site"]);
+        assert_eq!(children("xiaoban"), ["小伴壁纸", "小伴游戏", "小伴App"]);
+        // 只有守护者能发帖，但不是 admin_only（admin_only 会拦住所有人，包括守护者）。
+        for c in CATEGORIES.iter().filter(|c| c.0 == "xiaoban" || c.4 == Some("xiaoban")) {
+            assert_eq!(c.5, 3, "{} 的最低发帖等级应是守护者", c.0);
+            assert!(!c.8, "{} 不应该设成 admin_only", c.0);
+        }
+        // 创建一级分类的迁移必须带上它在种子里的全部二级板块。
+        let m = BOARD_MIGRATIONS.iter().find(|m| m.parent == "xiaoban").expect("缺少小伴产品的迁移");
+        assert!(m.create_parent);
+        assert_eq!(m.boards, ["xiaoban-wallpaper", "xiaoban-game", "xiaoban-app"]);
     }
 
     #[test]

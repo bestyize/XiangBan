@@ -84,7 +84,7 @@ onMounted(load)
               {{ c.name }}
               <span class="adm-tags" style="margin-left: 6px">
                 <span class="adm-tag" :class="c.kind === 'deal' ? 'valid' : ''">{{ CATEGORY_KIND[c.kind] }}</span>
-                <span v-if="c.admin_only" class="adm-tag line">仅管理员</span>
+                <span v-if="c.admin_only" class="adm-tag line">仅守护者</span>
                 <span v-if="!c.on_home" class="adm-tag line">不上首页</span>
                 <span v-if="!c.award_points" class="adm-tag line">不奖励积分</span>
               </span>

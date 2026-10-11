@@ -109,7 +109,7 @@ function submit() {
     <div class="adm-checks">
       <label><input v-model="form.on_home" type="checkbox" />显示在首页</label>
       <label><input v-model="form.award_points" type="checkbox" />发帖奖励积分</label>
-      <label><input v-model="form.admin_only" type="checkbox" />仅管理员可发帖</label>
+      <label><input v-model="form.admin_only" type="checkbox" />仅守护者可发帖</label>
     </div>
     <div class="adm-form-actions">
       <button class="btn btn-primary" type="submit" :disabled="busy">{{ editing ? '保存修改' : '创建分类' }}</button>
