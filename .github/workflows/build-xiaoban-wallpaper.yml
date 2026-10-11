@@ -1,7 +1,8 @@
 name: BuildXiaoBanWallpaper
 
-# Packages 小伴壁纸 for Windows x64, macOS aarch64 and Android arm64-v8a.
-# Run it from the Actions tab, or push a tag such as xiaoban-wallpaper-v1.0.0.
+# Packages 小伴壁纸 for Windows x64, macOS aarch64 and Android arm64-v8a and attaches them to the GitHub Release
+# xiaoban-wallpaper-v<version> (created if missing, files replaced on a re-run). Release files do not count against
+# the Actions artifact storage quota. Run it from the Actions tab, or push a tag such as xiaoban-wallpaper-v1.0.0.
 on:
   workflow_dispatch:
   push:
@@ -9,15 +10,37 @@ on:
       - 'xiaoban-wallpaper-v*'
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: build-xiaoban-wallpaper-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
+  release:
+    name: Prepare release
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      tag: ${{ steps.release.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          version=$(node -p "require('./client/xiaoban-desktop-wallpaper/src-tauri/tauri.conf.json').version")
+          tag="xiaoban-wallpaper-v$version"
+          if ! gh release view "$tag" > /dev/null 2>&1; then
+            gh release create "$tag" --target "$GITHUB_SHA" --title "小伴壁纸 $version" \
+              --notes "小伴壁纸 $version：Windows x64 便携版、macOS aarch64 dmg（ad-hoc 签名，未公证）、Android arm64-v8a APK。"
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
   windows-x64:
     name: Windows x64
+    needs: release
     runs-on: windows-latest
     timeout-minutes: 45
     defaults:
@@ -44,17 +67,18 @@ jobs:
           $version = (Get-Content src-tauri/tauri.conf.json -Raw | ConvertFrom-Json).version
           New-Item -ItemType Directory -Force out | Out-Null
           Copy-Item src-tauri/target/release/xiaoban-desktop-wallpaper.exe "out/XiaoBanWallpaper-$version-Windows-x64.exe"
-          Compress-Archive -LiteralPath "out/XiaoBanWallpaper-$version-Windows-x64.exe" -DestinationPath "out/XiaoBanWallpaper-$version-Windows-x64.zip"
           Get-ChildItem out | Format-Table Name, Length
-      - uses: actions/upload-artifact@v4
-        with:
-          name: XiaoBanWallpaper-WindowsX64
-          path: client/xiaoban-desktop-wallpaper/out/*
-          if-no-files-found: error
-          retention-days: 30
+      - name: Upload to release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ needs.release.outputs.tag }}
+        run: gh release upload $env:TAG (Get-ChildItem out).FullName --clobber
 
   macos-aarch64:
     name: macOS aarch64
+    needs: release
     runs-on: macos-15
     timeout-minutes: 45
     defaults:
@@ -84,17 +108,17 @@ jobs:
           bundle=src-tauri/target/aarch64-apple-darwin/release/bundle
           mkdir -p out
           cp "$bundle"/dmg/*.dmg "out/XiaoBanWallpaper-$version-MacOS-aarch64.dmg"
-          ditto -c -k --sequesterRsrc --keepParent "$bundle/macos/小伴.app" "out/XiaoBanWallpaper-$version-MacOS-aarch64.app.zip"
           ls -lh out
-      - uses: actions/upload-artifact@v4
-        with:
-          name: XiaoBanWallpaper-MacOS-aarch64
-          path: client/xiaoban-desktop-wallpaper/out/*
-          if-no-files-found: error
-          retention-days: 30
+      - name: Upload to release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ needs.release.outputs.tag }}
+        run: gh release upload "$TAG" out/* --clobber
 
   android-arm64-v8a:
     name: Android arm64-v8a
+    needs: release
     runs-on: ubuntu-latest
     timeout-minutes: 45
     defaults:
@@ -144,9 +168,9 @@ jobs:
           done
           rm -f "$RUNNER_TEMP/release.jks"
           ls -lh out
-      - uses: actions/upload-artifact@v4
-        with:
-          name: XiaoBanWallpaper-Android-arm64-v8a
-          path: client/xiaoban-mobile-wallpaper/out/*
-          if-no-files-found: error
-          retention-days: 30
+      - name: Upload to release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ needs.release.outputs.tag }}
+        run: gh release upload "$TAG" out/* --clobber
