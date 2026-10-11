@@ -151,17 +151,6 @@ export const EFFECT_REACTIONS: Record<string, EffectProfile> = {
       },
     ],
   },
-  ripples: {
-    interval: [30, 60],
-    reactions: [
-      {
-        id: 'ripples-koi',
-        beats: [{ expr: 'curious', hold: 2.4 }, { expr: 'happy', hold: 1 }],
-        looks: [{ at: 0, look: { x: -0.7, y: 0.6 } }, { at: 1.2, look: { x: 0.6, y: 0.5 } }],
-      },
-      { id: 'ripples-calm', beats: [{ expr: { expression: 'idle', symbol: 'wave' }, hold: 2.6 }], looks: [{ at: 0, look: { x: 0, y: 0.7 } }] },
-    ],
-  },
   aurora: {
     interval: [30, 60],
     reactions: [
