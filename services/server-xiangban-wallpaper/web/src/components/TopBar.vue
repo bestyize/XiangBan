@@ -40,11 +40,11 @@ const links = [
           v-if="account.user"
           to="/me"
           class="account"
-          :aria-label="`我的账号：${account.user.nickname}`"
+          :aria-label="`我的账号：${account.user.username}`"
         >
           <img v-if="account.user.avatar_url" :src="account.user.avatar_url" alt="" class="avatar">
           <Icon v-else name="user" :size="18" />
-          <span class="label">{{ account.user.nickname }}</span>
+          <span class="label">{{ account.user.username }}</span>
         </RouterLink>
         <button v-else type="button" class="account" aria-label="登录或注册" @click="account.openLogin()">
           <Icon name="user" :size="18" />

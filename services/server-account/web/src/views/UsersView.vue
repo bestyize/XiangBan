@@ -54,7 +54,7 @@ function go(delta: number) {
   <div class="page-head"><h2>用户</h2></div>
 
   <div class="toolbar">
-    <input v-model="query" class="input" type="search" aria-label="搜索用户" placeholder="昵称 / 完整邮箱 / 完整手机号 / UID" />
+    <input v-model="query" class="input" type="search" aria-label="搜索用户" placeholder="用户名 / 完整邮箱 / 完整手机号 / UID" />
     <select v-model="status" class="input" aria-label="按状态筛选">
       <option value="">全部状态</option>
       <option value="active">正常</option>
@@ -65,10 +65,10 @@ function go(delta: number) {
 
   <div class="card table-wrap">
     <table class="table">
-      <thead><tr><th>昵称</th><th>登录标识</th><th>状态</th><th>注册时间</th><th>最近登录</th></tr></thead>
+      <thead><tr><th>用户名</th><th>登录标识</th><th>状态</th><th>注册时间</th><th>最近登录</th></tr></thead>
       <tbody>
         <tr v-for="user in data?.items" :key="user.uid" class="clickable" tabindex="0" @click="selected = user.uid" @keydown.enter="selected = user.uid">
-          <td>{{ user.nickname }}</td>
+          <td>{{ user.username }}</td>
           <td>
             <div v-for="(identity, index) in user.identities" :key="index" class="ident">
               <span class="muted">{{ KIND_LABEL[identity.kind] ?? identity.kind }}</span> <span class="mono">{{ identity.masked }}</span>

@@ -51,8 +51,6 @@ export interface GuardianUpdate {
 export interface ProfileUpdate {
   companionName?: string
   personality?: Personality
-  /** Empty string clears it. */
-  nickname?: string
   cityCode?: string
   workStart?: string
   workEnd?: string

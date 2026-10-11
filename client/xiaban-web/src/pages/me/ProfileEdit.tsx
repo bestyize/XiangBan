@@ -19,7 +19,6 @@ export default function ProfileEdit() {
   const [draft, setDraft] = useState({
     companionName: profile.companionName,
     personality: profile.personality as Personality,
-    nickname: profile.nickname ?? '',
     cityCode: profile.cityCode,
     workStart: profile.workStart,
     workEnd: profile.workEnd,
@@ -33,7 +32,7 @@ export default function ProfileEdit() {
     setBusy(true)
     setError(null)
     const patch: ProfileUpdate = {
-      companionName: draft.companionName.trim(), personality: draft.personality, nickname: draft.nickname.trim(),
+      companionName: draft.companionName.trim(), personality: draft.personality,
       workStart: draft.workStart, workEnd: draft.workEnd, payday: draft.payday,
       ...(draft.cityCode ? { cityCode: draft.cityCode } : {}),
     }
@@ -52,8 +51,8 @@ export default function ProfileEdit() {
         <div className="grid grid-cols-2 gap-3">
           <label className="block"><span className="mb-1.5 block text-sm text-window/70">小伴的名字</span>
             <input className={input} value={draft.companionName} maxLength={8} onChange={(e) => set({ companionName: e.target.value })} /></label>
-          <label className="block"><span className="mb-1.5 block text-sm text-window/70">小伴怎么叫你</span>
-            <input className={input} value={draft.nickname} maxLength={24} placeholder="昵称至少 2 字，英文至少 4 字" onChange={(e) => set({ nickname: e.target.value })} /></label>
+          <label className="block"><span className="mb-1.5 block text-sm text-window/70">你的用户名（不可修改）</span>
+            <input className={`${input} opacity-70`} value={profile.nickname ?? '登录后显示'} readOnly /></label>
         </div>
         <fieldset>
           <legend className="mb-1.5 text-sm text-window/70">性格</legend>

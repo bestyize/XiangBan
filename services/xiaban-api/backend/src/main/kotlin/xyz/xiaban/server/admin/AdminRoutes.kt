@@ -122,7 +122,7 @@ fun Route.adminRoutes(services: Services) {
         post("/email/test") {
             val username = call.requireAdmin(services)
             val req = call.receive<TestEmail>()
-            val email = xyz.xiaban.server.account.EmailBinding.normalize(req.email)
+            val email = xyz.xiaban.server.mail.normalizeEmail(req.email)
             if (services.redis.cmd.set("xb:admin:testmail:$username", "1", io.lettuce.core.SetArgs.Builder.nx().ex(30)).await() != "OK") {
                 tooMany("请等 30 秒再发送测试邮件")
             }

@@ -16,10 +16,10 @@ describe('administrator profile patches', () => {
     expect(userPatch({ ...draft, companionName: '新小伴' }, detail)).toEqual({ companionName: '新小伴' })
   })
   it('sends explicit clearing values for optional profile fields', () => {
-    expect(userPatch({ ...userDraft(detail), nickname: '', cityCode: '', payday: 0 }, detail)).toEqual({ nickname: '', cityCode: '', payday: 0 })
+    expect(userPatch({ ...userDraft(detail), cityCode: '', payday: 0 }, detail)).toEqual({ cityCode: '', payday: 0 })
   })
   it('normalizes whitespace without changing verified email or registration fields', () => {
-    const patch = userPatch({ ...userDraft(detail), nickname: ' 小李 ', timezone: ' Asia/Shanghai ' }, detail)
+    const patch = userPatch({ ...userDraft(detail), companionName: ' 小伴 ', timezone: ' Asia/Shanghai ' }, detail)
     expect(patch).toEqual({})
     expect(patch).not.toHaveProperty('email')
     expect(patch).not.toHaveProperty('emailVerifiedAt')

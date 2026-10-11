@@ -1,10 +1,32 @@
 import { reactive } from "vue";
-import { desktop, defaults, invoke, listen, type Settings, type WallpaperEntry, type WallpaperLibrary, type AppInfo, type AccountSession, type SendCodeResult, type LoginResult } from "../bridge.ts";
+import { desktop, defaults, invoke, listen, toAccountError, type Settings, type WallpaperEntry, type WallpaperLibrary, type AppInfo, type AccountSession, type SendCodeResult, type CodeLoginOutcome, type UsernameCheck, type LoginResult } from "../bridge.ts";
 import type { WebsiteStatus } from "./website-types.ts";
 import { loadBuiltinPacks, noPacks, readList } from "../effects/catalog.ts";
 import type { ControlStore } from "./control-types.ts";
 
 export const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value));
+
+/** Account commands reject with `{ message, code }`; the UI needs both, so turn it into an AccountError. */
+async function accountInvoke<T>(command: string, args?: Record<string, unknown>): Promise<T> {
+  try {
+    return await invoke<T>(command, args);
+  } catch (error) {
+    throw toAccountError(error);
+  }
+}
+
+/** Browser preview only: a signed-in session without any network. */
+function mockLogin(username: string, isNewUser: boolean): LoginResult {
+  return {
+    isNewUser,
+    session: {
+      accessToken: "mock.access.token",
+      refreshToken: "mock.refresh.token",
+      expiresAt: Math.floor(Date.now() / 1000) + 1800,
+      user: { uid: "mock-uid-1234", username },
+    },
+  };
+}
 export function createControlStore(notify: ControlStore["notify"]): ControlStore {
   let disposed = false;
   const unsubscribers: (() => void)[] = [];
@@ -149,31 +171,39 @@ export function createControlStore(notify: ControlStore["notify"]): ControlStore
       if (!desktop) throw new Error("请在桌面应用中检查版本与公告");
       store.website = await invoke<WebsiteStatus>("check_website");
     },
-    async sendAccountCode(email) {
-      if (!desktop) {
-        return { ok: true, cooldownSeconds: 60, expiresIn: 300 };
-      }
-      return await invoke<SendCodeResult>("send_account_code", { email });
+    async sendAccountCode(identifier, purpose = "login") {
+      if (!desktop) return { ok: true, cooldownSeconds: 60, expiresIn: 300 };
+      return await accountInvoke<SendCodeResult>("send_account_code", { identifier, purpose });
     },
-    async loginAccount(email, code) {
+    async loginAccountWithCode(identifier, code) {
       if (!desktop) {
-        const isNew = email.includes("new");
-        const mockSession: AccountSession = {
-          accessToken: "mock.access.token",
-          refreshToken: "mock.refresh.token",
-          expiresAt: Math.floor(Date.now() / 1000) + 1800,
-          user: {
-            uid: "mock-uid-1234",
-            nickname: email.split("@")[0] || "小伴伙伴",
-            email,
-          },
-        };
-        store.account = mockSession;
-        return { isNewUser: isNew, session: mockSession };
+        if (identifier.includes("new")) return { kind: "registration", registrationToken: "mock.registration" };
+        const result = mockLogin(identifier.split("@")[0] || "Xiaoban_user", false);
+        return { kind: "session", ...result };
       }
-      const result = await invoke<LoginResult>("login_account_with_code", { email, code });
+      const outcome = await accountInvoke<CodeLoginOutcome>("login_account_with_code", { identifier, code });
+      if (outcome.kind === "session") store.account = outcome.session;
+      return outcome;
+    },
+    async loginAccountWithPassword(identifier, password) {
+      if (!desktop) return mockLogin(identifier.split("@")[0] || "Xiaoban_user", false);
+      const result = await accountInvoke<LoginResult>("login_account_with_password", { identifier, password });
       store.account = result.session;
       return result;
+    },
+    async registerAccount(registrationToken, username, password) {
+      if (!desktop) return mockLogin(username, true);
+      const result = await accountInvoke<LoginResult>("register_account", { registrationToken, username, password });
+      store.account = result.session;
+      return result;
+    },
+    async resetAccountPassword(identifier, code, newPassword) {
+      if (!desktop) return;
+      await accountInvoke("reset_account_password", { identifier, code, newPassword });
+    },
+    async checkAccountUsername(username) {
+      if (!desktop) return { available: true };
+      return await accountInvoke<UsernameCheck>("check_account_username", { username });
     },
     async logoutAccount() {
       if (!desktop) {

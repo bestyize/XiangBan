@@ -22,8 +22,7 @@ pub async fn get_me(State(state): State<AppState>, user: AuthUser) -> Result<Jso
 
 #[derive(Deserialize)]
 pub struct UpdateMeReq {
-    nickname: Option<String>,
-    /// 空字符串表示清除头像。
+    /// 空字符串表示清除头像。用户名不可修改，所以这里没有它。
     avatar_url: Option<String>,
 }
 
@@ -34,18 +33,6 @@ pub async fn update_me(
 ) -> Result<Json<UserView>, AppError> {
     users::ensure_active(&state, user.uid).await?;
 
-    if let Some(nickname) = &req.nickname {
-        let nickname = nickname.trim();
-        let len = nickname.chars().count();
-        if !(1..=24).contains(&len) || nickname.chars().any(char::is_control) {
-            return Err(AppError::BadRequest("昵称需为 1-24 个字符".into()));
-        }
-        sqlx::query("UPDATE users SET nickname = $2, updated_at = now() WHERE uid = $1")
-            .bind(user.uid)
-            .bind(nickname)
-            .execute(&state.pool)
-            .await?;
-    }
     if let Some(avatar) = &req.avatar_url {
         let avatar = avatar.trim();
         if !avatar.is_empty() && (!avatar.starts_with("https://") || avatar.len() > 512 || avatar.chars().any(char::is_whitespace)) {
@@ -74,10 +61,14 @@ pub async fn set_password(
     users::ensure_active(&state, user.uid).await?;
     password::validate(&req.new_password)?;
 
-    let (existing,): (Option<String>,) = sqlx::query_as("SELECT password_hash FROM users WHERE uid = $1")
-        .bind(user.uid)
-        .fetch_one(&state.pool)
-        .await?;
+    let (existing, username): (Option<String>, String) =
+        sqlx::query_as("SELECT password_hash, username FROM users WHERE uid = $1")
+            .bind(user.uid)
+            .fetch_one(&state.pool)
+            .await?;
+    if req.new_password.eq_ignore_ascii_case(&username) {
+        return Err(AppError::BadRequest("密码不能和用户名相同".into()));
+    }
     if let Some(hash) = existing {
         let current = req.current_password.ok_or_else(|| AppError::BadRequest("请输入当前密码".into()))?;
         if !password::verify(current, hash).await {

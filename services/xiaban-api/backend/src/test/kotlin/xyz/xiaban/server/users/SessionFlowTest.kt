@@ -53,14 +53,14 @@ class SessionFlowTest {
     fun `device cookie wins over a fresh device id in the body`() = apiTest {
         val original = newDeviceId()
         val first = session(original)
-        put(ProfileApiPaths.PROFILE, first.token, ProfileUpdate(nickname = "阿明"))
+        put(ProfileApiPaths.PROFILE, first.token, ProfileUpdate(companionName = "阿明"))
         val restored = client.post(SessionApiPaths.SESSION) {
             header(HttpHeaders.Cookie, "$DEVICE_COOKIE=$original")
             contentType(ContentType.Application.Json)
             setBody(SessionRequest(newDeviceId(), materialize = true))
         }.body<SessionResponse>()
         assertEquals(original, restored.deviceId)
-        assertEquals("阿明", restored.profile.nickname)
+        assertEquals("阿明", restored.profile.companionName)
     }
 
     @Test
@@ -82,7 +82,7 @@ class SessionFlowTest {
         val saved = put(
             ProfileApiPaths.PROFILE, token,
             ProfileUpdate(
-                companionName = "煤球", personality = Personality.Tsundere, nickname = "打工人",
+                companionName = "煤球", personality = Personality.Tsundere,
                 cityCode = "hangzhou", workStart = "10:00", workEnd = "19:30", onboarded = true,
             ),
         ).body<ProfileView>()
@@ -91,12 +91,8 @@ class SessionFlowTest {
         assertTrue(saved.onboarded)
 
         assertEquals(HttpStatusCode.BadRequest, put(ProfileApiPaths.PROFILE, token, ProfileUpdate(companionName = "猫")).status)
-        assertEquals(HttpStatusCode.BadRequest, put(ProfileApiPaths.PROFILE, token, ProfileUpdate(nickname = "加我vx123456")).status)
         assertEquals(HttpStatusCode.BadRequest, put(ProfileApiPaths.PROFILE, token, ProfileUpdate(cityCode = "atlantis")).status)
         assertEquals(HttpStatusCode.BadRequest, put(ProfileApiPaths.PROFILE, token, ProfileUpdate(workEnd = "25:00")).status)
-
-        val cleared = put(ProfileApiPaths.PROFILE, token, ProfileUpdate(nickname = "")).body<ProfileView>()
-        assertNull(cleared.nickname)
     }
 
     @Test

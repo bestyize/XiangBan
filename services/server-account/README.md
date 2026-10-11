@@ -1,6 +1,6 @@
 # server-account：相伴统一账号中心
 
-状态：已实现（v1）。只负责账号基本信息与登录凭证：邮箱/手机号验证码注册登录、可选密码、昵称头像、令牌签发，并带一个管理后台（用户、应用、操作日志）。不存任何产品业务数据。设计取舍见 [docs/architecture/account-center.md](../../docs/architecture/account-center.md)。
+状态：已实现（v1）。只负责账号基本信息与登录凭证：邮箱/手机号验证码验证身份、注册时设置唯一且不可修改的用户名与密码、用户名/邮箱/手机号加密码登录、头像、令牌签发，并带一个管理后台（用户、应用、操作日志）。不存任何产品业务数据。设计取舍见 [docs/architecture/account-center.md](../../docs/architecture/account-center.md)。
 
 技术栈：Rust Axum 0.8 + PostgreSQL（SQLx），Ed25519（EdDSA）签发 JWT，Argon2 存密码，腾讯云短信/邮件发送验证码；管理后台为 Vue 3 + Vite + TypeScript（`web/`），由本服务直接托管。默认端口 55009。
 
@@ -75,14 +75,16 @@ cargo run --manifest-path services/server-account/Cargo.toml -- gen-keys
 | 方法 路径 | 鉴权 | 说明 |
 | --- | --- | --- |
 | `POST /api/auth/code/send` | 无 | `{identifier, purpose?}`，purpose 为 `login`（默认）或 `reset_password`。重置密码时账号不存在也返回成功但不发送 |
-| `POST /api/auth/code/login` | 无 | `{identifier, code, client_id, device_name?}`，首次验证即注册，返回令牌、`is_new_user`、`user` |
-| `POST /api/auth/password/login` | 无 | `{identifier, password, client_id, device_name?}`，连续错 5 次锁 15 分钟 |
+| `POST /api/auth/code/login` | 无 | `{identifier, code, client_id, device_name?}`。已有账号：返回令牌、`is_new_user:false`、`user`。**新的邮箱 / 手机号不建号**，返回 `{registration_required:true, registration_token, expires_in}`（凭证 15 分钟有效），客户端带它去 `register` |
+| `POST /api/auth/register` | 无 | `{registration_token, username, password, client_id, device_name?}`，一次事务里建号并写入用户名、密码和已验证标识，返回令牌与 `is_new_user:true`。错误码：`username_taken`（409，同一凭证可换名重试）、`identity_exists`（409）、`registration_expired`（401） |
+| `GET /api/auth/username/available?username=` | 无 | `{available, message}`，格式不对或保留词也返回 200 并说明原因。每 IP 每分钟 60 次，只是提示，唯一性以 `register` 为准 |
+| `POST /api/auth/password/login` | 无 | `{identifier, password, client_id, device_name?}`，`identifier` 可以是用户名、邮箱或手机号；账号不存在、没设密码、密码错误提示完全一致；连续错 5 次锁 15 分钟 |
 | `POST /api/auth/password/reset` | 无 | `{identifier, code, new_password}`，成功后吊销该用户全部会话 |
 | `POST /api/auth/refresh` | 无 | `{refresh_token, client_id}`，轮换刷新令牌 |
 | `POST /api/auth/logout` | 无 | `{refresh_token}`，吊销该设备会话 |
 | `POST /api/auth/logout-all` | Bearer | 吊销全部设备会话 |
-| `GET /api/me` / `PATCH /api/me` | Bearer | 读取资料；改 `nickname`（1-24 字）、`avatar_url`（https，空串清除） |
-| `POST /api/me/password` | Bearer | `{current_password?, new_password}`，已有密码时必须带当前密码 |
+| `GET /api/me` / `PATCH /api/me` | Bearer | 读取资料（`username` 唯一且不可修改）；`PATCH` 只能改 `avatar_url`（https，空串清除） |
+| `POST /api/me/password` | Bearer | `{current_password, new_password}`，必须带当前密码；新密码不能和用户名相同 |
 | `POST /api/me/identities/code` | Bearer | `{identifier}`，给待绑定的邮箱/手机号发验证码 |
 | `POST /api/me/identities` | Bearer | `{identifier, code}`，绑定；每类最多一个，已被他人占用返回 409 |
 | `GET /.well-known/jwks.json` | 无 | Ed25519 公钥（JWKS），业务服务离线验签用 |

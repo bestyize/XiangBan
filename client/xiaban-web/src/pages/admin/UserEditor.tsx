@@ -3,7 +3,6 @@ import type { Meta } from '../../api/types.ts'
 import type { UserDetail } from './types.ts'
 import { userDraft, userPatch, type UserDraft } from './user-edit.ts'
 import { Alerts, Button, Field, input, TextButton } from './ui.tsx'
-import { nicknameError } from '../../lib/nickname.ts'
 
 export default function UserEditor({ detail, busy, onSave, onCancel }: {
   detail: UserDetail; busy: boolean; onSave: (patch: Partial<UserDraft>) => Promise<void>; onCancel: () => void
@@ -12,7 +11,6 @@ export default function UserEditor({ detail, busy, onSave, onCancel }: {
   const [meta, setMeta] = useState<Meta | null>(null)
   const [error, setError] = useState<string | null>(null)
   const patch = userPatch(draft, detail)
-  const invalidNickname = nicknameError(draft.nickname)
   useEffect(() => {
     const controller = new AbortController()
     fetch('/api/meta', { signal: controller.signal }).then(async (response) => {
@@ -25,9 +23,8 @@ export default function UserEditor({ detail, busy, onSave, onCancel }: {
   return <form className="rounded-xl border border-slate-200 bg-slate-50 p-4" onSubmit={(e) => {
     e.preventDefault(); if (Object.keys(patch).length && !busy) void onSave(patch)
   }}>
-    <h3 className="mb-4 font-semibold">编辑用户资料</h3><Alerts error={error ?? invalidNickname} />
+    <h3 className="mb-4 font-semibold">编辑用户资料</h3><Alerts error={error} />
     <fieldset className="grid grid-cols-2 gap-4" disabled={busy}>
-      <Field title="昵称（2–24 字，英文至少 4 字）"><input className={input} maxLength={24} value={draft.nickname} onChange={(e) => change('nickname', e.target.value)} placeholder="留空使用用户 ID 默认名" /></Field>
       <Field title="小伴名字（2–8 字）"><input className={input} required minLength={2} maxLength={8} value={draft.companionName} onChange={(e) => change('companionName', e.target.value)} /></Field>
       <Field title="小伴性格"><select className={input} value={draft.personality} onChange={(e) => change('personality', e.target.value as UserDraft['personality'])}>
         <option value="toxic">毒舌心软</option><option value="gentle">温柔治愈</option><option value="chatty">元气话痨</option><option value="tsundere">高冷傲娇</option>
@@ -42,6 +39,6 @@ export default function UserEditor({ detail, busy, onSave, onCancel }: {
       <Field title="发薪日"><select className={input} value={draft.payday} onChange={(e) => change('payday', Number(e.target.value))}><option value={0}>未设置</option>
         {Array.from({ length: 31 }, (_, i) => <option key={i + 1} value={i + 1}>每月 {i + 1} 号</option>)}
       </select></Field>
-    </fieldset><div className="mt-5 flex items-center justify-end gap-2"><TextButton disabled={busy} onClick={onCancel}>取消编辑</TextButton><Button type="submit" disabled={busy || !!invalidNickname || !Object.keys(patch).length}>{busy ? '正在保存…' : '保存资料'}</Button></div>
+    </fieldset><div className="mt-5 flex items-center justify-end gap-2"><TextButton disabled={busy} onClick={onCancel}>取消编辑</TextButton><Button type="submit" disabled={busy || !Object.keys(patch).length}>{busy ? '正在保存…' : '保存资料'}</Button></div>
   </form>
 }

@@ -82,7 +82,18 @@ docker images xiangban-account
 ACCOUNT_IMAGE_TAG=<旧标签> docker compose --env-file .env -f compose.yaml up -d --wait
 ```
 
-数据库表由服务启动时自动创建，新版本只会增加 `IF NOT EXISTS` 的表和索引；回滚到旧镜像不需要回退数据库。
+数据库表由服务启动时自动创建，新版本通常只会增加 `IF NOT EXISTS` 的表和索引；回滚到旧镜像不需要回退数据库。
+
+**升级到「用户名 + 密码注册」的那一版是例外。** 它把 `users.nickname` 换成必填的 `username`，在有用户的库上 `ALTER TABLE ... ADD COLUMN username NOT NULL` 会失败（有意为之，宁可启动失败也不留下没有用户名的账号）。上线前所有产品都还没有真实用户，所以升级时先备份、再清空用户表，然后换二进制：
+
+```sh
+# 1. 停服务并备份（见下方「备份数据库」）
+# 2. 清空用户及其关联（identities、refresh_tokens 随之级联删除）；clients、admins、system_settings 保留
+docker compose --env-file .env -f compose.yaml exec -T postgres psql -U account xiaban_account -c 'TRUNCATE users CASCADE'
+# 3. 换新版本并启动
+```
+
+这一步会让所有已登录的设备下线，不能回退；回滚到旧镜像时旧版 `users` 表结构已不存在，需要用步骤 1 的备份恢复。
 
 备份数据库（Docker 卷本身不是备份）：
 

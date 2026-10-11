@@ -1,6 +1,6 @@
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
-import { AccountError, accountApi, type TokenPair } from '@/api/account'
+import { AccountError, accountApi, needsRegistration, type LoginResponse, type TokenPair } from '@/api/account'
 import { api, configureAuth } from '@/api/forum'
 import type { SessionInfo } from '@/api/types'
 
@@ -100,11 +100,25 @@ export const useSession = defineStore('session', () => {
     }
   }
 
-  async function loginWithCode(identifier: string, code: string) {
-    const res = await accountApi.loginWithCode(identifier, code)
+  async function signedIn(res: LoginResponse) {
     save(fromPair(res))
     await loadSession()
-    return res.is_new_user
+    return { isNewUser: res.is_new_user, username: res.user.username }
+  }
+
+  /** 已有账号直接登录；新的邮箱 / 手机号返回注册凭证，由调用方收集用户名和密码后调用 register。 */
+  async function loginWithCode(identifier: string, code: string) {
+    const res = await accountApi.loginWithCode(identifier, code)
+    if (needsRegistration(res)) return { registrationToken: res.registration_token } as const
+    return signedIn(res)
+  }
+
+  async function loginWithPassword(identifier: string, password: string) {
+    return signedIn(await accountApi.loginWithPassword(identifier, password))
+  }
+
+  async function register(registrationToken: string, username: string, password: string) {
+    return signedIn(await accountApi.register(registrationToken, username, password))
   }
 
   async function logout() {
@@ -133,6 +147,8 @@ export const useSession = defineStore('session', () => {
     restore,
     loadSession,
     loginWithCode,
+    loginWithPassword,
+    register,
     logout,
     requireLogin,
   }

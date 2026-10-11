@@ -18,7 +18,6 @@ import java.util.concurrent.atomic.AtomicInteger
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
-import kotlin.test.assertNull
 import kotlinx.coroutines.runBlocking
 import xyz.xiaban.server.http.ApiException
 
@@ -28,7 +27,7 @@ class RemoteAccountCenterTest {
     private val clock = Clock.fixed(now, ZoneOffset.UTC)
     private val keyPair: KeyPair = KeyPairGenerator.getInstance("Ed25519").generateKeyPair()
     private val jwksFetches = AtomicInteger()
-    private var meBody = """{"uid":"x","email":"Person@Example.com"}"""
+    private var meBody = """{"uid":"x","username":"Person_One","email":"Person@Example.com"}"""
     private var meStatus = HttpStatusCode.OK
 
     private fun center(kid: String = "k1"): RemoteAccountCenter {
@@ -102,18 +101,24 @@ class RemoteAccountCenterTest {
         assertEquals(1, jwksFetches.get())
     }
 
-    @Test fun `reads the email normalised and treats a missing email as null`() = runBlocking {
+    @Test fun `reads the username as is and the email normalised, and treats a missing email as null`() = runBlocking {
         val center = center()
-        assertEquals("person@example.com", center.email("t"))
-        meBody = """{"uid":"x"}"""
-        assertNull(center.email("t"))
+        assertEquals(AccountProfile("Person_One", "person@example.com"), center.profile("t"))
+        meBody = """{"uid":"x","username":"Phone_Only"}"""
+        assertEquals(AccountProfile("Phone_Only", null), center.profile("t"))
+    }
+
+    @Test fun `a profile without a username is treated as an unusable account center answer`() = runBlocking {
+        val center = center()
+        meBody = """{"uid":"x","email":"a@example.com"}"""
+        assertEquals("account_center_unavailable", assertFailsWith<ApiException> { center.profile("t") }.code)
     }
 
     @Test fun `maps account center failures to clear errors`() = runBlocking {
         val center = center()
         meStatus = HttpStatusCode.Unauthorized
-        assertEquals("account_token_invalid", assertFailsWith<ApiException> { center.email("t") }.code)
+        assertEquals("account_token_invalid", assertFailsWith<ApiException> { center.profile("t") }.code)
         meStatus = HttpStatusCode.InternalServerError
-        assertEquals("account_center_unavailable", assertFailsWith<ApiException> { center.email("t") }.code)
+        assertEquals("account_center_unavailable", assertFailsWith<ApiException> { center.profile("t") }.code)
     }
 }

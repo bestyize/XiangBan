@@ -46,8 +46,6 @@ class ProfileService(private val users: UserRepository, private val cities: Citi
         val changes = ProfileChanges(
             companionName = req.companionName?.let(TextRules::companionName),
             personality = req.personality,
-            nicknameChanged = req.nickname != null,
-            nickname = req.nickname?.let(TextRules::nickname),
             cityCode = req.cityCode?.also { if (cities.find(it) == null) badRequest("没有这个城市", "invalid_city") },
             workStart = req.workStart?.let(::parseTime),
             workEnd = req.workEnd?.let(::parseTime),

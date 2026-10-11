@@ -8,7 +8,8 @@ use std::str::FromStr;
 const SCHEMA: &str = r#"
 CREATE TABLE IF NOT EXISTS users (
     uid           UUID PRIMARY KEY,
-    nickname      TEXT NOT NULL,
+    username      TEXT NOT NULL,
+    username_key  TEXT NOT NULL,
     avatar_url    TEXT,
     status        TEXT NOT NULL DEFAULT 'active',
     password_hash TEXT,
@@ -94,6 +95,12 @@ CREATE TABLE IF NOT EXISTS system_settings (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS users_created_idx ON users (created_at DESC);
+
+-- 昵称改为不可修改的唯一用户名。旧库必须先清空 users（ADD COLUMN ... NOT NULL 在有数据时会失败，这是有意的）。
+ALTER TABLE users ADD COLUMN IF NOT EXISTS username TEXT NOT NULL;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS username_key TEXT NOT NULL;
+ALTER TABLE users DROP COLUMN IF EXISTS nickname;
+CREATE UNIQUE INDEX IF NOT EXISTS users_username_key_idx ON users (username_key);
 "#;
 
 /// `schema` 仅供测试隔离使用：连接级 search_path。

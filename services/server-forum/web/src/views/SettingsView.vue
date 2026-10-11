@@ -1,46 +1,16 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
 import TopicList from '@/components/TopicList.vue'
 import PagerNav from '@/components/PagerNav.vue'
 import { api } from '@/api/forum'
-import { accountApi } from '@/api/account'
 import { useSession } from '@/stores/session'
-import { useToast } from '@/stores/toast'
 import { useTopicList } from '@/lib/useList'
 import { TRUST_LABEL } from '@/lib/format'
 import { useHead } from '@/lib/head'
 
 useHead(() => ({ title: '收藏与设置' }))
 const session = useSession()
-const toast = useToast()
 
 const bookmarks = useTopicList(p => api.bookmarks(p), [() => session.user?.uid])
-
-const nickname = ref(session.user?.nickname ?? '')
-watch(
-  () => session.user?.nickname,
-  v => {
-    if (v) nickname.value = v
-  },
-)
-const saving = ref(false)
-
-async function saveNickname() {
-  const name = nickname.value.trim()
-  if (!name || name === session.user?.nickname) return
-  saving.value = true
-  try {
-    const token = await session.accessToken()
-    if (!token) throw new Error('请重新登录')
-    await accountApi.updateProfile(token, { nickname: name })
-    await session.loadSession()
-    toast.show('昵称已更新')
-  } catch (e) {
-    toast.error(e)
-  } finally {
-    saving.value = false
-  }
-}
 </script>
 
 <template>
@@ -56,14 +26,11 @@ async function saveNickname() {
     <section class="block" aria-labelledby="profile-title">
       <h2 id="profile-title">资料</h2>
       <div class="panel box">
-        <form class="row" @submit.prevent="saveNickname">
-          <label class="field grow">
-            <span>昵称</span>
-            <input v-model="nickname" class="input" maxlength="24" />
-            <small>昵称和头像属于相伴账号，改了以后在所有相伴产品里都会生效。</small>
-          </label>
-          <button type="submit" class="btn btn-primary" :disabled="saving || !nickname.trim() || nickname.trim() === session.user?.nickname">保存昵称</button>
-        </form>
+        <div class="field">
+          <span>用户名</span>
+          <strong class="username">{{ session.user?.nickname }}</strong>
+          <small>用户名是你的唯一账号，注册时设置，不能修改。头像属于相伴账号，在所有相伴产品里通用。</small>
+        </div>
       </div>
     </section>
 

@@ -14,41 +14,47 @@ import xyz.xiaban.wallpaper.data.AccountRules
 import xyz.xiaban.wallpaper.data.AccountSession
 import xyz.xiaban.wallpaper.data.AccountStore
 import xyz.xiaban.wallpaper.data.AccountUser
+import xyz.xiaban.wallpaper.data.CodeLoginResult
 import java.io.File
 
 class AccountParserTest {
     private val loginBody = """
         {"access_token":"acc","refresh_token":"ref","token_type":"Bearer","expires_in":1800,"is_new_user":true,
-         "user":{"uid":"u-1","nickname":"阿伴","avatar_url":"https://a.example/p.png"}}
+         "user":{"uid":"u-1","username":"Alice_01","avatar_url":"https://a.example/p.png"}}
     """.trimIndent()
 
     @Test
     fun loginReadsTokensUserAndExpiry() {
-        val outcome = AccountParser.login(loginBody, " me@example.com ", nowSeconds = 1_000)
+        val outcome = AccountParser.login(loginBody, nowSeconds = 1_000)
         assertTrue(outcome.isNewUser)
         assertEquals("acc", outcome.session.accessToken)
         assertEquals("ref", outcome.session.refreshToken)
         assertEquals(2_800L, outcome.session.expiresAt)
         assertEquals("u-1", outcome.session.user.uid)
-        assertEquals("阿伴", outcome.session.user.nickname)
-        assertEquals("me@example.com", outcome.session.user.email)
+        assertEquals("Alice_01", outcome.session.user.username)
         assertEquals("https://a.example/p.png", outcome.session.user.avatarUrl)
     }
 
     @Test
-    fun loginFallsBackWhenProfileIsBlank() {
-        val body = """{"access_token":"a","refresh_token":"r","expires_in":60,"user":{"uid":"u","nickname":"","avatar_url":""}}"""
-        val outcome = AccountParser.login(body, "x@y.zz", 0)
+    fun aBlankAvatarIsNoAvatar() {
+        val body = """{"access_token":"a","refresh_token":"r","expires_in":60,"user":{"uid":"u","username":"Bob_Smith","avatar_url":""}}"""
+        val outcome = AccountParser.login(body, 0)
         assertFalse(outcome.isNewUser)
-        assertEquals(AccountRules.FALLBACK_NICKNAME, outcome.session.user.nickname)
         assertNull(outcome.session.user.avatarUrl)
     }
 
     @Test
     fun incompleteOrUnreadableAnswersAreRejected() {
-        for (body in listOf("""{"refresh_token":"r","user":{"uid":"u"}}""", """{"access_token":"a","refresh_token":"r"}""", "not json", "")) {
+        val incomplete = listOf(
+            """{"refresh_token":"r","user":{"uid":"u","username":"Alice_01"}}""",
+            """{"access_token":"a","refresh_token":"r"}""",
+            """{"access_token":"a","refresh_token":"r","user":{"uid":"u","username":""}}""",
+            "not json",
+            "",
+        )
+        for (body in incomplete) {
             try {
-                AccountParser.login(body, "x@y.zz", 0)
+                AccountParser.login(body, 0)
                 fail("accepted: $body")
             } catch (_: AccountException) {
             }
@@ -57,12 +63,43 @@ class AccountParserTest {
 
     @Test
     fun refreshKeepsTheProfileAndSwapsBothTokens() {
-        val old = AccountParser.login(loginBody, "me@example.com", 0).session
+        val old = AccountParser.login(loginBody, 0).session
         val next = AccountParser.refreshed("""{"access_token":"acc2","refresh_token":"ref2","token_type":"Bearer","expires_in":900}""", old, 5_000)
         assertEquals("acc2", next.accessToken)
         assertEquals("ref2", next.refreshToken)
         assertEquals(5_900L, next.expiresAt)
         assertEquals(old.user, next.user)
+    }
+
+    @Test
+    fun aCodeLoginEitherSignsInOrAsksForRegistration() {
+        val signedIn = AccountParser.codeLogin(loginBody, 0)
+        assertEquals("Alice_01", (signedIn as CodeLoginResult.SignedIn).outcome.session.user.username)
+
+        val pending = AccountParser.codeLogin("""{"registration_required":true,"registration_token":"tok","expires_in":900}""", 0)
+        assertEquals(CodeLoginResult.RegistrationRequired("tok"), pending)
+
+        try {
+            AccountParser.codeLogin("""{"registration_required":true}""", 0)
+            fail("a registration without a token must be rejected")
+        } catch (_: AccountException) {
+        }
+    }
+
+    @Test
+    fun usernameCheckReadsAvailabilityAndTheMessage() {
+        assertEquals(true, AccountParser.usernameCheck("""{"available":true,"message":null}""").available)
+        assertNull(AccountParser.usernameCheck("""{"available":true,"message":null}""").message)
+        val taken = AccountParser.usernameCheck("""{"available":false,"message":"这个用户名已被占用，换一个吧"}""")
+        assertFalse(taken.available)
+        assertEquals("这个用户名已被占用，换一个吧", taken.message)
+    }
+
+    @Test
+    fun errorCodeComesFromTheBodyOrIsNull() {
+        assertEquals("username_taken", AccountParser.errorCode("""{"error":true,"code":"username_taken","message":"x"}"""))
+        assertNull(AccountParser.errorCode("<html>busy</html>"))
+        assertNull(AccountParser.errorCode("""{"message":"no code"}"""))
     }
 
     @Test
@@ -82,7 +119,7 @@ class AccountParserTest {
 }
 
 class AccountRulesTest {
-    private fun session(expiresAt: Long) = AccountSession("a", "r", expiresAt, AccountUser("u", "n", "e@x.yz", null))
+    private fun session(expiresAt: Long) = AccountSession("a", "r", expiresAt, AccountUser("u", "Alice_01", null))
 
     @Test
     fun emailCheckAcceptsOrdinaryAddressesOnly() {
@@ -92,6 +129,26 @@ class AccountRulesTest {
         assertFalse(AccountRules.isEmail("me@example"))
         assertFalse(AccountRules.isEmail("me example@x.com"))
         assertFalse(AccountRules.isEmail("@example.com"))
+    }
+
+    @Test
+    fun usernameRulesMatchTheAccountCenter() {
+        for (ok in listOf("abcd", "Alice_01", "a2345678901234567890")) assertNull(ok, AccountRules.usernameError(ok))
+        assertNull(AccountRules.usernameError("  "))
+        assertEquals("用户名需以字母开头", AccountRules.usernameError("1abc"))
+        assertEquals("用户名需以字母开头", AccountRules.usernameError("用户名abcd"))
+        assertEquals("只能包含字母、数字和下划线", AccountRules.usernameError("ab-cd"))
+        assertEquals("需为 4-20 个字符", AccountRules.usernameError("abc"))
+        assertEquals("需为 4-20 个字符", AccountRules.usernameError("a23456789012345678901"))
+    }
+
+    @Test
+    fun passwordRulesCheckLengthAndTheUsername() {
+        assertNull(AccountRules.passwordError(""))
+        assertEquals("密码至少 8 位", AccountRules.passwordError("short"))
+        assertEquals("密码不能和用户名相同", AccountRules.passwordError("Alice_01", "alice_01"))
+        assertNull(AccountRules.passwordError("long-enough-1", "alice_01"))
+        assertEquals("密码最多 128 位", AccountRules.passwordError("x".repeat(129)))
     }
 
     @Test
@@ -112,7 +169,7 @@ class AccountStoreTest {
     @get:Rule
     val folder = TemporaryFolder()
 
-    private val session = AccountSession("acc", "ref", 1234, AccountUser("u-1", "阿伴", "me@example.com", "https://a.example/p.png"))
+    private val session = AccountSession("acc", "ref", 1234, AccountUser("u-1", "Alice_01", "https://a.example/p.png"))
 
     @Test
     fun savedLoginComesBackIntact() {
@@ -146,6 +203,13 @@ class AccountStoreTest {
         store.save(session)
         store.clear()
         assertNull(store.load())
+    }
+
+    @Test
+    fun aLoginSavedByAnOlderVersionReadsAsSignedOut() {
+        val file = File(folder.root, "account.json")
+        file.writeText("""{"access":"a","refresh":"r","exp":1,"user":{"uid":"u","nick":"阿伴","email":"me@example.com","avatar":""}}""")
+        assertNull(AccountStore(file).load())
     }
 
     @Test

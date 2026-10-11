@@ -36,6 +36,12 @@ server {
     proxy_connect_timeout 5s;
     proxy_read_timeout 30s;
 
+    # 用户名查重没有登录，也要限流；服务内部另有每 IP 每分钟 60 次的兜底。
+    location = /api/auth/username/available {
+        limit_req zone=account_api burst=20 nodelay;
+        proxy_pass http://127.0.0.1:55009;
+    }
+
     # 发验证码：每个 IP 每分钟 6 次，叠加服务内的号码冷却与日上限，防止短信被刷。
     location = /api/auth/code/send {
         limit_req zone=account_code burst=3 nodelay;

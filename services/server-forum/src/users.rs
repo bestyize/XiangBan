@@ -51,7 +51,8 @@ pub async fn load_or_create(pool: &PgPool, uid: Uuid) -> Result<ForumUser, AppEr
 
 #[derive(Deserialize)]
 struct AccountMe {
-    nickname: String,
+    /// 账号中心里唯一且不可修改的用户名，论坛直接把它当作展示名。
+    username: String,
     avatar_url: Option<String>,
 }
 
@@ -70,7 +71,7 @@ pub async fn sync_profile(http: &reqwest::Client, account_base: &str, token: &st
         }
     };
     if let Some(me) = me {
-        let nickname: String = me.nickname.trim().chars().take(24).collect();
+        let nickname: String = me.username.trim().chars().take(24).collect();
         if !nickname.is_empty() {
             let _ = sqlx::query("UPDATE users SET nickname = $2, avatar_url = $3 WHERE uid = $1")
                 .bind(uid)

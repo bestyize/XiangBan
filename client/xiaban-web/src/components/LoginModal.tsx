@@ -4,7 +4,7 @@ import { api, getToken } from '../api/client.ts'
 import { TERMS_VERSION } from '../lib/consent.ts'
 import { clearLoginReturn, readLoginReturn } from '../lib/loginReturn.ts'
 import { useSession } from '../lib/session.tsx'
-import { EmailBind } from '../pages/me/EmailBind.tsx'
+import { LoginForm } from './LoginForm.tsx'
 
 /** Centered login dialog over a dimmed page, opened from anywhere via useLoginModal(). */
 export function LoginModal({ open, onClose }: { open: boolean; onClose: () => void }) {
@@ -44,10 +44,10 @@ export function LoginModal({ open, onClose }: { open: boolean; onClose: () => vo
           <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M6 6l12 12M18 6 6 18" /></svg>
         </button>
         <h2 id="login-modal-title" className="text-center text-xl font-bold text-window">登录 / 注册</h2>
-        <p className="mt-1.5 text-center text-[13px] text-window/55">邮箱验证码登录，新邮箱自动注册</p>
+        <p className="mt-1.5 text-center text-[13px] text-window/55">已有账号用密码登录，新用户用验证码注册</p>
         <div className="mt-6">
           {open && (status === 'ready'
-            ? <EmailBind disabled={!agreed} termsVersion={TERMS_VERSION} onDone={done} beforeSend={async () => {
+            ? <LoginForm disabled={!agreed} termsVersion={TERMS_VERSION} onDone={done} beforeSend={async () => {
               if (getToken()) await api('/api/consent', { method: 'PUT', body: { termsVersion: TERMS_VERSION } })
             }} />
             : <p className="py-6 text-center text-sm text-window/60">{status === 'error' ? '小伴没接到你，关掉再试一次吧。' : '小伴正在开门…'}</p>)}

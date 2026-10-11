@@ -10,7 +10,6 @@ import java.time.ZoneId
 import kotlinx.coroutines.future.await
 import xyz.xiaban.contracts.account.guardian.GuardianUpdate
 import xyz.xiaban.contracts.account.guardian.GuardianView
-import xyz.xiaban.server.account.EmailBinding
 import xyz.xiaban.server.calendar.HolidayCalendar
 import xyz.xiaban.server.checkin.CheckinRepository
 import xyz.xiaban.server.checkin.WorkDay
@@ -18,6 +17,7 @@ import xyz.xiaban.server.http.badRequest
 import xyz.xiaban.server.http.conflict
 import xyz.xiaban.server.http.notFound
 import xyz.xiaban.server.mail.maskEmail
+import xyz.xiaban.server.mail.normalizeEmail
 import xyz.xiaban.server.redis.Redis
 import xyz.xiaban.server.users.TextRules
 import xyz.xiaban.server.users.UserRepository
@@ -41,7 +41,7 @@ class GuardianService(
         if (user.email == null) conflict("先绑定你自己的邮箱，快到时间时小伴要先提醒你", "email_required")
         if (!req.consent || !req.informedContact) badRequest("需要勾选同意，并确认已经告诉联系人本人", "consent_required")
         if (req.thresholdDays !in 1..3) badRequest("可以选 1–3 天", "invalid_threshold")
-        val contactEmail = EmailBinding.normalize(req.contactEmail)
+        val contactEmail = normalizeEmail(req.contactEmail)
         if (contactEmail == user.email) badRequest("联系人的邮箱不能是你自己的", "invalid_contact")
         guardians.upsert(
             userId = userId,

@@ -26,9 +26,9 @@ export interface Settings {
 
 export interface AccountUser {
   uid: string;
-  nickname: string;
+  /** Unique and unchangeable; also the name shown everywhere. */
+  username: string;
   avatarUrl?: string | null;
-  email: string;
 }
 
 export interface AccountSession {
@@ -47,6 +47,33 @@ export interface SendCodeResult {
 export interface LoginResult {
   isNewUser: boolean;
   session: AccountSession;
+}
+
+/** A code login either signs an existing account in, or says the account still has to be created. */
+export type CodeLoginOutcome =
+  | { kind: "session"; isNewUser: boolean; session: AccountSession }
+  | { kind: "registration"; registrationToken: string };
+
+export interface UsernameCheck {
+  available: boolean;
+  message?: string | null;
+}
+
+/** The account center's error: `code` is machine readable (username_taken, registration_expired, identity_exists...). */
+export class AccountError extends Error {
+  constructor(message: string, readonly code?: string | null) {
+    super(message);
+  }
+}
+
+/** Tauri rejects with whatever the command returned: an `{ message, code }` object, a plain string, or an Error. */
+export function toAccountError(error: unknown): AccountError {
+  if (error instanceof AccountError) return error;
+  if (error && typeof error === "object") {
+    const { message, code } = error as { message?: unknown; code?: unknown };
+    return new AccountError(typeof message === "string" && message ? message : "操作失败，请稍后再试", typeof code === "string" ? code : null);
+  }
+  return new AccountError(typeof error === "string" && error ? error : "操作失败，请稍后再试");
 }
 
 export type WallpaperKind = "image" | "video" | "canvas";

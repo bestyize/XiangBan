@@ -2,13 +2,12 @@ import type { Meta, Personality } from '../../api/types.ts'
 import type { RobotInput } from '../../robot/expressions.ts'
 import { CityPicker } from '../../components/CityPicker.tsx'
 
-export const STEPS = ['hello', 'name', 'personality', 'nickname', 'city', 'hours'] as const
+export const STEPS = ['hello', 'name', 'personality', 'city', 'hours'] as const
 export type Step = (typeof STEPS)[number]
 
 export interface Draft {
   companionName: string
   personality: Personality
-  nickname: string
   cityCode: string | null
   workStart: string
   workEnd: string
@@ -27,8 +26,6 @@ export function stepFace(step: Step, draft: Draft): RobotInput {
       return 'greeting'
     case 'personality':
       return personalityFace[draft.personality]
-    case 'nickname':
-      return 'shy'
     case 'city':
       return 'curious'
     case 'hours':
@@ -46,8 +43,6 @@ export function stepLine(step: Step, draft: Draft): string {
       return '先给我起个名字吧。不起的话，我就叫小伴。'
     case 'personality':
       return `${draft.companionName || '小伴'}该用什么性格陪你？`
-    case 'nickname':
-      return '我该怎么称呼你？'
     case 'city':
       return '你在哪个城市上班？我帮你盯着天气。'
     case 'hours':
@@ -75,14 +70,6 @@ export function StepBody({ step, draft, meta, update }: BodyProps) {
           <span className="mb-2 block text-sm text-window/70">名字，2–8 个字</span>
           <input className={inputClass} value={draft.companionName} maxLength={8} autoFocus
             onChange={(e) => update({ companionName: e.target.value })} />
-        </label>
-      )
-    case 'nickname':
-      return (
-        <label className="block">
-          <span className="mb-2 block text-sm text-window/70">至少 2 字；英文或英文加数字至少 4 字，不能是纯数字</span>
-          <input className={inputClass} value={draft.nickname} maxLength={24} placeholder="比如：阿明、打工人（可跳过）" autoFocus
-            onChange={(e) => update({ nickname: e.target.value })} />
         </label>
       )
     case 'personality':

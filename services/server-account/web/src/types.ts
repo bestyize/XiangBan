@@ -7,7 +7,7 @@ export type UserStatus = 'active' | 'disabled';
 
 export interface UserRow {
   uid: string;
-  nickname: string;
+  username: string;
   avatar_url: string | null;
   status: UserStatus;
   created_at: string;
@@ -33,7 +33,7 @@ export interface SessionRow {
 export interface UserDetail {
   user: {
     uid: string;
-    nickname: string;
+    username: string;
     avatar_url: string | null;
     has_password: boolean;
     identities: IdentityView[];

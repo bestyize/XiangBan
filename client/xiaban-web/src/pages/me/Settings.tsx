@@ -68,7 +68,7 @@ export default function Settings() {
         ) : (
           <ButtonRow onClick={openLogin} label="登录 / 注册" tone="accent" />
         )}
-        <LinkRow href="/me/account" label="昵称和头像" />
+        <LinkRow href="/me/account" label="头像和用户名" />
         {profile.userId > 0 && <InfoRow label="用户 ID" detail={<span className="selectable">{profile.userId}</span>} />}
       </ListGroup>
 

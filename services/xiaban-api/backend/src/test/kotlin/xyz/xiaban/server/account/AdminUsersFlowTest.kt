@@ -19,7 +19,7 @@ class AdminUsersFlowTest {
         val ids = seedUsers(2)
         val userId = ids[0]
         val ordinary = session().token
-        val request = AdminUserUpdate(nickname = "运营称呼", companionName = "新小伴", personality = xyz.xiaban.contracts.companion.personality.Personality.Gentle,
+        val request = AdminUserUpdate(companionName = "新小伴", personality = xyz.xiaban.contracts.companion.personality.Personality.Gentle,
             cityCode = services.cities.all.first().code, timezone = "Asia/Shanghai", workStart = "08:30", workEnd = "17:30", payday = 15)
         assertEquals(HttpStatusCode.Unauthorized, put("/api/admin/users/$userId", ordinary, request).status)
         val cookie = adminCookie()
@@ -30,18 +30,18 @@ class AdminUsersFlowTest {
         }
         assertEquals(HttpStatusCode.OK, result.status)
         val edited = result.body<AdminUserDetail>()
-        assertEquals("运营称呼", edited.user.nickname); assertEquals("新小伴", edited.user.companionName)
+        assertEquals("新小伴", edited.user.companionName)
         assertEquals("08:30", edited.workStart); assertEquals(15, edited.payday)
         assertEquals(before.user.email, edited.user.email); assertEquals(before.user.emailVerifiedAt, edited.user.emailVerifiedAt)
         assertEquals(HttpStatusCode.BadRequest, client.put("/api/admin/users/$userId") {
-            header(HttpHeaders.Cookie, cookie); contentType(ContentType.Application.Json); setBody(AdminUserUpdate(nickname = "不应保存", workStart = "25:00"))
+            header(HttpHeaders.Cookie, cookie); contentType(ContentType.Application.Json); setBody(AdminUserUpdate(companionName = "不应保存", workStart = "25:00"))
         }.status)
-        assertEquals("运营称呼", services.adminUsers.detail(userId).user.nickname)
+        assertEquals("新小伴", services.adminUsers.detail(userId).user.companionName)
         assertEquals(HttpStatusCode.OK, client.put("/api/admin/users/$userId") {
-            header(HttpHeaders.Cookie, cookie); contentType(ContentType.Application.Json); setBody(AdminUserUpdate(nickname = "", cityCode = "", payday = 0))
+            header(HttpHeaders.Cookie, cookie); contentType(ContentType.Application.Json); setBody(AdminUserUpdate(cityCode = "", payday = 0))
         }.status)
         val cleared = services.adminUsers.detail(userId)
-        assertNull(cleared.user.nickname); assertNull(cleared.cityCode); assertNull(cleared.payday)
+        assertNull(cleared.cityCode); assertNull(cleared.payday)
         val logs = services.adminUsers.auditPage(1, 20)
         assertEquals(2, logs.total); assertTrue(logs.items.all { it.action == "user_edit" && it.targetUserId == userId })
     }
@@ -152,7 +152,7 @@ private suspend fun ApiScope.seedUsers(count: Int): List<Long> {
         c.execute("update users set created_at=?,email=?,email_verified_at=?,onboarded_at=? where id=?", base.plusSeconds(index.toLong()),
             if (index < 5) "person_$index@example.com" else null, if (index < 5) base else null, if (index % 2 == 0) base else null, id)
         c.execute("update companions set name=? where user_id=?", if (index == 0) "小伴_百分%100" else "小伴$index", id)
-        c.execute("update user_profiles set nickname=?,nickname_key=? where user_id=?", if (index == 4) "测试昵称" else null, if (index == 4) "测试昵称" else null, id)
+        c.execute("update user_profiles set nickname=? where user_id=?", if (index == 4) "测试昵称" else null, id)
     } }
     return ids
 }

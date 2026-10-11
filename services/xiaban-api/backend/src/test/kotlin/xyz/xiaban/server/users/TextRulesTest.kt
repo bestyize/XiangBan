@@ -4,7 +4,6 @@ import xyz.xiaban.server.http.ApiException
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
-import kotlin.test.assertNull
 
 class TextRulesTest {
     @Test
@@ -20,14 +19,9 @@ class TextRulesTest {
     }
 
     @Test
-    fun `rejects contact details and links`() {
+    fun `rejects contact details and links in companion names`() {
         listOf("加我微信", "qq12345", "13800138000", "a@b", "www.x").forEach {
-            assertFailsWith<ApiException>(it) { TextRules.nickname(it) }
+            assertFailsWith<ApiException>(it) { TextRules.companionName(it) }
         }
-    }
-
-    @Test
-    fun `blank nickname clears it`() {
-        assertNull(TextRules.nickname("   "))
     }
 }

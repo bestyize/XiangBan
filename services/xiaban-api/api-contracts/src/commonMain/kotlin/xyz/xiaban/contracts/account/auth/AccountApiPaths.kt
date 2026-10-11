@@ -1,10 +1,6 @@
 package xyz.xiaban.contracts.account.auth
 
 object AccountApiPaths {
-    const val BIND_CODE = "/api/account/bind/code"
-    const val BIND = "/api/account/bind"
-    const val EMAIL_LOGIN_CODE = "/api/account/login/code"
-    const val EMAIL_LOGIN = "/api/account/login"
     const val ACCOUNT_CENTER_LOGIN = "/api/account/center/login"
     const val LOGOUT = "/api/account/logout"
     const val ACCOUNT = "/api/account"

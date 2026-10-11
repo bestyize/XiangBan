@@ -22,13 +22,16 @@ import kotlinx.serialization.json.longOrNull
 import xyz.xiaban.server.http.ApiException
 import xyz.xiaban.server.http.AppJson
 
-/** The unified account center (services/server-account): who a token belongs to, and which email it has verified. */
+/** What this service keeps from an account center account: the unique, unchangeable username and the verified email, if any. */
+data class AccountProfile(val username: String, val email: String?)
+
+/** The unified account center (services/server-account): who a token belongs to, and its username and verified email. */
 interface AccountCenter {
     /** Verifies an access token's signature, issuer, audience and expiry; returns its `sub`. */
     suspend fun verify(token: String): UUID
 
-    /** The verified email of the token's account, or null when it only has a phone number. */
-    suspend fun email(token: String): String?
+    /** The token's account profile; the email is null when the account only has a phone number. */
+    suspend fun profile(token: String): AccountProfile
 }
 
 class RemoteAccountCenter(
@@ -65,7 +68,7 @@ class RemoteAccountCenter(
         return runCatching { UUID.fromString(claims["sub"]?.jsonPrimitive?.contentOrNull) }.getOrNull() ?: invalid()
     }
 
-    override suspend fun email(token: String): String? {
+    override suspend fun profile(token: String): AccountProfile {
         val response = try {
             http.get("$baseUrl/api/me") { bearerAuth(token) }
         } catch (e: Exception) {
@@ -74,9 +77,10 @@ class RemoteAccountCenter(
         }
         if (response.status == HttpStatusCode.Unauthorized) invalid()
         if (!response.status.isSuccess()) unavailable()
-        return runCatching { AppJson.parseToJsonElement(response.bodyAsText()).jsonObject["email"]?.jsonPrimitive?.contentOrNull }
-            .getOrElse { unavailable() }
-            ?.trim()?.lowercase()?.takeIf { it.isNotEmpty() }
+        val body = runCatching { AppJson.parseToJsonElement(response.bodyAsText()).jsonObject }.getOrElse { unavailable() }
+        val username = body["username"]?.jsonPrimitive?.contentOrNull?.trim()?.takeIf { it.isNotEmpty() } ?: unavailable()
+        val email = body["email"]?.jsonPrimitive?.contentOrNull?.trim()?.lowercase()?.takeIf { it.isNotEmpty() }
+        return AccountProfile(username, email)
     }
 
     private suspend fun key(kid: String): PublicKey {

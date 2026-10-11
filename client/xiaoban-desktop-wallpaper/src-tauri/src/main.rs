@@ -654,7 +654,9 @@ fn main() {
             content::check_updates, content::open_download_url, local_media::import_local_wallpaper, storage::open_data_directory,
             website::set_automatic_updates, website::open_official_site, website::fetch_site_wallpapers, website::fetch_site_categories,
             website::select_site_wallpaper, website::download_site_wallpaper, website::cancel_site_download, website::check_website, website::get_website_status, website::dismiss_website_message,
-            account::send_account_code, account::login_account_with_code, account::get_account_session, account::logout_account]);
+            account::send_account_code, account::login_account_with_code, account::login_account_with_password,
+            account::register_account, account::reset_account_password, account::check_account_username,
+            account::get_account_session, account::logout_account]);
     let app = builder.manage(state).manage(content::ContentState::default()).manage(website::WebsiteState::default())
         .manage(games::GameState::default()).manage(reminders::ReminderState::default()).manage(account::AccountState::default())
         .register_uri_scheme_protocol("wallpaper-asset", |context, request| library::serve(context.app_handle(), request))

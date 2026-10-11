@@ -23,20 +23,16 @@ class AccountCenterLogin(
         if (!SessionService.isValidDeviceId(req.deviceId)) badRequest("设备标识无效", "invalid_device")
         val uid = center.verify(req.accountToken)
         val owner = userId?.takeIf { it > 0 } ?: 0L
-        val linked = users.findIdByAccountUid(uid)
-        // The email only matters for accounts not yet linked locally, so skip the extra round trip for returning users.
-        val email = if (linked == null) center.email(req.accountToken) else null
         if (owner > 0) {
             val current = profiles.user(owner)
             if (current.termsVersion.isNullOrBlank()) conflict("请先阅读并同意用户协议和隐私政策", "consent_required")
-            val switching = when {
-                current.accountUid != null -> current.accountUid != uid
-                current.email != null -> linked != null || email != current.email
-                else -> false
+            if (current.accountUid != null && current.accountUid != uid) {
+                conflict("请先退出当前账号，再使用其他账号登录", "account_switch_required")
             }
-            if (switching) conflict("请先退出当前账号，再使用其他账号登录", "account_switch_required")
         }
-        val target = users.claimAccount(owner, uid, email, req.username)
+        // Logging in is rare, so reading the profile every time keeps the mirrored username right after an admin rename.
+        val account = center.profile(req.accountToken)
+        val target = users.claimAccount(owner, uid, account.username, account.email)
 
         val merged = owner > 0 && target != owner && req.mergeGuest
         if (merged) { merger.merge(source = owner, target = target); afterMerge(target) }

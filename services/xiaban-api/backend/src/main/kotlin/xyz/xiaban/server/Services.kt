@@ -38,7 +38,6 @@ import xyz.xiaban.server.account.AccountCenter
 import xyz.xiaban.server.account.AccountCenterLogin
 import xyz.xiaban.server.account.AccountMerge
 import xyz.xiaban.server.account.RemoteAccountCenter
-import xyz.xiaban.server.account.EmailBinding
 import xyz.xiaban.server.guardian.GuardianRepository
 import xyz.xiaban.server.guardian.GuardianScheduler
 import xyz.xiaban.server.guardian.GuardianService
@@ -173,17 +172,13 @@ class Services(
     val administrators = xyz.xiaban.server.admin.AdminAccounts(db, redis, config)
     val adminUsers = xyz.xiaban.server.admin.AdminUsers(db, clock, cities)
     private val runtimeMailer = xyz.xiaban.server.mail.RuntimeMailer(emailSettings)
-    private val suppliedMailer = mailer
     val mailer: Mailer = mailer ?: runtimeMailer
-    val emailAvailable: suspend () -> Boolean = { suppliedMailer != null || runtimeMailer.available() }
     val mail = MailQueue(redis, db, this.mailer, clock)
     val guardianRepository = GuardianRepository(db)
     val guardian: GuardianService by lazy { GuardianService(guardianRepository, users, checkinRepository, calendar, redis, clock) }
     val guardianScheduler = GuardianScheduler(guardian, guardianRepository, users, mail, redis, config.publicBaseUrl, clock)
     val unsubscribeLinks = UnsubscribeLinks(config.jwtSecret, config.publicBaseUrl)
     val recall = RecallJob(db, users, CopySelector(copyLibrary), mail, unsubscribeLinks, config.publicBaseUrl, clock)
-    val emailBinding = EmailBinding(redis, users, profiles, tokens, AccountMerge(db, clock), emailAvailable,
-        { this.mailer.send(it) }, { guardian.reschedule(it) })
     val accountCenterLogin = AccountCenterLogin(
         accountCenter ?: RemoteAccountCenter(http, config.accountIssuer, config.accountBaseUrl, config.accountAudiences, clock),
         users, profiles, tokens, AccountMerge(db, clock), { guardian.reschedule(it) },

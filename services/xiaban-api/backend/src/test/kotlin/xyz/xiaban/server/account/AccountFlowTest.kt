@@ -6,12 +6,12 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
-import kotlinx.coroutines.future.await
+import java.util.UUID
 import xyz.xiaban.contracts.account.auth.AccountApiPaths
-import xyz.xiaban.contracts.account.auth.BindEmailRequest
+import xyz.xiaban.contracts.account.auth.AccountCenterLoginRequest
 import xyz.xiaban.contracts.account.auth.BindResponse
-import xyz.xiaban.contracts.account.auth.EmailCodeRequest
 import xyz.xiaban.contracts.account.consent.ConsentApiPaths
+import xyz.xiaban.contracts.account.consent.ConsentUpdate
 import xyz.xiaban.contracts.account.profile.ProfileApiPaths
 import xyz.xiaban.contracts.account.profile.ProfileView
 import xyz.xiaban.contracts.account.profile.SubscriptionUpdate
@@ -21,7 +21,6 @@ import xyz.xiaban.contracts.afterwork.stats.StatsView
 import xyz.xiaban.server.support.ApiScope
 import xyz.xiaban.server.support.TestEnv
 import xyz.xiaban.server.support.apiTest
-import xyz.xiaban.server.users.SessionService
 
 class AccountFlowTest {
     private val clock = TestEnv.clock
@@ -49,13 +48,7 @@ class AccountFlowTest {
     }
 
     @Test
-    fun `wrong codes are refused and recall emails need a bound email`() = apiTest {
-        val token = session().token
-        put(ConsentApiPaths.CONSENT, token, xyz.xiaban.contracts.account.consent.ConsentUpdate("0.1", false))
-        post(AccountApiPaths.BIND_CODE, token, EmailCodeRequest("me@example.com"))
-        assertEquals(HttpStatusCode.BadRequest, post(AccountApiPaths.BIND, token, BindEmailRequest("me@example.com", "000000x")).status)
-        assertEquals(HttpStatusCode.TooManyRequests, post(AccountApiPaths.BIND_CODE, token, EmailCodeRequest("me@example.com")).status)
-
+    fun `recall emails need a bound email`() = apiTest {
         val other = session().token
         assertEquals(HttpStatusCode.Conflict, put(ProfileApiPaths.SUBSCRIPTION, other, SubscriptionUpdate(true)).status)
         val boundOther = bind(other, "other@example.com")
@@ -63,14 +56,13 @@ class AccountFlowTest {
     }
 }
 
-/** Requests a code, reads it from the logged mail and binds. */
+/**
+ * Signs the caller in as the account-center account that owns [email] (the same email always maps to the same uid),
+ * moving this device's guest data into it, so tests can get a registered user without going through the account center.
+ */
 suspend fun ApiScope.bind(token: String, email: String): BindResponse {
-    put(ConsentApiPaths.CONSENT, token, xyz.xiaban.contracts.account.consent.ConsentUpdate("0.1", false))
-    post(AccountApiPaths.BIND_CODE, token, EmailCodeRequest(email))
-    val mail = TestEnv.awaitMail { it.to == email.lowercase() && it.subject.startsWith("下班啦验证码") }
-    val code = Regex("\\d{6}").find(mail.subject)!!.value
-    synchronized(TestEnv.mailer.sent) { TestEnv.mailer.sent.remove(mail) }
-    // Lift the one-minute resend cooldown so a test can bind the same address again right away.
-    services.redis.cmd.del("xb:code:cool:${SessionService.sha256(email.lowercase())}").await()
-    return post(AccountApiPaths.BIND, token, BindEmailRequest(email, code, "User${services.tokens.userIdOrNull(token)}")).body()
+    put(ConsentApiPaths.CONSENT, token, ConsentUpdate("0.1", false))
+    val normalized = email.trim().lowercase()
+    val accountToken = TestEnv.accountCenter.issue(UUID.nameUUIDFromBytes(normalized.toByteArray()), normalized, normalized.substringBefore('@'))
+    return post(AccountApiPaths.ACCOUNT_CENTER_LOGIN, token, AccountCenterLoginRequest(accountToken, newDeviceId(), mergeGuest = true)).body()
 }

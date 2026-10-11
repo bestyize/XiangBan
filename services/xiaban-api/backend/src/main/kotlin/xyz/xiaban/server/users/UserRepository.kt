@@ -1,8 +1,6 @@
 package xyz.xiaban.server.users
 
-import java.sql.Connection
 import java.sql.ResultSet
-import java.sql.SQLException
 import java.time.Instant
 import java.time.LocalTime
 import java.time.ZoneId
@@ -14,8 +12,6 @@ import xyz.xiaban.server.db.instant
 import xyz.xiaban.server.db.intOrNull
 import xyz.xiaban.server.db.localTime
 import xyz.xiaban.server.db.queryOne
-import xyz.xiaban.server.http.badRequest
-import xyz.xiaban.server.http.conflict
 
 data class User(
     val id: Long,
@@ -47,8 +43,6 @@ data class Referral(val inviteCode: String?, val source: String?)
 data class ProfileChanges(
     val companionName: String? = null,
     val personality: Personality? = null,
-    val nicknameChanged: Boolean = false,
-    val nickname: String? = null,
     val cityCode: String? = null,
     val workStart: LocalTime? = null,
     val workEnd: LocalTime? = null,
@@ -113,81 +107,28 @@ class UserRepository(private val db: Db) {
         c.queryOne("select id from users where account_uid = ?", uid) { it.getLong(1) }
     }
 
-    suspend fun findIdByEmail(email: String): Long? = db.read { c ->
-        c.queryOne("select id from users where email = ?", email) { it.getLong(1) }
-    }
-
     suspend fun setEmail(userId: Long, email: String) = db.read { c ->
         c.execute("update users set email = ?, email_verified_at = now() where id = ?", email, userId)
     }
 
-    private fun generateUniqueChineseNickname(c: Connection): String {
-        repeat(100) {
-            val candidate = TextRules.randomChineseNickname()
-            val taken = c.queryOne("select exists(select 1 from user_profiles where nickname_key = ?)", TextRules.nicknameKey(candidate)) { it.getBoolean(1) } == true
-            if (!taken) return candidate
-        }
-        return "下班小伴" + (1000..9999).random()
-    }
-
-    /** Serialise first registrations for an address so its unique constraint is never raced. */
-    suspend fun claimEmail(userId: Long, email: String, username: String?, consumeCode: () -> Unit): Long = try { db.tx { c ->
-        c.queryOne("select pg_advisory_xact_lock(hashtext(?))", "email:$email") { }
-        val target = c.queryOne("select id from users where email = ?", email) { it.getLong(1) } ?: run {
-            val name = if (!username.isNullOrBlank()) {
-                val explicit = TextRules.nickname(username) ?: generateUniqueChineseNickname(c)
-                val taken = c.queryOne("select exists(select 1 from user_profiles where nickname_key = ?)", TextRules.nicknameKey(explicit)) { it.getBoolean(1) } == true
-                if (taken) conflict("这个用户名已有人使用，换一个吧", "nickname_taken")
-                explicit
-            } else {
-                generateUniqueChineseNickname(c)
-            }
-            val id = if (userId > 0 && c.queryOne("select exists(select 1 from users where id = ?)", userId) { it.getBoolean(1) } == true) {
-                c.execute("update user_profiles set nickname=?,nickname_key=?,updated_at=now() where user_id=?", name, TextRules.nicknameKey(name), userId)
-                c.execute("update users set email = ?, email_verified_at = now() where id = ?", email, userId)
-                userId
-            } else {
-                val newId = c.queryOne(
-                    "insert into users (email, email_verified_at, timezone, invite_code) values (?, now(), ?, ?) returning id",
-                    email, DEFAULT_ZONE.id, newInviteCode(),
-                ) { it.getLong(1) }!!
-                c.execute("insert into companions (user_id) values (?)", newId)
-                c.execute("insert into user_profiles (user_id, nickname, nickname_key) values (?, ?, ?)", newId, name, TextRules.nicknameKey(name))
-                newId
-            }
-            id
-        }
-        consumeCode()
-        target
-    } } catch (e: SQLException) { if (e.sqlState == "23505") conflict("这个用户名已有人使用，换一个吧", "nickname_taken"); throw e }
-
     /**
-     * Resolves the local account for an account-center uid, in order: already linked; an older account that
-     * registered the same (account-center verified) email; the caller's own guest account, which becomes the
-     * registered one; otherwise a new account. A taken or invalid [username] falls back to a generated name,
-     * because the login proof is already spent when this runs.
+     * Resolves the local account for an account-center uid, in order: already linked; the caller's own guest
+     * account, which becomes the registered one; otherwise a new account. [username] is the account center's
+     * unique, unchangeable name; it is mirrored into the profile as the display name and re-synced on each
+     * login in case an administrator renamed the account.
      */
-    suspend fun claimAccount(ownerId: Long, uid: UUID, email: String?, username: String?): Long = db.tx { c ->
+    suspend fun claimAccount(ownerId: Long, uid: UUID, username: String, email: String?): Long = db.tx { c ->
         c.queryOne("select pg_advisory_xact_lock(hashtext(?))", "account:$uid") { }
-        email?.let { c.queryOne("select pg_advisory_xact_lock(hashtext(?))", "email:$it") { } }
 
-        c.queryOne("select id from users where account_uid = ?", uid) { it.getLong(1) }?.let { return@tx it }
-
-        if (email != null) {
-            val legacy = c.queryOne("select id, account_uid from users where email = ?", email) { it.getLong(1) to it.getObject(2) }
-            if (legacy != null) {
-                if (legacy.second != null) conflict("这个邮箱已关联另一个统一账号，请联系客服处理", "account_conflict")
-                c.execute("update users set account_uid = ?, email_verified_at = coalesce(email_verified_at, now()) where id = ?", uid, legacy.first)
-                return@tx legacy.first
-            }
+        val linked = c.queryOne("select id from users where account_uid = ?", uid) { it.getLong(1) }
+        if (linked != null) {
+            c.execute("update user_profiles set nickname = ?, updated_at = now() where user_id = ? and nickname is distinct from ?", username, linked, username)
+            return@tx linked
         }
 
-        val name = username?.let { runCatching { TextRules.nickname(it) }.getOrNull() }
-            ?.takeUnless { c.queryOne("select exists(select 1 from user_profiles where nickname_key = ?)", TextRules.nicknameKey(it)) { rs -> rs.getBoolean(1) } == true }
-            ?: generateUniqueChineseNickname(c)
-        val guest = ownerId > 0 && c.queryOne("select exists(select 1 from users where id = ? and account_uid is null and email_verified_at is null)", ownerId) { it.getBoolean(1) } == true
+        val guest = ownerId > 0 && c.queryOne("select exists(select 1 from users where id = ? and account_uid is null)", ownerId) { it.getBoolean(1) } == true
         if (guest) {
-            c.execute("update user_profiles set nickname=?,nickname_key=?,updated_at=now() where user_id=?", name, TextRules.nicknameKey(name), ownerId)
+            c.execute("update user_profiles set nickname = ?, updated_at = now() where user_id = ?", username, ownerId)
             c.execute("update users set account_uid = ?, email = ?, email_verified_at = case when ?::text is null then null else now() end where id = ?", uid, email, email, ownerId)
             ownerId
         } else {
@@ -196,7 +137,7 @@ class UserRepository(private val db: Db) {
                 uid, email, email, DEFAULT_ZONE.id, newInviteCode(),
             ) { it.getLong(1) }!!
             c.execute("insert into companions (user_id) values (?)", id)
-            c.execute("insert into user_profiles (user_id, nickname, nickname_key) values (?, ?, ?)", id, name, TextRules.nicknameKey(name))
+            c.execute("insert into user_profiles (user_id, nickname) values (?, ?)", id, username)
             id
         }
     }
@@ -218,7 +159,7 @@ class UserRepository(private val db: Db) {
         c.execute("update users set timezone = ? where id = ? and timezone <> ?", timezone, userId, timezone)
     }
 
-    suspend fun update(userId: Long, changes: ProfileChanges) = try { db.tx { c ->
+    suspend fun update(userId: Long, changes: ProfileChanges) = db.tx { c ->
         val userSets = buildList {
             changes.cityCode?.let { add("city_code = ?" to it) }
             changes.workStart?.let { add("work_start = ?" to it) }
@@ -232,14 +173,9 @@ class UserRepository(private val db: Db) {
             changes.personality?.let { add("personality = ?" to it.code) }
         }
         c.applySets("users", "id", userId, userSets)
-        if (changes.nicknameChanged) c.execute("update user_profiles set nickname=?,nickname_key=?,updated_at=now() where user_id=?",
-            changes.nickname, changes.nickname?.let(TextRules::nicknameKey), userId)
         if (companionSets.isNotEmpty()) {
             c.applySets("companions", "user_id", userId, companionSets + ("updated_at = now()" to null))
         }
-    } } catch (e: SQLException) {
-        if (e.sqlState == "23505") conflict("这个昵称已有人使用，换一个吧", "nickname_taken")
-        throw e
     }
 
     private fun java.sql.Connection.applySets(table: String, key: String, id: Long, sets: List<Pair<String, Any?>>) {

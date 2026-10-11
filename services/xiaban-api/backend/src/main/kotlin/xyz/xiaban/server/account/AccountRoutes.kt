@@ -5,7 +5,6 @@ import io.ktor.http.Cookie
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.auth.authenticate
-import io.ktor.server.plugins.origin
 import io.ktor.server.plugins.ratelimit.rateLimit
 import io.ktor.server.request.receive
 import io.ktor.server.response.header
@@ -19,9 +18,6 @@ import io.ktor.server.routing.put
 import kotlinx.serialization.json.JsonObject
 import xyz.xiaban.contracts.account.auth.AccountApiPaths
 import xyz.xiaban.contracts.account.auth.AccountCenterLoginRequest
-import xyz.xiaban.contracts.account.auth.BindEmailRequest
-import xyz.xiaban.contracts.account.auth.EmailCodeRequest
-import xyz.xiaban.contracts.account.auth.EmailLoginRequest
 import xyz.xiaban.contracts.account.auth.LogoutRequest
 import xyz.xiaban.contracts.account.consent.ConsentApiPaths
 import xyz.xiaban.contracts.account.consent.ConsentUpdate
@@ -45,31 +41,6 @@ import xyz.xiaban.server.users.DEVICE_COOKIE
 import xyz.xiaban.server.users.SessionService
 
 fun Route.accountRoutes(services: Services) {
-    get("/api/account/email/status") {
-        val settings = services.emailSettings.current()
-        call.respond(xyz.xiaban.server.admin.EmailServiceStatus(settings.enabled, services.emailAvailable()))
-    }
-    post(AccountApiPaths.EMAIL_LOGIN_CODE) {
-        val bearer = call.request.headers[HttpHeaders.Authorization]?.removePrefix("Bearer ")?.trim()
-        val userId = bearer?.let { services.tokens.userIdOrNull(it) }
-        services.emailBinding.sendCode(userId, call.receive<EmailCodeRequest>().email, login = true, ip = call.request.origin.remoteHost)
-        call.respond(OkResponse())
-    }
-    post(AccountApiPaths.EMAIL_LOGIN) {
-        val bearer = call.request.headers[HttpHeaders.Authorization]?.removePrefix("Bearer ")?.trim()
-        val userId = bearer?.let { services.tokens.userIdOrNull(it) }
-        val req = call.receive<EmailLoginRequest>()
-        val termsVersion = req.termsVersion?.trim()?.also {
-            if (it.isEmpty() || it.length > 20) badRequest("协议版本无效", "invalid_terms_version")
-        }
-        val result = services.emailBinding.login(userId, req.email, req.code, req.deviceId, req.mergeGuest, req.username)
-        val profile = if (termsVersion != null) {
-            services.account.consent(result.profile.userId, termsVersion, false)
-            services.profiles.view(result.profile.userId)
-        } else result.profile
-        bearer?.let { services.tokens.revoke(it) }
-        call.respond(result.copy(profile = profile))
-    }
     post(AccountApiPaths.ACCOUNT_CENTER_LOGIN) {
         val bearer = call.request.headers[HttpHeaders.Authorization]?.removePrefix("Bearer ")?.trim()
         val userId = bearer?.let { services.tokens.userIdOrNull(it) }
@@ -94,16 +65,6 @@ fun Route.accountRoutes(services: Services) {
             call.response.cookies.append(Cookie(DEVICE_COOKIE, "", maxAge = 0, path = "/api", httpOnly = true,
                 secure = services.config.publicBaseUrl.startsWith("https://"), extensions = mapOf("SameSite" to "Lax")))
             call.respond(OkResponse())
-        }
-        post(AccountApiPaths.BIND_CODE) {
-            services.emailBinding.sendCode(call.userId(), call.receive<EmailCodeRequest>().email, ip = call.request.origin.remoteHost)
-            call.respond(OkResponse())
-        }
-        post(AccountApiPaths.BIND) {
-            val req = call.receive<BindEmailRequest>()
-            val result = services.emailBinding.bind(call.userId(), req.email, req.code, req.username)
-            call.request.headers[HttpHeaders.Authorization]?.removePrefix("Bearer ")?.trim()?.let { services.tokens.revoke(it) }
-            call.respond(result)
         }
         put(ProfileApiPaths.SUBSCRIPTION) {
             val userId = call.userId()

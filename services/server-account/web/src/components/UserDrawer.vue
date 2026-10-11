@@ -47,6 +47,13 @@ function toggleStatus() {
   );
 }
 
+function rename() {
+  if (!detail.value) return;
+  const next = window.prompt('用户名对用户本人不可修改，仅用于处理违规或冒充的名字。新用户名：', detail.value.user.username)?.trim();
+  if (!next || next === detail.value.user.username) return;
+  act(`确定把用户名改为「${next}」？旧用户名会被释放，改名会记入审计日志。`, () => api.renameUser(props.uid, next));
+}
+
 function revokeAll() {
   act('该用户所有设备将需要重新登录（已发出的访问令牌最长再存活约 30 分钟）。确定？', () => api.revokeSessions(props.uid));
 }
@@ -69,11 +76,11 @@ onUnmounted(() => window.removeEventListener('keydown', onKey));
 
       <template v-if="detail">
         <dl>
-          <dt>昵称</dt><dd>{{ detail.user.nickname }}</dd>
+          <dt>用户名</dt><dd>{{ detail.user.username }}</dd>
           <dt>UID</dt><dd class="mono">{{ detail.user.uid }}</dd>
           <dt>状态</dt>
           <dd><span class="badge" :class="detail.status === 'active' ? 'ok' : 'bad'">{{ detail.status === 'active' ? '正常' : '已停用' }}</span></dd>
-          <dt>密码</dt><dd>{{ detail.user.has_password ? '已设置' : '未设置（仅验证码登录）' }}</dd>
+          <dt>密码</dt><dd>{{ detail.user.has_password ? '已设置' : '未设置' }}</dd>
           <dt>注册时间</dt><dd>{{ formatTime(detail.user.created_at) }}</dd>
           <dt>最近登录</dt><dd>{{ formatTime(detail.last_login_at) }}</dd>
           <dt>头像</dt><dd class="mono wrap">{{ detail.user.avatar_url ?? '—' }}</dd>
@@ -104,6 +111,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKey));
         </div>
 
         <footer>
+          <button type="button" class="btn" :disabled="busy" @click="rename">改用户名</button>
           <button type="button" class="btn" :disabled="busy || !detail.sessions.length" @click="revokeAll">下线全部设备</button>
           <button type="button" class="btn" :class="{ danger: detail.status === 'active' }" :disabled="busy" @click="toggleStatus">
             {{ detail.status === 'active' ? '停用用户' : '启用用户' }}

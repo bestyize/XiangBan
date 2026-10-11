@@ -15,8 +15,6 @@ function changesFor(step: Step, draft: Draft): ProfileUpdate {
       return { companionName: draft.companionName.trim() }
     case 'personality':
       return { personality: draft.personality }
-    case 'nickname':
-      return { nickname: draft.nickname.trim() }
     case 'city':
       return draft.cityCode ? { cityCode: draft.cityCode } : {}
     case 'hours':
@@ -38,7 +36,6 @@ export default function Onboarding() {
   const [draft, setDraft] = useState<Draft>(() => ({
     companionName: profile.companionName,
     personality: profile.personality,
-    nickname: profile.nickname ?? '',
     cityCode: profile.cityCode,
     workStart: profile.workStart,
     workEnd: profile.workEnd,

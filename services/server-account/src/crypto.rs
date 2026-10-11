@@ -40,6 +40,8 @@ pub struct SubKeys {
     aead: aead::LessSafeKey,
     /// 管理员令牌的 HS256 密钥：与用户令牌的 Ed25519 密钥完全独立，业务服务拿不到。
     pub admin_jwt_secret: Vec<u8>,
+    /// 注册凭证（验证码通过后、设置用户名密码前）的 HS256 密钥，独立于管理员与用户令牌。
+    pub register_jwt_secret: Vec<u8>,
 }
 
 impl SubKeys {
@@ -53,6 +55,7 @@ impl SubKeys {
             code_mac: hmac::Key::new(hmac::HMAC_SHA256, &sub(b"code-hash")),
             aead: aead::LessSafeKey::new(aead_key),
             admin_jwt_secret: sub(b"admin-jwt"),
+            register_jwt_secret: sub(b"register-jwt"),
         }
     }
 

@@ -5,32 +5,68 @@ import { accountApi, AccountError } from '@/api/account'
 import { useSession } from '@/stores/session'
 import { useToast } from '@/stores/toast'
 
+type Mode = 'password' | 'code' | 'reset'
+type Step = 'identify' | 'verify' | 'setup'
+type Availability = { kind: 'idle' } | { kind: 'checking' } | { kind: 'ok' } | { kind: 'taken' | 'invalid'; message: string }
+
 const session = useSession()
 const toast = useToast()
 
+const mode = ref<Mode>('password')
+const step = ref<Step>('identify')
 const identifier = ref('')
+const password = ref('')
 const code = ref('')
-const step = ref<'id' | 'code'>('id')
+const username = ref('')
+const showPassword = ref(false)
 const busy = ref(false)
 const error = ref('')
+const notice = ref('')
 const cooldown = ref(0)
+const availability = ref<Availability>({ kind: 'idle' })
+let registrationToken: string | null = null
 let timer: ReturnType<typeof setInterval> | null = null
+let checkTimer: ReturnType<typeof setTimeout> | null = null
 
+const codeSent = computed(() => step.value === 'verify')
 const validId = computed(() => {
   const v = identifier.value.trim()
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v) || /^\+?\d{6,15}$/.test(v)
 })
 
-watch(
-  () => session.loginOpen,
-  open => {
-    if (open) {
-      error.value = ''
-      code.value = ''
-      step.value = 'id'
-    }
-  },
-)
+function usernameProblem(raw: string): string {
+  const v = raw.trim()
+  if (!v) return ''
+  if (!/^[A-Za-z]/.test(v)) return '用户名需以字母开头'
+  if (!/^[A-Za-z0-9_]+$/.test(v)) return '只能包含字母、数字和下划线'
+  if (v.length < 4 || v.length > 20) return '需为 4-20 个字符'
+  return ''
+}
+
+function passwordProblemOf(raw: string, name = ''): string {
+  if (!raw) return ''
+  if (raw.length < 8) return '密码至少 8 位'
+  if (raw.length > 128) return '密码最多 128 位'
+  if (name && raw.toLowerCase() === name.trim().toLowerCase()) return '密码不能和用户名相同'
+  return ''
+}
+
+const passwordProblem = computed(() => passwordProblemOf(password.value, mode.value === 'reset' ? '' : username.value))
+const hint = computed(() => {
+  const a = availability.value
+  if (a.kind === 'checking') return '正在检查…'
+  if (a.kind === 'ok') return '可以使用'
+  return a.kind === 'taken' || a.kind === 'invalid' ? a.message : ''
+})
+const canSubmit = computed(() => {
+  if (mode.value === 'password') return !!identifier.value.trim() && !!password.value
+  if (mode.value === 'reset') return codeSent.value && code.value.trim().length >= 4 && !!password.value && !passwordProblem.value
+  if (step.value === 'setup') {
+    const k = availability.value.kind
+    return !!username.value.trim() && k === 'ok' && !!password.value && !passwordProblem.value
+  }
+  return codeSent.value && code.value.trim().length >= 4
+})
 
 function startCooldown(secs: number) {
   cooldown.value = secs
@@ -43,15 +79,67 @@ function startCooldown(secs: number) {
     }
   }, 1000)
 }
-onBeforeUnmount(() => timer && clearInterval(timer))
+
+function switchMode(next: Mode) {
+  mode.value = next
+  step.value = 'identify'
+  code.value = ''
+  password.value = ''
+  error.value = ''
+  notice.value = ''
+  registrationToken = null
+  if (timer) clearInterval(timer)
+  timer = null
+  cooldown.value = 0
+}
+
+watch(
+  () => session.loginOpen,
+  open => {
+    if (!open) return
+    switchMode('password')
+    username.value = ''
+    availability.value = { kind: 'idle' }
+  },
+)
+
+// 设置账号时边输入边查重，只是提示；真正的唯一性由服务端保证。
+watch([username, step], () => {
+  if (checkTimer) clearTimeout(checkTimer)
+  if (step.value !== 'setup') return
+  const name = username.value.trim()
+  if (!name) {
+    availability.value = { kind: 'idle' }
+    return
+  }
+  const local = usernameProblem(name)
+  if (local) {
+    availability.value = { kind: 'invalid', message: local }
+    return
+  }
+  availability.value = { kind: 'checking' }
+  checkTimer = setTimeout(async () => {
+    try {
+      const res = await accountApi.checkUsername(name)
+      if (username.value.trim() === name) availability.value = res.available ? { kind: 'ok' } : { kind: 'taken', message: res.message ?? '这个用户名已被占用' }
+    } catch {
+      if (username.value.trim() === name) availability.value = { kind: 'idle' }
+    }
+  }, 350)
+})
+
+onBeforeUnmount(() => {
+  if (timer) clearInterval(timer)
+  if (checkTimer) clearTimeout(checkTimer)
+})
 
 async function sendCode() {
   if (!validId.value || busy.value || cooldown.value > 0) return
   busy.value = true
   error.value = ''
   try {
-    const res = await accountApi.sendCode(identifier.value.trim())
-    step.value = 'code'
+    const res = await accountApi.sendCode(identifier.value.trim(), mode.value === 'reset' ? 'reset_password' : 'login')
+    step.value = 'verify'
     startCooldown(res.cooldown_seconds || 60)
   } catch (e) {
     error.value = e instanceof Error ? e.message : '验证码发送失败'
@@ -61,15 +149,42 @@ async function sendCode() {
   }
 }
 
-async function login() {
-  if (code.value.trim().length < 4 || busy.value) return
+function welcome(result: { isNewUser: boolean; username: string }) {
+  session.loginOpen = false
+  toast.show(result.isNewUser ? `欢迎来到超级小伴，${result.username}` : `已登录，${result.username}`)
+}
+
+async function submit() {
+  if (!canSubmit.value || busy.value) return
   busy.value = true
   error.value = ''
   try {
-    const isNew = await session.loginWithCode(identifier.value.trim(), code.value.trim())
-    session.loginOpen = false
-    toast.show(isNew ? '欢迎来到超级小伴' : '已登录')
+    if (mode.value === 'password') {
+      welcome(await session.loginWithPassword(identifier.value.trim(), password.value))
+    } else if (mode.value === 'reset') {
+      await accountApi.resetPassword(identifier.value.trim(), code.value.trim(), password.value)
+      switchMode('password')
+      notice.value = '密码已重置，请用新密码登录。'
+    } else if (step.value === 'setup') {
+      if (!registrationToken) throw new AccountError(401, '验证已过期，请重新获取验证码', undefined, 'registration_expired')
+      welcome(await session.register(registrationToken, username.value.trim(), password.value))
+    } else {
+      const res = await session.loginWithCode(identifier.value.trim(), code.value.trim())
+      if ('registrationToken' in res) {
+        registrationToken = res.registrationToken
+        password.value = ''
+        step.value = 'setup'
+      } else {
+        welcome(res)
+      }
+    }
   } catch (e) {
+    if (e instanceof AccountError && e.code === 'username_taken') availability.value = { kind: 'taken', message: e.message }
+    if (e instanceof AccountError && (e.code === 'registration_expired' || e.code === 'identity_exists')) {
+      registrationToken = null
+      step.value = 'identify'
+      code.value = ''
+    }
     error.value = e instanceof Error ? e.message : '登录失败'
   } finally {
     busy.value = false
@@ -79,52 +194,69 @@ async function login() {
 
 <template>
   <ModalDialog :open="session.loginOpen" title="登录超级小伴" :width="400" @close="session.loginOpen = false">
-    <p class="lead">用相伴账号登录。没有账号的话，验证后会自动注册。</p>
+    <p class="lead">
+      <template v-if="step === 'setup'">验证通过，设置你的账号。用户名是你的唯一账号，设置后不能修改。</template>
+      <template v-else>已有相伴账号用密码登录；新用户用邮箱验证码注册，再设置用户名和密码。</template>
+    </p>
 
-    <form v-if="step === 'id'" class="form" @submit.prevent="sendCode">
-      <label class="field">
-        <span>邮箱或手机号</span>
+    <div v-if="step !== 'setup'" class="tabs" role="tablist">
+      <button type="button" role="tab" :aria-selected="mode !== 'code'" :class="{ on: mode !== 'code' }" @click="switchMode('password')">密码登录</button>
+      <button type="button" role="tab" :aria-selected="mode === 'code'" :class="{ on: mode === 'code' }" @click="switchMode('code')">验证码登录 / 注册</button>
+    </div>
+
+    <form class="form" @submit.prevent="submit">
+      <label v-if="step === 'setup'" class="field">
+        <span>用户名</span>
+        <input v-model="username" class="input" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" maxlength="20" placeholder="字母开头，4-20 位字母、数字或下划线" />
+        <small v-if="hint" class="hint" :class="{ bad: availability.kind === 'taken' || availability.kind === 'invalid' }" role="status">{{ hint }}</small>
+      </label>
+      <label v-else class="field">
+        <span>{{ mode === 'password' ? '用户名 / 邮箱 / 手机号' : '邮箱或手机号' }}</span>
         <input
           v-model="identifier"
           class="input"
           type="text"
-          inputmode="email"
           autocomplete="username"
-          placeholder="name@example.com"
-          autofocus
+          autocapitalize="none"
+          spellcheck="false"
+          :disabled="codeSent"
+          :placeholder="mode === 'password' ? '用户名、邮箱或手机号' : 'name@example.com'"
         />
       </label>
-      <p v-if="error" class="error-text" role="alert">{{ error }}</p>
-      <button class="btn btn-primary wide" type="submit" :disabled="!validId || busy || cooldown > 0">
-        {{ cooldown > 0 ? `${cooldown} 秒后可重新发送` : busy ? '正在发送' : '发送验证码' }}
-      </button>
-    </form>
 
-    <form v-else class="form" @submit.prevent="login">
-      <p class="sent">验证码已发到 <strong>{{ identifier }}</strong></p>
-      <label class="field">
-        <span>验证码</span>
-        <input
-          v-model="code"
-          class="input code"
-          type="text"
-          inputmode="numeric"
-          autocomplete="one-time-code"
-          maxlength="8"
-          placeholder="6 位数字"
-          autofocus
-        />
+      <label v-if="mode === 'password' || step === 'setup' || (mode === 'reset' && codeSent)" class="field">
+        <span>{{ mode === 'reset' ? '新密码' : step === 'setup' ? '设置密码' : '密码' }}</span>
+        <span class="with-button">
+          <input
+            v-model="password"
+            class="input"
+            :type="showPassword ? 'text' : 'password'"
+            :autocomplete="mode === 'password' ? 'current-password' : 'new-password'"
+            placeholder="至少 8 位"
+          />
+          <button type="button" class="link" @click="showPassword = !showPassword">{{ showPassword ? '隐藏' : '显示' }}</button>
+        </span>
+        <small v-if="mode !== 'password' && passwordProblem" class="hint bad">{{ passwordProblem }}</small>
       </label>
+
+      <label v-if="mode !== 'password' && codeSent" class="field">
+        <span>验证码</span>
+        <input v-model="code" class="input code" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="8" placeholder="6 位数字" />
+      </label>
+
+      <p v-if="notice" class="sent" role="status">{{ notice }}</p>
       <p v-if="error" class="error-text" role="alert">{{ error }}</p>
-      <button class="btn btn-primary wide" type="submit" :disabled="code.trim().length < 4 || busy">
-        {{ busy ? '正在登录' : '登录' }}
+
+      <button v-if="mode !== 'password' && step !== 'setup'" class="btn wide" type="button" :disabled="!validId || busy || cooldown > 0" @click="sendCode">
+        {{ cooldown > 0 ? `${cooldown} 秒后可重新发送` : busy ? '正在发送' : codeSent ? '重新发送' : '发送验证码' }}
       </button>
-      <div class="row">
-        <button type="button" class="link" @click="step = 'id'">换个账号</button>
-        <button type="button" class="link" :disabled="cooldown > 0 || busy" @click="sendCode">
-          {{ cooldown > 0 ? `${cooldown} 秒后重发` : '重新发送' }}
-        </button>
-      </div>
+
+      <button v-if="mode === 'password' || codeSent || step === 'setup'" class="btn btn-primary wide" type="submit" :disabled="!canSubmit || busy">
+        {{ busy ? '请稍候' : mode === 'password' ? '登录' : mode === 'reset' ? '重置密码' : step === 'setup' ? '完成注册' : '验证并继续' }}
+      </button>
+
+      <button v-if="mode === 'password'" type="button" class="link" @click="switchMode('reset')">忘记密码？</button>
+      <button v-if="mode === 'reset'" type="button" class="link" @click="switchMode('password')">返回密码登录</button>
     </form>
 
     <p class="legal">
@@ -151,6 +283,15 @@ async function login() {
   width: 100%;
   height: 42px;
   font-size: var(--fs-md);
+}
+.wide.btn-primary {
+  background: var(--brand);
+  border-color: var(--brand);
+  color: var(--brand-ink);
+}
+.wide.btn-primary:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--brand) 88%, #000);
+  border-color: color-mix(in srgb, var(--brand) 88%, #000);
 }
 .code {
   font-family: var(--font-display);
@@ -189,5 +330,43 @@ async function login() {
   color: var(--ink-2);
   text-decoration: underline;
   text-underline-offset: 2px;
+}
+.tabs {
+  display: flex;
+  gap: 6px;
+  margin: 0 0 14px;
+  padding: 4px;
+  border-radius: 999px;
+  background: var(--surface-2);
+}
+.tabs button {
+  flex: 1;
+  height: 34px;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  color: var(--ink-2);
+  font-size: var(--fs-sm);
+}
+.tabs button.on {
+  background: var(--brand);
+  color: var(--brand-ink);
+  font-weight: 600;
+}
+.with-button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.with-button .input {
+  flex: 1;
+  min-width: 0;
+}
+.hint {
+  color: var(--ink-2);
+  font-size: var(--fs-xs);
+}
+.hint.bad {
+  color: var(--danger);
 }
 </style>

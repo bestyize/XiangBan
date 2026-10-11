@@ -8,6 +8,7 @@ import xyz.xiaban.contracts.companion.personality.PersonalityView
 data class ProfileView(
     val companionName: String,
     val personality: Personality,
+    /** The account's unique username (mirrored from the account center); null for a guest. Read-only. */
     val nickname: String?,
     val cityCode: String?,
     val cityName: String?,
@@ -34,12 +35,11 @@ data class ProfileView(
     val avatarUrl: String? = null,
 )
 
-/** Omitted fields stay unchanged; an empty [nickname] or a [payday] of 0 clears it. */
+/** Omitted fields stay unchanged; a [payday] of 0 clears it. The username cannot be changed here. */
 @Serializable
 data class ProfileUpdate(
     val companionName: String? = null,
     val personality: Personality? = null,
-    val nickname: String? = null,
     val cityCode: String? = null,
     val workStart: String? = null,
     val workEnd: String? = null,

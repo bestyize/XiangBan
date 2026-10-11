@@ -3,12 +3,16 @@ use crate::{
     error::AppError,
     extract::{AuthUser, ClientIp},
     identifier::Identifier,
-    password,
+    password, registration,
     sessions::{self, TokenPair},
     state::AppState,
+    username,
     users::{self, UserView},
 };
-use axum::{extract::State, Json};
+use axum::{
+    extract::{Query, State},
+    Json,
+};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use uuid::Uuid;
@@ -87,18 +91,94 @@ pub struct CodeLoginReq {
     device_name: Option<String>,
 }
 
+#[derive(Serialize)]
+#[serde(untagged)]
+pub enum CodeLoginResponse {
+    /// 这个邮箱 / 手机号已有账号：直接登录。
+    Session(AuthResponse),
+    /// 新的邮箱 / 手机号：验证码通过，但还没有账号，客户端带着凭证去设置用户名和密码。
+    RegistrationRequired(RegistrationRequired),
+}
+
+#[derive(Serialize)]
+pub struct RegistrationRequired {
+    registration_required: bool,
+    registration_token: String,
+    expires_in: i64,
+}
+
 pub async fn login_with_code(
     State(state): State<AppState>,
     ClientIp(ip): ClientIp,
     Json(req): Json<CodeLoginReq>,
-) -> Result<Json<AuthResponse>, AppError> {
+) -> Result<Json<CodeLoginResponse>, AppError> {
     let ident = Identifier::parse(&req.identifier)?;
     require_client(&state, &req.client_id).await?;
     codes::verify(&state, &ident, Purpose::Login, &req.code).await?;
 
-    let (uid, is_new) = users::get_or_create(&state, &ident).await?;
+    let Some(uid) = users::find_uid(&state, &ident).await? else {
+        return Ok(Json(CodeLoginResponse::RegistrationRequired(RegistrationRequired {
+            registration_required: true,
+            registration_token: registration::issue(&state.keys.sub.register_jwt_secret, &ident)?,
+            expires_in: registration::TTL_SECS,
+        })));
+    };
     users::ensure_active(&state, uid).await?;
-    respond(&state, uid, is_new, &req.client_id, req.device_name.as_deref(), &ip).await
+    let session = respond(&state, uid, false, &req.client_id, req.device_name.as_deref(), &ip).await?;
+    Ok(Json(CodeLoginResponse::Session(session.0)))
+}
+
+#[derive(Deserialize)]
+pub struct RegisterReq {
+    registration_token: String,
+    username: String,
+    password: String,
+    client_id: String,
+    device_name: Option<String>,
+}
+
+pub async fn register(
+    State(state): State<AppState>,
+    ClientIp(ip): ClientIp,
+    Json(req): Json<RegisterReq>,
+) -> Result<Json<AuthResponse>, AppError> {
+    require_client(&state, &req.client_id).await?;
+    let ident = registration::verify(&state.keys.sub.register_jwt_secret, &req.registration_token)?;
+    let name = username::parse(&req.username)?;
+    password::validate(&req.password)?;
+    if req.password.eq_ignore_ascii_case(&name.display) {
+        return Err(AppError::BadRequest("密码不能和用户名相同".into()));
+    }
+    let hash = password::hash(req.password).await?;
+    let uid = users::register(&state, &ident, &name, &hash).await?;
+    respond(&state, uid, true, &req.client_id, req.device_name.as_deref(), &ip).await
+}
+
+#[derive(Deserialize)]
+pub struct UsernameQuery {
+    username: String,
+}
+
+/// 设置账号页边输入边查重。只是提示：真正的唯一性由 `register` 里的唯一索引保证。
+pub async fn username_available(
+    State(state): State<AppState>,
+    ClientIp(ip): ClientIp,
+    Query(query): Query<UsernameQuery>,
+) -> Result<Json<Value>, AppError> {
+    state.username_limiter.check(&ip).map_err(|retry_after| AppError::TooManyRequests {
+        message: "查询太频繁，请稍后再试".into(),
+        retry_after,
+    })?;
+    let name = match username::parse(&query.username) {
+        Ok(name) => name,
+        Err(AppError::BadRequest(message)) => return Ok(Json(json!({ "available": false, "message": message }))),
+        Err(other) => return Err(other),
+    };
+    let taken = users::username_exists(&state, &name.key).await?;
+    Ok(Json(json!({
+        "available": !taken,
+        "message": if taken { Value::from("这个用户名已被占用，换一个吧") } else { Value::Null },
+    })))
 }
 
 #[derive(Deserialize)]
@@ -114,20 +194,11 @@ pub async fn login_with_password(
     ClientIp(ip): ClientIp,
     Json(req): Json<PasswordLoginReq>,
 ) -> Result<Json<AuthResponse>, AppError> {
-    let ident = Identifier::parse(&req.identifier).map_err(|_| AppError::Unauthorized(BAD_CREDENTIALS.into()))?;
     require_client(&state, &req.client_id).await?;
 
-    let row: Option<(Uuid, Option<String>, bool)> = sqlx::query_as(
-        "SELECT u.uid, u.password_hash, COALESCE(u.locked_until > now(), false)
-         FROM identities i JOIN users u ON u.uid = i.uid
-         WHERE i.kind = $1 AND i.identifier_hash = $2",
-    )
-    .bind(ident.kind.as_str())
-    .bind(state.keys.sub.identifier_hash(ident.kind.as_str(), &ident.value))
-    .fetch_optional(&state.pool)
-    .await?;
-
-    let Some((uid, Some(hash), locked)) = row else {
+    // 标识可以是用户名、邮箱或手机号；查无此人、没设密码、格式不对一律走同样的耗时与提示。
+    let found = users::find_for_password_login(&state, &req.identifier).await?;
+    let Some(users::LoginRow { uid, password_hash: Some(hash), locked }) = found else {
         password::verify(req.password, state.dummy_password_hash.to_string()).await;
         return Err(AppError::Unauthorized(BAD_CREDENTIALS.into()));
     };

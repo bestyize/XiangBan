@@ -4,20 +4,16 @@ import type { Profile } from '../../api/types.ts'
 import { SubPage } from '../../components/SubPage.tsx'
 import { FieldError, PrimaryButton, QuietButton } from '../../components/ui.tsx'
 import { compressAvatar, uploadAvatar } from '../../lib/avatar.ts'
-import { nicknameError, normalizeNickname } from '../../lib/nickname.ts'
 import { useProfile, useSession } from '../../lib/session.tsx'
 
-const input = 'w-full rounded-2xl border-2 border-dusk-soft bg-dusk-deep/60 px-4 py-3 text-window focus:border-lamp focus:outline-none'
 export default function AccountProfile() {
   const profile = useProfile()
-  const { updateProfile, setProfile, refresh, isLoggedIn } = useSession()
-  const [nickname, setNickname] = useState(profile.nickname ?? '')
+  const { setProfile, refresh } = useSession()
   const [avatar, setAvatar] = useState<Blob | null>(null)
   const [preview, setPreview] = useState<string | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [message, setMessage] = useState<string | null>(null)
-  const invalidNickname = nicknameError(nickname)
   useEffect(() => {
     if (!avatar) { setPreview(null); return }
     const url = URL.createObjectURL(avatar); setPreview(url)
@@ -36,7 +32,7 @@ export default function AccountProfile() {
       if (e instanceof ApiError && e.status === 401) void refresh().catch(() => undefined)
     } finally { setBusy(null) }
   }
-  return <SubPage title="昵称和头像" back="/me">
+  return <SubPage title="头像和用户名" back="/me">
     <div className="mt-2 space-y-6">
       <FieldError message={error} />{message && <p role="status" className="text-sm text-lamp">{message}</p>}
       <section className="rounded-2xl bg-dusk-soft/35 p-5"><h2 className="font-bold">我的头像</h2><div className="mt-4 flex items-center gap-5">
@@ -53,12 +49,10 @@ export default function AccountProfile() {
           {profile.avatarUrl && <QuietButton disabled={!!busy} onClick={() => void action('remove-avatar', async () => { setProfile(await api<Profile>('/api/account/avatar', { method: 'DELETE' })); setAvatar(null); setMessage('已恢复默认头像。') })}>恢复默认</QuietButton>}
         </div>
       </section>
-      <form className="rounded-2xl bg-dusk-soft/35 p-5" onSubmit={(e) => { e.preventDefault(); if (!invalidNickname && !busy) void action('nickname', async () => {
-        const saved = await updateProfile({ nickname: normalizeNickname(nickname) }); setNickname(saved.nickname ?? ''); setMessage('昵称已保存。')
-      }) }}><label className="block"><span className="mb-3 block font-bold">我的昵称</span><input className={input} value={nickname} maxLength={24} disabled={!!busy} onChange={(e) => { setNickname(e.target.value); setMessage(null) }} placeholder={`留空则显示${isLoggedIn ? '用户' : '游客'} #${profile.userId}`} /></label>
-        <p className="mt-3 text-xs leading-relaxed text-window/55">至少 2 个字符；纯英文或英文加数字至少 4 个字符；不能为纯数字，最多 24 个字符。昵称不可重复，大小写与全角写法也会判重。</p>
-        <FieldError message={invalidNickname} /><PrimaryButton className="mt-5" type="submit" disabled={!!busy || !!invalidNickname || normalizeNickname(nickname) === (profile.nickname ?? '')}>{busy === 'nickname' ? '正在保存…' : '保存昵称'}</PrimaryButton>
-      </form>
+      <section className="rounded-2xl bg-dusk-soft/35 p-5"><h2 className="font-bold">我的用户名</h2>
+        <p className="mt-3 text-lg">{profile.nickname ?? '登录后显示'}</p>
+        <p className="mt-3 text-xs leading-relaxed text-window/55">用户名是你的唯一账号，注册时设置，不能修改，也不能与他人重复。</p>
+      </section>
     </div>
   </SubPage>
 }

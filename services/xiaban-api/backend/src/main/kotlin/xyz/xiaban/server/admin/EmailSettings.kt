@@ -54,7 +54,7 @@ class EmailSettingsStore(private val db: Db, private val config: AppConfig) {
             fromName = request.fromName.trim(), password = request.password.ifEmpty { previous.password }, passwordConfigured = false)
         if (next.port !in 1..65535) badRequest("SMTP 端口需在 1–65535 之间")
         if (next.host.isNotEmpty() && !Regex("^[A-Za-z0-9.-]{1,253}$").matches(next.host)) badRequest("SMTP 主机请填写域名或 IPv4 地址")
-        if (next.from.isNotEmpty()) xyz.xiaban.server.account.EmailBinding.normalize(next.from)
+        if (next.from.isNotEmpty()) xyz.xiaban.server.mail.normalizeEmail(next.from)
         if (next.fromName.length > 80 || next.user.length > 254 || next.password.length > 4096) badRequest("配置内容过长")
         if (next.enabled && !next.configured()) badRequest("启用邮箱登录前，请填完整 SMTP 主机、用户名、授权码和发件邮箱")
         val value = encrypt(AppJson.encodeToString(EmailSettings.serializer(), next))

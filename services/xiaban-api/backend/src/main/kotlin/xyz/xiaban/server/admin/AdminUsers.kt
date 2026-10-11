@@ -1,7 +1,6 @@
 package xyz.xiaban.server.admin
 
 import java.sql.ResultSet
-import java.sql.SQLException
 import java.time.Clock
 import java.time.LocalDate
 import java.time.LocalTime
@@ -10,7 +9,6 @@ import kotlinx.serialization.Serializable
 import xyz.xiaban.contracts.companion.personality.Personality
 import xyz.xiaban.server.db.*
 import xyz.xiaban.server.http.badRequest
-import xyz.xiaban.server.http.conflict
 import xyz.xiaban.server.http.notFound
 import xyz.xiaban.server.meta.Cities
 import xyz.xiaban.server.users.TextRules
@@ -35,7 +33,7 @@ data class AdminUserRow(
     val guardianPaused: Boolean?, val note: String, val noteUpdatedAt: Long?, val noteUpdatedBy: String?,
     val devices: List<AdminDevice>, val recentCheckins: List<AdminCheckin>, val cityCode: String?, val personality: Personality, val payday: Int?)
 @Serializable data class AdminNoteUpdate(val note: String)
-@Serializable data class AdminUserUpdate(val nickname: String? = null, val companionName: String? = null, val personality: Personality? = null,
+@Serializable data class AdminUserUpdate(val companionName: String? = null, val personality: Personality? = null,
     val cityCode: String? = null, val timezone: String? = null, val workStart: String? = null, val workEnd: String? = null, val payday: Int? = null)
 @Serializable data class AdminUserDelete(val confirmUserId: Long)
 @Serializable data class AdminAuditRow(val id: Long, val actor: String, val action: String, val targetUserId: Long?, val summary: String, val createdAt: Long)
@@ -116,12 +114,7 @@ class AdminUsers(private val db: Db, private val clock: Clock, private val citie
     suspend fun update(id: Long, request: AdminUserUpdate, actor: String) {
         val userFields = mutableListOf<Pair<String, Any?>>()
         val companionFields = mutableListOf<Pair<String, Any?>>()
-        val identityFields = mutableListOf<Pair<String, Any?>>()
         val labels = mutableListOf<String>()
-        request.nickname?.let {
-            val nickname = TextRules.nickname(it)
-            identityFields += "nickname" to nickname; identityFields += "nickname_key" to nickname?.let(TextRules::nicknameKey); labels += "昵称"
-        }
         request.companionName?.let { companionFields += "name" to TextRules.companionName(it); labels += "小伴名字" }
         request.personality?.let { companionFields += "personality" to it.code; labels += "性格" }
         request.cityCode?.let {
@@ -144,13 +137,12 @@ class AdminUsers(private val db: Db, private val clock: Clock, private val citie
             userFields += "payday" to it.takeIf { day -> day != 0 }; labels += "发薪日"
         }
         if (labels.isEmpty()) badRequest("没有需要修改的资料")
-        try { db.tx { c ->
+        db.tx { c ->
             c.queryOne("select id from users where id = ? for update", id) { it.getLong(1) } ?: notFound("没有找到这个用户", "user_not_found")
             if (userFields.isNotEmpty()) c.execute("update users set ${userFields.joinToString { "${it.first}=?" }} where id=?", *(userFields.map { it.second } + id).toTypedArray())
-            if (identityFields.isNotEmpty()) c.execute("update user_profiles set ${identityFields.joinToString { "${it.first}=?" }},updated_at=now() where user_id=?", *(identityFields.map { it.second } + id).toTypedArray())
             if (companionFields.isNotEmpty()) c.execute("update companions set ${companionFields.joinToString { "${it.first}=?" }},updated_at=now() where user_id=?", *(companionFields.map { it.second } + id).toTypedArray())
             c.execute("insert into admin_audit_log(actor,action,target_user_id,summary) values (?,?,?,?)", actor, "user_edit", id, "编辑用户资料：${labels.joinToString("、")}")
-        } } catch (e: SQLException) { if (e.sqlState == "23505") conflict("这个昵称已有人使用，换一个吧", "nickname_taken"); throw e }
+        }
     }
 
     suspend fun delete(id: Long, confirmation: Long, actor: String) {

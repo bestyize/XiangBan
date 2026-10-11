@@ -35,13 +35,13 @@ async function install() {
       <h2 class="display">相伴账号</h2>
       <template v-if="account.user">
         <p class="lead">
-          {{ account.user.nickname }}<span v-if="account.email" class="muted-inline"> · {{ account.email }}</span>
+          {{ account.user.username }}<span v-if="account.email" class="muted-inline"> · {{ account.email }}</span>
         </p>
         <p class="hint">同一个账号可登录小伴桌面、小伴手机壁纸和相伴其他产品。</p>
         <button class="btn" type="button" @click="logout">退出登录</button>
       </template>
       <template v-else>
-        <p class="lead">用邮箱验证码登录，新邮箱会自动注册。登录后小伴桌面与手机端共用同一个账号。</p>
+        <p class="lead">用用户名、邮箱或手机号加密码登录；新用户用邮箱验证码注册并设置用户名和密码。小伴桌面与手机端共用同一个账号。</p>
         <button class="btn btn-primary" type="button" @click="account.openLogin()">登录 / 注册</button>
       </template>
     </section>

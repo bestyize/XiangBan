@@ -151,12 +151,12 @@ private fun AccountEntry(app: AppViewModel) {
     ) {
         Box(Modifier.size(44.dp).clip(CircleShape).background(if (user == null) Palette.Field else Palette.BrandSoft), contentAlignment = Alignment.Center) {
             if (user == null) GlyphIcon(Glyph.User, Palette.Sub, 24.dp)
-            else Text(user.nickname.take(1), color = Palette.Brand, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+            else Text(user.username.take(1).uppercase(), color = Palette.Brand, fontSize = 18.sp, fontWeight = FontWeight.Bold)
         }
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
-            Text(user?.nickname ?: "登录 / 注册", color = Palette.Text, fontSize = 16.sp, fontWeight = FontWeight.Bold, maxLines = 1)
-            Text(user?.email ?: "与桌面版共用同一账号", color = Palette.Sub, fontSize = 12.sp, maxLines = 1)
+            Text(user?.username ?: "登录 / 注册", color = Palette.Text, fontSize = 16.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+            Text(if (user != null) "相伴账号" else "与桌面版共用同一账号", color = Palette.Sub, fontSize = 12.sp, maxLines = 1)
         }
         if (user == null) {
             Box(Modifier.clip(CircleShape).background(Palette.Brand).padding(horizontal = 16.dp, vertical = 7.dp)) {

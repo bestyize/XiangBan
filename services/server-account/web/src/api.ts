@@ -41,6 +41,8 @@ export const api = {
   user: (uid: string) => request<UserDetail>('GET', `/admin/users/${uid}`),
   setUserStatus: (uid: string, status: 'active' | 'disabled') =>
     request<{ ok: true }>('POST', `/admin/users/${uid}/status`, { status }),
+  renameUser: (uid: string, username: string) =>
+    request<{ ok: true; username: string }>('POST', `/admin/users/${uid}/username`, { username }),
   revokeSessions: (uid: string) => request<{ ok: true }>('POST', `/admin/users/${uid}/revoke-sessions`),
   clients: () => request<{ items: ClientRow[] }>('GET', '/admin/clients'),
   createClient: (client_id: string, name: string) => request<{ ok: true }>('POST', '/admin/clients', { client_id, name }),

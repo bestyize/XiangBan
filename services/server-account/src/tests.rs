@@ -11,11 +11,16 @@ use axum::{
 };
 use serde_json::{json, Value};
 use sqlx::PgPool;
-use std::sync::Arc;
+use std::sync::{
+    atomic::{AtomicUsize, Ordering},
+    Arc,
+};
 use tower::ServiceExt;
 use uuid::Uuid;
 
 const CLIENT: &str = "xiaban-web";
+const PASSWORD: &str = "pass-word-123";
+static NEXT_USER: AtomicUsize = AtomicUsize::new(1);
 const ADMIN_PASSWORD: &str = "admin-pass-123";
 
 struct Harness {
@@ -55,6 +60,7 @@ impl Harness {
             keys: Arc::new(Keys::ephemeral()),
             sender: Arc::new(Sender::capture()),
             dummy_password_hash: Arc::new(password::hash("dummy".into()).await.unwrap()),
+            username_limiter: crate::state::username_limiter(),
         };
         Some(Self { app: build_router(state.clone()), state, admin, schema })
     }
@@ -95,14 +101,37 @@ impl Harness {
         body["token"].as_str().unwrap().to_string()
     }
 
-    async fn login(&self, identifier: &str) -> Value {
+    async fn code_login(&self, identifier: &str, client: &str) -> (StatusCode, Value) {
         let (status, _) = self.post("/api/auth/code/send", None, json!({ "identifier": identifier })).await;
         assert_eq!(status, StatusCode::OK);
-        let (status, body) = self
-            .post("/api/auth/code/login", None, json!({ "identifier": identifier, "code": self.last_code(), "client_id": CLIENT }))
-            .await;
+        self.post("/api/auth/code/login", None, json!({ "identifier": identifier, "code": self.last_code(), "client_id": client }))
+            .await
+    }
+
+    async fn register(&self, token: &str, username: &str, client: &str) -> (StatusCode, Value) {
+        self.post(
+            "/api/auth/register",
+            None,
+            json!({ "registration_token": token, "username": username, "password": PASSWORD, "client_id": client }),
+        )
+        .await
+    }
+
+    /// 验证码登录；新的邮箱 / 手机号会接着完成注册（不指定用户名时自动生成一个）。
+    async fn login_as(&self, identifier: &str, client: &str, username: Option<&str>) -> Value {
+        let (status, body) = self.code_login(identifier, client).await;
         assert_eq!(status, StatusCode::OK, "{body}");
-        body
+        if body["registration_required"] != true {
+            return body;
+        }
+        let name = username.map(str::to_string).unwrap_or_else(|| format!("user{:04}", NEXT_USER.fetch_add(1, Ordering::Relaxed)));
+        let (status, session) = self.register(body["registration_token"].as_str().unwrap(), &name, client).await;
+        assert_eq!(status, StatusCode::OK, "{session}");
+        session
+    }
+
+    async fn login(&self, identifier: &str) -> Value {
+        self.login_as(identifier, CLIENT, None).await
     }
 }
 
@@ -125,7 +154,7 @@ async fn code_login_registers_then_reuses_the_same_user() {
     assert_eq!(first["is_new_user"], true);
     assert_eq!(first["token_type"], "Bearer");
     assert_eq!(first["user"]["identities"][0]["masked"], "a***@example.com");
-    assert_eq!(first["user"]["has_password"], false);
+    assert_eq!(first["user"]["has_password"], true, "every account is created with a password");
 
     let second = h.login("alice@example.com").await;
     assert_eq!(second["is_new_user"], false);
@@ -261,14 +290,16 @@ async fn password_can_be_set_used_and_locks_after_failures() {
     let login = h.login("frank@example.com").await;
     let token = login["access_token"].as_str().unwrap();
 
-    let (status, _) = h.post("/api/me/password", Some(token), json!({ "new_password": "short" })).await;
+    let (status, _) = h.post("/api/me/password", Some(token), json!({ "current_password": PASSWORD, "new_password": "short" })).await;
     assert_eq!(status, StatusCode::BAD_REQUEST);
-    let (status, _) = h.post("/api/me/password", Some(token), json!({ "new_password": "correct horse battery" })).await;
-    assert_eq!(status, StatusCode::OK);
     let (status, _) = h
-        .post("/api/me/password", Some(token), json!({ "new_password": "another long password" }))
+        .post("/api/me/password", Some(token), json!({ "new_password": "correct horse battery" }))
         .await;
-    assert_eq!(status, StatusCode::BAD_REQUEST, "changing an existing password requires the current one");
+    assert_eq!(status, StatusCode::BAD_REQUEST, "changing the password requires the current one");
+    let (status, _) = h
+        .post("/api/me/password", Some(token), json!({ "current_password": PASSWORD, "new_password": "correct horse battery" }))
+        .await;
+    assert_eq!(status, StatusCode::OK);
 
     let ok = json!({ "identifier": "frank@example.com", "password": "correct horse battery", "client_id": CLIENT });
     let (status, body) = h.post("/api/auth/password/login", None, ok.clone()).await;
@@ -372,12 +403,13 @@ async fn profile_update_validates_input() {
     let login = h.login("jack@example.com").await;
     let token = login["access_token"].as_str();
 
+    let before = login["user"]["username"].clone();
     let (status, me) = h
-        .call(Method::PATCH, "/api/me", token, json!({ "nickname": " 小明 ", "avatar_url": "https://img.example.com/a.png" }))
+        .call(Method::PATCH, "/api/me", token, json!({ "username": "someone_else", "avatar_url": "https://img.example.com/a.png" }))
         .await;
     assert_eq!(status, StatusCode::OK);
-    assert_eq!(me["nickname"], "小明");
-    assert_eq!(h.call(Method::PATCH, "/api/me", token, json!({ "nickname": "" })).await.0, StatusCode::BAD_REQUEST);
+    assert_eq!(me["username"], before, "the username can never be changed by the user");
+    assert_eq!(me["avatar_url"], "https://img.example.com/a.png");
     assert_eq!(
         h.call(Method::PATCH, "/api/me", token, json!({ "avatar_url": "http://insecure.example/a.png" })).await.0,
         StatusCode::BAD_REQUEST
@@ -484,9 +516,8 @@ async fn admin_stats_and_user_search() {
     let h = harness!(&[]);
     let admin = h.admin_token().await;
     let admin = Some(admin.as_str());
-    let nina = h.login("nina@example.com").await;
-    let oscar = h.login("13800138000").await;
-    h.call(Method::PATCH, "/api/me", nina["access_token"].as_str(), json!({ "nickname": "小红_100%" })).await;
+    let nina = h.login_as("nina@example.com", CLIENT, Some("Nina_Red")).await;
+    let oscar = h.login_as("13800138000", CLIENT, Some("oscar99")).await;
 
     let (status, stats) = h.call(Method::GET, "/api/admin/stats", admin, Value::Null).await;
     assert_eq!(status, StatusCode::OK);
@@ -512,9 +543,9 @@ async fn admin_stats_and_user_search() {
     assert_eq!((by_phone["total"].as_i64(), by_phone["items"][0]["uid"].clone()), (Some(1), oscar["user"]["uid"].clone()));
     let uid = oscar["user"]["uid"].as_str().unwrap();
     assert_eq!(list(&format!("?q={uid}")).await.1["total"], 1);
-    assert_eq!(list("?q=%E5%B0%8F%E7%BA%A2").await.1["total"], 1, "nickname substring");
-    assert_eq!(list("?q=100%25").await.1["total"], 1, "literal percent sign");
-    assert_eq!(list("?q=%25").await.1["total"], 1, "percent must be escaped, not a wildcard for every row");
+    assert_eq!(list("?q=nina_r").await.1["total"], 1, "username substring, case-insensitive");
+    assert_eq!(list("?q=_").await.1["total"], 1, "underscore must be escaped, not a wildcard for every row");
+    assert_eq!(list("?q=%25").await.1["total"], 0, "percent must be escaped, not a wildcard for every row");
     assert_eq!(list("?q=nobody@example.com").await.1["total"], 0);
     assert_eq!(list("?status=disabled").await.1["total"], 0);
     assert_eq!(list("?status=bogus").await.0, StatusCode::BAD_REQUEST);
@@ -576,10 +607,7 @@ async fn admin_can_manage_clients() {
     assert_eq!(h.post("/api/admin/clients", admin, json!({ "client_id": "ok-app", "name": "新应用" })).await.0, StatusCode::OK);
     assert_eq!(h.post("/api/admin/clients", admin, json!({ "client_id": "ok-app", "name": "again" })).await.0, StatusCode::CONFLICT);
 
-    h.post("/api/auth/code/send", None, json!({ "identifier": "quinn@example.com" })).await;
-    let login = json!({ "identifier": "quinn@example.com", "code": h.last_code(), "client_id": "ok-app" });
-    let (status, session) = h.post("/api/auth/code/login", None, login).await;
-    assert_eq!(status, StatusCode::OK);
+    let session = h.login_as("quinn@example.com", "ok-app", None).await;
 
     let (_, clients) = h.call(Method::GET, "/api/admin/clients", admin, Value::Null).await;
     let row = clients["items"].as_array().unwrap().iter().find(|c| c["client_id"] == "ok-app").unwrap();
@@ -651,5 +679,198 @@ async fn admin_can_configure_and_read_sender_settings() {
     let (_, cfg) = h.call(Method::GET, "/api/admin/sender", admin, Value::Null).await;
     assert_eq!(cfg["provider"], "console");
 
+    h.cleanup().await;
+}
+
+#[tokio::test]
+async fn a_new_identifier_gets_a_registration_token_and_no_account_until_it_registers() {
+    let h = harness!(&[]);
+    let (status, body) = h.code_login("newbie@example.com", CLIENT).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["registration_required"], true);
+    assert!(body.get("access_token").is_none(), "no session before the account exists");
+    let token = body["registration_token"].as_str().unwrap();
+    let (users,): (i64,) = sqlx::query_as("SELECT COUNT(*) FROM users").fetch_one(&h.state.pool).await.unwrap();
+    assert_eq!(users, 0, "verifying the code must not create an account");
+
+    let (status, session) = h.register(token, "Newbie_One", CLIENT).await;
+    assert_eq!(status, StatusCode::OK, "{session}");
+    assert_eq!(session["is_new_user"], true);
+    assert_eq!(session["user"]["username"], "Newbie_One");
+    assert_eq!(session["user"]["has_password"], true);
+    assert!(session["access_token"].as_str().is_some());
+
+    let again = h.login("newbie@example.com").await;
+    assert_eq!(again["is_new_user"], false);
+    assert_eq!(again["user"]["uid"], session["user"]["uid"]);
+    h.cleanup().await;
+}
+
+#[tokio::test]
+async fn usernames_are_unique_ignoring_case_and_a_taken_name_keeps_the_token_usable() {
+    let h = harness!(&[]);
+    h.login_as("first@example.com", CLIENT, Some("Alice_Wonder")).await;
+
+    let (_, body) = h.code_login("second@example.com", CLIENT).await;
+    let token = body["registration_token"].as_str().unwrap();
+    let (status, err) = h.register(token, "alice_wonder", CLIENT).await;
+    assert_eq!((status, err["code"].as_str()), (StatusCode::CONFLICT, Some("username_taken")));
+    let (users,): (i64,) = sqlx::query_as("SELECT COUNT(*) FROM users").fetch_one(&h.state.pool).await.unwrap();
+    assert_eq!(users, 1, "a failed registration leaves nothing behind");
+
+    let (status, _) = h.register(token, "bob_builder", CLIENT).await;
+    assert_eq!(status, StatusCode::OK, "the same token can retry with another name");
+    h.cleanup().await;
+}
+
+#[tokio::test]
+async fn registration_rejects_bad_input_and_replayed_or_forged_tokens() {
+    let h = harness!(&[]);
+    let (_, body) = h.code_login("rules@example.com", CLIENT).await;
+    let token = body["registration_token"].as_str().unwrap();
+
+    for bad in ["abc", "1abcdef", "has space", "a@b.com", "admin_x", "xiaoban2026", "用户名用户名"] {
+        assert_eq!(h.register(token, bad, CLIENT).await.0, StatusCode::BAD_REQUEST, "{bad}");
+    }
+    let weak = |password: &str, username: &str| {
+        h.post(
+            "/api/auth/register",
+            None,
+            json!({ "registration_token": token, "username": username, "password": password, "client_id": CLIENT }),
+        )
+    };
+    assert_eq!(weak("short", "rules_one").await.0, StatusCode::BAD_REQUEST);
+    assert_eq!(weak("Rules_One", "rules_one").await.0, StatusCode::BAD_REQUEST, "password must differ from the username");
+    assert_eq!(h.register(token, "rules_one", "nope").await.0, StatusCode::BAD_REQUEST, "unknown client");
+
+    let (status, forged) = h.register("aaa.bbb.ccc", "rules_one", CLIENT).await;
+    assert_eq!((status, forged["code"].as_str()), (StatusCode::UNAUTHORIZED, Some("registration_expired")));
+    let admin_token = crate::admin_auth::issue(&h.state.keys.sub.admin_jwt_secret, uuid::Uuid::new_v4(), 0, 600).unwrap();
+    assert_eq!(h.register(&admin_token, "rules_one", CLIENT).await.0, StatusCode::UNAUTHORIZED, "an admin token is not a registration token");
+
+    assert_eq!(h.register(token, "rules_one", CLIENT).await.0, StatusCode::OK);
+    let (status, replay) = h.register(token, "rules_two", CLIENT).await;
+    assert_eq!((status, replay["code"].as_str()), (StatusCode::CONFLICT, Some("identity_exists")));
+    h.cleanup().await;
+}
+
+#[tokio::test]
+async fn password_login_accepts_username_email_or_phone_and_hides_which_part_was_wrong() {
+    let h = harness!(&[]);
+    h.login_as("dora@example.com", CLIENT, Some("Dora_Explorer")).await;
+    let phone = h.login_as("13700137000", CLIENT, Some("phone_user")).await;
+    assert_eq!(phone["user"]["identities"][0]["kind"], "phone");
+
+    let login = |identifier: &str, password: &str| {
+        h.post("/api/auth/password/login", None, json!({ "identifier": identifier, "password": password, "client_id": CLIENT }))
+    };
+    for identifier in ["Dora_Explorer", "dora_explorer", "dora@example.com", "DORA@example.com"] {
+        let (status, body) = login(identifier, PASSWORD).await;
+        assert_eq!(status, StatusCode::OK, "{identifier}: {body}");
+        assert_eq!(body["user"]["username"], "Dora_Explorer");
+        assert_eq!(body["is_new_user"], false);
+    }
+    assert_eq!(login("phone_user", PASSWORD).await.0, StatusCode::OK);
+    assert_eq!(login("13700137000", PASSWORD).await.0, StatusCode::OK);
+
+    let wrong = login("dora_explorer", "wrong-password").await;
+    let unknown = login("nobody_here", PASSWORD).await;
+    let junk = login("???", PASSWORD).await;
+    for (status, body) in [&wrong, &unknown, &junk] {
+        assert_eq!(*status, StatusCode::UNAUTHORIZED);
+        assert_eq!(body["message"], wrong.1["message"], "same message whatever was wrong");
+    }
+    h.cleanup().await;
+}
+
+#[tokio::test]
+async fn a_username_never_receives_codes_and_password_reset_still_works_by_email() {
+    let h = harness!(&[]);
+    h.login_as("eve@example.com", CLIENT, Some("Eve_Online")).await;
+    let (status, _) = h.post("/api/auth/code/send", None, json!({ "identifier": "Eve_Online" })).await;
+    assert_eq!(status, StatusCode::BAD_REQUEST, "a username cannot be used to request a code");
+
+    h.post("/api/auth/code/send", None, json!({ "identifier": "eve@example.com", "purpose": "reset_password" })).await;
+    let reset = json!({ "identifier": "eve@example.com", "code": h.last_code(), "new_password": "brand-new-pass-9" });
+    assert_eq!(h.post("/api/auth/password/reset", None, reset).await.0, StatusCode::OK);
+    let login = json!({ "identifier": "Eve_Online", "password": "brand-new-pass-9", "client_id": CLIENT });
+    assert_eq!(h.post("/api/auth/password/login", None, login).await.0, StatusCode::OK);
+    h.cleanup().await;
+}
+
+#[tokio::test]
+async fn username_availability_reports_format_taken_and_free_and_is_rate_limited() {
+    let h = harness!(&[]);
+    h.login_as("fred@example.com", CLIENT, Some("Fred_Flint")).await;
+    let check = |name: &str| {
+        let path = format!("/api/auth/username/available?username={name}");
+        let h = &h;
+        async move { h.call(Method::GET, &path, None, Value::Null).await }
+    };
+    let (status, taken) = check("fred_flint").await;
+    assert_eq!((status, taken["available"].as_bool()), (StatusCode::OK, Some(false)));
+    let (_, free) = check("barney_rubble").await;
+    assert_eq!(free["available"], true);
+    let (_, bad) = check("a").await;
+    assert_eq!(bad["available"], false);
+    assert!(bad["message"].as_str().unwrap().contains("4-20"));
+    let (_, reserved) = check("administrator").await;
+    assert_eq!(reserved["available"], false);
+
+    let mut limited = None;
+    for _ in 0..70 {
+        let (status, body) = check("barney_rubble").await;
+        if status == StatusCode::TOO_MANY_REQUESTS {
+            limited = Some(body);
+            break;
+        }
+    }
+    assert!(limited.expect("probing usernames must hit the rate limit")["retry_after"].as_i64().unwrap() > 0);
+    h.cleanup().await;
+}
+
+#[tokio::test]
+async fn me_shows_the_username_and_changing_the_password_rejects_the_username() {
+    let h = harness!(&[]);
+    let login = h.login_as("gus@example.com", CLIENT, Some("Gus_Gus")).await;
+    let token = login["access_token"].as_str();
+    let (_, me) = h.call(Method::GET, "/api/me", token, Value::Null).await;
+    assert_eq!(me["username"], "Gus_Gus");
+    assert!(me.get("nickname").is_none());
+
+    let same = h.post("/api/me/password", token, json!({ "current_password": PASSWORD, "new_password": "gus_gus" })).await;
+    assert_eq!(same.0, StatusCode::BAD_REQUEST);
+    let wrong_current = h.post("/api/me/password", token, json!({ "current_password": "nope-nope-nope", "new_password": "a-new-password-1" })).await;
+    assert_eq!(wrong_current.0, StatusCode::UNAUTHORIZED);
+    let ok = h.post("/api/me/password", token, json!({ "current_password": PASSWORD, "new_password": "a-new-password-1" })).await;
+    assert_eq!(ok.0, StatusCode::OK);
+    h.cleanup().await;
+}
+
+#[tokio::test]
+async fn only_an_admin_can_rename_a_user_and_it_is_audited() {
+    let h = harness!(&[]);
+    let admin = h.admin_token().await;
+    let admin = Some(admin.as_str());
+    let hal = h.login_as("hal@example.com", CLIENT, Some("Hal_9000")).await;
+    h.login_as("ian@example.com", CLIENT, Some("Ian_Fleming")).await;
+    let uid = hal["user"]["uid"].as_str().unwrap();
+    let path = format!("/api/admin/users/{uid}/username");
+
+    assert_eq!(h.post(&path, hal["access_token"].as_str(), json!({ "username": "Hal_Renamed" })).await.0, StatusCode::UNAUTHORIZED);
+    assert_eq!(h.post(&path, admin, json!({ "username": "ian_fleming" })).await.0, StatusCode::CONFLICT);
+    assert_eq!(h.post(&path, admin, json!({ "username": "admin_hal" })).await.0, StatusCode::BAD_REQUEST);
+    let (status, body) = h.post(&path, admin, json!({ "username": "Hal_Renamed" })).await;
+    assert_eq!((status, body["username"].as_str()), (StatusCode::OK, Some("Hal_Renamed")));
+    let login = json!({ "identifier": "hal_renamed", "password": PASSWORD, "client_id": CLIENT });
+    assert_eq!(h.post("/api/auth/password/login", None, login).await.0, StatusCode::OK);
+    let old = json!({ "identifier": "Hal_9000", "password": PASSWORD, "client_id": CLIENT });
+    assert_eq!(h.post("/api/auth/password/login", None, old).await.0, StatusCode::UNAUTHORIZED, "the old name is released");
+
+    let missing = format!("/api/admin/users/{}/username", uuid::Uuid::new_v4());
+    assert_eq!(h.post(&missing, admin, json!({ "username": "Ghost_User" })).await.0, StatusCode::NOT_FOUND);
+    let (_, audit) = h.call(Method::GET, "/api/admin/audit", admin, Value::Null).await;
+    let entry = audit["items"].as_array().unwrap().iter().find(|e| e["action"] == "user.rename").expect("rename is audited");
+    assert_eq!(entry["detail"], "Hal_9000 -> Hal_Renamed");
     h.cleanup().await;
 }

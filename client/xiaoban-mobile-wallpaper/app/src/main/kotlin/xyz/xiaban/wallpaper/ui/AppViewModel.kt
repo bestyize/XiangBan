@@ -16,6 +16,9 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import xyz.xiaban.wallpaper.data.AccountClient
+import xyz.xiaban.wallpaper.data.CodeLoginResult
+import xyz.xiaban.wallpaper.data.LoginOutcome
+import xyz.xiaban.wallpaper.data.UsernameCheck
 import xyz.xiaban.wallpaper.data.AccountException
 import xyz.xiaban.wallpaper.data.AccountRules
 import xyz.xiaban.wallpaper.data.AccountSession
@@ -148,17 +151,41 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         _loginOpen.value = false
     }
 
-    /** Asks the account centre to email a code. Returns the seconds to wait before asking again. */
-    suspend fun sendLoginCode(email: String): Int = withContext(Dispatchers.IO) { accountClient.sendCode(email) }
+    /** Asks the account centre to send a code. Returns the seconds to wait before asking again. */
+    suspend fun sendLoginCode(identifier: String, resetPassword: Boolean = false): Int =
+        withContext(Dispatchers.IO) { accountClient.sendCode(identifier, resetPassword) }
 
-    /** Signs in with the emailed code; an address that has no account yet gets one. Throws [AccountException] with a sentence to show. */
-    suspend fun login(email: String, code: String) {
-        val outcome = withContext(Dispatchers.IO) { accountClient.loginWithCode(email, code) }
+    /**
+     * Checks the code. An existing account is signed in right away; a new email or phone number comes back as
+     * [CodeLoginResult.RegistrationRequired] and has to pick a username and password through [register].
+     * Throws [AccountException] with a sentence to show.
+     */
+    suspend fun loginWithCode(identifier: String, code: String): CodeLoginResult {
+        val result = withContext(Dispatchers.IO) { accountClient.loginWithCode(identifier, code) }
+        if (result is CodeLoginResult.SignedIn) signedIn(result.outcome)
+        return result
+    }
+
+    suspend fun loginWithPassword(identifier: String, password: String) {
+        signedIn(withContext(Dispatchers.IO) { accountClient.loginWithPassword(identifier, password) })
+    }
+
+    suspend fun register(registrationToken: String, username: String, password: String) {
+        signedIn(withContext(Dispatchers.IO) { accountClient.register(registrationToken, username, password) })
+    }
+
+    suspend fun resetPassword(identifier: String, code: String, newPassword: String) {
+        withContext(Dispatchers.IO) { accountClient.resetPassword(identifier, code, newPassword) }
+    }
+
+    suspend fun checkUsername(username: String): UsernameCheck = withContext(Dispatchers.IO) { accountClient.checkUsername(username) }
+
+    private suspend fun signedIn(outcome: LoginOutcome) {
         withContext(Dispatchers.IO) { accountStore.save(outcome.session) }
         _account.value = outcome.session
         _loginOpen.value = false
-        val nickname = outcome.session.user.nickname
-        _messages.tryEmit(if (outcome.isNewUser) "欢迎，已为你创建账号并登录" else "欢迎回来，$nickname")
+        val name = outcome.session.user.username
+        _messages.tryEmit(if (outcome.isNewUser) "注册成功，欢迎你，$name" else "欢迎回来，$name")
     }
 
     /** Forgets the login on this phone right away, then asks the account centre to revoke it as a best effort. */

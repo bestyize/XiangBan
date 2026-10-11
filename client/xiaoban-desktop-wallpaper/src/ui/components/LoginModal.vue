@@ -1,26 +1,71 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
-import { Mail, ShieldCheck, X, Loader2 } from "lucide-vue-next";
+import { KeyRound, Mail, ShieldCheck, UserRound, X, Loader2 } from "lucide-vue-next";
+import { toAccountError } from "../../bridge.ts";
 import type { ControlStore } from "../control-types.ts";
 
 const props = defineProps<{
   store: ControlStore;
 }>();
 
-const email = ref("");
+type Mode = "password" | "code" | "reset";
+type Step = "identify" | "verify" | "setup";
+type Availability = { kind: "idle" | "checking" | "ok" } | { kind: "taken" | "invalid"; message: string };
+
+const mode = ref<Mode>("password");
+const step = ref<Step>("identify");
+const identifier = ref("");
+const password = ref("");
 const code = ref("");
+const username = ref("");
+const showPassword = ref(false);
 const sending = ref(false);
 const submitting = ref(false);
 const errorMessage = ref("");
+const noticeMessage = ref("");
 const countdown = ref(0);
+const availability = ref<Availability>({ kind: "idle" });
+let registrationToken: string | null = null;
 let timer: ReturnType<typeof setInterval> | null = null;
+let checkTimer: ReturnType<typeof setTimeout> | null = null;
 
-const emailInput = ref<HTMLInputElement>();
+const identifierInput = ref<HTMLInputElement>();
 const codeInput = ref<HTMLInputElement>();
 
-const isValidEmail = computed(() => {
-  const trimmed = email.value.trim();
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed);
+const codeSent = computed(() => step.value === "verify");
+
+function usernameProblem(raw: string): string {
+  const value = raw.trim();
+  if (!value) return "";
+  if (!/^[A-Za-z]/.test(value)) return "用户名需以字母开头";
+  if (!/^[A-Za-z0-9_]+$/.test(value)) return "只能包含字母、数字和下划线";
+  if (value.length < 4 || value.length > 20) return "需为 4-20 个字符";
+  return "";
+}
+
+function passwordProblemOf(raw: string, name = ""): string {
+  if (!raw) return "";
+  if (raw.length < 8) return "密码至少 8 位";
+  if (raw.length > 128) return "密码最多 128 位";
+  if (name && raw.toLowerCase() === name.trim().toLowerCase()) return "密码不能和用户名相同";
+  return "";
+}
+
+const passwordProblem = computed(() => passwordProblemOf(password.value, mode.value === "reset" ? "" : username.value));
+const hint = computed(() => {
+  const a = availability.value;
+  if (a.kind === "checking") return "正在检查…";
+  if (a.kind === "ok") return "可以使用";
+  return a.kind === "taken" || a.kind === "invalid" ? a.message : "";
+});
+const canSubmit = computed(() => {
+  if (mode.value === "password") return !!identifier.value.trim() && !!password.value;
+  if (mode.value === "reset") return codeSent.value && !!code.value.trim() && !!password.value && !passwordProblem.value;
+  if (step.value === "setup") {
+    const kind = availability.value.kind;
+    return !!username.value.trim() && !["taken", "invalid", "checking"].includes(kind) && !!password.value && !passwordProblem.value;
+  }
+  return codeSent.value && !!code.value.trim();
 });
 
 function clearCountdown() {
@@ -29,6 +74,17 @@ function clearCountdown() {
     timer = null;
   }
   countdown.value = 0;
+}
+
+function switchMode(next: Mode) {
+  mode.value = next;
+  step.value = "identify";
+  code.value = "";
+  password.value = "";
+  errorMessage.value = "";
+  noticeMessage.value = "";
+  registrationToken = null;
+  clearCountdown();
 }
 
 function close(force = false) {
@@ -41,54 +97,95 @@ function handleClose() {
   close(false);
 }
 
+// While choosing a username, check it as the user types. It is only a hint: the server enforces uniqueness.
+watch([username, step], () => {
+  if (checkTimer) clearTimeout(checkTimer);
+  if (step.value !== "setup") return;
+  const name = username.value.trim();
+  if (!name) {
+    availability.value = { kind: "idle" };
+    return;
+  }
+  const local = usernameProblem(name);
+  if (local) {
+    availability.value = { kind: "invalid", message: local };
+    return;
+  }
+  availability.value = { kind: "checking" };
+  checkTimer = setTimeout(async () => {
+    try {
+      const res = await props.store.checkAccountUsername(name);
+      if (username.value.trim() === name) {
+        availability.value = res.available ? { kind: "ok" } : { kind: "taken", message: res.message || "这个用户名已被占用" };
+      }
+    } catch {
+      if (username.value.trim() === name) availability.value = { kind: "idle" };
+    }
+  }, 350);
+});
+
 async function handleSendCode() {
-  if (!isValidEmail.value || countdown.value > 0 || sending.value) return;
+  if (!identifier.value.trim() || countdown.value > 0 || sending.value) return;
   errorMessage.value = "";
   sending.value = true;
   try {
-    const res = await props.store.sendAccountCode(email.value.trim());
+    const res = await props.store.sendAccountCode(identifier.value.trim(), mode.value === "reset" ? "reset_password" : "login");
+    step.value = "verify";
     countdown.value = res.cooldownSeconds || 60;
     timer = setInterval(() => {
       countdown.value--;
-      if (countdown.value <= 0) {
-        clearCountdown();
-      }
+      if (countdown.value <= 0) clearCountdown();
     }, 1000);
-    props.store.notify("验证码已发送，请查收邮件", "success");
+    props.store.notify("验证码已发送，请查收", "success");
     await nextTick();
     codeInput.value?.focus();
   } catch (error) {
-    errorMessage.value = String(error);
+    errorMessage.value = toAccountError(error).message;
   } finally {
     sending.value = false;
   }
 }
 
-async function handleLogin() {
-  if (!isValidEmail.value) {
-    errorMessage.value = "请输入有效的邮箱地址";
-    emailInput.value?.focus();
-    return;
-  }
-  if (!code.value.trim()) {
-    errorMessage.value = "请输入验证码";
-    codeInput.value?.focus();
-    return;
-  }
+function welcome(result: { isNewUser: boolean; session: { user: { username: string } } }) {
+  clearCountdown();
+  close(true);
+  const name = result.session.user.username;
+  props.store.notify(result.isNewUser ? `注册成功，欢迎你，${name}` : `欢迎回来，${name}`, "success");
+}
 
+async function handleSubmit() {
+  if (!canSubmit.value || submitting.value) return;
   errorMessage.value = "";
   submitting.value = true;
   try {
-    const result = await props.store.loginAccount(email.value.trim(), code.value.trim());
-    clearCountdown();
-    close(true);
-    if (result.isNewUser) {
-      props.store.notify("欢迎新朋友！已为你自动创建账号并登录", "success");
+    if (mode.value === "password") {
+      welcome(await props.store.loginAccountWithPassword(identifier.value.trim(), password.value));
+    } else if (mode.value === "reset") {
+      await props.store.resetAccountPassword(identifier.value.trim(), code.value.trim(), password.value);
+      switchMode("password");
+      noticeMessage.value = "密码已重置，请用新密码登录。";
+    } else if (step.value === "setup") {
+      if (!registrationToken) throw new Error("验证已过期，请重新获取验证码");
+      welcome(await props.store.registerAccount(registrationToken, username.value.trim(), password.value));
     } else {
-      props.store.notify(`欢迎回来，${result.session.user.nickname || "小伴伙伴"}！`, "success");
+      const outcome = await props.store.loginAccountWithCode(identifier.value.trim(), code.value.trim());
+      if (outcome.kind === "registration") {
+        registrationToken = outcome.registrationToken;
+        password.value = "";
+        step.value = "setup";
+      } else {
+        welcome(outcome);
+      }
     }
   } catch (error) {
-    errorMessage.value = String(error);
+    const failure = toAccountError(error);
+    if (failure.code === "username_taken") availability.value = { kind: "taken", message: failure.message };
+    if (failure.code === "registration_expired" || failure.code === "identity_exists") {
+      registrationToken = null;
+      step.value = "identify";
+      code.value = "";
+    }
+    errorMessage.value = failure.message;
   } finally {
     submitting.value = false;
   }
@@ -106,10 +203,17 @@ watch(
   () => props.store.showLoginModal,
   async (show) => {
     if (show) {
+      mode.value = "password";
+      step.value = "identify";
       errorMessage.value = "";
+      noticeMessage.value = "";
       code.value = "";
+      password.value = "";
+      username.value = "";
+      registrationToken = null;
+      availability.value = { kind: "idle" };
       await nextTick();
-      emailInput.value?.focus();
+      identifierInput.value?.focus();
     } else {
       clearCountdown();
     }
@@ -118,6 +222,7 @@ watch(
 
 onBeforeUnmount(() => {
   clearCountdown();
+  if (checkTimer) clearTimeout(checkTimer);
   window.removeEventListener("keydown", onKeyDown);
 });
 </script>
@@ -150,73 +255,129 @@ onBeforeUnmount(() => {
               <img src="/xiaoban.svg" alt="小伴" />
             </div>
             <h2 id="login-modal-title">登录小伴 / 快速注册</h2>
-            <p class="subtitle">未注册邮箱验证后自动创建账号，已注册直接登录</p>
+            <p class="subtitle" data-testid="login-subtitle">
+              <template v-if="step === 'setup'">验证通过，设置你的账号。用户名是你的唯一账号，设置后不能修改。</template>
+              <template v-else>已有账号用密码登录；新用户用邮箱验证码注册，再设置用户名和密码</template>
+            </p>
           </div>
 
-          <form class="login-form" @submit.prevent="handleLogin">
+          <form class="login-form" @submit.prevent="handleSubmit">
+            <div v-if="step !== 'setup'" class="mode-tabs" role="tablist">
+              <button type="button" role="tab" data-testid="tab-password" :aria-selected="mode !== 'code'" :class="{ on: mode !== 'code' }" @click="switchMode('password')">密码登录</button>
+              <button type="button" role="tab" data-testid="tab-code" :aria-selected="mode === 'code'" :class="{ on: mode === 'code' }" @click="switchMode('code')">验证码登录 / 注册</button>
+            </div>
+
             <div v-if="errorMessage" class="error-banner" role="alert" data-testid="login-error-msg">
               {{ errorMessage }}
             </div>
+            <div v-if="noticeMessage" class="notice-banner" role="status" data-testid="login-notice">
+              {{ noticeMessage }}
+            </div>
 
-            <div class="input-group">
-              <label for="login-email">邮箱地址</label>
+            <div v-if="step === 'setup'" class="input-group">
+              <label for="login-username">用户名</label>
+              <div class="input-wrapper">
+                <UserRound :size="18" class="input-icon" />
+                <input
+                  id="login-username"
+                  v-model="username"
+                  type="text"
+                  data-testid="login-username-input"
+                  placeholder="字母开头，4-20 位字母、数字或下划线"
+                  maxlength="20"
+                  autocomplete="username"
+                  autocapitalize="none"
+                  spellcheck="false"
+                  :disabled="submitting"
+                />
+              </div>
+              <small v-if="hint" class="field-hint" :class="{ bad: availability.kind === 'taken' || availability.kind === 'invalid' }" data-testid="username-hint">{{ hint }}</small>
+            </div>
+            <div v-else class="input-group">
+              <label for="login-identifier">{{ mode === "password" ? "用户名 / 邮箱 / 手机号" : "邮箱或手机号" }}</label>
               <div class="input-wrapper">
                 <Mail :size="18" class="input-icon" />
                 <input
-                  id="login-email"
-                  ref="emailInput"
-                  v-model="email"
-                  type="email"
-                  data-testid="login-email-input"
-                  placeholder="name@example.com"
-                  autocomplete="email"
-                  :disabled="submitting"
-                  @keyup.enter="codeInput?.focus()"
+                  id="login-identifier"
+                  ref="identifierInput"
+                  v-model="identifier"
+                  type="text"
+                  data-testid="login-identifier-input"
+                  :placeholder="mode === 'password' ? '用户名、邮箱或手机号' : 'name@example.com'"
+                  autocomplete="username"
+                  autocapitalize="none"
+                  spellcheck="false"
+                  :disabled="submitting || codeSent"
                 />
               </div>
             </div>
 
-            <div class="input-group">
-              <label for="login-code">验证码</label>
+            <div v-if="mode === 'password' || step === 'setup' || (mode === 'reset' && codeSent)" class="input-group">
+              <label for="login-password">{{ mode === "reset" ? "新密码" : step === "setup" ? "设置密码" : "密码" }}</label>
               <div class="code-wrapper">
                 <div class="input-wrapper flex-1">
-                  <ShieldCheck :size="18" class="input-icon" />
+                  <KeyRound :size="18" class="input-icon" />
                   <input
-                    id="login-code"
-                    ref="codeInput"
-                    v-model="code"
-                    type="text"
-                    data-testid="login-code-input"
-                    placeholder="请输入 6 位验证码"
-                    maxlength="8"
-                    autocomplete="one-time-code"
+                    id="login-password"
+                    v-model="password"
+                    :type="showPassword ? 'text' : 'password'"
+                    data-testid="login-password-input"
+                    placeholder="至少 8 位"
+                    :autocomplete="mode === 'password' ? 'current-password' : 'new-password'"
                     :disabled="submitting"
-                    @keyup.enter="handleLogin"
                   />
                 </div>
-                <button
-                  type="button"
-                  class="code-send-btn"
-                  data-testid="send-code-btn"
-                  :disabled="!isValidEmail || countdown > 0 || sending || submitting"
-                  @click="handleSendCode"
-                >
-                  <Loader2 v-if="sending" :size="14" class="spin" />
-                  <span v-else-if="countdown > 0">{{ countdown }}s 后重发</span>
-                  <span v-else>获取验证码</span>
+                <button type="button" class="code-send-btn" data-testid="toggle-password" @click="showPassword = !showPassword">
+                  {{ showPassword ? "隐藏" : "显示" }}
                 </button>
+              </div>
+              <small v-if="passwordProblem && mode !== 'password'" class="field-hint bad" data-testid="password-hint">{{ passwordProblem }}</small>
+            </div>
+
+            <div v-if="mode !== 'password' && codeSent" class="input-group">
+              <label for="login-code">验证码</label>
+              <div class="input-wrapper">
+                <ShieldCheck :size="18" class="input-icon" />
+                <input
+                  id="login-code"
+                  ref="codeInput"
+                  v-model="code"
+                  type="text"
+                  data-testid="login-code-input"
+                  placeholder="请输入 6 位验证码"
+                  maxlength="8"
+                  autocomplete="one-time-code"
+                  :disabled="submitting"
+                />
               </div>
             </div>
 
             <button
+              v-if="mode !== 'password' && step !== 'setup'"
+              type="button"
+              class="code-send-btn wide"
+              data-testid="send-code-btn"
+              :disabled="!identifier.trim() || countdown > 0 || sending || submitting"
+              @click="handleSendCode"
+            >
+              <Loader2 v-if="sending" :size="14" class="spin" />
+              <span v-else-if="countdown > 0">{{ countdown }}s 后重发</span>
+              <span v-else>{{ codeSent ? "重新发送" : "获取验证码" }}</span>
+            </button>
+
+            <button
+              v-if="mode === 'password' || codeSent || step === 'setup'"
               type="submit"
               class="login-submit-btn"
               data-testid="login-submit-btn"
-              :disabled="submitting"
+              :disabled="submitting || !canSubmit"
             >
               <Loader2 v-if="submitting" :size="18" class="spin" />
-              <span v-else>进入小伴生活空间</span>
+              <span v-else>{{ mode === "password" ? "登录" : mode === "reset" ? "重置密码" : step === "setup" ? "完成注册" : "验证并继续" }}</span>
             </button>
+
+            <button v-if="mode === 'password'" type="button" class="link-button" data-testid="forgot-password" @click="switchMode('reset')">忘记密码？</button>
+            <button v-if="mode === 'reset'" type="button" class="link-button" data-testid="back-to-password" @click="switchMode('password')">返回密码登录</button>
 
             <div class="policy-note">
               登录即代表你已阅读并同意
@@ -507,5 +668,65 @@ onBeforeUnmount(() => {
     transform: scale(0.94) translateY(6px);
     opacity: 0;
   }
+}
+.mode-tabs {
+  display: flex;
+  gap: 6px;
+  padding: 4px;
+  border-radius: 999px;
+  background: var(--ui-primary-soft);
+}
+
+.mode-tabs button {
+  flex: 1;
+  height: 34px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ui-text-secondary);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.mode-tabs button.on {
+  background: var(--ui-primary);
+  color: #fff;
+}
+
+.notice-banner {
+  background: var(--ui-primary-soft);
+  color: var(--ui-text-primary);
+  border-radius: 12px;
+  padding: 10px 14px;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.field-hint {
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--ui-text-tertiary);
+}
+
+.field-hint.bad {
+  color: #ef4444;
+}
+
+.code-send-btn.wide {
+  width: 100%;
+  justify-content: center;
+}
+
+.link-button {
+  justify-self: start;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: var(--ui-text-secondary);
+  font: inherit;
+  font-size: 13px;
+  text-decoration: underline;
+  cursor: pointer;
 }
 </style>

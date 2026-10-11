@@ -20,6 +20,9 @@ pub enum AppError {
     NotFound(String),
     #[error("{0}")]
     Conflict(String),
+    /// 客户端需要据此分支处理的错误（如用户名被占用、注册凭证过期），`code` 是稳定的机读值。
+    #[error("{message}")]
+    Coded { status: StatusCode, code: &'static str, message: String },
     #[error("{message}")]
     TooManyRequests { message: String, retry_after: i64 },
     #[error("{0}")]
@@ -40,6 +43,7 @@ impl IntoResponse for AppError {
             AppError::Forbidden(m) => (StatusCode::FORBIDDEN, "forbidden", m.clone(), None),
             AppError::NotFound(m) => (StatusCode::NOT_FOUND, "not_found", m.clone(), None),
             AppError::Conflict(m) => (StatusCode::CONFLICT, "conflict", m.clone(), None),
+            AppError::Coded { status, code, message } => (*status, *code, message.clone(), None),
             AppError::TooManyRequests { message, retry_after } => (
                 StatusCode::TOO_MANY_REQUESTS,
                 "too_many_requests",

@@ -20,7 +20,7 @@ class ContractCompatibilityTest {
     fun publicEndpointPathsRemainCompatible() {
         assertEquals("/api/session", SessionApiPaths.SESSION)
         assertEquals("/api/profile", ProfileApiPaths.PROFILE)
-        assertEquals("/api/account/login", AccountApiPaths.EMAIL_LOGIN)
+        assertEquals("/api/account/center/login", AccountApiPaths.ACCOUNT_CENTER_LOGIN)
         assertEquals("/api/guardian/pause", GuardianApiPaths.GUARDIAN_PAUSE)
         assertEquals("/api/checkin/today", CheckinApiPaths.CHECKIN_TODAY)
         assertEquals("/api/chat/stream", ChatApiPaths.CHAT_STREAM)

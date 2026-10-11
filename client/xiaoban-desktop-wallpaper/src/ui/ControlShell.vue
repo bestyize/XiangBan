@@ -57,12 +57,12 @@ onBeforeUnmount(() => { store.dispose(); window.removeEventListener('focus', foc
       <div class="sidebar-account-box">
         <div v-if="store.account" class="account-profile-card" data-testid="sidebar-profile-card">
           <div class="account-avatar">
-            <img v-if="store.account.user.avatarUrl" :src="store.account.user.avatarUrl" :alt="store.account.user.nickname" />
-            <span v-else>{{ (store.account.user.nickname || store.account.user.email || '伴')[0]?.toUpperCase() }}</span>
+            <img v-if="store.account.user.avatarUrl" :src="store.account.user.avatarUrl" :alt="store.account.user.username" />
+            <span v-else>{{ (store.account.user.username || '伴')[0]?.toUpperCase() }}</span>
           </div>
           <div class="account-copy">
-            <strong>{{ store.account.user.nickname || '小伴用户' }}</strong>
-            <span :title="store.account.user.email">{{ store.account.user.email }}</span>
+            <strong>{{ store.account.user.username }}</strong>
+            <span>相伴账号</span>
           </div>
           <button type="button" class="account-logout-btn" data-testid="sidebar-logout-btn" title="退出账号" @click="handleLogout">
             <LogOut :size="15" />

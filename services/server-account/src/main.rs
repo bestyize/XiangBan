@@ -9,11 +9,14 @@ mod handlers;
 mod identifier;
 mod keys;
 mod password;
+mod ratelimit;
+mod registration;
 mod sender;
 mod sessions;
 mod state;
 mod tencent;
 mod tokens;
+mod username;
 mod users;
 
 #[cfg(test)]
@@ -41,6 +44,8 @@ pub fn build_router(state: AppState) -> Router {
         .route("/health", get(meta::health))
         .route("/auth/code/send", post(auth::send_code))
         .route("/auth/code/login", post(auth::login_with_code))
+        .route("/auth/register", post(auth::register))
+        .route("/auth/username/available", get(auth::username_available))
         .route("/auth/password/login", post(auth::login_with_password))
         .route("/auth/password/reset", post(auth::reset_password))
         .route("/auth/refresh", post(auth::refresh))
@@ -57,6 +62,7 @@ pub fn build_router(state: AppState) -> Router {
         .route("/admin/users", get(admin::list_users))
         .route("/admin/users/{uid}", get(admin::get_user))
         .route("/admin/users/{uid}/status", post(admin::set_user_status))
+        .route("/admin/users/{uid}/username", post(admin::set_user_username))
         .route("/admin/users/{uid}/revoke-sessions", post(admin::revoke_user_sessions))
         .route("/admin/clients", get(admin::list_clients).post(admin::create_client))
         .route("/admin/clients/{client_id}", patch(admin::update_client))
@@ -137,6 +143,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         keys: Arc::new(keys),
         sender: Arc::new(sender),
         dummy_password_hash: Arc::new(dummy_password_hash),
+        username_limiter: state::username_limiter(),
     };
     let listener = tokio::net::TcpListener::bind(addr).await?;
     axum::serve(listener, build_router(state).into_make_service_with_connect_info::<SocketAddr>()).await?;

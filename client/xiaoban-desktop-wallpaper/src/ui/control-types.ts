@@ -1,4 +1,4 @@
-import type { AccountSession, AppInfo, LoginResult, SendCodeResult, Settings, WallpaperLibrary, WallpaperOptions } from "../bridge.ts";
+import type { AccountSession, AppInfo, CodeLoginOutcome, LoginResult, SendCodeResult, Settings, UsernameCheck, WallpaperLibrary, WallpaperOptions } from "../bridge.ts";
 import type { EffectsChoice } from "../effects/types.ts";
 import type { LoadedPacks } from "../effects/catalog.ts";
 import type { WebsiteStatus } from "./website-types.ts";
@@ -21,8 +21,12 @@ export interface ControlStore {
   navigate(page: ControlPage): void;
   openLogin(): void;
   closeLogin(): void;
-  sendAccountCode(email: string): Promise<SendCodeResult>;
-  loginAccount(email: string, code: string): Promise<LoginResult>;
+  sendAccountCode(identifier: string, purpose?: "login" | "reset_password"): Promise<SendCodeResult>;
+  loginAccountWithCode(identifier: string, code: string): Promise<CodeLoginOutcome>;
+  loginAccountWithPassword(identifier: string, password: string): Promise<LoginResult>;
+  registerAccount(registrationToken: string, username: string, password: string): Promise<LoginResult>;
+  resetAccountPassword(identifier: string, code: string, newPassword: string): Promise<void>;
+  checkAccountUsername(username: string): Promise<UsernameCheck>;
   logoutAccount(): Promise<void>;
   initialize(): Promise<void>;
   dispose(): void;

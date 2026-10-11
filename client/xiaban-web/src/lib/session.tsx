@@ -147,7 +147,6 @@ export function SessionProvider({ children, enabled = true }: { children: ReactN
         ...current,
         companionName: patch.companionName ?? current.companionName,
         personality: (patch.personality as any) ?? current.personality,
-        nickname: patch.nickname !== undefined ? (patch.nickname || null) : current.nickname,
         cityCode: patch.cityCode !== undefined ? (patch.cityCode || null) : current.cityCode,
         workStart: patch.workStart ?? current.workStart,
         workEnd: patch.workEnd ?? current.workEnd,

@@ -5,6 +5,7 @@ use crate::{
     identifier::{self, Identifier, Kind},
     password, sessions,
     state::AppState,
+    username,
     users::{self, IdentityView},
 };
 use axum::{
@@ -159,7 +160,7 @@ pub struct ListQuery {
 #[derive(Serialize)]
 struct UserRow {
     uid: Uuid,
-    nickname: String,
+    username: String,
     avatar_url: Option<String>,
     status: String,
     created_at: DateTime<Utc>,
@@ -182,7 +183,7 @@ fn parse_status(status: &str) -> Result<&str, AppError> {
     }
 }
 
-/// 搜索：UUID 精确匹配 uid；邮箱/手机号精确匹配已绑定标识；其余（含上述输入）按昵称模糊匹配。
+/// 搜索：UUID 精确匹配 uid；邮箱/手机号精确匹配已绑定标识；其余（含上述输入）按用户名模糊匹配。
 pub async fn list_users(
     State(state): State<AppState>,
     _admin: AuthAdmin,
@@ -205,7 +206,7 @@ pub async fn list_users(
     }
     let has_query = q.is_some();
 
-    const FILTER: &str = "(NOT $3::bool OR u.uid = $1::uuid OR u.nickname ILIKE $2::text) AND ($4::text IS NULL OR u.status = $4::text)";
+    const FILTER: &str = "(NOT $3::bool OR u.uid = $1::uuid OR u.username ILIKE $2::text) AND ($4::text IS NULL OR u.status = $4::text)";
     let (total,): (i64,) = sqlx::query_as(&format!("SELECT COUNT(*) FROM users u WHERE {FILTER}"))
         .bind(uid_filter)
         .bind(&like)
@@ -214,7 +215,7 @@ pub async fn list_users(
         .fetch_one(&state.pool)
         .await?;
     let rows: Vec<(Uuid, String, Option<String>, String, DateTime<Utc>, Option<DateTime<Utc>>)> = sqlx::query_as(&format!(
-        "SELECT u.uid, u.nickname, u.avatar_url, u.status, u.created_at, u.last_login_at
+        "SELECT u.uid, u.username, u.avatar_url, u.status, u.created_at, u.last_login_at
          FROM users u WHERE {FILTER} ORDER BY u.created_at DESC, u.uid LIMIT $5 OFFSET $6"
     ))
     .bind(uid_filter)
@@ -241,10 +242,10 @@ pub async fn list_users(
 
     let items: Vec<UserRow> = rows
         .into_iter()
-        .map(|(uid, nickname, avatar_url, status, created_at, last_login_at)| UserRow {
+        .map(|(uid, username, avatar_url, status, created_at, last_login_at)| UserRow {
             identities: by_uid.remove(&uid).unwrap_or_default(),
             uid,
-            nickname,
+            username,
             avatar_url,
             status,
             created_at,
@@ -305,6 +306,29 @@ pub async fn set_user_status(
     }
     audit(&state, &admin, &format!("user.{status}"), Some(&uid.to_string()), None).await?;
     Ok(Json(json!({ "ok": true, "status": status })))
+}
+
+#[derive(Deserialize)]
+pub struct SetUsernameReq {
+    username: String,
+}
+
+/// 用户名对用户本人不可修改；这里是唯一入口，用于处理违规或冒充的名字，并记入审计。
+pub async fn set_user_username(
+    State(state): State<AppState>,
+    AuthAdmin(admin): AuthAdmin,
+    Path(uid): Path<Uuid>,
+    Json(req): Json<SetUsernameReq>,
+) -> Result<Json<Value>, AppError> {
+    let name = username::parse(&req.username)?;
+    let (old,): (String,) = sqlx::query_as("SELECT username FROM users WHERE uid = $1")
+        .bind(uid)
+        .fetch_optional(&state.pool)
+        .await?
+        .ok_or_else(|| AppError::NotFound("用户不存在".into()))?;
+    users::admin_set_username(&state, uid, &name).await?;
+    audit(&state, &admin, "user.rename", Some(&uid.to_string()), Some(format!("{old} -> {}", name.display))).await?;
+    Ok(Json(json!({ "ok": true, "username": name.display })))
 }
 
 pub async fn revoke_user_sessions(

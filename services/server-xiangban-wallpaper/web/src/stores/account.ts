@@ -1,6 +1,6 @@
 import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
-import { AccountError, accountApi, type AccountUser, type TokenPair } from '@/account/api'
+import { AccountError, accountApi, needsRegistration, type AccountUser, type LoginResponse, type TokenPair } from '@/account/api'
 
 const STORAGE_KEY = 'xiaoban.account.session'
 /** 访问令牌在到期前这么多毫秒就换新，避免请求途中过期。 */
@@ -78,17 +78,34 @@ export const useAccount = defineStore('account', () => {
     return refreshing
   }
 
-  async function sendCode(identifier: string) {
-    return accountApi.sendCode(identifier)
+  async function sendCode(identifier: string, purpose: 'login' | 'reset_password' = 'login') {
+    return accountApi.sendCode(identifier, purpose)
   }
 
-  async function loginWithCode(identifier: string, code: string) {
-    const res = await accountApi.loginWithCode(identifier, code)
+  function signedIn(res: LoginResponse) {
     save(withTokens(res, res.user))
     return { isNewUser: res.is_new_user, user: res.user }
   }
 
-  /** 页面打开时校验登录状态并同步最新昵称头像。 */
+  /** 已有账号直接登录；新的邮箱 / 手机号返回注册凭证，由调用方收集用户名和密码后调用 register。 */
+  async function loginWithCode(identifier: string, code: string) {
+    const res = await accountApi.loginWithCode(identifier, code)
+    if (needsRegistration(res)) return { registrationToken: res.registration_token } as const
+    return signedIn(res)
+  }
+
+  async function loginWithPassword(identifier: string, password: string) {
+    return signedIn(await accountApi.loginWithPassword(identifier, password))
+  }
+
+  async function register(registrationToken: string, username: string, password: string) {
+    return signedIn(await accountApi.register(registrationToken, username, password))
+  }
+
+  const resetPassword = accountApi.resetPassword
+  const checkUsername = accountApi.checkUsername
+
+  /** 页面打开时校验登录状态并同步最新资料。 */
   async function restore() {
     const token = await accessToken()
     if (!token) return
@@ -114,5 +131,9 @@ export const useAccount = defineStore('account', () => {
     loginOpen.value = false
   }
 
-  return { user, loggedIn, email, loginOpen, accessToken, sendCode, loginWithCode, restore, logout, openLogin, closeLogin }
+  return {
+    user, loggedIn, email, loginOpen, accessToken, sendCode, loginWithCode, loginWithPassword, register,
+    resetPassword, checkUsername,
+    restore, logout, openLogin, closeLogin,
+  }
 })
