@@ -42,13 +42,20 @@ const bookmarks = useTopicList(p => api.bookmarks(p), [() => session.user?.uid])
           {{ session.info.limits.daily_topics }} 个帖子、{{ session.info.limits.daily_posts }} 条回复。
         </p>
         <ol>
-          <li :class="{ on: session.info.user.trust_level === 0 }"><strong>新人</strong>：可以浏览、点赞和少量回复，链接和图片显示为文字。</li>
-          <li :class="{ on: session.info.user.trust_level === 1 }">
-            <strong>成员</strong>：注册满 {{ session.info.limits.tl1_days }} 天、读过 {{ session.info.limits.tl1_reads }} 个帖子后自动升级，可以发帖、发链接和图片。
+          <li :class="{ on: session.info.user.trust_level === 0 }">
+            <strong>新人</strong>：可以浏览所有人可见的帖子、点赞和少量回复，链接和图片显示为文字，还不能发帖。
           </li>
-          <li :class="{ on: session.info.user.trust_level === 2 }"><strong>老用户</strong>：长期分享靠谱羊毛的成员，由管理员根据贡献升级。</li>
-          <li :class="{ on: session.info.user.trust_level === 3 }"><strong>守护者</strong>：由管理员邀请，协助处理举报。</li>
+          <li :class="{ on: session.info.user.trust_level === 1 }">
+            <strong>成员</strong>：注册满 {{ session.info.limits.tl1_days }} 天、读过 {{ session.info.limits.tl1_reads }} 个帖子后自动升级。可以发帖、发链接和图片，能看「成员以上」可见的帖子，发帖时也能设成「成员以上」可见。
+          </li>
+          <li :class="{ on: session.info.user.trust_level === 2 }">
+            <strong>老用户</strong>：长期分享靠谱内容的成员，由管理员根据贡献升级。能看和设置「老用户以上」可见的帖子。
+          </li>
+          <li :class="{ on: session.info.user.trust_level === 3 }">
+            <strong>守护者</strong>：由管理员邀请，能看所有帖子，协助处理举报。
+          </li>
         </ol>
+        <p class="note">发帖时可以设置谁能看，最高只能设到你自己的等级。设了限制的帖子，游客和等级不够的人在列表、搜索和搜索引擎里都看不到。</p>
       </div>
     </section>
 
@@ -106,6 +113,11 @@ h2 {
   gap: 6px;
   font-size: var(--fs-sm);
   color: var(--ink-2);
+}
+.levels .note {
+  margin: 12px 0 0;
+  color: var(--ink-3);
+  font-size: var(--fs-xs);
 }
 .levels li.on {
   color: var(--ink);

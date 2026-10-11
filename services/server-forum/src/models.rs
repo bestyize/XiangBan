@@ -1,6 +1,6 @@
 //! 帖子、羊毛的读模型与列表查询，前台和 SEO 页面共用。
 
-use crate::{error::AppError, users::PublicUser};
+use crate::{error::{AppError, AppResult}, users::{ForumUser, PublicUser}};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use sqlx::{PgPool, Postgres, QueryBuilder};
@@ -17,6 +17,62 @@ pub const CONDITIONS: &[(&str, i32)] = &[
     ("realname", 32),
 ];
 pub const CONDITION_MASK: i32 = 63;
+
+/// 信任等级的名称，下标就是等级。
+pub const TRUST_NAMES: [&str; 4] = ["新人", "成员", "老用户", "守护者"];
+
+/// 谁在读：未登录是 level 0、uid None，只能读 `min_read_level = 0` 的帖子；
+/// 登录用户按信任等级读，并且总能读自己发的帖子。
+/// 默认值就是游客，所以没特意设置读者的查询（比如 SEO 页面）只会看到公开内容。
+#[derive(Debug, Clone, Default)]
+pub struct Reader {
+    pub level: i16,
+    pub uid: Option<Uuid>,
+}
+
+impl Reader {
+    pub fn from_user(user: Option<&ForumUser>) -> Self {
+        match user {
+            Some(u) => Reader { level: u.trust_level.clamp(0, 3), uid: Some(u.uid) },
+            None => Reader::default(),
+        }
+    }
+
+    /// 能不能读一个阅读权限为 `min_read_level`、作者为 `author` 的帖子。
+    pub fn check(&self, min_read_level: i16, author: Uuid) -> AppResult<()> {
+        if min_read_level <= self.level || self.uid == Some(author) {
+            return Ok(());
+        }
+        let need = TRUST_NAMES[min_read_level.clamp(0, 3) as usize];
+        Err(AppError::Forbidden(if self.uid.is_none() {
+            format!("这个帖子仅「{need}」及以上等级可见，请先登录")
+        } else {
+            format!("这个帖子仅「{need}」及以上等级可见，你目前是「{}」", TRUST_NAMES[self.level.clamp(0, 3) as usize])
+        }))
+    }
+}
+
+/// 读一个帖子的权限检查：帖子不存在报 404，等级不够报 403。
+pub async fn ensure_readable(pool: &PgPool, reader: &Reader, topic_id: i64) -> AppResult<()> {
+    let row: Option<(i16, Uuid)> = sqlx::query_as("SELECT min_read_level, author_uid FROM topics WHERE id = $1")
+        .bind(topic_id)
+        .fetch_optional(pool)
+        .await?;
+    let (min, author) = row.ok_or_else(|| AppError::not_found("帖子"))?;
+    reader.check(min, author)
+}
+
+/// 同上，入口是回复 id。
+pub async fn ensure_post_readable(pool: &PgPool, reader: &Reader, post_id: i64) -> AppResult<()> {
+    let row: Option<(i16, Uuid)> = sqlx::query_as(
+        "SELECT t.min_read_level, t.author_uid FROM posts p JOIN topics t ON t.id = p.topic_id WHERE p.id = $1",
+    )
+    .bind(post_id)
+    .fetch_optional(pool)
+    .await?;
+    let (min, author) = row.ok_or_else(|| AppError::not_found("回复"))?;
+    reader.check(min, author)
+}
 
 #[derive(Debug, Clone, Serialize)]
 pub struct CategoryRef {
@@ -58,6 +114,8 @@ pub struct TopicItem {
     pub reply_count: i32,
     pub like_count: i32,
     pub view_count: i32,
+    /// 阅读权限：0 所有人，1 成员以上，2 老用户以上，3 守护者以上。
+    pub min_read_level: i16,
     pub created_at: DateTime<Utc>,
     pub last_reply_at: DateTime<Utc>,
     pub edited_at: Option<DateTime<Utc>>,
@@ -76,6 +134,7 @@ struct TopicRow {
     reply_count: i32,
     like_count: i32,
     view_count: i32,
+    min_read_level: i16,
     created_at: DateTime<Utc>,
     last_reply_at: DateTime<Utc>,
     edited_at: Option<DateTime<Utc>>,
@@ -130,6 +189,7 @@ impl TopicRow {
             reply_count: self.reply_count,
             like_count: self.like_count,
             view_count: self.view_count,
+            min_read_level: self.min_read_level,
             created_at: self.created_at,
             last_reply_at: self.last_reply_at,
             edited_at: self.edited_at,
@@ -139,7 +199,7 @@ impl TopicRow {
 }
 
 const SELECT: &str = "SELECT t.id, t.title, t.excerpt, t.status, t.pinned, t.featured, t.locked,
-        t.reply_count, t.like_count, t.view_count, t.created_at, t.last_reply_at, t.edited_at,
+        t.reply_count, t.like_count, t.view_count, t.min_read_level, t.created_at, t.last_reply_at, t.edited_at,
         c.id AS category_id, c.slug AS category_slug, c.name AS category_name,
         u.uid AS author_uid, u.nickname AS author_nickname, u.avatar_url AS author_avatar, u.trust_level AS author_level,
         p.id AS product_id, p.slug AS product_slug, p.name AS product_name,
@@ -172,6 +232,9 @@ pub struct ListFilter {
     pub featured: bool,
     pub page: Option<i64>,
     pub page_size: Option<i64>,
+    /// 谁在读。只能由服务端按登录态设置，`serde(skip)` 保证不能通过查询参数伪造。
+    #[serde(skip)]
+    pub reader: Reader,
 }
 
 impl ListFilter {
@@ -193,6 +256,12 @@ pub struct Page<T> {
 
 fn push_filters(qb: &mut QueryBuilder<'_, Postgres>, f: &ListFilter) {
     qb.push(" WHERE t.status = 'normal'");
+    // 阅读权限：公开的、等级够的，以及读者自己发的。
+    qb.push(" AND (t.min_read_level <= ").push_bind(f.reader.level);
+    if let Some(uid) = f.reader.uid {
+        qb.push(" OR t.author_uid = ").push_bind(uid);
+    }
+    qb.push(")");
     if let Some(slug) = f.category.as_deref().filter(|s| !s.is_empty()) {
         qb.push(" AND (c.slug = ")
             .push_bind(slug.to_string())
@@ -318,4 +387,44 @@ pub async fn refresh_hot_scores(pool: &PgPool, topic_id: Option<i64>) -> Result<
         q = q.bind(id);
     }
     Ok(q.execute(pool).await?.rows_affected())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn reader(level: i16, uid: Option<Uuid>) -> Reader {
+        Reader { level, uid }
+    }
+
+    #[test]
+    fn guests_only_read_public_topics() {
+        let author = Uuid::new_v4();
+        let guest = Reader::default();
+        assert!(guest.check(0, author).is_ok());
+        for need in 1..=3 {
+            let err = guest.check(need, author).unwrap_err().to_string();
+            assert!(err.contains("请先登录"), "{err}");
+        }
+    }
+
+    #[test]
+    fn logged_in_readers_need_the_level() {
+        let author = Uuid::new_v4();
+        let member = reader(1, Some(Uuid::new_v4()));
+        assert!(member.check(0, author).is_ok());
+        assert!(member.check(1, author).is_ok());
+        let err = member.check(2, author).unwrap_err().to_string();
+        assert!(err.contains("老用户") && err.contains("成员"), "{err}");
+        assert!(member.check(3, author).is_err());
+        assert!(reader(3, Some(Uuid::new_v4())).check(3, author).is_ok());
+    }
+
+    #[test]
+    fn authors_always_read_their_own_topics() {
+        let me = Uuid::new_v4();
+        // 即使后来被降级到比自己帖子的阅读权限还低，也能读自己的帖子。
+        assert!(reader(0, Some(me)).check(3, me).is_ok());
+        assert!(reader(0, Some(Uuid::new_v4())).check(3, me).is_err());
+    }
 }

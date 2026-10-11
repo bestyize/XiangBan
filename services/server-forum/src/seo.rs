@@ -508,7 +508,11 @@ async fn topic_page(
 ) -> Res {
     let cx = Ctx::new(&state, &index);
     let Some(id) = id.parse::<i64>().ok().filter(|i| *i > 0) else { return Ok(cx.not_found()) };
-    let Some(topic) = models::get_topic(&state.pool, id).await?.filter(|t| t.status == "normal") else {
+    // 设了阅读权限的帖子不给搜索引擎看：当作不存在（noindex）。登录用户浏览器里的前端会带着令牌自己去取。
+    let Some(topic) = models::get_topic(&state.pool, id)
+        .await?
+        .filter(|t| t.status == "normal" && t.min_read_level == 0)
+    else {
         return Ok(cx.not_found());
     };
     // body_html 在写入时已由 ammonia 清洗过，可以原样输出。
@@ -762,7 +766,7 @@ async fn sitemap(State(state): State<AppState>) -> Res {
     let prods: Vec<(String,)> = sqlx::query_as("SELECT slug FROM products ORDER BY id").fetch_all(&state.pool).await?;
     // GREATEST 会忽略 NULL，所以没编辑过的帖子取最后回复时间。
     let topics: Vec<(i64, DateTime<Utc>)> = sqlx::query_as(
-        "SELECT id, GREATEST(last_reply_at, edited_at) AS m FROM topics WHERE status = 'normal' ORDER BY m DESC LIMIT 5000",
+        "SELECT id, GREATEST(last_reply_at, edited_at) AS m FROM topics WHERE status = 'normal' AND min_read_level = 0 ORDER BY m DESC LIMIT 5000",
     )
     .fetch_all(&state.pool)
     .await?;

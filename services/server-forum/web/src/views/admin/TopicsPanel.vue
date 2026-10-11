@@ -3,7 +3,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { adminApi, type AdminCategory, type AdminTopic, type TopicAction, type TopicState } from '@/api/admin'
 import AdminPager from './AdminPager.vue'
-import { fmtTime, perform, TOPIC_STATUS, topicTone, usePagedList } from './shared'
+import { fmtTime, perform, TOPIC_STATUS, topicTone, trustName, usePagedList } from './shared'
 
 const q = ref('')
 const status = ref('all')
@@ -126,6 +126,7 @@ onMounted(async () => {
             <span class="adm-tags">
               <span class="adm-tag" :class="topicTone(t.status)">{{ TOPIC_STATUS[t.status] }}</span>
               <span v-if="t.is_deal" class="adm-tag">羊毛</span>
+              <span v-if="t.min_read_level > 0" class="adm-tag">仅{{ trustName(t.min_read_level) }}以上</span>
             </span>
           </td>
           <td data-label="回复" class="num">{{ t.reply_count }}</td>

@@ -14,6 +14,19 @@ export function conditionLabels(bits: number) {
 
 export const TRUST_LABEL = ['新人', '成员', '老用户', '守护者']
 
+/** 阅读权限的选项，下标就是等级。 */
+export const READ_LEVELS = [
+  { level: 0, label: '所有人', short: '' },
+  { level: 1, label: '成员以上', short: '仅成员以上' },
+  { level: 2, label: '老用户以上', short: '仅老用户以上' },
+  { level: 3, label: '守护者', short: '仅守护者' },
+] as const
+
+/** 列表和详情里标出的阅读权限；公开的帖子不标。 */
+export function readLevelBadge(level: number) {
+  return READ_LEVELS[Math.min(Math.max(level, 0), 3)].short
+}
+
 const MIN = 60_000
 const HOUR = 60 * MIN
 const DAY = 24 * HOUR

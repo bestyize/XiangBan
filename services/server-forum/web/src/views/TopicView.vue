@@ -13,7 +13,7 @@ import type { PostItem, TopicDetail } from '@/api/types'
 import { useSession } from '@/stores/session'
 import { useMeta } from '@/stores/meta'
 import { useToast } from '@/stores/toast'
-import { TRUST_LABEL, formatDateTime, timeAgo } from '@/lib/format'
+import { TRUST_LABEL, formatDateTime, readLevelBadge, timeAgo } from '@/lib/format'
 import { useHead } from '@/lib/head'
 
 const route = useRoute()
@@ -25,6 +25,8 @@ const toast = useToast()
 const id = computed(() => Number(route.params.id))
 const topic = ref<TopicDetail | null>(null)
 const missing = ref(false)
+/** 没有阅读权限时服务端返回的说明，比如「这个帖子仅「老用户」及以上等级可见」。 */
+const forbidden = ref('')
 const posts = ref<PostItem[]>([])
 const postPage = ref(1)
 const postTotal = ref(0)
@@ -45,11 +47,17 @@ const parentCategory = computed(() => {
 
 async function loadTopic() {
   missing.value = false
+  forbidden.value = ''
   try {
     topic.value = await api.topic(id.value)
   } catch (e) {
     if (e instanceof ApiError && e.status === 404) missing.value = true
-    else toast.error(e)
+    else if (e instanceof ApiError && e.status === 403) {
+      // 例如退出登录后再看一个需要登录的帖子：把已经载入的内容也清掉。
+      forbidden.value = e.message
+      topic.value = null
+      posts.value = []
+    } else toast.error(e)
   }
 }
 
@@ -60,7 +68,8 @@ async function loadPosts(page = 1) {
     postPage.value = res.page
     postTotal.value = res.total
   } catch (e) {
-    toast.error(e)
+    // 没有阅读权限的提示由帖子本身的请求负责展示，这里不重复弹。
+    if (!(e instanceof ApiError && e.status === 403)) toast.error(e)
   }
 }
 
@@ -83,10 +92,10 @@ watch(
   { immediate: true },
 )
 
-// 登录状态变化后重新取一次，刷新"是否点过赞、能否编辑"等。
+// 登录状态变化后重新取一次：刷新"是否点过赞、能否编辑"，以及登录后能读到原来没权限的帖子。
 watch(
   () => session.user?.uid,
-  () => loadTopic(),
+  () => Promise.all([loadTopic(), loadPosts(1)]),
 )
 
 async function toggleLike() {
@@ -180,6 +189,13 @@ function goPosts(page: number) {
       <RouterLink to="/" class="btn">回到首页</RouterLink>
     </div>
 
+    <div v-else-if="forbidden" class="panel missing">
+      <h1>没有权限查看</h1>
+      <p class="muted">{{ forbidden }}</p>
+      <button v-if="!session.loggedIn" type="button" class="btn btn-primary" @click="session.loginOpen = true">登录</button>
+      <RouterLink v-else to="/" class="btn">回到首页</RouterLink>
+    </div>
+
     <div v-else-if="!topic" class="panel loading" aria-busy="true">
       <div class="bar w60" />
       <div class="bar w40" />
@@ -202,6 +218,7 @@ function goPosts(page: number) {
         <time :datetime="topic.created_at" :title="formatDateTime(topic.created_at)">{{ timeAgo(topic.created_at) }}发布</time>
         <span v-if="topic.edited_at">编辑于 {{ timeAgo(topic.edited_at) }}</span>
         <span>{{ topic.view_count }} 次浏览</span>
+        <span v-if="topic.min_read_level > 0" class="read-lock">{{ readLevelBadge(topic.min_read_level) }}可见</span>
         <span v-if="topic.locked" class="locked">已锁定</span>
       </div>
 
@@ -350,6 +367,14 @@ function goPosts(page: number) {
   font-weight: 700;
   line-height: 18px;
   color: var(--ink-2);
+}
+.read-lock {
+  border: 1px solid var(--line-strong);
+  border-radius: 4px;
+  padding: 0 6px;
+  line-height: 18px;
+  color: var(--ink-2);
+  font-weight: 600;
 }
 .locked {
   color: var(--suspect);

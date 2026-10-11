@@ -1,7 +1,7 @@
 use crate::{
-    auth::AuthUser,
+    auth::{AuthUser, MaybeUser},
     error::{AppError, AppResult},
-    models::{self, ListFilter, Page, TopicItem},
+    models::{self, ListFilter, Page, Reader, TopicItem},
     state::AppState,
     users::{self, PublicUser},
 };
@@ -38,19 +38,26 @@ pub async fn bookmarks(
     auth: AuthUser,
     Query(q): Query<ListFilter>,
 ) -> AppResult<Json<Page<TopicItem>>> {
+    // 收藏之后帖子的阅读权限可能被调高，等级不够的不再显示。
+    let level = auth.user.trust_level.clamp(0, 3);
     let ids: Vec<(i64,)> = sqlx::query_as(
-        "SELECT b.topic_id FROM bookmarks b JOIN topics t ON t.id = b.topic_id AND t.status = 'normal'
-         WHERE b.uid = $1 ORDER BY b.created_at DESC LIMIT $2 OFFSET $3",
+        "SELECT b.topic_id FROM bookmarks b
+         JOIN topics t ON t.id = b.topic_id AND t.status = 'normal' AND (t.min_read_level <= $2 OR t.author_uid = $1)
+         WHERE b.uid = $1 ORDER BY b.created_at DESC LIMIT $3 OFFSET $4",
     )
     .bind(auth.user.uid)
+    .bind(level)
     .bind(q.page_size())
     .bind((q.page() - 1) * q.page_size())
     .fetch_all(&state.pool)
     .await?;
     let (total,): (i64,) = sqlx::query_as(
-        "SELECT COUNT(*) FROM bookmarks b JOIN topics t ON t.id = b.topic_id AND t.status = 'normal' WHERE b.uid = $1",
+        "SELECT COUNT(*) FROM bookmarks b
+         JOIN topics t ON t.id = b.topic_id AND t.status = 'normal' AND (t.min_read_level <= $2 OR t.author_uid = $1)
+         WHERE b.uid = $1",
     )
     .bind(auth.user.uid)
+    .bind(level)
     .fetch_one(&state.pool)
     .await?;
     let mut items = Vec::with_capacity(ids.len());
@@ -75,14 +82,24 @@ pub struct Profile {
     pub banned: bool,
 }
 
-pub async fn profile(State(state): State<AppState>, Path(uid): Path<Uuid>) -> AppResult<Json<Profile>> {
+pub async fn profile(
+    State(state): State<AppState>,
+    MaybeUser(viewer): MaybeUser,
+    Path(uid): Path<Uuid>,
+) -> AppResult<Json<Profile>> {
+    let reader = Reader::from_user(viewer.as_ref());
     let user = users::find(&state.pool, uid).await?.ok_or_else(|| AppError::not_found("用户"))?;
     let (topic_count, post_count, deal_count): (i64, i64, i64) = sqlx::query_as(
-        "SELECT (SELECT COUNT(*) FROM topics WHERE author_uid = $1 AND status = 'normal'),
-                (SELECT COUNT(*) FROM posts WHERE author_uid = $1 AND status = 'normal'),
-                (SELECT COUNT(*) FROM topics t JOIN deals d ON d.topic_id = t.id WHERE t.author_uid = $1 AND t.status = 'normal')",
+        "SELECT (SELECT COUNT(*) FROM topics t WHERE t.author_uid = $1 AND t.status = 'normal'
+                   AND (t.min_read_level <= $2 OR t.author_uid = $3)),
+                (SELECT COUNT(*) FROM posts p JOIN topics t ON t.id = p.topic_id
+                 WHERE p.author_uid = $1 AND p.status = 'normal' AND (t.min_read_level <= $2 OR t.author_uid = $3)),
+                (SELECT COUNT(*) FROM topics t JOIN deals d ON d.topic_id = t.id
+                 WHERE t.author_uid = $1 AND t.status = 'normal' AND (t.min_read_level <= $2 OR t.author_uid = $3))",
     )
     .bind(uid)
+    .bind(reader.level)
+    .bind(reader.uid)
     .fetch_one(&state.pool)
     .await?;
     Ok(Json(Profile {
@@ -99,9 +116,11 @@ pub async fn profile(State(state): State<AppState>, Path(uid): Path<Uuid>) -> Ap
 
 pub async fn user_topics(
     State(state): State<AppState>,
+    MaybeUser(viewer): MaybeUser,
     Path(uid): Path<Uuid>,
     Query(mut f): Query<ListFilter>,
 ) -> AppResult<Json<Page<TopicItem>>> {
+    f.reader = Reader::from_user(viewer.as_ref());
     f.author = Some(uid);
     f.include_expired = true;
     if f.sort.is_none() {
@@ -122,25 +141,36 @@ pub struct UserReply {
 
 pub async fn user_posts(
     State(state): State<AppState>,
+    MaybeUser(viewer): MaybeUser,
     Path(uid): Path<Uuid>,
     Query(q): Query<ListFilter>,
 ) -> AppResult<Json<Value>> {
+    // 回复所在的帖子读者没有权限时，连帖子标题和回复摘要都不能露出来。
+    let reader = Reader::from_user(viewer.as_ref());
     let rows: Vec<UserReply> = sqlx::query_as(
         "SELECT p.id, p.topic_id, t.title AS topic_title, p.floor, left(p.body_md, 160) AS excerpt, p.created_at
          FROM posts p JOIN topics t ON t.id = p.topic_id AND t.status = 'normal'
+              AND (t.min_read_level <= $4 OR t.author_uid = $5)
          WHERE p.author_uid = $1 AND p.status = 'normal'
          ORDER BY p.created_at DESC LIMIT $2 OFFSET $3",
     )
     .bind(uid)
     .bind(q.page_size())
     .bind((q.page() - 1) * q.page_size())
+    .bind(reader.level)
+    .bind(reader.uid)
     .fetch_all(&state.pool)
     .await?;
     Ok(Json(json!({ "items": rows, "page": q.page(), "page_size": q.page_size() })))
 }
 
 /// 搜索：帖子 + 产品。
-pub async fn search(State(state): State<AppState>, Query(mut f): Query<ListFilter>) -> AppResult<Json<Value>> {
+pub async fn search(
+    State(state): State<AppState>,
+    MaybeUser(viewer): MaybeUser,
+    Query(mut f): Query<ListFilter>,
+) -> AppResult<Json<Value>> {
+    f.reader = Reader::from_user(viewer.as_ref());
     let q = f.q.clone().unwrap_or_default();
     let q = q.trim();
     if q.chars().count() < 1 || q.chars().count() > 50 {

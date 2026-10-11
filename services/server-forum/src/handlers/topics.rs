@@ -2,7 +2,7 @@ use crate::{
     auth::{AuthUser, MaybeUser},
     error::{AppError, AppResult},
     markdown,
-    models::{self, ListFilter, Page, TopicItem, CONDITION_MASK},
+    models::{self, ListFilter, Page, Reader, TopicItem, CONDITION_MASK, TRUST_NAMES},
     state::AppState,
     users,
 };
@@ -15,11 +15,21 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use sqlx::PgPool;
 
-pub async fn list(State(state): State<AppState>, Query(f): Query<ListFilter>) -> AppResult<Json<Page<TopicItem>>> {
+pub async fn list(
+    State(state): State<AppState>,
+    MaybeUser(user): MaybeUser,
+    Query(mut f): Query<ListFilter>,
+) -> AppResult<Json<Page<TopicItem>>> {
+    f.reader = Reader::from_user(user.as_ref());
     Ok(Json(models::list_topics(&state.pool, &f).await?))
 }
 
-pub async fn list_deals(State(state): State<AppState>, Query(mut f): Query<ListFilter>) -> AppResult<Json<Page<TopicItem>>> {
+pub async fn list_deals(
+    State(state): State<AppState>,
+    MaybeUser(user): MaybeUser,
+    Query(mut f): Query<ListFilter>,
+) -> AppResult<Json<Page<TopicItem>>> {
+    f.reader = Reader::from_user(user.as_ref());
     f.kind = Some("deal".into());
     if f.sort.is_none() {
         f.sort = Some("new".into());
@@ -50,6 +60,8 @@ pub async fn get(State(state): State<AppState>, MaybeUser(user): MaybeUser, Path
     if topic.status != "normal" && !is_author {
         return Err(AppError::not_found("帖子"));
     }
+    // 阅读权限在读正文、记浏览数之前检查。
+    Reader::from_user(user.as_ref()).check(topic.min_read_level, topic.author.uid)?;
     let (body_html, body_md): (String, String) =
         sqlx::query_as("SELECT body_html, body_md FROM topics WHERE id = $1").bind(id).fetch_one(&state.pool).await?;
 
@@ -111,6 +123,9 @@ pub struct TopicInput {
     #[serde(default)]
     pub tags: Vec<String>,
     pub deal: Option<DealInput>,
+    /// 谁能读：0 所有人，1 成员以上，2 老用户以上，3 守护者以上。
+    /// 不能超过发帖人自己的信任等级。发帖不传按 0，编辑不传保持原样。
+    pub min_read_level: Option<i16>,
 }
 
 #[derive(sqlx::FromRow)]
@@ -221,6 +236,25 @@ pub async fn save_tags(pool: &PgPool, topic_id: i64, tags: &[String]) -> AppResu
     Ok(())
 }
 
+/// 阅读权限只能设到不超过自己的信任等级。`current` 是编辑时帖子原来的值：保持不变总是允许
+/// （比如发帖人后来被降级，编辑其他内容时不应该被迫改阅读权限）。
+fn clean_read_level(wanted: Option<i16>, user_level: i16, current: Option<i16>) -> AppResult<i16> {
+    let level = match wanted {
+        Some(l) => l,
+        None => return Ok(current.unwrap_or(0)),
+    };
+    if !(0..=3).contains(&level) {
+        return Err(AppError::BadRequest("阅读权限无效".into()));
+    }
+    if level > user_level.clamp(0, 3) && Some(level) != current {
+        return Err(AppError::Forbidden(format!(
+            "阅读权限最高只能设到你自己的等级「{}」",
+            TRUST_NAMES[user_level.clamp(0, 3) as usize]
+        )));
+    }
+    Ok(level)
+}
+
 /// 产品可以不选；选了就必须是库里有的。
 async fn ensure_product(pool: &PgPool, id: Option<i32>) -> AppResult<()> {
     let Some(id) = id else { return Ok(()) };
@@ -246,6 +280,7 @@ pub async fn create(State(state): State<AppState>, auth: AuthUser, Json(input): 
     let title = clean_title(&input.title)?;
     let body = clean_body(&input.body, if cat.kind == "deal" { 0 } else { 10 })?;
     let tags = clean_tags(&input.tags)?;
+    let read_level = clean_read_level(input.min_read_level, user.trust_level, None)?;
     let empty_deal = DealInput::default();
     let deal = match (cat.kind.as_str(), &input.deal) {
         ("deal", Some(d)) => {
@@ -265,8 +300,8 @@ pub async fn create(State(state): State<AppState>, auth: AuthUser, Json(input): 
 
     let mut tx = state.pool.begin().await?;
     let (id,): (i64,) = sqlx::query_as(
-        "INSERT INTO topics (category_id, author_uid, title, body_md, body_html, excerpt)
-         VALUES ($1, $2, $3, $4, $5, $6) RETURNING id",
+        "INSERT INTO topics (category_id, author_uid, title, body_md, body_html, excerpt, min_read_level)
+         VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id",
     )
     .bind(cat.id)
     .bind(user.uid)
@@ -274,6 +309,7 @@ pub async fn create(State(state): State<AppState>, auth: AuthUser, Json(input): 
     .bind(&body)
     .bind(&html)
     .bind(&excerpt)
+    .bind(read_level)
     .fetch_one(&mut *tx)
     .await?;
     if let Some(d) = deal {
@@ -320,12 +356,14 @@ pub async fn update(
     let title = clean_title(&input.title)?;
     let body = clean_body(&input.body, if cat.kind == "deal" { 0 } else { 10 })?;
     let tags = clean_tags(&input.tags)?;
+    let read_level = clean_read_level(input.min_read_level, user.trust_level, Some(topic.min_read_level))?;
     let html = markdown::render(&body, user.trust_level >= 1);
     let excerpt = markdown::excerpt(&body, 140);
 
     let mut tx = state.pool.begin().await?;
     sqlx::query(
-        "UPDATE topics SET category_id = $2, title = $3, body_md = $4, body_html = $5, excerpt = $6, edited_at = now()
+        "UPDATE topics SET category_id = $2, title = $3, body_md = $4, body_html = $5, excerpt = $6, min_read_level = $7,
+            edited_at = now()
          WHERE id = $1",
     )
     .bind(id)
@@ -334,6 +372,7 @@ pub async fn update(
     .bind(&body)
     .bind(&html)
     .bind(&excerpt)
+    .bind(read_level)
     .execute(&mut *tx)
     .await?;
     if let Some(d) = &input.deal {
@@ -397,6 +436,33 @@ mod tests {
         assert!(validate_link("https://x.com/a?b=1&AFF=2").is_err());
         assert!(validate_link("javascript:alert(1)").is_err());
         assert!(validate_link("").is_ok());
+    }
+
+    #[test]
+    fn read_level_cannot_exceed_own_trust_level() {
+        // 发帖：不传默认公开；不超过自己等级都行
+        assert_eq!(clean_read_level(None, 1, None).unwrap(), 0);
+        assert_eq!(clean_read_level(Some(0), 1, None).unwrap(), 0);
+        assert_eq!(clean_read_level(Some(1), 1, None).unwrap(), 1);
+        // 超过自己等级被拒绝，并说明自己是什么等级
+        let err = clean_read_level(Some(2), 1, None).unwrap_err().to_string();
+        assert!(err.contains("成员"), "{err}");
+        assert!(clean_read_level(Some(3), 2, None).is_err());
+        assert_eq!(clean_read_level(Some(3), 3, None).unwrap(), 3);
+        // 越界的值
+        assert!(clean_read_level(Some(-1), 3, None).is_err());
+        assert!(clean_read_level(Some(4), 3, None).is_err());
+    }
+
+    #[test]
+    fn editing_keeps_the_existing_read_level_unless_changed() {
+        // 编辑不传：保持原样
+        assert_eq!(clean_read_level(None, 1, Some(2)).unwrap(), 2);
+        // 发帖人后来被降级：原来的阅读权限原样保留是允许的，但不能借编辑设成别的更高值
+        assert_eq!(clean_read_level(Some(2), 1, Some(2)).unwrap(), 2);
+        assert!(clean_read_level(Some(3), 1, Some(2)).is_err());
+        // 往下调总是允许
+        assert_eq!(clean_read_level(Some(0), 1, Some(2)).unwrap(), 0);
     }
 
     #[test]

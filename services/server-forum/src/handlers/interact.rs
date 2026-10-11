@@ -3,7 +3,7 @@
 use crate::{
     auth::AuthUser,
     error::{AppError, AppResult},
-    models,
+    models::{self, Reader},
     state::AppState,
 };
 use axum::{
@@ -15,6 +15,13 @@ use serde_json::{json, Value};
 
 async fn toggle_like(state: &AppState, auth: &AuthUser, target: &str, id: i64, on: bool) -> AppResult<Json<Value>> {
     let table = if target == "topic" { "topics" } else { "posts" };
+    // 没有阅读权限的帖子不能点赞（否则能靠猜 id 探测）。
+    let reader = Reader::from_user(Some(&auth.user));
+    if target == "topic" {
+        models::ensure_readable(&state.pool, &reader, id).await?;
+    } else {
+        models::ensure_post_readable(&state.pool, &reader, id).await?;
+    }
     let exists: Option<(i64,)> = sqlx::query_as(&format!("SELECT id FROM {table} WHERE id = $1 AND status = 'normal'"))
         .bind(id)
         .fetch_optional(&state.pool)
@@ -61,6 +68,7 @@ pub async fn unlike_post(State(s): State<AppState>, auth: AuthUser, Path(id): Pa
 }
 
 pub async fn bookmark(State(state): State<AppState>, auth: AuthUser, Path(id): Path<i64>) -> AppResult<Json<Value>> {
+    models::ensure_readable(&state.pool, &Reader::from_user(Some(&auth.user)), id).await?;
     let exists: Option<(i64,)> = sqlx::query_as("SELECT id FROM topics WHERE id = $1 AND status = 'normal'")
         .bind(id)
         .fetch_optional(&state.pool)
@@ -104,6 +112,12 @@ pub async fn report(State(state): State<AppState>, auth: AuthUser, Json(input): 
     };
     if !REPORT_REASONS.contains(&input.reason.as_str()) {
         return Err(AppError::BadRequest("请选择举报原因".into()));
+    }
+    let reader = Reader::from_user(Some(&auth.user));
+    if input.target_type == "topic" {
+        models::ensure_readable(&state.pool, &reader, input.target_id).await?;
+    } else {
+        models::ensure_post_readable(&state.pool, &reader, input.target_id).await?;
     }
     let detail: String = input.detail.trim().chars().take(500).collect();
     let exists: Option<(i64,)> = sqlx::query_as(&format!("SELECT id FROM {table} WHERE id = $1"))

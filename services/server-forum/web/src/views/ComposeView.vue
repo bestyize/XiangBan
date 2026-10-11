@@ -7,7 +7,7 @@ import type { TopicInput } from '@/api/types'
 import { useMeta } from '@/stores/meta'
 import { useSession } from '@/stores/session'
 import { useToast } from '@/stores/toast'
-import { CONDITIONS } from '@/lib/format'
+import { CONDITIONS, READ_LEVELS, TRUST_LABEL } from '@/lib/format'
 import { useHead } from '@/lib/head'
 
 const route = useRoute()
@@ -32,7 +32,11 @@ const form = reactive({
   linkUrl: '',
   expiry: 'unknown' as 'unknown' | 'date' | 'long',
   expiresDate: '',
+  /** 谁能读：0 所有人，1 成员以上，2 老用户以上，3 守护者 */
+  readLevel: 0,
 })
+/** 编辑时帖子原来的阅读权限；发帖人后来被降级时，原值仍然可以保留。 */
+const originalReadLevel = ref<number | null>(null)
 const tagDraft = ref('')
 const busy = ref(false)
 const error = ref('')
@@ -94,6 +98,8 @@ watch(
       form.title = t.title
       form.body = t.body_md
       form.tags = [...t.tags]
+      form.readLevel = t.min_read_level
+      originalReadLevel.value = t.min_read_level
       loadedKind.value = t.deal ? 'deal' : 'normal'
       if (t.deal) {
         form.productId = t.deal.product?.id ?? 0
@@ -135,6 +141,12 @@ function onTagKey(e: KeyboardEvent) {
   }
 }
 
+/** 阅读权限最高只能设到发帖人自己的信任等级。 */
+const myLevel = computed(() => session.user?.trust_level ?? 0)
+function readLevelDisabled(level: number) {
+  return level > myLevel.value && level !== originalReadLevel.value
+}
+
 const titleLen = computed(() => Array.from(form.title.trim()).length)
 
 const titleHint = computed(() =>
@@ -152,6 +164,7 @@ async function submit() {
     title: form.title,
     body: form.body,
     tags: form.tags,
+    min_read_level: form.readLevel,
   }
   if (isDeal.value) {
     input.deal = {
@@ -298,6 +311,23 @@ const today = new Date().toISOString().slice(0, 10)
           </div>
           <small>最多 5 个，产品名做标签能让帖子出现在产品页。</small>
         </div>
+        <fieldset class="field">
+          <legend>谁能看</legend>
+          <div class="seg">
+            <label
+              v-for="r in READ_LEVELS"
+              :key="r.level"
+              :class="{ on: form.readLevel === r.level, off: readLevelDisabled(r.level) }"
+              :title="readLevelDisabled(r.level) ? `需要升到「${TRUST_LABEL[r.level]}」才能设置` : ''"
+            >
+              <input v-model="form.readLevel" type="radio" :value="r.level" :disabled="readLevelDisabled(r.level)" />{{ r.label }}
+            </label>
+          </div>
+          <small v-if="form.readLevel > 0">
+            游客和等级不够的用户看不到这个帖子，也不会出现在列表、搜索和搜索引擎里。
+          </small>
+          <small v-else>最高只能设到你自己的等级（你现在是「{{ TRUST_LABEL[myLevel] }}」）。</small>
+        </fieldset>
       </section>
 
       <div class="submit">
@@ -493,6 +523,10 @@ legend {
 .seg label.on {
   background: var(--ink);
   color: var(--paper);
+}
+.seg label.off {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 .date {
   margin-top: 8px;

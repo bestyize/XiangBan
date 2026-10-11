@@ -623,6 +623,7 @@ struct AdminTopic {
     reply_count: i32,
     created_at: DateTime<Utc>,
     is_deal: bool,
+    min_read_level: i16,
     open_reports: i64,
 }
 
@@ -667,7 +668,7 @@ async fn list_topics(
 
     let mut qb = QueryBuilder::<Postgres>::new(format!(
         "SELECT t.id, t.title, t.status, t.category_id, c.name AS category_name, t.author_uid, u.nickname AS author_nickname,
-                t.pinned, t.featured, t.locked, t.reply_count, t.created_at, (d.topic_id IS NOT NULL) AS is_deal,
+                t.pinned, t.featured, t.locked, t.reply_count, t.created_at, (d.topic_id IS NOT NULL) AS is_deal, t.min_read_level,
                 (SELECT COUNT(*) FROM reports r WHERE r.target_type = 'topic' AND r.target_id = t.id AND r.status = 'open') AS open_reports{FROM}"
     ));
     filter(&mut qb);

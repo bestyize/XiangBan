@@ -66,6 +66,8 @@ CREATE TABLE IF NOT EXISTS topics (
     created_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
     edited_at      TIMESTAMPTZ
 );
+-- 帖子阅读权限：0 所有人（含游客）、1 成员以上、2 老用户以上、3 守护者以上。
+ALTER TABLE topics ADD COLUMN IF NOT EXISTS min_read_level SMALLINT NOT NULL DEFAULT 0;
 CREATE INDEX IF NOT EXISTS topics_category_idx ON topics (category_id, last_reply_at DESC);
 CREATE INDEX IF NOT EXISTS topics_hot_idx ON topics (hot_score DESC);
 CREATE INDEX IF NOT EXISTS topics_created_idx ON topics (created_at DESC);

@@ -68,6 +68,8 @@ export interface TopicItem {
   pinned: boolean
   featured: boolean
   locked: boolean
+  /** 谁能读：0 所有人，1 成员以上，2 老用户以上，3 守护者 */
+  min_read_level: number
   reply_count: number
   like_count: number
   view_count: number
@@ -146,6 +148,8 @@ export interface TopicInput {
   body: string
   tags: string[]
   deal?: DealInput
+  /** 不传：发帖按公开，编辑保持原样 */
+  min_read_level?: number
 }
 
 export interface SiteConfig {

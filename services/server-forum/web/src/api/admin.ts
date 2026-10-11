@@ -164,6 +164,8 @@ export interface AdminTopic {
   reply_count: number
   created_at: string
   is_deal: boolean
+  /** 阅读权限：0 所有人，1 成员以上，2 老用户以上，3 守护者 */
+  min_read_level: number
   open_reports: number
 }
 

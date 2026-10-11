@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { TopicItem } from '@/api/types'
 import UserAvatar from './UserAvatar.vue'
-import { compactCount, timeAgo } from '@/lib/format'
+import { compactCount, readLevelBadge, timeAgo } from '@/lib/format'
 
 withDefaults(defineProps<{ topic: TopicItem; showCategory?: boolean }>(), { showCategory: true })
 </script>
@@ -15,6 +15,7 @@ withDefaults(defineProps<{ topic: TopicItem; showCategory?: boolean }>(), { show
       <h3 class="title">
         <span v-if="topic.pinned" class="flag pin">置顶</span>
         <span v-if="topic.featured" class="flag feat">精选</span>
+        <span v-if="topic.min_read_level > 0" class="flag lock">{{ readLevelBadge(topic.min_read_level) }}</span>
         <RouterLink :to="`/t/${topic.id}`">{{ topic.title }}</RouterLink>
       </h3>
       <div class="meta">
@@ -84,6 +85,15 @@ withDefaults(defineProps<{ topic: TopicItem; showCategory?: boolean }>(), { show
 }
 .feat {
   color: var(--suspect);
+}
+.lock {
+  color: var(--ink-2);
+  border: 1px solid var(--line-strong);
+  border-radius: 3px;
+  padding: 0 5px;
+  line-height: 16px;
+  display: inline-block;
+  vertical-align: 1px;
 }
 .meta {
   display: flex;

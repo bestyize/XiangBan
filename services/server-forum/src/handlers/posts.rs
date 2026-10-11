@@ -1,7 +1,8 @@
 use crate::{
     auth::{AuthUser, MaybeUser},
     error::{AppError, AppResult},
-    markdown, models,
+    markdown,
+    models::{self, Reader},
     state::AppState,
     users::{self, PublicUser},
 };
@@ -61,6 +62,7 @@ pub async fn list(
     Path(topic_id): Path<i64>,
     Query(q): Query<PageQuery>,
 ) -> AppResult<Json<Value>> {
+    models::ensure_readable(&state.pool, &Reader::from_user(user.as_ref()), topic_id).await?;
     let page = q.page.unwrap_or(1).clamp(1, 10_000);
     let size = q.page_size.unwrap_or(50).clamp(1, 100);
     let viewer = user.as_ref().map(|u| u.uid);
@@ -128,6 +130,7 @@ pub async fn create(
 ) -> AppResult<Json<Value>> {
     let user = &auth.user;
     users::ensure_can_write(user)?;
+    models::ensure_readable(&state.pool, &Reader::from_user(Some(user)), topic_id).await?;
     let topic: Option<(String, bool)> = sqlx::query_as("SELECT status, locked FROM topics WHERE id = $1")
         .bind(topic_id)
         .fetch_optional(&state.pool)

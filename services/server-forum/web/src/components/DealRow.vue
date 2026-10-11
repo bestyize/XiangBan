@@ -2,7 +2,7 @@
 import { computed } from 'vue'
 import type { TopicItem } from '@/api/types'
 import UserAvatar from './UserAvatar.vue'
-import { compactCount, conditionLabels, expiringSoon, expiryText, timeAgo } from '@/lib/format'
+import { compactCount, conditionLabels, expiringSoon, expiryText, readLevelBadge, timeAgo } from '@/lib/format'
 
 const props = defineProps<{ topic: TopicItem }>()
 const deal = computed(() => props.topic.deal!)
@@ -22,6 +22,7 @@ const soon = computed(() => expiringSoon(deal.value.expires_at, deal.value.long_
       <h3 class="title">
         <span v-if="topic.pinned" class="flag pin">置顶</span>
         <span v-if="topic.featured" class="flag feat">精选</span>
+        <span v-if="topic.min_read_level > 0" class="flag lock">{{ readLevelBadge(topic.min_read_level) }}</span>
         <RouterLink :to="`/t/${topic.id}`">{{ topic.title }}</RouterLink>
       </h3>
       <!-- 羊毛信息是选填的，填了哪项显示哪项，和普通帖的"分类 作者 时间"在同一个位置 -->
@@ -96,6 +97,15 @@ const soon = computed(() => expiringSoon(deal.value.expires_at, deal.value.long_
 }
 .feat {
   color: var(--suspect);
+}
+.lock {
+  color: var(--ink-2);
+  border: 1px solid var(--line-strong);
+  border-radius: 3px;
+  padding: 0 5px;
+  line-height: 16px;
+  display: inline-block;
+  vertical-align: 1px;
 }
 .meta {
   display: flex;
