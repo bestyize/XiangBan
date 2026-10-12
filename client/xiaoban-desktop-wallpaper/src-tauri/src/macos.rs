@@ -46,6 +46,29 @@ fn native(window: &tauri::WebviewWindow) -> Result<&NSWindow, String> {
     Ok(unsafe { &*pointer.cast::<NSWindow>() })
 }
 
+/// Use AppKit points consistently, including negative coordinates and Retina screens.
+pub fn widget_monitors(app:&tauri::AppHandle)->Result<Vec<crate::widget_geometry::MonitorArea>,String>{
+    on_main(app,move|mtm|{
+        let screens=NSScreen::screens(mtm);let primary=screens.firstObject().ok_or("没有找到显示器")?.frame();
+        Ok(screens.iter().enumerate().map(|(index,screen)|{
+            let frame=screen.frame();let name=screen.localizedName().to_string();
+            let (x,y)=crate::widget_geometry::from_bottom_left(primary.size.height,frame.origin.x,frame.origin.y,frame.size.height);
+            crate::widget_geometry::MonitorArea{id:format!("{}@{},{}",name,frame.origin.x,frame.origin.y),name,x,y,width:frame.size.width,height:frame.size.height,scale:1.0,primary:index==0}
+        }).collect())
+    })
+}
+pub fn widget_cursor(app:&tauri::AppHandle)->Result<(f64,f64),String>{
+    on_main(app,move|mtm|{let height=NSScreen::screens(mtm).firstObject().ok_or("没有找到显示器")?.frame().size.height;let point=NSEvent::mouseLocation();Ok((point.x,height-point.y))})
+}
+pub fn place_widget(window:&tauri::WebviewWindow,x:f64,y:f64,width:f64,height:f64)->Result<(),String>{
+    let window=window.clone();let app=window.app_handle().clone();
+    on_main(&app,move|mtm|{
+        let primary_height=NSScreen::screens(mtm).firstObject().ok_or("没有找到显示器")?.frame().size.height;
+        let frame=objc2_foundation::NSRect::new(objc2_foundation::NSPoint::new(x,primary_height-y-height),objc2_foundation::NSSize::new(width,height));
+        native(&window)?.setFrame_display(frame,true);Ok(())
+    })
+}
+
 pub fn configure_scene(
     window: &tauri::WebviewWindow,
     wallpaper: bool,
@@ -335,3 +358,4 @@ pub fn smoke_dock_reopen(app: &tauri::AppHandle) -> Result<serde_json::Value, St
     }
     Ok(serde_json::json!({"cases":cases, "wallpaperPreserved":true}))
 }
+

@@ -1,0 +1,59 @@
+//! Per-monitor widget placement. Windows uses global physical pixels;
+//! macOS uses global AppKit points with a top-left origin.
+#[derive(Clone, Debug, serde::Serialize)]
+pub struct MonitorArea {
+    pub id: String, pub name: String, pub x: f64, pub y: f64,
+    pub width: f64, pub height: f64, pub scale: f64, pub primary: bool,
+}
+pub fn resolve<'a>(areas: &'a [MonitorArea], saved: Option<&str>) -> Option<&'a MonitorArea> {
+    saved.and_then(|id|areas.iter().find(|m|m.id==id))
+        .or_else(||areas.iter().find(|m|m.primary)).or_else(||areas.first())
+}
+pub fn at_point(areas: &[MonitorArea], x: f64, y: f64) -> Option<&MonitorArea> {
+    areas.iter().find(|m|x>=m.x&&x<m.x+m.width&&y>=m.y&&y<m.y+m.height)
+        .or_else(||areas.iter().min_by(|a,b|distance(a,x,y).total_cmp(&distance(b,x,y))))
+}
+fn distance(m: &MonitorArea, x: f64, y: f64) -> f64 {
+    let dx=x-x.clamp(m.x,m.x+m.width);let dy=y-y.clamp(m.y,m.y+m.height);dx*dx+dy*dy
+}
+pub fn spans(m: &MonitorArea, width: f64, height: f64) -> (f64,f64,f64) {
+    let top=(32.0*m.scale).min((m.height-height).max(0.0));
+    let bottom=(56.0*m.scale).min((m.height-height-top).max(0.0));
+    ((m.width-width).max(0.0),(m.height-height-top-bottom).max(0.0),top)
+}
+pub fn position(m: &MonitorArea, width: f64, height: f64, x: f64, y: f64) -> (f64,f64) {
+    let (span_x,span_y,top)=spans(m,width,height);(m.x+x*span_x,m.y+top+y*span_y)
+}
+pub fn drag_position(m: &MonitorArea, width: f64, height: f64, cursor: (f64,f64), grab: (f64,f64)) -> (f64,f64) {
+    let (span_x,span_y,top)=spans(m,width,height);
+    let x=if span_x>0.0{((cursor.0-grab.0*width-m.x)/span_x).clamp(0.0,1.0)}else{0.0};
+    let y=if span_y>0.0{((cursor.1-grab.1*height-m.y-top)/span_y).clamp(0.0,1.0)}else{0.0};
+    (x,y)
+}
+pub fn from_bottom_left(primary_height:f64,x:f64,y:f64,height:f64)->(f64,f64){(x,primary_height-y-height)}
+#[cfg(test)]
+mod tests {
+    use super::*;
+    fn monitor(id:&str,x:f64,y:f64,width:f64,height:f64,scale:f64,primary:bool)->MonitorArea{MonitorArea{id:id.into(),name:id.into(),x,y,width,height,scale,primary}}
+    #[test]fn targets_right_left_and_above_displays(){
+        let screens=vec![monitor("main",0.,0.,1920.,1080.,1.,true),monitor("left",-1280.,0.,1280.,1024.,1.,false),monitor("right",1920.,0.,2560.,1440.,2.,false),monitor("above",0.,-900.,1600.,900.,1.,false)];
+        assert_eq!(at_point(&screens,-100.,300.).unwrap().id,"left");assert_eq!(at_point(&screens,2200.,300.).unwrap().id,"right");assert_eq!(at_point(&screens,100.,-100.).unwrap().id,"above");
+        assert_eq!(at_point(&screens,1920.,100.).unwrap().id,"right");
+    }
+    #[test]fn restores_saved_screen_and_falls_back_without_rewriting_it(){
+        let screens=vec![monitor("main",0.,0.,1920.,1080.,1.,true),monitor("second",1920.,0.,1920.,1080.,1.,false)];
+        assert_eq!(resolve(&screens,Some("second")).unwrap().id,"second");assert_eq!(resolve(&screens[..1],Some("second")).unwrap().id,"main");assert_eq!(resolve(&screens,None).unwrap().id,"main");assert!(resolve(&[],None).is_none());
+    }
+    #[test]fn mixed_dpi_drag_preserves_grab_point_and_round_trips(){
+        let screen=monitor("retina",1920.,0.,2560.,1440.,2.,false);let (w,h)=(632.,752.);let cursor=(2600.,500.);let grab=(0.25,0.1);
+        let (x,y)=drag_position(&screen,w,h,cursor,grab);let (px,py)=position(&screen,w,h,x,y);
+        assert!((px+w*grab.0-cursor.0).abs()<0.001);assert!((py+h*grab.1-cursor.1).abs()<0.001);
+    }
+    #[test]fn small_screens_and_monitor_gaps_remain_finite(){
+        let screen=monitor("small",-500.,0.,200.,150.,1.,true);assert_eq!(drag_position(&screen,600.,700.,(-100.,400.),(0.5,0.5)),(0.,0.));
+        let screens=vec![screen,monitor("right",1000.,0.,800.,600.,1.,false)];assert_eq!(at_point(&screens,900.,100.).unwrap().id,"right");
+    }
+    #[test]fn appkit_conversion_handles_screens_above_and_below(){
+        assert_eq!(from_bottom_left(900.,-1280.,0.,1024.),(-1280.,-124.));assert_eq!(from_bottom_left(900.,0.,900.,1080.),(0.,-1080.));assert_eq!(from_bottom_left(900.,0.,-768.,768.),(0.,900.));
+    }
+}

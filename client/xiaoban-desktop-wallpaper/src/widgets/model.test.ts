@@ -19,4 +19,12 @@ describe('desktop widget layout',()=>{
     const february=calendarDays(2024,1);expect(february).toHaveLength(42);expect(february[0].date.getDay()).toBe(1);expect(february.filter(day=>day.current)).toHaveLength(29);
     const december=calendarDays(2026,11);expect(december.filter(day=>day.current)).toHaveLength(31);expect(december.at(-1)?.date.getFullYear()).toBe(2027);
   });
+  it('keeps saved monitor identities when their screens are disconnected and validates live monitor metadata',()=>{
+    const monitors=[{id:'left',name:'外接屏',width:1920,height:1080,primary:false},{id:'main',name:'主屏幕',width:1440,height:900,primary:true}];
+    const layout=validateLayout({...emptyLayout(),widgets:[{...one(),monitor:'disconnected'}],monitors});
+    expect(layout.widgets[0].monitor).toBe('disconnected');expect(layout.monitors).toEqual(monitors);
+    expect(()=>validateLayout({...emptyLayout(),widgets:[{...one(),monitor:''}]})).toThrow();
+  });
+
 });
+

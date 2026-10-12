@@ -21,6 +21,8 @@ concurrency:
 
 jobs:
   windows-x64:
+    # This branch uses the scoped macOS packaging workflow; avoid duplicate builds.
+    if: github.head_ref != 'feat/desktop-calendar-notes-countdown' && github.ref_name != 'feat/desktop-calendar-notes-countdown'
     runs-on: windows-latest
     timeout-minutes: 35
     defaults:
@@ -68,6 +70,8 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
   macos-arm64:
+    # This branch uses the scoped macOS packaging workflow; avoid duplicate builds.
+    if: github.head_ref != 'feat/desktop-calendar-notes-countdown' && github.ref_name != 'feat/desktop-calendar-notes-countdown'
     runs-on: macos-15
     timeout-minutes: 35
     defaults:
@@ -116,3 +120,4 @@ jobs:
             client/xiaoban-desktop-wallpaper/artifacts/macos-size.txt
           if-no-files-found: warn
           retention-days: 14
+
