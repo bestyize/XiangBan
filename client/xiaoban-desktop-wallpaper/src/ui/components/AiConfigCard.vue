@@ -10,7 +10,9 @@ import {
   endpointPreview,
   getProviderMeta,
   insecureRemote,
+  normalizeBaseUrl,
   protocolOption,
+  providerEndpoint,
   validateAiForm,
   validateBaseUrl,
   validateKey,
@@ -64,15 +66,37 @@ const currentMeta = computed<ProviderMeta>(() => getProviderMeta(editingId.value
 const modalOption = computed(() => protocolOption(modalProtocol.value));
 const modalPreview = computed(() => validateBaseUrl(modalBaseUrl.value) ? '' : endpointPreview(modalProtocol.value, modalBaseUrl.value));
 
+/** True when the address is one of this provider's own presets, so switching protocol may replace it. */
+function isPresetAddress(id: string, url: string): boolean {
+  const trimmed = normalizeBaseUrl(url);
+  if (!trimmed) return true;
+  const meta = getProviderMeta(id);
+  return Object.values(meta.endpoints).some(endpoint => normalizeBaseUrl(endpoint ?? '') === trimmed);
+}
+
+/**
+ * Each built-in vendor serves all three wire formats, but on a different path, so following the
+ * protocol means following the address. A hand-edited address (a proxy, a gateway) is never
+ * replaced; for a custom provider the address is simply the protocol's own example.
+ */
 function onProtocolChange(newProto: AiProtocol) {
+  const previous = modalProtocol.value;
   modalProtocol.value = newProto;
   if (isEditingCustom.value) {
     const newOption = protocolOption(newProto);
-    if (!modalBaseUrl.value.trim() || aiProtocols.some(p => p.placeholder === modalBaseUrl.value.trim())) {
+    if (isPresetAddress(editingId.value, modalBaseUrl.value) || normalizeBaseUrl(modalBaseUrl.value) === normalizeBaseUrl(protocolOption(previous).placeholder)) {
       modalBaseUrl.value = newOption.placeholder;
     }
+    return;
+  }
+  if (isPresetAddress(editingId.value, modalBaseUrl.value)) {
+    modalBaseUrl.value = providerEndpoint(editingId.value, newProto);
   }
 }
+
+/** The protocol picker. Every built-in vendor serves all three formats, so all of them are listed;
+ * a hand-typed address stays valid because the host is told the protocol, not the vendor. */
+const protocolChoices = computed(() => aiProtocols.map(o => ({ label: o.label, value: o.value })));
 
 const activeProviderMeta = computed(() => {
   const activeId = saved.value.activeProvider || 'deepseek';
@@ -167,7 +191,7 @@ function openConfigureModal(id: string) {
   } else {
     modalName.value = meta.name;
     modalProtocol.value = meta.protocol;
-    modalBaseUrl.value = meta.defaultBaseUrl;
+    modalBaseUrl.value = providerEndpoint(id, meta.protocol);
     modalModel.value = meta.defaultModel;
     modalHasKey.value = false;
     modalKeyHint.value = '';
@@ -561,19 +585,17 @@ function getProviderIcon(id: string) {
         <div class="field">
           <label for="ai-protocol">接口协议</label>
           <NSelect
-            v-if="isEditingCustom"
             :value="modalProtocol"
             input-id="ai-protocol"
-            :options="aiProtocols.map(o => ({ label: o.label, value: o.value }))"
+            :options="protocolChoices"
             :disabled="!store.desktop || !!busy"
             data-testid="ai-protocol"
             @update:value="onProtocolChange"
           />
-          <div v-else class="builtin-protocol-badge">
-            <NTag size="small" type="info" :bordered="false">OpenAI 兼容协议（Chat Completions）</NTag>
-            <small class="protocol-fixed-hint">该服务商官方遵循 OpenAI 标准 Chat Completions 协议</small>
-          </div>
-          <small v-if="isEditingCustom">{{ modalOption.hint }}</small>
+          <small>{{ modalOption.hint }}</small>
+          <small v-if="!isEditingCustom" class="protocol-switch-hint" data-testid="ai-protocol-endpoint-hint">
+            切换协议会自动换成该服务商对应的接口地址；手动改过的地址不会被覆盖。
+          </small>
         </div>
 
         <div class="field">

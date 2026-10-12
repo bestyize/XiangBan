@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import { NButton, NInput } from 'naive-ui';
-import { ArrowDown, Check, FolderOpen, LoaderCircle, MessageSquarePlus, SendHorizontal, Shield, ShieldAlert, Square, Trash2, X, Zap } from 'lucide-vue-next';
+import { ArrowDown, Check, FolderOpen, ImagePlus, LoaderCircle, MessageSquarePlus, SendHorizontal, Shield, ShieldAlert, Square, Trash2, X, Zap } from 'lucide-vue-next';
 import { invoke } from '../../bridge.ts';
 import type { ControlStore } from '../control-types.ts';
 import MarkdownView from '../chat/MarkdownView.ts';
@@ -21,10 +21,21 @@ const confirmingId = ref('');
 const answerText = ref('');
 const examples = ['帮我看看工作目录里有什么，整理一份清单', '把壁纸换成一张安静的风景', '每天下午三点提醒我喝水', '查一下今天是几号，再告诉我这周还剩几天'];
 
+/** Images waiting to be sent, as `data:` URLs. Cleared on send, alongside the draft. */
+const attachments = ref<string[]>([]);
+const filePicker = ref<HTMLInputElement | null>(null);
+/** The image shown enlarged, or null. */
+const preview = ref<string | null>(null);
+/** How many images one message may carry, matching the host's own limit. */
+const MAX_IMAGES = 8;
+/** The host refuses anything bigger; checking here keeps a huge paste from being read at all. */
+const MAX_IMAGE_BYTES = 3 * 1024 * 1024;
+const IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
+
 const view = computed(() => chat.current());
 const running = computed(() => !!view.value?.running);
 const title = computed(() => (chat.currentId && chat.sessions.find(s => s.id === chat.currentId)?.title) || '新对话');
-const canSend = computed(() => chat.configured && !running.value && draft.value.trim() !== '');
+const canSend = computed(() => chat.configured && !running.value && (draft.value.trim() !== '' || attachments.value.length > 0));
 const workspaceName = computed(() => chat.workspace.split(/[\\/]/).filter(Boolean).slice(-2).join('/') || chat.workspace);
 const now = () => Math.floor(Date.now() / 1000);
 const waiting = computed(() => !!view.value && (view.value.approvals.length > 0 || view.value.questions.length > 0));
@@ -63,13 +74,72 @@ watch(signature, async (value, before) => {
 
 async function submit() {
   const text = draft.value.trim();
-  if (!text || !canSend.value) return;
+  if ((!text && !attachments.value.length) || !canSend.value) return;
+  const images = [...attachments.value];
+  const kept = text;
   draft.value = '';
+  attachments.value = [];
   stick.value = true;
-  if (!(await chat.send(text)) && !draft.value) draft.value = text;
+  if (!(await chat.send(text, images)) && !draft.value) {
+    // The host refused, so nothing was sent: hand the whole message back untouched.
+    draft.value = kept;
+    attachments.value = images;
+  }
   await nextTick();
   toBottom();
 }
+
+/** Reads a picked or pasted file into a `data:` URL, refusing anything the host would reject. */
+function readImage(file: File): Promise<string | null> {
+  return new Promise(resolve => {
+    if (!IMAGE_TYPES.includes(file.type)) {
+      props.store.notify('只能发送 PNG、JPEG、GIF 或 WebP 图片', 'error');
+      resolve(null);
+      return;
+    }
+    if (file.size > MAX_IMAGE_BYTES) {
+      props.store.notify('这张图片太大了，请换一张小于 3MB 的', 'error');
+      resolve(null);
+      return;
+    }
+    const reader = new FileReader();
+    reader.onerror = () => { props.store.notify('这张图片读不出来，请换一张', 'error'); resolve(null); };
+    reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : null);
+    reader.readAsDataURL(file);
+  });
+}
+
+async function addImages(files: File[]) {
+  if (!files.length) return;
+  const room = MAX_IMAGES - attachments.value.length;
+  if (room <= 0) {
+    props.store.notify(`一次最多发送 ${MAX_IMAGES} 张图片`, 'error');
+    return;
+  }
+  if (files.length > room) props.store.notify(`一次最多发送 ${MAX_IMAGES} 张图片，多余的没有加上`, 'info');
+  const read = await Promise.all(files.slice(0, room).map(readImage));
+  const accepted = read.filter((url): url is string => !!url);
+  if (accepted.length) attachments.value = [...attachments.value, ...accepted];
+}
+
+/** Images on the clipboard arrive as files; anything else is left to the normal paste. */
+function onPaste(event: ClipboardEvent) {
+  const files = Array.from(event.clipboardData?.files ?? []).filter(file => file.type.startsWith('image/'));
+  if (!files.length) return;
+  event.preventDefault();
+  void addImages(files);
+}
+
+function onPick(event: Event) {
+  const input = event.target as HTMLInputElement;
+  void addImages(Array.from(input.files ?? []));
+  // Let the same file be chosen again after it is removed.
+  input.value = '';
+}
+
+const removeAttachment = (index: number) => { attachments.value = attachments.value.filter((_, n) => n !== index); };
+const openPicker = () => filePicker.value?.click();
+
 function onKeydown(event: KeyboardEvent) {
   if (event.key !== 'Enter' || event.shiftKey || isImeEnter(event, composing.value)) return;
   event.preventDefault();
@@ -176,7 +246,7 @@ async function openLink(href: string) {
 
           <template v-if="view">
             <template v-for="item in view.items" :key="item.id">
-              <div v-if="item.kind === 'user'" class="msg user" data-testid="msg-user"><div class="bubble">{{ item.text }}<small v-if="item.images" class="muted">（含 {{ item.images }} 张图片）</small></div></div>
+              <div v-if="item.kind === 'user'" class="msg user" data-testid="msg-user"><div class="bubble"><div v-if="item.images.length" class="bubble-images"><img v-for="(url, n) in item.images" :key="n" :src="url" :alt="`第 ${n + 1} 张图片`" :data-testid="`msg-user-image-${n}`" @click="preview = url" /></div><template v-if="item.text">{{ item.text }}</template></div></div>
               <div v-else-if="item.kind === 'assistant'" class="msg assistant" data-testid="msg-assistant">
                 <img class="avatar" src="/xiaoban.svg" alt="" width="28" height="28" />
                 <div class="answer"><MarkdownView :source="item.text" @open="openLink" /><span v-if="item.streaming" class="cursor" aria-hidden="true"></span></div>
@@ -227,13 +297,29 @@ async function openLink(href: string) {
 
       <button v-if="!stick && view?.items.length" type="button" class="to-bottom" data-testid="chat-bottom" aria-label="回到最新" @click="stick = true; toBottom()"><ArrowDown :size="16" /></button>
 
-      <footer class="composer" @compositionstart="composing = true" @compositionend="composing = false">
-        <div class="composer-box">
-          <NInput v-model:value="draft" type="textarea" :autosize="{ minRows: 1, maxRows: 8 }" :disabled="!store.desktop || !chat.configured" :placeholder="chat.configured ? '问点什么，或者交给小伴去办（Enter 发送，Shift+Enter 换行）' : '先到设置里配置模型'" data-testid="chat-input" @keydown="onKeydown" />
-          <NButton v-if="running" type="error" circle data-testid="chat-stop" aria-label="停止" @click="chat.cancel()"><template #icon><Square :size="14" /></template></NButton>
-          <NButton v-else type="primary" circle data-testid="chat-send" aria-label="发送" :disabled="!canSend" @click="submit"><template #icon><SendHorizontal :size="16" /></template></NButton>
+      <footer class="composer" @compositionstart="composing = true" @compositionend="composing = false" @paste="onPaste">
+        <div class="composer-box" :class="{ 'has-attachments': attachments.length > 0 }">
+          <div v-if="attachments.length" class="attachments" data-testid="chat-attachments">
+            <div v-for="(url, n) in attachments" :key="n" class="thumb">
+              <img :src="url" :alt="`待发送的第 ${n + 1} 张图片`" :data-testid="`chat-attachment-${n}`" @click="preview = url" />
+              <button type="button" class="thumb-remove" :data-testid="`chat-attachment-remove-${n}`" :aria-label="`移除第 ${n + 1} 张图片`" :disabled="running" @click="removeAttachment(n)"><X :size="12" /></button>
+            </div>
+            <small class="attach-hint">{{ attachments.length }}/{{ MAX_IMAGES }} 张 · 发送时会一起交给小伴</small>
+          </div>
+          <div class="composer-row">
+            <input ref="filePicker" type="file" accept="image/png,image/jpeg,image/gif,image/webp" multiple hidden data-testid="chat-image-input" @change="onPick" />
+            <NButton quaternary circle size="small" data-testid="chat-pick-image" aria-label="选择图片" :disabled="!store.desktop || !chat.configured || running || attachments.length >= MAX_IMAGES" @click="openPicker"><template #icon><ImagePlus :size="16" /></template></NButton>
+            <NInput v-model:value="draft" type="textarea" :autosize="{ minRows: 1, maxRows: 8 }" :disabled="!store.desktop || !chat.configured" :placeholder="chat.configured ? '问点什么，或者交给小伴去办（Enter 发送，Shift+Enter 换行，可直接粘贴图片）' : '先到设置里配置模型'" data-testid="chat-input" @keydown="onKeydown" />
+            <NButton v-if="running" type="error" circle data-testid="chat-stop" aria-label="停止" @click="chat.cancel()"><template #icon><Square :size="14" /></template></NButton>
+            <NButton v-else type="primary" circle data-testid="chat-send" aria-label="发送" :disabled="!canSend" @click="submit"><template #icon><SendHorizontal :size="16" /></template></NButton>
+          </div>
         </div>
       </footer>
+    </div>
+
+    <div v-if="preview" class="lightbox" data-testid="chat-image-preview" role="dialog" aria-label="图片预览" @click="preview = null">
+      <img :src="preview" alt="图片预览" />
+      <button type="button" class="lightbox-close" data-testid="chat-image-preview-close" aria-label="关闭预览" @click="preview = null"><X :size="18" /></button>
     </div>
   </section>
 </template>
@@ -310,7 +396,22 @@ async function openLink(href: string) {
 @keyframes spin{to{transform:rotate(360deg)}}
 .to-bottom{position:absolute;right:28px;bottom:96px;width:34px;height:34px;border-radius:50%;border:1px solid var(--ui-border);background:var(--ui-surface);color:var(--ui-text-primary);cursor:pointer;display:grid;place-items:center;box-shadow:var(--ui-shadow-pop)}
 .composer{padding:10px 24px 18px;width:100%;box-sizing:border-box}
-.composer-box{max-width:820px;margin:0 auto;display:flex;gap:10px;align-items:flex-end;background:var(--ui-surface);border:1px solid var(--ui-border);border-radius:18px;padding:8px 10px 8px 14px}
+.composer-box{max-width:820px;margin:0 auto;display:flex;flex-direction:column;gap:8px;background:var(--ui-surface);border:1px solid var(--ui-border);border-radius:18px;padding:8px 10px 8px 14px}
+.composer-row{display:flex;gap:10px;align-items:flex-end;min-width:0}
+.composer-row :deep(.n-input){flex:1;min-width:0}
+.attachments{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:2px 2px 0}
+.thumb{position:relative;width:56px;height:56px;border-radius:10px;overflow:hidden;border:1px solid var(--ui-line);background:var(--ui-surface-alt);flex:none}
+.thumb img{width:100%;height:100%;object-fit:cover;cursor:zoom-in;display:block}
+.thumb-remove{position:absolute;top:2px;right:2px;width:17px;height:17px;border-radius:50%;border:0;background:rgba(0,0,0,.58);color:#fff;display:grid;place-items:center;cursor:pointer;padding:0}
+.thumb-remove:hover:not(:disabled){background:rgba(0,0,0,.78)}
+.thumb-remove:disabled{cursor:not-allowed;opacity:.5}
+.attach-hint{color:var(--ui-text-tertiary);font-size:12px}
+.bubble-images{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px}
+.bubble-images img{max-width:180px;max-height:180px;border-radius:10px;border:1px solid var(--ui-line);cursor:zoom-in;display:block}
+.lightbox{position:fixed;inset:0;z-index:60;background:rgba(0,0,0,.78);display:grid;place-items:center;padding:40px;cursor:zoom-out}
+.lightbox img{max-width:100%;max-height:100%;border-radius:12px;box-shadow:0 18px 60px rgba(0,0,0,.5)}
+.lightbox-close{position:absolute;top:18px;right:18px;width:36px;height:36px;border-radius:50%;border:0;background:rgba(255,255,255,.16);color:#fff;display:grid;place-items:center;cursor:pointer}
+.lightbox-close:hover{background:rgba(255,255,255,.3)}
 .composer-box :deep(.n-input){--n-border:none;--n-border-hover:none;--n-border-focus:none;--n-box-shadow-focus:none;background:transparent}
 .composer-box :deep(.n-input .n-input__border),.composer-box :deep(.n-input .n-input__state-border){display:none}
 .composer-box :deep(.n-input-wrapper){padding-left:0}

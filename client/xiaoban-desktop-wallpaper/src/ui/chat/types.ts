@@ -51,7 +51,7 @@ export type ApprovalDecision = 'once' | 'always' | 'deny';
 export interface QuestionRequest { id: string; session: string; question: string; options: string[] }
 
 export type ChatItem =
-  | { kind: 'user'; id: string; text: string; images: number }
+  | { kind: 'user'; id: string; text: string; images: string[] }
   | { kind: 'assistant'; id: string; text: string; streaming: boolean }
   | { kind: 'tool'; id: string; name: string; arguments: string; output: string; status: 'running' | 'done' | 'error' }
   | { kind: 'notice'; id: string; tone: 'info' | 'warning' | 'error'; text: string; canContinue?: boolean };

@@ -34,8 +34,9 @@ describe('model service form helpers', () => {
     for (const fine of ['http://localhost:11434/v1', 'http://127.0.0.1:1234', 'http://[::1]:8080', 'https://api.example.com/v1', '', 'nonsense']) expect(insecureRemote(fine), fine).toBe(false);
   });
   it('offers the three protocols with the right starting addresses', () => {
-    expect(aiProtocols.map(option => option.value)).toEqual(['chat', 'responses', 'anthropic']);
+    expect(aiProtocols.map(option => option.value)).toEqual(['responses', 'anthropic', 'chat']);
     expect(protocolOption('anthropic').placeholder).toBe('https://api.anthropic.com');
     expect(protocolOption('chat').placeholder).toContain('/v1');
+    expect(protocolOption('chat').label).toContain('Chat Completions');
   });
 });

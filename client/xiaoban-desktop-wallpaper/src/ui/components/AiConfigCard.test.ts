@@ -197,14 +197,47 @@ describe('AI model settings card and provider templates', () => {
     expect(q('ai-provider-modal')?.style.display).toBe('none');
   });
 
-  it('shows the real address for each protocol', async () => {
+  it('follows the protocol with its example address, but keeps an address typed by hand', async () => {
     await open(unconfigured);
     await click('ai-add-custom-card');
+    // A brand new custom provider starts empty: its vendor is unknown, so there is no example.
+    expect(field('ai-base-url').value).toBe('');
+
+    // Once an example has been taken, following the protocol replaces it.
     await pickProtocol('anthropic');
-    await type('ai-base-url', 'https://api.anthropic.com/');
-    expect(q('ai-endpoint-preview')!.textContent).toContain('https://api.anthropic.com/v1/messages');
+    expect(field('ai-base-url').value).toBe('https://api.anthropic.com');
+    await type('ai-base-url', 'https://api.anthropic.com');
+    await pickProtocol('chat');
+    expect(field('ai-base-url').value).toBe('https://api.openai.com/v1');
+    expect(q('ai-endpoint-preview')!.textContent).toContain('https://api.openai.com/v1/chat/completions');
+
+    // An address the user typed is theirs: switching protocol leaves it alone.
+    await type('ai-base-url', 'https://gw.example.com/proxy/anthropic');
     await pickProtocol('responses');
-    expect(q('ai-endpoint-preview')!.textContent).toContain('https://api.anthropic.com/responses');
+    expect(field('ai-base-url').value).toBe('https://gw.example.com/proxy/anthropic');
+    expect(q('ai-endpoint-preview')!.textContent).toContain('https://gw.example.com/proxy/anthropic/responses');
+  });
+
+  it('switches a built-in vendor to the address that serves the chosen protocol', async () => {
+    await open(unconfigured);
+    await openModal('deepseek');
+    expect(field('ai-base-url').value).toBe('https://api.deepseek.com');
+
+    await pickProtocol('anthropic');
+    expect(field('ai-base-url').value).toBe('https://api.deepseek.com/anthropic');
+    expect(q('ai-endpoint-preview')!.textContent).toContain('https://api.deepseek.com/anthropic/v1/messages');
+
+    await pickProtocol('responses');
+    expect(field('ai-base-url').value).toBe('https://api.deepseek.com');
+    expect(q('ai-endpoint-preview')!.textContent).toContain('https://api.deepseek.com/responses');
+
+    // 智谱 puts each protocol on its own path.
+    await openModal('zhipu');
+    expect(field('ai-base-url').value).toBe('https://open.bigmodel.cn/api/paas/v4');
+    await pickProtocol('anthropic');
+    expect(field('ai-base-url').value).toBe('https://open.bigmodel.cn/api/anthropic');
+    await pickProtocol('responses');
+    expect(field('ai-base-url').value).toBe('https://open.bigmodel.cn/api/v1');
   });
 
   it('warns about plain http except loopback', async () => {

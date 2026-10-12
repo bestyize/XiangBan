@@ -379,3 +379,137 @@ describe('hiding tool calls', () => {
     expect(q('tool-t1')).not.toBeNull();
   });
 });
+
+/** A real one-pixel PNG, so FileReader produces the same `data:` URL the host will accept. */
+const PNG_BASE64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+const pngFile = (name = 'shot.png') => new File([Uint8Array.from(atob(PNG_BASE64), c => c.charCodeAt(0))], name, { type: 'image/png' });
+
+/** FileReader finishes on its own schedule in happy-dom, so tests wait for the effect. */
+async function settleAttachments(count?: number) {
+  for (let attempt = 0; attempt < 40; attempt++) {
+    await flushPromises();
+    await new Promise(resolve => setTimeout(resolve, 5));
+    const shown = all('[data-testid^="chat-attachment-"]').filter(el => !el.dataset.testid!.includes('remove')).length;
+    if (count === undefined ? true : shown >= count) {
+      await flushPromises();
+      return;
+    }
+  }
+  await flushPromises();
+}
+
+/** Puts files on the hidden picker, the way the system dialog would. */
+async function pickFiles(files: File[]) {
+  const input = q<HTMLInputElement>('chat-image-input')!;
+  Object.defineProperty(input, 'files', { value: files, configurable: true });
+  input.dispatchEvent(new Event('change', { bubbles: true }));
+  await settleAttachments(files.length);
+}
+
+/** Pastes files, which is how a screenshot arrives from the clipboard. */
+async function pasteFiles(files: File[]) {
+  const event = new Event('paste', { bubbles: true, cancelable: true });
+  Object.defineProperty(event, 'clipboardData', { value: { files }, configurable: true });
+  q('chat-input')!.closest('footer')!.dispatchEvent(event);
+  await settleAttachments(files.length);
+}
+
+describe('sending images', () => {
+  it('adds a pasted image, sends it with the text, and shows it in the conversation', async () => {
+    const h = await open({ ...startChat, chat_send: () => summary('s1', '看这个截图') });
+    await pasteFiles([pngFile()]);
+    expect(q('chat-attachment-0')).not.toBeNull();
+    expect(q('chat-attachments')!.textContent).toContain('1/8');
+
+    await type('这个报错是什么原因');
+    await click('chat-send');
+
+    const sent = h.calls.find(([command]) => command === 'chat_send')!;
+    expect(sent[1]).toMatchObject({ text: '这个报错是什么原因' });
+    expect(sent[1]!.images).toHaveLength(1);
+    expect(String((sent[1]!.images as string[])[0])).toMatch(/^data:image\/png;base64,/);
+    // The composer is cleared, and the image is now shown on the sent message.
+    expect(q('chat-attachments')).toBeNull();
+    expect(q('msg-user-image-0')).not.toBeNull();
+  });
+
+  it('sends an image with no text at all', async () => {
+    const h = await open({ ...startChat });
+    await pickFiles([pngFile()]);
+    expect(q<HTMLButtonElement>('chat-send')!.disabled).toBe(false);
+
+    await click('chat-send');
+    const sent = h.calls.find(([command]) => command === 'chat_send')!;
+    expect(sent[1]).toMatchObject({ text: '' });
+    expect(sent[1]!.images).toHaveLength(1);
+  });
+
+  it('lets one image be removed before sending, and closes the picker at the limit', async () => {
+    const h = await open({ ...startChat });
+    await pickFiles([pngFile('a.png'), pngFile('b.png')]);
+    expect(q('chat-attachment-0')).not.toBeNull();
+    expect(q('chat-attachment-1')).not.toBeNull();
+
+    await click('chat-attachment-remove-0');
+    expect(q('chat-attachment-1')).toBeNull();
+    expect(q('chat-attachment-0')).not.toBeNull();
+
+    await pickFiles(Array.from({ length: 8 }, (_, n) => pngFile(`f${n}.png`)));
+    expect(h.notify).toHaveBeenCalledWith('一次最多发送 8 张图片，多余的没有加上', 'info');
+    expect(q<HTMLButtonElement>('chat-pick-image')!.disabled).toBe(true);
+
+    await type('还是有文字');
+    await click('chat-send');
+    expect((h.calls.find(([c]) => c === 'chat_send')![1]!.images as string[])).toHaveLength(8);
+  });
+
+  it('refuses a type or a size the host would reject, and says why', async () => {
+    const h = await open({ ...startChat });
+    await pickFiles([new File(['<svg/>'], 'icon.svg', { type: 'image/svg+xml' })]);
+    expect(h.notify).toHaveBeenCalledWith('只能发送 PNG、JPEG、GIF 或 WebP 图片', 'error');
+    expect(q('chat-attachments')).toBeNull();
+
+    const huge = new File([new Uint8Array(3 * 1024 * 1024 + 1)], 'big.png', { type: 'image/png' });
+    await pickFiles([huge]);
+    expect(h.notify).toHaveBeenCalledWith('这张图片太大了，请换一张小于 3MB 的', 'error');
+    expect(q('chat-attachments')).toBeNull();
+  });
+
+  it('hands the image back when the host refuses the message', async () => {
+    const h = await open({ ...startChat, chat_send: () => { throw new Error('这个对话还在回答'); } });
+    await pickFiles([pngFile()]);
+    await type('看看');
+    await click('chat-send');
+
+    expect(h.notify).toHaveBeenCalledWith(expect.anything(), 'error');
+    expect(q('chat-attachment-0')).not.toBeNull();
+    expect(textarea().value).toBe('看看');
+  });
+
+  it('leaves plain text untouched when nothing is pasted', async () => {
+    const h = await open({ ...startChat });
+    await type('只是文字');
+    await click('chat-send');
+    expect(h.calls.find(([c]) => c === 'chat_send')![1]).toEqual({ sessionId: 's1', text: '只是文字' });
+  });
+
+  it('shows images that were sent earlier and opens one larger when clicked', async () => {
+    const history: WireMessage[] = [
+      { role: 'user', parts: [{ type: 'image', url: 'data:image/png;base64,AA' }, { type: 'text', text: '看这张图' }] },
+      { role: 'assistant', parts: [{ type: 'text', text: '看到了' }] },
+    ];
+    await open({ chat_overview: () => overview({ sessions: [summary('s1', '看这张图')] }), chat_load_session: () => history });
+    await click('chat-session-s1');
+
+    const shown = q<HTMLImageElement>('msg-user-image-0');
+    expect(shown).not.toBeNull();
+    expect(shown!.getAttribute('src')).toBe('data:image/png;base64,AA');
+    expect(q('msg-user')!.textContent).toContain('看这张图');
+
+    shown!.click();
+    await flushPromises();
+    expect(q('chat-image-preview')).not.toBeNull();
+    await click('chat-image-preview-close');
+    expect(q('chat-image-preview')).toBeNull();
+  });
+});

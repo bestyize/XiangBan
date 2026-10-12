@@ -16,7 +16,7 @@ use agent_kernel::provider::openai::OpenAiCompat;
 use agent_kernel::provider::responses::OpenAiResponses;
 use agent_kernel::provider::wire::ProviderProfile;
 use agent_kernel::skills::Skills;
-use agent_kernel::{Agent, Approval, ApprovalRequest, ContextTrim, JsonlStore, Message, ModelProvider, Permission, PermissionMode, Risk, SessionStore, SpillOutput, ToolCtx};
+use agent_kernel::{Agent, Approval, ApprovalRequest, ContextTrim, JsonlStore, Message, ModelProvider, Part, Permission, PermissionMode, Risk, SessionStore, SpillOutput, ToolCtx};
 use broker::Broker;
 use desktop_tools::{Desktop, TauriDesktop};
 use serde_json::{json, Value};
@@ -37,11 +37,61 @@ use crate::ai_config::{self, AiConfig};
 
 /// Most of what one message may hold. Longer input should be a file.
 const MAX_INPUT_CHARS: usize = 30_000;
+/// How many images one message may carry.
+const MAX_IMAGES: usize = 8;
+/// Largest single image, measured in the encoded data URL. Base64 inflates by a third, so this is
+/// roughly 3 MiB of original bytes — enough for a screenshot without bloating the session file.
+const MAX_IMAGE_CHARS: usize = 4 * 1024 * 1024;
+/// Image types the three protocols accept. SVG and friends are rejected: providers either refuse
+/// them or need them rasterised first.
+const IMAGE_MEDIA_TYPES: &[&str] = &["image/png", "image/jpeg", "image/gif", "image/webp"];
 /// Estimated tokens kept in a request before old tool output and old turns are dropped.
 const CONTEXT_TOKENS: usize = 48_000;
 const MAX_TURNS: usize = 40;
 const SPILL_KEEP: Duration = Duration::from_secs(7 * 86_400);
 const ARGUMENT_PREVIEW_CHARS: usize = 2_000;
+
+/// Checks one image and returns the `data:` URL to store, or why it was refused.
+///
+/// Every protocol the kernel speaks wants the image inline as a data URL: OpenAI puts it in
+/// `image_url`, Anthropic takes the base64 plus its `media_type`, and Responses passes the URL
+/// through. A remote `http(s)` URL would therefore be fetched by the provider, not by us, and
+/// would leak a reference to whatever host it points at; only inline data is accepted here.
+fn clean_image(raw: &str) -> Result<String, String> {
+    let url = raw.trim();
+    if url.is_empty() {
+        return Err("图片内容为空".into());
+    }
+    if url.len() > MAX_IMAGE_CHARS {
+        return Err("这张图片太大了，请换一张小于 3MB 的".into());
+    }
+    let Some((meta, data)) = url.strip_prefix("data:").and_then(|rest| rest.split_once(',')) else {
+        return Err("只支持本机粘贴或选择的图片".into());
+    };
+    let Some(media_type) = meta.strip_suffix(";base64") else {
+        return Err("图片必须是 base64 编码的".into());
+    };
+    if !IMAGE_MEDIA_TYPES.contains(&media_type) {
+        return Err(format!("不支持这种图片格式（{media_type}），请用 PNG、JPEG、GIF 或 WebP"));
+    }
+    if data.is_empty() || !data.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'+' || b == b'/' || b == b'=') {
+        return Err("图片数据不完整，请重新粘贴".into());
+    }
+    Ok(url.to_string())
+}
+
+/// The user's parts in the order the protocols expect: text first, then images.
+///
+/// Anthropic and Responses both reject an empty text block, so text is dropped when blank; but a
+/// message has to keep *something*, so a blank message with images keeps only its images.
+fn user_parts(text: &str, images: &[String]) -> Vec<Part> {
+    let mut parts = Vec::with_capacity(images.len() + 1);
+    if !text.trim().is_empty() {
+        parts.push(Part::Text { text: text.to_string() });
+    }
+    parts.extend(images.iter().map(|url| Part::Image { url: url.clone() }));
+    parts
+}
 
 fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
     mutex.lock().unwrap_or_else(|e| e.into_inner())
@@ -337,12 +387,17 @@ pub fn chat_new_session(app: tauri::AppHandle) -> Result<SessionSummary, String>
 }
 
 #[tauri::command]
-pub fn chat_send(app: tauri::AppHandle, session_id: String, text: String) -> Result<SessionSummary, String> {
+pub fn chat_send(app: tauri::AppHandle, session_id: String, text: String, images: Option<Vec<String>>) -> Result<SessionSummary, String> {
     if !sessions::valid_id(&session_id) {
         return Err("对话编号不对".into());
     }
     let text = text.trim().to_string();
-    if text.is_empty() {
+    let images = images.unwrap_or_default();
+    if images.len() > MAX_IMAGES {
+        return Err(format!("一次最多发送 {MAX_IMAGES} 张图片"));
+    }
+    let images = images.iter().map(|raw| clean_image(raw)).collect::<Result<Vec<_>, _>>()?;
+    if text.is_empty() && images.is_empty() {
         return Err("请先输入内容".into());
     }
     if text.chars().count() > MAX_INPUT_CHARS {
@@ -368,7 +423,10 @@ pub fn chat_send(app: tauri::AppHandle, session_id: String, text: String) -> Res
     let (seconds, _) = now();
     let summary = mutate(&app, |index| -> Result<SessionSummary, String> {
         let summary = index.get(&session_id).cloned().ok_or("这个对话已经不存在")?;
-        index.name_from_first_message(&summary.id, &text);
+        // An image-only message has no text to name the conversation after.
+        if !text.is_empty() {
+            index.name_from_first_message(&summary.id, &text);
+        }
         index.touch(&summary.id, seconds);
         Ok(index.get(&summary.id).cloned().unwrap_or(summary))
     })??;
@@ -384,7 +442,8 @@ pub fn chat_send(app: tauri::AppHandle, session_id: String, text: String) -> Res
     // Build the agent and run it entirely on a dedicated OS thread.
     // reqwest::blocking::Client internally manages its own current-thread runtime;
     // building or dropping it inside Tokio's async worker threads panics.
-    let (handle, id, text_owned, config_owned, workspace_owned) = (app.clone(), summary.id.clone(), text, config, workspace);
+    let parts = user_parts(&text, &images);
+    let (handle, id, parts_owned, config_owned, workspace_owned) = (app.clone(), summary.id.clone(), parts, config, workspace);
     let started = std::thread::Builder::new().name(format!("chat-{id}")).spawn(move || {
         let sender = handle.clone();
         let session = id.clone();
@@ -396,7 +455,7 @@ pub fn chat_send(app: tauri::AppHandle, session_id: String, text: String) -> Res
                 return;
             }
         };
-        let _ = agent.run(&id, &text_owned, &mut |event| emit(&sender, "chat-event", json!({ "session": session, "event": event })), &cancel);
+        let _ = agent.run_parts(&id, parts_owned, &mut |event| emit(&sender, "chat-event", json!({ "session": session, "event": event })), &cancel);
         finish_run(&handle, &id);
     });
     if let Err(error) = started {

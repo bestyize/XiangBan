@@ -143,6 +143,54 @@ fn call(id: &str, tool: &str, args: Value) -> Step {
     Step::tool_call(id, tool, &args.to_string())
 }
 
+/// A tiny valid PNG as a data URL, the shape the web side sends.
+const PNG: &str = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
+
+#[test]
+fn images_are_checked_before_a_message_is_accepted() {
+    assert_eq!(clean_image(PNG).unwrap(), PNG, "a pasted PNG is kept as it came");
+    assert_eq!(clean_image(&format!("  {PNG}  ")).unwrap(), PNG, "surrounding whitespace is dropped");
+    for (bad, why) in [
+        ("", "empty"),
+        ("   ", "blank"),
+        ("https://example.com/a.png", "remote"),
+        ("data:image/png,iVBORw0KGgo=", "not base64 labelled"),
+        ("data:image/svg+xml;base64,PHN2Zz48L3N2Zz4=", "unsupported type"),
+        ("data:image/png;base64,not base64!!", "not base64 data"),
+        ("data:image/png;base64,", "no data"),
+    ] {
+        assert!(clean_image(bad).is_err(), "{why} must be refused: {bad:?}");
+    }
+    let huge = format!("data:image/png;base64,{}", "A".repeat(MAX_IMAGE_CHARS));
+    assert!(clean_image(&huge).is_err(), "an image over the size limit is refused");
+}
+
+#[test]
+fn a_message_keeps_its_text_its_images_and_nothing_more() {
+    let with_text = user_parts("看这个", &[PNG.to_string()]);
+    assert_eq!(with_text, vec![Part::Text { text: "看这个".into() }, Part::Image { url: PNG.into() }], "text comes first");
+    let image_only = user_parts("   ", &[PNG.to_string()]);
+    assert_eq!(image_only, vec![Part::Image { url: PNG.into() }], "a blank caption adds no empty text block");
+    assert_eq!(user_parts("只有文字", &[]), vec![Part::Text { text: "只有文字".into() }]);
+}
+
+#[test]
+fn an_image_reaches_the_model_in_the_form_its_protocol_needs() {
+    let rig = rig("images", vec![Step::text("看到了")], Approval::Once);
+    let mut events = Vec::new();
+    let parts = user_parts("这是什么", &[PNG.to_string()]);
+    rig.agent.run_parts("s1", parts, &mut |e| events.push(e), &Arc::new(AtomicBool::new(false))).unwrap();
+
+    let request = &rig.provider.requests()[0];
+    let sent = request.messages.iter().find(|m| m.role == Role::User).expect("the user turn reached the model");
+    assert_eq!(
+        sent.parts,
+        vec![Part::Text { text: "这是什么".into() }, Part::Image { url: PNG.into() }],
+        "the text and the image both arrived, in order"
+    );
+    assert!(matches!(events.last(), Some(Event::Done)), "the run finished normally");
+}
+
 #[test]
 fn the_assistant_has_every_tool_it_needs_and_no_others() {
     let rig = rig("tools", vec![Step::text("ok")], Approval::Once);

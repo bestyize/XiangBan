@@ -32,7 +32,7 @@ export interface ChatStore {
   dispose(): void;
   select(id: string | null): Promise<void>;
   /** Returns false when nothing was sent, so the caller can give the text back to the user. */
-  send(text: string): Promise<boolean>;
+  send(text: string, images?: string[]): Promise<boolean>;
   cancel(): Promise<void>;
   remove(id: string): Promise<void>;
   answerApproval(request: ApprovalRequest, decision: ApprovalDecision): Promise<void>;
@@ -157,7 +157,7 @@ export function createChatStore(deps: ChatDeps): ChatStore {
       }
     },
 
-    async send(text) {
+    async send(text, images = []) {
       if (!deps.desktop) { deps.notify('请在桌面应用中使用聊天', 'error'); return false; }
       let id = store.currentId;
       let created = false;
@@ -176,12 +176,14 @@ export function createChatStore(deps: ChatDeps): ChatStore {
       }
       const view = viewOf(id, true);
       if (view.running) return false;
-      const item = { kind: 'user' as const, id: nextId(view), text, images: 0 };
+      const item = { kind: 'user' as const, id: nextId(view), text, images: [...images] };
       view.items.push(item);
       view.running = true;
       view.status = '';
       try {
-        upsert(await deps.invoke<SessionSummary>('chat_send', { sessionId: id, text }));
+        // Images are left out entirely when there are none, so a plain message keeps its old shape.
+        const args = images.length ? { sessionId: id, text, images } : { sessionId: id, text };
+        upsert(await deps.invoke<SessionSummary>('chat_send', args));
         return true;
       } catch (error) {
         // The host refused before starting, so nothing of this message happened.

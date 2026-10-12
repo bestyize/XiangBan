@@ -4,21 +4,42 @@ export interface ProviderMeta {
   id: string;
   name: string;
   desc: string;
+  /** The protocol a fresh setup starts on. */
   protocol: AiProtocol;
-  defaultBaseUrl: string;
+  /** The base address for the protocol the form is currently on, if this provider serves it. */
+  endpoints: Partial<Record<AiProtocol, string>>;
   defaultModel: string;
   suggestedModels: string[];
   consoleUrl?: string;
   consoleText?: string;
 }
 
+/**
+ * The built-in providers, with one base address per protocol. The four vendors serve the same
+ * model behind all three wire formats but each on its own path, so switching protocol has to
+ * change the address too:
+ *
+ *   DeepSeek   chat https://api.deepseek.com            responses https://api.deepseek.com
+ *              anthropic https://api.deepseek.com/anthropic
+ *   智谱        chat https://open.bigmodel.cn/api/paas/v4
+ *              responses https://open.bigmodel.cn/api/v1
+ *              anthropic https://open.bigmodel.cn/api/anthropic
+ *   Kimi       chat https://api.moonshot.cn/v1          responses https://api.moonshot.cn/v1
+ *              anthropic https://api.moonshot.cn/anthropic
+ *   MiniMax    chat https://api.minimax.cn/v1           responses https://api.minimax.cn/v1
+ *              anthropic https://api.minimax.cn/anthropic
+ */
 export const BUILTIN_PROVIDERS: ProviderMeta[] = [
   {
     id: 'deepseek',
     name: 'DeepSeek',
-    desc: '高性价比通用与深度思考模型，支持 V3 对话与 R1 推理',
+    desc: '高性价比通用与深度思考模型，三种接口协议都支持',
     protocol: 'chat',
-    defaultBaseUrl: 'https://api.deepseek.com',
+    endpoints: {
+      chat: 'https://api.deepseek.com',
+      responses: 'https://api.deepseek.com',
+      anthropic: 'https://api.deepseek.com/anthropic',
+    },
     defaultModel: 'deepseek-chat',
     suggestedModels: ['deepseek-chat', 'deepseek-reasoner'],
     consoleUrl: 'https://platform.deepseek.com/api_keys',
@@ -27,9 +48,13 @@ export const BUILTIN_PROVIDERS: ProviderMeta[] = [
   {
     id: 'zhipu',
     name: '智谱 BigModel',
-    desc: '清华系基座大模型，glm-4-flash 面向个人开发者免费开放',
+    desc: '清华系基座大模型，glm-4-flash 面向个人开发者免费开放，三种接口协议都支持',
     protocol: 'chat',
-    defaultBaseUrl: 'https://open.bigmodel.cn/api/paas/v4',
+    endpoints: {
+      chat: 'https://open.bigmodel.cn/api/paas/v4',
+      responses: 'https://open.bigmodel.cn/api/v1',
+      anthropic: 'https://open.bigmodel.cn/api/anthropic',
+    },
     defaultModel: 'glm-4-flash',
     suggestedModels: ['glm-4-plus', 'glm-4-flash', 'glm-4-air', 'glm-4-long'],
     consoleUrl: 'https://open.bigmodel.cn/usercenter/apikeys',
@@ -37,23 +62,31 @@ export const BUILTIN_PROVIDERS: ProviderMeta[] = [
   },
   {
     id: 'kimi',
-    name: 'Kimi (Moonshot)',
-    desc: '月之暗面长文本模型，超长上下文与长篇文档理解写作',
+    name: 'Kimi',
+    desc: '月之暗面长文本模型，超长上下文，三种接口协议都支持',
     protocol: 'chat',
-    defaultBaseUrl: 'https://api.moonshot.cn/v1',
-    defaultModel: 'moonshot-v1-auto',
-    suggestedModels: ['moonshot-v1-auto', 'moonshot-v1-8k', 'moonshot-v1-32k', 'moonshot-v1-128k'],
-    consoleUrl: 'https://platform.moonshot.cn/console/api-keys',
+    endpoints: {
+      chat: 'https://api.moonshot.cn/v1',
+      responses: 'https://api.moonshot.cn/v1',
+      anthropic: 'https://api.moonshot.cn/anthropic',
+    },
+    defaultModel: 'kimi-k2-0905-preview',
+    suggestedModels: ['kimi-k2-0905-preview', 'kimi-k2-turbo-preview', 'moonshot-v1-auto', 'moonshot-v1-128k'],
+    consoleUrl: 'https://platform.kimi.com/console/api-keys',
     consoleText: '前往 Kimi 开放平台获取 API Key',
   },
   {
     id: 'minimax',
     name: 'MiniMax',
-    desc: 'MiniMax 开放平台，提供 Text-01 与 abab 强大的通用生成能力',
+    desc: 'MiniMax 开放平台的通用生成模型，三种接口协议都支持',
     protocol: 'chat',
-    defaultBaseUrl: 'https://api.minimax.chat/v1',
-    defaultModel: 'MiniMax-Text-01',
-    suggestedModels: ['MiniMax-Text-01', 'abab6.5s-chat'],
+    endpoints: {
+      chat: 'https://api.minimax.cn/v1',
+      responses: 'https://api.minimax.cn/v1',
+      anthropic: 'https://api.minimax.cn/anthropic',
+    },
+    defaultModel: 'MiniMax-M2',
+    suggestedModels: ['MiniMax-M2', 'MiniMax-Text-01', 'abab6.5s-chat'],
     consoleUrl: 'https://platform.minimaxi.com/user-center/basic-information/interface-key',
     consoleText: '前往 MiniMax 开放平台获取 API Key',
   },
@@ -62,7 +95,7 @@ export const BUILTIN_PROVIDERS: ProviderMeta[] = [
     name: '自定义供应商',
     desc: '自定义第三方端点、海外服务或本地部署的 Ollama / vLLM 模型服务',
     protocol: 'chat',
-    defaultBaseUrl: '',
+    endpoints: {},
     defaultModel: '',
     suggestedModels: [],
   },
@@ -72,15 +105,22 @@ export function getProviderMeta(id: string): ProviderMeta {
   return BUILTIN_PROVIDERS.find(p => p.id === id) ?? BUILTIN_PROVIDERS[BUILTIN_PROVIDERS.length - 1];
 }
 
+/** The address this provider uses for a protocol; empty when it does not serve that one. */
+export function providerEndpoint(id: string, protocol: AiProtocol): string {
+  return getProviderMeta(id).endpoints[protocol] ?? '';
+}
+
 export interface ProtocolOption { value: AiProtocol; label: string; placeholder: string; hint: string }
 
+/** In the order the picker shows them: newest first, with the broadly compatible one last. */
 export const aiProtocols: ProtocolOption[] = [
-  { value: 'chat', label: 'OpenAI 兼容（Chat Completions）', placeholder: 'https://api.openai.com/v1', hint: '多数服务商和本地模型服务都支持这种，不确定就选它。' },
   { value: 'responses', label: 'OpenAI Responses', placeholder: 'https://api.openai.com/v1', hint: 'OpenAI 较新的接口，只在服务商明确支持时选。' },
   { value: 'anthropic', label: 'Anthropic Claude（Messages）', placeholder: 'https://api.anthropic.com', hint: '地址不用带 /v1，带了也可以。' },
+  { value: 'chat', label: 'OpenAI 兼容（Chat Completions）', placeholder: 'https://api.openai.com/v1', hint: '多数服务商和本地模型服务都支持这种，不确定就选它。' },
 ];
 
-export const protocolOption = (protocol: AiProtocol) => aiProtocols.find(option => option.value === protocol) ?? aiProtocols[0];
+export const protocolOption = (protocol: AiProtocol) =>
+  aiProtocols.find(option => option.value === protocol) ?? aiProtocols.find(option => option.value === 'chat')!;
 
 /** Trimmed, without trailing slashes: the form the host stores. */
 export const normalizeBaseUrl = (value: string) => value.trim().replace(/\/+$/, '');

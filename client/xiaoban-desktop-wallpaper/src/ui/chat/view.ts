@@ -14,9 +14,9 @@ export function itemsFromHistory(view: SessionView, messages: WireMessage[]): Ch
   const tools = new Map<string, Extract<ChatItem, { kind: 'tool' }>>();
   for (const message of messages) {
     if (message.role === 'user') {
-      const images = (message.parts ?? []).filter(part => part.type === 'image').length;
+      const images = (message.parts ?? []).filter(part => part.type === 'image').map(part => (part as { url: string }).url);
       const text = textOf(message);
-      if (text || images) items.push({ kind: 'user', id: nextId(view), text, images });
+      if (text || images.length) items.push({ kind: 'user', id: nextId(view), text, images });
     } else if (message.role === 'assistant') {
       const text = textOf(message);
       if (text.trim()) items.push({ kind: 'assistant', id: nextId(view), text, streaming: false });

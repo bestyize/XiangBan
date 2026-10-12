@@ -19,7 +19,7 @@ describe('history to chat items', () => {
     expect(items[3]).toMatchObject({ id: 'c2', output: 'a.txt\nb.txt' });
   });
 
-  it('skips empty assistant turns, counts images, and ignores stray results and system messages', () => {
+  it('skips empty assistant turns, keeps images, and ignores stray results and system messages', () => {
     const items = itemsFromHistory(newView('s1'), [
       { role: 'system', parts: text('hidden') },
       { role: 'user', parts: [{ type: 'image', url: 'data:x' }, { type: 'text', text: '看这个' }] },
@@ -30,8 +30,8 @@ describe('history to chat items', () => {
       { role: 'tool', parts: text('no id') },
     ]);
     expect(items).toEqual([
-      { kind: 'user', id: 's1:1', text: '看这个', images: 1 },
-      { kind: 'user', id: 's1:2', text: '', images: 1 },
+      { kind: 'user', id: 's1:1', text: '看这个', images: ['data:x'] },
+      { kind: 'user', id: 's1:2', text: '', images: ['data:y'] },
     ]);
   });
 

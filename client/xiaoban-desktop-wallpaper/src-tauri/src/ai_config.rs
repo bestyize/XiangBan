@@ -18,11 +18,15 @@ const MAX_URL: usize = 2048;
 const MAX_MODEL: usize = 200;
 const MAX_KEY: usize = 2048;
 
+/// The built-in providers a fresh install starts with: id, display name, and the chat-completions
+/// address and default model. Each vendor also serves the Responses and Anthropic wire formats on
+/// its own path; the web side switches the address with the protocol, and the host only needs a
+/// usable default here. See `src/ui/ai-config.ts` for the full list of endpoints.
 pub const DEFAULT_PROVIDERS: &[(&str, &str, &str, &str, &str)] = &[
     ("deepseek", "DeepSeek", "chat", "https://api.deepseek.com", "deepseek-chat"),
     ("zhipu", "智谱 BigModel", "chat", "https://open.bigmodel.cn/api/paas/v4", "glm-4-flash"),
-    ("kimi", "Kimi", "chat", "https://api.moonshot.cn/v1", "moonshot-v1-auto"),
-    ("minimax", "MiniMax", "chat", "https://api.minimax.chat/v1", "MiniMax-Text-01"),
+    ("kimi", "Kimi", "chat", "https://api.moonshot.cn/v1", "kimi-k2-0905-preview"),
+    ("minimax", "MiniMax", "chat", "https://api.minimax.cn/v1", "MiniMax-M2"),
 ];
 
 #[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -1075,6 +1079,11 @@ mod tests {
         assert!(cfg.providers.iter().any(|p| p.id == "zhipu"));
         assert!(cfg.providers.iter().any(|p| p.id == "kimi"));
         assert!(cfg.providers.iter().any(|p| p.id == "minimax"));
+        // Every built-in starts on chat completions with a working address and model.
+        for p in &cfg.providers {
+            assert_eq!(p.protocol, "chat", "{} starts on the broadly compatible protocol", p.id);
+            assert!(!p.base_url.is_empty() && !p.model.is_empty(), "{} has a usable default", p.id);
+        }
 
         // 添加一个自定义供应商
         cfg.providers.push(ProviderConfig {
@@ -1091,5 +1100,17 @@ mod tests {
         let custom = view.providers.iter().find(|p| p.id == "custom_1").unwrap();
         assert_eq!(custom.name, "我的本地 Ollama");
         assert!(custom.is_custom);
+    }
+
+    #[test]
+    fn a_builtin_provider_may_be_switched_to_any_of_the_three_protocols() {
+        // The vendors serve all three wire formats on their own paths; the host only stores what
+        // the form sent, so every protocol has to be accepted for a built-in id.
+        for protocol in PROTOCOLS {
+            let next = apply(&saved(), &Input { protocol, ..input("https://api.deepseek.com/anthropic", "m") }).unwrap();
+            assert_eq!(next.protocol, *protocol, "{protocol} is accepted");
+            assert_eq!(next.providers.iter().find(|p| p.id == next.active_provider).unwrap().protocol, *protocol, "the provider entry follows");
+        }
+        assert!(apply(&saved(), &Input { protocol: "grpc", ..input("https://a.example.com", "m") }).is_err());
     }
 }
