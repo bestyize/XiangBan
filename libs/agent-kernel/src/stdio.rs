@@ -11,7 +11,7 @@
 //! - `{"type":"event","run":"r1","event":{"type":"text_delta","text":".."}}`
 //! - `{"type":"run_end","run":"r1","ok":true,"text":"..","turns":2,"finish":"stop","prompt_tokens":10,"completion_tokens":5}`
 //!   (`finish` is `stop`, `length` when the answer may be cut off, `content_filter` or `other`) or `{"type":"run_end","run":"r1","ok":false,"error":".."}`; the run id can be reused after it
-//! - `{"type":"approval_request","id":"a1","session":"s1","tool":"shell","risk":"exec","arguments":{..},"tainted":false}`
+//! - `{"type":"approval_request","id":"a1","session":"s1","tool":"shell","risk":"exec","arguments":{..},"tainted":false}` (plus `"danger":".."` when the host's `danger_check` flagged the call)
 //! - `{"type":"question","id":"q1","session":"s1","question":"..","options":[..]}`
 //! - `{"type":"error","message":".."}` for malformed input; the server keeps going
 //!
@@ -230,11 +230,14 @@ impl StdioBridge {
         let (tx, rx) = mpsc::channel();
         lock(&self.pending).approvals.insert(id.clone(), (request.session.to_string(), tx));
         // Re-checked after registering: a cancel or close that ran in between has already cleared the table.
-        let sent = !self.unavailable(request.session)
-            && self.send(&json!({
-                "type": "approval_request", "id": id, "session": request.session, "tool": request.tool,
-                "risk": risk_name(request.risk), "arguments": request.arguments, "tainted": request.tainted,
-            }));
+        let mut message = json!({
+            "type": "approval_request", "id": id, "session": request.session, "tool": request.tool,
+            "risk": risk_name(request.risk), "arguments": request.arguments, "tainted": request.tainted,
+        });
+        if let Some(danger) = request.danger {
+            message["danger"] = json!(danger);
+        }
+        let sent = !self.unavailable(request.session) && self.send(&message);
         if !sent {
             lock(&self.pending).approvals.remove(&id);
             return Approval::Deny;

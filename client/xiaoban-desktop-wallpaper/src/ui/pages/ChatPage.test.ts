@@ -219,6 +219,22 @@ describe('asking the user', () => {
     expect(q('chat-approval')).toBeNull();
   });
 
+  it('says why a dangerous operation is asked even in full trust, and never offers to remember it', async () => {
+    const h = await running();
+    h.emit('chat-approval', approval({ id: 'a9', arguments: { command: 'sudo rm -rf /tmp/x' }, danger: '以管理员权限运行', canRemember: false }));
+    await flushPromises();
+    expect(q('approval-danger')!.textContent).toContain('以管理员权限运行');
+    expect(q('approval-danger')!.textContent).toContain('完全信任');
+    expect(q('chat-approval')!.className).toContain('dangerous');
+    expect(q('approval-always')).toBeNull();
+    expect(q('approval-tainted')).toBeNull();
+    await click('approval-deny');
+    expect(h.calls.at(-1)).toEqual(['chat_answer_approval', { id: 'a9', decision: 'deny' }]);
+    h.emit('chat-approval', approval({ id: 'a10' }));
+    await flushPromises();
+    expect(q('approval-danger'), 'an ordinary request carries no warning').toBeNull();
+  });
+
   it('offers to remember an ordinary change, explains why an outside-content run is asked every time, and lets the user refuse', async () => {
     const h = await running();
     h.emit('chat-approval', approval({ id: 'a2', tool: 'write_file', risk: 'write', canRemember: true, tainted: true, arguments: { path: 'notes.md', content: '# 今天' } }));

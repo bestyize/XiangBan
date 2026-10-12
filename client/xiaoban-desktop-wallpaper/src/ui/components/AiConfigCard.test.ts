@@ -27,7 +27,6 @@ const configured: AiConfigView = {
   keyHint: '••••9876',
   workspace: '',
   defaultWorkspace: '/data/workspace',
-  permissionMode: 'ask',
   hideToolCalls: false,
   openComputerUse: false,
 };
@@ -42,7 +41,6 @@ const unconfigured: AiConfigView = {
   keyHint: '',
   workspace: '',
   defaultWorkspace: '/data/workspace',
-  permissionMode: 'ask',
   hideToolCalls: false,
   openComputerUse: false,
 };

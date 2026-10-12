@@ -269,8 +269,9 @@ async function openLink(href: string) {
               </div>
             </template>
 
-            <section v-for="request in view.approvals" :key="request.id" class="card approval" :class="{ exec: request.risk === 'exec' }" data-testid="chat-approval" role="alertdialog" :aria-label="`需要你确认：${toolLabel(request.tool)}`">
+            <section v-for="request in view.approvals" :key="request.id" class="card approval" :class="{ exec: request.risk === 'exec', dangerous: !!request.danger }" data-testid="chat-approval" role="alertdialog" :aria-label="`需要你确认：${toolLabel(request.tool)}`">
               <header><ShieldAlert :size="16" /><span>小伴想要{{ riskVerb(request.risk) }}：<b>{{ toolLabel(request.tool) }}</b></span></header>
+              <p v-if="request.danger" class="caution danger-note" data-testid="approval-danger"><b>高风险操作：{{ request.danger }}。</b>即使在“完全信任”下，这类操作也要你确认，每次都问。</p>
               <p v-if="request.tainted" class="caution" data-testid="approval-tainted">这段对话读过网页等外部内容，其中可能夹带诱导，所以这次每一步都要你确认。</p>
               <pre class="preview" data-testid="approval-preview">{{ approvalPreview(request) }}</pre>
               <footer>
@@ -390,6 +391,8 @@ async function openLink(href: string) {
 .card header svg{color:var(--ui-primary);flex:none}
 .card footer{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .caution{margin:0;font-size:12.5px;color:var(--ui-text-secondary);background:rgba(245,158,11,.14);border-radius:8px;padding:7px 10px;line-height:1.6}
+.danger-note{background:rgba(239,68,68,.12);color:var(--ui-text-primary)}
+.approval.dangerous{outline:1.5px solid rgba(239,68,68,.55)}
 .options{display:flex;gap:8px;flex-wrap:wrap}
 .status-line{margin:0 0 0 40px;font-size:13px;color:var(--ui-text-tertiary);display:flex;gap:8px;align-items:center}
 .spin{animation:spin 1s linear infinite}

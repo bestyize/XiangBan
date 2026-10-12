@@ -116,8 +116,6 @@ pub struct AiConfig {
     pub api_key: String,
     /// The folder the assistant's file and command tools work in. Empty means the built-in one.
     pub workspace: String,
-    /// Permission approval mode: `ask` (default) asks before writes/exec, `auto` trusts everything.
-    pub permission_mode: String,
     /// Whether to hide intermediate tool call cards in the conversation.
     pub hide_tool_calls: bool,
     /// Whether open-computer-use MCP tools are enabled.
@@ -134,7 +132,6 @@ impl Default for AiConfig {
             model: String::new(),
             api_key: String::new(),
             workspace: String::new(),
-            permission_mode: "ask".into(),
             hide_tool_calls: false,
             open_computer_use: false,
         };
@@ -182,8 +179,6 @@ pub struct AiConfigView {
     /// Empty when the built-in folder is used.
     pub workspace: String,
     pub default_workspace: String,
-    /// `ask` or `auto`.
-    pub permission_mode: String,
     pub hide_tool_calls: bool,
     pub open_computer_use: bool,
 }
@@ -201,7 +196,6 @@ impl AiConfig {
             key_hint: make_key_hint(&self.api_key),
             workspace: self.workspace.clone(),
             default_workspace: default_workspace.display().to_string(),
-            permission_mode: self.permission_mode.clone(),
             hide_tool_calls: self.hide_tool_calls,
             open_computer_use: self.open_computer_use,
         }
@@ -210,9 +204,6 @@ impl AiConfig {
     fn normalize(&mut self) {
         if !PROTOCOLS.contains(&self.protocol.as_str()) {
             self.protocol = "chat".into();
-        }
-        if !["ask", "auto"].contains(&self.permission_mode.as_str()) {
-            self.permission_mode = "ask".into();
         }
 
         for &(id, name, default_proto, default_url, default_model) in DEFAULT_PROVIDERS {
@@ -270,7 +261,6 @@ pub struct Input<'a> {
     pub clear_key: bool,
     /// `None` keeps the saved folder, `Some("")` goes back to the built-in one.
     pub workspace: Option<&'a str>,
-    pub permission_mode: Option<&'a str>,
     pub hide_tool_calls: Option<bool>,
     pub open_computer_use: Option<bool>,
 }
@@ -365,12 +355,6 @@ pub fn apply(current: &AiConfig, input: &Input<'_>) -> Result<AiConfig, String> 
     if let Some(raw) = input.workspace {
         next.workspace = clean_workspace(raw)?;
     }
-    if let Some(mode) = input.permission_mode {
-        if !["ask", "auto"].contains(&mode) {
-            return Err("不支持的权限模式".into());
-        }
-        next.permission_mode = mode.to_string();
-    }
     if let Some(htc) = input.hide_tool_calls {
         next.hide_tool_calls = htc;
     }
@@ -446,16 +430,6 @@ pub fn current(app: &tauri::AppHandle) -> Result<AiConfig, String> {
     load(&path).map_err(|e| format!("模型配置读取失败：{e}"))
 }
 
-pub fn update_permission_mode(app: &tauri::AppHandle, mode: &str) -> Result<(), String> {
-    let path = path(app)?;
-    let state = app.state::<AiConfigState>();
-    let _io = state.io.lock().unwrap();
-    let mut config = load(&path).unwrap_or_default();
-    config.permission_mode = mode.to_string();
-    config.normalize();
-    save(&path, &config).map_err(|e| format!("无法保存权限设置：{e}"))
-}
-
 #[tauri::command]
 pub fn get_ai_config(app: tauri::AppHandle) -> Result<AiConfigView, String> {
     let path = path(&app)?;
@@ -489,7 +463,6 @@ pub fn save_ai_config(
     api_key: Option<String>,
     clear_key: bool,
     workspace: Option<String>,
-    permission_mode: Option<String>,
     hide_tool_calls: Option<bool>,
     open_computer_use: Option<bool>,
 ) -> Result<AiConfigView, String> {
@@ -498,7 +471,7 @@ pub fn save_ai_config(
     let _io = state.io.lock().unwrap();
     // A damaged file must not stop the user from writing a new one over it.
     let current = load(&path).unwrap_or_default();
-    let next = apply(&current, &Input { protocol: &protocol, base_url: &base_url, model: &model, api_key: api_key.as_deref(), clear_key, workspace: workspace.as_deref(), permission_mode: permission_mode.as_deref(), hide_tool_calls, open_computer_use })?;
+    let next = apply(&current, &Input { protocol: &protocol, base_url: &base_url, model: &model, api_key: api_key.as_deref(), clear_key, workspace: workspace.as_deref(), hide_tool_calls, open_computer_use })?;
     save(&path, &next).map_err(|e| format!("无法保存模型配置：{e}"))?;
     let _ = app.emit_to("control", "chat-hide-tool-calls-changed", serde_json::json!({ "enabled": next.hide_tool_calls }));
     Ok(next.view(&default_workspace(&app)?))
@@ -636,7 +609,6 @@ pub fn switch_ai_provider(
 pub fn save_ai_preferences(
     app: tauri::AppHandle,
     workspace: Option<String>,
-    permission_mode: Option<String>,
     hide_tool_calls: Option<bool>,
     open_computer_use: Option<bool>,
 ) -> Result<AiConfigView, String> {
@@ -648,12 +620,6 @@ pub fn save_ai_preferences(
 
     if let Some(raw) = workspace.as_deref() {
         config.workspace = clean_workspace(raw)?;
-    }
-    if let Some(mode) = permission_mode.as_deref() {
-        if !["ask", "auto"].contains(&mode) {
-            return Err("不支持的权限模式".into());
-        }
-        config.permission_mode = mode.to_string();
     }
     if let Some(htc) = hide_tool_calls {
         config.hide_tool_calls = htc;
@@ -817,7 +783,7 @@ mod tests {
     }
 
     fn input<'a>(base_url: &'a str, model: &'a str) -> Input<'a> {
-        Input { protocol: "chat", base_url, model, api_key: None, clear_key: false, workspace: None, permission_mode: None, hide_tool_calls: None, open_computer_use: None }
+        Input { protocol: "chat", base_url, model, api_key: None, clear_key: false, workspace: None, hide_tool_calls: None, open_computer_use: None }
     }
 
     fn temp(tag: &str) -> PathBuf {

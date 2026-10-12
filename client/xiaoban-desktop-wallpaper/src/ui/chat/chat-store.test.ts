@@ -98,6 +98,30 @@ describe('sending', () => {
     expect(h.store.current()!.items).toMatchObject([{ kind: 'user', text: '整理下载文件夹' }]);
   });
 
+  it('creates a new conversation in the mode the top bar shows, so it is not shown as trusted but run as asking', async () => {
+    const trusted = { ...summary('s1'), permissionMode: 'auto' as const };
+    const h = harness({
+      chat_overview: () => overview({ sessions: [trusted], permissionMode: 'auto' }), chat_load_session: () => [],
+      chat_set_permission_mode: () => 'auto', chat_new_session: () => ({ ...summary('s2'), permissionMode: 'auto' }), chat_send: () => summary('s2'),
+    });
+    await h.store.init();
+    await h.store.select('s1');
+    expect(h.store.permissionMode).toBe('auto');
+    // "新对话" leaves the id empty and the bar keeps showing the mode of the conversation before it.
+    await h.store.select(null);
+    expect(h.store.permissionMode).toBe('auto');
+    await h.store.send('接着做');
+    const created = h.calls.find(([command]) => command === 'chat_new_session');
+    expect(created?.[1]).toEqual({ permissionMode: 'auto' });
+
+    // Choosing a mode before the first message of a draft counts as well.
+    await h.store.select(null);
+    await h.store.setPermissionMode('ask');
+    await h.store.send('再来一个');
+    const calls = h.calls.filter(([command]) => command === 'chat_new_session');
+    expect(calls[calls.length - 1][1]).toEqual({ permissionMode: 'ask' });
+  });
+
   it('adds to the open conversation without making a new one', async () => {
     const h = harness({ chat_overview: () => overview({ sessions: [summary('s1')] }), chat_load_session: () => [], chat_send: () => summary('s1', 'x', 9) });
     await h.store.init();

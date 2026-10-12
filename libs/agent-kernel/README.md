@@ -64,7 +64,9 @@ agent.run("session-1", "你好", &mut |event| { /* 转给 UI */ }, &Arc::new(Ato
 - 污染（taint）：工具声明 `untrusted_output`（网页、搜索结果、子 agent 的回答）后，该会话里所有非只读工具的自动放行（`Auto`、`allow_tool`、`Always`）都改为询问，`ApprovalRequest::tainted` 告知宿主。污染只存在内存里：重启后恢复的会话从未污染开始，`forget_session` 可清除。
 - `always_ask`：任何模式都询问，不记忆（`ReadOnly` 下仍是阻止）。`skill_manage` 用它，因为 skill 会作为指令长期保留。
 
-这是纵深防御，不是隔离：已污染会话里用户点了同意，注入的内容照样能执行。
+- `danger_check`（可选）：宿主给 `Permission` 装一个检查函数，参数是工具名和参数，返回“太危险”的原因。装了它，`Auto` 才真正只在被标出的调用上询问：污染和 `always_ask` 在 `Auto` 下不再强制询问，被标出的调用每次都问、不记忆，原因通过 `ApprovalRequest::danger`（stdio 协议里是 `danger` 字段）告知宿主。`Ask` 和 `ReadOnly` 的行为不变，只读工具不会被检查。不装它，`Auto` 保持上面更严格的行为。
+
+这是纵深防御，不是隔离：已污染会话里用户点了同意，注入的内容照样能执行；`danger_check` 由宿主实现，通常是对命令行的启发式判断，拦不住藏在脚本里的命令。
 
 ## 其他中间件
 

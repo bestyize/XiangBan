@@ -42,6 +42,9 @@ pub struct ApprovalRequest<'a> {
     pub arguments: &'a Value,
     /// The session has already read external content, so this approval is not skippable by policy.
     pub tainted: bool,
+    /// Why the host's `danger_check` flagged this call, if it did. Such a call is asked even in `Auto` mode
+    /// and is never remembered.
+    pub danger: Option<&'a str>,
     pub(crate) ctx: &'a ToolCtx,
 }
 
@@ -83,9 +86,12 @@ where
     }
 }
 
+type DangerCheck = Arc<dyn Fn(&str, &Value) -> Option<String> + Send + Sync>;
+
 pub struct Permission {
     mode: AtomicU8,
     approver: Arc<dyn Approver>,
+    danger: Option<DangerCheck>,
     allow: HashSet<String>,
     deny: HashSet<String>,
     always: Mutex<HashSet<(String, String)>>,
@@ -97,6 +103,7 @@ impl Permission {
         Self {
             mode: AtomicU8::new(mode.to_u8()),
             approver: Arc::new(approver),
+            danger: None,
             allow: HashSet::new(),
             deny: HashSet::new(),
             always: Mutex::new(HashSet::new()),
@@ -107,6 +114,16 @@ impl Permission {
     /// Never asks for this tool in `Ask` mode. Has no effect in `ReadOnly` mode.
     pub fn allow_tool(mut self, name: &str) -> Self {
         self.allow.insert(name.to_string());
+        self
+    }
+
+    /// Lets `Auto` mode mean what it says. `check` gets the tool name and its arguments and returns a reason
+    /// when the call is too dangerous to run unattended. With a check installed, `Auto` asks only for those
+    /// calls; reading external content (taint) and `always_ask` no longer force a prompt there. The other modes
+    /// behave as before, and a flagged call is reported in `ApprovalRequest::danger` and never remembered.
+    /// Without a check, `Auto` keeps the stricter behaviour described in the README.
+    pub fn danger_check(mut self, check: impl Fn(&str, &Value) -> Option<String> + Send + Sync + 'static) -> Self {
+        self.danger = Some(Arc::new(check));
         self
     }
 
@@ -149,9 +166,15 @@ impl Middleware for Permission {
         }
 
         let tainted = self.is_tainted(session);
-        let sticky = spec.risk == Risk::Exec || spec.always_ask;
+        let danger = match &self.danger {
+            Some(check) if spec.risk != Risk::Read => check(name, args),
+            _ => None,
+        };
+        let sticky = spec.risk == Risk::Exec || spec.always_ask || danger.is_some();
         let key = (session.to_string(), name.to_string());
-        let needs_ask = if spec.always_ask {
+        let needs_ask = if self.danger.is_some() && mode == PermissionMode::Auto {
+            danger.is_some()
+        } else if spec.always_ask {
             true
         } else if spec.risk == Risk::Read {
             false
@@ -163,7 +186,7 @@ impl Middleware for Permission {
         };
 
         if needs_ask {
-            let request = ApprovalRequest { session, tool: name, risk: spec.risk, arguments: args, tainted, ctx };
+            let request = ApprovalRequest { session, tool: name, risk: spec.risk, arguments: args, tainted, danger: danger.as_deref(), ctx };
             let decision = self.approver.approve(&request);
             if ctx.is_cancelled() {
                 return ToolGate::Block("cancelled".to_string());

@@ -163,7 +163,9 @@ export function createChatStore(deps: ChatDeps): ChatStore {
       let created = false;
       try {
         if (!id) {
-          const summary = await deps.invoke<SessionSummary>('chat_new_session');
+          // The host runs each conversation in the mode saved with it, so a new one must be created in the
+          // mode the top bar shows now; otherwise "完全信任" would be displayed but not applied.
+          const summary = await deps.invoke<SessionSummary>('chat_new_session', { permissionMode: store.permissionMode });
           id = summary.id;
           created = true;
           upsert(summary);

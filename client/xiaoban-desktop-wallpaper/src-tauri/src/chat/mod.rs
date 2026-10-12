@@ -4,6 +4,7 @@
 //! (`emit_to("control", ..)`): wallpaper pages run content from outside and must not see a chat.
 
 mod broker;
+mod danger;
 mod desktop_tools;
 mod prompt;
 mod sessions;
@@ -105,6 +106,8 @@ fn now() -> (i64, u128) {
 pub struct ChatState {
     broker: Arc<Broker>,
     permission: Arc<Permission>,
+    /// The folder the shell works in, as of the latest message. The danger check needs it to tell work inside from outside.
+    workspace: Arc<Mutex<Option<PathBuf>>>,
     todo: Arc<Todo>,
     runs: Mutex<HashMap<String, Arc<AtomicBool>>>,
     index: Mutex<Option<Index>>,
@@ -117,17 +120,23 @@ impl ChatState {
             let (app, broker) = (app.clone(), broker.clone());
             move |request: &ApprovalRequest<'_>| ask_approval(&app, &broker, request)
         };
-        let initial_mode = ai_config::current(app).ok()
-            .map(|c| if c.permission_mode == "auto" { PermissionMode::Auto } else { PermissionMode::Ask })
-            .unwrap_or(PermissionMode::Ask);
+        let workspace = Arc::new(Mutex::new(None));
         Self {
             broker,
-            permission: Arc::new(Permission::new(initial_mode, approver)),
+            // Each conversation carries its own mode and sets it again before every run.
+            permission: Arc::new(permission_with_danger_check(PermissionMode::Ask, approver, workspace.clone())),
+            workspace,
             todo: Arc::new(Todo::new()),
             runs: Mutex::new(HashMap::new()),
             index: Mutex::new(None),
         }
     }
+}
+
+/// "完全信任" runs everything except what `danger::assess` flags, which is asked every time.
+/// Shared by the app and its tests so the tests exercise the rules that really apply.
+fn permission_with_danger_check(mode: PermissionMode, approver: impl agent_kernel::Approver + 'static, workspace: Arc<Mutex<Option<PathBuf>>>) -> Permission {
+    Permission::new(mode, approver).danger_check(move |tool, args| danger::assess(tool, args, lock(&workspace).as_deref()).map(str::to_string))
 }
 
 fn emit(app: &tauri::AppHandle, name: &str, payload: Value) {
@@ -157,15 +166,17 @@ fn risk_name(risk: Risk) -> &'static str {
 }
 
 fn ask_approval(app: &tauri::AppHandle, broker: &Broker, request: &ApprovalRequest<'_>) -> Approval {
+    // In full trust a tainted conversation is not asked because of the taint, so the card must not say it is.
+    let tainted_by_policy = request.tainted && app.state::<ChatState>().permission.mode() != PermissionMode::Auto;
     let (id, rx) = broker.open_approval(request.session);
     emit(
         app,
         "chat-approval",
         json!({
             "id": id, "session": request.session, "tool": request.tool, "risk": risk_name(request.risk),
-            "arguments": shorten(request.arguments, 0), "tainted": request.tainted,
-            // Commands and skill changes are asked every time, so "always" would only mislead.
-            "canRemember": request.risk != Risk::Exec && request.tool != "skill_manage",
+            "arguments": shorten(request.arguments, 0), "tainted": tainted_by_policy, "danger": request.danger,
+            // Commands, skill changes and flagged calls are asked every time, so "always" would only mislead.
+            "canRemember": request.risk != Risk::Exec && request.tool != "skill_manage" && request.danger.is_none(),
         }),
     );
     let decision = request.wait_for(&rx).unwrap_or(Approval::Deny);
@@ -414,9 +425,14 @@ pub fn chat_load_session(app: tauri::AppHandle, session_id: String) -> Result<Ve
 /// An empty conversation. The chat page makes one when the first message is sent, so the page
 /// already knows the id when the answer's events start to arrive.
 #[tauri::command]
-pub fn chat_new_session(app: tauri::AppHandle) -> Result<SessionSummary, String> {
+pub fn chat_new_session(app: tauri::AppHandle, permission_mode: Option<String>) -> Result<SessionSummary, String> {
+    let mode = match permission_mode.as_deref() {
+        None => "ask",
+        Some(mode @ ("ask" | "auto")) => mode,
+        Some(_) => return Err("不支持的权限模式".into()),
+    };
     let (seconds, millis) = now();
-    mutate(&app, |index| index.create(seconds, millis))?
+    mutate(&app, |index| index.create(seconds, millis, mode))?
 }
 
 #[tauri::command]
@@ -466,6 +482,7 @@ pub fn chat_send(app: tauri::AppHandle, session_id: String, text: String, images
 
     let perm_mode = if summary.permission_mode == "auto" { PermissionMode::Auto } else { PermissionMode::Ask };
     state.permission.set_mode(perm_mode);
+    *lock(&state.workspace) = Some(workspace.clone());
 
     let cancel = Arc::new(AtomicBool::new(false));
     if lock(&state.runs).insert(summary.id.clone(), cancel.clone()).is_some() {

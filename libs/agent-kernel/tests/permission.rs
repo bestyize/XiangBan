@@ -201,3 +201,68 @@ fn approval_requests_report_the_taint() {
     run_set(&p, "s1", &["saver", "fetch", "writer"], &runs);
     assert_eq!(*seen.lock().unwrap(), vec![("saver".to_string(), false), ("writer".to_string(), true)]);
 }
+
+fn flag_saver_and_runner(name: &str, _: &serde_json::Value) -> Option<String> {
+    (name == "saver").then(|| "writes a thing that must not happen by itself".to_string())
+}
+
+#[test]
+fn a_danger_check_lets_auto_mode_run_everything_except_what_it_flags() {
+    let runs = Arc::new(AtomicUsize::new(0));
+    let seen = Arc::new(Mutex::new(Vec::new()));
+    let log = seen.clone();
+    let p = Arc::new(
+        Permission::new(PermissionMode::Auto, move |r: &ApprovalRequest<'_>| {
+            log.lock().unwrap().push((r.tool.to_string(), r.tainted, r.danger.map(str::to_string)));
+            Approval::Once
+        })
+        .danger_check(flag_saver_and_runner),
+    );
+    // Reading the web taints the session, and `saver` is an `always_ask` tool; with a check installed neither asks by itself.
+    let out = run_set(&p, "s1", &["fetch", "writer", "reader", "saver"], &runs);
+    assert!(out.iter().all(|text| text == "ran"), "{out:?}");
+    assert!(p.is_tainted("s1"), "the taint is still recorded and reported");
+    // Only the flagged call asks, and it says why and that the session was tainted.
+    assert_eq!(*seen.lock().unwrap(), vec![("saver".to_string(), true, Some("writes a thing that must not happen by itself".to_string()))]);
+}
+
+#[test]
+fn a_flagged_call_is_asked_every_time_and_a_refusal_stops_it() {
+    let runs = Arc::new(AtomicUsize::new(0));
+    let (fx, p) = setup(PermissionMode::Auto, vec![Approval::Always, Approval::Always, Approval::Deny], |p| p.danger_check(flag_saver_and_runner));
+    run_set(&p, "s1", &["saver"], &runs);
+    run_set(&p, "s1", &["saver"], &runs);
+    let out = run_set(&p, "s1", &["saver"], &runs);
+    assert_eq!(fx.asked.lock().unwrap().len(), 3, "\"always\" is not remembered for a flagged call");
+    assert!(out[0].contains("denied"));
+    assert_eq!(runs.load(Ordering::SeqCst), 2);
+}
+
+#[test]
+fn a_danger_check_changes_nothing_outside_auto_mode() {
+    let runs = Arc::new(AtomicUsize::new(0));
+    let (fx, p) = setup(PermissionMode::Ask, vec![Approval::Once; 4], |p| p.danger_check(|_, _| None));
+    run_set(&p, "s1", &["writer"], &runs);
+    assert_eq!(fx.asked.lock().unwrap().len(), 1, "ask mode still asks for the write");
+    run_set(&p, "s1", &["fetch", "writer"], &runs);
+    let asked: Vec<String> = fx.asked.lock().unwrap().iter().map(|a| a.1.clone()).collect();
+    assert_eq!(asked, vec!["writer", "fetch", "writer"], "the fetch asks, and the taint it leaves keeps forcing the next write");
+
+    p.set_mode(PermissionMode::ReadOnly);
+    assert!(run_set(&p, "s2", &["saver"], &runs)[0].contains("Read-only"));
+}
+
+#[test]
+fn the_check_sees_the_arguments_and_never_runs_for_reads() {
+    let calls = Arc::new(Mutex::new(Vec::new()));
+    let log = calls.clone();
+    let p = Arc::new(
+        Permission::new(PermissionMode::Auto, |_: &ApprovalRequest<'_>| Approval::Deny).danger_check(move |name, args| {
+            log.lock().unwrap().push((name.to_string(), args.clone()));
+            None
+        }),
+    );
+    let runs = Arc::new(AtomicUsize::new(0));
+    run_set(&p, "s1", &["reader", "writer"], &runs);
+    assert_eq!(*calls.lock().unwrap(), vec![("writer".to_string(), serde_json::json!({}))], "reads are never examined");
+}

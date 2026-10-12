@@ -31,7 +31,6 @@ const blank: AiConfigView = {
   keyHint: '',
   workspace: '',
   defaultWorkspace: '',
-  permissionMode: 'ask',
   hideToolCalls: false,
   openComputerUse: false,
 };
@@ -346,7 +345,6 @@ async function savePreferences() {
   try {
     const updated = await invoke<AiConfigView>('save_ai_preferences', {
       workspace: workspaceChanged.value ? workspace.value : null,
-      permissionMode: null,
       hideToolCalls: hideToolCalls.value,
       openComputerUse: openComputerUse.value,
     });
@@ -704,10 +702,10 @@ function getProviderIcon(id: string) {
       </template>
     </NModal>
 
-    <!-- Global Preferences Section (权限审批模式已移至各会话独立控制) -->
+    <!-- Global Preferences Section -->
     <div class="preferences-divider">
       <h3>全局工具与运行设置</h3>
-      <p class="muted">影响所有服务商的通用工具、电脑操作与工作目录偏好（权限模式请在对话顶部自由切换）</p>
+      <p class="muted">影响所有服务商的通用工具、电脑操作与工作目录偏好</p>
     </div>
 
     <div class="preferences-box">

@@ -513,6 +513,84 @@ fn in_auto_mode_all_write_tools_run_without_asking() {
 
 
 
+/// The real tool set with the app's own permission rules in "完全信任" mode. Anything asked about is refused,
+/// so a test can never end up running a dangerous command.
+fn trusted_rig(tag: &str, steps: Vec<Step>) -> (Rig, Arc<Mutex<Vec<(String, Option<String>)>>>) {
+    let dir = TempDir::new(tag);
+    let workspace = dir.path("work");
+    fs::create_dir_all(&workspace).unwrap();
+    let dirs = Dirs { chat: dir.path("chat") };
+    let asked: Arc<Mutex<Vec<(String, Option<String>)>>> = Arc::default();
+    let log = asked.clone();
+    let shared = Arc::new(Mutex::new(Some(workspace.clone())));
+    let permission = Arc::new(permission_with_danger_check(PermissionMode::Auto, move |request: &ApprovalRequest<'_>| {
+        lock(&log).push((request.tool.to_string(), request.danger.map(str::to_string)));
+        Approval::Deny
+    }, shared));
+    let provider = Arc::new(ScriptedProvider::new(steps));
+    let desktop = Arc::new(FakeDesktop::default());
+    let todo = Arc::new(Todo::new());
+    let agent = assemble(Parts {
+        provider: provider.clone(),
+        dirs: &dirs,
+        workspace: &workspace,
+        permission,
+        todo: todo.clone(),
+        ask: AskUser::new(|_, _, _| None),
+        desktop: desktop.clone(),
+        utc_offset_minutes: 0,
+        open_computer_use: false,
+        spawn_computer_use: no_computer_use,
+    })
+    .unwrap();
+    let rig = Rig { _dir: dir, workspace, dirs, desktop, asked: Arc::default(), provider, agent, todo };
+    (rig, asked)
+}
+
+#[test]
+fn full_trust_runs_everyday_commands_and_stops_only_for_the_dangerous_ones() {
+    let steps = vec![
+        call("1", "shell", json!({"command": "echo fine"})),
+        call("2", "shell", json!({"command": "rm -rf build node_modules"})),
+        call("3", "shell", json!({"command": "sudo true"})),
+        call("4", "shell", json!({"command": "git push --force origin main"})),
+        call("5", "write_file", json!({"path": "notes.txt", "content": "ok"})),
+        Step::text("done"),
+    ];
+    let (rig, asked) = trusted_rig("trusted-danger", steps);
+    let (result, _) = run(&rig, "go");
+    assert_eq!(result.unwrap().text, "done");
+    let asked = lock(&asked).clone();
+    assert_eq!(
+        asked.iter().map(|(tool, _)| tool.as_str()).collect::<Vec<_>>(),
+        vec!["shell", "shell"],
+        "only the two dangerous commands asked; the harmless ones and the file write ran on their own"
+    );
+    assert_eq!(asked[0].1.as_deref(), Some("以管理员权限运行"));
+    assert_eq!(asked[1].1.as_deref(), Some("会丢失改动或改写远端历史的 git 操作"));
+    let results = tool_results(&rig);
+    assert_eq!(results.len(), 5);
+    assert!(results[0].contains("fine"), "{}", results[0]);
+    assert!(!results[1].contains("denied"), "a delete inside the working folder is not interrupted: {}", results[1]);
+    assert!(results[2].contains("denied") && results[3].contains("denied"), "{results:?}");
+    assert_eq!(fs::read_to_string(rig.workspace.join("notes.txt")).unwrap(), "ok");
+}
+
+#[test]
+fn full_trust_is_not_taken_back_after_a_skill_change() {
+    let steps = vec![
+        call("1", "skill_manage", json!({"action": "create", "name": "tidy-notes", "description": "整理笔记", "content": "步骤"})),
+        call("2", "write_file", json!({"path": "after.txt", "content": "x"})),
+        Step::text("ok"),
+    ];
+    let (rig, asked) = trusted_rig("trusted-skill", steps);
+    let (result, _) = run(&rig, "go");
+    assert_eq!(result.unwrap().text, "ok");
+    assert!(lock(&asked).is_empty(), "nothing was asked: {:?}", lock(&asked));
+    assert!(rig.dirs.skills().join("tidy-notes/SKILL.md").exists());
+}
+
+
 #[test]
 fn the_bundled_computer_use_skill_is_listed_loadable_and_follows_the_switch() {
     let dir = TempDir::new("ocu-skill");

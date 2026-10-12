@@ -103,11 +103,12 @@ impl Index {
         self.sessions.iter().find(|s| s.id == id)
     }
 
-    pub fn create(&mut self, now: i64, now_millis: u128) -> Result<SessionSummary, String> {
+    /// A new conversation starts in the mode the top bar was showing, so what the user sees is what takes effect.
+    pub fn create(&mut self, now: i64, now_millis: u128, permission_mode: &str) -> Result<SessionSummary, String> {
         if self.sessions.len() >= MAX_SESSIONS {
             return Err(format!("对话最多保存 {MAX_SESSIONS} 个，请先删除一些旧对话"));
         }
-        let summary = SessionSummary { id: new_id(now_millis), title: DEFAULT_TITLE.into(), created_at: now, updated_at: now, permission_mode: "ask".into() };
+        let summary = SessionSummary { id: new_id(now_millis), title: DEFAULT_TITLE.into(), created_at: now, updated_at: now, permission_mode: permission_mode.into() };
         self.sessions.push(summary.clone());
         Ok(summary)
     }
@@ -230,8 +231,8 @@ mod tests {
         let dir = temp("lifecycle");
         let (mut index, _) = open(&dir);
         assert!(index.list().is_empty());
-        let first = index.create(100, 1).unwrap();
-        let second = index.create(200, 2).unwrap();
+        let first = index.create(100, 1, "ask").unwrap();
+        let second = index.create(200, 2, "ask").unwrap();
         assert_eq!((first.title.as_str(), second.updated_at), (DEFAULT_TITLE, 200));
         assert_eq!(index.list().iter().map(|s| s.id.clone()).collect::<Vec<_>>(), vec![second.id.clone(), first.id.clone()]);
 
@@ -252,10 +253,24 @@ mod tests {
     }
 
     #[test]
+    fn a_new_conversation_starts_in_the_mode_it_is_given() {
+        let dir = temp("new-mode");
+        let (mut index, _) = open(&dir);
+        let trusted = index.create(1, 1, "auto").unwrap();
+        let careful = index.create(2, 2, "ask").unwrap();
+        assert_eq!((trusted.permission_mode.as_str(), careful.permission_mode.as_str()), ("auto", "ask"));
+        assert_eq!(index.get(&trusted.id).unwrap().permission_mode, "auto", "the stored copy agrees with what was returned");
+        index.save().unwrap();
+        let (again, _) = open(&dir);
+        assert_eq!(again.get(&trusted.id).unwrap().permission_mode, "auto", "it survives a restart");
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
     fn the_list_survives_restart_and_leaves_no_temporary_files() {
         let dir = temp("persist");
         let (mut index, _) = open(&dir);
-        let one = index.create(10, 1).unwrap();
+        let one = index.create(10, 1, "ask").unwrap();
         index.name_from_first_message(&one.id, "记住我");
         index.save().unwrap();
         let (again, _) = open(&dir);
@@ -303,9 +318,9 @@ mod tests {
         let (mut index, _) = open(&dir);
         assert_eq!(index.list().iter().map(|s| s.id.as_str()).collect::<Vec<_>>(), vec!["ok-1"]);
         for i in 0..499 {
-            index.create(i, i as u128 + 10).unwrap();
+            index.create(i, i as u128 + 10, "ask").unwrap();
         }
-        assert!(index.create(1000, 9999).unwrap_err().contains("最多保存"));
+        assert!(index.create(1000, 9999, "ask").unwrap_err().contains("最多保存"));
         fs::remove_dir_all(dir).unwrap();
     }
 }

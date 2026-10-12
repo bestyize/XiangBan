@@ -44,6 +44,8 @@ export interface ApprovalRequest {
   arguments: unknown;
   /** The conversation has read outside content, so this is asked even where it normally would not be. */
   tainted: boolean;
+  /** Why this was asked even in full trust: a dangerous operation. Absent or null for an ordinary request. */
+  danger?: string | null;
   canRemember: boolean;
 }
 export type ApprovalDecision = 'once' | 'always' | 'deny';

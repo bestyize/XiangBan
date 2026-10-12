@@ -51,7 +51,6 @@ export interface AiConfigView {
   /** The folder the assistant's file and command tools work in; empty means the built-in one. */
   workspace: string;
   defaultWorkspace: string;
-  permissionMode: "ask" | "auto";
   /** Whether intermediate tool call cards are hidden in chat. */
   hideToolCalls: boolean;
   /** Whether open-computer-use MCP tools are enabled. */
