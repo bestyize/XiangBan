@@ -268,8 +268,8 @@ async function openLink(href: string) {
 .perm-btn.active svg{color:var(--ui-primary)}
 .workspace-chip{border:1px solid var(--ui-border);background:var(--ui-surface);color:var(--ui-text-secondary);border-radius:999px;padding:4px 10px;font-size:12px;display:inline-flex;gap:6px;align-items:center;cursor:pointer;max-width:260px;overflow:hidden;white-space:nowrap}
 .workspace-chip:hover{color:var(--ui-text-primary)}
-.chat-scroll{flex:1;min-height:0;overflow:auto;scrollbar-width:thin;scrollbar-color:var(--ui-scrollbar) transparent;overscroll-behavior:contain}
-.chat-column{max-width:820px;margin:0 auto;padding:22px 24px 12px;display:grid;gap:14px}
+.chat-scroll{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;scrollbar-width:thin;scrollbar-color:var(--ui-scrollbar) transparent;overscroll-behavior:contain}
+.chat-column{width:100%;max-width:820px;margin:0 auto;padding:22px 24px 12px;display:grid;gap:14px;box-sizing:border-box;min-width:0}
 .state-line{text-align:center;padding:40px 0}
 .info-card,.welcome{text-align:center;padding:48px 16px;display:grid;gap:10px;justify-items:center}
 .info-card{background:var(--ui-surface);border:1px solid var(--ui-border);border-radius:16px;margin-top:40px}
@@ -278,11 +278,11 @@ async function openLink(href: string) {
 .examples{display:grid;gap:8px;margin-top:14px;width:min(520px,100%)}
 .examples button{text-align:left;border:1px solid var(--ui-border);background:var(--ui-surface);color:var(--ui-text-primary);border-radius:12px;padding:11px 14px;cursor:pointer;font:inherit;font-size:13.5px}
 .examples button:hover{border-color:var(--ui-primary);background:var(--ui-primary-soft)}
-.msg.user{display:flex;justify-content:flex-end}
-.bubble{background:var(--ui-primary-soft);color:var(--ui-text-primary);border-radius:16px 16px 4px 16px;padding:10px 14px;max-width:80%;white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.7;font-size:14.5px}
-.msg.assistant{display:grid;grid-template-columns:28px minmax(0,1fr);gap:12px;align-items:start}
+.msg.user{display:flex;justify-content:flex-end;width:100%;max-width:100%;min-width:0;box-sizing:border-box}
+.bubble{background:var(--ui-primary-soft);color:var(--ui-text-primary);border-radius:16px 16px 4px 16px;padding:10px 14px;max-width:min(82%,100%);white-space:pre-wrap;word-break:break-word;overflow-wrap:anywhere;line-height:1.7;font-size:14.5px;min-width:0;box-sizing:border-box}
+.msg.assistant{display:grid;grid-template-columns:28px minmax(0,1fr);gap:12px;align-items:start;width:100%;max-width:100%;min-width:0;box-sizing:border-box}
 .avatar{border-radius:8px;margin-top:2px}
-.answer{min-width:0;font-size:14.5px;line-height:1.8;color:var(--ui-text-primary);overflow-wrap:anywhere}
+.answer{min-width:0;font-size:14.5px;line-height:1.8;color:var(--ui-text-primary);overflow-wrap:anywhere;word-break:break-word;box-sizing:border-box}
 .cursor{display:inline-block;width:7px;height:15px;background:var(--ui-primary);border-radius:2px;margin-left:2px;vertical-align:text-bottom;animation:blink 1s steps(2,start) infinite}
 @keyframes blink{to{visibility:hidden}}
 .tool{margin-left:40px;border:1px solid var(--ui-line);border-radius:10px;background:var(--ui-surface);font-size:13px}
@@ -329,6 +329,16 @@ async function openLink(href: string) {
 .chat-page :deep(.markdown table){border-collapse:collapse;font-size:13.5px}
 .chat-page :deep(.markdown th),.chat-page :deep(.markdown td){border:1px solid var(--ui-line);padding:6px 12px;text-align:left}
 .chat-page :deep(.markdown th){background:var(--ui-surface-alt);font-weight:600}
-@media(max-width:900px){.chat-page{grid-template-columns:200px minmax(0,1fr)}.tool,.notice,.card,.status-line{margin-left:0}}
+@media(max-width:900px){
+  .chat-page{grid-template-columns:190px minmax(0,1fr)}
+  .chat-column{padding:16px 14px 12px}
+  .bubble{max-width:88%}
+  .tool,.notice,.card,.status-line{margin-left:0}
+}
+@media(max-width:680px){
+  .chat-page{grid-template-columns:1fr}
+  .chat-side{display:none}
+  .bubble{max-width:92%}
+}
 @media(prefers-reduced-motion:reduce){.spin,.cursor{animation:none}}
 </style>
