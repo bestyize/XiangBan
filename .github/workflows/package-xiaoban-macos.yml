@@ -1,0 +1,65 @@
+name: Package XiaoBan macOS arm64
+
+on:
+  workflow_dispatch:
+  # One scoped push trigger lets this development branch produce its requested
+  # package. Once merged, production builds remain manually dispatched.
+  push:
+    branches: ['feat/desktop-calendar-notes-countdown']
+    paths: ['.github/workflows/package-xiaoban-macos.yml']
+
+permissions:
+  contents: write
+
+concurrency:
+  group: package-xiaoban-macos-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  macos-arm64:
+    runs-on: macos-15
+    timeout-minutes: 40
+    defaults:
+      run:
+        working-directory: client/xiaoban-desktop-wallpaper
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: client/xiaoban-desktop-wallpaper/package-lock.json
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: client/xiaoban-desktop-wallpaper/src-tauri
+      - name: Install frontend dependencies
+        run: npm ci
+      - name: Build Apple silicon app and DMG
+        run: npx tauri build --target aarch64-apple-darwin --config src-tauri/tauri.macos.conf.json --bundles app,dmg
+      - name: Package app
+        run: |
+          set -euo pipefail
+          version=$(node -p "require('./src-tauri/tauri.conf.json').version")
+          bundle=src-tauri/target/aarch64-apple-darwin/release/bundle
+          mkdir -p out
+          ditto -c -k --sequesterRsrc --keepParent "$bundle/macos/小伴.app" "out/XiaoBanWallpaper-$version-MacOS-arm64.zip"
+          cp "$bundle"/dmg/*.dmg "out/XiaoBanWallpaper-$version-MacOS-arm64.dmg"
+          shasum -a 256 out/*.zip out/*.dmg > out/SHA256SUMS.txt
+          ls -lh out
+      - name: Save package to private draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          tag="xiaoban-macos-preview-${GITHUB_SHA:0:12}"
+          if ! gh release view "$tag" >/dev/null 2>&1; then
+            gh release create "$tag" --target "$GITHUB_SHA" --draft \
+              --title "小伴 macOS arm64 测试包 ${GITHUB_SHA:0:7}" \
+              --notes "Apple 芯片 Mac，macOS 12+。包含当前分支的日历、便签待办、倒数日／纪念日。Ad-hoc 签名，未公证；这是未发布的测试包。提交：$GITHUB_SHA。"
+          fi
+          gh release upload "$tag" out/* --clobber
+          printf '### macOS arm64 package\n\nDraft release: %s\n' "$(gh release view "$tag" --json url --jq .url)" >> "$GITHUB_STEP_SUMMARY"
