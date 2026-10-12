@@ -4,11 +4,12 @@
 use crate::{effect_packs, preferences::Settings, settings, storage, DesktopState};
 use serde_json::{json, Value};
 use std::{
-    path::PathBuf,
+    path::{Path, PathBuf},
     sync::Mutex,
     time::{Duration, Instant},
 };
 use tauri::{Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
+use tauri_plugin_dialog::DialogExt;
 
 pub const LABEL: &str = "effects";
 /// Serialises opening and closing; every pass reads the settings again, so the last pass always wins.
@@ -138,14 +139,85 @@ pub fn list_desktop_effects(window: tauri::WebviewWindow) -> Result<Value, Strin
 pub fn open_effects_directory(window: tauri::WebviewWindow) -> Result<(), String> {
     control_only(&window)?;
     let directory = folder(window.app_handle())?;
-    if !directory.exists() {
-        std::fs::create_dir_all(&directory).map_err(|e| e.to_string())?;
-        let _ = std::fs::write(directory.join(effect_packs::EXAMPLE_NAME), effect_packs::EXAMPLE);
-    }
+    ensure_folder(&directory);
     storage::show_in_file_manager(&directory)
+}
+
+/// Creates the folder with its example on first use, so there is something to copy from.
+fn ensure_folder(directory: &Path) {
+    if directory.exists() { return; }
+    let _ = std::fs::create_dir_all(directory);
+    let _ = std::fs::write(directory.join(effect_packs::EXAMPLE_NAME), effect_packs::EXAMPLE);
+}
+
+/// Copies a pack file the user picked into the effects folder, under the name its `id` asks for.
+/// The file is checked first, so a broken one is refused with the reason instead of landing in the folder.
+/// When a pack with the same id is already there the user is asked before anything is replaced.
+#[tauri::command]
+pub async fn import_effect_pack(window: tauri::WebviewWindow) -> Result<Value, String> {
+    control_only(&window)?;
+    let app = window.app_handle().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let chosen = app.dialog().file().set_parent(&window).set_title("选择特效包（JSON 文件）")
+            .add_filter("特效包", &["json"]).blocking_pick_file();
+        let Some(chosen) = chosen else { return Ok(json!({ "status": "cancelled" })); };
+        let source = chosen.into_path().map_err(|e| e.to_string())?;
+        let text = std::fs::read_to_string(&source).map_err(|_| "无法读取这个文件（需要 UTF-8 文本的 JSON）".to_string())?;
+        if text.len() as u64 > 64 * 1024 { return Err("特效包超过 64 KB".into()); }
+        let pack: Value = serde_json::from_str(text.trim_start_matches('\u{feff}')).map_err(|e| format!("JSON 格式错误：{e}"))?;
+        effect_packs::validate(&pack)?;
+        let directory = folder(&app)?;
+        ensure_folder(&directory);
+        let id = pack["id"].as_str().unwrap_or_default().to_string();
+        // Two packs sharing an id would mean the second is silently ignored, so ask before replacing one.
+        if let Some(taken) = effect_packs::file_with_id(&directory, &id) {
+            let confirmed = app.dialog()
+                .message(format!("特效文件夹里已经有一个使用 id「{id}」的特效包（{taken}）。\n导入这个会替换掉它。"))
+                .title("替换已有的特效包")
+                .kind(tauri_plugin_dialog::MessageDialogKind::Warning)
+                .buttons(tauri_plugin_dialog::MessageDialogButtons::OkCancelCustom("替换".into(), "取消".into()))
+                .parent(&window).blocking_show();
+            if !confirmed { return Ok(json!({ "status": "declined", "id": id, "existing": taken })); }
+            if taken != format!("{id}.json") {
+                std::fs::remove_file(directory.join(&taken)).map_err(|e| format!("无法替换已有的特效包：{e}"))?;
+            }
+        }
+        let saved = effect_packs::save(&directory, &pack, true)?;
+        sync(&app);
+        Ok(json!({
+            "status": "imported", "id": id, "name": pack["name"].as_str().unwrap_or_default(),
+            "file": saved.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default(),
+        }))
+    }).await.map_err(|e| e.to_string())?
 }
 
 /// Whether `id` names an effect that can be used now (checked before a choice is saved).
 pub fn exists(app: &tauri::AppHandle, id: &str) -> bool {
     folder(app).ok().and_then(|directory| effect_packs::find(&directory, id)).is_some()
+}
+
+/// Saves a pack into the effects folder and tells the overlay to pick it up. Used by the assistant's
+/// `effect_create` tool; the settings page goes through `import_effect_pack` instead.
+pub fn save_pack(app: &tauri::AppHandle, pack: &Value, overwrite: bool) -> Result<String, String> {
+    let directory = folder(app)?;
+    ensure_folder(&directory);
+    let path = effect_packs::save(&directory, pack, overwrite)?;
+    sync(app);
+    Ok(path.file_name().map(|name| name.to_string_lossy().to_string()).unwrap_or_default())
+}
+
+/// The rules a pack must follow, in the words the assistant needs. Kept next to the checks themselves.
+pub fn format_help() -> &'static str {
+    "特效包是一个 JSON 对象：schemaVersion 必须是 1；id 用小写字母、数字、- 和 _（不超过 48 字符，不能与内置的 12 个重名）；\
+     name 最多 24 字；description 可选，最多 80 字；sky 可选，2 到 4 个十六进制颜色，用作预览卡片背景；\
+     layers 是 1 到 6 层，每层：count（0 到 1500，各层合计不超过 3000，也不能都是 0）、shape（必填）、colors（必填，1 到 24 个颜色，\
+     写成 \"#rrggbb\" 或 [\"#上色\", \"#下色\"]）。\
+     shape.kind 可为 circle（实心圆）、glow（柔光斑，core 0-0.9、aspect 0.1-4）、streak（雨丝/流星，length、width、head 0-8）、\
+     ring（涟漪，width、aspect 0.1-1）、beam（极光光幕，length、focus 0-0.9）、path（自定义 SVG 路径，d 画在 -1 到 1 的方框里，\
+     可带 style fill/stroke/both、lineWidth、vein 叶脉、halo 背光）。\
+     每层还可写：size [最小,最大] 像素（默认 [10,20]）、speed 像素每秒（默认 0）、direction 度数（0 右 90 下，默认 90）、\
+     alpha [0.5,1]、wind 阵风、sway {amplitude,frequency} 左右摇摆、wander 游荡、spin 自转弧度每秒、pendulum 摆动幅度、\
+     scatter 0-1、flip {rate,min} 翻面、twinkle {rate,depth} 闪烁、blend normal/add（发光用 add）、orient fixed/motion；\
+     另有 burst（隔一会儿出现一次，用于流星、烟花、涟漪）和 band（聚在一条带上，用于银河、极光）。\
+     完整的字段说明在 docs/effects.md，示例见 docs/effect-pack-example.json。"
 }

@@ -81,6 +81,23 @@ describe('control state with native settings', () => {
     await store.openEffectsDirectory();
     expect(ipc).toHaveBeenLastCalledWith('open_effects_directory');
   });
+  it('imports a pack file, reloading the list only when one actually arrived', async () => {
+    const store = createControlStore(vi.fn());
+    ipc.mockImplementation(async (command) => command === 'import_effect_pack'
+      ? { status: 'imported', id: 'glitter', name: '星尘', file: 'glitter.json' } as never
+      : { packs: [], errors: [], directory: '/data/effects' } as never);
+    await expect(store.importEffectPack()).resolves.toEqual({ status: 'imported', id: 'glitter', name: '星尘', file: 'glitter.json' });
+    expect(ipc).toHaveBeenCalledWith('import_effect_pack');
+    expect(ipc).toHaveBeenCalledWith('list_desktop_effects');
+
+    ipc.mockClear();
+    ipc.mockImplementation(async (command) => command === 'import_effect_pack' ? { status: 'cancelled' } as never : {} as never);
+    await expect(store.importEffectPack()).resolves.toEqual({ status: 'cancelled' });
+    expect(ipc).not.toHaveBeenCalledWith('list_desktop_effects');
+
+    ipc.mockRejectedValueOnce(new Error('JSON 格式错误：expected value'));
+    await expect(store.importEffectPack()).rejects.toThrow('JSON 格式错误');
+  });
   it('does not adopt preview settings or reload the active library when opening a wallpaper preview', async () => {
     const store = createControlStore(vi.fn()); const before = clone(store.settings);
     ipc.mockResolvedValue({ ...before, wallpaperId: 'preview-item' } as never);

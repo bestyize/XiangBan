@@ -1,6 +1,6 @@
 import type { AccountSession, AppInfo, CodeLoginOutcome, LoginResult, SendCodeResult, Settings, UsernameCheck, WallpaperLibrary, WallpaperOptions } from "../bridge.ts";
 import type { EffectsChoice } from "../effects/types.ts";
-import type { LoadedPacks } from "../effects/catalog.ts";
+import type { ImportOutcome, LoadedPacks } from "../effects/catalog.ts";
 import type { WebsiteStatus } from "./website-types.ts";
 import type { ChatStore } from "./chat/chat-store.ts";
 
@@ -46,6 +46,8 @@ export interface ControlStore {
   effectList: LoadedPacks;
   loadEffects(): Promise<void>;
   openEffectsDirectory(): Promise<void>;
+  /** Offers a pack file to the effects folder; the pack's own id names the file it is saved as. */
+  importEffectPack(): Promise<ImportOutcome>;
   /** Chooses the desktop-wide particle effect; it applies at once, whichever wallpaper is behind it. */
   setEffects(effects: EffectsChoice): Promise<void>;
   setAutostart(enabled: boolean): Promise<void>;

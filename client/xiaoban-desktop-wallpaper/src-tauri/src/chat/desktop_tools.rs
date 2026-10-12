@@ -27,6 +27,8 @@ pub trait Desktop: Send + Sync {
     fn effects(&self) -> Result<Value, String>;
     /// Empty turns the effect off.
     fn set_effect(&self, id: &str) -> Result<(), String>;
+    /// Writes a new effect pack the user asked for. Returns the file name it landed in.
+    fn create_effect(&self, pack: &Value, overwrite: bool) -> Result<String, String>;
     fn set_companion(&self, change: &CompanionChange) -> Result<(), String>;
     /// `{ config, rules }`
     fn care(&self) -> Result<Value, String>;
@@ -99,6 +101,10 @@ impl Desktop for TauriDesktop {
         let mut choice = serde_json::to_value(&crate::settings(&self.app).effects).map_err(|e| e.to_string())?;
         choice["selected"] = json!(id);
         crate::set_desktop_effects(self.app.clone(), choice).map(|_| ())
+    }
+
+    fn create_effect(&self, pack: &Value, overwrite: bool) -> Result<String, String> {
+        crate::effects::save_pack(&self.app, pack, overwrite)
     }
 
     fn set_companion(&self, change: &CompanionChange) -> Result<(), String> {
@@ -260,6 +266,26 @@ fn effect_set(desktop: &dyn Desktop, args: &Value) -> Result<String, String> {
     }
     desktop.set_effect(id)?;
     Ok(format!("已切换到特效 {id}"))
+}
+
+/// The pack the model wrote: an object, or the same thing as a JSON string.
+fn effect_pack_arg(args: &Value) -> Result<Value, String> {
+    match args.get("pack") {
+        Some(Value::String(text)) => serde_json::from_str(text.trim_start_matches('\u{feff}'))
+            .map_err(|e| format!("pack 不是有效的 JSON：{e}")),
+        Some(value @ Value::Object(_)) => Ok(value.clone()),
+        Some(_) => Err("pack 需要是一个 JSON 对象".into()),
+        None => Err("`pack` is required and must be a non-empty string".into()),
+    }
+}
+
+fn effect_create(desktop: &dyn Desktop, args: &Value) -> Result<String, String> {
+    let pack = effect_pack_arg(args)?;
+    let overwrite = optional_bool(args, "overwrite")?.unwrap_or(false);
+    let file = desktop.create_effect(&pack, overwrite)?;
+    let name = pack["name"].as_str().unwrap_or_default();
+    let id = pack["id"].as_str().unwrap_or_default();
+    Ok(format!("已创建特效「{name}」（id: {id}，文件 {file}），可在“桌面特效”页选用。"))
 }
 
 fn companion_set(desktop: &dyn Desktop, args: &Value) -> Result<String, String> {
@@ -578,6 +604,33 @@ pub fn tools(desktop: Arc<dyn Desktop>) -> Vec<Arc<dyn Tool>> {
         tool(
             &desktop,
             ToolSpec::new(
+                "effect_create",
+                format!("为用户创作一个新的桌面特效包并保存到特效文件夹，保存后它就能像内置特效一样被选用。先想清楚要什么效果，再按下面的格式写一份完整的 JSON 放进 pack。pack 是一个 JSON 对象（也可写成 JSON 字符串），必须包含 schemaVersion、id、name、layers。{}", crate::effects::format_help()),
+                object(
+                    json!({
+                        "pack": {
+                            "type": "object",
+                            "description": "完整的特效包，字段见工具说明。",
+                            "properties": {
+                                "schemaVersion": {"type": "integer", "const": 1},
+                                "id": {"type": "string", "description": "小写字母、数字、- 和 _，不能与内置特效重名"},
+                                "name": {"type": "string", "description": "显示名，最多 24 字"},
+                                "description": {"type": "string", "description": "一句话说明，最多 80 字"},
+                                "sky": {"type": "array", "items": {"type": "string"}, "description": "2 到 4 个十六进制颜色"},
+                                "layers": {"type": "array", "items": {"type": "object"}, "description": "1 到 6 层粒子"},
+                            },
+                            "required": ["schemaVersion", "id", "name", "layers"],
+                        },
+                        "overwrite": {"type": "boolean", "description": "true 时覆盖同 id 的已有自定义特效，默认 false"},
+                    }),
+                    &["pack"],
+                ),
+            ).risk(Risk::Write).serial(),
+            effect_create,
+        ),
+        tool(
+            &desktop,
+            ToolSpec::new(
                 "companion_set",
                 "设置桌面小伴：表情、外壳，或显示/隐藏。至少给一项。",
                 object(
@@ -738,6 +791,10 @@ mod tests {
         fn set_effect(&self, id: &str) -> Result<(), String> {
             self.log(format!("effect {id:?}"))
         }
+        fn create_effect(&self, pack: &Value, overwrite: bool) -> Result<String, String> {
+            self.log(format!("create-effect {} overwrite={overwrite}", pack["id"].as_str().unwrap_or("?")))?;
+            Ok(format!("{}.json", pack["id"].as_str().unwrap_or("?")))
+        }
         fn set_companion(&self, change: &CompanionChange) -> Result<(), String> {
             self.log(format!("companion {change:?}"))
         }
@@ -801,7 +858,7 @@ mod tests {
         let mut unique = names.clone();
         unique.dedup();
         assert_eq!(names, unique);
-        assert_eq!(names.len(), 17);
+        assert_eq!(names.len(), 18);
         for tool in &all {
             let spec = tool.spec();
             assert!(spec.name.len() <= 64 && spec.name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_'), "{}", spec.name);
@@ -839,6 +896,39 @@ mod tests {
             assert!(call(&fake, "wallpaper_apply", args).unwrap_err().contains("`id`"));
         }
         assert_eq!(fake.calls().len(), 4, "invalid input never reaches the desktop");
+    }
+
+    #[test]
+    fn creating_an_effect_accepts_an_object_or_a_json_string_and_says_where_it_landed() {
+        let fake = Arc::new(Fake::default());
+        let pack = json!({"schemaVersion": 1, "id": "glitter", "name": "星尘", "layers": [{"count": 5, "shape": {"kind": "circle"}, "colors": ["#fff"]}]});
+        let expected = "已创建特效「星尘」（id: glitter，文件 glitter.json），可在“桌面特效”页选用。";
+        assert_eq!(call(&fake, "effect_create", json!({"pack": pack})).unwrap(), expected);
+        assert_eq!(call(&fake, "effect_create", json!({"pack": pack.to_string()})).unwrap(), expected, "a JSON string works too");
+        assert_eq!(call(&fake, "effect_create", json!({"pack": pack, "overwrite": true})).unwrap(), expected);
+        assert_eq!(
+            fake.calls(),
+            vec!["create-effect glitter overwrite=false", "create-effect glitter overwrite=false", "create-effect glitter overwrite=true"]
+        );
+
+        for (args, fragment) in [
+            (json!({}), "`pack`"),
+            (json!({"pack": 5}), "JSON 对象"),
+            (json!({"pack": "{ not json"}), "不是有效的 JSON"),
+            (json!({"pack": pack, "overwrite": "yes"}), "true or false"),
+        ] {
+            let error = call(&fake, "effect_create", args.clone()).unwrap_err();
+            assert!(error.contains(fragment), "{args}: {error}");
+        }
+        assert_eq!(fake.calls().len(), 3, "invalid input never reaches the desktop");
+    }
+
+    #[test]
+    fn the_effect_pack_is_refused_by_the_host_with_its_reason() {
+        let fake = Arc::new(Fake::default());
+        *fake.fail.lock().unwrap() = Some("id「rain」是内置特效的名字，请换一个".into());
+        let pack = json!({"schemaVersion": 1, "id": "rain", "name": "冒名", "layers": []});
+        assert_eq!(call(&fake, "effect_create", json!({"pack": pack})).unwrap_err(), "id「rain」是内置特效的名字，请换一个");
     }
 
     #[test]

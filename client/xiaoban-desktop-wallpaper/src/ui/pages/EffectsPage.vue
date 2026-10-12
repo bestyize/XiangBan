@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { NAlert, NButton, NSlider } from 'naive-ui';
-import { Ban, Check, FolderOpen, RefreshCw } from 'lucide-vue-next';
+import { Ban, Check, FileUp, FolderOpen, RefreshCw } from 'lucide-vue-next';
 import { normalizeChoice, paramsOf } from '../../effects/parse.ts';
 import { limits, type EffectsChoice } from '../../effects/types.ts';
 import type { ControlStore } from '../control-types.ts';
@@ -41,6 +41,13 @@ async function reload(announce: boolean) {
 async function openFolder() {
   try { await props.store.openEffectsDirectory(); } catch (error) { props.store.notify(message(error), 'error'); }
 }
+async function importPack() {
+  try {
+    const outcome = await props.store.importEffectPack();
+    if (outcome.status === 'imported') props.store.notify(`已导入特效「${outcome.name}」，可以选用了`, 'success');
+    else if (outcome.status === 'declined') props.store.notify(`特效「${outcome.id}」已经存在，没有替换`, 'info');
+  } catch (error) { props.store.notify(message(error), 'error'); }
+}
 onMounted(() => { void reload(false); });
 onBeforeUnmount(() => { if (timer) { clearTimeout(timer); commit(); } });
 </script>
@@ -48,7 +55,7 @@ onBeforeUnmount(() => { if (timer) { clearTimeout(timer); commit(); } });
   <section class="ui-page effects-page" data-testid="effects-page">
     <header class="page-header">
       <div><h1>桌面特效</h1><p class="page-subtitle">给桌面加一层飘落的雨雪、花瓣、枫叶或繁星。开启后不受壁纸影响，换壁纸或用系统桌面，它都照常显示。</p></div>
-      <div class="header-actions"><NButton round data-testid="effects-reload" @click="reload(true)"><template #icon><RefreshCw :size="15" /></template>重新载入</NButton><NButton round data-testid="effects-folder" @click="openFolder"><template #icon><FolderOpen :size="15" /></template>打开特效文件夹</NButton></div>
+      <div class="header-actions"><NButton round data-testid="effects-reload" @click="reload(true)"><template #icon><RefreshCw :size="15" /></template>重新载入</NButton><NButton round data-testid="effects-import" @click="importPack"><template #icon><FileUp :size="15" /></template>导入特效</NButton><NButton round data-testid="effects-folder" @click="openFolder"><template #icon><FolderOpen :size="15" /></template>打开特效文件夹</NButton></div>
     </header>
     <NAlert v-if="missing" type="warning" :show-icon="false" data-testid="effect-missing">所选的特效「{{ choice.selected }}」已经找不到（可能被移出了特效文件夹），桌面上暂时没有特效。重新选一个即可。</NAlert>
     <NAlert v-if="store.effectList.errors.length" type="warning" :show-icon="false" data-testid="effect-errors">有 {{ store.effectList.errors.length }} 个自定义特效无法使用：{{ store.effectList.errors.join('；') }}</NAlert>
@@ -70,12 +77,12 @@ onBeforeUnmount(() => { if (timer) { clearTimeout(timer); commit(); } });
       <div class="field"><label>速度 <span data-testid="effect-speed-value">×{{ speed }}</span></label><NSlider v-model:value="speed" :min="limits.speed[0]" :max="limits.speed[1]" :step="0.25" @update:value="tune" /></div>
       <div class="field"><label>大小 <span data-testid="effect-size-value">×{{ size.toFixed(1) }}</span></label><NSlider v-model:value="size" :min="limits.size[0]" :max="limits.size[1]" :step="0.1" @update:value="tune" /></div>
     </section>
-    <p class="muted notes">特效显示在桌面图片之上、桌面图标和其他窗口之下，鼠标可以穿过它。想要自己的特效？打开特效文件夹，把特效包（一个 JSON 文件）放进去再点“重新载入”，格式见文件夹里的示例。{{ store.settings.paused ? '桌面动画目前已暂停，特效会静止，可在“设置”里恢复。' : '' }}{{ store.game.active ? '游戏空间打开期间特效会先隐藏，退出后自动回来。' : '' }}</p>
+    <p class="muted notes">特效显示在桌面图片之上、桌面图标和其他窗口之下，鼠标可以穿过它。想要自己的特效？点“导入特效”选一个特效包文件（JSON），或者打开特效文件夹把文件放进去再点“重新载入”，格式见文件夹里的示例；也可以直接在聊天里让小伴为你写一个。{{ store.settings.paused ? '桌面动画目前已暂停，特效会静止，可在“设置”里恢复。' : '' }}{{ store.game.active ? '游戏空间打开期间特效会先隐藏，退出后自动回来。' : '' }}</p>
   </section>
 </template>
 <style scoped>
 .effects-page{display:grid;gap:var(--ui-section-gap)}
-.header-actions{display:flex;gap:10px;flex:none}
+.header-actions{display:flex;gap:10px;flex:none;flex-wrap:wrap;justify-content:flex-end}
 .effect-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:var(--ui-card-gap)}
 .effect-card{position:relative;display:grid;grid-template-rows:auto auto;padding:0;border:0;background:var(--ui-surface);border-radius:var(--ui-radius-card);overflow:hidden;cursor:pointer;text-align:left;color:var(--ui-text-primary);transition:transform 200ms cubic-bezier(.2,.8,.2,1),box-shadow 200ms}
 .effect-card:hover{transform:translateY(-3px);box-shadow:0 14px 30px var(--ui-shadow-hover)}

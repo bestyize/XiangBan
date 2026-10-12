@@ -6,6 +6,7 @@ import EffectsPage from './EffectsPage.vue';
 import { defaults } from '../../bridge.ts';
 import { parsePack } from '../../effects/parse.ts';
 import type { EffectPack, EffectsChoice } from '../../effects/types.ts';
+import type { ImportOutcome } from '../../effects/catalog.ts';
 import type { ControlStore } from '../control-types.ts';
 
 const slider = vi.hoisted(() => ({ name: 'SliderStub', props: ['value'], emits: ['update:value'], template: '<input class="slider" type="range" />' }));
@@ -19,12 +20,12 @@ const pack = (id: string, name: string, source: 'builtin' | 'user' = 'builtin'):
 };
 const none: EffectsChoice = { selected: '', params: {} };
 
-function setup(effects: EffectsChoice = none, packs = [pack('rain', '下雨'), pack('maple', '枫叶飘落'), pack('glitter', '星尘', 'user')], errors: string[] = []) {
+function setup(effects: EffectsChoice = none, packs = [pack('rain', '下雨'), pack('maple', '枫叶飘落'), pack('glitter', '星尘', 'user')], errors: string[] = [], imported: ImportOutcome = { status: 'imported', id: 'glitter', name: '星尘', file: 'glitter.json' }) {
   const sent: EffectsChoice[] = [];
   const store = reactive({
     settings: { ...JSON.parse(JSON.stringify(defaults)), effects: JSON.parse(JSON.stringify(effects)) },
     game: { active: false }, notify: vi.fn(), effectList: { packs, errors, directory: '/data/effects' },
-    loadEffects: vi.fn(async () => {}), openEffectsDirectory: vi.fn(async () => {}),
+    loadEffects: vi.fn(async () => {}), openEffectsDirectory: vi.fn(async () => {}), importEffectPack: vi.fn(async () => imported),
     setEffects: vi.fn(async (next: EffectsChoice) => { sent.push(JSON.parse(JSON.stringify(next))); store.settings.effects = JSON.parse(JSON.stringify(next)); }),
   }) as unknown as ControlStore;
   const wrapper = mount(EffectsPage, { props: { store }, global: { stubs: { EffectPreview: true } } });
@@ -100,6 +101,31 @@ describe('desktop effects page', () => {
     expect(store.notify).toHaveBeenCalledWith('已重新载入特效', 'success');
     await wrapper.get('[data-testid="effects-folder"]').trigger('click'); await flushPromises();
     expect(store.openEffectsDirectory).toHaveBeenCalledOnce();
+    wrapper.unmount();
+  });
+  it('imports a pack file, says which effect arrived, and reloads the list', async () => {
+    const { wrapper, store } = setup();
+    await wrapper.get('[data-testid="effects-import"]').trigger('click'); await flushPromises();
+    expect(store.importEffectPack).toHaveBeenCalledOnce();
+    expect(store.notify).toHaveBeenCalledWith('已导入特效「星尘」，可以选用了', 'success');
+    expect(store.loadEffects).toHaveBeenCalledTimes(1);
+    wrapper.unmount();
+  });
+  it('says nothing was imported when the picker was closed or the clash was declined', async () => {
+    const closed = setup(none, [], [], { status: 'cancelled' });
+    await closed.wrapper.get('[data-testid="effects-import"]').trigger('click'); await flushPromises();
+    expect(closed.store.notify).not.toHaveBeenCalled();
+    closed.wrapper.unmount();
+    const declined = setup(none, [], [], { status: 'declined', id: 'glitter', existing: 'glitter.json' });
+    await declined.wrapper.get('[data-testid="effects-import"]').trigger('click'); await flushPromises();
+    expect(declined.store.notify).toHaveBeenCalledWith('特效「glitter」已经存在，没有替换', 'info');
+    declined.wrapper.unmount();
+  });
+  it('reports why an import failed instead of pretending it worked', async () => {
+    const { wrapper, store } = setup();
+    vi.mocked(store.importEffectPack).mockRejectedValueOnce(new Error('JSON 格式错误：expected value'));
+    await wrapper.get('[data-testid="effects-import"]').trigger('click'); await flushPromises();
+    expect(store.notify).toHaveBeenCalledWith('JSON 格式错误：expected value', 'error');
     wrapper.unmount();
   });
   it('reports a failure instead of pretending the effect was applied', async () => {

@@ -4,6 +4,8 @@
 
 内置的十二个特效包在 `public/effects/`（雨、雪、萤火虫、花瓣、枫叶、流星、繁星、庄周梦蝶、孔明灯、烟花、极光、银河），编译进程序。自己的特效包放进用户数据目录的 `effects/` 文件夹（控制台“桌面特效”页的“打开特效文件夹”会打开它，首次打开时里面有一份示例），改完点“重新载入”即可，不用重启。
 
+也可以不用手动放文件：在“桌面特效”页点“导入特效”选一个 JSON 文件，应用会先按下面的规则检查它（另外要求各层 `count` 加起来大于 0，否则这个特效什么也画不出来），通过后按它自己的 `id` 存成 `<id>.json` 并自动刷新列表。如果文件夹里已经有一个特效包用了同一个 `id`，会先问你要不要替换那个文件，选“取消”就什么都不写。或者直接在聊天里让小伴写一个（它会用 `effect_create` 工具，走同一套检查）。
+
 加载规则：
 
 - 只读 `.json` 文件；文件名以 `_` 或 `.` 开头的会被跳过（想暂时停用一个特效包，给文件名加个下划线前缀）。
@@ -137,5 +139,6 @@
 | 绘制 | `src/effects/draw.ts` |
 | 画布、帧率、暂停、生命周期 | `src/effects/layer.ts` |
 | 桌面上的覆盖窗口页面 | `src/effects-scene.ts` |
-| 窗口、特效包文件夹、命令 | `src-tauri/src/effects.rs`、`effect_packs.rs`、`effect_choice.rs` |
+| 窗口、特效包文件夹、导入与命令 | `src-tauri/src/effects.rs`、`effect_packs.rs`（结构检查 `validate`、落盘 `save`）、`effect_choice.rs` |
 | 控制台“桌面特效”页 | `src/ui/pages/EffectsPage.vue` |
+| 让小伴写特效的工具 | `src-tauri/src/chat/desktop_tools.rs`（`effect_create`） |

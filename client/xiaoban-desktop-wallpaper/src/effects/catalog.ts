@@ -11,6 +11,22 @@ export interface LoadedPacks {
 }
 export const noPacks = (): LoadedPacks => ({ packs: [], errors: [], directory: "" });
 
+/** What the host reports after a pack file was offered to the effects folder. */
+export type ImportOutcome =
+  /** The pack was saved; `id` is also the file name it landed under. */
+  | { status: "imported"; id: string; name: string; file: string }
+  /** The user closed the picker, or said no when asked about replacing a pack with the same id. */
+  | { status: "cancelled" }
+  | { status: "declined"; id: string; existing: string };
+
+/** Reads the host's reply to an import. Anything unrecognised counts as nothing having happened. */
+export function readImported(raw: unknown): ImportOutcome {
+  const value = (typeof raw === "object" && raw !== null ? raw : {}) as { status?: unknown; id?: unknown; name?: unknown; file?: unknown; existing?: unknown };
+  if (value.status === "declined" && typeof value.id === "string") return { status: "declined", id: value.id, existing: typeof value.existing === "string" ? value.existing : `${value.id}.json` };
+  if (value.status !== "imported" || typeof value.id !== "string" || !value.id) return { status: "cancelled" };
+  return { status: "imported", id: value.id, name: typeof value.name === "string" && value.name ? value.name : value.id, file: typeof value.file === "string" && value.file ? value.file : `${value.id}.json` };
+}
+
 /** Checks what the host listed (`{packs, errors, directory}`) and keeps the usable packs. */
 export function readList(raw: unknown): LoadedPacks {
   const list = typeof raw === "object" && raw !== null ? (raw as { packs?: unknown; errors?: unknown; directory?: unknown }) : {};

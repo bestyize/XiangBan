@@ -45,6 +45,10 @@ impl Desktop for FakeDesktop {
         lock(&self.calls).push(format!("effect {id}"));
         Ok(())
     }
+    fn create_effect(&self, pack: &Value, overwrite: bool) -> Result<String, String> {
+        lock(&self.calls).push(format!("create-effect {} {overwrite}", pack["id"]));
+        Ok(format!("{}.json", pack["id"].as_str().unwrap_or("?")))
+    }
     fn set_companion(&self, change: &CompanionChange) -> Result<(), String> {
         lock(&self.calls).push(format!("companion {change:?}"));
         Ok(())
@@ -200,7 +204,7 @@ fn the_assistant_has_every_tool_it_needs_and_no_others() {
     names.sort();
     let mut expected = vec![
         "time_now", "todo", "ask_user", "read_file", "list_dir", "grep", "write_file", "edit_file", "shell", "web_fetch", "load_skill", "skill_manage",
-        "memory_read", "memory_write", "desktop_status", "wallpaper_list", "wallpaper_apply", "effect_list", "effect_set", "companion_set", "care_list",
+        "memory_read", "memory_write", "desktop_status", "wallpaper_list", "wallpaper_apply", "effect_list", "effect_set", "effect_create", "companion_set", "care_list",
         "care_set", "care_delete", "widget_list", "widget_add", "widget_update", "widget_remove", "game_list", "game_open", "game_close",
         "request_accessibility_permission",
     ];

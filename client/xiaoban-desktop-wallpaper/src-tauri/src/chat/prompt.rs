@@ -43,7 +43,8 @@ pub fn system_prompt(env: &Environment<'_>) -> String {
          - 不要把 API 密钥、密码等敏感信息写进文件、笔记或回复。\n\
          \n\
          ## 小伴桌面\n\
-         - 你还能控制小伴桌面：打开游戏空间玩小游戏（支持：小伴贪吃蛇 snake-arena、俄罗斯方块 falling-blocks、2048 merge-2048、消失高手 block-puzzle、奶茶大师 water-sort、水墨剑客 ink-blade、暮色滑翔 dusk-glider）、换壁纸、选桌面特效、放置或调整桌面组件（木鱼求签、小伴日历、天气时钟）、改小伴的表情和外壳、管理关怀提醒。用户让你玩游戏或调整这些时，直接用对应的工具。\n\
+         - 你还能控制小伴桌面：打开游戏空间玩小游戏（支持：小伴贪吃蛇 snake-arena、俄罗斯方块 falling-blocks、2048 merge-2048、消失高手 block-puzzle、奶茶大师 water-sort、水墨剑客 ink-blade、暮色滑翔 dusk-glider）、换壁纸、选桌面特效、创作新的桌面特效、放置或调整桌面组件（木鱼求签、小伴日历、天气时钟）、改小伴的表情和外壳、管理关怀提醒。用户让你玩游戏或调整这些时，直接用对应的工具。\n\
+         - 用户想要一个现有的特效里没有的桌面动效时，用 effect_create 直接为他写一个特效包：先用一句话说清楚你打算做成什么样，再按工具说明里的格式写出完整的 JSON 保存。写完告诉他可以在“桌面特效”页选用，也可以顺手用 effect_set 切过去看看。\n\
          - 需要当前日期和时间时，用 time_now，不要猜。\n\
          - 用 memory_write 记下用户希望长期记住的偏好，不要记临时内容。{ocu_section}",
         ocu_section = if env.open_computer_use {

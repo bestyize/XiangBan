@@ -1,7 +1,7 @@
 import { reactive } from "vue";
 import { desktop, defaults, invoke, listen, toAccountError, type Settings, type WallpaperEntry, type WallpaperLibrary, type AppInfo, type AccountSession, type SendCodeResult, type CodeLoginOutcome, type UsernameCheck, type LoginResult } from "../bridge.ts";
 import type { WebsiteStatus } from "./website-types.ts";
-import { loadBuiltinPacks, noPacks, readList } from "../effects/catalog.ts";
+import { loadBuiltinPacks, noPacks, readImported, readList } from "../effects/catalog.ts";
 import type { ControlStore } from "./control-types.ts";
 import { createChatStore } from "./chat/chat-store.ts";
 
@@ -126,6 +126,12 @@ export function createControlStore(notify: ControlStore["notify"]): ControlStore
     async openEffectsDirectory() {
       if (!desktop) throw new Error("请在桌面应用中打开特效文件夹");
       await invoke("open_effects_directory");
+    },
+    async importEffectPack() {
+      if (!desktop) throw new Error("请在桌面应用中导入特效包");
+      const outcome = readImported(await invoke("import_effect_pack"));
+      if (outcome.status === "imported") await store.loadEffects();
+      return outcome;
     },
     setEffects(effects) {
       const pending = effectsQueue.catch(() => {}).then(async () => {

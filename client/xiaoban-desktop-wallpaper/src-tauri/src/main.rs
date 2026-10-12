@@ -666,7 +666,7 @@ fn main() {
         }));
     #[cfg(target_os = "macos")]
     let builder = builder.plugin(tauri_plugin_autostart::Builder::new().app_name(startup_name).arg("--autostart").build());
-    let command_handler: Box<dyn Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Sync> = Box::new(tauri::generate_handler![get_platform, get_settings, set_mode, update_settings, set_desktop_effects, effects::list_desktop_effects, effects::open_effects_directory, set_companion_enabled, set_companion_links, set_companion_skin, poke,
+    let command_handler: Box<dyn Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Sync> = Box::new(tauri::generate_handler![get_platform, get_settings, set_mode, update_settings, set_desktop_effects, effects::list_desktop_effects, effects::open_effects_directory, effects::import_effect_pack, set_companion_enabled, set_companion_links, set_companion_skin, poke,
             scene_ready, set_hit_test, start_drag, hide_control, show_control, quit, get_diagnostics, ui_smoke_report,
             get_startup_status, set_autostart, content::get_wallpaper_library, content::import_wallpaper_catalog,
             games::open_game_space, games::close_game_space, games::get_game_catalog, games::load_game_save,
@@ -695,7 +695,7 @@ fn main() {
             let label=invoke.message.webview_ref().label(); let command=invoke.message.command();
             let allowed=widgets::permitted(label,command).or_else(|| rituals::permitted(label,command)).or_else(|| games::permitted(label,command)).unwrap_or_else(|| {
                 if command=="ui_smoke_report" {return label=="control";}
-                if command=="set_companion_enabled" || command=="set_companion_links" || command=="set_companion_skin" || command=="set_desktop_effects" || command=="list_desktop_effects" || command=="open_effects_directory" {return label=="control";}
+                if command=="set_companion_enabled" || command=="set_companion_links" || command=="set_companion_skin" || command=="set_desktop_effects" || command=="list_desktop_effects" || command=="open_effects_directory" || command=="import_effect_pack" {return label=="control";}
                 if label=="care" { return ["get_care_delivery","care_ready","dismiss_care","snooze_care"].contains(&command); }
                 if command.contains("care") { return label=="control"; }
                 content::permitted(label,command)
