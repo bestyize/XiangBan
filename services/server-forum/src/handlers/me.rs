@@ -30,6 +30,7 @@ pub async fn session(State(state): State<AppState>, auth: AuthUser) -> AppResult
             "daily_posts": t.daily_posts[level],
             "tl1_days": t.tl1_days,
             "tl1_reads": t.tl1_reads,
+            "image_max_bytes": if user.trust_level >= 1 { state.config.upload_limit_image } else { 0 },
             "upload_max_bytes": if user.trust_level >= 1 {
                 attachments::upload_limit(&state.config, user.trust_level)
             } else {

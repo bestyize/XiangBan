@@ -17,7 +17,7 @@ use axum::{
     Router,
 };
 use config::AppConfig;
-use handlers::{admin, attachments, interact, me, meta, posts, topics};
+use handlers::{admin, attachments, images, interact, me, meta, posts, topics};
 use state::AppState;
 use std::{net::SocketAddr, sync::Arc, time::Duration};
 use tower_http::{
@@ -57,6 +57,11 @@ pub fn build_router(state: AppState) -> Router {
                 (state.config.upload_limit_user.max(state.config.upload_limit_admin) + 1024 * 1024) as usize,
             )),
         )
+        .route(
+            "/images",
+            post(images::upload).layer(DefaultBodyLimit::max((state.config.upload_limit_image + 1024 * 1024) as usize)),
+        )
+        .route("/images/{id}", get(images::show))
         .route("/attachments/{id}", get(attachments::download).delete(attachments::delete_pending))
         .nest("/admin", admin::routes());
 

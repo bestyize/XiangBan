@@ -129,12 +129,11 @@ export const api = {
     request<{ items: UserReply[] }>('GET', `/users/${uid}/posts${qs({ page })}`, undefined, false),
 }
 
-/** 上传一个附件，进度用 0-1 回调。返回的 id 在发帖或编辑时通过 attachment_ids 挂到帖子上。 */
-export async function uploadAttachment(file: File, onProgress?: (ratio: number) => void): Promise<Attachment> {
+async function uploadFile<T>(path: string, file: File, onProgress?: (ratio: number) => void): Promise<T> {
   const token = await tokenProvider()
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest()
-    xhr.open('POST', '/api/attachments')
+    xhr.open('POST', `/api${path}`)
     if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`)
     xhr.upload.onprogress = e => {
       if (e.lengthComputable) onProgress?.(e.loaded / e.total)
@@ -147,7 +146,7 @@ export async function uploadAttachment(file: File, onProgress?: (ratio: number) 
       } catch {
         data = null
       }
-      if (xhr.status >= 200 && xhr.status < 300) return resolve(data as unknown as Attachment)
+      if (xhr.status >= 200 && xhr.status < 300) return resolve(data as unknown as T)
       if (xhr.status === 401 && token) onUnauthorized()
       const fallback = xhr.status === 413 ? '文件太大，被服务器拒绝了' : `上传失败（${xhr.status}）`
       reject(new ApiError(xhr.status, data?.message ?? fallback))
@@ -157,6 +156,13 @@ export async function uploadAttachment(file: File, onProgress?: (ratio: number) 
     xhr.send(form)
   })
 }
+
+/** 上传一个附件，进度用 0-1 回调。返回的 id 在发帖或编辑时通过 attachment_ids 挂到帖子上。 */
+export const uploadAttachment = (file: File, onProgress?: (ratio: number) => void) =>
+  uploadFile<Attachment>('/attachments', file, onProgress)
+
+/** 上传一张正文插图，返回可直接写进 Markdown 的站内地址。 */
+export const uploadImage = (file: File) => uploadFile<{ id: string; url: string; size: number }>('/images', file)
 
 export const attachmentUrl = (id: string) => `/api/attachments/${id}`
 

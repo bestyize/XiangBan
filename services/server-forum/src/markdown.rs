@@ -86,4 +86,13 @@ mod tests {
         assert_eq!(excerpt("# 标题\n\n**粗体** `code`", 50), "标题 粗体 code");
         assert_eq!(excerpt(&"字".repeat(20), 5), "字字字字字…");
     }
+
+    #[test]
+    fn site_images_keep_their_relative_url_for_members_only() {
+        let md = "![图](/api/images/6f1c2d3e-0000-4000-8000-000000000000)";
+        let html = render(md, true);
+        assert!(html.contains(r#"src="/api/images/6f1c2d3e-0000-4000-8000-000000000000""#), "{html}");
+        assert!(html.contains(r#"loading="lazy""#), "{html}");
+        assert!(!render(md, false).contains("<img"));
+    }
 }

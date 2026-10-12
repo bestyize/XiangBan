@@ -33,7 +33,7 @@ pub const MAX_PER_TOPIC: usize = 5;
 /// 已上传但还没挂到帖子上的附件上限，防止只传不发占满磁盘。
 const MAX_PENDING: i64 = 10;
 /// multipart 头部和边界的余量，用于按 Content-Length 提前拒绝超大请求。
-const MULTIPART_OVERHEAD: u64 = 64 * 1024;
+pub(super) const MULTIPART_OVERHEAD: u64 = 64 * 1024;
 
 #[derive(Serialize, sqlx::FromRow)]
 pub struct AttachmentItem {
@@ -56,15 +56,15 @@ fn pick_limit(trust_level: i16, user: u64, admin: u64) -> u64 {
     }
 }
 
-fn too_large(limit: u64) -> AppError {
+pub(super) fn too_large(limit: u64) -> AppError {
     AppError::BadRequest(format!("文件太大，你最多可以上传 {} MB 以内的文件", limit / (1024 * 1024)))
 }
 
-fn io_err(e: std::io::Error) -> AppError {
+pub(super) fn io_err(e: std::io::Error) -> AppError {
     AppError::Internal(format!("附件文件读写失败: {e}"))
 }
 
-fn multipart_err(e: MultipartError, limit: u64) -> AppError {
+pub(super) fn multipart_err(e: MultipartError, limit: u64) -> AppError {
     if e.status() == StatusCode::PAYLOAD_TOO_LARGE {
         too_large(limit)
     } else {
@@ -158,7 +158,7 @@ pub async fn upload(
     Ok(Json(json!({ "id": id, "name": filename, "size": size })))
 }
 
-async fn write_field(field: &mut Field<'_>, path: &FsPath, limit: u64) -> AppResult<u64> {
+pub(super) async fn write_field(field: &mut Field<'_>, path: &FsPath, limit: u64) -> AppResult<u64> {
     let mut file = File::create(path).await.map_err(io_err)?;
     let mut size = 0u64;
     while let Some(chunk) = field.chunk().await.map_err(|e| multipart_err(e, limit))? {

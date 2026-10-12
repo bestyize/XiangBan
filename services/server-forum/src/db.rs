@@ -160,6 +160,17 @@ CREATE TABLE IF NOT EXISTS attachments (
 CREATE INDEX IF NOT EXISTS attachments_topic_idx ON attachments (topic_id);
 CREATE INDEX IF NOT EXISTS attachments_pending_idx ON attachments (uploader_uid, created_at) WHERE topic_id IS NULL;
 
+-- 正文插图：文件在磁盘（FORUM_UPLOAD_DIR/img-{id}），公开按 id 访问。
+-- 上传一天后正文里没有引用它的（帖子和回复的 Markdown 里搜不到 id）由定时任务清理。
+CREATE TABLE IF NOT EXISTS images (
+    id           UUID PRIMARY KEY,
+    uploader_uid UUID NOT NULL REFERENCES users(uid),
+    mime         TEXT NOT NULL,
+    size         BIGINT NOT NULL,
+    created_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS images_uploader_idx ON images (uploader_uid, created_at DESC);
+
 CREATE TABLE IF NOT EXISTS admins (
     id            UUID PRIMARY KEY,
     username      TEXT NOT NULL UNIQUE,

@@ -37,6 +37,7 @@ cargo test --manifest-path services/server-forum/Cargo.toml
 | `FORUM_DAILY_TOPICS` / `FORUM_DAILY_POSTS` | `0,5,20,50` / `10,60,200,500` | 按信任等级 0-3 的每日发帖、回复上限 |
 | `FORUM_UPLOAD_DIR` | `services/server-forum/data/uploads` | 帖子附件存放目录，需要持久化和备份 |
 | `FORUM_UPLOAD_MAX_MB_USER` / `FORUM_UPLOAD_MAX_MB_ADMIN` | 5 / 30 | 单个附件上限（MB）：成员及以上 / 守护者 |
+| `FORUM_UPLOAD_MAX_MB_IMAGE` | 5 | 正文插图上限（MB），所有人一样 |
 
 ## 页面与接口
 
@@ -58,6 +59,7 @@ cargo test --manifest-path services/server-forum/Cargo.toml
 | `PUT/DELETE /topics/{id}/pin` | 置顶、取消置顶（仅守护者 TL3） |
 | `POST /reports` | 举报帖子或回复 |
 | `POST /markdown/preview` | 发帖预览 |
+| `POST /images`、`GET /images/{id}` | 正文插图：上传（multipart，字段 `file`）、按 id 公开访问 |
 | `POST /attachments`、`GET/DELETE /attachments/{id}` | 上传附件（multipart，字段 `file`）、下载、撤销还没挂到帖子上的上传 |
 | `GET /users/{uid}`、`/users/{uid}/topics`、`/users/{uid}/posts`、`/me/bookmarks` | 用户主页、我的收藏 |
 
@@ -76,13 +78,14 @@ cargo test --manifest-path services/server-forum/Cargo.toml
 - 信任等级与阅读权限：用户分 TL0 新人、TL1 成员、TL2 老用户、TL3 守护者。每个帖子有 `min_read_level`（0 所有人含游客，1 成员以上，2 老用户以上，3 守护者），发帖人只能设到不超过自己的等级，编辑时可以保持或调低，不能调高到超过自己；不传按公开。读者按登录态确定（游客是 0 级），作者总能读自己的帖子。受限帖子在列表、搜索、标签页、用户主页（帖子、回复摘要、统计）、收藏夹和搜索引擎页面里对没权限的人完全不可见，直接打开返回 403 并说明需要什么等级；回复列表、回复、点赞、收藏、举报同样检查。分类、产品、标签上的帖子数只统计公开帖。`sitemap.xml` 不收录受限帖，受限帖的搜索引擎页面按不存在处理（404 + noindex）。后台能看到所有帖子及其阅读权限。读者身份在 `models::Reader`，`ListFilter.reader` 用 `serde(skip)` 防止被查询参数伪造，默认值是游客，所以忘记设置的查询只会看到公开内容。
 - 帖子附件：发帖和编辑页的「附件」一栏，先逐个上传（`POST /attachments`），再用 `attachment_ids` 随发帖或编辑挂到帖子上，一个帖子最多 5 个。单文件上限看信任等级：成员及以上（TL1-TL2）5 MB，守护者（TL3，也就是站务人员，后台账号发不了帖）30 MB，新人不能上传。文件落在 `FORUM_UPLOAD_DIR/{id}`，库表 `attachments` 只记文件名和大小；上传后一天内没挂到帖子上的由定时任务清理，编辑时移除的附件立即删文件。下载一律按 `application/octet-stream` + `attachment` 输出，下载权限和读帖子一致（阅读等级不够返回 403，帖子被隐藏或删除返回 404，没挂上的只有上传者能取），所以站内不会直接打开用户传的 HTML。阅读等级受限的帖子前端用带令牌的 fetch 下载，公开帖子是普通链接。只有主楼支持附件，回复不支持；搜索引擎页面不列附件。部署时 Nginx 的 `client_max_body_size` 要调到 31m 以上，否则上传会被代理直接 413。
 - 置顶：守护者（TL3）在帖子页的操作栏能看到「置顶 / 取消置顶」，只有正常状态的帖子可以置顶；管理后台 `/admin` 的帖子管理里原来就有同样的开关，两边改的是同一个 `topics.pinned`。置顶的帖子在所属板块和首页的列表里排在最前面（不管按哪种方式排序），列表里带「置顶」标记；搜索、标签页和用户主页不受影响。前台守护者的操作同样记进审计日志，操作人显示为「守护者:昵称」。
+- 正文插图：编辑器工具栏的「插图」按钮，也可以直接粘贴截图或把图片拖进输入框（发帖、编辑、回复都一样）。上传后得到站内地址 `/api/images/{id}`，自动插进 Markdown 的 `![](…)`。只收 PNG、JPEG、GIF、WebP，服务端按文件头判断真实类型（不信文件名和客户端类型），不收 SVG；每张不超过 `FORUM_UPLOAD_MAX_MB_IMAGE`，成员及以上才能传（新人的图片本来就会被渲染成纯文字），每人每天最多 50 张。文件放在 `FORUM_UPLOAD_DIR/img-{id}`，库表 `images`。图片地址靠不可猜的 id 公开访问，不看帖子的阅读等级，响应带 `nosniff` 和沙箱 CSP，长期缓存。上传一天后帖子和回复的 Markdown 里都搜不到它的 id 的，定时任务每小时清理一次。Nginx 要给 `/api/images` 单独放宽 `client_max_body_size`（6m 以上）。后续接腾讯云 COS 时，只需要换这两个接口的存储。
 - 活动链接不允许带 `ref`、`aff`、`invite` 等个人推广参数。
 - 只做站内功能：没有系统推送、邮件提醒，也没有匿名发帖（按产品决定）。
 
 ## 已知限制与后续
 
 - 数据库兼容：阅读权限是追加的列（`ALTER TABLE topics ADD COLUMN IF NOT EXISTS min_read_level ... DEFAULT 0`），已部署的库启动时自动补上，旧帖子都按公开处理。
-- 二期（PRD 里的 M2 起）未做：站内通知和关键词订阅、积分规则、TL2 自动升级、屏蔽用户、敏感词、图片上传到腾讯云 COS、赞助位。现在帖子里的图片只能用外链。
+- 二期（PRD 里的 M2 起）未做：站内通知和关键词订阅、积分规则、TL2 自动升级、屏蔽用户、敏感词、图片上传到腾讯云 COS、赞助位。正文插图已经走本机磁盘（见业务规则），COS 是二期的存储替换。
 - 账号中心还没有用户自助注销，设置页提示发邮件处理。
 - SEO 页面只渲染第一页（30-50 条），sitemap 每次请求实时查询，没有进程内缓存。
 - 部署：香港机 `/home/ubuntu/xiangban-forum`，systemd 服务 `server-forum`，监听 127.0.0.1:55010，Nginx 反代 chat.xiangban.xyz（Let's Encrypt），库 `xiaban_forum` 在 `wallpaper_postgres` 容器里，独立角色 `forum`。账号中心已登记 `forum-web` 并在 `ACCOUNT_CORS_ORIGINS` 加入 `https://chat.xiangban.xyz`。初始管理员密码在服务器 `.env` 的 `FORUM_ADMIN_PASSWORD`，登录 /admin 改密码后删掉它。更新时本地交叉编译后替换二进制和 `web/dist`，再重启服务（index.html 启动时读一次）。

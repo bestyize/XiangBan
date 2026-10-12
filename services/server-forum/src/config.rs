@@ -35,6 +35,8 @@ pub struct AppConfig {
     /// 单个附件的大小上限（字节）：普通用户、守护者（站务）。
     pub upload_limit_user: u64,
     pub upload_limit_admin: u64,
+    /// 正文插图的大小上限（字节），所有人一样。
+    pub upload_limit_image: u64,
 }
 
 const MB: u64 = 1024 * 1024;
@@ -105,6 +107,7 @@ impl AppConfig {
             upload_dir: PathBuf::from(get("FORUM_UPLOAD_DIR").unwrap_or_else(|| "services/server-forum/data/uploads".into())),
             upload_limit_user: num("FORUM_UPLOAD_MAX_MB_USER", 5).max(1) as u64 * MB,
             upload_limit_admin: num("FORUM_UPLOAD_MAX_MB_ADMIN", 30).max(1) as u64 * MB,
+            upload_limit_image: num("FORUM_UPLOAD_MAX_MB_IMAGE", 5).max(1) as u64 * MB,
         }
     }
 }
