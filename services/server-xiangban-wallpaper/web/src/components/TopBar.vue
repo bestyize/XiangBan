@@ -8,6 +8,7 @@ const route = useRoute()
 const account = useAccount()
 const tab = computed(() => route.meta.tab as string)
 
+const FORUM_URL = 'https://chat.xiangban.xyz/c/xiaoban-wallpaper'
 const links = [
   { to: '/images', tab: 'home', label: '图片' },
   { to: '/videos', tab: 'videos', label: '视频' },
@@ -29,6 +30,7 @@ const links = [
         >
           {{ l.label }}
         </RouterLink>
+        <a :href="FORUM_URL" target="_blank" rel="noopener noreferrer">超级小伴论坛<Icon name="external" :size="14" /></a>
       </nav>
 
       <div class="actions">

@@ -25,6 +25,10 @@ const tabs: { to: string; tab: string; label: string; icon: IconName }[] = [
       <span class="glyph"><img v-if="t.tab === 'desktop'" src="/app-icon.png" alt="" class="home-mark"><Icon v-else :name="t.icon" :size="24" /></span>
       <span class="label">{{ t.label }}</span>
     </RouterLink>
+    <a href="https://chat.xiangban.xyz/c/xiaoban-wallpaper" target="_blank" rel="noopener noreferrer">
+      <span class="glyph"><Icon name="network" :size="24" /></span>
+      <span class="label">论坛</span>
+    </a>
   </nav>
 </template>
 

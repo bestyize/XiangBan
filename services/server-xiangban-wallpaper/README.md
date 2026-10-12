@@ -13,7 +13,7 @@
 
 正式域名 `wallpaper.xiangban.xyz`。网站首页 `/` 展示小伴桌面介绍、分平台下载与公告，左侧猫脸品牌“小伴桌面”链接到首页；图片 `/images`、视频 `/videos` 保留独立导航。旧 `/desktop` 地址重定向到首页，旧图片分类 `/c/:id` 作为 `/images/c/:id` 的别名保留。后台 `/admin/apps` 支持 Windows/macOS/Android 安装包上传（EXE/MSI/DMG/PKG/APK/ZIP）、版本上架 / 下架和更新说明，官网与升级检测同步生效；`/admin/desktop` 配置官网介绍、网站源站和公告有效时间。站内包自动计算大小和 SHA-256，单包最多 512 MiB，草稿不公开，保存在独立的持久目录 `app-packages/`。
 
-首页在首屏演示之后依次介绍动态视频壁纸（macOS 实机录屏动图）、桌面特效、小伴桌宠和游戏空间，素材在 `web/public/desktop/`：`live-desktop.webp`（1280×720、15 帧/秒、约 6 MB 的动图，偏好减少动态效果时改用静帧 `live-desktop-still.webp`）和三张控制台截图。图片均为 WebP，不进 PWA 预缓存，但会随 `web/dist` 编入服务端程序。
+首页在首屏演示之后依次介绍动态视频壁纸（macOS 实机录屏动图）、对话创作、壁纸库、桌面特效、小伴桌宠和桌面组件，再用三张卡片带过关怀提醒、游戏空间与自带模型，文案见[产品介绍](../../docs/product/小伴桌面_产品介绍.md)。素材在 `web/public/desktop/`：`live-desktop.webp`（1280×720、15 帧/秒、约 6 MB 的动图，偏好减少动态效果时改用静帧 `live-desktop-still.webp`）和八张 1280×800 的控制台截图（chat、wallpapers、effects、companion、widgets、care、games、models）。图片均为 WebP，不进 PWA 预缓存，但会随 `web/dist` 编入服务端程序。
 选中“小伴桌面”栏目时网站平滑切换为浅色，图片 / 视频栏目保持深色。官网使用独立维护的原有猫脸角色引擎，支持视线跟随、点击表情和桌面内拖动；Windows 风格演示包含图标、开始菜单、文件夹与任务栏，桌面显示区固定为 16:9 并响应缩放，背景为真实循环视频。视频入库先保存到服务器，缺少封面时截取首帧；运行环境需安装 FFmpeg（或配置 `FFMPEG_BIN`），本机开发工具安装见[桌面 API](docs/desktop-api.md)。
 
 **相伴账号。** 网站顶栏右侧有「登录 / 注册」，邮箱验证码登录，新邮箱自动注册；浏览器直接调用账号中心（`/api/v1/auth/config` 返回的 `issuer`，应用 ID `xiangban-wallpaper-web`），令牌存 `localStorage`，过期前用刷新令牌换新，「我的」页可退出。服务端用 JWKS 离线验签（`src/auth.rs`），收藏按 `uid` 隔离，未登录时仍是访客收藏。账号中心的 `ACCOUNT_CORS_ORIGINS` 必须包含本站域名。

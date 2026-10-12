@@ -4,6 +4,29 @@ import { useRoute } from "vue-router";
 import Icon from "@/components/Icon.vue";
 import WindowsDesktopDemo from "@/components/WindowsDesktopDemo.vue";
 import { getDesktopProduct, targets, type DesktopProduct } from "@/desktop";
+const moreCards = [
+  {
+    src: "/desktop/care.webp",
+    eyebrow: "关怀提醒",
+    title: "该下班了，该吃药了",
+    body: "下班、休息、天气、自定义提醒，小伴用气泡轻轻告诉你。可稍后再说，有免打扰时段，玩游戏时自动延后。",
+    alt: "小伴桌面的关怀提醒页：天气提醒、吃药提醒列表，以及开启提醒、免打扰时段等偏好开关",
+  },
+  {
+    src: "/desktop/games.webp",
+    eyebrow: "游戏空间",
+    title: "累了，玩一会儿",
+    body: "俄罗斯方块、2048、奶茶大师、小伴贪吃蛇、水墨剑客等七款小游戏，全部离线可玩，水墨剑客还会记住进度。",
+    alt: "小伴桌面的游戏空间页：俄罗斯方块、2048、消失高手、奶茶大师、小伴贪吃蛇、水墨剑客等本地游戏卡片",
+  },
+  {
+    src: "/desktop/models.webp",
+    eyebrow: "自带模型",
+    title: "用你自己的模型",
+    body: "内置 DeepSeek、智谱、Kimi、MiniMax 预设，也能添加任意兼容端点，支持三种主流接口协议。密钥只保存在你的电脑上。",
+    alt: "小伴桌面的 AI 模型服务商设置：DeepSeek、智谱、Kimi、MiniMax 官方预设与自定义端点，当前使用的服务商高亮显示",
+  },
+];
 const product = ref<DesktopProduct | null>(null);
 const error = ref("");
 const loading = ref(false);
@@ -47,7 +70,7 @@ onActivated(() => {
         <p>
           {{
             product?.introduction ||
-            "会回应的桌面小伙伴，搭配喜欢的图片与动态壁纸，让工作和休息多一点温暖。"
+            "壁纸是风景，特效是天气，小组件是日子，小伴是陪你的人。动态壁纸、桌面特效、小组件、关怀提醒和小游戏，开口一句话就能帮你布置。"
           }}
         </p>
         <a class="btn btn-primary" href="#desktop-downloads"
@@ -109,20 +132,60 @@ onActivated(() => {
     <section class="showcase" aria-label="功能介绍">
       <article class="showcase-row">
         <div class="showcase-copy">
-          <span class="eyebrow">桌面特效</span>
-          <h2>雨雪花瓣，落在你的桌面上</h2>
+          <span class="eyebrow">对话创作</span>
+          <h2>说一句话，桌面就变了</h2>
           <p>
-            下雨、下雪、萤火虫、花瓣飘落、枫叶飘落、流星划过、繁星，七种特效铺在壁纸之上。换壁纸时照常显示，密度、速度和大小都能调，鼠标点击照样穿过去，不挡你工作。
+            内置桌面小助手。跟它说“帮我做一个春日风筝特效，做完设到桌面”，它会自己写好特效、保存并切换，几十秒后风筝就飘在你的桌面上。换壁纸、摆组件、设提醒、玩游戏，开口就行。
+          </p>
+          <ul class="ticks">
+            <li>读写文件、查网页、跑命令，也能帮你办正事</li>
+            <li>写文件和运行命令前先问你，高风险操作一定确认</li>
+          </ul>
+        </div>
+        <img
+          class="shot"
+          src="/desktop/chat.webp"
+          width="1280"
+          height="800"
+          loading="lazy"
+          decoding="async"
+          alt="小伴桌面的聊天页：用户让小伴制作春日风筝桌面特效，小伴创建特效并切换到桌面，列出彩鸢、樱花花瓣、暖阳柔光等六层效果"
+        />
+      </article>
+      <article class="showcase-row reverse">
+        <div class="showcase-copy">
+          <span class="eyebrow">壁纸库</span>
+          <h2>风景会动，桌面更有生命力</h2>
+          <p>
+            在线精选图片与循环视频，或导入自己的图片和 MP4。保存后断网也能用，画面适配和播放速度随你调。壁纸位于图标之下，想回到系统壁纸，一键恢复。
+          </p>
+        </div>
+        <img
+          class="shot"
+          src="/desktop/wallpapers.webp"
+          width="1280"
+          height="800"
+          loading="lazy"
+          decoding="async"
+          alt="小伴桌面的壁纸库：银河、海滩日落两段动态视频壁纸，冰川河流、海岬灯塔等图片壁纸，以及恢复原生壁纸的入口"
+        />
+      </article>
+      <article class="showcase-row">
+        <div class="showcase-copy">
+          <span class="eyebrow">桌面特效</span>
+          <h2>十二种天气与节庆，落在你的桌面上</h2>
+          <p>
+            孔明灯升空、枫叶打旋、银河横空、蝴蝶翩跹、烟花绽放、细雨、大雪、萤火、落樱、流星……特效铺在壁纸之上，换壁纸照常显示，点击直接穿过，不挡你工作。密度、速度、大小都能调，还能导入特效包，或者让小伴现写一个。
           </p>
         </div>
         <img
           class="shot"
           src="/desktop/effects.webp"
-          width="1093"
-          height="738"
+          width="1280"
+          height="800"
           loading="lazy"
           decoding="async"
-          alt="小伴桌面的桌面特效页：下雨、下雪、萤火虫、花瓣飘落、枫叶飘落等特效卡片，当前选中枫叶飘落"
+          alt="小伴桌面的桌面特效页：灯火阑珊、层林尽染、星汉灿烂、庄周梦蝶、火树银花、银装素裹、和风细雨等特效卡片，当前选中灯火阑珊"
         />
       </article>
       <article class="showcase-row reverse">
@@ -136,8 +199,8 @@ onActivated(() => {
         <img
           class="shot"
           src="/desktop/companion.webp"
-          width="1093"
-          height="738"
+          width="1280"
+          height="800"
           loading="lazy"
           decoding="async"
           alt="小伴桌面的桌面小伴页：左侧是笑眯眯的猫耳小伴互动预览，右侧可在猫耳、兔耳、盆栽三款外壳之间切换"
@@ -145,25 +208,39 @@ onActivated(() => {
       </article>
       <article class="showcase-row">
         <div class="showcase-copy">
-          <span class="eyebrow">游戏空间</span>
-          <h2>累了，就在桌面上玩一会儿</h2>
+          <span class="eyebrow">桌面小组件</span>
+          <h2>壁纸是风景，小组件是日子</h2>
           <p>
-            俄罗斯方块、2048、奶茶大师、小伴贪吃蛇、水墨剑客等七款小游戏，打开就能玩。全部离线可玩，不用注册账户，水墨剑客还会记住你的进度。
+            一签好意、带农历与“休 / 班”标识的日历、天气、便签待办、倒数日与纪念日。随意缩放和拖放，支持多个显示器，换一张壁纸，小物件依然留在原处。
           </p>
         </div>
         <img
           class="shot"
-          src="/desktop/games.webp"
-          width="1093"
-          height="738"
+          src="/desktop/widgets.webp"
+          width="1280"
+          height="800"
           loading="lazy"
           decoding="async"
-          alt="小伴桌面的游戏空间页：俄罗斯方块、2048、消失高手、奶茶大师、小伴贪吃蛇、水墨剑客等本地游戏卡片"
+          alt="小伴桌面的桌面组件页：一签好意求签、日有所序时钟日历、晴雨之间天气三款组件"
         />
       </article>
+      <div class="more">
+        <article v-for="card in moreCards" :key="card.src">
+          <img
+            :src="card.src"
+            width="1280"
+            height="800"
+            loading="lazy"
+            decoding="async"
+            :alt="card.alt"
+          />
+          <span class="eyebrow">{{ card.eyebrow }}</span>
+          <h3>{{ card.title }}</h3>
+          <p>{{ card.body }}</p>
+        </article>
+      </div>
       <p class="also">
-        还有在线壁纸库、下班 / 休息 / 天气关怀提醒和开机自动启动。以上功能适用于 Windows 与 macOS
-        版；Android 版用于浏览和下载壁纸。
+        以上功能适用于 Windows 与 macOS 版，开机自动启动可关；Android 版用于浏览和下载壁纸。
       </p>
     </section>
     <section id="desktop-downloads" class="downloads">
@@ -214,6 +291,21 @@ onActivated(() => {
         Windows 需要 WebView2，缺少时程序会引导准备。macOS 当前面向 Apple
         芯片。Android 支持 Android 10 及以上系统。视频能否播放取决于系统解码支持。
       </p>
+    </section>
+    <section class="community" aria-labelledby="community-title">
+      <div>
+        <h2 id="community-title">来超级小伴论坛聊聊</h2>
+        <p>
+          更新日志、使用教程、问题反馈和想要的功能，都可以在论坛的小伴壁纸板块留言，也能看看大家做的特效和桌面。
+        </p>
+      </div>
+      <a
+        class="btn btn-primary"
+        href="https://chat.xiangban.xyz/c/xiaoban-wallpaper"
+        target="_blank"
+        rel="noopener noreferrer"
+        ><Icon name="external" />进入论坛</a
+      >
     </section>
     <section v-if="product?.announcements.length" class="notices">
       <h2>小伴公告</h2>
@@ -353,8 +445,66 @@ onActivated(() => {
   order: 2;
 }
 .shot {
-  aspect-ratio: 1093 / 738;
+  aspect-ratio: 8 / 5;
   border-radius: 16px;
+}
+.ticks {
+  margin: 18px 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 8px;
+}
+.ticks li {
+  position: relative;
+  padding-left: 22px;
+  color: var(--text-2);
+  font-size: 15px;
+  line-height: 1.7;
+}
+.ticks li::before {
+  content: "";
+  position: absolute;
+  left: 2px;
+  top: 0.7em;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #ad7084;
+}
+.more {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+}
+.more article {
+  padding: 16px 16px 24px;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: var(--surface);
+}
+.more img {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 8 / 5;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface-2);
+  margin-bottom: 18px;
+}
+.more .eyebrow {
+  padding: 0 6px;
+}
+.more h3 {
+  font-size: 20px;
+  margin: 8px 6px 10px;
+}
+.more p {
+  margin: 0 6px;
+  color: var(--text-2);
+  font-size: 14px;
+  line-height: 1.8;
 }
 .also {
   color: var(--text-3);
@@ -389,6 +539,29 @@ onActivated(() => {
 .requirements {
   margin-top: 20px;
   font-size: 13px;
+}
+.community {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  margin-top: 56px;
+  padding: 28px 32px;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: var(--surface);
+}
+.community h2 {
+  font-size: 22px;
+  margin-bottom: 8px;
+}
+.community p {
+  color: var(--text-2);
+  line-height: 1.8;
+  margin: 0;
+}
+.community .btn {
+  flex: none;
 }
 .notices {
   margin-top: 50px;
@@ -447,8 +620,17 @@ summary {
   .shot {
     border-radius: 12px;
   }
+  .more {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
   .download-grid {
     grid-template-columns: 1fr;
+  }
+  .community {
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 22px;
   }
   .intro h1 {
     font-size: 48px;
