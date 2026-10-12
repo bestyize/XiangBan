@@ -318,10 +318,13 @@ pub fn chat_load_session(app: tauri::AppHandle, session_id: String) -> Result<Ve
     if !sessions::valid_id(&session_id) {
         return Err("对话编号不对".into());
     }
-    let known = mutate(&app, |index| index.get(&session_id).is_some())?;
-    if !known {
+    let summary = mutate(&app, |index| index.get(&session_id).cloned())?;
+    let Some(summary) = summary else {
         return Ok(Vec::new());
-    }
+    };
+    let perm_mode = if summary.permission_mode == "auto" { PermissionMode::Auto } else { PermissionMode::Ask };
+    app.state::<ChatState>().permission.set_mode(perm_mode);
+    emit(&app, "chat-permission-mode-changed", json!({ "sessionId": session_id, "mode": summary.permission_mode }));
     JsonlStore::new(Dirs::of(&app)?.sessions()).load(&session_id).map_err(|e| e.to_string())
 }
 
@@ -369,6 +372,9 @@ pub fn chat_send(app: tauri::AppHandle, session_id: String, text: String) -> Res
         index.touch(&summary.id, seconds);
         Ok(index.get(&summary.id).cloned().unwrap_or(summary))
     })??;
+
+    let perm_mode = if summary.permission_mode == "auto" { PermissionMode::Auto } else { PermissionMode::Ask };
+    state.permission.set_mode(perm_mode);
 
     let cancel = Arc::new(AtomicBool::new(false));
     if lock(&state.runs).insert(summary.id.clone(), cancel.clone()).is_some() {
@@ -445,7 +451,7 @@ pub fn chat_answer_question(app: tauri::AppHandle, id: String, answer: Option<St
 }
 
 #[tauri::command]
-pub fn chat_set_permission_mode(app: tauri::AppHandle, mode: String) -> Result<String, String> {
+pub fn chat_set_permission_mode(app: tauri::AppHandle, session_id: Option<String>, mode: String) -> Result<String, String> {
     if !["ask", "auto"].contains(&mode.as_str()) {
         return Err("不支持的权限模式".into());
     }
@@ -453,9 +459,13 @@ pub fn chat_set_permission_mode(app: tauri::AppHandle, mode: String) -> Result<S
     let state = app.state::<ChatState>();
     state.permission.set_mode(perm_mode);
 
-    let _ = ai_config::update_permission_mode(&app, &mode);
+    if let Some(ref sid) = session_id {
+        let _ = mutate(&app, |index| {
+            index.set_permission_mode(sid, &mode);
+        });
+    }
 
-    emit(&app, "chat-permission-mode-changed", json!({ "mode": mode }));
+    emit(&app, "chat-permission-mode-changed", json!({ "sessionId": session_id, "mode": mode }));
     Ok(mode)
 }
 

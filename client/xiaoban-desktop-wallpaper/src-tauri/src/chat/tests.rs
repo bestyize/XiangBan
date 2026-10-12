@@ -80,6 +80,10 @@ impl Desktop for FakeDesktop {
         lock(&self.calls).push("game-close".to_string());
         Ok(())
     }
+    fn request_permissions(&self) -> Result<Value, String> {
+        lock(&self.calls).push("request-permissions".to_string());
+        Ok(json!({"ok": true}))
+    }
 }
 
 struct Rig {
@@ -150,6 +154,7 @@ fn the_assistant_has_every_tool_it_needs_and_no_others() {
         "time_now", "todo", "ask_user", "read_file", "list_dir", "grep", "write_file", "edit_file", "shell", "web_fetch", "load_skill", "skill_manage",
         "memory_read", "memory_write", "desktop_status", "wallpaper_list", "wallpaper_apply", "effect_list", "effect_set", "companion_set", "care_list",
         "care_set", "care_delete", "widget_list", "widget_add", "widget_update", "widget_remove", "game_list", "game_open", "game_close",
+        "request_accessibility_permission",
     ];
     expected.sort();
     assert_eq!(names, expected);
@@ -363,7 +368,7 @@ fn old_spilled_output_is_removed_and_recent_output_is_kept() {
 #[test]
 fn each_protocol_builds_a_provider_and_unusable_settings_are_refused() {
     for protocol in ["chat", "responses", "anthropic", "something-else"] {
-        let config = AiConfig { protocol: protocol.into(), base_url: "https://api.example.com/v1".into(), model: "m".into(), api_key: "k".into(), workspace: String::new(), permission_mode: "ask".into(), hide_tool_calls: false, open_computer_use: false };
+        let config = AiConfig { protocol: protocol.into(), base_url: "https://api.example.com/v1".into(), model: "m".into(), api_key: "k".into(), ..AiConfig::default() };
         assert!(provider(&config).is_ok(), "{protocol}");
     }
     let empty = AiConfig::default();

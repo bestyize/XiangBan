@@ -333,6 +333,26 @@ async fn set_companion_enabled(app:tauri::AppHandle,enabled:bool)->Result<Settin
 }
 
 #[tauri::command]
+fn request_system_permissions() -> Result<serde_json::Value, String> {
+    #[cfg(target_os = "macos")]
+    {
+        let _ = std::process::Command::new("osascript")
+            .args(["-e", "tell application \"System Events\" to get name of first process"])
+            .status();
+        let _ = std::process::Command::new("/usr/bin/open")
+            .arg("x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")
+            .status();
+        let _ = std::process::Command::new("/usr/bin/open")
+            .arg("x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture")
+            .status();
+    }
+    Ok(serde_json::json!({
+        "ok": true,
+        "message": "已打开系统设置中的辅助功能与屏幕录制授权页面"
+    }))
+}
+
+#[tauri::command]
 fn set_companion_links(app: tauri::AppHandle, enabled: bool) -> Result<Settings, String> {
     let state = app.state::<DesktopState>();
     let _update = state.update_lock.lock().unwrap();
@@ -664,7 +684,8 @@ fn main() {
             account::send_account_code, account::login_account_with_code, account::login_account_with_password,
             account::register_account, account::reset_account_password, account::check_account_username,
             account::get_account_session, account::logout_account,
-            ai_config::get_ai_config, ai_config::save_ai_config, ai_config::pick_workspace,
+            ai_config::get_ai_config, ai_config::save_ai_config, ai_config::pick_workspace, ai_config::fetch_ai_models,
+            ai_config::save_ai_provider, ai_config::switch_ai_provider, ai_config::delete_ai_provider, ai_config::save_ai_preferences, request_system_permissions,
             chat::chat_overview, chat::chat_load_session, chat::chat_new_session, chat::chat_send, chat::chat_cancel, chat::chat_delete_session,
             chat::chat_answer_approval, chat::chat_answer_question, chat::chat_set_permission_mode]);
     let app = builder.manage(state).manage(content::ContentState::default()).manage(website::WebsiteState::default())
@@ -709,6 +730,9 @@ fn main() {
             widgets::start(app.handle());
             if !std::env::args().any(|argument| argument == "--autostart") {
                 present_control(app.handle()).map_err(std::io::Error::other)?;
+            }
+            for (label, win) in app.handle().webview_windows() {
+                eprintln!(">>> WebviewWindow label={label}, visible={:?}, size={:?}, pos={:?}", win.is_visible(), win.outer_size(), win.outer_position());
             }
             #[cfg(windows)] windows::start_cursor_bridge(app.handle().clone());
             #[cfg(target_os = "macos")] macos::start_cursor_bridge(app.handle().clone());

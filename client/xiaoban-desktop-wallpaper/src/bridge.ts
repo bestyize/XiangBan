@@ -27,8 +27,21 @@ export interface Settings {
 /** `chat` is /chat/completions, `responses` is /responses and `anthropic` is /v1/messages. */
 export type AiProtocol = "chat" | "responses" | "anthropic";
 
+export interface ProviderConfigView {
+  id: string;
+  name: string;
+  protocol: AiProtocol;
+  baseUrl: string;
+  model: string;
+  hasKey: boolean;
+  keyHint: string;
+  isCustom: boolean;
+}
+
 /** What the host tells the web side about the model service. The key itself is never sent back. */
 export interface AiConfigView {
+  activeProvider?: string;
+  providers?: ProviderConfigView[];
   protocol: AiProtocol;
   baseUrl: string;
   model: string;

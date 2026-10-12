@@ -18,9 +18,92 @@ const MAX_URL: usize = 2048;
 const MAX_MODEL: usize = 200;
 const MAX_KEY: usize = 2048;
 
+pub const DEFAULT_PROVIDERS: &[(&str, &str, &str, &str, &str)] = &[
+    ("deepseek", "DeepSeek", "chat", "https://api.deepseek.com", "deepseek-chat"),
+    ("zhipu", "智谱 BigModel", "chat", "https://open.bigmodel.cn/api/paas/v4", "glm-4-flash"),
+    ("kimi", "Kimi", "chat", "https://api.moonshot.cn/v1", "moonshot-v1-auto"),
+    ("minimax", "MiniMax", "chat", "https://api.minimax.chat/v1", "MiniMax-Text-01"),
+];
+
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct ProviderConfig {
+    pub id: String,
+    pub name: String,
+    pub protocol: String,
+    pub base_url: String,
+    pub model: String,
+    pub api_key: String,
+}
+
+impl Default for ProviderConfig {
+    fn default() -> Self {
+        Self {
+            id: "custom".into(),
+            name: "自定义供应商".into(),
+            protocol: "chat".into(),
+            base_url: String::new(),
+            model: String::new(),
+            api_key: String::new(),
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProviderConfigView {
+    pub id: String,
+    pub name: String,
+    pub protocol: String,
+    pub base_url: String,
+    pub model: String,
+    pub has_key: bool,
+    pub key_hint: String,
+    pub is_custom: bool,
+}
+
+fn make_key_hint(key: &str) -> String {
+    match key.chars().count() {
+        0 => String::new(),
+        n if n >= 12 => format!("••••{}", key.chars().skip(n - 4).collect::<String>()),
+        _ => "••••".into(),
+    }
+}
+
+impl ProviderConfig {
+    pub fn is_custom(&self) -> bool {
+        !["deepseek", "zhipu", "kimi", "minimax"].contains(&self.id.as_str())
+    }
+
+    pub fn view(&self) -> ProviderConfigView {
+        ProviderConfigView {
+            id: self.id.clone(),
+            name: if self.name.is_empty() {
+                match self.id.as_str() {
+                    "deepseek" => "DeepSeek".into(),
+                    "zhipu" => "智谱 BigModel".into(),
+                    "kimi" => "Kimi".into(),
+                    "minimax" => "MiniMax".into(),
+                    _ => "自定义供应商".into(),
+                }
+            } else {
+                self.name.clone()
+            },
+            protocol: self.protocol.clone(),
+            base_url: self.base_url.clone(),
+            model: self.model.clone(),
+            has_key: !self.api_key.is_empty(),
+            key_hint: make_key_hint(&self.api_key),
+            is_custom: self.is_custom(),
+        }
+    }
+}
+
 #[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 pub struct AiConfig {
+    pub active_provider: String,
+    pub providers: Vec<ProviderConfig>,
     /// `chat` (/chat/completions), `responses` (/responses) or `anthropic` (/v1/messages).
     pub protocol: String,
     pub base_url: String,
@@ -39,7 +122,20 @@ pub struct AiConfig {
 
 impl Default for AiConfig {
     fn default() -> Self {
-        Self { protocol: "chat".into(), base_url: String::new(), model: String::new(), api_key: String::new(), workspace: String::new(), permission_mode: "ask".into(), hide_tool_calls: false, open_computer_use: false }
+        let mut cfg = Self {
+            active_provider: "deepseek".into(),
+            providers: Vec::new(),
+            protocol: "chat".into(),
+            base_url: String::new(),
+            model: String::new(),
+            api_key: String::new(),
+            workspace: String::new(),
+            permission_mode: "ask".into(),
+            hide_tool_calls: false,
+            open_computer_use: false,
+        };
+        cfg.normalize();
+        cfg
     }
 }
 
@@ -57,6 +153,7 @@ impl AiConfig {
 impl fmt::Debug for AiConfig {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("AiConfig")
+            .field("active_provider", &self.active_provider)
             .field("protocol", &self.protocol)
             .field("base_url", &self.base_url)
             .field("model", &self.model)
@@ -70,6 +167,8 @@ impl fmt::Debug for AiConfig {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AiConfigView {
+    pub active_provider: String,
+    pub providers: Vec<ProviderConfigView>,
     pub protocol: String,
     pub base_url: String,
     pub model: String,
@@ -87,17 +186,15 @@ pub struct AiConfigView {
 
 impl AiConfig {
     pub fn view(&self, default_workspace: &Path) -> AiConfigView {
-        let key_hint = match self.api_key.chars().count() {
-            0 => String::new(),
-            n if n >= 12 => format!("••••{}", self.api_key.chars().skip(n - 4).collect::<String>()),
-            _ => "••••".into(),
-        };
+        let providers_view = self.providers.iter().map(|p| p.view()).collect();
         AiConfigView {
+            active_provider: self.active_provider.clone(),
+            providers: providers_view,
             protocol: self.protocol.clone(),
             base_url: self.base_url.clone(),
             model: self.model.clone(),
             has_key: !self.api_key.is_empty(),
-            key_hint,
+            key_hint: make_key_hint(&self.api_key),
             workspace: self.workspace.clone(),
             default_workspace: default_workspace.display().to_string(),
             permission_mode: self.permission_mode.clone(),
@@ -112,6 +209,50 @@ impl AiConfig {
         }
         if !["ask", "auto"].contains(&self.permission_mode.as_str()) {
             self.permission_mode = "ask".into();
+        }
+
+        for &(id, name, default_proto, default_url, default_model) in DEFAULT_PROVIDERS {
+            if !self.providers.iter().any(|p| p.id == id) {
+                self.providers.push(ProviderConfig {
+                    id: id.into(),
+                    name: name.into(),
+                    protocol: default_proto.into(),
+                    base_url: default_url.into(),
+                    model: default_model.into(),
+                    api_key: String::new(),
+                });
+            }
+        }
+
+        if self.active_provider.is_empty() {
+            self.active_provider = if self.base_url.contains("deepseek.com") {
+                "deepseek".into()
+            } else if self.base_url.contains("bigmodel.cn") {
+                "zhipu".into()
+            } else if self.base_url.contains("moonshot.cn") {
+                "kimi".into()
+            } else if self.base_url.contains("minimax") {
+                "minimax".into()
+            } else if !self.base_url.is_empty() {
+                "custom".into()
+            } else {
+                "deepseek".into()
+            };
+        }
+
+        if let Some(active) = self.providers.iter_mut().find(|p| p.id == self.active_provider) {
+            if !self.base_url.is_empty() && active.base_url.is_empty() {
+                active.base_url = self.base_url.clone();
+            }
+            if !self.model.is_empty() && active.model.is_empty() {
+                active.model = self.model.clone();
+            }
+            if !self.api_key.is_empty() && active.api_key.is_empty() {
+                active.api_key = self.api_key.clone();
+            }
+            if !self.protocol.is_empty() {
+                active.protocol = self.protocol.clone();
+            }
         }
     }
 }
@@ -207,27 +348,40 @@ pub fn apply(current: &AiConfig, input: &Input<'_>) -> Result<AiConfig, String> 
         (None, true) => String::new(),
         (None, false) => current.api_key.clone(),
     };
-    Ok(AiConfig {
-        protocol: input.protocol.to_string(),
-        base_url: clean_base_url(input.base_url)?,
-        model: clean_model(input.model)?,
-        api_key,
-        workspace: match input.workspace {
-            Some(raw) => clean_workspace(raw)?,
-            None => current.workspace.clone(),
-        },
-        permission_mode: match input.permission_mode {
-            Some(mode) => {
-                if !["ask", "auto"].contains(&mode) {
-                    return Err("不支持的权限模式".into());
-                }
-                mode.to_string()
-            }
-            None => current.permission_mode.clone(),
-        },
-        hide_tool_calls: input.hide_tool_calls.unwrap_or(current.hide_tool_calls),
-        open_computer_use: input.open_computer_use.unwrap_or(current.open_computer_use),
-    })
+    let base_url = clean_base_url(input.base_url)?;
+    let model = clean_model(input.model)?;
+    let protocol = input.protocol.to_string();
+
+    let mut next = current.clone();
+    next.protocol = protocol.clone();
+    next.base_url = base_url.clone();
+    next.model = model.clone();
+    next.api_key = api_key.clone();
+
+    if let Some(raw) = input.workspace {
+        next.workspace = clean_workspace(raw)?;
+    }
+    if let Some(mode) = input.permission_mode {
+        if !["ask", "auto"].contains(&mode) {
+            return Err("不支持的权限模式".into());
+        }
+        next.permission_mode = mode.to_string();
+    }
+    if let Some(htc) = input.hide_tool_calls {
+        next.hide_tool_calls = htc;
+    }
+    if let Some(ocu) = input.open_computer_use {
+        next.open_computer_use = ocu;
+    }
+
+    if let Some(p) = next.providers.iter_mut().find(|p| p.id == next.active_provider) {
+        p.protocol = protocol;
+        p.base_url = base_url;
+        p.model = model;
+        p.api_key = api_key;
+    }
+    next.normalize();
+    Ok(next)
 }
 
 pub fn load(path: &Path) -> io::Result<AiConfig> {
@@ -346,6 +500,306 @@ pub fn save_ai_config(
     Ok(next.view(&default_workspace(&app)?))
 }
 
+#[tauri::command]
+pub fn save_ai_provider(
+    app: tauri::AppHandle,
+    provider_id: String,
+    name: Option<String>,
+    protocol: String,
+    base_url: String,
+    model: String,
+    api_key: Option<String>,
+    clear_key: bool,
+    activate: bool,
+) -> Result<AiConfigView, String> {
+    let path = path(&app)?;
+    let state = app.state::<AiConfigState>();
+    let _io = state.io.lock().unwrap();
+    let mut config = load(&path).unwrap_or_default();
+    config.normalize();
+
+    let clean_url = clean_base_url(&base_url)?;
+    let clean_mdl = clean_model(&model)?;
+    if !PROTOCOLS.contains(&protocol.as_str()) {
+        return Err("不支持这种接口协议".into());
+    }
+
+    let existing_idx = config.providers.iter().position(|p| p.id == provider_id);
+    let (current_name, current_key) = match existing_idx {
+        Some(i) => (config.providers[i].name.clone(), config.providers[i].api_key.clone()),
+        None => (String::new(), String::new()),
+    };
+
+    let new_name = match name {
+        Some(n) if !n.trim().is_empty() => n.trim().to_string(),
+        _ => if current_name.is_empty() { "自定义供应商".into() } else { current_name },
+    };
+
+    let new_key = match (api_key.as_deref(), clear_key) {
+        (Some(new), _) if !new.trim().is_empty() => clean_key(new)?,
+        (None, true) => String::new(),
+        _ => current_key,
+    };
+
+    let updated_entry = ProviderConfig {
+        id: provider_id.clone(),
+        name: new_name,
+        protocol: protocol.clone(),
+        base_url: clean_url.clone(),
+        model: clean_mdl.clone(),
+        api_key: new_key.clone(),
+    };
+
+    if let Some(idx) = existing_idx {
+        config.providers[idx] = updated_entry;
+    } else {
+        config.providers.push(updated_entry);
+    }
+
+    if activate || config.active_provider == provider_id || config.base_url.is_empty() {
+        config.active_provider = provider_id;
+        config.protocol = protocol;
+        config.base_url = clean_url;
+        config.model = clean_mdl;
+        config.api_key = new_key;
+    }
+
+    save(&path, &config).map_err(|e| format!("无法保存服务商配置：{e}"))?;
+    Ok(config.view(&default_workspace(&app)?))
+}
+
+#[tauri::command]
+pub fn delete_ai_provider(
+    app: tauri::AppHandle,
+    provider_id: String,
+) -> Result<AiConfigView, String> {
+    let path = path(&app)?;
+    let state = app.state::<AiConfigState>();
+    let _io = state.io.lock().unwrap();
+    let mut config = load(&path).unwrap_or_default();
+    config.normalize();
+
+    if ["deepseek", "zhipu", "kimi", "minimax"].contains(&provider_id.as_str()) {
+        return Err("内置服务商不能删除".into());
+    }
+    if config.active_provider == provider_id {
+        return Err("当前正在使用该服务商，请先切换为其他服务商后再删除".into());
+    }
+
+    let initial_len = config.providers.len();
+    config.providers.retain(|p| p.id != provider_id);
+    if config.providers.len() == initial_len {
+        return Err("未找到该服务商".into());
+    }
+
+    save(&path, &config).map_err(|e| format!("无法删除服务商：{e}"))?;
+    Ok(config.view(&default_workspace(&app)?))
+}
+
+#[tauri::command]
+pub fn switch_ai_provider(
+    app: tauri::AppHandle,
+    provider_id: String,
+) -> Result<AiConfigView, String> {
+    let path = path(&app)?;
+    let state = app.state::<AiConfigState>();
+    let _io = state.io.lock().unwrap();
+    let mut config = load(&path).unwrap_or_default();
+    config.normalize();
+
+    let provider = config.providers.iter().find(|p| p.id == provider_id)
+        .ok_or_else(|| format!("未找到服务商配置：{provider_id}"))?
+        .clone();
+
+    if provider.base_url.trim().is_empty() {
+        return Err("该服务商尚未配置 API 地址，请先点击配置".into());
+    }
+    if provider.model.trim().is_empty() {
+        return Err("该服务商尚未填写模型名，请先点击配置".into());
+    }
+
+    config.active_provider = provider_id;
+    config.protocol = provider.protocol;
+    config.base_url = provider.base_url;
+    config.model = provider.model;
+    config.api_key = provider.api_key;
+
+    save(&path, &config).map_err(|e| format!("无法切换服务商：{e}"))?;
+    Ok(config.view(&default_workspace(&app)?))
+}
+
+#[tauri::command]
+pub fn save_ai_preferences(
+    app: tauri::AppHandle,
+    workspace: Option<String>,
+    permission_mode: Option<String>,
+    hide_tool_calls: Option<bool>,
+    open_computer_use: Option<bool>,
+) -> Result<AiConfigView, String> {
+    let path = path(&app)?;
+    let state = app.state::<AiConfigState>();
+    let _io = state.io.lock().unwrap();
+    let mut config = load(&path).unwrap_or_default();
+    config.normalize();
+
+    if let Some(raw) = workspace.as_deref() {
+        config.workspace = clean_workspace(raw)?;
+    }
+    if let Some(mode) = permission_mode.as_deref() {
+        if !["ask", "auto"].contains(&mode) {
+            return Err("不支持的权限模式".into());
+        }
+        config.permission_mode = mode.to_string();
+    }
+    if let Some(htc) = hide_tool_calls {
+        config.hide_tool_calls = htc;
+    }
+    if let Some(ocu) = open_computer_use {
+        config.open_computer_use = ocu;
+    }
+
+    save(&path, &config).map_err(|e| format!("无法保存偏好设置：{e}"))?;
+    let _ = app.emit_to("control", "chat-hide-tool-calls-changed", serde_json::json!({ "enabled": config.hide_tool_calls }));
+    Ok(config.view(&default_workspace(&app)?))
+}
+
+pub fn candidate_models_urls(protocol: &str, base_url: &str) -> Vec<String> {
+    let base = base_url.trim_end_matches('/');
+    if protocol == "anthropic" {
+        if base.ends_with("/v1") {
+            vec![format!("{base}/models")]
+        } else {
+            vec![format!("{base}/v1/models"), format!("{base}/models")]
+        }
+    } else if base.ends_with("/v1") {
+        vec![format!("{base}/models")]
+    } else {
+        vec![format!("{base}/models"), format!("{base}/v1/models")]
+    }
+}
+
+pub fn parse_model_list_json(raw: &str) -> Result<Vec<String>, String> {
+    let value: serde_json::Value = serde_json::from_str(raw).map_err(|e| format!("解析服务商返回的 JSON 失败：{e}"))?;
+    let mut models = Vec::new();
+
+    if let Some(data) = value.get("data").and_then(|v| v.as_array()) {
+        for item in data {
+            if let Some(id) = item.get("id").and_then(|id| id.as_str()) {
+                models.push(id.trim().to_string());
+            } else if let Some(id) = item.as_str() {
+                models.push(id.trim().to_string());
+            }
+        }
+    } else if let Some(items) = value.get("models").and_then(|v| v.as_array()) {
+        for item in items {
+            if let Some(id) = item.get("name").and_then(|n| n.as_str()).or_else(|| item.get("id").and_then(|i| i.as_str())) {
+                models.push(id.trim().to_string());
+            } else if let Some(id) = item.as_str() {
+                models.push(id.trim().to_string());
+            }
+        }
+    } else if let Some(items) = value.as_array() {
+        for item in items {
+            if let Some(id) = item.get("id").and_then(|i| i.as_str()).or_else(|| item.get("name").and_then(|n| n.as_str())) {
+                models.push(id.trim().to_string());
+            } else if let Some(id) = item.as_str() {
+                models.push(id.trim().to_string());
+            }
+        }
+    }
+
+    models.retain(|m| !m.is_empty());
+    models.sort();
+    models.dedup();
+
+    if models.is_empty() {
+        return Err("服务商返回的数据中未包含任何模型".into());
+    }
+    Ok(models)
+}
+
+#[tauri::command]
+pub async fn fetch_ai_models(
+    app: tauri::AppHandle,
+    protocol: String,
+    base_url: String,
+    api_key: Option<String>,
+) -> Result<Vec<String>, String> {
+    let base_url = clean_base_url(&base_url)?;
+    let protocol = if PROTOCOLS.contains(&protocol.as_str()) { protocol } else { "chat".into() };
+
+    let effective_key = match api_key {
+        Some(key) if !key.trim().is_empty() => clean_key(&key)?,
+        _ => {
+            let path = path(&app)?;
+            let state = app.state::<AiConfigState>();
+            let _io = state.io.lock().unwrap();
+            let cfg = load(&path).unwrap_or_default();
+            if let Some(p) = cfg.providers.iter().find(|p| !p.api_key.is_empty() && (clean_base_url(&p.base_url).ok().as_deref() == Some(&base_url) || p.base_url.is_empty())) {
+                p.api_key.clone()
+            } else {
+                cfg.api_key
+            }
+        }
+    };
+
+    tauri::async_runtime::spawn_blocking(move || {
+        let client = reqwest::blocking::Client::builder()
+            .timeout(std::time::Duration::from_secs(15))
+            .build()
+            .map_err(|e| format!("无法创建网络请求客户端：{e}"))?;
+
+        let urls = candidate_models_urls(&protocol, &base_url);
+        let mut last_error = String::new();
+
+        for url in urls {
+            let mut req = client.get(&url).header("User-Agent", "XiaoBanDesktop/1.0");
+            if protocol == "anthropic" {
+                req = req.header("anthropic-version", "2023-06-01");
+                if !effective_key.is_empty() {
+                    req = req.header("x-api-key", &effective_key)
+                        .header("Authorization", format!("Bearer {effective_key}"));
+                }
+            } else if !effective_key.is_empty() {
+                req = req.header("Authorization", format!("Bearer {effective_key}"));
+            }
+
+            let resp = match req.send() {
+                Ok(r) => r,
+                Err(e) => {
+                    last_error = format!("网络请求失败：{e}");
+                    continue;
+                }
+            };
+
+            let status = resp.status();
+            if status == reqwest::StatusCode::NOT_FOUND {
+                last_error = format!("未找到模型列表接口（HTTP 404，地址：{url}）");
+                continue;
+            }
+            if status == reqwest::StatusCode::UNAUTHORIZED || status == reqwest::StatusCode::FORBIDDEN {
+                return Err(format!("鉴权失败（HTTP {status}）：请检查 API 密钥是否正确"));
+            }
+            if !status.is_success() {
+                let text = resp.text().unwrap_or_default();
+                let summary = text.chars().take(200).collect::<String>();
+                return Err(format!("服务商返回错误（HTTP {status}）：{summary}"));
+            }
+
+            let body = resp.text().map_err(|e| format!("读取响应失败：{e}"))?;
+            return parse_model_list_json(&body);
+        }
+
+        if last_error.is_empty() {
+            Err("未能获取到模型列表".into())
+        } else {
+            Err(last_error)
+        }
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -353,7 +807,9 @@ mod tests {
     const KEY: &str = "sk-abcdefghijklmnop1234";
 
     fn saved() -> AiConfig {
-        AiConfig { protocol: "chat".into(), base_url: "https://api.example.com/v1".into(), model: "m1".into(), api_key: KEY.into(), workspace: String::new(), permission_mode: "ask".into(), hide_tool_calls: false, open_computer_use: false }
+        let mut cfg = AiConfig { protocol: "chat".into(), base_url: "https://api.example.com/v1".into(), model: "m1".into(), api_key: KEY.into(), ..AiConfig::default() };
+        cfg.normalize();
+        cfg
     }
 
     fn input<'a>(base_url: &'a str, model: &'a str) -> Input<'a> {
@@ -559,11 +1015,81 @@ mod tests {
 
     #[test]
     fn only_the_control_window_may_read_or_change_it() {
-        for command in ["get_ai_config", "save_ai_config", "pick_workspace"] {
+        for command in ["get_ai_config", "save_ai_config", "pick_workspace", "fetch_ai_models", "save_ai_provider", "switch_ai_provider", "delete_ai_provider", "save_ai_preferences"] {
             assert!(crate::content::permitted("control", command), "{command}");
             for label in ["pet", "wallpaper", "care", "games", "media-a", "media-preview", "ritual", "widgets"] {
                 assert!(!crate::content::permitted(label, command), "{label} must not reach {command}");
             }
         }
+    }
+
+    #[test]
+    fn candidate_urls_are_constructed_correctly() {
+        assert_eq!(
+            candidate_models_urls("chat", "https://api.openai.com/v1"),
+            vec!["https://api.openai.com/v1/models"]
+        );
+        assert_eq!(
+            candidate_models_urls("chat", "https://api.deepseek.com"),
+            vec!["https://api.deepseek.com/models", "https://api.deepseek.com/v1/models"]
+        );
+        assert_eq!(
+            candidate_models_urls("anthropic", "https://api.anthropic.com"),
+            vec!["https://api.anthropic.com/v1/models", "https://api.anthropic.com/models"]
+        );
+        assert_eq!(
+            candidate_models_urls("anthropic", "https://api.anthropic.com/v1"),
+            vec!["https://api.anthropic.com/v1/models"]
+        );
+    }
+
+    #[test]
+    fn parses_various_provider_model_responses() {
+        // OpenAI / Anthropic 标准 data 格式
+        let openai_json = r#"{"data":[{"id":"gpt-4o"},{"id":"gpt-4o-mini"}]}"#;
+        assert_eq!(parse_model_list_json(openai_json).unwrap(), vec!["gpt-4o", "gpt-4o-mini"]);
+
+        // Ollama / 某些平台的 models 格式
+        let ollama_json = r#"{"models":[{"name":"llama3:latest"},{"name":"qwen2.5:7b"}]}"#;
+        assert_eq!(parse_model_list_json(ollama_json).unwrap(), vec!["llama3:latest", "qwen2.5:7b"]);
+
+        // 顶层数组格式
+        let list_json = r#"[{"id":"claude-3-5-sonnet"},{"id":"claude-3-5-haiku"}]"#;
+        assert_eq!(parse_model_list_json(list_json).unwrap(), vec!["claude-3-5-haiku", "claude-3-5-sonnet"]);
+
+        // 纯字符串数组格式
+        let str_list = r#"["model-b","model-a","model-b"]"#;
+        assert_eq!(parse_model_list_json(str_list).unwrap(), vec!["model-a", "model-b"]);
+
+        // 空或无模型应返回 Err
+        assert!(parse_model_list_json(r#"{"data":[]}"#).is_err());
+        assert!(parse_model_list_json(r#"{"other":"field"}"#).is_err());
+    }
+
+    #[test]
+    fn default_providers_are_initialized_and_accessible() {
+        let mut cfg = AiConfig::default();
+        cfg.normalize();
+        assert_eq!(cfg.providers.len(), 4);
+        assert!(cfg.providers.iter().any(|p| p.id == "deepseek"));
+        assert!(cfg.providers.iter().any(|p| p.id == "zhipu"));
+        assert!(cfg.providers.iter().any(|p| p.id == "kimi"));
+        assert!(cfg.providers.iter().any(|p| p.id == "minimax"));
+
+        // 添加一个自定义供应商
+        cfg.providers.push(ProviderConfig {
+            id: "custom_1".into(),
+            name: "我的本地 Ollama".into(),
+            protocol: "chat".into(),
+            base_url: "http://localhost:11434/v1".into(),
+            model: "llama3".into(),
+            api_key: String::new(),
+        });
+
+        let view = cfg.view(Path::new("/work"));
+        assert_eq!(view.providers.len(), 5);
+        let custom = view.providers.iter().find(|p| p.id == "custom_1").unwrap();
+        assert_eq!(custom.name, "我的本地 Ollama");
+        assert!(custom.is_custom);
     }
 }

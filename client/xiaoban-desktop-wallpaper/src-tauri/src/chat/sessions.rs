@@ -17,12 +17,25 @@ const MAX_TITLE_CHARS: usize = 40;
 const MAX_SESSIONS: usize = 500;
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
+#[serde(default, rename_all = "camelCase")]
 pub struct SessionSummary {
     pub id: String,
     pub title: String,
     pub created_at: i64,
     pub updated_at: i64,
+    pub permission_mode: String,
+}
+
+impl Default for SessionSummary {
+    fn default() -> Self {
+        Self {
+            id: String::new(),
+            title: DEFAULT_TITLE.into(),
+            created_at: 0,
+            updated_at: 0,
+            permission_mode: "ask".into(),
+        }
+    }
 }
 
 #[derive(Default, Serialize, Deserialize)]
@@ -94,9 +107,18 @@ impl Index {
         if self.sessions.len() >= MAX_SESSIONS {
             return Err(format!("对话最多保存 {MAX_SESSIONS} 个，请先删除一些旧对话"));
         }
-        let summary = SessionSummary { id: new_id(now_millis), title: DEFAULT_TITLE.into(), created_at: now, updated_at: now };
+        let summary = SessionSummary { id: new_id(now_millis), title: DEFAULT_TITLE.into(), created_at: now, updated_at: now, permission_mode: "ask".into() };
         self.sessions.push(summary.clone());
         Ok(summary)
+    }
+
+    pub fn set_permission_mode(&mut self, id: &str, mode: &str) -> bool {
+        if let Some(s) = self.sessions.iter_mut().find(|s| s.id == id) {
+            s.permission_mode = mode.to_string();
+            true
+        } else {
+            false
+        }
     }
 
     pub fn touch(&mut self, id: &str, now: i64) {
@@ -155,7 +177,7 @@ fn rebuild(sessions_dir: &Path, store: &JsonlStore) -> Vec<SessionSummary> {
         let first_user = store.load(id).ok().and_then(|messages| messages.into_iter().find(|m| m.role == Role::User)).map(|m| m.text());
         let updated_at = meta.as_ref().map_or(0, |m| seconds(m.modified()));
         let created_at = meta.as_ref().map_or(updated_at, |m| seconds(m.created()).min(updated_at).max(0));
-        found.push(SessionSummary { id: id.to_string(), title: first_user.map_or_else(|| DEFAULT_TITLE.to_string(), |t| title_from(&t)), created_at, updated_at });
+        found.push(SessionSummary { id: id.to_string(), title: first_user.map_or_else(|| DEFAULT_TITLE.to_string(), |t| title_from(&t)), created_at, updated_at, permission_mode: "ask".into() });
         if found.len() >= MAX_SESSIONS {
             break;
         }

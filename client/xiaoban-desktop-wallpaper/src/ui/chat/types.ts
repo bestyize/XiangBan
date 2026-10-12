@@ -1,6 +1,6 @@
 /** What the host sends and accepts for the chat. Field names are the host's own (snake_case for kernel events). */
 
-export interface SessionSummary { id: string; title: string; createdAt: number; updatedAt: number }
+export interface SessionSummary { id: string; title: string; createdAt: number; updatedAt: number; permissionMode?: 'ask' | 'auto' }
 
 export interface Overview {
   configured: boolean;

@@ -39,6 +39,7 @@ pub trait Desktop: Send + Sync {
     fn games(&self) -> Result<Value, String>;
     fn game_open(&self, id: Option<&str>) -> Result<(), String>;
     fn game_close(&self) -> Result<(), String>;
+    fn request_permissions(&self) -> Result<Value, String>;
 }
 
 pub struct TauriDesktop {
@@ -52,6 +53,24 @@ impl TauriDesktop {
 }
 
 impl Desktop for TauriDesktop {
+    fn request_permissions(&self) -> Result<Value, String> {
+        #[cfg(target_os = "macos")]
+        {
+            let _ = std::process::Command::new("osascript")
+                .args(["-e", "tell application \"System Events\" to get name of first process"])
+                .status();
+            let _ = std::process::Command::new("/usr/bin/open")
+                .arg("x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")
+                .status();
+            let _ = std::process::Command::new("/usr/bin/open")
+                .arg("x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture")
+                .status();
+        }
+        Ok(json!({
+            "ok": true,
+            "message": "已成功唤起 macOS 辅助功能（无障碍）与屏幕录制授权弹窗并打开系统设置页面，请用户在设置中勾选开启小伴的权限。"
+        }))
+    }
     fn status(&self) -> Result<Value, String> {
         let s = crate::settings(&self.app);
         Ok(json!({
@@ -660,6 +679,18 @@ pub fn tools(desktop: Arc<dyn Desktop>) -> Vec<Arc<dyn Tool>> {
             game_open,
         ),
         tool(&desktop, ToolSpec::new("game_close", "退出游戏空间，回到正常的桌面生活空间。", none()).risk(Risk::Write).serial(), game_close),
+        tool(
+            &desktop,
+            ToolSpec::new(
+                "request_accessibility_permission",
+                "向 macOS 系统自主申请电脑控制（无障碍/辅助功能与屏幕录制）权限，并自动呼出系统设置面板。当需要操控其他软件（如 Edge、Safari）遇到权限不足或尚未授权时调用此工具，无需让用户在终端输入命令。",
+                none(),
+            ),
+            |d: &dyn Desktop, _: &Value| -> Result<String, String> {
+                let res = d.request_permissions()?;
+                Ok(res["message"].as_str().unwrap_or("已申请系统权限").to_string())
+            },
+        ),
     ]
 }
 
@@ -748,6 +779,10 @@ mod tests {
         fn game_close(&self) -> Result<(), String> {
             self.log("game-close".to_string())
         }
+        fn request_permissions(&self) -> Result<Value, String> {
+            self.log("request-permissions".to_string())?;
+            Ok(json!({"ok": true, "message": "已申请系统权限"}))
+        }
     }
 
     fn call(fake: &Arc<Fake>, name: &str, args: Value) -> Result<String, String> {
@@ -766,7 +801,7 @@ mod tests {
         let mut unique = names.clone();
         unique.dedup();
         assert_eq!(names, unique);
-        assert_eq!(names.len(), 16);
+        assert_eq!(names.len(), 17);
         for tool in &all {
             let spec = tool.spec();
             assert!(spec.name.len() <= 64 && spec.name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_'), "{}", spec.name);
@@ -776,7 +811,7 @@ mod tests {
         let read: Vec<&str> = all.iter().filter(|t| t.spec().risk == Risk::Read).map(|t| t.spec().name.as_str()).collect();
         let mut read = read;
         read.sort();
-        assert_eq!(read, vec!["care_list", "desktop_status", "effect_list", "game_list", "wallpaper_list", "widget_list"]);
+        assert_eq!(read, vec!["care_list", "desktop_status", "effect_list", "game_list", "request_accessibility_permission", "wallpaper_list", "widget_list"]);
         for tool in all.iter().filter(|t| t.spec().risk == Risk::Write) {
             assert!(!tool.spec().parallel_safe, "{} changes shared settings, so it runs alone", tool.spec().name);
         }

@@ -56,9 +56,14 @@ export function createChatStore(deps: ChatDeps): ChatStore {
     hideToolCalls: false,
     async setPermissionMode(mode: 'ask' | 'auto') {
       store.permissionMode = mode;
+      if (store.currentId) {
+        const s = store.sessions.find(item => item.id === store.currentId);
+        if (s) s.permissionMode = mode;
+      }
       if (!deps.desktop) return;
       try {
-        await deps.invoke('chat_set_permission_mode', { mode });
+        const args = store.currentId ? { sessionId: store.currentId, mode } : { mode };
+        await deps.invoke('chat_set_permission_mode', args);
       } catch (error) {
         deps.notify(error, 'error');
       }
@@ -80,7 +85,19 @@ export function createChatStore(deps: ChatDeps): ChatStore {
             deps.listen<ApprovalRequest>('chat-approval', request => { if (!disposed) addPending(viewOf(request.session, true).approvals, request); }),
             deps.listen<QuestionRequest>('chat-question', request => { if (!disposed) addPending(viewOf(request.session, true).questions, request); }),
             deps.listen<SessionSummary[]>('chat-sessions-changed', sessions => { if (!disposed) store.sessions = sessions; }),
-            deps.listen<{ mode: 'ask' | 'auto' }>('chat-permission-mode-changed', payload => { if (!disposed) store.permissionMode = payload.mode; }),
+            deps.listen<{ sessionId?: string; mode: 'ask' | 'auto' }>('chat-permission-mode-changed', payload => {
+              if (!disposed) {
+                if (payload.sessionId) {
+                  const s = store.sessions.find(item => item.id === payload.sessionId);
+                  if (s) s.permissionMode = payload.mode;
+                  if (store.currentId === payload.sessionId) {
+                    store.permissionMode = payload.mode;
+                  }
+                } else {
+                  store.permissionMode = payload.mode;
+                }
+              }
+            }),
             deps.listen<{ enabled: boolean }>('chat-hide-tool-calls-changed', payload => { if (!disposed) store.hideToolCalls = payload.enabled; }),
           ]);
           if (disposed) { listeners.forEach(stop => stop()); return; }
@@ -124,6 +141,10 @@ export function createChatStore(deps: ChatDeps): ChatStore {
     async select(id) {
       store.currentId = id;
       if (!id) return;
+      const curSession = store.sessions.find(s => s.id === id);
+      if (curSession?.permissionMode) {
+        store.permissionMode = curSession.permissionMode;
+      }
       const view = viewOf(id, false);
       if (view.loaded) return;
       try {
