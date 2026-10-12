@@ -59,7 +59,7 @@ jobs:
           if ! gh release view "$tag" >/dev/null 2>&1; then
             gh release create "$tag" --target "$GITHUB_SHA" --draft \
               --title "小伴 macOS arm64 测试包 ${GITHUB_SHA:0:7}" \
-              --notes "Apple 芯片 Mac，macOS 12+。包含当前分支的日历、便签待办、倒数日／纪念日。Ad-hoc 签名，未公证；这是未发布的测试包。提交：$GITHUB_SHA。"
+              --notes "Apple 芯片 Mac，macOS 12+。包含当前分支的日历、便签待办、倒数日／纪念日。Ad-hoc 签名，未公证；这是未发布的测试包。提交：${GITHUB_SHA}。"
           fi
           gh release upload "$tag" out/* --clobber
           printf '### macOS arm64 package\n\nDraft release: %s\n' "$(gh release view "$tag" --json url --jq .url)" >> "$GITHUB_STEP_SUMMARY"
