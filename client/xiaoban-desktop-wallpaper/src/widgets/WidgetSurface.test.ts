@@ -35,4 +35,9 @@ describe('desktop widget interactions',()=>{
     const view=mount(WidgetSurface,{props:{widget:one('calendar'),preview:true}});const title=view.get('.month-name').text();await view.get('[aria-label="下个月"]').trigger('click');expect(view.get('.month-name').text()).not.toBe(title);await view.get('.month-name').trigger('click');expect(view.get('.month-name').text()).toBe(title);view.unmount();
   });
   it('shows configuration status instead of invented weather readings',()=>{const view=mount(WidgetSurface,{props:{widget:one('weather'),preview:true}});expect(view.text()).toContain('设置城市后显示天气');expect(view.get('.weather-main strong').text()).toBe('—');view.unmount();});
+  it('tells the preview that live weather only appears on the desktop, and has no hidden drag handle while editing',()=>{
+    const city={name:'北京',country:'中国',admin1:'北京',latitude:39.9,longitude:116.4};
+    const view=mount(WidgetSurface,{props:{widget:{...one('weather'),city},preview:true,editing:true}});
+    expect(view.text()).toContain('实时天气显示在桌面上');expect(view.find('.drag-handle').exists()).toBe(false);expect(view.find('.widget-settings').exists()).toBe(false);view.unmount();
+  });
 });
