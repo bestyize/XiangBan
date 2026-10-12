@@ -6,7 +6,7 @@ on:
   # package. Once merged, production builds remain manually dispatched.
   push:
     branches: ['feat/desktop-calendar-notes-countdown']
-    paths: ['.github/workflows/package-xiaoban-macos.yml']
+    paths: ['.github/workflows/package-xiaoban-macos.yml', 'client/xiaoban-desktop-wallpaper/**']
 
 permissions:
   contents: write
@@ -37,6 +37,10 @@ jobs:
           workspaces: client/xiaoban-desktop-wallpaper/src-tauri
       - name: Install frontend dependencies
         run: npm ci
+      - name: Validate widget changes
+        run: |
+          npx vitest run src/widgets
+          cargo test --locked --manifest-path src-tauri/Cargo.toml widget
       - name: Build Apple silicon app and DMG
         run: npx tauri build --target aarch64-apple-darwin --config src-tauri/tauri.macos.conf.json --bundles app,dmg
       - name: Package app
@@ -59,7 +63,8 @@ jobs:
           if ! gh release view "$tag" >/dev/null 2>&1; then
             gh release create "$tag" --target "$GITHUB_SHA" --draft \
               --title "小伴 macOS arm64 测试包 ${GITHUB_SHA:0:7}" \
-              --notes "Apple 芯片 Mac，macOS 12+。包含当前分支的日历、便签待办、倒数日／纪念日。Ad-hoc 签名，未公证；这是未发布的测试包。提交：${GITHUB_SHA}。"
+              --notes "Apple 芯片 Mac，macOS 12+。包含当前分支的日历、便签待办、倒数日／纪念日和多屏拖动修复。Ad-hoc 签名，未公证；这是未发布的测试包。提交：${GITHUB_SHA}。"
           fi
           gh release upload "$tag" out/* --clobber
           printf '### macOS arm64 package\n\nDraft release: %s\n' "$(gh release view "$tag" --json url --jq .url)" >> "$GITHUB_STEP_SUMMARY"
+

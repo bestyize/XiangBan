@@ -19,6 +19,7 @@ mod local_media;
 mod games;
 mod rituals;
 mod widgets;
+mod widget_geometry;
 mod reminders;
 mod presence;
 mod care_system;

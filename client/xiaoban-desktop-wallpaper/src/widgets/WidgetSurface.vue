@@ -40,9 +40,9 @@ function draw() {
 }
 async function detail() { try { await openRitual('fortune',fortune.value); } catch(e){error.value=String(e);} }
 async function settings() { if(props.preview)return;try{await invoke('show_widget_settings');}catch(e){error.value=String(e);} }
-let drag:{startX:number;startY:number;originX:number;originY:number;moved:boolean}|null=null;
+let drag:{startX:number;startY:number;grabX:number;grabY:number;moved:boolean}|null=null;
 let suppressClick=false,clickTimer:ReturnType<typeof setTimeout>|undefined;
-let moving=false,pending:{x:number;y:number;commit:boolean}|null=null;
+let moving=false,pending:{grabX:number;grabY:number;commit:boolean}|null=null;
 async function movePending(){
   if(moving)return;moving=true;
   try{while(pending){const point=pending;pending=null;try{await invoke('move_desktop_widget',point);}catch(e){error.value=String(e);pending=null;}}}finally{moving=false;}
@@ -53,14 +53,14 @@ function startDrag(event:PointerEvent){
   if(event.button!==0||props.preview||!props.payload)return;
   if(!props.editing&&(event.target as Element).closest('input,textarea,select,[data-no-drag]'))return;
   if(clickTimer)clearTimeout(clickTimer);suppressClick=false;
-  drag={startX:event.screenX,startY:event.screenY,originX:props.payload.screenX,originY:props.payload.screenY,moved:false};
+  drag={startX:event.screenX,startY:event.screenY,grabX:Math.max(0,Math.min(1,event.clientX/Math.max(1,window.innerWidth))),grabY:Math.max(0,Math.min(1,event.clientY/Math.max(1,window.innerHeight))),moved:false};
   // Capture on the original target so a stationary button press keeps its normal click.
   (event.target as Element).setPointerCapture?.(event.pointerId);
 }
 function dragTo(event:PointerEvent,commit=false){
   if(!drag)return;const dx=event.screenX-drag.startX,dy=event.screenY-drag.startY;
   if(!drag.moved&&Math.hypot(dx,dy)>5){drag.moved=true;suppressClick=true;if(event.type==='pointermove')(event.currentTarget as HTMLElement).setPointerCapture?.(event.pointerId);}
-  if(drag.moved){event.preventDefault();pending={x:drag.originX+dx,y:drag.originY+dy,commit};void movePending();}
+  if(drag.moved){event.preventDefault();pending={grabX:drag.grabX,grabY:drag.grabY,commit};void movePending();}
   if(commit){drag=null;clickTimer=setTimeout(()=>{suppressClick=false;},0);}
 }
 function captureClick(event:MouseEvent){if(suppressClick){event.preventDefault();event.stopImmediatePropagation();suppressClick=false;}}

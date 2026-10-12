@@ -21,7 +21,7 @@ describe('desktop widget interactions',()=>{
     vi.useFakeTimers();vi.mocked(invoke).mockClear();
     const widget=one('fortune'),view=mount(WidgetSurface,{props:{widget,payload:{widget,editing:false,screenX:100,screenY:200}}});
     try{await view.get('.fortune-draw').trigger('pointerdown',{button:0,pointerId:1,screenX:120,screenY:220});await view.get('article').trigger('pointermove',{pointerId:1,screenX:150,screenY:240});await view.get('article').trigger('pointerup',{pointerId:1,screenX:155,screenY:245});await view.get('.fortune-draw').trigger('click');
-      expect(invoke).toHaveBeenLastCalledWith('move_desktop_widget',{x:135,y:225,commit:true});expect(view.get('.fortune-draw').text()).toBe('求一支好签');
+      expect(invoke).toHaveBeenLastCalledWith('move_desktop_widget',{grabX:0,grabY:0,commit:true});expect(view.get('.fortune-draw').text()).toBe('求一支好签');
       await vi.advanceTimersByTimeAsync(1);await view.get('.fortune-draw').trigger('click');expect(view.get('.fortune-draw').text()).toContain('正在途中');
     }finally{view.unmount();vi.useRealTimers();}
   });
@@ -46,6 +46,12 @@ describe('desktop widget interactions',()=>{
     await view.get('textarea').trigger('pointerdown',{button:0,pointerId:1,screenX:120,screenY:220});
     await view.get('article').trigger('pointermove',{pointerId:1,screenX:150,screenY:240});await view.get('article').trigger('pointerup',{pointerId:1,screenX:150,screenY:240});expect(invoke).not.toHaveBeenCalled();
     await view.get('textarea').setValue('明天开会');await view.get('.notes-content footer button').trigger('click');expect(invoke).toHaveBeenCalledWith('save_desktop_widget_content',{content:{note:{...widget.note,text:'明天开会'}}});view.unmount();
+  });
+
+  it('uses a viewport grab fraction rather than browser global screen coordinates for cross-screen dragging',async()=>{
+    vi.mocked(invoke).mockClear();vi.stubGlobal('innerWidth',400);vi.stubGlobal('innerHeight',400);
+    const widget=one('calendar'),view=mount(WidgetSurface,{props:{widget,payload:{widget,editing:false,screenX:-1920,screenY:-900}}});
+    try{await view.get('article').trigger('pointerdown',{button:0,pointerId:1,clientX:100,clientY:40,screenX:-1820,screenY:-860});await view.get('article').trigger('pointermove',{pointerId:1,screenX:2200,screenY:100});await view.get('article').trigger('pointerup',{pointerId:1,screenX:2200,screenY:100});expect(invoke).toHaveBeenLastCalledWith('move_desktop_widget',{grabX:.25,grabY:.1,commit:true});}finally{view.unmount();vi.unstubAllGlobals();}
   });
 
 });

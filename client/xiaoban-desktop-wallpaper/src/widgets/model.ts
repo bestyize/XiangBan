@@ -6,9 +6,10 @@ export interface TodoItem { id: string; text: string; done: boolean }
 export interface NoteData { title: string; mode: 'note' | 'todo'; text: string; items: TodoItem[] }
 export interface CountdownData { title: string; date: string; mode: 'countdown' | 'elapsed'; repeat: 'none' | 'yearly' }
 export interface WidgetContent { note?: NoteData; countdown?: CountdownData }
-export interface DesktopWidget { id: string; kind: WidgetKind; theme: WidgetTheme; scale: number; x: number; y: number; enabled: boolean; city: City | null; note?: NoteData; countdown?: CountdownData }
-export interface WidgetLayout { version: 1; widgets: DesktopWidget[]; editing: boolean; errors: string[]; desktop?: {width:number;height:number} }
-export interface WidgetPayload { widget: DesktopWidget; editing: boolean; screenX: number; screenY: number }
+export interface DesktopWidget { id: string; kind: WidgetKind; theme: WidgetTheme; scale: number; x: number; y: number; enabled: boolean; city: City | null; monitor?: string; note?: NoteData; countdown?: CountdownData }
+export interface WidgetMonitor { id: string; name: string; width: number; height: number; primary: boolean }
+export interface WidgetLayout { version: 1; widgets: DesktopWidget[]; editing: boolean; errors: string[]; desktop?: {width:number;height:number}; monitors?: WidgetMonitor[] }
+export interface WidgetPayload { widget: DesktopWidget; editing: boolean; screenX: number; screenY: number; displayScale?: number | null }
 export const widgetKinds = [
   { kind: 'fortune' as const, title: '一签好意', description: '给今天收下一份温柔祝福', label: '求签' },
   { kind: 'calendar' as const, title: '日有所序', description: '时间、日期与一眼可见的月历', label: '时钟日历' },
@@ -27,12 +28,14 @@ export function validateLayout(value: unknown): WidgetLayout {
     if (!widget || !/^[a-z0-9]{1,32}$/.test(widget.id) || ids.has(widget.id) || !widgetKinds.some(k => k.kind === widget.kind) || !widgetThemes.some(t => t.value === widget.theme)
       || typeof widget.enabled !== 'boolean' || !Number.isFinite(widget.scale) || widget.scale < .75 || widget.scale > 1.5 || !Number.isFinite(widget.x) || widget.x < 0 || widget.x > 1 || !Number.isFinite(widget.y) || widget.y < 0 || widget.y > 1) throw new Error('组件布局无效，原记录已保留');
     if (widget.city && (widget.kind !== 'weather' || typeof widget.city.name !== 'string' || !widget.city.name.trim() || widget.city.name.length > 160 || !Number.isFinite(widget.city.latitude) || Math.abs(widget.city.latitude) > 90 || !Number.isFinite(widget.city.longitude) || Math.abs(widget.city.longitude) > 180)) throw new Error('天气城市配置无效');
+    if (widget.monitor != null && (typeof widget.monitor !== 'string' || !widget.monitor || new TextEncoder().encode(widget.monitor).length > 512)) throw new Error('显示器标识无效');
     if (widget.note != null) { if (widget.kind !== 'notes') throw new Error('便签配置类型不匹配'); validateNote(widget.note); }
     if (widget.countdown != null) { if (widget.kind !== 'countdown') throw new Error('纪念日配置类型不匹配'); validateCountdown(widget.countdown); }
     ids.add(widget.id);
   }
   const desktop=data.desktop&&Number.isFinite(data.desktop.width)&&data.desktop.width>0&&Number.isFinite(data.desktop.height)&&data.desktop.height>0?data.desktop:undefined;
-  return { version: 1, widgets: data.widgets, editing: data.editing === true, errors: Array.isArray(data.errors) ? data.errors.filter(e => typeof e === 'string') : [], desktop };
+  const monitors=Array.isArray(data.monitors)?data.monitors.filter(m=>m&&typeof m.id==='string'&&!!m.id&&typeof m.name==='string'&&Number.isFinite(m.width)&&m.width>0&&Number.isFinite(m.height)&&m.height>0&&typeof m.primary==='boolean'):undefined;
+  return { version: 1, widgets: data.widgets, editing: data.editing === true, errors: Array.isArray(data.errors) ? data.errors.filter(e => typeof e === 'string') : [], desktop, monitors };
 }
 export function calendarDays(year: number, month: number) {
   const first = new Date(year, month, 1), offset = (first.getDay() + 6) % 7;

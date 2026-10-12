@@ -13,6 +13,8 @@ pub struct Widget {
     #[serde(default, skip_serializing_if="Option::is_none")]
     pub note: Option<NoteData>,
     #[serde(default, skip_serializing_if="Option::is_none")]
+    pub monitor: Option<String>,
+    #[serde(default, skip_serializing_if="Option::is_none")]
     pub countdown: Option<CountdownData>,
 }
 const MAX_LAYOUT_BYTES: usize = 128 * 1024;
@@ -74,6 +76,7 @@ pub fn validate(layout: &Layout) -> Result<(), String> {
             || !widget.scale.is_finite() || !(0.75..=1.5).contains(&widget.scale)
             || !widget.x.is_finite() || !(0.0..=1.0).contains(&widget.x)
             || !widget.y.is_finite() || !(0.0..=1.0).contains(&widget.y) { return Err("组件配置无效，原布局已保留".into()); }
+        if widget.monitor.as_ref().is_some_and(|id|id.is_empty()||id.len()>512){return Err("显示器标识无效".into());}
         validate_content(widget)?;
         if let Some(city) = &widget.city {
             city.validate()?;
@@ -94,28 +97,45 @@ fn persist(app: &tauri::AppHandle, layout: &Layout) -> Result<(), String> {
     let temporary = folder.join("widgets.tmp"); fs::write(&temporary, bytes).map_err(|e| e.to_string())?;
     fs::rename(temporary, folder.join("widgets.json")).map_err(|e| format!("布局保存失败，原布局已保留：{e}"))
 }
+fn monitors(app:&tauri::AppHandle)->Result<Vec<crate::widget_geometry::MonitorArea>,String>{
+    #[cfg(target_os="macos")] {return crate::macos::widget_monitors(app);}
+    #[cfg(not(target_os="macos"))] {
+        let primary=app.primary_monitor().map_err(|e|e.to_string())?;
+        Ok(app.available_monitors().map_err(|e|e.to_string())?.into_iter().enumerate().map(|(index,m)|{
+            let name=m.name().cloned().unwrap_or_else(||format!("显示器 {}",index+1));
+            crate::widget_geometry::MonitorArea{id:name.clone(),name,x:m.position().x as f64,y:m.position().y as f64,width:m.size().width as f64,height:m.size().height as f64,scale:m.scale_factor(),primary:primary.as_ref().is_some_and(|p|p.position()==m.position())}
+        }).collect())
+    }
+}
+fn cursor(app:&tauri::AppHandle)->Result<(f64,f64),String>{
+    #[cfg(target_os="macos")] {return crate::macos::widget_cursor(app);}
+    #[cfg(not(target_os="macos"))] {let p=app.cursor_position().map_err(|e|e.to_string())?;Ok((p.x,p.y))}
+}
 fn snapshot(app: &tauri::AppHandle) -> Value {
-    let state = app.state::<WidgetState>(); let layout = state.layout.lock().unwrap().clone();
-    let desktop=app.primary_monitor().ok().flatten().map(|m|json!({"width":m.size().width as f64/m.scale_factor(),"height":m.size().height as f64/m.scale_factor()}));
-    json!({"version":1,"widgets":layout.widgets,"editing":state.editing.load(Ordering::Relaxed),"errors":state.errors.lock().unwrap().clone(),"desktop":desktop})
+    let state=app.state::<WidgetState>();let layout=state.layout.lock().unwrap().clone();
+    let areas=monitors(app).unwrap_or_default();
+    let displays:Vec<_>=areas.iter().map(|m|json!({"id":m.id,"name":m.name,"width":m.width/m.scale,"height":m.height/m.scale,"primary":m.primary})).collect();
+    let desktop=crate::widget_geometry::resolve(&areas,None).map(|m|json!({"width":m.width/m.scale,"height":m.height/m.scale}));
+    json!({"version":1,"widgets":layout.widgets,"editing":state.editing.load(Ordering::Relaxed),"errors":state.errors.lock().unwrap().clone(),"desktop":desktop,"monitors":displays})
 }
 pub fn base_size(kind: &str) -> (f64, f64) { match kind { "fortune" => (220.0, 330.0), "calendar" => (300.0, 400.0), "notes" => (300.0, 360.0), _ => (280.0, 230.0) } }
 fn geometry(app: &tauri::AppHandle, widget: &Widget) -> Result<(f64, f64, f64, f64, f64), String> {
-    let monitor = app.primary_monitor().map_err(|e| e.to_string())?.ok_or("没有找到主显示器")?;
-    let scale = monitor.scale_factor(); let (base_w, base_h) = base_size(&widget.kind);
-    let width = base_w * widget.scale + 16.0; let height = base_h * widget.scale + 16.0;
-    let x = monitor.position().x as f64 / scale + widget.x * (monitor.size().width as f64 / scale - width).max(0.0);
-    let y = monitor.position().y as f64 / scale + 32.0 + widget.y * (monitor.size().height as f64 / scale - height - 88.0).max(0.0);
-    Ok((x, y, width, height, scale))
+    let areas=monitors(app)?;let monitor=crate::widget_geometry::resolve(&areas,widget.monitor.as_deref()).ok_or("没有找到显示器")?;
+    let scale=monitor.scale;let (base_w,base_h)=base_size(&widget.kind);
+    let width=(base_w*widget.scale+16.0)*scale;let height=(base_h*widget.scale+16.0)*scale;
+    let (x,y)=crate::widget_geometry::position(monitor,width,height,widget.x,widget.y);
+    Ok((x,y,width,height,scale))
 }
 fn widget_payload(app: &tauri::AppHandle, widget: &Widget) -> Result<Value, String> {
-    let (x, y, _, _, _) = geometry(app, widget)?;
-    Ok(json!({"widget":widget,"editing":app.state::<WidgetState>().editing.load(Ordering::Relaxed),"screenX":x,"screenY":y}))
+    let (x,y,_,_,dpi)=geometry(app,widget)?;
+    let display_scale=if cfg!(windows){Some(dpi)}else{None};
+    Ok(json!({"widget":widget,"editing":app.state::<WidgetState>().editing.load(Ordering::Relaxed),"screenX":x,"screenY":y,"displayScale":display_scale}))
 }
 fn place(app: &tauri::AppHandle, window: &tauri::WebviewWindow, widget: &Widget) -> Result<(), String> {
-    let (x, y, width, height, dpi) = geometry(app, widget)?;
-    #[cfg(windows)] return crate::windows::place_widget(window, tauri::PhysicalPosition::new((x*dpi).round() as i32,(y*dpi).round() as i32), (width*dpi).round() as i32,(height*dpi).round() as i32);
-    #[cfg(not(windows))] { let _ = dpi; window.set_size(tauri::LogicalSize::new(width,height)).and_then(|_| window.set_position(tauri::LogicalPosition::new(x,y))).map_err(|e| e.to_string()) }
+    let (x,y,width,height,dpi)=geometry(app,widget)?;
+    #[cfg(windows)] return crate::windows::place_widget(window,tauri::PhysicalPosition::new(x.round() as i32,y.round() as i32),width.round() as i32,height.round() as i32);
+    #[cfg(target_os="macos")] {let _=dpi;return crate::macos::place_widget(window,x,y,width,height);}
+    #[cfg(not(any(windows,target_os="macos")))] {window.set_size(tauri::LogicalSize::new(width/dpi,height/dpi)).and_then(|_|window.set_position(tauri::PhysicalPosition::new(x,y))).map_err(|e|e.to_string())}
 }
 pub fn sync(app: &tauri::AppHandle) {
     let state = app.state::<WidgetState>(); let layout = state.layout.lock().unwrap().clone(); let mut errors = vec![];
@@ -131,10 +151,10 @@ pub fn sync(app: &tauri::AppHandle) {
                 window.eval(format!("window.dispatchEvent(new CustomEvent('widget-config',{{detail:{}}}));",widget_payload(app,widget)?)).map_err(|e| e.to_string())?;
                 return Ok(());
             }
-            let (x,y,width,height,_) = geometry(app,widget)?;
+            let (x,y,width,height,dpi) = geometry(app,widget)?;
             let builder = WebviewWindowBuilder::new(app,&label,WebviewUrl::App(format!("index.html?scene=widget&id={}",widget.id).into()))
                 .title("小伴 · 桌面组件").decorations(false).shadow(false).transparent(true).resizable(false).visible(false)
-                .skip_taskbar(true).always_on_top(false).focused(false).position(x,y).inner_size(width,height)
+                .skip_taskbar(true).always_on_top(false).focused(false).position(x/dpi,y/dpi).inner_size(width/dpi,height/dpi)
                 .initialization_script(format!("window.__XIAOBAN_WIDGET__={};",widget_payload(app,widget)?));
             // Keep the native parent in Tao's own state as well as the final HWND styles.
             #[cfg(windows)] let builder = builder.parent_raw(::windows::Win32::Foundation::HWND(crate::windows::widget_parent()? as _))
@@ -167,6 +187,12 @@ pub fn start(app: &tauri::AppHandle) {
     let state=app.state::<WidgetState>();
     match result { Ok(layout)=>*state.layout.lock().unwrap()=layout,Err(error)=>*state.load_error.lock().unwrap()=Some(error) }
     sync(app);
+    let app=app.clone();std::thread::spawn(move||{
+        let mut previous=String::new();
+        loop{std::thread::sleep(std::time::Duration::from_secs(3));
+            if let Ok(areas)=monitors(&app){let signature=serde_json::to_string(&areas).unwrap_or_default();if signature!=previous{previous=signature;sync(&app);}}
+        }
+    });
 }
 #[tauri::command]
 pub fn get_desktop_widgets(app: tauri::AppHandle) -> Result<Value,String> { ensure_writable(&app)?; Ok(snapshot(&app)) }
@@ -179,17 +205,17 @@ pub async fn add_desktop_widget(app: tauri::AppHandle, kind: String) -> Result<V
     let note=if kind=="notes"{Some(NoteData{title:"随手记".into(),mode:"note".into(),text:String::new(),items:vec![]})}else{None};
     let countdown=if kind=="countdown"{Some(CountdownData{title:"值得期待的日子".into(),date:chrono::Local::now().format("%Y-%m-%d").to_string(),mode:"countdown".into(),repeat:"none".into()})}else{None};
     let theme=if kind=="fortune"{"paper"}else{"glass"}.into();
-    next.widgets.push(Widget{id:random.iter().map(|b|format!("{b:02x}")).collect(),kind,theme,scale:1.0,x:((if index%3==1{0.88}else{0.52})-(index/3) as f64*0.25).max(0.05),y:if index%3==2{0.94}else{0.06},enabled:true,city:None,note,countdown});
+    next.widgets.push(Widget{id:random.iter().map(|b|format!("{b:02x}")).collect(),kind,theme,scale:1.0,x:((if index%3==1{0.88}else{0.52})-(index/3) as f64*0.25).max(0.05),y:if index%3==2{0.94}else{0.06},enabled:true,city:None,note,countdown,monitor:None});
     persist(&app,&next)?; *state.layout.lock().unwrap()=next; sync(&app); Ok(snapshot(&app))
 }
 #[derive(Deserialize)]
 #[serde(rename_all="camelCase",deny_unknown_fields)]
-pub struct Patch { theme: Option<String>, scale: Option<f64>, x: Option<f64>, y: Option<f64>, enabled: Option<bool>, city: Option<City>, note: Option<NoteData>, countdown: Option<CountdownData> }
+pub struct Patch { monitor: Option<String>, theme: Option<String>, scale: Option<f64>, x: Option<f64>, y: Option<f64>, enabled: Option<bool>, city: Option<City>, note: Option<NoteData>, countdown: Option<CountdownData> }
 #[tauri::command]
 pub async fn update_desktop_widget(app: tauri::AppHandle, id: String, patch: Patch) -> Result<Value,String> {
     let state=app.state::<WidgetState>();let _operation=state.operation.lock().await;
     let mut next=state.layout.lock().unwrap().clone();let widget=next.widgets.iter_mut().find(|w|w.id==id).ok_or("没有找到这个组件")?;
-    if let Some(v)=patch.theme{widget.theme=v;}if let Some(v)=patch.scale{widget.scale=v;}if let Some(v)=patch.x{widget.x=v;}if let Some(v)=patch.y{widget.y=v;}if let Some(v)=patch.enabled{widget.enabled=v;}if let Some(v)=patch.city{widget.city=Some(v);}if let Some(v)=patch.note{widget.note=Some(v);}if let Some(v)=patch.countdown{widget.countdown=Some(v);}
+    if let Some(v)=patch.monitor{widget.monitor=Some(v);}if let Some(v)=patch.theme{widget.theme=v;}if let Some(v)=patch.scale{widget.scale=v;}if let Some(v)=patch.x{widget.x=v;}if let Some(v)=patch.y{widget.y=v;}if let Some(v)=patch.enabled{widget.enabled=v;}if let Some(v)=patch.city{widget.city=Some(v);}if let Some(v)=patch.note{widget.note=Some(v);}if let Some(v)=patch.countdown{widget.countdown=Some(v);}
     persist(&app,&next)?;*state.layout.lock().unwrap()=next;sync(&app);Ok(snapshot(&app))
 }
 /// A widget can save only its own typed content; no caller-supplied identity or layout patch.
@@ -221,17 +247,17 @@ pub async fn set_widgets_editing(app:tauri::AppHandle,editing:bool)->Result<Valu
 #[tauri::command]
 pub fn get_desktop_widget(window:tauri::WebviewWindow)->Result<Value,String>{widget_payload(window.app_handle(),&own_widget(&window)?)}
 #[tauri::command]
-pub async fn move_desktop_widget(window:tauri::WebviewWindow,x:f64,y:f64,commit:bool)->Result<(),String>{
+pub async fn move_desktop_widget(window:tauri::WebviewWindow,grab_x:f64,grab_y:f64,commit:bool)->Result<(),String>{
     let app=window.app_handle();let state=app.state::<WidgetState>();let _operation=state.operation.lock().await;
-    if !x.is_finite()||!y.is_finite(){return Err("组件位置无效".into());}
-    let original=own_widget(&window)?;let (old_x,old_y,width,height,dpi)=geometry(app,&original)?;
-    let monitor=app.primary_monitor().map_err(|e|e.to_string())?.ok_or("没有找到显示器")?;
+    if !grab_x.is_finite()||!grab_y.is_finite()||!(0.0..=1.0).contains(&grab_x)||!(0.0..=1.0).contains(&grab_y){return Err("组件拖动位置无效".into());}
+    let original=own_widget(&window)?;let point=cursor(app)?;let areas=monitors(app)?;
+    let monitor=crate::widget_geometry::at_point(&areas,point.0,point.1).ok_or("没有找到显示器")?;
+    let (base_w,base_h)=base_size(&original.kind);let width=(base_w*original.scale+16.0)*monitor.scale;let height=(base_h*original.scale+16.0)*monitor.scale;
+    let (x,y)=crate::widget_geometry::drag_position(monitor,width,height,point,(grab_x,grab_y));
     let mut next=state.layout.lock().unwrap().clone();let widget=next.widgets.iter_mut().find(|w|w.id==original.id).ok_or("没有找到组件")?;
-    let nx=(widget.x+(x-old_x)/(monitor.size().width as f64/dpi-width).max(1.0)).clamp(0.0,1.0);
-    let ny=(widget.y+(y-old_y)/(monitor.size().height as f64/dpi-height-88.0).max(1.0)).clamp(0.0,1.0);
-    widget.x=nx;widget.y=ny;let moved=widget.clone();
+    widget.x=x;widget.y=y;widget.monitor=Some(monitor.id.clone());let moved=widget.clone();
     if commit{persist(app,&next)?;}*state.layout.lock().unwrap()=next;place(app,&window,&moved)?;
-    if commit{sync(app);}Ok(())
+    if commit{sync(app);}else{window.eval(format!("window.dispatchEvent(new CustomEvent('widget-config',{{detail:{}}}));",widget_payload(app,&moved)?)).map_err(|e|e.to_string())?;}Ok(())
 }
 #[tauri::command]
 pub fn show_widget_settings(window:tauri::WebviewWindow)->Result<(),String>{
@@ -253,7 +279,7 @@ pub async fn get_widget_weather(window:tauri::WebviewWindow)->Result<Weather,Str
 #[cfg(test)]
 mod tests{
     use super::*;
-    fn one()->Layout{Layout{version:1,widgets:vec![Widget{id:"abc123".into(),kind:"calendar".into(),theme:"glass".into(),scale:1.0,x:0.8,y:0.2,enabled:true,city:None,note:None,countdown:None}]}}
+    fn one()->Layout{Layout{version:1,widgets:vec![Widget{id:"abc123".into(),kind:"calendar".into(),theme:"glass".into(),scale:1.0,x:0.8,y:0.2,enabled:true,city:None,note:None,countdown:None,monitor:None}]}}
     #[test]fn bounds_and_duplicate_ids_are_checked(){let mut layout=one();assert!(validate(&layout).is_ok());layout.widgets.push(layout.widgets[0].clone());assert!(validate(&layout).is_err());layout=one();layout.widgets[0].x=f64::NAN;assert!(validate(&layout).is_err());layout=one();layout.widgets[0].scale=10.;assert!(validate(&layout).is_err());}
     #[test]fn window_cannot_manage_other_widgets_or_wallpapers(){assert_eq!(permitted("widget-abc123","add_desktop_widget"),Some(false));assert_eq!(permitted("widget-abc123","apply_wallpaper"),Some(false));assert_eq!(permitted("widget-abc123","move_desktop_widget"),Some(true));assert_eq!(permitted("media-a","add_desktop_widget"),Some(false));}
     #[test]fn old_or_corrupt_layouts_are_rejected(){let mut layout=one();layout.version=2;assert!(validate(&layout).is_err());let mut layout=one();layout.widgets[0].id="../escape".into();assert!(validate(&layout).is_err());}
