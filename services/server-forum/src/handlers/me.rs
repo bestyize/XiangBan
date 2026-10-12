@@ -1,3 +1,4 @@
+use super::attachments;
 use crate::{
     auth::{AuthUser, MaybeUser},
     error::{AppError, AppResult},
@@ -29,6 +30,11 @@ pub async fn session(State(state): State<AppState>, auth: AuthUser) -> AppResult
             "daily_posts": t.daily_posts[level],
             "tl1_days": t.tl1_days,
             "tl1_reads": t.tl1_reads,
+            "upload_max_bytes": if user.trust_level >= 1 {
+                attachments::upload_limit(&state.config, user.trust_level)
+            } else {
+                0
+            },
         },
     })))
 }

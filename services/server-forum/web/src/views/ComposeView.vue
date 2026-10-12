@@ -2,8 +2,9 @@
 import { computed, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import MarkdownEditor from '@/components/MarkdownEditor.vue'
+import AttachmentUploader from '@/components/AttachmentUploader.vue'
 import { api } from '@/api/forum'
-import type { TopicInput } from '@/api/types'
+import type { Attachment, TopicInput } from '@/api/types'
 import { useMeta } from '@/stores/meta'
 import { useSession } from '@/stores/session'
 import { useToast } from '@/stores/toast'
@@ -35,6 +36,7 @@ const form = reactive({
 })
 /** 编辑时帖子原来的阅读权限；发帖人后来被降级时，原值仍然可以保留。 */
 const originalReadLevel = ref<number | null>(null)
+const attachments = ref<Attachment[]>([])
 const tagDraft = ref('')
 const busy = ref(false)
 const error = ref('')
@@ -108,6 +110,7 @@ watch(
       form.body = t.body_md
       form.tags = [...t.tags]
       form.readLevel = t.min_read_level
+      attachments.value = [...t.attachments]
       originalReadLevel.value = t.min_read_level
       loadedKind.value = t.deal ? 'deal' : 'normal'
       if (t.deal) {
@@ -178,6 +181,7 @@ async function submit() {
     body: form.body,
     tags: form.tags,
     min_read_level: form.readLevel,
+    attachment_ids: attachments.value.map(a => a.id),
   }
   if (isDeal.value) {
     input.deal = {
@@ -331,6 +335,10 @@ const today = new Date().toISOString().slice(0, 10)
             </button>
           </div>
           <small>最多 5 个，方便别人按标签找到这个帖子。</small>
+        </div>
+        <div v-if="(session.info?.limits.upload_max_bytes ?? 0) > 0" class="field">
+          <span>附件</span>
+          <AttachmentUploader v-model="attachments" :max-bytes="session.info!.limits.upload_max_bytes" />
         </div>
         <fieldset class="field">
           <legend>谁能看</legend>

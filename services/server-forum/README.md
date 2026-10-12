@@ -35,6 +35,8 @@ cargo test --manifest-path services/server-forum/Cargo.toml
 | `FORUM_WEB_DIR` | `services/server-forum/web/dist` | 前端产物；index.html 启动时读一次，换前端后要重启 |
 | `FORUM_TL1_DAYS` / `FORUM_TL1_READS` | 3 / 30 | 新人自动升级为成员的门槛 |
 | `FORUM_DAILY_TOPICS` / `FORUM_DAILY_POSTS` | `0,5,20,50` / `10,60,200,500` | 按信任等级 0-3 的每日发帖、回复上限 |
+| `FORUM_UPLOAD_DIR` | `services/server-forum/data/uploads` | 帖子附件存放目录，需要持久化和备份 |
+| `FORUM_UPLOAD_MAX_MB_USER` / `FORUM_UPLOAD_MAX_MB_ADMIN` | 5 / 30 | 单个附件上限（MB）：成员及以上 / 守护者 |
 
 ## 页面与接口
 
@@ -53,8 +55,10 @@ cargo test --manifest-path services/server-forum/Cargo.toml
 | `GET/POST /topics`、`GET/PATCH/DELETE /topics/{id}` | 帖子；羊毛帖带 `deal` 字段 |
 | `GET/POST /topics/{id}/posts`、`PATCH/DELETE /posts/{id}` | 回复 |
 | | `PUT/DELETE /topics/{id}/like`、`/posts/{id}/like`、`/topics/{id}/bookmark` | 点赞、收藏 |
+| `PUT/DELETE /topics/{id}/pin` | 置顶、取消置顶（仅守护者 TL3） |
 | `POST /reports` | 举报帖子或回复 |
 | `POST /markdown/preview` | 发帖预览 |
+| `POST /attachments`、`GET/DELETE /attachments/{id}` | 上传附件（multipart，字段 `file`）、下载、撤销还没挂到帖子上的上传 |
 | `GET /users/{uid}`、`/users/{uid}/topics`、`/users/{uid}/posts`、`/me/bookmarks` | 用户主页、我的收藏 |
 
 管理接口在 `/api/admin/*`（`src/handlers/admin.rs`）：管理员独立建表，HS256 令牌带 `token_version`，改密码后旧令牌失效，连续输错 5 次锁 15 分钟；包括概览、举报处理、帖子与回复管理、用户等级和禁言封禁、分类维护、操作日志，所有写操作都记审计。
@@ -70,6 +74,8 @@ cargo test --manifest-path services/server-forum/Cargo.toml
 - 资源分享板块：精品软件、电影资源、音乐资源、学习资料，只收合法来源的内容（板块说明和站规里写明，禁止盗版下载）。已部署的库里旧的四个二级板块（开源项目、工具软件、提示词·工作流、自制作品）由上面的迁移并入：开源项目、工具软件、自制作品里的帖子归到精品软件，提示词·工作流归到学习资料；
 - 羊毛帖：能领到什么、领取条件、有效期、活动页全部选填，什么都不填也能发；没有投票和状态标记，写了有效期的到期后自动不再出现在福利羊毛、首页和分类列表（用户主页、搜索、标签页、产品页的历史仍保留）。每 10 分钟重算最近 7 天的热度。
 - 信任等级与阅读权限：用户分 TL0 新人、TL1 成员、TL2 老用户、TL3 守护者。每个帖子有 `min_read_level`（0 所有人含游客，1 成员以上，2 老用户以上，3 守护者），发帖人只能设到不超过自己的等级，编辑时可以保持或调低，不能调高到超过自己；不传按公开。读者按登录态确定（游客是 0 级），作者总能读自己的帖子。受限帖子在列表、搜索、标签页、用户主页（帖子、回复摘要、统计）、收藏夹和搜索引擎页面里对没权限的人完全不可见，直接打开返回 403 并说明需要什么等级；回复列表、回复、点赞、收藏、举报同样检查。分类、产品、标签上的帖子数只统计公开帖。`sitemap.xml` 不收录受限帖，受限帖的搜索引擎页面按不存在处理（404 + noindex）。后台能看到所有帖子及其阅读权限。读者身份在 `models::Reader`，`ListFilter.reader` 用 `serde(skip)` 防止被查询参数伪造，默认值是游客，所以忘记设置的查询只会看到公开内容。
+- 帖子附件：发帖和编辑页的「附件」一栏，先逐个上传（`POST /attachments`），再用 `attachment_ids` 随发帖或编辑挂到帖子上，一个帖子最多 5 个。单文件上限看信任等级：成员及以上（TL1-TL2）5 MB，守护者（TL3，也就是站务人员，后台账号发不了帖）30 MB，新人不能上传。文件落在 `FORUM_UPLOAD_DIR/{id}`，库表 `attachments` 只记文件名和大小；上传后一天内没挂到帖子上的由定时任务清理，编辑时移除的附件立即删文件。下载一律按 `application/octet-stream` + `attachment` 输出，下载权限和读帖子一致（阅读等级不够返回 403，帖子被隐藏或删除返回 404，没挂上的只有上传者能取），所以站内不会直接打开用户传的 HTML。阅读等级受限的帖子前端用带令牌的 fetch 下载，公开帖子是普通链接。只有主楼支持附件，回复不支持；搜索引擎页面不列附件。部署时 Nginx 的 `client_max_body_size` 要调到 31m 以上，否则上传会被代理直接 413。
+- 置顶：守护者（TL3）在帖子页的操作栏能看到「置顶 / 取消置顶」，只有正常状态的帖子可以置顶；管理后台 `/admin` 的帖子管理里原来就有同样的开关，两边改的是同一个 `topics.pinned`。置顶的帖子在所属板块和首页的列表里排在最前面（不管按哪种方式排序），列表里带「置顶」标记；搜索、标签页和用户主页不受影响。前台守护者的操作同样记进审计日志，操作人显示为「守护者:昵称」。
 - 活动链接不允许带 `ref`、`aff`、`invite` 等个人推广参数。
 - 只做站内功能：没有系统推送、邮件提醒，也没有匿名发帖（按产品决定）。
 

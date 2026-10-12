@@ -1,4 +1,5 @@
 import type {
+  Attachment,
   Category,
   Page,
   PostItem,
@@ -104,6 +105,7 @@ export const api = {
   createTopic: (input: TopicInput) => request<{ id: number }>('POST', '/topics', input),
   updateTopic: (id: number, input: TopicInput) => request<{ id: number }>('PATCH', `/topics/${id}`, input),
   deleteTopic: (id: number) => request<unknown>('DELETE', `/topics/${id}`),
+  pinTopic: (id: number, on: boolean) => request<{ pinned: boolean }>(on ? 'PUT' : 'DELETE', `/topics/${id}/pin`),
   preview: (body: string) => request<{ html: string }>('POST', '/markdown/preview', { body }),
 
   posts: (topicId: number, page = 1) => request<Page<PostItem>>('GET', `/topics/${topicId}/posts${qs({ page })}`),
@@ -125,4 +127,60 @@ export const api = {
   userTopics: (uid: string, page = 1) => request<Page<TopicItem>>('GET', `/users/${uid}/topics${qs({ page })}`, undefined, false),
   userPosts: (uid: string, page = 1) =>
     request<{ items: UserReply[] }>('GET', `/users/${uid}/posts${qs({ page })}`, undefined, false),
+}
+
+/** 上传一个附件，进度用 0-1 回调。返回的 id 在发帖或编辑时通过 attachment_ids 挂到帖子上。 */
+export async function uploadAttachment(file: File, onProgress?: (ratio: number) => void): Promise<Attachment> {
+  const token = await tokenProvider()
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest()
+    xhr.open('POST', '/api/attachments')
+    if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`)
+    xhr.upload.onprogress = e => {
+      if (e.lengthComputable) onProgress?.(e.loaded / e.total)
+    }
+    xhr.onerror = () => reject(new ApiError(0, '网络连接失败，请稍后再试'))
+    xhr.onload = () => {
+      let data: { message?: string } | null = null
+      try {
+        data = JSON.parse(xhr.responseText)
+      } catch {
+        data = null
+      }
+      if (xhr.status >= 200 && xhr.status < 300) return resolve(data as unknown as Attachment)
+      if (xhr.status === 401 && token) onUnauthorized()
+      const fallback = xhr.status === 413 ? '文件太大，被服务器拒绝了' : `上传失败（${xhr.status}）`
+      reject(new ApiError(xhr.status, data?.message ?? fallback))
+    }
+    const form = new FormData()
+    form.append('file', file)
+    xhr.send(form)
+  })
+}
+
+export const attachmentUrl = (id: string) => `/api/attachments/${id}`
+
+export const deleteAttachment = (id: string) => request<unknown>('DELETE', `/attachments/${id}`)
+
+/** 需要登录才能读的帖子，下载链接带不上令牌，先带令牌取回再交给浏览器保存。 */
+export async function downloadAttachment(att: Attachment): Promise<void> {
+  const token = await tokenProvider()
+  let res: Response
+  try {
+    res = await fetch(attachmentUrl(att.id), { headers: token ? { Authorization: `Bearer ${token}` } : {} })
+  } catch {
+    throw new ApiError(0, '网络连接失败，请稍后再试')
+  }
+  if (!res.ok) {
+    const data = await res.json().catch(() => null)
+    throw new ApiError(res.status, data?.message ?? `下载失败（${res.status}）`)
+  }
+  const url = URL.createObjectURL(await res.blob())
+  const a = document.createElement('a')
+  a.href = url
+  a.download = att.name
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  setTimeout(() => URL.revokeObjectURL(url), 10_000)
 }

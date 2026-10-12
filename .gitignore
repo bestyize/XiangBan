@@ -29,6 +29,7 @@ dev-dist/
 # Local dev data
 .dev/
 services/server-pan/pandown_data/
+services/server-forum/data/
 services/server-pan/backend/target/
 *.log
 

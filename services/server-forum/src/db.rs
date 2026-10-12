@@ -147,6 +147,19 @@ CREATE TABLE IF NOT EXISTS reports (
 );
 CREATE INDEX IF NOT EXISTS reports_status_idx ON reports (status, created_at DESC);
 
+-- 帖子附件：文件本体放在磁盘（FORUM_UPLOAD_DIR/{id}），这里只记元数据。
+-- topic_id 为空表示已上传、还没挂到帖子上，超过一天没挂的由定时任务清理。
+CREATE TABLE IF NOT EXISTS attachments (
+    id           UUID PRIMARY KEY,
+    topic_id     BIGINT REFERENCES topics(id) ON DELETE CASCADE,
+    uploader_uid UUID NOT NULL REFERENCES users(uid),
+    filename     TEXT NOT NULL,
+    size         BIGINT NOT NULL,
+    created_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS attachments_topic_idx ON attachments (topic_id);
+CREATE INDEX IF NOT EXISTS attachments_pending_idx ON attachments (uploader_uid, created_at) WHERE topic_id IS NULL;
+
 CREATE TABLE IF NOT EXISTS admins (
     id            UUID PRIMARY KEY,
     username      TEXT NOT NULL UNIQUE,

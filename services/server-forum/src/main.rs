@@ -11,12 +11,13 @@ mod state;
 mod users;
 
 use axum::{
+    extract::DefaultBodyLimit,
     http::{header, HeaderValue, Method},
     routing::{get, post, put},
     Router,
 };
 use config::AppConfig;
-use handlers::{admin, interact, me, meta, posts, topics};
+use handlers::{admin, attachments, interact, me, meta, posts, topics};
 use state::AppState;
 use std::{net::SocketAddr, sync::Arc, time::Duration};
 use tower_http::{
@@ -43,12 +44,20 @@ pub fn build_router(state: AppState) -> Router {
         .route("/markdown/preview", post(topics::preview))
         .route("/topics/{id}", get(topics::get).patch(topics::update).delete(topics::delete))
         .route("/topics/{id}/posts", get(posts::list).post(posts::create))
+        .route("/topics/{id}/pin", put(topics::pin).delete(topics::unpin))
         .route("/topics/{id}/like", put(interact::like_topic).delete(interact::unlike_topic))
         .route("/topics/{id}/bookmark", put(interact::bookmark).delete(interact::unbookmark))
         .route("/posts/{id}", axum::routing::patch(posts::update).delete(posts::delete))
         .route("/posts/{id}/source", get(posts::source))
         .route("/posts/{id}/like", put(interact::like_post).delete(interact::unlike_post))
         .route("/reports", post(interact::report))
+        .route(
+            "/attachments",
+            post(attachments::upload).layer(DefaultBodyLimit::max(
+                (state.config.upload_limit_user.max(state.config.upload_limit_admin) + 1024 * 1024) as usize,
+            )),
+        )
+        .route("/attachments/{id}", get(attachments::download).delete(attachments::delete_pending))
         .nest("/admin", admin::routes());
 
     // 凭证只走 Authorization 头，不用 Cookie，跨域放开不构成 CSRF 面。

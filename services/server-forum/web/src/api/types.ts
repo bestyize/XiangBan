@@ -17,7 +17,14 @@ export interface ForumUser extends PublicUser {
 
 export interface SessionInfo {
   user: ForumUser
-  limits: { daily_topics: number; daily_posts: number; tl1_days: number; tl1_reads: number }
+  limits: {
+    daily_topics: number
+    daily_posts: number
+    tl1_days: number
+    tl1_reads: number
+    /** 单个附件的大小上限（字节），0 表示暂时不能上传 */
+    upload_max_bytes: number
+  }
 }
 
 export interface Category {
@@ -73,11 +80,19 @@ export interface Viewer {
   bookmarked: boolean
   can_edit: boolean
   can_reply: boolean
+  can_pin: boolean
+}
+
+export interface Attachment {
+  id: string
+  name: string
+  size: number
 }
 
 export interface TopicDetail extends TopicItem {
   body_html: string
   body_md: string
+  attachments: Attachment[]
   viewer: Viewer
 }
 
@@ -138,6 +153,8 @@ export interface TopicInput {
   deal?: DealInput
   /** 不传：发帖按公开，编辑保持原样 */
   min_read_level?: number
+  /** 不传：发帖没有附件，编辑保持原样；传了以这个列表为准 */
+  attachment_ids?: string[]
 }
 
 export interface SiteConfig {

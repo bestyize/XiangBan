@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import ForumShell from '@/components/ForumShell.vue'
 import DealPanel from '@/components/DealPanel.vue'
 import PostEntry from '@/components/PostEntry.vue'
+import AttachmentList from '@/components/AttachmentList.vue'
 import UserAvatar from '@/components/UserAvatar.vue'
 import MarkdownEditor from '@/components/MarkdownEditor.vue'
 import ReportDialog from '@/components/ReportDialog.vue'
@@ -120,6 +121,17 @@ async function toggleBookmark() {
   }
 }
 
+async function togglePin() {
+  if (!topic.value) return
+  try {
+    const res = await api.pinTopic(topic.value.id, !topic.value.pinned)
+    topic.value.pinned = res.pinned
+    toast.show(res.pinned ? '已置顶到板块' : '已取消置顶')
+  } catch (e) {
+    toast.error(e)
+  }
+}
+
 async function share() {
   const url = `${location.origin}/t/${id.value}`
   try {
@@ -226,6 +238,8 @@ function goPosts(page: number) {
 
       <div v-if="topic.body_html" class="body prose" v-html="topic.body_html" />
 
+      <AttachmentList v-if="topic.attachments.length" :items="topic.attachments" :restricted="topic.min_read_level > 0" />
+
       <div v-if="topic.tags.length" class="tags">
         <RouterLink v-for="t in topic.tags" :key="t" :to="`/tag/${encodeURIComponent(t)}`" class="tag">#{{ t }}</RouterLink>
       </div>
@@ -240,6 +254,9 @@ function goPosts(page: number) {
         </button>
         <button type="button" class="btn" @click="share">分享</button>
         <span class="spacer" />
+        <button v-if="topic.viewer.can_pin" type="button" class="btn btn-ghost" :aria-pressed="topic.pinned" @click="togglePin">
+          {{ topic.pinned ? '取消置顶' : '置顶' }}
+        </button>
         <template v-if="topic.viewer.can_edit">
           <RouterLink :to="`/t/${topic.id}/edit`" class="btn btn-ghost">编辑</RouterLink>
           <button type="button" class="btn btn-ghost btn-danger" @click="removeTopic">删除</button>

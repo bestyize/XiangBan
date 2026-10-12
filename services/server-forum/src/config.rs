@@ -30,7 +30,14 @@ pub struct AppConfig {
     pub admin_token_ttl_secs: i64,
     pub web_dir: PathBuf,
     pub trust: TrustRules,
+    /// 附件存放目录。
+    pub upload_dir: PathBuf,
+    /// 单个附件的大小上限（字节）：普通用户、守护者（站务）。
+    pub upload_limit_user: u64,
+    pub upload_limit_admin: u64,
 }
+
+const MB: u64 = 1024 * 1024;
 
 fn get(key: &str) -> Option<String> {
     std::env::var(key).ok().map(|v| v.trim().to_string()).filter(|v| !v.is_empty())
@@ -95,6 +102,9 @@ impl AppConfig {
                 daily_topics: list4("FORUM_DAILY_TOPICS", [0, 5, 20, 50]),
                 daily_posts: list4("FORUM_DAILY_POSTS", [10, 60, 200, 500]),
             },
+            upload_dir: PathBuf::from(get("FORUM_UPLOAD_DIR").unwrap_or_else(|| "services/server-forum/data/uploads".into())),
+            upload_limit_user: num("FORUM_UPLOAD_MAX_MB_USER", 5).max(1) as u64 * MB,
+            upload_limit_admin: num("FORUM_UPLOAD_MAX_MB_ADMIN", 30).max(1) as u64 * MB,
         }
     }
 }

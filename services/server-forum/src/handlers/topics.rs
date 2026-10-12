@@ -1,3 +1,4 @@
+use super::attachments::{self, AttachmentItem};
 use crate::{
     auth::{AuthUser, MaybeUser},
     error::{AppError, AppResult},
@@ -14,6 +15,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use sqlx::PgPool;
+use uuid::Uuid;
 
 pub async fn list(
     State(state): State<AppState>,
@@ -43,6 +45,7 @@ pub struct TopicDetail {
     pub topic: TopicItem,
     pub body_html: String,
     pub body_md: String,
+    pub attachments: Vec<AttachmentItem>,
     pub viewer: Viewer,
 }
 
@@ -52,6 +55,8 @@ pub struct Viewer {
     pub bookmarked: bool,
     pub can_edit: bool,
     pub can_reply: bool,
+    /// 守护者可以把正常状态的帖子置顶到所在板块（和首页）。
+    pub can_pin: bool,
 }
 
 pub async fn get(State(state): State<AppState>, MaybeUser(user): MaybeUser, Path(id): Path<i64>) -> AppResult<Json<TopicDetail>> {
@@ -94,9 +99,11 @@ pub async fn get(State(state): State<AppState>, MaybeUser(user): MaybeUser, Path
             bookmarked,
             can_edit: is_author && !topic.locked && writable,
             can_reply: !topic.locked && writable,
+            can_pin: u.trust_level >= GUARDIAN_LEVEL && topic.status == "normal",
         };
     }
-    Ok(Json(TopicDetail { topic, body_html, body_md, viewer }))
+    let attachments = attachments::list_for_topic(&state.pool, id).await?;
+    Ok(Json(TopicDetail { topic, body_html, body_md, attachments, viewer }))
 }
 
 /// 羊毛信息，每一项发帖人都可以不填。
@@ -125,10 +132,12 @@ pub struct TopicInput {
     /// 谁能读：0 所有人，1 成员以上，2 老用户以上，3 守护者以上。
     /// 不能超过发帖人自己的信任等级。发帖不传按 0，编辑不传保持原样。
     pub min_read_level: Option<i16>,
+    /// 先用 `POST /attachments` 上传得到 id。发帖不传按没有附件，编辑不传保持原样，传了就以这个列表为准。
+    pub attachment_ids: Option<Vec<Uuid>>,
 }
 
 /// 守护者（站务人员）的信任等级。
-const GUARDIAN_LEVEL: i16 = 3;
+pub const GUARDIAN_LEVEL: i16 = 3;
 
 /// 发帖到某个分类需要的信任等级：「仅管理员可发」的分类要守护者，其余看分类的最低发帖等级。
 ///
@@ -339,6 +348,9 @@ pub async fn create(State(state): State<AppState>, auth: AuthUser, Json(input): 
         .execute(&mut *tx)
         .await?;
     }
+    if let Some(ids) = &input.attachment_ids {
+        attachments::set_for_topic(&mut tx, id, user.uid, ids).await?;
+    }
     tx.commit().await?;
     save_tags(&state.pool, id, &tags).await?;
     models::refresh_hot_scores(&state.pool, Some(id)).await?;
@@ -412,7 +424,12 @@ pub async fn update(
             .await?;
         }
     }
+    let removed = match &input.attachment_ids {
+        Some(ids) => attachments::set_for_topic(&mut tx, id, user.uid, ids).await?,
+        None => Vec::new(),
+    };
     tx.commit().await?;
+    attachments::remove_files(&state.config.upload_dir, &removed).await;
     save_tags(&state.pool, id, &tags).await?;
     Ok(Json(json!({ "id": id })))
 }
@@ -428,6 +445,44 @@ pub async fn delete(State(state): State<AppState>, auth: AuthUser, Path(id): Pat
         return Err(AppError::Forbidden("只能删除自己的帖子".into()));
     }
     Ok(Json(json!({ "ok": true })))
+}
+
+/// 守护者置顶或取消置顶。后台账号和论坛用户是两套体系，这里的操作同样写进审计日志，操作人记为「守护者:昵称」。
+async fn set_pinned(state: &AppState, auth: &AuthUser, id: i64, pinned: bool) -> AppResult<Json<Value>> {
+    let user = &auth.user;
+    if user.trust_level < GUARDIAN_LEVEL {
+        return Err(AppError::Forbidden("只有守护者（站务人员）可以置顶帖子".into()));
+    }
+    users::ensure_can_write(user)?;
+    let mut tx = state.pool.begin().await?;
+    let (status, was): (String, bool) = sqlx::query_as("SELECT status, pinned FROM topics WHERE id = $1 FOR UPDATE")
+        .bind(id)
+        .fetch_optional(&mut *tx)
+        .await?
+        .ok_or_else(|| AppError::not_found("帖子"))?;
+    if status != "normal" {
+        return Err(AppError::Conflict("只有正常状态的帖子可以置顶".into()));
+    }
+    if was != pinned {
+        sqlx::query("UPDATE topics SET pinned = $2 WHERE id = $1").bind(id).bind(pinned).execute(&mut *tx).await?;
+        sqlx::query("INSERT INTO admin_audit (admin, action, target_type, target_id, detail) VALUES ($1, $2, 'topic', $3, $4)")
+            .bind(format!("守护者:{}", user.nickname))
+            .bind(if pinned { "topic.pin" } else { "topic.unpin" })
+            .bind(id.to_string())
+            .bind(format!("uid {}", user.uid))
+            .execute(&mut *tx)
+            .await?;
+    }
+    tx.commit().await?;
+    Ok(Json(json!({ "pinned": pinned })))
+}
+
+pub async fn pin(State(state): State<AppState>, auth: AuthUser, Path(id): Path<i64>) -> AppResult<Json<Value>> {
+    set_pinned(&state, &auth, id, true).await
+}
+
+pub async fn unpin(State(state): State<AppState>, auth: AuthUser, Path(id): Path<i64>) -> AppResult<Json<Value>> {
+    set_pinned(&state, &auth, id, false).await
 }
 
 #[derive(Deserialize)]
