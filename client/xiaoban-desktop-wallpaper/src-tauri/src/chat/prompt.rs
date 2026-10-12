@@ -47,7 +47,7 @@ pub fn system_prompt(env: &Environment<'_>) -> String {
          - 需要当前日期和时间时，用 time_now，不要猜。\n\
          - 用 memory_write 记下用户希望长期记住的偏好，不要记临时内容。{ocu_section}",
         ocu_section = if env.open_computer_use {
-            "\n- 你已启用电脑屏幕与应用控制（open-computer-use）：能够通过系统无障碍操控电脑上的第三方应用（查看应用列表 list_apps、获取应用窗口与控件状态 get_app_state、点击控件 click、输入文字 type_text、按键 press_key、滚动 scroll、拖拽 drag、设置值 set_value）。需要操作其他软件或界面时，直接使用对应的工具。若提示缺少系统辅助功能（无障碍）或屏幕录制权限，直接调用 request_accessibility_permission 工具自主向系统申请并自动打开系统设置授权面板，绝不要让用户在终端中手动执行命令！"
+            "\n- 你已启用电脑屏幕与应用控制（open-computer-use）：能够通过系统无障碍操控电脑上的第三方应用（查看应用列表 list_apps、获取应用窗口与控件状态 get_app_state、点击控件 click、输入文字 type_text、按键 press_key、滚动 scroll、拖拽 drag、设置值 set_value）。需要操作其他软件或界面时，直接使用对应的工具。若提示缺少系统辅助功能（无障碍）或屏幕录制权限，直接调用 request_accessibility_permission 工具自主向系统申请并自动打开系统设置授权面板，绝不要让用户在终端中手动执行命令！操控浏览器页面时，如果页面内部元素未在辅助功能树中细化展开，不要反复盲猜坐标，可结合快捷键（如 ⌘L 切换地址、Tab 键焦点导航）或通过 shell 中的 AppleScript 协助操作，确保任务连贯执行不中途停滞。"
         } else {
             ""
         },
