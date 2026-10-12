@@ -103,6 +103,19 @@ struct Rig {
 
 /// `answer` decides every confirmation; `None` would be a user who never answers, so tests always give one.
 fn rig(tag: &str, steps: Vec<Step>, answer: Approval) -> Rig {
+    build_rig(tag, steps, answer, false)
+}
+
+/// Computer control switched on, with a server that cannot be started.
+fn rig_with_failing_computer_use(tag: &str) -> Rig {
+    build_rig(tag, vec![Step::text("好")], Approval::Once, true)
+}
+
+fn no_computer_use() -> Result<Arc<agent_kernel::mcp::McpClient>, agent_kernel::HarnessError> {
+    Err(agent_kernel::HarnessError::Config("cannot start MCP server `npx`: not found".into()))
+}
+
+fn build_rig(tag: &str, steps: Vec<Step>, answer: Approval, computer_use: bool) -> Rig {
     let dir = TempDir::new(tag);
     let workspace = dir.path("work");
     fs::create_dir_all(&workspace).unwrap();
@@ -125,7 +138,8 @@ fn rig(tag: &str, steps: Vec<Step>, answer: Approval) -> Rig {
         ask: AskUser::new(|_, question, _| Some(format!("回答：{}", question.text))),
         desktop: desktop.clone(),
         utc_offset_minutes: 480,
-        open_computer_use: false,
+        open_computer_use: computer_use,
+        spawn_computer_use: no_computer_use,
     })
     .expect("the tool set assembles");
     Rig { _dir: dir, workspace, dirs, desktop, asked, provider, agent, todo }
@@ -300,6 +314,7 @@ fn the_folder_for_saved_output_can_be_read_but_not_written() {
             desktop: Arc::new(FakeDesktop::default()),
             utc_offset_minutes: 0,
             open_computer_use: false,
+            spawn_computer_use: no_computer_use,
         })
         .unwrap()
     };
@@ -485,6 +500,7 @@ fn in_auto_mode_all_write_tools_run_without_asking() {
         desktop: desktop.clone(),
         utc_offset_minutes: 0,
         open_computer_use: false,
+        spawn_computer_use: no_computer_use,
     }).unwrap();
 
     let mut events = Vec::new();
@@ -496,3 +512,52 @@ fn in_auto_mode_all_write_tools_run_without_asking() {
 }
 
 
+
+#[test]
+fn the_bundled_computer_use_skill_is_listed_loadable_and_follows_the_switch() {
+    let dir = TempDir::new("ocu-skill");
+    let skills_dir = dir.path("skills");
+    let read = || agent_kernel::skills::Skills::new().read_only_root(&skills_dir);
+
+    sync_computer_use_skill(&skills_dir, true);
+    let info = read().find("open-computer-use").expect("the skill is found by its name");
+    assert!(!info.agent_created, "the assistant cannot edit or delete it");
+    assert!(info.description.contains("get_app_state"), "{}", info.description);
+    let body = read().load("open-computer-use").unwrap();
+    for rule in ["element_index", "text_limit", "max_tree_nodes", "set_value", "query", "perform_secondary_action", "Drag delivered via app_post"] {
+        assert!(body.contains(rule), "the skill teaches {rule}");
+    }
+
+    // Switching the tools off takes the skill out of the prompt again.
+    sync_computer_use_skill(&skills_dir, false);
+    assert!(read().find("open-computer-use").is_none());
+    assert!(!skills_dir.join("open-computer-use").exists(), "the empty folder goes too");
+}
+
+#[test]
+fn the_computer_use_skill_refreshes_its_own_copy_but_never_a_skill_of_the_users() {
+    let dir = TempDir::new("ocu-skill-own");
+    let skills_dir = dir.path("skills");
+    let file = skills_dir.join("open-computer-use/SKILL.md");
+    fs::create_dir_all(file.parent().unwrap()).unwrap();
+
+    let stale = COMPUTER_USE_SKILL.replace("改编自开源项目", "旧版：改编自开源项目");
+    fs::write(&file, &stale).unwrap();
+    sync_computer_use_skill(&skills_dir, true);
+    assert_eq!(fs::read_to_string(&file).unwrap(), COMPUTER_USE_SKILL, "an older copy of ours is brought up to date");
+
+    let theirs = "---\nname: open-computer-use\ndescription: 我自己写的\n---\n\n自己的做法\n";
+    fs::write(&file, theirs).unwrap();
+    sync_computer_use_skill(&skills_dir, true);
+    sync_computer_use_skill(&skills_dir, false);
+    assert_eq!(fs::read_to_string(&file).unwrap(), theirs, "a file that is not ours is left alone, on or off");
+}
+
+#[test]
+fn a_computer_use_server_that_cannot_start_is_reported_to_the_model_not_hidden() {
+    let rig = rig_with_failing_computer_use("ocu-fail");
+    let _ = run(&rig, "帮我点一下浏览器");
+    let system = rig.provider.requests()[0].messages[0].text();
+    assert!(system.contains("没能启动") && system.contains("不要假装能操作"), "{system}");
+    assert!(!system.contains("load_skill 加载 open-computer-use"), "no instructions for tools that are not there");
+}

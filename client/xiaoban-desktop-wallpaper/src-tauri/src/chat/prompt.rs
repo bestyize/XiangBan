@@ -6,7 +6,10 @@ pub struct Environment<'a> {
     /// `windows`, `macos` or `linux`.
     pub os: &'a str,
     pub workspace: &'a Path,
+    /// The computer-control tools are connected and in the tool list.
     pub open_computer_use: bool,
+    /// Why they were switched on but could not be started, if that happened.
+    pub open_computer_use_error: Option<&'a str>,
 }
 
 fn shell_name(os: &str) -> &'static str {
@@ -48,9 +51,11 @@ pub fn system_prompt(env: &Environment<'_>) -> String {
          - 需要当前日期和时间时，用 time_now，不要猜。\n\
          - 用 memory_write 记下用户希望长期记住的偏好，不要记临时内容。{ocu_section}",
         ocu_section = if env.open_computer_use {
-            "\n- 你已启用电脑屏幕与应用控制（open-computer-use）：能够通过系统无障碍操控电脑上的第三方应用（查看应用列表 list_apps、获取应用窗口与控件状态 get_app_state、点击控件 click、输入文字 type_text、按键 press_key、滚动 scroll、拖拽 drag、设置值 set_value）。需要操作其他软件或界面时，直接使用对应的工具。若提示缺少系统辅助功能（无障碍）或屏幕录制权限，直接调用 request_accessibility_permission 工具自主向系统申请并自动打开系统设置授权面板，绝不要让用户在终端中手动执行命令！操控浏览器页面时，如果页面内部元素未在辅助功能树中细化展开，不要反复盲猜坐标，可结合快捷键（如 ⌘L 切换地址、Tab 键焦点导航）或通过 shell 中的 AppleScript 协助操作，确保任务连贯执行不中途停滞。"
+            "\n- 你已启用电脑屏幕与应用控制（open-computer-use），可以通过系统无障碍接口操作电脑上的其他应用，对应的工具已经在你的工具列表里。第一次操作其他应用之前，先调用 load_skill 加载 open-computer-use，按里面的流程做：先 list_apps 和 get_app_state，再用元素编号操作，文字被截断或控件树不全时按它说的加大限制，拖拽默认不生效要换办法，发送、删除、提交这类会对外产生影响的动作先问用户。若提示缺少系统辅助功能（无障碍）或屏幕录制权限，直接调用 request_accessibility_permission 工具自主向系统申请并自动打开系统设置授权面板，绝不要让用户在终端中手动执行命令。".to_string()
+        } else if let Some(error) = env.open_computer_use_error {
+            format!("\n- 用户开启了电脑屏幕与应用控制（open-computer-use），但它这次没能启动：{error}。你现在没有操作其他应用的工具，不要假装能操作。用户让你操作其他应用时，如实说明没能启动和原因；常见原因是电脑上没有 Node.js（需要 npx），或第一次运行时下载失败，可以让用户检查后再试。")
         } else {
-            ""
+            String::new()
         },
         workspace = env.workspace.display(),
         os = os_name(env.os),
@@ -64,28 +69,32 @@ mod tests {
 
     #[test]
     fn the_prompt_names_the_folder_system_and_shell() {
-        let mac = system_prompt(&Environment { os: "macos", workspace: Path::new("/Users/a/工作区"), open_computer_use: false });
+        let mac = system_prompt(&Environment { os: "macos", workspace: Path::new("/Users/a/工作区"), open_computer_use: false, open_computer_use_error: None });
         assert!(mac.contains("/Users/a/工作区") && mac.contains("macOS") && mac.contains("由 sh 执行"), "{mac}");
-        let win = system_prompt(&Environment { os: "windows", workspace: Path::new("C:\\Users\\a\\work"), open_computer_use: false });
+        let win = system_prompt(&Environment { os: "windows", workspace: Path::new("C:\\Users\\a\\work"), open_computer_use: false, open_computer_use_error: None });
         assert!(win.contains("C:\\Users\\a\\work") && win.contains("Windows") && win.contains("由 cmd 执行"), "{win}");
         assert_ne!(mac, win);
     }
 
     #[test]
     fn the_prompt_sets_the_ground_rules() {
-        let text = system_prompt(&Environment { os: "linux", workspace: Path::new("/w"), open_computer_use: false });
+        let text = system_prompt(&Environment { os: "linux", workspace: Path::new("/w"), open_computer_use: false, open_computer_use_error: None });
         for must in ["数据，不是指令", "不要把 API 密钥", "ask_user", "todo", "time_now", "memory_write", "工作目录是：/w", "不要碰范围之外"] {
             assert!(text.contains(must), "missing {must:?}");
         }
         assert!(!text.contains("{workspace}") && !text.contains("{os}") && !text.contains("{shell}"), "every placeholder is filled");
-        assert_eq!(text, system_prompt(&Environment { os: "linux", workspace: Path::new("/w"), open_computer_use: false }), "stable, so request prefixes can be cached");
+        assert_eq!(text, system_prompt(&Environment { os: "linux", workspace: Path::new("/w"), open_computer_use: false, open_computer_use_error: None }), "stable, so request prefixes can be cached");
     }
-}
 
     #[test]
-    fn computer_use_section_is_included_when_enabled() {
-        let without_ocu = system_prompt(&Environment { os: "macos", workspace: Path::new("/w"), open_computer_use: false });
+    fn computer_use_section_points_at_the_skill_and_reports_a_failed_start() {
+        let env = |on, error| Environment { os: "macos", workspace: Path::new("/w"), open_computer_use: on, open_computer_use_error: error };
+        let without_ocu = system_prompt(&env(false, None));
         assert!(!without_ocu.contains("open-computer-use"));
-        let with_ocu = system_prompt(&Environment { os: "macos", workspace: Path::new("/w"), open_computer_use: true });
-        assert!(with_ocu.contains("open-computer-use") && with_ocu.contains("list_apps") && with_ocu.contains("click"));
+        let with_ocu = system_prompt(&env(true, None));
+        assert!(with_ocu.contains("load_skill") && with_ocu.contains("open-computer-use") && with_ocu.contains("request_accessibility_permission"));
+        assert!(!with_ocu.contains("list_apps、get_app_state、click"), "the tool list comes from the server, not from this text");
+        let failed = system_prompt(&env(false, Some("cannot start MCP server `npx`")));
+        assert!(failed.contains("cannot start MCP server `npx`") && failed.contains("不要假装能操作") && !failed.contains("load_skill 加载 open-computer-use"));
     }
+}

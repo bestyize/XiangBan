@@ -245,6 +245,29 @@ fn clean_spill(dir: &Path, keep: Duration) {
     }
 }
 
+/// The usage rules for the computer-control tools, shipped with the app so they stay in step with the tools it starts.
+const COMPUTER_USE_SKILL: &str = include_str!("../../skills/open-computer-use/SKILL.md");
+const COMPUTER_USE_SKILL_NAME: &str = "open-computer-use";
+
+/// Keeps the bundled computer-control skill in the assistant's skill folder while the tools are on, and removes
+/// it when they are off so the prompt does not advertise something that is not there. Only a file that is ours is touched.
+fn sync_computer_use_skill(skills: &Path, enabled: bool) {
+    let dir = skills.join(COMPUTER_USE_SKILL_NAME);
+    let file = dir.join("SKILL.md");
+    let ours = fs::read_to_string(&file).map(|text| text.contains("iFurySt/open-codex-computer-use")).unwrap_or(false);
+    if enabled {
+        if !file.exists() || ours {
+            if fs::read_to_string(&file).map(|text| text != COMPUTER_USE_SKILL).unwrap_or(true) {
+                let _ = fs::create_dir_all(&dir);
+                let _ = fs::write(&file, COMPUTER_USE_SKILL);
+            }
+        }
+    } else if ours {
+        let _ = fs::remove_file(&file);
+        let _ = fs::remove_dir(&dir);
+    }
+}
+
 struct Parts<'a> {
     provider: Arc<dyn ModelProvider>,
     dirs: &'a Dirs,
@@ -255,18 +278,29 @@ struct Parts<'a> {
     desktop: Arc<dyn Desktop>,
     utc_offset_minutes: i32,
     open_computer_use: bool,
+    /// Starts the computer-control server; a parameter so tests never launch a real one.
+    spawn_computer_use: fn() -> Result<Arc<agent_kernel::mcp::McpClient>, agent_kernel::HarnessError>,
 }
 
 /// Puts the kernel together: the model, the tools the assistant may use, and the rules around them.
 fn assemble(parts: Parts<'_>) -> Result<Agent, String> {
-    let Parts { provider, dirs, workspace, permission, todo, ask, desktop, utc_offset_minutes, open_computer_use } = parts;
+    let Parts { provider, dirs, workspace, permission, todo, ask, desktop, utc_offset_minutes, open_computer_use, spawn_computer_use } = parts;
     for dir in [dirs.sessions(), dirs.spill(), dirs.memory(), dirs.skills()] {
         fs::create_dir_all(&dir).map_err(|e| format!("无法创建 {}：{e}", dir.display()))?;
     }
     clean_spill(&dirs.spill(), SPILL_KEEP);
+    sync_computer_use_skill(&dirs.skills(), open_computer_use);
     let skills = Arc::new(Skills::new().writable_root(dirs.skills()));
     let memory = Arc::new(Memory::new(dirs.memory()));
-    let environment = prompt::Environment { os: std::env::consts::OS, workspace, open_computer_use };
+    // Started before the prompt is written, so the prompt can say honestly whether the tools exist.
+    let computer_use = if open_computer_use { Some(spawn_computer_use()) } else { None };
+    let computer_use_error = match &computer_use { Some(Err(error)) => Some(error.to_string()), _ => None };
+    let environment = prompt::Environment {
+        os: std::env::consts::OS,
+        workspace,
+        open_computer_use: matches!(computer_use, Some(Ok(_))),
+        open_computer_use_error: computer_use_error.as_deref(),
+    };
 
     let mut builder = Agent::builder(provider, Arc::new(JsonlStore::new(dirs.sessions())))
         .system_prompt(prompt::system_prompt(&environment))
@@ -286,11 +320,9 @@ fn assemble(parts: Parts<'_>) -> Result<Agent, String> {
     for tool in readable.into_iter().chain(writable).chain(skills.tools()).chain(memory.tools()).chain(desktop_tools::tools(desktop)) {
         builder = builder.tool_arc(tool);
     }
-    if open_computer_use {
-        if let Ok(mcp_client) = spawn_open_computer_use() {
-            for tool in mcp_client.tools() {
-                builder = builder.tool_arc(tool);
-            }
+    if let Some(Ok(mcp_client)) = &computer_use {
+        for tool in mcp_client.tools() {
+            builder = builder.tool_arc(tool);
         }
     }
     builder.build().map_err(|e| e.to_string())
@@ -312,6 +344,7 @@ fn build_agent(app: &tauri::AppHandle, config: &AiConfig, workspace: &Path) -> R
         desktop: Arc::new(TauriDesktop { app: app.clone() }),
         utc_offset_minutes: chrono::Local::now().offset().local_minus_utc() / 60,
         open_computer_use: config.open_computer_use,
+        spawn_computer_use: spawn_open_computer_use,
     })
 }
 
