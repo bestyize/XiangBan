@@ -1,0 +1,219 @@
+use crate::agent::{Agent, RetryPolicy};
+use crate::error::HarnessError;
+use crate::middleware::Turn;
+use crate::provider::{ChatRequest, Reply};
+use crate::types::{Event, FinishReason, Message, Part, Role, Usage};
+use std::collections::HashSet;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
+use std::time::{Duration, Instant};
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct RunSummary {
+    pub text: String,
+    pub turns: usize,
+    pub usage: Usage,
+    /// Why the last reply ended. `Length` means the final answer may be cut off.
+    pub finish: FinishReason,
+}
+
+const CUT_OFF_MESSAGE: &str = "Not run: your reply hit the output length limit, so this tool call may be incomplete. \
+                               Try again with a shorter reply, or split the work into smaller steps.";
+
+struct SessionGuard<'a> {
+    agent: &'a Agent,
+    id: String,
+}
+
+impl Drop for SessionGuard<'_> {
+    fn drop(&mut self) {
+        self.agent.running.lock().unwrap_or_else(|e| e.into_inner()).remove(&self.id);
+    }
+}
+
+/// A crash between a tool call and its result leaves history that providers reject. Close it with
+/// error results; only the tail is handled, because that is the only place a crash can leave a gap.
+fn dangling_tool_results(history: &[Message]) -> Vec<Message> {
+    let Some(pos) = history.iter().rposition(|m| m.role == Role::Assistant && !m.tool_calls.is_empty()) else {
+        return Vec::new();
+    };
+    let tail = &history[pos + 1..];
+    if tail.iter().any(|m| m.role != Role::Tool) {
+        return Vec::new();
+    }
+    let answered: HashSet<&str> = tail.iter().filter_map(|m| m.tool_call_id.as_deref()).collect();
+    history[pos]
+        .tool_calls
+        .iter()
+        .filter(|c| !answered.contains(c.id.as_str()))
+        .map(|c| Message::tool(c.id.as_str(), "Error: this tool call was interrupted before it produced a result."))
+        .collect()
+}
+
+fn backoff(policy: &RetryPolicy, attempt: u32) -> Duration {
+    let factor = 1u32 << (attempt - 1).min(16);
+    policy.base_delay.saturating_mul(factor).min(policy.max_delay)
+}
+
+fn sleep_unless_cancelled(delay: Duration, cancel: &AtomicBool) -> Result<(), HarnessError> {
+    let end = Instant::now() + delay;
+    while Instant::now() < end {
+        if cancel.load(Ordering::Relaxed) {
+            return Err(HarnessError::Cancelled);
+        }
+        std::thread::sleep(Duration::from_millis(20).min(end - Instant::now()));
+    }
+    Ok(())
+}
+
+impl Agent {
+    /// Runs one user message to completion: model calls and tool rounds until a plain reply.
+    /// The terminal event (`Done`, `Cancelled` or `Error`) is always emitted before returning.
+    pub fn run(
+        &self,
+        session: &str,
+        input: &str,
+        on_event: &mut dyn FnMut(Event),
+        cancel: &Arc<AtomicBool>,
+    ) -> Result<RunSummary, HarnessError> {
+        self.run_parts(session, vec![Part::Text { text: input.to_string() }], on_event, cancel)
+    }
+
+    pub fn run_parts(
+        &self,
+        session: &str,
+        input: Vec<Part>,
+        on_event: &mut dyn FnMut(Event),
+        cancel: &Arc<AtomicBool>,
+    ) -> Result<RunSummary, HarnessError> {
+        let result = self.run_inner(session, input, on_event, cancel);
+        match &result {
+            Ok(_) => on_event(Event::Done),
+            Err(HarnessError::Cancelled) => on_event(Event::Cancelled),
+            Err(error) => on_event(Event::Error { message: error.to_string() }),
+        }
+        result
+    }
+
+    fn acquire(&self, session: &str) -> Result<SessionGuard<'_>, HarnessError> {
+        let mut running = self.running.lock().unwrap_or_else(|e| e.into_inner());
+        if !running.insert(session.to_string()) {
+            return Err(HarnessError::SessionBusy(session.to_string()));
+        }
+        Ok(SessionGuard { agent: self, id: session.to_string() })
+    }
+
+    fn run_inner(
+        &self,
+        session: &str,
+        input: Vec<Part>,
+        on_event: &mut dyn FnMut(Event),
+        cancel: &Arc<AtomicBool>,
+    ) -> Result<RunSummary, HarnessError> {
+        let _guard = self.acquire(session)?;
+        let mut history = self.store.load(session)?;
+        let repair = dangling_tool_results(&history);
+        if !repair.is_empty() {
+            self.store.append(session, &repair)?;
+            history.extend(repair);
+        }
+        let user = Message::user(input);
+        self.store.append(session, std::slice::from_ref(&user))?;
+        history.push(user);
+
+        let mut usage = Usage::default();
+        for index in 0..self.max_turns {
+            if cancel.load(Ordering::Relaxed) {
+                return Err(HarnessError::Cancelled);
+            }
+            let mut messages = Vec::with_capacity(history.len() + 1);
+            let system = self.system_text();
+            if !system.is_empty() {
+                messages.push(Message::system(system));
+            }
+            messages.extend_from_slice(&history);
+            let mut turn = Turn { session: session.to_string(), index, messages };
+            for mw in &self.middleware {
+                mw.before_model(&mut turn)?;
+            }
+            let request = ChatRequest { messages: turn.messages, tools: self.tool_schemas() };
+            let mut reply = self.chat_with_retry(&request, on_event, cancel)?;
+            let turn = Turn { session: turn.session, index, messages: request.messages };
+            for mw in &self.middleware {
+                mw.after_model(&turn, &mut reply.message)?;
+            }
+            if let Some(u) = reply.usage {
+                usage += u;
+                on_event(Event::Usage { prompt_tokens: u.prompt_tokens, completion_tokens: u.completion_tokens });
+            }
+
+            let finish = reply.finish;
+            let mut assistant = reply.message;
+            let cut_off = finish == FinishReason::Length;
+            if cut_off {
+                on_event(Event::Truncated);
+            }
+            let cut_calls = cut_off && !assistant.tool_calls.is_empty();
+            if cut_calls {
+                // Half-written arguments would be sent back to the model as history; keep them parseable.
+                for call in &mut assistant.tool_calls {
+                    if !serde_json::from_str::<serde_json::Value>(&call.arguments).is_ok_and(|v| v.is_object()) {
+                        call.arguments = "{}".to_string();
+                    }
+                }
+            }
+            self.store.append(session, std::slice::from_ref(&assistant))?;
+            let (calls, text) = (assistant.tool_calls.clone(), assistant.text());
+            history.push(assistant);
+            if calls.is_empty() {
+                return Ok(RunSummary { text, turns: index + 1, usage, finish });
+            }
+
+            let results = if cut_calls {
+                self.reject_calls(session, &calls, CUT_OFF_MESSAGE, on_event)
+            } else {
+                self.execute_calls(session, &calls, cancel, on_event)
+            };
+            let tool_messages: Vec<Message> =
+                calls.iter().zip(&results).map(|(c, r)| Message::tool(c.id.as_str(), r.output.as_str())).collect();
+            self.store.append(session, &tool_messages)?;
+            history.extend(tool_messages);
+        }
+        if cancel.load(Ordering::Relaxed) {
+            return Err(HarnessError::Cancelled);
+        }
+        Err(HarnessError::MaxTurns(self.max_turns))
+    }
+
+    /// Retries only when nothing was streamed yet, so the UI never sees a half answer replayed.
+    fn chat_with_retry(
+        &self,
+        request: &ChatRequest,
+        on_event: &mut dyn FnMut(Event),
+        cancel: &AtomicBool,
+    ) -> Result<Reply, HarnessError> {
+        let mut attempt = 0;
+        loop {
+            let mut streamed = false;
+            let result = self.provider.chat(
+                request,
+                &mut |text| {
+                    streamed = true;
+                    on_event(Event::TextDelta { text: text.to_string() });
+                },
+                cancel,
+            );
+            match result {
+                Err(HarnessError::Provider { message, retryable: true })
+                    if !streamed && attempt < self.retry.max_retries =>
+                {
+                    attempt += 1;
+                    let delay = backoff(&self.retry, attempt);
+                    on_event(Event::Retrying { attempt, delay_ms: delay.as_millis() as u64, message });
+                    sleep_unless_cancelled(delay, cancel)?;
+                }
+                other => return other,
+            }
+        }
+    }
+}

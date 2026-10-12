@@ -1,0 +1,68 @@
+use super::http::{self, Call, Decoder};
+use super::stream::StreamAccumulator;
+use super::wire::{build_request_body, ProviderProfile};
+use super::{ChatRequest, ModelProvider, Reply};
+use crate::error::HarnessError;
+use reqwest::blocking::Client;
+use std::sync::atomic::AtomicBool;
+
+/// Streaming `/chat/completions` client for any OpenAI-compatible endpoint.
+pub struct OpenAiCompat {
+    profile: ProviderProfile,
+    client: Client,
+}
+
+impl OpenAiCompat {
+    pub fn new(profile: ProviderProfile) -> Result<Self, HarnessError> {
+        if profile.base_url.trim().is_empty() || profile.model.trim().is_empty() {
+            return Err(HarnessError::Config("base_url and model are required".into()));
+        }
+        Ok(Self { profile, client: http::new_client()? })
+    }
+}
+
+#[derive(Default)]
+struct ChatDecoder(StreamAccumulator);
+
+impl Decoder for ChatDecoder {
+    fn push(&mut self, payload: &str, on_text: &mut dyn FnMut(&str)) -> Result<bool, HarnessError> {
+        if payload.trim() == "[DONE]" {
+            self.0.mark_done();
+            return Ok(true);
+        }
+        let chunk = serde_json::from_str(payload).map_err(|e| HarnessError::provider(format!("bad stream chunk: {e}"), false))?;
+        self.0.push(&chunk, on_text)?;
+        Ok(false)
+    }
+
+    fn complete(&self) -> bool {
+        self.0.is_finished()
+    }
+}
+
+impl ModelProvider for OpenAiCompat {
+    fn chat(
+        &self,
+        request: &ChatRequest,
+        on_text: &mut dyn FnMut(&str),
+        cancel: &AtomicBool,
+    ) -> Result<Reply, HarnessError> {
+        let body = serde_json::to_vec(&build_request_body(&self.profile, request))
+            .map_err(|e| HarnessError::provider(format!("encode request: {e}"), false))?;
+        let mut headers = vec![
+            ("Content-Type".to_string(), "application/json".to_string()),
+            ("Accept".to_string(), "text/event-stream".to_string()),
+        ];
+        if !self.profile.api_key.is_empty() {
+            headers.push(("Authorization".to_string(), format!("Bearer {}", self.profile.api_key)));
+        }
+        let call = Call {
+            url: format!("{}/chat/completions", self.profile.base_url.trim_end_matches('/')),
+            headers: http::merge_headers(headers, &self.profile.extra_headers),
+            body,
+        };
+        let mut decoder = ChatDecoder::default();
+        http::post_stream(&self.client, call, &mut decoder, on_text, cancel)?;
+        Ok(decoder.0.finish())
+    }
+}

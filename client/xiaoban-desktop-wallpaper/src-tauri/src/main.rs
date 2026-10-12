@@ -14,6 +14,8 @@ mod library;
 mod website;
 mod content;
 mod account;
+mod ai_config;
+mod chat;
 mod storage;
 mod local_media;
 mod games;
@@ -660,9 +662,12 @@ fn main() {
             website::select_site_wallpaper, website::download_site_wallpaper, website::cancel_site_download, website::check_website, website::get_website_status, website::dismiss_website_message,
             account::send_account_code, account::login_account_with_code, account::login_account_with_password,
             account::register_account, account::reset_account_password, account::check_account_username,
-            account::get_account_session, account::logout_account]);
+            account::get_account_session, account::logout_account,
+            ai_config::get_ai_config, ai_config::save_ai_config, ai_config::pick_workspace,
+            chat::chat_overview, chat::chat_load_session, chat::chat_new_session, chat::chat_send, chat::chat_cancel, chat::chat_delete_session,
+            chat::chat_answer_approval, chat::chat_answer_question, chat::chat_set_permission_mode]);
     let app = builder.manage(state).manage(content::ContentState::default()).manage(website::WebsiteState::default())
-        .manage(games::GameState::default()).manage(rituals::RitualState::default()).manage(widgets::WidgetState::default()).manage(reminders::ReminderState::default()).manage(account::AccountState::default())
+        .manage(games::GameState::default()).manage(rituals::RitualState::default()).manage(widgets::WidgetState::default()).manage(reminders::ReminderState::default()).manage(account::AccountState::default()).manage(ai_config::AiConfigState::default())
         .register_uri_scheme_protocol("wallpaper-asset", |context, request| library::serve(context.app_handle(), request))
         .invoke_handler(move |invoke| {
             let label=invoke.message.webview_ref().label(); let command=invoke.message.command();
@@ -684,6 +689,7 @@ fn main() {
             if let Some(session) = account::load_session(app.handle()) {
                 *app.state::<account::AccountState>().session.lock().unwrap() = Some(session);
             }
+            app.manage(chat::ChatState::new(app.handle()));
             reminders::start(app.handle());
             games::start(app.handle());
             setup_tray(app)?;

@@ -1,0 +1,49 @@
+use crate::error::HarnessError;
+use crate::types::{FinishReason, Message, Usage};
+use serde_json::Value;
+use std::sync::atomic::AtomicBool;
+
+pub mod anthropic;
+pub mod responses;
+pub mod scripted;
+pub mod stream;
+pub mod wire;
+
+#[cfg(any(feature = "openai", feature = "anthropic"))]
+mod http;
+
+#[cfg(feature = "openai")]
+pub mod openai;
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct ToolSchema {
+    pub name: String,
+    pub description: String,
+    pub parameters: Value,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct ChatRequest {
+    /// Includes the system message, if any, as the first entry.
+    pub messages: Vec<Message>,
+    pub tools: Vec<ToolSchema>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Reply {
+    pub message: Message,
+    pub usage: Option<Usage>,
+    pub finish: FinishReason,
+}
+
+pub trait ModelProvider: Send + Sync {
+    /// Streams text through `on_text` and returns the assembled reply.
+    /// Implementations should check `cancel` between reads and return `Cancelled`.
+    /// Mark an error `retryable` only when repeating the identical request is safe.
+    fn chat(
+        &self,
+        request: &ChatRequest,
+        on_text: &mut dyn FnMut(&str),
+        cancel: &AtomicBool,
+    ) -> Result<Reply, HarnessError>;
+}

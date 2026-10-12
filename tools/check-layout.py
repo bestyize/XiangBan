@@ -28,6 +28,7 @@ entrypoints = {
     'services/server-xiangban-wallpaper': 'Cargo.toml',
     'services/server-xiaoban-appstore': 'Cargo.toml',
     'services/server-account': 'Cargo.toml',
+    'libs/agent-kernel': 'Cargo.toml',
 }
 planned = ['client/xiaoban-multiplatform', 'client/xiaoban-realbot',
            'services/server-asr', 'services/server-edgetts', 'services/server-websearch']

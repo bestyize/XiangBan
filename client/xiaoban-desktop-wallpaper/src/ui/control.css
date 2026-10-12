@@ -12,7 +12,7 @@ body.desktop-control{background:var(--ui-app-bg);color:var(--ui-text-primary);ov
 .control-main{display:flex;flex-direction:column;min-width:0;min-height:0}
 .control-workspace{flex:1;min-height:0;overflow:auto;padding:var(--ui-page-top) var(--ui-page-inset) 32px;scrollbar-width:thin;scrollbar-color:var(--ui-scrollbar) transparent;overscroll-behavior:none;scroll-behavior:auto}
 .desktop-control{overscroll-behavior:none}
-.control-workspace.wallpaper-workspace{padding:0;overflow:hidden;display:flex;flex-direction:column}
+.control-workspace.wallpaper-workspace,.control-workspace.chat-workspace{padding:0;overflow:hidden;display:flex;flex-direction:column}
 .control-statusbar{height:30px;flex-shrink:0;background:transparent;display:flex;align-items:center;justify-content:space-between;padding:0 var(--ui-page-inset);font-size:12px;color:var(--ui-text-tertiary)}
 .control-statusbar>span:first-child{display:flex;align-items:center;gap:6px}
 
@@ -46,6 +46,9 @@ body.desktop-control{background:var(--ui-app-bg);color:var(--ui-text-primary);ov
 .control-navigation{display:grid;gap:6px}
 .control-navigation>button,.settings-nav,.website-nav{display:flex;align-items:center;gap:12px;width:100%;text-align:left;border:0;background:transparent;border-radius:13px;padding:0 14px;cursor:pointer;color:var(--ui-text-secondary);min-height:46px;font-size:14px}
 .control-navigation>button:hover,.settings-nav:hover,.website-nav:hover{background:var(--ui-surface-alt);color:var(--ui-text-primary)}
+.control-navigation>button{position:relative}
+.control-navigation>.nav-attention,.control-navigation>button .nav-attention{margin-left:auto}
+.is-collapsed .control-navigation>button .nav-attention{position:absolute;top:9px;right:9px;margin:0}
 .control-navigation>button:active,.settings-nav:active,.website-nav:active{transform:scale(.98)}
 .control-navigation>button.selected,.settings-nav.selected{background:var(--ui-primary);color:#fff}
 .control-navigation>button>span{display:grid;gap:3px;min-width:0}

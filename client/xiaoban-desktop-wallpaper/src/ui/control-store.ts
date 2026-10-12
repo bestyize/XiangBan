@@ -3,6 +3,7 @@ import { desktop, defaults, invoke, listen, toAccountError, type Settings, type 
 import type { WebsiteStatus } from "./website-types.ts";
 import { loadBuiltinPacks, noPacks, readList } from "../effects/catalog.ts";
 import type { ControlStore } from "./control-types.ts";
+import { createChatStore } from "./chat/chat-store.ts";
 
 export const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value));
 
@@ -44,7 +45,7 @@ export function createControlStore(notify: ControlStore["notify"]): ControlStore
     effectList: noPacks(),
     account: null,
     showLoginModal: false,
-    page: "wallpapers", ready: false, initialError: "", desktop, notify,
+    page: "wallpapers", settingsTab: "general", chat: createChatStore({ desktop, invoke, listen, notify }), ready: false, initialError: "", desktop, notify,
     navigate(page) { store.page = page; },
     openLogin() { store.showLoginModal = true; },
     closeLogin() { store.showLoginModal = false; },
@@ -99,7 +100,7 @@ export function createControlStore(notify: ControlStore["notify"]): ControlStore
       } catch (error) { store.initialError = String(error); }
       finally { if (!disposed) store.ready = true; }
     },
-    dispose() { disposed = true; unsubscribers.splice(0).forEach((unlisten) => unlisten()); },
+    dispose() { disposed = true; store.chat.dispose(); unsubscribers.splice(0).forEach((unlisten) => unlisten()); },
     async refreshSettings() {
       if (!desktop || disposed) return;
       store.settings = await invoke<Settings>("get_settings");

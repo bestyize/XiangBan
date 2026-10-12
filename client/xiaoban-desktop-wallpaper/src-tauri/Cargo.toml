@@ -23,6 +23,7 @@ tauri-plugin-dialog = "2"
 dirs = "6"
 chrono = { version = "0.4", features = ["clock", "serde"] }
 getrandom = "0.3"
+agent-kernel = { path = "../../../libs/agent-kernel", features = ["native-tls", "fs", "skills", "memory", "web", "shell", "mcp"] }
 
 [target.'cfg(windows)'.dependencies]
 windows = { version = "0.62", features = [

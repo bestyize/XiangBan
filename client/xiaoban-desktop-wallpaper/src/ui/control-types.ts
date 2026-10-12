@@ -2,8 +2,9 @@ import type { AccountSession, AppInfo, CodeLoginOutcome, LoginResult, SendCodeRe
 import type { EffectsChoice } from "../effects/types.ts";
 import type { LoadedPacks } from "../effects/catalog.ts";
 import type { WebsiteStatus } from "./website-types.ts";
+import type { ChatStore } from "./chat/chat-store.ts";
 
-export type ControlPage = "wallpapers" | "widgets" | "interactive" | "effects" | "companion" | "games" | "care" | "settings";
+export type ControlPage = "chat" | "wallpapers" | "widgets" | "interactive" | "effects" | "companion" | "games" | "care" | "settings";
 export interface ControlStore {
   settings: Settings;
   info: AppInfo;
@@ -14,6 +15,10 @@ export interface ControlStore {
   account: AccountSession | null;
   showLoginModal: boolean;
   page: ControlPage;
+  /** Which tab of the settings page opens next; the chat sends people to "ai" when no model is set up. */
+  settingsTab: "general" | "ai" | "about";
+  /** The assistant's conversations. Lives here so an answer keeps arriving while another page is open. */
+  chat: ChatStore;
   ready: boolean;
   initialError: string;
   desktop: boolean;

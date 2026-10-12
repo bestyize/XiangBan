@@ -24,6 +24,27 @@ export interface Settings {
   effects: EffectsChoice;
 }
 
+/** `chat` is /chat/completions, `responses` is /responses and `anthropic` is /v1/messages. */
+export type AiProtocol = "chat" | "responses" | "anthropic";
+
+/** What the host tells the web side about the model service. The key itself is never sent back. */
+export interface AiConfigView {
+  protocol: AiProtocol;
+  baseUrl: string;
+  model: string;
+  hasKey: boolean;
+  /** Dots, plus the last four characters of a long key. Empty when there is no key. */
+  keyHint: string;
+  /** The folder the assistant's file and command tools work in; empty means the built-in one. */
+  workspace: string;
+  defaultWorkspace: string;
+  permissionMode: "ask" | "auto";
+  /** Whether intermediate tool call cards are hidden in chat. */
+  hideToolCalls: boolean;
+  /** Whether open-computer-use MCP tools are enabled. */
+  openComputerUse: boolean;
+}
+
 export interface AccountUser {
   uid: string;
   /** Unique and unchangeable; also the name shown everywhere. */

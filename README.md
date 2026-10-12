@@ -7,7 +7,7 @@
 | 项目 | 状态 | 说明 |
 | --- | --- | --- |
 | [client/xiaban-web](client/xiaban-web/README.md) | 已实现 | 相伴网页/PWA，包含管理后台 |
-| [client/xiaoban-desktop-wallpaper](client/xiaoban-desktop-wallpaper/README.md) | 1.0.0 | 小伴壁纸桌面版：Windows/macOS 桌宠、动态壁纸、十二个桌面特效（数据驱动的特效包）、游戏空间与关怀提醒；接入壁纸网站的在线壁纸、版本与公告 |
+| [client/xiaoban-desktop-wallpaper](client/xiaoban-desktop-wallpaper/README.md) | 1.0.0 | 小伴壁纸桌面版：Windows/macOS 桌宠、动态壁纸、十二个桌面特效、游戏空间、关怀提醒与通用 Agent 聊天；接入自研 agent-kernel 内核与壁纸网站 |
 | [client/xiaoban-pot-garden](client/xiaoban-pot-garden/README.md) | 可运行原型 | 表情盆栽的 3D 质感原型（Vite + three.js），花盆养成游戏的起点，目前只有表情和质感，没有玩法 |
 | [client/xiaoban-mobile-wallpaper](client/xiaoban-mobile-wallpaper/README.md) | 1.0.0 | 小伴壁纸 Android 版：浏览与下载壁纸网站的图片和视频，Compose 瀑布流，可登录统一账号，收藏只存本机；release 只打 arm64-v8a |
 | [client/xiaoban-multiplatform](client/xiaoban-multiplatform/README.md) | 可运行原型 | 把 xiaban.xyz 套进原生壳：Android/iOS 用 KMP + Compose，桌面用 Rust + Tauri（`desktopApp/`）；Android 与 macOS 已运行验证，iOS 仅编译 |
@@ -19,6 +19,7 @@
 | [services/server-xiaoban-appstore](services/server-xiaoban-appstore/README.md) | 已实现 | 小伴优质应用商店，Rust Axum + PostgreSQL 后端与 Vue 3 + Vite 前端，腾讯柠檬精选美学与管理后台 |
 | [services/server-forum](services/server-forum/README.md) | 一期已实现，已部署 | 超级小伴论坛（chat.xiangban.xyz）：技术交流、资源分享、福利羊毛与闲聊的社区，Rust Axum + PostgreSQL + Vue 3，登录走统一账号中心，带管理后台和 SEO 页面 |
 | [services/server-account](services/server-account/README.md) | 已实现 | 统一账号中心与管理后台，邮箱/手机号验证码注册登录，Rust Axum + PostgreSQL + Vue 3，签发 EdDSA JWT；壁纸网站与相伴网页（xiaban.xyz，经主后端换票）已接入 |
+| [libs/agent-kernel](libs/agent-kernel/README.md) | 里程碑 3 已实现，已接入小伴桌面 | 跨产品复用的轻量 agent harness 内核（Rust）：宿主注入模型、工具与存储，支持 OpenAI chat completions、Responses 与 Claude Messages 三种协议（含自定义兼容端点），内置权限、文件、网页、shell、skills、子 agent 与 JSON 行协议，不含任何产品逻辑 |
 | [services/server-asr](services/server-asr/README.md) | 规划 | 语音识别服务 |
 | [services/server-edgetts](services/server-edgetts/README.md) | 规划 | Edge TTS 服务，现有语音功能仍在主后端 |
 | [services/server-websearch](services/server-websearch/README.md) | 规划 | 搜索能力服务 |
@@ -29,6 +30,7 @@ services/xiaban-api/backend/     Gradle :backend
 services/xiaban-api/api-contracts/ Gradle :api-contracts，JVM + iOS
 services/server-pan/             独立网盘服务：backend（Cargo）+ frontend（npm）
 services/server-*/               其余规划中的独立能力服务
+libs/                           跨产品复用、与产品无关的运行时库（agent-kernel）
 infra/                          Compose、Nginx 与环境模板
 tools/                          仓库开发辅助工具
 docs/                           产品、架构、部署与设计资料
