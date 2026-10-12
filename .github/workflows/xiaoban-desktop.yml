@@ -1,15 +1,8 @@
 name: Xiaoban desktop prototype
 
+# Manual only: this builds and packages the desktop app for both platforms, which is slow
+# and not needed on every push. Run it from the Actions tab when a package is actually wanted.
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'client/xiaoban-desktop-wallpaper/**'
-      - '.github/workflows/xiaoban-desktop.yml'
-  pull_request:
-    paths:
-      - 'client/xiaoban-desktop-wallpaper/**'
-      - '.github/workflows/xiaoban-desktop.yml'
   workflow_dispatch:
 
 permissions:
@@ -21,8 +14,6 @@ concurrency:
 
 jobs:
   windows-x64:
-    # This branch uses the scoped macOS packaging workflow; avoid duplicate builds.
-    if: github.head_ref != 'feat/desktop-calendar-notes-countdown' && github.ref_name != 'feat/desktop-calendar-notes-countdown'
     runs-on: windows-latest
     timeout-minutes: 35
     defaults:
@@ -70,8 +61,6 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
   macos-arm64:
-    # This branch uses the scoped macOS packaging workflow; avoid duplicate builds.
-    if: github.head_ref != 'feat/desktop-calendar-notes-countdown' && github.ref_name != 'feat/desktop-calendar-notes-countdown'
     runs-on: macos-15
     timeout-minutes: 35
     defaults:
