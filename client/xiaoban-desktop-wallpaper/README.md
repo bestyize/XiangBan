@@ -79,6 +79,8 @@ macOS 悬浮窗口使用 AppKit 浮动层；壁纸使用 Core Graphics 的 deskt
 
 动态壁纸支持图片、静音循环 H.264 MP4 与自包含 Canvas/WebGL ES module。可添加 HTTPS 订阅或导入 JSON 清单；下载后的内容校验 SHA-256 并缓存，离线可继续使用。小伴悬浮时可与通用壁纸并存，融入壁纸时叠在所选内容上；“小伴房间”恢复原先的房间场景或系统桌面。下发协议、SDK、限制和更新 JSON 示例见 [delivery-protocol.md](docs/delivery-protocol.md)，Schema 为 [壁纸](docs/wallpapers-v1.schema.json) 和 [更新](docs/updates-v1.schema.json)。
 
+内置壁纸在 `public/wallpapers/builtin/`，目录 `catalog.json` 记录每个文件的大小和 SHA-256。除早期的晴山、晨潮、浮光和一池心灯外，新增六张程序绘制的 Canvas 壁纸，离线可用、不依赖任何外部素材：暮海、极光之夜、云海、山水（宣纸水墨）、糖霜微光（弥散光与玻璃球）、枫林暖阳。它们的共同做法是：静态层只在窗口尺寸或参数变化时画到离屏画布，每帧只绘制流动的部分，最后叠一层颗粒来增加质感；不使用 `ctx.filter`、`roundRect`、圆锥渐变等较新的画布接口，兼容 macOS 12 的 WebKit；参数只用滑块、取色器和开关，因为壁纸页的参数面板不渲染下拉选项。在没有 GPU 的无头浏览器里按 2872×1716 逐帧计时，六张约 12–50 毫秒一帧，不比原有的浮光重；真机帧率和耗电未测。新增或修改素材后运行 `node scripts/check-builtin-assets.mjs --write` 刷新校验值，`all_builtin_wallpapers_are_valid` 会校验整份目录。封面是用真实场景渲染出的 WebP，改动画面后需要重新生成。
+
 ### 本轮已实现能力（1–3，尚未发布）
 
 - **游戏空间**：设置页和托盘/菜单栏的“玩一玩”打开主屏沉浸窗口，离线展示七款本地游戏包。资源协议沿用网页发布包的 manifest 与 v1 消息格式；桌面使用自己的宿主，iframe 仅授予脚本权限并校验消息来源、nonce、游戏 ID 和回合状态。桌面不接账户分享；网页专属分享和钱包入口由本地 adapter 隐藏。只有水墨剑客保存进度，位于用户数据目录 `games/saves/ink-blade.json`，上限 32 KiB；读取或保存失败会保留原文件并提示处理。Windows 原生 smoke 已验证七包 ready、存档往返、Esc、IPC 隔离和桌面状态恢复。桌面空白双击入口仅 Windows 可用，默认关闭；只读低级鼠标钩子将事件交给异步队列并判断 Explorer 桌面列表空白区域，不吞鼠标输入。Windows 真实图标交互尚待人工验收。macOS 暂无可靠桌面空白双击判断，使用显式入口。
