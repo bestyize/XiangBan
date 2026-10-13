@@ -101,7 +101,7 @@ fn headers(raw: &str) -> BTreeMap<String, String> {
 }
 pub fn text_path(frame: &str) -> Result<String, String> {
     let (head, _) = frame.split_once("\r\n\r\n").ok_or("语音响应缺少帧头")?;
-    headers(head).remove("path").ok_or("语音响应缺少 Path")
+    headers(head).remove("path").ok_or_else(|| "语音响应缺少 Path".into())
 }
 pub fn audio_frame(frame: &[u8]) -> Result<&[u8], String> {
     if frame.len() < 2 { return Err("语音响应帧不完整".into()); }
