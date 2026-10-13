@@ -1,3 +1,4 @@
+import { modelFailure } from './model-errors.ts';
 import { reactive } from 'vue';
 import type { ApprovalDecision, ApprovalRequest, ChatEventPayload, Overview, QuestionRequest, SessionSummary, SessionView, WireMessage } from './types.ts';
 import { applyEvent, itemsFromHistory, newView, nextId } from './view.ts';
@@ -33,6 +34,7 @@ export interface ChatStore {
   select(id: string | null): Promise<void>;
   /** Returns false when nothing was sent, so the caller can give the text back to the user. */
   send(text: string, images?: string[]): Promise<boolean>;
+  retry(): Promise<boolean>;
   cancel(): Promise<void>;
   remove(id: string): Promise<void>;
   answerApproval(request: ApprovalRequest, decision: ApprovalDecision): Promise<void>;
@@ -47,6 +49,7 @@ export function createChatStore(deps: ChatDeps): ChatStore {
   const unsubscribers: (() => void)[] = [];
   let starting: Promise<void> | null = null;
   let disposed = false;
+  let refreshedAfterErrorAt = 0;
 
   const store: ChatStore = reactive({
     ready: false,
@@ -81,7 +84,13 @@ export function createChatStore(deps: ChatDeps): ChatStore {
         if (!deps.desktop) { store.ready = true; return; }
         try {
           const listeners = await Promise.all([
-            deps.listen<ChatEventPayload>('chat-event', ({ session, event }) => { if (!disposed) applyEvent(viewOf(session, true), event); }),
+            deps.listen<ChatEventPayload>('chat-event', ({ session, event }) => { if (!disposed) {
+              applyEvent(viewOf(session, true), event);
+              if (event.type === 'error' && modelFailure(event.message).refresh && Date.now() - refreshedAfterErrorAt > 300000) {
+                refreshedAfterErrorAt = Date.now();
+                void deps.invoke('refresh_ai_providers', { force: true }).catch(() => {});
+              }
+            } }),
             deps.listen<ApprovalRequest>('chat-approval', request => { if (!disposed) addPending(viewOf(request.session, true).approvals, request); }),
             deps.listen<QuestionRequest>('chat-question', request => { if (!disposed) addPending(viewOf(request.session, true).questions, request); }),
             deps.listen<SessionSummary[]>('chat-sessions-changed', sessions => { if (!disposed) store.sessions = sessions; }),
@@ -200,6 +209,19 @@ export function createChatStore(deps: ChatDeps): ChatStore {
         }
         return false;
       }
+    },
+
+    async retry() {
+      const id = store.currentId, view = store.current();
+      if (!id || !view || view.running) return false;
+      view.running = true; view.status = '';
+      const previousFailure = [...view.items].reverse().find(i => i.kind === 'notice' && i.canRetry)?.id;
+      try {
+        upsert(await deps.invoke<SessionSummary>('chat_send', { sessionId: id, text: '', retry: true }));
+        // Keep the original user message and drop only the now-resolved failure notice.
+        view.items = view.items.filter(i => i.id !== previousFailure);
+        return true;
+      } catch (e) { view.running = false; deps.notify(e, 'error'); return false; }
     },
 
     async cancel() {

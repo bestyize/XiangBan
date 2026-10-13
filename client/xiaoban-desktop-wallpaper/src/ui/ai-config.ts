@@ -1,6 +1,8 @@
-import type { AiProtocol } from '../bridge.ts';
+import type { AiProtocol, ProviderConfigView } from '../bridge.ts';
 
 export interface ProviderMeta {
+  type?: "third" | "free" | "paid";
+  models?: { id: string; name: string; description?: string }[];
   id: string;
   name: string;
   desc: string;
@@ -164,4 +166,16 @@ export function insecureRemote(baseUrl: string): boolean {
     const url = new URL(baseUrl.trim());
     return url.protocol === 'http:' && !loopback(url.hostname);
   } catch { return false; }
+}
+
+
+export function remoteProviderMeta(p: ProviderConfigView): ProviderMeta {
+  const fallback = getProviderMeta(p.id);
+  return {
+    id: p.id, name: p.name, desc: p.description || fallback.desc, protocol: p.protocol,
+    endpoints: Object.keys(p.endpoints ?? {}).length ? p.endpoints! : { [p.protocol]: p.baseUrl },
+    defaultModel: p.defaultModel || p.model, suggestedModels: p.models?.map(m => m.id) ?? fallback.suggestedModels,
+    consoleUrl: p.consoleUrl, consoleText: p.consoleText, type: p.type === 'custom' ? undefined : p.type,
+    models: p.models,
+  };
 }

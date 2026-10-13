@@ -34,6 +34,7 @@ export const router = createRouter({
       meta: { admin: true },
       redirect: '/admin/collector',
       children: [
+        { path: 'ai-providers', name: 'admin-ai-providers', component: () => import('./views/admin/AiProvidersView.vue') },
         { path: 'apps', name: 'admin-apps', component: () => import('./views/admin/AppReleasesView.vue') },
         { path: 'desktop', name: 'admin-desktop', component: () => import('./views/admin/DesktopAdminView.vue') },
         { path: 'collector', name: 'admin-collector', component: () => import('./views/admin/CollectorView.vue') },

@@ -1,5 +1,5 @@
 import { reactive } from "vue";
-import { desktop, defaults, invoke, listen, toAccountError, type Settings, type WallpaperEntry, type WallpaperLibrary, type AppInfo, type AccountSession, type SendCodeResult, type CodeLoginOutcome, type UsernameCheck, type LoginResult } from "../bridge.ts";
+import { desktop, defaults, invoke, listen, toAccountError, type AiConfigView, type Settings, type WallpaperEntry, type WallpaperLibrary, type AppInfo, type AccountSession, type SendCodeResult, type CodeLoginOutcome, type UsernameCheck, type LoginResult } from "../bridge.ts";
 import type { WebsiteStatus } from "./website-types.ts";
 import { loadBuiltinPacks, noPacks, readImported, readList } from "../effects/catalog.ts";
 import type { ControlStore } from "./control-types.ts";
@@ -67,9 +67,10 @@ export function createControlStore(notify: ControlStore["notify"]): ControlStore
           return;
         }
         const subscriptions = await Promise.all([
+          listen<AiConfigView>("ai-config-changed", () => { if (!disposed) void store.chat.refresh(); }),
           listen<Settings>("settings-changed", (settings) => { if (!disposed) store.settings = settings; }),
           listen<WebsiteStatus>("website-status", (website) => { if (!disposed) store.website = website; }),
-          listen<AccountSession | null>("account-changed", (account) => { if (!disposed) store.account = account; }),
+          listen<AccountSession | null>("account-changed", (account) => { if (!disposed) { store.account = account; void invoke('refresh_ai_providers', { force: true }).catch(() => {}); } }),
           listen<boolean>("games-active", (active) => { if (!disposed) store.game.active = active; }),
           listen<string>("desktop-error", (error) => notify(error, "error")),
         ]);

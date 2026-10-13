@@ -86,7 +86,19 @@ impl Agent {
         on_event: &mut dyn FnMut(Event),
         cancel: &Arc<AtomicBool>,
     ) -> Result<RunSummary, HarnessError> {
-        let result = self.run_inner(session, input, on_event, cancel);
+        let result = self.run_inner(session, Some(input), on_event, cancel);
+        match &result {
+            Ok(_) => on_event(Event::Done),
+            Err(HarnessError::Cancelled) => on_event(Event::Cancelled),
+            Err(error) => on_event(Event::Error { message: error.to_string() }),
+        }
+        result
+    }
+
+    /// Retry only a user message which has not produced a persisted assistant/tool message.
+    /// It reuses the original parts (including images), without appending a duplicate user message.
+    pub fn retry_last(&self, session: &str, on_event: &mut dyn FnMut(Event), cancel: &Arc<AtomicBool>) -> Result<RunSummary, HarnessError> {
+        let result = self.run_inner(session, None, on_event, cancel);
         match &result {
             Ok(_) => on_event(Event::Done),
             Err(HarnessError::Cancelled) => on_event(Event::Cancelled),
@@ -106,20 +118,25 @@ impl Agent {
     fn run_inner(
         &self,
         session: &str,
-        input: Vec<Part>,
+        input: Option<Vec<Part>>,
         on_event: &mut dyn FnMut(Event),
         cancel: &Arc<AtomicBool>,
     ) -> Result<RunSummary, HarnessError> {
         let _guard = self.acquire(session)?;
         let mut history = self.store.load(session)?;
+        if input.is_none() && !history.last().is_some_and(|m| m.role == Role::User) {
+            return Err(HarnessError::Config("The last message has already produced output or tool actions; it cannot be replayed.".into()));
+        }
         let repair = dangling_tool_results(&history);
         if !repair.is_empty() {
             self.store.append(session, &repair)?;
             history.extend(repair);
         }
-        let user = Message::user(input);
-        self.store.append(session, std::slice::from_ref(&user))?;
-        history.push(user);
+        if let Some(input) = input {
+            let user = Message::user(input);
+            self.store.append(session, std::slice::from_ref(&user))?;
+            history.push(user);
+        }
 
         let mut usage = Usage::default();
         for index in 0..self.max_turns {

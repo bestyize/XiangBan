@@ -4,6 +4,7 @@ import { NButton, NInput } from 'naive-ui';
 import { ArrowDown, Check, FolderOpen, ImagePlus, LoaderCircle, MessageSquarePlus, SendHorizontal, Shield, ShieldAlert, Square, Trash2, X, Zap } from 'lucide-vue-next';
 import { invoke } from '../../bridge.ts';
 import type { ControlStore } from '../control-types.ts';
+import ModelSwitchDialog from '../components/ModelSwitchDialog.vue';
 import MarkdownView from '../chat/MarkdownView.ts';
 import { CONTINUE_TEXT } from '../chat/chat-store.ts';
 import { approvalPreview, clip, formatAgo, isImeEnter, isNearBottom, prettyArguments, riskVerb, toolLabel } from '../chat/format.ts';
@@ -14,6 +15,10 @@ const props = defineProps<{ store: ControlStore }>();
 const chat = props.store.chat;
 
 const draft = ref('');
+const modelDialog = ref(false);
+const retryAfterSwitch = ref(false);
+function chooseModel(retry = false) { retryAfterSwitch.value = retry; modelDialog.value = true; }
+async function modelSwitched() { await chat.refresh(); if (retryAfterSwitch.value) await chat.retry(); props.store.notify('模型已切换', 'success'); }
 const composing = ref(false);
 const scroller = ref<HTMLElement | null>(null);
 const stick = ref(true);
@@ -150,7 +155,7 @@ const continueAnswer = () => { stick.value = true; void chat.send(CONTINUE_TEXT)
 
 const choose = (id: string | null) => { confirmingId.value = ''; void chat.select(id); };
 async function remove(id: string) { confirmingId.value = ''; await chat.remove(id); }
-function openSettings() { props.store.settingsTab = 'ai'; props.store.navigate('settings'); }
+function openSettings() { modelDialog.value = false; props.store.settingsTab = 'ai'; props.store.navigate('settings'); }
 
 const decide = (request: ApprovalRequest, decision: ApprovalDecision) => chat.answerApproval(request, decision);
 function answer(request: QuestionRequest, value: string | null) {
@@ -170,6 +175,7 @@ async function openLink(href: string) {
 </script>
 
 <template>
+  <ModelSwitchDialog v-model:show="modelDialog" :retry="retryAfterSwitch" @switched="modelSwitched" @settings="openSettings" />
   <section class="chat-page" data-testid="chat-page">
     <aside class="chat-side" aria-label="对话列表">
       <div class="side-head">
@@ -265,6 +271,9 @@ async function openLink(href: string) {
               </template>
               <div v-else-if="item.kind === 'notice'" class="notice" :class="item.tone" :data-testid="`notice-${item.tone}`" :role="item.tone === 'error' ? 'alert' : 'status'">
                 {{ item.text }}
+                <details v-if="item.details"><summary>错误详情</summary><span>{{ item.details }}</span></details>
+                <button v-if="item.canSwitchModel && !view.running" type="button" class="link" @click="chooseModel(!!item.canRetry)">切换模型</button>
+                <button v-if="item.canRetry && !view.running" type="button" class="link" @click="chat.retry()">重试</button>
                 <button v-if="item.canContinue && !view.running" type="button" class="link" data-testid="chat-continue" @click="continueAnswer">继续</button>
               </div>
             </template>
@@ -285,7 +294,8 @@ async function openLink(href: string) {
               <header><span>{{ request.question }}</span></header>
               <div v-if="request.options.length" class="options"><NButton v-for="(option, n) in request.options" :key="option" size="small" :data-testid="`question-option-${n}`" @click="answer(request, option)">{{ option }}</NButton></div>
               <footer>
-                <NInput v-model:value="answerText" size="small" placeholder="或者自己回答" data-testid="question-input" @keydown.enter="!isImeEnter($event, composing) && answerText.trim() && answer(request, answerText)" />
+                <button type="button" class="link" :disabled="running" @click="chooseModel()">切换模型</button>
+          <NInput v-model:value="answerText" size="small" placeholder="或者自己回答" data-testid="question-input" @keydown.enter="!isImeEnter($event, composing) && answerText.trim() && answer(request, answerText)" />
                 <NButton type="primary" size="small" :disabled="!answerText.trim()" data-testid="question-submit" @click="answer(request, answerText)">回答</NButton>
                 <NButton size="small" quaternary data-testid="question-skip" @click="answer(request, null)">跳过</NButton>
               </footer>
