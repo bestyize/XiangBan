@@ -51,7 +51,7 @@ export function useWallpaperWorkspace(store: ControlStore) {
   watch([media,category], () => {page.value = 1;});
   watch(() => store.settings.websiteUrl, () => { generation++; prepared.clear(); Object.assign(feed,{items:[],has_more:false,total:0}); categories.value=[]; selection.value=null; page.value=1; if(tab.value === "online") {void load();void loadCategories();} });
   onScopeDispose(() => {generation++;disposed=true;unlisten?.();progress.value=null;progressId=undefined;});
-  const localItems = computed(() => store.library.items.filter(entry => entry.definition.kind !== "canvas" && (!media.value || entry.definition.kind === media.value) && (!localSource.value || entry.source === localSource.value) && entry.definition.title.toLowerCase().includes(query.value.toLowerCase())));
+  const localItems = computed(() => store.library.items.filter(entry => (!media.value || entry.definition.kind === media.value) && (!localSource.value || entry.source === localSource.value) && entry.definition.title.toLowerCase().includes(query.value.toLowerCase())));
   async function prepare(value: Selection) {
     if(value.source === "local") return value.item.definition.id;
     const site = store.settings.websiteUrl, key = value.item.id;

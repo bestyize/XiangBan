@@ -25,7 +25,7 @@ const closeViewer=ref<HTMLButtonElement>();let viewerOpener:HTMLElement|null=nul
 function openViewer(){if(!canView.value)return;viewerOpener=document.activeElement instanceof HTMLElement?document.activeElement:null;viewer.value=true;}
 watch(selection,()=>{viewer.value=false;});
 watch(viewer,async open=>{await nextTick();if(open)closeViewer.value?.focus();else{viewerOpener?.focus();viewerOpener=null;}});
-const types=[{label:'全部',value:''},{label:'图片',value:'image'},{label:'视频',value:'video'}];
+const types=[{label:'全部',value:''},{label:'图片',value:'image'},{label:'视频',value:'video'},{label:'动画',value:'canvas'}];
 const typeOptions=computed(()=>tab.value==='online'?types.filter(type=>type.value!=='canvas'):types);
 const sourceOptions=[{label:'全部来源',value:''},{label:'我的导入',value:'local'},{label:'内置壁纸',value:'builtin'},{label:'订阅壁纸',value:'subscription'}];
 const categoryOptions=computed(()=>[{label:'全部',value:''},...categories.value.map(c=>({label:c.name,value:c.id}))]);
