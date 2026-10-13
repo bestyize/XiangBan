@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import { NButton, NInput } from 'naive-ui';
-import { ArrowDown, Check, FolderOpen, ImagePlus, LoaderCircle, MessageSquarePlus, SendHorizontal, Shield, ShieldAlert, Square, Trash2, X, Zap } from 'lucide-vue-next';
+import { ArrowDown, Check, FolderOpen, ImagePlus, LoaderCircle, MessageSquarePlus, SendHorizontal, Volume2, Shield, ShieldAlert, Square, Trash2, X, Zap } from 'lucide-vue-next';
 import { invoke } from '../../bridge.ts';
 import type { ControlStore } from '../control-types.ts';
 import ModelSwitchDialog from '../components/ModelSwitchDialog.vue';
@@ -206,6 +206,7 @@ async function openLink(href: string) {
       <header class="chat-head">
         <h2 data-testid="chat-title">{{ title }}</h2>
         <div class="head-actions">
+          <button v-if="store.speech && store.speech.status !== 'idle'" type="button" class="link" data-testid="chat-speech-status" @click="store.speech.stop()"><Volume2 :size="14" />{{ store.speech.status === 'synthesizing' ? '取消合成' : '停止朗读' }}</button>
           <div class="permission-toggle" role="group" aria-label="权限模式" data-testid="chat-permission-toggle">
             <button
               type="button"
@@ -255,7 +256,11 @@ async function openLink(href: string) {
               <div v-if="item.kind === 'user'" class="msg user" data-testid="msg-user"><div class="bubble"><div v-if="item.images.length" class="bubble-images"><img v-for="(url, n) in item.images" :key="n" :src="url" :alt="`第 ${n + 1} 张图片`" :data-testid="`msg-user-image-${n}`" @click="preview = url" /></div><template v-if="item.text">{{ item.text }}</template></div></div>
               <div v-else-if="item.kind === 'assistant'" class="msg assistant" data-testid="msg-assistant">
                 <img class="avatar" src="/xiaoban.svg" alt="" width="28" height="28" />
-                <div class="answer"><MarkdownView :source="item.text" @open="openLink" /><span v-if="item.streaming" class="cursor" aria-hidden="true"></span></div>
+                <div class="answer"><MarkdownView :source="item.text" @open="openLink" /><span v-if="item.streaming" class="cursor" aria-hidden="true"></span>
+                  <button v-if="store.speech && !item.streaming && item.text.trim()" type="button" class="link speech-button" :disabled="!store.desktop" :aria-label="store.speech.currentKey === item.id ? '停止朗读' : '朗读回复'" data-testid="chat-read-reply" @click="store.speech.currentKey === item.id ? store.speech.stop() : store.speech.speak(item.text, item.id)">
+                    <Volume2 :size="14" />{{ store.speech.currentKey === item.id ? (store.speech.status === 'synthesizing' ? '取消合成' : '停止朗读') : '朗读' }}
+                  </button>
+                </div>
               </div>
               <template v-else-if="item.kind === 'tool'">
                 <details v-if="!chat.hideToolCalls" class="tool" :class="item.status" :data-testid="`tool-${item.id}`">
@@ -336,6 +341,8 @@ async function openLink(href: string) {
 </template>
 
 <style scoped>
+.speech-button{display:inline-flex;align-items:center;gap:5px;margin-top:8px;font-size:12px}
+
 .chat-page{flex:1;min-height:0;display:grid;grid-template-columns:268px minmax(0,1fr);background:var(--ui-app-bg)}
 .chat-side{border-right:1px solid var(--ui-border);display:flex;flex-direction:column;min-height:0;background:var(--ui-surface)}
 .side-head{padding:16px 14px 10px}

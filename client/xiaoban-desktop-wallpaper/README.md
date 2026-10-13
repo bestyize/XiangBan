@@ -187,3 +187,11 @@ Mac 实机还需检查：原角色的发光与连续表情、桌宠拖动、空�
 
 品牌插画使用 `public/xiaoban.svg`，由本工程原有猫脸角色 `robotMarkup(stillFrame("idle"))` 导出；网站维护一份相同的静态 SVG，不导入客户端源码。
 
+
+## Edge TTS 语音朗读
+
+设置中的“声音”页支持音色、语速、音量、音调、试听和自动朗读；默认晓晓中文女声，自动朗读默认关闭。可刷新在线音色列表；失败时保留常用音色。聊天完整回复旁提供朗读/停止按钮；自动朗读仅针对当前可见聊天的新完整回复，发送新消息、切换/删除当前会话或离开聊天页会停止，不补读历史记录。代码块和链接地址不进入朗读文本。
+
+原生实现位于 `src-tauri/src/tts/`，参考后端 `services/xiaban-api/backend/src/main/kotlin/xyz/xiaban/server/tts` 的 GEC、浏览器握手、UTF-8 分段、SSML 和二进制帧协议；桌面直接连接 Edge，不经过小伴后端。仅控制台可调用 TTS 命令。合成返回 MP3 二进制，由 WebView 播放，取消时废弃过期请求并回收 Blob URL。声音配置位于 `config/tts.json`；音频仅在内存缓存（最多 4 项，总计 8 MiB），不保存合成文本或音频到磁盘。
+
+需要联网，无需语音服务 Key。单次最多 10000 字、16 MiB 音频；语音失败保留文字对话。Edge 接口是非官方读出服务，握手或协议变化时会提示重试。针对性验证：`npx vitest run src/ui/speech/speech.test.ts src/ui/chat/speech-events.test.ts`、`npx vue-tsc --noEmit`；Rust 环境运行 `cargo test --manifest-path src-tauri/Cargo.toml tts:: --locked`，Windows/macOS 需实际验证合成、播放及取消。

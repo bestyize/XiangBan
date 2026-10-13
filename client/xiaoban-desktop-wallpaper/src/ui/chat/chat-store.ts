@@ -4,6 +4,8 @@ import type { ApprovalDecision, ApprovalRequest, ChatEventPayload, Overview, Que
 import { applyEvent, itemsFromHistory, newView, nextId } from './view.ts';
 
 export interface ChatDeps {
+  onReply?(session: string, text: string, key?: string): void;
+  onActivity?(): void;
   desktop: boolean;
   invoke<T>(command: string, args?: Record<string, unknown>): Promise<T>;
   listen<T>(event: string, callback: (payload: T) => void): Promise<() => void>;
@@ -85,7 +87,13 @@ export function createChatStore(deps: ChatDeps): ChatStore {
         try {
           const listeners = await Promise.all([
             deps.listen<ChatEventPayload>('chat-event', ({ session, event }) => { if (!disposed) {
-              applyEvent(viewOf(session, true), event);
+              const view = viewOf(session, true);
+              applyEvent(view, event);
+              if (event.type === 'done' && store.currentId === session) {
+                const last = view.items.at(-1);
+                if (last?.kind === 'assistant' && last.text.trim()) deps.onReply?.(session, last.text, last.id);
+              }
+              if ((event.type === 'cancelled' || event.type === 'error') && store.currentId === session) deps.onActivity?.();
               if (event.type === 'error' && modelFailure(event.message).refresh && Date.now() - refreshedAfterErrorAt > 300000) {
                 refreshedAfterErrorAt = Date.now();
                 void deps.invoke('refresh_ai_providers', { force: true }).catch(() => {});
@@ -148,6 +156,7 @@ export function createChatStore(deps: ChatDeps): ChatStore {
     },
 
     async select(id) {
+      deps.onActivity?.();
       store.currentId = id;
       if (!id) return;
       const curSession = store.sessions.find(s => s.id === id);
@@ -167,6 +176,7 @@ export function createChatStore(deps: ChatDeps): ChatStore {
     },
 
     async send(text, images = []) {
+      deps.onActivity?.();
       if (!deps.desktop) { deps.notify('请在桌面应用中使用聊天', 'error'); return false; }
       let id = store.currentId;
       let created = false;
@@ -212,6 +222,7 @@ export function createChatStore(deps: ChatDeps): ChatStore {
     },
 
     async retry() {
+      deps.onActivity?.();
       const id = store.currentId, view = store.current();
       if (!id || !view || view.running) return false;
       view.running = true; view.status = '';
@@ -225,11 +236,13 @@ export function createChatStore(deps: ChatDeps): ChatStore {
     },
 
     async cancel() {
+      deps.onActivity?.();
       const id = store.currentId;
       if (id) await deps.invoke('chat_cancel', { sessionId: id }).catch(error => deps.notify(error, 'error'));
     },
 
     async remove(id) {
+      if (id === store.currentId) deps.onActivity?.();
       try {
         const sessions = await deps.invoke<SessionSummary[]>('chat_delete_session', { sessionId: id });
         store.sessions = sessions ?? store.sessions.filter(s => s.id !== id);
