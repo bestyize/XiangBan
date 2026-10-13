@@ -5,12 +5,10 @@ name: BuildXiaoBanWallpaper
 # the Actions artifact storage quota. Run it from the Actions tab, or push a tag such as xiaoban-wallpaper-v1.0.0.
 on:
   workflow_dispatch:
-  push:
-    tags:
-      - 'xiaoban-wallpaper-v*'
 
 permissions:
   contents: write
+  actions: write
 
 concurrency:
   group: build-xiaoban-wallpaper-${{ github.ref }}
@@ -174,3 +172,32 @@ jobs:
           GH_REPO: ${{ github.repository }}
           TAG: ${{ needs.release.outputs.tag }}
         run: gh release upload "$TAG" out/* --clobber
+  
+  cleanup-history:
+    name: Keep latest 2 runs
+    needs: [release, windows-x64, macos-aarch64, android-arm64-v8a]
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Delete older workflow runs
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          CURRENT_RUN_ID: ${{ github.run_id }}
+        run: |
+          set -euo pipefail
+
+          gh api --paginate \
+            "repos/$GH_REPO/actions/workflows/build-xiaoban-wallpaper.yml/runs?per_page=100" \
+            --jq '.workflow_runs[] | [.id, .status, .created_at] | @tsv' |
+          sort -k3,3r |
+          awk 'NR > 2 && $2 == "completed" { print $1 }' |
+          while read -r run_id; do
+            if [ "$run_id" != "$CURRENT_RUN_ID" ]; then
+              echo "Deleting run: $run_id"
+              gh api -X DELETE "repos/$GH_REPO/actions/runs/$run_id"
+            fi
+          done
+
