@@ -90,6 +90,21 @@ beforeEach(() => { vi.resetAllMocks(); });
 afterEach(() => { wrapper?.unmount(); wrapper = undefined; });
 
 describe('AI model settings card and provider templates', () => {
+  it('uses the delivered catalogue and locks managed credentials while allowing manual models', async () => {
+    const remote: AiConfigView = { ...configured, catalogueReceived: true, activeProvider: 'official-free', providers: [{
+      ...configured.providers![0], id: 'official-free', name: '小伴免费', type: 'free', remote: true, available: true,
+      defaultModel: 'new-recommendation', models: [{ id: 'model-a', name: '手动模型', description: '保留用户选择' }, { id: 'new-recommendation', name: '推荐模型' }],
+      selectionMode: 'manual', description: '免费服务说明',
+    }] };
+    await open(remote);
+    expect(q('ai-provider-card-deepseek')).toBeNull();
+    expect(q('ai-provider-card-official-free')?.textContent).toContain('免费服务说明');
+    await openModal('official-free');
+    expect(q('ai-api-key')).toBeNull();
+    expect(field('ai-base-url').disabled).toBe(true);
+    expect(field('ai-model').value).toBe('model-a');
+  });
+
   it('renders 4 builtin provider cards and add-custom card, showing "待配置" for providers without key', async () => {
     await open();
     expect(q('ai-provider-card-deepseek')).not.toBeNull();

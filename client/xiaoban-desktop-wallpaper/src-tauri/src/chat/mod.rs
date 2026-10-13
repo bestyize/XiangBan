@@ -436,17 +436,18 @@ pub fn chat_new_session(app: tauri::AppHandle, permission_mode: Option<String>) 
 }
 
 #[tauri::command]
-pub fn chat_send(app: tauri::AppHandle, session_id: String, text: String, images: Option<Vec<String>>) -> Result<SessionSummary, String> {
+pub fn chat_send(app: tauri::AppHandle, session_id: String, text: String, images: Option<Vec<String>>, retry: Option<bool>) -> Result<SessionSummary, String> {
     if !sessions::valid_id(&session_id) {
         return Err("对话编号不对".into());
     }
+    let retry = retry.unwrap_or(false);
     let text = text.trim().to_string();
     let images = images.unwrap_or_default();
     if images.len() > MAX_IMAGES {
         return Err(format!("一次最多发送 {MAX_IMAGES} 张图片"));
     }
     let images = images.iter().map(|raw| clean_image(raw)).collect::<Result<Vec<_>, _>>()?;
-    if text.is_empty() && images.is_empty() {
+    if !retry && text.is_empty() && images.is_empty() {
         return Err("请先输入内容".into());
     }
     if text.chars().count() > MAX_INPUT_CHARS {
@@ -456,7 +457,14 @@ pub fn chat_send(app: tauri::AppHandle, session_id: String, text: String, images
     if lock(&state.runs).contains_key(&session_id) {
         return Err("这个对话还在回答，请等它结束或先停止".into());
     }
+    if retry {
+        let history = JsonlStore::new(Dirs::of(&app)?.sessions()).load(&session_id).map_err(|e| e.to_string())?;
+        if !history.last().is_some_and(|m| m.role == agent_kernel::Role::User) {
+            return Err("这条消息已产生回复或执行工具，无法直接重放。请发送新的消息继续。".into());
+        }
+    }
     let config = ai_config::current(&app)?;
+    crate::ai_catalogue::usable(&app, &config)?;
     if !config.is_complete() {
         return Err("还没有配置模型，请先到“设置 → AI 模型”填写".into());
     }
@@ -505,7 +513,14 @@ pub fn chat_send(app: tauri::AppHandle, session_id: String, text: String, images
                 return;
             }
         };
-        let _ = agent.run_parts(&id, parts_owned, &mut |event| emit(&sender, "chat-event", json!({ "session": session, "event": event })), &cancel);
+        let mut callback = |mut event| {
+            if let agent_kernel::Event::Error { message } = &mut event {
+                if !config_owned.api_key.is_empty() { *message = message.replace(&config_owned.api_key, "<hidden>"); }
+            }
+            emit(&sender, "chat-event", json!({ "session": session, "event": event }));
+        };
+        if retry { let _ = agent.retry_last(&id, &mut callback, &cancel); }
+        else { let _ = agent.run_parts(&id, parts_owned, &mut callback, &cancel); }
         finish_run(&handle, &id);
     });
     if let Err(error) = started {

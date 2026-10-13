@@ -230,3 +230,8 @@ export function createCustomWallpaper(data: {
 }): Promise<{ success: boolean; message: string; item: WallpaperItem }> {
   return request('/wallpapers/custom', 'POST', data)
 }
+
+
+import type { AiCatalogue } from './ai-types'
+export const getAiCatalogue = () => request<AiCatalogue>('/ai/providers')
+export const saveAiCatalogue = (value: AiCatalogue) => request<AiCatalogue>('/ai/providers', 'PUT', value)

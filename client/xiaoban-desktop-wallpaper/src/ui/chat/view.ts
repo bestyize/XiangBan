@@ -1,3 +1,4 @@
+import { modelFailure } from './model-errors.ts';
 import type { ChatItem, KernelEvent, SessionView, WireMessage } from './types.ts';
 
 export function newView(id: string, loaded = false): SessionView {
@@ -83,10 +84,14 @@ export function applyEvent(view: SessionView, event: KernelEvent): void {
       settle(view);
       view.items.push({ kind: 'notice', id: nextId(view), tone: 'info', text: '已停止' });
       break;
-    case 'error':
+    case 'error': {
+      const lastUser = view.items.map(i => i.kind).lastIndexOf('user');
+      const partial = view.items.slice(lastUser + 1).some(i => i.kind === 'tool' || i.kind === 'assistant');
       settle(view);
-      view.items.push({ kind: 'notice', id: nextId(view), tone: 'error', text: event.message });
+      view.items.push({ kind: 'notice', id: nextId(view), tone: 'error', text: modelFailure(event.message).message,
+        canSwitchModel: true, canRetry: lastUser >= 0 && !partial, details: event.message });
       break;
+    }
     case 'usage':
       break;
   }

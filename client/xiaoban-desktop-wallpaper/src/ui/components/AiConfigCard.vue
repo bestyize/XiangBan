@@ -1,14 +1,15 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, onBeforeUnmount, ref } from 'vue';
 import { NAlert, NButton, NInput, NModal, NPopconfirm, NSelect, NSwitch, NTag } from 'naive-ui';
 import { Bot, Cpu, ExternalLink, FolderOpen, Globe, Plus, RefreshCw, Settings, ShieldCheck, Sparkles, Trash2, Wrench } from 'lucide-vue-next';
-import { invoke, type AiConfigView, type AiProtocol, type ProviderConfigView } from '../../bridge.ts';
+import { invoke, listen, type AiConfigView, type AiProtocol, type ProviderConfigView } from '../../bridge.ts';
 import type { ControlStore } from '../control-types.ts';
 import {
   aiProtocols,
   BUILTIN_PROVIDERS,
   endpointPreview,
-  getProviderMeta,
+  getProviderMeta as fallbackMeta,
+  remoteProviderMeta,
   insecureRemote,
   normalizeBaseUrl,
   protocolOption,
@@ -52,15 +53,26 @@ const modalProtocol = ref<AiProtocol>('chat');
 const modalBaseUrl = ref('');
 const modalModel = ref('');
 const modalApiKey = ref('');
+const modalSelectionMode = ref<'manual' | 'recommended'>('manual');
 const modalHasKey = ref(false);
 const modalKeyHint = ref('');
 const confirmingClear = ref(false);
 const fetchedModels = ref<string[]>([]);
 
 const isEditingCustom = computed(() => {
-  return !['deepseek', 'zhipu', 'kimi', 'minimax'].includes(editingId.value);
+  return getProviderSaved(editingId.value)?.isCustom ?? !catalogueProviders.value.some(p => p.id === editingId.value);
 });
 
+const catalogueProviders = computed<ProviderMeta[]>(() => {
+  if (!saved.value.catalogueReceived) return BUILTIN_PROVIDERS.filter(p => p.id !== 'custom');
+  return (saved.value.providers ?? []).filter(p => !p.isCustom && p.available !== false).map(remoteProviderMeta);
+});
+function getProviderMeta(id: string): ProviderMeta {
+  const p = getProviderSaved(id);
+  return p?.remote ? remoteProviderMeta(p) : fallbackMeta(id);
+}
+const isManaged = computed(() => ['free', 'paid'].includes(getProviderSaved(editingId.value)?.type ?? ''));
+const selectedModelDescription = computed(() => currentMeta.value.models?.find(m => m.id === modalModel.value)?.description ?? '');
 const currentMeta = computed<ProviderMeta>(() => getProviderMeta(editingId.value));
 const modalOption = computed(() => protocolOption(modalProtocol.value));
 const modalPreview = computed(() => validateBaseUrl(modalBaseUrl.value) ? '' : endpointPreview(modalProtocol.value, modalBaseUrl.value));
@@ -113,7 +125,7 @@ const activeStatusText = computed(() => {
 
 // User's custom providers
 const customProviders = computed<ProviderConfigView[]>(() => {
-  return (saved.value.providers || []).filter(p => !['deepseek', 'zhipu', 'kimi', 'minimax'].includes(p.id));
+  return (saved.value.providers || []).filter(p => p.isCustom);
 });
 
 // Dropdown options for models in modal
@@ -121,7 +133,7 @@ const allModelOptions = computed(() => {
   const set = new Set<string>();
   fetchedModels.value.forEach(m => set.add(m));
   currentMeta.value.suggestedModels.forEach(m => set.add(m));
-  return Array.from(set).map(m => ({ label: m, value: m }));
+  return Array.from(set).map(m => ({ label: currentMeta.value.models?.find(v => v.id === m)?.name || m, value: m }));
 });
 
 const modalFormError = computed(() => {
@@ -156,7 +168,7 @@ function isProviderActive(id: string): boolean {
 function isProviderFullyConfigured(id: string): boolean {
   const p = getProviderSaved(id);
   if (!p) return false;
-  return Boolean(p.baseUrl && p.model && p.hasKey);
+  return p.available !== false && Boolean(p.baseUrl && p.model && (p.hasKey || p.isCustom));
 }
 
 function fill(view: AiConfigView) {
@@ -166,10 +178,21 @@ function fill(view: AiConfigView) {
   openComputerUse.value = view.openComputerUse ?? false;
 }
 
+let unlisten: (() => void) | undefined;
+onBeforeUnmount(() => unlisten?.());
+async function refreshCatalogue() {
+  if (!props.store.desktop || busy.value) return;
+  busy.value = 'catalogue';
+  try { fill(await invoke<AiConfigView>('refresh_ai_providers', { force: true })); loadError.value = ''; }
+  catch (e) { loadError.value = String(e instanceof Error ? e.message : e); }
+  finally { busy.value = ''; }
+}
 onMounted(async () => {
   if (!props.store.desktop) return;
   try {
     fill(await invoke<AiConfigView>('get_ai_config'));
+    unlisten = await listen<AiConfigView>('ai-config-changed', fill);
+    void invoke<AiConfigView>('refresh_ai_providers', { force: false }).then(fill).catch(() => {});
   } catch (error) {
     loadError.value = String(error instanceof Error ? error.message : error);
   }
@@ -196,6 +219,7 @@ function openConfigureModal(id: string) {
     modalKeyHint.value = '';
   }
 
+  modalSelectionMode.value = p?.selectionMode ?? 'manual';
   modalApiKey.value = '';
   confirmingClear.value = false;
   fetchedModels.value = [];
@@ -203,6 +227,7 @@ function openConfigureModal(id: string) {
 }
 
 function openCreateCustomModal() {
+  modalSelectionMode.value = 'manual';
   const newId = `custom_${Date.now()}`;
   editingId.value = newId;
   modalName.value = '自定义供应商';
@@ -220,7 +245,7 @@ function openCreateCustomModal() {
 async function activateProvider(id: string) {
   if (!props.store.desktop) return;
   const p = getProviderSaved(id);
-  if (!p || !p.baseUrl || !p.model || !p.hasKey) {
+  if (!p || p.available === false || !p.baseUrl || !p.model || (!p.hasKey && !p.isCustom)) {
     props.store.notify('该服务商尚未完整配置（缺少密钥或地址），请先配置', 'info');
     openConfigureModal(id);
     return;
@@ -254,6 +279,7 @@ async function saveProvider(activate: boolean) {
       apiKey: modalApiKey.value.trim() || null,
       clearKey: false,
       activate,
+      selectionMode: modalSelectionMode.value,
     });
     fill(updated);
     modalVisible.value = false;
@@ -392,12 +418,12 @@ function getProviderIcon(id: string) {
         <h2>AI 模型服务商</h2>
         <p data-testid="ai-status">{{ activeStatusText }}</p>
       </div>
-      <Bot :size="20" />
+      <NButton size="small" secondary :disabled="!store.desktop || !!busy" :loading="busy === 'catalogue'" @click="refreshCatalogue">刷新供应商</NButton>
     </div>
 
     <NAlert v-if="!store.desktop" type="info" :show-icon="false">请在桌面应用中配置模型服务。</NAlert>
     <NAlert v-if="loadError" type="warning" :show-icon="false" data-testid="ai-load-error">
-      {{ loadError }}。重新配置并保存即可覆盖。
+      {{ loadError }}。可以稍后刷新，已有配置会保留。
     </NAlert>
 
     <!-- Providers Grid Cards -->
@@ -405,7 +431,7 @@ function getProviderIcon(id: string) {
       <div class="providers-grid">
         <!-- 4 Built-in templates -->
         <article
-          v-for="p in BUILTIN_PROVIDERS.filter(item => item.id !== 'custom')"
+          v-for="p in catalogueProviders"
           :key="p.id"
           class="provider-card"
           :class="{ active: isProviderActive(p.id) }"
@@ -416,7 +442,7 @@ function getProviderIcon(id: string) {
               <component :is="getProviderIcon(p.id)" :size="20" />
               <div class="provider-title">
                 <h3>{{ p.name }}</h3>
-                <span class="provider-sub">官方预设</span>
+                <span class="provider-sub">{{ p.type === 'free' ? '免费服务' : p.type === 'paid' ? '付费服务' : '第三方供应商' }}</span>
               </div>
             </div>
             <div class="status-tags">
@@ -586,7 +612,7 @@ function getProviderIcon(id: string) {
             :value="modalProtocol"
             input-id="ai-protocol"
             :options="protocolChoices"
-            :disabled="!store.desktop || !!busy"
+            :disabled="!store.desktop || !!busy || isManaged"
             data-testid="ai-protocol"
             @update:value="onProtocolChange"
           />
@@ -601,7 +627,7 @@ function getProviderIcon(id: string) {
           <NInput
             v-model:value="modalBaseUrl"
             :placeholder="modalOption.placeholder"
-            :disabled="!store.desktop || !!busy"
+            :disabled="!store.desktop || !!busy || isManaged"
             data-testid="ai-base-url"
             :input-props="{ id: 'ai-base-url', autocomplete: 'off', spellcheck: false }"
           />
@@ -611,7 +637,7 @@ function getProviderIcon(id: string) {
           </NAlert>
         </div>
 
-        <div class="field">
+        <div v-if="!isManaged" class="field">
           <label for="ai-api-key">API 密钥</label>
           <NInput
             v-model:value="modalApiKey"
@@ -644,7 +670,7 @@ function getProviderIcon(id: string) {
               secondary
               type="primary"
               :loading="busy === 'models'"
-              :disabled="!store.desktop || !!busy || !modalBaseUrl.trim()"
+              :disabled="!store.desktop || !!busy || isManaged || !modalBaseUrl.trim()"
               data-testid="ai-fetch-models"
               @click="fetchModels"
             >
@@ -654,6 +680,7 @@ function getProviderIcon(id: string) {
           </div>
           <NInput
             v-model:value="modalModel"
+            @update:value="modalSelectionMode = 'manual'"
             placeholder="输入或从下方选择模型"
             :disabled="!store.desktop || !!busy"
             data-testid="ai-model"
@@ -663,6 +690,7 @@ function getProviderIcon(id: string) {
             <small>常用或拉取到的可用模型：</small>
             <NSelect
               v-model:value="modalModel"
+              @update:value="modalSelectionMode = 'manual'"
               :options="allModelOptions"
               filterable
               placeholder="搜索并选择模型..."
@@ -672,6 +700,12 @@ function getProviderIcon(id: string) {
           </div>
         </div>
 
+        <small v-if="selectedModelDescription">{{ selectedModelDescription }}</small>
+        <label v-if="currentMeta.defaultModel && !isEditingCustom" class="field">
+          <span>跟随推荐模型 · {{ currentMeta.defaultModel }}</span>
+          <NSwitch :value="modalSelectionMode === 'recommended'" @update:value="value => { modalSelectionMode = value ? 'recommended' : 'manual'; if (value) modalModel = currentMeta.defaultModel; }" />
+          <small>手动选择的模型不会被推荐更新覆盖。</small>
+        </label>
         <NAlert v-if="modalFormError" type="error" :show-icon="false" class="form-error" data-testid="ai-form-error">
           {{ modalFormError }}
         </NAlert>

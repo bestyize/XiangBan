@@ -27,7 +27,15 @@ export interface Settings {
 /** `chat` is /chat/completions, `responses` is /responses and `anthropic` is /v1/messages. */
 export type AiProtocol = "chat" | "responses" | "anthropic";
 
+export type ProviderType = "third" | "free" | "paid" | "custom";
 export interface ProviderConfigView {
+  type?: ProviderType;
+  remote?: boolean; available?: boolean; description?: string;
+  defaultModel?: string;
+  models?: { id: string; name: string; description?: string }[];
+  endpoints?: Partial<Record<AiProtocol, string>>;
+  consoleUrl?: string; consoleText?: string;
+  selectionMode?: "manual" | "recommended";
   id: string;
   name: string;
   protocol: AiProtocol;
@@ -40,6 +48,8 @@ export interface ProviderConfigView {
 
 /** What the host tells the web side about the model service. The key itself is never sent back. */
 export interface AiConfigView {
+  catalogueReceived?: boolean;
+  catalogueFetchedAt?: number;
   activeProvider?: string;
   providers?: ProviderConfigView[];
   protocol: AiProtocol;

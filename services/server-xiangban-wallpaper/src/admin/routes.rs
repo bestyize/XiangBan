@@ -20,6 +20,7 @@ async fn no_store(mut response: Response) -> Response {
 /// added to the protected group is private by default.
 pub fn admin_router(state: AppState) -> Router<AppState> {
     let protected = Router::new()
+        .route("/ai/providers", get(crate::ai_providers::admin_get).put(crate::ai_providers::admin_save))
         .route("/desktop/packages", post(crate::app_packages::upload).layer(axum::extract::DefaultBodyLimit::max(513 * 1024 * 1024)))
         .route("/desktop/releases", get(crate::app_packages::list))
         .route("/desktop/releases/{version}", put(crate::app_packages::save).delete(crate::app_packages::remove))

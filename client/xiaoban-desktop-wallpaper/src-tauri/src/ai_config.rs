@@ -32,6 +32,16 @@ pub const DEFAULT_PROVIDERS: &[(&str, &str, &str, &str, &str)] = &[
 #[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 pub struct ProviderConfig {
+    #[serde(rename = "type")] pub provider_type: String,
+    pub remote: bool,
+    pub available: bool,
+    pub description: String,
+    pub default_model: String,
+    pub models: Vec<ModelConfig>,
+    pub endpoints: std::collections::BTreeMap<String, String>,
+    pub console_url: String,
+    pub console_text: String,
+    pub selection_mode: String,
     pub id: String,
     pub name: String,
     pub protocol: String,
@@ -40,9 +50,17 @@ pub struct ProviderConfig {
     pub api_key: String,
 }
 
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct ModelConfig { pub id: String, pub name: String, pub description: String }
+
 impl Default for ProviderConfig {
     fn default() -> Self {
         Self {
+            provider_type: "custom".into(), remote: false, available: true,
+            description: String::new(), default_model: String::new(), models: Vec::new(),
+            endpoints: Default::default(), console_url: String::new(), console_text: String::new(),
+            selection_mode: "manual".into(),
             id: "custom".into(),
             name: "自定义供应商".into(),
             protocol: "chat".into(),
@@ -56,6 +74,11 @@ impl Default for ProviderConfig {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ProviderConfigView {
+    #[serde(rename = "type")] pub provider_type: String,
+    pub remote: bool, pub available: bool, pub description: String,
+    pub default_model: String, pub models: Vec<ModelConfig>,
+    pub endpoints: std::collections::BTreeMap<String, String>,
+    pub console_url: String, pub console_text: String, pub selection_mode: String,
     pub id: String,
     pub name: String,
     pub protocol: String,
@@ -76,11 +99,15 @@ fn make_key_hint(key: &str) -> String {
 
 impl ProviderConfig {
     pub fn is_custom(&self) -> bool {
-        !["deepseek", "zhipu", "kimi", "minimax"].contains(&self.id.as_str())
+        !self.remote && !["deepseek", "zhipu", "kimi", "minimax"].contains(&self.id.as_str())
     }
 
     pub fn view(&self) -> ProviderConfigView {
         ProviderConfigView {
+            provider_type: if self.is_custom() { "custom".into() } else if self.provider_type == "custom" { "third".into() } else { self.provider_type.clone() },
+            remote: self.remote, available: self.available, description: self.description.clone(),
+            default_model: self.default_model.clone(), models: self.models.clone(), endpoints: self.endpoints.clone(),
+            console_url: self.console_url.clone(), console_text: self.console_text.clone(), selection_mode: self.selection_mode.clone(),
             id: self.id.clone(),
             name: if self.name.is_empty() {
                 match self.id.as_str() {
@@ -106,6 +133,11 @@ impl ProviderConfig {
 #[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 pub struct AiConfig {
+    pub catalogue_received: bool,
+    pub catalogue_owner: String,
+    pub catalogue_fetched_at: u64,
+    pub catalogue_etag: String,
+    pub catalogue_refresh_after: u64,
     pub active_provider: String,
     pub providers: Vec<ProviderConfig>,
     /// `chat` (/chat/completions), `responses` (/responses) or `anthropic` (/v1/messages).
@@ -125,6 +157,8 @@ pub struct AiConfig {
 impl Default for AiConfig {
     fn default() -> Self {
         let mut cfg = Self {
+            catalogue_received: false, catalogue_owner: String::new(), catalogue_fetched_at: 0,
+            catalogue_etag: String::new(), catalogue_refresh_after: 21600,
             active_provider: "deepseek".into(),
             providers: Vec::new(),
             protocol: "chat".into(),
@@ -168,6 +202,8 @@ impl fmt::Debug for AiConfig {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AiConfigView {
+    pub catalogue_received: bool,
+    pub catalogue_fetched_at: u64,
     pub active_provider: String,
     pub providers: Vec<ProviderConfigView>,
     pub protocol: String,
@@ -187,6 +223,7 @@ impl AiConfig {
     pub fn view(&self, default_workspace: &Path) -> AiConfigView {
         let providers_view = self.providers.iter().map(|p| p.view()).collect();
         AiConfigView {
+            catalogue_received: self.catalogue_received, catalogue_fetched_at: self.catalogue_fetched_at,
             active_provider: self.active_provider.clone(),
             providers: providers_view,
             protocol: self.protocol.clone(),
@@ -207,14 +244,15 @@ impl AiConfig {
         }
 
         for &(id, name, default_proto, default_url, default_model) in DEFAULT_PROVIDERS {
-            if !self.providers.iter().any(|p| p.id == id) {
+            if !self.catalogue_received && !self.providers.iter().any(|p| p.id == id) {
                 self.providers.push(ProviderConfig {
                     id: id.into(),
                     name: name.into(),
                     protocol: default_proto.into(),
                     base_url: default_url.into(),
                     model: default_model.into(),
-                    api_key: String::new(),
+                    api_key: String::new(), provider_type: "third".into(),
+                    selection_mode: "recommended".into(), ..ProviderConfig::default()
                 });
             }
         }
@@ -366,6 +404,7 @@ pub fn apply(current: &AiConfig, input: &Input<'_>) -> Result<AiConfig, String> 
         p.protocol = protocol;
         p.base_url = base_url;
         p.model = model;
+        p.selection_mode = "manual".into();
         p.api_key = api_key;
     }
     next.normalize();
@@ -410,7 +449,7 @@ pub fn save(path: &Path, value: &AiConfig) -> io::Result<()> {
 
 #[derive(Default)]
 pub struct AiConfigState {
-    io: Mutex<()>,
+    pub(crate) io: Mutex<()>,
 }
 
 pub(crate) fn path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
@@ -488,6 +527,7 @@ pub fn save_ai_provider(
     api_key: Option<String>,
     clear_key: bool,
     activate: bool,
+    selection_mode: Option<String>,
 ) -> Result<AiConfigView, String> {
     let path = path(&app)?;
     let state = app.state::<AiConfigState>();
@@ -502,6 +542,17 @@ pub fn save_ai_provider(
     }
 
     let existing_idx = config.providers.iter().position(|p| p.id == provider_id);
+    let previous = existing_idx.map(|i| config.providers[i].clone()).unwrap_or_default();
+    if previous.remote && !previous.available { return Err("该供应商已停用，请选择其他模型".into()); }
+    if previous.remote && previous.provider_type != "third" {
+        if clean_url != previous.base_url || protocol != previous.protocol || api_key.is_some() || clear_key {
+            return Err("官方服务的地址、协议和凭证由服务端管理".into());
+        }
+        if !previous.models.iter().any(|m| m.id == clean_mdl) { return Err("该模型已停用，请选择其他模型".into()); }
+    }
+    let mode = selection_mode.as_deref().unwrap_or("manual");
+    if !["manual", "recommended"].contains(&mode) { return Err("模型选择方式无效".into()); }
+    let clean_mdl = if mode == "recommended" && !previous.default_model.is_empty() { previous.default_model.clone() } else { clean_mdl };
     let (current_name, current_key) = match existing_idx {
         Some(i) => (config.providers[i].name.clone(), config.providers[i].api_key.clone()),
         None => (String::new(), String::new()),
@@ -525,6 +576,7 @@ pub fn save_ai_provider(
         base_url: clean_url.clone(),
         model: clean_mdl.clone(),
         api_key: new_key.clone(),
+        selection_mode: mode.into(), ..previous
     };
 
     if let Some(idx) = existing_idx {
@@ -556,7 +608,7 @@ pub fn delete_ai_provider(
     let mut config = load(&path).unwrap_or_default();
     config.normalize();
 
-    if ["deepseek", "zhipu", "kimi", "minimax"].contains(&provider_id.as_str()) {
+    if config.providers.iter().any(|p| p.id == provider_id && !p.is_custom()) {
         return Err("内置服务商不能删除".into());
     }
     if config.active_provider == provider_id {
@@ -588,6 +640,10 @@ pub fn switch_ai_provider(
         .ok_or_else(|| format!("未找到服务商配置：{provider_id}"))?
         .clone();
 
+    if !provider.available { return Err("该供应商已停用，请切换模型".into()); }
+    if provider.remote && provider.provider_type != "third" && !provider.models.iter().any(|m| m.id == provider.model) {
+        return Err("该模型已停用，请选择其他模型".into());
+    }
     if provider.base_url.trim().is_empty() {
         return Err("该服务商尚未配置 API 地址，请先点击配置".into());
     }
@@ -985,7 +1041,7 @@ mod tests {
 
     #[test]
     fn only_the_control_window_may_read_or_change_it() {
-        for command in ["get_ai_config", "save_ai_config", "pick_workspace", "fetch_ai_models", "save_ai_provider", "switch_ai_provider", "delete_ai_provider", "save_ai_preferences"] {
+        for command in ["refresh_ai_providers", "get_ai_config", "save_ai_config", "pick_workspace", "fetch_ai_models", "save_ai_provider", "switch_ai_provider", "delete_ai_provider", "save_ai_preferences"] {
             assert!(crate::content::permitted("control", command), "{command}");
             for label in ["pet", "wallpaper", "care", "games", "media-a", "media-preview", "ritual", "widgets"] {
                 assert!(!crate::content::permitted(label, command), "{label} must not reach {command}");
@@ -1059,6 +1115,7 @@ mod tests {
             base_url: "http://localhost:11434/v1".into(),
             model: "llama3".into(),
             api_key: String::new(),
+            ..ProviderConfig::default()
         });
 
         let view = cfg.view(Path::new("/work"));
