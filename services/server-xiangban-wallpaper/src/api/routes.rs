@@ -27,6 +27,7 @@ pub fn create_api_router(state: AppState) -> Router {
         .route("/api/v1/desktop/wallpapers/{id}", get(crate::desktop::wallpaper))
         .route("/api/v1/desktop/downloads/{id}", get(crate::app_packages::download))
         .route_layer(axum::middleware::map_response(crate::desktop::no_store))
+        .route("/api/v1/ai/providers", get(crate::ai_providers::get))
         // Account & User endpoints
         .route("/api/v1/auth/config", get(get_auth_config))
         .route("/api/v1/user/me", get(get_current_user))

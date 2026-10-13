@@ -1,5 +1,12 @@
 # 开发导航
 
+## GitHub Actions 手动触发强制规范
+
+- **所有 GitHub Actions Workflow 必须只能手动触发**：在 `.github/workflows/*.yml` 和 `*.yaml` 中，`on` 只能配置 `workflow_dispatch`。
+- **禁止所有自动触发**，包括但不限于 `push`、`pull_request`、`pull_request_target`、`schedule`、`release`、`workflow_run`、`repository_dispatch`、`workflow_call`。
+- 新增或修改 Workflow 时，应删除其他触发器；禁止通过推送代码、标签、PR、定时事件或其他 Workflow 自动发起 CI、构建、测试、打包和部署。
+- 本规范覆盖所有子项目与平台，任何 AI 编码助手均不得擅自添加自动触发 Workflow。需要构建时，由用户在 GitHub Actions 页面手动运行。
+
 先阅读根目录 README.md，再阅读本次修改涉及的子项目 README.md，确认职责、实现状态、依赖边界和验证命令。
 
 客户端允许重复实现，按任务决定是否复用。接口库保持协议兼容，业务策略归后端。目录迁移时同时检查构建、测试、部署和文档路径。

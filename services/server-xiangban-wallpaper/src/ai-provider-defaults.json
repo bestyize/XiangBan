@@ -1,0 +1,165 @@
+{
+  "version": 1,
+  "revision": 0,
+  "refreshAfterSeconds": 21600,
+  "providers": [
+    {
+      "id": "deepseek",
+      "provider": "DeepSeek",
+      "description": "填写自己的 API Key 使用该供应商。",
+      "endPoint": "https://api.deepseek.com",
+      "protocol": "OpenAI Chat Completions",
+      "type": "third",
+      "enabled": true,
+      "defaultModel": "deepseek-chat",
+      "models": [
+        {
+          "id": "deepseek-chat",
+          "name": "deepseek-chat",
+          "description": "",
+          "enabled": true
+        },
+        {
+          "id": "deepseek-reasoner",
+          "name": "deepseek-reasoner",
+          "description": "",
+          "enabled": true
+        }
+      ],
+      "endpoints": {
+        "OpenAI Chat Completions": "https://api.deepseek.com",
+        "OpenAI Responses": "https://api.deepseek.com",
+        "Anthropic Messages": "https://api.deepseek.com/anthropic"
+      },
+      "consoleUrl": "https://platform.deepseek.com/api_keys",
+      "consoleText": "前往开放平台获取 API Key",
+      "userAccess": []
+    },
+    {
+      "id": "zhipu",
+      "provider": "智谱 BigModel",
+      "description": "填写自己的 API Key 使用该供应商。",
+      "endPoint": "https://open.bigmodel.cn/api/paas/v4",
+      "protocol": "OpenAI Chat Completions",
+      "type": "third",
+      "enabled": true,
+      "defaultModel": "glm-4-flash",
+      "models": [
+        {
+          "id": "glm-4-plus",
+          "name": "glm-4-plus",
+          "description": "",
+          "enabled": true
+        },
+        {
+          "id": "glm-4-flash",
+          "name": "glm-4-flash",
+          "description": "",
+          "enabled": true
+        },
+        {
+          "id": "glm-4-air",
+          "name": "glm-4-air",
+          "description": "",
+          "enabled": true
+        },
+        {
+          "id": "glm-4-long",
+          "name": "glm-4-long",
+          "description": "",
+          "enabled": true
+        }
+      ],
+      "endpoints": {
+        "OpenAI Chat Completions": "https://open.bigmodel.cn/api/paas/v4",
+        "OpenAI Responses": "https://open.bigmodel.cn/api/v1",
+        "Anthropic Messages": "https://open.bigmodel.cn/api/anthropic"
+      },
+      "consoleUrl": "https://open.bigmodel.cn/usercenter/apikeys",
+      "consoleText": "前往开放平台获取 API Key",
+      "userAccess": []
+    },
+    {
+      "id": "kimi",
+      "provider": "Kimi",
+      "description": "填写自己的 API Key 使用该供应商。",
+      "endPoint": "https://api.moonshot.cn/v1",
+      "protocol": "OpenAI Chat Completions",
+      "type": "third",
+      "enabled": true,
+      "defaultModel": "kimi-k2-0905-preview",
+      "models": [
+        {
+          "id": "kimi-k2-0905-preview",
+          "name": "kimi-k2-0905-preview",
+          "description": "",
+          "enabled": true
+        },
+        {
+          "id": "kimi-k2-turbo-preview",
+          "name": "kimi-k2-turbo-preview",
+          "description": "",
+          "enabled": true
+        },
+        {
+          "id": "moonshot-v1-auto",
+          "name": "moonshot-v1-auto",
+          "description": "",
+          "enabled": true
+        },
+        {
+          "id": "moonshot-v1-128k",
+          "name": "moonshot-v1-128k",
+          "description": "",
+          "enabled": true
+        }
+      ],
+      "endpoints": {
+        "OpenAI Chat Completions": "https://api.moonshot.cn/v1",
+        "OpenAI Responses": "https://api.moonshot.cn/v1",
+        "Anthropic Messages": "https://api.moonshot.cn/anthropic"
+      },
+      "consoleUrl": "https://platform.kimi.com/console/api-keys",
+      "consoleText": "前往开放平台获取 API Key",
+      "userAccess": []
+    },
+    {
+      "id": "minimax",
+      "provider": "MiniMax",
+      "description": "填写自己的 API Key 使用该供应商。",
+      "endPoint": "https://api.minimax.cn/v1",
+      "protocol": "OpenAI Chat Completions",
+      "type": "third",
+      "enabled": true,
+      "defaultModel": "MiniMax-M2",
+      "models": [
+        {
+          "id": "MiniMax-M2",
+          "name": "MiniMax-M2",
+          "description": "",
+          "enabled": true
+        },
+        {
+          "id": "MiniMax-Text-01",
+          "name": "MiniMax-Text-01",
+          "description": "",
+          "enabled": true
+        },
+        {
+          "id": "abab6.5s-chat",
+          "name": "abab6.5s-chat",
+          "description": "",
+          "enabled": true
+        }
+      ],
+      "endpoints": {
+        "OpenAI Chat Completions": "https://api.minimax.cn/v1",
+        "OpenAI Responses": "https://api.minimax.cn/v1",
+        "Anthropic Messages": "https://api.minimax.cn/anthropic"
+      },
+      "consoleUrl": "https://platform.minimaxi.com/user-center/basic-information/interface-key",
+      "consoleText": "前往开放平台获取 API Key",
+      "userAccess": []
+    }
+  ]
+}

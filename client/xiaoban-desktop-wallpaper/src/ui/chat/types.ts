@@ -56,7 +56,7 @@ export type ChatItem =
   | { kind: 'user'; id: string; text: string; images: string[] }
   | { kind: 'assistant'; id: string; text: string; streaming: boolean }
   | { kind: 'tool'; id: string; name: string; arguments: string; output: string; status: 'running' | 'done' | 'error' }
-  | { kind: 'notice'; id: string; tone: 'info' | 'warning' | 'error'; text: string; canContinue?: boolean };
+  | { kind: 'notice'; id: string; tone: 'info' | 'warning' | 'error'; text: string; canContinue?: boolean; canSwitchModel?: boolean; canRetry?: boolean; details?: string };
 
 export interface SessionView {
   id: string;

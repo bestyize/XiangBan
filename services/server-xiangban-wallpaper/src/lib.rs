@@ -1,4 +1,5 @@
 pub mod admin;
+pub mod ai_providers;
 pub mod app_packages;
 pub mod api;
 pub mod auth;

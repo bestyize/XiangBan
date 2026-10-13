@@ -81,7 +81,7 @@ describe('events while an answer is running', () => {
     for (const [event, tone, text] of [
       [{ type: 'done' }, undefined, undefined],
       [{ type: 'cancelled' }, 'info', '已停止'],
-      [{ type: 'error', message: '模型不可用' }, 'error', '模型不可用'],
+      [{ type: 'error', message: '模型不可用' }, 'error', '暂时无法完成回复，可以重试或切换模型。'],
     ] as const) {
       const view = newView('s1', true);
       view.running = true;

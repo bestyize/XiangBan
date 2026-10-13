@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import { NButton, NInput } from 'naive-ui';
-import { ArrowDown, Check, FolderOpen, ImagePlus, LoaderCircle, MessageSquarePlus, SendHorizontal, Shield, ShieldAlert, Square, Trash2, X, Zap } from 'lucide-vue-next';
+import { ArrowDown, Check, FolderOpen, ImagePlus, LoaderCircle, MessageSquarePlus, SendHorizontal, Volume2, Shield, ShieldAlert, Square, Trash2, X, Zap } from 'lucide-vue-next';
 import { invoke } from '../../bridge.ts';
 import type { ControlStore } from '../control-types.ts';
+import ModelSwitchDialog from '../components/ModelSwitchDialog.vue';
 import MarkdownView from '../chat/MarkdownView.ts';
 import { CONTINUE_TEXT } from '../chat/chat-store.ts';
 import { approvalPreview, clip, formatAgo, isImeEnter, isNearBottom, prettyArguments, riskVerb, toolLabel } from '../chat/format.ts';
@@ -14,6 +15,10 @@ const props = defineProps<{ store: ControlStore }>();
 const chat = props.store.chat;
 
 const draft = ref('');
+const modelDialog = ref(false);
+const retryAfterSwitch = ref(false);
+function chooseModel(retry = false) { retryAfterSwitch.value = retry; modelDialog.value = true; }
+async function modelSwitched() { await chat.refresh(); if (retryAfterSwitch.value) await chat.retry(); props.store.notify('模型已切换', 'success'); }
 const composing = ref(false);
 const scroller = ref<HTMLElement | null>(null);
 const stick = ref(true);
@@ -150,7 +155,7 @@ const continueAnswer = () => { stick.value = true; void chat.send(CONTINUE_TEXT)
 
 const choose = (id: string | null) => { confirmingId.value = ''; void chat.select(id); };
 async function remove(id: string) { confirmingId.value = ''; await chat.remove(id); }
-function openSettings() { props.store.settingsTab = 'ai'; props.store.navigate('settings'); }
+function openSettings() { modelDialog.value = false; props.store.settingsTab = 'ai'; props.store.navigate('settings'); }
 
 const decide = (request: ApprovalRequest, decision: ApprovalDecision) => chat.answerApproval(request, decision);
 function answer(request: QuestionRequest, value: string | null) {
@@ -170,6 +175,7 @@ async function openLink(href: string) {
 </script>
 
 <template>
+  <ModelSwitchDialog v-model:show="modelDialog" :retry="retryAfterSwitch" @switched="modelSwitched" @settings="openSettings" />
   <section class="chat-page" data-testid="chat-page">
     <aside class="chat-side" aria-label="对话列表">
       <div class="side-head">
@@ -200,6 +206,7 @@ async function openLink(href: string) {
       <header class="chat-head">
         <h2 data-testid="chat-title">{{ title }}</h2>
         <div class="head-actions">
+          <button v-if="store.speech && store.speech.status !== 'idle'" type="button" class="link" data-testid="chat-speech-status" @click="store.speech.stop()"><Volume2 :size="14" />{{ store.speech.status === 'synthesizing' ? '取消合成' : '停止朗读' }}</button>
           <div class="permission-toggle" role="group" aria-label="权限模式" data-testid="chat-permission-toggle">
             <button
               type="button"
@@ -249,7 +256,11 @@ async function openLink(href: string) {
               <div v-if="item.kind === 'user'" class="msg user" data-testid="msg-user"><div class="bubble"><div v-if="item.images.length" class="bubble-images"><img v-for="(url, n) in item.images" :key="n" :src="url" :alt="`第 ${n + 1} 张图片`" :data-testid="`msg-user-image-${n}`" @click="preview = url" /></div><template v-if="item.text">{{ item.text }}</template></div></div>
               <div v-else-if="item.kind === 'assistant'" class="msg assistant" data-testid="msg-assistant">
                 <img class="avatar" src="/xiaoban.svg" alt="" width="28" height="28" />
-                <div class="answer"><MarkdownView :source="item.text" @open="openLink" /><span v-if="item.streaming" class="cursor" aria-hidden="true"></span></div>
+                <div class="answer"><MarkdownView :source="item.text" @open="openLink" /><span v-if="item.streaming" class="cursor" aria-hidden="true"></span>
+                  <button v-if="store.speech && !item.streaming && item.text.trim()" type="button" class="link speech-button" :disabled="!store.desktop" :aria-label="store.speech.currentKey === item.id ? '停止朗读' : '朗读回复'" data-testid="chat-read-reply" @click="store.speech.currentKey === item.id ? store.speech.stop() : store.speech.speak(item.text, item.id)">
+                    <Volume2 :size="14" />{{ store.speech.currentKey === item.id ? (store.speech.status === 'synthesizing' ? '取消合成' : '停止朗读') : '朗读' }}
+                  </button>
+                </div>
               </div>
               <template v-else-if="item.kind === 'tool'">
                 <details v-if="!chat.hideToolCalls" class="tool" :class="item.status" :data-testid="`tool-${item.id}`">
@@ -265,6 +276,9 @@ async function openLink(href: string) {
               </template>
               <div v-else-if="item.kind === 'notice'" class="notice" :class="item.tone" :data-testid="`notice-${item.tone}`" :role="item.tone === 'error' ? 'alert' : 'status'">
                 {{ item.text }}
+                <details v-if="item.details"><summary>错误详情</summary><span>{{ item.details }}</span></details>
+                <button v-if="item.canSwitchModel && !view.running" type="button" class="link" @click="chooseModel(!!item.canRetry)">切换模型</button>
+                <button v-if="item.canRetry && !view.running" type="button" class="link" @click="chat.retry()">重试</button>
                 <button v-if="item.canContinue && !view.running" type="button" class="link" data-testid="chat-continue" @click="continueAnswer">继续</button>
               </div>
             </template>
@@ -285,7 +299,8 @@ async function openLink(href: string) {
               <header><span>{{ request.question }}</span></header>
               <div v-if="request.options.length" class="options"><NButton v-for="(option, n) in request.options" :key="option" size="small" :data-testid="`question-option-${n}`" @click="answer(request, option)">{{ option }}</NButton></div>
               <footer>
-                <NInput v-model:value="answerText" size="small" placeholder="或者自己回答" data-testid="question-input" @keydown.enter="!isImeEnter($event, composing) && answerText.trim() && answer(request, answerText)" />
+                <button type="button" class="link" :disabled="running" @click="chooseModel()">切换模型</button>
+          <NInput v-model:value="answerText" size="small" placeholder="或者自己回答" data-testid="question-input" @keydown.enter="!isImeEnter($event, composing) && answerText.trim() && answer(request, answerText)" />
                 <NButton type="primary" size="small" :disabled="!answerText.trim()" data-testid="question-submit" @click="answer(request, answerText)">回答</NButton>
                 <NButton size="small" quaternary data-testid="question-skip" @click="answer(request, null)">跳过</NButton>
               </footer>
@@ -326,6 +341,8 @@ async function openLink(href: string) {
 </template>
 
 <style scoped>
+.speech-button{display:inline-flex;align-items:center;gap:5px;margin-top:8px;font-size:12px}
+
 .chat-page{flex:1;min-height:0;display:grid;grid-template-columns:268px minmax(0,1fr);background:var(--ui-app-bg)}
 .chat-side{border-right:1px solid var(--ui-border);display:flex;flex-direction:column;min-height:0;background:var(--ui-surface)}
 .side-head{padding:16px 14px 10px}

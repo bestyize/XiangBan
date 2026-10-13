@@ -4,6 +4,23 @@ use sqlx::Row;
 use std::collections::HashMap;
 
 impl Store {
+    pub async fn update_ai_catalogue<F>(&self, change: F) -> Result<crate::ai_providers::Catalogue, AppError>
+    where F: FnOnce(&mut crate::ai_providers::Catalogue) -> Result<(), AppError> {
+        let mut tx = self.pool.begin().await?;
+        let initial = serde_json::to_string(&crate::ai_providers::Catalogue::default())
+            .map_err(|_| AppError::Internal("模型默认配置无效".into()))?;
+        sqlx::query("INSERT INTO app_settings (key,value) VALUES ('ai.providers',$1) ON CONFLICT (key) DO NOTHING")
+            .bind(initial).execute(&mut *tx).await?;
+        let raw: String = sqlx::query_scalar("SELECT value FROM app_settings WHERE key='ai.providers' FOR UPDATE")
+            .fetch_one(&mut *tx).await?;
+        let mut value = serde_json::from_str(&raw).map_err(|_| AppError::Internal("模型配置无法读取".into()))?;
+        change(&mut value)?;
+        let json = serde_json::to_string(&value).map_err(|_| AppError::Internal("模型配置无法保存".into()))?;
+        sqlx::query("UPDATE app_settings SET value=$1 WHERE key='ai.providers'").bind(json).execute(&mut *tx).await?;
+        tx.commit().await?;
+        Ok(value)
+    }
+
     pub async fn update_desktop_config<F>(
         &self,
         change: F,

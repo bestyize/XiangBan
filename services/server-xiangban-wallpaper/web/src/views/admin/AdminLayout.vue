@@ -11,6 +11,7 @@ const router = useRouter()
 const admin = useAdmin()
 
 const NAV: { to: string; label: string; icon: IconName }[] = [
+  { to: '/admin/ai-providers', label: '模型供应商', icon: 'key' },
   { to: '/admin/collector', label: '采集工作台', icon: 'download' },
   { to: '/admin/wallpapers', label: '壁纸图库', icon: 'image' },
   { to: '/admin/upload', label: '自定义上架', icon: 'upload' },

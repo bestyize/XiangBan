@@ -1,8 +1,11 @@
+import { modelFailure } from './model-errors.ts';
 import { reactive } from 'vue';
 import type { ApprovalDecision, ApprovalRequest, ChatEventPayload, Overview, QuestionRequest, SessionSummary, SessionView, WireMessage } from './types.ts';
 import { applyEvent, itemsFromHistory, newView, nextId } from './view.ts';
 
 export interface ChatDeps {
+  onReply?(session: string, text: string, key?: string): void;
+  onActivity?(): void;
   desktop: boolean;
   invoke<T>(command: string, args?: Record<string, unknown>): Promise<T>;
   listen<T>(event: string, callback: (payload: T) => void): Promise<() => void>;
@@ -33,6 +36,7 @@ export interface ChatStore {
   select(id: string | null): Promise<void>;
   /** Returns false when nothing was sent, so the caller can give the text back to the user. */
   send(text: string, images?: string[]): Promise<boolean>;
+  retry(): Promise<boolean>;
   cancel(): Promise<void>;
   remove(id: string): Promise<void>;
   answerApproval(request: ApprovalRequest, decision: ApprovalDecision): Promise<void>;
@@ -47,6 +51,7 @@ export function createChatStore(deps: ChatDeps): ChatStore {
   const unsubscribers: (() => void)[] = [];
   let starting: Promise<void> | null = null;
   let disposed = false;
+  let refreshedAfterErrorAt = 0;
 
   const store: ChatStore = reactive({
     ready: false,
@@ -81,7 +86,19 @@ export function createChatStore(deps: ChatDeps): ChatStore {
         if (!deps.desktop) { store.ready = true; return; }
         try {
           const listeners = await Promise.all([
-            deps.listen<ChatEventPayload>('chat-event', ({ session, event }) => { if (!disposed) applyEvent(viewOf(session, true), event); }),
+            deps.listen<ChatEventPayload>('chat-event', ({ session, event }) => { if (!disposed) {
+              const view = viewOf(session, true);
+              applyEvent(view, event);
+              if (event.type === 'done' && store.currentId === session) {
+                const last = view.items.at(-1);
+                if (last?.kind === 'assistant' && last.text.trim()) deps.onReply?.(session, last.text, last.id);
+              }
+              if ((event.type === 'cancelled' || event.type === 'error') && store.currentId === session) deps.onActivity?.();
+              if (event.type === 'error' && modelFailure(event.message).refresh && Date.now() - refreshedAfterErrorAt > 300000) {
+                refreshedAfterErrorAt = Date.now();
+                void deps.invoke('refresh_ai_providers', { force: true }).catch(() => {});
+              }
+            } }),
             deps.listen<ApprovalRequest>('chat-approval', request => { if (!disposed) addPending(viewOf(request.session, true).approvals, request); }),
             deps.listen<QuestionRequest>('chat-question', request => { if (!disposed) addPending(viewOf(request.session, true).questions, request); }),
             deps.listen<SessionSummary[]>('chat-sessions-changed', sessions => { if (!disposed) store.sessions = sessions; }),
@@ -139,6 +156,7 @@ export function createChatStore(deps: ChatDeps): ChatStore {
     },
 
     async select(id) {
+      deps.onActivity?.();
       store.currentId = id;
       if (!id) return;
       const curSession = store.sessions.find(s => s.id === id);
@@ -158,6 +176,7 @@ export function createChatStore(deps: ChatDeps): ChatStore {
     },
 
     async send(text, images = []) {
+      deps.onActivity?.();
       if (!deps.desktop) { deps.notify('请在桌面应用中使用聊天', 'error'); return false; }
       let id = store.currentId;
       let created = false;
@@ -202,12 +221,28 @@ export function createChatStore(deps: ChatDeps): ChatStore {
       }
     },
 
+    async retry() {
+      deps.onActivity?.();
+      const id = store.currentId, view = store.current();
+      if (!id || !view || view.running) return false;
+      view.running = true; view.status = '';
+      const previousFailure = [...view.items].reverse().find(i => i.kind === 'notice' && i.canRetry)?.id;
+      try {
+        upsert(await deps.invoke<SessionSummary>('chat_send', { sessionId: id, text: '', retry: true }));
+        // Keep the original user message and drop only the now-resolved failure notice.
+        view.items = view.items.filter(i => i.id !== previousFailure);
+        return true;
+      } catch (e) { view.running = false; deps.notify(e, 'error'); return false; }
+    },
+
     async cancel() {
+      deps.onActivity?.();
       const id = store.currentId;
       if (id) await deps.invoke('chat_cancel', { sessionId: id }).catch(error => deps.notify(error, 'error'));
     },
 
     async remove(id) {
+      if (id === store.currentId) deps.onActivity?.();
       try {
         const sessions = await deps.invoke<SessionSummary[]>('chat_delete_session', { sessionId: id });
         store.sessions = sessions ?? store.sessions.filter(s => s.id !== id);

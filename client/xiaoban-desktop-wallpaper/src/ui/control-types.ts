@@ -1,3 +1,4 @@
+import type { SpeechStore } from './speech/store.ts';
 import type { AccountSession, AppInfo, CodeLoginOutcome, LoginResult, SendCodeResult, Settings, UsernameCheck, WallpaperLibrary, WallpaperOptions } from "../bridge.ts";
 import type { EffectsChoice } from "../effects/types.ts";
 import type { ImportOutcome, LoadedPacks } from "../effects/catalog.ts";
@@ -16,9 +17,10 @@ export interface ControlStore {
   showLoginModal: boolean;
   page: ControlPage;
   /** Which tab of the settings page opens next; the chat sends people to "ai" when no model is set up. */
-  settingsTab: "general" | "ai" | "about";
+  settingsTab: "general" | "ai" | "voice" | "about";
   /** The assistant's conversations. Lives here so an answer keeps arriving while another page is open. */
   chat: ChatStore;
+  speech: SpeechStore;
   ready: boolean;
   initialError: string;
   desktop: boolean;

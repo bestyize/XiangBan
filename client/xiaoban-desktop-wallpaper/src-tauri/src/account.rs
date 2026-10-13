@@ -213,6 +213,7 @@ fn require_identifier(identifier: &str) -> Result<String, AccountFailure> {
 fn remember(app: &tauri::AppHandle, result: &LoginResult) -> Result<(), AccountFailure> {
     save_session(app, &result.session)?;
     *app.state::<AccountState>().session.lock().unwrap() = Some(result.session.clone());
+    crate::ai_catalogue::account_changed(app);
     let _ = app.emit("account-changed", Some(result.session.clone()));
     Ok(())
 }
@@ -324,6 +325,7 @@ pub fn get_account_session(app: tauri::AppHandle) -> Option<AccountSession> {
 pub async fn logout_account(app: tauri::AppHandle) -> Result<(), String> {
     let session = app.state::<AccountState>().session.lock().unwrap().take();
     let _ = clear_session(&app);
+    crate::ai_catalogue::account_changed(&app);
     let _ = app.emit("account-changed", None::<AccountSession>);
 
     if let Some(sess) = session {
