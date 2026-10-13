@@ -7,7 +7,7 @@ export const DOWNLOAD_CANCELLED = "已取消下载";
 export type Selection = { source: "local"; item: WallpaperEntry } | { source: "online"; item: SiteWallpaper };
 export function cloneOptions(options: WallpaperOptions) { return JSON.parse(JSON.stringify(options)) as WallpaperOptions; }
 export function useWallpaperWorkspace(store: ControlStore) {
-  const tab = ref(store.desktop && !store.info?.uiSmoke ? "online" : "local"), media = ref(""), query = ref(""), category = ref(""), page = ref(1), localSource = ref("");
+  const tab = ref("local"), media = ref(""), query = ref(""), category = ref(""), page = ref(1), localSource = ref("");
   const selection = ref<Selection | null>(null), draft = ref(cloneOptions(store.settings.wallpaperOptions)), busy = ref(false), loading = ref(false), error = ref("");
   const feed = reactive<{items: SiteWallpaper[]; has_more: boolean; total: number}>({items: [], has_more: false,total: 0});
   const progress = ref<{id:string;received:number;total:number} | null>(null);
@@ -51,7 +51,9 @@ export function useWallpaperWorkspace(store: ControlStore) {
   watch([media,category], () => {page.value = 1;});
   watch(() => store.settings.websiteUrl, () => { generation++; prepared.clear(); Object.assign(feed,{items:[],has_more:false,total:0}); categories.value=[]; selection.value=null; page.value=1; if(tab.value === "online") {void load();void loadCategories();} });
   onScopeDispose(() => {generation++;disposed=true;unlisten?.();progress.value=null;progressId=undefined;});
-  const localItems = computed(() => store.library.items.filter(entry => (!media.value || entry.definition.kind === media.value) && (!localSource.value || entry.source === localSource.value) && entry.definition.title.toLowerCase().includes(query.value.toLowerCase())));
+  /** 动画（程序绘制）排在最前，其次图片、视频；排序保持稳定，同类型内仍按原有顺序。 */
+  const KIND_ORDER: Record<string, number> = { canvas: 0, image: 1, video: 2 };
+  const localItems = computed(() => store.library.items.filter(entry => (!media.value || entry.definition.kind === media.value) && (!localSource.value || entry.source === localSource.value) && entry.definition.title.toLowerCase().includes(query.value.toLowerCase())).sort((a, b) => (KIND_ORDER[a.definition.kind] ?? 3) - (KIND_ORDER[b.definition.kind] ?? 3)));
   async function prepare(value: Selection) {
     if(value.source === "local") return value.item.definition.id;
     const site = store.settings.websiteUrl, key = value.item.id;
