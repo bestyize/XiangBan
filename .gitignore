@@ -36,7 +36,7 @@ services/server-pan/backend/target/
 # Local tool config
 .claude/launch.json
 .claude/worktrees/
-.claude/plan/
+.claude/plans/
 
 # Account center generated keys
 account_data/
