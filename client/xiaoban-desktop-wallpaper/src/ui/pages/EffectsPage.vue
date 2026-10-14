@@ -11,6 +11,10 @@ const props = defineProps<{ store: ControlStore }>();
 const choice = computed(() => normalizeChoice(props.store.settings.effects));
 const packs = computed(() => props.store.effectList.packs);
 const chosen = computed(() => packs.value.find(pack => pack.id === choice.value.selected) ?? null);
+// A saved desktop selection does not autoplay when this page opens.
+const previewId = ref('');
+const hoveredId = ref('');
+const playingId = computed(() => hoveredId.value || previewId.value);
 // While the list is still loading nothing can be missing; afterwards a chosen effect that is gone is worth saying.
 const missing = computed(() => choice.value.selected !== '' && packs.value.length > 0 && !chosen.value);
 const message = (error: unknown) => error instanceof Error ? error.message : String(error);
@@ -27,7 +31,7 @@ watch(() => [chosen.value?.id, chosen.value ? JSON.stringify(paramsOf(choice.val
 async function apply(next: EffectsChoice) {
   try { await props.store.setEffects(next); } catch (error) { props.store.notify(message(error), 'error'); }
 }
-function choose(id: string) { void apply({ selected: id, params: choice.value.params }); }
+function choose(id: string) { previewId.value = id; void apply({ selected: id, params: choice.value.params }); }
 function commit() {
   timer = null;
   if (!chosen.value) return;
@@ -65,8 +69,8 @@ onBeforeUnmount(() => { if (timer) { clearTimeout(timer); commit(); } });
         <span class="effect-name"><b>无特效</b><small>桌面保持安静</small></span>
         <Check v-if="!chosen" :size="16" class="effect-check" />
       </button>
-      <button v-for="pack in packs" :key="pack.id" class="effect-card" :class="{ on: chosen?.id === pack.id }" :aria-pressed="chosen?.id === pack.id" :data-testid="`effect-${pack.id}`" @click="choose(pack.id)">
-        <span class="effect-stage"><EffectPreview :pack="pack" :paused="store.settings.paused" :fps="store.settings.fps" /></span>
+      <button v-for="pack in packs" :key="pack.id" class="effect-card" :class="{ on: chosen?.id === pack.id }" :aria-pressed="chosen?.id === pack.id" :data-testid="`effect-${pack.id}`" @click="choose(pack.id)" @mouseenter="hoveredId = pack.id" @mouseleave="hoveredId = ''">
+        <span class="effect-stage"><EffectPreview :pack="pack" :playing="playingId === pack.id" :paused="store.settings.paused" :fps="store.settings.fps" /></span>
         <span class="effect-name"><b>{{ pack.name }}<i v-if="pack.source === 'user'" class="mine">我的</i></b><small>{{ pack.description }}</small></span>
         <Check v-if="chosen?.id === pack.id" :size="16" class="effect-check" />
       </button>
@@ -100,3 +104,4 @@ onBeforeUnmount(() => { if (timer) { clearTimeout(timer); commit(); } });
 .field>label{display:flex;justify-content:space-between;font-size:13px;font-weight:600;margin-bottom:10px}
 .notes{font-size:13px;line-height:1.7;margin:0}
 </style>
+

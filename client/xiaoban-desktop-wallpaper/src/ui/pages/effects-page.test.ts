@@ -3,6 +3,7 @@ import { flushPromises, mount } from '@vue/test-utils';
 import { describe, expect, it, vi } from 'vitest';
 import { reactive } from 'vue';
 import EffectsPage from './EffectsPage.vue';
+import EffectPreview from '../components/EffectPreview.vue';
 import { defaults } from '../../bridge.ts';
 import { parsePack } from '../../effects/parse.ts';
 import type { EffectPack, EffectsChoice } from '../../effects/types.ts';
@@ -33,6 +34,40 @@ function setup(effects: EffectsChoice = none, packs = [pack('rain', '下雨'), p
 }
 
 describe('desktop effects page', () => {
+  it('plays hovered cards temporarily without changing the desktop selection', async () => {
+    const { wrapper, store } = setup({ selected: 'rain', params: {} });
+    const playing = () => wrapper.findAllComponents(EffectPreview).filter(preview => preview.props('playing')).map(preview => preview.props('pack').id);
+    const maple = wrapper.get('[data-testid="effect-maple"]');
+    await maple.trigger('mouseenter');
+    expect(playing()).toEqual(['maple']);
+    expect(store.setEffects).not.toHaveBeenCalled();
+    expect(store.settings.effects.selected).toBe('rain');
+    await maple.trigger('mouseleave');
+    expect(playing()).toEqual([]);
+    await wrapper.get('[data-testid="effect-rain"]').trigger('click');
+    await maple.trigger('mouseenter');
+    expect(playing()).toEqual(['maple']);
+    await maple.trigger('mouseleave');
+    expect(playing()).toEqual(['rain']);
+    wrapper.unmount();
+  });
+  it('keeps saved selections static until clicked and plays only the clicked card', async () => {
+    const { wrapper } = setup({ selected: 'rain', params: {} });
+    const previews = () => wrapper.findAllComponents(EffectPreview);
+    const playing = () => previews().filter(preview => preview.props('playing')).map(preview => preview.props('pack').id);
+    expect(previews()).toHaveLength(3);
+    expect(playing()).toEqual([]);
+    await wrapper.get('[data-testid="effect-rain"]').trigger('click');
+    expect(playing()).toEqual(['rain']);
+    await wrapper.get('[data-testid="effect-maple"]').trigger('click');
+    expect(playing()).toEqual(['maple']);
+    await wrapper.get('[data-testid="effect-none"]').trigger('click');
+    expect(playing()).toEqual([]);
+    wrapper.unmount();
+    const reopened = setup({ selected: 'maple', params: {} });
+    expect(reopened.wrapper.findAllComponents(EffectPreview).every(preview => !preview.props('playing'))).toBe(true);
+    reopened.wrapper.unmount();
+  });
   it('lists "no effects" and every effect it was given, the user\'s own marked, with nothing chosen at first', () => {
     const { wrapper, store } = setup();
     for (const id of ['none', 'rain', 'maple', 'glitter']) expect(wrapper.find(`[data-testid="effect-${id}"]`).exists(), id).toBe(true);
@@ -137,3 +172,4 @@ describe('desktop effects page', () => {
     wrapper.unmount();
   });
 });
+
