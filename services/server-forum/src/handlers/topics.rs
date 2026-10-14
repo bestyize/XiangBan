@@ -102,7 +102,7 @@ pub async fn get(State(state): State<AppState>, MaybeUser(user): MaybeUser, Path
             can_pin: u.trust_level >= GUARDIAN_LEVEL && topic.status == "normal",
         };
     }
-    let attachments = attachments::list_for_topic(&state.pool, id).await?;
+    let attachments = attachments::list_for_topic(&state.pool, id, user.as_ref().map(|u| u.uid)).await?;
     Ok(Json(TopicDetail { topic, body_html, body_md, attachments, viewer }))
 }
 
@@ -134,6 +134,8 @@ pub struct TopicInput {
     pub min_read_level: Option<i16>,
     /// 先用 `POST /attachments` 上传得到 id。发帖不传按没有附件，编辑不传保持原样，传了就以这个列表为准。
     pub attachment_ids: Option<Vec<Uuid>>,
+    pub attachment_prices: Option<Vec<attachments::AttachmentPriceInput>>,
+    pub help: Option<super::help::HelpInput>,
 }
 
 /// 守护者（站务人员）的信任等级。
@@ -351,6 +353,10 @@ pub async fn create(State(state): State<AppState>, auth: AuthUser, Json(input): 
     if let Some(ids) = &input.attachment_ids {
         attachments::set_for_topic(&mut tx, id, user.uid, ids).await?;
     }
+    if let Some(prices) = &input.attachment_prices {
+        attachments::set_prices(&mut tx, id, user.uid, prices).await?;
+    }
+    super::help::create_for_topic(&mut tx, id, user.uid, cat.id, input.help.as_ref()).await?;
     tx.commit().await?;
     save_tags(&state.pool, id, &tags).await?;
     models::refresh_hot_scores(&state.pool, Some(id)).await?;
@@ -407,6 +413,7 @@ pub async fn update(
     .bind(read_level)
     .execute(&mut *tx)
     .await?;
+    super::help::ensure_category(&mut tx, id, cat.id).await?;
     if let Some(d) = &input.deal {
         if topic.deal.is_some() {
             clean_deal(d)?;
@@ -428,6 +435,9 @@ pub async fn update(
         Some(ids) => attachments::set_for_topic(&mut tx, id, user.uid, ids).await?,
         None => Vec::new(),
     };
+    if let Some(prices) = &input.attachment_prices {
+        attachments::set_prices(&mut tx, id, user.uid, prices).await?;
+    }
     tx.commit().await?;
     attachments::remove_files(&state.config.upload_dir, &removed).await;
     save_tags(&state.pool, id, &tags).await?;
@@ -435,15 +445,18 @@ pub async fn update(
 }
 
 pub async fn delete(State(state): State<AppState>, auth: AuthUser, Path(id): Path<i64>) -> AppResult<Json<Value>> {
+    let mut tx = state.pool.begin().await?;
     let done = sqlx::query("UPDATE topics SET status = 'deleted' WHERE id = $1 AND author_uid = $2 AND status <> 'deleted'")
         .bind(id)
         .bind(auth.user.uid)
-        .execute(&state.pool)
+        .execute(&mut *tx)
         .await?
         .rows_affected();
     if done == 0 {
         return Err(AppError::Forbidden("只能删除自己的帖子".into()));
     }
+    super::help::refund(&mut tx, id, "closed").await?;
+    tx.commit().await?;
     Ok(Json(json!({ "ok": true })))
 }
 

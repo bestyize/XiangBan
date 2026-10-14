@@ -9,6 +9,7 @@ use crate::{
     config::AppConfig,
     error::{AppError, AppResult},
     models::Reader,
+    points,
     state::AppState,
     users,
 };
@@ -20,7 +21,7 @@ use axum::{
     Json,
 };
 use chrono::{DateTime, Utc};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use sqlx::{PgPool, Postgres, Transaction};
 use std::path::Path as FsPath;
@@ -41,6 +42,8 @@ pub struct AttachmentItem {
     pub name: String,
     pub size: i64,
     pub created_at: DateTime<Utc>,
+    pub price: i32,
+    pub purchased: bool,
 }
 
 /// 普通用户和守护者（站务人员，信任等级 3）的单文件上限不同。
@@ -155,7 +158,7 @@ pub async fn upload(
         let _ = tokio::fs::remove_file(&final_path).await;
         return Err(e.into());
     }
-    Ok(Json(json!({ "id": id, "name": filename, "size": size })))
+    Ok(Json(json!({ "id": id, "name": filename, "size": size, "price": 0, "purchased": true })))
 }
 
 pub(super) async fn write_field(field: &mut Field<'_>, path: &FsPath, limit: u64) -> AppResult<u64> {
@@ -196,6 +199,7 @@ struct DownloadRow {
     topic_status: Option<String>,
     min_read_level: Option<i16>,
     author_uid: Option<Uuid>,
+    price: i32,
 }
 
 pub async fn download(
@@ -205,7 +209,7 @@ pub async fn download(
 ) -> AppResult<Response> {
     let row: DownloadRow = sqlx::query_as(
         "SELECT a.filename, a.size, a.uploader_uid, a.topic_id, t.status AS topic_status,
-                t.min_read_level, t.author_uid
+                t.min_read_level, t.author_uid, a.price
          FROM attachments a LEFT JOIN topics t ON t.id = a.topic_id WHERE a.id = $1",
     )
     .bind(id)
@@ -228,6 +232,15 @@ pub async fn download(
                 return Err(AppError::not_found("附件"));
             }
         }
+    }
+
+    if row.price > 0 && !user.as_ref().is_some_and(|u| u.uid == row.uploader_uid) {
+        let viewer = user.as_ref().ok_or_else(|| AppError::Unauthorized("请登录后购买附件".into()))?;
+        if viewer.status == "banned" { return Err(AppError::Forbidden("账号已被封禁".into())); }
+        let (purchased,): (bool,) = sqlx::query_as(
+            "SELECT EXISTS(SELECT 1 FROM attachment_purchases WHERE attachment_id = $1 AND buyer_uid = $2)",
+        ).bind(id).bind(viewer.uid).fetch_one(&state.pool).await?;
+        if !purchased { return Err(AppError::Forbidden(format!("请先确认购买，附件需要 {} 积分", row.price))); }
     }
 
     let file = File::open(state.config.upload_dir.join(id.to_string()))
@@ -261,13 +274,78 @@ pub fn content_disposition(filename: &str) -> String {
     format!("attachment; filename=\"{fallback}\"; filename*=UTF-8''{encoded}")
 }
 
-pub async fn list_for_topic(pool: &PgPool, topic_id: i64) -> AppResult<Vec<AttachmentItem>> {
+pub async fn list_for_topic(pool: &PgPool, topic_id: i64, viewer: Option<Uuid>) -> AppResult<Vec<AttachmentItem>> {
     Ok(sqlx::query_as(
-        "SELECT id, filename AS name, size, created_at FROM attachments WHERE topic_id = $1 ORDER BY created_at, id",
+        "SELECT a.id, a.filename AS name, a.size, a.created_at, a.price,
+                (a.uploader_uid = $2 OR EXISTS(SELECT 1 FROM attachment_purchases p WHERE p.attachment_id = a.id AND p.buyer_uid = $2)) IS TRUE AS purchased
+         FROM attachments a WHERE a.topic_id = $1 ORDER BY a.created_at, a.id",
     )
     .bind(topic_id)
+    .bind(viewer)
     .fetch_all(pool)
     .await?)
+}
+
+#[derive(Deserialize)]
+pub struct AttachmentPriceInput {
+    pub id: Uuid,
+    pub price: i32,
+}
+
+pub async fn set_prices(tx: &mut Transaction<'_, Postgres>, topic: i64, uid: Uuid, prices: &[AttachmentPriceInput]) -> AppResult<()> {
+    if prices.len() > MAX_PER_TOPIC { return Err(AppError::BadRequest("附件数量超过上限".into())); }
+    let mut seen = std::collections::HashSet::new();
+    for item in prices {
+        if !seen.insert(item.id) || !(0..=points::MAX_ATTACHMENT_PRICE).contains(&item.price) {
+            return Err(AppError::BadRequest("附件定价必须为 0～10 的整数，且不能重复指定附件".into()));
+        }
+        let changed = sqlx::query("UPDATE attachments SET price = $4 WHERE id = $1 AND topic_id = $2 AND uploader_uid = $3")
+            .bind(item.id).bind(topic).bind(uid).bind(item.price).execute(&mut **tx).await?.rows_affected();
+        if changed != 1 { return Err(AppError::BadRequest("只能设置自己在当前帖子中的附件价格".into())); }
+    }
+    Ok(())
+}
+
+#[derive(Deserialize)]
+pub struct PurchaseInput { pub price: i32 }
+
+pub async fn purchase(
+    State(state): State<AppState>, auth: AuthUser, Path(id): Path<Uuid>, Json(input): Json<PurchaseInput>,
+) -> AppResult<Json<Value>> {
+    let mut tx = state.pool.begin().await?;
+    let row: DownloadRow = sqlx::query_as(
+        "SELECT a.filename, a.size, a.uploader_uid, a.topic_id, t.status AS topic_status,
+                t.min_read_level, t.author_uid, a.price
+         FROM attachments a JOIN topics t ON t.id = a.topic_id WHERE a.id = $1 FOR UPDATE OF t, a",
+    ).bind(id).fetch_optional(&mut *tx).await?.ok_or_else(|| AppError::not_found("附件"))?;
+    if row.topic_status.as_deref() != Some("normal") { return Err(AppError::not_found("附件")); }
+    Reader::from_user(Some(&auth.user)).check(row.min_read_level.unwrap_or(0), row.author_uid.unwrap())?;
+    // 文件不存在时不收费；解锁后下载失败可以凭购买记录重试。
+    File::open(state.config.upload_dir.join(id.to_string())).await.map_err(|_| AppError::not_found("附件"))?;
+    let buyer = auth.user.uid;
+    let seller = row.uploader_uid;
+    points::lock_users(&mut tx, &[buyer, seller]).await?;
+    let (already,): (bool,) = sqlx::query_as(
+        "SELECT EXISTS(SELECT 1 FROM attachment_purchases WHERE attachment_id = $1 AND buyer_uid = $2)",
+    ).bind(id).bind(buyer).fetch_one(&mut *tx).await?;
+    let mut charged = 0;
+    if !already && buyer != seller && row.price > 0 {
+        if input.price != row.price { return Err(AppError::Conflict("附件价格已变化，请刷新后重新确认".into())); }
+        let (seller_active,): (bool,) = sqlx::query_as("SELECT status <> 'banned' FROM users WHERE uid = $1")
+            .bind(seller).fetch_one(&mut *tx).await?;
+        if !seller_active { return Err(AppError::Forbidden("附件发布者已被封禁，暂时无法购买".into())); }
+        let key = format!("attachment:{id}:buyer:{buyer}");
+        points::change(&mut tx, buyer, -row.price, "attachment_purchase", &key, Some(seller), &id.to_string(),
+            &format!("购买附件：{}", row.filename)).await?;
+        points::change(&mut tx, seller, row.price, "attachment_income", &key, Some(buyer), &id.to_string(),
+            &format!("附件收益：{}", row.filename)).await?;
+        sqlx::query("INSERT INTO attachment_purchases (attachment_id, buyer_uid, seller_uid, price) VALUES ($1, $2, $3, $4)")
+            .bind(id).bind(buyer).bind(seller).bind(row.price).execute(&mut *tx).await?;
+        charged = row.price;
+    }
+    let (balance,): (i32,) = sqlx::query_as("SELECT points FROM users WHERE uid = $1").bind(buyer).fetch_one(&mut *tx).await?;
+    tx.commit().await?;
+    Ok(Json(json!({ "purchased": true, "charged": charged, "balance": balance })))
 }
 
 /// 把帖子的附件设成 `ids`：不在列表里的删除（返回它们的 id，提交后再清文件），

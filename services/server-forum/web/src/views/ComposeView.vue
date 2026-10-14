@@ -33,6 +33,8 @@ const form = reactive({
   expiresDate: '',
   /** 谁能读：0 所有人，1 成员以上，2 老用户以上，3 守护者 */
   readLevel: 0,
+  bounty: 0,
+  helpDays: 7,
 })
 /** 编辑时帖子原来的阅读权限；发帖人后来被降级时，原值仍然可以保留。 */
 const originalReadLevel = ref<number | null>(null)
@@ -63,6 +65,7 @@ const root = computed(() => roots.value.find(r => r.id === form.rootId))
 const leaves = computed(() => root.value?.children ?? [])
 const isDeal = computed(() => root.value?.kind === 'deal')
 const leaf = computed(() => leaves.value.find(l => l.id === form.categoryId))
+const isHelp = computed(() => leaf.value?.slug === 'share-help')
 /** 选中的二级分类上的内置标签；已经加到帖子上的也留着，方便点第二次取消。 */
 const presetTags = computed(() => leaf.value?.preset_tags ?? [])
 
@@ -113,6 +116,7 @@ watch(
       attachments.value = [...t.attachments]
       originalReadLevel.value = t.min_read_level
       loadedKind.value = t.deal ? 'deal' : 'normal'
+      if (t.help) form.bounty = t.help.bounty
       if (t.deal) {
         form.valueText = t.deal.value_text
         form.conditions = t.deal.conditions
@@ -173,6 +177,8 @@ async function submit() {
   error.value = ''
   if (!form.categoryId) return (error.value = '请选择分类')
   if (titleLen.value < 4) return (error.value = '标题至少 4 个字')
+  if (attachments.value.some(a => !Number.isInteger(a.price) || a.price < 0 || a.price > 10)) return (error.value = '附件下载积分必须为 0～10 的整数')
+  if (isHelp.value && !editId.value && (!Number.isInteger(form.bounty) || form.bounty < 0 || form.bounty > 1000)) return (error.value = '悬赏积分必须为 0～1000 的整数')
   if (isDeal.value && form.expiry === 'date' && !form.expiresDate) return (error.value = '请选择截止日期，或改成"不清楚"')
   addTag()
   const input: TopicInput = {
@@ -182,7 +188,9 @@ async function submit() {
     tags: form.tags,
     min_read_level: form.readLevel,
     attachment_ids: attachments.value.map(a => a.id),
+    attachment_prices: attachments.value.map(a => ({ id: a.id, price: a.price })),
   }
+  if (isHelp.value && !editId.value) input.help = { bounty: form.bounty, days: form.helpDays }
   if (isDeal.value) {
     input.deal = {
       value_text: form.valueText,
@@ -197,6 +205,7 @@ async function submit() {
   try {
     const res = editId.value ? await api.updateTopic(editId.value, input) : await api.createTopic(input)
     meta.load(true)
+    session.loadSession()
     toast.show(editId.value ? '修改已保存' : '发布成功')
     router.replace(`/t/${res.id}`)
   } catch (e) {
@@ -285,6 +294,19 @@ const today = new Date().toISOString().slice(0, 10)
           </div>
           <input v-if="form.expiry === 'date'" v-model="form.expiresDate" class="input date" type="date" :min="today" aria-label="截止日期" />
         </fieldset>
+      </section>
+
+      <section v-if="isHelp" class="panel section">
+        <h2>资源求助与悬赏</h2>
+        <label class="field">
+          <span>悬赏积分（0 为免费求助）</span>
+          <input v-model.number="form.bounty" class="input" type="number" min="0" max="1000" step="1" :disabled="!!editId" />
+          <small>{{ editId ? '已发布的悬赏金额保持不变，可在帖子页采纳或关闭求助。' : `当前可用 ${session.user?.points ?? 0} 分；发布时暂存悬赏，采纳后给回答者，关闭或到期退还。` }}</small>
+        </label>
+        <label v-if="!editId" class="field">
+          <span>求助有效期</span>
+          <select v-model.number="form.helpDays" class="select"><option :value="7">7 天</option><option :value="14">14 天</option><option :value="30">30 天</option></select>
+        </label>
       </section>
 
       <section class="panel section">

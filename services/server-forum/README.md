@@ -6,6 +6,12 @@
 
 ## 运行与验证
 
+积分系统已实现：新加入论坛 +50、每日登录访问 +1、签到 +1，当月累计签到 7／20 天分别额外 +3／+5，有效邀请 +30（每天最多 3 位）、同帖首次加精 +10。积分与信任等级独立，入口为顶部积分余额与 `/points`，提供签到、邀请和账本。已有论坛用户不补发注册奖励。
+
+附件可设置 0～10 分；购买确认、扣款、作者入账和购买记录在同一事务内完成，同一附件重复下载免费，作者自己下载免费，付费不绕过阅读权限。资源分享下新增“资源求助”，支持 0～1000 分悬赏、7／14／30 天期限、采纳发放、关闭和到期退款。后台任务约每 10 分钟处理到期退款；已采纳回答保留原文。
+
+数据库回归测试需要 `TEST_DATABASE_URL` 指向隔离测试库：`cargo test --locked --manifest-path services/server-forum/Cargo.toml points::tests`。测试使用独立 schema，不改生产数据。
+
 ```sh
 cp services/server-forum/.env.example services/server-forum/.env   # 按需修改
 npm --prefix services/server-forum/web ci
@@ -85,7 +91,7 @@ cargo test --manifest-path services/server-forum/Cargo.toml
 ## 已知限制与后续
 
 - 数据库兼容：阅读权限是追加的列（`ALTER TABLE topics ADD COLUMN IF NOT EXISTS min_read_level ... DEFAULT 0`），已部署的库启动时自动补上，旧帖子都按公开处理。
-- 二期（PRD 里的 M2 起）未做：站内通知和关键词订阅、积分规则、TL2 自动升级、屏蔽用户、敏感词、图片上传到腾讯云 COS、赞助位。正文插图已经走本机磁盘（见业务规则），COS 是二期的存储替换。
+- 二期（PRD 里的 M2 起）未做：站内通知和关键词订阅、TL2 自动升级、屏蔽用户、敏感词、图片上传到腾讯云 COS、赞助位。积分规则见上面的运行与验证；正文插图已经走本机磁盘（见业务规则），COS 是二期的存储替换。
 - 账号中心还没有用户自助注销，设置页提示发邮件处理。
 - SEO 页面只渲染第一页（30-50 条），sitemap 每次请求实时查询，没有进程内缓存。
 - 部署：香港机 `/home/ubuntu/xiangban-forum`，systemd 服务 `server-forum`，监听 127.0.0.1:55010，Nginx 反代 chat.xiangban.xyz（Let's Encrypt），库 `xiaban_forum` 在 `wallpaper_postgres` 容器里，独立角色 `forum`。账号中心已登记 `forum-web` 并在 `ACCOUNT_CORS_ORIGINS` 加入 `https://chat.xiangban.xyz`。初始管理员密码在服务器 `.env` 的 `FORUM_ADMIN_PASSWORD`，登录 /admin 改密码后删掉它。更新时本地交叉编译后替换二进制和 `web/dist`，再重启服务（index.html 启动时读一次）。

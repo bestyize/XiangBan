@@ -6,6 +6,7 @@ mod handlers;
 mod jobs;
 mod markdown;
 mod models;
+mod points;
 mod seo;
 mod state;
 mod users;
@@ -17,7 +18,7 @@ use axum::{
     Router,
 };
 use config::AppConfig;
-use handlers::{admin, attachments, follows, images, interact, me, meta, posts, topics};
+use handlers::{admin, attachments, follows, help, images, interact, me, meta, posts, topics};
 use state::AppState;
 use std::{net::SocketAddr, sync::Arc, time::Duration};
 use tower_http::{
@@ -35,6 +36,10 @@ pub fn build_router(state: AppState) -> Router {
         .route("/tags", get(meta::popular_tags))
         .route("/session", post(me::session))
         .route("/me/bookmarks", get(me::bookmarks))
+        .route("/me/points", get(points::wallet))
+        .route("/me/points/ledger", get(points::ledger))
+        .route("/me/points/invites", get(points::invites))
+        .route("/me/check-in", post(points::check_in))
         .route("/me/following/topics", get(follows::topics))
         .route("/users/{uid}", get(me::profile))
         .route("/users/{uid}/follow", put(follows::follow).delete(follows::unfollow))
@@ -49,6 +54,8 @@ pub fn build_router(state: AppState) -> Router {
         .route("/topics/{id}", get(topics::get).patch(topics::update).delete(topics::delete))
         .route("/topics/{id}/posts", get(posts::list).post(posts::create))
         .route("/topics/{id}/pin", put(topics::pin).delete(topics::unpin))
+        .route("/topics/{id}/help/accept", post(help::accept))
+        .route("/topics/{id}/help/close", post(help::close))
         .route("/topics/{id}/like", put(interact::like_topic).delete(interact::unlike_topic))
         .route("/topics/{id}/bookmark", put(interact::bookmark).delete(interact::unbookmark))
         .route("/posts/{id}", axum::routing::patch(posts::update).delete(posts::delete))
@@ -67,6 +74,7 @@ pub fn build_router(state: AppState) -> Router {
         )
         .route("/images/{id}", get(images::show))
         .route("/attachments/{id}", get(attachments::download).delete(attachments::delete_pending))
+        .route("/attachments/{id}/purchase", post(attachments::purchase))
         .nest("/admin", admin::routes());
 
     // 凭证只走 Authorization 头，不用 Cookie，跨域放开不构成 CSRF 面。

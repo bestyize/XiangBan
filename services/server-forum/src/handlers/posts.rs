@@ -191,40 +191,55 @@ pub async fn update(
     users::ensure_can_write(&auth.user)?;
     let body = clean_reply(&input.body)?;
     let html = markdown::render(&body, auth.user.trust_level >= 1);
+    let mut tx = state.pool.begin().await?;
+    lock_topic_for_post(&mut tx, id).await?;
     let done = sqlx::query(
         "UPDATE posts SET body_md = $3, body_html = $4, edited_at = now()
          WHERE id = $1 AND author_uid = $2 AND status = 'normal'
-           AND NOT (SELECT locked FROM topics WHERE topics.id = posts.topic_id)",
+           AND NOT (SELECT locked FROM topics WHERE topics.id = posts.topic_id)
+           AND NOT EXISTS(SELECT 1 FROM help_requests WHERE accepted_post_id = posts.id)",
     )
     .bind(id)
     .bind(auth.user.uid)
     .bind(&body)
     .bind(&html)
-    .execute(&state.pool)
+    .execute(&mut *tx)
     .await?
     .rows_affected();
     if done == 0 {
-        return Err(AppError::Forbidden("只能编辑自己的回复".into()));
+        return Err(AppError::Forbidden("只能编辑自己的未采纳回复，已采纳回答保留原文".into()));
     }
+    tx.commit().await?;
     Ok(Json(json!({ "ok": true, "body_html": html })))
 }
 
 pub async fn delete(State(state): State<AppState>, auth: AuthUser, Path(id): Path<i64>) -> AppResult<Json<Value>> {
+    let mut tx = state.pool.begin().await?;
+    lock_topic_for_post(&mut tx, id).await?;
     let topic: Option<(i64,)> = sqlx::query_as(
-        "UPDATE posts SET status = 'deleted' WHERE id = $1 AND author_uid = $2 AND status = 'normal' RETURNING topic_id",
+        "UPDATE posts SET status = 'deleted' WHERE id = $1 AND author_uid = $2 AND status = 'normal'
+         AND NOT EXISTS(SELECT 1 FROM help_requests WHERE accepted_post_id = posts.id) RETURNING topic_id",
     )
     .bind(id)
     .bind(auth.user.uid)
-    .fetch_optional(&state.pool)
+    .fetch_optional(&mut *tx)
     .await?;
     let Some((topic_id,)) = topic else {
-        return Err(AppError::Forbidden("只能删除自己的回复".into()));
+        return Err(AppError::Forbidden("只能删除自己的未采纳回复".into()));
     };
     sqlx::query("UPDATE topics SET reply_count = GREATEST(reply_count - 1, 0) WHERE id = $1")
         .bind(topic_id)
-        .execute(&state.pool)
+        .execute(&mut *tx)
         .await?;
+    tx.commit().await?;
     Ok(Json(json!({ "ok": true })))
+}
+
+pub(super) async fn lock_topic_for_post(tx: &mut sqlx::Transaction<'_, sqlx::Postgres>, id: i64) -> AppResult<()> {
+    let (topic,): (i64,) = sqlx::query_as("SELECT topic_id FROM posts WHERE id = $1")
+        .bind(id).fetch_optional(&mut **tx).await?.ok_or_else(|| AppError::not_found("回复"))?;
+    sqlx::query("SELECT id FROM topics WHERE id = $1 FOR UPDATE").bind(topic).execute(&mut **tx).await?;
+    Ok(())
 }
 
 /// 编辑回复时取原文。

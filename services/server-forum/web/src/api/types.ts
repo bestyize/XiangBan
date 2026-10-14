@@ -78,6 +78,42 @@ export interface TopicItem {
   last_reply_at: string
   edited_at: string | null
   deal: DealInfo | null
+  help: HelpInfo | null
+}
+
+export interface HelpInfo {
+  bounty: number
+  status: 'open' | 'solved' | 'closed' | 'expired'
+  accepted_post_id: number | null
+  expires_at: string
+}
+
+export interface PointsWallet {
+  balance: number
+  visited_today: boolean
+  checked_in_today: boolean
+  month_check_ins: number
+  invite_code: string
+  invites: number
+  rewarded_invites: number
+  invite_income: number
+  day: string
+}
+
+export interface PointsLedgerItem {
+  id: number
+  delta: number
+  balance_after: number
+  kind: string
+  reference: string
+  description: string
+  created_at: string
+}
+
+export interface InviteItem {
+  nickname: string
+  invite_status: 'pending' | 'rewarded' | 'capped' | 'ineligible'
+  created_at: string
 }
 
 export interface Viewer {
@@ -92,6 +128,8 @@ export interface Attachment {
   id: string
   name: string
   size: number
+  price: number
+  purchased: boolean
 }
 
 export interface TopicDetail extends TopicItem {
@@ -169,6 +207,8 @@ export interface TopicInput {
   min_read_level?: number
   /** 不传：发帖没有附件，编辑保持原样；传了以这个列表为准 */
   attachment_ids?: string[]
+  attachment_prices?: { id: string; price: number }[]
+  help?: { bounty: number; days: number }
 }
 
 export interface SiteConfig {

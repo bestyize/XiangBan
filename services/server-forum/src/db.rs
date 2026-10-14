@@ -216,6 +216,7 @@ pub async fn connect(url: &str, schema: Option<&str>) -> Result<PgPool, AppError
 
 pub async fn migrate(pool: &PgPool) -> Result<(), AppError> {
     sqlx::raw_sql(SCHEMA).execute(pool).await?;
+    sqlx::raw_sql(POINTS_SCHEMA).execute(pool).await?;
     // 搜索用的三元组索引是可选的：数据库没有 pg_trgm 扩展时退化为普通 ILIKE 扫描。
     if sqlx::raw_sql("CREATE EXTENSION IF NOT EXISTS pg_trgm").execute(pool).await.is_ok() {
         let _ = sqlx::raw_sql(
@@ -226,6 +227,56 @@ pub async fn migrate(pool: &PgPool) -> Result<(), AppError> {
     }
     Ok(())
 }
+
+const POINTS_SCHEMA: &str = r#"
+-- 已有用户不补发注册奖励；新增用户首次加入论坛时领取一次。
+ALTER TABLE users ADD COLUMN IF NOT EXISTS points_initialized BOOLEAN NOT NULL DEFAULT true;
+ALTER TABLE users ALTER COLUMN points_initialized SET DEFAULT false;
+ALTER TABLE attachments ADD COLUMN IF NOT EXISTS price INT NOT NULL DEFAULT 0 CHECK (price BETWEEN 0 AND 10);
+CREATE TABLE IF NOT EXISTS points_ledger (
+    id BIGSERIAL PRIMARY KEY,
+    uid UUID NOT NULL REFERENCES users(uid),
+    delta INT NOT NULL CHECK (delta <> 0),
+    balance_after INT NOT NULL CHECK (balance_after >= 0),
+    kind TEXT NOT NULL,
+    event_key TEXT NOT NULL,
+    counterparty UUID REFERENCES users(uid),
+    reference TEXT NOT NULL DEFAULT '',
+    description TEXT NOT NULL,
+    reward_day DATE NOT NULL DEFAULT (now() AT TIME ZONE 'Asia/Shanghai')::date,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    UNIQUE (uid, event_key)
+);
+CREATE INDEX IF NOT EXISTS points_ledger_uid_idx ON points_ledger (uid, id DESC);
+CREATE INDEX IF NOT EXISTS points_ledger_rewards_idx ON points_ledger (uid, kind, reward_day);
+CREATE TABLE IF NOT EXISTS forum_registrations (
+    uid UUID PRIMARY KEY REFERENCES users(uid),
+    inviter_uid UUID REFERENCES users(uid),
+    invite_status TEXT NOT NULL DEFAULT 'pending' CHECK (invite_status IN ('pending', 'rewarded', 'capped', 'ineligible')),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CHECK (uid <> inviter_uid)
+);
+CREATE INDEX IF NOT EXISTS forum_registrations_inviter_idx ON forum_registrations (inviter_uid, created_at DESC);
+CREATE TABLE IF NOT EXISTS attachment_purchases (
+    attachment_id UUID NOT NULL REFERENCES attachments(id) ON DELETE CASCADE,
+    buyer_uid UUID NOT NULL REFERENCES users(uid),
+    seller_uid UUID NOT NULL REFERENCES users(uid),
+    price INT NOT NULL CHECK (price BETWEEN 1 AND 10),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (attachment_id, buyer_uid),
+    CHECK (buyer_uid <> seller_uid)
+);
+CREATE TABLE IF NOT EXISTS help_requests (
+    topic_id BIGINT PRIMARY KEY REFERENCES topics(id),
+    bounty INT NOT NULL DEFAULT 0 CHECK (bounty BETWEEN 0 AND 1000),
+    status TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'solved', 'closed', 'expired')),
+    accepted_post_id BIGINT REFERENCES posts(id),
+    expires_at TIMESTAMPTZ NOT NULL,
+    settled_at TIMESTAMPTZ,
+    CHECK ((status = 'solved') = (accepted_post_id IS NOT NULL))
+);
+CREATE INDEX IF NOT EXISTS help_requests_expiry_idx ON help_requests (expires_at) WHERE status = 'open';
+"#;
 
 /// 分类种子：(slug, 名称, 说明, 类型, 父 slug, 最低发帖等级, 进首页, 加积分, 仅管理员)
 const CATEGORIES: &[(&str, &str, &str, &str, Option<&str>, i16, bool, bool, bool)] = &[
@@ -240,6 +291,7 @@ const CATEGORIES: &[(&str, &str, &str, &str, Option<&str>, i16, bool, bool, bool
     ("share-movies", "电影资源", "片单、影评，以及公版和授权影片，不要贴盗版下载链接", "normal", Some("share"), 1, true, true, false),
     ("share-music", "音乐资源", "歌单、乐评，以及公版和授权音乐，不要贴盗版下载链接", "normal", Some("share"), 1, true, true, false),
     ("share-learn", "学习资料", "课程、电子书、文档和笔记，请只分享可以公开的资料", "normal", Some("share"), 1, true, true, false),
+    ("share-help", "资源求助", "求助合法来源的软件、学习资料和资源，可使用积分悬赏", "normal", Some("share"), 1, true, true, false),
     ("deals", "福利羊毛", "大家分享的免费额度、试用和优惠", "deal", None, 1, true, true, false),
     ("deals-ai", "AI 羊毛", "大模型 API、AI 对话、编程工具、绘图视频音频的免费额度和优惠", "deal", Some("deals"), 1, true, true, false),
     ("deals-cloud", "云服务器 · GPU", "VPS 促销、GPU 试用、算力赠金", "deal", Some("deals"), 1, true, true, false),
@@ -336,6 +388,7 @@ struct BoardMigration {
 }
 
 const BOARD_MIGRATIONS: &[BoardMigration] = &[
+    BoardMigration { name: "share-help-v1", parent: "share", create_parent: false, boards: &["share-help"], moves: &[] },
     // 资源分享：开源项目、工具软件、提示词·工作流、自制作品 → 精品软件 / 电影资源 / 音乐资源 / 学习资料
     BoardMigration {
         name: "share-boards-v1",
@@ -565,7 +618,7 @@ mod tests {
 
     #[test]
     fn share_boards_are_the_four_requested_ones() {
-        assert_eq!(children("share"), ["精品软件", "电影资源", "音乐资源", "学习资料"]);
+        assert_eq!(children("share"), ["精品软件", "电影资源", "音乐资源", "学习资料", "资源求助"]);
         for (slug, tags) in PRESET_TAGS {
             assert!(!tags.is_empty(), "{slug} 没有内置标签");
         }

@@ -91,6 +91,14 @@ pub struct DealInfo {
 }
 
 #[derive(Debug, Clone, Serialize)]
+pub struct HelpInfo {
+    pub bounty: i32,
+    pub status: String,
+    pub accepted_post_id: Option<i64>,
+    pub expires_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize)]
 pub struct TopicItem {
     pub id: i64,
     pub title: String,
@@ -112,6 +120,7 @@ pub struct TopicItem {
     pub last_reply_at: DateTime<Utc>,
     pub edited_at: Option<DateTime<Utc>>,
     pub deal: Option<DealInfo>,
+    pub help: Option<HelpInfo>,
 }
 
 #[derive(sqlx::FromRow)]
@@ -143,6 +152,10 @@ struct TopicRow {
     link_url: Option<String>,
     expires_at: Option<DateTime<Utc>>,
     long_term: Option<bool>,
+    bounty: Option<i32>,
+    help_status: Option<String>,
+    accepted_post_id: Option<i64>,
+    help_expires_at: Option<DateTime<Utc>>,
 }
 
 impl TopicRow {
@@ -155,6 +168,12 @@ impl TopicRow {
             expires_at: self.expires_at,
             long_term: self.long_term.unwrap_or(false),
         });
+        let help = match (self.bounty, self.help_status, self.help_expires_at) {
+            (Some(bounty), Some(status), Some(expires_at)) => Some(HelpInfo {
+                bounty, status, accepted_post_id: self.accepted_post_id, expires_at,
+            }),
+            _ => None,
+        };
         TopicItem {
             id: self.id,
             title: self.title,
@@ -180,6 +199,7 @@ impl TopicRow {
             last_reply_at: self.last_reply_at,
             edited_at: self.edited_at,
             deal,
+            help,
         }
     }
 }
@@ -188,11 +208,13 @@ const SELECT: &str = "SELECT t.id, t.title, t.excerpt, t.status, t.pinned, t.pin
         t.reply_count, t.like_count, t.view_count, t.min_read_level, t.created_at, t.last_reply_at, t.edited_at,
         c.id AS category_id, c.slug AS category_slug, c.name AS category_name,
         u.uid AS author_uid, u.nickname AS author_nickname, u.avatar_url AS author_avatar, u.trust_level AS author_level,
-        d.value_text, d.conditions, d.link_url, d.expires_at, d.long_term
+        d.value_text, d.conditions, d.link_url, d.expires_at, d.long_term,
+        h.bounty, h.status AS help_status, h.accepted_post_id, h.expires_at AS help_expires_at
     FROM topics t
     JOIN categories c ON c.id = t.category_id
     JOIN users u ON u.uid = t.author_uid
-    LEFT JOIN deals d ON d.topic_id = t.id";
+    LEFT JOIN deals d ON d.topic_id = t.id
+    LEFT JOIN help_requests h ON h.topic_id = t.id";
 
 #[derive(Debug, Default, Clone, Deserialize)]
 pub struct ListFilter {
@@ -200,6 +222,7 @@ pub struct ListFilter {
     pub category: Option<String>,
     pub tag: Option<String>,
     pub author: Option<Uuid>,
+    pub help_status: Option<String>,
     /// 关注动态只允许服务端从 AuthUser 设置，查询参数不能指定其他用户。
     #[serde(skip)]
     pub followed_by: Option<Uuid>,
@@ -296,6 +319,12 @@ fn push_filters(qb: &mut QueryBuilder<'_, Postgres>, f: &ListFilter) {
     }
     if f.featured {
         qb.push(" AND t.featured");
+    }
+    match f.help_status.as_deref() {
+        Some("open") => { qb.push(" AND t.id IN (SELECT topic_id FROM help_requests WHERE status = 'open' AND expires_at > now())"); }
+        Some("solved") => { qb.push(" AND t.id IN (SELECT topic_id FROM help_requests WHERE status = 'solved')"); }
+        Some("bounty") => { qb.push(" AND t.id IN (SELECT topic_id FROM help_requests WHERE status = 'open' AND expires_at > now() AND bounty > 0)"); }
+        _ => {}
     }
 }
 

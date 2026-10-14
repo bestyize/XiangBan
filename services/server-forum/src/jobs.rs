@@ -1,7 +1,7 @@
 //! 后台定时任务：重算热度、清理没挂到帖子上的附件。
 
 use crate::{
-    handlers::{attachments, images},
+    handlers::{attachments, help, images},
     models,
     state::AppState,
 };
@@ -14,6 +14,9 @@ pub fn spawn(state: AppState) {
         loop {
             tick.tick().await;
             round = round.wrapping_add(1);
+            if let Err(e) = help::expire(&state.pool).await {
+                tracing::warn!("退还到期悬赏失败: {e}");
+            }
             if let Err(e) = models::refresh_hot_scores(&state.pool, None).await {
                 tracing::warn!("重算热度失败: {e}");
             }

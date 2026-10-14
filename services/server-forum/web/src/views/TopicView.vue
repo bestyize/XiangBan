@@ -5,6 +5,7 @@ import ForumShell from '@/components/ForumShell.vue'
 import DealPanel from '@/components/DealPanel.vue'
 import PostEntry from '@/components/PostEntry.vue'
 import AttachmentList from '@/components/AttachmentList.vue'
+import HelpPanel from '@/components/HelpPanel.vue'
 import UserAvatar from '@/components/UserAvatar.vue'
 import MarkdownEditor from '@/components/MarkdownEditor.vue'
 import ReportDialog from '@/components/ReportDialog.vue'
@@ -16,6 +17,7 @@ import { useMeta } from '@/stores/meta'
 import { useToast } from '@/stores/toast'
 import { TRUST_LABEL, formatDateTime, pinScopeLabel, readLevelBadge, tagLabel, timeAgo } from '@/lib/format'
 import { useHead } from '@/lib/head'
+import { inviteUrl } from '@/lib/invite'
 
 const route = useRoute()
 const router = useRouter()
@@ -43,6 +45,21 @@ const replyTo = ref<PostItem | null>(null)
 const sending = ref(false)
 const editor = ref<InstanceType<typeof MarkdownEditor> | null>(null)
 const reportTarget = ref<{ type: 'topic' | 'post'; id: number } | null>(null)
+const helpBusy = ref(false)
+const helpOwner = computed(() => session.user?.uid === topic.value?.author.uid)
+const helpExpired = ref(false)
+watch(() => topic.value?.help, (help, _, cleanup) => {
+  const refresh = () => { helpExpired.value = !!help && new Date(help.expires_at).getTime() <= Date.now() }
+  refresh()
+  if (help?.status === 'open' && !helpExpired.value) {
+    const timer = window.setInterval(() => {
+      refresh()
+      if (helpExpired.value) window.clearInterval(timer)
+    }, 1000)
+    cleanup(() => window.clearInterval(timer))
+  }
+}, { immediate: true })
+const helpOpen = computed(() => topic.value?.help?.status === 'open' && !helpExpired.value)
 
 useHead(() => ({ title: topic.value?.title ?? '' }))
 
@@ -144,7 +161,7 @@ async function togglePin() {
 }
 
 async function share() {
-  const url = `${location.origin}/t/${id.value}`
+  const url = session.user ? inviteUrl(session.user.uid, `/t/${id.value}`) : `${location.origin}/t/${id.value}`
   try {
     if (navigator.share) await navigator.share({ title: topic.value?.title, url })
     else {
@@ -202,6 +219,28 @@ function goPosts(page: number) {
   loadPosts(page)
   document.getElementById('replies')?.scrollIntoView({ behavior: 'smooth' })
 }
+
+async function acceptAnswer(post: PostItem) {
+  if (!topic.value || helpBusy.value || !window.confirm(`采纳「${post.author.nickname}」的回答？悬赏将发放给对方，采纳后不能撤销。`)) return
+  helpBusy.value = true
+  try {
+    await api.acceptHelp(topic.value.id, post.id)
+    toast.show('已采纳，求助标记为已解决')
+    await Promise.all([loadTopic(), session.loadSession()])
+  } catch (e) { toast.error(e) }
+  finally { helpBusy.value = false }
+}
+
+async function closeHelp() {
+  if (!topic.value || helpBusy.value || !window.confirm('关闭这次求助？尚未发放的悬赏积分将退还。')) return
+  helpBusy.value = true
+  try {
+    const result = await api.closeHelp(topic.value.id)
+    toast.show(result.refunded ? `已退还 ${result.refunded} 积分` : '求助已结束')
+    await Promise.all([loadTopic(), session.loadSession()])
+  } catch (e) { toast.error(e) }
+  finally { helpBusy.value = false }
+}
 </script>
 
 <template>
@@ -246,6 +285,7 @@ function goPosts(page: number) {
       </div>
 
       <DealPanel v-if="topic.deal" :topic="topic" />
+      <HelpPanel v-if="topic.help" :help="topic.help" :owner="helpOwner" :busy="helpBusy" :expired="helpExpired" @close="closeHelp" />
 
       <div v-if="topic.body_html" class="body prose" v-html="topic.body_html" />
 
@@ -295,16 +335,21 @@ function goPosts(page: number) {
       <section id="replies" class="replies" aria-labelledby="replies-title">
         <h2 id="replies-title">{{ topic.reply_count ? `${topic.reply_count} 条回复` : '还没有回复' }}</h2>
         <div v-if="posts.length" class="list">
+          <div v-for="p in posts" :key="p.id" class="answer">
+          <div v-if="topic.help?.accepted_post_id === p.id" class="accepted">✓ 已采纳的回答</div>
           <PostEntry
-            v-for="p in posts"
-            :key="p.id"
             :post="p"
             :topic-author="topic.author.uid"
             :can-reply="!topic.locked"
+            :accepted="topic.help?.accepted_post_id === p.id"
             @reply="startReply"
             @report="post => report({ type: 'post', id: post.id })"
             @removed="topic.reply_count = Math.max(0, topic.reply_count - 1)"
           />
+          <div v-if="helpOwner && helpOpen && p.status === 'normal' && p.author.uid !== topic.author.uid" class="accept-control">
+            <button class="btn btn-sm" type="button" :disabled="helpBusy" @click="acceptAnswer(p)">采纳回答{{ topic.help?.bounty ? ` · 发放 ${topic.help.bounty} 积分` : '' }}</button>
+          </div>
+          </div>
         </div>
         <PagerNav :page="postPage" :page-size="POST_PAGE" :total="postTotal" @go="goPosts" />
       </section>
@@ -343,6 +388,8 @@ function goPosts(page: number) {
 </template>
 
 <style scoped>
+.accepted { color: var(--brand); font-size: var(--fs-sm); font-weight: 600; padding-top: 12px; }
+.accept-control { display: flex; justify-content: flex-end; padding: 0 0 12px; }
 .topic {
   max-width: 820px;
 }
