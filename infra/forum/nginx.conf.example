@@ -1,0 +1,57 @@
+# 宿主机 Nginx 反代示例，放进 /etc/nginx/conf.d/ 或 sites-available。
+# 把 sh-chat.xiangban.xyz 换成你的域名，并与 FORUM_PUBLIC_URL 保持一致；证书用 certbot 签发。
+# limit_req_zone 必须位于 http 上下文，conf.d 下的文件已经在 http 里。
+# 还没有域名时：先只保留 80 的 server 块，proxy_pass 到 127.0.0.1:55010，用 http://IP 联调。
+
+limit_req_status 429;
+limit_req_zone $binary_remote_addr zone=forum_api:10m rate=20r/s;
+limit_req_zone $binary_remote_addr zone=forum_write:10m rate=5r/s;
+
+server {
+    listen 80;
+    server_name sh-chat.xiangban.xyz;
+    return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl;
+    http2 on;
+    server_name sh-chat.xiangban.xyz;
+
+    ssl_certificate     /etc/letsencrypt/live/sh-chat.xiangban.xyz/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/sh-chat.xiangban.xyz/privkey.pem;
+
+    server_tokens off;
+    # 帖子附件上限 30MB（守护者）、正文插图 6MB，这里留足余量；改小会把上传挡在 413。
+    client_max_body_size 64m;
+    add_header Strict-Transport-Security "max-age=31536000" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-Frame-Options "SAMEORIGIN" always;
+
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_connect_timeout 5s;
+    proxy_read_timeout 60s;
+
+    # 上传类接口单独声明体积上限，防止被其他 location 的配置覆盖。
+    location ~ ^/api/(attachments|images) {
+        limit_req zone=forum_write burst=20 nodelay;
+        proxy_pass http://127.0.0.1:55010;
+    }
+
+    # 管理接口。公网不需要后台时，用 allow/deny 只放行办公网络或 VPN 出口。
+    location ~ ^/(admin|api/admin) {
+        # allow 203.0.113.0/24;
+        # deny all;
+        limit_req zone=forum_write burst=10 nodelay;
+        proxy_pass http://127.0.0.1:55010;
+    }
+
+    location / {
+        limit_req zone=forum_api burst=50 nodelay;
+        proxy_pass http://127.0.0.1:55010;
+    }
+}

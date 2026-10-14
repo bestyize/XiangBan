@@ -1,0 +1,66 @@
+# 超级小伴论坛独立部署栈：自带 PostgreSQL，与主站 infra/compose.yaml、账号中心 infra/account 互不依赖。
+# 镜像由 .github/workflows/forum-deploy.yml 构建并加载到服务器，这里不 build。
+# 数据卷、备份和发布节奏独立：换环境（如上海独立论坛）时直接整套搬走。
+name: xiangban-forum
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: xiaban_forum
+      POSTGRES_USER: forum
+      POSTGRES_PASSWORD: ${FORUM_DB_PASSWORD:?在服务器端 .env 中设置 FORUM_DB_PASSWORD}
+    volumes:
+      - forum_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U forum -d xiaban_forum"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - backend
+
+  forum:
+    image: xiangban-forum:${FORUM_IMAGE_TAG:-latest}
+    restart: unless-stopped
+    environment:
+      FORUM_DATABASE_URL: postgres://forum:${FORUM_DB_PASSWORD}@postgres:5432/xiaban_forum
+      FORUM_PUBLIC_URL: ${FORUM_PUBLIC_URL:?设置 FORUM_PUBLIC_URL，对外的完整地址，带 https://}
+      # 统一账号中心。issuer 会写进令牌校验（iss 必须完全一致），不能改成代理路径。
+      FORUM_ACCOUNT_ISSUER: ${FORUM_ACCOUNT_ISSUER:-https://account.xiangban.xyz}
+      FORUM_ACCOUNT_CLIENT_ID: ${FORUM_ACCOUNT_CLIENT_ID:-forum-web}
+      FORUM_ADMIN_USER: ${FORUM_ADMIN_USER:-}
+      FORUM_ADMIN_PASSWORD: ${FORUM_ADMIN_PASSWORD:-}
+      FORUM_ADMIN_JWT_SECRET: ${FORUM_ADMIN_JWT_SECRET:?设置 FORUM_ADMIN_JWT_SECRET，至少 32 位随机字符串}
+      FORUM_CORS_ORIGINS: ${FORUM_CORS_ORIGINS:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      # 服务只绑定本机回环，唯一入口是宿主机 Nginx。
+      - "${FORUM_BIND_ADDRESS:-127.0.0.1}:55010:55010"
+    volumes:
+      # 帖子附件与正文插图，需要持久化和备份。
+      - forum_uploads:/app/data/uploads
+    # 密钥来自环境变量，运行期不写磁盘；上传目录是独立卷，根文件系统只读。
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - backend
+      - edge
+
+volumes:
+  forum_pg_data:
+  forum_uploads:
+
+networks:
+  # 数据库所在网络不能出网；论坛额外接入 edge 才能发布端口并访问账号中心（JWKS、/api/me）。
+  backend:
+    internal: true
+  edge:

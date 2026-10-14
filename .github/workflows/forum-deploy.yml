@@ -1,0 +1,159 @@
+name: Forum deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      deploy:
+        description: "传到服务器并更新服务（不勾选只构建，产物保留 14 天）"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: forum-production-deploy
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build forum image
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: cargo-forum-${{ hashFiles('services/server-forum/Cargo.lock') }}
+
+      - name: Build web dist
+        run: |
+          set -euo pipefail
+          npm --prefix services/server-forum/web ci
+          npm --prefix services/server-forum/web run build
+
+      - name: Build release binary
+        run: |
+          set -euo pipefail
+          cargo build --release --locked --manifest-path services/server-forum/Cargo.toml
+          mkdir -p "$RUNNER_TEMP/context"
+          cp target/release/server-forum "$RUNNER_TEMP/context/server-forum"
+          cp -r services/server-forum/web/dist "$RUNNER_TEMP/context/web"
+
+      - name: Build runtime image
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_SHA::12}"
+          docker build -f infra/forum/Dockerfile -t "xiangban-forum:$tag" "$RUNNER_TEMP/context"
+          echo "FORUM_IMAGE_TAG=$tag" >> "$GITHUB_ENV"
+
+      - name: Export image and binary packages
+        run: |
+          set -euo pipefail
+          docker save "xiangban-forum:$FORUM_IMAGE_TAG" | gzip > "$RUNNER_TEMP/forum-image-$FORUM_IMAGE_TAG.tar.gz"
+          mkdir -p "$RUNNER_TEMP/standalone"
+          cp target/release/server-forum "$RUNNER_TEMP/standalone/server-forum"
+          cp -r services/server-forum/web/dist "$RUNNER_TEMP/standalone/dist"
+          tar -czf "$RUNNER_TEMP/forum-binary-linux-x64-$FORUM_IMAGE_TAG.tar.gz" -C "$RUNNER_TEMP/standalone" .
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: forum-build-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/forum-image-*.tar.gz
+            ${{ runner.temp }}/forum-binary-linux-x64-*.tar.gz
+          retention-days: 14
+          if-no-files-found: error
+
+  deploy:
+    name: Deploy to server
+    if: inputs.deploy && github.ref == 'refs/heads/main'
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: forum-build-${{ github.sha }}
+          path: ${{ runner.temp }}/build
+
+      - name: Validate deployment settings
+        env:
+          FORUM_DEPLOY_HOST: ${{ vars.FORUM_DEPLOY_HOST }}
+          FORUM_DEPLOY_USER: ${{ vars.FORUM_DEPLOY_USER }}
+          FORUM_DEPLOY_PATH: ${{ vars.FORUM_DEPLOY_PATH }}
+          FORUM_DEPLOY_SSH_KEY: ${{ secrets.FORUM_DEPLOY_SSH_KEY }}
+          FORUM_DEPLOY_KNOWN_HOSTS: ${{ secrets.FORUM_DEPLOY_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          for name in FORUM_DEPLOY_HOST FORUM_DEPLOY_USER FORUM_DEPLOY_PATH FORUM_DEPLOY_SSH_KEY FORUM_DEPLOY_KNOWN_HOSTS; do
+            if [ -z "${!name}" ]; then
+              echo "::error::Missing GitHub variable/secret: $name"
+              exit 1
+            fi
+          done
+          [[ "$FORUM_DEPLOY_PATH" =~ ^/[a-zA-Z0-9._/-]+$ ]] || {
+            echo "::error::FORUM_DEPLOY_PATH must be an absolute path containing only letters, numbers, dots, underscores, slashes, or hyphens."
+            exit 1
+          }
+
+      - name: Configure SSH
+        env:
+          FORUM_DEPLOY_SSH_KEY: ${{ secrets.FORUM_DEPLOY_SSH_KEY }}
+          FORUM_DEPLOY_KNOWN_HOSTS: ${{ secrets.FORUM_DEPLOY_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$FORUM_DEPLOY_SSH_KEY" > "$HOME/.ssh/forum_deploy"
+          printf '%s\n' "$FORUM_DEPLOY_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/forum_deploy" "$HOME/.ssh/known_hosts"
+          ssh-keygen -y -f "$HOME/.ssh/forum_deploy" >/dev/null
+
+      - name: Upload image and stack
+        env:
+          FORUM_DEPLOY_HOST: ${{ vars.FORUM_DEPLOY_HOST }}
+          FORUM_DEPLOY_USER: ${{ vars.FORUM_DEPLOY_USER }}
+          FORUM_DEPLOY_PORT: ${{ vars.FORUM_DEPLOY_PORT }}
+          FORUM_DEPLOY_PATH: ${{ vars.FORUM_DEPLOY_PATH }}
+        run: |
+          set -euo pipefail
+          port="${FORUM_DEPLOY_PORT:-22}"
+          target="$FORUM_DEPLOY_USER@$FORUM_DEPLOY_HOST"
+          ssh_args=(-i "$HOME/.ssh/forum_deploy" -p "$port" -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$HOME/.ssh/known_hosts")
+          ssh "${ssh_args[@]}" "$target" bash -s -- "$FORUM_DEPLOY_PATH" <<'REMOTE'
+          set -euo pipefail
+          root="$1"
+          mkdir -p "$root"
+          test -f "$root/.env" || {
+            echo "Missing $root/.env. Create it from infra/forum/.env.production.example before deploying."
+            exit 1
+          }
+          docker compose version >/dev/null
+          REMOTE
+          image=$(ls "$RUNNER_TEMP"/build/forum-image-*.tar.gz | head -1)
+          scp -i "$HOME/.ssh/forum_deploy" -P "$port" -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$HOME/.ssh/known_hosts" \
+            "$image" "$target:/tmp/forum-image.tar.gz"
+          scp -i "$HOME/.ssh/forum_deploy" -P "$port" -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$HOME/.ssh/known_hosts" \
+            infra/forum/compose.yaml "$target:$FORUM_DEPLOY_PATH/compose.yaml"
+          ssh "${ssh_args[@]}" "$target" bash -s -- "$FORUM_DEPLOY_PATH" "${GITHUB_SHA::12}" <<'REMOTE'
+          set -euo pipefail
+          root="$1"
+          tag="$2"
+          gunzip -c /tmp/forum-image.tar.gz | docker load
+          rm -f /tmp/forum-image.tar.gz
+          FORUM_IMAGE_TAG="$tag" docker compose -p xiangban-forum --env-file "$root/.env" -f "$root/compose.yaml" up -d --wait
+          docker compose -p xiangban-forum --env-file "$root/.env" -f "$root/compose.yaml" ps
+          curl -fsS "http://127.0.0.1:55010/" >/dev/null
+          REMOTE
