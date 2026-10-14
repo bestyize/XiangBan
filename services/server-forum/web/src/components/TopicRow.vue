@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import type { TopicItem } from '@/api/types'
 import UserAvatar from './UserAvatar.vue'
-import { compactCount, pinScopeLabel, readLevelBadge, timeAgo } from '@/lib/format'
+import TopicStats from './TopicStats.vue'
+import { pinScopeLabel, readLevelBadge, timeAgo } from '@/lib/format'
 
 withDefaults(defineProps<{ topic: TopicItem; showCategory?: boolean }>(), { showCategory: true })
 </script>
@@ -24,17 +25,15 @@ withDefaults(defineProps<{ topic: TopicItem; showCategory?: boolean }>(), { show
         <span>{{ topic.reply_count ? `${timeAgo(topic.last_reply_at)}回复` : timeAgo(topic.created_at) }}</span>
         <span v-if="topic.locked">已锁定</span>
       </div>
+      <TopicStats :topic="topic" />
     </div>
-    <RouterLink :to="`/t/${topic.id}`" class="count" :class="{ zero: !topic.reply_count }" :aria-label="`${topic.reply_count} 条回复`">
-      {{ compactCount(topic.reply_count) }}
-    </RouterLink>
   </article>
 </template>
 
 <style scoped>
 .row {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: auto minmax(0, 1fr);
   gap: 12px;
   padding: 12px 4px;
   align-items: start;
@@ -109,20 +108,6 @@ withDefaults(defineProps<{ topic: TopicItem; showCategory?: boolean }>(), { show
 .author:hover,
 .cat:hover {
   color: var(--ink);
-}
-.count {
-  min-width: 28px;
-  text-align: right;
-  font-family: var(--font-display);
-  font-weight: 600;
-  font-size: var(--fs-sm);
-  font-variant-numeric: tabular-nums;
-  color: var(--ink-2);
-  line-height: 1.8;
-}
-.count.zero {
-  color: var(--ink-3);
-  font-weight: 400;
 }
 @media (max-width: 767px) {
   .row {

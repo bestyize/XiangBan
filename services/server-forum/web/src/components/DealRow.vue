@@ -2,7 +2,8 @@
 import { computed } from 'vue'
 import type { TopicItem } from '@/api/types'
 import UserAvatar from './UserAvatar.vue'
-import { compactCount, conditionLabels, expiringSoon, expiryText, readLevelBadge, timeAgo } from '@/lib/format'
+import TopicStats from './TopicStats.vue'
+import { conditionLabels, expiringSoon, expiryText, readLevelBadge, timeAgo } from '@/lib/format'
 
 const props = defineProps<{ topic: TopicItem }>()
 const deal = computed(() => props.topic.deal!)
@@ -34,10 +35,8 @@ const soon = computed(() => expiringSoon(deal.value.expires_at, deal.value.long_
         <RouterLink :to="`/u/${topic.author.uid}`" class="author">{{ topic.author.nickname }}</RouterLink>
         <span>{{ topic.reply_count ? `${timeAgo(topic.last_reply_at)}回复` : timeAgo(topic.created_at) }}</span>
       </div>
+      <TopicStats :topic="topic" />
     </div>
-    <RouterLink :to="`/t/${topic.id}`" class="count" :class="{ zero: !topic.reply_count }" :aria-label="`${topic.reply_count} 条回复`">
-      {{ compactCount(topic.reply_count) }}
-    </RouterLink>
   </article>
 </template>
 
@@ -45,7 +44,7 @@ const soon = computed(() => expiringSoon(deal.value.expires_at, deal.value.long_
 /* 和 TopicRow 完全同一套骨架，只是 meta 里多了几段文字。 */
 .row {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: auto minmax(0, 1fr);
   gap: 12px;
   padding: 12px 4px;
   align-items: start;
@@ -129,20 +128,6 @@ const soon = computed(() => expiringSoon(deal.value.expires_at, deal.value.long_
 .soon {
   color: var(--suspect);
   font-weight: 600;
-}
-.count {
-  min-width: 28px;
-  text-align: right;
-  font-family: var(--font-display);
-  font-weight: 600;
-  font-size: var(--fs-sm);
-  font-variant-numeric: tabular-nums;
-  color: var(--ink-2);
-  line-height: 1.8;
-}
-.count.zero {
-  color: var(--ink-3);
-  font-weight: 400;
 }
 @media (max-width: 767px) {
   .row {
