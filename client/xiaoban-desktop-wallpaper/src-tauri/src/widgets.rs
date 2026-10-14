@@ -334,7 +334,19 @@ pub fn save_custom_widget(app: tauri::AppHandle, pack: Value, overwrite: Option<
 pub fn remove_custom_widget(app: tauri::AppHandle, id: String) -> Result<Value, String> {
     let dir = crate::storage::root(&app)?.join("custom_widgets");
     crate::custom_widgets::remove(&dir, &id)?;
-    Ok(json!({ "ok": true }))
+    let state = app.state::<WidgetState>();
+    let mut next = state.layout.lock().unwrap().clone();
+    let before = next.widgets.len();
+    next.widgets.retain(|w| !(w.kind == "custom" && w.custom_id.as_deref() == Some(&id)));
+    if next.widgets.len() != before {
+        let _ = persist(&app, &next);
+        *state.layout.lock().unwrap() = next;
+        sync(&app);
+    }
+    Ok(json!({ "ok": true, "id": id }))
+}
+pub fn delete_custom_pack(app: &tauri::AppHandle, id: &str) -> Result<(), String> {
+    remove_custom_widget(app.clone(), id.to_string()).map(|_| ())
 }
 #[cfg(test)]
 mod tests{

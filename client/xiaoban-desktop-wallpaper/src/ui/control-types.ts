@@ -50,6 +50,7 @@ export interface ControlStore {
   openEffectsDirectory(): Promise<void>;
   /** Offers a pack file to the effects folder; the pack's own id names the file it is saved as. */
   importEffectPack(): Promise<ImportOutcome>;
+  deleteEffect(id: string): Promise<void>;
   /** Chooses the desktop-wide particle effect; it applies at once, whichever wallpaper is behind it. */
   setEffects(effects: EffectsChoice): Promise<void>;
   setAutostart(enabled: boolean): Promise<void>;
@@ -57,6 +58,7 @@ export interface ControlStore {
   openGames(gameId?: string): Promise<void>;
   applyWallpaper(id: string, options: WallpaperOptions, preview?: boolean): Promise<void>;
   importMedia(): Promise<string | null>;
+  deleteWallpaper(id: string): Promise<void>;
   setAutomaticUpdates(enabled: boolean): Promise<void>;
   checkWebsite(): Promise<void>;
 }

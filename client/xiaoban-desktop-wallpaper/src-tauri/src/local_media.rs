@@ -52,6 +52,7 @@ pub fn validate(item: &Wallpaper) -> Result<(), String> {
                     .contains(&r.mime.as_str())
             }
             "video" => ["video/mp4", "video/webm"].contains(&r.mime.as_str()),
+            "web" => r.bytes <= 4 * 1024 * 1024 && r.mime == "text/html",
             _ => false,
         }
     {
@@ -65,6 +66,8 @@ pub fn validate(item: &Wallpaper) -> Result<(), String> {
     remote.resource.bytes = r.bytes.min(library::MAX_FILE);
     remote.resource.mime = if item.kind == "video" {
         "video/mp4"
+    } else if item.kind == "web" {
+        "text/html"
     } else {
         "image/png"
     }
@@ -232,6 +235,101 @@ pub fn import_file(root: &Path, source: &Path) -> Result<Wallpaper, String> {
     result
 }
 
+pub fn save_local_html(
+    root: &Path,
+    title: &str,
+    description: Option<&str>,
+    html: &str,
+) -> Result<Wallpaper, String> {
+    if html.trim().is_empty() {
+        return Err("HTML 内容不能为空".into());
+    }
+    if html.len() as u64 > 4 * 1024 * 1024 {
+        return Err("动态壁纸 HTML 内容不能超过 4 MB".into());
+    }
+    let title_clean = title.trim();
+    if title_clean.is_empty() || title_clean.chars().count() > 48 {
+        return Err("壁纸名称不能为空且不能超过 48 个字".into());
+    }
+
+    let mut hasher = Sha256::new();
+    hasher.update(html.as_bytes());
+    let hash = format!("{:x}", hasher.finalize());
+
+    let directory = root.join("imports");
+    fs::create_dir_all(&directory).map_err(|e| e.to_string())?;
+    let temporary = directory.join(format!(".html-{}.tmp", &hash[..16]));
+    let target = directory.join(&hash);
+
+    let desc = description.unwrap_or("由小伴现场创作的自包含动态桌面壁纸。").trim();
+    let item = Wallpaper {
+        id: format!("local-{}", &hash[..32]),
+        version: "1.0.0".into(),
+        title: title_clean.to_string(),
+        description: if desc.is_empty() { "自包含动态桌面壁纸。".into() } else { desc.to_string() },
+        author: "小伴创作".into(),
+        kind: "web".into(),
+        resource: Resource {
+            url: format!("{PREFIX}{hash}"),
+            sha256: hash.clone(),
+            bytes: html.len() as u64,
+            mime: "text/html".into(),
+        },
+        cover: None,
+        assets: Default::default(),
+        controls: Vec::new(),
+    };
+    validate(&item)?;
+
+    let result = (|| -> Result<Wallpaper, String> {
+        let mut catalog = read(root)?;
+        if let Some(existing) = catalog.items.iter().find(|old| old.id == item.id) {
+            if existing.resource.sha256 != hash {
+                return Err("本地壁纸标识冲突".into());
+            }
+        } else if catalog.items.len() >= 1000 {
+            return Err("本地壁纸库最多保存 1000 张壁纸。".into());
+        }
+
+        if !target.exists() || !library::verify_file(&target, &item.resource)? {
+            fs::write(&temporary, html.as_bytes()).map_err(|e| e.to_string())?;
+            fs::rename(&temporary, &target).map_err(|e| e.to_string())?;
+        }
+
+        if let Some(existing) = catalog.items.iter().find(|old| old.id == item.id) {
+            return Ok(existing.clone());
+        }
+        catalog.items.push(item.clone());
+        library::save_json(&root.join("local.json"), &catalog)?;
+        Ok(item)
+    })();
+    if result.is_err() {
+        let _ = fs::remove_file(&temporary);
+    }
+    result
+}
+
+/// Deletes a local wallpaper by id. Only local wallpapers (`local-*`) can be deleted.
+/// If no other local wallpapers reference the imported file, the physical file is also removed.
+pub fn delete_local_wallpaper(root: &Path, id: &str) -> Result<String, String> {
+    if !id.starts_with("local-") {
+        return Err("只能删除本地导入或创作的壁纸".into());
+    }
+    let mut catalog = read(root)?;
+    let pos = catalog.items.iter().position(|w| w.id == id).ok_or_else(|| format!("未找到壁纸 {id}"))?;
+    let removed = catalog.items.remove(pos);
+    library::save_json(&root.join("local.json"), &catalog)?;
+
+    // Check if any remaining wallpaper shares the same file hash
+    let hash = removed.resource.sha256;
+    let in_use = catalog.items.iter().any(|w| w.resource.sha256 == hash);
+    if !in_use {
+        let file_path = root.join("imports").join(&hash);
+        let _ = fs::remove_file(file_path);
+    }
+    Ok(hash)
+}
+
 #[tauri::command]
 pub async fn import_local_wallpaper(
     window: tauri::WebviewWindow,
@@ -299,5 +397,46 @@ mod tests {
         invalid.resource.bytes = MAX_LOCAL_FILE + 1;
         assert!(validate(&invalid).is_err());
         fs::remove_dir_all(base).unwrap();
+    }
+
+    #[test]
+    fn saves_and_validates_custom_html_wallpaper() {
+        let base = std::env::temp_dir().join(format!("xiaoban-html-test-{}", std::process::id()));
+        let root = base.join("wallpapers");
+        fs::create_dir_all(&base).unwrap();
+        let item = save_local_html(
+            &root,
+            "水墨互动桌面",
+            Some("自包含互动壁纸"),
+            "<!DOCTYPE html><html><body><canvas></canvas></body></html>",
+        )
+        .unwrap();
+        assert_eq!(item.kind, "web");
+        assert_eq!(item.title, "水墨互动桌面");
+        assert!(item.id.starts_with("local-"));
+        assert_eq!(item.resource.mime, "text/html");
+
+        let loaded = read(&root).unwrap();
+        assert_eq!(loaded.items.len(), 1);
+        assert_eq!(loaded.items[0].id, item.id);
+        let _ = fs::remove_dir_all(base);
+    }
+
+    #[test]
+    fn delete_local_wallpaper_removes_entry_and_file() {
+        let base = std::env::temp_dir().join(format!("xiaoban-del-wall-{}", std::process::id()));
+        let root = base.join("wallpapers");
+        fs::create_dir_all(&base).unwrap();
+        let item = save_local_html(&root, "测试壁纸", None, "<html>hello</html>").unwrap();
+        let file_path = root.join("imports").join(&item.resource.sha256);
+        assert!(file_path.exists());
+
+        assert!(delete_local_wallpaper(&root, "builtin-soft-hills").unwrap_err().contains("只能删除"));
+
+        let hash = delete_local_wallpaper(&root, &item.id).unwrap();
+        assert_eq!(hash, item.resource.sha256);
+        assert!(!file_path.exists(), "physical file is cleaned up when no other wallpaper references it");
+        assert_eq!(read(&root).unwrap().items.len(), 0);
+        let _ = fs::remove_dir_all(base);
     }
 }

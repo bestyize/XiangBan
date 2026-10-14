@@ -23,12 +23,15 @@ pub trait Desktop: Send + Sync {
     /// `{ items: [{ definition: { id, title, kind }, installed, source }], activeId }`
     fn wallpapers(&self) -> Result<Value, String>;
     fn apply_wallpaper(&self, id: &str) -> Result<(), String>;
+    fn create_wallpaper(&self, title: &str, description: Option<&str>, html: &str, apply_now: bool) -> Result<Value, String>;
+    fn delete_wallpaper(&self, id: &str) -> Result<String, String>;
     /// `{ packs: [{ id, name }] }` plus `selected` for the one in use.
     fn effects(&self) -> Result<Value, String>;
     /// Empty turns the effect off.
     fn set_effect(&self, id: &str) -> Result<(), String>;
     /// Writes a new effect pack the user asked for. Returns the file name it landed in.
     fn create_effect(&self, pack: &Value, overwrite: bool) -> Result<String, String>;
+    fn delete_effect(&self, id: &str) -> Result<String, String>;
     fn set_companion(&self, change: &CompanionChange) -> Result<(), String>;
     /// `{ config, rules }`
     fn care(&self) -> Result<Value, String>;
@@ -40,6 +43,7 @@ pub trait Desktop: Send + Sync {
     fn widget_remove(&self, id: &str) -> Result<(), String>;
     fn custom_widgets(&self) -> Result<Value, String>;
     fn create_custom_widget(&self, pack: &Value, place_now: bool, overwrite: bool) -> Result<Value, String>;
+    fn delete_custom_widget(&self, id: &str) -> Result<(), String>;
     fn games(&self) -> Result<Value, String>;
     fn game_open(&self, id: Option<&str>) -> Result<(), String>;
     fn game_close(&self) -> Result<(), String>;
@@ -91,6 +95,15 @@ impl Desktop for TauriDesktop {
     fn apply_wallpaper(&self, id: &str) -> Result<(), String> {
         let app = self.app.clone();
         tauri::async_runtime::block_on(crate::content::apply_wallpaper(app, id.to_string(), Default::default(), false)).map(|_| ())
+    }
+
+    fn create_wallpaper(&self, title: &str, description: Option<&str>, html: &str, apply_now: bool) -> Result<Value, String> {
+        let root = crate::content::root(&self.app)?;
+        let item = crate::local_media::save_local_html(&root, title, description, html)?;
+        if apply_now {
+            self.apply_wallpaper(&item.id)?;
+        }
+        Ok(json!({ "id": item.id, "title": item.title, "applied": apply_now }))
     }
 
     fn effects(&self) -> Result<Value, String> {
@@ -174,6 +187,24 @@ impl Desktop for TauriDesktop {
             let _ = tauri::async_runtime::block_on(crate::widgets::add_desktop_widget(app, "custom".to_string(), Some(id.to_string())))?;
         }
         Ok(json!({ "id": id, "name": name, "file": path.file_name().unwrap_or_default().to_string_lossy(), "placed": place_now }))
+    }
+
+    fn delete_wallpaper(&self, id: &str) -> Result<String, String> {
+        let root = crate::content::root(&self.app)?;
+        let hash = crate::local_media::delete_local_wallpaper(&root, id)?;
+        let current_id = crate::settings(&self.app).wallpaper_id;
+        if current_id == id {
+            self.apply_wallpaper("companion")?;
+        }
+        Ok(hash)
+    }
+
+    fn delete_effect(&self, id: &str) -> Result<String, String> {
+        crate::effects::delete_pack(&self.app, id)
+    }
+
+    fn delete_custom_widget(&self, id: &str) -> Result<(), String> {
+        crate::widgets::delete_custom_pack(&self.app, id)
     }
 
     fn games(&self) -> Result<Value, String> {
@@ -266,6 +297,28 @@ fn wallpaper_apply(desktop: &dyn Desktop, args: &Value) -> Result<String, String
     Ok(if id == "companion" { "已换回系统桌面".to_string() } else { format!("已应用壁纸 {id}") })
 }
 
+fn wallpaper_create(desktop: &dyn Desktop, args: &Value) -> Result<String, String> {
+    let title = text_arg(args, "title")?;
+    let html = text_arg(args, "html")?;
+    let description = optional_text(args, "description")?;
+    let apply_now = optional_bool(args, "apply_now")?.unwrap_or(true);
+
+    let res = desktop.create_wallpaper(title, description, html, apply_now)?;
+    let id = res["id"].as_str().unwrap_or_default();
+    let applied_msg = if res["applied"].as_bool().unwrap_or(false) {
+        "，并已立即应用为当前桌面壁纸"
+    } else {
+        "（可在壁纸库随时选用）"
+    };
+    Ok(format!("已成功创作动态网页壁纸「{title}」（id: {id}）{applied_msg}。"))
+}
+
+fn wallpaper_delete(desktop: &dyn Desktop, args: &Value) -> Result<String, String> {
+    let id = text_arg(args, "id")?;
+    desktop.delete_wallpaper(id)?;
+    Ok(format!("已删除本地壁纸 {id}。若当前正在使用，已自动换回系统桌面。"))
+}
+
 fn effect_list(desktop: &dyn Desktop, _: &Value) -> Result<String, String> {
     let value = desktop.effects()?;
     let selected = value["selected"].as_str().unwrap_or("");
@@ -305,6 +358,12 @@ fn effect_create(desktop: &dyn Desktop, args: &Value) -> Result<String, String> 
     let name = pack["name"].as_str().unwrap_or_default();
     let id = pack["id"].as_str().unwrap_or_default();
     Ok(format!("已创建特效「{name}」（id: {id}，文件 {file}），可在“桌面特效”页选用。"))
+}
+
+fn effect_delete(desktop: &dyn Desktop, args: &Value) -> Result<String, String> {
+    let id = text_arg(args, "id")?;
+    desktop.delete_effect(id)?;
+    Ok(format!("已删除自定义特效 {id}。若当前正在使用，已自动重置为无特效。"))
 }
 
 fn companion_set(desktop: &dyn Desktop, args: &Value) -> Result<String, String> {
@@ -567,6 +626,12 @@ fn widget_create(desktop: &dyn Desktop, args: &Value) -> Result<String, String> 
     Ok(format!("已成功创建小组件「{name}」（id: {id}）{placed_msg}。"))
 }
 
+fn widget_delete_custom(desktop: &dyn Desktop, args: &Value) -> Result<String, String> {
+    let id = text_arg(args, "id")?;
+    desktop.delete_custom_widget(id)?;
+    Ok(format!("已删除自定义小组件「{id}」模板，桌面上若有该组件实例也已同步清理。"))
+}
+
 
 pub fn resolve_game_id(input: &str) -> Option<&'static str> {
     let lower = input.trim().to_lowercase();
@@ -650,6 +715,30 @@ pub fn tools(desktop: Arc<dyn Desktop>) -> Vec<Arc<dyn Tool>> {
                 .timeout(std::time::Duration::from_secs(180)),
             wallpaper_apply,
         ),
+        tool(
+            &desktop,
+            ToolSpec::new(
+                "wallpaper_create",
+                "为用户创作一份全新的自包含 HTML 动态/交互桌面壁纸（或整屏桌面小游戏）。可编写单文件 HTML、CSS 与 JavaScript 脚本（支持 Canvas、WebGL、CSS 动效及动画循环），自动适应 100vw/100vh 屏幕尺寸。创作完成后会自动保存至本地壁纸库并去重，默认立即应用到当前桌面。",
+                object(
+                    json!({
+                        "title": { "type": "string", "description": "动态壁纸标题（最多 48 字，如 水墨涟漪交互壁纸）" },
+                        "html": { "type": "string", "description": "完整的自包含单文件 HTML 内容（包含完整的 <!DOCTYPE html>、<style>、Canvas/DOM 结构与动画逻辑）" },
+                        "description": { "type": "string", "description": "一句话介绍（最多 80 字）" },
+                        "apply_now": { "type": "boolean", "description": "创作完成后是否立即应用为桌面壁纸，默认 true" },
+                    }),
+                    &["title", "html"],
+                ),
+            )
+            .risk(Risk::Write)
+            .serial(),
+            wallpaper_create,
+        ),
+        tool(
+            &desktop,
+            ToolSpec::new("wallpaper_delete", "删除指定的本地导入或创作的壁纸，id 来自 wallpaper_list（必须是 local- 开头）。若该壁纸正在使用，会自动换回系统桌面。", object(json!({"id": {"type": "string"}}), &["id"])).risk(Risk::Write).serial(),
+            wallpaper_delete,
+        ),
         tool(&desktop, ToolSpec::new("effect_list", "列出桌面特效（雨、雪、花瓣等）和正在使用的那个。", none()), effect_list),
         tool(
             &desktop,
@@ -682,6 +771,11 @@ pub fn tools(desktop: Arc<dyn Desktop>) -> Vec<Arc<dyn Tool>> {
                 ),
             ).risk(Risk::Write).serial(),
             effect_create,
+        ),
+        tool(
+            &desktop,
+            ToolSpec::new("effect_delete", "删除指定的自定义特效包，id 来自 effect_list（内置的 12 个特效受保护不可删）。若该特效正在使用，会自动重置为无特效。", object(json!({"id": {"type": "string"}}), &["id"])).risk(Risk::Write).serial(),
+            effect_delete,
         ),
         tool(
             &desktop,
@@ -791,6 +885,11 @@ pub fn tools(desktop: Arc<dyn Desktop>) -> Vec<Arc<dyn Tool>> {
             .serial(),
             widget_create,
         ),
+        tool(
+            &desktop,
+            ToolSpec::new("widget_delete_custom", "删除指定的自定义小组件模板，id 来自 widget_create 定义的 id。若桌面上摆有该组件实例，也会一并从桌面移除。", object(json!({"id": {"type": "string"}}), &["id"])).risk(Risk::Write).serial(),
+            widget_delete_custom,
+        ),
         tool(&desktop, ToolSpec::new("game_list", "列出小伴支持的小游戏（贪吃蛇、俄罗斯方块、2048、消失高手、奶茶大师、水墨剑客、暮色滑翔等）以及游戏空间状态。", none()), game_list),
         tool(
             &desktop,
@@ -864,6 +963,14 @@ mod tests {
         fn apply_wallpaper(&self, id: &str) -> Result<(), String> {
             self.log(format!("apply {id}"))
         }
+        fn create_wallpaper(&self, title: &str, _desc: Option<&str>, _html: &str, apply_now: bool) -> Result<Value, String> {
+            self.log(format!("create-wallpaper {title} apply_now={apply_now}"))?;
+            Ok(json!({"id": "local-mock", "title": title, "applied": apply_now}))
+        }
+        fn delete_wallpaper(&self, id: &str) -> Result<String, String> {
+            self.log(format!("delete-wallpaper {id}"))?;
+            Ok("hash".to_string())
+        }
         fn effects(&self) -> Result<Value, String> {
             Ok(json!({"selected": "rain", "packs": [{"id": "rain", "name": "细雨"}, {"id": "snow", "name": "飘雪"}]}))
         }
@@ -873,6 +980,10 @@ mod tests {
         fn create_effect(&self, pack: &Value, overwrite: bool) -> Result<String, String> {
             self.log(format!("create-effect {} overwrite={overwrite}", pack["id"].as_str().unwrap_or("?")))?;
             Ok(format!("{}.json", pack["id"].as_str().unwrap_or("?")))
+        }
+        fn delete_effect(&self, id: &str) -> Result<String, String> {
+            self.log(format!("delete-effect {id}"))?;
+            Ok(format!("{id}.json"))
         }
         fn set_companion(&self, change: &CompanionChange) -> Result<(), String> {
             self.log(format!("companion {change:?}"))
@@ -911,6 +1022,9 @@ mod tests {
             self.log(format!("create-custom-widget {id} place_now={place_now} overwrite={overwrite}"))?;
             Ok(json!({"id": id, "name": pack["name"], "file": format!("{id}.json"), "placed": place_now}))
         }
+        fn delete_custom_widget(&self, id: &str) -> Result<(), String> {
+            self.log(format!("delete-custom-widget {id}"))
+        }
         fn games(&self) -> Result<Value, String> {
             Ok(json!({"active": false, "games": [
                 {"id": "snake-arena", "name": "小伴贪吃蛇", "description": "吃糖果长成大蛇"},
@@ -945,7 +1059,7 @@ mod tests {
         let mut unique = names.clone();
         unique.dedup();
         assert_eq!(names, unique);
-        assert_eq!(names.len(), 19);
+        assert_eq!(names.len(), 23);
         for tool in &all {
             let spec = tool.spec();
             assert!(spec.name.len() <= 64 && spec.name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_'), "{}", spec.name);
@@ -1198,5 +1312,56 @@ mod tests {
         .unwrap();
         assert!(res_no_place.contains("未自动放置到桌面"));
         assert_eq!(fake.calls()[1], "create-custom-widget poetry-daily place_now=false overwrite=false");
+    }
+
+    #[test]
+    fn wallpaper_create_validates_and_calls_desktop() {
+        let fake = Arc::new(Fake::default());
+        let res = call(
+            &fake,
+            "wallpaper_create",
+            json!({
+                "title": "水墨涟漪交互壁纸",
+                "html": "<!DOCTYPE html><html><body><canvas></canvas></body></html>",
+                "apply_now": true
+            }),
+        )
+        .unwrap();
+        assert!(res.contains("已成功创作动态网页壁纸「水墨涟漪交互壁纸」"));
+        assert!(res.contains("并已立即应用为当前桌面壁纸"));
+        assert_eq!(fake.calls(), vec!["create-wallpaper 水墨涟漪交互壁纸 apply_now=true"]);
+
+        let res_no_apply = call(
+            &fake,
+            "wallpaper_create",
+            json!({
+                "title": "星空桌面",
+                "html": "<html><body>stars</body></html>",
+                "apply_now": false
+            }),
+        )
+        .unwrap();
+        assert!(res_no_apply.contains("可在壁纸库随时选用"));
+        assert_eq!(fake.calls()[1], "create-wallpaper 星空桌面 apply_now=false");
+    }
+
+    #[test]
+    fn deletion_tools_validate_and_call_desktop() {
+        let fake = Arc::new(Fake::default());
+        let res_wall = call(&fake, "wallpaper_delete", json!({"id": "local-123"})).unwrap();
+        assert!(res_wall.contains("已删除本地壁纸 local-123"));
+        assert_eq!(fake.calls()[0], "delete-wallpaper local-123");
+
+        let res_eff = call(&fake, "effect_delete", json!({"id": "my-effect"})).unwrap();
+        assert!(res_eff.contains("已删除自定义特效 my-effect"));
+        assert_eq!(fake.calls()[1], "delete-effect my-effect");
+
+        let res_wgt = call(&fake, "widget_delete_custom", json!({"id": "my-clock"})).unwrap();
+        assert!(res_wgt.contains("已删除自定义小组件「my-clock」模板"));
+        assert_eq!(fake.calls()[2], "delete-custom-widget my-clock");
+
+        assert!(call(&fake, "wallpaper_delete", json!({})).is_err());
+        assert!(call(&fake, "effect_delete", json!({})).is_err());
+        assert!(call(&fake, "widget_delete_custom", json!({})).is_err());
     }
 }

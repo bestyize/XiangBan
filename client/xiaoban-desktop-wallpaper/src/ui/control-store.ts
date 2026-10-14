@@ -139,6 +139,12 @@ export function createControlStore(notify: ControlStore["notify"]): ControlStore
       if (outcome.status === "imported") await store.loadEffects();
       return outcome;
     },
+    async deleteEffect(id: string) {
+      if (!desktop) throw new Error("请在桌面应用中删除特效");
+      await invoke("delete_desktop_effect", { id });
+      await store.loadEffects();
+      await store.refreshSettings();
+    },
     setEffects(effects) {
       const pending = effectsQueue.catch(() => {}).then(async () => {
         const next = clone(effects);
@@ -172,6 +178,12 @@ export function createControlStore(notify: ControlStore["notify"]): ControlStore
       if (!result) return null;
       store.library = result.library;
       return result.id;
+    },
+    async deleteWallpaper(id: string) {
+      if (!desktop) throw new Error("请在桌面应用中删除壁纸");
+      const res = await invoke<{ library: WallpaperLibrary }>("delete_local_wallpaper", { id });
+      store.library = res.library;
+      await store.refreshSettings();
     },
     async setAutomaticUpdates(enabled) {
       if (!desktop) {

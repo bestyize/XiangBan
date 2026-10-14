@@ -175,6 +175,17 @@ pub fn file_with_id(directory: &Path, id: &str) -> Option<String> {
     None
 }
 
+/// Deletes a custom pack file by id. Built-in packs are refused.
+pub fn delete(directory: &Path, id: &str) -> Result<String, String> {
+    if is_builtin_id(id) {
+        return Err(format!("「{id}」是内置特效，不能删除"));
+    }
+    let file = file_with_id(directory, id).ok_or_else(|| format!("未找到自定义特效「{id}」"))?;
+    let path = directory.join(&file);
+    fs::remove_file(&path).map_err(|e| format!("无法删除特效文件：{e}"))?;
+    Ok(file)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -302,5 +313,20 @@ mod tests {
         assert_eq!(file_with_id(&dir, "glitter").as_deref(), Some("mine.json"));
         assert_eq!(file_with_id(&dir, "other").as_deref(), Some("other.json"));
         assert_eq!(file_with_id(&dir, "missing"), None, "a file whose name starts with _ is not loaded");
+    }
+
+    #[test]
+    fn deleting_custom_packs_removes_file_and_protects_builtins() {
+        let dir = folder("delete");
+        save(&dir, &good_pack(), false).unwrap();
+        assert!(find(&dir, "glitter").is_some());
+
+        assert!(delete(&dir, "rain").unwrap_err().contains("内置特效"));
+
+        let file = delete(&dir, "glitter").unwrap();
+        assert_eq!(file, "glitter.json");
+        assert!(find(&dir, "glitter").is_none());
+        assert!(!dir.join("glitter.json").exists());
+        assert!(delete(&dir, "glitter").unwrap_err().contains("未找到"));
     }
 }

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
-import { NAlert, NButton, NSlider } from 'naive-ui';
-import { Ban, Check, FileUp, FolderOpen, RefreshCw } from 'lucide-vue-next';
+import { NAlert, NButton, NPopconfirm, NSlider } from 'naive-ui';
+import { Ban, Check, FileUp, FolderOpen, RefreshCw, Trash2 } from 'lucide-vue-next';
 import { normalizeChoice, paramsOf } from '../../effects/parse.ts';
 import { limits, type EffectsChoice } from '../../effects/types.ts';
 import type { ControlStore } from '../control-types.ts';
@@ -52,6 +52,14 @@ async function importPack() {
     else if (outcome.status === 'declined') props.store.notify(`特效「${outcome.id}」已经存在，没有替换`, 'info');
   } catch (error) { props.store.notify(message(error), 'error'); }
 }
+async function removeEffect(id: string, name: string) {
+  try {
+    await props.store.deleteEffect(id);
+    props.store.notify(`已删除特效「${name}」`, 'success');
+  } catch (error) {
+    props.store.notify(message(error), 'error');
+  }
+}
 onMounted(() => { void reload(false); });
 onBeforeUnmount(() => { if (timer) { clearTimeout(timer); commit(); } });
 </script>
@@ -69,11 +77,21 @@ onBeforeUnmount(() => { if (timer) { clearTimeout(timer); commit(); } });
         <span class="effect-name"><b>无特效</b><small>桌面保持安静</small></span>
         <Check v-if="!chosen" :size="16" class="effect-check" />
       </button>
-      <button v-for="pack in packs" :key="pack.id" class="effect-card" :class="{ on: chosen?.id === pack.id }" :aria-pressed="chosen?.id === pack.id" :data-testid="`effect-${pack.id}`" @click="choose(pack.id)" @mouseenter="hoveredId = pack.id" @mouseleave="hoveredId = ''">
-        <span class="effect-stage"><EffectPreview :pack="pack" :playing="playingId === pack.id" :paused="store.settings.paused" :fps="store.settings.fps" /></span>
-        <span class="effect-name"><b>{{ pack.name }}<i v-if="pack.source === 'user'" class="mine">我的</i></b><small>{{ pack.description }}</small></span>
-        <Check v-if="chosen?.id === pack.id" :size="16" class="effect-check" />
-      </button>
+      <div v-for="pack in packs" :key="pack.id" class="effect-card-wrapper">
+        <button class="effect-card" :class="{ on: chosen?.id === pack.id }" :aria-pressed="chosen?.id === pack.id" :data-testid="`effect-${pack.id}`" @click="choose(pack.id)" @mouseenter="hoveredId = pack.id" @mouseleave="hoveredId = ''">
+          <span class="effect-stage"><EffectPreview :pack="pack" :playing="playingId === pack.id" :paused="store.settings.paused" :fps="store.settings.fps" /></span>
+          <span class="effect-name"><b>{{ pack.name }}<i v-if="pack.source === 'user'" class="mine">我的</i></b><small>{{ pack.description }}</small></span>
+          <Check v-if="chosen?.id === pack.id" :size="16" class="effect-check" />
+        </button>
+        <NPopconfirm v-if="pack.source === 'user'" positive-text="删除" negative-text="取消" @positive-click="removeEffect(pack.id, pack.name)">
+          <template #trigger>
+            <button class="effect-delete-btn" title="删除这个自定义特效" :aria-label="`删除特效 ${pack.name}`" :data-testid="`delete-effect-${pack.id}`" @click.stop>
+              <Trash2 :size="13" />
+            </button>
+          </template>
+          确定要删除自定义特效「{{ pack.name }}」吗？
+        </NPopconfirm>
+      </div>
     </div>
     <section v-if="chosen" class="surface tuning" data-testid="effect-tuning">
       <div class="section-heading"><div><h2>{{ chosen.name }}</h2><p>调整后立即生效，每种特效各自记住自己的设置</p></div></div>
@@ -88,6 +106,10 @@ onBeforeUnmount(() => { if (timer) { clearTimeout(timer); commit(); } });
 .effects-page{display:grid;gap:var(--ui-section-gap)}
 .header-actions{display:flex;gap:10px;flex:none;flex-wrap:wrap;justify-content:flex-end}
 .effect-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:var(--ui-card-gap)}
+.effect-card-wrapper{position:relative}
+.effect-card-wrapper .effect-card{width:100%}
+.effect-delete-btn{position:absolute;top:8px;right:8px;z-index:3;width:26px;height:26px;border-radius:50%;border:0;background:rgba(0,0,0,0.5);color:#fff;display:grid;place-items:center;cursor:pointer;opacity:0.7;transition:all .2s}
+.effect-delete-btn:hover{opacity:1;background:#dc2626}
 .effect-card{position:relative;display:grid;grid-template-rows:auto auto;padding:0;border:0;background:var(--ui-surface);border-radius:var(--ui-radius-card);overflow:hidden;cursor:pointer;text-align:left;color:var(--ui-text-primary);transition:transform 200ms cubic-bezier(.2,.8,.2,1),box-shadow 200ms}
 .effect-card:hover{transform:translateY(-3px);box-shadow:0 14px 30px var(--ui-shadow-hover)}
 .effect-card.on{outline:3px solid var(--ui-primary);outline-offset:2px}

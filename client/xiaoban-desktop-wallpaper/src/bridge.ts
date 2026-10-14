@@ -119,7 +119,7 @@ export function toAccountError(error: unknown): AccountError {
   return new AccountError(typeof error === "string" && error ? error : "操作失败，请稍后再试");
 }
 
-export type WallpaperKind = "image" | "video" | "canvas";
+export type WallpaperKind = "image" | "video" | "canvas" | "web";
 export interface Resource {
   url: string;
   sha256: string;

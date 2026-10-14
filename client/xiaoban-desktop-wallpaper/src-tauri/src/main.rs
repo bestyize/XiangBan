@@ -669,9 +669,9 @@ fn main() {
         }));
     #[cfg(target_os = "macos")]
     let builder = builder.plugin(tauri_plugin_autostart::Builder::new().app_name(startup_name).arg("--autostart").build());
-    let command_handler: Box<dyn Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Sync> = Box::new(tauri::generate_handler![get_platform, get_settings, set_mode, update_settings, set_desktop_effects, effects::list_desktop_effects, effects::open_effects_directory, effects::import_effect_pack, set_companion_enabled, set_companion_links, set_companion_skin, poke,
+    let command_handler: Box<dyn Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Sync> = Box::new(tauri::generate_handler![get_platform, get_settings, set_mode, update_settings, set_desktop_effects, effects::list_desktop_effects, effects::open_effects_directory, effects::import_effect_pack, effects::delete_desktop_effect, set_companion_enabled, set_companion_links, set_companion_skin, poke,
             scene_ready, set_hit_test, start_drag, hide_control, show_control, quit, get_diagnostics, ui_smoke_report,
-            get_startup_status, set_autostart, content::get_wallpaper_library, content::import_wallpaper_catalog,
+            get_startup_status, set_autostart, content::get_wallpaper_library, content::import_wallpaper_catalog, content::delete_local_wallpaper,
             games::open_game_space, games::close_game_space, games::get_game_catalog, games::load_game_save,
             games::save_game_save, games::get_game_status, games::set_game_desktop_double_click,
             games::game_smoke_report, rituals::open_ritual_space, rituals::close_ritual_space, rituals::read_ritual_journal, rituals::write_ritual_journal,

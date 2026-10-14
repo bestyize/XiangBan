@@ -206,6 +206,29 @@ pub fn save_pack(app: &tauri::AppHandle, pack: &Value, overwrite: bool) -> Resul
     Ok(path.file_name().map(|name| name.to_string_lossy().to_string()).unwrap_or_default())
 }
 
+/// Deletes a custom pack from the effects folder. If in use, the desktop resets to no effect.
+pub fn delete_pack(app: &tauri::AppHandle, id: &str) -> Result<String, String> {
+    let directory = folder(app)?;
+    let file = effect_packs::delete(&directory, id)?;
+    let config = crate::settings(app);
+    if config.effects.selected == id {
+        let mut choice = serde_json::to_value(&config.effects).map_err(|e| e.to_string())?;
+        choice["selected"] = json!("");
+        let _ = crate::set_desktop_effects(app.clone(), choice);
+    } else {
+        sync(app);
+    }
+    Ok(file)
+}
+
+#[tauri::command]
+pub fn delete_desktop_effect(window: tauri::WebviewWindow, id: String) -> Result<Value, String> {
+    control_only(&window)?;
+    let app = window.app_handle();
+    let file = delete_pack(app, &id)?;
+    Ok(json!({ "ok": true, "id": id, "file": file }))
+}
+
 /// The rules a pack must follow, in the words the assistant needs. Kept next to the checks themselves.
 pub fn format_help() -> &'static str {
     "特效包是一个 JSON 对象：schemaVersion 必须是 1；id 用小写字母、数字、- 和 _（不超过 48 字符，不能与内置的 12 个重名）；\

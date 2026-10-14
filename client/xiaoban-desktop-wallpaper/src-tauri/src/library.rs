@@ -173,6 +173,7 @@ fn validate_resource(resource: &Resource, builtin: bool) -> Result<(), String> {
         "application/javascript",
         "application/json",
         "application/octet-stream",
+        "text/html",
     ]
     .contains(&resource.mime.as_str())
         && !(builtin && resource.mime == "image/svg+xml")
@@ -181,6 +182,9 @@ fn validate_resource(resource: &Resource, builtin: bool) -> Result<(), String> {
     }
     if resource.mime == "application/javascript" && resource.bytes > 2 * 1024 * 1024 {
         return Err("动画脚本不能超过 2 MB，请预先打包压缩。".into());
+    }
+    if resource.mime == "text/html" && resource.bytes > 4 * 1024 * 1024 {
+        return Err("自包含网页壁纸不能超过 4 MB。".into());
     }
     Ok(())
 }
@@ -206,6 +210,7 @@ pub fn validate_item(item: &Wallpaper, builtin: bool) -> Result<(), String> {
         "image" => mime.starts_with("image/"),
         "video" => ["video/mp4", "video/webm"].contains(&mime.as_str()),
         "canvas" => mime == "application/javascript",
+        "web" => mime == "text/html",
         _ => false,
     } {
         return Err("壁纸类型与资源 MIME 不匹配".into());

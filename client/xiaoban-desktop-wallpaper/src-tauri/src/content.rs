@@ -27,7 +27,7 @@ pub fn permitted(label: &str, command: &str) -> bool {
     if command.starts_with("tts_") { return label == "control"; }
     if command.contains("account") || command.starts_with("chat_") { return label == "control"; }
     if command.contains("website") || command.starts_with("fetch_site_") || ["select_site_wallpaper","download_site_wallpaper","cancel_site_download"].contains(&command) { return label == "control"; }
-    if ["import_local_wallpaper", "open_data_directory", "set_automatic_updates", "open_official_site", "refresh_ai_providers", "get_ai_config", "save_ai_config", "pick_workspace", "fetch_ai_models", "save_ai_provider", "switch_ai_provider", "delete_ai_provider", "save_ai_preferences", "request_system_permissions"].contains(&command) { return label == "control"; }
+    if ["import_local_wallpaper", "delete_local_wallpaper", "open_data_directory", "set_automatic_updates", "open_official_site", "refresh_ai_providers", "get_ai_config", "save_ai_config", "pick_workspace", "fetch_ai_models", "save_ai_provider", "switch_ai_provider", "delete_ai_provider", "save_ai_preferences", "request_system_permissions"].contains(&command) { return label == "control"; }
     if ["control", "pet", "wallpaper"].contains(&label) {
         return true;
     }
@@ -335,6 +335,28 @@ pub async fn import_wallpaper_catalog(
     })
     .await
     .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+pub async fn delete_local_wallpaper(
+    app: tauri::AppHandle,
+    id: String,
+) -> Result<Value, String> {
+    let hash = {
+        let root_path = root(&app)?;
+        let state = app.state::<ContentState>();
+        let _io = state.io.lock().unwrap();
+        crate::local_media::delete_local_wallpaper(&root_path, &id)?
+    };
+
+    // If currently active, reset to companion
+    let current_id = settings(&app).wallpaper_id;
+    if current_id == id {
+        let _ = apply_wallpaper(app.clone(), "companion".into(), Default::default(), false).await;
+    }
+
+    let library = get_wallpaper_library(app.clone())?;
+    Ok(json!({ "ok": true, "id": id, "hash": hash, "library": library }))
 }
 
 #[tauri::command]

@@ -203,6 +203,29 @@ export async function mountContent() {
       });
       await video.play();
       await ready({ width: video.videoWidth, height: video.videoHeight });
+    } else if (state.item.kind === "web") {
+      frame = document.createElement("iframe");
+      frame.setAttribute("sandbox", "allow-scripts allow-forms allow-same-origin");
+      frame.setAttribute("allow", "autoplay");
+      frame.title = state.item.title;
+      frame.style.width = "100%";
+      frame.style.height = "100%";
+      frame.style.border = "0";
+      frame.style.display = "block";
+      frame.src = state.item.resourceUrl;
+      host.append(frame);
+      await new Promise<void>((resolve, reject) => {
+        frame!.addEventListener(
+          "load",
+          () => ready({ width: innerWidth, height: innerHeight }).then(resolve, reject),
+          { once: true },
+        );
+        frame!.addEventListener(
+          "error",
+          () => reject(new Error("动态网页壁纸加载失败")),
+          { once: true },
+        );
+      });
     } else {
       frame = document.createElement("iframe");
       frame.setAttribute("sandbox", "allow-scripts");

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import {computed,ref,watch,nextTick,onBeforeUnmount} from "vue";
-import {NButton,NInput,NSelect,NSlider,NSwitch,NTabs,NTabPane,NEmpty,NAlert,NPagination,NCollapse,NCollapseItem,NColorPicker,NSpin} from "naive-ui";
-import {Search,Maximize2,X,Monitor} from "lucide-vue-next";
+import {NButton,NInput,NSelect,NSlider,NSwitch,NTabs,NTabPane,NEmpty,NAlert,NPagination,NCollapse,NCollapseItem,NColorPicker,NSpin,NPopconfirm} from "naive-ui";
+import {Search,Maximize2,X,Monitor,Trash2} from "lucide-vue-next";
 import {invoke,wallpaperDefaults,type WallpaperLibrary,type WallpaperOptions} from "../../bridge.ts";
 import {siteMedia,siteFullMedia} from "../../wallpaper-media.ts";
 import type {ControlStore} from "../control-types.ts";
@@ -41,19 +41,36 @@ async function useNativeWallpaper(){
   finally{busy.value=false;}
 }
 
+async function deleteLocal(id: string) {
+  if (busy.value) return;
+  busy.value = true;
+  try {
+    await props.store.deleteWallpaper(id);
+    props.store.notify('已删除壁纸', 'success');
+    cancel();
+  } catch (e) {
+    props.store.notify(e, 'error');
+  } finally {
+    busy.value = false;
+  }
+}
+
 const nativeContext=createWallpaperContextMenu();
 const context=ref<{x:number;y:number;card:Selection;items:ContextAction[]} | null>(null);
 function contextActions(card:Selection):ContextAction[]{
   const items:ContextAction[]=[{key:'inspect',label:'预览与设置'},{key:'apply',label:'应用到桌面',disabled:busy.value}];
   if(card.source==='online')items.push({key:'save',label:saved.value?'已保存到我的壁纸':'保存到我的壁纸',disabled:busy.value||saved.value});
   if(cardKind(card)==='canvas')items.push({key:'preview',label:'独立窗口预览',disabled:busy.value});
+  if(card.source==='local' && card.item.source==='local')items.push({key:'delete',label:'删除这幅壁纸',disabled:busy.value});
   return items;
 }
 function chooseContext(key:string){
+  const target = context.value?.card;
   context.value=null;
   if(key==='apply')void action(true);
   else if(key==='save')void action(false);
   else if(key==='preview')void action(true,true);
+  else if(key==='delete' && target)void deleteLocal(cardId(target));
 }
 async function openContext(event:MouseEvent,card:Selection){
   if(busy.value)return;
@@ -80,7 +97,7 @@ onBeforeUnmount(()=>{nativeContext.dispose();window.removeEventListener("keydown
 <Transition name="drawer"><aside v-if="selection" class="inspector" data-testid="wallpaper-inspector"><div class="inspector-heading"><span class="muted">预览与设置</span><NButton text data-testid="cancel-selection" :disabled="busy" @click="cancel">取消选择</NButton></div><div class="inspector-scroll" data-testid="inspector-scroll"><div class="inspector-preview" :class="{viewable:canView && kind!=='video'}" data-testid="inspector-preview" :title="canView && kind!=='video' ? '点击全屏查看' : undefined" @click="kind!=='video' && openViewer()"><MediaPreview :key="selection.source+cardId(selection)" :kind="kind || ''" :source="preview.video" :poster="preview.poster" :title="title" controls :fit="draft.fit" :rate="draft.playbackRate"/><button v-if="canView" type="button" class="preview-expand" data-testid="open-fullscreen" aria-label="全屏查看" title="全屏查看" @click.stop="openViewer"><Maximize2 :size="16"/></button></div><h2>{{title}}</h2><p class="muted">{{selection.source==='local'?selection.item.definition.description:selection.item.description}}</p><div class="draft-note">修改后点击“应用到桌面”生效。</div>
 <div v-if="kind!=='canvas'" class="field"><label>画面适配</label><NSelect :disabled="busy" :value="draft.fit" :options="fits" data-testid="wallpaper-fit" @update:value="setFit"/></div><div v-if="kind==='video'" class="field"><label>播放速度 <span>{{draft.playbackRate}}×</span></label><NSlider :disabled="busy" v-model:value="draft.playbackRate" :min="0.25" :max="2" :step="0.25"/><small class="muted">静音循环播放</small></div>
 <NCollapse v-if="current?.controls?.length"><NCollapseItem title="动画参数" name="controls"><div v-for="control in current.controls" :key="control.key" class="field"><label>{{control.label}}</label><NSlider :disabled="busy" v-if="control.type==='range'" :value="Number(draft.values[control.key])" :min="control.min" :max="control.max" :step="control.step" @update:value="draft.values[control.key]=$event"/><NSwitch :disabled="busy" v-else-if="control.type==='boolean'" :value="Boolean(draft.values[control.key])" @update:value="draft.values[control.key]=$event"/><NColorPicker :disabled="busy" v-else-if="control.type==='color'" :value="String(draft.values[control.key])" :show-alpha="false" @update:value="draft.values[control.key]=$event"/><NSelect :disabled="busy" v-else :value="String(draft.values[control.key])" :options="(control.options||[]).map(value=>({label:value,value}))" @update:value="draft.values[control.key]=$event"/></div></NCollapseItem></NCollapse>
-</div><footer class="inspector-actions" data-testid="inspector-actions"><div v-if="busy" class="download-feedback" role="status" data-testid="wallpaper-progress"><span>{{progressPercent===null ? "正在准备壁纸文件…" : progressPercent>=100 ? "下载完成，正在校验 / 应用…" : `正在下载 ${progressPercent}%`}}</span><progress v-if="progress" max="100" :value="progressPercent || 0"/><progress v-else max="100"/><NButton v-if="downloading" size="small" secondary data-testid="cancel-download" :loading="cancelling" :disabled="cancelling" @click="cancelDownload">{{cancelling?'正在取消…':'取消下载'}}</NButton></div><div class="actions"><NButton v-if="selection.source==='online'" block :loading="busy" :disabled="saved || busy" data-testid="save-wallpaper" @click="action(false)">{{saved?'已保存到我的壁纸':'保存到我的壁纸'}}</NButton><NButton v-if="kind==='canvas'" block :disabled="busy" @click="action(true,true)">独立窗口预览</NButton><NButton type="primary" size="large" block :loading="busy" data-testid="apply-wallpaper" :disabled="busy" @click="action(true)">应用到桌面</NButton></div></footer></aside></Transition>
+</div><footer class="inspector-actions" data-testid="inspector-actions"><div v-if="busy" class="download-feedback" role="status" data-testid="wallpaper-progress"><span>{{progressPercent===null ? "正在准备壁纸文件…" : progressPercent>=100 ? "下载完成，正在校验 / 应用…" : `正在下载 ${progressPercent}%`}}</span><progress v-if="progress" max="100" :value="progressPercent || 0"/><progress v-else max="100"/><NButton v-if="downloading" size="small" secondary data-testid="cancel-download" :loading="cancelling" :disabled="cancelling" @click="cancelDownload">{{cancelling?'正在取消…':'取消下载'}}</NButton></div><div class="actions"><NButton v-if="selection.source==='online'" block :loading="busy" :disabled="saved || busy" data-testid="save-wallpaper" @click="action(false)">{{saved?'已保存到我的壁纸':'保存到我的壁纸'}}</NButton><NButton v-if="kind==='canvas'" block :disabled="busy" @click="action(true,true)">独立窗口预览</NButton><NButton type="primary" size="large" block :loading="busy" data-testid="apply-wallpaper" :disabled="busy" @click="action(true)">应用到桌面</NButton><NPopconfirm v-if="selection.source==='local' && selection.item.source==='local'" positive-text="删除" negative-text="取消" @positive-click="deleteLocal(cardId(selection))"><template #trigger><NButton quaternary block type="error" :disabled="busy" data-testid="delete-wallpaper"><template #icon><Trash2 :size="14" /></template>删除这幅壁纸</NButton></template>确定要删除这幅壁纸吗？本地文件将被清除。</NPopconfirm></div></footer></aside></Transition>
 </div>
 
 <Teleport to="body"><Transition name="viewer"><div v-if="viewer && selection" class="fullscreen-viewer" role="dialog" aria-modal="true" :aria-label="`全屏查看：${title}`" data-testid="fullscreen-viewer" @click.self="viewer=false"><div class="fullscreen-media" @click.self="viewer=false"><MediaPreview :key="'full'+selection.source+cardId(selection)" :kind="kind || ''" :source="fullMedia.video" :poster="fullMedia.poster" :title="title" controls fit="contain" :rate="draft.playbackRate"/></div><div class="fullscreen-bar"><span class="fullscreen-title">{{title}}</span><button ref="closeViewer" type="button" class="fullscreen-close" data-testid="close-fullscreen" aria-label="退出全屏" title="退出全屏（Esc）" @click="viewer=false"><X :size="20"/></button></div></div></Transition></Teleport>

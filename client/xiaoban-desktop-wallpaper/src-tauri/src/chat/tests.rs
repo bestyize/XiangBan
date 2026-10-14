@@ -40,6 +40,14 @@ impl Desktop for FakeDesktop {
         lock(&self.calls).push(format!("apply {id}"));
         Ok(())
     }
+    fn create_wallpaper(&self, title: &str, _desc: Option<&str>, _html: &str, apply_now: bool) -> Result<Value, String> {
+        lock(&self.calls).push(format!("create-wallpaper {title} {apply_now}"));
+        Ok(json!({"id": "local-mock", "title": title, "applied": apply_now}))
+    }
+    fn delete_wallpaper(&self, id: &str) -> Result<String, String> {
+        lock(&self.calls).push(format!("delete-wallpaper {id}"));
+        Ok("hash".to_string())
+    }
     fn effects(&self) -> Result<Value, String> { Ok(json!({"selected": "", "packs": []})) }
     fn set_effect(&self, id: &str) -> Result<(), String> {
         lock(&self.calls).push(format!("effect {id}"));
@@ -48,6 +56,10 @@ impl Desktop for FakeDesktop {
     fn create_effect(&self, pack: &Value, overwrite: bool) -> Result<String, String> {
         lock(&self.calls).push(format!("create-effect {} {overwrite}", pack["id"]));
         Ok(format!("{}.json", pack["id"].as_str().unwrap_or("?")))
+    }
+    fn delete_effect(&self, id: &str) -> Result<String, String> {
+        lock(&self.calls).push(format!("delete-effect {id}"));
+        Ok(format!("{id}.json"))
     }
     fn set_companion(&self, change: &CompanionChange) -> Result<(), String> {
         lock(&self.calls).push(format!("companion {change:?}"));
@@ -80,6 +92,10 @@ impl Desktop for FakeDesktop {
         let id = pack["id"].as_str().unwrap_or("?");
         lock(&self.calls).push(format!("custom-widget {id} {place_now} {overwrite}"));
         Ok(json!({"id": id, "name": pack["name"], "file": format!("{id}.json"), "placed": place_now}))
+    }
+    fn delete_custom_widget(&self, id: &str) -> Result<(), String> {
+        lock(&self.calls).push(format!("delete-custom-widget {id}"));
+        Ok(())
     }
     fn games(&self) -> Result<Value, String> { Ok(json!({"active": false, "games": []})) }
     fn game_open(&self, id: Option<&str>) -> Result<(), String> {
@@ -224,8 +240,8 @@ fn the_assistant_has_every_tool_it_needs_and_no_others() {
     names.sort();
     let mut expected = vec![
         "time_now", "todo", "ask_user", "read_file", "list_dir", "grep", "write_file", "edit_file", "shell", "web_fetch", "load_skill", "skill_manage",
-        "memory_read", "memory_write", "desktop_status", "wallpaper_list", "wallpaper_apply", "effect_list", "effect_set", "effect_create", "companion_set", "care_list",
-        "care_set", "care_delete", "widget_list", "widget_add", "widget_create", "widget_update", "widget_remove", "game_list", "game_open", "game_close",
+        "memory_read", "memory_write", "desktop_status", "wallpaper_list", "wallpaper_apply", "wallpaper_create", "wallpaper_delete", "effect_list", "effect_set", "effect_create", "effect_delete", "companion_set", "care_list",
+        "care_set", "care_delete", "widget_list", "widget_add", "widget_create", "widget_delete_custom", "widget_update", "widget_remove", "game_list", "game_open", "game_close",
         "request_accessibility_permission",
     ];
     expected.sort();
