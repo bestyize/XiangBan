@@ -17,8 +17,8 @@ body.desktop-control{background:var(--ui-app-bg);color:var(--ui-text-primary);ov
 .control-statusbar>span:first-child{display:flex;align-items:center;gap:6px}
 
 /* Sidebar */
-.control-sidebar{background:var(--ui-sidebar-bg);border-right:1px solid var(--ui-border);display:flex;flex-direction:column;padding:24px 14px 16px;min-height:0}
-.control-brand{display:flex;align-items:center;gap:12px;padding:0 8px 24px}
+.control-sidebar{background:var(--ui-sidebar-bg);border-right:1px solid var(--ui-border);display:flex;flex-direction:column;padding:24px 14px 16px;min-height:0;overflow:hidden}
+.control-brand{display:flex;align-items:center;gap:12px;padding:0 8px 24px;flex-shrink:0}
 .control-brand-mark{width:40px;height:40px;flex-shrink:0;display:grid;place-items:center;background:var(--ui-primary-soft);border-radius:13px}
 .control-brand-mark img{width:30px;height:30px}
 .brand-copy{display:grid;gap:1px;white-space:nowrap}
@@ -26,7 +26,7 @@ body.desktop-control{background:var(--ui-app-bg);color:var(--ui-text-primary);ov
 .brand-copy span{font-size:12px;color:var(--ui-text-tertiary)}
 
 /* Sidebar Account */
-.sidebar-account-box{margin:0 2px 18px;display:grid}
+.sidebar-account-box{margin:0 2px 18px;display:grid;flex-shrink:0}
 .account-login-card{display:flex;align-items:center;gap:10px;width:100%;padding:10px 12px;border:1px solid var(--ui-border);background:var(--ui-surface-alt);border-radius:14px;cursor:pointer;color:var(--ui-text-primary);text-align:left;transition:all .15s}
 .account-login-card:hover{border-color:var(--ui-primary);background:var(--ui-primary-soft)}
 .account-avatar-placeholder{width:32px;height:32px;border-radius:10px;background:color-mix(in srgb, var(--ui-primary) 18%, transparent);color:var(--ui-primary);display:grid;place-items:center;flex-shrink:0}
@@ -43,6 +43,10 @@ body.desktop-control{background:var(--ui-app-bg);color:var(--ui-text-primary);ov
 .account-logout-btn:hover{background:color-mix(in srgb, #ef4444 15%, transparent);color:#ef4444}
 
 .sidebar-group-label{font-size:12px;color:var(--ui-text-tertiary);padding:0 12px 10px}
+.sidebar-scroll{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;display:flex;flex-direction:column;scrollbar-width:thin;scrollbar-color:var(--ui-scrollbar) transparent;overscroll-behavior:contain}
+.sidebar-scroll::-webkit-scrollbar{width:6px}
+.sidebar-scroll::-webkit-scrollbar-thumb{background:var(--ui-scrollbar);border-radius:3px}
+.sidebar-scroll::-webkit-scrollbar-track{background:transparent}
 .control-navigation{display:grid;gap:6px}
 .control-navigation>button,.settings-nav,.website-nav{display:flex;align-items:center;gap:12px;width:100%;text-align:left;border:0;background:transparent;border-radius:13px;padding:0 14px;cursor:pointer;color:var(--ui-text-secondary);min-height:46px;font-size:14px}
 .control-navigation>button:hover,.settings-nav:hover,.website-nav:hover{background:var(--ui-surface-alt);color:var(--ui-text-primary)}
@@ -54,13 +58,13 @@ body.desktop-control{background:var(--ui-app-bg);color:var(--ui-text-primary);ov
 .control-navigation>button>span{display:grid;gap:3px;min-width:0}
 .control-navigation b{font-size:14px;font-weight:650}
 .control-navigation small{font-size:12px;color:var(--ui-text-tertiary);white-space:nowrap}
-.sidebar-desktop-state{margin:20px 2px 0;padding:12px 14px;background:var(--ui-surface-alt);border-radius:14px;display:grid;grid-template-columns:8px 1fr;gap:4px 8px;align-items:center}
+.sidebar-desktop-state{margin:20px 2px 4px;padding:12px 14px;background:var(--ui-surface-alt);border-radius:14px;display:grid;grid-template-columns:8px 1fr;gap:4px 8px;align-items:center}
 .sidebar-desktop-state b{font-size:13px;font-weight:600;color:var(--ui-text-primary)}
 .sidebar-desktop-state small{grid-column:2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;color:var(--ui-text-tertiary)}
 .state-dot{display:inline-block;width:8px;height:8px;flex-shrink:0;border-radius:50%;background:var(--ui-accent)}
 .state-dot.idle{background:var(--ui-text-tertiary)}
 .state-dot.small{width:6px;height:6px}
-.sidebar-bottom{margin-top:auto;padding-top:16px;display:grid;gap:2px}
+.sidebar-bottom{margin-top:auto;padding-top:16px;display:grid;gap:2px;flex-shrink:0}
 .settings-nav,.website-nav{font-weight:600}
 .website-nav .external-icon{margin-left:auto;color:var(--ui-text-tertiary);opacity:.85}
 .website-nav:hover .external-icon{color:var(--ui-text-primary);opacity:1}

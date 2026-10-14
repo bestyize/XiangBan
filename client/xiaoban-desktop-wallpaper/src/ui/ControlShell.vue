@@ -97,11 +97,13 @@ onBeforeUnmount(() => { store.dispose(); window.removeEventListener('focus', foc
         </button>
       </div>
 
-      <div class="sidebar-group-label">我的桌面</div>
-      <nav id="control-navigation" class="control-navigation" aria-label="功能分区">
-        <button v-for="item in items" :key="item.id" :data-testid="`nav-${item.id}`" :class="{ selected: store.page === item.id }" :aria-current="store.page === item.id ? 'page' : undefined" :title="item.label" @click="navigate(item.id)"><component :is="item.icon" :size="19" /><span><b>{{ item.label }}</b></span><i v-if="item.id === 'chat' && store.chat.attention && store.page !== 'chat'" class="notice-dot nav-attention" data-testid="chat-attention" aria-label="小伴在等你确认"></i></button>
-      </nav>
-      <div class="sidebar-desktop-state"><span class="state-dot" :class="{ idle: store.settings.paused || !store.settings.companionEnabled }"></span><b>{{ store.settings.companionEnabled ? (store.settings.paused ? '小伴休息中' : '小伴正在陪伴') : '小伴已隐藏' }}</b><small>{{ activeWallpaper }}</small></div>
+      <div class="sidebar-scroll">
+        <div class="sidebar-group-label">我的桌面</div>
+        <nav id="control-navigation" class="control-navigation" aria-label="功能分区">
+          <button v-for="item in items" :key="item.id" :data-testid="`nav-${item.id}`" :class="{ selected: store.page === item.id }" :aria-current="store.page === item.id ? 'page' : undefined" :title="item.label" @click="navigate(item.id)"><component :is="item.icon" :size="19" /><span><b>{{ item.label }}</b></span><i v-if="item.id === 'chat' && store.chat.attention && store.page !== 'chat'" class="notice-dot nav-attention" data-testid="chat-attention" aria-label="小伴在等你确认"></i></button>
+        </nav>
+        <div class="sidebar-desktop-state"><span class="state-dot" :class="{ idle: store.settings.paused || !store.settings.companionEnabled }"></span><b>{{ store.settings.companionEnabled ? (store.settings.paused ? '小伴休息中' : '小伴正在陪伴') : '小伴已隐藏' }}</b><small>{{ activeWallpaper }}</small></div>
+      </div>
       <div class="sidebar-bottom"><button class="website-nav" data-testid="nav-website" @click="openOfficialSite"><Globe :size="18" /><span>小伴官网</span><ArrowUpRight :size="14" class="external-icon" /></button><button class="settings-nav" data-testid="nav-settings" :class="{ selected: store.page === 'settings' }" @click="navigate('settings')"><Settings2 :size="18" /><span>设置</span><em v-if="store.website.update?.available" class="new-badge" data-testid="nav-settings-new">新版本</em><i v-else-if="unread" class="notice-dot"></i></button><div class="sidebar-meta"><span>v{{ store.info.version }}</span><NButton quaternary size="tiny" :title="collapsed ? '展开导航' : '收起导航'" :aria-label="collapsed ? '展开导航' : '收起导航'" :aria-expanded="!collapsed" aria-controls="control-navigation"  @click="toggleNavigation"><component :is="collapsed ? PanelLeftOpen : PanelLeftClose" :size="16" /></NButton></div></div>
     </aside>
     <div class="control-main">
