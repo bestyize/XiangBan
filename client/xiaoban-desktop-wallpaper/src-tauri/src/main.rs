@@ -16,6 +16,7 @@ mod content;
 mod account;
 mod ai_config;
 mod tts;
+mod asr;
 mod ai_catalogue;
 mod chat;
 mod storage;
@@ -689,15 +690,20 @@ fn main() {
             account::register_account, account::reset_account_password, account::check_account_username,
             account::get_account_session, account::logout_account,
             tts::tts_get_settings, tts::tts_save_settings, tts::tts_list_voices, tts::tts_synthesize, tts::tts_cancel,
+            asr::asr_get_status, asr::asr_set_enabled, asr::asr_prepare, asr::asr_transcribe,
             ai_catalogue::refresh_ai_providers, ai_config::get_ai_config, ai_config::save_ai_config, ai_config::pick_workspace, ai_config::fetch_ai_models,
             ai_config::save_ai_provider, ai_config::switch_ai_provider, ai_config::delete_ai_provider, ai_config::save_ai_preferences, request_system_permissions,
             chat::chat_overview, chat::chat_load_session, chat::chat_new_session, chat::chat_send, chat::chat_cancel, chat::chat_delete_session,
             chat::chat_answer_approval, chat::chat_answer_question, chat::chat_set_permission_mode]);
     let app = builder.manage(state).manage(content::ContentState::default()).manage(website::WebsiteState::default())
-        .manage(games::GameState::default()).manage(rituals::RitualState::default()).manage(widgets::WidgetState::default()).manage(reminders::ReminderState::default()).manage(account::AccountState::default()).manage(ai_config::AiConfigState::default()).manage(tts::TtsState::default()).manage(ai_catalogue::CatalogueState::default())
+        .manage(games::GameState::default()).manage(rituals::RitualState::default()).manage(widgets::WidgetState::default()).manage(reminders::ReminderState::default()).manage(account::AccountState::default()).manage(ai_config::AiConfigState::default()).manage(tts::TtsState::default()).manage(asr::AsrState::default()).manage(ai_catalogue::CatalogueState::default())
         .register_uri_scheme_protocol("wallpaper-asset", |context, request| library::serve(context.app_handle(), request))
         .invoke_handler(move |invoke| {
             let label=invoke.message.webview_ref().label(); let command=invoke.message.command();
+            if command.starts_with("asr_") && label != "control" {
+                invoke.resolver.reject("只能在聊天和声音设置中使用语音识别");
+                return true;
+            }
             let allowed=widgets::permitted(label,command).or_else(|| rituals::permitted(label,command)).or_else(|| games::permitted(label,command)).unwrap_or_else(|| {
                 if command=="ui_smoke_report" {return label=="control";}
                 if command=="set_companion_enabled" || command=="set_companion_links" || command=="set_companion_skin" || command=="set_desktop_effects" || command=="list_desktop_effects" || command=="open_effects_directory" || command=="import_effect_pack" {return label=="control";}
@@ -831,3 +837,4 @@ fn main() {
         }
     });
 }
+
