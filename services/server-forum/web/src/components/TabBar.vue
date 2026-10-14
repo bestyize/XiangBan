@@ -26,12 +26,6 @@ function me() {
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10.5 12 4l8 6.5V20h-5.5v-5.5h-5V20H4z" /></svg>
       <span>首页</span>
     </RouterLink>
-    <RouterLink to="/deals" :class="{ on: route.name === 'deals' }">
-      <svg viewBox="0 0 24 24" aria-hidden="true">
-        <path d="M4 6h16v4a2 2 0 0 0 0 4v4H4v-4a2 2 0 0 0 0-4z" /><path d="M14.5 6v12" stroke-dasharray="2 2" />
-      </svg>
-      <span>福利羊毛</span>
-    </RouterLink>
     <button type="button" class="compose" aria-label="发帖" @click="compose">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
     </button>
@@ -54,7 +48,7 @@ function me() {
     bottom: 0;
     z-index: 30;
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(3, 1fr);
     align-items: center;
     height: calc(var(--tabbar-h) + env(safe-area-inset-bottom));
     padding-bottom: env(safe-area-inset-bottom);

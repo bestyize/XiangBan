@@ -33,7 +33,7 @@ const bookmarks = useTopicList(p => api.bookmarks(p), [() => session.user?.uid])
           :aria-pressed="preference === option.value" :class="{ selected: preference === option.value }"
           @click="setPreference(option.value)">
           <span>{{ option.label }}</span>
-          <small>{{ option.value === 'system' ? '自动适配设备的日夜间设置' : option.value === 'light' ? '使用清爽的浅色界面' : '使用暖灰与红棕色界面' }}</small>
+          <small>{{ option.value === 'system' ? '自动适配设备的日夜间设置' : option.value === 'light' ? '白色与浅灰色界面' : '黑色与浅灰色界面' }}</small>
           <span v-if="preference === option.value" class="check" aria-hidden="true">✓</span>
         </button>
       </div>

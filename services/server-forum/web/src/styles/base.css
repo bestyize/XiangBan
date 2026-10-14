@@ -1,24 +1,24 @@
-/* 超级小伴设计令牌：日间是清爽纸面，夜间使用暖灰与红棕，减少冷黑感。 */
+/* 小红书配色：品牌红 + 黑白灰；日夜间共用同一品牌色。 */
 :root {
   --paper: #f5f5f5;
   --surface: #ffffff;
   --surface-2: #fafafa;
-  --ink: #18233d;
-  --ink-2: #4c566c;
-  --ink-3: #7c8496;
+  --ink: #333333;
+  --ink-2: #666666;
+  --ink-3: #737373;
   --line: #ebebeb;
   --line-strong: #d6d6d6;
   --brand: #ff2442;
   --brand-ink: #ffffff;
-  --valid: #11865a;
-  --valid-soft: #e3f3eb;
-  --suspect: #a8700f;
-  --suspect-soft: #fbf0d9;
-  --expired: #8b919c;
-  --expired-soft: #eceef0;
-  --danger: #c23b3b;
-  --focus: #2f6fe4;
-  --shadow: 0 1px 0 rgba(24, 35, 61, 0.04), 0 6px 18px -10px rgba(24, 35, 61, 0.18);
+  --valid: var(--ink-2);
+  --valid-soft: var(--surface-2);
+  --suspect: var(--brand);
+  --suspect-soft: var(--surface-2);
+  --expired: var(--ink-3);
+  --expired-soft: var(--surface-2);
+  --danger: var(--brand);
+  --focus: var(--brand);
+  --shadow: 0 1px 0 rgba(0, 0, 0, 0.04), 0 6px 18px -10px rgba(0, 0, 0, 0.18);
 
   --font-sans: 'PingFang SC', 'HarmonyOS Sans SC', 'Hiragino Sans GB', 'Microsoft YaHei UI', 'Microsoft YaHei',
     'Noto Sans CJK SC', system-ui, -apple-system, 'Segoe UI', sans-serif;
@@ -42,25 +42,15 @@
 }
 
 :root[data-theme="dark"] {
-  --paper: #201b1a;
-  --surface: #2a2321;
-  --surface-2: #352b28;
-  --ink: #f4ece8;
-  --ink-2: #cbbcb6;
-  --ink-3: #a0928c;
-  --line: #473a36;
-  --line-strong: #5e4c46;
-  --brand: #ff536b;
-  --brand-ink: #ffffff;
-  --valid: #62bd91;
-  --valid-soft: #263c31;
-  --suspect: #e6b358;
-  --suspect-soft: #40331f;
-  --expired: #ab9d97;
-  --expired-soft: #39312e;
-  --danger: #ff827d;
-  --focus: #ff7184;
-  --shadow: 0 1px 0 rgba(0, 0, 0, 0.24), 0 8px 22px -12px rgba(22, 12, 10, 0.68);
+  --paper: #111111;
+  --surface: #1b1b1b;
+  --surface-2: #252525;
+  --ink: #f5f5f5;
+  --ink-2: #cccccc;
+  --ink-3: #a3a3a3;
+  --line: #333333;
+  --line-strong: #4d4d4d;
+  --shadow: 0 1px 0 rgba(0, 0, 0, 0.24), 0 8px 22px -12px rgba(0, 0, 0, 0.68);
   color-scheme: dark;
 }
 
@@ -96,6 +86,7 @@ select,
 textarea {
   font: inherit;
   color: inherit;
+  accent-color: var(--brand);
 }
 
 button {
@@ -123,7 +114,7 @@ img {
   border: 0;
 }
 
-/* 通用按钮：主按钮是墨色实底，次按钮是描边。 */
+/* 通用按钮：主按钮使用品牌红，次按钮是黑白灰描边。 */
 .btn {
   display: inline-flex;
   align-items: center;
@@ -147,13 +138,13 @@ img {
   cursor: not-allowed;
 }
 .btn-primary {
-  background: var(--ink);
-  border-color: var(--ink);
-  color: var(--paper);
+  background: var(--brand);
+  border-color: var(--brand);
+  color: var(--brand-ink);
 }
 .btn-primary:hover {
-  background: color-mix(in srgb, var(--ink) 88%, var(--brand));
-  border-color: var(--ink);
+  background: color-mix(in srgb, var(--brand) 88%, #000);
+  border-color: color-mix(in srgb, var(--brand) 88%, #000);
 }
 .btn-ghost {
   border-color: transparent;
@@ -290,8 +281,9 @@ img {
   padding: 1px 5px;
 }
 .prose pre {
-  background: #302724;
-  color: #f0e7e3;
+  background: var(--surface-2);
+  color: var(--ink);
+  border: 1px solid var(--line);
   border-radius: var(--r-sm);
   padding: 14px 16px;
   overflow-x: auto;
