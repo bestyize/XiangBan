@@ -18,6 +18,13 @@ const bookmarks = useTopicList(p => api.bookmarks(p), [() => session.user?.uid])
 <template>
   <div class="settings">
     <h1>我的设置</h1>
+    <section class="block">
+      <h2>积分与签到</h2>
+      <div class="panel box">
+        <p>当前积分 <strong>{{ session.user?.points ?? 0 }}</strong></p>
+        <RouterLink to="/points" class="btn btn-sm">签到、邀请和积分明细</RouterLink>
+      </div>
+    </section>
 
     <section class="block" aria-labelledby="appearance-title">
       <h2 id="appearance-title">外观</h2>

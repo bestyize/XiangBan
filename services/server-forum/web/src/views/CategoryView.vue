@@ -25,6 +25,7 @@ const parent = computed(() => {
   return c?.parent_id ? meta.byId.get(c.parent_id) : undefined
 })
 const sort = computed(() => (route.query.sort === 'new' || route.query.sort === 'hot' ? route.query.sort : 'latest'))
+const helpStatus = computed(() => slug.value === 'share-help' && ['open', 'solved', 'bounty'].includes(String(route.query.help)) ? route.query.help as 'open' | 'solved' | 'bounty' : undefined)
 
 useHead(() => ({ title: category.value?.name ?? '分类' }))
 
@@ -36,17 +37,19 @@ const tag = computed(() => {
 })
 
 const list = useTopicList(
-  p => api.topics({ category: slug.value, tag: tag.value || undefined, sort: sort.value, page: p }),
-  [slug, sort, tag],
+  p => api.topics({ category: slug.value, tag: tag.value || undefined, sort: sort.value, help_status: helpStatus.value, page: p }),
+  [slug, sort, tag, helpStatus],
 )
 
 /** 切排序时保留标签，切标签时保留排序。 */
-function withQuery(patch: { sort?: string; tag?: string }) {
+function withQuery(patch: { sort?: string; tag?: string; help?: string }) {
   const q: Record<string, string> = {}
   const nextSort = 'sort' in patch ? patch.sort : sort.value
   const nextTag = 'tag' in patch ? patch.tag : tag.value
   if (nextSort && nextSort !== 'latest') q.sort = nextSort
   if (nextTag) q.tag = nextTag
+  const nextHelp = 'help' in patch ? patch.help : helpStatus.value
+  if (nextHelp) q.help = nextHelp
   return { query: q }
 }
 
@@ -84,6 +87,12 @@ function compose() {
       <RouterLink v-for="t in presetTags" :key="t" :to="withQuery({ tag: t })" class="chip" :class="{ on: tag === t }">{{ tagLabel(t) }}</RouterLink>
     </nav>
 
+    <nav v-if="slug === 'share-help'" class="tag-filter" aria-label="求助筛选">
+      <RouterLink :to="withQuery({ help: '' })" class="chip" :class="{ on: !helpStatus }">全部求助</RouterLink>
+      <RouterLink :to="withQuery({ help: 'open' })" class="chip" :class="{ on: helpStatus === 'open' }">未解决</RouterLink>
+      <RouterLink :to="withQuery({ help: 'bounty' })" class="chip" :class="{ on: helpStatus === 'bounty' }">有悬赏</RouterLink>
+      <RouterLink :to="withQuery({ help: 'solved' })" class="chip" :class="{ on: helpStatus === 'solved' }">已解决</RouterLink>
+    </nav>
     <div class="tabs" role="tablist" aria-label="排序">
       <RouterLink :to="withQuery({ sort: 'latest' })" role="tab" :aria-selected="sort === 'latest'" :class="{ on: sort === 'latest' }">最新回复</RouterLink>
       <RouterLink :to="withQuery({ sort: 'new' })" role="tab" :aria-selected="sort === 'new'" :class="{ on: sort === 'new' }">新帖</RouterLink>

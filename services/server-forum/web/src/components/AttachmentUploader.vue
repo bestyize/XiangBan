@@ -40,7 +40,7 @@ async function onPick(e: Event) {
     try {
       const att = await uploadAttachment(file, r => (item.ratio = r))
       fresh.add(att.id)
-      list = [...list, att]
+      list = [...props.modelValue, att]
       emit('update:modelValue', list)
     } catch (err) {
       toast.error(err)
@@ -54,6 +54,11 @@ function remove(att: Attachment) {
   emit('update:modelValue', props.modelValue.filter(a => a.id !== att.id))
   if (fresh.delete(att.id)) deleteAttachment(att.id).catch(() => {})
 }
+
+function priceChanged(att: Attachment, event: Event) {
+  const price = Number((event.target as HTMLInputElement).value)
+  emit('update:modelValue', props.modelValue.map(a => a.id === att.id ? { ...a, price } : a))
+}
 </script>
 
 <template>
@@ -62,6 +67,7 @@ function remove(att: Attachment) {
       <li v-for="a in modelValue" :key="a.id" class="file">
         <span class="name" :title="a.name">{{ a.name }}</span>
         <span class="size">{{ formatSize(a.size) }}</span>
+        <label class="price">积分 <input type="number" min="0" max="10" step="1" :value="a.price ?? 0" :aria-label="`附件 ${a.name} 的下载积分`" @input="priceChanged(a, $event)" /></label>
         <button type="button" class="rm" :aria-label="`移除附件 ${a.name}`" @click="remove(a)">×</button>
       </li>
       <li v-for="u in uploading" :key="u.key" class="file busy">
@@ -80,7 +86,7 @@ function remove(att: Attachment) {
       >
         添加附件
       </button>
-      <small>最多 {{ MAX_FILES }} 个，每个不超过 {{ formatSize(maxBytes) }}。</small>
+      <small>最多 {{ MAX_FILES }} 个，每个不超过 {{ formatSize(maxBytes) }}。下载价格 0～10 分，0 为免费。</small>
     </div>
   </div>
 </template>
@@ -90,6 +96,9 @@ function remove(att: Attachment) {
   display: grid;
   gap: 8px;
 }
+.price { display: inline-flex; align-items: center; gap: 4px; flex: none; color: var(--ink-3); font-size: var(--fs-xs); }
+.price input { width: 46px; padding: 3px; border: 1px solid var(--line); border-radius: 4px; background: var(--surface); color: var(--ink); }
+@media(max-width:480px) { .file { flex-wrap: wrap; } .name { flex-basis: 55%; } }
 .picker {
   display: none;
 }

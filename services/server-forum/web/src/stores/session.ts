@@ -3,6 +3,7 @@ import { defineStore } from 'pinia'
 import { AccountError, accountApi, needsRegistration, type LoginResponse, type TokenPair } from '@/api/account'
 import { api, configureAuth } from '@/api/forum'
 import type { SessionInfo } from '@/api/types'
+import { clearInvite } from '@/lib/invite'
 
 const STORAGE_KEY = 'chat.xiangban.session'
 /** 访问令牌到期前这么久就换新，避免请求途中过期。 */
@@ -86,6 +87,7 @@ export const useSession = defineStore('session', () => {
     if (!tokens.value) return
     try {
       info.value = await api.session()
+      clearInvite()
     } catch (error) {
       if (error instanceof Error && 'status' in error && (error as { status: number }).status === 401) save(null)
     }

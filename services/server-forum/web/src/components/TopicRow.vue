@@ -24,6 +24,7 @@ withDefaults(defineProps<{ topic: TopicItem; showCategory?: boolean }>(), { show
         <RouterLink :to="`/u/${topic.author.uid}`" class="author">{{ topic.author.nickname }}</RouterLink>
         <span>{{ topic.reply_count ? `${timeAgo(topic.last_reply_at)}回复` : timeAgo(topic.created_at) }}</span>
         <span v-if="topic.locked">已锁定</span>
+        <span v-if="topic.help" class="help-label">{{ topic.help.status === 'solved' ? '已解决' : topic.help.status === 'open' && new Date(topic.help.expires_at).getTime() > Date.now() ? '求助中' : '求助已结束' }}{{ topic.help.bounty ? ` · 悬赏 ${topic.help.bounty} 分` : '' }}</span>
       </div>
       <TopicStats :topic="topic" />
     </div>
@@ -31,6 +32,7 @@ withDefaults(defineProps<{ topic: TopicItem; showCategory?: boolean }>(), { show
 </template>
 
 <style scoped>
+.help-label { color: var(--brand); }
 .row {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);

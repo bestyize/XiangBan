@@ -11,15 +11,21 @@ use axum::{
     Json,
 };
 use chrono::{DateTime, Utc};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use uuid::Uuid;
 
 /// 登录后和每次打开页面时调用：同步账号中心昵称头像、记访问、检查升级，返回本站资料。
-pub async fn session(State(state): State<AppState>, auth: AuthUser) -> AppResult<Json<Value>> {
+#[derive(Deserialize)]
+pub struct SessionInput {
+    pub invite: Option<String>,
+}
+
+pub async fn session(State(state): State<AppState>, auth: AuthUser, input: Option<Json<SessionInput>>) -> AppResult<Json<Value>> {
     let uid = auth.user.uid;
     users::sync_profile(&state.http, &state.config.account_issuer, &auth.token, &state.pool, uid).await;
     users::record_visit(&state.pool, &state.config.trust, uid).await?;
+    crate::points::on_visit(&state.pool, uid, input.and_then(|i| i.invite.clone())).await?;
     let user = users::find(&state.pool, uid).await?.ok_or_else(|| AppError::not_found("用户"))?;
     let level = user.trust_level.clamp(0, 3) as usize;
     let t = &state.config.trust;

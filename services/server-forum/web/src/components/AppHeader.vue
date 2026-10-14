@@ -71,6 +71,7 @@ async function logout() {
         <button class="btn btn-primary compose only-desktop" type="button" @click="compose">发帖</button>
 
         <template v-if="session.loggedIn">
+          <RouterLink to="/points" class="points-entry" aria-label="积分与签到">积分 {{ session.user?.points ?? '…' }}</RouterLink>
           <div class="me">
             <button class="me-btn" type="button" :aria-expanded="menuOpen" aria-haspopup="menu" @click="menuOpen = !menuOpen">
               <UserAvatar :name="session.user?.nickname ?? '我'" :src="session.user?.avatar_url" :size="32" />
@@ -82,6 +83,7 @@ async function logout() {
               </div>
               <RouterLink v-if="session.user" role="menuitem" :to="`/u/${session.user.uid}`">我的主页</RouterLink>
               <RouterLink role="menuitem" to="/settings">收藏与设置</RouterLink>
+              <RouterLink role="menuitem" to="/points">积分、签到与邀请</RouterLink>
               <button role="menuitem" type="button" @click="logout">退出登录</button>
             </div>
           </div>
@@ -94,6 +96,8 @@ async function logout() {
 </template>
 
 <style scoped>
+.points-entry { white-space: nowrap; color: var(--ink-2); font-size: var(--fs-xs); }
+.points-entry:hover { color: var(--brand); }
 .header {
   position: sticky;
   top: 0;

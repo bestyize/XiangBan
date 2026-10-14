@@ -7,11 +7,19 @@ import LoginDialog from '@/components/LoginDialog.vue'
 import ToastHost from '@/components/ToastHost.vue'
 import { useSession } from '@/stores/session'
 import { useMeta } from '@/stores/meta'
+import { captureInvite } from '@/lib/invite'
 
 const route = useRoute()
 const router = useRouter()
 const session = useSession()
 const meta = useMeta()
+captureInvite()
+let visitDay = ''
+watch([() => route.fullPath, () => session.user?.uid], () => {
+  const day = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Shanghai' }).format(new Date())
+  if (session.user && visitDay && day !== visitDay) session.loadSession()
+  if (session.user) visitDay = day
+})
 
 /** 管理后台自带布局，不显示前台的顶栏和底部导航。 */
 const bare = computed(() => route.meta.bare === true)

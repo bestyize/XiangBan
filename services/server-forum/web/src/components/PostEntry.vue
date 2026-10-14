@@ -7,7 +7,7 @@ import { useSession } from '@/stores/session'
 import { useToast } from '@/stores/toast'
 import { TRUST_LABEL, formatDateTime, timeAgo } from '@/lib/format'
 
-const props = defineProps<{ post: PostItem; topicAuthor: string; canReply: boolean }>()
+const props = defineProps<{ post: PostItem; topicAuthor: string; canReply: boolean; accepted?: boolean }>()
 const emit = defineEmits<{ reply: [post: PostItem]; report: [post: PostItem]; removed: [] }>()
 const session = useSession()
 const toast = useToast()
@@ -96,7 +96,7 @@ async function remove() {
           {{ post.like_count || '赞' }}
         </button>
         <button v-if="canReply" type="button" class="act" @click="emit('reply', post)">回复</button>
-        <template v-if="post.mine">
+        <template v-if="post.mine && !accepted">
           <button type="button" class="act" @click="startEdit">编辑</button>
           <button type="button" class="act" @click="remove">删除</button>
         </template>

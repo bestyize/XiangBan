@@ -13,6 +13,7 @@ const routes: RouteRecordRaw[] = [
   { path: '/search', name: 'search', component: () => import('@/views/SearchView.vue') },
   { path: '/u/:uid', name: 'user', component: () => import('@/views/UserView.vue') },
   { path: '/settings', name: 'settings', component: () => import('@/views/SettingsView.vue'), meta: { auth: true } },
+  { path: '/points', name: 'points', component: () => import('@/views/PointsView.vue'), meta: { auth: true } },
   { path: '/rules', name: 'rules', component: () => import('@/views/StaticView.vue'), props: { page: 'rules' } },
   { path: '/terms', name: 'terms', component: () => import('@/views/StaticView.vue'), props: { page: 'terms' } },
   { path: '/privacy', name: 'privacy', component: () => import('@/views/StaticView.vue'), props: { page: 'privacy' } },

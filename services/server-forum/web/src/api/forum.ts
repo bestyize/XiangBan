@@ -7,6 +7,9 @@ import type {
   PostItem,
   Profile,
   PublicUser,
+  PointsWallet,
+  PointsLedgerItem,
+  InviteItem,
   SessionInfo,
   SiteConfig,
   TopicDetail,
@@ -14,6 +17,7 @@ import type {
   TopicItem,
   UserReply,
 } from './types'
+import { pendingInvite } from '@/lib/invite'
 
 export class ApiError extends Error {
   constructor(
@@ -81,6 +85,7 @@ async function request<T>(method: string, path: string, body?: unknown, auth = t
 }
 
 export interface ListParams extends Query {
+  help_status?: 'open' | 'solved' | 'bounty'
   category?: string
   tag?: string
   q?: string
@@ -98,7 +103,14 @@ export const api = {
   categories: () => request<Category[]>('GET', '/categories', undefined, false),
   tags: () => request<{ name: string; count: number }[]>('GET', '/tags', undefined, false),
 
-  session: () => request<SessionInfo>('POST', '/session'),
+  session: () => request<SessionInfo>('POST', '/session', { invite: pendingInvite() }),
+  points: () => request<PointsWallet>('GET', '/me/points'),
+  pointsLedger: (page = 1) => request<Page<PointsLedgerItem>>('GET', `/me/points/ledger${qs({ page })}`),
+  invites: (page = 1) => request<Page<InviteItem>>('GET', `/me/points/invites${qs({ page })}`),
+  checkIn: () => request<{ earned: number; balance: number }>('POST', '/me/check-in'),
+  purchaseAttachment: (id: string, price: number) => request<{ purchased: boolean; charged: number; balance: number }>('POST', `/attachments/${id}/purchase`, { price }),
+  acceptHelp: (id: number, post_id: number) => request<{ status: string }>('POST', `/topics/${id}/help/accept`, { post_id }),
+  closeHelp: (id: number) => request<{ status: string; refunded: number }>('POST', `/topics/${id}/help/close`),
   bookmarks: (page = 1) => request<Page<TopicItem>>('GET', `/me/bookmarks${qs({ page })}`),
 
   topics: (p: ListParams) => request<Page<TopicItem>>('GET', `/topics${qs(p)}`),

@@ -723,6 +723,16 @@ async fn moderate_topic(
             .bind(id)
             .fetch_one(&mut *tx)
             .await?;
+    if input.action == "hide" || input.action == "delete" {
+        super::help::refund(&mut tx, id, "closed").await?;
+    }
+    if input.action == "feature" && snapshot.0 == "normal" {
+        let (author,): (Uuid,) = sqlx::query_as("SELECT author_uid FROM topics WHERE id = $1")
+            .bind(id).fetch_one(&mut *tx).await?;
+        crate::points::lock_users(&mut tx, &[author]).await?;
+        crate::points::change(&mut tx, author, 10, "featured", &format!("featured:{id}"),
+            None, &id.to_string(), "帖子被管理员加精").await?;
+    }
     let detail = if input.action == "pin" || input.action == "unpin" {
         format!("置顶范围: {}", snapshot.2)
     } else {
@@ -771,6 +781,7 @@ async fn move_topic(
         }));
     }
     sqlx::query("UPDATE topics SET category_id = $2 WHERE id = $1").bind(id).bind(input.category_id).execute(&mut *tx).await?;
+    super::help::ensure_category(&mut tx, id, input.category_id).await?;
     audit(&mut tx, &admin, "topic.move", "topic", id, format!("{from_id} -> {} ({name})", input.category_id)).await?;
     tx.commit().await?;
     Ok(Json(json!({ "id": id, "category_id": input.category_id })))
@@ -778,6 +789,10 @@ async fn move_topic(
 
 /// 隐藏回复并同步楼主帖的回复数；已不是正常状态则什么都不做。返回受影响的帖子 id。
 async fn hide_post(conn: &mut PgConnection, post_id: i64) -> AppResult<Option<i64>> {
+    let owner: Option<(i64,)> = sqlx::query_as("SELECT topic_id FROM posts WHERE id = $1")
+        .bind(post_id).fetch_optional(&mut *conn).await?;
+    let Some((topic,)) = owner else { return Ok(None) };
+    sqlx::query("SELECT id FROM topics WHERE id = $1 FOR UPDATE").bind(topic).execute(&mut *conn).await?;
     let row: Option<(i64,)> =
         sqlx::query_as("UPDATE posts SET status = 'hidden' WHERE id = $1 AND status = 'normal' RETURNING topic_id")
             .bind(post_id)
@@ -789,6 +804,10 @@ async fn hide_post(conn: &mut PgConnection, post_id: i64) -> AppResult<Option<i6
 }
 
 async fn restore_post(conn: &mut PgConnection, post_id: i64) -> AppResult<Option<i64>> {
+    let owner: Option<(i64,)> = sqlx::query_as("SELECT topic_id FROM posts WHERE id = $1")
+        .bind(post_id).fetch_optional(&mut *conn).await?;
+    let Some((topic,)) = owner else { return Ok(None) };
+    sqlx::query("SELECT id FROM topics WHERE id = $1 FOR UPDATE").bind(topic).execute(&mut *conn).await?;
     let row: Option<(i64,)> =
         sqlx::query_as("UPDATE posts SET status = 'normal' WHERE id = $1 AND status = 'hidden' RETURNING topic_id")
             .bind(post_id)
@@ -809,6 +828,7 @@ async fn moderate_post(
         return Err(AppError::BadRequest("action 只能是 hide 或 restore".into()));
     }
     let mut tx = state.pool.begin().await?;
+    super::posts::lock_topic_for_post(&mut tx, id).await?;
     let (status,): (String,) = sqlx::query_as("SELECT status FROM posts WHERE id = $1 FOR UPDATE")
         .bind(id)
         .fetch_optional(&mut *tx)
