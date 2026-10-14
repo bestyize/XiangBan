@@ -4,8 +4,10 @@ import { useRoute, useRouter } from 'vue-router'
 import { useSession } from '@/stores/session'
 import UserAvatar from './UserAvatar.vue'
 import BrandMark from './BrandMark.vue'
+import { useTheme, THEME_LABEL } from '@/lib/theme'
 
 const session = useSession()
+const { preference, resolved, cycleTheme } = useTheme()
 const route = useRoute()
 const router = useRouter()
 
@@ -59,6 +61,11 @@ async function logout() {
       </form>
 
       <div class="actions">
+        <button class="theme-toggle" type="button" aria-label="切换日间或夜间模式" title="点击切换：自动 → 日间 → 夜间 → 自动" @click="cycleTheme">
+          <svg v-if="resolved === 'dark'" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.5" /><path d="M12 2v2m0 16v2M4.93 4.93l1.42 1.42m11.3 11.3 1.42 1.42M2 12h2m16 0h2M4.93 19.07l1.42-1.42m11.3-11.3 1.42-1.42" /></svg>
+          <svg v-else viewBox="0 0 24 24" aria-hidden="true"><path d="M20.3 15.4A8.4 8.4 0 0 1 8.6 3.7 8.5 8.5 0 1 0 20.3 15.4Z" /></svg>
+          <span class="theme-label">外观 · {{ THEME_LABEL[preference] }}</span>
+        </button>
         <button class="icon-btn only-mobile" type="button" aria-label="搜索" @click="searchOpen = !searchOpen">
           <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="9" cy="9" r="6" /><path d="M13.5 13.5 17 17" /></svg>
         </button>
@@ -270,6 +277,12 @@ async function logout() {
   }
   .actions {
     margin-left: auto;
+    gap: 6px;
   }
 }
+.theme-toggle { display: inline-flex; align-items: center; justify-content: center; gap: 5px; min-width: 38px; height: 36px; padding: 0 8px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--ink-2); transition: background-color .15s, border-color .15s, color .15s; }
+.theme-toggle:hover { border-color: var(--brand); color: var(--brand); background: var(--surface-2); }
+.theme-toggle svg { width: 18px; height: 18px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.theme-label { font-size: var(--fs-xs); font-weight: 650; }
+@media (max-width: 767px) { .theme-toggle { width: 36px; min-width: 36px; padding: 0; } .theme-label { display: none; } }
 </style>

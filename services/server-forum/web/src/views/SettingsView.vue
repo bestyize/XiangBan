@@ -6,16 +6,31 @@ import { useSession } from '@/stores/session'
 import { useTopicList } from '@/lib/useList'
 import { TRUST_LABEL } from '@/lib/format'
 import { useHead } from '@/lib/head'
+import { THEME_OPTIONS, useTheme } from '@/lib/theme'
 
 useHead(() => ({ title: '收藏与设置' }))
 const session = useSession()
+const { preference, setPreference } = useTheme()
 
 const bookmarks = useTopicList(p => api.bookmarks(p), [() => session.user?.uid])
 </script>
 
 <template>
   <div class="settings">
-    <h1>收藏与设置</h1>
+    <h1>我的设置</h1>
+
+    <section class="block" aria-labelledby="appearance-title">
+      <h2 id="appearance-title">外观</h2>
+      <div class="panel appearance-options" role="group" aria-label="外观模式">
+        <button v-for="option in THEME_OPTIONS" :key="option.value" type="button" role="radio"
+          :aria-pressed="preference === option.value" :class="{ selected: preference === option.value }"
+          @click="setPreference(option.value)">
+          <span>{{ option.label }}</span>
+          <small>{{ option.value === 'system' ? '自动适配设备的日夜间设置' : option.value === 'light' ? '使用清爽的浅色界面' : '使用暖灰与红棕色界面' }}</small>
+          <span v-if="preference === option.value" class="check" aria-hidden="true">✓</span>
+        </button>
+      </div>
+    </section>
 
     <section class="block" aria-labelledby="bm-title">
       <h2 id="bm-title">我的收藏</h2>
@@ -70,6 +85,16 @@ const bookmarks = useTopicList(p => api.bookmarks(p), [() => session.user?.uid])
 </template>
 
 <style scoped>
+.appearance-options { overflow: hidden; }
+.appearance-options button {
+  position: relative; display: grid; width: 100%; gap: 2px; padding: 12px 44px 12px 16px;
+  border: 0; border-bottom: 1px solid var(--line); background: var(--surface); text-align: left;
+}
+.appearance-options button:last-child { border-bottom: 0; }
+.appearance-options button:hover, .appearance-options button.selected { background: var(--surface-2); }
+.appearance-options button.selected > span:first-child { color: var(--brand); font-weight: 700; }
+.appearance-options small { color: var(--ink-3); font-size: var(--fs-xs); }
+.appearance-options .check { position: absolute; top: 50%; right: 16px; color: var(--brand); font-size: 18px; transform: translateY(-50%); }
 .settings {
   max-width: 780px;
   margin: 0 auto;
