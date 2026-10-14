@@ -75,6 +75,12 @@ impl Desktop for FakeDesktop {
         lock(&self.calls).push(format!("widget-remove {id}"));
         Ok(())
     }
+    fn custom_widgets(&self) -> Result<Value, String> { Ok(json!([])) }
+    fn create_custom_widget(&self, pack: &Value, place_now: bool, overwrite: bool) -> Result<Value, String> {
+        let id = pack["id"].as_str().unwrap_or("?");
+        lock(&self.calls).push(format!("custom-widget {id} {place_now} {overwrite}"));
+        Ok(json!({"id": id, "name": pack["name"], "file": format!("{id}.json"), "placed": place_now}))
+    }
     fn games(&self) -> Result<Value, String> { Ok(json!({"active": false, "games": []})) }
     fn game_open(&self, id: Option<&str>) -> Result<(), String> {
         lock(&self.calls).push(format!("game-open {}", id.unwrap_or("lobby")));
@@ -219,7 +225,7 @@ fn the_assistant_has_every_tool_it_needs_and_no_others() {
     let mut expected = vec![
         "time_now", "todo", "ask_user", "read_file", "list_dir", "grep", "write_file", "edit_file", "shell", "web_fetch", "load_skill", "skill_manage",
         "memory_read", "memory_write", "desktop_status", "wallpaper_list", "wallpaper_apply", "effect_list", "effect_set", "effect_create", "companion_set", "care_list",
-        "care_set", "care_delete", "widget_list", "widget_add", "widget_update", "widget_remove", "game_list", "game_open", "game_close",
+        "care_set", "care_delete", "widget_list", "widget_add", "widget_create", "widget_update", "widget_remove", "game_list", "game_open", "game_close",
         "request_accessibility_permission",
     ];
     expected.sort();

@@ -1,3 +1,4 @@
+pub(crate) mod drm;
 mod protocol;
 use protocol::{Options, HOST, MAX_AUDIO};
 use serde::{Deserialize, Serialize};
@@ -92,7 +93,10 @@ fn synthesize(app: &tauri::AppHandle, id: u64, text: &str, options: &Options) ->
         let tcp = stream.ok_or("无法连接语音服务，请检查网络")?;
         tcp.set_read_timeout(Some(Duration::from_secs(15))).map_err(|_| "语音连接设置失败")?;
         tcp.set_write_timeout(Some(Duration::from_secs(15))).map_err(|_| "语音连接设置失败")?;
-        let (mut socket, _) = tungstenite::client_tls_with_config(request, tcp, None, None).map_err(|_| "语音服务握手失败，请稍后重试")?;
+        let (mut socket, _) = tungstenite::client_tls_with_config(request, tcp, None, None).map_err(|e| {
+            eprintln!("[TTS] WebSocket handshake failed: {e}");
+            "语音服务握手失败，请稍后重试"
+        })?;
         match socket.get_mut() {
             MaybeTlsStream::NativeTls(tls) => tls.get_mut().set_read_timeout(Some(Duration::from_secs(2))),
             MaybeTlsStream::Plain(tcp) => tcp.set_read_timeout(Some(Duration::from_secs(2))),

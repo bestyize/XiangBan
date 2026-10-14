@@ -25,6 +25,12 @@ describe('desktop widget layout',()=>{
     expect(layout.widgets[0].monitor).toBe('disconnected');expect(layout.monitors).toEqual(monitors);
     expect(()=>validateLayout({...emptyLayout(),widgets:[{...one(),monitor:''}]})).toThrow();
   });
+  it('validates custom widgets with customId',()=>{
+    const customWidget: DesktopWidget = { ...one(), id: 'custom1', kind: 'custom', customId: 'pomodoro-timer' };
+    expect(validateLayout({ ...emptyLayout(), widgets: [customWidget] }).widgets).toHaveLength(1);
+    expect(() => validateLayout({ ...emptyLayout(), widgets: [{ ...customWidget, customId: '' }] })).toThrow();
+    expect(() => validateLayout({ ...emptyLayout(), widgets: [{ ...customWidget, customId: 'Invalid Id!' }] })).toThrow();
+  });
 
 });
 

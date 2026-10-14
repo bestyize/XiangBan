@@ -24,6 +24,7 @@ mod games;
 mod rituals;
 mod widgets;
 mod widget_geometry;
+mod custom_widgets;
 mod reminders;
 mod presence;
 mod care_system;
@@ -676,6 +677,7 @@ fn main() {
             games::game_smoke_report, rituals::open_ritual_space, rituals::close_ritual_space, rituals::read_ritual_journal, rituals::write_ritual_journal,
             widgets::get_desktop_widgets, widgets::add_desktop_widget, widgets::update_desktop_widget, widgets::remove_desktop_widget,
             widgets::set_widgets_editing, widgets::get_desktop_widget, widgets::move_desktop_widget, widgets::show_widget_settings, widgets::get_widget_weather, widgets::save_desktop_widget_content,
+            widgets::list_custom_widgets, widgets::save_custom_widget, widgets::remove_custom_widget,
             reminders::get_care_settings, reminders::configure_care, reminders::upsert_care_rule, reminders::delete_care_rule,
             reminders::preview_care_rule, reminders::get_care_delivery, reminders::care_ready, reminders::dismiss_care,
             reminders::snooze_care, reminders::search_care_cities, reminders::detect_care_city, reminders::check_care_weather,

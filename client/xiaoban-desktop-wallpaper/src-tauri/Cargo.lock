@@ -3357,6 +3357,7 @@ dependencies = [
  "cpufeatures",
  "digest",
 ]
+
 [[package]]
 name = "sha2"
 version = "0.10.9"
@@ -5291,7 +5292,7 @@ checksum = "5457206954b06561e2608c7e19cf58b1926586d999c246eebe4502f7e2039d1a"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn",
+ "syn 2.0.119",
 ]
 
 [[package]]
@@ -5406,4 +5407,3 @@ dependencies = [
  "syn 3.0.6",
  "winnow 1.0.4",
 ]
-

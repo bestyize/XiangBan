@@ -38,6 +38,8 @@ pub trait Desktop: Send + Sync {
     fn widget_add(&self, kind: &str) -> Result<Value, String>;
     fn widget_update(&self, id: &str, patch: Value) -> Result<Value, String>;
     fn widget_remove(&self, id: &str) -> Result<(), String>;
+    fn custom_widgets(&self) -> Result<Value, String>;
+    fn create_custom_widget(&self, pack: &Value, place_now: bool, overwrite: bool) -> Result<Value, String>;
     fn games(&self) -> Result<Value, String>;
     fn game_open(&self, id: Option<&str>) -> Result<(), String>;
     fn game_close(&self) -> Result<(), String>;
@@ -141,7 +143,7 @@ impl Desktop for TauriDesktop {
     fn widget_add(&self, kind: &str) -> Result<Value, String> {
         let app = self.app.clone();
         let kind = kind.to_string();
-        tauri::async_runtime::block_on(crate::widgets::add_desktop_widget(app, kind))
+        tauri::async_runtime::block_on(crate::widgets::add_desktop_widget(app, kind, None))
     }
 
     fn widget_update(&self, id: &str, patch: Value) -> Result<Value, String> {
@@ -155,6 +157,23 @@ impl Desktop for TauriDesktop {
         let app = self.app.clone();
         let id = id.to_string();
         tauri::async_runtime::block_on(crate::widgets::remove_desktop_widget(app, id)).map(|_| ())
+    }
+
+    fn custom_widgets(&self) -> Result<Value, String> {
+        let dir = crate::storage::root(&self.app)?.join("custom_widgets");
+        Ok(json!(crate::custom_widgets::load_all(&dir)))
+    }
+
+    fn create_custom_widget(&self, pack: &Value, place_now: bool, overwrite: bool) -> Result<Value, String> {
+        let dir = crate::storage::root(&self.app)?.join("custom_widgets");
+        let path = crate::custom_widgets::save(&dir, pack, overwrite)?;
+        let id = pack["id"].as_str().unwrap_or_default();
+        let name = pack["name"].as_str().unwrap_or_default();
+        if place_now {
+            let app = self.app.clone();
+            let _ = tauri::async_runtime::block_on(crate::widgets::add_desktop_widget(app, "custom".to_string(), Some(id.to_string())))?;
+        }
+        Ok(json!({ "id": id, "name": name, "file": path.file_name().unwrap_or_default().to_string_lossy(), "placed": place_now }))
     }
 
     fn games(&self) -> Result<Value, String> {
@@ -512,6 +531,42 @@ fn widget_remove(desktop: &dyn Desktop, args: &Value) -> Result<String, String> 
     Ok(format!("已从桌面移除组件 {id}"))
 }
 
+fn widget_create(desktop: &dyn Desktop, args: &Value) -> Result<String, String> {
+    let id = text_arg(args, "id")?;
+    let name = text_arg(args, "name")?;
+    let html = text_arg(args, "html")?;
+    let description = optional_text(args, "description")?;
+    let width = args.get("width").and_then(Value::as_f64);
+    let height = args.get("height").and_then(Value::as_f64);
+    let theme = optional_text(args, "theme")?.unwrap_or("glass");
+    let overwrite = optional_bool(args, "overwrite")?.unwrap_or(false);
+    let place_now = optional_bool(args, "place_now")?.unwrap_or(true);
+
+    let mut pack = json!({
+        "schemaVersion": 1,
+        "id": id,
+        "name": name,
+        "html": html,
+        "theme": theme,
+    });
+    if let Some(desc) = description {
+        pack["description"] = json!(desc);
+    }
+    if let Some(w) = width {
+        pack["width"] = json!(w);
+    }
+    if let Some(h) = height {
+        pack["height"] = json!(h);
+    }
+    let res = desktop.create_custom_widget(&pack, place_now, overwrite)?;
+    let placed_msg = if res["placed"].as_bool().unwrap_or(false) {
+        "，并已直接添加到桌面上展示"
+    } else {
+        "（未自动放置到桌面，可在组件库随时添加）"
+    };
+    Ok(format!("已成功创建小组件「{name}」（id: {id}）{placed_msg}。"))
+}
+
 
 pub fn resolve_game_id(input: &str) -> Option<&'static str> {
     let lower = input.trim().to_lowercase();
@@ -712,6 +767,30 @@ pub fn tools(desktop: Arc<dyn Desktop>) -> Vec<Arc<dyn Tool>> {
             ToolSpec::new("widget_remove", "从桌面移除指定的组件，id 来自 widget_list。", object(json!({"id": {"type": "string"}}), &["id"])).risk(Risk::Write).serial(),
             widget_remove,
         ),
+        tool(
+            &desktop,
+            ToolSpec::new(
+                "widget_create",
+                "为用户创作一个新的自定义单文件 HTML 桌面小组件。可编写包含完整 HTML、CSS 样式与 JavaScript 交互逻辑的独立微卡片（如番茄钟、极简时钟、每日诗词、倒数日、健康喝水提醒、趣味小工具等）。支持自适应外壳主题（glass 透光玻璃 / paper 温润纸张 / transparent 透明无底），默认宽 280、高 240。创作完成后默认自动放置到桌面上。",
+                object(
+                    json!({
+                        "id": { "type": "string", "description": "小组件英文标识（小写字母、数字、-、_，如 pomodoro-timer）" },
+                        "name": { "type": "string", "description": "小组件中文名称（最多 24 字，如 专注番茄钟）" },
+                        "html": { "type": "string", "description": "完整的自包含单文件 HTML 内容（包含 <style>、DOM 结构与 <script> 逻辑）" },
+                        "description": { "type": "string", "description": "一句话介绍（最多 80 字）" },
+                        "width": { "type": "number", "minimum": 100, "maximum": 800, "description": "建议默认宽度（像素，默认 280）" },
+                        "height": { "type": "number", "minimum": 80, "maximum": 800, "description": "建议默认高度（像素，默认 240）" },
+                        "theme": { "type": "string", "enum": ["glass", "paper", "transparent"], "description": "底板外观风格，默认 glass" },
+                        "place_now": { "type": "boolean", "description": "创作完成后是否立即放置到桌面上，默认 true" },
+                        "overwrite": { "type": "boolean", "description": "true 时覆盖同 id 的已有小组件，默认 false" }
+                    }),
+                    &["id", "name", "html"],
+                ),
+            )
+            .risk(Risk::Write)
+            .serial(),
+            widget_create,
+        ),
         tool(&desktop, ToolSpec::new("game_list", "列出小伴支持的小游戏（贪吃蛇、俄罗斯方块、2048、消失高手、奶茶大师、水墨剑客、暮色滑翔等）以及游戏空间状态。", none()), game_list),
         tool(
             &desktop,
@@ -824,6 +903,14 @@ mod tests {
         fn widget_remove(&self, id: &str) -> Result<(), String> {
             self.log(format!("widget-remove {id}"))
         }
+        fn custom_widgets(&self) -> Result<Value, String> {
+            Ok(json!([]))
+        }
+        fn create_custom_widget(&self, pack: &Value, place_now: bool, overwrite: bool) -> Result<Value, String> {
+            let id = pack["id"].as_str().unwrap_or("?");
+            self.log(format!("create-custom-widget {id} place_now={place_now} overwrite={overwrite}"))?;
+            Ok(json!({"id": id, "name": pack["name"], "file": format!("{id}.json"), "placed": place_now}))
+        }
         fn games(&self) -> Result<Value, String> {
             Ok(json!({"active": false, "games": [
                 {"id": "snake-arena", "name": "小伴贪吃蛇", "description": "吃糖果长成大蛇"},
@@ -858,7 +945,7 @@ mod tests {
         let mut unique = names.clone();
         unique.dedup();
         assert_eq!(names, unique);
-        assert_eq!(names.len(), 18);
+        assert_eq!(names.len(), 19);
         for tool in &all {
             let spec = tool.spec();
             assert!(spec.name.len() <= 64 && spec.name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_'), "{}", spec.name);
@@ -1078,5 +1165,38 @@ mod tests {
         assert!(call(&fake, "game_open", json!({"id": "不存在的游戏"})).unwrap_err().contains("没有找到游戏"));
     }
 
+    #[test]
+    fn widget_create_validates_and_calls_desktop() {
+        let fake = Arc::new(Fake::default());
+        let res = call(
+            &fake,
+            "widget_create",
+            json!({
+                "id": "pomodoro-timer",
+                "name": "番茄钟",
+                "html": "<div id='app'>25:00</div>",
+                "width": 260,
+                "height": 200,
+                "theme": "glass"
+            }),
+        )
+        .unwrap();
+        assert!(res.contains("已成功创建小组件「番茄钟」（id: pomodoro-timer）"));
+        assert!(res.contains("并已直接添加到桌面上展示"));
+        assert_eq!(fake.calls(), vec!["create-custom-widget pomodoro-timer place_now=true overwrite=false"]);
 
+        let res_no_place = call(
+            &fake,
+            "widget_create",
+            json!({
+                "id": "poetry-daily",
+                "name": "每日诗词",
+                "html": "<div>床前明月光</div>",
+                "place_now": false
+            }),
+        )
+        .unwrap();
+        assert!(res_no_place.contains("未自动放置到桌面"));
+        assert_eq!(fake.calls()[1], "create-custom-widget poetry-daily place_now=false overwrite=false");
+    }
 }
