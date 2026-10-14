@@ -5,6 +5,19 @@ import { SHOW_CHILD_THRESHOLD, useMeta } from '@/stores/meta'
 const props = defineProps<{ active?: string }>()
 const meta = useMeta()
 
+// 福利羊毛在侧栏中紧随随便唠唠，其他分类保留后台配置的顺序。
+const navTree = computed(() => {
+  const nodes = [...meta.tree]
+  const dealsIndex = nodes.findIndex(node => node.slug === 'deals')
+  if (dealsIndex < 0) return nodes
+  const [deals] = nodes.splice(dealsIndex, 1)
+  const casualIndex = nodes.findIndex(node => node.slug === 'casual')
+  const siteIndex = nodes.findIndex(node => node.slug === 'site')
+  const insertAt = casualIndex >= 0 ? casualIndex + 1 : siteIndex >= 0 ? siteIndex : dealsIndex
+  nodes.splice(insertAt, 0, deals!)
+  return nodes
+})
+
 /** 当前所在的一级分类：选中二级分类时，它的父级也算展开。 */
 const activeRoot = computed(() => {
   const c = props.active ? meta.bySlug.get(props.active) : undefined
@@ -21,7 +34,7 @@ function visibleChildren(node: (typeof meta.tree)[number]) {
 <template>
   <nav class="side" aria-label="分类">
     <RouterLink to="/" class="item top" :class="{ on: active === 'home' }">首页</RouterLink>
-    <div v-for="node in meta.tree" :key="node.id" class="group">
+    <div v-for="node in navTree" :key="node.id" class="group">
       <!-- 福利羊毛一级分类直接进可筛选的福利羊毛页 -->
       <RouterLink
         :to="node.kind === 'deal' ? '/deals' : `/c/${node.slug}`"
