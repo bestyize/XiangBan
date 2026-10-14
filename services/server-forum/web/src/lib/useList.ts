@@ -34,7 +34,13 @@ export function useTopicList(fetcher: (page: number) => Promise<Page<TopicItem>>
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
-  watch(sources, () => load(1), { immediate: true })
+  watch(sources, () => {
+    // 切换标签、用户或登录身份时，先清掉上一份结果，避免短暂展示旧身份可见的帖子。
+    items.value = []
+    total.value = 0
+    load(1)
+  }, { immediate: true })
 
   return { items, page, total, pageSize, loading, load, go }
 }
+

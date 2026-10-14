@@ -17,7 +17,7 @@ use axum::{
     Router,
 };
 use config::AppConfig;
-use handlers::{admin, attachments, images, interact, me, meta, posts, topics};
+use handlers::{admin, attachments, follows, images, interact, me, meta, posts, topics};
 use state::AppState;
 use std::{net::SocketAddr, sync::Arc, time::Duration};
 use tower_http::{
@@ -35,7 +35,11 @@ pub fn build_router(state: AppState) -> Router {
         .route("/tags", get(meta::popular_tags))
         .route("/session", post(me::session))
         .route("/me/bookmarks", get(me::bookmarks))
+        .route("/me/following/topics", get(follows::topics))
         .route("/users/{uid}", get(me::profile))
+        .route("/users/{uid}/follow", put(follows::follow).delete(follows::unfollow))
+        .route("/users/{uid}/following", get(follows::following))
+        .route("/users/{uid}/followers", get(follows::followers))
         .route("/users/{uid}/topics", get(me::user_topics))
         .route("/users/{uid}/posts", get(me::user_posts))
         .route("/search", get(me::search))
@@ -116,3 +120,4 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     axum::serve(listener, build_router(state).into_make_service_with_connect_info::<SocketAddr>()).await?;
     Ok(())
 }
+

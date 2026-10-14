@@ -200,6 +200,9 @@ pub struct ListFilter {
     pub category: Option<String>,
     pub tag: Option<String>,
     pub author: Option<Uuid>,
+    /// 关注动态只允许服务端从 AuthUser 设置，查询参数不能指定其他用户。
+    #[serde(skip)]
+    pub followed_by: Option<Uuid>,
     pub q: Option<String>,
     /// latest（最新回复）/ new（最新发布）/ hot / expiring（即将过期）
     pub sort: Option<String>,
@@ -259,6 +262,13 @@ fn push_filters(qb: &mut QueryBuilder<'_, Postgres>, f: &ListFilter) {
     }
     if let Some(author) = f.author {
         qb.push(" AND t.author_uid = ").push_bind(author);
+    }
+    if let Some(uid) = f.followed_by {
+        qb.push(" AND t.author_uid IN (SELECT f.followed_uid FROM user_follows f
+                 JOIN users followed ON followed.uid = f.followed_uid AND followed.status <> 'banned'
+                 WHERE f.follower_uid = ")
+            .push_bind(uid)
+            .push(")");
     }
     if let Some(q) = f.q.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
         let pattern = format!("%{}%", q.replace('\\', "\\\\").replace('%', "\\%").replace('_', "\\_"));
@@ -388,6 +398,30 @@ pub async fn refresh_hot_scores(pool: &PgPool, topic_id: Option<i64>) -> Result<
 mod tests {
     use super::*;
 
+    #[test]
+    fn followed_feed_cannot_spoof_owner_or_reader() {
+        use sqlx::Execute;
+        let uid = Uuid::new_v4();
+        let input = serde_json::json!({
+            "followed_by": uid,
+            "reader": { "uid": uid, "level": 3 }
+        });
+        let mut filter: ListFilter = serde_json::from_value(input).unwrap();
+        assert!(filter.followed_by.is_none());
+        assert!(filter.reader.uid.is_none());
+        assert_eq!(filter.reader.level, 0);
+        filter.followed_by = Some(uid);
+        let mut qb = QueryBuilder::<Postgres>::new("SELECT t.id FROM topics t");
+        push_filters(&mut qb, &filter);
+        let query = qb.build();
+        let sql = query.sql();
+        assert!(sql.contains("t.status = 'normal'"));
+        assert!(sql.contains("t.min_read_level <="));
+        assert!(sql.contains("f.follower_uid ="));
+        assert!(sql.contains("followed.status <> 'banned'"));
+        assert!(sql.contains("d.expires_at > now()"));
+    }
+
     fn reader(level: i16, uid: Option<Uuid>) -> Reader {
         Reader { level, uid }
     }
@@ -423,3 +457,4 @@ mod tests {
         assert!(reader(0, Some(Uuid::new_v4())).check(3, me).is_err());
     }
 }
+

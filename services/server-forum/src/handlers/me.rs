@@ -87,6 +87,9 @@ pub struct Profile {
     pub post_count: i64,
     pub deal_count: i64,
     pub banned: bool,
+    pub following: bool,
+    pub following_count: i64,
+    pub follower_count: i64,
 }
 
 pub async fn profile(
@@ -109,6 +112,7 @@ pub async fn profile(
     .bind(reader.uid)
     .fetch_one(&state.pool)
     .await?;
+    let follows = super::follows::stats(&state.pool, uid, reader.uid).await?;
     Ok(Json(Profile {
         user: PublicUser { uid, nickname: user.nickname, avatar_url: user.avatar_url, trust_level: user.trust_level },
         points: user.points,
@@ -118,6 +122,9 @@ pub async fn profile(
         post_count,
         deal_count,
         banned: user.status == "banned",
+        following: follows.following,
+        following_count: follows.following_count,
+        follower_count: follows.follower_count,
     }))
 }
 
@@ -189,3 +196,4 @@ pub async fn search(
     f.include_expired = true;
     Ok(Json(models::list_topics(&state.pool, &f).await?))
 }
+

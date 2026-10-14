@@ -1,10 +1,12 @@
 import type {
   Attachment,
   Category,
+  FollowState,
   Page,
   PinScope,
   PostItem,
   Profile,
+  PublicUser,
   SessionInfo,
   SiteConfig,
   TopicDetail,
@@ -125,10 +127,17 @@ export const api = {
   report: (target_type: 'topic' | 'post', target_id: number, reason: string, detail: string) =>
     request<unknown>('POST', '/reports', { target_type, target_id, reason, detail }),
 
-  profile: (uid: string) => request<Profile>('GET', `/users/${uid}`, undefined, false),
-  userTopics: (uid: string, page = 1) => request<Page<TopicItem>>('GET', `/users/${uid}/topics${qs({ page })}`, undefined, false),
+  profile: (uid: string) => request<Profile>('GET', `/users/${uid}`),
+  follow: (uid: string, on: boolean) =>
+    request<FollowState>(on ? 'PUT' : 'DELETE', `/users/${uid}/follow`),
+  following: (uid: string, page = 1) =>
+    request<Page<PublicUser>>('GET', `/users/${uid}/following${qs({ page })}`),
+  followers: (uid: string, page = 1) =>
+    request<Page<PublicUser>>('GET', `/users/${uid}/followers${qs({ page })}`),
+  followingTopics: (page = 1) => request<Page<TopicItem>>('GET', `/me/following/topics${qs({ page })}`),
+  userTopics: (uid: string, page = 1) => request<Page<TopicItem>>('GET', `/users/${uid}/topics${qs({ page })}`),
   userPosts: (uid: string, page = 1) =>
-    request<{ items: UserReply[] }>('GET', `/users/${uid}/posts${qs({ page })}`, undefined, false),
+    request<{ items: UserReply[] }>('GET', `/users/${uid}/posts${qs({ page })}`),
 }
 
 async function uploadFile<T>(path: string, file: File, onProgress?: (ratio: number) => void): Promise<T> {
@@ -192,3 +201,4 @@ export async function downloadAttachment(att: Attachment): Promise<void> {
   a.remove()
   setTimeout(() => URL.revokeObjectURL(url), 10_000)
 }
+

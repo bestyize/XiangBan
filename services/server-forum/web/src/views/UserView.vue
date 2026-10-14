@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import ForumShell from '@/components/ForumShell.vue'
 import TopicList from '@/components/TopicList.vue'
 import PagerNav from '@/components/PagerNav.vue'
 import UserAvatar from '@/components/UserAvatar.vue'
+import UserConnections from '@/components/UserConnections.vue'
 import { api, ApiError } from '@/api/forum'
 import type { Profile, UserReply } from '@/api/types'
 import { useSession } from '@/stores/session'
@@ -14,28 +15,40 @@ import { TRUST_LABEL, formatDate, timeAgo } from '@/lib/format'
 import { useHead } from '@/lib/head'
 
 const route = useRoute()
+const router = useRouter()
 const session = useSession()
 const toast = useToast()
 const uid = computed(() => String(route.params.uid))
-const tab = ref<'topics' | 'replies'>('topics')
+type Tab = 'topics' | 'replies' | 'following' | 'followers'
+const tab = computed<Tab>(() => {
+  const value = route.query.tab
+  return value === 'replies' || value === 'following' || value === 'followers' ? value : 'topics'
+})
+function setTab(value: Tab) {
+  router.replace({ query: { ...route.query, tab: value === 'topics' ? undefined : value } })
+}
 
 const profile = ref<Profile | null>(null)
 const missing = ref(false)
 const replies = ref<UserReply[]>([])
+const followBusy = ref(false)
+let profileSeq = 0
 
 useHead(() => ({ title: profile.value?.nickname ?? '用户' }))
 
 const isMe = computed(() => session.user?.uid === uid.value)
 
 watch(
-  uid,
-  async u => {
+  [uid, () => session.user?.uid],
+  async ([u]) => {
+    const mine = ++profileSeq
     profile.value = null
     missing.value = false
-    tab.value = 'topics'
     try {
-      profile.value = await api.profile(u)
+      const res = await api.profile(u!)
+      if (mine === profileSeq) profile.value = res
     } catch (e) {
+      if (mine !== profileSeq) return
       if (e instanceof ApiError && e.status === 404) missing.value = true
       else toast.error(e)
     }
@@ -43,18 +56,33 @@ watch(
   { immediate: true },
 )
 
-const topics = useTopicList(p => api.userTopics(uid.value, p), [uid])
+async function toggleFollow() {
+  if (!session.requireLogin() || followBusy.value || !profile.value) return
+  const current = profile.value
+  followBusy.value = true
+  try {
+    const res = await api.follow(current.uid, !current.following)
+    if (profile.value === current) Object.assign(current, res)
+  } catch (e) {
+    toast.error(e)
+  } finally {
+    followBusy.value = false
+  }
+}
 
-watch(tab, async t => {
+const topics = useTopicList(p => api.userTopics(uid.value, p), [uid, () => session.user?.uid])
+
+watch([tab, uid, () => session.user?.uid], async ([t, u, viewer]) => {
   if (t === 'replies' && !replies.value.length) {
     try {
-      replies.value = (await api.userPosts(uid.value)).items
+      const res = await api.userPosts(u)
+      if (uid.value === u && session.user?.uid === viewer && tab.value === 'replies') replies.value = res.items
     } catch (e) {
       toast.error(e)
     }
   }
-})
-watch(uid, () => (replies.value = []))
+}, { immediate: true })
+watch([uid, () => session.user?.uid], () => (replies.value = []), { flush: 'sync' })
 </script>
 
 <template>
@@ -75,23 +103,37 @@ watch(uid, () => (replies.value = []))
           </p>
         </div>
         <dl class="stats">
+          <div><dt><button type="button" @click="setTab('following')">关注</button></dt><dd>{{ profile.following_count }}</dd></div>
+          <div><dt><button type="button" @click="setTab('followers')">粉丝</button></dt><dd>{{ profile.follower_count }}</dd></div>
           <div><dt>羊毛</dt><dd>{{ profile.deal_count }}</dd></div>
           <div><dt>帖子</dt><dd>{{ profile.topic_count }}</dd></div>
           <div><dt>回复</dt><dd>{{ profile.post_count }}</dd></div>
           <div><dt>积分</dt><dd>{{ profile.points }}</dd></div>
         </dl>
         <RouterLink v-if="isMe" to="/settings" class="btn btn-sm edit">收藏与设置</RouterLink>
+        <button
+          v-else-if="!profile.banned || profile.following"
+          type="button"
+          class="btn btn-sm edit"
+          :class="{ 'btn-primary': !profile.following }"
+          :disabled="followBusy || (session.loggedIn && !session.user)"
+          :aria-pressed="profile.following"
+          @click="toggleFollow"
+        >{{ followBusy ? '处理中…' : profile.following ? '已关注 · 取消' : '+ 关注' }}</button>
       </header>
 
       <div class="tabs" role="tablist">
-        <button type="button" role="tab" :aria-selected="tab === 'topics'" :class="{ on: tab === 'topics' }" @click="tab = 'topics'">帖子</button>
-        <button type="button" role="tab" :aria-selected="tab === 'replies'" :class="{ on: tab === 'replies' }" @click="tab = 'replies'">回复</button>
+        <button type="button" role="tab" :aria-selected="tab === 'topics'" :class="{ on: tab === 'topics' }" @click="setTab('topics')">帖子</button>
+        <button type="button" role="tab" :aria-selected="tab === 'replies'" :class="{ on: tab === 'replies' }" @click="setTab('replies')">回复</button>
+        <button type="button" role="tab" :aria-selected="tab === 'following'" :class="{ on: tab === 'following' }" @click="setTab('following')">关注</button>
+        <button type="button" role="tab" :aria-selected="tab === 'followers'" :class="{ on: tab === 'followers' }" @click="setTab('followers')">粉丝</button>
       </div>
 
       <template v-if="tab === 'topics'">
         <TopicList :items="topics.items.value" :loading="topics.loading.value" empty="还没有发过帖子。" />
         <PagerNav :page="topics.page.value" :page-size="topics.pageSize.value" :total="topics.total.value" @go="topics.go" />
       </template>
+      <UserConnections v-else-if="tab === 'following' || tab === 'followers'" :uid="uid" :mode="tab" />
       <div v-else class="panel replies">
         <RouterLink v-for="r in replies" :key="r.id" :to="`/t/${r.topic_id}#floor-${r.floor}`" class="reply">
           <span class="rt">{{ r.topic_title }}</span>
@@ -139,8 +181,12 @@ h1 {
 }
 .stats {
   display: flex;
-  gap: 20px;
+  grid-column: 1 / -1;
+  flex-wrap: wrap;
+  gap: 12px 24px;
   margin: 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
 }
 .stats div {
   text-align: center;
@@ -149,6 +195,8 @@ dt {
   font-size: var(--fs-xs);
   color: var(--ink-3);
 }
+dt button { border: 0; padding: 0; background: none; color: inherit; font: inherit; }
+dt button:hover { color: var(--brand); }
 dd {
   margin: 0;
   font-family: var(--font-display);
@@ -157,9 +205,8 @@ dd {
   font-variant-numeric: tabular-nums;
 }
 .edit {
-  position: absolute;
-  top: 12px;
-  right: 12px;
+  grid-column: 3;
+  grid-row: 1;
 }
 .tabs {
   display: flex;
@@ -225,6 +272,8 @@ dd {
   .edit {
     position: static;
     grid-column: 1 / -1;
+    grid-row: auto;
   }
 }
 </style>
+

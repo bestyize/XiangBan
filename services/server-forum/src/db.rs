@@ -35,6 +35,16 @@ CREATE TABLE IF NOT EXISTS categories (
     admin_only     BOOLEAN NOT NULL DEFAULT false
 );
 
+CREATE TABLE IF NOT EXISTS user_follows (
+    follower_uid UUID NOT NULL REFERENCES users(uid) ON DELETE CASCADE,
+    followed_uid UUID NOT NULL REFERENCES users(uid) ON DELETE CASCADE,
+    created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (follower_uid, followed_uid),
+    CHECK (follower_uid <> followed_uid)
+);
+CREATE INDEX IF NOT EXISTS user_follows_following_idx ON user_follows (follower_uid, created_at DESC, followed_uid);
+CREATE INDEX IF NOT EXISTS user_follows_followers_idx ON user_follows (followed_uid, created_at DESC, follower_uid);
+
 -- 一次性的数据迁移记录：做过的不再重复做，后台之后的改动不会被覆盖。
 CREATE TABLE IF NOT EXISTS data_migrations (
     name       TEXT PRIMARY KEY,
@@ -620,3 +630,4 @@ mod tests {
         }
     }
 }
+

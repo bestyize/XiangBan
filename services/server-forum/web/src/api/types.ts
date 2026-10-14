@@ -131,6 +131,15 @@ export interface Profile extends PublicUser {
   post_count: number
   deal_count: number
   banned: boolean
+  following: boolean
+  following_count: number
+  follower_count: number
+}
+
+export interface FollowState {
+  following: boolean
+  following_count: number
+  follower_count: number
 }
 
 export interface UserReply {
@@ -167,3 +176,4 @@ export interface SiteConfig {
   account_base: string
   client_id: string
 }
+
