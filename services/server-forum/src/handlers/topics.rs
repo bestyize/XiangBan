@@ -55,7 +55,7 @@ pub struct Viewer {
     pub bookmarked: bool,
     pub can_edit: bool,
     pub can_reply: bool,
-    /// 守护者可以把正常状态的帖子置顶到所在板块（和首页）。
+    /// 守护者可以将正常状态的帖子置顶到全站、一级板块或二级板块。
     pub can_pin: bool,
 }
 
@@ -448,14 +448,14 @@ pub async fn delete(State(state): State<AppState>, auth: AuthUser, Path(id): Pat
 }
 
 /// 守护者置顶或取消置顶。后台账号和论坛用户是两套体系，这里的操作同样写进审计日志，操作人记为「守护者:昵称」。
-async fn set_pinned(state: &AppState, auth: &AuthUser, id: i64, pinned: bool) -> AppResult<Json<Value>> {
+async fn set_pinned(state: &AppState, auth: &AuthUser, id: i64, pinned: bool, requested_scope: Option<&str>) -> AppResult<Json<Value>> {
     let user = &auth.user;
     if user.trust_level < GUARDIAN_LEVEL {
         return Err(AppError::Forbidden("只有守护者（站务人员）可以置顶帖子".into()));
     }
     users::ensure_can_write(user)?;
     let mut tx = state.pool.begin().await?;
-    let (status, was): (String, bool) = sqlx::query_as("SELECT status, pinned FROM topics WHERE id = $1 FOR UPDATE")
+    let (status, was, old_scope): (String, bool, String) = sqlx::query_as("SELECT status, pinned, pin_scope FROM topics WHERE id = $1 FOR UPDATE")
         .bind(id)
         .fetch_optional(&mut *tx)
         .await?
@@ -463,28 +463,58 @@ async fn set_pinned(state: &AppState, auth: &AuthUser, id: i64, pinned: bool) ->
     if status != "normal" {
         return Err(AppError::Conflict("只有正常状态的帖子可以置顶".into()));
     }
-    if was != pinned {
-        sqlx::query("UPDATE topics SET pinned = $2 WHERE id = $1").bind(id).bind(pinned).execute(&mut *tx).await?;
+    let scope = if pinned { requested_scope.unwrap_or("site") } else { "none" };
+    if pinned && !matches!(scope, "site" | "parent" | "category") {
+        return Err(AppError::BadRequest("置顶范围只能是全站、一级板块或二级板块".into()));
+    }
+    if pinned && scope == "category" {
+        let (parent_id,): (Option<i32>,) = sqlx::query_as(
+            "SELECT c.parent_id FROM topics t JOIN categories c ON c.id = t.category_id WHERE t.id = $1",
+        )
+        .bind(id)
+        .fetch_one(&mut *tx)
+        .await?;
+        if parent_id.is_none() {
+            return Err(AppError::BadRequest("二级板块置顶只能用于二级板块中的帖子".into()));
+        }
+    }
+    if was != pinned || old_scope != scope {
+        sqlx::query("UPDATE topics SET pinned = $2, pin_scope = $3 WHERE id = $1")
+            .bind(id)
+            .bind(pinned)
+            .bind(scope)
+            .execute(&mut *tx)
+            .await?;
         sqlx::query("INSERT INTO admin_audit (admin, action, target_type, target_id, detail) VALUES ($1, $2, 'topic', $3, $4)")
             .bind(format!("守护者:{}", user.nickname))
             .bind(if pinned { "topic.pin" } else { "topic.unpin" })
             .bind(id.to_string())
-            .bind(format!("uid {}", user.uid))
+            .bind(format!("uid {}; pin_scope={}", user.uid, scope))
             .execute(&mut *tx)
             .await?;
     }
     tx.commit().await?;
-    Ok(Json(json!({ "pinned": pinned })))
+    Ok(Json(json!({ "pinned": pinned, "pin_scope": scope })))
 }
 
-pub async fn pin(State(state): State<AppState>, auth: AuthUser, Path(id): Path<i64>) -> AppResult<Json<Value>> {
-    set_pinned(&state, &auth, id, true).await
+#[derive(Deserialize, Default)]
+pub struct PinInput {
+    pub scope: Option<String>,
+}
+
+pub async fn pin(
+    State(state): State<AppState>,
+    auth: AuthUser,
+    Path(id): Path<i64>,
+    input: Option<Json<PinInput>>,
+) -> AppResult<Json<Value>> {
+    let scope = input.and_then(|Json(body)| body.scope);
+    set_pinned(&state, &auth, id, true, Some(scope.as_deref().unwrap_or("site"))).await
 }
 
 pub async fn unpin(State(state): State<AppState>, auth: AuthUser, Path(id): Path<i64>) -> AppResult<Json<Value>> {
-    set_pinned(&state, &auth, id, false).await
+    set_pinned(&state, &auth, id, false, None).await
 }
-
 #[derive(Deserialize)]
 pub struct PreviewInput {
     pub body: String,

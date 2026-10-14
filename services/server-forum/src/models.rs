@@ -100,6 +100,7 @@ pub struct TopicItem {
     pub tags: Vec<String>,
     pub status: String,
     pub pinned: bool,
+    pub pin_scope: String,
     pub featured: bool,
     pub locked: bool,
     pub reply_count: i32,
@@ -120,6 +121,7 @@ struct TopicRow {
     excerpt: String,
     status: String,
     pinned: bool,
+    pin_scope: String,
     featured: bool,
     locked: bool,
     reply_count: i32,
@@ -167,6 +169,7 @@ impl TopicRow {
             tags,
             status: self.status,
             pinned: self.pinned,
+            pin_scope: self.pin_scope,
             featured: self.featured,
             locked: self.locked,
             reply_count: self.reply_count,
@@ -181,7 +184,7 @@ impl TopicRow {
     }
 }
 
-const SELECT: &str = "SELECT t.id, t.title, t.excerpt, t.status, t.pinned, t.featured, t.locked,
+const SELECT: &str = "SELECT t.id, t.title, t.excerpt, t.status, t.pinned, t.pin_scope, t.featured, t.locked,
         t.reply_count, t.like_count, t.view_count, t.min_read_level, t.created_at, t.last_reply_at, t.edited_at,
         c.id AS category_id, c.slug AS category_slug, c.name AS category_name,
         u.uid AS author_uid, u.nickname AS author_nickname, u.avatar_url AS author_avatar, u.trust_level AS author_level,
@@ -296,15 +299,32 @@ pub async fn list_topics(pool: &PgPool, f: &ListFilter) -> Result<Page<TopicItem
 
     let mut qb = QueryBuilder::<Postgres>::new(SELECT);
     push_filters(&mut qb, f);
-    // 首页和分类页：管理员置顶的帖子排在最前面（不管按哪种方式排序）；搜索、标签、用户主页不受影响。
-    let pinned_first = if f.category.is_some() || f.home { "t.pinned DESC, " } else { "" };
+    // 置顶按范围逐级生效：首页只提升全站置顶；板块页提升全站、所属一级板块、当前二级板块置顶。
+    if let Some(slug) = f.category.as_deref().filter(|s| !s.is_empty()) {
+        qb.push(" ORDER BY CASE WHEN t.pin_scope = 'site' THEN 0
+            WHEN t.pin_scope = 'parent' AND (
+                c.id = (SELECT id FROM categories WHERE slug = ")
+            .push_bind(slug.to_string())
+            .push(") OR c.parent_id = (SELECT id FROM categories WHERE slug = ")
+            .push_bind(slug.to_string())
+            .push(") OR c.parent_id = (SELECT parent_id FROM categories WHERE slug = ")
+            .push_bind(slug.to_string())
+            .push(")) THEN 1
+            WHEN t.pin_scope = 'category' AND c.id = (SELECT id FROM categories WHERE slug = ")
+            .push_bind(slug.to_string())
+            .push(") THEN 2 ELSE 3 END, ");
+    } else if f.home {
+        qb.push(" ORDER BY CASE WHEN t.pin_scope = 'site' THEN 0 ELSE 1 END, ");
+    } else {
+        qb.push(" ORDER BY ");
+    }
     let order = match f.sort.as_deref() {
         Some("new") => "t.created_at DESC",
         Some("hot") => "t.hot_score DESC, t.created_at DESC",
         Some("expiring") => "d.expires_at ASC NULLS LAST, t.created_at DESC",
         _ => "t.last_reply_at DESC",
     };
-    qb.push(format!(" ORDER BY {pinned_first}{order}, t.id DESC LIMIT "))
+    qb.push(format!("{order}, t.id DESC LIMIT "))
         .push_bind(f.page_size())
         .push(" OFFSET ")
         .push_bind((f.page() - 1) * f.page_size());

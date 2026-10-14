@@ -8,7 +8,7 @@ import type { Attachment, TopicInput } from '@/api/types'
 import { useMeta } from '@/stores/meta'
 import { useSession } from '@/stores/session'
 import { useToast } from '@/stores/toast'
-import { CONDITIONS, READ_LEVELS, TRUST_LABEL, requiredPostLevel } from '@/lib/format'
+import { CONDITIONS, READ_LEVELS, TRUST_LABEL, requiredPostLevel, tagLabel } from '@/lib/format'
 import { useHead } from '@/lib/head'
 
 const route = useRoute()
@@ -307,7 +307,7 @@ const today = new Date().toISOString().slice(0, 10)
           <span>标签</span>
           <div class="tags-input">
             <span v-for="(t, i) in form.tags" :key="t" class="tag">
-              #{{ t }}
+              #{{ tagLabel(t) }}
               <button type="button" :aria-label="`移除标签 ${t}`" @click="form.tags.splice(i, 1)">×</button>
             </span>
             <input
@@ -331,7 +331,7 @@ const today = new Date().toISOString().slice(0, 10)
               :disabled="!form.tags.includes(t) && form.tags.length >= 5"
               @click="togglePreset(t)"
             >
-              {{ t }}
+              {{ tagLabel(t) }}
             </button>
           </div>
           <small>最多 5 个，方便别人按标签找到这个帖子。</small>

@@ -11,6 +11,7 @@ import { useSession } from '@/stores/session'
 import { requiredPostLevel } from '@/lib/format'
 import { useTopicList } from '@/lib/useList'
 import { useHead } from '@/lib/head'
+import { tagLabel } from '@/lib/format'
 
 const route = useRoute()
 const router = useRouter()
@@ -80,7 +81,7 @@ function compose() {
 
     <nav v-if="presetTags.length" class="tag-filter" aria-label="按标签筛选">
       <RouterLink :to="withQuery({ tag: '' })" class="chip" :class="{ on: !tag }">全部</RouterLink>
-      <RouterLink v-for="t in presetTags" :key="t" :to="withQuery({ tag: t })" class="chip" :class="{ on: tag === t }">{{ t }}</RouterLink>
+      <RouterLink v-for="t in presetTags" :key="t" :to="withQuery({ tag: t })" class="chip" :class="{ on: tag === t }">{{ tagLabel(t) }}</RouterLink>
     </nav>
 
     <div class="tabs" role="tablist" aria-label="排序">

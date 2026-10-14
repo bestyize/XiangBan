@@ -2,6 +2,7 @@ import type {
   Attachment,
   Category,
   Page,
+  PinScope,
   PostItem,
   Profile,
   SessionInfo,
@@ -105,7 +106,8 @@ export const api = {
   createTopic: (input: TopicInput) => request<{ id: number }>('POST', '/topics', input),
   updateTopic: (id: number, input: TopicInput) => request<{ id: number }>('PATCH', `/topics/${id}`, input),
   deleteTopic: (id: number) => request<unknown>('DELETE', `/topics/${id}`),
-  pinTopic: (id: number, on: boolean) => request<{ pinned: boolean }>(on ? 'PUT' : 'DELETE', `/topics/${id}/pin`),
+  pinTopic: (id: number, on: boolean, scope?: PinScope) =>
+    request<{ pinned: boolean; pin_scope: PinScope }>(on ? 'PUT' : 'DELETE', `/topics/${id}/pin`, on ? { scope } : undefined),
   preview: (body: string) => request<{ html: string }>('POST', '/markdown/preview', { body }),
 
   posts: (topicId: number, page = 1) => request<Page<PostItem>>('GET', `/topics/${topicId}/posts${qs({ page })}`),

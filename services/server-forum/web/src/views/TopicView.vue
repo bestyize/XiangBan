@@ -10,11 +10,11 @@ import MarkdownEditor from '@/components/MarkdownEditor.vue'
 import ReportDialog from '@/components/ReportDialog.vue'
 import PagerNav from '@/components/PagerNav.vue'
 import { api, ApiError } from '@/api/forum'
-import type { PostItem, TopicDetail } from '@/api/types'
+import type { PinScope, PostItem, TopicDetail } from '@/api/types'
 import { useSession } from '@/stores/session'
 import { useMeta } from '@/stores/meta'
 import { useToast } from '@/stores/toast'
-import { TRUST_LABEL, formatDateTime, readLevelBadge, timeAgo } from '@/lib/format'
+import { TRUST_LABEL, formatDateTime, pinScopeLabel, readLevelBadge, tagLabel, timeAgo } from '@/lib/format'
 import { useHead } from '@/lib/head'
 
 const route = useRoute()
@@ -25,6 +25,11 @@ const toast = useToast()
 
 const id = computed(() => Number(route.params.id))
 const topic = ref<TopicDetail | null>(null)
+const pinScopeDraft = ref<Exclude<PinScope, 'none'>>('site')
+const pinActionLabel = computed(() => {
+  if (!topic.value?.pinned) return '置顶'
+  return topic.value.pin_scope === pinScopeDraft.value ? '取消置顶' : '更新置顶范围'
+})
 const missing = ref(false)
 /** 没有阅读权限时服务端返回的说明，比如「这个帖子仅「老用户」及以上等级可见」。 */
 const forbidden = ref('')
@@ -40,6 +45,10 @@ const editor = ref<InstanceType<typeof MarkdownEditor> | null>(null)
 const reportTarget = ref<{ type: 'topic' | 'post'; id: number } | null>(null)
 
 useHead(() => ({ title: topic.value?.title ?? '' }))
+
+watch(topic, current => {
+  if (current && current.pin_scope !== 'none') pinScopeDraft.value = current.pin_scope
+})
 
 const parentCategory = computed(() => {
   const c = topic.value ? meta.byId.get(topic.value.category.id) : undefined
@@ -123,10 +132,12 @@ async function toggleBookmark() {
 
 async function togglePin() {
   if (!topic.value) return
+  const shouldPin = !topic.value.pinned || topic.value.pin_scope !== pinScopeDraft.value
   try {
-    const res = await api.pinTopic(topic.value.id, !topic.value.pinned)
+    const res = await api.pinTopic(topic.value.id, shouldPin, pinScopeDraft.value)
     topic.value.pinned = res.pinned
-    toast.show(res.pinned ? '已置顶到板块' : '已取消置顶')
+    topic.value.pin_scope = res.pin_scope
+    toast.show(res.pinned ? `已设置为${pinScopeLabel(res.pin_scope)}` : '已取消置顶')
   } catch (e) {
     toast.error(e)
   }
@@ -220,7 +231,7 @@ function goPosts(page: number) {
         <RouterLink v-if="parentCategory" :to="`/c/${parentCategory.slug}`">{{ parentCategory.name }}</RouterLink>
         <RouterLink :to="`/c/${topic.category.slug}`">{{ topic.category.name }}</RouterLink>
       </nav>
-      <h1 class="title"><span v-if="topic.pinned" class="pin-badge">置顶</span>{{ topic.title }}</h1>
+      <h1 class="title"><span v-if="topic.pinned" class="pin-badge">{{ pinScopeLabel(topic.pin_scope) }}</span>{{ topic.title }}</h1>
       <div class="byline">
         <RouterLink :to="`/u/${topic.author.uid}`" class="who">
           <UserAvatar :name="topic.author.nickname" :src="topic.author.avatar_url" :size="28" />
@@ -241,7 +252,7 @@ function goPosts(page: number) {
       <AttachmentList v-if="topic.attachments.length" :items="topic.attachments" :restricted="topic.min_read_level > 0" />
 
       <div v-if="topic.tags.length" class="tags">
-        <RouterLink v-for="t in topic.tags" :key="t" :to="`/tag/${encodeURIComponent(t)}`" class="tag">#{{ t }}</RouterLink>
+        <RouterLink v-for="t in topic.tags" :key="t" :to="`/tag/${encodeURIComponent(t)}`" class="tag">#{{ tagLabel(t) }}</RouterLink>
       </div>
 
       <div class="actions">
@@ -254,9 +265,19 @@ function goPosts(page: number) {
         </button>
         <button type="button" class="btn" @click="share">分享</button>
         <span class="spacer" />
-        <button v-if="topic.viewer.can_pin" type="button" class="btn btn-ghost" :aria-pressed="topic.pinned" @click="togglePin">
-          {{ topic.pinned ? '取消置顶' : '置顶' }}
-        </button>
+        <template v-if="topic.viewer.can_pin">
+          <label class="pin-scope-control">
+            <span>置顶范围</span>
+            <select v-model="pinScopeDraft" class="select is-sm" aria-label="置顶范围">
+              <option value="site">全站</option>
+              <option value="parent">一级板块</option>
+              <option value="category">二级板块</option>
+            </select>
+          </label>
+          <button type="button" class="btn btn-ghost" :aria-pressed="topic.pinned" @click="togglePin">
+            {{ pinActionLabel }}
+          </button>
+        </template>
         <template v-if="topic.viewer.can_edit">
           <RouterLink :to="`/t/${topic.id}/edit`" class="btn btn-ghost">编辑</RouterLink>
           <button type="button" class="btn btn-ghost btn-danger" @click="removeTopic">删除</button>
@@ -424,6 +445,13 @@ function goPosts(page: number) {
   flex-wrap: wrap;
   gap: 8px;
   margin: 16px 0 28px;
+}
+.pin-scope-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ink-3);
+  font-size: var(--fs-xs);
 }
 .actions svg {
   width: 15px;

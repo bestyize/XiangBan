@@ -604,6 +604,7 @@ struct AdminTopic {
     author_uid: Uuid,
     author_nickname: String,
     pinned: bool,
+    pin_scope: String,
     featured: bool,
     locked: bool,
     reply_count: i32,
@@ -654,7 +655,7 @@ async fn list_topics(
 
     let mut qb = QueryBuilder::<Postgres>::new(format!(
         "SELECT t.id, t.title, t.status, t.category_id, c.name AS category_name, t.author_uid, u.nickname AS author_nickname,
-                t.pinned, t.featured, t.locked, t.reply_count, t.created_at, (d.topic_id IS NOT NULL) AS is_deal, t.min_read_level,
+                t.pinned, t.pin_scope, t.featured, t.locked, t.reply_count, (d.topic_id IS NOT NULL) AS is_deal, t.min_read_level,
                 (SELECT COUNT(*) FROM reports r WHERE r.target_type = 'topic' AND r.target_id = t.id AND r.status = 'open') AS open_reports{FROM}"
     ));
     filter(&mut qb);
@@ -666,6 +667,7 @@ async fn list_topics(
 #[derive(Deserialize)]
 struct ModerateInput {
     action: String,
+    pin_scope: Option<String>,
 }
 
 async fn moderate_topic(
@@ -680,27 +682,55 @@ async fn moderate_topic(
         .fetch_optional(&mut *tx)
         .await?
         .ok_or_else(|| AppError::not_found("帖子"))?;
-    let sql = match (input.action.as_str(), status.as_str()) {
-        ("hide", "normal") => "UPDATE topics SET status = 'hidden' WHERE id = $1",
-        ("hide", _) => return Err(AppError::Conflict("只有正常状态的帖子可以隐藏".into())),
-        ("restore", "hidden" | "deleted") => "UPDATE topics SET status = 'normal' WHERE id = $1",
-        ("restore", _) => return Err(AppError::Conflict("帖子本来就是正常状态".into())),
-        ("delete", "deleted") => return Err(AppError::Conflict("帖子已经删除".into())),
-        ("delete", _) => "UPDATE topics SET status = 'deleted' WHERE id = $1",
-        ("pin", _) => "UPDATE topics SET pinned = true WHERE id = $1",
-        ("unpin", _) => "UPDATE topics SET pinned = false WHERE id = $1",
-        ("feature", _) => "UPDATE topics SET featured = true WHERE id = $1",
-        ("unfeature", _) => "UPDATE topics SET featured = false WHERE id = $1",
-        ("lock", _) => "UPDATE topics SET locked = true WHERE id = $1",
-        ("unlock", _) => "UPDATE topics SET locked = false WHERE id = $1",
-        _ => return Err(AppError::BadRequest("不支持的操作".into())),
+    if input.action == "pin" {
+        let scope = input.pin_scope.as_deref().unwrap_or("site");
+        if !matches!(scope, "site" | "parent" | "category") {
+            return Err(AppError::BadRequest("pin_scope 只能是 site / parent / category".into()));
+        }
+        let (parent_id,): (Option<i32>,) = sqlx::query_as(
+            "SELECT c.parent_id FROM topics t JOIN categories c ON c.id = t.category_id WHERE t.id = $1",
+        )
+        .bind(id)
+        .fetch_one(&mut *tx)
+        .await?;
+        if scope == "category" && parent_id.is_none() {
+            return Err(AppError::BadRequest("二级板块置顶只能用于二级板块中的帖子".into()));
+        }
+        sqlx::query("UPDATE topics SET pinned = true, pin_scope = $2 WHERE id = $1")
+            .bind(id)
+            .bind(scope)
+            .execute(&mut *tx)
+            .await?;
+    } else {
+        let sql = match (input.action.as_str(), status.as_str()) {
+            ("hide", "normal") => "UPDATE topics SET status = 'hidden' WHERE id = $1",
+            ("hide", _) => return Err(AppError::Conflict("只有正常状态的帖子可以隐藏".into())),
+            ("restore", "hidden" | "deleted") => "UPDATE topics SET status = 'normal' WHERE id = $1",
+            ("restore", _) => return Err(AppError::Conflict("帖子本来就是正常状态".into())),
+            ("delete", "deleted") => return Err(AppError::Conflict("帖子已经删除".into())),
+            ("delete", _) => "UPDATE topics SET status = 'deleted' WHERE id = $1",
+            ("unpin", _) => "UPDATE topics SET pinned = false, pin_scope = 'none' WHERE id = $1",
+            ("feature", _) => "UPDATE topics SET featured = true WHERE id = $1",
+            ("unfeature", _) => "UPDATE topics SET featured = false WHERE id = $1",
+            ("lock", _) => "UPDATE topics SET locked = true WHERE id = $1",
+            ("unlock", _) => "UPDATE topics SET locked = false WHERE id = $1",
+            _ => return Err(AppError::BadRequest("不支持的操作".into())),
+        };
+        sqlx::query(sql).bind(id).execute(&mut *tx).await?;
+    }
+    let snapshot: (String, bool, String, bool, bool) =
+        sqlx::query_as("SELECT status, pinned, pin_scope, featured, locked FROM topics WHERE id = $1")
+            .bind(id)
+            .fetch_one(&mut *tx)
+            .await?;
+    let detail = if input.action == "pin" || input.action == "unpin" {
+        format!("置顶范围: {}", snapshot.2)
+    } else {
+        format!("{status} -> {}", snapshot.0)
     };
-    sqlx::query(sql).bind(id).execute(&mut *tx).await?;
-    let snapshot: (String, bool, bool, bool) =
-        sqlx::query_as("SELECT status, pinned, featured, locked FROM topics WHERE id = $1").bind(id).fetch_one(&mut *tx).await?;
-    audit(&mut tx, &admin, &format!("topic.{}", input.action), "topic", id, format!("{status} -> {}", snapshot.0)).await?;
+    audit(&mut tx, &admin, &format!("topic.{}", input.action), "topic", id, detail).await?;
     tx.commit().await?;
-    Ok(Json(json!({ "id": id, "status": snapshot.0, "pinned": snapshot.1, "featured": snapshot.2, "locked": snapshot.3 })))
+    Ok(Json(json!({ "id": id, "status": snapshot.0, "pinned": snapshot.1, "pin_scope": snapshot.2, "featured": snapshot.3, "locked": snapshot.4 })))
 }
 
 #[derive(Deserialize)]

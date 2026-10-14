@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { TopicItem } from '@/api/types'
 import UserAvatar from './UserAvatar.vue'
-import { compactCount, readLevelBadge, timeAgo } from '@/lib/format'
+import { compactCount, pinScopeLabel, readLevelBadge, timeAgo } from '@/lib/format'
 
 withDefaults(defineProps<{ topic: TopicItem; showCategory?: boolean }>(), { showCategory: true })
 </script>
@@ -13,7 +13,7 @@ withDefaults(defineProps<{ topic: TopicItem; showCategory?: boolean }>(), { show
     </RouterLink>
     <div class="body">
       <h3 class="title">
-        <span v-if="topic.pinned" class="flag pin">置顶</span>
+        <span v-if="topic.pinned" class="flag pin">{{ pinScopeLabel(topic.pin_scope) }}</span>
         <span v-if="topic.featured" class="flag feat">精选</span>
         <span v-if="topic.min_read_level > 0" class="flag lock">{{ readLevelBadge(topic.min_read_level) }}</span>
         <RouterLink :to="`/t/${topic.id}`">{{ topic.title }}</RouterLink>

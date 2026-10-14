@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // 帖子管理：搜索与筛选，行内隐藏/删除/置顶/加精/锁定，移动分类，修改羊毛状态。
 import { computed, onMounted, ref } from 'vue'
-import { adminApi, type AdminCategory, type AdminTopic, type TopicAction, type TopicState } from '@/api/admin'
+import { adminApi, type AdminCategory, type AdminTopic, type TopicAction, type PinScope, type TopicState } from '@/api/admin'
 import AdminPager from './AdminPager.vue'
 import { fmtTime, perform, TOPIC_STATUS, topicTone, trustName, usePagedList } from './shared'
 
@@ -20,6 +20,12 @@ const catById = computed(() => new Map(categories.value.map(c => [c.id, c])))
 const parents = computed(() => categories.value.filter(c => c.parent_id === null))
 const childrenOf = (id: number) => categories.value.filter(c => c.parent_id === id)
 const leaves = computed(() => categories.value.filter(c => !categories.value.some(x => x.parent_id === c.id)))
+const pinScopeLabel: Record<PinScope, string> = {
+  none: '不置顶',
+  site: '全站置顶',
+  parent: '一级板块置顶',
+  category: '二级板块置顶',
+}
 
 /** 可移动到的分类：叶子分类，且类型（羊毛/普通）与原分类一致。 */
 function moveTargets(t: AdminTopic) {
@@ -41,6 +47,17 @@ async function moderate(t: AdminTopic, action: TopicAction, okText: string, conf
   if (ok && out.state) Object.assign(t, out.state)
 }
 
+async function changePinScope(t: AdminTopic, ev: Event) {
+  const el = ev.target as HTMLSelectElement
+  const pin_scope = el.value as PinScope
+  const action: TopicAction = pin_scope === 'none' ? 'unpin' : 'pin'
+  const out: { state?: TopicState } = {}
+  const ok = await perform(async () => {
+    out.state = await adminApi.moderateTopic(t.id, action, pin_scope)
+  }, pinScopeLabel[pin_scope] === '不置顶' ? '已取消置顶' : `已设置${pinScopeLabel[pin_scope]}`)
+  if (ok && out.state) Object.assign(t, out.state)
+  else el.value = t.pin_scope
+}
 async function move(t: AdminTopic, ev: Event) {
   const el = ev.target as HTMLSelectElement
   const id = Number(el.value)
@@ -107,7 +124,7 @@ onMounted(async () => {
             <div class="adm-title">
               <a :href="`/t/${t.id}`" target="_blank" rel="noopener">{{ t.title }}</a>
               <span class="adm-tags" style="margin-left: 6px">
-                <span v-if="t.pinned" class="adm-tag line">置顶</span>
+                <span v-if="t.pinned" class="adm-tag line">{{ pinScopeLabel[t.pin_scope] }}</span>
                 <span v-if="t.featured" class="adm-tag line">精华</span>
                 <span v-if="t.locked" class="adm-tag line">已锁定</span>
                 <span v-if="t.open_reports" class="adm-tag danger">{{ t.open_reports }} 条待处理举报</span>
@@ -141,9 +158,12 @@ onMounted(async () => {
               >
                 删除帖子
               </button>
-              <button class="btn btn-sm" @click="moderate(t, t.pinned ? 'unpin' : 'pin', t.pinned ? '已取消置顶' : '已置顶')">
-                {{ t.pinned ? '取消置顶' : '置顶' }}
-              </button>
+              <select class="select is-sm" :value="t.pin_scope" aria-label="置顶范围" @change="changePinScope(t, $event)">
+                <option value="none">不置顶</option>
+                <option value="site">全站置顶</option>
+                <option value="parent">一级板块置顶</option>
+                <option value="category">二级板块置顶</option>
+              </select>
               <button
                 class="btn btn-sm"
                 @click="moderate(t, t.featured ? 'unfeature' : 'feature', t.featured ? '已取消加精' : '已加精')"

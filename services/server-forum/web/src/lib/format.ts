@@ -89,3 +89,12 @@ export function formatSize(bytes: number) {
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(bytes < 10 * 1024 ? 1 : 0)} KB`
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`
 }
+
+/** 标签 key 保持规范化；展示时还原常用缩写的大小写。 */
+export function tagLabel(tag: string) {
+  return tag === '4k' ? '4K' : tag
+}
+
+export function pinScopeLabel(scope: string) {
+  return ({ site: '全站置顶', parent: '一级板块置顶', category: '二级板块置顶' } as Record<string, string>)[scope] ?? '置顶'
+}

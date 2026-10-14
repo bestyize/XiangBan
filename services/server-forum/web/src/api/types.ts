@@ -55,6 +55,8 @@ export interface DealInfo {
   long_term: boolean
 }
 
+export type PinScope = 'none' | 'site' | 'parent' | 'category'
+
 export interface TopicItem {
   id: number
   title: string
@@ -64,6 +66,7 @@ export interface TopicItem {
   tags: string[]
   status: string
   pinned: boolean
+  pin_scope: PinScope
   featured: boolean
   locked: boolean
   /** 谁能读：0 所有人，1 成员以上，2 老用户以上，3 守护者 */

@@ -54,6 +54,7 @@ CREATE TABLE IF NOT EXISTS topics (
     excerpt        TEXT NOT NULL DEFAULT '',
     status         TEXT NOT NULL DEFAULT 'normal',
     pinned         BOOLEAN NOT NULL DEFAULT false,
+    pin_scope      TEXT NOT NULL DEFAULT 'none',
     featured       BOOLEAN NOT NULL DEFAULT false,
     locked         BOOLEAN NOT NULL DEFAULT false,
     reply_count    INT NOT NULL DEFAULT 0,
@@ -67,6 +68,8 @@ CREATE TABLE IF NOT EXISTS topics (
 );
 -- 帖子阅读权限：0 所有人（含游客）、1 成员以上、2 老用户以上、3 守护者以上。
 ALTER TABLE topics ADD COLUMN IF NOT EXISTS min_read_level SMALLINT NOT NULL DEFAULT 0;
+ALTER TABLE topics ADD COLUMN IF NOT EXISTS pin_scope TEXT NOT NULL DEFAULT 'none';
+UPDATE topics SET pin_scope = 'site' WHERE pinned AND pin_scope = 'none';
 CREATE INDEX IF NOT EXISTS topics_category_idx ON topics (category_id, last_reply_at DESC);
 CREATE INDEX IF NOT EXISTS topics_hot_idx ON topics (hot_score DESC);
 CREATE INDEX IF NOT EXISTS topics_created_idx ON topics (created_at DESC);
@@ -256,7 +259,7 @@ const CATEGORIES: &[(&str, &str, &str, &str, Option<&str>, i16, bool, bool, bool
 /// 各分类内置的标签（slug → 标签）。写入时的形态和发帖时一致：小写、不含空格。
 const PRESET_TAGS: &[(&str, &[&str])] = &[
     ("share-software", &["windows", "macos", "linux", "android", "ios", "开源", "免费", "效率工具", "开发工具", "设计工具"]),
-    ("share-movies", &["片单推荐", "影评", "纪录片", "动画", "科幻", "悬疑", "喜剧", "经典老片", "公版", "授权"]),
+    ("share-movies", &["片单推荐", "影评", "纪录片", "动画", "科幻", "悬疑", "喜剧", "经典老片", "公版", "授权", "4k", "美剧"]),
     ("share-music", &["歌单推荐", "乐评", "古典", "流行", "摇滚", "电子", "爵士", "纯音乐", "独立音乐", "公版"]),
     ("xiaoban-wallpaper", &["更新日志", "下载", "使用教程", "桌面版", "手机版", "网站", "动态壁纸", "桌宠"]),
     ("xiaoban-game", &["更新日志", "新游戏", "玩法介绍", "攻略", "水墨剑客", "暮色滑翔"]),
@@ -304,6 +307,7 @@ pub async fn seed(pool: &PgPool) -> Result<(), AppError> {
             apply_board_migration(pool, m).await?;
         }
     }
+    apply_movie_tag_migration(pool).await?;
     Ok(())
 }
 
@@ -421,6 +425,31 @@ async fn create_root_board(conn: &mut sqlx::PgConnection, slug: &str) -> Result<
 /// 旧板块的帖子并入指定的新板块后删除旧板块，一级分类的说明也一起更新。新板块插在种子里前一个板块的后面，已有分类的排序不动。
 ///
 /// 做完记进 `data_migrations`，之后不再执行，所以管理员后来改过、甚至重新建过同名 slug 的分类都不会被动到。
+/// 一次性更新已部署论坛中的电影板块标签，之后不覆盖管理员修改。
+async fn apply_movie_tag_migration(pool: &PgPool) -> Result<(), AppError> {
+    const NAME: &str = "share-movies-tags-4k-tv-v1";
+    let done: Option<(String,)> =
+        sqlx::query_as("SELECT name FROM data_migrations WHERE name = $1").bind(NAME).fetch_optional(pool).await?;
+    if done.is_some() {
+        return Ok(());
+    }
+
+    let mut tx = pool.begin().await?;
+    let changed = sqlx::query(
+        "UPDATE categories SET preset_tags = preset_tags || ARRAY(            SELECT tag FROM unnest(ARRAY['4k', '美剧']::TEXT[]) AS new_tags(tag)            WHERE NOT (tag = ANY(categories.preset_tags))         ) WHERE slug = 'share-movies'",
+    )
+        .execute(&mut *tx)
+        .await?
+        .rows_affected();
+    if changed > 0 {
+        sqlx::query("INSERT INTO data_migrations (name) VALUES ($1) ON CONFLICT DO NOTHING")
+            .bind(NAME)
+            .execute(&mut *tx)
+            .await?;
+    }
+    tx.commit().await?;
+    Ok(())
+}
 async fn apply_board_migration(pool: &PgPool, m: &BoardMigration) -> Result<(), AppError> {
     let done: Option<(String,)> =
         sqlx::query_as("SELECT name FROM data_migrations WHERE name = $1").bind(m.name).fetch_optional(pool).await?;

@@ -150,6 +150,8 @@ export interface AdminReport {
   report_count: number
 }
 
+export type PinScope = 'none' | 'site' | 'parent' | 'category'
+
 export interface AdminTopic {
   id: number
   title: string
@@ -159,6 +161,7 @@ export interface AdminTopic {
   author_uid: string
   author_nickname: string
   pinned: boolean
+  pin_scope: PinScope
   featured: boolean
   locked: boolean
   reply_count: number
@@ -230,6 +233,7 @@ export interface TopicState {
   id: number
   status: ContentStatus
   pinned: boolean
+  pin_scope: PinScope
   featured: boolean
   locked: boolean
 }
@@ -255,8 +259,8 @@ export const adminApi = {
 
   topics: (params: { q?: string; status?: string; category?: string; page?: number; page_size?: number }) =>
     request<AdminPage<AdminTopic>>('GET', `/topics${qs(params)}`),
-  moderateTopic: (id: number, action: TopicAction) =>
-    request<TopicState>('POST', `/topics/${id}/moderate`, { action }),
+  moderateTopic: (id: number, action: TopicAction, pin_scope?: PinScope) =>
+    request<TopicState>('POST', `/topics/${id}/moderate`, { action, ...(pin_scope ? { pin_scope } : {}) }),
   moveTopic: (id: number, category_id: number) =>
     request<{ id: number; category_id: number }>('POST', `/topics/${id}/move`, { category_id }),
   moderatePost: (id: number, action: 'hide' | 'restore') =>
