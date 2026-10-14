@@ -32,7 +32,7 @@ export const resolved = computed<'light' | 'dark'>(() =>
 watch(resolved, value => {
   if (typeof document === 'undefined') return
   document.documentElement.dataset.theme = value
-  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', value === 'dark' ? '#201b1a' : '#f5f5f5')
+  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', value === 'dark' ? '#111111' : '#f5f5f5')
 }, { immediate: true })
 
 export function setPreference(value: ThemePreference) {

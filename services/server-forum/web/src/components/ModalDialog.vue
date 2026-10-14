@@ -53,10 +53,10 @@ function onBackdrop(e: MouseEvent) {
   border-radius: 14px;
   background: var(--surface);
   color: var(--ink);
-  box-shadow: 0 24px 60px -20px rgba(10, 16, 30, 0.45);
+  box-shadow: 0 24px 60px -20px rgba(0, 0, 0, 0.45);
 }
 .dialog::backdrop {
-  background: rgba(14, 20, 33, 0.42);
+  background: rgba(0, 0, 0, 0.42);
 }
 .dialog[open] {
   animation: rise 0.18s ease-out;
