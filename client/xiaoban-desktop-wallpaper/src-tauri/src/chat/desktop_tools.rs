@@ -47,6 +47,10 @@ pub trait Desktop: Send + Sync {
     fn games(&self) -> Result<Value, String>;
     fn game_open(&self, id: Option<&str>) -> Result<(), String>;
     fn game_close(&self) -> Result<(), String>;
+    /// Writes a user game folder from text files. Returns `{ id, name, directory, files, save, replaced }`.
+    fn create_game(&self, id: &str, name: &str, description: &str, files: &[(String, String)], save: bool, overwrite: bool) -> Result<Value, String>;
+    /// Deletes a user game, closing the game space first when it is open.
+    fn delete_game(&self, id: &str) -> Result<(), String>;
     fn request_permissions(&self) -> Result<Value, String>;
 }
 
@@ -208,9 +212,19 @@ impl Desktop for TauriDesktop {
     }
 
     fn games(&self) -> Result<Value, String> {
-        let catalog = crate::games::catalog()?;
+        let catalog = crate::games::catalog(&self.app)?;
         let active = crate::games::is_active(&self.app);
-        Ok(json!({ "active": active, "games": catalog }))
+        Ok(json!({ "active": active, "games": catalog.games, "errors": catalog.errors }))
+    }
+
+    fn create_game(&self, id: &str, name: &str, description: &str, files: &[(String, String)], save: bool, overwrite: bool) -> Result<Value, String> {
+        let root = crate::storage::root(&self.app)?;
+        crate::game_packs::create_pack(&root, id, name, description, files, save, overwrite)
+    }
+
+    fn delete_game(&self, id: &str) -> Result<(), String> {
+        let app = self.app.clone();
+        tauri::async_runtime::block_on(crate::games::delete_user_game_by_id(&app, id))
     }
 
     fn game_open(&self, id: Option<&str>) -> Result<(), String> {
@@ -652,19 +666,30 @@ pub fn resolve_game_id(input: &str) -> Option<&'static str> {
     }
 }
 
+fn is_user_game(game: &Value) -> bool {
+    game["source"].as_str() == Some("user")
+}
+
 fn game_list(desktop: &dyn Desktop, _: &Value) -> Result<String, String> {
     let data = desktop.games()?;
     let active = data["active"].as_bool().unwrap_or(false);
     let state = if active { "当前正在游戏空间中" } else { "游戏空间未打开" };
     let games = data["games"].as_array().cloned().unwrap_or_default();
-    let mut lines = vec![format!("小伴内置 7 款独立桌面小游戏（{state}）：")];
-    for g in &games {
+    let line = |g: &Value| {
         let id = g["id"].as_str().unwrap_or("");
-        let name = g["name"].as_str().unwrap_or(id);
-        let desc = g["description"].as_str().unwrap_or("");
-        lines.push(format!("- {name} ({id}): {desc}"));
+        format!("- {} ({id}): {}", g["name"].as_str().unwrap_or(id), g["description"].as_str().unwrap_or(""))
+    };
+    let mut lines = vec![format!("小伴内置 7 款独立桌面小游戏（{state}）：")];
+    lines.extend(games.iter().filter(|g| !is_user_game(g)).map(line));
+    let mine: Vec<&Value> = games.iter().filter(|g| is_user_game(g)).collect();
+    if !mine.is_empty() {
+        lines.push(format!("用户自创游戏（{} 款，来源：游戏文件夹，可用 game_delete 删除）：", mine.len()));
+        lines.extend(mine.into_iter().map(|g| format!("{} [自创]", line(g))));
     }
-    lines.push(r#"可用 game_open 启动（例如 game_open(id: "snake-arena") 打开贪吃蛇），game_close 退出游戏空间。"#.into());
+    for error in data["errors"].as_array().into_iter().flatten().filter_map(Value::as_str) {
+        lines.push(format!("无法加载的自创游戏文件夹：{error}"));
+    }
+    lines.push(r#"可用 game_open 启动（例如 game_open(id: "snake-arena") 打开贪吃蛇），game_close 退出游戏空间；game_create 可以为用户创作新游戏。"#.into());
     Ok(lines.join("\n"))
 }
 
@@ -672,19 +697,68 @@ fn game_open(desktop: &dyn Desktop, args: &Value) -> Result<String, String> {
     let id_opt = optional_text(args, "id")?.filter(|s| !s.is_empty());
     let target = match id_opt {
         Some(raw) => {
-            let id = resolve_game_id(raw).ok_or_else(|| {
-                format!("没有找到游戏“{raw}”。支持的游戏：小伴贪吃蛇 (snake-arena)、俄罗斯方块 (falling-blocks)、2048 (merge-2048)、消失高手 (block-puzzle)、奶茶大师 (water-sort)、水墨剑客 (ink-blade)、暮色滑翔 (dusk-glider)")
-            })?;
-            Some(id)
+            if let Some(id) = resolve_game_id(raw) {
+                Some(id.to_string())
+            } else {
+                // User games match on their exact id only.
+                let games = desktop.games()?;
+                let mine: Vec<&Value> = games["games"].as_array().into_iter().flatten().filter(|g| is_user_game(g)).collect();
+                match mine.iter().find(|g| g["id"].as_str() == Some(raw)) {
+                    Some(game) => game["id"].as_str().map(str::to_string),
+                    None => {
+                        let extra: String = mine.iter().filter_map(|g| g["id"].as_str().map(|id| format!("、{} ({id})", g["name"].as_str().unwrap_or(id)))).collect();
+                        return Err(format!("没有找到游戏“{raw}”。支持的游戏：小伴贪吃蛇 (snake-arena)、俄罗斯方块 (falling-blocks)、2048 (merge-2048)、消失高手 (block-puzzle)、奶茶大师 (water-sort)、水墨剑客 (ink-blade)、暮色滑翔 (dusk-glider){extra}"));
+                    }
+                }
+            }
         }
         None => None,
     };
-    desktop.game_open(target)?;
+    desktop.game_open(target.as_deref())?;
     Ok(match target {
         Some(id) => format!("已进入游戏空间并启动游戏：{id}"),
         None => "已打开小伴游戏空间大厅".into(),
     })
 }
+
+fn game_create(desktop: &dyn Desktop, args: &Value) -> Result<String, String> {
+    let id = text_arg(args, "id")?;
+    let name = text_arg(args, "name")?;
+    let description = text_arg(args, "description")?;
+    let save = optional_bool(args, "save")?.unwrap_or(false);
+    let overwrite = optional_bool(args, "overwrite")?.unwrap_or(false);
+    let items = args.get("files").and_then(Value::as_array).ok_or("`files` is required and must be an array of { path, content }")?;
+    let mut files = Vec::with_capacity(items.len());
+    for item in items {
+        let path = item.get("path").and_then(Value::as_str).ok_or("each file needs a string `path`")?;
+        let content = item.get("content").and_then(Value::as_str).ok_or_else(|| format!("文件 {path} 缺少文本 `content`"))?;
+        files.push((path.to_string(), content.to_string()));
+    }
+    // Same checks the writer runs, so a bad request is refused before the desktop is involved.
+    crate::game_packs::validate_request(id, name, description, &files)?;
+    let made = desktop.create_game(id, name, description, &files, save, overwrite)?;
+    let replaced = if made["replaced"].as_bool().unwrap_or(false) { "（已覆盖同 id 的旧版本）" } else { "" };
+    let saves = if save { "，已启用本机存档" } else { "" };
+    Ok(format!("已保存游戏「{name}」（id: {id}）{replaced}{saves}，共 {} 个文件。游戏还没有打开，需要试玩时调用 game_open(id: \"{id}\")。", files.len() + 1))
+}
+
+fn game_delete(desktop: &dyn Desktop, args: &Value) -> Result<String, String> {
+    let id = text_arg(args, "id")?;
+    if crate::game_packs::is_builtin(id) {
+        return Err(format!("「{id}」是内置游戏，不能删除；只能删除 game_create 创作的自创游戏"));
+    }
+    desktop.delete_game(id)?;
+    Ok(format!("已删除自创游戏 {id}（游戏空间若正在运行已先关闭，它的本机存档也一并清除）。"))
+}
+
+const GAME_CREATE_DESCRIPTION: &str = "为用户创作一款全屏离线小游戏，保存成游戏文件夹（用户数据目录 games/packs/<id>/，文件夹即游戏）。保存后不会自动打开，试玩请再调用 game_open(id)；可用 game_list 查看、game_delete 删除。\n\
+游戏包规范：\n\
+1. 文件：files 必须包含 index.html 作为入口，其余文件用相对路径引用（如 <script src=\"game.js\"></script>、<link rel=\"stylesheet\" href=\"style.css\">）。只能写 html、js、css、json、svg、md、txt 文本文件，最多 40 个，单个不超过 1 MB，合计不超过 4 MB；路径只用字母数字和 . _ -，用 / 分层，最多 4 层，不以 . 开头。不要写 manifest.json（由本工具生成）；若包含 cover.svg 会用作封面。\n\
+2. 脚本：用普通经典脚本（<script src>），不要 ES modules（type=module、import/export），所有资源用相对路径，不联网、不引用任何外部 CDN、字体或图片；图片用内联 SVG 或 canvas 绘制。\n\
+3. 运行环境：游戏在沙盒 iframe 里全屏运行，没有网络、localStorage、cookie、IndexedDB 和任何系统权限。画布与布局适配 100vw × 100vh，同时支持键盘和鼠标/触摸。宿主会自动注入 desktop-host.js，由它处理 Esc 退出，游戏不要自己再处理 Esc，也不要自己引用它。\n\
+4. 握手协议（宿主注入的 desktop-host.js 会在收到 host.init 时自动回复 game.ready，所以不读存档的游戏可以不写；需要存档或成绩时按下面实现）：在页面脚本顶层同步监听 window 的 message。宿主在 iframe 加载完成后发送 {channel:'xiaban.game-host', protocol:1, type:'host.init', nonce, save, safeArea}，其中 save 是上次存档对象或 null。只接受 event.source === window.parent 且 channel、protocol、nonce 都匹配的消息；nonce 与地址栏参数 hostNonce 相同（new URLSearchParams(location.search).get('hostNonce')）。收到 host.init 后回复 window.parent.postMessage({channel:'xiaban.game-pack', protocol:1, nonce, type:'game.ready'}, '*')；game.ready 之前发出的其它消息会被忽略。\n\
+5. 可选成绩：开始一局发 type:'game.start'，之后可发 type:'game.progress' 和一次 type:'game.result'，都带非负整数 score（消息结构同上，channel 为 'xiaban.game-pack'，带 nonce）。\n\
+6. 存档（仅 save=true 时有效）：游戏在 game.ready 之后用 {channel:'xiaban.game-pack', protocol:1, nonce, type:'game.save', data:{…}} 提交存档，data 必须是普通 JSON 对象，序列化后不超过 32 KiB；宿主存在本机，下次启动时放进 host.init 的 save 字段。进度变化时就发送，不要依赖退出时才存。save=false 时不要发送 game.save，宿主会忽略。";
 
 fn game_close(desktop: &dyn Desktop, _: &Value) -> Result<String, String> {
     desktop.game_close()?;
@@ -890,24 +964,61 @@ pub fn tools(desktop: Arc<dyn Desktop>) -> Vec<Arc<dyn Tool>> {
             ToolSpec::new("widget_delete_custom", "删除指定的自定义小组件模板，id 来自 widget_create 定义的 id。若桌面上摆有该组件实例，也会一并从桌面移除。", object(json!({"id": {"type": "string"}}), &["id"])).risk(Risk::Write).serial(),
             widget_delete_custom,
         ),
-        tool(&desktop, ToolSpec::new("game_list", "列出小伴支持的小游戏（贪吃蛇、俄罗斯方块、2048、消失高手、奶茶大师、水墨剑客、暮色滑翔等）以及游戏空间状态。", none()), game_list),
+        tool(&desktop, ToolSpec::new("game_list", "列出小伴支持的小游戏（内置的贪吃蛇、俄罗斯方块、2048、消失高手、奶茶大师、水墨剑客、暮色滑翔，以及用户自创游戏）以及游戏空间状态。", none()), game_list),
         tool(
             &desktop,
             ToolSpec::new(
                 "game_open",
-                "进入游戏空间全屏玩游戏，可指定游戏 id（例如 snake-arena 为小伴贪吃蛇，falling-blocks 为俄罗斯方块，merge-2048 为 2048，block-puzzle 为消失高手，water-sort 为奶茶大师，ink-blade 为水墨剑客，dusk-glider 为暮色滑翔）。不指定 id 则打开游戏大厅。",
+                "进入游戏空间全屏玩游戏，可指定游戏 id（例如 snake-arena 为小伴贪吃蛇，falling-blocks 为俄罗斯方块，merge-2048 为 2048，block-puzzle 为消失高手，water-sort 为奶茶大师，ink-blade 为水墨剑客，dusk-glider 为暮色滑翔；用户自创游戏用 game_list 里的 id）。不指定 id 则打开游戏大厅。",
                 object(
                     json!({
                         "id": {
                             "type": "string",
-                            "enum": ["snake-arena", "falling-blocks", "merge-2048", "block-puzzle", "water-sort", "ink-blade", "dusk-glider"],
-                            "description": "游戏标识或游戏名称",
+                            "description": "游戏标识或内置游戏名称；自创游戏只认精确 id",
                         },
                     }),
                     &[],
                 ),
             ).risk(Risk::Write).serial(),
             game_open,
+        ),
+        tool(
+            &desktop,
+            ToolSpec::new(
+                "game_create",
+                GAME_CREATE_DESCRIPTION,
+                object(
+                    json!({
+                        "id": { "type": "string", "description": "游戏英文标识（小写字母、数字、-，2 到 40 个字符，如 star-catcher；不能与内置游戏重名）" },
+                        "name": { "type": "string", "description": "游戏中文名称（最多 24 字）" },
+                        "description": { "type": "string", "description": "一句话介绍（最多 80 字）" },
+                        "files": {
+                            "type": "array",
+                            "maxItems": 40,
+                            "description": "游戏文件列表，必须包含 index.html",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "path": { "type": "string", "description": "相对路径，如 index.html、js/main.js" },
+                                    "content": { "type": "string", "description": "UTF-8 文本内容" }
+                                },
+                                "required": ["path", "content"]
+                            }
+                        },
+                        "save": { "type": "boolean", "description": "游戏是否需要本机存档，默认 false" },
+                        "overwrite": { "type": "boolean", "description": "true 时覆盖同 id 的已有自创游戏，默认 false" }
+                    }),
+                    &["id", "name", "description", "files"],
+                ),
+            )
+            .risk(Risk::Write)
+            .serial(),
+            game_create,
+        ),
+        tool(
+            &desktop,
+            ToolSpec::new("game_delete", "删除指定的自创游戏（只能删除 game_create 创作的、game_list 标注为自创的游戏，内置游戏受保护）。若游戏空间正在运行会先关闭，游戏的本机存档也会一并清除。", object(json!({"id": {"type": "string"}}), &["id"])).risk(Risk::Write).serial(),
+            game_delete,
         ),
         tool(&desktop, ToolSpec::new("game_close", "退出游戏空间，回到正常的桌面生活空间。", none()).risk(Risk::Write).serial(), game_close),
         tool(
@@ -1029,13 +1140,21 @@ mod tests {
             Ok(json!({"active": false, "games": [
                 {"id": "snake-arena", "name": "小伴贪吃蛇", "description": "吃糖果长成大蛇"},
                 {"id": "falling-blocks", "name": "俄罗斯方块", "description": "单人下落方块"},
-            ]}))
+                {"id": "star-catcher", "name": "接星星", "description": "接住落下的星星", "source": "user"},
+            ], "errors": ["「broken」：缺少 manifest.json"]}))
         }
         fn game_open(&self, id: Option<&str>) -> Result<(), String> {
             self.log(format!("game-open {}", id.unwrap_or("lobby")))
         }
         fn game_close(&self) -> Result<(), String> {
             self.log("game-close".to_string())
+        }
+        fn create_game(&self, id: &str, _name: &str, _description: &str, files: &[(String, String)], save: bool, overwrite: bool) -> Result<Value, String> {
+            self.log(format!("create-game {id} files={} save={save} overwrite={overwrite}", files.len()))?;
+            Ok(json!({"id": id, "replaced": overwrite}))
+        }
+        fn delete_game(&self, id: &str) -> Result<(), String> {
+            self.log(format!("delete-game {id}"))
         }
         fn request_permissions(&self) -> Result<Value, String> {
             self.log("request-permissions".to_string())?;
@@ -1059,7 +1178,7 @@ mod tests {
         let mut unique = names.clone();
         unique.dedup();
         assert_eq!(names, unique);
-        assert_eq!(names.len(), 23);
+        assert_eq!(names.len(), 25);
         for tool in &all {
             let spec = tool.spec();
             assert!(spec.name.len() <= 64 && spec.name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_'), "{}", spec.name);
@@ -1277,6 +1396,69 @@ mod tests {
 
         assert_eq!(fake.calls(), vec!["game-open snake-arena", "game-open lobby", "game-close"]);
         assert!(call(&fake, "game_open", json!({"id": "不存在的游戏"})).unwrap_err().contains("没有找到游戏"));
+    }
+
+    #[test]
+    fn game_list_marks_user_games_and_game_open_matches_them_by_exact_id() {
+        let fake = Arc::new(Fake::default());
+        let out = call(&fake, "game_list", json!({})).unwrap();
+        assert!(out.contains("- 接星星 (star-catcher): 接住落下的星星 [自创]"), "{out}");
+        assert!(out.contains("- 小伴贪吃蛇 (snake-arena): 吃糖果长成大蛇\n"), "built-in games are not marked");
+        assert!(out.contains("无法加载的自创游戏文件夹：「broken」"));
+        assert_eq!(call(&fake, "game_open", json!({"id": "star-catcher"})).unwrap(), "已进入游戏空间并启动游戏：star-catcher");
+        assert!(call(&fake, "game_open", json!({"id": "接星星"})).unwrap_err().contains("star-catcher"));
+        assert!(call(&fake, "game_open", json!({"id": "STAR-CATCHER"})).is_err(), "user ids match exactly");
+        assert_eq!(fake.calls(), vec!["game-open star-catcher"]);
+    }
+
+    fn game_args() -> Value {
+        json!({"id": "star-catcher", "name": "接星星", "description": "接住落下的星星",
+            "files": [{"path": "index.html", "content": "<html><head></head></html>"}, {"path": "js/main.js", "content": "1"}]})
+    }
+
+    #[test]
+    fn game_create_checks_the_request_then_saves_without_opening() {
+        let fake = Arc::new(Fake::default());
+        let out = call(&fake, "game_create", game_args()).unwrap();
+        assert!(out.contains("star-catcher") && out.contains("共 3 个文件") && out.contains("game_open(id: \"star-catcher\")"), "{out}");
+        let mut args = game_args();
+        args["save"] = json!(true);
+        args["overwrite"] = json!(true);
+        let out = call(&fake, "game_create", args).unwrap();
+        assert!(out.contains("已覆盖") && out.contains("本机存档"));
+        assert_eq!(fake.calls(), vec!["create-game star-catcher files=2 save=false overwrite=false", "create-game star-catcher files=2 save=true overwrite=true"]);
+
+        let calls_before = fake.calls().len();
+        let bad = |edit: &dyn Fn(&mut Value)| {
+            let mut args = game_args();
+            edit(&mut args);
+            call(&fake, "game_create", args)
+        };
+        assert!(bad(&|a| a["id"] = json!("snake-arena")).unwrap_err().contains("内置"));
+        assert!(bad(&|a| a["id"] = json!("Bad Id")).is_err());
+        assert!(bad(&|a| a["files"] = json!([{"path": "game.js", "content": "x"}])).unwrap_err().contains("index.html"));
+        assert!(bad(&|a| a["files"].as_array_mut().unwrap().push(json!({"path": "manifest.json", "content": "{}"}))).unwrap_err().contains("manifest.json"));
+        assert!(bad(&|a| a["files"].as_array_mut().unwrap().push(json!({"path": "../evil.js", "content": "x"}))).is_err());
+        assert!(bad(&|a| a["files"].as_array_mut().unwrap().push(json!({"path": "logo.png", "content": "x"}))).unwrap_err().contains("类型"));
+        assert!(bad(&|a| a["files"].as_array_mut().unwrap().push(json!({"path": "big.js", "content": "x".repeat(1024 * 1024 + 1)}))).unwrap_err().contains("1 MB"));
+        assert!(bad(&|a| a["files"] = json!("nope")).is_err());
+        assert!(bad(&|a| a["files"] = json!([{"path": "index.html"}])).is_err());
+        assert!(bad(&|a| a["name"] = json!("字".repeat(25))).is_err());
+        assert!(bad(&|a| a["save"] = json!("yes")).is_err());
+        assert_eq!(fake.calls().len(), calls_before, "refused requests never reach the desktop");
+        let spec_text = tools(fake.clone()).iter().find(|t| t.spec().name == "game_create").unwrap().spec().description.clone();
+        for needle in ["host.init", "game.ready", "game.save", "32 KiB", "xiaban.game-pack", "hostNonce", "ES modules", "desktop-host.js"] {
+            assert!(spec_text.contains(needle), "description mentions {needle}");
+        }
+    }
+
+    #[test]
+    fn game_delete_only_removes_user_games() {
+        let fake = Arc::new(Fake::default());
+        assert!(call(&fake, "game_delete", json!({"id": "ink-blade"})).unwrap_err().contains("内置"));
+        assert!(call(&fake, "game_delete", json!({})).is_err());
+        assert!(call(&fake, "game_delete", json!({"id": "star-catcher"})).unwrap().contains("已删除"));
+        assert_eq!(fake.calls(), vec!["delete-game star-catcher"]);
     }
 
     #[test]

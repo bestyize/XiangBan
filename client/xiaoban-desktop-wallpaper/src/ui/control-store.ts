@@ -3,6 +3,7 @@ import { createAsrStore } from './asr/store.ts';
 import { reactive } from "vue";
 import { desktop, defaults, invoke, listen, toAccountError, type AiConfigView, type Settings, type WallpaperEntry, type WallpaperLibrary, type AppInfo, type AccountSession, type SendCodeResult, type CodeLoginOutcome, type UsernameCheck, type LoginResult } from "../bridge.ts";
 import type { WebsiteStatus } from "./website-types.ts";
+import { loadBuiltinCatalog, readCatalog } from "../games/catalog.ts";
 import { loadBuiltinPacks, noPacks, readImported, readList } from "../effects/catalog.ts";
 import type { ControlStore } from "./control-types.ts";
 import { createChatStore } from "./chat/chat-store.ts";
@@ -169,6 +170,18 @@ export function createControlStore(notify: ControlStore["notify"]): ControlStore
       if (!desktop) { window.open(`/?scene=games${gameId ? `&game=${encodeURIComponent(gameId)}` : ""}`, "_blank", "noopener"); return; }
       await invoke("open_game_space", { gameId: gameId ?? null });
       store.game.active = true;
+    },
+    async listGames() {
+      return desktop ? readCatalog(await invoke("list_games")) : loadBuiltinCatalog();
+    },
+    async deleteUserGame(id: string) {
+      if (!desktop) throw new Error("请在桌面应用中删除游戏");
+      await invoke("delete_user_game", { id });
+      await store.refreshSettings();
+    },
+    async openUserGamesFolder() {
+      if (!desktop) throw new Error("请在桌面应用中打开游戏文件夹");
+      await invoke("open_user_games_folder");
     },
     async applyWallpaper(id, options, preview = false) {
       if (!desktop) throw new Error("请在桌面应用中预览或应用壁纸");

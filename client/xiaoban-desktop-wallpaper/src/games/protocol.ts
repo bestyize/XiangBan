@@ -1,5 +1,5 @@
-export const GAME_IDS = ['falling-blocks', 'merge-2048', 'block-puzzle', 'water-sort', 'snake-arena', 'ink-blade', 'dusk-glider'] as const;
-export interface GameManifest { id: string; name: string; description: string; entry: string; cover: string; runtimeProtocol: number; orientation?: string; save?: boolean }
+/** One game in the catalog. `base` is where its files live (`/game-packs/<id>/` for shipped games, the game-pack protocol for the user's own). */
+export interface GameManifest { id: string; name: string; description: string; entry: string; cover?: string; runtimeProtocol: number; orientation?: string; save?: boolean; source?: 'builtin' | 'user'; base?: string }
 export interface Metrics { score: number; lines?: number; maxTile?: number }
 /** Compare JSON documents by value; serde_json can reorder object keys in native round trips. */
 export function sameJson(left: unknown, right: unknown): boolean {

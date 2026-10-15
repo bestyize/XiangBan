@@ -5,6 +5,9 @@ import type { EffectsChoice } from "../effects/types.ts";
 import type { ImportOutcome, LoadedPacks } from "../effects/catalog.ts";
 import type { WebsiteStatus } from "./website-types.ts";
 import type { ChatStore } from "./chat/chat-store.ts";
+import type { GameCatalog } from "../games/catalog.ts";
+
+export type { GameCatalog };
 
 export type ControlPage = "chat" | "wallpapers" | "widgets" | "interactive" | "effects" | "companion" | "games" | "care" | "settings";
 export interface ControlStore {
@@ -58,6 +61,11 @@ export interface ControlStore {
   setAutostart(enabled: boolean): Promise<void>;
   setDoubleClick(enabled: boolean): Promise<void>;
   openGames(gameId?: string): Promise<void>;
+  /** Shipped games plus the user's own, and the user folders that could not be loaded. */
+  listGames(): Promise<GameCatalog>;
+  /** Removes a user's own game folder (and closes the game space first if it is open). */
+  deleteUserGame(id: string): Promise<void>;
+  openUserGamesFolder(): Promise<void>;
   applyWallpaper(id: string, options: WallpaperOptions, preview?: boolean): Promise<void>;
   importMedia(): Promise<string | null>;
   deleteWallpaper(id: string): Promise<void>;

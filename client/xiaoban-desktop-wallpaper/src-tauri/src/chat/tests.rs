@@ -106,6 +106,14 @@ impl Desktop for FakeDesktop {
         lock(&self.calls).push("game-close".to_string());
         Ok(())
     }
+    fn create_game(&self, id: &str, _name: &str, _description: &str, _files: &[(String, String)], _save: bool, _overwrite: bool) -> Result<serde_json::Value, String> {
+        lock(&self.calls).push(format!("create-game {id}"));
+        Ok(serde_json::json!({"id": id}))
+    }
+    fn delete_game(&self, id: &str) -> Result<(), String> {
+        lock(&self.calls).push(format!("delete-game {id}"));
+        Ok(())
+    }
     fn request_permissions(&self) -> Result<Value, String> {
         lock(&self.calls).push("request-permissions".to_string());
         Ok(json!({"ok": true}))
@@ -241,7 +249,7 @@ fn the_assistant_has_every_tool_it_needs_and_no_others() {
     let mut expected = vec![
         "time_now", "todo", "ask_user", "read_file", "list_dir", "grep", "write_file", "edit_file", "shell", "web_fetch", "load_skill", "skill_manage",
         "memory_read", "memory_write", "desktop_status", "wallpaper_list", "wallpaper_apply", "wallpaper_create", "wallpaper_delete", "effect_list", "effect_set", "effect_create", "effect_delete", "companion_set", "care_list",
-        "care_set", "care_delete", "widget_list", "widget_add", "widget_create", "widget_delete_custom", "widget_update", "widget_remove", "game_list", "game_open", "game_close",
+        "care_set", "care_delete", "widget_list", "widget_add", "widget_create", "widget_delete_custom", "widget_update", "widget_remove", "game_list", "game_open", "game_close", "game_create", "game_delete",
         "request_accessibility_permission",
     ];
     expected.sort();

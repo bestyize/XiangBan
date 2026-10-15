@@ -26,7 +26,7 @@
 
 `backups/legacy-v1` 只在存在旧版本数据、执行迁移时创建。内置壁纸仍打包在程序中，不重复复制到用户目录。Windows 的设置、桌宠、壁纸和预览窗口共用上述 WebView2 目录；macOS 使用非持久 WKWebView 数据存储，应用设置与壁纸资源仍由上述目录持久化，WebKit 临时文件由系统管理。系统自启动项依然位于 Windows 注册表或 macOS `Library/LaunchAgents`。
 
-游戏包没有文件系统或浏览器存储权限。桌面宿主仅允许水墨剑客使用 `games/saves/ink-blade.json`；规则配置和提醒状态由原生宿主写入 `config/care-reminders.json`。天气城市由用户手动选择，不读取系统定位；查询天气需用户启用来源并联网。天气缓存和提醒去重账本属于关怀配置。备份时复制 `config`、`wallpapers` 与需要保留的 `games`；游戏存档损坏或读写失败时应用不会用空进度覆盖它。
+游戏包没有文件系统或浏览器存储权限。桌面宿主仅允许水墨剑客使用 `games/saves/ink-blade.json`，以及 manifest 声明 `save: true` 的自创游戏使用 `games/saves/user-<id>.json`；自创游戏本身放在 `games/packs/<id>/`（由 `game-pack:` 只读协议提供，路径限制在该目录内）；规则配置和提醒状态由原生宿主写入 `config/care-reminders.json`。天气城市由用户手动选择，不读取系统定位；查询天气需用户启用来源并联网。天气缓存和提醒去重账本属于关怀配置。备份时复制 `config`、`wallpapers` 与需要保留的 `games`；游戏存档损坏或读写失败时应用不会用空进度覆盖它。
 
 ## 本地图片、视频
 

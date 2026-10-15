@@ -1,7 +1,8 @@
 import { applyUiTokens } from './ui/design-tokens';
 import './games.css';
 import { desktop, invoke } from './bridge.ts';
-import { GAME_IDS, GameSession, validSave, sameJson, type GameManifest } from './games/protocol.ts';
+import { GameSession, validSave, sameJson, type GameManifest } from './games/protocol.ts';
+import { coverUrl, entryUrl, loadBuiltinCatalog, readGames } from './games/catalog.ts';
 
 declare global { interface Window { __XIAOBAN_GAME_TOKEN__?: string; __XIAOBAN_GAME_SMOKE__?: boolean } }
 
@@ -9,7 +10,7 @@ export async function mountGameSpace() {
   applyUiTokens();
   document.body.className = 'game-space';
   const app = document.querySelector<HTMLElement>('#app')!;
-  app.innerHTML = '<main class="games-shell"><header class="games-toolbar"><button id="games-back" title="返回游戏面板" aria-label="返回游戏面板" hidden>←</button><div><span id="games-status" role="status">正在准备游戏目录…</span></div><button id="games-close" title="退出游戏空间（Esc）" aria-label="退出游戏空间">×</button></header><section id="games-hub"><div class="games-intro"><p>给自己一小段轻松时光</p><h1>今天想玩点什么？</h1><span>七款本地小游戏，断网也能玩。水墨剑客进度保存在这台电脑。</span></div><div id="games-cards" class="games-grid"></div></section><section id="games-player" hidden><div id="game-stage"></div></section><div id="games-failure" class="games-failure" hidden><h2>游戏需要重试</h2><p id="games-error"></p><button id="games-retry">重试</button><button id="games-cancel">返回游戏面板</button><button id="games-force-close" hidden>放弃未保存进度并退出</button></div></main>';
+  app.innerHTML = '<main class="games-shell"><header class="games-toolbar"><button id="games-back" title="返回游戏面板" aria-label="返回游戏面板" hidden>←</button><div><span id="games-status" role="status">正在准备游戏目录…</span></div><button id="games-close" title="退出游戏空间（Esc）" aria-label="退出游戏空间">×</button></header><section id="games-hub"><div class="games-intro"><p>给自己一小段轻松时光</p><h1>今天想玩点什么？</h1><span>本地小游戏，断网也能玩。需要存档的游戏，进度保存在这台电脑。</span></div><div id="games-cards" class="games-grid"></div></section><section id="games-player" hidden><div id="game-stage"></div></section><div id="games-failure" class="games-failure" hidden><h2>游戏需要重试</h2><p id="games-error"></p><button id="games-retry">重试</button><button id="games-cancel">返回游戏面板</button><button id="games-force-close" hidden>放弃未保存进度并退出</button></div></main>';
   const node = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
   let manifests: GameManifest[] = [];
   let session: GameSession | null = null;
@@ -61,7 +62,7 @@ export async function mountGameSpace() {
       iframe.title = game.name; iframe.sandbox.add('allow-scripts');
       // Native host is already fullscreen. Nested browser fullscreen can consume Escape before JS.
       iframe.allow = 'autoplay'; iframe.referrerPolicy = 'no-referrer';
-      iframe.src = `/game-packs/${game.id}/${game.entry}?hostNonce=${encodeURIComponent(nonce)}&desktop=1${window.__XIAOBAN_GAME_SMOKE__ ? '&desktopSmoke=1' : ''}`;
+      iframe.src = `${entryUrl(game)}?hostNonce=${encodeURIComponent(nonce)}&desktop=1${window.__XIAOBAN_GAME_SMOKE__ ? '&desktopSmoke=1' : ''}`;
       frame = iframe;
       iframe.addEventListener('load', () => {
         if (!iframe.contentWindow || generation !== token) return;
@@ -97,12 +98,11 @@ export async function mountGameSpace() {
   node('games-retry').onclick = () => { if (saveFailure) void flush().then(ok => { if (ok) void hub(); }); else if (current) void launch(current); else void loadCatalog(); };
   async function loadCatalog() {
     try {
-      if (desktop) manifests = await gameInvoke<GameManifest[]>('get_game_catalog');
-      else { const catalog = await fetch('/game-packs/catalog.json').then(r => { if (!r.ok) throw new Error('游戏目录缺失'); return r.json(); }); manifests = await Promise.all(catalog.games.map((id: string) => fetch(`/game-packs/${id}/manifest.json`).then(r => r.json()))); }
-      if (manifests.length !== GAME_IDS.length || manifests.some(m => !GAME_IDS.includes(m.id as typeof GAME_IDS[number]))) throw new Error('本地游戏目录不完整');
+      manifests = readGames(desktop ? await gameInvoke<unknown>('get_game_catalog') : (await loadBuiltinCatalog()).games);
+      if (!manifests.length) throw new Error('没有找到可玩的游戏');
       node('games-cards').replaceChildren(...manifests.map(game => {
         const button = document.createElement('button'); button.className = 'game-card';
-        const image = document.createElement('img'); image.src = `/game-packs/${game.id}/${game.cover}`; image.alt = ''; image.loading = 'lazy';
+        const image = document.createElement('img'); image.src = coverUrl(game); image.alt = ''; image.loading = 'lazy';
         const name = document.createElement('strong'); name.textContent = game.name;
         const description = document.createElement('span'); description.textContent = game.description;
         const badge = document.createElement('small'); badge.textContent = game.save ? '本地存档 · 点击开始' : '离线可玩 · 点击开始';

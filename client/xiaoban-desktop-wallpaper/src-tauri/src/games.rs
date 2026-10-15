@@ -18,11 +18,12 @@ pub struct GameState {
 pub fn is_active(app: &tauri::AppHandle) -> bool { app.state::<GameState>().active.load(Ordering::SeqCst) }
 pub fn permitted(label: &str, command: &str) -> Option<bool> {
     if label == "games" { return Some(["close_game_space", "get_game_catalog", "load_game_save", "save_game_save", "game_smoke_report"].contains(&command)); }
-    if ["open_game_space", "close_game_space", "get_game_status", "set_game_desktop_double_click"].contains(&command) { return Some(label == "control"); }
+    if ["open_game_space", "close_game_space", "get_game_status", "set_game_desktop_double_click", "list_games", "delete_user_game", "open_user_games_folder"].contains(&command) { return Some(label == "control"); }
     if ["get_game_catalog", "load_game_save", "save_game_save", "game_smoke_report"].contains(&command) { return Some(false); }
     None
 }
-pub fn catalog() -> Result<Vec<Value>, String> {
+/// The seven shipped games, each tagged with where its files come from.
+pub fn builtin_catalog() -> Result<Vec<Value>, String> {
     let manifests = [
         include_str!("../../public/game-packs/falling-blocks/manifest.json"),
         include_str!("../../public/game-packs/merge-2048/manifest.json"),
@@ -33,13 +34,27 @@ pub fn catalog() -> Result<Vec<Value>, String> {
         include_str!("../../public/game-packs/dusk-glider/manifest.json"),
     ];
     manifests.iter().zip(IDS).map(|(text, id)| {
-        let value: Value = serde_json::from_str(text.trim_start_matches('\u{feff}')).map_err(|e| e.to_string())?;
+        let mut value: Value = serde_json::from_str(text.trim_start_matches('\u{feff}')).map_err(|e| e.to_string())?;
         if value["id"] != id || value["runtimeProtocol"] != 1 || value["entry"] != "index.html" || value["cover"] != "cover.svg" { return Err(format!("游戏 {id} 的资源协议无效")); }
+        value["source"] = json!("builtin"); value["base"] = json!(format!("/game-packs/{id}/"));
         Ok(value)
     }).collect()
 }
+/// Every game the games window can start, and the folders that were skipped.
+#[derive(Default)]
+pub struct Catalog { pub games: Vec<Value>, pub errors: Vec<String> }
+impl Catalog {
+    pub fn ids(&self) -> Vec<String> { self.games.iter().filter_map(|g| g["id"].as_str().map(str::to_string)).collect() }
+}
+/// Shipped games first, then the user's own from `<root>/games/packs`.
+pub fn catalog_in(root: Option<&std::path::Path>) -> Result<Catalog, String> {
+    let mut catalog = Catalog { games: builtin_catalog()?, errors: Vec::new() };
+    if let Some(root) = root { let user = crate::game_packs::scan(root); catalog.games.extend(user.games); catalog.errors = user.errors; }
+    Ok(catalog)
+}
+pub fn catalog(app: &tauri::AppHandle) -> Result<Catalog, String> { catalog_in(crate::storage::root(app).ok().as_deref()) }
 #[tauri::command]
-pub fn get_game_catalog(app: tauri::AppHandle, host_token: String) -> Result<Vec<Value>, String> { authorize(&app, &host_token)?; catalog() }
+pub fn get_game_catalog(app: tauri::AppHandle, host_token: String) -> Result<Vec<Value>, String> { authorize(&app, &host_token)?; Ok(catalog(&app)?.games) }
 fn authorize(app: &tauri::AppHandle, token: &str) -> Result<(), String> {
     let state = app.state::<GameState>(); let expected=state.host_token.lock().unwrap();
     if expected.is_empty() || token != expected.as_str() { return Err("游戏资源没有原生宿主权限".into()); } Ok(())
@@ -56,13 +71,21 @@ pub fn get_game_status(app: tauri::AppHandle) -> Value {
     let state = app.state::<GameState>();
     json!({"active":is_active(&app), "desktopDoubleClickSupported":state.desktop_entry_ready.load(Ordering::Relaxed),
         "desktopEntryError":state.desktop_entry_error.lock().unwrap().clone(),
-        "platform":std::env::consts::OS, "games":IDS})
+        "platform":std::env::consts::OS, "games":catalog(&app).map(|c|c.ids()).unwrap_or_else(|_|IDS.iter().map(|id|id.to_string()).collect())})
 }
-fn save_path(app: &tauri::AppHandle, id: &str) -> Result<std::path::PathBuf, String> {
-    // Only the shipped opt-in pack may persist; IDs never become arbitrary filesystem paths.
-    if id != "ink-blade" { return Err("此游戏不使用本地存档".into()); }
-    Ok(crate::storage::root(app)?.join("games/saves").join(format!("{id}.json")))
+/// Shipped games may only persist when their manifest says so (ink-blade, kept under its old file name);
+/// user games use `user-<id>.json`. IDs never become arbitrary filesystem paths.
+pub fn save_file_in(root: &std::path::Path, id: &str) -> Result<std::path::PathBuf, String> {
+    let saves = crate::game_packs::save_dir(root);
+    if IDS.contains(&id) {
+        return if builtin_catalog()?.iter().any(|g| g["id"] == id && g["save"] == true) { Ok(saves.join(format!("{id}.json"))) } else { Err("此游戏不使用本地存档".into()) };
+    }
+    match crate::game_packs::find_user_game(root, id) {
+        Ok(game) if game["save"] == true => Ok(saves.join(crate::game_packs::user_save_name(id))),
+        _ => Err("此游戏不使用本地存档".into()),
+    }
 }
+fn save_path(app: &tauri::AppHandle, id: &str) -> Result<std::path::PathBuf, String> { save_file_in(&crate::storage::root(app)?, id) }
 pub fn validate_save(value: &Value) -> Result<Vec<u8>, String> {
     if !value.is_object() { return Err("存档必须是 JSON 对象".into()); }
     let bytes = serde_json::to_vec(value).map_err(|e| e.to_string())?;
@@ -97,7 +120,7 @@ pub fn save_game_save(app: tauri::AppHandle, game_id: String, data: Value, host_
 }
 pub async fn open(app: &tauri::AppHandle) -> Result<(), String> { open_selected(app, None).await }
 async fn open_selected(app: &tauri::AppHandle, game_id: Option<String>) -> Result<(), String> {
-    if game_id.as_deref().is_some_and(|id| !IDS.contains(&id)) { return Err("没有找到这款本地游戏".into()); }
+    if let Some(id) = game_id.as_deref() { if !catalog(app)?.ids().iter().any(|known| known == id) { return Err("没有找到这款本地游戏".into()); } }
     let state = app.state::<GameState>(); let _operation = state.operation.lock().await;
     let content_state = app.state::<crate::content::ContentState>(); let _content = content_state.operation.lock().await;
     if let Some(window) = app.get_webview_window("games") {
@@ -163,6 +186,39 @@ pub async fn close_game_space(app: tauri::AppHandle, window: tauri::WebviewWindo
     if window.label()=="games" { authorize(&app,host_token.as_deref().unwrap_or(""))?; }
     close(&app).await
 }
+fn control_only(window: &tauri::WebviewWindow) -> Result<(), String> {
+    if window.label() != "control" { return Err("只有设置面板可以管理游戏".into()); }
+    Ok(())
+}
+/// Shipped and user games for the control window, plus why some user folders were skipped.
+#[tauri::command]
+pub fn list_games(window: tauri::WebviewWindow) -> Result<Value, String> {
+    control_only(&window)?;
+    let app = window.app_handle(); let catalog = catalog(app)?;
+    let directory = crate::storage::root(app).ok().map(|root| crate::game_packs::packs_dir(&root));
+    Ok(json!({"games":catalog.games,"errors":catalog.errors,"directory":directory}))
+}
+/// Deletes a user game folder. A running game space is closed first so no frame keeps files that vanish.
+pub async fn delete_user_game_by_id(app: &tauri::AppHandle, id: &str) -> Result<(), String> {
+    let root = crate::storage::root(app)?;
+    if !crate::game_packs::valid_id(id) || crate::game_packs::is_builtin(id) { return Err("只能删除自创游戏".into()); }
+    if fs::symlink_metadata(crate::game_packs::packs_dir(&root).join(id)).is_err() { return Err(format!("没有找到自创游戏「{id}」")); }
+    if is_active(app) { close(app).await?; }
+    let state = app.state::<GameState>(); let _io = state.io.lock().unwrap();
+    crate::game_packs::remove_pack(&root, id)
+}
+#[tauri::command]
+pub async fn delete_user_game(app: tauri::AppHandle, window: tauri::WebviewWindow, id: String) -> Result<(), String> {
+    control_only(&window)?; delete_user_game_by_id(&app, &id).await
+}
+/// Opens `games/packs` in the file manager, creating it first so there is somewhere to drop a folder.
+#[tauri::command]
+pub fn open_user_games_folder(window: tauri::WebviewWindow) -> Result<(), String> {
+    control_only(&window)?;
+    let directory = crate::game_packs::packs_dir(&crate::storage::root(window.app_handle())?);
+    fs::create_dir_all(&directory).map_err(|e| e.to_string())?;
+    crate::storage::show_in_file_manager(&directory)
+}
 pub fn start(app: &tauri::AppHandle) {
     #[cfg(windows)] crate::windows::start_desktop_game_entry(app.clone());
     #[cfg(not(windows))] { *app.state::<GameState>().desktop_entry_error.lock().unwrap()=Some("此平台尚未提供可靠的桌面空白双击判断，请使用设置或菜单栏的玩一玩。".into()); }
@@ -191,7 +247,7 @@ pub async fn smoke(app:&tauri::AppHandle)->Result<Value,String>{
     let restored=app.get_webview_window("pet").and_then(|w|w.outer_position().ok());
     if position.is_some()&&restored!=position{return Err("游戏退出后桌宠坐标没有恢复".into());}
     if report.get("error").is_some(){return Err(report["error"].as_str().unwrap_or("游戏验证失败").into());}
-    if report["ready"].as_array().map_or(0,|a|a.len())!=7{return Err("七款游戏未全部加载".into());}
+    if report["ready"].as_array().map_or(0,|a|a.len())<IDS.len(){return Err("内置游戏未全部加载".into());}
     Ok(json!({"frontend":report,"backgroundSuspended":true,"settingsPreserved":true,"positionRestored":position.is_none()||position==restored,"closed":true}))
 }
 async fn tokio_sleep(){ tauri::async_runtime::spawn_blocking(||std::thread::sleep(std::time::Duration::from_millis(100))).await.ok(); }
@@ -204,7 +260,30 @@ async fn wait_gone(app:&tauri::AppHandle,labels:&[&str])->Result<(),String>{
 }
 #[cfg(test)] mod tests {
     use super::*;
-    #[test] fn all_seven_local_manifests_are_valid() { let items=catalog().unwrap(); assert_eq!(items.len(),7); assert_eq!(items.iter().filter(|v|v["save"]==true).count(),1); }
+    #[test] fn all_seven_local_manifests_are_valid() { let items=builtin_catalog().unwrap(); assert_eq!(items.len(),7); assert_eq!(items.iter().filter(|v|v["save"]==true).count(),1); assert!(items.iter().all(|v|v["source"]=="builtin" && v["base"]==format!("/game-packs/{}/",v["id"].as_str().unwrap()))); }
+    fn temp_root(tag:&str)->std::path::PathBuf{ let p=std::env::temp_dir().join(format!("xiaoban-games-{tag}-{}",std::process::id())); let _=fs::remove_dir_all(&p); fs::create_dir_all(&p).unwrap(); p }
+    fn user_game(root:&std::path::Path,id:&str,save:bool){ let files=vec![("index.html".to_string(),"<html><head></head></html>".to_string())]; crate::game_packs::create_pack(root,id,"测试","一个游戏",&files,save,false).unwrap(); }
+    #[test] fn catalog_merges_builtin_and_user_games_and_reports_bad_folders() {
+        let root=temp_root("merge"); user_game(&root,"my-game",false);
+        fs::create_dir_all(crate::game_packs::packs_dir(&root).join("broken")).unwrap();
+        let merged=catalog_in(Some(&root)).unwrap();
+        assert_eq!(merged.games.len(),8); assert_eq!(merged.ids()[..7],IDS); assert_eq!(merged.ids()[7],"my-game");
+        assert_eq!(merged.games[7]["source"],"user"); assert!(merged.games[7]["base"].as_str().unwrap().contains("game-pack")); assert!(merged.games[7]["base"].as_str().unwrap().ends_with("/my-game/"));
+        assert_eq!(merged.errors.len(),1); assert!(merged.errors[0].contains("broken"));
+        assert_eq!(catalog_in(None).unwrap().games.len(),7);
+        let _=fs::remove_dir_all(root);
+    }
+    #[test] fn save_files_follow_the_manifest_flag() {
+        let root=temp_root("saves"); user_game(&root,"saves-yes",true); user_game(&root,"saves-no",false);
+        let saves=root.join("games/saves");
+        assert_eq!(save_file_in(&root,"ink-blade").unwrap(),saves.join("ink-blade.json"));
+        for id in ["falling-blocks","snake-arena","dusk-glider"] { assert!(save_file_in(&root,id).is_err(),"{id}"); }
+        assert_eq!(save_file_in(&root,"saves-yes").unwrap(),saves.join("user-saves-yes.json"));
+        assert!(save_file_in(&root,"saves-no").is_err()); assert!(save_file_in(&root,"missing-game").is_err());
+        for id in ["../ink-blade","..","user-saves-yes","","a/b"] { assert!(save_file_in(&root,id).is_err(),"{id}"); }
+        let _=fs::remove_dir_all(root);
+    }
+    #[test] fn user_game_commands_are_control_only() { for command in ["list_games","delete_user_game","open_user_games_folder"] { assert_eq!(permitted("control",command),Some(true)); for label in ["games","pet","wallpaper","media-a"] { assert_eq!(permitted(label,command),Some(false),"{label} {command}"); } } }
     #[test] fn permissions_do_not_grant_control_to_games() { assert_eq!(permitted("games","quit"),Some(false)); assert_eq!(permitted("games","save_game_save"),Some(true)); assert_eq!(permitted("media-a","open_game_space"),Some(false)); assert_eq!(permitted("pet","load_game_save"),Some(false)); }
     #[test] fn save_limit_is_utf8_bytes_and_object_only() { assert!(validate_save(&json!([1])).is_err()); assert!(validate_save(&json!({"text":"猫".repeat(12000)})).is_err()); assert!(validate_save(&json!({"progress":3})).is_ok()); }
 }
