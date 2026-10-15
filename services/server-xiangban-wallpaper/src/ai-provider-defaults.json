@@ -1,28 +1,40 @@
 {
   "version": 1,
-  "revision": 2,
+  "revision": 3,
   "refreshAfterSeconds": 21600,
   "providers": [
     {
       "id": "deepseek",
       "provider": "DeepSeek",
-      "description": "高性价比通用与深度思考模型，支持 deepseek-chat (V3) 与 deepseek-reasoner (R1)。",
+      "description": "深度求索最新一代大模型，支持 deepseek-v4-pro 旗舰与 deepseek-flash 极速模型。",
       "endPoint": "https://api.deepseek.com",
       "protocol": "OpenAI Chat Completions",
       "type": "third",
       "enabled": true,
-      "defaultModel": "deepseek-chat",
+      "defaultModel": "deepseek-v4-pro",
       "models": [
         {
+          "id": "deepseek-v4-pro",
+          "name": "deepseek-v4-pro (最新旗舰)",
+          "description": "DeepSeek 最新一代旗舰基座大模型，逻辑、编程与长文本推理大幅提升",
+          "enabled": true
+        },
+        {
+          "id": "deepseek-flash",
+          "name": "deepseek-flash (极速模型)",
+          "description": "官方最新极速高吞吐模型，具备超低延迟与高性价比",
+          "enabled": true
+        },
+        {
           "id": "deepseek-chat",
-          "name": "deepseek-chat (V3)",
-          "description": "最新一代深度求索通用基座大模型，综合推理与编码能力卓越",
+          "name": "deepseek-chat (通用入口)",
+          "description": "官方通用对话兼容入口，自动路由至当前稳定版本",
           "enabled": true
         },
         {
           "id": "deepseek-reasoner",
-          "name": "deepseek-reasoner (R1)",
-          "description": "强化推理大模型，具备完整长思维链，适合复杂逻辑与数学任务",
+          "name": "deepseek-reasoner (深度思考)",
+          "description": "长思维链强化推理模型，专为数学与复杂分析设计",
           "enabled": true
         }
       ],
@@ -38,47 +50,41 @@
     {
       "id": "zhipu",
       "provider": "智谱 BigModel",
-      "description": "清华系自研基座大模型，默认升级为最新旗舰 glm-4-plus，支持多模态与长文本。",
+      "description": "清华系自研基座大模型，默认升级为官方最新 GLM-5.3 旗舰大模型。",
       "endPoint": "https://open.bigmodel.cn/api/paas/v4",
       "protocol": "OpenAI Chat Completions",
       "type": "third",
       "enabled": true,
-      "defaultModel": "glm-4-plus",
+      "defaultModel": "glm-5.3",
       "models": [
         {
-          "id": "glm-4-plus",
-          "name": "glm-4-plus (最新旗舰)",
-          "description": "智谱最强基座大模型，通用逻辑、写作与指令遵循全面增强",
+          "id": "glm-5.3",
+          "name": "glm-5.3 (官方最新旗舰)",
+          "description": "智谱 GLM 第五代最新旗舰大模型，综合推理、代码与生成能力跃升",
           "enabled": true
         },
         {
-          "id": "glm-4-air",
-          "name": "glm-4-air",
-          "description": "高性价比平衡款模型，兼顾速度与生成效果",
+          "id": "glm-5.3-flash",
+          "name": "glm-5.3-flash (超高速闪电)",
+          "description": "GLM 第五代轻量高速模型，支持多模态理解与极速响应",
+          "enabled": true
+        },
+        {
+          "id": "glm-5.2",
+          "name": "glm-5.2 (高阶稳定版)",
+          "description": "GLM 第五代高阶模型，具备极佳的稳定输出与指令遵循",
+          "enabled": true
+        },
+        {
+          "id": "glm-4-plus",
+          "name": "glm-4-plus (上一代经典)",
+          "description": "GLM-4 系列高阶旗舰模型",
           "enabled": true
         },
         {
           "id": "glm-4-flash",
-          "name": "glm-4-flash",
+          "name": "glm-4-flash (免费轻量)",
           "description": "面向个人与开发者的免费轻量模型",
-          "enabled": true
-        },
-        {
-          "id": "glm-4-flashx",
-          "name": "glm-4-flashx",
-          "description": "超高速闪电模型，专为超低延迟场景设计",
-          "enabled": true
-        },
-        {
-          "id": "glm-4-long",
-          "name": "glm-4-long",
-          "description": "支持百万 Token 超长上下文输入",
-          "enabled": true
-        },
-        {
-          "id": "glm-zero-preview",
-          "name": "glm-zero-preview",
-          "description": "针对数理逻辑与复杂推理的最新强化思维模型",
           "enabled": true
         }
       ],
@@ -94,47 +100,41 @@
     {
       "id": "kimi",
       "provider": "Kimi",
-      "description": "月之暗面长文本大模型，默认配置官方推荐自动调优的 moonshot-v1-auto。",
+      "description": "月之暗面长文本大模型，默认配置官方最新 1M 上下文 Kimi K3 旗舰大模型。",
       "endPoint": "https://api.moonshot.cn/v1",
       "protocol": "OpenAI Chat Completions",
       "type": "third",
       "enabled": true,
-      "defaultModel": "moonshot-v1-auto",
+      "defaultModel": "kimi-k3",
       "models": [
         {
+          "id": "kimi-k3",
+          "name": "kimi-k3 (官方最新旗舰)",
+          "description": "月之暗面最新一代旗舰基座大模型，支持 100 万 Token 超长上下文",
+          "enabled": true
+        },
+        {
+          "id": "kimi-k2.7-code",
+          "name": "kimi-k2.7-code (专业编程模型)",
+          "description": "针对软件工程与代码推理深度优化的 256k 编程专家模型",
+          "enabled": true
+        },
+        {
+          "id": "kimi-k2.7-code-highspeed",
+          "name": "kimi-k2.7-code-highspeed (极速编程)",
+          "description": "极速低延迟代码推理模型",
+          "enabled": true
+        },
+        {
+          "id": "kimi-k2.6",
+          "name": "kimi-k2.6 (通用高阶版)",
+          "description": "高性价比通用大语言模型",
+          "enabled": true
+        },
+        {
           "id": "moonshot-v1-auto",
-          "name": "moonshot-v1-auto (推荐)",
-          "description": "官方推荐模型，根据上下文长短自动选用最佳版本",
-          "enabled": true
-        },
-        {
-          "id": "kimi-k2-turbo-preview",
-          "name": "kimi-k2-turbo-preview",
-          "description": "最新 Kimi k2 高速模型，低延迟响应",
-          "enabled": true
-        },
-        {
-          "id": "kimi-k2-0905-preview",
-          "name": "kimi-k2-0905-preview",
-          "description": "Kimi k2 预览版",
-          "enabled": true
-        },
-        {
-          "id": "moonshot-v1-128k",
-          "name": "moonshot-v1-128k",
-          "description": "支持 12.8 万 Token 长上下文阅读与解析",
-          "enabled": true
-        },
-        {
-          "id": "moonshot-v1-32k",
-          "name": "moonshot-v1-32k",
-          "description": "3.2 万 Token 适中上下文模型",
-          "enabled": true
-        },
-        {
-          "id": "moonshot-v1-8k",
-          "name": "moonshot-v1-8k",
-          "description": "8 千 Token 快速基础对话模型",
+          "name": "moonshot-v1-auto (自动路由)",
+          "description": "官方长文本自动匹配版本",
           "enabled": true
         }
       ],
@@ -150,29 +150,35 @@
     {
       "id": "minimax",
       "provider": "MiniMax",
-      "description": "MiniMax 开放平台大模型，默认采用最新万亿参数 MoE 旗舰 MiniMax-Text-01。",
+      "description": "MiniMax 开放平台大模型，默认采用官方最新万亿参数 MiniMax-M3 旗舰基座。",
       "endPoint": "https://api.minimax.cn/v1",
       "protocol": "OpenAI Chat Completions",
       "type": "third",
       "enabled": true,
-      "defaultModel": "MiniMax-Text-01",
+      "defaultModel": "MiniMax-M3",
       "models": [
         {
-          "id": "MiniMax-Text-01",
-          "name": "MiniMax-Text-01 (最新旗舰)",
-          "description": "MiniMax 最新万亿 MoE 基座模型，综合表现优异，支持超长文本",
+          "id": "MiniMax-M3",
+          "name": "MiniMax-M3 (官方最新旗舰)",
+          "description": "MiniMax 最新一代超强旗舰模型，文本生成、逻辑推理与角色扮演顶级水准",
+          "enabled": true
+        },
+        {
+          "id": "MiniMax-M2.7",
+          "name": "MiniMax-M2.7 (高阶均衡款)",
+          "description": "MiniMax 高阶平衡大模型",
+          "enabled": true
+        },
+        {
+          "id": "MiniMax-M2.7-highspeed",
+          "name": "MiniMax-M2.7-highspeed (极速版)",
+          "description": "超高速交互对话模型",
           "enabled": true
         },
         {
           "id": "MiniMax-M2",
-          "name": "MiniMax-M2",
-          "description": "轻量高响应模型",
-          "enabled": true
-        },
-        {
-          "id": "abab6.5s-chat",
-          "name": "abab6.5s-chat",
-          "description": "通用高效对话模型",
+          "name": "MiniMax-M2 (上一代稳定版)",
+          "description": "上一代高响应对话模型",
           "enabled": true
         }
       ],

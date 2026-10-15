@@ -23,10 +23,10 @@ const MAX_KEY: usize = 2048;
 /// its own path; the web side switches the address with the protocol, and the host only needs a
 /// usable default here. See `src/ui/ai-config.ts` for the full list of endpoints.
 pub const DEFAULT_PROVIDERS: &[(&str, &str, &str, &str, &str)] = &[
-    ("deepseek", "DeepSeek", "chat", "https://api.deepseek.com", "deepseek-chat"),
-    ("zhipu", "智谱 BigModel", "chat", "https://open.bigmodel.cn/api/paas/v4", "glm-4-plus"),
-    ("kimi", "Kimi", "chat", "https://api.moonshot.cn/v1", "moonshot-v1-auto"),
-    ("minimax", "MiniMax", "chat", "https://api.minimax.cn/v1", "MiniMax-Text-01"),
+    ("deepseek", "DeepSeek", "chat", "https://api.deepseek.com", "deepseek-v4-pro"),
+    ("zhipu", "智谱 BigModel", "chat", "https://open.bigmodel.cn/api/paas/v4", "glm-5.3"),
+    ("kimi", "Kimi", "chat", "https://api.moonshot.cn/v1", "kimi-k3"),
+    ("minimax", "MiniMax", "chat", "https://api.minimax.cn/v1", "MiniMax-M3"),
 ];
 
 #[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
