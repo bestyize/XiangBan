@@ -22,6 +22,6 @@ A landscape 3D glide game over a sunset archipelago, rendered with three.js. A p
 
 ## Host
 
-The manifest sets `orientation: "landscape"`; `viewport.js` rotates the game when a phone is held in portrait, as in the snake and ink-blade packs. The game reports `game.progress` / `game.result` with `score`, `lines` (perfect landings) and `maxTile` (longest perfect chain). The shared `result-share.js` sends `{ score, lines: perfects, maxTile: maxChain, level: islands reached, steps: flights }`, and `client/xiaban-web/src/games/dusk-glider/index.ts` labels these for the poster.
+The manifest sets `orientation: "landscape"`; `viewport.js` rotates the game when a phone is held in portrait, as in the snake and ink-blade packs. The game reports `game.progress` / `game.result` with `score`, `lines` (perfect landings) and `maxTile` (longest perfect chain). The desktop build has no result sharing; the web build's shared `result-share.js` sends `{ score, lines: perfects, maxTile: maxChain, level: islands reached, steps: flights }` for the poster.
 
 Touch devices start at medium quality (1.5× pixel ratio, 1024 px shadow map) and desktops at high (2×, 2048 px). If frames stay slower than about 24 ms, the game drops one quality step at a time; the lowest step turns shadows off. Without WebGL the pack shows a message and a way back to the game hub.

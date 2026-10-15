@@ -36,7 +36,7 @@ UI smoke 在 `XIAOBAN_UI_SMOKE=1` 时严格核对报告标记与页面、配置�
 node client/xiaoban-desktop-wallpaper/scripts/check-game-assets.mjs
 ```
 
-该只读检查核对桌面与网页的七包 catalog、manifest、entry、cover、HTML/CSS/JS 的本地引用、游戏包内源码引用边界，以及共享依赖。网页专属分享按钮隐藏、结算焦点、七个入口页加载的 `desktop-host.js` 是登记的桌面适配差异；脚本只去除这些精确差异后再与网页文件比较，其他包资源和共享依赖仍要求匹配。**本轮已执行通过**。
+该只读检查核对桌面与网页的七包 catalog、manifest、entry、cover、HTML/CSS/JS 的本地引用、游戏包内源码引用边界。每个桌面游戏包自包含：各自带有同内容的 `desktop-host.js`，浅色主题三款（block-puzzle、merge-2048、water-sort）带有拆分后的 `theme.css`；桌面入口页由网页入口页按固定规则改写（去掉网页分享共享文件与分享按钮、主题与适配层改为本地引用），脚本据此校验，`theme.css` 规则合集须与网页 `fresh-theme.css` 完全对应，其他包资源仍要求与网页一致。**本轮已执行通过**。
 
 根目录集成结果（2026-10-09）：
 

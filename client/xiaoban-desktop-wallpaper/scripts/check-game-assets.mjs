@@ -6,28 +6,23 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const desktop = path.join(root, 'public/game-packs');
 const web = path.resolve(root, '../xiaban-web/public/game-packs');
 const errors = [];
-// Deliberate desktop-only adaptations. Each normalizer removes only the exact
-// adapter change, then the remaining resource is still compared byte-for-byte.
-const desktopSharedAdaptations = {
-  'result-share.js': {
-    reason: 'keep the website share button hidden in desktop-hosted games',
-    normalize(text) {
-      const withFlag = "  const desktop = new URLSearchParams(location.search).get('desktop') === '1'\n";
-      const withBehavior = 'if (button) button.hidden = desktop';
-      if (!text.includes(withFlag) || !text.includes(withBehavior)) return null;
-      return text.replace(withFlag, '').replace(withBehavior, 'if (button) button.hidden = false');
-    },
-  },
-};
+// Deliberate desktop-only adaptations. Every desktop pack is self-contained, so
+// the desktop index.html is derived from the web one by an exact, ordered rewrite
+// (web shared files and the share button are dropped, theme/host become local).
+const desktopOnlyFiles = new Set(['desktop-host.js', 'theme.css']);
+const freshThemePacks = new Set(['block-puzzle', 'merge-2048', 'water-sort']);
+const shareButtonRemovedPacks = new Set(['falling-blocks', 'merge-2048', 'block-puzzle', 'water-sort']);
+function desktopizeIndex(webText, id) {
+  const lines = webText.split('\n').flatMap(line => {
+    if (/\.\.\/result-share\.(?:css|js)/.test(line)) return [];
+    if (shareButtonRemovedPacks.has(id) && line.includes('id="shareResultButton"')) return [];
+    if (line.includes('href="../fresh-theme.css"')) return [line.replace('../fresh-theme.css', './theme.css')];
+    return [line];
+  });
+  const text = lines.join('\n');
+  return text.includes('<head>') ? text.replace('<head>', '<head><script src="./desktop-host.js"></script>') : null;
+}
 const desktopPackageAdaptations = {
-  '*/index.html': {
-    reason: 'load the desktop host adapter for Escape and desktop-only controls',
-    normalize(text) {
-      const tag = '<script src="../desktop-host.js"></script>';
-      if (text.split(tag).length !== 2) return null;
-      return text.replace(tag, '');
-    },
-  },
   'falling-blocks/game.js': {
     reason: 'move result focus to restart when the unavailable desktop share action is hidden',
     normalize(text) {
@@ -37,6 +32,19 @@ const desktopPackageAdaptations = {
     },
   },
 };
+// Top-level CSS rules, whitespace-normalized, to prove theme.css loses nothing from web fresh-theme.css.
+function cssRules(text) {
+  const rules = [];
+  let depth = 0, start = 0;
+  const clean = text.replace(/\/\*[\s\S]*?\*\//g, '');
+  for (let i = 0; i < clean.length; i++) {
+    if (clean[i] === '{') depth++;
+    else if (clean[i] === '}' && --depth === 0) { rules.push(clean.slice(start, i + 1).replace(/\s+/g, ' ').trim()); start = i + 1; }
+  }
+  return rules;
+}
+// The only rule desktop themes may add: the generic half of a web media rule that also targets block-puzzle.
+const splitThemeRules = new Set(['@media (max-height: 510px) { .fresh-game .quiet-button { min-height: 44px; } }']);
 const readJson = file => JSON.parse(fs.readFileSync(file, 'utf8'));
 const exists = file => fs.existsSync(file) && fs.statSync(file).isFile();
 const sourceText = file => fs.readFileSync(file, 'utf8').replace(/^\uFEFF/, '').replace(/\r\n?/g, '\n').replace(/\s+$/, '\n');
@@ -110,24 +118,40 @@ if (!errors.length) {
     }
     const desktopFiles = filesUnder(path.join(desktop, id));
     const webFiles = filesUnder(path.join(web, id));
-    for (const relative of new Set([...desktopFiles, ...webFiles])) {
+    for (const relative of desktopFiles) {
+      if (desktopOnlyFiles.has(relative)) {
+        if (relative === 'theme.css' && !freshThemePacks.has(id)) errors.push(`${id}: 不应存在 theme.css`);
+        continue;
+      }
+      if (!webFiles.includes(relative)) errors.push(`${id}/${relative}: 桌面与网页资源清单不一致`);
+    }
+    for (const relative of webFiles) if (!desktopFiles.includes(relative)) errors.push(`${id}/${relative}: 桌面与网页资源清单不一致`);
+    if (!desktopFiles.includes('desktop-host.js')) errors.push(`${id}: 缺少本地 desktop-host.js`);
+    if (freshThemePacks.has(id) && !desktopFiles.includes('theme.css')) errors.push(`${id}: 缺少本地 theme.css`);
+    for (const relative of webFiles) {
       const desktopFile = path.join(desktop, id, relative);
       const webFile = path.join(web, id, relative);
-      if (!exists(desktopFile) || !exists(webFile)) { errors.push(`${id}/${relative}: 桌面与网页资源清单不一致`); continue; }
-      const adaptation = relative === 'index.html' ? desktopPackageAdaptations['*/index.html'] : desktopPackageAdaptations[`${id}/${relative}`];
+      if (!exists(desktopFile) || !exists(webFile)) continue;
       const desktopText = sourceText(desktopFile);
+      if (relative === 'index.html') {
+        const expected = desktopizeIndex(sourceText(webFile), id);
+        if (expected === null || expected !== desktopText) errors.push(`${id}/${relative}: 桌面入口页与网页入口页存在未登记的内容差异`);
+        continue;
+      }
+      // README describes how this copy is packaged, which differs from the web copy.
+      if (relative === 'README.md') continue;
+      const adaptation = desktopPackageAdaptations[`${id}/${relative}`];
       const normalized = normalizeWithAdaptation(desktopText, adaptation, `${id}/${relative}`);
       if (normalized !== sourceText(webFile)) errors.push(`${id}/${relative}: 桌面与网页资源存在未登记的内容差异`);
     }
   }
-  for (const shared of ['fresh-theme.css', 'result-share.css', 'result-share.js']) {
-    if (!exists(path.join(desktop, shared)) || !exists(path.join(web, shared))) errors.push(`共享依赖缺失：${shared}`);
-    else {
-      const normalized = normalizeWithAdaptation(sourceText(path.join(desktop, shared)), desktopSharedAdaptations[shared], shared);
-      if (normalized !== sourceText(path.join(web, shared))) errors.push(`共享依赖与网页版本存在未登记的内容差异：${shared}`);
-    }
-  }
-  if (!exists(path.join(desktop, 'desktop-host.js'))) errors.push('桌面适配器缺失：desktop-host.js');
+  const webThemeRules = cssRules(sourceText(path.join(web, 'fresh-theme.css')));
+  const themeRules = [...freshThemePacks].flatMap(id => exists(path.join(desktop, id, 'theme.css')) ? cssRules(sourceText(path.join(desktop, id, 'theme.css'))) : []);
+  for (const rule of webThemeRules) if (!themeRules.includes(rule)) errors.push(`theme.css 丢失网页 fresh-theme.css 规则：${rule.slice(0, 60)}`);
+  for (const rule of themeRules) if (!webThemeRules.includes(rule) && !splitThemeRules.has(rule)) errors.push(`theme.css 含网页 fresh-theme.css 之外的规则：${rule.slice(0, 60)}`);
+  const hostSources = new Set(desktopCatalog.games.map(id => exists(path.join(desktop, id, 'desktop-host.js')) ? sourceText(path.join(desktop, id, 'desktop-host.js')) : ''));
+  if (hostSources.size !== 1) errors.push('各游戏包的 desktop-host.js 副本不一致');
+  for (const shared of ['desktop-host.js', 'fresh-theme.css', 'result-share.css', 'result-share.js']) if (exists(path.join(desktop, shared))) errors.push(`桌面 game-packs 根目录不应再有共享文件：${shared}`);
 }
 if (errors.length) { console.error(errors.map(error => `✗ ${error}`).join('\n')); process.exitCode = 1; }
-else console.log('✓ 桌面七款游戏包、manifest、入口、封面、本地引用及网页共享依赖均通过只读校验。');
+else console.log('✓ 桌面七款游戏包、manifest、入口、封面、本地引用（自包含）及与网页版本的差异均通过只读校验。');

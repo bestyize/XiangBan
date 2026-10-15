@@ -1,0 +1,52 @@
+/* Shared light palette. Each game keeps its own layout and interaction rules. */
+:root {
+  color-scheme: light;
+  font-family: "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  color: #24382f; background: #f2f8f5;
+  --lamp: #527d62; --warm: #527d62; --muted: #4f655a;
+  --share-accent: #23845b; --share-ink: #ffffff; --share-hover: #1d714e;
+  --share-outline: #d1e0d8; --share-secondary: #ffffff; --share-secondary-ink: #344e42;
+  --share-secondary-hover: #edf5f0; --share-focus: #23845b;
+}
+body.fresh-game { background: linear-gradient(180deg, #eef6f1 0%, #f6f8f4 100%); color: #24382f; }
+.fresh-game select { color: #344e42; }
+.fresh-game button:focus-visible, .fresh-game select:focus-visible, .fresh-game .board:focus-visible { outline-color: #23845b; }
+.fresh-game h1, .fresh-game h2 { color: #24382f; }
+.fresh-game .quiet-button, .fresh-game select { min-height: 44px; border: 1px solid #d1e0d8; border-radius: 13px; background: #ffffff; color: #344e42; }
+.fresh-game .quiet-button:hover:enabled { background: #edf5f0; }
+.fresh-game .primary-button { min-height: 44px; border: 1px solid #23845b; border-radius: 13px; background: #23845b; color: #ffffff; }
+.fresh-game.hosted #exitButton { background: #ffffff; border: 1px solid #ffffff; border-radius: 14px; color: #344e42; }
+.fresh-game.hosted #exitButton:active { background: #edf5f0; }
+.fresh-game .stats > div { background: #ffffff; border: 1px solid #dce8e0; border-radius: 14px; text-align: center; box-shadow: 0 2px 4px #294e3504, 0 5px 14px #294e3506; }
+.fresh-game .stats > div:nth-child(1) { background: #ffffff; }
+.fresh-game .stats > div:nth-child(2) { background: #ffffff; }
+.fresh-game .stats > div:nth-child(3) { background: #ffffff; }
+.fresh-game .stats strong { color: #24382f; font-weight: 750; }
+.fresh-game .stats > div:nth-child(1) strong { color: #24382f; }
+.fresh-game .stats > div:nth-child(3) strong { color: #24382f; }
+.fresh-game .stats span { font-size: 11px; line-height: 1.5; }
+.fresh-game .stats span, .fresh-game .intro, .fresh-game .help, .fresh-game .help span,
+.fresh-game .status, .fresh-game .eyebrow, .fresh-game .level-bar label { color: #4f655a; }
+.fresh-game .controls button { min-height: 44px; border: 1px solid #d1e0d8; border-radius: 15px; background: #ffffff; color: #344e42; box-shadow: 0 3px 0 #d7e5dd, 0 5px 10px #294e3508; }
+.fresh-game .overlay { background: #f2f8f5e6; backdrop-filter: none; }
+.fresh-game .result-card { border: 1px solid #dce8e0; border-radius: 22px; background: #ffffff; box-shadow: 0 4px 8px #294e3508, 0 16px 40px #294e3512; max-height: 100%; overflow-y: auto; }
+.fresh-game .result-card p, .fresh-game .result-card > p:not(.eyebrow) { color: #4f655a; }
+.fresh-game .result-icon { color: #e7b325; }
+/* 2048: cream and yellow first, then orange, berry, purple and blue. */
+.fresh-game[data-game="merge-2048"] .board { border: 2px solid #ffffff; outline: 1px solid #d6e4dc; border-radius: 22px; background: #f4f8f5; box-shadow: 0 3px 8px #294e3508, 0 12px 28px #294e350c; }
+.fresh-game[data-game="merge-2048"] .tile { border-radius: clamp(7px, 3cqw, 14px); background: #e5eee8; color: #152019; box-shadow: none; }
+.fresh-game[data-game="merge-2048"] .tile[data-value="2"] { background: #f2eee1; color: #152019; }
+.fresh-game[data-game="merge-2048"] .tile[data-value="4"] { background: #ffedb0; color: #152019; }
+.fresh-game[data-game="merge-2048"] .tile[data-value="8"] { background: #ffd12b; color: #152019; }
+.fresh-game[data-game="merge-2048"] .tile[data-value="16"] { background: #ffb23e; color: #152019; }
+.fresh-game[data-game="merge-2048"] .tile[data-value="32"] { background: #ff8e57; color: #152019; }
+.fresh-game[data-game="merge-2048"] .tile[data-value="64"] { background: #ff607a; color: #152019; }
+.fresh-game[data-game="merge-2048"] .tile[data-value="128"] { background: #ee4c84; color: #152019; }
+.fresh-game[data-game="merge-2048"] .tile[data-value="256"] { background: #bb3484; color: #ffffff; }
+.fresh-game[data-game="merge-2048"] .tile[data-value="512"] { background: #9c45d9; color: #ffffff; }
+.fresh-game[data-game="merge-2048"] .tile[data-value="1024"] { background: #7854da; color: #ffffff; }
+.fresh-game[data-game="merge-2048"] .tile[data-value="2048"] { background: #526bd5; color: #ffffff; box-shadow: none; }
+.fresh-game[data-game="merge-2048"] .tile-large { background: #206f64; color: #ffffff; }
+.fresh-game[data-game="merge-2048"] .tile[data-value="0"] { box-shadow: inset 0 1px 2px #2b50350a; }
+.fresh-game[data-game="merge-2048"] .tile:not([data-value="0"]) { box-shadow: 0 2px 3px #24382f12; }
+@media (max-height: 510px) { .fresh-game .quiet-button { min-height: 44px; } }

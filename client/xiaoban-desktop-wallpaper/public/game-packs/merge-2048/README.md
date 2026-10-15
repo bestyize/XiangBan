@@ -1,8 +1,8 @@
 # 2048 游戏包
 
-独立的单人数字合并游戏，使用 HTML、CSS 和 JavaScript，在游戏广场的受限 iframe 中运行。游戏资源和规则随包提供，清新主题复用上级目录的 `fresh-theme.css`，结算分享复用 `result-share.js` 和 `result-share.css`，部署时须同时保留这三个共享文件。无外部服务或运行时依赖。
+独立的单人数字合并游戏，使用 HTML、CSS 和 JavaScript，在游戏广场的受限 iframe 中运行。全部资源都在本目录，可单独拷走运行：桌面适配层为 `desktop-host.js`，清新主题为 `theme.css`。桌面端不提供结算分享。无外部服务或运行时依赖。
 
-画面使用浅色背景和白色面板，正文统一为深色，边框和阴影克制。低数字方块颜色温和，高数字逐步鲜艳；低值方块统一深色数字，深色高值方块使用白字，保持数字清楚。`fresh-theme.css` 在 `game.css` 后、`result-share.css` 前加载，通过 body 的 `fresh-game` 类和 `data-game="merge-2048"` 属性启用对应皮肤。
+画面使用浅色背景和白色面板，正文统一为深色，边框和阴影克制。低数字方块颜色温和，高数字逐步鲜艳；低值方块统一深色数字，深色高值方块使用白字，保持数字清楚。`theme.css` 在 `game.css` 后加载，通过 body 的 `fresh-game` 类和 `data-game="merge-2048"` 属性启用对应皮肤。
 
 - 电脑：方向键或 WASD 移动，Esc 返回游戏广场。
 - 手机：在棋盘上滑动，或点按下方四个方向按钮。

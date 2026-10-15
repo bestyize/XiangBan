@@ -32,42 +32,6 @@ body.fresh-game { background: linear-gradient(180deg, #eef6f1 0%, #f6f8f4 100%);
 .fresh-game .result-card { border: 1px solid #dce8e0; border-radius: 22px; background: #ffffff; box-shadow: 0 4px 8px #294e3508, 0 16px 40px #294e3512; max-height: 100%; overflow-y: auto; }
 .fresh-game .result-card p, .fresh-game .result-card > p:not(.eyebrow) { color: #4f655a; }
 .fresh-game .result-icon { color: #e7b325; }
-
-/* Block puzzle: vivid, flat pieces on a quiet cream grid. */
-.fresh-game[data-game="block-puzzle"] { --color-1: #ffd12b; --color-2: #00b9f5; --color-3: #a34dff; --color-4: #ff4f76; --color-5: #42d34f; --color-6: #ff8a16; }
-.fresh-game[data-game="block-puzzle"] .board { border: 2px solid #ffffff; outline: 1px solid #d6e4dc; border-radius: 18px; background: #f4f8f5; box-shadow: 0 3px 8px #294e3508, 0 12px 28px #294e350c; gap: 3px; padding: 7px; }
-.fresh-game[data-game="block-puzzle"] .cell { border-radius: 5px; background: #e5eee8; box-shadow: inset 0 1px 2px #2b50350a; }
-.fresh-game[data-game="block-puzzle"] .cell.filled,
-.fresh-game[data-game="block-puzzle"] .mini-cell { background: var(--piece-color); box-shadow: 0 1px 2px #24382f12; }
-.fresh-game[data-game="block-puzzle"] .cell.preview { background: var(--piece-color); opacity: .45; box-shadow: inset 0 0 0 2px #24382f; }
-.fresh-game[data-game="block-puzzle"] .cell.preview-invalid { background: #f8d3db; box-shadow: inset 0 0 0 2px #cc4060; opacity: 1; }
-.fresh-game[data-game="block-puzzle"] .piece-button { border: 1px solid #dce8e0; border-radius: 16px; background: #ffffff; box-shadow: 0 3px 0 #d7e5dd, 0 5px 12px #294e3506; }
-.fresh-game[data-game="block-puzzle"] .piece-button[aria-pressed="true"] { border: 2px solid #699b75; background: #f5faee; }
-.fresh-game[data-game="block-puzzle"] .piece-label { color: #4f655a; }
-.fresh-game[data-game="block-puzzle"] .mini-cell { border-radius: 3px; }
-.fresh-game[data-game="block-puzzle"] .piece-art { --mini-step: min(14px, calc(56px / var(--piece-height))); flex-shrink: 0; }
-.fresh-game[data-game="block-puzzle"] .drag-ghost { filter: drop-shadow(0 4px 5px #24382f20); }
-.fresh-game[data-game="block-puzzle"] .drag-ghost.invalid .mini-cell { background: #cc4060; }
-@keyframes clear { 0%, 45% { background: #ffd12b; box-shadow: none; } 100% { background: #e5eee8; } }
-
-/* 2048: cream and yellow first, then orange, berry, purple and blue. */
-.fresh-game[data-game="merge-2048"] .board { border: 2px solid #ffffff; outline: 1px solid #d6e4dc; border-radius: 22px; background: #f4f8f5; box-shadow: 0 3px 8px #294e3508, 0 12px 28px #294e350c; }
-.fresh-game[data-game="merge-2048"] .tile { border-radius: clamp(7px, 3cqw, 14px); background: #e5eee8; color: #152019; box-shadow: none; }
-.fresh-game[data-game="merge-2048"] .tile[data-value="2"] { background: #f2eee1; color: #152019; }
-.fresh-game[data-game="merge-2048"] .tile[data-value="4"] { background: #ffedb0; color: #152019; }
-.fresh-game[data-game="merge-2048"] .tile[data-value="8"] { background: #ffd12b; color: #152019; }
-.fresh-game[data-game="merge-2048"] .tile[data-value="16"] { background: #ffb23e; color: #152019; }
-.fresh-game[data-game="merge-2048"] .tile[data-value="32"] { background: #ff8e57; color: #152019; }
-.fresh-game[data-game="merge-2048"] .tile[data-value="64"] { background: #ff607a; color: #152019; }
-.fresh-game[data-game="merge-2048"] .tile[data-value="128"] { background: #ee4c84; color: #152019; }
-.fresh-game[data-game="merge-2048"] .tile[data-value="256"] { background: #bb3484; color: #ffffff; }
-.fresh-game[data-game="merge-2048"] .tile[data-value="512"] { background: #9c45d9; color: #ffffff; }
-.fresh-game[data-game="merge-2048"] .tile[data-value="1024"] { background: #7854da; color: #ffffff; }
-.fresh-game[data-game="merge-2048"] .tile[data-value="2048"] { background: #526bd5; color: #ffffff; box-shadow: none; }
-.fresh-game[data-game="merge-2048"] .tile-large { background: #206f64; color: #ffffff; }
-.fresh-game[data-game="merge-2048"] .tile[data-value="0"] { box-shadow: inset 0 1px 2px #2b50350a; }
-.fresh-game[data-game="merge-2048"] .tile:not([data-value="0"]) { box-shadow: 0 2px 3px #24382f12; }
-
 /* Drinks: flat fruit colors; letters remain visible regardless of hue. */
 .fresh-game[data-game="water-sort"] {
   background: #f6f7f9; color: #2f3742;
@@ -121,6 +85,5 @@ body.fresh-game { background: linear-gradient(180deg, #eef6f1 0%, #f6f8f4 100%);
 .fresh-game[data-game="water-sort"] .status[data-tone="warning"] { color: #a35326; }
 .fresh-game[data-game="water-sort"] .tube-button.flash .glass { animation-name: fresh-pour; }
 @keyframes fresh-pour { 50% { transform: translateY(-3px); } }
-@media (max-height: 640px) { .fresh-game[data-game="block-puzzle"] .piece-art { --mini-step: min(12px, calc(48px / var(--piece-height))); } }
-@media (max-height: 510px) { .fresh-game .quiet-button { min-height: 44px; } .fresh-game[data-game="block-puzzle"] .piece-art { --mini-step: min(10px, calc(40px / var(--piece-height))); } }
+@media (max-height: 510px) { .fresh-game .quiet-button { min-height: 44px; } }
 @media (prefers-reduced-motion: reduce) { .fresh-game .tube-button.flash .glass { animation: none; } }

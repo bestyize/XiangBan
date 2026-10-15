@@ -1,8 +1,8 @@
 # 消失高手
 
-独立的 8×8 方块消除网页游戏。游戏资源在本目录，清新主题使用上级目录的 `fresh-theme.css`，结算分享使用上级目录的 `result-share.js` 和 `result-share.css`；部署时须同时保留这三个共享文件。普通 `defer` 脚本在宿主的 `sandbox="allow-scripts"` iframe 中运行，不依赖 ES modules、外部服务或浏览器存储。
+独立的 8×8 方块消除网页游戏。全部资源都在本目录，可单独拷走运行：桌面适配层为 `desktop-host.js`，清新主题为 `theme.css`。桌面端不提供结算分享。普通 `defer` 脚本在宿主的 `sandbox="allow-scripts"` iframe 中运行，不依赖 ES modules、外部服务或浏览器存储。
 
-画面使用浅色背景、白色面板和鲜艳纯色方块，正文统一为深色，辅助文字保持清楚；边框和阴影克制，突出棋盘和待放置方块。`fresh-theme.css` 在 `game.css` 后、`result-share.css` 前加载，通过 body 的 `fresh-game` 类和 `data-game="block-puzzle"` 属性启用对应皮肤。
+画面使用浅色背景、白色面板和鲜艳纯色方块，正文统一为深色，辅助文字保持清楚；边框和阴影克制，突出棋盘和待放置方块。`theme.css` 在 `game.css` 后加载，通过 body 的 `fresh-game` 类和 `data-game="block-puzzle"` 属性启用对应皮肤。
 
 ## 玩法
 
