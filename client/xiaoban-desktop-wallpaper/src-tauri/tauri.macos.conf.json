@@ -6,7 +6,10 @@
     "icon": ["icons/icon.png", "icons/icon.icns"],
     "macOS": {
       "minimumSystemVersion": "12.0",
+      "infoPlist": "Info.plist",
+      "entitlements": "Entitlements.plist",
       "signingIdentity": "-"
     }
   }
 }
+

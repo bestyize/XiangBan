@@ -197,3 +197,13 @@ Mac 实机还需检查：原角色的发光与连续表情、桌宠拖动、空�
 原生实现位于 `src-tauri/src/tts/`，参考后端 `services/xiaban-api/backend/src/main/kotlin/xyz/xiaban/server/tts` 的 GEC、浏览器握手、UTF-8 分段、SSML 和二进制帧协议；桌面直接连接 Edge，不经过小伴后端。仅控制台可调用 TTS 命令。合成返回 MP3 二进制，由 WebView 播放，取消时废弃过期请求并回收 Blob URL。声音配置位于 `config/tts.json`；音频仅在内存缓存（最多 4 项，总计 8 MiB），不保存合成文本或音频到磁盘。
 
 需要联网，无需语音服务 Key。单次最多 10000 字、16 MiB 音频；语音失败保留文字对话。Edge 接口是非官方读出服务，握手或协议变化时会提示重试。针对性验证：`npx vitest run src/ui/speech/speech.test.ts src/ui/chat/speech-events.test.ts`、`npx vue-tsc --noEmit`；Rust 环境运行 `cargo test --manifest-path src-tauri/Cargo.toml tts:: --locked`，Windows/macOS 需实际验证合成、播放及取消。
+
+## SenseVoice Small 本地语音识别
+
+聊天输入框的麦克风开关与设置 → 声音 →「语音识别」共用设置，默认关闭。首次开启提示加载引擎，从魔搭社区下载 SenseVoice Small 的 sherpa-onnx INT8 导出（模型与词表共约 229 MiB），显示进度并校验固定大小及 SHA-256。模型不随安装包分发；保存至用户数据根目录的 `asr/model.int8.onnx` 与 `asr/tokens.txt`，开关保存于 `config/asr.json`。关闭时停止采集、丢弃未完成识别并释放引擎，保留完整模型，下次开启离线复用；下载中断、校验失败及权限错误可重试。
+
+下载源为 `https://modelscope.cn/models/pengzhendong/sherpa-onnx-sense-voice-zh-en-ja-ko-yue`，固定版本 `73eca47697f980daa3d16112404174b6b950b514`，由 `iic/SenseVoiceSmall` 导出。推理使用 `sherpa-onnx` Rust 静态库和 CPU；构建时需要下载对应平台的原生推理库（可通过 `SHERPA_ONNX_ARCHIVE_DIR` 或 `SHERPA_ONNX_LIB_DIR` 使用本地库），无需用户安装 Python。
+
+只在聊天页位于前台且模型已配置时申请麦克风权限；设置页开启只准备引擎。语音在本机转成文字并追加到输入框，由用户确认后发送。离开聊天、切换会话、窗口失焦、发送消息或朗读回复时停止采集，避免误录和旧结果进入其他会话。采集使用 AudioWorklet，转为 16kHz 单声道，按短暂停顿分句（每段最多 20 秒）；音频仅驻留内存，不写文件、不上传语音服务。macOS 安装包包含麦克风用途说明。
+
+针对性验证：`npx vitest run src/ui/asr src/ui/pages/ChatPage.test.ts src/ui/speech/speech.test.ts`、`npx vue-tsc --noEmit`。原生测试位于 `src-tauri/src/asr/engine.rs`；Windows/macOS 仍需实机确认麦克风授权、录音及系统音频设备兼容性。

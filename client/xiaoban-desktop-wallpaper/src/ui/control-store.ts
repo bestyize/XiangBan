@@ -1,4 +1,5 @@
 import { createSpeechStore } from './speech/store.ts';
+import { createAsrStore } from './asr/store.ts';
 import { reactive } from "vue";
 import { desktop, defaults, invoke, listen, toAccountError, type AiConfigView, type Settings, type WallpaperEntry, type WallpaperLibrary, type AppInfo, type AccountSession, type SendCodeResult, type CodeLoginOutcome, type UsernameCheck, type LoginResult } from "../bridge.ts";
 import type { WebsiteStatus } from "./website-types.ts";
@@ -46,15 +47,16 @@ export function createControlStore(notify: ControlStore["notify"]): ControlStore
     effectList: noPacks(),
     account: null,
     showLoginModal: false,
-    page: "wallpapers", settingsTab: "general", speech: createSpeechStore({ desktop, invoke, notify }), chat: createChatStore({ desktop, invoke, listen, notify,
+    page: "wallpapers", settingsTab: "general", asr: createAsrStore({ desktop, invoke, listen, notify }), speech: createSpeechStore({ desktop, invoke, notify }), chat: createChatStore({ desktop, invoke, listen, notify,
       onActivity: () => { void store.speech.stop(); },
       onReply: (session, text, key) => { if (store.page === 'chat' && store.speech.settings.autoRead && document.visibilityState !== 'hidden') void store.speech.speak(text, key ?? 'auto:' + session, undefined, true); },
     }), ready: false, initialError: "", desktop, notify,
-    navigate(page) { if (store.page !== page) void store.speech.stop(); store.page = page; },
+    navigate(page) { if (store.page !== page) { void store.speech.stop(); store.asr.deactivate(); } store.page = page; },
     openLogin() { store.showLoginModal = true; },
     closeLogin() { store.showLoginModal = false; },
     async initialize() {
       void store.speech.init();
+      void store.asr.init();
       store.initialError = "";
       store.ready = false;
       unsubscribers.splice(0).forEach((unlisten) => unlisten());
@@ -106,7 +108,7 @@ export function createControlStore(notify: ControlStore["notify"]): ControlStore
       } catch (error) { store.initialError = String(error); }
       finally { if (!disposed) store.ready = true; }
     },
-    dispose() { disposed = true; store.chat.dispose(); store.speech.dispose(); unsubscribers.splice(0).forEach((unlisten) => unlisten()); },
+    dispose() { disposed = true; store.chat.dispose(); store.speech.dispose(); store.asr.dispose(); unsubscribers.splice(0).forEach((unlisten) => unlisten()); },
     async refreshSettings() {
       if (!desktop || disposed) return;
       store.settings = await invoke<Settings>("get_settings");
@@ -241,3 +243,4 @@ export function createControlStore(notify: ControlStore["notify"]): ControlStore
   } as ControlStore);
   return store;
 }
+

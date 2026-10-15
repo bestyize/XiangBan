@@ -1,4 +1,5 @@
 import type { SpeechStore } from './speech/store.ts';
+import type { AsrStore } from './asr/store.ts';
 import type { AccountSession, AppInfo, CodeLoginOutcome, LoginResult, SendCodeResult, Settings, UsernameCheck, WallpaperLibrary, WallpaperOptions } from "../bridge.ts";
 import type { EffectsChoice } from "../effects/types.ts";
 import type { ImportOutcome, LoadedPacks } from "../effects/catalog.ts";
@@ -21,6 +22,7 @@ export interface ControlStore {
   /** The assistant's conversations. Lives here so an answer keeps arriving while another page is open. */
   chat: ChatStore;
   speech: SpeechStore;
+  asr: AsrStore;
   ready: boolean;
   initialError: string;
   desktop: boolean;
@@ -62,3 +64,4 @@ export interface ControlStore {
   setAutomaticUpdates(enabled: boolean): Promise<void>;
   checkWebsite(): Promise<void>;
 }
+

@@ -2,8 +2,10 @@
 import { computed, onMounted } from 'vue';
 import { NAlert, NButton, NSelect, NSlider, NSwitch } from 'naive-ui';
 import type { ControlStore } from '../control-types.ts';
+import AsrStatus from './AsrStatus.vue';
 const props = defineProps<{ store: ControlStore }>();
 const speech = props.store.speech;
+const asr = props.store.asr;
 const disabled = computed(() => !props.store.desktop || !speech.ready);
 const options = computed(() => {
   const voices = speech.voices.some(v => v.shortName === speech.settings.voice) ? speech.voices
@@ -11,12 +13,16 @@ const options = computed(() => {
   return [...voices].sort((a, b) => Number(!a.locale.startsWith('zh')) - Number(!b.locale.startsWith('zh')))
     .map(v => ({ value: v.shortName, label: v.friendlyName + (v.locale ? ' · ' + v.locale : '') }));
 });
-onMounted(() => speech.init());
+onMounted(() => { void speech.init(); void asr.init(); });
 </script>
 <template>
   <section class="surface voice-settings" data-testid="voice-settings">
     <div class="section-heading"><div><h2>小伴的声音</h2><p>Edge TTS 在线合成语音，需联网，无需填写语音服务 Key。</p></div></div>
     <NAlert v-if="!store.desktop" type="info" :show-icon="false">请在桌面应用中设置声音。</NAlert>
+    <div class="setting-row"><div><b>语音识别</b><p>SenseVoice Small 本地识别，语音转成文字后可在聊天中确认发送。首次开启从魔搭下载约 229 MiB 模型，关闭后保留。</p></div>
+      <NSwitch :value="asr.enabled" :disabled="!store.desktop || !asr.ready || asr.saving" :loading="asr.saving" data-testid="asr-settings-switch" @update:value="value => asr.setEnabled(value)" />
+    </div>
+    <AsrStatus :asr="asr" />
     <div class="setting-row"><div><b>自动朗读回复</b><p>开启后，当前聊天的完整回复文本会发送给 Edge 在线合成；切换会话或发送新消息会停止朗读。</p></div>
       <NSwitch :value="speech.settings.autoRead" :disabled="disabled" :loading="speech.saving" @update:value="value => speech.save({ autoRead: value })" />
     </div>
@@ -38,3 +44,4 @@ onMounted(() => speech.init());
 <style scoped>
 .voice-picker{display:flex;align-items:center;gap:10px;width:min(65%,470px)}.voice-picker :deep(.n-select){flex:1;min-width:0}@media(max-width:760px){.voice-picker{width:65%;flex-wrap:wrap}}
 </style>
+

@@ -16,6 +16,7 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 reqwest = { version = "0.13", default-features = false, features = ["blocking", "native-tls-no-alpn"] }
 sha2 = "0.10"
+sherpa-onnx = "=1.13.8"
 tungstenite = { version = "=0.28.0", default-features = false, features = ["handshake", "native-tls"] }
 semver = "1"
 url = "2"
@@ -60,3 +61,4 @@ lto = "thin"
 codegen-units = 1
 strip = true
 panic = "abort"
+
