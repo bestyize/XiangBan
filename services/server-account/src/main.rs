@@ -59,7 +59,8 @@ pub fn build_router(state: AppState) -> Router {
         .route("/admin/me", get(admin::me))
         .route("/admin/password", post(admin::change_password))
         .route("/admin/stats", get(admin::stats))
-        .route("/admin/users", get(admin::list_users))
+        .route("/admin/users", get(admin::list_users).post(admin::create_user))
+        .route("/internal/forum/users", post(admin::provision_forum_user))
         .route("/admin/users/{uid}", get(admin::get_user))
         .route("/admin/users/{uid}/status", post(admin::set_user_status))
         .route("/admin/users/{uid}/username", post(admin::set_user_username))
@@ -149,3 +150,4 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     axum::serve(listener, build_router(state).into_make_service_with_connect_info::<SocketAddr>()).await?;
     Ok(())
 }
+

@@ -37,6 +37,7 @@ pub fn routes() -> Router<AppState> {
         .route("/topics/{id}/move", post(move_topic))
         .route("/posts/{id}/moderate", post(moderate_post))
         .route("/users", get(list_users))
+        .nest("/editor", super::editor::admin_routes())
         .route("/users/{uid}/trust", post(set_trust))
         .route("/users/{uid}/status", post(set_user_status))
         .route("/categories", get(list_categories).post(create_category))
@@ -1265,3 +1266,4 @@ mod tests {
         assert_eq!(like_pattern("50%_off"), "%50\\%\\_off%");
     }
 }
+

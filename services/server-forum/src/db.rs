@@ -85,6 +85,32 @@ CREATE INDEX IF NOT EXISTS topics_hot_idx ON topics (hot_score DESC);
 CREATE INDEX IF NOT EXISTS topics_created_idx ON topics (created_at DESC);
 CREATE INDEX IF NOT EXISTS topics_author_idx ON topics (author_uid, created_at DESC);
 
+CREATE TABLE IF NOT EXISTS editor_authors (
+    uid UUID PRIMARY KEY REFERENCES users(uid),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS editor_drafts (
+    id UUID PRIMARY KEY,
+    author_uid UUID NOT NULL REFERENCES users(uid),
+    external_id TEXT NOT NULL,
+    category_id INT NOT NULL REFERENCES categories(id),
+    title TEXT NOT NULL,
+    body_md TEXT NOT NULL,
+    tags TEXT[] NOT NULL DEFAULT '{}',
+    topic_id BIGINT REFERENCES topics(id),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    UNIQUE(author_uid, external_id)
+);
+CREATE TABLE IF NOT EXISTS editor_tokens (
+    id UUID PRIMARY KEY,
+    name TEXT NOT NULL,
+    author_uid UUID NOT NULL REFERENCES editor_authors(uid),
+    can_publish BOOLEAN NOT NULL DEFAULT false,
+    expires_at TIMESTAMPTZ NOT NULL,
+    revoked_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
 CREATE TABLE IF NOT EXISTS deals (
     topic_id   BIGINT PRIMARY KEY REFERENCES topics(id) ON DELETE CASCADE,
     value_text TEXT NOT NULL DEFAULT '',
@@ -203,6 +229,14 @@ CREATE TABLE IF NOT EXISTS admin_audit (
     target_id   TEXT NOT NULL,
     detail      TEXT NOT NULL DEFAULT '',
     created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+ALTER TABLE images ADD COLUMN IF NOT EXISTS editor_pending BOOLEAN NOT NULL DEFAULT false;
+CREATE TABLE IF NOT EXISTS editor_draft_assets (
+    draft_id UUID NOT NULL REFERENCES editor_drafts(id) ON DELETE CASCADE,
+    image_id UUID NOT NULL REFERENCES images(id) ON DELETE CASCADE,
+    path TEXT NOT NULL,
+    PRIMARY KEY(draft_id, path)
 );
 "#;
 
@@ -683,4 +717,5 @@ mod tests {
         }
     }
 }
+
 

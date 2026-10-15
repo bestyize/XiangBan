@@ -20,6 +20,9 @@ CREATE TABLE IF NOT EXISTS users (
     last_login_at TIMESTAMPTZ
 );
 
+ALTER TABLE users ADD COLUMN IF NOT EXISTS provision_request_id UUID;
+CREATE UNIQUE INDEX IF NOT EXISTS users_provision_request_idx ON users (provision_request_id) WHERE provision_request_id IS NOT NULL;
+
 CREATE TABLE IF NOT EXISTS identities (
     id              BIGSERIAL PRIMARY KEY,
     uid             UUID NOT NULL REFERENCES users(uid) ON DELETE CASCADE,
@@ -128,3 +131,4 @@ pub async fn seed_clients(pool: &PgPool, clients: &[(String, String)]) -> Result
     }
     Ok(())
 }
+

@@ -24,6 +24,7 @@ pub struct AppConfig {
     pub account_jwks_url: String,
     pub account_client_id: String,
     pub cors_origins: Vec<String>,
+    pub account_provision_key: Option<String>,
     pub admin_user: Option<String>,
     pub admin_password: Option<String>,
     pub admin_jwt_secret: Vec<u8>,
@@ -93,6 +94,7 @@ impl AppConfig {
             cors_origins: get("FORUM_CORS_ORIGINS")
                 .map(|raw| raw.split(',').map(|s| s.trim().to_string()).filter(|s| !s.is_empty()).collect())
                 .unwrap_or_default(),
+            account_provision_key: get("FORUM_ACCOUNT_PROVISION_KEY").filter(|v| v.len() >= 32),
             admin_user: get("FORUM_ADMIN_USER"),
             admin_password: get("FORUM_ADMIN_PASSWORD"),
             admin_jwt_secret,
@@ -111,3 +113,4 @@ impl AppConfig {
         }
     }
 }
+

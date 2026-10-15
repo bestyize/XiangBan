@@ -75,7 +75,8 @@ pub fn build_router(state: AppState) -> Router {
         .route("/images/{id}", get(images::show))
         .route("/attachments/{id}", get(attachments::download).delete(attachments::delete_pending))
         .route("/attachments/{id}/purchase", post(attachments::purchase))
-        .nest("/admin", admin::routes());
+        .nest("/admin", admin::routes())
+        .nest("/editor", handlers::editor::routes());
 
     // 凭证只走 Authorization 头，不用 Cookie，跨域放开不构成 CSRF 面。
     let origins: Vec<HeaderValue> = state.config.cors_origins.iter().filter_map(|o| o.parse().ok()).collect();
@@ -128,4 +129,5 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     axum::serve(listener, build_router(state).into_make_service_with_connect_info::<SocketAddr>()).await?;
     Ok(())
 }
+
 

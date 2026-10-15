@@ -124,7 +124,7 @@ pub async fn upload(
 }
 
 pub async fn show(State(state): State<AppState>, Path(id): Path<Uuid>) -> AppResult<Response> {
-    let (mime, size): (String, i64) = sqlx::query_as("SELECT mime, size FROM images WHERE id = $1")
+    let (mime, size): (String, i64) = sqlx::query_as("SELECT mime, size FROM images WHERE id = $1 AND NOT editor_pending")
         .bind(id)
         .fetch_optional(&state.pool)
         .await?
@@ -150,6 +150,7 @@ pub async fn purge_unused(pool: &PgPool, dir: &FsPath) -> AppResult<usize> {
          WHERE i.created_at < now() - interval '1 day'
            AND NOT EXISTS (SELECT 1 FROM topics t WHERE position(i.id::text in t.body_md) > 0)
            AND NOT EXISTS (SELECT 1 FROM posts p WHERE position(i.id::text in p.body_md) > 0)
+           AND NOT EXISTS (SELECT 1 FROM editor_draft_assets a WHERE a.image_id = i.id)
          RETURNING i.id",
     )
     .fetch_all(pool)
@@ -181,3 +182,4 @@ mod tests {
         assert_eq!(sniff(b""), None);
     }
 }
+

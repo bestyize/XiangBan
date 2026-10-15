@@ -38,6 +38,8 @@ export const api = {
     if (params.status) query.set('status', params.status);
     return request<UserList>('GET', `/admin/users?${query}`);
   },
+  createUser: (body: { request_id: string; username: string; password: string; avatar_url?: string }) =>
+    request<{ uid: string }>('POST', '/admin/users', body),
   user: (uid: string) => request<UserDetail>('GET', `/admin/users/${uid}`),
   setUserStatus: (uid: string, status: 'active' | 'disabled') =>
     request<{ ok: true }>('POST', `/admin/users/${uid}/status`, { status }),
@@ -64,3 +66,4 @@ export function formatTime(value: string | null): string {
 export function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : '操作失败';
 }
+

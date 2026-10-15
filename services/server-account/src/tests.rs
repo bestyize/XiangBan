@@ -34,9 +34,11 @@ impl Harness {
     async fn new(overrides: &[(&str, &str)]) -> Option<Self> {
         let url = std::env::var("TEST_DATABASE_URL").ok()?;
         let schema = format!("acct_test_{}", Uuid::new_v4().simple());
-        let admin = db::connect(&url, None).await.unwrap();
+        let single = std::env::var("TEST_SINGLE_CONNECTION").as_deref() == Ok("1");
+        let admin = if single {sqlx::postgres::PgPoolOptions::new().max_connections(1).connect(&url).await.unwrap()} else {db::connect(&url, None).await.unwrap()};
         sqlx::query(&format!("CREATE SCHEMA {schema}")).execute(&admin).await.unwrap();
-        let pool = db::connect(&url, Some(&schema)).await.unwrap();
+        let pool = if single {admin.clone()} else {db::connect(&url, Some(&schema)).await.unwrap()};
+        if single {sqlx::raw_sql(&format!("SET search_path TO {schema}")).execute(&pool).await.unwrap();}
 
         let overrides: Vec<(String, String)> = overrides.iter().map(|(k, v)| (k.to_string(), v.to_string())).collect();
         let config = AppConfig::from_lookup(|key| {
@@ -66,6 +68,11 @@ impl Harness {
     }
 
     async fn cleanup(self) {
+        if std::env::var("TEST_SINGLE_CONNECTION").as_deref() == Ok("1") {
+            sqlx::raw_sql(&format!("SET search_path TO public; DROP SCHEMA {} CASCADE; DEALLOCATE ALL",self.schema)).execute(&self.state.pool).await.unwrap();
+            self.state.pool.close().await;
+            return;
+        }
         self.state.pool.close().await;
         sqlx::query(&format!("DROP SCHEMA {} CASCADE", self.schema)).execute(&self.admin).await.unwrap();
     }
@@ -872,5 +879,63 @@ async fn only_an_admin_can_rename_a_user_and_it_is_audited() {
     let (_, audit) = h.call(Method::GET, "/api/admin/audit", admin, Value::Null).await;
     let entry = audit["items"].as_array().unwrap().iter().find(|e| e["action"] == "user.rename").expect("rename is audited");
     assert_eq!(entry["detail"], "Hal_9000 -> Hal_Renamed");
+    h.cleanup().await;
+}
+
+
+#[tokio::test]
+async fn admin_and_scoped_service_create_real_users_without_fake_verified_identities() {
+    let _ = tracing_subscriber::fmt()
+        .with_test_writer()
+        .with_max_level(tracing::Level::ERROR)
+        .try_init();
+    const KEY: &str = "forum-provision-test-key-at-least-32-bytes";
+    let h = harness!(&[("ACCOUNT_FORUM_PROVISION_KEY", KEY)]);
+    let admin = h.admin_token().await;
+    let req = json!({"request_id":Uuid::new_v4(),"username":"EditorAlice","password":PASSWORD,"avatar_url":null});
+    let (status, _) = h.post("/api/admin/users", None, req.clone()).await;
+    assert_eq!(status, StatusCode::UNAUTHORIZED);
+    let (status, created) = h.post("/api/admin/users", Some(&admin), req.clone()).await;
+    assert_eq!(status, StatusCode::OK, "{created}");
+    let (_, retry) = h.post("/api/admin/users", Some(&admin), req.clone()).await;
+    assert_eq!(created["uid"], retry["uid"]);
+    let mut same_name = req.clone();
+    same_name["request_id"] = json!(Uuid::new_v4());
+    let (status, _) = h.post("/api/admin/users", Some(&admin), same_name).await;
+    assert_eq!(status, StatusCode::CONFLICT);
+    let (status, login) = h
+        .post(
+            "/api/auth/password/login",
+            None,
+            json!({"identifier":"editoralice","password":PASSWORD,"client_id":CLIENT}),
+        )
+        .await;
+    assert_eq!(status, StatusCode::OK, "{login}");
+    let (_, me) = h
+        .call(
+            Method::GET,
+            "/api/me",
+            login["access_token"].as_str(),
+            Value::Null,
+        )
+        .await;
+    assert_eq!(me["identities"], json!([]));
+    let service_req = json!({"request_id":Uuid::new_v4(),"username":"EditorBob","password":PASSWORD,"avatar_url":null});
+    let (status, _) = h
+        .post(
+            "/api/internal/forum/users",
+            Some("invalid"),
+            service_req.clone(),
+        )
+        .await;
+    assert_eq!(status, StatusCode::UNAUTHORIZED);
+    let (status, created) = h
+        .post("/api/internal/forum/users", Some(KEY), service_req.clone())
+        .await;
+    assert_eq!(status, StatusCode::OK, "{created}");
+    let (_, retry) = h
+        .post("/api/internal/forum/users", Some(KEY), service_req)
+        .await;
+    assert_eq!(created["uid"], retry["uid"]);
     h.cleanup().await;
 }

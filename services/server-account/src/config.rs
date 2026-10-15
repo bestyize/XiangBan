@@ -51,6 +51,7 @@ pub struct AppConfig {
     pub email_clients: Vec<String>,
     pub clients: Vec<(String, String)>,
     pub sender: SenderConfig,
+    pub forum_provision_key: Option<String>,
     pub admin_user: Option<String>,
     pub admin_password: Option<String>,
     pub admin_token_ttl_secs: i64,
@@ -136,6 +137,7 @@ impl AppConfig {
             },
             clients,
             sender,
+            forum_provision_key: get("ACCOUNT_FORUM_PROVISION_KEY").filter(|v| v.len() >= 32),
             admin_user: get("ACCOUNT_ADMIN_USER"),
             admin_password: get("ACCOUNT_ADMIN_PASSWORD"),
             admin_token_ttl_secs: num("ACCOUNT_ADMIN_TOKEN_TTL_SECS", 8 * 3600),
@@ -145,3 +147,4 @@ impl AppConfig {
         }
     }
 }
+

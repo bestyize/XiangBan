@@ -73,7 +73,7 @@ pub async fn sync_profile(http: &reqwest::Client, account_base: &str, token: &st
     if let Some(me) = me {
         let nickname: String = me.username.trim().chars().take(24).collect();
         if !nickname.is_empty() {
-            let _ = sqlx::query("UPDATE users SET nickname = $2, avatar_url = $3 WHERE uid = $1")
+            let _ = sqlx::query("UPDATE users SET nickname = CASE WHEN EXISTS (SELECT 1 FROM editor_authors e WHERE e.uid = users.uid) THEN nickname ELSE $2 END, avatar_url = $3 WHERE uid = $1")
                 .bind(uid)
                 .bind(nickname)
                 .bind(me.avatar_url.filter(|u| u.starts_with("https://")))
@@ -145,3 +145,4 @@ pub async fn ensure_daily_quota(
     }
     Ok(())
 }
+

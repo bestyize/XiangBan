@@ -202,7 +202,7 @@ pub fn validate_link(url: &str) -> AppResult<()> {
     Ok(())
 }
 
-fn clean_title(raw: &str) -> AppResult<String> {
+pub(super) fn clean_title(raw: &str) -> AppResult<String> {
     let title = raw.split_whitespace().collect::<Vec<_>>().join(" ");
     let len = title.chars().count();
     if !(4..=80).contains(&len) {
@@ -211,7 +211,7 @@ fn clean_title(raw: &str) -> AppResult<String> {
     Ok(title)
 }
 
-fn clean_body(raw: &str, min: usize) -> AppResult<String> {
+pub(super) fn clean_body(raw: &str, min: usize) -> AppResult<String> {
     let body = raw.trim().to_string();
     let len = body.chars().count();
     if len < min || len > 20_000 {
@@ -226,7 +226,7 @@ pub fn normalize_tag(raw: &str) -> Option<String> {
     (!t.is_empty()).then_some(t)
 }
 
-fn clean_tags(raw: &[String]) -> AppResult<Vec<String>> {
+pub(super) fn clean_tags(raw: &[String]) -> AppResult<Vec<String>> {
     let mut tags: Vec<String> = Vec::new();
     for t in raw.iter().filter_map(|t| normalize_tag(t)) {
         if t.chars().count() > 20 {
@@ -621,3 +621,4 @@ mod tests {
         assert!(clean_tags(&(0..6).map(|i| format!("t{i}")).collect::<Vec<_>>()).is_err());
     }
 }
+

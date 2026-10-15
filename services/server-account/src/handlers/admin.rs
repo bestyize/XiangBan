@@ -624,3 +624,106 @@ pub async fn test_sender(
         json!({ "ok": true, "message": "测试邮件已发送，请检查收件箱或垃圾箱" }),
     ))
 }
+
+
+// 站方创建的账号只设置用户名/密码，不伪造已验证的邮箱或手机号。
+#[derive(Deserialize, Serialize)]
+pub struct CreateUserReq {
+    pub request_id: Uuid,
+    pub username: String,
+    pub password: String,
+    pub avatar_url: Option<String>,
+}
+
+async fn insert_user(
+    state: &AppState,
+    req: CreateUserReq,
+    operator: &str,
+) -> Result<Value, AppError> {
+    let name = username::parse(&req.username)?;
+    password::validate(&req.password)?;
+    if req.password.eq_ignore_ascii_case(&name.display) {
+        return Err(AppError::BadRequest("密码不能和用户名相同".into()));
+    }
+    let avatar = req
+        .avatar_url
+        .as_deref()
+        .map(str::trim)
+        .filter(|v| !v.is_empty());
+    if avatar.is_some_and(|v| {
+        !v.starts_with("https://") || v.len() > 512 || v.chars().any(char::is_whitespace)
+    }) {
+        return Err(AppError::BadRequest(
+            "头像需要是不超过 512 字符的 https 地址".into(),
+        ));
+    }
+    let hash = password::hash(req.password).await?;
+    let mut tx = state.pool.begin().await?;
+    // 同一请求重试时返回原 UID，包括账号中心成功、论坛同步失败的情况。
+    sqlx::query("SELECT pg_advisory_xact_lock(hashtextextended($1, 0))")
+        .bind(req.request_id.to_string())
+        .execute(&mut *tx)
+        .await?;
+    let old: Option<(Uuid, String)> =
+        sqlx::query_as("SELECT uid, username_key FROM users WHERE provision_request_id = $1")
+            .bind(req.request_id)
+            .fetch_optional(&mut *tx)
+            .await?;
+    if let Some((uid, key)) = old {
+        if key != name.key {
+            return Err(AppError::BadRequest("这个请求编号已用于其他用户名".into()));
+        }
+        tx.commit().await?;
+        return Ok(json!({"uid": uid, "username": name.display, "avatar_url": avatar}));
+    }
+    let (taken,): (bool,) =
+        sqlx::query_as("SELECT EXISTS(SELECT 1 FROM users WHERE username_key=$1)")
+            .bind(&name.key)
+            .fetch_one(&mut *tx)
+            .await?;
+    if taken {
+        return Err(users::username_taken());
+    }
+    let uid = Uuid::new_v4();
+    sqlx::query("INSERT INTO users (uid, username, username_key, password_hash, avatar_url, provision_request_id) VALUES ($1,$2,$3,$4,$5,$6)")
+        .bind(uid).bind(&name.display).bind(&name.key).bind(hash).bind(avatar).bind(req.request_id)
+        .execute(&mut *tx).await.map_err(|e| {
+            if e.as_database_error().is_some_and(|e| e.is_unique_violation()) { users::username_taken() } else { e.into() }
+        })?;
+    sqlx::query("INSERT INTO admin_audit (admin_username, action, target, detail) VALUES ($1,'user.create',$2,$3)")
+        .bind(operator).bind(uid.to_string()).bind(&name.display).execute(&mut *tx).await?;
+    tx.commit().await?;
+    Ok(json!({"uid": uid, "username": name.display, "avatar_url": avatar}))
+}
+
+pub async fn create_user(
+    State(state): State<AppState>,
+    AuthAdmin(admin): AuthAdmin,
+    Json(req): Json<CreateUserReq>,
+) -> Result<Json<Value>, AppError> {
+    insert_user(&state, req, &admin.username).await.map(Json)
+}
+
+pub async fn provision_forum_user(
+    State(state): State<AppState>,
+    headers: axum::http::HeaderMap,
+    Json(req): Json<CreateUserReq>,
+) -> Result<Json<Value>, AppError> {
+    let expected = state
+        .config
+        .forum_provision_key
+        .as_deref()
+        .ok_or_else(|| AppError::Forbidden("论坛账号创建通道未配置".into()))?;
+    let supplied = headers
+        .get(axum::http::header::AUTHORIZATION)
+        .and_then(|v| v.to_str().ok())
+        .and_then(|v| v.strip_prefix("Bearer "))
+        .unwrap_or("");
+    let key = ring::hmac::Key::new(ring::hmac::HMAC_SHA256, b"forum-provision-auth-v1");
+    let expected_tag = ring::hmac::sign(&key, expected.as_bytes());
+    ring::hmac::verify(&key, supplied.as_bytes(), expected_tag.as_ref())
+        .map_err(|_| AppError::Unauthorized("无效的服务凭据".into()))?;
+    insert_user(&state, req, "forum-provisioner")
+        .await
+        .map(Json)
+}

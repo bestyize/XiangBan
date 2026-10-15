@@ -27,6 +27,13 @@ export const CATEGORY_KIND: Record<string, string> = { deal: '羊毛', normal: '
 /** 操作日志里的动作码对应的中文说明，未收录的原样显示。 */
 export const AUDIT_ACTIONS: Record<string, string> = {
   'admin.login': '登录后台',
+  'editor.author.create': '创建编辑账号',
+  'editor.author.bind': '绑定编辑账号',
+  'editor.token.create': '创建创作令牌',
+  'editor.token.revoke': '撤销创作令牌',
+  'editor.draft.save': '保存导入稿件',
+  'editor.draft.delete': '删除待发布稿',
+  'editor.publish': '发布导入稿件',
   'admin.password_change': '修改密码',
   'report.resolve': '处理举报',
   'report.dismiss': '驳回举报',
@@ -53,6 +60,7 @@ export const AUDIT_ACTIONS: Record<string, string> = {
 
 export const AUDIT_TARGETS: Record<string, string> = {
   admin: '管理员',
+  editor: '站方创作',
   report: '举报',
   topic: '帖子',
   post: '回复',

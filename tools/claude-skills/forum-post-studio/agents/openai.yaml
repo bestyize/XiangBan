@@ -1,0 +1,4 @@
+interface:
+  display_name: "论坛图文创作"
+  short_description: "为超级小伴论坛选题、创作图文 Markdown、导入和发布帖子"
+  default_prompt: "为论坛规划选题并创作图文帖子，导入待发布列表。"

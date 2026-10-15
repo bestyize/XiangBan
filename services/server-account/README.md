@@ -140,3 +140,10 @@ cargo run --manifest-path services/server-account/Cargo.toml -- gen-keys
 - 管理后台没有登录 IP 限流，只有账号级锁定；公网暴露时建议在 Nginx 层限制 `/admin/` 与 `/api/admin/` 的来源或加访问限流。
 - 暂无托管登录页与 OIDC 授权码 + PKCE 流程；v1 由各客户端直接调用上述接口。桌面与 Android 端若不想自带登录表单，再补授权端点。
 - 密码修改（已登录状态下）不会吊销其他设备的会话，忘记密码重置才会。
+
+
+## 后台创建用户与论坛编辑账号
+
+用户页新增“创建用户”，管理接口为 `POST /api/admin/users`：`{request_id,username,password,avatar_url?}`。`request_id` 是客户端生成并在失败重试时保留的 UUID。沿用用户名和密码规则；用户名不区分大小写唯一，密码仍用 Argon2 存储，创建和审计在同一事务中完成。相同请求重试返回原 UID，不生成重复账号。账号可用用户名和密码正常登录，未绑定任何邮箱/手机号，可在登录后自行完成验证绑定。
+
+给论坛后台使用的专用建号通道为 `POST /api/internal/forum/users`，请求体相同。设置 `ACCOUNT_FORUM_PROVISION_KEY`（至少 32 字节随机值）后，以同值 Bearer 凭据调用；论坛配置项为 `FORUM_ACCOUNT_PROVISION_KEY`。未配置默认关闭，该凭据只能创建普通用户，不能管理其他用户或签发用户会话。账号中心管理员令牌与论坛管理员令牌仍不通用。

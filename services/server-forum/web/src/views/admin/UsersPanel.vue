@@ -55,6 +55,7 @@ onMounted(list.load)
 </script>
 
 <template>
+  <p class="adm-sub">需要创建发帖账号？前往 <RouterLink to="/admin/editor-accounts">编辑账号</RouterLink>，也可以将这里的已有用户绑定为编辑。</p>
   <div class="adm-toolbar">
     <form @submit.prevent="list.search()">
       <input v-model="q" class="input" placeholder="搜索昵称或完整 uid" aria-label="搜索用户" />

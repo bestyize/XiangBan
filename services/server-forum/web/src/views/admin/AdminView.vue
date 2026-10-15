@@ -9,6 +9,8 @@ import OverviewPanel from './OverviewPanel.vue'
 import ReportsPanel from './ReportsPanel.vue'
 import TopicsPanel from './TopicsPanel.vue'
 import UsersPanel from './UsersPanel.vue'
+import EditorPanel from './EditorPanel.vue'
+import EditorAccounts from './EditorAccounts.vue'
 import CategoriesPanel from './CategoriesPanel.vue'
 import AuditPanel from './AuditPanel.vue'
 import AccountPanel from './AccountPanel.vue'
@@ -20,6 +22,8 @@ const SECTIONS = [
   { key: 'reports', label: '举报', comp: ReportsPanel },
   { key: 'topics', label: '帖子', comp: TopicsPanel },
   { key: 'users', label: '用户', comp: UsersPanel },
+  { key: 'editor-accounts', label: '编辑账号', comp: EditorAccounts },
+  { key: 'editor', label: '批量发帖', comp: EditorPanel },
   { key: 'categories', label: '分类', comp: CategoriesPanel },
   { key: 'audit', label: '操作日志', comp: AuditPanel },
   { key: 'account', label: '账号', comp: AccountPanel },

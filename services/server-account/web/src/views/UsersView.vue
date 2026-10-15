@@ -3,7 +3,9 @@ import { computed, onMounted, ref, watch } from 'vue';
 import { api, errorMessage, formatTime } from '../api';
 import type { UserList } from '../types';
 import UserDrawer from '../components/UserDrawer.vue';
+import CreateUserDialog from '../components/CreateUserDialog.vue';
 
+const creating = ref(false);
 const query = ref('');
 const status = ref('');
 const page = ref(1);
@@ -51,7 +53,7 @@ function go(delta: number) {
 </script>
 
 <template>
-  <div class="page-head"><h2>用户</h2></div>
+  <div class="page-head"><h2>用户</h2><button class="btn primary" @click="creating = true">创建用户</button></div>
 
   <div class="toolbar">
     <input v-model="query" class="input" type="search" aria-label="搜索用户" placeholder="用户名 / 完整邮箱 / 完整手机号 / UID" />
@@ -91,6 +93,7 @@ function go(delta: number) {
     <button type="button" class="btn small" :disabled="page >= pageCount || loading" @click="go(1)">下一页</button>
   </div>
 
+  <CreateUserDialog v-if="creating" @close="creating = false" @created="creating = false; load()" />
   <UserDrawer v-if="selected" :uid="selected" @close="selected = null" @changed="load" />
 </template>
 
@@ -98,3 +101,4 @@ function go(delta: number) {
 .ident { white-space: nowrap; }
 .pager { display: flex; align-items: center; justify-content: flex-end; gap: 12px; margin-top: 14px; }
 </style>
+

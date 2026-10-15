@@ -95,3 +95,33 @@ cargo test --manifest-path services/server-forum/Cargo.toml
 - 账号中心还没有用户自助注销，设置页提示发邮件处理。
 - SEO 页面只渲染第一页（30-50 条），sitemap 每次请求实时查询，没有进程内缓存。
 - 部署：香港机 `/home/ubuntu/xiangban-forum`，systemd 服务 `server-forum`，监听 127.0.0.1:55010，Nginx 反代 chat.xiangban.xyz（Let's Encrypt），库 `xiaban_forum` 在 `wallpaper_postgres` 容器里，独立角色 `forum`。账号中心已登记 `forum-web` 并在 `ACCOUNT_CORS_ORIGINS` 加入 `https://chat.xiangban.xyz`。初始管理员密码在服务器 `.env` 的 `FORUM_ADMIN_PASSWORD`，登录 /admin 改密码后删掉它。更新时本地交叉编译后替换二进制和 `web/dist`，再重启服务（index.html 启动时读一次）。
+
+## 站方图文创作与批量发帖
+
+后台新增 `/admin/editor-accounts`（编辑账号与本地令牌）和 `/admin/editor`（批量发帖）。统一账号中心后台的用户页也支持“创建用户”。站方账号用用户名和密码正常登录，不会被自动标为拥有已验证邮箱/手机号，后续可自行绑定。
+
+- **创建新编辑账号**：账号中心设置 `ACCOUNT_FORUM_PROVISION_KEY`、论坛设置相同的 `FORUM_ACCOUNT_PROVISION_KEY`（至少 32 字节随机值，例如本机 `openssl rand -hex 32` 生成）。两项都是服务端环境变量，不写进前端或本地 Skill。账号中心与论坛均需更新并重启。论坛通过受限的 `/api/internal/forum/users` 建号；该凭据不能管理已有用户或获取用户会话。
+- **绑定已有账号**：用户先正常登录过论坛，再在编辑账号页填 UID 绑定；须为正常状态且至少 TL1。绑定后论坛展示名作为编辑资料保留，不被登录同步覆盖。官方板块仍要求 TL3，批量发布重新核对作者状态和板块权限。
+- **导入**：每篇 `.md` 带 YAML 元信息 `id/title/category/tags`，图片放在该文件旁的 `images/` 并用相对路径引用。`category` 使用真实 slug。一个 ZIP 可含 1–50 篇；单个 `.md` 用于纯文字稿。ZIP 不超过 100 MB，解压后不超过 80 MB、最多 500 个内容文件。每篇最多 20 张图片、共 20 MB；后台上传适配默认每张 5 MB 的限制。浏览器解包，逐篇调用同一导入接口；可选择作者、覆盖板块、更新已有待发布稿。部分失败不回滚成功项。
+- **待发布稿**：导入不产生前台帖子。稿件与图片随数据库/上传目录一起持久化；图片清理任务会保留稿件引用的图片，待发布图片公开接口返回 404。编辑预览通过鉴权接口返回内嵌配图，使用论坛同一 Markdown 渲染器。保存后才更新预览。
+- **发布与去重**：同作者下稿件 `id` 唯一；默认拒绝重复导入，显式覆盖只允许更新待发布稿。逐篇发布在事务中写正文、标签、分类扩展、图片公开状态和记录，再返回正式链接；重试相同稿件只返回已有帖子。已发布稿不能通过再次导入覆盖，走论坛原有编辑入口。发布的是公开帖，暂不提供付费附件、阅读等级、定时发布及羊毛扩展字段；羊毛稿可正常发文，额外信息走现有编辑入口。
+- **权限与审计**：站方专用通道不受普通用户每日发帖/图片次数限制，但保留作者禁言封禁、最低等级和板块权限检查，所有导入/发布写后台审计。不会因导入或发布额外发注册、签到积分，不制造点赞或浏览量。
+- **创作令牌**：后台生成，仅显示一次，固定绑定一个作者；默认只允许导入，可选直接发布，有效期 1–365 天，可撤销。令牌不能访问管理接口，不存明文；签名使用 `FORUM_ADMIN_JWT_SECRET`，生产必须稳定配置，改密钥会让全部创作令牌失效。
+
+本地 Claude Skill 位于 [`tools/claude-skills/forum-post-studio`](../../tools/claude-skills/forum-post-studio)，将完整目录复制到 `~/.claude/skills/`，按其中引用说明安装依赖，设置 `FORUM_EDITOR_TOKEN`，即可选题、创作、打包、导入并按授权发布。`FORUM_URL` 默认 `https://chat.xiangban.xyz`。帖子目录只放 Markdown 和图片，报告放目录外。
+
+API：
+
+| 路径 | 凭据与用途 |
+| --- | --- |
+| `GET/POST /api/admin/editor/authors` | 管理员：列出/创建编辑账号 |
+| `POST /api/admin/editor/authors/bind` | 管理员：绑定已有论坛用户 |
+| `GET/POST /api/admin/editor/tokens`、`DELETE /api/admin/editor/tokens/{id}` | 管理员：生成、查看元数据、撤销本地令牌 |
+| `GET /api/editor/context` | 管理员或创作令牌：板块、作者及权限 |
+| `GET/POST /api/editor/drafts` | 分页列表/导入结构化稿件（浏览器和 CLI 负责 ZIP/YAML 解析） |
+| `GET/DELETE /api/editor/drafts/{id}` | 读取带配图的预览/删除未发布稿 |
+| `POST /api/editor/drafts/{id}/publish` | 发布；限定令牌需拥有发布权限 |
+
+结构化导入包含 `author_uid/external_id/title/category/body/tags/images`，其中 `images` 是 `{path,data_base64}` 列表（仅用于传输，正式 Markdown 仍是站内 URL）。更新需传 `overwrite:true`，后台编辑还带 `expected_updated_at` 防止覆盖并发修改。单请求上限 30 MiB。生产 Nginx 应给 `/api/editor/drafts` 放宽 `client_max_body_size 31m`，否则图文包可能被代理拒绝；其他上传接口限制不变。
+
+验证：`npm --prefix services/server-forum/web run test:post-bundle`、`python -m unittest discover -s tools/claude-skills/forum-post-studio/scripts -p 'test_*.py'`。数据库回归：设置隔离的 `TEST_DATABASE_URL` 后执行 `cargo test --locked --manifest-path services/server-forum/Cargo.toml handlers::editor`，涵盖作者隔离、令牌撤销、待发布图片私有性、图片保留及重复发布；账号创建回归在账号服务 `admin_and_scoped_service_create_real_users_without_fake_verified_identities` 测试中。
