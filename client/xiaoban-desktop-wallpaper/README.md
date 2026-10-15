@@ -200,10 +200,10 @@ Mac 实机还需检查：原角色的发光与连续表情、桌宠拖动、空�
 
 ## SenseVoice Small 本地语音识别
 
-聊天输入框的麦克风开关与设置 → 声音 →「语音识别」共用设置，默认关闭。首次开启提示加载引擎，从魔搭社区下载 SenseVoice Small 的 sherpa-onnx INT8 导出（模型与词表共约 229 MiB），显示进度并校验固定大小及 SHA-256。模型不随安装包分发；保存至用户数据根目录的 `asr/model.int8.onnx` 与 `asr/tokens.txt`，开关保存于 `config/asr.json`。关闭时停止采集、丢弃未完成识别并释放引擎，保留完整模型，下次开启离线复用；下载中断、校验失败及权限错误可重试。
+设置 → 声音 →「语音识别」是全局能力开关，默认关闭；聊天页麦克风仅控制当前会话的本次录音，不持久化。设置页开启只准备引擎；聊天页手动点击麦克风时也可首次启用识别能力。首次开启提示加载引擎，从魔搭社区下载 SenseVoice Small 的 sherpa-onnx INT8 导出（模型与词表共约 229 MiB），显示进度并校验固定大小及 SHA-256。模型不随安装包分发；保存至用户数据根目录的 `asr/model.int8.onnx` 与 `asr/tokens.txt`，开关保存于 `config/asr.json`。关闭时停止采集、丢弃未完成识别并释放引擎，保留完整模型，下次开启离线复用；下载中断、校验失败及权限错误可重试。
 
 下载源为 `https://modelscope.cn/models/pengzhendong/sherpa-onnx-sense-voice-zh-en-ja-ko-yue`，固定版本 `73eca47697f980daa3d16112404174b6b950b514`，由 `iic/SenseVoiceSmall` 导出。推理使用 `sherpa-onnx` Rust 静态库和 CPU；构建时需要下载对应平台的原生推理库（可通过 `SHERPA_ONNX_ARCHIVE_DIR` 或 `SHERPA_ONNX_LIB_DIR` 使用本地库），无需用户安装 Python。
 
-只在聊天页位于前台且模型已配置时申请麦克风权限；设置页开启只准备引擎。语音在本机转成文字并追加到输入框，由用户确认后发送。离开聊天、切换会话、窗口失焦、发送消息或朗读回复时停止采集，避免误录和旧结果进入其他会话。采集使用 AudioWorklet，转为 16kHz 单声道，按短暂停顿分句（每段最多 20 秒）；音频仅驻留内存，不写文件、不上传语音服务。macOS 安装包包含麦克风用途说明。
+只在用户手动开启本次录音、聊天页位于前台且模型已配置时申请麦克风权限。进入、切换、新建或返回会话均保持录音关闭；发送消息、离开聊天、窗口失焦或开始朗读会结束本次录音，之后不自动恢复。下载过程中切换会话可继续准备模型，完成后等待用户重新点击麦克风。语音在本机转成文字并追加到输入框，由用户确认后发送。离开聊天、切换会话、窗口失焦、发送消息或朗读回复时停止采集，避免误录和旧结果进入其他会话。采集使用 AudioWorklet，转为 16kHz 单声道，按短暂停顿分句（每段最多 20 秒）；音频仅驻留内存，不写文件、不上传语音服务。macOS 安装包包含麦克风用途说明。
 
 针对性验证：`npx vitest run src/ui/asr src/ui/pages/ChatPage.test.ts src/ui/speech/speech.test.ts`、`npx vue-tsc --noEmit`。原生测试位于 `src-tauri/src/asr/engine.rs`；Windows/macOS 仍需实机确认麦克风授权、录音及系统音频设备兼容性。

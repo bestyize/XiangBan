@@ -60,12 +60,18 @@ const thinking = computed(() => {
 });
 const statusLine = computed(() => view.value?.status || (waiting.value ? '等你确认后继续' : thinking.value ? '思考中…' : ''));
 
-const microphoneAllowed = computed(() => !!asr?.enabled && asr.ready && !asr.saving && foreground.value && chat.configured && !running.value && (!props.store.speech || props.store.speech.status === 'idle'));
-watch([microphoneAllowed, () => chat.currentId], ([allowed]) => {
-  asr?.deactivate();
-  if (allowed) asr?.activate(text => { draft.value += (draft.value && !/\s$/.test(draft.value) ? ' ' : '') + text; });
-}, { immediate: true });
+const microphoneAllowed = computed(() => foreground.value && chat.configured && !running.value && (!props.store.speech || props.store.speech.status === 'idle'));
+watch(() => chat.currentId, () => asr?.deactivate(), { flush: 'sync' });
+watch(microphoneAllowed, allowed => { if (!allowed) asr?.deactivate(); }, { flush: 'sync' });
+watch(() => props.store.page, page => { if (page !== 'chat') asr?.deactivate(); }, { flush: 'sync' });
+function toggleVoice() {
+  if (!asr) return;
+  if (asr.recordingRequested) { asr.deactivate(); return; }
+  if (!microphoneAllowed.value || props.store.page !== 'chat') return;
+  void asr.activate(text => { draft.value += (draft.value && !/\s$/.test(draft.value) ? ' ' : '') + text; });
+}
 onMounted(() => {
+  asr?.deactivate();
   void asr?.init();
   document.addEventListener('visibilitychange', updateVisibility);
   window.addEventListener('blur', blurChat); window.addEventListener('focus', focusChat);
@@ -102,6 +108,7 @@ watch(signature, async (value, before) => {
 async function submit() {
   const text = draft.value.trim();
   if ((!text && !attachments.value.length) || !canSend.value) return;
+  asr?.deactivate();
   const images = [...attachments.value];
   const kept = text;
   draft.value = '';
@@ -173,9 +180,9 @@ function onKeydown(event: KeyboardEvent) {
   void submit();
 }
 const useExample = (text: string) => { draft.value = text; };
-const continueAnswer = () => { stick.value = true; void chat.send(CONTINUE_TEXT); };
+const continueAnswer = () => { asr?.deactivate(); stick.value = true; void chat.send(CONTINUE_TEXT); };
 
-const choose = (id: string | null) => { confirmingId.value = ''; void chat.select(id); };
+const choose = (id: string | null) => { asr?.deactivate(); confirmingId.value = ''; void chat.select(id); };
 async function remove(id: string) { confirmingId.value = ''; await chat.remove(id); }
 function openSettings() { modelDialog.value = false; props.store.settingsTab = 'ai'; props.store.navigate('settings'); }
 
@@ -357,7 +364,7 @@ async function openLink(href: string) {
 
       <footer class="composer" @compositionstart="composing = true" @compositionend="composing = false" @paste="onPaste">
         <div class="composer-box" :class="{ 'has-attachments': attachments.length > 0 }">
-          <AsrStatus v-if="asr" :asr="asr" />
+          <AsrStatus v-if="asr" :asr="asr" chat />
           <div v-if="attachments.length" class="attachments" data-testid="chat-attachments">
             <div v-for="(url, n) in attachments" :key="n" class="thumb">
               <img :src="url" :alt="`待发送的第 ${n + 1} 张图片`" :data-testid="`chat-attachment-${n}`" @click="preview = url" />
@@ -368,7 +375,7 @@ async function openLink(href: string) {
           <div class="composer-row">
             <input ref="filePicker" type="file" accept="image/png,image/jpeg,image/gif,image/webp" multiple hidden data-testid="chat-image-input" @change="onPick" />
             <NButton quaternary circle size="small" data-testid="chat-pick-image" aria-label="选择图片" :disabled="!store.desktop || !chat.configured || running || attachments.length >= MAX_IMAGES" @click="openPicker"><template #icon><ImagePlus :size="16" /></template></NButton>
-            <NButton v-if="asr" :type="asr.enabled ? 'primary' : 'default'" :quaternary="!asr.enabled" circle size="small" data-testid="chat-asr-toggle" :aria-label="asr.enabled ? '关闭语音识别' : '开启语音识别'" :aria-pressed="asr.enabled" :title="asr.enabled ? '关闭语音识别' : '开启本地语音识别'" :disabled="!store.desktop || !asr.ready || asr.saving" :loading="asr.saving" @click="asr.setEnabled(!asr.enabled)"><template #icon><Mic v-if="asr.enabled" :size="16" /><MicOff v-else :size="16" /></template></NButton>
+            <NButton v-if="asr" :type="asr.listening ? 'primary' : 'default'" :quaternary="!asr.listening" circle size="small" data-testid="chat-asr-toggle" :aria-label="asr.recordingRequested ? '停止语音输入' : '开始语音输入'" :aria-pressed="asr.recordingRequested" :title="asr.recordingRequested ? '停止本次语音输入' : '开始本次语音输入'" :disabled="!store.desktop || !asr.ready || (!asr.recordingRequested && (!microphoneAllowed || asr.saving))" @click="toggleVoice"><template #icon><Mic v-if="asr.recordingRequested" :size="16" /><MicOff v-else :size="16" /></template></NButton>
             <NInput v-model:value="draft" type="textarea" :autosize="{ minRows: 1, maxRows: 8 }" :disabled="!store.desktop || !chat.configured" :placeholder="chat.configured ? '问点什么，或者交给小伴去办（Enter 发送，Shift+Enter 换行，可直接粘贴图片）' : '先到设置里配置模型'" data-testid="chat-input" @keydown="onKeydown" />
             <NButton v-if="running" type="error" circle data-testid="chat-stop" aria-label="停止" @click="chat.cancel()"><template #icon><Square :size="14" /></template></NButton>
             <NButton v-else type="primary" circle data-testid="chat-send" aria-label="发送" :disabled="!canSend" @click="submit"><template #icon><SendHorizontal :size="16" /></template></NButton>

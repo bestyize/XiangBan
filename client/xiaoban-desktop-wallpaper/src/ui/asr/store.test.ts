@@ -51,12 +51,22 @@ describe('local ASR lifecycle', () => {
   });
   it('surfaces microphone permission errors and permits retry', async () => {
     const h = setup({ enabled: true, deny: true }); h.store.activate(vi.fn()); await flushPromises();
-    expect(h.store.listening).toBe(false); expect(h.store.error).toContain('麦克风');
+    expect(h.store.listening).toBe(false); expect(h.store.recordingRequested).toBe(false); expect(h.store.error).toContain('麦克风');
     await h.store.retry(); expect(h.capture).toHaveBeenCalledTimes(2); h.store.dispose();
   });
   it('reports a model download failure without opening the microphone', async () => {
     const h = setup({ enabled: true, prepare: async () => { throw new Error('魔搭下载中断'); } });
     h.store.activate(vi.fn()); await flushPromises(); expect(h.store.error).toBe('魔搭下载中断');
     expect(h.store.preparing).toBe(false); expect(h.capture).not.toHaveBeenCalled(); h.store.dispose();
+  });
+  it('closes a late microphone grant without affecting a subsequent recording', async () => {
+    const h = setup({ enabled: true });
+    const lateStop = vi.fn(); const grant = deferred<{ stop: typeof lateStop }>();
+    h.capture.mockImplementationOnce(() => grant.promise);
+    const pending = h.store.activate(vi.fn()); await flushPromises();
+    h.store.deactivate(); await h.store.activate(vi.fn()); expect(h.store.listening).toBe(true);
+    grant.resolve({ stop: lateStop }); await pending;
+    expect(lateStop).toHaveBeenCalledOnce(); expect(h.store.listening).toBe(true);
+    expect(h.store.recordingRequested).toBe(true); expect(h.stop).not.toHaveBeenCalled(); h.store.dispose();
   });
 });

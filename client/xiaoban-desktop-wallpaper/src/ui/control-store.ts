@@ -48,7 +48,7 @@ export function createControlStore(notify: ControlStore["notify"]): ControlStore
     account: null,
     showLoginModal: false,
     page: "wallpapers", settingsTab: "general", asr: createAsrStore({ desktop, invoke, listen, notify }), speech: createSpeechStore({ desktop, invoke, notify }), chat: createChatStore({ desktop, invoke, listen, notify,
-      onActivity: () => { void store.speech.stop(); },
+      onActivity: () => { store.asr.deactivate(); void store.speech.stop(); },
       onReply: (session, text, key) => { if (store.page === 'chat' && store.speech.settings.autoRead && document.visibilityState !== 'hidden') void store.speech.speak(text, key ?? 'auto:' + session, undefined, true); },
     }), ready: false, initialError: "", desktop, notify,
     navigate(page) { if (store.page !== page) { void store.speech.stop(); store.asr.deactivate(); } store.page = page; },

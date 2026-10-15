@@ -2,7 +2,7 @@
 import { computed } from 'vue';
 import { NButton, NProgress } from 'naive-ui';
 import type { AsrStore } from '../asr/store.ts';
-const props = defineProps<{ asr: AsrStore }>();
+const props = defineProps<{ asr: AsrStore; chat?: boolean }>();
 const percent = computed(() => Math.min(100, Math.floor(props.asr.downloaded / Math.max(1, props.asr.total) * 100)));
 </script>
 <template>
@@ -15,7 +15,8 @@ const percent = computed(() => Math.min(100, Math.floor(props.asr.downloaded / M
     <template v-else-if="asr.error"><span class="asr-error">{{ asr.error }}</span><NButton v-if="asr.enabled" size="tiny" :disabled="asr.saving" data-testid="asr-retry" @click="asr.retry()">重试</NButton></template>
     <span v-else-if="asr.recognizing">正在本地识别…</span>
     <span v-else-if="asr.listening">正在听你说话，停顿后转为文字，确认后发送。</span>
-    <span v-else-if="asr.enabled">{{ asr.modelReady ? '本地模型已保存，进入聊天即可语音输入。' : '语音识别已开启，进入聊天将加载本地引擎。' }}</span>
+    <span v-else-if="asr.recordingRequested">正在准备麦克风，请稍后…</span>
+    <span v-else-if="asr.enabled">{{ chat ? '点击麦克风开始本次语音输入。' : '语音识别已启用，录音需在聊天中点击麦克风；关闭录音会保留模型。' }}</span>
   </div>
 </template>
 <style scoped>

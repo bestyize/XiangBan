@@ -13,9 +13,11 @@ export interface AsrDeps {
 }
 export interface AsrStore extends HostStatus {
   ready: boolean; saving: boolean; preparing: boolean; listening: boolean; recognizing: boolean;
+  /** Temporary user intent for the current conversation; never persisted. */
+  recordingRequested: boolean;
   phase: 'idle' | 'downloading' | 'loading'; downloaded: number; total: number; error: string;
   init(): Promise<void>; setEnabled(enabled: boolean): Promise<void>; prepare(): Promise<boolean>;
-  activate(onText: (text: string) => void): void; deactivate(): void; retry(): Promise<void>; dispose(): void;
+  activate(onText: (text: string) => void): Promise<void>; deactivate(): void; retry(): Promise<void>; dispose(): void;
 }
 const message = (error: unknown) => error instanceof Error ? error.message : String(error);
 export function createAsrStore(deps: AsrDeps): AsrStore {
@@ -31,9 +33,9 @@ export function createAsrStore(deps: AsrDeps): AsrStore {
   let starting: number | undefined;
   function stopCapture() {
     recording++; starting = undefined; capture?.stop(); capture = undefined; queue = [];
-    store.listening = false; store.recognizing = false;
+    store.recordingRequested = false; store.listening = false; store.recognizing = false;
   }
-  function fail(error: unknown) { store.error = message(error); deps.notify(store.error, 'error'); }
+  function fail(error: unknown) { stopCapture(); store.error = message(error); deps.notify(store.error, 'error'); }
   async function drain(ticket: number) {
     if (draining) return;
     draining = true;
@@ -44,7 +46,7 @@ export function createAsrStore(deps: AsrDeps): AsrStore {
         const text = await deps.invoke<string>('asr_transcribe', { samples: Array.from(audio) });
         if (ticket === recording && store.enabled && !disposed && text.trim()) receiver?.(text.trim());
       }
-    } catch (e) { if (ticket === recording && !disposed) { stopCapture(); fail(e); } }
+    } catch (e) { if (ticket === recording && !disposed) fail(e); }
     finally {
       draining = false;
       if (ticket === recording) store.recognizing = false;
@@ -52,7 +54,7 @@ export function createAsrStore(deps: AsrDeps): AsrStore {
     }
   }
   async function start() {
-    if (!receiver || disposed || !store.enabled || !store.engineReady || capture || starting !== undefined) return;
+    if (!receiver || !store.recordingRequested || disposed || !store.enabled || !store.engineReady || capture || starting !== undefined) return;
     const ticket = recording;
     starting = ticket;
     const segmenter = new UtteranceSegmenter();
@@ -61,16 +63,16 @@ export function createAsrStore(deps: AsrDeps): AsrStore {
         if (ticket !== recording || disposed) return;
         const audio = segmenter.push(frame);
         if (!audio) return;
-        if (queue.length >= 3) { stopCapture(); fail('语音处理暂时跟不上，请稍后点击重试'); return; }
+        if (queue.length >= 3) { fail('语音处理暂时跟不上，请稍后点击重试'); return; }
         queue.push(audio); void drain(ticket);
-      }, error => { if (ticket === recording && !disposed) { stopCapture(); fail(error); } });
+      }, error => { if (ticket === recording && !disposed) fail(error); });
       if (ticket !== recording || disposed || !receiver || !store.enabled) { microphone.stop(); return; }
       capture = microphone; store.listening = true; store.error = '';
     } catch (e) { if (ticket === recording && !disposed) fail(e); }
     finally { if (starting === ticket) starting = undefined; }
   }
   const store: AsrStore = reactive({
-    ready: false, enabled: false, modelReady: false, engineReady: false, saving: false, preparing: false,
+    ready: false, enabled: false, modelReady: false, engineReady: false, saving: false, preparing: false, recordingRequested: false,
     listening: false, recognizing: false, phase: 'idle', downloaded: 0, total: 239549735, error: '',
     init() {
       initialization ??= (async () => {
@@ -93,7 +95,8 @@ export function createAsrStore(deps: AsrDeps): AsrStore {
       await store.init();
       if (disposed || store.saving) return;
       const ticket = ++generation;
-      stopCapture(); store.error = ''; store.saving = true;
+      if (!enabled) store.deactivate();
+      store.error = ''; store.saving = true;
       // Flip immediately so closing a download cancels its UI and never restarts the microphone.
       const before = store.enabled; store.enabled = enabled;
       try {
@@ -102,7 +105,7 @@ export function createAsrStore(deps: AsrDeps): AsrStore {
         Object.assign(store, value);
       } catch (e) { if (ticket === generation && !disposed) { store.enabled = before; fail(e); } }
       finally { if (ticket === generation) store.saving = false; }
-      if (enabled && store.enabled && ticket === generation && !store.error) { await store.prepare(); await start(); }
+      if (enabled && store.enabled && ticket === generation && !store.error) await store.prepare();
     },
     prepare() {
       if (preparing) return prepareGeneration === generation ? preparing : preparing.then(() => store.prepare());
@@ -127,12 +130,22 @@ export function createAsrStore(deps: AsrDeps): AsrStore {
       })();
       return preparing;
     },
-    activate(onText) {
-      receiver = onText;
-      void (async () => { await store.init(); if (store.enabled && !store.saving && !disposed) { if (await store.prepare()) await start(); } })();
+    async activate(onText) {
+      if (!deps.desktop || disposed) return;
+      store.deactivate(); receiver = onText; store.recordingRequested = true;
+      const ticket = recording;
+      await store.init();
+      if (ticket !== recording || disposed) return;
+      if (!store.enabled) await store.setEnabled(true);
+      if (ticket !== recording || disposed || !store.enabled || store.saving) return;
+      if (await store.prepare()) { if (ticket === recording && !disposed) await start(); }
     },
     deactivate() { receiver = undefined; stopCapture(); },
-    async retry() { store.error = ''; if (await store.prepare()) await start(); },
+    async retry() {
+      store.error = '';
+      if (receiver) await store.activate(receiver);
+      else await store.prepare();
+    },
     dispose() { disposed = true; generation++; receiver = undefined; stopCapture(); unlisten?.(); },
   });
   return store;

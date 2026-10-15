@@ -19,7 +19,7 @@ onMounted(() => { void speech.init(); void asr.init(); });
   <section class="surface voice-settings" data-testid="voice-settings">
     <div class="section-heading"><div><h2>小伴的声音</h2><p>Edge TTS 在线合成语音，需联网，无需填写语音服务 Key。</p></div></div>
     <NAlert v-if="!store.desktop" type="info" :show-icon="false">请在桌面应用中设置声音。</NAlert>
-    <div class="setting-row"><div><b>语音识别</b><p>SenseVoice Small 本地识别，语音转成文字后可在聊天中确认发送。首次开启从魔搭下载约 229 MiB 模型，关闭后保留。</p></div>
+    <div class="setting-row"><div><b>语音识别</b><p>开启本地识别能力，录音需在聊天中手动点击麦克风。首次开启从魔搭下载约 229 MiB 模型，关闭后保留。</p></div>
       <NSwitch :value="asr.enabled" :disabled="!store.desktop || !asr.ready || asr.saving" :loading="asr.saving" data-testid="asr-settings-switch" @update:value="value => asr.setEnabled(value)" />
     </div>
     <AsrStatus :asr="asr" />
