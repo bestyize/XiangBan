@@ -13,7 +13,7 @@ use std::{
 };
 use tauri::{Emitter, Manager};
 
-pub const PROTOCOLS: &[&str] = &["chat", "responses", "anthropic"];
+pub const PROTOCOLS: &[&str] = &["responses", "chat", "anthropic"];
 const MAX_URL: usize = 2048;
 const MAX_MODEL: usize = 200;
 const MAX_KEY: usize = 2048;
@@ -23,10 +23,10 @@ const MAX_KEY: usize = 2048;
 /// its own path; the web side switches the address with the protocol, and the host only needs a
 /// usable default here. See `src/ui/ai-config.ts` for the full list of endpoints.
 pub const DEFAULT_PROVIDERS: &[(&str, &str, &str, &str, &str)] = &[
-    ("deepseek", "DeepSeek", "chat", "https://api.deepseek.com", "deepseek-v4-pro"),
-    ("zhipu", "智谱 BigModel", "chat", "https://open.bigmodel.cn/api/paas/v4", "glm-5.3"),
-    ("kimi", "Kimi", "chat", "https://api.moonshot.cn/v1", "kimi-k3"),
-    ("minimax", "MiniMax", "chat", "https://api.minimax.cn/v1", "MiniMax-M3"),
+    ("deepseek", "DeepSeek", "responses", "https://api.deepseek.com", "deepseek-v4-pro"),
+    ("zhipu", "智谱 BigModel", "responses", "https://open.bigmodel.cn/api/v1", "glm-5.3"),
+    ("kimi", "Kimi", "responses", "https://api.moonshot.cn/v1", "kimi-k3"),
+    ("minimax", "MiniMax", "responses", "https://api.minimax.cn/v1", "MiniMax-M3"),
 ];
 
 #[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -159,9 +159,9 @@ impl Default for AiConfig {
         let mut cfg = Self {
             catalogue_received: false, catalogue_owner: String::new(), catalogue_fetched_at: 0,
             catalogue_etag: String::new(), catalogue_refresh_after: 21600,
-            active_provider: "deepseek".into(),
+            active_provider: String::new(),
             providers: Vec::new(),
-            protocol: "chat".into(),
+            protocol: "responses".into(),
             base_url: String::new(),
             model: String::new(),
             api_key: String::new(),
@@ -240,7 +240,7 @@ impl AiConfig {
 
     fn normalize(&mut self) {
         if !PROTOCOLS.contains(&self.protocol.as_str()) {
-            self.protocol = "chat".into();
+            self.protocol = "responses".into();
         }
 
         for &(id, name, default_proto, default_url, default_model) in DEFAULT_PROVIDERS {
@@ -269,7 +269,7 @@ impl AiConfig {
             } else if !self.base_url.is_empty() {
                 "custom".into()
             } else {
-                "deepseek".into()
+                String::new()
             };
         }
 
@@ -833,7 +833,7 @@ mod tests {
     const KEY: &str = "sk-abcdefghijklmnop1234";
 
     fn saved() -> AiConfig {
-        let mut cfg = AiConfig { protocol: "chat".into(), base_url: "https://api.example.com/v1".into(), model: "m1".into(), api_key: KEY.into(), ..AiConfig::default() };
+        let mut cfg = AiConfig { active_provider: "deepseek".into(), protocol: "responses".into(), base_url: "https://api.example.com/v1".into(), model: "m1".into(), api_key: KEY.into(), ..AiConfig::default() };
         cfg.normalize();
         cfg
     }
@@ -1029,7 +1029,7 @@ mod tests {
         let file = directory.join("ai.json");
         fs::write(&file, r#"{"baseUrl":"https://x.example.com","protocol":"telepathy"}"#).unwrap();
         let loaded = load(&file).unwrap();
-        assert_eq!((loaded.protocol.as_str(), loaded.base_url.as_str(), loaded.model.as_str()), ("chat", "https://x.example.com", ""));
+        assert_eq!((loaded.protocol.as_str(), loaded.base_url.as_str(), loaded.model.as_str()), ("responses", "https://x.example.com", ""));
         fs::write(&file, "{ this is not json").unwrap();
         let error = load(&file).unwrap_err().to_string();
         assert!(!error.contains("this is not json"), "errors never echo file contents: {error}");
@@ -1103,7 +1103,7 @@ mod tests {
         assert!(cfg.providers.iter().any(|p| p.id == "minimax"));
         // Every built-in starts on chat completions with a working address and model.
         for p in &cfg.providers {
-            assert_eq!(p.protocol, "chat", "{} starts on the broadly compatible protocol", p.id);
+            assert_eq!(p.protocol, "responses", "{} starts on the responses protocol", p.id);
             assert!(!p.base_url.is_empty() && !p.model.is_empty(), "{} has a usable default", p.id);
         }
 

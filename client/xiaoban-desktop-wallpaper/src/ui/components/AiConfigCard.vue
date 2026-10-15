@@ -23,9 +23,9 @@ import {
 const props = defineProps<{ store: ControlStore }>();
 
 const blank: AiConfigView = {
-  activeProvider: 'deepseek',
+  activeProvider: '',
   providers: [],
-  protocol: 'chat',
+  protocol: 'responses',
   baseUrl: '',
   model: '',
   hasKey: false,
@@ -49,7 +49,7 @@ const openComputerUse = ref(false);
 const modalVisible = ref(false);
 const editingId = ref<string>('deepseek');
 const modalName = ref('');
-const modalProtocol = ref<AiProtocol>('chat');
+const modalProtocol = ref<AiProtocol>('responses');
 const modalBaseUrl = ref('');
 const modalModel = ref('');
 const modalApiKey = ref('');
@@ -119,8 +119,11 @@ const activeProviderMeta = computed(() => {
 });
 
 const activeStatusText = computed(() => {
-  if (!saved.value.baseUrl && !saved.value.model) return '尚未配置可用服务商';
-  return `当前生效：${activeProviderMeta.value.name} · ${saved.value.model || '未设模型'}${saved.value.hasKey ? ' · 已配置密钥' : '（未设密钥）'}`;
+  const activeId = saved.value.activeProvider;
+  if (!activeId || !isProviderFullyConfigured(activeId)) {
+    return '尚未配置可用服务商，请先配置 API 密钥';
+  }
+  return `当前生效：${activeProviderMeta.value.name} · ${saved.value.model || '未设模型'}${saved.value.hasKey ? ' · 已配置密钥' : ''}`;
 });
 
 // User's custom providers
@@ -161,7 +164,8 @@ function getProviderSaved(id: string): ProviderConfigView | undefined {
 }
 
 function isProviderActive(id: string): boolean {
-  return (saved.value.activeProvider || 'deepseek') === id;
+  if (!saved.value.activeProvider) return false;
+  return saved.value.activeProvider === id;
 }
 
 // 没有配置 API Key 的，不算已配置，显示为待配置
@@ -169,6 +173,11 @@ function isProviderFullyConfigured(id: string): boolean {
   const p = getProviderSaved(id);
   if (!p) return false;
   return p.available !== false && Boolean(p.baseUrl && p.model && (p.hasKey || p.isCustom));
+}
+
+// 真正正在使用中的服务商：必须是 activeProvider 且已经配置了密钥（或是自定义服务）
+function isProviderInUse(id: string): boolean {
+  return isProviderActive(id) && isProviderFullyConfigured(id);
 }
 
 function fill(view: AiConfigView) {
@@ -231,7 +240,7 @@ function openCreateCustomModal() {
   const newId = `custom_${Date.now()}`;
   editingId.value = newId;
   modalName.value = '自定义供应商';
-  modalProtocol.value = 'chat';
+  modalProtocol.value = 'responses';
   modalBaseUrl.value = '';
   modalModel.value = '';
   modalApiKey.value = '';
@@ -446,7 +455,7 @@ function getProviderIcon(id: string) {
               </div>
             </div>
             <div class="status-tags">
-              <NTag v-if="isProviderActive(p.id)" type="success" size="small" :bordered="false">当前使用</NTag>
+              <NTag v-if="isProviderInUse(p.id)" type="success" size="small" :bordered="false">当前使用</NTag>
               <NTag v-else-if="isProviderFullyConfigured(p.id)" type="info" size="small" :bordered="false">已配置</NTag>
               <NTag v-else type="warning" size="small" :bordered="false">待配置</NTag>
             </div>
@@ -471,7 +480,7 @@ function getProviderIcon(id: string) {
               配置
             </NButton>
             <NButton
-              v-if="!isProviderActive(p.id)"
+              v-if="!isProviderInUse(p.id)"
               size="small"
               type="primary"
               secondary
@@ -493,7 +502,7 @@ function getProviderIcon(id: string) {
           v-for="cp in customProviders"
           :key="cp.id"
           class="provider-card"
-          :class="{ active: isProviderActive(cp.id) }"
+          :class="{ active: isProviderInUse(cp.id) }"
           :data-testid="`ai-provider-card-${cp.id}`"
         >
           <div class="card-top">
@@ -505,7 +514,7 @@ function getProviderIcon(id: string) {
               </div>
             </div>
             <div class="status-tags">
-              <NTag v-if="isProviderActive(cp.id)" type="success" size="small" :bordered="false">当前使用</NTag>
+              <NTag v-if="isProviderInUse(cp.id)" type="success" size="small" :bordered="false">当前使用</NTag>
               <NTag v-else-if="isProviderFullyConfigured(cp.id)" type="info" size="small" :bordered="false">已配置</NTag>
               <NTag v-else type="warning" size="small" :bordered="false">待配置</NTag>
             </div>
@@ -530,7 +539,7 @@ function getProviderIcon(id: string) {
               配置
             </NButton>
             <NButton
-              v-if="!isProviderActive(cp.id)"
+              v-if="!isProviderInUse(cp.id)"
               size="small"
               type="primary"
               secondary

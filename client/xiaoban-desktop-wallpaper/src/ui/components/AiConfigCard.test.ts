@@ -120,6 +120,15 @@ describe('AI model settings card and provider templates', () => {
     expect(q('ai-status')!.textContent).toContain('DeepSeek');
   });
 
+  it('shows 待配置 and not in-use when key is missing even if activeProvider is set', async () => {
+    await open(unconfigured);
+    expect(q('ai-provider-card-deepseek')?.textContent).toContain('待配置');
+    expect(q('ai-provider-card-deepseek')?.textContent).not.toContain('当前使用');
+    expect(q('ai-provider-card-deepseek')?.textContent).not.toContain('正在使用中');
+    expect(q('ai-provider-activate-deepseek')).not.toBeNull();
+    expect(q('ai-status')!.textContent).toContain('尚未配置');
+  });
+
   it('shows what is saved in modal and never the key', async () => {
     await open();
     await openModal('deepseek');
@@ -246,9 +255,11 @@ describe('AI model settings card and provider templates', () => {
 
     // 智谱 puts each protocol on its own path.
     await openModal('zhipu');
-    expect(field('ai-base-url').value).toBe('https://open.bigmodel.cn/api/paas/v4');
+    expect(field('ai-base-url').value).toBe('https://open.bigmodel.cn/api/v1');
     await pickProtocol('anthropic');
     expect(field('ai-base-url').value).toBe('https://open.bigmodel.cn/api/anthropic');
+    await pickProtocol('chat');
+    expect(field('ai-base-url').value).toBe('https://open.bigmodel.cn/api/paas/v4');
     await pickProtocol('responses');
     expect(field('ai-base-url').value).toBe('https://open.bigmodel.cn/api/v1');
   });

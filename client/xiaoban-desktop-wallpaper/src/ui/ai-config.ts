@@ -36,7 +36,7 @@ export const BUILTIN_PROVIDERS: ProviderMeta[] = [
     id: 'deepseek',
     name: 'DeepSeek',
     desc: '深度求索最新一代大模型，默认配置 deepseek-v4-pro 旗舰大模型',
-    protocol: 'chat',
+    protocol: 'responses',
     endpoints: {
       chat: 'https://api.deepseek.com',
       responses: 'https://api.deepseek.com',
@@ -51,7 +51,7 @@ export const BUILTIN_PROVIDERS: ProviderMeta[] = [
     id: 'zhipu',
     name: '智谱 BigModel',
     desc: '清华系自研基座大模型，默认升级为官方最新 GLM-5.3 旗舰大模型',
-    protocol: 'chat',
+    protocol: 'responses',
     endpoints: {
       chat: 'https://open.bigmodel.cn/api/paas/v4',
       responses: 'https://open.bigmodel.cn/api/v1',
@@ -66,7 +66,7 @@ export const BUILTIN_PROVIDERS: ProviderMeta[] = [
     id: 'kimi',
     name: 'Kimi',
     desc: '月之暗面长文本大模型，默认配置官方最新 1M 上下文 Kimi K3 旗舰大模型',
-    protocol: 'chat',
+    protocol: 'responses',
     endpoints: {
       chat: 'https://api.moonshot.cn/v1',
       responses: 'https://api.moonshot.cn/v1',
@@ -81,7 +81,7 @@ export const BUILTIN_PROVIDERS: ProviderMeta[] = [
     id: 'minimax',
     name: 'MiniMax',
     desc: 'MiniMax 开放平台大模型，默认采用官方最新万亿参数 MiniMax-M3 旗舰基座',
-    protocol: 'chat',
+    protocol: 'responses',
     endpoints: {
       chat: 'https://api.minimax.cn/v1',
       responses: 'https://api.minimax.cn/v1',
@@ -96,7 +96,7 @@ export const BUILTIN_PROVIDERS: ProviderMeta[] = [
     id: 'custom',
     name: '自定义供应商',
     desc: '自定义第三方端点、海外服务或本地部署的 Ollama / vLLM 模型服务',
-    protocol: 'chat',
+    protocol: 'responses',
     endpoints: {},
     defaultModel: '',
     suggestedModels: [],
@@ -122,7 +122,7 @@ export const aiProtocols: ProtocolOption[] = [
 ];
 
 export const protocolOption = (protocol: AiProtocol) =>
-  aiProtocols.find(option => option.value === protocol) ?? aiProtocols.find(option => option.value === 'chat')!;
+  aiProtocols.find(option => option.value === protocol) ?? aiProtocols.find(option => option.value === 'responses')!;
 
 /** Trimmed, without trailing slashes: the form the host stores. */
 export const normalizeBaseUrl = (value: string) => value.trim().replace(/\/+$/, '');
