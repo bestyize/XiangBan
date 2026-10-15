@@ -34,6 +34,24 @@ describe('local ASR lifecycle', () => {
     h.phrase(); await flushPromises(); expect(text).toHaveBeenCalledWith('你好，小伴。');
     expect(h.notify).not.toHaveBeenCalled(); h.store.deactivate(); expect(h.stop).toHaveBeenCalledOnce(); h.store.dispose();
   });
+  it('flushes and transcribes accumulated speech when user finishes recording explicitly', async () => {
+    let frameCallback: ((frame: Float32Array) => void) | undefined;
+    const h = setup({ enabled: true, modelReady: true });
+    h.capture.mockImplementation(async cb => { frameCallback = cb; return { stop: h.stop }; });
+    const text = vi.fn();
+    await h.store.activate(text);
+    expect(h.store.listening).toBe(true);
+    // User speaks 3 frames without a following 0.9s pause
+    for (let i = 0; i < 3; i++) frameCallback!(new Float32Array(1600).fill(0.1));
+    expect(text).not.toHaveBeenCalled();
+    // User clicks the microphone button to stop recording
+    await h.store.finish();
+    expect(text).toHaveBeenCalledWith('你好，小伴。');
+    expect(h.store.listening).toBe(false);
+    expect(h.store.recordingRequested).toBe(false);
+    expect(h.stop).toHaveBeenCalledOnce();
+    h.store.dispose();
+  });
   it('shows download progress and ignores a completion after turning off', async () => {
     const pending = deferred<unknown>(); const h = setup({ enabled: true, prepare: () => pending.promise });
     const text = vi.fn(); h.store.activate(text); await flushPromises();

@@ -17,7 +17,7 @@ export interface AsrStore extends HostStatus {
   recordingRequested: boolean;
   phase: 'idle' | 'downloading' | 'loading'; downloaded: number; total: number; error: string;
   init(): Promise<void>; setEnabled(enabled: boolean): Promise<void>; prepare(): Promise<boolean>;
-  activate(onText: (text: string) => void): Promise<void>; deactivate(): void; retry(): Promise<void>; dispose(): void;
+  activate(onText: (text: string) => void): Promise<void>; finish(): Promise<void>; deactivate(): void; retry(): Promise<void>; dispose(): void;
 }
 const message = (error: unknown) => error instanceof Error ? error.message : String(error);
 export function createAsrStore(deps: AsrDeps): AsrStore {
@@ -28,11 +28,12 @@ export function createAsrStore(deps: AsrDeps): AsrStore {
   let disposed = false, generation = 0, recording = 0, request = '';
   let capture: Capture | undefined;
   let receiver: ((text: string) => void) | undefined;
+  let segmenter: UtteranceSegmenter | undefined;
   let queue: Float32Array[] = [];
   let draining = false;
   let starting: number | undefined;
   function stopCapture() {
-    recording++; starting = undefined; capture?.stop(); capture = undefined; queue = [];
+    recording++; starting = undefined; capture?.stop(); capture = undefined; queue = []; segmenter = undefined;
     store.recordingRequested = false; store.listening = false; store.recognizing = false;
   }
   function fail(error: unknown) { stopCapture(); store.error = message(error); deps.notify(store.error, 'error'); }
@@ -50,23 +51,24 @@ export function createAsrStore(deps: AsrDeps): AsrStore {
     finally {
       draining = false;
       if (ticket === recording) store.recognizing = false;
-      if (queue.length && capture && !disposed) void drain(recording);
+      if (queue.length && ticket === recording && !disposed && store.enabled) void drain(ticket);
     }
   }
   async function start() {
     if (!receiver || !store.recordingRequested || disposed || !store.enabled || !store.engineReady || capture || starting !== undefined) return;
     const ticket = recording;
     starting = ticket;
-    const segmenter = new UtteranceSegmenter();
+    const activeSegmenter = new UtteranceSegmenter();
+    segmenter = activeSegmenter;
     try {
       const microphone = await (deps.capture ?? captureMicrophone)(frame => {
         if (ticket !== recording || disposed) return;
-        const audio = segmenter.push(frame);
+        const audio = activeSegmenter.push(frame);
         if (!audio) return;
-        if (queue.length >= 3) { fail('语音处理暂时跟不上，请稍后点击重试'); return; }
+        if (queue.length >= 5) { fail('语音处理暂时跟不上，请稍后点击重试'); return; }
         queue.push(audio); void drain(ticket);
       }, error => { if (ticket === recording && !disposed) fail(error); });
-      if (ticket !== recording || disposed || !receiver || !store.enabled) { microphone.stop(); return; }
+      if (ticket !== recording || disposed || !receiver || !store.enabled || !store.recordingRequested) { microphone.stop(); return; }
       capture = microphone; store.listening = true; store.error = '';
     } catch (e) { if (ticket === recording && !disposed) fail(e); }
     finally { if (starting === ticket) starting = undefined; }
@@ -140,7 +142,27 @@ export function createAsrStore(deps: AsrDeps): AsrStore {
       if (ticket !== recording || disposed || !store.enabled || store.saving) return;
       if (await store.prepare()) { if (ticket === recording && !disposed) await start(); }
     },
-    deactivate() { receiver = undefined; stopCapture(); },
+    async finish() {
+      if (disposed) return;
+      const ticket = recording;
+      store.listening = false;
+      store.recordingRequested = false;
+      const activeMic = capture;
+      capture = undefined;
+      activeMic?.stop();
+      if (segmenter) {
+        const remaining = segmenter.flush();
+        segmenter = undefined;
+        if (remaining && remaining.length >= 1600) {
+          queue.push(remaining);
+        }
+      }
+      await drain(ticket);
+      if (ticket === recording) {
+        store.recognizing = false;
+      }
+    },
+    deactivate() { receiver = undefined; segmenter = undefined; stopCapture(); },
     async retry() {
       store.error = '';
       if (receiver) await store.activate(receiver);

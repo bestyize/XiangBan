@@ -8,7 +8,7 @@ class XiaoBanPcm extends AudioWorkletProcessor {
       let sample = 0;
       for (const channel of channels) sample += channel[i] / channels.length;
       this.buffer[this.offset++] = sample;
-      if (this.offset === this.buffer.length) { this.port.postMessage(this.buffer); this.offset = 0; }
+      if (this.offset === this.buffer.length) { this.port.postMessage(this.buffer.slice()); this.offset = 0; }
     }
     return true;
   }

@@ -20,7 +20,7 @@ const draft = ref('');
 const asr = props.store.asr;
 const foreground = ref(document.visibilityState !== 'hidden');
 function updateVisibility() { foreground.value = document.visibilityState !== 'hidden'; }
-function blurChat() { foreground.value = false; }
+function blurChat() { if (document.visibilityState === 'hidden') foreground.value = false; }
 function focusChat() { updateVisibility(); }
 const modelDialog = ref(false);
 const guideDialog = ref(false);
@@ -66,7 +66,7 @@ watch(microphoneAllowed, allowed => { if (!allowed) asr?.deactivate(); }, { flus
 watch(() => props.store.page, page => { if (page !== 'chat') asr?.deactivate(); }, { flush: 'sync' });
 function toggleVoice() {
   if (!asr) return;
-  if (asr.recordingRequested) { asr.deactivate(); return; }
+  if (asr.recordingRequested) { void asr.finish(); return; }
   if (!microphoneAllowed.value || props.store.page !== 'chat') return;
   void asr.activate(text => { draft.value += (draft.value && !/\s$/.test(draft.value) ? ' ' : '') + text; });
 }

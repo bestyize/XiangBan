@@ -32,7 +32,7 @@ export class UtteranceSegmenter {
   push(frame: Float32Array): Float32Array | null {
     if (!frame.length) return null;
     const rms = Math.sqrt(frame.reduce((sum, s) => sum + s * s, 0) / frame.length);
-    const voiced = rms >= 0.012;
+    const voiced = rms >= 0.005;
     if (!this.audio.length && !voiced) {
       this.pre.push(...frame); this.pre = this.pre.slice(-4000); return null;
     }
@@ -44,6 +44,12 @@ export class UtteranceSegmenter {
     if (this.audio.length < 320000 && this.silence < 14400) return null;
     const result = this.speech >= 2880 ? Float32Array.from(this.audio) : null;
     this.audio = Array.from(frame.subarray(available)); this.speech = this.audio.length && voiced ? this.audio.length : 0; this.silence = 0;
+    return result;
+  }
+  flush(): Float32Array | null {
+    if (!this.audio.length) return null;
+    const result = this.speech >= 1600 ? Float32Array.from(this.audio) : null;
+    this.audio = []; this.pre = []; this.speech = 0; this.silence = 0;
     return result;
   }
 }
