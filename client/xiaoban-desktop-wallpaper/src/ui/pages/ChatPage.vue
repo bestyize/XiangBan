@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import { NButton, NInput } from 'naive-ui';
-import { ArrowDown, Check, FolderOpen, ImagePlus, LoaderCircle, MessageSquarePlus, SendHorizontal, Volume2, Shield, ShieldAlert, Square, Trash2, X, Zap } from 'lucide-vue-next';
+import { ArrowDown, Check, FolderOpen, ImagePlus, LoaderCircle, MessageSquarePlus, SendHorizontal, Volume2, Shield, ShieldAlert, Sparkles, Square, Trash2, X, Zap } from 'lucide-vue-next';
 import { invoke } from '../../bridge.ts';
 import type { ControlStore } from '../control-types.ts';
 import ModelSwitchDialog from '../components/ModelSwitchDialog.vue';
+import GuideModal from '../components/GuideModal.vue';
 import MarkdownView from '../chat/MarkdownView.ts';
 import { CONTINUE_TEXT } from '../chat/chat-store.ts';
 import { approvalPreview, clip, formatAgo, isImeEnter, isNearBottom, prettyArguments, riskVerb, toolLabel } from '../chat/format.ts';
@@ -16,6 +17,7 @@ const chat = props.store.chat;
 
 const draft = ref('');
 const modelDialog = ref(false);
+const guideDialog = ref(false);
 const retryAfterSwitch = ref(false);
 function chooseModel(retry = false) { retryAfterSwitch.value = retry; modelDialog.value = true; }
 async function modelSwitched() { await chat.refresh(); if (retryAfterSwitch.value) await chat.retry(); props.store.notify('模型已切换', 'success'); }
@@ -176,6 +178,7 @@ async function openLink(href: string) {
 
 <template>
   <ModelSwitchDialog v-model:show="modelDialog" :retry="retryAfterSwitch" @switched="modelSwitched" @settings="openSettings" />
+  <GuideModal v-model:show="guideDialog" :desktop="store.desktop" @select-prompt="useExample" @open-settings="openSettings" />
   <section class="chat-page" data-testid="chat-page">
     <aside class="chat-side" aria-label="对话列表">
       <div class="side-head">
@@ -207,6 +210,16 @@ async function openLink(href: string) {
         <h2 data-testid="chat-title">{{ title }}</h2>
         <div class="head-actions">
           <button v-if="store.speech && store.speech.status !== 'idle'" type="button" class="link" data-testid="chat-speech-status" @click="store.speech.stop()"><Volume2 :size="14" />{{ store.speech.status === 'synthesizing' ? '取消合成' : '停止朗读' }}</button>
+          <button
+            type="button"
+            class="guide-chip"
+            data-testid="chat-open-guide"
+            title="查看小伴 AI 玩法指南与提示词手册"
+            @click="guideDialog = true"
+          >
+            <Sparkles :size="13" />
+            <span>玩法指南</span>
+          </button>
           <div class="permission-toggle" role="group" aria-label="权限模式" data-testid="chat-permission-toggle">
             <button
               type="button"
@@ -248,7 +261,16 @@ async function openLink(href: string) {
             <img src="/xiaoban.svg" alt="" width="56" height="56" />
             <h3>有什么可以帮你？</h3>
             <p>我能回答问题，也能在你选的工作目录里读写文件、运行命令，还能替你调整壁纸、特效和提醒。改动之前我会先问你。</p>
-            <div class="examples"><button v-for="(text, n) in examples" :key="text" type="button" :data-testid="`chat-example-${n}`" @click="useExample(text)">{{ text }}</button></div>
+            <div class="examples">
+              <button v-for="(text, n) in examples" :key="text" type="button" :data-testid="`chat-example-${n}`" @click="useExample(text)">
+                <span class="example-tag">{{ ['📁 工作区', '🖼️ 壁纸', '🍵 关怀', '📅 日常'][n] ?? '💡 尝试' }}</span>
+                <span>{{ text }}</span>
+              </button>
+            </div>
+            <button type="button" class="more-guides-link" data-testid="chat-welcome-more-guides" @click="guideDialog = true">
+              <Sparkles :size="14" />
+              <span>查看更多 AI 精彩玩法与咒语手册 →</span>
+            </button>
           </div>
 
           <template v-if="view">
@@ -365,6 +387,8 @@ async function openLink(href: string) {
 .chat-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 24px;border-bottom:1px solid var(--ui-border)}
 .chat-head h2{font-size:15px;margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .head-actions{display:flex;align-items:center;gap:10px;flex-shrink:0}
+.guide-chip{border:1px solid var(--ui-border);background:var(--ui-surface);color:var(--ui-primary);border-radius:999px;padding:4px 10px;font-size:12px;display:inline-flex;gap:5px;align-items:center;cursor:pointer;font-weight:600;transition:all .15s}
+.guide-chip:hover{background:var(--ui-primary-soft);border-color:var(--ui-primary)}
 .permission-toggle{display:inline-flex;padding:2px;background:var(--ui-surface-alt);border:1px solid var(--ui-line);border-radius:999px;gap:2px}
 .perm-btn{border:0;background:none;color:var(--ui-text-tertiary);border-radius:999px;padding:3px 9px;font-size:12px;cursor:pointer;display:inline-flex;gap:4px;align-items:center;transition:all .15s}
 .perm-btn:hover{color:var(--ui-text-primary)}
@@ -382,6 +406,9 @@ async function openLink(href: string) {
 .examples{display:grid;gap:8px;margin-top:14px;width:min(520px,100%)}
 .examples button{text-align:left;border:1px solid var(--ui-border);background:var(--ui-surface);color:var(--ui-text-primary);border-radius:12px;padding:11px 14px;cursor:pointer;font:inherit;font-size:13.5px}
 .examples button:hover{border-color:var(--ui-primary);background:var(--ui-primary-soft)}
+.example-tag{font-size:11px;padding:1px 6px;border-radius:4px;background:var(--ui-surface-alt);color:var(--ui-text-tertiary);margin-right:8px;font-weight:normal}
+.more-guides-link{display:inline-flex;align-items:center;gap:6px;border:0;background:none;color:var(--ui-primary);font-size:13px;font-weight:600;cursor:pointer;margin-top:6px;padding:5px 12px;border-radius:8px;transition:background .15s}
+.more-guides-link:hover{background:var(--ui-primary-soft)}
 .msg.user{display:flex;justify-content:flex-end;width:100%;max-width:100%;min-width:0;box-sizing:border-box}
 .bubble{background:var(--ui-primary-soft);color:var(--ui-text-primary);border-radius:16px 16px 4px 16px;padding:10px 14px;max-width:min(80%,100%);white-space:pre-wrap;word-break:break-word;overflow-wrap:anywhere;line-height:1.7;font-size:14.5px;min-width:0;box-sizing:border-box}
 .msg.assistant{display:grid;grid-template-columns:28px minmax(0,1fr);gap:12px;align-items:start;width:100%;max-width:100%;min-width:0;box-sizing:border-box}

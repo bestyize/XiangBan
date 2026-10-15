@@ -91,6 +91,13 @@ describe('the chat page before a conversation', () => {
     await click('chat-workspace');
     expect(h.store.settingsTab).toBe('ai');
   });
+
+  it('opens the capability guide from the header or welcome screen', async () => {
+    await open();
+    expect(q('chat-open-guide')).not.toBeNull();
+    await click('chat-open-guide');
+    expect(document.body.textContent).toContain('小伴桌面 · AI 玩法指南');
+  });
 });
 
 describe('talking', () => {

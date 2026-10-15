@@ -9,6 +9,7 @@ export const router = createRouter({
   routes: [
     { path: '/desktop', redirect: to => ({ path: '/', query: to.query, hash: to.hash }) },
     { path: '/', name: 'desktop', component: () => import('./views/DesktopView.vue'), meta: { tab: 'desktop' } },
+    { path: '/guide', name: 'guide', component: () => import('./views/GuideView.vue'), meta: { tab: 'guide' } },
     { path: '/images', name: 'home', component: () => import('./views/BrowseView.vue'), meta: { tab: 'home' } },
     { path: '/images/c/:id', alias: '/c/:id', name: 'category', component: () => import('./views/BrowseView.vue'), meta: { tab: 'home' } },
     { path: '/videos', name: 'videos', component: () => import('./views/BrowseView.vue'), meta: { tab: 'videos' } },

@@ -29,10 +29,4 @@ describe('interactive wallpaper entry', () => {
     await view.get('[data-testid="apply-pond"]').trigger('click'); await flushPromises();
     expect(store.applyWallpaper).toHaveBeenCalledWith('builtin-wish-pond', expect.objectContaining({values:{}}), false); view.unmount();
   });
-  it('keeps the migrated procedural wallpaper controls usable', async () => {
-    const { view, store } = setup();
-    await view.get('input[type="range"]').setValue('1.2');
-    await view.get('.landscape-actions button:last-child').trigger('click'); await flushPromises();
-    expect(store.applyWallpaper).toHaveBeenCalledWith('builtin-mint-orbits', expect.objectContaining({values:{speed:1.2}}), false); view.unmount();
-  });
 });

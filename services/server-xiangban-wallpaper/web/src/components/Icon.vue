@@ -30,6 +30,8 @@ export type IconName =
   | 'check'
   | 'pulse'
   | 'upload'
+  | 'sparkles'
+  | 'book'
 
 const props = withDefaults(defineProps<{ name: IconName; size?: number }>(), { size: 22 })
 
@@ -65,6 +67,8 @@ const PATHS: Record<IconName, string> = {
   check: '<path d="m5 12.5 4.5 4.5L19 7.5"/>',
   pulse: '<path d="M3 12h4l2.5-6 4 12 2.5-6H21"/>',
   upload: '<path d="M12 15V4m0 0L8 8m4-4 4 4M5 19h14"/>',
+  sparkles: '<path d="m12 3 1.9 5.8a2 2 0 0 0 1.3 1.3L21 12l-5.8 1.9a2 2 0 0 0-1.3 1.3L12 21l-1.9-5.8a2 2 0 0 0-1.3-1.3L3 12l5.8-1.9a2 2 0 0 0 1.3-1.3zM19 3v4M21 5h-4M5 19v2M6 20H4"/>',
+  book: '<path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z"/><path d="M6 6h10M6 10h10"/>',
 }
 
 const markup = computed(() => PATHS[props.name])

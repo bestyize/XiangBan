@@ -12,6 +12,7 @@ const FORUM_URL = 'https://chat.xiangban.xyz/c/xiaoban-wallpaper'
 const links = [
   { to: '/images', tab: 'home', label: '图片' },
   { to: '/videos', tab: 'videos', label: '视频' },
+  { to: '/guide', tab: 'guide', label: '玩法指南' },
 ]
 </script>
 

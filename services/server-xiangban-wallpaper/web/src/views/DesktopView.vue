@@ -141,6 +141,9 @@ onActivated(() => {
             <li>读写文件、查网页、跑命令，也能帮你办正事</li>
             <li>写文件和运行命令前先问你，高风险操作一定确认</li>
           </ul>
+          <RouterLink to="/guide" class="guide-action-link">
+            <span>查看 AI 玩法指南与示例咒语 →</span>
+          </RouterLink>
         </div>
         <img
           class="shot"
@@ -471,6 +474,19 @@ onActivated(() => {
   height: 8px;
   border-radius: 50%;
   background: #ad7084;
+}
+.guide-action-link {
+  display: inline-block;
+  margin-top: 20px;
+  color: #d4a373;
+  font-size: 15px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: opacity 0.2s;
+}
+.guide-action-link:hover {
+  text-decoration: underline;
+  opacity: 0.85;
 }
 .more {
   display: grid;
