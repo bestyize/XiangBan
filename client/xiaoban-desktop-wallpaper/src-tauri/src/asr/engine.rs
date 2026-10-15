@@ -26,7 +26,9 @@ fn verified(path: &Path, spec: &ModelFile, check: &impl Fn() -> Result<(), Strin
 }
 pub fn ensure_model(directory: &Path, check: impl Fn() -> Result<(), String>, progress: impl Fn(&str, u64)) -> Result<(), String> {
     fs::create_dir_all(directory).map_err(|e| format!("无法创建语音模型目录：{e}"))?;
-    let client = reqwest::blocking::Client::builder().https_only(true).connect_timeout(Duration::from_secs(15))
+    let client = reqwest::blocking::Client::builder()
+        .user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36 XiaoBan/1.0")
+        .https_only(true).connect_timeout(Duration::from_secs(15))
         .timeout(Duration::from_secs(600)).build().map_err(|e| e.to_string())?;
     let mut completed = 0;
     for spec in &FILES {
