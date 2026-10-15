@@ -13,6 +13,7 @@ export interface CareSource {
 export interface CareConfig {
   enabled: boolean;
   sound: boolean;
+  voice: boolean;
   quietEnabled: boolean;
   quietStart: string;
   quietEnd: string;
@@ -66,6 +67,7 @@ export interface CareDelivery {
   id: string;
   items: CarePending[];
   sound: boolean;
+  voice: boolean;
   displaySeconds: number;
 }
 export const careNames: Record<CareKind, string> = {

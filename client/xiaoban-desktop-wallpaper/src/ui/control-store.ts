@@ -79,6 +79,7 @@ export function createControlStore(notify: ControlStore["notify"]): ControlStore
           listen<WebsiteStatus>("website-status", (website) => { if (!disposed) store.website = website; }),
           listen<AccountSession | null>("account-changed", (account) => { if (!disposed) { store.account = account; void invoke('refresh_ai_providers', { force: true }).catch(() => {}); } }),
           listen<boolean>("games-active", (active) => { if (!disposed) store.game.active = active; }),
+          listen("care-voice-start", () => { if (!disposed) void store.speech.stop(); }),
           listen<string>("desktop-error", (error) => notify(error, "error")),
         ]);
         if (disposed) { subscriptions.forEach((unlisten) => unlisten()); return; }

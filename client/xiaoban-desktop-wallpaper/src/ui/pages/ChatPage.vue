@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import { NButton, NInput } from 'naive-ui';
-import { ArrowDown, Check, FolderOpen, ImagePlus, LoaderCircle, MessageSquarePlus, Mic, MicOff, SendHorizontal, Volume2, Shield, ShieldAlert, Sparkles, Square, Trash2, X, Zap } from 'lucide-vue-next';
+import { ArrowDown, Check, FolderOpen, ImagePlus, LoaderCircle, MessageSquarePlus, Mic, SendHorizontal, Volume2, Shield, ShieldAlert, Sparkles, Square, Trash2, X, Zap } from 'lucide-vue-next';
 import { invoke } from '../../bridge.ts';
 import type { ControlStore } from '../control-types.ts';
 import ModelSwitchDialog from '../components/ModelSwitchDialog.vue';
@@ -18,6 +18,8 @@ const chat = props.store.chat;
 
 const draft = ref('');
 const asr = props.store.asr;
+const voiceHasText = ref(false);
+const finishingVoice = ref(false);
 const foreground = ref(document.visibilityState !== 'hidden');
 function updateVisibility() { foreground.value = document.visibilityState !== 'hidden'; }
 function blurChat() { if (document.visibilityState === 'hidden') foreground.value = false; }
@@ -64,11 +66,23 @@ const microphoneAllowed = computed(() => foreground.value && chat.configured && 
 watch(() => chat.currentId, () => asr?.deactivate(), { flush: 'sync' });
 watch(microphoneAllowed, allowed => { if (!allowed) asr?.deactivate(); }, { flush: 'sync' });
 watch(() => props.store.page, page => { if (page !== 'chat') asr?.deactivate(); }, { flush: 'sync' });
-function toggleVoice() {
-  if (!asr) return;
-  if (asr.recordingRequested) { void asr.finish(); return; }
+async function toggleVoice() {
+  if (!asr || finishingVoice.value) return;
+  if (asr.recordingRequested) {
+    const wasListening = asr.listening;
+    const sessionId = chat.currentId;
+    finishingVoice.value = true;
+    try {
+      await asr.finish();
+      if (!wasListening || asr.error || props.store.page !== 'chat' || !foreground.value || chat.currentId !== sessionId || running.value) return;
+      if (!voiceHasText.value) { props.store.notify('没有识别到语音，请重试', 'info'); return; }
+      await submit();
+    } finally { finishingVoice.value = false; }
+    return;
+  }
   if (!microphoneAllowed.value || props.store.page !== 'chat') return;
-  void asr.activate(text => { draft.value += (draft.value && !/\s$/.test(draft.value) ? ' ' : '') + text; });
+  voiceHasText.value = false;
+  void asr.activate(text => { voiceHasText.value = true; draft.value += (draft.value && !/\s$/.test(draft.value) ? ' ' : '') + text; });
 }
 onMounted(() => {
   asr?.deactivate();
@@ -363,7 +377,7 @@ async function openLink(href: string) {
       <button v-if="!stick && view?.items.length" type="button" class="to-bottom" data-testid="chat-bottom" aria-label="回到最新" @click="stick = true; toBottom()"><ArrowDown :size="16" /></button>
 
       <footer class="composer" @compositionstart="composing = true" @compositionend="composing = false" @paste="onPaste">
-        <div class="composer-box" :class="{ 'has-attachments': attachments.length > 0 }">
+        <div class="composer-box" :class="{ 'has-attachments': attachments.length > 0, 'voice-active': asr?.listening }">
           <AsrStatus v-if="asr" :asr="asr" chat />
           <div v-if="attachments.length" class="attachments" data-testid="chat-attachments">
             <div v-for="(url, n) in attachments" :key="n" class="thumb">
@@ -375,7 +389,9 @@ async function openLink(href: string) {
           <div class="composer-row">
             <input ref="filePicker" type="file" accept="image/png,image/jpeg,image/gif,image/webp" multiple hidden data-testid="chat-image-input" @change="onPick" />
             <NButton quaternary circle size="small" data-testid="chat-pick-image" aria-label="选择图片" :disabled="!store.desktop || !chat.configured || running || attachments.length >= MAX_IMAGES" @click="openPicker"><template #icon><ImagePlus :size="16" /></template></NButton>
-            <NButton v-if="asr" :type="asr.listening ? 'primary' : 'default'" :quaternary="!asr.listening" circle size="small" data-testid="chat-asr-toggle" :aria-label="asr.recordingRequested ? '停止语音输入' : '开始语音输入'" :aria-pressed="asr.recordingRequested" :title="asr.recordingRequested ? '停止本次语音输入' : '开始本次语音输入'" :disabled="!store.desktop || !asr.ready || (!asr.recordingRequested && (!microphoneAllowed || asr.saving))" @click="toggleVoice"><template #icon><Mic v-if="asr.recordingRequested" :size="16" /><MicOff v-else :size="16" /></template></NButton>
+            <button v-if="finishingVoice" type="button" class="voice-finish" data-testid="chat-asr-toggle" aria-label="正在转写并发送" aria-pressed="false" disabled><LoaderCircle class="spin" :size="13" aria-hidden="true" />正在发送</button>
+            <button v-else-if="asr?.recordingRequested" type="button" class="voice-finish" data-testid="chat-asr-toggle" :aria-label="asr.listening ? '结束录音并发送' : '取消准备'" aria-pressed="true" @click="toggleVoice"><span v-if="asr.listening" class="recording-dot" aria-hidden="true" /><LoaderCircle v-else class="spin" :size="13" aria-hidden="true" />{{ asr.listening ? '结束并发送' : '取消准备' }}</button>
+            <NButton v-else-if="asr" quaternary circle size="small" data-testid="chat-asr-toggle" aria-label="开始语音输入" aria-pressed="false" title="开始语音输入" :disabled="!store.desktop || !asr.ready || !microphoneAllowed || asr.saving" @click="toggleVoice"><template #icon><Mic :size="16" /></template></NButton>
             <NInput v-model:value="draft" type="textarea" :autosize="{ minRows: 1, maxRows: 8 }" :disabled="!store.desktop || !chat.configured" :placeholder="chat.configured ? '问点什么，或者交给小伴去办（Enter 发送，Shift+Enter 换行，可直接粘贴图片）' : '先到设置里配置模型'" data-testid="chat-input" @keydown="onKeydown" />
             <NButton v-if="running" type="error" circle data-testid="chat-stop" aria-label="停止" @click="chat.cancel()"><template #icon><Square :size="14" /></template></NButton>
             <NButton v-else type="primary" circle data-testid="chat-send" aria-label="发送" :disabled="!canSend" @click="submit"><template #icon><SendHorizontal :size="16" /></template></NButton>
@@ -473,8 +489,15 @@ async function openLink(href: string) {
 .to-bottom{position:absolute;right:28px;bottom:96px;width:34px;height:34px;border-radius:50%;border:1px solid var(--ui-border);background:var(--ui-surface);color:var(--ui-text-primary);cursor:pointer;display:grid;place-items:center;box-shadow:var(--ui-shadow-pop)}
 .composer{padding:10px 24px 18px;width:100%;box-sizing:border-box}
 .composer-box{max-width:820px;margin:0 auto;display:flex;flex-direction:column;gap:8px;background:var(--ui-surface);border:1px solid var(--ui-border);border-radius:18px;padding:8px 10px 8px 14px}
+.composer-box.voice-active{border-color:var(--ui-primary);box-shadow:0 0 0 2px var(--ui-primary-soft)}
 .composer-row{display:flex;gap:10px;align-items:flex-end;min-width:0}
 .composer-row :deep(.n-input){flex:1;min-width:0}
+.voice-finish{display:inline-flex;align-items:center;justify-content:center;gap:7px;align-self:flex-end;min-height:28px;flex:none;padding:3px 10px;border:1px solid var(--ui-primary);border-radius:999px;background:var(--ui-primary-soft);color:var(--ui-primary);font:inherit;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap}
+.voice-finish:hover{background:var(--ui-primary);color:#fff}
+.voice-finish:disabled{cursor:wait;opacity:.75}
+.voice-finish:focus-visible{outline:2px solid var(--ui-primary);outline-offset:2px}
+.recording-dot{width:7px;height:7px;border-radius:50%;background:currentColor;animation:recording-pulse 1.3s ease-in-out infinite}
+@keyframes recording-pulse{50%{opacity:.3}}
 .attachments{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:2px 2px 0}
 .thumb{position:relative;width:56px;height:56px;border-radius:10px;overflow:hidden;border:1px solid var(--ui-line);background:var(--ui-surface-alt);flex:none}
 .thumb img{width:100%;height:100%;object-fit:cover;cursor:zoom-in;display:block}
@@ -518,7 +541,7 @@ async function openLink(href: string) {
   .chat-side{display:none}
   .bubble{max-width:92%}
 }
-@media(prefers-reduced-motion:reduce){.spin,.cursor{animation:none}}
+@media(prefers-reduced-motion:reduce){.spin,.cursor,.recording-dot{animation:none}}
 </style>
 
 

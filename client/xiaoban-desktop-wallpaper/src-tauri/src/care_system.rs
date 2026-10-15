@@ -13,6 +13,16 @@ pub fn play_sound() {
         .stdin(std::process::Stdio::null()).stdout(std::process::Stdio::null()).stderr(std::process::Stdio::null()).spawn(); }
 }
 
+#[cfg(windows)]
+pub fn foreground_point() -> Option<(i32, i32)> {
+    use windows_sys::Win32::UI::WindowsAndMessaging::{GetForegroundWindow, GetWindowRect};
+    let hwnd = unsafe { GetForegroundWindow() };
+    if hwnd.is_null() { return None; }
+    let mut rect = windows_sys::Win32::Foundation::RECT::default();
+    if unsafe { GetWindowRect(hwnd, &mut rect) } == 0 { return None; }
+    Some((rect.left + (rect.right - rect.left) / 2, rect.top + (rect.bottom - rect.top) / 2))
+}
+
 /// Showing a care bubble must never activate it or replace keyboard focus.
 #[cfg(windows)]
 pub fn show_bubble(window: &tauri::WebviewWindow) -> Result<(), String> {
@@ -61,9 +71,11 @@ pub fn bubble_diagnostics(window: &tauri::WebviewWindow) -> Result<serde_json::V
         use windows_sys::Win32::UI::WindowsAndMessaging::*;
         let hwnd = window.hwnd().map_err(|e| e.to_string())?.0;
         let foreground = unsafe { GetForegroundWindow() };
-        let no_activate = unsafe { GetWindowLongPtrW(hwnd, GWL_EXSTYLE) } & WS_EX_NOACTIVATE as isize != 0;
+        let style = unsafe { GetWindowLongPtrW(hwnd, GWL_EXSTYLE) };
+        let no_activate = style & WS_EX_NOACTIVATE as isize != 0;
+        let topmost = style & WS_EX_TOPMOST as isize != 0;
         return Ok(serde_json::json!({"visible":visible,"focused":focused,"nativeVisible":unsafe { IsWindowVisible(hwnd) } != 0,
-            "hwnd":hwnd as usize,"foregroundHwnd":foreground as usize,"foregroundIsBubble":foreground == hwnd,"noActivate":no_activate}));
+            "hwnd":hwnd as usize,"foregroundHwnd":foreground as usize,"foregroundIsBubble":foreground == hwnd,"noActivate":no_activate,"topmost":topmost}));
     }
     #[cfg(not(windows))]
     Ok(serde_json::json!({"visible":visible,"focused":focused}))

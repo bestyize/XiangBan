@@ -30,29 +30,36 @@ export function createAsrStore(deps: AsrDeps): AsrStore {
   let receiver: ((text: string) => void) | undefined;
   let segmenter: UtteranceSegmenter | undefined;
   let queue: Float32Array[] = [];
-  let draining = false;
+  let draining: Promise<void> | undefined;
   let starting: number | undefined;
   function stopCapture() {
     recording++; starting = undefined; capture?.stop(); capture = undefined; queue = []; segmenter = undefined;
     store.recordingRequested = false; store.listening = false; store.recognizing = false;
   }
   function fail(error: unknown) { stopCapture(); store.error = message(error); deps.notify(store.error, 'error'); }
-  async function drain(ticket: number) {
-    if (draining) return;
-    draining = true;
-    try {
-      while (queue.length && ticket === recording && !disposed) {
-        const audio = queue.shift()!;
-        store.recognizing = true;
-        const text = await deps.invoke<string>('asr_transcribe', { samples: Array.from(audio) });
-        if (ticket === recording && store.enabled && !disposed && text.trim()) receiver?.(text.trim());
-      }
-    } catch (e) { if (ticket === recording && !disposed) fail(e); }
-    finally {
-      draining = false;
-      if (ticket === recording) store.recognizing = false;
-      if (queue.length && ticket === recording && !disposed && store.enabled) void drain(ticket);
+  async function drain(ticket: number): Promise<void> {
+    if (draining) {
+      await draining;
+      if (queue.length && ticket === recording && store.enabled && !disposed) await drain(ticket);
+      return;
     }
+    const pending = (async () => {
+      try {
+        while (queue.length && ticket === recording && !disposed) {
+          const audio = queue.shift()!;
+          store.recognizing = true;
+          const text = await deps.invoke<string>('asr_transcribe', { samples: Array.from(audio) });
+          if (ticket === recording && store.enabled && !disposed && text.trim()) receiver?.(text.trim());
+        }
+      } catch (e) { if (ticket === recording && !disposed) fail(e); }
+      finally {
+        if (ticket === recording) store.recognizing = false;
+      }
+    })();
+    draining = pending;
+    try { await pending; }
+    finally { if (draining === pending) draining = undefined; }
+    if (queue.length && ticket === recording && store.enabled && !disposed) await drain(ticket);
   }
   async function start() {
     if (!receiver || !store.recordingRequested || disposed || !store.enabled || !store.engineReady || capture || starting !== undefined) return;

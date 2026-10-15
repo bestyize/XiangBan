@@ -14,13 +14,14 @@ const SNOOZE_SECONDS: i64 = 10 * 60;
 pub struct CareConfig {
     pub enabled: bool,
     pub sound: bool,
+    pub voice: bool,
     pub quiet_enabled: bool,
     pub quiet_start: String,
     pub quiet_end: String,
     pub weather_source: Source,
 }
 impl Default for CareConfig {
-    fn default() -> Self { Self { enabled: true, sound: false, quiet_enabled: false, quiet_start: "22:00".into(), quiet_end: "08:00".into(), weather_source: Source::default() } }
+    fn default() -> Self { Self { enabled: true, sound: false, voice: false, quiet_enabled: false, quiet_start: "22:00".into(), quiet_end: "08:00".into(), weather_source: Source::default() } }
 }
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
@@ -76,6 +77,7 @@ pub struct Delivery {
     pub id: String,
     pub items: Vec<Pending>,
     pub sound: bool,
+    pub voice: bool,
     pub display_seconds: i64,
 }
 #[derive(Clone, Default)]
@@ -269,25 +271,23 @@ fn blocked(app: &tauri::AppHandle, activity: &care_system::Activity) -> bool {
     let state = app.state::<ReminderState>();
     let store = state.store.lock().unwrap();
     !store.config.enabled || quiet(&store.config, Local::now().time()) || activity.locked
-        || state.game.load(Ordering::Relaxed) || state.runtime.lock().unwrap().focus || !companion_visible(app)
+        || state.game.load(Ordering::Relaxed) || state.runtime.lock().unwrap().focus
 }
 fn position(app: &tauri::AppHandle, window: &tauri::WebviewWindow) -> Result<(), String> {
-    let pet = app.get_webview_window("pet");
-    let monitor = pet.as_ref().and_then(|w| w.current_monitor().ok().flatten())
+    #[cfg(windows)] let point = care_system::foreground_point();
+    #[cfg(not(windows))] let point = app.cursor_position().ok().map(|point| (point.x as i32, point.y as i32));
+    let monitor = point.and_then(|(x, y)| app.available_monitors().ok()?.into_iter().find(|monitor| {
+        let origin = monitor.position(); let size = monitor.size();
+        x >= origin.x && y >= origin.y && (x as i64) < origin.x as i64 + size.width as i64 && (y as i64) < origin.y as i64 + size.height as i64
+    })).or_else(|| app.get_webview_window("control").and_then(|w| w.current_monitor().ok().flatten()))
         .or_else(|| app.primary_monitor().ok().flatten()).ok_or("没有可用显示器")?;
     let scale = monitor.scale_factor();
     let origin = monitor.position(); let size = monitor.size();
-    let left = origin.x as f64 / scale; let top = origin.y as f64 / scale;
-    let width = size.width as f64 / scale; let height = size.height as f64 / scale;
-    let (anchor_x, anchor_y) = if let Some(pet) = pet.filter(|_| crate::settings(app).mode == "floating") {
-        let p = pet.outer_position().map_err(|e| e.to_string())?;
-        let s = pet.outer_size().map_err(|e| e.to_string())?;
-        (p.x as f64 / scale + s.width as f64 / scale / 2.0, p.y as f64 / scale)
-    } else { (left + width * 0.7, top + height * 0.62) };
-    let x = (anchor_x - 170.0).clamp(left + 8.0, (left + width - 348.0).max(left + 8.0));
-    let y = if anchor_y - 188.0 >= top + 8.0 { anchor_y - 188.0 } else { anchor_y + crate::settings(app).size * 1.1 };
-    let y = y.clamp(top + 8.0, (top + height - 188.0).max(top + 8.0));
-    window.set_position(tauri::LogicalPosition::new(x, y)).map_err(|e| e.to_string())
+    let margin = (20.0 * scale).round() as i32;
+    let width = (340.0 * scale).round() as i32;
+    let x = origin.x + (size.width as i32 - width - margin).max(margin);
+    let y = origin.y + margin;
+    window.set_position(tauri::PhysicalPosition::new(x, y)).map_err(|e| e.to_string())
 }
 fn open_bubble(app: &tauri::AppHandle) -> Result<(), String> {
     if let Some(window) = app.get_webview_window("care") {
@@ -303,6 +303,8 @@ fn open_bubble(app: &tauri::AppHandle) -> Result<(), String> {
     #[cfg(windows)] let builder = builder.data_directory(crate::storage::webview(&crate::storage::root(app)?));
     #[cfg(target_os = "macos")] let builder = builder.incognito(true).background_throttling(tauri::utils::config::BackgroundThrottlingPolicy::Disabled);
     let window = builder.build().map_err(|e| e.to_string())?;
+    #[cfg(target_os = "macos")]
+    crate::macos::configure_scene(&window, false, false)?;
     position(app, &window)
 }
 fn close_active(app: &tauri::AppHandle) {
@@ -338,8 +340,9 @@ fn cancel_active_rule(app: &tauri::AppHandle, id: &str) {
 }
 fn show(app: &tauri::AppHandle, items: Vec<Pending>) -> Result<(), String> {
     let state = app.state::<ReminderState>();
-    let sound = state.store.lock().unwrap().config.sound;
-    let delivery = Delivery { id: format!("bubble-{}", Local::now().timestamp_millis()), items, sound, display_seconds: BUBBLE_SECONDS };
+    let config = state.store.lock().unwrap().config.clone();
+    let delivery = Delivery { id: format!("bubble-{}", Local::now().timestamp_millis()), items, sound: config.sound, voice: config.voice,
+        display_seconds: if config.voice { 30 } else { BUBBLE_SECONDS } };
     { let mut runtime = state.runtime.lock().unwrap(); runtime.active = Some(delivery.clone()); runtime.shown_at = if runtime.ready { Some(Local::now().timestamp()) } else { None }; }
     if let Err(error) = open_bubble(app) { close_active(app); return Err(error); }
     if blocked(app, &care_system::activity()) { defer_active(app); return Ok(()); }
@@ -371,6 +374,25 @@ pub fn care_ready(window: tauri::WebviewWindow) -> Result<Option<Delivery>, Stri
 #[tauri::command]
 pub fn get_care_delivery(window: tauri::WebviewWindow) -> Result<Option<Delivery>, String> {
     bubble(&window)?; Ok(window.app_handle().state::<ReminderState>().runtime.lock().unwrap().active.clone())
+}
+#[tauri::command]
+pub async fn care_synthesize(window: tauri::WebviewWindow, id: String) -> Result<tauri::ipc::Response, String> {
+    if window.label() != "care" { return Err("只有关怀气泡可以播报提醒".into()); }
+    let app = window.app_handle().clone();
+    let delivery = app.state::<ReminderState>().runtime.lock().unwrap().active.clone()
+        .filter(|delivery| delivery.id == id && delivery.voice).ok_or("提醒已关闭或未开启语音播报")?;
+    if blocked(&app, &care_system::activity()) { return Err("当前不适合播报提醒".into()); }
+    let texts: Vec<_> = delivery.items.iter().filter_map(|item| {
+        let text = item.text.trim(); if text.is_empty() { None } else { Some(text) }
+    }).collect();
+    let text = if texts.len() > 2 { format!("{}。还有 {} 条到期提醒。", texts[..2].join("。"), texts.len() - 2) }
+        else { texts.join("。") };
+    if text.is_empty() { return Err("提醒没有可播报的文字".into()); }
+    let audio = crate::tts::tts_synthesize(app.clone(), text, None).await?;
+    if app.state::<ReminderState>().runtime.lock().unwrap().active.as_ref().is_none_or(|active| active.id != id)
+        || blocked(&app, &care_system::activity()) { return Err("提醒已关闭".into()); }
+    let _ = app.emit_to("control", "care-voice-start", ());
+    Ok(audio)
 }
 #[tauri::command]
 pub fn dismiss_care(window: tauri::WebviewWindow, id: String) -> Result<(), String> {
@@ -484,9 +506,9 @@ fn tick(app: &tauri::AppHandle, elapsed: f64, checkpoint: bool) {
     }
     if blocked(app, &activity) { defer_active(app); if changed { publish(app); } return; }
     let active = state.runtime.lock().unwrap().active.clone();
-    if active.is_some() {
+    if let Some(active) = active {
         let shown_at = state.runtime.lock().unwrap().shown_at;
-        if shown_at.is_some_and(|at| now.timestamp() - at >= BUBBLE_SECONDS) { close_active(app); }
+        if shown_at.is_some_and(|at| now.timestamp() - at >= active.display_seconds) { close_active(app); }
         else if let Some(window) = app.get_webview_window("care") { let _ = position(app, &window); }
         return;
     }
@@ -643,7 +665,7 @@ fn smoke_sync(app: &tauri::AppHandle) -> Result<serde_json::Value, String> {
             return Err(format!("关怀气泡可见/焦点检查失败：{bubble_state}"));
         }
         #[cfg(windows)]
-        if bubble_state["nativeVisible"] != true || bubble_state["foregroundIsBubble"] != false || bubble_state["noActivate"] != true {
+        if bubble_state["nativeVisible"] != true || bubble_state["foregroundIsBubble"] != false || bubble_state["noActivate"] != true || bubble_state["topmost"] != true {
             return Err(format!("关怀气泡原生不激活检查失败：{bubble_state}"));
         }
         let preview = get_care_delivery(care.clone())?.ok_or("没有预览气泡")?;
@@ -708,6 +730,12 @@ fn smoke_sync(app: &tauri::AppHandle) -> Result<serde_json::Value, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn old_care_config_keeps_voice_off() {
+        let config: CareConfig = serde_json::from_str(r#"{"enabled":true,"sound":true}"#).unwrap();
+        assert!(config.sound);
+        assert!(!config.voice);
+    }
     fn date() -> DateTime<Local> { Local.with_ymd_and_hms(2026, 10, 9, 15, 10, 0).earliest().unwrap() }
     fn scheduled() -> Rule { Rule { id: "test".into(), text: "喝水".into(), revision: 1, ..Rule::default() } }
     #[test] fn due_once_deduplicates_clock_rollback_and_restart() {
@@ -747,7 +775,7 @@ mod tests {
             collect(&mut store, date(), 0.0);
             assert_eq!(store.pending.len(), 2);
             let remaining_key = store.pending.iter().find(|item| item.rule_id == "second").unwrap().key.clone();
-            let mut runtime = Runtime { active: Some(Delivery { id: "combined".into(), items: std::mem::take(&mut store.pending), sound: false, display_seconds: BUBBLE_SECONDS }),
+            let mut runtime = Runtime { active: Some(Delivery { id: "combined".into(), items: std::mem::take(&mut store.pending), sound: false, voice: false, display_seconds: BUBBLE_SECONDS }),
                 shown_at: Some(date().timestamp()), ..Runtime::default() };
             if delete { store.rules.retain(|rule| rule.id != "test"); }
             else { store.rules[0].revision += 1; }

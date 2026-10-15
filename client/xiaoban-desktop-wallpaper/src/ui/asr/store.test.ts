@@ -52,6 +52,21 @@ describe('local ASR lifecycle', () => {
     expect(h.stop).toHaveBeenCalledOnce();
     h.store.dispose();
   });
+  it('waits for an active transcription before finishing', async () => {
+    const pending = deferred<string>();
+    const h = setup({ enabled: true, modelReady: true, transcribe: () => pending.promise });
+    const text = vi.fn();
+    await h.store.activate(text);
+    h.phrase(); await flushPromises();
+    let finished = false;
+    const finish = h.store.finish().then(() => { finished = true; });
+    await flushPromises();
+    expect(finished).toBe(false);
+    pending.resolve('最后一句话'); await finish;
+    expect(text).toHaveBeenCalledWith('最后一句话');
+    expect(finished).toBe(true);
+    h.store.dispose();
+  });
   it('shows download progress and ignores a completion after turning off', async () => {
     const pending = deferred<unknown>(); const h = setup({ enabled: true, prepare: () => pending.promise });
     const text = vi.fn(); h.store.activate(text); await flushPromises();

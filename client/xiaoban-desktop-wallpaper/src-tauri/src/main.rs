@@ -681,7 +681,7 @@ fn main() {
             widgets::list_custom_widgets, widgets::save_custom_widget, widgets::remove_custom_widget,
             reminders::get_care_settings, reminders::configure_care, reminders::upsert_care_rule, reminders::delete_care_rule,
             reminders::preview_care_rule, reminders::get_care_delivery, reminders::care_ready, reminders::dismiss_care,
-            reminders::snooze_care, reminders::search_care_cities, reminders::detect_care_city, reminders::check_care_weather,
+            reminders::snooze_care, reminders::care_synthesize, reminders::search_care_cities, reminders::detect_care_city, reminders::check_care_weather,
             content::subscribe_wallpapers, content::apply_wallpaper, content::get_app_info,
             content::check_updates, content::open_download_url, local_media::import_local_wallpaper, storage::open_data_directory,
             website::set_automatic_updates, website::open_official_site, website::fetch_site_wallpapers, website::fetch_site_categories,
@@ -707,7 +707,7 @@ fn main() {
             let allowed=widgets::permitted(label,command).or_else(|| rituals::permitted(label,command)).or_else(|| games::permitted(label,command)).unwrap_or_else(|| {
                 if command=="ui_smoke_report" {return label=="control";}
                 if command=="set_companion_enabled" || command=="set_companion_links" || command=="set_companion_skin" || command=="set_desktop_effects" || command=="list_desktop_effects" || command=="open_effects_directory" || command=="import_effect_pack" {return label=="control";}
-                if label=="care" { return ["get_care_delivery","care_ready","dismiss_care","snooze_care"].contains(&command); }
+                if label=="care" { return ["get_care_delivery","care_ready","dismiss_care","snooze_care","care_synthesize"].contains(&command); }
                 if command.contains("care") { return label=="control"; }
                 content::permitted(label,command)
             });
