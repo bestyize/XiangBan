@@ -24,9 +24,9 @@ const MAX_KEY: usize = 2048;
 /// usable default here. See `src/ui/ai-config.ts` for the full list of endpoints.
 pub const DEFAULT_PROVIDERS: &[(&str, &str, &str, &str, &str)] = &[
     ("deepseek", "DeepSeek", "chat", "https://api.deepseek.com", "deepseek-chat"),
-    ("zhipu", "智谱 BigModel", "chat", "https://open.bigmodel.cn/api/paas/v4", "glm-4-flash"),
-    ("kimi", "Kimi", "chat", "https://api.moonshot.cn/v1", "kimi-k2-0905-preview"),
-    ("minimax", "MiniMax", "chat", "https://api.minimax.cn/v1", "MiniMax-M2"),
+    ("zhipu", "智谱 BigModel", "chat", "https://open.bigmodel.cn/api/paas/v4", "glm-4-plus"),
+    ("kimi", "Kimi", "chat", "https://api.moonshot.cn/v1", "moonshot-v1-auto"),
+    ("minimax", "MiniMax", "chat", "https://api.minimax.cn/v1", "MiniMax-Text-01"),
 ];
 
 #[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]

@@ -1,12 +1,12 @@
 {
   "version": 1,
-  "revision": 0,
+  "revision": 2,
   "refreshAfterSeconds": 21600,
   "providers": [
     {
       "id": "deepseek",
       "provider": "DeepSeek",
-      "description": "填写自己的 API Key 使用该供应商。",
+      "description": "高性价比通用与深度思考模型，支持 deepseek-chat (V3) 与 deepseek-reasoner (R1)。",
       "endPoint": "https://api.deepseek.com",
       "protocol": "OpenAI Chat Completions",
       "type": "third",
@@ -15,14 +15,14 @@
       "models": [
         {
           "id": "deepseek-chat",
-          "name": "deepseek-chat",
-          "description": "",
+          "name": "deepseek-chat (V3)",
+          "description": "最新一代深度求索通用基座大模型，综合推理与编码能力卓越",
           "enabled": true
         },
         {
           "id": "deepseek-reasoner",
-          "name": "deepseek-reasoner",
-          "description": "",
+          "name": "deepseek-reasoner (R1)",
+          "description": "强化推理大模型，具备完整长思维链，适合复杂逻辑与数学任务",
           "enabled": true
         }
       ],
@@ -32,41 +32,53 @@
         "Anthropic Messages": "https://api.deepseek.com/anthropic"
       },
       "consoleUrl": "https://platform.deepseek.com/api_keys",
-      "consoleText": "前往开放平台获取 API Key",
+      "consoleText": "前往 DeepSeek 开放平台获取 API Key",
       "userAccess": []
     },
     {
       "id": "zhipu",
       "provider": "智谱 BigModel",
-      "description": "填写自己的 API Key 使用该供应商。",
+      "description": "清华系自研基座大模型，默认升级为最新旗舰 glm-4-plus，支持多模态与长文本。",
       "endPoint": "https://open.bigmodel.cn/api/paas/v4",
       "protocol": "OpenAI Chat Completions",
       "type": "third",
       "enabled": true,
-      "defaultModel": "glm-4-flash",
+      "defaultModel": "glm-4-plus",
       "models": [
         {
           "id": "glm-4-plus",
-          "name": "glm-4-plus",
-          "description": "",
-          "enabled": true
-        },
-        {
-          "id": "glm-4-flash",
-          "name": "glm-4-flash",
-          "description": "",
+          "name": "glm-4-plus (最新旗舰)",
+          "description": "智谱最强基座大模型，通用逻辑、写作与指令遵循全面增强",
           "enabled": true
         },
         {
           "id": "glm-4-air",
           "name": "glm-4-air",
-          "description": "",
+          "description": "高性价比平衡款模型，兼顾速度与生成效果",
+          "enabled": true
+        },
+        {
+          "id": "glm-4-flash",
+          "name": "glm-4-flash",
+          "description": "面向个人与开发者的免费轻量模型",
+          "enabled": true
+        },
+        {
+          "id": "glm-4-flashx",
+          "name": "glm-4-flashx",
+          "description": "超高速闪电模型，专为超低延迟场景设计",
           "enabled": true
         },
         {
           "id": "glm-4-long",
           "name": "glm-4-long",
-          "description": "",
+          "description": "支持百万 Token 超长上下文输入",
+          "enabled": true
+        },
+        {
+          "id": "glm-zero-preview",
+          "name": "glm-zero-preview",
+          "description": "针对数理逻辑与复杂推理的最新强化思维模型",
           "enabled": true
         }
       ],
@@ -76,41 +88,53 @@
         "Anthropic Messages": "https://open.bigmodel.cn/api/anthropic"
       },
       "consoleUrl": "https://open.bigmodel.cn/usercenter/apikeys",
-      "consoleText": "前往开放平台获取 API Key",
+      "consoleText": "前往智谱开放平台获取 API Key",
       "userAccess": []
     },
     {
       "id": "kimi",
       "provider": "Kimi",
-      "description": "填写自己的 API Key 使用该供应商。",
+      "description": "月之暗面长文本大模型，默认配置官方推荐自动调优的 moonshot-v1-auto。",
       "endPoint": "https://api.moonshot.cn/v1",
       "protocol": "OpenAI Chat Completions",
       "type": "third",
       "enabled": true,
-      "defaultModel": "kimi-k2-0905-preview",
+      "defaultModel": "moonshot-v1-auto",
       "models": [
         {
-          "id": "kimi-k2-0905-preview",
-          "name": "kimi-k2-0905-preview",
-          "description": "",
+          "id": "moonshot-v1-auto",
+          "name": "moonshot-v1-auto (推荐)",
+          "description": "官方推荐模型，根据上下文长短自动选用最佳版本",
           "enabled": true
         },
         {
           "id": "kimi-k2-turbo-preview",
           "name": "kimi-k2-turbo-preview",
-          "description": "",
+          "description": "最新 Kimi k2 高速模型，低延迟响应",
           "enabled": true
         },
         {
-          "id": "moonshot-v1-auto",
-          "name": "moonshot-v1-auto",
-          "description": "",
+          "id": "kimi-k2-0905-preview",
+          "name": "kimi-k2-0905-preview",
+          "description": "Kimi k2 预览版",
           "enabled": true
         },
         {
           "id": "moonshot-v1-128k",
           "name": "moonshot-v1-128k",
-          "description": "",
+          "description": "支持 12.8 万 Token 长上下文阅读与解析",
+          "enabled": true
+        },
+        {
+          "id": "moonshot-v1-32k",
+          "name": "moonshot-v1-32k",
+          "description": "3.2 万 Token 适中上下文模型",
+          "enabled": true
+        },
+        {
+          "id": "moonshot-v1-8k",
+          "name": "moonshot-v1-8k",
+          "description": "8 千 Token 快速基础对话模型",
           "enabled": true
         }
       ],
@@ -120,35 +144,35 @@
         "Anthropic Messages": "https://api.moonshot.cn/anthropic"
       },
       "consoleUrl": "https://platform.kimi.com/console/api-keys",
-      "consoleText": "前往开放平台获取 API Key",
+      "consoleText": "前往 Kimi 开放平台获取 API Key",
       "userAccess": []
     },
     {
       "id": "minimax",
       "provider": "MiniMax",
-      "description": "填写自己的 API Key 使用该供应商。",
+      "description": "MiniMax 开放平台大模型，默认采用最新万亿参数 MoE 旗舰 MiniMax-Text-01。",
       "endPoint": "https://api.minimax.cn/v1",
       "protocol": "OpenAI Chat Completions",
       "type": "third",
       "enabled": true,
-      "defaultModel": "MiniMax-M2",
+      "defaultModel": "MiniMax-Text-01",
       "models": [
         {
-          "id": "MiniMax-M2",
-          "name": "MiniMax-M2",
-          "description": "",
+          "id": "MiniMax-Text-01",
+          "name": "MiniMax-Text-01 (最新旗舰)",
+          "description": "MiniMax 最新万亿 MoE 基座模型，综合表现优异，支持超长文本",
           "enabled": true
         },
         {
-          "id": "MiniMax-Text-01",
-          "name": "MiniMax-Text-01",
-          "description": "",
+          "id": "MiniMax-M2",
+          "name": "MiniMax-M2",
+          "description": "轻量高响应模型",
           "enabled": true
         },
         {
           "id": "abab6.5s-chat",
           "name": "abab6.5s-chat",
-          "description": "",
+          "description": "通用高效对话模型",
           "enabled": true
         }
       ],
@@ -158,7 +182,7 @@
         "Anthropic Messages": "https://api.minimax.cn/anthropic"
       },
       "consoleUrl": "https://platform.minimaxi.com/user-center/basic-information/interface-key",
-      "consoleText": "前往开放平台获取 API Key",
+      "consoleText": "前往 MiniMax 开放平台获取 API Key",
       "userAccess": []
     }
   ]
