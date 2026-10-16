@@ -104,7 +104,15 @@ impl Agent {
 
     fn prepare(&self, session: &str, call: &ToolCall, cancel: &Arc<AtomicBool>) -> Prepared {
         let Some(&index) = self.tool_index.get(&call.name) else {
-            return Prepared::Done(ToolResult::error(format!("unknown tool `{}`", call.name)));
+            let mut names: Vec<&str> = self.tools.iter().map(|tool| tool.spec().name.as_str()).collect();
+            names.sort_unstable();
+            let available = if names.is_empty() { "(none)".to_string() } else { names.join(", ") };
+            return Prepared::Done(ToolResult::error(format!(
+                "unknown tool `{}`. No tool was executed. Available tools: {}. \
+                 Use an exact registered name and its argument schema from the current tool definitions; \
+                 do not invent names or reuse names from another client. If no suitable tool is available, explain that limitation.",
+                call.name, available,
+            )));
         };
         if cancel.load(Ordering::Relaxed) {
             return Prepared::Done(ToolResult::error("cancelled"));
@@ -165,3 +173,4 @@ impl Agent {
         result
     }
 }
+
