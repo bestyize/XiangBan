@@ -109,7 +109,10 @@ pub fn account_changed(app: &tauri::AppHandle) {
         let uid = owner(app);
         if config.catalogue_owner == uid { return; }
         for p in &mut config.providers {
-            if p.remote && matches!(p.provider_type.as_str(), "free" | "paid") { p.api_key.clear(); p.available = false; }
+            if p.remote && (p.provider_type == "paid" || (p.provider_type == "free" && !p.api_key.is_empty())) {
+                p.api_key.clear();
+                p.available = false;
+            }
         }
         config.catalogue_owner = uid; config.catalogue_fetched_at = 0; config.catalogue_etag.clear();
         activate_snapshot(&mut config);
