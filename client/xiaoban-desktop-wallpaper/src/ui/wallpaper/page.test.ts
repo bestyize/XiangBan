@@ -45,3 +45,15 @@ describe('wallpaper tabs rendering',()=>{
  await flushPromises();expect(wrapper.findAll('.n-tabs-tab__label').map(node=>node.text())).toEqual(['我的壁纸','在线资源']);expect(wrapper.find('h1').exists()).toBe(false);expect(wrapper.find('.desktop-overview').exists()).toBe(false);expect(wrapper.findAll('button').some(button=>button.text()==='订阅与清单')).toBe(false);expect(wrapper.find('[data-testid="import-media"]').exists()).toBe(true);wrapper.unmount();
  });
 });
+
+
+it('labels authored HTML as animation and offers a preview without changing the desktop',async()=>{
+ const store=reactive({desktop:false,settings:JSON.parse(JSON.stringify(defaults)),library:{items:[{definition:{id:'local-stars',title:'星空',kind:'web',version:'1.0.0',resource:{url:'local://hash',sha256:'',bytes:100,mime:'text/html'}},installed:true,coverUrl:null,previewUrl:'wallpaper-asset://localhost/hash',source:'local'}],source:'',activeId:''},applyWallpaper:vi.fn().mockResolvedValue(undefined),notify:vi.fn()} as unknown as ControlStore);
+ const wrapper=mount(WallpaperPage,{props:{store},global:{stubs:{NButton:{template:'<button><slot /></button>'},NInput:stub,NSelect:stub,NSlider:stub,NSwitch:stub,NTabs:stub,NTabPane:stub,NEmpty:stub,NAlert:stub,NPagination:stub,NCollapse:stub,NCollapseItem:stub,NColorPicker:stub,NSpin:stub,NPopconfirm:stub}}});
+ expect(wrapper.get('[data-testid="wallpaper-card-local-stars"] .type-badge').text()).toBe('动画');
+ await wrapper.get('[data-testid="wallpaper-card-local-stars"]').trigger('click');await flushPromises();
+ const preview=wrapper.findAll('button').find(button=>button.text()==='独立窗口预览');
+ expect(preview).toBeDefined();await preview!.trigger('click');await flushPromises();
+ expect(store.applyWallpaper).toHaveBeenCalledWith('local-stars',expect.any(Object),true);
+ expect(store.settings.wallpaperId).toBe(defaults.wallpaperId);wrapper.unmount();
+});

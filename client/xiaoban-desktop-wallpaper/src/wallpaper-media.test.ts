@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { siteMedia, siteFullMedia, mediaUrl, type SiteWallpaper } from "./wallpaper-media";
+import { siteMedia, siteFullMedia, mediaUrl, mediaMarkup, type SiteWallpaper } from "./wallpaper-media";
 const video: SiteWallpaper = {
   id: "pixabay_v_284566",
   title: "Desert",
@@ -88,4 +88,17 @@ describe("full-screen media", () => {
     expect(siteFullMedia(clip, site).video).toBe("https://cdn.example/1440.mp4");
     expect(siteFullMedia({ ...clip, video: { preview_url: "https://cdn.example/tiny.mp4", qualities: [] } }, site).video).toBe("https://cdn.example/tiny.mp4");
   });
+});
+
+
+it('renders selected HTML animations in an isolated frame and leaves gallery cards static', () => {
+  const selected = mediaMarkup('web', 'wallpaper-asset://localhost/hash', '', '星空', true);
+  expect(selected).toContain('<iframe');
+  expect(selected).toContain('sandbox="allow-scripts"');
+  expect(selected).not.toContain('allow-same-origin');
+  expect(selected).not.toContain('<img');
+  const card = mediaMarkup('web', 'wallpaper-asset://localhost/hash', '', '星空');
+  expect(card).not.toContain('<iframe');
+  expect(card).toContain('选择后预览动画');
+  expect(mediaMarkup('web', '" onload="bad', '', '<test>', true)).not.toContain('src="" onload=');
 });

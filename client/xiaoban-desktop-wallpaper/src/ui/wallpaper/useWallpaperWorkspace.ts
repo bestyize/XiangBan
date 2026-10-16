@@ -1,6 +1,6 @@
 import { computed, reactive, ref, watch, onScopeDispose } from "vue";
 import { invoke, listen, wallpaperDefaults, type WallpaperEntry, type WallpaperLibrary, type WallpaperOptions } from "../../bridge.ts";
-import type { SiteWallpaper } from "../../wallpaper-media.ts";
+import { isAnimatedWallpaper, type SiteWallpaper } from "../../wallpaper-media.ts";
 import type { ControlStore } from "../control-types.ts";
 /** Error text of a download the user stopped; matches `library::CANCELLED` in the native host. */
 export const DOWNLOAD_CANCELLED = "已取消下载";
@@ -52,8 +52,8 @@ export function useWallpaperWorkspace(store: ControlStore) {
   watch(() => store.settings.websiteUrl, () => { generation++; prepared.clear(); Object.assign(feed,{items:[],has_more:false,total:0}); categories.value=[]; selection.value=null; page.value=1; if(tab.value === "online") {void load();void loadCategories();} });
   onScopeDispose(() => {generation++;disposed=true;unlisten?.();progress.value=null;progressId=undefined;});
   /** 动画（程序绘制）排在最前，其次图片、视频；排序保持稳定，同类型内仍按原有顺序。 */
-  const KIND_ORDER: Record<string, number> = { canvas: 0, image: 1, video: 2 };
-  const localItems = computed(() => store.library.items.filter(entry => (!media.value || entry.definition.kind === media.value) && (!localSource.value || entry.source === localSource.value) && entry.definition.title.toLowerCase().includes(query.value.toLowerCase())).sort((a, b) => (KIND_ORDER[a.definition.kind] ?? 3) - (KIND_ORDER[b.definition.kind] ?? 3)));
+  const KIND_ORDER: Record<string, number> = { canvas: 0, web: 0, image: 1, video: 2 };
+  const localItems = computed(() => store.library.items.filter(entry => (!media.value || (media.value === "canvas" ? isAnimatedWallpaper(entry.definition.kind) : entry.definition.kind === media.value)) && (!localSource.value || entry.source === localSource.value) && entry.definition.title.toLowerCase().includes(query.value.toLowerCase())).sort((a, b) => (KIND_ORDER[a.definition.kind] ?? 3) - (KIND_ORDER[b.definition.kind] ?? 3)));
   async function prepare(value: Selection) {
     if(value.source === "local") return value.item.definition.id;
     const site = store.settings.websiteUrl, key = value.item.id;
@@ -76,3 +76,4 @@ export function useWallpaperWorkspace(store: ControlStore) {
   const saved = computed(() => { const chosen=selection.value; if(chosen?.source!=="online") return false; const id=prepared.get(chosen.item.id) || chosen.item.desktop_id; return store.library.items.some(item=>item.definition.id===id && item.installed); });
   return {progress,progressPercent,saved,tab,media,query,category,page,localSource,selection,draft,busy,downloading,cancelling,loading,error,feed,categories,kind,select,cancel,cancelDownload,load,localItems,action};
 }
+

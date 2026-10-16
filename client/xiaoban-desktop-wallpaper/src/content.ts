@@ -205,7 +205,7 @@ export async function mountContent() {
       await ready({ width: video.videoWidth, height: video.videoHeight });
     } else if (state.item.kind === "web") {
       frame = document.createElement("iframe");
-      frame.setAttribute("sandbox", "allow-scripts allow-forms allow-same-origin");
+      frame.setAttribute("sandbox", "allow-scripts");
       frame.setAttribute("allow", "autoplay");
       frame.title = state.item.title;
       frame.style.width = "100%";
@@ -310,3 +310,4 @@ export async function mountContent() {
     fail(error);
   }
 }
+
