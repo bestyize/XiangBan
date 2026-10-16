@@ -775,6 +775,14 @@ fn tool(desktop: &Arc<dyn Desktop>, spec: ToolSpec, run: impl Fn(&dyn Desktop, &
     Arc::new(DesktopTool { spec, desktop: desktop.clone(), run: Box::new(run) })
 }
 
+fn effect_read_format(_: &dyn Desktop, _: &Value) -> Result<String, String> {
+    Ok(format!(
+        "以下是小伴程序内置的完整特效包格式和示例，可离线读取，无需查找本地文件。文档中的源码路径仅供开发参考，示例已附在末尾。\n\n{}\n\n## 完整可用示例\n\n```json\n{}\n```",
+        crate::effect_packs::FORMAT_GUIDE,
+        crate::effect_packs::EXAMPLE,
+    ))
+}
+
 pub fn tools(desktop: Arc<dyn Desktop>) -> Vec<Arc<dyn Tool>> {
     let none = || object(json!({}), &[]);
     let status_run = |d: &dyn Desktop, _: &Value| -> Result<String, String> { Ok(d.status()?.to_string()) };
@@ -816,6 +824,11 @@ pub fn tools(desktop: Arc<dyn Desktop>) -> Vec<Arc<dyn Tool>> {
         tool(&desktop, ToolSpec::new("effect_list", "列出桌面特效（雨、雪、花瓣等）和正在使用的那个。", none()), effect_list),
         tool(
             &desktop,
+            ToolSpec::new("effect_read_format", "读取程序内置的完整桌面特效包格式与可用 JSON 示例。创作特效前先调用本工具；无需搜索工作目录、安装目录或联网查找文档。", none()).risk(Risk::Read),
+            effect_read_format,
+        ),
+        tool(
+            &desktop,
             ToolSpec::new("effect_set", "切换桌面特效，用 effect_list 里的 id；id 为 none 表示关闭特效。", object(json!({"id": {"type": "string"}}), &["id"])).risk(Risk::Write).serial(),
             effect_set,
         ),
@@ -823,7 +836,7 @@ pub fn tools(desktop: Arc<dyn Desktop>) -> Vec<Arc<dyn Tool>> {
             &desktop,
             ToolSpec::new(
                 "effect_create",
-                format!("为用户创作一个新的桌面特效包并保存到特效文件夹，保存后它就能像内置特效一样被选用。先想清楚要什么效果，再按下面的格式写一份完整的 JSON 放进 pack。pack 是一个 JSON 对象（也可写成 JSON 字符串），必须包含 schemaVersion、id、name、layers。{}", crate::effects::format_help()),
+                format!("为用户创作一个新的桌面特效包并保存到特效文件夹，保存后它就能像内置特效一样被选用。先调用 effect_read_format 阅读内置的完整格式和示例，再按下面的格式写一份完整的 JSON 放进 pack。pack 是一个 JSON 对象（也可写成 JSON 字符串），必须包含 schemaVersion、id、name、layers。{}", crate::effects::format_help()),
                 object(
                     json!({
                         "pack": {
@@ -1178,7 +1191,7 @@ mod tests {
         let mut unique = names.clone();
         unique.dedup();
         assert_eq!(names, unique);
-        assert_eq!(names.len(), 25);
+        assert_eq!(names.len(), 26);
         for tool in &all {
             let spec = tool.spec();
             assert!(spec.name.len() <= 64 && spec.name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_'), "{}", spec.name);
@@ -1188,7 +1201,7 @@ mod tests {
         let read: Vec<&str> = all.iter().filter(|t| t.spec().risk == Risk::Read).map(|t| t.spec().name.as_str()).collect();
         let mut read = read;
         read.sort();
-        assert_eq!(read, vec!["care_list", "desktop_status", "effect_list", "game_list", "request_accessibility_permission", "wallpaper_list", "widget_list"]);
+        assert_eq!(read, vec!["care_list", "desktop_status", "effect_list", "effect_read_format", "game_list", "request_accessibility_permission", "wallpaper_list", "widget_list"]);
         for tool in all.iter().filter(|t| t.spec().risk == Risk::Write) {
             assert!(!tool.spec().parallel_safe, "{} changes shared settings, so it runs alone", tool.spec().name);
         }
@@ -1202,6 +1215,20 @@ mod tests {
         let out = call(&fake, "effect_list", json!({})).unwrap();
         assert_eq!(out, "当前特效：rain\nrain | 细雨 | 正在使用\nsnow | 飘雪");
         assert!(call(&fake, "desktop_status", json!({})).unwrap().contains("\"wallpaper\":\"w1\""));
+    }
+
+    #[test]
+    fn effect_format_is_embedded_complete_and_read_only() {
+        let fake = Arc::new(Fake::default());
+        let out = call(&fake, "effect_read_format", json!({})).unwrap();
+        assert!(out.contains(crate::effect_packs::FORMAT_GUIDE));
+        assert!(out.contains(crate::effect_packs::EXAMPLE));
+        assert!(out.contains("## 粒子层") && out.contains("## 形状"));
+        let example: Value = serde_json::from_str(crate::effect_packs::EXAMPLE).unwrap();
+        crate::effect_packs::validate(&example).unwrap();
+        assert!(fake.calls().is_empty(), "reading documentation never touches desktop state");
+        let all = tools(fake);
+        assert!(all.iter().find(|tool| tool.spec().name == "effect_create").unwrap().spec().description.contains("effect_read_format"));
     }
 
     #[test]
@@ -1547,3 +1574,4 @@ mod tests {
         assert!(call(&fake, "widget_delete_custom", json!({})).is_err());
     }
 }
+

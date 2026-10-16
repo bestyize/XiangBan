@@ -22,6 +22,8 @@ const BUILTIN: [(&str, &str); 12] = [
 #[cfg(test)]
 pub const CATALOG: &str = include_str!("../../public/effects/catalog.json");
 /// Written into a new `effects` folder so the format has an example next to it. A name that starts with `_` is not loaded.
+// Compile the guide alongside the example so installed assistants do not need the source tree.
+pub const FORMAT_GUIDE: &str = include_str!("../../docs/effects.md");
 pub const EXAMPLE: &str = include_str!("../../docs/effect-pack-example.json");
 pub const EXAMPLE_NAME: &str = "_示例-星尘.json";
 const MAX_FILE: u64 = 64 * 1024;
@@ -330,3 +332,4 @@ mod tests {
         assert!(delete(&dir, "glitter").unwrap_err().contains("未找到"));
     }
 }
+

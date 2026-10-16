@@ -242,5 +242,6 @@ pub fn format_help() -> &'static str {
      alpha [0.5,1]、wind 阵风、sway {amplitude,frequency} 左右摇摆、wander 游荡、spin 自转弧度每秒、pendulum 摆动幅度、\
      scatter 0-1、flip {rate,min} 翻面、twinkle {rate,depth} 闪烁、blend normal/add（发光用 add）、orient fixed/motion；\
      另有 burst（隔一会儿出现一次，用于流星、烟花、涟漪）和 band（聚在一条带上，用于银河、极光）。\
-     完整的字段说明在 docs/effects.md，示例见 docs/effect-pack-example.json。"
+     完整字段说明和可用示例由 effect_read_format 工具提供，已内置在程序中；不要在工作目录查找源码文档。"
 }
+
