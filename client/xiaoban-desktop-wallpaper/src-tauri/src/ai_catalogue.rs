@@ -52,7 +52,7 @@ pub fn merge(config: &mut AiConfig, catalogue: Catalogue) -> Result<(), String> 
         }
         let mut models = HashSet::new();
         if p.models.iter().any(|m| m.id.trim().is_empty() || !models.insert(m.id.clone())) { return Err("模型列表无效".into()); }
-        if p.provider_type != "third" && p.apikey.is_empty() { return Err("官方服务未提供调用凭证".into()); }
+        if p.provider_type == "paid" && p.apikey.is_empty() { return Err("官方服务未提供调用凭证".into()); }
         let proto = protocol(&p.protocol)?;
         let mut endpoints = BTreeMap::new();
         for (k, v) in p.endpoints { if !address(&v) { return Err("协议地址无效".into()); } endpoints.insert(protocol(&k)?, v.trim_end_matches('/').to_string()); }
@@ -119,11 +119,18 @@ pub fn account_changed(app: &tauri::AppHandle) {
 pub fn usable(app: &tauri::AppHandle, config: &AiConfig) -> Result<(), String> {
     if let Some(p) = config.providers.iter().find(|p| p.id == config.active_provider) {
         if !p.available { return Err("当前模型供应商已停用，请切换模型".into()); }
-        if p.remote && p.provider_type != "third" {
+        if p.remote && p.provider_type == "paid" {
             if config.catalogue_owner != owner(app) || config.catalogue_owner.is_empty() || p.api_key.is_empty()
                 || !crate::account::get_account_session(app.clone()).is_some_and(|s| s.expires_at > now() as i64) {
                 return Err("请登录并刷新模型配置后使用官方服务".into());
             }
+        } else if p.remote && p.provider_type == "free" && !p.api_key.is_empty() {
+            if config.catalogue_owner != owner(app) || config.catalogue_owner.is_empty()
+                || !crate::account::get_account_session(app.clone()).is_some_and(|s| s.expires_at > now() as i64) {
+                return Err("请登录并刷新模型配置后使用官方服务".into());
+            }
+        }
+        if p.remote && p.provider_type != "third" {
             if !p.models.iter().any(|m| m.id == p.model) { return Err("当前模型已停用，请切换模型".into()); }
         }
     }

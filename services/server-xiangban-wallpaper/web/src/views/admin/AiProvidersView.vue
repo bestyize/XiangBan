@@ -71,7 +71,7 @@ async function remove(p: AiProvider) {
         <label><input v-model="draft.enabled" type="checkbox" /> 启用供应商</label>
         <label>默认模型<select v-model="draft.defaultModel"><option value="">请选择</option><option v-for="m in draft.models.filter(m => m.enabled)" :key="m.id" :value="m.id">{{ m.name || m.id }}</option></select></label>
         <template v-if="draft.type === 'free'">
-          <label class="wide">专用受限调用凭证<input v-model="draft.apikey" type="password" autocomplete="new-password" :placeholder="draft.hasKey ? '已配置，留空保持原值' : '填写用于免费服务的专用受限凭证'" /></label>
+          <label class="wide">调用凭证（公共免密网关留空即可）<input v-model="draft.apikey" type="password" autocomplete="new-password" :placeholder="draft.hasKey ? '已配置，留空保持原值' : '免密网关直接留空；若有自备受限 Key 则填入'" /></label>
           <label><input v-model="draft.clearKey" type="checkbox" /> 清除已保存凭证（需停用供应商）</label>
         </template>
         <template v-if="draft.type === 'third'">

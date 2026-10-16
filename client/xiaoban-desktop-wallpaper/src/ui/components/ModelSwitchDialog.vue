@@ -9,7 +9,7 @@ const selected = ref('');
 const busy = ref(false);
 const error = ref('');
 const choices = computed(() => (config.value?.providers ?? [])
-  .filter(p => p.available !== false && p.baseUrl && (p.hasKey || p.isCustom))
+  .filter(p => p.available !== false && p.baseUrl && (p.hasKey || p.isCustom || p.type === 'free'))
   .sort((a, b) => rank(a) - rank(b))
   .flatMap(p => (p.models?.length ? p.models : [{ id: p.model, name: p.model }]).filter(m => m.id)
     .map(m => ({ label: p.name + ' · ' + m.name + (p.type === 'free' ? ' · 免费' : p.type === 'paid' ? ' · 付费' : ''),

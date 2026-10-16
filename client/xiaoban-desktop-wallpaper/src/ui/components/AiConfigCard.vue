@@ -168,11 +168,11 @@ function isProviderActive(id: string): boolean {
   return saved.value.activeProvider === id;
 }
 
-// 没有配置 API Key 的，不算已配置，显示为待配置
+// 没有配置 API Key 的，不算已配置，显示为待配置；官方免费服务(free)或自定义本地服务允许免密
 function isProviderFullyConfigured(id: string): boolean {
   const p = getProviderSaved(id);
   if (!p) return false;
-  return p.available !== false && Boolean(p.baseUrl && p.model && (p.hasKey || p.isCustom));
+  return p.available !== false && Boolean(p.baseUrl && p.model && (p.hasKey || p.isCustom || p.type === 'free'));
 }
 
 // 真正正在使用中的服务商：必须是 activeProvider 且已经配置了密钥（或是自定义服务）
@@ -254,7 +254,7 @@ function openCreateCustomModal() {
 async function activateProvider(id: string) {
   if (!props.store.desktop) return;
   const p = getProviderSaved(id);
-  if (!p || p.available === false || !p.baseUrl || !p.model || (!p.hasKey && !p.isCustom)) {
+  if (!p || p.available === false || !p.baseUrl || !p.model || (!p.hasKey && !p.isCustom && p.type !== 'free')) {
     props.store.notify('该服务商尚未完整配置（缺少密钥或地址），请先配置', 'info');
     openConfigureModal(id);
     return;

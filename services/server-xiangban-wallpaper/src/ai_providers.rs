@@ -100,9 +100,6 @@ impl Catalogue {
             if p.apikey.as_ref().is_some_and(|key| key.len() > 2048 || key.chars().any(char::is_whitespace)) {
                 return Err(bad("凭证包含空白字符或过长"));
             }
-            if p.enabled && p.provider_type == "free" && p.apikey.as_deref().unwrap_or("").is_empty() {
-                return Err(bad("免费服务需要配置专用的受限调用凭证"));
-            }
             let mut users = HashSet::new();
             for access in &p.user_access {
                 if uuid::Uuid::parse_str(&access.uid).is_err() || !users.insert(&access.uid)
@@ -148,7 +145,14 @@ impl Catalogue {
         let providers: Vec<_> = self.providers.iter().filter(|p| p.enabled).filter_map(|p| {
             let key = match p.provider_type.as_str() {
                 "third" => None,
-                "free" => { uid?; p.apikey.clone() },
+                "free" => {
+                    if let Some(token) = p.apikey.as_ref().filter(|k| !k.is_empty()) {
+                        uid?;
+                        Some(token.clone())
+                    } else {
+                        None
+                    }
+                }
                 "paid" => Some(p.user_access.iter().find(|a| Some(a.uid.as_str()) == uid)?.apikey.clone()?),
                 _ => return None,
             };
