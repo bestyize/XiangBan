@@ -34,7 +34,9 @@ pub fn validate(item: &Wallpaper) -> Result<(), String> {
     if !library::hash_name(&r.sha256)
         || r.bytes == 0
         || r.bytes > MAX_LOCAL_FILE
-        || item.id != format!("local-{}", &r.sha256[..32])
+        || (if item.kind == "web" {
+            !item.id.strip_prefix("local-").is_some_and(|id| id.len() == 32 && id.bytes().all(|c| c.is_ascii_digit() || (b'a'..=b'f').contains(&c)))
+        } else { item.id != format!("local-{}", &r.sha256[..32]) })
         || r.url != format!("{PREFIX}{}", r.sha256)
         || item.cover.is_some()
         || !item.assets.is_empty()
@@ -262,7 +264,7 @@ pub fn save_local_html(
     let target = directory.join(&hash);
 
     let desc = description.unwrap_or("由小伴现场创作的自包含动态桌面壁纸。").trim();
-    let item = Wallpaper {
+    let mut item = Wallpaper {
         id: format!("local-{}", &hash[..32]),
         version: "1.0.0".into(),
         title: title_clean.to_string(),
@@ -283,6 +285,15 @@ pub fn save_local_html(
 
     let result = (|| -> Result<Wallpaper, String> {
         let mut catalog = read(root)?;
+        if let Some(existing) = catalog.items.iter().find(|old| old.kind == "web" && old.resource.sha256 == hash) {
+            item.id = existing.id.clone();
+        } else if catalog.items.iter().any(|old| old.id == item.id) {
+            // An edited wallpaper can still own the id originally derived from this HTML.
+            item.id = (1..=1000).map(|n| {
+                let unique = format!("{:x}", Sha256::digest(format!("{hash}:{n}").as_bytes()));
+                format!("local-{}", &unique[..32])
+            }).find(|candidate| !catalog.items.iter().any(|old| &old.id == candidate)).ok_or("无法分配壁纸标识")?;
+        }
         if let Some(existing) = catalog.items.iter().find(|old| old.id == item.id) {
             if existing.resource.sha256 != hash {
                 return Err("本地壁纸标识冲突".into());
@@ -307,6 +318,34 @@ pub fn save_local_html(
         let _ = fs::remove_file(&temporary);
     }
     result
+}
+
+/// Replaces authored HTML while keeping its library identity and presentation metadata.
+/// Old content hashes stay available for the active renderer and version restoration.
+pub fn update_local_html(root: &Path, id: &str, title: &str, description: &str, html: &str) -> Result<Wallpaper, String> {
+    let mut catalog = read(root)?;
+    let item = catalog.items.iter_mut().find(|item| item.id == id && item.kind == "web")
+        .ok_or("只能编辑自己创作的 HTML 壁纸")?;
+    if html.trim().is_empty() { return Err("HTML 内容不能为空".into()); }
+    let hash = format!("{:x}", Sha256::digest(html.as_bytes()));
+    item.title = title.trim().to_string();
+    item.description = description.to_string();
+    item.resource = Resource { url: format!("{PREFIX}{hash}"), sha256: hash.clone(), bytes: html.len() as u64, mime: "text/html".into() };
+    let mut version = semver::Version::parse(&item.version).map_err(|e| e.to_string())?;
+    version.patch = version.patch.checked_add(1).ok_or("壁纸版本号过大")?;
+    item.version = version.to_string();
+    validate(item)?;
+    let result = item.clone();
+    let directory = root.join("imports");
+    fs::create_dir_all(&directory).map_err(|e| e.to_string())?;
+    let target = directory.join(&hash);
+    if !library::verify_file(&target, &result.resource)? {
+        let temporary = directory.join(format!(".edit-{}.tmp", std::process::id()));
+        fs::write(&temporary, html.as_bytes()).map_err(|e| e.to_string())?;
+        fs::rename(&temporary, &target).map_err(|e| { let _ = fs::remove_file(&temporary); e.to_string() })?;
+    }
+    library::save_json(&root.join("local.json"), &catalog)?;
+    Ok(result)
 }
 
 /// Deletes a local wallpaper by id. Only local wallpapers (`local-*`) can be deleted.

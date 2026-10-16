@@ -136,4 +136,7 @@ it('summarizes authored resources by title or pack name', () => {
   expect(describeCall('wallpaper_create', JSON.stringify({title:'星空',html:'<html></html>'}))).toBe('星空');
   expect(describeCall('effect_create', JSON.stringify({pack:{id:'stars',name:'繁星'}}))).toBe('繁星');
   expect(describeCall('game_create', JSON.stringify({id:'star-game',name:'摘星星',files:[]}))).toBe('摘星星');
+  expect(describeCall('resource_read', JSON.stringify({kind:'wallpaper',id:'my-snow'}))).toBe('my-snow');
+  expect(describeCall('resource_edit', JSON.stringify({kind:'widget',id:'my-clock',changes:[]}))).toBe('my-clock');
+  expect(describeCall('resource_restore', JSON.stringify({kind:'game',id:'my-game'}))).toBe('my-game');
 });

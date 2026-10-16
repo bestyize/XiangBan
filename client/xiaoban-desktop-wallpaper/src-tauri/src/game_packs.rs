@@ -478,6 +478,15 @@ fn swap_in(temporary: &Path, target: &Path, backup: &Path, had_old: bool) -> Res
 /// Writes a new game folder. The files go to a temporary folder first and are renamed into place at the
 /// end; with `overwrite` the old folder is set aside and put back if the swap fails.
 pub fn create_pack(root: &Path, id: &str, name: &str, description: &str, files: &[(String, String)], save: bool, overwrite: bool) -> Result<Value, String> {
+    write_pack(root, id, name, description, files, save, overwrite, false)
+}
+
+/// Source edits retain existing manifest options and never touch the external save directory.
+pub fn edit_pack(root: &Path, id: &str, name: &str, description: &str, files: &[(String, String)], save: bool) -> Result<Value, String> {
+    write_pack(root, id, name, description, files, save, true, true)
+}
+
+fn write_pack(root: &Path, id: &str, name: &str, description: &str, files: &[(String, String)], save: bool, overwrite: bool, preserve_manifest: bool) -> Result<Value, String> {
     validate_request(id, name, description, files)?;
     let (name, description) = check_meta(name, description)?;
     let _guard = WRITE_LOCK.lock().unwrap_or_else(|e| e.into_inner());
@@ -485,6 +494,12 @@ pub fn create_pack(root: &Path, id: &str, name: &str, description: &str, files: 
     fs::create_dir_all(&packs).map_err(|e| format!("无法创建游戏文件夹：{e}"))?;
     let target = packs.join(id);
     let exists = fs::symlink_metadata(&target).is_ok();
+    let original_manifest = if preserve_manifest {
+        // Validate the existing pack before reading its options. No new pack is created by edit_pack.
+        find_user_game(root, id)?;
+        let text = fs::read_to_string(target.join("manifest.json")).map_err(|e| e.to_string())?;
+        Some(serde_json::from_str::<Value>(text.trim_start_matches('\u{feff}')).map_err(|e| e.to_string())?)
+    } else { None };
     if exists && !overwrite {
         return Err(format!("游戏「{id}」已经存在，请换一个 id，或设置 overwrite=true 覆盖它"));
     }
@@ -504,11 +519,12 @@ pub fn create_pack(root: &Path, id: &str, name: &str, description: &str, files: 
             }
             fs::write(&destination, content.as_bytes()).map_err(|e| format!("无法写入 {path}：{e}"))?;
         }
-        let mut manifest = json!({
-            "id": id, "name": name, "description": description, "entry": "index.html",
-            "runtimeProtocol": 1, "save": save,
-        });
-        if files.iter().any(|(p, _)| p == "cover.svg") {
+        let mut manifest = original_manifest.clone().unwrap_or_else(|| json!({}));
+        for (key, value) in [("id", json!(id)), ("name", json!(name)), ("description", json!(description)),
+            ("entry", json!("index.html")), ("runtimeProtocol", json!(1)), ("save", json!(save))] {
+            manifest[key] = value;
+        }
+        if manifest.get("cover").is_none() && files.iter().any(|(p, _)| p == "cover.svg") {
             manifest["cover"] = json!("cover.svg");
         }
         let text = serde_json::to_string_pretty(&manifest).map_err(|e| e.to_string())?;

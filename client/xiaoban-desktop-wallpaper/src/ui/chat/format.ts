@@ -10,6 +10,7 @@ const TOOL_LABELS: Record<string, string> = {
   widget_list: '查看桌面组件', widget_add: '添加桌面组件', widget_update: '调整桌面组件', widget_remove: '移除桌面组件', widget_create: '创作桌面组件', widget_delete_custom: '删除自创组件',
   game_list: '查看游戏列表', game_open: '打开游戏', game_close: '退出游戏', game_create: '创作游戏', game_delete: '删除游戏',
   request_accessibility_permission: '打开系统权限设置',
+  resource_read: '读取作品', resource_edit: '修改作品', resource_restore: '恢复作品版本', effect_adjust: '调整特效参数',
   list_apps: '查看应用列表', get_app_state: '获取窗口状态', click: '模拟点击',
   type_text: '模拟键盘打字', press_key: '模拟按键', scroll: '模拟滚动',
   drag: '模拟拖拽', set_value: '设置控件值', perform_secondary_action: '触发辅助动作',
@@ -47,6 +48,14 @@ export function approvalPreview(request: Pick<ApprovalRequest, 'tool' | 'argumen
       return `从桌面移除组件：${str(args.id)}`;
     case 'widget_update':
       return `调整桌面组件 ${str(args.id)}`;
+    case 'resource_edit': {
+      const changes = Array.isArray(args.changes) ? args.changes.filter((change): change is Record<string, unknown> => !!change && typeof change === 'object') : [];
+      return `修改作品 ${str(args.id)}\n${changes.map(change => `${str(change.file)}\n- ${cut(str(change.old_string), 400)}\n+ ${cut(str(change.new_string), 400)}`).join('\n\n')}`;
+    }
+    case 'resource_restore':
+      return `将作品 ${str(args.id)} 恢复到版本 ${str(args.version)}`;
+    case 'effect_adjust':
+      return `调整${args.id ? `特效 ${str(args.id)}` : '当前特效'}：${(['density', 'speed', 'size'] as const).filter(key => args[key] !== undefined).map(key => `${({ density: '密度', speed: '速度', size: '大小' })[key]} ${String(args[key])}`).join('，')}`;
     case 'edit_file':
       return `${str(args.path)}\n\n- ${cut(str(args.old_string), 600).replace(/\n/g, '\n  ')}\n+ ${cut(str(args.new_string), 600).replace(/\n/g, '\n  ')}`;
     default:
@@ -81,4 +90,3 @@ export const clip = (text: string, max = 6000) => (text.length > max ? `${text.s
 export function prettyArguments(argumentsJson: string): string {
   try { return clip(JSON.stringify(JSON.parse(argumentsJson), null, 2), 4000); } catch { return clip(argumentsJson, 4000); }
 }
-

@@ -22,6 +22,7 @@ mod chat;
 mod storage;
 mod local_media;
 mod resource_packs;
+mod resource_editor;
 mod games;
 mod game_packs;
 mod rituals;
@@ -840,5 +841,3 @@ fn main() {
         }
     });
 }
-
-

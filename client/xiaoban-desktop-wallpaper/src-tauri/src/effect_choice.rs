@@ -48,6 +48,26 @@ pub struct EffectsChoice {
 const LEGACY: [(&str, &str); 6] = [("rain", "rain"), ("snow", "snow"), ("fireflies", "fireflies"), ("petals", "petals"), ("leaves", "maple"), ("meteors", "meteors")];
 
 impl EffectsChoice {
+    /// Patch only the requested parameters; invalid values must not silently clamp a chat edit.
+    pub fn adjust(&mut self, id: &str, patch: &Value) -> Result<EffectParams, String> {
+        if !valid_id(id) { return Err("没有有效的特效 id".into()); }
+        let object = patch.as_object().ok_or("参数必须是对象")?;
+        if object.is_empty() { return Err("至少提供 density、speed、size 中的一项".into()); }
+        let mut value = serde_json::to_value(self.params_of(id)).map_err(|e| e.to_string())?;
+        for (key, number) in object {
+            let (min, max) = match key.as_str() {
+                "density" => (0.2, 2.5), "speed" => (0.25, 3.0), "size" => (0.5, 2.0),
+                _ => return Err(format!("不支持的特效参数 {key}")),
+            };
+            let n = number.as_f64().filter(|n| n.is_finite() && (min..=max).contains(n))
+                .ok_or_else(|| format!("{key} 必须在 {min} 到 {max} 之间"))?;
+            value[key] = serde_json::json!(n);
+        }
+        let next = EffectParams::from_value(&value);
+        self.params.insert(id.to_string(), next.clone());
+        Ok(next)
+    }
+
     /// Reads a choice leniently: anything missing or malformed falls back to a safe default.
     /// Also accepts the older shape `{rain:{enabled,intensity,speed}, ...}`, from this setting and from the
     /// per-wallpaper copy before it, and turns it into the current one.
@@ -88,6 +108,23 @@ mod tests {
     fn ids_follow_the_pack_naming_rule() {
         for good in ["rain", "maple", "my-glitter_2", "0day"] { assert!(valid_id(good), "{good}"); }
         for bad in ["", "Rain", "-x", "_x", "a b", "雨", "a/b", &"a".repeat(49)] { assert!(!valid_id(bad), "{bad}"); }
+    }
+    #[test]
+    fn chat_adjustment_preserves_selection_other_parameters_and_rejects_invalid_patches_atomically() {
+        let mut choice = EffectsChoice::from_value(&json!({"selected":"snow","params":{
+            "snow":{"density":1.2,"speed":0.7,"size":1.4},"rain":{"speed":2}
+        }}));
+        let result = choice.adjust("snow",&json!({"density":2})).unwrap();
+        assert_eq!(result, EffectParams { density:2.0, speed:0.7, size:1.4 });
+        assert_eq!(choice.selected,"snow");
+        assert_eq!(choice.params_of("rain").speed,2.0);
+        let before = choice.clone();
+        for invalid in [json!({}),json!({"density":0}),json!({"size":3}),json!({"density":2.5,"speed":"fast"}),json!({"unknown":1})] {
+            assert!(choice.adjust("snow",&invalid).is_err());
+            assert_eq!(choice,before);
+        }
+        choice.adjust("rain",&json!({"speed":1.5})).unwrap();
+        assert_eq!(choice.selected,"snow");
     }
     #[test]
     fn the_current_shape_is_read_and_clamped() {

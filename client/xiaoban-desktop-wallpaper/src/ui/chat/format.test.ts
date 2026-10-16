@@ -41,6 +41,14 @@ describe('what the cards say', () => {
     expect(prettyArguments('{"a":1}')).toBe('{\n  "a": 1\n}');
     expect(prettyArguments('{"half')).toBe('{"half');
   });
+
+  it('shows the source changes and parameter values before approving an edit', () => {
+    expect(approvalPreview({tool:'resource_edit',arguments:{id:'my-snow',changes:[{file:'index.html',old_string:'count=80',new_string:'count=160'}]}}))
+      .toBe('修改作品 my-snow\nindex.html\n- count=80\n+ count=160');
+    expect(approvalPreview({tool:'resource_restore',arguments:{id:'my-snow',version:'previous'}})).toBe('将作品 my-snow 恢复到版本 previous');
+    expect(approvalPreview({tool:'effect_adjust',arguments:{density:1.8,speed:0.6}})).toBe('调整当前特效：密度 1.8，速度 0.6');
+    expect(() => approvalPreview({tool:'resource_edit',arguments:{changes:[null]}})).not.toThrow();
+  });
 });
 
 describe('typing and scrolling', () => {

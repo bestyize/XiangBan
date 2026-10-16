@@ -106,8 +106,8 @@ export function describeCall(name: string, argumentsJson: string): string {
   const packName = typeof pack.name === 'string' ? pack.name : typeof pack.id === 'string' ? pack.id : '';
   const text = name === 'shell' ? pick('command')
     : name === 'effect_create' ? packName
+    : name.startsWith('resource_') ? pick('id')
     : pick('command', 'path', 'url', 'query', 'pattern', 'kind', 'title', 'name', 'id', 'text', 'question', 'expression', 'skin', 'theme', 'gameId');
   const line = (text ?? '').split('\n')[0].trim();
   return line.length > 90 ? `${line.slice(0, 90)}…` : line;
 }
-

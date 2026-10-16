@@ -52,6 +52,10 @@ pub trait Desktop: Send + Sync {
     /// Deletes a user game, closing the game space first when it is open.
     fn delete_game(&self, id: &str) -> Result<(), String>;
     fn request_permissions(&self) -> Result<Value, String>;
+    fn resource_read(&self, request: crate::resource_editor::ReadRequest) -> Result<Value, String>;
+    fn resource_edit(&self, request: crate::resource_editor::EditRequest) -> Result<Value, String>;
+    fn resource_restore(&self, request: crate::resource_editor::RestoreRequest) -> Result<Value, String>;
+    fn effect_adjust(&self, id: Option<&str>, params: &Value) -> Result<Value, String>;
 }
 
 pub struct TauriDesktop {
@@ -59,12 +63,85 @@ pub struct TauriDesktop {
 }
 
 impl TauriDesktop {
+    fn refresh_resource(&self, mut result: Value, apply: Option<bool>) -> Value {
+        let kind = result["kind"].as_str().unwrap_or_default().to_string();
+        let id = result["id"].as_str().unwrap_or_default().to_string();
+        let settings = crate::settings(&self.app);
+        let should_apply = apply.unwrap_or(match kind.as_str() {
+            "wallpaper" => settings.wallpaper_id == id,
+            "effect" => settings.effects.selected == id,
+            "widget" => true,
+            _ => false,
+        });
+        let refreshed: Result<&str, String> = if !should_apply { Ok("saved_only") } else {
+            match kind.as_str() {
+                "wallpaper" => {
+                    let options = if settings.wallpaper_id == id { settings.wallpaper_options } else { Default::default() };
+                    tauri::async_runtime::block_on(crate::content::apply_wallpaper(self.app.clone(), id, options, false)).map(|_| "applied")
+                }
+                "effect" => self.set_effect(&id).map(|_| "refresh_requested"),
+                "widget" => { crate::widgets::sync(&self.app); Ok("refresh_requested") }
+                "game" => self.game_open(Some(&id)).map(|_| "opened"),
+                _ => Ok("saved_only"),
+            }
+        };
+        match refreshed {
+            Ok(status) => { result["runtime_status"] = json!(status); }
+            Err(error) => {
+                result["runtime_status"] = json!("refresh_failed");
+                result["warning"] = json!(format!("作品已保存，但应用失败：{error}。不要重复编辑，可重试应用。"));
+            }
+        }
+        result
+    }
+
     fn control(&self) -> Result<tauri::WebviewWindow, String> {
         self.app.get_webview_window("control").ok_or_else(|| "控制台窗口没有打开".to_string())
     }
 }
 
 impl Desktop for TauriDesktop {
+    fn resource_read(&self, request: crate::resource_editor::ReadRequest) -> Result<Value, String> {
+        let state = self.app.state::<crate::content::ContentState>();
+        let _guard = state.io.lock().map_err(|e| e.to_string())?;
+        let mut value = crate::resource_editor::read(&crate::storage::root(&self.app)?, &request)?;
+        if request.kind == "effect" {
+            let effects = crate::settings(&self.app).effects;
+            value["params"] = json!(effects.params_of(&request.id));
+            value["active"] = json!(effects.selected == request.id);
+        }
+        Ok(value)
+    }
+
+    fn resource_edit(&self, request: crate::resource_editor::EditRequest) -> Result<Value, String> {
+        let result = {
+            let state = self.app.state::<crate::content::ContentState>();
+            let _guard = state.io.lock().map_err(|e| e.to_string())?;
+            crate::resource_editor::edit(&crate::storage::root(&self.app)?, &request)?
+        };
+        Ok(self.refresh_resource(result, request.apply_now))
+    }
+
+    fn resource_restore(&self, request: crate::resource_editor::RestoreRequest) -> Result<Value, String> {
+        let result = {
+            let state = self.app.state::<crate::content::ContentState>();
+            let _guard = state.io.lock().map_err(|e| e.to_string())?;
+            crate::resource_editor::restore(&crate::storage::root(&self.app)?, &request)?
+        };
+        Ok(self.refresh_resource(result, request.apply_now))
+    }
+
+    fn effect_adjust(&self, id: Option<&str>, params: &Value) -> Result<Value, String> {
+        let mut choice = crate::settings(&self.app).effects;
+        let id = id.unwrap_or(&choice.selected).to_string();
+        if !crate::effects::exists(&self.app, &id) { return Err("没有找到要调整的特效，请先 effect_list 确认 id".into()); }
+        let previous = choice.params_of(&id);
+        let next = choice.adjust(&id, params)?;
+        let active = choice.selected == id;
+        crate::set_desktop_effects(self.app.clone(), json!(choice))?;
+        Ok(json!({"id":id,"saved":true,"active":active,"params":next,"previous_params":previous}))
+    }
+
     fn request_permissions(&self) -> Result<Value, String> {
         #[cfg(target_os = "macos")]
         {
@@ -260,6 +337,15 @@ impl Tool for DesktopTool {
 
 fn object(properties: Value, required: &[&str]) -> Value {
     json!({ "type": "object", "properties": properties, "required": required })
+}
+
+fn resource_schema(extra: Value, required: &[&str]) -> Value {
+    let mut properties = json!({
+        "kind":{"type":"string","enum":["wallpaper","effect","widget","game"]},
+        "id":{"type":"string","description":"作品 id；组件使用自创模板 id，不是桌面实例 id"}
+    });
+    if let Some(extra) = extra.as_object() { properties.as_object_mut().unwrap().extend(extra.clone()); }
+    object(properties, required)
 }
 
 fn text_arg<'a>(args: &'a Value, key: &str) -> Result<&'a str, String> {
@@ -803,6 +889,44 @@ pub fn tools(desktop: Arc<dyn Desktop>) -> Vec<Arc<dyn Tool>> {
     let status_run = |d: &dyn Desktop, _: &Value| -> Result<String, String> { Ok(d.status()?.to_string()) };
     vec![
         tool(&desktop, ToolSpec::new("desktop_status", "查看小伴桌面当前的状态：显示模式、正在用的壁纸和特效、小伴的外壳与表情。", none()), status_run),
+        tool(
+            &desktop,
+            ToolSpec::new("resource_read", "读取已有自创壁纸、特效、组件或游戏的原始内容、revision 和最近 5 个源代码版本。先用对应 list 或 desktop_status 确认 id；修改已有作品必须先读原文。返回虚拟文件清单；默认读取 index.html（特效为 effect.json），元数据为 $metadata.json。offset/limit 按 Unicode 字符分页，next_offset 非空时可继续读取，不要把片段误当完整文件。内置特效可读不可改，params 是当前密度/速度/大小；内置游戏和组件不支持源代码编辑。", resource_schema(json!({
+                "file":{"type":"string"},"offset":{"type":"integer","minimum":0},"limit":{"type":"integer","minimum":1,"maximum":16000}
+            }), &["kind","id"])).max_output(128_000),
+            |d, args| Ok(d.resource_read(serde_json::from_value(args.clone()).map_err(|e| format!("读取参数不合法：{e}"))?)?.to_string()),
+        ),
+        tool(
+            &desktop,
+            ToolSpec::new("resource_edit", "在已有自创作品上修改原文，保持原 id，不创建副本。必须先 resource_read 并传回 revision。changes 按顺序执行，每项 file 来自文件清单，old_string 必须在当时原文恰好出现一次；提供足够上下文。修改全部校验通过后保存，并保留最近 5 个旧源代码版本；不备份运行数据或存档。默认刷新正在使用的壁纸/特效和已有组件，游戏下次打开生效。apply_now=false 仅保存，可在对应资源页预览；true 应用壁纸/特效或打开游戏，组件仅刷新已有实例。保存成功但应用失败会返回 warning，不要重复编辑。", resource_schema(json!({
+                "revision":{"type":"string"},"changes":{"type":"array","minItems":1,"maxItems":16,"items":object(json!({
+                    "file":{"type":"string"},"old_string":{"type":"string","minLength":1},"new_string":{"type":"string"}
+                }), &["file","old_string","new_string"])},"apply_now":{"type":"boolean"}
+            }), &["kind","id","revision","changes"])).risk(Risk::Write).serial().timeout(std::time::Duration::from_secs(180)),
+            |d, args| Ok(d.resource_edit(serde_json::from_value(args.clone()).map_err(|e| format!("编辑参数不合法：{e}"))?)?.to_string()),
+        ),
+        tool(
+            &desktop,
+            ToolSpec::new("resource_restore", "恢复 resource_read.history 中的一个旧源代码版本。revision 是当前作品的 revision，version 是选中的历史 revision。保持 id，并把恢复前的内容保存为历史，支持再次撤销；游戏存档和组件运行数据不回滚。apply_now 规则同 resource_edit。", resource_schema(json!({
+                "revision":{"type":"string"},"version":{"type":"string"},"apply_now":{"type":"boolean"}
+            }), &["kind","id","revision","version"])).risk(Risk::Write).serial().timeout(std::time::Duration::from_secs(180)),
+            |d, args| Ok(d.resource_restore(serde_json::from_value(args.clone()).map_err(|e| format!("恢复参数不合法：{e}"))?)?.to_string()),
+        ),
+        tool(
+            &desktop,
+            ToolSpec::new("effect_adjust", "调整独立桌面粒子特效的参数，不改包源码，不切换特效。id 不填则调整当前特效。density 控制多少（0.2–2.5），size 控制粒子大小（0.5–2），speed 控制速度（0.25–3），至少给一项，1 为默认。先 resource_read(kind=effect) 查看现值，再按用户要求调整；返回 previous_params 可用于撤销。注意：HTML 壁纸自己绘制的雪花应使用 resource_read/resource_edit 修改 HTML，不应改独立桌面特效。", object(json!({
+                "id":{"type":"string"},"density":{"type":"number","minimum":0.2,"maximum":2.5},
+                "speed":{"type":"number","minimum":0.25,"maximum":3},"size":{"type":"number","minimum":0.5,"maximum":2}
+            }), &[])).risk(Risk::Write).serial(),
+            |d, args| {
+                let id = optional_text(args, "id")?;
+                let mut params = args.as_object().ok_or("参数必须是对象")?.clone();
+                params.remove("id");
+                // Validate at the tool boundary too, so adapters never get invalid ranges.
+                crate::effect_choice::EffectsChoice::default().adjust("validation", &json!(params))?;
+                Ok(d.effect_adjust(id, &json!(params))?.to_string())
+            },
+        ),
         tool(&desktop, ToolSpec::new("wallpaper_list", "列出可用的壁纸（id、标题、类型、是否已下载）和当前正在使用的那张。", none()), wallpaper_list),
         tool(
             &desktop,
@@ -1102,6 +1226,22 @@ mod tests {
     }
 
     impl Desktop for Fake {
+        fn resource_read(&self, request: crate::resource_editor::ReadRequest) -> Result<Value, String> {
+            self.log(format!("resource-read {} {}", request.kind, request.id))?;
+            Ok(json!({"revision":"old","content":"original source"}))
+        }
+        fn resource_edit(&self, request: crate::resource_editor::EditRequest) -> Result<Value, String> {
+            self.log(format!("resource-edit {} {} {}", request.kind, request.id, request.revision))?;
+            Ok(json!({"saved":true,"id":request.id}))
+        }
+        fn resource_restore(&self, request: crate::resource_editor::RestoreRequest) -> Result<Value, String> {
+            self.log(format!("resource-restore {} {} {}", request.kind, request.id, request.version))?;
+            Ok(json!({"saved":true,"id":request.id}))
+        }
+        fn effect_adjust(&self, id: Option<&str>, params: &Value) -> Result<Value, String> {
+            self.log(format!("effect-adjust {} {params}", id.unwrap_or("current")))?;
+            Ok(json!({"saved":true,"params":params}))
+        }
         fn status(&self) -> Result<Value, String> {
             Ok(json!({"mode": "floating", "wallpaper": "w1"}))
         }
@@ -1219,7 +1359,7 @@ mod tests {
         let mut unique = names.clone();
         unique.dedup();
         assert_eq!(names, unique);
-        assert_eq!(names.len(), 26);
+        assert_eq!(names.len(), 30);
         for tool in &all {
             let spec = tool.spec();
             assert!(spec.name.len() <= 64 && spec.name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_'), "{}", spec.name);
@@ -1229,7 +1369,7 @@ mod tests {
         let read: Vec<&str> = all.iter().filter(|t| t.spec().risk == Risk::Read).map(|t| t.spec().name.as_str()).collect();
         let mut read = read;
         read.sort();
-        assert_eq!(read, vec!["care_list", "desktop_status", "effect_list", "effect_read_format", "game_list", "wallpaper_list", "widget_list"]);
+        assert_eq!(read, vec!["care_list", "desktop_status", "effect_list", "effect_read_format", "game_list", "resource_read", "wallpaper_list", "widget_list"]);
         for tool in all.iter().filter(|t| t.spec().risk == Risk::Write) {
             assert!(!tool.spec().parallel_safe, "{} changes shared settings, so it runs alone", tool.spec().name);
         }
@@ -1243,6 +1383,23 @@ mod tests {
         let out = call(&fake, "effect_list", json!({})).unwrap();
         assert_eq!(out, "当前特效：rain\nrain | 细雨 | 正在使用\nsnow | 飘雪");
         assert!(call(&fake, "desktop_status", json!({})).unwrap().contains("\"wallpaper\":\"w1\""));
+    }
+
+    #[test]
+    fn source_tools_parse_requests_and_parameter_errors_do_not_reach_desktop() {
+        let fake = Arc::new(Fake::default());
+        call(&fake,"resource_read",json!({"kind":"wallpaper","id":"local-example"})).unwrap();
+        call(&fake,"resource_edit",json!({"kind":"wallpaper","id":"local-example","revision":"old","changes":[
+            {"file":"index.html","old_string":"count=80","new_string":"count=160"}
+        ]})).unwrap();
+        call(&fake,"resource_restore",json!({"kind":"wallpaper","id":"local-example","revision":"current","version":"old"})).unwrap();
+        for args in [json!({}),json!({"size":9}),json!({"density":null}),json!({"density":1,"speed":"fast"}),json!({"unknown":2})] {
+            assert!(call(&fake,"effect_adjust",args).is_err());
+        }
+        assert_eq!(fake.calls().len(),3);
+        call(&fake,"effect_adjust",json!({"density":1.8})).unwrap();
+        assert!(fake.calls()[3].contains("effect-adjust current"));
+        assert!(call(&fake,"resource_edit",json!({"kind":"wallpaper","id":"local-example","changes":[]})).is_err());
     }
 
     #[test]
@@ -1628,4 +1785,3 @@ mod tests {
         assert!(call(&fake, "widget_delete_custom", json!({})).is_err());
     }
 }
-
