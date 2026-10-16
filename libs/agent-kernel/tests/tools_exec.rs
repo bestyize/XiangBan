@@ -108,3 +108,35 @@ fn oversized_output_keeps_head_and_tail_on_char_boundaries() {
     assert!(messages[0].1.contains("bytes truncated") && messages[0].1.len() < 1100);
     assert!(messages[1].1.contains("bytes truncated") && messages[1].1.len() < 1100);
 }
+
+
+#[test]
+fn unknown_tool_reports_registered_names_and_can_recover_without_running_an_alias() {
+    let calls = Arc::new(AtomicUsize::new(0));
+    let count = calls.clone();
+    let shell = FnTool::new(spec("shell").risk(Risk::Exec).serial(), move |args, _| {
+        assert_eq!(args["command"], "echo hello");
+        count.fetch_add(1, Ordering::SeqCst);
+        Ok("hello".into())
+    });
+    let h = harness(vec![
+        Step::tool_call("wrong", "shell_client", r#"{"command":"echo hello"}"#),
+        Step::tool_call("correct", "shell", r#"{"command":"echo hello"}"#),
+        Step::text("done"),
+    ], |b| b.tool(shell).tool(FnTool::new(spec("time_now"), |_, _| Ok("now".into()))));
+    assert!(run(&h.agent, "go").0.is_ok());
+    assert_eq!(calls.load(Ordering::SeqCst), 1, "only the explicitly corrected call runs");
+    let messages = tool_messages(&h);
+    assert_eq!(messages[0].0, "wrong");
+    assert!(messages[0].1.contains("unknown tool `shell_client`"));
+    assert!(messages[0].1.contains("No tool was executed"));
+    assert!(messages[0].1.contains("Available tools: shell, time_now"));
+    assert_eq!(messages[1], ("correct".into(), "hello".into()));
+}
+
+#[test]
+fn unknown_tool_with_no_registered_tools_does_not_suggest_a_missing_command() {
+    let h = harness(vec![Step::tool_call("wrong", "shell_client", "{}"), Step::text("unavailable")], |b| b);
+    assert!(run(&h.agent, "go").0.is_ok());
+    assert!(tool_messages(&h)[0].1.contains("Available tools: (none)"));
+}
