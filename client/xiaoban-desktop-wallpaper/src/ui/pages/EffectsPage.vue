@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ResourceShareActions from "../components/ResourceShareActions.vue";
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { NAlert, NButton, NPopconfirm, NSlider } from 'naive-ui';
 import { Ban, Check, FileUp, FolderOpen, RefreshCw, Trash2 } from 'lucide-vue-next';
@@ -67,7 +68,7 @@ onBeforeUnmount(() => { if (timer) { clearTimeout(timer); commit(); } });
   <section class="ui-page effects-page" data-testid="effects-page">
     <header class="page-header">
       <div><h1>桌面特效</h1><p class="page-subtitle">给桌面加一层飘落的雨雪、花瓣、枫叶或繁星。开启后不受壁纸影响，换壁纸或用系统桌面，它都照常显示。</p></div>
-      <div class="header-actions"><NButton round data-testid="effects-reload" @click="reload(true)"><template #icon><RefreshCw :size="15" /></template>重新载入</NButton><NButton round data-testid="effects-import" @click="importPack"><template #icon><FileUp :size="15" /></template>导入特效</NButton><NButton round data-testid="effects-folder" @click="openFolder"><template #icon><FolderOpen :size="15" /></template>打开特效文件夹</NButton></div>
+      <div class="header-actions"><ResourceShareActions :store="store" kind="effect" @imported="reload(false)"/><NButton round data-testid="effects-reload" @click="reload(true)"><template #icon><RefreshCw :size="15" /></template>重新载入</NButton><NButton round data-testid="effects-import" @click="importPack"><template #icon><FileUp :size="15" /></template>导入特效</NButton><NButton round data-testid="effects-folder" @click="openFolder"><template #icon><FolderOpen :size="15" /></template>打开特效文件夹</NButton></div>
     </header>
     <NAlert v-if="missing" type="warning" :show-icon="false" data-testid="effect-missing">所选的特效「{{ choice.selected }}」已经找不到（可能被移出了特效文件夹），桌面上暂时没有特效。重新选一个即可。</NAlert>
     <NAlert v-if="store.effectList.errors.length" type="warning" :show-icon="false" data-testid="effect-errors">有 {{ store.effectList.errors.length }} 个自定义特效无法使用：{{ store.effectList.errors.join('；') }}</NAlert>
@@ -83,6 +84,7 @@ onBeforeUnmount(() => { if (timer) { clearTimeout(timer); commit(); } });
           <span class="effect-name"><b>{{ pack.name }}<i v-if="pack.source === 'user'" class="mine">我的</i></b><small>{{ pack.description }}</small></span>
           <Check v-if="chosen?.id === pack.id" :size="16" class="effect-check" />
         </button>
+        <ResourceShareActions v-if="pack.source === 'user'" :store="store" kind="effect" :id="pack.id"/>
         <NPopconfirm v-if="pack.source === 'user'" positive-text="删除" negative-text="取消" @positive-click="removeEffect(pack.id, pack.name)">
           <template #trigger>
             <button class="effect-delete-btn" title="删除这个自定义特效" :aria-label="`删除特效 ${pack.name}`" :data-testid="`delete-effect-${pack.id}`" @click.stop>
@@ -126,4 +128,5 @@ onBeforeUnmount(() => { if (timer) { clearTimeout(timer); commit(); } });
 .field>label{display:flex;justify-content:space-between;font-size:13px;font-weight:600;margin-bottom:10px}
 .notes{font-size:13px;line-height:1.7;margin:0}
 </style>
+
 

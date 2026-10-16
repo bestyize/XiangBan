@@ -83,6 +83,8 @@ export function siteFullMedia(item: SiteWallpaper, site: string) {
   }
   return preview;
 }
+export const isAnimatedWallpaper = (kind: string) => kind === "canvas" || kind === "web";
+
 export function mediaMarkup(
   kind: string,
   source: string,
@@ -90,11 +92,14 @@ export function mediaMarkup(
   title: string,
   controls = false,
 ) {
+  // Run HTML only in the selected inspector or full-screen viewer, never every card.
+  if (kind === "web" && source && controls)
+    return `<iframe src="${escapeHtml(source)}" title="${escapeHtml(title)}" sandbox="allow-scripts" referrerpolicy="no-referrer"></iframe>`;
   if (kind === "video" && source)
     return `<video data-video-source="${escapeHtml(source)}" ${poster ? `poster="${escapeHtml(poster)}"` : ""} muted playsinline loop preload="none" ${controls ? "controls" : ""} disablepictureinpicture aria-label="${escapeHtml(title)}"></video><span class="media-status">加载视频画面…</span>`;
   if (poster || (kind === "image" && source))
     return `<img src="${escapeHtml(poster || source)}" alt="${escapeHtml(title)}" loading="lazy"><span class="media-status" hidden>图片暂不可用</span>`;
-  return '<span class="fallback-art">✧</span><span class="media-status">暂无预览</span>';
+  return `<span class="fallback-art">✧</span><span class="media-status">${isAnimatedWallpaper(kind) ? '选择后预览动画' : '暂无预览'}</span>`;
 }
 // Only visible cards request metadata/first frame. Hover playback stays muted and pauses on exit.
 // The inspector has controls; it never starts a full-quality download when merely selected.
@@ -167,3 +172,4 @@ export function bindMedia(root: HTMLElement): () => void {
     }
   };
 }
+

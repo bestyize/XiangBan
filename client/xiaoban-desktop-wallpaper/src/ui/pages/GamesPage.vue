@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ResourceShareActions from "../components/ResourceShareActions.vue";
 import { computed, onMounted, ref } from "vue";
 import { FolderOpen, RefreshCw, Save, Trash2 } from "lucide-vue-next";
 import { NAlert, NButton, NPopconfirm, NSkeleton, NTag } from "naive-ui";
@@ -114,7 +115,7 @@ onMounted(loadGames);
           <h2 id="user-games-heading">自创游戏</h2>
           <p class="muted">{{ userGames.length ? `共 ${userGames.length} 款 · 由小伴创作或你放进游戏文件夹` : "还没有自创游戏" }}</p>
         </div>
-        <NButton round data-testid="games-folder" @click="openFolder"><template #icon><FolderOpen :size="15" /></template>打开游戏文件夹</NButton>
+        <ResourceShareActions :store="store" kind="game" :disabled="opening" @imported="loadGames"/><NButton round data-testid="games-folder" @click="openFolder"><template #icon><FolderOpen :size="15" /></template>打开游戏文件夹</NButton>
       </div>
       <NAlert v-if="folderErrors.length" class="catalog-error" type="warning" :show-icon="false" data-testid="user-game-errors">
         有 {{ folderErrors.length }} 个游戏文件夹无法使用：{{ folderErrors.join("；") }}
@@ -132,6 +133,7 @@ onMounted(loadGames);
               <div v-if="game.save" class="game-footnote"><Save :size="14" /> 进度保存在本机</div>
             </div>
           </article>
+          <ResourceShareActions :store="store" kind="game" :id="game.id" :disabled="opening"/>
           <NPopconfirm positive-text="删除" negative-text="取消" @positive-click="removeGame(game)">
             <template #trigger>
               <button class="game-delete-btn" title="删除这个自创游戏" :aria-label="`删除游戏 ${game.name}`" :data-testid="`delete-game-${game.id}`" @click.stop>
@@ -177,3 +179,4 @@ onMounted(loadGames);
 @media (max-width: 900px) { .game-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 580px) { .game-grid { grid-template-columns: 1fr; } .game-cover { height: 175px; } }
 </style>
+

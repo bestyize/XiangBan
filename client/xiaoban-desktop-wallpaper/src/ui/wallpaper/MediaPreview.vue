@@ -10,5 +10,6 @@ onBeforeUnmount(()=>{disposed=true;generation++;cleanup?.();});
 </script>
 <template><div ref="host" class="media-preview" :style="{'--media-fit':fit || 'cover'}" /></template>
 <style scoped>
-.media-preview{position:relative;overflow:hidden;width:100%;height:100%;background:var(--ui-primary-soft);display:grid;place-items:center}.media-preview :deep(img),.media-preview :deep(video){width:100%;height:100%;object-fit:var(--media-fit)}.media-preview :deep(.media-status){position:absolute;bottom:8px;left:8px;right:8px;color:var(--ui-text-secondary);font-size:12px;background:color-mix(in srgb, var(--ui-surface) 86%, transparent);padding:4px;border-radius:5px}.media-preview :deep(.media-status[hidden]){display:none}.media-preview :deep(.fallback-art){font-size:34px;color:var(--ui-text-secondary)}
+.media-preview{position:relative;overflow:hidden;width:100%;height:100%;background:var(--ui-primary-soft);display:grid;place-items:center}.media-preview :deep(img),.media-preview :deep(video){width:100%;height:100%;object-fit:var(--media-fit)}.media-preview :deep(iframe){width:100%;height:100%;border:0;display:block}.media-preview :deep(.media-status){position:absolute;bottom:8px;left:8px;right:8px;color:var(--ui-text-secondary);font-size:12px;background:color-mix(in srgb, var(--ui-surface) 86%, transparent);padding:4px;border-radius:5px}.media-preview :deep(.media-status[hidden]){display:none}.media-preview :deep(.fallback-art){font-size:34px;color:var(--ui-text-secondary)}
 </style>
+
