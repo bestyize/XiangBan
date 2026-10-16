@@ -144,3 +144,38 @@ it('stops when speech output begins and does not restart after it ends', async (
   expect(h.pressed()).toBe('false'); h.speech.status = 'idle'; await flushPromises();
   expect(h.capture).toHaveBeenCalledOnce(); expect(h.asr.enabled).toBe(true);
 });
+
+
+it('reports a missing microphone once without leaving a banner above the composer', async () => {
+  const h = await open();
+  const error = '当前麦克风无法开始录音，请在系统声音设置中选择可用的输入设备，或切换麦克风后重试';
+  await h.page().get('[data-testid="chat-input"] textarea').setValue('保留这段草稿');
+  h.capture.mockRejectedValueOnce(new Error(error));
+  await h.clickMic();
+  expect(h.notify).toHaveBeenCalledExactlyOnceWith(error, 'error');
+  expect(h.pressed()).toBe('false');
+  expect(h.page().find('[data-testid="asr-status"]').exists()).toBe(false);
+  expect(h.input()).toBe('保留这段草稿');
+  expect(h.invoke.mock.calls.map(([command]) => command)).not.toContain('chat_send');
+  expect(h.page().get('[data-testid="chat-asr-toggle"]').attributes('title')).toContain(error);
+  expect(h.settings.get('[data-testid="asr-status"]').text()).toContain(error);
+  // Reconnecting the device and explicitly retrying clears the old diagnostic.
+  await h.clickMic();
+  expect(h.pressed()).toBe('true');
+  expect(h.asr.error).toBe('');
+  expect(h.page().get('[data-testid="asr-status"]').text()).toContain('正在倾听');
+  expect(h.notify).toHaveBeenCalledTimes(1);
+});
+
+it('clears a stale microphone error before the next capture request completes', async () => {
+  const h = await open();
+  h.capture.mockRejectedValueOnce(new Error('找不到可用麦克风'));
+  await h.clickMic();
+  const pending = deferred<{ stop: typeof h.stop }>();
+  h.capture.mockImplementationOnce(() => pending.promise);
+  await h.clickMic();
+  expect(h.asr.error).toBe('');
+  expect(h.page().get('[data-testid="asr-status"]').text()).toContain('正在准备麦克风');
+  pending.resolve({ stop: h.stop }); await flushPromises();
+  expect(h.asr.listening).toBe(true);
+});

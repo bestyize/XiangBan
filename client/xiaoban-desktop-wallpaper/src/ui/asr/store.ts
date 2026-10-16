@@ -141,7 +141,7 @@ export function createAsrStore(deps: AsrDeps): AsrStore {
     },
     async activate(onText) {
       if (!deps.desktop || disposed) return;
-      store.deactivate(); receiver = onText; store.recordingRequested = true;
+      store.deactivate(); store.error = ''; receiver = onText; store.recordingRequested = true;
       const ticket = recording;
       await store.init();
       if (ticket !== recording || disposed) return;
@@ -179,3 +179,4 @@ export function createAsrStore(deps: AsrDeps): AsrStore {
   });
   return store;
 }
+
