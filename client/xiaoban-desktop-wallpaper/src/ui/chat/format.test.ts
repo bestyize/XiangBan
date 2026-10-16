@@ -1,3 +1,4 @@
+import desktopToolSource from '../../../src-tauri/src/chat/desktop_tools.rs?raw';
 import { describe, expect, it } from 'vitest';
 import { approvalPreview, clip, formatAgo, isImeEnter, isNearBottom, prettyArguments, riskVerb, toolLabel } from './format.ts';
 
@@ -69,4 +70,13 @@ describe('times', () => {
     expect(formatAgo(now - 3 * 86400, now)).toBe('3 天前');
     expect(formatAgo(now - 30 * 86400, now)).toMatch(/^\d{1,2} 月 \d{1,2} 日$/);
   });
+});
+
+
+
+it('gives every registered desktop tool a readable label', () => {
+  const source = desktopToolSource;
+  const names = [...source.matchAll(/ToolSpec::new\(\s*"([^"]+)"/g)].map(match => match[1]!);
+  expect(names.length).toBeGreaterThan(20);
+  for (const name of names) expect(toolLabel(name), name).not.toBe(name);
 });

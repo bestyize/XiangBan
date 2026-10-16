@@ -68,20 +68,21 @@ impl Desktop for TauriDesktop {
     fn request_permissions(&self) -> Result<Value, String> {
         #[cfg(target_os = "macos")]
         {
-            let _ = std::process::Command::new("osascript")
-                .args(["-e", "tell application \"System Events\" to get name of first process"])
-                .status();
-            let _ = std::process::Command::new("/usr/bin/open")
-                .arg("x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")
-                .status();
-            let _ = std::process::Command::new("/usr/bin/open")
-                .arg("x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture")
-                .status();
+            for (pane, label) in [("Privacy_Accessibility", "辅助功能"), ("Privacy_ScreenCapture", "屏幕录制")] {
+                let status = std::process::Command::new("/usr/bin/open")
+                    .arg(format!("x-apple.systempreferences:com.apple.preference.security?{pane}"))
+                    .status().map_err(|e| format!("无法打开{label}设置：{e}"))?;
+                if !status.success() { return Err(format!("无法打开{label}设置，请在系统设置中手动查看")); }
+            }
+            Ok(json!({
+                "ok": true,
+                "message": "已依次打开 macOS 辅助功能与屏幕录制设置页面。请用户检查并按需开启小伴的权限；打开设置不代表已经获得授权。"
+            }))
         }
-        Ok(json!({
-            "ok": true,
-            "message": "已成功唤起 macOS 辅助功能（无障碍）与屏幕录制授权弹窗并打开系统设置页面，请用户在设置中勾选开启小伴的权限。"
-        }))
+        #[cfg(not(target_os = "macos"))]
+        {
+            Err("此权限设置引导仅适用于 macOS，当前平台未执行任何授权操作。请根据具体工具返回的错误处理当前系统权限。".into())
+        }
     }
     fn status(&self) -> Result<Value, String> {
         let s = crate::settings(&self.app);
@@ -497,6 +498,9 @@ fn widget_kind_label(kind: &str) -> &'static str {
         "fortune" => "木鱼求签",
         "calendar" => "小伴日历",
         "weather" => "天气时钟",
+        "notes" => "便签待办",
+        "countdown" => "倒数日／纪念日",
+        "custom" => "自创组件",
         _ => "其他组件",
     }
 }
@@ -513,10 +517,9 @@ fn widget_theme_label(theme: &str) -> &'static str {
 fn widget_list(desktop: &dyn Desktop, _: &Value) -> Result<String, String> {
     let value = desktop.widgets()?;
     let widgets = value["widgets"].as_array().cloned().unwrap_or_default();
-    if widgets.is_empty() {
-        return Ok("桌面当前没有放置任何组件。可用 widget_add 添加（支持 fortune 木鱼求签、calendar 小伴日历、weather 天气时钟）。".into());
-    }
-    let mut lines = vec![format!("桌面当前放置了 {} 个组件（最多 12 个）：", widgets.len())];
+    let mut lines = if widgets.is_empty() {
+        vec!["桌面当前没有放置任何组件。可用 widget_add 添加（支持 fortune 木鱼求签、calendar 小伴日历、weather 天气时钟、notes 便签待办、countdown 倒数日／纪念日）。".to_string()]
+    } else { vec![format!("桌面当前放置了 {} 个组件（最多 12 个）：", widgets.len())] };
     for w in &widgets {
         let id = w["id"].as_str().unwrap_or("?");
         let kind = w["kind"].as_str().unwrap_or("");
@@ -527,21 +530,30 @@ fn widget_list(desktop: &dyn Desktop, _: &Value) -> Result<String, String> {
         let state = if enabled { "显示中" } else { "已隐藏" };
         lines.push(format!("{id} | {} ({kind}) | {}风格 ({theme}) | 缩放 {scale:.2}{city} | {state}", widget_kind_label(kind), widget_theme_label(theme)));
     }
+    let templates = desktop.custom_widgets()?;
+    if let Some(templates) = templates.as_array().filter(|items| !items.is_empty()) {
+        lines.push("自创组件模板（可在组件库添加到桌面，删除模板用 widget_delete_custom）：".into());
+        for template in templates {
+            lines.push(format!("{} | {}", template["id"].as_str().unwrap_or("?"), template["name"].as_str().unwrap_or("自创组件")));
+        }
+    }
     Ok(lines.join("\n"))
 }
 
 fn widget_add(desktop: &dyn Desktop, args: &Value) -> Result<String, String> {
     let kind = text_arg(args, "kind")?;
-    if !["fortune", "calendar", "weather"].contains(&kind) {
-        return Err("kind 只能是 fortune（木鱼求签）、calendar（小伴日历）或 weather（天气时钟）".into());
+    if !crate::custom_widgets::BUILTIN_KINDS.contains(&kind) {
+        return Err("kind 只能是 fortune（木鱼求签）、calendar（小伴日历）、weather（天气时钟）、notes（便签待办）或 countdown（倒数日／纪念日）".into());
+    }
+    // Validate all options before creating anything, and never hide a failed theme update.
+    let theme = optional_text(args, "theme")?;
+    if theme.is_some_and(|theme| !["glass", "paper", "transparent"].contains(&theme)) {
+        return Err("theme 必须是 glass（毛玻璃）、paper（纸张）或 transparent（透明）".into());
     }
     let res = desktop.widget_add(kind)?;
-    let id = res["widgets"].as_array().and_then(|w| w.last()).and_then(|w| w.get("id")).and_then(Value::as_str).unwrap_or("新组件");
-    if let Some(theme) = optional_text(args, "theme")? {
-        if !["glass", "paper", "transparent"].contains(&theme) {
-            return Err("theme 必须是 glass（毛玻璃）、paper（纸张）或 transparent（透明）".into());
-        }
-        let _ = desktop.widget_update(id, json!({ "theme": theme }));
+    let id = res["widgets"].as_array().and_then(|w| w.last()).and_then(|w| w.get("id")).and_then(Value::as_str).ok_or("组件创建结果没有返回 id")?;
+    if let Some(theme) = theme {
+        desktop.widget_update(id, json!({ "theme": theme })).map_err(|e| format!("组件已添加（id: {id}），但设置外观失败：{e}"))?;
     }
     Ok(format!("已在桌面添加组件：{}（id: {id}）", widget_kind_label(kind)))
 }
@@ -581,6 +593,9 @@ fn parse_widget_patch(args: &Value) -> Result<Value, String> {
         obj.insert("enabled".into(), json!(b));
     }
     if let Some(v) = args.get("city").filter(|v| !v.is_null()) {
+        for coordinate in ["latitude", "longitude"] {
+            if v.get(coordinate).and_then(Value::as_f64).is_none() { return Err(format!("city 需要有效的 {coordinate} 经纬度")); }
+        }
         let city: crate::care_weather::City = serde_json::from_value(v.clone()).map_err(|e| format!("城市格式无效：{e}"))?;
         city.validate()?;
         obj.insert("city".into(), serde_json::to_value(&city).map_err(|e| e.to_string())?);
@@ -908,15 +923,15 @@ pub fn tools(desktop: Arc<dyn Desktop>) -> Vec<Arc<dyn Tool>> {
             care_set,
         ),
         tool(&desktop, ToolSpec::new("care_delete", "删除一条关怀提醒，id 来自 care_list。", object(json!({"id": {"type": "string"}}), &["id"])).risk(Risk::Write).serial(), care_delete),
-        tool(&desktop, ToolSpec::new("widget_list", "列出桌面当前放置的组件（id、类型、风格、缩放、显示状态）。", none()), widget_list),
+        tool(&desktop, ToolSpec::new("widget_list", "列出桌面当前放置的组件（id、类型、风格、缩放、显示状态）以及自创组件模板的 id 和名称。", none()), widget_list),
         tool(
             &desktop,
             ToolSpec::new(
                 "widget_add",
-                "在桌面放置新组件：fortune（木鱼求签）、calendar（小伴日历）或 weather（天气时钟），可选 theme（glass 毛玻璃 / paper 纸张 / transparent 透明）。桌面最多 12 个组件。",
+                "在桌面放置新组件：fortune（木鱼求签）、calendar（小伴日历）、weather（天气时钟）、notes（便签待办）或 countdown（倒数日／纪念日），可选 theme（glass 毛玻璃 / paper 纸张 / transparent 透明）。桌面最多 12 个组件。",
                 object(
                     json!({
-                        "kind": {"type": "string", "enum": ["fortune", "calendar", "weather"], "description": "组件类型"},
+                        "kind": {"type": "string", "enum": crate::custom_widgets::BUILTIN_KINDS, "description": "组件类型"},
                         "theme": {"type": "string", "enum": ["glass", "paper", "transparent"], "description": "可选外观风格，默认 paper 或 glass"},
                     }),
                     &["kind"],
@@ -937,6 +952,16 @@ pub fn tools(desktop: Arc<dyn Desktop>) -> Vec<Arc<dyn Tool>> {
                         "enabled": {"type": "boolean", "description": "true 显示，false 隐藏"},
                         "x": {"type": "number", "minimum": 0.0, "maximum": 1.0, "description": "水平位置比例"},
                         "y": {"type": "number", "minimum": 0.0, "maximum": 1.0, "description": "垂直位置比例"},
+                        "city": {
+                            "type": "object", "description": "天气城市，需提供真实经纬度；不确定时请让用户在组件页选择城市",
+                            "properties": {
+                                "name": {"type": "string", "description": "城市名"},
+                                "country": {"type": "string"}, "admin1": {"type": "string"},
+                                "latitude": {"type": "number", "minimum": -90, "maximum": 90},
+                                "longitude": {"type": "number", "minimum": -180, "maximum": 180}
+                            },
+                            "required": ["name", "latitude", "longitude"]
+                        },
                     }),
                     &["id"],
                 ),
@@ -1038,9 +1063,9 @@ pub fn tools(desktop: Arc<dyn Desktop>) -> Vec<Arc<dyn Tool>> {
             &desktop,
             ToolSpec::new(
                 "request_accessibility_permission",
-                "向 macOS 系统自主申请电脑控制（无障碍/辅助功能与屏幕录制）权限，并自动呼出系统设置面板。当需要操控其他软件（如 Edge、Safari）遇到权限不足或尚未授权时调用此工具，无需让用户在终端输入命令。",
+                "仅在 macOS 打开辅助功能与屏幕录制设置页面，供用户手动检查和授权。打开设置不等于已获授权；其他平台不支持此引导。",
                 none(),
-            ),
+            ).risk(Risk::Write).serial(),
             |d: &dyn Desktop, _: &Value| -> Result<String, String> {
                 let res = d.request_permissions()?;
                 Ok(res["message"].as_str().unwrap_or("已申请系统权限").to_string())
@@ -1058,6 +1083,8 @@ mod tests {
     struct Fake {
         calls: Mutex<Vec<String>>,
         rules: Mutex<Vec<Value>>,
+        templates: Mutex<Vec<Value>>,
+        fail_widget_update: Mutex<Option<String>>,
         fail: Mutex<Option<String>>,
     }
 
@@ -1133,13 +1160,14 @@ mod tests {
         }
         fn widget_update(&self, id: &str, patch: Value) -> Result<Value, String> {
             self.log(format!("widget-update {id} {patch}"))?;
+            if let Some(error) = self.fail_widget_update.lock().unwrap().clone() { return Err(error); }
             Ok(json!({}))
         }
         fn widget_remove(&self, id: &str) -> Result<(), String> {
             self.log(format!("widget-remove {id}"))
         }
         fn custom_widgets(&self) -> Result<Value, String> {
-            Ok(json!([]))
+            Ok(json!(self.templates.lock().unwrap().clone()))
         }
         fn create_custom_widget(&self, pack: &Value, place_now: bool, overwrite: bool) -> Result<Value, String> {
             let id = pack["id"].as_str().unwrap_or("?");
@@ -1201,7 +1229,7 @@ mod tests {
         let read: Vec<&str> = all.iter().filter(|t| t.spec().risk == Risk::Read).map(|t| t.spec().name.as_str()).collect();
         let mut read = read;
         read.sort();
-        assert_eq!(read, vec!["care_list", "desktop_status", "effect_list", "effect_read_format", "game_list", "request_accessibility_permission", "wallpaper_list", "widget_list"]);
+        assert_eq!(read, vec!["care_list", "desktop_status", "effect_list", "effect_read_format", "game_list", "wallpaper_list", "widget_list"]);
         for tool in all.iter().filter(|t| t.spec().risk == Risk::Write) {
             assert!(!tool.spec().parallel_safe, "{} changes shared settings, so it runs alone", tool.spec().name);
         }
@@ -1377,6 +1405,32 @@ mod tests {
 
         assert!(call(&fake, "widget_add", json!({"kind": "unknown"})).unwrap_err().contains("kind 只能是"));
         assert!(call(&fake, "widget_add", json!({"kind": "fortune", "theme": "neon"})).unwrap_err().contains("theme 必须是"));
+        assert_eq!(fake.calls().len(), 2, "invalid options never create a widget");
+    }
+
+    #[test]
+    fn widget_tools_match_the_builtin_types_city_schema_and_custom_library() {
+        let fake = Arc::new(Fake::default());
+        for (kind, label) in [("notes", "便签待办"), ("countdown", "倒数日／纪念日")] {
+            assert!(call(&fake, "widget_add", json!({"kind":kind})).unwrap().contains(label));
+        }
+        *fake.templates.lock().unwrap() = vec![json!({"id":"my-clock","name":"专注时钟"})];
+        assert!(call(&fake, "widget_list", json!({})).unwrap().contains("my-clock | 专注时钟"));
+        let all = tools(fake.clone());
+        let add = all.iter().find(|tool| tool.spec().name == "widget_add").unwrap().spec();
+        assert_eq!(add.schema["properties"]["kind"]["enum"], json!(crate::custom_widgets::BUILTIN_KINDS));
+        let update = all.iter().find(|tool| tool.spec().name == "widget_update").unwrap().spec();
+        assert_eq!(update.schema["properties"]["city"]["required"], json!(["name", "latitude", "longitude"]));
+        assert!(parse_widget_patch(&json!({"city":{"name":"上海"}})).is_err());
+        assert!(parse_widget_patch(&json!({"city":{"name":"上海","latitude":31.23,"longitude":121.47}})).is_ok());
+    }
+
+    #[test]
+    fn widget_add_reports_a_failed_theme_update_instead_of_claiming_success() {
+        let fake = Arc::new(Fake::default());
+        *fake.fail_widget_update.lock().unwrap() = Some("写入失败".into());
+        let error = call(&fake, "widget_add", json!({"kind":"notes","theme":"paper"})).unwrap_err();
+        assert!(error.contains("组件已添加") && error.contains("设置外观失败") && error.contains("写入失败"));
     }
 
     #[test]

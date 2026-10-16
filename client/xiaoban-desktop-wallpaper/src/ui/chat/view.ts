@@ -102,8 +102,12 @@ export function describeCall(name: string, argumentsJson: string): string {
   let args: Record<string, unknown> = {};
   try { const parsed = JSON.parse(argumentsJson); if (parsed && typeof parsed === 'object') args = parsed as Record<string, unknown>; } catch { /* half-written arguments */ }
   const pick = (...keys: string[]) => keys.map(key => args[key]).find((value): value is string => typeof value === 'string' && value.trim() !== '');
+  const pack = args.pack && typeof args.pack === 'object' ? args.pack as Record<string, unknown> : {};
+  const packName = typeof pack.name === 'string' ? pack.name : typeof pack.id === 'string' ? pack.id : '';
   const text = name === 'shell' ? pick('command')
-    : pick('command', 'path', 'url', 'query', 'pattern', 'kind', 'id', 'name', 'text', 'question', 'expression', 'skin', 'theme', 'gameId');
+    : name === 'effect_create' ? packName
+    : pick('command', 'path', 'url', 'query', 'pattern', 'kind', 'title', 'name', 'id', 'text', 'question', 'expression', 'skin', 'theme', 'gameId');
   const line = (text ?? '').split('\n')[0].trim();
   return line.length > 90 ? `${line.slice(0, 90)}…` : line;
 }
+
