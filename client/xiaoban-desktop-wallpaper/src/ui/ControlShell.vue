@@ -52,7 +52,11 @@ async function handleLogout() {
     store.notify(error, 'error');
   }
 }
-const manageWidgets = () => navigate('widgets');
+const manageWidgets = (event: Event) => {
+  const id = (event as CustomEvent<{ id?: unknown }>).detail?.id;
+  store.widgetSettingsTarget = typeof id === 'string' ? id : '';
+  navigate('widgets');
+};
 const focus = () => store.refreshSettings().catch(error => store.notify(error, 'error'));
 onMounted(() => {
   if (typeof window !== 'undefined' && store.desktop) {
@@ -118,3 +122,4 @@ onBeforeUnmount(() => { store.dispose(); window.removeEventListener('focus', foc
     <LoginModal :store="store" />
   </div>
 </template>
+

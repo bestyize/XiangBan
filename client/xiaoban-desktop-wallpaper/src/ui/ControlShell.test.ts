@@ -97,3 +97,48 @@ describe('ControlShell sidebar', () => {
     quiet.unmount();
   });
 });
+
+
+it('opens configuration for the originating widget after the layout loads and handles repeat requests', async () => {
+  const base = vi.mocked(invoke).getMockImplementation()!;
+  let resolveLayout!: (layout: unknown) => void;
+  const pending = new Promise<unknown>(resolve => { resolveLayout = resolve; });
+  vi.mocked(invoke).mockImplementation(((command: string, ...rest: unknown[]) => {
+    if (command === 'get_desktop_widgets') return pending;
+    if (command === 'list_custom_widgets') return Promise.resolve([]);
+    return base(command, ...(rest as []));
+  }) as typeof invoke);
+  const wrapper = mount(ControlShell);
+  try {
+    await flushPromises();
+    await wrapper.get('[data-testid="nav-settings"]').trigger('click');
+    await import('./pages/SettingsPage.vue'); await flushPromises();
+    window.dispatchEvent(new CustomEvent('widgets-manage', { detail: { id: 'ef12' } }));
+    await import('./pages/WidgetsPage.vue');
+    await vi.waitFor(() => expect(invoke).toHaveBeenCalledWith('get_desktop_widgets'));
+    resolveLayout({version:1,widgets:[
+      {id:'abcd',kind:'calendar',theme:'glass',scale:1,x:.2,y:.2,enabled:true,city:null,monitor:'primary'},
+      {id:'ef12',kind:'weather',theme:'glass',scale:1,x:.2,y:.2,enabled:true,city:null,monitor:'second'},
+    ],monitors:[
+      {id:'primary',name:'主屏幕',width:1920,height:1080,primary:true},
+      {id:'second',name:'副屏幕',width:1600,height:900,primary:false},
+    ]});
+    await vi.waitFor(async () => {
+      await flushPromises();
+      expect(wrapper.find('[data-testid="widgets-page"]').exists()).toBe(true);
+      expect(wrapper.find('[data-testid="settings-page"]').exists()).toBe(false);
+      expect(wrapper.get('[data-testid="layout-ef12"]').classes()).toContain('selected');
+    });
+    expect(wrapper.get('[role="tab"][aria-selected="true"]').text()).toContain('我的桌面');
+    expect(wrapper.find('[data-testid="layout-abcd"]').exists()).toBe(false);
+    // A later click still opens the same widget after switching back to the library.
+    const library = wrapper.findAll('[role="tab"]').find(tab => tab.text() === '组件库')!;
+    await library.trigger('click');
+    window.dispatchEvent(new CustomEvent('widgets-manage', { detail: { id: 'ef12' } }));
+    await flushPromises();
+    expect(wrapper.get('[data-testid="layout-ef12"]').classes()).toContain('selected');
+    // Older hosts sent an event without an id; they should open configuration too.
+    window.dispatchEvent(new Event('widgets-manage')); await flushPromises();
+    expect(wrapper.get('[data-testid="layout-abcd"]').classes()).toContain('selected');
+  } finally { wrapper.unmount(); vi.mocked(invoke).mockImplementation(base); }
+});

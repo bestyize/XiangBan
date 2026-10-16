@@ -11,6 +11,8 @@ export type { GameCatalog };
 
 export type ControlPage = "chat" | "wallpapers" | "widgets" | "interactive" | "effects" | "companion" | "games" | "care" | "settings";
 export interface ControlStore {
+  /** Pending component configuration request, consumed after its layout loads. */
+  widgetSettingsTarget: string | null;
   settings: Settings;
   info: AppInfo;
   library: WallpaperLibrary;
@@ -72,4 +74,5 @@ export interface ControlStore {
   setAutomaticUpdates(enabled: boolean): Promise<void>;
   checkWebsite(): Promise<void>;
 }
+
 

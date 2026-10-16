@@ -304,8 +304,11 @@ pub async fn move_desktop_widget(window:tauri::WebviewWindow,grab_x:f64,grab_y:f
 }
 #[tauri::command]
 pub fn show_widget_settings(window:tauri::WebviewWindow)->Result<(),String>{
-    own_widget(&window)?;crate::present_control(window.app_handle())?;
-    if let Some(control)=window.app_handle().get_webview_window("control"){control.eval("window.dispatchEvent(new Event('widgets-manage'));".to_string()).map_err(|e|e.to_string())?;}Ok(())
+    let widget=own_widget(&window)?;crate::present_control(window.app_handle())?;
+    let id=serde_json::to_string(&widget.id).map_err(|e|e.to_string())?;
+    if let Some(control)=window.app_handle().get_webview_window("control"){
+        control.eval(format!("window.dispatchEvent(new CustomEvent('widgets-manage',{{detail:{{id:{id}}}}}));")).map_err(|e|e.to_string())?;
+    }Ok(())
 }
 #[tauri::command]
 pub async fn get_widget_weather(window:tauri::WebviewWindow)->Result<Weather,String>{
@@ -380,4 +383,5 @@ mod tests{
     }
 
 }
+
 

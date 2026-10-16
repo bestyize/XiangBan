@@ -48,6 +48,7 @@ export function createControlStore(notify: ControlStore["notify"]): ControlStore
     effectList: noPacks(),
     account: null,
     showLoginModal: false,
+    widgetSettingsTarget: null,
     page: "wallpapers", settingsTab: "general", asr: createAsrStore({ desktop, invoke, listen, notify }), speech: createSpeechStore({ desktop, invoke, notify }), chat: createChatStore({ desktop, invoke, listen, notify,
       onActivity: () => { store.asr.deactivate(); void store.speech.stop(); },
       onReply: (session, text, key) => { if (store.page === 'chat' && store.speech.settings.autoRead && document.visibilityState !== 'hidden') void store.speech.speak(text, key ?? 'auto:' + session, undefined, true); },
@@ -257,4 +258,5 @@ export function createControlStore(notify: ControlStore["notify"]): ControlStore
   } as ControlStore);
   return store;
 }
+
 
