@@ -5,6 +5,19 @@ import { createWidgetClient } from './client.ts';
 vi.mock('../bridge.ts',()=>({desktop:false,invoke:vi.fn()}));
 beforeEach(()=>localStorage.clear());
 describe('widget collection persistence',()=>{
+  it('persists layer independently from background and loads legacy layouts on the desktop layer',async()=>{
+    localStorage.setItem('xiaoban.widgets.v1',JSON.stringify({version:1,widgets:[{id:'old',kind:'calendar',theme:'paper',scale:1,x:.5,y:.5,enabled:true,city:null}]}));
+    const client=createWidgetClient();await client.load();
+    expect(client.layout.value.widgets[0].alwaysOnTop).toBe(false);
+    await client.update('old',{theme:'transparent',alwaysOnTop:true});client.dispose();
+    const reopened=createWidgetClient();await reopened.load();
+    expect(reopened.layout.value.widgets[0]).toMatchObject({theme:'transparent',alwaysOnTop:true});
+    await reopened.update('old',{alwaysOnTop:false});
+    expect(reopened.layout.value.widgets[0]).toMatchObject({theme:'transparent',alwaysOnTop:false});
+    const stored=localStorage.getItem('xiaoban.widgets.v1');
+    await expect(reopened.update('old',{alwaysOnTop:'yes' as unknown as boolean})).rejects.toThrow('层级无效');
+    expect(localStorage.getItem('xiaoban.widgets.v1')).toBe(stored);reopened.dispose();
+  });
   it('keeps several instances, per-instance settings and positions after reopening',async()=>{
     const client=createWidgetClient();await client.load();
     await Promise.all([client.add('calendar'),client.add('calendar'),client.add('fortune')]);
@@ -36,4 +49,3 @@ describe('widget collection persistence',()=>{
   });
 
 });
-

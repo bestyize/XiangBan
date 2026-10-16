@@ -28,6 +28,8 @@ pub struct CustomWidgetPack {
     pub height: f64,
     #[serde(default = "default_theme")]
     pub theme: String,
+    #[serde(default)]
+    pub always_on_top: bool,
     pub html: String,
 }
 
@@ -41,7 +43,7 @@ fn default_height() -> f64 {
 }
 #[allow(dead_code)]
 fn default_theme() -> String {
-    "glass".to_string()
+    "transparent".to_string()
 }
 
 pub fn valid_widget_id(value: &str) -> bool {
@@ -57,6 +59,9 @@ pub fn is_builtin_kind(id: &str) -> bool {
 
 /// Validates a custom widget pack structure.
 pub fn validate(pack: &Value) -> Result<(), String> {
+    if pack.get("alwaysOnTop").is_some_and(|v| !v.is_boolean()) {
+        return Err("alwaysOnTop 必须是 true 或 false".into());
+    }
     if pack.get("schemaVersion").and_then(Value::as_u64) != Some(1) {
         return Err("schemaVersion 需要是 1".into());
     }

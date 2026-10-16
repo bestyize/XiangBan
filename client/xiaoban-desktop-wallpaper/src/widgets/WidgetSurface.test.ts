@@ -10,6 +10,20 @@ vi.mock('../rituals/FortuneVessel.vue',()=>({default:{template:'<div />'}}));
 vi.mock('../rituals/journal.ts',async original=>({...await original<typeof import('../rituals/journal.ts')>(),openRitual:vi.fn().mockResolvedValue(undefined)}));
 const one=(kind:DesktopWidget['kind']):DesktopWidget=>({id:'test',kind,theme:'paper',scale:1,x:.5,y:.5,enabled:true,city:null});
 describe('desktop widget interactions',()=>{
+  it('renders transparent custom HTML without changing its source and keeps the frame sandboxed',async()=>{
+    const html='<html><body style="background:white"><div>12:00</div></body></html>';
+    const widget:DesktopWidget={...one('custom'),theme:'transparent',customId:'my-clock',custom:{id:'my-clock',name:'时钟',html}};
+    const view=mount(WidgetSurface,{props:{widget}});
+    expect(view.get('article').classes()).toContain('transparent');
+    expect(view.get('iframe').attributes('srcdoc')).toContain('data-xiaoban-transparent');
+    expect(view.get('iframe').attributes('srcdoc')).toContain('background:transparent!important');
+    expect(view.get('iframe').attributes('sandbox')).toBe('allow-scripts');
+    expect(view.find('.widget-settings').exists()).toBe(true);
+    expect(widget.custom!.html).toBe(html);
+    await view.setProps({widget:{...widget,theme:'paper'}});
+    expect(view.get('iframe').attributes('srcdoc')).toBe(html);
+    view.unmount();
+  });
   it('keeps a small stationary press as a click without moving the widget',async()=>{
     vi.useFakeTimers();vi.mocked(invoke).mockClear();
     const widget=one('fortune'),view=mount(WidgetSurface,{props:{widget,payload:{widget,editing:false,screenX:100,screenY:200}}});
@@ -55,4 +69,3 @@ describe('desktop widget interactions',()=>{
   });
 
 });
-

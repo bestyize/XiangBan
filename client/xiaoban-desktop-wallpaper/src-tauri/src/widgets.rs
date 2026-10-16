@@ -9,6 +9,8 @@ use tauri::{Manager, WebviewUrl, WebviewWindowBuilder};
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Widget {
     pub id: String, pub kind: String, pub theme: String, pub scale: f64,
+    #[serde(default)]
+    pub always_on_top: bool,
     pub x: f64, pub y: f64, pub enabled: bool, pub city: Option<City>,
     #[serde(default, skip_serializing_if="Option::is_none")]
     pub note: Option<NoteData>,
@@ -59,9 +61,14 @@ pub struct WidgetState {
     weather: Mutex<HashMap<String, Weather>>, attempts: Mutex<HashMap<String, i64>>,
 }
 pub fn is_widget(label: &str) -> bool { label.starts_with("widget-") }
+fn window_label(widget: &Widget) -> String {
+    // Different labels recreate the native window when its parent/layer changes.
+    // This keeps Tao's parent state consistent with Explorer's desktop child windows.
+    format!("widget-{}{}", widget.id, if widget.always_on_top { "-top" } else { "" })
+}
 fn own_widget(window: &tauri::WebviewWindow) -> Result<Widget, String> {
     window.app_handle().state::<WidgetState>().layout.lock().unwrap().widgets.iter()
-        .find(|widget| format!("widget-{}", widget.id) == window.label()).cloned().ok_or("没有找到这个桌面组件".into())
+        .find(|widget| window_label(widget) == window.label()).cloned().ok_or("没有找到这个桌面组件".into())
 }
 pub fn permitted(label: &str, command: &str) -> Option<bool> {
     if is_widget(label) { return Some(["get_desktop_widget", "move_desktop_widget", "show_widget_settings", "get_widget_weather", "save_desktop_widget_content", "open_ritual_space"].contains(&command)); }
@@ -168,7 +175,13 @@ fn widget_payload(app: &tauri::AppHandle, widget: &Widget) -> Result<Value, Stri
 }
 fn place(app: &tauri::AppHandle, window: &tauri::WebviewWindow, widget: &Widget) -> Result<(), String> {
     let (x,y,width,height,dpi)=geometry(app,widget)?;
-    #[cfg(windows)] return crate::windows::place_widget(window,tauri::PhysicalPosition::new(x.round() as i32,y.round() as i32),width.round() as i32,height.round() as i32);
+    #[cfg(windows)] {
+        if widget.always_on_top {
+            return window.set_size(tauri::PhysicalSize::new(width.round() as u32,height.round() as u32))
+                .and_then(|_| window.set_position(tauri::PhysicalPosition::new(x.round() as i32,y.round() as i32))).map_err(|e|e.to_string());
+        }
+        return crate::windows::place_widget(window,tauri::PhysicalPosition::new(x.round() as i32,y.round() as i32),width.round() as i32,height.round() as i32);
+    }
     #[cfg(target_os="macos")] {let _=dpi;return crate::macos::place_widget(window,x,y,width,height);}
     #[cfg(not(any(windows,target_os="macos")))] {window.set_size(tauri::LogicalSize::new(width/dpi,height/dpi)).and_then(|_|window.set_position(tauri::PhysicalPosition::new(x,y))).map_err(|e|e.to_string())}
 }
@@ -176,11 +189,11 @@ pub fn sync(app: &tauri::AppHandle) {
     let state = app.state::<WidgetState>(); let layout = state.layout.lock().unwrap().clone(); let mut errors = vec![];
     let enabled: Vec<_> = layout.widgets.iter().filter(|w| w.enabled && !crate::games::is_active(app)).collect();
     for (label, window) in app.webview_windows() {
-        if is_widget(&label) && !enabled.iter().any(|w| label == format!("widget-{}",w.id)) { let _ = window.destroy(); }
+        if is_widget(&label) && !enabled.iter().any(|w| label == window_label(w)) { let _ = window.destroy(); }
     }
     for widget in enabled {
         let result = (|| -> Result<(), String> {
-            let label = format!("widget-{}",widget.id);
+            let label = window_label(widget);
             if let Some(window) = app.get_webview_window(&label) {
                 place(app,&window,widget)?;
                 window.eval(format!("window.dispatchEvent(new CustomEvent('widget-config',{{detail:{}}}));",widget_payload(app,widget)?)).map_err(|e| e.to_string())?;
@@ -189,19 +202,22 @@ pub fn sync(app: &tauri::AppHandle) {
             let (x,y,width,height,dpi) = geometry(app,widget)?;
             let builder = WebviewWindowBuilder::new(app,&label,WebviewUrl::App(format!("index.html?scene=widget&id={}",widget.id).into()))
                 .title("小伴 · 桌面组件").decorations(false).shadow(false).transparent(true).resizable(false).visible(false)
-                .skip_taskbar(true).always_on_top(false).focused(false).position(x/dpi,y/dpi).inner_size(width/dpi,height/dpi)
+                .skip_taskbar(true).always_on_top(widget.always_on_top).focused(false).position(x/dpi,y/dpi).inner_size(width/dpi,height/dpi)
                 .initialization_script(format!("window.__XIAOBAN_WIDGET__={};",widget_payload(app,widget)?));
             // Keep the native parent in Tao's own state as well as the final HWND styles.
-            #[cfg(windows)] let builder = builder.parent_raw(::windows::Win32::Foundation::HWND(crate::windows::widget_parent()? as _))
-                .data_directory(crate::storage::webview(&crate::storage::root(app)?));
+            #[cfg(windows)] let builder = {
+                let builder = builder.data_directory(crate::storage::webview(&crate::storage::root(app)?));
+                if widget.always_on_top { builder }
+                else { builder.parent_raw(::windows::Win32::Foundation::HWND(crate::windows::widget_parent()? as _)) }
+            };
             #[cfg(target_os="macos")] let builder = builder.incognito(true);
             let window = builder.build().map_err(|e| e.to_string())?;
             let configured = (|| -> Result<(),String> {
-                #[cfg(windows)] crate::windows::attach_widget(&window)?;
-                #[cfg(target_os="macos")] crate::macos::configure_scene(&window,true,false)?;
+                #[cfg(windows)] if !widget.always_on_top { crate::windows::attach_widget(&window)?; }
+                #[cfg(target_os="macos")] crate::macos::configure_scene(&window,!widget.always_on_top,false)?;
                 place(app,&window,widget)?; window.show().map_err(|e| e.to_string())?;
                 // Show can reconcile Tao's window styles; apply the desktop child frame last.
-                #[cfg(windows)] crate::windows::attach_widget(&window)?;
+                #[cfg(windows)] if !widget.always_on_top { crate::windows::attach_widget(&window)?; }
                 place(app,&window,widget)?; Ok(())
             })();
             if let Err(error) = configured { let _=window.destroy(); return Err(error); }
@@ -239,25 +255,28 @@ pub async fn add_desktop_widget(app: tauri::AppHandle, kind: String, custom_id: 
     let index=next.widgets.len();
     let note=if kind=="notes"{Some(NoteData{title:"随手记".into(),mode:"note".into(),text:String::new(),items:vec![]})}else{None};
     let countdown=if kind=="countdown"{Some(CountdownData{title:"值得期待的日子".into(),date:chrono::Local::now().format("%Y-%m-%d").to_string(),mode:"countdown".into(),repeat:"none".into()})}else{None};
-    let mut theme=if kind=="fortune"{"paper"}else{"glass"}.into();
+    let mut theme=if kind=="fortune"{"paper"}else if kind=="custom"{"transparent"}else{"glass"}.into();
+    let mut always_on_top = false;
     if kind == "custom" {
         let cid = custom_id.as_deref().ok_or("添加自定义组件需要指定 customId")?;
         let root = crate::storage::root(&app)?;
         let pack = crate::custom_widgets::find(&root.join("custom_widgets"), cid).ok_or_else(|| format!("未找到自定义小组件模板「{cid}」"))?;
+        always_on_top = pack["alwaysOnTop"].as_bool().unwrap_or(false);
         if let Some(t) = pack.get("theme").and_then(Value::as_str) {
             theme = t.to_string();
         }
     }
-    next.widgets.push(Widget{id:random.iter().map(|b|format!("{b:02x}")).collect(),kind,theme,scale:1.0,x:((if index%3==1{0.88}else{0.52})-(index/3) as f64*0.25).max(0.05),y:if index%3==2{0.94}else{0.06},enabled:true,city:None,note,countdown,monitor:None,custom_id});
+    next.widgets.push(Widget{id:random.iter().map(|b|format!("{b:02x}")).collect(),kind,theme,always_on_top,scale:1.0,x:((if index%3==1{0.88}else{0.52})-(index/3) as f64*0.25).max(0.05),y:if index%3==2{0.94}else{0.06},enabled:true,city:None,note,countdown,monitor:None,custom_id});
     persist(&app,&next)?; *state.layout.lock().unwrap()=next; sync(&app); Ok(snapshot(&app))
 }
 #[derive(Deserialize)]
 #[serde(rename_all="camelCase",deny_unknown_fields)]
-pub struct Patch { monitor: Option<String>, theme: Option<String>, scale: Option<f64>, x: Option<f64>, y: Option<f64>, enabled: Option<bool>, city: Option<City>, note: Option<NoteData>, countdown: Option<CountdownData>, custom_id: Option<String> }
+pub struct Patch { always_on_top: Option<bool>, monitor: Option<String>, theme: Option<String>, scale: Option<f64>, x: Option<f64>, y: Option<f64>, enabled: Option<bool>, city: Option<City>, note: Option<NoteData>, countdown: Option<CountdownData>, custom_id: Option<String> }
 #[tauri::command]
 pub async fn update_desktop_widget(app: tauri::AppHandle, id: String, patch: Patch) -> Result<Value,String> {
     let state=app.state::<WidgetState>();let _operation=state.operation.lock().await;
     let mut next=state.layout.lock().unwrap().clone();let widget=next.widgets.iter_mut().find(|w|w.id==id).ok_or("没有找到这个组件")?;
+    if let Some(v)=patch.always_on_top{widget.always_on_top=v;}
     if let Some(v)=patch.monitor{widget.monitor=Some(v);}if let Some(v)=patch.theme{widget.theme=v;}if let Some(v)=patch.scale{widget.scale=v;}if let Some(v)=patch.x{widget.x=v;}if let Some(v)=patch.y{widget.y=v;}if let Some(v)=patch.enabled{widget.enabled=v;}if let Some(v)=patch.city{widget.city=Some(v);}if let Some(v)=patch.note{widget.note=Some(v);}if let Some(v)=patch.countdown{widget.countdown=Some(v);}if let Some(v)=patch.custom_id{widget.custom_id=Some(v);}
     persist(&app,&next)?;*state.layout.lock().unwrap()=next;sync(&app);Ok(snapshot(&app))
 }
@@ -354,7 +373,7 @@ pub fn delete_custom_pack(app: &tauri::AppHandle, id: &str) -> Result<(), String
 #[cfg(test)]
 mod tests{
     use super::*;
-    fn one()->Layout{Layout{version:1,widgets:vec![Widget{id:"abc123".into(),kind:"calendar".into(),theme:"glass".into(),scale:1.0,x:0.8,y:0.2,enabled:true,city:None,note:None,countdown:None,monitor:None,custom_id:None}]}}
+    fn one()->Layout{Layout{version:1,widgets:vec![Widget{id:"abc123".into(),kind:"calendar".into(),theme:"glass".into(),always_on_top:false,scale:1.0,x:0.8,y:0.2,enabled:true,city:None,note:None,countdown:None,monitor:None,custom_id:None}]}}
     #[test]fn custom_widgets_in_layout_validated(){
         let mut layout=one();layout.widgets[0].kind="custom".into();layout.widgets[0].custom_id=Some("pomodoro-timer".into());
         assert!(validate(&layout).is_ok());
@@ -367,6 +386,16 @@ mod tests{
     #[test]fn legacy_layouts_load_without_new_content_fields(){
         let layout:Layout=serde_json::from_str(r#"{"version":1,"widgets":[{"id":"old","kind":"calendar","theme":"paper","scale":1.0,"x":0.5,"y":0.2,"enabled":true,"city":null}]}"#).unwrap();
         assert!(validate(&layout).is_ok());assert!(layout.widgets[0].note.is_none());assert!(layout.widgets[0].countdown.is_none());
+        assert!(!layout.widgets[0].always_on_top);
+    }
+    #[test]fn layer_serializes_and_uses_a_distinct_native_window(){
+        let mut layout=one();let desktop=window_label(&layout.widgets[0]);
+        layout.widgets[0].always_on_top=true;
+        assert_eq!(window_label(&layout.widgets[0]),format!("{desktop}-top"));
+        let json=serde_json::to_value(&layout).unwrap();
+        assert_eq!(json["widgets"][0]["alwaysOnTop"],true);
+        assert!(serde_json::from_value::<Patch>(json!({"alwaysOnTop":true})).is_ok());
+        assert!(serde_json::from_value::<Patch>(json!({"alwaysOnTop":"yes"})).is_err());
     }
     #[test]fn typed_content_and_dates_are_validated(){
         let mut layout=one();layout.widgets[0].kind="notes".into();
@@ -383,5 +412,3 @@ mod tests{
     }
 
 }
-
-

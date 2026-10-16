@@ -614,7 +614,8 @@ fn widget_list(desktop: &dyn Desktop, _: &Value) -> Result<String, String> {
         let enabled = w["enabled"].as_bool().unwrap_or(true);
         let city = w.get("city").and_then(|c| c.get("name")).and_then(Value::as_str).map(|n| format!(" | 城市: {n}")).unwrap_or_default();
         let state = if enabled { "显示中" } else { "已隐藏" };
-        lines.push(format!("{id} | {} ({kind}) | {}风格 ({theme}) | 缩放 {scale:.2}{city} | {state}", widget_kind_label(kind), widget_theme_label(theme)));
+        let layer = if w["alwaysOnTop"].as_bool().unwrap_or(false) { "始终置顶" } else { "融入桌面" };
+        lines.push(format!("{id} | {} ({kind}) | {}风格 ({theme}) | 缩放 {scale:.2}{city} | {state} | {layer}", widget_kind_label(kind), widget_theme_label(theme)));
     }
     let templates = desktop.custom_widgets()?;
     if let Some(templates) = templates.as_array().filter(|items| !items.is_empty()) {
@@ -636,16 +637,23 @@ fn widget_add(desktop: &dyn Desktop, args: &Value) -> Result<String, String> {
     if theme.is_some_and(|theme| !["glass", "paper", "transparent"].contains(&theme)) {
         return Err("theme 必须是 glass（毛玻璃）、paper（纸张）或 transparent（透明）".into());
     }
+    let always_on_top = optional_bool(args, "always_on_top")?;
     let res = desktop.widget_add(kind)?;
     let id = res["widgets"].as_array().and_then(|w| w.last()).and_then(|w| w.get("id")).and_then(Value::as_str).ok_or("组件创建结果没有返回 id")?;
-    if let Some(theme) = theme {
-        desktop.widget_update(id, json!({ "theme": theme })).map_err(|e| format!("组件已添加（id: {id}），但设置外观失败：{e}"))?;
+    let mut patch = json!({});
+    if let Some(theme) = theme { patch["theme"] = json!(theme); }
+    if let Some(top) = always_on_top { patch["alwaysOnTop"] = json!(top); }
+    if patch.as_object().is_some_and(|p| !p.is_empty()) {
+        desktop.widget_update(id, patch).map_err(|e| format!("组件已添加（id: {id}），但设置外观或层级失败：{e}"))?;
     }
     Ok(format!("已在桌面添加组件：{}（id: {id}）", widget_kind_label(kind)))
 }
 
 fn parse_widget_patch(args: &Value) -> Result<Value, String> {
     let mut obj = serde_json::Map::new();
+    if let Some(top) = optional_bool(args, "always_on_top")? {
+        obj.insert("alwaysOnTop".into(), json!(top));
+    }
     if let Some(v) = args.get("theme").filter(|v| !v.is_null()) {
         let theme = v.as_str().ok_or("theme 必须是字符串")?;
         if !["glass", "paper", "transparent"].contains(&theme) {
@@ -687,7 +695,7 @@ fn parse_widget_patch(args: &Value) -> Result<Value, String> {
         obj.insert("city".into(), serde_json::to_value(&city).map_err(|e| e.to_string())?);
     }
     if obj.is_empty() {
-        return Err("请至少指定 theme、scale、x、y、enabled 或 city 之一".into());
+        return Err("请至少指定 theme、always_on_top、scale、x、y、enabled 或 city 之一".into());
     }
     Ok(Value::Object(obj))
 }
@@ -712,7 +720,8 @@ fn widget_create(desktop: &dyn Desktop, args: &Value) -> Result<String, String> 
     let description = optional_text(args, "description")?;
     let width = args.get("width").and_then(Value::as_f64);
     let height = args.get("height").and_then(Value::as_f64);
-    let theme = optional_text(args, "theme")?.unwrap_or("glass");
+    let theme = optional_text(args, "theme")?.unwrap_or("transparent");
+    let always_on_top = optional_bool(args, "always_on_top")?.unwrap_or(false);
     let overwrite = optional_bool(args, "overwrite")?.unwrap_or(false);
     let place_now = optional_bool(args, "place_now")?.unwrap_or(true);
 
@@ -722,6 +731,7 @@ fn widget_create(desktop: &dyn Desktop, args: &Value) -> Result<String, String> 
         "name": name,
         "html": html,
         "theme": theme,
+        "alwaysOnTop": always_on_top,
     });
     if let Some(desc) = description {
         pack["description"] = json!(desc);
@@ -1052,11 +1062,12 @@ pub fn tools(desktop: Arc<dyn Desktop>) -> Vec<Arc<dyn Tool>> {
             &desktop,
             ToolSpec::new(
                 "widget_add",
-                "在桌面放置新组件：fortune（木鱼求签）、calendar（小伴日历）、weather（天气时钟）、notes（便签待办）或 countdown（倒数日／纪念日），可选 theme（glass 毛玻璃 / paper 纸张 / transparent 透明）。桌面最多 12 个组件。",
+                "在桌面放置新组件：fortune（木鱼求签）、calendar（小伴日历）、weather（天气时钟）、notes（便签待办）或 countdown（倒数日／纪念日），可选 theme（glass 毛玻璃 / paper 纸张 / transparent 透明）和 always_on_top。默认融入桌面；true 浮在普通应用窗口上方。桌面最多 12 个组件。",
                 object(
                     json!({
                         "kind": {"type": "string", "enum": crate::custom_widgets::BUILTIN_KINDS, "description": "组件类型"},
                         "theme": {"type": "string", "enum": ["glass", "paper", "transparent"], "description": "可选外观风格，默认 paper 或 glass"},
+                        "always_on_top": {"type":"boolean","description":"true 始终置顶；false 融入桌面，默认 false"},
                     }),
                     &["kind"],
                 ),
@@ -1067,11 +1078,12 @@ pub fn tools(desktop: Arc<dyn Desktop>) -> Vec<Arc<dyn Tool>> {
             &desktop,
             ToolSpec::new(
                 "widget_update",
-                "修改已有的桌面组件：外观风格、缩放大小（0.75-1.5）、位置（x, y 为 0.0-1.0 比例）、显示/隐藏或城市。至少给一项修改。",
+                "修改已有的桌面组件：外观风格、显示层级（always_on_top=true 始终置顶，false 融入桌面）、缩放大小（0.75-1.5）、位置（x, y 为 0.0-1.0 比例）、显示/隐藏或城市。至少给一项修改。透明外观移除外壳和 HTML 根背景；若源码内另有卡片底板，可通过 resource_edit 修改模板。",
                 object(
                     json!({
                         "id": {"type": "string", "description": "组件 id，来自 widget_list"},
                         "theme": {"type": "string", "enum": ["glass", "paper", "transparent"]},
+                        "always_on_top": {"type":"boolean","description":"true 浮在普通应用窗口上方；false 融入桌面"},
                         "scale": {"type": "number", "minimum": 0.75, "maximum": 1.5, "description": "缩放比例"},
                         "enabled": {"type": "boolean", "description": "true 显示，false 隐藏"},
                         "x": {"type": "number", "minimum": 0.0, "maximum": 1.0, "description": "水平位置比例"},
@@ -1101,7 +1113,7 @@ pub fn tools(desktop: Arc<dyn Desktop>) -> Vec<Arc<dyn Tool>> {
             &desktop,
             ToolSpec::new(
                 "widget_create",
-                "为用户创作一个新的自定义单文件 HTML 桌面小组件。可编写包含完整 HTML、CSS 样式与 JavaScript 交互逻辑的独立微卡片（如番茄钟、极简时钟、每日诗词、倒数日、健康喝水提醒、趣味小工具等）。支持自适应外壳主题（glass 透光玻璃 / paper 温润纸张 / transparent 透明无底），默认宽 280、高 240。创作完成后默认自动放置到桌面上。",
+                "为用户创作自包含 HTML 桌面小组件（如时钟、番茄钟、股票面板、诗词、趣味装饰）。必须根据内容自行选择 theme，不必询问用户：独立数字、时钟、木鱼、装饰通常选 transparent，信息密集的股票、便签、列表或需要阅读对比度的面板选 paper 或 glass；用户明确要求优先。HTML 的 html/body 保持透明，背景由外壳提供，透明作品不要再在内容根容器画整块底板。支持 Canvas、CSS、JavaScript；默认 280×240。always_on_top 默认 false 融入桌面，用户要求置顶时才设 true。默认保存并放置。",
                 object(
                     json!({
                         "id": { "type": "string", "description": "小组件英文标识（小写字母、数字、-、_，如 pomodoro-timer）" },
@@ -1110,11 +1122,12 @@ pub fn tools(desktop: Arc<dyn Desktop>) -> Vec<Arc<dyn Tool>> {
                         "description": { "type": "string", "description": "一句话介绍（最多 80 字）" },
                         "width": { "type": "number", "minimum": 100, "maximum": 800, "description": "建议默认宽度（像素，默认 280）" },
                         "height": { "type": "number", "minimum": 80, "maximum": 800, "description": "建议默认高度（像素，默认 240）" },
-                        "theme": { "type": "string", "enum": ["glass", "paper", "transparent"], "description": "底板外观风格，默认 glass" },
+                        "theme": { "type": "string", "enum": ["glass", "paper", "transparent"], "description": "由你按内容判断需不需要背景：透明无底或有阅读底板；不要机械套玻璃背景" },
+                        "always_on_top": {"type":"boolean","description":"true 始终置顶，false 融入桌面；默认 false"},
                         "place_now": { "type": "boolean", "description": "创作完成后是否立即放置到桌面上，默认 true" },
                         "overwrite": { "type": "boolean", "description": "true 时覆盖同 id 的已有小组件，默认 false" }
                     }),
-                    &["id", "name", "html"],
+                    &["id", "name", "html", "theme"],
                 ),
             )
             .risk(Risk::Write)
@@ -1587,7 +1600,7 @@ mod tests {
         let fake = Arc::new(Fake::default());
         *fake.fail_widget_update.lock().unwrap() = Some("写入失败".into());
         let error = call(&fake, "widget_add", json!({"kind":"notes","theme":"paper"})).unwrap_err();
-        assert!(error.contains("组件已添加") && error.contains("设置外观失败") && error.contains("写入失败"));
+        assert!(error.contains("组件已添加") && error.contains("设置外观或层级失败") && error.contains("写入失败"));
     }
 
     #[test]
@@ -1600,6 +1613,20 @@ mod tests {
         assert!(call(&fake, "widget_update", json!({"id": "wgt-1", "scale": 0.5})).unwrap_err().contains("缩放范围"));
         assert!(call(&fake, "widget_update", json!({"id": "wgt-1", "x": 1.5})).unwrap_err().contains("x 坐标范围"));
         assert!(call(&fake, "widget_update", json!({"id": "wgt-1"})).unwrap_err().contains("至少指定"));
+    }
+
+    #[test]
+    fn widget_layer_is_available_to_add_update_and_create_tools() {
+        let fake=Arc::new(Fake::default());
+        assert!(call(&fake,"widget_add",json!({"kind":"calendar","always_on_top":"yes"})).is_err());
+        assert!(fake.calls().is_empty());
+        call(&fake,"widget_add",json!({"kind":"calendar","always_on_top":true})).unwrap();
+        assert!(fake.calls().last().unwrap().contains(r#""alwaysOnTop":true"#));
+        assert_eq!(parse_widget_patch(&json!({"always_on_top":false})).unwrap(),json!({"alwaysOnTop":false}));
+        assert!(parse_widget_patch(&json!({"always_on_top":"yes"})).is_err());
+        let all=tools(fake);let create=all.iter().find(|t|t.spec().name=="widget_create").unwrap().spec();
+        assert!(create.schema["required"].as_array().unwrap().contains(&json!("theme")));
+        assert_eq!(create.schema["properties"]["always_on_top"]["type"],"boolean");
     }
 
     #[test]

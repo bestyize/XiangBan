@@ -6,8 +6,8 @@ export interface TodoItem { id: string; text: string; done: boolean }
 export interface NoteData { title: string; mode: 'note' | 'todo'; text: string; items: TodoItem[] }
 export interface CountdownData { title: string; date: string; mode: 'countdown' | 'elapsed'; repeat: 'none' | 'yearly' }
 export interface WidgetContent { note?: NoteData; countdown?: CountdownData }
-export interface CustomWidgetData { schemaVersion?: number; id: string; name: string; description?: string; width?: number; height?: number; theme?: string; html: string }
-export interface DesktopWidget { id: string; kind: WidgetKind; theme: WidgetTheme; scale: number; x: number; y: number; enabled: boolean; city: City | null; monitor?: string; note?: NoteData; countdown?: CountdownData; customId?: string; custom?: CustomWidgetData }
+export interface CustomWidgetData { schemaVersion?: number; id: string; name: string; description?: string; width?: number; height?: number; theme?: string; alwaysOnTop?: boolean; html: string }
+export interface DesktopWidget { id: string; kind: WidgetKind; theme: WidgetTheme; alwaysOnTop?: boolean; scale: number; x: number; y: number; enabled: boolean; city: City | null; monitor?: string; note?: NoteData; countdown?: CountdownData; customId?: string; custom?: CustomWidgetData }
 export interface WidgetMonitor { id: string; name: string; width: number; height: number; primary: boolean }
 export interface WidgetLayout { version: 1; widgets: DesktopWidget[]; editing: boolean; errors: string[]; desktop?: {width:number;height:number}; monitors?: WidgetMonitor[] }
 export interface WidgetPayload { widget: DesktopWidget; editing: boolean; screenX: number; screenY: number; displayScale?: number | null }
@@ -36,6 +36,7 @@ export function validateLayout(value: unknown): WidgetLayout {
     const kindValid = isCustom || widgetKinds.some(k => k.kind === widget.kind);
     if (!widget || !/^[a-z0-9]{1,32}$/.test(widget.id) || ids.has(widget.id) || !kindValid || !widgetThemes.some(t => t.value === widget.theme)
       || typeof widget.enabled !== 'boolean' || !Number.isFinite(widget.scale) || widget.scale < .75 || widget.scale > 1.5 || !Number.isFinite(widget.x) || widget.x < 0 || widget.x > 1 || !Number.isFinite(widget.y) || widget.y < 0 || widget.y > 1) throw new Error('组件布局无效，原记录已保留');
+    if (widget.alwaysOnTop !== undefined && typeof widget.alwaysOnTop !== 'boolean') throw new Error('组件显示层级无效');
     if (isCustom && (!widget.customId || typeof widget.customId !== 'string' || !/^[a-z0-9_-]{1,48}$/.test(widget.customId))) throw new Error('自定义组件缺少有效的 customId');
     if (widget.city && (widget.kind !== 'weather' || typeof widget.city.name !== 'string' || !widget.city.name.trim() || widget.city.name.length > 160 || !Number.isFinite(widget.city.latitude) || Math.abs(widget.city.latitude) > 90 || !Number.isFinite(widget.city.longitude) || Math.abs(widget.city.longitude) > 180)) throw new Error('天气城市配置无效');
     if (widget.monitor != null && (typeof widget.monitor !== 'string' || !widget.monitor || new TextEncoder().encode(widget.monitor).length > 512)) throw new Error('显示器标识无效');
@@ -45,10 +46,9 @@ export function validateLayout(value: unknown): WidgetLayout {
   }
   const desktop=data.desktop&&Number.isFinite(data.desktop.width)&&data.desktop.width>0&&Number.isFinite(data.desktop.height)&&data.desktop.height>0?data.desktop:undefined;
   const monitors=Array.isArray(data.monitors)?data.monitors.filter(m=>m&&typeof m.id==='string'&&!!m.id&&typeof m.name==='string'&&Number.isFinite(m.width)&&m.width>0&&Number.isFinite(m.height)&&m.height>0&&typeof m.primary==='boolean'):undefined;
-  return { version: 1, widgets: data.widgets, editing: data.editing === true, errors: Array.isArray(data.errors) ? data.errors.filter(e => typeof e === 'string') : [], desktop, monitors };
+  return { version: 1, widgets: data.widgets.map(widget => ({...widget, alwaysOnTop:widget.alwaysOnTop ?? false})), editing: data.editing === true, errors: Array.isArray(data.errors) ? data.errors.filter(e => typeof e === 'string') : [], desktop, monitors };
 }
 export function calendarDays(year: number, month: number) {
   const first = new Date(year, month, 1), offset = (first.getDay() + 6) % 7;
   return Array.from({ length: 42 }, (_, index) => { const date = new Date(year, month, index - offset + 1); return { date, day: date.getDate(), current: date.getMonth() === month }; });
 }
-
