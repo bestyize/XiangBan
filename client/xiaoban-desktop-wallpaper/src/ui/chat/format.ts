@@ -9,6 +9,7 @@ const TOOL_LABELS: Record<string, string> = {
   companion_set: '设置小伴', care_list: '查看提醒', care_set: '设置提醒', care_delete: '删除提醒',
   widget_list: '查看桌面组件', widget_add: '添加桌面组件', widget_update: '调整桌面组件', widget_remove: '移除桌面组件', widget_create: '创作桌面组件', widget_delete_custom: '删除自创组件',
   game_list: '查看游戏列表', game_open: '打开游戏', game_close: '退出游戏', game_create: '创作游戏', game_delete: '删除游戏',
+  community_share: '分享到论坛', community_open: '打开官网或论坛',
   request_accessibility_permission: '打开系统权限设置',
   list_apps: '查看应用列表', get_app_state: '获取窗口状态', click: '模拟点击',
   type_text: '模拟键盘打字', press_key: '模拟按键', scroll: '模拟滚动',

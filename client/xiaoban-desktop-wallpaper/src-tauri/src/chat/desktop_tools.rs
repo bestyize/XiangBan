@@ -4,6 +4,7 @@
 //!
 //! The tools talk to a `Desktop`, so they can be tested without a running app.
 
+use super::community;
 use crate::preferences::{EXPRESSIONS, SKINS};
 use crate::reminders::Rule;
 use agent_kernel::{Risk, Tool, ToolCtx, ToolSpec};
@@ -52,6 +53,10 @@ pub trait Desktop: Send + Sync {
     /// Deletes a user game, closing the game space first when it is open.
     fn delete_game(&self, id: &str) -> Result<(), String>;
     fn request_permissions(&self) -> Result<Value, String>;
+    /// Saves one of the user's own works as a `.xiaoban` pack through the save dialog. `None` when they cancel; otherwise the file path and its size.
+    fn export_pack(&self, kind: &str, id: &str) -> Result<Option<(String, u64)>, String>;
+    /// Opens an https address in the system browser.
+    fn open_url(&self, url: &str) -> Result<(), String>;
 }
 
 pub struct TauriDesktop {
@@ -65,6 +70,15 @@ impl TauriDesktop {
 }
 
 impl Desktop for TauriDesktop {
+    fn export_pack(&self, kind: &str, id: &str) -> Result<Option<(String, u64)>, String> {
+        let saved = crate::resource_packs::export_with_dialog(&self.app, kind, id)?;
+        Ok(saved.map(|(path, bytes)| (path.display().to_string(), bytes)))
+    }
+
+    fn open_url(&self, url: &str) -> Result<(), String> {
+        crate::content::open_download_url(url.to_string())
+    }
+
     fn request_permissions(&self) -> Result<Value, String> {
         #[cfg(target_os = "macos")]
         {
@@ -262,7 +276,7 @@ fn object(properties: Value, required: &[&str]) -> Value {
     json!({ "type": "object", "properties": properties, "required": required })
 }
 
-fn text_arg<'a>(args: &'a Value, key: &str) -> Result<&'a str, String> {
+pub(super) fn text_arg<'a>(args: &'a Value, key: &str) -> Result<&'a str, String> {
     args.get(key).and_then(Value::as_str).map(str::trim).filter(|s| !s.is_empty()).ok_or_else(|| format!("`{key}` is required and must be a non-empty string"))
 }
 
@@ -274,7 +288,7 @@ fn optional_text<'a>(args: &'a Value, key: &str) -> Result<Option<&'a str>, Stri
     }
 }
 
-fn optional_bool(args: &Value, key: &str) -> Result<Option<bool>, String> {
+pub(super) fn optional_bool(args: &Value, key: &str) -> Result<Option<bool>, String> {
     match args.get(key) {
         None | Some(Value::Null) => Ok(None),
         Some(Value::Bool(b)) => Ok(Some(*b)),
@@ -1062,6 +1076,39 @@ pub fn tools(desktop: Arc<dyn Desktop>) -> Vec<Arc<dyn Tool>> {
         tool(
             &desktop,
             ToolSpec::new(
+                "community_share",
+                "把用户自己创作的壁纸、特效、桌面组件或游戏分享到超级小伴论坛：先弹出保存对话框，把作品导出成 .xiaoban 资源包，再在浏览器打开对应板块（壁纸、特效、组件去「小伴壁纸」，游戏去「小伴游戏」）。发帖要用户自己登录论坛完成，本工具只负责导出和打开页面。id 来自 wallpaper_list、effect_list、widget_list、game_list，只能是用户自创的作品，内置的不能导出。用户说“分享到论坛”“发到论坛”“导出给别人用”时使用。",
+                object(
+                    json!({
+                        "kind": {"type": "string", "enum": community::KINDS, "description": "作品类型"},
+                        "id": {"type": "string", "description": "作品的 id"},
+                        "open_forum": {"type": "boolean", "description": "导出后是否打开论坛板块，默认 true"},
+                    }),
+                    &["kind", "id"],
+                ),
+            )
+            .risk(Risk::Write)
+            .serial()
+            .timeout(std::time::Duration::from_secs(300)),
+            community::share,
+        ),
+        tool(
+            &desktop,
+            ToolSpec::new(
+                "community_open",
+                "在系统浏览器打开小伴桌面官网或超级小伴论坛的指定页面。用户想去官网看看、下载、看使用指南，或去论坛某个板块时使用。想了解页面里写了什么，用 web_fetch 读取，不要只靠打开。",
+                object(
+                    json!({"target": {"type": "string", "enum": community::PAGES.map(|(target, _, _)| target), "description": "site 官网首页，site_images 图片壁纸，site_videos 动态视频壁纸，site_guide 使用指南，forum 论坛首页，forum_wallpaper 小伴壁纸板块，forum_game 小伴游戏板块，forum_app 小伴App板块，forum_feedback 建议反馈板块"}}),
+                    &["target"],
+                ),
+            )
+            .risk(Risk::Write)
+            .serial(),
+            community::open,
+        ),
+        tool(
+            &desktop,
+            ToolSpec::new(
                 "request_accessibility_permission",
                 "仅在 macOS 打开辅助功能与屏幕录制设置页面，供用户手动检查和授权。打开设置不等于已获授权；其他平台不支持此引导。",
                 none(),
@@ -1086,6 +1133,7 @@ mod tests {
         templates: Mutex<Vec<Value>>,
         fail_widget_update: Mutex<Option<String>>,
         fail: Mutex<Option<String>>,
+        saved: Mutex<Option<(String, u64)>>,
     }
 
     impl Fake {
@@ -1197,6 +1245,13 @@ mod tests {
         fn delete_game(&self, id: &str) -> Result<(), String> {
             self.log(format!("delete-game {id}"))
         }
+        fn export_pack(&self, kind: &str, id: &str) -> Result<Option<(String, u64)>, String> {
+            self.log(format!("export-pack {kind} {id}"))?;
+            Ok(self.saved.lock().unwrap().clone())
+        }
+        fn open_url(&self, url: &str) -> Result<(), String> {
+            self.log(format!("open-url {url}"))
+        }
         fn request_permissions(&self) -> Result<Value, String> {
             self.log("request-permissions".to_string())?;
             Ok(json!({"ok": true, "message": "已申请系统权限"}))
@@ -1219,7 +1274,7 @@ mod tests {
         let mut unique = names.clone();
         unique.dedup();
         assert_eq!(names, unique);
-        assert_eq!(names.len(), 26);
+        assert_eq!(names.len(), 28);
         for tool in &all {
             let spec = tool.spec();
             assert!(spec.name.len() <= 64 && spec.name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_'), "{}", spec.name);
@@ -1627,5 +1682,49 @@ mod tests {
         assert!(call(&fake, "effect_delete", json!({})).is_err());
         assert!(call(&fake, "widget_delete_custom", json!({})).is_err());
     }
-}
 
+    #[test]
+    fn sharing_a_work_exports_it_then_opens_the_matching_forum_board() {
+        let fake = Arc::new(Fake::default());
+        *fake.saved.lock().unwrap() = Some(("/Users/a/effect-stars.xiaoban".to_string(), 2048));
+        let out = call(&fake, "community_share", json!({"kind": "effect", "id": "stars"})).unwrap();
+        assert_eq!(fake.calls(), vec!["export-pack effect stars", "open-url https://chat.xiangban.xyz/c/xiaoban-wallpaper"]);
+        assert!(out.contains("/Users/a/effect-stars.xiaoban") && out.contains("小伴壁纸") && out.contains("不能代发"), "{out}");
+        assert!(!out.contains("超过 5 MB"));
+
+        call(&fake, "community_share", json!({"kind": "game", "id": "star-catcher"})).unwrap();
+        assert_eq!(fake.calls()[3], "open-url https://chat.xiangban.xyz/c/xiaoban-game");
+    }
+
+    #[test]
+    fn cancelling_the_save_dialog_opens_nothing_and_open_forum_false_stays_in_the_app() {
+        let fake = Arc::new(Fake::default());
+        let out = call(&fake, "community_share", json!({"kind": "wallpaper", "id": "local-1"})).unwrap();
+        assert!(out.contains("取消"), "{out}");
+        assert_eq!(fake.calls(), vec!["export-pack wallpaper local-1"]);
+
+        *fake.saved.lock().unwrap() = Some(("/tmp/a.xiaoban".to_string(), 6 * 1024 * 1024));
+        let out = call(&fake, "community_share", json!({"kind": "wallpaper", "id": "local-1", "open_forum": false})).unwrap();
+        assert!(out.contains("没有打开论坛") && out.contains("超过 5 MB"), "{out}");
+        assert_eq!(fake.calls().len(), 2, "no browser call");
+    }
+
+    #[test]
+    fn sharing_rejects_unknown_kinds_before_touching_the_desktop() {
+        let fake = Arc::new(Fake::default());
+        assert!(call(&fake, "community_share", json!({"kind": "skin", "id": "x"})).is_err());
+        assert!(call(&fake, "community_share", json!({"kind": "effect"})).is_err());
+        assert!(fake.calls().is_empty());
+    }
+
+    #[test]
+    fn community_open_only_knows_the_listed_official_pages() {
+        let fake = Arc::new(Fake::default());
+        let out = call(&fake, "community_open", json!({"target": "forum_wallpaper"})).unwrap();
+        assert!(out.contains("https://chat.xiangban.xyz/c/xiaoban-wallpaper"));
+        call(&fake, "community_open", json!({"target": "site"})).unwrap();
+        assert_eq!(fake.calls(), vec!["open-url https://chat.xiangban.xyz/c/xiaoban-wallpaper", "open-url https://wallpaper.xiangban.xyz"]);
+        assert!(call(&fake, "community_open", json!({"target": "https://evil.example"})).is_err());
+        assert_eq!(fake.calls().len(), 2);
+    }
+}

@@ -128,20 +128,24 @@ pub fn import(root: &Path, content: &str, expected_kind: &str) -> Result<Value, 
     Ok(json!({"kind":pack.kind,"id":id,"name":name}))
 }
 
+/// Asks where to save, then writes the pack. `None` means the user cancelled the dialog. Blocks, so call it off the main thread.
+pub fn export_with_dialog(app: &tauri::AppHandle, kind: &str, id: &str) -> Result<Option<(std::path::PathBuf, u64)>, String> {
+    let pack = export(&crate::storage::root(app)?, kind, id)?;
+    let content = serde_json::to_vec_pretty(&pack).map_err(|e| e.to_string())?;
+    if content.len() as u64 > MAX_PACK { return Err("资源包不能超过 32 MB".into()); }
+    let filename = format!("{kind}-{id}.xiaoban");
+    let Some(file) = app.dialog().file().set_title("导出小伴资源包").add_filter("小伴资源包", &["xiaoban"]).set_file_name(&filename).blocking_save_file() else { return Ok(None); };
+    let path = file.into_path().map_err(|_| "请选择本机文件")?;
+    fs::write(&path, &content).map_err(|e| format!("导出失败：{e}"))?;
+    Ok(Some((path, content.len() as u64)))
+}
+
 #[tauri::command]
 pub async fn export_resource_pack(window: tauri::WebviewWindow, kind: String, id: String) -> Result<bool, String> {
     if window.label() != "control" { return Err("只能从控制台导出资源".into()); }
     let app = window.app_handle().clone();
-    tauri::async_runtime::spawn_blocking(move || {
-        let pack = export(&crate::storage::root(&app)?, &kind, &id)?;
-        let content = serde_json::to_vec_pretty(&pack).map_err(|e| e.to_string())?;
-        if content.len() as u64 > MAX_PACK { return Err("资源包不能超过 32 MB".into()); }
-        let filename = format!("{}-{}.xiaoban", kind, id);
-        let Some(file) = app.dialog().file().set_title("导出小伴资源包").add_filter("小伴资源包", &["xiaoban"]).set_file_name(&filename).blocking_save_file() else { return Ok(false); };
-        let path = file.into_path().map_err(|_| "请选择本机文件")?;
-        fs::write(path, content).map_err(|e| format!("导出失败：{e}"))?;
-        Ok(true)
-    }).await.map_err(|e| e.to_string())?
+    tauri::async_runtime::spawn_blocking(move || export_with_dialog(&app, &kind, &id).map(|saved| saved.is_some()))
+        .await.map_err(|e| e.to_string())?
 }
 
 #[tauri::command]

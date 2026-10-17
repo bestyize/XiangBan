@@ -1,0 +1,6 @@
+target/
+.env
+ai_data/
+*.log
+web/node_modules/
+web/dist/
