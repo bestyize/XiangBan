@@ -3,6 +3,26 @@
   "revision": "builtin-1",
   "items": [
     {
+      "id": "builtin-planet-garden",
+      "version": "1.0.0",
+      "title": "桌面小星球",
+      "description": "会转动的绿色小星球：木屋、树林、云海与飘雪，拖动可以旋转、滚轮可以缩放。",
+      "author": "小伴创作",
+      "kind": "web",
+      "resource": {
+        "url": "builtin://planet-garden.html",
+        "sha256": "0a590e7695fbcd3f3084592b484001281d2a38eb7fa50319718dda6bcfcc688e",
+        "bytes": 124155,
+        "mime": "text/html"
+      },
+      "cover": {
+        "url": "builtin://planet-garden-cover.webp",
+        "sha256": "ef52c90495fbbf998e539828e68d350cb6607b464f77c5c3fcfd91c0c6ac3a45",
+        "bytes": 29052,
+        "mime": "image/webp"
+      }
+    },
+    {
       "id": "builtin-soft-hills",
       "version": "1.0.0",
       "title": "晴山",
