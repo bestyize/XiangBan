@@ -16,7 +16,7 @@ export interface ControlStore {
   library: WallpaperLibrary;
   website: WebsiteStatus;
   startup: { available: boolean; error: string | null };
-  game: { active: boolean; desktopDoubleClickSupported: boolean; desktopEntryError: string | null };
+  game: { active: boolean; desktopDoubleClickSupported: boolean; desktopEntryError: string | null; /** The desktop-layer game that is running, if any. */ desk?: { active: boolean; id: string | null } };
   account: AccountSession | null;
   showLoginModal: boolean;
   page: ControlPage;
@@ -63,6 +63,8 @@ export interface ControlStore {
   setAutostart(enabled: boolean): Promise<void>;
   setDoubleClick(enabled: boolean): Promise<void>;
   openGames(gameId?: string): Promise<void>;
+  /** Stops the desktop-layer game that is running. */
+  stopDeskGame(): Promise<void>;
   /** Shipped games plus the user's own, and the user folders that could not be loaded. */
   listGames(): Promise<GameCatalog>;
   /** Removes a user's own game folder (and closes the game space first if it is open). */

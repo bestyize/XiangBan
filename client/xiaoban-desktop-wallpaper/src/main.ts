@@ -31,6 +31,11 @@ async function init() {
     await mountEffects();
     return;
   }
+  if (mode === "desk") {
+    const { mountDeskGame } = await import("./desk-scene.ts");
+    await mountDeskGame();
+    return;
+  }
   if (mode === "games") {
     const { mountGameSpace } = await import("./games.ts");
     await mountGameSpace();

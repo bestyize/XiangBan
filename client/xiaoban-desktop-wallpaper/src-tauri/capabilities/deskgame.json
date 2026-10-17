@@ -1,0 +1,6 @@
+{
+  "identifier": "deskgame",
+  "description": "The desktop-layer game host receives only explicitly guarded custom commands; sandbox packs have no core capabilities.",
+  "windows": ["deskgame"],
+  "permissions": []
+}

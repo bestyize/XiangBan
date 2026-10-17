@@ -8,7 +8,8 @@ use objc2_app_kit::{
 };
 use objc2_core_foundation::{CFArray, CFDictionary, CFNumber, CFRetained, CFString, CFType};
 use objc2_core_graphics::{
-    kCGWindowLayer, CGWindowLevelForKey, CGWindowLevelKey, CGWindowListCopyWindowInfo,
+    kCGWindowAlpha, kCGWindowBounds, kCGWindowLayer, kCGWindowOwnerPID, CGWindowLevelForKey, CGWindowLevelKey,
+    CGWindowListCopyWindowInfo,
     CGWindowListOption,
 };
 use std::{sync::mpsc, time::Duration};
@@ -67,6 +68,37 @@ pub fn place_widget(window:&tauri::WebviewWindow,x:f64,y:f64,width:f64,height:f6
         let frame=objc2_foundation::NSRect::new(objc2_foundation::NSPoint::new(x,primary_height-y-height),objc2_foundation::NSSize::new(width,height));
         native(&window)?.setFrame_display(frame,true);Ok(())
     })
+}
+
+/// Rectangles of the windows on screen, front to back, in points from the primary display's top-left corner.
+/// Only geometry and the owning process id are read; window titles are never touched.
+pub fn window_rects() -> Vec<crate::desk_windows::Raw> {
+    use crate::desk_windows::{Raw, Rect};
+    let options = CGWindowListOption::OptionOnScreenOnly | CGWindowListOption::ExcludeDesktopElements;
+    let Some(list) = CGWindowListCopyWindowInfo(options, 0) else { return Vec::new() };
+    // The system hands back an immutable array of dictionaries keyed by CFString.
+    let list: CFRetained<CFArray<CFDictionary<CFString, CFType>>> = unsafe { CFRetained::cast_unchecked(list) };
+    let own = std::process::id() as i64;
+    let number = |dictionary: &CFDictionary<CFString, CFType>, key: &CFString| {
+        dictionary.get(key).and_then(|value| value.downcast::<CFNumber>().ok()).and_then(|n| n.as_f64())
+    };
+    let mut out = Vec::new();
+    for index in 0..list.len() {
+        let Some(window) = list.get(index) else { continue };
+        let Some(bounds) = window.get(unsafe { kCGWindowBounds }).and_then(|value| value.downcast::<CFDictionary>().ok()) else { continue };
+        let bounds: CFRetained<CFDictionary<CFString, CFType>> = unsafe { CFRetained::cast_unchecked(bounds) };
+        let (Some(x), Some(y), Some(w), Some(h)) = (
+            number(&bounds, &CFString::from_static_str("X")),
+            number(&bounds, &CFString::from_static_str("Y")),
+            number(&bounds, &CFString::from_static_str("Width")),
+            number(&bounds, &CFString::from_static_str("Height")),
+        ) else { continue };
+        let layer = number(&window, unsafe { kCGWindowLayer }).unwrap_or(-1.0);
+        let alpha = number(&window, unsafe { kCGWindowAlpha }).unwrap_or(1.0);
+        let pid = number(&window, unsafe { kCGWindowOwnerPID }).unwrap_or(-1.0) as i64;
+        out.push(Raw { rect: Rect::new(x, y, w, h), ours: pid == own, ordinary: layer == 0.0 && alpha > 0.0 });
+    }
+    out
 }
 
 pub fn configure_scene(

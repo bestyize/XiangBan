@@ -116,7 +116,10 @@ pub fn export(root: &Path, kind: &str, id: &str) -> Result<Pack, String> {
             let description = manifest["description"].as_str().unwrap_or("");
             game_packs::validate_request(id, name, description, &found.text)?;
             assets = found.assets;
-            json!({"id":id,"name":name,"description":description,"files":found.text,"save":manifest["save"].as_bool().unwrap_or(false)})
+            let mut data = json!({"id":id,"name":name,"description":description,"files":found.text,"save":manifest["save"].as_bool().unwrap_or(false)});
+            let layer = game_packs::Layer::from_value(&manifest)?;
+            if layer.desktop { data["layer"] = json!("desktop"); data["capabilities"] = json!(layer.capabilities); }
+            data
         }
         _ => return Err("不支持的资源类型".into()),
     };
@@ -128,7 +131,8 @@ pub fn export(root: &Path, kind: &str, id: &str) -> Result<Pack, String> {
 fn zip_entries(pack: &Pack) -> Result<(Value, Vec<(String, Vec<u8>)>), String> {
     let data = &pack.data;
     // Text-only packs stay at version 1 so older apps still open them; pictures and sound need version 2.
-    let version = if pack.assets.is_empty() { 1 } else { 2 };
+    let desktop = pack.kind == "game" && game_packs::Layer::from_value(data)?.desktop;
+    let version = if pack.assets.is_empty() && !desktop { 1 } else { 2 };
     let mut manifest = json!({"schemaVersion": version, "kind": pack.kind});
     let mut files: Vec<(String, Vec<u8>)> = Vec::new();
     match pack.kind.as_str() {
@@ -147,6 +151,7 @@ fn zip_entries(pack: &Pack) -> Result<(Value, Vec<(String, Vec<u8>)>), String> {
         "game" => {
             for key in ["id", "name", "description"] { manifest[key] = json!(text(data, key)?); }
             manifest["save"] = json!(data["save"].as_bool().unwrap_or(false));
+            if desktop { manifest["layer"] = json!("desktop"); manifest["capabilities"] = data["capabilities"].clone(); }
             let list: Vec<(String, String)> = serde_json::from_value(data["files"].clone()).map_err(|_| "游戏文件清单不合法")?;
             files.extend(list.into_iter().map(|(path, content)| (path, content.into_bytes())));
             files.extend(pack.assets.iter().cloned());
@@ -256,7 +261,11 @@ fn from_zip(bytes: &[u8]) -> Result<Pack, String> {
             files.sort();
             assets.sort();
             if !assets.is_empty() && version == Some(1) { return Err("带 assets/ 资源文件的包要把 manifest.json 的 schemaVersion 写成 2".into()); }
-            json!({"id": text(&manifest, "id")?, "name": text(&manifest, "name")?, "description": text(&manifest, "description")?, "files": files, "save": manifest["save"].as_bool().unwrap_or(false)})
+            let layer = game_packs::Layer::from_value(&manifest)?;
+            if layer.desktop && version == Some(1) { return Err("桌面层游戏的包要把 manifest.json 的 schemaVersion 写成 2".into()); }
+            let mut data = json!({"id": text(&manifest, "id")?, "name": text(&manifest, "name")?, "description": text(&manifest, "description")?, "files": files, "save": manifest["save"].as_bool().unwrap_or(false)});
+            if layer.desktop { data["layer"] = json!("desktop"); data["capabilities"] = json!(layer.capabilities); }
+            data
         }
         _ => return Err("不支持的资源类型".into()),
     };
@@ -287,7 +296,8 @@ pub fn import(root: &Path, content: &[u8]) -> Result<Value, String> {
             let files: Vec<(String, String)> = serde_json::from_value(data["files"].clone()).map_err(|_| "游戏文件清单不合法")?;
             let id = text(data, "id")?;
             let name = text(data, "name")?;
-            game_packs::create_pack_with_assets(root, id, name, text(data, "description")?, &files, &pack.assets, data["save"].as_bool().unwrap_or(false), false)?;
+            let layer = game_packs::Layer::from_value(data)?;
+            game_packs::create_pack_with_assets(root, id, name, text(data, "description")?, &files, &pack.assets, &layer, data["save"].as_bool().unwrap_or(false), false)?;
             (id.to_string(), name.to_string())
         }
         _ => return Err("不支持的资源类型".into()),
@@ -460,6 +470,48 @@ mod tests {
         assert_eq!(fs::read(game_packs::packs_dir(&other).join("pic-game/assets/hero.png")).unwrap(), PNG);
         fs::remove_dir_all(root).unwrap();
         fs::remove_dir_all(other).unwrap();
+    }
+
+    #[test]
+    fn a_desktop_game_asks_for_version_two_and_keeps_its_capabilities() {
+        let root = temp_root("desktop-game");
+        let manifest = |version: u32| format!(r#"{{"schemaVersion":{version},"kind":"game","id":"desk-pal","name":"桌面伙伴","description":"在窗口上走","layer":"desktop","capabilities":["windows","pointer"]}}"#);
+        // Older apps would run it as a full-screen game, so the version has to stop them.
+        let old = make_zip_bytes(&[("manifest.json", manifest(1).as_bytes()), ("index.html", b"x")]);
+        assert!(import(&root, &old).unwrap_err().contains("schemaVersion"));
+        assert!(!root.exists());
+
+        let zip = make_zip_bytes(&[("manifest.json", manifest(2).as_bytes()), ("index.html", b"x")]);
+        let done = import(&root, &zip).unwrap();
+        assert_eq!(done["id"], "desk-pal");
+        let entry = game_packs::find_user_game(&root, "desk-pal").unwrap();
+        assert_eq!((entry["layer"].as_str(), entry["capabilities"].clone()), (Some("desktop"), json!(["pointer", "windows"])));
+
+        let exported = export(&root, "game", "desk-pal").unwrap();
+        let mut archive = ZipArchive::new(Cursor::new(to_zip(&exported).unwrap())).unwrap();
+        let mut text = String::new();
+        archive.by_name("manifest.json").unwrap().read_to_string(&mut text).unwrap();
+        let back: Value = serde_json::from_str(&text).unwrap();
+        assert_eq!((back["schemaVersion"].clone(), back["layer"].clone(), back["capabilities"].clone()), (json!(2), json!("desktop"), json!(["pointer", "windows"])));
+
+        let bad = make_zip_bytes(&[("manifest.json", br#"{"schemaVersion":2,"kind":"game","id":"bad-pal","name":"x","description":"y","layer":"desktop","capabilities":["icons"]}"#), ("index.html", b"x")]);
+        assert!(import(&temp_root("desktop-game-bad"), &bad).unwrap_err().contains("icons"));
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn the_example_desktop_game_in_the_docs_imports_as_one() {
+        let root = temp_root("example-desk-pal");
+        let zip = make_zip(&[
+            ("manifest.json", include_str!("../../docs/examples/desk-pal/manifest.json")),
+            ("index.html", include_str!("../../docs/examples/desk-pal/index.html")),
+            ("game.js", include_str!("../../docs/examples/desk-pal/game.js")),
+        ]);
+        let done = import(&root, &zip).unwrap();
+        assert_eq!((done["kind"].as_str(), done["id"].as_str()), (Some("game"), Some("desk-pal")));
+        let entry = game_packs::find_user_game(&root, "desk-pal").unwrap();
+        assert_eq!((entry["layer"].as_str(), entry["capabilities"].clone()), (Some("desktop"), json!(["pointer", "windows"])));
+        fs::remove_dir_all(root).unwrap();
     }
 
     #[test]
