@@ -129,15 +129,6 @@ describe('desktop effects page', () => {
     expect(wrapper.find('[data-testid="effect-missing"]').exists()).toBe(false);
     wrapper.unmount();
   });
-  it('reloads the files and opens the folder on request', async () => {
-    const { wrapper, store } = setup();
-    await wrapper.get('[data-testid="effects-reload"]').trigger('click'); await flushPromises();
-    expect(store.loadEffects).toHaveBeenCalledTimes(2);
-    expect(store.notify).toHaveBeenCalledWith('已重新载入特效', 'success');
-    await wrapper.get('[data-testid="effects-folder"]').trigger('click'); await flushPromises();
-    expect(store.openEffectsDirectory).toHaveBeenCalledOnce();
-    wrapper.unmount();
-  });
   it('imports a pack file, says which effect arrived, and reloads the list', async () => {
     const { wrapper, store } = setup();
     await wrapper.get('[data-testid="effects-import"]').trigger('click'); await flushPromises();

@@ -49,14 +49,12 @@ it('shows the user games in their own section with the default cover, and starts
   } finally { wrapper.unmount(); }
 });
 
-it('explains how to add games when there are none yet and opens the games folder', async () => {
-  const { wrapper, store } = setup({ games: [builtin] });
+it('explains how to add games when there are none yet', async () => {
+  const { wrapper } = setup({ games: [builtin] });
   try {
     await flushPromises();
     const section = wrapper.get('[data-testid="user-games"]');
     expect(section.text()).toContain('还没有自创游戏');
-    await wrapper.get('[data-testid="games-folder"]').trigger('click'); await flushPromises();
-    expect(store.openUserGamesFolder).toHaveBeenCalledTimes(1);
   } finally { wrapper.unmount(); }
 });
 

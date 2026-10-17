@@ -2,7 +2,7 @@
 import ResourceShareActions from "../components/ResourceShareActions.vue";
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { NAlert, NButton, NPopconfirm, NSlider } from 'naive-ui';
-import { Ban, Check, FileUp, FolderOpen, RefreshCw, Sparkles, Trash2 } from 'lucide-vue-next';
+import { Ban, Check, FileUp, Sparkles, Trash2 } from 'lucide-vue-next';
 import { normalizeChoice, paramsOf } from '../../effects/parse.ts';
 import { limits, type EffectsChoice } from '../../effects/types.ts';
 import type { ControlStore } from '../control-types.ts';
@@ -42,9 +42,6 @@ function tune() { if (timer) clearTimeout(timer); timer = setTimeout(commit, 150
 async function reload(announce: boolean) {
   try { await props.store.loadEffects(); if (announce) props.store.notify('已重新载入特效', 'success'); }
   catch (error) { props.store.notify(message(error), 'error'); }
-}
-async function openFolder() {
-  try { await props.store.openEffectsDirectory(); } catch (error) { props.store.notify(message(error), 'error'); }
 }
 async function importPack() {
   try {
@@ -102,8 +99,7 @@ onBeforeUnmount(() => { if (timer) { clearTimeout(timer); commit(); } });
       <div class="field"><label>速度 <span data-testid="effect-speed-value">×{{ speed }}</span></label><NSlider v-model:value="speed" :min="limits.speed[0]" :max="limits.speed[1]" :step="0.25" @update:value="tune" /></div>
       <div class="field"><label>大小 <span data-testid="effect-size-value">×{{ size.toFixed(1) }}</span></label><NSlider v-model:value="size" :min="limits.size[0]" :max="limits.size[1]" :step="0.1" @update:value="tune" /></div>
     </section>
-    <div class="effect-library-actions"><ResourceShareActions :store="store" kind="effect" @imported="reload(false)"/><NButton text data-testid="effects-reload" @click="reload(true)"><template #icon><RefreshCw :size="15" /></template>重新载入</NButton><NButton text data-testid="effects-folder" @click="openFolder"><template #icon><FolderOpen :size="15" /></template>打开特效文件夹</NButton></div>
-    <p class="muted notes">特效显示在桌面图片之上、桌面图标和其他窗口之下，鼠标可以穿过它。想要自己的特效？点“导入特效”选一个特效包文件（JSON），或者打开特效文件夹把文件放进去再点“重新载入”，格式见文件夹里的示例；也可以直接在聊天里让小伴为你写一个。{{ store.settings.paused ? '桌面动画目前已暂停，特效会静止，可在“设置”里恢复。' : '' }}{{ store.game.active ? '游戏空间打开期间特效会先隐藏，退出后自动回来。' : '' }}</p>
+    <p class="muted notes">特效显示在桌面图片之上、桌面图标和其他窗口之下，鼠标可以穿过它。想要自己的特效？点“导入特效”选一个特效包文件（JSON），也可以直接在聊天里让小伴为你写一个。{{ store.settings.paused ? '桌面动画目前已暂停，特效会静止，可在“设置”里恢复。' : '' }}{{ store.game.active ? '游戏空间打开期间特效会先隐藏，退出后自动回来。' : '' }}</p>
     </div>
   </section>
 </template>
@@ -112,7 +108,6 @@ onBeforeUnmount(() => { if (timer) { clearTimeout(timer); commit(); } });
 .effects-page>.page-header{flex:none;background:var(--ui-app-bg);padding:var(--ui-page-top) var(--ui-page-inset) 16px;margin-bottom:0;border-bottom:1px solid var(--ui-border)}
 .effects-body{flex:1;min-height:0;overflow-y:auto;padding:var(--ui-section-gap) var(--ui-page-inset) 32px;display:grid;gap:var(--ui-section-gap);align-content:start}
 .header-actions{display:flex;gap:10px;flex:none;flex-wrap:wrap;justify-content:flex-end}
-.effect-library-actions{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
 .effect-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:var(--ui-card-gap)}
 .effect-card-wrapper{position:relative}
 .effect-card-wrapper .effect-card{width:100%}

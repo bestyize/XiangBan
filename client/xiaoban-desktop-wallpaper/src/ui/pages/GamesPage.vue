@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import ResourceShareActions from "../components/ResourceShareActions.vue";
 import { computed, onMounted, ref } from "vue";
-import { FolderOpen, RefreshCw, Save, Sparkles, Trash2 } from "lucide-vue-next";
+import { RefreshCw, Save, Sparkles, Trash2 } from "lucide-vue-next";
 import { NAlert, NButton, NPopconfirm, NSkeleton, NTag } from "naive-ui";
 import type { ControlStore } from "../control-types.ts";
 import { coverUrl } from "../../games/catalog.ts";
@@ -46,10 +46,6 @@ async function openGameSpace(gameId?: string) {
   } finally {
     opening.value = false;
   }
-}
-
-async function openFolder() {
-  try { await props.store.openUserGamesFolder(); } catch (error) { props.store.notify(message(error, "无法打开游戏文件夹"), "error"); }
 }
 
 async function removeGame(game: GameManifest) {
@@ -117,7 +113,6 @@ onMounted(loadGames);
           <h2 id="user-games-heading">自创游戏</h2>
           <p class="muted">{{ userGames.length ? `共 ${userGames.length} 款 · 由小伴创作或你放进游戏文件夹` : "还没有自创游戏" }}</p>
         </div>
-        <NButton round data-testid="games-folder" @click="openFolder"><template #icon><FolderOpen :size="15" /></template>打开游戏文件夹</NButton>
       </div>
       <NAlert v-if="folderErrors.length" class="catalog-error" type="warning" :show-icon="false" data-testid="user-game-errors">
         有 {{ folderErrors.length }} 个游戏文件夹无法使用：{{ folderErrors.join("；") }}
@@ -146,7 +141,6 @@ onMounted(loadGames);
           </NPopconfirm>
         </div>
       </div>
-      <p v-else class="muted">想要自己的游戏？在聊天里让小伴为你写一个，或者点“打开游戏文件夹”，把做好的游戏文件夹（里面有 manifest.json 和 index.html）放进去，再点“重新载入”。</p>
     </section>
     </div>
   </main>

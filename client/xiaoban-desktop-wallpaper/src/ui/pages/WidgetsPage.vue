@@ -120,7 +120,6 @@ onMounted(()=>{void client.load();void loadCustomTemplates();});onBeforeUnmount(
     <NAlert v-if="error" type="error" :show-icon="false">{{ error }}<NButton v-if="!ready" size="tiny" text @click="client.load">重新读取</NButton></NAlert>
     <NAlert v-if="layout.errors.length" type="warning" :show-icon="false">{{ layout.errors.join('；') }}</NAlert>
     <template v-if="tab==='library'">
-      <div class="widget-library-intro"><span>小小一隅，也有好日子</span><p>自由添加、拖动和搭配。换一张壁纸，小物件依然留在原处。</p></div>
       <div class="widget-library" ref="libraryGrid">
         <article v-for="item in widgetKinds" :key="item.kind" class="widget-library-card">
           <div class="widget-art" :class="item.kind"><div class="demo-widget" :class="item.kind" :style="{'--demo-scale':demoScale(item.kind)}"><WidgetSurface :widget="demo(item.kind)" preview/></div><button class="widget-add-badge" :disabled="!ready||busy||layout.widgets.length>=12" :data-testid="`add-${item.kind}`" :title="layout.widgets.length>=12?'桌面已放满 12 个':'添加到桌面'" :aria-label="layout.widgets.length>=12?'桌面已放满 12 个':'添加到桌面'" @click="add(item.kind)"><Plus :size="15"/></button></div>
