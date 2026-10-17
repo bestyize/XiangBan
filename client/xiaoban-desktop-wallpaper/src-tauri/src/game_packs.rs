@@ -35,6 +35,57 @@ fn injected_host_script() -> Vec<u8> { [HOST_SCRIPT, AUTO_READY].concat().into_b
 /// Serialises create/delete so two tool calls never rename the same folder at once.
 static WRITE_LOCK: Mutex<()> = Mutex::new(());
 
+/// What a desktop-layer game may ask the host for. Nothing is sent to it unless its manifest lists the capability.
+pub const CAPABILITIES: [&str; 2] = ["windows", "pointer"];
+
+/// Where a game runs: the full-screen game space (the default) or the desktop itself.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct Layer {
+    pub desktop: bool,
+    /// Sorted, without repeats; always empty for a game in the game space.
+    pub capabilities: Vec<String>,
+}
+
+impl Layer {
+    pub fn parse(layer: Option<&str>, capabilities: &[String]) -> Result<Layer, String> {
+        match layer {
+            None | Some("space") => {
+                if !capabilities.is_empty() { return Err("capabilities 只能用在 layer 为 desktop 的游戏上".into()); }
+                Ok(Layer::default())
+            }
+            Some("desktop") => {
+                let mut list: Vec<String> = Vec::new();
+                for capability in capabilities {
+                    if !CAPABILITIES.contains(&capability.as_str()) {
+                        return Err(format!("capabilities 里的「{capability}」不认识，可用：{}", CAPABILITIES.join("、")));
+                    }
+                    if !list.contains(capability) { list.push(capability.clone()); }
+                }
+                list.sort();
+                Ok(Layer { desktop: true, capabilities: list })
+            }
+            Some(other) => Err(format!("layer 需要是 space 或 desktop，不能是「{other}」")),
+        }
+    }
+
+    /// Reads `layer` and `capabilities` from a manifest-shaped object.
+    pub fn from_value(value: &Value) -> Result<Layer, String> {
+        let layer = match value.get("layer").filter(|v| !v.is_null()) {
+            None => None,
+            Some(v) => Some(v.as_str().ok_or("layer 需要是文字")?),
+        };
+        let mut capabilities = Vec::new();
+        if let Some(list) = value.get("capabilities").filter(|v| !v.is_null()) {
+            for item in list.as_array().ok_or("capabilities 需要是文字列表")? {
+                capabilities.push(item.as_str().ok_or("capabilities 需要是文字列表")?.to_string());
+            }
+        }
+        Layer::parse(layer, &capabilities)
+    }
+
+    pub fn name(&self) -> &'static str { if self.desktop { "desktop" } else { "space" } }
+}
+
 pub fn valid_id(id: &str) -> bool {
     let bytes = id.as_bytes();
     (2..=40).contains(&bytes.len())
@@ -145,9 +196,10 @@ pub fn validate_manifest(dir: &Path, folder: &str, manifest: &Value) -> Result<V
         return Err("manifest 的 runtimeProtocol 必须是 1".into());
     }
     resolve_file(dir, &["index.html"]).map_err(|_| "缺少入口页 index.html".to_string())?;
+    let layer = Layer::from_value(manifest)?;
     let mut entry = json!({
         "id": folder, "name": name, "description": description, "entry": "index.html",
-        "runtimeProtocol": 1, "save": false,
+        "runtimeProtocol": 1, "save": false, "layer": layer.name(), "capabilities": layer.capabilities,
     });
     if let Some(cover) = manifest.get("cover").filter(|v| !v.is_null()) {
         let cover = cover.as_str().ok_or("cover 需要是文字路径")?;
@@ -525,7 +577,7 @@ fn swap_in(temporary: &Path, target: &Path, backup: &Path, had_old: bool) -> Res
 /// Writes a new game folder. The files go to a temporary folder first and are renamed into place at the
 /// end; with `overwrite` the old folder is set aside and put back if the swap fails.
 pub fn create_pack(root: &Path, id: &str, name: &str, description: &str, files: &[(String, String)], save: bool, overwrite: bool) -> Result<Value, String> {
-    create_pack_with_assets(root, id, name, description, files, &[], save, overwrite)
+    create_pack_with_assets(root, id, name, description, files, &[], &Layer::default(), save, overwrite)
 }
 
 /// Like [`create_pack`], plus binary files that go under `assets/` next to the text files.
@@ -536,6 +588,7 @@ pub fn create_pack_with_assets(
     description: &str,
     files: &[(String, String)],
     assets: &[(String, Vec<u8>)],
+    layer: &Layer,
     save: bool,
     overwrite: bool,
 ) -> Result<Value, String> {
@@ -592,6 +645,10 @@ pub fn create_pack_with_assets(
         if files.iter().any(|(p, _)| p == "cover.svg") {
             manifest["cover"] = json!("cover.svg");
         }
+        if layer.desktop {
+            manifest["layer"] = json!("desktop");
+            manifest["capabilities"] = json!(layer.capabilities);
+        }
         let text = serde_json::to_string_pretty(&manifest).map_err(|e| e.to_string())?;
         fs::write(temporary.join("manifest.json"), text).map_err(|e| format!("无法写入 manifest.json：{e}"))?;
         load_manifest(&temporary, id).map(|_| ())
@@ -605,7 +662,7 @@ pub fn create_pack_with_assets(
         let _ = fs::remove_dir_all(&temporary);
         return Err(error);
     }
-    Ok(json!({"id": id, "name": name, "directory": target, "files": files.len() + assets.len() + 1, "save": save, "replaced": exists}))
+    Ok(json!({"id": id, "name": name, "directory": target, "files": files.len() + assets.len() + 1, "save": save, "layer": layer.name(), "replaced": exists}))
 }
 
 /// Deletes a user game folder and its save file (so a game created later under the same id starts fresh).
@@ -649,6 +706,39 @@ mod tests {
     }
     fn manifest(id: &str) -> Value {
         json!({"id": id, "name": "好玩", "description": "介绍", "entry": "index.html", "runtimeProtocol": 1})
+    }
+
+    #[test]
+    fn layers_default_to_the_game_space_and_capabilities_belong_to_the_desktop() {
+        assert_eq!(Layer::parse(None, &[]).unwrap(), Layer::default());
+        assert_eq!(Layer::parse(Some("space"), &[]).unwrap().name(), "space");
+        let caps = |list: &[&str]| list.iter().map(|c| c.to_string()).collect::<Vec<_>>();
+        let desktop = Layer::parse(Some("desktop"), &caps(&["pointer", "windows", "pointer"])).unwrap();
+        assert!(desktop.desktop && desktop.capabilities == ["pointer", "windows"], "sorted, no repeats: {desktop:?}");
+        assert!(Layer::parse(Some("desktop"), &[]).unwrap().capabilities.is_empty());
+        for (layer, list) in [(Some("space"), vec!["windows"]), (None, vec!["pointer"]), (Some("desktop"), vec!["icons"]), (Some("floating"), vec![])] {
+            assert!(Layer::parse(layer, &caps(&list)).is_err(), "{layer:?} {list:?}");
+        }
+        assert!(Layer::from_value(&json!({"layer": 3})).is_err());
+        assert!(Layer::from_value(&json!({"layer": "desktop", "capabilities": "windows"})).is_err());
+        assert!(Layer::from_value(&json!({"layer": "desktop", "capabilities": [1]})).is_err());
+        assert_eq!(Layer::from_value(&json!({"layer": null, "capabilities": null})).unwrap(), Layer::default());
+    }
+
+    #[test]
+    fn a_desktop_game_keeps_its_layer_in_the_folder_and_the_catalog() {
+        let r = root("layer-folder");
+        let layer = Layer::parse(Some("desktop"), &["windows".to_string()]).unwrap();
+        let made = create_pack_with_assets(&r, "desk-pal", "桌面伙伴", "在窗口上走", &sample(), &[], &layer, false, false).unwrap();
+        assert_eq!(made["layer"], "desktop");
+        let entry = find_user_game(&r, "desk-pal").unwrap();
+        assert_eq!((entry["layer"].as_str(), entry["capabilities"].clone()), (Some("desktop"), json!(["windows"])));
+        make(&r, "plain-pal");
+        let plain = find_user_game(&r, "plain-pal").unwrap();
+        assert_eq!((plain["layer"].as_str(), plain["capabilities"].clone()), (Some("space"), json!([])));
+        write_manifest(&r, "bad-layer", json!({"id":"bad-layer","name":"x","description":"y","entry":"index.html","runtimeProtocol":1,"layer":"space","capabilities":["windows"]}));
+        assert!(load_manifest(&packs_dir(&r).join("bad-layer"), "bad-layer").unwrap_err().contains("capabilities"));
+        let _ = fs::remove_dir_all(r);
     }
 
     #[test]

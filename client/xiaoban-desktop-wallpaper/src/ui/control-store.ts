@@ -91,6 +91,7 @@ export function createControlStore(notify: ControlStore["notify"]): ControlStore
           listen<WebsiteStatus>("website-status", (website) => { if (!disposed) store.website = website; }),
           listen<AccountSession | null>("account-changed", (account) => { if (!disposed) { store.account = account; void invoke('refresh_ai_providers', { force: true }).catch(() => {}); } }),
           listen<boolean>("games-active", (active) => { if (!disposed) store.game.active = active; }),
+          listen<string | null>("desk-game-active", (id) => { if (!disposed) store.game.desk = { active: !!id, id: id ?? null }; }),
           listen("care-voice-start", () => { if (!disposed) void store.speech.stop(); }),
           listen<string>("desktop-error", (error) => notify(error, "error")),
         ]);
@@ -180,7 +181,15 @@ export function createControlStore(notify: ControlStore["notify"]): ControlStore
     async openGames(gameId?: string) {
       if (!desktop) { window.open(`/?scene=games${gameId ? `&game=${encodeURIComponent(gameId)}` : ""}`, "_blank", "noopener"); return; }
       await invoke("open_game_space", { gameId: gameId ?? null });
-      store.game.active = true;
+      // A game on the desktop layer does not open the game space, so ask the host what is running.
+      const status = await invoke<ControlStore["game"]>("get_game_status").catch(() => null);
+      if (status) store.game = status;
+      else store.game.active = true;
+    },
+    async stopDeskGame() {
+      if (!desktop) return;
+      await invoke("close_desktop_game");
+      store.game.desk = { active: false, id: null };
     },
     async listGames() {
       return desktop ? readCatalog(await invoke("list_games")) : loadBuiltinCatalog();

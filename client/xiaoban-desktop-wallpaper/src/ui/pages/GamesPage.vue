@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import ResourceShareActions from "../components/ResourceShareActions.vue";
 import { computed, onMounted, ref } from "vue";
-import { RefreshCw, Save, Sparkles, Trash2 } from "lucide-vue-next";
+import { RefreshCw, Save, Sparkles, Square, Trash2 } from "lucide-vue-next";
 import { NAlert, NButton, NPopconfirm, NSkeleton, NTag } from "naive-ui";
 import type { ControlStore } from "../control-types.ts";
 import { coverUrl } from "../../games/catalog.ts";
@@ -48,6 +48,14 @@ async function openGameSpace(gameId?: string) {
   }
 }
 
+async function stopDeskGame() {
+  try {
+    await props.store.stopDeskGame();
+  } catch (error) {
+    props.store.notify(message(error, "桌面游戏暂时无法停止。"), "error");
+  }
+}
+
 async function removeGame(game: GameManifest) {
   try {
     await props.store.deleteUserGame(game.id);
@@ -63,7 +71,7 @@ onMounted(loadGames);
 
 <template>
   <main class="ui-page games-page" data-testid="games-page">
-    <header class="page-header"><h1>游戏空间</h1><div class="header-actions"><ResourceShareActions :store="store" kind="game" import-label="导入游戏" :disabled="opening" @imported="loadGames"/><NButton type="primary" round :disabled="!store.desktop" data-testid="games-create" @click="store.startCreation('game')"><template #icon><Sparkles :size="15"/></template>创作游戏</NButton></div></header>
+    <header class="page-header"><h1>游戏空间</h1><div class="header-actions"><ResourceShareActions :store="store" kind="game" import-label="导入游戏" :disabled="opening" @imported="loadGames"/><NButton v-if="store.game.desk?.active" round data-testid="games-stop-desk" @click="stopDeskGame"><template #icon><Square :size="15"/></template>停止桌面游戏</NButton><NButton type="primary" round :disabled="!store.desktop" data-testid="games-create" @click="store.startCreation('game')"><template #icon><Sparkles :size="15"/></template>创作游戏</NButton></div></header>
     <div class="games-body">
     <NAlert v-if="!store.desktop" class="browser-note" type="info" :bordered="false">
       浏览器预览只展示游戏资料；请在小伴桌面应用中进入游戏空间。
@@ -122,11 +130,12 @@ onMounted(loadGames);
           <article class="surface game-card" role="button" tabindex="0" :data-testid="`user-game-${game.id}`" :aria-label="`开始${game.name}`" :aria-disabled="opening" @click="openGameSpace(game.id)" @keydown.enter.prevent="openGameSpace(game.id)" @keydown.space.prevent="openGameSpace(game.id)">
             <div class="game-cover">
               <img :src="coverUrl(game)" :alt="`${game.name}封面`" loading="lazy" />
-              <NTag class="game-kind" :bordered="false">自创</NTag>
+              <NTag class="game-kind" :bordered="false">{{ game.layer === "desktop" ? "桌面层" : "自创" }}</NTag>
             </div>
             <div class="game-content">
               <h3>{{ game.name }}</h3>
               <p class="muted">{{ game.description }}</p>
+              <div v-if="game.layer === 'desktop'" class="game-footnote">浮在桌面上运行 · 托盘菜单可随时停止</div>
               <div v-if="game.save" class="game-footnote"><Save :size="14" /> 进度保存在本机</div>
             </div>
           </article>

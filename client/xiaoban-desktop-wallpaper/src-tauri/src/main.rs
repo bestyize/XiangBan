@@ -28,6 +28,8 @@ mod rituals;
 mod widgets;
 mod widget_geometry;
 mod custom_widgets;
+mod desk_game;
+mod desk_windows;
 mod reminders;
 mod presence;
 mod care_system;
@@ -602,10 +604,11 @@ fn setup_tray(app: &tauri::App) -> tauri::Result<()> {
     let control = MenuItem::with_id(app, "control", "打开小伴设置", true, None::<&str>)?;
     let poke = MenuItem::with_id(app, "poke", "戳戳小伴", true, None::<&str>)?;
     let games = MenuItem::with_id(app, "games", "玩一玩", true, None::<&str>)?;
+    let stop_desk = MenuItem::with_id(app, "stop-desk-game", "停止桌面游戏", true, None::<&str>)?;
     let autostart = CheckMenuItem::with_id(app, "autostart", "开机自动启动",
         app.state::<DesktopState>().startup_allowed, settings(app.handle()).autostart, None::<&str>)?;
     let exit = MenuItem::with_id(app, "exit", "退出小伴", true, None::<&str>)?;
-    let menu = Menu::with_items(app, &[&control, &games, &poke, &autostart, &exit])?;
+    let menu = Menu::with_items(app, &[&control, &games, &stop_desk, &poke, &autostart, &exit])?;
     *app.state::<DesktopState>().startup_menu.lock().unwrap() = Some(autostart);
     // The app icon at 64x64 as raw RGBA (icons/tray.rgba), so the tray needs no image decoder.
     const TRAY_ICON: &[u8] = include_bytes!("../icons/tray.rgba");
@@ -623,6 +626,10 @@ fn setup_tray(app: &tauri::App) -> tauri::Result<()> {
             "games" => {
                 let handle=app.clone();
                 tauri::async_runtime::spawn(async move { if let Err(error)=games::open(&handle).await { let _=handle.emit("desktop-error",error); } });
+            }
+            "stop-desk-game" => {
+                let handle=app.clone();
+                tauri::async_runtime::spawn(async move { if let Err(error)=desk_game::close(&handle).await { let _=handle.emit("desktop-error",error); } });
             }
             "autostart" => {
                 if let Err(error) = set_autostart(app.clone(), !get_settings(app.clone()).autostart) {
@@ -679,6 +686,7 @@ fn main() {
     let command_handler: Box<dyn Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Sync> = Box::new(tauri::generate_handler![resource_packs::export_resource_pack, resource_packs::import_resource_pack, get_platform, get_settings, set_mode, update_settings, set_desktop_effects, effects::list_desktop_effects, effects::open_effects_directory, effects::import_effect_pack, effects::delete_desktop_effect, set_companion_enabled, set_companion_links, set_companion_skin, poke,
             scene_ready, set_hit_test, start_drag, hide_control, show_control, quit, get_diagnostics, ui_smoke_report,
             get_startup_status, set_autostart, content::get_wallpaper_library, content::import_wallpaper_catalog, content::delete_local_wallpaper,
+            desk_game::open_desktop_game, desk_game::close_desktop_game, desk_game::desk_set_regions,
             games::open_game_space, games::close_game_space, games::get_game_catalog, games::load_game_save,
             games::save_game_save, games::get_game_status, games::set_game_desktop_double_click,
             games::game_smoke_report, games::list_games, games::delete_user_game, games::open_user_games_folder, rituals::open_ritual_space, rituals::close_ritual_space, rituals::read_ritual_journal, rituals::write_ritual_journal,
@@ -702,7 +710,7 @@ fn main() {
             chat::chat_overview, chat::chat_load_session, chat::chat_new_session, chat::chat_send, chat::chat_cancel, chat::chat_delete_session,
             chat::chat_answer_approval, chat::chat_answer_question, chat::chat_set_permission_mode]);
     let app = builder.manage(state).manage(content::ContentState::default()).manage(website::WebsiteState::default())
-        .manage(games::GameState::default()).manage(rituals::RitualState::default()).manage(widgets::WidgetState::default()).manage(reminders::ReminderState::default()).manage(account::AccountState::default()).manage(ai_config::AiConfigState::default()).manage(tts::TtsState::default()).manage(asr::AsrState::default()).manage(ai_catalogue::CatalogueState::default())
+        .manage(games::GameState::default()).manage(desk_game::DeskState::default()).manage(rituals::RitualState::default()).manage(widgets::WidgetState::default()).manage(reminders::ReminderState::default()).manage(account::AccountState::default()).manage(ai_config::AiConfigState::default()).manage(tts::TtsState::default()).manage(asr::AsrState::default()).manage(ai_catalogue::CatalogueState::default())
         .register_uri_scheme_protocol("wallpaper-asset", |context, request| library::serve(context.app_handle(), request))
         .register_uri_scheme_protocol("game-pack", |context, request| game_packs::serve(context.app_handle(), request))
         .invoke_handler(move |invoke| {
@@ -711,7 +719,7 @@ fn main() {
                 invoke.resolver.reject("只能在聊天和声音设置中使用语音识别");
                 return true;
             }
-            let allowed=widgets::permitted(label,command).or_else(|| rituals::permitted(label,command)).or_else(|| games::permitted(label,command)).unwrap_or_else(|| {
+            let allowed=desk_game::permitted(label,command).or_else(|| widgets::permitted(label,command)).or_else(|| rituals::permitted(label,command)).or_else(|| games::permitted(label,command)).unwrap_or_else(|| {
                 if command=="ui_smoke_report" {return label=="control";}
                 if command=="set_companion_enabled" || command=="set_companion_links" || command=="set_companion_skin" || command=="set_desktop_effects" || command=="list_desktop_effects" || command=="open_effects_directory" || command=="import_effect_pack" {return label=="control";}
                 if label=="care" { return ["get_care_delivery","care_ready","dismiss_care","snooze_care","care_synthesize"].contains(&command); }

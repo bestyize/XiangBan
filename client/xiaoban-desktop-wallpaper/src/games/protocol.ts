@@ -1,5 +1,5 @@
 /** One game in the catalog. `base` is where its files live (`/game-packs/<id>/` for shipped games, the game-pack protocol for the user's own). */
-export interface GameManifest { id: string; name: string; description: string; entry: string; cover?: string; runtimeProtocol: number; orientation?: string; save?: boolean; source?: 'builtin' | 'user'; base?: string }
+export interface GameManifest { id: string; name: string; description: string; entry: string; cover?: string; runtimeProtocol: number; orientation?: string; save?: boolean; source?: 'builtin' | 'user'; base?: string; layer?: 'space' | 'desktop'; capabilities?: string[] }
 export interface Metrics { score: number; lines?: number; maxTile?: number }
 /** Compare JSON documents by value; serde_json can reorder object keys in native round trips. */
 export function sameJson(left: unknown, right: unknown): boolean {
@@ -42,6 +42,7 @@ export class GameSession {
     if (!this.ready) return null;
     if (d.type === 'game.start') { this.started = true; this.completed = false; this.record = null; return d; }
     if (d.type === 'game.save') return validSave(d.data) ? d : null;
+    if (d.type === 'game.regions') return Array.isArray(d.rects) && d.rects.length <= 32 ? d : null;
     if (['game.progress', 'game.result'].includes(d.type)) {
       const value = metrics(d);
       if (!this.started || this.completed || !value) return null;

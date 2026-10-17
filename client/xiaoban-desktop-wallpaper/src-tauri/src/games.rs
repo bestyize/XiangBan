@@ -36,7 +36,7 @@ pub fn builtin_catalog() -> Result<Vec<Value>, String> {
     manifests.iter().zip(IDS).map(|(text, id)| {
         let mut value: Value = serde_json::from_str(text.trim_start_matches('\u{feff}')).map_err(|e| e.to_string())?;
         if value["id"] != id || value["runtimeProtocol"] != 1 || value["entry"] != "index.html" || value["cover"] != "cover.svg" { return Err(format!("游戏 {id} 的资源协议无效")); }
-        value["source"] = json!("builtin"); value["base"] = json!(format!("/game-packs/{id}/"));
+        value["source"] = json!("builtin"); value["base"] = json!(format!("/game-packs/{id}/")); value["layer"] = json!("space"); value["capabilities"] = json!([]);
         Ok(value)
     }).collect()
 }
@@ -54,8 +54,20 @@ pub fn catalog_in(root: Option<&std::path::Path>) -> Result<Catalog, String> {
 }
 pub fn catalog(app: &tauri::AppHandle) -> Result<Catalog, String> { catalog_in(crate::storage::root(app).ok().as_deref()) }
 #[tauri::command]
-pub fn get_game_catalog(app: tauri::AppHandle, host_token: String) -> Result<Vec<Value>, String> { authorize(&app, &host_token)?; Ok(catalog(&app)?.games) }
-fn authorize(app: &tauri::AppHandle, token: &str) -> Result<(), String> {
+pub fn get_game_catalog(app: tauri::AppHandle, host_token: String) -> Result<Vec<Value>, String> {
+    authorize(&app, &host_token)?;
+    // Games that live on the desktop layer cannot run full screen, so the game space never lists them.
+    Ok(catalog(&app)?.games.into_iter().filter(|game| game["layer"] != "desktop").collect())
+}
+/// A fresh secret for the window that is about to host a game; commands that touch saves check it.
+pub(crate) fn issue_token(app: &tauri::AppHandle) -> Result<String, String> {
+    let mut random = [0u8; 32];
+    getrandom::fill(&mut random).map_err(|e| format!("安全宿主初始化失败：{e}"))?;
+    let token = random.iter().map(|b| format!("{b:02x}")).collect::<String>();
+    *app.state::<GameState>().host_token.lock().unwrap() = token.clone();
+    Ok(token)
+}
+pub(crate) fn authorize(app: &tauri::AppHandle, token: &str) -> Result<(), String> {
     let state = app.state::<GameState>(); let expected=state.host_token.lock().unwrap();
     if expected.is_empty() || token != expected.as_str() { return Err("游戏资源没有原生宿主权限".into()); } Ok(())
 }
@@ -69,7 +81,7 @@ pub fn set_game_desktop_double_click(app: tauri::AppHandle, enabled: bool) -> Re
 #[tauri::command]
 pub fn get_game_status(app: tauri::AppHandle) -> Value {
     let state = app.state::<GameState>();
-    json!({"active":is_active(&app), "desktopDoubleClickSupported":state.desktop_entry_ready.load(Ordering::Relaxed),
+    json!({"active":is_active(&app), "desk":{"active":crate::desk_game::active_id(&app).is_some(),"id":crate::desk_game::active_id(&app)}, "desktopDoubleClickSupported":state.desktop_entry_ready.load(Ordering::Relaxed),
         "desktopEntryError":state.desktop_entry_error.lock().unwrap().clone(),
         "platform":std::env::consts::OS, "games":catalog(&app).map(|c|c.ids()).unwrap_or_else(|_|IDS.iter().map(|id|id.to_string()).collect())})
 }
@@ -120,17 +132,20 @@ pub fn save_game_save(app: tauri::AppHandle, game_id: String, data: Value, host_
 }
 pub async fn open(app: &tauri::AppHandle) -> Result<(), String> { open_selected(app, None).await }
 async fn open_selected(app: &tauri::AppHandle, game_id: Option<String>) -> Result<(), String> {
-    if let Some(id) = game_id.as_deref() { if !catalog(app)?.ids().iter().any(|known| known == id) { return Err("没有找到这款本地游戏".into()); } }
+    if let Some(id) = game_id.as_deref() {
+        let known = catalog(app)?;
+        let game = known.games.iter().find(|game| game["id"] == id).ok_or("没有找到这款本地游戏")?;
+        if game["layer"] == "desktop" { return crate::desk_game::open(app, id).await; }
+    }
     let state = app.state::<GameState>(); let _operation = state.operation.lock().await;
     let content_state = app.state::<crate::content::ContentState>(); let _content = content_state.operation.lock().await;
+    crate::desk_game::close(app).await?;
     if let Some(window) = app.get_webview_window("games") {
         if let Some(id) = &game_id { window.eval(format!("window.dispatchEvent(new CustomEvent('game-launch',{{detail:{}}}));", json!(id))).map_err(|e|e.to_string())?; }
         window.unminimize().map_err(|e|e.to_string())?; window.show().map_err(|e|e.to_string())?; return window.set_focus().map_err(|e|e.to_string()); }
     let monitor = app.primary_monitor().map_err(|e| e.to_string())?.ok_or("没有找到主显示器")?;
     let scale = monitor.scale_factor();
-    let mut random=[0u8;32]; getrandom::fill(&mut random).map_err(|e|format!("安全宿主初始化失败：{e}"))?;
-    let token=random.iter().map(|b|format!("{b:02x}")).collect::<String>();
-    *state.host_token.lock().unwrap()=token.clone();
+    let token=issue_token(app)?;
     let smoke=app.state::<crate::DesktopState>().isolated && std::env::var_os("XIAOBAN_GAMES_SMOKE").is_some();
     *state.smoke_report.lock().unwrap()=None;
     let builder = WebviewWindowBuilder::new(app, "games", WebviewUrl::App(format!("index.html?scene=games{}", game_id.as_ref().map(|id|format!("&game={id}")).unwrap_or_default()).into()))
@@ -172,6 +187,7 @@ fn restore_background(app: &tauri::AppHandle) {
     }
 }
 pub async fn close(app: &tauri::AppHandle) -> Result<(), String> {
+    crate::desk_game::close(app).await?;
     let state = app.state::<GameState>(); let _operation = state.operation.lock().await;
     let content_state = app.state::<crate::content::ContentState>(); let _content = content_state.operation.lock().await;
     if state.active.swap(false,Ordering::SeqCst) { restore_background(app); }
@@ -204,6 +220,7 @@ pub async fn delete_user_game_by_id(app: &tauri::AppHandle, id: &str) -> Result<
     if !crate::game_packs::valid_id(id) || crate::game_packs::is_builtin(id) { return Err("只能删除自创游戏".into()); }
     if fs::symlink_metadata(crate::game_packs::packs_dir(&root).join(id)).is_err() { return Err(format!("没有找到自创游戏「{id}」")); }
     if is_active(app) { close(app).await?; }
+    if crate::desk_game::active_id(app).as_deref() == Some(id) { crate::desk_game::close(app).await?; }
     let state = app.state::<GameState>(); let _io = state.io.lock().unwrap();
     crate::game_packs::remove_pack(&root, id)
 }

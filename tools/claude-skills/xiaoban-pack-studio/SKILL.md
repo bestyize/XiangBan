@@ -14,7 +14,7 @@ description: 为小伴桌面创作可导入的资源包 zip：动态壁纸、桌
 | 动态壁纸 | `wallpaper` | 一个自包含的 `index.html`（CSS 动画、canvas、WebGL） |
 | 桌面特效 | `effect` | 一个 `effect.json`，粒子层的纯数据，不含代码 |
 | 桌面组件 | `widget` | 一个自包含的 `index.html`，摆在桌面一角的小卡片 |
-| 小游戏 | `game` | `index.html` 加其他文本文件，全屏离线运行；图片、音频、字体放 `assets/` |
+| 小游戏 | `game` | `index.html` 加其他文本文件，默认全屏离线运行；图片、音频、字体放 `assets/`；也可以做成跑在桌面上的“桌面层游戏” |
 
 其他东西做不了：内置组件、小伴外壳、关怀提醒都不属于资源包。
 
@@ -35,6 +35,7 @@ description: 为小伴桌面创作可导入的资源包 zip：动态壁纸、桌
 - 只有游戏的包可以带图片、音频、字体，放在 `assets/` 下，`manifest.json` 的 `schemaVersion` 写 `2`。壁纸和组件不能放额外文件，图片要转成 `data:` 地址写进页面（组件只有 128 KB，基本只放得下小图标）；包里有多余文件会被拒绝。
 - 组件里的内联脚本在打包后的应用中可能不执行，详见引用文档的说明。需要交互的组件优先用纯 HTML 和 CSS；确实要脚本，提醒用户导入后先看效果。
 - 游戏用普通 `<script src>`，不要 ES modules；Esc 退出由宿主处理，游戏不要自己处理。
+- 桌面层游戏（角色在桌面和窗口上走动、跟着鼠标的互动）：`manifest.json` 写 `"layer": "desktop"`、`schemaVersion: 2`，并按需申请 `capabilities`（`windows` 其他窗口的位置大小，`pointer` 鼠标位置）。画布透明，用 `game.regions` 告诉宿主哪里要接收鼠标，没有键盘，要自己提供退出方式（发 `game.exit`）。先读引用文档的“桌面层游戏”一节，并参考 `references/examples/desk-pal/`。
 - 导入失败时应用会给出具体原因。按原因改，不要换一个 `id` 绕过“已存在”之类的提示，除非用户同意。
 
 ## 分享到论坛

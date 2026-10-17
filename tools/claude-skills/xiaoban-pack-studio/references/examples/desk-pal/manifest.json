@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 2,
+  "kind": "game",
+  "id": "desk-pal",
+  "name": "桌面伙伴",
+  "description": "一个站在窗口上沿走来走去的小家伙，窗口被挡住或移走它会掉下去",
+  "layer": "desktop",
+  "capabilities": ["windows", "pointer"]
+}

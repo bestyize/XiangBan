@@ -270,6 +270,68 @@ pub fn order_desktop_layers(app: &tauri::AppHandle) -> Result<(), String> {
     Ok(())
 }
 
+/// Rectangles of the visible application windows in physical pixels, front to back. Only geometry and the owning
+/// process id are read; titles are never touched. Minimised and cloaked windows (other virtual desktops) are skipped.
+pub fn window_rects() -> Vec<crate::desk_windows::Raw> {
+    use crate::desk_windows::{Raw, Rect};
+    use windows_sys::Win32::Graphics::Dwm::{DwmGetWindowAttribute, DWMWA_CLOAKED, DWMWA_EXTENDED_FRAME_BOUNDS};
+    struct Found {
+        windows: Vec<Raw>,
+        own: u32,
+    }
+    unsafe extern "system" fn each(hwnd: HWND, lparam: LPARAM) -> i32 {
+        let found = &mut *(lparam as *mut Found);
+        if IsWindowVisible(hwnd) == 0 || IsIconic(hwnd) != 0 {
+            return 1;
+        }
+        let mut cloaked = 0u32;
+        DwmGetWindowAttribute(hwnd, DWMWA_CLOAKED as u32, &mut cloaked as *mut u32 as *mut _, std::mem::size_of::<u32>() as u32);
+        if cloaked != 0 {
+            return 1;
+        }
+        // The extended frame is what the eye sees; GetWindowRect also counts the invisible resize border.
+        let mut rect = RECT { left: 0, top: 0, right: 0, bottom: 0 };
+        let framed = DwmGetWindowAttribute(hwnd, DWMWA_EXTENDED_FRAME_BOUNDS as u32, &mut rect as *mut RECT as *mut _, std::mem::size_of::<RECT>() as u32) == 0;
+        if !framed && GetWindowRect(hwnd, &mut rect) == 0 {
+            return 1;
+        }
+        let mut process = 0u32;
+        GetWindowThreadProcessId(hwnd, &mut process);
+        let class = class_name(hwnd);
+        let tool = (GetWindowLongW(hwnd, GWL_EXSTYLE) as u32) & WS_EX_TOOLWINDOW != 0;
+        let shell = ["Progman", "WorkerW", "Shell_TrayWnd", "Shell_SecondaryTrayWnd"].contains(&class.as_str());
+        found.windows.push(Raw {
+            rect: Rect::new(rect.left as f64, rect.top as f64, (rect.right - rect.left) as f64, (rect.bottom - rect.top) as f64),
+            ours: process == found.own,
+            ordinary: !tool && !shell,
+        });
+        1
+    }
+    let mut found = Found { windows: Vec::new(), own: std::process::id() };
+    unsafe { EnumWindows(Some(each), &mut found as *mut Found as LPARAM) };
+    found.windows
+}
+
+/// The pointer in physical pixels from the virtual screen's origin.
+pub fn cursor_position() -> Option<(f64, f64)> {
+    let mut point = POINT::default();
+    (unsafe { GetCursorPos(&mut point) } != 0).then(|| (point.x as f64, point.y as f64))
+}
+
+/// Keeps a click on the desktop layer from taking keyboard focus away from the program the user is working in,
+/// and out of the Alt-Tab list.
+pub fn make_overlay(window: &tauri::WebviewWindow) -> Result<(), String> {
+    let hwnd = window.hwnd().map_err(|e| e.to_string())?.0 as HWND;
+    unsafe {
+        let style = GetWindowLongPtrW(hwnd, GWL_EXSTYLE);
+        SetLastError(0);
+        if SetWindowLongPtrW(hwnd, GWL_EXSTYLE, style | (WS_EX_NOACTIVATE | WS_EX_TOOLWINDOW) as isize) == 0 && GetLastError() != 0 {
+            return Err(format!("无法设置桌面层窗口样式（{}）", GetLastError()));
+        }
+    }
+    Ok(())
+}
+
 pub fn left_button_down() -> bool {
     unsafe { GetAsyncKeyState(VK_LBUTTON as i32) < 0 }
 }

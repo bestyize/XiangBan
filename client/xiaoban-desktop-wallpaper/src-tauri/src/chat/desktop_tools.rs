@@ -713,12 +713,12 @@ fn game_list(desktop: &dyn Desktop, _: &Value) -> Result<String, String> {
     let mine: Vec<&Value> = games.iter().filter(|g| is_user_game(g)).collect();
     if !mine.is_empty() {
         lines.push(format!("用户自创游戏（{} 款，来源：游戏文件夹，可用 game_delete 删除）：", mine.len()));
-        lines.extend(mine.into_iter().map(|g| format!("{} [自创]", line(g))));
+        lines.extend(mine.into_iter().map(|g| format!("{} {}", line(g), if g["layer"] == "desktop" { "[自创·桌面层：浮在桌面其他窗口上方运行]" } else { "[自创]" })));
     }
     for error in data["errors"].as_array().into_iter().flatten().filter_map(Value::as_str) {
         lines.push(format!("无法加载的自创游戏文件夹：{error}"));
     }
-    lines.push(r#"可用 game_open 启动（例如 game_open(id: "snake-arena") 打开贪吃蛇），game_close 退出游戏空间；game_create 可以为用户创作新游戏。"#.into());
+    lines.push(r#"可用 game_open 启动（例如 game_open(id: "snake-arena") 打开贪吃蛇），game_close 退出游戏空间或停止桌面层游戏；game_create 可以为用户创作新游戏。"#.into());
     Ok(lines.join("\n"))
 }
 
@@ -744,7 +744,12 @@ fn game_open(desktop: &dyn Desktop, args: &Value) -> Result<String, String> {
         None => None,
     };
     desktop.game_open(target.as_deref())?;
+    let on_desktop = match target.as_deref() {
+        Some(id) => desktop.games()?["games"].as_array().into_iter().flatten().any(|g| g["id"].as_str() == Some(id) && g["layer"] == "desktop"),
+        None => false,
+    };
     Ok(match target {
+        Some(id) if on_desktop => format!("已把桌面层游戏放到桌面上：{id}。它浮在其他窗口上方运行，用 game_close 停止。"),
         Some(id) => format!("已进入游戏空间并启动游戏：{id}"),
         None => "已打开小伴游戏空间大厅".into(),
     })
@@ -791,7 +796,7 @@ const GAME_CREATE_DESCRIPTION: &str = "为用户创作一款全屏离线小游�
 
 fn game_close(desktop: &dyn Desktop, _: &Value) -> Result<String, String> {
     desktop.game_close()?;
-    Ok("已退出游戏空间，返回桌面".into())
+    Ok("已退出游戏空间或停止桌面层游戏，返回桌面".into())
 }
 
 fn care_delete(desktop: &dyn Desktop, args: &Value) -> Result<String, String> {
@@ -1072,7 +1077,7 @@ pub fn tools(desktop: Arc<dyn Desktop>) -> Vec<Arc<dyn Tool>> {
             ToolSpec::new("game_delete", "删除指定的自创游戏（只能删除 game_create 创作的、game_list 标注为自创的游戏，内置游戏受保护）。若游戏空间正在运行会先关闭，游戏的本机存档也会一并清除。", object(json!({"id": {"type": "string"}}), &["id"])).risk(Risk::Write).serial(),
             game_delete,
         ),
-        tool(&desktop, ToolSpec::new("game_close", "退出游戏空间，回到正常的桌面生活空间。", none()).risk(Risk::Write).serial(), game_close),
+        tool(&desktop, ToolSpec::new("game_close", "退出游戏空间，回到正常的桌面生活空间；如果正在运行的是桌面层游戏，就停止它。", none()).risk(Risk::Write).serial(), game_close),
         tool(
             &desktop,
             ToolSpec::new(
@@ -1230,6 +1235,7 @@ mod tests {
                 {"id": "snake-arena", "name": "小伴贪吃蛇", "description": "吃糖果长成大蛇"},
                 {"id": "falling-blocks", "name": "俄罗斯方块", "description": "单人下落方块"},
                 {"id": "star-catcher", "name": "接星星", "description": "接住落下的星星", "source": "user"},
+                {"id": "desk-pal", "name": "桌面伙伴", "description": "在窗口上走来走去", "source": "user", "layer": "desktop"},
             ], "errors": ["「broken」：缺少 manifest.json"]}))
         }
         fn game_open(&self, id: Option<&str>) -> Result<(), String> {
@@ -1528,7 +1534,7 @@ mod tests {
         let lobby_out = call(&fake, "game_open", json!({})).unwrap();
         assert_eq!(lobby_out, "已打开小伴游戏空间大厅");
         let close_out = call(&fake, "game_close", json!({})).unwrap();
-        assert_eq!(close_out, "已退出游戏空间，返回桌面");
+        assert_eq!(close_out, "已退出游戏空间或停止桌面层游戏，返回桌面");
 
         assert_eq!(fake.calls(), vec!["game-open snake-arena", "game-open lobby", "game-close"]);
         assert!(call(&fake, "game_open", json!({"id": "不存在的游戏"})).unwrap_err().contains("没有找到游戏"));
@@ -1726,5 +1732,17 @@ mod tests {
         assert_eq!(fake.calls(), vec!["open-url https://chat.xiangban.xyz/c/xiaoban-wallpaper", "open-url https://wallpaper.xiangban.xyz"]);
         assert!(call(&fake, "community_open", json!({"target": "https://evil.example"})).is_err());
         assert_eq!(fake.calls().len(), 2);
+    }
+
+    #[test]
+    fn desktop_layer_games_are_labelled_and_announced_as_living_on_the_desktop() {
+        let fake = Arc::new(Fake::default());
+        let list = call(&fake, "game_list", json!({})).unwrap();
+        assert!(list.contains("桌面伙伴 (desk-pal)") && list.contains("[自创·桌面层"), "{list}");
+        assert!(list.contains("接星星 (star-catcher): 接住落下的星星 [自创]"), "{list}");
+        let opened = call(&fake, "game_open", json!({"id": "desk-pal"})).unwrap();
+        assert!(opened.contains("桌面层游戏") && opened.contains("game_close"), "{opened}");
+        let space = call(&fake, "game_open", json!({"id": "star-catcher"})).unwrap();
+        assert_eq!(space, "已进入游戏空间并启动游戏：star-catcher");
     }
 }
