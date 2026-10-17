@@ -98,3 +98,37 @@ export interface AuditRow {
   detail: string | null;
   created_at: string;
 }
+
+export interface Batch {
+  id: number;
+  product_id: string;
+  kind: 'topup' | 'monthly';
+  quota: number;
+  valid_days: number;
+  note: string;
+  created_by: string;
+  created_at: string;
+  total: number;
+  unused: number;
+  redeemed: number;
+  void: number;
+}
+
+export interface CodeLookup {
+  id: number;
+  status: 'unused' | 'redeemed' | 'void';
+  batch_id: number;
+  product_id: string;
+  kind: 'topup' | 'monthly';
+  quota: number;
+  valid_days: number;
+  note: string;
+  redeemed_by: string | null;
+  redeemed_at: string | null;
+  voided_at: string | null;
+  binding_id: number | null;
+  bucket_id: number | null;
+  bucket_remaining: number | null;
+  bucket_expires_at: string | null;
+  bucket_closed_reason: string | null;
+}

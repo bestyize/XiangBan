@@ -1,8 +1,10 @@
 # AI 网关与额度系统设计（server-ai）
 
-状态：一期已实现（`services/server-ai`，未部署）；兑换码（二期）和在线支付（四期）尚未实现。本文记录为什么这样设计；接口与配置以 `services/server-ai/README.md` 为准。
+状态：一期、二期（兑换码）已实现（`services/server-ai`，未部署）；在线支付（四期）尚未实现。本文记录为什么这样设计；接口与配置以 `services/server-ai/README.md` 为准。
 
-与最初设计相比，一期实现有两处不同：试用只发一次由 `quota_buckets` 上「每个绑定只能有一个试用桶」的唯一索引保证，没有单独的 `trial_grants` 表；`usage_snapshots` 表没有做，对账的每次结算直接记在 `quota_ledger` 里。
+与最初设计相比，二期兑换码有三处不同：兑换码明文不是“导出 CSV”，而是生成时在响应里返回一次、后台提供下载 txt（一行一个码）；码的哈希用主密钥派生的 HMAC，而不是裸哈希；限流只数失败次数，成功的兑换不占额度。
+
+一期实现有两处不同：试用只发一次由 `quota_buckets` 上「每个绑定只能有一个试用桶」的唯一索引保证，没有单独的 `trial_grants` 表；`usage_snapshots` 表没有做，对账的每次结算直接记在 `quota_ledger` 里。
 
 ## 目标与边界
 

@@ -75,4 +75,13 @@ export const auditLabels: Record<string, string> = {
   'binding.grant': '补发额度',
   'bucket.void': '扣回额度',
   'anomaly.resolve': '处理异常',
+  'batch.create': '生成兑换码批次',
+  'batch.void': '作废批次剩余的码',
+  'code.void': '作废兑换码',
+};
+
+export const codeStatusLabels: Record<string, string> = {
+  unused: '未兑换',
+  redeemed: '已兑换',
+  void: '已作废',
 };

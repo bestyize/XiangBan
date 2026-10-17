@@ -95,14 +95,18 @@ button, input, select, textarea { font: inherit; color: inherit; }
 
 /* ---- 表格 ---- */
 .table-wrap { overflow-x: auto; }
-.table { width: 100%; border-collapse: collapse; }
+/* 最小宽度保证窄屏下列不会被压成单字竖排，而是出现横向滚动；空表不需要，见下方 .table-empty。 */
+.table { width: 100%; min-width: 640px; border-collapse: collapse; }
 .table th { text-align: left; font-weight: 500; color: var(--muted); font-size: 13px; padding: 9px 14px; border-bottom: 1px solid var(--line); background: #fafbfc; white-space: nowrap; }
 .table td { padding: 11px 14px; border-bottom: 1px solid var(--line); vertical-align: middle; }
 .table tr:last-child td { border-bottom: none; }
 .table tbody tr.click { cursor: pointer; }
 .table tbody tr.click:hover td { background: #f7f9fa; }
 .table .right { text-align: right; }
-.table-empty { padding: 36px 20px; text-align: center; color: var(--muted); }
+.table-empty { padding: 36px 20px; text-align: center; color: var(--muted); white-space: normal; }
+/* 表里没有数据时不需要横向滚动，让表头换行，空状态的说明才不会被撑宽的表格挤出屏幕。 */
+.table-wrap:has(.table-empty) .table { min-width: 0; }
+.table-wrap:has(.table-empty) .table th { white-space: normal; }
 
 /* ---- 标记 ---- */
 .tag { display: inline-flex; align-items: center; height: 22px; padding: 0 8px; border-radius: 4px; font-size: 12.5px; background: var(--bg); color: var(--muted); white-space: nowrap; }

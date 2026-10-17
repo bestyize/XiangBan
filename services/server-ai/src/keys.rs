@@ -16,6 +16,7 @@ pub fn random_bytes<const N: usize>() -> [u8; N] {
 pub struct Keys {
     pub admin_jwt_secret: Vec<u8>,
     aead: aead::LessSafeKey,
+    code_mac: hmac::Key,
 }
 
 impl Keys {
@@ -36,7 +37,16 @@ impl Keys {
         let root = hmac::Key::new(hmac::HMAC_SHA256, master);
         let sub = |label: &[u8]| hmac::sign(&root, label).as_ref().to_vec();
         let key = aead::UnboundKey::new(&aead::AES_256_GCM, &sub(b"newapi-key-aead")).expect("32-byte AES-256 key");
-        Ok(Self { admin_jwt_secret: sub(b"admin-jwt"), aead: aead::LessSafeKey::new(key) })
+        Ok(Self {
+            admin_jwt_secret: sub(b"admin-jwt"),
+            aead: aead::LessSafeKey::new(key),
+            code_mac: hmac::Key::new(hmac::HMAC_SHA256, &sub(b"redeem-code-hash")),
+        })
+    }
+
+    /// 兑换码的查找哈希。带密钥，所以拿到数据库也没法离线穷举；输入必须是规范化后的码。
+    pub fn code_hash(&self, canonical: &str) -> Vec<u8> {
+        hmac::sign(&self.code_mac, canonical.as_bytes()).as_ref().to_vec()
     }
 
     #[cfg(test)]
@@ -108,6 +118,14 @@ mod tests {
         assert_eq!(keys.decrypt("newapi_key", &enc).unwrap(), "sk-abc");
         assert!(keys.decrypt("other", &enc).is_err());
         assert_ne!(enc, keys.encrypt("newapi_key", "sk-abc").unwrap());
+    }
+
+    #[test]
+    fn code_hashes_are_stable_per_key_and_differ_between_keys() {
+        let (a, b) = (Keys::from_master(&[1u8; 32]).unwrap(), Keys::from_master(&[2u8; 32]).unwrap());
+        assert_eq!(a.code_hash("ABCDEFGHJKLMNPQR"), a.code_hash("ABCDEFGHJKLMNPQR"));
+        assert_ne!(a.code_hash("ABCDEFGHJKLMNPQR"), a.code_hash("ABCDEFGHJKLMNPQS"));
+        assert_ne!(a.code_hash("ABCDEFGHJKLMNPQR"), b.code_hash("ABCDEFGHJKLMNPQR"));
     }
 
     #[test]

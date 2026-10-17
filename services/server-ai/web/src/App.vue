@@ -7,6 +7,7 @@ import LoginView from './views/LoginView.vue';
 import OverviewView from './views/OverviewView.vue';
 import ProductsView from './views/ProductsView.vue';
 import UsersView from './views/UsersView.vue';
+import CodesView from './views/CodesView.vue';
 import IssuesView from './views/IssuesView.vue';
 import AuditView from './views/AuditView.vue';
 import PasswordDialog from './components/PasswordDialog.vue';
@@ -15,6 +16,7 @@ const pages = [
   { key: 'overview', label: '概览', component: OverviewView },
   { key: 'products', label: '产品与档位', component: ProductsView },
   { key: 'users', label: '用户额度', component: UsersView },
+  { key: 'codes', label: '兑换码', component: CodesView },
   { key: 'issues', label: '对账异常', component: IssuesView },
   { key: 'audit', label: '操作日志', component: AuditView },
 ] as const;

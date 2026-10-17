@@ -103,7 +103,7 @@ async function confirmVoid() {
               </div>
               <div class="bucket-foot muted num">
                 <span :class="{ soonText: isSoon(b.expires_at) }">{{ timeLeft(b.expires_at) }}（{{ formatDate(b.expires_at) }}）</span>
-                <span>{{ b.source.startsWith('admin:') ? `由 ${b.source.slice(6)} 补发` : b.source === 'trial' ? '新用户试用' : b.source }}</span>
+                <span>{{ b.source.startsWith('admin:') ? `由 ${b.source.slice(6)} 补发` : b.source.startsWith('code:') ? `兑换码 #${b.source.slice(5)}` : b.source === 'trial' ? '新用户试用' : b.source }}</span>
               </div>
             </li>
           </ul>

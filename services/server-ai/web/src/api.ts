@@ -1,5 +1,5 @@
 import { session, signOut } from './session';
-import type { Anomaly, AuditRow, BindingDetail, BindingRow, ModelOption, Overview, Product, Tier } from './types';
+import type { Anomaly, AuditRow, Batch, BindingDetail, BindingRow, CodeLookup, ModelOption, Overview, Product, Tier } from './types';
 
 export class ApiError extends Error {
   constructor(message: string, public status: number) {
@@ -55,6 +55,12 @@ export const api = {
   anomalies: () => request<{ items: Anomaly[] }>('GET', '/admin/anomalies'),
   resolveAnomaly: (id: number) => request<{ ok: true }>('POST', `/admin/anomalies/${id}/resolve`),
   audit: () => request<{ items: AuditRow[] }>('GET', '/admin/audit?limit=100'),
+  batches: () => request<{ items: Batch[] }>('GET', '/admin/batches'),
+  createBatch: (body: { product_id: string; kind: string; quota: number; valid_days: number; count: number; note: string }) =>
+    request<{ batch: Batch; codes: string[] }>('POST', '/admin/batches', body),
+  voidBatch: (id: number) => request<{ ok: true; voided: number }>('POST', `/admin/batches/${id}/void`),
+  lookupCode: (code: string) => request<{ code: CodeLookup }>('POST', '/admin/codes/lookup', { code }),
+  voidCode: (id: number) => request<{ ok: true }>('POST', `/admin/codes/${id}/void`),
 };
 
 export function errorMessage(error: unknown): string {

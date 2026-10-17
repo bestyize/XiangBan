@@ -1,5 +1,6 @@
 mod admin_auth;
 mod binding;
+mod codes;
 mod config;
 mod db;
 mod error;
@@ -13,6 +14,8 @@ mod password;
 mod products;
 mod proxy;
 mod quota;
+mod ratelimit;
+mod redeem;
 mod state;
 mod sync;
 
@@ -43,6 +46,7 @@ pub fn build_router(state: AppState) -> Router {
         .route("/ai/tiers", get(user::tiers))
         .route("/ai/balance", get(user::balance))
         .route("/ai/ledger", get(user::ledger))
+        .route("/ai/redeem", post(user::redeem))
         .route("/admin/login", post(admin::login))
         .route("/admin/me", get(admin::me))
         .route("/admin/password", post(admin::change_password))
@@ -56,6 +60,10 @@ pub fn build_router(state: AppState) -> Router {
         .route("/admin/bindings/{id}", get(admin::get_binding))
         .route("/admin/bindings/{id}/grant", post(admin::grant))
         .route("/admin/buckets/{id}/void", post(admin::void_bucket))
+        .route("/admin/batches", get(admin::list_batches).post(admin::create_batch))
+        .route("/admin/batches/{id}/void", post(admin::void_batch))
+        .route("/admin/codes/lookup", post(admin::lookup_code))
+        .route("/admin/codes/{id}/void", post(admin::void_code))
         .route("/admin/anomalies", get(admin::anomalies))
         .route("/admin/anomalies/{id}/resolve", post(admin::resolve_anomaly))
         .route("/admin/audit", get(admin::audit_log));
@@ -111,8 +119,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let addr: SocketAddr = format!("{}:{}", config.host, config.port).parse()?;
     info!("server-ai issuer={} newapi={} listening on {addr}", config.account_issuer, config.newapi_base_url);
 
+    let (redeem_user_limiter, redeem_ip_limiter) = state::redeem_limiters();
     let state = AppState {
         pool,
+        redeem_user_limiter,
+        redeem_ip_limiter,
         verifier: Arc::new(jwks::JwksVerifier::new(config.account_issuer.clone(), config.account_jwks_url.clone())),
         newapi: Arc::new(newapi::NewApi::new(config.newapi_base_url.clone(), config.newapi_admin_token.clone())),
         config: Arc::new(config),

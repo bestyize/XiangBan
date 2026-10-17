@@ -5,9 +5,10 @@ use crate::{
     state::AppState,
 };
 use axum::{
-    extract::FromRequestParts,
+    extract::{ConnectInfo, FromRequestParts},
     http::{header, request::Parts},
 };
+use std::{convert::Infallible, net::SocketAddr};
 use uuid::Uuid;
 
 fn bearer(parts: &Parts) -> Option<&str> {
@@ -36,6 +37,27 @@ impl FromRequestParts<AppState> for AuthUser {
             .await?
             .ok_or_else(|| AppError::Forbidden("该应用暂未开通 AI 功能".into()))?;
         Ok(AuthUser { uid: verified.uid, product })
+    }
+}
+
+/// 来源 IP：仅在 AI_TRUST_PROXY=true 时信任反向代理设置的 X-Real-IP。
+pub struct ClientIp(pub String);
+
+impl FromRequestParts<AppState> for ClientIp {
+    type Rejection = Infallible;
+
+    async fn from_request_parts(parts: &mut Parts, state: &AppState) -> Result<Self, Self::Rejection> {
+        if state.config.trust_proxy {
+            if let Some(ip) = parts.headers.get("x-real-ip").and_then(|v| v.to_str().ok()) {
+                return Ok(ClientIp(ip.trim().chars().take(45).collect()));
+            }
+        }
+        let peer = parts
+            .extensions
+            .get::<ConnectInfo<SocketAddr>>()
+            .map(|c| c.0.ip().to_string())
+            .unwrap_or_else(|| "unknown".to_string());
+        Ok(ClientIp(peer))
     }
 }
 

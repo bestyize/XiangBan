@@ -4,6 +4,7 @@ use crate::{
     extract::AuthAdmin,
     password, products, quota,
     quota::LIVE,
+    redeem,
     state::AppState,
     sync,
 };
@@ -530,6 +531,84 @@ pub async fn resolve_anomaly(State(state): State<AppState>, AuthAdmin(admin): Au
         return Err(AppError::NotFound("异常不存在或已处理".into()));
     }
     audit(&state, &admin, "anomaly.resolve", Some(&id.to_string()), None).await?;
+    Ok(Json(json!({ "ok": true })))
+}
+
+// ---- 兑换码 ----
+
+pub async fn list_batches(State(state): State<AppState>, _admin: AuthAdmin) -> Result<Json<Value>, AppError> {
+    Ok(Json(json!({ "items": redeem::list_batches(&state).await? })))
+}
+
+#[derive(Deserialize)]
+pub struct BatchReq {
+    product_id: String,
+    kind: String,
+    quota: i64,
+    valid_days: i32,
+    count: i64,
+    #[serde(default)]
+    note: String,
+}
+
+/// 明文兑换码只在这个响应里出现一次，数据库里只有哈希；关掉页面后无法再找回。
+pub async fn create_batch(State(state): State<AppState>, AuthAdmin(admin): AuthAdmin, Json(req): Json<BatchReq>) -> Result<Json<Value>, AppError> {
+    if !matches!(req.kind.as_str(), "topup" | "monthly") {
+        return Err(AppError::BadRequest("兑换码类型只能是加油包或月卡".into()));
+    }
+    if !(1..=MAX_GRANT_QUOTA).contains(&req.quota) {
+        return Err(AppError::BadRequest("面额需大于 0，且不超过单次上限".into()));
+    }
+    if !(1..=3650).contains(&req.valid_days) {
+        return Err(AppError::BadRequest("有效期需为 1-3650 天".into()));
+    }
+    if !(1..=redeem::MAX_BATCH_SIZE).contains(&req.count) {
+        return Err(AppError::BadRequest(format!("一批最少 1 个、最多 {} 个", redeem::MAX_BATCH_SIZE)));
+    }
+    let note = req.note.trim().to_string();
+    if note.chars().count() > 100 {
+        return Err(AppError::BadRequest("备注最多 100 个字符".into()));
+    }
+    if products::get(&state.pool, &req.product_id).await?.is_none() {
+        return Err(AppError::NotFound("产品不存在".into()));
+    }
+
+    let (batch, codes) = redeem::create_batch(
+        &state,
+        &admin.username,
+        redeem::NewBatch { product_id: req.product_id, kind: req.kind, quota: req.quota, valid_days: req.valid_days, count: req.count, note },
+    )
+    .await?;
+    audit(
+        &state,
+        &admin,
+        "batch.create",
+        Some(&batch.id.to_string()),
+        Some(format!("product={} kind={} quota={} days={} count={} note={}", batch.product_id, batch.kind, batch.quota, batch.valid_days, batch.total, batch.note)),
+    )
+    .await?;
+    Ok(Json(json!({ "batch": batch, "codes": codes })))
+}
+
+pub async fn void_batch(State(state): State<AppState>, AuthAdmin(admin): AuthAdmin, Path(id): Path<i64>) -> Result<Json<Value>, AppError> {
+    let voided = redeem::void_batch(&state, id).await?;
+    audit(&state, &admin, "batch.void", Some(&id.to_string()), Some(format!("voided={voided}"))).await?;
+    Ok(Json(json!({ "ok": true, "voided": voided })))
+}
+
+#[derive(Deserialize)]
+pub struct LookupReq {
+    code: String,
+}
+
+/// 用 POST 而不是 GET：码不进 URL，也就不会落进访问日志。
+pub async fn lookup_code(State(state): State<AppState>, _admin: AuthAdmin, Json(req): Json<LookupReq>) -> Result<Json<Value>, AppError> {
+    Ok(Json(json!({ "code": redeem::lookup(&state, &req.code).await? })))
+}
+
+pub async fn void_code(State(state): State<AppState>, AuthAdmin(admin): AuthAdmin, Path(id): Path<i64>) -> Result<Json<Value>, AppError> {
+    redeem::void_code(&state, id).await?;
+    audit(&state, &admin, "code.void", Some(&id.to_string()), None).await?;
     Ok(Json(json!({ "ok": true })))
 }
 

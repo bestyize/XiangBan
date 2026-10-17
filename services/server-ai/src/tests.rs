@@ -264,8 +264,11 @@ impl Harness {
         let x = URL_SAFE_NO_PAD.encode(pair.public_key().as_ref());
         let verifier = JwksVerifier::with_static_key(ISSUER.into(), DecodingKey::from_ed_components(&x).unwrap());
 
+        let (redeem_user_limiter, redeem_ip_limiter) = crate::state::redeem_limiters();
         let state = AppState {
             pool,
+            redeem_user_limiter,
+            redeem_ip_limiter,
             newapi: Arc::new(NewApi::new(base, Some(ADMIN_TOKEN.to_string()))),
             config: Arc::new(config),
             keys: Arc::new(Keys::ephemeral()),
@@ -908,5 +911,354 @@ async fn trial_is_not_granted_when_the_product_has_no_trial_quota() {
     let (status, body) = h.chat(Uuid::new_v4(), "standard").await;
     assert_eq!((status, body["error"]["code"].as_str()), (StatusCode::PAYMENT_REQUIRED, Some("insufficient_quota")));
     assert_eq!(h.mock.user_count(), 1, "the account is still provisioned so a later top-up works");
+    h.cleanup().await;
+}
+
+// ---- 兑换码 ----
+
+const TOPUP: i64 = 1_000_000;
+
+impl Harness {
+    async fn make_batch(&self, kind: &str, quota: i64, days: i64, count: i64) -> Vec<String> {
+        let admin = self.admin_token().await;
+        let (status, body) = self
+            .call(
+                Method::POST,
+                "/api/admin/batches",
+                Some(&admin),
+                json!({ "product_id": "wallpaper", "kind": kind, "quota": quota, "valid_days": days, "count": count, "note": "淘宝 5 美元包" }),
+            )
+            .await;
+        assert_eq!(status, StatusCode::OK, "{body}");
+        body["codes"].as_array().unwrap().iter().map(|c| c.as_str().unwrap().to_string()).collect()
+    }
+
+    async fn redeem(&self, uid: Uuid, client: &str, code: &str) -> (StatusCode, Value) {
+        let token = self.token(uid, client);
+        self.call(Method::POST, "/api/ai/redeem", Some(&token), json!({ "code": code })).await
+    }
+
+    async fn code_status(&self, code: &str) -> String {
+        let canonical = crate::codes::canonical(code).unwrap();
+        let (status,): (String,) = sqlx::query_as("SELECT status FROM redeem_codes WHERE code_hash = $1")
+            .bind(self.state.keys.code_hash(&canonical))
+            .fetch_one(&self.state.pool)
+            .await
+            .unwrap();
+        status
+    }
+}
+
+#[tokio::test]
+async fn a_batch_returns_valid_unique_codes_and_stores_only_hashes() {
+    let h = harness!();
+    h.seed_wallpaper().await;
+    let codes = h.make_batch("topup", TOPUP, 365, 50).await;
+
+    assert_eq!(codes.len(), 50);
+    assert_eq!(codes.iter().collect::<std::collections::HashSet<_>>().len(), 50);
+    for code in &codes {
+        assert_eq!(code.len(), 19, "four groups of four joined by dashes: {code}");
+        assert!(crate::codes::canonical(code).is_some(), "{code}");
+    }
+
+    let stored: Vec<(Vec<u8>,)> = sqlx::query_as("SELECT code_hash FROM redeem_codes").fetch_all(&h.state.pool).await.unwrap();
+    assert_eq!(stored.len(), 50);
+    let canonical = crate::codes::canonical(&codes[0]).unwrap();
+    assert!(stored.iter().all(|(hash,)| hash.len() == 32 && hash.as_slice() != canonical.as_bytes()), "only keyed hashes are stored");
+    let (leaks,): (i64,) = sqlx::query_as("SELECT COUNT(*) FROM admin_audit WHERE detail LIKE '%' || $1 || '%'").bind(&canonical[..8]).fetch_one(&h.state.pool).await.unwrap();
+    assert_eq!(leaks, 0, "codes must not appear in the audit log");
+
+    let admin = h.admin_token().await;
+    for (body, why) in [
+        (json!({ "product_id": "wallpaper", "kind": "topup", "quota": TOPUP, "valid_days": 30, "count": 0 }), "no codes"),
+        (json!({ "product_id": "wallpaper", "kind": "topup", "quota": TOPUP, "valid_days": 30, "count": 5000 }), "too many"),
+        (json!({ "product_id": "wallpaper", "kind": "trial", "quota": TOPUP, "valid_days": 30, "count": 1 }), "bad kind"),
+        (json!({ "product_id": "wallpaper", "kind": "topup", "quota": 0, "valid_days": 30, "count": 1 }), "zero face value"),
+        (json!({ "product_id": "wallpaper", "kind": "topup", "quota": TOPUP, "valid_days": 0, "count": 1 }), "zero days"),
+        (json!({ "product_id": "ghost", "kind": "topup", "quota": TOPUP, "valid_days": 30, "count": 1 }), "unknown product"),
+    ] {
+        let (status, _) = h.call(Method::POST, "/api/admin/batches", Some(&admin), body).await;
+        assert!(status.is_client_error(), "{why}");
+    }
+    let (total,): (i64,) = sqlx::query_as("SELECT COUNT(*) FROM redeem_codes").fetch_one(&h.state.pool).await.unwrap();
+    assert_eq!(total, 50, "rejected requests must not create codes");
+    h.cleanup().await;
+}
+
+#[tokio::test]
+async fn redeeming_adds_a_dated_bucket_and_pushes_it_to_the_wallet_once() {
+    let h = harness!();
+    h.seed_wallpaper().await;
+    let codes = h.make_batch("monthly", TOPUP, 30, 2).await;
+    let uid = Uuid::new_v4();
+    h.chat(uid, "standard").await;
+    let (user_id, _) = h.mock.only_user();
+
+    let (status, body) = h.redeem(uid, CLIENT, &codes[0]).await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    assert_eq!((body["kind"].as_str(), body["quota"].as_i64(), body["balance"].as_i64()), (Some("monthly"), Some(TOPUP), Some(TRIAL + TOPUP)));
+    assert_eq!(h.mock.quota_of(user_id), TRIAL + TOPUP, "the wallet already holds the new quota when the response returns");
+
+    let (kind, total, days_left): (String, i64, f64) = sqlx::query_as(
+        "SELECT kind, total, (EXTRACT(EPOCH FROM expires_at - now()) / 86400)::FLOAT8 FROM quota_buckets WHERE kind = 'monthly'",
+    )
+    .fetch_one(&h.state.pool)
+    .await
+    .unwrap();
+    assert_eq!((kind.as_str(), total), ("monthly", TOPUP));
+    assert!((29.9..=30.0).contains(&days_left), "validity counts from the day of redemption: {days_left}");
+    assert_eq!(h.code_status(&codes[0]).await, "redeemed");
+    assert_eq!(h.code_status(&codes[1]).await, "unused", "the other code in the batch is untouched");
+
+    let (status, body) = h.redeem(uid, CLIENT, &codes[0]).await;
+    assert_eq!((status, body["code"].as_str()), (StatusCode::CONFLICT, Some("code_used")));
+    assert_eq!(h.mock.quota_of(user_id), TRIAL + TOPUP, "a second attempt adds nothing");
+
+    let (status, body) = h.redeem(Uuid::new_v4(), CLIENT, &codes[0]).await;
+    assert_eq!((status, body["code"].as_str()), (StatusCode::CONFLICT, Some("code_used")), "another account cannot reuse it either");
+    h.cleanup().await;
+}
+
+#[tokio::test]
+async fn redeeming_before_any_chat_opens_the_account_with_trial_plus_the_code() {
+    let h = harness!();
+    h.seed_wallpaper().await;
+    let codes = h.make_batch("topup", TOPUP, 365, 1).await;
+
+    let (status, body) = h.redeem(Uuid::new_v4(), "xiaoban-mobile-wallpaper", &codes[0].to_lowercase().replace('-', " ")).await;
+    assert_eq!(status, StatusCode::OK, "lowercase and spaces are accepted: {body}");
+    assert_eq!(h.mock.user_count(), 1);
+    assert_eq!(h.mock.only_user().1, TRIAL + TOPUP);
+    let (premium_status, _) = h.chat(Uuid::new_v4(), "premium").await;
+    assert_eq!(premium_status, StatusCode::FORBIDDEN, "other accounts are unaffected");
+    h.cleanup().await;
+}
+
+#[tokio::test]
+async fn a_paid_code_unlocks_the_premium_tier() {
+    let h = harness!();
+    h.seed_wallpaper().await;
+    let codes = h.make_batch("topup", TOPUP, 365, 1).await;
+    let uid = Uuid::new_v4();
+
+    let (status, _) = h.chat(uid, "premium").await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+    assert_eq!(h.redeem(uid, CLIENT, &codes[0]).await.0, StatusCode::OK);
+    let (status, body) = h.chat(uid, "premium").await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    h.cleanup().await;
+}
+
+#[tokio::test]
+async fn simultaneous_redemptions_of_one_code_succeed_exactly_once() {
+    let h = harness!();
+    h.seed_wallpaper().await;
+    let codes = h.make_batch("topup", TOPUP, 365, 1).await;
+    let (a, b) = (Uuid::new_v4(), Uuid::new_v4());
+    h.chat(a, "standard").await;
+    h.chat(b, "standard").await;
+
+    let (r1, r2, r3, r4) = tokio::join!(h.redeem(a, CLIENT, &codes[0]), h.redeem(b, CLIENT, &codes[0]), h.redeem(a, CLIENT, &codes[0]), h.redeem(b, CLIENT, &codes[0]));
+    let outcomes = [r1, r2, r3, r4];
+    assert_eq!(outcomes.iter().filter(|(s, _)| *s == StatusCode::OK).count(), 1, "{outcomes:?}");
+    assert!(outcomes.iter().filter(|(s, _)| *s != StatusCode::OK).all(|(s, v)| *s == StatusCode::CONFLICT && v["code"] == "code_used"), "{outcomes:?}");
+    let (buckets,): (i64,) = sqlx::query_as("SELECT COUNT(*) FROM quota_buckets WHERE kind = 'topup'").fetch_one(&h.state.pool).await.unwrap();
+    assert_eq!(buckets, 1);
+    let (granted,): (i64,) = sqlx::query_as("SELECT COALESCE(SUM(delta), 0)::BIGINT FROM quota_ledger WHERE kind = 'grant' AND bucket_id IN (SELECT id FROM quota_buckets WHERE kind = 'topup')").fetch_one(&h.state.pool).await.unwrap();
+    assert_eq!(granted, TOPUP, "the quota is credited once, not once per request");
+    h.cleanup().await;
+}
+
+#[tokio::test]
+async fn a_code_only_works_for_its_own_product() {
+    let h = harness!();
+    h.seed_wallpaper().await;
+    let admin = h.admin_token().await;
+    h.call(Method::PUT, "/api/admin/products/forum", Some(&admin), json!({ "name": "论坛", "client_ids": ["forum-web"], "trial_quota": 0, "trial_days": 7, "enabled": true })).await;
+    let codes = h.make_batch("topup", TOPUP, 365, 1).await;
+    let uid = Uuid::new_v4();
+
+    let (status, body) = h.redeem(uid, "forum-web", &codes[0]).await;
+    assert_eq!((status, body["code"].as_str()), (StatusCode::BAD_REQUEST, Some("code_wrong_product")));
+    assert_eq!(h.code_status(&codes[0]).await, "unused", "a wrong-product attempt must not burn the code");
+    assert_eq!(h.mock.user_count(), 0, "and must not provision anything");
+    assert_eq!(h.redeem(uid, CLIENT, &codes[0]).await.0, StatusCode::OK);
+    h.cleanup().await;
+}
+
+#[tokio::test]
+async fn unknown_malformed_and_unauthenticated_attempts_are_refused_without_side_effects() {
+    let h = harness!();
+    h.seed_wallpaper().await;
+    h.make_batch("topup", TOPUP, 365, 1).await;
+    let uid = Uuid::new_v4();
+    let unknown = crate::codes::display(&crate::codes::generate());
+
+    for (code, label) in [(unknown.as_str(), "well-formed but not ours"), ("ABCD-EFGH", "too short"), ("", "empty"), ("我是兑换码", "not a code")] {
+        let (status, body) = h.redeem(uid, CLIENT, code).await;
+        assert_eq!((status, body["code"].as_str()), (StatusCode::BAD_REQUEST, Some("code_invalid")), "{label}");
+    }
+    assert_eq!(h.mock.user_count(), 0, "bad codes never create a gateway user");
+
+    let (status, _) = h.call(Method::POST, "/api/ai/redeem", None, json!({ "code": unknown })).await;
+    assert_eq!(status, StatusCode::UNAUTHORIZED);
+    let stranger = h.token(uid, "unknown-app");
+    let (status, _) = h.call(Method::POST, "/api/ai/redeem", Some(&stranger), json!({ "code": unknown })).await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+    h.cleanup().await;
+}
+
+#[tokio::test]
+async fn repeated_wrong_guesses_lock_the_account_but_successes_do_not_count() {
+    let h = harness!();
+    h.seed_wallpaper().await;
+    let good = h.make_batch("topup", 100_000, 365, 12).await;
+    let uid = Uuid::new_v4();
+
+    for code in &good[..10] {
+        assert_eq!(h.redeem(uid, CLIENT, code).await.0, StatusCode::OK, "ten genuine redemptions in a row are fine");
+    }
+    let wrong = crate::codes::display(&crate::codes::generate());
+    for _ in 0..8 {
+        assert_eq!(h.redeem(uid, CLIENT, &wrong).await.0, StatusCode::BAD_REQUEST);
+    }
+    let (status, body) = h.redeem(uid, CLIENT, &good[10]).await;
+    assert_eq!((status, body["code"].as_str()), (StatusCode::TOO_MANY_REQUESTS, Some("too_many_attempts")), "{body}");
+    assert_eq!(h.code_status(&good[10]).await, "unused", "even a genuine code is refused while locked");
+
+    let (status, _) = h.redeem(Uuid::new_v4(), CLIENT, &good[10]).await;
+    assert_eq!(status, StatusCode::OK, "one account's lock does not lock out a different account behind the same address");
+    h.cleanup().await;
+}
+
+#[tokio::test]
+async fn many_accounts_guessing_from_one_address_trip_the_address_lock() {
+    let h = harness!();
+    h.seed_wallpaper().await;
+    let good = h.make_batch("topup", 100_000, 365, 1).await;
+    let wrong = crate::codes::display(&crate::codes::generate());
+
+    // 每个账号只错一次，永远碰不到单账号的上限；只有按来源地址累计才拦得住这种分散的猜测。
+    for _ in 0..60 {
+        assert_eq!(h.redeem(Uuid::new_v4(), CLIENT, &wrong).await.0, StatusCode::BAD_REQUEST);
+    }
+    let (status, body) = h.redeem(Uuid::new_v4(), CLIENT, &good[0]).await;
+    assert_eq!((status, body["code"].as_str()), (StatusCode::TOO_MANY_REQUESTS, Some("too_many_attempts")), "{body}");
+    assert_eq!(h.code_status(&good[0]).await, "unused");
+    h.cleanup().await;
+}
+
+#[tokio::test]
+async fn a_failed_gateway_push_after_redeeming_is_retried_by_the_sync() {
+    let h = harness!();
+    h.seed_wallpaper().await;
+    let codes = h.make_batch("topup", TOPUP, 365, 1).await;
+    let uid = Uuid::new_v4();
+    h.chat(uid, "standard").await;
+    let (user_id, _) = h.mock.only_user();
+
+    h.mock.0.lock().unwrap().fail_manage = true;
+    let (status, body) = h.redeem(uid, CLIENT, &codes[0]).await;
+    assert_eq!(status, StatusCode::OK, "the redemption itself is recorded even if the push fails: {body}");
+    assert_eq!(h.mock.quota_of(user_id), TRIAL, "nothing reached the wallet yet");
+    assert_eq!(h.code_status(&codes[0]).await, "redeemed");
+
+    h.mock.0.lock().unwrap().fail_manage = false;
+    sync::sync_binding(&h.state, h.only_binding().await).await.unwrap();
+    assert_eq!(h.mock.quota_of(user_id), TRIAL + TOPUP);
+    h.cleanup().await;
+}
+
+#[tokio::test]
+async fn refunds_void_unused_codes_and_claw_back_redeemed_ones() {
+    let h = harness!();
+    h.seed_wallpaper().await;
+    let admin = h.admin_token().await;
+    let codes = h.make_batch("topup", TOPUP, 365, 4).await;
+    let uid = Uuid::new_v4();
+    h.chat(uid, "standard").await;
+    let (user_id, _) = h.mock.only_user();
+    assert_eq!(h.redeem(uid, CLIENT, &codes[0]).await.0, StatusCode::OK);
+
+    let lookup = |code: String| {
+        let admin = admin.clone();
+        let h = &h;
+        async move { h.call(Method::POST, "/api/admin/codes/lookup", Some(&admin), json!({ "code": code })).await }
+    };
+    let (status, found) = lookup(codes[1].to_lowercase()).await;
+    assert_eq!((status, found["code"]["status"].as_str(), found["code"]["quota"].as_i64()), (StatusCode::OK, Some("unused"), Some(TOPUP)));
+    assert_eq!(found["code"]["note"], "淘宝 5 美元包");
+
+    let unused_id = found["code"]["id"].as_i64().unwrap();
+    let (status, _) = h.call(Method::POST, &format!("/api/admin/codes/{unused_id}/void"), Some(&admin), json!({})).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(h.code_status(&codes[1]).await, "void");
+    let (status, body) = h.redeem(Uuid::new_v4(), CLIENT, &codes[1]).await;
+    assert_eq!((status, body["code"].as_str()), (StatusCode::CONFLICT, Some("code_void")));
+    let (status, _) = h.call(Method::POST, &format!("/api/admin/codes/{unused_id}/void"), Some(&admin), json!({})).await;
+    assert_eq!(status, StatusCode::CONFLICT, "voiding twice is refused");
+
+    let (_, redeemed) = lookup(codes[0].clone()).await;
+    assert_eq!((redeemed["code"]["status"].as_str(), redeemed["code"]["bucket_remaining"].as_i64()), (Some("redeemed"), Some(TOPUP)));
+    assert_eq!(redeemed["code"]["redeemed_by"].as_str(), Some(uid.to_string().as_str()));
+    let redeemed_id = redeemed["code"]["id"].as_i64().unwrap();
+    let (status, body) = h.call(Method::POST, &format!("/api/admin/codes/{redeemed_id}/void"), Some(&admin), json!({})).await;
+    assert_eq!(status, StatusCode::CONFLICT, "a redeemed code is clawed back through its bucket instead: {body}");
+
+    let bucket_id = redeemed["code"]["bucket_id"].as_i64().unwrap();
+    let (status, _) = h.call(Method::POST, &format!("/api/admin/buckets/{bucket_id}/void"), Some(&admin), json!({ "note": "淘宝退款" })).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(h.mock.quota_of(user_id), TRIAL, "the refunded quota leaves the wallet");
+
+    let (_, batches) = h.call(Method::GET, "/api/admin/batches", Some(&admin), Value::Null).await;
+    let batch_id = batches["items"][0]["id"].as_i64().unwrap();
+    let counts = |b: &Value| (b["unused"].as_i64().unwrap(), b["redeemed"].as_i64().unwrap(), b["void"].as_i64().unwrap());
+    assert_eq!(counts(&batches["items"][0]), (2, 1, 1));
+    let (status, body) = h.call(Method::POST, &format!("/api/admin/batches/{batch_id}/void"), Some(&admin), json!({})).await;
+    assert_eq!((status, body["voided"].as_i64()), (StatusCode::OK, Some(2)));
+    let (_, batches) = h.call(Method::GET, "/api/admin/batches", Some(&admin), Value::Null).await;
+    assert_eq!(counts(&batches["items"][0]), (0, 1, 3), "voiding a batch leaves redeemed codes alone");
+
+    let (_, audit) = h.call(Method::GET, "/api/admin/audit", Some(&admin), Value::Null).await;
+    let actions: Vec<&str> = audit["items"].as_array().unwrap().iter().map(|r| r["action"].as_str().unwrap()).collect();
+    for expected in ["batch.create", "batch.void", "code.void", "bucket.void"] {
+        assert!(actions.contains(&expected), "{expected} missing from {actions:?}");
+    }
+
+    let (status, _) = h.call(Method::POST, "/api/admin/codes/lookup", Some(&admin), json!({ "code": "ABCD-EFGH-JKLM-NPQR" })).await;
+    assert!(status.is_client_error(), "a code with a bad check character is refused");
+    let (status, _) = h.call(Method::POST, "/api/admin/codes/lookup", Some(&admin), json!({ "code": crate::codes::generate() })).await;
+    assert_eq!(status, StatusCode::NOT_FOUND, "a well-formed code that we never issued is reported as unknown");
+    let user_token = h.token(uid, CLIENT);
+    let (status, _) = h.call(Method::POST, "/api/admin/codes/lookup", Some(&user_token), json!({ "code": codes[0] })).await;
+    assert_eq!(status, StatusCode::UNAUTHORIZED, "end users cannot look codes up");
+    h.cleanup().await;
+}
+
+#[tokio::test]
+async fn users_never_see_admin_notes_or_operator_names() {
+    let h = harness!();
+    h.seed_wallpaper().await;
+    let uid = Uuid::new_v4();
+    h.chat(uid, "standard").await;
+    let binding_id = h.only_binding().await;
+    let admin = h.admin_token().await;
+    h.call(Method::POST, &format!("/api/admin/bindings/{binding_id}/grant"), Some(&admin), json!({ "quota": 300_000, "note": "淘宝订单 7654321" })).await;
+    let codes = h.make_batch("topup", TOPUP, 365, 1).await;
+    h.redeem(uid, CLIENT, &codes[0]).await;
+
+    let token = h.token(uid, CLIENT);
+    let (_, balance) = h.call(Method::GET, "/api/ai/balance", Some(&token), Value::Null).await;
+    let (_, ledger) = h.call(Method::GET, "/api/ai/ledger", Some(&token), Value::Null).await;
+    for (name, body) in [("balance", &balance), ("ledger", &ledger)] {
+        let text = body.to_string();
+        for secret in ["root", "7654321", "淘宝", "admin:", "code:", "source", "note"] {
+            assert!(!text.contains(secret), "{name} leaks {secret:?}: {text}");
+        }
+    }
+    let titles: Vec<&str> = ledger["items"].as_array().unwrap().iter().map(|r| r["title"].as_str().unwrap()).collect();
+    assert!(titles.contains(&"新用户试用额度") && titles.contains(&"兑换码入账") && titles.contains(&"额度补发"), "{titles:?}");
+    assert_eq!(balance["buckets"].as_array().unwrap().len(), 3);
     h.cleanup().await;
 }

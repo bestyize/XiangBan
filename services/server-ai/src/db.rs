@@ -91,6 +91,33 @@ CREATE TABLE IF NOT EXISTS sync_anomalies (
 );
 CREATE INDEX IF NOT EXISTS sync_anomalies_open_idx ON sync_anomalies (created_at DESC) WHERE resolved_at IS NULL;
 
+-- 一批兑换码对应淘宝上的一个商品：同产品、同类型、同面额、同有效期。有效期从用户兑换那天算起。
+CREATE TABLE IF NOT EXISTS redeem_batches (
+    id         BIGSERIAL PRIMARY KEY,
+    product_id TEXT NOT NULL REFERENCES products(product_id),
+    kind       TEXT NOT NULL CHECK (kind IN ('topup', 'monthly')),
+    quota      BIGINT NOT NULL CHECK (quota > 0),
+    valid_days INT NOT NULL CHECK (valid_days > 0),
+    note       TEXT NOT NULL DEFAULT '',
+    created_by TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- 只存带密钥的哈希：数据库泄露也看不到可用的码。明文只在生成批次时返回一次。
+CREATE TABLE IF NOT EXISTS redeem_codes (
+    id          BIGSERIAL PRIMARY KEY,
+    batch_id    BIGINT NOT NULL REFERENCES redeem_batches(id),
+    code_hash   BYTEA NOT NULL UNIQUE,
+    status      TEXT NOT NULL DEFAULT 'unused' CHECK (status IN ('unused', 'redeemed', 'void')),
+    redeemed_by UUID,
+    binding_id  BIGINT REFERENCES bindings(id),
+    bucket_id   BIGINT REFERENCES quota_buckets(id),
+    redeemed_at TIMESTAMPTZ,
+    voided_at   TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS redeem_codes_batch_idx ON redeem_codes (batch_id, status);
+CREATE INDEX IF NOT EXISTS redeem_codes_user_idx ON redeem_codes (redeemed_by) WHERE redeemed_by IS NOT NULL;
+
 CREATE TABLE IF NOT EXISTS admins (
     id            UUID PRIMARY KEY,
     username      TEXT NOT NULL UNIQUE,
