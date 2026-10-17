@@ -18,6 +18,7 @@
 | [services/server-xiangban-wallpaper](services/server-xiangban-wallpaper/README.md) | 已实现 | 正式壁纸网站 wallpaper.xiangban.xyz，图片/视频采集与上传、小伴桌面下载、版本与公告；桌面客户端接入此服务 |
 | [services/server-xiaoban-appstore](services/server-xiaoban-appstore/README.md) | 已实现 | 小伴优质应用商店，Rust Axum + PostgreSQL 后端与 Vue 3 + Vite 前端，腾讯柠檬精选美学与管理后台 |
 | [services/server-forum](services/server-forum/README.md) | 一期已实现，已部署 | 超级小伴论坛（chat.xiangban.xyz）：技术交流、资源分享、福利羊毛与闲聊的社区，Rust Axum + PostgreSQL + Vue 3，登录走统一账号中心，带管理后台和 SEO 页面 |
+| [services/server-ai](services/server-ai/README.md) | 一期已实现，未部署 | AI 网关与额度系统：账号中心验签，经 New API 调用上游模型；按「账号 × 产品」隔离的试用、月卡与加油包额度，档位对用户隐藏真实模型；Rust Axum + PostgreSQL + Vue 3 管理后台。设计见 [docs/architecture/ai-gateway.md](docs/architecture/ai-gateway.md) |
 | [services/server-account](services/server-account/README.md) | 已实现 | 统一账号中心与管理后台，邮箱/手机号验证码注册登录，Rust Axum + PostgreSQL + Vue 3，签发 EdDSA JWT；壁纸网站与相伴网页（xiaban.xyz，经主后端换票）已接入 |
 | [libs/agent-kernel](libs/agent-kernel/README.md) | 里程碑 3 已实现，已接入小伴桌面 | 跨产品复用的轻量 agent harness 内核（Rust）：宿主注入模型、工具与存储，支持 OpenAI chat completions、Responses 与 Claude Messages 三种协议（含自定义兼容端点），内置权限、文件、网页、shell、skills、子 agent 与 JSON 行协议，不含任何产品逻辑 |
 | [services/server-asr](services/server-asr/README.md) | 规划 | 语音识别服务 |

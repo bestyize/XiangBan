@@ -1,0 +1,39 @@
+[package]
+name = "server-ai"
+version = "0.1.0"
+edition = "2021"
+description = "相伴 AI 网关与额度系统：按产品隔离的试用与额度桶，经 New API 调用上游模型"
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+axum = "0.8"
+tower = { version = "0.5", features = ["util"] }
+tower-http = { version = "0.6", features = ["cors", "trace", "fs"] }
+tokio = { version = "1.40", features = ["full"] }
+futures-util = "0.3"
+bytes = "1"
+
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+chrono = { version = "0.4", features = ["serde"] }
+uuid = { version = "1.10", features = ["v4", "serde"] }
+dotenvy = "0.15"
+base64 = "0.22"
+
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "stream"] }
+
+sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio", "tls-rustls", "postgres", "chrono", "uuid", "derive"] }
+
+argon2 = "=0.6.0"
+jsonwebtoken = "9.3"
+ring = "0.17"
+
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+thiserror = "2.0"
+
+[profile.release]
+opt-level = 3
+codegen-units = 1
+panic = "abort"
+strip = true
