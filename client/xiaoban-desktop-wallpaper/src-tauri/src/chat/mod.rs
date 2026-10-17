@@ -4,6 +4,7 @@
 //! (`emit_to("control", ..)`): wallpaper pages run content from outside and must not see a chat.
 
 mod broker;
+mod community;
 mod danger;
 mod desktop_tools;
 mod prompt;
@@ -263,14 +264,28 @@ const COMPUTER_USE_SKILL_NAME: &str = "open-computer-use";
 /// Keeps the bundled computer-control skill in the assistant's skill folder while the tools are on, and removes
 /// it when they are off so the prompt does not advertise something that is not there. Only a file that is ours is touched.
 fn sync_computer_use_skill(skills: &Path, enabled: bool) {
-    let dir = skills.join(COMPUTER_USE_SKILL_NAME);
+    sync_bundled_skill(skills, COMPUTER_USE_SKILL_NAME, COMPUTER_USE_SKILL, "iFurySt/open-codex-computer-use", enabled);
+}
+
+/// What the assistant knows about the official website and the forum, shipped with the app so it stays in step with the tools.
+const COMMUNITY_SKILL: &str = include_str!("../../skills/xiaoban-community/SKILL.md");
+const COMMUNITY_SKILL_NAME: &str = "xiaoban-community";
+
+fn sync_community_skill(skills: &Path) {
+    sync_bundled_skill(skills, COMMUNITY_SKILL_NAME, COMMUNITY_SKILL, "小伴桌面内置技能", true);
+}
+
+/// Writes or removes a skill that ships with the app. A file counts as ours when it contains `marker`;
+/// one the user wrote under the same name is never touched.
+fn sync_bundled_skill(skills: &Path, name: &str, text: &str, marker: &str, enabled: bool) {
+    let dir = skills.join(name);
     let file = dir.join("SKILL.md");
-    let ours = fs::read_to_string(&file).map(|text| text.contains("iFurySt/open-codex-computer-use")).unwrap_or(false);
+    let ours = fs::read_to_string(&file).map(|existing| existing.contains(marker)).unwrap_or(false);
     if enabled {
         if !file.exists() || ours {
-            if fs::read_to_string(&file).map(|text| text != COMPUTER_USE_SKILL).unwrap_or(true) {
+            if fs::read_to_string(&file).map(|existing| existing != text).unwrap_or(true) {
                 let _ = fs::create_dir_all(&dir);
-                let _ = fs::write(&file, COMPUTER_USE_SKILL);
+                let _ = fs::write(&file, text);
             }
         }
     } else if ours {
@@ -301,6 +316,7 @@ fn assemble(parts: Parts<'_>) -> Result<Agent, String> {
     }
     clean_spill(&dirs.spill(), SPILL_KEEP);
     sync_computer_use_skill(&dirs.skills(), open_computer_use);
+    sync_community_skill(&dirs.skills());
     let skills = Arc::new(Skills::new().writable_root(dirs.skills()));
     let memory = Arc::new(Memory::new(dirs.memory()));
     // Started before the prompt is written, so the prompt can say honestly whether the tools exist.

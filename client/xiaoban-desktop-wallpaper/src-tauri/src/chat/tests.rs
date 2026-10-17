@@ -118,6 +118,14 @@ impl Desktop for FakeDesktop {
         lock(&self.calls).push("request-permissions".to_string());
         Ok(json!({"ok": true}))
     }
+    fn export_pack(&self, kind: &str, id: &str) -> Result<Option<(String, u64)>, String> {
+        lock(&self.calls).push(format!("export-pack {kind} {id}"));
+        Ok(None)
+    }
+    fn open_url(&self, url: &str) -> Result<(), String> {
+        lock(&self.calls).push(format!("open-url {url}"));
+        Ok(())
+    }
 }
 
 struct Rig {
@@ -248,9 +256,9 @@ fn the_assistant_has_every_tool_it_needs_and_no_others() {
     names.sort();
     let mut expected = vec![
         "time_now", "todo", "ask_user", "read_file", "list_dir", "grep", "write_file", "edit_file", "shell", "web_fetch", "load_skill", "skill_manage",
-        "memory_read", "memory_write", "desktop_status", "wallpaper_list", "wallpaper_apply", "wallpaper_create", "wallpaper_delete", "effect_list", "effect_set", "effect_create", "effect_delete", "companion_set", "care_list",
+        "memory_read", "memory_write", "desktop_status", "wallpaper_list", "wallpaper_apply", "wallpaper_create", "wallpaper_delete", "effect_list", "effect_set", "effect_create", "effect_delete", "effect_read_format", "companion_set", "care_list",
         "care_set", "care_delete", "widget_list", "widget_add", "widget_create", "widget_delete_custom", "widget_update", "widget_remove", "game_list", "game_open", "game_close", "game_create", "game_delete",
-        "request_accessibility_permission",
+        "request_accessibility_permission", "community_share", "community_open",
     ];
     expected.sort();
     assert_eq!(names, expected);
@@ -668,4 +676,29 @@ fn a_computer_use_server_that_cannot_start_is_reported_to_the_model_not_hidden()
     let system = rig.provider.requests()[0].messages[0].text();
     assert!(system.contains("没能启动") && system.contains("不要假装能操作"), "{system}");
     assert!(!system.contains("load_skill 加载 open-computer-use"), "no instructions for tools that are not there");
+}
+
+#[test]
+fn the_community_skill_is_always_listed_loadable_and_never_overwrites_a_users_own() {
+    let dir = TempDir::new("community-skill");
+    let skills_dir = dir.path("skills");
+    let read = || agent_kernel::skills::Skills::new().read_only_root(&skills_dir);
+
+    sync_community_skill(&skills_dir);
+    let info = read().find("xiaoban-community").expect("the skill is found by its name");
+    assert!(!info.agent_created, "the assistant cannot edit or delete it");
+    let body = read().load("xiaoban-community").unwrap();
+    for fact in ["https://wallpaper.xiangban.xyz", "https://chat.xiangban.xyz", "xiaoban-wallpaper", "community_share", "community_open", ".xiaoban"] {
+        assert!(body.contains(fact), "the skill teaches {fact}");
+    }
+
+    let file = skills_dir.join("xiaoban-community/SKILL.md");
+    fs::write(&file, COMMUNITY_SKILL.replace("随程序更新", "旧版：随程序更新")).unwrap();
+    sync_community_skill(&skills_dir);
+    assert_eq!(fs::read_to_string(&file).unwrap(), COMMUNITY_SKILL, "an older copy of ours is brought up to date");
+
+    let theirs = "---\nname: xiaoban-community\ndescription: 我自己写的\n---\n\n自己的做法\n";
+    fs::write(&file, theirs).unwrap();
+    sync_community_skill(&skills_dir);
+    assert_eq!(fs::read_to_string(&file).unwrap(), theirs);
 }
