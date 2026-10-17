@@ -53,7 +53,7 @@ pub trait Desktop: Send + Sync {
     /// Deletes a user game, closing the game space first when it is open.
     fn delete_game(&self, id: &str) -> Result<(), String>;
     fn request_permissions(&self) -> Result<Value, String>;
-    /// Saves one of the user's own works as a `.xiaoban` pack through the save dialog. `None` when they cancel; otherwise the file path and its size.
+    /// Saves one of the user's own works as a `.zip` resource pack through the save dialog. `None` when they cancel; otherwise the file path and its size.
     fn export_pack(&self, kind: &str, id: &str) -> Result<Option<(String, u64)>, String>;
     /// Opens an https address in the system browser.
     fn open_url(&self, url: &str) -> Result<(), String>;
@@ -1077,7 +1077,7 @@ pub fn tools(desktop: Arc<dyn Desktop>) -> Vec<Arc<dyn Tool>> {
             &desktop,
             ToolSpec::new(
                 "community_share",
-                "把用户自己创作的壁纸、特效、桌面组件或游戏分享到超级小伴论坛：先弹出保存对话框，把作品导出成 .xiaoban 资源包，再在浏览器打开对应板块（壁纸、特效、组件去「小伴壁纸」，游戏去「小伴游戏」）。发帖要用户自己登录论坛完成，本工具只负责导出和打开页面。id 来自 wallpaper_list、effect_list、widget_list、game_list，只能是用户自创的作品，内置的不能导出。用户说“分享到论坛”“发到论坛”“导出给别人用”时使用。",
+                "把用户自己创作的壁纸、特效、桌面组件或游戏分享到超级小伴论坛：先弹出保存对话框，把作品导出成 zip 资源包，再在浏览器打开对应板块（壁纸、特效、组件去「小伴壁纸」，游戏去「小伴游戏」）。发帖要用户自己登录论坛完成，本工具只负责导出和打开页面。id 来自 wallpaper_list、effect_list、widget_list、game_list，只能是用户自创的作品，内置的不能导出。用户说“分享到论坛”“发到论坛”“导出给别人用”时使用。",
                 object(
                     json!({
                         "kind": {"type": "string", "enum": community::KINDS, "description": "作品类型"},
@@ -1686,10 +1686,10 @@ mod tests {
     #[test]
     fn sharing_a_work_exports_it_then_opens_the_matching_forum_board() {
         let fake = Arc::new(Fake::default());
-        *fake.saved.lock().unwrap() = Some(("/Users/a/effect-stars.xiaoban".to_string(), 2048));
+        *fake.saved.lock().unwrap() = Some(("/Users/a/effect-stars.zip".to_string(), 2048));
         let out = call(&fake, "community_share", json!({"kind": "effect", "id": "stars"})).unwrap();
         assert_eq!(fake.calls(), vec!["export-pack effect stars", "open-url https://chat.xiangban.xyz/c/xiaoban-wallpaper"]);
-        assert!(out.contains("/Users/a/effect-stars.xiaoban") && out.contains("小伴壁纸") && out.contains("不能代发"), "{out}");
+        assert!(out.contains("/Users/a/effect-stars.zip") && out.contains("小伴壁纸") && out.contains("不能代发"), "{out}");
         assert!(!out.contains("超过 5 MB"));
 
         call(&fake, "community_share", json!({"kind": "game", "id": "star-catcher"})).unwrap();
@@ -1703,7 +1703,7 @@ mod tests {
         assert!(out.contains("取消"), "{out}");
         assert_eq!(fake.calls(), vec!["export-pack wallpaper local-1"]);
 
-        *fake.saved.lock().unwrap() = Some(("/tmp/a.xiaoban".to_string(), 6 * 1024 * 1024));
+        *fake.saved.lock().unwrap() = Some(("/tmp/a.zip".to_string(), 6 * 1024 * 1024));
         let out = call(&fake, "community_share", json!({"kind": "wallpaper", "id": "local-1", "open_forum": false})).unwrap();
         assert!(out.contains("没有打开论坛") && out.contains("超过 5 MB"), "{out}");
         assert_eq!(fake.calls().len(), 2, "no browser call");

@@ -55,7 +55,7 @@ pub fn share(desktop: &dyn Desktop, args: &Value) -> Result<String, String> {
     } else {
         out.push_str(&format!("没有打开论坛，板块地址是 {url}。"));
     }
-    out.push_str("发帖要用户自己登录论坛来完成，你不能代发。请告诉用户：在论坛点“发帖”，写几句说明，上传预览图，再把刚导出的 .xiaoban 文件作为附件传上去。");
+    out.push_str("发帖要用户自己登录论坛来完成，你不能代发。请告诉用户：在论坛点“发帖”，写几句说明，上传预览图，再把刚导出的 zip 文件作为附件传上去。");
     if bytes > FORUM_ATTACHMENT_BYTES {
         out.push_str("提醒：资源包超过 5 MB，而论坛成员的单个附件上限是 5 MB，可能传不上去。");
     }

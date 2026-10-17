@@ -688,7 +688,7 @@ fn the_community_skill_is_always_listed_loadable_and_never_overwrites_a_users_ow
     let info = read().find("xiaoban-community").expect("the skill is found by its name");
     assert!(!info.agent_created, "the assistant cannot edit or delete it");
     let body = read().load("xiaoban-community").unwrap();
-    for fact in ["https://wallpaper.xiangban.xyz", "https://chat.xiangban.xyz", "xiaoban-wallpaper", "community_share", "community_open", ".xiaoban"] {
+    for fact in ["https://wallpaper.xiangban.xyz", "https://chat.xiangban.xyz", "xiaoban-wallpaper", "community_share", "community_open", "zip 资源包"] {
         assert!(body.contains(fact), "the skill teaches {fact}");
     }
 

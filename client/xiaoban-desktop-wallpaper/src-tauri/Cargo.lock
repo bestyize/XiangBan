@@ -3611,7 +3611,7 @@ dependencies = [
  "bzip2 0.4.4",
  "tar",
  "ureq",
- "zip",
+ "zip 2.4.2",
 ]
 
 [[package]]
@@ -4575,6 +4575,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "typed-path"
+version = "0.12.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8e28f89b80c87b8fb0cf04ab448d5dd0dd0ade2f8891bae878de66a75a28600e"
+
+[[package]]
 name = "typeid"
 version = "1.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5502,6 +5508,7 @@ dependencies = [
  "windows-registry",
  "windows-sys 0.61.2",
  "windows-version",
+ "zip 9.0.4",
 ]
 
 [[package]]
@@ -5728,6 +5735,20 @@ dependencies = [
  "zeroize",
  "zopfli",
  "zstd",
+]
+
+[[package]]
+name = "zip"
+version = "9.0.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a954114b47a54df49f83d2722814e86b23d4bb1b54a1b90fb7d92b41619ddc22"
+dependencies = [
+ "crc32fast",
+ "flate2",
+ "indexmap 2.14.2",
+ "memchr",
+ "nix",
+ "typed-path",
 ]
 
 [[package]]
