@@ -67,7 +67,7 @@ onBeforeUnmount(() => { if (timer) { clearTimeout(timer); commit(); } });
 <template>
   <section class="ui-page effects-page" data-testid="effects-page">
     <header class="page-header">
-      <div><h1>桌面特效</h1><p class="page-subtitle">给桌面加一层飘落的雨雪、花瓣、枫叶或繁星。开启后不受壁纸影响，换壁纸或用系统桌面，它都照常显示。</p></div>
+      <h1>桌面特效</h1>
       <div class="header-actions"><NButton round data-testid="effects-import" @click="importPack"><template #icon><FileUp :size="15" /></template>导入特效</NButton><NButton type="primary" round :disabled="!store.desktop" data-testid="effects-create" @click="store.startCreation('effect')"><template #icon><Sparkles :size="15" /></template>创作特效</NButton></div>
     </header>
     <div class="effects-body">
@@ -109,7 +109,7 @@ onBeforeUnmount(() => { if (timer) { clearTimeout(timer); commit(); } });
 </template>
 <style scoped>
 .effects-page{display:flex;flex-direction:column;flex:1;min-height:0;width:100%}
-.effects-page>.page-header{flex:none;background:var(--ui-app-bg);padding:var(--ui-page-top) var(--ui-page-inset) 16px;border-bottom:1px solid var(--ui-border)}
+.effects-page>.page-header{flex:none;background:var(--ui-app-bg);padding:var(--ui-page-top) var(--ui-page-inset) 16px;margin-bottom:0;border-bottom:1px solid var(--ui-border)}
 .effects-body{flex:1;min-height:0;overflow-y:auto;padding:var(--ui-section-gap) var(--ui-page-inset) 32px;display:grid;gap:var(--ui-section-gap);align-content:start}
 .header-actions{display:flex;gap:10px;flex:none;flex-wrap:wrap;justify-content:flex-end}
 .effect-library-actions{display:flex;align-items:center;gap:12px;flex-wrap:wrap}

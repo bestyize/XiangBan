@@ -24,7 +24,7 @@ async function applyPond() {
 </script>
 <template>
   <section class="ui-page interactive-page" data-testid="interactive-page">
-    <header class="page-header"><div><h1>互动壁纸</h1><p class="page-subtitle">让风景回应你，也给平常的日子一点好意。</p></div><span class="collection-label"><Sparkles :size="14" /> 心愿集 · 壹</span></header>
+    <header class="page-header"><h1>互动壁纸</h1><span class="collection-label"><Sparkles :size="14" /> 心愿集 · 壹</span></header>
     <div class="ritual-intro"><span>一方风景，一点心意</span><p>求一支好签，放一盏心灯。把愿望轻轻交给此刻。</p></div>
     <div class="ritual-grid">
       <article class="ritual-card fortune-card" data-testid="ritual-fortune">

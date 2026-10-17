@@ -67,7 +67,7 @@ onMounted(loadGames);
 
 <template>
   <main class="ui-page games-page" data-testid="games-page">
-    <header class="page-header"><div><h1>游戏空间</h1><p class="page-subtitle">这里有本地游戏，也能让小伴为你创作新的小游戏。</p></div><div class="header-actions"><ResourceShareActions :store="store" kind="game" import-label="导入游戏" :disabled="opening" @imported="loadGames"/><NButton type="primary" round :disabled="!store.desktop" data-testid="games-create" @click="store.startCreation('game')"><template #icon><Sparkles :size="15"/></template>创作游戏</NButton></div></header>
+    <header class="page-header"><h1>游戏空间</h1><div class="header-actions"><ResourceShareActions :store="store" kind="game" import-label="导入游戏" :disabled="opening" @imported="loadGames"/><NButton type="primary" round :disabled="!store.desktop" data-testid="games-create" @click="store.startCreation('game')"><template #icon><Sparkles :size="15"/></template>创作游戏</NButton></div></header>
     <div class="games-body">
     <NAlert v-if="!store.desktop" class="browser-note" type="info" :bordered="false">
       浏览器预览只展示游戏资料；请在小伴桌面应用中进入游戏空间。
@@ -158,9 +158,8 @@ onMounted(loadGames);
 .games-body{flex:1;min-height:0;overflow-y:auto;padding:var(--ui-section-gap) var(--ui-page-inset) 32px;display:flex;flex-direction:column;gap:var(--ui-section-gap)}
 .page-header { display: flex; align-items: center; justify-content: space-between; gap: 24px; margin-bottom: 5px; }
 .header-actions{display:flex;align-items:center;justify-content:flex-end;gap:10px;flex-wrap:wrap}
-.page-header h1 { margin: 7px 0 4px; font-size: 24px; letter-spacing: -.035em; }
 .eyebrow { display: flex; align-items: center; gap: 8px; color: var(--ui-primary-text); font-size: 13px; font-weight: 650; }
-.page-subtitle, .muted { margin: 0; color: var(--ui-text-secondary); font-size:14px;line-height:1.65; }
+.muted { margin: 0; color: var(--ui-text-secondary); font-size:14px;line-height:1.65; }
 .browser-note, .catalog-error { border-radius: 12px; }
 .games-section { display: flex; flex-direction: column; gap: 14px; }
 .section-heading { display: flex; align-items: center; justify-content: space-between; }
