@@ -18,6 +18,12 @@ const MAX_MANIFEST_BYTES: u64 = 64 * 1024;
 const MAX_SERVED_BYTES: u64 = 32 * 1024 * 1024;
 /// Text extensions the Agent may write.
 const WRITE_EXTENSIONS: [&str; 7] = ["html", "js", "css", "json", "svg", "md", "txt"];
+/// Pictures, sound and fonts a pack may carry, only inside `assets/`. All of them are things the pack protocol serves.
+const ASSET_EXTENSIONS: [&str; 9] = ["png", "jpg", "jpeg", "webp", "gif", "mp3", "ogg", "wav", "woff2"];
+pub const ASSET_DIR: &str = "assets/";
+pub const MAX_ASSETS: usize = 60;
+pub const MAX_ASSET_BYTES: usize = 4 * 1024 * 1024;
+pub const MAX_ASSETS_TOTAL: usize = 16 * 1024 * 1024;
 const COVER_EXTENSIONS: [&str; 5] = ["svg", "png", "jpg", "jpeg", "webp"];
 pub const HOST_SCRIPT: &str = include_str!("../../public/game-packs/falling-blocks/desktop-host.js");
 const HOST_TAG: &str = "<script src=\"/__host/desktop-host.js\"></script>";
@@ -400,6 +406,47 @@ pub fn serve(app: &tauri::AppHandle, request: tauri::http::Request<Vec<u8>>) -> 
 
 // ---------------------------------------------------------------- creating and removing
 
+/// True for a path that belongs in `assets/` as a binary file rather than a text file.
+pub fn is_asset_path(path: &str) -> bool {
+    path.starts_with(ASSET_DIR) && extension(path.rsplit('/').next().unwrap_or_default()).is_some_and(|ext| ASSET_EXTENSIONS.contains(&ext.as_str()))
+}
+
+/// The first bytes of a file say what it is; a renamed file of another kind is refused.
+fn matches_extension(ext: &str, bytes: &[u8]) -> bool {
+    let riff = |kind: &[u8; 4]| bytes.len() >= 12 && &bytes[0..4] == b"RIFF" && &bytes[8..12] == kind;
+    match ext {
+        "png" => bytes.starts_with(b"\x89PNG\r\n\x1a\n"),
+        "jpg" | "jpeg" => bytes.starts_with(&[0xFF, 0xD8, 0xFF]),
+        "gif" => bytes.starts_with(b"GIF87a") || bytes.starts_with(b"GIF89a"),
+        "webp" => riff(b"WEBP"),
+        "wav" => riff(b"WAVE"),
+        "ogg" => bytes.starts_with(b"OggS"),
+        "mp3" => bytes.starts_with(b"ID3") || (bytes.len() >= 2 && bytes[0] == 0xFF && bytes[1] & 0xE0 == 0xE0),
+        "woff2" => bytes.starts_with(b"wOF2"),
+        _ => false,
+    }
+}
+
+fn valid_asset(path: &str, bytes: &[u8]) -> Result<(), String> {
+    let segments: Vec<&str> = path.split('/').collect();
+    let plain = segments.len() <= 4
+        && segments.iter().all(|s| !s.is_empty() && !s.starts_with('.') && s.bytes().all(|c| c.is_ascii_alphanumeric() || matches!(c, b'.' | b'_' | b'-')));
+    if !plain || !is_asset_path(path) {
+        return Err(format!(
+            "资源文件「{path}」不合法：要放在 {ASSET_DIR} 下，扩展名是 {}，路径只用字母、数字、. _ -，最多 4 层，不以 . 开头",
+            ASSET_EXTENSIONS.join("、")
+        ));
+    }
+    if bytes.is_empty() || bytes.len() > MAX_ASSET_BYTES {
+        return Err(format!("资源文件「{path}」不能为空，也不能超过 {} MB", MAX_ASSET_BYTES / 1024 / 1024));
+    }
+    let ext = extension(segments[segments.len() - 1]).unwrap_or_default();
+    if !matches_extension(&ext, bytes) {
+        return Err(format!("资源文件「{path}」的内容和扩展名 .{ext} 对不上"));
+    }
+    Ok(())
+}
+
 fn valid_file_path(path: &str) -> Result<(), String> {
     let bad = || format!("文件路径「{path}」不合法：只能用字母、数字、. _ - 组成的分段，用 / 分隔，最多 4 层，不能以 . 开头");
     let segments: Vec<&str> = path.split('/').collect();
@@ -478,7 +525,40 @@ fn swap_in(temporary: &Path, target: &Path, backup: &Path, had_old: bool) -> Res
 /// Writes a new game folder. The files go to a temporary folder first and are renamed into place at the
 /// end; with `overwrite` the old folder is set aside and put back if the swap fails.
 pub fn create_pack(root: &Path, id: &str, name: &str, description: &str, files: &[(String, String)], save: bool, overwrite: bool) -> Result<Value, String> {
+    create_pack_with_assets(root, id, name, description, files, &[], save, overwrite)
+}
+
+/// Like [`create_pack`], plus binary files that go under `assets/` next to the text files.
+pub fn create_pack_with_assets(
+    root: &Path,
+    id: &str,
+    name: &str,
+    description: &str,
+    files: &[(String, String)],
+    assets: &[(String, Vec<u8>)],
+    save: bool,
+    overwrite: bool,
+) -> Result<Value, String> {
     validate_request(id, name, description, files)?;
+    if assets.len() > MAX_ASSETS {
+        return Err(format!("资源文件最多 {MAX_ASSETS} 个"));
+    }
+    let mut names: Vec<String> = files.iter().map(|(path, _)| path.to_ascii_lowercase()).collect();
+    let mut total = 0usize;
+    for (path, bytes) in assets {
+        valid_asset(path, bytes)?;
+        total += bytes.len();
+        if names.contains(&path.to_ascii_lowercase()) {
+            return Err(format!("文件路径「{path}」重复"));
+        }
+        names.push(path.to_ascii_lowercase());
+    }
+    if total > MAX_ASSETS_TOTAL {
+        return Err(format!("资源文件合计超过 {} MB", MAX_ASSETS_TOTAL / 1024 / 1024));
+    }
+    if names.iter().any(|a| names.iter().any(|b| b.starts_with(&format!("{a}/")))) {
+        return Err("文件路径冲突：同一个名字不能既是文件又是文件夹".into());
+    }
     let (name, description) = check_meta(name, description)?;
     let _guard = WRITE_LOCK.lock().unwrap_or_else(|e| e.into_inner());
     let packs = packs_dir(root);
@@ -497,12 +577,13 @@ pub fn create_pack(root: &Path, id: &str, name: &str, description: &str, files: 
     let temporary = packs.join(format!(".tmp-{id}-{}", random_tag()));
     let build = || -> Result<(), String> {
         fs::create_dir_all(&temporary).map_err(|e| format!("无法创建临时文件夹：{e}"))?;
-        for (path, content) in files {
+        let bodies = files.iter().map(|(path, content)| (path, content.as_bytes())).chain(assets.iter().map(|(path, bytes)| (path, bytes.as_slice())));
+        for (path, content) in bodies {
             let destination = temporary.join(path);
             if let Some(parent) = destination.parent() {
                 fs::create_dir_all(parent).map_err(|e| format!("无法创建文件夹：{e}"))?;
             }
-            fs::write(&destination, content.as_bytes()).map_err(|e| format!("无法写入 {path}：{e}"))?;
+            fs::write(&destination, content).map_err(|e| format!("无法写入 {path}：{e}"))?;
         }
         let mut manifest = json!({
             "id": id, "name": name, "description": description, "entry": "index.html",
@@ -524,7 +605,7 @@ pub fn create_pack(root: &Path, id: &str, name: &str, description: &str, files: 
         let _ = fs::remove_dir_all(&temporary);
         return Err(error);
     }
-    Ok(json!({"id": id, "name": name, "directory": target, "files": files.len() + 1, "save": save, "replaced": exists}))
+    Ok(json!({"id": id, "name": name, "directory": target, "files": files.len() + assets.len() + 1, "save": save, "replaced": exists}))
 }
 
 /// Deletes a user game folder and its save file (so a game created later under the same id starts fresh).

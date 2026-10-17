@@ -13,14 +13,16 @@ use tauri_plugin_dialog::DialogExt;
 use zip::{write::SimpleFileOptions, CompressionMethod, ZipArchive, ZipWriter};
 
 const MAX_PACK: u64 = 32 * 1024 * 1024;
-/// Games hold at most 40 files plus the manifest.
-const MAX_ENTRIES: usize = 100;
+/// A game holds at most 40 text files and 60 assets, plus the manifest.
+const MAX_ENTRIES: usize = 110;
 /// The largest single file a pack may hold is a wallpaper page.
 const MAX_ENTRY: u64 = 4 * 1024 * 1024;
 
 pub struct Pack {
     kind: String,
     data: Value,
+    /// Binary files under `assets/`; only games carry them for now.
+    assets: Vec<(String, Vec<u8>)>,
 }
 
 fn text<'a>(value: &'a Value, key: &str) -> Result<&'a str, String> {
@@ -43,7 +45,14 @@ fn read_text(path: &Path, limit: u64) -> Result<String, String> {
     String::from_utf8(read_bytes(path, limit)?).map_err(|_| "资源必须使用 UTF-8 文本".to_string())
 }
 
-fn collect_game_files(directory: &Path, prefix: &str, files: &mut Vec<(String, String)>, total: &mut usize) -> Result<(), String> {
+struct GameFiles {
+    text: Vec<(String, String)>,
+    text_total: usize,
+    assets: Vec<(String, Vec<u8>)>,
+    assets_total: usize,
+}
+
+fn collect_game_files(directory: &Path, prefix: &str, found: &mut GameFiles) -> Result<(), String> {
     if !fs::symlink_metadata(directory).map_err(|e| e.to_string())?.is_dir() {
         return Err("游戏文件夹不能是链接".into());
     }
@@ -55,20 +64,29 @@ fn collect_game_files(directory: &Path, prefix: &str, files: &mut Vec<(String, S
         let metadata = fs::symlink_metadata(entry.path()).map_err(|e| e.to_string())?;
         if metadata.is_dir() {
             if relative.split('/').count() >= 4 { return Err("游戏目录层数过多".into()); }
-            collect_game_files(&entry.path(), &format!("{relative}/"), files, total)?;
+            collect_game_files(&entry.path(), &format!("{relative}/"), found)?;
+        } else if game_packs::is_asset_path(&relative) {
+            if found.assets.len() >= game_packs::MAX_ASSETS { return Err("游戏资源文件数量过多".into()); }
+            let bytes = read_bytes(&entry.path(), game_packs::MAX_ASSET_BYTES as u64)?;
+            found.assets_total += bytes.len();
+            if found.assets_total > game_packs::MAX_ASSETS_TOTAL { return Err("游戏资源文件合计超过 16 MB".into()); }
+            found.assets.push((relative, bytes));
         } else {
-            if files.len() >= game_packs::MAX_FILES { return Err("游戏文件数量过多".into()); }
-            let content = read_text(&entry.path(), game_packs::MAX_FILE_BYTES as u64)?;
-            *total += content.len();
-            if *total > game_packs::MAX_TOTAL_BYTES { return Err("游戏文件合计超过 4 MB".into()); }
-            files.push((relative, content));
+            if found.text.len() >= game_packs::MAX_FILES { return Err("游戏文件数量过多".into()); }
+            let content = read_text(&entry.path(), game_packs::MAX_FILE_BYTES as u64)
+                .map_err(|e| format!("「{relative}」无法导出：{e}。图片、音频和字体要放在 assets/ 下"))?;
+            found.text_total += content.len();
+            if found.text_total > game_packs::MAX_TOTAL_BYTES { return Err("游戏文本文件合计超过 4 MB".into()); }
+            found.text.push((relative, content));
         }
     }
-    files.sort_by(|a, b| a.0.cmp(&b.0));
+    found.text.sort_by(|a, b| a.0.cmp(&b.0));
+    found.assets.sort_by(|a, b| a.0.cmp(&b.0));
     Ok(())
 }
 
 pub fn export(root: &Path, kind: &str, id: &str) -> Result<Pack, String> {
+    let mut assets = Vec::new();
     let data = match kind {
         "wallpaper" => {
             let item = local_media::read(&root.join("wallpapers"))?.items.into_iter()
@@ -92,24 +110,26 @@ pub fn export(root: &Path, kind: &str, id: &str) -> Result<Pack, String> {
         }
         "game" => {
             let manifest = game_packs::find_user_game(root, id)?;
-            let mut files = Vec::new();
-            let mut total = 0;
-            collect_game_files(&game_packs::packs_dir(root).join(id), "", &mut files, &mut total)?;
+            let mut found = GameFiles { text: Vec::new(), text_total: 0, assets: Vec::new(), assets_total: 0 };
+            collect_game_files(&game_packs::packs_dir(root).join(id), "", &mut found)?;
             let name = text(&manifest, "name")?;
             let description = manifest["description"].as_str().unwrap_or("");
-            game_packs::validate_request(id, name, description, &files)?;
-            json!({"id":id,"name":name,"description":description,"files":files,"save":manifest["save"].as_bool().unwrap_or(false)})
+            game_packs::validate_request(id, name, description, &found.text)?;
+            assets = found.assets;
+            json!({"id":id,"name":name,"description":description,"files":found.text,"save":manifest["save"].as_bool().unwrap_or(false)})
         }
         _ => return Err("不支持的资源类型".into()),
     };
-    Ok(Pack { kind: kind.into(), data })
+    Ok(Pack { kind: kind.into(), data, assets })
 }
 
 /// The manifest and the files a pack is written as. Wallpapers and widgets keep their page in `index.html`,
 /// an effect is its own `effect.json`, and a game keeps its folder as it is.
 fn zip_entries(pack: &Pack) -> Result<(Value, Vec<(String, Vec<u8>)>), String> {
     let data = &pack.data;
-    let mut manifest = json!({"schemaVersion": 1, "kind": pack.kind});
+    // Text-only packs stay at version 1 so older apps still open them; pictures and sound need version 2.
+    let version = if pack.assets.is_empty() { 1 } else { 2 };
+    let mut manifest = json!({"schemaVersion": version, "kind": pack.kind});
     let mut files: Vec<(String, Vec<u8>)> = Vec::new();
     match pack.kind.as_str() {
         "wallpaper" => {
@@ -129,10 +149,16 @@ fn zip_entries(pack: &Pack) -> Result<(Value, Vec<(String, Vec<u8>)>), String> {
             manifest["save"] = json!(data["save"].as_bool().unwrap_or(false));
             let list: Vec<(String, String)> = serde_json::from_value(data["files"].clone()).map_err(|_| "游戏文件清单不合法")?;
             files.extend(list.into_iter().map(|(path, content)| (path, content.into_bytes())));
+            files.extend(pack.assets.iter().cloned());
         }
         _ => return Err("不支持的资源类型".into()),
     }
+    if !pack.assets.is_empty() && pack.kind != "game" { return Err("只有游戏包可以带资源文件".into()); }
     Ok((manifest, files))
+}
+
+fn kind_label(kind: &str) -> &'static str {
+    match kind { "wallpaper" => "壁纸", "effect" => "特效", "widget" => "组件", _ => "游戏" }
 }
 
 fn to_zip(pack: &Pack) -> Result<Vec<u8>, String> {
@@ -192,8 +218,27 @@ fn from_zip(bytes: &[u8]) -> Result<Pack, String> {
     let page = || -> Result<String, String> { utf8("index.html", file("index.html").ok_or("压缩包里缺少 index.html")?) };
     let manifest: Value = serde_json::from_slice(file("manifest.json").ok_or("压缩包里缺少 manifest.json，它要放在最外层")?)
         .map_err(|_| "manifest.json 不是有效的 JSON".to_string())?;
-    if manifest.get("schemaVersion").and_then(Value::as_u64) != Some(1) { return Err("资源包版本暂不支持，请更新小伴桌面".into()); }
+    let version = manifest.get("schemaVersion").and_then(Value::as_u64);
+    if !matches!(version, Some(1 | 2)) { return Err("资源包版本暂不支持，请更新小伴桌面".into()); }
     let kind = text(&manifest, "kind")?.to_string();
+    // Only the listed files are read. Anything else would be dropped without a word, so it is refused instead.
+    let allowed: &[&str] = match kind.as_str() {
+        "wallpaper" | "widget" => &["manifest.json", "index.html"],
+        "effect" => &["manifest.json", "effect.json"],
+        _ => &[],
+    };
+    if !allowed.is_empty() {
+        let extra: Vec<&str> = entries.iter().map(|(name, _)| name.as_str()).filter(|name| !allowed.contains(name)).collect();
+        if !extra.is_empty() {
+            let hint = if extra.iter().any(|name| name.starts_with(game_packs::ASSET_DIR)) {
+                "这个类型还不支持 assets/ 资源文件，图片请用 data: 地址写进页面里"
+            } else {
+                "这个类型只读取上面这些文件，多余的文件请删掉"
+            };
+            return Err(format!("{}包里只能有 {}，多出了：{}。{hint}", kind_label(&kind), allowed.join("、"), extra.join("、")));
+        }
+    }
+    let mut assets: Vec<(String, Vec<u8>)> = Vec::new();
     let data = match kind.as_str() {
         "wallpaper" => json!({"title": text(&manifest, "title")?, "description": manifest["description"].as_str().unwrap_or(""), "html": page()?}),
         "effect" => serde_json::from_slice(file("effect.json").ok_or("压缩包里缺少 effect.json")?).map_err(|_| "effect.json 不是有效的 JSON".to_string())?,
@@ -205,18 +250,22 @@ fn from_zip(bytes: &[u8]) -> Result<Pack, String> {
         }
         "game" => {
             let mut files = Vec::new();
-            for (name, content) in entries.iter().filter(|(name, _)| name != "manifest.json") { files.push((name.clone(), utf8(name, content)?)); }
+            for (name, content) in entries.iter().filter(|(name, _)| name != "manifest.json") {
+                if game_packs::is_asset_path(name) { assets.push((name.clone(), content.clone())); } else { files.push((name.clone(), utf8(name, content)?)); }
+            }
             files.sort();
+            assets.sort();
+            if !assets.is_empty() && version == Some(1) { return Err("带 assets/ 资源文件的包要把 manifest.json 的 schemaVersion 写成 2".into()); }
             json!({"id": text(&manifest, "id")?, "name": text(&manifest, "name")?, "description": text(&manifest, "description")?, "files": files, "save": manifest["save"].as_bool().unwrap_or(false)})
         }
         _ => return Err("不支持的资源类型".into()),
     };
-    Ok(Pack { kind, data })
+    Ok(Pack { kind, data, assets })
 }
 
-pub fn import(root: &Path, content: &[u8], expected_kind: &str) -> Result<Value, String> {
+/// Imports a pack into the place its `kind` belongs to, whichever page the file was picked on.
+pub fn import(root: &Path, content: &[u8]) -> Result<Value, String> {
     let pack = from_zip(content)?;
-    if pack.kind != expected_kind { return Err("资源类型不匹配，请到对应的壁纸、特效、组件或游戏页导入".into()); }
     let data = &pack.data;
     let (id, name) = match pack.kind.as_str() {
         "wallpaper" => {
@@ -238,7 +287,7 @@ pub fn import(root: &Path, content: &[u8], expected_kind: &str) -> Result<Value,
             let files: Vec<(String, String)> = serde_json::from_value(data["files"].clone()).map_err(|_| "游戏文件清单不合法")?;
             let id = text(data, "id")?;
             let name = text(data, "name")?;
-            game_packs::create_pack(root, id, name, text(data, "description")?, &files, data["save"].as_bool().unwrap_or(false), false)?;
+            game_packs::create_pack_with_assets(root, id, name, text(data, "description")?, &files, &pack.assets, data["save"].as_bool().unwrap_or(false), false)?;
             (id.to_string(), name.to_string())
         }
         _ => return Err("不支持的资源类型".into()),
@@ -267,7 +316,7 @@ pub async fn export_resource_pack(window: tauri::WebviewWindow, kind: String, id
 }
 
 #[tauri::command]
-pub async fn import_resource_pack(window: tauri::WebviewWindow, kind: String) -> Result<Option<Value>, String> {
+pub async fn import_resource_pack(window: tauri::WebviewWindow) -> Result<Option<Value>, String> {
     if window.label() != "control" { return Err("只能从控制台导入资源".into()); }
     let app = window.app_handle().clone();
     tauri::async_runtime::spawn_blocking(move || {
@@ -278,7 +327,7 @@ pub async fn import_resource_pack(window: tauri::WebviewWindow, kind: String) ->
         // Wallpaper creation and downloads share the same catalog lock.
         let state = app.state::<crate::content::ContentState>();
         let _guard = state.io.lock().unwrap();
-        import(&root, &content, &kind).map(Some)
+        import(&root, &content).map(Some)
     }).await.map_err(|e| e.to_string())?
 }
 
@@ -308,14 +357,13 @@ mod tests {
         let pack = export(&root.join("a"), "wallpaper", &original.id).unwrap();
         let content = to_zip(&pack).unwrap();
         assert!(content.starts_with(b"PK"), "the pack is an ordinary zip");
-        let imported = import(&root.join("b"), &content, "wallpaper").unwrap();
+        let imported = import(&root.join("b"), &content).unwrap();
         assert_eq!(imported["id"], original.id);
+        assert_eq!(imported["kind"], "wallpaper");
         let items = local_media::read(&root.join("b/wallpapers")).unwrap().items;
         assert_eq!(items[0].kind, "web");
         assert_eq!(items[0].resource.sha256, original.resource.sha256);
         assert!(!root.join("b/wallpapers/active.json").exists());
-        assert!(import(&root.join("c"), &content, "effect").is_err());
-        assert!(!root.join("c").exists());
         fs::remove_dir_all(root).unwrap();
     }
 
@@ -326,7 +374,7 @@ mod tests {
         let game = json!({"id": "star-catcher", "name": "接星星", "description": "接住星星", "save": true,
             "files": [["game.js", "var a = 1;"], ["index.html", "<script src=\"game.js\"></script>"], ["sub/style.css", "body{}"]]});
         for (kind, data) in [("widget", widget), ("effect", effect), ("game", game)] {
-            let pack = Pack { kind: kind.into(), data: data.clone() };
+            let pack = Pack { kind: kind.into(), data: data.clone(), assets: Vec::new() };
             let back = from_zip(&to_zip(&pack).unwrap()).unwrap();
             assert_eq!(back.kind, kind);
             assert_eq!(back.data, data, "{kind}");
@@ -344,22 +392,134 @@ mod tests {
             ("tiny-clock/.DS_Store", "junk"),
             ("tiny-clock/._manifest.json", "junk"),
         ]);
-        let done = import(&root, &widget, "widget").unwrap();
+        let done = import(&root, &widget).unwrap();
         assert_eq!(done["id"], "tiny-clock");
         assert!(custom_widgets::find(&root.join("custom_widgets"), "tiny-clock").is_some());
 
         let effect = make_zip(&[("manifest.json", r#"{"schemaVersion":1,"kind":"effect"}"#), ("effect.json", effect_packs::EXAMPLE)]);
-        assert!(import(&root, &effect, "effect").is_ok());
+        assert!(import(&root, &effect).is_ok());
 
         let game = make_zip(&[
             ("manifest.json", r#"{"schemaVersion":1,"kind":"game","id":"star-catcher","name":"接星星","description":"接住星星"}"#),
             ("index.html", "<script src=\"game.js\"></script>"),
             ("game.js", "var a = 1;"),
         ]);
-        assert_eq!(import(&root, &game, "game").unwrap()["id"], "star-catcher");
+        assert_eq!(import(&root, &game).unwrap()["id"], "star-catcher");
 
         let wallpaper = make_zip(&[("manifest.json", r#"{"schemaVersion":1,"kind":"wallpaper","title":"手作"}"#), ("index.html", "<html><body>hi</body></html>")]);
-        assert_eq!(import(&root, &wallpaper, "wallpaper").unwrap()["name"], "手作");
+        assert_eq!(import(&root, &wallpaper).unwrap()["name"], "手作");
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    // 1x1 pixel images and short headers: enough bytes to pass the type check.
+    const PNG: &[u8] = b"\x89PNG\r\n\x1a\n\0\0\0\rIHDR";
+    const JPG: &[u8] = &[0xFF, 0xD8, 0xFF, 0xE0, 0, 0x10];
+    const OGG: &[u8] = b"OggS\0\x02";
+
+    fn make_zip_bytes(files: &[(&str, &[u8])]) -> Vec<u8> {
+        let mut writer = ZipWriter::new(Cursor::new(Vec::new()));
+        for (name, content) in files {
+            writer.start_file(*name, SimpleFileOptions::default()).unwrap();
+            writer.write_all(content).unwrap();
+        }
+        writer.finish().unwrap().into_inner()
+    }
+
+    fn game_manifest(version: u32) -> String {
+        format!(r#"{{"schemaVersion":{version},"kind":"game","id":"pic-game","name":"图片游戏","description":"带图片和音效"}}"#)
+    }
+
+    #[test]
+    fn games_carry_pictures_and_sound_and_the_files_come_back_byte_for_byte() {
+        let root = temp_root("assets");
+        let zip = make_zip_bytes(&[
+            ("manifest.json", game_manifest(2).as_bytes()),
+            ("index.html", b"<img src=\"assets/hero.png\">"),
+            ("assets/hero.png", PNG),
+            ("assets/sfx/jump.ogg", OGG),
+        ]);
+        let done = import(&root, &zip).unwrap();
+        assert_eq!((done["kind"].as_str(), done["id"].as_str()), (Some("game"), Some("pic-game")));
+        let folder = game_packs::packs_dir(&root).join("pic-game");
+        assert_eq!(fs::read(folder.join("assets/hero.png")).unwrap(), PNG);
+        assert_eq!(fs::read(folder.join("assets/sfx/jump.ogg")).unwrap(), OGG);
+        // The pack protocol hands the pictures out with the right type.
+        let served = game_packs::serve_from(&root, "/pic-game/assets/hero.png", None);
+        assert_eq!((served.status, served.mime, served.body.as_slice()), (200, "image/png", PNG));
+
+        // Exporting that game again keeps the files, and the pack asks for version 2.
+        let exported = export(&root, "game", "pic-game").unwrap();
+        assert_eq!(exported.assets.len(), 2);
+        let again = to_zip(&exported).unwrap();
+        let mut archive = ZipArchive::new(Cursor::new(again.clone())).unwrap();
+        let mut manifest = String::new();
+        archive.by_name("manifest.json").unwrap().read_to_string(&mut manifest).unwrap();
+        assert!(manifest.contains("\"schemaVersion\": 2"), "{manifest}");
+        let other = temp_root("assets-again");
+        import(&other, &again).unwrap();
+        assert_eq!(fs::read(game_packs::packs_dir(&other).join("pic-game/assets/hero.png")).unwrap(), PNG);
+        fs::remove_dir_all(root).unwrap();
+        fs::remove_dir_all(other).unwrap();
+    }
+
+    #[test]
+    fn a_text_only_pack_stays_at_version_one_so_older_apps_still_open_it() {
+        let pack = Pack { kind: "game".into(), data: json!({"id": "plain-game", "name": "纯文本", "description": "没有资源", "files": [["index.html", "x"]], "save": false}), assets: Vec::new() };
+        let mut archive = ZipArchive::new(Cursor::new(to_zip(&pack).unwrap())).unwrap();
+        let mut manifest = String::new();
+        archive.by_name("manifest.json").unwrap().read_to_string(&mut manifest).unwrap();
+        assert!(manifest.contains("\"schemaVersion\": 1"), "{manifest}");
+    }
+
+    #[test]
+    fn assets_are_checked_before_anything_is_written() {
+        let root = temp_root("bad-assets");
+        let big = vec![0x89u8; game_packs::MAX_ASSET_BYTES + 1];
+        let cases: Vec<(&str, Vec<u8>)> = vec![
+            ("pictures need version 2", make_zip_bytes(&[("manifest.json", game_manifest(1).as_bytes()), ("index.html", b"x"), ("assets/a.png", PNG)])),
+            ("a jpg that is really a png", make_zip_bytes(&[("manifest.json", game_manifest(2).as_bytes()), ("index.html", b"x"), ("assets/a.jpg", PNG)])),
+            ("a binary outside assets/", make_zip_bytes(&[("manifest.json", game_manifest(2).as_bytes()), ("index.html", b"x"), ("a.png", PNG)])),
+            ("an unsupported type", make_zip_bytes(&[("manifest.json", game_manifest(2).as_bytes()), ("index.html", b"x"), ("assets/a.exe", b"MZ")])),
+            ("an empty file", make_zip_bytes(&[("manifest.json", game_manifest(2).as_bytes()), ("index.html", b"x"), ("assets/a.png", b"")])),
+            ("a file over the size limit", make_zip_bytes(&[("manifest.json", game_manifest(2).as_bytes()), ("index.html", b"x"), ("assets/a.png", &[PNG, &big].concat())])),
+            ("a hidden file", make_zip_bytes(&[("manifest.json", game_manifest(2).as_bytes()), ("index.html", b"x"), ("assets/.a.png", PNG)])),
+            ("the same name twice", make_zip_bytes(&[("manifest.json", game_manifest(2).as_bytes()), ("index.html", b"x"), ("assets/a.png", PNG), ("assets/A.png", PNG)])),
+            ("text that is not utf-8", make_zip_bytes(&[("manifest.json", game_manifest(2).as_bytes()), ("index.html", b"x"), ("game.js", &[0xFF, 0xFE, 0x00])])),
+        ];
+        for (what, zip) in cases {
+            assert!(import(&root, &zip).is_err(), "{what} should be refused");
+        }
+        assert!(!root.exists(), "nothing is written for a refused pack");
+        fs::remove_dir_all(&root).ok();
+    }
+
+    #[test]
+    fn kinds_that_cannot_carry_files_say_so_instead_of_dropping_them() {
+        let root = temp_root("extra-files");
+        let widget = r#"{"schemaVersion":1,"kind":"widget","id":"tiny-clock","name":"小时钟"}"#;
+        let with_picture = make_zip_bytes(&[("manifest.json", widget.as_bytes()), ("index.html", b"<p>x</p>"), ("assets/a.png", PNG)]);
+        let error = import(&root, &with_picture).unwrap_err();
+        assert!(error.contains("assets/") && error.contains("data:"), "{error}");
+        let with_style = make_zip_bytes(&[("manifest.json", widget.as_bytes()), ("index.html", b"<p>x</p>"), ("style.css", b"p{}")]);
+        assert!(import(&root, &with_style).unwrap_err().contains("style.css"));
+        let effect = make_zip_bytes(&[("manifest.json", br#"{"schemaVersion":1,"kind":"effect"}"#), ("effect.json", effect_packs::EXAMPLE.as_bytes()), ("note.md", b"hi")]);
+        assert!(import(&root, &effect).unwrap_err().contains("note.md"));
+        assert!(!root.exists());
+        fs::remove_dir_all(&root).ok();
+        // The page itself still imports, and a picture can ride inside it as a data: address.
+        let inline = make_zip_bytes(&[("manifest.json", widget.as_bytes()), ("index.html", b"<img src=\"data:image/png;base64,AAAA\">")]);
+        let other = temp_root("extra-files-ok");
+        assert!(import(&other, &inline).is_ok());
+        fs::remove_dir_all(other).unwrap();
+    }
+
+    #[test]
+    fn a_pack_imports_from_any_page_because_the_manifest_names_its_kind() {
+        let root = temp_root("any-page");
+        let effect = make_zip(&[("manifest.json", r#"{"schemaVersion":1,"kind":"effect"}"#), ("effect.json", effect_packs::EXAMPLE)]);
+        assert_eq!(import(&root, &effect).unwrap()["kind"], "effect");
+        let wallpaper = make_zip(&[("manifest.json", r#"{"schemaVersion":1,"kind":"wallpaper","title":"手作"}"#), ("index.html", "<html><body>hi</body></html>")]);
+        assert_eq!(import(&root, &wallpaper).unwrap()["kind"], "wallpaper");
         fs::remove_dir_all(root).unwrap();
     }
 
@@ -372,21 +532,21 @@ mod tests {
         symlink.write_all(manifest("game", 1).as_bytes()).unwrap();
         symlink.add_symlink("index.html", "/etc/passwd", SimpleFileOptions::default()).unwrap();
         let symlink = symlink.finish().unwrap().into_inner();
-        let cases: Vec<(&str, Vec<u8>)> = vec![
-            ("game", make_zip(&[("manifest.json", &manifest("game", 2)), ("index.html", "x")])),
-            ("unknown", make_zip(&[("manifest.json", &manifest("unknown", 1))])),
-            ("game", make_zip(&[("manifest.json", &manifest("game", 1)), ("../escape.html", "bad"), ("index.html", "ok")])),
-            ("game", make_zip(&[("manifest.json", &manifest("game", 1)), ("/abs.html", "bad"), ("index.html", "ok")])),
-            ("game", make_zip(&[("manifest.json", &manifest("game", 1)), ("a\\b.html", "bad"), ("index.html", "ok")])),
-            ("game", make_zip(&[("manifest.json", &manifest("game", 1)), ("Index.html", "dup"), ("index.html", "ok")])),
-            ("game", make_zip(&[("index.html", "no manifest")])),
-            ("widget", make_zip(&[("manifest.json", &manifest("widget", 1))])),
-            ("game", symlink),
-            ("game", b"{\"schemaVersion\":1}".to_vec()),
-            ("game", make_zip(&[("manifest.json", &manifest("game", 1)), ("index.html", "x"), ("big.js", &"a".repeat(MAX_ENTRY as usize + 1))])),
+        let cases: Vec<Vec<u8>> = vec![
+            make_zip(&[("manifest.json", &manifest("game", 3)), ("index.html", "x")]),
+            make_zip(&[("manifest.json", &manifest("unknown", 1))]),
+            make_zip(&[("manifest.json", &manifest("game", 1)), ("../escape.html", "bad"), ("index.html", "ok")]),
+            make_zip(&[("manifest.json", &manifest("game", 1)), ("/abs.html", "bad"), ("index.html", "ok")]),
+            make_zip(&[("manifest.json", &manifest("game", 1)), ("a\\b.html", "bad"), ("index.html", "ok")]),
+            make_zip(&[("manifest.json", &manifest("game", 1)), ("Index.html", "dup"), ("index.html", "ok")]),
+            make_zip(&[("index.html", "no manifest")]),
+            make_zip(&[("manifest.json", &manifest("widget", 1))]),
+            symlink,
+            b"{\"schemaVersion\":1}".to_vec(),
+            make_zip(&[("manifest.json", &manifest("game", 1)), ("index.html", "x"), ("big.js", &"a".repeat(MAX_ENTRY as usize + 1))]),
         ];
-        for (kind, content) in cases {
-            assert!(import(&root, &content, kind).is_err());
+        for content in cases {
+            assert!(import(&root, &content).is_err());
         }
         assert!(!root.exists(), "nothing is written for a refused pack");
     }

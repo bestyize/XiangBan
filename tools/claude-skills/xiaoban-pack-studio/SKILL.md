@@ -14,7 +14,7 @@ description: 为小伴桌面创作可导入的资源包 zip：动态壁纸、桌
 | 动态壁纸 | `wallpaper` | 一个自包含的 `index.html`（CSS 动画、canvas、WebGL） |
 | 桌面特效 | `effect` | 一个 `effect.json`，粒子层的纯数据，不含代码 |
 | 桌面组件 | `widget` | 一个自包含的 `index.html`，摆在桌面一角的小卡片 |
-| 小游戏 | `game` | `index.html` 加其他文本文件，全屏离线运行 |
+| 小游戏 | `game` | `index.html` 加其他文本文件，全屏离线运行；图片、音频、字体放 `assets/` |
 
 其他东西做不了：内置组件、小伴外壳、关怀提醒都不属于资源包。
 
@@ -23,7 +23,7 @@ description: 为小伴桌面创作可导入的资源包 zip：动态壁纸、桌
 1. 弄清用户要哪一类、做成什么样。用户没说清楚时，按他描述的效果推荐一类，再继续，不要一次问很多问题。
 2. 读 `references/resource-pack-format.md`：通用 zip 规则、各类型的 manifest 字段、文件和大小限制、运行环境。做特效时再读 `references/effects.md`，并参考 `references/effect-pack-example.json`。
 3. 在工作目录下建一个以作品 `id` 命名的文件夹，写 `manifest.json` 和作品文件。`id` 用小写字母、数字、`-`，不要与引用文档里列出的内置项重名。
-4. 对照引用文档末尾的检查清单自查：字段、字数、大小、UTF-8 文本、没有外部链接和二进制文件。
+4. 对照引用文档末尾的检查清单自查：字段、字数、大小、文本文件是 UTF-8（游戏 `assets/` 下的图片、音频、字体除外）、没有外部链接。
 5. 在文件夹里面打包，让 `manifest.json` 在 zip 最外层：
    - macOS、Linux：`cd <文件夹> && zip -r ../<id>.zip .`
    - 没有 `zip` 命令时：`python3 -m zipfile -c ../<id>.zip manifest.json index.html`，把所有文件逐个列出，路径用 `/`。
@@ -31,7 +31,8 @@ description: 为小伴桌面创作可导入的资源包 zip：动态壁纸、桌
 
 ## 要点
 
-- 组件、壁纸、游戏都不能联网，不能用 `localStorage`、cookie；不要引用外部 CDN、字体、图片，图形用内联 SVG、CSS 或 canvas。
+- 组件、壁纸、游戏都不能联网，不能用 `localStorage`、cookie；不要引用外部 CDN、字体、图片。
+- 只有游戏的包可以带图片、音频、字体，放在 `assets/` 下，`manifest.json` 的 `schemaVersion` 写 `2`。壁纸和组件不能放额外文件，图片要转成 `data:` 地址写进页面（组件只有 128 KB，基本只放得下小图标）；包里有多余文件会被拒绝。
 - 组件里的内联脚本在打包后的应用中可能不执行，详见引用文档的说明。需要交互的组件优先用纯 HTML 和 CSS；确实要脚本，提醒用户导入后先看效果。
 - 游戏用普通 `<script src>`，不要 ES modules；Esc 退出由宿主处理，游戏不要自己处理。
 - 导入失败时应用会给出具体原因。按原因改，不要换一个 `id` 绕过“已存在”之类的提示，除非用户同意。

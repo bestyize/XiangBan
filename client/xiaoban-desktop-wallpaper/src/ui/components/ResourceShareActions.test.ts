@@ -31,8 +31,14 @@ describe('portable resource actions',()=>{
  it('refreshes the resource list after import without applying it',async()=>{
   const result={kind:'wallpaper',id:'imported',name:'星空'};vi.mocked(invoke).mockResolvedValue(result);const {wrapper}=create();
   await wrapper.get('[data-testid="import-resource"]').trigger('click');await flushPromises();
-  expect(invoke).toHaveBeenCalledExactlyOnceWith('import_resource_pack',{kind:'wallpaper'});
+  expect(invoke).toHaveBeenCalledExactlyOnceWith('import_resource_pack');
   expect(wrapper.emitted('imported')).toEqual([[result]]);wrapper.unmount();
+ });
+ it('says where a pack of another kind went and leaves this page alone',async()=>{
+  vi.mocked(invoke).mockResolvedValue({kind:'game',id:'star-catcher',name:'接星星'});const {wrapper,store}=create();
+  await wrapper.get('[data-testid="import-resource"]').trigger('click');await flushPromises();
+  expect(wrapper.emitted('imported')).toBeUndefined();
+  expect(store.notify).toHaveBeenCalledWith('已导入「接星星」，在游戏空间页查看。','success');wrapper.unmount();
  });
  it('reports failed imports without emitting a success',async()=>{
   vi.mocked(invoke).mockRejectedValue('资源包版本暂不支持');const {wrapper,store}=create();

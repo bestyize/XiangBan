@@ -8,6 +8,8 @@ import type { ControlStore } from '../control-types.ts';
 const props = defineProps<{ store: ControlStore; kind: 'wallpaper' | 'effect' | 'widget' | 'game'; id?: string; disabled?: boolean; importLabel?: string; icons?: boolean }>();
 const emit = defineEmits<{ imported: [result: { kind: string; id: string; name: string }] }>();
 const busy = ref(false);
+// Where each kind of pack lands, for the note shown when a pack is picked on another kind's page.
+const PLACES: Record<string, string> = { wallpaper: '壁纸页的“我的壁纸”', effect: '桌面特效页', widget: '桌面组件页', game: '游戏空间页' };
 async function run(share = false) {
   if (busy.value || props.disabled || !props.store.desktop) return;
   busy.value = true;
@@ -18,10 +20,14 @@ async function run(share = false) {
       props.store.notify(share ? '资源包已导出，请在论坛发帖，添加预览图和资源包附件。' : '资源包已导出，其他用户可在对应页面导入使用。', 'success');
       if (share) await invoke('open_download_url', { url: 'https://chat.xiangban.xyz' });
     } else {
-      const result = await invoke<{ kind: string; id: string; name: string } | null>('import_resource_pack', { kind: props.kind });
+      const result = await invoke<{ kind: string; id: string; name: string } | null>('import_resource_pack');
       if (!result) return;
-      emit('imported', result);
-      props.store.notify(`已导入「${result.name}」，可预览后再使用。`, 'success');
+      if (result.kind === props.kind) {
+        emit('imported', result);
+        props.store.notify(`已导入「${result.name}」，可预览后再使用。`, 'success');
+      } else {
+        props.store.notify(`已导入「${result.name}」，在${PLACES[result.kind] ?? '对应页面'}查看。`, 'success');
+      }
     }
   } catch (error) { props.store.notify(error, 'error'); }
   finally { busy.value = false; }
