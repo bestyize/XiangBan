@@ -11,13 +11,25 @@ export function toPoints(dollars: number): number {
   return Math.round(dollars * units.perDollar);
 }
 
+export interface MoneyParts {
+  sign: string;
+  int: string;
+  dec: string;
+}
+
 /** 额度一律用美元展示：至少两位小数，不到 1 美元时最多保留三位，避免一次对话的零头显示成 $0.00。 */
-export function money(points: number): string {
+export function moneyParts(points: number): MoneyParts {
   const dollars = toDollars(points);
   const abs = Math.abs(dollars);
   const min = abs >= 100 ? 0 : 2;
   const max = abs >= 100 ? 0 : abs >= 1 ? 2 : 3;
-  return `$${dollars.toLocaleString('en-US', { minimumFractionDigits: min, maximumFractionDigits: max })}`;
+  const [int, dec] = abs.toLocaleString('en-US', { minimumFractionDigits: min, maximumFractionDigits: max }).split('.');
+  return { sign: dollars < 0 ? '\u2212' : '', int, dec: dec ? `.${dec}` : '' };
+}
+
+export function money(points: number): string {
+  const { sign, int, dec } = moneyParts(points);
+  return `${sign}$${int}${dec}`;
 }
 
 export function formatTime(value: string | null): string {
@@ -86,3 +98,40 @@ export const codeStatusLabels: Record<string, string> = {
   redeemed: '已兑换',
   void: '已作废',
 };
+
+export function relativeTime(value: string | null): string {
+  if (!value) return '从未';
+  const seconds = Math.floor((Date.now() - new Date(value).getTime()) / 1000);
+  if (seconds < 45) return '刚刚';
+  if (seconds < 3600) return `${Math.max(1, Math.round(seconds / 60))} 分钟前`;
+  if (seconds < 86400) return `${Math.round(seconds / 3600)} 小时前`;
+  if (seconds < 86400 * 30) return `${Math.round(seconds / 86400)} 天前`;
+  return formatDate(value);
+}
+
+export function shortUid(uid: string): string {
+  return uid.slice(0, 8);
+}
+
+function localKey(date: Date): string {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
+/** 按本地日期分组用的键，如 2026-10-17。 */
+export function dayKey(value: string): string {
+  return localKey(new Date(value));
+}
+
+export function dayTitle(key: string): string {
+  const today = new Date();
+  const yesterday = new Date(today.getTime() - 86_400_000);
+  if (key === localKey(today)) return '今天';
+  if (key === localKey(yesterday)) return '昨天';
+  const [y, m, d] = key.split('-').map(Number);
+  const weekday = ['日', '一', '二', '三', '四', '五', '六'][new Date(y, m - 1, d).getDay()];
+  return `${m} 月 ${d} 日 周${weekday}`;
+}
+
+export function clock(value: string): string {
+  return new Date(value).toLocaleTimeString('zh-CN', { hour12: false, hour: '2-digit', minute: '2-digit' });
+}

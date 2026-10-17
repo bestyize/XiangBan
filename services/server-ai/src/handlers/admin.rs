@@ -17,6 +17,7 @@ use chrono::{DateTime, Duration, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use sqlx::FromRow;
+use std::collections::HashMap;
 use uuid::Uuid;
 
 const MAX_ADMIN_FAILURES: i32 = 5;
@@ -114,6 +115,16 @@ pub async fn change_password(
     Ok(Json(json!({ "ok": true })))
 }
 
+#[derive(Serialize, FromRow)]
+struct DayRow {
+    day: String,
+    consumed: i64,
+    granted: i64,
+}
+
+/// 日界按北京时间算：管理员看的「今天」是他自己的今天。
+const REPORT_TZ: &str = "Asia/Shanghai";
+
 pub async fn overview(State(state): State<AppState>, _admin: AuthAdmin) -> Result<Json<Value>, AppError> {
     let (bindings, active, funded, balance): (i64, i64, i64, i64) = sqlx::query_as(&format!(
         "SELECT COUNT(*), COUNT(*) FILTER (WHERE status = 'active'),
@@ -129,6 +140,26 @@ pub async fn overview(State(state): State<AppState>, _admin: AuthAdmin) -> Resul
     )
     .fetch_one(&state.pool)
     .await?;
+    // 发放出去的每一份额度最后去了哪：用掉了、过期或被扣回作废了、还留在用户手里。
+    let (granted_total, consumed_total, lapsed_total): (i64, i64, i64) = sqlx::query_as(
+        "SELECT COALESCE(SUM(delta) FILTER (WHERE kind = 'grant'), 0)::BIGINT,
+                COALESCE(-SUM(delta) FILTER (WHERE kind IN ('consume', 'consume_overdraft')), 0)::BIGINT,
+                COALESCE(-SUM(delta) FILTER (WHERE kind IN ('expire', 'void')), 0)::BIGINT
+         FROM quota_ledger",
+    )
+    .fetch_one(&state.pool)
+    .await?;
+    let (active_24h,): (i64,) = sqlx::query_as("SELECT COUNT(*) FROM bindings WHERE last_used_at > now() - interval '1 day'").fetch_one(&state.pool).await?;
+    let series: Vec<DayRow> = sqlx::query_as(&format!(
+        "SELECT to_char(d, 'YYYY-MM-DD') AS day,
+                COALESCE(-SUM(l.delta) FILTER (WHERE l.kind IN ('consume', 'consume_overdraft')), 0)::BIGINT AS consumed,
+                COALESCE(SUM(l.delta) FILTER (WHERE l.kind = 'grant'), 0)::BIGINT AS granted
+         FROM generate_series(((now() AT TIME ZONE '{REPORT_TZ}')::date - 13)::timestamp, (now() AT TIME ZONE '{REPORT_TZ}')::date::timestamp, interval '1 day') AS d
+         LEFT JOIN quota_ledger l ON l.created_at >= now() - interval '15 days' AND (l.created_at AT TIME ZONE '{REPORT_TZ}')::date = d::date
+         GROUP BY d ORDER BY d"
+    ))
+    .fetch_all(&state.pool)
+    .await?;
     let (anomalies,): (i64,) = sqlx::query_as("SELECT COUNT(*) FROM sync_anomalies WHERE resolved_at IS NULL").fetch_one(&state.pool).await?;
     let per_product: Vec<(String, String, i64)> = sqlx::query_as(
         "SELECT p.product_id, p.name, COUNT(b.id) FROM products p LEFT JOIN bindings b ON b.product_id = p.product_id
@@ -136,17 +167,46 @@ pub async fn overview(State(state): State<AppState>, _admin: AuthAdmin) -> Resul
     )
     .fetch_all(&state.pool)
     .await?;
+    let balances: HashMap<String, i64> = sqlx::query_as::<_, (String, i64)>(&format!(
+        "SELECT b.product_id, COALESCE(SUM(q.remaining), 0)::BIGINT FROM bindings b JOIN quota_buckets q ON q.binding_id = b.id WHERE {LIVE} GROUP BY b.product_id"
+    ))
+    .fetch_all(&state.pool)
+    .await?
+    .into_iter()
+    .collect();
+    let consumed_7d: HashMap<String, i64> = sqlx::query_as::<_, (String, i64)>(
+        "SELECT b.product_id, COALESCE(-SUM(l.delta), 0)::BIGINT FROM quota_ledger l JOIN bindings b ON b.id = l.binding_id
+         WHERE l.kind IN ('consume', 'consume_overdraft') AND l.created_at > now() - interval '7 days' GROUP BY b.product_id",
+    )
+    .fetch_all(&state.pool)
+    .await?
+    .into_iter()
+    .collect();
     Ok(Json(json!({
         "bindings": bindings,
         "active_bindings": active,
         "funded_bindings": funded,
+        "active_24h": active_24h,
         "balance": balance,
         "consumed_24h": consumed_24h,
         "granted_24h": granted_24h,
+        "granted_total": granted_total,
+        "consumed_total": consumed_total,
+        "lapsed_total": lapsed_total,
+        "series": series,
         "open_anomalies": anomalies,
         "quota_per_unit": state.config.quota_per_unit,
         "newapi_configured": state.newapi.is_configured(),
-        "products": per_product.into_iter().map(|(id, name, count)| json!({ "product_id": id, "name": name, "bindings": count })).collect::<Vec<_>>(),
+        "products": per_product
+            .into_iter()
+            .map(|(id, name, count)| json!({
+                "product_id": id,
+                "name": name,
+                "bindings": count,
+                "balance": balances.get(&id).copied().unwrap_or(0),
+                "consumed_7d": consumed_7d.get(&id).copied().unwrap_or(0),
+            }))
+            .collect::<Vec<_>>(),
     })))
 }
 

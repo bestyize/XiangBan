@@ -28,17 +28,44 @@ export interface ModelOption {
   ratio_warning: boolean;
 }
 
+export interface DayPoint {
+  day: string;
+  consumed: number;
+  granted: number;
+}
+
+export interface FlowSegment {
+  key: string;
+  label: string;
+  points: number;
+  tone: 'used' | 'lapsed' | 'left';
+  note: string;
+}
+
+export interface ProductOverview {
+  product_id: string;
+  name: string;
+  bindings: number;
+  balance: number;
+  consumed_7d: number;
+}
+
 export interface Overview {
   bindings: number;
   active_bindings: number;
   funded_bindings: number;
+  active_24h: number;
   balance: number;
   consumed_24h: number;
   granted_24h: number;
+  granted_total: number;
+  consumed_total: number;
+  lapsed_total: number;
+  series: DayPoint[];
   open_anomalies: number;
   quota_per_unit: number;
   newapi_configured: boolean;
-  products: { product_id: string; name: string; bindings: number }[];
+  products: ProductOverview[];
 }
 
 export interface BindingRow {

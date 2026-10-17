@@ -1,10 +1,14 @@
 <script setup lang="ts">
+import { useModal } from '../composables/useModal';
 import { computed, ref, watch } from 'vue';
 import { api, errorMessage } from '../api';
 import type { ModelOption, Product, Tier } from '../types';
 
 const props = defineProps<{ product: Product; tier: Tier | null; models: ModelOption[] }>();
 const emit = defineEmits<{ close: []; saved: [warnings: string[]] }>();
+
+const root = ref<HTMLElement | null>(null);
+useModal(root, () => emit('close'));
 
 const isNew = computed(() => props.tier === null);
 const slug = ref(props.tier?.tier ?? '');
@@ -57,7 +61,7 @@ async function submit() {
 
 <template>
   <div class="scrim" @click="emit('close')"></div>
-  <form class="dialog" role="dialog" aria-modal="true" aria-labelledby="tier-title" @submit.prevent="submit" @keydown.esc="emit('close')">
+  <form ref="root" class="dialog" role="dialog" aria-modal="true" aria-labelledby="tier-title" @submit.prevent="submit">
     <div class="dialog-head">
       <h2 id="tier-title">{{ isNew ? '添加档位' : '修改档位' }} · {{ product.name }}</h2>
     </div>
@@ -119,9 +123,9 @@ async function submit() {
 </template>
 
 <style scoped>
-fieldset { border: 1px solid var(--line); border-radius: var(--radius); margin: 0; padding: 4px 14px 14px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+fieldset { border: 1px solid var(--line); border-radius: var(--r-md); margin: 0; padding: 4px 14px 14px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
 legend { padding: 0 6px; font-weight: 600; font-size: 13px; }
-.back { background: var(--curtain); }
+.back { background: var(--curtain-light); }
 .rules { display: flex; flex-direction: column; gap: 8px; }
 .check.disabled { opacity: 0.55; cursor: default; }
 .order { max-width: 140px; }

@@ -1,11 +1,16 @@
 <script setup lang="ts">
+import { useModal } from '../composables/useModal';
 import { computed, ref, watch } from 'vue';
 import { api, errorMessage } from '../api';
 import { money, toPoints } from '../format';
+import KindPicker from './KindPicker.vue';
 import type { Batch, Product } from '../types';
 
 const props = defineProps<{ products: Product[] }>();
 const emit = defineEmits<{ close: []; created: [batch: Batch, codes: string[]] }>();
+
+const root = ref<HTMLElement | null>(null);
+useModal(root, () => emit('close'));
 
 const productId = ref(props.products.find((p) => p.enabled)?.product_id ?? props.products[0]?.product_id ?? '');
 const kind = ref<'topup' | 'monthly'>('topup');
@@ -47,7 +52,7 @@ async function submit() {
 
 <template>
   <div class="scrim" @click="emit('close')"></div>
-  <form class="dialog" role="dialog" aria-modal="true" aria-labelledby="batch-title" @submit.prevent="submit" @keydown.esc="emit('close')">
+  <form ref="root" class="dialog" role="dialog" aria-modal="true" aria-labelledby="batch-title" @submit.prevent="submit">
     <div class="dialog-head">
       <h2 id="batch-title">生成兑换码</h2>
       <p class="hint">一批对应淘宝上的一个商品：同一个产品、同样的类型和面额。</p>
@@ -63,36 +68,26 @@ async function submit() {
         <span class="hint">码只能在这个产品的客户端里兑换。</span>
       </div>
 
-      <fieldset class="kinds">
-        <legend class="sr">类型</legend>
-        <label class="kind" :class="{ on: kind === 'topup' }">
-          <input v-model="kind" type="radio" value="topup" />
-          <span><strong>加油包</strong><small>长期有效，适合按量买</small></span>
-        </label>
-        <label class="kind" :class="{ on: kind === 'monthly' }">
-          <input v-model="kind" type="radio" value="monthly" />
-          <span><strong>月卡</strong><small>限时额度，到期没用完就作废</small></span>
-        </label>
-      </fieldset>
+      <KindPicker v-model="kind" />
 
       <div class="trio">
         <div class="field">
           <label for="b-amount">每个码的额度</label>
-          <div class="input-affix">
+          <div class="affix-wrap">
             <input id="b-amount" v-model.number="dollars" class="input num" type="number" min="0.01" step="0.01" required />
             <span class="affix">美元</span>
           </div>
         </div>
         <div class="field">
           <label for="b-days">兑换后有效</label>
-          <div class="input-affix">
+          <div class="affix-wrap">
             <input id="b-days" v-model.number="days" class="input num" type="number" min="1" max="3650" step="1" required />
             <span class="affix">天</span>
           </div>
         </div>
         <div class="field">
           <label for="b-count">生成数量</label>
-          <div class="input-affix">
+          <div class="affix-wrap">
             <input id="b-count" v-model.number="count" class="input num" type="number" min="1" max="2000" step="1" required />
             <span class="affix">个</span>
           </div>
@@ -115,16 +110,5 @@ async function submit() {
 
 <style scoped>
 .trio { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
-.kinds { border: none; margin: 0; padding: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
-.kind { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border: 1px solid var(--line-strong); border-radius: var(--radius); cursor: pointer; }
-.kind:hover { border-color: var(--faint); }
-.kind.on { border-color: var(--primary); background: var(--primary-soft); }
-.kind input { margin-top: 3px; accent-color: var(--primary); }
-.kind span { display: flex; flex-direction: column; }
-.kind small { color: var(--muted); font-size: 12.5px; }
-
-@media (max-width: 520px) {
-  .trio { grid-template-columns: 1fr; }
-}
+@media (max-width: 520px) { .trio { grid-template-columns: 1fr; } }
 </style>

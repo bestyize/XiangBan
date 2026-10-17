@@ -1,9 +1,13 @@
 <script setup lang="ts">
+import { useModal } from '../composables/useModal';
 import { ref } from 'vue';
 import { api, errorMessage } from '../api';
 import { signOut } from '../session';
 
 const emit = defineEmits<{ close: [] }>();
+
+const root = ref<HTMLElement | null>(null);
+useModal(root, () => emit('close'));
 
 const current = ref('');
 const next = ref('');
@@ -32,7 +36,7 @@ async function submit() {
 
 <template>
   <div class="scrim" @click="emit('close')"></div>
-  <form class="dialog" role="dialog" aria-modal="true" aria-labelledby="pw-title" @submit.prevent="submit" @keydown.esc="emit('close')">
+  <form ref="root" class="dialog" role="dialog" aria-modal="true" aria-labelledby="pw-title" @submit.prevent="submit">
     <div class="dialog-head">
       <h2 id="pw-title">修改管理员密码</h2>
       <p class="hint">修改后需要重新登录，其他设备上的登录也会失效。</p>
