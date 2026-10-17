@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import ResourceShareActions from "../components/ResourceShareActions.vue";
 import { computed, onMounted, ref } from "vue";
-import { FolderOpen, RefreshCw, Save, Trash2 } from "lucide-vue-next";
+import { FolderOpen, RefreshCw, Save, Sparkles, Trash2 } from "lucide-vue-next";
 import { NAlert, NButton, NPopconfirm, NSkeleton, NTag } from "naive-ui";
 import type { ControlStore } from "../control-types.ts";
 import { coverUrl } from "../../games/catalog.ts";
@@ -67,6 +67,8 @@ onMounted(loadGames);
 
 <template>
   <main class="ui-page games-page" data-testid="games-page">
+    <header class="page-header"><div><h1>游戏空间</h1><p class="page-subtitle">这里有本地游戏，也能让小伴为你创作新的小游戏。</p></div><div class="header-actions"><ResourceShareActions :store="store" kind="game" import-label="导入游戏" :disabled="opening" @imported="loadGames"/><NButton type="primary" round :disabled="!store.desktop" data-testid="games-create" @click="store.startCreation('game')"><template #icon><Sparkles :size="15"/></template>创作游戏</NButton></div></header>
+    <div class="games-body">
     <NAlert v-if="!store.desktop" class="browser-note" type="info" :bordered="false">
       浏览器预览只展示游戏资料；请在小伴桌面应用中进入游戏空间。
     </NAlert>
@@ -115,7 +117,7 @@ onMounted(loadGames);
           <h2 id="user-games-heading">自创游戏</h2>
           <p class="muted">{{ userGames.length ? `共 ${userGames.length} 款 · 由小伴创作或你放进游戏文件夹` : "还没有自创游戏" }}</p>
         </div>
-        <ResourceShareActions :store="store" kind="game" :disabled="opening" @imported="loadGames"/><NButton round data-testid="games-folder" @click="openFolder"><template #icon><FolderOpen :size="15" /></template>打开游戏文件夹</NButton>
+        <NButton round data-testid="games-folder" @click="openFolder"><template #icon><FolderOpen :size="15" /></template>打开游戏文件夹</NButton>
       </div>
       <NAlert v-if="folderErrors.length" class="catalog-error" type="warning" :show-icon="false" data-testid="user-game-errors">
         有 {{ folderErrors.length }} 个游戏文件夹无法使用：{{ folderErrors.join("；") }}
@@ -146,12 +148,16 @@ onMounted(loadGames);
       </div>
       <p v-else class="muted">想要自己的游戏？在聊天里让小伴为你写一个，或者点“打开游戏文件夹”，把做好的游戏文件夹（里面有 manifest.json 和 index.html）放进去，再点“重新载入”。</p>
     </section>
+    </div>
   </main>
 </template>
 
 <style scoped>
-.games-page { display: flex; flex-direction: column; gap:var(--ui-section-gap); color: var(--ui-text-primary); }
+.games-page { display: flex; flex-direction: column; flex:1; min-height:0; gap:0; width:100%; color: var(--ui-text-primary); }
+.games-page>.page-header{flex:none;background:var(--ui-app-bg);padding:var(--ui-page-top) var(--ui-page-inset) 16px;margin-bottom:0;border-bottom:1px solid var(--ui-border)}
+.games-body{flex:1;min-height:0;overflow-y:auto;padding:var(--ui-section-gap) var(--ui-page-inset) 32px;display:flex;flex-direction:column;gap:var(--ui-section-gap)}
 .page-header { display: flex; align-items: center; justify-content: space-between; gap: 24px; margin-bottom: 5px; }
+.header-actions{display:flex;align-items:center;justify-content:flex-end;gap:10px;flex-wrap:wrap}
 .page-header h1 { margin: 7px 0 4px; font-size: 24px; letter-spacing: -.035em; }
 .eyebrow { display: flex; align-items: center; gap: 8px; color: var(--ui-primary-text); font-size: 13px; font-weight: 650; }
 .page-subtitle, .muted { margin: 0; color: var(--ui-text-secondary); font-size:14px;line-height:1.65; }

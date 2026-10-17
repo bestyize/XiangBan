@@ -3,7 +3,7 @@ import { ref } from 'vue';
 import { NButton } from 'naive-ui';
 import { invoke } from '../../bridge.ts';
 import type { ControlStore } from '../control-types.ts';
-const props = defineProps<{ store: ControlStore; kind: 'wallpaper' | 'effect' | 'widget' | 'game'; id?: string; disabled?: boolean }>();
+const props = defineProps<{ store: ControlStore; kind: 'wallpaper' | 'effect' | 'widget' | 'game'; id?: string; disabled?: boolean; importLabel?: string }>();
 const emit = defineEmits<{ imported: [result: { kind: string; id: string; name: string }] }>();
 const busy = ref(false);
 async function run(share = false) {
@@ -27,7 +27,7 @@ async function run(share = false) {
 </script>
 <template>
   <div v-if="store.desktop" class="resource-share-actions" @click.stop @keydown.stop>
-    <NButton size="small" secondary :loading="busy" :disabled="busy || disabled" :data-testid="id ? 'export-resource' : 'import-resource'" @click="run()">{{ id ? '导出资源包' : '导入资源包' }}</NButton>
+    <NButton :size="importLabel ? 'medium' : 'small'" :round="!!importLabel" secondary :loading="busy" :disabled="busy || disabled" :data-testid="id ? 'export-resource' : 'import-resource'" @click="run()">{{ id ? '导出资源包' : importLabel || '导入资源包' }}</NButton>
     <NButton v-if="id" size="small" quaternary :disabled="busy || disabled" data-testid="share-resource" @click="run(true)">分享到论坛</NButton>
   </div>
 </template>

@@ -99,6 +99,6 @@ it('renders selected HTML animations in an isolated frame and leaves gallery car
   expect(selected).not.toContain('<img');
   const card = mediaMarkup('web', 'wallpaper-asset://localhost/hash', '', '星空');
   expect(card).not.toContain('<iframe');
-  expect(card).toContain('选择后预览动画');
+  expect(card).toContain('悬停预览动画');
   expect(mediaMarkup('web', '" onload="bad', '', '<test>', true)).not.toContain('src="" onload=');
 });

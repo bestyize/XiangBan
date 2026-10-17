@@ -1,6 +1,6 @@
 //! Windows desktop hosting, cursor sampling, and a read-only desktop double-click hook.
 //! No mouse input is consumed; icon clicks remain with Explorer.
-use std::{ptr::null_mut, time::Duration};
+use std::{ptr::null_mut, sync::atomic::{AtomicBool, Ordering}, time::Duration};
 use tauri::{Emitter, Manager};
 use windows_sys::Win32::{
     Foundation::{GetLastError, SetLastError, HWND, LPARAM, POINT, RECT},
@@ -10,6 +10,7 @@ use windows_sys::Win32::{
         Input::KeyboardAndMouse::{GetAsyncKeyState, GetDoubleClickTime, VK_LBUTTON},
         WindowsAndMessaging::*,
     },
+    System::Threading::GetCurrentThreadId,
 };
 
 fn wide(text: &str) -> Vec<u16> {
@@ -163,6 +164,10 @@ fn attach_desktop(
 /// Preserve the pet's screen position while moving it between Explorer's background
 /// and a floating top-level window. Turning off topmost alone does not put it below icons.
 pub fn configure_companion(window: &tauri::WebviewWindow, desktop: bool) -> Result<(), String> {
+    let hwnd = window.hwnd().map_err(|e| e.to_string())?.0 as HWND;
+    if unsafe { GetWindowThreadProcessId(hwnd, null_mut()) } == unsafe { GetCurrentThreadId() } {
+        return configure_companion_on_main(window, desktop);
+    }
     let (sender, receiver) = std::sync::mpsc::sync_channel(1);
     let target = window.clone();
     window.run_on_main_thread(move || { let _ = sender.send(configure_companion_on_main(&target, desktop)); })
@@ -213,6 +218,39 @@ fn configure_companion_on_main(window: &tauri::WebviewWindow, desktop: bool) -> 
         }
     }
     order_desktop_layers(window.app_handle())
+}
+
+static PET_DRAGGING: AtomicBool = AtomicBool::new(false);
+
+/// A wallpaper pet is an Explorer child window, so the system's top-level
+/// window drag operation cannot move it. Keep the cursor's initial grab point.
+pub fn drag_companion(window: &tauri::WebviewWindow) -> Result<(), String> {
+    let hwnd = window.hwnd().map_err(|e| e.to_string())?.0 as HWND;
+    let parent = unsafe { GetParent(hwnd) };
+    if parent.is_null() { return Err("小伴不在桌面背景层".into()); }
+    let mut origin = POINT::default();
+    let mut cursor = POINT::default();
+    if unsafe { ClientToScreen(hwnd, &mut origin) } == 0 || unsafe { GetCursorPos(&mut cursor) } == 0 {
+        return Err("无法读取小伴拖动位置".into());
+    }
+    if PET_DRAGGING.swap(true, Ordering::SeqCst) { return Ok(()); }
+    let hwnd = hwnd as usize;
+    std::thread::spawn(move || {
+        let hwnd = hwnd as HWND;
+        let grab_x = cursor.x - origin.x;
+        let grab_y = cursor.y - origin.y;
+        while left_button_down() && unsafe { IsWindow(hwnd) } != 0 {
+            let parent = unsafe { GetParent(hwnd) };
+            if parent.is_null() || unsafe { GetCursorPos(&mut cursor) } == 0 { break; }
+            let mut position = POINT { x: cursor.x - grab_x, y: cursor.y - grab_y };
+            if unsafe { ScreenToClient(parent, &mut position) } == 0 { break; }
+            if unsafe { SetWindowPos(hwnd, null_mut(), position.x, position.y, 0, 0,
+                SWP_NOACTIVATE | SWP_NOZORDER | SWP_NOSIZE) } == 0 { break; }
+            std::thread::sleep(Duration::from_millis(16));
+        }
+        PET_DRAGGING.store(false, Ordering::SeqCst);
+    });
+    Ok(())
 }
 
 /// All desktop layers are siblings below Explorer's icon view. Reapply this order

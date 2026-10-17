@@ -194,6 +194,11 @@ function onKeydown(event: KeyboardEvent) {
   void submit();
 }
 const useExample = (text: string) => { draft.value = text; };
+watch([() => props.store.creationDraft, () => chat.configured], ([text, configured]) => {
+  if (!text || !configured) return;
+  useExample(text);
+  props.store.creationDraft = null;
+}, { immediate: true });
 const continueAnswer = () => { asr?.deactivate(); stick.value = true; void chat.send(CONTINUE_TEXT); };
 
 const choose = (id: string | null) => { asr?.deactivate(); confirmingId.value = ''; void chat.select(id); };

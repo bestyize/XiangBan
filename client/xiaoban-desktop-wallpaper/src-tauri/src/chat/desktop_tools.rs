@@ -626,7 +626,7 @@ fn widget_create(desktop: &dyn Desktop, args: &Value) -> Result<String, String> 
     let description = optional_text(args, "description")?;
     let width = args.get("width").and_then(Value::as_f64);
     let height = args.get("height").and_then(Value::as_f64);
-    let theme = optional_text(args, "theme")?.unwrap_or("glass");
+    let theme = optional_text(args, "theme")?.unwrap_or("transparent");
     let overwrite = optional_bool(args, "overwrite")?.unwrap_or(false);
     let place_now = optional_bool(args, "place_now")?.unwrap_or(true);
 
@@ -932,7 +932,7 @@ pub fn tools(desktop: Arc<dyn Desktop>) -> Vec<Arc<dyn Tool>> {
                 object(
                     json!({
                         "kind": {"type": "string", "enum": crate::custom_widgets::BUILTIN_KINDS, "description": "组件类型"},
-                        "theme": {"type": "string", "enum": ["glass", "paper", "transparent"], "description": "可选外观风格，默认 paper 或 glass"},
+                        "theme": {"type": "string", "enum": ["glass", "paper", "transparent"], "description": "可选外观风格，默认 transparent（透明无底）"},
                     }),
                     &["kind"],
                 ),
@@ -977,16 +977,16 @@ pub fn tools(desktop: Arc<dyn Desktop>) -> Vec<Arc<dyn Tool>> {
             &desktop,
             ToolSpec::new(
                 "widget_create",
-                "为用户创作一个新的自定义单文件 HTML 桌面小组件。可编写包含完整 HTML、CSS 样式与 JavaScript 交互逻辑的独立微卡片（如番茄钟、极简时钟、每日诗词、倒数日、健康喝水提醒、趣味小工具等）。支持自适应外壳主题（glass 透光玻璃 / paper 温润纸张 / transparent 透明无底），默认宽 280、高 240。创作完成后默认自动放置到桌面上。",
+                "为用户创作一个新的自定义单文件 HTML 桌面小组件。可编写包含完整 HTML、CSS 样式与 JavaScript 交互逻辑的独立微卡片（如番茄钟、极简时钟、每日诗词、倒数日、健康喝水提醒、趣味小工具等）。默认透明无底，HTML 的页面和主体也不要绘制整块背景；仅在用户需要时添加底板。支持外壳主题（glass 透光玻璃 / paper 温润纸张 / transparent 透明无底），默认宽 280、高 240。创作完成后默认自动放置到桌面上。",
                 object(
                     json!({
                         "id": { "type": "string", "description": "小组件英文标识（小写字母、数字、-、_，如 pomodoro-timer）" },
                         "name": { "type": "string", "description": "小组件中文名称（最多 24 字，如 专注番茄钟）" },
-                        "html": { "type": "string", "description": "完整的自包含单文件 HTML 内容（包含 <style>、DOM 结构与 <script> 逻辑）" },
+                        "html": { "type": "string", "description": "完整的自包含单文件 HTML 内容（包含 <style>、DOM 结构与 <script> 逻辑）；默认让 html、body 背景透明，不绘制铺满组件的底板；内容应在指定 width、height 的视口内自适应，避免横向溢出和滚动条" },
                         "description": { "type": "string", "description": "一句话介绍（最多 80 字）" },
                         "width": { "type": "number", "minimum": 100, "maximum": 800, "description": "建议默认宽度（像素，默认 280）" },
                         "height": { "type": "number", "minimum": 80, "maximum": 800, "description": "建议默认高度（像素，默认 240）" },
-                        "theme": { "type": "string", "enum": ["glass", "paper", "transparent"], "description": "底板外观风格，默认 glass" },
+                        "theme": { "type": "string", "enum": ["glass", "paper", "transparent"], "description": "底板外观风格，默认 transparent（透明无底）" },
                         "place_now": { "type": "boolean", "description": "创作完成后是否立即放置到桌面上，默认 true" },
                         "overwrite": { "type": "boolean", "description": "true 时覆盖同 id 的已有小组件，默认 false" }
                     }),

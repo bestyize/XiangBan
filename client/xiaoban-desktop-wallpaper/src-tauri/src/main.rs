@@ -452,6 +452,10 @@ fn start_drag(window: tauri::WebviewWindow) -> Result<(), String> {
     if window.label() != "pet" {
         return Err("只有小伴窗口可以拖动".into());
     }
+    #[cfg(windows)]
+    if settings(window.app_handle()).mode == "wallpaper" {
+        return windows::drag_companion(&window);
+    }
     window.start_dragging().map_err(|e| e.to_string())
 }
 

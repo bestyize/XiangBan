@@ -20,6 +20,8 @@ export interface ControlStore {
   account: AccountSession | null;
   showLoginModal: boolean;
   page: ControlPage;
+  creationDraft: string | null;
+  startCreation(kind: "wallpaper" | "effect" | "widget" | "game"): Promise<void>;
   /** Which tab of the settings page opens next; the chat sends people to "ai" when no model is set up. */
   settingsTab: "general" | "ai" | "voice" | "about";
   /** The assistant's conversations. Lives here so an answer keeps arriving while another page is open. */

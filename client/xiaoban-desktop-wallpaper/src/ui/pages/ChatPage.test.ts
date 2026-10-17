@@ -77,6 +77,15 @@ describe('the chat page before a conversation', () => {
     expect(q<HTMLButtonElement>('chat-send')!.disabled).toBe(false);
   });
 
+  it('receives a creative prompt in a fresh conversation without sending it', async () => {
+    const h = await open();
+    h.store.creationDraft = '帮我创作一个桌面特效：';
+    await flushPromises();
+    expect(textarea().value).toBe('帮我创作一个桌面特效：');
+    expect(h.store.creationDraft).toBeNull();
+    expect(h.commands()).toEqual(['chat_overview']);
+  });
+
   it('only says it is a preview in the browser', async () => {
     const h = await open({}, { desktop: false });
     expect(q('chat-preview-only')).not.toBeNull();

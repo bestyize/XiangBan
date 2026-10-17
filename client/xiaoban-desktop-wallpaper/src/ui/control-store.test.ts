@@ -7,6 +7,18 @@ vi.mock('../bridge.ts', async (importOriginal) => ({ ...await importOriginal<typ
 const ipc = vi.mocked(invoke);
 beforeEach(() => { vi.resetAllMocks(); vi.mocked(listen).mockResolvedValue(() => {}); });
 describe('control state with native settings', () => {
+  it('starts each creative action in a fresh chat with an editable prompt', async () => {
+    const store = createControlStore(vi.fn());
+    store.chat.currentId = 'existing';
+    await store.startCreation('effect');
+    expect(store.chat.currentId).toBeNull();
+    expect(store.page).toBe('chat');
+    expect(store.creationDraft).toBe('帮我创作一个桌面特效：');
+    await store.startCreation('widget');
+    expect(store.creationDraft).toBe('帮我创作一个桌面小组件：');
+    await store.startCreation('game');
+    expect(store.creationDraft).toBe('帮我创作一款小游戏：');
+  });
   it('does not replace loaded settings when the optional wallpaper directory fails', async () => {
     const native = { ...clone(defaults), size: 340, expression: 'proud' };
     ipc.mockImplementation(async (command) => {

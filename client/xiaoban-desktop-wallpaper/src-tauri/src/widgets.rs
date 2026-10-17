@@ -239,7 +239,7 @@ pub async fn add_desktop_widget(app: tauri::AppHandle, kind: String, custom_id: 
     let index=next.widgets.len();
     let note=if kind=="notes"{Some(NoteData{title:"随手记".into(),mode:"note".into(),text:String::new(),items:vec![]})}else{None};
     let countdown=if kind=="countdown"{Some(CountdownData{title:"值得期待的日子".into(),date:chrono::Local::now().format("%Y-%m-%d").to_string(),mode:"countdown".into(),repeat:"none".into()})}else{None};
-    let mut theme=if kind=="fortune"{"paper"}else{"glass"}.into();
+    let mut theme="transparent".to_string();
     if kind == "custom" {
         let cid = custom_id.as_deref().ok_or("添加自定义组件需要指定 customId")?;
         let root = crate::storage::root(&app)?;

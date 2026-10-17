@@ -48,11 +48,22 @@ export function createControlStore(notify: ControlStore["notify"]): ControlStore
     effectList: noPacks(),
     account: null,
     showLoginModal: false,
-    page: "wallpapers", settingsTab: "general", asr: createAsrStore({ desktop, invoke, listen, notify }), speech: createSpeechStore({ desktop, invoke, notify }), chat: createChatStore({ desktop, invoke, listen, notify,
+    page: "wallpapers", creationDraft: null, settingsTab: "general", asr: createAsrStore({ desktop, invoke, listen, notify }), speech: createSpeechStore({ desktop, invoke, notify }), chat: createChatStore({ desktop, invoke, listen, notify,
       onActivity: () => { store.asr.deactivate(); void store.speech.stop(); },
       onReply: (session, text, key) => { if (store.page === 'chat' && store.speech.settings.autoRead && document.visibilityState !== 'hidden') void store.speech.speak(text, key ?? 'auto:' + session, undefined, true); },
     }), ready: false, initialError: "", desktop, notify,
     navigate(page) { if (store.page !== page) { void store.speech.stop(); store.asr.deactivate(); } store.page = page; },
+    async startCreation(kind) {
+      const prompts = {
+        wallpaper: '帮我创作一张动态壁纸：',
+        effect: '帮我创作一个桌面特效：',
+        widget: '帮我创作一个桌面小组件：',
+        game: '帮我创作一款小游戏：',
+      };
+      await store.chat.select(null);
+      store.creationDraft = prompts[kind];
+      store.navigate('chat');
+    },
     openLogin() { store.showLoginModal = true; },
     closeLogin() { store.showLoginModal = false; },
     async initialize() {

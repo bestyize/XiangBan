@@ -41,7 +41,7 @@ fn default_height() -> f64 {
 }
 #[allow(dead_code)]
 fn default_theme() -> String {
-    "glass".to_string()
+    "transparent".to_string()
 }
 
 pub fn valid_widget_id(value: &str) -> bool {
