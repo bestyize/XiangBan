@@ -76,20 +76,21 @@ export const SKINS: Record<SkinId, Skin> = {
     id: 'pot', label: '盆栽', scale: 0.76,
     art: {
       feet: '',
-      head: 'M30 50A130 12 0 0 1 290 50L290 76Q290 88 278 88L268 232Q266 252 246 252H74Q54 252 52 232L42 88Q30 88 30 76Z',
+      // A round-bellied porcelain pot: a small mouth, a full belly and a soft base, with no flared rim or straight sides.
+      head: 'M70 56A90 10 0 0 1 250 56C276 62 296 104 296 156C296 214 268 252 222 252H98C52 252 24 214 24 156C24 104 44 62 70 56Z',
       trim:
-        '<ellipse cx="160" cy="52" rx="116" ry="9" fill="#d6c8b6"/>' +
-        '<ellipse cx="160" cy="53" rx="113" ry="7.5" fill="#4b3022"/>' +
-        '<ellipse cx="120" cy="52" rx="5" ry="1.6" fill="#6b4730"/><ellipse cx="150" cy="56" rx="4" ry="1.4" fill="#6b4730"/>' +
-        '<ellipse cx="190" cy="54" rx="5" ry="1.6" fill="#6b4730"/><ellipse cx="214" cy="51" rx="4" ry="1.4" fill="#6b4730"/>' +
-        [[96, 52], [130, 57], [194, 57], [228, 52], [176, 49]].map(([x, y]) => `<circle cx="${x}" cy="${y}" r="3.2" fill="#c98b4a"/><circle cx="${x - 1}" cy="${y - 1}" r="1.1" fill="#e8b27a"/>`).join('') +
-        '<ellipse cx="92" cy="42" rx="40" ry="1.8" fill="#fff" opacity="0.85"/>' +
-        '<rect x="30" y="88" width="260" height="9" fill="#6b4a30" opacity="0.14"/>' +
-        '<path d="M42 88H278" fill="none" stroke="#cdbfae" stroke-width="1.4" opacity="0.8"/>',
+        '<ellipse cx="160" cy="72" rx="94" ry="9" fill="#6b4a30" opacity="0.1"/>' +
+        '<ellipse cx="160" cy="56" rx="90" ry="10" fill="#ece3d8"/>' +
+        '<ellipse cx="160" cy="57" rx="81" ry="7.4" fill="#4b3022"/>' +
+        '<ellipse cx="122" cy="56" rx="5" ry="1.6" fill="#6b4730"/><ellipse cx="150" cy="60" rx="4" ry="1.4" fill="#6b4730"/>' +
+        '<ellipse cx="192" cy="58" rx="5" ry="1.6" fill="#6b4730"/><ellipse cx="214" cy="55" rx="4" ry="1.4" fill="#6b4730"/>' +
+        [[104, 57], [134, 61], [190, 61], [220, 57], [176, 54]].map(([x, y]) => `<circle cx="${x}" cy="${y}" r="3.2" fill="#c98b4a"/><circle cx="${x - 1}" cy="${y - 1}" r="1.1" fill="#e8b27a"/>`).join('') +
+        '<ellipse cx="110" cy="50" rx="30" ry="1.8" fill="#fff" opacity="0.85"/>' +
+        '<path d="M40 114C34 130 34 148 40 164" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round" opacity="0.6"/>',
       front:
-        '<ellipse cx="160" cy="54" rx="9" ry="2.6" fill="#3b2418" opacity="0.6"/>' +
-        '<path d="M160 54C161 40 159 20 160 4" fill="none" stroke="#5aa92f" stroke-width="9" stroke-linecap="round"/>' +
-        '<path d="M157.5 52C158.5 38 157 20 158 6" fill="none" stroke="#a6dd6b" stroke-width="2.4" stroke-linecap="round" opacity="0.8"/>',
+        '<ellipse cx="160" cy="57" rx="9" ry="2.6" fill="#3b2418" opacity="0.6"/>' +
+        '<path d="M160 57C161 41 159 20 160 4" fill="none" stroke="#5aa92f" stroke-width="9" stroke-linecap="round"/>' +
+        '<path d="M157.5 55C158.5 39 157 20 158 6" fill="none" stroke="#a6dd6b" stroke-width="2.4" stroke-linecap="round" opacity="0.8"/>',
     },
     earOuter: 'M160 6C150 -34 112 -66 64 -62C70 -18 112 24 160 6Z',
     earInner: 'M156 2C148 -26 118 -52 78 -52C84 -20 116 12 156 2Z',
