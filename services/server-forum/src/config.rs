@@ -103,7 +103,7 @@ impl AppConfig {
             trust: TrustRules {
                 tl1_days: num("FORUM_TL1_DAYS", 3),
                 tl1_reads: num("FORUM_TL1_READS", 30),
-                daily_topics: list4("FORUM_DAILY_TOPICS", [0, 5, 20, 50]),
+                daily_topics: list4("FORUM_DAILY_TOPICS", [2, 5, 20, 50]),
                 daily_posts: list4("FORUM_DAILY_POSTS", [10, 60, 200, 500]),
             },
             upload_dir: PathBuf::from(get("FORUM_UPLOAD_DIR").unwrap_or_else(|| "services/server-forum/data/uploads".into())),

@@ -102,9 +102,6 @@ pub async fn upload(
 ) -> AppResult<Json<Value>> {
     let user = &auth.user;
     users::ensure_can_write(user)?;
-    if user.trust_level < 1 {
-        return Err(AppError::Forbidden("新人暂时不能上传附件，升级为成员后就可以了".into()));
-    }
     let limit = upload_limit(&state.config, user.trust_level);
     let declared = headers.get(header::CONTENT_LENGTH).and_then(|v| v.to_str().ok()).and_then(|v| v.parse::<u64>().ok());
     if declared.is_some_and(|n| n > limit + MULTIPART_OVERHEAD) {

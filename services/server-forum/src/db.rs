@@ -333,8 +333,8 @@ const CATEGORIES: &[(&str, &str, &str, &str, Option<&str>, i16, bool, bool, bool
     ("deals-public", "公益站", "只收录信息，站方不做担保", "deal", Some("deals"), 1, true, true, false),
     ("deals-other", "其他福利", "不属于以上分类的福利和优惠", "deal", Some("deals"), 1, true, true, false),
     ("xiaoban", "小伴产品", "小伴系列产品的官方介绍与更新：壁纸、游戏、App。由站方发布，欢迎在帖子下回复反馈", "normal", None, 3, true, false, false),
-    ("xiaoban-wallpaper", "小伴壁纸", "小伴壁纸的下载、更新和使用技巧（官方发布，欢迎回复反馈）", "normal", Some("xiaoban"), 3, true, false, false),
-    ("xiaoban-game", "小伴游戏", "小伴游戏的新玩法、攻略和更新（官方发布，欢迎回复反馈）", "normal", Some("xiaoban"), 3, true, false, false),
+    ("xiaoban-wallpaper", "小伴壁纸", "小伴壁纸的下载、更新和使用技巧，也欢迎分享你自己做的壁纸、特效、组件资源包", "normal", Some("xiaoban"), 0, true, false, false),
+    ("xiaoban-game", "小伴游戏", "小伴游戏的新玩法、攻略和更新，也欢迎分享你自己做的游戏资源包", "normal", Some("xiaoban"), 0, true, false, false),
     ("xiaoban-app", "小伴App", "小伴 App 的功能介绍、更新和使用教程（官方发布，欢迎回复反馈）", "normal", Some("xiaoban"), 3, true, false, false),
     ("casual", "随便唠唠", "什么都可以聊，别引战", "normal", None, 1, true, false, false),
     ("casual-work", "职场", "加班、跳槽、远程办公", "normal", Some("casual"), 1, true, false, false),
@@ -404,6 +404,37 @@ pub async fn seed(pool: &PgPool) -> Result<(), AppError> {
         }
     }
     apply_movie_tag_migration(pool).await?;
+    apply_open_share_boards_migration(pool).await?;
+    Ok(())
+}
+
+/// 已部署的论坛把小伴壁纸、小伴游戏两个板块放开给所有人发帖（含新人），分享作品资源包用。
+/// 只在最低发帖等级还是原来的守护者时才改，说明文字也只在没被改过时才换，做完记进 `data_migrations`，之后后台怎么调都不再动。
+async fn apply_open_share_boards_migration(pool: &PgPool) -> Result<(), AppError> {
+    const NAME: &str = "xiaoban-share-boards-open-v1";
+    let done: Option<(String,)> =
+        sqlx::query_as("SELECT name FROM data_migrations WHERE name = $1").bind(NAME).fetch_optional(pool).await?;
+    if done.is_some() {
+        return Ok(());
+    }
+    let mut tx = pool.begin().await?;
+    for (slug, old, new) in [
+        ("xiaoban-wallpaper", "小伴壁纸的下载、更新和使用技巧（官方发布，欢迎回复反馈）", "小伴壁纸的下载、更新和使用技巧，也欢迎分享你自己做的壁纸、特效、组件资源包"),
+        ("xiaoban-game", "小伴游戏的新玩法、攻略和更新（官方发布，欢迎回复反馈）", "小伴游戏的新玩法、攻略和更新，也欢迎分享你自己做的游戏资源包"),
+    ] {
+        sqlx::query("UPDATE categories SET min_post_level = 0 WHERE slug = $1 AND min_post_level = 3 AND NOT admin_only")
+            .bind(slug)
+            .execute(&mut *tx)
+            .await?;
+        sqlx::query("UPDATE categories SET description = $3 WHERE slug = $1 AND description = $2")
+            .bind(slug)
+            .bind(old)
+            .bind(new)
+            .execute(&mut *tx)
+            .await?;
+    }
+    sqlx::query("INSERT INTO data_migrations (name) VALUES ($1) ON CONFLICT DO NOTHING").bind(NAME).execute(&mut *tx).await?;
+    tx.commit().await?;
     Ok(())
 }
 
@@ -672,13 +703,15 @@ mod tests {
     }
 
     #[test]
-    fn xiaoban_is_a_guardian_only_root_between_deals_and_casual() {
+    fn xiaoban_is_a_root_between_deals_and_casual_with_open_share_boards() {
         let roots: Vec<&str> = CATEGORIES.iter().filter(|c| c.4.is_none()).map(|c| c.0).collect();
         assert_eq!(roots, ["tech", "share", "deals", "xiaoban", "casual", "site"]);
         assert_eq!(children("xiaoban"), ["小伴壁纸", "小伴游戏", "小伴App"]);
-        // 只有守护者能发帖，但不是 admin_only（admin_only 会拦住所有人，包括守护者）。
+        // 官方板块只有守护者能发帖，但不是 admin_only（admin_only 会拦住所有人，包括守护者）。
+        // 小伴壁纸、小伴游戏用来分享用户自己的资源包，所有人（含新人）都能发。
         for c in CATEGORIES.iter().filter(|c| c.0 == "xiaoban" || c.4 == Some("xiaoban")) {
-            assert_eq!(c.5, 3, "{} 的最低发帖等级应是守护者", c.0);
+            let open = c.0 == "xiaoban-wallpaper" || c.0 == "xiaoban-game";
+            assert_eq!(c.5, if open { 0 } else { 3 }, "{} 的最低发帖等级不对", c.0);
             assert!(!c.8, "{} 不应该设成 admin_only", c.0);
         }
         // 创建一级分类的迁移必须带上它在种子里的全部二级板块。
