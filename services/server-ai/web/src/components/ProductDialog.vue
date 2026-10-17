@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useModal } from '../composables/useModal';
 import { computed, ref } from 'vue';
 import { api, errorMessage } from '../api';
 import { toDollars, toPoints } from '../format';
@@ -6,6 +7,9 @@ import type { Product } from '../types';
 
 const props = defineProps<{ product: Product | null }>();
 const emit = defineEmits<{ close: []; saved: [id: string] }>();
+
+const root = ref<HTMLElement | null>(null);
+useModal(root, () => emit('close'));
 
 const isNew = computed(() => props.product === null);
 const productId = ref(props.product?.product_id ?? '');
@@ -43,7 +47,7 @@ async function submit() {
 
 <template>
   <div class="scrim" @click="emit('close')"></div>
-  <form class="dialog" role="dialog" aria-modal="true" aria-labelledby="product-title" @submit.prevent="submit" @keydown.esc="emit('close')">
+  <form ref="root" class="dialog" role="dialog" aria-modal="true" aria-labelledby="product-title" @submit.prevent="submit">
     <div class="dialog-head">
       <h2 id="product-title">{{ isNew ? '添加产品' : '编辑产品' }}</h2>
     </div>
@@ -68,14 +72,14 @@ async function submit() {
       <div class="pair">
         <div class="field">
           <label for="p-trial">新用户试用额度</label>
-          <div class="input-affix">
+          <div class="affix-wrap">
             <input id="p-trial" v-model.number="trialDollars" class="input num" type="number" min="0" step="0.01" />
             <span class="affix">美元</span>
           </div>
         </div>
         <div class="field">
           <label for="p-days">试用有效期</label>
-          <div class="input-affix">
+          <div class="affix-wrap">
             <input id="p-days" v-model.number="trialDays" class="input num" type="number" min="1" max="365" step="1" required />
             <span class="affix">天</span>
           </div>

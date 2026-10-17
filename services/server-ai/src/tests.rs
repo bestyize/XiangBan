@@ -949,6 +949,20 @@ async fn admin_can_grant_and_claw_back_and_everything_is_audited() {
 
     let (_, overview) = h.call(Method::GET, "/api/admin/overview", Some(&admin), Value::Null).await;
     assert_eq!((overview["bindings"].as_i64(), overview["balance"].as_i64(), overview["newapi_configured"].as_bool()), (Some(1), Some(TRIAL), Some(true)));
+    assert_eq!(
+        (overview["granted_total"].as_i64(), overview["consumed_total"].as_i64(), overview["lapsed_total"].as_i64()),
+        (Some(TRIAL + 600_000), Some(0), Some(600_000)),
+        "every granted point is accounted for: the claw-back counts as lapsed, not consumed"
+    );
+    let series = overview["series"].as_array().unwrap();
+    assert_eq!(series.len(), 14, "two weeks, oldest first, one entry per day even when nothing happened");
+    let days: Vec<&str> = series.iter().map(|d| d["day"].as_str().unwrap()).collect();
+    assert!(days.windows(2).all(|w| w[0] < w[1]), "days ascend: {days:?}");
+    assert_eq!(series.iter().map(|d| d["granted"].as_i64().unwrap()).sum::<i64>(), TRIAL + 600_000, "the daily grants add up to the total");
+    assert_eq!(series[13]["granted"], TRIAL + 600_000, "today is the last entry");
+    assert!(series[..13].iter().all(|d| d["granted"] == 0 && d["consumed"] == 0));
+    let product = &overview["products"][0];
+    assert_eq!((product["product_id"].as_str(), product["bindings"].as_i64(), product["balance"].as_i64(), product["consumed_7d"].as_i64()), (Some("wallpaper"), Some(1), Some(TRIAL), Some(0)));
     let (_, listing) = h.call(Method::GET, "/api/admin/bindings?q=nobody", Some(&admin), Value::Null).await;
     assert_eq!(listing["total"], 0);
     h.cleanup().await;
@@ -1588,5 +1602,29 @@ async fn only_administrators_can_read_or_change_the_gateway_settings() {
         let (status, _) = h.call(method.clone(), path, Some(&user), json!({ "admin_token": NEW_TOKEN })).await;
         assert_eq!(status, StatusCode::UNAUTHORIZED, "{method} {path} with a user token");
     }
+    h.cleanup().await;
+}
+
+#[tokio::test]
+async fn consumption_shows_up_in_the_overview_series_and_per_product_figures() {
+    let h = harness!();
+    h.seed_wallpaper().await;
+    let admin = h.admin_token().await;
+    h.chat(Uuid::new_v4(), "standard").await;
+    let binding_id = h.only_binding().await;
+    let (user_id, _) = h.mock.only_user();
+    h.mock.consume(user_id, 90_000);
+    sync::sync_binding(&h.state, binding_id).await.unwrap();
+
+    let (_, overview) = h.call(Method::GET, "/api/admin/overview", Some(&admin), Value::Null).await;
+    assert_eq!((overview["consumed_24h"].as_i64(), overview["consumed_total"].as_i64(), overview["active_24h"].as_i64()), (Some(90_000), Some(90_000), Some(1)));
+    assert_eq!(overview["balance"], TRIAL - 90_000);
+    assert_eq!(overview["series"][13]["consumed"], 90_000, "today's bar carries today's consumption");
+    let product = &overview["products"][0];
+    assert_eq!((product["consumed_7d"].as_i64(), product["balance"].as_i64()), (Some(90_000), Some(TRIAL - 90_000)));
+
+    // 发放 = 用掉 + 作废/过期 + 还剩：这条恒等式成立，概览页的「去向」条才可信。
+    let conserved = overview["consumed_total"].as_i64().unwrap() + overview["lapsed_total"].as_i64().unwrap() + overview["balance"].as_i64().unwrap();
+    assert_eq!(conserved, overview["granted_total"].as_i64().unwrap());
     h.cleanup().await;
 }
