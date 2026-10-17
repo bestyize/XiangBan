@@ -44,14 +44,18 @@ export async function mountContent() {
     const item =
       catalog.items.find((item: { id: string }) => item.id === id) ??
       catalog.items[0];
+    const assetUrl = (url?: string) => url?.replace("builtin://", "/wallpapers/builtin/") ?? "";
+    const sourceAssets = (item.assets ?? {}) as Record<string, { url: string; mime: string }>;
     payload = {
       item: {
         ...item,
-        resourceUrl: item.resource.url.replace(
-          "builtin://",
-          "/wallpapers/builtin/",
+        resourceUrl: assetUrl(item.resource.url),
+        assets: Object.fromEntries(
+          Object.entries(sourceAssets).map(([key, asset]) => [
+            key,
+            { ...asset, url: assetUrl(asset.url) },
+          ]),
         ),
-        assets: {},
       },
       options: defaults.wallpaperOptions,
       config: { ...defaults, overlay: false },
