@@ -5,9 +5,9 @@ import ResourceShareActions from './ResourceShareActions.vue';
 import { invoke } from '../../bridge.ts';
 import type { ControlStore } from '../control-types.ts';
 vi.mock('../../bridge.ts',()=>({invoke:vi.fn()}));
-const create = (id?:string) => {
+const create = (id?:string, icons=false) => {
  const store={desktop:true,notify:vi.fn()} as unknown as ControlStore;
- const wrapper=mount(ResourceShareActions,{props:{store,kind:'wallpaper',id},global:{stubs:{NButton:{template:'<button><slot/></button>'}}}});
+ const wrapper=mount(ResourceShareActions,{props:{store,kind:'wallpaper',id,icons},global:{stubs:{NButton:{template:'<button v-bind="$attrs"><slot/><slot name="icon"/></button>'}}}});
  return {store,wrapper};
 };
 beforeEach(()=>vi.clearAllMocks());
@@ -38,5 +38,22 @@ describe('portable resource actions',()=>{
   vi.mocked(invoke).mockRejectedValue('资源包版本暂不支持');const {wrapper,store}=create();
   await wrapper.get('[data-testid="import-resource"]').trigger('click');await flushPromises();
   expect(wrapper.emitted('imported')).toBeUndefined();expect(store.notify).toHaveBeenCalledWith('资源包版本暂不支持','error');wrapper.unmount();
+ });
+ it('keeps both verbs reachable when only the marks are drawn',async()=>{
+  vi.mocked(invoke).mockResolvedValue(true);const {wrapper}=create('local-demo',true);
+  expect(wrapper.get('.resource-share-actions').classes()).toContain('icons');
+  // The wording goes away, so the accessible names have to carry it.
+  expect(wrapper.get('[data-testid="export-resource"]').attributes('aria-label')).toBe('导出资源包');
+  expect(wrapper.get('[data-testid="share-resource"]').attributes('aria-label')).toBe('分享到论坛');
+  expect(wrapper.text()).not.toContain('导出资源包');
+  await wrapper.get('[data-testid="share-resource"]').trigger('click');await flushPromises();
+  expect(invoke).toHaveBeenNthCalledWith(2,'open_download_url',{url:'https://chat.xiangban.xyz'});wrapper.unmount();
+ });
+ it('still spells both verbs out when the marks are not asked for',()=>{
+  const {wrapper}=create('local-demo');
+  expect(wrapper.get('.resource-share-actions').classes()).not.toContain('icons');
+  expect(wrapper.get('[data-testid="export-resource"]').text()).toContain('导出资源包');
+  expect(wrapper.get('[data-testid="share-resource"]').text()).toContain('分享到论坛');
+  wrapper.unmount();
  });
 });

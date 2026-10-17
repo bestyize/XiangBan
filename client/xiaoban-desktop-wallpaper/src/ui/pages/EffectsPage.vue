@@ -76,13 +76,13 @@ onBeforeUnmount(() => { if (timer) { clearTimeout(timer); commit(); } });
         <span class="effect-name"><b>无特效</b><small>桌面保持安静</small></span>
         <Check v-if="!chosen" :size="16" class="effect-check" />
       </button>
-      <div v-for="pack in packs" :key="pack.id" class="effect-card-wrapper">
+      <div v-for="pack in packs" :key="pack.id" class="effect-card-wrapper" :class="{ user: pack.source === 'user' }">
         <button class="effect-card" :class="{ on: chosen?.id === pack.id }" :aria-pressed="chosen?.id === pack.id" :data-testid="`effect-${pack.id}`" @click="choose(pack.id)" @mouseenter="hoveredId = pack.id" @mouseleave="hoveredId = ''">
           <span class="effect-stage"><EffectPreview :pack="pack" :playing="playingId === pack.id" :paused="store.settings.paused" :fps="store.settings.fps" /></span>
           <span class="effect-name"><b>{{ pack.name }}<i v-if="pack.source === 'user'" class="mine">我的</i></b><small>{{ pack.description }}</small></span>
           <Check v-if="chosen?.id === pack.id" :size="16" class="effect-check" />
         </button>
-        <ResourceShareActions v-if="pack.source === 'user'" :store="store" kind="effect" :id="pack.id"/>
+        <ResourceShareActions v-if="pack.source === 'user'" icons :store="store" kind="effect" :id="pack.id"/>
         <NPopconfirm v-if="pack.source === 'user'" positive-text="删除" negative-text="取消" @positive-click="removeEffect(pack.id, pack.name)">
           <template #trigger>
             <button class="effect-delete-btn" title="删除这个自定义特效" :aria-label="`删除特效 ${pack.name}`" :data-testid="`delete-effect-${pack.id}`" @click.stop>
@@ -111,6 +111,8 @@ onBeforeUnmount(() => { if (timer) { clearTimeout(timer); commit(); } });
 .effect-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:var(--ui-card-gap)}
 .effect-card-wrapper{position:relative}
 .effect-card-wrapper .effect-card{width:100%}
+.effect-card-wrapper .resource-share-actions.icons{position:absolute;right:12px;bottom:12px;z-index:2}
+.effect-card-wrapper.user .effect-name{padding-right:82px}
 .effect-delete-btn{position:absolute;top:8px;right:8px;z-index:3;width:26px;height:26px;border-radius:50%;border:0;background:rgba(0,0,0,0.5);color:#fff;display:grid;place-items:center;cursor:pointer;opacity:0.7;transition:all .2s}
 .effect-delete-btn:hover{opacity:1;background:#dc2626}
 .effect-card{position:relative;display:grid;grid-template-rows:auto auto;padding:0;border:0;background:var(--ui-surface);border-radius:var(--ui-radius-card);overflow:hidden;cursor:pointer;text-align:left;color:var(--ui-text-primary);transition:transform 200ms cubic-bezier(.2,.8,.2,1),box-shadow 200ms}
@@ -122,7 +124,7 @@ onBeforeUnmount(() => { if (timer) { clearTimeout(timer); commit(); } });
 .effect-name b{font-size:15px;font-weight:650}
 .effect-name small{font-size:12px;color:var(--ui-text-secondary)}
 .mine{font-style:normal;font-size:11px;font-weight:600;margin-left:8px;padding:1px 7px;border-radius:999px;background:var(--ui-primary-soft);color:var(--ui-primary-text)}
-.effect-check{position:absolute;top:10px;right:10px;width:26px;height:26px;padding:5px;border-radius:50%;background:var(--ui-primary);color:#fff}
+.effect-check{position:absolute;top:10px;left:10px;width:26px;height:26px;padding:5px;border-radius:50%;background:var(--ui-primary);color:#fff}
 .tuning{padding:24px;max-width:640px}
 .tuning .section-heading{margin-bottom:12px}
 .field{margin:16px 0 4px}
