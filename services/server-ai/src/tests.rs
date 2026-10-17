@@ -57,6 +57,17 @@ struct MockInner {
     chat_mode: ChatMode,
     chat_cost: i64,
     chat_requests: Vec<(String, Value)>,
+    admin_token: String,
+    /// 每次转发到 /v1/* 收到的 (路径, 全部请求头名, Authorization, 请求体)。
+    relayed: Vec<Relayed>,
+}
+
+struct Relayed {
+    path: String,
+    header_names: Vec<String>,
+    anthropic_version: Option<String>,
+    authorization: String,
+    body: Value,
 }
 
 struct Mock(Mutex<MockInner>);
@@ -74,6 +85,18 @@ impl Mock {
     fn user_count(&self) -> usize {
         self.0.lock().unwrap().users.len()
     }
+    fn accept_admin_token(&self, token: &str) {
+        self.0.lock().unwrap().admin_token = token.to_string();
+    }
+    fn relayed(&self, path: &str) -> Vec<Relayed> {
+        self.0.lock().unwrap().relayed.iter().filter(|r| r.path == path).map(|r| Relayed {
+            path: r.path.clone(),
+            header_names: r.header_names.clone(),
+            anthropic_version: r.anthropic_version.clone(),
+            authorization: r.authorization.clone(),
+            body: r.body.clone(),
+        }).collect()
+    }
     fn consume(&self, id: i64, amount: i64) {
         self.0.lock().unwrap().users.get_mut(&id).unwrap().quota -= amount;
     }
@@ -82,8 +105,9 @@ impl Mock {
     }
 }
 
-fn authorized(headers: &HeaderMap) -> bool {
-    headers.get(header::AUTHORIZATION).and_then(|v| v.to_str().ok()) == Some(&format!("Bearer {ADMIN_TOKEN}"))
+fn authorized(m: &Mock, headers: &HeaderMap) -> bool {
+    let expected = m.0.lock().unwrap().admin_token.clone();
+    headers.get(header::AUTHORIZATION).and_then(|v| v.to_str().ok()) == Some(&format!("Bearer {expected}"))
 }
 
 fn ok(data: Value) -> Response {
@@ -99,7 +123,7 @@ fn user_json(id: i64, user: &MockUser) -> Value {
 }
 
 async fn mock_create(State(m): State<Arc<Mock>>, headers: HeaderMap, Json(body): Json<Value>) -> Response {
-    if !authorized(&headers) {
+    if !authorized(&m, &headers) {
         return StatusCode::UNAUTHORIZED.into_response();
     }
     let username = body["username"].as_str().unwrap_or_default().to_string();
@@ -118,7 +142,7 @@ async fn mock_create(State(m): State<Arc<Mock>>, headers: HeaderMap, Json(body):
 }
 
 async fn mock_search(State(m): State<Arc<Mock>>, headers: HeaderMap, Query(q): Query<HashMap<String, String>>) -> Response {
-    if !authorized(&headers) {
+    if !authorized(&m, &headers) {
         return StatusCode::UNAUTHORIZED.into_response();
     }
     let keyword = q.get("keyword").cloned().unwrap_or_default();
@@ -128,7 +152,7 @@ async fn mock_search(State(m): State<Arc<Mock>>, headers: HeaderMap, Query(q): Q
 }
 
 async fn mock_get_user(State(m): State<Arc<Mock>>, headers: HeaderMap, Path(id): Path<i64>) -> Response {
-    if !authorized(&headers) {
+    if !authorized(&m, &headers) {
         return StatusCode::UNAUTHORIZED.into_response();
     }
     match m.0.lock().unwrap().users.get(&id) {
@@ -138,7 +162,7 @@ async fn mock_get_user(State(m): State<Arc<Mock>>, headers: HeaderMap, Path(id):
 }
 
 async fn mock_manage(State(m): State<Arc<Mock>>, headers: HeaderMap, Json(body): Json<Value>) -> Response {
-    if !authorized(&headers) {
+    if !authorized(&m, &headers) {
         return StatusCode::UNAUTHORIZED.into_response();
     }
     let mut inner = m.0.lock().unwrap();
@@ -159,7 +183,7 @@ async fn mock_manage(State(m): State<Arc<Mock>>, headers: HeaderMap, Json(body):
 }
 
 async fn mock_token(State(m): State<Arc<Mock>>, headers: HeaderMap, Path(id): Path<i64>, Json(body): Json<Value>) -> Response {
-    if !authorized(&headers) {
+    if !authorized(&m, &headers) {
         return StatusCode::UNAUTHORIZED.into_response();
     }
     if body["name"] != json!("server-ai") {
@@ -204,6 +228,53 @@ async fn mock_chat(State(m): State<Arc<Mock>>, headers: HeaderMap, Json(body): J
     }
 }
 
+/// 假的 /v1/responses 与 /v1/messages：和对话补全一样按 Key 扣钱，响应里把真实模型放在协议规定的位置，
+/// 并故意在用户数据（工具参数）里也放一个叫 model 的字段，用来确认代理不会误改。
+async fn mock_relay(State(m): State<Arc<Mock>>, uri: axum::http::Uri, headers: HeaderMap, Json(body): Json<Value>) -> Response {
+    let path = uri.path().to_string();
+    let authorization = headers.get(header::AUTHORIZATION).and_then(|v| v.to_str().ok()).unwrap_or_default().to_string();
+    let mut inner = m.0.lock().unwrap();
+    inner.relayed.push(Relayed {
+        path: path.clone(),
+        header_names: headers.keys().map(|k| k.as_str().to_string()).collect(),
+        anthropic_version: headers.get("anthropic-version").and_then(|v| v.to_str().ok()).map(str::to_string),
+        authorization: authorization.clone(),
+        body: body.clone(),
+    });
+    let Some(key) = authorization.strip_prefix("Bearer sk-") else { return StatusCode::UNAUTHORIZED.into_response() };
+    let Some(id) = inner.users.iter().find(|(_, u)| u.key == key).map(|(id, _)| *id) else { return StatusCode::UNAUTHORIZED.into_response() };
+    let cost = inner.chat_cost;
+    inner.users.get_mut(&id).unwrap().quota -= cost;
+    let model = body["model"].as_str().unwrap_or_default().to_string();
+    let anthropic = path == "/v1/messages";
+    let streaming = body["stream"] == json!(true);
+    match (inner.chat_mode, anthropic, streaming) {
+        (ChatMode::Fail, _, _) => (StatusCode::INTERNAL_SERVER_ERROR, format!("model {model} failed on channel 7")).into_response(),
+        (_, true, false) => Json(json!({ "id": "msg_1", "type": "message", "role": "assistant", "model": format!("{model}-20260101"),
+            "content": [{ "type": "tool_use", "id": "t1", "name": "pick", "input": { "model": "keep-me" } }], "stop_reason": "tool_use" })).into_response(),
+        (_, false, false) => Json(json!({ "id": "resp_1", "object": "response", "model": model, "status": "completed",
+            "output": [{ "type": "function_call", "name": "pick", "arguments": "{\"model\":\"keep-me\"}" }] })).into_response(),
+        (_, true, true) => {
+            let events = [
+                ("message_start", json!({ "type": "message_start", "message": { "id": "msg_1", "model": format!("{model}-20260101"), "role": "assistant" } })),
+                ("content_block_start", json!({ "type": "content_block_start", "index": 0, "content_block": { "type": "tool_use", "input": { "model": "keep-me" } } })),
+                ("message_stop", json!({ "type": "message_stop" })),
+            ];
+            let text: String = events.iter().map(|(name, data)| format!("event: {name}\ndata: {data}\n\n")).collect();
+            Response::builder().header(header::CONTENT_TYPE, "text/event-stream").body(Body::from(text)).unwrap()
+        }
+        (_, false, true) => {
+            let events = [
+                ("response.created", json!({ "type": "response.created", "response": { "id": "resp_1", "model": model, "status": "in_progress" } })),
+                ("response.output_item.done", json!({ "type": "response.output_item.done", "item": { "type": "function_call", "model": "keep-me" } })),
+                ("response.completed", json!({ "type": "response.completed", "response": { "id": "resp_1", "model": model, "status": "completed" } })),
+            ];
+            let text: String = events.iter().map(|(name, data)| format!("event: {name}\ndata: {data}\n\n")).collect();
+            Response::builder().header(header::CONTENT_TYPE, "text/event-stream").body(Body::from(text)).unwrap()
+        }
+    }
+}
+
 async fn start_mock() -> (Arc<Mock>, String) {
     let mock = Arc::new(Mock(Mutex::new(MockInner {
         users: BTreeMap::new(),
@@ -213,6 +284,8 @@ async fn start_mock() -> (Arc<Mock>, String) {
         chat_mode: ChatMode::Json,
         chat_cost: 0,
         chat_requests: Vec::new(),
+        admin_token: ADMIN_TOKEN.to_string(),
+        relayed: Vec::new(),
     })));
     let app = Router::new()
         .route("/api/user/", post(mock_create))
@@ -222,6 +295,8 @@ async fn start_mock() -> (Arc<Mock>, String) {
         .route("/api/user/{id}/token", post(mock_token))
         .route("/api/pricing", get(mock_pricing))
         .route("/v1/chat/completions", post(mock_chat))
+        .route("/v1/responses", post(mock_relay))
+        .route("/v1/messages", post(mock_relay))
         .with_state(mock.clone());
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let base = format!("http://{}", listener.local_addr().unwrap());
@@ -1260,5 +1335,258 @@ async fn users_never_see_admin_notes_or_operator_names() {
     let titles: Vec<&str> = ledger["items"].as_array().unwrap().iter().map(|r| r["title"].as_str().unwrap()).collect();
     assert!(titles.contains(&"新用户试用额度") && titles.contains(&"兑换码入账") && titles.contains(&"额度补发"), "{titles:?}");
     assert_eq!(balance["buckets"].as_array().unwrap().len(), 3);
+    h.cleanup().await;
+}
+
+// ---- /v1/responses 与 /v1/messages ----
+
+impl Harness {
+    async fn api_call(&self, path: &str, headers: &[(&str, String)], body: Value) -> (StatusCode, String) {
+        let mut req = Request::builder().method(Method::POST).uri(path).header(header::CONTENT_TYPE, "application/json");
+        for (name, value) in headers {
+            req = req.header(*name, value);
+        }
+        let response = self.app.clone().oneshot(req.body(Body::from(body.to_string())).unwrap()).await.unwrap();
+        let status = response.status();
+        let bytes = to_bytes(response.into_body(), 1 << 20).await.unwrap();
+        (status, String::from_utf8_lossy(&bytes).into_owned())
+    }
+
+    fn bearer(&self, uid: Uuid) -> (&'static str, String) {
+        ("authorization", format!("Bearer {}", self.token(uid, CLIENT)))
+    }
+
+    /// Anthropic 的 SDK 把密钥放在 x-api-key 里，而不是 Authorization。
+    fn api_key(&self, uid: Uuid) -> (&'static str, String) {
+        ("x-api-key", self.token(uid, CLIENT))
+    }
+}
+
+#[tokio::test]
+async fn responses_requests_are_translated_and_the_real_model_never_comes_back() {
+    let h = harness!();
+    h.seed_wallpaper().await;
+    let uid = Uuid::new_v4();
+
+    let (status, text) = h.api_call("/v1/responses", &[h.bearer(uid)], json!({ "model": "standard", "input": "hi" })).await;
+    assert_eq!(status, StatusCode::OK, "{text}");
+    let body: Value = serde_json::from_str(&text).unwrap();
+    assert_eq!(body["model"], "standard");
+    assert!(!text.contains(REAL_STANDARD), "{text}");
+    assert!(text.contains("keep-me"), "user data inside tool arguments must survive untouched: {text}");
+
+    let seen = h.mock.relayed("/v1/responses");
+    assert_eq!(seen.len(), 1);
+    assert_eq!(seen[0].body["model"], REAL_STANDARD, "the tier is swapped for the real model on the way in");
+    assert!(seen[0].authorization.starts_with("Bearer sk-mockkey"), "the gateway sees the binding's key, not the user's login token");
+    assert!(!seen[0].authorization.contains(&h.token(uid, CLIENT)));
+    assert_eq!(h.mock.user_count(), 1, "the first call provisions the account just like chat completions");
+
+    let (status, text) = h.api_call("/v1/responses", &[h.bearer(uid)], json!({ "input": "hi" })).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(serde_json::from_str::<Value>(&text).unwrap()["model"], "standard", "a missing model falls back to the default tier");
+    h.cleanup().await;
+}
+
+#[tokio::test]
+async fn responses_streams_relabel_the_nested_model_and_keep_user_data() {
+    let h = harness!();
+    h.seed_wallpaper().await;
+    let (status, text) = h.api_call("/v1/responses", &[h.bearer(Uuid::new_v4())], json!({ "model": "standard", "stream": true, "input": "hi" })).await;
+    assert_eq!(status, StatusCode::OK, "{text}");
+    assert!(!text.contains(REAL_STANDARD), "{text}");
+    assert_eq!(text.matches(r#""model":"standard""#).count(), 2, "response.created and response.completed both carry the tier: {text}");
+    assert!(text.contains(r#""model":"keep-me""#), "an item's own model field is user data: {text}");
+    assert!(text.contains("event: response.completed"), "event lines pass through: {text}");
+    h.cleanup().await;
+}
+
+#[tokio::test]
+async fn messages_accept_x_api_key_forward_only_protocol_headers_and_relabel() {
+    let h = harness!();
+    h.seed_wallpaper().await;
+    let uid = Uuid::new_v4();
+
+    let (status, text) = h
+        .api_call(
+            "/v1/messages",
+            &[h.api_key(uid), ("anthropic-version", "2023-06-01".into()), ("x-forwarded-for", "203.0.113.9".into())],
+            json!({ "model": "standard", "max_tokens": 16, "messages": [{ "role": "user", "content": "hi" }] }),
+        )
+        .await;
+    assert_eq!(status, StatusCode::OK, "{text}");
+    let body: Value = serde_json::from_str(&text).unwrap();
+    assert_eq!(body["model"], "standard", "a dated upstream id like model-20260101 is replaced as a whole");
+    assert!(!text.contains(REAL_STANDARD), "{text}");
+    assert_eq!(body["content"][0]["input"]["model"], "keep-me");
+
+    let seen = h.mock.relayed("/v1/messages");
+    assert_eq!(seen.len(), 1);
+    assert_eq!(seen[0].anthropic_version.as_deref(), Some("2023-06-01"));
+    assert_eq!(seen[0].body["model"], REAL_STANDARD);
+    for leaked in ["x-api-key", "x-forwarded-for", "cookie"] {
+        assert!(!seen[0].header_names.iter().any(|n| n == leaked), "{leaked} must not reach the gateway: {:?}", seen[0].header_names);
+    }
+    assert!(!seen[0].authorization.contains(&h.token(uid, CLIENT)), "the user's login token must not reach the gateway");
+
+    let (status, text) = h.api_call("/v1/messages", &[h.bearer(uid)], json!({ "model": "standard", "max_tokens": 16, "messages": [] })).await;
+    assert_eq!(status, StatusCode::OK, "Authorization: Bearer works for messages too: {text}");
+    h.cleanup().await;
+}
+
+#[tokio::test]
+async fn message_streams_relabel_message_start_and_leave_content_blocks_alone() {
+    let h = harness!();
+    h.seed_wallpaper().await;
+    let (status, text) = h
+        .api_call("/v1/messages", &[h.api_key(Uuid::new_v4())], json!({ "model": "standard", "max_tokens": 16, "stream": true, "messages": [] }))
+        .await;
+    assert_eq!(status, StatusCode::OK, "{text}");
+    assert!(!text.contains(REAL_STANDARD), "{text}");
+    assert!(text.contains(r#""model":"standard""#), "message_start carries the tier: {text}");
+    assert!(text.contains(r#""model":"keep-me""#), "tool input is user data: {text}");
+    assert!(text.contains("event: message_start") && text.contains("event: message_stop"), "{text}");
+    h.cleanup().await;
+}
+
+#[tokio::test]
+async fn errors_follow_each_protocol_and_the_paid_tier_gate_applies_everywhere() {
+    let h = harness!();
+    h.seed_wallpaper().await;
+    let uid = Uuid::new_v4();
+
+    let (status, text) = h.api_call("/v1/messages", &[h.api_key(uid)], json!({ "model": "premium", "max_tokens": 16, "messages": [] })).await;
+    let body: Value = serde_json::from_str(&text).unwrap();
+    assert_eq!(status, StatusCode::FORBIDDEN);
+    assert_eq!((body["type"].as_str(), body["error"]["type"].as_str(), body["error"]["code"].as_str()), (Some("error"), Some("permission_error"), Some("paid_required")), "{text}");
+
+    let (status, text) = h.api_call("/v1/responses", &[h.bearer(uid)], json!({ "model": "premium", "input": "hi" })).await;
+    let body: Value = serde_json::from_str(&text).unwrap();
+    assert_eq!((status, body["error"]["code"].as_str()), (StatusCode::FORBIDDEN, Some("paid_required")), "{text}");
+
+    let (status, text) = h.api_call("/v1/messages", &[h.api_key(uid)], json!({ "model": REAL_STANDARD, "max_tokens": 16, "messages": [] })).await;
+    let body: Value = serde_json::from_str(&text).unwrap();
+    assert_eq!((status, body["error"]["type"].as_str(), body["error"]["code"].as_str()), (StatusCode::BAD_REQUEST, Some("invalid_request_error"), Some("model_not_found")), "a real model name is not a tier: {text}");
+
+    let (status, text) = h.api_call("/v1/messages", &[], json!({ "model": "standard", "max_tokens": 16, "messages": [] })).await;
+    let body: Value = serde_json::from_str(&text).unwrap();
+    assert_eq!((status, body["error"]["type"].as_str()), (StatusCode::UNAUTHORIZED, Some("authentication_error")), "{text}");
+    let (status, text) = h.api_call("/v1/messages", &[("x-api-key", "garbage".into())], json!({ "model": "standard", "max_tokens": 16, "messages": [] })).await;
+    assert_eq!(status, StatusCode::UNAUTHORIZED, "{text}");
+
+    h.mock.0.lock().unwrap().chat_mode = ChatMode::Fail;
+    for (path, headers) in [("/v1/messages", vec![h.api_key(uid)]), ("/v1/responses", vec![h.bearer(uid)])] {
+        let (status, text) = h.api_call(path, &headers, json!({ "model": "standard", "max_tokens": 16, "messages": [], "input": "hi" })).await;
+        assert_eq!(status, StatusCode::BAD_GATEWAY, "{path}");
+        assert!(!text.contains(REAL_STANDARD) && !text.contains("channel"), "{path} leaks upstream details: {text}");
+    }
+    h.cleanup().await;
+}
+
+#[tokio::test]
+async fn all_three_protocols_draw_on_the_same_balance() {
+    let h = harness!();
+    h.seed_wallpaper().await;
+    let uid = Uuid::new_v4();
+    h.mock.0.lock().unwrap().chat_cost = 40_000;
+
+    h.chat(uid, "standard").await;
+    h.api_call("/v1/responses", &[h.bearer(uid)], json!({ "model": "standard", "input": "hi" })).await;
+    h.api_call("/v1/messages", &[h.api_key(uid)], json!({ "model": "standard", "max_tokens": 16, "messages": [] })).await;
+    let (user_id, wallet) = h.mock.only_user();
+    assert_eq!(wallet, TRIAL - 3 * 40_000);
+
+    let binding_id = h.only_binding().await;
+    sync::sync_binding(&h.state, binding_id).await.unwrap();
+    assert_eq!(h.balance(binding_id).await, h.mock.quota_of(user_id), "consumption through any protocol is settled into the buckets");
+    h.cleanup().await;
+}
+
+// ---- 后台填写的网关令牌 ----
+
+const NEW_TOKEN: &str = "nap_rotated_token_0123456789abcdef";
+
+#[tokio::test]
+async fn the_gateway_token_can_be_entered_in_the_console_verified_and_swapped_live() {
+    let h = harness!();
+    h.seed_wallpaper().await;
+    let admin = h.admin_token().await;
+
+    let (_, view) = h.call(Method::GET, "/api/admin/settings", Some(&admin), Value::Null).await;
+    assert_eq!((view["newapi"]["source"].as_str(), view["newapi"]["configured"].as_bool()), (Some("env"), Some(true)));
+    assert_eq!(view["newapi"]["hint"], "…oken", "only the last four characters are ever shown");
+
+    // 填错的令牌被网关拒绝：什么都不保存，正在用的令牌继续工作。
+    let (status, body) = h.call(Method::PUT, "/api/admin/settings/newapi", Some(&admin), json!({ "admin_token": NEW_TOKEN })).await;
+    assert_eq!(status, StatusCode::BAD_REQUEST, "{body}");
+    assert!(body["message"].as_str().unwrap().contains("不接受"), "{body}");
+    let (stored,): (i64,) = sqlx::query_as("SELECT COUNT(*) FROM system_settings").fetch_one(&h.state.pool).await.unwrap();
+    assert_eq!(stored, 0, "a rejected token is not saved");
+    assert_eq!(h.chat(Uuid::new_v4(), "standard").await.0, StatusCode::OK, "the previous token still works");
+
+    for (bad, why) in [("", "empty"), ("   ", "blank"), ("nap_short", "too short"), ("nap_has space_0123456789", "whitespace inside"), ("令牌令牌令牌令牌令牌令牌令牌令牌", "non-ascii")] {
+        let (status, _) = h.call(Method::PUT, "/api/admin/settings/newapi", Some(&admin), json!({ "admin_token": bad })).await;
+        assert_eq!(status, StatusCode::BAD_REQUEST, "{why}");
+    }
+
+    // 网关换了令牌后填入新的：保存成功，立刻生效，旧的不再被使用。
+    h.mock.accept_admin_token(NEW_TOKEN);
+    let (status, body) = h.call(Method::PUT, "/api/admin/settings/newapi", Some(&admin), json!({ "admin_token": format!("  {NEW_TOKEN}\n") })).await;
+    assert_eq!((status, body["hint"].as_str()), (StatusCode::OK, Some("…cdef")), "{body}");
+    let (status, body) = h.chat(Uuid::new_v4(), "standard").await;
+    assert_eq!(status, StatusCode::OK, "provisioning now uses the console token, which is the only one the gateway accepts: {body}");
+
+    let (_, view) = h.call(Method::GET, "/api/admin/settings", Some(&admin), Value::Null).await;
+    assert_eq!((view["newapi"]["source"].as_str(), view["newapi"]["hint"].as_str()), (Some("console"), Some("…cdef")));
+    assert!(view["newapi"]["updated_at"].is_string());
+    assert!(!view.to_string().contains(NEW_TOKEN), "the token itself is never returned");
+
+    let (_, test) = h.call(Method::POST, "/api/admin/settings/newapi/test", Some(&admin), json!({})).await;
+    assert_eq!(test["ok"], true, "{test}");
+    h.mock.accept_admin_token("rotated-away-again-0123456789");
+    let (status, test) = h.call(Method::POST, "/api/admin/settings/newapi/test", Some(&admin), json!({})).await;
+    assert_eq!((status, test["ok"].as_bool()), (StatusCode::OK, Some(false)), "a revoked token is reported, not hidden: {test}");
+    assert!(test["message"].as_str().unwrap().contains("不接受"));
+    h.cleanup().await;
+}
+
+#[tokio::test]
+async fn the_saved_gateway_token_is_encrypted_audited_and_survives_a_restart() {
+    let h = harness!();
+    h.seed_wallpaper().await;
+    let admin = h.admin_token().await;
+    h.mock.accept_admin_token(NEW_TOKEN);
+    let (status, _) = h.call(Method::PUT, "/api/admin/settings/newapi", Some(&admin), json!({ "admin_token": NEW_TOKEN })).await;
+    assert_eq!(status, StatusCode::OK);
+
+    let (raw,): (Vec<u8>,) = sqlx::query_as("SELECT value_enc FROM system_settings WHERE key = 'newapi_admin_token'").fetch_one(&h.state.pool).await.unwrap();
+    assert!(!raw.windows(NEW_TOKEN.len()).any(|w| w == NEW_TOKEN.as_bytes()), "the database must not hold the plaintext token");
+    assert!(h.state.keys.decrypt("some-other-purpose", &raw).is_err(), "the ciphertext is bound to its purpose");
+
+    // 重启：新进程只有环境变量里的旧令牌，启动时应当用数据库里的覆盖它。
+    let restarted = NewApi::new(h.state.newapi.base_url().to_string(), Some(ADMIN_TOKEN.to_string()));
+    assert!(restarted.check_current().await.is_err(), "the env token alone is no longer accepted by the gateway");
+    let stored = crate::settings::load_newapi_token(&h.state.pool, &h.state.keys).await.unwrap().expect("a saved token");
+    restarted.set_admin_token(Some(stored.token));
+    restarted.check_current().await.expect("the stored token works after a restart");
+
+    let (_, audit) = h.call(Method::GET, "/api/admin/audit", Some(&admin), Value::Null).await;
+    let entry = audit["items"].as_array().unwrap().iter().find(|r| r["action"] == "settings.newapi_token").expect("audit entry");
+    assert_eq!(entry["detail"], "令牌尾号 …cdef");
+    assert!(!audit.to_string().contains(NEW_TOKEN), "the token must not appear in the audit log");
+    h.cleanup().await;
+}
+
+#[tokio::test]
+async fn only_administrators_can_read_or_change_the_gateway_settings() {
+    let h = harness!();
+    h.seed_wallpaper().await;
+    let user = h.token(Uuid::new_v4(), CLIENT);
+    for (method, path) in [(Method::GET, "/api/admin/settings"), (Method::PUT, "/api/admin/settings/newapi"), (Method::POST, "/api/admin/settings/newapi/test")] {
+        let (status, _) = h.call(method.clone(), path, None, json!({ "admin_token": NEW_TOKEN })).await;
+        assert_eq!(status, StatusCode::UNAUTHORIZED, "{method} {path} without credentials");
+        let (status, _) = h.call(method.clone(), path, Some(&user), json!({ "admin_token": NEW_TOKEN })).await;
+        assert_eq!(status, StatusCode::UNAUTHORIZED, "{method} {path} with a user token");
+    }
     h.cleanup().await;
 }

@@ -16,6 +16,7 @@ mod proxy;
 mod quota;
 mod ratelimit;
 mod redeem;
+mod settings;
 mod state;
 mod sync;
 
@@ -64,6 +65,9 @@ pub fn build_router(state: AppState) -> Router {
         .route("/admin/batches/{id}/void", post(admin::void_batch))
         .route("/admin/codes/lookup", post(admin::lookup_code))
         .route("/admin/codes/{id}/void", post(admin::void_code))
+        .route("/admin/settings", get(admin::get_settings))
+        .route("/admin/settings/newapi", put(admin::put_newapi_token))
+        .route("/admin/settings/newapi/test", post(admin::test_newapi))
         .route("/admin/anomalies", get(admin::anomalies))
         .route("/admin/anomalies/{id}/resolve", post(admin::resolve_anomaly))
         .route("/admin/audit", get(admin::audit_log));
@@ -71,6 +75,8 @@ pub fn build_router(state: AppState) -> Router {
     let v1 = Router::new()
         .route("/models", get(proxy::list_models))
         .route("/chat/completions", post(proxy::chat_completions))
+        .route("/responses", post(proxy::responses))
+        .route("/messages", post(proxy::messages))
         .layer(DefaultBodyLimit::max(state.config.max_body_bytes));
 
     // 凭证只走 Authorization 头，不使用 Cookie，因此跨域放开不构成 CSRF 面。
@@ -112,20 +118,30 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     db::migrate(&pool).await?;
     admin_auth::seed(&pool, &config).await?;
 
-    if config.newapi_admin_token.is_none() {
-        tracing::warn!("未设置 AI_NEWAPI_ADMIN_TOKEN：无法开通用户、对账，也无法转发调用");
-    }
     let dummy_password_hash = password::hash("dummy-password-for-timing".into()).await?;
     let addr: SocketAddr = format!("{}:{}", config.host, config.port).parse()?;
     info!("server-ai issuer={} newapi={} listening on {addr}", config.account_issuer, config.newapi_base_url);
 
+    // 后台里填写的令牌优先于环境变量；读不出来（例如主密钥换过）时退回环境变量，并在后台提示重新填写。
+    let newapi = Arc::new(newapi::NewApi::new(config.newapi_base_url.clone(), config.newapi_admin_token.clone()));
+    match settings::load_newapi_token(&pool, &keys).await {
+        Ok(Some(stored)) => {
+            newapi.set_admin_token(Some(stored.token));
+            info!("已从数据库加载 New API 管理令牌");
+        }
+        Ok(None) => {}
+        Err(e) => tracing::warn!("后台保存的 New API 令牌读不出来，暂用环境变量: {e}"),
+    }
+    if !newapi.is_configured() {
+        tracing::warn!("尚未设置 New API 管理令牌：登录后台「网关连接」页填写之前，无法开通用户、对账，也不能转发调用");
+    }
     let (redeem_user_limiter, redeem_ip_limiter) = state::redeem_limiters();
     let state = AppState {
         pool,
         redeem_user_limiter,
         redeem_ip_limiter,
         verifier: Arc::new(jwks::JwksVerifier::new(config.account_issuer.clone(), config.account_jwks_url.clone())),
-        newapi: Arc::new(newapi::NewApi::new(config.newapi_base_url.clone(), config.newapi_admin_token.clone())),
+        newapi,
         config: Arc::new(config),
         keys: Arc::new(keys),
         dummy_password_hash: Arc::new(dummy_password_hash),

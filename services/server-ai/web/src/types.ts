@@ -132,3 +132,12 @@ export interface CodeLookup {
   bucket_expires_at: string | null;
   bucket_closed_reason: string | null;
 }
+
+export interface GatewaySettings {
+  base_url: string;
+  configured: boolean;
+  source: 'console' | 'env' | 'none';
+  hint: string | null;
+  updated_at: string | null;
+  problem: string | null;
+}

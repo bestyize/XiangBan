@@ -118,6 +118,13 @@ CREATE TABLE IF NOT EXISTS redeem_codes (
 CREATE INDEX IF NOT EXISTS redeem_codes_batch_idx ON redeem_codes (batch_id, status);
 CREATE INDEX IF NOT EXISTS redeem_codes_user_idx ON redeem_codes (redeemed_by) WHERE redeemed_by IS NOT NULL;
 
+-- 后台里填写的运行时设置（如 New API 管理令牌），值已加密。
+CREATE TABLE IF NOT EXISTS system_settings (
+    key        TEXT PRIMARY KEY,
+    value_enc  BYTEA NOT NULL,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
 CREATE TABLE IF NOT EXISTS admins (
     id            UUID PRIMARY KEY,
     username      TEXT NOT NULL UNIQUE,

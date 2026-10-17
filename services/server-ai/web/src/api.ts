@@ -1,5 +1,5 @@
 import { session, signOut } from './session';
-import type { Anomaly, AuditRow, Batch, BindingDetail, BindingRow, CodeLookup, ModelOption, Overview, Product, Tier } from './types';
+import type { Anomaly, AuditRow, Batch, BindingDetail, BindingRow, CodeLookup, GatewaySettings, ModelOption, Overview, Product, Tier } from './types';
 
 export class ApiError extends Error {
   constructor(message: string, public status: number) {
@@ -61,6 +61,9 @@ export const api = {
   voidBatch: (id: number) => request<{ ok: true; voided: number }>('POST', `/admin/batches/${id}/void`),
   lookupCode: (code: string) => request<{ code: CodeLookup }>('POST', '/admin/codes/lookup', { code }),
   voidCode: (id: number) => request<{ ok: true }>('POST', `/admin/codes/${id}/void`),
+  settings: () => request<{ newapi: GatewaySettings }>('GET', '/admin/settings'),
+  saveGatewayToken: (admin_token: string) => request<{ ok: true; hint: string }>('PUT', '/admin/settings/newapi', { admin_token }),
+  testGateway: () => request<{ ok: boolean; message?: string }>('POST', '/admin/settings/newapi/test'),
 };
 
 export function errorMessage(error: unknown): string {

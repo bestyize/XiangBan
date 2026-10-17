@@ -4,7 +4,7 @@ use crate::error::AppError;
 use reqwest::{Method, Response};
 use serde::Deserialize;
 use serde_json::{json, Value};
-use std::time::Duration;
+use std::{sync::RwLock, time::Duration};
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct NewApiUser {
@@ -49,7 +49,8 @@ pub struct NewApi {
     /// 转发调用不设整体超时（流式响应可能持续很久），只限制建立连接。
     stream_http: reqwest::Client,
     base: String,
-    admin_token: Option<String>,
+    /// 管理令牌可以在后台随时更换，所以放在锁里；读出来立刻克隆，绝不带着锁跨 await。
+    admin_token: RwLock<Option<String>>,
 }
 
 impl NewApi {
@@ -62,18 +63,54 @@ impl NewApi {
             .read_timeout(Duration::from_secs(300))
             .build()
             .unwrap_or_default();
-        Self { http, stream_http, base, admin_token }
+        Self { http, stream_http, base, admin_token: RwLock::new(admin_token) }
+    }
+
+    pub fn base_url(&self) -> &str {
+        &self.base
+    }
+
+    fn token(&self) -> Option<String> {
+        self.admin_token.read().unwrap_or_else(|e| e.into_inner()).clone()
+    }
+
+    pub fn set_admin_token(&self, token: Option<String>) {
+        *self.admin_token.write().unwrap_or_else(|e| e.into_inner()) = token;
     }
 
     pub fn is_configured(&self) -> bool {
-        self.admin_token.is_some()
+        self.token().is_some()
+    }
+
+    /// 用一个还没保存的候选令牌访问网关，确认它被接受、且能读取用户（`user:read`）。
+    /// 写权限（`user:write`）没法在不产生副作用的前提下验证，用户第一次开通失败时会在日志里看到。
+    pub async fn check_token(&self, candidate: &str) -> Result<(), AppError> {
+        let url = format!("{}/api/user/search?keyword=a&p=1&page_size=1", self.base);
+        let response = self.http.get(&url).bearer_auth(candidate).send().await.map_err(|e| {
+            tracing::warn!("验证 New API 令牌时连不上网关 {}: {e}", self.base);
+            AppError::BadGateway(format!("连不上 AI 网关（{}），请确认它正在运行", self.base))
+        })?;
+        let status = response.status();
+        let text = response.text().await.unwrap_or_default();
+        let value: Value = serde_json::from_str(&text).unwrap_or(Value::Null);
+        let rejected = !status.is_success() || value.get("success").and_then(Value::as_bool) == Some(false);
+        if !rejected {
+            return Ok(());
+        }
+        let detail = value.get("message").and_then(Value::as_str).filter(|m| !m.is_empty()).map(|m| format!("（网关说：{}）", truncate(m))).unwrap_or_default();
+        tracing::warn!("New API 不接受管理令牌 status={status}: {}", truncate(&text));
+        Err(AppError::BadRequest(format!("AI 网关不接受这个令牌：令牌填错、已过期，或没有「用户」的查看权限{detail}")))
+    }
+
+    pub async fn check_current(&self) -> Result<(), AppError> {
+        let token = self.token().ok_or_else(|| AppError::BadRequest("还没有设置管理令牌".into()))?;
+        self.check_token(&token).await
     }
 
     async fn admin_call(&self, method: Method, path: &str, body: Option<Value>) -> Result<Value, AppError> {
         let token = self
-            .admin_token
-            .as_deref()
-            .ok_or_else(|| AppError::ServiceUnavailable("尚未配置 New API 管理令牌".into()))?;
+            .token()
+            .ok_or_else(|| AppError::ServiceUnavailable("尚未配置 New API 管理令牌，请到后台「网关连接」填写".into()))?;
         let mut request = self.http.request(method, format!("{}{}", self.base, path)).bearer_auth(token);
         if let Some(body) = body {
             request = request.json(&body);
@@ -150,19 +187,22 @@ impl NewApi {
         Ok(items.into_iter().filter_map(|v| serde_json::from_value(v).ok()).collect())
     }
 
-    /// 以某个绑定自己的 Key 转发一次对话补全，原样返回上游响应供调用方处理。
-    pub async fn chat_completions(&self, key: &str, body: Vec<u8>) -> Result<Response, AppError> {
-        self.stream_http
-            .post(format!("{}/v1/chat/completions", self.base))
+    /// 以某个绑定自己的 Key 把请求转发到 New API 的指定路径（对话补全、Responses、Messages），原样返回上游响应供调用方处理。
+    /// `extra_headers` 只用来带上协议必需的头（如 `anthropic-version`），调用方负责只传白名单里的头。
+    pub async fn relay(&self, path: &str, key: &str, body: Vec<u8>, extra_headers: &[(&str, String)]) -> Result<Response, AppError> {
+        let mut request = self
+            .stream_http
+            .post(format!("{}{}", self.base, path))
             .bearer_auth(format!("sk-{key}"))
             .header(reqwest::header::CONTENT_TYPE, "application/json")
-            .body(body)
-            .send()
-            .await
-            .map_err(|e| {
-                tracing::warn!("转发到 New API 失败: {e}");
-                AppError::BadGateway("AI 服务暂时不可用".into())
-            })
+            .body(body);
+        for (name, value) in extra_headers {
+            request = request.header(*name, value);
+        }
+        request.send().await.map_err(|e| {
+            tracing::warn!("转发到 New API 失败 {path}: {e}");
+            AppError::BadGateway("AI 服务暂时不可用".into())
+        })
     }
 }
 

@@ -36,7 +36,7 @@ cargo test --locked --manifest-path services/server-ai/Cargo.toml
 | `AI_ACCOUNT_ISSUER` | `https://account.xiangban.xyz` | 账号中心令牌的 `iss`，必须一致 |
 | `AI_ACCOUNT_JWKS_URL` | `{issuer}/.well-known/jwks.json` | 公钥地址 |
 | `AI_NEWAPI_BASE_URL` | `http://127.0.0.1:3000` | New API 地址（回环）。本服务访问它时忽略系统代理环境变量 |
-| `AI_NEWAPI_ADMIN_TOKEN` | 空 | New API 访问令牌（`nap_` 前缀），只授予 `user:read`、`user:write`，不要用 root。未设置时无法开通用户、对账和转发 |
+| `AI_NEWAPI_ADMIN_TOKEN` | 空 | **可选，一般不用设**。New API 管理令牌推荐直接在后台「网关连接」页填写（加密存数据库，立即生效，无需重启）；后台保存过的令牌优先于这个变量。令牌是 `nap_` 前缀的访问令牌，只授予「用户」的查看和编辑（`user:read`、`user:write`），不要用 root |
 | `AI_NEWAPI_DEFAULT_RATIO` | `37.5` | 未配置倍率的模型在 New API 里的默认倍率，保存档位时用它判断是否漏配 |
 | `AI_QUOTA_PER_UNIT` | `500000` | New API 里 1 美元对应的额度点数，仅用于后台展示 |
 | `AI_MASTER_KEY_BASE64` / `AI_DATA_DIR` | 空 / `ai_data` | 主密钥（至少 32 字节）；未设置时首次启动在数据目录生成 `master.key`。**必须备份**，丢失后已保存的 New API Key 无法解密 |
@@ -52,6 +52,8 @@ cargo test --locked --manifest-path services/server-ai/Cargo.toml
 | 方法 路径 | 说明 |
 | --- | --- |
 | `POST /v1/chat/completions` | OpenAI 兼容。`model` 填档位名，省略则用默认档。支持流式。余额为 0 返回 402 `insufficient_quota`；档位要求付费而用户只有试用额度返回 403 `paid_required`；错误体为 OpenAI 格式 |
+| `POST /v1/responses` | OpenAI Responses 协议，规则同上（档位、余额、流式、错误格式）。`response.model` 也会回写成档位名 |
+| `POST /v1/messages` | Anthropic Messages 协议。密钥放 `x-api-key`（Anthropic SDK 默认）或 `Authorization: Bearer` 都行，值是账号中心的登录令牌；只透传 `anthropic-version`、`anthropic-beta`；`message_start` 里的 `message.model` 回写成档位名；错误体是 Anthropic 格式（`{"type":"error","error":{"type":"billing_error",…}}`）。这三个协议能否真正跑通，还取决于档位对应的模型在 New API 里有没有渠道，以及 New API 的协议转换 |
 | `GET /v1/models` | 当前产品启用的档位名 |
 | `GET /api/ai/tiers` | 档位的展示名、说明、对当前用户是否可用；不含真实模型名 |
 | `GET /api/ai/balance` | 各有效额度桶、合计、付费部分、试用是否还可领取。只读，不会触发开通 |
@@ -59,7 +61,7 @@ cargo test --locked --manifest-path services/server-ai/Cargo.toml
 | `POST /api/ai/redeem` | `{code}`，兑换到令牌 `aud` 所属产品。错误码：`code_invalid`（格式或校验位不对、系统里没有）、`code_used`、`code_void`、`code_wrong_product`、`too_many_attempts`（429） |
 | `GET /api/health` | 健康检查 |
 
-管理接口 `/api/admin/*` 与账号中心同一套做法：独立管理员表、HS256 令牌（由主密钥派生，与用户令牌不通用）、连续错 5 次锁 15 分钟、没有默认账号、写操作入审计表。包含登录与改密码、概览、产品与档位增改删、New API 模型列表（标记倍率疑似未配置的模型）、用户额度查看、补发与扣回、对账异常、操作日志，以及兑换码：`POST /api/admin/batches` 生成批次、`GET /api/admin/batches` 批次列表、`POST /api/admin/batches/{id}/void` 作废批次里未兑换的码、`POST /api/admin/codes/lookup` 查单个码（用 POST，码不进 URL 和访问日志）、`POST /api/admin/codes/{id}/void` 作废单个码。
+管理接口 `/api/admin/*` 与账号中心同一套做法：独立管理员表、HS256 令牌（由主密钥派生，与用户令牌不通用）、连续错 5 次锁 15 分钟、没有默认账号、写操作入审计表。包含登录与改密码、概览、网关连接（`GET /api/admin/settings`、`PUT /api/admin/settings/newapi` 先向网关验证再保存、`POST /api/admin/settings/newapi/test`；令牌只写不读，只返回来源和尾号）、产品与档位增改删、New API 模型列表（标记倍率疑似未配置的模型）、用户额度查看、补发与扣回、对账异常、操作日志，以及兑换码：`POST /api/admin/batches` 生成批次、`GET /api/admin/batches` 批次列表、`POST /api/admin/batches/{id}/void` 作废批次里未兑换的码、`POST /api/admin/codes/lookup` 查单个码（用 POST，码不进 URL 和访问日志）、`POST /api/admin/codes/{id}/void` 作废单个码。
 
 ## 兑换码
 
@@ -78,7 +80,8 @@ cargo test --locked --manifest-path services/server-ai/Cargo.toml
 
 - New API 的「新用户注册额度」必须为 0，否则每个新用户在网关里会多出一笔不在账本里的额度（对账会记为异常并对齐，但不该靠它兜底）。
 - 给用到的每个模型在 New API 配置真实倍率。线上现状是多数模型仍是默认倍率。
-- 用于本服务的 New API 管理员令牌只含 `user:read`、`user:write` 两个作用域。
+- 登录后台「网关连接」页填 New API 管理令牌，只含 `user:read`、`user:write` 两个作用域。令牌不写进 `.env`。
+- 首次登录后台后改掉初始管理员密码，并从 `.env` 里删掉 `AI_ADMIN_PASSWORD`。
 - 备份主密钥。
 - 账号中心对该产品的客户端 `aud` 要与产品的 `client_ids` 一致。
 

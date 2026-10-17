@@ -33,7 +33,8 @@ onMounted(async () => {
     <template v-if="data">
       <div class="alerts">
         <div v-if="!data.newapi_configured" class="notice error" role="alert">
-          还没有配置 AI 网关的管理令牌（AI_NEWAPI_ADMIN_TOKEN）。在配置之前，用户无法开通，也不能调用 AI。
+          还没有设置 AI 网关的管理令牌。设置之前，用户无法开通，也不能调用 AI。
+          <button type="button" class="linkbtn" @click="emit('go', 'gateway')">去填写</button>
         </div>
         <div v-if="data.open_anomalies > 0" class="notice warn">
           有 {{ data.open_anomalies }} 条对账异常没处理，可能是有人在 New API 后台手工改过用户额度。

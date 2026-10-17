@@ -4,7 +4,7 @@ use crate::{
     extract::AuthAdmin,
     password, products, quota,
     quota::LIVE,
-    redeem,
+    redeem, settings,
     state::AppState,
     sync,
 };
@@ -634,4 +634,55 @@ pub async fn audit_log(State(state): State<AppState>, _admin: AuthAdmin, Query(q
     .fetch_all(&state.pool)
     .await?;
     Ok(Json(json!({ "items": items })))
+}
+
+// ---- 网关连接 ----
+
+/// 令牌只写不读：这里只返回来源、尾号和状态，永远不返回令牌本身。
+pub async fn get_settings(State(state): State<AppState>, _admin: AuthAdmin) -> Result<Json<Value>, AppError> {
+    let (source, hint, updated_at, problem) = match settings::load_newapi_token(&state.pool, &state.keys).await {
+        Ok(Some(stored)) => ("console", Some(settings::hint(&stored.token)), Some(stored.updated_at), None),
+        Ok(None) => match &state.config.newapi_admin_token {
+            Some(token) => ("env", Some(settings::hint(token)), None, None),
+            None => ("none", None, None, None),
+        },
+        Err(e) => {
+            tracing::warn!("读取后台保存的 New API 令牌失败: {e}");
+            ("console", None, None, Some("后台保存的令牌读不出来（主密钥可能换过），请重新填写一次"))
+        }
+    };
+    Ok(Json(json!({
+        "newapi": {
+            "base_url": state.newapi.base_url(),
+            "configured": state.newapi.is_configured(),
+            "source": source,
+            "hint": hint,
+            "updated_at": updated_at,
+            "problem": problem,
+        }
+    })))
+}
+
+#[derive(Deserialize)]
+pub struct TokenReq {
+    admin_token: String,
+}
+
+/// 先向网关验证再保存：填错的令牌不会覆盖正在用的那个，也就不会因为手滑把服务搞断。
+pub async fn put_newapi_token(State(state): State<AppState>, AuthAdmin(admin): AuthAdmin, Json(req): Json<TokenReq>) -> Result<Json<Value>, AppError> {
+    let token = settings::validate_token_format(&req.admin_token)?;
+    state.newapi.check_token(&token).await?;
+    settings::save_newapi_token(&state.pool, &state.keys, &token).await?;
+    state.newapi.set_admin_token(Some(token.clone()));
+    let hint = settings::hint(&token);
+    audit(&state, &admin, "settings.newapi_token", None, Some(format!("令牌尾号 {hint}"))).await?;
+    Ok(Json(json!({ "ok": true, "hint": hint })))
+}
+
+/// 重新测试现在在用的令牌。网关不通或令牌失效时仍返回 200，由 `ok` 表示结果，方便页面直接显示原因。
+pub async fn test_newapi(State(state): State<AppState>, _admin: AuthAdmin) -> Json<Value> {
+    match state.newapi.check_current().await {
+        Ok(()) => Json(json!({ "ok": true })),
+        Err(e) => Json(json!({ "ok": false, "message": e.parts().2 })),
+    }
 }

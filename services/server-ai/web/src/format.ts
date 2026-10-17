@@ -78,6 +78,7 @@ export const auditLabels: Record<string, string> = {
   'batch.create': '生成兑换码批次',
   'batch.void': '作废批次剩余的码',
   'code.void': '作废兑换码',
+  'settings.newapi_token': '更新网关令牌',
 };
 
 export const codeStatusLabels: Record<string, string> = {

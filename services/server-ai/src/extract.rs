@@ -21,6 +21,13 @@ fn bearer(parts: &Parts) -> Option<&str> {
         .filter(|s| !s.is_empty())
 }
 
+/// Anthropic 的 SDK 把密钥放在 `x-api-key` 头里。用户接口两种都认，`Authorization` 优先；管理员只认 `Authorization`。
+fn bearer_or_api_key(parts: &Parts) -> Option<&str> {
+    bearer(parts).or_else(|| {
+        parts.headers.get("x-api-key").and_then(|v| v.to_str().ok()).map(str::trim).filter(|s| !s.is_empty())
+    })
+}
+
 /// 账号中心登录用户，并由令牌 `aud` 解析出所属产品。客户端不属于任何已启用产品时拒绝。
 pub struct AuthUser {
     pub uid: Uuid,
@@ -31,7 +38,7 @@ impl FromRequestParts<AppState> for AuthUser {
     type Rejection = AppError;
 
     async fn from_request_parts(parts: &mut Parts, state: &AppState) -> Result<Self, Self::Rejection> {
-        let token = bearer(parts).ok_or_else(|| AppError::Unauthorized("请先登录".into()))?;
+        let token = bearer_or_api_key(parts).ok_or_else(|| AppError::Unauthorized("请先登录".into()))?;
         let verified = state.verifier.verify(token).await?;
         let product = products::for_client(&state.pool, &verified.client_id)
             .await?
