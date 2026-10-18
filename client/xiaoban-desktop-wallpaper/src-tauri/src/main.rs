@@ -49,7 +49,7 @@ use std::{
     sync::{Mutex, atomic::{AtomicBool, Ordering}},
     time::{Duration, Instant},
 };
-use tauri::{Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
+use tauri::{Emitter, Manager, Theme, WebviewUrl, WebviewWindowBuilder};
 
 #[derive(Default)]
 struct DesktopState {
@@ -374,6 +374,19 @@ fn set_companion_links(app: tauri::AppHandle, enabled: bool) -> Result<Settings,
     Ok(next)
 }
 
+fn apply_window_appearance(app: &tauri::AppHandle, mode: &str) {
+    if let Some(window) = app.get_webview_window("control") {
+        let theme = match mode {
+            "dark" => Some(Theme::Dark),
+            "light" => Some(Theme::Light),
+            _ => None,
+        };
+        let _ = window.set_theme(theme);
+        #[cfg(target_os = "macos")]
+        let _ = macos::apply_control_appearance(&window, mode);
+    }
+}
+
 /// Saves the console's colour scheme and tells every window, so the floating assistant matches it.
 #[tauri::command]
 fn set_appearance(app: tauri::AppHandle, mode: String) -> Result<Settings, String> {
@@ -387,6 +400,7 @@ fn set_appearance(app: tauri::AppHandle, mode: String) -> Result<Settings, Strin
     persist(&app, &next)?;
     *state.settings.lock().unwrap() = next.clone();
     publish(&app);
+    apply_window_appearance(&app, &next.appearance);
     Ok(next)
 }
 
@@ -502,6 +516,7 @@ fn present_control(app: &tauri::AppHandle) -> Result<(), String> {
     let window = app
         .get_webview_window("control")
         .ok_or("没有找到小伴设置面板")?;
+    apply_window_appearance(app, &settings(app).appearance);
     window.unminimize().map_err(|error| error.to_string())?;
     window.show().map_err(|error| error.to_string())?;
     window.set_focus().map_err(|error| error.to_string())?;
@@ -787,6 +802,7 @@ fn main() {
                 }
             };
             open_scene(app.handle(), &initial_mode).map_err(std::io::Error::other)?;
+            apply_window_appearance(app.handle(), &settings(app.handle()).appearance);
             effects::sync(app.handle());
             widgets::start(app.handle());
             if !std::env::args().any(|argument| argument == "--autostart") {

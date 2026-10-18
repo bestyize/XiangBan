@@ -47,7 +47,7 @@ windows-sys = { version = "0.61", features = [
 tauri-plugin-autostart = "2"
 objc2 = "0.6"
 objc2-app-kit = { version = "0.3", default-features = false, features = [
-  "std", "NSApplication", "NSWindow", "NSView", "NSScreen", "NSEvent", "NSColor", "objc2-core-foundation"
+  "std", "NSApplication", "NSWindow", "NSView", "NSScreen", "NSEvent", "NSColor", "NSAppearance", "objc2-core-foundation"
 ] }
 objc2-foundation = { version = "0.3", default-features = false, features = ["std", "NSGeometry"] }
 objc2-core-foundation = { version = "0.3", default-features = false, features = [

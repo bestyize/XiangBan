@@ -46,6 +46,7 @@ describe('ControlShell sidebar', () => {
     await flushPromises();
     const entry = wrapper.get('[data-testid="account-entry"]');
     expect(entry.attributes('aria-label')).toBe('登录 / 注册小伴账号');
+    expect(entry.text()).toBe('登录');
     expect(wrapper.find('.sidebar-account-box').exists()).toBe(false);
     expect(wrapper.find('[data-testid="sidebar-login-btn"]').exists()).toBe(false);
     await entry.trigger('click');

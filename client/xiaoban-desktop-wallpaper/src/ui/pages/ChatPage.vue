@@ -534,10 +534,10 @@ async function openLink(href: string) {
 <style scoped>
 .speech-button{display:inline-flex;align-items:center;gap:5px;margin-top:8px;font-size:12px}
 
-.chat-page{flex:1;min-height:0;display:grid;grid-template-columns:268px minmax(0,1fr);background:var(--ui-app-bg)}
+.chat-page{flex:1;min-height:0;display:grid;grid-template-columns:200px minmax(0,1fr);background:var(--ui-app-bg)}
 .chat-side{border-right:1px solid var(--ui-border);display:flex;flex-direction:column;min-height:0;background:var(--ui-surface)}
 .side-assistant{flex:none;display:flex;align-items:center;gap:8px;margin:8px 12px 12px;padding:10px 12px;border:1px solid var(--ui-border);border-radius:12px;background:var(--ui-surface-alt);color:var(--ui-text-primary);font:inherit;font-size:13px;cursor:pointer;text-align:left}
-.side-assistant small{margin-left:auto;font-size:11px;color:var(--ui-text-tertiary)}
+.side-assistant small{margin-left:auto;font-size:11px;color:var(--ui-text-tertiary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .side-assistant:hover{border-color:var(--ui-primary)}
 .side-head{padding:16px 14px 10px;display:flex;gap:8px}
 .side-new{flex:1}

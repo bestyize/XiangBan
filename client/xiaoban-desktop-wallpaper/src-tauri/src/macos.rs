@@ -4,6 +4,7 @@
 use crate::coordinates::{content_point_to_css, is_desktop_level, scene_level, Levels};
 use objc2::{rc::autoreleasepool, MainThreadMarker};
 use objc2_app_kit::{
+    NSAppearance, NSAppearanceCustomization, NSAppearanceNameAqua, NSAppearanceNameDarkAqua,
     NSApplication, NSColor, NSEvent, NSScreen, NSWindow, NSWindowCollectionBehavior,
 };
 use objc2_core_foundation::{CFArray, CFDictionary, CFNumber, CFRetained, CFString, CFType};
@@ -399,3 +400,35 @@ pub fn smoke_dock_reopen(app: &tauri::AppHandle) -> Result<serde_json::Value, St
     Ok(serde_json::json!({"cases":cases, "wallpaperPreserved":true}))
 }
 
+/// Adapts the native window titlebar, frame controls, and background color to the chosen appearance.
+pub fn apply_control_appearance(window: &tauri::WebviewWindow, appearance: &str) -> Result<(), String> {
+    let window = window.clone();
+    let app = window.app_handle().clone();
+    let appearance = appearance.to_string();
+    on_main(&app, move |_mtm| {
+        let ns = native(&window)?;
+        match appearance.as_str() {
+            "dark" => {
+                let name = unsafe { NSAppearanceNameDarkAqua };
+                let dark = NSAppearance::appearanceNamed(name);
+                ns.setAppearance(dark.as_deref());
+                // Dark theme background matches --ui-sidebar-bg / --ui-app-bg (#161618)
+                let bg = NSColor::colorWithSRGBRed_green_blue_alpha(0.086, 0.086, 0.094, 1.0);
+                ns.setBackgroundColor(Some(&bg));
+            }
+            "light" => {
+                let name = unsafe { NSAppearanceNameAqua };
+                let light = NSAppearance::appearanceNamed(name);
+                ns.setAppearance(light.as_deref());
+                let bg = NSColor::colorWithSRGBRed_green_blue_alpha(1.0, 1.0, 1.0, 1.0);
+                ns.setBackgroundColor(Some(&bg));
+            }
+            _ => {
+                ns.setAppearance(None);
+                let bg = NSColor::windowBackgroundColor();
+                ns.setBackgroundColor(Some(&bg));
+            }
+        }
+        Ok(())
+    })
+}

@@ -122,7 +122,7 @@ onBeforeUnmount(() => { assistantListeners.splice(0).forEach(off => off()); stor
         <button type="button" class="control-brand-mark" :class="{ 'is-signed-in': store.account }" data-testid="account-entry" :title="store.account ? '查看账号信息' : '登录 / 注册小伴账号'" :aria-label="store.account ? '查看账号信息' : '登录 / 注册小伴账号'" aria-haspopup="dialog" @click="openAccount">
           <img v-if="store.account?.user.avatarUrl" class="brand-avatar" :src="store.account.user.avatarUrl" alt="" />
           <span v-else-if="store.account">{{ Array.from(store.account.user.username)[0]?.toUpperCase() }}</span>
-          <img v-else src="/xiaoban.svg" alt="" />
+          <span v-else class="brand-login-text">登录</span>
         </button>
         <div class="brand-copy"><strong>小伴桌面</strong></div>
       </div>
