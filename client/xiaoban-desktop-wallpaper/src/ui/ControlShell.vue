@@ -3,6 +3,7 @@ import { computed, defineAsyncComponent, onMounted, onBeforeUnmount, ref } from 
 import { NAlert, NButton, NSkeleton, NTag, useMessage } from 'naive-ui';
 import { MessageCircle, AudioLines, Images, Sparkles, Hand, Bot, Gamepad2, Bell, Settings2, PanelLeftClose, PanelLeftOpen, ArrowUpRight, Globe, User, LogIn, LogOut } from 'lucide-vue-next';
 import { invoke, listen } from '../bridge.ts';
+import { appearanceMode, publishAppearanceTo, reconcile } from './appearance.ts';
 import { createControlStore } from './control-store.ts';
 import type { ControlPage } from './control-types.ts';
 const ChatPage = defineAsyncComponent(() => import('./pages/ChatPage.vue'));
@@ -23,11 +24,11 @@ const collapsed = ref(true);
 function toggleNavigation() { collapsed.value = !collapsed.value; }
 const items = [
   { id: 'chat', label: '聊天', hint: '和小伴说话，让它帮忙', icon: MessageCircle },
-  { id: 'assistant', label: '悬浮助手', hint: '随时呼出，直接对话', icon: AudioLines },
+  { id: 'assistant', label: '超级小伴', hint: '随时呼出，直接对话', icon: AudioLines },
   { id: 'wallpapers', label: '壁纸库', hint: '发现喜欢的风景', icon: Images },
   { id: 'widgets', label: '桌面组件', hint: '把小物件留在桌面上', icon: Hand },
   { id: 'effects', label: '桌面特效', hint: '雨雪花瓣与流星', icon: Sparkles },
-  { id: 'companion', label: '桌面小伴', hint: '外观与陪伴方式', icon: Bot },
+  { id: 'companion', label: '桌面宠物', hint: '外观与陪伴方式', icon: Bot },
   { id: 'games', label: '游戏空间', hint: '给自己放个小假', icon: Gamepad2 },
   { id: 'care', label: '关怀提醒', hint: '照顾日常的小事', icon: Bell },
 ] as const;
@@ -55,12 +56,26 @@ async function handleLogout() {
   }
 }
 const manageWidgets = () => navigate('widgets');
+/**
+ * The colour scheme is kept by the host so the floating assistant, which cannot read this window's storage, can match.
+ * The first time, what this window already had is sent up (it is the user's choice from before the host kept one);
+ * after that the host's value rules, so a change made anywhere reaches every window.
+ */
+async function shareAppearance() {
+  publishAppearanceTo(mode => { store.setAppearance(mode).catch(error => store.notify(error, 'error')); });
+  try {
+    const kept = await invoke<{ appearance: string; appearanceKept?: boolean }>('get_appearance');
+    const step = reconcile(kept, appearanceMode.value);
+    if (step.send) await store.setAppearance(step.send);
+    else if (step.adopt) appearanceMode.value = step.adopt;
+  } catch { /* this window keeps its own copy */ }
+}
 /** Once, after the floating assistant first exists, say how to call it: most people never open its settings. */
 async function introduceAssistant() {
   try {
     const assistant = await invoke<{ enabled: boolean; hintSeen: boolean; shortcutLabel: string; ball: boolean }>('assistant_status');
     if (assistant.hintSeen || !assistant.enabled) return;
-    store.notify(`新功能：按 ${assistant.shortcutLabel} 随时呼出悬浮助手${assistant.ball ? '，也可以点屏幕边缘的小球' : ''}`, 'info');
+    store.notify(`新功能：按 ${assistant.shortcutLabel} 随时呼出超级小伴${assistant.ball ? '，也可以点屏幕边缘的小球' : ''}`, 'info');
     await invoke('assistant_configure', { patch: { hintSeen: true } });
   } catch { /* the hint is a courtesy; it can wait for the next start */ }
 }
@@ -84,7 +99,7 @@ onMounted(() => {
   void store.initialize().then(async () => { if (store.info.uiSmoke) await (await import('./ui-smoke.ts')).runUiSmoke(store); });
   window.addEventListener('focus', focus);
   window.addEventListener('widgets-manage', manageWidgets);
-  if (store.desktop) { void listenForAssistant(); void introduceAssistant(); }
+  if (store.desktop) { void listenForAssistant(); void introduceAssistant(); void shareAppearance(); }
 });
 onBeforeUnmount(() => { assistantListeners.splice(0).forEach(off => off()); store.dispose(); window.removeEventListener('focus', focus); window.removeEventListener('widgets-manage', manageWidgets); });
 </script>

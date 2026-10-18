@@ -130,10 +130,10 @@ pub fn plugin() -> tauri::plugin::TauriPlugin<tauri::Wry> {
 pub fn start(app: &tauri::AppHandle) {
     let settings = crate::settings(app);
     if let Err(error) = apply(app, settings.assistant_enabled, &settings.assistant_shortcut) {
-        eprintln!("悬浮助手快捷键没有注册：{error}");
+        eprintln!("超级小伴快捷键没有注册：{error}");
     }
     if let Err(error) = sync(app) {
-        eprintln!("悬浮助手：{error}");
+        eprintln!("超级小伴：{error}");
     }
 }
 
@@ -202,7 +202,7 @@ fn status(app: &tauri::AppHandle) -> Value {
 
 fn build(app: &tauri::AppHandle) -> Result<WebviewWindow, String> {
     let builder = WebviewWindowBuilder::new(app, LABEL, WebviewUrl::App("index.html?scene=assistant".into()))
-        .title("小伴 · 助手")
+        .title("小伴 · 超级小伴")
         .decorations(false).shadow(false).resizable(false).skip_taskbar(true)
         .always_on_top(true).transparent(true).visible(false).focused(false)
         // The ball sits over other apps, which are the active ones: the click that lands on it must reach the page.
@@ -443,7 +443,7 @@ pub fn toggle(app: &tauri::AppHandle) {
     }
     let result = if mode(app) == Mode::Capsule { collapse(app) } else { expand(app) };
     if let Err(error) = result {
-        eprintln!("悬浮助手：{error}");
+        eprintln!("超级小伴：{error}");
     }
 }
 
@@ -597,7 +597,7 @@ pub fn assistant_try(app: tauri::AppHandle) -> Result<(), String> {
 #[tauri::command]
 pub fn assistant_prefs(app: tauri::AppHandle) -> Value {
     let settings = crate::settings(&app);
-    json!({ "open": settings.assistant_open, "read": settings.assistant_read })
+    json!({ "open": settings.assistant_open, "read": settings.assistant_read, "appearance": settings.appearance })
 }
 
 /// The ball was clicked.
@@ -636,7 +636,7 @@ pub fn assistant_fit(window: WebviewWindow, height: f64) -> Result<(), String> {
 #[tauri::command]
 pub fn assistant_drag(window: WebviewWindow) -> Result<(), String> {
     if window.label() != LABEL {
-        return Err("只有助手窗口可以拖动".into());
+        return Err("只有超级小伴的窗口可以拖动".into());
     }
     window.start_dragging().map_err(|e| e.to_string())
 }

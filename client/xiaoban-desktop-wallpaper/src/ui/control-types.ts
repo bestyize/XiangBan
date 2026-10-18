@@ -49,6 +49,7 @@ export interface ControlStore {
   refreshLibrary(): Promise<void>;
   updateAppearance(patch: Partial<Settings>): Promise<void>;
   setMode(mode: Settings["mode"]): Promise<void>;
+  setAppearance(mode: Settings["appearance"]): Promise<void>;
   setCompanion(enabled: boolean): Promise<void>;
   setCompanionLinks(enabled: boolean): Promise<void>;
   setCompanionSkin(skin: string): Promise<void>;

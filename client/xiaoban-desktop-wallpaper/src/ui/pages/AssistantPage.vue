@@ -64,7 +64,7 @@ onMounted(() => { void read(); void asr.value.init(); });
 
 <template>
   <section class="ui-page assistant-page" data-testid="assistant-page">
-    <header class="page-header"><h1>悬浮助手</h1><span class="header-note">随时呼出，直接对话</span></header>
+    <header class="page-header"><h1>超级小伴</h1><span class="header-note">随时呼出，直接对话</span></header>
 
     <section class="surface hero" data-testid="assistant-hero">
       <div class="hero-copy">
@@ -86,7 +86,7 @@ onMounted(() => { void read(); void asr.value.init(); });
 
     <section class="surface">
       <div class="section-heading"><div><h2>呼出方式</h2><p>怎么找到它、怎么叫出它</p></div><AudioLines :size="20" /></div>
-      <div class="setting-row"><div><b>启用悬浮助手</b><p>关闭后，快捷键和悬浮球都会消失。</p></div><NSwitch :value="status.enabled" :disabled="!store.desktop || busy === 'assistant'" aria-label="启用悬浮助手" data-testid="assistant-enabled" @update:value="change({ enabled: $event })" /></div>
+      <div class="setting-row"><div><b>启用超级小伴</b><p>关闭后，快捷键和悬浮球都会消失。</p></div><NSwitch :value="status.enabled" :disabled="!store.desktop || busy === 'assistant'" aria-label="启用超级小伴" data-testid="assistant-enabled" @update:value="change({ enabled: $event })" /></div>
       <div class="setting-row"><div><b>屏幕边缘的悬浮球</b><p>常驻一个小球，点一下展开，按住可以拖到喜欢的位置。关闭后只能用快捷键呼出。</p></div><NSwitch :value="status.ball" :disabled="!store.desktop || !status.enabled || busy === 'assistant'" aria-label="屏幕边缘的悬浮球" data-testid="assistant-ball-switch" @update:value="change({ ball: $event })" /></div>
       <div class="setting-row"><div><b>呼出快捷键</b><p>和别的应用冲突时，换一个组合就行。</p></div><NSelect class="select" :value="status.shortcut" :options="shortcutOptions" :disabled="!store.desktop || !status.enabled || busy === 'assistant'" aria-label="呼出快捷键" data-testid="assistant-shortcut" @update:value="change({ shortcut: $event })" /></div>
       <div class="setting-row"><div><b>位置</b><p>把悬浮球和对话框放回默认的位置。</p></div><NButton round :disabled="!store.desktop || !status.enabled || busy === 'assistant'" data-testid="assistant-reset" @click="change({ resetPosition: true })"><template #icon><RotateCcw :size="14" /></template>放回默认位置</NButton></div>
@@ -104,7 +104,8 @@ onMounted(() => { void read(); void asr.value.init(); });
 <style scoped>
 .assistant-page{display:grid;gap:var(--ui-section-gap,24px);max-width:860px;margin:0 auto;align-content:start}
 .header-note{font-size:12px;color:var(--ui-text-tertiary)}
-.hero{display:flex;align-items:center;justify-content:space-between;gap:28px;padding:28px 32px}
+.assistant-page>.surface{padding:24px}
+.assistant-page>.hero{display:flex;align-items:center;justify-content:space-between;gap:28px;padding:28px 32px}
 .hero-copy{max-width:470px}
 .hero h2{font-size:19px;line-height:1.5;margin:0 0 10px}
 .hero p{font-size:13px;line-height:1.8;color:var(--ui-text-secondary);margin:0 0 18px}

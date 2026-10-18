@@ -11,7 +11,7 @@
 | 桌面生产构建 | 通过；Windows x64 UI 包为 `artifacts/XiaoBan-UI-Windows-x64.exe`，6,014,464 bytes（5.74 MiB），SHA-256 `7EF780BABBA7F2D545EDBF56D7018D3F80E1E58E65CE0DD0CDE1A388B2420278` |
 | Windows 原生 UI + 游戏 + 关怀 smoke | 通过；UI `ok=true`、配置绑定、只读原生控制台标记、5 个页面和 7 个游戏包均匹配；完整报告（本地：`../artifacts/games-smoke-1791564963404.json`） |
 | Windows 媒体与特效 smoke | 通过；完整报告（本地：`../artifacts/media-smoke-1791564827748.json`） |
-| UI 浏览器检查 | 通过；逐页检查 5 个分区，验证提醒创建、壁纸特效选择、关于页切换，以及 960×680 窗口无水平溢出；截图见桌面小伴（本地：`../artifacts/ui/companion-blue.jpg`）和壁纸库（本地：`../artifacts/ui/wallpapers-blue.jpg`） |
+| UI 浏览器检查 | 通过；逐页检查 5 个分区，验证提醒创建、壁纸特效选择、关于页切换，以及 960×680 窗口无水平溢出；截图见桌面宠物（本地：`../artifacts/ui/companion-blue.jpg`）和壁纸库（本地：`../artifacts/ui/wallpapers-blue.jpg`） |
 
 UI smoke 在 `XIAOBAN_UI_SMOKE=1` 时严格核对报告标记与页面、配置和游戏包字段，避免普通游戏 smoke 被误记为 UI 通过。此前 2026-10-09 试用包不代表本轮 UI。
 

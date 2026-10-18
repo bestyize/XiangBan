@@ -138,6 +138,7 @@ export function createControlStore(notify: ControlStore["notify"]): ControlStore
       appearanceQueue = pending;
       return pending;
     },
+    async setAppearance(mode) { store.settings = desktop ? await invoke<Settings>("set_appearance", { mode }) : { ...store.settings, appearance: mode }; },
     async setMode(mode) { store.settings = desktop ? await invoke<Settings>("set_mode", { mode }) : { ...store.settings, mode }; },
     async setCompanion(enabled) { store.settings = desktop ? await invoke<Settings>("set_companion_enabled", { enabled }) : { ...store.settings, companionEnabled: enabled }; },
     async setCompanionSkin(skin) { store.settings = desktop ? await invoke<Settings>("set_companion_skin", { skin }) : { ...store.settings, companionSkin: skin }; },

@@ -902,7 +902,7 @@ pub fn tools(desktop: Arc<dyn Desktop>) -> Vec<Arc<dyn Tool>> {
             &desktop,
             ToolSpec::new(
                 "companion_set",
-                "设置桌面小伴：表情、外壳，或显示/隐藏。至少给一项。",
+                "设置桌面宠物：表情、外壳，或显示/隐藏。至少给一项。",
                 object(
                     json!({
                         "expression": {"type": "string", "enum": EXPRESSIONS},

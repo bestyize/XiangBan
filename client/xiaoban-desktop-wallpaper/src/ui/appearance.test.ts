@@ -1,21 +1,22 @@
 // @vitest-environment happy-dom
 import { describe, expect, it } from 'vitest';
-import { appearanceMode, setAppearance } from './appearance.ts';
+import { appearanceMode, followHost, isDark, setAppearance } from './appearance.ts';
 
 describe('appearance shared between windows', () => {
-  it('follows a choice made in another window, which arrives as a storage event', () => {
+  it('follows the choice the host reports, which is how a window with its own storage learns it', () => {
     setAppearance('light');
-    localStorage.setItem('xiaoban.control.appearance', 'dark');
-    window.dispatchEvent(new StorageEvent('storage', { key: 'xiaoban.control.appearance', newValue: 'dark' }));
+    followHost('dark');
     expect(appearanceMode.value).toBe('dark');
-    localStorage.setItem('xiaoban.control.appearance', 'nonsense');
-    window.dispatchEvent(new StorageEvent('storage', { key: 'xiaoban.control.appearance', newValue: 'nonsense' }));
+    expect(isDark.value).toBe(true);
+    followHost('light');
+    expect(isDark.value).toBe(false);
+    followHost('system');
     expect(appearanceMode.value).toBe('system');
   });
 
-  it('ignores unrelated storage keys', () => {
+  it('ignores anything that is not one of the three choices', () => {
     setAppearance('light');
-    window.dispatchEvent(new StorageEvent('storage', { key: 'something.else', newValue: 'dark' }));
+    for (const bad of ['sepia', '', null, undefined, 3, {}]) followHost(bad);
     expect(appearanceMode.value).toBe('light');
   });
 });

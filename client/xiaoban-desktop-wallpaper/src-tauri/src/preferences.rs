@@ -6,6 +6,9 @@ use std::{
 };
 
 pub const SKINS: &[&str] = &["pot"];
+/// The console's colour scheme. It lives here, not only in the console's page storage, because the other windows (the
+/// floating assistant) cannot read that storage and still have to match.
+pub const APPEARANCES: &[&str] = &["system", "light", "dark"];
 pub const EXPRESSIONS: &[&str] = &[
     "idle",
     "happy",
@@ -38,6 +41,10 @@ pub const EXPRESSIONS: &[&str] = &[
 #[serde(default, rename_all = "camelCase")]
 pub struct Settings {
     pub mode: String,
+    pub appearance: String,
+    /// The host has been given a choice (by the user, or carried over from before the host kept one). Until then the
+    /// console's own saved choice is the one to keep.
+    pub appearance_kept: bool,
     pub expression: String,
     pub size: f64,
     pub theme: String,
@@ -78,6 +85,8 @@ impl Default for Settings {
     fn default() -> Self {
         Self {
             mode: "floating".into(),
+            appearance: "system".into(),
+            appearance_kept: false,
             expression: "idle".into(),
             size: 260.0,
             theme: "night".into(),
@@ -112,6 +121,9 @@ impl Settings {
         let defaults = Self::default();
         if !["floating", "wallpaper"].contains(&self.mode.as_str()) {
             self.mode = defaults.mode;
+        }
+        if !APPEARANCES.contains(&self.appearance.as_str()) {
+            self.appearance = defaults.appearance;
         }
         if !SKINS.contains(&self.companion_skin.as_str()) {
             self.companion_skin = defaults.companion_skin;
@@ -254,6 +266,34 @@ mod tests {
         let mut odd: Preferences = serde_json::from_str(r#"{"settings":{"assistantShortcut":"Ctrl+Q"}}"#).unwrap();
         odd.settings.normalize();
         assert_eq!(odd.settings.assistant_shortcut, "Alt+Space");
+    }
+
+    #[test]
+    fn the_appearance_defaults_to_the_system_and_repairs_an_unknown_value() {
+        assert_eq!(Settings::default().appearance, "system");
+        assert!(!Settings::default().appearance_kept);
+        for saved in ["system", "light", "dark"] {
+            let mut prefs: Preferences = serde_json::from_str(&format!(r#"{{"settings":{{"appearance":"{saved}"}}}}"#)).unwrap();
+            prefs.settings.normalize();
+            assert_eq!(prefs.settings.appearance, saved);
+        }
+        let mut odd: Preferences = serde_json::from_str(r#"{"settings":{"appearance":"sepia"}}"#).unwrap();
+        odd.settings.normalize();
+        assert_eq!(odd.settings.appearance, "system");
+        let mut older: Preferences = serde_json::from_str(r#"{"settings":{"mode":"wallpaper"}}"#).unwrap();
+        older.settings.normalize();
+        assert_eq!(older.settings.appearance, "system");
+    }
+
+    #[test]
+    fn an_appearance_saved_by_an_older_version_counts_as_not_yet_kept_by_the_host() {
+        // Older files have no `appearanceKept`: the console's own saved choice must still be carried up once.
+        let mut older: Preferences = serde_json::from_str(r#"{"settings":{"mode":"floating"}}"#).unwrap();
+        older.settings.normalize();
+        assert!(!older.settings.appearance_kept);
+        let mut kept: Preferences = serde_json::from_str(r#"{"settings":{"appearance":"dark","appearanceKept":true}}"#).unwrap();
+        kept.settings.normalize();
+        assert!(kept.settings.appearance_kept && kept.settings.appearance == "dark");
     }
 
     #[test]

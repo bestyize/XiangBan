@@ -38,7 +38,7 @@ npm --prefix client/xiaoban-pot-garden run build
 
 ## 与其他项目的关系
 
-- 独立项目，不引用 `client/xiaoban-desktop-wallpaper` 的源码（`tools/check-layout.py` 禁止客户端之间互相导入）。桌面小伴的表情系统是 SVG 机器人脸，这里的脸是另外画在画布上的，两边的 25 种表情并不一一对应，目前只有 8 种。
+- 独立项目，不引用 `client/xiaoban-desktop-wallpaper` 的源码（`tools/check-layout.py` 禁止客户端之间互相导入）。桌面宠物的表情系统是 SVG 机器人脸，这里的脸是另外画在画布上的，两边的 25 种表情并不一一对应，目前只有 8 种。
 - 以后可以按网页游戏包的约定（manifest、版本 1 消息格式、存档上限）打包后放进桌面的游戏空间，或做成桌面组件。这一步还没有做，也没有核对过协议细节。
 
 ## 和参考图的差距
@@ -53,4 +53,4 @@ npm --prefix client/xiaoban-pot-garden run build
 
 ## 下一步（未做）
 
-养成玩法（浇水、阳光、成长阶段、离线成长、收集）、存档、桌面小伴联动（真实天气和时间影响光照与状态）、更多植物和花盆、性能与功耗测试、真机和 Windows 验证。
+养成玩法（浇水、阳光、成长阶段、离线成长、收集）、存档、桌面宠物联动（真实天气和时间影响光照与状态）、更多植物和花盆、性能与功耗测试、真机和 Windows 验证。

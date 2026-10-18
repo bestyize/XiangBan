@@ -25,6 +25,8 @@ export interface AssistantDeps {
   asr: AsrStore;
   speech: SpeechStore;
   now?(): number;
+  /** The console's colour scheme, as the host reports it (at start and whenever it changes). */
+  onAppearance?(value: string): void;
   setTimer?(callback: () => void, ms: number): unknown;
   clearTimer?(id: unknown): void;
 }
@@ -123,7 +125,7 @@ export function createAssistantStore(deps: AssistantDeps): AssistantStore {
 
   async function startListening(): Promise<boolean> {
     await asr.init();
-    if (!asr.enabled) { store.note('语音对话还没开启。在悬浮助手设置里打开后，就能直接说话。', 'assistant'); return false; }
+    if (!asr.enabled) { store.note('语音对话还没开启。在超级小伴设置里打开后，就能直接说话。', 'assistant'); return false; }
     if (!(await asr.prepare())) { store.note(asr.error || '语音识别还没准备好，请稍后再试。'); return false; }
     if (!store.open) return false;
     store.note(''); heard = '';
@@ -190,11 +192,12 @@ export function createAssistantStore(deps: AssistantDeps): AssistantStore {
           await deps.listen('assistant-close', () => store.closed()),
           await deps.listen<boolean>('assistant-ball', shown => { store.ball = Boolean(shown); }),
           // The settings page lives in another window; its choices arrive with every settings change.
-          await deps.listen<{ assistantOpen?: string; assistantRead?: string }>('settings-changed', value => readPrefs(value.assistantOpen, value.assistantRead)),
+          await deps.listen<{ assistantOpen?: string; assistantRead?: string; appearance?: string }>('settings-changed', value => { readPrefs(value.assistantOpen, value.assistantRead); if (value.appearance) deps.onAppearance?.(value.appearance); }),
         );
         try {
-          const saved = await deps.invoke<{ open?: string; read?: string }>('assistant_prefs');
+          const saved = await deps.invoke<{ open?: string; read?: string; appearance?: string }>('assistant_prefs');
           readPrefs(saved?.open, saved?.read);
+          if (saved?.appearance) deps.onAppearance?.(saved.appearance);
         } catch { /* the defaults stand */ }
         await Promise.all([chat.init(), asr.init(), speech.init()]);
         await deps.invoke('assistant_ready');

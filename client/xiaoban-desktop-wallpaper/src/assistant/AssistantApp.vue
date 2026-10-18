@@ -109,12 +109,12 @@ onBeforeUnmount(() => { window.removeEventListener('focus', onFocus); observer?.
 <template>
   <div class="stage" :class="{ light: !isDark }" @keydown.esc.prevent="store.hide()" @mousedown.left="drag">
     <div v-if="store.ball && !store.open" class="ball-stage" data-testid="assistant-ball-stage">
-      <button type="button" class="ball" :data-phase="store.phase" title="点一下提问，按住可以拖动，右键打开设置" aria-label="打开小伴助手" data-testid="assistant-ball" @pointerdown="ballDown" @pointermove="ballMove" @pointerup="release" @pointercancel="release" @click="ballClick" @contextmenu.prevent="store.openSettings('assistant')">
+      <button type="button" class="ball" :data-phase="store.phase" title="点一下提问，按住可以拖动，右键打开设置" aria-label="打开超级小伴" data-testid="assistant-ball" @pointerdown="ballDown" @pointermove="ballMove" @pointerup="release" @pointercancel="release" @click="ballClick" @contextmenu.prevent="store.openSettings('assistant')">
         <Orb :phase="store.phase" :level="0" :active="true" :size="48" :dark="isDark" :fps="quiet ? 20 : 60" />
       </button>
     </div>
     <Transition name="pop" appear>
-      <div v-if="store.open" ref="inner" class="inner" role="dialog" aria-label="小伴助手" data-testid="assistant">
+      <div v-if="store.open" ref="inner" class="inner" role="dialog" aria-label="超级小伴" data-testid="assistant">
         <Transition name="rise">
           <section v-if="hasCard" class="card" data-testid="assistant-card">
             <div ref="scroller" class="card-body">

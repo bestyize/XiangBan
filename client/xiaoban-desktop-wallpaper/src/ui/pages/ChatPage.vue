@@ -366,7 +366,7 @@ async function openLink(href: string) {
         </template>
         <li v-if="chat.ready && !chat.sessions.length" class="empty-list">还没有对话</li>
       </ul>
-      <button type="button" class="side-assistant" data-testid="chat-open-assistant" @click="store.navigate('assistant')"><AudioLines :size="15" /><span>悬浮助手</span><small>随时呼出，直接对话</small></button>
+      <button type="button" class="side-assistant" data-testid="chat-open-assistant" @click="store.navigate('assistant')"><AudioLines :size="15" /><span>超级小伴</span><small>随时呼出，直接对话</small></button>
     </aside>
 
     <div class="chat-main">

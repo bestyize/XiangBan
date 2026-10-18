@@ -2,7 +2,7 @@ import { nextTick, reactive } from 'vue';
 import { describe, expect, it, vi } from 'vitest';
 import { createAssistantStore, LISTEN_IDLE_MS, RESUME_MS, SEND_GRACE_MS } from './assistant-store.ts';
 
-function setup(options: { configured?: boolean; voice?: boolean; prefs?: { open: string; read: string } } = {}) {
+function setup(options: { configured?: boolean; voice?: boolean; prefs?: { open: string; read: string; appearance?: string } } = {}) {
   let clock = 1_000_000;
   const timers: { id: number; at: number; run: () => void }[] = [];
   let nextId = 1;
@@ -41,14 +41,15 @@ function setup(options: { configured?: boolean; voice?: boolean; prefs?: { open:
   });
   const handlers = new Map<string, (payload: unknown) => void>();
   const invoke = vi.fn(async (command: string) => (command === 'assistant_prefs' ? options.prefs ?? { open: 'voice', read: 'voice' } : undefined) as never);
+  const appearance = vi.fn();
   const store = createAssistantStore({
-    desktop: true, invoke, listen: async (event, callback) => { handlers.set(event, callback as (payload: unknown) => void); return () => {}; },
+    onAppearance: appearance, desktop: true, invoke, listen: async (event, callback) => { handlers.set(event, callback as (payload: unknown) => void); return () => {}; },
     chat: chat as never, asr: asr as never, speech: speech as never,
     now: () => clock,
     setTimer: (run, ms) => { const timer = { id: nextId++, at: clock + ms, run }; timers.push(timer); return timer.id; },
     clearTimer: id => { const at = timers.findIndex(timer => timer.id === id); if (at >= 0) timers.splice(at, 1); },
   });
-  return { store, chat, asr, speech, invoke, advance, say: (text: string) => heard(text), emit: (event: string, payload?: unknown) => handlers.get(event)?.(payload) };
+  return { store, chat, asr, speech, invoke, advance, say: (text: string) => heard(text), emit: (event: string, payload?: unknown) => handlers.get(event)?.(payload), appearance };
 }
 const finishAnswer = (chat: ReturnType<typeof setup>['chat'], text = '好的，已经处理完了。') => {
   chat.views.s1.items.push({ kind: 'assistant', id: 'a', text, streaming: false });
@@ -282,5 +283,15 @@ describe('floating assistant', () => {
       finishAnswer(spoken.chat); spoken.store.replied('s1', '回答', 'a');
       expect(spoken.speech.speak.mock.calls.length > 0, `spoken, ${read}`).toBe(spokenReads);
     }
+  });
+
+  it('takes the console\'s colour scheme from the host at start and follows every change, since it cannot read the console\'s storage', async () => {
+    const { store, emit, appearance } = setup({ prefs: { open: 'voice', read: 'voice', appearance: 'dark' } });
+    await store.init();
+    expect(appearance).toHaveBeenLastCalledWith('dark');
+    emit('settings-changed', { appearance: 'light' });
+    expect(appearance).toHaveBeenLastCalledWith('light');
+    emit('settings-changed', { assistantOpen: 'type' });
+    expect(appearance).toHaveBeenCalledTimes(2);
   });
 });

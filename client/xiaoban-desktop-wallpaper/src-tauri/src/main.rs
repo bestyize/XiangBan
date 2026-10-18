@@ -215,7 +215,7 @@ fn open_scene(app: &tauri::AppHandle, mode: &str) -> Result<(), String> {
     let scene_w = s.size * 1.5;
     let scene_h = s.size * 1.22;
     let builder = WebviewWindowBuilder::new(app, "pet", WebviewUrl::App("index.html?scene=floating".into()))
-        .title("小伴 · 桌面小伴")
+        .title("小伴 · 桌面宠物")
         .decorations(false).shadow(false).resizable(false).skip_taskbar(true)
         .always_on_top(mode == "floating").transparent(true).visible(false).focused(false)
         .inner_size(scene_w, scene_h)
@@ -372,6 +372,29 @@ fn set_companion_links(app: tauri::AppHandle, enabled: bool) -> Result<Settings,
     *state.settings.lock().unwrap() = next.clone();
     publish(&app);
     Ok(next)
+}
+
+/// Saves the console's colour scheme and tells every window, so the floating assistant matches it.
+#[tauri::command]
+fn set_appearance(app: tauri::AppHandle, mode: String) -> Result<Settings, String> {
+    if !preferences::APPEARANCES.contains(&mode.as_str()) { return Err(format!("没有这个外观：{mode}")); }
+    let state = app.state::<DesktopState>();
+    let _update = state.update_lock.lock().unwrap();
+    let mut next = settings(&app);
+    if next.appearance == mode && next.appearance_kept { return Ok(next); }
+    next.appearance = mode;
+    next.appearance_kept = true;
+    persist(&app, &next)?;
+    *state.settings.lock().unwrap() = next.clone();
+    publish(&app);
+    Ok(next)
+}
+
+/// What the host has for the colour scheme, and whether it was ever given one.
+#[tauri::command]
+fn get_appearance(app: tauri::AppHandle) -> serde_json::Value {
+    let s = settings(&app);
+    serde_json::json!({ "appearance": s.appearance, "appearanceKept": s.appearance_kept })
 }
 
 #[tauri::command]
@@ -604,7 +627,7 @@ fn setup_tray(app: &tauri::App) -> tauri::Result<()> {
         tray::TrayIconBuilder,
     };
     let control = MenuItem::with_id(app, "control", "打开小伴设置", true, None::<&str>)?;
-    let assistant = MenuItem::with_id(app, "assistant", "呼出助手", true, None::<&str>)?;
+    let assistant = MenuItem::with_id(app, "assistant", "呼出超级小伴", true, None::<&str>)?;
     let poke = MenuItem::with_id(app, "poke", "戳戳小伴", true, None::<&str>)?;
     let games = MenuItem::with_id(app, "games", "玩一玩", true, None::<&str>)?;
     let stop_desk = MenuItem::with_id(app, "stop-desk-game", "停止桌面游戏", true, None::<&str>)?;
@@ -688,7 +711,7 @@ fn main() {
         }));
     #[cfg(target_os = "macos")]
     let builder = builder.plugin(tauri_plugin_autostart::Builder::new().app_name(startup_name).arg("--autostart").build());
-    let command_handler: Box<dyn Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Sync> = Box::new(tauri::generate_handler![resource_packs::export_resource_pack, resource_packs::import_resource_pack, get_platform, get_settings, set_mode, update_settings, set_desktop_effects, effects::list_desktop_effects, effects::open_effects_directory, effects::import_effect_pack, effects::delete_desktop_effect, set_companion_enabled, set_companion_links, set_companion_skin, poke,
+    let command_handler: Box<dyn Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Sync> = Box::new(tauri::generate_handler![resource_packs::export_resource_pack, resource_packs::import_resource_pack, get_platform, get_settings, set_mode, update_settings, set_desktop_effects, effects::list_desktop_effects, effects::open_effects_directory, effects::import_effect_pack, effects::delete_desktop_effect, set_companion_enabled, set_appearance, get_appearance, set_companion_links, set_companion_skin, poke,
             scene_ready, set_hit_test, start_drag, hide_control, show_control, quit, get_diagnostics, ui_smoke_report,
             get_startup_status, set_autostart, content::get_wallpaper_library, content::import_wallpaper_catalog, content::delete_local_wallpaper,
             desk_game::open_desktop_game, desk_game::close_desktop_game, desk_game::desk_set_regions,
@@ -730,7 +753,7 @@ fn main() {
             }
             let allowed=float_assistant::permitted(label,command).or_else(|| desk_game::permitted(label,command)).or_else(|| widgets::permitted(label,command)).or_else(|| rituals::permitted(label,command)).or_else(|| games::permitted(label,command)).unwrap_or_else(|| {
                 if command=="ui_smoke_report" {return label=="control";}
-                if command=="set_companion_enabled" || command=="set_companion_links" || command=="set_companion_skin" || command=="set_desktop_effects" || command=="list_desktop_effects" || command=="open_effects_directory" || command=="import_effect_pack" {return label=="control";}
+                if command=="set_appearance" || command=="get_appearance" || command=="set_companion_enabled" || command=="set_companion_links" || command=="set_companion_skin" || command=="set_desktop_effects" || command=="list_desktop_effects" || command=="open_effects_directory" || command=="import_effect_pack" {return label=="control";}
                 if label=="care" { return ["get_care_delivery","care_ready","dismiss_care","snooze_care","care_synthesize"].contains(&command); }
                 if command.contains("care") { return label=="control"; }
                 content::permitted(label,command)

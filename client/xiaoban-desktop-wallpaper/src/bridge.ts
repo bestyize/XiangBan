@@ -2,6 +2,9 @@ import type { EffectsChoice } from "./effects/types.ts";
 
 export interface Settings {
   mode: "floating" | "wallpaper";
+  /** The console's colour scheme. Kept by the host so the floating assistant can match it. */
+  appearance: "system" | "light" | "dark";
+  appearanceKept: boolean;
   expression: string;
   size: number;
   theme: "night" | "dawn";
@@ -272,6 +275,8 @@ declare global {
 export const desktop = Boolean(window.__TAURI__);
 export const defaults: Settings = {
   mode: "floating",
+  appearance: "system",
+  appearanceKept: false,
   expression: "idle",
   size: 260,
   theme: "night",

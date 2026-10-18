@@ -11,10 +11,26 @@ const query = typeof window !== 'undefined' && typeof window.matchMedia === 'fun
 export const appearanceMode = ref<AppearanceMode>(read());
 const systemDark = ref(!!query?.matches);
 query?.addEventListener?.('change', event => { systemDark.value = event.matches; });
-// Another window (the control console) changed the choice: follow it, so the floating assistant matches.
-if (typeof window !== 'undefined') window.addEventListener('storage', event => { if (event.key === KEY || event.key === null) appearanceMode.value = read(); });
+const valid = (value: unknown): value is AppearanceMode => appearanceModes.some(mode => mode.value === value);
+/** The choice as the host has it. Windows cannot share page storage, so this is how the others learn what the console chose. */
+export function followHost(value: unknown) {
+  if (valid(value) && value !== appearanceMode.value) appearanceMode.value = value;
+}
 export const isDark = computed(() => appearanceMode.value === 'dark' || (appearanceMode.value === 'system' && systemDark.value));
+/**
+ * What the console does at start with what the host has. A host that was never given a choice takes the one this window
+ * already had (the user's pick from before the host kept one) unless it was the system setting; otherwise the host rules.
+ */
+export function reconcile(host: { appearance: string; appearanceKept?: boolean }, own: AppearanceMode): { send?: AppearanceMode; adopt?: AppearanceMode } {
+  if (!host.appearanceKept && own !== 'system') return { send: own };
+  if (valid(host.appearance) && host.appearance !== own) return { adopt: host.appearance };
+  return {};
+}
+/** Where a choice is also sent, so the host can keep it and tell the other windows. Set by the console. */
+let publish: ((mode: AppearanceMode) => void) | undefined;
+export function publishAppearanceTo(callback: (mode: AppearanceMode) => void) { publish = callback; }
 export function setAppearance(mode: AppearanceMode) {
   appearanceMode.value = mode;
   try { localStorage.setItem(KEY, mode); } catch { /* The choice still applies for this session. */ }
+  publish?.(mode);
 }

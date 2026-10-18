@@ -206,7 +206,7 @@ onActivated(() => {
           height="800"
           loading="lazy"
           decoding="async"
-          alt="小伴桌面的桌面小伴页：左侧是笑眯眯的猫耳小伴互动预览，右侧可在猫耳、兔耳、盆栽三款外壳之间切换"
+          alt="小伴桌面的桌面宠物页：左侧是笑眯眯的猫耳小伴互动预览，右侧可在猫耳、兔耳、盆栽三款外壳之间切换"
         />
       </article>
       <article class="showcase-row">
