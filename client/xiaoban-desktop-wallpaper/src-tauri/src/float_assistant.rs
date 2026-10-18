@@ -16,28 +16,47 @@ pub const SHORTCUTS: &[&str] = &["Alt+Space", "Ctrl+Alt+Space", "CmdOrCtrl+Shift
 pub const DEFAULT_SHORTCUT: &str = "Alt+Space";
 
 const WIDTH: f64 = 560.0;
-const MIN_HEIGHT: f64 = 112.0;
+const MIN_HEIGHT: f64 = 92.0;
 const MAX_HEIGHT: f64 = 620.0;
 /// Space kept between the capsule and the bottom of the usable screen (above the Dock or taskbar).
 const BOTTOM_GAP: f64 = 56.0;
 
-#[derive(Clone, Copy)]
-struct Anchor {
+/// A rectangle in physical pixels.
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct Area {
     x: i32,
-    bottom: i32,
-    scale: f64,
+    y: i32,
+    w: i32,
+    h: i32,
+}
+
+impl Area {
+    fn bottom(&self) -> i32 {
+        self.y + self.h
+    }
+    fn right(&self) -> i32 {
+        self.x + self.w
+    }
+}
+
+/// Where the capsule sits on a screen, relative to the default spot (bottom centre of the usable area), in logical
+/// pixels. Dragging it somewhere changes this, and it is applied again on whichever screen the pointer is on.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+struct Offset {
+    dx: f64,
+    dy: f64,
 }
 
 #[derive(Default)]
 pub struct AssistantState {
     registered: Mutex<Option<String>>,
     error: Mutex<String>,
-    anchor: Mutex<Option<Anchor>>,
+    moved: Mutex<Offset>,
     /// The page has loaded and listens for `assistant-open`.
     ready: AtomicBool,
 }
 
-const WINDOW_COMMANDS: &[&str] = &["assistant_ready", "assistant_hide", "assistant_fit", "assistant_open_chat", "assistant_open_settings"];
+const WINDOW_COMMANDS: &[&str] = &["assistant_ready", "assistant_hide", "assistant_fit", "assistant_drag", "assistant_open_chat", "assistant_open_settings"];
 const CONTROL_COMMANDS: &[&str] = &["assistant_status", "assistant_configure"];
 /// What the capsule may ask of the host besides its own window commands: ask and answer, speak, listen.
 /// Deleting, renaming, compacting or changing the trust mode of conversations stays with the control window.
@@ -154,7 +173,35 @@ fn build(app: &tauri::AppHandle) -> Result<WebviewWindow, String> {
     Ok(window)
 }
 
-/// Bottom centre of the usable area of the screen the pointer is on.
+fn area_of(monitor: &tauri::Monitor) -> Area {
+    let area = monitor.work_area();
+    Area { x: area.position.x, y: area.position.y, w: area.size.width as i32, h: area.size.height as i32 }
+}
+
+/// The left edge and the bottom edge of a capsule `width` wide, for the given usable area and offset. It always stays
+/// fully on the screen, so a spot saved on a bigger screen still works on a smaller one.
+fn anchor(area: Area, scale: f64, width: i32, min_height: i32, offset: Offset) -> (i32, i32) {
+    let gap = (BOTTOM_GAP * scale).round() as i32;
+    let x = area.x + (area.w - width) / 2 + (offset.dx * scale).round() as i32;
+    let bottom = area.bottom() - gap + (offset.dy * scale).round() as i32;
+    (x.clamp(area.x, (area.right() - width).max(area.x)), bottom.clamp(area.y + min_height, area.bottom()))
+}
+
+/// Where the top edge goes when the capsule changes to `height` with its bottom edge held in place; if that would
+/// push it off the top of the screen it is pulled back down instead.
+fn top_for(area: Area, bottom: i32, height: i32) -> i32 {
+    (bottom - height).clamp(area.y, (area.bottom() - height).max(area.y))
+}
+
+/// How far the capsule's bottom centre is from the default spot of the screen it is on.
+fn offset_of(area: Area, scale: f64, x: i32, width: i32, bottom: i32) -> Offset {
+    let gap = (BOTTOM_GAP * scale).round() as i32;
+    let dx = (x + width / 2) - (area.x + area.w / 2);
+    let dy = bottom - (area.bottom() - gap);
+    Offset { dx: f64::from(dx) / scale, dy: f64::from(dy) / scale }
+}
+
+/// Puts the capsule on the screen the pointer is on, at its default spot or where the user last left it.
 fn place(app: &tauri::AppHandle, window: &WebviewWindow) -> Result<(), String> {
     let monitor = app
         .cursor_position()
@@ -163,29 +210,43 @@ fn place(app: &tauri::AppHandle, window: &WebviewWindow) -> Result<(), String> {
         .or_else(|| app.primary_monitor().ok().flatten())
         .ok_or("没有找到显示器")?;
     let scale = monitor.scale_factor();
-    let area = monitor.work_area();
     let width = (WIDTH * scale).round() as i32;
-    let anchor = Anchor {
-        x: area.position.x + (area.size.width as i32 - width) / 2,
-        bottom: area.position.y + area.size.height as i32 - (BOTTOM_GAP * scale).round() as i32,
-        scale,
-    };
-    *app.state::<AssistantState>().anchor.lock().unwrap() = Some(anchor);
-    resize(window, MIN_HEIGHT)
+    let height = (MIN_HEIGHT * scale).round() as i32;
+    let offset = *app.state::<AssistantState>().moved.lock().unwrap();
+    let (x, bottom) = anchor(area_of(&monitor), scale, width, height, offset);
+    // Move first so a window arriving on another screen takes that screen's scale before it is sized.
+    let top = bottom - height;
+    window.set_position(PhysicalPosition::new(x, top)).map_err(|e| e.to_string())?;
+    window.set_size(PhysicalSize::new(width as u32, height as u32)).map_err(|e| e.to_string())?;
+    window.set_position(PhysicalPosition::new(x, top)).map_err(|e| e.to_string())
 }
 
-/// Sets the height in logical pixels while the bottom edge stays where it is, so the capsule grows upward.
+/// Sets the height in logical pixels. The bottom edge stays wherever the capsule is now (the user may have dragged
+/// it), so it grows upward.
 fn resize(window: &WebviewWindow, height: f64) -> Result<(), String> {
-    let app = window.app_handle();
-    let Some(anchor) = *app.state::<AssistantState>().anchor.lock().unwrap() else { return Ok(()) };
-    let height = height.clamp(MIN_HEIGHT, MAX_HEIGHT);
-    let physical = (height * anchor.scale).round() as i32;
-    // Move first so a window arriving on another screen takes that screen's scale before it is sized.
-    window.set_position(PhysicalPosition::new(anchor.x, anchor.bottom - physical)).map_err(|e| e.to_string())?;
-    window
-        .set_size(PhysicalSize::new((WIDTH * anchor.scale).round() as u32, physical as u32))
-        .map_err(|e| e.to_string())?;
-    window.set_position(PhysicalPosition::new(anchor.x, anchor.bottom - physical)).map_err(|e| e.to_string())
+    let scale = window.scale_factor().map_err(|e| e.to_string())?;
+    let position = window.outer_position().map_err(|e| e.to_string())?;
+    let size = window.outer_size().map_err(|e| e.to_string())?;
+    let target = (height.clamp(MIN_HEIGHT, MAX_HEIGHT) * scale).round() as i32;
+    let bottom = position.y + size.height as i32;
+    let top = match window.current_monitor().map_err(|e| e.to_string())? {
+        Some(monitor) => top_for(area_of(&monitor), bottom, target),
+        None => bottom - target,
+    };
+    window.set_position(PhysicalPosition::new(position.x, top)).map_err(|e| e.to_string())?;
+    window.set_size(PhysicalSize::new(size.width, target as u32)).map_err(|e| e.to_string())?;
+    window.set_position(PhysicalPosition::new(position.x, top)).map_err(|e| e.to_string())
+}
+
+/// Remembers where the user left the capsule, so the next time it opens it is there and not back at the default.
+fn remember(app: &tauri::AppHandle, window: &WebviewWindow) {
+    let (Ok(position), Ok(size), Ok(Some(monitor)), Ok(scale)) =
+        (window.outer_position(), window.outer_size(), window.current_monitor(), window.scale_factor())
+    else {
+        return;
+    };
+    let offset = offset_of(area_of(&monitor), scale, position.x, size.width as i32, position.y + size.height as i32);
+    *app.state::<AssistantState>().moved.lock().unwrap() = offset;
 }
 
 pub fn toggle(app: &tauri::AppHandle) {
@@ -216,6 +277,9 @@ pub fn show(app: &tauri::AppHandle) -> Result<(), String> {
 
 pub fn hide(app: &tauri::AppHandle) -> Result<(), String> {
     let Some(window) = app.get_webview_window(LABEL) else { return Ok(()) };
+    if window.is_visible().unwrap_or(false) {
+        remember(app, &window);
+    }
     let _ = window.emit("assistant-close", ());
     window.hide().map_err(|e| e.to_string())
 }
@@ -278,6 +342,15 @@ pub fn assistant_fit(window: WebviewWindow, height: f64) -> Result<(), String> {
     resize(&window, height)
 }
 
+/// Lets the user drag the capsule by its empty parts. The page calls this on the mouse press.
+#[tauri::command]
+pub fn assistant_drag(window: WebviewWindow) -> Result<(), String> {
+    if window.label() != LABEL {
+        return Err("只有助手窗口可以拖动".into());
+    }
+    window.start_dragging().map_err(|e| e.to_string())
+}
+
 /// Brings the control window forward on the chat page, with the conversation the capsule was using.
 #[tauri::command]
 pub fn assistant_open_chat(app: tauri::AppHandle, session: Option<String>) -> Result<(), String> {
@@ -301,6 +374,55 @@ pub fn assistant_open_settings(app: tauri::AppHandle, tab: String) -> Result<(),
 mod tests {
     use super::*;
     use tauri_plugin_global_shortcut::Shortcut;
+
+    /// A 1440x900 screen with a 25px menu bar, and the same kind of screen at 2x.
+    const SCREEN: Area = Area { x: 0, y: 25, w: 1440, h: 875 };
+    const RETINA: Area = Area { x: 0, y: 50, w: 2880, h: 1750 };
+
+    #[test]
+    fn by_default_the_capsule_sits_at_the_bottom_centre_of_the_usable_area() {
+        assert_eq!(anchor(SCREEN, 1.0, 560, 112, Offset::default()), (440, 900 - 56));
+        assert_eq!(anchor(RETINA, 2.0, 1120, 224, Offset::default()), (880, 1800 - 112));
+    }
+
+    #[test]
+    fn a_dragged_spot_comes_back_and_is_kept_on_screen_when_the_screen_is_smaller() {
+        assert_eq!(anchor(SCREEN, 1.0, 560, 112, Offset { dx: -300.0, dy: -200.0 }), (140, 900 - 56 - 200));
+        // far to the right and below the bottom edge: pulled back inside
+        assert_eq!(anchor(SCREEN, 1.0, 560, 112, Offset { dx: 5000.0, dy: 5000.0 }), (1440 - 560, 900));
+        // far to the left and above the top edge
+        assert_eq!(anchor(SCREEN, 1.0, 560, 112, Offset { dx: -5000.0, dy: -5000.0 }), (0, 25 + 112));
+    }
+
+    #[test]
+    fn where_the_user_leaves_it_is_what_is_remembered_and_the_default_is_zero() {
+        let (x, bottom) = anchor(RETINA, 2.0, 1120, 224, Offset::default());
+        assert_eq!(offset_of(RETINA, 2.0, x, 1120, bottom), Offset::default());
+        let dragged = offset_of(RETINA, 2.0, x + 200, 1120, bottom - 400);
+        assert_eq!(dragged, Offset { dx: 100.0, dy: -200.0 });
+        assert_eq!(anchor(RETINA, 2.0, 1120, 224, dragged), (x + 200, bottom - 400));
+        // a spot saved on the retina screen lands in the same place, in logical terms, on the plain one
+        assert_eq!(anchor(SCREEN, 1.0, 560, 112, dragged), (440 + 100, 900 - 56 - 200));
+    }
+
+    #[test]
+    fn growing_keeps_the_bottom_edge_and_never_leaves_the_screen() {
+        assert_eq!(top_for(SCREEN, 800, 300), 500);
+        // taller than the room above the bottom edge: it stops at the top of the usable area
+        assert_eq!(top_for(SCREEN, 300, 620), 25);
+        // dragged to the very top: it grows downward instead of going off the screen
+        assert_eq!(top_for(SCREEN, 137, 700), 25);
+        // and never past the bottom edge
+        assert_eq!(top_for(SCREEN, 899, 600), 299);
+        assert_eq!(top_for(SCREEN, 880, 100), 780);
+    }
+
+    #[test]
+    fn only_the_assistant_window_can_start_a_drag() {
+        assert_eq!(permitted(LABEL, "assistant_drag"), Some(true));
+        assert_eq!(permitted("control", "assistant_drag"), Some(false));
+        assert_eq!(permitted("pet", "assistant_drag"), Some(false));
+    }
 
     #[test]
     fn every_offered_shortcut_is_a_valid_key_combination() {

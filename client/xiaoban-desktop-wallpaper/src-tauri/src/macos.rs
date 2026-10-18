@@ -111,7 +111,10 @@ pub fn configure_scene(
     on_main(&app, move |mtm| {
         let ns = native(&window)?;
         let desktop = CGWindowLevelForKey(CGWindowLevelKey::DesktopWindowLevelKey) as isize;
-        let floating = CGWindowLevelForKey(CGWindowLevelKey::FloatingWindowLevelKey) as isize;
+        // Above the "always on top" tier (floating, level 3) that most utilities and other apps' pinned windows use:
+        // inside one level the window used last wins, so staying in that tier meant being covered after a click elsewhere.
+        // The status level also sits over the Dock, and these windows are small and click-through where they are empty.
+        let floating = CGWindowLevelForKey(CGWindowLevelKey::StatusWindowLevelKey) as isize;
         // Effects sit one level above the wallpaper window, still under the desktop icons.
         ns.setLevel(if wallpaper {
             if crate::widgets::is_widget(window.label()) { CGWindowLevelForKey(CGWindowLevelKey::DesktopIconWindowLevelKey) as isize + 1 }

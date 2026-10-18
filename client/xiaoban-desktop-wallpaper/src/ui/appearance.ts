@@ -11,6 +11,8 @@ const query = typeof window !== 'undefined' && typeof window.matchMedia === 'fun
 export const appearanceMode = ref<AppearanceMode>(read());
 const systemDark = ref(!!query?.matches);
 query?.addEventListener?.('change', event => { systemDark.value = event.matches; });
+// Another window (the control console) changed the choice: follow it, so the floating assistant matches.
+if (typeof window !== 'undefined') window.addEventListener('storage', event => { if (event.key === KEY || event.key === null) appearanceMode.value = read(); });
 export const isDark = computed(() => appearanceMode.value === 'dark' || (appearanceMode.value === 'system' && systemDark.value));
 export function setAppearance(mode: AppearanceMode) {
   appearanceMode.value = mode;

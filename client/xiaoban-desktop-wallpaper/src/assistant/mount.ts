@@ -1,14 +1,15 @@
-import { createApp } from 'vue';
+import { createApp, watchEffect } from 'vue';
 import { desktop, invoke, listen } from '../bridge.ts';
 import { createAsrStore } from '../ui/asr/store.ts';
 import { createChatStore } from '../ui/chat/chat-store.ts';
+import { isDark } from '../ui/appearance.ts';
 import { applyUiTokens } from '../ui/design-tokens.ts';
 import { createSpeechStore } from '../ui/speech/store.ts';
 import AssistantApp from './AssistantApp.vue';
 import { createAssistantStore, type AssistantStore } from './assistant-store.ts';
 
 export async function mountAssistant() {
-  applyUiTokens(true);
+  watchEffect(() => applyUiTokens(isDark.value));
   document.documentElement.style.background = 'transparent';
   document.body.style.background = 'transparent';
   document.body.className = 'assistant';

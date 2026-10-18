@@ -10,13 +10,8 @@ export type Phase = 'idle' | 'listening' | 'thinking' | 'answering' | 'speaking'
 export const RESUME_MS = 5 * 60 * 1000;
 /** Voice text is sent this long after the last words were recognised, in case more follows. */
 export const SEND_GRACE_MS = 600;
-/** The capsule puts itself away when nothing was said or typed for this long after it opened. */
-export const QUIET_CLOSE_MS = 12_000;
-/** The same, once an answer has been shown (and read). */
-export const DONE_CLOSE_MS = 30_000;
-const RECHECK_MS = 3_000;
-/** A focus change this soon after opening is the system settling, not the user leaving. */
-const SETTLE_MS = 500;
+/** The microphone is released when nothing was heard for this long. The capsule itself stays until it is dismissed. */
+export const LISTEN_IDLE_MS = 15_000;
 
 export interface AssistantDeps {
   desktop: boolean;
@@ -38,8 +33,6 @@ export interface AssistantStore {
   hint: string;
   /** The settings tab that fixes the hint, if one does. */
   hintTab: '' | 'ai' | 'voice';
-  /** The pointer is over the capsule, so it will not put itself away. */
-  hovering: boolean;
   readonly phase: Phase;
   readonly configured: boolean;
   readonly voiceAvailable: boolean;
@@ -63,8 +56,6 @@ export interface AssistantStore {
   replied(session: string, text: string, key?: string): void;
   /** Called when the open conversation was cancelled or failed. */
   stopped(): void;
-  blurred(): void;
-  touch(): void;
   /** Shows a line in the card, optionally with a way to the settings tab that fixes it. */
   note(message: string, tab?: '' | 'ai' | 'voice'): void;
   hide(): Promise<void>;
@@ -90,8 +81,8 @@ export function createAssistantStore(deps: AssistantDeps): AssistantStore {
   const unsubscribers: (() => void)[] = [];
   let starting: Promise<void> | null = null;
   let disposed = false;
-  let openedAt = 0, lastActivity = 0;
-  let closeTimer: unknown, sendTimer: unknown;
+  let lastActivity = 0;
+  let listenTimer: unknown, sendTimer: unknown;
   /** Words recognised so far in this utterance; sent together when speaking pauses. */
   let heard = '';
   /** The last question was spoken, so the answer is read aloud and listening resumes afterwards. */
@@ -112,17 +103,7 @@ export function createAssistantStore(deps: AssistantDeps): AssistantStore {
     return { question, answer, working: tool ? describeTool(tool.name) : '', failure: notice?.text ?? '' };
   }
 
-  function clearTimers() { clearTimer(closeTimer); clearTimer(sendTimer); closeTimer = sendTimer = undefined; }
-  function busy() { return store.phase !== 'idle' && store.phase !== 'listening'; }
-  /** Puts the capsule away after `ms` of nothing happening; it waits while the user is reading, typing or being answered. */
-  function arm(ms: number) {
-    clearTimer(closeTimer);
-    closeTimer = setTimer(() => {
-      if (disposed || !store.open) return;
-      if (store.hovering || busy() || store.input.trim()) { arm(RECHECK_MS); return; }
-      void store.hide();
-    }, ms);
-  }
+  function clearTimers() { clearTimer(listenTimer); clearTimer(sendTimer); listenTimer = sendTimer = undefined; }
 
   async function startListening(): Promise<boolean> {
     await asr.init();
@@ -131,9 +112,18 @@ export function createAssistantStore(deps: AssistantDeps): AssistantStore {
     if (!store.open) return false;
     store.note(''); heard = '';
     await asr.activate(onHeard);
-    return asr.recordingRequested;
+    if (!asr.recordingRequested) return false;
+    // Nobody is talking: let the microphone go, but keep the capsule where it is.
+    clearTimer(listenTimer);
+    listenTimer = setTimer(() => {
+      if (disposed || !store.open || heard || !asr.recordingRequested) return;
+      asr.deactivate(); voiceTurn = false;
+      store.note('没听到声音，点光球可以继续说话。');
+    }, LISTEN_IDLE_MS);
+    return true;
   }
   function onHeard(text: string) {
+    clearTimer(listenTimer);
     heard = heard ? `${heard} ${text}` : text;
     store.input = heard;
     clearTimer(sendTimer);
@@ -143,15 +133,13 @@ export function createAssistantStore(deps: AssistantDeps): AssistantStore {
       void store.submit(heard, true);
     }, SEND_GRACE_MS);
   }
-  /** What happens once an answer is complete and has been read: listen again if the user is talking, and arm the timer. */
+  /** What happens once an answer is complete and has been read: listen again if the user is talking. */
   function afterTurn() {
-    if (!store.open) return;
-    if (voiceTurn && asr.enabled) void startListening();
-    arm(DONE_CLOSE_MS);
+    if (store.open && voiceTurn && asr.enabled) void startListening();
   }
 
   const store: AssistantStore = reactive({
-    open: false, input: '', hint: '', hintTab: '', hovering: false,
+    open: false, input: '', hint: '', hintTab: '',
     get configured() { return chat.configured; },
     get voiceAvailable() { return asr.enabled; },
     get question() { return turn().question; },
@@ -193,18 +181,17 @@ export function createAssistantStore(deps: AssistantDeps): AssistantStore {
     async opened() {
       if (disposed) return;
       clearTimers();
-      openedAt = now(); store.open = true; store.note(''); store.input = ''; heard = ''; voiceTurn = false; flags.awaitingSpeech = false;
+      store.open = true; store.note(''); store.input = ''; heard = ''; voiceTurn = false; flags.awaitingSpeech = false;
       await Promise.all([chat.init(), asr.init()]);
       if (!store.open) return;
-      if (!chat.configured) { store.note('还没有配置模型。先到设置里添加一个，我才能回答。', 'ai'); arm(QUIET_CLOSE_MS * 2); return; }
+      if (!chat.configured) { store.note('还没有配置模型。先到设置里添加一个，我才能回答。', 'ai'); return; }
       if (!chat.currentId || now() - lastActivity > RESUME_MS) await chat.select(null);
-      arm(QUIET_CLOSE_MS);
       if (store.open && asr.enabled) { voiceTurn = await startListening(); }
     },
     closed() {
       clearTimers();
       asr.deactivate(); void speech.stop();
-      store.open = false; store.input = ''; store.note(''); store.hovering = false; heard = ''; voiceTurn = false; flags.awaitingSpeech = false;
+      store.open = false; store.input = ''; store.note(''); heard = ''; voiceTurn = false; flags.awaitingSpeech = false;
     },
     async submit(text, spoken = false) {
       const value = (text ?? store.input).trim();
@@ -213,10 +200,9 @@ export function createAssistantStore(deps: AssistantDeps): AssistantStore {
       asr.deactivate(); await speech.stop();
       store.input = ''; store.note('');
       voiceTurn = spoken; lastActivity = now();
-      if (!(await chat.send(value))) { store.input = value; arm(DONE_CLOSE_MS); }
+      if (!(await chat.send(value))) store.input = value;
     },
     async toggleListening() {
-      store.touch();
       if (asr.listening || asr.recordingRequested) { asr.deactivate(); voiceTurn = false; heard = ''; return; }
       await speech.stop(); flags.awaitingSpeech = false;
       voiceTurn = await startListening();
@@ -239,15 +225,8 @@ export function createAssistantStore(deps: AssistantDeps): AssistantStore {
     },
     stopped() {
       flags.awaitingSpeech = false; void speech.stop();
-      if (store.open) arm(DONE_CLOSE_MS);
-    },
-    blurred() {
-      if (!store.open || now() - openedAt < SETTLE_MS) return;
-      if (busy() || store.input.trim()) return;
-      void store.hide();
     },
     note(message, tab = '') { store.hint = message; store.hintTab = message ? tab : ''; },
-    touch() { if (store.open) arm(busy() ? DONE_CLOSE_MS : QUIET_CLOSE_MS * 2); },
     hide() { return deps.invoke<void>('assistant_hide').catch(() => {}); },
     async expand() { await deps.invoke('assistant_open_chat', { session: chat.currentId }); },
     async openSettings(tab) { await deps.invoke('assistant_open_settings', { tab }); },

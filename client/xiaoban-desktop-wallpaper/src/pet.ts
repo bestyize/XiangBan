@@ -36,7 +36,7 @@ export class PetView {
     this.skin = skinOf(settings.companionSkin).id
     this.host = document.createElement('div')
     this.host.className = 'pet-stage'
-    this.host.innerHTML = `<div class="pet-lamp"></div><div class="pet-art" role="img" aria-label="小伴" tabindex="0">${robotMarkup(stillFrame('idle'), this.id, undefined, this.skin)}</div>`
+    this.host.innerHTML = `<div class="pet-art" role="img" aria-label="小伴" tabindex="0">${robotMarkup(stillFrame('idle'), this.id, undefined, this.skin)}</div>`
     parent.append(this.host)
     window.addEventListener('care-expression', this.careExpression)
     this.bind()

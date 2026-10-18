@@ -1,6 +1,6 @@
 import { nextTick, reactive } from 'vue';
 import { describe, expect, it, vi } from 'vitest';
-import { createAssistantStore, DONE_CLOSE_MS, QUIET_CLOSE_MS, RESUME_MS, SEND_GRACE_MS } from './assistant-store.ts';
+import { createAssistantStore, LISTEN_IDLE_MS, RESUME_MS, SEND_GRACE_MS } from './assistant-store.ts';
 
 function setup(options: { configured?: boolean; voice?: boolean } = {}) {
   let clock = 1_000_000;
@@ -160,42 +160,53 @@ describe('floating assistant', () => {
     expect(noVoice.invoke).toHaveBeenCalledWith('assistant_open_settings', { tab: 'voice' });
   });
 
-  it('puts itself away when nothing happens, but waits while the pointer is over it or an answer is coming', async () => {
+  it('stays where it is until it is dismissed, however long it sits and whatever else the user clicks', async () => {
     const { store, invoke, advance } = setup({ voice: false });
     await store.opened();
-    store.hovering = true;
-    advance(QUIET_CLOSE_MS + 100);
+    advance(60 * 60 * 1000);
+    expect(store.open).toBe(true);
     expect(invoke).not.toHaveBeenCalledWith('assistant_hide');
-    store.hovering = false;
-    advance(5000);
-    expect(invoke).toHaveBeenCalledWith('assistant_hide');
-
-    const busy = setup({ voice: false });
-    await busy.store.opened();
-    await busy.store.submit('慢一点的问题');
-    busy.advance(DONE_CLOSE_MS * 2);
-    expect(busy.invoke).not.toHaveBeenCalledWith('assistant_hide');
-  });
-
-  it('leaves when focus is lost, unless it is answering or has text to send', async () => {
-    const { store, invoke, advance } = setup({ voice: false });
-    await store.opened();
-    store.blurred();
-    expect(invoke).not.toHaveBeenCalled();
-    advance(600);
-    store.input = '写到一半';
-    store.blurred();
-    expect(invoke).not.toHaveBeenCalled();
-    store.input = '';
-    store.blurred();
-    expect(invoke).toHaveBeenCalledWith('assistant_hide');
 
     const answering = setup({ voice: false });
     await answering.store.opened();
-    await answering.store.submit('问题');
-    answering.advance(600);
-    answering.store.blurred();
-    expect(answering.invoke).not.toHaveBeenCalled();
+    await answering.store.submit('慢一点的问题');
+    answering.advance(60 * 60 * 1000);
+    expect(answering.store.open).toBe(true);
+    expect(answering.invoke).not.toHaveBeenCalledWith('assistant_hide');
+  });
+
+  it('lets the microphone go when nobody talks, but keeps the capsule, and listens again on a tap', async () => {
+    const { store, asr, advance } = setup();
+    await store.opened();
+    expect(asr.recordingRequested).toBe(true);
+    advance(LISTEN_IDLE_MS - 1000);
+    expect(asr.recordingRequested).toBe(true);
+    advance(2000);
+    expect(asr.recordingRequested).toBe(false);
+    expect(store.open).toBe(true);
+    expect(store.hint).toContain('没听到声音');
+    await store.toggleListening();
+    expect(asr.recordingRequested).toBe(true);
+    expect(store.hint).toBe('');
+  });
+
+  it('keeps the microphone while the user is talking, and releases it once more after the next silence', async () => {
+    const { store, asr, speech, say, advance, chat } = setup();
+    await store.opened();
+    advance(LISTEN_IDLE_MS - 1000);
+    say('你好');
+    advance(LISTEN_IDLE_MS * 2);
+    // what was heard was sent, so the microphone is off while the answer is written
+    await vi.waitFor(() => expect(chat.send).toHaveBeenCalledWith('你好'));
+    expect(asr.recordingRequested).toBe(false);
+    finishAnswer(chat, '你好呀');
+    store.replied('s1', '你好呀', 'a');
+    await nextTick();
+    speech.status = 'idle'; await nextTick();
+    await vi.waitFor(() => expect(asr.activate).toHaveBeenCalledTimes(2));
+    advance(LISTEN_IDLE_MS + 1000);
+    expect(asr.recordingRequested).toBe(false);
+    expect(store.open).toBe(true);
   });
 
   it('stops listening and speaking when it closes, and can hand the conversation to the full chat', async () => {

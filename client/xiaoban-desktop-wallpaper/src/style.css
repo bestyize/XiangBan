@@ -37,22 +37,6 @@ svg { width: 20px; height: 20px; flex-shrink: 0; }
   touch-action: none;
   outline: none;
 }
-.pet-lamp {
-  pointer-events: none;
-  position: absolute;
-  left: 50%;
-  top: 42%;
-  transform: translate(-50%, -50%);
-  width: calc(var(--pet-size) * 1.4);
-  height: calc(var(--pet-size) * 1.05);
-  border-radius: 50%;
-  background: radial-gradient(
-    circle,
-    rgba(255, 196, 110, 0.32),
-    rgba(255, 196, 110, 0.08) 52%,
-    transparent 70%
-  );
-}
 .wallpaper-pet {
   position: absolute;
   left: 58%;

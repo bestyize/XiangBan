@@ -2,7 +2,7 @@
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import type { Phase } from './assistant-store.ts';
 
-const props = withDefaults(defineProps<{ phase: Phase; level?: number; active?: boolean; size?: number }>(), { level: 0, active: true, size: 48 });
+const props = withDefaults(defineProps<{ phase: Phase; level?: number; active?: boolean; size?: number; dark?: boolean }>(), { level: 0, active: true, size: 48, dark: true });
 const canvas = ref<HTMLCanvasElement>();
 
 type Rgb = [number, number, number];
@@ -10,7 +10,8 @@ const palette: Record<Phase, Rgb> = {
   idle: [92, 196, 255], listening: [84, 226, 255], thinking: [158, 140, 255],
   answering: [118, 184, 255], speaking: [128, 168, 255], attention: [255, 188, 98],
 };
-const color: Rgb = [...palette.idle];
+// Starts in the colour of the current state, so a capsule that opens mid-conversation does not flash blue first.
+const color: Rgb = [...palette[props.phase]];
 const rgba = (rgb: Rgb, alpha: number) => `rgba(${rgb[0] | 0},${rgb[1] | 0},${rgb[2] | 0},${Math.max(0, Math.min(1, alpha))})`;
 const shift = (rgb: Rgb, by: Rgb): Rgb => [rgb[0] + by[0], rgb[1] + by[1], rgb[2] + by[2]];
 
@@ -62,19 +63,18 @@ function draw(dt: number) {
   ctx.arc(c, c, radius, 0, Math.PI * 2);
   ctx.clip();
   const body = ctx.createRadialGradient(c - radius * 0.35, c - radius * 0.45, radius * 0.1, c, c, radius * 1.05);
-  body.addColorStop(0, rgba(shift(color, [120, 90, 40]), 1));
-  body.addColorStop(0.45, rgba(color, 1));
-  body.addColorStop(1, rgba(shift(color, [-90, -80, -30]), 1));
+  body.addColorStop(0, rgba(shift(color, [55, 45, 25]), 1));
+  body.addColorStop(0.5, rgba(color, 1));
+  body.addColorStop(1, rgba(shift(color, [-85, -75, -35]), 1));
   ctx.fillStyle = body;
   ctx.fillRect(0, 0, size, size);
-  ctx.globalCompositeOperation = 'lighter';
   const speed = props.phase === 'thinking' ? 2.4 : 0.9 + energy;
   for (let i = 0; i < 3; i++) {
     const a = t * speed * (i % 2 ? -1 : 1) + i * 2.1;
     const bx = c + Math.cos(a) * radius * 0.45, by = c + Math.sin(a * 1.3) * radius * 0.45;
     const blob = ctx.createRadialGradient(bx, by, 0, bx, by, radius * (0.7 + 0.25 * energy));
-    const tint = shift(color, i === 0 ? [60, -40, 60] : i === 1 ? [-30, 40, 70] : [70, 50, -20]);
-    blob.addColorStop(0, rgba(tint, 0.55));
+    const tint = shift(color, i === 0 ? [35, -30, 40] : i === 1 ? [-30, 25, 45] : [40, 30, -25]);
+    blob.addColorStop(0, rgba(tint, 0.5));
     blob.addColorStop(1, rgba(tint, 0));
     ctx.fillStyle = blob;
     ctx.fillRect(0, 0, size, size);
@@ -87,7 +87,7 @@ function draw(dt: number) {
   ctx.lineWidth = 0.8;
   ctx.stroke();
   const gloss = ctx.createLinearGradient(c, c - radius, c, c);
-  gloss.addColorStop(0, 'rgba(255,255,255,0.55)');
+  gloss.addColorStop(0, 'rgba(255,255,255,0.42)');
   gloss.addColorStop(1, 'rgba(255,255,255,0)');
   ctx.beginPath();
   ctx.ellipse(c - radius * 0.15, c - radius * 0.52, radius * 0.5, radius * 0.24, -0.3, 0, Math.PI * 2);
@@ -98,8 +98,9 @@ function draw(dt: number) {
     const a = t * 3.2;
     ctx.beginPath();
     ctx.arc(c, c, radius * 1.32, a, a + Math.PI * 0.7);
-    ctx.strokeStyle = rgba(shift(color, [90, 80, 0]), 0.9);
-    ctx.lineWidth = 1.8;
+    // Lighter than the ball on a dark capsule, darker than it on a white one; either way it has to stand out.
+    ctx.strokeStyle = rgba(props.dark ? shift(color, [90, 80, 0]) : shift(color, [-60, -60, -20]), 0.95);
+    ctx.lineWidth = props.dark ? 1.8 : 2.2;
     ctx.lineCap = 'round';
     ctx.stroke();
   }

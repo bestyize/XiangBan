@@ -107,7 +107,6 @@ body.desktop-control{background:var(--ui-app-bg);color:var(--ui-text-primary);ov
 .control-pet-preview .pet-stage{width:var(--pet-size);height:calc(var(--pet-size)*.875);position:relative;flex-shrink:0;user-select:none}
 .control-pet-preview .pet-art{width:100%;height:100%;position:relative;display:inline-block;cursor:pointer;touch-action:none;outline:none}
 .control-pet-preview .pet-art>svg{width:100%;height:100%;display:block}
-.control-pet-preview .pet-lamp{pointer-events:none;position:absolute;left:50%;top:42%;transform:translate(-50%,-50%);width:calc(var(--pet-size)*1.4);height:calc(var(--pet-size)*1.05);border-radius:50%;background:radial-gradient(circle,rgba(255,196,110,.22),rgba(255,196,110,.05) 52%,transparent 70%)}
 
 /* Collapsed sidebar */
 .is-collapsed{grid-template-columns:var(--ui-sidebar-collapsed) minmax(0,1fr)}
