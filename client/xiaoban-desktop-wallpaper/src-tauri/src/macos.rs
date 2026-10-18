@@ -1,7 +1,7 @@
 //! AppKit desktop hosting. Every NSWindow/NSView operation runs on the main
 //! thread. Cursor sampling reads public mouse state and window layers only;
 //! it does not install event taps or request screen recording/accessibility.
-use crate::coordinates::{content_point_to_css, is_desktop_level};
+use crate::coordinates::{content_point_to_css, is_desktop_level, scene_level, Levels};
 use objc2::{rc::autoreleasepool, MainThreadMarker};
 use objc2_app_kit::{
     NSApplication, NSColor, NSEvent, NSScreen, NSWindow, NSWindowCollectionBehavior,
@@ -115,11 +115,9 @@ pub fn configure_scene(
         // inside one level the window used last wins, so staying in that tier meant being covered after a click elsewhere.
         // The status level also sits over the Dock, and these windows are small and click-through where they are empty.
         let floating = CGWindowLevelForKey(CGWindowLevelKey::StatusWindowLevelKey) as isize;
-        // Effects sit one level above the wallpaper window, still under the desktop icons.
-        ns.setLevel(if wallpaper {
-            if crate::widgets::is_widget(window.label()) { CGWindowLevelForKey(CGWindowLevelKey::DesktopIconWindowLevelKey) as isize + 1 }
-            else { match window.label() { "pet" => 0, crate::effects::LABEL => desktop + 2, _ => desktop + 1 } }
-        } else { floating });
+        let icons = CGWindowLevelForKey(CGWindowLevelKey::DesktopIconWindowLevelKey) as isize;
+        let levels = Levels { desktop: desktop as i64, icons: icons as i64, floating: floating as i64 };
+        ns.setLevel(scene_level(window.label(), crate::widgets::is_widget(window.label()), wallpaper, crate::effects::LABEL, levels) as isize);
         let common = NSWindowCollectionBehavior::CanJoinAllSpaces
             | NSWindowCollectionBehavior::Stationary
             | NSWindowCollectionBehavior::IgnoresCycle;

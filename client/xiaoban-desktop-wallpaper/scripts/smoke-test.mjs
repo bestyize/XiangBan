@@ -55,7 +55,9 @@ try {
     assert.ok(scene.joinsAllSpaces, '窗口未配置桌面空间行为')
   }
   const petDesktop = result.wallpaper.floating
-  assert.equal(petDesktop.level, 0, '融入壁纸时应取消置顶')
+  // 融入壁纸：在桌面图标之上（还能点、能拖），但必须在所有应用窗口（层级 0）之下，不能浮起来
+  assert.ok(petDesktop.level > petDesktop.desktopIconLevel && petDesktop.level < 0, `融入壁纸时应在桌面图标层之上、普通窗口之下，实际层级 ${petDesktop.level}`)
+  for (const scene of [result.floatingBefore.floating, result.floatingAfter.floating]) assert.ok(scene.level > 0, `悬浮时应高于普通窗口，实际层级 ${scene.level}`)
   assert.equal(petDesktop.opaque, false)
   for (const dimension of ['x', 'y', 'width', 'height']) {
     assert.ok(Math.abs(petDesktop[dimension] - result.floatingBefore.floating[dimension]) < 1, `切换模式未保留 ${dimension}`)
