@@ -1,6 +1,6 @@
 use crate::agent::{Agent, RetryPolicy};
 use crate::error::HarnessError;
-use crate::middleware::{Stop, Turn};
+use crate::middleware::{Stop, StopDecision, Turn};
 use crate::provider::{ChatRequest, Reply};
 use crate::types::{Event, FinishReason, Message, Part, Role, Usage};
 use std::collections::HashSet;
@@ -141,6 +141,8 @@ impl Agent {
 
         let mut usage = Usage::default();
         let mut continuations = 0;
+        let mut continuations_without_progress = 0;
+        let mut successful_calls = Vec::new();
         for index in 0..self.max_turns {
             if cancel.load(Ordering::Relaxed) {
                 return Err(HarnessError::Cancelled);
@@ -183,20 +185,30 @@ impl Agent {
             let (calls, text) = (assistant.tool_calls.clone(), assistant.text());
             history.push(assistant);
             if calls.is_empty() {
-                let has_turn_left = index + 1 < self.max_turns && !cancel.load(Ordering::Relaxed);
-                let stop = Stop { session, history: &history, run_start, finish, continuations };
-                let nudge = if has_turn_left { self.middleware.iter().find_map(|mw| mw.before_stop(&stop)) } else { None };
-                let Some(nudge) = nudge else {
-                    if cut_off {
-                        on_event(Event::Truncated);
+                if cancel.load(Ordering::Relaxed) {
+                    return Err(HarnessError::Cancelled);
+                }
+                let stop = Stop { session, history: &history, run_start, finish, continuations, continuations_without_progress };
+                let decision = self.middleware.iter().map(|mw| mw.before_stop(&stop))
+                    .find(|decision| !matches!(decision, StopDecision::Finish))
+                    .unwrap_or(StopDecision::Finish);
+                let nudge = match decision {
+                    StopDecision::Finish => {
+                        if cut_off {
+                            on_event(Event::Truncated);
+                        }
+                        return Ok(RunSummary { text, turns: index + 1, usage, finish });
                     }
-                    return Ok(RunSummary { text, turns: index + 1, usage, finish });
+                    StopDecision::Pause(reason) => return Err(HarnessError::Paused(reason)),
+                    StopDecision::Continue(_) if index + 1 == self.max_turns => return Err(HarnessError::MaxTurns(self.max_turns)),
+                    StopDecision::Continue(nudge) => nudge,
                 };
-                on_event(Event::Continuing { reason: nudge.reason });
                 let reminder = Message::reminder(nudge.message);
                 self.store.append(session, std::slice::from_ref(&reminder))?;
                 history.push(reminder);
+                on_event(Event::Continuing { reason: nudge.reason });
                 continuations += 1;
+                continuations_without_progress += 1;
                 continue;
             }
 
@@ -209,6 +221,17 @@ impl Agent {
                 calls.iter().zip(&results).map(|(c, r)| Message::tool(c.id.as_str(), r.output.as_str())).collect();
             self.store.append(session, &tool_messages)?;
             history.extend(tool_messages);
+            for (call, result) in calls.iter().zip(&results) {
+                if result.is_error || matches!(call.name.as_str(), "todo" | "ask_user" | "time_now") {
+                    continue;
+                }
+                let Ok(args) = serde_json::from_str::<serde_json::Value>(&call.arguments) else { continue };
+                let key = (call.name.clone(), args);
+                if !successful_calls.contains(&key) {
+                    successful_calls.push(key);
+                    continuations_without_progress = 0;
+                }
+            }
         }
         if cancel.load(Ordering::Relaxed) {
             return Err(HarnessError::Cancelled);

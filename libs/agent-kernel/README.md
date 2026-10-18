@@ -75,7 +75,8 @@ agent.run("session-1", "你好", &mut |event| { /* 转给 UI */ }, &Arc::new(Ato
 
 - `ContextTrim`：超出 token 预算时，先把旧工具输出换成占位，仍超再按用户消息边界丢掉最旧的整轮。不调用模型，只改本次请求，不改已存会话。token 是粗估值，预算要留余量。
 - `SpillOutput`：大输出存成文件，只给模型头尾预览和路径。目录由宿主提供并清理，要让模型读到需把它加进文件工具的根目录。写失败时退回普通截断。
-- `ContinueGuard`：模型没调工具就结束时，判断是不是活没干完，是就补一条合成的用户消息（`Message::synthetic` 为 true）让它接着做，并发出 `Event::Continuing { reason }`。四种情形：本次运行里 `todo` 最新清单还有 `pending` 项（`unfinished_todos`；只剩一项 `in_progress` 视为忘了勾，不算）；回复最后一句以冒号结尾或在说“让我／我先／let me…”（`announced_action`）；回复为空（`empty`）；纯文字回答被长度截断（`length`，此时不再发 `Truncated`，续写用完才发）。最后一句是在问用户（问号、“吗”“呢”）时不催；催过一次模型仍不调工具就接受结束（续写截断除外）；每次运行最多催 3 次（`max_per_run`），最后一轮不催。判断是启发式的，误判时模型只需回一句话结束。宿主装了它，就要在界面上隐藏合成消息。
+- `ContinueGuard`：模型没调工具就结束时，检测本次运行 `todo` 还有 `pending` 项、最后一句只宣布下一步（如冒号结尾、“让我／我先／let me…”）、空回复或长度截断，补合成用户消息续跑并发出 `Event::Continuing`。默认不限制整轮累计续跑次数，改为最多 3 次无新进展的续跑（`max_without_progress`）；首次成功执行的工具名 + 解析后的 JSON 参数组合恢复额度，参数键序不影响比较，失败、拒绝、重复调用及 `todo` / `ask_user` / `time_now` 不恢复。这是进展启发式，不保证工作正确；`max_turns` 仍限制总运行量，可用 `max_per_run` 另设累计上限（0 禁用）。
+- `before_stop` 返回 `StopDecision::Finish` / `Continue(Nudge)` / `Pause(reason)`，第一个非 Finish 决策生效。需要续跑但额度已耗尽时返回 `HarnessError::Paused`（`no_progress` 或 `continuation_limit`），经 Error 事件通知宿主，不能当作 Done；最后一轮仍有工作则返回 MaxTurns。正常回答、询问用户、安全结束不会强制续跑；催过后模型明确完成或受阻也可结束，但再次空答或只宣布动作仍受保护。合成消息应在界面隐藏；宿主应对暂停提供原因和继续入口。
 - `RepeatGuard`：同一工具、同样参数、同样结果连续出现时，从第 3 次起在结果后附提醒，第 6 次起直接拒绝执行（`warn_after`、`block_after` 可调）；换参数、换结果或新的用户消息都会重新计数。要放在 `SpillOutput` 前面，否则比较的是每次文件名都不同的预览。
 
 ## 内置工具

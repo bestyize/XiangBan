@@ -140,6 +140,23 @@ describe('events while an answer is running', () => {
     expect(notice).not.toHaveProperty('canSwitchModel');
   });
 
+  it('shows the continuation guard pause reason and offers only to continue', () => {
+    for (const reason of ['no_progress', 'continuation_limit']) {
+      const view = newView('s1', true);
+      view.running = true;
+      applyEvent(view, { type: 'text_delta', text: '现在开始写：' });
+      applyEvent(view, { type: 'error', message: `run paused by continuation guard: ${reason}` });
+      expect(view.running).toBe(false);
+      expect(view.status).toBe('');
+      expect(view.items[0]).toMatchObject({ streaming: false });
+      const notice = view.items.at(-1);
+      expect(notice).toMatchObject({ kind: 'notice', tone: 'warning', canContinue: true });
+      expect(notice).not.toHaveProperty('canRetry');
+      expect(notice).not.toHaveProperty('canSwitchModel');
+      if (notice?.kind === 'notice') expect(notice.text).toContain(reason === 'no_progress' ? '未取得新进展' : '续跑次数上限');
+    }
+  });
+
   it('gives every item of a conversation its own key', () => {
     const view = newView('s1', true);
     for (let i = 0; i < 3; i++) { applyEvent(view, { type: 'text_delta', text: 'a' }); applyEvent(view, { type: 'tool_start', id: `t${i}`, name: 'x', arguments: '{}' }); }

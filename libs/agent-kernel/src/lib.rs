@@ -27,7 +27,7 @@ pub use agent::{Agent, AgentBuilder, RetryPolicy};
 pub use error::HarnessError;
 pub use middleware::{
     estimate_tokens, Approval, ApprovalRequest, Approver, ContextTrim, ContinueGuard, Middleware, Nudge, Permission,
-    PermissionMode, RepeatGuard, SpillOutput, Stop, Turn,
+    PermissionMode, RepeatGuard, SpillOutput, Stop, StopDecision, Turn,
 };
 pub use provider::{ChatRequest, ModelProvider, Reply, ToolSchema};
 pub use run::RunSummary;

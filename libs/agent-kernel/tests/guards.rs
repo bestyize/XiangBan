@@ -128,13 +128,14 @@ fn a_cut_off_answer_is_continued_without_flagging_truncation() {
 }
 
 #[test]
-fn the_last_cut_off_answer_is_still_flagged_when_nudges_run_out() {
+fn a_cut_off_answer_reports_a_pause_when_the_explicit_total_budget_runs_out() {
     let steps = vec![Step::text("a").finish(FinishReason::Length), Step::text("b").finish(FinishReason::Length)];
     let h = harness(steps, |b| b.middleware(ContinueGuard::new().max_per_run(1)));
     let (result, events) = run(&h.agent, "写长文");
-    assert_eq!(result.unwrap().finish, FinishReason::Length);
-    let tail: Vec<&Event> = events.iter().filter(|e| matches!(e, Event::Truncated | Event::Done | Event::Continuing { .. })).collect();
-    assert_eq!(tail, vec![&Event::Continuing { reason: "length".into() }, &Event::Truncated, &Event::Done]);
+    assert_eq!(result, Err(HarnessError::Paused("continuation_limit".into())));
+    assert_eq!(reasons(&events), vec!["length"]);
+    assert!(!events.contains(&Event::Done));
+    assert!(matches!(events.last(), Some(Event::Error { .. })));
 }
 
 #[test]
@@ -155,15 +156,129 @@ fn nudges_are_capped_per_run() {
     steps.push(Step::text("让我继续："));
     let h = harness(steps, |b| b.tool(echo(&Arc::new(AtomicUsize::new(0)))).middleware(ContinueGuard::new().max_per_run(2)));
     let (result, events) = run(&h.agent, "go");
-    assert!(result.is_ok());
+    assert_eq!(result, Err(HarnessError::Paused("continuation_limit".into())));
     assert_eq!(reasons(&events).len(), 2);
 }
 
 #[test]
-fn no_nudge_on_the_last_turn_so_the_run_ends_cleanly() {
+fn unfinished_work_on_the_last_turn_reports_the_turn_limit() {
     let h = harness(vec![Step::text("让我继续：")], |b| b.middleware(ContinueGuard::new()).max_turns(1));
     let (result, events) = run(&h.agent, "go");
-    assert_eq!(result.unwrap().turns, 1);
+    assert_eq!(result, Err(HarnessError::MaxTurns(1)));
+    assert!(reasons(&events).is_empty());
+    assert!(!events.contains(&Event::Done));
+}
+
+#[test]
+fn huaguo_keeps_going_past_three_recoveries_when_each_one_makes_progress() {
+    let runs = Arc::new(AtomicUsize::new(0));
+    let mut steps = Vec::new();
+    for (i, path) in ["world.js", "actors.js", "render.js", "game.js", "audio.js"].iter().enumerate() {
+        steps.push(Step::text("现在开始写下一部分："));
+        steps.push(Step::tool_call(&format!("w{i}"), "echo", &format!("{{\"path\":\"{path}\"}}")));
+    }
+    steps.push(Step::text("花果山已经写好。"));
+    let h = guarded(steps, &runs);
+    let (result, events) = run(&h.agent, "继续");
+    assert_eq!(result.unwrap().text, "花果山已经写好。");
+    assert_eq!(reasons(&events).len(), 5);
+    assert_eq!(runs.load(Ordering::SeqCst), 5);
+}
+
+#[test]
+fn empty_replies_and_repeated_promises_pause_instead_of_reporting_done() {
+    for reply in ["", "现在开始写："] {
+        let h = guarded((0..4).map(|_| Step::text(reply)).collect(), &Arc::new(AtomicUsize::new(0)));
+        let (result, events) = run(&h.agent, "go");
+        assert_eq!(result, Err(HarnessError::Paused("no_progress".into())));
+        assert_eq!(reasons(&events).len(), 3);
+        assert!(!events.contains(&Event::Done));
+        assert!(matches!(events.last(), Some(Event::Error { message }) if message.contains("no_progress")));
+    }
+}
+
+#[test]
+fn repeated_calls_and_failures_do_not_restore_the_idle_budget() {
+    for fails in [false, true] {
+        let steps = vec![
+            Step::text("现在开始写："), Step::tool_call("a", "work", r#"{"a":1,"b":{"x":2,"y":3}}"#),
+            Step::text("现在开始写："), Step::tool_call("b", "work", r#"{"b":{"y":3,"x":2},"a":1}"#),
+            Step::text("现在开始写："), Step::tool_call("c", "work", r#"{"a":1,"b":{"x":2,"y":3}}"#),
+            Step::text("现在开始写："), Step::tool_call("d", "work", r#"{"a":1,"b":{"x":2,"y":3}}"#),
+            Step::text("现在开始写："),
+        ];
+        let h = harness(steps, |b| b
+            .tool(FnTool::new(spec("work"), move |_, _| if fails { Err("failed".into()) } else { Ok("ok".into()) }))
+            .middleware(ContinueGuard::new()));
+        let (result, events) = run(&h.agent, "go");
+        assert_eq!(result, Err(HarnessError::Paused("no_progress".into())));
+        assert_eq!(reasons(&events).len(), if fails { 3 } else { 4 });
+    }
+}
+
+#[test]
+fn housekeeping_and_denied_calls_do_not_restore_the_idle_budget() {
+    for tool in ["todo", "ask_user", "time_now", "denied"] {
+        let mut steps = Vec::new();
+        for i in 0..3 {
+            steps.push(Step::text("现在开始写："));
+            steps.push(Step::tool_call(&format!("a{i}"), tool, &format!("{{\"n\":{i}}}")));
+        }
+        steps.push(Step::text("现在开始写："));
+        struct Deny;
+        impl Middleware for Deny {
+            fn before_tool(&self, _: &ToolCtx, call: &ToolCall, _: &serde_json::Value, _: &ToolSpec) -> ToolGate {
+                if call.name == "denied" { ToolGate::Block("denied".into()) } else { ToolGate::Proceed }
+            }
+        }
+        let h = harness(steps, |b| b.tool(FnTool::new(spec(tool), |_, _| Ok("ok".into())))
+            .middleware(Deny).middleware(ContinueGuard::new()));
+        let (result, events) = run(&h.agent, "go");
+        assert_eq!(result, Err(HarnessError::Paused("no_progress".into())), "{tool}");
+        assert_eq!(reasons(&events).len(), 3);
+    }
+}
+
+#[test]
+fn normal_completion_or_handoff_is_accepted_even_after_the_budget_is_used() {
+    for final_text in ["全部完成。", "缺少权限，暂时无法继续。", "你希望选择哪个方案？"] {
+        let steps = vec![Step::text("现在开始写："), Step::text("现在开始写："), Step::text(final_text)];
+        let h = harness(steps, |b| b.middleware(ContinueGuard::new().max_without_progress(2)));
+        let (result, events) = run(&h.agent, "go");
+        assert_eq!(result.unwrap().text, final_text);
+        assert_eq!(reasons(&events).len(), 2);
+    }
+    let h = harness(vec![Step::text("完成。")], |b| b.middleware(ContinueGuard::new()).max_turns(1));
+    assert!(run(&h.agent, "go").0.is_ok());
+}
+
+#[test]
+fn cancellation_after_the_last_text_delta_never_reports_done() {
+    let cancel = Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let h = guarded(vec![Step::text("完成。")], &Arc::new(AtomicUsize::new(0)));
+    let mut events = Vec::new();
+    let result = h.agent.run("s1", "go", &mut |e| {
+        if matches!(e, Event::TextDelta { .. }) { cancel.store(true, Ordering::SeqCst); }
+        events.push(e);
+    }, &cancel);
+    assert_eq!(result, Err(HarnessError::Cancelled));
+    assert!(!events.contains(&Event::Done));
+    assert_eq!(events.last(), Some(&Event::Cancelled));
+}
+
+#[test]
+fn repeated_length_cutoffs_pause_and_safety_stops_are_not_overridden() {
+    let h = harness((0..4).map(|_| Step::text("part").finish(FinishReason::Length)).collect(),
+        |b| b.middleware(ContinueGuard::new()));
+    let (result, events) = run(&h.agent, "go");
+    assert_eq!(result, Err(HarnessError::Paused("no_progress".into())));
+    assert_eq!(reasons(&events), vec!["length"; 3]);
+    assert!(!events.contains(&Event::Done));
+
+    let h = harness(vec![Step::text("").finish(FinishReason::ContentFilter)],
+        |b| b.middleware(ContinueGuard::new()));
+    let (result, events) = run(&h.agent, "go");
+    assert_eq!(result.unwrap().finish, FinishReason::ContentFilter);
     assert!(reasons(&events).is_empty());
 }
 

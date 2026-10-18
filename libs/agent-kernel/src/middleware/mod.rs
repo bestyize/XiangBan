@@ -26,6 +26,14 @@ pub struct Stop<'a> {
     pub finish: FinishReason,
     /// How many times middleware has already kept this run going.
     pub continuations: usize,
+    pub continuations_without_progress: usize,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum StopDecision {
+    Finish,
+    Continue(Nudge),
+    Pause(String),
 }
 
 /// Keeps a run going: `message` is stored as a synthetic user message and the model is called again.
@@ -63,10 +71,9 @@ pub trait Middleware: Send + Sync {
 
     fn after_tool(&self, _session: &str, _call: &ToolCall, _result: &mut ToolResult) {}
 
-    /// Called when the model replied without tool calls. Returning a `Nudge` keeps the run going
-    /// instead of ending it; the first middleware to return one wins. `max_turns` still bounds the run.
-    fn before_stop(&self, _stop: &Stop<'_>) -> Option<Nudge> {
-        None
+    /// The first non-Finish decision wins; `max_turns` still bounds continuations.
+    fn before_stop(&self, _stop: &Stop<'_>) -> StopDecision {
+        StopDecision::Finish
     }
 }
 
@@ -88,7 +95,7 @@ impl<T: Middleware + ?Sized> Middleware for Arc<T> {
         (**self).after_tool(session, call, result)
     }
 
-    fn before_stop(&self, stop: &Stop<'_>) -> Option<Nudge> {
+    fn before_stop(&self, stop: &Stop<'_>) -> StopDecision {
         (**self).before_stop(stop)
     }
 }

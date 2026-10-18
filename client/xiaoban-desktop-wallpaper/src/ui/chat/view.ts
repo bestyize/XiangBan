@@ -108,6 +108,13 @@ export function applyEvent(view: SessionView, event: KernelEvent): void {
       const lastUser = view.items.map(i => i.kind).lastIndexOf('user');
       const partial = view.items.slice(lastUser + 1).some(i => i.kind === 'tool' || i.kind === 'assistant');
       settle(view);
+      if (/^run paused by continuation guard:/.test(event.message)) {
+        const text = event.message.endsWith(': no_progress')
+          ? '连续多次未取得新进展，小伴已暂停。点“继续”可以接着尝试。'
+          : '已达到自动续跑次数上限，小伴已暂停。点“继续”可以接着做。';
+        view.items.push({ kind: 'notice', id: nextId(view), tone: 'warning', text, canContinue: true, details: event.message });
+        break;
+      }
       if (TURN_LIMIT.test(event.message)) {
         // Not a model failure: the work so far is saved and can simply go on.
         view.items.push({ kind: 'notice', id: nextId(view), tone: 'warning', text: '这一轮步骤太多，先停在这里。点“继续”让小伴接着做。',

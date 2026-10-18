@@ -219,6 +219,23 @@ describe('talking', () => {
     expect(q('chat-continue'), 'hidden while the new answer runs').toBeNull();
   });
 
+  it('resumes saved work after a no-progress pause without replaying previous actions', async () => {
+    const h = await open({ ...startChat, chat_send: () => summary('s1', 'x') });
+    await type('继续完成花果山');
+    await click('chat-send');
+    await h.events('s1',
+      { type: 'text_delta', text: '现在增加夜间灯光：' },
+      { type: 'continuing', reason: 'announced_action' },
+      { type: 'error', message: 'run paused by continuation guard: no_progress' });
+    expect(q('notice-warning')!.textContent).toContain('未取得新进展');
+    expect(q('notice-error')).toBeNull();
+    await click('chat-continue');
+    expect(h.calls.at(-1)).toEqual(['chat_send', { sessionId: 's1', text: CONTINUE_TEXT }]);
+    expect(q('chat-continue')).toBeNull();
+    await h.events('s1', { type: 'text_delta', text: '已经完成。' }, { type: 'done' });
+    expect(q('chat-send')).not.toBeNull();
+  });
+
   it('shows an error from the model as an alert', async () => {
     const h = await open(startChat);
     await type('hi');

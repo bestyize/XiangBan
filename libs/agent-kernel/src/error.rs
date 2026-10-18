@@ -8,6 +8,7 @@ pub enum HarnessError {
     Middleware(String),
     SessionBusy(String),
     MaxTurns(usize),
+    Paused(String),
     Cancelled,
 }
 
@@ -26,6 +27,7 @@ impl fmt::Display for HarnessError {
             Self::Middleware(m) => write!(f, "middleware error: {m}"),
             Self::SessionBusy(id) => write!(f, "session `{id}` already has a run in progress"),
             Self::MaxTurns(n) => write!(f, "stopped after reaching the turn limit ({n})"),
+            Self::Paused(reason) => write!(f, "run paused by continuation guard: {reason}"),
             Self::Cancelled => write!(f, "cancelled"),
         }
     }

@@ -1,4 +1,4 @@
-use super::{Middleware, Nudge, Stop};
+use super::{Middleware, Nudge, Stop, StopDecision};
 use crate::types::{FinishReason, Message, Role};
 use serde_json::Value;
 
@@ -18,26 +18,26 @@ const ANNOUNCING: &[&str] = &[
 /// Common sign-offs that contain an announcing phrase but hand the turn back to the user.
 const HANDING_BACK: &[&str] = &["让我知道", "告诉我", "let me know"];
 
-/// Keeps a run going when the model stops although the work is plainly unfinished: its todo list from
-/// this run still has open items, its reply ends by announcing a step it never took, the reply is empty,
-/// or a plain answer was cut off by the length limit.
-///
-/// The checks are heuristics, so the nudge always lets the model end the turn by saying why, and it is
-/// never sent twice in a row (except to finish a cut-off answer). Hosts that install it should hide
-/// synthetic messages from the visible conversation.
+/// Successful new tool calls restore the idle budget; `max_turns` still bounds the entire run.
 pub struct ContinueGuard {
     max_per_run: usize,
+    max_without_progress: usize,
     todo_tool: String,
 }
 
 impl ContinueGuard {
     pub fn new() -> Self {
-        Self { max_per_run: 3, todo_tool: "todo".to_string() }
+        Self { max_per_run: usize::MAX, max_without_progress: 3, todo_tool: "todo".to_string() }
     }
 
     /// Most nudges in one run. Zero turns the guard off.
     pub fn max_per_run(mut self, nudges: usize) -> Self {
         self.max_per_run = nudges;
+        self
+    }
+
+    pub fn max_without_progress(mut self, nudges: usize) -> Self {
+        self.max_without_progress = nudges;
         self
     }
 
@@ -115,41 +115,51 @@ fn announces_action(text: &str) -> bool {
 }
 
 impl Middleware for ContinueGuard {
-    fn before_stop(&self, stop: &Stop<'_>) -> Option<Nudge> {
-        if stop.continuations >= self.max_per_run {
-            return None;
+    fn before_stop(&self, stop: &Stop<'_>) -> StopDecision {
+        if self.max_per_run == 0 {
+            return StopDecision::Finish;
         }
-        let reply = stop.history.last()?;
+        let Some(reply) = stop.history.last() else { return StopDecision::Finish };
         let text = reply.text();
-        if stop.finish == FinishReason::Length {
-            return Some(Nudge { reason: "length".into(), message: LENGTH.into() });
-        }
-        if stop.finish != FinishReason::Stop {
-            return None;
-        }
-        // The model already ignored one nudge: accept the stop rather than nag.
-        let after_nudge = stop.history.len() >= 2 && stop.history[stop.history.len() - 2].synthetic;
-        if after_nudge {
-            return None;
-        }
-        if text.trim().is_empty() {
-            return Some(Nudge { reason: "empty".into(), message: EMPTY.into() });
-        }
-        let run = stop.history.get(stop.run_start..).unwrap_or_default();
-        let open = self.open_todos(run);
-        if !open.is_empty() && !asks_user(last_sentence(&text)) {
+        let nudge = if stop.finish == FinishReason::Length {
+            Nudge { reason: "length".into(), message: LENGTH.into() }
+        } else if stop.finish != FinishReason::Stop || asks_user(last_sentence(&text)) {
+            return StopDecision::Finish;
+        } else if text.trim().is_empty() {
+            Nudge { reason: "empty".into(), message: EMPTY.into() }
+        } else {
+            let run = stop.history.get(stop.run_start..).unwrap_or_default();
+            let open = self.open_todos(run);
+            let after_nudge = stop.history.len() >= 2 && stop.history[stop.history.len() - 2].synthetic;
+            if open.is_empty() || after_nudge {
+                if announces_action(&text) {
+                    return self.decide(stop, Nudge { reason: "announced_action".into(), message: ANNOUNCED.into() });
+                }
+                return StopDecision::Finish;
+            }
             let list: String = open.iter().map(|item| format!("\n- {item}")).collect();
-            let message = format!(
-                "You stopped, but your todo list still has unfinished items:{list}\n\
-                 If you can keep going, continue now with tool calls. If you are waiting for the user or are blocked, \
-                 say so in one or two sentences and end your turn. If the plan changed, update the todo list first."
-            );
-            return Some(Nudge { reason: "unfinished_todos".into(), message });
+            Nudge {
+                reason: "unfinished_todos".into(),
+                message: format!(
+                    "You stopped, but your todo list still has unfinished items:{list}\n\
+                     If you can keep going, continue now with tool calls. If you are waiting for the user or are blocked, \
+                     say so in one or two sentences and end your turn. If the plan changed, update the todo list first."
+                ),
+            }
+        };
+        self.decide(stop, nudge)
+    }
+}
+
+impl ContinueGuard {
+    fn decide(&self, stop: &Stop<'_>, nudge: Nudge) -> StopDecision {
+        if stop.continuations >= self.max_per_run {
+            StopDecision::Pause("continuation_limit".into())
+        } else if stop.continuations_without_progress >= self.max_without_progress {
+            StopDecision::Pause("no_progress".into())
+        } else {
+            StopDecision::Continue(nudge)
         }
-        if announces_action(&text) {
-            return Some(Nudge { reason: "announced_action".into(), message: ANNOUNCED.into() });
-        }
-        None
     }
 }
 
