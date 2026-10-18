@@ -1,0 +1,6 @@
+{
+  "identifier": "assistant",
+  "description": "The floating assistant listens to chat and window events from the host. Every command it may call is checked by its window label.",
+  "windows": ["assistant"],
+  "permissions": ["core:event:allow-listen", "core:event:allow-unlisten"]
+}

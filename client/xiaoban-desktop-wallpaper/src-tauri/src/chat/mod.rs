@@ -1,7 +1,7 @@
 //! The assistant: conversations, the agent that answers them, and the commands the chat page uses.
 //!
-//! Everything the assistant says, asks or runs is sent to the control window only
-//! (`emit_to("control", ..)`): wallpaper pages run content from outside and must not see a chat.
+//! Everything the assistant says, asks or runs is sent to the control window and the floating assistant's
+//! window only (one `emit_filter`): wallpaper pages run content from outside and must not see a chat.
 
 mod broker;
 mod community;
@@ -144,8 +144,14 @@ fn permission_with_danger_check(mode: PermissionMode, approver: impl agent_kerne
     Permission::new(mode, approver).danger_check(move |tool, args| danger::assess(tool, args, lock(&workspace).as_deref()).map(str::to_string))
 }
 
-fn emit(app: &tauri::AppHandle, name: &str, payload: Value) {
-    let _ = app.emit_to("control", name, payload);
+fn emit<R: tauri::Runtime>(app: &tauri::AppHandle<R>, name: &str, payload: Value) {
+    // One emit, not one per window: a listener registered the usual way (the page's global `listen`) matches every
+    // targeted emit, so emitting to each window in turn would hand that listener every event twice.
+    let _ = app.emit_filter(name, payload, |target| {
+        use tauri::EventTarget::{AnyLabel, Webview, WebviewWindow, Window};
+        matches!(target, AnyLabel { label } | Webview { label } | WebviewWindow { label } | Window { label }
+            if label == "control" || label == crate::float_assistant::LABEL)
+    });
 }
 
 /// Long values (a whole file about to be written) are cut for the confirmation card.

@@ -54,8 +54,11 @@ pub struct Settings {
     pub companion_enabled: bool,
     /// The companion reacts to the desktop effect (and later, to local presence) with expressions only.
     pub companion_links: bool,
-    /// Official shell of the companion; an unknown name falls back to the cat.
+    /// Official shell of the companion; an unknown name falls back to the pot.
     pub companion_skin: String,
+    /// The floating assistant: a capsule that a global shortcut brings up for a quick spoken or typed question.
+    pub assistant_enabled: bool,
+    pub assistant_shortcut: String,
     /// The particle effect over the desktop, whatever wallpaper (or plain system desktop) is behind it.
     pub effects: crate::effect_choice::EffectsChoice,
 }
@@ -80,6 +83,8 @@ impl Default for Settings {
             companion_enabled: true,
             companion_links: true,
             companion_skin: "pot".into(),
+            assistant_enabled: true,
+            assistant_shortcut: crate::float_assistant::DEFAULT_SHORTCUT.into(),
             effects: Default::default(),
         }
     }
@@ -93,6 +98,9 @@ impl Settings {
         }
         if !SKINS.contains(&self.companion_skin.as_str()) {
             self.companion_skin = defaults.companion_skin;
+        }
+        if !crate::float_assistant::SHORTCUTS.contains(&self.assistant_shortcut.as_str()) {
+            self.assistant_shortcut = defaults.assistant_shortcut;
         }
         if !EXPRESSIONS.contains(&self.expression.as_str()) {
             self.expression = defaults.expression;
@@ -201,6 +209,23 @@ mod tests {
             prefs.settings.normalize();
             assert_eq!(prefs.settings.companion_skin, "pot", "{saved}");
         }
+    }
+    #[test]
+    fn the_assistant_is_on_by_default_and_an_unknown_shortcut_falls_back() {
+        let defaults = Settings::default();
+        assert!(defaults.assistant_enabled);
+        assert_eq!(defaults.assistant_shortcut, "Alt+Space");
+        let mut older: Preferences = serde_json::from_str(r#"{"settings":{"mode":"wallpaper"}}"#).unwrap();
+        older.settings.normalize();
+        assert!(older.settings.assistant_enabled);
+        assert_eq!(older.settings.assistant_shortcut, "Alt+Space");
+        let mut chosen: Preferences = serde_json::from_str(r#"{"settings":{"assistantEnabled":false,"assistantShortcut":"Ctrl+Alt+Space"}}"#).unwrap();
+        chosen.settings.normalize();
+        assert!(!chosen.settings.assistant_enabled);
+        assert_eq!(chosen.settings.assistant_shortcut, "Ctrl+Alt+Space");
+        let mut odd: Preferences = serde_json::from_str(r#"{"settings":{"assistantShortcut":"Ctrl+Q"}}"#).unwrap();
+        odd.settings.normalize();
+        assert_eq!(odd.settings.assistant_shortcut, "Alt+Space");
     }
     #[test]
     fn effects_chosen_per_wallpaper_become_the_desktop_wide_choice_once() {

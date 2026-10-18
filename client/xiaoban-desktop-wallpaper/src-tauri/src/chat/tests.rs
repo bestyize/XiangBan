@@ -761,3 +761,21 @@ fn the_context_size_from_settings_is_what_the_agent_trims_to() {
     assert!(!tiny.iter().any(|t| t.contains("第一个问题")), "a small limit drops the oldest exchange: {}", tiny.len());
     assert!(tiny.iter().any(|t| t.contains("第三个问题")) && tiny.iter().any(|t| t.contains("第二个问题")));
 }
+
+/// A listener registered the usual way (the page's global `listen`) matches every targeted emit, so sending an
+/// event once per window would hand it each event twice and the reply would be written twice.
+#[test]
+fn a_chat_event_reaches_a_global_listener_once_even_with_two_chat_windows() {
+    use std::sync::atomic::Ordering;
+    use tauri::{Listener, WebviewUrl, WebviewWindowBuilder};
+    let app = tauri::test::mock_app();
+    let handle = app.handle();
+    for label in ["control", crate::float_assistant::LABEL] {
+        WebviewWindowBuilder::new(handle, label, WebviewUrl::App("index.html".into())).build().unwrap();
+    }
+    let seen = Arc::new(AtomicUsize::new(0));
+    let counter = seen.clone();
+    handle.listen_any("chat-event", move |_| { counter.fetch_add(1, Ordering::SeqCst); });
+    emit(handle, "chat-event", json!({ "session": "s", "event": { "type": "text_delta", "text": "你好" } }));
+    assert_eq!(seen.load(Ordering::SeqCst), 1);
+}

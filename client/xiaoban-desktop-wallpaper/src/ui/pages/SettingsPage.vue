@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { NAlert, NButton, NSelect, NSwitch, NTag, NTabs, NTabPane } from 'naive-ui';
-import { Bell, FolderOpen, Gauge, Palette, RefreshCw, ShieldCheck } from 'lucide-vue-next';
+import { Bell, FolderOpen, Gauge, Palette, RefreshCw, ShieldCheck, Sparkles } from 'lucide-vue-next';
 import { invoke } from '../../bridge.ts';
 import { appearanceMode, appearanceModes, setAppearance } from '../appearance.ts';
 import type { ControlStore } from '../control-types.ts';
@@ -12,6 +12,17 @@ const props = defineProps<{ store: ControlStore }>();
 const tab = ref(props.store.settingsTab || 'general');
 props.store.settingsTab = 'general';
 const busy = ref('');
+interface AssistantStatus { enabled: boolean; shortcut: string; shortcuts: { value: string; label: string }[]; registered: boolean; error: string }
+const assistant = ref<AssistantStatus>({ enabled: props.store.settings.assistantEnabled, shortcut: props.store.settings.assistantShortcut, shortcuts: [], registered: false, error: '' });
+const assistantOptions = computed(() => assistant.value.shortcuts.map(item => ({ label: item.label, value: item.value })));
+async function readAssistant() { if (props.store.desktop) { try { assistant.value = await invoke<AssistantStatus>('assistant_status'); } catch { /* keep what the settings said */ } } }
+async function configureAssistant(patch: { enabled?: boolean; shortcut?: string }) {
+  busy.value = 'assistant';
+  try { assistant.value = await invoke<AssistantStatus>('assistant_configure', patch); await props.store.refreshSettings(); }
+  catch (error) { props.store.notify(error, 'error'); await readAssistant(); }
+  finally { busy.value = ''; }
+}
+onMounted(readAssistant);
 const announcements = computed(() => props.store.website.announcements);
 const lastUpdate = computed(() => props.store.website.update);
 async function act(key: string, action: () => Promise<unknown>, success?: string) { busy.value = key; try { await action(); if (success) props.store.notify(success); } catch (error) { props.store.notify(error, 'error'); } finally { busy.value = ''; } }
@@ -20,6 +31,7 @@ async function act(key: string, action: () => Promise<unknown>, success?: string
   <section class="ui-page settings-page" data-testid="settings-page">
     <NTabs v-model:value="tab" type="line" animated class="settings-tabs"><NTabPane name="general"><template #tab>通用设置</template><div class="settings-content">
       <section class="surface"><div class="section-heading"><div><h2>外观</h2><p>控制台的浅色与深色，只影响这个窗口</p></div><Palette :size="20" /></div><div class="appearance-options" role="group" aria-label="外观模式" data-testid="appearance-mode"><button v-for="mode in appearanceModes" :key="mode.value" :class="{ on: appearanceMode === mode.value }" :aria-pressed="appearanceMode === mode.value" :data-testid="`appearance-${mode.value}`" @click="setAppearance(mode.value)"><span :class="`swatch swatch-${mode.value}`"><i></i><i></i></span><b>{{ mode.label }}</b></button></div></section>
+      <section class="surface" data-testid="assistant-settings"><div class="section-heading"><div><h2>悬浮助手</h2><p>在任何应用里按下快捷键，直接说话或打字向小伴提问</p></div><Sparkles :size="20" /></div><div class="setting-row"><div><b>用快捷键呼出助手</b><p>再按一次收起。语音对话需要先在“声音”里开启语音识别。</p></div><NSwitch :value="assistant.enabled" :disabled="!store.desktop || busy === 'assistant'" aria-label="用快捷键呼出助手" @update:value="configureAssistant({ enabled: $event })" /></div><div class="setting-row"><div><b>呼出快捷键</b><p>如果和别的应用冲突，换一个组合就行。</p></div><NSelect style="width:200px" :value="assistant.shortcut" :options="assistantOptions" :disabled="!store.desktop || !assistant.enabled || busy === 'assistant'" aria-label="呼出快捷键" @update:value="configureAssistant({ shortcut: $event })" /></div><NAlert v-if="assistant.enabled && assistant.error" type="warning" :show-icon="false" data-testid="assistant-shortcut-error">{{ assistant.error }}</NAlert></section>
       <section class="surface"><div class="section-heading"><div><h2>运行偏好</h2><p>启动与动画</p></div><Gauge :size="20" /></div><div class="setting-row"><div><b>开机自动启动</b><p>{{ store.startup.available ? '登录电脑后恢复上次的桌面，不自动弹出设置。' : '请在正式桌面应用中设置。' }}</p></div><NSwitch :value="store.settings.autostart" :disabled="!store.startup.available || !!busy" :loading="busy === 'startup'" @update:value="value => act('startup', () => store.setAutostart(value))" /></div><NAlert v-if="store.startup.error" type="warning" :show-icon="false">{{ store.startup.error }}</NAlert><div class="setting-row"><div><b>暂停桌面动画</b><p>暂停小伴与动态壁纸，不影响提醒的计时。</p></div><NSwitch :value="store.settings.paused" :disabled="!!busy" :loading="busy === 'pause'" @update:value="value => act('pause', () => store.updateAppearance({ paused: value }))" /></div><div class="setting-row"><div><b>动画帧率</b><p>30 帧更省资源，60 帧更流畅。</p></div><NSelect style="width:145px" :value="store.settings.fps" :options="[{ label: '30 帧 · 节能', value: 30 }, { label: '60 帧 · 流畅', value: 60 }]" :disabled="!!busy" @update:value="value => act('fps', () => store.updateAppearance({ fps: value }))" /></div></section>
       <section class="surface"><div class="section-heading"><div><h2>版本与公告</h2><p>自动同步小伴桌面的更新与公告信息</p></div><RefreshCw :size="20" /></div><div class="setting-row"><div><b>自动检查版本与公告</b><p>启动时检查，之后每天自动同步一次。</p></div><NSwitch :value="store.settings.automaticUpdates" :disabled="!store.desktop || !!busy" :loading="busy === 'automatic'" @update:value="value => act('automatic', () => store.setAutomaticUpdates(value))" /></div><div class="settings-actions"><NButton :disabled="!store.desktop || !!busy" :loading="busy === 'check'" @click="act('check', () => store.checkWebsite(), '已完成版本与公告检查')"><template #icon><RefreshCw :size="15" /></template>立即检查</NButton></div><NAlert v-if="store.website.errors.length" type="warning" :show-icon="false" class="source-errors">{{ store.website.errors.join('；') }}</NAlert></section>
       <section class="surface"><div class="section-heading"><div><h2>本地数据</h2><p>壁纸、游戏存档与提醒都保存在本机</p></div><FolderOpen :size="20" /></div><div class="data-location"><code>{{ store.info.dataDirectory || '桌面应用中可查看实际保存位置' }}</code><NButton :disabled="!store.desktop" @click="act('directory', () => invoke('open_data_directory'))"><template #icon><FolderOpen :size="15" /></template>打开目录</NButton></div></section>

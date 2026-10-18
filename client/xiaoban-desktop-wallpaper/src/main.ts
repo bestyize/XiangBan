@@ -41,6 +41,11 @@ async function init() {
     await mountGameSpace();
     return;
   }
+  if (mode === "assistant") {
+    const { mountAssistant } = await import("./assistant/mount.ts");
+    await mountAssistant();
+    return;
+  }
   if (mode === "care") {
     const { mountCareBubble } = await import("./care-bubble.ts");
     await mountCareBubble();

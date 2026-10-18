@@ -13,11 +13,20 @@ export interface AsrDeps {
 }
 export interface AsrStore extends HostStatus {
   ready: boolean; saving: boolean; preparing: boolean; listening: boolean; recognizing: boolean;
+  /** Loudness of the microphone, 0..1, refreshed about fifteen times a second while listening. */
+  level: number;
   /** Temporary user intent for the current conversation; never persisted. */
   recordingRequested: boolean;
   phase: 'idle' | 'downloading' | 'loading'; downloaded: number; total: number; error: string;
   init(): Promise<void>; setEnabled(enabled: boolean): Promise<void>; prepare(): Promise<boolean>;
   activate(onText: (text: string) => void): Promise<void>; finish(): Promise<void>; deactivate(): void; retry(): Promise<void>; dispose(): void;
+}
+/** Root-mean-square loudness mapped so ordinary speech lands around 0.4 to 0.9. */
+function loudness(frame: Float32Array): number {
+  if (!frame.length) return 0;
+  let sum = 0;
+  for (let i = 0; i < frame.length; i++) sum += frame[i] * frame[i];
+  return Math.min(1, Math.sqrt(sum / frame.length) * 9);
 }
 const message = (error: unknown) => error instanceof Error ? error.message : String(error);
 export function createAsrStore(deps: AsrDeps): AsrStore {
@@ -34,7 +43,7 @@ export function createAsrStore(deps: AsrDeps): AsrStore {
   let starting: number | undefined;
   function stopCapture() {
     recording++; starting = undefined; capture?.stop(); capture = undefined; queue = []; segmenter = undefined;
-    store.recordingRequested = false; store.listening = false; store.recognizing = false;
+    store.recordingRequested = false; store.listening = false; store.recognizing = false; store.level = 0;
   }
   function fail(error: unknown) { stopCapture(); store.error = message(error); deps.notify(store.error, 'error'); }
   async function drain(ticket: number): Promise<void> {
@@ -68,8 +77,11 @@ export function createAsrStore(deps: AsrDeps): AsrStore {
     const activeSegmenter = new UtteranceSegmenter();
     segmenter = activeSegmenter;
     try {
+      let levelAt = 0;
       const microphone = await (deps.capture ?? captureMicrophone)(frame => {
         if (ticket !== recording || disposed) return;
+        const now = Date.now();
+        if (now - levelAt >= 66) { levelAt = now; store.level = loudness(frame); }
         const audio = activeSegmenter.push(frame);
         if (!audio) return;
         if (queue.length >= 5) { fail('语音处理暂时跟不上，请稍后点击重试'); return; }
@@ -82,7 +94,7 @@ export function createAsrStore(deps: AsrDeps): AsrStore {
   }
   const store: AsrStore = reactive({
     ready: false, enabled: false, modelReady: false, engineReady: false, saving: false, preparing: false, recordingRequested: false,
-    listening: false, recognizing: false, phase: 'idle', downloaded: 0, total: 239549735, error: '',
+    listening: false, recognizing: false, level: 0, phase: 'idle', downloaded: 0, total: 239549735, error: '',
     init() {
       initialization ??= (async () => {
         try {

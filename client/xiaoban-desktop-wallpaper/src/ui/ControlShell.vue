@@ -2,7 +2,7 @@
 import { computed, defineAsyncComponent, onMounted, onBeforeUnmount, ref } from 'vue';
 import { NAlert, NButton, NSkeleton, NTag, useMessage } from 'naive-ui';
 import { MessageCircle, Images, Sparkles, Hand, Bot, Gamepad2, Bell, Settings2, PanelLeftClose, PanelLeftOpen, ArrowUpRight, Globe, User, LogIn, LogOut } from 'lucide-vue-next';
-import { invoke } from '../bridge.ts';
+import { invoke, listen } from '../bridge.ts';
 import { createControlStore } from './control-store.ts';
 import type { ControlPage } from './control-types.ts';
 const ChatPage = defineAsyncComponent(() => import('./pages/ChatPage.vue'));
@@ -53,6 +53,14 @@ async function handleLogout() {
   }
 }
 const manageWidgets = () => navigate('widgets');
+const assistantListeners: (() => void)[] = [];
+async function listenForAssistant() {
+  const off = await Promise.all([
+    listen<{ session: string | null }>('assistant-open-chat', ({ session }) => { navigate('chat'); if (session) void store.chat.select(session); }),
+    listen<{ tab: 'ai' | 'voice' }>('assistant-open-settings', ({ tab }) => { store.settingsTab = tab; navigate('settings'); }),
+  ]);
+  assistantListeners.push(...off);
+}
 const focus = () => store.refreshSettings().catch(error => store.notify(error, 'error'));
 onMounted(() => {
   if (typeof window !== 'undefined' && store.desktop) {
@@ -65,8 +73,9 @@ onMounted(() => {
   void store.initialize().then(async () => { if (store.info.uiSmoke) await (await import('./ui-smoke.ts')).runUiSmoke(store); });
   window.addEventListener('focus', focus);
   window.addEventListener('widgets-manage', manageWidgets);
+  if (store.desktop) void listenForAssistant();
 });
-onBeforeUnmount(() => { store.dispose(); window.removeEventListener('focus', focus); window.removeEventListener('widgets-manage', manageWidgets); });
+onBeforeUnmount(() => { assistantListeners.splice(0).forEach(off => off()); store.dispose(); window.removeEventListener('focus', focus); window.removeEventListener('widgets-manage', manageWidgets); });
 </script>
 <template>
   <div class="control-app" :class="{ 'is-collapsed': collapsed, 'is-wallpapers': store.page === 'wallpapers' }">

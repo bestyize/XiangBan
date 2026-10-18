@@ -39,6 +39,7 @@ mod effect_choice;
 mod effect_packs;
 mod effects;
 mod effects_smoke;
+mod float_assistant;
 
 use preferences::{Preferences, Settings};
 use serde::Serialize;
@@ -603,13 +604,14 @@ fn setup_tray(app: &tauri::App) -> tauri::Result<()> {
         tray::TrayIconBuilder,
     };
     let control = MenuItem::with_id(app, "control", "打开小伴设置", true, None::<&str>)?;
+    let assistant = MenuItem::with_id(app, "assistant", "呼出助手", true, None::<&str>)?;
     let poke = MenuItem::with_id(app, "poke", "戳戳小伴", true, None::<&str>)?;
     let games = MenuItem::with_id(app, "games", "玩一玩", true, None::<&str>)?;
     let stop_desk = MenuItem::with_id(app, "stop-desk-game", "停止桌面游戏", true, None::<&str>)?;
     let autostart = CheckMenuItem::with_id(app, "autostart", "开机自动启动",
         app.state::<DesktopState>().startup_allowed, settings(app.handle()).autostart, None::<&str>)?;
     let exit = MenuItem::with_id(app, "exit", "退出小伴", true, None::<&str>)?;
-    let menu = Menu::with_items(app, &[&control, &games, &stop_desk, &poke, &autostart, &exit])?;
+    let menu = Menu::with_items(app, &[&control, &assistant, &games, &stop_desk, &poke, &autostart, &exit])?;
     *app.state::<DesktopState>().startup_menu.lock().unwrap() = Some(autostart);
     // The app icon at 64x64 as raw RGBA (icons/tray.rgba), so the tray needs no image decoder.
     const TRAY_ICON: &[u8] = include_bytes!("../icons/tray.rgba");
@@ -621,6 +623,7 @@ fn setup_tray(app: &tauri::App) -> tauri::Result<()> {
             "control" => {
                 let _ = present_control(app);
             }
+            "assistant" => float_assistant::toggle(app),
             "poke" => {
                 let _ = app.emit("pet-poke", ());
             }
@@ -679,6 +682,7 @@ fn main() {
     for window in &mut context.config_mut().app.windows { window.incognito = true; }
     let builder = tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
+        .plugin(float_assistant::plugin())
         .plugin(tauri_plugin_single_instance::init(|app, arguments, _| {
             if !arguments.iter().any(|arg| arg == "--autostart") { let _ = present_control(app); }
         }));
@@ -711,18 +715,20 @@ fn main() {
             ai_config::save_ai_provider, ai_config::switch_ai_provider, ai_config::delete_ai_provider, ai_config::save_ai_preferences, ai_config::set_context_tokens, request_system_permissions,
             chat::chat_overview, chat::chat_load_session, chat::chat_new_session, chat::chat_send, chat::chat_cancel, chat::chat_delete_session,
             chat::chat_context, chat::chat_compact, chat::chat_rename_session, chat::chat_move_session, chat::chat_create_group, chat::chat_rename_group, chat::chat_delete_group,
-            chat::chat_answer_approval, chat::chat_answer_question, chat::chat_set_permission_mode]);
+            chat::chat_answer_approval, chat::chat_answer_question, chat::chat_set_permission_mode,
+            float_assistant::assistant_status, float_assistant::assistant_configure, float_assistant::assistant_ready, float_assistant::assistant_hide,
+            float_assistant::assistant_fit, float_assistant::assistant_open_chat, float_assistant::assistant_open_settings]);
     let app = builder.manage(state).manage(content::ContentState::default()).manage(website::WebsiteState::default())
-        .manage(games::GameState::default()).manage(desk_game::DeskState::default()).manage(rituals::RitualState::default()).manage(widgets::WidgetState::default()).manage(reminders::ReminderState::default()).manage(account::AccountState::default()).manage(ai_config::AiConfigState::default()).manage(tts::TtsState::default()).manage(asr::AsrState::default()).manage(ai_catalogue::CatalogueState::default())
+        .manage(games::GameState::default()).manage(desk_game::DeskState::default()).manage(rituals::RitualState::default()).manage(widgets::WidgetState::default()).manage(reminders::ReminderState::default()).manage(account::AccountState::default()).manage(ai_config::AiConfigState::default()).manage(tts::TtsState::default()).manage(asr::AsrState::default()).manage(ai_catalogue::CatalogueState::default()).manage(float_assistant::AssistantState::default())
         .register_uri_scheme_protocol("wallpaper-asset", |context, request| library::serve(context.app_handle(), request))
         .register_uri_scheme_protocol("game-pack", |context, request| game_packs::serve(context.app_handle(), request))
         .invoke_handler(move |invoke| {
             let label=invoke.message.webview_ref().label(); let command=invoke.message.command();
-            if command.starts_with("asr_") && label != "control" {
+            if command.starts_with("asr_") && label != "control" && label != float_assistant::LABEL {
                 invoke.resolver.reject("只能在聊天和声音设置中使用语音识别");
                 return true;
             }
-            let allowed=desk_game::permitted(label,command).or_else(|| widgets::permitted(label,command)).or_else(|| rituals::permitted(label,command)).or_else(|| games::permitted(label,command)).unwrap_or_else(|| {
+            let allowed=float_assistant::permitted(label,command).or_else(|| desk_game::permitted(label,command)).or_else(|| widgets::permitted(label,command)).or_else(|| rituals::permitted(label,command)).or_else(|| games::permitted(label,command)).unwrap_or_else(|| {
                 if command=="ui_smoke_report" {return label=="control";}
                 if command=="set_companion_enabled" || command=="set_companion_links" || command=="set_companion_skin" || command=="set_desktop_effects" || command=="list_desktop_effects" || command=="open_effects_directory" || command=="import_effect_pack" {return label=="control";}
                 if label=="care" { return ["get_care_delivery","care_ready","dismiss_care","snooze_care","care_synthesize"].contains(&command); }
@@ -742,6 +748,7 @@ fn main() {
             }
             app.manage(chat::ChatState::new(app.handle()));
             reminders::start(app.handle());
+            float_assistant::start(app.handle());
             games::start(app.handle());
             setup_tray(app)?;
             website::start(app.handle());
