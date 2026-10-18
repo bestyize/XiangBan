@@ -21,6 +21,8 @@ pub struct CompanionChange {
 
 pub trait Desktop: Send + Sync {
     fn status(&self) -> Result<Value, String>;
+    fn windows(&self) -> Result<Value, String> { Err("当前宿主不支持窗口查询".into()) }
+    fn window_update(&self, _change: &crate::window_control::Change) -> Result<Value, String> { Err("当前宿主不支持窗口控制".into()) }
     /// `{ items: [{ definition: { id, title, kind }, installed, source }], activeId }`
     fn wallpapers(&self) -> Result<Value, String>;
     fn apply_wallpaper(&self, id: &str) -> Result<(), String>;
@@ -70,6 +72,9 @@ impl TauriDesktop {
 }
 
 impl Desktop for TauriDesktop {
+    fn windows(&self) -> Result<Value, String> { crate::window_control::snapshot(&self.app) }
+    fn window_update(&self, change: &crate::window_control::Change) -> Result<Value, String> { crate::window_control::update(&self.app, change) }
+
     fn export_pack(&self, kind: &str, id: &str) -> Result<Option<(String, u64)>, String> {
         let saved = crate::resource_packs::export_with_dialog(&self.app, kind, id)?;
         Ok(saved.map(|(path, bytes)| (path.display().to_string(), bytes)))
@@ -542,7 +547,7 @@ fn widget_list(desktop: &dyn Desktop, _: &Value) -> Result<String, String> {
         let enabled = w["enabled"].as_bool().unwrap_or(true);
         let city = w.get("city").and_then(|c| c.get("name")).and_then(Value::as_str).map(|n| format!(" | 城市: {n}")).unwrap_or_default();
         let state = if enabled { "显示中" } else { "已隐藏" };
-        lines.push(format!("{id} | {} ({kind}) | {}风格 ({theme}) | 缩放 {scale:.2}{city} | {state}", widget_kind_label(kind), widget_theme_label(theme)));
+        lines.push(format!("{id} | {} ({kind}) | {}风格 ({theme}) | 缩放 {scale:.2}{city} | {state} | 位置 ({}, {}) | 显示器 {}", widget_kind_label(kind), widget_theme_label(theme), w["x"], w["y"], w["monitor"]));
     }
     let templates = desktop.custom_widgets()?;
     if let Some(templates) = templates.as_array().filter(|items| !items.is_empty()) {
@@ -821,6 +826,16 @@ pub fn tools(desktop: Arc<dyn Desktop>) -> Vec<Arc<dyn Tool>> {
     let none = || object(json!({}), &[]);
     let status_run = |d: &dyn Desktop, _: &Value| -> Result<String, String> { Ok(d.status()?.to_string()) };
     vec![
+        tool(&desktop, ToolSpec::new("desktop_windows", "查看小伴自己的窗口和显示器：盆栽 companion、超级小伴 assistant、控制台 control、桌面组件 widget:<id> 的位置、显示状态和层级。移动前用本工具确认目标与显示器。", none()), |d, _| d.windows().map(|v| v.to_string())),
+        tool(&desktop, ToolSpec::new("desktop_window_set", "控制小伴自己的窗口，不操作其他应用。target: companion 是盆栽，assistant 是超级小伴悬浮条（用户让你收起来时用 action=collapse），control 是设置控制台，widget:<id> 是组件。移动 x/y 使用屏内比例（0 左/上，0.5 中间，1 右/下），可指定 desktop_windows 返回的 monitor。layer: desktop 贴桌面、normal 普通窗口、topmost 置顶；层级本次运行有效。隐藏盆栽或组件会保存开关；收起助手不退出应用、不取消任务。", object(json!({
+            "target":{"type":"string"},"action":{"type":"string","enum":["show","hide","collapse"]},
+            "x":{"type":"number","minimum":0,"maximum":1},"y":{"type":"number","minimum":0,"maximum":1},
+            "monitor":{"type":"string"},"layer":{"type":"string","enum":["desktop","normal","topmost"]}
+        }), &["target"])).risk(Risk::Write).serial(), |d, args| {
+            let change: crate::window_control::Change=serde_json::from_value(args.clone()).map_err(|e|format!("窗口参数无效：{e}"))?;
+            change.validate()?;
+            d.window_update(&change).map(|v|v.to_string())
+        }),
         tool(&desktop, ToolSpec::new("desktop_status", "查看小伴桌面当前的状态：显示模式、正在用的壁纸和特效、小伴的外壳与表情。", none()), status_run),
         tool(&desktop, ToolSpec::new("wallpaper_list", "列出可用的壁纸（id、标题、类型、是否已下载）和当前正在使用的那张。", none()), wallpaper_list),
         tool(
@@ -1155,6 +1170,11 @@ mod tests {
     }
 
     impl Desktop for Fake {
+        fn windows(&self) -> Result<Value,String> { Ok(json!({"windows":[{"target":"companion"},{"target":"assistant"}],"monitors":[{"id":"main"}]})) }
+        fn window_update(&self, change: &crate::window_control::Change) -> Result<Value,String> {
+            self.log(format!("window {change:?}"))?;
+            Ok(json!({"ok":true,"target":change.target}))
+        }
         fn status(&self) -> Result<Value, String> {
             Ok(json!({"mode": "floating", "wallpaper": "w1"}))
         }
@@ -1280,7 +1300,7 @@ mod tests {
         let mut unique = names.clone();
         unique.dedup();
         assert_eq!(names, unique);
-        assert_eq!(names.len(), 28);
+        assert_eq!(names.len(), 30);
         for tool in &all {
             let spec = tool.spec();
             assert!(spec.name.len() <= 64 && spec.name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_'), "{}", spec.name);
@@ -1290,10 +1310,23 @@ mod tests {
         let read: Vec<&str> = all.iter().filter(|t| t.spec().risk == Risk::Read).map(|t| t.spec().name.as_str()).collect();
         let mut read = read;
         read.sort();
-        assert_eq!(read, vec!["care_list", "desktop_status", "effect_list", "effect_read_format", "game_list", "wallpaper_list", "widget_list"]);
+        assert_eq!(read, vec!["care_list", "desktop_status", "desktop_windows", "effect_list", "effect_read_format", "game_list", "wallpaper_list", "widget_list"]);
         for tool in all.iter().filter(|t| t.spec().risk == Risk::Write) {
             assert!(!tool.spec().parallel_safe, "{} changes shared settings, so it runs alone", tool.spec().name);
         }
+    }
+
+    #[test]
+    fn window_tools_expose_self_collapse_and_normalized_movement_without_shell() {
+        let fake=Arc::new(Fake::default());
+        assert!(call(&fake,"desktop_windows",json!({})).unwrap().contains("companion"));
+        for args in [json!({"target":"assistant","action":"collapse"}),json!({"target":"companion","x":0.0,"y":0.0}),json!({"target":"widget:abc123","layer":"topmost"})] {
+            assert!(call(&fake,"desktop_window_set",args).unwrap().contains("true"));
+        }
+        assert_eq!(fake.calls().len(),3);
+        assert!(call(&fake,"desktop_window_set",json!({"target":"other-app","action":"hide"})).is_err());
+        assert!(call(&fake,"desktop_window_set",json!({"target":"companion","x":12,"y":0})).is_err());
+        assert_eq!(fake.calls().len(),3);
     }
 
     #[test]

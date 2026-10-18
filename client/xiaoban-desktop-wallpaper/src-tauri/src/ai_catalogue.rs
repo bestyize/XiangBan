@@ -2,7 +2,7 @@
 use crate::ai_config::{self, AiConfig, AiConfigView, ModelConfig, ProviderConfig};
 use serde::Deserialize;
 use std::{collections::{BTreeMap, HashSet}, time::{Duration, SystemTime, UNIX_EPOCH}};
-use tauri::{Emitter, Manager};
+use tauri::Manager;
 
 #[derive(Default)]
 pub struct CatalogueState {
@@ -214,7 +214,7 @@ async fn refresh_inner(app: tauri::AppHandle, force: Option<bool>) -> Result<AiC
         ai_config::save(&path, &next).map_err(|_| "模型配置保存失败")?;
         next.view(&ai_config::default_workspace(&app)?)
     };
-    let _ = app.emit_to("control", "ai-config-changed", &view);
+    ai_config::emit_changed(&app, &view);
     Ok(view)
 }
 pub fn start(app: &tauri::AppHandle) {

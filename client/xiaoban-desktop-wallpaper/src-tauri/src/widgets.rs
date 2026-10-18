@@ -102,7 +102,7 @@ fn persist(app: &tauri::AppHandle, layout: &Layout) -> Result<(), String> {
     let temporary = folder.join("widgets.tmp"); fs::write(&temporary, bytes).map_err(|e| e.to_string())?;
     fs::rename(temporary, folder.join("widgets.json")).map_err(|e| format!("布局保存失败，原布局已保留：{e}"))
 }
-fn monitors(app:&tauri::AppHandle)->Result<Vec<crate::widget_geometry::MonitorArea>,String>{
+pub(crate) fn monitors(app:&tauri::AppHandle)->Result<Vec<crate::widget_geometry::MonitorArea>,String>{
     #[cfg(target_os="macos")] {return crate::macos::widget_monitors(app);}
     #[cfg(not(target_os="macos"))] {
         let primary=app.primary_monitor().map_err(|e|e.to_string())?;
@@ -168,7 +168,12 @@ fn widget_payload(app: &tauri::AppHandle, widget: &Widget) -> Result<Value, Stri
 }
 fn place(app: &tauri::AppHandle, window: &tauri::WebviewWindow, widget: &Widget) -> Result<(), String> {
     let (x,y,width,height,dpi)=geometry(app,widget)?;
-    #[cfg(windows)] return crate::windows::place_widget(window,tauri::PhysicalPosition::new(x.round() as i32,y.round() as i32),width.round() as i32,height.round() as i32);
+    #[cfg(windows)] {
+        if crate::window_control::layer(app, window.label(), "desktop") == "desktop" {
+            return crate::windows::place_widget(window,tauri::PhysicalPosition::new(x.round() as i32,y.round() as i32),width.round() as i32,height.round() as i32);
+        }
+        return crate::windows::place_interactive(window,x,y,width,height);
+    }
     #[cfg(target_os="macos")] {let _=dpi;return crate::macos::place_widget(window,x,y,width,height);}
     #[cfg(not(any(windows,target_os="macos")))] {window.set_size(tauri::LogicalSize::new(width/dpi,height/dpi)).and_then(|_|window.set_position(tauri::PhysicalPosition::new(x,y))).map_err(|e|e.to_string())}
 }
@@ -182,6 +187,7 @@ pub fn sync(app: &tauri::AppHandle) {
         let result = (|| -> Result<(), String> {
             let label = format!("widget-{}",widget.id);
             if let Some(window) = app.get_webview_window(&label) {
+                crate::window_control::apply_saved(app,&window,"desktop")?;
                 place(app,&window,widget)?;
                 window.eval(format!("window.dispatchEvent(new CustomEvent('widget-config',{{detail:{}}}));",widget_payload(app,widget)?)).map_err(|e| e.to_string())?;
                 return Ok(());
@@ -202,6 +208,7 @@ pub fn sync(app: &tauri::AppHandle) {
                 place(app,&window,widget)?; window.show().map_err(|e| e.to_string())?;
                 // Show can reconcile Tao's window styles; apply the desktop child frame last.
                 #[cfg(windows)] crate::windows::attach_widget(&window)?;
+                crate::window_control::apply_saved(app,&window,"desktop")?;
                 place(app,&window,widget)?; Ok(())
             })();
             if let Err(error) = configured { let _=window.destroy(); return Err(error); }

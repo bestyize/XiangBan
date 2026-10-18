@@ -69,6 +69,27 @@ pub fn widget_monitors(app:&tauri::AppHandle)->Result<Vec<crate::widget_geometry
 pub fn widget_cursor(app:&tauri::AppHandle)->Result<(f64,f64),String>{
     on_main(app,move|mtm|{let height=NSScreen::screens(mtm).firstObject().ok_or("没有找到显示器")?.frame().size.height;let point=NSEvent::mouseLocation();Ok((point.x,height-point.y))})
 }
+pub fn interactive_frame(window: &tauri::WebviewWindow) -> Result<(f64,f64,f64,f64),String> {
+    let window=window.clone();let app=window.app_handle().clone();
+    on_main(&app,move|mtm|{
+        let height=NSScreen::screens(mtm).firstObject().ok_or("没有找到显示器")?.frame().size.height;
+        let f=native(&window)?.frame();
+        Ok((f.origin.x,height-f.origin.y-f.size.height,f.size.width,f.size.height))
+    })
+}
+
+pub fn set_interactive_layer(window: &tauri::WebviewWindow, layer: &str) -> Result<(),String> {
+    let window=window.clone();let layer=layer.to_string();let app=window.app_handle().clone();
+    on_main(&app,move|_|{
+        let level=match layer.as_str(){
+            "desktop"=>CGWindowLevelForKey(CGWindowLevelKey::DesktopIconWindowLevelKey) as isize+1,
+            "topmost"=>CGWindowLevelForKey(CGWindowLevelKey::StatusWindowLevelKey) as isize,
+            _=>0,
+        };
+        native(&window)?.setLevel(level);Ok(())
+    })
+}
+
 pub fn place_widget(window:&tauri::WebviewWindow,x:f64,y:f64,width:f64,height:f64)->Result<(),String>{
     let window=window.clone();let app=window.app_handle().clone();
     on_main(&app,move|mtm|{

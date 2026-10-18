@@ -1,6 +1,7 @@
 import { nextTick, reactive } from 'vue';
 import { describe, expect, it, vi } from 'vitest';
 import { createAssistantStore, LISTEN_IDLE_MS, RESUME_MS, SEND_GRACE_MS } from './assistant-store.ts';
+import { createChatStore } from '../ui/chat/chat-store.ts';
 
 function setup(options: { configured?: boolean; voice?: boolean; prefs?: { open: string; read: string; appearance?: string } } = {}) {
   let clock = 1_000_000;
@@ -16,8 +17,9 @@ function setup(options: { configured?: boolean; voice?: boolean; prefs?: { open:
     }
   };
   const chat = reactive({
-    configured: options.configured ?? true, currentId: null as string | null, views: {} as Record<string, any>,
+    configured: options.configured ?? true, currentId: null as string | null, views: {} as Record<string, any>, permissionMode: 'ask' as 'ask' | 'auto',
     init: vi.fn(async () => {}),
+    refresh: vi.fn(async () => {}),
     select: vi.fn(async (id: string | null) => { chat.currentId = id; }),
     send: vi.fn(async (text: string) => {
       chat.currentId = 's1';
@@ -65,6 +67,44 @@ describe('floating assistant', () => {
     expect(asr.activate).toHaveBeenCalledTimes(1);
     expect(store.phase).toBe('listening');
     expect(store.status).toBe('我在听，请说…');
+  });
+
+  it.each([true, false])('creates capsule conversations in full trust (spoken: %s)', async spoken => {
+    const { asr, speech } = setup();
+    const invoke = vi.fn(async (command: string, args?: Record<string, unknown>) => {
+      if (command === 'chat_new_session' || command === 'chat_send') {
+        return { id: 'trusted', permissionMode: command === 'chat_new_session' ? args?.permissionMode : 'auto' };
+      }
+      return undefined;
+    });
+    const chat = createChatStore({ desktop: true, invoke: invoke as never, listen: async () => () => {}, notify: vi.fn() });
+    chat.configured = true;
+    const store = createAssistantStore({ desktop: true, invoke: invoke as never, listen: async () => () => {}, chat, asr: asr as never, speech: speech as never, setTimer: vi.fn(), clearTimer: vi.fn() });
+    await store.submit('帮我换个壁纸', spoken);
+    expect(invoke).toHaveBeenCalledWith('chat_new_session', { permissionMode: 'auto' });
+    expect(invoke).toHaveBeenCalledWith('chat_send', { sessionId: 'trusted', text: '帮我换个壁纸' });
+    expect(chat.sessions[0].permissionMode).toBe('auto');
+    store.dispose(); chat.dispose();
+  });
+
+  it('keeps the saved permission mode when continuing a conversation', async () => {
+    const { store, chat, advance } = setup({ voice: false });
+    await store.opened();
+    await store.submit('你好');
+    expect(chat.permissionMode).toBe('auto');
+    finishAnswer(chat);
+    chat.permissionMode = 'ask';
+    store.closed();
+    advance(1000);
+    await store.opened();
+    await store.submit('继续');
+    expect(chat.permissionMode).toBe('ask');
+    store.closed();
+    advance(RESUME_MS + 1000);
+    await store.opened();
+    await store.submit('新话题');
+    expect(chat.permissionMode).toBe('auto');
+    store.dispose();
   });
 
   it('continues a conversation left a moment ago, and starts over after a while', async () => {
@@ -160,6 +200,107 @@ describe('floating assistant', () => {
     expect(noVoice.asr.activate).not.toHaveBeenCalled();
     await noVoice.store.openSettings('assistant');
     expect(noVoice.invoke).toHaveBeenCalledWith('assistant_open_settings', { tab: 'assistant' });
+  });
+
+  it('recovers from the cached unconfigured overview through the real chat store', async () => {
+    let configured = false;
+    const handlers = new Map<string, (payload: never) => void>();
+    const listen = async (event: string, callback: (payload: never) => void) => { handlers.set(event, callback); return () => { handlers.delete(event); }; };
+    const invoke = vi.fn(async (command: string) => {
+      if (command === 'chat_overview') return { configured, sessions: [], running: [], workspace: '/work', permissionMode: 'ask' };
+      if (command === 'chat_new_session' || command === 'chat_send') return { id: 's1', permissionMode: 'auto' };
+      return undefined;
+    });
+    const { asr, speech } = setup({ voice: false });
+    const chat = createChatStore({ desktop: true, invoke: invoke as never, listen, notify: vi.fn() });
+    const store = createAssistantStore({ desktop: true, invoke: invoke as never, listen, chat, asr: asr as never, speech: speech as never, setTimer: vi.fn(), clearTimer: vi.fn() });
+    await store.init(); await store.opened();
+    expect(store.configured).toBe(false);
+    expect(store.hintTab).toBe('ai');
+    configured = true;
+    // init is intentionally cached: the event must fetch a fresh overview instead.
+    await chat.init();
+    expect(store.configured).toBe(false);
+    handlers.get('ai-config-changed')?.(undefined as never);
+    await vi.waitFor(() => expect(store.configured).toBe(true));
+    expect(store.hint).toBe('');
+    await store.submit('模型配置好了', true);
+    expect(invoke).toHaveBeenCalledWith('chat_new_session', { permissionMode: 'auto' });
+    expect(invoke).toHaveBeenCalledWith('chat_send', { sessionId: 's1', text: '模型配置好了' });
+    store.dispose(); chat.dispose();
+  });
+
+  it('refreshes after model setup and clears only the stale model hint without opening the microphone', async () => {
+    const { store, chat, asr, emit } = setup({ configured: false });
+    await store.init();
+    await store.opened();
+    expect(store.hintTab).toBe('ai');
+    store.input = '先保留这句话';
+    chat.refresh.mockImplementation(async () => { chat.configured = true; });
+    emit('ai-config-changed');
+    await vi.waitFor(() => expect(store.configured).toBe(true));
+    expect(store.hint).toBe('');
+    expect(store.hintTab).toBe('');
+    expect(store.input).toBe('先保留这句话');
+    expect(asr.activate).not.toHaveBeenCalled();
+    await store.submit();
+    expect(chat.send).toHaveBeenCalledWith('先保留这句话');
+    store.note('语音识别暂时不可用');
+    emit('ai-config-changed');
+    await Promise.resolve();
+    expect(store.hint).toBe('语音识别暂时不可用');
+    store.dispose();
+  });
+
+  it('reads the latest model status whenever reopened even if the change event was missed', async () => {
+    const { store, chat, asr } = setup({ configured: false });
+    await store.opened();
+    expect(store.configured).toBe(false);
+    store.closed();
+    chat.refresh.mockImplementation(async () => { chat.configured = true; });
+    await store.opened();
+    expect(chat.refresh).toHaveBeenCalledTimes(2);
+    expect(store.configured).toBe(true);
+    expect(store.hint).toBe('');
+    expect(asr.activate).toHaveBeenCalledTimes(1);
+    store.dispose();
+  });
+
+  it('preserves the conversation, draft and permission mode across configuration changes', async () => {
+    const { store, chat, emit } = setup({ voice: false });
+    await store.init(); await store.opened();
+    await store.submit('你好');
+    store.input = '下一句';
+    const view = chat.views.s1;
+    chat.refresh.mockImplementation(async () => { chat.permissionMode = 'ask'; });
+    emit('ai-config-changed');
+    await Promise.resolve();
+    expect(chat.currentId).toBe('s1');
+    expect(chat.permissionMode).toBe('auto');
+    expect(chat.views.s1).toBe(view);
+    expect(store.input).toBe('下一句');
+    store.dispose();
+  });
+
+  it('keeps the question and shows model settings when the configuration is removed', async () => {
+    const { store, chat, emit } = setup({ voice: false });
+    await store.init(); await store.opened();
+    chat.refresh.mockImplementation(async () => { chat.configured = false; });
+    emit('ai-config-changed');
+    await vi.waitFor(() => expect(store.configured).toBe(false));
+    await store.submit('不要丢掉这个问题', true);
+    expect(chat.send).not.toHaveBeenCalled();
+    expect(store.input).toBe('不要丢掉这个问题');
+    expect(store.hintTab).toBe('ai');
+    store.dispose();
+  });
+
+  it('ignores configuration notifications after disposal', async () => {
+    const { store, chat, emit } = setup();
+    await store.init();
+    store.dispose();
+    emit('ai-config-changed');
+    expect(chat.refresh).not.toHaveBeenCalled();
   });
 
   it('stays where it is until it is dismissed, however long it sits and whatever else the user clicks', async () => {

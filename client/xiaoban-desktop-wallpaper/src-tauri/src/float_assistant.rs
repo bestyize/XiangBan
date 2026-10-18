@@ -319,6 +319,8 @@ fn remember(app: &tauri::AppHandle, window: &WebviewWindow) {
     *app.state::<AssistantState>().moved.lock().unwrap() = offset;
 }
 
+pub(crate) fn remember_position(app: &tauri::AppHandle, window: &WebviewWindow) { remember(app, window); }
+
 fn mode(app: &tauri::AppHandle) -> Mode {
     *app.state::<AssistantState>().mode.lock().unwrap()
 }
@@ -373,6 +375,7 @@ fn show_ball(app: &tauri::AppHandle) -> Result<(), String> {
     window.set_size(PhysicalSize::new(size as u32, size as u32)).map_err(|e| e.to_string())?;
     window.set_position(PhysicalPosition::new(x, y)).map_err(|e| e.to_string())?;
     // Shown without taking the focus: the ball appears over whatever the user is doing.
+    crate::window_control::apply_saved(app, &window, "topmost")?;
     window.show().map_err(|e| e.to_string())?;
     announce(app, &window);
     Ok(())
@@ -389,6 +392,8 @@ fn hide_window(app: &tauri::AppHandle) -> Result<(), String> {
     window.hide().map_err(|e| e.to_string())
 }
 
+pub(crate) fn hide_surface(app: &tauri::AppHandle) -> Result<(), String> { hide_window(app) }
+
 /// Opens the capsule, from the ball or from nothing.
 pub fn expand(app: &tauri::AppHandle) -> Result<(), String> {
     if !crate::settings(app).assistant_enabled {
@@ -401,6 +406,7 @@ pub fn expand(app: &tauri::AppHandle) -> Result<(), String> {
     }
     place(app, &window)?;
     set_mode(app, Mode::Capsule);
+    crate::window_control::apply_saved(app, &window, "topmost")?;
     window.show().map_err(|e| e.to_string())?;
     window.set_focus().map_err(|e| e.to_string())?;
     announce(app, &window);

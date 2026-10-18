@@ -40,6 +40,7 @@ mod effect_packs;
 mod effects;
 mod effects_smoke;
 mod float_assistant;
+mod window_control;
 
 use preferences::{Preferences, Settings};
 use serde::Serialize;
@@ -209,6 +210,7 @@ fn open_scene(app: &tauri::AppHandle, mode: &str) -> Result<(), String> {
         window.show().map_err(|e| e.to_string())?;
         #[cfg(windows)]
         windows::configure_companion(&window, mode == "wallpaper")?;
+        window_control::apply_saved(app, &window, if mode == "wallpaper" { "desktop" } else { "topmost" })?;
         return Ok(());
     }
     let monitor = app.primary_monitor().map_err(|e| e.to_string())?.ok_or("没有找到主显示器")?;
@@ -236,6 +238,7 @@ fn open_scene(app: &tauri::AppHandle, mode: &str) -> Result<(), String> {
     }
     #[cfg(target_os = "macos")]
     macos::configure_scene(&window, mode == "wallpaper", false)?;
+    window_control::apply_saved(app, &window, if mode == "wallpaper" { "desktop" } else { "topmost" })?;
     Ok(())
 }
 
@@ -460,6 +463,10 @@ fn scene_ready(window: tauri::WebviewWindow, report: Option<serde_json::Value>) 
         (window.label() == "pet" && settings(window.app_handle()).mode == "wallpaper") || ["media-a", "media-b", effects::LABEL].contains(&window.label()),
         ["media-a", "media-b", effects::LABEL].contains(&window.label()),
     )?;
+    if window.label() == "pet" || window.label() == float_assistant::LABEL || widgets::is_widget(window.label()) {
+        let default = if widgets::is_widget(window.label()) || (window.label() == "pet" && settings(window.app_handle()).mode == "wallpaper") { "desktop" } else { "topmost" };
+        window_control::apply_saved(window.app_handle(), &window, default)?;
+    }
     window
         .app_handle()
         .state::<DesktopState>()
@@ -476,7 +483,7 @@ fn set_hit_test(window: tauri::WebviewWindow, hit: bool) -> Result<(), String> {
         return Ok(());
     }
     #[cfg(windows)]
-    if settings(window.app_handle()).mode == "wallpaper" { return Ok(()); }
+    if window_control::layer(window.app_handle(), "pet", if settings(window.app_handle()).mode == "wallpaper" { "desktop" } else { "topmost" }) == "desktop" { return Ok(()); }
     #[cfg(windows)]
     if windows::left_button_down() {
         return Ok(());
@@ -496,7 +503,7 @@ fn start_drag(window: tauri::WebviewWindow) -> Result<(), String> {
         return Err("只有小伴窗口可以拖动".into());
     }
     #[cfg(windows)]
-    if settings(window.app_handle()).mode == "wallpaper" {
+    if window_control::layer(window.app_handle(), "pet", if settings(window.app_handle()).mode == "wallpaper" { "desktop" } else { "topmost" }) == "desktop" {
         return windows::drag_companion(&window);
     }
     window.start_dragging().map_err(|e| e.to_string())
@@ -759,7 +766,7 @@ fn main() {
             float_assistant::assistant_status, float_assistant::assistant_configure, float_assistant::assistant_ready, float_assistant::assistant_hide,
             float_assistant::assistant_fit, float_assistant::assistant_drag, float_assistant::assistant_unfold, float_assistant::assistant_prefs, float_assistant::assistant_try, float_assistant::assistant_open_chat, float_assistant::assistant_open_settings]);
     let app = builder.manage(state).manage(content::ContentState::default()).manage(website::WebsiteState::default())
-        .manage(games::GameState::default()).manage(desk_game::DeskState::default()).manage(rituals::RitualState::default()).manage(widgets::WidgetState::default()).manage(reminders::ReminderState::default()).manage(account::AccountState::default()).manage(ai_config::AiConfigState::default()).manage(tts::TtsState::default()).manage(asr::AsrState::default()).manage(ai_catalogue::CatalogueState::default()).manage(float_assistant::AssistantState::default())
+        .manage(games::GameState::default()).manage(desk_game::DeskState::default()).manage(rituals::RitualState::default()).manage(widgets::WidgetState::default()).manage(reminders::ReminderState::default()).manage(account::AccountState::default()).manage(ai_config::AiConfigState::default()).manage(tts::TtsState::default()).manage(asr::AsrState::default()).manage(ai_catalogue::CatalogueState::default()).manage(float_assistant::AssistantState::default()).manage(window_control::WindowState::default())
         .register_uri_scheme_protocol("wallpaper-asset", |context, request| library::serve(context.app_handle(), request))
         .register_uri_scheme_protocol("game-pack", |context, request| game_packs::serve(context.app_handle(), request))
         .invoke_handler(move |invoke| {

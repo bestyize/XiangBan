@@ -14,10 +14,17 @@ const field = ref<HTMLInputElement>();
 const inner = ref<HTMLElement>();
 const scroller = ref<HTMLElement>();
 const composing = ref(false);
+const cardDismissed = ref(false);
+watch(() => props.store.question, () => { cardDismissed.value = false; });
+watch(() => props.store.phase, (phase, before) => {
+  if (phase === 'thinking' && !['thinking', 'answering'].includes(before)) cardDismissed.value = false;
+});
+watch(() => props.store.open, open => { if (open) cardDismissed.value = false; });
+watch(() => [props.store.approval?.id, props.store.ask?.id, props.store.hint, props.store.failure], () => { cardDismissed.value = false; });
 const quiet = computed(() => props.store.phase === 'idle');
 
 const busy = computed(() => ['thinking', 'answering', 'speaking'].includes(props.store.phase));
-const hasCard = computed(() => Boolean(
+const hasCard = computed(() => !cardDismissed.value && Boolean(
   props.store.hint || props.store.question || props.store.answer || props.store.working || props.store.failure
   || props.store.approval || props.store.ask || props.store.phase === 'thinking',
 ));
@@ -32,6 +39,7 @@ function send() {
   const text = props.store.input.trim();
   if (!text) return;
   if (props.store.ask) { props.store.input = ''; void props.store.reply(text); return; }
+  cardDismissed.value = false;
   void props.store.submit();
 }
 function onEnter(event: KeyboardEvent) {
@@ -117,6 +125,7 @@ onBeforeUnmount(() => { window.removeEventListener('focus', onFocus); observer?.
       <div v-if="store.open" ref="inner" class="inner" role="dialog" aria-label="超级小伴" data-testid="assistant">
         <Transition name="rise">
           <section v-if="hasCard" class="card" data-testid="assistant-card">
+            <button type="button" class="round card-close" title="暂时关闭对话框" aria-label="暂时关闭对话框" data-testid="assistant-card-close" @click="cardDismissed = true"><X :size="15" /></button>
             <div ref="scroller" class="card-body">
               <p v-if="store.hint" class="hint" data-testid="assistant-hint">
                 {{ store.hint }}
@@ -169,8 +178,9 @@ html,body,#app{background:transparent!important}
 .ball[data-phase=thinking],.ball[data-phase=answering],.ball[data-phase=speaking]{border-color:var(--busy)}
 .ball[data-phase=attention]{border-color:var(--attention)}
 .inner{display:flex;flex-direction:column;gap:10px;padding:12px}
-.card{border-radius:22px;background:var(--card);border:1px solid var(--line);overflow:hidden}
-.card-body{cursor:auto;max-height:390px;overflow-y:auto;padding:16px 20px 18px;user-select:text;scrollbar-width:thin;scrollbar-color:var(--scroll) transparent}
+.card{position:relative;border-radius:22px;background:var(--card);border:1px solid var(--line);overflow:hidden}
+.card .card-close{position:absolute;z-index:1;top:8px;right:8px;width:28px;height:28px}
+.card-body{cursor:auto;max-height:390px;overflow-y:auto;padding:16px 44px 18px 20px;user-select:text;scrollbar-width:thin;scrollbar-color:var(--scroll) transparent}
 .you{margin:0 0 8px;font-size:12.5px;color:var(--text-soft);display:-webkit-box;-webkit-line-clamp:2;line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .reply{font-size:15px;line-height:1.75;color:var(--text);overflow-wrap:anywhere}
 .reply :deep(p){margin:0 0 .7em}

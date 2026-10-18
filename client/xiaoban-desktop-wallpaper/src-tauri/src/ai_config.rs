@@ -497,6 +497,17 @@ pub fn current(app: &tauri::AppHandle) -> Result<AiConfig, String> {
     load(&path).map_err(|e| format!("模型配置读取失败：{e}"))
 }
 
+/// Notify only the local configuration and chat windows, once, without exposing credentials.
+pub(crate) fn emit_changed<R: tauri::Runtime>(app: &tauri::AppHandle<R>, view: &AiConfigView) {
+    let _ = app.emit_filter("ai-config-changed", view, configuration_target);
+}
+
+fn configuration_target(target: &tauri::EventTarget) -> bool {
+    use tauri::EventTarget::{AnyLabel, Webview, WebviewWindow, Window};
+    matches!(target, AnyLabel { label } | Webview { label } | WebviewWindow { label } | Window { label }
+        if label == "control" || label == crate::float_assistant::LABEL)
+}
+
 #[tauri::command]
 pub fn get_ai_config(app: tauri::AppHandle) -> Result<AiConfigView, String> {
     let path = path(&app)?;
@@ -541,7 +552,9 @@ pub fn save_ai_config(
     let next = apply(&current, &Input { protocol: &protocol, base_url: &base_url, model: &model, api_key: api_key.as_deref(), clear_key, workspace: workspace.as_deref(), hide_tool_calls, open_computer_use })?;
     save(&path, &next).map_err(|e| format!("无法保存模型配置：{e}"))?;
     let _ = app.emit_to("control", "chat-hide-tool-calls-changed", serde_json::json!({ "enabled": next.hide_tool_calls }));
-    Ok(next.view(&default_workspace(&app)?))
+    let view = next.view(&default_workspace(&app)?);
+    emit_changed(&app, &view);
+    Ok(view)
 }
 
 #[tauri::command]
@@ -622,7 +635,9 @@ pub fn save_ai_provider(
     }
 
     save(&path, &config).map_err(|e| format!("无法保存服务商配置：{e}"))?;
-    Ok(config.view(&default_workspace(&app)?))
+    let view = config.view(&default_workspace(&app)?);
+    emit_changed(&app, &view);
+    Ok(view)
 }
 
 #[tauri::command]
@@ -650,7 +665,9 @@ pub fn delete_ai_provider(
     }
 
     save(&path, &config).map_err(|e| format!("无法删除服务商：{e}"))?;
-    Ok(config.view(&default_workspace(&app)?))
+    let view = config.view(&default_workspace(&app)?);
+    emit_changed(&app, &view);
+    Ok(view)
 }
 
 #[tauri::command]
@@ -686,7 +703,9 @@ pub fn switch_ai_provider(
     config.api_key = provider.api_key;
 
     save(&path, &config).map_err(|e| format!("无法切换服务商：{e}"))?;
-    Ok(config.view(&default_workspace(&app)?))
+    let view = config.view(&default_workspace(&app)?);
+    emit_changed(&app, &view);
+    Ok(view)
 }
 
 #[tauri::command]
@@ -714,7 +733,9 @@ pub fn save_ai_preferences(
 
     save(&path, &config).map_err(|e| format!("无法保存偏好设置：{e}"))?;
     let _ = app.emit_to("control", "chat-hide-tool-calls-changed", serde_json::json!({ "enabled": config.hide_tool_calls }));
-    Ok(config.view(&default_workspace(&app)?))
+    let view = config.view(&default_workspace(&app)?);
+    emit_changed(&app, &view);
+    Ok(view)
 }
 
 /// The context limit the chat page's slider chose. Saved on its own so moving the slider never touches the other settings.
@@ -886,6 +907,46 @@ mod tests {
         let directory = std::env::temp_dir().join(format!("xiaoban-ai-{tag}-{}", std::process::id()));
         let _ = fs::remove_dir_all(&directory);
         directory
+    }
+
+    #[test]
+    fn model_config_notifications_only_target_the_two_trusted_windows() {
+        use tauri::EventTarget;
+        for label in ["control", crate::float_assistant::LABEL, "pet", "wallpaper", "preview", "game"] {
+            let allowed = label == "control" || label == crate::float_assistant::LABEL;
+            for target in [
+                EventTarget::AnyLabel { label: label.into() },
+                EventTarget::Window { label: label.into() },
+                EventTarget::Webview { label: label.into() },
+                EventTarget::WebviewWindow { label: label.into() },
+            ] {
+                assert_eq!(configuration_target(&target), allowed, "{label}");
+            }
+        }
+        assert!(!configuration_target(&EventTarget::Any));
+        assert!(!configuration_target(&EventTarget::App));
+    }
+
+    #[test]
+    fn model_config_notifications_are_redacted_and_delivered_once() {
+        use std::sync::{Arc, atomic::{AtomicUsize, Ordering}};
+        use tauri::{Listener, WebviewUrl, WebviewWindowBuilder};
+        let app = tauri::test::mock_app();
+        for label in ["control", crate::float_assistant::LABEL, "wallpaper"] {
+            WebviewWindowBuilder::new(app.handle(), label, WebviewUrl::App("index.html".into())).build().unwrap();
+        }
+        let seen = Arc::new(AtomicUsize::new(0));
+        let counter = seen.clone();
+        app.handle().listen_any("ai-config-changed", move |event| {
+            counter.fetch_add(1, Ordering::SeqCst);
+            assert!(!event.payload().contains(KEY));
+            let value: serde_json::Value = serde_json::from_str(event.payload()).unwrap();
+            assert_eq!(value["hasKey"], true);
+            assert!(value.get("apiKey").is_none());
+            assert!(value["providers"].as_array().unwrap().iter().all(|p| p.get("apiKey").is_none()));
+        });
+        emit_changed(app.handle(), &saved().view(Path::new("/work")));
+        assert_eq!(seen.load(Ordering::SeqCst), 1);
     }
 
     #[test]

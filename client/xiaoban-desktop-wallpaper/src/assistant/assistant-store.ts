@@ -16,6 +16,7 @@ export const RESUME_MS = 5 * 60 * 1000;
 export const SEND_GRACE_MS = 600;
 /** The microphone is released when nothing was heard for this long. The capsule itself stays until it is dismissed. */
 export const LISTEN_IDLE_MS = 15_000;
+const MODEL_REQUIRED = '还没有配置模型。先到设置里添加一个，我才能回答。';
 
 export interface AssistantDeps {
   desktop: boolean;
@@ -117,6 +118,17 @@ export function createAssistantStore(deps: AssistantDeps): AssistantStore {
     return { question, answer, working: tool ? describeTool(tool.name) : '', failure: notice?.text ?? '' };
   }
 
+  async function refreshModel() {
+    const id = chat.currentId, mode = chat.permissionMode;
+    await chat.refresh();
+    // The overview's mode belongs to the host, not necessarily this capsule's conversation.
+    if (chat.currentId === id) chat.permissionMode = mode;
+    if (disposed) return;
+    if (chat.configured) {
+      if (store.hint === MODEL_REQUIRED) store.note('');
+    } else if (store.open && !store.hint) store.note(MODEL_REQUIRED, 'ai');
+  }
+
   function readPrefs(open?: string, read?: string) {
     if (open === 'voice' || open === 'type') store.prefs.open = open;
     if (read === 'voice' || read === 'always' || read === 'never') store.prefs.read = read;
@@ -190,6 +202,7 @@ export function createAssistantStore(deps: AssistantDeps): AssistantStore {
         unsubscribers.push(
           await deps.listen('assistant-open', () => { void store.opened(); }),
           await deps.listen('assistant-close', () => store.closed()),
+          await deps.listen('ai-config-changed', () => { if (!disposed) void refreshModel(); }),
           await deps.listen<boolean>('assistant-ball', shown => { store.ball = Boolean(shown); }),
           // The settings page lives in another window; its choices arrive with every settings change.
           await deps.listen<{ assistantOpen?: string; assistantRead?: string; appearance?: string }>('settings-changed', value => { readPrefs(value.assistantOpen, value.assistantRead); if (value.appearance) deps.onAppearance?.(value.appearance); }),
@@ -209,8 +222,9 @@ export function createAssistantStore(deps: AssistantDeps): AssistantStore {
       clearTimers();
       store.open = true; store.ball = false; store.note(''); store.input = ''; heard = ''; voiceTurn = false; flags.awaitingSpeech = false;
       await Promise.all([chat.init(), asr.init()]);
-      if (!store.open) return;
-      if (!chat.configured) { store.note('还没有配置模型。先到设置里添加一个，我才能回答。', 'ai'); return; }
+      await refreshModel();
+      if (disposed || !store.open) return;
+      if (!chat.configured) { store.note(MODEL_REQUIRED, 'ai'); return; }
       if (!chat.currentId || now() - lastActivity > RESUME_MS) await chat.select(null);
       // Typing first: the capsule waits, and a tap on the ball starts listening.
       if (store.open && asr.enabled && store.prefs.open === 'voice') { voiceTurn = await startListening(); }
@@ -222,11 +236,18 @@ export function createAssistantStore(deps: AssistantDeps): AssistantStore {
     },
     async submit(text, spoken = false) {
       const value = (text ?? store.input).trim();
-      if (!value || !chat.configured) return;
+      if (!value) return;
+      if (!chat.configured) {
+        store.input = value;
+        store.note(MODEL_REQUIRED, 'ai');
+        return;
+      }
       clearTimers(); heard = '';
       asr.deactivate(); await speech.stop();
       store.input = ''; store.note('');
       voiceTurn = spoken; lastActivity = now();
+      // New capsule conversations start in full trust; resumed ones keep their saved mode.
+      if (!chat.currentId) chat.permissionMode = 'auto';
       if (!(await chat.send(value))) store.input = value;
     },
     async toggleListening() {

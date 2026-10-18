@@ -112,6 +112,18 @@ pub fn place_widget(window:&tauri::WebviewWindow,position:tauri::PhysicalPositio
     Ok(())
 }
 
+/// Place either a top-level surface or an Explorer child using screen coordinates.
+pub fn place_interactive(window:&tauri::WebviewWindow,x:f64,y:f64,width:f64,height:f64)->Result<(),String>{
+    let hwnd=window.hwnd().map_err(|e|e.to_string())?.0 as HWND;
+    unsafe {
+        let mut point=POINT{x:x.round() as i32,y:y.round() as i32};
+        let parent=GetParent(hwnd);
+        if !parent.is_null(){ScreenToClient(parent,&mut point);}
+        if SetWindowPos(hwnd,null_mut(),point.x,point.y,width.round() as i32,height.round() as i32,SWP_NOACTIVATE|SWP_NOZORDER)==0{return Err(format!("窗口移动失败：{}",GetLastError()));}
+    }
+    Ok(())
+}
+
 fn attach_desktop(
     window: &tauri::WebviewWindow,
     parent: usize,

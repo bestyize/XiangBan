@@ -5,7 +5,7 @@ use crate::ai_config::{self, AiConfig, AiConfigView};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::{sync::Arc, time::Duration};
-use tauri::{Emitter, Manager};
+use tauri::Manager;
 
 pub const DEFAULT_AI_URL: &str = "https://ai.xiangban.xyz";
 /// 写在 `active_provider` 里的固定编号。它不在供应商列表里，因为地址、协议和密钥都不是用户可编辑的。
@@ -179,7 +179,7 @@ pub fn use_ai_gateway(app: tauri::AppHandle, tier: String) -> Result<AiConfigVie
         ai_config::save(&path, &config).map_err(|e| format!("无法保存模型配置：{e}"))?;
         config.view(&ai_config::default_workspace(&app)?)
     };
-    let _ = app.emit_to("control", "ai-config-changed", &view);
+    ai_config::emit_changed(&app, &view);
     Ok(view)
 }
 
