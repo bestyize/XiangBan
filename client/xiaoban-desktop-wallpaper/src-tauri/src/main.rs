@@ -137,12 +137,14 @@ fn initialize_preferences(app: &tauri::AppHandle) -> Result<(), String> {
         let result = if !prefs.autostart_initialized {
             state.autostart_initialized.store(true, Ordering::Relaxed);
             startup::set(app, settings(app).autostart)
-        } else {
+        } else if settings(app).autostart {
             match startup::enabled(app) {
                 Ok(true) => startup::refresh(app),
-                Ok(false) => Ok(()),
+                Ok(false) => startup::set(app, true),
                 Err(error) => Err(error),
             }
+        } else {
+            Ok(())
         };
         if let Err(error) = result {
             *state.startup_error.lock().unwrap() = Some(format!("开机自动启动未能设置：{error}"));
@@ -708,7 +710,7 @@ fn main() {
     let data_root = storage::location(isolated).expect("无法找到用户数据目录");
     let state = DesktopState { startup_name: startup_name.clone(), isolated,
         data_root: Mutex::new(Some(data_root.clone())),
-        startup_allowed: !cfg!(debug_assertions) || isolated, ..Default::default() };
+        startup_allowed: true, ..Default::default() };
     let mut context = tauri::generate_context!();
     if isolated { context.config_mut().identifier.push_str(".smoke"); }
     else if cfg!(debug_assertions) { context.config_mut().identifier.push_str(".development"); }

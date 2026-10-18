@@ -169,4 +169,23 @@ describe('ControlShell sidebar', () => {
     expect(quiet.find('[data-testid="nav-settings"] .notice-dot').exists()).toBe(true);
     quiet.unmount();
   });
+
+  it('directly opens game space instead of switching to an intermediate page when clicking games nav', async () => {
+    const wrapper = mount(ControlShell);
+    await flushPromises();
+    const loginModal = wrapper.findComponent(LoginModal);
+    const store = loginModal.props('store');
+    const openGamesSpy = vi.spyOn(store, 'openGames').mockResolvedValue(undefined);
+    const initialPage = store.page;
+
+    const gamesNav = wrapper.find('[data-testid="nav-games"]');
+    expect(gamesNav.exists()).toBe(true);
+    await gamesNav.trigger('click');
+    await flushPromises();
+
+    expect(openGamesSpy).toHaveBeenCalledTimes(1);
+    expect(store.page).toBe(initialPage);
+    expect(store.page).not.toBe('games');
+    wrapper.unmount();
+  });
 });

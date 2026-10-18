@@ -34,7 +34,14 @@ const items = [
 ] as const;
 const activeWallpaper = computed(() => store.settings.wallpaperId === 'companion' ? '系统桌面' : store.library.items.find(item => item.definition.id === store.settings.wallpaperId)?.definition.title ?? '已保存的壁纸');
 const unread = computed(() => store.website.announcements.filter(item => store.website.dismissed[item.id] !== item.revision).length);
-function navigate(page: ControlPage) { store.navigate(page); document.querySelector('.control-workspace')?.scrollTo(0, 0); }
+function navigate(page: ControlPage) {
+  if (page === 'games') {
+    void store.openGames();
+    return;
+  }
+  store.navigate(page);
+  document.querySelector('.control-workspace')?.scrollTo(0, 0);
+}
 async function openOfficialSite() {
   if (store.desktop) {
     store.notify('正在通过系统浏览器打开小伴官网...', 'info');
