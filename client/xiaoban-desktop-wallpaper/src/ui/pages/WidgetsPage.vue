@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import ResourceShareActions from "../components/ResourceShareActions.vue";
 import { computed, watch, onMounted, onBeforeUnmount, ref } from 'vue';
-import { Check, Eye, LayoutGrid, Move, Plus, Search, Sparkles, Trash2 } from 'lucide-vue-next';
-import { NAlert, NButton, NInput, NPopconfirm, NSelect, NSlider, NSwitch } from 'naive-ui';
+import { Check, Eye, Move, Plus, Search, Sparkles, Trash2 } from 'lucide-vue-next';
+import { NAlert, NButton, NInput, NModal, NPopconfirm, NSelect, NSlider, NSwitch } from 'naive-ui';
 import { invoke } from '../../bridge.ts';
 import type { ControlStore } from '../control-types.ts';
 import { createWidgetClient, searchWidgetCities } from '../../widgets/client.ts';
@@ -12,24 +12,16 @@ import NotesWidget from '../../widgets/NotesWidget.vue';
 import CountdownEditor from '../../widgets/CountdownEditor.vue';
 import type { WidgetContent } from '../../widgets/model.ts';
 import { emptyNote, emptyCountdown } from '../../widgets/content.ts';
-import InteractivePage from './InteractivePage.vue';
 const props=defineProps<{store:ControlStore}>();
 const client=createWidgetClient(),{layout,ready,busy,error}=client;
-const tab=ref<'library'|'desktop'|'scenes'>('library'),selected=ref(''),cityQuery=ref(''),cities=ref<City[]>([]),cityBusy=ref(false);
+const MAX_WIDGETS=12;
+const selected=ref(''),settingsOpen=ref(false),cityQuery=ref(''),cities=ref<City[]>([]),cityBusy=ref(false);
 const chosen=computed(()=>layout.value.widgets.find(widget=>widget.id===selected.value)??null);
-const enabled=computed(()=>layout.value.widgets.filter(widget=>widget.enabled));
+const full=computed(()=>layout.value.widgets.length>=MAX_WIDGETS);
 const customTemplates=ref<any[]>([]);
 async function loadCustomTemplates(){
   if(!props.store.desktop)return;
   try{customTemplates.value=await invoke<any[]>('list_custom_widgets');}catch(e){}
-}
-async function addCustom(template:any){
-  await action(async()=>{
-    await client.add('custom',template.id);
-    selected.value=layout.value.widgets.at(-1)?.id??'';
-    tab.value='desktop';
-    props.store.notify(`已添加「${template.name}」到桌面`,'success');
-  });
 }
 async function deleteCustomTemplate(id:string,name:string){
   await action(async()=>{
@@ -39,15 +31,11 @@ async function deleteCustomTemplate(id:string,name:string){
     await client.load();
   });
 }
-const monitorOptions=computed(()=>displays.value.map(m=>({label:`${m.name}${m.primary?' · 主屏幕':''}`,value:m.id})));
-const previewMonitor=ref('');
 const displays=computed(()=>layout.value.monitors?.length?layout.value.monitors:[{id:'primary',name:'主屏幕',width:layout.value.desktop?.width??Math.max(1280,screen.width),height:layout.value.desktop?.height??Math.max(800,screen.height),primary:true}]);
 const primaryDisplay=computed(()=>displays.value.find(m=>m.primary)??displays.value[0]);
-const activeDisplay=computed(()=>displays.value.find(m=>m.id===previewMonitor.value)??primaryDisplay.value);
+const monitorOptions=computed(()=>displays.value.map(m=>({label:`${m.name}${m.primary?' · 主屏幕':''}`,value:m.id})));
 function monitorOf(widget:DesktopWidget){return displays.value.find(m=>m.id===widget.monitor)??primaryDisplay.value;}
-const visibleWidgets=computed(()=>enabled.value.filter(w=>monitorOf(w).id===activeDisplay.value.id));
-const previewWallpaper=computed(()=>props.store.library.items.find(item=>item.definition.id===props.store.settings.wallpaperId)?.coverUrl??'');
-const TOP=32,BOTTOM=88,PAD=8;
+const titleOf=(widget:DesktopWidget)=>widget.kind==='custom'?widget.custom?.name||'自创组件':widgetKinds.find(item=>item.kind===widget.kind)?.title??'';
 // Library previews sit in a 16/9 stage the width of the card, so every demo widget shrinks to fit it.
 const libraryGrid=ref<HTMLElement>();
 const stageWidth=ref(0);
@@ -56,85 +44,90 @@ function measureStage(){const column=libraryGrid.value?getComputedStyle(libraryG
 const demoScale=(kind:WidgetKind,custom?:CustomWidgetData)=>{const{width,height}=baseSize(kind,custom);const stage=stageWidth.value||210;return Math.min(1,stage/width,stage*9/16/height);};
 const demo=(kind:WidgetKind):DesktopWidget=>({id:`demo${kind}`,kind,theme:'transparent',scale:1,x:0,y:0,enabled:true,city:null,...(kind==='notes'?{note:{...emptyNote(),text:'慢慢来，也会抵达。\n\n把今天的小事，放在这里。'}}:kind==='countdown'?{countdown:{...emptyCountdown(),title:'下一次旅行',date:'2026-12-31'}}:{})});
 async function action(task:()=>Promise<unknown>){try{await task();}catch(e){props.store.notify(e,'error');}}
-async function add(kind:WidgetKind){await action(async()=>{await client.add(kind);selected.value=layout.value.widgets.at(-1)?.id??'';tab.value='desktop';if(layout.value.errors.length)props.store.notify('组件已保存，桌面显示遇到问题，请查看页面提示','error');else props.store.notify('已添加到桌面，可以直接拖动摆放','success');});}
+// A brief check mark on the "+" badge confirms the add without moving the user away from the library.
+const flashKey=ref('');let flashTimer:ReturnType<typeof setTimeout>|undefined;
+function flash(key:string){flashKey.value=key;clearTimeout(flashTimer);flashTimer=setTimeout(()=>{flashKey.value='';},1600);}
+async function addWidget(key:string,create:()=>Promise<unknown>,needsSetup:boolean){
+  await action(async()=>{
+    await create();
+    flash(key);
+    const added=layout.value.widgets.at(-1);
+    if(layout.value.errors.length)props.store.notify('组件已保存，桌面显示遇到问题，请查看页面提示','error');
+    else if(needsSetup&&added){props.store.notify('已添加到桌面，先选一座城市吧','success');openSettings(added.id);}
+    else props.store.notify('已添加到桌面，按住组件即可拖动摆放','success');
+  });
+}
+const add=(kind:WidgetKind)=>addWidget(`kind:${kind}`,()=>client.add(kind),kind==='weather');
+const addCustom=(template:any)=>addWidget(`custom:${template.id}`,()=>client.add('custom',template.id),false);
 function update(patch:Partial<DesktopWidget>){if(chosen.value)void action(()=>client.update(chosen.value!.id,patch));}
 async function saveChosenContent(content:WidgetContent){if(chosen.value)await client.update(chosen.value.id,content);}
-function select(id:string){const widget=layout.value.widgets.find(w=>w.id===id);if(widget)previewMonitor.value=monitorOf(widget).id;if(selected.value===id)return;selected.value=id;cities.value=[];cityQuery.value='';}
+function openSettings(id:string){selected.value=id;cities.value=[];cityQuery.value='';settingsOpen.value=true;}
+function closeSettings(){settingsOpen.value=false;void commitScale();}
 const scaleDraft=ref<{id:string;value:number}|null>(null);let scaleTimer:ReturnType<typeof setTimeout>|undefined;
 const scaleOf=(widget:DesktopWidget)=>scaleDraft.value?.id===widget.id?scaleDraft.value.value:widget.scale;
 function commitScale(){clearTimeout(scaleTimer);const draft=scaleDraft.value;if(!draft)return Promise.resolve();return action(()=>client.update(draft.id,{scale:draft.value})).finally(()=>{if(scaleDraft.value===draft)scaleDraft.value=null;});}
 function setScale(value:number){if(!chosen.value)return;scaleDraft.value={id:chosen.value.id,value};clearTimeout(scaleTimer);scaleTimer=setTimeout(()=>void commitScale(),250);}
-async function remove(id:string){await action(async()=>{await client.remove(id);if(selected.value===id)selected.value=layout.value.widgets[0]?.id??'';});}
+// The settings preview is fitted to the largest allowed scale, so dragging the size slider visibly grows the widget.
+const PREVIEW_W=400,PREVIEW_H=220,MAX_SCALE=1.5;
+function previewScale(widget:DesktopWidget){const{width,height}=baseSize(widget.kind,widget.custom);return Math.min(1,PREVIEW_W/(width*MAX_SCALE),PREVIEW_H/(height*MAX_SCALE))*scaleOf(widget);}
+async function removeChosen(){
+  const id=selected.value;if(!id)return;
+  await action(async()=>{await client.remove(id);settingsOpen.value=false;setTimeout(()=>{if(!settingsOpen.value)selected.value='';},300);});
+}
 async function search(){if(!cityQuery.value.trim()||cityBusy.value)return;cityBusy.value=true;try{cities.value=await searchWidgetCities(cityQuery.value.trim());if(!cities.value.length)props.store.notify('没有找到城市，可以试试完整名称','info');}catch(e){props.store.notify(e,'error');}finally{cityBusy.value=false;}}
 function chooseCity(index:number){const city=cities.value[index];if(city)update({city});}
 const cityOptions=computed(()=>cities.value.map((city,index)=>({label:[city.name,city.admin1,city.country].filter(Boolean).join(' · '),value:index})));
 async function tuckAway(){try{await invoke('hide_control');}catch(e){props.store.notify(e,'error');}}
-const canvas=ref<HTMLElement>();
-const previewScale=ref(.4);
-const desktopSize=computed(()=>({width:activeDisplay.value.width,height:activeDisplay.value.height}));
-function targetMonitor(id:string){previewMonitor.value=id;update({monitor:id});}
-let resizeObserver:ResizeObserver|undefined;
-function fitPreview(){const rect=canvas.value?.getBoundingClientRect();if(rect&&rect.width)previewScale.value=rect.width/desktopSize.value.width;}
-const windowSize=(widget:DesktopWidget)=>{const size=baseSize(widget.kind,widget.custom),scale=scaleOf(widget);return {width:size.width*scale+16,height:size.height*scale+16};};
-let drag:{id:string;pointerX:number;pointerY:number;x:number;y:number;width:number;height:number;moved:boolean}|null=null;
-const draft=ref<Record<string,{x:number;y:number}>>({});
-function position(widget:DesktopWidget){const point=draft.value[widget.id]??widget,box=windowSize(widget),k=previewScale.value;return {left:`${(PAD+point.x*Math.max(0,desktopSize.value.width-box.width))*k}px`,top:`${(TOP+PAD+point.y*Math.max(0,desktopSize.value.height-box.height-BOTTOM))*k}px`};}
-function begin(event:PointerEvent,widget:DesktopWidget){select(widget.id);if(event.button!==0||busy.value||!canvas.value)return;const box=windowSize(widget),k=previewScale.value;drag={id:widget.id,pointerX:event.clientX,pointerY:event.clientY,x:widget.x,y:widget.y,width:Math.max(1,(desktopSize.value.width-box.width)*k),height:Math.max(1,(desktopSize.value.height-box.height-BOTTOM)*k),moved:false};(event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);}
-function move(event:PointerEvent){if(!drag)return;const dx=event.clientX-drag.pointerX,dy=event.clientY-drag.pointerY;if(!drag.moved&&Math.hypot(dx,dy)<=5)return;drag.moved=true;draft.value[drag.id]={x:Math.max(0,Math.min(1,drag.x+dx/drag.width)),y:Math.max(0,Math.min(1,drag.y+dy/drag.height))};}
-async function finish(event:PointerEvent){if(!drag)return;move(event);const id=drag.id,point=draft.value[id];drag=null;if(point)await action(()=>client.update(id,point));delete draft.value[id];}
-let resizing:{id:string;startX:number;startY:number;startScale:number;width:number;height:number}|null=null;
-function beginResize(event:PointerEvent,widget:DesktopWidget){
-  if(event.button!==0||busy.value)return;
-  if(scaleDraft.value&&scaleDraft.value.id!==widget.id)void commitScale();else clearTimeout(scaleTimer);
-  select(widget.id);
-  const size=baseSize(widget.kind,widget.custom),k=previewScale.value;
-  resizing={id:widget.id,startX:event.clientX,startY:event.clientY,startScale:scaleOf(widget),width:size.width*k,height:size.height*k};
-  (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
-  event.preventDefault();
-}
-function moveResize(event:PointerEvent){
-  if(!resizing)return;
-  const {id,startX,startY,startScale,width,height}=resizing;
-  const delta=((event.clientX-startX)*width+(event.clientY-startY)*height)/(width*width+height*height);
-  scaleDraft.value={id,value:Math.max(.75,Math.min(1.5,Math.round((startScale+delta)*20)/20))};
-}
-async function finishResize(event:PointerEvent){if(!resizing)return;moveResize(event);resizing=null;await commitScale();}
-function resizeKey(event:KeyboardEvent,widget:DesktopWidget){
-  const direction=event.key==='ArrowRight'||event.key==='ArrowUp'?1:event.key==='ArrowLeft'||event.key==='ArrowDown'?-1:0;
-  if(!direction||busy.value)return;
-  event.preventDefault();select(widget.id);setScale(Math.max(.75,Math.min(1.5,Math.round((scaleOf(widget)+direction*.05)*20)/20)));
-}
-function nudge(event:KeyboardEvent,widget:DesktopWidget){const step=event.shiftKey?.05:.01,delta={ArrowLeft:[-step,0],ArrowRight:[step,0],ArrowUp:[0,-step],ArrowDown:[0,step]}[event.key as 'ArrowLeft'];if(!delta||busy.value)return;event.preventDefault();void action(()=>client.update(widget.id,{x:Math.max(0,Math.min(1,widget.x+delta[0])),y:Math.max(0,Math.min(1,widget.y+delta[1]))}));}
-watch([tab,()=>layout.value.widgets],()=>{if(tab.value=='desktop'&&!chosen.value&&layout.value.widgets.length)select(layout.value.widgets[0].id);},{immediate:true});
-watch(tab,(next,previous)=>{if(previous==='desktop'&&next!=='desktop'&&layout.value.editing)void action(()=>client.edit(false));});
-watch(canvas,element=>{resizeObserver?.disconnect();if(element){resizeObserver=new ResizeObserver(fitPreview);resizeObserver.observe(element);fitPreview();}});
 watch(libraryGrid,element=>{libraryObserver?.disconnect();if(element){libraryObserver=new ResizeObserver(measureStage);libraryObserver.observe(element);measureStage();}});
-watch(desktopSize,fitPreview);
-onMounted(()=>{void client.load();void loadCustomTemplates();});onBeforeUnmount(()=>{void commitScale();if(layout.value.editing)void client.edit(false).catch(e=>props.store.notify(e,'error'));resizeObserver?.disconnect();libraryObserver?.disconnect();client.dispose();});
+onMounted(()=>{void client.load();void loadCustomTemplates();});onBeforeUnmount(()=>{clearTimeout(flashTimer);void commitScale();if(layout.value.editing)void client.edit(false).catch(e=>props.store.notify(e,'error'));libraryObserver?.disconnect();client.dispose();});
 </script>
 <template>
   <section class="ui-page widgets-page" data-testid="widgets-page">
-    <div class="widgets-top"><header class="page-header"><div class="widget-title"><h1>桌面组件</h1><span class="widget-count">{{ layout.widgets.length }} / 12 个组件</span></div><div class="widget-header-actions"><ResourceShareActions :store="store" kind="widget" import-label="导入小组件" @imported="loadCustomTemplates"/><NButton type="primary" round :disabled="!store.desktop" data-testid="widgets-create" @click="store.startCreation('widget')"><template #icon><Sparkles :size="15"/></template>创作小组件</NButton></div></header>
-    <nav class="widget-tabs" role="tablist" aria-label="桌面组件分区"><button role="tab" :aria-selected="tab==='library'" :class="{on:tab==='library'}" @click="tab='library'">组件库</button><button role="tab" :aria-selected="tab==='desktop'" :class="{on:tab==='desktop'}" @click="tab='desktop'">我的桌面<span v-if="layout.widgets.length">{{ layout.widgets.length }}</span></button><button role="tab" :aria-selected="tab==='scenes'" :class="{on:tab==='scenes'}" @click="tab='scenes'">互动场景</button></nav></div>
+    <div class="widgets-top">
+      <header class="page-header">
+        <div class="widget-title"><h1>桌面组件</h1><span class="widget-count">{{ layout.widgets.length }} / {{ MAX_WIDGETS }} 个组件</span></div>
+        <div class="widget-header-actions">
+          <ResourceShareActions :store="store" kind="widget" import-label="导入小组件" @imported="loadCustomTemplates"/>
+          <NButton v-if="store.desktop&&layout.editing" round @click="tuckAway"><template #icon><Eye :size="14"/></template>收起面板</NButton>
+          <NButton v-if="layout.widgets.length" round :type="layout.editing?'primary':'default'" :ghost="layout.editing" :disabled="!ready||busy" data-testid="edit-widgets" @click="action(()=>client.edit(!layout.editing))"><template #icon><Check v-if="layout.editing" :size="14"/><Move v-else :size="14"/></template>{{ layout.editing?'完成摆放':'在桌面上摆放' }}</NButton>
+          <NButton type="primary" round :disabled="!store.desktop" data-testid="widgets-create" @click="store.startCreation('widget')"><template #icon><Sparkles :size="15"/></template>创作小组件</NButton>
+        </div>
+      </header>
+    </div>
     <div class="widgets-body">
-    <NAlert v-if="error" type="error" :show-icon="false">{{ error }}<NButton v-if="!ready" size="tiny" text @click="client.load">重新读取</NButton></NAlert>
-    <NAlert v-if="layout.errors.length" type="warning" :show-icon="false">{{ layout.errors.join('；') }}</NAlert>
-    <template v-if="tab==='library'">
-      <div class="widget-library" ref="libraryGrid">
-        <article v-for="item in widgetKinds" :key="item.kind" class="widget-library-card">
-          <div class="widget-art" :class="item.kind"><div class="demo-widget" :class="item.kind" :style="{'--demo-scale':demoScale(item.kind)}"><WidgetSurface :widget="demo(item.kind)" preview/></div><button class="widget-add-badge" :disabled="!ready||busy||layout.widgets.length>=12" :data-testid="`add-${item.kind}`" :title="layout.widgets.length>=12?'桌面已放满 12 个':'添加到桌面'" :aria-label="layout.widgets.length>=12?'桌面已放满 12 个':'添加到桌面'" @click="add(item.kind)"><Plus :size="15"/></button></div>
-          <div class="widget-card-copy"><span class="widget-category">{{ item.label }} · 可添加多个</span><h2>{{ item.title }}</h2><p>{{ item.description }}</p></div>
-        </article>
-      </div>
-      <template v-if="customTemplates.length">
-        <div class="widget-library-intro custom-intro"><span>巧思妙想 · 自创组件</span><p>由小伴现场创作或导入的专属桌面小部件，可自由摆放与清理。</p></div>
+      <NAlert v-if="error" type="error" :show-icon="false">{{ error }}<NButton v-if="!ready" size="tiny" text @click="client.load">重新读取</NButton></NAlert>
+      <NAlert v-if="layout.errors.length" type="warning" :show-icon="false">{{ layout.errors.join('；') }}</NAlert>
+      <NAlert v-if="layout.editing" type="info" :show-icon="false">真实桌面上的组件已锁定功能，按住即可拖动到想放的位置。摆好后点右上角的“完成摆放”。</NAlert>
+
+      <section v-if="layout.widgets.length" class="widget-section" data-testid="desktop-widgets">
+        <div class="section-head"><h2>已在桌面</h2><p>点一张卡片，调整它的样式、大小和内容。</p></div>
+        <div class="widget-library">
+          <button v-for="widget in layout.widgets" :key="widget.id" type="button" class="widget-library-card desktop-card" :class="{off:!widget.enabled}" :data-testid="`widget-card-${widget.id}`" :aria-label="`调整${titleOf(widget)}`" @click="openSettings(widget.id)">
+            <div class="widget-art" :class="widget.kind"><div class="demo-widget" :style="{'--demo-scale':demoScale(widget.kind,widget.custom)}"><WidgetSurface :widget="widget" preview/></div><span v-if="!widget.enabled" class="off-badge">已隐藏</span></div>
+            <div class="widget-card-copy"><span class="widget-category">{{ monitorOf(widget).name }}</span><h2>{{ titleOf(widget) }}</h2></div>
+          </button>
+        </div>
+      </section>
+
+      <section class="widget-section">
+        <div class="section-head"><h2>组件库</h2><p>点右下角的 + 放到桌面，同一种组件可以添加多个。</p></div>
+        <div class="widget-library" ref="libraryGrid">
+          <article v-for="item in widgetKinds" :key="item.kind" class="widget-library-card">
+            <div class="widget-art" :class="item.kind"><div class="demo-widget" :class="item.kind" :style="{'--demo-scale':demoScale(item.kind)}"><WidgetSurface :widget="demo(item.kind)" preview/></div><button class="widget-add-badge" :disabled="!ready||busy||full" :data-testid="`add-${item.kind}`" :title="full?`桌面已放满 ${MAX_WIDGETS} 个`:'添加到桌面'" :aria-label="full?`桌面已放满 ${MAX_WIDGETS} 个`:`添加${item.title}到桌面`" @click="add(item.kind)"><Check v-if="flashKey===`kind:${item.kind}`" :size="15"/><Plus v-else :size="15"/></button></div>
+            <div class="widget-card-copy"><span class="widget-category">{{ item.label }}</span><h2>{{ item.title }}</h2><p>{{ item.description }}</p></div>
+          </article>
+        </div>
+      </section>
+
+      <section v-if="customTemplates.length" class="widget-section">
+        <div class="section-head"><h2>自创组件</h2><p>由小伴现场创作或导入的专属桌面小部件。</p></div>
         <div class="widget-library">
           <article v-for="item in customTemplates" :key="item.id" class="widget-library-card">
             <div class="widget-art custom">
               <div class="demo-widget custom-demo" :style="{'--demo-scale':demoScale('custom',item)}">
                 <WidgetSurface :widget="{ id: 'demo' + item.id, kind: 'custom', customId: item.id, custom: item, theme: item.theme || 'transparent', scale: 1, x: 0, y: 0, enabled: true, city: null }" preview/>
               </div>
-              <button class="widget-add-badge" :disabled="!ready||busy||layout.widgets.length>=12" :title="layout.widgets.length>=12?'桌面已放满 12 个':'添加到桌面'" :aria-label="layout.widgets.length>=12?'桌面已放满 12 个':`添加${item.name}到桌面`" @click="addCustom(item)"><Plus :size="15"/></button>
+              <button class="widget-add-badge" :disabled="!ready||busy||full" :title="full?`桌面已放满 ${MAX_WIDGETS} 个`:'添加到桌面'" :aria-label="full?`桌面已放满 ${MAX_WIDGETS} 个`:`添加${item.name}到桌面`" @click="addCustom(item)"><Check v-if="flashKey===`custom:${item.id}`" :size="15"/><Plus v-else :size="15"/></button>
             </div>
             <div class="widget-card-copy">
               <div class="custom-card-header">
@@ -152,24 +145,86 @@ onMounted(()=>{void client.load();void loadCustomTemplates();});onBeforeUnmount(
             </div>
           </article>
         </div>
-      </template>
-      <p class="widget-hint">轻点组件使用功能，按住拖动即可摆放，位置会自动保存。求签、日历、便签和纪念日可离线使用，天气需要选择城市并联网。</p>
-    </template>
-    <template v-else-if="tab==='desktop'"><div class="desktop-toolbar"><div><h2>你的桌面布局</h2><p>{{ layout.editing?'真实桌面上的组件已锁定功能，按住即可拖动；在预览中拖动右下角可等比缩放。摆好后点“完成摆放”。':'拖动下方预览即可摆放；选中后拖动右下角可等比缩放，也可用方向键微调位置。' }}</p></div><div class="desktop-tools"><NSelect v-if="displays.length>1" :value="activeDisplay.id" :options="monitorOptions" aria-label="预览显示器" style="width:180px" @update:value="previewMonitor=$event"/><NButton v-if="store.desktop" round @click="tuckAway"><template #icon><Eye :size="14"/></template>收起面板</NButton><NButton round :type="layout.editing?'primary':'default'" :disabled="!ready||busy" data-testid="edit-widgets" @click="action(()=>client.edit(!layout.editing))"><template #icon><Check v-if="layout.editing" :size="14"/><Move v-else :size="14"/></template>{{ layout.editing?'完成摆放':'在桌面上摆放' }}</NButton></div></div><div class="desktop-editor"><div ref="canvas" class="desktop-canvas" :class="{editing:layout.editing}" :style="{aspectRatio:`${desktopSize.width} / ${desktopSize.height}`,'--inset-top':`${TOP*previewScale}px`,'--inset-bottom':`${BOTTOM*previewScale}px`,...(previewWallpaper&&activeDisplay.primary?{backgroundImage:`linear-gradient(0deg,#071f2933,#071f2922),url(${JSON.stringify(previewWallpaper)})`}:{})}"><span class="canvas-label">DESKTOP · {{ activeDisplay.name }}</span><div v-for="widget in visibleWidgets" :key="widget.id" class="canvas-widget" :class="{selected:selected===widget.id}" :style="{...position(widget),width:`${baseSize(widget.kind,widget.custom).width*scaleOf(widget)*previewScale}px`,height:`${baseSize(widget.kind,widget.custom).height*scaleOf(widget)*previewScale}px`}" :data-testid="`layout-${widget.id}`" tabindex="0" role="button" :aria-label="`${widgetKinds.find(item=>item.kind===widget.kind)?.label}组件，方向键微调位置`" @keydown="nudge($event,widget)" @focus="select(widget.id)" @pointerdown="begin($event,widget)" @pointermove="move" @pointerup="finish" @pointercancel="finish"><div class="canvas-widget-content" :style="{transform:`scale(${scaleOf(widget)*previewScale})`}"><WidgetSurface :widget="widget" :editing="layout.editing" preview/></div><span v-if="layout.editing" class="canvas-drag-corner"><Move :size="12"/></span><button v-if="selected===widget.id" type="button" class="canvas-resize-corner" aria-label="等比缩放组件" title="拖动以等比缩放" @pointerdown.stop="beginResize($event,widget)" @pointermove.stop="moveResize" @pointerup.stop="finishResize" @pointercancel.stop="finishResize" @keydown.stop="resizeKey($event,widget)">↘</button></div><div v-if="!visibleWidgets.length" class="empty-layout"><LayoutGrid :size="30" :stroke-width="1.2"/><h3>桌面还在等第一件小物</h3><p>从组件库挑一个喜欢的，放在这里。</p><button @click="tab='library'">去添加组件<Plus :size="12"/></button></div></div><aside class="widget-inspector"><template v-if="chosen"><div class="inspector-heading"><div><span>组件设置</span><h3>{{ widgetKinds.find(item=>item.kind===chosen!.kind)?.title }}</h3></div><NPopconfirm positive-text="移除" negative-text="取消" @positive-click="remove(chosen.id)"><template #trigger><NButton quaternary circle :disabled="busy" aria-label="移除这个组件" data-testid="remove-widget"><Trash2 :size="15"/></NButton></template>移除后，这个组件的内容、样式和设置会一并清除。</NPopconfirm></div><div v-if="displays.length>1" class="widget-field"><span>所在显示器</span><NSelect :value="monitorOf(chosen).id" :options="monitorOptions" :disabled="busy" aria-label="组件所在显示器" @update:value="targetMonitor"/></div><label class="widget-field inline"><span>显示在桌面</span><NSwitch :value="chosen.enabled" :disabled="busy" @update:value="update({enabled:$event})"/></label><div class="widget-field"><span>外观样式</span><NSelect :value="chosen.theme" :options="widgetThemes" :disabled="busy" @update:value="update({theme:$event})"/></div><div class="widget-field"><span>大小（等比） <small>×{{ scaleOf(chosen).toFixed(2) }}</small></span><NSlider :value="scaleOf(chosen)" :min=".75" :max="1.5" :step=".05" :disabled="busy" @update:value="setScale"/></div><NotesWidget v-if="chosen.kind==='notes'" :key="chosen.id" :note="chosen.note" :save="saveChosenContent"/><CountdownEditor v-else-if="chosen.kind==='countdown'" :key="chosen.id" :data="chosen.countdown" :save="saveChosenContent"/><template v-else-if="chosen.kind==='weather'"><div class="widget-field"><span>天气城市</span><small v-if="chosen.city" class="current-city">当前：{{ chosen.city.name }} {{ chosen.city.admin1 }}</small><div class="city-search"><NInput v-model:value="cityQuery" placeholder="输入城市名称" @keydown.enter="search"/><NButton :loading="cityBusy" :disabled="!cityQuery.trim()" aria-label="搜索城市" @click="search"><Search :size="14"/></NButton></div><NSelect v-if="cities.length" :options="cityOptions" placeholder="选择搜索结果" :disabled="busy" @update:value="chooseCity"/></div><p class="inspector-note">天气沿用“关怀提醒”的天气来源。每半小时更新一次；可随时在组件上手动刷新。</p></template><p v-else class="inspector-note">{{ chosen.kind==='fortune'?'点击签筒求签，揭晓后可以展开好签册收藏。':'显示本机时间与农历。点击日期查看详情；休／班标识使用已收录的官方年度安排。点击月份回到今天。' }}</p></template><div v-else class="inspector-empty"><Move :size="22"/><p>点击预览中的组件，<br>调整它的大小和样式。</p></div></aside></div><div v-if="layout.widgets.length" class="widget-instance-list"><button v-for="(widget,index) in layout.widgets" :key="widget.id" :class="{on:selected===widget.id,hidden:!widget.enabled}" @click="select(widget.id)">{{ widgetKinds.find(item=>item.kind===widget.kind)?.label }} {{ index+1 }}<small>{{ widget.enabled?monitorOf(widget).name:'已隐藏' }}</small></button></div><p class="widget-hint">{{ store.info.platform==='windows'?'按 Win+D 可以查看桌面上的组件。':'' }} 组件可拖到其他屏幕，也可在设置中选择显示器；位置和内容保存在本机，重启后恢复。关闭小伴桌面时，组件也会关闭。</p></template>
-    <InteractivePage v-else :store="store"/>
+      </section>
+
+      <p class="widget-hint">{{ store.info.platform==='windows'?'按 Win+D 可以查看桌面上的组件。':'' }} 求签、日历、便签和纪念日可离线使用，天气需要选择城市并联网。位置和内容保存在本机，重启后恢复；关闭小伴桌面时，组件也会关闭。</p>
     </div>
+
+    <NModal :show="settingsOpen" preset="card" :title="chosen?titleOf(chosen):'组件设置'" :mask-closable="true" style="max-width:480px;width:92vw" content-style="max-height:60vh;overflow-y:auto" data-testid="widget-settings" @update:show="value=>{if(!value)closeSettings();}">
+      <div v-if="chosen" class="settings-body">
+        <div class="settings-stage widget-art" :class="chosen.kind"><div class="demo-widget" :style="{'--demo-scale':previewScale(chosen)}"><WidgetSurface :widget="chosen" preview/></div></div>
+        <label class="widget-field inline"><span>显示在桌面</span><NSwitch :value="chosen.enabled" :disabled="busy" @update:value="update({enabled:$event})"/></label>
+        <div class="widget-field"><span>外观样式</span><NSelect :value="chosen.theme" :options="widgetThemes" :disabled="busy" @update:value="update({theme:$event})"/></div>
+        <div class="widget-field"><span>大小（等比） <small>×{{ scaleOf(chosen).toFixed(2) }}</small></span><NSlider :value="scaleOf(chosen)" :min=".75" :max="MAX_SCALE" :step=".05" :disabled="busy" @update:value="setScale"/></div>
+        <div v-if="displays.length>1" class="widget-field"><span>所在显示器</span><NSelect :value="monitorOf(chosen).id" :options="monitorOptions" :disabled="busy" aria-label="组件所在显示器" @update:value="update({monitor:$event})"/></div>
+        <NotesWidget v-if="chosen.kind==='notes'" :key="chosen.id" :note="chosen.note" :save="saveChosenContent"/>
+        <CountdownEditor v-else-if="chosen.kind==='countdown'" :key="chosen.id" :data="chosen.countdown" :save="saveChosenContent"/>
+        <template v-else-if="chosen.kind==='weather'">
+          <div class="widget-field"><span>天气城市</span><small v-if="chosen.city" class="current-city">当前：{{ chosen.city.name }} {{ chosen.city.admin1 }}</small><div class="city-search"><NInput v-model:value="cityQuery" placeholder="输入城市名称" @keydown.enter="search"/><NButton :loading="cityBusy" :disabled="!cityQuery.trim()" aria-label="搜索城市" @click="search"><Search :size="14"/></NButton></div><NSelect v-if="cities.length" :options="cityOptions" placeholder="选择搜索结果" :disabled="busy" @update:value="chooseCity"/></div>
+          <p class="inspector-note">天气沿用“关怀提醒”的天气来源。每半小时更新一次；可随时在组件上手动刷新。</p>
+        </template>
+        <p v-else-if="chosen.kind==='fortune'" class="inspector-note">点击签筒求签，揭晓后可以展开好签册收藏。</p>
+        <p v-else-if="chosen.kind==='calendar'" class="inspector-note">显示本机时间与农历。点击日期查看详情；休／班标识使用已收录的官方年度安排。点击月份回到今天。</p>
+      </div>
+      <template #footer>
+        <div class="settings-footer">
+          <NPopconfirm positive-text="移除" negative-text="取消" @positive-click="removeChosen"><template #trigger><NButton quaternary :disabled="busy||!chosen" aria-label="从桌面移除这个组件" data-testid="remove-widget"><template #icon><Trash2 :size="15"/></template>从桌面移除</NButton></template>移除后，这个组件的内容、样式和设置会一并清除。</NPopconfirm>
+          <NButton type="primary" round data-testid="widget-settings-done" @click="closeSettings">完成</NButton>
+        </div>
+      </template>
+    </NModal>
   </section>
 </template>
 <style scoped>
-.widget-count{font-size:12px;color:var(--ui-text-tertiary);white-space:nowrap}.widget-tabs{display:flex;gap:24px;border-bottom:1px solid var(--ui-border)}.widget-tabs button{border:0;background:none;color:var(--ui-text-secondary);font:13px 'Microsoft YaHei',sans-serif;padding:0 1px 13px;cursor:pointer;position:relative}.widget-tabs button.on{color:var(--ui-text-primary);font-weight:600}.widget-tabs button.on:after{position:absolute;content:'';bottom:-1px;left:0;right:0;height:2px;background:#a89065}.widget-tabs span{margin-left:7px;background:var(--ui-surface-alt);padding:1px 5px;border-radius:5px;font-size:10px;color:var(--ui-text-tertiary)}.widget-library-intro{padding-left:16px;border-left:2px solid #bba477}.widget-library-intro>span{font:21px 'KaiTi','STKaiti',serif;letter-spacing:2px}.widget-library-intro p{font-size:12px;color:var(--ui-text-secondary);margin:8px 0 0}.widget-library{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:var(--ui-card-gap)}.widget-library-card{border:1px solid var(--ui-border);background:var(--ui-surface);border-radius:var(--ui-radius-card);overflow:hidden;box-shadow:0 6px 20px #10252c0a}.widget-art{aspect-ratio:16/9;position:relative;background:radial-gradient(ellipse at 45% 40%,#e1d5ba,#c7b390);overflow:hidden}.widget-art.notes{background:radial-gradient(ellipse at 40% 30%,#e4d8b6,#a99a78)}.widget-art.countdown{background:radial-gradient(ellipse at 70% 30%,#b293a0,#644f65)}.widget-art.calendar{background:radial-gradient(ellipse at 70% 30%,#698c86,#243f46)}.widget-art.weather{background:radial-gradient(ellipse at 65% 10%,#7e9fa8,#344e62)}.custom-intro{margin-top:28px}.widget-art.custom{background:radial-gradient(ellipse at 50% 30%,#b5c9c3,#3d6168)}.custom-card-header{display:flex;justify-content:space-between;align-items:center}.custom-delete-btn{border:0;background:none;color:var(--ui-text-tertiary);cursor:pointer;padding:4px;border-radius:4px;display:flex;align-items:center;transition:color .2s}.custom-delete-btn:hover{color:#dc2626}.demo-widget{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%) scale(var(--demo-scale,1))}.demo-widget :deep(.widget-heading){display:none}.widget-card-copy{display:grid;gap:2px;padding:12px 16px 14px}.widget-category{font-size:11px;letter-spacing:0;color:var(--ui-text-tertiary)}.widget-card-copy h2{font:15px/1.3 'Microsoft YaHei','Microsoft YaHei UI',sans-serif;letter-spacing:0;font-weight:650;margin:2px 0 0}.widget-card-copy p{font-size:12px;color:var(--ui-text-secondary);margin:0;line-height:1.5;display:-webkit-box;-webkit-line-clamp:1;line-clamp:1;-webkit-box-orient:vertical;overflow:hidden}.widget-add-badge{position:absolute;right:10px;bottom:10px;z-index:3;width:30px;height:30px;display:grid;place-items:center;padding:0;border:0;border-radius:50%;background:var(--ui-primary);color:#fff;cursor:pointer;box-shadow:0 4px 14px var(--ui-shadow-hover);transition:transform .2s,background .2s}.widget-add-badge:hover:not(:disabled){transform:scale(1.08)}.widget-card-copy .resource-share-actions{margin-top:8px}.widget-hint{font-size:12px;line-height:1.8;color:var(--ui-text-tertiary);margin:0}.desktop-toolbar{display:flex;justify-content:space-between;align-items:center;gap:14px}.desktop-toolbar h2{font-size:16px;margin:0 0 6px}.desktop-toolbar p{font-size:12px;color:var(--ui-text-secondary);margin:0}.desktop-tools{display:flex;gap:9px;flex:none}.desktop-editor{display:grid;grid-template-columns:minmax(0,1fr) 265px;gap:18px}.desktop-canvas{position:relative;width:100%;border-radius:16px;background:radial-gradient(ellipse at 20% 10%,#708b82,#203943 60%,#102832);background-position:center;background-size:cover;box-shadow:inset 0 0 80px #071a2222;overflow:hidden;border:1px solid var(--ui-border)}.desktop-canvas:before,.desktop-canvas:after{content:'';position:absolute;left:0;right:0;pointer-events:none;background:#0713190f}.desktop-canvas:before{top:0;height:var(--inset-top)}.desktop-canvas:after{bottom:0;height:var(--inset-bottom)}.desktop-canvas.editing{outline:1px dashed #af9b75;outline-offset:3px}.canvas-label{position:absolute;top:18px;left:20px;font-size:10px;letter-spacing:2px;color:#f6edce;opacity:.5;pointer-events:none}.canvas-widget{position:absolute;touch-action:none;cursor:grab;transition:outline .2s;border-radius:12px}.desktop-canvas.editing .canvas-widget{cursor:grab}.canvas-widget:focus-visible{outline:2px solid #e6d29b;outline-offset:3px}.canvas-widget.selected{outline:1px solid #d0b982b3;outline-offset:3px}.canvas-widget-content{position:absolute;inset:0;transform-origin:top left;pointer-events:none}.canvas-drag-corner{position:absolute;top:-12px;right:-12px;border:1px solid #c5b17d;background:#203c3e;color:#e7d7ad;border-radius:50%;width:23px;height:23px;display:grid;place-items:center;pointer-events:none}.widget-inspector{padding:22px;border:1px solid var(--ui-border);border-radius:14px;background:var(--ui-surface)}.inspector-heading{display:flex;justify-content:space-between;align-items:start}.inspector-heading span{font-size:10px;color:var(--ui-text-tertiary);letter-spacing:1px}.inspector-heading h3{font:22px 'KaiTi','STKaiti',serif;letter-spacing:2px;margin:8px 0 6px}.widget-field{display:grid;gap:10px;margin-top:22px}.widget-field>span{font-size:12px;display:flex;justify-content:space-between}.widget-field small{font-size:11px;color:var(--ui-text-tertiary)}.widget-field.inline{display:flex;justify-content:space-between;align-items:center}.city-search{display:flex;gap:6px}.inspector-note{font-size:11px;line-height:1.9;color:var(--ui-text-tertiary);margin-top:24px}.inspector-empty{display:grid;place-items:center;height:100%;color:var(--ui-text-tertiary);text-align:center;font-size:12px;line-height:2;align-content:center;gap:12px}.widget-instance-list{display:flex;flex-wrap:wrap;gap:8px}.widget-instance-list button{display:flex;align-items:center;gap:12px;padding:8px 12px;border:1px solid var(--ui-border);border-radius:8px;color:var(--ui-text-secondary);background:var(--ui-surface);font-size:12px;cursor:pointer}.widget-instance-list .on{border-color:#af9468;color:var(--ui-text-primary)}.widget-instance-list .hidden{opacity:.5}.widget-instance-list small{font-size:10px;color:var(--ui-text-tertiary)}.empty-layout{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#e4dfcb;gap:7px}.empty-layout h3{font:22px 'KaiTi','STKaiti',serif;letter-spacing:2px;margin:10px 0 3px}.empty-layout p{font-size:12px;opacity:.6;margin:0}.empty-layout button{display:flex;align-items:center;gap:8px;color:#e4d0a4;background:#12343670;border:1px solid #bca27260;padding:9px 16px;border-radius:7px;margin-top:13px;font-size:11px;cursor:pointer}button:disabled{opacity:.4;cursor:default}button:focus-visible{outline:2px solid #af9468;outline-offset:3px}@media(max-width:1000px){.desktop-editor{grid-template-columns:minmax(0,1fr) 225px}.widget-inspector{padding:17px}}@media(max-width:720px){.desktop-editor{grid-template-columns:1fr}.desktop-toolbar{flex-wrap:wrap}}
 .widgets-page{display:flex;flex-direction:column;flex:1;min-height:0;width:100%;gap:0}
-.widgets-top{flex:none;display:grid;gap:14px;background:var(--ui-app-bg);padding:var(--ui-page-top) var(--ui-page-inset) 0;border-bottom:1px solid var(--ui-border)}
+.widgets-top{flex:none;display:grid;gap:14px;background:var(--ui-app-bg);padding:var(--ui-page-top) var(--ui-page-inset) 14px;border-bottom:1px solid var(--ui-border)}
 .widgets-top .page-header{margin-bottom:0}
-.widgets-body{flex:1;min-height:0;overflow-y:auto;padding:var(--ui-section-gap) var(--ui-page-inset) 32px;display:grid;gap:var(--ui-section-gap);align-content:start}
+.widgets-body{flex:1;min-height:0;overflow-y:auto;padding:var(--ui-section-gap) var(--ui-page-inset) 32px;display:grid;gap:calc(var(--ui-section-gap) + 8px);align-content:start}
 .widget-title{display:flex;align-items:center;gap:12px}
+.widget-count{font-size:12px;color:var(--ui-text-tertiary);white-space:nowrap}
 .widget-header-actions{display:flex;align-items:center;justify-content:flex-end;gap:10px;flex-wrap:wrap}
-.canvas-resize-corner{position:absolute;right:0;bottom:0;z-index:2;width:22px;height:22px;display:grid;place-items:center;border:1px solid #c5b17d;border-radius:7px;background:#203c3e;color:#e7d7ad;font-size:15px;line-height:1;cursor:nwse-resize;touch-action:none}
-.canvas-resize-corner:hover,.canvas-resize-corner:focus-visible{background:#315651;outline:1px solid #e6d29b;outline-offset:2px}
+.widget-section{display:grid;gap:14px}
+.section-head{display:flex;align-items:baseline;gap:12px;padding-left:12px;border-left:2px solid #bba477}
+.section-head h2{font-size:16px;font-weight:650;margin:0;color:var(--ui-text-primary)}
+.section-head p{font-size:12px;color:var(--ui-text-secondary);margin:0}
+.widget-library{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:var(--ui-card-gap)}
+.widget-library-card{border:1px solid var(--ui-border);background:var(--ui-surface);border-radius:var(--ui-radius-card);overflow:hidden;box-shadow:0 6px 20px #10252c0a}
+.desktop-card{display:block;width:100%;padding:0;text-align:left;font:inherit;color:inherit;cursor:pointer;transition:transform .2s,box-shadow .2s,border-color .2s}
+.desktop-card:hover{transform:translateY(-2px);border-color:#af9468;box-shadow:0 10px 26px #10252c14}
+.desktop-card.off .widget-art{opacity:.55}
+.desktop-card .demo-widget{pointer-events:none}
+.off-badge{position:absolute;left:10px;top:10px;z-index:3;padding:2px 8px;border-radius:10px;background:#0d2a2fb8;color:#f0e6c8;font-size:10px}
+.widget-art{aspect-ratio:16/9;position:relative;background:radial-gradient(ellipse at 45% 40%,#e1d5ba,#c7b390);overflow:hidden}
+.widget-art.notes{background:radial-gradient(ellipse at 40% 30%,#e4d8b6,#a99a78)}
+.widget-art.countdown{background:radial-gradient(ellipse at 70% 30%,#b293a0,#644f65)}
+.widget-art.calendar{background:radial-gradient(ellipse at 70% 30%,#698c86,#243f46)}
+.widget-art.weather{background:radial-gradient(ellipse at 65% 10%,#7e9fa8,#344e62)}
+.widget-art.custom{background:radial-gradient(ellipse at 50% 30%,#b5c9c3,#3d6168)}
+.custom-card-header{display:flex;justify-content:space-between;align-items:center}
+.custom-delete-btn{border:0;background:none;color:var(--ui-text-tertiary);cursor:pointer;padding:4px;border-radius:4px;display:flex;align-items:center;transition:color .2s}
+.custom-delete-btn:hover{color:#dc2626}
+.demo-widget{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%) scale(var(--demo-scale,1))}
+.demo-widget :deep(.widget-heading){display:none}
+.widget-card-copy{display:grid;gap:2px;padding:12px 16px 14px}
+.widget-category{font-size:11px;letter-spacing:0;color:var(--ui-text-tertiary)}
+.widget-card-copy h2{font:15px/1.3 'Microsoft YaHei','Microsoft YaHei UI',sans-serif;letter-spacing:0;font-weight:650;margin:2px 0 0}
+.widget-card-copy p{font-size:12px;color:var(--ui-text-secondary);margin:0;line-height:1.5;display:-webkit-box;-webkit-line-clamp:1;line-clamp:1;-webkit-box-orient:vertical;overflow:hidden}
+.widget-add-badge{position:absolute;right:10px;bottom:10px;z-index:3;width:30px;height:30px;display:grid;place-items:center;padding:0;border:0;border-radius:50%;background:var(--ui-primary);color:#fff;cursor:pointer;box-shadow:0 4px 14px var(--ui-shadow-hover);transition:transform .2s,background .2s}
+.widget-add-badge:hover:not(:disabled){transform:scale(1.08)}
+.widget-card-copy .resource-share-actions{margin-top:8px}
+.widget-hint{font-size:12px;line-height:1.8;color:var(--ui-text-tertiary);margin:0}
+.settings-body{display:grid;gap:18px}
+.settings-stage{aspect-ratio:auto;height:220px;border-radius:12px}
+.settings-body .widget-field{margin-top:0}
+.widget-field{display:grid;gap:10px}
+.widget-field>span{font-size:12px;display:flex;justify-content:space-between}
+.widget-field small{font-size:11px;color:var(--ui-text-tertiary)}
+.widget-field.inline{display:flex;justify-content:space-between;align-items:center}
+.city-search{display:flex;gap:6px}
+.inspector-note{font-size:11px;line-height:1.9;color:var(--ui-text-tertiary);margin:0}
+.settings-footer{display:flex;justify-content:space-between;align-items:center;gap:12px}
+button:disabled{opacity:.4;cursor:default}
+button:focus-visible{outline:2px solid #af9468;outline-offset:3px}
+@media(prefers-reduced-motion:reduce){.desktop-card{transition:none}.desktop-card:hover{transform:none}}
+@media(max-width:720px){.section-head{flex-direction:column;gap:4px}}
 </style>
-
-
