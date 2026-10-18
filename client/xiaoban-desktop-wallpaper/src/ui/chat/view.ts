@@ -23,6 +23,7 @@ export function itemsFromHistory(view: SessionView, messages: WireMessage[]): Ch
   const items: ChatItem[] = [];
   const tools = new Map<string, Extract<ChatItem, { kind: 'tool' }>>();
   for (const message of messages) {
+    if (message.synthetic) continue;
     if (message.role === 'user') {
       const images = (message.parts ?? []).filter(part => part.type === 'image').map(part => (part as { url: string }).url);
       const text = textOf(message);
@@ -46,6 +47,9 @@ export function itemsFromHistory(view: SessionView, messages: WireMessage[]): Ch
   for (const item of tools.values()) if (item.status === 'running') { item.status = 'error'; item.output = item.output || '没有执行完就中断了'; }
   return items;
 }
+
+/** The kernel's `MaxTurns` error (`error.rs`). */
+const TURN_LIMIT = /stopped after reaching the turn limit/;
 
 function endStreaming(view: SessionView) {
   for (const item of view.items) if (item.kind === 'assistant' && item.streaming) item.streaming = false;
@@ -88,6 +92,11 @@ export function applyEvent(view: SessionView, event: KernelEvent): void {
       endStreaming(view);
       view.items.push({ kind: 'notice', id: nextId(view), tone: 'warning', text: '回答太长，被截断了。', canContinue: true });
       break;
+    case 'continuing':
+      // The next reply is a new message, not more of the one that just stopped.
+      endStreaming(view);
+      view.status = '还没做完，小伴继续处理中…';
+      break;
     case 'done':
       settle(view);
       break;
@@ -99,6 +108,12 @@ export function applyEvent(view: SessionView, event: KernelEvent): void {
       const lastUser = view.items.map(i => i.kind).lastIndexOf('user');
       const partial = view.items.slice(lastUser + 1).some(i => i.kind === 'tool' || i.kind === 'assistant');
       settle(view);
+      if (TURN_LIMIT.test(event.message)) {
+        // Not a model failure: the work so far is saved and can simply go on.
+        view.items.push({ kind: 'notice', id: nextId(view), tone: 'warning', text: '这一轮步骤太多，先停在这里。点“继续”让小伴接着做。',
+          canContinue: true, details: event.message });
+        break;
+      }
       view.items.push({ kind: 'notice', id: nextId(view), tone: 'error', text: modelFailure(event.message).message,
         canSwitchModel: true, canRetry: lastUser >= 0 && !partial, details: event.message });
       break;

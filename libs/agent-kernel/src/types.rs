@@ -37,11 +37,20 @@ pub struct Message {
     pub tool_calls: Vec<ToolCall>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tool_call_id: Option<String>,
+    /// Written by the harness rather than the person, for example a nudge to keep working. The model
+    /// sees it as an ordinary user message; hosts usually leave it out of the visible conversation.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub synthetic: bool,
 }
 
 impl Message {
     fn with(role: Role, parts: Vec<Part>) -> Self {
-        Self { role, parts, tool_calls: Vec::new(), tool_call_id: None }
+        Self { role, parts, tool_calls: Vec::new(), tool_call_id: None, synthetic: false }
+    }
+
+    /// A user-role message from the harness itself (see `synthetic`).
+    pub fn reminder(text: impl Into<String>) -> Self {
+        Self { synthetic: true, ..Self::user_text(text) }
     }
 
     pub fn system(text: impl Into<String>) -> Self {
@@ -134,6 +143,9 @@ pub enum Event {
     Retrying { attempt: u32, delay_ms: u64, message: String },
     /// A reply ended because it hit the length limit. Tool calls in it are not run.
     Truncated,
+    /// The model stopped although the work looked unfinished, so the harness asked it to go on.
+    /// `reason` is a short code from the middleware, such as `unfinished_todos` or `length`.
+    Continuing { reason: String },
     Done,
     Cancelled,
     Error { message: String },

@@ -1,6 +1,6 @@
 use crate::agent::{Agent, RetryPolicy};
 use crate::error::HarnessError;
-use crate::middleware::Turn;
+use crate::middleware::{Stop, Turn};
 use crate::provider::{ChatRequest, Reply};
 use crate::types::{Event, FinishReason, Message, Part, Role, Usage};
 use std::collections::HashSet;
@@ -137,8 +137,10 @@ impl Agent {
             self.store.append(session, std::slice::from_ref(&user))?;
             history.push(user);
         }
+        let run_start = history.len().saturating_sub(1);
 
         let mut usage = Usage::default();
+        let mut continuations = 0;
         for index in 0..self.max_turns {
             if cancel.load(Ordering::Relaxed) {
                 return Err(HarnessError::Cancelled);
@@ -167,11 +169,9 @@ impl Agent {
             let finish = reply.finish;
             let mut assistant = reply.message;
             let cut_off = finish == FinishReason::Length;
-            if cut_off {
-                on_event(Event::Truncated);
-            }
             let cut_calls = cut_off && !assistant.tool_calls.is_empty();
             if cut_calls {
+                on_event(Event::Truncated);
                 // Half-written arguments would be sent back to the model as history; keep them parseable.
                 for call in &mut assistant.tool_calls {
                     if !serde_json::from_str::<serde_json::Value>(&call.arguments).is_ok_and(|v| v.is_object()) {
@@ -183,7 +183,21 @@ impl Agent {
             let (calls, text) = (assistant.tool_calls.clone(), assistant.text());
             history.push(assistant);
             if calls.is_empty() {
-                return Ok(RunSummary { text, turns: index + 1, usage, finish });
+                let has_turn_left = index + 1 < self.max_turns && !cancel.load(Ordering::Relaxed);
+                let stop = Stop { session, history: &history, run_start, finish, continuations };
+                let nudge = if has_turn_left { self.middleware.iter().find_map(|mw| mw.before_stop(&stop)) } else { None };
+                let Some(nudge) = nudge else {
+                    if cut_off {
+                        on_event(Event::Truncated);
+                    }
+                    return Ok(RunSummary { text, turns: index + 1, usage, finish });
+                };
+                on_event(Event::Continuing { reason: nudge.reason });
+                let reminder = Message::reminder(nudge.message);
+                self.store.append(session, std::slice::from_ref(&reminder))?;
+                history.push(reminder);
+                continuations += 1;
+                continue;
             }
 
             let results = if cut_calls {

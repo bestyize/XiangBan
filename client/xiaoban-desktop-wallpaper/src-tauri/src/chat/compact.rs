@@ -130,7 +130,8 @@ pub struct Plan {
 /// With only one question there is nothing to keep apart, so the whole conversation goes into the summary.
 pub fn plan(raw: &[Message]) -> Option<Plan> {
     let (previous, kept) = visible(raw);
-    let questions: Vec<usize> = kept.iter().copied().filter(|&at| raw[at].role == Role::User).collect();
+    // A nudge to keep working is not a question: cutting there would summarize half of one answer.
+    let questions: Vec<usize> = kept.iter().copied().filter(|&at| raw[at].role == Role::User && !raw[at].synthetic).collect();
     let keep_from = if questions.len() >= 2 { *questions.last()? } else { raw.len() };
     let input: Vec<Message> = kept.iter().copied().filter(|&at| at < keep_from).map(|at| raw[at].clone()).collect();
     let size = estimate_tokens(&input) + previous.as_deref().map_or(0, |p| estimate_tokens(&[summary_for_model(p)]));
@@ -162,6 +163,8 @@ fn clip(text: &str, max_chars: usize) -> String {
 fn block(message: &Message) -> Option<String> {
     match message.role {
         Role::System => None,
+        // The harness's own reminders, not something the user said.
+        Role::User if message.synthetic => None,
         Role::User => {
             let images = message.parts.iter().filter(|part| matches!(part, Part::Image { .. })).count();
             let note = if images > 0 { format!("（附 {images} 张图片）") } else { String::new() };
@@ -314,6 +317,19 @@ mod tests {
         ] {
             assert_eq!(parse(&not_a_summary), None, "{:?}", not_a_summary.text());
         }
+    }
+
+    #[test]
+    fn a_nudge_to_keep_working_is_neither_a_question_nor_something_the_user_said() {
+        let raw = vec![
+            ask(&long("旧问题")), answer(&long("旧回答")),
+            ask("做个游戏"), answer("先写世界数据："), Message::reminder("NUDGE keep going"), answer("写好了"),
+        ];
+        let plan = plan(&raw).expect("the old exchange is big enough to summarize");
+        assert_eq!(plan.keep_from, 2, "the cut is at the user's question, not at the nudge");
+        let raw = vec![ask("做个游戏"), answer("先写："), Message::reminder("NUDGE keep going"), answer("写好了")];
+        let text = transcript(None, &raw, 50_000);
+        assert!(!text.contains("NUDGE") && text.contains("做个游戏"), "{text}");
     }
 
     #[test]

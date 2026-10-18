@@ -19,7 +19,7 @@ use agent_kernel::provider::openai::OpenAiCompat;
 use agent_kernel::provider::responses::OpenAiResponses;
 use agent_kernel::provider::wire::ProviderProfile;
 use agent_kernel::skills::Skills;
-use agent_kernel::{Agent, Approval, ApprovalRequest, ContextTrim, JsonlStore, Message, ModelProvider, Part, Permission, PermissionMode, Risk, SessionStore, SpillOutput, ToolCtx};
+use agent_kernel::{Agent, Approval, ApprovalRequest, ContextTrim, ContinueGuard, JsonlStore, RepeatGuard, Message, ModelProvider, Part, Permission, PermissionMode, Risk, SessionStore, SpillOutput, ToolCtx};
 use broker::Broker;
 use compact::{CompactingStore, ContextInfo};
 use desktop_tools::{Desktop, TauriDesktop};
@@ -50,7 +50,9 @@ const MAX_IMAGE_CHARS: usize = 4 * 1024 * 1024;
 /// Image types the three protocols accept. SVG and friends are rejected: providers either refuse
 /// them or need them rasterised first.
 const IMAGE_MEDIA_TYPES: &[&str] = &["image/png", "image/jpeg", "image/gif", "image/webp"];
-const MAX_TURNS: usize = 40;
+/// Model calls in one answer. Building something real (a game, a set of files) can take dozens of steps;
+/// `RepeatGuard` and `ContinueGuard`'s own cap keep a stuck model from using them all.
+const MAX_TURNS: usize = 60;
 const SPILL_KEEP: Duration = Duration::from_secs(7 * 86_400);
 const ARGUMENT_PREVIEW_CHARS: usize = 2_000;
 
@@ -358,8 +360,11 @@ fn assemble(parts: Parts<'_>) -> Result<Agent, String> {
         .tool(Shell::new(workspace))
         .tool(WebFetch::new())
         .middleware(permission)
+        // Before spilling, so it compares real outputs rather than previews that name a fresh file each time.
+        .middleware(RepeatGuard::new())
         .middleware(SpillOutput::new(dirs.spill()))
         .middleware(ContextTrim::new(context_tokens))
+        .middleware(ContinueGuard::new())
         .max_turns(MAX_TURNS);
     let readable = fs_tools(vec![workspace.to_path_buf(), dirs.spill()]).map_err(|e| e.to_string())?;
     let writable = fs_write_tools(vec![workspace.to_path_buf()]).map_err(|e| e.to_string())?;

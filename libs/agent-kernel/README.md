@@ -11,7 +11,7 @@
 | `ModelProvider` | 自带三种协议，见下；宿主可自写 | 流式调用模型，返回完整回复 |
 | `Tool` | 宿主与内置工具 | 名称、JSON Schema、风险等级、超时、输出上限；`execute` 在独立线程运行 |
 | `SessionStore` | 自带 `MemoryStore`、`JsonlStore` | 只负责 `load` 与 `append` |
-| `Middleware` | 宿主与内置中间件 | `before_model`、`after_model`、`before_tool`（可阻止，拿到 `ToolCtx`，含会话 id 和取消状态）、`after_tool` |
+| `Middleware` | 宿主与内置中间件 | `before_model`、`after_model`、`before_tool`（可阻止，拿到 `ToolCtx`，含会话 id 和取消状态）、`after_tool`、`before_stop`（模型不调工具、本轮将结束时调用，返回 `Nudge` 可让运行继续） |
 | `Approver` | 宿主 | 需要确认时弹窗，返回 `Once`、`Always` 或 `Deny`；等用户时用 `request.wait_for(&rx)`，取消运行才能关掉弹窗 |
 | `SearchBackend` | 宿主 | `web_search` 背后的搜索服务，内核不绑定任何一家 |
 | `prompt_section` | 宿主与 skills、记忆 | 追加到系统提示的片段，每次调用模型前重新生成 |
@@ -55,7 +55,8 @@ agent.run("session-1", "你好", &mut |event| { /* 转给 UI */ }, &Arc::new(Ato
 - 取消能打断等人的地方：`Approver` 用 `request.wait_for(&rx)`、`AskUser` 回调用 `ctx.wait_for(&rx)` 等待用户时，取消运行会让它们立即返回；取消后给出的批准会被丢弃，工具不执行，也不记入"总是允许"。不配合的回调（直接阻塞）会拖到它自己返回为止，stdio 桥已经处理好了。
 - 工具超时靠协作式取消：超时后设置 `ToolCtx::is_cancelled`，不响应的工具线程会继续跑到结束，结果被丢弃。
 - 宿主若启用 `panic = "abort"`，工具里的 panic 会直接终止进程。工具内部不要 panic。
-- 已知限制：三种 Provider 都只处理 SSE 流，服务端忽略 `stream` 返回整块 JSON 时会报错；不会自动续写被截断的回答，只告知宿主。
+- 已知限制：三种 Provider 都只处理 SSE 流，服务端忽略 `stream` 返回整块 JSON 时会报错；内核本身不会自动续写被截断的回答，只告知宿主，装了 `ContinueGuard` 才会续写。
+- 模型回复不带工具调用即结束本次运行，这和主流 harness 一致；`before_stop` 是唯一的例外入口，`max_turns` 仍然兜底。
 
 ## 权限与注入防护
 
@@ -70,10 +71,12 @@ agent.run("session-1", "你好", &mut |event| { /* 转给 UI */ }, &Arc::new(Ato
 
 ## 其他中间件
 
-`Arc<T>` 也实现了 `Middleware`，宿主可留一个句柄，例如运行中切换权限模式。建议顺序：`Permission`、`SpillOutput`、`ContextTrim`。
+`Arc<T>` 也实现了 `Middleware`，宿主可留一个句柄，例如运行中切换权限模式。建议顺序：`Permission`、`RepeatGuard`、`SpillOutput`、`ContextTrim`、`ContinueGuard`。
 
 - `ContextTrim`：超出 token 预算时，先把旧工具输出换成占位，仍超再按用户消息边界丢掉最旧的整轮。不调用模型，只改本次请求，不改已存会话。token 是粗估值，预算要留余量。
 - `SpillOutput`：大输出存成文件，只给模型头尾预览和路径。目录由宿主提供并清理，要让模型读到需把它加进文件工具的根目录。写失败时退回普通截断。
+- `ContinueGuard`：模型没调工具就结束时，判断是不是活没干完，是就补一条合成的用户消息（`Message::synthetic` 为 true）让它接着做，并发出 `Event::Continuing { reason }`。四种情形：本次运行里 `todo` 最新清单还有 `pending` 项（`unfinished_todos`；只剩一项 `in_progress` 视为忘了勾，不算）；回复最后一句以冒号结尾或在说“让我／我先／let me…”（`announced_action`）；回复为空（`empty`）；纯文字回答被长度截断（`length`，此时不再发 `Truncated`，续写用完才发）。最后一句是在问用户（问号、“吗”“呢”）时不催；催过一次模型仍不调工具就接受结束（续写截断除外）；每次运行最多催 3 次（`max_per_run`），最后一轮不催。判断是启发式的，误判时模型只需回一句话结束。宿主装了它，就要在界面上隐藏合成消息。
+- `RepeatGuard`：同一工具、同样参数、同样结果连续出现时，从第 3 次起在结果后附提醒，第 6 次起直接拒绝执行（`warn_after`、`block_after` 可调）；换参数、换结果或新的用户消息都会重新计数。要放在 `SpillOutput` 前面，否则比较的是每次文件名都不同的预览。
 
 ## 内置工具
 

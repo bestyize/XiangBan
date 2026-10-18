@@ -30,6 +30,8 @@ export interface WireMessage {
   parts?: WirePart[];
   tool_calls?: WireToolCall[];
   tool_call_id?: string | null;
+  /** Written by the assistant's harness (for example a nudge to keep working), not by the user. */
+  synthetic?: boolean;
 }
 
 export type KernelEvent =
@@ -39,6 +41,8 @@ export type KernelEvent =
   | { type: 'usage'; prompt_tokens: number; completion_tokens: number }
   | { type: 'retrying'; attempt: number; delay_ms: number; message: string }
   | { type: 'truncated' }
+  /** The model stopped with work left; the host asked it to go on. */
+  | { type: 'continuing'; reason: string }
   | { type: 'done' }
   | { type: 'cancelled' }
   | { type: 'error'; message: string };

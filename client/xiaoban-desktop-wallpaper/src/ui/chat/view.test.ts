@@ -35,6 +35,16 @@ describe('history to chat items', () => {
     ]);
   });
 
+  it('leaves out what the harness wrote, such as a nudge to keep working', () => {
+    const items = itemsFromHistory(newView('s1'), [
+      { role: 'user', parts: text('做个游戏') },
+      { role: 'assistant', parts: text('先写世界数据：') },
+      { role: 'user', parts: text('You said what you would do next but did not call any tool.'), synthetic: true },
+      { role: 'assistant', parts: text('写好了') },
+    ]);
+    expect(items.map(i => (i.kind === 'user' || i.kind === 'assistant' ? i.text : i.kind))).toEqual(['做个游戏', '先写世界数据：', '写好了']);
+  });
+
   it('marks a call that never got an answer as interrupted', () => {
     const items = itemsFromHistory(newView('s1'), [{ role: 'assistant', tool_calls: [{ id: 'c1', name: 'shell', arguments: '{}' }] }]);
     expect(items[0]).toMatchObject({ kind: 'tool', status: 'error', output: '没有执行完就中断了' });
@@ -106,6 +116,28 @@ describe('events while an answer is running', () => {
     applyEvent(view, { type: 'done' });
     expect(view.items[0]).toMatchObject({ streaming: false });
     expect(view.items[1]).toMatchObject({ kind: 'notice', tone: 'warning', canContinue: true });
+  });
+
+  it('starts a new message when the harness keeps a stopped answer going', () => {
+    const view = newView('s1', true);
+    view.running = true;
+    applyEvent(view, { type: 'text_delta', text: '先写世界数据：' });
+    applyEvent(view, { type: 'continuing', reason: 'announced_action' });
+    expect(view.status).toBe('还没做完，小伴继续处理中…');
+    expect(view.running).toBe(true);
+    applyEvent(view, { type: 'text_delta', text: '写好了。' });
+    expect(view.items.map(i => (i.kind === 'assistant' ? i.text : i.kind))).toEqual(['先写世界数据：', '写好了。']);
+    expect(view.status).toBe('');
+  });
+
+  it('offers to continue, not to switch models, when an answer hits the step limit', () => {
+    const view = newView('s1', true);
+    applyEvent(view, { type: 'tool_start', id: 't1', name: 'write_file', arguments: '{}' });
+    applyEvent(view, { type: 'tool_end', id: 't1', output: 'ok', is_error: false });
+    applyEvent(view, { type: 'error', message: 'stopped after reaching the turn limit (60)' });
+    const notice = view.items[view.items.length - 1];
+    expect(notice).toMatchObject({ kind: 'notice', tone: 'warning', canContinue: true });
+    expect(notice).not.toHaveProperty('canSwitchModel');
   });
 
   it('gives every item of a conversation its own key', () => {
