@@ -1,6 +1,5 @@
 mod engine;
 use serde::{Deserialize, Serialize};
-use sherpa_onnx::OfflineRecognizer;
 use std::{sync::{Mutex, atomic::{AtomicBool, AtomicU64, Ordering}}, time::Duration};
 use tauri::{Emitter, Manager};
 
@@ -14,7 +13,7 @@ pub struct AsrState {
     warming: AtomicBool,
     /// A page is asking for the engine right now: a download that nobody asked for steps aside so that page sees progress.
     urgent: AtomicBool,
-    recognizer: Mutex<Option<OfflineRecognizer>>,
+    recognizer: Mutex<Option<engine::AsrProcess>>,
 }
 #[derive(Clone, Default, Serialize, Deserialize)]
 #[serde(default)]
@@ -222,9 +221,9 @@ pub async fn asr_transcribe(app: tauri::AppHandle, samples: Vec<f32>) -> Result<
     tauri::async_runtime::spawn_blocking(move || {
         let state = app.state::<AsrState>();
         if !settings(&app)?.enabled { return Err("语音识别未开启".into()); }
-        let slot = state.recognizer.lock().unwrap();
+        let mut slot = state.recognizer.lock().unwrap();
         check(&app, generation)?;
-        let recognizer = slot.as_ref().ok_or("语音引擎尚未加载，请重试")?;
+        let recognizer = slot.as_mut().ok_or("语音引擎尚未加载，请重试")?;
         let text = engine::transcribe(recognizer, &samples)?;
         check(&app, generation)?;
         Ok(text)
