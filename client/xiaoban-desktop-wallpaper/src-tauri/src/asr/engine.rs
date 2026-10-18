@@ -9,7 +9,7 @@ use std::{
 };
 
 // ModelScope's sherpa-compatible export of iic/SenseVoiceSmall. Pin both revision and hashes.
-pub const SOURCE: &str = "https://modelscope.cn/api/v1/models/pengzhendong/sherpa-onnx-sense-voice-zh-en-ja-ko-yue/repo?Revision=73eca47697f980daa3d16112404174b6b950b514&FilePath=";
+pub const SOURCE: &str = "https://modelscope.cn/api/v1/models/bestyize/xiaoban-asr/repo?Revision=master&FilePath=";
 
 // Runtime fallback download source (official site / release)
 pub const RUNTIME_FALLBACK: &str = "https://wallpaper.xiangban.xyz/app-packages/xiaoban-asr.exe";
@@ -17,7 +17,7 @@ pub const RUNTIME_FALLBACK: &str = "https://wallpaper.xiangban.xyz/app-packages/
 #[cfg(windows)]
 pub const RUNTIME_NAME: &str = "xiaoban-asr.exe";
 #[cfg(not(windows))]
-pub const RUNTIME_NAME: &str = "xiaoban-asr";
+pub const RUNTIME_NAME: &str = "xiaoban-asr-macos-arm64";
 
 pub struct ModelFile { pub name: &'static str, pub bytes: u64, pub sha256: &'static str }
 pub const FILES: [ModelFile; 2] = [
@@ -28,21 +28,23 @@ pub const TOTAL_BYTES: u64 = FILES[0].bytes + FILES[1].bytes;
 pub const MAX_SAMPLES: usize = 20 * 16000;
 
 pub fn resolve_exe(directory: &Path) -> Option<PathBuf> {
-    let in_dir = directory.join(RUNTIME_NAME);
-    if in_dir.is_file() {
-        return Some(in_dir);
-    }
-    if let Ok(current) = std::env::current_exe() {
-        if let Some(parent) = current.parent() {
-            let next_to_app = parent.join(RUNTIME_NAME);
-            if next_to_app.is_file() {
-                return Some(next_to_app);
+    for name in [RUNTIME_NAME, "xiaoban-asr", "xiaoban-asr.exe"] {
+        let in_dir = directory.join(name);
+        if in_dir.is_file() {
+            return Some(in_dir);
+        }
+        if let Ok(current) = std::env::current_exe() {
+            if let Some(parent) = current.parent() {
+                let next_to_app = parent.join(name);
+                if next_to_app.is_file() {
+                    return Some(next_to_app);
+                }
             }
         }
-    }
-    let in_cwd = PathBuf::from(RUNTIME_NAME);
-    if in_cwd.is_file() {
-        return Some(in_cwd);
+        let in_cwd = PathBuf::from(name);
+        if in_cwd.is_file() {
+            return Some(in_cwd);
+        }
     }
     None
 }
@@ -136,8 +138,16 @@ pub fn ensure_model(directory: &Path, check: impl Fn() -> Result<(), String>, pr
         let temporary = directory.join(format!("{RUNTIME_NAME}.part"));
         let result: Result<(), String> = (|| {
             progress(RUNTIME_NAME, completed);
-            let mut response = client.get(RUNTIME_FALLBACK).send()
-                .and_then(reqwest::blocking::Response::error_for_status).map_err(|e| format!("语音引擎组件下载失败：{e}"))?;
+            let url = format!("{SOURCE}{RUNTIME_NAME}");
+            let mut response = match client.get(&url).send().and_then(|r| r.error_for_status()) {
+                Ok(resp) => resp,
+                Err(err) => {
+                    eprintln!("从魔搭下载语音运行时失败，尝试备用源：{err}");
+                    client.get(RUNTIME_FALLBACK).send()
+                        .and_then(reqwest::blocking::Response::error_for_status)
+                        .map_err(|e| format!("语音引擎组件下载失败：{e}"))?
+                }
+            };
             let mut file = fs::File::create(&temporary).map_err(|e| format!("语音组件写入失败：{e}"))?;
             let mut buffer = [0; 65536];
             loop {
