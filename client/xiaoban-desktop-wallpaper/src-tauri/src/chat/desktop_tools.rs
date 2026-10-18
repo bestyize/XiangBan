@@ -1377,11 +1377,11 @@ mod tests {
     #[test]
     fn the_companion_accepts_only_known_expressions_and_shells() {
         let fake = Arc::new(Fake::default());
-        let out = call(&fake, "companion_set", json!({"expression": "happy", "skin": "bunny", "enabled": true})).unwrap();
-        assert_eq!(out, "已设置：表情 happy，外壳 bunny，显示小伴");
+        let out = call(&fake, "companion_set", json!({"expression": "happy", "skin": "pot", "enabled": true})).unwrap();
+        assert_eq!(out, "已设置：表情 happy，外壳 pot，显示小伴");
         assert_eq!(call(&fake, "companion_set", json!({"enabled": false})).unwrap(), "已设置：隐藏小伴");
         assert!(call(&fake, "companion_set", json!({"expression": "furious"})).unwrap_err().contains("可用："));
-        assert!(call(&fake, "companion_set", json!({"skin": "dragon"})).unwrap_err().contains("cat"));
+        assert!(call(&fake, "companion_set", json!({"skin": "dragon"})).unwrap_err().contains("pot"));
         assert!(call(&fake, "companion_set", json!({})).unwrap_err().contains("至少"));
         assert!(call(&fake, "companion_set", json!({"enabled": "yes"})).unwrap_err().contains("true or false"));
         assert_eq!(fake.calls().len(), 2);

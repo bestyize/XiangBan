@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { Animator } from './animator.ts'
 import { EXPRESSION_NAMES, resolve, stillFrame } from './expressions.ts'
 import { Mind } from './mind.ts'
-import { robotMarkup, type Frame } from './render.ts'
+import { COLOR } from './geometry.ts'
+import { faceMarkup, robotMarkup, type Frame } from './render.ts'
 import { DEFAULT_SKIN, SKIN_IDS, SKINS, skinOf } from './skins.ts'
 import { SYMBOL_NAMES } from './symbols.ts'
 
@@ -28,7 +29,7 @@ describe('robot expressions', () => {
   })
 
   it('renders every expression in every shell, with the same moving parts and screen', () => {
-    expect(SKIN_IDS).toEqual(['cat', 'bunny', 'pot'])
+    expect(SKIN_IDS).toEqual(['pot'])
     const parts = (svg: string) => [...svg.matchAll(/data-part="(\w+)"/g)].map(match => match[1]).sort()
     const reference = parts(robotMarkup(stillFrame('idle'), 'x'))
     for (const skin of SKIN_IDS) {
@@ -39,7 +40,7 @@ describe('robot expressions', () => {
     }
   })
 
-  it('falls back to the cat for an unknown shell, and keeps ear art inside the view', () => {
+  it('falls back to the pot for an unknown shell, and keeps ear art inside the view', () => {
     expect(skinOf('nonsense').id).toBe(DEFAULT_SKIN)
     expect(robotMarkup(stillFrame('idle'), 'x', undefined, 'nonsense')).toBe(robotMarkup(stillFrame('idle'), 'x'))
     for (const skin of Object.values(SKINS)) {
@@ -48,6 +49,17 @@ describe('robot expressions', () => {
       expect(top, skin.id).toBeGreaterThanOrEqual(0)
       expect(Math.max(...numbers), skin.id).toBeLessThanOrEqual(320)
     }
+  })
+
+  it('draws the face and symbols in the palette it is given', () => {
+    const ink = { ...COLOR, line: '#123456', lineDim: '#654321', yellow: '#abcdef' }
+    const frame = stillFrame({ expression: 'happy', symbol: 'sparkle' })
+    const own = faceMarkup(frame, 'x', ink)
+    expect(own).toContain('#123456')
+    expect(own).toContain('#abcdef')
+    expect(own).not.toContain(COLOR.line)
+    expect(own).not.toContain(COLOR.yellow)
+    expect(faceMarkup(frame, 'x')).toContain(COLOR.line)
   })
 
   it('renders every screen symbol', () => {

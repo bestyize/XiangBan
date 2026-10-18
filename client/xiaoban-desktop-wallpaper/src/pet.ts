@@ -4,7 +4,7 @@ import { Mind, type Beat } from './companion/mind.ts'
 import { Reactions } from './companion/reactions.ts'
 import { toSpec, stillFrame, type RobotInput } from './companion/expressions.ts'
 import { bodyTransform, earLight, earTransform, faceMarkup, faceOpacity, robotMarkup, shadowAttrs } from './companion/render.ts'
-import { skinOf, type SkinId } from './companion/skins.ts'
+import { faceStyleOf, skinOf, type SkinId } from './companion/skins.ts'
 import type { Settings } from './bridge.ts'
 
 export class PetView {
@@ -56,7 +56,7 @@ export class PetView {
       const frame = this.animator.step(dt)
       const { body, face, shadow, ears } = this.parts
       body?.setAttribute('transform', bodyTransform(frame))
-      if (face) { face.innerHTML = faceMarkup(frame, this.id); face.setAttribute('opacity', faceOpacity(frame).toFixed(2)) }
+      if (face) { face.innerHTML = faceMarkup(frame, this.id, faceStyleOf(skinOf(this.skin)).palette); face.setAttribute('opacity', faceOpacity(frame).toFixed(2)) }
       const light = earLight(frame)
       ears.forEach(({ group, halo, light: inner }, i) => {
         group?.setAttribute('transform', earTransform(frame, i === 0 ? -1 : 1, skinOf(this.skin).earPivot))
@@ -112,7 +112,7 @@ export class PetView {
     const bounds = this.host.querySelector('.pet-art')!.getBoundingClientRect()
     if (x < bounds.left || x > bounds.right || y < bounds.top || y > bounds.bottom) return false
     return [...this.host.querySelectorAll<SVGGeometryElement>('svg path, svg rect, svg ellipse')].some(element => {
-      if (element.closest('defs') || element.matches('[data-part="halo"], [data-part="shadow"]')) return false
+      if (element.closest('defs') || element.matches('[data-part="halo"], [data-part="shadow"], [data-part="aura"]')) return false
       const fill = getComputedStyle(element).fill
       if (fill === 'none' || fill === 'transparent') return false
       const transform = element.getScreenCTM()

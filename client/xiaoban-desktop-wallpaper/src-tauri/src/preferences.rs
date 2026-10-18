@@ -5,7 +5,7 @@ use std::{
     path::Path,
 };
 
-pub const SKINS: &[&str] = &["cat", "bunny", "pot"];
+pub const SKINS: &[&str] = &["pot"];
 pub const EXPRESSIONS: &[&str] = &[
     "idle",
     "happy",
@@ -79,7 +79,7 @@ impl Default for Settings {
             game_desktop_double_click: false,
             companion_enabled: true,
             companion_links: true,
-            companion_skin: "cat".into(),
+            companion_skin: "pot".into(),
             effects: Default::default(),
         }
     }
@@ -191,20 +191,16 @@ mod tests {
         assert!(!again.settings.companion_links);
     }
     #[test]
-    fn the_shell_defaults_to_the_cat_keeps_a_known_choice_and_drops_an_unknown_one() {
-        assert_eq!(Settings::default().companion_skin, "cat");
+    fn the_shell_is_the_pot_and_every_retired_or_unknown_choice_falls_back_to_it() {
+        assert_eq!(Settings::default().companion_skin, "pot");
         let mut older: Preferences = serde_json::from_str(r#"{"settings":{"mode":"wallpaper"}}"#).unwrap();
         older.settings.normalize();
-        assert_eq!(older.settings.companion_skin, "cat");
-        let mut bunny: Preferences = serde_json::from_str(r#"{"settings":{"companionSkin":"bunny"}}"#).unwrap();
-        bunny.settings.normalize();
-        assert_eq!(bunny.settings.companion_skin, "bunny");
-        let mut bear: Preferences = serde_json::from_str(r#"{"settings":{"companionSkin":"bear"}}"#).unwrap();
-        bear.settings.normalize();
-        assert_eq!(bear.settings.companion_skin, "cat");
-        let mut odd: Preferences = serde_json::from_str(r#"{"settings":{"companionSkin":"<script>"}}"#).unwrap();
-        odd.settings.normalize();
-        assert_eq!(odd.settings.companion_skin, "cat");
+        assert_eq!(older.settings.companion_skin, "pot");
+        for saved in ["pot", "cat", "bunny", "nezha", "bear", "<script>"] {
+            let mut prefs: Preferences = serde_json::from_str(&format!(r#"{{"settings":{{"companionSkin":"{saved}"}}}}"#)).unwrap();
+            prefs.settings.normalize();
+            assert_eq!(prefs.settings.companion_skin, "pot", "{saved}");
+        }
     }
     #[test]
     fn effects_chosen_per_wallpaper_become_the_desktop_wide_choice_once() {

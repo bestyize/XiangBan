@@ -1,9 +1,9 @@
 import {
-  BEZEL, BODY_PIVOT, CHEEK_OFFSET, COLOR, EYE_OFFSET, FACE_CENTER, HEAD, MOUTH_OFFSET, SCREEN, VIEW,
+  BEZEL, BODY_PIVOT, CHEEK_OFFSET, COLOR, EYE_OFFSET, FACE_CENTER, HEAD, MOUTH_OFFSET, SCREEN, VIEW, type Palette,
 } from './geometry.ts'
 import type { Eye, EyeGlyph, Face, Mouth, SymbolName } from './params.ts'
 import { heartPath, renderSymbol } from './symbols.ts'
-import { skinOf, type Skin, type SkinId } from './skins.ts'
+import { faceStyleOf, skinOf, type Markup, type Skin, type SkinId } from './skins.ts'
 
 /** Everything needed to draw one moment of the robot. */
 export interface Frame {
@@ -40,7 +40,7 @@ function ellipsePerimeter(a: number, b: number) {
   return Math.PI * (3 * (a + b) - Math.sqrt(Math.max(0, (3 * a + b) * (a + 3 * b))))
 }
 
-interface EyeCtx { id: string; side: -1 | 1; squash: number; glyph: EyeGlyph; color: string; dash: number; gx: number; gy: number }
+interface EyeCtx { id: string; side: -1 | 1; squash: number; glyph: EyeGlyph; color: string; pink: string; dash: number; gx: number; gy: number }
 
 function eyeMarkup(e: Eye, c: EyeCtx) {
   const cx = FACE_CENTER.x + c.side * EYE_OFFSET.x + e.x + c.gx
@@ -56,7 +56,7 @@ function eyeMarkup(e: Eye, c: EyeCtx) {
     return `<path d="M${f(cx - ww * inner)} ${f(cy - hh)}L${f(cx + ww * inner)} ${f(cy)}L${f(cx - ww * inner)} ${f(cy + hh)}" fill="none" stroke="${c.color}" stroke-width="${f(Math.max(T, LINE_MIN))}" stroke-linecap="round" stroke-linejoin="round"/>`
   }
   if (c.glyph === 'heart') {
-    return `<path d="${heartPath(cx, cy + 2, W * 0.82, c.squash)}" fill="${COLOR.pink}"/>`
+    return `<path d="${heartPath(cx, cy + 2, W * 0.82, c.squash)}" fill="${c.pink}"/>`
   }
 
   const sw = Math.max(Math.min(T, 2 * Math.max(H0 * c.squash, 0)), LINE_MIN)
@@ -104,7 +104,7 @@ function eyeMarkup(e: Eye, c: EyeCtx) {
   return (defs.length ? `<defs>${defs.join('')}</defs>` : '') + (wrap.length ? `<g ${wrap.join(' ')}>${stroke}</g>` : stroke)
 }
 
-function mouthMarkup(m: Mouth, color: string, gx: number, gy: number) {
+function mouthMarkup(m: Mouth, color: string, p: Palette, gx: number, gy: number) {
   const mx = FACE_CENTER.x + MOUTH_OFFSET.x + m.x + gx * 0.8
   const my = FACE_CENTER.y + MOUTH_OFFSET.y + m.y + gy * 0.8
   const w = Math.max(m.w, 1)
@@ -123,27 +123,27 @@ function mouthMarkup(m: Mouth, color: string, gx: number, gy: number) {
     return `<path d="${pts(upper)}" fill="none" stroke="${color}" stroke-width="3.8" stroke-linecap="round" stroke-linejoin="round"/>`
   }
   const shape = pts(upper) + lower.reverse().map(([x, y]) => `L${f(x)} ${f(y)}`).join('') + 'Z'
-  const fill = m.tongue > 0.02 ? COLOR.pink : COLOR.screen
+  const fill = m.tongue > 0.02 ? p.pink : p.mouth
   return `<path d="${shape}" fill="${fill}" fill-opacity="${f(Math.max(m.tongue, 0.9))}" stroke="${color}" stroke-width="3.2" stroke-linejoin="round"/>`
 }
 
-function cheeks(face: Face) {
+function cheeks(face: Face, p: Palette) {
   const out: string[] = []
   for (const side of [-1, 1] as const) {
     const x = FACE_CENTER.x + side * CHEEK_OFFSET.x + face.gazeX * 0.7
     const y = FACE_CENTER.y + CHEEK_OFFSET.y + face.gazeY * 0.7
     if (face.blush > 0.02) {
-      out.push(`<ellipse cx="${f(x)}" cy="${f(y)}" rx="10" ry="5.5" fill="${COLOR.blush}" opacity="${f(clamp(face.blush, 0, 1) * 0.8)}"/>`)
+      out.push(`<ellipse cx="${f(x)}" cy="${f(y)}" rx="10" ry="5.5" fill="${p.blush}" opacity="${f(clamp(face.blush, 0, 1) * 0.8)}"/>`)
     }
     if (face.blushLines > 0.02) {
       const marks = [-5, 0, 5].map((dx) => `M${f(x + dx - 1.8)} ${f(y + 3.6)}L${f(x + dx + 1.8)} ${f(y - 3.6)}`).join('')
-      out.push(`<path d="${marks}" fill="none" stroke="#ff9ab6" stroke-width="2.2" stroke-linecap="round" opacity="${f(clamp(face.blushLines, 0, 1))}"/>`)
+      out.push(`<path d="${marks}" fill="none" stroke="${p.hatch}" stroke-width="2.2" stroke-linecap="round" opacity="${f(clamp(face.blushLines, 0, 1))}"/>`)
     }
   }
   return out.join('')
 }
 
-function tears(face: Face, t: number) {
+function tears(face: Face, t: number, p: Palette) {
   if (face.tears < 0.02) return ''
   const k = clamp(face.tears, 0, 1)
   const bottom = SCREEN.y + SCREEN.h + 6
@@ -152,24 +152,24 @@ function tears(face: Face, t: number) {
     const y0 = FACE_CENTER.y + EYE_OFFSET.y + e.y + face.gazeY + 2
     const yEnd = y0 + (bottom - y0) * k
     const d = `M${f(x)} ${f(y0)}C${f(x - side)} ${f(y0 + 18)} ${f(x + side * 2)} ${f(yEnd - 14)} ${f(x + side * 3)} ${f(yEnd)}`
-    return `<path d="${d}" fill="none" stroke="${COLOR.tear}" stroke-width="${f(7 + 4 * k)}" stroke-linecap="round" opacity="0.9"/>` +
+    return `<path d="${d}" fill="none" stroke="${p.tear}" stroke-width="${f(7 + 4 * k)}" stroke-linecap="round" opacity="0.9"/>` +
       `<path d="${d}" fill="none" stroke="#d8f3ff" stroke-width="2.6" stroke-linecap="round" stroke-dasharray="5 13" stroke-dashoffset="${f(-t * 36)}" opacity="0.75"/>`
   }).join('')
 }
 
 /** The dynamic contents of the screen. ids must be unique per robot instance on the page. */
-export function faceMarkup(frame: Frame, id: string) {
+export function faceMarkup(frame: Frame, id: string, p: Palette = COLOR) {
   const { face } = frame
   const lit = clamp((face.screen - 0.3) / 0.7, 0, 1)
-  const color = mixHex(COLOR.lineDim, COLOR.line, lit)
-  const ctx = { color, dash: frame.dash, gx: face.gazeX, gy: face.gazeY }
+  const color = mixHex(p.lineDim, p.line, lit)
+  const ctx = { color, pink: p.pink, dash: frame.dash, gx: face.gazeX, gy: face.gazeY }
   return [
-    cheeks(face),
-    tears(face, frame.t),
+    cheeks(face, p),
+    tears(face, frame.t, p),
     eyeMarkup(face.eyeL, { ...ctx, id: `${id}l`, side: -1, squash: frame.squashL, glyph: frame.glyphL }),
     eyeMarkup(face.eyeR, { ...ctx, id: `${id}r`, side: 1, squash: frame.squashR, glyph: frame.glyphR }),
-    mouthMarkup(face.mouth, color, face.gazeX, face.gazeY),
-    frame.symbol ? renderSymbol(frame.symbol, frame.symbolP, frame.t, frame.badge) : '',
+    mouthMarkup(face.mouth, color, p, face.gazeX, face.gazeY),
+    frame.symbol ? renderSymbol(frame.symbol, frame.symbolP, frame.t, frame.badge, p) : '',
   ].join('')
 }
 
@@ -210,8 +210,11 @@ function ear(id: string, side: -1 | 1, frame: Frame, skin: Skin) {
     `</g>`
 }
 
+const draw = (value: Markup | undefined, id: string) => (typeof value === 'function' ? value(id) : value ?? '')
+
 function defs(id: string, skin: Skin) {
   const s = SCREEN
+  const style = faceStyleOf(skin)
   return `<defs>` +
     `<radialGradient id="${id}shell" cx="0.36" cy="0.2" r="0.95"><stop offset="0" stop-color="${skin.shell[0]}"/><stop offset="0.45" stop-color="${skin.shell[1]}"/><stop offset="0.82" stop-color="${skin.shell[2]}"/><stop offset="1" stop-color="${skin.shell[3]}"/></radialGradient>` +
     `<linearGradient id="${id}shade" x1="0" y1="0" x2="0" y2="1"><stop offset="0.5" stop-color="${skin.shade}" stop-opacity="0"/><stop offset="1" stop-color="${skin.shade}" stop-opacity="0.24"/></linearGradient>` +
@@ -226,11 +229,15 @@ function defs(id: string, skin: Skin) {
     `<radialGradient id="${id}ground"><stop offset="0" stop-color="#000" stop-opacity="1"/><stop offset="1" stop-color="#000" stop-opacity="0"/></radialGradient>` +
     `<clipPath id="${id}headClip">${skin.art ? `<path d="${skin.art.head}"/>` : `<rect x="${HEAD.x}" y="${HEAD.y}" width="${HEAD.w}" height="${HEAD.h}" rx="${HEAD.r}"/>`}</clipPath>` +
     `<clipPath id="${id}screenClip"><rect x="${s.x}" y="${s.y}" width="${s.w}" height="${s.h}" rx="${s.r}"/></clipPath>` +
-    `<filter id="${id}glow" filterUnits="userSpaceOnUse" x="${s.x}" y="${s.y}" width="${s.w}" height="${s.h}" color-interpolation-filters="sRGB">` +
+    (style.glow === 'ink'
+      ? `<filter id="${id}glow" filterUnits="userSpaceOnUse" x="${s.x}" y="${s.y}" width="${s.w}" height="${s.h}" color-interpolation-filters="sRGB">` +
+        `<feGaussianBlur in="SourceGraphic" stdDeviation="0.9" result="soft"/><feMerge><feMergeNode in="soft"/><feMergeNode in="SourceGraphic"/></feMerge></filter>`
+      : `<filter id="${id}glow" filterUnits="userSpaceOnUse" x="${s.x}" y="${s.y}" width="${s.w}" height="${s.h}" color-interpolation-filters="sRGB">` +
     `<feGaussianBlur in="SourceGraphic" stdDeviation="5.5" result="blur"/>` +
     `<feColorMatrix in="blur" type="matrix" values="0.55 0 0 0 0  0 0.85 0 0 0.04  0 0 1 0 0.12  0 0 0 1.35 0" result="wide"/>` +
     `<feGaussianBlur in="SourceGraphic" stdDeviation="1.5" result="near"/>` +
-    `<feMerge><feMergeNode in="wide"/><feMergeNode in="near"/><feMergeNode in="SourceGraphic"/></feMerge></filter>` +
+    `<feMerge><feMergeNode in="wide"/><feMergeNode in="near"/><feMergeNode in="SourceGraphic"/></feMerge></filter>`) +
+    draw(skin.art?.defs, id) +
     `</defs>`
 }
 
@@ -246,10 +253,11 @@ function shell(id: string, skin: Skin) {
     `<rect x="${b.x}" y="${b.y}" width="${b.w}" height="${b.h}" rx="${b.r}" fill="url(#${id}bezel)"/>` +
     `<rect x="${s.x}" y="${s.y}" width="${s.w}" height="${s.h}" rx="${s.r}" fill="url(#${id}screen)" stroke="#000" stroke-opacity="0.7" stroke-width="1.6"/>`
   if (skin.art) {
-    return skin.art.feet +
-      `<path d="${skin.art.head}" fill="url(#${id}shell)" stroke="${skin.stroke}" stroke-width="1.5" stroke-linejoin="round"/>` +
-      `<path d="${skin.art.head}" fill="url(#${id}shade)"/>` +
-      `<g clip-path="url(#${id}headClip)">${skin.art.trim}</g>` + skin.art.front + bezelAndScreen
+    const art = skin.art
+    return art.feet +
+      `<path d="${art.head}" fill="${draw(art.fill, id) || `url(#${id}shell)`}" stroke="${skin.stroke}" stroke-width="1.5" stroke-linejoin="round"/>` +
+      `<path d="${art.head}" fill="url(#${id}shade)"/>` +
+      `<g clip-path="url(#${id}headClip)">${draw(art.trim, id)}</g>` + draw(art.front, id) + (art.panel === undefined ? bezelAndScreen : draw(art.panel, id))
   }
   return foot(98) + foot(182) + pod(19) + pod(265) +
     `<rect x="${h.x}" y="${h.y}" width="${h.w}" height="${h.h}" rx="${h.r}" fill="url(#${id}shell)" stroke="${skin.stroke}" stroke-width="1.5"/>` +
@@ -259,7 +267,8 @@ function shell(id: string, skin: Skin) {
     `<rect x="${s.x}" y="${s.y}" width="${s.w}" height="${s.h}" rx="${s.r}" fill="url(#${id}screen)" stroke="#000" stroke-opacity="0.7" stroke-width="1.6"/>`
 }
 
-function gloss(id: string) {
+function gloss(id: string, skin: Skin) {
+  if (!faceStyleOf(skin).gloss) return ''
   const s = SCREEN
   return `<rect x="${s.x}" y="${s.y}" width="${s.w}" height="${s.h}" rx="${s.r}" fill="url(#${id}gloss)" pointer-events="none"/>` +
     `<path d="M76 128Q78 104 106 100L146 99Q108 106 88 124Z" fill="#fff" opacity="0.07" pointer-events="none"/>`
@@ -280,10 +289,11 @@ export function robotMarkup(frame: Frame, id: string, label?: string, skinId?: S
     scaleOpen(skin) +
     `<ellipse data-part="shadow" cx="160" cy="250" rx="${shadow.rx}" ry="11" fill="url(#${id}ground)" opacity="${shadow.opacity}"/>` +
     `<g data-part="body" transform="${bodyTransform(frame)}">` +
+    draw(skin.art?.back, id) +
     ear(id, -1, frame, skin) + ear(id, 1, frame, skin) +
     shell(id, skin) +
-    `<g clip-path="url(#${id}screenClip)"><g data-part="face" filter="url(#${id}glow)" opacity="${f(faceOpacity(frame))}">${faceMarkup(frame, id)}</g></g>` +
-    gloss(id) +
+    `<g clip-path="url(#${id}screenClip)"><g data-part="face" filter="url(#${id}glow)" opacity="${f(faceOpacity(frame))}">${faceMarkup(frame, id, faceStyleOf(skin).palette)}</g></g>` +
+    gloss(id, skin) +
     `</g>` + (skin.scale === 1 ? '' : '</g>') + `</svg>`
 }
 

@@ -71,14 +71,14 @@ describe('control state with native settings', () => {
   });
   it('sends the chosen shell to the host and keeps the acknowledged one', async () => {
     const store = createControlStore(vi.fn());
-    expect(store.settings.companionSkin).toBe('cat');
+    expect(store.settings.companionSkin).toBe('pot');
     ipc.mockImplementation(async (_command, args) => ({ ...clone(defaults), companionSkin: args?.skin } as never));
-    await store.setCompanionSkin('bunny');
-    expect(ipc).toHaveBeenCalledWith('set_companion_skin', { skin: 'bunny' });
-    expect(store.settings.companionSkin).toBe('bunny');
+    await store.setCompanionSkin('next');
+    expect(ipc).toHaveBeenCalledWith('set_companion_skin', { skin: 'next' });
+    expect(store.settings.companionSkin).toBe('next');
     ipc.mockRejectedValueOnce(new Error('没有这个外壳：x'));
     await expect(store.setCompanionSkin('x')).rejects.toThrow('没有这个外壳');
-    expect(store.settings.companionSkin).toBe('bunny');
+    expect(store.settings.companionSkin).toBe('next');
   });
   it('lists the effects through the host, keeping the usable ones and naming the rest', async () => {
     const store = createControlStore(vi.fn());
