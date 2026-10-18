@@ -403,10 +403,10 @@
       },
       "assets": {
         "base": {
-          "url": "builtin://meadow-breeze-base.png",
-          "sha256": "fa2c2c64e4cc561024387b2813e164122ef7592ecae2079047be834ba51d5f1e",
-          "bytes": 5509673,
-          "mime": "image/png"
+          "url": "builtin://meadow-breeze-base.webp",
+          "sha256": "3e39f357db5cd642214844c144d0159d73c6428ea9203632277cd1fd9946875f",
+          "bytes": 619708,
+          "mime": "image/webp"
         }
       },
       "controls": [
