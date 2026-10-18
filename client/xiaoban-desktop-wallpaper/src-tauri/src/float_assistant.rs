@@ -24,7 +24,7 @@ pub const OPEN_MODES: &[&str] = &["voice", "type"];
 /// When answers are read aloud.
 pub const READ_MODES: &[&str] = &["voice", "always", "never"];
 
-const WIDTH: f64 = 560.0;
+const WIDTH: f64 = 480.0;
 const MIN_HEIGHT: f64 = 92.0;
 const MAX_HEIGHT: f64 = 620.0;
 /// Space kept between the capsule and the bottom of the usable screen (above the Dock or taskbar).
