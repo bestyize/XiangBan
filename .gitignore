@@ -9,6 +9,7 @@
 # Gradle / Kotlin
 .gradle/
 build/
+out/
 !gradle/wrapper/gradle-wrapper.jar
 local.properties
 
