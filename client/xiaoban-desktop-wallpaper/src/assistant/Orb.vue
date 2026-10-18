@@ -2,7 +2,7 @@
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import type { Phase } from './assistant-store.ts';
 
-const props = withDefaults(defineProps<{ phase: Phase; level?: number; active?: boolean; size?: number; dark?: boolean }>(), { level: 0, active: true, size: 48, dark: true });
+const props = withDefaults(defineProps<{ phase: Phase; level?: number; active?: boolean; size?: number; dark?: boolean; fps?: number }>(), { level: 0, active: true, size: 48, dark: true, fps: 60 });
 const canvas = ref<HTMLCanvasElement>();
 
 type Rgb = [number, number, number];
@@ -108,6 +108,8 @@ function draw(dt: number) {
 
 function loop(now: number) {
   frame = requestAnimationFrame(loop);
+  // A ball that sits on screen all day breathes slowly: skipping frames costs nothing the eye can see.
+  if (last && now - last < 1000 / props.fps - 1) return;
   const dt = Math.min(0.05, last ? (now - last) / 1000 : 0.016);
   last = now; clock += dt;
   draw(dt);

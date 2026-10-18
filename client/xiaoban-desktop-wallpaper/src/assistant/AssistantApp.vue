@@ -14,6 +14,7 @@ const field = ref<HTMLInputElement>();
 const inner = ref<HTMLElement>();
 const scroller = ref<HTMLElement>();
 const composing = ref(false);
+const quiet = computed(() => props.store.phase === 'idle');
 
 const busy = computed(() => ['thinking', 'answering', 'speaking'].includes(props.store.phase));
 const hasCard = computed(() => Boolean(
@@ -74,6 +75,25 @@ watch(() => props.store.open, open => {
 });
 watch(() => props.store.answer, () => { void nextTick(() => { if (scroller.value) scroller.value.scrollTop = scroller.value.scrollHeight; }); });
 
+/** The ball opens on a click and moves when it is pressed and pulled; the two are told apart by how far the pointer went. */
+let press: { x: number; y: number } | null = null;
+let pulled = false;
+function ballDown(event: PointerEvent) {
+  if (event.button !== 0) return;
+  press = { x: event.clientX, y: event.clientY };
+  pulled = false;
+}
+function release() { press = null; }
+function ballMove(event: PointerEvent) {
+  if (!press || pulled || Math.hypot(event.clientX - press.x, event.clientY - press.y) < 4) return;
+  pulled = true; press = null;
+  void invoke('assistant_drag').catch(() => {});
+}
+function ballClick() {
+  if (pulled) { pulled = false; return; }
+  void props.store.unfold();
+}
+
 /** Anything that is not a control or readable text moves the whole capsule, including the clear margin around it. */
 function drag(event: MouseEvent) {
   if ((event.target as Element).closest('button, input, a, pre, code, .card-body')) return;
@@ -88,6 +108,11 @@ onBeforeUnmount(() => { window.removeEventListener('focus', onFocus); observer?.
 
 <template>
   <div class="stage" :class="{ light: !isDark }" @keydown.esc.prevent="store.hide()" @mousedown.left="drag">
+    <div v-if="store.ball && !store.open" class="ball-stage" data-testid="assistant-ball-stage">
+      <button type="button" class="ball" :data-phase="store.phase" title="点一下提问，按住可以拖动，右键打开设置" aria-label="打开小伴助手" data-testid="assistant-ball" @pointerdown="ballDown" @pointermove="ballMove" @pointerup="release" @pointercancel="release" @click="ballClick" @contextmenu.prevent="store.openSettings('assistant')">
+        <Orb :phase="store.phase" :level="0" :active="true" :size="48" :dark="isDark" :fps="quiet ? 20 : 60" />
+      </button>
+    </div>
     <Transition name="pop" appear>
       <div v-if="store.open" ref="inner" class="inner" role="dialog" aria-label="小伴助手" data-testid="assistant">
         <Transition name="rise">
@@ -120,7 +145,7 @@ onBeforeUnmount(() => { window.removeEventListener('focus', onFocus); observer?.
           </button>
           <input ref="field" v-model="store.input" class="field" type="text" autocomplete="off" spellcheck="false" :placeholder="store.status" aria-label="向小伴提问" data-testid="assistant-input" @keydown.enter="onEnter" @compositionstart="composing = true" @compositionend="composing = false" />
           <button v-if="canSend || busy || store.phase === 'attention'" type="button" class="round primary" :aria-label="canSend ? '发送' : '停止'" :title="canSend ? '发送' : '停止'" data-testid="assistant-primary" @click="primary"><ArrowUp v-if="canSend" :size="18" /><Square v-else :size="14" /></button>
-          <button type="button" class="round" title="在完整聊天中继续" aria-label="在完整聊天中继续" data-testid="assistant-expand" @click="store.expand()"><ArrowUpRight :size="17" /></button>
+          <button type="button" class="round" title="在完整聊天中继续" aria-label="在完整聊天中继续" data-testid="assistant-expand" @click="store.openChat()"><ArrowUpRight :size="17" /></button>
           <button type="button" class="round" title="收起 (Esc)" aria-label="收起" data-testid="assistant-close" @click="store.hide()"><X :size="17" /></button>
         </div>
         <span class="sr" aria-live="polite">{{ store.status }}</span>
@@ -135,6 +160,14 @@ html,body,#app{background:transparent!important}
 <style scoped>
 .stage{--card:#141925;--capsule:#151a27;--line:rgba(160,190,255,.2);--text:#eaf0fb;--text-soft:#8a94ab;--working:#9fb0cf;--placeholder:#7d88a2;--field:#f3f6fd;--button:rgba(255,255,255,.07);--button-hover:rgba(255,255,255,.14);--button-fg:#b9c3d8;--button-fg-hover:#fff;--code:rgba(255,255,255,.08);--link:#7fd6ff;--hint:#ffd9a0;--failure:#ff9aa6;--gate-bg:rgba(255,190,100,.08);--gate-line:rgba(255,190,100,.28);--gate-title:#ffe2b4;--gate-tool:#c3cce0;--ghost:rgba(255,255,255,.08);--ghost-fg:#dfe6f5;--scroll:rgba(255,255,255,.18);--dot:#8fb7ff;--listen:rgba(84,226,255,.7);--busy:rgba(140,150,255,.6);--attention:rgba(255,190,100,.7);--ui-line:var(--line);--ui-surface-alt:var(--code);--ui-text-primary:var(--text);--ui-text-secondary:var(--working);--ui-text-tertiary:var(--text-soft);--ui-primary:var(--link);position:relative;display:flex;flex-direction:column;justify-content:flex-end;height:100vh;color:var(--text);font:14px/1.6 -apple-system,BlinkMacSystemFont,"PingFang SC","Segoe UI","Microsoft YaHei UI",sans-serif;-webkit-font-smoothing:antialiased;user-select:none;cursor:grab}
 .stage.light{--card:#ffffff;--capsule:#ffffff;--line:rgba(40,60,100,.28);--text:#1d2433;--text-soft:#6b7487;--working:#55627d;--placeholder:#98a1b3;--field:#1d2433;--button:rgba(30,45,80,.07);--button-hover:rgba(30,45,80,.13);--button-fg:#566079;--button-fg-hover:#1d2433;--code:rgba(30,45,80,.07);--link:#1a6fd4;--hint:#9a5b00;--failure:#c8324a;--gate-bg:rgba(255,170,60,.12);--gate-line:rgba(220,140,30,.42);--gate-title:#7a4700;--gate-tool:#4a556d;--ghost:rgba(30,45,80,.07);--ghost-fg:#2a3550;--scroll:rgba(30,45,80,.24);--dot:#5b7fe0;--listen:rgba(0,160,200,.8);--busy:rgba(90,100,230,.7);--attention:rgba(230,140,20,.85)}
+.ball-stage{display:grid;place-items:center;height:100vh}
+.ball{display:grid;place-items:center;width:64px;height:64px;padding:0;border-radius:50%;background:var(--capsule);border:1px solid var(--line);cursor:pointer;transition:border-color .3s,transform .2s}
+.ball:hover{transform:scale(1.06)}
+.ball:active{transform:scale(.96)}
+.ball:focus-visible{outline:2px solid var(--link);outline-offset:2px}
+.ball[data-phase=listening]{border-color:var(--listen)}
+.ball[data-phase=thinking],.ball[data-phase=answering],.ball[data-phase=speaking]{border-color:var(--busy)}
+.ball[data-phase=attention]{border-color:var(--attention)}
 .inner{display:flex;flex-direction:column;gap:10px;padding:12px}
 .card{border-radius:22px;background:var(--card);border:1px solid var(--line);overflow:hidden}
 .card-body{cursor:auto;max-height:390px;overflow-y:auto;padding:16px 20px 18px;user-select:text;scrollbar-width:thin;scrollbar-color:var(--scroll) transparent}

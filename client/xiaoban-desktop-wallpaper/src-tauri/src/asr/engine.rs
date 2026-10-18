@@ -16,13 +16,34 @@ pub const MAX_SAMPLES: usize = 20 * 16000;
 pub fn present(directory: &Path) -> bool {
     FILES.iter().all(|file| fs::metadata(directory.join(file.name)).is_ok_and(|m| m.is_file() && m.len() == file.bytes))
 }
+/// A file that was fully hashed once is remembered by its size and modification time, so the next start does not read
+/// 239 MB again to learn the same thing. Any change to the file, or no record at all, means it is hashed again.
+fn stamp_path(path: &Path) -> std::path::PathBuf {
+    let mut name = path.file_name().unwrap_or_default().to_os_string();
+    name.push(".verified");
+    path.with_file_name(name)
+}
+fn stamp_of(path: &Path, spec: &ModelFile) -> Option<String> {
+    let meta = fs::metadata(path).ok()?;
+    let modified = meta.modified().ok()?.duration_since(std::time::UNIX_EPOCH).ok()?;
+    Some(format!("{} {} {}.{:09} {}", spec.name, meta.len(), modified.as_secs(), modified.subsec_nanos(), spec.sha256))
+}
+fn remember_verified(path: &Path, spec: &ModelFile) {
+    if let Some(stamp) = stamp_of(path, spec) { let _ = fs::write(stamp_path(path), stamp); }
+}
+fn stamped(path: &Path, spec: &ModelFile) -> bool {
+    stamp_of(path, spec).is_some_and(|now| fs::read_to_string(stamp_path(path)).is_ok_and(|saved| saved == now))
+}
 fn verified(path: &Path, spec: &ModelFile, check: &impl Fn() -> Result<(), String>) -> Result<bool, String> {
     if !fs::metadata(path).is_ok_and(|m| m.is_file() && m.len() == spec.bytes) { return Ok(false); }
+    if stamped(path, spec) { return Ok(true); }
     let mut file = fs::File::open(path).map_err(|e| format!("语音模型读取失败：{e}"))?;
     let mut digest = Sha256::new();
     let mut buffer = [0; 65536];
     loop { check()?; let n = file.read(&mut buffer).map_err(|e| e.to_string())?; if n == 0 { break; } digest.update(&buffer[..n]); }
-    Ok(format!("{:x}", digest.finalize()) == spec.sha256)
+    let good = format!("{:x}", digest.finalize()) == spec.sha256;
+    if good { remember_verified(path, spec); }
+    Ok(good)
 }
 pub fn ensure_model(directory: &Path, check: impl Fn() -> Result<(), String>, progress: impl Fn(&str, u64)) -> Result<(), String> {
     fs::create_dir_all(directory).map_err(|e| format!("无法创建语音模型目录：{e}"))?;
@@ -63,6 +84,8 @@ pub fn ensure_model(directory: &Path, check: impl Fn() -> Result<(), String>, pr
             // Windows rename cannot replace an existing, damaged file.
             if target.exists() { fs::remove_file(&target).map_err(|e| e.to_string())?; }
             fs::rename(&temporary, &target).map_err(|e| format!("模型保存失败：{e}"))?;
+            // It was hashed while it was written, so there is no need to read it again for the record.
+            remember_verified(&target, spec);
             Ok(())
         })();
         if result.is_err() { let _ = fs::remove_file(&temporary); }
@@ -120,6 +143,48 @@ mod tests {
         assert!(validate_audio(&[f32::INFINITY; 1600]).is_err());
         assert!(validate_audio(&[2.0; 1600]).is_err());
         assert!(validate_audio(&[]).is_err());
+    }
+    /// `XIAOBAN_ASR_DIR=<model folder> cargo test --bin xiaoban-desktop-wallpaper measure_startup_cost -- --ignored --nocapture`
+    #[test] #[ignore = "needs the downloaded model"]
+    fn measure_startup_cost() {
+        let directory = std::path::PathBuf::from(std::env::var("XIAOBAN_ASR_DIR").expect("set XIAOBAN_ASR_DIR"));
+        let started = Instant::now();
+        ensure_model(&directory, || Ok(()), |_, _| {}).unwrap();
+        println!("verify  {:?}", started.elapsed());
+        let started = Instant::now();
+        let recognizer = load(&directory).unwrap();
+        println!("load    {:?}", started.elapsed());
+        for round in 1..=3 {
+            let started = Instant::now();
+            transcribe(&recognizer, &vec![0.0; 16000]).unwrap();
+            println!("decode {round}  {:?}", started.elapsed());
+        }
+    }
+    #[test] fn a_verified_file_is_not_hashed_again_until_it_changes() {
+        let dir = std::env::temp_dir().join(format!("xiaoban-asr-stamp-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("model.bin");
+        fs::write(&path, b"abc").unwrap();
+        // sha256("abc")
+        let spec = ModelFile { name: "model.bin", bytes: 3, sha256: "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad" };
+        let reads = std::cell::Cell::new(0);
+        let counting = || { reads.set(reads.get() + 1); Ok(()) };
+        assert!(verified(&path, &spec, &counting).unwrap());
+        let first = reads.get();
+        assert!(first > 0, "the first check reads the file");
+        assert!(verified(&path, &spec, &counting).unwrap());
+        assert_eq!(reads.get(), first, "the second check trusts the record");
+        // same size, different content: the modification time moves, so it is read and rejected
+        std::thread::sleep(std::time::Duration::from_millis(20));
+        fs::write(&path, b"abd").unwrap();
+        assert!(!verified(&path, &spec, &counting).unwrap());
+        assert!(reads.get() > first);
+        // a record for other content never vouches for a file
+        fs::write(stamp_path(&path), "garbage").unwrap();
+        fs::write(&path, b"abc").unwrap();
+        assert!(verified(&path, &spec, &counting).unwrap());
+        fs::remove_dir_all(&dir).unwrap();
     }
     #[test] fn removes_sensevoice_tags() {
         assert_eq!(clean_text("<|zh|><|NEUTRAL|><|Speech|><|withitn|>你好。"), "你好。");

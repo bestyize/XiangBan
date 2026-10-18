@@ -34,6 +34,13 @@ fn on_main<T: Send + 'static>(
         .map_err(|e| format!("AppKit 窗口操作未完成：{e}"))?
 }
 
+/// The window level AppKit has for a window, for the smoke test.
+pub fn window_level(window: &tauri::WebviewWindow) -> Result<i64, String> {
+    let window = window.clone();
+    let app = window.app_handle().clone();
+    on_main(&app, move |_| Ok(native(&window)?.level() as i64))
+}
+
 fn native(window: &tauri::WebviewWindow) -> Result<&NSWindow, String> {
     // Caller holds the live Tauri window and invokes this only on the main
     // thread. The reference never leaves the enclosing AppKit operation.

@@ -2,7 +2,7 @@ import { nextTick, reactive } from 'vue';
 import { describe, expect, it, vi } from 'vitest';
 import { createAssistantStore, LISTEN_IDLE_MS, RESUME_MS, SEND_GRACE_MS } from './assistant-store.ts';
 
-function setup(options: { configured?: boolean; voice?: boolean } = {}) {
+function setup(options: { configured?: boolean; voice?: boolean; prefs?: { open: string; read: string } } = {}) {
   let clock = 1_000_000;
   const timers: { id: number; at: number; run: () => void }[] = [];
   let nextId = 1;
@@ -39,15 +39,16 @@ function setup(options: { configured?: boolean; voice?: boolean } = {}) {
     speak: vi.fn(async () => { speech.status = 'playing'; }),
     stop: vi.fn(async () => { speech.status = 'idle'; }),
   });
-  const invoke = vi.fn(async () => undefined as never);
+  const handlers = new Map<string, (payload: unknown) => void>();
+  const invoke = vi.fn(async (command: string) => (command === 'assistant_prefs' ? options.prefs ?? { open: 'voice', read: 'voice' } : undefined) as never);
   const store = createAssistantStore({
-    desktop: true, invoke, listen: async () => () => {},
+    desktop: true, invoke, listen: async (event, callback) => { handlers.set(event, callback as (payload: unknown) => void); return () => {}; },
     chat: chat as never, asr: asr as never, speech: speech as never,
     now: () => clock,
     setTimer: (run, ms) => { const timer = { id: nextId++, at: clock + ms, run }; timers.push(timer); return timer.id; },
     clearTimer: id => { const at = timers.findIndex(timer => timer.id === id); if (at >= 0) timers.splice(at, 1); },
   });
-  return { store, chat, asr, speech, invoke, advance, say: (text: string) => heard(text) };
+  return { store, chat, asr, speech, invoke, advance, say: (text: string) => heard(text), emit: (event: string, payload?: unknown) => handlers.get(event)?.(payload) };
 }
 const finishAnswer = (chat: ReturnType<typeof setup>['chat'], text = '好的，已经处理完了。') => {
   chat.views.s1.items.push({ kind: 'assistant', id: 'a', text, streaming: false });
@@ -154,10 +155,10 @@ describe('floating assistant', () => {
     await noVoice.store.opened();
     expect(noVoice.store.hint).toBe('');
     await noVoice.store.toggleListening();
-    expect(noVoice.store.hintTab).toBe('voice');
+    expect(noVoice.store.hintTab).toBe('assistant');
     expect(noVoice.asr.activate).not.toHaveBeenCalled();
-    await noVoice.store.openSettings('voice');
-    expect(noVoice.invoke).toHaveBeenCalledWith('assistant_open_settings', { tab: 'voice' });
+    await noVoice.store.openSettings('assistant');
+    expect(noVoice.invoke).toHaveBeenCalledWith('assistant_open_settings', { tab: 'assistant' });
   });
 
   it('stays where it is until it is dismissed, however long it sits and whatever else the user clicks', async () => {
@@ -217,7 +218,69 @@ describe('floating assistant', () => {
     expect(asr.deactivate).toHaveBeenCalled();
     expect(speech.stop).toHaveBeenCalled();
     await store.submit('留下一个会话'); // closed: still sends nothing wrong
-    await store.expand();
+    await store.openChat();
     expect(invoke).toHaveBeenCalledWith('assistant_open_chat', { session: expect.anything() });
+  });
+
+  it('shows the ball when the host says so, and the capsule replaces it', async () => {
+    const { store, emit } = setup({ voice: false });
+    await store.init();
+    expect(store.ball).toBe(false);
+    emit('assistant-ball', true);
+    expect(store.ball).toBe(true);
+    emit('assistant-open');
+    await vi.waitFor(() => expect(store.open).toBe(true));
+    expect(store.ball).toBe(false);
+    emit('assistant-close');
+    expect(store.open).toBe(false);
+    emit('assistant-ball', true);
+    expect(store.ball).toBe(true);
+    emit('assistant-ball', false);
+    expect(store.ball).toBe(false);
+  });
+
+  it('tells the host to open the capsule when the ball is clicked', async () => {
+    const { store, invoke } = setup({ voice: false });
+    await store.unfold();
+    expect(invoke).toHaveBeenCalledWith('assistant_unfold');
+  });
+
+  it('waits for typing when the user chose to type first, and listens when they tap the ball', async () => {
+    const { store, asr } = setup({ prefs: { open: 'type', read: 'voice' } });
+    await store.init();
+    await store.opened();
+    expect(asr.activate).not.toHaveBeenCalled();
+    expect(store.phase).toBe('idle');
+    await store.toggleListening();
+    expect(asr.activate).toHaveBeenCalledTimes(1);
+  });
+
+  it('follows a change of the open and read choices made in the settings window', async () => {
+    const { store, asr, emit } = setup();
+    await store.init();
+    expect(store.prefs).toEqual({ open: 'voice', read: 'voice' });
+    emit('settings-changed', { assistantOpen: 'type', assistantRead: 'always', other: 1 });
+    expect(store.prefs).toEqual({ open: 'type', read: 'always' });
+    emit('settings-changed', { assistantOpen: 'nonsense', assistantRead: undefined });
+    expect(store.prefs).toEqual({ open: 'type', read: 'always' });
+    await store.opened();
+    expect(asr.activate).not.toHaveBeenCalled();
+  });
+
+  it('reads answers aloud always, only after spoken questions, or never, as chosen', async () => {
+    for (const [read, typedReads, spokenReads] of [['always', true, true], ['voice', false, true], ['never', false, false]] as const) {
+      const typed = setup({ voice: false, prefs: { open: 'type', read } });
+      await typed.store.init(); await typed.store.opened();
+      typed.store.input = '打字问'; await typed.store.submit();
+      finishAnswer(typed.chat); typed.store.replied('s1', '回答', 'a');
+      expect(typed.speech.speak.mock.calls.length > 0, `typed, ${read}`).toBe(typedReads);
+
+      const spoken = setup({ prefs: { open: 'voice', read } });
+      await spoken.store.init(); await spoken.store.opened();
+      spoken.say('说着问'); spoken.advance(SEND_GRACE_MS + 1);
+      await vi.waitFor(() => expect(spoken.chat.send).toHaveBeenCalled());
+      finishAnswer(spoken.chat); spoken.store.replied('s1', '回答', 'a');
+      expect(spoken.speech.speak.mock.calls.length > 0, `spoken, ${read}`).toBe(spokenReads);
+    }
   });
 });

@@ -59,6 +59,17 @@ pub struct Settings {
     /// The floating assistant: a capsule that a global shortcut brings up for a quick spoken or typed question.
     pub assistant_enabled: bool,
     pub assistant_shortcut: String,
+    /// A small ball stays on screen; clicking it opens the capsule. Without it the capsule only appears on the shortcut.
+    pub assistant_ball: bool,
+    /// Where the ball was left, relative to its default spot on the screen it is on, in logical pixels.
+    pub assistant_ball_dx: f64,
+    pub assistant_ball_dy: f64,
+    /// What the capsule does when it opens: `voice` starts listening, `type` waits for typing.
+    pub assistant_open: String,
+    /// When answers are read aloud: `voice` for spoken questions only, `always`, or `never`.
+    pub assistant_read: String,
+    /// The one-time "press X anytime" hint has been shown.
+    pub assistant_hint_seen: bool,
     /// The particle effect over the desktop, whatever wallpaper (or plain system desktop) is behind it.
     pub effects: crate::effect_choice::EffectsChoice,
 }
@@ -85,6 +96,12 @@ impl Default for Settings {
             companion_skin: "pot".into(),
             assistant_enabled: true,
             assistant_shortcut: crate::float_assistant::DEFAULT_SHORTCUT.into(),
+            assistant_ball: true,
+            assistant_ball_dx: 0.0,
+            assistant_ball_dy: 0.0,
+            assistant_open: "voice".into(),
+            assistant_read: "voice".into(),
+            assistant_hint_seen: false,
             effects: Default::default(),
         }
     }
@@ -101,6 +118,17 @@ impl Settings {
         }
         if !crate::float_assistant::SHORTCUTS.contains(&self.assistant_shortcut.as_str()) {
             self.assistant_shortcut = defaults.assistant_shortcut;
+        }
+        if !crate::float_assistant::OPEN_MODES.contains(&self.assistant_open.as_str()) {
+            self.assistant_open = defaults.assistant_open;
+        }
+        if !crate::float_assistant::READ_MODES.contains(&self.assistant_read.as_str()) {
+            self.assistant_read = defaults.assistant_read;
+        }
+        // A saved spot is only a hint: anything absurd (or not a number) means the default spot.
+        if ![self.assistant_ball_dx, self.assistant_ball_dy].iter().all(|v| v.is_finite() && v.abs() <= 20000.0) {
+            self.assistant_ball_dx = 0.0;
+            self.assistant_ball_dy = 0.0;
         }
         if !EXPRESSIONS.contains(&self.expression.as_str()) {
             self.expression = defaults.expression;
@@ -226,6 +254,26 @@ mod tests {
         let mut odd: Preferences = serde_json::from_str(r#"{"settings":{"assistantShortcut":"Ctrl+Q"}}"#).unwrap();
         odd.settings.normalize();
         assert_eq!(odd.settings.assistant_shortcut, "Alt+Space");
+    }
+
+    #[test]
+    fn the_assistant_ball_and_its_voice_preferences_default_on_and_repair_bad_values() {
+        let defaults = Settings::default();
+        assert!(defaults.assistant_ball && !defaults.assistant_hint_seen);
+        assert_eq!((defaults.assistant_open.as_str(), defaults.assistant_read.as_str()), ("voice", "voice"));
+        let mut chosen: Preferences = serde_json::from_str(
+            r#"{"settings":{"assistantBall":false,"assistantBallDx":-120.5,"assistantBallDy":30,"assistantOpen":"type","assistantRead":"never"}}"#,
+        ).unwrap();
+        chosen.settings.normalize();
+        assert!(!chosen.settings.assistant_ball);
+        assert_eq!((chosen.settings.assistant_ball_dx, chosen.settings.assistant_ball_dy), (-120.5, 30.0));
+        assert_eq!((chosen.settings.assistant_open.as_str(), chosen.settings.assistant_read.as_str()), ("type", "never"));
+        let mut bad: Preferences = serde_json::from_str(
+            r#"{"settings":{"assistantBallDx":1e30,"assistantBallDy":5,"assistantOpen":"shout","assistantRead":"loud"}}"#,
+        ).unwrap();
+        bad.settings.normalize();
+        assert_eq!((bad.settings.assistant_ball_dx, bad.settings.assistant_ball_dy), (0.0, 0.0));
+        assert_eq!((bad.settings.assistant_open.as_str(), bad.settings.assistant_read.as_str()), ("voice", "voice"));
     }
     #[test]
     fn effects_chosen_per_wallpaper_become_the_desktop_wide_choice_once() {

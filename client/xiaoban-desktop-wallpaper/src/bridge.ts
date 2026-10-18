@@ -23,6 +23,11 @@ export interface Settings {
   /** The floating assistant: a capsule that a global shortcut brings up for a quick spoken or typed question. */
   assistantEnabled: boolean;
   assistantShortcut: string;
+  assistantBall: boolean;
+  /** `voice` listens as soon as the capsule opens, `type` waits for typing. */
+  assistantOpen: "voice" | "type";
+  /** `voice` reads answers to spoken questions only. */
+  assistantRead: "voice" | "always" | "never";
   /** The particle effect over the desktop, whatever wallpaper is behind it. */
   effects: EffectsChoice;
 }
@@ -285,6 +290,9 @@ export const defaults: Settings = {
   companionSkin: "pot",
   assistantEnabled: true,
   assistantShortcut: "Alt+Space",
+  assistantBall: true,
+  assistantOpen: "voice",
+  assistantRead: "voice",
   effects: { selected: "", params: {} },
 };
 export function invoke<T>(

@@ -7,6 +7,7 @@ function setup(options: { enabled?: boolean; modelReady?: boolean; prepare?: () 
   let enabled = options.enabled ?? false;
   let frame: ((frame: Float32Array) => void) | undefined;
   let progress: ((payload: unknown) => void) | undefined;
+  let hostState: ((payload: unknown) => void) | undefined;
   const stop = vi.fn(), off = vi.fn(), notify = vi.fn();
   const invoke = vi.fn(async (command: string, args?: Record<string, unknown>) => {
     if (command === 'asr_get_status') return { enabled, modelReady: options.modelReady ?? false, engineReady: false };
@@ -17,11 +18,23 @@ function setup(options: { enabled?: boolean; modelReady?: boolean; prepare?: () 
   });
   const capture = vi.fn(async (onFrame: (frame: Float32Array) => void) => { if (options.deny) throw new Error('请允许麦克风'); frame = onFrame; return { stop }; });
   const store = createAsrStore({ desktop: true, invoke: invoke as AsrDeps['invoke'], notify, capture,
-    listen: async (_, callback) => { progress = callback as (payload: unknown) => void; return off; } });
+    listen: async (event, callback) => { if (event === 'asr-state') hostState = callback as (payload: unknown) => void; else progress = callback as (payload: unknown) => void; return off; } });
   function phrase() { for (let i = 0; i < 3; i++) frame?.(new Float32Array(1600).fill(0.1)); for (let i = 0; i < 9; i++) frame?.(new Float32Array(1600)); }
-  return { store, invoke, capture, notify, stop, off, phrase, progress: (payload: unknown) => progress?.(payload) };
+  return { store, invoke, capture, notify, stop, off, phrase, progress: (payload: unknown) => progress?.(payload), hostState: (payload: unknown) => hostState?.(payload) };
 }
 describe('local ASR lifecycle', () => {
+  it('follows the host warming the engine up in the background, without changing the user\'s choice', async () => {
+    const h = setup({ modelReady: false });
+    await h.store.init();
+    expect(h.store.engineReady).toBe(false);
+    h.hostState({ enabled: true, modelReady: true, engineReady: false, warming: true });
+    expect(h.store.warming).toBe(true); expect(h.store.modelReady).toBe(true); expect(h.store.enabled).toBe(false);
+    h.hostState({ enabled: false, modelReady: true, engineReady: true, warming: false });
+    expect(h.store.engineReady).toBe(true); expect(h.store.warming).toBe(false);
+    expect(h.off).not.toHaveBeenCalled();
+    h.store.dispose();
+    expect(h.off).toHaveBeenCalledTimes(2);
+  });
   it('defaults off and never requests the microphone from settings', async () => {
     const h = setup(); await h.store.init(); expect(h.store.enabled).toBe(false);
     await h.store.setEnabled(true); expect(h.store.engineReady).toBe(true); expect(h.capture).not.toHaveBeenCalled();

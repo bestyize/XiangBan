@@ -2,7 +2,7 @@ import { reactive } from 'vue';
 import { UtteranceSegmenter } from './audio.ts';
 import { captureMicrophone, type Capture } from './capture.ts';
 
-interface HostStatus { enabled: boolean; modelReady: boolean; engineReady: boolean }
+interface HostStatus { enabled: boolean; modelReady: boolean; engineReady: boolean; warming?: boolean }
 interface Progress { requestId: string; phase: 'downloading' | 'loading'; file: string; downloaded: number; total: number }
 export interface AsrDeps {
   desktop: boolean;
@@ -15,6 +15,8 @@ export interface AsrStore extends HostStatus {
   ready: boolean; saving: boolean; preparing: boolean; listening: boolean; recognizing: boolean;
   /** Loudness of the microphone, 0..1, refreshed about fifteen times a second while listening. */
   level: number;
+  /** The host is fetching or loading the model on its own, in the background. */
+  warming: boolean;
   /** Temporary user intent for the current conversation; never persisted. */
   recordingRequested: boolean;
   phase: 'idle' | 'downloading' | 'loading'; downloaded: number; total: number; error: string;
@@ -94,7 +96,7 @@ export function createAsrStore(deps: AsrDeps): AsrStore {
   }
   const store: AsrStore = reactive({
     ready: false, enabled: false, modelReady: false, engineReady: false, saving: false, preparing: false, recordingRequested: false,
-    listening: false, recognizing: false, level: 0, phase: 'idle', downloaded: 0, total: 239549735, error: '',
+    listening: false, recognizing: false, level: 0, warming: false, phase: 'idle', downloaded: 0, total: 239549735, error: '',
     init() {
       initialization ??= (async () => {
         try {
@@ -103,7 +105,12 @@ export function createAsrStore(deps: AsrDeps): AsrStore {
             if (disposed || !store.enabled || value.requestId !== request) return;
             store.phase = value.phase; store.downloaded = value.downloaded; store.total = value.total;
           });
-          if (disposed) { off(); return; } unlisten = off;
+          // The host warms the engine up on its own after a start; follow it, without touching what the user chose.
+          const offState = await deps.listen<HostStatus>('asr-state', value => {
+            if (disposed) return;
+            store.modelReady = value.modelReady; store.engineReady = value.engineReady; store.warming = Boolean(value.warming);
+          });
+          if (disposed) { off(); offState(); return; } unlisten = () => { off(); offState(); };
           const value = await deps.invoke<HostStatus>('asr_get_status');
           if (!disposed) Object.assign(store, value);
         } catch (e) { if (!disposed) store.error = message(e); }

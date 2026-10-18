@@ -717,7 +717,7 @@ fn main() {
             chat::chat_context, chat::chat_compact, chat::chat_rename_session, chat::chat_move_session, chat::chat_create_group, chat::chat_rename_group, chat::chat_delete_group,
             chat::chat_answer_approval, chat::chat_answer_question, chat::chat_set_permission_mode,
             float_assistant::assistant_status, float_assistant::assistant_configure, float_assistant::assistant_ready, float_assistant::assistant_hide,
-            float_assistant::assistant_fit, float_assistant::assistant_drag, float_assistant::assistant_open_chat, float_assistant::assistant_open_settings]);
+            float_assistant::assistant_fit, float_assistant::assistant_drag, float_assistant::assistant_unfold, float_assistant::assistant_prefs, float_assistant::assistant_try, float_assistant::assistant_open_chat, float_assistant::assistant_open_settings]);
     let app = builder.manage(state).manage(content::ContentState::default()).manage(website::WebsiteState::default())
         .manage(games::GameState::default()).manage(desk_game::DeskState::default()).manage(rituals::RitualState::default()).manage(widgets::WidgetState::default()).manage(reminders::ReminderState::default()).manage(account::AccountState::default()).manage(ai_config::AiConfigState::default()).manage(tts::TtsState::default()).manage(asr::AsrState::default()).manage(ai_catalogue::CatalogueState::default()).manage(float_assistant::AssistantState::default())
         .register_uri_scheme_protocol("wallpaper-asset", |context, request| library::serve(context.app_handle(), request))
@@ -749,6 +749,7 @@ fn main() {
             app.manage(chat::ChatState::new(app.handle()));
             reminders::start(app.handle());
             float_assistant::start(app.handle());
+            asr::start(app.handle());
             games::start(app.handle());
             setup_tray(app)?;
             website::start(app.handle());
@@ -798,11 +799,13 @@ fn main() {
                     let games_report=if std::env::var_os("XIAOBAN_GAMES_SMOKE").is_some(){Some(games::smoke(&handle).await)}else{None};
                     let care_report=if std::env::var_os("XIAOBAN_CARE_SMOKE").is_some(){Some(reminders::smoke(&handle).await)}else{None};
                     let ui_report=if ui_smoke_enabled(&handle){Some(wait_ui_smoke(&handle).await)}else{None};
+                    let assistant_report=float_assistant::smoke(&handle).await;
+                    let asr_report=asr::smoke(&handle).await;
                     #[allow(unused_mut)]
                     let mut report = serde_json::json!({"floatingBefore": floating_before, "wallpaper": wallpaper,
                         "floatingAfter": floating_after, "wallpaperResult": wallpaper_result.map(|_| "ok"),
                         "floatingResult": floating_result.map(|_| "ok"), "startupResult": startup_result.map(|_| "ok"),
-                        "lifecycle": lifecycle,"media":media,"website":website,"games":games_report,"care":care_report,"ui":ui_report});
+                        "lifecycle": lifecycle,"media":media,"website":website,"games":games_report,"care":care_report,"ui":ui_report,"assistant":assistant_report,"asr":asr_report});
                     #[cfg(target_os = "macos")]
                     { report["dockReopen"] = serde_json::to_value(dock_reopen).unwrap(); }
                     if let Ok(path) = std::env::var("XIAOBAN_SMOKE_REPORT") {
@@ -814,6 +817,7 @@ fn main() {
             Ok(())
         })
         .on_window_event(|window, event| {
+            if window.label() == float_assistant::LABEL && matches!(event, tauri::WindowEvent::Moved(_)) { float_assistant::moved(window.app_handle()); }
             if window.label()=="care" && matches!(event,tauri::WindowEvent::Destroyed){reminders::window_closed(window.app_handle());}
             if window.label()=="games" {
                 if let tauri::WindowEvent::CloseRequested { api, .. } = event {
