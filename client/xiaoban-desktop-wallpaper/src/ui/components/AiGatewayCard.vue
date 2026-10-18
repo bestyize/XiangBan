@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 import { NAlert, NButton, NInput, NModal, NTag } from 'naive-ui';
-import { Wallet } from 'lucide-vue-next';
+import { Settings, Wallet } from 'lucide-vue-next';
 import { GATEWAY_PROVIDER, invoke, toAccountError, type AiBalance, type AiConfigView, type AiRedeemed, type AiTier } from '../../bridge.ts';
 import type { ControlStore } from '../control-types.ts';
 import { bucketLabel, expiryText, money, pickTier } from '../ai-gateway.ts';
@@ -88,9 +88,28 @@ async function enable() {
     props.store.notify(`聊天已切换到小伴 AI · ${tiers.value.find(t => t.tier === picked.value)?.displayName ?? picked.value}`, 'success');
   } catch (error) {
     enableError.value = toAccountError(error).message;
+    // Enabling from the card has no dialog open to show it in.
+    if (!open.value) props.store.notify(enableError.value, 'error');
   } finally {
     enabling.value = false;
   }
+}
+
+/** The card's own "启用此服务商": the tier that would be preselected in the dialog, with no dialog in between. */
+async function activate() {
+  if (!props.store.desktop || enabling.value) return;
+  if (!uid.value) {
+    props.store.notify('请先登录小伴账号，登录后即可启用', 'info');
+    openModal();
+    return;
+  }
+  if (!tiers.value.length) await load();
+  if (!picked.value) {
+    props.store.notify('暂时没有可用的模型档位，请在配置里刷新后再试', 'info');
+    openModal();
+    return;
+  }
+  await enable();
 }
 
 function openModal() {
@@ -114,7 +133,7 @@ watch(uid, () => {
 </script>
 
 <template>
-  <article class="provider-card gateway-card" :class="{ active: gatewayActive }" data-testid="ai-gateway-card" @click="openModal">
+  <article class="provider-card gateway-card" :class="{ active: gatewayActive }" data-testid="ai-gateway-card">
     <div class="gw-top">
       <div class="gw-badge">
         <Wallet :size="20" />
@@ -138,8 +157,15 @@ watch(uid, () => {
     </div>
 
     <div class="gw-actions">
-      <NButton size="small" type="primary" secondary :disabled="!store.desktop" data-testid="gateway-open">
-        {{ uid ? '额度与设置' : '了解并登录' }}
+      <NButton size="small" secondary :disabled="!store.desktop || enabling" data-testid="gateway-open" @click="openModal">
+        <template #icon><Settings :size="13" /></template>
+        配置
+      </NButton>
+      <NButton v-if="!gatewayActive" size="small" type="primary" secondary :loading="enabling" :disabled="!store.desktop || enabling" data-testid="gateway-activate" @click="activate">
+        启用此服务商
+      </NButton>
+      <NButton v-else size="small" disabled quaternary type="success" data-testid="gateway-in-use">
+        正在使用中
       </NButton>
     </div>
   </article>
@@ -227,11 +253,9 @@ watch(uid, () => {
   padding: 16px;
   border: 1px solid var(--ui-border);
   border-radius: 14px;
-  cursor: pointer;
   transition: all 0.2s ease;
   background: linear-gradient(135deg, var(--ui-primary-soft), var(--ui-surface-alt) 60%);
 }
-.gateway-card:hover { border-color: var(--ui-line); box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08); }
 .gateway-card.active { border-color: var(--ui-primary); }
 .gw-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
 .gw-badge { display: flex; align-items: center; gap: 10px; }

@@ -14,7 +14,7 @@ function harness(responders: Record<string, Responder> = {}, desktop = true) {
   const handlers = new Map<string, (payload: never) => void>();
   const stopped: string[] = [];
   const calls: [string, Record<string, unknown> | undefined][] = [];
-  const table: Record<string, Responder> = { chat_overview: () => overview(), chat_context: () => ({ used: 0, limit: 48_000, canCompact: false }), ...responders };
+  const table: Record<string, Responder> = { chat_overview: () => overview(), chat_context: () => ({ used: 0, limit: 256_000, canCompact: false }), ...responders };
   // The ring's numbers are read on their own schedule, so they are kept apart from the calls a test is about.
   const contextCalls: (Record<string, unknown> | undefined)[] = [];
   const deps: ChatDeps = {
@@ -40,8 +40,8 @@ describe('starting up', () => {
     const h = harness({ chat_overview: () => overview({ sessions: [summary('s1', '第一个')], workspace: '/Users/me/work', configured: true }) });
     await Promise.all([h.store.init(), h.store.init()]);
     await h.store.init();
-    expect([...h.handlers.keys()].sort()).toEqual(['chat-approval', 'chat-event', 'chat-hide-tool-calls-changed', 'chat-permission-mode-changed', 'chat-question', 'chat-sessions-changed']);
-    expect(h.deps.listen).toHaveBeenCalledTimes(6);
+    expect([...h.handlers.keys()].sort()).toEqual(['chat-approval', 'chat-compacting', 'chat-event', 'chat-hide-tool-calls-changed', 'chat-permission-mode-changed', 'chat-question', 'chat-sessions-changed']);
+    expect(h.deps.listen).toHaveBeenCalledTimes(7);
     expect(h.commands()).toEqual(['chat_overview']);
     expect(h.store).toMatchObject({ ready: true, configured: true, workspace: '/Users/me/work' });
     expect(h.store.sessions.map(s => s.title)).toEqual(['第一个']);
@@ -423,7 +423,7 @@ describe('shutting down', () => {
     const h = harness();
     await h.store.init();
     h.store.dispose();
-    expect(h.stopped.sort()).toEqual(['chat-approval', 'chat-event', 'chat-hide-tool-calls-changed', 'chat-permission-mode-changed', 'chat-question', 'chat-sessions-changed']);
+    expect(h.stopped.sort()).toEqual(['chat-approval', 'chat-compacting', 'chat-event', 'chat-hide-tool-calls-changed', 'chat-permission-mode-changed', 'chat-question', 'chat-sessions-changed']);
     h.events('s1', { type: 'text_delta', text: 'late' });
     h.emit('chat-approval', approval('a1'));
     expect(h.store.views.s1).toBeUndefined();
@@ -434,7 +434,7 @@ describe('shutting down', () => {
     const starting = h.store.init();
     h.store.dispose();
     await starting;
-    expect(h.stopped.sort()).toEqual(['chat-approval', 'chat-event', 'chat-hide-tool-calls-changed', 'chat-permission-mode-changed', 'chat-question', 'chat-sessions-changed']);
+    expect(h.stopped.sort()).toEqual(['chat-approval', 'chat-compacting', 'chat-event', 'chat-hide-tool-calls-changed', 'chat-permission-mode-changed', 'chat-question', 'chat-sessions-changed']);
     expect(h.store.sessions).toEqual([]);
   });
 });
@@ -480,7 +480,7 @@ describe('what the page can see', () => {
 });
 
 describe('the context of the open conversation and compacting it', () => {
-  const info = (used: number, canCompact = true) => ({ used, limit: 48_000, canCompact });
+  const info = (used: number, canCompact = true) => ({ used, limit: 256_000, canCompact });
   const say = (value: string) => [{ type: 'text' as const, text: value }];
   const history: WireMessage[] = [{ role: 'user', parts: say('早') }, { role: 'assistant', parts: say('早上好') }];
   const withSummary: WireMessage[] = [...history, { role: 'user', parts: say('[[xiaoban-summary keep_from=2]]\n摘要正文') }];
@@ -626,5 +626,95 @@ describe('the context of the open conversation and compacting it', () => {
     await h.store.refreshContext();
     expect(await h.store.compact()).toBe(false);
     expect(h.deps.invoke).not.toHaveBeenCalled();
+  });
+});
+
+describe('the context limit and the host compacting by itself', () => {
+  const info = (used: number, limit = 256_000, canCompact = true) => ({ used, limit, canCompact });
+  const say = (value: string) => [{ type: 'text' as const, text: value }];
+  const history: WireMessage[] = [{ role: 'user', parts: say('早') }, { role: 'assistant', parts: say('早上好') }];
+  const tick = () => new Promise(resolve => setTimeout(resolve, 0));
+
+  it('shows a new limit at once, saves it, and then reads the numbers back from the host', async () => {
+    let limit = 256_000;
+    const h = harness({ chat_overview: () => overview(), chat_context: () => info(100_000, limit), set_context_tokens: args => { limit = Number(args?.tokens); return undefined; } });
+    await h.store.init();
+    await vi.waitFor(() => expect(h.store.context.limit).toBe(256_000));
+
+    const pending = h.store.setContextSize(512_000);
+    expect(h.store.context.limit).toBe(512_000);
+    expect(await pending).toBe(true);
+    expect(h.calls.at(-1)).toEqual(['set_context_tokens', { tokens: 512_000 }]);
+    expect(h.store.context).toEqual(info(100_000, 512_000));
+  });
+
+  it('puts the old limit back and says why when the host refuses', async () => {
+    const h = harness({ chat_overview: () => overview(), chat_context: () => info(100_000), set_context_tokens: () => { throw new Error('无法保存上下文大小：磁盘已满'); } });
+    await h.store.init();
+    await vi.waitFor(() => expect(h.store.context.used).toBe(100_000));
+    expect(await h.store.setContextSize(900_000)).toBe(false);
+    expect(h.store.context.limit).toBe(256_000);
+    expect(h.deps.notify).toHaveBeenCalledWith(expect.objectContaining({ message: '无法保存上下文大小：磁盘已满' }), 'error');
+  });
+
+  it('does nothing about the limit in the browser preview', async () => {
+    const h = harness({}, false);
+    await h.store.init();
+    expect(await h.store.setContextSize(512_000)).toBe(false);
+    expect(h.deps.invoke).not.toHaveBeenCalled();
+  });
+
+  it('marks a conversation as being compacted while the host does it, then shows the summary there', async () => {
+    let used = 240_000;
+    const h = harness({ chat_overview: () => overview({ sessions: [summary('s1')] }), chat_load_session: () => history, chat_context: () => info(used) });
+    await h.store.init();
+    await h.store.select('s1');
+    await vi.waitFor(() => expect(h.store.context.used).toBe(240_000));
+    const before = h.store.current()!.items.length;
+
+    h.emit('chat-compacting', { session: 's1', state: 'start' });
+    expect(h.store.compactingId).toBe('s1');
+
+    used = 30_000;
+    h.emit('chat-compacting', { session: 's1', state: 'done', summary: '【用户目标】整理文件' });
+    expect(h.store.compactingId).toBeNull();
+    const items = h.store.current()!.items;
+    expect(items).toHaveLength(before + 1);
+    const notice = items.at(-1) as Extract<(typeof items)[number], { kind: 'notice' }>;
+    expect([notice.kind, notice.detailsLabel, notice.details]).toEqual(['notice', '查看摘要', '【用户目标】整理文件']);
+    await vi.waitFor(() => expect(h.store.context.used).toBe(30_000));
+  });
+
+  it('says so, once, when the host could not compact', async () => {
+    const h = harness({ chat_overview: () => overview({ sessions: [summary('s1')] }), chat_load_session: () => history });
+    await h.store.init();
+    await h.store.select('s1');
+    h.emit('chat-compacting', { session: 's1', state: 'start' });
+    h.emit('chat-compacting', { session: 's1', state: 'failed', message: '额度已用完，请兑换额度后继续使用' });
+    expect(h.store.compactingId).toBeNull();
+    expect(h.deps.notify).toHaveBeenCalledTimes(1);
+    expect(h.deps.notify).toHaveBeenCalledWith(expect.stringContaining('额度已用完'), 'info');
+    expect(h.store.current()!.items.some(item => item.kind === 'notice')).toBe(false);
+  });
+
+  it('leaves the open conversation alone when another one is compacted, and a manual compaction of its own still works', async () => {
+    let compacted = false;
+    const h = harness({
+      chat_overview: () => overview({ sessions: [summary('s1'), summary('s2')] }),
+      chat_load_session: () => history,
+      chat_compact: () => { compacted = true; return info(1_000, 256_000, false); },
+    });
+    await h.store.init();
+    await h.store.select('s1');
+    h.emit('chat-compacting', { session: 's2', state: 'start' });
+    expect(h.store.compactingId).toBe('s2');
+    expect(await h.store.compact()).toBe(true);
+    expect(compacted).toBe(true);
+
+    const calls = h.contextCalls.length;
+    h.emit('chat-compacting', { session: 's2', state: 'done', summary: '别的对话' });
+    await tick();
+    expect(h.contextCalls.length).toBe(calls);
+    expect(h.store.current()!.items.some(item => item.kind === 'notice' && item.details === '别的对话')).toBe(false);
   });
 });

@@ -13,6 +13,11 @@ const textOf = (message: WireMessage) => (message.parts ?? []).map(part => (part
 const SUMMARY_MARK = /^\[\[xiaoban-summary keep_from=\d+\]\]\n/;
 export const summaryOf = (text: string) => (SUMMARY_MARK.test(text) ? text.replace(SUMMARY_MARK, '') : null);
 
+/** What the conversation shows where an older part was replaced by a summary. */
+export function summaryNotice(view: SessionView, summary: string): ChatItem {
+  return { kind: 'notice', id: nextId(view), tone: 'info', text: '较早的对话已压缩成摘要，小伴之后会参考摘要和最近的内容。', details: summary, detailsLabel: '查看摘要' };
+}
+
 /** The conversation as it was saved: tool results are put onto the calls they answer. */
 export function itemsFromHistory(view: SessionView, messages: WireMessage[]): ChatItem[] {
   const items: ChatItem[] = [];
@@ -22,9 +27,8 @@ export function itemsFromHistory(view: SessionView, messages: WireMessage[]): Ch
       const images = (message.parts ?? []).filter(part => part.type === 'image').map(part => (part as { url: string }).url);
       const text = textOf(message);
       const summary = summaryOf(text);
-      if (summary !== null) {
-        items.push({ kind: 'notice', id: nextId(view), tone: 'info', text: '较早的对话已压缩成摘要，小伴之后会参考摘要和最近的内容。', details: summary, detailsLabel: '查看摘要' });
-      } else if (text || images.length) items.push({ kind: 'user', id: nextId(view), text, images });
+      if (summary !== null) items.push(summaryNotice(view, summary));
+      else if (text || images.length) items.push({ kind: 'user', id: nextId(view), text, images });
     } else if (message.role === 'assistant') {
       const text = textOf(message);
       if (text.trim()) items.push({ kind: 'assistant', id: nextId(view), text, streaming: false });

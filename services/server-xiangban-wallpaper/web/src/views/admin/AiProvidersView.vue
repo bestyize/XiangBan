@@ -1,100 +1,403 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { getAiCatalogue, saveAiCatalogue } from '@/admin/api'
-import type { AiCatalogue, AiProvider } from '@/admin/ai-types'
-const clone = <T,>(value: T): T => JSON.parse(JSON.stringify(value));
+import { aiTypeLabel, newAiProvider, type AiCatalogue, type AiProvider } from '@/admin/ai-types'
+import AiProviderDialog from '@/components/admin/AiProviderDialog.vue'
+import ConfirmButton from '@/components/admin/ConfirmButton.vue'
+import ToggleSwitch from '@/components/admin/ToggleSwitch.vue'
+import Icon from '@/components/Icon.vue'
+import { toast } from '@/composables/toast'
+
+const clone = <T,>(value: T): T => JSON.parse(JSON.stringify(value))
+const message = (e: unknown) => (e instanceof Error ? e.message : String(e))
+
 const config = ref<AiCatalogue | null>(null)
-const draft = ref<AiProvider | null>(null)
-const originalId = ref<string | null>(null)
-const error = ref('')
+const loading = ref(true)
 const busy = ref(false)
-const protocols = ['OpenAI Responses', 'OpenAI Chat Completions', 'Anthropic Messages']
-const labels = { third: '第三方 · 用户填写 Key', free: '小伴免费', paid: '小伴付费' }
+const error = ref('')
+
+// The provider being edited in the dialog. `originalId` is null for a new one.
+const editing = ref<{ provider: AiProvider; originalId: string | null } | null>(null)
+const dialogError = ref('')
+
+const entryOn = computed(() => config.value?.xiaobanAi?.enabled ?? true)
+const typeTone = { third: '', free: 'ok', paid: 'warn' } as const
+
 async function load() {
-  busy.value = true
+  loading.value = true
   try { config.value = await getAiCatalogue(); error.value = '' }
-  catch (e) { error.value = String(e instanceof Error ? e.message : e) }
-  finally { busy.value = false }
+  catch (e) { error.value = message(e) }
+  finally { loading.value = false }
 }
 onMounted(load)
-function edit(p?: AiProvider) {
-  originalId.value = p?.id ?? null
-  draft.value = p ? clone(p) : {
-    id: '', provider: '', description: '', endPoint: '', protocol: 'OpenAI Responses', type: 'third',
-    enabled: false, defaultModel: '', models: [], endpoints: {}, consoleUrl: '', consoleText: '', userAccess: [],
-  }
-}
-async function publish(next: AiCatalogue) {
+
+/** Saves the whole catalogue. Returns the reason when it was refused, so each caller shows it where the user is looking. */
+async function publish(next: AiCatalogue): Promise<string> {
   busy.value = true
-  try { config.value = await saveAiCatalogue(next); draft.value = null; error.value = '' }
-  catch (e) { error.value = String(e instanceof Error ? e.message : e) }
+  try { config.value = await saveAiCatalogue(next); return '' }
+  catch (e) { return message(e) }
   finally { busy.value = false }
 }
-async function save() {
-  if (!config.value || !draft.value) return
-  const next = clone(config.value), p = clone(draft.value)
-  if (!p.id || !p.provider.trim()) { error.value = '请填写供应商 ID 和名称'; return }
-  if (next.providers.some(v => v.id === p.id && v.id !== originalId.value)) { error.value = '供应商 ID 已存在'; return }
-  const i = next.providers.findIndex(v => v.id === originalId.value)
-  if (i < 0) next.providers.push(p); else next.providers[i] = p
-  await publish(next)
+
+/** Page-level changes (a switch, a delete) report to the banner at the top of the page. */
+async function change(next: AiCatalogue, done: string) {
+  const refused = await publish(next)
+  error.value = refused
+  if (!refused) toast(done)
 }
-async function toggle(p: AiProvider) {
+
+function openEditor(provider?: AiProvider) {
+  dialogError.value = ''
+  editing.value = provider ? { provider: clone(provider), originalId: provider.id } : { provider: newAiProvider(), originalId: null }
+}
+
+async function saveProvider(provider: AiProvider) {
+  if (!config.value || !editing.value) return
+  const next = clone(config.value)
+  const { originalId } = editing.value
+  if (next.providers.some(v => v.id === provider.id && v.id !== originalId)) {
+    dialogError.value = `ID「${provider.id}」已经被另一个供应商用了`
+    return
+  }
+  const at = next.providers.findIndex(v => v.id === originalId)
+  if (at < 0) next.providers.push(provider)
+  else next.providers[at] = provider
+  dialogError.value = await publish(next)
+  if (!dialogError.value) {
+    editing.value = null
+    error.value = ''
+    toast(originalId ? '已保存并生效' : '已添加，客户端下次刷新后可见')
+  }
+}
+
+function toggle(provider: AiProvider) {
   if (!config.value) return
   const next = clone(config.value)
-  next.providers.find(v => v.id === p.id)!.enabled = !p.enabled
-  await publish(next)
+  const target = next.providers.find(v => v.id === provider.id)
+  if (!target) return
+  target.enabled = !provider.enabled
+  void change(next, target.enabled ? `已启用 ${provider.provider}` : `已停用 ${provider.provider}`)
 }
-async function remove(p: AiProvider) {
-  if (!config.value || !window.confirm('删除 ' + p.provider + '？客户端下次刷新后将无法再选择。')) return
-  await publish({ ...clone(config.value), providers: config.value.providers.filter(v => v.id !== p.id) })
+
+function setEntry() {
+  if (!config.value) return
+  const next = clone(config.value)
+  next.xiaobanAi = { enabled: !entryOn.value }
+  void change(next, next.xiaobanAi.enabled ? '已开启“小伴 AI”入口' : '已关闭“小伴 AI”入口')
 }
+
+function remove(provider: AiProvider) {
+  if (!config.value) return
+  const next = clone(config.value)
+  next.providers = next.providers.filter(v => v.id !== provider.id)
+  void change(next, `已删除 ${provider.provider}`)
+}
+
+const enabledModels = (p: AiProvider) => p.models.filter(m => m.enabled).length
+const credential = (p: AiProvider) =>
+  p.type === 'third' ? '用户自备' : p.type === 'paid' ? `${p.userAccess.length} 人已授权` : p.hasKey ? '已配置' : '免密网关'
 </script>
+
 <template>
   <div class="a-page">
-    <header class="a-head"><h1 class="display">模型供应商</h1><p>管理桌面端的第三方预设、免费和付费服务。保存后在客户端下次刷新时生效。</p></header>
-    <p v-if="error" class="a-error" role="alert">{{ error }} <button type="button" class="a-link" :disabled="busy" @click="load">重新加载</button></p>
-    <div class="toolbar"><button type="button" :disabled="busy" @click="edit()">新增供应商</button><button type="button" :disabled="busy" @click="load">刷新</button><span>修订 {{ config?.revision ?? '—' }}</span></div>
-    <section v-for="p in config?.providers" :key="p.id" class="a-section">
-      <div class="row"><div><h2>{{ p.provider }}</h2><p>{{ labels[p.type] }} · {{ p.enabled ? '已启用' : '已停用' }} · {{ p.models.length }} 个模型</p><p>{{ p.description }}</p><small>推荐模型：{{ p.defaultModel || '未设置' }}</small></div>
-      <div class="toolbar"><button type="button" :disabled="busy" @click="edit(p)">编辑</button><button type="button" :disabled="busy" @click="toggle(p)">{{ p.enabled ? '停用' : '启用' }}</button><button type="button" :disabled="busy" @click="remove(p)">删除</button></div></div>
+    <header class="a-head">
+      <h1 class="display">模型供应商</h1>
+      <p>管理桌面端“设置 → AI 模型”里的服务商卡片。保存后，客户端在下次刷新时生效。</p>
+    </header>
+
+    <p v-if="error" class="a-error banner" role="alert">{{ error }} <button type="button" class="a-link" :disabled="busy || loading" @click="load">重新加载</button></p>
+
+    <section class="entry" :class="{ off: !entryOn }" aria-labelledby="entry-title">
+      <span class="entry-icon" aria-hidden="true"><Icon name="sparkles" :size="22" /></span>
+      <div class="entry-main">
+        <h2 id="entry-title">“小伴 AI”入口 <span class="a-tag" :class="entryOn ? 'ok' : 'warn'">{{ entryOn ? '已开启' : '已关闭' }}</span></h2>
+        <p>桌面端卡片列表里排第一的官方服务（账号登录 + 额度，由 AI 网关提供），不在下面的列表里。关闭后，桌面端下次刷新时会隐藏它，正在用它聊天的用户会被提示改选其他服务商。</p>
+      </div>
+      <ToggleSwitch :model-value="entryOn" label="在桌面端显示“小伴 AI”入口" :disabled="busy || !config" @update:model-value="setEntry" />
     </section>
-    <form v-if="draft" class="editor a-section" @submit.prevent="save">
-      <h2>{{ originalId ? '编辑供应商' : '新增供应商' }}</h2>
-      <div class="fields">
-        <label>ID<input v-model="draft.id" :disabled="originalId !== null" maxlength="80" required /></label>
-        <label>名称<input v-model="draft.provider" required maxlength="100" /></label>
-        <label>类型<select v-model="draft.type"><option value="third">第三方 third</option><option value="free">免费 free</option><option value="paid">付费 paid</option></select></label>
-        <label>协议<select v-model="draft.protocol"><option v-for="p in protocols" :key="p">{{ p }}</option></select></label>
-        <label class="wide">描述<textarea v-model="draft.description" maxlength="1000" /></label>
-        <label class="wide">API 基础地址<input v-model="draft.endPoint" placeholder="https://gateway.example.com/v1" /></label>
-        <label><input v-model="draft.enabled" type="checkbox" /> 启用供应商</label>
-        <label>默认模型<select v-model="draft.defaultModel"><option value="">请选择</option><option v-for="m in draft.models.filter(m => m.enabled)" :key="m.id" :value="m.id">{{ m.name || m.id }}</option></select></label>
-        <template v-if="draft.type === 'free'">
-          <label class="wide">调用凭证（公共免密网关留空即可）<input v-model="draft.apikey" type="password" autocomplete="new-password" :placeholder="draft.hasKey ? '已配置，留空保持原值' : '免密网关直接留空；若有自备受限 Key 则填入'" /></label>
-          <label><input v-model="draft.clearKey" type="checkbox" /> 清除已保存凭证（需停用供应商）</label>
-        </template>
-        <template v-if="draft.type === 'third'">
-          <label class="wide">获取 Key 的页面<input v-model="draft.consoleUrl" placeholder="https://…" /></label>
-          <label class="wide">链接文字<input v-model="draft.consoleText" /></label>
-          <details class="wide"><summary>不同协议的基础地址</summary><label v-for="p in protocols" :key="p">{{ p }}<input :value="draft.endpoints[p] ?? ''" @input="($event.target as HTMLInputElement).value.trim() ? draft.endpoints[p] = ($event.target as HTMLInputElement).value.trim() : delete draft.endpoints[p]" /></label></details>
-        </template>
+
+    <div class="bar">
+      <h2 class="bar-title">服务商 <span v-if="config" class="n">{{ config.providers.length }}</span></h2>
+      <div class="bar-actions">
+        <span v-if="config" class="a-small">修订 {{ config.revision }}</span>
+        <button type="button" class="a-btn small" :disabled="busy || loading" @click="load">刷新</button>
+        <button type="button" class="a-btn small primary" :disabled="busy || !config" @click="openEditor()"><Icon name="plus" :size="16" />新增供应商</button>
       </div>
-      <h3>模型列表</h3>
-      <div v-for="(m, i) in draft.models" :key="i" class="model-row">
-        <input v-model="m.id" placeholder="模型调用 ID" required /><input v-model="m.name" placeholder="展示名称" required />
-        <input v-model="m.description" placeholder="描述（可选）" />
-        <label><input v-model="m.enabled" type="checkbox" />启用</label><button type="button" @click="draft.models.splice(i, 1)">删除</button>
-      </div>
-      <button type="button" @click="draft.models.push({ id: '', name: '', description: '', enabled: true })">添加模型</button>
-      <section v-if="draft.type === 'paid'"><h3>用户授权</h3><p>按用户 UID 下发该用户的网关令牌；计费和额度由网关校验，不提供共享上游 Key。</p>
-        <div v-for="(a, i) in draft.userAccess" :key="i" class="model-row"><input v-model="a.uid" placeholder="用户 UID" required /><input v-model="a.apikey" type="password" autocomplete="new-password" :placeholder="a.hasKey ? '留空保持令牌' : '该用户的受限网关令牌'" /><button type="button" @click="draft.userAccess.splice(i, 1)">撤销授权</button></div>
-        <button type="button" @click="draft.userAccess.push({ uid: '', apikey: '' })">添加用户授权</button>
-      </section>
-      <div class="toolbar"><button type="submit" :disabled="busy">{{ busy ? '保存中…' : '保存并生效' }}</button><button type="button" :disabled="busy" @click="draft = null">取消</button></div>
-    </form>
+    </div>
+
+    <p v-if="loading && !config" class="state" role="status">正在加载…</p>
+    <div v-else-if="config && !config.providers.length" class="state">
+      <p>还没有服务商。桌面端会只显示“小伴 AI”入口和用户自己添加的服务商。</p>
+      <button type="button" class="a-btn" :disabled="busy" @click="openEditor()"><Icon name="plus" :size="16" />新增供应商</button>
+    </div>
+
+    <ul v-if="config?.providers.length" class="grid">
+      <li v-for="p in config.providers" :key="p.id" class="card" :class="{ off: !p.enabled }">
+        <div class="top">
+          <div class="titles">
+            <h3>{{ p.provider }}</h3>
+            <span class="id">{{ p.id }}</span>
+          </div>
+          <ToggleSwitch :model-value="p.enabled" :label="`${p.enabled ? '停用' : '启用'} ${p.provider}`" :disabled="busy" @update:model-value="toggle(p)" />
+        </div>
+        <div class="tags">
+          <span class="a-tag" :class="typeTone[p.type]">{{ aiTypeLabel(p.type) }}</span>
+          <span class="a-tag">{{ p.enabled ? '已启用' : '已停用' }}</span>
+        </div>
+        <p class="desc">{{ p.description || '没有描述' }}</p>
+        <dl class="facts">
+          <div><dt>模型</dt><dd>{{ enabledModels(p) }}<small> / {{ p.models.length }}</small></dd></div>
+          <div><dt>推荐</dt><dd class="mono" :title="p.defaultModel">{{ p.defaultModel || '未设置' }}</dd></div>
+          <div><dt>凭证</dt><dd>{{ credential(p) }}</dd></div>
+        </dl>
+        <div class="actions">
+          <button type="button" class="a-btn small" :disabled="busy" @click="openEditor(p)">编辑</button>
+          <ConfirmButton label="删除" confirm-label="再点一次删除" :busy="busy" @confirm="remove(p)" />
+        </div>
+      </li>
+    </ul>
+
+    <AiProviderDialog
+      v-if="editing"
+      :key="editing.originalId ?? '__new'"
+      :provider="editing.provider"
+      :is-new="editing.originalId === null"
+      :busy="busy"
+      :error="dialogError"
+      @save="saveProvider"
+      @close="editing = null"
+    />
   </div>
 </template>
+
 <style scoped>
-.toolbar,.row{display:flex;align-items:center;gap:12px;flex-wrap:wrap}.toolbar{margin:16px 0}.row{justify-content:space-between}.fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}.wide{grid-column:1/-1}label{display:grid;gap:6px}input:not([type=checkbox]),select,textarea{width:100%;padding:9px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:inherit}button{padding:8px 14px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:inherit;cursor:pointer}button:disabled{opacity:.5;cursor:default}.model-row{display:flex;gap:8px;align-items:center;margin:10px 0;flex-wrap:wrap}.model-row input:not([type=checkbox]){flex:1;min-width:150px}textarea{min-height:70px}section h3{margin-top:24px}@media(max-width:600px){.fields{grid-template-columns:1fr}}
+.banner {
+  margin-top: 16px;
+}
+
+.entry {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 16px;
+  margin-top: 24px;
+  padding: 18px 20px;
+  border: 1px solid var(--line-strong);
+  border-radius: 16px;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--heart) 11%, var(--surface)), var(--surface) 70%);
+  transition: opacity 0.2s;
+}
+
+.entry.off {
+  background: var(--surface);
+}
+
+.entry.off .entry-icon {
+  color: var(--text-3);
+}
+
+.entry-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--heart) 16%, transparent);
+  color: var(--heart);
+}
+
+.entry.off .entry-icon {
+  background: var(--surface-2);
+}
+
+.entry-main h2 {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.entry-main p {
+  margin-top: 4px;
+  max-width: 62ch;
+  color: var(--text-2);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 16px;
+  margin: 32px 0 14px;
+}
+
+.bar-title {
+  font-size: 22px;
+}
+
+.n {
+  margin-left: 4px;
+  color: var(--text-3);
+  font-size: 14px;
+  font-weight: 400;
+}
+
+.bar-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.state {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 28px 0;
+  color: var(--text-3);
+  border-top: 1px solid var(--line);
+}
+
+.grid {
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 14px;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  padding: 16px 18px 14px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--surface);
+  transition:
+    border-color 0.2s,
+    transform 0.2s var(--ease);
+}
+
+.card:hover {
+  border-color: var(--line-strong);
+}
+
+.card.off .titles,
+.card.off .desc,
+.card.off .facts {
+  opacity: 0.55;
+}
+
+.top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.titles {
+  min-width: 0;
+}
+
+.titles h3 {
+  overflow: hidden;
+  font-size: 16px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.id {
+  display: block;
+  margin-top: 2px;
+  overflow: hidden;
+  color: var(--text-3);
+  font-family: var(--mono);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.desc {
+  display: -webkit-box;
+  min-height: 3.2em;
+  overflow: hidden;
+  color: var(--text-2);
+  font-size: 13px;
+  line-height: 1.6;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+}
+
+.facts {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 14px;
+  padding: 10px 0;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+
+.facts div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.facts dt {
+  color: var(--text-3);
+  font-size: 12px;
+}
+
+.facts dd {
+  overflow: hidden;
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.facts dd small {
+  color: var(--text-3);
+}
+
+.mono {
+  font-family: var(--mono);
+  font-size: 12px;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: auto;
+}
+
+@media (max-width: 640px) {
+  .entry {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .entry > :last-child {
+    grid-column: 2;
+    justify-self: start;
+  }
+
+  .grid {
+    grid-template-columns: 1fr;
+  }
+}
 </style>

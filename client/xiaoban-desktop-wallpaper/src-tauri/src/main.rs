@@ -708,7 +708,7 @@ fn main() {
             asr::asr_get_status, asr::asr_set_enabled, asr::asr_prepare, asr::asr_transcribe,
             ai_gateway::ai_gateway_balance, ai_gateway::ai_gateway_redeem, ai_gateway::ai_gateway_tiers, ai_gateway::use_ai_gateway,
             ai_catalogue::refresh_ai_providers, ai_config::get_ai_config, ai_config::save_ai_config, ai_config::pick_workspace, ai_config::fetch_ai_models,
-            ai_config::save_ai_provider, ai_config::switch_ai_provider, ai_config::delete_ai_provider, ai_config::save_ai_preferences, request_system_permissions,
+            ai_config::save_ai_provider, ai_config::switch_ai_provider, ai_config::delete_ai_provider, ai_config::save_ai_preferences, ai_config::set_context_tokens, request_system_permissions,
             chat::chat_overview, chat::chat_load_session, chat::chat_new_session, chat::chat_send, chat::chat_cancel, chat::chat_delete_session,
             chat::chat_context, chat::chat_compact, chat::chat_rename_session, chat::chat_move_session, chat::chat_create_group, chat::chat_rename_group, chat::chat_delete_group,
             chat::chat_answer_approval, chat::chat_answer_question, chat::chat_set_permission_mode]);

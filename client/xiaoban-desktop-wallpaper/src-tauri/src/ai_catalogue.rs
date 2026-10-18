@@ -15,8 +15,21 @@ pub struct CatalogueState {
 pub struct Catalogue {
     version: u32,
     refresh_after_seconds: u64,
+    /// Missing from catalogues of sites that predate the switch, which means on.
+    #[serde(default)]
+    xiaoban_ai: XiaobanAiSwitch,
     providers: Vec<RemoteProvider>,
 }
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct XiaobanAiSwitch {
+    #[serde(default = "on")]
+    enabled: bool,
+}
+impl Default for XiaobanAiSwitch {
+    fn default() -> Self { Self { enabled: true } }
+}
+fn on() -> bool { true }
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RemoteProvider {
@@ -85,6 +98,7 @@ pub fn merge(config: &mut AiConfig, catalogue: Catalogue) -> Result<(), String> 
         }
     }
     next.catalogue_received = true;
+    next.gateway_enabled = catalogue.xiaoban_ai.enabled;
     next.catalogue_refresh_after = catalogue.refresh_after_seconds;
     activate_snapshot(&mut next);
     *config = next;
@@ -120,6 +134,9 @@ pub fn account_changed(app: &tauri::AppHandle) {
     }
 }
 pub fn usable(app: &tauri::AppHandle, config: &AiConfig) -> Result<(), String> {
+    if crate::ai_gateway::switched_off(config) {
+        return Err("小伴 AI 入口已被关闭，请到“设置 → AI 模型”选择其他服务商".into());
+    }
     if let Some(p) = config.providers.iter().find(|p| p.id == config.active_provider) {
         if !p.available { return Err("当前模型供应商已停用，请切换模型".into()); }
         if p.remote && p.provider_type == "paid" {
@@ -227,6 +244,29 @@ mod tests {
         assert_eq!(c.providers[0].model, "chosen"); assert_eq!(c.providers[0].api_key, "user-key");
         c.providers[0].selection_mode = "recommended".into();
         merge(&mut c, catalogue("next-default")).unwrap(); assert_eq!(c.providers[0].model, "next-default");
+    }
+    #[test] fn the_xiaoban_ai_entry_follows_the_catalogue_and_is_on_when_the_site_says_nothing() {
+        let mut c = AiConfig::default();
+        assert!(c.gateway_enabled, "on before any catalogue arrived");
+        let mut off = catalogue("m");
+        off.xiaoban_ai.enabled = false;
+        merge(&mut c, off).unwrap();
+        assert!(!c.gateway_enabled);
+        merge(&mut c, catalogue("m")).unwrap();
+        assert!(c.gateway_enabled, "a catalogue that does not mention it turns it back on");
+
+        let silent: Catalogue = serde_json::from_value(serde_json::json!({"version":1,"refreshAfterSeconds":21600,"providers":[]})).unwrap();
+        assert!(silent.xiaoban_ai.enabled, "an older site sends no field");
+        let empty: Catalogue = serde_json::from_value(serde_json::json!({"version":1,"refreshAfterSeconds":21600,"xiaobanAi":{},"providers":[]})).unwrap();
+        assert!(empty.xiaoban_ai.enabled);
+    }
+    #[test] fn a_refused_catalogue_does_not_switch_the_entry() {
+        let mut c = AiConfig::default();
+        let mut bad = catalogue("m");
+        bad.xiaoban_ai.enabled = false;
+        bad.providers[0].protocol = "unknown".into();
+        assert!(merge(&mut c, bad).is_err());
+        assert!(c.gateway_enabled);
     }
     #[test] fn invalid_response_does_not_destroy_cache() {
         let mut c = AiConfig::default(); let before = c.clone(); let mut invalid = catalogue("m");

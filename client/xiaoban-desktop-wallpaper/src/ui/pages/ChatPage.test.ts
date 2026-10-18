@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { NSlider } from 'naive-ui';
 import { reactive } from 'vue';
 import ChatPage from './ChatPage.vue';
 import ChatNameDialog from '../components/ChatNameDialog.vue';
@@ -21,7 +22,7 @@ let wrapper: VueWrapper | undefined;
 async function open(responders: Record<string, Responder> = {}, options: { desktop?: boolean } = {}) {
   const handlers = new Map<string, (payload: never) => void>();
   const calls: [string, Record<string, unknown> | undefined][] = [];
-  const table: Record<string, Responder> = { chat_overview: () => overview(), chat_context: () => ({ used: 0, limit: 48_000, canCompact: false }), ...responders };
+  const table: Record<string, Responder> = { chat_overview: () => overview(), chat_context: () => ({ used: 0, limit: 256_000, canCompact: false }), ...responders };
   // The ring's numbers are read on their own schedule, so they are kept apart from the calls a test is about.
   const contextCalls: (Record<string, unknown> | undefined)[] = [];
   const invoke = vi.fn(async (command: string, args?: Record<string, unknown>) => {
@@ -814,7 +815,7 @@ describe('sending images', () => {
 });
 
 describe('the context ring in the composer', () => {
-  const info = (used: number, canCompact = true) => ({ used, limit: 48_000, canCompact });
+  const info = (used: number, canCompact = true) => ({ used, limit: 256_000, canCompact });
   const say = (value: string) => [{ type: 'text' as const, text: value }];
   const history: WireMessage[] = [{ role: 'user', parts: say('早') }, { role: 'assistant', parts: say('早上好') }];
   const summarized: WireMessage[] = [...history, { role: 'user', parts: say('[[xiaoban-summary keep_from=2]]\n摘要正文') }];
@@ -826,7 +827,7 @@ describe('the context ring in the composer', () => {
     expect(q('chat-context')).not.toBeNull();
     expect(q('chat-send')!.previousElementSibling).toBe(q('chat-context'));
     await click('chat-context');
-    expect(inBody('ctx-numbers')!.textContent).toBe('12.3K / 48K');
+    expect(inBody('ctx-numbers')!.textContent).toBe('12.3K / 256K');
   });
 
   it('is not there in the browser preview', async () => {
@@ -838,9 +839,9 @@ describe('the context ring in the composer', () => {
     const h = await open({ ...listed, chat_context: args => (args?.sessionId === 's1' ? info(30_000) : info(3_000)) });
     await flushPromises();
     await click('chat-context');
-    expect(inBody('ctx-numbers')!.textContent).toBe('3K / 48K');
+    expect(inBody('ctx-numbers')!.textContent).toBe('3K / 256K');
     await click('chat-session-s1');
-    await vi.waitFor(() => expect(inBody('ctx-numbers')!.textContent).toBe('30K / 48K'));
+    await vi.waitFor(() => expect(inBody('ctx-numbers')!.textContent).toBe('30K / 256K'));
     expect(h.contextCalls.at(-1)).toEqual({ sessionId: 's1' });
   });
 
@@ -854,9 +855,9 @@ describe('the context ring in the composer', () => {
     });
     await click('chat-session-s1');
     await click('chat-context');
-    await vi.waitFor(() => expect(inBody('ctx-numbers')!.textContent).toBe('40K / 48K'));
+    await vi.waitFor(() => expect(inBody('ctx-numbers')!.textContent).toBe('40K / 256K'));
     await clickBody('ctx-compact');
-    await vi.waitFor(() => expect(inBody('ctx-numbers')!.textContent).toBe('2K / 48K'));
+    await vi.waitFor(() => expect(inBody('ctx-numbers')!.textContent).toBe('2K / 256K'));
     expect(h.calls.map(([command]) => command)).toContain('chat_compact');
     const notice = q('notice-info')!;
     expect(notice.textContent).toContain('压缩成摘要');
@@ -894,5 +895,45 @@ describe('the context ring in the composer', () => {
     await flushPromises();
     await click('chat-context');
     expect(inBody<HTMLButtonElement>('ctx-compact')!.disabled).toBe(true);
+  });
+});
+
+describe('the limit slider and automatic compaction in the composer', () => {
+  const info = (used: number, limit = 256_000, canCompact = true) => ({ used, limit, canCompact });
+  const say = (value: string) => [{ type: 'text' as const, text: value }];
+  const history: WireMessage[] = [{ role: 'user', parts: say('早') }, { role: 'assistant', parts: say('早上好') }];
+  const listed = { chat_overview: () => overview({ sessions: [summary('s1', '整理文件')] }), chat_load_session: () => history };
+
+  it('saves the limit a moment after the slider stops and shows the host\'s number', async () => {
+    let limit = 256_000;
+    const h = await open({ ...listed, chat_context: () => info(64_000, limit), set_context_tokens: a => { limit = Number(a?.tokens); return undefined; } });
+    await flushPromises();
+    await click('chat-context');
+    wrapper!.findComponent(NSlider).vm.$emit('update:value', 640_000);
+    await flushPromises();
+    expect(inBody('ctx-numbers')!.textContent).toBe('64K / 640K');
+    await vi.waitFor(() => expect(h.calls.at(-1)).toEqual(['set_context_tokens', { tokens: 640_000 }]));
+    await vi.waitFor(() => expect(h.chat.context.limit).toBe(640_000));
+    expect(inBody('ctx-numbers')!.textContent).toBe('64K / 640K');
+  });
+
+  it('shows "正在压缩…" and blocks sending while the host compacts a full conversation by itself', async () => {
+    const h = await open({ ...listed, chat_context: () => info(240_000) });
+    await click('chat-session-s1');
+    await type('接着聊');
+    expect(q<HTMLButtonElement>('chat-send')!.disabled).toBe(false);
+    await click('chat-context');
+
+    h.emit('chat-compacting', { session: 's1', state: 'start' });
+    await flushPromises();
+    expect(inBody('ctx-compact')!.textContent).toContain('正在压缩…');
+    expect(q<HTMLButtonElement>('chat-send')!.disabled).toBe(true);
+
+    h.emit('chat-compacting', { session: 's1', state: 'done', summary: '摘要正文' });
+    await flushPromises();
+    expect(q<HTMLButtonElement>('chat-send')!.disabled).toBe(false);
+    const notice = q('notice-info')!;
+    expect(notice.querySelector('summary')!.textContent).toBe('查看摘要');
+    expect(notice.querySelector('.notice-details')!.textContent).toBe('摘要正文');
   });
 });

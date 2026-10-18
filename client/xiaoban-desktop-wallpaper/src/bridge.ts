@@ -67,8 +67,8 @@ export interface AiConfigView {
   openComputerUse: boolean;
   /** The 小伴 AI tier picked in settings; only in use while `activeProvider` is the gateway. */
   gatewayTier?: string;
-  /** How much conversation is sent to the model before the oldest part is left out, in estimated tokens. */
-  contextTokens?: number;
+  /** False once the site has closed the 小伴 AI entry; missing means on. */
+  gatewayEnabled?: boolean;
 }
 
 /** `activeProvider` while chat is going through 小伴 AI instead of one of the listed providers. */
@@ -103,6 +103,11 @@ export interface LoginResult {
 export type CodeLoginOutcome =
   | { kind: "session"; isNewUser: boolean; session: AccountSession }
   | { kind: "registration"; registrationToken: string };
+
+export interface SignupMethods {
+  email: boolean;
+  phone: boolean;
+}
 
 export interface UsernameCheck {
   available: boolean;

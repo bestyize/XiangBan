@@ -113,6 +113,8 @@ pub struct ChatState {
     todo: Arc<Todo>,
     runs: Mutex<HashMap<String, Arc<AtomicBool>>>,
     index: Mutex<Option<Index>>,
+    /// Conversations whose automatic compaction failed lately.
+    auto_compact: compact::AutoCooldown,
 }
 
 impl ChatState {
@@ -131,6 +133,7 @@ impl ChatState {
             todo: Arc::new(Todo::new()),
             runs: Mutex::new(HashMap::new()),
             index: Mutex::new(None),
+            auto_compact: compact::AutoCooldown::default(),
         }
     }
 }
@@ -535,9 +538,9 @@ pub fn chat_send(app: tauri::AppHandle, session_id: String, text: String, images
         let session = id.clone();
         // 小伴 AI 要先拿到有效的账号令牌，可能需要联网刷新，所以放在这条线程里做，不卡住界面。
         let prepared = ai_gateway::prepare(&handle, config_owned).and_then(|(config, source)| {
-            build_agent(&handle, &config, source, &workspace_owned).map(|agent| (agent, config))
+            build_agent(&handle, &config, source.clone(), &workspace_owned).map(|agent| (agent, config, source))
         });
-        let (agent, config_owned) = match prepared {
+        let (agent, config_owned, key_source) = match prepared {
             Ok(ready) => ready,
             Err(error) => {
                 emit(&sender, "chat-event", json!({ "session": session, "event": { "type": "error", "message": error } }));
@@ -552,8 +555,10 @@ pub fn chat_send(app: tauri::AppHandle, session_id: String, text: String, images
             }
             emit(&sender, "chat-event", json!({ "session": session, "event": event }));
         };
-        if retry { let _ = agent.retry_last(&id, &mut callback, &cancel); }
-        else { let _ = agent.run_parts(&id, parts_owned, &mut callback, &cancel); }
+        let answered = if retry { agent.retry_last(&id, &mut callback, &cancel) } else { agent.run_parts(&id, parts_owned, &mut callback, &cancel) };
+        if answered.is_ok() {
+            auto_compact(&handle, &id, &config_owned, key_source, &cancel);
+        }
         finish_run(&handle, &id);
     });
     if let Err(error) = started {
@@ -584,6 +589,7 @@ pub fn chat_delete_session(app: tauri::AppHandle, session_id: String) -> Result<
     JsonlStore::new(Dirs::of(&app)?.sessions()).remove(&session_id).map_err(|e| e.to_string())?;
     state.permission.forget_session(&session_id);
     state.todo.clear_session(&session_id);
+    state.auto_compact.forget(&session_id);
     mutate(&app, |index| {
         index.remove(&session_id);
         index.list()
@@ -625,27 +631,49 @@ pub fn chat_context(app: tauri::AppHandle, session_id: Option<String>) -> Result
     context_of(&app, &config, &raw)
 }
 
+/// Has the model summarize the older part of a conversation and saves the summary. Returns its text.
+fn write_summary(app: &tauri::AppHandle, config: &AiConfig, key_source: Option<KeySource>, id: &str, cancel: &AtomicBool) -> Result<String, String> {
+    let file = JsonlStore::new(Dirs::of(app)?.sessions());
+    let provider = provider_with(config, key_source)?;
+    compact::compact_into(&file, provider.as_ref(), config.context_tokens, id, cancel)
+        .map_err(|error| if ai_gateway::is_active(config) { ai_gateway::readable_error(&error) } else { error })
+}
+
 fn compact_session(app: &tauri::AppHandle, id: &str, cancel: &AtomicBool) -> Result<ContextInfo, String> {
     let config = ai_config::current(app)?;
     crate::ai_catalogue::usable(app, &config)?;
     if !config.is_complete() {
         return Err("还没有配置模型，请先到“设置 → AI 模型”填写".into());
     }
-    let file = JsonlStore::new(Dirs::of(app)?.sessions());
-    let raw = file.load(id).map_err(|e| e.to_string())?;
-    let plan = compact::plan(&raw).ok_or("这段对话还很短，不需要压缩")?;
-    let transcript = compact::transcript(plan.previous.as_deref(), &plan.input, compact::budget_for(config.context_tokens));
     let (config, key_source) = ai_gateway::prepare(app, config)?;
-    let provider = provider_with(&config, key_source)?;
-    let summary = compact::summarize(provider.as_ref(), &transcript, cancel)
-        .map_err(|error| if ai_gateway::is_active(&config) { ai_gateway::readable_error(&error) } else { error })?;
-    // A summary that is hardly shorter than what it replaces would only cost a model call.
-    let replaced = agent_kernel::estimate_tokens(&plan.input) + plan.previous.as_deref().map_or(0, |p| agent_kernel::estimate_tokens(&[Message::user_text(p)]));
-    if agent_kernel::estimate_tokens(&[Message::user_text(&summary)]) * 10 >= replaced * 9 {
-        return Err("摘要没有比原文短多少，已保留原对话".into());
+    write_summary(app, &config, key_source, id, cancel)?;
+    let raw = JsonlStore::new(Dirs::of(app)?.sessions()).load(id).map_err(|e| e.to_string())?;
+    context_of(app, &config, &raw)
+}
+
+/// After an answer went through: once the next request would use 90% of the context limit, the older part is
+/// replaced by a summary, so a long conversation does not lose its beginning. Runs on the answer's thread, so the
+/// conversation stays busy meanwhile. A failure is reported once and not tried again for a while; `ContextTrim`
+/// still keeps every request under the limit.
+fn auto_compact(app: &tauri::AppHandle, id: &str, config: &AiConfig, key_source: Option<KeySource>, cancel: &AtomicBool) {
+    let Ok(dirs) = Dirs::of(app) else { return };
+    let Ok(raw) = JsonlStore::new(dirs.sessions()).load(id) else { return };
+    let Ok(info) = context_of(app, config, &raw) else { return };
+    let state = app.state::<ChatState>();
+    if !compact::due(&info) || !state.auto_compact.allowed(id, std::time::Instant::now()) {
+        return;
     }
-    file.append(id, &[compact::summary_message(plan.keep_from, &summary)]).map_err(|e| e.to_string())?;
-    context_of(app, &config, &file.load(id).map_err(|e| e.to_string())?)
+    emit(app, "chat-compacting", json!({ "session": id, "state": "start" }));
+    match write_summary(app, config, key_source, id, cancel) {
+        Ok(summary) => {
+            state.auto_compact.forget(id);
+            emit(app, "chat-compacting", json!({ "session": id, "state": "done", "summary": summary }));
+        }
+        Err(message) => {
+            state.auto_compact.failed(id, std::time::Instant::now());
+            emit(app, "chat-compacting", json!({ "session": id, "state": "failed", "message": message }));
+        }
+    }
 }
 
 /// Replaces the older part of a conversation, for the model only, with a summary the model writes.

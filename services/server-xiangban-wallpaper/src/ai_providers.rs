@@ -45,12 +45,24 @@ pub struct Provider {
     /// Paid credentials are explicitly granted per user, never a shared upstream master key.
     #[serde(default)] pub user_access: Vec<UserAccess>,
 }
+/// The built-in 小伴 AI entry of the desktop app (account login and credit, served by `server-ai`).
+/// It is not a provider in the list, so this switch is the only thing the console controls about it.
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct XiaobanAi {
+    #[serde(default = "enabled")] pub enabled: bool,
+}
+impl Default for XiaobanAi {
+    fn default() -> Self { Self { enabled: true } }
+}
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Catalogue {
     pub version: u32,
     pub revision: u64,
     #[serde(default = "interval")] pub refresh_after_seconds: u64,
+    /// Missing in catalogues saved before the switch existed, which means on.
+    #[serde(default)] pub xiaoban_ai: XiaobanAi,
     pub providers: Vec<Provider>,
 }
 impl Default for Catalogue {
@@ -167,7 +179,7 @@ impl Catalogue {
             Some(value)
         }).collect();
         serde_json::json!({"version":1,"revision":self.revision.to_string(),
-            "refreshAfterSeconds":self.refresh_after_seconds,"providers":providers})
+            "refreshAfterSeconds":self.refresh_after_seconds,"xiaobanAi":{"enabled":self.xiaoban_ai.enabled},"providers":providers})
     }
 }
 async fn load(store: &Store) -> Result<Catalogue, AppError> {
@@ -216,6 +228,32 @@ mod tests {
     #[test] fn defaults_are_valid_and_never_send_user_keys() {
         let c = Catalogue::default(); c.validate().unwrap();
         assert!(c.public(None)["providers"].as_array().unwrap().iter().all(|p| p.get("apikey").is_none()));
+    }
+    #[test] fn the_xiaoban_ai_entry_is_on_by_default_and_the_switch_reaches_the_desktop() {
+        let mut c = Catalogue::default();
+        assert!(c.xiaoban_ai.enabled);
+        assert_eq!(c.public(None)["xiaobanAi"]["enabled"], true);
+        c.xiaoban_ai.enabled = false;
+        c.validate().unwrap();
+        assert_eq!(c.public(None)["xiaobanAi"]["enabled"], false);
+        assert_eq!(c.public(Some(UID))["xiaobanAi"]["enabled"], false, "the switch is the same for everyone");
+        assert_eq!(c.redacted().xiaoban_ai.enabled, false, "the console reads it back");
+        let json = serde_json::to_value(&c).unwrap();
+        assert_eq!(json["xiaobanAi"]["enabled"], false);
+    }
+    #[test] fn a_catalogue_saved_before_the_switch_existed_still_loads_with_the_entry_on() {
+        let mut value = serde_json::to_value(Catalogue::default()).unwrap();
+        value.as_object_mut().unwrap().remove("xiaobanAi");
+        let old: Catalogue = serde_json::from_value(value).unwrap();
+        assert!(old.xiaoban_ai.enabled);
+        let empty: Catalogue = serde_json::from_value(serde_json::json!({"version":1,"revision":3,"providers":[],"xiaobanAi":{}})).unwrap();
+        assert!(empty.xiaoban_ai.enabled, "an empty object also means on");
+    }
+    #[test] fn the_switch_changes_what_the_desktop_downloads_so_it_is_not_answered_with_not_modified() {
+        let mut c = Catalogue::default();
+        let on = serde_json::to_vec(&c.public(None)).unwrap();
+        c.xiaoban_ai.enabled = false;
+        assert_ne!(on, serde_json::to_vec(&c.public(None)).unwrap(), "the ETag is a hash of the body, so it moves with the switch");
     }
     #[test] fn paid_keys_are_only_returned_to_the_granted_user() {
         let mut c = configured(); let p = c.providers.last_mut().unwrap();

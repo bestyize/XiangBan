@@ -172,6 +172,9 @@ pub fn use_ai_gateway(app: tauri::AppHandle, tier: String) -> Result<AiConfigVie
         let state = app.state::<ai_config::AiConfigState>();
         let _io = state.io.lock().unwrap();
         let mut config = ai_config::load(&path).unwrap_or_default();
+        if !config.gateway_enabled {
+            return Err("小伴 AI 入口已被关闭，暂时不能启用".into());
+        }
         select(&mut config, &tier, &format!("{}/v1", ai_base_url()));
         ai_config::save(&path, &config).map_err(|e| format!("无法保存模型配置：{e}"))?;
         config.view(&ai_config::default_workspace(&app)?)
@@ -182,6 +185,11 @@ pub fn use_ai_gateway(app: tauri::AppHandle, tier: String) -> Result<AiConfigVie
 
 pub fn is_active(config: &AiConfig) -> bool {
     config.active_provider == GATEWAY_ID
+}
+
+/// Chat is set to 小伴 AI, but the site has closed that entry.
+pub fn switched_off(config: &AiConfig) -> bool {
+    is_active(config) && !config.gateway_enabled
 }
 
 /// 模型请求失败时内核给的是 `HTTP 402: {"error":true,"code":...,"message":"..."}`，
@@ -241,6 +249,17 @@ mod tests {
         assert_eq!(config.gateway_tier, "standard");
         assert!(config.api_key.is_empty(), "the account token is never stored, nor is another provider's key");
         assert!(config.is_complete(), "the chat page treats it as configured");
+    }
+
+    #[test]
+    fn chat_through_the_gateway_is_blocked_only_while_it_is_selected_and_the_site_has_closed_it() {
+        let mut config = on_other_provider();
+        config.gateway_enabled = false;
+        assert!(!switched_off(&config), "another provider keeps working whatever the switch says");
+        select(&mut config, "standard", BASE);
+        assert!(switched_off(&config));
+        config.gateway_enabled = true;
+        assert!(!switched_off(&config));
     }
 
     #[test]

@@ -17,9 +17,10 @@ pub const PROTOCOLS: &[&str] = &["responses", "chat", "anthropic"];
 const MAX_URL: usize = 2048;
 const MAX_MODEL: usize = 200;
 const MAX_KEY: usize = 2048;
-pub const DEFAULT_CONTEXT_TOKENS: usize = 48_000;
-pub const MIN_CONTEXT_TOKENS: usize = 16_000;
-pub const MAX_CONTEXT_TOKENS: usize = 2_000_000;
+/// The context limit is chosen with a slider (`chat/format.ts` has the same range); the default is the smallest.
+pub const MIN_CONTEXT_TOKENS: usize = 256_000;
+pub const MAX_CONTEXT_TOKENS: usize = 1_000_000;
+pub const DEFAULT_CONTEXT_TOKENS: usize = MIN_CONTEXT_TOKENS;
 
 /// The built-in providers a fresh install starts with: id, display name, and the chat-completions
 /// address and default model. Each vendor also serves the Responses and Anthropic wire formats on
@@ -160,6 +161,8 @@ pub struct AiConfig {
     pub gateway_tier: String,
     /// How much conversation is sent to the model before the oldest part is dropped, in estimated tokens.
     pub context_tokens: usize,
+    /// The 小伴 AI entry is on in the catalogue the site delivers. On until the site says otherwise.
+    pub gateway_enabled: bool,
 }
 
 impl Default for AiConfig {
@@ -178,6 +181,7 @@ impl Default for AiConfig {
             open_computer_use: false,
             gateway_tier: String::new(),
             context_tokens: DEFAULT_CONTEXT_TOKENS,
+            gateway_enabled: true,
         };
         cfg.normalize();
         cfg
@@ -228,7 +232,7 @@ pub struct AiConfigView {
     pub hide_tool_calls: bool,
     pub open_computer_use: bool,
     pub gateway_tier: String,
-    pub context_tokens: usize,
+    pub gateway_enabled: bool,
 }
 
 impl AiConfig {
@@ -248,12 +252,12 @@ impl AiConfig {
             hide_tool_calls: self.hide_tool_calls,
             open_computer_use: self.open_computer_use,
             gateway_tier: self.gateway_tier.clone(),
-            context_tokens: self.context_tokens,
+            gateway_enabled: self.gateway_enabled,
         }
     }
 
     fn normalize(&mut self) {
-        self.context_tokens = if self.context_tokens == 0 { DEFAULT_CONTEXT_TOKENS } else { self.context_tokens.clamp(MIN_CONTEXT_TOKENS, MAX_CONTEXT_TOKENS) };
+        self.context_tokens = self.context_tokens.clamp(MIN_CONTEXT_TOKENS, MAX_CONTEXT_TOKENS);
         if !PROTOCOLS.contains(&self.protocol.as_str()) {
             self.protocol = "responses".into();
         }
@@ -691,7 +695,6 @@ pub fn save_ai_preferences(
     workspace: Option<String>,
     hide_tool_calls: Option<bool>,
     open_computer_use: Option<bool>,
-    context_tokens: Option<u32>,
 ) -> Result<AiConfigView, String> {
     let path = path(&app)?;
     let state = app.state::<AiConfigState>();
@@ -708,13 +711,22 @@ pub fn save_ai_preferences(
     if let Some(ocu) = open_computer_use {
         config.open_computer_use = ocu;
     }
-    if let Some(size) = context_tokens {
-        config.context_tokens = clean_context_tokens(size)?;
-    }
 
     save(&path, &config).map_err(|e| format!("无法保存偏好设置：{e}"))?;
     let _ = app.emit_to("control", "chat-hide-tool-calls-changed", serde_json::json!({ "enabled": config.hide_tool_calls }));
     Ok(config.view(&default_workspace(&app)?))
+}
+
+/// The context limit the chat page's slider chose. Saved on its own so moving the slider never touches the other settings.
+#[tauri::command]
+pub fn set_context_tokens(app: tauri::AppHandle, tokens: u32) -> Result<(), String> {
+    let size = clean_context_tokens(tokens)?;
+    let path = path(&app)?;
+    let state = app.state::<AiConfigState>();
+    let _io = state.io.lock().unwrap();
+    let mut config = load(&path).unwrap_or_default();
+    config.context_tokens = size;
+    save(&path, &config).map_err(|e| format!("无法保存上下文大小：{e}"))
 }
 
 pub fn candidate_models_urls(protocol: &str, base_url: &str) -> Vec<String> {
@@ -1169,23 +1181,24 @@ mod tests {
     fn the_context_size_defaults_for_old_files_and_is_kept_inside_its_range() {
         let old: AiConfig = serde_json::from_str(r#"{"activeProvider":"deepseek","baseUrl":"https://a.example.com","model":"m"}"#).unwrap();
         assert_eq!(old.context_tokens, DEFAULT_CONTEXT_TOKENS, "a file written before the setting existed gets the default");
-        assert_eq!(AiConfig::default().context_tokens, 48_000);
+        assert_eq!(AiConfig::default().context_tokens, 256_000);
+        assert_eq!(DEFAULT_CONTEXT_TOKENS, MIN_CONTEXT_TOKENS, "the default is the smallest the slider allows");
 
-        for (stored, expected) in [(0, DEFAULT_CONTEXT_TOKENS), (1_000, MIN_CONTEXT_TOKENS), (128_000, 128_000), (9_999_999, MAX_CONTEXT_TOKENS)] {
+        // Sizes saved by an earlier build (48K and the like) are below the new floor and come up to it.
+        for (stored, expected) in [(0, DEFAULT_CONTEXT_TOKENS), (48_000, MIN_CONTEXT_TOKENS), (300_000, 300_000), (9_999_999, MAX_CONTEXT_TOKENS)] {
             let mut config = AiConfig { context_tokens: stored, ..AiConfig::default() };
             config.normalize();
             assert_eq!(config.context_tokens, expected, "stored {stored}");
         }
-        assert_eq!(AiConfig { context_tokens: 64_000, ..AiConfig::default() }.view(Path::new("/w")).context_tokens, 64_000);
     }
 
     #[test]
     fn a_context_size_from_the_form_must_be_inside_the_range() {
-        assert_eq!(clean_context_tokens(32_000), Ok(32_000));
-        assert_eq!(clean_context_tokens(16_000), Ok(16_000));
-        assert_eq!(clean_context_tokens(2_000_000), Ok(2_000_000));
-        for bad in [0, 15_999, 2_000_001, u32::MAX] {
-            assert!(clean_context_tokens(bad).unwrap_err().contains("16K 到 2M"), "{bad}");
+        assert_eq!(clean_context_tokens(512_000), Ok(512_000));
+        assert_eq!(clean_context_tokens(256_000), Ok(256_000));
+        assert_eq!(clean_context_tokens(1_000_000), Ok(1_000_000));
+        for bad in [0, 255_999, 1_000_001, u32::MAX] {
+            assert!(clean_context_tokens(bad).unwrap_err().contains("256K 到 1M"), "{bad}");
         }
     }
 }

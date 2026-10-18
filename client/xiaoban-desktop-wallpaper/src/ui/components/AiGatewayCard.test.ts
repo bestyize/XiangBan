@@ -78,7 +78,7 @@ const submit = async () => {
 };
 const codeValue = () => q<HTMLInputElement>('gateway-code')!.querySelector('input')!.value;
 const gatewayCalls = () => ipc.mock.calls.filter(([command]) => command.startsWith('ai_gateway_') || command === 'use_ai_gateway');
-const openDialog = async () => { await click('ai-gateway-card'); };
+const openDialog = async () => { await click('gateway-open'); };
 
 // A hook that returns a function is treated as its cleanup callback, so don't return the mock.
 beforeEach(() => { ipc.mockReset(); });
@@ -91,7 +91,8 @@ describe('小伴 AI card', () => {
     mountCard(store);
     await flushPromises();
     expect(text('gateway-card-status')).toBe('需登录');
-    expect(text('gateway-open')).toContain('登录');
+    expect(wrapper!.find('[data-testid="gateway-open"]').text()).toBe('配置');
+    expect(wrapper!.find('[data-testid="gateway-activate"]').text()).toBe('启用此服务商');
     expect(has('gateway-modal')).toBe(false);
 
     await openDialog();
@@ -128,6 +129,18 @@ describe('小伴 AI card', () => {
     await flushPromises();
     expect(ipc).not.toHaveBeenCalled();
     expect(wrapper!.find('[data-testid="gateway-open"]').attributes('disabled')).toBeDefined();
+    expect(wrapper!.find('[data-testid="gateway-activate"]').attributes('disabled')).toBeDefined();
+  });
+
+  it('shows the same two buttons as the other providers, and the card itself is not a button', async () => {
+    backend(defaults);
+    mountCard(createStore(session('u1')));
+    await flushPromises();
+    const buttons = wrapper!.findAll('.gw-actions button').map(b => b.text());
+    expect(buttons).toEqual(['配置', '启用此服务商']);
+    await wrapper!.find('[data-testid="ai-gateway-card"]').trigger('click');
+    await flushPromises();
+    expect(has('gateway-modal')).toBe(false);
   });
 
   it('opens the dialog with a fresh load when the card is clicked', async () => {
@@ -321,5 +334,100 @@ describe('小伴 AI dialog: chat model', () => {
     expect(text('gateway-total')).toBe('$0.50');
     expect(has('gateway-use')).toBe(false);
     expect(text('gateway-load-error')).toContain('暂时不可用');
+  });
+});
+
+describe('小伴 AI card: 启用此服务商', () => {
+  const useCalls = () => ipc.mock.calls.filter(([command]) => command === 'use_ai_gateway');
+  const withUse = (extra: Record<string, Handler> = {}) => backend({
+    ...defaults,
+    use_ai_gateway: (args?: Record<string, unknown>) => aiConfig({ activeProvider: 'xiaoban-ai', gatewayTier: String(args?.tier) }),
+    ...extra,
+  });
+
+  it('turns chat to the preselected tier straight from the card, without opening the dialog', async () => {
+    withUse();
+    const store = createStore(session('u1'));
+    mountCard(store);
+    await flushPromises();
+    await wrapper!.find('[data-testid="gateway-activate"]').trigger('click');
+    await flushPromises();
+
+    expect(useCalls()).toEqual([['use_ai_gateway', { tier: 'standard' }]]);
+    expect(has('gateway-modal')).toBe(false);
+    const emitted = wrapper!.emitted('config');
+    expect(emitted).toHaveLength(1);
+    expect((emitted![0][0] as AiConfigView).activeProvider).toBe('xiaoban-ai');
+    expect(store.notify).toHaveBeenCalledWith(expect.stringContaining('标准'), 'success');
+  });
+
+  it('becomes a disabled "正在使用中" once it is the provider in use, like the other cards', async () => {
+    withUse();
+    mountCard(createStore(session('u1')), aiConfig({ activeProvider: 'xiaoban-ai', gatewayTier: 'standard' }));
+    await flushPromises();
+    expect(has('gateway-activate')).toBe(false);
+    expect(wrapper!.find('[data-testid="gateway-in-use"]').text()).toBe('正在使用中');
+    expect(wrapper!.find('[data-testid="gateway-in-use"]').attributes('disabled')).toBeDefined();
+    expect(wrapper!.find('[data-testid="gateway-open"]').text()).toBe('配置');
+  });
+
+  it('asks a signed-out user to log in instead, and opens the dialog that has the login button', async () => {
+    withUse();
+    const store = createStore(null);
+    mountCard(store);
+    await flushPromises();
+    await wrapper!.find('[data-testid="gateway-activate"]').trigger('click');
+    await flushPromises();
+    expect(useCalls()).toHaveLength(0);
+    expect(store.notify).toHaveBeenCalledWith(expect.stringContaining('登录'), 'info');
+    expect(has('gateway-signin')).toBe(true);
+  });
+
+  it('opens the dialog with the reason when there is no tier to use yet', async () => {
+    withUse({ ai_gateway_tiers: [] });
+    const store = createStore(session('u1'));
+    mountCard(store);
+    await flushPromises();
+    await wrapper!.find('[data-testid="gateway-activate"]').trigger('click');
+    await flushPromises();
+    expect(useCalls()).toHaveLength(0);
+    expect(store.notify).toHaveBeenCalledWith(expect.stringContaining('没有可用的模型档位'), 'info');
+    expect(has('gateway-modal') || has('gateway-redeem')).toBe(true);
+  });
+
+  it('loads the tiers first when they have not arrived by the time the button is pressed', async () => {
+    let release!: () => void;
+    const gate = new Promise<void>(resolve => { release = resolve; });
+    withUse({ ai_gateway_tiers: async () => { await gate; return [standard, premium]; } });
+    mountCard(createStore(session('u1')));
+    await flushPromises();
+    const pending = wrapper!.find('[data-testid="gateway-activate"]').trigger('click');
+    release();
+    await pending;
+    await flushPromises();
+    expect(useCalls()).toEqual([['use_ai_gateway', { tier: 'standard' }]]);
+  });
+
+  it('tells the user why it failed when the dialog is closed, and the button works again', async () => {
+    withUse({ use_ai_gateway: new AccountError('小伴 AI 入口已被关闭，暂时不能启用') });
+    const store = createStore(session('u1'));
+    mountCard(store);
+    await flushPromises();
+    await wrapper!.find('[data-testid="gateway-activate"]').trigger('click');
+    await flushPromises();
+    expect(store.notify).toHaveBeenCalledWith('小伴 AI 入口已被关闭，暂时不能启用', 'error');
+    expect(wrapper!.find('[data-testid="gateway-activate"]').attributes('disabled')).toBeUndefined();
+    expect(wrapper!.emitted('config')).toBeUndefined();
+  });
+
+  it('shows a failure in the dialog instead of a toast when it is the dialog that was used', async () => {
+    withUse({ use_ai_gateway: new AccountError('磁盘已满') });
+    const store = createStore(session('u1'));
+    mountCard(store);
+    await flushPromises();
+    await openDialog();
+    await click('gateway-use-btn');
+    expect(text('gateway-use-error')).toContain('磁盘已满');
+    expect(store.notify).not.toHaveBeenCalledWith('磁盘已满', 'error');
   });
 });

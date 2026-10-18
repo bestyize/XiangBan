@@ -18,6 +18,11 @@ const TOOL_LABELS: Record<string, string> = {
 
 export const toolLabel = (name: string) => TOOL_LABELS[name] ?? (name || '工具');
 
+/** The range of the context limit slider. The host (`ai_config.rs`) holds the same range; the default is the smallest. */
+export const CONTEXT_MIN = 256_000;
+export const CONTEXT_MAX = 1_000_000;
+export const CONTEXT_STEP = 8_000;
+
 /** 850, 12.3K, 48K, 1M: short enough for the ring's popover. */
 export function formatTokens(count: number): string {
   if (!Number.isFinite(count) || count <= 0) return '0';

@@ -1,7 +1,7 @@
 import { modelFailure } from './model-errors.ts';
 import { reactive } from 'vue';
 import type { ApprovalDecision, ApprovalRequest, ChatEventPayload, ChatGroup, ContextInfo, Library, Overview, QuestionRequest, SessionSummary, SessionView, WireMessage } from './types.ts';
-import { applyEvent, itemsFromHistory, newView, nextId } from './view.ts';
+import { applyEvent, itemsFromHistory, newView, nextId, summaryNotice } from './view.ts';
 
 export interface ChatDeps {
   onReply?(session: string, text: string, key?: string): void;
@@ -48,6 +48,8 @@ export interface ChatStore {
   refreshContext(): Promise<void>;
   /** Replaces the older part of the open conversation, for the model only, with a summary. Returns whether it was done; the reason is shown when not. */
   compact(): Promise<boolean>;
+  /** Saves the context limit the slider chose. The ring shows it at once; it is put back if the host refuses. */
+  setContextSize(tokens: number): Promise<boolean>;
   /** The edits below return whether the host accepted them, so a dialog can stay open when it did not. The host's reason is shown to the user. */
   rename(id: string, title: string): Promise<boolean>;
   /** `null` takes the conversation out of its group. */
@@ -61,6 +63,9 @@ export interface ChatStore {
   answerQuestion(request: QuestionRequest, answer: string | null): Promise<void>;
   current(): SessionView | null;
 }
+
+/** Sent by the host around an automatic compaction (`chat-compacting`). */
+interface CompactingEvent { session: string; state: 'start' | 'done' | 'failed'; summary?: string; message?: string }
 
 export const CONTINUE_TEXT = '请接着上面的内容继续写完。';
 const STALE = '这个确认已经结束';
@@ -94,7 +99,7 @@ export function createChatStore(deps: ChatDeps): ChatStore {
     loadError: '',
     sessions: [] as SessionSummary[],
     groups: [] as ChatGroup[],
-    context: { used: 0, limit: 48_000, canCompact: false } as ContextInfo,
+    context: { used: 0, limit: 256_000, canCompact: false } as ContextInfo,
     compactingId: null as string | null,
     views: {} as Record<string, SessionView>,
     currentId: null as string | null,
@@ -138,6 +143,7 @@ export function createChatStore(deps: ChatDeps): ChatStore {
               }
             }),
             deps.listen<{ enabled: boolean }>('chat-hide-tool-calls-changed', payload => { if (!disposed) store.hideToolCalls = payload.enabled; }),
+            deps.listen<CompactingEvent>('chat-compacting', payload => { if (!disposed) onCompacting(payload); }),
           ]);
           if (disposed) { listeners.forEach(stop => stop()); return; }
           unsubscribers.push(...listeners);
@@ -292,7 +298,7 @@ export function createChatStore(deps: ChatDeps): ChatStore {
     async compact() {
       const id = store.currentId;
       const view = store.current();
-      if (!deps.desktop || !id || !view || view.running || store.compactingId) return false;
+      if (!deps.desktop || !id || !view || view.running || store.compactingId === id) return false;
       store.compactingId = id;
       try {
         const info = await deps.invoke<ContextInfo>('chat_compact', { sessionId: id });
@@ -310,8 +316,24 @@ export function createChatStore(deps: ChatDeps): ChatStore {
         deps.notify(error, 'error');
         return false;
       } finally {
-        store.compactingId = null;
+        if (store.compactingId === id) store.compactingId = null;
       }
+    },
+
+    async setContextSize(tokens) {
+      if (!deps.desktop) return false;
+      const before = store.context.limit;
+      store.context = { ...store.context, limit: tokens };
+      try {
+        await deps.invoke('set_context_tokens', { tokens });
+      } catch (error) {
+        deps.notify(error, 'error');
+        if (!disposed) store.context = { ...store.context, limit: before };
+        return false;
+      } finally {
+        await store.refreshContext();
+      }
+      return true;
     },
 
     rename: (id, title) => edit('chat_rename_session', { sessionId: id, title }),
@@ -362,6 +384,22 @@ export function createChatStore(deps: ChatDeps): ChatStore {
       deps.notify(error, 'error');
       return false;
     }
+  }
+
+  /** The host compacts a conversation by itself once it is nearly full; the ring shows that like a compaction asked for. */
+  function onCompacting(event: CompactingEvent) {
+    if (event.state === 'start') {
+      store.compactingId = event.session;
+      return;
+    }
+    if (store.compactingId === event.session) store.compactingId = null;
+    if (event.state === 'done') {
+      const view = store.views[event.session];
+      if (view && event.summary) view.items.push(summaryNotice(view, event.summary));
+    } else {
+      deps.notify(`自动压缩没有成功：${event.message ?? '原因不明'}。较早的内容仍会在超出上限时被省略。`, 'info');
+    }
+    if (store.currentId === event.session) void store.refreshContext();
   }
 
   function upsert(summary: SessionSummary) {

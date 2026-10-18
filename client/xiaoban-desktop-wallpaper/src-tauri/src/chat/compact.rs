@@ -7,7 +7,10 @@
 
 use agent_kernel::{estimate_tokens, ChatRequest, HarnessError, JsonlStore, Message, ModelProvider, Part, Role, SessionStore};
 use serde::Serialize;
+use std::collections::HashMap;
 use std::sync::atomic::AtomicBool;
+use std::sync::Mutex;
+use std::time::{Duration, Instant};
 
 /// Starts the first line of a stored summary. The web side knows the same text (`chat/view.ts`).
 pub const MARK: &str = "[[xiaoban-summary keep_from=";
@@ -20,8 +23,13 @@ const MAX_OUTPUT_CHARS: usize = 1_500;
 /// Room kept free for the instructions and the summary itself.
 const RESERVED_TOKENS: usize = 4_000;
 const MIN_BUDGET_TOKENS: usize = 6_000;
-/// One summary is never asked to digest more than this, whatever the context size is set to.
-const MAX_BUDGET_TOKENS: usize = 200_000;
+/// One summary is never asked to digest more than this, whatever the context size is set to:
+/// a bigger record costs more and takes longer without making the summary better.
+const MAX_BUDGET_TOKENS: usize = 120_000;
+/// An automatic compaction starts once the next request would use this share of the limit.
+const AUTO_SHARE_PERCENT: usize = 90;
+/// After an automatic compaction failed, the same conversation is left alone for this long.
+const AUTO_RETRY_AFTER: Duration = Duration::from_secs(600);
 
 const INSTRUCTIONS: &str = "你是对话压缩助手。下面是小伴（桌面智能助手）和用户的一段对话记录，请把它压缩成一份摘要。\
 小伴之后只能看到这份摘要和最近的几条消息，所以摘要要让它能无缝接着办事。\n\
@@ -40,6 +48,33 @@ pub struct ContextInfo {
     pub used: usize,
     pub limit: usize,
     pub can_compact: bool,
+}
+
+/// Whether the conversation has reached the share of its limit where compacting starts by itself.
+pub fn due(info: &ContextInfo) -> bool {
+    info.can_compact && info.limit > 0 && info.used * 100 >= info.limit * AUTO_SHARE_PERCENT
+}
+
+/// Keeps an automatic compaction that fails (no network, no credit, a model that refuses) from being tried
+/// again after every answer. Compacting by hand is never held back by this.
+#[derive(Default)]
+pub struct AutoCooldown {
+    failed: Mutex<HashMap<String, Instant>>,
+}
+
+impl AutoCooldown {
+    pub fn allowed(&self, session: &str, now: Instant) -> bool {
+        let failed = self.failed.lock().unwrap_or_else(|e| e.into_inner());
+        failed.get(session).is_none_or(|at| now.saturating_duration_since(*at) >= AUTO_RETRY_AFTER)
+    }
+
+    pub fn failed(&self, session: &str, now: Instant) {
+        self.failed.lock().unwrap_or_else(|e| e.into_inner()).insert(session.to_string(), now);
+    }
+
+    pub fn forget(&self, session: &str) {
+        self.failed.lock().unwrap_or_else(|e| e.into_inner()).remove(session);
+    }
 }
 
 /// The stored form of a summary: the marker line, then the text.
@@ -198,6 +233,21 @@ pub fn summarize(provider: &dyn ModelProvider, transcript: &str, cancel: &Atomic
         return Ok(format!("{}…", text.chars().take(MAX_SUMMARY_CHARS).collect::<String>()));
     }
     Ok(text.to_string())
+}
+
+/// Summarizes the older part of a conversation and saves the summary at the end of its file. Returns the summary.
+/// Nothing is written unless the model returned a summary that is clearly shorter than what it replaces.
+pub fn compact_into(file: &JsonlStore, provider: &dyn ModelProvider, context_tokens: usize, session: &str, cancel: &AtomicBool) -> Result<String, String> {
+    let raw = file.load(session).map_err(|e| e.to_string())?;
+    let plan = plan(&raw).ok_or("这段对话还很短，不需要压缩")?;
+    let record = transcript(plan.previous.as_deref(), &plan.input, budget_for(context_tokens));
+    let summary = summarize(provider, &record, cancel)?;
+    let replaced = estimate_tokens(&plan.input) + plan.previous.as_deref().map_or(0, |p| estimate_tokens(&[summary_for_model(p)]));
+    if estimate_tokens(&[Message::user_text(&summary)]) * 10 >= replaced * 9 {
+        return Err("摘要没有比原文短多少，已保留原对话".into());
+    }
+    file.append(session, &[summary_message(plan.keep_from, &summary)]).map_err(|e| e.to_string())?;
+    Ok(summary)
 }
 
 /// The agent's store: reads give the model's view, writes go to the saved file as they are.
@@ -378,7 +428,8 @@ mod tests {
     fn the_budget_follows_the_context_size_with_floor_and_ceiling() {
         assert_eq!(budget_for(48_000), 44_000);
         assert_eq!(budget_for(1_000), 6_000);
-        assert_eq!(budget_for(2_000_000), 200_000);
+        assert_eq!(budget_for(256_000), 120_000, "even the smallest limit now allowed gets the ceiling, not 250K of record");
+        assert_eq!(budget_for(2_000_000), 120_000);
     }
 
     #[test]
@@ -431,6 +482,105 @@ mod tests {
         let summary = summarize(&provider, "x", &AtomicBool::new(false)).unwrap();
         assert_eq!(summary.chars().count(), MAX_SUMMARY_CHARS + 1);
         assert!(summary.ends_with('…'));
+    }
+
+    fn script(steps: Vec<agent_kernel::provider::scripted::Step>) -> agent_kernel::provider::scripted::ScriptedProvider {
+        agent_kernel::provider::scripted::ScriptedProvider::new(steps)
+    }
+
+    #[test]
+    fn compacting_saves_the_summary_at_the_end_and_the_model_then_sees_it_with_the_latest_turn() {
+        use agent_kernel::provider::scripted::Step;
+        let dir = temp("into");
+        let file = JsonlStore::new(&dir);
+        file.append("c1-aa-0", &[ask(&long("问1")), answer(&long("答1")), ask(&long("问2")), answer(&long("答2")), ask("最后的问题"), answer("最后的回答")]).unwrap();
+        let provider = script(vec![Step::text("【用户目标】做了两件事")]);
+
+        let summary = compact_into(&file, &provider, 256_000, "c1-aa-0", &AtomicBool::new(false)).unwrap();
+        assert_eq!(summary, "【用户目标】做了两件事");
+        let saved = file.load("c1-aa-0").unwrap();
+        assert_eq!(saved.len(), 7, "every message is still there, plus the summary");
+        assert_eq!(parse(&saved[6]), Some((4, summary.clone())), "it points at the latest question");
+        let seen = texts(&view(&saved));
+        assert_eq!(seen.len(), 3);
+        assert!(seen[0].contains("做了两件事"));
+        assert_eq!(&seen[1..], ["最后的问题", "最后的回答"]);
+
+        let sent = provider.requests()[0].messages[1].text();
+        assert!(sent.contains("问1") && sent.contains("答2"), "the older part went to the summarizer");
+        assert!(!sent.contains("最后的问题"), "the part that stays did not");
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn a_second_compaction_hands_the_first_summary_on_and_moves_the_cut_forward() {
+        use agent_kernel::provider::scripted::Step;
+        let dir = temp("into-twice");
+        let file = JsonlStore::new(&dir);
+        file.append("c1-aa-0", &[ask(&long("问1")), answer(&long("答1")), ask(&long("问2")), answer(&long("答2")), ask("问3"), answer("答3")]).unwrap();
+        let provider = script(vec![Step::text("第一份摘要"), Step::text("第二份摘要")]);
+        compact_into(&file, &provider, 256_000, "c1-aa-0", &AtomicBool::new(false)).unwrap();
+        file.append("c1-aa-0", &[ask(&long("问4")), answer(&long("答4")), ask("问5"), answer("答5")]).unwrap();
+
+        compact_into(&file, &provider, 256_000, "c1-aa-0", &AtomicBool::new(false)).unwrap();
+        let sent = provider.requests()[1].messages[1].text();
+        assert!(sent.contains("【此前的摘要】\n第一份摘要"), "{sent}");
+        assert!(sent.contains("问4") && !sent.contains("问5"));
+        let saved = file.load("c1-aa-0").unwrap();
+        let (keep_from, latest) = parse(saved.last().unwrap()).unwrap();
+        assert_eq!(latest, "第二份摘要");
+        assert_eq!(saved[keep_from].text(), "问5", "the newest question is the first thing kept word for word");
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn nothing_is_written_when_the_conversation_is_short_the_summary_is_not_shorter_or_the_model_fails() {
+        use agent_kernel::provider::scripted::Step;
+        let dir = temp("into-refused");
+        let file = JsonlStore::new(&dir);
+
+        file.append("short", &[ask("你好"), answer("你好！"), ask("再见"), answer("再见")]).unwrap();
+        let idle = script(vec![Step::text("不会被用到")]);
+        assert!(compact_into(&file, &idle, 256_000, "short", &AtomicBool::new(false)).unwrap_err().contains("很短"));
+        assert!(idle.requests().is_empty(), "no model call is spent on a short conversation");
+
+        file.append("wordy", &[ask(&"字".repeat(1_200)), answer("好"), ask("末"), answer("好")]).unwrap();
+        let lazy = script(vec![Step::text(&"字".repeat(1_150))]);
+        assert!(compact_into(&file, &lazy, 256_000, "wordy", &AtomicBool::new(false)).unwrap_err().contains("没有比原文短多少"));
+
+        let broken = script(vec![Step::error(HarnessError::Config("quota used up".into()))]);
+        assert!(compact_into(&file, &broken, 256_000, "wordy", &AtomicBool::new(false)).unwrap_err().contains("quota used up"));
+
+        assert_eq!(file.load("short").unwrap().len(), 4);
+        assert_eq!(file.load("wordy").unwrap().len(), 4, "the conversation is exactly as it was");
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn compacting_starts_at_ninety_percent_of_the_limit_and_only_when_there_is_something_to_compact() {
+        let at = |used: usize, can_compact: bool| ContextInfo { used, limit: 256_000, can_compact };
+        assert!(!due(&at(230_399, true)), "just under 90%");
+        assert!(due(&at(230_400, true)), "exactly 90%");
+        assert!(due(&at(300_000, true)), "over the limit");
+        assert!(!due(&at(300_000, false)), "nothing left that could be summarized");
+        assert!(!due(&ContextInfo { used: 10, limit: 0, can_compact: true }), "a broken limit never triggers");
+        assert!(due(&ContextInfo { used: 900_000, limit: 1_000_000, can_compact: true }));
+    }
+
+    #[test]
+    fn a_failed_automatic_compaction_is_not_retried_for_ten_minutes_and_only_for_that_conversation() {
+        let cooldown = AutoCooldown::default();
+        let start = Instant::now();
+        assert!(cooldown.allowed("s1", start));
+        cooldown.failed("s1", start);
+        assert!(!cooldown.allowed("s1", start + Duration::from_secs(1)));
+        assert!(!cooldown.allowed("s1", start + Duration::from_secs(599)));
+        assert!(cooldown.allowed("s1", start + Duration::from_secs(600)));
+        assert!(cooldown.allowed("s2", start), "other conversations are not held back");
+
+        cooldown.forget("s1");
+        assert!(cooldown.allowed("s1", start), "a success (or deleting the conversation) clears it");
+        cooldown.forget("never-failed");
     }
 
     #[test]
