@@ -334,8 +334,9 @@ mod client {
                 ("Accept".to_string(), "text/event-stream".to_string()),
                 ("anthropic-version".to_string(), DEFAULT_VERSION.to_string()),
             ];
-            if !self.profile.api_key.is_empty() {
-                headers.push(("x-api-key".to_string(), self.profile.api_key.clone()));
+            let key = self.profile.current_api_key();
+            if !key.is_empty() {
+                headers.push(("x-api-key".to_string(), key));
             }
             let call = Call { url: endpoint_url(&self.profile.base_url), headers: http::merge_headers(headers, &self.profile.extra_headers), body };
             let mut decoder = AnthropicStream::default();

@@ -39,6 +39,27 @@ fn streams_a_reply_and_sends_auth_and_body() {
 }
 
 #[test]
+fn a_key_source_is_asked_again_for_every_request() {
+    let (url, server) = serve(vec![sse(&HELLO), sse(&HELLO), sse(&HELLO)]);
+    let calls = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    let counter = calls.clone();
+    let source: Arc<dyn Fn() -> String + Send + Sync> = Arc::new(move || match counter.fetch_add(1, Ordering::SeqCst) {
+        0 => "token-1".into(),
+        1 => "token-2".into(),
+        _ => String::new(),
+    });
+    let p = OpenAiCompat::new(ProviderProfile::new(&url, "static-key", "m1").with_api_key_source(source)).unwrap();
+    let cancel = AtomicBool::new(false);
+    for _ in 0..3 {
+        p.chat(&request("hi"), &mut |_| {}, &cancel).unwrap();
+    }
+    let seen: Vec<String> = server.join().unwrap().into_iter().map(|s| s.to_lowercase()).collect();
+    assert!(seen[0].contains("authorization: bearer token-1"), "{}", seen[0]);
+    assert!(seen[1].contains("authorization: bearer token-2"), "{}", seen[1]);
+    assert!(seen[2].contains("authorization: bearer static-key"), "an empty answer falls back to the fixed key: {}", seen[2]);
+}
+
+#[test]
 fn http_errors_map_to_retryable_or_not() {
     let status = |line: &str| format!("HTTP/1.1 {line}\r\nConnection: close\r\nContent-Length: 4\r\n\r\nnope");
     let (url, server) = serve(vec![status("429 Too Many Requests"), status("401 Unauthorized"), status("503 Unavailable")]);

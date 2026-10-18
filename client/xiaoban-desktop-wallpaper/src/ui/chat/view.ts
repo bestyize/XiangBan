@@ -9,6 +9,10 @@ export const nextId = (view: SessionView) => `${view.id}:${++view.seq}`;
 
 const textOf = (message: WireMessage) => (message.parts ?? []).map(part => (part.type === 'text' ? part.text : '')).join('');
 
+/** The first line of a stored summary (`compact.rs` writes it): the line, then the summary text. */
+const SUMMARY_MARK = /^\[\[xiaoban-summary keep_from=\d+\]\]\n/;
+export const summaryOf = (text: string) => (SUMMARY_MARK.test(text) ? text.replace(SUMMARY_MARK, '') : null);
+
 /** The conversation as it was saved: tool results are put onto the calls they answer. */
 export function itemsFromHistory(view: SessionView, messages: WireMessage[]): ChatItem[] {
   const items: ChatItem[] = [];
@@ -17,7 +21,10 @@ export function itemsFromHistory(view: SessionView, messages: WireMessage[]): Ch
     if (message.role === 'user') {
       const images = (message.parts ?? []).filter(part => part.type === 'image').map(part => (part as { url: string }).url);
       const text = textOf(message);
-      if (text || images.length) items.push({ kind: 'user', id: nextId(view), text, images });
+      const summary = summaryOf(text);
+      if (summary !== null) {
+        items.push({ kind: 'notice', id: nextId(view), tone: 'info', text: '较早的对话已压缩成摘要，小伴之后会参考摘要和最近的内容。', details: summary, detailsLabel: '查看摘要' });
+      } else if (text || images.length) items.push({ kind: 'user', id: nextId(view), text, images });
     } else if (message.role === 'assistant') {
       const text = textOf(message);
       if (text.trim()) items.push({ kind: 'assistant', id: nextId(view), text, streaming: false });

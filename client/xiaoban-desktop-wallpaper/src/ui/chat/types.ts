@@ -1,10 +1,20 @@
 /** What the host sends and accepts for the chat. Field names are the host's own (snake_case for kernel events). */
 
-export interface SessionSummary { id: string; title: string; createdAt: number; updatedAt: number; permissionMode?: 'ask' | 'auto' }
+export interface SessionSummary { id: string; title: string; createdAt: number; updatedAt: number; permissionMode?: 'ask' | 'auto'; /** The group it was moved into; empty or missing when it is not in one. */ group?: string }
+
+/** How much of the context the next request would use. The numbers are estimates, in tokens. */
+export interface ContextInfo { used: number; limit: number; canCompact: boolean }
+
+/** A folder in the list of conversations. Deleting one never deletes the conversations in it. */
+export interface ChatGroup { id: string; name: string }
+
+/** What the host sends back after it changes names or groups: the whole list, so both stay in step. */
+export interface Library { sessions: SessionSummary[]; groups: ChatGroup[] }
 
 export interface Overview {
   configured: boolean;
   sessions: SessionSummary[];
+  groups?: ChatGroup[];
   running: string[];
   /** The folder the assistant's file and command tools work in. */
   workspace: string;
@@ -56,7 +66,7 @@ export type ChatItem =
   | { kind: 'user'; id: string; text: string; images: string[] }
   | { kind: 'assistant'; id: string; text: string; streaming: boolean }
   | { kind: 'tool'; id: string; name: string; arguments: string; output: string; status: 'running' | 'done' | 'error' }
-  | { kind: 'notice'; id: string; tone: 'info' | 'warning' | 'error'; text: string; canContinue?: boolean; canSwitchModel?: boolean; canRetry?: boolean; details?: string };
+  | { kind: 'notice'; id: string; tone: 'info' | 'warning' | 'error'; text: string; canContinue?: boolean; canSwitchModel?: boolean; canRetry?: boolean; details?: string; /** The label on the fold-out `details`; "错误详情" when missing. */ detailsLabel?: string };
 
 export interface SessionView {
   id: string;

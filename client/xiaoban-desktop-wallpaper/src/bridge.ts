@@ -65,7 +65,14 @@ export interface AiConfigView {
   hideToolCalls: boolean;
   /** Whether open-computer-use MCP tools are enabled. */
   openComputerUse: boolean;
+  /** The 小伴 AI tier picked in settings; only in use while `activeProvider` is the gateway. */
+  gatewayTier?: string;
+  /** How much conversation is sent to the model before the oldest part is left out, in estimated tokens. */
+  contextTokens?: number;
 }
+
+/** `activeProvider` while chat is going through 小伴 AI instead of one of the listed providers. */
+export const GATEWAY_PROVIDER = "xiaoban-ai";
 
 export interface AccountUser {
   uid: string;
@@ -117,6 +124,44 @@ export function toAccountError(error: unknown): AccountError {
     return new AccountError(typeof message === "string" && message ? message : "操作失败，请稍后再试", typeof code === "string" ? code : null);
   }
   return new AccountError(typeof error === "string" && error ? error : "操作失败，请稍后再试");
+}
+
+/** One pot of AI credit. `kind` is trial, monthly or topup; amounts are in gateway points. */
+export interface AiBucket {
+  id: number;
+  kind: string;
+  total: number;
+  remaining: number;
+  expiresAt: string | null;
+  createdAt: string;
+}
+
+export interface AiBalance {
+  product: { name: string };
+  /** Points that make one US dollar. */
+  quotaPerUnit: number;
+  total: number;
+  paid: number;
+  buckets: AiBucket[];
+  trial: { available: boolean; quota: number; days: number };
+}
+
+/** A model level the gateway offers. The real model behind it is never sent to the client. */
+export interface AiTier {
+  tier: string;
+  displayName: string;
+  description: string;
+  isDefault: boolean;
+  requiresPaid: boolean;
+  /** False while the account has no paid credit for a paid tier. */
+  available: boolean;
+}
+
+export interface AiRedeemed {
+  kind: string;
+  quota: number;
+  expiresAt: string | null;
+  balance: number;
 }
 
 export type WallpaperKind = "image" | "video" | "canvas" | "web";

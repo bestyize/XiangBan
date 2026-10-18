@@ -5,6 +5,7 @@
 
 mod broker;
 mod community;
+mod compact;
 mod danger;
 mod desktop_tools;
 mod prompt;
@@ -20,9 +21,10 @@ use agent_kernel::provider::wire::ProviderProfile;
 use agent_kernel::skills::Skills;
 use agent_kernel::{Agent, Approval, ApprovalRequest, ContextTrim, JsonlStore, Message, ModelProvider, Part, Permission, PermissionMode, Risk, SessionStore, SpillOutput, ToolCtx};
 use broker::Broker;
+use compact::{CompactingStore, ContextInfo};
 use desktop_tools::{Desktop, TauriDesktop};
 use serde_json::{json, Value};
-use sessions::{Index, SessionSummary};
+use sessions::{Index, Library, SessionSummary};
 use std::{
     collections::HashMap,
     fs,
@@ -36,6 +38,7 @@ use std::{
 use tauri::{Emitter, Manager};
 
 use crate::ai_config::{self, AiConfig};
+use crate::ai_gateway::{self, KeySource};
 
 /// Most of what one message may hold. Longer input should be a file.
 const MAX_INPUT_CHARS: usize = 30_000;
@@ -47,8 +50,6 @@ const MAX_IMAGE_CHARS: usize = 4 * 1024 * 1024;
 /// Image types the three protocols accept. SVG and friends are rejected: providers either refuse
 /// them or need them rasterised first.
 const IMAGE_MEDIA_TYPES: &[&str] = &["image/png", "image/jpeg", "image/gif", "image/webp"];
-/// Estimated tokens kept in a request before old tool output and old turns are dropped.
-const CONTEXT_TOKENS: usize = 48_000;
 const MAX_TURNS: usize = 40;
 const SPILL_KEEP: Duration = Duration::from_secs(7 * 86_400);
 const ARGUMENT_PREVIEW_CHARS: usize = 2_000;
@@ -208,7 +209,14 @@ impl Dirs {
 }
 
 pub(crate) fn provider(config: &AiConfig) -> Result<Arc<dyn ModelProvider>, String> {
-    let profile = ProviderProfile::new(config.base_url.clone(), config.api_key.clone(), config.model.clone());
+    provider_with(config, None)
+}
+
+fn provider_with(config: &AiConfig, key_source: Option<KeySource>) -> Result<Arc<dyn ModelProvider>, String> {
+    let mut profile = ProviderProfile::new(config.base_url.clone(), config.api_key.clone(), config.model.clone());
+    if let Some(source) = key_source {
+        profile = profile.with_api_key_source(source);
+    }
     let made: Result<Arc<dyn ModelProvider>, agent_kernel::HarnessError> = match config.protocol.as_str() {
         "responses" => OpenAiResponses::new(profile).map(|p| Arc::new(p) as Arc<dyn ModelProvider>),
         "anthropic" => AnthropicMessages::new(profile).map(|p| Arc::new(p) as Arc<dyn ModelProvider>),
@@ -306,11 +314,13 @@ struct Parts<'a> {
     open_computer_use: bool,
     /// Starts the computer-control server; a parameter so tests never launch a real one.
     spawn_computer_use: fn() -> Result<Arc<agent_kernel::mcp::McpClient>, agent_kernel::HarnessError>,
+    /// Estimated tokens kept in a request before old tool output and old turns are dropped.
+    context_tokens: usize,
 }
 
 /// Puts the kernel together: the model, the tools the assistant may use, and the rules around them.
 fn assemble(parts: Parts<'_>) -> Result<Agent, String> {
-    let Parts { provider, dirs, workspace, permission, todo, ask, desktop, utc_offset_minutes, open_computer_use, spawn_computer_use } = parts;
+    let Parts { provider, dirs, workspace, permission, todo, ask, desktop, utc_offset_minutes, open_computer_use, spawn_computer_use, context_tokens } = parts;
     for dir in [dirs.sessions(), dirs.spill(), dirs.memory(), dirs.skills()] {
         fs::create_dir_all(&dir).map_err(|e| format!("无法创建 {}：{e}", dir.display()))?;
     }
@@ -329,7 +339,7 @@ fn assemble(parts: Parts<'_>) -> Result<Agent, String> {
         open_computer_use_error: computer_use_error.as_deref(),
     };
 
-    let mut builder = Agent::builder(provider, Arc::new(JsonlStore::new(dirs.sessions())))
+    let mut builder = Agent::builder(provider, Arc::new(CompactingStore::new(JsonlStore::new(dirs.sessions()))))
         .system_prompt(prompt::system_prompt(&environment))
         .prompt_section(skills.prompt_section())
         .prompt_section(memory.prompt_section())
@@ -340,7 +350,7 @@ fn assemble(parts: Parts<'_>) -> Result<Agent, String> {
         .tool(WebFetch::new())
         .middleware(permission)
         .middleware(SpillOutput::new(dirs.spill()))
-        .middleware(ContextTrim::new(CONTEXT_TOKENS))
+        .middleware(ContextTrim::new(context_tokens))
         .max_turns(MAX_TURNS);
     let readable = fs_tools(vec![workspace.to_path_buf(), dirs.spill()]).map_err(|e| e.to_string())?;
     let writable = fs_write_tools(vec![workspace.to_path_buf()]).map_err(|e| e.to_string())?;
@@ -355,14 +365,14 @@ fn assemble(parts: Parts<'_>) -> Result<Agent, String> {
     builder.build().map_err(|e| e.to_string())
 }
 
-fn build_agent(app: &tauri::AppHandle, config: &AiConfig, workspace: &Path) -> Result<Agent, String> {
+fn build_agent(app: &tauri::AppHandle, config: &AiConfig, key_source: Option<KeySource>, workspace: &Path) -> Result<Agent, String> {
     let state = app.state::<ChatState>();
     let ask = {
         let (app, broker) = (app.clone(), state.broker.clone());
         AskUser::new(move |session, question, ctx| ask_question(&app, &broker, session, question, ctx))
     };
     assemble(Parts {
-        provider: provider(config)?,
+        provider: provider_with(config, key_source)?,
         dirs: &Dirs::of(app)?,
         workspace,
         permission: state.permission.clone(),
@@ -372,6 +382,7 @@ fn build_agent(app: &tauri::AppHandle, config: &AiConfig, workspace: &Path) -> R
         utc_offset_minutes: chrono::Local::now().offset().local_minus_utc() / 60,
         open_computer_use: config.open_computer_use,
         spawn_computer_use: spawn_open_computer_use,
+        context_tokens: config.context_tokens,
     })
 }
 
@@ -416,6 +427,7 @@ pub fn chat_overview(app: tauri::AppHandle) -> Result<Value, String> {
     Ok(json!({
         "configured": config.is_complete(),
         "sessions": list(&app)?,
+        "groups": mutate(&app, |index| index.groups())?,
         "running": running,
         "workspace": config.workspace_or(&default).display().to_string(),
         "permissionMode": mode,
@@ -471,7 +483,7 @@ pub fn chat_send(app: tauri::AppHandle, session_id: String, text: String, images
     }
     let state = app.state::<ChatState>();
     if lock(&state.runs).contains_key(&session_id) {
-        return Err("这个对话还在回答，请等它结束或先停止".into());
+        return Err("这个对话还在回答或正在压缩，请等它结束或先停止".into());
     }
     if retry {
         let history = JsonlStore::new(Dirs::of(&app)?.sessions()).load(&session_id).map_err(|e| e.to_string())?;
@@ -510,7 +522,7 @@ pub fn chat_send(app: tauri::AppHandle, session_id: String, text: String, images
 
     let cancel = Arc::new(AtomicBool::new(false));
     if lock(&state.runs).insert(summary.id.clone(), cancel.clone()).is_some() {
-        return Err("这个对话还在回答，请等它结束或先停止".into());
+        return Err("这个对话还在回答或正在压缩，请等它结束或先停止".into());
     }
 
     // Build the agent and run it entirely on a dedicated OS thread.
@@ -521,8 +533,12 @@ pub fn chat_send(app: tauri::AppHandle, session_id: String, text: String, images
     let started = std::thread::Builder::new().name(format!("chat-{id}")).spawn(move || {
         let sender = handle.clone();
         let session = id.clone();
-        let agent = match build_agent(&handle, &config_owned, &workspace_owned) {
-            Ok(agent) => agent,
+        // 小伴 AI 要先拿到有效的账号令牌，可能需要联网刷新，所以放在这条线程里做，不卡住界面。
+        let prepared = ai_gateway::prepare(&handle, config_owned).and_then(|(config, source)| {
+            build_agent(&handle, &config, source, &workspace_owned).map(|agent| (agent, config))
+        });
+        let (agent, config_owned) = match prepared {
+            Ok(ready) => ready,
             Err(error) => {
                 emit(&sender, "chat-event", json!({ "session": session, "event": { "type": "error", "message": error } }));
                 finish_run(&handle, &id);
@@ -532,6 +548,7 @@ pub fn chat_send(app: tauri::AppHandle, session_id: String, text: String, images
         let mut callback = |mut event| {
             if let agent_kernel::Event::Error { message } = &mut event {
                 if !config_owned.api_key.is_empty() { *message = message.replace(&config_owned.api_key, "<hidden>"); }
+                if ai_gateway::is_active(&config_owned) { *message = ai_gateway::readable_error(message); }
             }
             emit(&sender, "chat-event", json!({ "session": session, "event": event }));
         };
@@ -571,6 +588,152 @@ pub fn chat_delete_session(app: tauri::AppHandle, session_id: String) -> Result<
         index.remove(&session_id);
         index.list()
     })
+}
+
+/// What the agent sends before any conversation: its instructions, the skill list and the note index.
+fn base_tokens(dirs: &Dirs, workspace: &Path, config: &AiConfig) -> usize {
+    let environment = prompt::Environment { os: std::env::consts::OS, workspace, open_computer_use: config.open_computer_use, open_computer_use_error: None };
+    let skills = Arc::new(Skills::new().writable_root(dirs.skills()));
+    let memory = Arc::new(Memory::new(dirs.memory()));
+    let (skills_section, memory_section) = (skills.prompt_section(), memory.prompt_section());
+    let text = [prompt::system_prompt(&environment), skills_section(), memory_section()]
+        .into_iter()
+        .filter(|part| !part.trim().is_empty())
+        .collect::<Vec<_>>()
+        .join("\n\n");
+    agent_kernel::estimate_tokens(&[Message::system(text)])
+}
+
+fn context_of(app: &tauri::AppHandle, config: &AiConfig, raw: &[Message]) -> Result<ContextInfo, String> {
+    let dirs = Dirs::of(app)?;
+    let default = ai_config::default_workspace(app)?;
+    Ok(compact::measure(raw, base_tokens(&dirs, config.workspace_or(&default), config), config.context_tokens))
+}
+
+/// How big the next request in a conversation would be, against the limit chosen in settings.
+/// `None` is a conversation that has not been started yet.
+#[tauri::command]
+pub fn chat_context(app: tauri::AppHandle, session_id: Option<String>) -> Result<ContextInfo, String> {
+    let config = ai_config::current(&app)?;
+    let raw = match session_id.as_deref() {
+        Some(id) => {
+            checked_session_id(id)?;
+            JsonlStore::new(Dirs::of(&app)?.sessions()).load(id).map_err(|e| e.to_string())?
+        }
+        None => Vec::new(),
+    };
+    context_of(&app, &config, &raw)
+}
+
+fn compact_session(app: &tauri::AppHandle, id: &str, cancel: &AtomicBool) -> Result<ContextInfo, String> {
+    let config = ai_config::current(app)?;
+    crate::ai_catalogue::usable(app, &config)?;
+    if !config.is_complete() {
+        return Err("还没有配置模型，请先到“设置 → AI 模型”填写".into());
+    }
+    let file = JsonlStore::new(Dirs::of(app)?.sessions());
+    let raw = file.load(id).map_err(|e| e.to_string())?;
+    let plan = compact::plan(&raw).ok_or("这段对话还很短，不需要压缩")?;
+    let transcript = compact::transcript(plan.previous.as_deref(), &plan.input, compact::budget_for(config.context_tokens));
+    let (config, key_source) = ai_gateway::prepare(app, config)?;
+    let provider = provider_with(&config, key_source)?;
+    let summary = compact::summarize(provider.as_ref(), &transcript, cancel)
+        .map_err(|error| if ai_gateway::is_active(&config) { ai_gateway::readable_error(&error) } else { error })?;
+    // A summary that is hardly shorter than what it replaces would only cost a model call.
+    let replaced = agent_kernel::estimate_tokens(&plan.input) + plan.previous.as_deref().map_or(0, |p| agent_kernel::estimate_tokens(&[Message::user_text(p)]));
+    if agent_kernel::estimate_tokens(&[Message::user_text(&summary)]) * 10 >= replaced * 9 {
+        return Err("摘要没有比原文短多少，已保留原对话".into());
+    }
+    file.append(id, &[compact::summary_message(plan.keep_from, &summary)]).map_err(|e| e.to_string())?;
+    context_of(app, &config, &file.load(id).map_err(|e| e.to_string())?)
+}
+
+/// Replaces the older part of a conversation, for the model only, with a summary the model writes.
+/// The saved conversation and what the user sees are untouched. While it runs the conversation counts as busy.
+#[tauri::command]
+pub async fn chat_compact(app: tauri::AppHandle, session_id: String) -> Result<ContextInfo, String> {
+    checked_session_id(&session_id)?;
+    let cancel = Arc::new(AtomicBool::new(false));
+    {
+        let state = app.state::<ChatState>();
+        let mut runs = lock(&state.runs);
+        if runs.contains_key(&session_id) {
+            return Err("这个对话还在回答或正在压缩，请等它结束再试".into());
+        }
+        runs.insert(session_id.clone(), cancel.clone());
+    }
+    let (sender, receiver) = std::sync::mpsc::channel();
+    let (handle, id) = (app.clone(), session_id.clone());
+    // The model client blocks, so it runs on its own thread, as a chat answer does.
+    let started = std::thread::Builder::new().name(format!("compact-{id}")).spawn(move || {
+        let result = compact_session(&handle, &id, &cancel);
+        lock(&handle.state::<ChatState>().runs).remove(&id);
+        let _ = sender.send(result);
+    });
+    if let Err(error) = started {
+        lock(&app.state::<ChatState>().runs).remove(&session_id);
+        return Err(format!("无法开始压缩：{error}"));
+    }
+    tauri::async_runtime::spawn_blocking(move || receiver.recv().unwrap_or_else(|_| Err("压缩被中断了".to_string())))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+fn checked_session_id(id: &str) -> Result<(), String> {
+    if sessions::valid_id(id) { Ok(()) } else { Err("对话编号不对".into()) }
+}
+
+fn checked_group_id(id: &str) -> Result<(), String> {
+    if sessions::valid_id(id) { Ok(()) } else { Err("分组编号不对".into()) }
+}
+
+/// Renaming works while the conversation is answering: the title is only a label.
+#[tauri::command]
+pub fn chat_rename_session(app: tauri::AppHandle, session_id: String, title: String) -> Result<Library, String> {
+    checked_session_id(&session_id)?;
+    mutate(&app, |index| index.rename(&session_id, &title).map(|()| index.library()))?
+}
+
+/// An empty or missing `group_id` takes the conversation out of its group.
+#[tauri::command]
+pub fn chat_move_session(app: tauri::AppHandle, session_id: String, group_id: Option<String>) -> Result<Library, String> {
+    checked_session_id(&session_id)?;
+    if let Some(group) = group_id.as_deref().filter(|g| !g.is_empty()) {
+        checked_group_id(group)?;
+    }
+    mutate(&app, |index| index.move_session(&session_id, group_id.as_deref()).map(|()| index.library()))?
+}
+
+/// With `session_id`, the conversation moves into the new group in the same step, so a failed name leaves it where it was.
+#[tauri::command]
+pub fn chat_create_group(app: tauri::AppHandle, name: String, session_id: Option<String>) -> Result<Library, String> {
+    if let Some(id) = session_id.as_deref() {
+        checked_session_id(id)?;
+    }
+    let (_, millis) = now();
+    mutate(&app, |index| -> Result<Library, String> {
+        if let Some(id) = session_id.as_deref() {
+            index.get(id).ok_or("这个对话已经不存在")?;
+        }
+        let group = index.create_group(millis, &name)?;
+        if let Some(id) = session_id.as_deref() {
+            index.move_session(id, Some(&group.id))?;
+        }
+        Ok(index.library())
+    })?
+}
+
+#[tauri::command]
+pub fn chat_rename_group(app: tauri::AppHandle, group_id: String, name: String) -> Result<Library, String> {
+    checked_group_id(&group_id)?;
+    mutate(&app, |index| index.rename_group(&group_id, &name).map(|()| index.library()))?
+}
+
+/// The conversations inside are kept and go back to the top level.
+#[tauri::command]
+pub fn chat_delete_group(app: tauri::AppHandle, group_id: String) -> Result<Library, String> {
+    checked_group_id(&group_id)?;
+    mutate(&app, |index| index.delete_group(&group_id).map(|()| index.library()))?
 }
 
 #[tauri::command]

@@ -48,8 +48,8 @@ body.desktop-control{background:var(--ui-app-bg);color:var(--ui-text-primary);ov
 .sidebar-scroll::-webkit-scrollbar{width:6px}
 .sidebar-scroll::-webkit-scrollbar-thumb{background:var(--ui-scrollbar);border-radius:3px}
 .sidebar-scroll::-webkit-scrollbar-track{background:transparent}
-.control-navigation{display:grid;gap:6px}
-.control-navigation>button,.settings-nav,.website-nav{display:flex;align-items:center;gap:12px;width:100%;text-align:left;border:0;background:transparent;border-radius:13px;padding:0 14px;cursor:pointer;color:var(--ui-text-secondary);min-height:46px;font-size:14px}
+.control-navigation{display:grid;gap:2px}
+.control-navigation>button,.settings-nav,.website-nav{display:flex;align-items:center;gap:12px;width:100%;text-align:left;border:0;background:transparent;border-radius:13px;padding:0 14px;cursor:pointer;color:var(--ui-text-secondary);min-height:40px;font-size:14px}
 .control-navigation>button:hover,.settings-nav:hover,.website-nav:hover{background:var(--ui-surface-alt);color:var(--ui-text-primary)}
 .control-navigation>button{position:relative}
 .control-navigation>.nav-attention,.control-navigation>button .nav-attention{margin-left:auto}
@@ -114,7 +114,7 @@ body.desktop-control{background:var(--ui-app-bg);color:var(--ui-text-primary);ov
 .is-collapsed .control-sidebar{padding-left:10px;padding-right:10px}
 .is-collapsed .control-brand{padding-left:6px;padding-bottom:24px}
 .is-collapsed .brand-copy,.is-collapsed .sidebar-group-label,.is-collapsed .control-navigation>button>span,.is-collapsed .nav-arrow,.is-collapsed .sidebar-desktop-state,.is-collapsed .settings-nav>span,.is-collapsed .website-nav>span,.is-collapsed .website-nav>.external-icon,.is-collapsed .sidebar-meta>span,.is-collapsed .account-copy,.is-collapsed .login-arrow,.is-collapsed .account-logout-btn{display:none}
-.is-collapsed .control-navigation>button,.is-collapsed .settings-nav,.is-collapsed .website-nav{justify-content:center;padding:0 8px;min-height:46px}
+.is-collapsed .control-navigation>button,.is-collapsed .settings-nav,.is-collapsed .website-nav{justify-content:center;padding:0 8px;min-height:40px}
 .is-collapsed .sidebar-account-box{margin:0 0 16px}
 .is-collapsed .account-login-card,.is-collapsed .account-profile-card{justify-content:center;padding:6px 0;border-radius:12px}
 .is-collapsed .sidebar-meta{justify-content:center;padding:12px 0 0}

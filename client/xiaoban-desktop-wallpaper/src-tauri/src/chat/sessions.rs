@@ -14,7 +14,11 @@ use std::{
 
 pub const DEFAULT_TITLE: &str = "新对话";
 const MAX_TITLE_CHARS: usize = 40;
+/// A name the user typed may be longer than the title cut from a first message.
+const MAX_NAME_CHARS: usize = 60;
+const MAX_GROUP_NAME_CHARS: usize = 20;
 const MAX_SESSIONS: usize = 500;
+const MAX_GROUPS: usize = 30;
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
@@ -24,6 +28,8 @@ pub struct SessionSummary {
     pub created_at: i64,
     pub updated_at: i64,
     pub permission_mode: String,
+    /// The group this conversation was moved into; empty when it is not in one.
+    pub group: String,
 }
 
 impl Default for SessionSummary {
@@ -34,8 +40,23 @@ impl Default for SessionSummary {
             created_at: 0,
             updated_at: 0,
             permission_mode: "ask".into(),
+            group: String::new(),
         }
     }
+}
+
+/// A folder in the conversation list. Conversations only point at it, so deleting a group never deletes them.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Group {
+    pub id: String,
+    pub name: String,
+}
+
+/// Everything the list shows, sent together so the page never sees conversations and groups out of step.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+pub struct Library {
+    pub sessions: Vec<SessionSummary>,
+    pub groups: Vec<Group>,
 }
 
 #[derive(Default, Serialize, Deserialize)]
@@ -43,6 +64,7 @@ impl Default for SessionSummary {
 struct IndexFile {
     version: u32,
     sessions: Vec<SessionSummary>,
+    groups: Vec<Group>,
 }
 
 /// Ids are written by us, so they use a small alphabet that is safe in file names.
@@ -71,25 +93,129 @@ pub fn title_from(text: &str) -> String {
 pub struct Index {
     path: PathBuf,
     sessions: Vec<SessionSummary>,
+    groups: Vec<Group>,
+}
+
+/// Keeps only groups that can be told apart, and sends conversations whose group is gone back to the top level.
+fn tidy(sessions: &mut [SessionSummary], groups: Vec<Group>) -> Vec<Group> {
+    let mut kept: Vec<Group> = Vec::new();
+    for group in groups {
+        let name = group.name.trim().to_string();
+        if valid_id(&group.id) && !name.is_empty() && !kept.iter().any(|g| g.id == group.id) {
+            kept.push(Group { id: group.id, name });
+        }
+    }
+    for session in sessions.iter_mut() {
+        if !session.group.is_empty() && !kept.iter().any(|g| g.id == session.group) {
+            session.group.clear();
+        }
+    }
+    kept
+}
+
+/// Collapses runs of whitespace, then checks the result is a usable name.
+fn clean_name(raw: &str, max_chars: usize, what: &str) -> Result<String, String> {
+    let name = raw.split_whitespace().collect::<Vec<_>>().join(" ");
+    if name.is_empty() {
+        return Err(format!("{what}不能为空"));
+    }
+    if name.chars().any(char::is_control) {
+        return Err(format!("{what}里不能有特殊控制字符"));
+    }
+    if name.chars().count() > max_chars {
+        return Err(format!("{what}最多 {max_chars} 个字"));
+    }
+    Ok(name)
+}
+
+fn new_group_id(now_millis: u128) -> String {
+    static COUNTER: AtomicU64 = AtomicU64::new(0);
+    let random = getrandom::u32().unwrap_or(0);
+    format!("g{now_millis:x}-{random:08x}-{:x}", COUNTER.fetch_add(1, Ordering::Relaxed))
 }
 
 impl Index {
     /// `dir` holds `index.json`; `store` is where the conversation files are.
     pub fn load(dir: &Path, sessions_dir: &Path, store: &JsonlStore) -> Self {
         let path = dir.join("index.json");
-        let sessions = match fs::read(&path) {
+        let (mut sessions, groups) = match fs::read(&path) {
             Ok(bytes) => match serde_json::from_slice::<IndexFile>(&bytes) {
-                Ok(file) => file.sessions.into_iter().filter(|s| valid_id(&s.id)).collect(),
+                Ok(file) => (file.sessions.into_iter().filter(|s| valid_id(&s.id)).collect(), file.groups),
                 Err(_) => {
                     // Keep the damaged file for inspection instead of writing over it.
                     let _ = fs::rename(&path, dir.join(format!("index.json.damaged-{}", std::process::id())));
-                    rebuild(sessions_dir, store)
+                    (rebuild(sessions_dir, store), Vec::new())
                 }
             },
-            Err(e) if e.kind() == io::ErrorKind::NotFound => rebuild(sessions_dir, store),
-            Err(_) => Vec::new(),
+            Err(e) if e.kind() == io::ErrorKind::NotFound => (rebuild(sessions_dir, store), Vec::new()),
+            Err(_) => (Vec::new(), Vec::new()),
         };
-        Self { path, sessions }
+        let groups = tidy(&mut sessions, groups);
+        Self { path, sessions, groups }
+    }
+
+    pub fn groups(&self) -> Vec<Group> {
+        self.groups.clone()
+    }
+
+    pub fn library(&self) -> Library {
+        Library { sessions: self.list(), groups: self.groups() }
+    }
+
+    /// The name is the user's own, so later messages never replace it.
+    pub fn rename(&mut self, id: &str, raw: &str) -> Result<(), String> {
+        let title = clean_name(raw, MAX_NAME_CHARS, "对话名称")?;
+        let session = self.sessions.iter_mut().find(|s| s.id == id).ok_or("这个对话已经不存在")?;
+        session.title = title;
+        Ok(())
+    }
+
+    /// `None` or an empty id takes the conversation out of its group.
+    pub fn move_session(&mut self, id: &str, group: Option<&str>) -> Result<(), String> {
+        let target = group.unwrap_or_default();
+        if !target.is_empty() && !self.groups.iter().any(|g| g.id == target) {
+            return Err("这个分组已经不存在".into());
+        }
+        let session = self.sessions.iter_mut().find(|s| s.id == id).ok_or("这个对话已经不存在")?;
+        session.group = target.to_string();
+        Ok(())
+    }
+
+    fn check_group_name(&self, raw: &str, except: Option<&str>) -> Result<String, String> {
+        let name = clean_name(raw, MAX_GROUP_NAME_CHARS, "分组名称")?;
+        let taken = self.groups.iter().any(|g| Some(g.id.as_str()) != except && g.name.to_lowercase() == name.to_lowercase());
+        if taken {
+            return Err("已经有同名的分组".into());
+        }
+        Ok(name)
+    }
+
+    pub fn create_group(&mut self, now_millis: u128, raw: &str) -> Result<Group, String> {
+        if self.groups.len() >= MAX_GROUPS {
+            return Err(format!("分组最多 {MAX_GROUPS} 个，请先删除一些不用的分组"));
+        }
+        let group = Group { id: new_group_id(now_millis), name: self.check_group_name(raw, None)? };
+        self.groups.push(group.clone());
+        Ok(group)
+    }
+
+    pub fn rename_group(&mut self, id: &str, raw: &str) -> Result<(), String> {
+        let name = self.check_group_name(raw, Some(id))?;
+        let group = self.groups.iter_mut().find(|g| g.id == id).ok_or("这个分组已经不存在")?;
+        group.name = name;
+        Ok(())
+    }
+
+    /// The conversations inside stay, and go back to the top level.
+    pub fn delete_group(&mut self, id: &str) -> Result<(), String> {
+        if !self.groups.iter().any(|g| g.id == id) {
+            return Err("这个分组已经不存在".into());
+        }
+        self.groups.retain(|g| g.id != id);
+        for session in self.sessions.iter_mut().filter(|s| s.group == id) {
+            session.group.clear();
+        }
+        Ok(())
     }
 
     /// Newest first.
@@ -108,7 +234,7 @@ impl Index {
         if self.sessions.len() >= MAX_SESSIONS {
             return Err(format!("对话最多保存 {MAX_SESSIONS} 个，请先删除一些旧对话"));
         }
-        let summary = SessionSummary { id: new_id(now_millis), title: DEFAULT_TITLE.into(), created_at: now, updated_at: now, permission_mode: permission_mode.into() };
+        let summary = SessionSummary { id: new_id(now_millis), created_at: now, updated_at: now, permission_mode: permission_mode.into(), ..SessionSummary::default() };
         self.sessions.push(summary.clone());
         Ok(summary)
     }
@@ -146,7 +272,7 @@ impl Index {
         fs::create_dir_all(parent)?;
         let temporary = parent.join(format!("index-{}.tmp", std::process::id()));
         let result = (|| {
-            let bytes = serde_json::to_vec_pretty(&IndexFile { version: 1, sessions: self.sessions.clone() }).map_err(io::Error::other)?;
+            let bytes = serde_json::to_vec_pretty(&IndexFile { version: 1, sessions: self.sessions.clone(), groups: self.groups.clone() }).map_err(io::Error::other)?;
             let mut file = fs::File::create(&temporary)?;
             file.write_all(&bytes)?;
             file.sync_all()?;
@@ -178,7 +304,7 @@ fn rebuild(sessions_dir: &Path, store: &JsonlStore) -> Vec<SessionSummary> {
         let first_user = store.load(id).ok().and_then(|messages| messages.into_iter().find(|m| m.role == Role::User)).map(|m| m.text());
         let updated_at = meta.as_ref().map_or(0, |m| seconds(m.modified()));
         let created_at = meta.as_ref().map_or(updated_at, |m| seconds(m.created()).min(updated_at).max(0));
-        found.push(SessionSummary { id: id.to_string(), title: first_user.map_or_else(|| DEFAULT_TITLE.to_string(), |t| title_from(&t)), created_at, updated_at, permission_mode: "ask".into() });
+        found.push(SessionSummary { id: id.to_string(), title: first_user.map_or_else(|| DEFAULT_TITLE.to_string(), |t| title_from(&t)), created_at, updated_at, ..SessionSummary::default() });
         if found.len() >= MAX_SESSIONS {
             break;
         }
@@ -321,6 +447,144 @@ mod tests {
             index.create(i, i as u128 + 10, "ask").unwrap();
         }
         assert!(index.create(1000, 9999, "ask").unwrap_err().contains("最多保存"));
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn a_conversation_can_be_renamed_and_the_name_is_cleaned_checked_and_kept() {
+        let dir = temp("rename");
+        let (mut index, _) = open(&dir);
+        let one = index.create(100, 1, "ask").unwrap();
+        index.rename(&one.id, "  周报   第 3 周\n").unwrap();
+        assert_eq!(index.get(&one.id).unwrap().title, "周报 第 3 周");
+        index.name_from_first_message(&one.id, "用户第一句话");
+        assert_eq!(index.get(&one.id).unwrap().title, "周报 第 3 周", "the first message does not rename a conversation the user named");
+        assert_eq!(index.get(&one.id).unwrap().updated_at, 100, "renaming is not activity");
+
+        assert!(index.rename(&one.id, "  \n ").unwrap_err().contains("不能为空"));
+        assert!(index.rename(&one.id, "名\u{7}字").unwrap_err().contains("控制字符"));
+        assert!(index.rename(&one.id, &"长".repeat(61)).unwrap_err().contains("最多 60"));
+        index.rename(&one.id, &"长".repeat(60)).unwrap();
+        assert!(index.rename("gone", "x").unwrap_err().contains("已经不存在"));
+        assert_eq!(index.get(&one.id).unwrap().title.chars().count(), 60, "a refused name leaves the old one");
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn groups_are_created_with_clean_unique_names_and_a_limit() {
+        let dir = temp("groups-create");
+        let (mut index, _) = open(&dir);
+        let work = index.create_group(1, "  工作   项目 ").unwrap();
+        assert_eq!(work.name, "工作 项目");
+        assert!(valid_id(&work.id) && work.id.starts_with('g'), "group ids are file-safe and cannot be mistaken for conversation ids");
+        assert!(index.create_group(2, "工作 项目").unwrap_err().contains("同名"));
+        assert!(index.create_group(3, "Abc").is_ok());
+        assert!(index.create_group(4, "aBC").unwrap_err().contains("同名"), "names differing only in case count as the same");
+        assert!(index.create_group(5, "").unwrap_err().contains("不能为空"));
+        assert!(index.create_group(6, &"组".repeat(21)).unwrap_err().contains("最多 20"));
+        for i in 0..28 {
+            index.create_group(10 + i, &format!("组{i}")).unwrap();
+        }
+        assert_eq!(index.groups().len(), 30);
+        assert!(index.create_group(99, "多一个").unwrap_err().contains("最多 30"));
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn a_conversation_moves_into_a_group_and_back_out() {
+        let dir = temp("groups-move");
+        let (mut index, _) = open(&dir);
+        let one = index.create(100, 1, "ask").unwrap();
+        let group = index.create_group(1, "工作").unwrap();
+        assert_eq!(index.get(&one.id).unwrap().group, "");
+        index.move_session(&one.id, Some(&group.id)).unwrap();
+        assert_eq!(index.get(&one.id).unwrap().group, group.id);
+        assert_eq!(index.get(&one.id).unwrap().updated_at, 100, "moving is not activity");
+        index.move_session(&one.id, None).unwrap();
+        assert_eq!(index.get(&one.id).unwrap().group, "");
+        index.move_session(&one.id, Some(&group.id)).unwrap();
+        index.move_session(&one.id, Some("")).unwrap();
+        assert_eq!(index.get(&one.id).unwrap().group, "", "an empty id also means no group");
+
+        assert!(index.move_session(&one.id, Some("g-missing")).unwrap_err().contains("分组已经不存在"));
+        assert!(index.move_session("gone", Some(&group.id)).unwrap_err().contains("对话已经不存在"));
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn a_group_can_be_renamed_but_not_to_another_groups_name() {
+        let dir = temp("groups-rename");
+        let (mut index, _) = open(&dir);
+        let a = index.create_group(1, "工作").unwrap();
+        let b = index.create_group(2, "生活").unwrap();
+        index.rename_group(&a.id, "工作 2").unwrap();
+        index.rename_group(&a.id, "工作 2").unwrap();
+        index.rename_group(&b.id, "生活".to_uppercase().as_str()).unwrap();
+        assert!(index.rename_group(&b.id, "工作 2").unwrap_err().contains("同名"));
+        assert!(index.rename_group(&b.id, " ").unwrap_err().contains("不能为空"));
+        assert!(index.rename_group("g-missing", "新").unwrap_err().contains("已经不存在"));
+        assert_eq!(index.groups().iter().map(|g| g.name.as_str()).collect::<Vec<_>>(), vec!["工作 2", "生活".to_uppercase().as_str()]);
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn deleting_a_group_keeps_its_conversations() {
+        let dir = temp("groups-delete");
+        let (mut index, _) = open(&dir);
+        let inside = index.create(100, 1, "ask").unwrap();
+        let elsewhere = index.create(200, 2, "ask").unwrap();
+        let doomed = index.create_group(1, "要删的").unwrap();
+        let other = index.create_group(2, "留着的").unwrap();
+        index.move_session(&inside.id, Some(&doomed.id)).unwrap();
+        index.move_session(&elsewhere.id, Some(&other.id)).unwrap();
+
+        index.delete_group(&doomed.id).unwrap();
+        assert_eq!(index.groups(), vec![other.clone()]);
+        assert_eq!(index.list().len(), 2, "no conversation is lost");
+        assert_eq!(index.get(&inside.id).unwrap().group, "");
+        assert_eq!(index.get(&elsewhere.id).unwrap().group, other.id, "other groups are untouched");
+        assert!(index.delete_group(&doomed.id).unwrap_err().contains("已经不存在"));
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn groups_and_names_survive_a_restart_and_the_library_carries_both() {
+        let dir = temp("groups-persist");
+        let (mut index, _) = open(&dir);
+        let one = index.create(100, 1, "ask").unwrap();
+        let group = index.create_group(1, "工作").unwrap();
+        index.move_session(&one.id, Some(&group.id)).unwrap();
+        index.rename(&one.id, "我取的名字").unwrap();
+        index.save().unwrap();
+
+        let (again, _) = open(&dir);
+        let library = again.library();
+        assert_eq!(library.groups, vec![group.clone()]);
+        assert_eq!((library.sessions[0].title.as_str(), library.sessions[0].group.as_str()), ("我取的名字", group.id.as_str()));
+        let json = serde_json::to_value(&library).unwrap();
+        assert_eq!(json["sessions"][0]["group"], group.id.as_str());
+        assert_eq!(json["groups"][0]["name"], "工作");
+        fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn an_index_from_before_groups_existed_loads_and_a_dangling_group_is_cleaned() {
+        let dir = temp("groups-legacy");
+        fs::write(dir.join("index.json"), r#"{"version":1,"sessions":[{"id":"old-1","title":"旧对话","createdAt":1,"updatedAt":1}]}"#).unwrap();
+        let (index, _) = open(&dir);
+        assert_eq!((index.list()[0].group.as_str(), index.groups().len()), ("", 0));
+        drop(index);
+
+        fs::write(
+            dir.join("index.json"),
+            r#"{"version":1,"groups":[{"id":"g1","name":" 工作 "},{"id":"g1","name":"重复编号"},{"id":"../bad","name":"坏编号"},{"id":"g2","name":"  "}],
+                "sessions":[{"id":"a","title":"在组里","createdAt":1,"updatedAt":1,"group":"g1"},{"id":"b","title":"组没了","createdAt":1,"updatedAt":2,"group":"g9"}]}"#,
+        )
+        .unwrap();
+        let (index, _) = open(&dir);
+        assert_eq!(index.groups(), vec![Group { id: "g1".into(), name: "工作".into() }], "duplicates, unsafe ids and blank names are dropped");
+        assert_eq!(index.get("a").unwrap().group, "g1");
+        assert_eq!(index.get("b").unwrap().group, "", "a conversation pointing at a group that is gone goes back to the top level");
         fs::remove_dir_all(dir).unwrap();
     }
 }

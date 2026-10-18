@@ -14,11 +14,13 @@ function harness(responders: Record<string, Responder> = {}, desktop = true) {
   const handlers = new Map<string, (payload: never) => void>();
   const stopped: string[] = [];
   const calls: [string, Record<string, unknown> | undefined][] = [];
-  const table: Record<string, Responder> = { chat_overview: () => overview(), ...responders };
+  const table: Record<string, Responder> = { chat_overview: () => overview(), chat_context: () => ({ used: 0, limit: 48_000, canCompact: false }), ...responders };
+  // The ring's numbers are read on their own schedule, so they are kept apart from the calls a test is about.
+  const contextCalls: (Record<string, unknown> | undefined)[] = [];
   const deps: ChatDeps = {
     desktop,
     invoke: vi.fn(async (command: string, args?: Record<string, unknown>) => {
-      calls.push([command, args]);
+      if (command === 'chat_context') contextCalls.push(args); else calls.push([command, args]);
       const respond = table[command];
       if (!respond) throw new Error(`unexpected ${command}`);
       return respond(args) as never;
@@ -30,7 +32,7 @@ function harness(responders: Record<string, Responder> = {}, desktop = true) {
   const emit = (event: string, payload: unknown) => handlers.get(event)!(payload as never);
   const events = (session: string, ...list: KernelEvent[]) => list.forEach(event => emit('chat-event', { session, event }));
   const commands = () => calls.map(([command]) => command);
-  return { store, deps, emit, events, calls, commands, handlers, stopped, table };
+  return { store, deps, emit, events, calls, contextCalls, commands, handlers, stopped, table };
 }
 
 describe('starting up', () => {
@@ -264,6 +266,97 @@ describe('opening and removing conversations', () => {
     expect(h.store.currentId).toBeNull();
   });
 
+  describe('names and groups', () => {
+    const work = { id: 'g1', name: '工作' };
+    const listing = (sessions: SessionSummary[], groups = [work]) => ({ sessions, groups });
+
+    it('reads the groups with the first overview', async () => {
+      const h = harness({ chat_overview: () => ({ ...overview({ sessions: [{ ...summary('s1'), group: 'g1' }] }), groups: [work] }) });
+      await h.store.init();
+      expect(h.store.groups).toEqual([work]);
+      expect(h.store.sessions[0].group).toBe('g1');
+      const old = harness({ chat_overview: () => overview() });
+      await old.store.init();
+      expect(old.store.groups).toEqual([]);
+    });
+
+    it('renames a conversation and takes the list the host sends back', async () => {
+      const h = harness({ chat_overview: () => overview({ sessions: [summary('s1', '旧名字')] }), chat_rename_session: () => listing([summary('s1', '新名字')], []) });
+      await h.store.init();
+      expect(await h.store.rename('s1', '新名字')).toBe(true);
+      expect(h.calls.at(-1)).toEqual(['chat_rename_session', { sessionId: 's1', title: '新名字' }]);
+      expect(h.store.sessions[0].title).toBe('新名字');
+    });
+
+    it('moves a conversation into a group and back out with a null group', async () => {
+      const h = harness({
+        chat_overview: () => overview({ sessions: [summary('s1')] }),
+        chat_move_session: args => listing([{ ...summary('s1'), group: (args?.groupId as string | null) ?? '' }]),
+      });
+      await h.store.init();
+      expect(await h.store.move('s1', 'g1')).toBe(true);
+      expect(h.calls.at(-1)).toEqual(['chat_move_session', { sessionId: 's1', groupId: 'g1' }]);
+      expect(h.store.sessions[0].group).toBe('g1');
+      expect(await h.store.move('s1', null)).toBe(true);
+      expect(h.calls.at(-1)).toEqual(['chat_move_session', { sessionId: 's1', groupId: null }]);
+      expect(h.store.sessions[0].group).toBe('');
+    });
+
+    it('creates a group, optionally moving a conversation into it in the same call', async () => {
+      const h = harness({
+        chat_overview: () => overview({ sessions: [summary('s1')] }),
+        chat_create_group: args => listing([{ ...summary('s1'), group: args?.sessionId ? 'g1' : '' }]),
+      });
+      await h.store.init();
+      expect(await h.store.createGroup('工作')).toBe(true);
+      expect(h.calls.at(-1)).toEqual(['chat_create_group', { name: '工作' }]);
+      expect(h.store.groups).toEqual([work]);
+      expect(h.store.sessions[0].group).toBe('');
+      await h.store.createGroup('工作', 's1');
+      expect(h.calls.at(-1)).toEqual(['chat_create_group', { name: '工作', sessionId: 's1' }]);
+      expect(h.store.sessions[0].group).toBe('g1');
+    });
+
+    it('renames and deletes a group; deleting hands back the conversations that were inside it', async () => {
+      const h = harness({
+        chat_overview: () => ({ ...overview({ sessions: [{ ...summary('s1'), group: 'g1' }] }), groups: [work] }),
+        chat_rename_group: () => listing([{ ...summary('s1'), group: 'g1' }], [{ id: 'g1', name: '项目' }]),
+        chat_delete_group: () => listing([summary('s1')], []),
+      });
+      await h.store.init();
+      expect(await h.store.renameGroup('g1', '项目')).toBe(true);
+      expect(h.calls.at(-1)).toEqual(['chat_rename_group', { groupId: 'g1', name: '项目' }]);
+      expect(h.store.groups[0].name).toBe('项目');
+      expect(await h.store.removeGroup('g1')).toBe(true);
+      expect(h.calls.at(-1)).toEqual(['chat_delete_group', { groupId: 'g1' }]);
+      expect(h.store.groups).toEqual([]);
+      expect(h.store.sessions.map(s => s.id)).toEqual(['s1']);
+    });
+
+    it('reports the host\'s reason and changes nothing when an edit is refused', async () => {
+      const h = harness({
+        chat_overview: () => ({ ...overview({ sessions: [summary('s1', '原名')] }), groups: [work] }),
+        chat_rename_session: () => { throw new Error('对话名称不能为空'); },
+        chat_create_group: () => { throw new Error('已经有同名的分组'); },
+      });
+      await h.store.init();
+      expect(await h.store.rename('s1', ' ')).toBe(false);
+      expect(await h.store.createGroup('工作')).toBe(false);
+      expect(h.deps.notify).toHaveBeenCalledTimes(2);
+      expect(h.deps.notify).toHaveBeenNthCalledWith(1, expect.objectContaining({ message: '对话名称不能为空' }), 'error');
+      expect(h.store.sessions[0].title).toBe('原名');
+      expect(h.store.groups).toEqual([work]);
+    });
+
+    it('does nothing in the browser preview', async () => {
+      const h = harness({}, false);
+      await h.store.init();
+      expect(await h.store.rename('s1', 'x')).toBe(false);
+      expect(await h.store.createGroup('x')).toBe(false);
+      expect(h.deps.invoke).not.toHaveBeenCalled();
+    });
+  });
+
   it('stops the open conversation', async () => {
     const h = harness({ chat_overview: () => overview({ sessions: [summary('s1')] }), chat_load_session: () => [], chat_cancel: () => undefined });
     await h.store.init();
@@ -383,5 +476,155 @@ describe('what the page can see', () => {
     h.events('s1', { type: 'done' });
     expect(w.seen.at(-1)).toBe('0|false');
     w.stop();
+  });
+});
+
+describe('the context of the open conversation and compacting it', () => {
+  const info = (used: number, canCompact = true) => ({ used, limit: 48_000, canCompact });
+  const say = (value: string) => [{ type: 'text' as const, text: value }];
+  const history: WireMessage[] = [{ role: 'user', parts: say('早') }, { role: 'assistant', parts: say('早上好') }];
+  const withSummary: WireMessage[] = [...history, { role: 'user', parts: say('[[xiaoban-summary keep_from=2]]\n摘要正文') }];
+  const tick = () => new Promise(resolve => setTimeout(resolve, 0));
+
+  it('reads the numbers with the first overview, and again when a conversation is opened', async () => {
+    let used = 1_000;
+    const h = harness({ chat_overview: () => overview({ sessions: [summary('s1')] }), chat_load_session: () => history, chat_context: () => info(used) });
+    await h.store.init();
+    await vi.waitFor(() => expect(h.store.context.used).toBe(1_000));
+    expect(h.contextCalls[0]).toEqual({ sessionId: null });
+
+    used = 7_000;
+    await h.store.select('s1');
+    await vi.waitFor(() => expect(h.store.context.used).toBe(7_000));
+    expect(h.contextCalls.at(-1)).toEqual({ sessionId: 's1' });
+    expect(h.commands()).not.toContain('chat_context');
+  });
+
+  it('ignores a late answer about a conversation that is no longer open', async () => {
+    let release!: (value: unknown) => void;
+    const slow = new Promise(resolve => { release = resolve; });
+    const h = harness({
+      chat_overview: () => overview({ sessions: [summary('s1'), summary('s2')] }),
+      chat_load_session: () => history,
+      chat_context: args => (args?.sessionId === 's1' ? slow : info(500)),
+    });
+    await h.store.init();
+    await h.store.select('s1');
+    await h.store.select('s2');
+    await vi.waitFor(() => expect(h.store.context.used).toBe(500));
+    release(info(9_000));
+    await tick();
+    expect(h.store.context.used).toBe(500);
+  });
+
+  it('reads the numbers again when the open conversation finishes, is stopped or fails, but not for others', async () => {
+    const h = harness({ chat_overview: () => overview({ sessions: [summary('s1'), summary('s2')] }), chat_load_session: () => history });
+    await h.store.init();
+    await h.store.select('s1');
+    await tick();
+    for (const event of [{ type: 'done' }, { type: 'cancelled' }, { type: 'error', message: '坏了' }] as KernelEvent[]) {
+      const before = h.contextCalls.length;
+      h.events('s1', event);
+      await vi.waitFor(() => expect(h.contextCalls.length).toBe(before + 1));
+    }
+    const before = h.contextCalls.length;
+    h.events('s2', { type: 'done' });
+    await tick();
+    expect(h.contextCalls.length).toBe(before);
+  });
+
+  it('keeps the last numbers when reading them fails', async () => {
+    let fail = false;
+    const h = harness({ chat_overview: () => overview(), chat_context: () => { if (fail) throw new Error('读取失败'); return info(3_000); } });
+    await h.store.init();
+    await vi.waitFor(() => expect(h.store.context.used).toBe(3_000));
+    fail = true;
+    await h.store.refreshContext();
+    expect(h.store.context.used).toBe(3_000);
+    expect(h.deps.notify).not.toHaveBeenCalled();
+  });
+
+  it('compacts, takes the new numbers and shows the summary where it now sits', async () => {
+    let compacted = false;
+    const h = harness({
+      chat_overview: () => overview({ sessions: [summary('s1')] }),
+      chat_load_session: () => (compacted ? withSummary : history),
+      chat_context: () => info(compacted ? 2_000 : 40_000),
+      chat_compact: () => { compacted = true; return info(2_000, false); },
+    });
+    await h.store.init();
+    await h.store.select('s1');
+    await vi.waitFor(() => expect(h.store.context.used).toBe(40_000));
+
+    const pending = h.store.compact();
+    expect(h.store.compactingId).toBe('s1');
+    expect(await pending).toBe(true);
+    expect(h.calls.at(-2)).toEqual(['chat_compact', { sessionId: 's1' }]);
+    expect(h.calls.at(-1)).toEqual(['chat_load_session', { sessionId: 's1' }]);
+    expect(h.store.compactingId).toBeNull();
+    expect(h.store.context).toEqual(info(2_000, false));
+    expect(h.store.current()!.items.map(item => item.kind)).toEqual(['user', 'assistant', 'notice']);
+    expect(h.deps.notify).toHaveBeenCalledWith('较早的对话已压缩成摘要', 'success');
+  });
+
+  it('still counts as done when only reloading the conversation afterwards fails', async () => {
+    let loads = 0;
+    const h = harness({
+      chat_overview: () => overview({ sessions: [summary('s1')] }),
+      chat_load_session: () => { if (++loads > 1) throw new Error('读不出来'); return history; },
+      chat_compact: () => info(2_000, false),
+    });
+    await h.store.init();
+    await h.store.select('s1');
+    expect(await h.store.compact()).toBe(true);
+    expect(h.store.context.used).toBe(2_000);
+    expect(h.deps.notify).not.toHaveBeenCalledWith(expect.anything(), 'error');
+  });
+
+  it('says why when the host refuses, and changes nothing', async () => {
+    const h = harness({
+      chat_overview: () => overview({ sessions: [summary('s1')] }),
+      chat_load_session: () => history,
+      chat_context: () => info(40_000),
+      chat_compact: () => { throw new Error('摘要没有比原文短多少，已保留原对话'); },
+    });
+    await h.store.init();
+    await h.store.select('s1');
+    await vi.waitFor(() => expect(h.store.context.used).toBe(40_000));
+    expect(await h.store.compact()).toBe(false);
+    expect(h.deps.notify).toHaveBeenCalledWith(expect.objectContaining({ message: '摘要没有比原文短多少，已保留原对话' }), 'error');
+    expect(h.store.compactingId).toBeNull();
+    expect(h.store.context.used).toBe(40_000);
+    expect(h.calls.filter(([command]) => command === 'chat_load_session')).toHaveLength(1);
+  });
+
+  it('does nothing with no open conversation, while it answers, or while another compaction is under way', async () => {
+    let release!: () => void;
+    const gate = new Promise<void>(resolve => { release = resolve; });
+    const h = harness({
+      chat_overview: () => overview({ sessions: [summary('s1'), summary('s2')], running: ['s2'] }),
+      chat_load_session: () => history,
+      chat_compact: async () => { await gate; return info(1_000, false); },
+    });
+    await h.store.init();
+    expect(await h.store.compact()).toBe(false);
+
+    await h.store.select('s2');
+    expect(await h.store.compact()).toBe(false);
+
+    await h.store.select('s1');
+    const first = h.store.compact();
+    expect(await h.store.compact()).toBe(false);
+    release();
+    expect(await first).toBe(true);
+    expect(h.calls.filter(([command]) => command === 'chat_compact')).toHaveLength(1);
+  });
+
+  it('is idle in the browser preview', async () => {
+    const h = harness({}, false);
+    await h.store.init();
+    await h.store.refreshContext();
+    expect(await h.store.compact()).toBe(false);
+    expect(h.deps.invoke).not.toHaveBeenCalled();
   });
 });

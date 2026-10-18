@@ -306,8 +306,9 @@ mod client {
                 ("Content-Type".to_string(), "application/json".to_string()),
                 ("Accept".to_string(), "text/event-stream".to_string()),
             ];
-            if !self.profile.api_key.is_empty() {
-                headers.push(("Authorization".to_string(), format!("Bearer {}", self.profile.api_key)));
+            let key = self.profile.current_api_key();
+            if !key.is_empty() {
+                headers.push(("Authorization".to_string(), format!("Bearer {key}")));
             }
             let call = Call { url: endpoint_url(&self.profile.base_url), headers: http::merge_headers(headers, &self.profile.extra_headers), body };
             let mut decoder = ResponsesStream::default();

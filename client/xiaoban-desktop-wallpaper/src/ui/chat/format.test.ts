@@ -1,6 +1,6 @@
 import desktopToolSource from '../../../src-tauri/src/chat/desktop_tools.rs?raw';
 import { describe, expect, it } from 'vitest';
-import { approvalPreview, clip, formatAgo, isImeEnter, isNearBottom, prettyArguments, riskVerb, toolLabel } from './format.ts';
+import { approvalPreview, clip, contextLevel, contextPercent, formatAgo, formatTokens, isImeEnter, isNearBottom, prettyArguments, riskVerb, toolLabel } from './format.ts';
 
 describe('what the cards say', () => {
   it('names tools in plain words and falls back to the tool name', () => {
@@ -79,4 +79,24 @@ it('gives every registered desktop tool a readable label', () => {
   const names = [...source.matchAll(/ToolSpec::new\(\s*"([^"]+)"/g)].map(match => match[1]!);
   expect(names.length).toBeGreaterThan(20);
   for (const name of names) expect(toolLabel(name), name).not.toBe(name);
+});
+
+describe('the numbers of the context ring', () => {
+  it('writes token counts short', () => {
+    expect(['0', 0, -5, NaN, 850, 1000, 1234, 12345, 48000, 99999, 128000, 999999, 1_000_000, 1_500_000].map(n => formatTokens(Number(n))))
+      .toEqual(['0', '0', '0', '0', '850', '1K', '1.2K', '12.3K', '48K', '100K', '128K', '1M', '1M', '1.5M']);
+  });
+
+  it('turns used and limit into a percent that stays inside the ring', () => {
+    expect(contextPercent(12_000, 48_000)).toBe(25);
+    expect(contextPercent(60_000, 48_000)).toBe(100);
+    expect(contextPercent(0, 48_000)).toBe(0);
+    expect(contextPercent(5, 0)).toBe(0);
+    expect(contextPercent(NaN, 48_000)).toBe(0);
+  });
+
+  it('warns from 70% and calls it full from 90%', () => {
+    expect([0, 0.69, 0.7, 0.89, 0.9, 1.4].map(r => contextLevel(r * 1000, 1000))).toEqual(['ok', 'ok', 'warn', 'warn', 'full', 'full']);
+    expect(contextLevel(10, 0)).toBe('ok');
+  });
 });

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { applyEvent, describeCall, itemsFromHistory, newView } from './view.ts';
+import { applyEvent, describeCall, itemsFromHistory, newView, summaryOf } from './view.ts';
 import type { WireMessage } from './types.ts';
 
 const text = (value: string) => [{ type: 'text' as const, text: value }];
@@ -138,4 +138,33 @@ it('summarizes authored resources by title or pack name', () => {
   expect(describeCall('game_create', JSON.stringify({id:'star-game',name:'摘星星',files:[]}))).toBe('摘星星');
   expect(describeCall('community_share', JSON.stringify({kind:'effect',id:'stars'}))).toBe('stars');
   expect(describeCall('community_open', JSON.stringify({target:'forum_wallpaper'}))).toBe('forum_wallpaper');
+});
+
+describe('a stored summary in the history', () => {
+  const summary = '[[xiaoban-summary keep_from=2]]\n【用户目标】整理文件\n【已完成】列出了目录';
+
+  it('is shown as a notice that unfolds to the summary, not as something the user said', () => {
+    const items = itemsFromHistory(newView('s1'), [
+      { role: 'user', parts: text('旧问题') }, { role: 'assistant', parts: text('旧回答') },
+      { role: 'user', parts: text('最近的问题') }, { role: 'assistant', parts: text('最近的回答') },
+      { role: 'user', parts: text(summary) },
+      { role: 'user', parts: text('之后的问题') },
+    ]);
+    expect(items.map(i => i.kind)).toEqual(['user', 'assistant', 'user', 'assistant', 'notice', 'user']);
+    const notice = items[4] as Extract<typeof items[number], { kind: 'notice' }>;
+    expect(notice.tone).toBe('info');
+    expect(notice.detailsLabel).toBe('查看摘要');
+    expect(notice.details).toBe('【用户目标】整理文件\n【已完成】列出了目录');
+    expect(notice.text).toContain('压缩成摘要');
+    expect(items.some(i => i.kind === 'user' && i.text.includes('xiaoban-summary'))).toBe(false);
+  });
+
+  it('is only recognised when the marker line is exact, so a person quoting it is still just talking', () => {
+    for (const said of ['[[xiaoban-summary keep_from=2]] 没有换行', '我贴一下：[[xiaoban-summary keep_from=2]]\nx', '[[xiaoban-summary keep_from=]]\nx']) {
+      const items = itemsFromHistory(newView('s1'), [{ role: 'user', parts: text(said) }]);
+      expect(items.map(i => i.kind)).toEqual(['user']);
+    }
+    expect(summaryOf('普通消息')).toBeNull();
+    expect(summaryOf('[[xiaoban-summary keep_from=7]]\n正文')).toBe('正文');
+  });
 });

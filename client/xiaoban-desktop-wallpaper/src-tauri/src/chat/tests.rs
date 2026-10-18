@@ -178,6 +178,7 @@ fn build_rig(tag: &str, steps: Vec<Step>, answer: Approval, computer_use: bool) 
         utc_offset_minutes: 480,
         open_computer_use: computer_use,
         spawn_computer_use: no_computer_use,
+        context_tokens: ai_config::DEFAULT_CONTEXT_TOKENS,
     })
     .expect("the tool set assembles");
     Rig { _dir: dir, workspace, dirs, desktop, asked, provider, agent, todo }
@@ -353,6 +354,7 @@ fn the_folder_for_saved_output_can_be_read_but_not_written() {
             utc_offset_minutes: 0,
             open_computer_use: false,
             spawn_computer_use: no_computer_use,
+        context_tokens: ai_config::DEFAULT_CONTEXT_TOKENS,
         })
         .unwrap()
     };
@@ -539,6 +541,7 @@ fn in_auto_mode_all_write_tools_run_without_asking() {
         utc_offset_minutes: 0,
         open_computer_use: false,
         spawn_computer_use: no_computer_use,
+        context_tokens: ai_config::DEFAULT_CONTEXT_TOKENS,
     }).unwrap();
 
     let mut events = Vec::new();
@@ -579,6 +582,7 @@ fn trusted_rig(tag: &str, steps: Vec<Step>) -> (Rig, Arc<Mutex<Vec<(String, Opti
         utc_offset_minutes: 0,
         open_computer_use: false,
         spawn_computer_use: no_computer_use,
+        context_tokens: ai_config::DEFAULT_CONTEXT_TOKENS,
     })
     .unwrap();
     let rig = Rig { _dir: dir, workspace, dirs, desktop, asked: Arc::default(), provider, agent, todo };
@@ -701,4 +705,59 @@ fn the_community_skill_is_always_listed_loadable_and_never_overwrites_a_users_ow
     fs::write(&file, theirs).unwrap();
     sync_community_skill(&skills_dir);
     assert_eq!(fs::read_to_string(&file).unwrap(), theirs);
+}
+
+#[test]
+fn a_compacted_conversation_is_sent_as_summary_then_the_kept_turn_then_the_new_question() {
+    let rig = rig("compacted", vec![Step::text("好的")], Approval::Once);
+    let file = JsonlStore::new(rig.dirs.sessions());
+    file.append(
+        "s9",
+        &[Message::user_text("旧问题"), Message::assistant("旧回答", vec![]), Message::user_text("最近的问题"), Message::assistant("最近的回答", vec![]), compact::summary_message(2, "摘要正文")],
+    )
+    .unwrap();
+    rig.agent.run("s9", "新问题", &mut |_| {}, &Arc::new(AtomicBool::new(false))).unwrap();
+
+    let sent: Vec<String> = rig.provider.requests()[0].messages.iter().map(|m| m.text()).collect();
+    assert_eq!(sent.len(), 5, "{sent:?}");
+    assert!(sent[0].len() > 100, "the instructions come first");
+    assert!(sent[1].contains("摘要正文") && !sent[1].contains(compact::MARK));
+    assert_eq!(&sent[2..], ["最近的问题", "最近的回答", "新问题"]);
+    assert!(!sent.iter().any(|t| t.contains("旧问题") || t.contains("旧回答")), "the summarized messages are not sent");
+
+    let saved = file.load("s9").unwrap();
+    assert_eq!(saved.len(), 7, "the file keeps every message, the summary and the new exchange");
+    assert_eq!(saved[0].text(), "旧问题");
+    assert_eq!(saved[5].text(), "新问题");
+}
+
+#[test]
+fn the_context_size_from_settings_is_what_the_agent_trims_to() {
+    let steps = vec![Step::text("好")];
+    let tiny = {
+        let rig = rig("trim-tiny", steps.clone(), Approval::Once);
+        let dirs = Dirs { chat: rig.dirs.chat.clone() };
+        let provider = Arc::new(ScriptedProvider::new(steps));
+        let agent = assemble(Parts {
+            provider: provider.clone(),
+            dirs: &dirs,
+            workspace: &rig.workspace,
+            permission: Arc::new(Permission::new(PermissionMode::Auto, |_: &ApprovalRequest<'_>| Approval::Once)),
+            todo: Arc::new(Todo::new()),
+            ask: AskUser::new(|_, _, _| None),
+            desktop: Arc::new(FakeDesktop::default()),
+            utc_offset_minutes: 0,
+            open_computer_use: false,
+            spawn_computer_use: no_computer_use,
+            context_tokens: 2_500,
+        })
+        .unwrap();
+        let file = JsonlStore::new(dirs.sessions());
+        let long = "字".repeat(1_500);
+        file.append("s8", &[Message::user_text(format!("第一个问题{long}")), Message::assistant(long.clone(), vec![]), Message::user_text("第二个问题"), Message::assistant("第二个回答", vec![])]).unwrap();
+        agent.run("s8", "第三个问题", &mut |_| {}, &Arc::new(AtomicBool::new(false))).unwrap();
+        provider.requests()[0].messages.iter().map(|m| m.text()).collect::<Vec<_>>()
+    };
+    assert!(!tiny.iter().any(|t| t.contains("第一个问题")), "a small limit drops the oldest exchange: {}", tiny.len());
+    assert!(tiny.iter().any(|t| t.contains("第三个问题")) && tiny.iter().any(|t| t.contains("第二个问题")));
 }

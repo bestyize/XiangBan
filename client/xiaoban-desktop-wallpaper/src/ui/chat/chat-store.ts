@@ -1,6 +1,6 @@
 import { modelFailure } from './model-errors.ts';
 import { reactive } from 'vue';
-import type { ApprovalDecision, ApprovalRequest, ChatEventPayload, Overview, QuestionRequest, SessionSummary, SessionView, WireMessage } from './types.ts';
+import type { ApprovalDecision, ApprovalRequest, ChatEventPayload, ChatGroup, ContextInfo, Library, Overview, QuestionRequest, SessionSummary, SessionView, WireMessage } from './types.ts';
 import { applyEvent, itemsFromHistory, newView, nextId } from './view.ts';
 
 export interface ChatDeps {
@@ -24,6 +24,7 @@ export interface ChatStore {
   hideToolCalls: boolean;
   loadError: string;
   sessions: SessionSummary[];
+  groups: ChatGroup[];
   views: Record<string, SessionView>;
   /** `null` is a new conversation that has not been started yet. */
   currentId: string | null;
@@ -39,6 +40,23 @@ export interface ChatStore {
   retry(): Promise<boolean>;
   cancel(): Promise<void>;
   remove(id: string): Promise<void>;
+  /** The size of the next request in the open conversation (or of a new one), against the limit chosen in settings. */
+  context: ContextInfo;
+  /** The conversation that is being compacted right now, if any. */
+  compactingId: string | null;
+  /** Reads `context` again. Quiet on failure: the ring keeps its last numbers. */
+  refreshContext(): Promise<void>;
+  /** Replaces the older part of the open conversation, for the model only, with a summary. Returns whether it was done; the reason is shown when not. */
+  compact(): Promise<boolean>;
+  /** The edits below return whether the host accepted them, so a dialog can stay open when it did not. The host's reason is shown to the user. */
+  rename(id: string, title: string): Promise<boolean>;
+  /** `null` takes the conversation out of its group. */
+  move(id: string, groupId: string | null): Promise<boolean>;
+  /** With `moveId`, that conversation goes into the new group in the same step. */
+  createGroup(name: string, moveId?: string): Promise<boolean>;
+  renameGroup(id: string, name: string): Promise<boolean>;
+  /** The conversations in the group are kept. */
+  removeGroup(id: string): Promise<boolean>;
   answerApproval(request: ApprovalRequest, decision: ApprovalDecision): Promise<void>;
   answerQuestion(request: QuestionRequest, answer: string | null): Promise<void>;
   current(): SessionView | null;
@@ -75,6 +93,9 @@ export function createChatStore(deps: ChatDeps): ChatStore {
     },
     loadError: '',
     sessions: [] as SessionSummary[],
+    groups: [] as ChatGroup[],
+    context: { used: 0, limit: 48_000, canCompact: false } as ContextInfo,
+    compactingId: null as string | null,
     views: {} as Record<string, SessionView>,
     currentId: null as string | null,
     get attention() {
@@ -94,6 +115,7 @@ export function createChatStore(deps: ChatDeps): ChatStore {
                 if (last?.kind === 'assistant' && last.text.trim()) deps.onReply?.(session, last.text, last.id);
               }
               if ((event.type === 'cancelled' || event.type === 'error') && store.currentId === session) deps.onActivity?.();
+              if ((event.type === 'done' || event.type === 'cancelled' || event.type === 'error') && store.currentId === session) void store.refreshContext();
               if (event.type === 'error' && modelFailure(event.message).refresh && Date.now() - refreshedAfterErrorAt > 300000) {
                 refreshedAfterErrorAt = Date.now();
                 void deps.invoke('refresh_ai_providers', { force: true }).catch(() => {});
@@ -137,8 +159,10 @@ export function createChatStore(deps: ChatDeps): ChatStore {
         if (overview.permissionMode) store.permissionMode = overview.permissionMode;
         if (typeof overview.hideToolCalls === 'boolean') store.hideToolCalls = overview.hideToolCalls;
         store.sessions = overview.sessions;
+        store.groups = overview.groups ?? [];
         for (const id of overview.running) viewOf(id, true).running = true;
         store.loadError = '';
+        void store.refreshContext();
       } catch (error) {
         store.loadError = String(error instanceof Error ? error.message : error);
       } finally {
@@ -158,6 +182,7 @@ export function createChatStore(deps: ChatDeps): ChatStore {
     async select(id) {
       deps.onActivity?.();
       store.currentId = id;
+      void store.refreshContext();
       if (!id) return;
       const curSession = store.sessions.find(s => s.id === id);
       if (curSession?.permissionMode) {
@@ -253,6 +278,48 @@ export function createChatStore(deps: ChatDeps): ChatStore {
       }
     },
 
+    async refreshContext() {
+      if (!deps.desktop) return;
+      const id = store.currentId;
+      try {
+        const info = await deps.invoke<ContextInfo>('chat_context', { sessionId: id });
+        if (!disposed && store.currentId === id && info) store.context = info;
+      } catch {
+        // A failed estimate is not worth a warning; the ring keeps its last numbers.
+      }
+    },
+
+    async compact() {
+      const id = store.currentId;
+      const view = store.current();
+      if (!deps.desktop || !id || !view || view.running || store.compactingId) return false;
+      store.compactingId = id;
+      try {
+        const info = await deps.invoke<ContextInfo>('chat_compact', { sessionId: id });
+        if (!disposed && store.currentId === id && info) store.context = info;
+        deps.notify('较早的对话已压缩成摘要', 'success');
+        try {
+          // Show the summary where it now sits in the saved conversation, as reopening the conversation would.
+          const messages = await deps.invoke<WireMessage[]>('chat_load_session', { sessionId: id });
+          if (!disposed && !view.running) view.items = itemsFromHistory(view, messages ?? []);
+        } catch {
+          // The summary is in force either way; it appears when the conversation is next opened.
+        }
+        return true;
+      } catch (error) {
+        deps.notify(error, 'error');
+        return false;
+      } finally {
+        store.compactingId = null;
+      }
+    },
+
+    rename: (id, title) => edit('chat_rename_session', { sessionId: id, title }),
+    move: (id, groupId) => edit('chat_move_session', { sessionId: id, groupId }),
+    createGroup: (name, moveId) => edit('chat_create_group', moveId ? { name, sessionId: moveId } : { name }),
+    renameGroup: (id, name) => edit('chat_rename_group', { groupId: id, name }),
+    removeGroup: id => edit('chat_delete_group', { groupId: id }),
+
     async answerApproval(request, decision) {
       const view = store.views[request.session];
       if (view) view.approvals = view.approvals.filter(a => a.id !== request.id);
@@ -280,6 +347,21 @@ export function createChatStore(deps: ChatDeps): ChatStore {
     // that would never reach the page. Only what comes out of the reactive store is watched.
     if (!store.views[id]) store.views[id] = newView(id, loaded);
     return store.views[id];
+  }
+
+  /** Runs one of the host's list edits and takes the whole list it sends back. */
+  async function edit(command: string, args: Record<string, unknown>): Promise<boolean> {
+    if (!deps.desktop) return false;
+    try {
+      const library = await deps.invoke<Library>(command, args);
+      if (disposed) return false;
+      store.sessions = library.sessions;
+      store.groups = library.groups;
+      return true;
+    } catch (error) {
+      deps.notify(error, 'error');
+      return false;
+    }
   }
 
   function upsert(summary: SessionSummary) {

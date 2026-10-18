@@ -18,6 +18,31 @@ const TOOL_LABELS: Record<string, string> = {
 
 export const toolLabel = (name: string) => TOOL_LABELS[name] ?? (name || '工具');
 
+/** 850, 12.3K, 48K, 1M: short enough for the ring's popover. */
+export function formatTokens(count: number): string {
+  if (!Number.isFinite(count) || count <= 0) return '0';
+  if (count < 1000) return String(Math.round(count));
+  // One decimal below 100, none above, and never a trailing ".0".
+  const short = (value: number) => (value >= 100 ? Math.round(value) : Math.round(value * 10) / 10);
+  if (count < 1_000_000) {
+    const thousands = short(count / 1000);
+    if (thousands < 1000) return `${thousands}K`;
+  }
+  return `${short(count / 1_000_000)}M`;
+}
+
+/** How full the context is, 0 to 100. A broken or missing limit counts as empty. */
+export function contextPercent(used: number, limit: number): number {
+  if (!(limit > 0) || !(used > 0)) return 0;
+  return Math.min(100, Math.round((used / limit) * 100));
+}
+
+/** `warn` from 70%, `full` from 90%: the point where compacting starts to pay off, and where old messages are about to be left out. */
+export function contextLevel(used: number, limit: number): 'ok' | 'warn' | 'full' {
+  const ratio = limit > 0 ? used / limit : 0;
+  return ratio >= 0.9 ? 'full' : ratio >= 0.7 ? 'warn' : 'ok';
+}
+
 const RISK_VERBS: Record<Risk, string> = { read: '读取', write: '修改', network: '联网', exec: '运行命令' };
 export const riskVerb = (risk: Risk) => RISK_VERBS[risk] ?? '操作';
 

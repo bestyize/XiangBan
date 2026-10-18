@@ -2,7 +2,9 @@
 import { computed, onMounted, onBeforeUnmount, ref } from 'vue';
 import { NAlert, NButton, NInput, NModal, NPopconfirm, NSelect, NSwitch, NTag } from 'naive-ui';
 import { Bot, Cpu, ExternalLink, FolderOpen, Globe, Plus, RefreshCw, Settings, ShieldCheck, Sparkles, Trash2, Wrench } from 'lucide-vue-next';
-import { invoke, listen, type AiConfigView, type AiProtocol, type ProviderConfigView } from '../../bridge.ts';
+import { GATEWAY_PROVIDER, invoke, listen, type AiConfigView, type AiProtocol, type ProviderConfigView } from '../../bridge.ts';
+import AiGatewayCard from './AiGatewayCard.vue';
+import { formatTokens } from '../chat/format.ts';
 import type { ControlStore } from '../control-types.ts';
 import {
   aiProtocols,
@@ -21,6 +23,10 @@ import {
 } from '../ai-config.ts';
 
 const props = defineProps<{ store: ControlStore }>();
+
+/** What the host uses when nothing was chosen (`ai_config.rs`). */
+const DEFAULT_CONTEXT_TOKENS = 48_000;
+const CONTEXT_SIZES = [32_000, 48_000, 64_000, 128_000, 256_000, 512_000, 1_000_000];
 
 const blank: AiConfigView = {
   activeProvider: '',
@@ -44,6 +50,14 @@ const loadError = ref('');
 const workspace = ref('');
 const hideToolCalls = ref(false);
 const openComputerUse = ref(false);
+const contextTokens = ref(DEFAULT_CONTEXT_TOKENS);
+const savedContextTokens = computed(() => saved.value.contextTokens ?? DEFAULT_CONTEXT_TOKENS);
+// A size typed into the file by hand is listed too, so the select never shows a blank.
+const contextOptions = computed(() => {
+  const options = CONTEXT_SIZES.map(size => ({ label: size === DEFAULT_CONTEXT_TOKENS ? `${formatTokens(size)}（默认）` : formatTokens(size), value: size }));
+  const odd = [savedContextTokens.value, contextTokens.value].filter((size, at, all) => !options.some(o => o.value === size) && all.indexOf(size) === at);
+  return [...options, ...odd.map(size => ({ label: `${formatTokens(size)}（自定义）`, value: size }))].sort((a, b) => a.value - b.value);
+});
 
 // Modal state
 const modalVisible = ref(false);
@@ -120,6 +134,7 @@ const activeProviderMeta = computed(() => {
 
 const activeStatusText = computed(() => {
   const activeId = saved.value.activeProvider;
+  if (activeId === GATEWAY_PROVIDER) return '当前生效：小伴 AI（点击“小伴 AI”卡片可查看额度、更换档位）';
   if (!activeId || !isProviderFullyConfigured(activeId)) {
     return '尚未配置可用服务商，请先配置 API 密钥';
   }
@@ -155,7 +170,8 @@ const prefsDirty = computed(() => {
   return (
     workspaceChanged.value ||
     hideToolCalls.value !== saved.value.hideToolCalls ||
-    openComputerUse.value !== saved.value.openComputerUse
+    openComputerUse.value !== saved.value.openComputerUse ||
+    contextTokens.value !== savedContextTokens.value
   );
 });
 
@@ -185,6 +201,7 @@ function fill(view: AiConfigView) {
   workspace.value = view.workspace;
   hideToolCalls.value = view.hideToolCalls ?? false;
   openComputerUse.value = view.openComputerUse ?? false;
+  contextTokens.value = view.contextTokens ?? DEFAULT_CONTEXT_TOKENS;
 }
 
 let unlisten: (() => void) | undefined;
@@ -382,6 +399,7 @@ async function savePreferences() {
       workspace: workspaceChanged.value ? workspace.value : null,
       hideToolCalls: hideToolCalls.value,
       openComputerUse: openComputerUse.value,
+      contextTokens: contextTokens.value !== savedContextTokens.value ? contextTokens.value : null,
     });
     fill(updated);
     props.store.notify('通用设置已保存', 'success');
@@ -438,6 +456,9 @@ function getProviderIcon(id: string) {
     <!-- Providers Grid Cards -->
     <div class="providers-section">
       <div class="providers-grid">
+        <!-- 小伴 AI is its own kind of provider: account login and credit instead of an address and key -->
+        <AiGatewayCard :store="store" :config="saved" @config="fill" />
+
         <!-- 4 Built-in templates -->
         <article
           v-for="p in catalogueProviders"
@@ -769,6 +790,16 @@ function getProviderIcon(id: string) {
             <p>允许小伴操控电脑应用（点击、键入文字等）。macOS 首次使用需授予辅助功能权限。</p>
           </div>
           <NSwitch v-model:value="openComputerUse" :disabled="!store.desktop || !!busy" data-testid="ai-open-computer-use" />
+        </div>
+      </div>
+
+      <div class="field">
+        <div class="setting-row">
+          <div>
+            <b>上下文大小</b>
+            <p>每次发给模型的对话内容上限（估算值）。调大能记住更早的内容，但更慢、更耗额度；请别超过所用模型支持的上限，否则请求会被拒绝。超出后最早的内容会被省略，也可以点聊天输入框旁的圆环，让小伴把它压缩成摘要。</p>
+          </div>
+          <NSelect v-model:value="contextTokens" style="width: 150px" :options="contextOptions" :disabled="!store.desktop || !!busy" data-testid="ai-context-tokens" />
         </div>
       </div>
 

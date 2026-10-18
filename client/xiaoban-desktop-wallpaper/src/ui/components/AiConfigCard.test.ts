@@ -105,6 +105,21 @@ describe('AI model settings card and provider templates', () => {
     expect(field('ai-model').value).toBe('model-a');
   });
 
+  it('puts the 小伴 AI card first, ahead of every provider, and tells the status line when it is in use', async () => {
+    await open();
+    const cards = Array.from(document.querySelectorAll('.providers-grid > article'));
+    expect(cards[0]?.getAttribute('data-testid')).toBe('ai-gateway-card');
+    expect(cards.map(c => c.getAttribute('data-testid'))).toContain('ai-provider-card-deepseek');
+    expect(q('ai-gateway-card')?.textContent).toContain('需登录');
+    expect(q('ai-status')?.textContent).not.toContain('小伴 AI');
+    wrapper?.unmount();
+    wrapper = undefined;
+
+    await open({ ...configured, activeProvider: 'xiaoban-ai', gatewayTier: 'standard' });
+    expect(q('ai-status')?.textContent).toContain('当前生效：小伴 AI');
+    expect(q('ai-provider-card-deepseek')?.textContent).not.toContain('当前使用');
+  });
+
   it('renders 4 builtin provider cards and add-custom card, showing "待配置" for providers without key', async () => {
     await open();
     expect(q('ai-provider-card-deepseek')).not.toBeNull();
@@ -335,5 +350,42 @@ describe('global preferences settings', () => {
     expect(q('ai-workspace')?.textContent).toBe('/Users/me/work');
     await click('ai-workspace-reset');
     expect(q('ai-workspace')?.textContent).toBe('/data/workspace');
+  });
+});
+
+describe('context size setting', () => {
+  const sizeSelect = () => wrapper!.findAllComponents(NSelect).find(s => s.attributes('data-testid') === 'ai-context-tokens')!;
+  const labels = () => (sizeSelect().props('options') as { label: string }[]).map(o => o.label);
+
+  it('offers the sizes, marks the default, and saves a change', async () => {
+    await open(configured);
+    expect(labels()).toEqual(['32K', '48K（默认）', '64K', '128K', '256K', '512K', '1M']);
+    expect(sizeSelect().props('value')).toBe(48_000);
+    expect(q<HTMLButtonElement>('ai-save-preferences')!.disabled).toBe(true);
+
+    sizeSelect().vm.$emit('update:value', 128_000);
+    await flushPromises();
+    expect(q<HTMLButtonElement>('ai-save-preferences')!.disabled).toBe(false);
+    ipc.mockResolvedValueOnce({ ...configured, contextTokens: 128_000 } as never);
+    await click('ai-save-preferences');
+    expect(ipc).toHaveBeenCalledWith('save_ai_preferences', expect.objectContaining({ contextTokens: 128_000 }));
+    expect(sizeSelect().props('value')).toBe(128_000);
+    expect(q<HTMLButtonElement>('ai-save-preferences')!.disabled).toBe(true);
+  });
+
+  it('sends no size when only something else was changed', async () => {
+    await open({ ...configured, contextTokens: 64_000 });
+    expect(sizeSelect().props('value')).toBe(64_000);
+    await q('ai-hide-tool-calls')?.click();
+    await flushPromises();
+    ipc.mockResolvedValueOnce({ ...configured, contextTokens: 64_000, hideToolCalls: true } as never);
+    await click('ai-save-preferences');
+    expect(ipc).toHaveBeenCalledWith('save_ai_preferences', expect.objectContaining({ contextTokens: null }));
+  });
+
+  it('lists a size that is not a preset instead of showing a blank', async () => {
+    await open({ ...configured, contextTokens: 100_000 });
+    expect(labels()).toEqual(['32K', '48K（默认）', '64K', '100K（自定义）', '128K', '256K', '512K', '1M']);
+    expect(sizeSelect().props('value')).toBe(100_000);
   });
 });

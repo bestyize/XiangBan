@@ -1,17 +1,21 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
-import { NButton, NInput } from 'naive-ui';
-import { ArrowDown, Check, FolderOpen, ImagePlus, LoaderCircle, MessageSquarePlus, Mic, SendHorizontal, Volume2, Shield, ShieldAlert, Sparkles, Square, Trash2, X, Zap } from 'lucide-vue-next';
+import { computed, h, nextTick, onMounted, onUnmounted, ref, watch, type Component, type HTMLAttributes } from 'vue';
+import { NButton, NDropdown, NInput, type DropdownOption } from 'naive-ui';
+import { ArrowDown, Check, ChevronDown, ChevronRight, Ellipsis, Folder, FolderInput, FolderPlus, ImagePlus, LoaderCircle, MessageSquarePlus, Mic, Pencil, SendHorizontal, Settings, Volume2, Shield, ShieldAlert, Sparkles, Square, Trash2, X, Zap } from 'lucide-vue-next';
 import { invoke } from '../../bridge.ts';
 import type { ControlStore } from '../control-types.ts';
 import ModelSwitchDialog from '../components/ModelSwitchDialog.vue';
+import ChatNameDialog from '../components/ChatNameDialog.vue';
+import ChatMoveDialog from '../components/ChatMoveDialog.vue';
+import ChatContextRing from '../components/ChatContextRing.vue';
 import GuideModal from '../components/GuideModal.vue';
 import AsrStatus from '../components/AsrStatus.vue';
 import MarkdownView from '../chat/MarkdownView.ts';
 import { CONTINUE_TEXT } from '../chat/chat-store.ts';
 import { approvalPreview, clip, formatAgo, isImeEnter, isNearBottom, prettyArguments, riskVerb, toolLabel } from '../chat/format.ts';
 import { describeCall } from '../chat/view.ts';
-import type { ApprovalDecision, ApprovalRequest, QuestionRequest } from '../chat/types.ts';
+import { listRows, type ListRow } from '../chat/groups.ts';
+import type { ApprovalDecision, ApprovalRequest, ChatGroup, QuestionRequest, SessionSummary } from '../chat/types.ts';
 
 const props = defineProps<{ store: ControlStore }>();
 const chat = props.store.chat;
@@ -50,8 +54,8 @@ const IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
 const view = computed(() => chat.current());
 const running = computed(() => !!view.value?.running);
 const title = computed(() => (chat.currentId && chat.sessions.find(s => s.id === chat.currentId)?.title) || '新对话');
-const canSend = computed(() => chat.configured && !running.value && (draft.value.trim() !== '' || attachments.value.length > 0));
-const workspaceName = computed(() => chat.workspace.split(/[\\/]/).filter(Boolean).slice(-2).join('/') || chat.workspace);
+const compacting = computed(() => !!chat.currentId && chat.compactingId === chat.currentId);
+const canSend = computed(() => chat.configured && !running.value && !compacting.value && (draft.value.trim() !== '' || attachments.value.length > 0));
 const now = () => Math.floor(Date.now() / 1000);
 const waiting = computed(() => !!view.value && (view.value.approvals.length > 0 || view.value.questions.length > 0));
 const thinking = computed(() => {
@@ -202,6 +206,96 @@ watch([() => props.store.creationDraft, () => chat.configured], ([text, configur
 const continueAnswer = () => { asr?.deactivate(); stick.value = true; void chat.send(CONTINUE_TEXT); };
 
 const choose = (id: string | null) => { asr?.deactivate(); confirmingId.value = ''; void chat.select(id); };
+
+// The list: groups as folders, then the conversations in none.
+const COLLAPSED_KEY = 'xiaoban.chat.collapsed-groups';
+function savedCollapsed(): string[] {
+  try {
+    const saved: unknown = JSON.parse(localStorage.getItem(COLLAPSED_KEY) ?? '[]');
+    return Array.isArray(saved) ? saved.filter((id): id is string => typeof id === 'string') : [];
+  } catch { return []; }
+}
+const collapsed = ref(new Set(savedCollapsed()));
+const rows = computed(() => listRows(chat.sessions, chat.groups, collapsed.value));
+const rowKey = (row: ListRow) => row.kind === 'group' ? `g:${row.group.id}` : row.kind === 'session' ? `s:${row.session.id}` : row.kind === 'empty' ? `e:${row.groupId}` : 'label';
+function setCollapsed(id: string, hide: boolean) {
+  const next = new Set(collapsed.value);
+  if (hide) next.add(id); else next.delete(id);
+  collapsed.value = next;
+  // Only groups that still exist are remembered, so deleted ones do not pile up.
+  try { localStorage.setItem(COLLAPSED_KEY, JSON.stringify([...next].filter(known => chat.groups.some(g => g.id === known)))); } catch { /* the folders just open again next time */ }
+}
+const toggleGroup = (id: string) => setCollapsed(id, !collapsed.value.has(id));
+
+const menuIcon = (icon: Component) => () => h(icon, { size: 14 });
+const optionId = (id: string) => ({ 'data-testid': id }) as HTMLAttributes;
+function sessionMenu(s: SessionSummary): DropdownOption[] {
+  return [
+    { label: '重命名', key: 'rename', icon: menuIcon(Pencil), props: optionId('chat-menu-rename') },
+    { label: '移动', key: 'move', icon: menuIcon(FolderInput), props: optionId('chat-menu-move') },
+    { type: 'divider', key: 'divider' },
+    { label: '删除', key: 'delete', icon: menuIcon(Trash2), disabled: !!chat.views[s.id]?.running, props: optionId('chat-menu-delete') },
+  ];
+}
+const groupMenu: DropdownOption[] = [
+  { label: '重命名分组', key: 'rename', icon: menuIcon(Pencil), props: optionId('chat-group-menu-rename') },
+  { label: '删除分组', key: 'delete', icon: menuIcon(Trash2), props: optionId('chat-group-menu-delete') },
+];
+/** The row whose menu is open, so its button stays visible while the pointer is over the menu. */
+const menuOpenFor = ref('');
+const trackMenu = (id: string, open: boolean) => { if (open) menuOpenFor.value = id; else if (menuOpenFor.value === id) menuOpenFor.value = ''; };
+
+type NameDialog = { mode: 'rename' | 'new-group' | 'rename-group'; id: string; moveId: string; initial: string };
+const nameDialog = ref<NameDialog | null>(null);
+const nameBusy = ref(false);
+const nameText = computed(() => {
+  const mode = nameDialog.value?.mode;
+  return mode === 'rename'
+    ? { title: '重命名对话', placeholder: '给这个对话起个名字', max: 60, ok: '保存' }
+    : mode === 'rename-group'
+      ? { title: '重命名分组', placeholder: '分组名称', max: 20, ok: '保存' }
+      : { title: '新建分组', placeholder: '分组名称，例如：工作', max: 20, ok: '创建' };
+});
+const moveFor = ref<SessionSummary | null>(null);
+const moveBusy = ref(false);
+const confirmingGroup = ref('');
+
+function onSessionMenu(s: SessionSummary, key: string | number) {
+  if (key === 'rename') nameDialog.value = { mode: 'rename', id: s.id, moveId: '', initial: s.title };
+  else if (key === 'move') moveFor.value = s;
+  else if (key === 'delete') confirmingId.value = s.id;
+}
+function onGroupMenu(group: ChatGroup, key: string | number) {
+  if (key === 'rename') nameDialog.value = { mode: 'rename-group', id: group.id, moveId: '', initial: group.name };
+  else if (key === 'delete') confirmingGroup.value = group.id;
+}
+async function submitName(value: string) {
+  const dialog = nameDialog.value;
+  if (!dialog || nameBusy.value) return;
+  nameBusy.value = true;
+  const done = dialog.mode === 'rename' ? (value.trim() === dialog.initial ? true : await chat.rename(dialog.id, value))
+    : dialog.mode === 'rename-group' ? (value.trim() === dialog.initial ? true : await chat.renameGroup(dialog.id, value))
+      : await chat.createGroup(value, dialog.moveId || undefined);
+  nameBusy.value = false;
+  if (done) nameDialog.value = null;
+}
+async function pickGroup(groupId: string | null) {
+  const s = moveFor.value;
+  if (!s || moveBusy.value) return;
+  if ((s.group || null) === groupId) { moveFor.value = null; return; }
+  moveBusy.value = true;
+  const done = await chat.move(s.id, groupId);
+  moveBusy.value = false;
+  if (!done) return;
+  moveFor.value = null;
+  if (groupId && collapsed.value.has(groupId)) setCollapsed(groupId, false);
+}
+function newGroupFromMove() {
+  const s = moveFor.value;
+  moveFor.value = null;
+  if (s) nameDialog.value = { mode: 'new-group', id: '', moveId: s.id, initial: '' };
+}
+async function removeGroup(id: string) { confirmingGroup.value = ''; await chat.removeGroup(id); }
 async function remove(id: string) { confirmingId.value = ''; await chat.remove(id); }
 function openSettings() { modelDialog.value = false; props.store.settingsTab = 'ai'; props.store.navigate('settings'); }
 
@@ -225,28 +319,51 @@ async function openLink(href: string) {
 <template>
   <ModelSwitchDialog v-model:show="modelDialog" :retry="retryAfterSwitch" @switched="modelSwitched" @settings="openSettings" />
   <GuideModal v-model:show="guideDialog" :desktop="store.desktop" @select-prompt="useExample" @open-settings="openSettings" />
+  <ChatNameDialog :show="!!nameDialog" :title="nameText.title" :placeholder="nameText.placeholder" :initial="nameDialog?.initial ?? ''" :max-length="nameText.max" :confirm-text="nameText.ok" :busy="nameBusy" @close="nameDialog = null" @submit="submitName" />
+  <ChatMoveDialog :show="!!moveFor" :conversation="moveFor?.title ?? ''" :groups="chat.groups" :current="moveFor?.group ?? ''" :busy="moveBusy" @close="moveFor = null" @pick="pickGroup" @create="newGroupFromMove" />
   <section class="chat-page" data-testid="chat-page">
     <aside class="chat-side" aria-label="对话列表">
       <div class="side-head">
-        <NButton type="primary" block data-testid="chat-new" :disabled="!chat.currentId" @click="choose(null)"><template #icon><MessageSquarePlus :size="16" /></template>新对话</NButton>
+        <NButton type="primary" class="side-new" data-testid="chat-new" :disabled="!chat.currentId" @click="choose(null)"><template #icon><MessageSquarePlus :size="16" /></template>新对话</NButton>
+        <NButton secondary title="新建分组" aria-label="新建分组" data-testid="chat-new-group" :disabled="!store.desktop" @click="nameDialog = { mode: 'new-group', id: '', moveId: '', initial: '' }"><template #icon><FolderPlus :size="16" /></template></NButton>
       </div>
       <ul class="session-list">
-        <li v-for="s in chat.sessions" :key="s.id" :class="{ current: s.id === chat.currentId }">
-          <template v-if="confirmingId === s.id">
-            <div class="confirm-row" data-testid="chat-delete-confirm"><span>删除这段对话？</span><button type="button" class="link danger" :data-testid="`chat-delete-yes-${s.id}`" @click="remove(s.id)">删除</button><button type="button" class="link" @click="confirmingId = ''">取消</button></div>
-          </template>
-          <template v-else>
-            <button type="button" class="session" :data-testid="`chat-session-${s.id}`" :aria-current="s.id === chat.currentId ? 'true' : undefined" @click="choose(s.id)">
-              <span class="session-title">{{ s.title }}</span>
-              <span class="session-meta">
-                <LoaderCircle v-if="chat.views[s.id]?.running" class="spin" :size="12" aria-label="正在回答" />
-                <i v-if="chat.views[s.id] && (chat.views[s.id].approvals.length || chat.views[s.id].questions.length)" class="attention-dot" :data-testid="`chat-attention-${s.id}`" aria-label="需要你确认"></i>
-                {{ formatAgo(s.updatedAt, now()) }}
-              </span>
-            </button>
-            <button type="button" class="session-delete" :data-testid="`chat-delete-${s.id}`" :aria-label="`删除 ${s.title}`" :disabled="chat.views[s.id]?.running" @click="confirmingId = s.id"><Trash2 :size="14" /></button>
-          </template>
-        </li>
+        <template v-for="row in rows" :key="rowKey(row)">
+          <li v-if="row.kind === 'group'" class="group-row" :class="{ 'menu-open': menuOpenFor === `g:${row.group.id}` }" :data-testid="`chat-group-row-${row.group.id}`">
+            <div v-if="confirmingGroup === row.group.id" class="confirm-row" data-testid="chat-group-delete-confirm"><span>删除分组“{{ row.group.name }}”？里面的对话会保留</span><button type="button" class="link danger" :data-testid="`chat-group-delete-yes-${row.group.id}`" @click="removeGroup(row.group.id)">删除</button><button type="button" class="link" @click="confirmingGroup = ''">取消</button></div>
+            <template v-else>
+              <button type="button" class="group-toggle" :aria-expanded="!row.collapsed" :data-testid="`chat-group-${row.group.id}`" @click="toggleGroup(row.group.id)">
+                <component :is="row.collapsed ? ChevronRight : ChevronDown" :size="14" />
+                <Folder :size="14" />
+                <span class="group-name">{{ row.group.name }}</span>
+                <span class="group-count">{{ row.count }}</span>
+              </button>
+              <NDropdown trigger="click" placement="bottom-end" :options="groupMenu" @select="key => onGroupMenu(row.group, key)" @update:show="open => trackMenu(`g:${row.group.id}`, open)">
+                <button type="button" class="row-more" :aria-label="`${row.group.name} 的更多操作`" aria-haspopup="menu" :data-testid="`chat-group-menu-${row.group.id}`"><Ellipsis :size="16" /></button>
+              </NDropdown>
+            </template>
+          </li>
+          <li v-else-if="row.kind === 'session'" :class="{ current: row.session.id === chat.currentId, grouped: row.grouped, 'menu-open': menuOpenFor === `s:${row.session.id}` }">
+            <template v-if="confirmingId === row.session.id">
+              <div class="confirm-row" data-testid="chat-delete-confirm"><span>删除这段对话？</span><button type="button" class="link danger" :data-testid="`chat-delete-yes-${row.session.id}`" @click="remove(row.session.id)">删除</button><button type="button" class="link" @click="confirmingId = ''">取消</button></div>
+            </template>
+            <template v-else>
+              <button type="button" class="session" :data-testid="`chat-session-${row.session.id}`" :aria-current="row.session.id === chat.currentId ? 'true' : undefined" @click="choose(row.session.id)">
+                <span class="session-title">{{ row.session.title }}</span>
+                <span class="session-meta">
+                  <LoaderCircle v-if="chat.views[row.session.id]?.running" class="spin" :size="12" aria-label="正在回答" />
+                  <i v-if="chat.views[row.session.id] && (chat.views[row.session.id].approvals.length || chat.views[row.session.id].questions.length)" class="attention-dot" :data-testid="`chat-attention-${row.session.id}`" aria-label="需要你确认"></i>
+                  {{ formatAgo(row.session.updatedAt, now()) }}
+                </span>
+              </button>
+              <NDropdown trigger="click" placement="bottom-end" :options="sessionMenu(row.session)" @select="key => onSessionMenu(row.session, key)" @update:show="open => trackMenu(`s:${row.session.id}`, open)">
+                <button type="button" class="row-more" :aria-label="`${row.session.title} 的更多操作`" aria-haspopup="menu" :data-testid="`chat-menu-${row.session.id}`"><Ellipsis :size="16" /></button>
+              </NDropdown>
+            </template>
+          </li>
+          <li v-else-if="row.kind === 'empty'" class="group-empty">还没有对话，用对话右侧的“⋯ → 移动”放进来</li>
+          <li v-else class="list-label">{{ row.text }}</li>
+        </template>
         <li v-if="chat.ready && !chat.sessions.length" class="empty-list">还没有对话</li>
       </ul>
     </aside>
@@ -290,7 +407,7 @@ async function openLink(href: string) {
               <span>完全信任</span>
             </button>
           </div>
-          <button v-if="chat.workspace" type="button" class="workspace-chip" data-testid="chat-workspace" :title="`工作目录：${chat.workspace}\n点击到设置里更改`" @click="openSettings"><FolderOpen :size="14" />{{ workspaceName }}</button>
+          <button type="button" class="ai-config-chip" data-testid="chat-ai-config" title="设置 → AI 模型：选择小伴 AI，或配置自己的模型服务" @click="openSettings"><Settings :size="14" />AI 模型配置</button>
         </div>
       </header>
 
@@ -300,7 +417,7 @@ async function openLink(href: string) {
           <div v-else-if="!store.desktop" class="info-card" data-testid="chat-preview-only"><b>请在桌面应用中使用聊天</b><p>浏览器预览里只能看到界面。</p></div>
           <div v-else-if="!chat.configured && !view?.items.length" class="info-card" data-testid="chat-unconfigured">
             <b>先给小伴接上一个模型</b>
-            <p>在“设置 → AI 模型”里填写接口地址、模型名，需要的话再填密钥。填好后回到这里就能聊天。</p>
+            <p>在“设置 → AI 模型”里登录后可以直接用小伴 AI，也可以填写自己的接口地址、模型名和密钥。设置好后回到这里就能聊天。</p>
             <NButton type="primary" data-testid="chat-go-settings" @click="openSettings">去设置</NButton>
           </div>
           <div v-else-if="!view?.items.length" class="welcome" data-testid="chat-welcome">
@@ -344,7 +461,7 @@ async function openLink(href: string) {
               </template>
               <div v-else-if="item.kind === 'notice'" class="notice" :class="item.tone" :data-testid="`notice-${item.tone}`" :role="item.tone === 'error' ? 'alert' : 'status'">
                 {{ item.text }}
-                <details v-if="item.details"><summary>错误详情</summary><span>{{ item.details }}</span></details>
+                <details v-if="item.details"><summary>{{ item.detailsLabel ?? '错误详情' }}</summary><span class="notice-details">{{ item.details }}</span></details>
                 <button v-if="item.canSwitchModel && !view.running" type="button" class="link" @click="chooseModel(!!item.canRetry)">切换模型</button>
                 <button v-if="item.canRetry && !view.running" type="button" class="link" @click="chat.retry()">重试</button>
                 <button v-if="item.canContinue && !view.running" type="button" class="link" data-testid="chat-continue" @click="continueAnswer">继续</button>
@@ -398,6 +515,7 @@ async function openLink(href: string) {
             <button v-else-if="asr?.recordingRequested" type="button" class="voice-finish" data-testid="chat-asr-toggle" :aria-label="asr.listening ? '结束录音并发送' : '取消准备'" aria-pressed="true" @click="toggleVoice"><span v-if="asr.listening" class="recording-dot" aria-hidden="true" /><LoaderCircle v-else class="spin" :size="13" aria-hidden="true" />{{ asr.listening ? '结束并发送' : '取消准备' }}</button>
             <NButton v-else-if="asr" quaternary circle size="small" data-testid="chat-asr-toggle" aria-label="开始语音输入" aria-pressed="false" :title="asr.error ? `${asr.error}（点击重试）` : '开始语音输入'" :disabled="!store.desktop || !asr.ready || !microphoneAllowed || asr.saving" @click="toggleVoice"><template #icon><Mic :size="16" /></template></NButton>
             <NInput v-model:value="draft" type="textarea" :autosize="{ minRows: 1, maxRows: 8 }" :disabled="!store.desktop || !chat.configured" :placeholder="chat.configured ? '问点什么，或交给小伴去办就行' : '先到设置里配置模型'" data-testid="chat-input" @keydown="onKeydown" />
+            <ChatContextRing v-if="store.desktop" :used="chat.context.used" :limit="chat.context.limit" :can-compact="chat.context.canCompact" :compacting="compacting" :busy="running" :disabled="!chat.currentId" @compact="chat.compact()" />
             <NButton v-if="running" type="error" circle data-testid="chat-stop" aria-label="停止" @click="chat.cancel()"><template #icon><Square :size="14" /></template></NButton>
             <NButton v-else type="primary" circle data-testid="chat-send" aria-label="发送" :disabled="!canSend" @click="submit"><template #icon><SendHorizontal :size="16" /></template></NButton>
           </div>
@@ -417,17 +535,27 @@ async function openLink(href: string) {
 
 .chat-page{flex:1;min-height:0;display:grid;grid-template-columns:268px minmax(0,1fr);background:var(--ui-app-bg)}
 .chat-side{border-right:1px solid var(--ui-border);display:flex;flex-direction:column;min-height:0;background:var(--ui-surface)}
-.side-head{padding:16px 14px 10px}
+.side-head{padding:16px 14px 10px;display:flex;gap:8px}
+.side-new{flex:1}
 .session-list{list-style:none;margin:0;padding:4px 8px 12px;overflow:auto;flex:1;scrollbar-width:thin}
 .session-list li{position:relative;display:flex;align-items:center;border-radius:10px}
 .session-list li:hover,.session-list li.current{background:var(--ui-surface-alt)}
+.session-list li.grouped{margin-left:14px}
+.group-row{margin-top:4px}
+.group-toggle{flex:1;min-width:0;display:flex;align-items:center;gap:6px;background:none;border:0;color:var(--ui-text-secondary);cursor:pointer;padding:8px 10px;font:inherit;font-size:13px;font-weight:600;text-align:left}
+.group-toggle:hover{color:var(--ui-text-primary)}
+.group-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.group-count{font-size:12px;font-weight:400;color:var(--ui-text-tertiary)}
+.group-empty,.list-label{font-size:12px;color:var(--ui-text-tertiary)}
+.session-list li.group-empty{margin-left:14px;padding:6px 10px;background:none}
+.session-list li.list-label{margin-top:8px;padding:6px 10px 2px;background:none}
 .session{flex:1;min-width:0;text-align:left;background:none;border:0;color:var(--ui-text-primary);cursor:pointer;padding:9px 10px;display:grid;gap:3px;font:inherit}
 .session-title{font-size:13.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .session-meta{font-size:12px;color:var(--ui-text-tertiary);display:flex;gap:6px;align-items:center}
-.session-delete{opacity:0;border:0;background:none;color:var(--ui-text-tertiary);cursor:pointer;padding:6px;margin-right:4px;border-radius:6px}
-.session-list li:hover .session-delete,.session-delete:focus-visible,.session-list li.current .session-delete{opacity:1}
-.session-delete:hover:not(:disabled){color:var(--ui-primary)}
-.session-delete:disabled{cursor:not-allowed;opacity:.3}
+.row-more{opacity:0;border:0;background:none;color:var(--ui-text-tertiary);cursor:pointer;padding:6px;margin-right:4px;border-radius:6px;display:inline-flex}
+.session-list li:hover .row-more,.row-more:focus-visible,.session-list li.current .row-more,.session-list li.menu-open .row-more{opacity:1}
+.row-more:hover{color:var(--ui-primary)}
+.row-more:focus-visible{outline:2px solid var(--ui-primary);outline-offset:1px}
 .confirm-row{flex:1;display:flex;gap:10px;align-items:center;padding:9px 10px;font-size:13px}
 .empty-list{justify-content:center;padding:24px 0;color:var(--ui-text-tertiary);font-size:13px}
 .attention-dot{width:7px;height:7px;border-radius:50%;background:var(--ui-primary);display:inline-block}
@@ -444,8 +572,9 @@ async function openLink(href: string) {
 .perm-btn:hover{color:var(--ui-text-primary)}
 .perm-btn.active{background:var(--ui-surface);color:var(--ui-text-primary);box-shadow:0 1px 3px rgba(0,0,0,.08);font-weight:600}
 .perm-btn.active svg{color:var(--ui-primary)}
-.workspace-chip{border:1px solid var(--ui-border);background:var(--ui-surface);color:var(--ui-text-secondary);border-radius:999px;padding:4px 10px;font-size:12px;display:inline-flex;gap:6px;align-items:center;cursor:pointer;max-width:260px;overflow:hidden;white-space:nowrap}
-.workspace-chip:hover{color:var(--ui-text-primary)}
+.ai-config-chip{border:1px solid var(--ui-border);background:var(--ui-surface);color:var(--ui-text-secondary);border-radius:999px;padding:4px 10px;font-size:12px;display:inline-flex;gap:6px;align-items:center;cursor:pointer;white-space:nowrap}
+.ai-config-chip:hover{color:var(--ui-text-primary)}
+.ai-config-chip:focus-visible{outline:2px solid var(--ui-primary);outline-offset:2px}
 .chat-scroll{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;scrollbar-width:thin;scrollbar-color:var(--ui-scrollbar) transparent;overscroll-behavior:contain}
 .chat-column{width:100%;max-width:820px;margin:0 auto;padding:22px 24px 12px;display:grid;gap:14px;box-sizing:border-box;min-width:0;overflow-x:hidden}
 .state-line{text-align:center;padding:40px 0}
@@ -479,6 +608,9 @@ async function openLink(href: string) {
 .notice{margin-left:40px;font-size:13px;padding:8px 12px;border-radius:10px;background:var(--ui-surface-alt);color:var(--ui-text-secondary);display:flex;gap:12px;align-items:center}
 .notice.error{background:var(--ui-primary-soft);color:var(--ui-primary-pressed)}
 .notice.warning{background:rgba(245,158,11,.14)}
+.notice details{flex:1;min-width:0}
+.notice summary{cursor:pointer}
+.notice-details{display:block;margin-top:6px;white-space:pre-wrap;overflow-wrap:anywhere;max-height:240px;overflow:auto;color:var(--ui-text-secondary)}
 .card{margin-left:40px;border:1px solid var(--ui-border);border-radius:14px;background:var(--ui-surface);padding:14px 16px;display:grid;gap:10px;box-shadow:var(--ui-shadow-pop);max-width:100%;min-width:0;box-sizing:border-box}
 .card.exec{border-color:var(--ui-primary)}
 .card header{display:flex;gap:8px;align-items:center;font-size:14px}

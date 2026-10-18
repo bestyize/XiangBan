@@ -53,8 +53,9 @@ impl ModelProvider for OpenAiCompat {
             ("Content-Type".to_string(), "application/json".to_string()),
             ("Accept".to_string(), "text/event-stream".to_string()),
         ];
-        if !self.profile.api_key.is_empty() {
-            headers.push(("Authorization".to_string(), format!("Bearer {}", self.profile.api_key)));
+        let key = self.profile.current_api_key();
+        if !key.is_empty() {
+            headers.push(("Authorization".to_string(), format!("Bearer {key}")));
         }
         let call = Call {
             url: format!("{}/chat/completions", self.profile.base_url.trim_end_matches('/')),

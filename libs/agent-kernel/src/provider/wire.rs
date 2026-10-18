@@ -1,7 +1,7 @@
 use super::ChatRequest;
 use crate::types::{Message, Part, Role};
 use serde_json::{json, Map, Value};
-use std::fmt;
+use std::{fmt, sync::Arc};
 
 /// Everything needed to talk to one OpenAI-compatible endpoint.
 #[derive(Clone)]
@@ -21,6 +21,9 @@ pub struct ProviderProfile {
     /// `max_output_tokens`, and chat completions sends nothing: endpoints disagree on the parameter
     /// name there, so set `max_tokens` or `max_completion_tokens` in `extra_body` instead.
     pub max_output_tokens: Option<u32>,
+    /// Asked for the key on every request, for credentials that expire while a long run is going.
+    /// Empty means "use `api_key`".
+    pub api_key_source: Option<Arc<dyn Fn() -> String + Send + Sync>>,
 }
 
 impl ProviderProfile {
@@ -34,7 +37,18 @@ impl ProviderProfile {
             stream_usage: true,
             supports_tools: true,
             max_output_tokens: None,
+            api_key_source: None,
         }
+    }
+
+    pub fn with_api_key_source(mut self, source: Arc<dyn Fn() -> String + Send + Sync>) -> Self {
+        self.api_key_source = Some(source);
+        self
+    }
+
+    /// The key to send with the next request.
+    pub fn current_api_key(&self) -> String {
+        self.api_key_source.as_ref().map(|source| source()).filter(|key| !key.is_empty()).unwrap_or_else(|| self.api_key.clone())
     }
 }
 

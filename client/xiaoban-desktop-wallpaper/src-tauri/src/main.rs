@@ -18,6 +18,7 @@ mod ai_config;
 mod tts;
 mod asr;
 mod ai_catalogue;
+mod ai_gateway;
 mod chat;
 mod storage;
 mod local_media;
@@ -705,9 +706,11 @@ fn main() {
             account::get_account_session, account::logout_account,
             tts::tts_get_settings, tts::tts_save_settings, tts::tts_list_voices, tts::tts_synthesize, tts::tts_cancel,
             asr::asr_get_status, asr::asr_set_enabled, asr::asr_prepare, asr::asr_transcribe,
+            ai_gateway::ai_gateway_balance, ai_gateway::ai_gateway_redeem, ai_gateway::ai_gateway_tiers, ai_gateway::use_ai_gateway,
             ai_catalogue::refresh_ai_providers, ai_config::get_ai_config, ai_config::save_ai_config, ai_config::pick_workspace, ai_config::fetch_ai_models,
             ai_config::save_ai_provider, ai_config::switch_ai_provider, ai_config::delete_ai_provider, ai_config::save_ai_preferences, request_system_permissions,
             chat::chat_overview, chat::chat_load_session, chat::chat_new_session, chat::chat_send, chat::chat_cancel, chat::chat_delete_session,
+            chat::chat_context, chat::chat_compact, chat::chat_rename_session, chat::chat_move_session, chat::chat_create_group, chat::chat_rename_group, chat::chat_delete_group,
             chat::chat_answer_approval, chat::chat_answer_question, chat::chat_set_permission_mode]);
     let app = builder.manage(state).manage(content::ContentState::default()).manage(website::WebsiteState::default())
         .manage(games::GameState::default()).manage(desk_game::DeskState::default()).manage(rituals::RitualState::default()).manage(widgets::WidgetState::default()).manage(reminders::ReminderState::default()).manage(account::AccountState::default()).manage(ai_config::AiConfigState::default()).manage(tts::TtsState::default()).manage(asr::AsrState::default()).manage(ai_catalogue::CatalogueState::default())

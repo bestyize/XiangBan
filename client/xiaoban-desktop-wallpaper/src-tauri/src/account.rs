@@ -84,7 +84,12 @@ impl From<&str> for AccountFailure {
 #[derive(Default)]
 pub struct AccountState {
     pub session: Mutex<Option<AccountSession>>,
+    /// 刷新令牌每次使用都会轮换，旧的再用会让整个会话作废，所以同一时刻只能有一个刷新请求。
+    refreshing: tauri::async_runtime::Mutex<()>,
 }
+
+/// 访问令牌剩余有效期低于这个值就先刷新，免得请求在路上过期。
+const REFRESH_MARGIN_SECS: i64 = 120;
 
 pub fn account_base_url() -> String {
     std::env::var("XIAOBAN_ACCOUNT_URL")
@@ -191,6 +196,62 @@ fn parse_login(val: &Value, now_sec: i64) -> Result<LoginResult, AccountFailure>
         is_new_user: val["is_new_user"].as_bool().unwrap_or(false),
         session: AccountSession { access_token, refresh_token, expires_at: now_sec + expires_in, user },
     })
+}
+
+/// 刷新接口只返回新的令牌对，用户信息沿用本地的。
+fn parse_refresh(old: &AccountSession, val: &Value, now_sec: i64) -> Result<AccountSession, AccountFailure> {
+    Ok(AccountSession {
+        access_token: val["access_token"].as_str().ok_or("缺少 access_token")?.to_string(),
+        refresh_token: val["refresh_token"].as_str().ok_or("缺少 refresh_token")?.to_string(),
+        expires_at: now_sec + val["expires_in"].as_i64().unwrap_or(1800),
+        user: old.user.clone(),
+    })
+}
+
+fn is_fresh(session: &AccountSession, now_sec: i64) -> bool {
+    session.expires_at - now_sec > REFRESH_MARGIN_SECS
+}
+
+/// 返回一个还有足够有效期的访问令牌，必要时先用刷新令牌换新的。
+/// 账号中心明确拒绝刷新令牌时，本地会话已经无法恢复，按退出登录处理，界面会回到未登录。
+pub async fn fresh_access_token(app: &tauri::AppHandle) -> Result<String, AccountFailure> {
+    let state = app.state::<AccountState>();
+    let signed_in = || state.session.lock().unwrap().clone().ok_or_else(|| AccountFailure::from("请先登录小伴账号"));
+    let current = signed_in()?;
+    if is_fresh(&current, now_secs()) {
+        return Ok(current.access_token);
+    }
+    let _only_one = state.refreshing.lock().await;
+    let current = signed_in()?;
+    if is_fresh(&current, now_secs()) {
+        return Ok(current.access_token);
+    }
+    let val = match call_json(
+        reqwest::Method::POST,
+        "/api/auth/refresh".into(),
+        Some(json!({ "refresh_token": current.refresh_token, "client_id": CLIENT_ID })),
+    )
+    .await
+    {
+        Ok(val) => val,
+        Err(failure) => {
+            if failure.code.as_deref() == Some("unauthorized") {
+                let _ = logout_account(app.clone()).await;
+            }
+            return Err(failure);
+        }
+    };
+    let next = parse_refresh(&current, &val, now_secs())?;
+    {
+        let mut slot = state.session.lock().unwrap();
+        if slot.as_ref().map(|s| s.refresh_token.as_str()) != Some(current.refresh_token.as_str()) {
+            return Err("账号已切换，请重试".into());
+        }
+        *slot = Some(next.clone());
+    }
+    // 写盘失败不影响本次运行；最坏是下次启动需要重新登录。
+    let _ = save_session(app, &next);
+    Ok(next.access_token)
 }
 
 fn parse_code_login(val: &Value, now_sec: i64) -> Result<CodeLoginOutcome, AccountFailure> {
@@ -403,6 +464,23 @@ mod tests {
         assert_eq!(result.session.user.username, "Alice_01");
         assert_eq!(result.session.expires_at, 2800);
         assert!(parse_login(&json!({ "access_token": "a", "refresh_token": "r", "user": { "uid": "u" } }), 0).is_err());
+    }
+
+    #[test]
+    fn a_refresh_swaps_the_tokens_and_keeps_the_user() {
+        let old = parse_login(&login_body(), 1000).unwrap().session;
+        let next = parse_refresh(&old, &json!({ "access_token": "a2", "refresh_token": "r2", "token_type": "Bearer", "expires_in": 900 }), 5000).unwrap();
+        assert_eq!((next.access_token.as_str(), next.refresh_token.as_str(), next.expires_at), ("a2", "r2", 5900));
+        assert_eq!(next.user, old.user);
+        assert!(parse_refresh(&old, &json!({ "access_token": "a2" }), 0).is_err());
+    }
+
+    #[test]
+    fn a_token_close_to_expiry_counts_as_stale() {
+        let session = parse_login(&login_body(), 0).unwrap().session;
+        assert!(is_fresh(&session, 1000));
+        assert!(!is_fresh(&session, session.expires_at - REFRESH_MARGIN_SECS));
+        assert!(!is_fresh(&session, session.expires_at + 1));
     }
 
     #[test]

@@ -17,6 +17,9 @@ pub const PROTOCOLS: &[&str] = &["responses", "chat", "anthropic"];
 const MAX_URL: usize = 2048;
 const MAX_MODEL: usize = 200;
 const MAX_KEY: usize = 2048;
+pub const DEFAULT_CONTEXT_TOKENS: usize = 48_000;
+pub const MIN_CONTEXT_TOKENS: usize = 16_000;
+pub const MAX_CONTEXT_TOKENS: usize = 2_000_000;
 
 /// The built-in providers a fresh install starts with: id, display name, and the chat-completions
 /// address and default model. Each vendor also serves the Responses and Anthropic wire formats on
@@ -152,6 +155,11 @@ pub struct AiConfig {
     pub hide_tool_calls: bool,
     /// Whether open-computer-use MCP tools are enabled.
     pub open_computer_use: bool,
+    /// The tier chosen for 小伴 AI. Used only while `active_provider` is the gateway; the
+    /// short-lived account token is never saved here.
+    pub gateway_tier: String,
+    /// How much conversation is sent to the model before the oldest part is dropped, in estimated tokens.
+    pub context_tokens: usize,
 }
 
 impl Default for AiConfig {
@@ -168,6 +176,8 @@ impl Default for AiConfig {
             workspace: String::new(),
             hide_tool_calls: false,
             open_computer_use: false,
+            gateway_tier: String::new(),
+            context_tokens: DEFAULT_CONTEXT_TOKENS,
         };
         cfg.normalize();
         cfg
@@ -217,6 +227,8 @@ pub struct AiConfigView {
     pub default_workspace: String,
     pub hide_tool_calls: bool,
     pub open_computer_use: bool,
+    pub gateway_tier: String,
+    pub context_tokens: usize,
 }
 
 impl AiConfig {
@@ -235,10 +247,13 @@ impl AiConfig {
             default_workspace: default_workspace.display().to_string(),
             hide_tool_calls: self.hide_tool_calls,
             open_computer_use: self.open_computer_use,
+            gateway_tier: self.gateway_tier.clone(),
+            context_tokens: self.context_tokens,
         }
     }
 
     fn normalize(&mut self) {
+        self.context_tokens = if self.context_tokens == 0 { DEFAULT_CONTEXT_TOKENS } else { self.context_tokens.clamp(MIN_CONTEXT_TOKENS, MAX_CONTEXT_TOKENS) };
         if !PROTOCOLS.contains(&self.protocol.as_str()) {
             self.protocol = "responses".into();
         }
@@ -347,6 +362,15 @@ fn clean_key(raw: &str) -> Result<String, String> {
         return Err("密钥里不能有空格或换行，请重新复制粘贴".into());
     }
     Ok(key.to_string())
+}
+
+fn clean_context_tokens(size: u32) -> Result<usize, String> {
+    let size = size as usize;
+    if (MIN_CONTEXT_TOKENS..=MAX_CONTEXT_TOKENS).contains(&size) {
+        Ok(size)
+    } else {
+        Err(format!("上下文大小需要在 {}K 到 {}M 之间", MIN_CONTEXT_TOKENS / 1000, MAX_CONTEXT_TOKENS / 1_000_000))
+    }
 }
 
 fn clean_workspace(raw: &str) -> Result<String, String> {
@@ -667,6 +691,7 @@ pub fn save_ai_preferences(
     workspace: Option<String>,
     hide_tool_calls: Option<bool>,
     open_computer_use: Option<bool>,
+    context_tokens: Option<u32>,
 ) -> Result<AiConfigView, String> {
     let path = path(&app)?;
     let state = app.state::<AiConfigState>();
@@ -682,6 +707,9 @@ pub fn save_ai_preferences(
     }
     if let Some(ocu) = open_computer_use {
         config.open_computer_use = ocu;
+    }
+    if let Some(size) = context_tokens {
+        config.context_tokens = clean_context_tokens(size)?;
     }
 
     save(&path, &config).map_err(|e| format!("无法保存偏好设置：{e}"))?;
@@ -1135,5 +1163,29 @@ mod tests {
             assert_eq!(next.providers.iter().find(|p| p.id == next.active_provider).unwrap().protocol, *protocol, "the provider entry follows");
         }
         assert!(apply(&saved(), &Input { protocol: "grpc", ..input("https://a.example.com", "m") }).is_err());
+    }
+
+    #[test]
+    fn the_context_size_defaults_for_old_files_and_is_kept_inside_its_range() {
+        let old: AiConfig = serde_json::from_str(r#"{"activeProvider":"deepseek","baseUrl":"https://a.example.com","model":"m"}"#).unwrap();
+        assert_eq!(old.context_tokens, DEFAULT_CONTEXT_TOKENS, "a file written before the setting existed gets the default");
+        assert_eq!(AiConfig::default().context_tokens, 48_000);
+
+        for (stored, expected) in [(0, DEFAULT_CONTEXT_TOKENS), (1_000, MIN_CONTEXT_TOKENS), (128_000, 128_000), (9_999_999, MAX_CONTEXT_TOKENS)] {
+            let mut config = AiConfig { context_tokens: stored, ..AiConfig::default() };
+            config.normalize();
+            assert_eq!(config.context_tokens, expected, "stored {stored}");
+        }
+        assert_eq!(AiConfig { context_tokens: 64_000, ..AiConfig::default() }.view(Path::new("/w")).context_tokens, 64_000);
+    }
+
+    #[test]
+    fn a_context_size_from_the_form_must_be_inside_the_range() {
+        assert_eq!(clean_context_tokens(32_000), Ok(32_000));
+        assert_eq!(clean_context_tokens(16_000), Ok(16_000));
+        assert_eq!(clean_context_tokens(2_000_000), Ok(2_000_000));
+        for bad in [0, 15_999, 2_000_001, u32::MAX] {
+            assert!(clean_context_tokens(bad).unwrap_err().contains("16K 到 2M"), "{bad}");
+        }
     }
 }
