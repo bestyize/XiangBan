@@ -18,6 +18,8 @@ pub struct IdentityView {
 #[derive(Serialize)]
 pub struct UserView {
     pub uid: Uuid,
+    /// 建号时分配的数字账号 ID（字符串），唯一且永不修改。
+    pub account_id: String,
     /// 唯一且不可修改的用户名，也是对外展示的名字。
     pub username: String,
     pub avatar_url: Option<String>,
@@ -163,12 +165,13 @@ pub async fn touch_login(state: &AppState, uid: Uuid) -> Result<(), AppError> {
 }
 
 pub async fn view(state: &AppState, uid: Uuid) -> Result<UserView, AppError> {
-    let user: Option<(String, Option<String>, bool, DateTime<Utc>)> =
-        sqlx::query_as("SELECT username, avatar_url, password_hash IS NOT NULL, created_at FROM users WHERE uid = $1")
-            .bind(uid)
-            .fetch_optional(&state.pool)
-            .await?;
-    let Some((username, avatar_url, has_password, created_at)) = user else {
+    let user: Option<(String, String, Option<String>, bool, DateTime<Utc>)> = sqlx::query_as(
+        "SELECT account_id::text, username, avatar_url, password_hash IS NOT NULL, created_at FROM users WHERE uid = $1",
+    )
+    .bind(uid)
+    .fetch_optional(&state.pool)
+    .await?;
+    let Some((account_id, username, avatar_url, has_password, created_at)) = user else {
         return Err(AppError::Unauthorized("登录已失效，请重新登录".into()));
     };
 
@@ -184,7 +187,7 @@ pub async fn view(state: &AppState, uid: Uuid) -> Result<UserView, AppError> {
         identities.push(IdentityView { kind, masked: identifier::mask(parsed, &value) });
     }
 
-    Ok(UserView { uid, username, avatar_url, has_password, identities, created_at, email: None })
+    Ok(UserView { uid, account_id, username, avatar_url, has_password, identities, created_at, email: None })
 }
 
 pub async fn verified_email(state: &AppState, uid: Uuid) -> Result<Option<String>, AppError> {

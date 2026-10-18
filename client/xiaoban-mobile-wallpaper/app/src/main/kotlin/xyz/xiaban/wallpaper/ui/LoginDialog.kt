@@ -62,6 +62,7 @@ import xyz.xiaban.wallpaper.companion.Expression
 import xyz.xiaban.wallpaper.data.AccountException
 import xyz.xiaban.wallpaper.data.AccountRules
 import xyz.xiaban.wallpaper.data.CodeLoginResult
+import xyz.xiaban.wallpaper.data.SignupMethods
 
 private enum class LoginMode { PASSWORD, CODE, RESET }
 
@@ -97,6 +98,8 @@ fun LoginDialog(app: AppViewModel, onDismiss: () -> Unit) {
     var error by remember { mutableStateOf<String?>(null) }
     var info by remember { mutableStateOf<String?>(null) }
     var availability by remember { mutableStateOf<Availability>(Availability.Idle) }
+    var methods by remember { mutableStateOf(SignupMethods.EMAIL_ONLY) }
+    LaunchedEffect(Unit) { methods = app.signupMethods() }
     val codeFocus = remember { FocusRequester() }
     val focusManager = LocalFocusManager.current
 
@@ -160,10 +163,16 @@ fun LoginDialog(app: AppViewModel, onDismiss: () -> Unit) {
         else -> codeSent && code.length == AccountRules.CODE_LENGTH
     }
 
+    val emailOnly = mode == LoginMode.CODE && !methods.phone
+
     fun sendCode() {
         if (!canSend) return
         error = null
         info = null
+        if (emailOnly && '@' !in identifier) {
+            error = "暂未开放手机号注册，请使用邮箱"
+            return
+        }
         sending = true
         scope.launch {
             try {
@@ -273,8 +282,8 @@ fun LoginDialog(app: AppViewModel, onDismiss: () -> Unit) {
                     LoginField(
                         value = username,
                         onValueChange = { username = it.trim().take(AccountRules.USERNAME_MAX); error = null },
-                        placeholder = "用户名（字母开头，4-20 位字母、数字或下划线）",
-                        keyboardType = KeyboardType.Ascii,
+                        placeholder = "用户名（中英文、数字、下划线，至少 2 个汉字或 3 个字母）",
+                        keyboardType = KeyboardType.Text,
                         imeAction = ImeAction.Next,
                         onImeAction = { focusManager.moveFocus(FocusDirection.Down) },
                         enabled = !submitting,
@@ -292,7 +301,7 @@ fun LoginDialog(app: AppViewModel, onDismiss: () -> Unit) {
                     LoginField(
                         value = identifier,
                         onValueChange = { identifier = it.trim(); error = null },
-                        placeholder = if (mode == LoginMode.PASSWORD) "用户名、邮箱或手机号" else "邮箱或手机号",
+                        placeholder = if (mode == LoginMode.PASSWORD) "用户名、邮箱或手机号" else if (emailOnly) "邮箱" else "邮箱或手机号",
                         keyboardType = KeyboardType.Email,
                         imeAction = if (mode == LoginMode.PASSWORD) ImeAction.Next else ImeAction.Done,
                         onImeAction = { if (mode != LoginMode.PASSWORD) sendCode() else focusManager.moveFocus(FocusDirection.Down) },
@@ -300,7 +309,7 @@ fun LoginDialog(app: AppViewModel, onDismiss: () -> Unit) {
                     )
                     if (codeSent) {
                         Text(
-                            "填错了？换一个邮箱 / 手机号",
+                            if (emailOnly) "填错了？换一个邮箱" else "填错了？换一个邮箱 / 手机号",
                             Modifier.fillMaxWidth().clickable(enabled = !submitting, interactionSource = remember { MutableInteractionSource() }, indication = null) { changeIdentifier() }
                                 .padding(top = 6.dp, start = 4.dp),
                             color = Palette.Sub, fontSize = 12.sp,

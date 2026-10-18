@@ -18,6 +18,7 @@ import kotlinx.coroutines.withContext
 import xyz.xiaban.wallpaper.data.AccountClient
 import xyz.xiaban.wallpaper.data.CodeLoginResult
 import xyz.xiaban.wallpaper.data.LoginOutcome
+import xyz.xiaban.wallpaper.data.SignupMethods
 import xyz.xiaban.wallpaper.data.UsernameCheck
 import xyz.xiaban.wallpaper.data.AccountException
 import xyz.xiaban.wallpaper.data.AccountRules
@@ -177,6 +178,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     suspend fun resetPassword(identifier: String, code: String, newPassword: String) {
         withContext(Dispatchers.IO) { accountClient.resetPassword(identifier, code, newPassword) }
     }
+
+    suspend fun signupMethods(): SignupMethods = withContext(Dispatchers.IO) { accountClient.signupMethods() }
 
     suspend fun checkUsername(username: String): UsernameCheck = withContext(Dispatchers.IO) { accountClient.checkUsername(username) }
 

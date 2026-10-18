@@ -62,6 +62,13 @@ pub struct UsernameCheck {
     pub message: Option<String>,
 }
 
+/// 账号中心当前开放哪些注册方式。
+#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+pub struct SignupMethods {
+    pub email: bool,
+    pub phone: bool,
+}
+
 /// 账号中心的错误：`code` 是机读值（username_taken、registration_expired、identity_exists 等）。
 #[derive(Clone, Debug, Serialize, PartialEq, Eq)]
 pub struct AccountFailure {
@@ -375,6 +382,15 @@ pub async fn check_account_username(username: String) -> Result<UsernameCheck, A
         available: val["available"].as_bool().unwrap_or(false),
         message: val["message"].as_str().map(String::from),
     })
+}
+
+/// 取不到（网络、旧版账号中心）就按只开邮箱处理，不影响登录框使用。
+#[tauri::command]
+pub async fn get_signup_methods() -> SignupMethods {
+    match call_json(reqwest::Method::GET, "/api/auth/methods".into(), None).await {
+        Ok(val) => SignupMethods { email: val["email"].as_bool().unwrap_or(true), phone: val["phone"].as_bool().unwrap_or(false) },
+        Err(_) => SignupMethods { email: true, phone: false },
+    }
 }
 
 #[tauri::command]

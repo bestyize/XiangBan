@@ -47,7 +47,12 @@ export function useWallpaperWorkspace(store: ControlStore) {
     try { const result = await invoke<{categories:{id:string;name:string}[]}>("fetch_site_categories"); if(site === store.settings.websiteUrl) categories.value = result.categories; }
     catch { /* Feed retains actionable retry. */ }
   }
-  watch([tab,media,category,page], () => { if(tab.value === "online") void load(); });
+  watch([tab,media,category,page], () => {
+    if(tab.value === "online") {
+      if(!categories.value.length) void loadCategories();
+      void load();
+    }
+  });
   watch([media,category], () => {page.value = 1;});
   watch(() => store.settings.websiteUrl, () => { generation++; prepared.clear(); Object.assign(feed,{items:[],has_more:false,total:0}); categories.value=[]; selection.value=null; page.value=1; if(tab.value === "online") {void load();void loadCategories();} });
   onScopeDispose(() => {generation++;disposed=true;unlisten?.();progress.value=null;progressId=undefined;});
@@ -72,7 +77,7 @@ export function useWallpaperWorkspace(store: ControlStore) {
     try { const id=await prepare(chosen); progressId=id; if(apply) await store.applyWallpaper(id,options,preview); else store.notify("已保存到我的壁纸","success"); }
     catch(e) {if(String(e)===DOWNLOAD_CANCELLED) store.notify(DOWNLOAD_CANCELLED,"info"); else store.notify(e,"error");} finally {busy.value=false;progress.value=null;progressId=undefined;}
   }
-  if(store.desktop && !store.info?.uiSmoke) {void load();void loadCategories();}
+  if(store.desktop && !store.info?.uiSmoke && tab.value === "online") {void load();void loadCategories();}
   const saved = computed(() => { const chosen=selection.value; if(chosen?.source!=="online") return false; const id=prepared.get(chosen.item.id) || chosen.item.desktop_id; return store.library.items.some(item=>item.definition.id===id && item.installed); });
   return {progress,progressPercent,saved,tab,media,query,category,page,localSource,selection,draft,busy,downloading,cancelling,loading,error,feed,categories,kind,select,cancel,cancelDownload,load,localItems,action};
 }

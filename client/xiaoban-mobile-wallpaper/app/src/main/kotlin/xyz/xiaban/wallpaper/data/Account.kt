@@ -26,6 +26,14 @@ sealed interface CodeLoginResult {
 
 data class UsernameCheck(val available: Boolean, val message: String?)
 
+/** Which ways a new account may sign up with right now; the account centre decides. */
+data class SignupMethods(val email: Boolean, val phone: Boolean) {
+    companion object {
+        /** What the dialog assumes when the answer cannot be read. */
+        val EMAIL_ONLY = SignupMethods(email = true, phone = false)
+    }
+}
+
 /**
  * [sessionExpired] is set only when the account centre said the saved login is no longer valid, never for a network failure.
  * [code] is the account centre's machine readable error (username_taken, registration_expired, identity_exists...).
@@ -36,7 +44,6 @@ object AccountRules {
     const val CLIENT_ID = "xiaoban-mobile-wallpaper"
     const val CODE_LENGTH = 6
     const val DEFAULT_COOLDOWN_SECONDS = 60
-    const val USERNAME_MIN = 4
     const val USERNAME_MAX = 20
     const val PASSWORD_MIN = 8
     const val PASSWORD_MAX = 128
@@ -52,11 +59,18 @@ object AccountRules {
     fun usernameError(raw: String): String? {
         val value = raw.trim()
         if (value.isEmpty()) return null
-        if (!value[0].let { it in 'A'..'Z' || it in 'a'..'z' }) return "用户名需以字母开头"
-        if (!value.all { it in 'A'..'Z' || it in 'a'..'z' || it in '0'..'9' || it == '_' }) return "只能包含字母、数字和下划线"
-        if (value.length !in USERNAME_MIN..USERNAME_MAX) return "需为 $USERNAME_MIN-$USERNAME_MAX 个字符"
+        if (!value[0].let { isAsciiLetter(it) || isHan(it) }) return "用户名需以字母或汉字开头"
+        if (!value.all { isAsciiLetter(it) || it in '0'..'9' || it == '_' || isHan(it) }) return "只能包含字母、数字、下划线和汉字"
+        val han = value.count { isHan(it) }
+        val letters = value.count { isAsciiLetter(it) }
+        if (if (han > 0) han + letters < 2 else letters < 3) return "至少要有 2 个汉字或 3 个英文字母"
+        if (value.fold(0) { n, c -> n + if (isHan(c)) 2 else 1 } > USERNAME_MAX) return "最长 $USERNAME_MAX 个字符，汉字算 2 个"
         return null
     }
+
+    private fun isAsciiLetter(c: Char) = c in 'A'..'Z' || c in 'a'..'z'
+
+    private fun isHan(c: Char) = c in '\u4e00'..'\u9fff'
 
     fun passwordError(raw: String, username: String = ""): String? = when {
         raw.isEmpty() -> null
@@ -103,6 +117,13 @@ object AccountParser {
     fun usernameCheck(body: String): UsernameCheck {
         val o = obj(body)
         return UsernameCheck(o.optBoolean("available", false), o.optString("message").takeIf { it.isNotBlank() && !o.isNull("message") })
+    }
+
+    fun signupMethods(body: String): SignupMethods = try {
+        val o = JSONObject(body)
+        SignupMethods(o.optBoolean("email", true), o.optBoolean("phone", false))
+    } catch (_: JSONException) {
+        SignupMethods.EMAIL_ONLY
     }
 
     /** The account centre's machine readable error code, or null. */
@@ -197,6 +218,13 @@ class AccountClient(private val origin: String = DEFAULT_ORIGIN) {
             "/api/auth/password/reset",
             JSONObject().put("identifier", identifier.trim()).put("code", code.trim()).put("new_password", newPassword),
         )
+    }
+
+    /** Never throws: an unreachable or older account centre just means email only. */
+    fun signupMethods(): SignupMethods = try {
+        AccountParser.signupMethods(request("GET", "/api/auth/methods", null))
+    } catch (_: Exception) {
+        SignupMethods.EMAIL_ONLY
     }
 
     fun checkUsername(username: String): UsernameCheck {

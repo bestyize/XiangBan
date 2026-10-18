@@ -104,6 +104,7 @@ export const useAccount = defineStore('account', () => {
 
   const resetPassword = accountApi.resetPassword
   const checkUsername = accountApi.checkUsername
+  const signupMethods = accountApi.signupMethods
 
   /** 页面打开时校验登录状态并同步最新资料。 */
   async function restore() {
@@ -133,7 +134,7 @@ export const useAccount = defineStore('account', () => {
 
   return {
     user, loggedIn, email, loginOpen, accessToken, sendCode, loginWithCode, loginWithPassword, register,
-    resetPassword, checkUsername,
+    resetPassword, checkUsername, signupMethods,
     restore, logout, openLogin, closeLogin,
   }
 })

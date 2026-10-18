@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import {mount,flushPromises} from '@vue/test-utils';
-import {reactive} from 'vue';
+import {reactive,ref} from 'vue';
 import {describe,it,expect,vi} from 'vitest';
 import WallpaperPage from '../pages/WallpaperPage.vue';
 import {defaults,invoke} from '../../bridge.ts';
@@ -56,4 +56,39 @@ it('labels authored HTML as animation and offers a preview without changing the 
  expect(preview).toBeDefined();await preview!.trigger('click');await flushPromises();
  expect(store.applyWallpaper).toHaveBeenCalledWith('local-stars',expect.any(Object),true);
  expect(store.settings.wallpaperId).toBe(defaults.wallpaperId);wrapper.unmount();
+});
+
+it('spins only on the online tab while a fetch is pending', async () => {
+ vi.mocked(invoke).mockReset();
+ vi.mocked(invoke).mockImplementation((() => new Promise(() => {})) as typeof invoke);
+ const store = reactive({ desktop: true, settings: JSON.parse(JSON.stringify(defaults)), library: { items: [], source: '', activeId: '' }, applyWallpaper: vi.fn(), notify: vi.fn() } as unknown as ControlStore);
+ const wrapper = mount(WallpaperPage, { attachTo: document.body, props: { store }, global: { stubs: { NButton: { template: '<button><slot /></button>' }, NInput: stub, NSelect: stub, NSlider: stub, NSwitch: stub, NModal: stub, NEmpty: stub, NAlert: stub, NPagination: stub, NCollapse: stub, NCollapseItem: stub, NColorPicker: stub, NPopconfirm: stub } } });
+ await flushPromises();
+ const spinning = () => String(document.body.querySelector('.n-spin-body') !== null);
+ expect(spinning()).toBe('false');
+ expect(invoke).not.toHaveBeenCalled();
+ const tabs = wrapper.findAll('.n-tabs-tab');
+ await tabs[1]!.trigger('click'); await flushPromises();
+ expect(invoke).toHaveBeenCalledWith('fetch_site_wallpapers', expect.any(Object));
+ expect(spinning()).toBe('true');
+ await tabs[0]!.trigger('click'); await flushPromises();
+ expect(spinning()).toBe('false');
+ wrapper.unmount();
+});
+
+it('keeps the online feed when the page is kept alive and navigated away', async () => {
+ vi.mocked(invoke).mockReset();
+ vi.mocked(invoke).mockResolvedValue({ items: [], total: 0, has_more: false, categories: [] });
+ const store = reactive({ desktop: true, settings: JSON.parse(JSON.stringify(defaults)), library: { items: [], source: '', activeId: '' }, applyWallpaper: vi.fn(), notify: vi.fn() } as unknown as ControlStore);
+ const shown = ref(true);
+ const host = { components: { WallpaperPage }, setup: () => ({ shown, store }), template: '<KeepAlive><WallpaperPage v-if="shown" :store="store" /></KeepAlive>' };
+ const wrapper = mount(host, { global: { stubs: { NButton: { template: '<button><slot /></button>' }, NInput: stub, NSelect: stub, NSlider: stub, NSwitch: stub, NModal: stub, NEmpty: stub, NAlert: stub, NPagination: stub, NCollapse: stub, NCollapseItem: stub, NColorPicker: stub, NPopconfirm: stub } } });
+ await flushPromises();
+ await wrapper.findAll('.n-tabs-tab')[1]!.trigger('click'); await flushPromises();
+ const calls = vi.mocked(invoke).mock.calls.length;
+ expect(calls).toBeGreaterThan(0);
+ shown.value = false; await flushPromises();
+ shown.value = true; await flushPromises();
+ expect(vi.mocked(invoke).mock.calls.length).toBe(calls);
+ wrapper.unmount();
 });

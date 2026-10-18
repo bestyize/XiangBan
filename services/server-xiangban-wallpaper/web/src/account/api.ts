@@ -117,6 +117,9 @@ export const accountApi = {
     }),
   resetPassword: (identifier: string, code: string, newPassword: string) =>
     call<{ ok: true }>('POST', '/api/auth/password/reset', { identifier, code, new_password: newPassword }),
+  /** 账号中心当前开放哪些注册方式；取不到就按只开邮箱处理。 */
+  signupMethods: (): Promise<{ email: boolean; phone: boolean }> =>
+    call<{ email: boolean; phone: boolean }>('GET', '/api/auth/methods').catch(() => ({ email: true, phone: false })),
   checkUsername: (username: string) =>
     call<{ available: boolean; message: string | null }>('GET', `/api/auth/username/available?username=${encodeURIComponent(username)}`),
   refresh: (refreshToken: string) =>

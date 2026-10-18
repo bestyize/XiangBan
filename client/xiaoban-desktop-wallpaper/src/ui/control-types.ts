@@ -1,6 +1,6 @@
 import type { SpeechStore } from './speech/store.ts';
 import type { AsrStore } from './asr/store.ts';
-import type { AccountSession, AppInfo, CodeLoginOutcome, LoginResult, SendCodeResult, Settings, UsernameCheck, WallpaperLibrary, WallpaperOptions } from "../bridge.ts";
+import type { AccountSession, AppInfo, CodeLoginOutcome, LoginResult, SendCodeResult, Settings, SignupMethods, UsernameCheck, WallpaperLibrary, WallpaperOptions } from "../bridge.ts";
 import type { EffectsChoice } from "../effects/types.ts";
 import type { ImportOutcome, LoadedPacks } from "../effects/catalog.ts";
 import type { WebsiteStatus } from "./website-types.ts";
@@ -41,6 +41,7 @@ export interface ControlStore {
   registerAccount(registrationToken: string, username: string, password: string): Promise<LoginResult>;
   resetAccountPassword(identifier: string, code: string, newPassword: string): Promise<void>;
   checkAccountUsername(username: string): Promise<UsernameCheck>;
+  getSignupMethods(): Promise<SignupMethods>;
   logoutAccount(): Promise<void>;
   initialize(): Promise<void>;
   dispose(): void;

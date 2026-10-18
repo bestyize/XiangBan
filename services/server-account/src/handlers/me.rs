@@ -3,7 +3,7 @@ use crate::{
     error::AppError,
     extract::{AuthUser, ClientIp},
     identifier::Identifier,
-    password,
+    password, signup_methods,
     state::AppState,
     users::{self, UserView},
 };
@@ -117,6 +117,7 @@ pub async fn send_bind_code(
 ) -> Result<Json<Value>, AppError> {
     users::ensure_active(&state, user.uid).await?;
     let ident = Identifier::parse(&req.identifier)?;
+    signup_methods::require(&state, ident.kind).await?;
     check_bindable(&state, user.uid, &ident).await?;
     codes::issue(&state, &ident, Purpose::Bind, &ip).await?;
     Ok(Json(json!({
@@ -139,6 +140,7 @@ pub async fn bind_identity(
 ) -> Result<Json<UserView>, AppError> {
     users::ensure_active(&state, user.uid).await?;
     let ident = Identifier::parse(&req.identifier)?;
+    signup_methods::require(&state, ident.kind).await?;
     check_bindable(&state, user.uid, &ident).await?;
     codes::verify(&state, &ident, Purpose::Bind, &req.code).await?;
 

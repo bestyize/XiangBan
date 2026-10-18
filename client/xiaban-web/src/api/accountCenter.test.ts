@@ -2,6 +2,7 @@ import { afterEach, expect, it, vi } from 'vitest'
 import {
   checkUsername,
   dropAccountSession,
+  getSignupMethods,
   loginWithCode,
   loginWithPassword,
   needsRegistration,
@@ -71,6 +72,15 @@ it('checks username availability with the name URL-encoded', async () => {
   await expect(checkUsername('a b&c')).resolves.toEqual({ available: false, message: '这个用户名已被占用' })
   expect(fetcher.mock.calls[0][0]).toBe('https://account.xiangban.xyz/api/auth/username/available?username=a%20b%26c')
   expect(fetcher.mock.calls[0][1].method).toBe('GET')
+})
+
+it('reads the open signup methods and falls back to email only when the account center is unreachable', async () => {
+  vi.stubGlobal('fetch', respond(200, { email: true, phone: true }))
+  await expect(getSignupMethods()).resolves.toEqual({ email: true, phone: true })
+  vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('offline')))
+  await expect(getSignupMethods()).resolves.toEqual({ email: true, phone: false })
+  vi.stubGlobal('fetch', respond(500, { error: true, code: 'internal', message: 'x' }))
+  await expect(getSignupMethods()).resolves.toEqual({ email: true, phone: false })
 })
 
 it('surfaces the account center error code and message', async () => {

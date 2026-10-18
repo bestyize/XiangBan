@@ -64,6 +64,8 @@ impl Harness {
             dummy_password_hash: Arc::new(password::hash("dummy".into()).await.unwrap()),
             username_limiter: crate::state::username_limiter(),
         };
+        // 生产默认只开放邮箱；多数用例要用手机号，所以测试环境先全部开放，专门的用例再恢复默认。
+        crate::signup_methods::save(&state, crate::signup_methods::SignupMethods { email: true, phone: true }).await.unwrap();
         Some(Self { app: build_router(state.clone()), state, admin, schema })
     }
 
@@ -736,7 +738,7 @@ async fn registration_rejects_bad_input_and_replayed_or_forged_tokens() {
     let (_, body) = h.code_login("rules@example.com", CLIENT).await;
     let token = body["registration_token"].as_str().unwrap();
 
-    for bad in ["abc", "1abcdef", "has space", "a@b.com", "admin_x", "xiaoban2026", "用户名用户名"] {
+    for bad in ["ab", "1abcdef", "has space", "a@b.com", "admin_x", "xiaoban2026", "用", "ab1", "用户名用户名用户名用户名"] {
         assert_eq!(h.register(token, bad, CLIENT).await.0, StatusCode::BAD_REQUEST, "{bad}");
     }
     let weak = |password: &str, username: &str| {
@@ -820,7 +822,7 @@ async fn username_availability_reports_format_taken_and_free_and_is_rate_limited
     assert_eq!(free["available"], true);
     let (_, bad) = check("a").await;
     assert_eq!(bad["available"], false);
-    assert!(bad["message"].as_str().unwrap().contains("4-20"));
+    assert!(bad["message"].as_str().unwrap().contains("2 个汉字或 3 个英文字母"));
     let (_, reserved) = check("administrator").await;
     assert_eq!(reserved["available"], false);
 
@@ -937,5 +939,87 @@ async fn admin_and_scoped_service_create_real_users_without_fake_verified_identi
         .post("/api/internal/forum/users", Some(KEY), service_req)
         .await;
     assert_eq!(created["uid"], retry["uid"]);
+    h.cleanup().await;
+}
+
+#[tokio::test]
+async fn account_ids_start_at_13586_count_up_as_strings_and_survive_a_rename() {
+    let h = harness!(&[]);
+    let admin = h.admin_token().await;
+    let admin = Some(admin.as_str());
+    let first = h.login_as("ids1@example.com", CLIENT, Some("张三")).await;
+    let second = h.login_as("ids2@example.com", CLIENT, Some("Second_One")).await;
+    assert_eq!(first["user"]["account_id"], "13586");
+    assert_eq!(second["user"]["account_id"], "13587");
+
+    let (_, me) = h.call(Method::GET, "/api/me", first["access_token"].as_str(), Value::Null).await;
+    assert_eq!((me["account_id"].clone(), me["username"].clone()), (json!("13586"), json!("张三")));
+
+    let (_, listed) = h.call(Method::GET, "/api/admin/users?q=13587", admin, Value::Null).await;
+    assert_eq!((listed["total"].as_i64(), listed["items"][0]["username"].clone()), (Some(1), json!("Second_One")));
+    assert_eq!(listed["items"][0]["account_id"], "13587");
+
+    let created = h
+        .post(
+            "/api/admin/users",
+            admin,
+            json!({ "request_id": uuid::Uuid::new_v4(), "username": "Made_By_Admin", "password": PASSWORD }),
+        )
+        .await;
+    assert_eq!((created.0, created.1["account_id"].clone()), (StatusCode::OK, json!("13588")));
+
+    let uid = first["user"]["uid"].as_str().unwrap();
+    let renamed = h.post(&format!("/api/admin/users/{uid}/username"), admin, json!({ "username": "李四" })).await;
+    assert_eq!(renamed.0, StatusCode::OK);
+    let (_, detail) = h.call(Method::GET, &format!("/api/admin/users/{uid}"), admin, Value::Null).await;
+    assert_eq!(detail["user"]["account_id"], "13586");
+    h.cleanup().await;
+}
+
+#[tokio::test]
+async fn signup_methods_default_to_email_only_and_gate_new_phone_accounts_but_not_existing_ones() {
+    let h = harness!(&[]);
+    let admin = h.admin_token().await;
+    let admin = Some(admin.as_str());
+    let existing = h.login_as("13600136000", CLIENT, Some("phone_old")).await;
+    let emailer = h.login_as("emailer@example.com", CLIENT, Some("email_only")).await;
+    let emailer_token = emailer["access_token"].as_str();
+
+    sqlx::query("DELETE FROM system_settings WHERE key = 'signup_methods'").execute(&h.state.pool).await.unwrap();
+    let (status, methods) = h.call(Method::GET, "/api/auth/methods", None, Value::Null).await;
+    assert_eq!((status, methods), (StatusCode::OK, json!({ "email": true, "phone": false })));
+
+    let (_, body) = h.post("/api/auth/code/send", None, json!({ "identifier": "13500135000" })).await;
+    assert_eq!(body["ok"], true);
+    let (status, err) = h
+        .post("/api/auth/code/login", None, json!({ "identifier": "13500135000", "code": h.last_code(), "client_id": CLIENT }))
+        .await;
+    assert_eq!((status, err["code"].as_str()), (StatusCode::FORBIDDEN, Some("signup_method_disabled")));
+    let (users,): (i64,) = sqlx::query_as("SELECT COUNT(*) FROM users").fetch_one(&h.state.pool).await.unwrap();
+    assert_eq!(users, 2);
+
+    let again = h.login("13600136000").await;
+    assert_eq!(again["user"]["uid"], existing["user"]["uid"], "an existing phone account can still sign in by code");
+    let (status, _) = h.post("/api/auth/password/login", None, json!({ "identifier": "13600136000", "password": PASSWORD, "client_id": CLIENT })).await;
+    assert_eq!(status, StatusCode::OK);
+
+    let (_, email_login) = h.code_login("fresh@example.com", CLIENT).await;
+    assert_eq!(email_login["registration_required"], true, "email stays open");
+
+    let (status, err) = h.post("/api/me/identities/code", emailer_token, json!({ "identifier": "13300133000" })).await;
+    assert_eq!((status, err["code"].as_str()), (StatusCode::FORBIDDEN, Some("signup_method_disabled")), "binding a closed kind is refused");
+    let (status, saved) = h.call(Method::PUT, "/api/admin/signup-methods", admin, json!({ "email": true, "phone": true })).await;
+    assert_eq!((status, saved), (StatusCode::OK, json!({ "email": true, "phone": true })));
+    assert_eq!(h.call(Method::GET, "/api/auth/methods", None, Value::Null).await.1, json!({ "email": true, "phone": true }));
+    let (_, audit) = h.call(Method::GET, "/api/admin/audit", admin, Value::Null).await;
+    assert!(audit.to_string().contains("signup_methods.update"));
+
+    assert_eq!(h.call(Method::PUT, "/api/admin/signup-methods", admin, json!({ "email": false, "phone": false })).await.0, StatusCode::BAD_REQUEST);
+    assert_eq!(h.call(Method::PUT, "/api/admin/signup-methods", emailer_token, json!({ "email": true, "phone": true })).await.0, StatusCode::UNAUTHORIZED);
+    assert_eq!(h.call(Method::PUT, "/api/admin/signup-methods", None, json!({ "email": true, "phone": true })).await.0, StatusCode::UNAUTHORIZED);
+
+    h.call(Method::PUT, "/api/admin/signup-methods", admin, json!({ "email": true, "phone": false })).await;
+    let (status, body) = h.code_login("13400134000", CLIENT).await;
+    assert_eq!((status, body["code"].as_str()), (StatusCode::FORBIDDEN, Some("signup_method_disabled")));
     h.cleanup().await;
 }

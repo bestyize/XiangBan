@@ -27,6 +27,8 @@ const error = ref('')
 const notice = ref('')
 const countdown = ref(0)
 const availability = ref<Availability>({ kind: 'idle' })
+const methods = ref({ email: true, phone: false })
+const emailOnly = computed(() => mode.value === 'code' && !methods.value.phone)
 let registrationToken: string | null = null
 let timer: ReturnType<typeof setInterval> | undefined
 let checkTimer: ReturnType<typeof setTimeout> | undefined
@@ -42,9 +44,13 @@ const sendLabel = computed(() => {
 function usernameError(raw: string): string {
   const value = raw.trim()
   if (!value) return ''
-  if (!/^[A-Za-z]/.test(value)) return '用户名需以字母开头'
-  if (!/^[A-Za-z0-9_]+$/.test(value)) return '只能包含字母、数字和下划线'
-  if (value.length < 4 || value.length > 20) return '需为 4-20 个字符'
+  if (!/^[A-Za-z一-鿿]/.test(value)) return '用户名需以字母或汉字开头'
+  if (!/^[A-Za-z0-9_一-鿿]+$/.test(value)) return '只能包含字母、数字、下划线和汉字'
+  const han = (value.match(/[一-鿿]/g) ?? []).length
+  const letters = (value.match(/[A-Za-z]/g) ?? []).length
+  if (han > 0 ? han + letters < 2 : letters < 3) return '至少要有 2 个汉字或 3 个英文字母'
+  const width = [...value].reduce((n, c) => n + (/[一-鿿]/.test(c) ? 2 : 1), 0)
+  if (width > 20) return '最长 20 个字符，汉字算 2 个'
   return ''
 }
 
@@ -136,6 +142,10 @@ async function sendCode() {
   }
   if (sending.value || countdown.value > 0) return
   error.value = ''
+  if (emailOnly.value && !identifier.value.includes('@')) {
+    error.value = '暂未开放手机号注册，请使用邮箱'
+    return
+  }
   sending.value = true
   try {
     const res = await account.sendCode(identifier.value.trim(), mode.value === 'reset' ? 'reset_password' : 'login')
@@ -212,6 +222,7 @@ watch(
     const el = dialog.value
     if (!el) return
     if (open && !el.open) {
+      void account.signupMethods().then(value => { methods.value = value })
       reset()
       el.showModal()
       await nextTick()
@@ -276,13 +287,13 @@ onBeforeUnmount(() => {
           autocapitalize="none"
           spellcheck="false"
           maxlength="20"
-          placeholder="字母开头，4-20 位字母、数字或下划线"
+          placeholder="中英文、数字、下划线，至少 2 个汉字或 3 个字母"
           :disabled="submitting"
         >
         <small v-if="hintText" class="field-hint" :class="{ bad: availability.kind === 'taken' || availability.kind === 'invalid' }" role="status">{{ hintText }}</small>
       </label>
       <label v-else class="field">
-        <span>{{ mode === 'password' ? '用户名 / 邮箱 / 手机号' : '邮箱或手机号' }}</span>
+        <span>{{ mode === 'password' ? '用户名 / 邮箱 / 手机号' : emailOnly ? '邮箱' : '邮箱或手机号' }}</span>
         <input
           ref="identifierInput"
           v-model="identifier"
@@ -294,7 +305,7 @@ onBeforeUnmount(() => {
           :placeholder="mode === 'password' ? '用户名、邮箱或手机号' : 'name@example.com'"
           :disabled="submitting || codeSent"
         >
-        <button v-if="codeSent" type="button" class="linkish start" :disabled="submitting" @click="changeIdentifier">填错了？换一个邮箱 / 手机号</button>
+        <button v-if="codeSent" type="button" class="linkish start" :disabled="submitting" @click="changeIdentifier">填错了？换一个{{ emailOnly ? '邮箱' : '邮箱 / 手机号' }}</button>
       </label>
 
       <label v-if="mode !== 'password' && codeSent" class="field">

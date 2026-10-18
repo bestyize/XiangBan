@@ -4,6 +4,7 @@ use crate::{
     extract::AuthAdmin,
     identifier::{self, Identifier, Kind},
     password, sessions,
+    signup_methods::{self, SignupMethods},
     state::AppState,
     username,
     users::{self, IdentityView},
@@ -160,6 +161,7 @@ pub struct ListQuery {
 #[derive(Serialize)]
 struct UserRow {
     uid: Uuid,
+    account_id: String,
     username: String,
     avatar_url: Option<String>,
     status: String,
@@ -183,7 +185,7 @@ fn parse_status(status: &str) -> Result<&str, AppError> {
     }
 }
 
-/// 搜索：UUID 精确匹配 uid；邮箱/手机号精确匹配已绑定标识；其余（含上述输入）按用户名模糊匹配。
+/// 搜索：纯数字精确匹配账号 ID；UUID 精确匹配 uid；邮箱/手机号精确匹配已绑定标识；其余（含上述输入）按用户名模糊匹配。
 pub async fn list_users(
     State(state): State<AppState>,
     _admin: AuthAdmin,
@@ -195,8 +197,12 @@ pub async fn list_users(
     let page_size = query.page_size.unwrap_or(20).clamp(1, 100);
 
     let mut uid_filter: Option<Uuid> = None;
+    let mut account_id_filter: Option<i64> = None;
     let mut like: Option<String> = None;
     if let Some(q) = q {
+        if q.len() <= 18 && q.bytes().all(|b| b.is_ascii_digit()) {
+            account_id_filter = q.parse().ok();
+        }
         if let Ok(uid) = Uuid::parse_str(q) {
             uid_filter = Some(uid);
         } else if let Ok(ident) = Identifier::parse(q) {
@@ -206,22 +212,24 @@ pub async fn list_users(
     }
     let has_query = q.is_some();
 
-    const FILTER: &str = "(NOT $3::bool OR u.uid = $1::uuid OR u.username ILIKE $2::text) AND ($4::text IS NULL OR u.status = $4::text)";
+    const FILTER: &str = "(NOT $3::bool OR u.uid = $1::uuid OR u.account_id = $5::bigint OR u.username ILIKE $2::text) AND ($4::text IS NULL OR u.status = $4::text)";
     let (total,): (i64,) = sqlx::query_as(&format!("SELECT COUNT(*) FROM users u WHERE {FILTER}"))
         .bind(uid_filter)
         .bind(&like)
         .bind(has_query)
         .bind(status)
+        .bind(account_id_filter)
         .fetch_one(&state.pool)
         .await?;
-    let rows: Vec<(Uuid, String, Option<String>, String, DateTime<Utc>, Option<DateTime<Utc>>)> = sqlx::query_as(&format!(
-        "SELECT u.uid, u.username, u.avatar_url, u.status, u.created_at, u.last_login_at
-         FROM users u WHERE {FILTER} ORDER BY u.created_at DESC, u.uid LIMIT $5 OFFSET $6"
+    let rows: Vec<(Uuid, String, String, Option<String>, String, DateTime<Utc>, Option<DateTime<Utc>>)> = sqlx::query_as(&format!(
+        "SELECT u.uid, u.account_id::text, u.username, u.avatar_url, u.status, u.created_at, u.last_login_at
+         FROM users u WHERE {FILTER} ORDER BY u.created_at DESC, u.uid LIMIT $6 OFFSET $7"
     ))
     .bind(uid_filter)
     .bind(&like)
     .bind(has_query)
     .bind(status)
+    .bind(account_id_filter)
     .bind(page_size)
     .bind((page - 1) * page_size)
     .fetch_all(&state.pool)
@@ -242,9 +250,10 @@ pub async fn list_users(
 
     let items: Vec<UserRow> = rows
         .into_iter()
-        .map(|(uid, username, avatar_url, status, created_at, last_login_at)| UserRow {
+        .map(|(uid, account_id, username, avatar_url, status, created_at, last_login_at)| UserRow {
             identities: by_uid.remove(&uid).unwrap_or_default(),
             uid,
+            account_id,
             username,
             avatar_url,
             status,
@@ -577,6 +586,29 @@ pub async fn update_sender(
     Ok(Json(json!({ "ok": true })))
 }
 
+pub async fn get_signup_methods(State(state): State<AppState>, _admin: AuthAdmin) -> Result<Json<SignupMethods>, AppError> {
+    signup_methods::load(&state).await.map(Json)
+}
+
+pub async fn update_signup_methods(
+    State(state): State<AppState>,
+    AuthAdmin(admin): AuthAdmin,
+    Json(req): Json<SignupMethods>,
+) -> Result<Json<SignupMethods>, AppError> {
+    signup_methods::validate(&state, req)?;
+    let before = signup_methods::load(&state).await?;
+    signup_methods::save(&state, req).await?;
+    audit(
+        &state,
+        &admin,
+        "signup_methods.update",
+        None,
+        Some(format!("email {}→{}, phone {}→{}", before.email, req.email, before.phone, req.phone)),
+    )
+    .await?;
+    Ok(Json(req))
+}
+
 #[derive(Deserialize)]
 pub struct TestSenderReq {
     pub recipient: String,
@@ -664,17 +696,17 @@ async fn insert_user(
         .bind(req.request_id.to_string())
         .execute(&mut *tx)
         .await?;
-    let old: Option<(Uuid, String)> =
-        sqlx::query_as("SELECT uid, username_key FROM users WHERE provision_request_id = $1")
+    let old: Option<(Uuid, String, String)> =
+        sqlx::query_as("SELECT uid, username_key, account_id::text FROM users WHERE provision_request_id = $1")
             .bind(req.request_id)
             .fetch_optional(&mut *tx)
             .await?;
-    if let Some((uid, key)) = old {
+    if let Some((uid, key, account_id)) = old {
         if key != name.key {
             return Err(AppError::BadRequest("这个请求编号已用于其他用户名".into()));
         }
         tx.commit().await?;
-        return Ok(json!({"uid": uid, "username": name.display, "avatar_url": avatar}));
+        return Ok(json!({"uid": uid, "account_id": account_id, "username": name.display, "avatar_url": avatar}));
     }
     let (taken,): (bool,) =
         sqlx::query_as("SELECT EXISTS(SELECT 1 FROM users WHERE username_key=$1)")
@@ -685,15 +717,15 @@ async fn insert_user(
         return Err(users::username_taken());
     }
     let uid = Uuid::new_v4();
-    sqlx::query("INSERT INTO users (uid, username, username_key, password_hash, avatar_url, provision_request_id) VALUES ($1,$2,$3,$4,$5,$6)")
+    let (account_id,): (String,) = sqlx::query_as("INSERT INTO users (uid, username, username_key, password_hash, avatar_url, provision_request_id) VALUES ($1,$2,$3,$4,$5,$6) RETURNING account_id::text")
         .bind(uid).bind(&name.display).bind(&name.key).bind(hash).bind(avatar).bind(req.request_id)
-        .execute(&mut *tx).await.map_err(|e| {
+        .fetch_one(&mut *tx).await.map_err(|e| {
             if e.as_database_error().is_some_and(|e| e.is_unique_violation()) { users::username_taken() } else { e.into() }
         })?;
     sqlx::query("INSERT INTO admin_audit (admin_username, action, target, detail) VALUES ($1,'user.create',$2,$3)")
         .bind(operator).bind(uid.to_string()).bind(&name.display).execute(&mut *tx).await?;
     tx.commit().await?;
-    Ok(json!({"uid": uid, "username": name.display, "avatar_url": avatar}))
+    Ok(json!({"uid": uid, "account_id": account_id, "username": name.display, "avatar_url": avatar}))
 }
 
 pub async fn create_user(

@@ -7,6 +7,7 @@ export type UserStatus = 'active' | 'disabled';
 
 export interface UserRow {
   uid: string;
+  account_id: string;
   username: string;
   avatar_url: string | null;
   status: UserStatus;
@@ -33,6 +34,7 @@ export interface SessionRow {
 export interface UserDetail {
   user: {
     uid: string;
+    account_id: string;
     username: string;
     avatar_url: string | null;
     has_password: boolean;
@@ -79,6 +81,11 @@ export interface SmtpConfig {
   has_password?: boolean;
   from_name: string;
   from_email: string;
+}
+
+export interface SignupMethods {
+  email: boolean;
+  phone: boolean;
 }
 
 export interface SenderConfig {

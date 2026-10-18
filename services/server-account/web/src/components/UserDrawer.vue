@@ -76,6 +76,7 @@ onUnmounted(() => window.removeEventListener('keydown', onKey));
 
       <template v-if="detail">
         <dl>
+          <dt>账号 ID</dt><dd class="mono">{{ detail.user.account_id }}</dd>
           <dt>用户名</dt><dd>{{ detail.user.username }}</dd>
           <dt>UID</dt><dd class="mono">{{ detail.user.uid }}</dd>
           <dt>状态</dt>

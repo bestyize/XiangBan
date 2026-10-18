@@ -1,14 +1,17 @@
-export const USERNAME_MIN = 4
 export const USERNAME_MAX = 20
 export const PASSWORD_MIN = 8
 
-/** 与账号中心的规则一致，只用来在输入时少打几次请求；最终以服务端为准。 */
+/** 与账号中心的规则一致（汉字占 2 个宽度），只用来在输入时少打几次请求；最终以服务端为准。 */
 export function usernameError(raw: string): string | null {
   const value = raw.trim()
   if (!value) return null
-  if (!/^[A-Za-z]/.test(value)) return '用户名需以字母开头'
-  if (!/^[A-Za-z0-9_]+$/.test(value)) return '只能包含字母、数字和下划线'
-  if (value.length < USERNAME_MIN || value.length > USERNAME_MAX) return `需为 ${USERNAME_MIN}-${USERNAME_MAX} 个字符`
+  if (!/^[A-Za-z一-鿿]/.test(value)) return '用户名需以字母或汉字开头'
+  if (!/^[A-Za-z0-9_一-鿿]+$/.test(value)) return '只能包含字母、数字、下划线和汉字'
+  const han = (value.match(/[一-鿿]/g) ?? []).length
+  const letters = (value.match(/[A-Za-z]/g) ?? []).length
+  if (han > 0 ? han + letters < 2 : letters < 3) return '至少要有 2 个汉字或 3 个英文字母'
+  const width = [...value].reduce((n, c) => n + (/[一-鿿]/.test(c) ? 2 : 1), 0)
+  if (width > USERNAME_MAX) return `最长 ${USERNAME_MAX} 个字符，汉字算 2 个`
   return null
 }
 

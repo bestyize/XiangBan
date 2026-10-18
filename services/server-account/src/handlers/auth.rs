@@ -3,7 +3,7 @@ use crate::{
     error::AppError,
     extract::{AuthUser, ClientIp},
     identifier::Identifier,
-    password, registration,
+    password, registration, signup_methods,
     sessions::{self, TokenPair},
     state::AppState,
     username,
@@ -117,6 +117,8 @@ pub async fn login_with_code(
     codes::verify(&state, &ident, Purpose::Login, &req.code).await?;
 
     let Some(uid) = users::find_uid(&state, &ident).await? else {
+        // 验证码已校验通过才报错：没验证前不能借这个接口探测某个号码是否已注册。
+        signup_methods::require(&state, ident.kind).await?;
         return Ok(Json(CodeLoginResponse::RegistrationRequired(RegistrationRequired {
             registration_required: true,
             registration_token: registration::issue(&state.keys.sub.register_jwt_secret, &ident)?,
@@ -144,6 +146,7 @@ pub async fn register(
 ) -> Result<Json<AuthResponse>, AppError> {
     require_client(&state, &req.client_id).await?;
     let ident = registration::verify(&state.keys.sub.register_jwt_secret, &req.registration_token)?;
+    signup_methods::require(&state, ident.kind).await?;
     let name = username::parse(&req.username)?;
     password::validate(&req.password)?;
     if req.password.eq_ignore_ascii_case(&name.display) {
@@ -152,6 +155,11 @@ pub async fn register(
     let hash = password::hash(req.password).await?;
     let uid = users::register(&state, &ident, &name, &hash).await?;
     respond(&state, uid, true, &req.client_id, req.device_name.as_deref(), &ip).await
+}
+
+/// 客户端据此决定登录框里显示哪些注册方式；只含开关，不含任何敏感信息。
+pub async fn signup_methods(State(state): State<AppState>) -> Result<Json<signup_methods::SignupMethods>, AppError> {
+    signup_methods::load(&state).await.map(Json)
 }
 
 #[derive(Deserialize)]

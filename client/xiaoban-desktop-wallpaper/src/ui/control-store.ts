@@ -1,7 +1,7 @@
 import { createSpeechStore } from './speech/store.ts';
 import { createAsrStore } from './asr/store.ts';
 import { reactive } from "vue";
-import { desktop, defaults, invoke, listen, toAccountError, type AiConfigView, type Settings, type WallpaperEntry, type WallpaperLibrary, type AppInfo, type AccountSession, type SendCodeResult, type CodeLoginOutcome, type UsernameCheck, type LoginResult } from "../bridge.ts";
+import { desktop, defaults, invoke, listen, toAccountError, type AiConfigView, type Settings, type WallpaperEntry, type WallpaperLibrary, type AppInfo, type AccountSession, type SendCodeResult, type CodeLoginOutcome, type UsernameCheck, type SignupMethods, type LoginResult } from "../bridge.ts";
 import type { WebsiteStatus } from "./website-types.ts";
 import { loadBuiltinCatalog, readCatalog } from "../games/catalog.ts";
 import { loadBuiltinPacks, noPacks, readImported, readList } from "../effects/catalog.ts";
@@ -265,6 +265,10 @@ export function createControlStore(notify: ControlStore["notify"]): ControlStore
     async checkAccountUsername(username) {
       if (!desktop) return { available: true };
       return await accountInvoke<UsernameCheck>("check_account_username", { username });
+    },
+    async getSignupMethods() {
+      if (!desktop) return { email: true, phone: false };
+      return await invoke<SignupMethods>("get_signup_methods");
     },
     async logoutAccount() {
       if (!desktop) {

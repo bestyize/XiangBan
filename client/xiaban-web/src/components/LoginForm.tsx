@@ -45,9 +45,14 @@ export function LoginForm({ onDone, disabled = false, termsVersion, beforeSend }
   const [error, setError] = useState<string | null>(null)
   const [notice, setNotice] = useState<string | null>(null)
   const [availability, setAvailability] = useState<Availability>({ kind: 'idle' })
+  const [methods, setMethods] = useState<account.SignupMethods>({ email: true, phone: false })
   const registrationToken = useRef<string | null>(null)
   // 账号中心已经认可、但本站还没接受的登录结果：验证码和注册凭证只能用一次，重试换票时不能再要新的。
   const verified = useRef<AccountSession | null>(null)
+
+  useEffect(() => {
+    void account.getSignupMethods().then(setMethods)
+  }, [])
 
   useEffect(() => {
     if (cooldown <= 0) return
@@ -121,6 +126,7 @@ export function LoginForm({ onDone, disabled = false, termsVersion, beforeSend }
   }
 
   const sendCode = () => run(async () => {
+    if (mode === 'code' && !methods.phone && !identifier.includes('@')) throw new Error('暂未开放手机号注册，请使用邮箱')
     await beforeSend?.()
     await (mode === 'reset' ? account.sendResetCode(identifier.trim()) : account.sendLoginCode(identifier.trim()))
     setStep('verify')
@@ -205,19 +211,19 @@ export function LoginForm({ onDone, disabled = false, termsVersion, beforeSend }
           <label className="block">
             <span className="mb-1.5 block text-sm text-window/70">用户名</span>
             <input className={input} autoComplete="username" autoCapitalize="none" spellCheck={false} maxLength={20}
-              value={username} disabled={busy} placeholder="字母开头，4-20 位字母、数字或下划线"
+              value={username} disabled={busy} placeholder="中英文、数字、下划线，至少 2 个汉字或 3 个字母"
               onChange={(e) => { setUsername(e.target.value); setError(null) }} />
             <UsernameHint availability={availability} />
           </label>
         </>
       ) : (
         <label className="block">
-          <span className="mb-1.5 block text-sm text-window/70">{mode === 'password' ? '用户名 / 邮箱 / 手机号' : '邮箱或手机号'}</span>
+          <span className="mb-1.5 block text-sm text-window/70">{mode === 'password' ? '用户名 / 邮箱 / 手机号' : mode === 'code' && !methods.phone ? '邮箱' : '邮箱或手机号'}</span>
           <input className={input} autoComplete="username" autoCapitalize="none" spellCheck={false} value={identifier} disabled={busy || codeSent}
             placeholder={mode === 'password' ? '用户名、邮箱或手机号' : 'you@example.com'}
             onChange={(e) => { setIdentifier(e.target.value); setError(null) }} />
           {codeSent && (
-            <button type="button" className={`${link} mt-1.5`} disabled={busy} onClick={changeIdentifier}>填错了？换一个邮箱 / 手机号</button>
+            <button type="button" className={`${link} mt-1.5`} disabled={busy} onClick={changeIdentifier}>填错了？换一个{mode === 'code' && !methods.phone ? '邮箱' : '邮箱 / 手机号'}</button>
           )}
         </label>
       )}

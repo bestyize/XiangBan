@@ -24,6 +24,8 @@ const error = ref('')
 const notice = ref('')
 const cooldown = ref(0)
 const availability = ref<Availability>({ kind: 'idle' })
+const methods = ref({ email: true, phone: false })
+const emailOnly = computed(() => mode.value === 'code' && !methods.value.phone)
 let registrationToken: string | null = null
 let timer: ReturnType<typeof setInterval> | null = null
 let checkTimer: ReturnType<typeof setTimeout> | null = null
@@ -32,15 +34,19 @@ const codeSent = computed(() => step.value === 'verify')
 const codeValid = computed(() => /^\d{6}$/.test(code.value.trim()))
 const validId = computed(() => {
   const v = identifier.value.trim()
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v) || /^\+?\d{6,15}$/.test(v)
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v) || (!emailOnly.value && /^\+?\d{6,15}$/.test(v))
 })
 
 function usernameProblem(raw: string): string {
   const v = raw.trim()
   if (!v) return ''
-  if (!/^[A-Za-z]/.test(v)) return '用户名需以字母开头'
-  if (!/^[A-Za-z0-9_]+$/.test(v)) return '只能包含字母、数字和下划线'
-  if (v.length < 4 || v.length > 20) return '需为 4-20 个字符'
+  if (!/^[A-Za-z一-鿿]/.test(v)) return '用户名需以字母或汉字开头'
+  if (!/^[A-Za-z0-9_一-鿿]+$/.test(v)) return '只能包含字母、数字、下划线和汉字'
+  const han = (v.match(/[一-鿿]/g) ?? []).length
+  const letters = (v.match(/[A-Za-z]/g) ?? []).length
+  if (han > 0 ? han + letters < 2 : letters < 3) return '至少要有 2 个汉字或 3 个英文字母'
+  const width = [...v].reduce((n, c) => n + (/[一-鿿]/.test(c) ? 2 : 1), 0)
+  if (width > 20) return '最长 20 个字符，汉字算 2 个'
   return ''
 }
 
@@ -109,6 +115,7 @@ watch(
   () => session.loginOpen,
   open => {
     if (!open) return
+    void accountApi.signupMethods().then(value => { methods.value = value })
     switchMode('password')
     username.value = ''
     availability.value = { kind: 'idle' }
@@ -221,11 +228,11 @@ async function submit() {
     <form class="form" @submit.prevent="submit">
       <label v-if="step === 'setup'" class="field">
         <span>用户名</span>
-        <input v-model="username" class="input" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" maxlength="20" placeholder="字母开头，4-20 位字母、数字或下划线" />
+        <input v-model="username" class="input" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" maxlength="20" placeholder="中英文、数字、下划线，至少 2 个汉字或 3 个字母" />
         <small v-if="hint" class="hint" :class="{ bad: availability.kind === 'taken' || availability.kind === 'invalid' }" role="status">{{ hint }}</small>
       </label>
       <label v-else class="field">
-        <span>{{ mode === 'password' ? '用户名 / 邮箱 / 手机号' : '邮箱或手机号' }}</span>
+        <span>{{ mode === 'password' ? '用户名 / 邮箱 / 手机号' : emailOnly ? '邮箱' : '邮箱或手机号' }}</span>
         <input
           v-model="identifier"
           class="input"
@@ -236,8 +243,8 @@ async function submit() {
           :disabled="codeSent"
           :placeholder="mode === 'password' ? '用户名、邮箱或手机号' : 'name@example.com'"
         />
-        <small v-if="mode !== 'password' && !codeSent && identifier.trim() && !validId" class="hint">验证码只能发到完整的邮箱或手机号。</small>
-        <button v-if="codeSent" type="button" class="link start" :disabled="busy" @click="changeIdentifier">填错了？换一个邮箱 / 手机号</button>
+        <small v-if="mode !== 'password' && !codeSent && identifier.trim() && !validId" class="hint">{{ emailOnly ? '暂未开放手机号注册，请填写完整的邮箱。' : '验证码只能发到完整的邮箱或手机号。' }}</small>
+        <button v-if="codeSent" type="button" class="link start" :disabled="busy" @click="changeIdentifier">填错了？换一个{{ emailOnly ? '邮箱' : '邮箱 / 手机号' }}</button>
       </label>
 
       <label v-if="mode !== 'password' && codeSent" class="field">

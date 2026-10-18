@@ -44,6 +44,13 @@ pub fn authorization(secret_id: &str, secret_key: &str, service: &str, host: &st
 }
 
 impl TencentSender {
+    pub fn can_send(&self, kind: crate::identifier::Kind) -> bool {
+        match kind {
+            crate::identifier::Kind::Phone => self.sms.is_some(),
+            crate::identifier::Kind::Email => self.ses.is_some(),
+        }
+    }
+
     pub fn new(config: &TencentConfig) -> Result<Self, AppError> {
         if config.secret_id.is_empty() || config.secret_key.is_empty() {
             return Err(AppError::Internal("ACCOUNT_SENDER=tencent 需要 TENCENT_SECRET_ID / TENCENT_SECRET_KEY".into()));

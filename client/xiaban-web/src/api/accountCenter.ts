@@ -66,6 +66,15 @@ export const register = (registrationToken: string, username: string, password: 
 export const resetPassword = (identifier: string, code: string, newPassword: string) =>
   call('POST', '/api/auth/password/reset', { identifier, code, new_password: newPassword })
 
+export interface SignupMethods {
+  email: boolean
+  phone: boolean
+}
+
+/** 账号中心当前开放哪些注册方式；取不到就按只开邮箱处理。 */
+export const getSignupMethods = (): Promise<SignupMethods> =>
+  call<SignupMethods>('GET', '/api/auth/methods').catch(() => ({ email: true, phone: false }))
+
 export const checkUsername = (username: string) =>
   call<{ available: boolean; message: string | null }>('GET', `/api/auth/username/available?username=${encodeURIComponent(username)}`)
 

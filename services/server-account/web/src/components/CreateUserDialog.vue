@@ -16,7 +16,7 @@ async function submit() {
     <form class="card create-dialog" role="dialog" aria-modal="true" aria-labelledby="create-title" @submit.prevent="submit">
       <h3 id="create-title">创建用户</h3>
       <p class="muted">使用用户名和密码登录。邮箱、手机号暂不绑定，用户可登录后自行验证绑定。</p>
-      <label class="field"><span>用户名（4–20 位，以字母开头）</span><input v-model="form.username" class="input" required minlength="4" maxlength="20" pattern="[A-Za-z][A-Za-z0-9_]{3,19}" autocomplete="off" /></label>
+      <label class="field"><span>用户名（至少 2 个汉字或 3 个字母，最长 20，汉字算 2）</span><input v-model="form.username" class="input" required maxlength="20" pattern="[A-Za-z一-鿿][A-Za-z0-9_一-鿿]*" autocomplete="off" /></label>
       <label class="field"><span>初始密码（8–128 位）</span><input v-model="form.password" class="input" type="password" required minlength="8" maxlength="128" autocomplete="new-password" /></label>
       <label class="field"><span>头像地址（选填）</span><input v-model="form.avatar_url" class="input" type="url" placeholder="https://…" /></label>
       <p v-if="error" class="error" role="alert">{{ error }}</p>

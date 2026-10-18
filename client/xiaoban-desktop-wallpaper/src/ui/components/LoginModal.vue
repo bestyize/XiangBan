@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { KeyRound, Mail, ShieldCheck, UserRound, X, Loader2 } from "lucide-vue-next";
 import { toAccountError } from "../../bridge.ts";
+import type { SignupMethods } from "../../bridge.ts";
 import type { ControlStore } from "../control-types.ts";
 
 const props = defineProps<{
@@ -25,6 +26,8 @@ const errorMessage = ref("");
 const noticeMessage = ref("");
 const countdown = ref(0);
 const availability = ref<Availability>({ kind: "idle" });
+const methods = ref<SignupMethods>({ email: true, phone: false });
+const emailOnly = computed(() => mode.value === "code" && !methods.value.phone);
 let registrationToken: string | null = null;
 let timer: ReturnType<typeof setInterval> | null = null;
 let checkTimer: ReturnType<typeof setTimeout> | null = null;
@@ -38,9 +41,13 @@ const codeValid = computed(() => /^\d{6}$/.test(code.value.trim()));
 function usernameProblem(raw: string): string {
   const value = raw.trim();
   if (!value) return "";
-  if (!/^[A-Za-z]/.test(value)) return "用户名需以字母开头";
-  if (!/^[A-Za-z0-9_]+$/.test(value)) return "只能包含字母、数字和下划线";
-  if (value.length < 4 || value.length > 20) return "需为 4-20 个字符";
+  if (!/^[A-Za-z一-鿿]/.test(value)) return "用户名需以字母或汉字开头";
+  if (!/^[A-Za-z0-9_一-鿿]+$/.test(value)) return "只能包含字母、数字、下划线和汉字";
+  const han = (value.match(/[一-鿿]/g) ?? []).length;
+  const letters = (value.match(/[A-Za-z]/g) ?? []).length;
+  if (han > 0 ? han + letters < 2 : letters < 3) return "至少要有 2 个汉字或 3 个英文字母";
+  const width = [...value].reduce((n, c) => n + (/[一-鿿]/.test(c) ? 2 : 1), 0);
+  if (width > 20) return "最长 20 个字符，汉字算 2 个";
   return "";
 }
 
@@ -137,6 +144,10 @@ watch([username, step], () => {
 async function handleSendCode() {
   if (!identifier.value.trim() || countdown.value > 0 || sending.value) return;
   errorMessage.value = "";
+  if (emailOnly.value && !identifier.value.includes("@")) {
+    errorMessage.value = "暂未开放手机号注册，请使用邮箱";
+    return;
+  }
   sending.value = true;
   try {
     const res = await props.store.sendAccountCode(identifier.value.trim(), mode.value === "reset" ? "reset_password" : "login");
@@ -201,6 +212,14 @@ async function handleSubmit() {
   }
 }
 
+function loadMethods() {
+  void props.store.getSignupMethods().then((value) => (methods.value = value), () => undefined);
+}
+
+onMounted(() => {
+  if (props.store.showLoginModal) loadMethods();
+});
+
 function onKeyDown(e: KeyboardEvent) {
   if (e.key === "Escape" && props.store.showLoginModal) {
     close();
@@ -213,6 +232,7 @@ watch(
   () => props.store.showLoginModal,
   async (show) => {
     if (show) {
+      loadMethods();
       mode.value = "password";
       step.value = "identify";
       errorMessage.value = "";
@@ -295,7 +315,7 @@ onBeforeUnmount(() => {
                   v-model="username"
                   type="text"
                   data-testid="login-username-input"
-                  placeholder="字母开头，4-20 位字母、数字或下划线"
+                  placeholder="中英文、数字、下划线，至少 2 个汉字或 3 个字母"
                   maxlength="20"
                   autocomplete="username"
                   autocapitalize="none"
@@ -306,7 +326,7 @@ onBeforeUnmount(() => {
               <small v-if="hint" class="field-hint" :class="{ bad: availability.kind === 'taken' || availability.kind === 'invalid' }" data-testid="username-hint">{{ hint }}</small>
             </div>
             <div v-else class="input-group">
-              <label for="login-identifier">{{ mode === "password" ? "用户名 / 邮箱 / 手机号" : "邮箱或手机号" }}</label>
+              <label for="login-identifier">{{ mode === "password" ? "用户名 / 邮箱 / 手机号" : emailOnly ? "邮箱" : "邮箱或手机号" }}</label>
               <div class="input-wrapper">
                 <Mail :size="18" class="input-icon" />
                 <input
@@ -323,7 +343,7 @@ onBeforeUnmount(() => {
                 />
               </div>
               <button v-if="codeSent" type="button" class="link-button" data-testid="change-identifier" :disabled="submitting" @click="changeIdentifier">
-                填错了？换一个邮箱 / 手机号
+                填错了？换一个{{ emailOnly ? "邮箱" : "邮箱 / 手机号" }}
               </button>
             </div>
 

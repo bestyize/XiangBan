@@ -32,6 +32,7 @@ function createStore() {
     registerAccount: vi.fn().mockResolvedValue({ isNewUser: true, session: session("Brand_New") }),
     resetAccountPassword: vi.fn().mockResolvedValue(undefined),
     checkAccountUsername: vi.fn().mockResolvedValue({ available: true }),
+    getSignupMethods: vi.fn().mockResolvedValue({ email: true, phone: false }),
     logoutAccount: vi.fn().mockResolvedValue(undefined),
     notify: vi.fn(),
   }) as unknown as ControlStore;
@@ -154,7 +155,7 @@ describe("LoginModal component", () => {
     expect(q<HTMLButtonElement>("login-submit-btn")?.disabled).toBe(true);
 
     await type("login-username-input", "1bad");
-    expect(q("username-hint")?.textContent).toContain("字母开头");
+    expect(q("username-hint")?.textContent).toContain("字母或汉字开头");
     expect(store.checkAccountUsername).not.toHaveBeenCalled();
 
     await type("login-username-input", "Brand_New");
@@ -171,6 +172,34 @@ describe("LoginModal component", () => {
     expect(store.registerAccount).toHaveBeenCalledWith("reg-token", "Brand_New", "pass-word-123");
     expect(store.notify).toHaveBeenCalledWith("注册成功，欢迎你，Brand_New", "success");
     expect(store.closeLogin).toHaveBeenCalled();
+  });
+
+  it("offers email only for code sign-up until the account center opens phone numbers", async () => {
+    await open();
+    await click("tab-code");
+    expect(q("login-identifier-input")?.getAttribute("placeholder")).toBe("name@example.com");
+    expect(document.body.querySelector('label[for="login-identifier"]')?.textContent).toBe("邮箱");
+
+    await type("login-identifier-input", "13800138000");
+    await click("send-code-btn");
+    expect(q("login-error-msg")?.textContent).toContain("暂未开放手机号注册");
+  });
+
+  it("keeps phone numbers for password login and shows them for code sign-up when opened", async () => {
+    const store = createStore();
+    vi.mocked(store.getSignupMethods).mockResolvedValue({ email: true, phone: true });
+    await open(store);
+    expect(document.body.querySelector('label[for="login-identifier"]')?.textContent).toContain("手机号");
+    await click("tab-code");
+    expect(document.body.querySelector('label[for="login-identifier"]')?.textContent).toBe("邮箱或手机号");
+  });
+
+  it("falls back to email only when the methods cannot be read", async () => {
+    const store = createStore();
+    vi.mocked(store.getSignupMethods).mockRejectedValue(new Error("offline"));
+    await open(store);
+    await click("tab-code");
+    expect(document.body.querySelector('label[for="login-identifier"]')?.textContent).toBe("邮箱");
   });
 
   it("blocks a username the server says is taken", async () => {

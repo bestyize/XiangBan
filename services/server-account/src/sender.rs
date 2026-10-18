@@ -174,6 +174,18 @@ impl Sender {
         }
     }
 
+    /// 当前发信通道能不能给这类标识发验证码。
+    pub fn can_send(&self, kind: Kind) -> bool {
+        let guard = self.inner.read().unwrap();
+        match &*guard {
+            SenderKind::Console => true,
+            SenderKind::Tencent(t) => t.can_send(kind),
+            SenderKind::Smtp(_) => kind == Kind::Email,
+            #[cfg(test)]
+            SenderKind::Capture(_) => true,
+        }
+    }
+
     pub fn get_smtp_config(&self) -> Option<SmtpConfig> {
         let guard = self.inner.read().unwrap();
         match &*guard {

@@ -11,6 +11,7 @@ import org.junit.rules.TemporaryFolder
 import xyz.xiaban.wallpaper.data.AccountException
 import xyz.xiaban.wallpaper.data.AccountParser
 import xyz.xiaban.wallpaper.data.AccountRules
+import xyz.xiaban.wallpaper.data.SignupMethods
 import xyz.xiaban.wallpaper.data.AccountSession
 import xyz.xiaban.wallpaper.data.AccountStore
 import xyz.xiaban.wallpaper.data.AccountUser
@@ -118,6 +119,20 @@ class AccountParserTest {
     }
 }
 
+class SignupMethodsParserTest {
+    @Test
+    fun readsTheOpenMethods() {
+        assertEquals(SignupMethods(email = true, phone = true), AccountParser.signupMethods("""{"email":true,"phone":true}"""))
+        assertEquals(SignupMethods(email = true, phone = false), AccountParser.signupMethods("""{"email":true,"phone":false}"""))
+    }
+
+    @Test
+    fun fallsBackToEmailOnlyWhenTheAnswerIsNotJson() {
+        assertEquals(SignupMethods.EMAIL_ONLY, AccountParser.signupMethods("<html>bad gateway</html>"))
+        assertEquals(SignupMethods.EMAIL_ONLY, AccountParser.signupMethods("{}"))
+    }
+}
+
 class AccountRulesTest {
     private fun session(expiresAt: Long) = AccountSession("a", "r", expiresAt, AccountUser("u", "Alice_01", null))
 
@@ -133,13 +148,14 @@ class AccountRulesTest {
 
     @Test
     fun usernameRulesMatchTheAccountCenter() {
-        for (ok in listOf("abcd", "Alice_01", "a2345678901234567890")) assertNull(ok, AccountRules.usernameError(ok))
+        for (ok in listOf("abc", "Alice_01", "abc45678901234567890", "张三", "张a", "用户名abcd", "用户名用户名用户名用")) assertNull(ok, AccountRules.usernameError(ok))
         assertNull(AccountRules.usernameError("  "))
-        assertEquals("用户名需以字母开头", AccountRules.usernameError("1abc"))
-        assertEquals("用户名需以字母开头", AccountRules.usernameError("用户名abcd"))
-        assertEquals("只能包含字母、数字和下划线", AccountRules.usernameError("ab-cd"))
-        assertEquals("需为 4-20 个字符", AccountRules.usernameError("abc"))
-        assertEquals("需为 4-20 个字符", AccountRules.usernameError("a23456789012345678901"))
+        assertEquals("用户名需以字母或汉字开头", AccountRules.usernameError("1abc"))
+        assertEquals("只能包含字母、数字、下划线和汉字", AccountRules.usernameError("ab-cd"))
+        assertEquals("只能包含字母、数字、下划线和汉字", AccountRules.usernameError("张三！"))
+        for (short in listOf("ab", "ab1", "用", "用_")) assertEquals("至少要有 2 个汉字或 3 个英文字母", AccountRules.usernameError(short))
+        assertEquals("最长 20 个字符，汉字算 2 个", AccountRules.usernameError("abc456789012345678901"))
+        assertEquals("最长 20 个字符，汉字算 2 个", AccountRules.usernameError("用户名用户名用户名用户"))
     }
 
     @Test

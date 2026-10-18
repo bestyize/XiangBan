@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue';
 import { api, errorMessage } from '../api';
-import type { SmtpConfig } from '../types';
+import type { SignupMethods, SmtpConfig } from '../types';
 
 const loading = ref(true);
 const saving = ref(false);
@@ -19,6 +19,23 @@ const smtp = reactive<SmtpConfig>({
   from_name: '相伴',
   from_email: '',
 });
+
+const signup = reactive<SignupMethods>({ email: true, phone: false });
+const savingSignup = ref(false);
+const signupMessage = ref<{ type: 'ok' | 'error'; text: string } | null>(null);
+
+async function saveSignup() {
+  savingSignup.value = true;
+  signupMessage.value = null;
+  try {
+    Object.assign(signup, await api.updateSignupMethods({ email: signup.email, phone: signup.phone }));
+    signupMessage.value = { type: 'ok', text: '注册方式已保存，各登录页刷新后生效' };
+  } catch (err) {
+    signupMessage.value = { type: 'error', text: errorMessage(err) };
+  } finally {
+    savingSignup.value = false;
+  }
+}
 
 const testRecipient = ref('');
 const showTestModal = ref(false);
@@ -42,7 +59,8 @@ async function load() {
   loading.value = true;
   message.value = null;
   try {
-    const data = await api.getSender();
+    const [data, methods] = await Promise.all([api.getSender(), api.getSignupMethods()]);
+    Object.assign(signup, methods);
     provider.value = data.provider;
     if (data.smtp) {
       smtp.host = data.smtp.host || '';
@@ -227,6 +245,22 @@ onMounted(load);
       </div>
     </div>
 
+    <div v-if="!loading" class="card form-card" style="margin-top: 16px;">
+      <div class="section-title">新用户注册方式</div>
+      <p class="muted" style="margin: 0 0 12px;">
+        只控制新用户用哪种方式注册，以及已有账号新绑定哪种方式；已经注册的账号照常登录、重置密码。
+        开放某种方式前，上面的发信通道必须能发送对应的验证码（手机号需要腾讯云短信）。
+      </p>
+      <div v-if="signupMessage" class="banner" :class="signupMessage.type">{{ signupMessage.text }}</div>
+      <label class="check-row"><input v-model="signup.email" type="checkbox" /> 邮箱验证码注册</label>
+      <label class="check-row"><input v-model="signup.phone" type="checkbox" /> 手机号验证码注册</label>
+      <div style="margin-top: 12px;">
+        <button type="button" class="btn primary" :disabled="savingSignup" @click="saveSignup">
+          {{ savingSignup ? '保存中…' : '保存注册方式' }}
+        </button>
+      </div>
+    </div>
+
     <!-- 测试发信弹窗 -->
     <div v-if="showTestModal" class="modal-mask">
       <div class="card modal-box">
@@ -257,6 +291,7 @@ onMounted(load);
 
 <style scoped>
 .sender-page { max-width: 860px; }
+.check-row { display: flex; align-items: center; gap: 8px; padding: 6px 0; cursor: pointer; }
 .head-actions { display: flex; gap: 8px; }
 .banner { padding: 10px 14px; border-radius: var(--radius); margin-bottom: 16px; font-size: 13.5px; }
 .banner.ok { background: var(--ok-bg); color: var(--ok); }

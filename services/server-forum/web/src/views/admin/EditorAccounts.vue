@@ -22,7 +22,7 @@ onMounted(() => act(load, ''))
   <p v-if="!enabled" class="muted">账号创建通道尚未配置，可先在统一账号中心创建用户并登录论坛，再绑定为编辑账号。配置方式见仓库论坛 README。</p>
   <form v-if="creating" class="panel editor-form" @submit.prevent="create">
     <h2>创建编辑账号</h2>
-    <label>登录用户名<input v-model="form.username" class="input" required minlength="4" maxlength="20" pattern="[A-Za-z][A-Za-z0-9_]{3,19}" autocomplete="off" placeholder="例如 ForumEditor" /></label>
+    <label>登录用户名<input v-model="form.username" class="input" required maxlength="20" pattern="[A-Za-z一-鿿][A-Za-z0-9_一-鿿]*" autocomplete="off" placeholder="例如 ForumEditor" /></label>
     <label>初始密码<input v-model="form.password" class="input" type="password" required minlength="8" maxlength="128" autocomplete="new-password" /></label>
     <label>论坛展示名<input v-model="form.nickname" class="input" required maxlength="24" placeholder="例如 超级小伴编辑部" /></label>
     <label>头像地址（选填）<input v-model="form.avatar_url" class="input" type="url" placeholder="https://…" /></label>

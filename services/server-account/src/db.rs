@@ -104,6 +104,12 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS username TEXT NOT NULL;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS username_key TEXT NOT NULL;
 ALTER TABLE users DROP COLUMN IF EXISTS nickname;
 CREATE UNIQUE INDEX IF NOT EXISTS users_username_key_idx ON users (username_key);
+
+-- 账号 ID：建号时由序列分配的数字，从 13586 起，对外以字符串展示，之后任何接口都不会修改它。
+-- 旧库已有用户时，ADD COLUMN 会按物理顺序给他们补号。
+CREATE SEQUENCE IF NOT EXISTS user_account_id_seq START WITH 13586 MINVALUE 13586;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS account_id BIGINT NOT NULL DEFAULT nextval('user_account_id_seq');
+CREATE UNIQUE INDEX IF NOT EXISTS users_account_id_idx ON users (account_id);
 "#;
 
 /// `schema` 仅供测试隔离使用：连接级 search_path。

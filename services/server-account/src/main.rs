@@ -13,6 +13,7 @@ mod ratelimit;
 mod registration;
 mod sender;
 mod sessions;
+mod signup_methods;
 mod state;
 mod tencent;
 mod tokens;
@@ -46,6 +47,7 @@ pub fn build_router(state: AppState) -> Router {
         .route("/auth/code/login", post(auth::login_with_code))
         .route("/auth/register", post(auth::register))
         .route("/auth/username/available", get(auth::username_available))
+        .route("/auth/methods", get(auth::signup_methods))
         .route("/auth/password/login", post(auth::login_with_password))
         .route("/auth/password/reset", post(auth::reset_password))
         .route("/auth/refresh", post(auth::refresh))
@@ -68,6 +70,7 @@ pub fn build_router(state: AppState) -> Router {
         .route("/admin/clients", get(admin::list_clients).post(admin::create_client))
         .route("/admin/clients/{client_id}", patch(admin::update_client))
         .route("/admin/audit", get(admin::audit_log))
+        .route("/admin/signup-methods", get(admin::get_signup_methods).put(admin::update_signup_methods))
         .route("/admin/sender", get(admin::get_sender).put(admin::update_sender))
         .route("/admin/sender/test", post(admin::test_sender));
 
