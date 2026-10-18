@@ -4,7 +4,7 @@ export const lightTokens = {
   appBg: '#F6F6F7', sidebarBg: '#FFFFFF', surface: '#FFFFFF', surfaceAlt: '#F5F5F6',
   border: '#EBEBED', textPrimary: '#1F1F22', textSecondary: '#66666B', textTertiary: '#9A9AA0', accent: '#1FB871',
   scrollbar: '#D6D6DA', shadowHover: 'rgba(31,31,34,.16)', shadowPop: 'rgba(31,31,34,.24)',
-  titlebarHeight: '44px', sidebarWidth: '216px', sidebarCollapsed: '72px', pageInset: '32px', pageTop: '28px',
+  titlebarHeight: '44px', sidebarWidth: '170px', sidebarCollapsed: '64px', pageInset: '32px', pageTop: '28px',
   sectionGap: '24px', cardGap: '20px', radiusTag: '8px', radiusInput: '12px', radiusButton: '12px',
   radiusWallpaper: '16px', radiusCard: '18px', radiusBanner: '20px',
   fontFamily: '"Microsoft YaHei UI", "PingFang SC", "Noto Sans CJK SC", sans-serif',

@@ -792,6 +792,7 @@ fn main() {
             if !std::env::args().any(|argument| argument == "--autostart") {
                 present_control(app.handle()).map_err(std::io::Error::other)?;
             }
+            account::activated(app.handle());
             for (label, win) in app.handle().webview_windows() {
                 eprintln!(">>> WebviewWindow label={label}, visible={:?}, size={:?}, pos={:?}", win.is_visible(), win.outer_size(), win.outer_position());
             }
@@ -840,13 +841,16 @@ fn main() {
             Ok(())
         })
         .on_window_event(|window, event| {
+            if matches!(window.label(), "control" | "assistant") && matches!(event, tauri::WindowEvent::Focused(true)) {
+                account::activated(window.app_handle());
+            }
             if window.label() == float_assistant::LABEL && matches!(event, tauri::WindowEvent::Moved(_)) { float_assistant::moved(window.app_handle()); }
             if window.label()=="care" && matches!(event,tauri::WindowEvent::Destroyed){reminders::window_closed(window.app_handle());}
             if window.label()=="games" {
                 if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                     api.prevent_close();
                     // Ask the trusted host to flush pending saves before requesting native close.
-                    if window.app_handle().get_webview_window("games").is_none_or(|webview|webview.eval("{const button=document.getElementById('games-close');if(button)button.click();else window.__TAURI__?.core.invoke('close_game_space',{hostToken:window.__XIAOBAN_GAME_TOKEN__});}".to_string()).is_err()) {
+                    if window.app_handle().get_webview_window("games").is_none_or(|webview|webview.eval("window.dispatchEvent(new Event('game-space-close'));".to_string()).is_err()) {
                         let handle=window.app_handle().clone(); tauri::async_runtime::spawn(async move { let _=games::close(&handle).await; });
                     }
                 }
@@ -877,6 +881,7 @@ fn main() {
         }
         #[cfg(target_os = "macos")]
         if matches!(_event, tauri::RunEvent::Reopen { .. }) {
+            account::activated(_handle);
             // A visible wallpaper also makes has_visible_windows true. Dock
             // clicks must restore the settings panel regardless of that flag.
             _handle

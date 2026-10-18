@@ -1,8 +1,10 @@
 // @vitest-environment happy-dom
 import { mount, flushPromises } from '@vue/test-utils';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import ControlShell from './ControlShell.vue';
-import { invoke } from '../bridge.ts';
+import { invoke, listen } from '../bridge.ts';
+import { NModal } from 'naive-ui';
+import LoginModal from './components/LoginModal.vue';
 
 vi.mock('naive-ui', async (importOriginal) => {
   const actual = await importOriginal<typeof import('naive-ui')>();
@@ -35,6 +37,76 @@ describe('ControlShell sidebar', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     (window as unknown as { __TAURI__?: unknown }).__TAURI__ = {};
+  });
+
+  afterEach(() => { document.body.innerHTML = ''; });
+
+  it('uses the brand icon to open login without a separate account card', async () => {
+    const wrapper = mount(ControlShell, { attachTo: document.body });
+    await flushPromises();
+    const entry = wrapper.get('[data-testid="account-entry"]');
+    expect(entry.attributes('aria-label')).toBe('登录 / 注册小伴账号');
+    expect(wrapper.find('.sidebar-account-box').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="sidebar-login-btn"]').exists()).toBe(false);
+    await entry.trigger('click');
+    await flushPromises();
+    expect(wrapper.findComponent(LoginModal).props('store').showLoginModal).toBe(true);
+    await wrapper.get('[aria-label="展开导航"]').trigger('click');
+    expect(wrapper.get('.brand-copy').text()).toContain('小伴桌面');
+    expect(wrapper.text()).not.toContain('你的桌面生活空间');
+    wrapper.unmount();
+  });
+
+  it('shows account details and signs out through the modal', async () => {
+    const wrapper = mount(ControlShell, { attachTo: document.body });
+    await flushPromises();
+    const store = wrapper.findComponent(LoginModal).props('store');
+    store.account = { accessToken: 'secret-access', refreshToken: 'secret-refresh', expiresAt: 0,
+      user: { uid: 'test-account-id', username: '用户名'.repeat(20), avatarUrl: null } };
+    await flushPromises();
+    expect(wrapper.get('[data-testid="account-entry"]').text()).toBe('用');
+    await wrapper.get('[data-testid="account-entry"]').trigger('click');
+    await flushPromises();
+    expect(document.querySelector('[data-testid="account-username"]')?.textContent).toBe(store.account.user.username);
+    expect(document.querySelector('[data-testid="account-uid"]')?.textContent).toBe('test-account-id');
+    expect(document.body.textContent).not.toContain('secret-access');
+    expect(document.body.textContent).not.toContain('secret-refresh');
+    const logout = vi.spyOn(store, 'logoutAccount').mockImplementation(async () => { store.account = null; });
+    (document.querySelector('[data-testid="account-logout"]') as HTMLButtonElement).click();
+    await flushPromises();
+    expect(logout).toHaveBeenCalledTimes(1);
+    expect(wrapper.findComponent(NModal).props('show')).toBe(false);
+    expect(wrapper.get('[data-testid="account-entry"]').attributes('aria-label')).toBe('登录 / 注册小伴账号');
+    wrapper.unmount();
+  });
+
+  it('keeps details open on logout failure, prevents duplicate requests, and closes on external sign-out', async () => {
+    const wrapper = mount(ControlShell, { attachTo: document.body });
+    await flushPromises();
+    const store = wrapper.findComponent(LoginModal).props('store');
+    store.account = { accessToken: 'a', refreshToken: 'r', expiresAt: 0,
+      user: { uid: 'u', username: 'Alice', avatarUrl: 'https://example.com/avatar.png' } };
+    await flushPromises();
+    expect(wrapper.get('.brand-avatar').attributes('src')).toBe('https://example.com/avatar.png');
+    await wrapper.get('[data-testid="account-entry"]').trigger('click');
+    await flushPromises();
+    let reject!: (reason: Error) => void;
+    const logout = vi.spyOn(store, 'logoutAccount').mockImplementation(() => new Promise<void>((_, fail) => { reject = fail; }));
+    const button = document.querySelector('[data-testid="account-logout"]') as HTMLButtonElement;
+    button.click(); button.click();
+    await flushPromises();
+    expect(logout).toHaveBeenCalledTimes(1);
+    expect(button.disabled).toBe(true);
+    reject(new Error('network error'));
+    await flushPromises();
+    expect(wrapper.findComponent(NModal).props('show')).toBe(true);
+    expect(button.disabled).toBe(false);
+    const callback = vi.mocked(listen).mock.calls.find(([name]) => name === 'account-changed')?.[1];
+    expect(callback).toBeDefined();
+    callback!(null as never);
+    await flushPromises();
+    expect(wrapper.findComponent(NModal).props('show')).toBe(false);
+    wrapper.unmount();
   });
 
   it('renders official website button above settings-and-about button and triggers invoke', async () => {

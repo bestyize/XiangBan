@@ -10,7 +10,7 @@ export async function mountGameSpace() {
   applyUiTokens();
   document.body.className = 'game-space';
   const app = document.querySelector<HTMLElement>('#app')!;
-  app.innerHTML = '<main class="games-shell"><header class="games-toolbar"><button id="games-back" title="返回游戏面板" aria-label="返回游戏面板" hidden>←</button><div><span id="games-status" role="status">正在准备游戏目录…</span></div><button id="games-close" title="退出游戏空间（Esc）" aria-label="退出游戏空间">×</button></header><section id="games-hub"><div class="games-intro"><p>给自己一小段轻松时光</p><h1>今天想玩点什么？</h1><span>本地小游戏，断网也能玩。需要存档的游戏，进度保存在这台电脑。</span></div><div id="games-cards" class="games-grid"></div></section><section id="games-player" hidden><div id="game-stage"></div></section><div id="games-failure" class="games-failure" hidden><h2>游戏需要重试</h2><p id="games-error"></p><button id="games-retry">重试</button><button id="games-cancel">返回游戏面板</button><button id="games-force-close" hidden>放弃未保存进度并退出</button></div></main>';
+  app.innerHTML = '<main class="games-shell"><header class="games-toolbar"><div><span id="games-status" role="status">正在准备游戏目录…</span></div></header><section id="games-hub"><div class="games-intro"><p>给自己一小段轻松时光</p><h1>今天想玩点什么？</h1><span>本地小游戏，断网也能玩。需要存档的游戏，进度保存在这台电脑。</span></div><div id="games-cards" class="games-grid"></div></section><section id="games-player" hidden><div id="game-stage"></div></section><div id="games-failure" class="games-failure" hidden><h2>游戏需要重试</h2><p id="games-error"></p><button id="games-retry">重试</button><button id="games-cancel">返回游戏面板</button><button id="games-force-close" hidden>放弃未保存进度并退出</button></div></main>';
   const node = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
   let manifests: GameManifest[] = [];
   let session: GameSession | null = null;
@@ -47,13 +47,13 @@ export async function mountGameSpace() {
   const destroyPlayer = () => { generation++; clearTimeout(timer); session = null; frame?.remove(); frame = null; node('game-stage').replaceChildren(); };
   const hub = async () => {
     if (!await flush()) { node<HTMLButtonElement>('games-retry').textContent = '重试保存'; node('games-error').textContent = saveFailure; node('games-failure').hidden = false; node('games-force-close').hidden = false; return; }
-    destroyPlayer(); current = null; node('games-player').hidden = true; node('games-hub').hidden = false; node('games-back').hidden = true; node('games-failure').hidden = true; status('选择游戏 · Esc 退出');
+    destroyPlayer(); current = null; node('games-player').hidden = true; node('games-hub').hidden = false; node('games-failure').hidden = true; status('选择游戏 · Esc 退出');
   };
   const fail = (error: unknown) => { clearTimeout(timer); frame?.remove(); frame = null; session = null; node('games-error').textContent = String(error); node('games-failure').hidden = false; status('加载失败，可重试或退出'); };
   const launch = async (game: GameManifest) => {
     if (!await flush()) return;
     destroyPlayer(); current = game; const token = generation;
-    node('games-hub').hidden = true; node('games-player').hidden = false; node('games-back').hidden = false; node('games-failure').hidden = true; node('games-force-close').hidden = true; node<HTMLButtonElement>('games-retry').textContent = '重试'; status(`正在准备 ${game.name}…`);
+    node('games-hub').hidden = true; node('games-player').hidden = false; node('games-failure').hidden = true; node('games-force-close').hidden = true; node<HTMLButtonElement>('games-retry').textContent = '重试'; status(`正在准备 ${game.name}…`);
     try {
       const save = game.save ? await readSave(game.id) : null;
       if (generation !== token) return;
@@ -82,7 +82,7 @@ export async function mountGameSpace() {
   };
   window.addEventListener('message', event => {
     const message = session?.accept(event); if (!message) return;
-    if (message.type === 'game.ready') { clearTimeout(timer); status(`${current?.name} · Esc 返回面板`); }
+    if (message.type === 'game.ready') { clearTimeout(timer); status(current?.name ?? '游戏已就绪'); }
     if (message.type === 'game.exit') void hub();
     if (message.type === 'game.save' && current?.save) { pendingSave = { id: current.id, data: message.data as Record<string, unknown> }; void flush(); }
     if (message.type === 'game.result') status(`${current?.name} · 本局 ${session?.record?.score ?? 0} 分`);
@@ -90,9 +90,8 @@ export async function mountGameSpace() {
     // Desktop has no account wallet or website sharing. The shipped adapter hides those controls.
     if (message.type === 'game.wallet') frame?.contentWindow?.postMessage({ channel:'xiaban.game-host', protocol:1, type:'host.wallet', nonce:session!.nonce, requestId:message.requestId, error:'桌面版不使用账户糖果币' }, '*');
   });
-  window.addEventListener('keydown', e => { if (e.key === 'Escape') { e.preventDefault(); current ? void hub() : void close(); } });
-  node('games-back').onclick = () => { void hub(); };
-  node('games-close').onclick = () => { void close(); };
+  window.addEventListener('keydown', e => { if (e.key === 'Escape' && !current) { e.preventDefault(); void close(); } });
+  window.addEventListener('game-space-close', () => { void close(); });
   node('games-cancel').onclick = () => { void hub(); };
   node('games-force-close').onclick = () => { destroyPlayer(); pendingSave = null; saveFailure = null; void close(); };
   node('games-retry').onclick = () => { if (saveFailure) void flush().then(ok => { if (ok) void hub(); }); else if (current) void launch(current); else void loadCatalog(); };

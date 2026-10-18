@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { computed, defineAsyncComponent, onMounted, onBeforeUnmount, ref } from 'vue';
-import { NAlert, NButton, NSkeleton, NTag, useMessage } from 'naive-ui';
-import { MessageCircle, AudioLines, Images, Sparkles, Hand, Bot, Gamepad2, Bell, Settings2, PanelLeftClose, PanelLeftOpen, ArrowUpRight, Globe, User, LogIn, LogOut } from 'lucide-vue-next';
+import { computed, defineAsyncComponent, onMounted, onBeforeUnmount, ref, watch } from 'vue';
+import { NAlert, NButton, NModal, NSkeleton, useMessage } from 'naive-ui';
+import { MessageCircle, AudioLines, Images, Sparkles, Hand, Bot, Gamepad2, Bell, Settings2, PanelLeftClose, PanelLeftOpen, ArrowUpRight, Globe, LogOut } from 'lucide-vue-next';
 import { invoke, listen } from '../bridge.ts';
 import { appearanceMode, publishAppearanceTo, reconcile } from './appearance.ts';
 import { createControlStore } from './control-store.ts';
@@ -47,12 +47,24 @@ async function openOfficialSite() {
     window.location.href = 'https://wallpaper.xiangban.xyz';
   }
 }
+const accountOpen = ref(false);
+const loggingOut = ref(false);
+function openAccount() {
+  if (store.account) accountOpen.value = true;
+  else store.openLogin();
+}
+watch(() => store.account, account => { if (!account) accountOpen.value = false; });
 async function handleLogout() {
+  if (loggingOut.value) return;
+  loggingOut.value = true;
   try {
     await store.logoutAccount();
+    accountOpen.value = false;
     store.notify('已退出当前账号', 'info');
   } catch (error) {
     store.notify(error, 'error');
+  } finally {
+    loggingOut.value = false;
   }
 }
 const manageWidgets = () => navigate('widgets');
@@ -106,30 +118,13 @@ onBeforeUnmount(() => { assistantListeners.splice(0).forEach(off => off()); stor
 <template>
   <div class="control-app" :class="{ 'is-collapsed': collapsed, 'is-wallpapers': store.page === 'wallpapers' }">
     <aside class="control-sidebar">
-      <div class="control-brand"><div class="control-brand-mark"><img src="/xiaoban.svg" alt="小伴"></div><div class="brand-copy"><strong>小伴桌面</strong><span>你的桌面生活空间</span></div></div>
-
-      <div class="sidebar-account-box">
-        <div v-if="store.account" class="account-profile-card" data-testid="sidebar-profile-card">
-          <div class="account-avatar">
-            <img v-if="store.account.user.avatarUrl" :src="store.account.user.avatarUrl" :alt="store.account.user.username" />
-            <span v-else>{{ (store.account.user.username || '伴')[0]?.toUpperCase() }}</span>
-          </div>
-          <div class="account-copy">
-            <strong>{{ store.account.user.username }}</strong>
-            <span>相伴账号</span>
-          </div>
-          <button type="button" class="account-logout-btn" data-testid="sidebar-logout-btn" title="退出账号" @click="handleLogout">
-            <LogOut :size="15" />
-          </button>
-        </div>
-        <button v-else type="button" class="account-login-card" data-testid="sidebar-login-btn" title="登录 / 注册小伴账号" @click="store.openLogin()">
-          <div class="account-avatar-placeholder"><User :size="16" /></div>
-          <div class="account-copy">
-            <strong>登录 / 注册</strong>
-            <span>同步壁纸与数据</span>
-          </div>
-          <LogIn :size="15" class="login-arrow" />
+      <div class="control-brand">
+        <button type="button" class="control-brand-mark" :class="{ 'is-signed-in': store.account }" data-testid="account-entry" :title="store.account ? '查看账号信息' : '登录 / 注册小伴账号'" :aria-label="store.account ? '查看账号信息' : '登录 / 注册小伴账号'" aria-haspopup="dialog" @click="openAccount">
+          <img v-if="store.account?.user.avatarUrl" class="brand-avatar" :src="store.account.user.avatarUrl" alt="" />
+          <span v-else-if="store.account">{{ Array.from(store.account.user.username)[0]?.toUpperCase() }}</span>
+          <img v-else src="/xiaoban.svg" alt="" />
         </button>
+        <div class="brand-copy"><strong>小伴桌面</strong></div>
       </div>
 
       <div class="sidebar-scroll">
@@ -150,6 +145,19 @@ onBeforeUnmount(() => { assistantListeners.splice(0).forEach(off => off()); stor
       </main>
       <footer class="control-statusbar"><span><span class="state-dot small"></span>{{ store.desktop ? (store.info.platform === 'windows' ? 'Windows 桌面已连接' : '桌面已连接') : '正在预览界面，桌面操作需在应用内使用' }}</span><span>{{ store.library.items.filter(item => item.installed).length }} 个本地壁纸</span></footer>
     </div>
+    <NModal v-model:show="accountOpen" preset="card" title="账号信息" style="width: 92vw; max-width: 380px;" data-testid="account-info-dialog">
+      <div v-if="store.account" class="account-info">
+        <div class="account-info-identity">
+          <div class="account-info-avatar">
+            <img v-if="store.account.user.avatarUrl" :src="store.account.user.avatarUrl" alt="" />
+            <span v-else>{{ Array.from(store.account.user.username)[0]?.toUpperCase() }}</span>
+          </div>
+          <div><strong data-testid="account-username">{{ store.account.user.username }}</strong><span>已登录小伴账号</span></div>
+        </div>
+        <dl><dt>账号 ID</dt><dd data-testid="account-uid">{{ store.account.user.uid }}</dd></dl>
+        <NButton block :loading="loggingOut" :disabled="loggingOut" data-testid="account-logout" @click="handleLogout"><template #icon><LogOut :size="16" /></template>退出登录</NButton>
+      </div>
+    </NModal>
     <LoginModal :store="store" />
   </div>
 </template>

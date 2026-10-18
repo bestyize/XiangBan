@@ -6,7 +6,7 @@ use serde_json::{json, Value};
 use std::{
     path::PathBuf,
     sync::Mutex,
-    time::{Duration, SystemTime, UNIX_EPOCH},
+    time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 use tauri::{Emitter, Manager};
 
@@ -28,6 +28,8 @@ pub struct AccountSession {
     pub access_token: String,
     pub refresh_token: String,
     pub expires_at: i64,
+    #[serde(default)]
+    pub refreshed_at: i64,
     pub user: AccountUser,
 }
 
@@ -93,6 +95,7 @@ pub struct AccountState {
     pub session: Mutex<Option<AccountSession>>,
     /// 刷新令牌每次使用都会轮换，旧的再用会让整个会话作废，所以同一时刻只能有一个刷新请求。
     refreshing: tauri::async_runtime::Mutex<()>,
+    activation_retry_at: Mutex<Option<Instant>>,
 }
 
 /// 访问令牌剩余有效期低于这个值就先刷新，免得请求在路上过期。
@@ -201,7 +204,7 @@ fn parse_login(val: &Value, now_sec: i64) -> Result<LoginResult, AccountFailure>
     };
     Ok(LoginResult {
         is_new_user: val["is_new_user"].as_bool().unwrap_or(false),
-        session: AccountSession { access_token, refresh_token, expires_at: now_sec + expires_in, user },
+        session: AccountSession { access_token, refresh_token, expires_at: now_sec + expires_in, refreshed_at: now_sec, user },
     })
 }
 
@@ -211,6 +214,7 @@ fn parse_refresh(old: &AccountSession, val: &Value, now_sec: i64) -> Result<Acco
         access_token: val["access_token"].as_str().ok_or("缺少 access_token")?.to_string(),
         refresh_token: val["refresh_token"].as_str().ok_or("缺少 refresh_token")?.to_string(),
         expires_at: now_sec + val["expires_in"].as_i64().unwrap_or(1800),
+        refreshed_at: now_sec,
         user: old.user.clone(),
     })
 }
@@ -219,8 +223,43 @@ fn is_fresh(session: &AccountSession, now_sec: i64) -> bool {
     session.expires_at - now_sec > REFRESH_MARGIN_SECS
 }
 
-/// 返回一个还有足够有效期的访问令牌，必要时先用刷新令牌换新的。
-/// 账号中心明确拒绝刷新令牌时，本地会话已经无法恢复，按退出登录处理，界面会回到未登录。
+fn daily_refresh_due(session: &AccountSession, now_sec: i64) -> bool {
+    if !is_fresh(session, now_sec) || session.refreshed_at == 0 {
+        return true;
+    }
+    let local_day = |seconds| chrono::DateTime::from_timestamp(seconds, 0)
+        .map(|date| date.with_timezone(&chrono::Local).date_naive());
+    local_day(session.refreshed_at) < local_day(now_sec)
+}
+
+fn same_session(slot: &Option<AccountSession>, expected: &AccountSession) -> bool {
+    slot.as_ref().is_some_and(|session| session.refresh_token == expected.refresh_token)
+}
+
+fn activation_due(session: Option<&AccountSession>, retry_at: Option<Instant>, now: Instant, now_sec: i64) -> bool {
+    session.is_some_and(|session| daily_refresh_due(session, now_sec))
+        && retry_at.is_none_or(|until| now >= until)
+}
+
+pub fn activated(app: &tauri::AppHandle) {
+    let app = app.clone();
+    tauri::async_runtime::spawn(async move {
+        let state = app.state::<AccountState>();
+        let Ok(_guard) = state.refreshing.try_lock() else { return };
+        let current = state.session.lock().unwrap().clone();
+        let Some(current) = current else { return };
+        if !activation_due(Some(&current), *state.activation_retry_at.lock().unwrap(), Instant::now(), now_secs()) {
+            return;
+        }
+        if let Err(failure) = refresh_session(&app, &current).await {
+            if same_session(&state.session.lock().unwrap(), &current) {
+                *state.activation_retry_at.lock().unwrap() = Some(Instant::now() + Duration::from_secs(300));
+            }
+            eprintln!("账号每日续期失败：{}", failure.message);
+        }
+    });
+}
+
 pub async fn fresh_access_token(app: &tauri::AppHandle) -> Result<String, AccountFailure> {
     let state = app.state::<AccountState>();
     let signed_in = || state.session.lock().unwrap().clone().ok_or_else(|| AccountFailure::from("请先登录小伴账号"));
@@ -233,6 +272,11 @@ pub async fn fresh_access_token(app: &tauri::AppHandle) -> Result<String, Accoun
     if is_fresh(&current, now_secs()) {
         return Ok(current.access_token);
     }
+    refresh_session(app, &current).await
+}
+
+async fn refresh_session(app: &tauri::AppHandle, current: &AccountSession) -> Result<String, AccountFailure> {
+    let state = app.state::<AccountState>();
     let val = match call_json(
         reqwest::Method::POST,
         "/api/auth/refresh".into(),
@@ -243,21 +287,35 @@ pub async fn fresh_access_token(app: &tauri::AppHandle) -> Result<String, Accoun
         Ok(val) => val,
         Err(failure) => {
             if failure.code.as_deref() == Some("unauthorized") {
-                let _ = logout_account(app.clone()).await;
+                let cleared = {
+                    let mut slot = state.session.lock().unwrap();
+                    if same_session(&slot, current) {
+                        *slot = None;
+                        let _ = clear_session(app);
+                        true
+                    } else { false }
+                };
+                if cleared {
+                    crate::ai_catalogue::account_changed(app);
+                    let _ = app.emit("account-changed", None::<AccountSession>);
+                }
             }
             return Err(failure);
         }
     };
-    let next = parse_refresh(&current, &val, now_secs())?;
+    let next = parse_refresh(current, &val, now_secs())?;
     {
         let mut slot = state.session.lock().unwrap();
-        if slot.as_ref().map(|s| s.refresh_token.as_str()) != Some(current.refresh_token.as_str()) {
+        if !same_session(&slot, current) {
             return Err("账号已切换，请重试".into());
         }
         *slot = Some(next.clone());
+        if let Err(error) = save_session(app, &next) {
+            eprintln!("保存账号续期结果失败：{error}");
+        }
+        let _ = app.emit("account-changed", Some(next.clone()));
     }
-    // 写盘失败不影响本次运行；最坏是下次启动需要重新登录。
-    let _ = save_session(app, &next);
+    *state.activation_retry_at.lock().unwrap() = None;
     Ok(next.access_token)
 }
 
@@ -279,8 +337,13 @@ fn require_identifier(identifier: &str) -> Result<String, AccountFailure> {
 }
 
 fn remember(app: &tauri::AppHandle, result: &LoginResult) -> Result<(), AccountFailure> {
-    save_session(app, &result.session)?;
-    *app.state::<AccountState>().session.lock().unwrap() = Some(result.session.clone());
+    {
+        let state = app.state::<AccountState>();
+        let mut slot = state.session.lock().unwrap();
+        save_session(app, &result.session)?;
+        *slot = Some(result.session.clone());
+        *state.activation_retry_at.lock().unwrap() = None;
+    }
     crate::ai_catalogue::account_changed(app);
     let _ = app.emit("account-changed", Some(result.session.clone()));
     Ok(())
@@ -400,8 +463,14 @@ pub fn get_account_session(app: tauri::AppHandle) -> Option<AccountSession> {
 
 #[tauri::command]
 pub async fn logout_account(app: tauri::AppHandle) -> Result<(), String> {
-    let session = app.state::<AccountState>().session.lock().unwrap().take();
-    let _ = clear_session(&app);
+    let session = {
+        let state = app.state::<AccountState>();
+        let mut slot = state.session.lock().unwrap();
+        let session = slot.take();
+        let _ = clear_session(&app);
+        *state.activation_retry_at.lock().unwrap() = None;
+        session
+    };
     crate::ai_catalogue::account_changed(&app);
     let _ = app.emit("account-changed", None::<AccountSession>);
 
@@ -448,6 +517,7 @@ mod tests {
             access_token: "access.token.123".into(),
             refresh_token: "refresh.token.456".into(),
             expires_at: 1890000000,
+            refreshed_at: 1889998200,
             user,
         };
 
@@ -455,6 +525,66 @@ mod tests {
         let deserialized: AccountSession = serde_json::from_str(&json_text).unwrap();
         assert_eq!(session, deserialized);
         assert_eq!(deserialized.user.username, "Alice_01");
+    }
+
+    #[test]
+    fn daily_renewal_survives_restart_and_handles_legacy_sessions() {
+        use chrono::TimeZone;
+        let now = chrono::Local.with_ymd_and_hms(2026, 10, 18, 14, 0, 0).single().unwrap().timestamp();
+        let mut session = parse_login(&login_body(), now).unwrap().session;
+        session.expires_at = now + 30 * 86_400;
+        let restored: AccountSession = serde_json::from_str(&serde_json::to_string(&session).unwrap()).unwrap();
+        assert!(!daily_refresh_due(&restored, now + 60));
+        assert!(daily_refresh_due(&restored, now + 86_400));
+        assert!(daily_refresh_due(&restored, restored.expires_at));
+        assert!(!daily_refresh_due(&restored, now - 86_400));
+        let mut legacy = serde_json::to_value(&session).unwrap();
+        legacy.as_object_mut().unwrap().remove("refreshedAt");
+        let legacy: AccountSession = serde_json::from_value(legacy).unwrap();
+        assert_eq!(legacy.refreshed_at, 0);
+        assert!(daily_refresh_due(&legacy, now));
+        let renewed = parse_refresh(&restored, &json!({"access_token":"new", "refresh_token":"new-r", "expires_in":2592000}), now + 86_400).unwrap();
+        assert_eq!(renewed.refreshed_at, now + 86_400);
+        assert!(!daily_refresh_due(&renewed, now + 86_400 + 60));
+    }
+
+    #[test]
+    fn daily_renewal_checks_a_local_date_boundary_not_twenty_four_hours() {
+        use chrono::TimeZone;
+        let before = chrono::Local.with_ymd_and_hms(2026, 10, 18, 23, 59, 0).single().unwrap().timestamp();
+        let after = chrono::Local.with_ymd_and_hms(2026, 10, 19, 0, 1, 0).single().unwrap().timestamp();
+        let mut session = parse_login(&login_body(), before).unwrap().session;
+        session.expires_at = before + 30 * 86_400;
+        assert!(daily_refresh_due(&session, after));
+    }
+
+    #[test]
+    fn activation_failure_cooldown_does_not_change_the_session() {
+        let now = Instant::now();
+        let mut old = parse_login(&login_body(), 1000).unwrap().session;
+        old.refreshed_at = 0;
+        assert!(!activation_due(None, None, now, 2000));
+        assert!(activation_due(Some(&old), None, now, 2000));
+        assert!(!activation_due(Some(&old), Some(now + Duration::from_secs(300)), now, 2000));
+        assert!(activation_due(Some(&old), Some(now + Duration::from_secs(300)), now + Duration::from_secs(300), 2300));
+        assert!(same_session(&Some(old.clone()), &old));
+        let mut switched = old.clone();
+        switched.refresh_token = "another-account-token".into();
+        assert!(!same_session(&Some(switched), &old));
+        assert!(!same_session(&None, &old));
+    }
+
+    #[test]
+    fn concurrent_activations_share_the_refresh_lock_and_recheck_the_new_session() {
+        let state = AccountState::default();
+        let old = parse_login(&login_body(), 1000).unwrap().session;
+        let guard = state.refreshing.try_lock().unwrap();
+        assert!(state.refreshing.try_lock().is_err());
+        let next = parse_refresh(&old, &json!({"access_token":"a2", "refresh_token":"r2", "expires_in":2592000}), 2000).unwrap();
+        *state.session.lock().unwrap() = Some(next);
+        drop(guard);
+        let _next_activation = state.refreshing.try_lock().unwrap();
+        assert!(!daily_refresh_due(state.session.lock().unwrap().as_ref().unwrap(), 2001));
     }
 
     #[test]

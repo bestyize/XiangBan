@@ -12,6 +12,13 @@ pub struct TokenPair {
 
 const SESSION_EXPIRED: &str = "登录已失效，请重新登录";
 
+fn access_ttl_secs(client_id: &str, default_secs: i64) -> i64 {
+    match client_id {
+        "xiaoban-desktop-wallpaper" => 30 * 24 * 60 * 60,
+        _ => default_secs,
+    }
+}
+
 fn hash_token(token: &str) -> Vec<u8> {
     crypto::sha256(token.as_bytes())
 }
@@ -40,12 +47,13 @@ pub async fn issue(
     .execute(&state.pool)
     .await?;
 
-    let access_token = tokens::issue_access(&state.keys, &state.config.issuer, uid, client_id, state.config.access_ttl_secs)?;
+    let ttl_secs = access_ttl_secs(client_id, state.config.access_ttl_secs);
+    let access_token = tokens::issue_access(&state.keys, &state.config.issuer, uid, client_id, ttl_secs)?;
     Ok(TokenPair {
         access_token,
         refresh_token,
         token_type: "Bearer",
-        expires_in: state.config.access_ttl_secs,
+        expires_in: ttl_secs,
     })
 }
 
@@ -108,6 +116,30 @@ pub async fn revoke(state: &AppState, refresh_token: &str) -> Result<(), AppErro
     .execute(&state.pool)
     .await?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn desktop_access_tokens_last_thirty_days() {
+        let ttl = access_ttl_secs("xiaoban-desktop-wallpaper", 1800);
+        assert_eq!(ttl, 2_592_000);
+        let keys = crate::keys::Keys::ephemeral();
+        let token = tokens::issue_access(&keys, "account", Uuid::new_v4(), "xiaoban-desktop-wallpaper", ttl).unwrap();
+        let claims = tokens::verify_access(&keys, "account", &token).unwrap();
+        assert_eq!(claims.exp - claims.iat, ttl);
+    }
+
+    #[test]
+    fn other_clients_keep_the_configured_lifetime() {
+        for client in ["xiaban-web", "xiaoban-mobile-wallpaper", "server-forum", "other"] {
+            for configured in [1800, 3600] {
+                assert_eq!(access_ttl_secs(client, configured), configured);
+            }
+        }
+    }
 }
 
 pub async fn revoke_all(state: &AppState, uid: Uuid) -> Result<(), AppError> {
