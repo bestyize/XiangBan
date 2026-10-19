@@ -500,6 +500,7 @@ mod tests{
     }
 
     #[test] fn living_widget_schema_rejects_bad_records() {
+        assert!(valid_stock_symbol("1.600519"));assert!(valid_stock_symbol("0.300750"));assert!(!valid_stock_symbol("105.AAPL"));
         let mut layout=one();layout.widgets[0].kind="woodfish".into();
         layout.widgets[0].living=Some(LivingData{count:108,reminders:vec![],symbol:"1.000001".into()});
         assert!(validate(&layout).is_ok());
