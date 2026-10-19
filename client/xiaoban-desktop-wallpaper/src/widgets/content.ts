@@ -29,3 +29,4 @@ export function countdownValue(data: CountdownData, now = new Date()) {
   if(data.mode==='elapsed')return {days:Math.abs(diff),label:diff>0?'还有':diff===0?'就是今天':'已经',date:dateKey(target)};
   return {days:Math.abs(diff),label:diff<0?'已过去':diff===0?'就是今天':'还有',date:dateKey(target)};
 }
+export { emptyFlower, flowerDays, flowerProgress, flowerStage, validateFlower, waterUntilNext, FLOWER_STAGES, FLOWER_THRESHOLDS, FLOWER_MAX_WATER } from './flower.ts';

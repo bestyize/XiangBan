@@ -5,5 +5,6 @@
   "description": "把同色饮料倒在一起。8 关慢慢调，随时撤销，没有倒计时。",
   "entry": "index.html",
   "cover": "cover.svg",
-  "runtimeProtocol": 1
+  "runtimeProtocol": 1,
+  "orientation": "portrait"
 }

@@ -43,3 +43,5 @@ services/server-pan/backend/target/
 # Account center generated keys
 account_data/
 
+video/
+

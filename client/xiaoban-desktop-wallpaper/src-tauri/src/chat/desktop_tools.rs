@@ -519,6 +519,7 @@ fn widget_kind_label(kind: &str) -> &'static str {
         "weather" => "天气时钟",
         "notes" => "便签待办",
         "countdown" => "倒数日／纪念日",
+        "flower" => "成长小白花",
         "custom" => "自创组件",
         _ => "其他组件",
     }
@@ -537,7 +538,7 @@ fn widget_list(desktop: &dyn Desktop, _: &Value) -> Result<String, String> {
     let value = desktop.widgets()?;
     let widgets = value["widgets"].as_array().cloned().unwrap_or_default();
     let mut lines = if widgets.is_empty() {
-        vec!["桌面当前没有放置任何组件。可用 widget_add 添加（支持 fortune 木鱼求签、calendar 小伴日历、weather 天气时钟、notes 便签待办、countdown 倒数日／纪念日）。".to_string()]
+        vec!["桌面当前没有放置任何组件。可用 widget_add 添加（支持 fortune 木鱼求签、calendar 小伴日历、weather 天气时钟、notes 便签待办、countdown 倒数日／纪念日、flower 成长小白花）。".to_string()]
     } else { vec![format!("桌面当前放置了 {} 个组件（最多 12 个）：", widgets.len())] };
     for w in &widgets {
         let id = w["id"].as_str().unwrap_or("?");
@@ -562,7 +563,7 @@ fn widget_list(desktop: &dyn Desktop, _: &Value) -> Result<String, String> {
 fn widget_add(desktop: &dyn Desktop, args: &Value) -> Result<String, String> {
     let kind = text_arg(args, "kind")?;
     if !crate::custom_widgets::BUILTIN_KINDS.contains(&kind) {
-        return Err("kind 只能是 fortune（木鱼求签）、calendar（小伴日历）、weather（天气时钟）、notes（便签待办）或 countdown（倒数日／纪念日）".into());
+        return Err("kind 只能是 fortune（木鱼求签）、calendar（小伴日历）、weather（天气时钟）、notes（便签待办）、countdown（倒数日／纪念日）或 flower（成长小白花）".into());
     }
     // Validate all options before creating anything, and never hide a failed theme update.
     let theme = optional_text(args, "theme")?;
@@ -756,7 +757,7 @@ fn game_open(desktop: &dyn Desktop, args: &Value) -> Result<String, String> {
     Ok(match target {
         Some(id) if on_desktop => format!("已把桌面层游戏放到桌面上：{id}。它浮在其他窗口上方运行，用 game_close 停止。"),
         Some(id) => format!("已进入游戏空间并启动游戏：{id}"),
-        None => "已打开小伴游戏空间大厅".into(),
+        None => "已打开小伴的游戏空间页面".into(),
     })
 }
 
@@ -790,11 +791,11 @@ fn game_delete(desktop: &dyn Desktop, args: &Value) -> Result<String, String> {
     Ok(format!("已删除自创游戏 {id}（游戏空间若正在运行已先关闭，它的本机存档也一并清除）。"))
 }
 
-const GAME_CREATE_DESCRIPTION: &str = "为用户创作一款全屏离线小游戏，保存成游戏文件夹（用户数据目录 games/packs/<id>/，文件夹即游戏）。保存后不会自动打开，试玩请再调用 game_open(id)；可用 game_list 查看、game_delete 删除。\n\
+const GAME_CREATE_DESCRIPTION: &str = "为用户创作一款离线小游戏，保存成游戏文件夹（用户数据目录 games/packs/<id>/，文件夹即游戏）。保存后不会自动打开，试玩请再调用 game_open(id)；可用 game_list 查看、game_delete 删除。\n\
 游戏包规范：\n\
 1. 文件：files 必须包含 index.html 作为入口，其余文件用相对路径引用（如 <script src=\"game.js\"></script>、<link rel=\"stylesheet\" href=\"style.css\">）。只能写 html、js、css、json、svg、md、txt 文本文件，最多 40 个，单个不超过 1 MB，合计不超过 4 MB；路径只用字母数字和 . _ -，用 / 分层，最多 4 层，不以 . 开头。不要写 manifest.json（由本工具生成）；若包含 cover.svg 会用作封面。\n\
 2. 脚本：用普通经典脚本（<script src>），不要 ES modules（type=module、import/export），所有资源用相对路径，不联网、不引用任何外部 CDN、字体或图片；图片用内联 SVG 或 canvas 绘制。\n\
-3. 运行环境：游戏在沙盒 iframe 里全屏运行，没有网络、localStorage、cookie、IndexedDB 和任何系统权限。画布与布局适配 100vw × 100vh，同时支持键盘和鼠标/触摸。宿主会自动注入 desktop-host.js，由它处理 Esc 退出，游戏不要自己再处理 Esc，也不要自己引用它。\n\
+3. 运行环境：游戏在沙盒 iframe 里运行，没有网络、localStorage、cookie、IndexedDB 和任何系统权限。画布与布局适配 100vw × 100vh，同时支持键盘和鼠标/触摸。宿主会自动注入 desktop-host.js，由它处理 Esc 退出，游戏不要自己再处理 Esc，也不要自己引用它。\n\
 4. 握手协议（宿主注入的 desktop-host.js 会在收到 host.init 时自动回复 game.ready，所以不读存档的游戏可以不写；需要存档或成绩时按下面实现）：在页面脚本顶层同步监听 window 的 message。宿主在 iframe 加载完成后发送 {channel:'xiaban.game-host', protocol:1, type:'host.init', nonce, save, safeArea}，其中 save 是上次存档对象或 null。只接受 event.source === window.parent 且 channel、protocol、nonce 都匹配的消息；nonce 与地址栏参数 hostNonce 相同（new URLSearchParams(location.search).get('hostNonce')）。收到 host.init 后回复 window.parent.postMessage({channel:'xiaban.game-pack', protocol:1, nonce, type:'game.ready'}, '*')；game.ready 之前发出的其它消息会被忽略。\n\
 5. 可选成绩：开始一局发 type:'game.start'，之后可发 type:'game.progress' 和一次 type:'game.result'，都带非负整数 score（消息结构同上，channel 为 'xiaban.game-pack'，带 nonce）。\n\
 6. 存档（仅 save=true 时有效）：游戏在 game.ready 之后用 {channel:'xiaban.game-pack', protocol:1, nonce, type:'game.save', data:{…}} 提交存档，data 必须是普通 JSON 对象，序列化后不超过 32 KiB；宿主存在本机，下次启动时放进 host.init 的 save 字段。进度变化时就发送，不要依赖退出时才存。save=false 时不要发送 game.save，宿主会忽略。";
@@ -917,7 +918,7 @@ pub fn tools(desktop: Arc<dyn Desktop>) -> Vec<Arc<dyn Tool>> {
             &desktop,
             ToolSpec::new(
                 "companion_set",
-                "设置桌面宠物：表情、外壳，或显示/隐藏。至少给一项。",
+                "设置桌面盆栽：表情、植物，或显示/隐藏。花盆保持不变，skin=pot 为绿叶，pot-white-flower 为白色小雏菊。至少给一项。",
                 object(
                     json!({
                         "expression": {"type": "string", "enum": EXPRESSIONS},
@@ -962,7 +963,7 @@ pub fn tools(desktop: Arc<dyn Desktop>) -> Vec<Arc<dyn Tool>> {
             &desktop,
             ToolSpec::new(
                 "widget_add",
-                "在桌面放置新组件：fortune（木鱼求签）、calendar（小伴日历）、weather（天气时钟）、notes（便签待办）或 countdown（倒数日／纪念日），可选 theme（glass 毛玻璃 / paper 纸张 / transparent 透明）。桌面最多 12 个组件。",
+                "在桌面放置新组件：fortune（木鱼求签）、calendar（小伴日历）、weather（天气时钟）、notes（便签待办）、countdown（倒数日／纪念日）或 flower（成长小白花，每天浇水会依次长成六种形态），可选 theme（glass 毛玻璃 / paper 纸张 / transparent 透明）。桌面最多 12 个组件。",
                 object(
                     json!({
                         "kind": {"type": "string", "enum": crate::custom_widgets::BUILTIN_KINDS, "description": "组件类型"},
@@ -1041,7 +1042,7 @@ pub fn tools(desktop: Arc<dyn Desktop>) -> Vec<Arc<dyn Tool>> {
             &desktop,
             ToolSpec::new(
                 "game_open",
-                "进入游戏空间全屏玩游戏，可指定游戏 id（例如 snake-arena 为小伴贪吃蛇，falling-blocks 为俄罗斯方块，merge-2048 为 2048，block-puzzle 为消失高手，water-sort 为奶茶大师，ink-blade 为水墨剑客，dusk-glider 为暮色滑翔；用户自创游戏用 game_list 里的 id）。不指定 id 则打开游戏大厅。",
+                "在单独的窗口里直接玩一款游戏，必须指定游戏 id（例如 snake-arena 为小伴贪吃蛇，falling-blocks 为俄罗斯方块，merge-2048 为 2048，block-puzzle 为消失高手，water-sort 为奶茶大师，ink-blade 为水墨剑客，dusk-glider 为暮色滑翔；用户自创游戏用 game_list 里的 id）。窗口默认不全屏，玩家可用系统标题栏切换全屏。不指定 id 只打开游戏空间页面，不会启动游戏。",
                 object(
                     json!({
                         "id": {
@@ -1408,6 +1409,16 @@ mod tests {
     }
 
     #[test]
+    fn the_companion_can_switch_to_white_flowers_using_the_existing_tool() {
+        let fake=Arc::new(Fake::default());
+        assert!(call(&fake,"companion_set",json!({"skin":"pot-white-flower"})).unwrap().contains("pot-white-flower"));
+        assert!(fake.calls()[0].contains("pot-white-flower"));
+        let all=tools(fake);
+        let spec=all.iter().find(|t|t.spec().name=="companion_set").unwrap().spec();
+        assert_eq!(spec.schema["properties"]["skin"]["enum"],json!(SKINS));
+    }
+
+    #[test]
     fn the_companion_accepts_only_known_expressions_and_shells() {
         let fake = Arc::new(Fake::default());
         let out = call(&fake, "companion_set", json!({"expression": "happy", "skin": "pot", "enabled": true})).unwrap();
@@ -1505,7 +1516,7 @@ mod tests {
     #[test]
     fn widget_tools_match_the_builtin_types_city_schema_and_custom_library() {
         let fake = Arc::new(Fake::default());
-        for (kind, label) in [("notes", "便签待办"), ("countdown", "倒数日／纪念日")] {
+        for (kind, label) in [("notes", "便签待办"), ("countdown", "倒数日／纪念日"), ("flower", "成长小白花")] {
             assert!(call(&fake, "widget_add", json!({"kind":kind})).unwrap().contains(label));
         }
         *fake.templates.lock().unwrap() = vec![json!({"id":"my-clock","name":"专注时钟"})];
@@ -1565,7 +1576,7 @@ mod tests {
         let open_out = call(&fake, "game_open", json!({"id": "贪吃蛇"})).unwrap();
         assert_eq!(open_out, "已进入游戏空间并启动游戏：snake-arena");
         let lobby_out = call(&fake, "game_open", json!({})).unwrap();
-        assert_eq!(lobby_out, "已打开小伴游戏空间大厅");
+        assert_eq!(lobby_out, "已打开小伴的游戏空间页面");
         let close_out = call(&fake, "game_close", json!({})).unwrap();
         assert_eq!(close_out, "已退出游戏空间或停止桌面层游戏，返回桌面");
 

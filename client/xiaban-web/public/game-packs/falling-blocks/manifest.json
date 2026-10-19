@@ -5,5 +5,6 @@
   "description": "单人下落方块，移动和旋转，填满一行就能消除。",
   "entry": "index.html",
   "cover": "cover.svg",
-  "runtimeProtocol": 1
+  "runtimeProtocol": 1,
+  "orientation": "portrait"
 }

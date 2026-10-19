@@ -52,7 +52,12 @@ describe('ControlShell sidebar', () => {
     await entry.trigger('click');
     await flushPromises();
     expect(wrapper.findComponent(LoginModal).props('store').showLoginModal).toBe(true);
+    expect(wrapper.classes()).not.toContain('is-collapsed');
+    expect(wrapper.get('[aria-label="收起导航"]').attributes('aria-expanded')).toBe('true');
+    await wrapper.get('[aria-label="收起导航"]').trigger('click');
+    expect(wrapper.classes()).toContain('is-collapsed');
     await wrapper.get('[aria-label="展开导航"]').trigger('click');
+    expect(wrapper.classes()).not.toContain('is-collapsed');
     expect(wrapper.get('.brand-copy').text()).toContain('小伴桌面');
     expect(wrapper.text()).not.toContain('你的桌面生活空间');
     wrapper.unmount();
@@ -108,6 +113,21 @@ describe('ControlShell sidebar', () => {
     await flushPromises();
     expect(wrapper.findComponent(NModal).props('show')).toBe(false);
     wrapper.unmount();
+  });
+
+  it('routes widget settings requests to the page and consumes them after opening', async () => {
+    const wrapper = mount(ControlShell, { global: { stubs: { WidgetsPage: { name: 'WidgetsPage', props: ['settingsRequest'], emits: ['settingsOpened'], template: '<div data-testid="widget-page-stub" />' } } } });
+    try {
+      await flushPromises();
+      window.dispatchEvent(new CustomEvent('widgets-manage', { detail: { id: 'notetwo' } }));
+      await vi.waitFor(async () => { await flushPromises(); expect(wrapper.find('[data-testid="widget-page-stub"]').exists()).toBe(true); });
+      const page = wrapper.findComponent({ name: 'WidgetsPage' });
+      expect(page.props('settingsRequest')).toEqual({ id: 'notetwo' });
+      page.vm.$emit('settingsOpened'); await flushPromises();
+      expect(page.props('settingsRequest')).toBeNull();
+      window.dispatchEvent(new CustomEvent('widgets-manage', { detail: { id: 'notetwo' } })); await flushPromises();
+      expect(page.props('settingsRequest')).toEqual({ id: 'notetwo' });
+    } finally { wrapper.unmount(); }
   });
 
   it('renders official website button above settings-and-about button and triggers invoke', async () => {
@@ -168,24 +188,5 @@ describe('ControlShell sidebar', () => {
     expect(quiet.find('[data-testid="nav-settings-new"]').exists()).toBe(false);
     expect(quiet.find('[data-testid="nav-settings"] .notice-dot').exists()).toBe(true);
     quiet.unmount();
-  });
-
-  it('directly opens game space instead of switching to an intermediate page when clicking games nav', async () => {
-    const wrapper = mount(ControlShell);
-    await flushPromises();
-    const loginModal = wrapper.findComponent(LoginModal);
-    const store = loginModal.props('store');
-    const openGamesSpy = vi.spyOn(store, 'openGames').mockResolvedValue(undefined);
-    const initialPage = store.page;
-
-    const gamesNav = wrapper.find('[data-testid="nav-games"]');
-    expect(gamesNav.exists()).toBe(true);
-    await gamesNav.trigger('click');
-    await flushPromises();
-
-    expect(openGamesSpy).toHaveBeenCalledTimes(1);
-    expect(store.page).toBe(initialPage);
-    expect(store.page).not.toBe('games');
-    wrapper.unmount();
   });
 });

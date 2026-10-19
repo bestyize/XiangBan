@@ -1,4 +1,4 @@
-import { emptyNote, emptyCountdown } from './content.ts';
+import { emptyNote, emptyCountdown, emptyFlower } from './content.ts';
 import { ref } from 'vue';
 import { desktop, invoke } from '../bridge.ts';
 import { emptyLayout, validateLayout, type WidgetLayout, type WidgetKind, type DesktopWidget, type City } from './model.ts';
@@ -22,7 +22,7 @@ export function createWidgetClient() {
       finally { busy.value = false; }
     }); queue = next; return next;
   }
-  function add(kind: WidgetKind, customId?: string) { return change('add_desktop_widget', {kind, customId}, current => { if(current.widgets.length >= 12) throw new Error('桌面最多放置 12 个组件'); const count=current.widgets.length; current.widgets.push({id:crypto.randomUUID().replaceAll('-','').slice(0,16),kind,theme:'transparent',scale:1,x:Math.max(.05,(count%3===1?.88:.52)-Math.floor(count/3)*.25),y:count%3===2?.94:.06,enabled:true,city:null,customId,...(kind==='notes'?{note:emptyNote()}:kind==='countdown'?{countdown:emptyCountdown()}:{})}); return current; }); }
+  function add(kind: WidgetKind, customId?: string) { return change('add_desktop_widget', {kind, customId}, current => { if(current.widgets.length >= 12) throw new Error('桌面最多放置 12 个组件'); const count=current.widgets.length; current.widgets.push({id:crypto.randomUUID().replaceAll('-','').slice(0,16),kind,theme:'transparent',scale:1,x:Math.max(.05,(count%3===1?.88:.52)-Math.floor(count/3)*.25),y:count%3===2?.94:.06,enabled:true,city:null,customId,...(kind==='notes'?{note:emptyNote()}:kind==='countdown'?{countdown:emptyCountdown()}:kind==='flower'?{flower:emptyFlower()}:{})}); return current; }); }
   function update(id: string, patch: Partial<Omit<DesktopWidget,'id'|'kind'>>) { return change('update_desktop_widget',{id,patch}, current => ({...current,widgets:current.widgets.map(widget=>widget.id===id?{...widget,...patch}:widget)})); }
   function remove(id: string) { return change('remove_desktop_widget',{id},current=>({...current,widgets:current.widgets.filter(widget=>widget.id!==id)})); }
   function edit(editing: boolean) { return change('set_widgets_editing',{editing},current=>({...current,editing})); }

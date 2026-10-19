@@ -103,7 +103,7 @@ onMounted(loadGames);
         <article v-for="game in builtinGames" :key="game.id" class="surface game-card" role="button" tabindex="0" :aria-label="`开始${game.name}`" :aria-disabled="opening || !store.desktop" @click="openGameSpace(game.id)" @keydown.enter.prevent="openGameSpace(game.id)" @keydown.space.prevent="openGameSpace(game.id)">
           <div class="game-cover">
             <img :src="coverUrl(game)" :alt="`${game.name}封面`" loading="lazy" />
-            <NTag class="game-kind" :bordered="false">{{ game.orientation === "landscape" ? "横屏" : "轻松益智" }}</NTag>
+            <NTag class="game-kind" :bordered="false">{{ game.orientation === "landscape" ? "横屏" : game.orientation === "portrait" ? "竖屏" : "轻松益智" }}</NTag>
           </div>
           <div class="game-content">
             <h3>{{ game.name }}</h3>

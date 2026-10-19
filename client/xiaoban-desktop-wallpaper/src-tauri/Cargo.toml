@@ -56,6 +56,14 @@ objc2-core-graphics = { version = "0.3", default-features = false, features = [
   "std", "CGWindow", "CGWindowLevel"
 ] }
 
+[profile.dev]
+debug = false
+incremental = false
+strip = "debuginfo"
+
+[profile.dev.package."*"]
+debug = false
+
 [profile.release]
 opt-level = "s"
 lto = "thin"

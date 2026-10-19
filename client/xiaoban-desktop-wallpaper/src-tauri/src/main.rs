@@ -519,7 +519,7 @@ fn show_control(app: tauri::AppHandle) -> Result<(), String> {
     present_control(&app)
 }
 
-fn present_control(app: &tauri::AppHandle) -> Result<(), String> {
+pub(crate) fn present_control(app: &tauri::AppHandle) -> Result<(), String> {
     #[cfg(target_os = "macos")]
     app.show().map_err(|error| error.to_string())?;
     let window = app

@@ -55,10 +55,9 @@ try {
   assert.ok(Object.values(game.frontend.security).every(v => v === true))
   for (const key of ['backgroundSuspended', 'settingsPreserved', 'positionRestored', 'closed']) assert.equal(game[key], true, key)
   assert.equal(game.frontend.directLaunch, 'falling-blocks')
-  assert.equal(game.frontend.fullViewport, true)
+  assert.equal(game.frontend.fillWindow, true)
   assert.equal(game.frontend.saveRoundTrip, true)
   assert.equal(game.frontend.controlRejected, true)
-  assert.equal(game.frontend.escapeReturned, true)
   if (uiSmoke) {
     const ui = result.ui?.Ok
     assert.ok(ui, `UI smoke did not pass: ${JSON.stringify(result.ui)}`)

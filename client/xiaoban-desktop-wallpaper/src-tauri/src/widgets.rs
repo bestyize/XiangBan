@@ -17,6 +17,8 @@ pub struct Widget {
     #[serde(default, skip_serializing_if="Option::is_none")]
     pub countdown: Option<CountdownData>,
     #[serde(default, skip_serializing_if="Option::is_none")]
+    pub flower: Option<FlowerData>,
+    #[serde(default, skip_serializing_if="Option::is_none")]
     pub custom_id: Option<String>,
 }
 const MAX_LAYOUT_BYTES: usize = 128 * 1024;
@@ -29,9 +31,13 @@ pub struct NoteData { pub title: String, pub mode: String, pub text: String, pub
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct CountdownData { pub title: String, pub date: String, pub mode: String, pub repeat: String }
+/// How many times the white flower has been watered, and the day it was planted (`YYYY-MM-DD`).
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct FlowerData { pub water: u32, pub since: String }
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct WidgetContent { note: Option<NoteData>, countdown: Option<CountdownData> }
+pub struct WidgetContent { note: Option<NoteData>, countdown: Option<CountdownData>, flower: Option<FlowerData> }
 fn short_text(value: &str, max: usize) -> bool { !value.trim().is_empty() && value.encode_utf16().count() <= max }
 fn valid_identity(value: &str) -> bool { !value.is_empty() && value.len()<=32 && value.bytes().all(|c|c.is_ascii_lowercase()||c.is_ascii_digit()) }
 fn validate_content(widget: &Widget) -> Result<(),String> {
@@ -39,6 +45,10 @@ fn validate_content(widget: &Widget) -> Result<(),String> {
         if widget.kind!="notes" || !short_text(&note.title,40) || !["note","todo"].contains(&note.mode.as_str()) || note.text.encode_utf16().count()>1200 || note.items.len()>12 { return Err("便签内容无效或超过长度限制".into()); }
         let mut ids=std::collections::HashSet::new();
         for item in &note.items { if !valid_identity(&item.id)||!ids.insert(&item.id)||!short_text(&item.text,120) {return Err("待办内容无效".into());} }
+    }
+    if let Some(data)=&widget.flower {
+        let valid_date=chrono::NaiveDate::parse_from_str(&data.since,"%Y-%m-%d").is_ok_and(|date|date.format("%Y-%m-%d").to_string()==data.since && data.since.as_str()>="1900-01-01" && data.since.as_str()<="2100-12-31");
+        if widget.kind!="flower" || data.water>999 || !valid_date {return Err("小白花的成长记录无效".into());}
     }
     if let Some(data)=&widget.countdown {
         let valid_date=chrono::NaiveDate::parse_from_str(&data.date,"%Y-%m-%d").is_ok_and(|date|date.format("%Y-%m-%d").to_string()==data.date && data.date.as_str()>="1900-01-01" && data.date.as_str()<="2100-12-31");
@@ -73,7 +83,7 @@ pub fn validate(layout: &Layout) -> Result<(), String> {
     let mut ids = std::collections::HashSet::new();
     for widget in &layout.widgets {
         if widget.id.is_empty() || widget.id.len() > 32 || !widget.id.bytes().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit()) || !ids.insert(&widget.id)
-            || !["fortune", "calendar", "weather", "notes", "countdown", "custom"].contains(&widget.kind.as_str())
+            || !["fortune", "calendar", "weather", "notes", "countdown", "flower", "custom"].contains(&widget.kind.as_str())
             || !["glass", "paper", "transparent"].contains(&widget.theme.as_str())
             || !widget.scale.is_finite() || !(0.75..=1.5).contains(&widget.scale)
             || !widget.x.is_finite() || !(0.0..=1.0).contains(&widget.x)
@@ -137,7 +147,7 @@ fn snapshot(app: &tauri::AppHandle) -> Value {
     let widgets_with_custom: Vec<_> = layout.widgets.iter().map(|w| attach_custom_data(app, w)).collect();
     json!({"version":1,"widgets":widgets_with_custom,"editing":state.editing.load(Ordering::Relaxed),"errors":state.errors.lock().unwrap().clone(),"desktop":desktop,"monitors":displays})
 }
-pub fn base_size(kind: &str) -> (f64, f64) { match kind { "fortune" => (220.0, 330.0), "calendar" => (300.0, 400.0), "notes" => (300.0, 360.0), _ => (280.0, 230.0) } }
+pub fn base_size(kind: &str) -> (f64, f64) { match kind { "fortune" => (220.0, 330.0), "calendar" => (300.0, 400.0), "notes" => (300.0, 360.0), "flower" => (260.0, 320.0), _ => (280.0, 230.0) } }
 pub fn widget_base_size(app: &tauri::AppHandle, widget: &Widget) -> (f64, f64) {
     if widget.kind == "custom" {
         if let Some(cid) = &widget.custom_id {
@@ -246,6 +256,7 @@ pub async fn add_desktop_widget(app: tauri::AppHandle, kind: String, custom_id: 
     let index=next.widgets.len();
     let note=if kind=="notes"{Some(NoteData{title:"随手记".into(),mode:"note".into(),text:String::new(),items:vec![]})}else{None};
     let countdown=if kind=="countdown"{Some(CountdownData{title:"值得期待的日子".into(),date:chrono::Local::now().format("%Y-%m-%d").to_string(),mode:"countdown".into(),repeat:"none".into()})}else{None};
+    let flower=if kind=="flower"{Some(FlowerData{water:0,since:chrono::Local::now().format("%Y-%m-%d").to_string()})}else{None};
     let mut theme="transparent".to_string();
     if kind == "custom" {
         let cid = custom_id.as_deref().ok_or("添加自定义组件需要指定 customId")?;
@@ -255,17 +266,17 @@ pub async fn add_desktop_widget(app: tauri::AppHandle, kind: String, custom_id: 
             theme = t.to_string();
         }
     }
-    next.widgets.push(Widget{id:random.iter().map(|b|format!("{b:02x}")).collect(),kind,theme,scale:1.0,x:((if index%3==1{0.88}else{0.52})-(index/3) as f64*0.25).max(0.05),y:if index%3==2{0.94}else{0.06},enabled:true,city:None,note,countdown,monitor:None,custom_id});
+    next.widgets.push(Widget{id:random.iter().map(|b|format!("{b:02x}")).collect(),kind,theme,scale:1.0,x:((if index%3==1{0.88}else{0.52})-(index/3) as f64*0.25).max(0.05),y:if index%3==2{0.94}else{0.06},enabled:true,city:None,note,countdown,flower,monitor:None,custom_id});
     persist(&app,&next)?; *state.layout.lock().unwrap()=next; sync(&app); Ok(snapshot(&app))
 }
 #[derive(Deserialize)]
 #[serde(rename_all="camelCase",deny_unknown_fields)]
-pub struct Patch { monitor: Option<String>, theme: Option<String>, scale: Option<f64>, x: Option<f64>, y: Option<f64>, enabled: Option<bool>, city: Option<City>, note: Option<NoteData>, countdown: Option<CountdownData>, custom_id: Option<String> }
+pub struct Patch { monitor: Option<String>, theme: Option<String>, scale: Option<f64>, x: Option<f64>, y: Option<f64>, enabled: Option<bool>, city: Option<City>, note: Option<NoteData>, countdown: Option<CountdownData>, flower: Option<FlowerData>, custom_id: Option<String> }
 #[tauri::command]
 pub async fn update_desktop_widget(app: tauri::AppHandle, id: String, patch: Patch) -> Result<Value,String> {
     let state=app.state::<WidgetState>();let _operation=state.operation.lock().await;
     let mut next=state.layout.lock().unwrap().clone();let widget=next.widgets.iter_mut().find(|w|w.id==id).ok_or("没有找到这个组件")?;
-    if let Some(v)=patch.monitor{widget.monitor=Some(v);}if let Some(v)=patch.theme{widget.theme=v;}if let Some(v)=patch.scale{widget.scale=v;}if let Some(v)=patch.x{widget.x=v;}if let Some(v)=patch.y{widget.y=v;}if let Some(v)=patch.enabled{widget.enabled=v;}if let Some(v)=patch.city{widget.city=Some(v);}if let Some(v)=patch.note{widget.note=Some(v);}if let Some(v)=patch.countdown{widget.countdown=Some(v);}if let Some(v)=patch.custom_id{widget.custom_id=Some(v);}
+    if let Some(v)=patch.monitor{widget.monitor=Some(v);}if let Some(v)=patch.theme{widget.theme=v;}if let Some(v)=patch.scale{widget.scale=v;}if let Some(v)=patch.x{widget.x=v;}if let Some(v)=patch.y{widget.y=v;}if let Some(v)=patch.enabled{widget.enabled=v;}if let Some(v)=patch.city{widget.city=Some(v);}if let Some(v)=patch.note{widget.note=Some(v);}if let Some(v)=patch.countdown{widget.countdown=Some(v);}if let Some(v)=patch.flower{widget.flower=Some(v);}if let Some(v)=patch.custom_id{widget.custom_id=Some(v);}
     persist(&app,&next)?;*state.layout.lock().unwrap()=next;sync(&app);Ok(snapshot(&app))
 }
 /// A widget can save only its own typed content; no caller-supplied identity or layout patch.
@@ -276,9 +287,10 @@ pub async fn save_desktop_widget_content(window:tauri::WebviewWindow,content:Wid
     if state.editing.load(Ordering::Relaxed){return Err("请先完成组件摆放".into());}
     let mut next=state.layout.lock().unwrap().clone();
     let widget=next.widgets.iter_mut().find(|w|w.id==original.id).ok_or("没有找到这个组件")?;
-    match (widget.kind.as_str(),content.note,content.countdown) {
-        ("notes",Some(note),None)=>widget.note=Some(note),
-        ("countdown",None,Some(countdown))=>widget.countdown=Some(countdown),
+    match (widget.kind.as_str(),content.note,content.countdown,content.flower) {
+        ("notes",Some(note),None,None)=>widget.note=Some(note),
+        ("countdown",None,Some(countdown),None)=>widget.countdown=Some(countdown),
+        ("flower",None,None,Some(flower))=>{validate_content(&Widget{flower:Some(flower.clone()),..widget.clone()})?;widget.flower=Some(flower);},
         _=>return Err("此组件不能保存这类内容".into())
     }
     persist(app,&next)?;*state.layout.lock().unwrap()=next;sync(app);Ok(())
@@ -311,8 +323,8 @@ pub async fn move_desktop_widget(window:tauri::WebviewWindow,grab_x:f64,grab_y:f
 }
 #[tauri::command]
 pub fn show_widget_settings(window:tauri::WebviewWindow)->Result<(),String>{
-    own_widget(&window)?;crate::present_control(window.app_handle())?;
-    if let Some(control)=window.app_handle().get_webview_window("control"){control.eval("window.dispatchEvent(new Event('widgets-manage'));".to_string()).map_err(|e|e.to_string())?;}Ok(())
+    let widget=own_widget(&window)?;crate::present_control(window.app_handle())?;
+    if let Some(control)=window.app_handle().get_webview_window("control"){control.eval(format!("window.dispatchEvent(new CustomEvent('widgets-manage',{{detail:{}}}));",json!({"id":widget.id}))).map_err(|e|e.to_string())?;}Ok(())
 }
 #[tauri::command]
 pub async fn get_widget_weather(window:tauri::WebviewWindow)->Result<Weather,String>{
@@ -358,7 +370,7 @@ pub fn delete_custom_pack(app: &tauri::AppHandle, id: &str) -> Result<(), String
 #[cfg(test)]
 mod tests{
     use super::*;
-    fn one()->Layout{Layout{version:1,widgets:vec![Widget{id:"abc123".into(),kind:"calendar".into(),theme:"glass".into(),scale:1.0,x:0.8,y:0.2,enabled:true,city:None,note:None,countdown:None,monitor:None,custom_id:None}]}}
+    fn one()->Layout{Layout{version:1,widgets:vec![Widget{id:"abc123".into(),kind:"calendar".into(),theme:"glass".into(),scale:1.0,x:0.8,y:0.2,enabled:true,city:None,note:None,countdown:None,flower:None,monitor:None,custom_id:None}]}}
     #[test]fn custom_widgets_in_layout_validated(){
         let mut layout=one();layout.widgets[0].kind="custom".into();layout.widgets[0].custom_id=Some("pomodoro-timer".into());
         assert!(validate(&layout).is_ok());
@@ -379,6 +391,16 @@ mod tests{
         layout=one();layout.widgets[0].kind="countdown".into();layout.widgets[0].countdown=Some(CountdownData{title:"生日".into(),date:"2026-02-29".into(),mode:"countdown".into(),repeat:"yearly".into()});assert!(validate(&layout).is_err());
         layout.widgets[0].countdown.as_mut().unwrap().date="2024-02-29".into();assert!(validate(&layout).is_ok());
         layout.widgets[0].kind="weather".into();assert!(validate(&layout).is_err());
+    }
+    #[test]
+    fn flower_growth_is_kept_on_its_own_widget_only(){
+        let mut layout=one();layout.widgets[0].kind="flower".into();
+        layout.widgets[0].flower=Some(FlowerData{water:7,since:"2026-10-19".into()});
+        assert!(validate(&layout).is_ok());
+        layout.widgets[0].flower.as_mut().unwrap().since="2026-02-30".into();assert!(validate(&layout).is_err());
+        layout.widgets[0].flower=Some(FlowerData{water:1000,since:"2026-10-19".into()});assert!(validate(&layout).is_err());
+        layout.widgets[0].flower=Some(FlowerData{water:3,since:"2026-10-19".into()});layout.widgets[0].kind="calendar".into();assert!(validate(&layout).is_err());
+        assert_eq!(base_size("flower"),(260.0,320.0));
     }
     #[test]fn content_command_has_no_id_or_layout_fields(){
         assert_eq!(permitted("widget-abc","save_desktop_widget_content"),Some(true));assert_eq!(permitted("media-a","save_desktop_widget_content"),Some(false));

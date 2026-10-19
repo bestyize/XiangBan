@@ -5,7 +5,7 @@ use std::{
     path::Path,
 };
 
-pub const SKINS: &[&str] = &["pot"];
+pub const SKINS: &[&str] = &["pot", "pot-white-flower"];
 /// The console's colour scheme. It lives here, not only in the console's page storage, because the other windows (the
 /// floating assistant) cannot read that storage and still have to match.
 pub const APPEARANCES: &[&str] = &["system", "light", "dark"];
@@ -250,6 +250,17 @@ mod tests {
             assert_eq!(prefs.settings.companion_skin, "pot", "{saved}");
         }
     }
+    #[test]
+    fn the_white_flower_choice_survives_normalization_and_reload() {
+        let mut value: Preferences = serde_json::from_str(r#"{"settings":{"companionSkin":"pot-white-flower"}}"#).unwrap();
+        value.settings.normalize();
+        let saved=serde_json::to_string(&value).unwrap();
+        let mut again:Preferences=serde_json::from_str(&saved).unwrap();
+        again.settings.normalize();
+        assert_eq!(again.settings.companion_skin,"pot-white-flower");
+        assert_eq!(again.settings.size,Settings::default().size);
+    }
+
     #[test]
     fn the_assistant_is_on_by_default_and_an_unknown_shortcut_falls_back() {
         let defaults = Settings::default();

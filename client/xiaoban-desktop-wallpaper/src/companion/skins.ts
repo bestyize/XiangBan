@@ -1,10 +1,11 @@
 /**
- * Official shells for the robot. A shell changes the ears and the colours only: the screen, the symbol anchor
- * and the part names stay the same, so expressions, ear motion, hit testing and dragging work in every shell.
+ * Official pot plants share the same body, screen and animated parts.
+ * Plant art can change without changing expressions, hit testing or dragging.
  */
 import { COLOR, type Palette } from './geometry.ts'
+import whiteFlower from './assets/white-flower/white_flower.webp?inline'
 
-export type SkinId = 'pot'
+export type SkinId = 'pot' | 'pot-white-flower'
 
 /** Art that needs gradient ids gets them from the instance id, so two robots on one page never share a definition. */
 export type Markup = string | ((id: string) => string)
@@ -73,8 +74,7 @@ export interface Skin {
   podStroke: string
 }
 
-export const SKINS: Record<SkinId, Skin> = {
-  pot: {
+const pot: Skin = {
     id: 'pot', label: '盆栽', scale: 0.76,
     art: {
       feet: '',
@@ -102,6 +102,20 @@ export const SKINS: Record<SkinId, Skin> = {
     stroke: '#d0c3b4', earStroke: '#4a8f26', earShell: ['#b9e66c', '#6cb62f'],
     bezel: ['#f6f0e8', '#e4d9cb', '#c9bba9'],
     pod: ['#d9a982', '#f8e4d3', '#dcb08c'], podCore: ['#c58f68', '#eed2ba', '#bd8660'], podStroke: '#b97f58',
+}
+
+export const SKINS: Record<SkinId, Skin> = {
+  pot: { ...pot, label: '绿叶' },
+  'pot-white-flower': {
+    ...pot, id: 'pot-white-flower', label: '白色小雏菊',
+    art: {
+      ...pot.art!,
+      front: id => `<defs><clipPath id="${id}plantClip"><rect x="64" y="-82" width="192" height="140"/></clipPath></defs>` +
+        `<image data-part="plant" href="${whiteFlower}" x="85" y="-82" width="150" height="150" clip-path="url(#${id}plantClip)"/>` +
+        '<path data-part="plant-hit" d="M160 -70C179 -74 198 -58 194 -29C216 -30 235 -10 225 13L230 48L200 57H120L92 46L100 10C87 -10 104 -40 125 -37C128 -58 139 -73 160 -70Z" fill="#000" opacity="0"/>',
+    },
+    earOuter: '', earInner: '', earHighlight: '',
+    haloAt: [160, 4, 0, 0],
   },
 }
 

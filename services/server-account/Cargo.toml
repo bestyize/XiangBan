@@ -31,6 +31,14 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 thiserror = "2.0"
 
+[profile.dev]
+debug = false
+incremental = false
+strip = "debuginfo"
+
+[profile.dev.package."*"]
+debug = false
+
 [profile.release]
 opt-level = 3
 codegen-units = 1

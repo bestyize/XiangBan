@@ -30,8 +30,8 @@ afterEach(() => {
 });
 
 async function launch() {
+  window.history.replaceState(null, '', '/?scene=games&game=test-game');
   await mountGameSpace();
-  document.querySelector<HTMLButtonElement>('.game-card')!.click();
   await vi.waitFor(() => expect(document.querySelector('iframe')).not.toBeNull());
   const frame = document.querySelector('iframe')!;
   const source = frame.contentWindow!;
@@ -44,7 +44,7 @@ async function launch() {
   return { frame, send };
 }
 
-it('leaves navigation to the game and does not intercept Escape during play', async () => {
+it('leaves navigation to the game and closes the window instead of returning to a game list', async () => {
   const { frame, send } = await launch();
   expect(document.querySelector('#games-back')).toBeNull();
   expect(document.querySelector('#games-close')).toBeNull();
@@ -54,8 +54,9 @@ it('leaves navigation to the game and does not intercept Escape during play', as
   expect(document.querySelector('iframe')).toBe(frame);
   send('game.exit');
   await vi.waitFor(() => expect(document.querySelector('iframe')).toBeNull());
-  expect(document.querySelector<HTMLElement>('#games-hub')!.hidden).toBe(false);
-  expect(invoke).not.toHaveBeenCalledWith('close_game_space', expect.anything());
+  expect(document.querySelector('#games-hub')).toBeNull();
+  expect(document.querySelector('#games-cards')).toBeNull();
+  await vi.waitFor(() => expect(invoke).toHaveBeenCalledWith('close_game_space', expect.anything()));
 });
 
 it('flushes a pending save before the native window close request', async () => {

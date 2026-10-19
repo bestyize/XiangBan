@@ -25,3 +25,11 @@ percent-encoding = "2.3"
 thiserror = "2.0"
 anyhow = "1.0"
 dirs = "6.0"
+
+[profile.dev]
+debug = false
+incremental = false
+strip = "debuginfo"
+
+[profile.dev.package."*"]
+debug = false

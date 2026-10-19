@@ -22,9 +22,23 @@ function setup(companionLinks = true) {
 describe('companion page shell choice', () => {
   it('offers the pot as the chosen shell', () => {
     const { wrapper } = setup();
-    expect(wrapper.findAll('[data-testid^="skin-"]')).toHaveLength(1);
+    expect(wrapper.findAll('[data-testid^="skin-"]')).toHaveLength(2);
     expect(wrapper.get('[data-testid="skin-pot"]').attributes('aria-pressed')).toBe('true');
   });
+  it('switches between green leaves and white flowers without changing the pot settings', async () => {
+    const { wrapper, store } = setup();
+    const size = store.settings.size;
+    await wrapper.get('[data-testid="skin-pot-white-flower"]').trigger('click');
+    await flushPromises();
+    expect(store.setCompanionSkin).toHaveBeenLastCalledWith('pot-white-flower');
+    expect(wrapper.get('[data-testid="skin-pot-white-flower"]').attributes('aria-pressed')).toBe('true');
+    expect(store.settings.size).toBe(size);
+    await wrapper.get('[data-testid="skin-pot"]').trigger('click');
+    await flushPromises();
+    expect(store.settings.companionSkin).toBe('pot');
+    wrapper.unmount();
+  });
+
   it('shows an unknown saved shell as the pot', () => {
     const { wrapper, store } = setup();
     store.settings.companionSkin = 'gone';

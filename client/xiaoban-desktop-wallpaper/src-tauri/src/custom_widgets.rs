@@ -11,7 +11,7 @@ use std::{
 
 pub const MAX_WIDGET_FILE: u64 = 128 * 1024; // 128 KB
 pub const MAX_USER_WIDGETS: usize = 40;
-pub const BUILTIN_KINDS: [&str; 5] = ["fortune", "calendar", "weather", "notes", "countdown"];
+pub const BUILTIN_KINDS: [&str; 6] = ["fortune", "calendar", "weather", "notes", "countdown", "flower"];
 
 #[allow(dead_code)]
 #[derive(Clone, Debug, Serialize, Deserialize)]

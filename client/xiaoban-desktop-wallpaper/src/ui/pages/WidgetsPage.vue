@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import ResourceShareActions from "../components/ResourceShareActions.vue";
 import { computed, watch, onMounted, onBeforeUnmount, ref } from 'vue';
-import { Check, Eye, Move, Plus, Search, Sparkles, Trash2 } from 'lucide-vue-next';
+import { Check, Plus, Search, Sparkles, Trash2 } from 'lucide-vue-next';
 import { NAlert, NButton, NInput, NModal, NPopconfirm, NSelect, NSlider, NSwitch } from 'naive-ui';
 import { invoke } from '../../bridge.ts';
 import type { ControlStore } from '../control-types.ts';
@@ -11,8 +11,9 @@ import WidgetSurface from '../../widgets/WidgetSurface.vue';
 import NotesWidget from '../../widgets/NotesWidget.vue';
 import CountdownEditor from '../../widgets/CountdownEditor.vue';
 import type { WidgetContent } from '../../widgets/model.ts';
-import { emptyNote, emptyCountdown } from '../../widgets/content.ts';
-const props=defineProps<{store:ControlStore}>();
+import { emptyNote, emptyCountdown, emptyFlower } from '../../widgets/content.ts';
+const props=defineProps<{store:ControlStore;settingsRequest?:{id:string}|null}>();
+const emit=defineEmits<{settingsOpened:[]}>();
 const client=createWidgetClient(),{layout,ready,busy,error}=client;
 const MAX_WIDGETS=12;
 const selected=ref(''),settingsOpen=ref(false),cityQuery=ref(''),cities=ref<City[]>([]),cityBusy=ref(false);
@@ -42,7 +43,7 @@ const stageWidth=ref(0);
 let libraryObserver:ResizeObserver|undefined;
 function measureStage(){const column=libraryGrid.value?getComputedStyle(libraryGrid.value).gridTemplateColumns.split(' ')[0]:'';const width=parseFloat(column??'');if(Number.isFinite(width)&&width>0)stageWidth.value=width;}
 const demoScale=(kind:WidgetKind,custom?:CustomWidgetData)=>{const{width,height}=baseSize(kind,custom);const stage=stageWidth.value||210;return Math.min(1,stage/width,stage*9/16/height);};
-const demo=(kind:WidgetKind):DesktopWidget=>({id:`demo${kind}`,kind,theme:'transparent',scale:1,x:0,y:0,enabled:true,city:null,...(kind==='notes'?{note:{...emptyNote(),text:'慢慢来，也会抵达。\n\n把今天的小事，放在这里。'}}:kind==='countdown'?{countdown:{...emptyCountdown(),title:'下一次旅行',date:'2026-12-31'}}:{})});
+const demo=(kind:WidgetKind):DesktopWidget=>({id:`demo${kind}`,kind,theme:'transparent',scale:1,x:0,y:0,enabled:true,city:null,...(kind==='notes'?{note:{...emptyNote(),text:'慢慢来，也会抵达。\n\n把今天的小事，放在这里。'}}:kind==='countdown'?{countdown:{...emptyCountdown(),title:'下一次旅行',date:'2026-12-31'}}:kind==='flower'?{flower:{...emptyFlower(),water:12}}:{})});
 async function action(task:()=>Promise<unknown>){try{await task();}catch(e){props.store.notify(e,'error');}}
 // A brief check mark on the "+" badge confirms the add without moving the user away from the library.
 const flashKey=ref('');let flashTimer:ReturnType<typeof setTimeout>|undefined;
@@ -54,7 +55,7 @@ async function addWidget(key:string,create:()=>Promise<unknown>,needsSetup:boole
     const added=layout.value.widgets.at(-1);
     if(layout.value.errors.length)props.store.notify('组件已保存，桌面显示遇到问题，请查看页面提示','error');
     else if(needsSetup&&added){props.store.notify('已添加到桌面，先选一座城市吧','success');openSettings(added.id);}
-    else props.store.notify('已添加到桌面，按住组件即可拖动摆放','success');
+    else props.store.notify('已添加到桌面，按住组件顶部即可拖动','success');
   });
 }
 const add=(kind:WidgetKind)=>addWidget(`kind:${kind}`,()=>client.add(kind),kind==='weather');
@@ -77,7 +78,13 @@ async function removeChosen(){
 async function search(){if(!cityQuery.value.trim()||cityBusy.value)return;cityBusy.value=true;try{cities.value=await searchWidgetCities(cityQuery.value.trim());if(!cities.value.length)props.store.notify('没有找到城市，可以试试完整名称','info');}catch(e){props.store.notify(e,'error');}finally{cityBusy.value=false;}}
 function chooseCity(index:number){const city=cities.value[index];if(city)update({city});}
 const cityOptions=computed(()=>cities.value.map((city,index)=>({label:[city.name,city.admin1,city.country].filter(Boolean).join(' · '),value:index})));
-async function tuckAway(){try{await invoke('hide_control');}catch(e){props.store.notify(e,'error');}}
+watch([()=>props.settingsRequest,ready],([request,loaded])=>{
+  if(!request||!loaded)return;
+  if(layout.value.widgets.some(widget=>widget.id===request.id))openSettings(request.id);
+  else props.store.notify('这个组件已不在桌面上','info');
+  emit('settingsOpened');
+},{immediate:true});
+watch(ready,loaded=>{if(loaded&&layout.value.editing)void action(()=>client.edit(false));});
 watch(libraryGrid,element=>{libraryObserver?.disconnect();if(element){libraryObserver=new ResizeObserver(measureStage);libraryObserver.observe(element);measureStage();}});
 onMounted(()=>{void client.load();void loadCustomTemplates();});onBeforeUnmount(()=>{clearTimeout(flashTimer);void commitScale();if(layout.value.editing)void client.edit(false).catch(e=>props.store.notify(e,'error'));libraryObserver?.disconnect();client.dispose();});
 </script>
@@ -88,8 +95,6 @@ onMounted(()=>{void client.load();void loadCustomTemplates();});onBeforeUnmount(
         <div class="widget-title"><h1>桌面组件</h1><span class="widget-count">{{ layout.widgets.length }} / {{ MAX_WIDGETS }} 个组件</span></div>
         <div class="widget-header-actions">
           <ResourceShareActions :store="store" kind="widget" import-label="导入小组件" @imported="loadCustomTemplates"/>
-          <NButton v-if="store.desktop&&layout.editing" round @click="tuckAway"><template #icon><Eye :size="14"/></template>收起面板</NButton>
-          <NButton v-if="layout.widgets.length" round :type="layout.editing?'primary':'default'" :ghost="layout.editing" :disabled="!ready||busy" data-testid="edit-widgets" @click="action(()=>client.edit(!layout.editing))"><template #icon><Check v-if="layout.editing" :size="14"/><Move v-else :size="14"/></template>{{ layout.editing?'完成摆放':'在桌面上摆放' }}</NButton>
           <NButton type="primary" round :disabled="!store.desktop" data-testid="widgets-create" @click="store.startCreation('widget')"><template #icon><Sparkles :size="15"/></template>创作小组件</NButton>
         </div>
       </header>
@@ -97,7 +102,6 @@ onMounted(()=>{void client.load();void loadCustomTemplates();});onBeforeUnmount(
     <div class="widgets-body">
       <NAlert v-if="error" type="error" :show-icon="false">{{ error }}<NButton v-if="!ready" size="tiny" text @click="client.load">重新读取</NButton></NAlert>
       <NAlert v-if="layout.errors.length" type="warning" :show-icon="false">{{ layout.errors.join('；') }}</NAlert>
-      <NAlert v-if="layout.editing" type="info" :show-icon="false">真实桌面上的组件已锁定功能，按住即可拖动到想放的位置。摆好后点右上角的“完成摆放”。</NAlert>
 
       <section v-if="layout.widgets.length" class="widget-section" data-testid="desktop-widgets">
         <div class="section-head"><h2>已在桌面</h2><p>点一张卡片，调整它的样式、大小和内容。</p></div>
@@ -147,7 +151,7 @@ onMounted(()=>{void client.load();void loadCustomTemplates();});onBeforeUnmount(
         </div>
       </section>
 
-      <p class="widget-hint">{{ store.info.platform==='windows'?'按 Win+D 可以查看桌面上的组件。':'' }} 求签、日历、便签和纪念日可离线使用，天气需要选择城市并联网。位置和内容保存在本机，重启后恢复；关闭小伴桌面时，组件也会关闭。</p>
+      <p class="widget-hint">{{ store.info.platform==='windows'?'按 Win+D 可以查看桌面上的组件。':'' }} 求签、日历、便签、纪念日和小白花可离线使用，天气需要选择城市并联网。按住组件顶部拖动，点右上角齿轮调整设置。位置和内容保存在本机，重启后恢复；关闭小伴桌面时，组件也会关闭。</p>
     </div>
 
     <NModal :show="settingsOpen" preset="card" :title="chosen?titleOf(chosen):'组件设置'" :mask-closable="true" style="max-width:480px;width:92vw" content-style="max-height:60vh;overflow-y:auto" data-testid="widget-settings" @update:show="value=>{if(!value)closeSettings();}">
@@ -165,6 +169,7 @@ onMounted(()=>{void client.load();void loadCustomTemplates();});onBeforeUnmount(
         </template>
         <p v-else-if="chosen.kind==='fortune'" class="inspector-note">点击签筒求签，揭晓后可以展开好签册收藏。</p>
         <p v-else-if="chosen.kind==='calendar'" class="inspector-note">显示本机时间与农历。点击日期查看详情；休／班标识使用已收录的官方年度安排。点击月份回到今天。</p>
+        <p v-else-if="chosen.kind==='flower'" class="inspector-note">在组件上点“浇水”，小白花会经历嫩芽、舒展、含苞、初绽、盛放到满庭六个阶段。进度只保存在这台设备，想重新开始可以移除后再添加一个。</p>
       </div>
       <template #footer>
         <div class="settings-footer">
@@ -200,6 +205,7 @@ onMounted(()=>{void client.load();void loadCustomTemplates();});onBeforeUnmount(
 .widget-art.calendar{background:radial-gradient(ellipse at 70% 30%,#698c86,#243f46)}
 .widget-art.weather{background:radial-gradient(ellipse at 65% 10%,#7e9fa8,#344e62)}
 .widget-art.custom{background:radial-gradient(ellipse at 50% 30%,#b5c9c3,#3d6168)}
+.widget-art.flower{background:radial-gradient(ellipse at 50% 22%,#53866f,#2f5d52 55%,#1c3a37)}
 .custom-card-header{display:flex;justify-content:space-between;align-items:center}
 .custom-delete-btn{border:0;background:none;color:var(--ui-text-tertiary);cursor:pointer;padding:4px;border-radius:4px;display:flex;align-items:center;transition:color .2s}
 .custom-delete-btn:hover{color:#dc2626}

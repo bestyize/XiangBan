@@ -63,7 +63,7 @@ export function approvalPreview(request: Pick<ApprovalRequest, 'tool' | 'argumen
     case 'write_file':
       return `${str(args.path)}\n\n${cut(str(args.content), 1500)}`;
     case 'game_open':
-      return `进入游戏空间${args.id ? `并启动游戏：${str(args.id)}` : '大厅'}`;
+      return `进入游戏空间${args.id ? `并启动游戏：${str(args.id)}` : '页面'}`;
     case 'game_close':
       return '退出游戏空间，返回桌面';
     case 'click':

@@ -17,7 +17,7 @@ const run = (animator: Animator, seconds: number, onFrame?: (frame: Frame) => vo
 }
 
 const wellFormed = (svg: string) => {
-  expect(svg).not.toMatch(/NaN|undefined|Infinity/)
+  expect(svg.replace(/data:image\/webp;base64,[A-Za-z0-9+/=]+/g, '')).not.toMatch(/NaN|undefined|Infinity/)
   expect(svg.startsWith('<svg')).toBe(true)
   expect(svg.endsWith('</svg>')).toBe(true)
 }
@@ -29,8 +29,8 @@ describe('robot expressions', () => {
   })
 
   it('renders every expression in every shell, with the same moving parts and screen', () => {
-    expect(SKIN_IDS).toEqual(['pot'])
-    const parts = (svg: string) => [...svg.matchAll(/data-part="(\w+)"/g)].map(match => match[1]).sort()
+    expect(SKIN_IDS).toEqual(['pot', 'pot-white-flower'])
+    const parts = (svg: string) => [...svg.matchAll(/data-part="(\w+)"/g)].map(match => match[1]).filter(part => part !== 'plant').sort()
     const reference = parts(robotMarkup(stillFrame('idle'), 'x'))
     for (const skin of SKIN_IDS) {
       for (const name of EXPRESSION_NAMES) wellFormed(robotMarkup(stillFrame(name), 'x', undefined, skin))
@@ -45,10 +45,22 @@ describe('robot expressions', () => {
     expect(robotMarkup(stillFrame('idle'), 'x', undefined, 'nonsense')).toBe(robotMarkup(stillFrame('idle'), 'x'))
     for (const skin of Object.values(SKINS)) {
       const numbers = (skin.earOuter.match(/-?\d+(\.\d+)?/g) ?? []).map(Number)
+      if (!numbers.length) continue
       const top = 246 + (Math.min(...numbers) - 246) * skin.scale
       expect(top, skin.id).toBeGreaterThanOrEqual(0)
       expect(Math.max(...numbers), skin.id).toBeLessThanOrEqual(320)
     }
+  })
+
+  it('keeps the same pot while embedding the flower image in previews and live markup', () => {
+    expect(SKINS['pot-white-flower'].art?.head).toBe(SKINS.pot.art?.head)
+    expect(SKINS['pot-white-flower'].art?.trim).toBe(SKINS.pot.art?.trim)
+    expect(SKINS['pot-white-flower'].shell).toEqual(SKINS.pot.shell)
+    const svg = robotMarkup(stillFrame('happy'), 'flower', undefined, 'pot-white-flower')
+    expect(svg).toContain('data-part="plant"')
+    expect(svg).toContain('data:image/webp;base64,')
+    expect(svg).toContain('data-part="plant-hit"')
+    expect(svg).not.toContain(SKINS.pot.earOuter)
   })
 
   it('draws the face and symbols in the palette it is given', () => {

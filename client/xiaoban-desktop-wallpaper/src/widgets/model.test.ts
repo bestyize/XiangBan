@@ -25,6 +25,12 @@ describe('desktop widget layout',()=>{
     expect(layout.widgets[0].monitor).toBe('disconnected');expect(layout.monitors).toEqual(monitors);
     expect(()=>validateLayout({...emptyLayout(),widgets:[{...one(),monitor:''}]})).toThrow();
   });
+  it('keeps flower records only on the flower widget and inside the growth bounds',()=>{
+    const flower={water:4,since:'2026-10-01'};
+    expect(validateLayout({...emptyLayout(),widgets:[{...one(),kind:'flower',flower}]}).widgets[0].flower).toEqual(flower);
+    expect(()=>validateLayout({...emptyLayout(),widgets:[{...one(),kind:'notes',flower}]})).toThrow();
+    expect(()=>validateLayout({...emptyLayout(),widgets:[{...one(),kind:'flower',flower:{...flower,water:-2}}]})).toThrow();
+  });
   it('validates custom widgets with customId',()=>{
     const customWidget: DesktopWidget = { ...one(), id: 'custom1', kind: 'custom', customId: 'pomodoro-timer' };
     expect(validateLayout({ ...emptyLayout(), widgets: [customWidget] }).widgets).toHaveLength(1);

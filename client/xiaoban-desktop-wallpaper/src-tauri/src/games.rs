@@ -130,30 +130,59 @@ pub fn save_game_save(app: tauri::AppHandle, game_id: String, data: Value, host_
     if result.is_err() { let _ = fs::remove_file(&temporary); }
     result.map_err(|e| format!("存档保存失败，已有进度已保留：{e}"))
 }
-pub async fn open(app: &tauri::AppHandle) -> Result<(), String> { open_selected(app, None).await }
+/// Without a game there is nothing to run full screen, so the game space page in the console is shown instead.
+pub async fn open(app: &tauri::AppHandle) -> Result<(), String> { show_space_page(app) }
+/// Small windowed sizes: the same 30% × 30% area as before, shaped 16:9 for landscape packs and 9:16 for portrait ones.
+pub fn game_window_size(screen_width: f64, screen_height: f64, landscape: bool) -> (f64, f64) {
+    let area = screen_width * screen_height * 0.3 * 0.3;
+    let long_side = (area * 16.0 / 9.0).sqrt();
+    if landscape { (long_side, long_side * 9.0 / 16.0) } else { (long_side * 9.0 / 16.0, long_side) }
+}
+pub(crate) fn show_space_page(app: &tauri::AppHandle) -> Result<(), String> {
+    crate::present_control(app)?;
+    app.emit_to("control", "games-open", ()).map_err(|e| e.to_string())
+}
 async fn open_selected(app: &tauri::AppHandle, game_id: Option<String>) -> Result<(), String> {
-    if let Some(id) = game_id.as_deref() {
+    let game_id = match game_id {
+        Some(id) => id,
+        None => return show_space_page(app),
+    };
+    let landscape = {
         let known = catalog(app)?;
-        let game = known.games.iter().find(|game| game["id"] == id).ok_or("没有找到这款本地游戏")?;
-        if game["layer"] == "desktop" { return crate::desk_game::open(app, id).await; }
-    }
+        let game = known.games.iter().find(|game| game["id"] == game_id.as_str()).ok_or("没有找到这款本地游戏")?;
+        if game["layer"] == "desktop" { return crate::desk_game::open(app, &game_id).await; }
+        game["orientation"] == "landscape"
+    };
     let state = app.state::<GameState>(); let _operation = state.operation.lock().await;
     let content_state = app.state::<crate::content::ContentState>(); let _content = content_state.operation.lock().await;
     crate::desk_game::close(app).await?;
-    if let Some(window) = app.get_webview_window("games") {
-        if let Some(id) = &game_id { window.eval(format!("window.dispatchEvent(new CustomEvent('game-launch',{{detail:{}}}));", json!(id))).map_err(|e|e.to_string())?; }
-        window.unminimize().map_err(|e|e.to_string())?; window.show().map_err(|e|e.to_string())?; return window.set_focus().map_err(|e|e.to_string()); }
     let monitor = app.primary_monitor().map_err(|e| e.to_string())?.ok_or("没有找到主显示器")?;
     let scale = monitor.scale_factor();
+    let screen_width = monitor.size().width as f64 / scale;
+    let screen_height = monitor.size().height as f64 / scale;
+    // Keep the same on-screen share as the previous 30% × 30% window, but in the game's own shape:
+    // landscape packs open at 16:9, portrait packs (the default) at 9:16. The player can still resize,
+    // maximize, or go full screen from the system title bar.
+    let (width, height) = game_window_size(screen_width, screen_height, landscape);
+    let left = monitor.position().x as f64 / scale + (screen_width - width) / 2.0;
+    let top = monitor.position().y as f64 / scale + (screen_height - height) / 2.0;
+    if let Some(window) = app.get_webview_window("games") {
+        window.eval(format!("window.dispatchEvent(new CustomEvent('game-launch',{{detail:{}}}));", json!(game_id))).map_err(|e|e.to_string())?;
+        // Switching between a landscape and a portrait game re-shapes the window to match.
+        let _ = window.set_size(tauri::LogicalSize::new(width, height));
+        let _ = window.set_position(tauri::LogicalPosition::new(left, top));
+        window.unminimize().map_err(|e|e.to_string())?; window.show().map_err(|e|e.to_string())?; return window.set_focus().map_err(|e|e.to_string()); }
     let token=issue_token(app)?;
     let smoke=app.state::<crate::DesktopState>().isolated && std::env::var_os("XIAOBAN_GAMES_SMOKE").is_some();
     *state.smoke_report.lock().unwrap()=None;
-    let builder = WebviewWindowBuilder::new(app, "games", WebviewUrl::App(format!("index.html?scene=games{}", game_id.as_ref().map(|id|format!("&game={id}")).unwrap_or_default()).into()))
+    let builder = WebviewWindowBuilder::new(app, "games", WebviewUrl::App(format!("index.html?scene=games&game={game_id}").into()))
         .initialization_script(format!("if(window===window.top){{window.__XIAOBAN_GAME_TOKEN__={};window.__XIAOBAN_GAME_SMOKE__={smoke};}}",json!(token)))
-        .title("小伴 · 游戏空间").decorations(false).shadow(false).resizable(false).visible(false).fullscreen(true)
+        // A normal decorated window: the system title bar owns close / minimize / full screen, so the game
+        // opens at its usual size and the player can go full screen when they want.
+        .title("小伴 · 游戏").decorations(true).shadow(true).resizable(true).visible(false)
         .always_on_top(false).skip_taskbar(false).focused(true)
-        .position(monitor.position().x as f64 / scale, monitor.position().y as f64 / scale)
-        .inner_size(monitor.size().width as f64 / scale, monitor.size().height as f64 / scale);
+        .position(left, top)
+        .inner_size(width, height);
     #[cfg(windows)] let builder = builder.data_directory(crate::storage::webview(&crate::storage::root(app)?));
     #[cfg(target_os="macos")] let builder = builder.incognito(true);
     let window = builder.build().map_err(|e|e.to_string())?;
@@ -251,7 +280,7 @@ pub async fn smoke(app:&tauri::AppHandle)->Result<Value,String>{
     let before=crate::settings(app);
     let position=app.get_webview_window("pet").and_then(|w|w.outer_position().ok());
     open_selected(app, Some("falling-blocks".into())).await?;
-    if !is_active(app) || app.get_webview_window("pet").is_some() || app.get_webview_window("wallpaper").is_some() || app.get_webview_window("media-a").is_some() || app.get_webview_window("media-b").is_some(){return Err("沉浸窗口未暂停背景".into());}
+    if !is_active(app) || app.get_webview_window("pet").is_some() || app.get_webview_window("wallpaper").is_some() || app.get_webview_window("media-a").is_some() || app.get_webview_window("media-b").is_some(){return Err("游戏窗口未暂停背景".into());}
     let deadline=std::time::Instant::now()+std::time::Duration::from_secs(145);
     let report=loop {
         if let Some(report)=app.state::<GameState>().smoke_report.lock().unwrap().clone(){break report;}
@@ -278,6 +307,16 @@ async fn wait_gone(app:&tauri::AppHandle,labels:&[&str])->Result<(),String>{
 #[cfg(test)] mod tests {
     use super::*;
     #[test] fn all_seven_local_manifests_are_valid() { let items=builtin_catalog().unwrap(); assert_eq!(items.len(),7); assert_eq!(items.iter().filter(|v|v["save"]==true).count(),1); assert!(items.iter().all(|v|v["source"]=="builtin" && v["base"]==format!("/game-packs/{}/",v["id"].as_str().unwrap()))); }
+    #[test] fn the_game_window_takes_the_pack_shape_at_the_same_area() {
+        let (landscape_w, landscape_h) = game_window_size(1440.0, 900.0, true);
+        let (portrait_w, portrait_h) = game_window_size(1440.0, 900.0, false);
+        assert!((landscape_w / landscape_h - 16.0 / 9.0).abs() < 1e-9);
+        assert!((portrait_h / portrait_w - 16.0 / 9.0).abs() < 1e-9);
+        let expected = 1440.0 * 900.0 * 0.09;
+        assert!((landscape_w * landscape_h - expected).abs() < 1e-6);
+        assert!((portrait_w * portrait_h - expected).abs() < 1e-6);
+        assert!(portrait_w < portrait_h && landscape_h < landscape_w);
+    }
     fn temp_root(tag:&str)->std::path::PathBuf{ let p=std::env::temp_dir().join(format!("xiaoban-games-{tag}-{}",std::process::id())); let _=fs::remove_dir_all(&p); fs::create_dir_all(&p).unwrap(); p }
     fn user_game(root:&std::path::Path,id:&str,save:bool){ let files=vec![("index.html".to_string(),"<html><head></head></html>".to_string())]; crate::game_packs::create_pack(root,id,"测试","一个游戏",&files,save,false).unwrap(); }
     #[test] fn catalog_merges_builtin_and_user_games_and_reports_bad_folders() {

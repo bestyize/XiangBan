@@ -20,7 +20,7 @@ const LoginModal = defineAsyncComponent(() => import('./components/LoginModal.vu
 
 const message = useMessage();
 const store = createControlStore((text, type = 'success') => message[type](String(text), { duration: type === 'error' ? 6500 : 3500 }));
-const collapsed = ref(true);
+const collapsed = ref(false);
 function toggleNavigation() { collapsed.value = !collapsed.value; }
 const items = [
   { id: 'chat', label: '聊天', hint: '和小伴说话，让它帮忙', icon: MessageCircle },
@@ -34,14 +34,7 @@ const items = [
 ] as const;
 const activeWallpaper = computed(() => store.settings.wallpaperId === 'companion' ? '系统桌面' : store.library.items.find(item => item.definition.id === store.settings.wallpaperId)?.definition.title ?? '已保存的壁纸');
 const unread = computed(() => store.website.announcements.filter(item => store.website.dismissed[item.id] !== item.revision).length);
-function navigate(page: ControlPage) {
-  if (page === 'games') {
-    void store.openGames();
-    return;
-  }
-  store.navigate(page);
-  document.querySelector('.control-workspace')?.scrollTo(0, 0);
-}
+function navigate(page: ControlPage) { store.navigate(page); document.querySelector('.control-workspace')?.scrollTo(0, 0); }
 async function openOfficialSite() {
   if (store.desktop) {
     store.notify('正在通过系统浏览器打开小伴官网...', 'info');
@@ -74,7 +67,12 @@ async function handleLogout() {
     loggingOut.value = false;
   }
 }
-const manageWidgets = () => navigate('widgets');
+const widgetSettingsRequest = ref<{ id: string } | null>(null);
+function manageWidgets(event: Event) {
+  const id = (event as CustomEvent<{ id?: string }>).detail?.id;
+  widgetSettingsRequest.value = typeof id === 'string' && id ? { id } : null;
+  navigate('widgets');
+}
 /**
  * The colour scheme is kept by the host so the floating assistant, which cannot read this window's storage, can match.
  * The first time, what this window already had is sent up (it is the user's choice from before the host kept one);
@@ -103,6 +101,7 @@ async function listenForAssistant() {
   const off = await Promise.all([
     listen<{ session: string | null }>('assistant-open-chat', ({ session }) => { navigate('chat'); if (session) void store.chat.select(session); }),
     listen<{ tab: 'ai' | 'assistant' }>('assistant-open-settings', ({ tab }) => { if (tab === 'assistant') navigate('assistant'); else { store.settingsTab = tab; navigate('settings'); } }),
+    listen<unknown>('games-open', () => { navigate('games'); }),
   ]);
   assistantListeners.push(...off);
 }
@@ -148,7 +147,7 @@ onBeforeUnmount(() => { assistantListeners.splice(0).forEach(off => off()); stor
         <NAlert v-if="store.initialError" class="workspace-alert" type="error" title="桌面配置暂时无法读取">{{ store.initialError }} <NButton size="small" @click="store.initialize()">重试</NButton></NAlert>
         <div v-if="store.website.update?.available && store.page !== 'settings' && store.page !== 'wallpapers' && store.page !== 'chat'" class="update-strip"><span><span class="notice-dot"></span>小伴有新版本 v{{ store.website.update.version }}</span><button @click="navigate('settings')">查看更新<ArrowUpRight :size="14" /></button></div>
         <div v-if="!store.ready" class="workspace-loading"><NSkeleton height="36px" width="220px" /><NSkeleton height="18px" width="320px" /><NSkeleton height="380px" :sharp="false" /></div>
-        <template v-else-if="!store.initialError"><KeepAlive><WallpaperPage v-if="store.page === 'wallpapers'" :store="store" /></KeepAlive><template v-if="store.page !== 'wallpapers'"><ChatPage v-if="store.page === 'chat'" :store="store" /><AssistantPage v-else-if="store.page === 'assistant'" :store="store" /><WidgetsPage v-else-if="store.page === 'widgets'" :store="store" /><InteractivePage v-else-if="store.page === 'interactive'" :store="store" /><EffectsPage v-else-if="store.page === 'effects'" :store="store" /><CompanionPage v-else-if="store.page === 'companion'" :store="store" /><GamesPage v-else-if="store.page === 'games'" :store="store" /><CarePage v-else-if="store.page === 'care'" :store="store" /><SettingsPage v-else :store="store" /></template></template>
+        <template v-else-if="!store.initialError"><KeepAlive><WallpaperPage v-if="store.page === 'wallpapers'" :store="store" /></KeepAlive><template v-if="store.page !== 'wallpapers'"><ChatPage v-if="store.page === 'chat'" :store="store" /><AssistantPage v-else-if="store.page === 'assistant'" :store="store" /><WidgetsPage v-else-if="store.page === 'widgets'" :store="store" :settings-request="widgetSettingsRequest" @settings-opened="widgetSettingsRequest = null" /><InteractivePage v-else-if="store.page === 'interactive'" :store="store" /><EffectsPage v-else-if="store.page === 'effects'" :store="store" /><CompanionPage v-else-if="store.page === 'companion'" :store="store" /><GamesPage v-else-if="store.page === 'games'" :store="store" /><CarePage v-else-if="store.page === 'care'" :store="store" /><SettingsPage v-else :store="store" /></template></template>
       </main>
       <footer class="control-statusbar"><span><span class="state-dot small"></span>{{ store.desktop ? (store.info.platform === 'windows' ? 'Windows 桌面已连接' : '桌面已连接') : '正在预览界面，桌面操作需在应用内使用' }}</span><span>{{ store.library.items.filter(item => item.installed).length }} 个本地壁纸</span></footer>
     </div>

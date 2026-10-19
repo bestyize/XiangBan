@@ -1,13 +1,15 @@
-import { validateNote, validateCountdown } from './content.ts';
-export type WidgetKind = 'fortune' | 'calendar' | 'weather' | 'notes' | 'countdown' | 'custom';
+import { validateNote, validateCountdown, validateFlower } from './content.ts';
+export type WidgetKind = 'fortune' | 'calendar' | 'weather' | 'notes' | 'countdown' | 'flower' | 'custom';
 export type WidgetTheme = 'glass' | 'paper' | 'transparent';
 export interface City { name: string; country: string; admin1: string; latitude: number; longitude: number }
 export interface TodoItem { id: string; text: string; done: boolean }
 export interface NoteData { title: string; mode: 'note' | 'todo'; text: string; items: TodoItem[] }
 export interface CountdownData { title: string; date: string; mode: 'countdown' | 'elapsed'; repeat: 'none' | 'yearly' }
-export interface WidgetContent { note?: NoteData; countdown?: CountdownData }
+/** A white flower grows one stage every few waterings; `since` is the day it was planted. */
+export interface FlowerData { water: number; since: string }
+export interface WidgetContent { note?: NoteData; countdown?: CountdownData; flower?: FlowerData }
 export interface CustomWidgetData { schemaVersion?: number; id: string; name: string; description?: string; width?: number; height?: number; theme?: string; html: string }
-export interface DesktopWidget { id: string; kind: WidgetKind; theme: WidgetTheme; scale: number; x: number; y: number; enabled: boolean; city: City | null; monitor?: string; note?: NoteData; countdown?: CountdownData; customId?: string; custom?: CustomWidgetData }
+export interface DesktopWidget { id: string; kind: WidgetKind; theme: WidgetTheme; scale: number; x: number; y: number; enabled: boolean; city: City | null; monitor?: string; note?: NoteData; countdown?: CountdownData; flower?: FlowerData; customId?: string; custom?: CustomWidgetData }
 export interface WidgetMonitor { id: string; name: string; width: number; height: number; primary: boolean }
 export interface WidgetLayout { version: 1; widgets: DesktopWidget[]; editing: boolean; errors: string[]; desktop?: {width:number;height:number}; monitors?: WidgetMonitor[] }
 export interface WidgetPayload { widget: DesktopWidget; editing: boolean; screenX: number; screenY: number; displayScale?: number | null }
@@ -17,6 +19,7 @@ export const widgetKinds = [
   { kind: 'weather' as const, title: '晴雨之间', description: '关心一座城市，也关心每次出门', label: '天气' },
   { kind: 'notes' as const, title: '心事有处', description: '随手记下灵感，逐件完成今天的小事', label: '便签待办' },
   { kind: 'countdown' as const, title: '好日将至', description: '记住重要的日子，也期待下一次相逢', label: '倒数日／纪念日' },
+  { kind: 'flower' as const, title: '小白花初开', description: '每天浇一点水，陪它从嫩芽开到满庭', label: '成长小白花' },
 ];
 export const widgetThemes = [{ value: 'glass' as const, label: '透光玻璃' }, { value: 'paper' as const, label: '温润纸张' }, { value: 'transparent' as const, label: '透明无底' }];
 export const baseSize = (kind: WidgetKind, custom?: CustomWidgetData) => {
@@ -24,7 +27,7 @@ export const baseSize = (kind: WidgetKind, custom?: CustomWidgetData) => {
     return { width: custom.width!, height: custom.height! };
   }
   if (kind === 'custom') return { width: 280, height: 240 };
-  return kind === 'fortune' ? { width: 220, height: 330 } : kind === 'calendar' ? { width: 300, height: 400 } : kind === 'notes' ? { width: 300, height: 360 } : { width: 280, height: 230 };
+  return kind === 'fortune' ? { width: 220, height: 330 } : kind === 'calendar' ? { width: 300, height: 400 } : kind === 'notes' ? { width: 300, height: 360 } : kind === 'flower' ? { width: 260, height: 320 } : { width: 280, height: 230 };
 };
 export const emptyLayout = (): WidgetLayout => ({ version: 1, widgets: [], editing: false, errors: [] });
 export function validateLayout(value: unknown): WidgetLayout {
@@ -41,6 +44,7 @@ export function validateLayout(value: unknown): WidgetLayout {
     if (widget.monitor != null && (typeof widget.monitor !== 'string' || !widget.monitor || new TextEncoder().encode(widget.monitor).length > 512)) throw new Error('显示器标识无效');
     if (widget.note != null) { if (widget.kind !== 'notes') throw new Error('便签配置类型不匹配'); validateNote(widget.note); }
     if (widget.countdown != null) { if (widget.kind !== 'countdown') throw new Error('纪念日配置类型不匹配'); validateCountdown(widget.countdown); }
+    if (widget.flower != null) { if (widget.kind !== 'flower') throw new Error('小白花配置类型不匹配'); validateFlower(widget.flower); }
     ids.add(widget.id);
   }
   const desktop=data.desktop&&Number.isFinite(data.desktop.width)&&data.desktop.width>0&&Number.isFinite(data.desktop.height)&&data.desktop.height>0?data.desktop:undefined;
