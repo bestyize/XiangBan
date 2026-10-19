@@ -6,7 +6,7 @@ import { NAlert, NButton, NInput, NModal, NPopconfirm, NSelect, NSlider, NSwitch
 import { invoke } from '../../bridge.ts';
 import type { ControlStore } from '../control-types.ts';
 import { createWidgetClient, searchWidgetCities } from '../../widgets/client.ts';
-import { baseSize, widgetKinds, widgetThemes, type WidgetKind, type DesktopWidget, type City, type CustomWidgetData } from '../../widgets/model.ts';
+import { baseSize, widgetKinds, widgetThemes, validStockSymbol, type WidgetKind, type DesktopWidget, type City, type CustomWidgetData } from '../../widgets/model.ts';
 import WidgetSurface from '../../widgets/WidgetSurface.vue';
 import NotesWidget from '../../widgets/NotesWidget.vue';
 import CountdownEditor from '../../widgets/CountdownEditor.vue';
@@ -18,6 +18,12 @@ const client=createWidgetClient(),{layout,ready,busy,error}=client;
 const MAX_WIDGETS=12;
 const selected=ref(''),settingsOpen=ref(false),cityQuery=ref(''),cities=ref<City[]>([]),cityBusy=ref(false);
 const chosen=computed(()=>layout.value.widgets.find(widget=>widget.id===selected.value)??null);
+const watchStock=ref('');
+watch(chosen,w=>{watchStock.value=w?.living?.symbol??'1.000001';},{immediate:true});
+function saveStock(){
+  const symbol=watchStock.value.trim();if(!validStockSymbol(symbol)){props.store.notify('证券代码格式：1.600519（沪市）或 0.000001（深市）','error');return;}
+  if(chosen.value?.kind==='stocks')update({living:{reminders:chosen.value.living?.reminders??[],count:chosen.value.living?.count??0,symbol}});
+}
 const full=computed(()=>layout.value.widgets.length>=MAX_WIDGETS);
 const customTemplates=ref<any[]>([]);
 async function loadCustomTemplates(){
@@ -43,7 +49,7 @@ const stageWidth=ref(0);
 let libraryObserver:ResizeObserver|undefined;
 function measureStage(){const column=libraryGrid.value?getComputedStyle(libraryGrid.value).gridTemplateColumns.split(' ')[0]:'';const width=parseFloat(column??'');if(Number.isFinite(width)&&width>0)stageWidth.value=width;}
 const demoScale=(kind:WidgetKind,custom?:CustomWidgetData)=>{const{width,height}=baseSize(kind,custom);const stage=stageWidth.value||210;return Math.min(1,stage/width,stage*9/16/height);};
-const demo=(kind:WidgetKind):DesktopWidget=>({id:`demo${kind}`,kind,theme:'transparent',scale:1,x:0,y:0,enabled:true,city:null,...(kind==='notes'?{note:{...emptyNote(),text:'慢慢来，也会抵达。\n\n把今天的小事，放在这里。'}}:kind==='countdown'?{countdown:{...emptyCountdown(),title:'下一次旅行',date:'2026-12-31'}}:kind==='flower'?{flower:{...emptyFlower(),water:12}}:{})});
+const demo=(kind:WidgetKind):DesktopWidget=>({id:`demo${kind}`,kind,theme:'transparent',scale:1,x:0,y:0,enabled:true,city:null,...(kind==='notes'?{note:{...emptyNote(),mode:'todo',items:[{id:'task1',text:'完成产品方案',done:true},{id:'task2',text:'健身 30 分钟',done:false},{id:'task3',text:'读一本喜欢的书',done:false}]}}:kind==='reminders'?{living:{count:0,symbol:'1.000001',reminders:[{id:'a1',title:'团队周会',at:'2026-10-19T09:30',done:false},{id:'a2',title:'设计评审',at:'2026-10-19T15:00',done:false}]}}:kind==='woodfish'?{living:{count:108,symbol:'1.000001',reminders:[]}}:kind==='countdown'?{countdown:{...emptyCountdown(),title:'下一次旅行',date:'2026-12-31'}}:kind==='flower'?{flower:{...emptyFlower(),water:12}}:{})});
 async function action(task:()=>Promise<unknown>){try{await task();}catch(e){props.store.notify(e,'error');}}
 // A brief check mark on the "+" badge confirms the add without moving the user away from the library.
 const flashKey=ref('');let flashTimer:ReturnType<typeof setTimeout>|undefined;
@@ -151,7 +157,7 @@ onMounted(()=>{void client.load();void loadCustomTemplates();});onBeforeUnmount(
         </div>
       </section>
 
-      <p class="widget-hint">{{ store.info.platform==='windows'?'按 Win+D 可以查看桌面上的组件。':'' }} 求签、日历、便签、纪念日和小白花可离线使用，天气需要选择城市并联网。按住组件顶部拖动，点右上角齿轮调整设置。位置和内容保存在本机，重启后恢复；关闭小伴桌面时，组件也会关闭。</p>
+      <p class="widget-hint">{{ store.info.platform==='windows'?'按 Win+D 可以查看桌面上的组件。':'' }} 时钟、待办、提醒、木鱼及原有离线组件不需要联网；天气与股票行情需要网络连接。按住组件顶部拖动，点右上角齿轮调整设置。位置和内容保存在本机，重启后恢复；关闭小伴桌面时，组件也会关闭。</p>
     </div>
 
     <NModal :show="settingsOpen" preset="card" :title="chosen?titleOf(chosen):'组件设置'" :mask-closable="true" style="max-width:480px;width:92vw" content-style="max-height:60vh;overflow-y:auto" data-testid="widget-settings" @update:show="value=>{if(!value)closeSettings();}">
@@ -169,6 +175,10 @@ onMounted(()=>{void client.load();void loadCustomTemplates();});onBeforeUnmount(
         </template>
         <p v-else-if="chosen.kind==='fortune'" class="inspector-note">点击签筒求签，揭晓后可以展开好签册收藏。</p>
         <p v-else-if="chosen.kind==='calendar'" class="inspector-note">显示本机时间与农历。点击日期查看详情；休／班标识使用已收录的官方年度安排。点击月份回到今天。</p>
+        <p v-else-if="chosen.kind==='clock'" class="inspector-note">时钟会跟随电脑时间自动更新。可以选择实体、柔和或无背景材质。</p>
+        <p v-else-if="chosen.kind==='reminders'" class="inspector-note">点击桌面提醒组件的 + 添加日程，点击事项名称可修改，点击圆点标记完成。该组件目前是本地日程清单，不会自动弹出系统通知。</p>
+        <template v-else-if="chosen.kind==='stocks'"><div class="widget-field"><span>自选股票代码</span><div class="city-search"><NInput v-model:value="watchStock" placeholder="例如 1.600519 或 0.000001" @keydown.enter="saveStock"/><NButton @click="saveStock">应用</NButton></div></div><p class="inspector-note">支持上证指数、深证成指、创业板指及输入沪深股票代码。点击组件中的标签切换大盘；1D / 5D 走势图来自公开行情接口。商业分发前应核实数据授权。</p></template>
+        <p v-else-if="chosen.kind==='woodfish'" class="inspector-note">点击木鱼即可敲击，支持静音和重置次数。敲击记录会保存在这台设备。</p>
         <p v-else-if="chosen.kind==='flower'" class="inspector-note">在组件上点“浇水”，小白花会经历嫩芽、舒展、含苞、初绽、盛放到满庭六个阶段。进度只保存在这台设备，想重新开始可以移除后再添加一个。</p>
       </div>
       <template #footer>

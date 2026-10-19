@@ -128,6 +128,36 @@ pub fn fetch(source: &Source, city: &City, now: i64) -> Result<Weather, String> 
     let value = get(url)?;
     parse_weather(&value, source, city, now)
 }
+
+/// Three-day forecast for a visible weather widget. Reuses the configured, validated weather source.
+pub fn forecast(source:&Source,city:&City)->Result<Value,String>{
+    city.validate()?;
+    let mut url=source.url(false)?;
+    url.query_pairs_mut().append_pair("latitude",&city.latitude.to_string())
+        .append_pair("longitude",&city.longitude.to_string())
+        .append_pair("daily","weather_code,temperature_2m_max,temperature_2m_min")
+        .append_pair("forecast_days","3").append_pair("timezone","auto");
+    let value=get(url)?;
+    forecast_values(&value)
+}
+fn forecast_values(value:&Value)->Result<Value,String>{
+    let dates=value.pointer("/daily/time").and_then(Value::as_array).ok_or("天气预报缺少日期")?;
+    let highs=value.pointer("/daily/temperature_2m_max").and_then(Value::as_array).ok_or("天气预报缺少最高温度")?;
+    let lows=value.pointer("/daily/temperature_2m_min").and_then(Value::as_array).ok_or("天气预报缺少最低温度")?;
+    let codes=value.pointer("/daily/weather_code").and_then(Value::as_array).ok_or("天气预报缺少天气状况")?;
+    let mut days=Vec::new();
+    for i in 0..dates.len().min(3){
+        let date=dates.get(i).and_then(Value::as_str).ok_or("预报日期无效")?;
+        let hi=highs.get(i).and_then(Value::as_f64).ok_or("最高温度无效")?;
+        let lo=lows.get(i).and_then(Value::as_f64).ok_or("最低温度无效")?;
+        let code=codes.get(i).and_then(Value::as_u64).ok_or("天气代码无效")?;
+        if chrono::NaiveDate::parse_from_str(date,"%Y-%m-%d").is_err() || !hi.is_finite() || !lo.is_finite() || !(-100.0..=70.0).contains(&hi) || !(-100.0..=70.0).contains(&lo) || hi<lo || code>99{return Err("天气预报内容无效".into());}
+        days.push(serde_json::json!({"date":date,"high":hi.round(),"low":lo.round(),"code":code}));
+    }
+    if days.is_empty(){return Err("暂无可用三日预报".into());}
+    Ok(serde_json::json!({"days":days}))
+}
+
 fn parse_weather(value: &Value, source: &Source, city: &City, now: i64) -> Result<Weather, String> {
     let current = value.get("current").ok_or("天气数据缺少当前状况")?;
     let model_at = current.get("time").and_then(Value::as_i64).ok_or("天气数据缺少更新时间")?;
@@ -146,6 +176,11 @@ fn parse_weather(value: &Value, source: &Source, city: &City, now: i64) -> Resul
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test] fn reads_three_day_forecast_without_fabricating_missing_values(){
+        let raw=serde_json::json!({"daily":{"time":["2026-10-19","2026-10-20","2026-10-21"],"temperature_2m_max":[26.2,25.9,20.0],"temperature_2m_min":[21.1,19.5,17.2],"weather_code":[1,2,3]}});
+        assert_eq!(forecast_values(&raw).unwrap()["days"].as_array().unwrap().len(),3);
+        assert!(forecast_values(&serde_json::json!({"daily":{"time":["2026-10-19"]}})).is_err());
+    }
     #[test] fn weather_source_defaults_to_open_meteo() {
         let source = Source::default();
         assert_eq!(source.provider, "open-meteo"); assert!(source.validate().is_ok());

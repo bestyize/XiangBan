@@ -2,7 +2,7 @@
 use crate::care_weather::{City, Weather};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use std::{collections::HashMap, fs, sync::{atomic::{AtomicBool, Ordering}, Mutex}};
+use std::{collections::HashMap, fs, io::Read, sync::{atomic::{AtomicBool, Ordering}, Mutex}};
 use tauri::{Manager, WebviewUrl, WebviewWindowBuilder};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -18,6 +18,8 @@ pub struct Widget {
     pub countdown: Option<CountdownData>,
     #[serde(default, skip_serializing_if="Option::is_none")]
     pub flower: Option<FlowerData>,
+    #[serde(default, skip_serializing_if="Option::is_none")]
+    pub living: Option<LivingData>,
     #[serde(default, skip_serializing_if="Option::is_none")]
     pub custom_id: Option<String>,
 }
@@ -35,11 +37,24 @@ pub struct CountdownData { pub title: String, pub date: String, pub mode: String
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct FlowerData { pub water: u32, pub since: String }
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all="camelCase", deny_unknown_fields)]
+pub struct ReminderItem { pub id:String, pub title:String, pub at:String, pub done:bool }
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all="camelCase", deny_unknown_fields)]
+pub struct LivingData { pub reminders:Vec<ReminderItem>, pub count:u32, pub symbol:String }
+impl Default for LivingData {fn default()->Self{Self{reminders:vec![],count:0,symbol:"1.000001".into()}}}
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct WidgetContent { note: Option<NoteData>, countdown: Option<CountdownData>, flower: Option<FlowerData> }
+pub struct WidgetContent { note: Option<NoteData>, countdown: Option<CountdownData>, flower: Option<FlowerData>, living: Option<LivingData> }
 fn short_text(value: &str, max: usize) -> bool { !value.trim().is_empty() && value.encode_utf16().count() <= max }
 fn valid_identity(value: &str) -> bool { !value.is_empty() && value.len()<=32 && value.bytes().all(|c|c.is_ascii_lowercase()||c.is_ascii_digit()) }
+fn valid_stock_symbol(symbol:&str)->bool{
+    let Some((market,code))=symbol.split_once('.') else{return false;};
+    code.len()==6 && code.bytes().all(|b|b.is_ascii_digit()) &&
+        ((market=="1" && (code=="000001" || code.starts_with('6'))) ||
+         (market=="0" && (code=="399001" || code=="399006" || code.starts_with('0') || code.starts_with('3'))))
+}
 fn validate_content(widget: &Widget) -> Result<(),String> {
     if let Some(note)=&widget.note {
         if widget.kind!="notes" || !short_text(&note.title,40) || !["note","todo"].contains(&note.mode.as_str()) || note.text.encode_utf16().count()>1200 || note.items.len()>12 { return Err("便签内容无效或超过长度限制".into()); }
@@ -54,6 +69,14 @@ fn validate_content(widget: &Widget) -> Result<(),String> {
         let valid_date=chrono::NaiveDate::parse_from_str(&data.date,"%Y-%m-%d").is_ok_and(|date|date.format("%Y-%m-%d").to_string()==data.date && data.date.as_str()>="1900-01-01" && data.date.as_str()<="2100-12-31");
         if widget.kind!="countdown" || !short_text(&data.title,40) || !valid_date || !["countdown","elapsed"].contains(&data.mode.as_str()) || !["none","yearly"].contains(&data.repeat.as_str()) || (data.mode=="elapsed"&&data.repeat!="none") {return Err("纪念日配置无效".into());}
     }
+    if let Some(data)=&widget.living {
+        if !["reminders","stocks","woodfish"].contains(&widget.kind.as_str()) || data.count>9999999 || !valid_stock_symbol(&data.symbol) || data.reminders.len()>12{return Err("生活组件配置无效".into());}
+        let mut ids=std::collections::HashSet::new();
+        for item in &data.reminders{
+            let date=chrono::NaiveDateTime::parse_from_str(&item.at,"%Y-%m-%dT%H:%M").is_ok_and(|v|v.format("%Y-%m-%dT%H:%M").to_string()==item.at);
+            if !valid_identity(&item.id) || !ids.insert(&item.id) || !short_text(&item.title,60) || !date{return Err("提醒记录无效".into());}
+        }
+    }
     Ok(())
 }
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -65,8 +88,12 @@ pub struct WidgetState {
     layout: Mutex<Layout>, editing: AtomicBool,
     operation: tauri::async_runtime::Mutex<()>,
     weather_operation: tauri::async_runtime::Mutex<()>,
+    market_operation: tauri::async_runtime::Mutex<()>,
+    forecast_operation: tauri::async_runtime::Mutex<()>,
     load_error: Mutex<Option<String>>, errors: Mutex<Vec<String>>,
     weather: Mutex<HashMap<String, Weather>>, attempts: Mutex<HashMap<String, i64>>,
+    market: Mutex<HashMap<String,(i64,Value)>>,
+    forecasts: Mutex<HashMap<String,(i64,Value)>>,
 }
 pub fn is_widget(label: &str) -> bool { label.starts_with("widget-") }
 fn own_widget(window: &tauri::WebviewWindow) -> Result<Widget, String> {
@@ -74,8 +101,8 @@ fn own_widget(window: &tauri::WebviewWindow) -> Result<Widget, String> {
         .find(|widget| format!("widget-{}", widget.id) == window.label()).cloned().ok_or("没有找到这个桌面组件".into())
 }
 pub fn permitted(label: &str, command: &str) -> Option<bool> {
-    if is_widget(label) { return Some(["get_desktop_widget", "move_desktop_widget", "show_widget_settings", "get_widget_weather", "save_desktop_widget_content", "open_ritual_space"].contains(&command)); }
-    if ["get_desktop_widgets", "add_desktop_widget", "update_desktop_widget", "remove_desktop_widget", "set_widgets_editing", "get_desktop_widget", "move_desktop_widget", "show_widget_settings", "get_widget_weather", "save_desktop_widget_content", "list_custom_widgets", "save_custom_widget", "remove_custom_widget"].contains(&command) { return Some(label == "control"); }
+    if is_widget(label) { return Some(["get_desktop_widget", "move_desktop_widget", "show_widget_settings", "get_widget_weather", "get_widget_forecast", "save_desktop_widget_content", "get_widget_stocks", "open_ritual_space"].contains(&command)); }
+    if ["get_desktop_widgets", "add_desktop_widget", "update_desktop_widget", "remove_desktop_widget", "set_widgets_editing", "get_desktop_widget", "move_desktop_widget", "show_widget_settings", "get_widget_weather", "get_widget_forecast", "get_widget_stocks", "save_desktop_widget_content", "list_custom_widgets", "save_custom_widget", "remove_custom_widget"].contains(&command) { return Some(label == "control"); }
     None
 }
 pub fn validate(layout: &Layout) -> Result<(), String> {
@@ -83,7 +110,7 @@ pub fn validate(layout: &Layout) -> Result<(), String> {
     let mut ids = std::collections::HashSet::new();
     for widget in &layout.widgets {
         if widget.id.is_empty() || widget.id.len() > 32 || !widget.id.bytes().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit()) || !ids.insert(&widget.id)
-            || !["fortune", "calendar", "weather", "notes", "countdown", "flower", "custom"].contains(&widget.kind.as_str())
+            || !["fortune", "calendar", "weather", "notes", "countdown", "flower", "custom", "clock", "reminders", "stocks", "woodfish"].contains(&widget.kind.as_str())
             || !["glass", "paper", "transparent"].contains(&widget.theme.as_str())
             || !widget.scale.is_finite() || !(0.75..=1.5).contains(&widget.scale)
             || !widget.x.is_finite() || !(0.0..=1.0).contains(&widget.x)
@@ -147,7 +174,7 @@ fn snapshot(app: &tauri::AppHandle) -> Value {
     let widgets_with_custom: Vec<_> = layout.widgets.iter().map(|w| attach_custom_data(app, w)).collect();
     json!({"version":1,"widgets":widgets_with_custom,"editing":state.editing.load(Ordering::Relaxed),"errors":state.errors.lock().unwrap().clone(),"desktop":desktop,"monitors":displays})
 }
-pub fn base_size(kind: &str) -> (f64, f64) { match kind { "fortune" => (220.0, 330.0), "calendar" => (300.0, 400.0), "notes" => (300.0, 360.0), "flower" => (260.0, 320.0), _ => (280.0, 230.0) } }
+pub fn base_size(kind: &str) -> (f64, f64) { match kind { "clock" | "weather" => (360.0,300.0), "reminders" | "woodfish" => (360.0,320.0), "stocks" => (390.0,330.0), "fortune" => (220.0, 330.0), "calendar" => (300.0, 400.0), "notes" => (300.0, 360.0), "flower" => (260.0, 320.0), _ => (280.0, 230.0) } }
 pub fn widget_base_size(app: &tauri::AppHandle, widget: &Widget) -> (f64, f64) {
     if widget.kind == "custom" {
         if let Some(cid) = &widget.custom_id {
@@ -254,10 +281,11 @@ pub async fn add_desktop_widget(app: tauri::AppHandle, kind: String, custom_id: 
     let mut next=state.layout.lock().unwrap().clone(); if next.widgets.len()>=12{return Err("桌面最多放置 12 个组件".into());}
     let mut random=[0u8;8];getrandom::fill(&mut random).map_err(|e|e.to_string())?;
     let index=next.widgets.len();
-    let note=if kind=="notes"{Some(NoteData{title:"随手记".into(),mode:"note".into(),text:String::new(),items:vec![]})}else{None};
+    let note=if kind=="notes"{Some(NoteData{title:"今日待办".into(),mode:"todo".into(),text:String::new(),items:vec![]})}else{None};
     let countdown=if kind=="countdown"{Some(CountdownData{title:"值得期待的日子".into(),date:chrono::Local::now().format("%Y-%m-%d").to_string(),mode:"countdown".into(),repeat:"none".into()})}else{None};
     let flower=if kind=="flower"{Some(FlowerData{water:0,since:chrono::Local::now().format("%Y-%m-%d").to_string()})}else{None};
-    let mut theme="transparent".to_string();
+    let living=if ["reminders","stocks","woodfish"].contains(&kind.as_str()){Some(LivingData::default())}else{None};
+    let mut theme=if kind=="stocks" || ["clock","reminders","woodfish","notes"].contains(&kind.as_str()){"paper".to_string()}else if kind=="weather"{"glass".to_string()}else{"transparent".to_string()};
     if kind == "custom" {
         let cid = custom_id.as_deref().ok_or("添加自定义组件需要指定 customId")?;
         let root = crate::storage::root(&app)?;
@@ -266,17 +294,17 @@ pub async fn add_desktop_widget(app: tauri::AppHandle, kind: String, custom_id: 
             theme = t.to_string();
         }
     }
-    next.widgets.push(Widget{id:random.iter().map(|b|format!("{b:02x}")).collect(),kind,theme,scale:1.0,x:((if index%3==1{0.88}else{0.52})-(index/3) as f64*0.25).max(0.05),y:if index%3==2{0.94}else{0.06},enabled:true,city:None,note,countdown,flower,monitor:None,custom_id});
+    next.widgets.push(Widget{id:random.iter().map(|b|format!("{b:02x}")).collect(),kind,theme,scale:1.0,x:((if index%3==1{0.88}else{0.52})-(index/3) as f64*0.25).max(0.05),y:if index%3==2{0.94}else{0.06},enabled:true,city:None,note,countdown,flower,living,monitor:None,custom_id});
     persist(&app,&next)?; *state.layout.lock().unwrap()=next; sync(&app); Ok(snapshot(&app))
 }
 #[derive(Deserialize)]
 #[serde(rename_all="camelCase",deny_unknown_fields)]
-pub struct Patch { monitor: Option<String>, theme: Option<String>, scale: Option<f64>, x: Option<f64>, y: Option<f64>, enabled: Option<bool>, city: Option<City>, note: Option<NoteData>, countdown: Option<CountdownData>, flower: Option<FlowerData>, custom_id: Option<String> }
+pub struct Patch { monitor: Option<String>, theme: Option<String>, scale: Option<f64>, x: Option<f64>, y: Option<f64>, enabled: Option<bool>, city: Option<City>, note: Option<NoteData>, countdown: Option<CountdownData>, flower: Option<FlowerData>, living: Option<LivingData>, custom_id: Option<String> }
 #[tauri::command]
 pub async fn update_desktop_widget(app: tauri::AppHandle, id: String, patch: Patch) -> Result<Value,String> {
     let state=app.state::<WidgetState>();let _operation=state.operation.lock().await;
     let mut next=state.layout.lock().unwrap().clone();let widget=next.widgets.iter_mut().find(|w|w.id==id).ok_or("没有找到这个组件")?;
-    if let Some(v)=patch.monitor{widget.monitor=Some(v);}if let Some(v)=patch.theme{widget.theme=v;}if let Some(v)=patch.scale{widget.scale=v;}if let Some(v)=patch.x{widget.x=v;}if let Some(v)=patch.y{widget.y=v;}if let Some(v)=patch.enabled{widget.enabled=v;}if let Some(v)=patch.city{widget.city=Some(v);}if let Some(v)=patch.note{widget.note=Some(v);}if let Some(v)=patch.countdown{widget.countdown=Some(v);}if let Some(v)=patch.flower{widget.flower=Some(v);}if let Some(v)=patch.custom_id{widget.custom_id=Some(v);}
+    if let Some(v)=patch.monitor{widget.monitor=Some(v);}if let Some(v)=patch.theme{widget.theme=v;}if let Some(v)=patch.scale{widget.scale=v;}if let Some(v)=patch.x{widget.x=v;}if let Some(v)=patch.y{widget.y=v;}if let Some(v)=patch.enabled{widget.enabled=v;}if let Some(v)=patch.city{widget.city=Some(v);}if let Some(v)=patch.note{widget.note=Some(v);}if let Some(v)=patch.countdown{widget.countdown=Some(v);}if let Some(v)=patch.flower{widget.flower=Some(v);}if let Some(v)=patch.living{widget.living=Some(v);}if let Some(v)=patch.custom_id{widget.custom_id=Some(v);}
     persist(&app,&next)?;*state.layout.lock().unwrap()=next;sync(&app);Ok(snapshot(&app))
 }
 /// A widget can save only its own typed content; no caller-supplied identity or layout patch.
@@ -287,10 +315,11 @@ pub async fn save_desktop_widget_content(window:tauri::WebviewWindow,content:Wid
     if state.editing.load(Ordering::Relaxed){return Err("请先完成组件摆放".into());}
     let mut next=state.layout.lock().unwrap().clone();
     let widget=next.widgets.iter_mut().find(|w|w.id==original.id).ok_or("没有找到这个组件")?;
-    match (widget.kind.as_str(),content.note,content.countdown,content.flower) {
-        ("notes",Some(note),None,None)=>widget.note=Some(note),
-        ("countdown",None,Some(countdown),None)=>widget.countdown=Some(countdown),
-        ("flower",None,None,Some(flower))=>{validate_content(&Widget{flower:Some(flower.clone()),..widget.clone()})?;widget.flower=Some(flower);},
+    match widget.kind.as_str() {
+        "notes" if content.note.is_some() && content.countdown.is_none() && content.flower.is_none() && content.living.is_none() => widget.note=content.note,
+        "countdown" if content.countdown.is_some() && content.note.is_none() && content.flower.is_none() && content.living.is_none() => widget.countdown=content.countdown,
+        "flower" if content.flower.is_some() && content.note.is_none() && content.countdown.is_none() && content.living.is_none() => widget.flower=content.flower,
+        "reminders" | "stocks" | "woodfish" if content.living.is_some() && content.note.is_none() && content.countdown.is_none() && content.flower.is_none() => widget.living=content.living,
         _=>return Err("此组件不能保存这类内容".into())
     }
     persist(app,&next)?;*state.layout.lock().unwrap()=next;sync(app);Ok(())
@@ -338,6 +367,68 @@ pub async fn get_widget_weather(window:tauri::WebviewWindow)->Result<Weather,Str
     let weather=tauri::async_runtime::spawn_blocking(move||crate::care_weather::fetch(&source,&city,now)).await.map_err(|e|e.to_string())??;
     let mut cache=state.weather.lock().unwrap();if cache.len()>48{cache.clear();}cache.insert(key,weather.clone());Ok(weather)
 }
+
+/// A narrow, read-only market-data adapter; no arbitrary host or symbol supplied by a webview.
+/// The public endpoint is best-effort, with no SLA or verified redistribution licence.
+#[tauri::command]
+pub async fn get_widget_forecast(window:tauri::WebviewWindow)->Result<Value,String>{
+    let widget=own_widget(&window)?;if widget.kind!="weather"{return Err("此组件不能读取天气预报".into());}
+    let city=widget.city.ok_or("请先在组件设置里选择城市")?;
+    let app=window.app_handle().clone();let state=app.state::<WidgetState>();
+    let _lock=state.forecast_operation.lock().await;let now=chrono::Utc::now().timestamp();
+    let source=crate::reminders::widget_weather_source(&app);
+    let key=format!("{}:{}:{}",city.latitude,city.longitude,serde_json::to_string(&source).map_err(|e|e.to_string())?);
+    if let Some((when,value))=state.forecasts.lock().unwrap().get(&key).filter(|(when,_)|(0..1800).contains(&(now-*when))).cloned(){return Ok(value);}
+    let result=tauri::async_runtime::spawn_blocking(move||crate::care_weather::forecast(&source,&city)).await.map_err(|e|e.to_string())??;
+    let mut cache=state.forecasts.lock().unwrap();if cache.len()>48{cache.clear();}cache.insert(key,(now,result.clone()));
+    Ok(result)
+}
+
+#[tauri::command]
+pub async fn get_widget_stocks(window: tauri::WebviewWindow, period:String)->Result<Value,String>{
+    let widget=own_widget(&window)?;
+    if widget.kind!="stocks"{return Err("此组件不读取股票行情".into());}
+    if period!="1D" && period!="5D"{return Err("当前仅支持 1D 和 5D 行情".into());}
+    let symbol=widget.living.unwrap_or_default().symbol;
+    if !valid_stock_symbol(&symbol){return Err("未支持的证券代码".into());}
+    let app=window.app_handle();let state=app.state::<WidgetState>();
+    let _operation=state.market_operation.lock().await;
+    let key=format!("{symbol}/{period}");let now=chrono::Utc::now().timestamp();
+    if let Some((when,value))=state.market.lock().unwrap().get(&key).filter(|(when,_)|(0..60).contains(&(now-*when))).cloned(){return Ok(value);}
+    let stock=symbol.clone();let days=if period=="1D"{1}else{5};
+    let response=tauri::async_runtime::spawn_blocking(move||->Result<Value,String>{
+        let url=format!("https://push2his.eastmoney.com/api/qt/stock/trends2/get?secid={stock}&fields1=f1,f2,f3,f4,f5&fields2=f51,f52,f53,f54,f55&ndays={days}&iscr=0&ut=fa5fd1943c7b386f172d6893dbfba10b");
+        let client=reqwest::blocking::Client::builder().timeout(std::time::Duration::from_secs(12))
+            .redirect(reqwest::redirect::Policy::none()).user_agent("Mozilla/5.0 XiaoBan Desktop").build().map_err(|e|e.to_string())?;
+        let mut res=client.get(url).send().map_err(|e|format!("行情连接失败：{e}"))?.error_for_status().map_err(|e|format!("行情服务错误：{e}"))?;
+        let mut bytes=Vec::new();res.take(512*1024+1).read_to_end(&mut bytes).map_err(|e|e.to_string())?;
+        if bytes.len()>512*1024{return Err("行情响应过大".into());}
+        let json:Value=serde_json::from_slice(&bytes).map_err(|_|"行情服务返回格式无效")?;
+        let data=json.get("data").filter(|d|!d.is_null()).ok_or("行情服务暂未返回数据")?;
+        let lines=data.get("trends").and_then(Value::as_array).ok_or("行情序列不可用")?;
+        let values:Vec<(String,f64)>=lines.iter().filter_map(|v|{
+            let row=v.as_str()?;let parts:Vec<_>=row.split(',').collect();
+            let value=parts.get(2)?.parse::<f64>().ok()?;
+            if !value.is_finite()||value<=0.0{return None;}
+            Some((parts.first()?.to_string(),value))
+        }).collect();
+        if values.len()<2{return Err("可用行情点数不足".into());}
+        let last=values.last().ok_or("行情为空")?;let price=last.1;
+        let prev=data.get("preClose").and_then(|v|v.as_f64().or_else(||v.as_str().and_then(|s|s.parse::<f64>().ok()))).unwrap_or(0.0);
+        if prev<=0.0{return Err("行情缺少昨收盘价".into());}
+        let step=((values.len()+119)/120).max(1);
+        let mut points:Vec<f64>=values.iter().step_by(step).map(|(_,value)|*value).collect();
+        if points.last()!=Some(&price){points.push(price);}
+        let change=price-prev;let pct=100.0*change/prev;
+        Ok(json!({"price":price,"change":change,"percent":pct,"updatedAt":last.0,"points":points,
+            "source":"东方财富公开数据","name":data.get("name").and_then(Value::as_str).unwrap_or("指数")}))
+    }).await.map_err(|e|e.to_string())??;
+    let mut response=response;
+    response["symbol"]=json!(symbol);response["period"]=json!(period);
+    let mut cache=state.market.lock().unwrap();if cache.len()>20{cache.clear();}cache.insert(key,(now,response.clone()));
+    Ok(response)
+}
+
 #[tauri::command]
 pub fn list_custom_widgets(app: tauri::AppHandle) -> Result<Value, String> {
     let dir = crate::storage::root(&app)?.join("custom_widgets");
@@ -370,7 +461,7 @@ pub fn delete_custom_pack(app: &tauri::AppHandle, id: &str) -> Result<(), String
 #[cfg(test)]
 mod tests{
     use super::*;
-    fn one()->Layout{Layout{version:1,widgets:vec![Widget{id:"abc123".into(),kind:"calendar".into(),theme:"glass".into(),scale:1.0,x:0.8,y:0.2,enabled:true,city:None,note:None,countdown:None,flower:None,monitor:None,custom_id:None}]}}
+    fn one()->Layout{Layout{version:1,widgets:vec![Widget{id:"abc123".into(),kind:"calendar".into(),theme:"glass".into(),scale:1.0,x:0.8,y:0.2,enabled:true,city:None,note:None,countdown:None,flower:None,living:None,monitor:None,custom_id:None}]}}
     #[test]fn custom_widgets_in_layout_validated(){
         let mut layout=one();layout.widgets[0].kind="custom".into();layout.widgets[0].custom_id=Some("pomodoro-timer".into());
         assert!(validate(&layout).is_ok());
@@ -406,6 +497,19 @@ mod tests{
         assert_eq!(permitted("widget-abc","save_desktop_widget_content"),Some(true));assert_eq!(permitted("media-a","save_desktop_widget_content"),Some(false));
         assert!(serde_json::from_value::<WidgetContent>(json!({"id":"other","note":null})).is_err());
         assert!(serde_json::from_value::<WidgetContent>(json!({"theme":"glass"})).is_err());
+    }
+
+    #[test] fn living_widget_schema_rejects_bad_records() {
+        assert!(valid_stock_symbol("1.600519"));assert!(valid_stock_symbol("0.300750"));assert!(!valid_stock_symbol("105.AAPL"));
+        let mut layout=one();layout.widgets[0].kind="woodfish".into();
+        layout.widgets[0].living=Some(LivingData{count:108,reminders:vec![],symbol:"1.000001".into()});
+        assert!(validate(&layout).is_ok());
+        layout.widgets[0].living.as_mut().unwrap().count=10000000;assert!(validate(&layout).is_err());
+        layout.widgets[0].living.as_mut().unwrap().count=5;
+        layout.widgets[0].living.as_mut().unwrap().reminders.push(ReminderItem{id:"r1".into(),title:"开会".into(),at:"2026-10-20T09:30".into(),done:false});
+        assert!(validate(&layout).is_ok());
+        layout.widgets[0].living.as_mut().unwrap().reminders[0].at="2026-02-30T09:30".into();assert!(validate(&layout).is_err());
+        layout.widgets[0].kind="calendar".into();assert!(validate(&layout).is_err());
     }
 
 }

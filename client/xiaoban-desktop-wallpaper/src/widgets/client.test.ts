@@ -35,5 +35,21 @@ describe('widget collection persistence',()=>{
     const reopened=createWidgetClient();await reopened.load();expect(reopened.layout.value.widgets.map(w=>w.monitor)).toEqual(['Built-in@0,0','External@-1920,0']);expect(reopened.layout.value.widgets[1].x).toBe(.8);reopened.dispose();
   });
 
+  it('persists the new soft living widgets independently',async()=>{
+    const client=createWidgetClient();await client.load();
+    await client.add('clock');await client.add('reminders');await client.add('stocks');await client.add('woodfish');
+    const [clock,reminders,stocks,woodfish]=client.layout.value.widgets;
+    expect(clock.kind).toBe('clock');
+    await client.update(reminders.id,{living:{count:0,symbol:'1.000001',reminders:[{id:'meet1',title:'设计评审',at:'2026-10-20T14:00',done:false}]}});
+    await client.update(stocks.id,{living:{count:0,symbol:'0.399006',reminders:[]}});
+    await client.update(woodfish.id,{living:{count:18,symbol:'1.000001',reminders:[]}});
+    client.dispose();
+    const reopened=createWidgetClient();await reopened.load();
+    expect(reopened.layout.value.widgets[1].living?.reminders).toHaveLength(1);
+    expect(reopened.layout.value.widgets[2].living?.symbol).toBe('0.399006');
+    expect(reopened.layout.value.widgets[3].living?.count).toBe(18);
+    reopened.dispose();
+  });
+
 });
 

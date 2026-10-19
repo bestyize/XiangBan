@@ -4,6 +4,7 @@ import { ChevronLeft, ChevronRight, Cloud, CloudRain, RefreshCw, Settings, Snowf
 import { desktop, invoke } from '../bridge.ts';
 import { baseSize, calendarDays, type DesktopWidget, type WidgetPayload } from './model.ts';
 import NotesWidget from './NotesWidget.vue';
+import LivingWidget from './LivingWidget.vue';
 import CountdownWidget from './CountdownWidget.vue';
 import FlowerWidget from './FlowerWidget.vue';
 import { dateKey, lunarDate, holidayInfo, calendarLabel } from './calendar.ts';
@@ -12,9 +13,31 @@ import FortuneVessel from '../rituals/FortuneVessel.vue';
 import { fortunes, openRitual } from '../rituals/journal.ts';
 const props=withDefaults(defineProps<{ widget: DesktopWidget; editing?: boolean; preview?: boolean; payload?: WidgetPayload }>(),{editing:false,preview:false});
 const size=computed(()=>baseSize(props.widget.kind, props.widget.custom));
+const livingKind=computed(()=>['clock','weather','reminders','stocks','woodfish'].includes(props.widget.kind)||(props.widget.kind==='notes'&&props.widget.note?.mode==='todo'));
+const livingTitle=computed(()=>({clock:'此刻时光',weather:props.widget.city?.name??'天气',notes:'待办',reminders:'提醒',stocks:'市场脉搏',woodfish:'电子木鱼'} as Record<string,string>)[props.widget.kind]??'');
 const customDocument=computed(()=>{
   const html=props.widget.custom?.html || '<div style="color:#999;padding:12px;font-size:12px">未找到小组件内容</div>';
-  const viewportStyle='<style>html,body{margin:0!important;overflow:hidden!important;max-width:100%;max-height:100%}</style>';
+  const viewportStyle='<style>html,body{margin:0!important;overflow:hidden!important;max-width:100%;max-height:100%}
+/* Soft Living UI is scoped to the actual desktop widget, not the control console. */
+.widget-surface.living{padding:19px 22px;border-radius:29px;box-shadow:0 10px 32px rgba(30,35,45,.10);color:#20242b;background:#f8f6f3;border:1px solid #ffffff9c;backdrop-filter:none;text-shadow:none}
+.widget-surface.living.paper{background:#f8f6f3;border-color:#ffffff9c}
+.widget-surface.living.glass{background:#ffffffd9;border-color:#ffffffa3;backdrop-filter:blur(18px)}
+.widget-surface.living.transparent{background:transparent;border-color:transparent;box-shadow:none;backdrop-filter:none;color:#20242b;text-shadow:0 1px 3px #fff8}
+.widget-surface.living.weather:not(.transparent){background:linear-gradient(145deg,#61a8e3,#a1cbea 65%,#d5e3f1);color:#fff}
+.widget-surface.living.stocks:not(.transparent){background:#1c2227;color:#f4f7f8;border-color:#30373b}
+.widget-surface.living.woodfish:not(.transparent){background:#f0dfcd;border-color:#fff4e6}
+.widget-surface.living.reminders:not(.transparent){background:#fff4f2}
+.widget-surface.living.notes:not(.transparent){background:#fffaf6}
+.widget-surface.living>.widget-heading{height:27px;margin-bottom:13px;opacity:1;font-size:13px;letter-spacing:.1px;font-weight:550}
+.widget-surface.living>.widget-heading .widget-settings{opacity:.65}
+.widget-surface.living .living-content{height:calc(100% - 40px)}
+.widget-surface.living.transparent .living-content.weather{color:#20242b;--muted:#545b66;text-shadow:0 1px 4px #fff9}
+.widget-surface.living.transparent .living-content.stocks{color:#20242b;--muted:#5d6266;text-shadow:0 1px 4px #fff9}
+.widget-surface.living.transparent .living-content.woodfish{color:#4d3423}
+.widget-surface.living.transparent .weather-foot{border-color:#20242b20}
+.widget-surface.living.transparent .weather-foot button{color:#20242b;background:#ffffffb0}
+@media (prefers-reduced-motion:reduce){.widget-surface.living *{transition:none!important;animation:none!important}}
+</style>';
   if (/<\/head\s*>/i.test(html)) return html.replace(/<\/head\s*>/i, `${viewportStyle}</head>`);
   if (/<html\b[^>]*>/i.test(html)) return html.replace(/<html\b[^>]*>/i, `$&<head>${viewportStyle}</head>`);
   const doctype=html.match(/^(<!doctype[^>]*>\s*)/i)?.[0] ?? '';
@@ -79,10 +102,11 @@ onMounted(()=>{clockTimer=setInterval(()=>now.value=new Date(),15000);if(props.w
 onBeforeUnmount(()=>{active=false;if(clockTimer)clearInterval(clockTimer);if(weatherTimer)clearInterval(weatherTimer);if(fortuneTimer)clearTimeout(fortuneTimer);if(clickTimer)clearTimeout(clickTimer);document.removeEventListener('visibilitychange',visible);});
 </script>
 <template>
-  <article class="widget-surface" :class="[widget.theme,widget.kind,{editing}]" :style="{width:`${size.width}px`,height:`${size.height}px`}" @pointerdown="startDrag" @pointermove="dragTo($event)" @pointerup="dragTo($event,true)" @pointercancel="dragTo($event,true)" @click.capture="captureClick">
+  <article class="widget-surface" :class="[widget.theme,widget.kind,{editing,living:livingKind}]" :style="{width:`${size.width}px`,height:`${size.height}px`}" @pointerdown="startDrag" @pointermove="dragTo($event)" @pointerup="dragTo($event,true)" @pointercancel="dragTo($event,true)" @click.capture="captureClick">
     <div v-if="editing" class="widget-drag-cover" aria-hidden="true" title="按住组件任意位置拖动"><span>编辑中 · 按住拖动</span></div>
-    <header class="widget-heading" :title="preview?undefined:'按住这里拖动组件'"><span>{{ widget.kind==='fortune'?'一签好意':widget.kind==='calendar'?'日有所序':widget.kind==='notes'?'心事有处':widget.kind==='countdown'?'好日将至':widget.kind==='flower'?'小白花初开':widget.kind==='custom'?(widget.custom?.name||'桌面小组件'):'晴雨之间' }}</span><button v-if="!editing&&!preview" class="widget-settings" aria-label="设置这个组件" title="设置这个组件" aria-haspopup="dialog" data-no-drag @click="settings"><Settings :size="14"/></button></header>
-    <template v-if="widget.kind==='fortune'"><div v-if="phase!=='result'" class="mini-vessel"><FortuneVessel :shaking="phase==='shaking'"/></div><div v-else class="mini-fortune" aria-live="polite"><span class="mini-sign">第 {{ String(fortune+1).padStart(2,'0') }} 签</span><h2>{{ fortunes[fortune].title }}</h2><p class="mini-verse">{{ fortunes[fortune].verse }}</p><p>{{ fortunes[fortune].blessing }}</p><span class="mini-action">{{ fortunes[fortune].action }}</span></div><div class="fortune-controls"><button v-if="phase!=='result'" :disabled="phase==='shaking'||editing" class="fortune-draw" @click="draw">{{ phase==='shaking'?'好签正在途中…':'求一支好签' }}</button><template v-else><button class="fortune-draw" :disabled="editing" @click="detail">展开好签册</button><button class="tiny-link" @click="phase='idle'">再求一签</button></template><small>心有所愿，日有所暖</small></div></template>
+    <header class="widget-heading" :title="preview?undefined:'按住这里拖动组件'"><span>{{ livingKind?livingTitle:widget.kind==='fortune'?'一签好意':widget.kind==='calendar'?'日有所序':widget.kind==='notes'?'心事有处':widget.kind==='countdown'?'好日将至':widget.kind==='flower'?'小白花初开':widget.kind==='custom'?(widget.custom?.name||'桌面小组件'):'晴雨之间' }}</span><button v-if="!editing&&!preview" class="widget-settings" aria-label="设置这个组件" title="设置这个组件" aria-haspopup="dialog" data-no-drag @click="settings"><Settings :size="14"/></button></header>
+    <LivingWidget v-if="livingKind" :widget="widget" :now="now" :preview="preview" :editing="editing" :weather="weather" :weather-busy="weatherBusy" :save="saveContent" :refresh-weather="refreshWeather" :settings="settings"/>
+    <template v-else-if="widget.kind==='fortune'"><div v-if="phase!=='result'" class="mini-vessel"><FortuneVessel :shaking="phase==='shaking'"/></div><div v-else class="mini-fortune" aria-live="polite"><span class="mini-sign">第 {{ String(fortune+1).padStart(2,'0') }} 签</span><h2>{{ fortunes[fortune].title }}</h2><p class="mini-verse">{{ fortunes[fortune].verse }}</p><p>{{ fortunes[fortune].blessing }}</p><span class="mini-action">{{ fortunes[fortune].action }}</span></div><div class="fortune-controls"><button v-if="phase!=='result'" :disabled="phase==='shaking'||editing" class="fortune-draw" @click="draw">{{ phase==='shaking'?'好签正在途中…':'求一支好签' }}</button><template v-else><button class="fortune-draw" :disabled="editing" @click="detail">展开好签册</button><button class="tiny-link" @click="phase='idle'">再求一签</button></template><small>心有所愿，日有所暖</small></div></template>
     <template v-else-if="widget.kind==='calendar'"><div class="clock-row"><strong>{{ clock }}</strong><span>{{ now.toLocaleDateString('zh-CN',{month:'long',day:'numeric',weekday:'long'}) }}</span></div><div class="month-navigation"><button aria-label="上个月" @click="monthOffset--"><ChevronLeft :size="14"/></button><button class="month-name" @click="resetMonth">{{ month.getFullYear() }} 年 {{ month.getMonth()+1 }} 月</button><button aria-label="下个月" @click="monthOffset++"><ChevronRight :size="14"/></button></div><div class="calendar-week"><span v-for="day in ['一','二','三','四','五','六','日']" :key="day">{{ day }}</span></div><div class="calendar-grid"><button v-for="day in days" :key="dateKey(day.date)" :class="{muted:!day.current,today:sameDay(day.date),selected:selected===dateKey(day.date),weekend:day.date.getDay()===0||day.date.getDay()===6,makeup:!!holidayInfo(day.date).makeup}" :aria-label="`${dateKey(day.date)} ${lunarDate(day.date).full} ${holidayInfo(day.date).holiday} ${holidayInfo(day.date).makeup?'调休上班':''}`" :aria-pressed="selected===dateKey(day.date)" @click="selected=dateKey(day.date)"><span>{{ day.day }}</span><small>{{ calendarLabel(day.date) }}</small><i v-if="holidayInfo(day.date).badge" :class="{work:!!holidayInfo(day.date).makeup}">{{ holidayInfo(day.date).badge }}</i></button></div><div class="calendar-detail" aria-live="polite"><span>{{ selectedDate.toLocaleDateString('zh-CN',{month:'long',day:'numeric'}) }} · {{ lunarDate(selectedDate).full }}</span><span>{{ selectedInfo.holiday?`${selectedInfo.holiday}假期`:selectedInfo.makeup?`${selectedInfo.makeup}调休上班`:'' }}</span></div><p class="calendar-note">{{ holidayInfo(month).covered?'休 / 班 · 国务院公布的年度安排':'本年调休数据未收录，仅展示日期与农历' }}</p></template>
     <NotesWidget v-else-if="widget.kind==='notes'" :note="widget.note" :preview="preview" :editing="editing" :save="saveContent"/>
     <CountdownWidget v-else-if="widget.kind==='countdown'" :data="widget.countdown" :now="now"/>
