@@ -10,7 +10,7 @@ fn call(id: &str) -> ToolCall {
 }
 
 fn turn(messages: Vec<Message>) -> Turn {
-    Turn { session: "s".into(), index: 0, messages }
+    Turn { session: "s".into(), index: 0, messages, tools: vec![] }
 }
 
 fn exchange(n: usize, output_len: usize) -> Vec<Message> {
@@ -68,8 +68,8 @@ fn oldest_exchanges_are_dropped_at_user_boundaries_keeping_system_and_pairs() {
 #[test]
 fn the_current_exchange_is_never_dropped() {
     let mut t = turn(vec![Message::user_text("x".repeat(40_000)), Message::assistant("", vec![call("c")]), Message::tool("c", "y".repeat(40_000))]);
-    ContextTrim::new(100).before_model(&mut t).unwrap();
-    assert_eq!(t.messages.len(), 3, "a single exchange over budget is left for the provider to judge");
+    assert!(ContextTrim::new(100).before_model(&mut t).is_err());
+    assert_eq!(t.messages.len(), 3, "an oversized current exchange is retained but rejected before calling the provider");
 }
 
 #[test]

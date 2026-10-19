@@ -6,10 +6,12 @@
 //! taint tracking and timeout mechanisms.
 
 use crate::error::HarnessError;
-use crate::tool::{Risk, Tool, ToolCtx, ToolSpec};
+use crate::tool::{Risk, Tool, ToolCtx, ToolResult, ToolSpec};
+use crate::Part;
+use base64::Engine;
 use serde_json::{json, Value};
 use std::collections::HashMap;
-use std::io::{BufRead, BufReader, Write};
+use std::io::{BufRead, BufReader, Read, Write};
 use std::path::PathBuf;
 use std::process::{Child, ChildStdin, Command, Stdio};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
@@ -19,12 +21,21 @@ use std::thread::{self, JoinHandle};
 use std::time::Duration;
 
 pub const DEFAULT_PROTOCOL_VERSION: &str = "2024-11-05";
+const MAX_FRAME_BYTES: u64 = 8 * 1024 * 1024;
+const MAX_IMAGE_BYTES: usize = 4 * 1024 * 1024;
+
+#[cfg(not(windows))]
+const BASE_ENV: &[&str] = &["PATH", "HOME", "USER", "LOGNAME", "LANG", "LC_ALL", "LC_CTYPE", "TMPDIR", "TZ"];
+#[cfg(windows)]
+const BASE_ENV: &[&str] = &["PATH", "SystemRoot", "ComSpec", "PATHEXT", "TEMP", "TMP", "USERPROFILE", "windir"];
 
 #[derive(Clone, Debug)]
 pub struct McpConfig {
     pub command: String,
     pub args: Vec<String>,
     pub env: Vec<(String, String)>,
+    /// Extra host environment keys to pass through. Credentials are never inherited by default.
+    pub inherited_env: Vec<String>,
     pub cwd: Option<PathBuf>,
     /// Optional prefix for tool names (e.g. `ocu_` or empty).
     pub tool_prefix: String,
@@ -40,6 +51,7 @@ impl McpConfig {
             command: command.into(),
             args: args.iter().map(|s| s.to_string()).collect(),
             env: Vec::new(),
+            inherited_env: Vec::new(),
             cwd: None,
             tool_prefix: String::new(),
             default_risk: Risk::Exec,
@@ -64,6 +76,11 @@ impl McpConfig {
 
     pub fn env(mut self, key: &str, value: &str) -> Self {
         self.env.push((key.to_string(), value.to_string()));
+        self
+    }
+
+    pub fn inherit_env(mut self, key: &str) -> Self {
+        self.inherited_env.push(key.to_string());
         self
     }
 
@@ -117,9 +134,13 @@ impl McpClient {
     pub fn spawn(config: McpConfig) -> Result<Arc<Self>, HarnessError> {
         let mut cmd = Command::new(&config.command);
         cmd.args(&config.args)
+            .env_clear()
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::null());
+        for key in BASE_ENV.iter().copied().chain(config.inherited_env.iter().map(String::as_str)) {
+            if let Some(value) = std::env::var_os(key) { cmd.env(key, value); }
+        }
         for (k, v) in &config.env {
             cmd.env(k, v);
         }
@@ -152,9 +173,10 @@ impl McpClient {
                 let mut line = String::new();
                 loop {
                     line.clear();
-                    match reader.read_line(&mut line) {
+                    match (&mut reader).take(MAX_FRAME_BYTES + 1).read_line(&mut line) {
                         Ok(0) => break,
                         Ok(_) => {
+                            if line.len() as u64 > MAX_FRAME_BYTES { break; }
                             let text = line.trim();
                             if text.is_empty() {
                                 continue;
@@ -208,7 +230,7 @@ impl McpClient {
             "capabilities": {},
             "clientInfo": {
                 "name": "agent-kernel",
-                "version": "0.1.0"
+                "version": env!("CARGO_PKG_VERSION")
             }
         });
         let init_res = client.send_request("initialize", init_params, Duration::from_secs(15))
@@ -236,6 +258,7 @@ impl McpClient {
                     };
                     let spec = ToolSpec::new(&exposed_name, &desc, schema)
                         .risk(config.default_risk)
+                        .untrusted_output()
                         .serial()
                         .timeout(config.timeout);
                     tool_infos.push(McpToolInfo {
@@ -309,7 +332,14 @@ impl McpClient {
         }
     }
 
+    /// Legacy text-only projection. The harness uses `call_tool_result` to preserve media.
     pub fn call_tool(&self, original_name: &str, args: Value, ctx: &ToolCtx) -> Result<String, String> {
+        let result = self.call_tool_result(original_name, args, ctx)?;
+        let text = result.message("legacy").tool_text();
+        if result.is_error { Err(text) } else { Ok(text) }
+    }
+
+    pub fn call_tool_result(&self, original_name: &str, args: Value, ctx: &ToolCtx) -> Result<ToolResult, String> {
         if ctx.is_cancelled() {
             return Err("cancelled".into());
         }
@@ -348,37 +378,7 @@ impl McpClient {
             }
         };
 
-        let is_error = res.get("isError").and_then(Value::as_bool).unwrap_or(false);
-        let mut out = String::new();
-        if let Some(content) = res.get("content").and_then(Value::as_array) {
-            for part in content {
-                match part.get("type").and_then(Value::as_str) {
-                    Some("text") => {
-                        if let Some(t) = part.get("text").and_then(Value::as_str) {
-                            if !out.is_empty() {
-                                out.push('\n');
-                            }
-                            out.push_str(t);
-                        }
-                    }
-                    Some("image") => {
-                        let mime = part.get("mimeType").and_then(Value::as_str).unwrap_or("image");
-                        let len = part.get("data").and_then(Value::as_str).map_or(0, |s| s.len());
-                        if !out.is_empty() {
-                            out.push('\n');
-                        }
-                        out.push_str(&format!("[image: {mime} ({len} bytes)]"));
-                    }
-                    _ => {}
-                }
-            }
-        }
-
-        if is_error {
-            Err(if out.is_empty() { "MCP tool reported an error".into() } else { out })
-        } else {
-            Ok(if out.is_empty() { "ok".into() } else { out })
-        }
+        decode_result(&res)
     }
 
     pub fn tools(self: &Arc<Self>) -> Vec<Arc<dyn Tool>> {
@@ -406,4 +406,47 @@ impl Tool for McpToolWrapper {
     fn execute(&self, args: Value, ctx: &ToolCtx) -> Result<String, String> {
         self.client.call_tool(&self.original_name, args, ctx)
     }
+
+    fn execute_result(&self, args: Value, ctx: &ToolCtx) -> ToolResult {
+        self.client.call_tool_result(&self.original_name, args, ctx).unwrap_or_else(ToolResult::error)
+    }
+}
+
+/// Decode supported MCP content without turning image bytes into a text placeholder.
+fn decode_result(res: &Value) -> Result<ToolResult, String> {
+    let mut result = ToolResult::ok("");
+    result.is_error = res.get("isError").and_then(Value::as_bool).unwrap_or(false);
+    result.structured_content = res.get("structuredContent").cloned();
+    if let Some(content) = res.get("content") {
+        let content = content.as_array().ok_or("MCP result content must be an array")?;
+        for part in content {
+            let text = match part.get("type").and_then(Value::as_str) {
+                Some("text") => part.get("text").and_then(Value::as_str).ok_or("MCP text block is missing text")?.to_string(),
+                Some("image") => {
+                    let mime = part.get("mimeType").and_then(Value::as_str).ok_or("MCP image is missing mimeType")?;
+                    if !matches!(mime, "image/png" | "image/jpeg" | "image/gif" | "image/webp") {
+                        return Err(format!("unsupported MCP image MIME type: {mime}"));
+                    }
+                    let data = part.get("data").and_then(Value::as_str).ok_or("MCP image is missing data")?;
+                    if data.len() > MAX_IMAGE_BYTES.div_ceil(3) * 4 { return Err("MCP image exceeds 4 MiB".into()); }
+                    let bytes = base64::engine::general_purpose::STANDARD.decode(data).map_err(|_| "MCP image data is not valid base64")?;
+                    if bytes.len() > MAX_IMAGE_BYTES { return Err("MCP image exceeds 4 MiB".into()); }
+                    result.parts.push(Part::Image { url: format!("data:{mime};base64,{data}") });
+                    format!("[image: {mime}]")
+                }
+                Some("resource") => {
+                    let resource = part.get("resource").ok_or("MCP resource block is missing resource")?;
+                    resource.get("text").and_then(Value::as_str).ok_or("binary MCP resources are not supported")?.to_string()
+                }
+                Some("resource_link") => format!("[resource: {}]", part.get("uri").and_then(Value::as_str).ok_or("MCP resource link is missing uri")?),
+                other => return Err(format!("unsupported MCP content block: {}", other.unwrap_or("missing type"))),
+            };
+            if !result.output.is_empty() { result.output.push('\n'); }
+            result.output.push_str(&text);
+        }
+    }
+    if result.output.is_empty() && result.structured_content.is_none() {
+        result.output = if result.is_error { "MCP tool reported an error" } else { "ok" }.into();
+    }
+    Ok(result)
 }

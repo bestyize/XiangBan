@@ -88,10 +88,20 @@ pub fn build_request_body(profile: &ProviderProfile, request: &ChatRequest) -> V
             }
             Role::Tool => {
                 let mut block = json!({ "type": "tool_result", "tool_use_id": message.tool_call_id.clone().unwrap_or_default() });
-                let text = message.text();
-                if !text.is_empty() {
-                    block["content"] = Value::String(text);
+                let text = message.tool_text();
+                let images: Vec<Value> = message.parts.iter().filter_map(|p| match p {
+                    Part::Image { url } => Some(image_block(url)),
+                    _ => None,
+                }).collect();
+                if images.is_empty() {
+                    if !text.is_empty() { block["content"] = Value::String(text); }
+                } else {
+                    let mut content = Vec::new();
+                    if let Some(text) = text_block(&text) { content.push(text); }
+                    content.extend(images);
+                    block["content"] = json!(content);
                 }
+                if message.is_error { block["is_error"] = json!(true); }
                 push_turn(&mut turns, "user", vec![block]);
             }
         }

@@ -7,15 +7,16 @@ import {dateKey,lunarDate} from './calendar.ts';
 import {emptyNote,emptyCountdown,countdownValue,occursOn,itemDone,toggleItem,scheduleLabel} from './content.ts';
 import ItemForm from './ItemForm.vue';
 import {cornerResize} from './resize.ts';
+import {customWidgetDocument,isCustomDragMessage} from './custom-drag.ts';
 import './surface.css';
 const props=withDefaults(defineProps<{widget:DesktopWidget;preview?:boolean;demo?:boolean;editing?:boolean;payload?:WidgetPayload;save?:(c:WidgetContent)=>Promise<void>}>(),{preview:false,demo:false,editing:false});
 const emit=defineEmits<{settings:[]}>();
 const now=ref(new Date()),error=ref(''),saving=ref(false),addOpen=ref(false),editingItem=ref<TodoItem|ReminderItem>();
 const size=computed(()=>baseSize(props.widget.kind,props.widget.custom)),clock=computed(()=>now.value.toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit',hour12:false}));
+const customFrame=ref<HTMLIFrameElement>();
 const customDocument=computed(()=>{
   const html=props.widget.custom?.html||'<div style="color:#999;padding:12px;font-size:12px">未找到小组件内容</div>';
-  const viewportStyle='<style>html,body{margin:0!important;padding:0!important;overflow:hidden!important;width:100%!important;height:100%!important;background:transparent!important}</style>';
-  return html.includes('<head>')?html.replace('<head>',`<head>${viewportStyle}`):`${viewportStyle}${html}`;
+  return customWidgetDocument(html,!props.preview);
 });
 const lunarLabel=computed(()=>{const year=new Intl.DateTimeFormat('zh-CN-u-ca-chinese',{year:'numeric'}).formatToParts(now.value).find(p=>(p.type as string)==='yearName')?.value;return `${year?year+'年 ':''}${lunarDate(now.value).full}`;});
 const greeting=computed(()=>now.value.getHours()<6?'夜深了':now.value.getHours()<12?'上午好':now.value.getHours()<18?'下午好':'晚上好');
@@ -123,7 +124,17 @@ let drag:{x:number;y:number;grabX:number;grabY:number;moved:boolean}|null=null,s
 let clickTimer:ReturnType<typeof setTimeout>|undefined;
 async function movePending(){if(moving)return;moving=true;try{while(pending){const p=pending;pending=null;await invoke('move_desktop_widget',p);}}catch(e){error.value=String(e);}finally{moving=false;}}
 function startDrag(e:PointerEvent){if(e.button!==0||props.preview||!props.payload)return;if((e.target as Element).closest('button,input,textarea,select,form,[data-no-drag]'))return;suppressClick=false;drag={x:e.screenX,y:e.screenY,grabX:e.clientX/Math.max(1,innerWidth),grabY:e.clientY/Math.max(1,innerHeight),moved:false};(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);}
-function move(e:PointerEvent,commit=false){if(!drag)return;if(Math.hypot(e.screenX-drag.x,e.screenY-drag.y)>5)drag.moved=true;if(drag.moved){suppressClick=true;pending={grabX:drag.grabX,grabY:drag.grabY,commit};void movePending();}if(commit){drag=null;clickTimer=setTimeout(()=>suppressClick=false,0);}}
+function move(e:Pick<PointerEvent,'screenX'|'screenY'>,commit=false){if(!drag)return;if(Math.hypot(e.screenX-drag.x,e.screenY-drag.y)>5)drag.moved=true;if(drag.moved){suppressClick=true;pending={grabX:drag.grabX,grabY:drag.grabY,commit};void movePending();}if(commit){drag=null;clickTimer=setTimeout(()=>suppressClick=false,0);}}
+function customDrag(event:MessageEvent){
+ if(props.preview||!props.payload||props.editing||!customFrame.value?.contentWindow||event.source!==customFrame.value.contentWindow||!isCustomDragMessage(event.data))return;
+ const data=event.data;
+ if(data.phase==='start'){
+  const rect=customFrame.value.getBoundingClientRect();
+  suppressClick=false;drag={x:data.screenX,y:data.screenY,grabX:(rect.left+data.x*rect.width)/Math.max(1,innerWidth),grabY:(rect.top+data.y*rect.height)/Math.max(1,innerHeight),moved:false};
+ }else move(data,data.phase==='end');
+}
+onMounted(()=>window.addEventListener('message',customDrag));
+onBeforeUnmount(()=>window.removeEventListener('message',customDrag));
 function capture(e:MouseEvent){if(suppressClick||props.editing){e.stopImmediatePropagation();e.preventDefault();}}
 let clockTimer:ReturnType<typeof setInterval>,networkTimer:ReturnType<typeof setInterval>;
 function visible(){now.value=new Date();if(!document.hidden){if(props.widget.kind==='weather')void refreshWeather();else if(props.widget.kind==='stocks'){void loadQuote();void loadWatchlist();}}}
@@ -176,6 +187,7 @@ onBeforeUnmount(()=>{resizer.finish(true);document.removeEventListener('keydown'
   </header>
   <div class="custom-widget-box" :data-testid="`custom-${widget.customId||'widget'}`">
    <iframe
+     ref="customFrame"
      :srcdoc="customDocument"
      sandbox="allow-scripts"
      class="custom-widget-frame"

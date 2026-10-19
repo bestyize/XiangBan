@@ -3,6 +3,7 @@ import {mount,flushPromises} from '@vue/test-utils';
 import {describe,it,expect,vi} from 'vitest';
 vi.mock('../bridge.ts',()=>({desktop:false,invoke:vi.fn().mockResolvedValue(undefined)}));
 import WidgetSurface from './WidgetSurface.vue';
+import {invoke} from '../bridge.ts';
 import type {DesktopWidget} from './model.ts';
 const one=(kind:DesktopWidget['kind']):DesktopWidget=>({id:'one',kind,theme:'ivory',scale:1,x:0,y:0,enabled:true,city:null});
 describe('reference widget interaction',()=>{
@@ -13,4 +14,32 @@ describe('reference widget interaction',()=>{
  it('keeps taps made while the sound preference is being saved',async()=>{const pending:Array<()=>void>=[];const save=vi.fn((_c:unknown)=>new Promise<void>(resolve=>pending.push(resolve)));const widget={...one('woodfish'),living:{count:108,sound:true,symbol:'1.000001',reminders:[]}};const view=mount(WidgetSurface,{props:{widget,save}});await view.get('.sound-toggle').trigger('click');await view.get('.fish-knock').trigger('click');await view.get('.fish-knock').trigger('click');await view.setProps({widget:{...widget,living:{...widget.living,sound:false}}});pending.shift()!();await flushPromises();expect(view.get('.fish-footer strong').text()).toContain('110');expect(save.mock.calls[1][0]).toMatchObject({living:{count:110,sound:false}});pending.shift()!();await flushPromises();view.unmount();});
  it('restores the saved sound preference',()=>{const view=mount(WidgetSurface,{props:{widget:{...one('woodfish'),living:{count:4,sound:false,symbol:'1.000001',reminders:[]}}}});expect(view.find('[aria-label="打开木鱼声音"]').exists()).toBe(true);view.unmount();});
  it('navigates months and returns to the current month',async()=>{const v=mount(WidgetSurface,{props:{widget:one('calendar'),preview:true}});const title=v.get('.month-title').text();await v.get('[aria-label="下个月"]').trigger('click');expect(v.get('.month-title').text()).not.toBe(title);await v.get('.month-title').trigger('click');expect(v.get('.month-title').text()).toBe(title);v.unmount();});
+});
+
+describe('custom widget host drag',()=>{
+ const custom=():DesktopWidget=>({...one('custom'),customId:'kitty',custom:{schemaVersion:1,id:'kitty',name:'Kitty',html:'<div>Kitty</div>',width:280,height:240,theme:'transparent'}});
+ it('accepts only its own iframe and saves the scaled grab position on release',async()=>{
+  vi.mocked(invoke).mockClear();
+  const widget=custom(),view=mount(WidgetSurface,{attachTo:document.body,props:{widget,payload:{widget,editing:false,screenX:0,screenY:0}}});
+  const iframe=view.get('iframe').element as HTMLIFrameElement;
+  vi.spyOn(iframe,'getBoundingClientRect').mockReturnValue({left:8,top:8,width:140,height:120} as DOMRect);
+  const send=(phase:string,screenX=100,source:Window|null=iframe.contentWindow,x=.5)=>window.dispatchEvent(new MessageEvent('message',{source,data:{type:'xiaoban-widget-drag',phase,screenX,screenY:100,x,y:.5}}));
+  send('start',100,window);send('move',120,window);send('end',120,window);
+  send('start',100,iframe.contentWindow,2);send('move',120);send('end',120);
+  await flushPromises();expect(invoke).not.toHaveBeenCalled();
+  send('start');send('end');await flushPromises();expect(invoke).not.toHaveBeenCalled();
+  send('start');send('move',120);await flushPromises();send('end',120);await flushPromises();
+  expect(invoke).toHaveBeenLastCalledWith('move_desktop_widget',{grabX:78/innerWidth,grabY:68/innerHeight,commit:true});
+  expect(iframe.getAttribute('sandbox')).toBe('allow-scripts');
+  view.unmount();vi.mocked(invoke).mockClear();send('start');send('move',120);await flushPromises();expect(invoke).not.toHaveBeenCalled();
+ });
+ it('keeps preview and placement mode from accepting iframe commands',async()=>{
+  for(const props of [{preview:true},{editing:true}]){
+   vi.mocked(invoke).mockClear();const widget=custom();
+   const view=mount(WidgetSurface,{attachTo:document.body,props:{widget,payload:{widget,editing:false,screenX:0,screenY:0},...props}});
+   const source=(view.get('iframe').element as HTMLIFrameElement).contentWindow;
+   for(const [phase,screenX] of [['start',100],['move',120],['end',120]])window.dispatchEvent(new MessageEvent('message',{source,data:{type:'xiaoban-widget-drag',phase,screenX,screenY:100,x:.5,y:.5}}));
+   await flushPromises();expect(invoke).not.toHaveBeenCalled();view.unmount();
+  }
+ });
 });

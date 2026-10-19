@@ -83,6 +83,12 @@ impl Subagent {
         self.spec.timeout = timeout;
         self
     }
+
+    /// Enable only when child jobs may safely share their tools and workspace concurrently.
+    pub fn parallel(mut self) -> Self {
+        self.spec.parallel_safe = true;
+        self
+    }
 }
 
 impl Tool for Subagent {

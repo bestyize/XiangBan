@@ -217,7 +217,7 @@ impl LoadSkill {
     fn new(skills: Arc<Skills>) -> Self {
         let schema = json!({ "type": "object", "properties": { "name": { "type": "string" } }, "required": ["name"] });
         let description = "Load the full instructions of a skill listed under Skills in the system prompt.";
-        Self { spec: ToolSpec::new("load_skill", description, schema), skills }
+        Self { spec: ToolSpec::new("load_skill", description, schema).risk(Risk::Read).parallel(), skills }
     }
 }
 

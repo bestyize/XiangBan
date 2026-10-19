@@ -57,6 +57,6 @@ fn empty_results_backend_errors_and_bad_queries() {
     for args in [r#"{"query":"   "}"#.to_string(), serde_json::json!({"query": "x".repeat(501)}).to_string(), "{}".to_string(), r#"{"query":"q","limit":"many"}"#.to_string()] {
         let (out, calls) = search(Ok(vec![hit(1)]), &args);
         assert!(calls.is_empty(), "the backend is not called for {args}");
-        assert!(out.contains("`query`") || out.contains("`limit`"), "{out}");
+        assert!(out.contains("query") || out.contains("limit"), "{out}");
     }
 }

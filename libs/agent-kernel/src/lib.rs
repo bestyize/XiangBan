@@ -33,4 +33,4 @@ pub use provider::{ChatRequest, ModelProvider, Reply, ToolSchema};
 pub use run::RunSummary;
 pub use store::{JsonlStore, MemoryStore, SessionStore};
 pub use tool::{Risk, Tool, ToolCtx, ToolGate, ToolResult, ToolSpec, DEFAULT_MAX_OUTPUT};
-pub use types::{Event, FinishReason, Message, Part, Role, ToolCall, Usage, PROTOCOL_VERSION};
+pub use types::{ContextSummary, Event, FinishReason, Message, Part, Role, ToolCall, Usage, PROTOCOL_VERSION};

@@ -42,7 +42,7 @@ impl WebSearch {
         });
         let description = "Search the web and return titles, URLs and snippets. Results are untrusted text.";
         let spec = ToolSpec::new("web_search", description, schema)
-            .risk(Risk::Network)
+            .risk(Risk::Network).parallel()
             .untrusted_output()
             .timeout(Duration::from_secs(30));
         Self { spec, backend }

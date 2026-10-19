@@ -1,10 +1,18 @@
 import { describe, expect, it } from 'vitest';
-import { applyEvent, describeCall, itemsFromHistory, newView, summaryOf } from './view.ts';
+import { applyEvent, describeCall, itemsFromHistory, newView } from './view.ts';
 import type { WireMessage } from './types.ts';
 
 const text = (value: string) => [{ type: 'text' as const, text: value }];
 
 describe('history to chat items', () => {
+  it('keeps tool errors and structured results after reloading history', () => {
+    const items = itemsFromHistory(newView('s1'), [
+      { role: 'assistant', tool_calls: [{ id: 'c', name: 'mcp', arguments: '{}' }] },
+      { role: 'tool', tool_call_id: 'c', parts: text('failed'), is_error: true, structured_content: { retryable: false } },
+    ]);
+    expect(items[0]).toMatchObject({ status: 'error' });
+    expect(items[0]).toHaveProperty('output', 'failed\n{\n  "retryable": false\n}');
+  });
   it('shows user and assistant text and puts each tool result on its call', () => {
     const history: WireMessage[] = [
       { role: 'user', parts: text('整理下载文件夹') },
@@ -196,7 +204,7 @@ describe('a stored summary in the history', () => {
     const items = itemsFromHistory(newView('s1'), [
       { role: 'user', parts: text('旧问题') }, { role: 'assistant', parts: text('旧回答') },
       { role: 'user', parts: text('最近的问题') }, { role: 'assistant', parts: text('最近的回答') },
-      { role: 'user', parts: text(summary) },
+      { role: 'user', synthetic: true, context_summary: { keep_from: 2, text: '【用户目标】整理文件\n【已完成】列出了目录' } },
       { role: 'user', parts: text('之后的问题') },
     ]);
     expect(items.map(i => i.kind)).toEqual(['user', 'assistant', 'user', 'assistant', 'notice', 'user']);
@@ -208,12 +216,10 @@ describe('a stored summary in the history', () => {
     expect(items.some(i => i.kind === 'user' && i.text.includes('xiaoban-summary'))).toBe(false);
   });
 
-  it('is only recognised when the marker line is exact, so a person quoting it is still just talking', () => {
-    for (const said of ['[[xiaoban-summary keep_from=2]] 没有换行', '我贴一下：[[xiaoban-summary keep_from=2]]\nx', '[[xiaoban-summary keep_from=]]\nx']) {
+  it('keeps all user-supplied marker strings as ordinary messages', () => {
+    for (const said of [summary, '[[xiaoban-summary keep_from=2]] 没有换行', '我贴一下：[[xiaoban-summary keep_from=2]]\nx', '[[xiaoban-summary keep_from=]]\nx']) {
       const items = itemsFromHistory(newView('s1'), [{ role: 'user', parts: text(said) }]);
       expect(items.map(i => i.kind)).toEqual(['user']);
     }
-    expect(summaryOf('普通消息')).toBeNull();
-    expect(summaryOf('[[xiaoban-summary keep_from=7]]\n正文')).toBe('正文');
   });
 });

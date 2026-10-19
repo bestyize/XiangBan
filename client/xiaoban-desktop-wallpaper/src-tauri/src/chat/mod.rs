@@ -363,7 +363,7 @@ fn assemble(parts: Parts<'_>) -> Result<Agent, String> {
         // Before spilling, so it compares real outputs rather than previews that name a fresh file each time.
         .middleware(RepeatGuard::new())
         .middleware(SpillOutput::new(dirs.spill()))
-        .middleware(ContextTrim::new(context_tokens))
+        .middleware(ContextTrim::new(context_tokens).reserve_output(8192))
         .middleware(ContinueGuard::new())
         .max_turns(MAX_TURNS);
     let readable = fs_tools(vec![workspace.to_path_buf(), dirs.spill()]).map_err(|e| e.to_string())?;

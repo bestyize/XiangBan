@@ -2,7 +2,31 @@
 
 与产品无关的轻量 agent harness 内核（Rust）。宿主提供模型、存储和自己的工具，内核负责循环、流式、并行工具、取消、重试和事件。不依赖 tauri，也不含任何产品逻辑、固定路径或人设。
 
-状态：里程碑 3 已实现。内核循环、三种模型协议（chat completions、Responses、Claude Messages）、权限/上下文/输出落盘中间件、JSONL 存储、内置工具（时间、任务清单、提问、文件读写、网页、搜索接口、shell、子 agent）、skills 与记忆笔记、JSON 行协议（stdio）。尚未接入任何产品。
+状态：0.2.0，已接入小伴桌面。内核循环、三种模型协议（chat completions、Responses、Claude Messages）、权限/上下文/输出落盘中间件、JSONL 存储、内置工具（时间、任务清单、提问、文件读写、网页、搜索接口、shell、子 agent）、skills 与记忆笔记、JSON 行协议（stdio）；新增工具 Schema 校验、结构化结果和 MCP 图片传递。演进设计与尚未实现的能力见 [框架审视](../../docs/architecture/agent-framework-review.md)。
+
+## 0.2 接入与迁移
+
+- `ToolSpec::new` 默认 `Risk::Exec`、串行。已核实的只读工具显式加 `.risk(Risk::Read)`，确认能并行的再加 `.parallel()`。风险声明不代替权限执行：宿主仍需安装 `Permission` 或自己的中间件。内置工具与桌面业务工具已迁移。
+- 工具 Schema 在 `build` 时编译，调用前先验证参数为 JSON 对象并通过 Schema，再进入权限确认和执行。采用 `jsonschema` 0.33，关闭文件/HTTP 解析并显式拒绝外部引用；本地 `$defs`/`$ref`、类型、必填、枚举、边界、数组和组合规则由库校验。`format` 遵循库的草案默认规则；未知自定义关键字不视为安全策略。参数错误包含 JSON Pointer，不执行工具，不弹批准框。
+- 原有 `Tool::execute -> Result<String, String>` 继续可用；框架改为调用 `execute_result -> ToolResult`，默认适配旧实现。返回图片或 JSON 的工具覆盖新入口，可用 `with_part`、`with_structured_content`。`output` 仍是可供中间件编辑/落盘的文本；附加文本会合并到它。结构化 JSON 受工具 `max_output` 字节限制，附加媒体合计最多 6 MiB；超过上限返回明确错误，不截断二进制或 JSON。错误发生时动作可能已经执行，不能盲目重试。
+- `Message` 新增可选 `is_error`、`structured_content`、`context_summary`；`ToolEnd` 新增可选 `parts`、`structured_content`。工具错误写入历史后仍保留；Claude 使用 `is_error`，Chat Completions/Responses 使用错误文本标记。Responses 与 Claude 原生传图片结果，Chat Completions 在一组工具结果之后追加带调用标识的用户图片消息。是否能识图仍取决于模型，宿主按模型能力选择工具。
+- `Turn` 新增 `tools`，中间件可看到本轮工具定义。`ContextTrim` 将其计入估算，可用 `.reserve_output(tokens)` 为输出和估算误差留余量；当前轮仍超限会在请求模型前返回错误。估算不等于实际 tokenizer，不保证任意 Provider 都不会报上下文错误。
+- `McpConfig` 默认只继承启动所需环境变量（PATH、HOME/USERPROFILE、系统路径、语言与临时目录等），通过 `.env(k, v)` 配置服务变量，或 `.inherit_env(k)` 显式放行已有变量。默认不继承模型、云服务等密钥；它不限制子进程读取磁盘。结果默认标记不可信。文本、图片、文本资源与资源链接可用，其他块明确报错；图片最多 4 MiB，单行 JSON 最大 8 MiB。图片与 `structuredContent` 会保留到模型请求和历史中。无字节内容的资源链接只展示 URI，不自动读取。
+- `Subagent` 默认串行，需要并发委派时由宿主调用 `.parallel()` 并确保子任务可共享工作区。父子共享预算仍待实现。
+- JSONL 与 stdio 的新增字段可选，线协议仍为 v1；Rust 结构体字面量和精确枚举匹配需补字段或使用构造器及 `..`。旧历史可读，旧版错误记录无法补出原本未保存的错误状态；降级程序可能忽略新元数据。`context_summary` 只供可信宿主写入，核心不从用户正文推断摘要，也不自动对其做压缩。
+
+结果格式核对来源：[OpenAI function calling](https://developers.openai.com/api/docs/guides/function-calling)、[Claude tool results](https://platform.claude.com/docs/en/agents-and-tools/tool-use/handle-tool-calls)。Schema 实现与草案支持见 [jsonschema 0.33 文档](https://docs.rs/jsonschema/0.33.0/jsonschema/)。协议转换已做本地测试，真实兼容端点仍需分别验证。
+
+结构化结果工具示例：
+
+```rust
+fn execute_result(&self, args: serde_json::Value, ctx: &ToolCtx) -> ToolResult {
+    // 真实工具在这里执行一次；旧 execute 接口可提供同一操作的文本投影。
+    ToolResult::ok("已生成截图")
+        .with_part(Part::Image { url: "data:image/png;base64,...".into() })
+        .with_structured_content(serde_json::json!({"width": 1280, "height": 720}))
+}
+```
 
 ## 接入点
 
@@ -74,7 +98,7 @@ agent.run("session-1", "你好", &mut |event| { /* 转给 UI */ }, &Arc::new(Ato
 
 `Arc<T>` 也实现了 `Middleware`，宿主可留一个句柄，例如运行中切换权限模式。建议顺序：`Permission`、`RepeatGuard`、`SpillOutput`、`ContextTrim`、`ContinueGuard`。
 
-- `ContextTrim`：超出 token 预算时，先把旧工具输出换成占位，仍超再按用户消息边界丢掉最旧的整轮。不调用模型，只改本次请求，不改已存会话。token 是粗估值，预算要留余量。
+- `ContextTrim`：预算包含工具定义和 `reserve_output`。先把旧工具输出与结构化数据换成占位，仍超再按用户消息边界丢掉最旧的整轮；当前轮无法容纳则返回错误。不调用模型，只改本次请求，不改已存会话。token 是粗估值，预算要留余量。
 - `SpillOutput`：大输出存成文件，只给模型头尾预览和路径。目录由宿主提供并清理，要让模型读到需把它加进文件工具的根目录。写失败时退回普通截断。
 - `ContinueGuard`：模型没调工具就结束时，检测本次运行 `todo` 还有 `pending` 项、最后一句只宣布下一步（如冒号结尾、“让我／我先／let me…”）、空回复或长度截断，补合成用户消息续跑并发出 `Event::Continuing`。默认不限制整轮累计续跑次数，改为最多 3 次无新进展的续跑（`max_without_progress`）；首次成功执行的工具名 + 解析后的 JSON 参数组合恢复额度，参数键序不影响比较，失败、拒绝、重复调用及 `todo` / `ask_user` / `time_now` 不恢复。这是进展启发式，不保证工作正确；`max_turns` 仍限制总运行量，可用 `max_per_run` 另设累计上限（0 禁用）。
 - `before_stop` 返回 `StopDecision::Finish` / `Continue(Nudge)` / `Pause(reason)`，第一个非 Finish 决策生效。需要续跑但额度已耗尽时返回 `HarnessError::Paused`（`no_progress` 或 `continuation_limit`），经 Error 事件通知宿主，不能当作 Done；最后一轮仍有工作则返回 MaxTurns。正常回答、询问用户、安全结束不会强制续跑；催过后模型明确完成或受阻也可结束，但再次空答或只宣布动作仍受保护。合成消息应在界面隐藏；宿主应对暂停提供原因和继续入口。
@@ -88,7 +112,7 @@ agent.run("session-1", "你好", &mut |event| { /* 转给 UI */ }, &Arc::new(Ato
 | `todo` | 默认 | Read | 任务清单整体替换，最多一项进行中；宿主用 `snapshot(session)` 读取 |
 | `ask_user` | 默认 | Read | 宿主提供回调 `(会话, 问题, ctx)`，等用户时用 `ctx.wait_for(&rx)`，取消运行即可关掉弹窗 |
 | `web_search` | 默认 | Network | 只定义 `SearchBackend`，结果标记为不可信 |
-| `task` | 默认 | 宿主指定 | `Subagent`：宿主构建受限的子 `Agent`，父级只拿到最终回答。子 agent 的中间件要自己装（共用同一个 `Arc<Permission>` 才会受同样约束），用量不计入父级，深度由宿主构造时决定。每次调用用全新的会话 id（`<父会话>#<工具名>-<时间>-<进程>-<序号>`），所以即使子 agent 用持久化存储，重启后也不会读到上一个任务的历史；任务结束后用 `on_finish(id)` 清理该会话的状态（如 `Permission::forget_session`、`Todo::clear_session`、删除存储），子 agent 不需要留档就用 `MemoryStore` |
+| `task` | 默认 | 宿主指定 | `Subagent`：默认串行，宿主可显式 `.parallel()`。宿主构建受限的子 `Agent`，父级只拿到最终回答。子 agent 的中间件要自己装（共用同一个 `Arc<Permission>` 才会受同样约束），用量不计入父级，深度由宿主构造时决定。每次调用用全新的会话 id（`<父会话>#<工具名>-<时间>-<进程>-<序号>`）；任务结束后用 `on_finish(id)` 清理状态，子 agent 不需要留档就用 `MemoryStore` |
 | `read_file` `list_dir` `grep` | `fs` | Read | 限定在宿主给的根目录内，符号链接逃逸被拒绝；`grep` 是字面量匹配 |
 | `write_file` `edit_file` | `fs` | Write | 同样限定根目录；拒绝 `..`，悬空符号链接不可写穿；原子写入，保留权限；`edit_file` 要求 `old_string` 唯一 |
 | `web_fetch` | `web` | Network | 只取公网 http/https；每一跳（含重定向）都解析主机并拒绝私有和保留地址，连接固定到检查过的 IP；可设域名白名单；https 需要 `native-tls` |
@@ -117,14 +141,14 @@ Skills：`<根>/<name>/SKILL.md`，开头 `---` 块含 `name`、`description`，
 
 | feature | 作用 |
 | --- | --- |
-| 默认 | 只依赖 `serde`、`serde_json`；含假模型 `ScriptedProvider`，以及三种协议的请求构造和流解析（不含网络） |
+| 默认 | 依赖 `serde`、`serde_json` 与关闭外部引用读取的 `jsonschema`；含假模型 `ScriptedProvider`，以及三种协议的请求构造和流解析（不含网络） |
 | `openai` | `OpenAiCompat`、`OpenAiResponses`，引入阻塞版 `reqwest` |
 | `native-tls` | `openai`、`anthropic` 加系统 TLS |
 | `anthropic` | `AnthropicMessages`，引入阻塞版 `reqwest` |
 | `mcp` | 轻量通用 MCP 客户端（JSON-RPC 2.0 over stdio），连接外部 MCP 工具服务（如 open-computer-use） |
 | `fs` `skills` `memory` `web` `shell` `stdio` `mcp` | 见上；只有 `web`、`openai`、`anthropic` 引入 `reqwest`，其余无额外依赖 |
 
-macOS arm64 实测（本 crate 的发布配置）：启用全部特性并用上全部工具、中间件和 stdio 的示例程序为 1.63 MiB。Windows 与宿主已有 `reqwest` 时的增量未测。
+0.1 历史 macOS arm64 实测（本 crate 的发布配置）：启用全部特性并用上全部工具、中间件和 stdio 的示例程序为 1.63 MiB。0.2 增加 Schema 校验依赖后的体积未重新测量；Windows 与宿主已有 `reqwest` 时的增量未测。
 
 ## 验证
 
@@ -134,3 +158,5 @@ cargo test --manifest-path libs/agent-kernel/Cargo.toml --features native-tls,fs
 ```
 
 `tests/` 是与产品无关的一致性测试，用 `ScriptedProvider` 和本地假 HTTP 服务，不依赖真实模型。只在 macOS 上运行过；`shell` 测试仅 Unix，Windows 上的文件、路径和进程处理未验证。新产品只能新增测试，不改这些。
+
+0.2 第一阶段验证：`cargo test --manifest-path libs/agent-kernel/Cargo.toml --locked --offline --all-features`，226 项通过；无默认 feature 测试通过。MCP 假服务测试需要开发机器上的 `python3`，产品使用内核本身不因此依赖 Python。

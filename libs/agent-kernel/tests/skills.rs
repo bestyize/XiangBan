@@ -150,7 +150,7 @@ fn skill_manage_validates_names_descriptions_and_sizes() {
     assert!(create("ok", "d", "  ").contains("`content` must be"));
     assert!(create("ok", "d", &"c".repeat(20_001)).contains("`content` must be"));
     assert!(create("taken", "d", "c").contains("already exists"));
-    assert!(manage(&skills, r#"{"action":"explode","name":"ok"}"#).contains("unknown action"));
+    assert!(manage(&skills, r#"{"action":"explode","name":"ok"}"#).contains("/action"));
     assert!(!user.path("ok").exists() && !user.path("taken").exists() && !user.path("../escape").exists());
 }
 

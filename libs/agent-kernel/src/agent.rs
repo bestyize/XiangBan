@@ -27,6 +27,7 @@ pub struct Agent {
     pub(crate) store: Arc<dyn SessionStore>,
     pub(crate) tools: Vec<Arc<dyn Tool>>,
     pub(crate) tool_index: HashMap<String, usize>,
+    pub(crate) validators: Vec<jsonschema::Validator>,
     pub(crate) middleware: Vec<Arc<dyn Middleware>>,
     pub(crate) system_prompt: String,
     pub(crate) prompt_sections: Vec<PromptSection>,
@@ -120,6 +121,7 @@ impl AgentBuilder {
 
     pub fn build(self) -> Result<Agent, HarnessError> {
         let mut tool_index = HashMap::new();
+        let mut validators = Vec::with_capacity(self.tools.len());
         for (i, tool) in self.tools.iter().enumerate() {
             let name = &tool.spec().name;
             let valid = !name.is_empty()
@@ -131,6 +133,11 @@ impl AgentBuilder {
             if tool_index.insert(name.clone(), i).is_some() {
                 return Err(HarnessError::Config(format!("duplicate tool name `{name}`")));
             }
+            let validator = jsonschema::options()
+                .with_retriever(NoExternalSchemas)
+                .build(&tool.spec().schema)
+                .map_err(|e| HarnessError::Config(format!("invalid schema for tool `{name}`: {e}")))?;
+            validators.push(validator);
         }
         if self.max_turns == 0 {
             return Err(HarnessError::Config("max_turns must be at least 1".into()));
@@ -140,6 +147,7 @@ impl AgentBuilder {
             store: self.store,
             tools: self.tools,
             tool_index,
+            validators,
             middleware: self.middleware,
             system_prompt: self.system_prompt,
             prompt_sections: self.prompt_sections,
@@ -147,5 +155,14 @@ impl AgentBuilder {
             retry: self.retry,
             running: Mutex::new(HashSet::new()),
         })
+    }
+}
+
+/// Tool schemas may refer to definitions inside themselves, never to host files or the network.
+struct NoExternalSchemas;
+
+impl jsonschema::Retrieve for NoExternalSchemas {
+    fn retrieve(&self, _uri: &jsonschema::Uri<String>) -> Result<serde_json::Value, Box<dyn std::error::Error + Send + Sync>> {
+        Err("external tool schema references are disabled; use local $defs/$ref".into())
     }
 }

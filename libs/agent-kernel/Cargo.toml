@@ -1,6 +1,6 @@
 [package]
 name = "agent-kernel"
-version = "0.1.0"
+version = "0.2.0"
 description = "Product-agnostic, lightweight agent harness kernel: loop, tools, middleware, OpenAI-compatible provider"
 edition = "2021"
 publish = false
@@ -16,11 +16,13 @@ memory = []
 web = ["dep:reqwest"]
 shell = []
 stdio = []
-mcp = []
+mcp = ["dep:base64"]
 
 [dependencies]
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+jsonschema = { version = "0.33", default-features = false }
+base64 = { version = "0.22", optional = true }
 reqwest = { version = "0.13", default-features = false, features = ["blocking"], optional = true }
 
 [profile.dev]

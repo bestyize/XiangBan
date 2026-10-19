@@ -1,4 +1,5 @@
 use serde_json::Value;
+use crate::types::{Message, Part};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{Receiver, RecvTimeoutError};
 use std::sync::Arc;
@@ -41,8 +42,8 @@ impl ToolSpec {
             name: name.into(),
             description: description.into(),
             schema,
-            risk: Risk::Read,
-            parallel_safe: true,
+            risk: Risk::Exec,
+            parallel_safe: false,
             timeout: Duration::from_secs(30),
             max_output: DEFAULT_MAX_OUTPUT,
             untrusted_output: false,
@@ -73,6 +74,12 @@ impl ToolSpec {
 
     pub fn serial(mut self) -> Self {
         self.parallel_safe = false;
+        self
+    }
+
+    /// Opt in only when overlapping calls cannot race on shared state.
+    pub fn parallel(mut self) -> Self {
+        self.parallel_safe = true;
         self
     }
 
@@ -129,22 +136,55 @@ impl ToolCtx {
 pub trait Tool: Send + Sync {
     fn spec(&self) -> &ToolSpec;
     /// `Ok` and `Err` both go back to the model; `Err` is flagged as an error result.
-    fn execute(&self, args: Value, ctx: &ToolCtx) -> Result<String, String>;
+    fn execute(&self, _args: Value, _ctx: &ToolCtx) -> Result<String, String> {
+        Err("this tool requires the structured execute_result entry point".into())
+    }
+
+    /// The harness calls this entry point. Text-only tools need no changes; tools returning
+    /// images or structured data override it and keep `execute` as a legacy text projection.
+    fn execute_result(&self, args: Value, ctx: &ToolCtx) -> ToolResult {
+        match self.execute(args, ctx) {
+            Ok(output) => ToolResult::ok(output),
+            Err(error) => ToolResult::error(error),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct ToolResult {
     pub output: String,
     pub is_error: bool,
+    /// Additional media. Text stays in `output` so existing middleware can edit/spill it.
+    pub parts: Vec<Part>,
+    pub structured_content: Option<Value>,
 }
 
 impl ToolResult {
     pub fn ok(output: impl Into<String>) -> Self {
-        Self { output: output.into(), is_error: false }
+        Self { output: output.into(), is_error: false, parts: Vec::new(), structured_content: None }
     }
 
     pub fn error(output: impl Into<String>) -> Self {
-        Self { output: output.into(), is_error: true }
+        Self { is_error: true, ..Self::ok(output) }
+    }
+
+    pub fn with_part(mut self, part: Part) -> Self {
+        self.parts.push(part);
+        self
+    }
+
+    pub fn with_structured_content(mut self, value: Value) -> Self {
+        self.structured_content = Some(value);
+        self
+    }
+
+    /// Preserves error state and media in persistent history.
+    pub fn message(&self, call_id: impl Into<String>) -> Message {
+        let mut message = Message::tool(call_id, &self.output);
+        message.parts.extend(self.parts.clone());
+        message.is_error = self.is_error;
+        message.structured_content = self.structured_content.clone();
+        message
     }
 }
 

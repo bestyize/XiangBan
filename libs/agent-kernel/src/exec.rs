@@ -12,7 +12,7 @@ const POLL: Duration = Duration::from_millis(20);
 
 struct Inflight {
     index: usize,
-    rx: Receiver<Result<String, String>>,
+    rx: Receiver<ToolResult>,
     deadline: Option<Instant>,
     timeout: Duration,
     call_cancel: Arc<AtomicBool>,
@@ -30,7 +30,7 @@ fn spawn(index: usize, tool: Arc<dyn Tool>, args: Value, ctx: ToolCtx) -> Result
     std::thread::Builder::new()
         .name(format!("tool-{}", tool.spec().name))
         .spawn(move || {
-            let _ = tx.send(tool.execute(args, &ctx));
+            let _ = tx.send(tool.execute_result(args, &ctx));
         })
         .map_err(|e| ToolResult::error(format!("could not start tool: {e}")))?;
     Ok(Inflight { index, rx, deadline: Instant::now().checked_add(timeout), timeout, call_cancel })
@@ -39,8 +39,7 @@ fn spawn(index: usize, tool: Arc<dyn Tool>, args: Value, ctx: ToolCtx) -> Result
 fn await_call(call: &Inflight, cancel: &AtomicBool) -> ToolResult {
     loop {
         match call.rx.recv_timeout(POLL) {
-            Ok(Ok(output)) => return ToolResult::ok(output),
-            Ok(Err(error)) => return ToolResult::error(error),
+            Ok(result) => return result,
             Err(RecvTimeoutError::Disconnected) => return ToolResult::error("tool crashed before returning a result"),
             Err(RecvTimeoutError::Timeout) => {
                 if cancel.load(Ordering::Relaxed) {
@@ -126,6 +125,15 @@ impl Agent {
             }
         };
         let tool = self.tools[index].clone();
+        if !args.is_object() {
+            return Prepared::Done(ToolResult::error("arguments must be a JSON object"));
+        }
+        if let Err(error) = self.validators[index].validate(&args) {
+            return Prepared::Done(ToolResult::error(format!(
+                "invalid arguments for `{}` at ${}: {}. No tool was executed.",
+                call.name, error.instance_path, error
+            )));
+        }
         let ctx = ToolCtx {
             session: session.to_string(),
             run_cancel: cancel.clone(),
@@ -164,12 +172,34 @@ impl Agent {
         mut result: ToolResult,
         on_event: &mut dyn FnMut(Event),
     ) -> ToolResult {
+        // Do not truncate binary data or JSON into unusable fragments. Keep media below the
+        // JSONL bridge's 8 MiB frame budget, with space for text and envelope fields.
+        let media_bytes: usize = result.parts.iter().map(|p| match p {
+            crate::Part::Text { text } => text.len(),
+            crate::Part::Image { url } => url.len(),
+        }).sum();
+        let max = self.tool_index.get(&call.name).map_or(DEFAULT_MAX_OUTPUT, |&i| self.tools[i].spec().max_output);
+        if media_bytes > 6 * 1024 * 1024 {
+            result = ToolResult::error("Tool returned too much media (limit: 6 MiB); request a smaller result. The tool may already have performed its action.");
+        } else if result.structured_content.as_ref().is_some_and(|v| v.to_string().len() > max) {
+            result = ToolResult::error("Tool returned structured data larger than its output limit; request a smaller result. The tool may already have performed its action.");
+        }
+        let mut images = Vec::new();
+        for part in std::mem::take(&mut result.parts) {
+            match part {
+                crate::Part::Text { text } => { result.output.push('\n'); result.output.push_str(&text); }
+                image => images.push(image),
+            }
+        }
+        result.parts = images;
         for mw in &self.middleware {
             mw.after_tool(session, call, &mut result);
         }
-        let max = self.tool_index.get(&call.name).map_or(DEFAULT_MAX_OUTPUT, |&i| self.tools[i].spec().max_output);
         result.output = truncate_middle(&result.output, max);
-        on_event(Event::ToolEnd { id: call.id.clone(), output: result.output.clone(), is_error: result.is_error });
+        on_event(Event::ToolEnd {
+            id: call.id.clone(), output: result.output.clone(), is_error: result.is_error,
+            parts: result.parts.clone(), structured_content: result.structured_content.clone(),
+        });
         result
     }
 }

@@ -49,6 +49,7 @@ pub struct Turn {
     pub session: String,
     pub index: usize,
     pub messages: Vec<Message>,
+    pub tools: Vec<crate::ToolSchema>,
 }
 
 /// Hooks run in registration order. Permission, context trimming, output spilling and budgets

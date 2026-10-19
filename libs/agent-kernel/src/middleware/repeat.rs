@@ -11,6 +11,9 @@ struct Streak {
     name: String,
     args: Value,
     output: String,
+    parts: Vec<crate::Part>,
+    structured_content: Option<Value>,
+    is_error: bool,
     count: usize,
 }
 
@@ -82,10 +85,14 @@ impl Middleware for RepeatGuard {
             // Refused in `before_tool`; the refusal must not reset the streak.
             return;
         }
-        if same_call && streak.output == result.output {
+        if same_call && streak.output == result.output && streak.parts == result.parts
+            && streak.structured_content == result.structured_content && streak.is_error == result.is_error {
             streak.count += 1;
         } else {
-            *streak = Streak { name: call.name.clone(), args, output: result.output.clone(), count: 1 };
+            *streak = Streak {
+                name: call.name.clone(), args, output: result.output.clone(), parts: result.parts.clone(),
+                structured_content: result.structured_content.clone(), is_error: result.is_error, count: 1,
+            };
         }
         if streak.count >= self.warn_after {
             result.output.push_str(&format!(

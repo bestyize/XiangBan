@@ -15,8 +15,14 @@ pub struct FnTool {
 }
 
 impl FnTool {
-    pub fn new(spec: ToolSpec, run: impl Fn(Value, &ToolCtx) -> Result<String, String> + Send + Sync + 'static) -> Self {
-        Self { spec, run: Box::new(run) }
+    pub fn new(
+        spec: ToolSpec,
+        run: impl Fn(Value, &ToolCtx) -> Result<String, String> + Send + Sync + 'static,
+    ) -> Self {
+        Self {
+            spec,
+            run: Box::new(run),
+        }
     }
 }
 
@@ -32,6 +38,8 @@ impl Tool for FnTool {
 
 pub fn spec(name: &str) -> ToolSpec {
     ToolSpec::new(name, "test tool", json!({ "type": "object" }))
+        .risk(Risk::Read)
+        .parallel()
 }
 
 pub struct Harness {
@@ -41,7 +49,11 @@ pub struct Harness {
 }
 
 pub fn fast_retry() -> RetryPolicy {
-    RetryPolicy { max_retries: 3, base_delay: Duration::from_millis(1), max_delay: Duration::from_millis(5) }
+    RetryPolicy {
+        max_retries: 3,
+        base_delay: Duration::from_millis(1),
+        max_delay: Duration::from_millis(5),
+    }
 }
 
 pub fn harness(steps: Vec<Step>, configure: impl FnOnce(AgentBuilder) -> AgentBuilder) -> Harness {
@@ -49,7 +61,11 @@ pub fn harness(steps: Vec<Step>, configure: impl FnOnce(AgentBuilder) -> AgentBu
     let store = Arc::new(MemoryStore::new());
     let builder = Agent::builder(provider.clone(), store.clone()).retry(fast_retry());
     let agent = configure(builder).build().expect("agent builds");
-    Harness { agent, provider, store }
+    Harness {
+        agent,
+        provider,
+        store,
+    }
 }
 
 pub fn run(agent: &Agent, input: &str) -> (Result<RunSummary, HarnessError>, Vec<Event>) {
@@ -81,7 +97,11 @@ pub struct TempDir(pub std::path::PathBuf);
 
 impl TempDir {
     pub fn new(tag: &str) -> Self {
-        let dir = std::env::temp_dir().join(format!("agent-kernel-{tag}-{}-{:?}", std::process::id(), std::thread::current().id()));
+        let dir = std::env::temp_dir().join(format!(
+            "agent-kernel-{tag}-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
         Self(dir)

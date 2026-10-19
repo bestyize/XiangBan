@@ -657,7 +657,6 @@ fn widget_create(desktop: &dyn Desktop, args: &Value) -> Result<String, String> 
     let description = optional_text(args, "description")?;
     let width = args.get("width").and_then(Value::as_f64);
     let height = args.get("height").and_then(Value::as_f64);
-    let theme = optional_text(args, "theme")?.unwrap_or("transparent");
     let overwrite = optional_bool(args, "overwrite")?.unwrap_or(false);
     let place_now = optional_bool(args, "place_now")?.unwrap_or(true);
 
@@ -666,7 +665,7 @@ fn widget_create(desktop: &dyn Desktop, args: &Value) -> Result<String, String> 
         "id": id,
         "name": name,
         "html": html,
-        "theme": theme,
+        "theme": "transparent",
     });
     if let Some(desc) = description {
         pack["description"] = json!(desc);
@@ -840,7 +839,7 @@ pub fn tools(desktop: Arc<dyn Desktop>) -> Vec<Arc<dyn Tool>> {
     let none = || object(json!({}), &[]);
     let status_run = |d: &dyn Desktop, _: &Value| -> Result<String, String> { Ok(d.status()?.to_string()) };
     vec![
-        tool(&desktop, ToolSpec::new("desktop_windows", "查看小伴自己的窗口和显示器：盆栽 companion、超级小伴 assistant、控制台 control、桌面组件 widget:<id> 的位置、显示状态和层级。移动前用本工具确认目标与显示器。", none()), |d, _| d.windows().map(|v| v.to_string())),
+        tool(&desktop, ToolSpec::new("desktop_windows", "查看小伴自己的窗口和显示器：盆栽 companion、超级小伴 assistant、控制台 control、桌面组件 widget:<id> 的位置、显示状态和层级。移动前用本工具确认目标与显示器。", none()).risk(Risk::Read).parallel(), |d, _| d.windows().map(|v| v.to_string())),
         tool(&desktop, ToolSpec::new("desktop_window_set", "控制小伴自己的窗口，不操作其他应用。target: companion 是盆栽，assistant 是超级小伴悬浮条（用户让你收起来时用 action=collapse），control 是设置控制台，widget:<id> 是组件。移动 x/y 使用屏内比例（0 左/上，0.5 中间，1 右/下），可指定 desktop_windows 返回的 monitor。layer: desktop 贴桌面、normal 普通窗口、topmost 置顶；层级本次运行有效。隐藏盆栽或组件会保存开关；收起助手不退出应用、不取消任务。", object(json!({
             "target":{"type":"string"},"action":{"type":"string","enum":["show","hide","collapse"]},
             "x":{"type":"number","minimum":0,"maximum":1},"y":{"type":"number","minimum":0,"maximum":1},
@@ -850,8 +849,8 @@ pub fn tools(desktop: Arc<dyn Desktop>) -> Vec<Arc<dyn Tool>> {
             change.validate()?;
             d.window_update(&change).map(|v|v.to_string())
         }),
-        tool(&desktop, ToolSpec::new("desktop_status", "查看小伴桌面当前的状态：显示模式、正在用的壁纸和特效、小伴的外壳与表情。", none()), status_run),
-        tool(&desktop, ToolSpec::new("wallpaper_list", "列出可用的壁纸（id、标题、类型、是否已下载）和当前正在使用的那张。", none()), wallpaper_list),
+        tool(&desktop, ToolSpec::new("desktop_status", "查看小伴桌面当前的状态：显示模式、正在用的壁纸和特效、小伴的外壳与表情。", none()).risk(Risk::Read).parallel(), status_run),
+        tool(&desktop, ToolSpec::new("wallpaper_list", "列出可用的壁纸（id、标题、类型、是否已下载）和当前正在使用的那张。", none()).risk(Risk::Read).parallel(), wallpaper_list),
         tool(
             &desktop,
             ToolSpec::new("wallpaper_apply", "把桌面壁纸换成指定的壁纸，用 wallpaper_list 里的 id。id 为 companion 表示换回没有壁纸的系统桌面。", object(json!({"id": {"type": "string"}}), &["id"]))
@@ -884,7 +883,7 @@ pub fn tools(desktop: Arc<dyn Desktop>) -> Vec<Arc<dyn Tool>> {
             ToolSpec::new("wallpaper_delete", "删除指定的本地导入或创作的壁纸，id 来自 wallpaper_list（必须是 local- 开头）。若该壁纸正在使用，会自动换回系统桌面。", object(json!({"id": {"type": "string"}}), &["id"])).risk(Risk::Write).serial(),
             wallpaper_delete,
         ),
-        tool(&desktop, ToolSpec::new("effect_list", "列出桌面特效（雨、雪、花瓣等）和正在使用的那个。", none()), effect_list),
+        tool(&desktop, ToolSpec::new("effect_list", "列出桌面特效（雨、雪、花瓣等）和正在使用的那个。", none()).risk(Risk::Read).parallel(), effect_list),
         tool(
             &desktop,
             ToolSpec::new("effect_read_format", "读取程序内置的完整桌面特效包格式与可用 JSON 示例。创作特效前先调用本工具；无需搜索工作目录、安装目录或联网查找文档。", none()).risk(Risk::Read),
@@ -945,7 +944,7 @@ pub fn tools(desktop: Arc<dyn Desktop>) -> Vec<Arc<dyn Tool>> {
             .serial(),
             companion_set,
         ),
-        tool(&desktop, ToolSpec::new("care_list", "列出关怀提醒的规则（id、时间、文案）和总开关状态。", none()), care_list),
+        tool(&desktop, ToolSpec::new("care_list", "列出关怀提醒的规则（id、时间、文案）和总开关状态。", none()).risk(Risk::Read).parallel(), care_list),
         tool(
             &desktop,
             ToolSpec::new(
@@ -971,7 +970,7 @@ pub fn tools(desktop: Arc<dyn Desktop>) -> Vec<Arc<dyn Tool>> {
             care_set,
         ),
         tool(&desktop, ToolSpec::new("care_delete", "删除一条关怀提醒，id 来自 care_list。", object(json!({"id": {"type": "string"}}), &["id"])).risk(Risk::Write).self_managed().serial(), care_delete),
-        tool(&desktop, ToolSpec::new("widget_list", "列出新版桌面组件的 id、类型、缩放和显示状态。", none()), widget_list),
+        tool(&desktop, ToolSpec::new("widget_list", "列出新版桌面组件的 id、类型、缩放和显示状态。", none()).risk(Risk::Read).parallel(), widget_list),
         tool(
             &desktop,
             ToolSpec::new(
@@ -991,16 +990,15 @@ pub fn tools(desktop: Arc<dyn Desktop>) -> Vec<Arc<dyn Tool>> {
             &desktop,
             ToolSpec::new(
                 "widget_create",
-                "为用户创作一个新的自定义单文件 HTML 桌面小组件。可编写包含完整 HTML、CSS 样式与 JavaScript 交互逻辑的独立微卡片（如番茄钟、极简时钟、每日诗词、倒数日、健康喝水提醒、趣味小工具等）。默认透明无底，HTML 的页面和主体也不要绘制整块背景；仅在用户需要时添加底板。支持外壳主题（glass 透光玻璃 / paper 温润纸张 / transparent 透明无底），默认宽 280、高 240。创作完成后默认自动放置到桌面上。",
+                "为用户创作一个新的自定义单文件 HTML 桌面小组件。可编写包含完整 HTML、CSS 样式与 JavaScript 交互逻辑的独立微卡片（如番茄钟、极简时钟、每日诗词、倒数日、健康喝水提醒、趣味小工具等）。宿主固定透明无底，不提供外壳主题、底板或纹理。HTML 的页面和主体保持透明，默认不绘制铺满组件的底板；仅在用户明确需要时，在组件内容中绘制底板。允许小范围、低透明度的柔和投影增加立体感：建议 box-shadow:0 1px 3px -2px rgba(0,0,0,0.12)，filter:drop-shadow(0 1px 1px rgba(0,0,0,0.08))，周围留至少 4px 空间；避免大模糊、大偏移、多层外投影以及贴着视口边缘画阴影，防止被截断。默认宽 280、高 240。创作完成后默认自动放置到桌面上。",
                 object(
                     json!({
                         "id": { "type": "string", "description": "小组件英文标识（小写字母、数字、-、_，如 pomodoro-timer）" },
                         "name": { "type": "string", "description": "小组件中文名称（最多 24 字，如 专注番茄钟）" },
-                        "html": { "type": "string", "description": "完整的自包含单文件 HTML 内容（包含 <style>、DOM 结构与 <script> 逻辑）；默认让 html、body 背景透明，不绘制铺满组件的底板；内容应在指定 width、height 的视口内自适应，避免横向溢出和滚动条" },
+                        "html": { "type": "string", "description": "完整的自包含单文件 HTML 内容（包含 <style>、DOM 结构与 <script> 逻辑）；默认让 html、body 背景透明，不绘制铺满组件的底板；内容应在指定 width、height 的视口内自适应，避免横向溢出和滚动条。宿主统一提供按住非交互区域拖动和位置保存，无需自行实现窗口拖拽；不要使用 Electron 的 -webkit-app-region 或直接调用 Tauri。按钮、输入框等使用语义化元素；自定义手势区域加 data-no-drag，保留可拖动的背景区域" },
                         "description": { "type": "string", "description": "一句话介绍（最多 80 字）" },
                         "width": { "type": "number", "minimum": 100, "maximum": 800, "description": "建议默认宽度（像素，默认 280）" },
                         "height": { "type": "number", "minimum": 80, "maximum": 800, "description": "建议默认高度（像素，默认 240）" },
-                        "theme": { "type": "string", "enum": ["glass", "paper", "transparent"], "description": "底板外观风格，默认 transparent（透明无底）" },
                         "place_now": { "type": "boolean", "description": "创作完成后是否立即放置到桌面上，默认 true" },
                         "overwrite": { "type": "boolean", "description": "true 时覆盖同 id 的已有小组件，默认 false" }
                     }),
@@ -1050,7 +1048,7 @@ pub fn tools(desktop: Arc<dyn Desktop>) -> Vec<Arc<dyn Tool>> {
             ToolSpec::new("widget_remove", "从桌面移除指定的组件，id 来自 widget_list。", object(json!({"id": {"type": "string"}}), &["id"])).risk(Risk::Write).self_managed().serial(),
             widget_remove,
         ),
-        tool(&desktop, ToolSpec::new("game_list", "列出小伴支持的小游戏（内置的贪吃蛇、俄罗斯方块、2048、消失高手、奶茶大师、水墨剑客、暮色滑翔，以及用户自创游戏）以及游戏空间状态。", none()), game_list),
+        tool(&desktop, ToolSpec::new("game_list", "列出小伴支持的小游戏（内置的贪吃蛇、俄罗斯方块、2048、消失高手、奶茶大师、水墨剑客、暮色滑翔，以及用户自创游戏）以及游戏空间状态。", none()).risk(Risk::Read).parallel(), game_list),
         tool(
             &desktop,
             ToolSpec::new(

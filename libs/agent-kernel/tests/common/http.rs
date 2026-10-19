@@ -6,7 +6,8 @@ use std::net::{TcpListener, TcpStream};
 use std::thread::{self, JoinHandle};
 use std::time::Duration;
 
-pub const SSE: &str = "HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nConnection: close\r\n\r\n";
+pub const SSE: &str =
+    "HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nConnection: close\r\n\r\n";
 
 pub fn read_request(stream: &mut TcpStream) -> String {
     let mut buf = Vec::new();
@@ -18,7 +19,11 @@ pub fn read_request(stream: &mut TcpStream) -> String {
         buf.push(byte[0]);
     }
     let head = String::from_utf8_lossy(&buf).to_string();
-    let length = head.to_lowercase().lines().find_map(|l| l.strip_prefix("content-length: ")?.trim().parse().ok()).unwrap_or(0);
+    let length = head
+        .to_lowercase()
+        .lines()
+        .find_map(|l| l.strip_prefix("content-length: ")?.trim().parse().ok())
+        .unwrap_or(0);
     let mut body = vec![0u8; length];
     let _ = stream.read_exact(&mut body);
     head + &String::from_utf8_lossy(&body)
@@ -56,12 +61,18 @@ pub fn sse(chunks: &[&str]) -> String {
 
 /// An SSE response with `event:` and `data:` lines, as the Messages and Responses APIs send them.
 pub fn sse_events(events: &[(&str, &str)]) -> String {
-    let body: String = events.iter().map(|(name, data)| format!("event: {name}\ndata: {data}\n\n")).collect();
+    let body: String = events
+        .iter()
+        .map(|(name, data)| format!("event: {name}\ndata: {data}\n\n"))
+        .collect();
     format!("{SSE}{body}")
 }
 
 pub fn status(line: &str, body: &str) -> String {
-    format!("HTTP/1.1 {line}\r\nConnection: close\r\nContent-Length: {}\r\n\r\n{body}", body.len())
+    format!(
+        "HTTP/1.1 {line}\r\nConnection: close\r\nContent-Length: {}\r\n\r\n{body}",
+        body.len()
+    )
 }
 
 /// Values of every header called `name` (case-insensitive) in a recorded request.
@@ -80,5 +91,6 @@ pub fn request_path(request: &str) -> String {
 }
 
 pub fn body_json(request: &str) -> Value {
-    serde_json::from_str(request.split("\r\n\r\n").nth(1).unwrap_or("")).expect("request body is JSON")
+    serde_json::from_str(request.split("\r\n\r\n").nth(1).unwrap_or(""))
+        .expect("request body is JSON")
 }

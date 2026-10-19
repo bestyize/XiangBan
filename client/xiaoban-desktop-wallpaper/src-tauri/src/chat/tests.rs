@@ -744,11 +744,11 @@ fn the_context_size_from_settings_is_what_the_agent_trims_to() {
             utc_offset_minutes: 0,
             open_computer_use: false,
             spawn_computer_use: no_computer_use,
-            context_tokens: 2_500,
+            context_tokens: 32_000,
         })
         .unwrap();
         let file = JsonlStore::new(dirs.sessions());
-        let long = "字".repeat(1_500);
+        let long = "字".repeat(30_000);
         file.append("s8", &[Message::user_text(format!("第一个问题{long}")), Message::assistant(long.clone(), vec![]), Message::user_text("第二个问题"), Message::assistant("第二个回答", vec![])]).unwrap();
         agent.run("s8", "第三个问题", &mut |_| {}, &Arc::new(AtomicBool::new(false))).unwrap();
         provider.requests()[0].messages.iter().map(|m| m.text()).collect::<Vec<_>>()

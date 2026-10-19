@@ -67,7 +67,7 @@ pub fn message_to_wire(message: &Message) -> Value {
         Role::Tool => json!({
             "role": "tool",
             "tool_call_id": message.tool_call_id,
-            "content": message.text(),
+            "content": message.tool_text_with_error(),
         }),
         Role::Assistant => {
             let text = message.text();
@@ -102,9 +102,26 @@ pub fn message_to_wire(message: &Message) -> Value {
 }
 
 pub fn build_request_body(profile: &ProviderProfile, request: &ChatRequest) -> Value {
+    // Chat Completions tool content is text-only. Attach tool images in a user message AFTER
+    // all adjacent tool results, preserving the assistant-call/result pairing required by APIs.
+    let mut messages = Vec::new();
+    let mut media = Vec::new();
+    for message in &request.messages {
+        if message.role != Role::Tool && !media.is_empty() {
+            messages.push(json!({"role": "user", "content": std::mem::take(&mut media)}));
+        }
+        messages.push(message_to_wire(message));
+        for part in &message.parts {
+            if let (Role::Tool, Part::Image { url }) = (message.role, part) {
+                media.push(json!({"type": "text", "text": format!("Image returned by tool call {}:", message.tool_call_id.as_deref().unwrap_or_default())}));
+                media.push(json!({"type": "image_url", "image_url": {"url": url}}));
+            }
+        }
+    }
+    if !media.is_empty() { messages.push(json!({"role": "user", "content": media})); }
     let mut body = json!({
         "model": profile.model,
-        "messages": request.messages.iter().map(message_to_wire).collect::<Vec<_>>(),
+        "messages": messages,
         "stream": true,
     });
     if profile.stream_usage {

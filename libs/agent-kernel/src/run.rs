@@ -46,7 +46,7 @@ fn dangling_tool_results(history: &[Message]) -> Vec<Message> {
         .tool_calls
         .iter()
         .filter(|c| !answered.contains(c.id.as_str()))
-        .map(|c| Message::tool(c.id.as_str(), "Error: this tool call was interrupted before it produced a result."))
+        .map(|c| crate::ToolResult::error("this tool call was interrupted before it produced a result.").message(c.id.as_str()))
         .collect()
 }
 
@@ -153,13 +153,13 @@ impl Agent {
                 messages.push(Message::system(system));
             }
             messages.extend_from_slice(&history);
-            let mut turn = Turn { session: session.to_string(), index, messages };
+            let mut turn = Turn { session: session.to_string(), index, messages, tools: self.tool_schemas() };
             for mw in &self.middleware {
                 mw.before_model(&mut turn)?;
             }
-            let request = ChatRequest { messages: turn.messages, tools: self.tool_schemas() };
+            let request = ChatRequest { messages: turn.messages, tools: turn.tools };
             let mut reply = self.chat_with_retry(&request, on_event, cancel)?;
-            let turn = Turn { session: turn.session, index, messages: request.messages };
+            let turn = Turn { session: turn.session, index, messages: request.messages, tools: request.tools };
             for mw in &self.middleware {
                 mw.after_model(&turn, &mut reply.message)?;
             }
@@ -218,7 +218,7 @@ impl Agent {
                 self.execute_calls(session, &calls, cancel, on_event)
             };
             let tool_messages: Vec<Message> =
-                calls.iter().zip(&results).map(|(c, r)| Message::tool(c.id.as_str(), r.output.as_str())).collect();
+                calls.iter().zip(&results).map(|(c, r)| r.message(c.id.as_str())).collect();
             self.store.append(session, &tool_messages)?;
             history.extend(tool_messages);
             for (call, result) in calls.iter().zip(&results) {

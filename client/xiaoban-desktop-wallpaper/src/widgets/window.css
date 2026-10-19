@@ -1,3 +1,5 @@
 html:has(body.widget-scene),body.widget-scene,body.widget-scene #app{background:transparent!important;overflow:hidden;margin:0;width:100%;height:100%}.widget-frame{position:absolute;top:8px;left:8px;transform-origin:top left}
+/* Keep the outer shadow inside the native window's 8px gutter at every widget scale. */
+.widget-scene .widget-frame>.xb-widget:not(.custom){box-shadow:0 calc(1px / var(--widget-scale,1)) calc(4px / var(--widget-scale,1)) calc(-2px / var(--widget-scale,1)) #0000001a}
 
 html:has(body.widget-menu-scene),body.widget-menu-scene,body.widget-menu-scene #app{margin:0;width:100%;height:100%;background:transparent!important;overflow:hidden}.widget-menu-frame{padding:8px;width:100%;box-sizing:border-box}.widget-menu-scene .widget-settings-menu{box-shadow:0 3px 8px #201c181f}

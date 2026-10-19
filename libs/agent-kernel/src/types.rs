@@ -28,6 +28,13 @@ pub struct ToolCall {
     pub arguments: String,
 }
 
+/// Host-authored context record, never inferred from text supplied by the user or a tool.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ContextSummary {
+    pub keep_from: usize,
+    pub text: String,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Message {
     pub role: Role,
@@ -41,11 +48,18 @@ pub struct Message {
     /// sees it as an ordinary user message; hosts usually leave it out of the visible conversation.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub synthetic: bool,
+    /// Tool errors remain distinguishable after saving/reloading. Old histories default to false.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub is_error: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub structured_content: Option<serde_json::Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub context_summary: Option<ContextSummary>,
 }
 
 impl Message {
     fn with(role: Role, parts: Vec<Part>) -> Self {
-        Self { role, parts, tool_calls: Vec::new(), tool_call_id: None, synthetic: false }
+        Self { role, parts, tool_calls: Vec::new(), tool_call_id: None, synthetic: false, is_error: false, structured_content: None, context_summary: None }
     }
 
     /// A user-role message from the harness itself (see `synthetic`).
@@ -87,6 +101,22 @@ impl Message {
                 Part::Image { .. } => None,
             })
             .collect()
+    }
+
+    /// JSON is kept separate in storage and appended only when constructing a model request.
+    pub fn tool_text(&self) -> String {
+        let mut text = self.text();
+        if let Some(value) = &self.structured_content {
+            if !text.is_empty() { text.push('\n'); }
+            text.push_str(&value.to_string());
+        }
+        text
+    }
+
+    /// Protocols without a native tool error flag get an explicit text marker.
+    pub fn tool_text_with_error(&self) -> String {
+        let text = self.tool_text();
+        if self.is_error { format!("Error: {text}") } else { text }
     }
 }
 
@@ -138,7 +168,13 @@ impl AddAssign for Usage {
 pub enum Event {
     TextDelta { text: String },
     ToolStart { id: String, name: String, arguments: String },
-    ToolEnd { id: String, output: String, is_error: bool },
+    ToolEnd {
+        id: String, output: String, is_error: bool,
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        parts: Vec<Part>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        structured_content: Option<serde_json::Value>,
+    },
     Usage { prompt_tokens: u32, completion_tokens: u32 },
     Retrying { attempt: u32, delay_ms: u64, message: String },
     /// A reply ended because it hit the length limit. Tool calls in it are not run.

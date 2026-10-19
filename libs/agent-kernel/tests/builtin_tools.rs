@@ -37,9 +37,9 @@ fn todo_replaces_the_list_per_session_and_validates_input() {
 
     let bad = |args: &str| one_call("todo", args, |b| b.tool(Todo::new()));
     assert!(bad(r#"{"todos":[{"content":"a","status":"in_progress"},{"content":"b","status":"in_progress"}]}"#).contains("only one item"));
-    assert!(bad(r#"{"todos":[{"content":"a","status":"started"}]}"#).contains("item 1"));
+    assert!(bad(r#"{"todos":[{"content":"a","status":"started"}]}"#).contains("/todos/0/status"));
     assert!(bad(r#"{"todos":[{"content":"  ","status":"pending"}]}"#).contains("1 to 300"));
-    assert!(bad(r#"{"nothing":1}"#).contains("`todos` is required"));
+    assert!(bad(r#"{"nothing":1}"#).contains("\"todos\" is a required property"));
     let many = format!(r#"{{"todos":[{}]}}"#, vec![r#"{"content":"x","status":"pending"}"#; 51].join(","));
     assert!(bad(&many).contains("too many items"));
     assert!(todo.snapshot("s1").is_empty(), "invalid updates leave the list unchanged");

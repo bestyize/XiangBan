@@ -51,7 +51,7 @@ fn names_actions_and_sizes_are_validated() {
         assert!(call(&memory, "memory_write", &args).contains("note names use"), "name {bad:?}");
         assert!(call(&memory, "memory_read", &serde_json::json!({"name": bad}).to_string()).contains("note names use") || bad.is_empty());
     }
-    assert!(call(&memory, "memory_write", r#"{"name":"ok","action":"burn","content":"c"}"#).contains("unknown action"));
+    assert!(call(&memory, "memory_write", r#"{"name":"ok","action":"burn","content":"c"}"#).contains("/action"));
     assert!(call(&memory, "memory_write", r#"{"name":"ok","content":"   "}"#).contains("1 to 20000"));
     let big = serde_json::json!({"name": "ok", "content": "x".repeat(20_001)}).to_string();
     assert!(call(&memory, "memory_write", &big).contains("1 to 20000"));

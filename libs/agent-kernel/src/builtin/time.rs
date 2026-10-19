@@ -1,4 +1,4 @@
-use crate::tool::{Tool, ToolCtx, ToolSpec};
+use crate::tool::{Risk, Tool, ToolCtx, ToolSpec};
 use serde_json::{json, Value};
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -50,7 +50,7 @@ impl TimeNow {
                 "time_now",
                 "Get the current date, time and weekday. Use it whenever the answer depends on today's date.",
                 json!({ "type": "object", "properties": {} }),
-            ),
+            ).risk(Risk::Read).parallel(),
             offset_minutes: 0,
         }
     }

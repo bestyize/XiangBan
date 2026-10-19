@@ -104,7 +104,7 @@ struct MemoryRead {
 impl MemoryRead {
     fn new(memory: Arc<Memory>) -> Self {
         let schema = json!({ "type": "object", "properties": { "name": { "type": "string", "description": "Omit to list all notes." } } });
-        let spec = ToolSpec::new("memory_read", "Read a saved note, or list all notes when no name is given.", schema);
+        let spec = ToolSpec::new("memory_read", "Read a saved note, or list all notes when no name is given.", schema).risk(Risk::Read).parallel();
         Self { spec, memory }
     }
 }

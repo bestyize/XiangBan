@@ -6,7 +6,7 @@ pub use write::fs_write_tools;
 
 use super::{opt_str_arg, opt_uint_arg, str_arg};
 use crate::error::HarnessError;
-use crate::tool::{Tool, ToolCtx, ToolSpec};
+use crate::tool::{Risk, Tool, ToolCtx, ToolSpec};
 use crate::util::nearest_boundary;
 use serde_json::{json, Value};
 use std::fs::{self, File};
@@ -133,7 +133,7 @@ impl ReadFile {
         });
         let description = "Read a text file with line numbers. Long files are returned in parts; the result \
                            says which offset to use for the next part.";
-        Self { spec: ToolSpec::new("read_file", description, schema).max_output(READ_OUTPUT_LIMIT * 2), roots }
+        Self { spec: ToolSpec::new("read_file", description, schema).risk(Risk::Read).parallel().max_output(READ_OUTPUT_LIMIT * 2), roots }
     }
 }
 
@@ -200,7 +200,7 @@ impl ListDir {
             "type": "object",
             "properties": { "path": { "type": "string", "description": "Directory to list. Defaults to the first allowed root." } }
         });
-        let spec = ToolSpec::new("list_dir", "List the entries of a directory. Directories end with /.", schema);
+        let spec = ToolSpec::new("list_dir", "List the entries of a directory. Directories end with /.", schema).risk(Risk::Read).parallel();
         Self { spec, roots }
     }
 }
@@ -255,7 +255,7 @@ impl Grep {
         });
         let description = "Search files for a literal string and return matching lines as `path:line: text`. \
                            Skips binary files, large files, symlinks and .git, node_modules, target.";
-        Self { spec: ToolSpec::new("grep", description, schema).timeout(Duration::from_secs(60)), roots }
+        Self { spec: ToolSpec::new("grep", description, schema).risk(Risk::Read).parallel().timeout(Duration::from_secs(60)), roots }
     }
 }
 

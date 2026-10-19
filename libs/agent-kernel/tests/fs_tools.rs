@@ -64,7 +64,7 @@ fn read_file_refuses_binary_directories_and_missing_files() {
     assert!(ws.call("read_file", r#"{"path":"blob.bin"}"#).contains("binary"));
     assert!(ws.call("read_file", r#"{"path":"src"}"#).contains("list_dir"));
     assert!(ws.call("read_file", r#"{"path":"nope.txt"}"#).contains("cannot access"));
-    assert!(ws.call("read_file", r#"{"offset":1}"#).contains("`path` is required"));
+    assert!(ws.call("read_file", r#"{"offset":1}"#).contains("\"path\" is a required property"));
 }
 
 #[test]

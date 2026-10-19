@@ -32,12 +32,15 @@ export interface WireMessage {
   tool_call_id?: string | null;
   /** Written by the assistant's harness (for example a nudge to keep working), not by the user. */
   synthetic?: boolean;
+  is_error?: boolean;
+  structured_content?: unknown;
+  context_summary?: { keep_from: number; text: string };
 }
 
 export type KernelEvent =
   | { type: 'text_delta'; text: string }
   | { type: 'tool_start'; id: string; name: string; arguments: string }
-  | { type: 'tool_end'; id: string; output: string; is_error: boolean }
+  | { type: 'tool_end'; id: string; output: string; is_error: boolean; parts?: WirePart[]; structured_content?: unknown }
   | { type: 'usage'; prompt_tokens: number; completion_tokens: number }
   | { type: 'retrying'; attempt: number; delay_ms: number; message: string }
   | { type: 'truncated' }

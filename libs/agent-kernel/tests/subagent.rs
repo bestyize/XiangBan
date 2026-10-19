@@ -59,7 +59,7 @@ fn several_tasks_in_one_turn_get_their_own_sessions_and_run_together() {
         |b| b.tool(sleeper("nap")),
     );
     let steps = vec![Step::tool_call("1", "task", r#"{"task":"one"}"#).and_tool_call("2", "task", r#"{"task":"two"}"#), Step::text("ok")];
-    let h = harness(steps, |b| b.tool(delegate(&c, |s| s)));
+    let h = harness(steps, |b| b.tool(delegate(&c, |s| s.parallel())));
     let started = Instant::now();
     assert!(run(&h.agent, "go").0.is_ok());
     assert!(started.elapsed() < Duration::from_millis(480), "both children slept at the same time: {:?}", started.elapsed());

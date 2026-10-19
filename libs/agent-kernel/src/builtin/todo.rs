@@ -1,4 +1,4 @@
-use crate::tool::{Tool, ToolCtx, ToolSpec};
+use crate::tool::{Risk, Tool, ToolCtx, ToolSpec};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::collections::HashMap;
@@ -51,7 +51,7 @@ impl Todo {
         });
         let description = "Plan and track a multi-step task. Send the complete list every time. Keep at most one item \
                            in_progress, mark items completed as soon as they are done, and skip this tool for trivial requests.";
-        Self { spec: ToolSpec::new("todo", description, schema), lists: Mutex::new(HashMap::new()) }
+        Self { spec: ToolSpec::new("todo", description, schema).risk(Risk::Read), lists: Mutex::new(HashMap::new()) }
     }
 
     pub fn snapshot(&self, session: &str) -> Vec<TodoItem> {

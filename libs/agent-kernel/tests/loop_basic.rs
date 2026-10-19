@@ -38,7 +38,7 @@ fn tool_round_trip_feeds_result_back() {
     let (result, events) = run(&h.agent, "go");
     assert_eq!(result.unwrap().text, "done");
     assert!(events.contains(&Event::ToolStart { id: "c1".into(), name: "echo".into(), arguments: r#"{"x":1}"#.into() }));
-    assert!(events.contains(&Event::ToolEnd { id: "c1".into(), output: "got 1".into(), is_error: false }));
+    assert!(events.contains(&Event::ToolEnd { id: "c1".into(), output: "got 1".into(), is_error: false, parts: vec![], structured_content: None }));
     assert_eq!(tool_messages(&h), vec![("c1".to_string(), "got 1".to_string())]);
     assert_eq!(h.store.load("s1").unwrap().len(), 4);
     assert_eq!(h.provider.requests()[0].tools[0].name, "echo");

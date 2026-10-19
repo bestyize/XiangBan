@@ -1,5 +1,5 @@
 use super::str_arg;
-use crate::tool::{Tool, ToolCtx, ToolSpec};
+use crate::tool::{Risk, Tool, ToolCtx, ToolSpec};
 use serde_json::{json, Value};
 use std::time::Duration;
 
@@ -37,7 +37,7 @@ impl AskUser {
         });
         let description = "Ask the user a question when you need a decision or missing information that you cannot \
                            find yourself. Ask one clear question at a time.";
-        let spec = ToolSpec::new("ask_user", description, schema).serial().timeout(Duration::from_secs(600));
+        let spec = ToolSpec::new("ask_user", description, schema).risk(Risk::Read).serial().timeout(Duration::from_secs(600));
         Self { spec, handler: Box::new(handler) }
     }
 }
@@ -69,9 +69,30 @@ impl Tool for AskUser {
 
     fn execute(&self, args: Value, ctx: &ToolCtx) -> Result<String, String> {
         let question = parse_question(&args)?;
-        Ok(match (self.handler)(ctx.session(), &question, ctx) {
+        let answer = (self.handler)(ctx.session(), &question, ctx);
+        // wait_for returns None both for cancellation and dismissal. Cancellation must never
+        // become a user's decision merely because this worker wins the race with the harness.
+        if ctx.is_cancelled() { return Err("cancelled".into()); }
+        Ok(match answer {
             Some(answer) => format!("The user answered: {answer}"),
             None => "The user dismissed the question without answering.".to_string(),
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::atomic::Ordering;
+
+    #[test]
+    fn cancellation_during_the_handler_is_not_reported_as_user_dismissal() {
+        let ctx = ToolCtx::detached("s");
+        let cancel = ctx.run_cancel.clone();
+        let ask = AskUser::new(move |_, _, _| {
+            cancel.store(true, Ordering::SeqCst);
+            None
+        });
+        assert_eq!(ask.execute(json!({"question": "continue?"}), &ctx), Err("cancelled".into()));
     }
 }

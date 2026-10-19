@@ -57,7 +57,17 @@ pub fn build_request_body(profile: &ProviderProfile, request: &ChatRequest) -> V
             }
             Role::Tool => {
                 let call_id = message.tool_call_id.clone().unwrap_or_default();
-                input.push(json!({ "type": "function_call_output", "call_id": call_id, "output": message.text() }));
+                let text = message.tool_text_with_error();
+                let images: Vec<Value> = message.parts.iter().filter_map(|p| match p {
+                    Part::Image { url } => Some(json!({"type": "input_image", "image_url": url, "detail": "auto"})),
+                    _ => None,
+                }).collect();
+                let output = if images.is_empty() { json!(text) } else {
+                    let mut content = vec![json!({"type": "input_text", "text": text})];
+                    content.extend(images);
+                    json!(content)
+                };
+                input.push(json!({ "type": "function_call_output", "call_id": call_id, "output": output }));
             }
         }
     }

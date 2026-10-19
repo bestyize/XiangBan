@@ -8,10 +8,7 @@ export function newView(id: string, loaded = false): SessionView {
 export const nextId = (view: SessionView) => `${view.id}:${++view.seq}`;
 
 const textOf = (message: WireMessage) => (message.parts ?? []).map(part => (part.type === 'text' ? part.text : '')).join('');
-
-/** The first line of a stored summary (`compact.rs` writes it): the line, then the summary text. */
-const SUMMARY_MARK = /^\[\[xiaoban-summary keep_from=\d+\]\]\n/;
-export const summaryOf = (text: string) => (SUMMARY_MARK.test(text) ? text.replace(SUMMARY_MARK, '') : null);
+const toolOutput = (output: string, structured: unknown) => structured === undefined || structured === null ? output : [output, JSON.stringify(structured, null, 2)].filter(Boolean).join('\n');
 
 /** What the conversation shows where an older part was replaced by a summary. */
 export function summaryNotice(view: SessionView, summary: string): ChatItem {
@@ -23,13 +20,15 @@ export function itemsFromHistory(view: SessionView, messages: WireMessage[]): Ch
   const items: ChatItem[] = [];
   const tools = new Map<string, Extract<ChatItem, { kind: 'tool' }>>();
   for (const message of messages) {
+    if (message.role === 'user' && message.synthetic && message.context_summary) {
+      items.push(summaryNotice(view, message.context_summary.text));
+      continue;
+    }
     if (message.synthetic) continue;
     if (message.role === 'user') {
       const images = (message.parts ?? []).filter(part => part.type === 'image').map(part => (part as { url: string }).url);
       const text = textOf(message);
-      const summary = summaryOf(text);
-      if (summary !== null) items.push(summaryNotice(view, summary));
-      else if (text || images.length) items.push({ kind: 'user', id: nextId(view), text, images });
+      if (text || images.length) items.push({ kind: 'user', id: nextId(view), text, images });
     } else if (message.role === 'assistant') {
       const text = textOf(message);
       if (text.trim()) items.push({ kind: 'assistant', id: nextId(view), text, streaming: false });
@@ -40,7 +39,7 @@ export function itemsFromHistory(view: SessionView, messages: WireMessage[]): Ch
       }
     } else if (message.role === 'tool' && message.tool_call_id) {
       const item = tools.get(message.tool_call_id);
-      if (item) { item.output = textOf(message); item.status = 'done'; }
+      if (item) { item.output = toolOutput(textOf(message), message.structured_content); item.status = message.is_error ? 'error' : 'done'; }
     }
   }
   // A call that never got an answer was cut short, for example by closing the app.
@@ -81,8 +80,9 @@ export function applyEvent(view: SessionView, event: KernelEvent): void {
       break;
     case 'tool_end': {
       const item = view.items.find((i): i is Extract<ChatItem, { kind: 'tool' }> => i.kind === 'tool' && i.id === event.id);
-      if (item) { item.output = event.output; item.status = event.is_error ? 'error' : 'done'; }
-      else view.items.push({ kind: 'tool', id: event.id, name: '', arguments: '', output: event.output, status: event.is_error ? 'error' : 'done' });
+      const output = toolOutput(event.output, event.structured_content);
+      if (item) { item.output = output; item.status = event.is_error ? 'error' : 'done'; }
+      else view.items.push({ kind: 'tool', id: event.id, name: '', arguments: '', output, status: event.is_error ? 'error' : 'done' });
       break;
     }
     case 'retrying':
