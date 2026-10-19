@@ -49,6 +49,12 @@ impl Default for LivingData {fn default()->Self{Self{reminders:vec![],count:0,sy
 pub struct WidgetContent { note: Option<NoteData>, countdown: Option<CountdownData>, flower: Option<FlowerData>, living: Option<LivingData> }
 fn short_text(value: &str, max: usize) -> bool { !value.trim().is_empty() && value.encode_utf16().count() <= max }
 fn valid_identity(value: &str) -> bool { !value.is_empty() && value.len()<=32 && value.bytes().all(|c|c.is_ascii_lowercase()||c.is_ascii_digit()) }
+fn valid_stock_symbol(symbol:&str)->bool{
+    let Some((market,code))=symbol.split_once('.') else{return false;};
+    code.len()==6 && code.bytes().all(|b|b.is_ascii_digit()) &&
+        ((market=="1" && (code=="000001" || code.starts_with('6'))) ||
+         (market=="0" && (code=="399001" || code=="399006" || code.starts_with('0') || code.starts_with('3'))))
+}
 fn validate_content(widget: &Widget) -> Result<(),String> {
     if let Some(note)=&widget.note {
         if widget.kind!="notes" || !short_text(&note.title,40) || !["note","todo"].contains(&note.mode.as_str()) || note.text.encode_utf16().count()>1200 || note.items.len()>12 { return Err("便签内容无效或超过长度限制".into()); }
@@ -64,7 +70,7 @@ fn validate_content(widget: &Widget) -> Result<(),String> {
         if widget.kind!="countdown" || !short_text(&data.title,40) || !valid_date || !["countdown","elapsed"].contains(&data.mode.as_str()) || !["none","yearly"].contains(&data.repeat.as_str()) || (data.mode=="elapsed"&&data.repeat!="none") {return Err("纪念日配置无效".into());}
     }
     if let Some(data)=&widget.living {
-        if !["reminders","stocks","woodfish"].contains(&widget.kind.as_str()) || data.count>9999999 || !["1.000001","0.399001","0.399006"].contains(&data.symbol.as_str()) || data.reminders.len()>12{return Err("生活组件配置无效".into());}
+        if !["reminders","stocks","woodfish"].contains(&widget.kind.as_str()) || data.count>9999999 || !valid_stock_symbol(&data.symbol) || data.reminders.len()>12{return Err("生活组件配置无效".into());}
         let mut ids=std::collections::HashSet::new();
         for item in &data.reminders{
             let date=chrono::NaiveDateTime::parse_from_str(&item.at,"%Y-%m-%dT%H:%M").is_ok_and(|v|v.format("%Y-%m-%dT%H:%M").to_string()==item.at);
@@ -384,7 +390,7 @@ pub async fn get_widget_stocks(window: tauri::WebviewWindow, period:String)->Res
     if widget.kind!="stocks"{return Err("此组件不读取股票行情".into());}
     if period!="1D" && period!="5D"{return Err("当前仅支持 1D 和 5D 行情".into());}
     let symbol=widget.living.unwrap_or_default().symbol;
-    if !["1.000001","0.399001","0.399006"].contains(&symbol.as_str()){return Err("未支持的证券代码".into());}
+    if !valid_stock_symbol(&symbol){return Err("未支持的证券代码".into());}
     let app=window.app_handle();let state=app.state::<WidgetState>();
     let _operation=state.market_operation.lock().await;
     let key=format!("{symbol}/{period}");let now=chrono::Utc::now().timestamp();
