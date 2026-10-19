@@ -6,7 +6,7 @@ import { NAlert, NButton, NInput, NModal, NPopconfirm, NSelect, NSlider, NSwitch
 import { invoke } from '../../bridge.ts';
 import type { ControlStore } from '../control-types.ts';
 import { createWidgetClient, searchWidgetCities } from '../../widgets/client.ts';
-import { baseSize, widgetKinds, widgetThemes, type WidgetKind, type DesktopWidget, type City, type CustomWidgetData } from '../../widgets/model.ts';
+import { baseSize, widgetKinds, widgetThemes, validStockSymbol, type WidgetKind, type DesktopWidget, type City, type CustomWidgetData } from '../../widgets/model.ts';
 import WidgetSurface from '../../widgets/WidgetSurface.vue';
 import NotesWidget from '../../widgets/NotesWidget.vue';
 import CountdownEditor from '../../widgets/CountdownEditor.vue';
@@ -18,6 +18,12 @@ const client=createWidgetClient(),{layout,ready,busy,error}=client;
 const MAX_WIDGETS=12;
 const selected=ref(''),settingsOpen=ref(false),cityQuery=ref(''),cities=ref<City[]>([]),cityBusy=ref(false);
 const chosen=computed(()=>layout.value.widgets.find(widget=>widget.id===selected.value)??null);
+const watchStock=ref('');
+watch(chosen,w=>{watchStock.value=w?.living?.symbol??'1.000001';},{immediate:true});
+function saveStock(){
+  const symbol=watchStock.value.trim();if(!validStockSymbol(symbol)){props.store.notify('证券代码格式：1.600519（沪市）或 0.000001（深市）','error');return;}
+  if(chosen.value?.kind==='stocks')update({living:{reminders:chosen.value.living?.reminders??[],count:chosen.value.living?.count??0,symbol}});
+}
 const full=computed(()=>layout.value.widgets.length>=MAX_WIDGETS);
 const customTemplates=ref<any[]>([]);
 async function loadCustomTemplates(){
@@ -171,7 +177,7 @@ onMounted(()=>{void client.load();void loadCustomTemplates();});onBeforeUnmount(
         <p v-else-if="chosen.kind==='calendar'" class="inspector-note">显示本机时间与农历。点击日期查看详情；休／班标识使用已收录的官方年度安排。点击月份回到今天。</p>
         <p v-else-if="chosen.kind==='clock'" class="inspector-note">时钟会跟随电脑时间自动更新。可以选择实体、柔和或无背景材质。</p>
         <p v-else-if="chosen.kind==='reminders'" class="inspector-note">点击桌面提醒组件的 + 添加日程，点击事项名称可修改，点击圆点标记完成。该组件目前是本地日程清单，不会自动弹出系统通知。</p>
-        <p v-else-if="chosen.kind==='stocks'" class="inspector-note">支持上证指数、深证成指和创业板指，点击组件中的标签切换；1D / 5D 分时数据取自公开行情接口，仅作功能展示，商业分发前需确认数据授权。</p>
+        <template v-else-if="chosen.kind==='stocks'"><div class="widget-field"><span>自选股票代码</span><div class="city-search"><NInput v-model:value="watchStock" placeholder="例如 1.600519 或 0.000001" @keydown.enter="saveStock"/><NButton @click="saveStock">应用</NButton></div></div><p class="inspector-note">支持上证指数、深证成指、创业板指及输入沪深股票代码。点击组件中的标签切换大盘；1D / 5D 走势图来自公开行情接口。商业分发前应核实数据授权。</p></template>
         <p v-else-if="chosen.kind==='woodfish'" class="inspector-note">点击木鱼即可敲击，支持静音和重置次数。敲击记录会保存在这台设备。</p>
         <p v-else-if="chosen.kind==='flower'" class="inspector-note">在组件上点“浇水”，小白花会经历嫩芽、舒展、含苞、初绽、盛放到满庭六个阶段。进度只保存在这台设备，想重新开始可以移除后再添加一个。</p>
       </div>
