@@ -375,7 +375,7 @@ pub async fn get_widget_stocks(window: tauri::WebviewWindow, period:String)->Res
     if let Some((when,value))=state.market.lock().unwrap().get(&key).filter(|(when,_)|(0..60).contains(&(now-*when))).cloned(){return Ok(value);}
     let stock=symbol.clone();let days=if period=="1D"{1}else{5};
     let response=tauri::async_runtime::spawn_blocking(move||->Result<Value,String>{
-        let url=format!("https://push2his.eastmoney.com/api/qt/stock/trends2/get?secid={stock}&fields1=f1,f2,f3,f4,f5&fields2=f51,f52,f53,f54,f55&ndays={days}");
+        let url=format!("https://push2his.eastmoney.com/api/qt/stock/trends2/get?secid={stock}&fields1=f1,f2,f3,f4,f5&fields2=f51,f52,f53,f54,f55&ndays={days}&iscr=0&ut=fa5fd1943c7b386f172d6893dbfba10b");
         let client=reqwest::blocking::Client::builder().timeout(std::time::Duration::from_secs(12))
             .redirect(reqwest::redirect::Policy::none()).user_agent("Mozilla/5.0 XiaoBan Desktop").build().map_err(|e|e.to_string())?;
         let mut res=client.get(url).send().map_err(|e|format!("行情连接失败：{e}"))?.error_for_status().map_err(|e|format!("行情服务错误：{e}"))?;
@@ -475,6 +475,18 @@ mod tests{
         assert_eq!(permitted("widget-abc","save_desktop_widget_content"),Some(true));assert_eq!(permitted("media-a","save_desktop_widget_content"),Some(false));
         assert!(serde_json::from_value::<WidgetContent>(json!({"id":"other","note":null})).is_err());
         assert!(serde_json::from_value::<WidgetContent>(json!({"theme":"glass"})).is_err());
+    }
+
+    #[test] fn living_widget_schema_rejects_bad_records() {
+        let mut layout=one();layout.widgets[0].kind="woodfish".into();
+        layout.widgets[0].living=Some(LivingData{count:108,reminders:vec![],symbol:"1.000001".into()});
+        assert!(validate(&layout).is_ok());
+        layout.widgets[0].living.as_mut().unwrap().count=10000000;assert!(validate(&layout).is_err());
+        layout.widgets[0].living.as_mut().unwrap().count=5;
+        layout.widgets[0].living.as_mut().unwrap().reminders.push(ReminderItem{id:"r1".into(),title:"开会".into(),at:"2026-10-20T09:30".into(),done:false});
+        assert!(validate(&layout).is_ok());
+        layout.widgets[0].living.as_mut().unwrap().reminders[0].at="2026-02-30T09:30".into();assert!(validate(&layout).is_err());
+        layout.widgets[0].kind="calendar".into();assert!(validate(&layout).is_err());
     }
 
 }
