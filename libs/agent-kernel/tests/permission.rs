@@ -110,6 +110,9 @@ fn net_tool(name: &str, risk: Risk, untrusted: bool, always_ask: bool, runs: &Ar
     if always_ask {
         s = s.always_ask();
     }
+    if name == "own" {
+        s = s.self_managed();
+    }
     let runs = runs.clone();
     FnTool::new(s, move |_, _| {
         runs.fetch_add(1, Ordering::SeqCst);
@@ -126,6 +129,7 @@ fn run_set(p: &Arc<Permission>, session: &str, calls: &[&str], runs: &Arc<Atomic
         b.tool(net_tool("fetch", Risk::Network, true, false, runs))
             .tool(net_tool("writer", Risk::Write, false, false, runs))
             .tool(net_tool("saver", Risk::Write, false, true, runs))
+            .tool(net_tool("own", Risk::Write, false, false, runs))
             .tool(net_tool("reader", Risk::Read, false, false, runs))
             .middleware(p.clone())
     });
@@ -265,4 +269,23 @@ fn the_check_sees_the_arguments_and_never_runs_for_reads() {
     let runs = Arc::new(AtomicUsize::new(0));
     run_set(&p, "s1", &["reader", "writer"], &runs);
     assert_eq!(*calls.lock().unwrap(), vec![("writer".to_string(), serde_json::json!({}))], "reads are never examined");
+}
+
+#[test]
+fn self_managed_tools_run_unasked_in_ask_mode_and_after_external_content() {
+    let runs = Arc::new(AtomicUsize::new(0));
+    let (fx, p) = setup(PermissionMode::Ask, vec![Approval::Once, Approval::Deny], |p| p);
+    let out = run_set(&p, "s1", &["own", "fetch", "writer", "own"], &runs);
+    assert_eq!((out[0].as_str(), out[3].as_str()), ("ran", "ran"), "the app's own state never asks: {out:?}");
+    assert!(p.is_tainted("s1"));
+    assert!(out[2].contains("denied"), "the scripted answer denies the user's file write");
+    let asked: Vec<String> = fx.asked.lock().unwrap().iter().map(|a| a.1.clone()).collect();
+    assert_eq!(asked, vec!["fetch", "writer"], "the web read and the user's file write were asked; the app's own work was not");
+
+    // Read-only still blocks it, and a danger check still asks.
+    p.set_mode(PermissionMode::ReadOnly);
+    assert!(run_set(&p, "s1", &["own"], &runs)[0].contains("Read-only"));
+    let flagged = Arc::new(Permission::new(PermissionMode::Ask, |_: &ApprovalRequest<'_>| Approval::Deny).danger_check(|name, _| (name == "own").then(|| "flagged".to_string())));
+    let out = run_set(&flagged, "s2", &["own"], &runs);
+    assert!(out[0].contains("denied"), "a flagged call is asked and the refusal holds: {out:?}");
 }

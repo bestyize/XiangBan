@@ -178,6 +178,9 @@ impl Middleware for Permission {
             true
         } else if spec.risk == Risk::Read {
             false
+        } else if spec.self_managed {
+            // Only the host app's own state changes, so neither a flag nor external content makes this a user decision.
+            danger.is_some()
         } else if tainted {
             true
         } else {

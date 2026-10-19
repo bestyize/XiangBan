@@ -28,6 +28,11 @@ pub struct ToolSpec {
     pub untrusted_output: bool,
     /// Always ask the user, in every mode, and never remember an approval.
     pub always_ask: bool,
+    /// Changes only this app's own state (its windows, appearance, settings or saved content), never the
+    /// user's files, other applications or the system. `Ask` mode runs it without asking and a session that
+    /// read external content is not asked again for it; `ReadOnly` still blocks it, and a `danger_check`
+    /// reason still asks.
+    pub self_managed: bool,
 }
 
 impl ToolSpec {
@@ -42,6 +47,7 @@ impl ToolSpec {
             max_output: DEFAULT_MAX_OUTPUT,
             untrusted_output: false,
             always_ask: false,
+            self_managed: false,
         }
     }
 
@@ -52,6 +58,11 @@ impl ToolSpec {
 
     pub fn always_ask(mut self) -> Self {
         self.always_ask = true;
+        self
+    }
+
+    pub fn self_managed(mut self) -> Self {
+        self.self_managed = true;
         self
     }
 

@@ -390,7 +390,7 @@ async function openLink(href: string) {
               class="perm-btn"
               :class="{ active: chat.permissionMode === 'ask' }"
               data-testid="perm-ask"
-              title="默认权限：读操作自动执行，写文件、运行命令与修改设置前需确认"
+              title="默认权限：读操作和小伴自己的操作自动执行，写文件、运行命令与修改设置前需确认"
               @click="chat.setPermissionMode('ask')"
             >
               <Shield :size="12" />

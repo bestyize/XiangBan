@@ -11,7 +11,12 @@ import './surface.css';
 const props=withDefaults(defineProps<{widget:DesktopWidget;preview?:boolean;demo?:boolean;editing?:boolean;payload?:WidgetPayload;save?:(c:WidgetContent)=>Promise<void>}>(),{preview:false,demo:false,editing:false});
 const emit=defineEmits<{settings:[]}>();
 const now=ref(new Date()),error=ref(''),saving=ref(false),addOpen=ref(false),editingItem=ref<TodoItem|ReminderItem>();
-const size=computed(()=>baseSize(props.widget.kind)),clock=computed(()=>now.value.toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit',hour12:false}));
+const size=computed(()=>baseSize(props.widget.kind,props.widget.custom)),clock=computed(()=>now.value.toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit',hour12:false}));
+const customDocument=computed(()=>{
+  const html=props.widget.custom?.html||'<div style="color:#999;padding:12px;font-size:12px">未找到小组件内容</div>';
+  const viewportStyle='<style>html,body{margin:0!important;padding:0!important;overflow:hidden!important;width:100%!important;height:100%!important;background:transparent!important}</style>';
+  return html.includes('<head>')?html.replace('<head>',`<head>${viewportStyle}`):`${viewportStyle}${html}`;
+});
 const lunarLabel=computed(()=>{const year=new Intl.DateTimeFormat('zh-CN-u-ca-chinese',{year:'numeric'}).formatToParts(now.value).find(p=>(p.type as string)==='yearName')?.value;return `${year?year+'年 ':''}${lunarDate(now.value).full}`;});
 const greeting=computed(()=>now.value.getHours()<6?'夜深了':now.value.getHours()<12?'上午好':now.value.getHours()<18?'下午好':'晚上好');
 const locked=computed(()=>props.editing),living=computed<LivingData>(()=>props.widget.living??{count:0,symbol:'116.00700',reminders:[]});
@@ -163,6 +168,21 @@ onBeforeUnmount(()=>{resizer.finish(true);document.removeEventListener('keydown'
  </template>
  <template v-else-if="widget.kind==='countdown'">
   <div class="lake-art" aria-hidden="true"/><header><h2 class="anniversary-title"><Heart :size="23" fill="#ef796b" stroke="#ec6c5c"/>{{ countdown.title }}</h2><button class="more hover-more" aria-label="纪念日设置" @click="settings"><MoreHorizontal/></button></header><p class="countdown-date">{{ remaining.date.replace('-','年').replace('-','月') }}日 {{ new Date(remaining.date+'T12:00').toLocaleDateString('zh-CN',{weekday:'long'}) }}</p><div class="countdown-value"><strong>{{ remaining.days }}</strong><span>{{ remaining.label==='还有'?'天后':remaining.label==='已经'?'天了':remaining.label==='就是今天'?'就是今天':'天前' }}</span></div><p class="anniversary-quote"><span>“</span> 和你在一起的每一天，<br>　 都是值得期待的日子。 <span>”</span></p>
+ </template>
+ <template v-else-if="widget.kind==='custom'">
+  <header class="custom-widget-header">
+   <span class="custom-widget-title">{{ widget.custom?.name||'自创组件' }}</span>
+   <button class="more hover-more" aria-label="组件设置" @click="settings"><MoreHorizontal/></button>
+  </header>
+  <div class="custom-widget-box" :data-testid="`custom-${widget.customId||'widget'}`">
+   <iframe
+     :srcdoc="customDocument"
+     sandbox="allow-scripts"
+     class="custom-widget-frame"
+     scrolling="no"
+     tabindex="-1"
+   />
+  </div>
  </template>
  <button v-if="!preview&&payload" class="resize-corner" aria-label="按比例调整组件大小" title="拖动调整大小 · Esc 取消" data-no-drag @pointerdown.stop.prevent="startResize" @pointermove.stop="resizer.move()" @pointerup.stop="finishResize()" @pointercancel.stop="finishResize(true)" @lostpointercapture="finishResize()"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 15 15 5M10 15l5-5M15 15h.01" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></button>
  <div v-if="addOpen" class="widget-popover" data-no-drag><ItemForm :key="editingItem?.id||'new'" :mode="widget.kind==='notes'?'todo':'agenda'" :item="editingItem" :busy="saving" @save="commitItem" @cancel="addOpen=false"/></div>

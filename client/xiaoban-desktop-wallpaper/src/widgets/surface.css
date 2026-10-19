@@ -12,3 +12,14 @@
 /* The reference is an opaque board. Mask each animated prop to its own silhouette. */
 .xb-widget .fish-photo-body{-webkit-mask:url('./assets/woodfish-body-mask.svg') center/100% 100% no-repeat;mask:url('./assets/woodfish-body-mask.svg') center/100% 100% no-repeat}.xb-widget .fish-photo-mallet{-webkit-mask:url('./assets/woodfish-mallet-mask.svg') center/100% 100% no-repeat;mask:url('./assets/woodfish-mallet-mask.svg') center/100% 100% no-repeat}
 .xb-widget .fish-hit{filter:drop-shadow(0 5px 4px #4d372e29)}
+.xb-widget.custom{padding:0;border:0;background:transparent}
+.xb-widget.custom .custom-widget-box{position:absolute;inset:0;width:100%;height:100%;border-radius:inherit;overflow:hidden}
+.xb-widget.custom .custom-widget-frame{width:100%;height:100%;border:0;background:transparent;display:block}
+.xb-widget.custom .custom-widget-header{position:absolute;top:8px;left:12px;right:12px;z-index:10;display:flex;justify-content:space-between;align-items:center;pointer-events:none}
+.xb-widget.custom .custom-widget-header button{pointer-events:auto}
+.xb-widget.custom .custom-widget-title{font-size:12px;color:rgba(0,0,0,0.45);font-weight:500;opacity:0;transition:opacity .15s}
+.xb-widget.custom:hover .custom-widget-title{opacity:1}
+.xb-widget.custom.transparent{background:transparent;border:0;box-shadow:none}
+.xb-widget.custom.transparent:before{display:none}
+.xb-widget.custom.glass{background:#ffffffd9;border:1px solid #ffffffa3;backdrop-filter:blur(18px)}
+.xb-widget.custom.paper{background:radial-gradient(ellipse at 35% 20%,#fff8e9,#eee2cb);border:1px solid #ceb894a3}

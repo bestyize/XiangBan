@@ -35,6 +35,14 @@ pub fn from_bottom_left(primary_height:f64,x:f64,y:f64,height:f64)->(f64,f64){(x
 mod tests {
     use super::*;
     fn monitor(id:&str,x:f64,y:f64,width:f64,height:f64,scale:f64,primary:bool)->MonitorArea{MonitorArea{id:id.into(),name:id.into(),x,y,width,height,scale,primary}}
+    #[test]fn a_new_card_keeps_its_share_of_the_screen(){
+        assert_eq!(default_scale(1440.,900.),0.5);
+        assert_eq!(default_scale(2560.,1440.),0.8);
+        assert_eq!(default_scale(3840.,2160.),1.2);
+        assert_eq!(default_scale(1280.,800.),0.44,"a small screen shrinks the starting size");
+        assert_eq!(default_scale(0.,0.),0.5);
+        assert_eq!(default_scale(f64::NAN,900.),0.5);
+    }
     #[test]fn targets_right_left_and_above_displays(){
         let screens=vec![monitor("main",0.,0.,1920.,1080.,1.,true),monitor("left",-1280.,0.,1280.,1024.,1.,false),monitor("right",1920.,0.,2560.,1440.,2.,false),monitor("above",0.,-900.,1600.,900.,1.,false)];
         assert_eq!(at_point(&screens,-100.,300.).unwrap().id,"left");assert_eq!(at_point(&screens,2200.,300.).unwrap().id,"right");assert_eq!(at_point(&screens,100.,-100.).unwrap().id,"above");
@@ -59,6 +67,18 @@ mod tests {
 }
 
 
+/// The component library is drawn for a 1440×900 desktop. A new card keeps roughly the same
+/// share of the screen elsewhere, instead of always starting at 50% and looking tiny on a large
+/// or high-resolution display. Sizes are in logical points/pixels, so Retina scaling cancels out.
+pub fn default_scale(width: f64, height: f64) -> f64 {
+    const REFERENCE_W: f64 = 1440.0;
+    const REFERENCE_H: f64 = 900.0;
+    if !width.is_finite() || !height.is_finite() || width <= 0.0 || height <= 0.0 {
+        return 0.5;
+    }
+    let fit = (width / REFERENCE_W).min(height / REFERENCE_H);
+    ((0.5 * fit) * 100.0).round() / 100.0
+}
 /// A corner resize projects cursor movement onto the original aspect ratio.
 /// Keep the top-left anchor fixed, and stop at the monitor edge when possible.
 pub fn corner_scale(m:&MonitorArea,base:(f64,f64),original:f64,anchor:(f64,f64),delta:(f64,f64))->f64{

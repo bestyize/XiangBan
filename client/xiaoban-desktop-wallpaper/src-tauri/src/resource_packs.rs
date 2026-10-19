@@ -1,6 +1,6 @@
 //! Portable authoring resources, shared as plain `.zip` files so any tool can make or open them.
 //! Packs contain templates, never runtime user data or saves. The layout is in docs/resource-pack-format.md.
-use crate::{effect_packs, game_packs, local_media};
+use crate::{custom_widgets, effect_packs, game_packs, local_media};
 use serde_json::{json, Value};
 use std::{
     collections::HashSet,
@@ -102,7 +102,12 @@ pub fn export(root: &Path, kind: &str, id: &str) -> Result<Pack, String> {
             if let Some(object) = pack.as_object_mut() { object.remove("source"); }
             pack
         }
-        "widget" => return Err("旧版 HTML 组件已移除，请使用新版八类组件".into()),
+        "widget" => {
+            if !custom_widgets::valid_widget_id(id) { return Err("组件标识不合法".into()); }
+            let pack = custom_widgets::find(&root.join("custom_widgets"), id).ok_or("没有找到自创组件")?;
+            custom_widgets::validate(&pack)?;
+            pack
+        }
         "game" => {
             let manifest = game_packs::find_user_game(root, id)?;
             let mut found = GameFiles { text: Vec::new(), text_total: 0, assets: Vec::new(), assets_total: 0 };
@@ -281,7 +286,12 @@ pub fn import(root: &Path, content: &[u8]) -> Result<Value, String> {
             effect_packs::save(&root.join("effects"), data, false)?;
             (text(data, "id")?.to_string(), text(data, "name")?.to_string())
         }
-        "widget" => return Err("旧版 HTML 组件已移除，无法导入".into()),
+        "widget" => {
+            if !custom_widgets::valid_widget_id(text(data, "id")?) { return Err("组件标识不合法".into()); }
+            if custom_widgets::find(&root.join("custom_widgets"), text(data, "id")?).is_some() { return Err("同名组件已存在，请先修改资源包的 id 或移除原作品".into()); }
+            custom_widgets::save(&root.join("custom_widgets"), data, false)?;
+            (text(data, "id")?.to_string(), text(data, "name")?.to_string())
+        }
         "game" => {
             let files: Vec<(String, String)> = serde_json::from_value(data["files"].clone()).map_err(|_| "游戏文件清单不合法")?;
             let id = text(data, "id")?;
@@ -392,7 +402,9 @@ mod tests {
             ("tiny-clock/.DS_Store", "junk"),
             ("tiny-clock/._manifest.json", "junk"),
         ]);
-        assert!(import(&root, &widget).unwrap_err().contains("已移除"));
+        let done = import(&root, &widget).unwrap();
+        assert_eq!(done["id"], "tiny-clock");
+        assert!(custom_widgets::find(&root.join("custom_widgets"), "tiny-clock").is_some());
 
         let effect = make_zip(&[("manifest.json", r#"{"schemaVersion":1,"kind":"effect"}"#), ("effect.json", effect_packs::EXAMPLE)]);
         assert!(import(&root, &effect).is_ok());
@@ -549,8 +561,8 @@ mod tests {
         // The page itself still imports, and a picture can ride inside it as a data: address.
         let inline = make_zip_bytes(&[("manifest.json", widget.as_bytes()), ("index.html", b"<img src=\"data:image/png;base64,AAAA\">")]);
         let other = temp_root("extra-files-ok");
-        assert!(import(&other, &inline).unwrap_err().contains("已移除"));
-        assert!(!other.exists());
+        assert!(import(&other, &inline).is_ok());
+        fs::remove_dir_all(other).unwrap();
     }
 
     #[test]

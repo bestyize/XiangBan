@@ -64,6 +64,7 @@ agent.run("session-1", "你好", &mut |event| { /* 转给 UI */ }, &Arc::new(Ato
 
 - 污染（taint）：工具声明 `untrusted_output`（网页、搜索结果、子 agent 的回答）后，该会话里所有非只读工具的自动放行（`Auto`、`allow_tool`、`Always`）都改为询问，`ApprovalRequest::tainted` 告知宿主。污染只存在内存里：重启后恢复的会话从未污染开始，`forget_session` 可清除。
 - `always_ask`：任何模式都询问，不记忆（`ReadOnly` 下仍是阻止）。`skill_manage` 用它，因为 skill 会作为指令长期保留。
+- `self_managed`：只改宿主自己的状态（它自己的窗口、外观、设置或它保存的内容），不碰用户的文件、其他应用和系统。`Ask` 下不询问，读过外部内容也不再因此逐步确认；`ReadOnly` 仍阻止，被 `danger_check` 标出时仍询问。只在该工具确实不改变用户数据时才标记，不要用它绕开用户文件之外的写入。
 
 - `danger_check`（可选）：宿主给 `Permission` 装一个检查函数，参数是工具名和参数，返回“太危险”的原因。装了它，`Auto` 才真正只在被标出的调用上询问：污染和 `always_ask` 在 `Auto` 下不再强制询问，被标出的调用每次都问、不记忆，原因通过 `ApprovalRequest::danger`（stdio 协议里是 `danger` 字段）告知宿主。`Ask` 和 `ReadOnly` 的行为不变，只读工具不会被检查。不装它，`Auto` 保持上面更严格的行为。
 

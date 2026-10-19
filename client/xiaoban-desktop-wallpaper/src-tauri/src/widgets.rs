@@ -19,6 +19,9 @@ pub struct Widget {
     pub countdown: Option<CountdownData>,
     #[serde(default, skip_serializing_if="Option::is_none")]
     pub living: Option<LivingData>,
+    /// Set when `kind` is `custom`: the template in `custom_widgets/` this card renders.
+    #[serde(default, skip_serializing_if="Option::is_none")]
+    pub custom_id: Option<String>,
 }
 const MAX_LAYOUT_BYTES: usize = 128 * 1024;
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -48,7 +51,8 @@ impl Default for LivingData {fn default()->Self{Self{reminders:vec![],count:0,sy
 pub struct WidgetContent { note: Option<NoteData>, countdown: Option<CountdownData>, living: Option<LivingData> }
 fn short_text(value: &str, max: usize) -> bool { !value.trim().is_empty() && value.encode_utf16().count() <= max }
 fn valid_identity(value: &str) -> bool { !value.is_empty() && value.len()<=32 && value.bytes().all(|c|c.is_ascii_lowercase()||c.is_ascii_digit()) }
-pub const KINDS: [&str;8] = ["clock","weather","notes","reminders","stocks","woodfish","calendar","countdown"];
+pub const BUILTIN_KINDS: [&str;8] = ["clock","weather","notes","reminders","stocks","woodfish","calendar","countdown"];
+pub const KINDS: [&str;9] = ["clock","weather","notes","reminders","stocks","woodfish","calendar","countdown","custom"];
 fn valid_time(v:&str)->bool {chrono::NaiveTime::parse_from_str(v,"%H:%M").is_ok_and(|t|t.format("%H:%M").to_string()==v)}
 fn valid_date(v:&str)->bool {chrono::NaiveDate::parse_from_str(v,"%Y-%m-%d").is_ok_and(|d|d.format("%Y-%m-%d").to_string()==v&&v>="1900-01-01"&&v<="2100-12-31")}
 fn valid_schedule(repeat:&str,notify:bool,date:&str,time:&str,completed:&str)->bool {
@@ -126,7 +130,7 @@ pub fn permitted(label: &str, command: &str) -> Option<bool> {
     if label=="widgetmenu" {return Some(["get_widget_settings","update_widget_settings","remove_widget_settings","close_widget_settings","size_widget_settings","search_widget_cities"].contains(&command));}
     if ["get_widget_settings","update_widget_settings","remove_widget_settings","close_widget_settings","size_widget_settings","search_widget_cities","resize_desktop_widget"].contains(&command)&&!is_widget(label){return Some(false);}
     if is_widget(label) { return Some(["resize_desktop_widget","get_desktop_widget", "move_desktop_widget", "show_widget_settings", "get_widget_weather", "get_widget_forecast", "get_widget_air_quality", "get_widget_stock_watchlist", "save_desktop_widget_content", "get_widget_stocks"].contains(&command)); }
-    if ["get_desktop_widgets", "add_desktop_widget", "update_desktop_widget", "remove_desktop_widget", "set_widgets_editing", "get_desktop_widget", "move_desktop_widget", "show_widget_settings", "get_widget_weather", "get_widget_forecast", "get_widget_air_quality", "get_widget_stock_watchlist", "get_widget_stocks", "save_desktop_widget_content"].contains(&command) { return Some(label == "control"); }
+    if ["get_desktop_widgets", "add_desktop_widget", "update_desktop_widget", "remove_desktop_widget", "set_widgets_editing", "get_desktop_widget", "move_desktop_widget", "show_widget_settings", "get_widget_weather", "get_widget_forecast", "get_widget_air_quality", "get_widget_stock_watchlist", "get_widget_stocks", "save_desktop_widget_content", "list_custom_widgets", "save_custom_widget", "remove_custom_widget"].contains(&command) { return Some(label == "control"); }
     None
 }
 pub fn validate(layout: &Layout) -> Result<(), String> {
@@ -141,6 +145,12 @@ pub fn validate(layout: &Layout) -> Result<(), String> {
             || !widget.x.is_finite() || !(0.0..=1.0).contains(&widget.x)
             || !widget.y.is_finite() || !(0.0..=1.0).contains(&widget.y) { return Err("组件配置无效，原布局已保留".into()); }
         if widget.monitor.as_ref().is_some_and(|id|id.is_empty()||id.len()>512){return Err("显示器标识无效".into());}
+        // A custom card is only meaningful while its template exists; the console deletes the cards
+        // with the template, so a missing one here means a hand-edited layout.
+        if widget.kind == "custom" {
+            if !widget.custom_id.as_deref().is_some_and(crate::custom_widgets::valid_widget_id) { return Err("自定义组件需要有效的 customId".into()); }
+            if widget.city.is_some() || widget.note.is_some() || widget.countdown.is_some() || widget.living.is_some() { return Err("自定义组件不能带内置组件的内容".into()); }
+        } else if widget.custom_id.is_some() { return Err("只有自定义组件可以带 customId".into()); }
         validate_content(widget)?;
         if let Some(city) = &widget.city {
             city.validate()?;
@@ -180,11 +190,30 @@ fn snapshot(app: &tauri::AppHandle) -> Value {
     let areas=monitors(app).unwrap_or_default();
     let displays:Vec<_>=areas.iter().map(|m|json!({"id":m.id,"name":m.name,"width":m.width/m.scale,"height":m.height/m.scale,"primary":m.primary})).collect();
     let desktop=crate::widget_geometry::resolve(&areas,None).map(|m|json!({"width":m.width/m.scale,"height":m.height/m.scale}));
-    let widgets = &layout.widgets;
+    let widgets:Vec<_> = layout.widgets.iter().map(|w| attach_custom_data(app, w)).collect();
     json!({"version":2,"widgets":widgets,"editing":state.editing.load(Ordering::Relaxed),"errors":state.errors.lock().unwrap().clone(),"desktop":desktop,"monitors":displays})
 }
-pub fn base_size(kind:&str)->(f64,f64){match kind {"clock"=>(596.,306.),"weather"=>(326.,306.),"notes"=>(352.,306.),"reminders"=>(480.,332.),"stocks"=>(404.,338.),"woodfish"=>(390.,332.),"calendar"=>(500.,286.),"countdown"=>(790.,286.),_=>(352.,306.)}}
-pub fn widget_base_size(_app:&tauri::AppHandle,widget:&Widget)->(f64,f64){base_size(&widget.kind)}
+pub fn base_size(kind:&str)->(f64,f64){match kind {"clock"=>(596.,306.),"weather"=>(326.,306.),"notes"=>(352.,306.),"reminders"=>(480.,332.),"stocks"=>(404.,338.),"woodfish"=>(390.,332.),"calendar"=>(500.,286.),"countdown"=>(790.,286.),"custom"=>(280.,240.),_=>(352.,306.)}}
+pub fn widget_base_size(app:&tauri::AppHandle,widget:&Widget)->(f64,f64){
+    if widget.kind=="custom"{
+        if let (Some(id),Ok(root))=(widget.custom_id.as_deref(),crate::storage::root(app)){
+            if let Some(pack)=crate::custom_widgets::find(&custom_dir(&root),id){return crate::custom_widgets::pack_size(&pack);}
+        }
+        return base_size("custom");
+    }
+    base_size(&widget.kind)
+}
+fn custom_dir(root:&std::path::Path)->std::path::PathBuf{root.join("custom_widgets")}
+/// Custom cards carry their template's HTML, so the widget window can render it without another read.
+fn attach_custom_data(app:&tauri::AppHandle,widget:&Widget)->Value{
+    let mut value=serde_json::to_value(widget).unwrap_or_default();
+    if widget.kind=="custom"{
+        if let (Some(id),Ok(root))=(widget.custom_id.as_deref(),crate::storage::root(app)){
+            if let Some(pack)=crate::custom_widgets::find(&custom_dir(&root),id){value["custom"]=pack;}
+        }
+    }
+    value
+}
 fn geometry(app: &tauri::AppHandle, widget: &Widget) -> Result<(f64, f64, f64, f64, f64), String> {
     let areas=monitors(app)?;let monitor=crate::widget_geometry::resolve(&areas,widget.monitor.as_deref()).ok_or("没有找到显示器")?;
     let scale=monitor.scale;let (base_w,base_h)=widget_base_size(app, widget);
@@ -195,7 +224,7 @@ fn geometry(app: &tauri::AppHandle, widget: &Widget) -> Result<(f64, f64, f64, f
 fn widget_payload(app: &tauri::AppHandle, widget: &Widget) -> Result<Value, String> {
     let (x,y,_,_,dpi)=geometry(app,widget)?;
     let display_scale=if cfg!(windows){Some(dpi)}else{None};
-    let widget_val = serde_json::to_value(widget).map_err(|e|e.to_string())?;
+    let widget_val = attach_custom_data(app, widget);
     Ok(json!({"widget":widget_val,"editing":app.state::<WidgetState>().editing.load(Ordering::Relaxed),"screenX":x,"screenY":y,"displayScale":display_scale}))
 }
 fn place(app: &tauri::AppHandle, window: &tauri::WebviewWindow, widget: &Widget) -> Result<(), String> {
@@ -289,9 +318,18 @@ pub fn start(app: &tauri::AppHandle) {
 #[tauri::command]
 pub fn get_desktop_widgets(app: tauri::AppHandle) -> Result<Value,String> { ensure_writable(&app)?; Ok(snapshot(&app)) }
 #[tauri::command]
-pub async fn add_desktop_widget(app: tauri::AppHandle, kind: String, layer: Option<String>) -> Result<Value,String> {
+pub async fn add_desktop_widget(app: tauri::AppHandle, kind: String, layer: Option<String>, custom_id: Option<String>) -> Result<Value,String> {
     let layer=layer.unwrap_or_else(desktop_layer);
     if !["desktop","topmost"].contains(&layer.as_str()) { return Err("组件层级只能是 desktop 或 topmost".into()); }
+    let custom_id=if kind=="custom"{
+        let id=custom_id.filter(|id|crate::custom_widgets::valid_widget_id(id)).ok_or("添加自定义组件需要指定模板 id")?;
+        let root=crate::storage::root(&app)?;
+        if crate::custom_widgets::find(&custom_dir(&root),&id).is_none(){return Err(format!("没有找到自定义组件「{id}」"));}
+        Some(id)
+    }else{
+        if custom_id.is_some(){return Err("只有 kind 为 custom 时才能指定模板".into());}
+        None
+    };
     let state=app.state::<WidgetState>();let _operation=state.operation.lock().await;
     let mut next=state.layout.lock().unwrap().clone(); if next.widgets.len()>=12{return Err("桌面最多放置 12 个组件".into());}
     let mut random=[0u8;8];getrandom::fill(&mut random).map_err(|e|e.to_string())?;
@@ -300,7 +338,8 @@ pub async fn add_desktop_widget(app: tauri::AppHandle, kind: String, layer: Opti
     let countdown=if kind=="countdown"{Some(CountdownData{title:"值得期待的日子".into(),date:chrono::Local::now().format("%Y-%m-%d").to_string(),mode:"countdown".into(),repeat:"none".into()})}else{None};
     let living=if ["reminders","stocks","woodfish"].contains(&kind.as_str()){let mut d=LivingData::default();if kind=="stocks"{d.symbol="116.00700".into();}Some(d)}else{None};
     let theme="ivory".to_string();
-    next.widgets.push(Widget{id:random.iter().map(|b|format!("{b:02x}")).collect(),kind,theme,layer,scale:0.5,x:((if index%3==1{0.88}else{0.52})-(index/3) as f64*0.25).max(0.05),y:if index%3==2{0.94}else{0.06},enabled:true,city:None,note,countdown,living,monitor:None});
+    let scale=crate::widget_geometry::resolve(&monitors(&app).unwrap_or_default(),None).map_or(0.5,|m|crate::widget_geometry::default_scale(m.width/m.scale,m.height/m.scale)).clamp(0.5,1.5);
+    next.widgets.push(Widget{id:random.iter().map(|b|format!("{b:02x}")).collect(),kind,theme,layer,scale,x:((if index%3==1{0.88}else{0.52})-(index/3) as f64*0.25).max(0.05),y:if index%3==2{0.94}else{0.06},enabled:true,city:None,note,countdown,living,monitor:None,custom_id});
     persist(&app,&next)?; *state.layout.lock().unwrap()=next; sync(&app); Ok(snapshot(&app))
 }
 #[derive(Deserialize)]
@@ -327,6 +366,44 @@ pub async fn update_desktop_widget(app: tauri::AppHandle, id: String, patch: Pat
     }
     sync(&app);Ok(snapshot(&app))
 }
+// ---- Custom (HTML) widget templates ---------------------------------------------------------
+// Only the console may manage templates. A template that disappears takes its cards with it.
+
+#[tauri::command]
+pub fn list_custom_widgets(app:tauri::AppHandle)->Result<Value,String>{
+    let root=crate::storage::root(&app)?;
+    Ok(json!(crate::custom_widgets::load_all(&custom_dir(&root))))
+}
+
+#[tauri::command]
+pub async fn save_custom_widget(app:tauri::AppHandle,pack:Value,overwrite:Option<bool>)->Result<Value,String>{
+    let root=crate::storage::root(&app)?;
+    let id=pack["id"].as_str().unwrap_or_default().to_string();
+    crate::custom_widgets::save(&custom_dir(&root),&pack,overwrite.unwrap_or(false))?;
+    sync(&app);
+    Ok(json!({"id":id,"templates":crate::custom_widgets::load_all(&custom_dir(&root))}))
+}
+
+#[tauri::command]
+pub async fn remove_custom_widget(app:tauri::AppHandle,id:String)->Result<Value,String>{
+    let root=crate::storage::root(&app)?;
+    crate::custom_widgets::remove(&custom_dir(&root),&id)?;
+    // Any card still showing the template goes with it, rather than turning into an empty box.
+    let removed=drop_custom_cards(&app,&id)?;
+    Ok(json!({"id":id,"templates":crate::custom_widgets::load_all(&custom_dir(&root)),"removedCards":removed}))
+}
+
+/// Removes every card that renders the given custom template, and saves the layout if anything went.
+pub fn drop_custom_cards(app:&tauri::AppHandle,id:&str)->Result<usize,String>{
+    let state=app.state::<WidgetState>();
+    let mut next=state.layout.lock().unwrap().clone();
+    let before=next.widgets.len();
+    next.widgets.retain(|w|!(w.kind=="custom"&&w.custom_id.as_deref()==Some(id)));
+    let removed=before-next.widgets.len();
+    if removed>0{persist(app,&next)?;*state.layout.lock().unwrap()=next;sync(app);}
+    Ok(removed)
+}
+
 /// A widget can save only its own typed content; no caller-supplied identity or layout patch.
 #[tauri::command]
 pub async fn save_desktop_widget_content(window:tauri::WebviewWindow,content:WidgetContent)->Result<(),String>{
@@ -592,8 +669,11 @@ mod tests {
   // Adding writes the chosen layer straight into the widget; the frontend no longer needs a second call.
   for layer in ["desktop","topmost"]{let mut l=one();l.widgets[0].layer=layer.into();assert!(validate(&l).is_ok());let restored:Layout=serde_json::from_slice(&serde_json::to_vec(&l).unwrap()).unwrap();assert_eq!(restored.widgets[0].layer,layer);}
  }
- #[test] fn old_kinds_and_materials_are_rejected(){for kind in ["fortune","flower","custom"]{let mut l=one();l.widgets[0].kind=kind.into();assert!(validate(&l).is_err());}let mut l=one();l.widgets[0].theme="glass".into();assert!(validate(&l).is_err());l=one();l.version=1;assert!(validate(&l).is_err());}
- #[test] fn only_eight_reference_components_are_available(){for k in KINDS{let mut l=one();l.widgets[0].kind=k.into();assert!(validate(&l).is_ok());assert!(base_size(k).0>300.);}}
+ #[test] fn old_kinds_and_materials_are_rejected(){for kind in ["fortune","flower"]{let mut l=one();l.widgets[0].kind=kind.into();assert!(validate(&l).is_err());}let mut l=one();l.widgets[0].theme="glass".into();assert!(validate(&l).is_err());l=one();l.version=1;assert!(validate(&l).is_err());}
+ #[test] fn only_eight_reference_components_and_custom_are_available(){
+  for k in BUILTIN_KINDS{let mut l=one();l.widgets[0].kind=k.into();assert!(validate(&l).is_ok());assert!(base_size(k).0>300.);}
+  let mut l=one();l.widgets[0].kind="custom".into();l.widgets[0].custom_id=Some("my-widget".into());assert!(validate(&l).is_ok());
+ }
  #[test] fn hk_and_a_share_codes_remain_constrained(){for s in ["116.00700","1.000001","0.399006","1.600519"]{assert!(valid_stock_symbol(s));}for s in ["116.00700&x=1","116.abcde","https://example.com","3.123456"]{assert!(!valid_stock_symbol(s));}}
  #[test] fn date_and_schedule_validation(){assert!(valid_time("09:30"));assert!(!valid_time("25:00"));let mut l=one();l.widgets[0].kind="reminders".into();l.widgets[0].living=Some(LivingData{count:0,symbol:"1.000001".into(),symbols:vec![],sound:true,reminders:vec![ReminderItem{id:"one".into(),title:"评审".into(),at:"2026-10-19T10:00".into(),done:false,end:"09:00".into(),location:"A302".into(),notify:true,repeat:"none".into(),completed_on:String::new()}]});assert!(validate(&l).is_err());l.widgets[0].living.as_mut().unwrap().reminders[0].end="11:00".into();assert!(validate(&l).is_ok());}
  #[test] fn menu_and_resize_commands_are_scoped_to_their_windows(){

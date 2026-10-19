@@ -391,26 +391,21 @@ fn a_refused_command_never_runs() {
 }
 
 #[test]
-fn changing_the_desktop_asks_first_and_then_goes_through_the_desktop() {
+fn changing_the_desktop_is_the_apps_own_work_and_goes_through_the_desktop_unasked() {
     let steps = vec![
         call("1", "wallpaper_list", json!({})),
         call("2", "wallpaper_apply", json!({"id": "companion"})),
         call("3", "care_set", json!({"text": "喝水", "time": "15:00"})),
+        call("4", "widget_add", json!({"kind": "clock"})),
+        call("5", "desktop_window_set", json!({"target": "assistant", "action": "collapse"})),
         Step::text("好了"),
     ];
-    let rig = rig("desktop", steps, Approval::Once);
-    let _ = run(&rig, "整理一下桌面");
-    assert_eq!(*lock(&rig.asked), vec![("wallpaper_apply".to_string(), "write".to_string()), ("care_set".to_string(), "write".to_string())]);
-    assert_eq!(*lock(&rig.desktop.calls), vec!["apply companion", "care 喝水"]);
-
-    let refused = rig_denied_desktop();
-    assert!(lock(&refused.desktop.calls).is_empty(), "a refused change does not reach the desktop");
-}
-
-fn rig_denied_desktop() -> Rig {
-    let rig = rig("desktop-deny", vec![call("1", "effect_set", json!({"id": "snow"})), Step::text("ok")], Approval::Deny);
-    let _ = run(&rig, "下雪");
-    rig
+    let rig = rig("desktop", steps, Approval::Deny);
+    let (result, _) = run(&rig, "整理一下桌面");
+    assert_eq!(result.unwrap().text, "好了");
+    assert_eq!(*lock(&rig.asked), Vec::<(String, String)>::new(), "the app's own state needs no confirmation");
+    assert_eq!(*lock(&rig.desktop.calls), vec!["apply companion", "care 喝水", "widget-add clock"]);
+    assert!(tool_results(&rig).iter().all(|text| !text.contains("denied")), "{:?}", tool_results(&rig));
 }
 
 #[test]

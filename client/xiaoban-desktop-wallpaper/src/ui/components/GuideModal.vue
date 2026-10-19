@@ -37,10 +37,10 @@ const creationCards: GuideCard[] = [
   },
   {
     id: 'c2',
-    badge: '现场写壁纸',
-    title: '交互式整屏小游戏',
-    desc: '壁纸也可以是能点的：整屏互动场景照样用一段自包含 HTML 做出来。',
-    prompt: '帮我做一个整屏的水墨涟漪互动壁纸，鼠标划过会荡开波纹，直接应用到桌面',
+    badge: '现场造挂件',
+    title: '自创单文件组件',
+    desc: '让小伴现场编写 HTML/CSS/JS 小卡片（如极简时钟、番茄钟），自动存入自定义组件并放置到桌面。',
+    prompt: '帮我写一个极简赛博朋克风格的时钟小组件，放在桌面上',
   },
   {
     id: 'c3',
@@ -324,7 +324,7 @@ async function openOnlineGuide() {
           </div>
           <div class="safety-box">
             <h4>🛡️ 透明的权限机制</h4>
-            <p>聊天顶栏有两种模式。<strong>默认权限</strong>下，读操作自动执行，写文件、运行命令、修改设置前先弹出确认卡片；<strong>完全信任</strong>下不再逐一询问，只在提权、批量删除、<code>git push --force</code> 这类高风险操作时停下来。每个对话各自记住自己的模式。</p>
+            <p>聊天顶栏有两种模式。<strong>默认权限</strong>下，读操作和小伴自己的操作（换壁纸、放组件、移动小伴窗口、改表情、开游戏等）直接执行，写文件、运行命令、修改设置前先弹出确认卡片；<strong>完全信任</strong>下不再逐一询问，只在提权、批量删除、<code>git push --force</code> 这类高风险操作时停下来。每个对话各自记住自己的模式。</p>
           </div>
           <div class="safety-box">
             <h4>🧠 上下文与压缩</h4>

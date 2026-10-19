@@ -4,7 +4,7 @@ const TOOL_LABELS: Record<string, string> = {
   shell: '运行命令', read_file: '读取文件', write_file: '写入文件', edit_file: '修改文件', list_dir: '查看文件夹', grep: '搜索文件',
   web_fetch: '打开网页', web_search: '搜索网页', todo: '任务清单', ask_user: '向你提问', time_now: '查看时间',
   memory_read: '读取笔记', memory_write: '保存笔记', load_skill: '读取技能', skill_manage: '管理技能',
-  desktop_status: '查看桌面状态', wallpaper_list: '查看壁纸', wallpaper_apply: '更换壁纸', wallpaper_create: '创作壁纸', wallpaper_delete: '删除壁纸',
+  desktop_status: '查看桌面状态', desktop_windows: '查看小伴窗口', desktop_window_set: '调整小伴窗口', wallpaper_list: '查看壁纸', wallpaper_apply: '更换壁纸', wallpaper_create: '创作壁纸', wallpaper_delete: '删除壁纸',
   effect_list: '查看特效', effect_set: '切换特效', effect_read_format: '读取特效格式', effect_create: '创作特效', effect_delete: '删除特效',
   companion_set: '设置小伴', care_list: '查看提醒', care_set: '设置提醒', care_delete: '删除提醒',
   widget_list: '查看桌面组件', widget_add: '添加桌面组件', widget_update: '调整桌面组件', widget_remove: '移除桌面组件', widget_create: '创作桌面组件', widget_delete_custom: '删除自创组件',

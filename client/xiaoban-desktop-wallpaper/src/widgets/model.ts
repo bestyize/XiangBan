@@ -1,5 +1,5 @@
 import { validateNote, validateCountdown, validateReminder } from './content.ts';
-export type WidgetKind = 'clock' | 'weather' | 'notes' | 'reminders' | 'stocks' | 'woodfish' | 'calendar' | 'countdown';
+export type WidgetKind = 'clock' | 'weather' | 'notes' | 'reminders' | 'stocks' | 'woodfish' | 'calendar' | 'countdown' | 'custom';
 export type WidgetTheme = 'ivory';
 export interface City { name: string; country: string; admin1: string; latitude: number; longitude: number }
 export type ItemRepeat = 'none' | 'daily' | 'weekdays' | 'weekly';
@@ -10,7 +10,8 @@ export interface ReminderItem { id: string; title: string; at: string; done: boo
 export const validStockSymbol = (symbol:string) => /^(?:116\.\d{5}|1\.(?:000001|6\d{5})|0\.(?:39900[16]|[03]\d{5}))$/.test(symbol);
 export interface LivingData { reminders: ReminderItem[]; count: number; symbol: string; symbols?:string[]; sound?:boolean }
 export interface WidgetContent { note?: NoteData; countdown?: CountdownData; living?: LivingData }
-export interface DesktopWidget { id: string; kind: WidgetKind; theme: WidgetTheme; scale: number; x: number; y: number; enabled: boolean; city: City | null; layer?: 'desktop' | 'topmost'; monitor?: string; note?: NoteData; countdown?: CountdownData; living?: LivingData; }
+export interface CustomWidgetPack { schemaVersion: 1; id: string; name: string; description?: string; width?: number; height?: number; theme?: string; html: string; }
+export interface DesktopWidget { id: string; kind: WidgetKind; theme: WidgetTheme | string; scale: number; x: number; y: number; enabled: boolean; city: City | null; layer?: 'desktop' | 'topmost'; monitor?: string; note?: NoteData; countdown?: CountdownData; living?: LivingData; customId?: string; custom?: CustomWidgetPack; }
 export interface WidgetMonitor { id: string; name: string; width: number; height: number; primary: boolean }
 export interface WidgetLayout { version: 2; widgets: DesktopWidget[]; editing: boolean; errors: string[]; desktop?: {width:number;height:number}; monitors?: WidgetMonitor[] }
 export interface WidgetPayload { widget: DesktopWidget; editing: boolean; screenX: number; screenY: number; displayScale?: number | null }
@@ -24,16 +25,22 @@ export const widgetKinds = [
  {kind:'calendar' as const,title:'月历',label:'月历',description:'翻过日常，回到今天'},
  {kind:'countdown' as const,title:'纪念日',label:'纪念日',description:'每一天，都值得期待'},
 ];
-export const baseSize = (kind:WidgetKind) => ({clock:{width:596,height:306},weather:{width:326,height:306},notes:{width:352,height:306},reminders:{width:480,height:332},stocks:{width:404,height:338},woodfish:{width:390,height:332},calendar:{width:500,height:286},countdown:{width:790,height:286}}[kind]);
+export const baseSize = (kind:WidgetKind, custom?: CustomWidgetPack) => {
+ if (kind === 'custom') return { width: custom?.width ?? 280, height: custom?.height ?? 240 };
+ return ({clock:{width:596,height:306},weather:{width:326,height:306},notes:{width:352,height:306},reminders:{width:480,height:332},stocks:{width:404,height:338},woodfish:{width:390,height:332},calendar:{width:500,height:286},countdown:{width:790,height:286}} as Record<string,{width:number;height:number}>)[kind] ?? {width:280,height:240};
+};
 export const emptyLayout = (): WidgetLayout => ({ version: 2, widgets: [], editing: false, errors: [] });
 export function validateLayout(value: unknown): WidgetLayout {
   const data = value as WidgetLayout;
   if (!data || data.version !== 2 || !Array.isArray(data.widgets) || data.widgets.length > 12) throw new Error('桌面组件记录格式不正确，原布局已保留');
   const ids = new Set<string>();
   for (const widget of data.widgets) {
-    const kindValid =  widgetKinds.some(k => k.kind === widget.kind);
-    if (!widget || !/^[a-z0-9]{1,32}$/.test(widget.id) || ids.has(widget.id) || !kindValid || widget.theme !== 'ivory'
+    const isCustom = widget.kind === 'custom';
+    const kindValid = isCustom || widgetKinds.some(k => k.kind === widget.kind);
+    if (!widget || !/^[a-z0-9]{1,32}$/.test(widget.id) || ids.has(widget.id) || !kindValid
       || typeof widget.enabled !== 'boolean' || !Number.isFinite(widget.scale) || widget.scale < .5 || widget.scale > 1.5 || !Number.isFinite(widget.x) || widget.x < 0 || widget.x > 1 || !Number.isFinite(widget.y) || widget.y < 0 || widget.y > 1) throw new Error('组件布局无效，原记录已保留');
+    if (isCustom && !widget.customId) throw new Error('自定义组件缺少模板标识');
+    if (!isCustom && widget.theme !== 'ivory') throw new Error('内置组件材质必须为 ivory');
     if (widget.city && (widget.kind !== 'weather' || typeof widget.city.name !== 'string' || !widget.city.name.trim() || widget.city.name.length > 160 || !Number.isFinite(widget.city.latitude) || Math.abs(widget.city.latitude) > 90 || !Number.isFinite(widget.city.longitude) || Math.abs(widget.city.longitude) > 180)) throw new Error('天气城市配置无效');
     if(widget.layer!==undefined&&!['desktop','topmost'].includes(widget.layer))throw Error('组件层级无效');
     if (widget.monitor != null && (typeof widget.monitor !== 'string' || !widget.monitor || new TextEncoder().encode(widget.monitor).length > 512)) throw new Error('显示器标识无效');
