@@ -39,6 +39,7 @@ impl Change {
         if self.action.as_deref() == Some("collapse") && label != "assistant" {
             return Err("collapse 只适用于超级小伴".into());
         }
+        if label.starts_with("widget-")&&self.layer.as_deref()==Some("normal"){return Err("组件层级只能是 desktop（贴在桌面）或 topmost（始终置顶）".into());}
         if self
             .layer
             .as_deref()
@@ -95,11 +96,12 @@ pub fn apply_saved(
     apply_layer(window, &layer(app, window.label(), default))
 }
 
-fn apply_layer(window: &tauri::WebviewWindow, layer: &str) -> Result<(), String> {
+pub(crate) fn apply_layer(window: &tauri::WebviewWindow, layer: &str) -> Result<(), String> {
     #[cfg(windows)]
     {
         if window.label() != "control" {
             if layer == "desktop" && crate::widgets::is_widget(window.label()) {
+                window.set_always_on_top(false).map_err(|e|e.to_string())?;
                 return crate::windows::attach_widget(window);
             }
             crate::windows::configure_companion(window, layer == "desktop")?;
@@ -177,10 +179,10 @@ pub fn snapshot(app: &tauri::AppHandle) -> Result<Value, String> {
     let widgets = crate::widgets::get_desktop_widgets(app.clone())?;
     for w in widgets["widgets"].as_array().into_iter().flatten() {
         let id = w["id"].as_str().unwrap_or_default();
-        windows.push(json!({"target":format!("widget:{id}"),"kind":w["kind"],"visible":w["enabled"],"x":w["x"],"y":w["y"],"monitor":w["monitor"],"layer":layer(app,&format!("widget-{id}"),"desktop")}));
+        windows.push(json!({"target":format!("widget:{id}"),"kind":w["kind"],"visible":w["enabled"],"x":w["x"],"y":w["y"],"monitor":w["monitor"],"layer":w["layer"].as_str().unwrap_or("desktop")}));
     }
     Ok(
-        json!({"monitors":monitors,"windows":windows,"coordinates":"移动使用屏内比例 0..1；bounds 为原生屏幕坐标。层级调整本次运行有效；组件位置会保存。壁纸和特效层不支持任意移动。"}),
+        json!({"monitors":monitors,"windows":windows,"coordinates":"移动使用屏内比例 0..1；bounds 为原生屏幕坐标。组件层级与位置会保存；其他窗口层级本次运行有效。壁纸和特效层不支持任意移动。"}),
     )
 }
 
@@ -193,6 +195,7 @@ pub fn update(app: &tauri::AppHandle, change: &Change) -> Result<Value, String> 
     }
     if let Some(id) = label.strip_prefix("widget-") {
         let mut patch = json!({});
+        if let Some(layer)=&change.layer{patch["layer"]=json!(layer);}
         if let Some(action) = change.action.as_deref() {
             patch["enabled"] = json!(action == "show");
         }
@@ -217,6 +220,7 @@ pub fn update(app: &tauri::AppHandle, change: &Change) -> Result<Value, String> 
                 return Err(format!("布局已保存，但窗口应用失败：{}", json!(errors)));
             }
         }
+        return Ok(json!({"ok":true,"target":change.target,"action":change.action,"x":change.x,"y":change.y,"layer":change.layer}));
     } else if let Some(action) = change.action.as_deref() {
         match label.as_str() {
             "assistant" => match action {
@@ -289,6 +293,11 @@ pub fn update(app: &tauri::AppHandle, change: &Change) -> Result<Value, String> 
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]fn widget_layers_are_persistable_modes(){
+        for layer in ["desktop","topmost"]{assert!(serde_json::from_value::<Change>(json!({"target":"widget:abc123","layer":layer})).unwrap().validate().is_ok());}
+        assert!(serde_json::from_value::<Change>(json!({"target":"widget:abc123","layer":"normal"})).unwrap().validate().is_err());
+        assert!(serde_json::from_value::<Change>(json!({"target":"assistant","layer":"normal"})).unwrap().validate().is_ok());
+    }
     #[test]
     fn only_app_surfaces_and_valid_normalized_positions_are_accepted() {
         for value in [
@@ -322,3 +331,4 @@ mod tests {
         }
     }
 }
+

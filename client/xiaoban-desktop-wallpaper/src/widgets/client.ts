@@ -23,7 +23,7 @@ export function createWidgetClient() {
       finally { busy.value = false; }
     }); queue = next; return next;
   }
-  function add(kind:WidgetKind){return change('add_desktop_widget',{kind},current=>{if(current.widgets.length>=12)throw Error('桌面最多放置 12 个组件');const count=current.widgets.length;current.widgets.push({id:crypto.randomUUID().replaceAll('-','').slice(0,16),kind,theme:'ivory',scale:.5,x:.05+(count%3)*.28,y:.06+Math.floor(count/3)*.2,enabled:true,city:null,...(kind==='notes'?{note:emptyNote()}:kind==='countdown'?{countdown:emptyCountdown()}:['reminders','stocks','woodfish'].includes(kind)?{living:{...emptyLiving(),symbol:kind==='stocks'?'116.00700':'1.000001'}}:{})});return current;});}
+  function add(kind:WidgetKind){return change('add_desktop_widget',{kind},current=>{if(current.widgets.length>=12)throw Error('桌面最多放置 12 个组件');const count=current.widgets.length;current.widgets.push({id:crypto.randomUUID().replaceAll('-','').slice(0,16),kind,theme:'ivory',layer:'desktop',scale:.5,x:.05+(count%3)*.28,y:.06+Math.floor(count/3)*.2,enabled:true,city:null,...(kind==='notes'?{note:emptyNote()}:kind==='countdown'?{countdown:emptyCountdown()}:['reminders','stocks','woodfish'].includes(kind)?{living:{...emptyLiving(),symbol:kind==='stocks'?'116.00700':'1.000001'}}:{})});return current;});}
   function update(id: string, patch: Partial<Omit<DesktopWidget,'id'|'kind'>>) { return change('update_desktop_widget',{id,patch}, current => ({...current,widgets:current.widgets.map(widget=>widget.id===id?{...widget,...patch}:widget)})); }
   function remove(id: string) { return change('remove_desktop_widget',{id},current=>({...current,widgets:current.widgets.filter(widget=>widget.id!==id)})); }
   function edit(editing: boolean) { return change('set_widgets_editing',{editing},current=>({...current,editing})); }
@@ -38,5 +38,6 @@ export async function searchWidgetCities(query: string): Promise<City[]> {
   const response=await fetch(url,{signal:AbortSignal.timeout(12000)});if(!response.ok)throw new Error('城市查询失败，请稍后再试');
   const data=await response.json();return (data.results??[]).map((city: City)=>({name:city.name,country:city.country??'',admin1:city.admin1??'',latitude:city.latitude,longitude:city.longitude}));
 }
+
 
 

@@ -10,6 +10,7 @@ use tauri::{Manager, WebviewUrl, WebviewWindowBuilder};
 pub struct Widget {
     pub id: String, pub kind: String, pub theme: String, pub scale: f64,
     pub x: f64, pub y: f64, pub enabled: bool, pub city: Option<City>,
+    #[serde(default="desktop_layer")] pub layer:String,
     #[serde(default, skip_serializing_if="Option::is_none")]
     pub note: Option<NoteData>,
     #[serde(default, skip_serializing_if="Option::is_none")]
@@ -25,6 +26,7 @@ const MAX_LAYOUT_BYTES: usize = 128 * 1024;
 #[serde(rename_all="camelCase")]
 pub struct TodoItem { pub id:String, pub text:String, pub done:bool, #[serde(default)] pub time:String,
  #[serde(default)] pub date:String, #[serde(default)] pub notify:bool, #[serde(default="repeat_none")] pub repeat:String, #[serde(default)] pub completed_on:String }
+fn desktop_layer()->String{"desktop".into()}
 fn repeat_none()->String{"none".into()}
 fn default_true()->bool{true}
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -122,6 +124,7 @@ pub fn validate(layout: &Layout) -> Result<(), String> {
     for widget in &layout.widgets {
         if widget.id.is_empty() || widget.id.len() > 32 || !widget.id.bytes().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit()) || !ids.insert(&widget.id)
             || !KINDS.contains(&widget.kind.as_str())
+            || !["desktop","topmost"].contains(&widget.layer.as_str())
             || widget.theme!="ivory"
             || !widget.scale.is_finite() || !(0.5..=1.5).contains(&widget.scale)
             || !widget.x.is_finite() || !(0.0..=1.0).contains(&widget.x)
@@ -187,7 +190,7 @@ fn widget_payload(app: &tauri::AppHandle, widget: &Widget) -> Result<Value, Stri
 fn place(app: &tauri::AppHandle, window: &tauri::WebviewWindow, widget: &Widget) -> Result<(), String> {
     let (x,y,width,height,dpi)=geometry(app,widget)?;
     #[cfg(windows)] {
-        if crate::window_control::layer(app, window.label(), "desktop") == "desktop" {
+        if widget.layer == "desktop" {
             return crate::windows::place_widget(window,tauri::PhysicalPosition::new(x.round() as i32,y.round() as i32),width.round() as i32,height.round() as i32);
         }
         return crate::windows::place_interactive(window,x,y,width,height);
@@ -206,7 +209,7 @@ pub fn sync(app: &tauri::AppHandle) {
         let result = (|| -> Result<(), String> {
             let label = format!("widget-{}",widget.id);
             if let Some(window) = app.get_webview_window(&label) {
-                crate::window_control::apply_saved(app,&window,"desktop")?;
+                crate::window_control::apply_layer(&window,&widget.layer)?;
                 place(app,&window,widget)?;
                 window.eval(format!("window.dispatchEvent(new CustomEvent('widget-config',{{detail:{}}}));",widget_payload(app,widget)?)).map_err(|e| e.to_string())?;
                 return Ok(());
@@ -214,20 +217,22 @@ pub fn sync(app: &tauri::AppHandle) {
             let (x,y,width,height,dpi) = geometry(app,widget)?;
             let builder = WebviewWindowBuilder::new(app,&label,WebviewUrl::App(format!("index.html?scene=widget&id={}",widget.id).into()))
                 .title("小伴 · 桌面组件").decorations(false).shadow(false).transparent(true).resizable(false).visible(false)
-                .skip_taskbar(true).always_on_top(false).focused(false).position(x/dpi,y/dpi).inner_size(width/dpi,height/dpi)
+                .skip_taskbar(true).always_on_top(widget.layer=="topmost").focused(false).position(x/dpi,y/dpi).inner_size(width/dpi,height/dpi)
                 .initialization_script(format!("window.__XIAOBAN_WIDGET__={};",widget_payload(app,widget)?));
             // Keep the native parent in Tao's own state as well as the final HWND styles.
-            #[cfg(windows)] let builder = builder.parent_raw(::windows::Win32::Foundation::HWND(crate::windows::widget_parent()? as _))
-                .data_directory(crate::storage::webview(&crate::storage::root(app)?));
+            #[cfg(windows)] let builder = {
+                let builder=if widget.layer=="desktop"{builder.parent_raw(::windows::Win32::Foundation::HWND(crate::windows::widget_parent()? as _))}else{builder};
+                builder.data_directory(crate::storage::webview(&crate::storage::root(app)?))
+            };
             #[cfg(target_os="macos")] let builder = builder.incognito(true);
             let window = builder.build().map_err(|e| e.to_string())?;
             let configured = (|| -> Result<(),String> {
-                #[cfg(windows)] crate::windows::attach_widget(&window)?;
+                #[cfg(windows)] if widget.layer=="desktop"{crate::windows::attach_widget(&window)?;}
                 #[cfg(target_os="macos")] crate::macos::configure_scene(&window,true,false)?;
                 place(app,&window,widget)?; window.show().map_err(|e| e.to_string())?;
                 // Show can reconcile Tao's window styles; apply the desktop child frame last.
-                #[cfg(windows)] crate::windows::attach_widget(&window)?;
-                crate::window_control::apply_saved(app,&window,"desktop")?;
+                #[cfg(windows)] if widget.layer=="desktop"{crate::windows::attach_widget(&window)?;}
+                crate::window_control::apply_layer(&window,&widget.layer)?;
                 place(app,&window,widget)?; Ok(())
             })();
             if let Err(error) = configured { let _=window.destroy(); return Err(error); }
@@ -282,18 +287,32 @@ pub async fn add_desktop_widget(app: tauri::AppHandle, kind: String,) -> Result<
     let countdown=if kind=="countdown"{Some(CountdownData{title:"值得期待的日子".into(),date:chrono::Local::now().format("%Y-%m-%d").to_string(),mode:"countdown".into(),repeat:"none".into()})}else{None};
     let living=if ["reminders","stocks","woodfish"].contains(&kind.as_str()){let mut d=LivingData::default();if kind=="stocks"{d.symbol="116.00700".into();}Some(d)}else{None};
     let theme="ivory".to_string();
-    next.widgets.push(Widget{id:random.iter().map(|b|format!("{b:02x}")).collect(),kind,theme,scale:0.5,x:((if index%3==1{0.88}else{0.52})-(index/3) as f64*0.25).max(0.05),y:if index%3==2{0.94}else{0.06},enabled:true,city:None,note,countdown,living,monitor:None});
+    next.widgets.push(Widget{id:random.iter().map(|b|format!("{b:02x}")).collect(),kind,theme,layer:desktop_layer(),scale:0.5,x:((if index%3==1{0.88}else{0.52})-(index/3) as f64*0.25).max(0.05),y:if index%3==2{0.94}else{0.06},enabled:true,city:None,note,countdown,living,monitor:None});
     persist(&app,&next)?; *state.layout.lock().unwrap()=next; sync(&app); Ok(snapshot(&app))
 }
 #[derive(Deserialize)]
 #[serde(rename_all="camelCase",deny_unknown_fields)]
-pub struct Patch { monitor: Option<String>, theme: Option<String>, scale: Option<f64>, x: Option<f64>, y: Option<f64>, enabled: Option<bool>, city: Option<City>, note: Option<NoteData>, countdown: Option<CountdownData>, living: Option<LivingData>, }
+pub struct Patch { layer:Option<String>, monitor: Option<String>, theme: Option<String>, scale: Option<f64>, x: Option<f64>, y: Option<f64>, enabled: Option<bool>, city: Option<City>, note: Option<NoteData>, countdown: Option<CountdownData>, living: Option<LivingData>, }
 #[tauri::command]
 pub async fn update_desktop_widget(app: tauri::AppHandle, id: String, patch: Patch) -> Result<Value,String> {
     let state=app.state::<WidgetState>();let _operation=state.operation.lock().await;
     let mut next=state.layout.lock().unwrap().clone();let widget=next.widgets.iter_mut().find(|w|w.id==id).ok_or("没有找到这个组件")?;
+    let old_layer=widget.layer.clone();if let Some(v)=patch.layer{widget.layer=v;}
     if let Some(v)=patch.monitor{widget.monitor=Some(v);}if let Some(v)=patch.theme{widget.theme=v;}if let Some(v)=patch.scale{widget.scale=v;}if let Some(v)=patch.x{widget.x=v;}if let Some(v)=patch.y{widget.y=v;}if let Some(v)=patch.enabled{widget.enabled=v;}if let Some(v)=patch.city{widget.city=Some(v);}if let Some(v)=patch.note{widget.note=Some(v);}if let Some(v)=patch.countdown{widget.countdown=Some(v);}if let Some(v)=patch.living{widget.living=Some(v);}
-    persist(&app,&next)?;*state.layout.lock().unwrap()=next;sync(&app);Ok(snapshot(&app))
+    let layer_changed=old_layer!=widget.layer;
+    persist(&app,&next)?;*state.layout.lock().unwrap()=next;
+    if layer_changed{state.resizes.lock().unwrap().remove(&id);
+        // Rebuild the Windows window with the correct Tao parent, not just HWND styles.
+        #[cfg(windows)] if let Some(window)=app.get_webview_window(&format!("widget-{id}")){
+            let handle=app.clone();
+            window.on_window_event(move|event|{if matches!(event,tauri::WindowEvent::Destroyed){
+                // Wait until Tao finishes unregistering the old label before rebuilding.
+                let next=handle.clone();let _=handle.run_on_main_thread(move||{tauri::async_runtime::spawn_blocking(move||sync(&next));});
+            }});
+            window.destroy().map_err(|e|e.to_string())?;return Ok(snapshot(&app));
+        }
+    }
+    sync(&app);Ok(snapshot(&app))
 }
 /// A widget can save only its own typed content; no caller-supplied identity or layout patch.
 #[tauri::command]
@@ -551,6 +570,11 @@ mod tests {
  }
  use super::*;
  fn one()->Layout{serde_json::from_value(json!({"version":2,"widgets":[{"id":"clock1","kind":"clock","theme":"ivory","scale":1.,"x":0.1,"y":0.1,"enabled":true,"city":null}]})).unwrap()}
+ #[test] fn layer_defaults_and_persistence_are_validated(){
+  let mut l=one();assert_eq!(l.widgets[0].layer,"desktop");l.widgets[0].layer="topmost".into();assert!(validate(&l).is_ok());
+  let saved=serde_json::to_vec(&l).unwrap();let restored:Layout=serde_json::from_slice(&saved).unwrap();assert_eq!(restored.widgets[0].layer,"topmost");
+  l.widgets[0].layer="normal".into();assert!(validate(&l).is_err());
+ }
  #[test] fn old_kinds_and_materials_are_rejected(){for kind in ["fortune","flower","custom"]{let mut l=one();l.widgets[0].kind=kind.into();assert!(validate(&l).is_err());}let mut l=one();l.widgets[0].theme="glass".into();assert!(validate(&l).is_err());l=one();l.version=1;assert!(validate(&l).is_err());}
  #[test] fn only_eight_reference_components_are_available(){for k in KINDS{let mut l=one();l.widgets[0].kind=k.into();assert!(validate(&l).is_ok());assert!(base_size(k).0>300.);}}
  #[test] fn hk_and_a_share_codes_remain_constrained(){for s in ["116.00700","1.000001","0.399006","1.600519"]{assert!(valid_stock_symbol(s));}for s in ["116.00700&x=1","116.abcde","https://example.com","3.123456"]{assert!(!valid_stock_symbol(s));}}

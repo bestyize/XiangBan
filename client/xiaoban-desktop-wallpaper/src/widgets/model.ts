@@ -10,7 +10,7 @@ export interface ReminderItem { id: string; title: string; at: string; done: boo
 export const validStockSymbol = (symbol:string) => /^(?:116\.\d{5}|1\.(?:000001|6\d{5})|0\.(?:39900[16]|[03]\d{5}))$/.test(symbol);
 export interface LivingData { reminders: ReminderItem[]; count: number; symbol: string; symbols?:string[]; sound?:boolean }
 export interface WidgetContent { note?: NoteData; countdown?: CountdownData; living?: LivingData }
-export interface DesktopWidget { id: string; kind: WidgetKind; theme: WidgetTheme; scale: number; x: number; y: number; enabled: boolean; city: City | null; monitor?: string; note?: NoteData; countdown?: CountdownData; living?: LivingData; }
+export interface DesktopWidget { id: string; kind: WidgetKind; theme: WidgetTheme; scale: number; x: number; y: number; enabled: boolean; city: City | null; layer?: 'desktop' | 'topmost'; monitor?: string; note?: NoteData; countdown?: CountdownData; living?: LivingData; }
 export interface WidgetMonitor { id: string; name: string; width: number; height: number; primary: boolean }
 export interface WidgetLayout { version: 2; widgets: DesktopWidget[]; editing: boolean; errors: string[]; desktop?: {width:number;height:number}; monitors?: WidgetMonitor[] }
 export interface WidgetPayload { widget: DesktopWidget; editing: boolean; screenX: number; screenY: number; displayScale?: number | null }
@@ -35,6 +35,7 @@ export function validateLayout(value: unknown): WidgetLayout {
     if (!widget || !/^[a-z0-9]{1,32}$/.test(widget.id) || ids.has(widget.id) || !kindValid || widget.theme !== 'ivory'
       || typeof widget.enabled !== 'boolean' || !Number.isFinite(widget.scale) || widget.scale < .5 || widget.scale > 1.5 || !Number.isFinite(widget.x) || widget.x < 0 || widget.x > 1 || !Number.isFinite(widget.y) || widget.y < 0 || widget.y > 1) throw new Error('组件布局无效，原记录已保留');
     if (widget.city && (widget.kind !== 'weather' || typeof widget.city.name !== 'string' || !widget.city.name.trim() || widget.city.name.length > 160 || !Number.isFinite(widget.city.latitude) || Math.abs(widget.city.latitude) > 90 || !Number.isFinite(widget.city.longitude) || Math.abs(widget.city.longitude) > 180)) throw new Error('天气城市配置无效');
+    if(widget.layer!==undefined&&!['desktop','topmost'].includes(widget.layer))throw Error('组件层级无效');
     if (widget.monitor != null && (typeof widget.monitor !== 'string' || !widget.monitor || new TextEncoder().encode(widget.monitor).length > 512)) throw new Error('显示器标识无效');
     if (widget.note != null) { if (widget.kind !== 'notes') throw new Error('便签配置类型不匹配'); validateNote(widget.note); }
     if (widget.countdown != null) { if (widget.kind !== 'countdown') throw new Error('纪念日配置类型不匹配'); validateCountdown(widget.countdown); }

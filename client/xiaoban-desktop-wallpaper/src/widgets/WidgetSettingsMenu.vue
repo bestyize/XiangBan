@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import {computed,ref} from 'vue';
-import {ArrowLeft,ChevronRight,Check,X,Trash2,ListTodo,CalendarDays,MapPin,ChartNoAxesCombined,Heart,Volume2,Monitor,Eye,SlidersHorizontal} from 'lucide-vue-next';
+import {ArrowLeft,ChevronRight,Check,X,Trash2,ListTodo,CalendarDays,MapPin,ChartNoAxesCombined,Heart,Volume2,Monitor,Eye,SlidersHorizontal,Layers} from 'lucide-vue-next';
 import type {City,DesktopWidget,WidgetContent,WidgetMonitor} from './model.ts';
 import {widgetKinds} from './model.ts';
 import {searchWidgetCities} from './client.ts';
@@ -29,6 +29,7 @@ async function search(){if(searching.value||!query.value.trim())return;searching
   <button v-if="editor" class="menu-row menu-action" :disabled="busy" @click="panel=true"><component :is="editor.icon" :size="16"/><span>{{ editor.text }}</span><small>{{ editor.detail }}</small><ChevronRight :size="14"/></button>
   <button v-if="widget.kind==='woodfish'" class="menu-row menu-action" :disabled="busy" :aria-pressed="living.sound??true" @click="update({living:{...living,sound:!(living.sound??true)}})"><Volume2 :size="16"/><span>敲击声音</span><small>{{ living.sound??true?'开启':'关闭' }}</small><Check v-if="living.sound??true" :size="15"/></button>
   <label v-if="(monitors?.length??0)>1" class="menu-row"><Monitor :size="16"/><span>显示器</span><select :value="widget.monitor??monitors?.find(m=>m.primary)?.id" aria-label="组件显示器" :disabled="busy" @change="update({monitor:($event.target as HTMLSelectElement).value})"><option v-for="m in monitors" :key="m.id" :value="m.id">{{ m.name }}</option></select></label>
+  <label class="menu-row menu-layer"><Layers :size="16"/><span>显示层级</span><select :value="widget.layer??'desktop'" aria-label="组件显示层级" :disabled="busy" @change="update({layer:($event.target as HTMLSelectElement).value as 'desktop'|'topmost'})"><option value="desktop">贴在桌面</option><option value="topmost">始终置顶</option></select></label>
   <button class="menu-row menu-action" :disabled="busy" :aria-pressed="widget.enabled" @click="update({enabled:!widget.enabled})"><Eye :size="16"/><span>显示在桌面</span><Check v-if="widget.enabled" :size="15"/></button>
   <div class="menu-separator"/>
   <div v-if="confirmRemove" class="menu-remove-confirm"><span>移除组件及其内容？</span><button :disabled="busy" @click="confirmRemove=false">取消</button><button class="danger" :disabled="busy" @click="remove">移除</button></div>
