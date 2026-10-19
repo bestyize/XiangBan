@@ -273,7 +273,7 @@ pub async fn add_desktop_widget(app: tauri::AppHandle, kind: String, custom_id: 
     let mut next=state.layout.lock().unwrap().clone(); if next.widgets.len()>=12{return Err("桌面最多放置 12 个组件".into());}
     let mut random=[0u8;8];getrandom::fill(&mut random).map_err(|e|e.to_string())?;
     let index=next.widgets.len();
-    let note=if kind=="notes"{Some(NoteData{title:"随手记".into(),mode:"note".into(),text:String::new(),items:vec![]})}else{None};
+    let note=if kind=="notes"{Some(NoteData{title:"今日待办".into(),mode:"todo".into(),text:String::new(),items:vec![]})}else{None};
     let countdown=if kind=="countdown"{Some(CountdownData{title:"值得期待的日子".into(),date:chrono::Local::now().format("%Y-%m-%d").to_string(),mode:"countdown".into(),repeat:"none".into()})}else{None};
     let flower=if kind=="flower"{Some(FlowerData{water:0,since:chrono::Local::now().format("%Y-%m-%d").to_string()})}else{None};
     let living=if ["reminders","stocks","woodfish"].contains(&kind.as_str()){Some(LivingData::default())}else{None};
