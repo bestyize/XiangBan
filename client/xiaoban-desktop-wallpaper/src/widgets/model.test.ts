@@ -37,6 +37,16 @@ describe('desktop widget layout',()=>{
     expect(() => validateLayout({ ...emptyLayout(), widgets: [{ ...customWidget, customId: '' }] })).toThrow();
     expect(() => validateLayout({ ...emptyLayout(), widgets: [{ ...customWidget, customId: 'Invalid Id!' }] })).toThrow();
   });
+  it('validates reminders, market symbols and wooden fish counts',()=>{
+    const living={reminders:[{id:'rem1',title:'团队周会',at:'2026-10-20T09:30',done:false}],count:108,symbol:'1.000001'};
+    const widget={...one(),kind:'reminders' as const,living};
+    expect(validateLayout({...emptyLayout(),widgets:[widget]}).widgets[0].living?.reminders[0].title).toBe('团队周会');
+    expect(()=>validateLayout({...emptyLayout(),widgets:[{...widget,living:{...living,count:-1}}]})).toThrow();
+    expect(()=>validateLayout({...emptyLayout(),widgets:[{...widget,living:{...living,symbol:'4.unknown'}}]})).toThrow();
+    expect(()=>validateLayout({...emptyLayout(),widgets:[{...widget,living:{...living,reminders:[...living.reminders,...living.reminders]}}]})).toThrow();
+    expect(()=>validateLayout({...emptyLayout(),widgets:[{...widget,living:{...living,reminders:[{...living.reminders[0],at:'broken'}]}}]})).toThrow();
+    expect(()=>validateLayout({...emptyLayout(),widgets:[{...widget,kind:'calendar'}]})).toThrow();
+  });
 
 });
 
