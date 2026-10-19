@@ -206,6 +206,8 @@ fn status(app: &tauri::AppHandle) -> Value {
 fn build(app: &tauri::AppHandle) -> Result<WebviewWindow, String> {
     let builder = WebviewWindowBuilder::new(app, LABEL, WebviewUrl::App("index.html?scene=assistant".into()))
         .title("小伴 · 超级小伴")
+        // Let the capsule receive HTML file drops (including on WebView2).
+        .disable_drag_drop_handler()
         .decorations(false).shadow(false).resizable(false).skip_taskbar(true)
         .always_on_top(true).transparent(true).visible(false).focused(false)
         // The ball sits over other apps, which are the active ones: the click that lands on it must reach the page.
