@@ -1,5 +1,7 @@
 # 桌面控制台 UI 设计规范
 
+> 实际桌面上的悬浮小组件采用独立的 [Soft Living UI 桌面小组件设计规范](desktop-widgets-design.md)；这里的视觉令牌主要面向应用控制台，不应直接套用到悬浮小组件。
+
 ## 技术结构与入口
 
 控制台使用 Vue 3.5.43、Naive UI 2.45.3、Vite 8 和 Lucide Vue Next。表单、按钮、提示、标签和加载状态优先使用 Naive UI；Lucide 图标用于辅助识别，不能取代文字标签。
