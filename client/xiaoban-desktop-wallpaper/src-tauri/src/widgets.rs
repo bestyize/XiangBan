@@ -2,7 +2,7 @@
 use crate::care_weather::{City, Weather};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use std::{collections::HashMap, fs, sync::{atomic::{AtomicBool, Ordering}, Mutex}};
+use std::{collections::HashMap, fs, io::Read, sync::{atomic::{AtomicBool, Ordering}, Mutex}};
 use tauri::{Manager, WebviewUrl, WebviewWindowBuilder};
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -82,8 +82,10 @@ pub struct WidgetState {
     layout: Mutex<Layout>, editing: AtomicBool,
     operation: tauri::async_runtime::Mutex<()>,
     weather_operation: tauri::async_runtime::Mutex<()>,
+    market_operation: tauri::async_runtime::Mutex<()>,
     load_error: Mutex<Option<String>>, errors: Mutex<Vec<String>>,
     weather: Mutex<HashMap<String, Weather>>, attempts: Mutex<HashMap<String, i64>>,
+    market: Mutex<HashMap<String,(i64,Value)>>,
 }
 pub fn is_widget(label: &str) -> bool { label.starts_with("widget-") }
 fn own_widget(window: &tauri::WebviewWindow) -> Result<Widget, String> {
@@ -357,6 +359,54 @@ pub async fn get_widget_weather(window:tauri::WebviewWindow)->Result<Weather,Str
     let weather=tauri::async_runtime::spawn_blocking(move||crate::care_weather::fetch(&source,&city,now)).await.map_err(|e|e.to_string())??;
     let mut cache=state.weather.lock().unwrap();if cache.len()>48{cache.clear();}cache.insert(key,weather.clone());Ok(weather)
 }
+
+/// A narrow, read-only market-data adapter; no arbitrary host or symbol supplied by a webview.
+/// The public endpoint is best-effort, with no SLA or verified redistribution licence.
+#[tauri::command]
+pub async fn get_widget_stocks(window: tauri::WebviewWindow, period:String)->Result<Value,String>{
+    let widget=own_widget(&window)?;
+    if widget.kind!="stocks"{return Err("此组件不读取股票行情".into());}
+    if period!="1D" && period!="5D"{return Err("当前仅支持 1D 和 5D 行情".into());}
+    let symbol=widget.living.unwrap_or_default().symbol;
+    if !["1.000001","0.399001","0.399006"].contains(&symbol.as_str()){return Err("未支持的证券代码".into());}
+    let app=window.app_handle();let state=app.state::<WidgetState>();
+    let _operation=state.market_operation.lock().await;
+    let key=format!("{symbol}/{period}");let now=chrono::Utc::now().timestamp();
+    if let Some((when,value))=state.market.lock().unwrap().get(&key).filter(|(when,_)|(0..60).contains(&(now-*when))).cloned(){return Ok(value);}
+    let stock=symbol.clone();let days=if period=="1D"{1}else{5};
+    let response=tauri::async_runtime::spawn_blocking(move||->Result<Value,String>{
+        let url=format!("https://push2his.eastmoney.com/api/qt/stock/trends2/get?secid={stock}&fields1=f1,f2,f3,f4,f5&fields2=f51,f52,f53,f54,f55&ndays={days}");
+        let client=reqwest::blocking::Client::builder().timeout(std::time::Duration::from_secs(12))
+            .redirect(reqwest::redirect::Policy::none()).user_agent("Mozilla/5.0 XiaoBan Desktop").build().map_err(|e|e.to_string())?;
+        let mut res=client.get(url).send().map_err(|e|format!("行情连接失败：{e}"))?.error_for_status().map_err(|e|format!("行情服务错误：{e}"))?;
+        let mut bytes=Vec::new();res.take(512*1024+1).read_to_end(&mut bytes).map_err(|e|e.to_string())?;
+        if bytes.len()>512*1024{return Err("行情响应过大".into());}
+        let json:Value=serde_json::from_slice(&bytes).map_err(|_|"行情服务返回格式无效")?;
+        let data=json.get("data").filter(|d|!d.is_null()).ok_or("行情服务暂未返回数据")?;
+        let lines=data.get("trends").and_then(Value::as_array).ok_or("行情序列不可用")?;
+        let values:Vec<(String,f64)>=lines.iter().filter_map(|v|{
+            let row=v.as_str()?;let parts:Vec<_>=row.split(',').collect();
+            let value=parts.get(2)?.parse::<f64>().ok()?;
+            if !value.is_finite()||value<=0.0{return None;}
+            Some((parts.first()?.to_string(),value))
+        }).collect();
+        if values.len()<2{return Err("可用行情点数不足".into());}
+        let last=values.last().ok_or("行情为空")?;let price=last.1;
+        let prev=data.get("preClose").and_then(|v|v.as_f64().or_else(||v.as_str().and_then(|s|s.parse::<f64>().ok()))).unwrap_or(0.0);
+        if prev<=0.0{return Err("行情缺少昨收盘价".into());}
+        let step=((values.len()+119)/120).max(1);
+        let mut points:Vec<f64>=values.iter().step_by(step).map(|(_,value)|*value).collect();
+        if points.last()!=Some(&price){points.push(price);}
+        let change=price-prev;let pct=100.0*change/prev;
+        Ok(json!({"price":price,"change":change,"percent":pct,"updatedAt":last.0,"points":points,
+            "source":"东方财富公开数据","name":data.get("name").and_then(Value::as_str).unwrap_or("指数")}))
+    }).await.map_err(|e|e.to_string())??;
+    let mut response=response;
+    response["symbol"]=json!(symbol);response["period"]=json!(period);
+    let mut cache=state.market.lock().unwrap();if cache.len()>20{cache.clear();}cache.insert(key,(now,response.clone()));
+    Ok(response)
+}
+
 #[tauri::command]
 pub fn list_custom_widgets(app: tauri::AppHandle) -> Result<Value, String> {
     let dir = crate::storage::root(&app)?.join("custom_widgets");
