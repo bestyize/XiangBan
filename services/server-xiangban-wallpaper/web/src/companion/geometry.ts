@@ -28,4 +28,9 @@ export const COLOR = {
   tear: '#5ec8ff',
   gray: '#b9c3cf',
   screen: '#050608',
+  mouth: '#050608',
+  hatch: '#ff9ab6',
 } as const
+
+/** The colours the face and screen symbols are drawn in. A shell may bring its own (ink on paper instead of light on a dark screen). */
+export type Palette = { readonly [K in keyof typeof COLOR]: string }

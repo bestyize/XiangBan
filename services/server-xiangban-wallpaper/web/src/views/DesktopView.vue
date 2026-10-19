@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { nextTick, onActivated, ref } from "vue";
+import { computed, nextTick, onActivated, ref } from "vue";
 import { useRoute } from "vue-router";
 import Icon from "@/components/Icon.vue";
 import WindowsDesktopDemo from "@/components/WindowsDesktopDemo.vue";
@@ -9,24 +9,32 @@ const moreCards = [
     src: "/desktop/care.webp",
     eyebrow: "关怀提醒",
     title: "该下班了，该吃药了",
-    body: "下班、休息、天气、自定义提醒，小伴用气泡轻轻告诉你。可稍后再说，有免打扰时段，玩游戏时自动延后。",
-    alt: "小伴桌面的关怀提醒页：天气提醒、吃药提醒列表，以及开启提醒、免打扰时段等偏好开关",
+    body: "下班、休息、天气与自定义提醒，小伴用气泡轻轻告诉你。可以稍后十分钟再说，有免打扰时段，开着游戏时会自动延后。",
+    alt: "小伴桌面的关怀提醒页：下班提醒、休息提醒与提醒偏好开关",
   },
   {
     src: "/desktop/games.webp",
     eyebrow: "游戏空间",
     title: "累了，玩一会儿",
-    body: "俄罗斯方块、2048、奶茶大师、小伴贪吃蛇、水墨剑客等七款小游戏，全部离线可玩，水墨剑客还会记住进度。",
-    alt: "小伴桌面的游戏空间页：俄罗斯方块、2048、消失高手、奶茶大师、小伴贪吃蛇、水墨剑客等本地游戏卡片",
+    body: "俄罗斯方块、2048、消失高手、奶茶大师、小伴贪吃蛇、水墨剑客、暮色滑翔，七款小游戏离线可玩，水墨剑客会记住进度。也能让小伴按想法创作一款。",
+    alt: "小伴桌面的游戏空间页：七款本地游戏卡片，标注竖屏、横屏与离线可玩",
   },
   {
     src: "/desktop/models.webp",
-    eyebrow: "自带模型",
-    title: "用你自己的模型",
-    body: "内置 DeepSeek、智谱、Kimi、MiniMax 预设，也能添加任意兼容端点，支持三种主流接口协议。密钥只保存在你的电脑上。",
-    alt: "小伴桌面的 AI 模型服务商设置：DeepSeek、智谱、Kimi、MiniMax 官方预设与自定义端点，当前使用的服务商高亮显示",
+    eyebrow: "模型选择",
+    title: "小伴 AI，或你熟悉的模型",
+    body: "登录后直接用上小伴 AI，额度和兑换在应用内查看。也可以接入 DeepSeek、智谱、Kimi、MiniMax 预设或任意兼容端点，密钥只保存在你的电脑上。",
+    alt: "小伴桌面的 AI 模型设置：小伴 AI、DeepSeek、智谱、Kimi、MiniMax 及添加自定义供应商",
   },
 ];
+const defaultIntroduction =
+  "随时唤起超级小伴，打字或开口提问，让它帮你查资料、整理文件、创作壁纸和小组件。再把喜欢的风景、日历和一盆小植物，留在每天都看见的桌面上。";
+const introduction = computed(() => {
+  const text = product.value?.introduction?.trim();
+  return !text || text === "会回应的桌面小伙伴，搭配喜欢的图片与动态壁纸，让工作和休息多一点温暖。"
+    ? defaultIntroduction
+    : text;
+});
 const product = ref<DesktopProduct | null>(null);
 const error = ref("");
 const loading = ref(false);
@@ -67,15 +75,11 @@ onActivated(() => {
       <div class="intro">
         <span class="eyebrow">陪伴，就在桌面上</span>
         <h1>小伴桌面</h1>
-        <p>
-          {{
-            product?.introduction ||
-            "壁纸是风景，特效是天气，小组件是日子，小伴是陪你的人。动态壁纸、桌面特效、小组件、关怀提醒和小游戏，开口一句话就能帮你布置。"
-          }}
-        </p>
+        <h2 class="hero-tagline">一句话，办点事。<br />一抬眼，好风景。</h2>
+        <p class="hero-description">{{ introduction }}</p>
         <a class="btn btn-primary" href="#desktop-downloads"
           ><Icon name="download" />下载小伴桌面</a
-        ><span class="support">Windows / macOS / Android · 无须注册账户</span>
+        ><span class="support">桌面版：Windows / macOS · Android 版浏览与下载壁纸</span>
       </div>
       <WindowsDesktopDemo />
     </section>
@@ -129,17 +133,32 @@ onActivated(() => {
         </li>
       </ul>
     </section>
+    <section class="assistant-feature" aria-labelledby="assistant-title">
+      <div class="section-head">
+        <span class="eyebrow">超级小伴</span>
+        <h2 id="assistant-title">不用切走手头的事，<br />小伴随叫随到。</h2>
+        <p>正在看网页，还是埋头写东西？按下快捷键，或点一下屏幕边缘的悬浮球，轻巧的对话框就出来了。打字、说话都可以，对话记录留在这里，需要长聊时再进入完整聊天。</p>
+      </div>
+      <img class="shot" src="/desktop/assistant.webp" width="1280" height="800" loading="lazy" decoding="async"
+        alt="小伴桌面的超级小伴设置：Alt+Space 呼出、屏幕边缘悬浮球、语音提问与回答朗读偏好" />
+      <ul class="live-points">
+        <li><Icon name="sparkles" :size="22" /><div><strong>快捷键，或点一下</strong><span>默认 Alt+Space；悬浮球常驻屏幕边缘，点开即用，按住还能拖到顺手的位置</span></div></li>
+        <li><Icon name="play" :size="22" /><div><strong>想到什么，直接说</strong><span>语音在本机转成文字，回答按你的偏好朗读；语音还没准备好时照常打字</span></div></li>
+        <li><Icon name="sliders" :size="22" /><div><strong>按你的习惯来</strong><span>快捷键、呼出方式和朗读偏好都能调整，也可以在任意应用里随时问一句</span></div></li>
+      </ul>
+    </section>
     <section class="showcase" aria-label="功能介绍">
       <article class="showcase-row">
         <div class="showcase-copy">
           <span class="eyebrow">对话创作</span>
           <h2>说一句话，桌面就变了</h2>
           <p>
-            内置桌面小助手。跟它说“帮我做一个春日风筝特效，做完设到桌面”，它会自己写好特效、保存并切换，几十秒后风筝就飘在你的桌面上。换壁纸、摆组件、设提醒、玩游戏，开口就行。
+            不只挑现成的，也能做你想要的。说一句“做一个春日风筝特效，放到桌面”，小伴会写好特效、保存并应用；动画壁纸、HTML 小组件和小游戏也能按你的想法创作。想换氛围、记一个日子，直接告诉它。
           </p>
           <ul class="ticks">
-            <li>读写文件、查网页、跑命令，也能帮你办正事</li>
-            <li>写文件和运行命令前先问你，高风险操作一定确认</li>
+            <li>查网页、整理文件、运行命令，也能帮你处理日常任务</li>
+            <li>支持任务规划、长期记忆与技能；默认权限下，写文件和运行命令前先确认</li>
+            <li>作品可以导入、导出资源包，也能分享到论坛</li>
           </ul>
           <RouterLink to="/guide" class="guide-action-link">
             <span>查看 AI 玩法指南与示例咒语 →</span>
@@ -157,6 +176,27 @@ onActivated(() => {
       </article>
       <article class="showcase-row reverse">
         <div class="showcase-copy">
+          <span class="eyebrow">玩法指南</span>
+          <h2>不知道让它做什么？<br />这里有一叠现成的句子</h2>
+          <p>
+            聊天页的“玩法指南”按现场创作、桌面控制、生活关怀、助手与多模态、模型接入分好类，每个例子都能一键填进输入框，也能复制带走。打开完整手册还有更多提示词和进阶用法。
+          </p>
+          <RouterLink to="/guide" class="guide-action-link">
+            <span>打开在线玩法手册 →</span>
+          </RouterLink>
+        </div>
+        <img
+          class="shot"
+          src="/desktop/chatguide.webp"
+          width="1280"
+          height="800"
+          loading="lazy"
+          decoding="async"
+          alt="小伴桌面的 AI 玩法指南弹窗：现场造挂件、下班倒计时便签、暗黑星轨 Canvas 壁纸、春日微风落樱特效等示例与一键尝试按钮"
+        />
+      </article>
+      <article class="showcase-row reverse">
+        <div class="showcase-copy">
           <span class="eyebrow">壁纸库</span>
           <h2>风景会动，桌面更有生命力</h2>
           <p>
@@ -170,7 +210,7 @@ onActivated(() => {
           height="800"
           loading="lazy"
           decoding="async"
-          alt="小伴桌面的壁纸库：银河、海滩日落两段动态视频壁纸，冰川河流、海岬灯塔等图片壁纸，以及恢复原生壁纸的入口"
+          alt="小伴桌面的壁纸库：使用原生壁纸的入口，以及桌面小星球、一池心灯、暮海、极光之夜等动态壁纸和图片壁纸"
         />
       </article>
       <article class="showcase-row">
@@ -178,7 +218,7 @@ onActivated(() => {
           <span class="eyebrow">桌面特效</span>
           <h2>十二种天气与节庆，落在你的桌面上</h2>
           <p>
-            孔明灯升空、枫叶打旋、银河横空、蝴蝶翩跹、烟花绽放、细雨、大雪、萤火、落樱、流星……特效铺在壁纸之上，换壁纸照常显示，点击直接穿过，不挡你工作。密度、速度、大小都能调，还能导入特效包，或者让小伴现写一个。
+            夜色里升起的孔明灯、打旋的枫叶、横过夜空的银河、翩跹的蝴蝶，还有烟花、白雪、细雨、萤火、落樱、流星与星空。特效铺在壁纸之上，换壁纸照常显示，鼠标直接穿过，不挡你工作。密度、速度、大小都能调，也能导入特效包，或让小伴现写一个。
           </p>
         </div>
         <img
@@ -188,7 +228,7 @@ onActivated(() => {
           height="800"
           loading="lazy"
           decoding="async"
-          alt="小伴桌面的桌面特效页：灯火阑珊、层林尽染、星汉灿烂、庄周梦蝶、火树银花、银装素裹、和风细雨等特效卡片，当前选中灯火阑珊"
+          alt="小伴桌面的桌面特效页：无特效、灯火阑珊、层林尽染、星汉灿烂、庄周梦蝶、火树银花、银装素裹、和风细雨等特效卡片"
         />
       </article>
       <article class="showcase-row reverse">
@@ -196,7 +236,7 @@ onActivated(() => {
           <span class="eyebrow">小伴桌宠</span>
           <h2>会回应你的桌面小伙伴</h2>
           <p>
-            小伴会望向你的鼠标，点一下就换个表情回应你，拖一拖就能换个位置；一会儿不理它，它还会犯困、睡着。猫耳、兔耳、盆栽三款外壳随心换，可以悬浮在桌面上，也能安静住进壁纸里。
+            一盆会回应你的小植物，安静待在桌面一角。它会望向鼠标，用表情回应点击，久不理它也会犯困、睡着。绿叶或白色小雏菊，选一株喜欢的；可以悬浮陪在身边，也能融进壁纸里。
           </p>
         </div>
         <img
@@ -206,7 +246,7 @@ onActivated(() => {
           height="800"
           loading="lazy"
           decoding="async"
-          alt="小伴桌面的桌面宠物页：左侧是笑眯眯的猫耳小伴互动预览，右侧可在猫耳、兔耳、盆栽三款外壳之间切换"
+          alt="小伴桌面的桌面宠物页：表情盆栽互动预览，绿叶与白色小雏菊两种植物外观，以及浮动桌宠和融入壁纸两种陪伴方式"
         />
       </article>
       <article class="showcase-row">
@@ -214,7 +254,7 @@ onActivated(() => {
           <span class="eyebrow">桌面小组件</span>
           <h2>壁纸是风景，小组件是日子</h2>
           <p>
-            一签好意、带农历与“休 / 班”标识的日历、天气、便签待办、倒数日与纪念日。随意缩放和拖放，支持多个显示器，换一张壁纸，小物件依然留在原处。
+            时钟、天气、待办事项、今日日程、股票行情、电子木鱼、月历与纪念日，八种常用小物件，一抬眼就能看见。可以放多个、随意缩放，支持多显示器与“始终置顶”；按住顶部拖动，点“…”就能调整它的内容和外观，也能让小伴现写一个专属小组件。
           </p>
         </div>
         <img
@@ -224,7 +264,7 @@ onActivated(() => {
           height="800"
           loading="lazy"
           decoding="async"
-          alt="小伴桌面的桌面组件页：一签好意求签、日有所序时钟日历、晴雨之间天气三款组件"
+          alt="小伴桌面的桌面组件库：桌面时钟、城市天气、待办事项、今日日程、股票行情、电子木鱼、月历与纪念日"
         />
       </article>
       <div class="more">
@@ -243,7 +283,7 @@ onActivated(() => {
         </article>
       </div>
       <p class="also">
-        以上功能适用于 Windows 与 macOS 版，开机自动启动可关；Android 版用于浏览和下载壁纸。
+        桌面功能适用于 Windows 与 macOS 版；Android 版用于浏览、下载壁纸并接收更新提醒。壁纸与本地组件无需登录；小伴 AI 需登录并有可用额度，自己的模型服务按服务商要求配置。语音识别在本机完成，首次使用需下载模型；回答朗读需要联网。
       </p>
     </section>
     <section id="desktop-downloads" class="downloads">
@@ -276,7 +316,9 @@ onActivated(() => {
               class="btn btn-primary"
               :href="product.downloads[target.id].url"
               rel="noopener noreferrer"
-              ><Icon name="download" />下载</a
+              ><Icon name="download" />{{
+                target.id === 'android-arm64' ? '下载壁纸手机版' : '下载桌面版'
+              }}</a
             >
             <details>
               <summary>更新说明</summary>
@@ -294,6 +336,16 @@ onActivated(() => {
         Windows 需要 WebView2，缺少时程序会引导准备。macOS 当前面向 Apple
         芯片。Android 支持 Android 10 及以上系统。视频能否播放取决于系统解码支持。
       </p>
+      <div class="usage-notes">
+        <article>
+          <h3>日常留在本机</h3>
+          <p>壁纸、组件内容与游戏进度保存在这台设备；AI 对话会把完成任务所需的内容发给你选择的模型服务。屏幕与应用控制需要单独开启。</p>
+        </article>
+        <article>
+          <h3>权限由你掌握</h3>
+          <p>默认模式下，写文件和运行命令前先确认；完全信任模式减少询问，高风险操作仍会停下来问。这不是系统沙箱，请只把任务交给信任的来源。</p>
+        </article>
+      </div>
     </section>
     <section class="community" aria-labelledby="community-title">
       <div>
@@ -337,14 +389,48 @@ onActivated(() => {
   letter-spacing: 0.14em;
 }
 .intro h1 {
-  font-size: clamp(44px, 6vw, 76px);
-  margin: 18px 0;
+  font-size: clamp(40px, 5vw, 62px);
+  margin: 18px 0 10px;
 }
+.hero-tagline {
+  font-size: clamp(24px, 2.9vw, 36px);
+  line-height: 1.4;
+  letter-spacing: -0.03em;
+  margin: 0 0 20px;
+}
+.hero-description,
 .intro p {
   color: var(--text-2);
-  font-size: 18px;
+  font-size: 17px;
   line-height: 1.9;
   margin-bottom: 28px;
+}
+.assistant-feature {
+  margin-top: 88px;
+}
+.assistant-feature > .shot {
+  max-width: 1000px;
+  margin: auto;
+}
+.assistant-feature .live-points {
+  max-width: 1000px;
+  margin-inline: auto;
+}
+.usage-notes {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 28px;
+  margin: 28px 0 0;
+  padding: 24px 0 0;
+  border-top: 1px solid var(--line);
+}
+.usage-notes h3 {
+  font-size: 17px;
+  margin: 0 0 8px;
+}
+.usage-notes p {
+  font-size: 14px;
+  margin: 0;
 }
 .support {
   display: block;
@@ -649,7 +735,14 @@ summary {
     padding: 22px;
   }
   .intro h1 {
-    font-size: 48px;
+    font-size: 44px;
+  }
+  .assistant-feature {
+    margin-top: 56px;
+  }
+  .usage-notes {
+    grid-template-columns: 1fr;
+    gap: 20px;
   }
 }
 </style>

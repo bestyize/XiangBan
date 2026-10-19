@@ -10,6 +10,7 @@ import {
 import { Animator } from "@/companion/animator";
 import { Mind } from "@/companion/mind";
 import { EXPRESSIONS, stillFrame, toSpec } from "@/companion/expressions";
+import { SKIN_IDS, skinOf } from "@/companion/skins";
 import {
   bodyTransform,
   earLight,
@@ -27,11 +28,13 @@ const props = defineProps<{
 const emit = defineEmits<{ mood: [string]; interaction: [string] }>();
 const host = ref<HTMLButtonElement | null>(null);
 const position = ref({ x: 70, y: 65 });
+/** The same plant shell the desktop app opens with. */
+const skin = skinOf(SKIN_IDS[0]);
 const style = computed(() => ({
   left: `${position.value.x}%`,
   top: `${position.value.y}%`,
 }));
-const art = robotMarkup(stillFrame("idle"), "site-xiaoban", "互动小伴猫脸");
+const art = robotMarkup(stillFrame("idle"), "site-xiaoban", "互动小伴花盆", skin.id);
 let animator: Animator,
   mind: Mind,
   frame = 0,
@@ -76,15 +79,17 @@ function animate(now: number) {
     face.innerHTML = faceMarkup(pose, "site-xiaoban");
     face.setAttribute("opacity", String(faceOpacity(pose)));
   }
-  for (const [side, index] of [
-    ["L", -1],
-    ["R", 1],
-  ] as const) {
-    const ear = query(`[data-part="ear${side}"]`);
-    ear?.setAttribute("transform", earTransform(pose, index));
-    ear
-      ?.querySelector('[data-part="halo"]')
-      ?.setAttribute("opacity", String(earLight(pose)));
+  if (skin.earOuter) {
+    for (const [side, index] of [
+      ["L", -1],
+      ["R", 1],
+    ] as const) {
+      const ear = query(`[data-part="ear${side}"]`);
+      ear?.setAttribute("transform", earTransform(pose, index, skin.earPivot));
+      ear
+        ?.querySelector('[data-part="halo"]')
+        ?.setAttribute("opacity", String(earLight(pose)));
+    }
   }
   const shadow = query('[data-part="shadow"]');
   if (shadow) {
