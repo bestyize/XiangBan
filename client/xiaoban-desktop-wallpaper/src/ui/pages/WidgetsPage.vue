@@ -43,7 +43,7 @@ const stageWidth=ref(0);
 let libraryObserver:ResizeObserver|undefined;
 function measureStage(){const column=libraryGrid.value?getComputedStyle(libraryGrid.value).gridTemplateColumns.split(' ')[0]:'';const width=parseFloat(column??'');if(Number.isFinite(width)&&width>0)stageWidth.value=width;}
 const demoScale=(kind:WidgetKind,custom?:CustomWidgetData)=>{const{width,height}=baseSize(kind,custom);const stage=stageWidth.value||210;return Math.min(1,stage/width,stage*9/16/height);};
-const demo=(kind:WidgetKind):DesktopWidget=>({id:`demo${kind}`,kind,theme:'transparent',scale:1,x:0,y:0,enabled:true,city:null,...(kind==='notes'?{note:{...emptyNote(),text:'慢慢来，也会抵达。\n\n把今天的小事，放在这里。'}}:kind==='countdown'?{countdown:{...emptyCountdown(),title:'下一次旅行',date:'2026-12-31'}}:kind==='flower'?{flower:{...emptyFlower(),water:12}}:{})});
+const demo=(kind:WidgetKind):DesktopWidget=>({id:`demo${kind}`,kind,theme:'transparent',scale:1,x:0,y:0,enabled:true,city:null,...(kind==='notes'?{note:{...emptyNote(),mode:'todo',items:[{id:'task1',text:'完成产品方案',done:true},{id:'task2',text:'健身 30 分钟',done:false},{id:'task3',text:'读一本喜欢的书',done:false}]}}:kind==='reminders'?{living:{count:0,symbol:'1.000001',reminders:[{id:'a1',title:'团队周会',at:'2026-10-19T09:30',done:false},{id:'a2',title:'设计评审',at:'2026-10-19T15:00',done:false}]}}:kind==='woodfish'?{living:{count:108,symbol:'1.000001',reminders:[]}}:kind==='countdown'?{countdown:{...emptyCountdown(),title:'下一次旅行',date:'2026-12-31'}}:kind==='flower'?{flower:{...emptyFlower(),water:12}}:{})});
 async function action(task:()=>Promise<unknown>){try{await task();}catch(e){props.store.notify(e,'error');}}
 // A brief check mark on the "+" badge confirms the add without moving the user away from the library.
 const flashKey=ref('');let flashTimer:ReturnType<typeof setTimeout>|undefined;
@@ -151,7 +151,7 @@ onMounted(()=>{void client.load();void loadCustomTemplates();});onBeforeUnmount(
         </div>
       </section>
 
-      <p class="widget-hint">{{ store.info.platform==='windows'?'按 Win+D 可以查看桌面上的组件。':'' }} 求签、日历、便签、纪念日和小白花可离线使用，天气需要选择城市并联网。按住组件顶部拖动，点右上角齿轮调整设置。位置和内容保存在本机，重启后恢复；关闭小伴桌面时，组件也会关闭。</p>
+      <p class="widget-hint">{{ store.info.platform==='windows'?'按 Win+D 可以查看桌面上的组件。':'' }} 时钟、待办、提醒、木鱼及原有离线组件不需要联网；天气与股票行情需要网络连接。按住组件顶部拖动，点右上角齿轮调整设置。位置和内容保存在本机，重启后恢复；关闭小伴桌面时，组件也会关闭。</p>
     </div>
 
     <NModal :show="settingsOpen" preset="card" :title="chosen?titleOf(chosen):'组件设置'" :mask-closable="true" style="max-width:480px;width:92vw" content-style="max-height:60vh;overflow-y:auto" data-testid="widget-settings" @update:show="value=>{if(!value)closeSettings();}">
