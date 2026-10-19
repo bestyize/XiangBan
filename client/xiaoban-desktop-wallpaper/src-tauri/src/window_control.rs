@@ -79,6 +79,8 @@ impl Change {
 }
 
 pub fn layer(app: &tauri::AppHandle, label: &str, default: &str) -> String {
+    if let Some(layer)=crate::widgets::window_layer(app,label){return layer;}
+
     app.state::<WindowState>()
         .layers
         .lock()
@@ -107,12 +109,13 @@ pub(crate) fn apply_layer(window: &tauri::WebviewWindow, layer: &str) -> Result<
             crate::windows::configure_companion(window, layer == "desktop")?;
         }
     }
-    window
-        .set_always_on_top(layer == "topmost")
-        .map_err(|e| e.to_string())?;
+    // On macOS the framework flag and the final AppKit level must be set in
+    // one main-thread operation. A queued "not topmost" update sets level 0.
     #[cfg(target_os = "macos")]
-    crate::macos::set_interactive_layer(window, layer)?;
-    Ok(())
+    { crate::macos::set_interactive_layer(window, layer) }
+    #[cfg(not(target_os = "macos"))]
+    { window.set_always_on_top(layer == "topmost").map_err(|e| e.to_string()) }
+
 }
 
 fn frame(window: &tauri::WebviewWindow) -> Result<(f64, f64, f64, f64), String> {

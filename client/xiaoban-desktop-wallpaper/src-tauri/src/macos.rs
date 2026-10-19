@@ -81,12 +81,24 @@ pub fn interactive_frame(window: &tauri::WebviewWindow) -> Result<(f64,f64,f64,f
 pub fn set_interactive_layer(window: &tauri::WebviewWindow, layer: &str) -> Result<(),String> {
     let window=window.clone();let layer=layer.to_string();let app=window.app_handle().clone();
     on_main(&app,move|_|{
+        // Tauri applies this synchronously when already on its event-loop thread.
+        // Do it first: false means Normal (0), not the desktop's negative level.
+        window.set_always_on_top(layer=="topmost").map_err(|e|e.to_string())?;
         let level=match layer.as_str(){
             "desktop"=>CGWindowLevelForKey(CGWindowLevelKey::DesktopIconWindowLevelKey) as isize+1,
             "topmost"=>CGWindowLevelForKey(CGWindowLevelKey::StatusWindowLevelKey) as isize,
             _=>0,
         };
-        native(&window)?.setLevel(level);Ok(())
+        let ns=native(&window)?;
+        ns.setLevel(level);
+        if crate::widgets::is_widget(window.label()){
+            let full_screen=if layer=="desktop"{NSWindowCollectionBehavior::FullScreenNone}else{NSWindowCollectionBehavior::FullScreenAuxiliary};
+            ns.setCollectionBehavior(NSWindowCollectionBehavior::CanJoinAllSpaces
+                |NSWindowCollectionBehavior::Stationary|NSWindowCollectionBehavior::IgnoresCycle|full_screen);
+            if layer=="desktop"{ns.orderBack(None);}
+        }
+        if ns.level()!=level{return Err("原生窗口层级未生效，请重新切换显示层级".into());}
+        Ok(())
     })
 }
 
@@ -453,3 +465,4 @@ pub fn apply_control_appearance(window: &tauri::WebviewWindow, appearance: &str)
         Ok(())
     })
 }
+

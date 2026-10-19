@@ -105,6 +105,17 @@ pub fn reminder_rules(app:&tauri::AppHandle,now:chrono::DateTime<chrono::Local>)
  let layout=app.state::<WidgetState>().layout.lock().unwrap().clone();crate::widget_schedule::rules(&layout,now)
 }
 pub fn is_widget(label: &str) -> bool { label.starts_with("widget-") }
+pub(crate) fn window_layer(app:&tauri::AppHandle,label:&str)->Option<String>{
+    let id=label.strip_prefix("widget-")?;
+    let state=app.state::<WidgetState>();let value=state.layout.lock().unwrap().widgets.iter().find(|w|w.id==id).map(|w|w.layer.clone());value
+}
+#[cfg(target_os="macos")]
+pub(crate) fn restore_window_layer(app:&tauri::AppHandle,label:&str){
+    if let (Some(layer),Some(window))=(window_layer(app,label),app.get_webview_window(label)){
+        let _=crate::macos::set_interactive_layer(&window,&layer);
+    }
+}
+
 fn own_widget(window: &tauri::WebviewWindow) -> Result<Widget, String> {
     let state=window.app_handle().state::<WidgetState>();
     let target=if window.label()=="widgetmenu"{state.menu_target.lock().unwrap().clone()}else{None};

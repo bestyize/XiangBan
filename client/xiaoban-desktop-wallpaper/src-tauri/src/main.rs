@@ -870,6 +870,11 @@ fn main() {
             Ok(())
         })
         .on_window_event(|window, event| {
+            #[cfg(target_os="macos")]
+            if widgets::is_widget(window.label())&&matches!(event,tauri::WindowEvent::Focused(true)){
+                widgets::restore_window_layer(window.app_handle(),window.label());
+            }
+
             if matches!(window.label(), "control" | "assistant") && matches!(event, tauri::WindowEvent::Focused(true)) {
                 account::activated(window.app_handle());
             }
