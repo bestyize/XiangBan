@@ -1,105 +1,14 @@
 // @vitest-environment happy-dom
-import { mount } from '@vue/test-utils';
-import { describe, it, expect, vi } from 'vitest';
-import WidgetSurface from './WidgetSurface.vue';
-import type { DesktopWidget } from './model.ts';
-import { openRitual } from '../rituals/journal.ts';
-import { invoke } from '../bridge.ts';
+import {mount,flushPromises} from '@vue/test-utils';
+import {describe,it,expect,vi} from 'vitest';
 vi.mock('../bridge.ts',()=>({desktop:false,invoke:vi.fn().mockResolvedValue(undefined)}));
-vi.mock('../rituals/FortuneVessel.vue',()=>({default:{template:'<div />'}}));
-vi.mock('../rituals/journal.ts',async original=>({...await original<typeof import('../rituals/journal.ts')>(),openRitual:vi.fn().mockResolvedValue(undefined)}));
-const one=(kind:DesktopWidget['kind']):DesktopWidget=>({id:'test',kind,theme:'paper',scale:1,x:.5,y:.5,enabled:true,city:null});
-describe('desktop widget interactions',()=>{
-  it('opens its own settings with a gear button without starting a drag',async()=>{
-    vi.mocked(invoke).mockClear();
-    const widget=one('calendar'),view=mount(WidgetSurface,{props:{widget,payload:{widget,editing:false,screenX:100,screenY:200}}});
-    try{
-      const button=view.get('[aria-label="设置这个组件"]');
-      expect(button.find('.lucide-settings').exists()).toBe(true);
-      expect(button.attributes('aria-haspopup')).toBe('dialog');
-      await button.trigger('pointerdown',{button:0,pointerId:1,screenX:120,screenY:220});
-      await view.get('article').trigger('pointermove',{pointerId:1,screenX:150,screenY:240});
-      await view.get('article').trigger('pointerup',{pointerId:1,screenX:150,screenY:240});
-      await button.trigger('click');
-      expect(invoke).toHaveBeenCalledExactlyOnceWith('show_widget_settings');
-    }finally{view.unmount();}
-  });
-  it('keeps a small stationary press as a click without moving the widget',async()=>{
-    vi.useFakeTimers();vi.mocked(invoke).mockClear();
-    const widget=one('fortune'),view=mount(WidgetSurface,{props:{widget,payload:{widget,editing:false,screenX:100,screenY:200}}});
-    try{const button=view.get('.fortune-draw');await button.trigger('pointerdown',{button:0,pointerId:1,screenX:120,screenY:220});await button.trigger('pointerup',{button:0,pointerId:1,screenX:122,screenY:221});await button.trigger('click');
-      expect(view.get('.fortune-draw').text()).toContain('正在途中');expect(invoke).not.toHaveBeenCalled();
-    }finally{view.unmount();vi.useRealTimers();}
-  });
-  it('drags from the heading without edit mode and saves on release',async()=>{
-    vi.useFakeTimers();vi.mocked(invoke).mockClear();
-    const widget=one('fortune'),view=mount(WidgetSurface,{props:{widget,payload:{widget,editing:false,screenX:100,screenY:200}}});
-    try{await view.get('.widget-heading span').trigger('pointerdown',{button:0,pointerId:1,screenX:120,screenY:220});await view.get('article').trigger('pointermove',{pointerId:1,screenX:150,screenY:240});await view.get('article').trigger('pointerup',{pointerId:1,screenX:155,screenY:245});await view.get('.fortune-draw').trigger('click');
-      expect(invoke).toHaveBeenLastCalledWith('move_desktop_widget',{grabX:0,grabY:0,commit:true});expect(view.get('.fortune-draw').text()).toBe('求一支好签');
-      await vi.advanceTimersByTimeAsync(1);await view.get('.fortune-draw').trigger('click');expect(view.get('.fortune-draw').text()).toContain('正在途中');
-    }finally{view.unmount();vi.useRealTimers();}
-  });
-  it('keeps content presses and button gestures from moving the widget',async()=>{
-    vi.useFakeTimers();vi.mocked(invoke).mockClear();
-    const widget=one('fortune'),view=mount(WidgetSurface,{props:{widget,payload:{widget,editing:false,screenX:100,screenY:200}}});
-    try{
-      for(const selector of ['article','.mini-vessel','.fortune-draw']){
-        await view.get(selector).trigger('pointerdown',{button:0,pointerId:1,screenX:120,screenY:220});
-        await view.get('article').trigger('pointermove',{pointerId:1,screenX:150,screenY:240});
-        await view.get('article').trigger('pointerup',{pointerId:1,screenX:150,screenY:240});
-      }
-      expect(invoke).not.toHaveBeenCalled();
-      await view.get('.fortune-draw').trigger('click');expect(view.text()).toContain('好签正在途中');
-    }finally{view.unmount();vi.useRealTimers();}
-  });
-  it('keeps a full-width heading drag area on custom widgets',async()=>{
-    vi.mocked(invoke).mockClear();
-    const widget={...one('custom'),customId:'demo',custom:{id:'demo',name:'自创组件',html:'<button>内容按钮</button>'}};
-    const view=mount(WidgetSurface,{props:{widget,payload:{widget,editing:false,screenX:100,screenY:200}}});
-    try{
-      await view.get('.widget-heading').trigger('pointerdown',{button:0,pointerId:1,screenX:120,screenY:220});
-      await view.get('article').trigger('pointerup',{pointerId:1,screenX:150,screenY:240});
-      expect(invoke).toHaveBeenLastCalledWith('move_desktop_widget',{grabX:0,grabY:0,commit:true});
-    }finally{view.unmount();}
-  });
-  it('opens the same fortune that the widget revealed',async()=>{
-    vi.useFakeTimers();const view=mount(WidgetSurface,{props:{widget:one('fortune'),preview:true}});
-    try{await view.get('.fortune-draw').trigger('click');expect(view.get('.fortune-draw').attributes('disabled')).toBeDefined();await vi.advanceTimersByTimeAsync(1900);const number=Number(view.get('.mini-sign').text().match(/\d+/)?.[0])-1;
-      await view.get('.fortune-draw').trigger('click');expect(openRitual).toHaveBeenLastCalledWith('fortune',number);
-    }finally{view.unmount();vi.useRealTimers();}
-  });
-  it('locks drag-only editing without preventing calendar navigation',async()=>{
-    const view=mount(WidgetSurface,{props:{widget:one('calendar'),preview:true}});const title=view.get('.month-name').text();await view.get('[aria-label="下个月"]').trigger('click');expect(view.get('.month-name').text()).not.toBe(title);await view.get('.month-name').trigger('click');expect(view.get('.month-name').text()).toBe(title);view.unmount();
-  });
-  it('shows configuration status instead of invented weather readings',()=>{const view=mount(WidgetSurface,{props:{widget:one('weather'),preview:true}});expect(view.text()).toContain('设置城市后显示天气');expect(view.get('.weather-main strong').text()).toBe('—');view.unmount();});
-  it('tells the preview that live weather only appears on the desktop, and has no hidden drag handle while editing',()=>{
-    const city={name:'北京',country:'中国',admin1:'北京',latitude:39.9,longitude:116.4};
-    const view=mount(WidgetSurface,{props:{widget:{...one('weather'),city},preview:true,editing:true}});
-    expect(view.text()).toContain('实时天气显示在桌面上');expect(view.find('.drag-handle').exists()).toBe(false);expect(view.find('.widget-settings').exists()).toBe(false);view.unmount();
-  });
-  it('lets note inputs select text without moving the desktop window, and saves through the own-content command',async()=>{
-    vi.mocked(invoke).mockClear();const widget={...one('notes'),note:{title:'随手记',mode:'note' as const,text:'',items:[]}};
-    const view=mount(WidgetSurface,{props:{widget,payload:{widget,editing:false,screenX:100,screenY:200}}});
-    await view.get('textarea').trigger('pointerdown',{button:0,pointerId:1,screenX:120,screenY:220});
-    await view.get('article').trigger('pointermove',{pointerId:1,screenX:150,screenY:240});await view.get('article').trigger('pointerup',{pointerId:1,screenX:150,screenY:240});expect(invoke).not.toHaveBeenCalled();
-    await view.get('textarea').setValue('明天开会');await view.get('.notes-content footer button').trigger('click');expect(invoke).toHaveBeenCalledWith('save_desktop_widget_content',{content:{note:{...widget.note,text:'明天开会'}}});view.unmount();
-  });
-
-  it('waters the white flower through the widget scene and saves only its own growth record',async()=>{
-    vi.mocked(invoke).mockClear();
-    const widget={...one('flower'),flower:{water:6,since:'2026-10-01'}};
-    const view=mount(WidgetSurface,{props:{widget,payload:{widget,editing:false,screenX:100,screenY:200}}});
-    expect(view.text()).toContain('小白花初开');
-    await view.get('.flower-water').trigger('click');
-    expect(invoke).toHaveBeenLastCalledWith('save_desktop_widget_content',{content:{flower:{water:7,since:'2026-10-01'}}});
-    expect(view.text()).toContain('含苞');
-    view.unmount();
-  });
-  it('uses a viewport grab fraction rather than browser global screen coordinates for cross-screen dragging',async()=>{
-    vi.mocked(invoke).mockClear();vi.stubGlobal('innerWidth',400);vi.stubGlobal('innerHeight',400);
-    const widget=one('calendar'),view=mount(WidgetSurface,{props:{widget,payload:{widget,editing:false,screenX:-1920,screenY:-900}}});
-    try{await view.get('.widget-heading').trigger('pointerdown',{button:0,pointerId:1,clientX:100,clientY:40,screenX:-1820,screenY:-860});await view.get('article').trigger('pointermove',{pointerId:1,screenX:2200,screenY:100});await view.get('article').trigger('pointerup',{pointerId:1,screenX:2200,screenY:100});expect(invoke).toHaveBeenLastCalledWith('move_desktop_widget',{grabX:.25,grabY:.1,commit:true});}finally{view.unmount();vi.unstubAllGlobals();}
-  });
-
+import WidgetSurface from './WidgetSurface.vue';
+import type {DesktopWidget} from './model.ts';
+const one=(kind:DesktopWidget['kind']):DesktopWidget=>({id:'one',kind,theme:'ivory',scale:1,x:0,y:0,enabled:true,city:null});
+describe('reference widget interaction',()=>{
+ it('keeps illustrative weather and stocks separate from actual readings',()=>{for(const kind of ['weather','stocks'] as const){const real=mount(WidgetSurface,{props:{widget:one(kind),preview:true}});expect(real.text()).toContain('—');expect(real.text()).not.toContain('309.600');real.unmount();}const demo=mount(WidgetSurface,{props:{widget:one('stocks'),preview:true,demo:true}});expect(demo.text()).toContain('309.600');expect(demo.findAll('.stock-periods button')).toHaveLength(4);demo.unmount();});
+ it('saves todo completion and keeps the original content on failure',async()=>{const save=vi.fn().mockRejectedValue(Error('磁盘不可写'));const widget={...one('notes'),note:{title:'待办',mode:'todo' as const,text:'',items:[{id:'first',text:'写周报',done:false,time:'09:00'}]}};const view=mount(WidgetSurface,{props:{widget,save}});await view.get('.check-circle').trigger('click');await flushPromises();expect(save.mock.calls[0][0].note.items[0].done).toBe(true);expect(widget.note.items[0].done).toBe(false);expect(view.get('[role="alert"]').text()).toContain('磁盘不可写');view.unmount();});
+ it('adds dated events with start, end and location',async()=>{const save=vi.fn().mockResolvedValue(undefined);const view=mount(WidgetSurface,{props:{widget:one('reminders'),save}});await view.get('.agenda-date').trigger('click');await view.get('[aria-label="事项名称"]').setValue('设计评审');await view.get('[aria-label="日程日期"]').setValue('2026-10-20');await view.get('[aria-label="开始时间"]').setValue('14:00');await view.get('[aria-label="结束时间"]').setValue('15:30');await view.get('[aria-label="日程地点"]').setValue('A302');await view.get('form').trigger('submit');expect(save.mock.calls[0][0].living.reminders[0]).toMatchObject({title:'设计评审',at:'2026-10-20T14:00',end:'15:30',location:'A302'});view.unmount();});
+ it('keeps rapid woodfish taps while an earlier count is being saved',async()=>{const pending:Array<()=>void>=[];const save=vi.fn((_content:unknown)=>new Promise<void>(resolve=>pending.push(resolve)));const view=mount(WidgetSurface,{props:{widget:{...one('woodfish'),living:{count:108,symbol:'1.000001',reminders:[]}},save}});await view.get('.sound-toggle').trigger('click');await view.get('.fish-knock').trigger('click');await view.get('.fish-knock').trigger('click');await view.get('.fish-knock').trigger('click');expect(view.get('.fish-footer strong').text()).toContain('111');expect(save).toHaveBeenCalledTimes(1);pending.shift()!();await flushPromises();expect(save).toHaveBeenCalledTimes(2);expect(save.mock.calls[1][0]).toMatchObject({living:{count:111}});pending.shift()!();await flushPromises();view.unmount();});
+ it('navigates months and returns to the current month',async()=>{const v=mount(WidgetSurface,{props:{widget:one('calendar'),preview:true}});const title=v.get('.month-title').text();await v.get('[aria-label="下个月"]').trigger('click');expect(v.get('.month-title').text()).not.toBe(title);await v.get('.month-title').trigger('click');expect(v.get('.month-title').text()).toBe(title);v.unmount();});
 });
-

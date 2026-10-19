@@ -47,7 +47,7 @@ pub fn system_prompt(env: &Environment<'_>) -> String {
          - 不要把 API 密钥、密码等敏感信息写进文件、笔记或回复。\n\
          \n\
          ## 小伴桌面\n\
-         - 你还能控制小伴桌面：打开游戏空间玩小游戏（支持：小伴贪吃蛇 snake-arena、俄罗斯方块 falling-blocks、2048 merge-2048、消失高手 block-puzzle、奶茶大师 water-sort、水墨剑客 ink-blade、暮色滑翔 dusk-glider）、换壁纸、选桌面特效、创作新的桌面特效、放置或调整桌面组件（木鱼求签、小伴日历、天气时钟、便签待办、倒数日／纪念日及自创组件）、改小伴的表情和外壳、管理关怀提醒。用户让你玩游戏或调整这些时，直接用对应的工具。\n\
+         - 你还能控制小伴桌面：打开游戏空间玩小游戏（支持：小伴贪吃蛇 snake-arena、俄罗斯方块 falling-blocks、2048 merge-2048、消失高手 block-puzzle、奶茶大师 water-sort、水墨剑客 ink-blade、暮色滑翔 dusk-glider）、换壁纸、选桌面特效、创作新的桌面特效、放置或调整桌面组件（时钟、天气、待办、今日日程、股票、电子木鱼、月历及纪念日）、改小伴的表情和外壳、管理关怀提醒。用户让你玩游戏或调整这些时，直接用对应的工具。\n\
          - 盆栽小伴和超级小伴悬浮条是不同窗口。用户说“你收起来”“收起语音助手”，用 desktop_window_set(target=assistant, action=collapse)，不要隐藏盆栽或退出程序。移动盆栽、组件或调整窗口层级时先用 desktop_windows 查看，再用 desktop_window_set；位置是屏内 0 到 1 的比例。优先使用这些应用内工具，不要靠 shell、AppleScript 或电脑控制去猜窗口。\n\
          - 用户想要一个现有的特效里没有的桌面动效时，用 effect_create 直接为他写一个特效包：先用一句话说清楚你打算做成什么样，再用 effect_read_format 读取程序内置的完整格式和示例，按规范写出完整的 JSON 保存；不要到工作目录查找 docs/effects.md 等源码文档。写完告诉他可以在“桌面特效”页选用，也可以顺手用 effect_set 切过去看看。\n\
          - 用户问起小伴桌面官网或超级小伴论坛，或想把自己创作的壁纸、特效、组件、游戏分享到论坛时，先用 load_skill 加载 xiaoban-community，再用 community_share 导出作品并打开论坛板块，用 community_open 打开官网或论坛页面。发帖要用户自己登录论坛完成，你不能代发，导出后把接下来要做的事告诉他。\n\
@@ -109,4 +109,5 @@ mod tests {
         assert!(failed.contains("cannot start MCP server `npx`") && failed.contains("不要假装能操作") && !failed.contains("load_skill 加载 open-computer-use"));
     }
 }
+
 

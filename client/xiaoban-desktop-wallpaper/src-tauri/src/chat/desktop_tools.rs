@@ -45,7 +45,7 @@ pub trait Desktop: Send + Sync {
     fn widget_update(&self, id: &str, patch: Value) -> Result<Value, String>;
     fn widget_remove(&self, id: &str) -> Result<(), String>;
     fn custom_widgets(&self) -> Result<Value, String>;
-    fn create_custom_widget(&self, pack: &Value, place_now: bool, overwrite: bool) -> Result<Value, String>;
+    fn create_custom_widget(&self, _pack:&Value, _place_now:bool, _overwrite:bool)->Result<Value,String>{Err("旧版 HTML 桌面组件已移除，请使用八类内置组件".into())}
     fn delete_custom_widget(&self, id: &str) -> Result<(), String>;
     fn games(&self) -> Result<Value, String>;
     fn game_open(&self, id: Option<&str>) -> Result<(), String>;
@@ -180,7 +180,7 @@ impl Desktop for TauriDesktop {
     fn widget_add(&self, kind: &str) -> Result<Value, String> {
         let app = self.app.clone();
         let kind = kind.to_string();
-        tauri::async_runtime::block_on(crate::widgets::add_desktop_widget(app, kind, None))
+        tauri::async_runtime::block_on(crate::widgets::add_desktop_widget(app, kind))
     }
 
     fn widget_update(&self, id: &str, patch: Value) -> Result<Value, String> {
@@ -196,22 +196,11 @@ impl Desktop for TauriDesktop {
         tauri::async_runtime::block_on(crate::widgets::remove_desktop_widget(app, id)).map(|_| ())
     }
 
-    fn custom_widgets(&self) -> Result<Value, String> {
-        let dir = crate::storage::root(&self.app)?.join("custom_widgets");
-        Ok(json!(crate::custom_widgets::load_all(&dir)))
-    }
+    fn custom_widgets(&self)->Result<Value,String>{Ok(json!([]))}
 
-    fn create_custom_widget(&self, pack: &Value, place_now: bool, overwrite: bool) -> Result<Value, String> {
-        let dir = crate::storage::root(&self.app)?.join("custom_widgets");
-        let path = crate::custom_widgets::save(&dir, pack, overwrite)?;
-        let id = pack["id"].as_str().unwrap_or_default();
-        let name = pack["name"].as_str().unwrap_or_default();
-        if place_now {
-            let app = self.app.clone();
-            let _ = tauri::async_runtime::block_on(crate::widgets::add_desktop_widget(app, "custom".to_string(), Some(id.to_string())))?;
-        }
-        Ok(json!({ "id": id, "name": name, "file": path.file_name().unwrap_or_default().to_string_lossy(), "placed": place_now }))
-    }
+
+    fn create_custom_widget(&self,_pack:&Value,_place_now:bool,_overwrite:bool)->Result<Value,String>{Err("旧版 HTML 组件已移除".into())}
+
 
     fn delete_wallpaper(&self, id: &str) -> Result<String, String> {
         let root = crate::content::root(&self.app)?;
@@ -227,9 +216,8 @@ impl Desktop for TauriDesktop {
         crate::effects::delete_pack(&self.app, id)
     }
 
-    fn delete_custom_widget(&self, id: &str) -> Result<(), String> {
-        crate::widgets::delete_custom_pack(&self.app, id)
-    }
+    fn delete_custom_widget(&self,_id:&str)->Result<(),String>{Err("旧版 HTML 组件已移除".into())}
+
 
     fn games(&self) -> Result<Value, String> {
         let catalog = crate::games::catalog(&self.app)?;
@@ -514,23 +502,24 @@ fn care_set(desktop: &dyn Desktop, args: &Value) -> Result<String, String> {
 
 fn widget_kind_label(kind: &str) -> &'static str {
     match kind {
-        "fortune" => "木鱼求签",
+        "clock" => "桌面时钟",
+        "reminders" => "今日日程",
+        "stocks" => "股票行情",
+        "woodfish" => "电子木鱼",
         "calendar" => "小伴日历",
         "weather" => "天气时钟",
-        "notes" => "便签待办",
+        "notes" => "待办事项",
         "countdown" => "倒数日／纪念日",
-        "flower" => "成长小白花",
-        "custom" => "自创组件",
+
+
         _ => "其他组件",
     }
 }
 
 fn widget_theme_label(theme: &str) -> &'static str {
     match theme {
-        "glass" => "毛玻璃",
-        "paper" => "纸张",
-        "transparent" => "透明",
-        _ => "默认",
+        "ivory" => "暖白",
+                _ => "默认",
     }
 }
 
@@ -538,7 +527,7 @@ fn widget_list(desktop: &dyn Desktop, _: &Value) -> Result<String, String> {
     let value = desktop.widgets()?;
     let widgets = value["widgets"].as_array().cloned().unwrap_or_default();
     let mut lines = if widgets.is_empty() {
-        vec!["桌面当前没有放置任何组件。可用 widget_add 添加（支持 fortune 木鱼求签、calendar 小伴日历、weather 天气时钟、notes 便签待办、countdown 倒数日／纪念日、flower 成长小白花）。".to_string()]
+        vec!["桌面当前没有放置任何组件。可用 widget_add 添加（支持 clock 时钟、weather 天气、notes 待办、reminders 日程、stocks 股票、woodfish 木鱼、calendar 月历、countdown 纪念日）。".to_string()]
     } else { vec![format!("桌面当前放置了 {} 个组件（最多 12 个）：", widgets.len())] };
     for w in &widgets {
         let id = w["id"].as_str().unwrap_or("?");
@@ -550,25 +539,18 @@ fn widget_list(desktop: &dyn Desktop, _: &Value) -> Result<String, String> {
         let state = if enabled { "显示中" } else { "已隐藏" };
         lines.push(format!("{id} | {} ({kind}) | {}风格 ({theme}) | 缩放 {scale:.2}{city} | {state} | 位置 ({}, {}) | 显示器 {}", widget_kind_label(kind), widget_theme_label(theme), w["x"], w["y"], w["monitor"]));
     }
-    let templates = desktop.custom_widgets()?;
-    if let Some(templates) = templates.as_array().filter(|items| !items.is_empty()) {
-        lines.push("自创组件模板（可在组件库添加到桌面，删除模板用 widget_delete_custom）：".into());
-        for template in templates {
-            lines.push(format!("{} | {}", template["id"].as_str().unwrap_or("?"), template["name"].as_str().unwrap_or("自创组件")));
-        }
-    }
     Ok(lines.join("\n"))
 }
 
 fn widget_add(desktop: &dyn Desktop, args: &Value) -> Result<String, String> {
     let kind = text_arg(args, "kind")?;
-    if !crate::custom_widgets::BUILTIN_KINDS.contains(&kind) {
-        return Err("kind 只能是 fortune（木鱼求签）、calendar（小伴日历）、weather（天气时钟）、notes（便签待办）、countdown（倒数日／纪念日）或 flower（成长小白花）".into());
+    if !crate::widgets::KINDS.contains(&kind) {
+        return Err("kind 只能是 clock（时钟）、weather（天气）、notes（待办）、reminders（日程）、stocks（股票）、woodfish（木鱼）、calendar（月历）或 countdown（纪念日）".into());
     }
     // Validate all options before creating anything, and never hide a failed theme update.
     let theme = optional_text(args, "theme")?;
-    if theme.is_some_and(|theme| !["glass", "paper", "transparent"].contains(&theme)) {
-        return Err("theme 必须是 glass（毛玻璃）、paper（纸张）或 transparent（透明）".into());
+    if theme.is_some_and(|theme| !["ivory"].contains(&theme)) {
+        return Err("theme 必须是 ivory（设计稿材质）".into());
     }
     let res = desktop.widget_add(kind)?;
     let id = res["widgets"].as_array().and_then(|w| w.last()).and_then(|w| w.get("id")).and_then(Value::as_str).ok_or("组件创建结果没有返回 id")?;
@@ -582,8 +564,8 @@ fn parse_widget_patch(args: &Value) -> Result<Value, String> {
     let mut obj = serde_json::Map::new();
     if let Some(v) = args.get("theme").filter(|v| !v.is_null()) {
         let theme = v.as_str().ok_or("theme 必须是字符串")?;
-        if !["glass", "paper", "transparent"].contains(&theme) {
-            return Err("theme 必须是 glass（毛玻璃）、paper（纸张）或 transparent（透明）".into());
+        if !["ivory"].contains(&theme) {
+            return Err("theme 必须是 ivory（设计稿材质）".into());
         }
         obj.insert("theme".into(), json!(theme));
     }
@@ -639,47 +621,7 @@ fn widget_remove(desktop: &dyn Desktop, args: &Value) -> Result<String, String> 
     Ok(format!("已从桌面移除组件 {id}"))
 }
 
-fn widget_create(desktop: &dyn Desktop, args: &Value) -> Result<String, String> {
-    let id = text_arg(args, "id")?;
-    let name = text_arg(args, "name")?;
-    let html = text_arg(args, "html")?;
-    let description = optional_text(args, "description")?;
-    let width = args.get("width").and_then(Value::as_f64);
-    let height = args.get("height").and_then(Value::as_f64);
-    let theme = optional_text(args, "theme")?.unwrap_or("transparent");
-    let overwrite = optional_bool(args, "overwrite")?.unwrap_or(false);
-    let place_now = optional_bool(args, "place_now")?.unwrap_or(true);
 
-    let mut pack = json!({
-        "schemaVersion": 1,
-        "id": id,
-        "name": name,
-        "html": html,
-        "theme": theme,
-    });
-    if let Some(desc) = description {
-        pack["description"] = json!(desc);
-    }
-    if let Some(w) = width {
-        pack["width"] = json!(w);
-    }
-    if let Some(h) = height {
-        pack["height"] = json!(h);
-    }
-    let res = desktop.create_custom_widget(&pack, place_now, overwrite)?;
-    let placed_msg = if res["placed"].as_bool().unwrap_or(false) {
-        "，并已直接添加到桌面上展示"
-    } else {
-        "（未自动放置到桌面，可在组件库随时添加）"
-    };
-    Ok(format!("已成功创建小组件「{name}」（id: {id}）{placed_msg}。"))
-}
-
-fn widget_delete_custom(desktop: &dyn Desktop, args: &Value) -> Result<String, String> {
-    let id = text_arg(args, "id")?;
-    desktop.delete_custom_widget(id)?;
-    Ok(format!("已删除自定义小组件「{id}」模板，桌面上若有该组件实例也已同步清理。"))
-}
 
 
 pub fn resolve_game_id(input: &str) -> Option<&'static str> {
@@ -958,16 +900,16 @@ pub fn tools(desktop: Arc<dyn Desktop>) -> Vec<Arc<dyn Tool>> {
             care_set,
         ),
         tool(&desktop, ToolSpec::new("care_delete", "删除一条关怀提醒，id 来自 care_list。", object(json!({"id": {"type": "string"}}), &["id"])).risk(Risk::Write).serial(), care_delete),
-        tool(&desktop, ToolSpec::new("widget_list", "列出桌面当前放置的组件（id、类型、风格、缩放、显示状态）以及自创组件模板的 id 和名称。", none()), widget_list),
+        tool(&desktop, ToolSpec::new("widget_list", "列出新版桌面组件的 id、类型、缩放和显示状态。", none()), widget_list),
         tool(
             &desktop,
             ToolSpec::new(
                 "widget_add",
-                "在桌面放置新组件：fortune（木鱼求签）、calendar（小伴日历）、weather（天气时钟）、notes（便签待办）、countdown（倒数日／纪念日）或 flower（成长小白花，每天浇水会依次长成六种形态），可选 theme（glass 毛玻璃 / paper 纸张 / transparent 透明）。桌面最多 12 个组件。",
+                "在桌面放置新版时钟、天气、待办、今日日程、股票、电子木鱼、月历或纪念日组件。固定 ivory 材质，最多 12 个。",
                 object(
                     json!({
-                        "kind": {"type": "string", "enum": crate::custom_widgets::BUILTIN_KINDS, "description": "组件类型"},
-                        "theme": {"type": "string", "enum": ["glass", "paper", "transparent"], "description": "可选外观风格，默认 transparent（透明无底）"},
+                        "kind": {"type": "string", "enum": crate::widgets::KINDS, "description": "组件类型"},
+                        "theme": {"type": "string", "enum": ["ivory"], "description": "可选外观风格，固定 ivory（设计稿材质）"},
                     }),
                     &["kind"],
                 ),
@@ -982,7 +924,7 @@ pub fn tools(desktop: Arc<dyn Desktop>) -> Vec<Arc<dyn Tool>> {
                 object(
                     json!({
                         "id": {"type": "string", "description": "组件 id，来自 widget_list"},
-                        "theme": {"type": "string", "enum": ["glass", "paper", "transparent"]},
+                        "theme": {"type": "string", "enum": ["ivory"]},
                         "scale": {"type": "number", "minimum": 0.75, "maximum": 1.5, "description": "缩放比例"},
                         "enabled": {"type": "boolean", "description": "true 显示，false 隐藏"},
                         "x": {"type": "number", "minimum": 0.0, "maximum": 1.0, "description": "水平位置比例"},
@@ -1007,35 +949,6 @@ pub fn tools(desktop: Arc<dyn Desktop>) -> Vec<Arc<dyn Tool>> {
             &desktop,
             ToolSpec::new("widget_remove", "从桌面移除指定的组件，id 来自 widget_list。", object(json!({"id": {"type": "string"}}), &["id"])).risk(Risk::Write).serial(),
             widget_remove,
-        ),
-        tool(
-            &desktop,
-            ToolSpec::new(
-                "widget_create",
-                "为用户创作一个新的自定义单文件 HTML 桌面小组件。可编写包含完整 HTML、CSS 样式与 JavaScript 交互逻辑的独立微卡片（如番茄钟、极简时钟、每日诗词、倒数日、健康喝水提醒、趣味小工具等）。默认透明无底，HTML 的页面和主体也不要绘制整块背景；仅在用户需要时添加底板。支持外壳主题（glass 透光玻璃 / paper 温润纸张 / transparent 透明无底），默认宽 280、高 240。创作完成后默认自动放置到桌面上。",
-                object(
-                    json!({
-                        "id": { "type": "string", "description": "小组件英文标识（小写字母、数字、-、_，如 pomodoro-timer）" },
-                        "name": { "type": "string", "description": "小组件中文名称（最多 24 字，如 专注番茄钟）" },
-                        "html": { "type": "string", "description": "完整的自包含单文件 HTML 内容（包含 <style>、DOM 结构与 <script> 逻辑）；默认让 html、body 背景透明，不绘制铺满组件的底板；内容应在指定 width、height 的视口内自适应，避免横向溢出和滚动条" },
-                        "description": { "type": "string", "description": "一句话介绍（最多 80 字）" },
-                        "width": { "type": "number", "minimum": 100, "maximum": 800, "description": "建议默认宽度（像素，默认 280）" },
-                        "height": { "type": "number", "minimum": 80, "maximum": 800, "description": "建议默认高度（像素，默认 240）" },
-                        "theme": { "type": "string", "enum": ["glass", "paper", "transparent"], "description": "底板外观风格，默认 transparent（透明无底）" },
-                        "place_now": { "type": "boolean", "description": "创作完成后是否立即放置到桌面上，默认 true" },
-                        "overwrite": { "type": "boolean", "description": "true 时覆盖同 id 的已有小组件，默认 false" }
-                    }),
-                    &["id", "name", "html"],
-                ),
-            )
-            .risk(Risk::Write)
-            .serial(),
-            widget_create,
-        ),
-        tool(
-            &desktop,
-            ToolSpec::new("widget_delete_custom", "删除指定的自定义小组件模板，id 来自 widget_create 定义的 id。若桌面上摆有该组件实例，也会一并从桌面移除。", object(json!({"id": {"type": "string"}}), &["id"])).risk(Risk::Write).serial(),
-            widget_delete_custom,
         ),
         tool(&desktop, ToolSpec::new("game_list", "列出小伴支持的小游戏（内置的贪吃蛇、俄罗斯方块、2048、消失高手、奶茶大师、水墨剑客、暮色滑翔，以及用户自创游戏）以及游戏空间状态。", none()), game_list),
         tool(
@@ -1224,8 +1137,8 @@ mod tests {
         }
         fn widgets(&self) -> Result<Value, String> {
             Ok(json!({"widgets": [
-                {"id": "wgt-1", "kind": "fortune", "theme": "paper", "scale": 1.0, "x": 0.5, "y": 0.1, "enabled": true},
-                {"id": "wgt-2", "kind": "weather", "theme": "glass", "scale": 1.2, "x": 0.8, "y": 0.1, "enabled": false, "city": {"name": "上海"}},
+                {"id": "wgt-1", "kind": "clock", "theme": "ivory", "scale": 1.0, "x": 0.5, "y": 0.1, "enabled": true},
+                {"id": "wgt-2", "kind": "weather", "theme": "ivory", "scale": 1.2, "x": 0.8, "y": 0.1, "enabled": false, "city": {"name": "上海"}},
             ]}))
         }
         fn widget_add(&self, kind: &str) -> Result<Value, String> {
@@ -1301,7 +1214,7 @@ mod tests {
         let mut unique = names.clone();
         unique.dedup();
         assert_eq!(names, unique);
-        assert_eq!(names.len(), 30);
+        assert_eq!(names.len(), 28);
         for tool in &all {
             let spec = tool.spec();
             assert!(spec.name.len() <= 64 && spec.name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_'), "{}", spec.name);
@@ -1497,33 +1410,33 @@ mod tests {
         let fake = Arc::new(Fake::default());
         let out = call(&fake, "widget_list", json!({})).unwrap();
         assert!(out.contains("桌面当前放置了 2 个组件"));
-        assert!(out.contains("wgt-1 | 木鱼求签 (fortune) | 纸张风格 (paper) | 缩放 1.00 | 显示中"));
-        assert!(out.contains("wgt-2 | 天气时钟 (weather) | 毛玻璃风格 (glass) | 缩放 1.20 | 城市: 上海 | 已隐藏"));
+        assert!(out.contains("wgt-1 | 桌面时钟 (clock) | 暖白风格 (ivory) | 缩放 1.00 | 显示中"));
+        assert!(out.contains("wgt-2 | 天气时钟 (weather) | 暖白风格 (ivory) | 缩放 1.20 | 城市: 上海 | 已隐藏"));
     }
 
     #[test]
     fn widget_add_validates_kind_and_theme() {
         let fake = Arc::new(Fake::default());
-        let out = call(&fake, "widget_add", json!({"kind": "fortune", "theme": "paper"})).unwrap();
-        assert_eq!(out, "已在桌面添加组件：木鱼求签（id: wgt-new）");
-        assert_eq!(fake.calls(), vec!["widget-add fortune", r#"widget-update wgt-new {"theme":"paper"}"#]);
+        let out = call(&fake, "widget_add", json!({"kind": "clock", "theme": "ivory"})).unwrap();
+        assert_eq!(out, "已在桌面添加组件：桌面时钟（id: wgt-new）");
+        assert_eq!(fake.calls(), vec!["widget-add clock", r#"widget-update wgt-new {"theme":"ivory"}"#]);
 
         assert!(call(&fake, "widget_add", json!({"kind": "unknown"})).unwrap_err().contains("kind 只能是"));
-        assert!(call(&fake, "widget_add", json!({"kind": "fortune", "theme": "neon"})).unwrap_err().contains("theme 必须是"));
+        assert!(call(&fake, "widget_add", json!({"kind": "clock", "theme": "neon"})).unwrap_err().contains("theme 必须是"));
         assert_eq!(fake.calls().len(), 2, "invalid options never create a widget");
     }
 
     #[test]
     fn widget_tools_match_the_builtin_types_city_schema_and_custom_library() {
         let fake = Arc::new(Fake::default());
-        for (kind, label) in [("notes", "便签待办"), ("countdown", "倒数日／纪念日"), ("flower", "成长小白花")] {
+        for (kind, label) in [("notes", "待办事项"), ("countdown", "倒数日／纪念日"), ("woodfish", "电子木鱼")] {
             assert!(call(&fake, "widget_add", json!({"kind":kind})).unwrap().contains(label));
         }
         *fake.templates.lock().unwrap() = vec![json!({"id":"my-clock","name":"专注时钟"})];
-        assert!(call(&fake, "widget_list", json!({})).unwrap().contains("my-clock | 专注时钟"));
+        assert!(!call(&fake, "widget_list", json!({})).unwrap().contains("my-clock | 专注时钟"));
         let all = tools(fake.clone());
         let add = all.iter().find(|tool| tool.spec().name == "widget_add").unwrap().spec();
-        assert_eq!(add.schema["properties"]["kind"]["enum"], json!(crate::custom_widgets::BUILTIN_KINDS));
+        assert_eq!(add.schema["properties"]["kind"]["enum"], json!(crate::widgets::KINDS));
         let update = all.iter().find(|tool| tool.spec().name == "widget_update").unwrap().spec();
         assert_eq!(update.schema["properties"]["city"]["required"], json!(["name", "latitude", "longitude"]));
         assert!(parse_widget_patch(&json!({"city":{"name":"上海"}})).is_err());
@@ -1534,7 +1447,7 @@ mod tests {
     fn widget_add_reports_a_failed_theme_update_instead_of_claiming_success() {
         let fake = Arc::new(Fake::default());
         *fake.fail_widget_update.lock().unwrap() = Some("写入失败".into());
-        let error = call(&fake, "widget_add", json!({"kind":"notes","theme":"paper"})).unwrap_err();
+        let error = call(&fake, "widget_add", json!({"kind":"notes","theme":"ivory"})).unwrap_err();
         assert!(error.contains("组件已添加") && error.contains("设置外观失败") && error.contains("写入失败"));
     }
 
@@ -1647,40 +1560,6 @@ mod tests {
         assert_eq!(fake.calls(), vec!["delete-game star-catcher"]);
     }
 
-    #[test]
-    fn widget_create_validates_and_calls_desktop() {
-        let fake = Arc::new(Fake::default());
-        let res = call(
-            &fake,
-            "widget_create",
-            json!({
-                "id": "pomodoro-timer",
-                "name": "番茄钟",
-                "html": "<div id='app'>25:00</div>",
-                "width": 260,
-                "height": 200,
-                "theme": "glass"
-            }),
-        )
-        .unwrap();
-        assert!(res.contains("已成功创建小组件「番茄钟」（id: pomodoro-timer）"));
-        assert!(res.contains("并已直接添加到桌面上展示"));
-        assert_eq!(fake.calls(), vec!["create-custom-widget pomodoro-timer place_now=true overwrite=false"]);
-
-        let res_no_place = call(
-            &fake,
-            "widget_create",
-            json!({
-                "id": "poetry-daily",
-                "name": "每日诗词",
-                "html": "<div>床前明月光</div>",
-                "place_now": false
-            }),
-        )
-        .unwrap();
-        assert!(res_no_place.contains("未自动放置到桌面"));
-        assert_eq!(fake.calls()[1], "create-custom-widget poetry-daily place_now=false overwrite=false");
-    }
 
     #[test]
     fn wallpaper_create_validates_and_calls_desktop() {
@@ -1724,13 +1603,8 @@ mod tests {
         assert!(res_eff.contains("已删除自定义特效 my-effect"));
         assert_eq!(fake.calls()[1], "delete-effect my-effect");
 
-        let res_wgt = call(&fake, "widget_delete_custom", json!({"id": "my-clock"})).unwrap();
-        assert!(res_wgt.contains("已删除自定义小组件「my-clock」模板"));
-        assert_eq!(fake.calls()[2], "delete-custom-widget my-clock");
-
         assert!(call(&fake, "wallpaper_delete", json!({})).is_err());
         assert!(call(&fake, "effect_delete", json!({})).is_err());
-        assert!(call(&fake, "widget_delete_custom", json!({})).is_err());
     }
 
     #[test]
@@ -1790,3 +1664,4 @@ mod tests {
         assert_eq!(space, "已进入游戏空间并启动游戏：star-catcher");
     }
 }
+

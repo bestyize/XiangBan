@@ -1,8 +1,8 @@
-import { emptyNote, emptyCountdown, emptyFlower } from './content.ts';
+import { emptyNote, emptyCountdown } from './content.ts';
 import { ref } from 'vue';
 import { desktop, invoke } from '../bridge.ts';
 import { emptyLayout, validateLayout, type WidgetLayout, type WidgetKind, type DesktopWidget, type City } from './model.ts';
-const key = 'xiaoban.widgets.v1';
+const key = 'xiaoban.widgets.v2';
 const emptyLiving = () => ({reminders: [],count:0,symbol:'1.000001'});
 export function createWidgetClient() {
   const layout = ref<WidgetLayout>(emptyLayout()), ready = ref(false), busy = ref(false), error = ref('');
@@ -18,12 +18,12 @@ export function createWidgetClient() {
       if (!ready.value) throw new Error('组件布局尚未载入'); busy.value = true; error.value = '';
       try {
         if (desktop) accept(await invoke(command, args));
-        else { const changed = validateLayout(fallback(structuredClone(JSON.parse(JSON.stringify(layout.value))))); localStorage.setItem(key, JSON.stringify({version:1,widgets:changed.widgets})); accept(changed); }
+        else { const changed = validateLayout(fallback(structuredClone(JSON.parse(JSON.stringify(layout.value))))); localStorage.setItem(key, JSON.stringify({version:2,widgets:changed.widgets})); accept(changed); }
       } catch (e) { error.value = String(e); throw e; }
       finally { busy.value = false; }
     }); queue = next; return next;
   }
-  function add(kind: WidgetKind, customId?: string) { return change('add_desktop_widget', {kind, customId}, current => { if(current.widgets.length >= 12) throw new Error('桌面最多放置 12 个组件'); const count=current.widgets.length; current.widgets.push({id:crypto.randomUUID().replaceAll('-','').slice(0,16),kind,theme:kind==='stocks'?'paper':kind==='weather'?'glass':['clock','reminders','woodfish','notes'].includes(kind)?'paper':'transparent',scale:1,x:Math.max(.05,(count%3===1?.88:.52)-Math.floor(count/3)*.25),y:count%3===2?.94:.06,enabled:true,city:null,customId,...(kind==='notes'?{note:{...emptyNote(),title:'今日待办',mode:'todo'}}:kind==='countdown'?{countdown:emptyCountdown()}:kind==='flower'?{flower:emptyFlower()}:['reminders','stocks','woodfish'].includes(kind)?{living:emptyLiving()}:{})}); return current; }); }
+  function add(kind:WidgetKind){return change('add_desktop_widget',{kind},current=>{if(current.widgets.length>=12)throw Error('桌面最多放置 12 个组件');const count=current.widgets.length;current.widgets.push({id:crypto.randomUUID().replaceAll('-','').slice(0,16),kind,theme:'ivory',scale:1,x:.05+(count%3)*.28,y:.06+Math.floor(count/3)*.2,enabled:true,city:null,...(kind==='notes'?{note:emptyNote()}:kind==='countdown'?{countdown:emptyCountdown()}:['reminders','stocks','woodfish'].includes(kind)?{living:{...emptyLiving(),symbol:kind==='stocks'?'116.00700':'1.000001'}}:{})});return current;});}
   function update(id: string, patch: Partial<Omit<DesktopWidget,'id'|'kind'>>) { return change('update_desktop_widget',{id,patch}, current => ({...current,widgets:current.widgets.map(widget=>widget.id===id?{...widget,...patch}:widget)})); }
   function remove(id: string) { return change('remove_desktop_widget',{id},current=>({...current,widgets:current.widgets.filter(widget=>widget.id!==id)})); }
   function edit(editing: boolean) { return change('set_widgets_editing',{editing},current=>({...current,editing})); }
@@ -38,4 +38,5 @@ export async function searchWidgetCities(query: string): Promise<City[]> {
   const response=await fetch(url,{signal:AbortSignal.timeout(12000)});if(!response.ok)throw new Error('城市查询失败，请稍后再试');
   const data=await response.json();return (data.results??[]).map((city: City)=>({name:city.name,country:city.country??'',admin1:city.admin1??'',latitude:city.latitude,longitude:city.longitude}));
 }
+
 
