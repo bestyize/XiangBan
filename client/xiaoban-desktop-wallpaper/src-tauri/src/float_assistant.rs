@@ -86,6 +86,9 @@ pub struct AssistantState {
     saving: AtomicBool,
     /// The page has loaded and listens for the assistant events.
     ready: AtomicBool,
+    dragging: AtomicBool,
+    drag_epoch: AtomicU64,
+    pending_height: Mutex<Option<f64>>,
 }
 
 const WINDOW_COMMANDS: &[&str] = &[
@@ -634,17 +637,39 @@ pub fn assistant_fit(window: WebviewWindow, height: f64) -> Result<(), String> {
     if mode(window.app_handle()) != Mode::Capsule || !window.is_visible().unwrap_or(false) {
         return Ok(());
     }
+    let state=window.app_handle().state::<AssistantState>();
+    if state.dragging.load(Ordering::SeqCst){*state.pending_height.lock().unwrap()=Some(height);return Ok(());}
     resize(&window, height)
 }
 
-/// Lets the user drag the capsule by its empty parts, or the ball by itself. The page calls this once the pointer
-/// has moved.
+/// Native dragging owns the pointer until release, so WebView pointerup is not reliable.
+/// Defer streamed-response resizing until the native mouse button is released.
 #[tauri::command]
 pub fn assistant_drag(window: WebviewWindow) -> Result<(), String> {
-    if window.label() != LABEL {
-        return Err("只有超级小伴的窗口可以拖动".into());
-    }
-    window.start_dragging().map_err(|e| e.to_string())
+    if window.label() != LABEL { return Err("只有超级小伴的窗口可以拖动".into()); }
+    let state=window.app_handle().state::<AssistantState>();
+    if state.dragging.swap(true,Ordering::SeqCst){return Ok(());}
+    let epoch=state.drag_epoch.fetch_add(1,Ordering::SeqCst)+1;
+    let target=window.clone();
+    std::thread::spawn(move||{
+        let app=target.app_handle();let state=app.state::<AssistantState>();
+        loop{
+            std::thread::sleep(Duration::from_millis(16));
+            if state.drag_epoch.load(Ordering::SeqCst)!=epoch{return;}
+            #[cfg(target_os="macos")] let down=crate::macos::left_button_down();
+            #[cfg(windows)] let down=crate::windows::left_button_down();
+            #[cfg(not(any(windows,target_os="macos")))] let down=false;
+            if !down||!state.dragging.load(Ordering::SeqCst)||mode(app)==Mode::Hidden{break;}
+        }
+        state.dragging.store(false,Ordering::SeqCst);
+        match mode(app){Mode::Capsule=>remember(app,&target),Mode::Ball=>save_ball(app,&target),_=>{}}
+        let pending=state.pending_height.lock().unwrap().take();
+        if let Some(height)=pending{if mode(app)==Mode::Capsule{let _=resize(&target,height);}}
+        let _=target.eval("window.dispatchEvent(new Event('assistant-drag-end'));".to_string());
+    });
+    let result=window.start_dragging().map_err(|e|e.to_string());
+    if result.is_err(){state.dragging.store(false,Ordering::SeqCst);}
+    result
 }
 
 /// Brings the control window forward on the chat page, with the conversation the capsule was using.
@@ -816,3 +841,4 @@ mod tests {
         assert_eq!(permitted("media-a", "chat_send"), None);
     }
 }
+

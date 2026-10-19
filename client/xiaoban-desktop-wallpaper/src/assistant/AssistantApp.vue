@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
-import { ArrowUp, ArrowUpRight, Square, X } from 'lucide-vue-next';
+import { ArrowUp, ArrowUpRight, Square, X, Copy, Check } from 'lucide-vue-next';
 import MarkdownView from '../ui/chat/MarkdownView.ts';
 import type { AsrStore } from '../ui/asr/store.ts';
 import type { ApprovalRequest } from '../ui/chat/types.ts';
@@ -14,8 +14,10 @@ const field = ref<HTMLInputElement>();
 const inner = ref<HTMLElement>();
 const scroller = ref<HTMLElement>();
 const composing = ref(false);
+const dragging=ref(false),copyState=ref<'idle'|'copying'|'copied'|'failed'>('idle');
+let copyTimer:ReturnType<typeof setTimeout>|undefined,copyVersion=0;
 const cardDismissed = ref(false);
-watch(() => props.store.question, () => { cardDismissed.value = false; });
+watch(() => props.store.question, () => { cardDismissed.value = false;copyVersion++;copyState.value='idle';clearTimeout(copyTimer); });
 watch(() => props.store.phase, (phase, before) => {
   if (phase === 'thinking' && !['thinking', 'answering'].includes(before)) cardDismissed.value = false;
 });
@@ -63,7 +65,9 @@ let fitted = 0, raf = 0;
 let observer: ResizeObserver | undefined;
 function fit() {
   cancelAnimationFrame(raf);
+  if(dragging.value)return;
   raf = requestAnimationFrame(() => {
+    if(dragging.value)return;
     const el = inner.value;
     if (!el) return;
     const height = Math.ceil(el.getBoundingClientRect().height);
@@ -83,41 +87,48 @@ watch(() => props.store.open, open => {
 });
 watch(() => props.store.answer, () => { void nextTick(() => { if (scroller.value) scroller.value.scrollTop = scroller.value.scrollHeight; }); });
 
-/** The ball opens on a click and moves when it is pressed and pulled; the two are told apart by how far the pointer went. */
-let press: { x: number; y: number } | null = null;
-let pulled = false;
-function ballDown(event: PointerEvent) {
-  if (event.button !== 0) return;
-  press = { x: event.clientX, y: event.clientY };
-  pulled = false;
-}
-function release() { press = null; }
-function ballMove(event: PointerEvent) {
-  if (!press || pulled || Math.hypot(event.clientX - press.x, event.clientY - press.y) < 4) return;
-  pulled = true; press = null;
-  void invoke('assistant_drag').catch(() => {});
-}
-function ballClick() {
-  if (pulled) { pulled = false; return; }
-  void props.store.unfold();
+async function copyAnswer(){
+  const text=props.store.answer;if(!text.trim()||copyState.value==='copying')return;
+  const version=++copyVersion;clearTimeout(copyTimer);copyState.value='copying';
+  try{await navigator.clipboard.writeText(text);if(version===copyVersion)copyState.value='copied';}
+  catch{if(version===copyVersion)copyState.value='failed';}
+  finally{if(version===copyVersion)copyTimer=setTimeout(()=>copyState.value='idle',2000);}
 }
 
-/** Anything that is not a control or readable text moves the whole capsule, including the clear margin around it. */
-function drag(event: MouseEvent) {
-  if ((event.target as Element).closest('button, input, a, pre, code, .card-body')) return;
-  event.preventDefault();
-  void invoke('assistant_drag').catch(() => {});
+// Only the orb and empty chrome are drag handles; text and controls retain native selection.
+let press:{id:number;x:number;y:number;capture:Element}|null=null,pulled=false;
+function releasePress(){const p=press;press=null;if(p?.capture.hasPointerCapture?.(p.id))p.capture.releasePointerCapture(p.id);}
+function dragDown(event:PointerEvent){
+  if(event.button!==0)return;pulled=false;
+  const target=event.target as Element,handle=target.closest('[data-drag-handle]');
+  if(!handle&&target.closest('button,input,textarea,select,a,pre,code,.card-body,[contenteditable],[data-no-drag]'))return;
+  event.preventDefault();const capture=handle??target;
+  press={id:event.pointerId,x:event.clientX,y:event.clientY,capture};capture.setPointerCapture?.(event.pointerId);
 }
-
-const onFocus = () => { if (props.store.open) field.value?.focus(); };
-onMounted(() => window.addEventListener('focus', onFocus));
-onBeforeUnmount(() => { window.removeEventListener('focus', onFocus); observer?.disconnect(); cancelAnimationFrame(raf); });
+function dragMove(event:PointerEvent){
+  if(!press||event.pointerId!==press.id)return;
+  if(event.buttons===0){releasePress();return;}
+  if(Math.hypot(event.clientX-press.x,event.clientY-press.y)<6)return;
+  pulled=true;dragging.value=true;cancelAnimationFrame(raf);releasePress();
+  void invoke('assistant_drag').catch(()=>{dragging.value=false;fit();});
+}
+function dragUp(event:PointerEvent){if(press?.id===event.pointerId)releasePress();}
+function captureClick(event:MouseEvent){if(pulled&&event.detail!==0){event.preventDefault();event.stopImmediatePropagation();pulled=false;}}
+function dragEnded(){dragging.value=false;releasePress();fit();}
+function ballClick(){void props.store.unfold();}
+const onFocus=()=>{if(props.store.open&&!dragging.value&&!press)field.value?.focus();};
+onMounted(()=>{
+  window.addEventListener('focus',onFocus);window.addEventListener('pointermove',dragMove);window.addEventListener('pointerup',dragUp);window.addEventListener('pointercancel',dragUp);window.addEventListener('blur',releasePress);window.addEventListener('assistant-drag-end',dragEnded);
+});
+onBeforeUnmount(()=>{
+  releasePress();copyVersion++;clearTimeout(copyTimer);window.removeEventListener('focus',onFocus);window.removeEventListener('pointermove',dragMove);window.removeEventListener('pointerup',dragUp);window.removeEventListener('pointercancel',dragUp);window.removeEventListener('blur',releasePress);window.removeEventListener('assistant-drag-end',dragEnded);observer?.disconnect();cancelAnimationFrame(raf);
+});
 </script>
 
 <template>
-  <div class="stage" :class="{ light: !isDark }" @keydown.esc.prevent="store.hide()" @mousedown.left="drag">
+  <div class="stage" :class="{ light: !isDark,dragging }" @keydown.esc.prevent="store.hide()" @pointerdown="dragDown" @click.capture="captureClick">
     <div v-if="store.ball && !store.open" class="ball-stage" data-testid="assistant-ball-stage">
-      <button type="button" class="ball" :data-phase="store.phase" title="点一下提问，按住可以拖动，右键打开设置" aria-label="打开超级小伴" data-testid="assistant-ball" @pointerdown="ballDown" @pointermove="ballMove" @pointerup="release" @pointercancel="release" @click="ballClick" @contextmenu.prevent="store.openSettings('assistant')">
+      <button type="button" class="ball" :data-phase="store.phase" title="点一下提问，按住可以拖动，右键打开设置" aria-label="打开超级小伴" data-testid="assistant-ball" data-drag-handle @click="ballClick" @contextmenu.prevent="store.openSettings('assistant')">
         <Orb :phase="store.phase" :level="0" :active="true" :size="48" :dark="isDark" :fps="quiet ? 20 : 60" />
       </button>
     </div>
@@ -146,10 +157,11 @@ onBeforeUnmount(() => { window.removeEventListener('focus', onFocus); observer?.
                 <div class="gate-actions wrap"><button v-for="option in store.ask.options" :key="option" type="button" class="ghost" @click="store.reply(option)">{{ option }}</button><button type="button" class="ghost dim" @click="store.reply(null)">跳过</button></div>
               </div>
             </div>
+            <footer v-if="store.answer.trim()" class="card-footer"><button type="button" class="copy-answer" data-testid="assistant-copy" :disabled="copyState==='copying'" :aria-label="copyState==='copied'?'已复制回复':copyState==='failed'?'复制失败，点击重试':'复制回复'" title="复制 AI 回复" @pointerdown.prevent @click="copyAnswer"><Check v-if="copyState==='copied'" :size="14"/><Copy v-else :size="14"/><span aria-live="polite">{{ copyState==='copied'?'已复制':copyState==='failed'?'复制失败，重试':copyState==='copying'?'复制中…':'复制' }}</span></button></footer>
           </section>
         </Transition>
         <div class="capsule" :data-phase="store.phase">
-          <button type="button" class="orb-button" :title="store.phase === 'speaking' ? '停止朗读' : store.phase === 'listening' ? '暂停聆听' : '点一下开始说话'" :aria-label="store.phase === 'listening' ? '暂停聆听' : '开始说话'" data-testid="assistant-orb" @click="onOrb">
+          <button type="button" class="orb-button" :title="store.phase === 'speaking' ? '停止朗读' : store.phase === 'listening' ? '暂停聆听 · 拖动可移动' : '点一下开始说话 · 拖动可移动'" :aria-label="store.phase === 'listening' ? '暂停聆听' : '开始说话'" data-testid="assistant-orb" data-drag-handle @click="onOrb">
             <Orb :phase="store.phase" :level="asr.level" :active="store.open" :size="52" :dark="isDark" />
           </button>
           <input ref="field" v-model="store.input" class="field" type="text" autocomplete="off" spellcheck="false" :placeholder="store.status" aria-label="向小伴提问" data-testid="assistant-input" @keydown.enter="onEnter" @compositionstart="composing = true" @compositionend="composing = false" />
@@ -170,7 +182,7 @@ html,body,#app{background:transparent!important}
 .stage{--card:#141925;--capsule:#151a27;--line:rgba(160,190,255,.2);--text:#eaf0fb;--text-soft:#8a94ab;--working:#9fb0cf;--placeholder:#7d88a2;--field:#f3f6fd;--button:rgba(255,255,255,.07);--button-hover:rgba(255,255,255,.14);--button-fg:#b9c3d8;--button-fg-hover:#fff;--code:rgba(255,255,255,.08);--link:#7fd6ff;--hint:#ffd9a0;--failure:#ff9aa6;--gate-bg:rgba(255,190,100,.08);--gate-line:rgba(255,190,100,.28);--gate-title:#ffe2b4;--gate-tool:#c3cce0;--ghost:rgba(255,255,255,.08);--ghost-fg:#dfe6f5;--scroll:rgba(255,255,255,.18);--dot:#8fb7ff;--listen:rgba(84,226,255,.7);--busy:rgba(140,150,255,.6);--attention:rgba(255,190,100,.7);--ui-line:var(--line);--ui-surface-alt:var(--code);--ui-text-primary:var(--text);--ui-text-secondary:var(--working);--ui-text-tertiary:var(--text-soft);--ui-primary:var(--link);position:relative;display:flex;flex-direction:column;justify-content:flex-end;height:100vh;color:var(--text);font:14px/1.6 -apple-system,BlinkMacSystemFont,"PingFang SC","Segoe UI","Microsoft YaHei UI",sans-serif;-webkit-font-smoothing:antialiased;user-select:none;cursor:grab}
 .stage.light{--card:#ffffff;--capsule:#ffffff;--line:rgba(40,60,100,.28);--text:#1d2433;--text-soft:#6b7487;--working:#55627d;--placeholder:#98a1b3;--field:#1d2433;--button:rgba(30,45,80,.07);--button-hover:rgba(30,45,80,.13);--button-fg:#566079;--button-fg-hover:#1d2433;--code:rgba(30,45,80,.07);--link:#1a6fd4;--hint:#9a5b00;--failure:#c8324a;--gate-bg:rgba(255,170,60,.12);--gate-line:rgba(220,140,30,.42);--gate-title:#7a4700;--gate-tool:#4a556d;--ghost:rgba(30,45,80,.07);--ghost-fg:#2a3550;--scroll:rgba(30,45,80,.24);--dot:#5b7fe0;--listen:rgba(0,160,200,.8);--busy:rgba(90,100,230,.7);--attention:rgba(230,140,20,.85)}
 .ball-stage{display:grid;place-items:center;height:100vh}
-.ball{display:grid;place-items:center;width:64px;height:64px;padding:0;border-radius:50%;background:var(--capsule);border:1px solid var(--line);cursor:pointer;transition:border-color .3s,transform .2s}
+.ball{touch-action:none;display:grid;place-items:center;width:64px;height:64px;padding:0;border-radius:50%;background:var(--capsule);border:1px solid var(--line);cursor:pointer;transition:border-color .3s,transform .2s}
 .ball:hover{transform:scale(1.06)}
 .ball:active{transform:scale(.96)}
 .ball:focus-visible{outline:2px solid var(--link);outline-offset:2px}
@@ -210,8 +222,8 @@ html,body,#app{background:transparent!important}
 .capsule[data-phase=listening]{border-color:var(--listen)}
 .capsule[data-phase=thinking],.capsule[data-phase=answering],.capsule[data-phase=speaking]{border-color:var(--busy)}
 .capsule[data-phase=attention]{border-color:var(--attention)}
-.orb-button,.round,.gate button,.link{cursor:pointer}
-.orb-button{flex:none;width:52px;height:52px;padding:0;border:0;border-radius:50%;background:none;cursor:pointer}
+.round,.gate button,.link{cursor:pointer}.orb-button,.ball{cursor:grab}.stage.dragging,.stage.dragging *{cursor:grabbing!important}
+.orb-button{touch-action:none;flex:none;width:52px;height:52px;padding:0;border:0;border-radius:50%;background:none;cursor:pointer}
 .orb-button:focus-visible,.round:focus-visible{outline:2px solid var(--link);outline-offset:2px}
 .field{cursor:text;flex:1;min-width:0;height:44px;padding:0 4px;border:0;outline:0;background:transparent;color:var(--field);font:inherit;font-size:16px;caret-color:var(--link);user-select:text}
 .field::placeholder{color:var(--placeholder)}
@@ -227,4 +239,9 @@ html,body,#app{background:transparent!important}
 @keyframes blink{to{visibility:hidden}}
 @keyframes dot{0%,80%,100%{opacity:.3;transform:translateY(0)}40%{opacity:1;transform:translateY(-3px)}}
 @media(prefers-reduced-motion:reduce){.pop-enter-active,.rise-enter-active{transition:none}.dots i,.cursor{animation:none}}
+</style>
+
+
+<style scoped>
+.card-footer{display:flex;justify-content:flex-end;padding:0 12px 9px}.copy-answer{display:inline-flex;align-items:center;gap:5px;padding:4px 7px;border:0;border-radius:7px;background:transparent;color:var(--text-soft);font:inherit;font-size:11px;line-height:1.5;cursor:pointer}.copy-answer:hover{background:var(--button-hover);color:var(--text)}.copy-answer:focus-visible{outline:2px solid var(--link);outline-offset:1px}.copy-answer:disabled{opacity:.5;cursor:default}
 </style>
