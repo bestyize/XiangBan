@@ -550,7 +550,7 @@ fn widget_list(desktop: &dyn Desktop, _: &Value) -> Result<String, String> {
     let widgets = value["widgets"].as_array().cloned().unwrap_or_default();
     let mut lines = if widgets.is_empty() {
         vec!["桌面当前没有放置任何组件。可用 widget_add 添加（支持 clock 时钟、weather 天气、notes 待办、reminders 日程、stocks 股票、woodfish 木鱼、calendar 月历、countdown 纪念日，或用 widget_create 创作自创组件）。".to_string()]
-    } else { vec![format!("桌面当前放置了 {} 个组件（最多 12 个）：", widgets.len())] };
+    } else { vec![format!("桌面当前放置了 {} 个组件：", widgets.len())] };
     for w in &widgets {
         let id = w["id"].as_str().unwrap_or("?");
         let kind = w["kind"].as_str().unwrap_or("");
@@ -975,7 +975,7 @@ pub fn tools(desktop: Arc<dyn Desktop>) -> Vec<Arc<dyn Tool>> {
             &desktop,
             ToolSpec::new(
                 "widget_add",
-                "在桌面放置新版时钟、天气、待办、今日日程、股票、电子木鱼、月历或纪念日组件。固定 ivory 材质，最多 12 个。",
+                "在桌面放置新版时钟、天气、待办、今日日程、股票、电子木鱼、月历或纪念日组件。固定 ivory 材质，支持多实例，不设组件数量上限。",
                 object(
                     json!({
                         "kind": {"type": "string", "enum": crate::widgets::KINDS, "description": "组件类型"},

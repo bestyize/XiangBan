@@ -54,14 +54,14 @@ const layerTitle=computed(()=>{
 });
 
 function askLayer(kind:WidgetKind){
-  if(!ready.value||busy.value||layout.value.widgets.length>=12)return;
+  if(!ready.value||busy.value)return;
   targetCustomId.value=null;
   targetCustomName.value='';
   layerFor.value=layerFor.value===kind?null:kind;
 }
 
 function askCustomLayer(pack:CustomWidgetPack){
-  if(!ready.value||busy.value||layout.value.widgets.length>=12)return;
+  if(!ready.value||busy.value)return;
   targetCustomId.value=pack.id;
   targetCustomName.value=pack.name;
   layerFor.value='custom';
@@ -136,7 +136,7 @@ onBeforeUnmount(()=>{observer?.disconnect();clearTimeout(flashTimer);client.disp
 
  <template v-if="activeCategory === 'builtin'">
   <div ref="board" class="xb-widget-board-wrap" :style="{height:`${967*boardScale}px`}"><div class="xb-widget-board" :style="{transform:`scale(${boardScale})`}">
-   <div v-for="item in widgetKinds" :key="item.kind" class="xb-widget-slot" :class="item.kind" :style="{...positions[item.kind],left:`${positions[item.kind].left}px`,top:`${positions[item.kind].top}px`,width:`${baseSize(item.kind).width}px`,height:`${baseSize(item.kind).height}px`}"><WidgetSurface :widget="demo(item.kind)" preview demo @settings="askLayer(item.kind)"/><button class="add-to-desktop" :class="{added:flash===item.kind}" :disabled="!ready||busy||layout.widgets.length>=12" :data-testid="`add-${item.kind}`" :aria-label="`添加${item.title}到桌面`" aria-haspopup="dialog" :aria-expanded="layerFor===item.kind" @click="askLayer(item.kind)"><Check v-if="flash===item.kind" :size="18"/><Layers v-else :size="18"/>{{ flash===item.kind?'已添加':'添加到桌面' }}</button></div>
+   <div v-for="item in widgetKinds" :key="item.kind" class="xb-widget-slot" :class="item.kind" :style="{...positions[item.kind],left:`${positions[item.kind].left}px`,top:`${positions[item.kind].top}px`,width:`${baseSize(item.kind).width}px`,height:`${baseSize(item.kind).height}px`}"><WidgetSurface :widget="demo(item.kind)" preview demo @settings="askLayer(item.kind)"/><button class="add-to-desktop" :class="{added:flash===item.kind}" :disabled="!ready||busy" :data-testid="`add-${item.kind}`" :aria-label="`添加${item.title}到桌面`" aria-haspopup="dialog" :aria-expanded="layerFor===item.kind" @click="askLayer(item.kind)"><Check v-if="flash===item.kind" :size="18"/><Layers v-else :size="18"/>{{ flash===item.kind?'已添加':'添加到桌面' }}</button></div>
   </div></div><p class="xb-page-hint">点击“添加到桌面”后先选择放在哪一层 · 展示内容为示例，添加后使用真实时间、天气和行情。</p>
  </template>
 
@@ -158,7 +158,7 @@ onBeforeUnmount(()=>{observer?.disconnect();clearTimeout(flashTimer);client.disp
       <strong>{{ pack.name }}</strong>
       <small v-if="pack.description">{{ pack.description }}</small>
       <div class="custom-card-footer">
-       <button class="add-to-desktop custom-add" :class="{added:flash===pack.id}" :disabled="!ready||busy||layout.widgets.length>=12" :data-testid="`add-custom-${pack.id}`" :aria-label="`添加${pack.name}到桌面`" @click="askCustomLayer(pack)">
+       <button class="add-to-desktop custom-add" :class="{added:flash===pack.id}" :disabled="!ready||busy" :data-testid="`add-custom-${pack.id}`" :aria-label="`添加${pack.name}到桌面`" @click="askCustomLayer(pack)">
         <Check v-if="flash===pack.id" :size="16"/>
         <Layers v-else :size="16"/>
         {{ flash===pack.id?'已添加':'添加到桌面' }}

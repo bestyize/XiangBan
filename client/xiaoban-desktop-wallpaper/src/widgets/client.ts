@@ -33,7 +33,6 @@ export function createWidgetClient() {
   }
   function add(kind:WidgetKind,layer:'desktop'|'topmost'='desktop',customId?:string){
     return change('add_desktop_widget',{kind,layer,customId},current=>{
-      if(current.widgets.length>=12)throw Error('桌面最多放置 12 个组件');
       const count=current.widgets.length;
       let custom: CustomWidgetPack | undefined;
       if (kind === 'custom' && customId) {
@@ -48,7 +47,7 @@ export function createWidgetClient() {
         layer,
         scale:defaultScale(),
         x:.05+(count%3)*.28,
-        y:.06+Math.floor(count/3)*.2,
+        y:Math.min(.94,.06+Math.floor(count/3)*.2),
         enabled:true,
         city:null,
         customId,

@@ -32,7 +32,7 @@ export const baseSize = (kind:WidgetKind, custom?: CustomWidgetPack) => {
 export const emptyLayout = (): WidgetLayout => ({ version: 2, widgets: [], editing: false, errors: [] });
 export function validateLayout(value: unknown): WidgetLayout {
   const data = value as WidgetLayout;
-  if (!data || data.version !== 2 || !Array.isArray(data.widgets) || data.widgets.length > 12) throw new Error('桌面组件记录格式不正确，原布局已保留');
+  if (!data || data.version !== 2 || !Array.isArray(data.widgets)) throw new Error('桌面组件记录格式不正确，原布局已保留');
   const ids = new Set<string>();
   for (const widget of data.widgets) {
     const isCustom = widget.kind === 'custom';

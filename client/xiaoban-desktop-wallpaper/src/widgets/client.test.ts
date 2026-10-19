@@ -3,6 +3,17 @@ import {describe,it,expect,beforeEach,vi} from 'vitest';
 vi.mock('../bridge.ts',()=>({desktop:false,invoke:vi.fn()}));
 import {createWidgetClient} from './client.ts';
 describe('new widget persistence',()=>{
+ it('adds and restores more than twelve instances while keeping all positions valid',async()=>{
+  const c=createWidgetClient();await c.load();
+  for(let i=0;i<24;i++)await c.add(i%2?'clock':'weather');
+  expect(c.layout.value.widgets).toHaveLength(24);
+  expect(new Set(c.layout.value.widgets.map(w=>w.id)).size).toBe(24);
+  expect(c.layout.value.widgets.every(w=>w.y>=0&&w.y<=1)).toBe(true);
+  const restored=createWidgetClient();await restored.load();
+  expect(restored.ready.value).toBe(true);expect(restored.layout.value.widgets).toHaveLength(24);
+  await restored.add('woodfish');expect(restored.layout.value.widgets).toHaveLength(25);
+  c.dispose();restored.dispose();
+ });
  it('defaults to desktop and restores each widget layer independently',async()=>{const c=createWidgetClient();await c.load();await c.add('clock');await c.add('weather');const [a,b]=c.layout.value.widgets;expect(a.layer).toBe('desktop');await c.update(a.id,{layer:'topmost'});const restored=createWidgetClient();await restored.load();expect(restored.layout.value.widgets.find(w=>w.id===a.id)?.layer).toBe('topmost');expect(restored.layout.value.widgets.find(w=>w.id===b.id)?.layer).toBe('desktop');await restored.update(a.id,{layer:'desktop'});expect(JSON.parse(localStorage.getItem('xiaoban.widgets.v2')!).widgets[0].layer).toBe('desktop');c.dispose();restored.dispose();});
  beforeEach(()=>localStorage.clear());
  it('starts empty and leaves v1 records out of the new runtime',async()=>{localStorage.setItem('xiaoban.widgets.v1',JSON.stringify({version:1,widgets:[{kind:'fortune'}]}));const c=createWidgetClient();await c.load();expect(c.ready.value).toBe(true);expect(c.layout.value.widgets).toEqual([]);await c.add('woodfish');expect(JSON.parse(localStorage.getItem('xiaoban.widgets.v2')!).version).toBe(2);expect(localStorage.getItem('xiaoban.widgets.v1')).toContain('fortune');c.dispose();});

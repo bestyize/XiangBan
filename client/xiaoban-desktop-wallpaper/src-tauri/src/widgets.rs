@@ -134,7 +134,7 @@ pub fn permitted(label: &str, command: &str) -> Option<bool> {
     None
 }
 pub fn validate(layout: &Layout) -> Result<(), String> {
-    if layout.version != 2 || layout.widgets.len() > 12 { return Err("桌面最多放置 12 个组件".into()); }
+    if layout.version != 2 { return Err("组件布局版本不受支持".into()); }
     let mut ids = std::collections::HashSet::new();
     for widget in &layout.widgets {
         if widget.id.is_empty() || widget.id.len() > 32 || !widget.id.bytes().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit()) || !ids.insert(&widget.id)
@@ -331,7 +331,7 @@ pub async fn add_desktop_widget(app: tauri::AppHandle, kind: String, layer: Opti
         None
     };
     let state=app.state::<WidgetState>();let _operation=state.operation.lock().await;
-    let mut next=state.layout.lock().unwrap().clone(); if next.widgets.len()>=12{return Err("桌面最多放置 12 个组件".into());}
+    let mut next=state.layout.lock().unwrap().clone();
     let mut random=[0u8;8];getrandom::fill(&mut random).map_err(|e|e.to_string())?;
     let index=next.widgets.len();
     let note=if kind=="notes"{Some(NoteData{title:"今日待办".into(),mode:"todo".into(),text:String::new(),items:vec![]})}else{None};
@@ -660,6 +660,13 @@ mod tests {
  }
  use super::*;
  fn one()->Layout{serde_json::from_value(json!({"version":2,"widgets":[{"id":"clock1","kind":"clock","theme":"ivory","scale":1.,"x":0.1,"y":0.1,"enabled":true,"city":null}]})).unwrap()}
+ #[test] fn layout_above_twelve_round_trips(){
+  let mut layout=one();let template=layout.widgets[0].clone();
+  layout.widgets=(0..24).map(|i|{let mut widget=template.clone();widget.id=format!("widget{i}");if i%2==1{widget.kind="custom".into();widget.custom_id=Some("kitty".into());}widget}).collect();
+  validate(&layout).unwrap();
+  let restored:Layout=serde_json::from_slice(&serde_json::to_vec(&layout).unwrap()).unwrap();
+  validate(&restored).unwrap();assert_eq!(restored.widgets.len(),24);
+ }
  #[test] fn layer_defaults_and_persistence_are_validated(){
   let mut l=one();assert_eq!(l.widgets[0].layer,"desktop");l.widgets[0].layer="topmost".into();assert!(validate(&l).is_ok());
   let saved=serde_json::to_vec(&l).unwrap();let restored:Layout=serde_json::from_slice(&saved).unwrap();assert_eq!(restored.widgets[0].layer,"topmost");

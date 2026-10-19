@@ -14,6 +14,21 @@ async function addWith(v:ReturnType<typeof mount>,kind:string,layer:'desktop'|'t
 }
 describe('replacement widget library',()=>{
  beforeEach(()=>localStorage.clear());
+ it('allows both built-in and custom additions after twelve widgets are already on the desktop',async()=>{
+  localStorage.setItem('xiaoban.widgets.v2',JSON.stringify({version:2,widgets:Array.from({length:12},(_,i)=>({id:`clock${i}`,kind:'clock',theme:'ivory',scale:1,x:0,y:0,enabled:true,city:null}))}));
+  localStorage.setItem('xiaoban.custom_widgets.v1',JSON.stringify([{schemaVersion:1,id:'kitty',name:'Kitty',html:'<p>Kitty</p>'}]));
+  const v=mount(WidgetsPage,{props:{store:store()},attachTo:document.body});await flushPromises();
+  expect(v.get('[data-testid="add-clock"]').attributes('disabled')).toBeUndefined();
+  await addWith(v,'clock','desktop');
+  expect(JSON.parse(localStorage.getItem('xiaoban.widgets.v2')!).widgets).toHaveLength(13);
+  await v.findAll('.n-tabs-tab').find(t=>t.text().includes('自定义组件'))!.trigger('click');await flushPromises();
+  const button=v.get('[data-testid="add-custom-kitty"]');expect(button.attributes('disabled')).toBeUndefined();
+  await button.trigger('click');await flushPromises();
+  (document.body.querySelector('[data-testid="layer-topmost-kitty"]') as HTMLElement).click();await flushPromises();
+  const widgets=JSON.parse(localStorage.getItem('xiaoban.widgets.v2')!).widgets;
+  expect(widgets).toHaveLength(14);expect(widgets[13]).toMatchObject({kind:'custom',customId:'kitty',layer:'topmost'});
+  v.unmount();
+ });
  it('shows all eight reference cards and import/create buttons in header',async()=>{
   const s=store();
   const v=mount(WidgetsPage,{props:{store:s},attachTo:document.body});
