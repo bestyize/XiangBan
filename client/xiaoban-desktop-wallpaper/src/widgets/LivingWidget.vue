@@ -20,16 +20,17 @@ const clock=computed(()=>props.now.toLocaleTimeString('zh-CN',{hour:'2-digit',mi
 const dateLabel=computed(()=>props.now.toLocaleDateString('zh-CN',{month:'long',day:'numeric',weekday:'long'}));
 const todayKey=computed(()=>[props.now.getFullYear(),String(props.now.getMonth()+1).padStart(2,'0'),String(props.now.getDate()).padStart(2,'0')].join('-'));
 const forecast=ref<ForecastDay[]>([]),forecastError=ref('');
-let forecastBusy=false;
+let forecastBusy=false,forecastQueued=false;
 const displayForecast=computed(()=>props.preview?[{date:todayKey.value,high:28,low:22,code:2},{date:'',high:27,low:21,code:0},{date:'',high:25,low:20,code:61}]:forecast.value);
 function weatherGlyph(code:number){return code===0?'☀️':code>=51&&code<=99?'🌧️':'⛅';}
 async function loadForecast(){
-  if(props.preview||!desktop||props.widget.kind!=='weather'||!props.widget.city||forecastBusy||document.hidden)return;
+  if(props.preview||!desktop||props.widget.kind!=='weather'||!props.widget.city||document.hidden)return;
+  if(forecastBusy){forecastQueued=true;return;}
   forecastBusy=true;forecastError.value='';
   const requested=JSON.stringify(props.widget.city);
   try{const result=await invoke<{days:ForecastDay[]}>('get_widget_forecast');if(requested===JSON.stringify(props.widget.city))forecast.value=result.days;}
   catch(e){if(requested===JSON.stringify(props.widget.city))forecastError.value=String(e);}
-  finally{forecastBusy=false;}
+  finally{forecastBusy=false;if(forecastQueued){forecastQueued=false;void loadForecast();}}
 }
 watch(()=>JSON.stringify(props.widget.city),()=>{forecast.value=[];void loadForecast();});
 const weatherDesc=computed(()=>props.weather?.text.match(/：([^，]+)，/)?.[1]??'天气待加载');
