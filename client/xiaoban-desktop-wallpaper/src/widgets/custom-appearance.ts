@@ -1,6 +1,23 @@
 // Runs inside the sandbox, where both user stylesheets and inline styles are accessible.
 // Keep this function self-contained so it can be injected without granting host access.
 export function installCustomAppearance() {
+  let layoutScale=1,layoutWidth=0,layoutHeight=0;
+  function layout(){
+    if(!document.body)return;
+    // CSS zoom inside the iframe lays out text at the actual output resolution.
+    // Keep the logical viewport unchanged for existing fixed-size widget packs.
+    document.body.style.setProperty('zoom',String(layoutScale),'important');
+    if(layoutWidth)document.body.style.setProperty('width',`${layoutWidth}px`,'important');
+    if(layoutHeight)document.body.style.setProperty('height',`${layoutHeight}px`,'important');
+  }
+  window.addEventListener('message',event=>{
+    if(event.source!==window.parent||event.data?.type!=='xiaoban-widget-layout')return;
+    const scale=event.data.scale;
+    if(typeof scale!=='number'||!Number.isFinite(scale)||scale<0.1||scale>10)return;
+    const {width,height}=event.data;
+    if(typeof width!=='number'||typeof height!=='number'||!Number.isFinite(width)||!Number.isFinite(height)||width<=0||height<=0||width>4096||height>4096)return;
+    layoutScale=scale;layoutWidth=width;layoutHeight=height;layout();
+  });
   function soften(style: CSSStyleDeclaration) {
     const shadow = style.getPropertyValue('box-shadow');
     if (shadow && !['none', 'inherit', 'initial', 'unset', 'revert'].includes(shadow.trim())) {
@@ -15,7 +32,7 @@ export function installCustomAppearance() {
       parts.push(shadow.slice(start));
       const inset = parts.filter(part => /\binset\b/i.test(part));
       if (inset.length < parts.length) {
-        style.setProperty('box-shadow', ['0 1px 3px -2px rgba(0,0,0,0.12)', ...inset].join(','), style.getPropertyPriority('box-shadow'));
+        style.setProperty('box-shadow', ['0 2px 5px -3px rgba(0,0,0,0.12)', ...inset].join(','), style.getPropertyPriority('box-shadow'));
       }
     }
     for (const property of ['filter', '-webkit-filter']) {
@@ -31,7 +48,7 @@ export function installCustomAppearance() {
           end++;
         }
         if (depth) break;
-        const replacement = 'drop-shadow(0 1px 1px rgba(0,0,0,0.08))';
+        const replacement = 'drop-shadow(0 1px 2px rgba(0,0,0,0.08))';
         filter = filter.slice(0, match.index) + replacement + filter.slice(end);
         pattern.lastIndex = match.index + replacement.length;
       }
@@ -45,6 +62,7 @@ export function installCustomAppearance() {
     }
   }
   function apply() {
+    layout();
     for (const sheet of Array.from(document.styleSheets)) {
       try { visit(sheet.cssRules); } catch { /* Cross-origin stylesheets remain isolated. */ }
     }

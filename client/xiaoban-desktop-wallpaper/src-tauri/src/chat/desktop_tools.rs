@@ -995,7 +995,7 @@ pub fn tools(desktop: Arc<dyn Desktop>) -> Vec<Arc<dyn Tool>> {
                     json!({
                         "id": { "type": "string", "description": "小组件英文标识（小写字母、数字、-、_，如 pomodoro-timer）" },
                         "name": { "type": "string", "description": "小组件中文名称（最多 24 字，如 专注番茄钟）" },
-                        "html": { "type": "string", "description": "完整的自包含单文件 HTML 内容（包含 <style>、DOM 结构与 <script> 逻辑）；默认让 html、body 背景透明，不绘制铺满组件的底板；内容应在指定 width、height 的视口内自适应，避免横向溢出和滚动条。宿主统一提供按住非交互区域拖动和位置保存，无需自行实现窗口拖拽；不要使用 Electron 的 -webkit-app-region 或直接调用 Tauri。按钮、输入框等使用语义化元素；自定义手势区域加 data-no-drag，保留可拖动的背景区域" },
+                        "html": { "type": "string", "description": "完整的自包含单文件 HTML 内容（包含 <style>、DOM 结构与 <script> 逻辑）；默认让 html、body 背景透明，不绘制铺满组件的底板；内容应在指定 width、height 的视口内自适应，避免横向溢出和滚动条。宿主会按声明的矩形视口裁切：角色头部、耳朵、蝴蝶结、突出装饰及动画最大位移都必须包含在视口内，并预留透明安全边距。绝对定位前确认实际的 position 容器；探出卡片的角色应以卡片为定位父级，并在整体视口中预留顶部空间，不能用负 top 让内容伸出整个视口，不能依赖 overflow:visible 越过 iframe 或窗口边界。宿主统一提供按住非交互区域拖动和位置保存，无需自行实现窗口拖拽；不要使用 Electron 的 -webkit-app-region 或直接调用 Tauri。按钮、输入框等使用语义化元素；自定义手势区域加 data-no-drag，保留可拖动的背景区域" },
                         "description": { "type": "string", "description": "一句话介绍（最多 80 字）" },
                         "width": { "type": "number", "minimum": 100, "maximum": 800, "description": "建议默认宽度（像素，默认 280）" },
                         "height": { "type": "number", "minimum": 80, "maximum": 800, "description": "建议默认高度（像素，默认 240）" },

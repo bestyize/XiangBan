@@ -9,11 +9,14 @@ import ItemForm from './ItemForm.vue';
 import {cornerResize} from './resize.ts';
 import {customWidgetDocument,isCustomDragMessage} from './custom-drag.ts';
 import './surface.css';
-const props=withDefaults(defineProps<{widget:DesktopWidget;preview?:boolean;demo?:boolean;editing?:boolean;payload?:WidgetPayload;save?:(c:WidgetContent)=>Promise<void>}>(),{preview:false,demo:false,editing:false});
+const props=withDefaults(defineProps<{widget:DesktopWidget;preview?:boolean;demo?:boolean;editing?:boolean;payload?:WidgetPayload;renderScale?:number;save?:(c:WidgetContent)=>Promise<void>}>(),{preview:false,demo:false,editing:false,renderScale:1});
 const emit=defineEmits<{settings:[]}>();
 const now=ref(new Date()),error=ref(''),saving=ref(false),addOpen=ref(false),editingItem=ref<TodoItem|ReminderItem>();
 const size=computed(()=>baseSize(props.widget.kind,props.widget.custom)),clock=computed(()=>now.value.toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit',hour12:false}));
 const customFrame=ref<HTMLIFrameElement>();
+const surfaceScale=computed(()=>props.widget.kind==='custom'?props.renderScale:1);
+function customLayout(){customFrame.value?.contentWindow?.postMessage({type:'xiaoban-widget-layout',scale:props.renderScale,width:size.value.width,height:size.value.height},'*');}
+watch(()=>props.renderScale,customLayout,{flush:'post'});
 const customDocument=computed(()=>{
   const html=props.widget.custom?.html||'<div style="color:#999;padding:12px;font-size:12px">未找到小组件内容</div>';
   return customWidgetDocument(html,!props.preview);
@@ -142,7 +145,7 @@ onMounted(()=>{clockTimer=setInterval(()=>now.value=new Date(),1000);if(props.wi
 onBeforeUnmount(()=>{resizer.finish(true);document.removeEventListener('keydown',resizeKey);alive=false;clearInterval(clockTimer);clearInterval(networkTimer);clearTimeout(hitTimer);clearTimeout(clickTimer);document.removeEventListener('visibilitychange',visible);void audio?.close();});
 </script>
 <template>
-<article class="xb-widget" :class="[widget.kind,{editing,resizing,falling:!up}]" :style="{width:`${size.width}px`,height:`${size.height}px`,'--widget-scale':widget.scale}" @pointerdown="startDrag" @pointermove="move($event)" @pointerup="move($event,true)" @pointercancel="move($event,true)" @click.capture="capture">
+<article class="xb-widget" :class="[widget.kind,{editing,resizing,falling:!up}]" :style="{width:`${size.width*surfaceScale}px`,height:`${size.height*surfaceScale}px`,'--widget-scale':widget.kind==='custom'?1:widget.scale}" @pointerdown="startDrag" @pointermove="move($event)" @pointerup="move($event,true)" @pointercancel="move($event,true)" @click.capture="capture">
  <template v-if="widget.kind==='clock'">
   <div class="clock-art" aria-hidden="true"/><div class="clock-greeting"><Sunrise :size="31"/><div><span>{{ greeting }}</span><small>新的一天，也要好好生活</small></div></div>
   <div class="clock-time">{{ clock }}</div><div class="clock-date">{{ now.getMonth()+1 }}月{{ now.getDate() }}日 <span>{{ now.toLocaleDateString('zh-CN',{weekday:'long'}) }}</span></div><p class="clock-lunar">{{ lunarLabel }}</p><button class="more hover-more" aria-label="时钟设置" @click="settings"><MoreHorizontal/></button>
@@ -188,6 +191,7 @@ onBeforeUnmount(()=>{resizer.finish(true);document.removeEventListener('keydown'
   <div class="custom-widget-box" :data-testid="`custom-${widget.customId||'widget'}`">
    <iframe
      ref="customFrame"
+     @load="customLayout"
      :srcdoc="customDocument"
      sandbox="allow-scripts"
      class="custom-widget-frame"

@@ -18,6 +18,21 @@ describe('reference widget interaction',()=>{
 
 describe('custom widget host drag',()=>{
  const custom=():DesktopWidget=>({...one('custom'),customId:'kitty',custom:{schemaVersion:1,id:'kitty',name:'Kitty',html:'<div>Kitty</div>',width:280,height:240,theme:'transparent'}});
+ it('resizes the iframe viewport without reloading its document or resetting its interactions',async()=>{
+  const widget=custom();
+  const view=mount(WidgetSurface,{attachTo:document.body,props:{widget,renderScale:1.3}});
+  const iframe=view.get('iframe').element as HTMLIFrameElement,srcdoc=iframe.srcdoc;
+  const post=vi.spyOn(iframe.contentWindow!,'postMessage');
+  await view.get('iframe').trigger('load');
+  expect((view.element as HTMLElement).style.width).toBe('364px');
+  expect(post).toHaveBeenLastCalledWith({type:'xiaoban-widget-layout',scale:1.3,width:280,height:240},'*');
+  await view.setProps({renderScale:1.5});
+  expect((view.element as HTMLElement).style.width).toBe('420px');
+  expect(view.get('iframe').element).toBe(iframe);
+  expect(iframe.srcdoc).toBe(srcdoc);
+  expect(post).toHaveBeenLastCalledWith({type:'xiaoban-widget-layout',scale:1.5,width:280,height:240},'*');
+  view.unmount();
+ });
  it('accepts only its own iframe and saves the scaled grab position on release',async()=>{
   vi.mocked(invoke).mockClear();
   const widget=custom(),view=mount(WidgetSurface,{attachTo:document.body,props:{widget,payload:{widget,editing:false,screenX:0,screenY:0}}});
