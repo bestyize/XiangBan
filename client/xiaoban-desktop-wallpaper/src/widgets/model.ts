@@ -8,6 +8,7 @@ export interface CountdownData { title: string; date: string; mode: 'countdown' 
 /** A white flower grows one stage every few waterings; `since` is the day it was planted. */
 export interface FlowerData { water: number; since: string }
 export interface ReminderItem { id: string; title: string; at: string; done: boolean }
+export const validStockSymbol = (symbol:string) => /^(?:1\.(?:000001|6\d{5})|0\.(?:39900[16]|[03]\d{5}))$/.test(symbol);
 export interface LivingData { reminders: ReminderItem[]; count: number; symbol: string }
 export interface WidgetContent { note?: NoteData; countdown?: CountdownData; flower?: FlowerData; living?: LivingData }
 export interface CustomWidgetData { schemaVersion?: number; id: string; name: string; description?: string; width?: number; height?: number; theme?: string; html: string }
@@ -55,7 +56,7 @@ export function validateLayout(value: unknown): WidgetLayout {
     if (widget.countdown != null) { if (widget.kind !== 'countdown') throw new Error('纪念日配置类型不匹配'); validateCountdown(widget.countdown); }
     if(widget.living != null) {
       const d=widget.living;
-      if(!['reminders','stocks','woodfish'].includes(widget.kind) || !Array.isArray(d.reminders) || d.reminders.length>12 || !Number.isSafeInteger(d.count) || d.count<0 || d.count>9999999 || !['1.000001','0.399001','0.399006'].includes(d.symbol)) throw new Error('生活组件配置无效');
+      if(!['reminders','stocks','woodfish'].includes(widget.kind) || !Array.isArray(d.reminders) || d.reminders.length>12 || !Number.isSafeInteger(d.count) || d.count<0 || d.count>9999999 || !validStockSymbol(d.symbol)) throw new Error('生活组件配置无效');
       const ids=new Set<string>();
       for(const r of d.reminders){if(!r || !/^[a-z0-9]{1,32}$/.test(r.id) || ids.has(r.id) || typeof r.title!=='string' || !r.title.trim() || r.title.length>60 || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(r.at) || Number.isNaN(new Date(r.at).getTime()) || typeof r.done!=='boolean') throw new Error('提醒记录无效');ids.add(r.id);}
     }
