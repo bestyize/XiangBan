@@ -22,7 +22,11 @@ pub struct Widget {
 const MAX_LAYOUT_BYTES: usize = 128 * 1024;
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct TodoItem { pub id: String, pub text: String, pub done: bool, #[serde(default)] pub time: String }
+#[serde(rename_all="camelCase")]
+pub struct TodoItem { pub id:String, pub text:String, pub done:bool, #[serde(default)] pub time:String,
+ #[serde(default)] pub date:String, #[serde(default)] pub notify:bool, #[serde(default="repeat_none")] pub repeat:String, #[serde(default)] pub completed_on:String }
+fn repeat_none()->String{"none".into()}
+fn default_true()->bool{true}
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct NoteData { pub title: String, pub mode: String, pub text: String, pub items: Vec<TodoItem> }
@@ -31,11 +35,12 @@ pub struct NoteData { pub title: String, pub mode: String, pub text: String, pub
 pub struct CountdownData { pub title: String, pub date: String, pub mode: String, pub repeat: String }
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all="camelCase", deny_unknown_fields)]
-pub struct ReminderItem { pub id:String, pub title:String, pub at:String, pub done:bool, #[serde(default)] pub end:String, #[serde(default)] pub location:String }
+pub struct ReminderItem {pub id:String,pub title:String,pub at:String,pub done:bool,#[serde(default)] pub end:String,#[serde(default)] pub location:String,
+ #[serde(default="default_true")] pub notify:bool, #[serde(default="repeat_none")] pub repeat:String, #[serde(default)] pub completed_on:String }
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all="camelCase", deny_unknown_fields)]
-pub struct LivingData { pub reminders:Vec<ReminderItem>, pub count:u32, pub symbol:String }
-impl Default for LivingData {fn default()->Self{Self{reminders:vec![],count:0,symbol:"1.000001".into()}}}
+pub struct LivingData { pub reminders:Vec<ReminderItem>, pub count:u32, pub symbol:String, #[serde(default)] pub symbols:Vec<String>, #[serde(default="default_true")] pub sound:bool }
+impl Default for LivingData {fn default()->Self{Self{reminders:vec![],count:0,symbol:"1.000001".into(),symbols:vec![],sound:true}}}
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct WidgetContent { note: Option<NoteData>, countdown: Option<CountdownData>, living: Option<LivingData> }
@@ -43,6 +48,10 @@ fn short_text(value: &str, max: usize) -> bool { !value.trim().is_empty() && val
 fn valid_identity(value: &str) -> bool { !value.is_empty() && value.len()<=32 && value.bytes().all(|c|c.is_ascii_lowercase()||c.is_ascii_digit()) }
 pub const KINDS: [&str;8] = ["clock","weather","notes","reminders","stocks","woodfish","calendar","countdown"];
 fn valid_time(v:&str)->bool {chrono::NaiveTime::parse_from_str(v,"%H:%M").is_ok_and(|t|t.format("%H:%M").to_string()==v)}
+fn valid_date(v:&str)->bool {chrono::NaiveDate::parse_from_str(v,"%Y-%m-%d").is_ok_and(|d|d.format("%Y-%m-%d").to_string()==v&&v>="1900-01-01"&&v<="2100-12-31")}
+fn valid_schedule(repeat:&str,notify:bool,date:&str,time:&str,completed:&str)->bool {
+ ["none","daily","weekdays","weekly"].contains(&repeat)&& (completed.is_empty()||valid_date(completed)) && (!(notify||repeat!="none")||(valid_date(date)&&valid_time(time)))
+}
 fn valid_stock_symbol(symbol:&str)->bool{
     let Some((market,code))=symbol.split_once('.') else{return false;};
     if market=="116" {return code.len()==5 && code.bytes().all(|b|b.is_ascii_digit());}
@@ -54,18 +63,19 @@ fn validate_content(widget: &Widget) -> Result<(),String> {
     if let Some(note)=&widget.note {
         if widget.kind!="notes" || !short_text(&note.title,40) || note.mode!="todo" || note.text.encode_utf16().count()>1200 || note.items.len()>12 { return Err("便签内容无效或超过长度限制".into()); }
         let mut ids=std::collections::HashSet::new();
-        for item in &note.items { if !valid_identity(&item.id)||!ids.insert(&item.id)||!short_text(&item.text,120)||(!item.time.is_empty()&&!valid_time(&item.time)) {return Err("待办内容无效".into());} }
+        for item in &note.items { if !valid_identity(&item.id)||!ids.insert(&item.id)||!short_text(&item.text,120)||(!item.time.is_empty()&&!valid_time(&item.time))||(!item.date.is_empty()&&!valid_date(&item.date))||!valid_schedule(&item.repeat,item.notify,&item.date,&item.time,&item.completed_on){return Err("待办提醒配置无效".into());} }
+
     }
     if let Some(data)=&widget.countdown {
         let valid_date=chrono::NaiveDate::parse_from_str(&data.date,"%Y-%m-%d").is_ok_and(|date|date.format("%Y-%m-%d").to_string()==data.date && data.date.as_str()>="1900-01-01" && data.date.as_str()<="2100-12-31");
         if widget.kind!="countdown" || !short_text(&data.title,40) || !valid_date || !["countdown","elapsed"].contains(&data.mode.as_str()) || !["none","yearly"].contains(&data.repeat.as_str()) || (data.mode=="elapsed"&&data.repeat!="none") {return Err("纪念日配置无效".into());}
     }
     if let Some(data)=&widget.living {
-        if !["reminders","stocks","woodfish"].contains(&widget.kind.as_str()) || data.count>9999999 || !valid_stock_symbol(&data.symbol) || data.reminders.len()>12{return Err("生活组件配置无效".into());}
+        if !["reminders","stocks","woodfish"].contains(&widget.kind.as_str()) || data.count>9999999 || !valid_stock_symbol(&data.symbol) || data.reminders.len()>12 || data.symbols.len()>8 || (!data.symbols.is_empty()&&(!data.symbols.contains(&data.symbol)||data.symbols.iter().any(|s|!valid_stock_symbol(s))||data.symbols.iter().collect::<std::collections::HashSet<_>>().len()!=data.symbols.len())){return Err("生活组件配置无效".into());}
         let mut ids=std::collections::HashSet::new();
         for item in &data.reminders{
             let date=chrono::NaiveDateTime::parse_from_str(&item.at,"%Y-%m-%dT%H:%M").is_ok_and(|v|v.format("%Y-%m-%dT%H:%M").to_string()==item.at);
-            if !valid_identity(&item.id) || !ids.insert(&item.id) || !short_text(&item.title,60) || !date || (!item.end.is_empty()&&(!valid_time(&item.end)||item.end.as_str()<=&item.at[11..])) || item.location.encode_utf16().count()>80{return Err("日程记录无效".into());}
+            if !valid_identity(&item.id) || !ids.insert(&item.id) || !short_text(&item.title,60) || !date || (!item.end.is_empty()&&(!valid_time(&item.end)||item.end.as_str()<=&item.at[11..])) || item.location.encode_utf16().count()>80 || !valid_schedule(&item.repeat,item.notify,item.at.get(..10).unwrap_or(""),item.at.get(11..).unwrap_or(""),&item.completed_on){return Err("日程记录无效".into());}
         }
     }
     Ok(())
@@ -86,14 +96,17 @@ pub struct WidgetState {
     market: Mutex<HashMap<String,(i64,Value)>>,
     forecasts: Mutex<HashMap<String,(i64,Value)>>,
 }
+pub fn reminder_rules(app:&tauri::AppHandle,now:chrono::DateTime<chrono::Local>)->Vec<crate::reminders::Rule>{
+ let layout=app.state::<WidgetState>().layout.lock().unwrap().clone();crate::widget_schedule::rules(&layout,now)
+}
 pub fn is_widget(label: &str) -> bool { label.starts_with("widget-") }
 fn own_widget(window: &tauri::WebviewWindow) -> Result<Widget, String> {
     window.app_handle().state::<WidgetState>().layout.lock().unwrap().widgets.iter()
         .find(|widget| format!("widget-{}", widget.id) == window.label()).cloned().ok_or("没有找到这个桌面组件".into())
 }
 pub fn permitted(label: &str, command: &str) -> Option<bool> {
-    if is_widget(label) { return Some(["get_desktop_widget", "move_desktop_widget", "show_widget_settings", "get_widget_weather", "get_widget_forecast", "save_desktop_widget_content", "get_widget_stocks"].contains(&command)); }
-    if ["get_desktop_widgets", "add_desktop_widget", "update_desktop_widget", "remove_desktop_widget", "set_widgets_editing", "get_desktop_widget", "move_desktop_widget", "show_widget_settings", "get_widget_weather", "get_widget_forecast", "get_widget_stocks", "save_desktop_widget_content"].contains(&command) { return Some(label == "control"); }
+    if is_widget(label) { return Some(["get_desktop_widget", "move_desktop_widget", "show_widget_settings", "get_widget_weather", "get_widget_forecast", "get_widget_air_quality", "get_widget_stock_watchlist", "save_desktop_widget_content", "get_widget_stocks"].contains(&command)); }
+    if ["get_desktop_widgets", "add_desktop_widget", "update_desktop_widget", "remove_desktop_widget", "set_widgets_editing", "get_desktop_widget", "move_desktop_widget", "show_widget_settings", "get_widget_weather", "get_widget_forecast", "get_widget_air_quality", "get_widget_stock_watchlist", "get_widget_stocks", "save_desktop_widget_content"].contains(&command) { return Some(label == "control"); }
     None
 }
 pub fn validate(layout: &Layout) -> Result<(), String> {
@@ -345,18 +358,60 @@ pub async fn get_widget_forecast(window:tauri::WebviewWindow)->Result<Value,Stri
 }
 
 #[tauri::command]
-pub async fn get_widget_stocks(window: tauri::WebviewWindow, period:String)->Result<Value,String>{
+pub async fn get_widget_air_quality(window:tauri::WebviewWindow)->Result<Value,String>{
+ let widget=own_widget(&window)?;if widget.kind!="weather"{return Err("此组件不能读取空气质量".into());}
+ let city=widget.city.ok_or("请先选择城市")?;let app=window.app_handle().clone();let state=app.state::<WidgetState>();
+ let _lock=state.forecast_operation.lock().await;let now=chrono::Utc::now().timestamp();let key=format!("air:{}:{}",city.latitude,city.longitude);
+ if let Some((_,value))=state.forecasts.lock().unwrap().get(&key).filter(|(at,_)|(0..1800).contains(&(now-*at))).cloned(){return Ok(value);}
+ let value=tauri::async_runtime::spawn_blocking(move||crate::care_weather::air_quality(&city,now)).await.map_err(|e|e.to_string())??;
+ let mut cache=state.forecasts.lock().unwrap();if cache.len()>48{cache.clear();}cache.insert(key,(now,value.clone()));Ok(value)
+}
+fn market_number(value:Option<&Value>)->Option<f64>{value.and_then(|v|v.as_f64().or_else(||v.as_str().and_then(|s|s.parse::<f64>().ok()))).filter(|v|v.is_finite())}
+fn watchlist_values(value:&Value,symbols:&[String],now:i64)->Result<Value,String>{
+ let rows=value.pointer("/data/diff").and_then(Value::as_array).ok_or("自选行情暂不可用")?;
+ let quotes:Vec<Value>=rows.iter().filter_map(|r|{
+  let code=r.get("f12")?.as_str()?;let market=r.get("f13")?.as_u64()?;let symbol=format!("{market}.{code}");
+  if !symbols.contains(&symbol){return None;}
+  let price=market_number(r.get("f2"))?;let percent=market_number(r.get("f3"))?;let change=market_number(r.get("f4"))?;
+  if price<=0.{return None;}
+  Some(json!({"symbol":symbol,"name":r.get("f14").and_then(Value::as_str).unwrap_or(code),"price":price,"change":change,"percent":percent,"updatedAt":r.get("f124").and_then(Value::as_i64)}))
+ }).collect();
+ if quotes.is_empty(){return Err("自选行情没有有效价格，请稍后重试".into());}
+ Ok(json!({"quotes":quotes,"fetchedAt":now,"source":"东方财富公开数据"}))
+}
+#[tauri::command]
+pub async fn get_widget_stock_watchlist(window:tauri::WebviewWindow)->Result<Value,String>{
+ let widget=own_widget(&window)?;if widget.kind!="stocks"{return Err("此组件不能读取自选行情".into());}
+ let d=widget.living.unwrap_or_default();let symbols=if d.symbols.is_empty(){vec![d.symbol]}else{d.symbols};
+ let app=window.app_handle().clone();let state=app.state::<WidgetState>();let _lock=state.market_operation.lock().await;
+ let now=chrono::Utc::now().timestamp();let key=format!("list:{}",symbols.join(","));
+ if let Some((_,value))=state.market.lock().unwrap().get(&key).filter(|(at,_)|(0..60).contains(&(now-*at))).cloned(){return Ok(value);}
+ let result=tauri::async_runtime::spawn_blocking(move||->Result<Value,String>{
+  let mut url=url::Url::parse("https://push2.eastmoney.com/api/qt/ulist.np/get").map_err(|e|e.to_string())?;
+  url.query_pairs_mut().append_pair("secids",&symbols.join(",")).append_pair("fields","f2,f3,f4,f12,f13,f14,f124").append_pair("fltt","2");
+  let client=reqwest::blocking::Client::builder().timeout(std::time::Duration::from_secs(12)).redirect(reqwest::redirect::Policy::none()).user_agent("Mozilla/5.0 XiaoBan Desktop").build().map_err(|e|e.to_string())?;
+  let response=client.get(url).header("Referer","https://quote.eastmoney.com/").send().map_err(|e|format!("自选行情连接失败：{e}"))?.error_for_status().map_err(|e|e.to_string())?;
+  let mut bytes=Vec::new();response.take(256*1024+1).read_to_end(&mut bytes).map_err(|e|e.to_string())?;if bytes.len()>256*1024{return Err("自选行情响应过大".into());}
+  let value:Value=serde_json::from_slice(&bytes).map_err(|_|"自选行情格式无效")?;watchlist_values(&value,&symbols,now)
+ }).await.map_err(|e|e.to_string())??;
+ let mut cache=state.market.lock().unwrap();if cache.len()>20{cache.clear();}cache.insert(key,(now,result.clone()));Ok(result)
+}
+#[tauri::command]
+pub async fn get_widget_stocks(window: tauri::WebviewWindow, period:String, symbol:Option<String>)->Result<Value,String>{
     let widget=own_widget(&window)?;
     if widget.kind!="stocks"{return Err("此组件不读取股票行情".into());}
     if !["1D","5D","1M","1Y"].contains(&period.as_str()){return Err("不支持的行情周期".into());}
-    let symbol=widget.living.unwrap_or_default().symbol;
+    let living=widget.living.unwrap_or_default();
+    let symbol=symbol.unwrap_or_else(||living.symbol.clone());
+    if symbol!=living.symbol&&!living.symbols.contains(&symbol){return Err("证券不在此组件的自选列表中".into());}
     if !valid_stock_symbol(&symbol){return Err("未支持的证券代码".into());}
     let app=window.app_handle();let state=app.state::<WidgetState>();
     let _operation=state.market_operation.lock().await;
     let key=format!("{symbol}/{period}");let now=chrono::Utc::now().timestamp();
     if let Some((when,value))=state.market.lock().unwrap().get(&key).filter(|(when,_)|(0..60).contains(&(now-*when))).cloned(){return Ok(value);}
-    let stock=symbol.clone();let historical=period=="1M"||period=="1Y";let days=if period=="1D"{1}else if period=="5D"{5}else if period=="1M"{23}else{251};
+    let stock=symbol.clone();let range=period.clone();let historical=period=="1M"||period=="1Y";let days=if period=="1D"{1}else if period=="5D"{5}else if period=="1M"{23}else{251};
     let response=tauri::async_runtime::spawn_blocking(move||->Result<Value,String>{
+        if let Ok(quote)=crate::widget_market::fetch(&stock,&range){return Ok(quote);}
         let url=if historical{format!("https://push2his.eastmoney.com/api/qt/stock/kline/get?secid={stock}&fields1=f1,f2,f3,f4,f5,f6&fields2=f51,f52,f53,f54,f55,f56&klt=101&fqt=1&end=20500101&lmt={days}")}
         else{format!("https://push2his.eastmoney.com/api/qt/stock/trends2/get?secid={stock}&fields1=f1,f2,f3,f4,f5,f6,f7,f8&fields2=f51,f52,f53,f54,f55&ndays={days}&iscr=0&ut=fa5fd1943c7b386f172d6893dbfba10b")};
         let client=reqwest::blocking::Client::builder().timeout(std::time::Duration::from_secs(12))
@@ -373,9 +428,9 @@ pub async fn get_widget_stocks(window: tauri::WebviewWindow, period:String)->Res
             if !value.is_finite()||value<=0.0{return None;}
             Some((parts.first()?.to_string(),value))
         }).collect();
-        if values.len()<2{return Err("可用行情点数不足".into());}
+        if values.is_empty(){return Err("可用行情点数不足".into());}
         let last=values.last().ok_or("行情为空")?;let price=last.1;
-        let prev=data.get("prePrice").or_else(||data.get("preClose")).and_then(|v|v.as_f64().or_else(||v.as_str().and_then(|s|s.parse::<f64>().ok()))).unwrap_or_else(||if historical{values[values.len()-2].1}else{0.0});
+        let prev=data.get("prePrice").or_else(||data.get("preClose")).and_then(|v|v.as_f64().or_else(||v.as_str().and_then(|s|s.parse::<f64>().ok()))).unwrap_or_else(||if historical&&values.len()>1{values[values.len()-2].1}else{0.0});
         if prev<=0.0{return Err("行情缺少昨收盘价".into());}
         let step=((values.len()+119)/120).max(1);
         let mut points:Vec<f64>=values.iter().step_by(step).map(|(_,value)|*value).collect();
@@ -392,11 +447,15 @@ pub async fn get_widget_stocks(window: tauri::WebviewWindow, period:String)->Res
 
 #[cfg(test)]
 mod tests {
+ #[test] fn watchlist_prices_ignore_missing_or_unrequested_data(){
+  let data=json!({"data":{"diff":[{"f12":"00700","f13":116,"f2":309.6,"f3":1.58,"f4":4.8,"f14":"腾讯控股"},{"f12":"000001","f13":1,"f2":"-"}]}});
+  let symbols=vec!["116.00700".to_string(),"1.000001".to_string()];let value=watchlist_values(&data,&symbols,1000).unwrap();assert_eq!(value["quotes"].as_array().unwrap().len(),1);assert_eq!(value["quotes"][0]["symbol"],"116.00700");assert!(watchlist_values(&data,&["0.399006".into()],1000).is_err());
+ }
  use super::*;
  fn one()->Layout{serde_json::from_value(json!({"version":2,"widgets":[{"id":"clock1","kind":"clock","theme":"ivory","scale":1.,"x":0.1,"y":0.1,"enabled":true,"city":null}]})).unwrap()}
  #[test] fn old_kinds_and_materials_are_rejected(){for kind in ["fortune","flower","custom"]{let mut l=one();l.widgets[0].kind=kind.into();assert!(validate(&l).is_err());}let mut l=one();l.widgets[0].theme="glass".into();assert!(validate(&l).is_err());l=one();l.version=1;assert!(validate(&l).is_err());}
  #[test] fn only_eight_reference_components_are_available(){for k in KINDS{let mut l=one();l.widgets[0].kind=k.into();assert!(validate(&l).is_ok());assert!(base_size(k).0>300.);}}
  #[test] fn hk_and_a_share_codes_remain_constrained(){for s in ["116.00700","1.000001","0.399006","1.600519"]{assert!(valid_stock_symbol(s));}for s in ["116.00700&x=1","116.abcde","https://example.com","3.123456"]{assert!(!valid_stock_symbol(s));}}
- #[test] fn date_and_schedule_validation(){assert!(valid_time("09:30"));assert!(!valid_time("25:00"));let mut l=one();l.widgets[0].kind="reminders".into();l.widgets[0].living=Some(LivingData{count:0,symbol:"1.000001".into(),reminders:vec![ReminderItem{id:"one".into(),title:"评审".into(),at:"2026-10-19T10:00".into(),done:false,end:"09:00".into(),location:"A302".into()}]});assert!(validate(&l).is_err());l.widgets[0].living.as_mut().unwrap().reminders[0].end="11:00".into();assert!(validate(&l).is_ok());}
+ #[test] fn date_and_schedule_validation(){assert!(valid_time("09:30"));assert!(!valid_time("25:00"));let mut l=one();l.widgets[0].kind="reminders".into();l.widgets[0].living=Some(LivingData{count:0,symbol:"1.000001".into(),symbols:vec![],sound:true,reminders:vec![ReminderItem{id:"one".into(),title:"评审".into(),at:"2026-10-19T10:00".into(),done:false,end:"09:00".into(),location:"A302".into(),notify:true,repeat:"none".into(),completed_on:String::new()}]});assert!(validate(&l).is_err());l.widgets[0].living.as_mut().unwrap().reminders[0].end="11:00".into();assert!(validate(&l).is_ok());}
  #[test] fn widget_cannot_modify_collection(){assert_eq!(permitted("widget-clock1","add_desktop_widget"),Some(false));assert_eq!(permitted("widget-clock1","save_desktop_widget_content"),Some(true));}
 }

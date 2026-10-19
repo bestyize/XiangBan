@@ -1,0 +1,17 @@
+// @vitest-environment happy-dom
+import {mount,flushPromises} from '@vue/test-utils';
+import {describe,it,expect,vi} from 'vitest';
+import ItemForm from './ItemForm.vue';
+import ItemManager from './ItemManager.vue';
+import StockWatchlistEditor from './StockWatchlistEditor.vue';
+import type {DesktopWidget} from './model.ts';
+describe('item editor and management',()=>{
+ it('edits the existing todo without changing its identity or done status',async()=>{const v=mount(ItemForm,{props:{mode:'todo',item:{id:'first',text:'旧内容',done:true,date:'2026-10-19',time:'09:00'}}});await v.get('[aria-label="事项名称"]').setValue('新内容');await v.get('form').trigger('submit');expect(v.emitted('save')?.[0][0]).toMatchObject({id:'first',text:'新内容',done:true});v.unmount();});
+ it('edits recurrence and notification options with a real date',async()=>{const v=mount(ItemForm,{props:{mode:'agenda'}});await v.get('[aria-label="事项名称"]').setValue('团队会');await v.get('[aria-label="日程日期"]').setValue('2026-10-20');await v.get('[aria-label="重复方式"]').setValue('weekly');await v.get('form').trigger('submit');expect(v.emitted('save')?.[0][0]).toMatchObject({title:'团队会',at:'2026-10-20T09:00',repeat:'weekly',notify:true});v.unmount();});
+ it('lists future events and edits one without duplicating it',async()=>{const save=vi.fn().mockResolvedValue(undefined);const widget:DesktopWidget={id:'one',kind:'reminders',theme:'ivory',scale:.5,x:0,y:0,enabled:true,city:null,living:{count:0,symbol:'1.000001',reminders:[{id:'future',title:'未来日程',at:'2027-01-01T09:00',end:'10:00',done:false}]}};const v=mount(ItemManager,{props:{widget,save}});expect(v.text()).toContain('未来日程');expect(v.text()).toContain('2027年');await v.get('[aria-label="编辑事项"]').trigger('click');await v.get('[aria-label="事项名称"]').setValue('修改未来日程');await v.get('form').trigger('submit');await flushPromises();expect(save.mock.calls[0][0].living.reminders).toHaveLength(1);expect(save.mock.calls[0][0].living.reminders[0]).toMatchObject({id:'future',title:'修改未来日程'});v.unmount();});
+ it('keeps an unsaved draft when persistence fails',async()=>{const v=mount(ItemManager,{props:{widget:{id:'one',kind:'notes',theme:'ivory',scale:.5,x:0,y:0,enabled:true,city:null},save:vi.fn().mockRejectedValue(Error('保存失败'))}});await v.get('header button').trigger('click');await v.get('[aria-label="事项名称"]').setValue('保留草稿');await v.get('form').trigger('submit');await flushPromises();expect(v.find('form').exists()).toBe(true);expect(v.text()).toContain('保存失败');v.unmount();});
+});
+describe('stock watchlist editor',()=>{
+ it('adds a symbol while preserving the selected security and sound preference',async()=>{const save=vi.fn().mockResolvedValue(undefined);const v=mount(StockWatchlistEditor,{props:{living:{symbol:'116.00700',symbols:['116.00700'],count:0,reminders:[],sound:false},save}});await v.get('[aria-label="自选证券代码"]').setValue('1.600519');await v.get('form').trigger('submit');expect(save.mock.calls[0][0].living).toMatchObject({symbol:'116.00700',symbols:['116.00700','1.600519'],sound:false});v.unmount();});
+ it('removing the selected symbol selects a remaining entry',async()=>{const save=vi.fn().mockResolvedValue(undefined);const v=mount(StockWatchlistEditor,{props:{living:{symbol:'116.00700',symbols:['116.00700','1.000001'],count:0,reminders:[]},save}});await v.get('[aria-label="移除腾讯控股"]').trigger('click');expect(save.mock.calls[0][0].living).toMatchObject({symbol:'1.000001',symbols:['1.000001']});v.unmount();});
+});

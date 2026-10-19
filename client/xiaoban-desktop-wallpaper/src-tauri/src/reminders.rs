@@ -164,10 +164,12 @@ fn local_due(rule: &Rule, now: DateTime<Local>) -> Vec<(String, i64)> {
         Some((format!("{}:{}:{}", rule.id, rule.revision, date.format("%Y-%m-%dT%H:%M")), due))
     }).collect()
 }
-fn collect(store: &mut Store, now: DateTime<Local>, active_seconds: f64) -> bool {
+fn collect(store:&mut Store,now:DateTime<Local>,active_seconds:f64)->bool{collect_with_widgets(store,now,active_seconds,&[])}
+fn collect_with_widgets(store: &mut Store, now: DateTime<Local>, active_seconds: f64,widgets:&[Rule]) -> bool {
+    let rules:Vec<Rule>=store.rules.iter().chain(widgets).cloned().collect();
     let timestamp = now.timestamp();
     let before = store.pending.len();
-    store.pending.retain(|item| item.expires_at >= timestamp && (item.preview || store.rules.iter().any(|r| r.enabled && r.id == item.rule_id && r.revision == item.revision)));
+    store.pending.retain(|item| item.expires_at >= timestamp && (item.preview || rules.iter().any(|r| r.enabled && r.id == item.rule_id && r.revision == item.revision)));
     for item in &mut store.pending {
         if item.kind == "weather" && item.weather_ready && item.weather_at.is_none_or(|at| timestamp - at > 7200 || at - timestamp > 1800) {
             item.weather_ready = false;
@@ -176,7 +178,7 @@ fn collect(store: &mut Store, now: DateTime<Local>, active_seconds: f64) -> bool
     }
     let mut changed = before != store.pending.len();
     if !store.config.enabled { return changed; }
-    for rule in store.rules.clone().into_iter().filter(|r| r.enabled) {
+    for rule in rules.into_iter().filter(|r| r.enabled) {
         let dues = if rule.kind == "rest" {
             let elapsed = store.rest_seconds.entry(rule.id.clone()).or_default();
             *elapsed += active_seconds;
@@ -497,11 +499,22 @@ fn defer_active(app: &tauri::AppHandle) {
     }
     close_active(app);
 }
+fn prune_widget_delivery(app:&tauri::AppHandle,rules:&[Rule]){
+ let state=app.state::<ReminderState>();
+ let mut runtime=state.runtime.lock().unwrap();let Some(active)=runtime.active.as_mut() else{return;};
+ let before=active.items.len();
+ active.items.retain(|p|!p.rule_id.starts_with("widget-")||rules.iter().any(|r|r.id==p.rule_id&&r.revision==p.revision));
+ if active.items.len()==before{return;}
+ let empty=active.items.is_empty();let delivery=active.clone();drop(runtime);
+ if empty{close_active(app);}else if let Some(window)=app.get_webview_window("care"){let _=window.emit("care-delivery",delivery);}
+}
 fn tick(app: &tauri::AppHandle, elapsed: f64, checkpoint: bool) {
     let now = Local::now(); let activity = care_system::activity(); let state = app.state::<ReminderState>();
     let active_seconds = if activity.available && !activity.locked && activity.idle_seconds < 60.0 { elapsed } else { 0.0 };
+    let widget_rules=crate::widgets::reminder_rules(app,now);
+    prune_widget_delivery(app,&widget_rules);
     let changed;
-    { let mut store = state.store.lock().unwrap(); changed = collect(&mut store, now, active_seconds);
+    { let mut store = state.store.lock().unwrap(); changed = collect_with_widgets(&mut store, now, active_seconds,&widget_rules);
         if changed || checkpoint { if let Err(error) = save(app, &store) { store.error = Some(error); } }
     }
     if blocked(app, &activity) { defer_active(app); if changed { publish(app); } return; }
@@ -729,6 +742,14 @@ fn smoke_sync(app: &tauri::AppHandle) -> Result<serde_json::Value, String> {
 
 #[cfg(test)]
 mod tests {
+    #[test] fn widget_reminders_persist_dedup_and_cancel_when_removed(){
+        let now=chrono::Local.with_ymd_and_hms(2026,10,19,10,0,0).unwrap();
+        let rule=Rule{id:"widget-one-task".into(),revision:1,repeat:"once".into(),once_at:"2026-10-19T10:00".into(),time:"10:00".into(),text:"读书".into(),..Rule::default()};
+        let mut store=Store::default();assert!(collect_with_widgets(&mut store,now,0.,&[rule.clone()]));assert_eq!(store.pending.len(),1);
+        let bytes=serde_json::to_vec(&store).unwrap();let mut restarted:Store=serde_json::from_slice(&bytes).unwrap();
+        assert!(!collect_with_widgets(&mut restarted,now,0.,&[rule.clone()]));assert_eq!(restarted.pending.len(),1);
+        assert!(collect_with_widgets(&mut restarted,now,0.,&[]));assert!(restarted.pending.is_empty());
+    }
     use super::*;
     #[test]
     fn old_care_config_keeps_voice_off() {

@@ -1,13 +1,14 @@
-import { validateNote, validateCountdown } from './content.ts';
+import { validateNote, validateCountdown, validateReminder } from './content.ts';
 export type WidgetKind = 'clock' | 'weather' | 'notes' | 'reminders' | 'stocks' | 'woodfish' | 'calendar' | 'countdown';
 export type WidgetTheme = 'ivory';
 export interface City { name: string; country: string; admin1: string; latitude: number; longitude: number }
-export interface TodoItem { id: string; text: string; done: boolean; time?:string }
+export type ItemRepeat = 'none' | 'daily' | 'weekdays' | 'weekly';
+export interface TodoItem { id: string; text: string; done: boolean; time?:string; date?:string; notify?:boolean; repeat?:ItemRepeat; completedOn?:string }
 export interface NoteData { title: string; mode: 'note' | 'todo'; text: string; items: TodoItem[] }
 export interface CountdownData { title: string; date: string; mode: 'countdown' | 'elapsed'; repeat: 'none' | 'yearly' }
-export interface ReminderItem { id: string; title: string; at: string; done: boolean; end?:string; location?:string }
+export interface ReminderItem { id: string; title: string; at: string; done: boolean; end?:string; location?:string; notify?:boolean; repeat?:ItemRepeat; completedOn?:string }
 export const validStockSymbol = (symbol:string) => /^(?:116\.\d{5}|1\.(?:000001|6\d{5})|0\.(?:39900[16]|[03]\d{5}))$/.test(symbol);
-export interface LivingData { reminders: ReminderItem[]; count: number; symbol: string }
+export interface LivingData { reminders: ReminderItem[]; count: number; symbol: string; symbols?:string[]; sound?:boolean }
 export interface WidgetContent { note?: NoteData; countdown?: CountdownData; living?: LivingData }
 export interface DesktopWidget { id: string; kind: WidgetKind; theme: WidgetTheme; scale: number; x: number; y: number; enabled: boolean; city: City | null; monitor?: string; note?: NoteData; countdown?: CountdownData; living?: LivingData; }
 export interface WidgetMonitor { id: string; name: string; width: number; height: number; primary: boolean }
@@ -41,7 +42,9 @@ export function validateLayout(value: unknown): WidgetLayout {
       const d=widget.living;
       if(!['reminders','stocks','woodfish'].includes(widget.kind) || !Array.isArray(d.reminders) || d.reminders.length>12 || !Number.isSafeInteger(d.count) || d.count<0 || d.count>9999999 || !validStockSymbol(d.symbol)) throw new Error('生活组件配置无效');
       const ids=new Set<string>();
-      for(const r of d.reminders){if(!r || !/^[a-z0-9]{1,32}$/.test(r.id) || ids.has(r.id) || typeof r.title!=='string' || !r.title.trim() || r.title.length>60 || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(r.at) || Number.isNaN(new Date(r.at).getTime()) || typeof r.done!=='boolean' || (r.end!==undefined&&r.end!==''&&(!/^([01]\d|2[0-3]):[0-5]\d$/.test(r.end)||r.end<=r.at.slice(11))) || (r.location!==undefined&&(typeof r.location!=='string'||r.location.length>80))) throw new Error('提醒记录无效');ids.add(r.id);}
+      for(const r of d.reminders){validateReminder(r);if(ids.has(r.id))throw Error('日程标识重复');ids.add(r.id);}
+      if(d.symbols!==undefined&&(!Array.isArray(d.symbols)||d.symbols.length>8||new Set(d.symbols).size!==d.symbols.length||d.symbols.some(s=>typeof s!=='string'||!validStockSymbol(s))||d.symbols.length>0&&!d.symbols.includes(d.symbol)))throw Error('自选列表应有 1–8 个不重复的有效代码，并包含当前股票');
+      if(d.sound!==undefined&&typeof d.sound!=='boolean')throw Error('声音开关无效');
     }
     ids.add(widget.id);
   }
@@ -53,5 +56,4 @@ export function calendarDays(year: number, month: number) {
   const first = new Date(year, month, 1), offset = first.getDay();
   return Array.from({ length: 42 }, (_, index) => { const date = new Date(year, month, index - offset + 1); return { date, day: date.getDate(), current: date.getMonth() === month }; });
 }
-
 

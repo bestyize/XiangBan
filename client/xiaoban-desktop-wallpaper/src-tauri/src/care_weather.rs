@@ -74,6 +74,21 @@ fn get(url: url::Url) -> Result<Value, String> {
     if value.get("error").and_then(Value::as_bool) == Some(true) { return Err("天气服务拒绝了本次查询".into()); }
     Ok(value)
 }
+/// CAMS model-based US AQI. Kept separate from the selected weather provider.
+pub fn air_quality(city:&City,now:i64)->Result<Value,String>{
+ city.validate()?;let mut url=endpoint("https://air-quality-api.open-meteo.com/v1/air-quality")?;
+ url.query_pairs_mut().append_pair("latitude",&city.latitude.to_string()).append_pair("longitude",&city.longitude.to_string()).append_pair("current","us_aqi,pm2_5,pm10").append_pair("timeformat","unixtime");
+ air_quality_values(&get(url)?,now)
+}
+fn air_quality_values(value:&Value,now:i64)->Result<Value,String>{
+ let current=value.get("current").ok_or("空气质量服务缺少当前数据")?;
+ let number=|key:&str|max_number(current.get(key));
+ let aqi=number("us_aqi").ok_or("当前地点暂无空气质量数据")?;
+ let model_at=current.get("time").and_then(Value::as_i64).ok_or("空气质量缺少数据时间")?;
+ if now.saturating_sub(model_at)>8*3600||model_at.saturating_sub(now)>3600{return Err("空气质量数据已过期".into());}
+ Ok(serde_json::json!({"aqi":aqi,"pm25":number("pm2_5"),"pm10":number("pm10"),"modelAt":model_at,"updatedAt":now,"standard":"US AQI","source":"Open-Meteo / CAMS 空气质量预报"}))
+}
+fn max_number(value:Option<&Value>)->Option<f64>{value.and_then(Value::as_f64).filter(|v|v.is_finite()&&*v>=0.)}
 /// City-level location from the public IP address, used only to pre-fill the city field.
 /// The IP address necessarily reaches the locator; nothing else is sent. Tried in order.
 const LOCATORS: [&str; 2] = [
@@ -175,6 +190,12 @@ fn parse_weather(value: &Value, source: &Source, city: &City, now: i64) -> Resul
 
 #[cfg(test)]
 mod tests {
+    #[test] fn air_quality_rejects_missing_and_stale_values(){
+        let valid=serde_json::json!({"current":{"time":1000,"us_aqi":42.,"pm2_5":9.,"pm10":20.}});
+        assert_eq!(air_quality_values(&valid,1100).unwrap()["standard"],"US AQI");
+        assert!(air_quality_values(&serde_json::json!({"current":{"time":1000,"us_aqi":null}}),1100).is_err());
+        assert!(air_quality_values(&valid,100000).is_err());
+    }
     use super::*;
     #[test] fn reads_three_day_forecast_without_fabricating_missing_values(){
         let raw=serde_json::json!({"daily":{"time":["2026-10-19","2026-10-20","2026-10-21"],"temperature_2m_max":[26.2,25.9,20.0],"temperature_2m_min":[21.1,19.5,17.2],"weather_code":[1,2,3]}});

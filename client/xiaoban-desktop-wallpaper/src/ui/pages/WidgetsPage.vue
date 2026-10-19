@@ -8,6 +8,8 @@ import {baseSize,widgetKinds,validStockSymbol,type WidgetKind,type DesktopWidget
 import {emptyCountdown,emptyNote} from '../../widgets/content.ts';
 import {dateKey} from '../../widgets/calendar.ts';
 import WidgetSurface from '../../widgets/WidgetSurface.vue';
+import ItemManager from '../../widgets/ItemManager.vue';
+import StockWatchlistEditor from '../../widgets/StockWatchlistEditor.vue';
 import CountdownEditor from '../../widgets/CountdownEditor.vue';
 const props=defineProps<{store:ControlStore;settingsRequest?:{id:string}|null}>();
 const emit=defineEmits<{settingsOpened:[]}>();
@@ -55,10 +57,12 @@ onBeforeUnmount(()=>{observer?.disconnect();clearTimeout(flashTimer);client.disp
    <label class="xb-setting-row"><span>显示在桌面</span><NSwitch :value="chosen.enabled" :disabled="busy" @update:value="update({enabled:$event})"/></label>
    <label class="xb-setting-field"><span>大小 <small>× {{ chosen.scale.toFixed(2) }}</small></span><NSlider :value="chosen.scale" :min=".5" :max="1.5" :step=".05" :disabled="busy" @update:value="update({scale:$event})"/></label>
    <label v-if="monitors.length>1" class="xb-setting-field"><span>所在显示器</span><NSelect :value="chosen.monitor??monitors.find(m=>m.primary)?.id" :options="monitorOptions" :disabled="busy" @update:value="update({monitor:$event})"/></label>
-   <CountdownEditor v-if="chosen.kind==='countdown'" :key="chosen.id" :data="chosen.countdown" :save="saveContent"/>
+   <ItemManager v-if="chosen.kind==='notes'||chosen.kind==='reminders'" :key="chosen.id" :widget="chosen" :save="saveContent"/>
+   <CountdownEditor v-else-if="chosen.kind==='countdown'" :key="chosen.id" :data="chosen.countdown" :save="saveContent"/>
    <div v-else-if="chosen.kind==='weather'" class="xb-setting-field"><span>天气城市</span><small v-if="chosen.city">当前：{{ chosen.city.name }}</small><div class="xb-city-search"><NInput v-model:value="cityQuery" placeholder="城市名称" @keydown.enter="search"/><NButton :loading="cityBusy" aria-label="搜索城市" @click="search"><Search :size="16"/></NButton></div><NSelect v-if="cities.length" :options="cityOptions" placeholder="选择城市" @update:value="i=>update({city:cities[i]})"/></div>
-   <div v-else-if="chosen.kind==='stocks'" class="xb-setting-field"><span>自选股票 / 指数</span><NSelect :value="chosen.living?.symbol" :options="[{label:'腾讯控股',value:'116.00700'},{label:'上证指数',value:'1.000001'},{label:'深证成指',value:'0.399001'},{label:'创业板指',value:'0.399006'}]" @update:value="update({living:{reminders:[],count:0,symbol:$event}})"/><div class="xb-city-search"><NInput v-model:value="stockSymbol" placeholder="证券代码" @keydown.enter="saveStock"/><NButton @click="saveStock">保存</NButton></div><small>沪市 1.600519 · 深市 0.000001 · 港股 116.00700</small></div>
-   <p v-else class="xb-settings-help">{{ chosen.kind==='notes'?'点击桌面卡片右上角 + 添加待办，点击圆圈切换完成状态。':chosen.kind==='reminders'?'点击桌面卡片右上角日期添加日程，支持起止时间与地点。此处管理日程，不触发系统通知。':chosen.kind==='woodfish'?'点击木鱼或“敲一敲”累加次数，声音可在组件右上角切换。':'显示本机日期和时间。' }}</p>
+   <StockWatchlistEditor v-else-if="chosen.kind==='stocks'" :key="chosen.id" :living="chosen.living" :save="saveContent"/>
+   <label v-else-if="chosen.kind==='woodfish'" class="xb-setting-row"><span>木鱼声音</span><NSwitch :value="chosen.living?.sound??true" :disabled="busy" @update:value="update({living:{...chosen.living!,sound:$event}})"/></label>
+   <p v-else class="xb-settings-help">显示本机日期和时间。</p>
    <div class="xb-settings-footer"><NPopconfirm positive-text="移除" negative-text="取消" @positive-click="remove"><template #trigger><NButton quaternary :disabled="busy" aria-label="移除组件"><Trash2 :size="16"/>移除组件</NButton></template>移除这个组件及其本地内容？</NPopconfirm><NButton data-testid="widget-settings-done" @click="settingsOpen=false">完成</NButton></div>
   </div>
  </NModal>
