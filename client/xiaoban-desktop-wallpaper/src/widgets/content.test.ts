@@ -3,7 +3,7 @@ import { calendarLabel, dateKey, holidayInfo, lunarDate } from './calendar.ts';
 import { countdownValue, emptyCountdown, emptyNote, validDate } from './content.ts';
 import { emptyLayout, validateLayout, type DesktopWidget } from './model.ts';
 const day=(value:string)=>{const [y,m,d]=value.split('-').map(Number);return new Date(y,m-1,d,12);};
-const widget=(kind:DesktopWidget['kind']):DesktopWidget=>({id:'abc',kind,theme:'paper',scale:1,x:0,y:0,enabled:true,city:null});
+const widget=(kind:DesktopWidget['kind']):DesktopWidget=>({id:'abc',kind,theme:'ivory',scale:1,x:0,y:0,enabled:true,city:null});
 describe('Chinese calendar metadata',()=>{
   it('distinguishes official holidays from weekend makeup workdays',()=>{
     expect(holidayInfo(day('2026-10-01'))).toMatchObject({holiday:'国庆节',badge:'休'});
@@ -52,3 +52,4 @@ describe('typed widget content',()=>{
     expect(()=>validateLayout({...emptyLayout(),widgets:[{...widget('countdown'),countdown:{...emptyCountdown(),mode:'elapsed',repeat:'yearly'}}]})).toThrow();
   });
 });
+
