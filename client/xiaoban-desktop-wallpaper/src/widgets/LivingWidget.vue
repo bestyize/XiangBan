@@ -6,6 +6,7 @@ import { emptyNote } from './content.ts';
 import type { DesktopWidget, WidgetContent, LivingData, ReminderItem, NoteData } from './model.ts';
 
 type Weather = { text:string; updatedAt:number; source:string };
+type ForecastDay={date:string;high:number;low:number;code:number};
 type Quote = {symbol:string;name:string;price:number;change:number;percent:number;updatedAt:string;points:number[];period:string;source:string};
 const props=withDefaults(defineProps<{
   widget:DesktopWidget; now:Date; preview?:boolean; editing?:boolean; weather?:Weather|null; weatherBusy?:boolean;
@@ -18,6 +19,19 @@ const localError=ref('');
 const clock=computed(()=>props.now.toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit',hour12:false}));
 const dateLabel=computed(()=>props.now.toLocaleDateString('zh-CN',{month:'long',day:'numeric',weekday:'long'}));
 const todayKey=computed(()=>[props.now.getFullYear(),String(props.now.getMonth()+1).padStart(2,'0'),String(props.now.getDate()).padStart(2,'0')].join('-'));
+const forecast=ref<ForecastDay[]>([]),forecastError=ref('');
+let forecastBusy=false;
+const displayForecast=computed(()=>props.preview?[{date:todayKey.value,high:28,low:22,code:2},{date:'',high:27,low:21,code:0},{date:'',high:25,low:20,code:61}]:forecast.value);
+function weatherGlyph(code:number){return code===0?'☀️':code>=51&&code<=99?'🌧️':'⛅';}
+async function loadForecast(){
+  if(props.preview||!desktop||props.widget.kind!=='weather'||!props.widget.city||forecastBusy||document.hidden)return;
+  forecastBusy=true;forecastError.value='';
+  const requested=JSON.stringify(props.widget.city);
+  try{const result=await invoke<{days:ForecastDay[]}>('get_widget_forecast');if(requested===JSON.stringify(props.widget.city))forecast.value=result.days;}
+  catch(e){if(requested===JSON.stringify(props.widget.city))forecastError.value=String(e);}
+  finally{forecastBusy=false;}
+}
+watch(()=>JSON.stringify(props.widget.city),()=>{forecast.value=[];void loadForecast();});
 const weatherDesc=computed(()=>props.weather?.text.match(/：([^，]+)，/)?.[1]??'天气待加载');
 const temp=computed(()=>props.weather?.text.match(/(-?\d+(?:\.\d+)?)°C/)?.[1]??'—');
 const stockChoices=[{symbol:'1.000001',name:'上证指数',code:'SH'},{symbol:'0.399001',name:'深证成指',code:'SZ'},{symbol:'0.399006',name:'创业板指',code:'CYB'}];
@@ -97,9 +111,10 @@ async function loadQuote(){
   }catch(e){quoteError.value=String(e);}finally{quoteBusy.value=false;if(reloadQueued){reloadQueued=false;void loadQuote();}}
 }
 watch([()=>living.value.symbol,period],()=>{quote.value=null;void loadQuote();});
-function visible(){if(!document.hidden)void loadQuote();}
+function visible(){if(!document.hidden){void loadQuote();void loadForecast();}}
 onMounted(()=>{
   if(props.widget.kind==='stocks'){void loadQuote();quotePoll=setInterval(()=>{if(!document.hidden)void loadQuote();},60000);document.addEventListener('visibilitychange',visible);}
+  if(props.widget.kind==='weather'){void loadForecast();document.addEventListener('visibilitychange',visible);}
 });
 onBeforeUnmount(()=>{if(quotePoll)clearInterval(quotePoll);if(hitTimer)clearTimeout(hitTimer);document.removeEventListener('visibilitychange',visible);});
 let audio:AudioContext|null=null;
@@ -151,6 +166,10 @@ function weatherRefresh(){if(!props.preview&&!props.editing)props.refreshWeather
           <path d="M65 110C49 104 58 84 77 87 83 62 116 65 126 84 151 78 162 112 135 118H76Z" fill="#dcecff" opacity=".8"/>
         </svg>
       </div>
+      <div v-if="displayForecast.length" class="weather-days">
+        <div v-for="(day,index) in displayForecast" :key="index"><span>{{ ['今天','明天','后天'][index] }}</span><b>{{ weatherGlyph(day.code) }}</b><small>{{ day.low }}° / {{ day.high }}°</small></div>
+      </div>
+      <div v-else class="forecast-unavailable">{{ forecastError?'三日预报暂不可用':'正在载入三日预报…' }}</div>
       <div class="weather-foot">
         <div><span>{{ preview?'演示预览':weather?new Date(weather.updatedAt*1000).toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit'})+' 更新':'选择城市后显示天气' }}</span><small>{{ preview?'示例城市 · 深圳':widget.city?.name??'尚未设置城市' }}</small></div>
         <button :disabled="locked||weatherBusy" aria-label="刷新天气" title="刷新天气" @click="weatherRefresh"><RefreshCw :size="16" :class="{spinning:weatherBusy}"/></button>
@@ -211,7 +230,7 @@ function weatherRefresh(){if(!props.preview&&!props.editing)props.refreshWeather
 .clock-digits{position:absolute;top:39px;left:-3px;font-size:79px;letter-spacing:-5px;font-weight:530;line-height:1.05;font-variant-numeric:tabular-nums;white-space:nowrap}
 .clock-caption{position:absolute;top:136px;left:0;margin:0;font-size:13px;letter-spacing:5px;color:#707c88}
 .clock-landscape{position:absolute;left:-18px;right:-18px;bottom:-18px;width:calc(100% + 36px);height:142px}
-.weather{color:white;--ink:white;--muted:#e3f2ff}.weather-degree{position:absolute;top:0;left:0;display:flex;align-items:start}.weather-degree strong{font-size:94px;line-height:1;letter-spacing:-6px;font-weight:450}.weather-degree span{font-size:46px;font-weight:400;padding-top:3px}.weather-condition{position:absolute;top:99px;font-size:17px;opacity:.96}.weather-illustration{position:absolute;right:-18px;top:38px;width:215px;height:155px}.weather-illustration svg{width:100%;height:100%}.weather-foot{position:absolute;bottom:5px;left:0;right:0;display:flex;align-items:center;justify-content:space-between;border-top:1px solid #ffffff50;padding-top:12px}.weather-foot div{display:grid;gap:4px;font-size:12px}.weather-foot small{font-size:12px;opacity:.8}.weather-foot button{border:0;border-radius:50%;width:30px;height:30px;display:grid;place-items:center;background:#ffffff33;color:#fff}
+.weather{color:white;--ink:white;--muted:#e3f2ff}.weather-degree{position:absolute;top:0;left:0;display:flex;align-items:start}.weather-degree strong{font-size:94px;line-height:1;letter-spacing:-6px;font-weight:450}.weather-degree span{font-size:46px;font-weight:400;padding-top:3px}.weather-condition{position:absolute;top:99px;font-size:17px;opacity:.96}.weather-illustration{position:absolute;right:-18px;top:38px;width:215px;height:155px}.weather-illustration svg{width:100%;height:100%}.weather-days{position:absolute;bottom:61px;left:0;right:0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:3px;z-index:1}.weather-days>div{background:#ffffff27;border:1px solid #ffffff26;border-radius:12px;text-align:center;padding:7px 0;display:grid;gap:2px}.weather-days span{font-size:11px}.weather-days b{font-size:18px}.weather-days small{font-size:11px;white-space:nowrap}.forecast-unavailable{position:absolute;bottom:84px;font-size:11px;opacity:.8}.weather-foot{position:absolute;bottom:5px;left:0;right:0;display:flex;align-items:center;justify-content:space-between;border-top:1px solid #ffffff50;padding-top:12px}.weather-foot div{display:grid;gap:4px;font-size:12px}.weather-foot small{font-size:12px;opacity:.8}.weather-foot button{border:0;border-radius:50%;width:30px;height:30px;display:grid;place-items:center;background:#ffffff33;color:#fff}
 .living-topline{display:flex;align-items:center;gap:10px;height:28px}.living-topline strong{font-size:22px;font-weight:650}.living-topline>span{margin-left:auto;font-size:12px;color:var(--muted)}.plus-action{border:0;background:#f5ece7;border-radius:50%;width:34px;height:34px;display:grid;place-items:center;color:#694d3a}
 .task-stack{margin-top:20px;display:grid;gap:0}.task-row{height:42px;border-bottom:1px solid #20242b0c;display:flex;align-items:center;gap:12px;font-size:14px}.task-row>span{flex:1;text-overflow:ellipsis;overflow:hidden;white-space:nowrap}.task-row .done,.reminder-row .done{text-decoration:line-through;color:var(--muted)}.task-check{height:23px;width:23px;border:1.5px solid #c5c4c2;background:none;border-radius:50%;display:grid;place-items:center;color:white}.task-check.checked{background:#60cba5;border-color:#60cba5}.remove-mini{opacity:0;background:none;border:0;color:#a8a2a0;padding:5px}.task-row:hover .remove-mini,.reminder-row:hover .remove-mini,.remove-mini:focus-visible{opacity:1}.extra-line{padding-top:7px;color:var(--muted);font-size:12px}.inline-form{position:absolute;bottom:0;left:0;right:0;display:flex;background:#ffffffee;padding:8px;border-radius:12px;gap:8px;box-shadow:0 5px 20px #0002}.inline-form input{width:100%;min-width:0;border:0;background:transparent;padding:6px}.inline-form button{background:#20242b;color:white;border:0;border-radius:8px;padding:5px 10px;white-space:nowrap}.living-bottom-text{position:absolute;bottom:0;left:0;right:0;font-size:12px;opacity:.57;margin:0}.living-empty{padding-top:44px;font-size:16px;color:#8d8e94;display:grid;text-align:center;gap:8px}.living-empty small{font-size:12px}
 .reminder-stack{position:relative;margin-top:24px;display:grid;gap:4px}.reminder-stack:before{content:'';position:absolute;top:14px;bottom:14px;left:10px;width:1px;background:#d4d7df}.reminder-row{position:relative;display:flex;align-items:center;gap:11px;min-height:43px;font-size:13px}.reminder-row time{font-size:12px;color:#747785;min-width:75px}.reminder-name{flex:1;min-width:0;text-align:left;background:none;border:0;color:inherit;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;padding:4px 0}.reminder-dot{width:21px;height:21px;border-radius:50%;border:5px solid #f4f0ee;background:#f27472;z-index:1;flex-shrink:0}.reminder-dot.color-1{background:#6aace5}.reminder-dot.color-2{background:#c49bd8}.reminder-dot.color-3{background:#edb542}.reminder-dot.done{background:#b9b9bd}.reminders-empty{padding-top:55px}.reminder-editor{position:absolute;inset:5px -6px 2px;background:#fff9f5;z-index:2;border-radius:12px;display:grid;align-content:center;gap:10px;padding:13px;box-shadow:0 5px 20px #0002}.reminder-editor input{box-sizing:border-box;width:100%;border:1px solid #ddd5cd;border-radius:8px;padding:8px;font-size:13px}.reminder-editor>div{display:flex;justify-content:flex-end;gap:12px}.reminder-editor button{border:0;background:none;font-size:13px}.reminder-editor button[type=submit]{background:#20242b;color:#fff;padding:7px 13px;border-radius:8px}
