@@ -18,8 +18,8 @@ const status = ref<Status>({
 const busy = ref('');
 const asr = computed(() => props.store.asr);
 const shortcutOptions = computed(() => status.value.shortcuts.map(item => ({ label: item.label, value: item.value })));
-const openOptions = [{ label: '直接开始听', value: 'voice' }, { label: '先打字，需要时点光球再说', value: 'type' }];
-const readOptions = [{ label: '只在我用语音提问时朗读', value: 'voice' }, { label: '每次回答都朗读', value: 'always' }, { label: '不朗读', value: 'never' }];
+const openOptions = [{ label: '直接开始听', value: 'voice' }, { label: '先打字', value: 'type' }];
+const readOptions = [{ label: '仅语音提问时', value: 'voice' }, { label: '每次回答都朗读', value: 'always' }, { label: '不朗读', value: 'never' }];
 const percent = computed(() => Math.min(100, Math.floor(asr.value.downloaded / Math.max(1, asr.value.total) * 100)));
 
 /** One line about the speech engine, in the words a person would use. */
@@ -64,18 +64,13 @@ onMounted(() => { void read(); void asr.value.init(); });
 
 <template>
   <section class="ui-page assistant-page" data-testid="assistant-page">
-    <header class="page-header"><h1>超级小伴</h1><span class="header-note">随时呼出，直接对话</span></header>
+    <header class="page-header"><div><h1>超级小伴</h1><p class="header-note">快捷呼出与语音偏好</p></div><NButton round size="small" :disabled="!store.desktop || !status.enabled" data-testid="assistant-try" @click="tryNow"><template #icon><Play :size="13" /></template>试一下</NButton></header>
 
     <section class="surface hero" data-testid="assistant-hero">
-      <div class="hero-copy">
-        <h2>在任何应用里，按下快捷键就能向小伴提问</h2>
-        <p>说一句话或打几个字，答案就浮在屏幕上，再按一下收起。需要长谈时，点“↗”把这一轮带到完整聊天。</p>
-        <div class="hero-actions">
-          <NButton type="primary" round :disabled="!store.desktop || !status.enabled" data-testid="assistant-try" @click="tryNow"><template #icon><Play :size="15" /></template>现在试一下</NButton>
-          <span v-if="status.enabled && status.registered" class="chip ok" data-testid="assistant-registered">快捷键已生效</span>
-        </div>
-      </div>
-      <div class="keycap" aria-label="当前快捷键" data-testid="assistant-shortcut-label">{{ status.shortcutLabel }}</div>
+      <div class="assistant-mark" aria-hidden="true"><AudioLines :size="23" :stroke-width="1.6" /></div>
+      <div class="hero-copy"><h2>启用超级小伴</h2><p>{{ status.enabled ? '随时呼出，说话或打字都可以。' : '开启后，可通过快捷键或悬浮球呼出。' }}</p></div>
+      <div class="hero-meta"><kbd class="keycap" aria-label="当前快捷键" data-testid="assistant-shortcut-label">{{ status.shortcutLabel }}</kbd><span v-if="status.enabled && status.registered" class="chip ok" data-testid="assistant-registered"><i aria-hidden="true"></i>快捷键已生效</span></div>
+      <NSwitch :value="status.enabled" :disabled="!store.desktop || busy === 'assistant'" aria-label="启用超级小伴" data-testid="assistant-enabled" @update:value="change({ enabled: $event })" />
     </section>
 
     <NAlert v-if="status.enabled && status.error" type="warning" :show-icon="false" data-testid="assistant-shortcut-error">{{ status.error }}</NAlert>
@@ -84,39 +79,55 @@ onMounted(() => { void read(); void asr.value.init(); });
       <NButton text type="primary" @click="store.settingsTab = 'general'; store.navigate('settings')">去打开</NButton>
     </NAlert>
 
-    <section class="surface">
-      <div class="section-heading"><div><h2>呼出方式</h2><p>怎么找到它、怎么叫出它</p></div><AudioLines :size="20" /></div>
-      <div class="setting-row"><div><b>启用超级小伴</b><p>关闭后，快捷键和悬浮球都会消失。</p></div><NSwitch :value="status.enabled" :disabled="!store.desktop || busy === 'assistant'" aria-label="启用超级小伴" data-testid="assistant-enabled" @update:value="change({ enabled: $event })" /></div>
-      <div class="setting-row"><div><b>屏幕边缘的悬浮球</b><p>常驻一个小球，点一下展开，按住可以拖到喜欢的位置。关闭后只能用快捷键呼出。</p></div><NSwitch :value="status.ball" :disabled="!store.desktop || !status.enabled || busy === 'assistant'" aria-label="屏幕边缘的悬浮球" data-testid="assistant-ball-switch" @update:value="change({ ball: $event })" /></div>
-      <div class="setting-row"><div><b>呼出快捷键</b><p>和别的应用冲突时，换一个组合就行。</p></div><NSelect class="select" :value="status.shortcut" :options="shortcutOptions" :disabled="!store.desktop || !status.enabled || busy === 'assistant'" aria-label="呼出快捷键" data-testid="assistant-shortcut" @update:value="change({ shortcut: $event })" /></div>
-      <div class="setting-row"><div><b>位置</b><p>把悬浮球和对话框放回默认的位置。</p></div><NButton round :disabled="!store.desktop || !status.enabled || busy === 'assistant'" data-testid="assistant-reset" @click="change({ resetPosition: true })"><template #icon><RotateCcw :size="14" /></template>放回默认位置</NButton></div>
+    <div class="settings-grid">
+    <section class="surface settings-group">
+      <div class="section-heading"><AudioLines :size="17" :stroke-width="1.7" /><h2>呼出方式</h2></div>
+      <div class="setting-row"><div><b>悬浮球</b><p>点击展开，按住拖动。关闭后用快捷键呼出。</p></div><NSwitch :value="status.ball" :disabled="!store.desktop || !status.enabled || busy === 'assistant'" aria-label="屏幕边缘的悬浮球" data-testid="assistant-ball-switch" @update:value="change({ ball: $event })" /></div>
+      <div class="setting-row"><div><b>呼出快捷键</b><p>与其他应用冲突时，可更换组合。</p></div><NSelect class="select" :value="status.shortcut" :options="shortcutOptions" :disabled="!store.desktop || !status.enabled || busy === 'assistant'" aria-label="呼出快捷键" data-testid="assistant-shortcut" @update:value="change({ shortcut: $event })" /></div>
+      <div class="setting-row"><div><b>悬浮位置</b><p>将悬浮球与对话框恢复到初始位置。</p></div><NButton round :disabled="!store.desktop || !status.enabled || busy === 'assistant'" data-testid="assistant-reset" @click="change({ resetPosition: true })"><template #icon><RotateCcw :size="14" /></template>重置位置</NButton></div>
     </section>
 
-    <section class="surface">
-      <div class="section-heading"><div><h2>语音对话</h2><p>呼出后直接说话，回答可以读给你听</p></div><Mic :size="20" /></div>
+    <section class="surface settings-group">
+      <div class="section-heading"><Mic :size="17" :stroke-width="1.7" /><h2>语音对话</h2></div>
       <div class="setting-row"><div><b>用语音提问</b><p data-testid="assistant-voice-line" :class="{ problem: asr.error }">{{ voiceLine }}</p><NProgress v-if="asr.preparing && asr.phase === 'downloading'" class="progress" type="line" :percentage="percent" :height="4" :show-indicator="false" /></div><div class="voice-actions"><NButton v-if="asr.error && asr.enabled" size="small" round :disabled="asr.saving || voiceBusy" data-testid="assistant-voice-retry" @click="asr.retry()">重试</NButton><NSwitch :value="asr.enabled" :disabled="!store.desktop || asr.saving" aria-label="用语音提问" data-testid="assistant-voice" @update:value="setVoice" /></div></div>
-      <div class="setting-row"><div><b>呼出后</b><p>语音关闭或还没准备好时，会自动改成打字。</p></div><NSelect class="select wide" :value="status.open" :options="openOptions" :disabled="!store.desktop || busy === 'assistant'" aria-label="呼出后" data-testid="assistant-open" @update:value="change({ open: $event })" /></div>
+      <div class="setting-row"><div><b>呼出后</b><p>语音未就绪时，自动切换为打字。</p></div><NSelect class="select wide" :value="status.open" :options="openOptions" :disabled="!store.desktop || busy === 'assistant'" aria-label="呼出后" data-testid="assistant-open" @update:value="change({ open: $event })" /></div>
       <div class="setting-row"><div><b>朗读回答</b><p>使用“声音”设置里选的音色。<NButton text type="primary" size="small" @click="openVoiceSettings">去选音色</NButton></p></div><NSelect class="select wide" :value="status.read" :options="readOptions" :disabled="!store.desktop || busy === 'assistant'" aria-label="朗读回答" data-testid="assistant-read" @update:value="change({ read: $event })" /></div>
     </section>
+    </div>
   </section>
 </template>
 
 <style scoped>
-.assistant-page{display:grid;gap:var(--ui-section-gap,24px);max-width:860px;margin:0 auto;align-content:start}
-.header-note{font-size:12px;color:var(--ui-text-tertiary)}
-.assistant-page>.surface{padding:24px}
-.assistant-page>.hero{display:flex;align-items:center;justify-content:space-between;gap:28px;padding:28px 32px}
-.hero-copy{max-width:470px}
-.hero h2{font-size:19px;line-height:1.5;margin:0 0 10px}
-.hero p{font-size:13px;line-height:1.8;color:var(--ui-text-secondary);margin:0 0 18px}
-.hero-actions{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
-.chip{font-size:12px;padding:3px 10px;border-radius:12px}
-.chip.ok{color:var(--ui-accent);background:color-mix(in srgb,var(--ui-accent) 14%,transparent)}
-.keycap{flex:none;min-width:150px;text-align:center;padding:22px 26px;border-radius:18px;font:600 28px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;letter-spacing:.06em;color:var(--ui-text-primary);background:var(--ui-surface-alt);border:1px solid var(--ui-border);border-bottom-width:4px}
-.select{width:200px}
-.select.wide{width:260px}
-.setting-row p.problem{color:#e0556a}
+.assistant-page{container-type:inline-size;display:grid;gap:16px;width:100%;max-width:920px;margin:0 auto;align-content:start;color:var(--ui-text-primary)}
+.assistant-page .page-header{margin:0 0 2px;gap:16px;align-items:center}
+.page-header h1{font-size:23px;letter-spacing:-.035em;font-weight:650}
+.header-note{margin:5px 0 0;font-size:12px;line-height:1.5;color:var(--ui-text-secondary)}
+.assistant-page .surface{border:1px solid color-mix(in srgb,var(--ui-border) 65%,transparent);border-radius:16px;box-shadow:0 2px 8px color-mix(in srgb,var(--ui-text-primary) 3%,transparent)}
+.assistant-page .hero{display:flex;align-items:center;gap:14px;padding:20px 22px;background:linear-gradient(120deg,var(--ui-surface),color-mix(in srgb,var(--ui-surface-alt) 65%,var(--ui-surface)))}
+.assistant-mark{display:grid;place-items:center;flex:none;width:44px;height:44px;border-radius:14px;background:var(--ui-surface);color:var(--ui-text-secondary);box-shadow:inset 0 0 0 1px var(--ui-border),0 2px 4px color-mix(in srgb,var(--ui-text-primary) 3%,transparent)}
+.hero-copy{flex:1;min-width:0}
+.hero h2{font-size:14px;line-height:1.5;font-weight:600;margin:0 0 4px}
+.hero p{font-size:12px;line-height:1.6;color:var(--ui-text-secondary);margin:0}
+.hero-meta{display:grid;justify-items:end;gap:7px;margin-right:6px;flex:none}
+.chip{display:inline-flex;align-items:center;gap:5px;font-size:10px;line-height:1.4;color:var(--ui-text-secondary)}
+.chip i{width:5px;height:5px;border-radius:50%;background:var(--ui-accent)}
+.keycap{padding:7px 11px;border-radius:8px;font:500 12px/1 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;white-space:nowrap;color:var(--ui-text-primary);background:var(--ui-surface);border:1px solid var(--ui-border);box-shadow:0 2px 0 var(--ui-border)}
+.settings-grid{display:grid;gap:16px;align-items:start}
+.settings-group{min-width:0;overflow:hidden;padding:0 20px}
+.assistant-page .section-heading{justify-content:flex-start;gap:8px;margin:0;padding:16px 0 12px;border-bottom:1px solid var(--ui-border);color:var(--ui-text-secondary)}
+.section-heading h2{font-size:13px;font-weight:600;margin:0;color:var(--ui-text-primary)}
+.assistant-page .setting-row{gap:16px;min-height:0;padding:15px 0;border-bottom:1px solid color-mix(in srgb,var(--ui-border) 75%,transparent)}
+.assistant-page .setting-row:last-child{border-bottom:0;padding-bottom:17px}
+.setting-row>div:first-child{flex:1;min-width:0}
+.setting-row b{font-size:13px;font-weight:500}
+.setting-row p{font-size:11px;line-height:1.65;margin:4px 0 0;max-width:410px;color:var(--ui-text-secondary)}
+.setting-row p.problem{color:var(--ui-primary-text)}
+.select{width:180px;flex:0 0 auto}
+.select.wide{width:180px}
+.setting-row :deep(.n-button){font-size:12px;height:32px}
+.setting-row :deep(.n-button--text-type){height:auto;font-size:11px;margin-left:4px}
 .progress{margin-top:8px;max-width:320px}
-.voice-actions{display:flex;align-items:center;gap:12px}
-@media(max-width:760px){.hero{flex-direction:column;align-items:flex-start}.select,.select.wide{width:100%}}
+.voice-actions{display:flex;align-items:center;gap:10px;flex:none}
+@container(min-width:820px){.settings-grid{grid-template-columns:1fr 1fr}.setting-row{flex-wrap:wrap;column-gap:12px}.setting-row>.select{width:100%;margin-top:0}.setting-row:has(>.select){row-gap:10px}.setting-row:has(>.select)>div:first-child{flex-basis:100%}}
+@container(max-width:520px){.assistant-page .hero{flex-wrap:wrap;padding:16px;gap:12px}.hero-copy{flex-basis:calc(100% - 60px)}.hero-meta{margin-left:56px;margin-right:auto;justify-items:start;display:flex;align-items:center;gap:10px}.settings-group{padding:0 16px}.setting-row{flex-wrap:wrap;row-gap:10px}.setting-row>.select{width:100%}.setting-row:has(>.select)>div:first-child{flex-basis:100%}}
 </style>
