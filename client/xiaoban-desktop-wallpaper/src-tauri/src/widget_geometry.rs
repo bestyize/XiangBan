@@ -57,3 +57,27 @@ mod tests {
         assert_eq!(from_bottom_left(900.,-1280.,0.,1024.),(-1280.,-124.));assert_eq!(from_bottom_left(900.,0.,900.,1080.),(0.,-1080.));assert_eq!(from_bottom_left(900.,0.,-768.,768.),(0.,900.));
     }
 }
+
+
+/// A corner resize projects cursor movement onto the original aspect ratio.
+/// Keep the top-left anchor fixed, and stop at the monitor edge when possible.
+pub fn corner_scale(m:&MonitorArea,base:(f64,f64),original:f64,anchor:(f64,f64),delta:(f64,f64))->f64{
+    let proposed=original+(delta.0*base.0+delta.1*base.1)/(m.scale*(base.0*base.0+base.1*base.1));
+    let max_x=((m.x+m.width-anchor.0)/m.scale-16.)/base.0;
+    let max_y=((m.y+m.height-56.*m.scale-anchor.1)/m.scale-16.)/base.1;
+    proposed.clamp(0.5,max_x.min(max_y).min(1.5).max(0.5))
+}
+/// A 340px menu fits beside the card, flips left at the edge, and stays on-screen.
+pub fn menu_position(m:&MonitorArea,card:(f64,f64,f64,f64),size:(f64,f64))->(f64,f64){
+    let gap=8.*m.scale;let (w,h)=(size.0*m.scale,size.1*m.scale);
+    let right=card.0+card.2+gap;let left=card.0-w-gap;
+    let x=if right+w<=m.x+m.width{right}else{left};
+    (x.clamp(m.x+gap,(m.x+m.width-w-gap).max(m.x+gap)),card.1.clamp(m.y+gap,(m.y+m.height-h-gap).max(m.y+gap)))
+}
+#[cfg(test)]mod interaction_tests{
+ use super::*;
+ fn screen()->MonitorArea{MonitorArea{id:"main".into(),name:"main".into(),x:0.,y:0.,width:1920.,height:1080.,scale:2.,primary:true}}
+ #[test]fn corner_resize_scales_proportionally_at_mixed_dpi(){let m=screen();assert!((corner_scale(&m,(400.,300.),0.5,(100.,100.),(400.,300.))-1.).abs()<0.001);assert_eq!(corner_scale(&m,(400.,300.),0.5,(100.,100.),(-1000.,-1000.)),0.5);}
+ #[test]fn corner_resize_stops_at_monitor_edge(){let m=screen();let s=corner_scale(&m,(400.,300.),0.5,(1400.,100.),(10000.,10000.));assert!(1400.+(400.*s+16.)*m.scale<=1920.+0.001);}
+ #[test]fn menu_flips_left_and_clamps_at_bottom(){let m=screen();let p=menu_position(&m,(1500.,800.,300.,200.),(340.,300.));assert!(p.0<1500.);assert!(p.1+600.<=1080.);}
+}

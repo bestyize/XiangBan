@@ -1,0 +1,9 @@
+import {describe,it,expect,vi} from 'vitest';
+import {cornerResize} from './resize.ts';
+const tick=async()=>{for(let i=0;i<6;i++)await Promise.resolve();};
+describe('corner resize command ordering',()=>{
+ it('commits a quick release after begin finishes and drops intermediate moves',async()=>{let start!:()=>void;const send=vi.fn((phase:string)=>phase==='begin'?new Promise<void>(r=>start=r):Promise.resolve());const r=cornerResize(send,vi.fn());const opening=r.begin();r.move();r.move();r.finish();expect(send.mock.calls.map(c=>c[0])).toEqual(['begin']);start();await opening;await tick();expect(send.mock.calls.map(c=>c[0])).toEqual(['begin','end']);expect(r.active).toBe(false);});
+ it('coalesces moves while native placement is busy and finishes last',async()=>{let moving!:()=>void;const send=vi.fn((phase:string)=>phase==='move'?new Promise<void>(r=>moving=r):Promise.resolve());const r=cornerResize(send,vi.fn());await r.begin();r.move();r.move();r.move();r.finish();moving();await tick();expect(send.mock.calls.map(c=>c[0])).toEqual(['begin','move','end']);});
+ it('cancels pending changes and reports a failed native update',async()=>{const failed=vi.fn(),send=vi.fn((phase:string)=>phase==='move'?Promise.reject(Error('放置失败')):Promise.resolve());const r=cornerResize(send,failed);await r.begin();r.move();await tick();expect(send.mock.calls.map(c=>c[0])).toEqual(['begin','move','cancel']);expect(failed).toHaveBeenCalledOnce();expect(r.active).toBe(false);});
+ it('uses cancel for escape and ignores moves after release',async()=>{let end!:()=>void;const send=vi.fn((phase:string)=>phase==='cancel'?new Promise<void>(r=>end=r):Promise.resolve());const r=cornerResize(send,vi.fn());await r.begin();r.finish(true);r.move();end();await tick();expect(send.mock.calls.map(c=>c[0])).toEqual(['begin','cancel']);});
+});

@@ -104,6 +104,7 @@ fn publish(app: &tauri::AppHandle) {
     let settings = settings(app);
     let item = app.state::<DesktopState>().startup_menu.lock().unwrap().clone();
     if let Some(item) = item { let _ = item.set_checked(settings.autostart); }
+    if let Some(menu)=app.get_webview_window("widgetmenu"){let _=menu.eval(format!("window.dispatchEvent(new CustomEvent('widget-menu-appearance',{{detail:{}}}));",serde_json::json!(settings.appearance)));}
     let _ = app.emit("settings-changed", settings);
     content::sync(app);
     effects::sync(app);
@@ -744,7 +745,7 @@ fn main() {
             games::save_game_save, games::get_game_status, games::set_game_desktop_double_click,
             games::game_smoke_report, games::list_games, games::delete_user_game, games::open_user_games_folder, rituals::open_ritual_space, rituals::close_ritual_space, rituals::read_ritual_journal, rituals::write_ritual_journal,
             widgets::get_desktop_widgets, widgets::add_desktop_widget, widgets::update_desktop_widget, widgets::remove_desktop_widget,
-            widgets::set_widgets_editing, widgets::get_desktop_widget, widgets::move_desktop_widget, widgets::show_widget_settings, widgets::get_widget_weather, widgets::get_widget_forecast, widgets::get_widget_air_quality, widgets::get_widget_stock_watchlist, widgets::get_widget_stocks, widgets::save_desktop_widget_content,
+            widgets::set_widgets_editing, widgets::get_desktop_widget, widgets::move_desktop_widget, widgets::show_widget_settings, widgets::resize_desktop_widget, widgets::get_widget_settings, widgets::update_widget_settings, widgets::remove_widget_settings, widgets::close_widget_settings, widgets::size_widget_settings, widgets::search_widget_cities, widgets::get_widget_weather, widgets::get_widget_forecast, widgets::get_widget_air_quality, widgets::get_widget_stock_watchlist, widgets::get_widget_stocks, widgets::save_desktop_widget_content,
             reminders::get_care_settings, reminders::configure_care, reminders::upsert_care_rule, reminders::delete_care_rule,
             reminders::preview_care_rule, reminders::get_care_delivery, reminders::care_ready, reminders::dismiss_care,
             reminders::snooze_care, reminders::care_synthesize, reminders::search_care_cities, reminders::detect_care_city, reminders::check_care_weather,

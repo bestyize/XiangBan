@@ -1,36 +1,29 @@
 <script setup lang="ts">
 import {computed,onMounted,onBeforeUnmount,ref,watch} from 'vue';
-import {Plus,Check,Search,Trash2,ArrowLeft} from 'lucide-vue-next';
-import {NAlert,NButton,NInput,NModal,NPopconfirm,NSelect,NSlider,NSwitch} from 'naive-ui';
+import {Plus,Check,ArrowLeft} from 'lucide-vue-next';
+import {NAlert,NButton,NModal} from 'naive-ui';
 import type {ControlStore} from '../control-types.ts';
-import {createWidgetClient,searchWidgetCities} from '../../widgets/client.ts';
-import {baseSize,widgetKinds,validStockSymbol,type WidgetKind,type DesktopWidget,type City,type WidgetContent} from '../../widgets/model.ts';
+import {createWidgetClient} from '../../widgets/client.ts';
+import {baseSize,widgetKinds,type WidgetKind,type DesktopWidget} from '../../widgets/model.ts';
 import {emptyCountdown,emptyNote} from '../../widgets/content.ts';
 import {dateKey} from '../../widgets/calendar.ts';
 import WidgetSurface from '../../widgets/WidgetSurface.vue';
-import ItemManager from '../../widgets/ItemManager.vue';
-import StockWatchlistEditor from '../../widgets/StockWatchlistEditor.vue';
-import CountdownEditor from '../../widgets/CountdownEditor.vue';
+import WidgetSettingsMenu from '../../widgets/WidgetSettingsMenu.vue';
 const props=defineProps<{store:ControlStore;settingsRequest?:{id:string}|null}>();
 const emit=defineEmits<{settingsOpened:[]}>();
 const client=createWidgetClient(),{layout,ready,busy,error}=client;
-const selected=ref(''),settingsOpen=ref(false),showAdded=ref(false),stockSymbol=ref(''),cityQuery=ref(''),cities=ref<City[]>([]),cityBusy=ref(false),flash=ref('');
+const selected=ref(''),settingsOpen=ref(false),showAdded=ref(false),flash=ref('');
 const chosen=computed(()=>layout.value.widgets.find(w=>w.id===selected.value));
 const titleOf=(w:DesktopWidget)=>widgetKinds.find(k=>k.kind===w.kind)?.title||'桌面组件';
-const monitors=computed(()=>layout.value.monitors??[]),monitorOptions=computed(()=>monitors.value.map(m=>({label:`${m.name}${m.primary?' · 主屏幕':''}`,value:m.id})));
-const cityOptions=computed(()=>cities.value.map((c,i)=>({label:[c.name,c.admin1,c.country].filter(Boolean).join(' · '),value:i})));
+const monitors=computed(()=>layout.value.monitors??[]);
 const board=ref<HTMLElement>(),boardScale=ref(.75);let observer:ResizeObserver|undefined,flashTimer:ReturnType<typeof setTimeout>;
 const positions:Record<WidgetKind,{left:number;top:number}>= {clock:{left:0,top:0},weather:{left:615,top:0},notes:{left:961,top:0},reminders:{left:0,top:328},stocks:{left:501,top:328},woodfish:{left:925,top:328},calendar:{left:0,top:681},countdown:{left:522,top:681}};
 const demo=(kind:WidgetKind):DesktopWidget=>({id:`demo${kind}`,kind,theme:'ivory',scale:.5,x:0,y:0,enabled:true,city:null,...(kind==='notes'?{note:{...emptyNote(),items:[{id:'task1',text:'完成产品周报',done:true,time:'09:00'},{id:'task2',text:'准备下周的设计评审',done:false,time:'14:00'},{id:'task3',text:'阅读一本书',done:false,time:'20:00'}]}}:kind==='reminders'?{living:{symbol:'1.000001',count:0,reminders:[{id:'demo1',title:'产品设计方案评审',at:dateKey(new Date())+'T10:00',end:'11:30',location:'会议室 A302',done:false},{id:'demo2',title:'与开发同学同步进度',at:dateKey(new Date())+'T14:00',end:'15:00',done:false},{id:'demo3',title:'健身',at:dateKey(new Date())+'T19:00',end:'20:00',done:false}]}}:kind==='woodfish'?{living:{count:108,symbol:'1.000001',reminders:[]}}:kind==='stocks'?{living:{count:0,symbol:'116.00700',reminders:[]}}:kind==='countdown'?{countdown:{...emptyCountdown(),title:'我们的纪念日',date:dateKey(new Date(Date.now()+79*86400000))}}:{})});
 async function action(fn:()=>Promise<unknown>){try{await fn();}catch(e){props.store.notify(e,'error');}}
 async function add(kind:WidgetKind){await action(async()=>{await client.add(kind);flash.value=kind;clearTimeout(flashTimer);flashTimer=setTimeout(()=>flash.value='',1600);props.store.notify('已添加到桌面，按住卡片顶部可拖动','success');});}
-function openSettings(id:string){selected.value=id;cityQuery.value='';cities.value=[];settingsOpen.value=true;}
-function update(patch:Partial<DesktopWidget>){if(chosen.value)void action(()=>client.update(chosen.value!.id,patch));}
-async function saveContent(content:WidgetContent){if(chosen.value)await client.update(chosen.value.id,content);}
-async function remove(){if(chosen.value)await action(async()=>{await client.remove(chosen.value!.id);settingsOpen.value=false;});}
-watch(chosen,w=>stockSymbol.value=w?.living?.symbol??'116.00700',{immediate:true});
-function saveStock(){const symbol=stockSymbol.value.trim();if(!validStockSymbol(symbol)){props.store.notify('例如：116.00700（腾讯）、1.600519（沪市）、0.000001（深市）','error');return;}update({living:{reminders:[],count:0,symbol}});}
-async function search(){if(!cityQuery.value.trim()||cityBusy.value)return;cityBusy.value=true;try{cities.value=await searchWidgetCities(cityQuery.value.trim());if(!cities.value.length)props.store.notify('没有找到城市，请试试完整名称','info');}catch(e){props.store.notify(e,'error');}finally{cityBusy.value=false;}}
+function openSettings(id:string){selected.value=id;settingsOpen.value=true;}
+async function update(patch:Partial<DesktopWidget>){if(!chosen.value)throw Error('组件已移除');await client.update(chosen.value.id,patch);}
+async function remove(){if(chosen.value){await client.remove(chosen.value.id);settingsOpen.value=false;}}
 watch([()=>props.settingsRequest,ready],([request,loaded])=>{if(!request||!loaded)return;if(layout.value.widgets.some(w=>w.id===request.id)){showAdded.value=true;openSettings(request.id);}else props.store.notify('这个组件已不在桌面上','info');emit('settingsOpened');},{immediate:true});
 function fit(){if(board.value)boardScale.value=Math.max(.1,Math.min(1,board.value.clientWidth/1314));}
 onMounted(()=>{void client.load();observer=new ResizeObserver(fit);if(board.value)observer.observe(board.value);fit();});
@@ -49,22 +42,10 @@ onBeforeUnmount(()=>{observer?.disconnect();clearTimeout(flashTimer);client.disp
  <template v-else>
   <div v-if="!layout.widgets.length" class="xb-empty"><span>还没有桌面组件</span><p>先挑选一个喜欢的，让桌面多一点生活。</p><button @click="showAdded=false">去组件库看看</button></div>
   <div v-else class="xb-added-grid" data-testid="desktop-widgets"><button v-for="w in layout.widgets" :key="w.id" class="xb-added-card desktop-card" :class="{off:!w.enabled}" :aria-label="`调整${titleOf(w)}`" @click="openSettings(w.id)"><div class="xb-added-preview"><div :style="{transform:`scale(${Math.min(280/baseSize(w.kind).width,180/baseSize(w.kind).height)})`}"><WidgetSurface :widget="w" preview/></div></div><strong>{{ titleOf(w) }}</strong><small>{{ w.enabled?'已显示在桌面':'已隐藏' }} · 点击设置</small></button></div>
-  <p class="xb-page-hint">按住卡片顶部拖动位置，点击卡片右上角查看设置。数据保存在本机，重新启动后恢复。</p>
+  <p class="xb-page-hint">按住顶部移动，拖动右下角调整大小，点击右上角打开设置菜单。</p>
  </template>
- <NModal :show="settingsOpen" preset="card" :title="chosen?titleOf(chosen):'组件设置'" style="max-width:560px;width:92vw;border-radius:24px" content-style="max-height:72vh;overflow:auto" data-testid="widget-settings" @update:show="settingsOpen=$event">
-  <div v-if="chosen" class="xb-widget-settings">
-   <div class="xb-settings-preview"><div :style="{transform:`scale(${Math.min(470/baseSize(chosen.kind).width,220/baseSize(chosen.kind).height)*chosen.scale/1.5})`}"><WidgetSurface :key="chosen.id" :widget="chosen" preview :save="saveContent"/></div></div>
-   <label class="xb-setting-row"><span>显示在桌面</span><NSwitch :value="chosen.enabled" :disabled="busy" @update:value="update({enabled:$event})"/></label>
-   <label class="xb-setting-field"><span>大小 <small>× {{ chosen.scale.toFixed(2) }}</small></span><NSlider :value="chosen.scale" :min=".5" :max="1.5" :step=".05" :disabled="busy" @update:value="update({scale:$event})"/></label>
-   <label v-if="monitors.length>1" class="xb-setting-field"><span>所在显示器</span><NSelect :value="chosen.monitor??monitors.find(m=>m.primary)?.id" :options="monitorOptions" :disabled="busy" @update:value="update({monitor:$event})"/></label>
-   <ItemManager v-if="chosen.kind==='notes'||chosen.kind==='reminders'" :key="chosen.id" :widget="chosen" :save="saveContent"/>
-   <CountdownEditor v-else-if="chosen.kind==='countdown'" :key="chosen.id" :data="chosen.countdown" :save="saveContent"/>
-   <div v-else-if="chosen.kind==='weather'" class="xb-setting-field"><span>天气城市</span><small v-if="chosen.city">当前：{{ chosen.city.name }}</small><div class="xb-city-search"><NInput v-model:value="cityQuery" placeholder="城市名称" @keydown.enter="search"/><NButton :loading="cityBusy" aria-label="搜索城市" @click="search"><Search :size="16"/></NButton></div><NSelect v-if="cities.length" :options="cityOptions" placeholder="选择城市" @update:value="i=>update({city:cities[i]})"/></div>
-   <StockWatchlistEditor v-else-if="chosen.kind==='stocks'" :key="chosen.id" :living="chosen.living" :save="saveContent"/>
-   <label v-else-if="chosen.kind==='woodfish'" class="xb-setting-row"><span>木鱼声音</span><NSwitch :value="chosen.living?.sound??true" :disabled="busy" @update:value="update({living:{...chosen.living!,sound:$event}})"/></label>
-   <p v-else class="xb-settings-help">显示本机日期和时间。</p>
-   <div class="xb-settings-footer"><NPopconfirm positive-text="移除" negative-text="取消" @positive-click="remove"><template #trigger><NButton quaternary :disabled="busy" aria-label="移除组件"><Trash2 :size="16"/>移除组件</NButton></template>移除这个组件及其本地内容？</NPopconfirm><NButton data-testid="widget-settings-done" @click="settingsOpen=false">完成</NButton></div>
-  </div>
+ <NModal :show="settingsOpen" :auto-focus="false" style="width:324px;max-width:92vw" data-testid="widget-settings" @update:show="settingsOpen=$event">
+  <WidgetSettingsMenu v-if="chosen" :key="chosen.id" :widget="chosen" :monitors="monitors" :update="update" :remove="remove" @close="settingsOpen=false"/>
  </NModal>
 </section>
 </template>

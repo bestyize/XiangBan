@@ -6,6 +6,7 @@ import {baseSize,calendarDays,type DesktopWidget,type WidgetPayload,type WidgetC
 import {dateKey,lunarDate} from './calendar.ts';
 import {emptyNote,emptyCountdown,countdownValue,occursOn,itemDone,toggleItem,scheduleLabel} from './content.ts';
 import ItemForm from './ItemForm.vue';
+import {cornerResize} from './resize.ts';
 import './surface.css';
 const props=withDefaults(defineProps<{widget:DesktopWidget;preview?:boolean;demo?:boolean;editing?:boolean;payload?:WidgetPayload;save?:(c:WidgetContent)=>Promise<void>}>(),{preview:false,demo:false,editing:false});
 const emit=defineEmits<{settings:[]}>();
@@ -105,6 +106,14 @@ function tap(){
  if(sound.value){try{audio??=new AudioContext();void audio.resume();const o=audio.createOscillator(),g=audio.createGain(),t=audio.currentTime;o.frequency.setValueAtTime(420,t);o.frequency.exponentialRampToValueAtTime(160,t+.16);g.gain.setValueAtTime(.18,t);g.gain.exponentialRampToValueAtTime(.001,t+.2);o.connect(g);g.connect(audio.destination);o.start(t);o.stop(t+.21);}catch{}}
  void persistHits();
 }
+const resizer=cornerResize(phase=>invoke('resize_desktop_widget',{phase}),e=>error.value=String(e));
+const resizing=ref(false);
+function startResize(e:PointerEvent){
+ if(e.button!==0||props.preview||!props.payload)return;
+ const handle=e.currentTarget as HTMLElement;handle.setPointerCapture?.(e.pointerId);resizing.value=true;void resizer.begin();
+}
+function finishResize(cancel=false){if(!resizing.value)return;resizing.value=false;resizer.finish(cancel);}
+function resizeKey(e:KeyboardEvent){if(e.key==='Escape'&&resizing.value){e.preventDefault();finishResize(true);}}
 let drag:{x:number;y:number;grabX:number;grabY:number;moved:boolean}|null=null,suppressClick=false,moving=false,pending:{grabX:number;grabY:number;commit:boolean}|null=null;
 let clickTimer:ReturnType<typeof setTimeout>|undefined;
 async function movePending(){if(moving)return;moving=true;try{while(pending){const p=pending;pending=null;await invoke('move_desktop_widget',p);}}catch(e){error.value=String(e);}finally{moving=false;}}
@@ -113,11 +122,11 @@ function move(e:PointerEvent,commit=false){if(!drag)return;if(Math.hypot(e.scree
 function capture(e:MouseEvent){if(suppressClick||props.editing){e.stopImmediatePropagation();e.preventDefault();}}
 let clockTimer:ReturnType<typeof setInterval>,networkTimer:ReturnType<typeof setInterval>;
 function visible(){now.value=new Date();if(!document.hidden){if(props.widget.kind==='weather')void refreshWeather();else if(props.widget.kind==='stocks'){void loadQuote();void loadWatchlist();}}}
-onMounted(()=>{clockTimer=setInterval(()=>now.value=new Date(),1000);if(props.widget.kind==='weather')void refreshWeather();if(props.widget.kind==='stocks'){void loadQuote();void loadWatchlist();}networkTimer=setInterval(visible,props.widget.kind==='stocks'?60000:1800000);document.addEventListener('visibilitychange',visible);});
-onBeforeUnmount(()=>{alive=false;clearInterval(clockTimer);clearInterval(networkTimer);clearTimeout(hitTimer);clearTimeout(clickTimer);document.removeEventListener('visibilitychange',visible);void audio?.close();});
+onMounted(()=>{clockTimer=setInterval(()=>now.value=new Date(),1000);if(props.widget.kind==='weather')void refreshWeather();if(props.widget.kind==='stocks'){void loadQuote();void loadWatchlist();}networkTimer=setInterval(visible,props.widget.kind==='stocks'?60000:1800000);document.addEventListener('visibilitychange',visible);document.addEventListener('keydown',resizeKey);});
+onBeforeUnmount(()=>{resizer.finish(true);document.removeEventListener('keydown',resizeKey);alive=false;clearInterval(clockTimer);clearInterval(networkTimer);clearTimeout(hitTimer);clearTimeout(clickTimer);document.removeEventListener('visibilitychange',visible);void audio?.close();});
 </script>
 <template>
-<article class="xb-widget" :class="[widget.kind,{editing,falling:!up}]" :style="{width:`${size.width}px`,height:`${size.height}px`}" @pointerdown="startDrag" @pointermove="move($event)" @pointerup="move($event,true)" @pointercancel="move($event,true)" @click.capture="capture">
+<article class="xb-widget" :class="[widget.kind,{editing,resizing,falling:!up}]" :style="{width:`${size.width}px`,height:`${size.height}px`,'--widget-scale':widget.scale}" @pointerdown="startDrag" @pointermove="move($event)" @pointerup="move($event,true)" @pointercancel="move($event,true)" @click.capture="capture">
  <template v-if="widget.kind==='clock'">
   <div class="clock-art" aria-hidden="true"/><div class="clock-greeting"><Sunrise :size="31"/><div><span>{{ greeting }}</span><small>新的一天，也要好好生活</small></div></div>
   <div class="clock-time">{{ clock }}</div><div class="clock-date">{{ now.getMonth()+1 }}月{{ now.getDate() }}日 <span>{{ now.toLocaleDateString('zh-CN',{weekday:'long'}) }}</span></div><p class="clock-lunar">{{ lunarLabel }}</p><button class="more hover-more" aria-label="时钟设置" @click="settings"><MoreHorizontal/></button>
@@ -155,6 +164,7 @@ onBeforeUnmount(()=>{alive=false;clearInterval(clockTimer);clearInterval(network
  <template v-else-if="widget.kind==='countdown'">
   <div class="lake-art" aria-hidden="true"/><header><h2 class="anniversary-title"><Heart :size="23" fill="#ef796b" stroke="#ec6c5c"/>{{ countdown.title }}</h2><button class="more hover-more" aria-label="纪念日设置" @click="settings"><MoreHorizontal/></button></header><p class="countdown-date">{{ remaining.date.replace('-','年').replace('-','月') }}日 {{ new Date(remaining.date+'T12:00').toLocaleDateString('zh-CN',{weekday:'long'}) }}</p><div class="countdown-value"><strong>{{ remaining.days }}</strong><span>{{ remaining.label==='还有'?'天后':remaining.label==='已经'?'天了':remaining.label==='就是今天'?'就是今天':'天前' }}</span></div><p class="anniversary-quote"><span>“</span> 和你在一起的每一天，<br>　 都是值得期待的日子。 <span>”</span></p>
  </template>
+ <button v-if="!preview&&payload" class="resize-corner" aria-label="按比例调整组件大小" title="拖动调整大小 · Esc 取消" data-no-drag @pointerdown.stop.prevent="startResize" @pointermove.stop="resizer.move()" @pointerup.stop="finishResize()" @pointercancel.stop="finishResize(true)" @lostpointercapture="finishResize()"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 15 15 5M10 15l5-5M15 15h.01" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></button>
  <div v-if="addOpen" class="widget-popover" data-no-drag><ItemForm :key="editingItem?.id||'new'" :mode="widget.kind==='notes'?'todo':'agenda'" :item="editingItem" :busy="saving" @save="commitItem" @cancel="addOpen=false"/></div>
  <section v-if="listOpen&&widget.kind==='stocks'" class="stock-list-panel" data-no-drag><header><strong>我的自选</strong><button aria-label="关闭自选列表" @click="listOpen=false">×</button></header><button v-for="symbol in watchlist" :key="symbol" :class="{selected:symbol===living.symbol}" :disabled="saving" @click="chooseStock(symbol)"><span>{{ quoteFor(symbol)?.name||symbol }}<small>{{ symbol }}</small></span><strong>{{ quoteFor(symbol)?.price.toFixed(3)||'—' }}</strong><small :class="{down:(quoteFor(symbol)?.change??0)<0}">{{ quoteFor(symbol)?((quoteFor(symbol)!.percent>=0?'+':'')+quoteFor(symbol)!.percent.toFixed(2)+'%'):'暂无数据' }}</small></button><p v-if="listBusy">正在更新…</p><p v-if="listError" role="alert">{{ listError }}<button @click="loadWatchlist">重试</button></p><p>点击证券查看走势；在组件设置中管理自选。</p></section>
  <p v-if="error" class="widget-error" role="alert">{{ error }}<button aria-label="关闭错误提示" @click="error=''">×</button></p><div v-if="editing" class="drag-cover">按住卡片拖动</div>

@@ -1,1 +1,2 @@
-{"identifier":"widgets","description":"Desktop widgets can use only their guarded instance commands.","windows":["widget-*"],"permissions":[]}
+{"identifier":"widgets","description":"Desktop widgets can use only their guarded instance commands.","windows":["widget-*","widgetmenu"],"permissions":[]}
+

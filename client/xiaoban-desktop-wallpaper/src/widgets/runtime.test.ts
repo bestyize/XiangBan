@@ -8,6 +8,9 @@ import type {DesktopWidget} from './model.ts';
 const one=(kind:DesktopWidget['kind']):DesktopWidget=>({id:'runtime',kind,theme:'ivory',scale:.5,x:0,y:0,enabled:true,city:null});
 describe('widget native bridge data',()=>{
  beforeEach(()=>{invoke.mockReset();Object.defineProperty(document,'hidden',{value:false,configurable:true});});
+ it('opens the widget settings window directly and exposes the resize grip only on desktop cards',async()=>{
+  invoke.mockResolvedValue(undefined);const widget=one('clock');const payload={widget,editing:false,screenX:100,screenY:100};const view=mount(WidgetSurface,{props:{widget,payload}});expect(view.find('[aria-label="按比例调整组件大小"]').exists()).toBe(true);await view.get('[aria-label="时钟设置"]').trigger('click');expect(invoke).toHaveBeenCalledWith('show_widget_settings');expect(invoke).not.toHaveBeenCalledWith('present_control');view.unmount();const preview=mount(WidgetSurface,{props:{widget,payload,preview:true}});expect(preview.find('[aria-label="按比例调整组件大小"]').exists()).toBe(false);preview.unmount();
+ });
  it('keeps actual weather when the independent air quality request fails',async()=>{
   invoke.mockImplementation((command:string)=>command==='get_widget_weather'?Promise.resolve({text:'杭州：多云，16°C',source:'天气来源',updatedAt:1}):command==='get_widget_forecast'?Promise.resolve({days:[{date:'2026-10-19',high:21,low:8,code:2}]}):Promise.reject(Error('空气质量服务不可用')));
   const view=mount(WidgetSurface,{props:{widget:{...one('weather'),city:{name:'杭州',latitude:30,longitude:120,country:'中国',admin1:'浙江'}}}});await flushPromises();expect(view.get('.weather-temperature').text()).toContain('16');expect(view.get('.weather-description').text()).toContain('多云');expect(view.get('.air-quality').text()).toContain('空气数据暂不可用');expect(view.text()).not.toContain('空气优');view.unmount();

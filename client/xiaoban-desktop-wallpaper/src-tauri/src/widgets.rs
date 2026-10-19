@@ -84,8 +84,11 @@ fn validate_content(widget: &Widget) -> Result<(),String> {
 #[serde(deny_unknown_fields)]
 pub struct Layout { pub version: u32, pub widgets: Vec<Widget> }
 impl Default for Layout { fn default() -> Self { Self { version: 2, widgets: vec![] } } }
+#[derive(Clone)]
+struct ResizeSession { original:Widget, anchor:(f64,f64), cursor:(f64,f64), monitor:crate::widget_geometry::MonitorArea }
 #[derive(Default)]
 pub struct WidgetState {
+    menu_target:Mutex<Option<String>>, resizes:Mutex<HashMap<String,ResizeSession>>,
     layout: Mutex<Layout>, editing: AtomicBool,
     operation: tauri::async_runtime::Mutex<()>,
     weather_operation: tauri::async_runtime::Mutex<()>,
@@ -101,11 +104,15 @@ pub fn reminder_rules(app:&tauri::AppHandle,now:chrono::DateTime<chrono::Local>)
 }
 pub fn is_widget(label: &str) -> bool { label.starts_with("widget-") }
 fn own_widget(window: &tauri::WebviewWindow) -> Result<Widget, String> {
-    window.app_handle().state::<WidgetState>().layout.lock().unwrap().widgets.iter()
-        .find(|widget| format!("widget-{}", widget.id) == window.label()).cloned().ok_or("没有找到这个桌面组件".into())
+    let state=window.app_handle().state::<WidgetState>();
+    let target=if window.label()=="widgetmenu"{state.menu_target.lock().unwrap().clone()}else{None};
+    let result=state.layout.lock().unwrap().widgets.iter()
+        .find(|widget| target.as_ref().map_or_else(||format!("widget-{}",widget.id)==window.label(),|id|id==&widget.id)).cloned().ok_or("没有找到这个桌面组件".into());result
 }
 pub fn permitted(label: &str, command: &str) -> Option<bool> {
-    if is_widget(label) { return Some(["get_desktop_widget", "move_desktop_widget", "show_widget_settings", "get_widget_weather", "get_widget_forecast", "get_widget_air_quality", "get_widget_stock_watchlist", "save_desktop_widget_content", "get_widget_stocks"].contains(&command)); }
+    if label=="widgetmenu" {return Some(["get_widget_settings","update_widget_settings","remove_widget_settings","close_widget_settings","size_widget_settings","search_widget_cities"].contains(&command));}
+    if ["get_widget_settings","update_widget_settings","remove_widget_settings","close_widget_settings","size_widget_settings","search_widget_cities","resize_desktop_widget"].contains(&command)&&!is_widget(label){return Some(false);}
+    if is_widget(label) { return Some(["resize_desktop_widget","get_desktop_widget", "move_desktop_widget", "show_widget_settings", "get_widget_weather", "get_widget_forecast", "get_widget_air_quality", "get_widget_stock_watchlist", "save_desktop_widget_content", "get_widget_stocks"].contains(&command)); }
     if ["get_desktop_widgets", "add_desktop_widget", "update_desktop_widget", "remove_desktop_widget", "set_widgets_editing", "get_desktop_widget", "move_desktop_widget", "show_widget_settings", "get_widget_weather", "get_widget_forecast", "get_widget_air_quality", "get_widget_stock_watchlist", "get_widget_stocks", "save_desktop_widget_content"].contains(&command) { return Some(label == "control"); }
     None
 }
@@ -190,6 +197,7 @@ fn place(app: &tauri::AppHandle, window: &tauri::WebviewWindow, widget: &Widget)
 }
 pub fn sync(app: &tauri::AppHandle) {
     let state = app.state::<WidgetState>(); let layout = state.layout.lock().unwrap().clone(); let mut errors = vec![];
+    state.resizes.lock().unwrap().retain(|id,_|layout.widgets.iter().any(|w|&w.id==id));
     let enabled: Vec<_> = layout.widgets.iter().filter(|w| w.enabled && !crate::games::is_active(app)).collect();
     for (label, window) in app.webview_windows() {
         if is_widget(&label) && !enabled.iter().any(|w| label == format!("widget-{}",w.id)) { let _ = window.destroy(); }
@@ -228,6 +236,12 @@ pub fn sync(app: &tauri::AppHandle) {
         if let Err(error) = result { errors.push(format!("{}：{error}",widget.kind)); }
     }
     *state.errors.lock().unwrap() = errors;
+    let menu_id=state.menu_target.lock().unwrap().clone();
+    if let Some(menu)=app.get_webview_window("widgetmenu"){
+        if menu_id.as_ref().is_some_and(|id|layout.widgets.iter().any(|w|&w.id==id))&&!crate::games::is_active(app){
+            if let Ok(data)=menu_payload(app){let _=menu.eval(format!("window.dispatchEvent(new CustomEvent('widget-menu-config',{{detail:{data}}}));"));}
+        }else{let _=menu.hide();*state.menu_target.lock().unwrap()=None;}
+    }
     if let Some(control) = app.get_webview_window("control") { let _ = control.eval(format!("window.dispatchEvent(new CustomEvent('widgets-changed',{{detail:{}}}));",snapshot(app))); }
 }
 pub fn start(app: &tauri::AppHandle) {
@@ -323,10 +337,94 @@ pub async fn move_desktop_widget(window:tauri::WebviewWindow,grab_x:f64,grab_y:f
     if commit{persist(app,&next)?;}*state.layout.lock().unwrap()=next;place(app,&window,&moved)?;
     if commit{sync(app);}else{window.eval(format!("window.dispatchEvent(new CustomEvent('widget-config',{{detail:{}}}));",widget_payload(app,&moved)?)).map_err(|e|e.to_string())?;}Ok(())
 }
+fn menu_payload(app:&tauri::AppHandle)->Result<Value,String>{
+    let state=app.state::<WidgetState>();let id=state.menu_target.lock().unwrap().clone().ok_or("组件菜单已关闭")?;
+    let widget=state.layout.lock().unwrap().widgets.iter().find(|w|w.id==id).cloned().ok_or("组件已移除")?;
+    let areas=monitors(app)?;let monitor=crate::widget_geometry::resolve(&areas,widget.monitor.as_deref()).ok_or("没有找到显示器")?;
+    Ok(json!({"widget":widget,"monitors":snapshot(app)["monitors"],"appearance":crate::settings(app).appearance,"maxHeight":(monitor.height/monitor.scale-24.).clamp(160.,560.)}))
+}
+fn menu_only(window:&tauri::WebviewWindow)->Result<(),String>{if window.label()=="widgetmenu"{Ok(())}else{Err("只能从组件菜单修改此组件".into())}}
+fn place_menu(app:&tauri::AppHandle,menu:&tauri::WebviewWindow,height:f64)->Result<(),String>{
+    let widget=own_widget(menu)?;let areas=monitors(app)?;
+    let monitor=crate::widget_geometry::resolve(&areas,widget.monitor.as_deref()).ok_or("没有找到显示器")?;
+    let (x,y,w,h,_)=geometry(app,&widget)?;let height=height.clamp(160.,560.).min((monitor.height/monitor.scale-24.).max(160.));
+    let (px,py)=crate::widget_geometry::menu_position(monitor,(x,y,w,h),(340.,height));
+    #[cfg(target_os="macos")] menu.set_size(tauri::LogicalSize::new(340.,height)).map_err(|e|e.to_string())?;
+    #[cfg(not(target_os="macos"))] menu.set_size(tauri::PhysicalSize::new((340.*monitor.scale).round() as u32,(height*monitor.scale).round() as u32)).map_err(|e|e.to_string())?;
+    // AppKit placement uses points while other platforms expose physical pixels.
+    #[cfg(target_os="macos")] {menu.set_position(tauri::LogicalPosition::new(px,py)).map_err(|e|e.to_string())?;}
+    #[cfg(not(target_os="macos"))] {menu.set_position(tauri::PhysicalPosition::new(px,py)).map_err(|e|e.to_string())?;}
+    Ok(())
+}
 #[tauri::command]
-pub fn show_widget_settings(window:tauri::WebviewWindow)->Result<(),String>{
-    let widget=own_widget(&window)?;crate::present_control(window.app_handle())?;
-    if let Some(control)=window.app_handle().get_webview_window("control"){control.eval(format!("window.dispatchEvent(new CustomEvent('widgets-manage',{{detail:{}}}));",json!({"id":widget.id}))).map_err(|e|e.to_string())?;}Ok(())
+pub async fn show_widget_settings(window:tauri::WebviewWindow)->Result<(),String>{
+    let widget=own_widget(&window)?;let app=window.app_handle();let state=app.state::<WidgetState>();
+    *state.menu_target.lock().unwrap()=Some(widget.id);
+    let data=menu_payload(app)?;
+    let menu=if let Some(menu)=app.get_webview_window("widgetmenu"){
+        menu.eval(format!("window.dispatchEvent(new CustomEvent('widget-menu-open',{{detail:{data}}}));")).map_err(|e|e.to_string())?;menu
+    }else{
+        let builder=WebviewWindowBuilder::new(app,"widgetmenu",WebviewUrl::App("index.html?scene=widget-settings".into()))
+            .title("组件设置").decorations(false).shadow(false).transparent(true).resizable(false).visible(false).skip_taskbar(true).always_on_top(true).focused(false).inner_size(340.,340.)
+            .initialization_script(format!("window.__XIAOBAN_WIDGET_MENU__={data};"));
+        #[cfg(target_os="macos")] let builder=builder.incognito(true);
+        #[cfg(windows)] let builder=builder.data_directory(crate::storage::webview(&crate::storage::root(app)?));
+        let menu=builder.build().map_err(|e|e.to_string())?;
+        let own=menu.clone();menu.on_window_event(move|event|{if matches!(event,tauri::WindowEvent::Focused(false)){let _=own.hide();}});menu
+    };
+    place_menu(app,&menu,340.)?;menu.show().map_err(|e|e.to_string())?;menu.set_focus().map_err(|e|e.to_string())?;Ok(())
+}
+#[tauri::command]
+pub fn get_widget_settings(window:tauri::WebviewWindow)->Result<Value,String>{menu_only(&window)?;menu_payload(window.app_handle())}
+#[tauri::command]
+pub async fn update_widget_settings(window:tauri::WebviewWindow,id:String,patch:Patch)->Result<Value,String>{
+    menu_only(&window)?;let widget=own_widget(&window)?;
+    if widget.id!=id{return Err("组件菜单已切换，请重新操作".into());}
+    update_desktop_widget(window.app_handle().clone(),widget.id,patch).await?;menu_payload(window.app_handle())
+}
+#[tauri::command]
+pub async fn remove_widget_settings(window:tauri::WebviewWindow,id:String)->Result<(),String>{
+    menu_only(&window)?;let widget=own_widget(&window)?;if widget.id!=id{return Err("组件菜单已切换，请重新操作".into());}remove_desktop_widget(window.app_handle().clone(),widget.id).await?;Ok(())
+}
+#[tauri::command]
+pub fn close_widget_settings(window:tauri::WebviewWindow)->Result<(),String>{menu_only(&window)?;window.hide().map_err(|e|e.to_string())}
+#[tauri::command]
+pub fn size_widget_settings(window:tauri::WebviewWindow,height:f64)->Result<(),String>{menu_only(&window)?;if !height.is_finite(){return Err("菜单高度无效".into());}place_menu(window.app_handle(),&window,height)}
+#[tauri::command]
+pub async fn search_widget_cities(window:tauri::WebviewWindow,query:String)->Result<Vec<City>,String>{
+    menu_only(&window)?;if own_widget(&window)?.kind!="weather"{return Err("此组件不支持城市查询".into());}
+    let app=window.app_handle();let state=app.state::<WidgetState>();let now=chrono::Utc::now().timestamp();
+    {let mut attempts=state.attempts.lock().unwrap();if attempts.get("menu-city").is_some_and(|at|now-*at<2){return Err("请稍后再查询城市".into());}attempts.insert("menu-city".into(),now);}
+    let source=crate::reminders::widget_weather_source(app);
+    tauri::async_runtime::spawn_blocking(move||crate::care_weather::search(&source,&query)).await.map_err(|e|e.to_string())?
+}
+#[tauri::command]
+pub async fn resize_desktop_widget(window:tauri::WebviewWindow,phase:String)->Result<(),String>{
+    let app=window.app_handle();let state=app.state::<WidgetState>();let _operation=state.operation.lock().await;
+    let original=own_widget(&window)?;
+    if phase=="begin"{
+        let (x,y,_,_,_)=geometry(app,&original)?;let areas=monitors(app)?;
+        let monitor=crate::widget_geometry::resolve(&areas,original.monitor.as_deref()).ok_or("没有找到显示器")?.clone();
+        let point=cursor(app)?;state.resizes.lock().unwrap().insert(original.id.clone(),ResizeSession{original,anchor:(x,y),cursor:point,monitor});return Ok(());
+    }
+    if !["move","end","cancel"].contains(&phase.as_str()){return Err("无效的缩放操作".into());}
+    let session=state.resizes.lock().unwrap().get(&original.id).cloned().ok_or("请先开始缩放")?;
+    let mut next=state.layout.lock().unwrap().clone();let widget=next.widgets.iter_mut().find(|w|w.id==original.id).ok_or("组件已移除")?;
+    if phase=="cancel"{widget.scale=session.original.scale;widget.x=session.original.x;widget.y=session.original.y;widget.monitor=session.original.monitor.clone();}
+    else{
+        let point=cursor(app)?;let base=widget_base_size(app,widget);
+        widget.scale=crate::widget_geometry::corner_scale(&session.monitor,base,session.original.scale,session.anchor,(point.0-session.cursor.0,point.1-session.cursor.1));
+        let width=(base.0*widget.scale+16.)*session.monitor.scale;let height=(base.1*widget.scale+16.)*session.monitor.scale;
+        let (x,y)=crate::widget_geometry::drag_position(&session.monitor,width,height,session.anchor,(0.,0.));widget.x=x;widget.y=y;widget.monitor=Some(session.monitor.id.clone());
+    }
+    let resized=widget.clone();
+    if phase=="end"{if let Err(error)=persist(app,&next){
+        let mut restored=state.layout.lock().unwrap();if let Some(w)=restored.widgets.iter_mut().find(|w|w.id==original.id){w.scale=session.original.scale;w.x=session.original.x;w.y=session.original.y;w.monitor=session.original.monitor;}
+        state.resizes.lock().unwrap().remove(&original.id);drop(restored);sync(app);return Err(error);
+    }}
+    *state.layout.lock().unwrap()=next;
+    if phase=="move"{place(app,&window,&resized)?;window.eval(format!("window.dispatchEvent(new CustomEvent('widget-config',{{detail:{}}}));",widget_payload(app,&resized)?)).map_err(|e|e.to_string())?;}
+    else{state.resizes.lock().unwrap().remove(&original.id);sync(app);}Ok(())
 }
 #[tauri::command]
 pub async fn get_widget_weather(window:tauri::WebviewWindow)->Result<Weather,String>{
@@ -457,5 +555,10 @@ mod tests {
  #[test] fn only_eight_reference_components_are_available(){for k in KINDS{let mut l=one();l.widgets[0].kind=k.into();assert!(validate(&l).is_ok());assert!(base_size(k).0>300.);}}
  #[test] fn hk_and_a_share_codes_remain_constrained(){for s in ["116.00700","1.000001","0.399006","1.600519"]{assert!(valid_stock_symbol(s));}for s in ["116.00700&x=1","116.abcde","https://example.com","3.123456"]{assert!(!valid_stock_symbol(s));}}
  #[test] fn date_and_schedule_validation(){assert!(valid_time("09:30"));assert!(!valid_time("25:00"));let mut l=one();l.widgets[0].kind="reminders".into();l.widgets[0].living=Some(LivingData{count:0,symbol:"1.000001".into(),symbols:vec![],sound:true,reminders:vec![ReminderItem{id:"one".into(),title:"评审".into(),at:"2026-10-19T10:00".into(),done:false,end:"09:00".into(),location:"A302".into(),notify:true,repeat:"none".into(),completed_on:String::new()}]});assert!(validate(&l).is_err());l.widgets[0].living.as_mut().unwrap().reminders[0].end="11:00".into();assert!(validate(&l).is_ok());}
+ #[test] fn menu_and_resize_commands_are_scoped_to_their_windows(){
+  assert_eq!(permitted("widgetmenu","update_widget_settings"),Some(true));assert_eq!(permitted("widgetmenu","update_desktop_widget"),Some(false));
+  assert_eq!(permitted("widgetmenu","resize_desktop_widget"),Some(false));assert_eq!(permitted("widget-clock1","resize_desktop_widget"),Some(true));
+  assert_eq!(permitted("control","resize_desktop_widget"),Some(false));assert_eq!(permitted("wallpaper","update_widget_settings"),Some(false));
+ }
  #[test] fn widget_cannot_modify_collection(){assert_eq!(permitted("widget-clock1","add_desktop_widget"),Some(false));assert_eq!(permitted("widget-clock1","save_desktop_widget_content"),Some(true));}
 }

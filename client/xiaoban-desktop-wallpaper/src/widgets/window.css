@@ -1,1 +1,3 @@
 html:has(body.widget-scene),body.widget-scene,body.widget-scene #app{background:transparent!important;overflow:hidden;margin:0;width:100%;height:100%}.widget-frame{position:absolute;top:8px;left:8px;transform-origin:top left}
+
+html:has(body.widget-menu-scene),body.widget-menu-scene,body.widget-menu-scene #app{margin:0;width:100%;height:100%;background:transparent!important;overflow:hidden}.widget-menu-frame{padding:8px;width:100%;box-sizing:border-box}.widget-menu-scene .widget-settings-menu{box-shadow:0 3px 8px #201c181f}
