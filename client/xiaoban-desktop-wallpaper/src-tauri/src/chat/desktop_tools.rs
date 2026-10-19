@@ -180,7 +180,7 @@ impl Desktop for TauriDesktop {
     fn widget_add(&self, kind: &str) -> Result<Value, String> {
         let app = self.app.clone();
         let kind = kind.to_string();
-        tauri::async_runtime::block_on(crate::widgets::add_desktop_widget(app, kind))
+        tauri::async_runtime::block_on(crate::widgets::add_desktop_widget(app, kind, None))
     }
 
     fn widget_update(&self, id: &str, patch: Value) -> Result<Value, String> {

@@ -292,8 +292,8 @@ fn update_settings(
     if !preferences::EXPRESSIONS.contains(&expression.as_str()) {
         return Err("不支持的表情".into());
     }
-    if !size.is_finite() || !(160.0..=420.0).contains(&size) {
-        return Err("尺寸应在 160–420 之间".into());
+    if !size.is_finite() || !(80.0..=420.0).contains(&size) {
+        return Err("尺寸应在 80–420 之间".into());
     }
     if !["night", "dawn"].contains(&theme.as_str()) || ![30, 60].contains(&fps) {
         return Err("不支持的场景设置".into());

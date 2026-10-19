@@ -78,7 +78,8 @@ async function openModal(providerId = 'deepseek') {
   await flushPromises();
 }
 
-const saveButton = () => q<HTMLButtonElement>('ai-save')!;
+// Without a usable provider only 保存并启用 is offered, so the helper follows whichever exists.
+const saveButton = () => q<HTMLButtonElement>('ai-save') ?? q<HTMLButtonElement>('ai-save-and-activate')!;
 const pickProtocol = async (value: string) => {
   const selects = wrapper!.findAllComponents(NSelect);
   const protoSelect = selects.find(s => s.attributes('data-testid') === 'ai-protocol');
@@ -226,6 +227,46 @@ describe('AI model settings card and provider templates', () => {
     await type('ai-api-key', 'sk bad key');
     expect(q('ai-form-error')!.textContent).toContain('空格');
     expect(saveButton().disabled).toBe(true);
+  });
+
+  it('offers only 保存并启用 while nothing usable is in effect', async () => {
+    await open(unconfigured);
+    await click('ai-add-custom-card');
+    expect(q('ai-save')).toBeNull();
+    expect(q('ai-save-and-activate')).not.toBeNull();
+    expect(q('ai-status')?.textContent).toContain('配置好一个后会自动启用');
+  });
+
+  it('keeps the plain 保存配置 once a provider is in effect', async () => {
+    await open(configured);
+    await openModal('deepseek');
+    expect(q('ai-save')).not.toBeNull();
+    expect(q('ai-save-and-activate')).not.toBeNull();
+  });
+
+  it('tells the user when saving what they configured made it take effect', async () => {
+    const store = await open(unconfigured);
+    await click('ai-add-custom-card');
+    await type('ai-provider-name', '我的服务商');
+    await type('ai-base-url', 'https://api.example.com/v1');
+    await type('ai-model', 'model-a');
+
+    // Answer the save once it is sent, with the view the host would return for this provider.
+    ipc.mockImplementationOnce(async (command, args) => {
+      if (command !== 'save_ai_provider') throw new Error(`unexpected command ${command}`);
+      const sent = args as { providerId: string; activate: boolean };
+      expect(sent.activate).toBe(true);
+      return {
+        ...unconfigured,
+        activeProvider: sent.providerId,
+        providers: [{ id: sent.providerId, name: '我的服务商', protocol: 'responses', baseUrl: 'https://api.example.com/v1', model: 'model-a', hasKey: false, keyHint: '', isCustom: true }],
+        baseUrl: 'https://api.example.com/v1',
+        model: 'model-a',
+      } as never;
+    });
+
+    await click('ai-save-and-activate');
+    expect(store.notify).toHaveBeenCalledWith('已保存并启用 我的服务商', 'success');
   });
 
   it('saves provider configuration via modal', async () => {

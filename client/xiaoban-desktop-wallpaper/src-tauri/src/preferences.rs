@@ -145,7 +145,7 @@ impl Settings {
         if !EXPRESSIONS.contains(&self.expression.as_str()) {
             self.expression = defaults.expression;
         }
-        if !self.size.is_finite() || !(160.0..=420.0).contains(&self.size) {
+        if !self.size.is_finite() || !(80.0..=420.0).contains(&self.size) {
             self.size = defaults.size;
         }
         if !["night", "dawn"].contains(&self.theme.as_str()) {

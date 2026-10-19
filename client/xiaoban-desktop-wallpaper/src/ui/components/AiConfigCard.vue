@@ -132,7 +132,7 @@ const activeStatusText = computed(() => {
       : '小伴 AI 入口已被关闭，请选择其他服务商';
   }
   if (!activeId || !isProviderFullyConfigured(activeId)) {
-    return '尚未配置可用服务商，请先配置 API 密钥';
+    return '尚未配置可用服务商，配置好一个后会自动启用';
   }
   return `当前生效：${activeProviderMeta.value.name} · ${saved.value.model || '未设模型'}${saved.value.hasKey ? ' · 已配置密钥' : ''}`;
 });
@@ -190,6 +190,13 @@ function isProviderFullyConfigured(id: string): boolean {
 function isProviderInUse(id: string): boolean {
   return isProviderActive(id) && isProviderFullyConfigured(id);
 }
+
+// 当前没有可用服务商：此时保存任何配置完整的一个，主机都会直接把它设为生效，用户无需再点启用。
+const noActiveProvider = computed(() => {
+  const id = saved.value.activeProvider;
+  if (id === GATEWAY_PROVIDER) return !gatewayOffered.value;
+  return !id || !isProviderFullyConfigured(id);
+});
 
 function fill(view: AiConfigView) {
   saved.value = view;
@@ -289,6 +296,8 @@ async function saveProvider(activate: boolean) {
     return;
   }
   busy.value = 'save-provider';
+  // 保存前是否已在生效；用于区分“本次保存让它生效”和“它本来就在用”。
+  const wasInUse = isProviderInUse(editingId.value);
   try {
     const updated = await invoke<AiConfigView>('save_ai_provider', {
       providerId: editingId.value,
@@ -304,7 +313,9 @@ async function saveProvider(activate: boolean) {
     fill(updated);
     modalVisible.value = false;
     const displayName = modalName.value.trim() || currentMeta.value.name;
-    props.store.notify(activate ? `已保存并启用 ${displayName}` : `${displayName} 配置已保存`, 'success');
+    // 没有可用服务商时主机自动启用刚保存的这个，按实际结果提示，而不是按按钮字面。
+    const becameActive = !wasInUse && updated.activeProvider === editingId.value;
+    props.store.notify(activate || becameActive ? `已保存并启用 ${displayName}` : `${displayName} 配置已保存`, 'success');
   } catch (error) {
     props.store.notify(String(error instanceof Error ? error.message : error), 'error');
   } finally {
@@ -738,6 +749,7 @@ function getProviderIcon(id: string) {
         <div class="modal-actions">
           <NButton :disabled="!!busy" @click="modalVisible = false">取消</NButton>
           <NButton
+            v-if="!noActiveProvider"
             secondary
             :disabled="!store.desktop || !!modalFormError || !!busy"
             :loading="busy === 'save-provider'"

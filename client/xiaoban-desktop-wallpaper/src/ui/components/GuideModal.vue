@@ -30,31 +30,31 @@ interface GuideCard {
 const creationCards: GuideCard[] = [
   {
     id: 'c1',
-    badge: '现场造挂件',
-    title: '极简赛博朋克时钟',
-    desc: '让小伴现场手写 HTML/JS 组件，立即自动挂载到桌面上。',
-    prompt: '帮我写一个极简赛博朋克风格的时钟挂件，放在桌面上',
-  },
-  {
-    id: 'c2',
-    badge: '现场造挂件',
-    title: '下班倒计时便签',
-    desc: '自定义标题和倒计时目标，支持自定义样式与微光动画。',
-    prompt: '帮我写一个下班倒计时便签挂件，写上“下班不慌，慢慢来”，放到桌面',
-  },
-  {
-    id: 'c3',
     badge: '现场写壁纸',
     title: '暗黑星轨 Canvas 壁纸',
-    desc: '让小伴现场编写动态 Canvas 壁纸代码，并一键应用到当前桌面。',
+    desc: '小伴现场编写单文件 HTML 壁纸（Canvas / WebGL / CSS 动效），自动存进壁纸库并应用。',
     prompt: '帮我写一个暗黑流动星轨的动态壁纸，带上微光粒子，做完直接应用到桌面',
   },
   {
-    id: 'c4',
+    id: 'c2',
+    badge: '现场写壁纸',
+    title: '交互式整屏小游戏',
+    desc: '壁纸也可以是能点的：整屏互动场景照样用一段自包含 HTML 做出来。',
+    prompt: '帮我做一个整屏的水墨涟漪互动壁纸，鼠标划过会荡开波纹，直接应用到桌面',
+  },
+  {
+    id: 'c3',
     badge: '粒子特效',
     title: '春日微风落樱特效',
-    desc: '编写粒子漂浮动画特效包，落花在屏幕上静静飘动。',
+    desc: '按特效包格式写一个粒子层，保存后就能像内置特效一样选用。',
     prompt: '帮我做一个春日微风带着粉色樱花瓣飘落的桌面特效，并切换到它',
+  },
+  {
+    id: 'c4',
+    badge: '现场造游戏',
+    title: '自创一款离线小游戏',
+    desc: '用 HTML/CSS/JS 写进游戏文件夹，支持存档、成绩和桌面层玩法，内置七款之外还能继续加。',
+    prompt: '帮我做一个接星星的小游戏，接住掉下来的星星会加分，玩的时候可以存档',
   },
 ];
 
@@ -69,16 +69,23 @@ const controlCards: GuideCard[] = [
   {
     id: 'd2',
     badge: '小伴互动',
-    title: '外观与情绪调整',
-    desc: '切换小伴的形象皮肤、神态表情，或者隐藏/唤出小伴。',
-    prompt: '把小伴换成毛绒小猫皮肤，做一个开心的表情',
+    title: '外壳与表情调整',
+    desc: '两款盆栽外壳（绿叶、白色小雏菊）与 25 种表情可换，也能让小伴先藏起来。',
+    prompt: '把小伴换成白色小雏菊外壳，做一个开心的表情',
   },
   {
     id: 'd3',
     badge: '快捷游戏',
     title: '摸鱼放松片刻',
-    desc: '一句话唤起水墨剑客、俄罗斯方块、贪吃蛇等离线小游戏。',
+    desc: '一句话唤起水墨剑客、俄罗斯方块、贪吃蛇、2048、暮色滑翔等离线小游戏。',
     prompt: '打开水墨剑客小游戏，我想放松一下',
+  },
+  {
+    id: 'd4',
+    badge: '窗口摆放',
+    title: '把桌面收拾一下',
+    desc: '查询小伴自己的窗口与显示器，按比例移动盆栽、组件；也能收起超级小伴。',
+    prompt: '把小伴和桌面组件的位置整理一下，别挡着右边的工作区',
   },
 ];
 
@@ -87,7 +94,7 @@ const lifeCards: GuideCard[] = [
     id: 'l1',
     badge: '健康作息',
     title: '定时饮水吃水果',
-    desc: '自动录入系统关怀提醒规则，到点以温和气泡通知，不打扰全屏沉浸。',
+    desc: '自动录入关怀提醒规则，到点以温和气泡通知，免打扰时段自动避让。',
     prompt: '每天下午三点半提醒我喝水吃点水果',
   },
   {
@@ -99,34 +106,48 @@ const lifeCards: GuideCard[] = [
   },
   {
     id: 'l3',
-    badge: '生活管家',
-    title: '下班提醒与天气',
-    desc: '查询天气变化与穿衣指引，或是提醒准时下班。',
-    prompt: '每天下午六点半提醒我：准备下班，今天辛苦啦',
+    badge: '下班提醒',
+    title: '准时下班',
+    desc: '按工作日或指定星期提醒收尾，给一天一个明确的结束。',
+    prompt: '周一到周五下午六点半提醒我：准备下班，今天辛苦啦',
+  },
+  {
+    id: 'l4',
+    badge: '一次提醒',
+    title: '临时事项不忘',
+    desc: '一次性的提醒同样能安排，例如会议、吃药或某个具体日期的约定。',
+    prompt: '明天上午十点提醒我给客户回电话',
   },
 ];
 
 const workspaceCards: GuideCard[] = [
   {
     id: 'w1',
-    badge: '本地文件',
+    badge: '本地工作区',
     title: '工作区文件整理',
-    desc: '分析工作目录结构，读取或汇总代码文件与日常笔记。',
+    desc: '在设置里选定工作目录后，读取、搜索、写入文件或运行命令，范围之外不碰。',
     prompt: '帮我看看当前工作目录里有什么文件，整理一份清晰的清单',
   },
   {
     id: 'w2',
     badge: '视觉识图',
     title: '粘贴截图一键分析',
-    desc: '直接 Ctrl+V / Cmd+V 粘贴错误截图、UI 设计稿，最多支持 8 张图并发分析。',
+    desc: '直接 Ctrl+V / Cmd+V 粘贴错误截图或 UI 设计稿，一条消息最多 8 张图。',
     prompt: '看下我刚粘贴的截图，分析一下报错的原因和解决办法',
   },
   {
     id: 'w3',
-    badge: '拟真语音',
-    title: 'Edge-TTS 自然朗读',
-    desc: '支持几十种近乎真人的中文与方言音色，随时收听小伴回答与诗意文字。',
+    badge: '本机语音',
+    title: '语音提问与自然朗读',
+    desc: 'SenseVoice Small 在本机识别语音，转成文字后再由你确认发送；回答可用 Edge-TTS 音色朗读。',
     prompt: '念一段温柔的晚安寄语给我听吧',
+  },
+  {
+    id: 'w4',
+    badge: '电脑控制',
+    title: '操作其他应用',
+    desc: '在“设置 → AI 模型”开启电脑屏幕与应用控制后，小伴可以读取窗口、点击和输入文字。',
+    prompt: '帮我把浏览器里当前这个页面保存成 PDF，放到工作目录',
   },
 ];
 
@@ -174,7 +195,7 @@ async function openOnlineGuide() {
       <div class="lead-icon"><Sparkles :size="20" /></div>
       <div class="lead-copy">
         <strong>不止是聊天，更是你的桌面全能管家</strong>
-        <p>小伴接入了系统控制与创造引擎，能直接替你写挂件、换壁纸、调特效、设提醒。点击任意示例即可一键填入试试。</p>
+        <p>小伴接入了桌面控制与创作引擎，能直接替你写壁纸、调特效、放组件、设提醒，也能读写工作区、操作其他应用。点击任意示例即可一键填入试试。</p>
       </div>
     </div>
 
@@ -294,16 +315,20 @@ async function openOnlineGuide() {
       <NTabPane name="models" tab="⚙️ 模型接入">
         <div class="models-guide">
           <div class="models-box">
-            <h4>💡 模型推荐配置</h4>
+            <h4>💡 两种用起来的方式</h4>
             <ul>
-              <li><strong>DeepSeek (推荐首选)</strong>：极高性价比与出色推理能力，模型填 <code>deepseek-chat</code> 或 <code>deepseek-reasoner</code>。</li>
-              <li><strong>智谱 GLM / Kimi / MiniMax</strong>：大厂官方端点支持，长上下文与多模态兼容性良好。</li>
-              <li><strong>本地 Ollama (完全离线)</strong>：端点填 <code>http://localhost:11434/v1</code>，密钥留空，数据 100% 留存在本机。</li>
+              <li><strong>小伴 AI（最省事）</strong>：在“AI 模型”里登录小伴账号就能直接用，不用自己申请密钥；新用户有试用额度，可用兑换码充值，模型档位由小伴后台维护。</li>
+              <li><strong>自己的服务商</strong>：内置 DeepSeek、智谱 BigModel、Kimi、MiniMax 预设，填 API 密钥即可；也可以选“自定义供应商”，接第三方端点或本地部署。</li>
+              <li><strong>本地 Ollama（完全离线）</strong>：自定义供应商地址填 <code>http://localhost:11434/v1</code>，密钥留空，协议选 OpenAI 兼容（Chat Completions）。</li>
             </ul>
           </div>
           <div class="safety-box">
-            <h4>🛡️ 透明安全的权限机制</h4>
-            <p>小伴在读取文件时自动执行；而在<strong>写入本地文件、修改系统设置、执行系统命令</strong>时，会先弹出授权卡片。每次操作清晰可见，随时掌控。</p>
+            <h4>🛡️ 透明的权限机制</h4>
+            <p>聊天顶栏有两种模式。<strong>默认权限</strong>下，读操作自动执行，写文件、运行命令、修改设置前先弹出确认卡片；<strong>完全信任</strong>下不再逐一询问，只在提权、批量删除、<code>git push --force</code> 这类高风险操作时停下来。每个对话各自记住自己的模式。</p>
+          </div>
+          <div class="safety-box">
+            <h4>🧠 上下文与压缩</h4>
+            <p>输入框旁的圆环显示当前对话的上下文占用，可以调节上限（256K 到 1M）。超出时内核会自动省略较早内容；“智能压缩”让模型把旧对话写成摘要，自动压缩在回答结束后用量达到上限 90% 时触发。</p>
           </div>
           <div class="models-action">
             <NButton type="primary" secondary @click="emit('open-settings'); emit('update:show', false);">
@@ -332,8 +357,15 @@ async function openOnlineGuide() {
 .lead-icon{color:var(--ui-primary);background:var(--ui-surface);border-radius:10px;width:34px;height:34px;display:grid;place-items:center;flex-shrink:0;box-shadow:0 2px 6px rgba(0,0,0,.04)}
 .lead-copy strong{font-size:14px;color:var(--ui-text-primary);display:block;margin-bottom:3px}
 .lead-copy p{font-size:12.5px;color:var(--ui-text-secondary);margin:0;line-height:1.6}
-.guide-tabs :deep(.n-tabs-nav){margin-bottom:12px}
-.guide-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;max-height:50vh;overflow-y:auto;padding-right:4px}
+/* NModal 注入的卡片/标签内部节点不带 scoped 属性，只能用 :global 限定在 .guide-modal 下 */
+:global(.guide-modal > .n-card-content){flex:1 1 auto;min-height:0;overflow:hidden;display:flex;flex-direction:column}
+:global(.guide-modal > .n-card-header),:global(.guide-modal > .n-card__footer){flex:none}
+:global(.guide-modal > .n-card__footer){padding-top:0}
+.guide-tabs{flex:1 1 auto;min-height:0;display:flex;flex-direction:column}
+:global(.guide-modal .n-tabs-nav){flex:none;margin-bottom:12px}
+:global(.guide-modal .n-tabs-pane-wrapper){flex:1 1 auto;min-height:0;overflow:hidden;display:flex;flex-direction:column}
+:global(.guide-modal .n-tab-pane){flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain;padding-right:4px}
+.guide-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;align-content:start}
 .guide-card{background:var(--ui-surface);border:1px solid var(--ui-border);border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:8px;transition:border-color .2s}
 .guide-card:hover{border-color:var(--ui-primary)}
 .card-top{display:flex;align-items:center;gap:8px}
@@ -358,5 +390,5 @@ async function openOnlineGuide() {
 .footer-hint{color:var(--ui-text-tertiary)}
 .web-guide-link{display:inline-flex;align-items:center;gap:4px;background:none;border:0;color:var(--ui-primary);cursor:pointer;font:inherit;font-weight:600;padding:0}
 .web-guide-link:hover{text-decoration:underline}
-@media(max-width:640px){.guide-grid{grid-template-columns:1fr}}
+@media(max-width:640px){.guide-grid{grid-template-columns:1fr}.guide-tabs{--n-tab-gap:18px}.guide-tabs :deep(.n-tabs-tab){padding-left:0;padding-right:0}}
 </style>

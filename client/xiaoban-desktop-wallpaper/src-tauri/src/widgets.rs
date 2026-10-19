@@ -289,7 +289,9 @@ pub fn start(app: &tauri::AppHandle) {
 #[tauri::command]
 pub fn get_desktop_widgets(app: tauri::AppHandle) -> Result<Value,String> { ensure_writable(&app)?; Ok(snapshot(&app)) }
 #[tauri::command]
-pub async fn add_desktop_widget(app: tauri::AppHandle, kind: String,) -> Result<Value,String> {
+pub async fn add_desktop_widget(app: tauri::AppHandle, kind: String, layer: Option<String>) -> Result<Value,String> {
+    let layer=layer.unwrap_or_else(desktop_layer);
+    if !["desktop","topmost"].contains(&layer.as_str()) { return Err("组件层级只能是 desktop 或 topmost".into()); }
     let state=app.state::<WidgetState>();let _operation=state.operation.lock().await;
     let mut next=state.layout.lock().unwrap().clone(); if next.widgets.len()>=12{return Err("桌面最多放置 12 个组件".into());}
     let mut random=[0u8;8];getrandom::fill(&mut random).map_err(|e|e.to_string())?;
@@ -298,7 +300,7 @@ pub async fn add_desktop_widget(app: tauri::AppHandle, kind: String,) -> Result<
     let countdown=if kind=="countdown"{Some(CountdownData{title:"值得期待的日子".into(),date:chrono::Local::now().format("%Y-%m-%d").to_string(),mode:"countdown".into(),repeat:"none".into()})}else{None};
     let living=if ["reminders","stocks","woodfish"].contains(&kind.as_str()){let mut d=LivingData::default();if kind=="stocks"{d.symbol="116.00700".into();}Some(d)}else{None};
     let theme="ivory".to_string();
-    next.widgets.push(Widget{id:random.iter().map(|b|format!("{b:02x}")).collect(),kind,theme,layer:desktop_layer(),scale:0.5,x:((if index%3==1{0.88}else{0.52})-(index/3) as f64*0.25).max(0.05),y:if index%3==2{0.94}else{0.06},enabled:true,city:None,note,countdown,living,monitor:None});
+    next.widgets.push(Widget{id:random.iter().map(|b|format!("{b:02x}")).collect(),kind,theme,layer,scale:0.5,x:((if index%3==1{0.88}else{0.52})-(index/3) as f64*0.25).max(0.05),y:if index%3==2{0.94}else{0.06},enabled:true,city:None,note,countdown,living,monitor:None});
     persist(&app,&next)?; *state.layout.lock().unwrap()=next; sync(&app); Ok(snapshot(&app))
 }
 #[derive(Deserialize)]
@@ -585,6 +587,10 @@ mod tests {
   let mut l=one();assert_eq!(l.widgets[0].layer,"desktop");l.widgets[0].layer="topmost".into();assert!(validate(&l).is_ok());
   let saved=serde_json::to_vec(&l).unwrap();let restored:Layout=serde_json::from_slice(&saved).unwrap();assert_eq!(restored.widgets[0].layer,"topmost");
   l.widgets[0].layer="normal".into();assert!(validate(&l).is_err());
+ }
+ #[test] fn a_new_widget_keeps_the_layer_it_was_added_with(){
+  // Adding writes the chosen layer straight into the widget; the frontend no longer needs a second call.
+  for layer in ["desktop","topmost"]{let mut l=one();l.widgets[0].layer=layer.into();assert!(validate(&l).is_ok());let restored:Layout=serde_json::from_slice(&serde_json::to_vec(&l).unwrap()).unwrap();assert_eq!(restored.widgets[0].layer,layer);}
  }
  #[test] fn old_kinds_and_materials_are_rejected(){for kind in ["fortune","flower","custom"]{let mut l=one();l.widgets[0].kind=kind.into();assert!(validate(&l).is_err());}let mut l=one();l.widgets[0].theme="glass".into();assert!(validate(&l).is_err());l=one();l.version=1;assert!(validate(&l).is_err());}
  #[test] fn only_eight_reference_components_are_available(){for k in KINDS{let mut l=one();l.widgets[0].kind=k.into();assert!(validate(&l).is_ok());assert!(base_size(k).0>300.);}}

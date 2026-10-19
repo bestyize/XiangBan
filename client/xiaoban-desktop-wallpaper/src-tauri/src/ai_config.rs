@@ -106,6 +106,15 @@ impl ProviderConfig {
         !self.remote && !["deepseek", "zhipu", "kimi", "minimax"].contains(&self.id.as_str())
     }
 
+    /// Enough to send a request: an address, a model, and a key unless this is a local custom
+    /// service or an official free service that needs none. The web side draws the same line.
+    pub fn is_usable(&self) -> bool {
+        self.available
+            && !self.base_url.trim().is_empty()
+            && !self.model.trim().is_empty()
+            && (!self.api_key.trim().is_empty() || self.is_custom() || self.provider_type == "free")
+    }
+
     pub fn view(&self) -> ProviderConfigView {
         ProviderConfigView {
             provider_type: if self.is_custom() { "custom".into() } else if self.provider_type == "custom" { "third".into() } else { self.provider_type.clone() },
@@ -192,6 +201,18 @@ impl AiConfig {
     /// Enough to send a request.
     pub fn is_complete(&self) -> bool {
         !self.base_url.trim().is_empty() && !self.model.trim().is_empty()
+    }
+
+    /// Whether the selected provider is ready to use. Saving another provider must not steal the
+    /// selection while this is true. 小伴 AI counts while the site still offers it.
+    pub fn has_usable_active_provider(&self) -> bool {
+        if !self.is_complete() {
+            return false;
+        }
+        if self.active_provider == crate::ai_gateway::GATEWAY_ID {
+            return self.gateway_enabled;
+        }
+        self.providers.iter().find(|p| p.id == self.active_provider).is_some_and(ProviderConfig::is_usable)
     }
 
     pub fn workspace_or<'a>(&'a self, default: &'a Path) -> &'a Path {
@@ -557,6 +578,17 @@ pub fn save_ai_config(
     Ok(view)
 }
 
+/// Whether saving a provider should also make it the one in effect: the user pressed
+/// 保存并启用, re-saved the provider already in effect, or nothing usable is in effect yet and the
+/// saved one is ready — in that last case it takes over by itself instead of waiting for a click.
+fn selecting_after_save(config: &AiConfig, provider_id: &str, activate: bool) -> bool {
+    if activate || config.active_provider == provider_id {
+        return true;
+    }
+    !config.has_usable_active_provider()
+        && config.providers.iter().any(|p| p.id == provider_id && p.is_usable())
+}
+
 #[tauri::command]
 pub fn save_ai_provider(
     app: tauri::AppHandle,
@@ -626,7 +658,10 @@ pub fn save_ai_provider(
         config.providers.push(updated_entry);
     }
 
-    if activate || config.active_provider == provider_id || config.base_url.is_empty() {
+    // With no provider in effect, the one the user just configured takes over by itself, so they
+    // never have to come back and press 启用. An incomplete entry is not put in effect yet.
+    let auto_activate = selecting_after_save(&config, &provider_id, activate);
+    if auto_activate {
         config.active_provider = provider_id;
         config.protocol = protocol;
         config.base_url = clean_url;
@@ -995,6 +1030,48 @@ mod tests {
         for bad in ["", "   ", "sk abc", "sk-abc\nX-Evil: 1", "sk-abc\r\nX-Evil: 1", "sk\tabc", "sk-\u{7}x", &"k".repeat(2049)] {
             assert!(clean_key(bad).is_err(), "{bad:?}");
         }
+    }
+
+    #[test]
+    fn a_freshly_configured_provider_is_enabled_without_a_second_click() {
+        // Nothing is in effect yet: the saved provider takes over by itself. The check runs on the
+        // configuration after the save, so deepseek here already carries the key just typed.
+        let mut fresh = AiConfig::default();
+        assert!(!fresh.has_usable_active_provider());
+        fresh.providers.iter_mut().find(|p| p.id == "deepseek").unwrap().api_key = KEY.into();
+        assert!(!fresh.has_usable_active_provider(), "nothing is selected yet");
+        assert!(selecting_after_save(&fresh, "deepseek", false));
+
+        // A provider that is already in effect keeps its place when another one is configured.
+        let working = saved();
+        assert!(working.has_usable_active_provider());
+        assert!(!selecting_after_save(&working, "zhipu", false), "another provider does not steal the selection");
+        assert!(selecting_after_save(&working, "deepseek", false), "re-saving the one in effect keeps it");
+
+        // The user's explicit choice always wins.
+        assert!(selecting_after_save(&working, "zhipu", true));
+
+        // 小伴 AI counts as in effect while the site still offers it.
+        let mut gateway = AiConfig { active_provider: crate::ai_gateway::GATEWAY_ID.into(), base_url: "https://ai.example.com/v1".into(), model: "standard".into(), ..AiConfig::default() };
+        gateway.gateway_enabled = true;
+        assert!(gateway.has_usable_active_provider());
+        assert!(!selecting_after_save(&gateway, "deepseek", false));
+        gateway.gateway_enabled = false;
+        assert!(!gateway.has_usable_active_provider(), "a closed entry leaves room for a key provider");
+        gateway.providers.iter_mut().find(|p| p.id == "deepseek").unwrap().api_key = KEY.into();
+        assert!(selecting_after_save(&gateway, "deepseek", false));
+    }
+
+    #[test]
+    fn an_incomplete_provider_is_not_put_in_effect() {
+        let local = ProviderConfig { id: "custom_x".into(), base_url: "https://a.example.com/v1".into(), model: "m".into(), ..ProviderConfig::default() };
+        assert!(local.is_usable(), "a local custom service needs no key");
+        let keyed = ProviderConfig { id: "deepseek".into(), base_url: "https://api.deepseek.com".into(), model: "m".into(), ..ProviderConfig::default() };
+        assert!(!keyed.is_usable(), "a vendor preset without its key is not usable");
+        let keyed = ProviderConfig { api_key: KEY.into(), ..keyed };
+        assert!(keyed.is_usable());
+        assert!(!ProviderConfig { available: false, ..keyed.clone() }.is_usable());
+        assert!(!ProviderConfig { model: "  ".into(), ..keyed }.is_usable());
     }
 
     #[test]
