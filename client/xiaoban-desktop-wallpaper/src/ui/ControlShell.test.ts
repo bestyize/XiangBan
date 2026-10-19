@@ -27,6 +27,7 @@ vi.mock('../bridge.ts', async (importOriginal) => {
       if (command === 'get_game_status') return Promise.resolve({ desktopDoubleClick: false });
       if (command === 'get_website_status') return Promise.resolve({ announcements: [], update: null, dismissed: {}, errors: [] });
       if (command === 'open_official_site') return Promise.resolve();
+      if (command === 'assistant_status') return Promise.resolve({enabled:true,shortcut:'default',shortcutLabel:'⌥ Space',shortcuts:[],ball:true,open:'type',read:'never',hintSeen:true,registered:true,error:''});
       return Promise.resolve();
     }),
     listen: vi.fn().mockResolvedValue(() => {}),
@@ -34,6 +35,30 @@ vi.mock('../bridge.ts', async (importOriginal) => {
 });
 
 describe('ControlShell sidebar', () => {
+  it('moves assistant preferences between AI and voice tabs and opens the capsule from the floating entry', async () => {
+    const wrapper = mount(ControlShell, { attachTo: document.body });
+    await flushPromises();
+    expect(wrapper.find('[data-testid="nav-assistant"]').exists()).toBe(false);
+    await wrapper.get('[data-testid="open-assistant"]').trigger('click');
+    await flushPromises();
+    expect(invoke).toHaveBeenCalledWith('assistant_try');
+    await wrapper.get('[data-testid="nav-settings"]').trigger('click');
+    await import('./pages/SettingsPage.vue');
+    await vi.waitFor(async () => { await flushPromises(); expect(wrapper.find('[data-testid="settings-page"]').exists()).toBe(true); });
+    const labels = wrapper.findAll('.settings-tabs .n-tabs-tab').map(tab => tab.text());
+    expect(labels.slice(1,4)).toEqual(['AI 模型','超级小伴','声音']);
+    // Native settings links must also switch tabs when the settings page is already mounted.
+    const handler = vi.mocked(listen).mock.calls.find(([name]) => name === 'assistant-open-settings')![1];
+    handler({tab:'assistant'});
+    await flushPromises();
+    expect(wrapper.find('[data-testid="assistant-page"]').exists()).toBe(true);
+    expect(wrapper.get('[data-testid="assistant-page"]').classes()).toContain('is-embedded');
+    const store = wrapper.findComponent(LoginModal).props('store');
+    expect(store.page).toBe('settings');
+    await wrapper.get('[data-testid="open-assistant"]').trigger('click');
+    await flushPromises();expect(store.page).toBe('settings');
+    wrapper.unmount();
+  });
   beforeEach(() => {
     vi.clearAllMocks();
     (window as unknown as { __TAURI__?: unknown }).__TAURI__ = {};

@@ -12,6 +12,11 @@ pub mod memory;
 mod middleware;
 pub mod provider;
 mod run;
+mod runtime;
+#[cfg(feature = "journal")]
+pub mod journal;
+#[cfg(feature = "process")]
+pub mod process;
 #[cfg(feature = "skills")]
 pub mod skills;
 #[cfg(feature = "mcp")]
@@ -31,6 +36,7 @@ pub use middleware::{
 };
 pub use provider::{ChatRequest, ModelProvider, Reply, ToolSchema};
 pub use run::RunSummary;
+pub use runtime::{RunEnd, RunEvent, RunEventBody, RunOptions, RunState};
 pub use store::{JsonlStore, MemoryStore, SessionStore};
 pub use tool::{Risk, Tool, ToolCtx, ToolGate, ToolResult, ToolSpec, DEFAULT_MAX_OUTPUT};
 pub use types::{ContextSummary, Event, FinishReason, Message, Part, Role, ToolCall, Usage, PROTOCOL_VERSION};

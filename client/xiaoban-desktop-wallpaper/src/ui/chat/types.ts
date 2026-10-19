@@ -40,6 +40,7 @@ export interface WireMessage {
 export type KernelEvent =
   | { type: 'text_delta'; text: string }
   | { type: 'tool_start'; id: string; name: string; arguments: string }
+  | { type: 'tool_dispatched'; id: string }
   | { type: 'tool_end'; id: string; output: string; is_error: boolean; parts?: WirePart[]; structured_content?: unknown }
   | { type: 'usage'; prompt_tokens: number; completion_tokens: number }
   | { type: 'retrying'; attempt: number; delay_ms: number; message: string }
@@ -50,7 +51,7 @@ export type KernelEvent =
   | { type: 'cancelled' }
   | { type: 'error'; message: string };
 
-export interface ChatEventPayload { session: string; event: KernelEvent }
+export interface ChatEventPayload { session: string; event: KernelEvent; runId?: string; sequence?: number; timestampMs?: number }
 
 export type Risk = 'read' | 'write' | 'network' | 'exec';
 export interface ApprovalRequest {

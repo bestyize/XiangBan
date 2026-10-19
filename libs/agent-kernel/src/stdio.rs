@@ -41,7 +41,11 @@ const MAX_SESSION_CHARS: usize = 256;
 #[derive(Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 enum Incoming {
-    Run { id: String, session: String, input: Option<String>, parts: Option<Vec<Part>> },
+    Run {
+        id: String, session: String, input: Option<String>, parts: Option<Vec<Part>>,
+        #[serde(default)] observed: bool,
+        max_tool_calls: Option<usize>,
+    },
     Cancel { id: String },
     Approval { id: String, decision: String },
     Answer { id: String, answer: Option<String> },
@@ -155,7 +159,7 @@ impl StdioBridge {
     /// output is only noticed between input lines, so the host should close both together.
     /// Returns an error if reading failed or the output was closed by the other side.
     pub fn serve(self: &Arc<Self>, agent: Arc<Agent>, mut input: impl BufRead) -> io::Result<()> {
-        self.send(&json!({ "type": "hello", "protocol": PROTOCOL_VERSION }));
+        self.send(&json!({ "type": "hello", "protocol": PROTOCOL_VERSION, "capabilities": ["run_events", "tool_call_budget"] }));
         let mut handles: Vec<JoinHandle<()>> = Vec::new();
         let mut buf = Vec::new();
         let outcome = loop {
@@ -271,7 +275,7 @@ impl StdioBridge {
         }
         match serde_json::from_slice::<Incoming>(line) {
             Err(e) => self.error(&format!("invalid message: {e}")),
-            Ok(Incoming::Run { id, session, input, parts }) => {
+            Ok(Incoming::Run { id, session, input, parts, observed, max_tool_calls }) => {
                 let input = match (input, parts) {
                     (Some(text), None) => vec![Part::Text { text }],
                     (None, Some(parts)) if !parts.is_empty() => parts,
@@ -281,7 +285,7 @@ impl StdioBridge {
                     return self.error("`id` must be 1 to 128 characters and `session` 1 to 256 characters");
                 }
                 handles.retain(|h| !h.is_finished());
-                if let Some(handle) = self.start_run(agent, id, session, input) {
+                if let Some(handle) = self.start_run(agent, id, session, input, observed, max_tool_calls) {
                     handles.push(handle);
                 }
             }
@@ -321,7 +325,7 @@ impl StdioBridge {
         }
     }
 
-    fn start_run(self: &Arc<Self>, agent: &Arc<Agent>, id: String, session: String, input: Vec<Part>) -> Option<JoinHandle<()>> {
+    fn start_run(self: &Arc<Self>, agent: &Arc<Agent>, id: String, session: String, input: Vec<Part>, observed: bool, max_tool_calls: Option<usize>) -> Option<JoinHandle<()>> {
         let cancel = Arc::new(AtomicBool::new(false));
         {
             let mut runs = lock(&self.runs);
@@ -335,24 +339,31 @@ impl StdioBridge {
         let (bridge, agent) = (self.clone(), agent.clone());
         let thread_id = id.clone();
         let spawned = thread::Builder::new().name(format!("run-{id}")).spawn(move || {
-            let result = agent.run_parts(
+            let mut kernel_run_id = None;
+            let result = agent.run_parts_observed(
                 &session,
                 input,
-                &mut |event| {
-                    if !bridge.send(&json!({ "type": "event", "run": thread_id, "event": event })) {
-                        cancel.store(true, Ordering::SeqCst);
-                    }
+                crate::RunOptions { max_tool_calls, ..Default::default() },
+                &mut |record| {
+                    kernel_run_id = Some(record.run_id.clone());
+                    let sent = if observed { bridge.send(&json!({"type":"run_event", "run":thread_id, "record":record})) }
+                        else if let crate::RunEventBody::Event { event } = record.body {
+                            matches!(event, crate::Event::ToolDispatched { .. }) || bridge.send(&json!({"type":"event", "run":thread_id, "event":event}))
+                        } else { true };
+                    if !sent { cancel.store(true, Ordering::SeqCst); }
+                    Ok(())
                 },
                 &cancel,
             );
             lock(&bridge.runs).remove(&thread_id);
-            let end = match result {
+            let mut end = match result {
                 Ok(s) => json!({
                     "type": "run_end", "run": thread_id, "ok": true, "text": s.text, "turns": s.turns, "finish": s.finish,
                     "prompt_tokens": s.usage.prompt_tokens, "completion_tokens": s.usage.completion_tokens,
                 }),
                 Err(e) => json!({ "type": "run_end", "run": thread_id, "ok": false, "error": e.to_string() }),
             };
+            if observed { end["run_id"] = json!(kernel_run_id); }
             bridge.send(&end);
         });
         match spawned {

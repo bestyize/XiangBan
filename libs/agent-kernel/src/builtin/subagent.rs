@@ -15,6 +15,7 @@ const POLL: Duration = Duration::from_millis(20);
 
 type Observer = Box<dyn Fn(&str, &Event) + Send + Sync>;
 type FinishHook = Box<dyn Fn(&str) + Send + Sync>;
+type RunObserver = Box<dyn Fn(&crate::RunEvent) -> Result<(), HarnessError> + Send + Sync>;
 
 static CHILD_SEQ: AtomicU64 = AtomicU64::new(0);
 
@@ -41,6 +42,7 @@ pub struct Subagent {
     child: Arc<Agent>,
     observer: Option<Observer>,
     on_finish: Option<FinishHook>,
+    run_observer: Option<RunObserver>,
 }
 
 impl Subagent {
@@ -56,12 +58,19 @@ impl Subagent {
             "required": ["task"]
         });
         let spec = ToolSpec::new(name, description, schema).risk(risk).untrusted_output().timeout(Duration::from_secs(600));
-        Self { spec, child, observer: None, on_finish: None }
+        Self { spec, child, observer: None, on_finish: None, run_observer: None }
     }
 
     /// Called with the parent session id and every event of the child run, e.g. to show progress.
     pub fn observe(mut self, observer: impl Fn(&str, &Event) + Send + Sync + 'static) -> Self {
         self.observer = Some(Box::new(observer));
+        self
+    }
+
+    /// Observe full child run identity, including parent_run_id. Errors fail closed before
+    /// dispatch, just as the root run observer does.
+    pub fn observe_run(mut self, observer: impl Fn(&crate::RunEvent) -> Result<(), HarnessError> + Send + Sync + 'static) -> Self {
+        self.run_observer = Some(Box::new(observer));
         self
     }
 
@@ -115,10 +124,13 @@ impl Tool for Subagent {
                     thread::sleep(POLL);
                 }
             });
-            let result = self.child.run(&child_session, task, &mut |event| {
-                if let Some(observer) = &self.observer {
-                    observer(ctx.session(), &event);
+            let options = crate::RunOptions { parent_run_id: Some(ctx.run_id().into()), ephemeral_session: true, ..Default::default() };
+            let result = self.child.run_parts_observed(&child_session, vec![crate::Part::Text { text: task.into() }], options, &mut |record| {
+                if let Some(observer) = &self.run_observer { observer(&record)?; }
+                if let (Some(observer), crate::RunEventBody::Event { event }) = (&self.observer, record.body) {
+                    if !matches!(event, Event::ToolDispatched { .. }) { observer(ctx.session(), &event); }
                 }
+                Ok(())
             }, &cancel);
             finished.store(true, Ordering::Relaxed);
             result

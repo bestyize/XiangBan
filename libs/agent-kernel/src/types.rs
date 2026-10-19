@@ -168,6 +168,9 @@ impl AddAssign for Usage {
 pub enum Event {
     TextDelta { text: String },
     ToolStart { id: String, name: String, arguments: String },
+    /// Emitted after validation and approval, immediately before dispatch. Observers may fail
+    /// closed at this point. A crash after this event leaves the action's outcome uncertain.
+    ToolDispatched { id: String },
     ToolEnd {
         id: String, output: String, is_error: bool,
         #[serde(default, skip_serializing_if = "Vec::is_empty")]

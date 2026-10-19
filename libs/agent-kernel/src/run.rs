@@ -10,6 +10,7 @@ use std::time::{Duration, Instant};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct RunSummary {
+    pub run_id: String,
     pub text: String,
     pub turns: usize,
     pub usage: Usage,
@@ -46,7 +47,7 @@ fn dangling_tool_results(history: &[Message]) -> Vec<Message> {
         .tool_calls
         .iter()
         .filter(|c| !answered.contains(c.id.as_str()))
-        .map(|c| crate::ToolResult::error("this tool call was interrupted before it produced a result.").message(c.id.as_str()))
+        .map(|c| crate::ToolResult::error("this tool call was interrupted before its result was saved; the action may already have happened. Check actual state before retrying; do not replay automatically.").message(c.id.as_str()))
         .collect()
 }
 
@@ -86,23 +87,93 @@ impl Agent {
         on_event: &mut dyn FnMut(Event),
         cancel: &Arc<AtomicBool>,
     ) -> Result<RunSummary, HarnessError> {
-        let result = self.run_inner(session, Some(input), on_event, cancel);
-        match &result {
-            Ok(_) => on_event(Event::Done),
-            Err(HarnessError::Cancelled) => on_event(Event::Cancelled),
-            Err(error) => on_event(Event::Error { message: error.to_string() }),
-        }
-        result
+        self.run_parts_observed(session, input, crate::RunOptions::default(), &mut |record| {
+            if let crate::RunEventBody::Event { event } = record.body {
+                if !matches!(event, Event::ToolDispatched { .. }) { on_event(event); }
+            }
+            Ok(())
+        }, cancel)
+    }
+
+    /// Observe typed run states and sequenced events. Observer failures cancel further dispatch.
+    /// The observer may persist records before returning Ok, without involving message storage.
+    pub fn run_parts_observed(
+        &self, session: &str, input: Vec<Part>, options: crate::RunOptions,
+        observe: &mut dyn FnMut(crate::RunEvent) -> Result<(), HarnessError>, cancel: &Arc<AtomicBool>,
+    ) -> Result<RunSummary, HarnessError> {
+        self.run_observed_inner(session, Some(input), options, observe, cancel)
     }
 
     /// Retry only a user message which has not produced a persisted assistant/tool message.
-    /// It reuses the original parts (including images), without appending a duplicate user message.
     pub fn retry_last(&self, session: &str, on_event: &mut dyn FnMut(Event), cancel: &Arc<AtomicBool>) -> Result<RunSummary, HarnessError> {
-        let result = self.run_inner(session, None, on_event, cancel);
-        match &result {
-            Ok(_) => on_event(Event::Done),
-            Err(HarnessError::Cancelled) => on_event(Event::Cancelled),
-            Err(error) => on_event(Event::Error { message: error.to_string() }),
+        self.retry_last_observed(session, crate::RunOptions::default(), &mut |record| {
+            if let crate::RunEventBody::Event { event } = record.body {
+                if !matches!(event, Event::ToolDispatched { .. }) { on_event(event); }
+            }
+            Ok(())
+        }, cancel)
+    }
+
+    pub fn retry_last_observed(
+        &self, session: &str, options: crate::RunOptions,
+        observe: &mut dyn FnMut(crate::RunEvent) -> Result<(), HarnessError>, cancel: &Arc<AtomicBool>,
+    ) -> Result<RunSummary, HarnessError> {
+        self.run_observed_inner(session, None, options, observe, cancel)
+    }
+
+    fn run_observed_inner(
+        &self, session: &str, input: Option<Vec<Part>>, options: crate::RunOptions,
+        observe: &mut dyn FnMut(crate::RunEvent) -> Result<(), HarnessError>, cancel: &Arc<AtomicBool>,
+    ) -> Result<RunSummary, HarnessError> {
+        use crate::{RunEnd, RunEventBody, RunState};
+        let mut emitter = crate::runtime::RunEmitter::new(session, &options, observe);
+        let run_id = emitter.run_id.clone();
+        // Keep the session locked through cleanup and terminal observation. A rejected competing
+        // run must never clean up resources belonging to the run that owns the session.
+        let _guard = match self.acquire(session) {
+            Ok(guard) => guard,
+            Err(error) => {
+                emitter.emit(RunEventBody::Event { event: Event::Error { message: error.to_string() } })?;
+                emitter.emit(RunEventBody::State { state: RunState::Failed, reason: Some(error.to_string()) })?;
+                return Err(error);
+            }
+        };
+        emitter.emit(RunEventBody::State { state: RunState::Running, reason: None })?;
+        let mut observation_error = None;
+        let mut result = {
+            let mut forward = |event| {
+                if observation_error.is_none() {
+                    if let Err(error) = emitter.emit(RunEventBody::Event { event }) {
+                        observation_error = Some(error);
+                        cancel.store(true, Ordering::SeqCst);
+                    }
+                }
+            };
+            self.run_inner(session, &run_id, input, &options, &mut forward, cancel)
+        };
+        if let Some(error) = observation_error { result = Err(error); }
+        let end = RunEnd { run_id, session_id: session.into(), state: crate::runtime::state_of(&result), ephemeral_session: options.ephemeral_session };
+        for tool in &self.tools {
+            if let Err(error) = tool.on_run_end(&end) {
+                result = Err(HarnessError::Middleware(format!("run cleanup failed: {error}")));
+            }
+        }
+        if crate::runtime::state_of(&result) != end.state {
+            let failed = RunEnd { state: RunState::Failed, ..end.clone() };
+            for tool in &self.tools { let _ = tool.on_run_end(&failed); }
+        }
+        let event = match &result {
+            Ok(_) => Event::Done,
+            Err(HarnessError::Cancelled) => Event::Cancelled,
+            Err(error) => Event::Error { message: error.to_string() },
+        };
+        let finalized = emitter.emit(RunEventBody::Event { event }).and_then(|_| {
+            emitter.emit(RunEventBody::State { state: crate::runtime::state_of(&result), reason: result.as_ref().err().map(ToString::to_string) })
+        });
+        if let Err(error) = finalized {
+            let failed = RunEnd { state: RunState::Failed, ..end };
+            for tool in &self.tools { let _ = tool.on_run_end(&failed); }
+            return Err(error);
         }
         result
     }
@@ -118,11 +189,12 @@ impl Agent {
     fn run_inner(
         &self,
         session: &str,
+        run_id: &str,
         input: Option<Vec<Part>>,
+        options: &crate::RunOptions,
         on_event: &mut dyn FnMut(Event),
         cancel: &Arc<AtomicBool>,
     ) -> Result<RunSummary, HarnessError> {
-        let _guard = self.acquire(session)?;
         let mut history = self.store.load(session)?;
         if input.is_none() && !history.last().is_some_and(|m| m.role == Role::User) {
             return Err(HarnessError::Config("The last message has already produced output or tool actions; it cannot be replayed.".into()));
@@ -143,6 +215,7 @@ impl Agent {
         let mut continuations = 0;
         let mut continuations_without_progress = 0;
         let mut successful_calls = Vec::new();
+        let mut tool_calls = 0usize;
         for index in 0..self.max_turns {
             if cancel.load(Ordering::Relaxed) {
                 return Err(HarnessError::Cancelled);
@@ -197,7 +270,7 @@ impl Agent {
                         if cut_off {
                             on_event(Event::Truncated);
                         }
-                        return Ok(RunSummary { text, turns: index + 1, usage, finish });
+                        return Ok(RunSummary { run_id: run_id.to_string(), text, turns: index + 1, usage, finish });
                     }
                     StopDecision::Pause(reason) => return Err(HarnessError::Paused(reason)),
                     StopDecision::Continue(_) if index + 1 == self.max_turns => return Err(HarnessError::MaxTurns(self.max_turns)),
@@ -212,15 +285,20 @@ impl Agent {
                 continue;
             }
 
-            let results = if cut_calls {
+            let over_budget = options.max_tool_calls.is_some_and(|limit| tool_calls.saturating_add(calls.len()) > limit);
+            tool_calls = tool_calls.saturating_add(calls.len());
+            let results = if over_budget {
+                self.reject_calls(session, &calls, "Not run: this batch exceeds the run tool-call budget. No calls in the batch were executed.", on_event)
+            } else if cut_calls {
                 self.reject_calls(session, &calls, CUT_OFF_MESSAGE, on_event)
             } else {
-                self.execute_calls(session, &calls, cancel, on_event)
+                self.execute_calls(session, run_id, &calls, cancel, on_event)
             };
             let tool_messages: Vec<Message> =
                 calls.iter().zip(&results).map(|(c, r)| r.message(c.id.as_str())).collect();
             self.store.append(session, &tool_messages)?;
             history.extend(tool_messages);
+            if over_budget { return Err(HarnessError::BudgetExceeded("tool calls".into())); }
             for (call, result) in calls.iter().zip(&results) {
                 if result.is_error || matches!(call.name.as_str(), "todo" | "ask_user" | "time_now") {
                     continue;

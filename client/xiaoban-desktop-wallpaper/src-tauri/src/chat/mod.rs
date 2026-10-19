@@ -117,6 +117,7 @@ pub struct ChatState {
     index: Mutex<Option<Index>>,
     /// Conversations whose automatic compaction failed lately.
     auto_compact: compact::AutoCooldown,
+    processes: Mutex<HashMap<PathBuf, Arc<agent_kernel::process::ProcessManager>>>,
 }
 
 impl ChatState {
@@ -136,8 +137,23 @@ impl ChatState {
             runs: Mutex::new(HashMap::new()),
             index: Mutex::new(None),
             auto_compact: compact::AutoCooldown::default(),
+            processes: Mutex::new(HashMap::new()),
         }
     }
+
+    fn processes_for(&self, workspace: &Path) -> Result<Arc<agent_kernel::process::ProcessManager>, String> {
+        let root = workspace.canonicalize().map_err(|e| e.to_string())?;
+        let mut managers = lock(&self.processes);
+        if let Some(manager) = managers.get(&root) { return Ok(manager.clone()); }
+        let manager = Arc::new(agent_kernel::process::ProcessManager::new(&root)?);
+        managers.insert(root, manager.clone());
+        Ok(manager)
+    }
+}
+
+pub fn shutdown_processes(app: &tauri::AppHandle) {
+    let managers: Vec<_> = lock(&app.state::<ChatState>().processes).values().cloned().collect();
+    for manager in managers { let _ = manager.shutdown(); }
 }
 
 /// "完全信任" runs everything except what `danger::assess` flags, which is asked every time.
@@ -217,6 +233,7 @@ impl Dirs {
     fn spill(&self) -> PathBuf { self.chat.join("spill") }
     fn memory(&self) -> PathBuf { self.chat.join("memory") }
     fn skills(&self) -> PathBuf { self.chat.join("skills") }
+    fn runs(&self, session: &str) -> PathBuf { self.chat.join("runs").join(session) }
 }
 
 pub(crate) fn provider(config: &AiConfig) -> Result<Arc<dyn ModelProvider>, String> {
@@ -327,11 +344,14 @@ struct Parts<'a> {
     spawn_computer_use: fn() -> Result<Arc<agent_kernel::mcp::McpClient>, agent_kernel::HarnessError>,
     /// Estimated tokens kept in a request before old tool output and old turns are dropped.
     context_tokens: usize,
+    processes: Option<Arc<agent_kernel::process::ProcessManager>>,
 }
 
 /// Puts the kernel together: the model, the tools the assistant may use, and the rules around them.
 fn assemble(parts: Parts<'_>) -> Result<Agent, String> {
-    let Parts { provider, dirs, workspace, permission, todo, ask, desktop, utc_offset_minutes, open_computer_use, spawn_computer_use, context_tokens } = parts;
+    let Parts { provider, dirs, workspace, permission, todo, ask, desktop, utc_offset_minutes, open_computer_use, spawn_computer_use, context_tokens, processes } = parts;
+    let processes = match processes { Some(manager) => manager, None => Arc::new(agent_kernel::process::ProcessManager::new(workspace)?) };
+    if processes.workspace() != workspace.canonicalize().map_err(|e| e.to_string())? { return Err("进程工具的工作目录与当前工作目录不同".into()); }
     for dir in [dirs.sessions(), dirs.spill(), dirs.memory(), dirs.skills()] {
         fs::create_dir_all(&dir).map_err(|e| format!("无法创建 {}：{e}", dir.display()))?;
     }
@@ -361,14 +381,14 @@ fn assemble(parts: Parts<'_>) -> Result<Agent, String> {
         .tool(WebFetch::new())
         .middleware(permission)
         // Before spilling, so it compares real outputs rather than previews that name a fresh file each time.
-        .middleware(RepeatGuard::new())
+        .middleware(RepeatGuard::new().ignore_tool("process_read"))
         .middleware(SpillOutput::new(dirs.spill()))
         .middleware(ContextTrim::new(context_tokens).reserve_output(8192))
         .middleware(ContinueGuard::new())
         .max_turns(MAX_TURNS);
     let readable = fs_tools(vec![workspace.to_path_buf(), dirs.spill()]).map_err(|e| e.to_string())?;
     let writable = fs_write_tools(vec![workspace.to_path_buf()]).map_err(|e| e.to_string())?;
-    for tool in readable.into_iter().chain(writable).chain(skills.tools()).chain(memory.tools()).chain(desktop_tools::tools(desktop)) {
+    for tool in readable.into_iter().chain(writable).chain(skills.tools()).chain(memory.tools()).chain(processes.tools()).chain(desktop_tools::tools(desktop)) {
         builder = builder.tool_arc(tool);
     }
     if let Some(Ok(mcp_client)) = &computer_use {
@@ -397,6 +417,7 @@ fn build_agent(app: &tauri::AppHandle, config: &AiConfig, key_source: Option<Key
         open_computer_use: config.open_computer_use,
         spawn_computer_use: spawn_open_computer_use,
         context_tokens: config.context_tokens,
+        processes: Some(state.processes_for(workspace)?),
     })
 }
 
@@ -559,14 +580,46 @@ pub fn chat_send(app: tauri::AppHandle, session_id: String, text: String, images
                 return;
             }
         };
-        let mut callback = |mut event| {
-            if let agent_kernel::Event::Error { message } = &mut event {
+        let run_log_dir = match Dirs::of(&handle) {
+            Ok(dirs) => dirs.runs(&session),
+            Err(error) => {
+                emit(&sender, "chat-event", json!({"session":session,"event":{"type":"error","message":error}}));
+                finish_run(&handle, &id);
+                return;
+            }
+        };
+        let run_log = agent_kernel::journal::JsonlRunLog::new(run_log_dir);
+        let mut observation_failed = None;
+        let mut callback = |mut record: agent_kernel::RunEvent| {
+            let message = match &mut record.body {
+                agent_kernel::RunEventBody::Event { event: agent_kernel::Event::Error { message } } => Some(message),
+                agent_kernel::RunEventBody::State { reason: Some(reason), .. } => Some(reason),
+                _ => None,
+            };
+            if let Some(message) = message {
                 if !config_owned.api_key.is_empty() { *message = message.replace(&config_owned.api_key, "<hidden>"); }
                 if ai_gateway::is_active(&config_owned) { *message = ai_gateway::readable_error(message); }
             }
-            emit(&sender, "chat-event", json!({ "session": session, "event": event }));
+            if let Err(error) = run_log.append(&record) {
+                observation_failed = Some(error.to_string());
+                return Err(error);
+            }
+            match &record.body {
+                agent_kernel::RunEventBody::Event { event } => emit(&sender, "chat-event", json!({
+                    "session": session, "event": event, "runId": record.run_id,
+                    "sequence": record.sequence, "timestampMs": record.timestamp_ms,
+                })),
+                agent_kernel::RunEventBody::State { .. } => emit(&sender, "chat-run-state", json!(record)),
+            }
+            Ok(())
         };
-        let answered = if retry { agent.retry_last(&id, &mut callback, &cancel) } else { agent.run_parts(&id, parts_owned, &mut callback, &cancel) };
+        let options = agent_kernel::RunOptions { max_tool_calls: Some(256), ..Default::default() };
+        let answered = if retry { agent.retry_last_observed(&id, options, &mut callback, &cancel) }
+            else { agent.run_parts_observed(&id, parts_owned, options, &mut callback, &cancel) };
+        drop(callback);
+        if let Some(error) = observation_failed {
+            emit(&sender, "chat-event", json!({"session": session, "event": {"type":"error", "message":format!("执行日志保存失败，任务已停止：{error}")}}));
+        }
         if answered.is_ok() {
             auto_compact(&handle, &id, &config_owned, key_source, &cancel);
         }
@@ -597,7 +650,15 @@ pub fn chat_delete_session(app: tauri::AppHandle, session_id: String) -> Result<
     if lock(&state.runs).contains_key(&session_id) {
         return Err("这个对话还在回答，请先停止再删除".into());
     }
-    JsonlStore::new(Dirs::of(&app)?.sessions()).remove(&session_id).map_err(|e| e.to_string())?;
+    let managers: Vec<_> = lock(&state.processes).values().cloned().collect();
+    for manager in managers { manager.forget_session(&session_id)?; }
+    let dirs = Dirs::of(&app)?;
+    match fs::remove_dir_all(dirs.runs(&session_id)) {
+        Ok(()) => {},
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {},
+        Err(error) => return Err(format!("无法删除执行记录：{error}")),
+    }
+    JsonlStore::new(dirs.sessions()).remove(&session_id).map_err(|e| e.to_string())?;
     state.permission.forget_session(&session_id);
     state.todo.clear_session(&session_id);
     state.auto_compact.forget(&session_id);

@@ -7,6 +7,12 @@ vi.mock('../bridge.ts', async (importOriginal) => ({ ...await importOriginal<typ
 const ipc = vi.mocked(invoke);
 beforeEach(() => { vi.resetAllMocks(); vi.mocked(listen).mockResolvedValue(() => {}); });
 describe('control state with native settings', () => {
+  it('routes previous assistant settings links into the settings tab', () => {
+    const store=createControlStore(vi.fn());
+    store.navigate('assistant');
+    expect(store.page).toBe('settings');expect(store.settingsTab).toBe('assistant');
+    store.dispose();
+  });
   it('starts each creative action in a fresh chat with an editable prompt', async () => {
     const store = createControlStore(vi.fn());
     store.chat.currentId = 'existing';

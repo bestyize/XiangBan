@@ -99,6 +99,7 @@ pub const DEFAULT_MAX_OUTPUT: usize = 32_000;
 /// Handed to a running tool. Long-running tools should poll `is_cancelled`.
 pub struct ToolCtx {
     pub(crate) session: String,
+    pub(crate) run_id: String,
     pub(crate) run_cancel: Arc<AtomicBool>,
     pub(crate) call_cancel: Arc<AtomicBool>,
 }
@@ -108,9 +109,11 @@ impl ToolCtx {
         &self.session
     }
 
+    pub fn run_id(&self) -> &str { &self.run_id }
+
     /// A context that is never cancelled, for calling a tool directly, for example in a host's tests.
     pub fn detached(session: &str) -> Self {
-        Self { session: session.to_string(), run_cancel: Arc::new(AtomicBool::new(false)), call_cancel: Arc::new(AtomicBool::new(false)) }
+        Self { session: session.to_string(), run_id: format!("detached-{session}"), run_cancel: Arc::new(AtomicBool::new(false)), call_cancel: Arc::new(AtomicBool::new(false)) }
     }
 
     /// True after the user cancels the run or this call hits its timeout.
@@ -148,6 +151,11 @@ pub trait Tool: Send + Sync {
             Err(error) => ToolResult::error(error),
         }
     }
+
+    /// Release run-owned resources before the terminal event. Runs once per registered tool;
+    /// implementations sharing a resource manager should designate one tool for cleanup.
+    /// Must be idempotent: finalization failure may trigger a second cleanup with Failed state.
+    fn on_run_end(&self, _end: &crate::RunEnd) -> Result<(), String> { Ok(()) }
 }
 
 #[derive(Debug, Clone, PartialEq)]

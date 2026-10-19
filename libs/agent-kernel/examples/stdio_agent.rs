@@ -5,6 +5,7 @@
 //! Optional: AGENT_MAX_TOKENS, AGENT_SYSTEM_PROMPT, AGENT_SESSIONS_DIR (default ./.agent-sessions),
 //! AGENT_ROOT (default .).
 //! File tools are read-only inside AGENT_ROOT; anything that changes state asks the client first.
+//! With feature `process`, AGENT_ALLOW_PROCESSES=1 explicitly enables managed process tools.
 
 use agent_kernel::builtin::{fs::fs_tools, AskUser, TimeNow, Todo};
 use agent_kernel::provider::anthropic::AnthropicMessages;
@@ -42,7 +43,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .tool(Todo::new())
         .tool(AskUser::new(bridge.ask_handler()))
         .middleware(Permission::new(PermissionMode::Ask, bridge.approver()))
-        .middleware(ContextTrim::new(100_000));
+        .middleware(ContextTrim::new(100_000).reserve_output(8192));
+    #[cfg(feature = "process")]
+    if env("AGENT_ALLOW_PROCESSES").as_deref() == Some("1") {
+        let processes = Arc::new(agent_kernel::process::ProcessManager::new(&root)?);
+        for tool in processes.tools() { builder = builder.tool_arc(tool); }
+    }
     for tool in fs_tools(vec![root])? {
         builder = builder.tool_arc(tool);
     }

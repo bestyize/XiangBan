@@ -78,6 +78,9 @@ export function applyEvent(view: SessionView, event: KernelEvent): void {
       endStreaming(view);
       view.items.push({ kind: 'tool', id: event.id, name: event.name, arguments: event.arguments, output: '', status: 'running' });
       break;
+    case 'tool_dispatched':
+      // The existing tool card remains running; dispatch is an execution-log boundary.
+      break;
     case 'tool_end': {
       const item = view.items.find((i): i is Extract<ChatItem, { kind: 'tool' }> => i.kind === 'tool' && i.id === event.id);
       const output = toolOutput(event.output, event.structured_content);
@@ -108,6 +111,10 @@ export function applyEvent(view: SessionView, event: KernelEvent): void {
       const lastUser = view.items.map(i => i.kind).lastIndexOf('user');
       const partial = view.items.slice(lastUser + 1).some(i => i.kind === 'tool' || i.kind === 'assistant');
       settle(view);
+      if (/^run budget exceeded:/.test(event.message)) {
+        view.items.push({ kind: 'notice', id: nextId(view), tone: 'warning', text: '本轮操作次数已达到上限，已暂停。点“继续”可以从已保存的进展接着处理。', canContinue: true, details: event.message });
+        break;
+      }
       if (/^run paused by continuation guard:/.test(event.message)) {
         const text = event.message.endsWith(': no_progress')
           ? '连续多次未取得新进展，小伴已暂停。点“继续”可以接着尝试。'

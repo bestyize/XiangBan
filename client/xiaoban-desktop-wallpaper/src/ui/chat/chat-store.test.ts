@@ -483,7 +483,7 @@ describe('the context of the open conversation and compacting it', () => {
   const info = (used: number, canCompact = true) => ({ used, limit: 256_000, canCompact });
   const say = (value: string) => [{ type: 'text' as const, text: value }];
   const history: WireMessage[] = [{ role: 'user', parts: say('早') }, { role: 'assistant', parts: say('早上好') }];
-  const withSummary: WireMessage[] = [...history, { role: 'user', parts: say('[[xiaoban-summary keep_from=2]]\n摘要正文') }];
+  const withSummary: WireMessage[] = [...history, { role: 'user', synthetic: true, context_summary: { keep_from: 2, text: '摘要正文' } }];
   const tick = () => new Promise(resolve => setTimeout(resolve, 0));
 
   it('reads the numbers with the first overview, and again when a conversation is opened', async () => {

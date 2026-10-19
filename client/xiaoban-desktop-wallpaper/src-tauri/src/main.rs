@@ -912,6 +912,7 @@ fn main() {
     #[cfg(not(windows))]
     let app = app.expect("小伴启动失败");
     app.run(|_handle, _event| {
+        if matches!(_event, tauri::RunEvent::Exit) { chat::shutdown_processes(_handle); }
         if matches!(_event, tauri::RunEvent::Exit) && _handle.state::<DesktopState>().isolated {
             let _ = startup::set(_handle, false);
         }

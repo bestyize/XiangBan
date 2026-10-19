@@ -9,7 +9,7 @@ interface Status {
   enabled: boolean; shortcut: string; shortcutLabel: string; shortcuts: { value: string; label: string }[];
   ball: boolean; open: 'voice' | 'type'; read: 'voice' | 'always' | 'never'; hintSeen: boolean; registered: boolean; error: string;
 }
-const props = defineProps<{ store: ControlStore }>();
+const props = withDefaults(defineProps<{ store: ControlStore; embedded?: boolean }>(), { embedded: false });
 const status = ref<Status>({
   enabled: props.store.settings.assistantEnabled, shortcut: props.store.settings.assistantShortcut, shortcutLabel: props.store.settings.assistantShortcut,
   shortcuts: [], ball: props.store.settings.assistantBall, open: props.store.settings.assistantOpen, read: props.store.settings.assistantRead,
@@ -63,7 +63,7 @@ onMounted(() => { void read(); void asr.value.init(); });
 </script>
 
 <template>
-  <section class="ui-page assistant-page" data-testid="assistant-page">
+  <section class="assistant-page" :class="{ 'ui-page': !embedded, 'is-embedded': embedded }" data-testid="assistant-page">
     <header class="page-header"><div><h1>超级小伴</h1><p class="header-note">快捷呼出与语音偏好</p></div><NButton round size="small" :disabled="!store.desktop || !status.enabled" data-testid="assistant-try" @click="tryNow"><template #icon><Play :size="13" /></template>试一下</NButton></header>
 
     <section class="surface hero" data-testid="assistant-hero">
@@ -99,6 +99,7 @@ onMounted(() => { void read(); void asr.value.init(); });
 
 <style scoped>
 .assistant-page{container-type:inline-size;display:grid;gap:16px;width:100%;max-width:920px;margin:0 auto;align-content:start;color:var(--ui-text-primary)}
+.assistant-page.is-embedded{max-width:none;margin:0;padding:0}
 .assistant-page .page-header{margin:0 0 2px;gap:16px;align-items:center}
 .page-header h1{font-size:23px;letter-spacing:-.035em;font-weight:650}
 .header-note{margin:5px 0 0;font-size:12px;line-height:1.5;color:var(--ui-text-secondary)}

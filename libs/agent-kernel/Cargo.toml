@@ -1,6 +1,6 @@
 [package]
 name = "agent-kernel"
-version = "0.2.0"
+version = "0.3.0"
 description = "Product-agnostic, lightweight agent harness kernel: loop, tools, middleware, OpenAI-compatible provider"
 edition = "2021"
 publish = false
@@ -17,6 +17,8 @@ web = ["dep:reqwest"]
 shell = []
 stdio = []
 mcp = ["dep:base64"]
+journal = []
+process = ["dep:libc", "dep:windows-sys"]
 
 [dependencies]
 serde = { version = "1", features = ["derive"] }
@@ -24,6 +26,12 @@ serde_json = "1"
 jsonschema = { version = "0.33", default-features = false }
 base64 = { version = "0.22", optional = true }
 reqwest = { version = "0.13", default-features = false, features = ["blocking"], optional = true }
+
+[target.'cfg(unix)'.dependencies]
+libc = { version = "0.2", optional = true }
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.61", optional = true, features = ["Win32_Foundation", "Win32_Security", "Win32_System_JobObjects", "Win32_System_Threading"] }
 
 [profile.dev]
 debug = false

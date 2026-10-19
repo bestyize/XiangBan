@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, h, nextTick, onMounted, onUnmounted, ref, watch, type Component, type HTMLAttributes } from 'vue';
 import { NButton, NDropdown, NInput, type DropdownOption } from 'naive-ui';
-import { ArrowDown, AudioLines, Check, ChevronDown, ChevronRight, Ellipsis, Folder, FolderInput, FolderPlus, ImagePlus, LoaderCircle, MessageSquarePlus, Mic, Pencil, SendHorizontal, Settings, Volume2, Shield, ShieldAlert, Sparkles, Square, Trash2, X, Zap } from 'lucide-vue-next';
+import { ArrowDown, Check, ChevronDown, ChevronRight, Ellipsis, Folder, FolderInput, FolderPlus, ImagePlus, LoaderCircle, MessageSquarePlus, Mic, Pencil, SendHorizontal, Settings, Volume2, Shield, ShieldAlert, Sparkles, Square, Trash2, X, Zap } from 'lucide-vue-next';
 import { invoke } from '../../bridge.ts';
 import type { ControlStore } from '../control-types.ts';
 import ModelSwitchDialog from '../components/ModelSwitchDialog.vue';
@@ -366,7 +366,6 @@ async function openLink(href: string) {
         </template>
         <li v-if="chat.ready && !chat.sessions.length" class="empty-list">还没有对话</li>
       </ul>
-      <button type="button" class="side-assistant" data-testid="chat-open-assistant" @click="store.navigate('assistant')"><AudioLines :size="15" /><span>超级小伴</span><small>随时呼出，直接对话</small></button>
     </aside>
 
     <div class="chat-main">
@@ -536,9 +535,6 @@ async function openLink(href: string) {
 
 .chat-page{flex:1;min-height:0;display:grid;grid-template-columns:200px minmax(0,1fr);background:var(--ui-app-bg)}
 .chat-side{border-right:1px solid var(--ui-border);display:flex;flex-direction:column;min-height:0;background:var(--ui-surface)}
-.side-assistant{flex:none;display:flex;align-items:center;gap:8px;margin:8px 12px 12px;padding:10px 12px;border:1px solid var(--ui-border);border-radius:12px;background:var(--ui-surface-alt);color:var(--ui-text-primary);font:inherit;font-size:13px;cursor:pointer;text-align:left}
-.side-assistant small{margin-left:auto;font-size:11px;color:var(--ui-text-tertiary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.side-assistant:hover{border-color:var(--ui-primary)}
 .side-head{padding:16px 14px 10px;display:flex;gap:8px}
 .side-new{flex:1}
 .session-list{list-style:none;margin:0;padding:4px 8px 12px;overflow:auto;flex:1;scrollbar-width:thin}

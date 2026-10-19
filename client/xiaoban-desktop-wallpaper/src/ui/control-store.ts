@@ -52,7 +52,7 @@ export function createControlStore(notify: ControlStore["notify"]): ControlStore
       onActivity: () => { store.asr.deactivate(); void store.speech.stop(); },
       onReply: (session, text, key) => { if (store.page === 'chat' && store.speech.settings.autoRead && document.visibilityState !== 'hidden') void store.speech.speak(text, key ?? 'auto:' + session, undefined, true); },
     }), ready: false, initialError: "", desktop, notify,
-    navigate(page) { if (store.page !== page) { void store.speech.stop(); store.asr.deactivate(); } store.page = page; },
+    navigate(page) { if (page === 'assistant') { store.settingsTab = 'assistant'; page = 'settings'; } if (store.page !== page) { void store.speech.stop(); store.asr.deactivate(); } store.page = page; },
     async startCreation(kind) {
       const prompts = {
         wallpaper: '帮我创作一张动态壁纸：',

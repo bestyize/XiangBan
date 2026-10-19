@@ -2,7 +2,20 @@
 
 与产品无关的轻量 agent harness 内核（Rust）。宿主提供模型、存储和自己的工具，内核负责循环、流式、并行工具、取消、重试和事件。不依赖 tauri，也不含任何产品逻辑、固定路径或人设。
 
-状态：0.2.0，已接入小伴桌面。内核循环、三种模型协议（chat completions、Responses、Claude Messages）、权限/上下文/输出落盘中间件、JSONL 存储、内置工具（时间、任务清单、提问、文件读写、网页、搜索接口、shell、子 agent）、skills 与记忆笔记、JSON 行协议（stdio）；新增工具 Schema 校验、结构化结果和 MCP 图片传递。演进设计与尚未实现的能力见 [框架审视](../../docs/architecture/agent-framework-review.md)。
+状态：0.3.0，已接入小伴桌面。内核循环、三种模型协议（chat completions、Responses、Claude Messages）、权限/上下文/输出落盘中间件、JSONL 存储、文件/网页/Shell、skills、记忆、子 Agent、MCP 与 stdio；支持工具 Schema 校验、结构化结果与图片。0.3 增加运行身份、可失败观察者、可选执行日志和进程管理。演进设计见 [框架审视](../../docs/architecture/agent-framework-review.md)，已实现架构图与使用约定见 [运行与进程基础](../../docs/architecture/agent-runtime.md)。
+
+## 0.3 运行与进程
+
+- 保留 `run` / `run_parts` / `retry_last`；新增 `run_parts_observed` / `retry_last_observed`，事件带独立 run_id、连续 sequence、时间戳和可选父 run。`RunSummary` 新增 run_id。运行状态与模型消息分开；completed 表示循环正常结束，不替代业务验收。
+- `RunOptions.max_tool_calls` 按批次限制本轮工具请求数，超额批次全部拒绝并暂停。取消和权限检查后，ToolDispatched 派发意图事件允许宿主先完成记录；观察失败会阻止派发。旧事件入口不插入这一新事件。
+- `ToolCtx.run_id()` 关联资源；`Tool::on_run_end` 在终止事件前清理，必须幂等，终止记录失败时可能重试清理。缺失历史结果会明确提示“动作可能已经发生”，不自动重放。
+- 可选 `journal`：`JsonlRunLog` 保存独立的 v1 执行记录，支持 `read_after` 补读和 `inspect` 检查未完成工具。仅包含日志和单 run 写入约束；没有自动恢复、跨进程会话锁或授权恢复。
+- 可选 `process`：宿主为工作区持有 `ProcessManager`，注入 process_start/read/write/stop。支持立即返回、日志游标、管道输入、超时、取消和受管进程清理；默认 run scope，keep_alive 显式保留到 session。宿主关闭会话和应用时主动清理。不含 PTY 或沙箱。
+- `Subagent.observe_run` 提供带父 run 身份的子任务记录；临时子任务会释放 session 运行资源，对话保留仍由宿主决定。父子用量预算尚未共享。
+- stdio hello 增加可选 capabilities。请求加 `observed: true` 切换到 run_event 帧，并可带 max_tool_calls；默认请求的 event/run_end 格式保持原样，协议版本仍为 v1。
+- 独立 stdio 示例可通过 feature `process` 和 AGENT_ALLOW_PROCESSES=1 显式启用进程工具，仍由客户端批准，无 Tauri 依赖。
+
+进程默认最多同时运行 8 个、保留 64 个记录、缓冲最近 256 KiB 输出；日志读取可聚合等待 10 秒，使用 next_cursor 避免重复。安装 RepeatGuard 时建议 `.ignore_tool("process_read")`，轮询仍受本轮调用预算限制。完整权限、生命周期、平台限制和示例见 [运行文档](../../docs/architecture/agent-runtime.md)。
 
 ## 0.2 接入与迁移
 
@@ -33,7 +46,7 @@ fn execute_result(&self, args: serde_json::Value, ctx: &ToolCtx) -> ToolResult {
 | 接口 | 谁实现 | 作用 |
 | --- | --- | --- |
 | `ModelProvider` | 自带三种协议，见下；宿主可自写 | 流式调用模型，返回完整回复 |
-| `Tool` | 宿主与内置工具 | 名称、JSON Schema、风险等级、超时、输出上限；`execute` 在独立线程运行 |
+| `Tool` | 宿主与内置工具 | 名称、JSON Schema、风险等级、超时、输出上限；`execute_result` 在独立线程运行，默认适配 `execute`；结束时 `on_run_end` 清理资源 |
 | `SessionStore` | 自带 `MemoryStore`、`JsonlStore` | 只负责 `load` 与 `append` |
 | `Middleware` | 宿主与内置中间件 | `before_model`、`after_model`、`before_tool`（可阻止，拿到 `ToolCtx`，含会话 id 和取消状态）、`after_tool`、`before_stop`（模型不调工具、本轮将结束时调用，返回 `Nudge` 可让运行继续） |
 | `Approver` | 宿主 | 需要确认时弹窗，返回 `Once`、`Always` 或 `Deny`；等用户时用 `request.wait_for(&rx)`，取消运行才能关掉弹窗 |
@@ -65,12 +78,12 @@ let agent = Agent::builder(Arc::new(OpenAiCompat::new(profile)?), Arc::new(Jsonl
 agent.run("session-1", "你好", &mut |event| { /* 转给 UI */ }, &Arc::new(AtomicBool::new(false)))?;
 ```
 
-`Event` 可序列化为 `{"type": "text_delta", ...}`，协议版本见 `PROTOCOL_VERSION`。
+`Event` 可序列化为 `{"type": "text_delta", ...}`，协议版本见 `PROTOCOL_VERSION`。新观察入口用 RunEvent 包装原事件和独立运行状态；旧入口过滤新增派发事件，保持旧事件视图。
 
 ## 行为约定
 
 - 同步加线程，不引入异步运行时。有 tokio 的宿主用 `spawn_blocking` 包一层。
-- 同一会话同一时刻只允许一个 `run`，否则返回 `SessionBusy`。
+- 同一个 Agent 实例内，同一会话同一时刻只允许一个 `run`，直到资源清理和终止事件结束才释放，否则返回 `SessionBusy`。多个实例/进程之间仍需宿主做会话互斥。
 - 同一轮的工具调用：`parallel_safe` 的并发执行，`serial()` 的单独执行；结果按调用顺序回填。
 - 工具不存在、参数不合法、超时、崩溃、被中间件阻止，都作为错误结果交还模型，不中断循环。
 - 取消后历史里每个 `tool_call` 都有对应结果，会话可继续使用。
@@ -102,7 +115,7 @@ agent.run("session-1", "你好", &mut |event| { /* 转给 UI */ }, &Arc::new(Ato
 - `SpillOutput`：大输出存成文件，只给模型头尾预览和路径。目录由宿主提供并清理，要让模型读到需把它加进文件工具的根目录。写失败时退回普通截断。
 - `ContinueGuard`：模型没调工具就结束时，检测本次运行 `todo` 还有 `pending` 项、最后一句只宣布下一步（如冒号结尾、“让我／我先／let me…”）、空回复或长度截断，补合成用户消息续跑并发出 `Event::Continuing`。默认不限制整轮累计续跑次数，改为最多 3 次无新进展的续跑（`max_without_progress`）；首次成功执行的工具名 + 解析后的 JSON 参数组合恢复额度，参数键序不影响比较，失败、拒绝、重复调用及 `todo` / `ask_user` / `time_now` 不恢复。这是进展启发式，不保证工作正确；`max_turns` 仍限制总运行量，可用 `max_per_run` 另设累计上限（0 禁用）。
 - `before_stop` 返回 `StopDecision::Finish` / `Continue(Nudge)` / `Pause(reason)`，第一个非 Finish 决策生效。需要续跑但额度已耗尽时返回 `HarnessError::Paused`（`no_progress` 或 `continuation_limit`），经 Error 事件通知宿主，不能当作 Done；最后一轮仍有工作则返回 MaxTurns。正常回答、询问用户、安全结束不会强制续跑；催过后模型明确完成或受阻也可结束，但再次空答或只宣布动作仍受保护。合成消息应在界面隐藏；宿主应对暂停提供原因和继续入口。
-- `RepeatGuard`：同一工具、同样参数、同样结果连续出现时，从第 3 次起在结果后附提醒，第 6 次起直接拒绝执行（`warn_after`、`block_after` 可调）；换参数、换结果或新的用户消息都会重新计数。要放在 `SpillOutput` 前面，否则比较的是每次文件名都不同的预览。
+- `RepeatGuard`：同一工具、同样参数、同样结果连续出现时，从第 3 次起在结果后附提醒，第 6 次起直接拒绝执行（`warn_after`、`block_after` 可调）；换参数、换结果或新的用户消息都会重新计数。可用 `ignore_tool` 排除合法轮询。要放在 `SpillOutput` 前面，否则比较的是每次文件名都不同的预览。
 
 ## 内置工具
 
@@ -146,6 +159,8 @@ Skills：`<根>/<name>/SKILL.md`，开头 `---` 块含 `name`、`description`，
 | `native-tls` | `openai`、`anthropic` 加系统 TLS |
 | `anthropic` | `AnthropicMessages`，引入阻塞版 `reqwest` |
 | `mcp` | 轻量通用 MCP 客户端（JSON-RPC 2.0 over stdio），连接外部 MCP 工具服务（如 open-computer-use） |
+| `process` | 可选受管进程会话；Unix 引入 libc，Windows 引入 windows-sys 的进程与 Job API，不引入网络或异步运行时 |
+| `journal` | 可选 JSONL 执行日志，与 SessionStore 及模型上下文独立 |
 | `fs` `skills` `memory` `web` `shell` `stdio` `mcp` | 见上；只有 `web`、`openai`、`anthropic` 引入 `reqwest`，其余无额外依赖 |
 
 0.1 历史 macOS arm64 实测（本 crate 的发布配置）：启用全部特性并用上全部工具、中间件和 stdio 的示例程序为 1.63 MiB。0.2 增加 Schema 校验依赖后的体积未重新测量；Windows 与宿主已有 `reqwest` 时的增量未测。
@@ -154,9 +169,11 @@ Skills：`<根>/<name>/SKILL.md`，开头 `---` 块含 `name`、`description`，
 
 ```sh
 cargo test --manifest-path libs/agent-kernel/Cargo.toml
-cargo test --manifest-path libs/agent-kernel/Cargo.toml --features native-tls,fs,skills,memory,web,shell,stdio,mcp
+cargo test --manifest-path libs/agent-kernel/Cargo.toml --locked --all-features
 ```
 
 `tests/` 是与产品无关的一致性测试，用 `ScriptedProvider` 和本地假 HTTP 服务，不依赖真实模型。只在 macOS 上运行过；`shell` 测试仅 Unix，Windows 上的文件、路径和进程处理未验证。新产品只能新增测试，不改这些。
 
 0.2 第一阶段验证：`cargo test --manifest-path libs/agent-kernel/Cargo.toml --locked --offline --all-features`，226 项通过；无默认 feature 测试通过。MCP 假服务测试需要开发机器上的 `python3`，产品使用内核本身不因此依赖 Python。
+
+0.3 执行基础验证（macOS arm64）：同一全 feature 命令 246 项通过；`--no-default-features` 146 项通过；无 Tauri 的 `stdio_agent` 参考宿主带 `native-tls,stdio,fs,process,journal` 编译通过。Windows x86_64 MSVC、Linux x86_64 的 `process,journal` 交叉编译检查通过，尚未运行对应平台进程测试。桌面聊天 Rust 115 项、前端聊天 116 项及 TypeScript 检查通过。未连接真实模型端点，未验收干净机器自动准备运行时或应用崩溃后恢复。

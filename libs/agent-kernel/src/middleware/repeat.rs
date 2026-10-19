@@ -3,7 +3,7 @@ use crate::error::HarnessError;
 use crate::tool::{ToolCtx, ToolGate, ToolResult, ToolSpec};
 use crate::types::ToolCall;
 use serde_json::Value;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::Mutex;
 
 #[derive(Default)]
@@ -24,12 +24,17 @@ pub struct RepeatGuard {
     warn_after: usize,
     block_after: usize,
     streaks: Mutex<HashMap<String, Streak>>,
+    ignored: HashSet<String>,
 }
 
 impl RepeatGuard {
     pub fn new() -> Self {
-        Self { warn_after: 3, block_after: 5, streaks: Mutex::new(HashMap::new()) }
+        Self { warn_after: 3, block_after: 5, streaks: Mutex::new(HashMap::new()), ignored: HashSet::new() }
     }
+
+    /// Polling a long-lived operation may legitimately return the same status repeatedly.
+    /// Run budgets still apply to these calls.
+    pub fn ignore_tool(mut self, name: &str) -> Self { self.ignored.insert(name.into()); self }
 
     pub fn warn_after(mut self, calls: usize) -> Self {
         self.warn_after = calls.max(2);
@@ -65,6 +70,7 @@ impl Middleware for RepeatGuard {
     }
 
     fn before_tool(&self, ctx: &ToolCtx, call: &ToolCall, args: &Value, _spec: &ToolSpec) -> ToolGate {
+        if self.ignored.contains(&call.name) { return ToolGate::Proceed; }
         let streaks = self.streaks.lock().unwrap_or_else(|e| e.into_inner());
         match streaks.get(ctx.session()) {
             Some(s) if s.count >= self.block_after && s.name == call.name && &s.args == args => ToolGate::Block(format!(
@@ -77,6 +83,7 @@ impl Middleware for RepeatGuard {
     }
 
     fn after_tool(&self, session: &str, call: &ToolCall, result: &mut ToolResult) {
+        if self.ignored.contains(&call.name) { self.forget_session(session); return; }
         let args = parse(&call.arguments);
         let mut streaks = self.streaks.lock().unwrap_or_else(|e| e.into_inner());
         let streak = streaks.entry(session.to_string()).or_default();

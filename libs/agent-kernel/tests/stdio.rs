@@ -171,10 +171,29 @@ fn a_run_streams_events_and_ends_with_a_summary() {
     let end = w.run_end("r1");
     let (result, lines) = w.finish();
     assert!(result.is_ok());
-    assert_eq!(lines[0], json!({"type": "hello", "protocol": 1}));
+    assert_eq!(lines[0], json!({"type": "hello", "protocol": 1, "capabilities":["run_events","tool_call_budget"]}));
     assert_eq!(lines[1], json!({"type": "event", "run": "r1", "event": {"type": "text_delta", "text": "Hel"}}));
     assert!(lines.contains(&json!({"type": "event", "run": "r1", "event": {"type": "done"}})));
     assert_eq!(end, json!({"type": "run_end", "run": "r1", "ok": true, "text": "Hello", "turns": 1, "finish": "stop", "prompt_tokens": 7, "completion_tokens": 2}));
+}
+
+#[test]
+fn observed_mode_exposes_run_identity_states_and_a_tool_budget_without_changing_legacy_frames() {
+    let w = start(vec![Step::tool_call("c", "save", "{}")], PermissionMode::Auto, |b| b);
+    w.send(json!({"type":"run","id":"outer","session":"s","input":"go","observed":true,"max_tool_calls":0}));
+    let end=w.run_end("outer");
+    assert_eq!(end["ok"],false);
+    assert!(end["error"].as_str().unwrap().contains("tool calls"));
+    let (_,lines)=w.finish();
+    assert!(!lines.iter().any(|line|line["type"]=="event"));
+    let records:Vec<_>=lines.iter().filter(|line|line["type"]=="run_event").map(|line|&line["record"]).collect();
+    assert_eq!(records.first().unwrap()["state"],"running");
+    assert_eq!(records.last().unwrap()["state"],"paused");
+    for (i,record) in records.iter().enumerate() {
+        assert_eq!(record["sequence"],i as u64+1);
+        assert_eq!(record["run_id"],end["run_id"]);
+    }
+    assert!(!records.iter().any(|record|record["event"]["type"]=="tool_dispatched"));
 }
 
 #[test]

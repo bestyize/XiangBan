@@ -60,6 +60,7 @@ impl Agent {
     pub(crate) fn execute_calls(
         &self,
         session: &str,
+        run_id: &str,
         calls: &[ToolCall],
         cancel: &Arc<AtomicBool>,
         on_event: &mut dyn FnMut(Event),
@@ -68,12 +69,17 @@ impl Agent {
         let mut inflight = Vec::new();
         for (i, call) in calls.iter().enumerate() {
             on_event(Event::ToolStart { id: call.id.clone(), name: call.name.clone(), arguments: call.arguments.clone() });
-            match self.prepare(session, call, cancel) {
+            match self.prepare(session, run_id, call, cancel) {
                 Prepared::Done(result) => results[i] = Some(self.finalize(session, call, result, on_event)),
                 Prepared::Run { tool, args, ctx } => {
                     let serial = !tool.spec().parallel_safe;
                     if serial {
                         self.drain(session, &mut inflight, &mut results, calls, cancel, on_event);
+                    }
+                    on_event(Event::ToolDispatched { id: call.id.clone() });
+                    if cancel.load(Ordering::Relaxed) {
+                        results[i] = Some(self.finalize(session, call, ToolResult::error("cancelled before dispatch"), on_event));
+                        continue;
                     }
                     match spawn(i, tool, args, ctx) {
                         Ok(call_in_flight) => inflight.push(call_in_flight),
@@ -101,7 +107,7 @@ impl Agent {
             .collect()
     }
 
-    fn prepare(&self, session: &str, call: &ToolCall, cancel: &Arc<AtomicBool>) -> Prepared {
+    fn prepare(&self, session: &str, run_id: &str, call: &ToolCall, cancel: &Arc<AtomicBool>) -> Prepared {
         let Some(&index) = self.tool_index.get(&call.name) else {
             let mut names: Vec<&str> = self.tools.iter().map(|tool| tool.spec().name.as_str()).collect();
             names.sort_unstable();
@@ -136,6 +142,7 @@ impl Agent {
         }
         let ctx = ToolCtx {
             session: session.to_string(),
+            run_id: run_id.to_string(),
             run_cancel: cancel.clone(),
             call_cancel: Arc::new(AtomicBool::new(false)),
         };

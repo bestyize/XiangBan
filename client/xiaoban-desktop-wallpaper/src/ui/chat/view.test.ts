@@ -5,6 +5,12 @@ import type { WireMessage } from './types.ts';
 const text = (value: string) => [{ type: 'text' as const, text: value }];
 
 describe('history to chat items', () => {
+  it('shows an exhausted run budget as a pause with a continue action', () => {
+    const view = newView('s1');
+    applyEvent(view, { type: 'error', message: 'run budget exceeded: tool calls' });
+    expect(view.items[0]).toMatchObject({ kind: 'notice', tone: 'warning', canContinue: true });
+    expect(view.items[0]).not.toHaveProperty('canSwitchModel');
+  });
   it('keeps tool errors and structured results after reloading history', () => {
     const items = itemsFromHistory(newView('s1'), [
       { role: 'assistant', tool_calls: [{ id: 'c', name: 'mcp', arguments: '{}' }] },

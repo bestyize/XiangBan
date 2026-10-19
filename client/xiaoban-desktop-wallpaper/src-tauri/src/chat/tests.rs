@@ -178,6 +178,7 @@ fn build_rig(tag: &str, steps: Vec<Step>, answer: Approval, computer_use: bool) 
         utc_offset_minutes: 480,
         open_computer_use: computer_use,
         spawn_computer_use: no_computer_use,
+        processes: None,
         context_tokens: ai_config::DEFAULT_CONTEXT_TOKENS,
     })
     .expect("the tool set assembles");
@@ -257,6 +258,7 @@ fn the_assistant_has_every_tool_it_needs_and_no_others() {
     names.sort();
     let mut expected = vec![
         "time_now", "todo", "ask_user", "read_file", "list_dir", "grep", "write_file", "edit_file", "shell", "web_fetch", "load_skill", "skill_manage",
+        "process_start", "process_read", "process_write", "process_stop",
         "memory_read", "memory_write", "desktop_status", "desktop_windows", "desktop_window_set", "wallpaper_list", "wallpaper_apply", "wallpaper_create", "wallpaper_delete", "effect_list", "effect_set", "effect_create", "effect_delete", "effect_read_format", "companion_set", "care_list",
         "care_set", "care_delete", "widget_list", "widget_add", "widget_create", "widget_delete_custom", "widget_update", "widget_remove", "game_list", "game_open", "game_close", "game_create", "game_delete",
         "request_accessibility_permission", "community_share", "community_open",
@@ -354,6 +356,7 @@ fn the_folder_for_saved_output_can_be_read_but_not_written() {
             utc_offset_minutes: 0,
             open_computer_use: false,
             spawn_computer_use: no_computer_use,
+        processes: None,
         context_tokens: ai_config::DEFAULT_CONTEXT_TOKENS,
         })
         .unwrap()
@@ -536,6 +539,7 @@ fn in_auto_mode_all_write_tools_run_without_asking() {
         utc_offset_minutes: 0,
         open_computer_use: false,
         spawn_computer_use: no_computer_use,
+        processes: None,
         context_tokens: ai_config::DEFAULT_CONTEXT_TOKENS,
     }).unwrap();
 
@@ -577,6 +581,7 @@ fn trusted_rig(tag: &str, steps: Vec<Step>) -> (Rig, Arc<Mutex<Vec<(String, Opti
         utc_offset_minutes: 0,
         open_computer_use: false,
         spawn_computer_use: no_computer_use,
+        processes: None,
         context_tokens: ai_config::DEFAULT_CONTEXT_TOKENS,
     })
     .unwrap();
@@ -744,7 +749,8 @@ fn the_context_size_from_settings_is_what_the_agent_trims_to() {
             utc_offset_minutes: 0,
             open_computer_use: false,
             spawn_computer_use: no_computer_use,
-            context_tokens: 32_000,
+            processes: None,
+        context_tokens: 32_000,
         })
         .unwrap();
         let file = JsonlStore::new(dirs.sessions());

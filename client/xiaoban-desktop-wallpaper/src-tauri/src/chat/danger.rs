@@ -34,7 +34,8 @@ const MAX_DEPTH: usize = 4;
 
 /// The reason the call must be confirmed, or `None` when it may run. `workspace` is the folder the shell works in.
 pub fn assess(tool: &str, args: &Value, workspace: Option<&Path>) -> Option<&'static str> {
-    if tool != "shell" {
+    if tool == "process_write" { return Some(R_BLIND); }
+    if !matches!(tool, "shell" | "process_start") {
         return None;
     }
     assess_command(args.get("command")?.as_str()?, &Ctx { workspace, depth: 0, stdin_targets: false })
@@ -484,6 +485,15 @@ mod tests {
 
     fn check(command: &str) -> Option<&'static str> {
         assess("shell", &json!({ "command": command }), Some(Path::new("/work")))
+    }
+
+    #[test]
+    fn managed_processes_share_command_checks_and_pipe_input_requires_review() {
+        for command in ["npm run build", "sudo true", "git push --force", "rm -rf /outside"] {
+            assert_eq!(assess("process_start", &json!({"command":command}), Some(Path::new("/work"))), check(command));
+        }
+        assert_eq!(assess("process_write", &json!({"id":"p","input":"sudo true\n"}), None), Some(R_BLIND));
+        assert_eq!(assess("process_read", &json!({"id":"p"}), None), None);
     }
 
     #[test]
