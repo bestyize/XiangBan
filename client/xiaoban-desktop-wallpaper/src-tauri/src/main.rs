@@ -730,7 +730,7 @@ fn main() {
     #[cfg(target_os = "macos")]
     for window in &mut context.config_mut().app.windows { window.incognito = true; }
     let builder = tauri::Builder::default()
-        .plugin(tauri::plugin::Builder::new("app-context-menu")
+        .plugin(tauri::plugin::Builder::<tauri::Wry, ()>::new("app-context-menu")
             .js_init_script_on_all_frames(include_str!("webview_context_menu.js"))
             .build())
         .plugin(tauri_plugin_dialog::init())
