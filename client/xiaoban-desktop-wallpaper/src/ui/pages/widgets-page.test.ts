@@ -67,7 +67,7 @@ describe('replacement widget library',()=>{
  it('switches to custom category and shows empty state',async()=>{
   const s=store(),v=mount(WidgetsPage,{props:{store:s},attachTo:document.body});
   await flushPromises();
-  expect(v.text()).toContain('内置组件');
+  expect(v.text()).toContain('官方组件');
   expect(v.text()).toContain('自定义组件');
   const tabs=[...v.findAll('.n-tabs-tab')];
   const customTab=tabs.find(t=>t.text().includes('自定义组件'));

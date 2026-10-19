@@ -20,15 +20,17 @@ function setup(catalog: { games: unknown[]; errors?: string[] }, desktop = true)
   return { store, openGames, wrapper: mount(GamesPage, { props: { store }, global: { stubs } }) };
 }
 
+async function customTab(wrapper:ReturnType<typeof mount>){await wrapper.findAll('.n-tabs-tab').find(t=>t.text()==='自定义游戏')!.trigger('click');await flushPromises();}
+
 it('opens the selected local game on a single click and supports keyboard entry', async () => {
   const { wrapper, openGames } = setup({ games: [builtin] });
   try {
     await flushPromises();
-    expect(wrapper.find('h1').exists()).toBe(false);
+    expect(wrapper.get('.resource-library-header h1').text()).toBe('游戏空间');expect(wrapper.find('.resource-library-header p').exists()).toBe(false);expect(wrapper.findAll('.n-tabs-tab').map(t=>t.text())).toEqual(['官方游戏','自定义游戏']);
     expect(wrapper.get('.game-card img').attributes('src')).toBe('/game-packs/merge-2048/cover.svg');
     await wrapper.get('.game-card').trigger('click'); await flushPromises();
     expect(openGames).toHaveBeenCalledWith('merge-2048');
-    expect(wrapper.find('.shortcut-card').exists()).toBe(false);
+    expect(wrapper.find('.shortcut-card').exists()).toBe(false);expect(wrapper.find('h2').exists()).toBe(false);expect(wrapper.find('.section-heading').exists()).toBe(false);expect(wrapper.find('.resource-library-body').text()).not.toContain('离线可玩');
     await wrapper.get('.game-card').trigger('keydown', { key: 'Enter' }); await flushPromises();
     expect(openGames).toHaveBeenCalledTimes(2);
   } finally { wrapper.unmount(); }
@@ -38,12 +40,13 @@ it('shows the user games in their own section with the default cover, and starts
   const { wrapper, openGames } = setup({ games: [builtin, mine], errors: ['「broken」：缺少 manifest.json'] });
   try {
     await flushPromises();
+    await customTab(wrapper);
     const section = wrapper.get('[data-testid="user-games"]');
     expect(section.findAll('.game-card')).toHaveLength(1);
     expect(section.get('img').attributes('src')).toBe(DEFAULT_COVER);
     expect(section.text()).toContain('接星星');
     expect(section.get('[data-testid="user-game-errors"]').text()).toContain('broken');
-    expect(wrapper.findAll('.game-card')).toHaveLength(2);
+    expect(wrapper.findAll('.game-card')).toHaveLength(1);
     await section.get('.game-card').trigger('click'); await flushPromises();
     expect(openGames).toHaveBeenCalledWith('star-catcher');
   } finally { wrapper.unmount(); }
@@ -53,8 +56,9 @@ it('explains how to add games when there are none yet', async () => {
   const { wrapper } = setup({ games: [builtin] });
   try {
     await flushPromises();
+    await customTab(wrapper);
     const section = wrapper.get('[data-testid="user-games"]');
-    expect(section.text()).toContain('还没有自创游戏');
+    expect(section.text()).toContain('还没有自定义游戏');
   } finally { wrapper.unmount(); }
 });
 
@@ -62,9 +66,10 @@ it('deletes a user game only after the confirmation and then reloads the list', 
   const { wrapper, store } = setup({ games: [builtin, mine] });
   try {
     await flushPromises();
+    await customTab(wrapper);
     await wrapper.get('[data-testid="delete-game-star-catcher"]').trigger('click');
     expect(store.deleteUserGame).not.toHaveBeenCalled();
-    expect(wrapper.findAll('.game-card')).toHaveLength(2);
+    expect(wrapper.findAll('.game-card')).toHaveLength(1);
     wrapper.findComponent(NPopconfirm).vm.$emit('positive-click');
     await flushPromises();
     expect(store.deleteUserGame).toHaveBeenCalledWith('star-catcher');

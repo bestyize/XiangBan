@@ -34,12 +34,12 @@ async function run(share = false) {
 }
 </script>
 <template>
-  <div v-if="store.desktop" class="resource-share-actions" :class="{ icons }" @click.stop @keydown.stop>
-    <NButton :size="importLabel && !icons ? 'medium' : 'small'" :round="!!importLabel && !icons" :circle="!!icons" secondary :loading="busy" :disabled="busy || disabled" :title="id ? '导出资源包' : importLabel || '导入资源包'" :aria-label="id ? '导出资源包' : importLabel || '导入资源包'" :data-testid="id ? 'export-resource' : 'import-resource'" @click="run()">
+  <div v-if="store.desktop || importLabel" class="resource-share-actions" :class="{ icons }" @click.stop @keydown.stop>
+    <NButton :size="importLabel && !icons ? 'medium' : 'small'" :round="!!importLabel && !icons" :circle="!!icons" secondary :loading="busy" :disabled="busy || disabled || !store.desktop" :title="id ? '导出资源包' : importLabel || '导入资源包'" :aria-label="id ? '导出资源包' : importLabel || '导入资源包'" :data-testid="id ? 'export-resource' : 'import-resource'" @click="run()">
       <template v-if="icons" #icon><FileDown :size="15" /></template>
       <template v-if="!icons">{{ id ? '导出资源包' : importLabel || '导入资源包' }}</template>
     </NButton>
-    <NButton v-if="id" size="small" :circle="!!icons" :secondary="!!icons" :quaternary="!icons" :disabled="busy || disabled" :title="icons ? '分享到论坛' : undefined" :aria-label="icons ? '分享到论坛' : undefined" data-testid="share-resource" @click="run(true)">
+    <NButton v-if="id" size="small" :circle="!!icons" :secondary="!!icons" :quaternary="!icons" :disabled="busy || disabled || !store.desktop" :title="icons ? '分享到论坛' : undefined" :aria-label="icons ? '分享到论坛' : undefined" data-testid="share-resource" @click="run(true)">
       <template v-if="icons" #icon><Share2 :size="15" /></template>
       <template v-if="!icons">分享到论坛</template>
     </NButton>

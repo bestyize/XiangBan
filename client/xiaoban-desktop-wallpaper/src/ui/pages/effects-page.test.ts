@@ -55,7 +55,7 @@ describe('desktop effects page', () => {
     const { wrapper } = setup({ selected: 'rain', params: {} });
     const previews = () => wrapper.findAllComponents(EffectPreview);
     const playing = () => previews().filter(preview => preview.props('playing')).map(preview => preview.props('pack').id);
-    expect(previews()).toHaveLength(3);
+    expect(previews()).toHaveLength(2);
     expect(playing()).toEqual([]);
     await wrapper.get('[data-testid="effect-rain"]').trigger('click');
     expect(playing()).toEqual(['rain']);
@@ -68,15 +68,19 @@ describe('desktop effects page', () => {
     expect(reopened.wrapper.findAllComponents(EffectPreview).every(preview => !preview.props('playing'))).toBe(true);
     reopened.wrapper.unmount();
   });
-  it('lists "no effects" and every effect it was given, the user\'s own marked, with nothing chosen at first', () => {
+  it('separates official and custom effects without changing the desktop selection', async () => {
     const { wrapper, store } = setup();
-    for (const id of ['none', 'rain', 'maple', 'glitter']) expect(wrapper.find(`[data-testid="effect-${id}"]`).exists(), id).toBe(true);
+    for (const id of ['none', 'rain', 'maple']) expect(wrapper.find(`[data-testid="effect-${id}"]`).exists(), id).toBe(true);
     expect(wrapper.get('[data-testid="effect-none"]').attributes('aria-pressed')).toBe('true');
-    expect(wrapper.get('[data-testid="effect-glitter"]').text()).toContain('我的');
+    expect(wrapper.find('[data-testid="effect-glitter"]').exists()).toBe(false);
     expect(wrapper.get('[data-testid="effect-rain"]').text()).not.toContain('我的');
     expect(wrapper.find('[data-testid="effect-tuning"]').exists()).toBe(false);
     expect(wrapper.find('h1').text()).toBe('桌面特效');
     expect(store.loadEffects).toHaveBeenCalledOnce();
+    await wrapper.findAll('.n-tabs-tab').find(t=>t.text()==='自定义特效')!.trigger('click');await flushPromises();
+    expect(wrapper.get('[data-testid="effect-glitter"]').text()).toContain('我的');
+    expect(wrapper.find('[data-testid="effect-rain"]').exists()).toBe(false);
+    expect(store.setEffects).not.toHaveBeenCalled();
     wrapper.unmount();
   });
   it('applies an effect at once, without any wallpaper being involved', async () => {

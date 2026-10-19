@@ -1,13 +1,17 @@
 <script setup lang="ts">
+import ResourceLibraryPage from '../components/ResourceLibraryPage.vue';
 import ResourceShareActions from "../components/ResourceShareActions.vue";
 import { computed, onMounted, ref } from "vue";
-import { RefreshCw, Save, Sparkles, Square, Trash2 } from "lucide-vue-next";
-import { NAlert, NButton, NPopconfirm, NSkeleton, NTag } from "naive-ui";
+import { Save, Sparkles, Square, Trash2 } from "lucide-vue-next";
+import { NAlert, NButton, NPopconfirm, NSkeleton, NTag, NTabs, NTabPane } from "naive-ui";
 import type { ControlStore } from "../control-types.ts";
 import { coverUrl } from "../../games/catalog.ts";
 import type { GameManifest } from "../../games/protocol.ts";
 
+defineOptions({name:'GamesPage'});
+
 const props = defineProps<{ store: ControlStore }>();
+const category=ref<'builtin'|'custom'>('builtin');
 const games = ref<GameManifest[]>([]);
 const loading = ref(true);
 const catalogError = ref("");
@@ -15,6 +19,7 @@ const folderErrors = ref<string[]>([]);
 const opening = ref(false);
 const builtinGames = computed(() => games.value.filter((game) => game.source !== "user"));
 const userGames = computed(() => games.value.filter((game) => game.source === "user"));
+const visibleGames=computed(()=>category.value==='builtin'?builtinGames.value:userGames.value);
 
 function descriptionFor(game: GameManifest) {
   if (game.id === "snake-arena") return "无尽成长或三分钟冲分，吃糖果长成大蛇，反击 AI。";
@@ -66,108 +71,51 @@ async function removeGame(game: GameManifest) {
   await loadGames();
 }
 
+async function imported(){await loadGames();category.value='custom';}
 onMounted(loadGames);
 </script>
 
 <template>
-  <main class="ui-page games-page" data-testid="games-page">
-    <header class="page-header"><h1>游戏空间</h1><div class="header-actions"><ResourceShareActions :store="store" kind="game" import-label="导入游戏" :disabled="opening" @imported="loadGames"/><NButton v-if="store.game.desk?.active" round data-testid="games-stop-desk" @click="stopDeskGame"><template #icon><Square :size="15"/></template>停止桌面游戏</NButton><NButton type="primary" round :disabled="!store.desktop" data-testid="games-create" @click="store.startCreation('game')"><template #icon><Sparkles :size="15"/></template>创作游戏</NButton></div></header>
-    <div class="games-body">
-    <NAlert v-if="!store.desktop" class="browser-note" type="info" :bordered="false">
-      浏览器预览只展示游戏资料；请在小伴桌面应用中进入游戏空间。
-    </NAlert>
-
-    <section class="games-section" aria-labelledby="games-heading">
-      <div class="section-heading">
-        <div>
-          <h2 id="games-heading">本地游戏</h2>
-          <p class="muted">共 {{ builtinGames.length }} 款 · 点击开始游戏</p>
-        </div>
-        <div class="heading-actions">
-          <NButton v-if="store.desktop" round data-testid="games-reload" @click="loadGames"><template #icon><RefreshCw :size="15" /></template>重新载入</NButton>
-          <NTag v-if="!loading" :bordered="false" type="info">离线可玩</NTag>
-        </div>
-      </div>
-
-      <NAlert v-if="catalogError" class="catalog-error" type="warning" :bordered="false">
-        {{ catalogError }}
-      </NAlert>
-
+  <ResourceLibraryPage title="游戏空间" :active-tab="category" class="games-page" data-testid="games-page">
+    <template #actions><ResourceShareActions :store="store" kind="game" import-label="导入游戏" :disabled="opening" @imported="imported"/><NButton type="primary" round :disabled="!store.desktop" data-testid="games-create" @click="store.startCreation('game')"><template #icon><Sparkles :size="15"/></template>创作游戏</NButton></template>
+    <template #tabs><NTabs v-model:value="category" type="line" size="large"><NTabPane name="builtin"><template #tab>官方游戏</template></NTabPane><NTabPane name="custom"><template #tab>自定义游戏</template></NTabPane></NTabs></template>
+    <div v-if="store.game.desk?.active" class="game-running-actions"><NButton round data-testid="games-stop-desk" @click="stopDeskGame"><template #icon><Square :size="15"/></template>停止桌面游戏</NButton></div>
+    <section class="games-section" :aria-label="category==='builtin'?'官方游戏':'自定义游戏'" :data-testid="category==='custom'?'user-games':'official-games'">
+      <NAlert v-if="catalogError" class="catalog-error" type="warning" :bordered="false">{{ catalogError }}<NButton text @click="loadGames">重新载入</NButton></NAlert>
+      <NAlert v-if="category==='custom'&&folderErrors.length" class="catalog-error" type="warning" :show-icon="false" data-testid="user-game-errors">有 {{ folderErrors.length }} 个游戏文件夹无法使用：{{ folderErrors.join('；') }}</NAlert>
       <div v-if="loading" class="game-grid" aria-label="正在读取游戏资料">
-        <article v-for="item in 6" :key="item" class="surface game-card-skeleton">
-          <NSkeleton height="142px" />
-          <NSkeleton text :repeat="2" />
-        </article>
+        <article v-for="item in 6" :key="item" class="surface game-card-skeleton"><NSkeleton height="142px"/><NSkeleton text :repeat="2"/></article>
       </div>
-      <div v-else-if="builtinGames.length" class="game-grid">
-        <article v-for="game in builtinGames" :key="game.id" class="surface game-card" role="button" tabindex="0" :aria-label="`开始${game.name}`" :aria-disabled="opening || !store.desktop" @click="openGameSpace(game.id)" @keydown.enter.prevent="openGameSpace(game.id)" @keydown.space.prevent="openGameSpace(game.id)">
-          <div class="game-cover">
-            <img :src="coverUrl(game)" :alt="`${game.name}封面`" loading="lazy" />
-            <NTag class="game-kind" :bordered="false">{{ game.orientation === "landscape" ? "横屏" : game.orientation === "portrait" ? "竖屏" : "轻松益智" }}</NTag>
-          </div>
-          <div class="game-content">
-            <h3>{{ game.name }}</h3>
-            <p class="muted">{{ descriptionFor(game) }}</p>
-            <div v-if="game.save" class="game-footnote"><Save :size="14" /> 进度保存在本机</div>
-          </div>
-        </article>
-      </div>
-      <NAlert v-else-if="!catalogError" type="warning" :bordered="false">暂时没有可展示的游戏资料，请稍后重试。</NAlert>
-    </section>
-
-    <section v-if="store.desktop && !loading" class="games-section" aria-labelledby="user-games-heading" data-testid="user-games">
-      <div class="section-heading">
-        <div>
-          <h2 id="user-games-heading">自创游戏</h2>
-          <p class="muted">{{ userGames.length ? `共 ${userGames.length} 款 · 由小伴创作或你放进游戏文件夹` : "还没有自创游戏" }}</p>
-        </div>
-      </div>
-      <NAlert v-if="folderErrors.length" class="catalog-error" type="warning" :show-icon="false" data-testid="user-game-errors">
-        有 {{ folderErrors.length }} 个游戏文件夹无法使用：{{ folderErrors.join("；") }}
-      </NAlert>
-      <div v-if="userGames.length" class="game-grid">
-        <div v-for="game in userGames" :key="game.id" class="game-card-wrapper">
-          <article class="surface game-card" role="button" tabindex="0" :data-testid="`user-game-${game.id}`" :aria-label="`开始${game.name}`" :aria-disabled="opening" @click="openGameSpace(game.id)" @keydown.enter.prevent="openGameSpace(game.id)" @keydown.space.prevent="openGameSpace(game.id)">
+      <div v-else-if="visibleGames.length" class="game-grid">
+        <div v-for="game in visibleGames" :key="game.id" class="game-card-wrapper">
+          <article class="surface game-card" role="button" tabindex="0" :data-testid="game.source==='user'?`user-game-${game.id}`:undefined" :aria-label="`开始${game.name}`" :aria-disabled="opening||!store.desktop" @click="openGameSpace(game.id)" @keydown.enter.prevent="openGameSpace(game.id)" @keydown.space.prevent="openGameSpace(game.id)">
             <div class="game-cover">
-              <img :src="coverUrl(game)" :alt="`${game.name}封面`" loading="lazy" />
-              <NTag class="game-kind" :bordered="false">{{ game.layer === "desktop" ? "桌面层" : "自创" }}</NTag>
+              <img :src="coverUrl(game)" :alt="`${game.name}封面`" loading="lazy"/>
+              <NTag class="game-kind" :bordered="false">{{ game.source==='user'?(game.layer==='desktop'?'桌面层':'自定义'):(game.orientation==='landscape'?'横屏':game.orientation==='portrait'?'竖屏':'轻松益智') }}</NTag>
             </div>
             <div class="game-content">
-              <h3>{{ game.name }}</h3>
-              <p class="muted">{{ game.description }}</p>
-              <div v-if="game.layer === 'desktop'" class="game-footnote">浮在桌面上运行 · 托盘菜单可随时停止</div>
-              <div v-if="game.save" class="game-footnote"><Save :size="14" /> 进度保存在本机</div>
+              <h3>{{ game.name }}</h3><p class="muted">{{ descriptionFor(game) }}</p>
+              <div v-if="game.source==='user'&&game.layer==='desktop'" class="game-footnote">浮在桌面上运行 · 托盘菜单可随时停止</div>
+              <div v-if="game.save" class="game-footnote"><Save :size="14"/> 进度保存在本机</div>
             </div>
           </article>
-          <ResourceShareActions :store="store" kind="game" :id="game.id" :disabled="opening"/>
-          <NPopconfirm positive-text="删除" negative-text="取消" @positive-click="removeGame(game)">
-            <template #trigger>
-              <button class="game-delete-btn" title="删除这个自创游戏" :aria-label="`删除游戏 ${game.name}`" :data-testid="`delete-game-${game.id}`" @click.stop>
-                <Trash2 :size="13" />
-              </button>
-            </template>
+          <ResourceShareActions v-if="game.source==='user'" :store="store" kind="game" :id="game.id" :disabled="opening"/>
+          <NPopconfirm v-if="game.source==='user'" positive-text="删除" negative-text="取消" @positive-click="removeGame(game)">
+            <template #trigger><button class="game-delete-btn" title="删除这个自创游戏" :aria-label="`删除游戏 ${game.name}`" :data-testid="`delete-game-${game.id}`" @click.stop><Trash2 :size="13"/></button></template>
             确定要删除自创游戏「{{ game.name }}」吗？游戏文件夹和它的存档都会被清除。
           </NPopconfirm>
         </div>
       </div>
+      <NAlert v-else-if="!catalogError" :type="category==='custom'?'info':'warning'" :bordered="false">{{ category==='custom'?'还没有自定义游戏，可从右上角导入或创作。':'暂时没有可展示的游戏资料，请稍后重试。' }}</NAlert>
     </section>
-    </div>
-  </main>
+  </ResourceLibraryPage>
 </template>
 
 <style scoped>
-.games-page { display: flex; flex-direction: column; flex:1; min-height:0; gap:0; width:100%; color: var(--ui-text-primary); }
-.games-page>.page-header{flex:none;background:var(--ui-app-bg);padding:var(--ui-page-top) var(--ui-page-inset) 16px;margin-bottom:0;border-bottom:1px solid var(--ui-border)}
-.games-body{flex:1;min-height:0;overflow-y:auto;padding:var(--ui-section-gap) var(--ui-page-inset) 32px;display:flex;flex-direction:column;gap:var(--ui-section-gap)}
-.page-header { display: flex; align-items: center; justify-content: space-between; gap: 24px; margin-bottom: 5px; }
-.header-actions{display:flex;align-items:center;justify-content:flex-end;gap:10px;flex-wrap:wrap}
-.eyebrow { display: flex; align-items: center; gap: 8px; color: var(--ui-primary-text); font-size: 13px; font-weight: 650; }
+.game-running-actions{display:flex;justify-content:flex-end}
 .muted { margin: 0; color: var(--ui-text-secondary); font-size:14px;line-height:1.65; }
-.browser-note, .catalog-error { border-radius: 12px; }
+.catalog-error { border-radius: 12px; }
 .games-section { display: flex; flex-direction: column; gap: 14px; }
-.section-heading { display: flex; align-items: center; justify-content: space-between; }
-.section-heading .muted { margin-top: 3px; }
-.heading-actions { display: flex; align-items: center; gap: 10px; }
 .game-card-wrapper { position: relative; min-width: 0; }
 .game-delete-btn { position: absolute; top: 8px; right: 8px; z-index: 3; width: 26px; height: 26px; border-radius: 50%; border: 0; background: rgba(0,0,0,.5); color: #fff; display: grid; place-items: center; cursor: pointer; opacity: .7; transition: all .2s; }
 .game-delete-btn:hover, .game-delete-btn:focus-visible { opacity: 1; background: #dc2626; }

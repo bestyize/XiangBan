@@ -3,6 +3,7 @@ import {computed,onMounted,onBeforeUnmount,ref,watch} from 'vue';
 import {Check,Layers,Pin,Monitor,Sparkles,Trash2} from 'lucide-vue-next';
 import {NAlert,NButton,NModal,NPopconfirm,NTabs,NTabPane} from 'naive-ui';
 import type {ControlStore} from '../control-types.ts';
+import ResourceLibraryPage from '../components/ResourceLibraryPage.vue';
 import ResourceShareActions from '../components/ResourceShareActions.vue';
 import {createWidgetClient} from '../../widgets/client.ts';
 import {baseSize,widgetKinds,type WidgetKind,type DesktopWidget,type CustomWidgetPack} from '../../widgets/model.ts';
@@ -114,25 +115,19 @@ onBeforeUnmount(()=>{observer?.disconnect();clearTimeout(flashTimer);client.disp
 </script>
 
 <template>
-<section class="ui-page xb-widgets-page" data-testid="widgets-page">
- <header class="page-header xb-page-header">
-  <div><h1>桌面组件</h1><p>让日常的小事，在桌面上好好安放。</p></div>
-  <div class="header-actions">
-   <ResourceShareActions :store="store" kind="widget" import-label="导入组件" :disabled="busy" @imported="onImported"/>
-   <NButton type="primary" round :disabled="!store.desktop" data-testid="widgets-create" @click="store.startCreation('widget')">
-    <template #icon><Sparkles :size="15" /></template>创作组件
-   </NButton>
-  </div>
- </header>
- <NAlert v-if="error" type="error" :show-icon="false">{{ error }}<NButton v-if="!ready" text @click="client.load">重新读取</NButton></NAlert>
- <NAlert v-if="layout.errors.length" type="warning" :show-icon="false">{{ layout.errors.join('；') }}</NAlert>
-
- <div class="category-tabs-wrap">
+<ResourceLibraryPage title="桌面组件" :active-tab="activeCategory" class="xb-widgets-page" data-testid="widgets-page">
+ <template #actions>
+  <ResourceShareActions :store="store" kind="widget" import-label="导入组件" :disabled="busy" @imported="onImported"/>
+  <NButton type="primary" round :disabled="!store.desktop" data-testid="widgets-create" @click="store.startCreation('widget')"><template #icon><Sparkles :size="15" /></template>创作组件</NButton>
+ </template>
+ <template #tabs>
   <NTabs v-model:value="activeCategory" type="line" size="large" class="category-tabs">
-   <NTabPane name="builtin"><template #tab>内置组件</template></NTabPane>
+   <NTabPane name="builtin"><template #tab>官方组件</template></NTabPane>
    <NTabPane name="custom"><template #tab>{{ customWidgets.length ? `自定义组件 (${customWidgets.length})` : '自定义组件' }}</template></NTabPane>
   </NTabs>
- </div>
+ </template>
+ <NAlert v-if="error" type="error" :show-icon="false">{{ error }}<NButton v-if="!ready" text @click="client.load">重新读取</NButton></NAlert>
+ <NAlert v-if="layout.errors.length" type="warning" :show-icon="false">{{ layout.errors.join('；') }}</NAlert>
 
  <template v-if="activeCategory === 'builtin'">
   <div ref="board" class="xb-widget-board-wrap" :style="{height:`${967*boardScale}px`}"><div class="xb-widget-board" :style="{transform:`scale(${boardScale})`}">
@@ -190,18 +185,10 @@ onBeforeUnmount(()=>{observer?.disconnect();clearTimeout(flashTimer);client.disp
  <NModal :show="settingsOpen" :auto-focus="false" style="width:324px;max-width:92vw" data-testid="widget-settings" @update:show="settingsOpen=$event">
   <WidgetSettingsMenu v-if="chosen" :key="chosen.id" :widget="chosen" :monitors="monitors" :update="update" :remove="remove" @close="settingsOpen=false"/>
  </NModal>
-</section>
+</ResourceLibraryPage>
 </template>
 
 <style scoped>
-.xb-widgets-page{max-width:1430px;margin:0 auto;padding:28px 30px 34px!important;background:var(--ui-app-bg);border-radius:20px;display:flex;flex-direction:column;gap:20px;overflow-y:auto;min-height:0;height:100%;width:100%;flex:1;color:var(--ui-text-primary);box-sizing:border-box}
-.xb-page-header{display:flex;justify-content:space-between;align-items:center;gap:20px}
-.xb-page-header h1{font-size:25px;letter-spacing:.5px;margin:0;font-weight:600}
-.xb-page-header p{font-size:13px;color:#9b8c7b;margin:8px 0 0}
-.header-actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
-.category-tabs-wrap{margin-top:-6px}
-.category-tabs :deep(.n-tabs-nav){margin-bottom:0}
-
 .xb-widget-board-wrap{position:relative;width:100%;flex:none}
 .xb-widget-board{position:absolute;top:0;left:0;width:1314px;height:967px;transform-origin:top left}
 .xb-widget-slot{position:absolute}
@@ -244,9 +231,6 @@ onBeforeUnmount(()=>{observer?.disconnect();clearTimeout(flashTimer);client.disp
 .xb-empty button:hover{background:#f3eae0}
 
 @media(max-width:760px){
-  .xb-widgets-page{padding:18px 14px!important}
-  .xb-page-header h1{font-size:21px}
-  .xb-page-header p{display:none}
   .add-to-desktop{opacity:1}
   .custom-widget-grid{grid-template-columns:1fr}
 }

@@ -1,7 +1,8 @@
 <script setup lang="ts">
+import ResourceLibraryPage from '../components/ResourceLibraryPage.vue';
 import ResourceShareActions from "../components/ResourceShareActions.vue";
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
-import { NAlert, NButton, NPopconfirm, NSlider } from 'naive-ui';
+import { NAlert, NButton, NPopconfirm, NSlider, NTabs, NTabPane } from 'naive-ui';
 import { Ban, Check, FileUp, Sparkles, Trash2 } from 'lucide-vue-next';
 import { normalizeChoice, paramsOf } from '../../effects/parse.ts';
 import { limits, type EffectsChoice } from '../../effects/types.ts';
@@ -10,7 +11,9 @@ import EffectPreview from '../components/EffectPreview.vue';
 const props = defineProps<{ store: ControlStore }>();
 
 const choice = computed(() => normalizeChoice(props.store.settings.effects));
+const category=ref<'builtin'|'custom'>('builtin');
 const packs = computed(() => props.store.effectList.packs);
+const visiblePacks=computed(()=>packs.value.filter(pack=>category.value==='custom'?pack.source==='user':pack.source!=='user'));
 const chosen = computed(() => packs.value.find(pack => pack.id === choice.value.selected) ?? null);
 // A saved desktop selection does not autoplay when this page opens.
 const previewId = ref('');
@@ -46,7 +49,7 @@ async function reload(announce: boolean) {
 async function importPack() {
   try {
     const outcome = await props.store.importEffectPack();
-    if (outcome.status === 'imported') props.store.notify(`已导入特效「${outcome.name}」，可以选用了`, 'success');
+    if (outcome.status === 'imported') {category.value='custom';props.store.notify(`已导入特效「${outcome.name}」，可以选用了`, 'success');}
     else if (outcome.status === 'declined') props.store.notify(`特效「${outcome.id}」已经存在，没有替换`, 'info');
   } catch (error) { props.store.notify(message(error), 'error'); }
 }
@@ -62,12 +65,9 @@ onMounted(() => { void reload(false); });
 onBeforeUnmount(() => { if (timer) { clearTimeout(timer); commit(); } });
 </script>
 <template>
-  <section class="ui-page effects-page" data-testid="effects-page">
-    <header class="page-header">
-      <h1>桌面特效</h1>
-      <div class="header-actions"><NButton round data-testid="effects-import" @click="importPack"><template #icon><FileUp :size="15" /></template>导入特效</NButton><NButton type="primary" round :disabled="!store.desktop" data-testid="effects-create" @click="store.startCreation('effect')"><template #icon><Sparkles :size="15" /></template>创作特效</NButton></div>
-    </header>
-    <div class="effects-body">
+  <ResourceLibraryPage title="桌面特效" :active-tab="category" class="effects-page" data-testid="effects-page">
+    <template #actions><NButton round data-testid="effects-import" @click="importPack"><template #icon><FileUp :size="15" /></template>导入特效</NButton><NButton type="primary" round :disabled="!store.desktop" data-testid="effects-create" @click="store.startCreation('effect')"><template #icon><Sparkles :size="15" /></template>创作特效</NButton></template>
+    <template #tabs><NTabs v-model:value="category" type="line" size="large"><NTabPane name="builtin"><template #tab>官方特效</template></NTabPane><NTabPane name="custom"><template #tab>自定义特效</template></NTabPane></NTabs></template>
     <NAlert v-if="missing" type="warning" :show-icon="false" data-testid="effect-missing">所选的特效「{{ choice.selected }}」已经找不到（可能被移出了特效文件夹），桌面上暂时没有特效。重新选一个即可。</NAlert>
     <NAlert v-if="store.effectList.errors.length" type="warning" :show-icon="false" data-testid="effect-errors">有 {{ store.effectList.errors.length }} 个自定义特效无法使用：{{ store.effectList.errors.join('；') }}</NAlert>
     <div class="effect-grid" role="group" aria-label="特效">
@@ -76,7 +76,7 @@ onBeforeUnmount(() => { if (timer) { clearTimeout(timer); commit(); } });
         <span class="effect-name"><b>无特效</b><small>桌面保持安静</small></span>
         <Check v-if="!chosen" :size="16" class="effect-check" />
       </button>
-      <div v-for="pack in packs" :key="pack.id" class="effect-card-wrapper" :class="{ user: pack.source === 'user' }">
+      <div v-for="pack in visiblePacks" :key="pack.id" class="effect-card-wrapper" :class="{ user: pack.source === 'user' }">
         <button class="effect-card" :class="{ on: chosen?.id === pack.id }" :aria-pressed="chosen?.id === pack.id" :data-testid="`effect-${pack.id}`" @click="choose(pack.id)" @mouseenter="hoveredId = pack.id" @mouseleave="hoveredId = ''">
           <span class="effect-stage"><EffectPreview :pack="pack" :playing="playingId === pack.id" :paused="store.settings.paused" :fps="store.settings.fps" /></span>
           <span class="effect-name"><b>{{ pack.name }}<i v-if="pack.source === 'user'" class="mine">我的</i></b><small>{{ pack.description }}</small></span>
@@ -93,21 +93,17 @@ onBeforeUnmount(() => { if (timer) { clearTimeout(timer); commit(); } });
         </NPopconfirm>
       </div>
     </div>
-    <section v-if="chosen" class="surface tuning" data-testid="effect-tuning">
+    <NAlert v-if="category==='custom'&&!visiblePacks.length" type="info" :show-icon="false" data-testid="custom-effects-empty">还没有自定义特效，可导入特效或让小伴创作。</NAlert>
+    <section v-if="chosen&&visiblePacks.some(pack=>pack.id===chosen!.id)" class="surface tuning" data-testid="effect-tuning">
       <div class="section-heading"><div><h2>{{ chosen.name }}</h2><p>调整后立即生效，每种特效各自记住自己的设置</p></div></div>
       <div class="field"><label>密度 <span data-testid="effect-density-value">×{{ density.toFixed(1) }}</span></label><NSlider v-model:value="density" :min="limits.density[0]" :max="limits.density[1]" :step="0.1" @update:value="tune" /></div>
       <div class="field"><label>速度 <span data-testid="effect-speed-value">×{{ speed }}</span></label><NSlider v-model:value="speed" :min="limits.speed[0]" :max="limits.speed[1]" :step="0.25" @update:value="tune" /></div>
       <div class="field"><label>大小 <span data-testid="effect-size-value">×{{ size.toFixed(1) }}</span></label><NSlider v-model:value="size" :min="limits.size[0]" :max="limits.size[1]" :step="0.1" @update:value="tune" /></div>
     </section>
     <p class="muted notes">特效显示在桌面图片之上、桌面图标和其他窗口之下，鼠标可以穿过它。想要自己的特效？点“导入特效”选一个特效包文件（JSON），也可以直接在聊天里让小伴为你写一个。{{ store.settings.paused ? '桌面动画目前已暂停，特效会静止，可在“设置”里恢复。' : '' }}{{ store.game.active ? '游戏空间打开期间特效会先隐藏，退出后自动回来。' : '' }}</p>
-    </div>
-  </section>
+  </ResourceLibraryPage>
 </template>
 <style scoped>
-.effects-page{display:flex;flex-direction:column;flex:1;min-height:0;width:100%}
-.effects-page>.page-header{flex:none;background:var(--ui-app-bg);padding:var(--ui-page-top) var(--ui-page-inset) 16px;margin-bottom:0;border-bottom:1px solid var(--ui-border)}
-.effects-body{flex:1;min-height:0;overflow-y:auto;padding:var(--ui-section-gap) var(--ui-page-inset) 32px;display:grid;gap:var(--ui-section-gap);align-content:start}
-.header-actions{display:flex;gap:10px;flex:none;flex-wrap:wrap;justify-content:flex-end}
 .effect-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:var(--ui-card-gap)}
 .effect-card-wrapper{position:relative}
 .effect-card-wrapper .effect-card{width:100%}
