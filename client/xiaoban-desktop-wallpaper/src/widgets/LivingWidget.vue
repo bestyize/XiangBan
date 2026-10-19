@@ -35,7 +35,7 @@ watch(()=>JSON.stringify(props.widget.city),()=>{forecast.value=[];void loadFore
 const weatherDesc=computed(()=>props.weather?.text.match(/：([^，]+)，/)?.[1]??'天气待加载');
 const temp=computed(()=>props.weather?.text.match(/(-?\d+(?:\.\d+)?)°C/)?.[1]??'—');
 const stockChoices=[{symbol:'1.000001',name:'上证指数',code:'SH'},{symbol:'0.399001',name:'深证成指',code:'SZ'},{symbol:'0.399006',name:'创业板指',code:'CYB'}];
-const selectedStock=computed(()=>stockChoices.find(x=>x.symbol===living.value.symbol)??stockChoices[0]);
+const selectedStock=computed(()=>stockChoices.find(x=>x.symbol===living.value.symbol)??{symbol:living.value.symbol,name:'自选股票',code:living.value.symbol.split('.')[1]??'SH/SZ'});
 const periodChoices=['1D','5D'] as const;
 const period=ref<'1D'|'5D'>('1D');
 let reloadQueued=false;
@@ -196,7 +196,7 @@ function weatherRefresh(){if(!props.preview&&!props.editing)props.refreshWeather
     </template>
 
     <template v-else-if="widget.kind==='stocks'">
-      <div class="stock-header"><div><strong>{{ preview?'AAPL':selectedStock.name }}</strong><small>{{ preview?'Apple Inc.':selectedStock.code+' · 指数行情' }}</small></div><div class="stock-value"><b>{{ preview?'172.28':quote?quote.price.toFixed(2):'—' }}</b><span :class="quoteUp?'rising':'falling'">{{ preview?'+1.54%':quote?(quote.change>=0?'+':'')+quote.percent.toFixed(2)+'%':'行情待连接' }}</span></div></div>
+      <div class="stock-header"><div><strong>{{ preview?'AAPL':quote?.name||selectedStock.name }}</strong><small>{{ preview?'Apple Inc.':selectedStock.code+' · 指数行情' }}</small></div><div class="stock-value"><b>{{ preview?'172.28':quote?quote.price.toFixed(2):'—' }}</b><span :class="quoteUp?'rising':'falling'">{{ preview?'+1.54%':quote?(quote.change>=0?'+':'')+quote.percent.toFixed(2)+'%':'行情待连接' }}</span></div></div>
       <div class="stock-graph"><svg viewBox="0 0 320 110" preserveAspectRatio="none" aria-label="价格趋势图"><path v-for="i in 3" :key="i" :d="'M0 '+(i*27)+' H320'" stroke="currentColor" opacity=".1" stroke-dasharray="3 5"/><polyline v-if="chartPoints" :points="chartPoints" fill="none" :stroke="quoteUp?'#ea5d59':'#47b58a'" stroke-width="2.7" stroke-linecap="round" stroke-linejoin="round"/><polyline v-else-if="preview" points="0,85 20,75 44,78 66,55 84,65 102,45 123,56 146,37 166,54 188,44 210,24 235,36 260,17 280,28 320,9" fill="none" stroke="#5acba1" stroke-width="3" stroke-linecap="round"/></svg><p v-if="!chartPoints&&!preview">{{ quoteBusy?'正在获取市场行情…':quoteError?'行情暂时不可用，请重试':'等待行情数据' }}</p></div>
       <div class="stock-periods"><button v-for="p in periodChoices" :key="p" :class="{selected:period===p}" :disabled="locked" @click="period=p">{{ p }}</button><span>1M</span><span>3M</span><span>1Y</span><button class="stock-reload" :disabled="locked||quoteBusy" aria-label="重新获取行情" @click="loadQuote"><RefreshCw :size="14"/></button></div>
       <div class="stock-tickers"><button v-for="choice in stockChoices" :key="choice.symbol" :disabled="locked" :class="{selected:!preview&&living.symbol===choice.symbol}" @click="chooseStock(choice.symbol)">{{ choice.name }}</button></div>
