@@ -83,9 +83,11 @@ pub struct WidgetState {
     operation: tauri::async_runtime::Mutex<()>,
     weather_operation: tauri::async_runtime::Mutex<()>,
     market_operation: tauri::async_runtime::Mutex<()>,
+    forecast_operation: tauri::async_runtime::Mutex<()>,
     load_error: Mutex<Option<String>>, errors: Mutex<Vec<String>>,
     weather: Mutex<HashMap<String, Weather>>, attempts: Mutex<HashMap<String, i64>>,
     market: Mutex<HashMap<String,(i64,Value)>>,
+    forecasts: Mutex<HashMap<String,(i64,Value)>>,
 }
 pub fn is_widget(label: &str) -> bool { label.starts_with("widget-") }
 fn own_widget(window: &tauri::WebviewWindow) -> Result<Widget, String> {
@@ -93,8 +95,8 @@ fn own_widget(window: &tauri::WebviewWindow) -> Result<Widget, String> {
         .find(|widget| format!("widget-{}", widget.id) == window.label()).cloned().ok_or("没有找到这个桌面组件".into())
 }
 pub fn permitted(label: &str, command: &str) -> Option<bool> {
-    if is_widget(label) { return Some(["get_desktop_widget", "move_desktop_widget", "show_widget_settings", "get_widget_weather", "save_desktop_widget_content", "get_widget_stocks", "open_ritual_space"].contains(&command)); }
-    if ["get_desktop_widgets", "add_desktop_widget", "update_desktop_widget", "remove_desktop_widget", "set_widgets_editing", "get_desktop_widget", "move_desktop_widget", "show_widget_settings", "get_widget_weather", "get_widget_stocks", "save_desktop_widget_content", "list_custom_widgets", "save_custom_widget", "remove_custom_widget"].contains(&command) { return Some(label == "control"); }
+    if is_widget(label) { return Some(["get_desktop_widget", "move_desktop_widget", "show_widget_settings", "get_widget_weather", "get_widget_forecast", "save_desktop_widget_content", "get_widget_stocks", "open_ritual_space"].contains(&command)); }
+    if ["get_desktop_widgets", "add_desktop_widget", "update_desktop_widget", "remove_desktop_widget", "set_widgets_editing", "get_desktop_widget", "move_desktop_widget", "show_widget_settings", "get_widget_weather", "get_widget_forecast", "get_widget_stocks", "save_desktop_widget_content", "list_custom_widgets", "save_custom_widget", "remove_custom_widget"].contains(&command) { return Some(label == "control"); }
     None
 }
 pub fn validate(layout: &Layout) -> Result<(), String> {
@@ -362,6 +364,20 @@ pub async fn get_widget_weather(window:tauri::WebviewWindow)->Result<Weather,Str
 
 /// A narrow, read-only market-data adapter; no arbitrary host or symbol supplied by a webview.
 /// The public endpoint is best-effort, with no SLA or verified redistribution licence.
+#[tauri::command]
+pub async fn get_widget_forecast(window:tauri::WebviewWindow)->Result<Value,String>{
+    let widget=own_widget(&window)?;if widget.kind!="weather"{return Err("此组件不能读取天气预报".into());}
+    let city=widget.city.ok_or("请先在组件设置里选择城市")?;
+    let app=window.app_handle().clone();let state=app.state::<WidgetState>();
+    let _lock=state.forecast_operation.lock().await;let now=chrono::Utc::now().timestamp();
+    let source=crate::reminders::widget_weather_source(&app);
+    let key=format!("{}:{}:{}",city.latitude,city.longitude,serde_json::to_string(&source).map_err(|e|e.to_string())?);
+    if let Some((when,value))=state.forecasts.lock().unwrap().get(&key).filter(|(when,_)|(0..1800).contains(&(now-*when))).cloned(){return Ok(value);}
+    let result=tauri::async_runtime::spawn_blocking(move||crate::care_weather::forecast(&source,&city)).await.map_err(|e|e.to_string())??;
+    let mut cache=state.forecasts.lock().unwrap();if cache.len()>48{cache.clear();}cache.insert(key,(now,result.clone()));
+    Ok(result)
+}
+
 #[tauri::command]
 pub async fn get_widget_stocks(window: tauri::WebviewWindow, period:String)->Result<Value,String>{
     let widget=own_widget(&window)?;
