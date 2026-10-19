@@ -1,77 +1,19 @@
 // @vitest-environment happy-dom
-import { flushPromises, mount } from '@vue/test-utils';
-import { describe, expect, it, vi } from 'vitest';
-import { reactive } from 'vue';
+import {mount,flushPromises} from '@vue/test-utils';
+import {reactive} from 'vue';
+import {NSelect} from 'naive-ui';
+import {beforeEach,describe,it,expect,vi} from 'vitest';
+import {defaults} from '../../bridge.ts';
+import type {ControlStore} from '../control-types.ts';
 import CompanionPage from './CompanionPage.vue';
-import { defaults } from '../../bridge.ts';
-import type { ControlStore } from '../control-types.ts';
-
-function setup(companionLinks = true) {
-  const store = reactive({
-    desktop: false,
-    settings: { ...JSON.parse(JSON.stringify(defaults)), companionLinks },
-    notify: vi.fn(), navigate: vi.fn(),
-    updateAppearance: vi.fn(async () => {}), setMode: vi.fn(async () => {}), setCompanion: vi.fn(async () => {}),
-    setCompanionLinks: vi.fn(async (enabled: boolean) => { store.settings.companionLinks = enabled; }),
-    setCompanionSkin: vi.fn(async (skin: string) => { store.settings.companionSkin = skin; }),
-  }) as unknown as ControlStore;
-  const wrapper = mount(CompanionPage, { props: { store }, global: { stubs: { PetPreview: true } } });
-  return { wrapper, store };
-}
-
-describe('companion page shell choice', () => {
-  it('offers the pot as the chosen shell', () => {
-    const { wrapper } = setup();
-    expect(wrapper.findAll('[data-testid^="skin-"]')).toHaveLength(2);
-    expect(wrapper.get('[data-testid="skin-pot"]').attributes('aria-pressed')).toBe('true');
-  });
-  it('switches between green leaves and white flowers without changing the pot settings', async () => {
-    const { wrapper, store } = setup();
-    const size = store.settings.size;
-    await wrapper.get('[data-testid="skin-pot-white-flower"]').trigger('click');
-    await flushPromises();
-    expect(store.setCompanionSkin).toHaveBeenLastCalledWith('pot-white-flower');
-    expect(wrapper.get('[data-testid="skin-pot-white-flower"]').attributes('aria-pressed')).toBe('true');
-    expect(store.settings.size).toBe(size);
-    await wrapper.get('[data-testid="skin-pot"]').trigger('click');
-    await flushPromises();
-    expect(store.settings.companionSkin).toBe('pot');
-    wrapper.unmount();
-  });
-
-  it('shows an unknown saved shell as the pot', () => {
-    const { wrapper, store } = setup();
-    store.settings.companionSkin = 'gone';
-    return wrapper.vm.$nextTick().then(() => expect(wrapper.get('[data-testid="skin-pot"]').attributes('aria-pressed')).toBe('true'));
-  });
-});
-
-describe('companion page links switch', () => {
-  it('shows the switch on by default with its explanation', () => {
-    const { wrapper } = setup();
-    const toggle = wrapper.get('[data-testid="companion-links"]');
-    expect(toggle.attributes('aria-checked')).toBe('true');
-    expect(wrapper.text()).toContain('小伴联动：让小伴回应特效和你的状态');
-  });
-
-  it('turns links off and on through the store', async () => {
-    const { wrapper, store } = setup();
-    await wrapper.get('[data-testid="companion-links"]').trigger('click');
-    await flushPromises();
-    expect(store.setCompanionLinks).toHaveBeenLastCalledWith(false);
-    expect(wrapper.get('[data-testid="companion-links"]').attributes('aria-checked')).toBe('false');
-    await wrapper.get('[data-testid="companion-links"]').trigger('click');
-    await flushPromises();
-    expect(store.setCompanionLinks).toHaveBeenLastCalledWith(true);
-  });
-
-  it('reflects a saved off value and reports a failed save', async () => {
-    const { wrapper, store } = setup(false);
-    expect(wrapper.get('[data-testid="companion-links"]').attributes('aria-checked')).toBe('false');
-    vi.mocked(store.setCompanionLinks).mockRejectedValueOnce(new Error('保存失败'));
-    await wrapper.get('[data-testid="companion-links"]').trigger('click');
-    await flushPromises();
-    expect(store.notify).toHaveBeenCalledWith(expect.any(Error), 'error');
-    expect(wrapper.get('[data-testid="companion-links"]').attributes('aria-checked')).toBe('false');
-  });
+vi.mock('../../pets/PetActor.vue',()=>({default:{template:'<div class="actor"/>',props:['definition','size','expression']}}));
+vi.mock('../../bridge.ts',async original=>({...await original<typeof import('../../bridge.ts')>(),desktop:false,invoke:vi.fn()}));
+function setup(){const settings=reactive({...defaults});const store={settings,desktop:false,notify:vi.fn(),startCreation:vi.fn().mockResolvedValue(undefined),setCompanion:vi.fn(async(enabled:boolean)=>{settings.companionEnabled=enabled;})} as unknown as ControlStore;return {store,view:mount(CompanionPage,{props:{store},attachTo:document.body})};}
+beforeEach(()=>{localStorage.clear();});
+describe('theme-based desktop pet library',()=>{
+ it('shows official families and their members instead of a single active skin',async()=>{const {view}=setup();await flushPromises();expect(view.text()).toContain('官方主题');expect(view.text()).toContain('自定义主题');for(const name of ['花朵心语','多肉点点'])expect(view.text()).toContain(name);expect(view.findAll('.pet-theme-card')).toHaveLength(2);expect(view.find('[data-testid="pet-add-daisy"]').exists()).toBe(true);expect(view.find('[data-testid="skin-pot"]').exists()).toBe(false);view.unmount();});
+ it('adds duplicate pets and a second species as independent instances',async()=>{const {view}=setup();await flushPromises();await view.get('[data-testid="pet-add-daisy"]').trigger('click');await flushPromises();await view.get('[data-testid="pet-add-daisy"]').trigger('click');await flushPromises();await view.get('[data-testid="pet-theme-succulent-dots"]').trigger('click');await view.get('[data-testid="pet-add-jade"]').trigger('click');await flushPromises();const layout=JSON.parse(localStorage.getItem('xiaoban.pets.layout.v1')!);expect(layout.instances).toHaveLength(3);expect(new Set(layout.instances.map((p:{id:string})=>p.id)).size).toBe(3);expect(layout.instances.map((p:{petId:string})=>p.petId)).toEqual(['daisy','daisy','jade']);expect(view.findAll('.desktop-pet-row')).toHaveLength(3);view.unmount();});
+ it('changes the top plant of one existing pot without creating another instance',async()=>{const {view}=setup();await flushPromises();await view.get('[data-testid="pet-add-daisy"]').trigger('click');await flushPromises();await view.get('.pet-manage').trigger('click');await flushPromises();const select=view.findAllComponents(NSelect).find(c=>c.attributes('data-testid')==='pet-change-plant')!;expect(select.exists()).toBe(true);select.vm.$emit('update:value','succulent-dots/jade');await flushPromises();const layout=JSON.parse(localStorage.getItem('xiaoban.pets.layout.v1')!);expect(layout.instances).toHaveLength(1);expect(layout.instances[0]).toMatchObject({themeId:'succulent-dots',petId:'jade',size:210,expression:'idle'});view.unmount();});
+ it('opens AI creation with a selected theme as context',async()=>{const {view,store}=setup();await flushPromises();await view.get('[data-testid="pet-create"]').trigger('click');await flushPromises();expect(store.startCreation).toHaveBeenCalledWith('pet');await view.get('.theme-actions button').trigger('click');await flushPromises();expect(store.creationDraft).toContain('flower-whispers');expect(store.creationDraft).toContain('现有主题');view.unmount();});
+ it('shows custom theme empty state and preserves the desktop instance list',async()=>{const {view}=setup();await flushPromises();await view.get('[data-testid="pet-add-daisy"]').trigger('click');await flushPromises();await view.findAll('.n-tabs-tab').find(t=>t.text()==='自定义主题')!.trigger('click');await flushPromises();expect(view.find('[data-testid="pet-custom-empty"]').exists()).toBe(true);expect(view.findAll('.desktop-pet-row')).toHaveLength(1);view.unmount();});
 });

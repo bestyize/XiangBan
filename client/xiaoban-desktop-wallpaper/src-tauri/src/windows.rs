@@ -554,9 +554,11 @@ fn over_companion(app:&tauri::AppHandle,click:DesktopClick)->bool{
     let config=crate::settings(app);
     if !config.companion_enabled{return false;}
     let contains=|rect:RECT|click.x>=rect.left&&click.x<rect.right&&click.y>=rect.top&&click.y<rect.bottom;
-    if let Some(pet)=app.get_webview_window("pet").and_then(|w|w.hwnd().ok()){
-        let mut rect=RECT::default();let hwnd=pet.0 as HWND;
-        if unsafe{IsWindowVisible(hwnd)!=0&&GetWindowRect(hwnd,&mut rect)!=0}&&contains(rect){return true;}
+    for (label,window) in app.webview_windows(){
+        if !crate::pets::is_pet(&label){continue;}
+        if let Ok(pet)=window.hwnd(){let mut rect=RECT::default();let hwnd=pet.0 as HWND;
+            if unsafe{IsWindowVisible(hwnd)!=0&&GetWindowRect(hwnd,&mut rect)!=0}&&contains(rect){return true;}
+        }
     }
     false
 }

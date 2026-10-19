@@ -581,6 +581,7 @@ fn presence_tick(app: &tauri::AppHandle, elapsed: f64) {
     if let Some(kind) = kind {
         let payload = serde_json::json!({"kind": kind.as_str()});
         let _ = app.emit_to("pet", "companion-presence", payload.clone());
+        for (label,window) in app.webview_windows(){if crate::pets::is_pet(&label){let _=window.eval(format!("window.dispatchEvent(new CustomEvent('pet-presence',{{detail:{payload}}}));"));}}
         if crate::content::composing(app) {
             for label in ["media-a", "media-b"] {
                 if let Some(window) = app.get_webview_window(label) {

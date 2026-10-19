@@ -91,7 +91,7 @@ pub fn set_interactive_layer(window: &tauri::WebviewWindow, layer: &str) -> Resu
         };
         let ns=native(&window)?;
         ns.setLevel(level);
-        if crate::widgets::is_widget(window.label()){
+        if crate::widgets::is_widget(window.label()) || crate::pets::is_pet(window.label()){
             let full_screen=if layer=="desktop"{NSWindowCollectionBehavior::FullScreenNone}else{NSWindowCollectionBehavior::FullScreenAuxiliary};
             ns.setCollectionBehavior(NSWindowCollectionBehavior::CanJoinAllSpaces
                 |NSWindowCollectionBehavior::Stationary|NSWindowCollectionBehavior::IgnoresCycle|full_screen);
@@ -158,7 +158,7 @@ pub fn configure_scene(
         let floating = CGWindowLevelForKey(CGWindowLevelKey::StatusWindowLevelKey) as isize;
         let icons = CGWindowLevelForKey(CGWindowLevelKey::DesktopIconWindowLevelKey) as isize;
         let levels = Levels { desktop: desktop as i64, icons: icons as i64, floating: floating as i64 };
-        ns.setLevel(scene_level(window.label(), crate::widgets::is_widget(window.label()), wallpaper, crate::effects::LABEL, levels) as isize);
+        ns.setLevel(scene_level(window.label(), crate::widgets::is_widget(window.label()) || crate::pets::is_pet(window.label()), wallpaper, crate::effects::LABEL, levels) as isize);
         let common = NSWindowCollectionBehavior::CanJoinAllSpaces
             | NSWindowCollectionBehavior::Stationary
             | NSWindowCollectionBehavior::IgnoresCycle;
@@ -174,7 +174,7 @@ pub fn configure_scene(
         ns.setCanHide(false);
         ns.setExcludedFromWindowsMenu(true);
         ns.setHasShadow(false);
-        let click_through = wallpaper && window.label() != "pet" && !crate::widgets::is_widget(window.label());
+        let click_through = wallpaper && window.label() != "pet" && !crate::widgets::is_widget(window.label()) && !crate::pets::is_pet(window.label());
         if click_through {
             ns.setIgnoresMouseEvents(true);
         }

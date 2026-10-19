@@ -20,6 +20,12 @@ pub struct CompanionChange {
 }
 
 pub trait Desktop: Send + Sync {
+    fn pet_catalog(&self)->Result<Value,String>{Err("当前宿主不支持宠物库".into())}
+    fn pet_save_theme(&self,_theme:crate::pet_packs::Theme,_overwrite:bool)->Result<Value,String>{Err("当前宿主不支持宠物创作".into())}
+    fn pet_delete_theme(&self,_id:String)->Result<Value,String>{Err("当前宿主不支持宠物主题".into())}
+    fn pet_add(&self,_theme:String,_pet:String,_layer:Option<String>)->Result<Value,String>{Err("当前宿主不支持宠物实例".into())}
+    fn pet_update(&self,_id:&str,_patch:crate::pets::Patch)->Result<Value,String>{Err("当前宿主不支持宠物实例".into())}
+    fn pet_remove(&self,_id:&str)->Result<Value,String>{Err("当前宿主不支持宠物实例".into())}
     fn status(&self) -> Result<Value, String>;
     fn windows(&self) -> Result<Value, String> { Err("当前宿主不支持窗口查询".into()) }
     fn window_update(&self, _change: &crate::window_control::Change) -> Result<Value, String> { Err("当前宿主不支持窗口控制".into()) }
@@ -72,6 +78,12 @@ impl TauriDesktop {
 }
 
 impl Desktop for TauriDesktop {
+    fn pet_catalog(&self)->Result<Value,String>{crate::pets::catalog(&self.app)}
+    fn pet_save_theme(&self,theme:crate::pet_packs::Theme,overwrite:bool)->Result<Value,String>{crate::pets::save_theme(&self.app,theme,overwrite)}
+    fn pet_delete_theme(&self,id:String)->Result<Value,String>{crate::pets::delete_pet_theme(self.app.clone(),id)}
+    fn pet_add(&self,theme:String,pet:String,layer:Option<String>)->Result<Value,String>{let result=crate::pets::add(&self.app,theme,pet,layer)?;if !crate::settings(&self.app).companion_enabled{tauri::async_runtime::block_on(crate::set_companion_enabled(self.app.clone(),true))?;}Ok(result)}
+    fn pet_update(&self,id:&str,patch:crate::pets::Patch)->Result<Value,String>{crate::pets::update(&self.app,id,patch)}
+    fn pet_remove(&self,id:&str)->Result<Value,String>{crate::pets::remove(&self.app,id)}
     fn windows(&self) -> Result<Value, String> { crate::window_control::snapshot(&self.app) }
     fn window_update(&self, change: &crate::window_control::Change) -> Result<Value, String> { crate::window_control::update(&self.app, change) }
 
@@ -835,6 +847,16 @@ fn effect_read_format(_: &dyn Desktop, _: &Value) -> Result<String, String> {
     ))
 }
 
+fn pet_read_format(_: &dyn Desktop,_args:&Value)->Result<String,String>{
+    let mut example=crate::pet_packs::builtin().remove(0);example.id="my-garden".into();example.name="我的小花园".into();example.pets=vec![example.pets.remove(2)];
+    Ok(json!({"format":"本期只支持植物。必须保留小伴现有的圆肚白瓷花盆、材质、屏幕和25种表情，仅替换顶部植物。主题是声明式 JSON，不能写 HTML/JS、花盆身体或自定义脸型。schemaVersion=1，id 为小写字母数字和 - _，name 最多24字，description最多160字，color为6位hex。pets 数组每项含 id/name/description/kind(固定plant)/parts，可选builtinPlant。builtinPlant仅为pot(原绿叶)或pot-white-flower(原白色小雏菊)，使用内置植物时parts必须为空；自创植物不要写builtinPlant，而在parts定义植物。各部件含id/name/pivot:[x,y]/motion(none|sway|left|right)/shapes。图形支持path(d)、ellipse(x,y,rx,ry)、rect(x,y,width,height,rx)，fill/stroke为6位hex或none，可选strokeWidth/opacity。植物设计坐标320×320，宿主整体平移y=-100放在原花盆上；根部应到(160,157)，植物顶部不低于y=24，左右留24px，并预留摇摆空间，建议内容放在x=64..256、y=24..160范围内。可把茎叶花分成部件或整体摇摆。不要绘制花盆、五官、背景或投影，宿主提供原有设计和全部互动。单主题最多40款植物，文件512KiB，不能含代码、外链。先pet_catalog查看主题和实例，theme_id可读取整份植物；pet_theme_save保存自定义主题，新id不能与官方重复；改已有主题需保留其他植物并overwrite=true。保存后pet_add逐盆添加，同株可添加多盆。pet_update可调整单盆大小/心情/位置，也可通过themeId和petId换植物而保留该盆的位置与配置。不要用companion_set修改所有宠物。", "expressions":EXPRESSIONS,"example":example}).to_string())
+}
+fn pet_catalog(desktop:&dyn Desktop,args:&Value)->Result<String,String>{
+ let value=desktop.pet_catalog()?;
+ if let Some(id)=optional_text(args,"theme_id")?{let mut theme=value["themes"].as_array().and_then(|items|items.iter().find(|t|t["id"]==id)).cloned().ok_or("主题不存在")?;theme.as_object_mut().unwrap().remove("source");return Ok(theme.to_string());}
+ let themes=value["themes"].as_array().into_iter().flatten().map(|t|json!({"id":t["id"],"name":t["name"],"source":t["source"],"pets":t["pets"].as_array().into_iter().flatten().map(|p|json!({"id":p["id"],"name":p["name"],"kind":p["kind"]})).collect::<Vec<_>>()})).collect::<Vec<_>>();
+ Ok(json!({"themes":themes,"instances":value["layout"]["instances"],"errors":value["errors"]}).to_string())
+}
 pub fn tools(desktop: Arc<dyn Desktop>) -> Vec<Arc<dyn Tool>> {
     let none = || object(json!({}), &[]);
     let status_run = |d: &dyn Desktop, _: &Value| -> Result<String, String> { Ok(d.status()?.to_string()) };
@@ -944,6 +966,13 @@ pub fn tools(desktop: Arc<dyn Desktop>) -> Vec<Arc<dyn Tool>> {
             .serial(),
             companion_set,
         ),
+        tool(&desktop,ToolSpec::new("pet_read_format","读取宠物主题创作格式和完整示例，创作或改造宠物前必读。",none()).risk(Risk::Read).parallel(),pet_read_format),
+        tool(&desktop,ToolSpec::new("pet_catalog","查看官方/自定义宠物主题及独立桌面实例。提供theme_id时读取该主题的完整作品，便于保留花盆、替换顶部植物。",object(json!({"theme_id":{"type":"string"}}),&[])).risk(Risk::Read).parallel(),pet_catalog),
+        tool(&desktop,ToolSpec::new("pet_theme_save","保存AI创作的宠物主题，格式先读pet_read_format。保留动态表情系统，保留原花盆，只创作顶部的花草植物。保存模板不会自动放到桌面，随后用pet_add。",object(json!({"theme":{"type":"object"},"overwrite":{"type":"boolean"}}),&["theme"])).risk(Risk::Write).serial(),|d,a|{let theme:crate::pet_packs::Theme=serde_json::from_value(a["theme"].clone()).map_err(|e|format!("主题格式无效：{e}"))?;let result=json!({"saved":true,"theme_id":theme.id,"name":theme.name,"pet_count":theme.pets.len()});d.pet_save_theme(theme,optional_bool(a,"overwrite")?.unwrap_or(false))?;Ok(result.to_string())}),
+        tool(&desktop,ToolSpec::new("pet_theme_delete","删除自定义宠物主题。官方主题受保护；先移除该主题的桌面实例。",object(json!({"id":{"type":"string"}}),&["id"])).risk(Risk::Write).serial(),|d,a|{let id=text_arg(a,"id")?;d.pet_delete_theme(id.into())?;Ok(json!({"deleted":true,"theme_id":id}).to_string())}),
+        tool(&desktop,ToolSpec::new("pet_add","从官方或自定义主题添加一只独立桌面宠物，允许多只以及同款重复添加。返回桌面实例id。",object(json!({"theme_id":{"type":"string"},"pet_id":{"type":"string"},"layer":{"type":"string","enum":["desktop","topmost"]}}),&["theme_id","pet_id"])).risk(Risk::Write).self_managed().serial(),|d,a|d.pet_add(text_arg(a,"theme_id")?.into(),text_arg(a,"pet_id")?.into(),optional_text(a,"layer")?.map(String::from)).map(|v|v.to_string())),
+        tool(&desktop,ToolSpec::new("pet_update","只调整指定桌面宠物实例，不影响同款其他宠物。id来自pet_catalog的instances。",object(json!({"id":{"type":"string"},"patch":{"type":"object","properties":{"name":{"type":"string"},"size":{"type":"number","minimum":80,"maximum":420},"expression":{"type":"string","enum":EXPRESSIONS},"enabled":{"type":"boolean"},"links":{"type":"boolean"},"x":{"type":"number","minimum":0,"maximum":1},"y":{"type":"number","minimum":0,"maximum":1},"layer":{"type":"string","enum":["desktop","topmost"]},"monitor":{"type":"string"},"themeId":{"type":"string"},"petId":{"type":"string"}},"additionalProperties":false}}),&["id","patch"])).risk(Risk::Write).self_managed().serial(),|d,a|{let patch=serde_json::from_value(a["patch"].clone()).map_err(|e|format!("宠物配置无效：{e}"))?;let id=text_arg(a,"id")?;d.pet_update(id,patch)?;Ok(json!({"updated":true,"id":id,"patch":a["patch"]}).to_string())}),
+        tool(&desktop,ToolSpec::new("pet_remove","移除指定桌面宠物实例，主题作品仍保留，其他实例不受影响。",object(json!({"id":{"type":"string"}}),&["id"])).risk(Risk::Write).self_managed().serial(),|d,a|{let id=text_arg(a,"id")?;d.pet_remove(id)?;Ok(json!({"removed":true,"id":id}).to_string())}),
         tool(&desktop, ToolSpec::new("care_list", "列出关怀提醒的规则（id、时间、文案）和总开关状态。", none()).risk(Risk::Read).parallel(), care_list),
         tool(
             &desktop,
@@ -1182,6 +1211,9 @@ mod tests {
     }
 
     impl Desktop for Fake {
+        fn pet_catalog(&self)->Result<Value,String>{let themes=crate::pet_packs::builtin().into_iter().map(|t|{let mut v=json!(t);v["source"]=json!("builtin");v}).collect::<Vec<_>>();Ok(json!({"themes":themes,"layout":{"instances":[]},"errors":[]}))}
+        fn pet_save_theme(&self,theme:crate::pet_packs::Theme,_overwrite:bool)->Result<Value,String>{crate::pet_packs::validate(&theme)?;self.log(format!("pet-save {}",theme.id))?;self.pet_catalog()}
+        fn pet_update(&self,id:&str,patch:crate::pets::Patch)->Result<Value,String>{self.log(format!("pet-update {id} {}",patch.pet_id.unwrap_or_default()))?;self.pet_catalog()}
         fn windows(&self) -> Result<Value,String> { Ok(json!({"windows":[{"target":"companion"},{"target":"assistant"}],"monitors":[{"id":"main"}]})) }
         fn window_update(&self, change: &crate::window_control::Change) -> Result<Value,String> {
             self.log(format!("window {change:?}"))?;
@@ -1326,6 +1358,23 @@ mod tests {
         for tool in all.iter().filter(|t| t.spec().risk == Risk::Write) {
             assert!(!tool.spec().parallel_safe, "{} changes shared settings, so it runs alone", tool.spec().name);
         }
+    }
+
+    #[test]
+    fn pet_tools_preserve_the_pot_and_create_only_plants_with_compact_results() {
+        let fake=Arc::new(Fake::default());
+        let format:Value=serde_json::from_str(&call(&fake,"pet_read_format",json!({})).unwrap()).unwrap();
+        let theme:crate::pet_packs::Theme=serde_json::from_value(format["example"].clone()).unwrap();
+        crate::pet_packs::validate(&theme).unwrap();
+        assert!(theme.pets.iter().all(|p|p.kind=="plant"));
+        assert!(format["example"]["pets"][0].get("body").is_none());
+        let catalog=call(&fake,"pet_catalog",json!({})).unwrap();
+        assert!(catalog.contains("花朵心语")&&catalog.contains("多肉点点"));
+        assert!(!catalog.contains("萌宠乐趣"));
+        let saved=call(&fake,"pet_theme_save",json!({"theme":theme})).unwrap();
+        assert!(saved.len()<200&&saved.contains("my-garden"));
+        call(&fake,"pet_update",json!({"id":"one","patch":{"themeId":"succulent-dots","petId":"jade"}})).unwrap();
+        assert_eq!(fake.calls(),vec!["pet-save my-garden","pet-update one jade"]);
     }
 
     #[test]

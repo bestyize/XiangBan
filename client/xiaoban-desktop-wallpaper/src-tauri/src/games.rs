@@ -188,6 +188,7 @@ async fn open_selected(app: &tauri::AppHandle, game_id: Option<String>) -> Resul
     let window = builder.build().map_err(|e|e.to_string())?;
     *state.pet_position.lock().unwrap() = app.get_webview_window("pet").and_then(|w| w.outer_position().ok());
     state.active.store(true, Ordering::SeqCst);
+    crate::pets::sync(app);
     crate::widgets::sync(app);
     crate::reminders::set_game_active(app, true);
     let _ = app.emit("games-active", true);

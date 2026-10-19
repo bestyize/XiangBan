@@ -6,6 +6,7 @@
 .xiaobanwallpaper/
 ├── config/
 │   ├── preferences.json       角色、布局、自启动、壁纸、桌面特效选择与服务地址设置
+│   ├── pets.json               多盆植物实例：植物引用、位置、大小、层级、心情与开关
 │   └── care-reminders.json    关怀规则、天气来源与结果、待展示提醒及去重状态
 ├── wallpapers/
 │   ├── catalog.json           订阅或导入 JSON 清单的元数据
@@ -14,6 +15,8 @@
 │   ├── imports/<sha256>       导入媒体的持久副本，属于用户内容
 │   └── cache/<sha256>         订阅下载缓存，可重新从资源地址获取；网站来源链接下载的文件同样按本地计算的 SHA-256 保存
 ├── effects/                   用户自己的特效包（*.json），可选；首次从控制台打开该文件夹时创建并放入示例
+├── pets/
+│   └── themes/<id>.json        自定义植物主题，属于用户作品
 ├── chat/
 │   ├── sessions/              完整聊天历史（包含工具结果与结构化摘要）
 │   ├── index.json             对话名称、分组等索引
@@ -33,7 +36,7 @@
 
 `backups/legacy-v1` 只在存在旧版本数据、执行迁移时创建。内置壁纸仍打包在程序中，不重复复制到用户目录。Windows 的设置、桌宠、壁纸和预览窗口共用上述 WebView2 目录；macOS 使用非持久 WKWebView 数据存储，应用设置与壁纸资源仍由上述目录持久化，WebKit 临时文件由系统管理。系统自启动项依然位于 Windows 注册表或 macOS `Library/LaunchAgents`。
 
-游戏包没有文件系统或浏览器存储权限。桌面宿主仅允许水墨剑客使用 `games/saves/ink-blade.json`，以及 manifest 声明 `save: true` 的自创游戏使用 `games/saves/user-<id>.json`；自创游戏本身放在 `games/packs/<id>/`（由 `game-pack:` 只读协议提供，路径限制在该目录内）；规则配置和提醒状态由原生宿主写入 `config/care-reminders.json`。天气城市由用户手动选择，不读取系统定位；查询天气需用户启用来源并联网。天气缓存和提醒去重账本属于关怀配置。备份时复制 `config`、`wallpapers` 与需要保留的 `games`；游戏存档损坏或读写失败时应用不会用空进度覆盖它。
+游戏包没有文件系统或浏览器存储权限。桌面宿主仅允许水墨剑客使用 `games/saves/ink-blade.json`，以及 manifest 声明 `save: true` 的自创游戏使用 `games/saves/user-<id>.json`；自创游戏本身放在 `games/packs/<id>/`（由 `game-pack:` 只读协议提供，路径限制在该目录内）；规则配置和提醒状态由原生宿主写入 `config/care-reminders.json`。天气城市由用户手动选择，不读取系统定位；查询天气需用户启用来源并联网。天气缓存和提醒去重账本属于关怀配置。备份时复制 `config`、`wallpapers`、`pets` 与需要保留的 `games`；游戏存档损坏或读写失败时应用不会用空进度覆盖它。
 
 聊天历史与执行日志可能包含用户输入、模型输出、工具参数及结果，不是可随意删除的缓存。需要保留对话时一并备份 `chat`。执行日志不自动上传；删除聊天会先停止该会话的受管进程，再删除对应日志与聊天历史。当前没有日志自动过期或磁盘总量回收策略；日志不可写时会停止本轮运行，避免继续执行而丢失记录。运行日志不用于自动重放命令，也不表示应用重启后原进程仍存活。
 
@@ -59,3 +62,7 @@
 所有应用设置、媒体和缓存路径从 `src-tauri/src/storage.rs` 获取，禁止另行使用当前工作目录或程序旁的 `data` 目录。`local_media.rs` 负责选择器、格式检查、复制和本地目录元数据；订阅 JSON 协议继续由 `library.rs` 维护，不接受 `local://` 或任意本地路径。新增存储版本使用迁移，保持旧数据可恢复。
 
 开发根为 `.xiaobanwallpaper/development`，不登记正式自启动；smoke test 使用唯一临时目录或 `XIAOBAN_TEST_CONFIG_DIR`，不修改用户的 `.xiaobanwallpaper/config`。测试媒体在临时目录生成并清理，不读取或删除用户相册。
+
+## 桌面植物
+
+`config/pets.json` 保存多盆实例；`pets/themes/<id>.json` 保存自创植物。两者都属于用户内容，需一起备份。第一次升级且实例文件不存在时，从旧小伴偏好迁移一盆；已有实例文件不会被偏好重置，坏文件会保留并在宠物页提示。官方主题由程序提供，不复制到用户目录。植物包不能替换原花盆和表情，格式见 [pets.md](pets.md)。

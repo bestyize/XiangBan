@@ -77,6 +77,8 @@ async function handleLogout() {
     loggingOut.value = false;
   }
 }
+const petSettingsRequest = ref<{ id: string } | null>(null);
+function managePets(event: Event) { petSettingsRequest.value=(event as CustomEvent<{id:string}>).detail; navigate('companion'); }
 const widgetSettingsRequest = ref<{ id: string } | null>(null);
 function manageWidgets(event: Event) {
   const id = (event as CustomEvent<{ id?: string }>).detail?.id;
@@ -127,9 +129,10 @@ onMounted(() => {
   void store.initialize().then(async () => { if (store.info.uiSmoke) await (await import('./ui-smoke.ts')).runUiSmoke(store); });
   window.addEventListener('focus', focus);
   window.addEventListener('widgets-manage', manageWidgets);
+  window.addEventListener('pets-manage', managePets);
   if (store.desktop) { void listenForAssistant(); void introduceAssistant(); void shareAppearance(); }
 });
-onBeforeUnmount(() => { assistantListeners.splice(0).forEach(off => off()); store.dispose(); window.removeEventListener('focus', focus); window.removeEventListener('widgets-manage', manageWidgets); });
+onBeforeUnmount(() => { assistantListeners.splice(0).forEach(off => off()); store.dispose(); window.removeEventListener('focus', focus); window.removeEventListener('widgets-manage', manageWidgets); window.removeEventListener('pets-manage', managePets); });
 </script>
 <template>
   <div class="control-app" :class="{ 'is-collapsed': collapsed, 'is-wallpapers': store.page === 'wallpapers' }">
@@ -157,7 +160,7 @@ onBeforeUnmount(() => { assistantListeners.splice(0).forEach(off => off()); stor
         <NAlert v-if="store.initialError" class="workspace-alert" type="error" title="桌面配置暂时无法读取">{{ store.initialError }} <NButton size="small" @click="store.initialize()">重试</NButton></NAlert>
         <div v-if="store.website.update?.available && store.page !== 'settings' && store.page !== 'wallpapers' && store.page !== 'chat'" class="update-strip"><span><span class="notice-dot"></span>小伴有新版本 v{{ store.website.update.version }}</span><button @click="navigate('settings')">查看更新<ArrowUpRight :size="14" /></button></div>
         <div v-if="!store.ready" class="workspace-loading"><NSkeleton height="36px" width="220px" /><NSkeleton height="18px" width="320px" /><NSkeleton height="380px" :sharp="false" /></div>
-        <template v-else-if="!store.initialError"><KeepAlive><WallpaperPage v-if="store.page === 'wallpapers'" :store="store" /></KeepAlive><template v-if="store.page !== 'wallpapers'"><ChatPage v-if="store.page === 'chat'" :store="store" /><WidgetsPage v-else-if="store.page === 'widgets'" :store="store" :settings-request="widgetSettingsRequest" @settings-opened="widgetSettingsRequest = null" /><InteractivePage v-else-if="store.page === 'interactive'" :store="store" /><EffectsPage v-else-if="store.page === 'effects'" :store="store" /><CompanionPage v-else-if="store.page === 'companion'" :store="store" /><GamesPage v-else-if="store.page === 'games'" :store="store" /><CarePage v-else-if="store.page === 'care'" :store="store" /><SettingsPage v-else :store="store" /></template></template>
+        <template v-else-if="!store.initialError"><KeepAlive><WallpaperPage v-if="store.page === 'wallpapers'" :store="store" /></KeepAlive><template v-if="store.page !== 'wallpapers'"><ChatPage v-if="store.page === 'chat'" :store="store" /><WidgetsPage v-else-if="store.page === 'widgets'" :store="store" :settings-request="widgetSettingsRequest" @settings-opened="widgetSettingsRequest = null" /><InteractivePage v-else-if="store.page === 'interactive'" :store="store" /><EffectsPage v-else-if="store.page === 'effects'" :store="store" /><CompanionPage v-else-if="store.page === 'companion'" :store="store" :settings-request="petSettingsRequest" @settings-opened="petSettingsRequest=null" /><GamesPage v-else-if="store.page === 'games'" :store="store" /><CarePage v-else-if="store.page === 'care'" :store="store" /><SettingsPage v-else :store="store" /></template></template>
       </main>
       <button type="button" class="assistant-launcher" data-testid="open-assistant" aria-label="打开超级小伴对话框" title="超级小伴" :disabled="!store.desktop || openingAssistant" :aria-busy="openingAssistant" @click="openAssistant"><AudioLines :size="25" :stroke-width="1.8" /><span>超级小伴</span></button>
       <footer class="control-statusbar"><span><span class="state-dot small"></span>{{ store.desktop ? (store.info.platform === 'windows' ? 'Windows 桌面已连接' : '桌面已连接') : '正在预览界面，桌面操作需在应用内使用' }}</span><span>{{ store.library.items.filter(item => item.installed).length }} 个本地壁纸</span></footer>

@@ -6,6 +6,8 @@ import { toSpec, stillFrame, type RobotInput } from './companion/expressions.ts'
 import { bodyTransform, earLight, earTransform, faceMarkup, faceOpacity, robotMarkup, shadowAttrs } from './companion/render.ts'
 import { faceStyleOf, skinOf, type SkinId } from './companion/skins.ts'
 import type { Settings } from './bridge.ts'
+import type { PetDefinition } from './pets/model.ts'
+import { petMarkup, petPalette, partTransform } from './pets/render.ts'
 
 export class PetView {
   readonly host: HTMLDivElement
@@ -31,12 +33,12 @@ export class PetView {
     if (event instanceof CustomEvent && event.detail === 'happy') this.temporaryExpression('happy')
   }
 
-  constructor(parent: HTMLElement, settings: Settings, private status?: (text: string) => void) {
+  constructor(parent: HTMLElement, settings: Settings, private status?: (text: string) => void, private definition?: PetDefinition) {
     this.config = settings
     this.skin = skinOf(settings.companionSkin).id
     this.host = document.createElement('div')
     this.host.className = 'pet-stage'
-    this.host.innerHTML = `<div class="pet-art" role="img" aria-label="小伴" tabindex="0">${robotMarkup(stillFrame('idle'), this.id, undefined, this.skin)}</div>`
+    this.host.innerHTML = `<div class="pet-art" role="img" aria-label="小伴" tabindex="0">${this.markup()}</div>`
     parent.append(this.host)
     window.addEventListener('care-expression', this.careExpression)
     this.bind()
@@ -56,7 +58,8 @@ export class PetView {
       const frame = this.animator.step(dt)
       const { body, face, shadow, ears } = this.parts
       body?.setAttribute('transform', bodyTransform(frame))
-      if (face) { face.innerHTML = faceMarkup(frame, this.id, faceStyleOf(skinOf(this.skin)).palette); face.setAttribute('opacity', faceOpacity(frame).toFixed(2)) }
+      if (face) { face.innerHTML = faceMarkup(frame, this.id, this.definition?petPalette(this.definition):faceStyleOf(skinOf(this.skin)).palette); face.setAttribute('opacity', faceOpacity(frame).toFixed(2)) }
+      if(this.definition)for(const part of this.definition.parts)this.host.querySelector(`[data-pet-part="${part.id}"]`)?.setAttribute('transform',partTransform(part,frame))
       const light = earLight(frame)
       ears.forEach(({ group, halo, light: inner }, i) => {
         group?.setAttribute('transform', earTransform(frame, i === 0 ? -1 : 1, skinOf(this.skin).earPivot))
@@ -78,16 +81,19 @@ export class PetView {
     })
     this.parts = { body: q('[data-part="body"]'), face: q('[data-part="face"]'), shadow: q('[data-part="shadow"]'), ears }
   }
+  private markup(){return this.definition?petMarkup(this.definition,stillFrame('idle'),this.id):robotMarkup(stillFrame('idle'),this.id,undefined,this.skin)}
+  setDefinition(definition:PetDefinition){if(JSON.stringify(definition)===JSON.stringify(this.definition))return;this.definition=definition;this.host.querySelector('.pet-art')!.innerHTML=this.markup();this.bind()}
 
   update(settings: Settings) {
     this.config = settings
     const skin = skinOf(settings.companionSkin).id
-    if (skin !== this.skin) {
+    if (skin !== this.skin && !this.definition) {
       this.skin = skin
       this.host.querySelector('.pet-art')!.innerHTML = robotMarkup(stillFrame('idle'), this.id, undefined, skin)
       this.bind()
     }
     this.host.style.setProperty('--pet-size', `${settings.size}px`)
+    if(this.definition)this.host.style.height=`${settings.size}px`
     if (settings.expression !== this.lastExpression) {
       this.lastExpression = settings.expression
       this.mind.play([])
@@ -111,7 +117,7 @@ export class PetView {
   hit(x: number, y: number): boolean {
     const bounds = this.host.querySelector('.pet-art')!.getBoundingClientRect()
     if (x < bounds.left || x > bounds.right || y < bounds.top || y > bounds.bottom) return false
-    return [...this.host.querySelectorAll<SVGGeometryElement>('svg path, svg rect, svg ellipse')].some(element => {
+    return [...this.host.querySelectorAll<SVGGeometryElement>('svg path, svg rect, svg ellipse, svg circle, svg polygon')].some(element => {
       if (element.closest('defs') || element.matches('[data-part="halo"], [data-part="shadow"], [data-part="aura"]')) return false
       const fill = getComputedStyle(element).fill
       if (fill === 'none' || fill === 'transparent') return false

@@ -281,8 +281,8 @@ function gloss(id: string, skin: Skin) {
 const scaleOpen = (skin: Skin) =>
   skin.scale === 1 ? '' : `<g transform="translate(${BODY_PIVOT.x} ${BODY_PIVOT.y}) scale(${skin.scale}) translate(${-BODY_PIVOT.x} ${-BODY_PIVOT.y})">`
 
-export function robotMarkup(frame: Frame, id: string, label?: string, skinId?: SkinId | string) {
-  const skin = skinOf(skinId)
+export function robotMarkup(frame: Frame, id: string, label?: string, skinId?: SkinId | string, skinOverride?: Skin) {
+  const skin = skinOverride ?? skinOf(skinId)
   const shadow = shadowAttrs(frame)
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${VIEW.w} ${VIEW.h}" width="100%" height="100%"${label ? ` role="img" aria-label="${label.replace(/[<>&"]/g, '')}"` : ''}>` +
     defs(id, skin) +

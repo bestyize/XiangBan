@@ -27,6 +27,8 @@ mod games;
 mod game_packs;
 mod rituals;
 mod widgets;
+mod pets;
+mod pet_packs;
 mod custom_widgets;
 mod widget_schedule;
 mod widget_market;
@@ -109,6 +111,7 @@ fn publish(app: &tauri::AppHandle) {
     let _ = app.emit("settings-changed", settings);
     content::sync(app);
     effects::sync(app);
+    pets::sync_preferences(app);
 }
 
 fn persist(app: &tauri::AppHandle, settings: &Settings) -> Result<(), String> {
@@ -204,6 +207,7 @@ fn set_autostart(app: tauri::AppHandle, enabled: bool) -> Result<Settings, Strin
 }
 
 fn open_scene(app: &tauri::AppHandle, mode: &str) -> Result<(), String> {
+    if pets::active(app) { pets::sync(app); return Ok(()); }
     if !settings(app).companion_enabled { return Ok(()); }
     if let Some(window) = app.get_webview_window("pet") {
         #[cfg(not(windows))]
@@ -466,7 +470,7 @@ fn scene_ready(window: tauri::WebviewWindow, report: Option<serde_json::Value>) 
         (window.label() == "pet" && settings(window.app_handle()).mode == "wallpaper") || ["media-a", "media-b", effects::LABEL].contains(&window.label()),
         ["media-a", "media-b", effects::LABEL].contains(&window.label()),
     )?;
-    if window.label() == "pet" || window.label() == float_assistant::LABEL || widgets::is_widget(window.label()) {
+    if window.label() == "pet" || window.label() == float_assistant::LABEL || widgets::is_widget(window.label()) || pets::is_pet(window.label()) {
         let default = if widgets::is_widget(window.label()) || (window.label() == "pet" && settings(window.app_handle()).mode == "wallpaper") { "desktop" } else { "topmost" };
         window_control::apply_saved(window.app_handle(), &window, default)?;
     }
@@ -748,6 +752,7 @@ fn main() {
             games::open_game_space, games::close_game_space, games::get_game_catalog, games::load_game_save,
             games::save_game_save, games::get_game_status, games::set_game_desktop_double_click,
             games::game_smoke_report, games::list_games, games::delete_user_game, games::open_user_games_folder, rituals::open_ritual_space, rituals::close_ritual_space, rituals::read_ritual_journal, rituals::write_ritual_journal,
+            pets::get_pet_catalog, pets::add_pet, pets::update_pet, pets::remove_pet, pets::save_pet_theme, pets::delete_pet_theme, pets::export_pet_theme, pets::get_pet_instance, pets::move_pet_instance, pets::set_pet_hit_test, pets::manage_pet_instance,
             widgets::get_desktop_widgets, widgets::add_desktop_widget, widgets::update_desktop_widget, widgets::remove_desktop_widget,
             widgets::set_widgets_editing, widgets::get_desktop_widget, widgets::move_desktop_widget, widgets::show_widget_settings, widgets::resize_desktop_widget, widgets::get_widget_settings, widgets::update_widget_settings, widgets::remove_widget_settings, widgets::close_widget_settings, widgets::size_widget_settings, widgets::search_widget_cities, widgets::get_widget_weather, widgets::get_widget_forecast, widgets::get_widget_air_quality, widgets::get_widget_stock_watchlist, widgets::get_widget_stocks, widgets::save_desktop_widget_content,
             widgets::list_custom_widgets, widgets::save_custom_widget, widgets::remove_custom_widget,
@@ -772,7 +777,7 @@ fn main() {
             float_assistant::assistant_status, float_assistant::assistant_configure, float_assistant::assistant_ready, float_assistant::assistant_hide,
             float_assistant::assistant_fit, float_assistant::assistant_drag, float_assistant::assistant_unfold, float_assistant::assistant_prefs, float_assistant::assistant_try, float_assistant::assistant_open_chat, float_assistant::assistant_open_settings]);
     let app = builder.manage(state).manage(content::ContentState::default()).manage(website::WebsiteState::default())
-        .manage(games::GameState::default()).manage(desk_game::DeskState::default()).manage(rituals::RitualState::default()).manage(widgets::WidgetState::default()).manage(reminders::ReminderState::default()).manage(account::AccountState::default()).manage(ai_config::AiConfigState::default()).manage(tts::TtsState::default()).manage(asr::AsrState::default()).manage(ai_catalogue::CatalogueState::default()).manage(float_assistant::AssistantState::default()).manage(window_control::WindowState::default())
+        .manage(games::GameState::default()).manage(desk_game::DeskState::default()).manage(rituals::RitualState::default()).manage(widgets::WidgetState::default()).manage(pets::PetState::default()).manage(reminders::ReminderState::default()).manage(account::AccountState::default()).manage(ai_config::AiConfigState::default()).manage(tts::TtsState::default()).manage(asr::AsrState::default()).manage(ai_catalogue::CatalogueState::default()).manage(float_assistant::AssistantState::default()).manage(window_control::WindowState::default())
         .register_uri_scheme_protocol("wallpaper-asset", |context, request| library::serve(context.app_handle(), request))
         .register_uri_scheme_protocol("game-pack", |context, request| game_packs::serve(context.app_handle(), request))
         .invoke_handler(move |invoke| {
@@ -781,7 +786,7 @@ fn main() {
                 invoke.resolver.reject("只能在聊天和声音设置中使用语音识别");
                 return true;
             }
-            let allowed=float_assistant::permitted(label,command).or_else(|| desk_game::permitted(label,command)).or_else(|| widgets::permitted(label,command)).or_else(|| rituals::permitted(label,command)).or_else(|| games::permitted(label,command)).unwrap_or_else(|| {
+            let allowed=pets::permitted(label,command).or_else(||float_assistant::permitted(label,command)).or_else(|| desk_game::permitted(label,command)).or_else(|| widgets::permitted(label,command)).or_else(|| rituals::permitted(label,command)).or_else(|| games::permitted(label,command)).unwrap_or_else(|| {
                 if command=="ui_smoke_report" {return label=="control";}
                 if command=="set_appearance" || command=="get_appearance" || command=="set_companion_enabled" || command=="set_companion_links" || command=="set_companion_skin" || command=="set_desktop_effects" || command=="list_desktop_effects" || command=="open_effects_directory" || command=="import_effect_pack" {return label=="control";}
                 if label=="care" { return ["get_care_delivery","care_ready","dismiss_care","snooze_care","care_synthesize"].contains(&command); }
@@ -815,6 +820,7 @@ fn main() {
                     false
                 }
             };
+            pets::start(app.handle());
             open_scene(app.handle(), &initial_mode).map_err(std::io::Error::other)?;
             apply_window_appearance(app.handle(), &settings(app.handle()).appearance);
             effects::sync(app.handle());

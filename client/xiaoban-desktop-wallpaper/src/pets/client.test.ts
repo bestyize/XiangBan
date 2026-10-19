@@ -1,0 +1,12 @@
+// @vitest-environment happy-dom
+import {beforeEach,describe,it,expect,vi} from 'vitest';
+vi.mock('../bridge.ts',()=>({desktop:false,invoke:vi.fn()}));
+import {createPetClient} from './client.ts';
+import {OFFICIAL_THEMES} from './model.ts';
+beforeEach(()=>localStorage.clear());
+describe('pet library persistence',()=>{
+ it('adds duplicate pets, edits only one and restores both after reload',async()=>{const c=createPetClient();await c.load();const a=await c.add('flower-whispers','daisy');const b=await c.add('flower-whispers','daisy','desktop');await c.update(a,{expression:'sleeping',size:300,x:.8});expect(c.catalog.value.layout.instances.find(p=>p.id===b)).toMatchObject({expression:'idle',size:210,layer:'desktop'});const reopened=createPetClient();await reopened.load();expect(reopened.catalog.value.layout.instances.find(p=>p.id===a)).toMatchObject({expression:'sleeping',size:300,x:.8});await reopened.remove(a);expect(reopened.catalog.value.layout.instances.map(p=>p.id)).toEqual([b]);c.dispose();reopened.dispose();});
+ it('changes only the plant while keeping a pot location, size and mood',async()=>{const c=createPetClient();await c.load();const id=await c.add('flower-whispers','daisy');await c.update(id,{x:.7,y:.3,size:280,expression:'happy'});await c.update(id,{themeId:'succulent-dots',petId:'jade'});expect(c.catalog.value.layout.instances[0]).toMatchObject({id,themeId:'succulent-dots',petId:'jade',x:.7,y:.3,size:280,expression:'happy'});c.dispose();});
+ it('protects official works and in-use custom templates without changing saved data',async()=>{const c=createPetClient();await c.load();await expect(c.saveTheme(OFFICIAL_THEMES[0])).rejects.toThrow('官方');const theme={...structuredClone(OFFICIAL_THEMES[0]),id:'my-garden',name:'我的花园'};await c.saveTheme(theme);const id=await c.add(theme.id,'daisy');const saved=localStorage.getItem('xiaoban.pets.themes.v1');await expect(c.deleteTheme(theme.id)).rejects.toThrow('先移除');await expect(c.update(id,{size:1})).rejects.toThrow();expect(localStorage.getItem('xiaoban.pets.themes.v1')).toBe(saved);await c.remove(id);await c.deleteTheme(theme.id);expect(c.catalog.value.themes.every(t=>t.source==='builtin')).toBe(true);c.dispose();});
+ it('leaves malformed saved layouts intact',async()=>{localStorage.setItem('xiaoban.pets.layout.v1','broken');const c=createPetClient();await c.load();expect(c.ready.value).toBe(false);await expect(c.add('flower-whispers','daisy')).rejects.toThrow();expect(localStorage.getItem('xiaoban.pets.layout.v1')).toBe('broken');c.dispose();});
+});

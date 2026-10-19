@@ -16,6 +16,12 @@ async function init() {
     return;
   }
   await import("./style.css");
+  if (mode === "pet-instance") {
+    const { createApp } = await import("vue");
+    const { default: PetWindow } = await import("./pets/PetWindow.vue");
+    createApp(PetWindow).mount("#app");
+    return;
+  }
   if (mode === "widget-settings") {
     const { mountWidgetSettings } = await import("./widgets/menu-mount.ts");
     await mountWidgetSettings();

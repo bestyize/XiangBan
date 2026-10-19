@@ -181,7 +181,7 @@ pub(crate) fn monitors(app:&tauri::AppHandle)->Result<Vec<crate::widget_geometry
         }).collect())
     }
 }
-fn cursor(app:&tauri::AppHandle)->Result<(f64,f64),String>{
+pub(crate) fn cursor(app:&tauri::AppHandle)->Result<(f64,f64),String>{
     #[cfg(target_os="macos")] {return crate::macos::widget_cursor(app);}
     #[cfg(not(target_os="macos"))] {let p=app.cursor_position().map_err(|e|e.to_string())?;Ok((p.x,p.y))}
 }

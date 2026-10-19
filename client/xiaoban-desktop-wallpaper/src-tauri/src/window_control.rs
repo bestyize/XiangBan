@@ -79,6 +79,7 @@ impl Change {
 }
 
 pub fn layer(app: &tauri::AppHandle, label: &str, default: &str) -> String {
+    if let Some(layer)=crate::pets::window_layer(app,label){return layer;}
     if let Some(layer)=crate::widgets::window_layer(app,label){return layer;}
 
     app.state::<WindowState>()
@@ -102,7 +103,7 @@ pub(crate) fn apply_layer(window: &tauri::WebviewWindow, layer: &str) -> Result<
     #[cfg(windows)]
     {
         if window.label() != "control" {
-            if layer == "desktop" && crate::widgets::is_widget(window.label()) {
+            if layer == "desktop" && (crate::widgets::is_widget(window.label()) || crate::pets::is_pet(window.label())) {
                 window.set_always_on_top(false).map_err(|e|e.to_string())?;
                 return crate::windows::attach_widget(window);
             }
@@ -118,7 +119,7 @@ pub(crate) fn apply_layer(window: &tauri::WebviewWindow, layer: &str) -> Result<
 
 }
 
-fn frame(window: &tauri::WebviewWindow) -> Result<(f64, f64, f64, f64), String> {
+pub(crate) fn frame(window: &tauri::WebviewWindow) -> Result<(f64, f64, f64, f64), String> {
     #[cfg(target_os = "macos")]
     {
         return crate::macos::interactive_frame(window);
