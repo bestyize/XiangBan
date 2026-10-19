@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { calendarDays, validateLayout, emptyLayout, type DesktopWidget } from './model.ts';
+import { calendarDays, validateLayout, emptyLayout, validStockSymbol, type DesktopWidget } from './model.ts';
 const one=():DesktopWidget=>({id:'one',kind:'calendar',theme:'glass',scale:1,x:.6,y:.2,enabled:true,city:null});
 describe('desktop widget layout',()=>{
   it('allows multiple instances but rejects duplicate identities and unsafe bounds',()=>{
@@ -38,6 +38,9 @@ describe('desktop widget layout',()=>{
     expect(() => validateLayout({ ...emptyLayout(), widgets: [{ ...customWidget, customId: 'Invalid Id!' }] })).toThrow();
   });
   it('validates reminders, market symbols and wooden fish counts',()=>{
+    expect(validStockSymbol('1.600519')).toBe(true);
+    expect(validStockSymbol('0.000001')).toBe(true);
+    expect(validStockSymbol('105.AAPL')).toBe(false);
     const living={reminders:[{id:'rem1',title:'团队周会',at:'2026-10-20T09:30',done:false}],count:108,symbol:'1.000001'};
     const widget={...one(),kind:'reminders' as const,living};
     expect(validateLayout({...emptyLayout(),widgets:[widget]}).widgets[0].living?.reminders[0].title).toBe('团队周会');
