@@ -436,3 +436,33 @@ describe('floating assistant', () => {
     expect(appearance).toHaveBeenCalledTimes(2);
   });
 });
+
+describe('assistant image messages', () => {
+  it('sends image-only questions through the existing image chat transport', async () => {
+    const { store, chat } = setup({ voice: false }); await store.opened();
+    store.attachments = ['data:image/png;base64,AA==']; await store.submit();
+    expect(chat.send).toHaveBeenCalledWith('', ['data:image/png;base64,AA==']);
+    expect(store.attachments).toEqual([]); store.dispose();
+  });
+  it('restores text and images if the host refuses the message', async () => {
+    const { store, chat } = setup({ voice: false }); await store.opened();
+    chat.send.mockResolvedValueOnce(false); store.input = '看看这个'; store.attachments = ['image'];
+    await store.submit(); expect(store.input).toBe('看看这个'); expect(store.attachments).toEqual(['image']); store.dispose();
+  });
+  it('keeps the image draft if a model is missing and clears it on close', async () => {
+    const { store, chat } = setup({ voice: false, configured: false }); await store.opened(); store.attachments = ['image'];
+    await store.submit(); expect(chat.send).not.toHaveBeenCalled(); expect(store.attachments).toEqual(['image']);
+    store.closed(); expect(store.attachments).toEqual([]); store.dispose();
+  });
+  it('pauses voice auto-send when the user starts attaching an image', async () => {
+    const { store, chat, asr, say, advance } = setup(); await store.opened(); say('看看这张图');
+    store.prepareImages(); advance(SEND_GRACE_MS + 1); await Promise.resolve();
+    expect(chat.send).not.toHaveBeenCalled(); expect(asr.recordingRequested).toBe(false); expect(store.input).toBe('看看这张图'); store.dispose();
+  });
+  it('ignores a second send while the first image message is being submitted', async () => {
+    const { store, chat, speech } = setup({ voice: false }); await store.opened();
+    let finish!: () => void; speech.stop.mockImplementationOnce(() => new Promise<void>(resolve => { finish = resolve; }));
+    store.attachments = ['image']; const sent = store.submit(); await store.submit('duplicate'); finish(); await sent;
+    expect(chat.send).toHaveBeenCalledTimes(1); store.dispose();
+  });
+});

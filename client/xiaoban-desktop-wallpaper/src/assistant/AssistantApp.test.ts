@@ -15,7 +15,7 @@ const wrappers: ReturnType<typeof mount>[] = [];
 beforeEach(()=>vi.clearAllMocks());
 afterEach(() => { wrappers.splice(0).forEach(w => w.unmount());document.body.replaceChildren(); });
 function setup() {
-  const store = reactive({ open: true, ball: false, phase: 'answering', hint: '', hintTab: '', question: '今天如何放松', answer: '可以先休息片刻。', working: '', failure: '', approval: null as null | { id: string; arguments: {}; tool: string }, ask: null, input: '草稿', status: '正在回答…', hide: vi.fn(), submit: vi.fn(), interrupt: vi.fn(), openChat: vi.fn(),toggleListening:vi.fn(),unfold:vi.fn() });
+  const store = reactive({ open: true, ball: false, phase: 'answering', hint: '', hintTab: '', question: '今天如何放松', answer: '可以先休息片刻。', working: '', failure: '', approval: null as null | { id: string; arguments: {}; tool: string }, ask: null, attachments: [] as string[], questionImages: [] as string[], prepareImages: vi.fn(), note: vi.fn(), input: '草稿', status: '正在回答…', hide: vi.fn(), submit: vi.fn(), interrupt: vi.fn(), openChat: vi.fn(),toggleListening:vi.fn(),unfold:vi.fn() });
   const wrapper=mount(AssistantApp,{attachTo:document.body,props:{store:store as unknown as AssistantStore,asr:{level:0} as AsrStore},global:{stubs:{MarkdownView:true}}});
   wrappers.push(wrapper);
   return {store,wrapper};
@@ -58,4 +58,54 @@ describe('copying assistant replies',()=>{
  it('copies only the current AI response including markdown and confirms success',async()=>{const writeText=vi.fn().mockResolvedValue(undefined);Object.defineProperty(navigator,'clipboard',{value:{writeText},configurable:true});const {store,wrapper}=setup();store.answer='**建议**\n\n先休息片刻。';await nextTick();await wrapper.get('[data-testid="assistant-copy"]').trigger('click');await flushPromises();expect(writeText).toHaveBeenCalledWith('**建议**\n\n先休息片刻。');expect(wrapper.get('[data-testid="assistant-copy"]').text()).toContain('已复制');expect(store.input).toBe('草稿');expect(store.interrupt).not.toHaveBeenCalled();});
  it('shows failure and allows retry without changing the reply',async()=>{const writeText=vi.fn().mockRejectedValueOnce(Error('clipboard denied')).mockResolvedValue(undefined);Object.defineProperty(navigator,'clipboard',{value:{writeText},configurable:true});const {store,wrapper}=setup();const answer=store.answer;await wrapper.get('[data-testid="assistant-copy"]').trigger('click');await flushPromises();expect(wrapper.get('[data-testid="assistant-copy"]').text()).toContain('复制失败');expect(store.answer).toBe(answer);await wrapper.get('[data-testid="assistant-copy"]').trigger('click');await flushPromises();expect(wrapper.get('[data-testid="assistant-copy"]').text()).toContain('已复制');});
  it('hides the copy action when there is no AI response',async()=>{const {store,wrapper}=setup();store.answer='';await nextTick();expect(wrapper.find('[data-testid="assistant-copy"]').exists()).toBe(false);});
+});
+
+const imageFile = () => new File(['test image'], 'photo.png', { type: 'image/png' });
+describe('assistant image input', () => {
+  it('places the small picker button immediately after the orb and opens a file picker without dragging', async () => {
+    const { store, wrapper } = setup(); store.phase = 'idle'; await nextTick();
+    const picker = wrapper.get<HTMLInputElement>('[data-testid="assistant-image-input"]');
+    const click = vi.spyOn(picker.element, 'click').mockImplementation(() => {});
+    const button = wrapper.get('[data-testid="assistant-add-image"]');
+    expect(button.element.previousElementSibling?.getAttribute('data-testid')).toBe('assistant-orb');
+    await button.trigger('pointerdown', { button: 0, pointerId: 1 }); move(80, 80);
+    await button.trigger('click');
+    expect(click).toHaveBeenCalledOnce(); expect(store.prepareImages).toHaveBeenCalledOnce();
+    expect(invoke).not.toHaveBeenCalledWith('assistant_drag');
+  });
+  it.each(['drop', 'paste', 'pick'])('stages a %s image and lets the user remove it', async method => {
+    const { store, wrapper } = setup(); store.phase = 'idle'; await nextTick();
+    const file = imageFile();
+    if (method === 'drop') await wrapper.get('.composer').trigger('drop', { dataTransfer: { files: [file], types: ['Files'] } });
+    if (method === 'paste') await wrapper.get('.composer').trigger('paste', { clipboardData: { files: [file] } });
+    if (method === 'pick') {
+      const picker = wrapper.get<HTMLInputElement>('[data-testid="assistant-image-input"]');
+      Object.defineProperty(picker.element, 'files', { value: [file], configurable: true });
+      await picker.trigger('change');
+    }
+    await vi.waitFor(() => expect(store.attachments).toHaveLength(1)); await nextTick();
+    expect(store.attachments[0]).toMatch(/^data:image\/png;base64,/);
+    expect(wrapper.get('[data-testid="assistant-attachments"] img').attributes('src')).toBe(store.attachments[0]);
+    await wrapper.get('[aria-label="移除图片 1"]').trigger('click'); expect(store.attachments).toEqual([]);
+  });
+  it('allows image-only questions and rejects unsupported and oversized files', async () => {
+    const { store, wrapper } = setup(); store.phase = 'idle'; store.input = ''; store.attachments = ['data:image/png;base64,AA==']; await nextTick();
+    await wrapper.get('[data-testid="assistant-primary"]').trigger('click'); expect(store.submit).toHaveBeenCalledOnce();
+    await wrapper.get('.composer').trigger('drop', { dataTransfer: { files: [new File(['x'], 'x.svg', { type: 'image/svg+xml' })], types: ['Files'] } });
+    await flushPromises(); expect(store.attachments).toHaveLength(1); expect(store.note).toHaveBeenCalledWith(expect.stringContaining('支持 PNG'));
+    const large = imageFile(); Object.defineProperty(large, 'size', { value: 3 * 1024 * 1024 + 1 });
+    await wrapper.get('.composer').trigger('drop', { dataTransfer: { files: [large], types: ['Files'] } }); await flushPromises();
+    expect(store.attachments).toHaveLength(1); expect(store.note).toHaveBeenCalledWith(expect.stringContaining('3MB'));
+  });
+  it('does not attach images while answering or after the capsule closes during reading', async () => {
+    const { store, wrapper } = setup();
+    expect(wrapper.get<HTMLButtonElement>('[data-testid="assistant-add-image"]').element.disabled).toBe(true);
+    await wrapper.get('.composer').trigger('drop', { dataTransfer: { files: [imageFile()], types: ['Files'] } });
+    expect(store.attachments).toHaveLength(0);
+    store.phase = 'idle'; await nextTick();
+    const read = vi.spyOn(FileReader.prototype, 'readAsDataURL').mockImplementation(function (this: FileReader) { setTimeout(() => this.onload?.(new ProgressEvent('load') as ProgressEvent<FileReader>), 10); });
+    await wrapper.get('.composer').trigger('drop', { dataTransfer: { files: [imageFile()], types: ['Files'] } });
+    store.open = false; await nextTick(); await new Promise(resolve => setTimeout(resolve, 20));
+    expect(store.attachments).toEqual([]); read.mockRestore();
+  });
 });

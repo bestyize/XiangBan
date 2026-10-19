@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
-import { ArrowUp, ArrowUpRight, Square, X, Copy, Check } from 'lucide-vue-next';
+import { ArrowUp, ArrowUpRight, Square, X, Copy, Check, ImagePlus } from 'lucide-vue-next';
 import MarkdownView from '../ui/chat/MarkdownView.ts';
 import type { AsrStore } from '../ui/asr/store.ts';
 import type { ApprovalRequest } from '../ui/chat/types.ts';
@@ -11,6 +11,61 @@ import type { AssistantStore } from './assistant-store.ts';
 
 const props = defineProps<{ store: AssistantStore; asr: AsrStore }>();
 const field = ref<HTMLInputElement>();
+const filePicker = ref<HTMLInputElement>();
+const imageReading = ref(false), submitting = ref(false), dropActive = ref(false);
+let imageVersion = 0, dropDepth = 0;
+const imageTypes = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
+const canAttach = computed(() => !busy.value && !props.store.ask && !props.store.approval && !imageReading.value && !submitting.value);
+watch(() => props.store.open, () => { imageVersion++; dropDepth = 0; dropActive.value = false; });
+function openPicker() {
+  if (!canAttach.value) return;
+  props.store.prepareImages(); filePicker.value?.click();
+}
+function readImage(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => typeof reader.result === 'string' ? resolve(reader.result) : reject(Error('图片读取失败，请重试。'));
+    reader.onerror = reader.onabort = () => reject(Error('图片读取失败，请重试。'));
+    reader.readAsDataURL(file);
+  });
+}
+async function addImages(files: File[]) {
+  if (!files.length || !props.store.open) return;
+  if (!canAttach.value) { props.store.note('请等待当前操作完成后再添加图片。'); return; }
+  props.store.prepareImages();
+  const version = imageVersion;
+  imageReading.value = true;
+  let warning = '';
+  try {
+    for (const file of files) {
+      if (version !== imageVersion) break;
+      if (props.store.attachments.length >= 8) { warning = '一次最多添加 8 张图片。'; break; }
+      if (!imageTypes.includes(file.type)) { warning = '支持 PNG、JPEG、GIF 和 WebP 图片。'; continue; }
+      if (file.size > 3 * 1024 * 1024) { warning = '单张图片需小于 3MB，请换一张。'; continue; }
+      try {
+        const image = await readImage(file);
+        if (version === imageVersion) props.store.attachments.push(image);
+      } catch (error) { warning = (error as Error).message; }
+    }
+    if (warning && version === imageVersion) props.store.note(warning);
+  } finally { imageReading.value = false; }
+}
+function onPick(event: Event) {
+  const input = event.target as HTMLInputElement;
+  void addImages(Array.from(input.files ?? [])); input.value = '';
+}
+function hasFiles(event: DragEvent) { return Array.from(event.dataTransfer?.types ?? []).includes('Files'); }
+function dragEnter(event: DragEvent) { if (hasFiles(event)) { event.preventDefault(); dropDepth++; dropActive.value = canAttach.value; } }
+function dragOver(event: DragEvent) { if (hasFiles(event)) { event.preventDefault(); if (event.dataTransfer) event.dataTransfer.dropEffect = canAttach.value ? 'copy' : 'none'; } }
+function dragLeave() { dropDepth = Math.max(0, dropDepth - 1); if (!dropDepth) dropActive.value = false; }
+function dropImages(event: DragEvent) {
+  event.preventDefault(); dropDepth = 0; dropActive.value = false;
+  void addImages(Array.from(event.dataTransfer?.files ?? []));
+}
+function pasteImages(event: ClipboardEvent) {
+  const files = Array.from(event.clipboardData?.files ?? []).filter(file => file.type.startsWith('image/'));
+  if (files.length) { event.preventDefault(); void addImages(files); }
+}
 const inner = ref<HTMLElement>();
 const scroller = ref<HTMLElement>();
 const composing = ref(false);
@@ -27,22 +82,23 @@ const quiet = computed(() => props.store.phase === 'idle');
 
 const busy = computed(() => ['thinking', 'answering', 'speaking'].includes(props.store.phase));
 const hasCard = computed(() => !cardDismissed.value && Boolean(
-  props.store.hint || props.store.question || props.store.answer || props.store.working || props.store.failure
+  props.store.hint || props.store.question || props.store.questionImages?.length || props.store.answer || props.store.working || props.store.failure
   || props.store.approval || props.store.ask || props.store.phase === 'thinking',
 ));
-const canSend = computed(() => Boolean(props.store.input.trim()));
+const canSend = computed(() => !busy.value && !props.store.approval && !imageReading.value && !submitting.value && Boolean(props.store.input.trim() || props.store.attachments.length));
 
 function approvalLine(request: ApprovalRequest) {
   const raw = typeof request.arguments === 'string' ? request.arguments : JSON.stringify(request.arguments);
   const text = `${request.tool} ${raw ?? ''}`.trim();
   return text.length > 180 ? `${text.slice(0, 180)}…` : text;
 }
-function send() {
+async function send() {
   const text = props.store.input.trim();
-  if (!text) return;
-  if (props.store.ask) { props.store.input = ''; void props.store.reply(text); return; }
-  cardDismissed.value = false;
-  void props.store.submit();
+  if (!canSend.value) return;
+  if (props.store.ask) { if (text) { props.store.input = ''; void props.store.reply(text); } return; }
+  if (busy.value || props.store.approval) return;
+  cardDismissed.value = false; submitting.value = true;
+  try { await props.store.submit(); } finally { submitting.value = false; }
 }
 function onEnter(event: KeyboardEvent) {
   if (event.isComposing || composing.value) return;
@@ -121,12 +177,12 @@ onMounted(()=>{
   window.addEventListener('focus',onFocus);window.addEventListener('pointermove',dragMove);window.addEventListener('pointerup',dragUp);window.addEventListener('pointercancel',dragUp);window.addEventListener('blur',releasePress);window.addEventListener('assistant-drag-end',dragEnded);
 });
 onBeforeUnmount(()=>{
-  releasePress();copyVersion++;clearTimeout(copyTimer);window.removeEventListener('focus',onFocus);window.removeEventListener('pointermove',dragMove);window.removeEventListener('pointerup',dragUp);window.removeEventListener('pointercancel',dragUp);window.removeEventListener('blur',releasePress);window.removeEventListener('assistant-drag-end',dragEnded);observer?.disconnect();cancelAnimationFrame(raf);
+  imageVersion++; releasePress();copyVersion++;clearTimeout(copyTimer);window.removeEventListener('focus',onFocus);window.removeEventListener('pointermove',dragMove);window.removeEventListener('pointerup',dragUp);window.removeEventListener('pointercancel',dragUp);window.removeEventListener('blur',releasePress);window.removeEventListener('assistant-drag-end',dragEnded);observer?.disconnect();cancelAnimationFrame(raf);
 });
 </script>
 
 <template>
-  <div class="stage" :class="{ light: !isDark,dragging }" @keydown.esc.prevent="store.hide()" @pointerdown="dragDown" @click.capture="captureClick">
+  <div class="stage" :class="{ light: !isDark,dragging }" @dragover="dragOver" @drop="dropImages" @keydown.esc.prevent="store.hide()" @pointerdown="dragDown" @click.capture="captureClick">
     <div v-if="store.ball && !store.open" class="ball-stage" data-testid="assistant-ball-stage">
       <button type="button" class="ball" :data-phase="store.phase" title="点一下提问，按住可以拖动，右键打开设置" aria-label="打开超级小伴" data-testid="assistant-ball" data-drag-handle @click="ballClick" @contextmenu.prevent="store.openSettings('assistant')">
         <Orb :phase="store.phase" :level="0" :active="true" :size="48" :dark="isDark" :fps="quiet ? 20 : 60" />
@@ -142,6 +198,7 @@ onBeforeUnmount(()=>{
                 {{ store.hint }}
                 <button v-if="store.hintTab" type="button" class="link" @click="store.openSettings(store.hintTab)">{{ store.hintTab === 'ai' ? '去配置' : '去设置' }}</button>
               </p>
+              <div v-if="store.questionImages?.length" class="sent-images"><img v-for="(image, index) in store.questionImages" :key="index" :src="image" :alt="`已发送的图片 ${index + 1}`" draggable="false" /></div>
               <p v-if="store.question" class="you">{{ store.question }}</p>
               <div v-if="store.answer" class="reply"><MarkdownView :source="store.answer" @open="openLink" /><span v-if="store.phase === 'answering'" class="cursor" aria-hidden="true"></span></div>
               <p v-else-if="store.failure" class="failure">{{ store.failure }}</p>
@@ -160,14 +217,22 @@ onBeforeUnmount(()=>{
             <footer v-if="store.answer.trim()" class="card-footer"><button type="button" class="copy-answer" data-testid="assistant-copy" :disabled="copyState==='copying'" :aria-label="copyState==='copied'?'已复制回复':copyState==='failed'?'复制失败，点击重试':'复制回复'" title="复制 AI 回复" @pointerdown.prevent @click="copyAnswer"><Check v-if="copyState==='copied'" :size="14"/><Copy v-else :size="14"/><span aria-live="polite">{{ copyState==='copied'?'已复制':copyState==='failed'?'复制失败，重试':copyState==='copying'?'复制中…':'复制' }}</span></button></footer>
           </section>
         </Transition>
+        <div class="composer" :class="{ 'drop-active': dropActive }" @dragenter="dragEnter" @dragleave="dragLeave" @dragover="dragOver" @drop.stop="dropImages" @paste="pasteImages">
+        <input ref="filePicker" class="sr" type="file" accept="image/png,image/jpeg,image/gif,image/webp" multiple tabindex="-1" aria-label="选择要发送的图片" data-testid="assistant-image-input" @change="onPick" />
+        <div v-if="store.attachments.length" class="image-tray" data-no-drag data-testid="assistant-attachments">
+          <div v-for="(image, index) in store.attachments" :key="index" class="image-thumb"><img :src="image" :alt="`待发送的图片 ${index + 1}`" draggable="false" /><button type="button" :aria-label="`移除图片 ${index + 1}`" :disabled="submitting || imageReading" @click="store.attachments.splice(index, 1)"><X :size="11" /></button></div>
+        </div>
         <div class="capsule" :data-phase="store.phase">
-          <button type="button" class="orb-button" :title="store.phase === 'speaking' ? '停止朗读' : store.phase === 'listening' ? '暂停聆听 · 拖动可移动' : '点一下开始说话 · 拖动可移动'" :aria-label="store.phase === 'listening' ? '暂停聆听' : '开始说话'" data-testid="assistant-orb" data-drag-handle @click="onOrb">
+          <button type="button" class="orb-button" :title="store.phase === 'speaking' ? '停止朗读' : store.phase === 'listening' ? '暂停聆听 · 拖动可移动' : '点一下开始说话 · 拖动可移动'" :aria-label="store.phase === 'listening' ? '暂停聆听' : '开始说话'" data-testid="assistant-orb" :disabled="imageReading || submitting" data-drag-handle @click="onOrb">
             <Orb :phase="store.phase" :level="asr.level" :active="store.open" :size="52" :dark="isDark" />
           </button>
+          <button type="button" class="image-add" title="添加图片（也可拖入或粘贴）" aria-label="添加图片" data-testid="assistant-add-image" :disabled="!canAttach || store.attachments.length >= 8" @click="openPicker"><ImagePlus :size="15" :stroke-width="1.7" /></button>
           <input ref="field" v-model="store.input" class="field" type="text" autocomplete="off" spellcheck="false" :placeholder="store.status" aria-label="向小伴提问" data-testid="assistant-input" @keydown.enter="onEnter" @compositionstart="composing = true" @compositionend="composing = false" />
           <button v-if="canSend || busy || store.phase === 'attention'" type="button" class="round primary" :aria-label="canSend ? '发送' : '停止'" :title="canSend ? '发送' : '停止'" data-testid="assistant-primary" @click="primary"><ArrowUp v-if="canSend" :size="18" /><Square v-else :size="14" /></button>
           <button type="button" class="round" title="在完整聊天中继续" aria-label="在完整聊天中继续" data-testid="assistant-expand" @click="store.openChat()"><ArrowUpRight :size="17" /></button>
           <button type="button" class="round" title="收起 (Esc)" aria-label="收起" data-testid="assistant-close" @click="store.hide()"><X :size="17" /></button>
+        </div>
+        <p v-if="dropActive || imageReading" class="image-status" aria-live="polite">{{ imageReading ? '正在读取图片…' : '松开添加图片' }}</p>
         </div>
         <span class="sr" aria-live="polite">{{ store.status }}</span>
       </div>
@@ -218,10 +283,23 @@ html,body,#app{background:transparent!important}
 .gate .ghost{background:var(--ghost);color:var(--ghost-fg)}
 .gate .ghost.dim{color:var(--text-soft)}
 .gate .solid{background:linear-gradient(135deg,#ffcf7a,#ff9f5a);color:#2a1604;font-weight:600}
-.capsule{display:flex;align-items:center;gap:8px;height:68px;padding:0 12px 0 8px;border-radius:34px;background:var(--capsule);border:1px solid var(--line);transition:border-color .3s}
-.capsule[data-phase=listening]{border-color:var(--listen)}
-.capsule[data-phase=thinking],.capsule[data-phase=answering],.capsule[data-phase=speaking]{border-color:var(--busy)}
-.capsule[data-phase=attention]{border-color:var(--attention)}
+.composer{position:relative;border-radius:34px;background:var(--capsule);border:1px solid var(--line);transition:border-color .2s}
+.composer.drop-active{border-color:var(--link);box-shadow:inset 0 0 0 1px var(--link)}
+.image-add{flex:none;width:24px;height:28px;display:grid;place-items:center;padding:0;border:0;border-radius:7px;background:transparent;color:var(--text-soft);cursor:pointer;transition:color .15s,background .15s}
+.image-add:hover:not(:disabled){color:var(--text);background:var(--button-hover)}
+.image-add:focus-visible{outline:2px solid var(--link);outline-offset:2px}
+.image-add:disabled{opacity:.35;cursor:default}
+.image-tray{display:flex;gap:8px;flex-wrap:wrap;padding:12px 16px 2px;cursor:default}
+.image-thumb{position:relative;width:44px;height:44px;flex:none}
+.image-thumb img,.sent-images img{width:44px;height:44px;object-fit:cover;border-radius:8px;background:var(--button)}
+.image-thumb button{position:absolute;right:-4px;top:-4px;width:17px;height:17px;padding:0;display:grid;place-items:center;border:1px solid var(--line);border-radius:50%;background:var(--card);color:var(--text);cursor:pointer}
+.image-thumb button:focus-visible{outline:2px solid var(--link)}
+.sent-images{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
+.image-status{font-size:11px;color:var(--link);margin:0;padding:0 20px 8px;cursor:default}
+.capsule{display:flex;align-items:center;gap:8px;height:68px;padding:0 12px 0 8px;border-radius:34px;background:transparent;border:0;transition:border-color .3s}
+.composer:has(.capsule[data-phase=listening]){border-color:var(--listen)}
+.composer:has(.capsule[data-phase=thinking]),.composer:has(.capsule[data-phase=answering]),.composer:has(.capsule[data-phase=speaking]){border-color:var(--busy)}
+.composer:has(.capsule[data-phase=attention]){border-color:var(--attention)}
 .round,.gate button,.link{cursor:pointer}.orb-button,.ball{cursor:grab}.stage.dragging,.stage.dragging *{cursor:grabbing!important}
 .orb-button{touch-action:none;flex:none;width:52px;height:52px;padding:0;border:0;border-radius:50%;background:none;cursor:pointer}
 .orb-button:focus-visible,.round:focus-visible{outline:2px solid var(--link);outline-offset:2px}

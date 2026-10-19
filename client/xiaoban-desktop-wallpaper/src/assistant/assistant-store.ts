@@ -41,6 +41,10 @@ export interface AssistantStore {
   prefs: { open: OpenMode; read: ReadMode };
   /** The text box. Voice fills it as words are recognised, then sends it. */
   input: string;
+  /** Images staged for the next question, as data URLs. */
+  attachments: string[];
+  /** Pause voice auto-send while choosing or dropping images. */
+  prepareImages(): void;
   /** Why voice or the model is not ready, in a sentence. Empty when nothing is wrong. */
   hint: string;
   /** The settings tab that fixes the hint, if one does. */
@@ -50,6 +54,7 @@ export interface AssistantStore {
   readonly voiceAvailable: boolean;
   readonly status: string;
   readonly question: string;
+  readonly questionImages: string[];
   readonly answer: string;
   readonly working: string;
   readonly failure: string;
@@ -103,7 +108,8 @@ export function createAssistantStore(deps: AssistantDeps): AssistantStore {
   /** The last question was spoken, so the answer is read aloud and listening resumes afterwards. */
   let voiceTurn = false;
   /** Reactive, because the phase shows `speaking` from the moment a reply is handed to the voice until it ends. */
-  const flags = reactive({ awaitingSpeech: false });
+  const flags = reactive({ awaitingSpeech: false, submitting: false });
+  let draftVersion = 0;
 
   const view = () => (chat.currentId ? chat.views[chat.currentId] ?? null : null);
   function turn() {
@@ -115,7 +121,8 @@ export function createAssistantStore(deps: AssistantDeps): AssistantStore {
     const answer = rest.filter((item): item is Extract<ChatItem, { kind: 'assistant' }> => item.kind === 'assistant').map(item => item.text.trim()).filter(Boolean).join('\n\n');
     const tool = [...rest].reverse().find((item): item is Extract<ChatItem, { kind: 'tool' }> => item.kind === 'tool' && item.status === 'running');
     const notice = [...rest].reverse().find((item): item is Extract<ChatItem, { kind: 'notice' }> => item.kind === 'notice' && item.tone === 'error');
-    return { question, answer, working: tool ? describeTool(tool.name) : '', failure: notice?.text ?? '' };
+    const questionImages = at >= 0 ? (items[at] as Extract<ChatItem, { kind: 'user' }>).images : [];
+    return { question, questionImages, answer, working: tool ? describeTool(tool.name) : '', failure: notice?.text ?? '' };
   }
 
   async function refreshModel() {
@@ -169,10 +176,14 @@ export function createAssistantStore(deps: AssistantDeps): AssistantStore {
   }
 
   const store: AssistantStore = reactive({
-    open: false, ball: false, prefs: { open: 'voice', read: 'voice' }, input: '', hint: '', hintTab: '',
+    open: false, ball: false, prefs: { open: 'voice', read: 'voice' }, input: '', attachments: [], hint: '', hintTab: '',
     get configured() { return chat.configured; },
     get voiceAvailable() { return asr.enabled; },
     get question() { return turn().question; },
+    get questionImages() { return turn().questionImages; },
+    prepareImages() {
+      clearTimers(); heard = ''; voiceTurn = false; asr.deactivate();
+    },
     get answer() { return turn().answer; },
     get working() { return turn().working; },
     get failure() { return turn().failure; },
@@ -220,6 +231,7 @@ export function createAssistantStore(deps: AssistantDeps): AssistantStore {
     async opened() {
       if (disposed) return;
       clearTimers();
+      draftVersion++; store.attachments = [];
       store.open = true; store.ball = false; store.note(''); store.input = ''; heard = ''; voiceTurn = false; flags.awaitingSpeech = false;
       await Promise.all([chat.init(), asr.init()]);
       await refreshModel();
@@ -230,25 +242,36 @@ export function createAssistantStore(deps: AssistantDeps): AssistantStore {
       if (store.open && asr.enabled && store.prefs.open === 'voice') { voiceTurn = await startListening(); }
     },
     closed() {
+      draftVersion++; store.attachments = [];
       clearTimers();
       asr.deactivate(); void speech.stop();
       store.open = false; store.input = ''; store.note(''); heard = ''; voiceTurn = false; flags.awaitingSpeech = false;
     },
     async submit(text, spoken = false) {
       const value = (text ?? store.input).trim();
-      if (!value) return;
+      if ((!value && !store.attachments.length) || flags.submitting || view()?.running || store.ask || store.approval) return;
       if (!chat.configured) {
         store.input = value;
         store.note(MODEL_REQUIRED, 'ai');
         return;
       }
+      const images = [...store.attachments], version = draftVersion;
+      flags.submitting = true;
       clearTimers(); heard = '';
-      asr.deactivate(); await speech.stop();
-      store.input = ''; store.note('');
-      voiceTurn = spoken; lastActivity = now();
-      // New capsule conversations start in full trust; resumed ones keep their saved mode.
-      if (!chat.currentId) chat.permissionMode = 'auto';
-      if (!(await chat.send(value))) store.input = value;
+      asr.deactivate();
+      store.input = ''; store.attachments = []; store.note('');
+      try {
+        await speech.stop();
+        if (version !== draftVersion) return;
+        voiceTurn = spoken; lastActivity = now();
+        // New capsule conversations start in full trust; resumed ones keep their saved mode.
+        if (!chat.currentId) chat.permissionMode = 'auto';
+        const sent = images.length ? await chat.send(value, images) : await chat.send(value);
+        if (!sent && version === draftVersion) {
+          if (!store.input) store.input = value;
+          store.attachments = [...images, ...store.attachments].slice(0, 8);
+        }
+      } finally { flags.submitting = false; }
     },
     async toggleListening() {
       if (asr.listening || asr.recordingRequested) { asr.deactivate(); voiceTurn = false; heard = ''; return; }
