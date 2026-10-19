@@ -60,7 +60,7 @@ watch(()=>living.value.count,value=>{if(value>=lastSynced)count.value=Math.max(c
 let quotePoll:ReturnType<typeof setInterval>|undefined,hitTimer:ReturnType<typeof setTimeout>|undefined;
 let saveQueue:Promise<void>=Promise.resolve();
 function persist(content:WidgetContent){
-  if(locked.value||!props.save)return;
+  if(locked.value||!props.save)return Promise.resolve();
   localError.value='';
   const operation=saveQueue.catch(()=>{}).then(()=>props.save!(content));
   saveQueue=operation.catch(e=>{localError.value=String(e);});
