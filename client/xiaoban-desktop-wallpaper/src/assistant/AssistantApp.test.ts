@@ -160,13 +160,23 @@ describe('compact horizontal assistant tools', () => {
     expect(wrapper.find('[role="toolbar"]').exists()).toBe(false); expect(store.hide).not.toHaveBeenCalled();
     await wrapper.get('.stage').trigger('keydown',{key:'Escape'}); expect(store.hide).toHaveBeenCalledOnce();
   });
-  it('grows the native window for an absolute popover above an empty capsule', async () => {
+  it('reserves toolbar space once and never resizes while the toolbar animates or closes', async () => {
     vi.useFakeTimers();
     const bounds=vi.spyOn(HTMLElement.prototype,'getBoundingClientRect').mockImplementation(function(this:HTMLElement){
       return {top:this.classList.contains('tools-toolbar')?-50:0,height:this.classList.contains('inner')?92:0,bottom:92,left:0,right:480,width:480,x:0,y:0,toJSON(){}} as DOMRect;
     });
-    try {const {store,wrapper}=setup();store.answer='';store.question='';store.phase='idle';await nextTick();await openToolbar(wrapper);await vi.advanceTimersByTimeAsync(20);expect(invoke).toHaveBeenCalledWith('assistant_fit',{height:150});}
-    finally {bounds.mockRestore();}
+    try {
+      const {store,wrapper}=setup();store.answer='';store.question='';store.phase='idle';
+      await nextTick();await vi.advanceTimersByTimeAsync(30);
+      expect(invoke).toHaveBeenCalledWith('assistant_fit',{height:156});
+      vi.mocked(invoke).mockClear();
+      await wrapper.get('.tools-host').trigger('pointerenter');await vi.advanceTimersByTimeAsync(240);
+      expect(wrapper.find('[role="toolbar"]').exists()).toBe(true);
+      expect(vi.mocked(invoke).mock.calls.filter(([name])=>name==='assistant_fit')).toHaveLength(0);
+      await wrapper.get('.tools-host').trigger('pointerleave');await vi.advanceTimersByTimeAsync(450);
+      expect(wrapper.find('[role="toolbar"]').exists()).toBe(false);
+      expect(vi.mocked(invoke).mock.calls.filter(([name])=>name==='assistant_fit')).toHaveLength(0);
+    } finally {bounds.mockRestore();}
   });
 });
 describe('assistant region screenshots',()=>{

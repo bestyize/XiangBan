@@ -64,7 +64,7 @@ async function takeScreenshot() {
   } catch (error) { if (version === imageVersion) props.store.note(error instanceof Error ? error.message : String(error)); }
   finally { capturing.value = false; void nextTick(() => field.value?.focus()); }
 }
-watch(toolsOpen, () => { void nextTick(fit); });
+// Toolbar visibility never changes native window geometry. Headroom is reserved on open.
 let imageVersion = 0, dropDepth = 0;
 const imageTypes = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
 const canAttach = computed(() => !busy.value && !props.store.ask && !props.store.approval && !imageReading.value && !submitting.value && !capturing.value);
@@ -175,16 +175,14 @@ let fitted = 0, raf = 0;
 let observer: ResizeObserver | undefined;
 function fit() {
   cancelAnimationFrame(raf);
-  if(dragging.value)return;
+  if(dragging.value || capturing.value)return;
   raf = requestAnimationFrame(() => {
-    if(dragging.value)return;
+    if(dragging.value || capturing.value)return;
     const el = inner.value;
     if (!el) return;
-    const bounds = el.getBoundingClientRect();
-    const menuTop = toolsOpen.value ? toolbar.value?.getBoundingClientRect().top : undefined;
-    // The absolute popover needs real native-window space when there is no answer card above it.
-    const overflow = menuTop === undefined ? 0 : Math.max(0, bounds.top - menuTop + 8);
-    const height = Math.ceil(bounds.height + overflow);
+    // Keep enough space for the toolbar even before hovering. Measuring its animated
+    // top caused a resize/reposition loop, so toolsOpen is deliberately absent here.
+    const height = Math.max(156, Math.ceil(el.getBoundingClientRect().height));
     if (height === fitted) return;
     fitted = height;
     void invoke('assistant_fit', { height }).catch(() => {});
