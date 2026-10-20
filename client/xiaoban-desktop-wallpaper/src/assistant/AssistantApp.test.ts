@@ -143,6 +143,15 @@ describe('compact horizontal assistant tools', () => {
     await wrapper.get('.tools-host').trigger('pointerleave'); await vi.advanceTimersByTimeAsync(400);
     expect(wrapper.find('[role="toolbar"]').exists()).toBe(false);
   });
+  it.each(['thinking','answering'])('keeps stop enabled during %s even before submit has returned',async phase=>{
+    const {store,wrapper}=setup();store.phase='idle';let finish!:()=>void;
+    store.submit.mockImplementationOnce(()=>{store.phase=phase;return new Promise<void>(resolve=>{finish=resolve;});});
+    await nextTick();await wrapper.get('[data-testid="assistant-primary"]').trigger('click');await nextTick();
+    const button=wrapper.get<HTMLButtonElement>('[data-testid="assistant-primary"]');
+    expect(button.attributes('aria-label')).toBe('停止');expect(button.element.disabled).toBe(false);
+    await button.trigger('click');expect(store.interrupt).toHaveBeenCalledOnce();expect(store.submit).toHaveBeenCalledOnce();
+    finish();await flushPromises();
+  });
   it('keeps send and stop as primary clicks while hovered tools are available', async () => {
     const {store,wrapper}=setup(); store.phase='idle'; await nextTick(); await openToolbar(wrapper);
     await wrapper.get('[data-testid="assistant-primary"]').trigger('click'); await flushPromises();

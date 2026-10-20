@@ -87,6 +87,13 @@ describe('floating assistant', () => {
     store.dispose(); chat.dispose();
   });
 
+  it('cancels a spoken turn before its first output without hiding or clearing the next draft',async()=>{
+    const {store,chat}=setup();await store.opened();await store.submit('这个问题需要思考',true);
+    expect(store.phase).toBe('thinking');store.input='下一句草稿';store.interrupt();
+    expect(chat.cancel).toHaveBeenCalledOnce();expect(store.input).toBe('下一句草稿');expect(store.open).toBe(true);
+    chat.views.s1.running=false;await nextTick();expect(store.phase).toBe('idle');store.dispose();
+  });
+
   it('keeps the saved permission mode when continuing a conversation', async () => {
     const { store, chat, advance } = setup({ voice: false });
     await store.opened();
