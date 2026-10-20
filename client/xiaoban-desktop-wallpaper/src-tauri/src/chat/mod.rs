@@ -26,6 +26,7 @@ use agent_kernel::skills::Skills;
 use agent_kernel::{Agent, Approval, ApprovalRequest, ContextTrim, ContinueGuard, JsonlStore, RepeatGuard, Message, ModelProvider, Part, Permission, PermissionMode, Risk, RunOptions, RunEventBody, SessionStore, SpillOutput, ToolCtx};
 use agent_kernel::journal::JsonlRunLog;
 use agent_learning::LearningDb;
+use agent_skill_discovery::SkillDiscovery;
 use broker::Broker;
 use compact::{CompactingStore, ContextInfo};
 use desktop_tools::{Desktop, TauriDesktop};
@@ -327,6 +328,7 @@ fn assemble_with_files(parts: Parts<'_>, attachments: Vec<Attachment>) -> Result
     fs::write(file_skill.join("scripts/csv_summary.py"), agent_file_tools::CSV_SUMMARY_SCRIPT).map_err(|e| e.to_string())?;
     let skills = Arc::new(Skills::new().read_only_root(bundled).writable_root(dirs.skills()));
     let memory = Arc::new(Memory::new(dirs.memory()));
+    let discovery = SkillDiscovery::new(dirs.skills());
     // Started before the prompt is written, so the prompt can say honestly whether the tools exist.
     let computer_use = if open_computer_use { Some(spawn_computer_use()) } else { None };
     let computer_use_error = match &computer_use { Some(Err(error)) => Some(error.to_string()), _ => None };
@@ -359,7 +361,7 @@ fn assemble_with_files(parts: Parts<'_>, attachments: Vec<Attachment>) -> Result
     readable.retain(|tool| tool.spec().name != "read_file");
     readable.push(Arc::new(ReadFile::new(roots, AttachmentStore::new(dirs.chat.join("attachments"))).map_err(|e| e.to_string())?));
     let writable = fs_write_tools(vec![workspace.to_path_buf()]).map_err(|e| e.to_string())?;
-    for tool in readable.into_iter().chain(writable).chain(skills.tools()).chain(memory.tools()).chain(desktop_tools::tools(desktop)) {
+    for tool in readable.into_iter().chain(writable).chain(skills.tools()).chain(memory.tools()).chain(discovery.tools()).chain(desktop_tools::tools(desktop)) {
         builder = builder.tool_arc(tool);
     }
     if let Some(Ok(mcp_client)) = &computer_use {
