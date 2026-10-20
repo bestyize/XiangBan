@@ -11,6 +11,7 @@ mod desktop_tools;
 mod prompt;
 mod sessions;
 
+use agent_computer_use_tools::{SKILL as COMPUTER_USE_SKILL, SKILL_NAME as COMPUTER_USE_SKILL_NAME, SKILL_ORIGIN_MARKER};
 use agent_kernel::builtin::fs::{fs_tools, fs_write_tools};
 use agent_file_tools::{Attachment, AttachmentInput, AttachmentStore, AttachmentHistory, AttachmentContext, ReadFile};
 use agent_kernel::builtin::{AskUser, Question, Shell, TimeNow, Todo, WebFetch};
@@ -238,35 +239,6 @@ fn provider_with(config: &AiConfig, key_source: Option<KeySource>) -> Result<Arc
 }
 
 /// Deletes spilled tool output nobody will look at again.
-
-fn open_computer_use_config() -> agent_kernel::mcp::McpConfig {
-    let in_path = std::process::Command::new("open-computer-use")
-        .arg("-v")
-        .stdout(std::process::Stdio::null())
-        .stderr(std::process::Stdio::null())
-        .status()
-        .is_ok_and(|s| s.success());
-
-    #[cfg(windows)]
-    let npx = "npx.cmd";
-    #[cfg(not(windows))]
-    let npx = "npx";
-
-    let (cmd, args): (&str, Vec<&str>) = if in_path {
-        ("open-computer-use", vec!["mcp"])
-    } else {
-        (npx, vec!["-y", "open-computer-use", "mcp"])
-    };
-
-    agent_kernel::mcp::McpConfig::new(cmd, &args)
-        .default_risk(Risk::Exec)
-        .timeout(Duration::from_secs(60))
-}
-
-pub fn spawn_open_computer_use() -> Result<Arc<agent_kernel::mcp::McpClient>, agent_kernel::HarnessError> {
-    agent_kernel::mcp::McpClient::spawn(open_computer_use_config())
-}
-
 fn clean_spill(dir: &Path, keep: Duration) {
     let Ok(read) = fs::read_dir(dir) else { return };
     for entry in read.flatten() {
@@ -277,14 +249,10 @@ fn clean_spill(dir: &Path, keep: Duration) {
     }
 }
 
-/// The usage rules for the computer-control tools, shipped with the app so they stay in step with the tools it starts.
-const COMPUTER_USE_SKILL: &str = include_str!("../../skills/open-computer-use/SKILL.md");
-const COMPUTER_USE_SKILL_NAME: &str = "open-computer-use";
-
 /// Keeps the bundled computer-control skill in the assistant's skill folder while the tools are on, and removes
 /// it when they are off so the prompt does not advertise something that is not there. Only a file that is ours is touched.
 fn sync_computer_use_skill(skills: &Path, enabled: bool) {
-    sync_bundled_skill(skills, COMPUTER_USE_SKILL_NAME, COMPUTER_USE_SKILL, "iFurySt/open-codex-computer-use", enabled);
+    sync_bundled_skill(skills, COMPUTER_USE_SKILL_NAME, COMPUTER_USE_SKILL, SKILL_ORIGIN_MARKER, enabled);
 }
 
 /// What the assistant knows about the official website and the forum, shipped with the app so it stays in step with the tools.
@@ -325,7 +293,7 @@ struct Parts<'a> {
     utc_offset_minutes: i32,
     open_computer_use: bool,
     /// Starts the computer-control server; a parameter so tests never launch a real one.
-    spawn_computer_use: fn() -> Result<Arc<agent_kernel::mcp::McpClient>, agent_kernel::HarnessError>,
+    spawn_computer_use: &'a dyn Fn() -> Result<Arc<agent_kernel::mcp::McpClient>, agent_kernel::HarnessError>,
     /// Estimated tokens kept in a request before old tool output and old turns are dropped.
     context_tokens: usize,
 }
@@ -401,6 +369,16 @@ fn build_agent(app: &tauri::AppHandle, config: &AiConfig, key_source: Option<Key
         let (app, broker) = (app.clone(), state.broker.clone());
         AskUser::new(move |session, question, ctx| ask_question(&app, &broker, session, question, ctx))
     };
+    let spawn_computer_use = || {
+        // Development resources live in the source tree; installed apps use Tauri's resource root.
+        #[cfg(debug_assertions)]
+        let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("resources/computer-use");
+        #[cfg(not(debug_assertions))]
+        let root = app.path().resource_dir()
+            .map_err(|e| agent_kernel::HarnessError::Config(format!("无法定位内置电脑控制资源：{e}")))?
+            .join("agent-tools/computer-use");
+        agent_computer_use_tools::spawn(&root)
+    };
     assemble_with_files(Parts {
         provider: provider_with(config, key_source)?,
         dirs: &Dirs::of(app)?,
@@ -411,7 +389,7 @@ fn build_agent(app: &tauri::AppHandle, config: &AiConfig, key_source: Option<Key
         desktop: Arc::new(TauriDesktop { app: app.clone() }),
         utc_offset_minutes: chrono::Local::now().offset().local_minus_utc() / 60,
         open_computer_use: config.open_computer_use,
-        spawn_computer_use: spawn_open_computer_use,
+        spawn_computer_use: &spawn_computer_use,
         context_tokens: config.context_tokens,
     }, attachments)
 }

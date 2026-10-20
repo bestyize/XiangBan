@@ -45,3 +45,7 @@ account_data/
 
 video/
 
+# Downloaded native Computer Use artifacts are prepared per target at build time.
+client/xiaoban-desktop-wallpaper/src-tauri/resources/computer-use/
+client/xiaoban-desktop-wallpaper/src-tauri/resources/computer-use.stage-*/
+

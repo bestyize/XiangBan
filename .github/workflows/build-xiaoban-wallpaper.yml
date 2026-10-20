@@ -62,8 +62,12 @@ jobs:
         run: npm ci
       - name: Verify NSIS-only one-click release contract
         run: npm run test:windows:installer
+      - name: Verify Computer Use platform selection
+        run: npm run test:computer-use
       - name: Build one-click user installer
         run: npm run desktop:windows:build
+      - name: Verify bundled Windows x64 engine
+        run: node ../../libs/agent-tools/computer-use/scripts/prepare-runtime.mjs --check --target x86_64-pc-windows-msvc --output src-tauri/resources/computer-use
       - name: Package one-click installer
         shell: pwsh
         run: |
@@ -116,6 +120,8 @@ jobs:
         run: npm ci
       - name: Validate custom DMG instructions
         run: npm run test:macos:dmg
+      - name: Verify Computer Use platform selection
+        run: npm run test:computer-use
       # Use one unchanged certificate across releases so TCC can compare a stable signing requirement.
       # No Apple Developer ID or notarization; Gatekeeper will still require user approval.
       - name: Import persistent self-signed signing identity
@@ -173,6 +179,10 @@ jobs:
           set -euo pipefail
           app="$(find src-tauri/target/aarch64-apple-darwin/release/bundle/macos -maxdepth 1 -type d -name '*.app' -print -quit)"
           test -n "$app"
+          node ../../libs/agent-tools/computer-use/scripts/prepare-runtime.mjs --check --target aarch64-apple-darwin --output "$app/Contents/Resources/agent-tools/computer-use"
+          engine="$app/Contents/Resources/agent-tools/computer-use/Open Computer Use.app"
+          engine_signature="$(codesign -dv --verbose=4 "$engine" 2>&1)"
+          printf '%s\n' "$engine_signature" | grep -F 'Authority=XiangBan Self-Signed Code Signing 2026'
           codesign --verify --deep --verbose=2 "$app"
           signature="$(codesign -dv --verbose=4 "$app" 2>&1)"
           printf '%s\n' "$signature" | grep -F 'Authority=XiangBan Self-Signed Code Signing 2026'

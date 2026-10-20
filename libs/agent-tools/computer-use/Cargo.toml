@@ -1,0 +1,11 @@
+[package]
+name = "agent-computer-use-tools"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "Open Computer Use MCP integration and bundled skill for agent-kernel hosts"
+
+[dependencies]
+agent-kernel = { path = "../../agent-kernel", features = ["mcp"] }
+
+serde_json = "1"
