@@ -60,6 +60,8 @@ jobs:
           workspaces: client/xiaoban-desktop-wallpaper/src-tauri
       - name: Install dependencies
         run: npm ci
+      - name: Verify NSIS-only one-click release contract
+        run: npm run test:windows:installer
       - name: Build one-click user installer
         run: npm run desktop:windows:build
       - name: Package one-click installer
