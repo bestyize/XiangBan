@@ -26,9 +26,11 @@ describe('theme-based desktop pet library',()=>{
   localStorage.setItem('xiaoban.pets.themes.v1',JSON.stringify([custom]));
   const {view}=setup();await flushPromises();
   expect(view.find('[data-testid="pet-theme-flower-whispers"] [data-testid="export-resource"]').exists()).toBe(false);
+  expect(view.find('[data-testid="pet-theme-flower-whispers"] [data-testid="pet-export-reference"]').exists()).toBe(true);
   await tab(view,'自定义主题');
   const theme=view.get('[data-testid="pet-theme-my-pets"]');
   expect(theme.findAll('[data-testid="export-resource"]')).toHaveLength(1);
+  expect(theme.find('[data-testid="pet-export-reference"]').exists()).toBe(false);
   expect(theme.findAll('[data-testid="share-resource"]')).toHaveLength(1);
   expect(theme.get('[data-testid="export-resource"]').text()).toContain('导出资源包');
   expect(theme.get('[data-testid="share-resource"]').text()).toContain('分享到论坛');
