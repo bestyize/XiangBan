@@ -87,13 +87,14 @@ pub struct AssistantState {
     /// The page has loaded and listens for the assistant events.
     ready: AtomicBool,
     dragging: AtomicBool,
+    capturing: AtomicBool,
     drag_epoch: AtomicU64,
     pending_height: Mutex<Option<f64>>,
 }
 
 const WINDOW_COMMANDS: &[&str] = &[
     "assistant_ready", "assistant_hide", "assistant_fit", "assistant_drag", "assistant_unfold", "assistant_prefs",
-    "assistant_open_chat", "assistant_open_settings",
+    "assistant_open_chat", "assistant_open_settings", "assistant_screenshot",
 ];
 const CONTROL_COMMANDS: &[&str] = &["assistant_status", "assistant_configure", "assistant_try"];
 /// What the capsule may ask of the host besides its own window commands: ask and answer, speak, listen.
@@ -449,6 +450,7 @@ pub fn sync(app: &tauri::AppHandle) -> Result<(), String> {
 }
 
 pub fn toggle(app: &tauri::AppHandle) {
+    if app.state::<AssistantState>().capturing.load(Ordering::SeqCst) { return; }
     if !crate::settings(app).assistant_enabled {
         return;
     }
@@ -674,6 +676,28 @@ pub fn assistant_drag(window: WebviewWindow) -> Result<(), String> {
     result
 }
 
+/// Capture is user-initiated, preserves the capsule's draft and never sends a message by itself.
+#[tauri::command]
+pub async fn assistant_screenshot(window: WebviewWindow) -> Result<Option<String>, String> {
+    if window.label() != LABEL { return Err("只有超级小伴可以发起截图".into()); }
+    let app = window.app_handle().clone();
+    if mode(&app) != Mode::Capsule || !window.is_visible().unwrap_or(false) { return Err("请先打开超级小伴再截图".into()); }
+    let state = app.state::<AssistantState>();
+    if state.capturing.swap(true, Ordering::SeqCst) { return Err("正在截图，请稍候。".into()); }
+    if let Err(error) = window.hide() { state.capturing.store(false, Ordering::SeqCst); return Err(error.to_string()); }
+    let result = tauri::async_runtime::spawn_blocking(|| {
+        std::thread::sleep(Duration::from_millis(180)); // Let the compositor remove the assistant first.
+        crate::assistant_capture::capture()
+    }).await.map_err(|e| format!("截图失败：{e}")).and_then(|result| result);
+    // No assistant-open event: that would reset the draft and turn the microphone back on.
+    let restore = if mode(&app) == Mode::Capsule && crate::settings(&app).assistant_enabled {
+        window.show().and_then(|_| window.set_focus()).map_err(|e| e.to_string())
+    } else { Ok(()) };
+    state.capturing.store(false, Ordering::SeqCst);
+    restore?;
+    result
+}
+
 /// Brings the control window forward on the chat page, with the conversation the capsule was using.
 #[tauri::command]
 pub fn assistant_open_chat(app: tauri::AppHandle, session: Option<String>) -> Result<(), String> {
@@ -729,6 +753,12 @@ mod tests {
     /// A 1440x900 screen with a 25px menu bar, and the same kind of screen at 2x.
     const SCREEN: Area = Area { x: 0, y: 25, w: 1440, h: 875 };
     const RETINA: Area = Area { x: 0, y: 50, w: 2880, h: 1750 };
+
+    #[test]
+    fn only_the_assistant_can_request_a_screen_capture() {
+        assert_eq!(permitted(LABEL, "assistant_screenshot"), Some(true));
+        for label in ["control", "pet", "widget-example", "content"] { assert_eq!(permitted(label, "assistant_screenshot"), Some(false)); }
+    }
 
     #[test]
     fn by_default_the_capsule_sits_at_the_bottom_centre_of_the_usable_area() {

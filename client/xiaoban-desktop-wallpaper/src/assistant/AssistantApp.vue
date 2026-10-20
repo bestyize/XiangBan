@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
-import { ArrowUp, ArrowUpRight, Square, X, Copy, Check, ImagePlus } from 'lucide-vue-next';
+import { ArrowUp, Square, X, Copy, Check, ImagePlus, Settings, ChevronDown, MessageSquare, ScanLine, Plus } from 'lucide-vue-next';
 import MarkdownView from '../ui/chat/MarkdownView.ts';
 import type { AsrStore } from '../ui/asr/store.ts';
 import type { ApprovalRequest } from '../ui/chat/types.ts';
@@ -12,11 +12,63 @@ import type { AssistantStore } from './assistant-store.ts';
 const props = defineProps<{ store: AssistantStore; asr: AsrStore }>();
 const field = ref<HTMLInputElement>();
 const filePicker = ref<HTMLInputElement>();
-const imageReading = ref(false), submitting = ref(false), dropActive = ref(false);
+const imageReading = ref(false), submitting = ref(false), dropActive = ref(false), capturing = ref(false);
+const toolsOpen = ref(false), toolsPinned = ref(false);
+const toolsHost = ref<HTMLElement>(), toolbar = ref<HTMLElement>(), primaryButton = ref<HTMLButtonElement>();
+let toolsOpenTimer: ReturnType<typeof setTimeout> | undefined, toolsCloseTimer: ReturnType<typeof setTimeout> | undefined;
+function clearToolTimers() { clearTimeout(toolsOpenTimer); clearTimeout(toolsCloseTimer); }
+function closeTools() { clearToolTimers(); toolsPinned.value = false; toolsOpen.value = false; }
+function showTools() { clearToolTimers(); if (!capturing.value) toolsOpen.value = true; }
+function enterTools() { clearTimeout(toolsCloseTimer); if (!toolsOpen.value) { clearTimeout(toolsOpenTimer); toolsOpenTimer = setTimeout(showTools, 220); } }
+function leaveTools() {
+  clearTimeout(toolsOpenTimer);
+  if (!toolsPinned.value && !toolsHost.value?.contains(document.activeElement)) toolsCloseTimer = setTimeout(closeTools, 400);
+}
+function focusTools() { clearToolTimers(); }
+function toolsFocusOut() { void nextTick(() => { if (!toolsHost.value?.contains(document.activeElement) && !toolsPinned.value) closeTools(); }); }
+function outsideTools(event: PointerEvent) { if (!toolsHost.value?.contains(event.target as Node)) closeTools(); }
+function escape() {
+  if (toolsOpen.value) { closeTools(); primaryButton.value?.focus(); return; }
+  if (!capturing.value) void props.store.hide();
+}
+function toolbarKeys(event: KeyboardEvent) {
+  const buttons = Array.from(toolbar.value?.querySelectorAll<HTMLButtonElement>('button:not(:disabled)') ?? []);
+  if (!buttons.length) return;
+  let at = buttons.indexOf(document.activeElement as HTMLButtonElement);
+  if (event.key === 'ArrowRight' || event.key === 'ArrowLeft') { event.preventDefault(); at = (at + (event.key === 'ArrowRight' ? 1 : -1) + buttons.length) % buttons.length; buttons[at].focus(); }
+  if (event.key === 'Home' || event.key === 'End') { event.preventDefault(); buttons[event.key === 'Home' ? 0 : buttons.length - 1].focus(); }
+}
+async function primaryKeys(event: KeyboardEvent) {
+  if (!['ArrowUp', 'ArrowDown'].includes(event.key)) return;
+  event.preventDefault(); showTools(); await nextTick(); toolbar.value?.querySelector<HTMLButtonElement>('button:not(:disabled)')?.focus();
+}
+async function toolAction(action: 'settings' | 'hide' | 'chat' | 'image' | 'screenshot') {
+  closeTools();
+  if (action === 'image') { openPicker(); return; }
+  if (action === 'screenshot') { await takeScreenshot(); return; }
+  try {
+    if (action === 'settings') await props.store.openSettings('assistant');
+    if (action === 'hide') await props.store.hide();
+    if (action === 'chat') await props.store.openChat();
+  } catch (error) { props.store.note(error instanceof Error ? error.message : String(error)); }
+}
+async function takeScreenshot() {
+  if (!canAttach.value || props.store.attachments.length >= 8) return;
+  props.store.prepareImages();
+  const version = imageVersion;
+  capturing.value = true;
+  try {
+    await nextTick();
+    const image = await invoke<string | null>('assistant_screenshot');
+    if (image && props.store.open && version === imageVersion) props.store.attachments.push(image);
+  } catch (error) { if (version === imageVersion) props.store.note(error instanceof Error ? error.message : String(error)); }
+  finally { capturing.value = false; void nextTick(() => field.value?.focus()); }
+}
+watch(toolsOpen, () => { void nextTick(fit); });
 let imageVersion = 0, dropDepth = 0;
 const imageTypes = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
-const canAttach = computed(() => !busy.value && !props.store.ask && !props.store.approval && !imageReading.value && !submitting.value);
-watch(() => props.store.open, () => { imageVersion++; dropDepth = 0; dropActive.value = false; });
+const canAttach = computed(() => !busy.value && !props.store.ask && !props.store.approval && !imageReading.value && !submitting.value && !capturing.value);
+watch(() => props.store.open, () => { imageVersion++; dropDepth = 0; dropActive.value = false; closeTools(); });
 function openPicker() {
   if (!canAttach.value) return;
   props.store.prepareImages(); filePicker.value?.click();
@@ -85,7 +137,7 @@ const hasCard = computed(() => !cardDismissed.value && Boolean(
   props.store.hint || props.store.question || props.store.questionImages?.length || props.store.answer || props.store.working || props.store.failure
   || props.store.approval || props.store.ask || props.store.phase === 'thinking',
 ));
-const canSend = computed(() => !busy.value && !props.store.approval && !imageReading.value && !submitting.value && Boolean(props.store.input.trim() || props.store.attachments.length));
+const canSend = computed(() => !busy.value && !props.store.approval && !imageReading.value && !submitting.value && !capturing.value && Boolean(props.store.input.trim() || props.store.attachments.length));
 
 function approvalLine(request: ApprovalRequest) {
   const raw = typeof request.arguments === 'string' ? request.arguments : JSON.stringify(request.arguments);
@@ -106,8 +158,10 @@ function onEnter(event: KeyboardEvent) {
   send();
 }
 function primary() {
-  if (canSend.value) send();
-  else if (busy.value || props.store.phase === 'attention') props.store.interrupt();
+  if (canSend.value) { closeTools(); void send(); }
+  else if (busy.value) { closeTools(); props.store.interrupt(); }
+  else if (toolsOpen.value) closeTools();
+  else { showTools(); toolsPinned.value = true; }
 }
 function onOrb() {
   if (props.store.phase === 'speaking') props.store.interrupt();
@@ -126,7 +180,11 @@ function fit() {
     if(dragging.value)return;
     const el = inner.value;
     if (!el) return;
-    const height = Math.ceil(el.getBoundingClientRect().height);
+    const bounds = el.getBoundingClientRect();
+    const menuTop = toolsOpen.value ? toolbar.value?.getBoundingClientRect().top : undefined;
+    // The absolute popover needs real native-window space when there is no answer card above it.
+    const overflow = menuTop === undefined ? 0 : Math.max(0, bounds.top - menuTop + 8);
+    const height = Math.ceil(bounds.height + overflow);
     if (height === fitted) return;
     fitted = height;
     void invoke('assistant_fit', { height }).catch(() => {});
@@ -174,15 +232,15 @@ function dragEnded(){dragging.value=false;releasePress();fit();}
 function ballClick(){void props.store.unfold();}
 const onFocus=()=>{if(props.store.open&&!dragging.value&&!press)field.value?.focus();};
 onMounted(()=>{
-  window.addEventListener('focus',onFocus);window.addEventListener('pointermove',dragMove);window.addEventListener('pointerup',dragUp);window.addEventListener('pointercancel',dragUp);window.addEventListener('blur',releasePress);window.addEventListener('assistant-drag-end',dragEnded);
+  document.addEventListener('pointerdown',outsideTools);window.addEventListener('blur',closeTools);window.addEventListener('focus',onFocus);window.addEventListener('pointermove',dragMove);window.addEventListener('pointerup',dragUp);window.addEventListener('pointercancel',dragUp);window.addEventListener('blur',releasePress);window.addEventListener('assistant-drag-end',dragEnded);
 });
 onBeforeUnmount(()=>{
-  imageVersion++; releasePress();copyVersion++;clearTimeout(copyTimer);window.removeEventListener('focus',onFocus);window.removeEventListener('pointermove',dragMove);window.removeEventListener('pointerup',dragUp);window.removeEventListener('pointercancel',dragUp);window.removeEventListener('blur',releasePress);window.removeEventListener('assistant-drag-end',dragEnded);observer?.disconnect();cancelAnimationFrame(raf);
+  clearToolTimers();window.removeEventListener('blur',closeTools);document.removeEventListener('pointerdown',outsideTools);imageVersion++; releasePress();copyVersion++;clearTimeout(copyTimer);window.removeEventListener('focus',onFocus);window.removeEventListener('pointermove',dragMove);window.removeEventListener('pointerup',dragUp);window.removeEventListener('pointercancel',dragUp);window.removeEventListener('blur',releasePress);window.removeEventListener('assistant-drag-end',dragEnded);observer?.disconnect();cancelAnimationFrame(raf);
 });
 </script>
 
 <template>
-  <div class="stage" :class="{ light: !isDark,dragging }" @dragover="dragOver" @drop="dropImages" @keydown.esc.prevent="store.hide()" @pointerdown="dragDown" @click.capture="captureClick">
+  <div class="stage" :class="{ light: !isDark,dragging }" @dragover="dragOver" @drop="dropImages" @keydown.esc.prevent.stop="escape" @pointerdown="dragDown" @click.capture="captureClick">
     <div v-if="store.ball && !store.open" class="ball-stage" data-testid="assistant-ball-stage">
       <button type="button" class="ball" :data-phase="store.phase" title="点一下提问，按住可以拖动，右键打开设置" aria-label="打开超级小伴" data-testid="assistant-ball" data-drag-handle @click="ballClick" @contextmenu.prevent="store.openSettings('assistant')">
         <Orb :phase="store.phase" :level="0" :active="true" :size="48" :dark="isDark" :fps="quiet ? 20 : 60" />
@@ -223,16 +281,22 @@ onBeforeUnmount(()=>{
           <div v-for="(image, index) in store.attachments" :key="index" class="image-thumb"><img :src="image" :alt="`待发送的图片 ${index + 1}`" draggable="false" /><button type="button" :aria-label="`移除图片 ${index + 1}`" :disabled="submitting || imageReading" @click="store.attachments.splice(index, 1)"><X :size="11" /></button></div>
         </div>
         <div class="capsule" :data-phase="store.phase">
-          <button type="button" class="orb-button" :title="store.phase === 'speaking' ? '停止朗读' : store.phase === 'listening' ? '暂停聆听 · 拖动可移动' : '点一下开始说话 · 拖动可移动'" :aria-label="store.phase === 'listening' ? '暂停聆听' : '开始说话'" data-testid="assistant-orb" :disabled="imageReading || submitting" data-drag-handle @click="onOrb">
+          <button type="button" class="orb-button" :title="store.phase === 'speaking' ? '停止朗读' : store.phase === 'listening' ? '暂停聆听 · 拖动可移动' : '点一下开始说话 · 拖动可移动'" :aria-label="store.phase === 'listening' ? '暂停聆听' : '开始说话'" data-testid="assistant-orb" :disabled="imageReading || submitting || capturing" data-drag-handle @click="onOrb">
             <Orb :phase="store.phase" :level="asr.level" :active="store.open" :size="52" :dark="isDark" />
           </button>
-          <button type="button" class="image-add" title="添加图片（也可拖入或粘贴）" aria-label="添加图片" data-testid="assistant-add-image" :disabled="!canAttach || store.attachments.length >= 8" @click="openPicker"><ImagePlus :size="15" :stroke-width="1.7" /></button>
           <input ref="field" v-model="store.input" class="field" type="text" autocomplete="off" spellcheck="false" :placeholder="store.status" aria-label="向小伴提问" data-testid="assistant-input" @keydown.enter="onEnter" @compositionstart="composing = true" @compositionend="composing = false" />
-          <button v-if="canSend || busy || store.phase === 'attention'" type="button" class="round primary" :aria-label="canSend ? '发送' : '停止'" :title="canSend ? '发送' : '停止'" data-testid="assistant-primary" @click="primary"><ArrowUp v-if="canSend" :size="18" /><Square v-else :size="14" /></button>
-          <button type="button" class="round" title="在完整聊天中继续" aria-label="在完整聊天中继续" data-testid="assistant-expand" @click="store.openChat()"><ArrowUpRight :size="17" /></button>
-          <button type="button" class="round" title="收起 (Esc)" aria-label="收起" data-testid="assistant-close" @click="store.hide()"><X :size="17" /></button>
+          <div ref="toolsHost" class="tools-host" data-no-drag @pointerenter="enterTools" @pointerleave="leaveTools" @focusin="focusTools" @focusout="toolsFocusOut">
+            <div v-if="toolsOpen" ref="toolbar" id="assistant-toolbar" class="tools-toolbar" role="toolbar" aria-label="小伴工具" aria-orientation="horizontal" data-testid="assistant-toolbar" @keydown="toolbarKeys" @pointerenter="focusTools" @pointerleave="leaveTools">
+              <button type="button" class="tool-button" title="去超级小伴设置页" aria-label="去超级小伴设置页" data-testid="assistant-settings" @click="toolAction('settings')"><Settings :size="16" :stroke-width="1.7" /></button>
+              <button type="button" class="tool-button" title="收起小伴" aria-label="收起小伴" data-testid="assistant-close" @click="toolAction('hide')"><ChevronDown :size="16" :stroke-width="1.7" /></button>
+              <button type="button" class="tool-button" title="去聊天详情页" aria-label="去聊天详情页" data-testid="assistant-expand" @click="toolAction('chat')"><MessageSquare :size="16" :stroke-width="1.7" /></button>
+              <button type="button" class="tool-button" title="选择图片" aria-label="选择图片" data-testid="assistant-add-image" :disabled="!canAttach || store.attachments.length >= 8" @click="toolAction('image')"><ImagePlus :size="16" :stroke-width="1.7" /></button>
+              <button type="button" class="tool-button" title="截图" aria-label="截图" data-testid="assistant-screenshot" :disabled="!canAttach || store.attachments.length >= 8" @click="toolAction('screenshot')"><ScanLine :size="16" :stroke-width="1.7" /></button>
+            </div>
+            <button ref="primaryButton" type="button" class="round main-action" :class="{ 'has-action': canSend || busy, 'tools-open': toolsOpen && !canSend && !busy }" :aria-label="busy ? '停止' : canSend ? '发送' : toolsOpen ? '收起工具' : '展开工具'" :title="busy ? '停止 · 悬停展开工具' : canSend ? '发送 · 悬停展开工具' : '展开工具'" :aria-expanded="toolsOpen" aria-controls="assistant-toolbar" aria-keyshortcuts="ArrowUp ArrowDown" :disabled="imageReading || submitting || capturing" data-testid="assistant-primary" @keydown="primaryKeys" @click="primary"><Square v-if="busy" :size="14" /><ArrowUp v-else-if="canSend" :size="18" /><Plus v-else :size="18" /></button>
+          </div>
         </div>
-        <p v-if="dropActive || imageReading" class="image-status" aria-live="polite">{{ imageReading ? '正在读取图片…' : '松开添加图片' }}</p>
+        <p v-if="dropActive || imageReading || capturing" class="image-status" aria-live="polite">{{ capturing ? '截图中，按 Esc 可以取消' : imageReading ? '正在读取图片…' : '松开添加图片' }}</p>
         </div>
         <span class="sr" aria-live="polite">{{ store.status }}</span>
       </div>
@@ -285,10 +349,19 @@ html,body,#app{background:transparent!important}
 .gate .solid{background:linear-gradient(135deg,#ffcf7a,#ff9f5a);color:#2a1604;font-weight:600}
 .composer{position:relative;border-radius:34px;background:var(--capsule);border:1px solid var(--line);transition:border-color .2s}
 .composer.drop-active{border-color:var(--link);box-shadow:inset 0 0 0 1px var(--link)}
-.image-add{flex:none;width:24px;height:28px;display:grid;place-items:center;padding:0;border:0;border-radius:7px;background:transparent;color:var(--text-soft);cursor:pointer;transition:color .15s,background .15s}
-.image-add:hover:not(:disabled){color:var(--text);background:var(--button-hover)}
-.image-add:focus-visible{outline:2px solid var(--link);outline-offset:2px}
-.image-add:disabled{opacity:.35;cursor:default}
+.tools-host{position:relative;flex:none;cursor:default}
+.tools-toolbar{position:absolute;right:-3px;bottom:calc(100% + 9px);display:flex;align-items:center;gap:4px;padding:6px;border-radius:16px;background:var(--card);border:1px solid var(--line);box-shadow:0 5px 20px rgba(0,0,0,.12);z-index:5;animation:toolbar-in .16s ease-out;cursor:default}
+.tools-toolbar::after{content:"";position:absolute;top:100%;left:0;right:0;height:12px}
+.tool-button{display:grid;place-items:center;width:32px;height:32px;flex:none;padding:0;border:0;border-radius:10px;background:transparent;color:var(--button-fg);cursor:pointer;transition:background .15s,color .15s}
+.tool-button:hover:not(:disabled){background:var(--button-hover);color:var(--button-fg-hover)}
+.tool-button:focus-visible{outline:2px solid var(--link);outline-offset:1px}
+.tool-button:disabled{opacity:.35;cursor:default}
+.round.main-action{background:var(--button);color:var(--button-fg)}
+.round.main-action.has-action{background:var(--text);color:var(--card)}
+.main-action svg{transition:transform .18s}
+.main-action.tools-open svg{transform:rotate(45deg)}
+.main-action:disabled{opacity:.45;cursor:default}
+@keyframes toolbar-in{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
 .image-tray{display:flex;gap:8px;flex-wrap:wrap;padding:12px 16px 2px;cursor:default}
 .image-thumb{position:relative;width:44px;height:44px;flex:none}
 .image-thumb img,.sent-images img{width:44px;height:44px;object-fit:cover;border-radius:8px;background:var(--button)}
@@ -316,7 +389,7 @@ html,body,#app{background:transparent!important}
 .rise-enter-from{opacity:0;transform:translateY(8px)}
 @keyframes blink{to{visibility:hidden}}
 @keyframes dot{0%,80%,100%{opacity:.3;transform:translateY(0)}40%{opacity:1;transform:translateY(-3px)}}
-@media(prefers-reduced-motion:reduce){.pop-enter-active,.rise-enter-active{transition:none}.dots i,.cursor{animation:none}}
+@media(prefers-reduced-motion:reduce){.pop-enter-active,.rise-enter-active{transition:none}.tools-toolbar{animation:none}.main-action svg{transition:none}.dots i,.cursor{animation:none}}
 </style>
 
 
