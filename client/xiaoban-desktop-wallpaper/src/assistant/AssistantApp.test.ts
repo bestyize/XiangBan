@@ -124,7 +124,7 @@ describe('compact horizontal assistant tools', () => {
     expect(wrapper.find('[data-testid="assistant-toolbar"]').exists()).toBe(false);
     expect(wrapper.get('.capsule').findAll('button')).toHaveLength(2); // orb and one primary button
     await wrapper.get('[data-testid="assistant-primary"]').trigger('click');
-    expect(wrapper.get('[role="toolbar"]').findAll('button').map(b=>b.attributes('aria-label'))).toEqual(['去超级小伴设置页','收起小伴','新会话','去聊天详情页','添加附件','截图']);
+    expect(wrapper.get('[role="toolbar"]').findAll('button').map(b=>b.attributes('aria-label'))).toEqual(['去超级小伴设置页','收起小伴','新会话','去聊天详情页','选择文件','截图']);
     await wrapper.get('[data-testid="assistant-settings"]').trigger('click'); await flushPromises();
     expect(store.openSettings).toHaveBeenCalledWith('assistant');
     await openToolbar(wrapper); await wrapper.get('[data-testid="assistant-expand"]').trigger('click');
