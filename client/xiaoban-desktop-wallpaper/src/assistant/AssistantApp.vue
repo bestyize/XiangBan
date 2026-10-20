@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
-import { ArrowUp, Square, X, Copy, Check, ImagePlus, Settings, ChevronDown, MessageSquare, ScanLine, Plus } from 'lucide-vue-next';
+import { ArrowUp, Square, X, Copy, Check, ImagePlus, Settings, ChevronDown, MessageSquare, MessageSquarePlus, ScanLine, Plus } from 'lucide-vue-next';
 import MarkdownView from '../ui/chat/MarkdownView.ts';
+import SelectionCopyMenu from '../ui/chat/SelectionCopyMenu.vue';
 import type { AsrStore } from '../ui/asr/store.ts';
 import type { ApprovalRequest } from '../ui/chat/types.ts';
 import { invoke } from '../bridge.ts';
@@ -43,13 +44,14 @@ async function primaryKeys(event: KeyboardEvent) {
   if (!['ArrowUp', 'ArrowDown'].includes(event.key)) return;
   event.preventDefault(); showTools(); await nextTick(); toolbar.value?.querySelector<HTMLButtonElement>('button:not(:disabled)')?.focus();
 }
-async function toolAction(action: 'settings' | 'hide' | 'chat' | 'image' | 'screenshot') {
+async function toolAction(action: 'settings' | 'hide' | 'new' | 'chat' | 'image' | 'screenshot') {
   closeTools();
   if (action === 'image') { openPicker(); return; }
   if (action === 'screenshot') { await takeScreenshot(); return; }
   try {
     if (action === 'settings') await props.store.openSettings('assistant');
     if (action === 'hide') await props.store.hide();
+    if (action === 'new') await props.store.newConversation();
     if (action === 'chat') await props.store.openChat();
   } catch (error) { props.store.note(error instanceof Error ? error.message : String(error)); }
 }
@@ -68,7 +70,7 @@ async function takeScreenshot() {
 // Toolbar visibility never changes native window geometry. Headroom is reserved on open.
 let imageVersion = 0, dropDepth = 0;
 const imageTypes = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
-const canAttach = computed(() => !busy.value && !props.store.ask && !props.store.approval && !imageReading.value && !submitting.value && !capturing.value);
+const canAttach = computed(() => !busy.value && !props.store.ask && !props.store.approval && !imageReading.value && !submitting.value && !capturing.value && !props.store.changingSession);
 watch(() => props.store.open, () => { imageVersion++; dropDepth = 0; dropActive.value = false; closeTools(); });
 function openPicker() {
   if (!canAttach.value) return;
@@ -138,7 +140,7 @@ const hasCard = computed(() => !cardDismissed.value && Boolean(
   props.store.hint || props.store.question || props.store.questionImages?.length || props.store.answer || props.store.working || props.store.failure
   || props.store.approval || props.store.ask || props.store.phase === 'thinking',
 ));
-const canSend = computed(() => !busy.value && !props.store.approval && !imageReading.value && !submitting.value && !capturing.value && Boolean(props.store.input.trim() || props.store.attachments.length));
+const canSend = computed(() => !busy.value && !props.store.approval && !imageReading.value && !submitting.value && !capturing.value && !props.store.changingSession && Boolean(props.store.input.trim() || props.store.attachments.length));
 
 function approvalLine(request: ApprovalRequest) {
   const raw = typeof request.arguments === 'string' ? request.arguments : JSON.stringify(request.arguments);
@@ -175,8 +177,8 @@ async function openLink(href: string) {
 let hitRaf=0,lastRegions='';
 function syncHitRegions(){
   const regions:HitRegion[]=[];
-  document.querySelectorAll<HTMLElement>('.composer,.card,.ball,.tools-toolbar').forEach(el=>{
-    const radius=el.classList.contains('composer')?34:el.classList.contains('ball')?32:el.classList.contains('card')?22:16;
+  document.querySelectorAll<HTMLElement>('.composer,.card,.ball,.tools-toolbar,.selection-copy-menu').forEach(el=>{
+    const radius=el.classList.contains('composer')?34:el.classList.contains('ball')?32:el.classList.contains('card')?22:el.classList.contains('selection-copy-menu')?9:16;
     const region=hitRegion(el.getBoundingClientRect(),window.innerHeight,radius);
     if(region)regions.push(region);
   });
@@ -306,11 +308,12 @@ onBeforeUnmount(()=>{
           <button type="button" class="orb-button" :title="store.phase === 'speaking' ? '停止朗读' : store.phase === 'listening' ? '暂停聆听 · 拖动可移动' : '点一下开始说话 · 拖动可移动'" :aria-label="store.phase === 'listening' ? '暂停聆听' : '开始说话'" data-testid="assistant-orb" :disabled="imageReading || submitting || capturing" data-drag-handle @click="onOrb">
             <Orb :phase="store.phase" :level="asr.level" :active="store.open" :size="52" :dark="isDark" />
           </button>
-          <input ref="field" v-model="store.input" class="field" type="text" autocomplete="off" spellcheck="false" :placeholder="store.status" aria-label="向小伴提问" data-testid="assistant-input" @keydown.enter="onEnter" @compositionstart="composing = true" @compositionend="composing = false" />
+          <input ref="field" v-model="store.input" :disabled="store.changingSession" class="field" type="text" autocomplete="off" spellcheck="false" :placeholder="store.status" aria-label="向小伴提问" data-testid="assistant-input" @keydown.enter="onEnter" @compositionstart="composing = true" @compositionend="composing = false" />
           <div ref="toolsHost" class="tools-host" data-no-drag @pointerenter="enterTools" @pointerleave="leaveTools" @focusin="focusTools" @focusout="toolsFocusOut">
             <div v-if="toolsOpen" ref="toolbar" id="assistant-toolbar" class="tools-toolbar" role="toolbar" aria-label="小伴工具" aria-orientation="horizontal" data-testid="assistant-toolbar" @animationend="queueHitRegions" @keydown="toolbarKeys" @pointerenter="focusTools" @pointerleave="leaveTools">
               <button type="button" class="tool-button" title="去超级小伴设置页" aria-label="去超级小伴设置页" data-testid="assistant-settings" @click="toolAction('settings')"><Settings :size="16" :stroke-width="1.7" /></button>
               <button type="button" class="tool-button" title="收起小伴" aria-label="收起小伴" data-testid="assistant-close" @click="toolAction('hide')"><ChevronDown :size="16" :stroke-width="1.7" /></button>
+              <button type="button" class="tool-button" title="新会话" aria-label="新会话" data-testid="assistant-new-chat" :disabled="imageReading || submitting || capturing || store.changingSession" @click="toolAction('new')"><MessageSquarePlus :size="16" :stroke-width="1.7" /></button>
               <button type="button" class="tool-button" title="去聊天详情页" aria-label="去聊天详情页" data-testid="assistant-expand" @click="toolAction('chat')"><MessageSquare :size="16" :stroke-width="1.7" /></button>
               <button type="button" class="tool-button" title="选择图片" aria-label="选择图片" data-testid="assistant-add-image" :disabled="!canAttach || store.attachments.length >= 8" @click="toolAction('image')"><ImagePlus :size="16" :stroke-width="1.7" /></button>
               <button type="button" class="tool-button" title="截图" aria-label="截图" data-testid="assistant-screenshot" :disabled="!canAttach || store.attachments.length >= 8" @click="toolAction('screenshot')"><ScanLine :size="16" :stroke-width="1.7" /></button>
@@ -323,6 +326,7 @@ onBeforeUnmount(()=>{
         <span class="sr" aria-live="polite">{{ store.status }}</span>
       </div>
     </Transition>
+    <SelectionCopyMenu :scope="scroller" @visibility-change="queueHitRegions" />
   </div>
 </template>
 

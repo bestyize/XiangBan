@@ -1,9 +1,9 @@
 import { nextTick, reactive } from 'vue';
 import { describe, expect, it, vi } from 'vitest';
-import { createAssistantStore, LISTEN_IDLE_MS, RESUME_MS, SEND_GRACE_MS } from './assistant-store.ts';
+import { createAssistantStore, LISTEN_IDLE_MS, SESSION_KEY, SEND_GRACE_MS } from './assistant-store.ts';
 import { createChatStore } from '../ui/chat/chat-store.ts';
 
-function setup(options: { configured?: boolean; voice?: boolean; prefs?: { open: string; read: string; appearance?: string } } = {}) {
+function setup(options: { configured?: boolean; voice?: boolean; prefs?: { open: string; read: string; appearance?: string }; storage?: Pick<Storage,'getItem'|'setItem'|'removeItem'> } = {}) {
   let clock = 1_000_000;
   const timers: { id: number; at: number; run: () => void }[] = [];
   let nextId = 1;
@@ -17,13 +17,14 @@ function setup(options: { configured?: boolean; voice?: boolean; prefs?: { open:
     }
   };
   const chat = reactive({
-    configured: options.configured ?? true, currentId: null as string | null, views: {} as Record<string, any>, permissionMode: 'ask' as 'ask' | 'auto',
+    sessions: [] as any[], loadError:'', configured: options.configured ?? true, currentId: null as string | null, views: {} as Record<string, any>, permissionMode: 'ask' as 'ask' | 'auto',
     init: vi.fn(async () => {}),
     refresh: vi.fn(async () => {}),
     select: vi.fn(async (id: string | null) => { chat.currentId = id; }),
     send: vi.fn(async (text: string) => {
-      chat.currentId = 's1';
-      chat.views.s1 = { id: 's1', items: [{ kind: 'user', id: 'u', text, images: [] }], running: true, approvals: [], questions: [] };
+      chat.currentId ??= 's1';
+      const id=chat.currentId;if(!chat.sessions.some(s=>s.id===id))chat.sessions.push({id,permissionMode:'auto'});
+      chat.views[id] = { id, items: [{ kind: 'user', id: 'u', text, images: [] }], running: true, approvals: [], questions: [] };
       return true;
     }),
     cancel: vi.fn(async () => {}), answerApproval: vi.fn(async () => {}), answerQuestion: vi.fn(async () => {}),
@@ -42,10 +43,11 @@ function setup(options: { configured?: boolean; voice?: boolean; prefs?: { open:
     stop: vi.fn(async () => { speech.status = 'idle'; }),
   });
   const handlers = new Map<string, (payload: unknown) => void>();
-  const invoke = vi.fn(async (command: string) => (command === 'assistant_prefs' ? options.prefs ?? { open: 'voice', read: 'voice' } : undefined) as never);
+  let fresh=0;
+  const invoke = vi.fn(async (command: string) => (command === 'assistant_prefs' ? options.prefs ?? { open: 'voice', read: 'voice' } : command==='chat_new_session'?{id:'fresh-'+(++fresh),permissionMode:'auto'}:undefined) as never);
   const appearance = vi.fn();
   const store = createAssistantStore({
-    onAppearance: appearance, desktop: true, invoke, listen: async (event, callback) => { handlers.set(event, callback as (payload: unknown) => void); return () => {}; },
+    storage:options.storage,onAppearance: appearance, desktop: true, invoke, listen: async (event, callback) => { handlers.set(event, callback as (payload: unknown) => void); return () => {}; },
     chat: chat as never, asr: asr as never, speech: speech as never,
     now: () => clock,
     setTimer: (run, ms) => { const timer = { id: nextId++, at: clock + ms, run }; timers.push(timer); return timer.id; },
@@ -107,26 +109,26 @@ describe('floating assistant', () => {
     await store.submit('继续');
     expect(chat.permissionMode).toBe('ask');
     store.closed();
-    advance(RESUME_MS + 1000);
+    advance(30*24*60*60*1000);
     await store.opened();
-    await store.submit('新话题');
-    expect(chat.permissionMode).toBe('auto');
+    await store.submit('继续旧会话');
+    expect(chat.permissionMode).toBe('ask');
     store.dispose();
   });
 
-  it('continues a conversation left a moment ago, and starts over after a while', async () => {
+  it('continues the assistant conversation regardless of time away', async () => {
     const { store, chat, advance } = setup({ voice: false });
     await store.opened();
     await store.submit('你好');
     store.closed();
     chat.select.mockClear();
-    advance(RESUME_MS - 1000);
+    advance(1000);
     await store.opened();
     expect(chat.select).not.toHaveBeenCalled();
     store.closed();
-    advance(RESUME_MS + 1000);
+    advance(30*24*60*60*1000);
     await store.opened();
-    expect(chat.select).toHaveBeenCalledWith(null);
+    expect(chat.select).not.toHaveBeenCalled();
   });
 
   it('sends what was heard once speaking pauses, and stops the microphone while it answers', async () => {
@@ -471,5 +473,31 @@ describe('assistant image messages', () => {
     let finish!: () => void; speech.stop.mockImplementationOnce(() => new Promise<void>(resolve => { finish = resolve; }));
     store.attachments = ['image']; const sent = store.submit(); await store.submit('duplicate'); finish(); await sent;
     expect(chat.send).toHaveBeenCalledTimes(1); store.dispose();
+  });
+});
+
+describe('assistant conversation persistence',()=>{
+  const memory=()=>{const data=new Map<string,string>();return {getItem:(k:string)=>data.get(k)??null,setItem:(k:string,v:string)=>{data.set(k,v);},removeItem:(k:string)=>{data.delete(k);}};};
+  it('restores the assistant conversation after recreating its window store',async()=>{
+    const storage=memory(),first=setup({voice:false,storage});await first.store.opened();await first.store.submit('记住这个上下文');
+    expect(storage.getItem(SESSION_KEY)).toBe('s1');first.store.dispose();
+    const next=setup({voice:false,storage});next.chat.sessions=[...first.chat.sessions];next.chat.views=first.chat.views;
+    await next.store.opened();expect(next.chat.select).toHaveBeenCalledWith('s1');expect(next.store.question).toBe('记住这个上下文');next.store.dispose();
+  });
+  it('starts a new persistent conversation explicitly and keeps the old history',async()=>{
+    const storage=memory(),h=setup({voice:false,storage});await h.store.opened();await h.store.submit('旧问题');
+    h.store.input='旧草稿';h.store.attachments=['image'];await h.store.newConversation();
+    expect(h.chat.cancel).toHaveBeenCalledOnce();expect(h.chat.currentId).toBe('fresh-1');expect(storage.getItem(SESSION_KEY)).toBe('fresh-1');
+    expect(h.chat.views.s1.items[0].text).toBe('旧问题');expect(h.store.input).toBe('');expect(h.store.attachments).toEqual([]);
+    await h.store.submit('新问题');expect(h.chat.currentId).toBe('fresh-1');h.store.closed();await h.store.opened();expect(h.chat.currentId).toBe('fresh-1');h.store.dispose();
+  });
+  it('keeps the current conversation and draft if creation fails',async()=>{
+    const storage=memory(),h=setup({voice:false,storage});await h.store.opened();await h.store.submit('旧问题');h.store.input='保留';h.store.attachments=['image'];
+    h.invoke.mockRejectedValueOnce(new Error('创建失败'));await h.store.newConversation();
+    expect(h.chat.currentId).toBe('s1');expect(storage.getItem(SESSION_KEY)).toBe('s1');expect(h.store.input).toBe('保留');expect(h.store.attachments).toEqual(['image']);expect(h.store.changingSession).toBe(false);h.store.dispose();
+  });
+  it('drops a pointer to a deleted conversation without choosing another chat',async()=>{
+    const storage=memory();storage.setItem(SESSION_KEY,'deleted');const h=setup({voice:false,storage});h.chat.sessions=[{id:'unrelated'}];
+    await h.store.opened();expect(h.chat.currentId).toBeNull();expect(storage.getItem(SESSION_KEY)).toBeNull();expect(h.invoke).not.toHaveBeenCalledWith('chat_new_session',expect.anything());h.store.dispose();
   });
 });

@@ -15,7 +15,7 @@ const wrappers: ReturnType<typeof mount>[] = [];
 beforeEach(()=>{vi.clearAllMocks();vi.mocked(invoke).mockReset().mockResolvedValue(undefined);});
 afterEach(() => { wrappers.splice(0).forEach(w => w.unmount());document.body.replaceChildren();vi.useRealTimers(); });
 function setup() {
-  const store = reactive({ open: true, ball: false, phase: 'answering', hint: '', hintTab: '', question: '今天如何放松', answer: '可以先休息片刻。', working: '', failure: '', approval: null as null | { id: string; arguments: {}; tool: string }, ask: null, attachments: [] as string[], questionImages: [] as string[], prepareImages: vi.fn(), note: vi.fn(), input: '草稿', status: '正在回答…', hide: vi.fn(), submit: vi.fn(), interrupt: vi.fn(), openChat: vi.fn(),openSettings:vi.fn(),toggleListening:vi.fn(),unfold:vi.fn() });
+  const store = reactive({ open: true, ball: false, phase: 'answering', hint: '', hintTab: '', question: '今天如何放松', answer: '可以先休息片刻。', working: '', failure: '', approval: null as null | { id: string; arguments: {}; tool: string }, ask: null, attachments: [] as string[], questionImages: [] as string[], prepareImages: vi.fn(), note: vi.fn(), input: '草稿', status: '正在回答…', hide: vi.fn(), submit: vi.fn(), interrupt: vi.fn(), openChat: vi.fn(),newConversation:vi.fn(),openSettings:vi.fn(),toggleListening:vi.fn(),unfold:vi.fn() });
   const wrapper=mount(AssistantApp,{attachTo:document.body,props:{store:store as unknown as AssistantStore,asr:{level:0} as AsrStore},global:{stubs:{MarkdownView:true}}});
   wrappers.push(wrapper);
   return {store,wrapper};
@@ -119,16 +119,17 @@ describe('assistant image input', () => {
 });
 
 describe('compact horizontal assistant tools', () => {
-  it('keeps one right-hand button and shows the exact five actions in order', async () => {
+  it('keeps one right-hand button and shows the exact six actions in order', async () => {
     const { store, wrapper } = setup(); store.phase='idle'; store.input=''; await nextTick();
     expect(wrapper.find('[data-testid="assistant-toolbar"]').exists()).toBe(false);
     expect(wrapper.get('.capsule').findAll('button')).toHaveLength(2); // orb and one primary button
     await wrapper.get('[data-testid="assistant-primary"]').trigger('click');
-    expect(wrapper.get('[role="toolbar"]').findAll('button').map(b=>b.attributes('aria-label'))).toEqual(['去超级小伴设置页','收起小伴','去聊天详情页','选择图片','截图']);
+    expect(wrapper.get('[role="toolbar"]').findAll('button').map(b=>b.attributes('aria-label'))).toEqual(['去超级小伴设置页','收起小伴','新会话','去聊天详情页','选择图片','截图']);
     await wrapper.get('[data-testid="assistant-settings"]').trigger('click'); await flushPromises();
     expect(store.openSettings).toHaveBeenCalledWith('assistant');
     await openToolbar(wrapper); await wrapper.get('[data-testid="assistant-expand"]').trigger('click');
     expect(store.openChat).toHaveBeenCalledOnce();
+    await openToolbar(wrapper);await wrapper.get('[data-testid="assistant-new-chat"]').trigger('click');await flushPromises();expect(store.newConversation).toHaveBeenCalledOnce();
     await openToolbar(wrapper); await wrapper.get('[data-testid="assistant-close"]').trigger('click');
     expect(store.hide).toHaveBeenCalledOnce();
   });
