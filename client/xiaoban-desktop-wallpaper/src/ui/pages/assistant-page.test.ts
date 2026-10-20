@@ -14,19 +14,68 @@ const status = {
 const invoke = vi.fn();
 vi.mock('../../bridge.ts', async importOriginal => ({ ...(await importOriginal<typeof import('../../bridge.ts')>()), invoke: (...args: unknown[]) => invoke(...args) }));
 
-function setup(voice: Record<string, unknown> = {}, settings: Record<string, unknown> = {}) {
+function setup(voice: Record<string, unknown> = {}, settings: Record<string, unknown> = {}, platform = 'macos') {
   const asr = reactive({ enabled: true, modelReady: true, engineReady: true, warming: false, preparing: false, phase: 'idle', downloaded: 0, total: 100, error: '', saving: false,
     init: vi.fn(async () => {}), setEnabled: vi.fn(async (enabled: boolean) => { asr.enabled = enabled; }), retry: vi.fn(async () => {}), ...voice });
   const store = reactive({
-    desktop: true, settings: { ...JSON.parse(JSON.stringify(defaults)), autostart: true, ...settings }, asr, settingsTab: 'general', page: 'assistant',
+    desktop: true, info: { platform }, settings: { ...JSON.parse(JSON.stringify(defaults)), autostart: true, ...settings }, asr, settingsTab: 'general', page: 'assistant',
     notify: vi.fn(), refreshSettings: vi.fn(async () => {}), navigate: vi.fn((page: ControlPage) => { store.page = page; }),
   }) as unknown as ControlStore;
-  return { wrapper: mount(AssistantPage, { props: { store } }), store, asr };
+  return { wrapper: mount(AssistantPage, { props: { store }, global: { stubs: {
+    NModal: { name: 'NModal', props: ['show'], template: '<div v-if="show" data-testid="capture-reset-dialog"><slot /></div>' },
+  } } }), store, asr };
 }
 const click = async (wrapper: ReturnType<typeof setup>['wrapper'], id: string) => { await wrapper.get(`[data-testid="${id}"]`).trigger('click'); await flushPromises(); };
 
 describe('assistant page', () => {
   beforeEach(() => { invoke.mockReset(); invoke.mockImplementation(async (command: string) => (command === 'assistant_status' || command === 'assistant_configure' ? status : undefined)); });
+
+  it('only offers the reset fallback on macOS and does not run tccutil without confirmation', async () => {
+    const windows = setup({}, {}, 'windows');
+    await flushPromises();
+    expect(windows.wrapper.find('[data-testid="assistant-capture-settings"]').exists()).toBe(false);
+    const mac = setup();
+    await flushPromises();
+    expect(mac.wrapper.find('[data-testid="assistant-capture-settings"]').exists()).toBe(true);
+    await click(mac.wrapper, 'assistant-capture-reset-tcc');
+    expect(mac.wrapper.find('[data-testid="capture-reset-dialog"]').exists()).toBe(true);
+    expect(invoke).not.toHaveBeenCalledWith('reset_screen_capture_permission');
+    await click(mac.wrapper, 'assistant-capture-reset-cancel');
+    expect(mac.wrapper.find('[data-testid="capture-reset-dialog"]').exists()).toBe(false);
+    expect(invoke).not.toHaveBeenCalledWith('reset_screen_capture_permission');
+  });
+
+  it('resets only after confirming, then tells the user to quit and reauthorize', async () => {
+    const { wrapper, store } = setup();
+    await flushPromises();
+    await click(wrapper, 'assistant-capture-reset-tcc');
+    await click(wrapper, 'assistant-capture-reset-confirm');
+    expect(invoke).toHaveBeenCalledWith('reset_screen_capture_permission');
+    expect(wrapper.get('[data-testid="assistant-capture-reset-notice"]').text()).toContain('完全退出');
+    expect(store.notify).toHaveBeenCalledWith(expect.stringContaining('重新授权'));
+    expect(wrapper.find('[data-testid="capture-reset-dialog"]').exists()).toBe(false);
+  });
+
+  it('reports reset failure without claiming permissions were cleared', async () => {
+    invoke.mockImplementation(async (command: string) => {
+      if (command === 'assistant_status') return status;
+      if (command === 'reset_screen_capture_permission') throw new Error('tccutil failed');
+    });
+    const { wrapper, store } = setup();
+    await flushPromises();
+    await click(wrapper, 'assistant-capture-reset-tcc');
+    await click(wrapper, 'assistant-capture-reset-confirm');
+    expect(store.notify).toHaveBeenCalledWith(expect.any(Error), 'error');
+    expect(wrapper.find('[data-testid="assistant-capture-reset-notice"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="capture-reset-dialog"]').exists()).toBe(true);
+  });
+
+  it('can open only the screen recording privacy settings', async () => {
+    const { wrapper } = setup();
+    await flushPromises();
+    await click(wrapper, 'assistant-capture-open-settings');
+    expect(invoke).toHaveBeenCalledWith('open_screen_capture_settings');
+  });
 
   it('shows the shortcut the host reports and whether it took effect', async () => {
     const { wrapper } = setup();

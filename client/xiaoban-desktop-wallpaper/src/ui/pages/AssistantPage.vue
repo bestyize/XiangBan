@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
-import { NAlert, NButton, NProgress, NSelect, NSwitch } from 'naive-ui';
-import { AudioLines, Mic, Play, RotateCcw } from 'lucide-vue-next';
+import { NAlert, NButton, NModal, NProgress, NSelect, NSwitch } from 'naive-ui';
+import { AudioLines, Mic, Play, RotateCcw, ScanLine } from 'lucide-vue-next';
 import { invoke } from '../../bridge.ts';
 import type { ControlStore } from '../control-types.ts';
 
@@ -16,6 +16,10 @@ const status = ref<Status>({
   hintSeen: true, registered: false, error: '',
 });
 const busy = ref('');
+const isMacOS = computed(() => props.store.info?.platform === 'macos');
+const repairConfirm = ref(false);
+const repairBusy = ref(false);
+const permissionResetDone = ref(false);
 const asr = computed(() => props.store.asr);
 const shortcutOptions = computed(() => status.value.shortcuts.map(item => ({ label: item.label, value: item.value })));
 const openOptions = [{ label: '直接开始听', value: 'voice' }, { label: '先打字', value: 'type' }];
@@ -59,6 +63,21 @@ function openVoiceSettings() {
   props.store.settingsTab = 'voice';
   props.store.navigate('settings');
 }
+async function openCaptureSettings() {
+  try { await invoke('open_screen_capture_settings'); }
+  catch (error) { props.store.notify(error, 'error'); }
+}
+async function resetCapturePermission() {
+  if (repairBusy.value) return;
+  repairBusy.value = true;
+  try {
+    await invoke('reset_screen_capture_permission');
+    permissionResetDone.value = true;
+    repairConfirm.value = false;
+    props.store.notify('已清除小伴的截图权限。请从托盘完全退出并重新打开小伴，再次截图时重新授权。');
+  } catch (error) { props.store.notify(error, 'error'); }
+  finally { repairBusy.value = false; }
+}
 onMounted(() => { void read(); void asr.value.init(); });
 </script>
 
@@ -93,7 +112,29 @@ onMounted(() => { void read(); void asr.value.init(); });
       <div class="setting-row"><div><b>呼出后</b><p>语音未就绪时，自动切换为打字。</p></div><NSelect class="select wide" :value="status.open" :options="openOptions" :disabled="!store.desktop || busy === 'assistant'" aria-label="呼出后" data-testid="assistant-open" @update:value="change({ open: $event })" /></div>
       <div class="setting-row"><div><b>朗读回答</b><p>使用“声音”设置里选的音色。<NButton text type="primary" size="small" @click="openVoiceSettings">去选音色</NButton></p></div><NSelect class="select wide" :value="status.read" :options="readOptions" :disabled="!store.desktop || busy === 'assistant'" aria-label="朗读回答" data-testid="assistant-read" @update:value="change({ read: $event })" /></div>
     </section>
+
+    <section v-if="isMacOS" class="surface settings-group capture-settings" data-testid="assistant-capture-settings">
+      <div class="section-heading"><ScanLine :size="17" :stroke-width="1.7" /><h2>屏幕截图权限</h2></div>
+      <div class="setting-row">
+        <div><b>截图失败时</b><p>更新后若系统仍显示已授权、截图却失败，可重置小伴自己的屏幕录制授权记录，再重新授权。</p></div>
+        <div class="capture-actions">
+          <NButton size="small" round :disabled="!store.desktop || repairBusy" data-testid="assistant-capture-open-settings" @click="openCaptureSettings">打开系统设置</NButton>
+          <NButton size="small" round :disabled="!store.desktop || repairBusy" data-testid="assistant-capture-reset-tcc" @click="repairConfirm = true"><template #icon><RotateCcw :size="14" /></template>修复截图权限</NButton>
+        </div>
+      </div>
+      <NAlert v-if="permissionResetDone" type="info" :show-icon="false" data-testid="assistant-capture-reset-notice" class="capture-notice">
+        已清除小伴的截图授权。请从托盘完全退出小伴，再从「应用程序」重新打开并允许系统授权。若仍失败，请在系统设置中手动移除旧的小伴记录。
+      </NAlert>
+    </section>
     </div>
+    <NModal v-model:show="repairConfirm" preset="card" title="重置小伴的截图权限" :mask-closable="!repairBusy" :closable="!repairBusy" :style="{ width: '420px', maxWidth: 'calc(100vw - 32px)' }">
+      <p class="repair-message">这会运行系统命令 <code>tccutil reset ScreenCapture xyz.xiaban.desktop-wallpaper</code>，只清除小伴的屏幕录制授权，不会更改其他应用的权限。</p>
+      <p class="repair-message">清除后需要从托盘完全退出并重新打开小伴，再次截图并允许授权。此操作不能直接修复截图坐标或其他截图错误。</p>
+      <div class="repair-actions">
+        <NButton :disabled="repairBusy" data-testid="assistant-capture-reset-cancel" @click="repairConfirm = false">取消</NButton>
+        <NButton type="primary" :loading="repairBusy" data-testid="assistant-capture-reset-confirm" @click="resetCapturePermission">确认清除</NButton>
+      </div>
+    </NModal>
   </section>
 </template>
 
@@ -129,6 +170,12 @@ onMounted(() => { void read(); void asr.value.init(); });
 .setting-row :deep(.n-button--text-type){height:auto;font-size:11px;margin-left:4px}
 .progress{margin-top:8px;max-width:320px}
 .voice-actions{display:flex;align-items:center;gap:10px;flex:none}
+.capture-settings{grid-column:1/-1}
+.capture-actions{display:flex;align-items:center;justify-content:flex-end;gap:8px;flex-wrap:wrap}
+.capture-notice{margin-bottom:16px}
+.repair-message{font-size:13px;line-height:1.8;color:var(--ui-text-secondary);margin:0 0 12px}
+.repair-message code{font-size:11px;word-break:break-all}
+.repair-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:20px}
 @container(min-width:820px){.settings-grid{grid-template-columns:1fr 1fr}.setting-row{flex-wrap:wrap;column-gap:12px}.setting-row>.select{width:100%;margin-top:0}.setting-row:has(>.select){row-gap:10px}.setting-row:has(>.select)>div:first-child{flex-basis:100%}}
 @container(max-width:520px){.assistant-page .hero{flex-wrap:wrap;padding:16px;gap:12px}.hero-copy{flex-basis:calc(100% - 60px)}.hero-meta{margin-left:56px;margin-right:auto;justify-items:start;display:flex;align-items:center;gap:10px}.settings-group{padding:0 16px}.setting-row{flex-wrap:wrap;row-gap:10px}.setting-row>.select{width:100%}.setting-row:has(>.select)>div:first-child{flex-basis:100%}}
 </style>
