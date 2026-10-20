@@ -25,7 +25,8 @@ pub const OPEN_MODES: &[&str] = &["voice", "type"];
 pub const READ_MODES: &[&str] = &["voice", "always", "never"];
 
 const WIDTH: f64 = 480.0;
-const MIN_HEIGHT: f64 = 92.0;
+// Reserve toolbar headroom from the start; hover must never resize the native window.
+const MIN_HEIGHT: f64 = 156.0;
 const MAX_HEIGHT: f64 = 620.0;
 /// Space kept between the capsule and the bottom of the usable screen (above the Dock or taskbar).
 const BOTTOM_GAP: f64 = 56.0;
@@ -304,6 +305,7 @@ fn resize(window: &WebviewWindow, height: f64) -> Result<(), String> {
     let position = window.outer_position().map_err(|e| e.to_string())?;
     let size = window.outer_size().map_err(|e| e.to_string())?;
     let target = (height.clamp(MIN_HEIGHT, MAX_HEIGHT) * scale).round() as i32;
+    if size.height == target as u32 { return Ok(()); }
     let bottom = position.y + size.height as i32;
     let top = match window.current_monitor().map_err(|e| e.to_string())? {
         Some(monitor) => top_for(area_of(&monitor), bottom, target),
@@ -684,11 +686,27 @@ pub async fn assistant_screenshot(window: WebviewWindow) -> Result<Option<String
     if mode(&app) != Mode::Capsule || !window.is_visible().unwrap_or(false) { return Err("请先打开超级小伴再截图".into()); }
     let state = app.state::<AssistantState>();
     if state.capturing.swap(true, Ordering::SeqCst) { return Err("正在截图，请稍候。".into()); }
-    if let Err(error) = window.hide() { state.capturing.store(false, Ordering::SeqCst); return Err(error.to_string()); }
-    let result = tauri::async_runtime::spawn_blocking(|| {
-        std::thread::sleep(Duration::from_millis(180)); // Let the compositor remove the assistant first.
-        crate::assistant_capture::capture()
-    }).await.map_err(|e| format!("截图失败：{e}")).and_then(|result| result);
+    let result = async {
+        #[cfg(target_os = "macos")]
+        {
+            // TCC's user interaction belongs on the app's main thread, while its window
+            // is still visible. A cached preflight result must not veto the real capture.
+            let permission_app = app.clone();
+            tauri::async_runtime::spawn_blocking(move || {
+                let (tx, rx) = std::sync::mpsc::channel();
+                permission_app.run_on_main_thread(move || {
+                    crate::assistant_capture::request_macos_permission();
+                    let _ = tx.send(());
+                }).map_err(|e| e.to_string())?;
+                rx.recv_timeout(Duration::from_secs(120)).map_err(|_| "屏幕录制授权未完成，请重试。".to_string())
+            }).await.map_err(|e| e.to_string())??;
+        }
+        window.hide().map_err(|e| e.to_string())?;
+        tauri::async_runtime::spawn_blocking(|| {
+            std::thread::sleep(Duration::from_millis(180));
+            crate::assistant_capture::capture()
+        }).await.map_err(|e| format!("截图失败：{e}")).and_then(|result| result)
+    }.await;
     // No assistant-open event: that would reset the draft and turn the microphone back on.
     let restore = if mode(&app) == Mode::Capsule && crate::settings(&app).assistant_enabled {
         window.show().and_then(|_| window.set_focus()).map_err(|e| e.to_string())
