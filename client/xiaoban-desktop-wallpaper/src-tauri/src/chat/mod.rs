@@ -12,6 +12,7 @@ mod prompt;
 mod run_history;
 mod task_outcome;
 mod learning;
+mod skill_evolution;
 mod sessions;
 
 use agent_computer_use_tools::{SKILL as COMPUTER_USE_SKILL, SKILL_NAME as COMPUTER_USE_SKILL_NAME, SKILL_ORIGIN_MARKER};
@@ -151,7 +152,14 @@ impl ChatState {
 /// "完全信任" runs everything except what `danger::assess` flags, which is asked every time.
 /// Shared by the app and its tests so the tests exercise the rules that really apply.
 fn permission_with_danger_check(mode: PermissionMode, approver: impl agent_kernel::Approver + 'static, workspace: Arc<Mutex<Option<PathBuf>>>) -> Permission {
-    Permission::new(mode, approver).danger_check(move |tool, args| danger::assess(tool, args, lock(&workspace).as_deref()).map(str::to_string))
+    Permission::new(mode, approver).danger_check(move |tool, args| {
+        // In Auto mode, always_ask alone does not trigger approval when a danger
+        // policy is installed; third-party skill installation must be flagged here.
+        if tool == "skill_install" {
+            return Some("安装第三方 Skill 必须逐次经过用户确认".to_string());
+        }
+        danger::assess(tool, args, lock(&workspace).as_deref()).map(str::to_string)
+    })
 }
 
 fn emit<R: tauri::Runtime>(app: &tauri::AppHandle<R>, name: &str, payload: Value) {
@@ -709,6 +717,8 @@ pub fn chat_verify_file_outcome(app: tauri::AppHandle, window: tauri::WebviewWin
     let default = ai_config::default_workspace(&app)?;
     let workspace = config.workspace_or(&default);
     let outcome=task_outcome::verify_file(&dirs.outcomes(), &session_id, &run_id, workspace, &relative_path, &expected_sha256)?;
+    LearningDb::open(&dirs.learning_db())?.record_outcome(&run_id, &session_id,
+        "succeeded", &outcome.validator, &outcome.evidence)?;
     Ok(json!(outcome))
 }
 
@@ -740,6 +750,48 @@ pub fn chat_review_experience(app: tauri::AppHandle, window: tauri::WebviewWindo
     if record.state!="candidate" {return Err("只有候选经验可以审核".into());}
     db.set_experience_state(experience_id,if approve{"approved"}else{"rejected"})?;
     Ok(json!(db.get_experience(experience_id)?))
+}
+
+/// Explicit proposal generation; reviewing and evaluating the proposal are separate steps.
+#[tauri::command]
+pub async fn chat_generate_skill_proposal(
+    app: tauri::AppHandle, window: tauri::WebviewWindow,
+    experience_id: i64, skill_name: String
+) -> Result<Value,String> {
+    if window.label() != "control" {return Err("只有控制台可以生成技能改进".into());}
+    let (tx,rx)=std::sync::mpsc::channel();
+    std::thread::Builder::new().name("xiaoban-skill-proposal".into()).spawn(move||{
+        let _=tx.send(skill_evolution::generate(&app,experience_id,&skill_name));
+    }).map_err(|e|e.to_string())?;
+    tauri::async_runtime::spawn_blocking(move||rx.recv().unwrap_or_else(|_|Err("提议生成失败".into())))
+       .await.map_err(|e|e.to_string())?
+}
+
+/// Records one external artifact-based eval; the model is not allowed to score itself.
+#[tauri::command]
+pub fn chat_record_skill_eval(app:tauri::AppHandle,window:tauri::WebviewWindow,
+    proposal_id:i64, case_id:String, description:String,
+    expected_sha256:String, artifact_path:String, baseline:bool,
+) -> Result<Value,String> {
+    if window.label()!="control"{return Err("只有控制台可以提交评测".into());}
+    skill_evolution::record_eval(&app,proposal_id,&case_id,&description,
+        &expected_sha256,&artifact_path,baseline)
+}
+
+#[tauri::command]
+pub fn chat_apply_skill_proposal(app:tauri::AppHandle,window:tauri::WebviewWindow,
+   proposal_id:i64,
+) -> Result<Value,String>{
+    if window.label()!="control"{return Err("只有控制台可以批准技能更新".into());}
+    skill_evolution::apply(&app,proposal_id)
+}
+
+#[tauri::command]
+pub fn chat_rollback_skill_proposal(app:tauri::AppHandle,window:tauri::WebviewWindow,
+    proposal_id:i64,
+) -> Result<Value,String>{
+    if window.label()!="control"{return Err("只有控制台可以恢复技能版本".into());}
+    skill_evolution::rollback(&app,proposal_id)
 }
 
 #[tauri::command]

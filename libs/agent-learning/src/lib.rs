@@ -163,6 +163,9 @@ impl LearningDb {
     pub fn record_eval_case(&self,id:&str,domain:&str,description:&str,hash:&str)->Result<(),String>{
         self.conn.execute("INSERT OR IGNORE INTO eval_cases(id,domain,description,expected_hash)
         VALUES(?1,?2,?3,?4)",params![id,domain,description,hash]).map_err(|e|e.to_string())?;
+        let recorded:String=self.conn.query_row("SELECT expected_hash FROM eval_cases WHERE id=?1",
+            params![id],|r|r.get(0)).map_err(|e|e.to_string())?;
+        if !recorded.eq_ignore_ascii_case(hash) {return Err("evaluation case hash changed".into());}
         Ok(())
     }
     pub fn record_eval_result(&self,case:&str,candidate:&str,passed:bool,evidence:&str)->Result<(),String>{
@@ -170,8 +173,16 @@ impl LearningDb {
         params![case,candidate,passed,evidence]).map_err(|e|e.to_string())?;
         Ok(())
     }
+    pub fn baseline_covers(&self,candidate:&str,baseline:&str)->Result<bool,String>{
+        let missing:i64=self.conn.query_row(
+          "SELECT count(*) FROM (SELECT DISTINCT case_id FROM eval_results WHERE candidate=?1) c
+           WHERE NOT EXISTS (SELECT 1 FROM eval_results b WHERE b.case_id=c.case_id AND b.candidate=?2)",
+          params![candidate,baseline],|r|r.get(0)).map_err(|e|e.to_string())?;
+        Ok(missing==0)
+    }
     pub fn eval_score(&self,candidate:&str)->Result<(i64,i64),String>{
-        self.conn.query_row("SELECT count(*),coalesce(sum(passed),0) FROM eval_results WHERE candidate=?1",
+        self.conn.query_row("SELECT count(*),coalesce(sum(passed),0)
+            FROM (SELECT case_id,min(passed) AS passed FROM eval_results WHERE candidate=?1 GROUP BY case_id)",
         params![candidate],|r|Ok((r.get(0)?,r.get(1)?))).map_err(|e|e.to_string())
     }
 }
