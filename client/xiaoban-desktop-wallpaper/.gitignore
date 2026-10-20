@@ -5,3 +5,6 @@
 /artifacts/
 /out/
 *.log
+
+# Rendered at build time from the editable Swift design source
+/src-tauri/dmg/background.png
