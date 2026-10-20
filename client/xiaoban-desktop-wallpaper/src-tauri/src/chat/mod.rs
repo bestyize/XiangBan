@@ -11,6 +11,7 @@ mod desktop_tools;
 mod prompt;
 mod run_history;
 mod task_outcome;
+mod learning;
 mod sessions;
 
 use agent_computer_use_tools::{SKILL as COMPUTER_USE_SKILL, SKILL_NAME as COMPUTER_USE_SKILL_NAME, SKILL_ORIGIN_MARKER};
@@ -348,6 +349,7 @@ fn assemble_with_files(parts: Parts<'_>, attachments: Vec<Attachment>) -> Result
         .tool(ask)
         .tool(Shell::new(workspace))
         .tool(WebFetch::new())
+        .tool(learning::Recall::new(dirs.learning_db()))
         .middleware(permission)
         // Before spilling, so it compares real outputs rather than previews that name a fresh file each time.
         .middleware(RepeatGuard::new())
@@ -708,6 +710,36 @@ pub fn chat_verify_file_outcome(app: tauri::AppHandle, window: tauri::WebviewWin
     let workspace = config.workspace_or(&default);
     let outcome=task_outcome::verify_file(&dirs.outcomes(), &session_id, &run_id, workspace, &relative_path, &expected_sha256)?;
     Ok(json!(outcome))
+}
+
+/// Explicit opt-in: run an isolated one-shot reflection model call. No auto approval.
+#[tauri::command]
+pub async fn chat_reflect_run(
+    app: tauri::AppHandle, window: tauri::WebviewWindow,
+    session_id: String, run_id: String
+) -> Result<Value, String> {
+    if window.label() != "control" { return Err("只有控制台可以启动学习".into()); }
+    checked_session_id(&session_id)?;
+    let (tx, rx) = std::sync::mpsc::channel();
+    std::thread::Builder::new().name("xiaoban-reflection".into()).spawn(move || {
+        let result = learning::reflect_run(&app, &session_id, &run_id);
+        let _ = tx.send(result);
+    }).map_err(|e| e.to_string())?;
+    tauri::async_runtime::spawn_blocking(move || rx.recv().unwrap_or_else(|_| Err("学习线程意外退出".into())))
+        .await.map_err(|e|e.to_string())?
+}
+
+/// Only user control-plane review can promote a candidate into reusable memory.
+#[tauri::command]
+pub fn chat_review_experience(app: tauri::AppHandle, window: tauri::WebviewWindow,
+    experience_id: i64, approve: bool,
+) -> Result<Value,String> {
+    if window.label() != "control" {return Err("只有控制台可以审核经验".into());}
+    let db=LearningDb::open(&Dirs::of(&app)?.learning_db())?;
+    let record=db.get_experience(experience_id)?.ok_or("未找到经验")?;
+    if record.state!="candidate" {return Err("只有候选经验可以审核".into());}
+    db.set_experience_state(experience_id,if approve{"approved"}else{"rejected"})?;
+    Ok(json!(db.get_experience(experience_id)?))
 }
 
 #[tauri::command]
