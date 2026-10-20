@@ -66,6 +66,17 @@ pub fn widget_monitors(app:&tauri::AppHandle)->Result<Vec<crate::widget_geometry
         }).collect())
     })
 }
+/// Pointer in assistant CSS points, sampled even when its transparent area ignores mouse events.
+pub fn assistant_pointer(window:&tauri::WebviewWindow)->Result<(f64,f64,f64,bool),String>{
+    let window=window.clone();let app=window.app_handle().clone();
+    on_main(&app,move|_|{
+        let ns=native(&window)?;let view=ns.contentView().ok_or("没有找到助手视图")?;
+        let point=view.convertPoint_fromView(ns.convertPointFromScreen(NSEvent::mouseLocation()),None);
+        let bounds=view.bounds();
+        let (x,y)=content_point_to_css(point.x,point.y,bounds.origin.x,bounds.origin.y,bounds.size.height,view.isFlipped());
+        Ok((x,y,bounds.size.height,left_button_down()))
+    })
+}
 pub fn widget_cursor(app:&tauri::AppHandle)->Result<(f64,f64),String>{
     on_main(app,move|mtm|{let height=NSScreen::screens(mtm).firstObject().ok_or("没有找到显示器")?.frame().size.height;let point=NSEvent::mouseLocation();Ok((point.x,height-point.y))})
 }
@@ -91,7 +102,7 @@ pub fn set_interactive_layer(window: &tauri::WebviewWindow, layer: &str) -> Resu
         };
         let ns=native(&window)?;
         ns.setLevel(level);
-        if crate::widgets::is_widget(window.label()) || crate::pets::is_pet(window.label()){
+        if crate::widgets::is_widget(window.label()){
             let full_screen=if layer=="desktop"{NSWindowCollectionBehavior::FullScreenNone}else{NSWindowCollectionBehavior::FullScreenAuxiliary};
             ns.setCollectionBehavior(NSWindowCollectionBehavior::CanJoinAllSpaces
                 |NSWindowCollectionBehavior::Stationary|NSWindowCollectionBehavior::IgnoresCycle|full_screen);
@@ -158,7 +169,7 @@ pub fn configure_scene(
         let floating = CGWindowLevelForKey(CGWindowLevelKey::StatusWindowLevelKey) as isize;
         let icons = CGWindowLevelForKey(CGWindowLevelKey::DesktopIconWindowLevelKey) as isize;
         let levels = Levels { desktop: desktop as i64, icons: icons as i64, floating: floating as i64 };
-        ns.setLevel(scene_level(window.label(), crate::widgets::is_widget(window.label()) || crate::pets::is_pet(window.label()), wallpaper, crate::effects::LABEL, levels) as isize);
+        ns.setLevel(scene_level(window.label(), crate::widgets::is_widget(window.label()), wallpaper, crate::effects::LABEL, levels) as isize);
         let common = NSWindowCollectionBehavior::CanJoinAllSpaces
             | NSWindowCollectionBehavior::Stationary
             | NSWindowCollectionBehavior::IgnoresCycle;
@@ -174,7 +185,7 @@ pub fn configure_scene(
         ns.setCanHide(false);
         ns.setExcludedFromWindowsMenu(true);
         ns.setHasShadow(false);
-        let click_through = wallpaper && window.label() != "pet" && !crate::widgets::is_widget(window.label()) && !crate::pets::is_pet(window.label());
+        let click_through = wallpaper && window.label() != "pet" && !crate::widgets::is_widget(window.label());
         if click_through {
             ns.setIgnoresMouseEvents(true);
         }
@@ -254,10 +265,8 @@ pub fn start_cursor_bridge(app: tauri::AppHandle) {
     std::thread::spawn(move || {
         let mut previous = (f64::NAN, f64::NAN);
         let mut previous_down = false;
-        let mut ticks = 0u32;
         loop {
             std::thread::sleep(Duration::from_millis(33));
-            ticks = ticks.wrapping_add(1);
             let handle = app.clone();
             let result = on_main(&app, move |mtm| {
                 let point = NSEvent::mouseLocation();
@@ -265,9 +274,6 @@ pub fn start_cursor_bridge(app: tauri::AppHandle) {
                 let moved = (point.x, point.y) != previous;
                 let pressed = down && !previous_down;
                 let released = !down && previous_down;
-                if !moved && !pressed && !released && ticks % 8 != 0 {
-                    return Ok(((point.x, point.y), down));
-                }
                 let desktop = pressed
                     && ["wallpaper", "media-a", "media-b"].iter().any(|label| handle.get_webview_window(label).is_some())
                     && desktop_at_point(point, mtm);

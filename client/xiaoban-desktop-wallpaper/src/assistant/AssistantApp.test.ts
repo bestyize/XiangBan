@@ -57,6 +57,7 @@ describe('assistant drag gestures',()=>{
  it('drags the orb after the threshold without toggling voice or losing the draft',async()=>{const {store,wrapper}=setup();const orb=wrapper.get('[data-testid="assistant-orb"]');await orb.trigger('pointerdown',{button:0,pointerId:1,clientX:10,clientY:10});move(18,10);await nextTick();expect(invoke).toHaveBeenCalledWith('assistant_drag');expect(wrapper.get('.stage').classes()).toContain('dragging');await orb.trigger('click',{detail:1});expect(store.toggleListening).not.toHaveBeenCalled();expect(store.interrupt).not.toHaveBeenCalled();expect(store.input).toBe('草稿');finish();await nextTick();expect(wrapper.get('.stage').classes()).not.toContain('dragging');});
  it('keeps text selection and control presses out of window dragging',async()=>{const {wrapper}=setup();await openToolbar(wrapper);for(const selector of ['[data-testid="assistant-input"]','.card-body','[data-testid="assistant-expand"]','[data-testid="assistant-copy"]']){await openToolbar(wrapper);await wrapper.get(selector).trigger('pointerdown',{button:0,pointerId:1,clientX:10,clientY:10});move(100,100);window.dispatchEvent(new PointerEvent('pointerup',{pointerId:1}));}expect(invoke).not.toHaveBeenCalledWith('assistant_drag');});
  it('uses the same threshold on the capsule edge and the folded ball',async()=>{const {store,wrapper}=setup();await wrapper.get('.capsule').trigger('pointerdown',{button:0,pointerId:1,clientX:10,clientY:10});move(17,10);expect(invoke).toHaveBeenCalledWith('assistant_drag');finish();store.open=false;store.ball=true;await nextTick();vi.mocked(invoke).mockClear();const ball=wrapper.get('[data-testid="assistant-ball"]');await ball.trigger('pointerdown',{button:0,pointerId:1,clientX:10,clientY:10});move(18,10);await ball.trigger('click',{detail:1});expect(invoke).toHaveBeenCalledWith('assistant_drag');expect(store.unfold).not.toHaveBeenCalled();finish();});
+ it('never starts dragging from transparent headroom or the gap around the surfaces',async()=>{const {wrapper}=setup();for(const selector of ['.stage','.inner']){await wrapper.get(selector).trigger('pointerdown',{button:0,pointerId:1,clientX:30,clientY:20});move(80,80);window.dispatchEvent(new PointerEvent('pointerup',{pointerId:1}));}expect(invoke).not.toHaveBeenCalledWith('assistant_drag');});
  it('does not treat a new input click after dragging as part of the drag',async()=>{const {wrapper}=setup();await wrapper.get('[data-testid="assistant-orb"]').trigger('pointerdown',{button:0,pointerId:1,clientX:10,clientY:10});move(20,10);finish();const field=wrapper.get('[data-testid="assistant-input"]');await field.trigger('pointerdown',{button:0,pointerId:2});const event=new MouseEvent('click',{bubbles:true,cancelable:true,detail:1});field.element.dispatchEvent(event);expect(event.defaultPrevented).toBe(false);});
 });
 describe('copying assistant replies',()=>{
@@ -141,6 +142,15 @@ describe('compact horizontal assistant tools', () => {
     expect(wrapper.find('[role="toolbar"]').exists()).toBe(true);
     await wrapper.get('.tools-host').trigger('pointerleave'); await vi.advanceTimersByTimeAsync(400);
     expect(wrapper.find('[role="toolbar"]').exists()).toBe(false);
+  });
+  it.each(['thinking','answering'])('keeps stop enabled during %s even before submit has returned',async phase=>{
+    const {store,wrapper}=setup();store.phase='idle';let finish!:()=>void;
+    store.submit.mockImplementationOnce(()=>{store.phase=phase;return new Promise<void>(resolve=>{finish=resolve;});});
+    await nextTick();await wrapper.get('[data-testid="assistant-primary"]').trigger('click');await nextTick();
+    const button=wrapper.get<HTMLButtonElement>('[data-testid="assistant-primary"]');
+    expect(button.attributes('aria-label')).toBe('停止');expect(button.element.disabled).toBe(false);
+    await button.trigger('click');expect(store.interrupt).toHaveBeenCalledOnce();expect(store.submit).toHaveBeenCalledOnce();
+    finish();await flushPromises();
   });
   it('keeps send and stop as primary clicks while hovered tools are available', async () => {
     const {store,wrapper}=setup(); store.phase='idle'; await nextTick(); await openToolbar(wrapper);

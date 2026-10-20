@@ -7,6 +7,7 @@ import type { ApprovalRequest } from '../ui/chat/types.ts';
 import { invoke } from '../bridge.ts';
 import { isDark } from '../ui/appearance.ts';
 import Orb from './Orb.vue';
+import { hitRegion, type HitRegion } from './hit-regions.ts';
 import type { AssistantStore } from './assistant-store.ts';
 
 const props = defineProps<{ store: AssistantStore; asr: AsrStore }>();
@@ -171,9 +172,29 @@ async function openLink(href: string) {
   try { await invoke('open_download_url', { url: href.split('#')[0] }); } catch { props.store.note('这个地址不能直接打开。'); }
 }
 
+let hitRaf=0,lastRegions='';
+function syncHitRegions(){
+  const regions:HitRegion[]=[];
+  document.querySelectorAll<HTMLElement>('.composer,.card,.ball,.tools-toolbar').forEach(el=>{
+    const radius=el.classList.contains('composer')?34:el.classList.contains('ball')?32:el.classList.contains('card')?22:16;
+    const region=hitRegion(el.getBoundingClientRect(),window.innerHeight,radius);
+    if(region)regions.push(region);
+  });
+  // Only a narrow corridor beneath the visible toolbar is interactive while crossing to it.
+  if(toolsOpen.value&&toolbar.value&&primaryButton.value){
+    const bar=toolbar.value.getBoundingClientRect(),button=primaryButton.value.getBoundingClientRect();
+    if(bar.width&&button.width){const gap=hitRegion({left:button.left,bottom:button.top,width:button.width,height:Math.max(0,button.top-bar.bottom)},window.innerHeight,0,2);if(gap)regions.push(gap);}
+  }
+  const signature=JSON.stringify(regions);if(signature===lastRegions)return;lastRegions=signature;
+  void invoke('assistant_set_regions',{regions}).catch(()=>{lastRegions='';});
+}
+function queueHitRegions(){cancelAnimationFrame(hitRaf);hitRaf=requestAnimationFrame(syncHitRegions);}
+watch([toolsOpen,()=>props.store.open,()=>props.store.ball,hasCard],()=>void nextTick(queueHitRegions));
+
 let fitted = 0, raf = 0;
 let observer: ResizeObserver | undefined;
 function fit() {
+  queueHitRegions();
   cancelAnimationFrame(raf);
   if(dragging.value || capturing.value)return;
   raf = requestAnimationFrame(() => {
@@ -213,6 +234,7 @@ function releasePress(){const p=press;press=null;if(p?.capture.hasPointerCapture
 function dragDown(event:PointerEvent){
   if(event.button!==0)return;pulled=false;
   const target=event.target as Element,handle=target.closest('[data-drag-handle]');
+  if(!handle&&!target.closest('.composer,.card'))return;
   if(!handle&&target.closest('button,input,textarea,select,a,pre,code,.card-body,[contenteditable],[data-no-drag]'))return;
   event.preventDefault();const capture=handle??target;
   press={id:event.pointerId,x:event.clientX,y:event.clientY,capture};capture.setPointerCapture?.(event.pointerId);
@@ -230,9 +252,11 @@ function dragEnded(){dragging.value=false;releasePress();fit();}
 function ballClick(){void props.store.unfold();}
 const onFocus=()=>{if(props.store.open&&!dragging.value&&!press)field.value?.focus();};
 onMounted(()=>{
+  void nextTick(queueHitRegions);window.addEventListener('resize',queueHitRegions);
   document.addEventListener('pointerdown',outsideTools);window.addEventListener('blur',closeTools);window.addEventListener('focus',onFocus);window.addEventListener('pointermove',dragMove);window.addEventListener('pointerup',dragUp);window.addEventListener('pointercancel',dragUp);window.addEventListener('blur',releasePress);window.addEventListener('assistant-drag-end',dragEnded);
 });
 onBeforeUnmount(()=>{
+  cancelAnimationFrame(hitRaf);window.removeEventListener('resize',queueHitRegions);
   clearToolTimers();window.removeEventListener('blur',closeTools);document.removeEventListener('pointerdown',outsideTools);imageVersion++; releasePress();copyVersion++;clearTimeout(copyTimer);window.removeEventListener('focus',onFocus);window.removeEventListener('pointermove',dragMove);window.removeEventListener('pointerup',dragUp);window.removeEventListener('pointercancel',dragUp);window.removeEventListener('blur',releasePress);window.removeEventListener('assistant-drag-end',dragEnded);observer?.disconnect();cancelAnimationFrame(raf);
 });
 </script>
@@ -244,9 +268,9 @@ onBeforeUnmount(()=>{
         <Orb :phase="store.phase" :level="0" :active="true" :size="48" :dark="isDark" :fps="quiet ? 20 : 60" />
       </button>
     </div>
-    <Transition name="pop" appear>
+    <Transition name="pop" appear @after-enter="queueHitRegions" @after-leave="queueHitRegions">
       <div v-if="store.open" ref="inner" class="inner" role="dialog" aria-label="超级小伴" data-testid="assistant">
-        <Transition name="rise">
+        <Transition name="rise" @after-enter="queueHitRegions" @after-leave="queueHitRegions">
           <section v-if="hasCard" class="card" data-testid="assistant-card">
             <button type="button" class="round card-close" title="暂时关闭对话框" aria-label="暂时关闭对话框" data-testid="assistant-card-close" @click="cardDismissed = true"><X :size="15" /></button>
             <div ref="scroller" class="card-body">
@@ -284,14 +308,14 @@ onBeforeUnmount(()=>{
           </button>
           <input ref="field" v-model="store.input" class="field" type="text" autocomplete="off" spellcheck="false" :placeholder="store.status" aria-label="向小伴提问" data-testid="assistant-input" @keydown.enter="onEnter" @compositionstart="composing = true" @compositionend="composing = false" />
           <div ref="toolsHost" class="tools-host" data-no-drag @pointerenter="enterTools" @pointerleave="leaveTools" @focusin="focusTools" @focusout="toolsFocusOut">
-            <div v-if="toolsOpen" ref="toolbar" id="assistant-toolbar" class="tools-toolbar" role="toolbar" aria-label="小伴工具" aria-orientation="horizontal" data-testid="assistant-toolbar" @keydown="toolbarKeys" @pointerenter="focusTools" @pointerleave="leaveTools">
+            <div v-if="toolsOpen" ref="toolbar" id="assistant-toolbar" class="tools-toolbar" role="toolbar" aria-label="小伴工具" aria-orientation="horizontal" data-testid="assistant-toolbar" @animationend="queueHitRegions" @keydown="toolbarKeys" @pointerenter="focusTools" @pointerleave="leaveTools">
               <button type="button" class="tool-button" title="去超级小伴设置页" aria-label="去超级小伴设置页" data-testid="assistant-settings" @click="toolAction('settings')"><Settings :size="16" :stroke-width="1.7" /></button>
               <button type="button" class="tool-button" title="收起小伴" aria-label="收起小伴" data-testid="assistant-close" @click="toolAction('hide')"><ChevronDown :size="16" :stroke-width="1.7" /></button>
               <button type="button" class="tool-button" title="去聊天详情页" aria-label="去聊天详情页" data-testid="assistant-expand" @click="toolAction('chat')"><MessageSquare :size="16" :stroke-width="1.7" /></button>
               <button type="button" class="tool-button" title="选择图片" aria-label="选择图片" data-testid="assistant-add-image" :disabled="!canAttach || store.attachments.length >= 8" @click="toolAction('image')"><ImagePlus :size="16" :stroke-width="1.7" /></button>
               <button type="button" class="tool-button" title="截图" aria-label="截图" data-testid="assistant-screenshot" :disabled="!canAttach || store.attachments.length >= 8" @click="toolAction('screenshot')"><ScanLine :size="16" :stroke-width="1.7" /></button>
             </div>
-            <button ref="primaryButton" type="button" class="round main-action" :class="{ 'has-action': canSend || busy, 'tools-open': toolsOpen && !canSend && !busy }" :aria-label="busy ? '停止' : canSend ? '发送' : toolsOpen ? '收起工具' : '展开工具'" :title="busy ? '停止 · 悬停展开工具' : canSend ? '发送 · 悬停展开工具' : '展开工具'" :aria-expanded="toolsOpen" aria-controls="assistant-toolbar" aria-keyshortcuts="ArrowUp ArrowDown" :disabled="imageReading || submitting || capturing" data-testid="assistant-primary" @keydown="primaryKeys" @click="primary"><Square v-if="busy" :size="14" /><ArrowUp v-else-if="canSend" :size="18" /><Plus v-else :size="18" /></button>
+            <button ref="primaryButton" type="button" class="round main-action" :class="{ 'has-action': canSend || busy, 'tools-open': toolsOpen && !canSend && !busy }" :aria-label="busy ? '停止' : canSend ? '发送' : toolsOpen ? '收起工具' : '展开工具'" :title="busy ? '停止 · 悬停展开工具' : canSend ? '发送 · 悬停展开工具' : '展开工具'" :aria-expanded="toolsOpen" aria-controls="assistant-toolbar" aria-keyshortcuts="ArrowUp ArrowDown" :disabled="imageReading || capturing || (submitting && !busy)" data-testid="assistant-primary" @keydown="primaryKeys" @click="primary"><Square v-if="busy" :size="14" /><ArrowUp v-else-if="canSend" :size="18" /><Plus v-else :size="18" /></button>
           </div>
         </div>
         <p v-if="dropActive || imageReading || capturing" class="image-status" aria-live="polite">{{ capturing ? '截图中，按 Esc 可以取消' : imageReading ? '正在读取图片…' : '松开添加图片' }}</p>
@@ -306,18 +330,18 @@ onBeforeUnmount(()=>{
 html,body,#app{background:transparent!important}
 </style>
 <style scoped>
-.stage{--card:#141925;--capsule:#151a27;--line:rgba(160,190,255,.2);--text:#eaf0fb;--text-soft:#8a94ab;--working:#9fb0cf;--placeholder:#7d88a2;--field:#f3f6fd;--button:rgba(255,255,255,.07);--button-hover:rgba(255,255,255,.14);--button-fg:#b9c3d8;--button-fg-hover:#fff;--code:rgba(255,255,255,.08);--link:#7fd6ff;--hint:#ffd9a0;--failure:#ff9aa6;--gate-bg:rgba(255,190,100,.08);--gate-line:rgba(255,190,100,.28);--gate-title:#ffe2b4;--gate-tool:#c3cce0;--ghost:rgba(255,255,255,.08);--ghost-fg:#dfe6f5;--scroll:rgba(255,255,255,.18);--dot:#8fb7ff;--listen:rgba(84,226,255,.7);--busy:rgba(140,150,255,.6);--attention:rgba(255,190,100,.7);--ui-line:var(--line);--ui-surface-alt:var(--code);--ui-text-primary:var(--text);--ui-text-secondary:var(--working);--ui-text-tertiary:var(--text-soft);--ui-primary:var(--link);position:relative;display:flex;flex-direction:column;justify-content:flex-end;height:100vh;color:var(--text);font:14px/1.6 -apple-system,BlinkMacSystemFont,"PingFang SC","Segoe UI","Microsoft YaHei UI",sans-serif;-webkit-font-smoothing:antialiased;user-select:none;cursor:grab}
+.stage{--card:#141925;--capsule:#151a27;--line:rgba(160,190,255,.2);--text:#eaf0fb;--text-soft:#8a94ab;--working:#9fb0cf;--placeholder:#7d88a2;--field:#f3f6fd;--button:rgba(255,255,255,.07);--button-hover:rgba(255,255,255,.14);--button-fg:#b9c3d8;--button-fg-hover:#fff;--code:rgba(255,255,255,.08);--link:#7fd6ff;--hint:#ffd9a0;--failure:#ff9aa6;--gate-bg:rgba(255,190,100,.08);--gate-line:rgba(255,190,100,.28);--gate-title:#ffe2b4;--gate-tool:#c3cce0;--ghost:rgba(255,255,255,.08);--ghost-fg:#dfe6f5;--scroll:rgba(255,255,255,.18);--dot:#8fb7ff;--listen:rgba(84,226,255,.7);--busy:rgba(140,150,255,.6);--attention:rgba(255,190,100,.7);--ui-line:var(--line);--ui-surface-alt:var(--code);--ui-text-primary:var(--text);--ui-text-secondary:var(--working);--ui-text-tertiary:var(--text-soft);--ui-primary:var(--link);position:relative;display:flex;flex-direction:column;justify-content:flex-end;height:100vh;color:var(--text);font:14px/1.6 -apple-system,BlinkMacSystemFont,"PingFang SC","Segoe UI","Microsoft YaHei UI",sans-serif;-webkit-font-smoothing:antialiased;user-select:none;cursor:default;pointer-events:none}
 .stage.light{--card:#ffffff;--capsule:#ffffff;--line:rgba(40,60,100,.28);--text:#1d2433;--text-soft:#6b7487;--working:#55627d;--placeholder:#98a1b3;--field:#1d2433;--button:rgba(30,45,80,.07);--button-hover:rgba(30,45,80,.13);--button-fg:#566079;--button-fg-hover:#1d2433;--code:rgba(30,45,80,.07);--link:#1a6fd4;--hint:#9a5b00;--failure:#c8324a;--gate-bg:rgba(255,170,60,.12);--gate-line:rgba(220,140,30,.42);--gate-title:#7a4700;--gate-tool:#4a556d;--ghost:rgba(30,45,80,.07);--ghost-fg:#2a3550;--scroll:rgba(30,45,80,.24);--dot:#5b7fe0;--listen:rgba(0,160,200,.8);--busy:rgba(90,100,230,.7);--attention:rgba(230,140,20,.85)}
 .ball-stage{display:grid;place-items:center;height:100vh}
-.ball{touch-action:none;display:grid;place-items:center;width:64px;height:64px;padding:0;border-radius:50%;background:var(--capsule);border:1px solid var(--line);cursor:pointer;transition:border-color .3s,transform .2s}
+.ball{pointer-events:auto;touch-action:none;display:grid;place-items:center;width:64px;height:64px;padding:0;border-radius:50%;background:var(--capsule);border:1px solid var(--line);cursor:pointer;transition:border-color .3s,transform .2s}
 .ball:hover{transform:scale(1.06)}
 .ball:active{transform:scale(.96)}
 .ball:focus-visible{outline:2px solid var(--link);outline-offset:2px}
 .ball[data-phase=listening]{border-color:var(--listen)}
 .ball[data-phase=thinking],.ball[data-phase=answering],.ball[data-phase=speaking]{border-color:var(--busy)}
 .ball[data-phase=attention]{border-color:var(--attention)}
-.inner{display:flex;flex-direction:column;gap:10px;padding:12px}
-.card{position:relative;border-radius:22px;background:var(--card);border:1px solid var(--line);overflow:hidden}
+.inner{pointer-events:none;display:flex;flex-direction:column;gap:10px;padding:12px}
+.card{pointer-events:auto;cursor:grab;position:relative;border-radius:22px;background:var(--card);border:1px solid var(--line);overflow:hidden}
 .card .card-close{position:absolute;z-index:1;top:8px;right:8px;width:28px;height:28px}
 .card-body{cursor:auto;max-height:390px;overflow-y:auto;padding:16px 44px 18px 20px;user-select:text;scrollbar-width:thin;scrollbar-color:var(--scroll) transparent}
 .you{margin:0 0 8px;font-size:12.5px;color:var(--text-soft);display:-webkit-box;-webkit-line-clamp:2;line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
@@ -345,7 +369,7 @@ html,body,#app{background:transparent!important}
 .gate .ghost{background:var(--ghost);color:var(--ghost-fg)}
 .gate .ghost.dim{color:var(--text-soft)}
 .gate .solid{background:linear-gradient(135deg,#ffcf7a,#ff9f5a);color:#2a1604;font-weight:600}
-.composer{position:relative;border-radius:34px;background:var(--capsule);border:1px solid var(--line);transition:border-color .2s}
+.composer{pointer-events:auto;cursor:grab;position:relative;border-radius:34px;background:var(--capsule);border:1px solid var(--line);transition:border-color .2s}
 .composer.drop-active{border-color:var(--link);box-shadow:inset 0 0 0 1px var(--link)}
 .tools-host{position:relative;flex:none;cursor:default}
 .tools-toolbar{position:absolute;right:-3px;bottom:calc(100% + 9px);display:flex;align-items:center;gap:4px;padding:6px;border-radius:16px;background:var(--card);border:1px solid var(--line);box-shadow:0 5px 20px rgba(0,0,0,.12);z-index:5;animation:toolbar-in .16s ease-out;cursor:default}
