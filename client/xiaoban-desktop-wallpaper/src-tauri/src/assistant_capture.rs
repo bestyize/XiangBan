@@ -79,7 +79,11 @@ fn macos_capture_outcome(success: bool, code: Option<i32>, stderr: &[u8], has_im
     if success && has_image { return Ok(true); }
     let detail = String::from_utf8_lossy(stderr).trim().chars().take(400).collect::<String>();
     if !detail.is_empty() {
-        return Err(format!("macOS 截图失败：{detail}。如刚授予权限，请从托盘完全退出小伴后重新打开再试。"));
+        return Err(if permission {
+            format!("macOS 截图失败：{detail}（屏幕录制权限检查已通过）。")
+        } else {
+            format!("macOS 截图失败：{detail}。请检查系统隐私设置中当前小伴的屏幕录制授权。")
+        });
     }
     if !permission {
         return Err("未生成截图。如果刚授予屏幕录制权限，请从托盘完全退出小伴后重新打开；仍失败时请检查系统隐私设置中的授权应用是否为当前小伴。".into());
@@ -89,21 +93,30 @@ fn macos_capture_outcome(success: bool, code: Option<i32>, stderr: &[u8], has_im
     Err(format!("macOS 截图未完成（退出状态 {code:?}），请重试。"))
 }
 
+// screencapture uses one-based display ordinals (main screen first), matching
+// widget_monitors' NSScreen::screens ordering. Capture whole displays: -R can
+// fail with "could not create image from rect" even after permission is granted.
+// Coordinates are only used to place our editor; Retina pixels stay in the JPEG.
+#[cfg(any(target_os = "macos", test))]
+fn macos_display_command(index: usize, image: &std::path::Path) -> Command {
+    let mut command = Command::new("/usr/sbin/screencapture");
+    command.args(["-x", "-t", "jpg", "-D", &(index + 1).to_string()]).arg(image);
+    command
+}
+
 #[cfg(target_os = "macos")]
 pub fn capture(app: &tauri::AppHandle) -> Result<Vec<Frame>, String> {
     let screens = crate::macos::widget_monitors(app)?;
+    if screens.is_empty() { return Err("没有找到可截图的显示器".into()); }
     if screens.len() > 16 { return Err("显示器数量超过截图支持范围".into()); }
     let temp = TempCapture::new()?;
     let mut total = 0;
     let mut frames = Vec::new();
     for (i, screen) in screens.into_iter().enumerate() {
         let image = temp.0.join(format!("screen-{i}.jpg"));
-        // -R takes Quartz global points, including negative coordinates. No system selection UI.
-        let region = format!("{},{},{},{}",screen.x as i32,screen.y as i32,screen.width as u32,screen.height as u32);
-        let mut command = Command::new("/usr/sbin/screencapture");
-        command.args(["-x", "-t", "jpg", "-R", &region]).arg(&image);
-        let output = run(command, 30)?;
-        if !macos_capture_outcome(output.status.success(), output.status.code(), &output.stderr, image.exists(), unsafe { CGPreflightScreenCaptureAccess() })? {
+        let output = run(macos_display_command(i, &image), 30)?;
+        if !macos_capture_outcome(output.status.success(), output.status.code(), &output.stderr, image.exists(), unsafe { CGPreflightScreenCaptureAccess() })
+            .map_err(|error| format!("显示器 {}（{} × {}）：{error}", i + 1, screen.width, screen.height))? {
             return Err("未生成屏幕画面，请检查屏幕录制权限后重试。".into());
         }
         // Keep native Retina pixels unless the snapshot would exceed the IPC budget.
@@ -164,6 +177,21 @@ fn encode_base64(bytes: &[u8]) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test] fn macos_snapshots_use_whole_displays_without_region_coordinates() {
+        for (index, display) in [(0, "1"), (1, "2"), (15, "16")] {
+            let command = macos_display_command(index, std::path::Path::new("screen.jpg"));
+            assert_eq!(command.get_program(), "/usr/sbin/screencapture");
+            let args: Vec<_> = command.get_args().map(|arg| arg.to_str().unwrap()).collect();
+            assert_eq!(args, ["-x", "-t", "jpg", "-D", display, "screen.jpg"]);
+            assert!(!args.iter().any(|arg| arg.starts_with("-R")));
+        }
+    }
+    #[test] fn macos_authorized_capture_errors_do_not_recommend_restart() {
+        let error = macos_capture_outcome(false, Some(1), b"could not create image from rect", false, true).unwrap_err();
+        assert!(error.contains("could not create image from rect"));
+        assert!(error.contains("权限检查已通过"));
+        assert!(!error.contains("退出"));
+    }
     #[test] fn macos_permission_cache_never_overrides_a_successful_capture() {
         assert_eq!(macos_capture_outcome(true, Some(0), b"", true, false), Ok(true));
     }

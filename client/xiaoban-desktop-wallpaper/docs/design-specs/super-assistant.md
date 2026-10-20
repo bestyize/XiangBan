@@ -109,7 +109,7 @@ HTML 是可交互的视觉与行为参考，使用模拟桌面和对话。正式
 实现位置：
 
 - `src/capture/`：独立截图场景、样式、选区几何与标注导出。
-- `src-tauri/src/assistant_capture.rs`、`assistant_capture_windows.ps1`：系统桌面快照、权限与临时文件处理。
+- `src-tauri/src/assistant_capture.rs`、`assistant_capture_windows.ps1`：系统桌面快照、权限与临时文件处理。macOS 按显示器用 `screencapture -D` 抓取整屏，不再用 `-R` 走矩形抓取；逻辑坐标仅用于编辑窗口布局，框选在冻结画面上完成。权限检查通过后的抓取错误保留原始诊断，不再统一提示重启。
 - `src-tauri/src/capture_editor.rs`：截图窗口、会话结果、取消及关闭清理；窗口仅允许截图所需命令。
 - `src-tauri/src/float_assistant.rs`：隐藏助手、启动截图、恢复原对话。
 
