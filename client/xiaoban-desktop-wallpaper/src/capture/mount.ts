@@ -15,7 +15,7 @@ export async function mountCapture() {
   const desktop=$<HTMLImageElement>('desktop'), selection=$('selection'), marks=$<HTMLCanvasElement>('marks'), capture=$('capture'), dock=$('dock');
   const ink=marks.getContext('2d');
   if(!ink) { await invoke('capture_finish',{image:null,error:'无法初始化截图画布，请重试。'}); return; }
-  let rect:Rect={x:0,y:0,w:0,h:0}, tool:Tool='select', color='#d67456', stroke=2;
+  let rect:Rect={x:0,y:0,w:0,h:0}, tool:Tool='select', color='#f26baa', stroke=2;
   let history:Mark[]=[], draft:Mark|null=null, gesture:Gesture|null=null, textEntry:HTMLTextAreaElement|null=null;
   let busy=false, raf=0, disposed=false;
   let pixelated:HTMLCanvasElement|null=null;
