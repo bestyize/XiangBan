@@ -74,6 +74,51 @@ pub fn request_macos_permission() {
     if !unsafe { CGPreflightScreenCaptureAccess() } { unsafe { CGRequestScreenCaptureAccess(); } }
 }
 
+/// Reset only this app's ScreenCapture TCC record, after explicit confirmation in the
+/// trusted control window. Never invoke automatically on capture failures.
+pub const SCREEN_CAPTURE_BUNDLE_ID: &str = "xyz.xiaban.desktop-wallpaper";
+
+#[tauri::command]
+pub fn reset_screen_capture_permission(window: tauri::WebviewWindow) -> Result<(), String> {
+    if window.label() != "control" { return Err("只能从小伴设置页修复截图权限。".into()); }
+    #[cfg(target_os = "macos")]
+    {
+        // Absolute command path and fixed arguments: no shell, no caller-supplied service or bundle ID.
+        // Removing authorization affects the current app only and requires a fresh grant afterwards.
+        let output = Command::new("/usr/bin/tccutil")
+            .args(["reset", "ScreenCapture", SCREEN_CAPTURE_BUNDLE_ID])
+            .output()
+            .map_err(|e| format!("无法运行权限修复工具：{e}"))?;
+        if !output.status.success() {
+            let detail = String::from_utf8_lossy(&output.stderr).trim().chars().take(320).collect::<String>();
+            return Err(if detail.is_empty() {
+                "无法重置截图权限，请到系统设置的「屏幕与系统音频录制」手动移除小伴，再重新授权。".into()
+            } else {
+                format!("无法重置截图权限：{detail}。请在系统设置中手动移除小伴授权。")
+            });
+        }
+        Ok(())
+    }
+    #[cfg(not(target_os = "macos"))]
+    { Err("此功能仅用于 macOS。".into()) }
+}
+
+/// Open the exact privacy pane; never change another app's permissions.
+#[tauri::command]
+pub fn open_screen_capture_settings(window: tauri::WebviewWindow) -> Result<(), String> {
+    if window.label() != "control" { return Err("只能从小伴设置页打开截图权限设置。".into()); }
+    #[cfg(target_os = "macos")]
+    {
+        let status = Command::new("/usr/bin/open")
+            .arg("x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture")
+            .status()
+            .map_err(|e| format!("无法打开屏幕录制权限设置：{e}"))?;
+        if status.success() { Ok(()) } else { Err("无法打开系统截图权限设置，请手动进入「隐私与安全性」。".into()) }
+    }
+    #[cfg(not(target_os = "macos"))]
+    { Err("此功能仅用于 macOS。".into()) }
+}
+
 #[cfg(any(target_os = "macos", test))]
 fn macos_capture_outcome(success: bool, code: Option<i32>, stderr: &[u8], has_image: bool, permission: bool) -> Result<bool, String> {
     if success && has_image { return Ok(true); }
@@ -164,6 +209,9 @@ fn encode_base64(bytes: &[u8]) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test] fn reset_targets_only_the_app_bundle_id() {
+        assert_eq!(SCREEN_CAPTURE_BUNDLE_ID, "xyz.xiaban.desktop-wallpaper");
+    }
     #[test] fn macos_permission_cache_never_overrides_a_successful_capture() {
         assert_eq!(macos_capture_outcome(true, Some(0), b"", true, false), Ok(true));
     }
