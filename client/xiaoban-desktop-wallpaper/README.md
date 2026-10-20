@@ -63,7 +63,7 @@ npm run desktop:macos:build
 open 'src-tauri/target/aarch64-apple-darwin/release/bundle/macos/小伴.app'
 ```
 
-应用使用系统 WKWebView，无需打包浏览器。macOS 配置自动读取 `src-tauri/tauri.macos.conf.json`，开启透明窗口并生成 `.app`，使用本地 ad-hoc 签名；尚未使用 Developer ID 签名或 Apple 公证。透明 WebView 目前使用 Tauri 的 macOS 私有透明接口，不以 Mac App Store 分发为目标。
+应用使用系统 WKWebView，无需打包浏览器。macOS 配置自动读取 `src-tauri/tauri.macos.conf.json`，开启透明窗口并生成 `.app`，本地构建默认使用 ad-hoc 签名；GitHub Release 使用固定自签名证书（归档和密码存放在私有仓库中，安全风险与跨版本验收方法见 [.github/signing/README.md](../../.github/signing/README.md)）；尚未使用 Developer ID 签名或 Apple 公证。透明 WebView 目前使用 Tauri 的 macOS 私有透明接口，不以 Mac App Store 分发为目标。
 
 macOS 悬浮窗口使用 AppKit 浮动层；壁纸使用 Core Graphics 的 desktop window level + 1，位于原桌面背景与桌面图标之间，并忽略鼠标事件以保留 Finder 的操作。角色视线使用 NSEvent 的鼠标逻辑点位置，经过 NSWindow/NSView 转换，处理坐标翻转和 Retina 缩放；壁纸点击只有命中桌面层时才触发，Finder 普通文件夹窗口和其他应用遮挡时不触发。角色视线与桌面命中检测不读取屏幕图像；超级小伴截图仅在用户主动点击时读取屏幕，macOS 会按需申请屏幕录制权限。
 
