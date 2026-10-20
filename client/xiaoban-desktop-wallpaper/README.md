@@ -24,14 +24,18 @@ npm ci
 npm run desktop
 ```
 
-生产构建与启动：
+生产构建（仅发布 NSIS 安装版，不再发布独立便携 EXE）：
 
 ```powershell
-npm run desktop:build
-.\src-tauri\target\release\xiaoban-desktop-wallpaper.exe
+npm run desktop:windows:build
+Get-ChildItem src-tauri/target/release/bundle/nsis/*-setup.exe
 ```
 
-这个 `.exe` 内嵌全部前端与背景资源，运行不需要 Node、Vite 或本地服务器。它依赖系统 WebView2，未把浏览器运行时打进包。当前配置不生成安装器；便携 EXE 本身在打开界面前检测运行时，支持 Windows 10/11，WebView2 最低主版本 109。
+双击 NSIS 安装器后，首次安装只显示「一键安装」按钮和安装进度，不要求选择目录、组件或开机启动。默认安装到当前用户的 `%LOCALAPPDATA%\小伴`，不需要管理员权限，完成后自动打开小伴；开始菜单有「小伴」入口，可在 Windows「已安装的应用」正常卸载。安装器不主动创建桌面快捷方式。NSIS 自动检查及按需准备 WebView2，应用启动时仍执行原有运行时检查。支持 Windows 10/11，WebView2 最低主版本 109。
+
+内部开发使用的 `npm run desktop:build` 仍可生成未打包的 exe 以运行原生 smoke test，但该文件不作为发行资产。
+
+**从旧便携版迁移**：先从托盘彻底退出便携版，再运行一键安装器。既有配置、聊天、壁纸与游戏数据仍使用同一个用户数据目录，不复制也不清空。安装后启动时会把已开启的开机自启动项刷新为新安装路径；如用户在任务管理器手动禁用自启动，保持禁用。首次迁移后手动删除旧便携 exe，避免误启动旧版本。
 
 ### 首次运行组件准备
 
@@ -42,7 +46,7 @@ npm run desktop:build
 - 首次缺组件时需要联网，后续正常启动无需联网。引导程序和脚本放在唯一临时目录，完成或取消后清理；运行时安装到系统/用户组件位置，独立于小伴 EXE 的体积。
 - 不支持的旧 Windows 提示升级系统，不尝试下载旧版运行时。macOS 12+ 使用系统 WKWebView，随系统维护，不下载或替换系统 WebKit；最低系统版本已写入 `.app` 配置。
 
-微软官方说明：[运行时按需检测与安装](https://learn.microsoft.com/en-us/microsoft-edge/webview2/concepts/distribution)。设置中的 `webviewInstallMode` 仅对未来安装包有效；便携 EXE 的准备流程在原生入口中实现。
+微软官方说明：[运行时按需检测与安装](https://learn.microsoft.com/en-us/microsoft-edge/webview2/concepts/distribution)。正式 NSIS 安装器也会使用 `webviewInstallMode` 检测/安装 WebView2；原生入口保留运行时检查作为安装失败或组件损坏时的兜底。
 
 单独浏览器预览：`npm run dev`，访问 `http://127.0.0.1:1420`。浏览器只能预览角色与场景，不能切换原生桌面模式。
 
@@ -173,7 +177,7 @@ Mac 实机还需检查：原角色的发光与连续表情、桌宠拖动、空�
 
 新增功能规划见 [小伴桌面 PRD](../../docs/product/PRD_小伴桌面.md)。本轮第 1–3 项已实现并通过 Windows 自动化检查，尚未发布；第 4–8 项仍规划中。实际能力及平台限制以本文和代码为准。
 
-启动流程另有四个 Rust 测试，覆盖已安装时不调用安装器、安装后重新检测、虚假成功退出码与失败重试。Windows CI 构建便携包并执行原生准备窗口成功/失败/取消模拟；本地 `-VerifyDownload` 还验证内嵌下载工具、进程清理及真实微软签名，不执行安装。真实缺组件的首次安装需在干净 Windows 虚拟机上验证。
+启动流程另有四个 Rust 测试，覆盖已安装时不调用安装器、安装后重新检测、虚假成功退出码与失败重试。Windows CI 构建 NSIS 一键安装包；内部原生准备窗口的成功/失败/取消模拟仍需单独验证；本地 `-VerifyDownload` 还验证内嵌下载工具、进程清理及真实微软签名，不执行安装。真实缺组件的首次安装需在干净 Windows 虚拟机上验证。
 
 - 提供 Windows 与 macOS 的原生接入；macOS 包面向 Apple 芯片，Intel / Universal 打包未纳入此原型。
 - 壁纸只覆盖主显示器；未实现多显示器管理、视频转码或签名安装包。
