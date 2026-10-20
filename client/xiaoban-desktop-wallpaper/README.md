@@ -67,6 +67,8 @@ open 'src-tauri/target/aarch64-apple-darwin/release/bundle/macos/小伴.app'
 
 macOS 悬浮窗口使用 AppKit 浮动层；壁纸使用 Core Graphics 的 desktop window level + 1，位于原桌面背景与桌面图标之间，并忽略鼠标事件以保留 Finder 的操作。角色视线使用 NSEvent 的鼠标逻辑点位置，经过 NSWindow/NSView 转换，处理坐标翻转和 Retina 缩放；壁纸点击只有命中桌面层时才触发，Finder 普通文件夹窗口和其他应用遮挡时不触发。角色视线与桌面命中检测不读取屏幕图像；超级小伴截图仅在用户主动点击时读取屏幕，macOS 会按需申请屏幕录制权限。
 
+截图失败（包括 `could not create image from rect`）时，超级小伴会在提示中提供「去设置」，跳转到「设置 → 超级小伴 → 屏幕截图权限」。用户可先打开系统的屏幕与系统音频录制设置检查授权；对于更新导致的历史授权失效，可点击「修复截图权限」，经二次确认后调用固定命令 `/usr/bin/tccutil reset ScreenCapture xyz.xiaban.desktop-wallpaper`。该操作只撤销当前小伴标识对应的 ScreenCapture 记录，不会重置其他应用或其他类型权限；不会自动执行。成功后必须从托盘完全退出、重新打开应用并再次授权。执行失败时会提示在系统设置中手动移除旧记录。此兜底仅修复权限记录，不保证解决屏幕坐标或截图库错误。
+
 配置 `CanJoinAllSpaces` 使角色与壁纸参与各桌面空间；AppKit 窗口操作都在主线程执行。macOS 14+ 会关闭 WKWebView 的后台调度限流以保留可见桌宠动画，旧系统的后台表现需要实机验证。
 
 ## 使用
