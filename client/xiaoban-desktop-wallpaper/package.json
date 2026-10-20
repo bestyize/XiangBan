@@ -11,7 +11,8 @@
     "desktop:macos:build": "tauri build --target aarch64-apple-darwin --bundles app",
     "test:macos": "node scripts/smoke-test.mjs",
     "test": "vitest run",
-    "desktop:windows:build": "tauri build --bundles nsis"
+    "desktop:windows:build": "tauri build --bundles nsis",
+    "test:windows:installer": "node scripts/verify-windows-installer.mjs"
   },
   "devDependencies": {
     "@tauri-apps/cli": "2.12.1",
