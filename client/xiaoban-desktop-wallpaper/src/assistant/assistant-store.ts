@@ -2,7 +2,7 @@ import { reactive, watch } from 'vue';
 import type { ChatStore } from '../ui/chat/chat-store.ts';
 import type { AsrStore } from '../ui/asr/store.ts';
 import type { SpeechStore } from '../ui/speech/store.ts';
-import type { ApprovalDecision, ApprovalRequest, ChatItem, QuestionRequest } from '../ui/chat/types.ts';
+import type { ApprovalDecision, ApprovalRequest, ChatItem, QuestionRequest, SessionSummary } from '../ui/chat/types.ts';
 
 export type OpenMode = 'voice' | 'type';
 export type ReadMode = 'voice' | 'always' | 'never';
@@ -10,8 +10,8 @@ export type SettingsTarget = 'ai' | 'assistant';
 
 export type Phase = 'idle' | 'listening' | 'thinking' | 'answering' | 'speaking' | 'attention';
 
-/** A conversation the capsule left less than this long ago is continued; an older one starts over. */
-export const RESUME_MS = 5 * 60 * 1000;
+/** Only the assistant window uses this pointer; conversation history remains with the host. */
+export const SESSION_KEY = 'xiaoban.assistant.session.v1';
 /** Voice text is sent this long after the last words were recognised, in case more follows. */
 export const SEND_GRACE_MS = 600;
 /** The microphone is released when nothing was heard for this long. The capsule itself stays until it is dismissed. */
@@ -26,6 +26,7 @@ export interface AssistantDeps {
   asr: AsrStore;
   speech: SpeechStore;
   now?(): number;
+  storage?: Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>;
   /** The console's colour scheme, as the host reports it (at start and whenever it changes). */
   onAppearance?(value: string): void;
   setTimer?(callback: () => void, ms: number): unknown;
@@ -64,6 +65,8 @@ export interface AssistantStore {
   opened(): Promise<void>;
   closed(): void;
   submit(text?: string, spoken?: boolean): Promise<void>;
+  readonly changingSession: boolean;
+  newConversation(): Promise<void>;
   toggleListening(): Promise<void>;
   /** Stops speaking, or cancels the answer being written. */
   interrupt(): void;
@@ -95,20 +98,22 @@ export function describeTool(name: string): string {
 
 export function createAssistantStore(deps: AssistantDeps): AssistantStore {
   const { chat, asr, speech } = deps;
-  const now = deps.now ?? (() => Date.now());
+  let storage = deps.storage;
+  try { storage ??= typeof window !== 'undefined' ? window.localStorage : undefined; } catch { /* persistence may be unavailable */ }
+  const readSession = () => { try { return storage?.getItem(SESSION_KEY) || null; } catch { return null; } };
+  const rememberSession = (id: string | null) => { try { if(id)storage?.setItem(SESSION_KEY,id);else storage?.removeItem(SESSION_KEY); } catch { /* the live conversation still works */ } };
   const setTimer = deps.setTimer ?? ((callback, ms) => window.setTimeout(callback, ms));
   const clearTimer = deps.clearTimer ?? (id => window.clearTimeout(id as number));
   const unsubscribers: (() => void)[] = [];
   let starting: Promise<void> | null = null;
   let disposed = false;
-  let lastActivity = 0;
   let listenTimer: unknown, sendTimer: unknown;
   /** Words recognised so far in this utterance; sent together when speaking pauses. */
   let heard = '';
   /** The last question was spoken, so the answer is read aloud and listening resumes afterwards. */
   let voiceTurn = false;
   /** Reactive, because the phase shows `speaking` from the moment a reply is handed to the voice until it ends. */
-  const flags = reactive({ awaitingSpeech: false, submitting: false });
+  const flags = reactive({ awaitingSpeech: false, submitting: false, changingSession: false });
   let draftVersion = 0;
 
   const view = () => (chat.currentId ? chat.views[chat.currentId] ?? null : null);
@@ -143,12 +148,14 @@ export function createAssistantStore(deps: AssistantDeps): AssistantStore {
   function clearTimers() { clearTimer(listenTimer); clearTimer(sendTimer); listenTimer = sendTimer = undefined; }
 
   async function startListening(): Promise<boolean> {
+    const version=draftVersion;
     await asr.init();
+    if(version!==draftVersion)return false;
     if (!asr.enabled) { store.note('语音对话还没开启。在超级小伴设置里打开后，就能直接说话。', 'assistant'); return false; }
     if (!(await asr.prepare())) { store.note(asr.error || '语音识别还没准备好，请稍后再试。'); return false; }
-    if (!store.open) return false;
+    if (!store.open || version!==draftVersion) return false;
     store.note(''); heard = '';
-    await asr.activate(onHeard);
+    await asr.activate(text=>{if(version===draftVersion)onHeard(text);});
     if (!asr.recordingRequested) return false;
     // Nobody is talking: let the microphone go, but keep the capsule where it is.
     clearTimer(listenTimer);
@@ -178,6 +185,7 @@ export function createAssistantStore(deps: AssistantDeps): AssistantStore {
   const store: AssistantStore = reactive({
     open: false, ball: false, prefs: { open: 'voice', read: 'voice' }, input: '', attachments: [], hint: '', hintTab: '',
     get configured() { return chat.configured; },
+    get changingSession() { return flags.changingSession; },
     get voiceAvailable() { return asr.enabled; },
     get question() { return turn().question; },
     get questionImages() { return turn().questionImages; },
@@ -235,9 +243,16 @@ export function createAssistantStore(deps: AssistantDeps): AssistantStore {
       store.open = true; store.ball = false; store.note(''); store.input = ''; heard = ''; voiceTurn = false; flags.awaitingSpeech = false;
       await Promise.all([chat.init(), asr.init()]);
       await refreshModel();
-      if (disposed || !store.open) return;
+      if (disposed || !store.open || flags.changingSession) return;
+      if (chat.loadError) { store.note('无法加载上次会话，请稍后重新打开小伴。'); return; }
       if (!chat.configured) { store.note(MODEL_REQUIRED, 'ai'); return; }
-      if (!chat.currentId || now() - lastActivity > RESUME_MS) await chat.select(null);
+      const id = chat.currentId ?? readSession();
+      if (id && chat.sessions.some(session => session.id === id)) {
+        if(chat.currentId !== id) await chat.select(id);
+      } else {
+        rememberSession(null);
+        await chat.select(null);
+      }
       // Typing first: the capsule waits, and a tap on the ball starts listening.
       if (store.open && asr.enabled && store.prefs.open === 'voice') { voiceTurn = await startListening(); }
     },
@@ -247,9 +262,25 @@ export function createAssistantStore(deps: AssistantDeps): AssistantStore {
       asr.deactivate(); void speech.stop();
       store.open = false; store.input = ''; store.note(''); heard = ''; voiceTurn = false; flags.awaitingSpeech = false;
     },
+    async newConversation() {
+      if (flags.changingSession || flags.submitting) return;
+      flags.changingSession = true;draftVersion++;
+      clearTimers(); heard = ''; voiceTurn = false; flags.awaitingSpeech = false; asr.deactivate();
+      try {
+        await speech.stop();
+        if(view()?.running) await chat.cancel();
+        const session = await deps.invoke<SessionSummary>('chat_new_session', { permissionMode: 'auto' });
+        if(!session?.id) throw new Error('无法创建新会话，请重试。');
+        if(!chat.sessions.some(item => item.id === session.id)) chat.sessions.unshift(session);
+        await chat.select(session.id);
+        draftVersion++; store.input=''; store.attachments=[]; store.note('');
+        if(store.open && asr.enabled && store.prefs.open === 'voice') voiceTurn = await startListening();
+      } catch(error) { store.note(error instanceof Error ? error.message : String(error)); }
+      finally { flags.changingSession = false; }
+    },
     async submit(text, spoken = false) {
       const value = (text ?? store.input).trim();
-      if ((!value && !store.attachments.length) || flags.submitting || view()?.running || store.ask || store.approval) return;
+      if ((!value && !store.attachments.length) || flags.submitting || flags.changingSession || view()?.running || store.ask || store.approval) return;
       if (!chat.configured) {
         store.input = value;
         store.note(MODEL_REQUIRED, 'ai');
@@ -263,7 +294,7 @@ export function createAssistantStore(deps: AssistantDeps): AssistantStore {
       try {
         await speech.stop();
         if (version !== draftVersion) return;
-        voiceTurn = spoken; lastActivity = now();
+        voiceTurn = spoken;
         // New capsule conversations start in full trust; resumed ones keep their saved mode.
         if (!chat.currentId) chat.permissionMode = 'auto';
         const sent = images.length ? await chat.send(value, images) : await chat.send(value);
@@ -286,7 +317,6 @@ export function createAssistantStore(deps: AssistantDeps): AssistantStore {
     async reply(answer) { const request = store.ask; if (request) await chat.answerQuestion(request, answer); },
     replied(session, text, key) {
       if (!store.open || session !== chat.currentId) return;
-      lastActivity = now();
       if (store.prefs.read === 'always' || (store.prefs.read === 'voice' && voiceTurn)) {
         flags.awaitingSpeech = true;
         void speech.speak(text, key ?? `assistant:${session}`, undefined, true).then(() => {
@@ -303,7 +333,7 @@ export function createAssistantStore(deps: AssistantDeps): AssistantStore {
     async openChat() { await deps.invoke('assistant_open_chat', { session: chat.currentId }); },
     async openSettings(tab) { await deps.invoke('assistant_open_settings', { tab }); },
     dispose() {
-      disposed = true; clearTimers(); stopWatch();
+      disposed = true; clearTimers(); stopWatch(); stopSessionWatch();
       unsubscribers.splice(0).forEach(off => off());
       asr.deactivate(); void speech.stop();
     },
@@ -311,5 +341,8 @@ export function createAssistantStore(deps: AssistantDeps): AssistantStore {
   const stopWatch = watch(() => speech.status, (status, before) => {
     if (flags.awaitingSpeech && status === 'idle' && before !== 'idle') { flags.awaitingSpeech = false; afterTurn(); }
   });
+  const stopSessionWatch = watch(() => chat.currentId, id => {
+    if(id && !disposed) rememberSession(id);
+  }, { flush: 'sync' });
   return store;
 }
