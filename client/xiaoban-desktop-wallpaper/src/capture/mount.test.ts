@@ -47,6 +47,21 @@ it('renders annotations, supports undo and excludes UI from the exported JPEG',a
   expect(invoke).toHaveBeenCalledWith('capture_finish',{image:output,error:null});
   expect(ctx.drawImage.mock.calls.map(c=>c[0])).toEqual([el('desktop'),el('marks')]);
 });
+it('uses rainbow pink by default and keeps the rainbow annotation colors selectable',async()=>{
+  await mountCapture();await crop();
+  const swatches=[...document.querySelectorAll<HTMLButtonElement>('[data-color]')];
+  expect(swatches.map(item=>item.dataset.color)).toEqual(['#f26baa','#ffe47a','#55beeb','#ffffff','#37323b']);
+  expect(swatches[0].getAttribute('aria-pressed')).toBe('true');
+  document.querySelector<HTMLButtonElement>('[data-tool="rectangle"]')!.click();
+  expect(el('palette').hidden).toBe(false);
+  pointer('pointerdown',130,130,el('selection'));pointer('pointermove',250,220);pointer('pointerup',250,220);await tick();
+  expect(ctx.strokeStyle).toBe('#f26baa');
+  swatches[2].click();
+  expect(swatches[2].getAttribute('aria-pressed')).toBe('true');
+  expect(swatches[0].getAttribute('aria-pressed')).toBe('false');
+  pointer('pointerdown',140,140,el('selection'));pointer('pointermove',260,240);pointer('pointerup',260,240);await tick();
+  expect(ctx.strokeStyle).toBe('#55beeb');
+});
 it('cancels by Escape without sending an image',async()=>{
   await mountCapture();document.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape'}));await tick();
   expect(invoke).toHaveBeenCalledWith('capture_finish',{image:null,error:null});
