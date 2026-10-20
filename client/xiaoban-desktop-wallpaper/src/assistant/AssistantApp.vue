@@ -138,7 +138,15 @@ async function takeScreenshot() {
     await nextTick();
     const image = await invoke<string | null>('assistant_screenshot');
     if (image && props.store.open && version === imageVersion) props.store.attachments.push(image);
-  } catch (error) { if (version === imageVersion) props.store.note(error instanceof Error ? error.message : String(error)); }
+  } catch (error) {
+    if (version === imageVersion) {
+      const message = error instanceof Error ? error.message : String(error);
+      // A failed capture is not always a permission failure. Show the repair link only
+      // for macOS permission or screencapture failures; never reset automatically.
+      const permissionIssue = /macOS 截图失败|屏幕录制权限|截图权限|could not create image from rect|could not create image from display/i.test(message);
+      props.store.note(message, permissionIssue ? 'assistant' : '');
+    }
+  }
   finally { capturing.value = false; void nextTick(() => field.value?.focus()); }
 }
 // Toolbar visibility never changes native window geometry. Headroom is reserved on open.
