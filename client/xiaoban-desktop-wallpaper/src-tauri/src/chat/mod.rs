@@ -586,10 +586,15 @@ pub fn chat_send(app: tauri::AppHandle, session_id: String, text: String, images
             Ok(dirs) => {
                 let journal = JsonlRunLog::new(dirs.runs().join(&id));
                 let options = RunOptions { max_tool_calls: Some(256), ..Default::default() };
-                let mut observe = |record| {
+                let mut observe = |mut record| {
                     let terminal = matches!(&record.body, RunEventBody::Event { event:
                         agent_kernel::Event::Done | agent_kernel::Event::Cancelled | agent_kernel::Event::Error { .. }
                     });
+                    if let RunEventBody::Event { event: agent_kernel::Event::Error { message } } = &mut record.body {
+                        if ai_gateway::is_active(&config_owned) {
+                            *message = ai_gateway::readable_error(message);
+                        }
+                    }
                     run_history::forward(&journal, record, &config_owned.api_key, |channel, payload| {
                         emit(&sender, channel, payload);
                     })?;
