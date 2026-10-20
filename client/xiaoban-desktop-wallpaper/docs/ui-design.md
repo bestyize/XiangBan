@@ -2,6 +2,8 @@
 
 > 实际桌面上的悬浮小组件采用独立的 [Soft Living UI 桌面小组件设计规范](desktop-widgets-design.md)；这里的视觉令牌主要面向应用控制台，不应直接套用到悬浮小组件。
 
+> 设计文档总入口见 [设计规范目录](design-specs/README.md)。超级小伴悬浮输入框、横排工具栏和截图蒙层采用独立的 [超级小伴设计规范与 HTML 交互稿](design-specs/super-assistant.md)，调整这些界面时先查看对应设计稿。
+
 ## 技术结构与入口
 
 控制台使用 Vue 3.5.43、Naive UI 2.45.3、Vite 8 和 Lucide Vue Next。表单、按钮、提示、标签和加载状态优先使用 Naive UI；Lucide 图标用于辅助识别，不能取代文字标签。
@@ -42,3 +44,4 @@
 ## 验证状态
 
 2026-10-10 UI 重构后，前端全量测试 51 tests / 11 files、Rust 55 tests、Windows x64 桌面生产构建均已通过。桌面宠物页和壁纸库视觉参考：companion-blue.jpg（本地：`../artifacts/ui/companion-blue.jpg`）、wallpapers-blue.jpg（本地：`../artifacts/ui/wallpapers-blue.jpg`）。
+
