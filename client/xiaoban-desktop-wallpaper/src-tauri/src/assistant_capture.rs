@@ -3,7 +3,10 @@
 use std::{io::Read, process::{Command, Output, Stdio}, time::{Duration, Instant}};
 
 const MAX_BYTES: usize = 3 * 1024 * 1024;
-const MAX_DATA_URL: usize = MAX_BYTES / 3 * 4 + 64;
+const MAX_SNAPSHOT_OUTPUT: usize = 48 * 1024 * 1024;
+
+#[derive(Clone, serde::Serialize, serde::Deserialize)]
+pub struct Frame { pub x: f64, pub y: f64, pub width: f64, pub height: f64, pub image: String }
 
 fn run(mut command: Command, seconds: u64) -> Result<Output, String> {
     command.stdin(Stdio::null()).stdout(Stdio::piped()).stderr(Stdio::piped());
@@ -16,7 +19,7 @@ fn run(mut command: Command, seconds: u64) -> Result<Output, String> {
     let output = child.stdout.take().ok_or("无法读取截图结果")?;
     let reader = std::thread::spawn(move || {
         let mut bytes = Vec::new();
-        output.take((MAX_DATA_URL + 1) as u64).read_to_end(&mut bytes).map(|_| bytes)
+        output.take((MAX_SNAPSHOT_OUTPUT + 1) as u64).read_to_end(&mut bytes).map(|_| bytes)
     });
     let error_output = child.stderr.take().ok_or("无法读取截图错误信息")?;
     let error_reader = std::thread::spawn(move || {
@@ -36,7 +39,7 @@ fn run(mut command: Command, seconds: u64) -> Result<Output, String> {
     };
     let bytes = reader.join().map_err(|_| "读取截图失败")?.map_err(|_| "读取截图失败")?;
     let stderr = error_reader.join().map_err(|_| "读取截图错误失败")?.map_err(|_| "读取截图错误失败")?;
-    if bytes.len() > MAX_DATA_URL { return Err("截图太大，请缩小区域后重试。".into()); }
+    if bytes.len() > MAX_SNAPSHOT_OUTPUT { return Err("截图太大，请缩小区域后重试。".into()); }
     Ok(Output { status: status?, stdout: bytes, stderr })
 }
 
@@ -87,51 +90,56 @@ fn macos_capture_outcome(success: bool, code: Option<i32>, stderr: &[u8], has_im
 }
 
 #[cfg(target_os = "macos")]
-fn capture_platform() -> Result<Option<String>, String> {
+pub fn capture(app: &tauri::AppHandle) -> Result<Vec<Frame>, String> {
+    let screens = crate::macos::widget_monitors(app)?;
+    if screens.len() > 16 { return Err("显示器数量超过截图支持范围".into()); }
     let temp = TempCapture::new()?;
-    let image = temp.0.join("region.jpg");
-    let mut command = Command::new("/usr/sbin/screencapture");
-    command.args(["-i", "-s", "-x", "-t", "jpg"]).arg(&image);
-    let output = run(command, 120)?;
-    if !macos_capture_outcome(output.status.success(), output.status.code(), &output.stderr, image.exists(), unsafe { CGPreflightScreenCaptureAccess() })? { return Ok(None); }
-    let path = if std::fs::metadata(&image).map_err(|e| e.to_string())?.len() > MAX_BYTES as u64 {
-        let smaller = temp.0.join("scaled.jpg");
-        let mut resize = Command::new("/usr/bin/sips");
-        resize.args(["-Z", "2048", "-s", "format", "jpeg", "-s", "formatOptions", "80"]).arg(&image).arg("--out").arg(&smaller);
-        if !run(resize, 20)?.status.success() { return Err("截图处理失败，请重试。".into()); }
-        smaller
-    } else { image };
-    let len = std::fs::metadata(&path).map_err(|e| e.to_string())?.len();
-    if len == 0 { return Ok(None); }
-    if len > MAX_BYTES as u64 { return Err("截图太大，请缩小区域后重试。".into()); }
-    let bytes = std::fs::read(path).map_err(|e| e.to_string())?;
-    if !bytes.starts_with(&[0xff, 0xd8]) { return Err("截图格式不正确，请重试。".into()); }
-    Ok(Some(format!("data:image/jpeg;base64,{}", encode_base64(&bytes))))
+    let mut total = 0;
+    let mut frames = Vec::new();
+    for (i, screen) in screens.into_iter().enumerate() {
+        let image = temp.0.join(format!("screen-{i}.jpg"));
+        // -R takes Quartz global points, including negative coordinates. No system selection UI.
+        let region = format!("{},{},{},{}",screen.x as i32,screen.y as i32,screen.width as u32,screen.height as u32);
+        let mut command = Command::new("/usr/sbin/screencapture");
+        command.args(["-x", "-t", "jpg", "-R", &region]).arg(&image);
+        let output = run(command, 30)?;
+        if !macos_capture_outcome(output.status.success(), output.status.code(), &output.stderr, image.exists(), unsafe { CGPreflightScreenCaptureAccess() })? {
+            return Err("未生成屏幕画面，请检查屏幕录制权限后重试。".into());
+        }
+        // Keep native Retina pixels unless the snapshot would exceed the IPC budget.
+        if std::fs::metadata(&image).map_err(|e|e.to_string())?.len() > 12 * 1024 * 1024 {
+            let mut resize = Command::new("/usr/bin/sips");
+            resize.args(["-Z", "4096", "-s", "formatOptions", "85"]).arg(&image);
+            if !run(resize,20)?.status.success() { return Err("截图处理失败，请重试。".into()); }
+        }
+        let size = std::fs::metadata(&image).map_err(|e|e.to_string())?.len();
+        if size == 0 || size > 16 * 1024 * 1024 { return Err("屏幕画面过大，请降低分辨率后重试。".into()); }
+        total += size;
+        if total > 32 * 1024 * 1024 { return Err("屏幕画面过大，请降低分辨率后重试。".into()); }
+        let bytes = std::fs::read(&image).map_err(|e|e.to_string())?;
+        if !bytes.starts_with(&[0xff,0xd8]) { return Err("截图格式错误".into()); }
+        frames.push(Frame { x:screen.x, y:screen.y, width:screen.width, height:screen.height, image:format!("data:image/jpeg;base64,{}",encode_base64(&bytes)) });
+    }
+    Ok(frames)
 }
 
 #[cfg(windows)]
-fn capture_platform() -> Result<Option<String>, String> {
-    // Windows PowerShell and .NET Framework are OS components; all script content is compiled in.
+pub fn capture(_app: &tauri::AppHandle) -> Result<Vec<Frame>, String> {
     let system = std::env::var_os("SystemRoot").ok_or("无法找到 Windows 系统目录")?;
     let exe = std::path::PathBuf::from(system).join("System32/WindowsPowerShell/v1.0/powershell.exe");
     let mut command = Command::new(exe);
     command.args(["-NoLogo", "-NoProfile", "-NonInteractive", "-STA", "-Command", include_str!("assistant_capture_windows.ps1")]);
-    let output = run(command, 120)?;
-    if !output.status.success() { return Err("截图未能启动，请重试；系统策略可能禁止运行截图组件。".into()); }
-    let result = String::from_utf8(output.stdout).map_err(|_| "截图结果格式错误")?;
-    let result = result.trim();
-    if result.is_empty() { return Ok(None); }
-    validate_data_url(result)?;
-    Ok(Some(result.to_string()))
+    let output = run(command, 30)?;
+    if !output.status.success() { return Err("无法获取屏幕画面，请检查系统截图权限或策略。".into()); }
+    let frames: Vec<Frame> = serde_json::from_slice(&output.stdout).map_err(|_| "截图结果格式错误")?;
+    if frames.is_empty() || frames.len() > 16 || frames.iter().any(|f| !f.image.starts_with("data:image/jpeg;base64,") || !f.width.is_finite() || !f.height.is_finite() || f.width <= 0.0 || f.height <= 0.0) { return Err("屏幕画面无效".into()); }
+    Ok(frames)
 }
 
 #[cfg(not(any(windows, target_os = "macos")))]
-fn capture_platform() -> Result<Option<String>, String> { Err("截图目前支持 Windows 和 macOS。".into()) }
+pub fn capture(_app: &tauri::AppHandle) -> Result<Vec<Frame>, String> { Err("截图目前支持 Windows 和 macOS。".into()) }
 
-pub fn capture() -> Result<Option<String>, String> { capture_platform() }
-
-#[cfg(any(windows, test))]
-fn validate_data_url(value: &str) -> Result<(), String> {
+pub fn validate_data_url(value: &str) -> Result<(), String> {
     let encoded = value.strip_prefix("data:image/jpeg;base64,").ok_or("截图结果格式错误")?;
     if encoded.is_empty() || encoded.len() > MAX_BYTES / 3 * 4 || encoded.len() % 4 != 0
         || !encoded.bytes().all(|b| b.is_ascii_alphanumeric() || matches!(b, b'+' | b'/' | b'=')) {
