@@ -10,6 +10,7 @@ mod danger;
 mod desktop_tools;
 mod prompt;
 mod run_history;
+mod task_outcome;
 mod sessions;
 
 use agent_computer_use_tools::{SKILL as COMPUTER_USE_SKILL, SKILL_NAME as COMPUTER_USE_SKILL_NAME, SKILL_ORIGIN_MARKER};
@@ -219,6 +220,7 @@ impl Dirs {
     }
     fn sessions(&self) -> PathBuf { self.chat.join("sessions") }
     fn runs(&self) -> PathBuf { self.chat.join("runs") }
+    fn outcomes(&self) -> PathBuf { self.chat.join("outcomes") }
     fn spill(&self) -> PathBuf { self.chat.join("spill") }
     fn memory(&self) -> PathBuf { self.chat.join("memory") }
     fn skills(&self) -> PathBuf { self.chat.join("skills") }
@@ -586,7 +588,9 @@ pub fn chat_send(app: tauri::AppHandle, session_id: String, text: String, images
             Ok(dirs) => {
                 let journal = JsonlRunLog::new(dirs.runs().join(&id));
                 let options = RunOptions { max_tool_calls: Some(256), ..Default::default() };
-                let mut observe = |mut record| {
+                let mut observed_run_id: Option<String> = None;
+                let mut observe = |mut record: agent_kernel::RunEvent| {
+                    observed_run_id = Some(record.run_id.clone());
                     let terminal = matches!(&record.body, RunEventBody::Event { event:
                         agent_kernel::Event::Done | agent_kernel::Event::Cancelled | agent_kernel::Event::Error { .. }
                     });
@@ -601,11 +605,20 @@ pub fn chat_send(app: tauri::AppHandle, session_id: String, text: String, images
                     if terminal { terminal_delivered = true; }
                     Ok(())
                 };
-                if retry {
+                let executed = if retry {
                     agent.retry_last_observed(&id, options, &mut observe, &cancel)
                 } else {
                     agent.run_parts_observed(&id, parts_owned, options, &mut observe, &cancel)
+                };
+                // The trace is the source of truth. Do not turn a successful model reply into
+                // a verified business success automatically.
+                if let Some(run) = observed_run_id {
+                    if let Ok(outcome) = task_outcome::inspect(&journal, &id, &run) {
+                        let _ = task_outcome::save(&dirs.outcomes(), &outcome);
+                        emit(&sender, "chat-task-outcome", json!({ "session": id, "outcome": outcome }));
+                    }
                 }
+                executed
             }
             Err(error) => Err(agent_kernel::HarnessError::Store(error)),
         };
@@ -660,7 +673,32 @@ pub fn chat_run_history(
     if events.iter().any(|event| event.session_id != session_id) {
         return Err("运行轨迹与会话不匹配".into());
     }
-    Ok(json!({ "inspection": inspection, "events": events }))
+    let outcome = task_outcome::load(&Dirs::of(&app)?.outcomes(), &session_id, &run_id)?;
+    Ok(json!({ "inspection": inspection, "events": events, "outcome": outcome }))
+}
+
+/// Verify one specifically requested file artifact. This does NOT approve an entire
+/// multi-step task or let the model self-mark its result as successful.
+#[tauri::command]
+pub fn chat_verify_file_outcome(app: tauri::AppHandle, window: tauri::WebviewWindow,
+    session_id: String, run_id: String, relative_path: String, expected_sha256: String
+) -> Result<Value, String> {
+    if window.label() != "control" { return Err("仅控制台可以验收任务".into()); }
+    checked_session_id(&session_id)?;
+    let dirs = Dirs::of(&app)?;
+    let journal = JsonlRunLog::new(dirs.runs().join(&session_id));
+    let previous = task_outcome::inspect(&journal, &session_id, &run_id)?;
+    if !matches!(journal.inspect(&run_id).map_err(|e|e.to_string())?.state, Some(agent_kernel::RunState::Completed)) {
+        return Err("只有正常结束的运行才允许文件验收".into());
+    }
+    if matches!(previous.status, task_outcome::Status::Partial | task_outcome::Status::Failed) {
+        return Err("工具执行异常，请先调查运行记录".into());
+    }
+    let config = ai_config::current(&app)?;
+    let default = ai_config::default_workspace(&app)?;
+    let workspace = config.workspace_or(&default);
+    let outcome=task_outcome::verify_file(&dirs.outcomes(), &session_id, &run_id, workspace, &relative_path, &expected_sha256)?;
+    Ok(json!(outcome))
 }
 
 #[tauri::command]
@@ -689,6 +727,7 @@ pub fn chat_delete_session(app: tauri::AppHandle, session_id: String) -> Result<
             return Err(format!("无法删除运行记录：{error}"));
         }
     }
+    let _ = fs::remove_dir_all(Dirs::of(&app)?.outcomes().join(&session_id));
     state.permission.forget_session(&session_id);
     state.todo.clear_session(&session_id);
     state.auto_compact.forget(&session_id);
