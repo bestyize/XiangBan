@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import {computed,onMounted,onBeforeUnmount,ref,watch} from 'vue';
+import {computed,onDeactivated,onMounted,onBeforeUnmount,ref,watch} from 'vue';
 import {NAlert,NButton,NDrawer,NDrawerContent,NInput,NModal,NPopconfirm,NSelect,NSlider,NSwitch,NTabs,NTabPane} from 'naive-ui';
 import {Download,Monitor,Pin,Plus,Settings2,Sparkles,Trash2,Upload} from 'lucide-vue-next';
 import type {ControlStore} from '../control-types.ts';
@@ -38,6 +38,7 @@ watch(()=>current.value?.size,value=>{draftSize.value=value??210;});
 async function imported(e:Event){const input=e.target as HTMLInputElement;const chosen=input.files?.[0];if(!chosen)return;await act(async()=>{if(chosen.size>512*1024)throw Error('宠物主题不能超过 512 KiB');const value=JSON.parse(await chosen.text());await client.saveTheme(value);category.value='custom';},'主题已导入');input.value='';}
 function manage(e:Event){const id=(e as CustomEvent<{id:string}>).detail?.id;void client.load().then(()=>{if(id)openManage(id);});}
 onMounted(()=>{void client.load();window.addEventListener('pets-manage',manage);});
+onDeactivated(()=>{hover.value='';});
 onBeforeUnmount(()=>{flushSize();client.dispose();window.removeEventListener('pets-manage',manage);});
 </script>
 <template>

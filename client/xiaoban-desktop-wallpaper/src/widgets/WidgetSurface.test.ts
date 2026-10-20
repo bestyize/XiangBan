@@ -1,5 +1,6 @@
 // @vitest-environment happy-dom
 import {mount,flushPromises} from '@vue/test-utils';
+import {nextTick} from 'vue';
 import {describe,it,expect,vi} from 'vitest';
 vi.mock('../bridge.ts',()=>({desktop:false,invoke:vi.fn().mockResolvedValue(undefined)}));
 import WidgetSurface from './WidgetSurface.vue';
@@ -7,6 +8,12 @@ import {invoke} from '../bridge.ts';
 import type {DesktopWidget} from './model.ts';
 const one=(kind:DesktopWidget['kind']):DesktopWidget=>({id:'one',kind,theme:'ivory',scale:1,x:0,y:0,enabled:true,city:null});
 describe('reference widget interaction',()=>{
+ it('updates the clock at the next minute boundary',async()=>{
+  vi.useFakeTimers();vi.setSystemTime(new Date('2026-10-20T12:34:15'));
+  const view=mount(WidgetSurface,{props:{widget:one('clock'),preview:true}});
+  try{expect(view.get('.clock-time').text()).toBe('12:34');vi.advanceTimersByTime(45030);await nextTick();expect(view.get('.clock-time').text()).toBe('12:35');}
+  finally{view.unmount();vi.useRealTimers();}
+ });
  it('keeps illustrative weather and stocks separate from actual readings',()=>{for(const kind of ['weather','stocks'] as const){const real=mount(WidgetSurface,{props:{widget:one(kind),preview:true}});expect(real.text()).toContain('—');expect(real.text()).not.toContain('309.600');real.unmount();}const demo=mount(WidgetSurface,{props:{widget:one('stocks'),preview:true,demo:true}});expect(demo.text()).toContain('309.600');expect(demo.findAll('.stock-periods button')).toHaveLength(4);demo.unmount();});
  it('saves todo completion and keeps the original content on failure',async()=>{const save=vi.fn().mockRejectedValue(Error('磁盘不可写'));const widget={...one('notes'),note:{title:'待办',mode:'todo' as const,text:'',items:[{id:'first',text:'写周报',done:false,time:'09:00'}]}};const view=mount(WidgetSurface,{props:{widget,save}});await view.get('.check-circle').trigger('click');await flushPromises();expect(save.mock.calls[0][0].note.items[0].done).toBe(true);expect(widget.note.items[0].done).toBe(false);expect(view.get('[role="alert"]').text()).toContain('磁盘不可写');view.unmount();});
  it('adds dated events with start, end and location',async()=>{const save=vi.fn().mockResolvedValue(undefined);const view=mount(WidgetSurface,{props:{widget:one('reminders'),save}});await view.get('.agenda-date').trigger('click');await view.get('[aria-label="事项名称"]').setValue('设计评审');await view.get('[aria-label="日程日期"]').setValue('2026-10-20');await view.get('[aria-label="开始时间"]').setValue('14:00');await view.get('[aria-label="结束时间"]').setValue('15:30');await view.get('[aria-label="日程地点"]').setValue('A302');await view.get('form').trigger('submit');expect(save.mock.calls[0][0].living.reminders[0]).toMatchObject({title:'设计评审',at:'2026-10-20T14:00',end:'15:30',location:'A302'});view.unmount();});

@@ -35,6 +35,20 @@ vi.mock('../bridge.ts', async (importOriginal) => {
 });
 
 describe('ControlShell sidebar', () => {
+  it('reuses a page when returning through the sidebar', async () => {
+    const wrapper = mount(ControlShell, { attachTo: document.body });
+    try {
+      await flushPromises();
+      await wrapper.get('[data-testid="nav-games"]').trigger('click');
+      await vi.waitFor(async () => { await flushPromises(); expect(wrapper.find('[data-testid="games-page"]').exists()).toBe(true); });
+      const first = wrapper.get('[data-testid="games-page"]').element;
+      await wrapper.get('[data-testid="nav-wallpapers"]').trigger('click');
+      await flushPromises();
+      await wrapper.get('[data-testid="nav-games"]').trigger('click');
+      await vi.waitFor(async () => { await flushPromises(); expect(wrapper.find('[data-testid="games-page"]').exists()).toBe(true); });
+      expect(wrapper.get('[data-testid="games-page"]').element).toBe(first);
+    } finally { wrapper.unmount(); }
+  });
   it('moves assistant preferences between AI and voice tabs and opens the capsule from the floating entry', async () => {
     const wrapper = mount(ControlShell, { attachTo: document.body });
     await flushPromises();

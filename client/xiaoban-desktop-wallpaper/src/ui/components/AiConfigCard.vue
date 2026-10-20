@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onBeforeUnmount, ref } from 'vue';
+import { computed, onDeactivated, onMounted, onBeforeUnmount, ref } from 'vue';
 import { NAlert, NButton, NInput, NModal, NPopconfirm, NSelect, NSwitch, NTag } from 'naive-ui';
 import { Bot, Cpu, ExternalLink, FolderOpen, Globe, Plus, RefreshCw, Settings, ShieldCheck, Sparkles, Trash2, Wrench } from 'lucide-vue-next';
 import { GATEWAY_PROVIDER, invoke, listen, type AiConfigView, type AiProtocol, type ProviderConfigView } from '../../bridge.ts';
@@ -207,6 +207,7 @@ function fill(view: AiConfigView) {
 
 let unlisten: (() => void) | undefined;
 onBeforeUnmount(() => unlisten?.());
+onDeactivated(() => { modalApiKey.value = ''; modalVisible.value = false; });
 async function refreshCatalogue() {
   if (!props.store.desktop || busy.value) return;
   busy.value = 'catalogue';

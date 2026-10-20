@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import ResourceLibraryPage from '../components/ResourceLibraryPage.vue';
 import ResourceShareActions from "../components/ResourceShareActions.vue";
-import { computed, onMounted, ref } from "vue";
+import { computed, onActivated, onMounted, ref } from "vue";
 import { Save, Sparkles, Square, Trash2 } from "lucide-vue-next";
 import { NAlert, NButton, NPopconfirm, NSkeleton, NTag, NTabs, NTabPane } from "naive-ui";
 import type { ControlStore } from "../control-types.ts";
@@ -28,7 +28,7 @@ function descriptionFor(game: GameManifest) {
 const message = (error: unknown, fallback: string) => (error instanceof Error ? error.message : typeof error === "string" ? error : fallback);
 
 async function loadGames() {
-  loading.value = true;
+  loading.value = games.value.length === 0;
   catalogError.value = "";
   try {
     const catalog = await props.store.listGames();
@@ -73,6 +73,8 @@ async function removeGame(game: GameManifest) {
 
 async function imported(){await loadGames();category.value='custom';}
 onMounted(loadGames);
+let opened = false;
+onActivated(() => { if (opened) void loadGames(); else opened = true; });
 </script>
 
 <template>

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import {computed,onMounted,onBeforeUnmount,ref,watch} from 'vue';
+import {computed,onActivated,onDeactivated,onMounted,onBeforeUnmount,ref,watch} from 'vue';
 import {Check,ChevronLeft,ChevronRight,Heart,MapPin,MoreHorizontal,Plus,Sunrise,Leaf,ArrowUp,ArrowDown,Volume2,VolumeX,Trash2,Pencil,List} from 'lucide-vue-next';
 import {desktop,invoke} from '../bridge.ts';
 import {baseSize,calendarDays,type DesktopWidget,type WidgetPayload,type WidgetContent,type LivingData,type NoteData,type ReminderItem,type TodoItem} from './model.ts';
@@ -139,10 +139,15 @@ function customDrag(event:MessageEvent){
 onMounted(()=>window.addEventListener('message',customDrag));
 onBeforeUnmount(()=>window.removeEventListener('message',customDrag));
 function capture(e:MouseEvent){if(suppressClick||props.editing){e.stopImmediatePropagation();e.preventDefault();}}
-let clockTimer:ReturnType<typeof setInterval>,networkTimer:ReturnType<typeof setInterval>;
-function visible(){now.value=new Date();if(!document.hidden){if(props.widget.kind==='weather')void refreshWeather();else if(props.widget.kind==='stocks'){void loadQuote();void loadWatchlist();}}}
-onMounted(()=>{clockTimer=setInterval(()=>now.value=new Date(),1000);if(props.widget.kind==='weather')void refreshWeather();if(props.widget.kind==='stocks'){void loadQuote();void loadWatchlist();}networkTimer=setInterval(visible,props.widget.kind==='stocks'?60000:1800000);document.addEventListener('visibilitychange',visible);document.addEventListener('keydown',resizeKey);});
-onBeforeUnmount(()=>{resizer.finish(true);document.removeEventListener('keydown',resizeKey);alive=false;clearInterval(clockTimer);clearInterval(networkTimer);clearTimeout(hitTimer);clearTimeout(clickTimer);document.removeEventListener('visibilitychange',visible);void audio?.close();});
+let clockTimer:ReturnType<typeof setTimeout>|undefined,networkTimer:ReturnType<typeof setInterval>|undefined,active=true;
+function scheduleClock(){if(!active||clockTimer)return;clockTimer=setTimeout(()=>{clockTimer=undefined;now.value=new Date();scheduleClock();},60000-Date.now()%60000+20);}
+function startTimers(){scheduleClock();if(!props.preview&&(props.widget.kind==='weather'||props.widget.kind==='stocks')&&!networkTimer)networkTimer=setInterval(visible,props.widget.kind==='stocks'?60000:1800000);}
+function stopTimers(){clearTimeout(clockTimer);clearInterval(networkTimer);clockTimer=undefined;networkTimer=undefined;}
+function visible(){if(!active)return;now.value=new Date();if(!document.hidden){if(props.widget.kind==='weather')void refreshWeather();else if(props.widget.kind==='stocks'){void loadQuote();void loadWatchlist();}}}
+onMounted(()=>{startTimers();if(props.widget.kind==='weather')void refreshWeather();if(props.widget.kind==='stocks'){void loadQuote();void loadWatchlist();}document.addEventListener('visibilitychange',visible);document.addEventListener('keydown',resizeKey);});
+onActivated(()=>{if(!active){active=true;startTimers();visible();}});
+onDeactivated(()=>{active=false;stopTimers();});
+onBeforeUnmount(()=>{resizer.finish(true);document.removeEventListener('keydown',resizeKey);alive=false;stopTimers();clearTimeout(hitTimer);clearTimeout(clickTimer);document.removeEventListener('visibilitychange',visible);void audio?.close();});
 </script>
 <template>
 <article class="xb-widget" :class="[widget.kind,{editing,resizing,falling:!up}]" :style="{width:`${size.width*surfaceScale}px`,height:`${size.height*surfaceScale}px`,'--widget-scale':widget.kind==='custom'?1:widget.scale}" @pointerdown="startDrag" @pointermove="move($event)" @pointerup="move($event,true)" @pointercancel="move($event,true)" @click.capture="capture">

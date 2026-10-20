@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import ResourceLibraryPage from '../components/ResourceLibraryPage.vue';
 import ResourceShareActions from "../components/ResourceShareActions.vue";
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, onDeactivated, onMounted, ref, watch } from 'vue';
 import { NAlert, NButton, NPopconfirm, NSlider, NTabs, NTabPane } from 'naive-ui';
 import { Ban, Check, FileUp, Sparkles, Trash2 } from 'lucide-vue-next';
 import { normalizeChoice, paramsOf } from '../../effects/parse.ts';
@@ -62,6 +62,7 @@ async function removeEffect(id: string, name: string) {
   }
 }
 onMounted(() => { void reload(false); });
+onDeactivated(() => { hoveredId.value = ''; previewId.value = ''; });
 onBeforeUnmount(() => { if (timer) { clearTimeout(timer); commit(); } });
 </script>
 <template>

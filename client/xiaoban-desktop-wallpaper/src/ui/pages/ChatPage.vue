@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, h, nextTick, onMounted, onUnmounted, ref, watch, type Component, type HTMLAttributes } from 'vue';
+import { computed, h, nextTick, onActivated, onDeactivated, onMounted, onUnmounted, ref, watch, type Component, type HTMLAttributes } from 'vue';
 import { NButton, NDropdown, NInput, type DropdownOption } from 'naive-ui';
 import { ArrowDown, Check, ChevronDown, ChevronRight, Ellipsis, Folder, FolderInput, FolderPlus, ImagePlus, LoaderCircle, MessageSquarePlus, Mic, Pencil, SendHorizontal, Settings, Volume2, Shield, ShieldAlert, Sparkles, Square, Trash2, X, Zap } from 'lucide-vue-next';
 import { invoke } from '../../bridge.ts';
@@ -93,6 +93,16 @@ onMounted(() => {
   void asr?.init();
   document.addEventListener('visibilitychange', updateVisibility);
   window.addEventListener('blur', blurChat); window.addEventListener('focus', focusChat);
+});
+onActivated(() => {
+  updateVisibility();
+  document.addEventListener('visibilitychange', updateVisibility);
+  window.addEventListener('blur', blurChat); window.addEventListener('focus', focusChat);
+});
+onDeactivated(() => {
+  asr?.deactivate(); foreground.value = false;
+  document.removeEventListener('visibilitychange', updateVisibility);
+  window.removeEventListener('blur', blurChat); window.removeEventListener('focus', focusChat);
 });
 onUnmounted(() => {
   asr?.deactivate(); document.removeEventListener('visibilitychange', updateVisibility);
