@@ -144,7 +144,7 @@ describe('compact horizontal assistant tools', () => {
     await wrapper.get('.tools-host').trigger('pointerleave'); await vi.advanceTimersByTimeAsync(400);
     expect(wrapper.find('[role="toolbar"]').exists()).toBe(false);
   });
-  it.each(['thinking','answering'])('keeps stop enabled during %s even before submit has returned',async phase=>{
+  it.each(['thinking','answering','speaking'])('keeps stop enabled during %s even before submit has returned',async phase=>{
     const {store,wrapper}=setup();store.phase='idle';let finish!:()=>void;
     store.submit.mockImplementationOnce(()=>{store.phase=phase;return new Promise<void>(resolve=>{finish=resolve;});});
     await nextTick();await wrapper.get('[data-testid="assistant-primary"]').trigger('click');await nextTick();
@@ -217,5 +217,20 @@ describe('assistant region screenshots',()=>{
     const {store,wrapper}=setup();store.phase='idle';store.attachments=Array(8).fill('image');await nextTick();await openToolbar(wrapper);
     expect(wrapper.get<HTMLButtonElement>('[data-testid="assistant-screenshot"]').element.disabled).toBe(true);
     expect(wrapper.get<HTMLButtonElement>('[data-testid="assistant-add-image"]').element.disabled).toBe(true);
+  });
+});
+
+describe('assistant rainbow presentation',()=>{
+  it('keeps the collapsed orb idle while a background answer is active',async()=>{
+    const {store,wrapper}=setup();store.open=false;store.ball=true;store.phase='speaking';await nextTick();
+    expect(wrapper.get('[data-testid="assistant-ball"]').attributes('data-phase')).toBe('idle');
+    expect(wrapper.find('[data-testid="assistant-primary"]').exists()).toBe(false);
+  });
+  it.each(['thinking','answering','speaking'])('uses a dedicated stop style during %s and restores send or plus afterwards',async phase=>{
+    const {store,wrapper}=setup();store.phase=phase;await nextTick();
+    const button=wrapper.get('[data-testid="assistant-primary"]');expect(button.classes()).toContain('is-stop');
+    await button.trigger('click');expect(store.interrupt).toHaveBeenCalledOnce();
+    store.phase='idle';await nextTick();expect(button.classes()).not.toContain('is-stop');expect(button.attributes('aria-label')).toBe('发送');
+    store.input='';await nextTick();expect(button.attributes('aria-label')).toBe('展开工具');
   });
 });

@@ -114,7 +114,8 @@ export function createAssistantStore(deps: AssistantDeps): AssistantStore {
   let voiceTurn = false;
   /** Reactive, because the phase shows `speaking` from the moment a reply is handed to the voice until it ends. */
   const flags = reactive({ awaitingSpeech: false, submitting: false, changingSession: false });
-  let draftVersion = 0;
+  let draftVersion = 0, speechVersion = 0;
+  let turnInterrupted = false;
 
   const view = () => (chat.currentId ? chat.views[chat.currentId] ?? null : null);
   function turn() {
@@ -210,7 +211,7 @@ export function createAssistantStore(deps: AssistantDeps): AssistantStore {
         case 'attention': return '需要你确认一下';
         case 'thinking': return store.working || '思考中…';
         case 'answering': return store.working || '正在回答…';
-        case 'speaking': return '正在朗读，点一下光球可以停止';
+        case 'speaking': return '正在朗读，可随时停止';
         case 'listening': return asr.preparing ? '正在准备语音识别…' : asr.recognizing ? '正在识别…' : '我在听，请说…';
         default: return asr.enabled ? '问点什么，或直接说话' : '问点什么';
       }
@@ -287,7 +288,7 @@ export function createAssistantStore(deps: AssistantDeps): AssistantStore {
         return;
       }
       const images = [...store.attachments], version = draftVersion;
-      flags.submitting = true;
+      flags.submitting = true; turnInterrupted = false; speechVersion++;
       clearTimers(); heard = '';
       asr.deactivate();
       store.input = ''; store.attachments = []; store.note('');
@@ -310,17 +311,21 @@ export function createAssistantStore(deps: AssistantDeps): AssistantStore {
       voiceTurn = await startListening();
     },
     interrupt() {
-      if (store.phase === 'speaking') { flags.awaitingSpeech = false; void speech.stop(); afterTurn(); return; }
+      // Stop both channels, including a reply that finishes while cancellation is in flight.
+      turnInterrupted = true; speechVersion++;
+      clearTimers(); heard = ''; voiceTurn = false; flags.awaitingSpeech = false;
+      asr.deactivate(); void speech.stop();
       if (view()?.running) void chat.cancel();
     },
     async decide(decision) { const request = store.approval; if (request) await chat.answerApproval(request, decision); },
     async reply(answer) { const request = store.ask; if (request) await chat.answerQuestion(request, answer); },
     replied(session, text, key) {
-      if (!store.open || session !== chat.currentId) return;
+      if (!store.open || session !== chat.currentId || turnInterrupted) return;
+      const version = ++speechVersion;
       if (store.prefs.read === 'always' || (store.prefs.read === 'voice' && voiceTurn)) {
         flags.awaitingSpeech = true;
         void speech.speak(text, key ?? `assistant:${session}`, undefined, true).then(() => {
-          if (flags.awaitingSpeech && speech.status === 'idle') { flags.awaitingSpeech = false; afterTurn(); }
+          if (version === speechVersion && flags.awaitingSpeech && speech.status === 'idle') { flags.awaitingSpeech = false; afterTurn(); }
         });
       } else afterTurn();
     },
