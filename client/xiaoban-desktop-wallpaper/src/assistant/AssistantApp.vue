@@ -133,7 +133,6 @@ watch(() => props.store.phase, (phase, before) => {
 });
 watch(() => props.store.open, open => { if (open) cardDismissed.value = false; });
 watch(() => [props.store.approval?.id, props.store.ask?.id, props.store.hint, props.store.failure], () => { cardDismissed.value = false; });
-const quiet = computed(() => props.store.phase === 'idle');
 
 const busy = computed(() => ['thinking', 'answering', 'speaking'].includes(props.store.phase));
 const hasCard = computed(() => !cardDismissed.value && Boolean(
@@ -178,7 +177,7 @@ let hitRaf=0,lastRegions='';
 function syncHitRegions(){
   const regions:HitRegion[]=[];
   document.querySelectorAll<HTMLElement>('.composer,.card,.ball,.tools-toolbar,.selection-copy-menu').forEach(el=>{
-    const radius=el.classList.contains('composer')?34:el.classList.contains('ball')?32:el.classList.contains('card')?22:el.classList.contains('selection-copy-menu')?9:16;
+    const radius=el.classList.contains('composer')?32:el.classList.contains('ball')?24:el.classList.contains('card')?18:el.classList.contains('selection-copy-menu')?9:16;
     const region=hitRegion(el.getBoundingClientRect(),window.innerHeight,radius);
     if(region)regions.push(region);
   });
@@ -266,8 +265,8 @@ onBeforeUnmount(()=>{
 <template>
   <div class="stage" :class="{ light: !isDark,dragging }" @dragover="dragOver" @drop="dropImages" @keydown.esc.prevent.stop="escape" @pointerdown="dragDown" @click.capture="captureClick">
     <div v-if="store.ball && !store.open" class="ball-stage" data-testid="assistant-ball-stage">
-      <button type="button" class="ball" :data-phase="store.phase" title="点一下提问，按住可以拖动，右键打开设置" aria-label="打开超级小伴" data-testid="assistant-ball" data-drag-handle @click="ballClick" @contextmenu.prevent="store.openSettings('assistant')">
-        <Orb :phase="store.phase" :level="0" :active="true" :size="48" :dark="isDark" :fps="quiet ? 20 : 60" />
+      <button type="button" class="ball" data-phase="idle" title="点一下提问，按住可以拖动，右键打开设置" aria-label="打开超级小伴" data-testid="assistant-ball" data-drag-handle @click="ballClick" @contextmenu.prevent="store.openSettings('assistant')">
+        <Orb phase="idle" :active="store.ball && !store.open" :size="38" />
       </button>
     </div>
     <Transition name="pop" appear @after-enter="queueHitRegions" @after-leave="queueHitRegions">
@@ -305,8 +304,8 @@ onBeforeUnmount(()=>{
           <div v-for="(image, index) in store.attachments" :key="index" class="image-thumb"><img :src="image" :alt="`待发送的图片 ${index + 1}`" draggable="false" /><button type="button" :aria-label="`移除图片 ${index + 1}`" :disabled="submitting || imageReading" @click="store.attachments.splice(index, 1)"><X :size="11" /></button></div>
         </div>
         <div class="capsule" :data-phase="store.phase">
-          <button type="button" class="orb-button" :title="store.phase === 'speaking' ? '停止朗读' : store.phase === 'listening' ? '暂停聆听 · 拖动可移动' : '点一下开始说话 · 拖动可移动'" :aria-label="store.phase === 'listening' ? '暂停聆听' : '开始说话'" data-testid="assistant-orb" :disabled="imageReading || submitting || capturing" data-drag-handle @click="onOrb">
-            <Orb :phase="store.phase" :level="asr.level" :active="store.open" :size="52" :dark="isDark" />
+          <button type="button" class="orb-button" :title="store.phase === 'speaking' ? '停止朗读' : store.phase === 'listening' ? '暂停聆听 · 拖动可移动' : '点一下开始说话 · 拖动可移动'" :aria-label="store.phase === 'speaking' ? '停止朗读' : store.phase === 'listening' ? '暂停聆听' : '开始说话'" data-testid="assistant-orb" :disabled="imageReading || submitting || capturing" data-drag-handle @click="onOrb">
+            <Orb :phase="store.phase" :level="asr.level" :active="store.open" :size="34" :dark="isDark" />
           </button>
           <input ref="field" v-model="store.input" :disabled="store.changingSession" class="field" type="text" autocomplete="off" spellcheck="false" :placeholder="store.status" aria-label="向小伴提问" data-testid="assistant-input" @keydown.enter="onEnter" @compositionstart="composing = true" @compositionend="composing = false" />
           <div ref="toolsHost" class="tools-host" data-no-drag @pointerenter="enterTools" @pointerleave="leaveTools" @focusin="focusTools" @focusout="toolsFocusOut">
@@ -318,7 +317,7 @@ onBeforeUnmount(()=>{
               <button type="button" class="tool-button" title="选择图片" aria-label="选择图片" data-testid="assistant-add-image" :disabled="!canAttach || store.attachments.length >= 8" @click="toolAction('image')"><ImagePlus :size="16" :stroke-width="1.7" /></button>
               <button type="button" class="tool-button" title="截图" aria-label="截图" data-testid="assistant-screenshot" :disabled="!canAttach || store.attachments.length >= 8" @click="toolAction('screenshot')"><ScanLine :size="16" :stroke-width="1.7" /></button>
             </div>
-            <button ref="primaryButton" type="button" class="round main-action" :class="{ 'has-action': canSend || busy, 'tools-open': toolsOpen && !canSend && !busy }" :aria-label="busy ? '停止' : canSend ? '发送' : toolsOpen ? '收起工具' : '展开工具'" :title="busy ? '停止 · 悬停展开工具' : canSend ? '发送 · 悬停展开工具' : '展开工具'" :aria-expanded="toolsOpen" aria-controls="assistant-toolbar" aria-keyshortcuts="ArrowUp ArrowDown" :disabled="imageReading || capturing || (submitting && !busy)" data-testid="assistant-primary" @keydown="primaryKeys" @click="primary"><Square v-if="busy" :size="14" /><ArrowUp v-else-if="canSend" :size="18" /><Plus v-else :size="18" /></button>
+            <button ref="primaryButton" type="button" class="round main-action" :class="{ 'has-action': canSend, 'is-stop': busy, 'tools-open': toolsOpen && !canSend && !busy }" :aria-label="busy ? '停止' : canSend ? '发送' : toolsOpen ? '收起工具' : '展开工具'" :title="busy ? '停止回复 · 悬停展开工具' : canSend ? '发送 · 悬停展开工具' : '展开工具'" :aria-expanded="toolsOpen" aria-controls="assistant-toolbar" aria-keyshortcuts="ArrowUp ArrowDown" :disabled="imageReading || capturing || (submitting && !busy)" data-testid="assistant-primary" @keydown="primaryKeys" @click="primary"><Square v-if="busy" :size="12" fill="currentColor" :stroke-width="0" /><ArrowUp v-else-if="canSend" :size="18" /><Plus v-else :size="18" /></button>
           </div>
         </div>
         <p v-if="dropActive || imageReading || capturing" class="image-status" aria-live="polite">{{ capturing ? '截图中，按 Esc 可以取消' : imageReading ? '正在读取图片…' : '松开添加图片' }}</p>
@@ -334,18 +333,18 @@ onBeforeUnmount(()=>{
 html,body,#app{background:transparent!important}
 </style>
 <style scoped>
-.stage{--card:#141925;--capsule:#151a27;--line:rgba(160,190,255,.2);--text:#eaf0fb;--text-soft:#8a94ab;--working:#9fb0cf;--placeholder:#7d88a2;--field:#f3f6fd;--button:rgba(255,255,255,.07);--button-hover:rgba(255,255,255,.14);--button-fg:#b9c3d8;--button-fg-hover:#fff;--code:rgba(255,255,255,.08);--link:#7fd6ff;--hint:#ffd9a0;--failure:#ff9aa6;--gate-bg:rgba(255,190,100,.08);--gate-line:rgba(255,190,100,.28);--gate-title:#ffe2b4;--gate-tool:#c3cce0;--ghost:rgba(255,255,255,.08);--ghost-fg:#dfe6f5;--scroll:rgba(255,255,255,.18);--dot:#8fb7ff;--listen:rgba(84,226,255,.7);--busy:rgba(140,150,255,.6);--attention:rgba(255,190,100,.7);--ui-line:var(--line);--ui-surface-alt:var(--code);--ui-text-primary:var(--text);--ui-text-secondary:var(--working);--ui-text-tertiary:var(--text-soft);--ui-primary:var(--link);position:relative;display:flex;flex-direction:column;justify-content:flex-end;height:100vh;color:var(--text);font:14px/1.6 -apple-system,BlinkMacSystemFont,"PingFang SC","Segoe UI","Microsoft YaHei UI",sans-serif;-webkit-font-smoothing:antialiased;user-select:none;cursor:default;pointer-events:none}
-.stage.light{--card:#ffffff;--capsule:#ffffff;--line:rgba(40,60,100,.28);--text:#1d2433;--text-soft:#6b7487;--working:#55627d;--placeholder:#98a1b3;--field:#1d2433;--button:rgba(30,45,80,.07);--button-hover:rgba(30,45,80,.13);--button-fg:#566079;--button-fg-hover:#1d2433;--code:rgba(30,45,80,.07);--link:#1a6fd4;--hint:#9a5b00;--failure:#c8324a;--gate-bg:rgba(255,170,60,.12);--gate-line:rgba(220,140,30,.42);--gate-title:#7a4700;--gate-tool:#4a556d;--ghost:rgba(30,45,80,.07);--ghost-fg:#2a3550;--scroll:rgba(30,45,80,.24);--dot:#5b7fe0;--listen:rgba(0,160,200,.8);--busy:rgba(90,100,230,.7);--attention:rgba(230,140,20,.85)}
+.stage{--card:#292C31;--capsule:linear-gradient(175deg,#3E4147 0%,#35383E 48%,#2F3238 100%);--line:#A6B5CB22;--text:#DFE3E9;--text-soft:#878E99;--working:#A4AEBD;--placeholder:#919CAB;--field:#DFE3E9;--button:#353A43;--button-hover:#434750;--button-fg:#BAC4D1;--button-fg-hover:#DFE3E9;--code:#FFFFFF0B;--link:#B0C4D7;--hint:#D7BE92;--failure:#EEA5AD;--gate-bg:#C6AE7D0F;--gate-line:#C6AE7D30;--gate-title:#DDC8A5;--gate-tool:#BCC4CF;--ghost:#FFFFFF0D;--ghost-fg:#DFE3E9;--scroll:#FFFFFF25;--dot:#A8B6C6;--listen:#B2C8EA50;--busy:#A6B5CB30;--attention:#C6AE7D60;--panel-shadow:0 5px 14px #00000014,0 1px 2px #00000016;--capsule-shadow:inset 0 1px 0 #E8F0FF15,inset 0 -1px 0 #11182126,0 8px 25px #00000025;--stop:#484E56;--stop-fg:#B1BBC7;--stop-hover:#535B65;--stop-fg-hover:#CCD5DF;--ui-line:var(--line);--ui-surface-alt:var(--code);--ui-text-primary:var(--text);--ui-text-secondary:var(--working);--ui-text-tertiary:var(--text-soft);--ui-primary:var(--link);position:relative;display:flex;flex-direction:column;justify-content:flex-end;height:100vh;color:var(--text);font:14px/1.6 -apple-system,BlinkMacSystemFont,"PingFang SC","Segoe UI","Microsoft YaHei UI",sans-serif;-webkit-font-smoothing:antialiased;user-select:none;cursor:default;pointer-events:none;color-scheme:dark}
+.stage.light{--card:#FFFFFF;--capsule:linear-gradient(175deg,#FEFFFF 0%,#F3F6F9 45%,#EAF0F5 100%);--line:#D5DDE6;--text:#414851;--text-soft:#929BA7;--working:#718092;--placeholder:#A0A9B4;--field:#414851;--button:#EAEFF4;--button-hover:#DFE6ED;--button-fg:#657181;--button-fg-hover:#414851;--code:#71849A0D;--link:#657F95;--hint:#947445;--failure:#B95264;--gate-bg:#B9944B0B;--gate-line:#B9944B30;--gate-title:#886B3E;--gate-tool:#657181;--ghost:#71849A0D;--ghost-fg:#414851;--scroll:#71849A35;--dot:#899BAE;--listen:#B3C2D3;--busy:#C4CFDA;--attention:#C6AE7D;--panel-shadow:0 3px 12px #68788A07,0 1px 2px #58677805;--capsule-shadow:inset 0 1px 0 #FFFFFFF2,inset 0 -1px 0 #8F9DAC0C,0 7px 24px #71849A12;--stop:#E6EBEF;--stop-fg:#778491;--stop-hover:#DDE4EA;--stop-fg-hover:#5F7080;color-scheme:light}
 .ball-stage{display:grid;place-items:center;height:100vh}
-.ball{pointer-events:auto;touch-action:none;display:grid;place-items:center;width:64px;height:64px;padding:0;border-radius:50%;background:var(--capsule);border:1px solid var(--line);cursor:pointer;transition:border-color .3s,transform .2s}
+.ball{pointer-events:auto;touch-action:none;display:grid;place-items:center;width:48px;height:48px;padding:0;border-radius:50%;background:var(--capsule);box-shadow:var(--capsule-shadow);border:1px solid var(--line);cursor:pointer;transition:border-color .3s,transform .2s}
 .ball:hover{transform:scale(1.06)}
 .ball:active{transform:scale(.96)}
 .ball:focus-visible{outline:2px solid var(--link);outline-offset:2px}
 .ball[data-phase=listening]{border-color:var(--listen)}
 .ball[data-phase=thinking],.ball[data-phase=answering],.ball[data-phase=speaking]{border-color:var(--busy)}
 .ball[data-phase=attention]{border-color:var(--attention)}
-.inner{pointer-events:none;display:flex;flex-direction:column;gap:10px;padding:12px}
-.card{pointer-events:auto;cursor:grab;position:relative;border-radius:22px;background:var(--card);border:1px solid var(--line);overflow:hidden}
+.inner{pointer-events:none;display:flex;flex-direction:column;gap:12px;padding:12px}
+.card{pointer-events:auto;cursor:grab;position:relative;border-radius:18px;background:var(--card);border:1px solid var(--line);box-shadow:var(--panel-shadow);overflow:hidden}
 .card .card-close{position:absolute;z-index:1;top:8px;right:8px;width:28px;height:28px}
 .card-body{cursor:auto;max-height:390px;overflow-y:auto;padding:16px 44px 18px 20px;user-select:text;scrollbar-width:thin;scrollbar-color:var(--scroll) transparent}
 .you{margin:0 0 8px;font-size:12.5px;color:var(--text-soft);display:-webkit-box;-webkit-line-clamp:2;line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
@@ -372,11 +371,11 @@ html,body,#app{background:transparent!important}
 .gate button{height:32px;padding:0 14px;border-radius:16px;border:1px solid transparent;font:inherit;font-size:13px;cursor:pointer}
 .gate .ghost{background:var(--ghost);color:var(--ghost-fg)}
 .gate .ghost.dim{color:var(--text-soft)}
-.gate .solid{background:linear-gradient(135deg,#ffcf7a,#ff9f5a);color:#2a1604;font-weight:600}
-.composer{pointer-events:auto;cursor:grab;position:relative;border-radius:34px;background:var(--capsule);border:1px solid var(--line);transition:border-color .2s}
+.gate .solid{background:var(--button);color:var(--text);font-weight:600}
+.composer{pointer-events:auto;cursor:grab;position:relative;border-radius:32px;background:var(--capsule);border:1px solid var(--line);box-shadow:var(--capsule-shadow);transition:border-color .2s}
 .composer.drop-active{border-color:var(--link);box-shadow:inset 0 0 0 1px var(--link)}
 .tools-host{position:relative;flex:none;cursor:default}
-.tools-toolbar{position:absolute;right:-3px;bottom:calc(100% + 9px);display:flex;align-items:center;gap:4px;padding:6px;border-radius:16px;background:var(--card);border:1px solid var(--line);box-shadow:0 5px 20px rgba(0,0,0,.12);z-index:5;animation:toolbar-in .16s ease-out;cursor:default}
+.tools-toolbar{position:absolute;right:-3px;bottom:calc(100% + 9px);display:flex;align-items:center;gap:4px;padding:6px;border-radius:16px;background:var(--card);border:1px solid var(--line);box-shadow:var(--panel-shadow);z-index:5;animation:toolbar-in .16s ease-out;cursor:default}
 .tools-toolbar::after{content:"";position:absolute;top:100%;left:0;right:0;height:12px}
 .tool-button{display:grid;place-items:center;width:32px;height:32px;flex:none;padding:0;border:0;border-radius:10px;background:transparent;color:var(--button-fg);cursor:pointer;transition:background .15s,color .15s}
 .tool-button:hover:not(:disabled){background:var(--button-hover);color:var(--button-fg-hover)}
@@ -384,6 +383,9 @@ html,body,#app{background:transparent!important}
 .tool-button:disabled{opacity:.35;cursor:default}
 .round.main-action{background:var(--button);color:var(--button-fg)}
 .round.main-action.has-action{background:var(--text);color:var(--card)}
+.round.main-action.is-stop{background:var(--stop);color:var(--stop-fg);box-shadow:inset 0 0 0 1px #8593A00D}
+.round.main-action.is-stop:hover{background:var(--stop-hover);color:var(--stop-fg-hover)}
+.main-action.is-stop :deep(svg){width:12px;height:12px;fill:currentColor;stroke:none}
 .main-action svg{transition:transform .18s}
 .main-action.tools-open svg{transform:rotate(45deg)}
 .main-action:disabled{opacity:.45;cursor:default}
@@ -396,14 +398,15 @@ html,body,#app{background:transparent!important}
 .image-thumb button:focus-visible{outline:2px solid var(--link)}
 .sent-images{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
 .image-status{font-size:11px;color:var(--link);margin:0;padding:0 20px 8px;cursor:default}
-.capsule{display:flex;align-items:center;gap:8px;height:68px;padding:0 12px 0 8px;border-radius:34px;background:transparent;border:0;transition:border-color .3s}
+.capsule{display:flex;align-items:center;gap:8px;height:64px;padding:0 15px 0 13px;border-radius:34px;background:transparent;border:0;transition:border-color .3s}
 .composer:has(.capsule[data-phase=listening]){border-color:var(--listen)}
 .composer:has(.capsule[data-phase=thinking]),.composer:has(.capsule[data-phase=answering]),.composer:has(.capsule[data-phase=speaking]){border-color:var(--busy)}
 .composer:has(.capsule[data-phase=attention]){border-color:var(--attention)}
 .round,.gate button,.link{cursor:pointer}.orb-button,.ball{cursor:grab}.stage.dragging,.stage.dragging *{cursor:grabbing!important}
-.orb-button{touch-action:none;flex:none;width:52px;height:52px;padding:0;border:0;border-radius:50%;background:none;cursor:pointer}
+.orb-button{touch-action:none;flex:none;width:34px;height:34px;padding:0;border:0;border-radius:50%;background:none;cursor:pointer}
 .orb-button:focus-visible,.round:focus-visible{outline:2px solid var(--link);outline-offset:2px}
-.field{cursor:text;flex:1;min-width:0;height:44px;padding:0 4px;border:0;outline:0;background:transparent;color:var(--field);font:inherit;font-size:16px;caret-color:var(--link);user-select:text}
+.field{cursor:text;flex:1;min-width:0;height:44px;padding:0 4px;border:0;outline:0;background:transparent;color:var(--field);font:inherit;font-size:14px;caret-color:var(--field);user-select:text}
+.field:focus,.field:focus-visible{outline:none;box-shadow:none}
 .field::placeholder{color:var(--placeholder)}
 .round{flex:none;width:36px;height:36px;display:grid;place-items:center;padding:0;border:0;border-radius:50%;background:var(--button);color:var(--button-fg);cursor:pointer;transition:background .2s,color .2s}
 .round:hover{background:var(--button-hover);color:var(--button-fg-hover)}

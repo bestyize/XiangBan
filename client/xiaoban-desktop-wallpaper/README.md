@@ -10,6 +10,8 @@ Windows / macOS 桌面应用：一个可拖动、透明处点击穿透的悬浮�
 
 ## 设计规范与交互稿
 
+超级小伴已采用月白 / 夜银两套配色与彩虹生命球，收起球使用待机动效；思考、文字回复及语音播放均可通过右侧方块停止。最终视觉参考见 [对话框设计稿](docs/design-specs/prototypes/assistant-conversation.html) 与 [生命球演示](docs/design-specs/prototypes/assistant-living-orb.html)。
+
 工程内的设计文档入口见 [设计规范目录](docs/design-specs/README.md)。超级小伴的 [悬浮按钮设计稿](docs/design-specs/prototypes/assistant-floating-tools.html) 与 [截图工具设计稿](docs/design-specs/prototypes/assistant-capture-overlay.html) 均可直接用浏览器打开；交互约定及正式代码对应关系见 [超级小伴设计规范](docs/design-specs/super-assistant.md)。
 
 ## 在 Windows 上运行

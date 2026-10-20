@@ -36,7 +36,7 @@ export function createAsrStore(deps: AsrDeps): AsrStore {
   let preparing: Promise<boolean> | undefined;
   let prepareGeneration = -1;
   let unlisten: (() => void) | undefined;
-  let disposed = false, generation = 0, recording = 0, request = '';
+  let disposed = false, generation = 0, recording = 0, hostRevision = 0, request = '';
   let capture: Capture | undefined;
   let receiver: ((text: string) => void) | undefined;
   let segmenter: UtteranceSegmenter | undefined;
@@ -105,14 +105,26 @@ export function createAsrStore(deps: AsrDeps): AsrStore {
             if (disposed || !store.enabled || value.requestId !== request) return;
             store.phase = value.phase; store.downloaded = value.downloaded; store.total = value.total;
           });
-          // The host warms the engine up on its own after a start; follow it, without touching what the user chose.
+          // Settings and the floating assistant have separate stores/windows. The host
+          // owns the saved switch; enabling it never requests this window's microphone.
           const offState = await deps.listen<HostStatus>('asr-state', value => {
             if (disposed) return;
-            store.modelReady = value.modelReady; store.engineReady = value.engineReady; store.warming = Boolean(value.warming);
+            hostRevision++;
+            if (store.enabled !== value.enabled) {
+              generation++;
+              store.saving = false;
+              store.error = '';
+              if (!value.enabled) {
+                store.deactivate(); request = '';
+                store.preparing = false; store.phase = 'idle';
+              }
+            }
+            Object.assign(store, value, { warming: Boolean(value.warming) });
           });
           if (disposed) { off(); offState(); return; } unlisten = () => { off(); offState(); };
+          const revision = hostRevision;
           const value = await deps.invoke<HostStatus>('asr_get_status');
-          if (!disposed) Object.assign(store, value);
+          if (!disposed && revision === hostRevision) Object.assign(store, value);
         } catch (e) { if (!disposed) store.error = message(e); }
         finally { if (!disposed) store.ready = true; }
       })();
@@ -198,4 +210,5 @@ export function createAsrStore(deps: AsrDeps): AsrStore {
   });
   return store;
 }
+
 

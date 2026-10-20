@@ -501,3 +501,27 @@ describe('assistant conversation persistence',()=>{
     await h.store.opened();expect(h.chat.currentId).toBeNull();expect(storage.getItem(SESSION_KEY)).toBeNull();expect(h.invoke).not.toHaveBeenCalledWith('chat_new_session',expect.anything());h.store.dispose();
   });
 });
+
+describe('interrupting assistant output',()=>{
+  it('stops simultaneous speech and generation, preserves text and draft, and suppresses late reading',async()=>{
+    const {store,chat,speech,asr}=setup({prefs:{open:'type',read:'always'}});await store.init();await store.opened();await store.submit('你好');
+    chat.views.s1.items.push({kind:'assistant',id:'a',text:'已经生成的文字'});
+    store.replied('s1','已经生成的文字','a');await nextTick();expect(store.phase).toBe('speaking');
+    store.input='下一句草稿';speech.stop.mockClear();asr.activate.mockClear();store.interrupt();await nextTick();
+    expect(chat.cancel).toHaveBeenCalledOnce();expect(speech.stop).toHaveBeenCalledOnce();expect(store.answer).toBe('已经生成的文字');expect(store.input).toBe('下一句草稿');
+    expect(asr.activate).not.toHaveBeenCalled();speech.speak.mockClear();store.replied('s1','延迟结束的回复','late');expect(speech.speak).not.toHaveBeenCalled();
+    chat.views.s1.running=false;await store.submit('继续');finishAnswer(chat,'新一轮');store.replied('s1','新一轮','b');expect(speech.speak).toHaveBeenCalledWith('新一轮','b',undefined,true);
+  });
+  it('stopping voice playback returns to input without automatically reopening the microphone',async()=>{
+    const {store,chat,speech,asr}=setup();await store.opened();await store.submit('讲个故事',true);finishAnswer(chat,'从前有座山');store.replied('s1','从前有座山','a');await nextTick();asr.activate.mockClear();
+    store.interrupt();await nextTick();expect(store.phase).toBe('idle');expect(asr.activate).not.toHaveBeenCalled();expect(speech.status).toBe('idle');
+  });
+});
+
+describe('assistant voice settings synchronization',()=>{
+  it('cancels the pending automatic send when settings disables voice, preserving the draft',async()=>{
+    const {store,asr,chat,say,advance}=setup();await store.opened();say('还没有发送的话');expect(store.input).toBe('还没有发送的话');
+    asr.enabled=false;advance(SEND_GRACE_MS+1);await nextTick();
+    expect(chat.send).not.toHaveBeenCalled();expect(asr.recordingRequested).toBe(false);expect(store.phase).toBe('idle');expect(store.input).toBe('还没有发送的话');
+  });
+});
