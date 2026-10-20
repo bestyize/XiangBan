@@ -5,9 +5,9 @@ import ResourceShareActions from './ResourceShareActions.vue';
 import { invoke } from '../../bridge.ts';
 import type { ControlStore } from '../control-types.ts';
 vi.mock('../../bridge.ts',()=>({invoke:vi.fn()}));
-const create = (id?:string, icons=false) => {
+const create = (id?:string, icons=false, kind:'wallpaper'|'pet'='wallpaper') => {
  const store={desktop:true,notify:vi.fn()} as unknown as ControlStore;
- const wrapper=mount(ResourceShareActions,{props:{store,kind:'wallpaper',id,icons},global:{stubs:{NButton:{template:'<button v-bind="$attrs"><slot/><slot name="icon"/></button>'}}}});
+ const wrapper=mount(ResourceShareActions,{props:{store,kind,id,icons},global:{stubs:{NButton:{template:'<button v-bind="$attrs"><slot/><slot name="icon"/></button>'}}}});
  return {store,wrapper};
 };
 beforeEach(()=>vi.clearAllMocks());
@@ -16,6 +16,12 @@ describe('portable resource actions',()=>{
   vi.mocked(invoke).mockResolvedValue(true);const {wrapper}=create('local-demo');
   await wrapper.get('[data-testid="export-resource"]').trigger('click');await flushPromises();
   expect(invoke).toHaveBeenCalledExactlyOnceWith('export_resource_pack',{kind:'wallpaper',id:'local-demo'});wrapper.unmount();
+ });
+ it('exports pet themes through the same ZIP resource route as custom widgets',async()=>{
+  vi.mocked(invoke).mockResolvedValue(true);const {wrapper}=create('my-pets',false,'pet');
+  await wrapper.get('[data-testid="export-resource"]').trigger('click');await flushPromises();
+  expect(invoke).toHaveBeenCalledExactlyOnceWith('export_resource_pack',{kind:'pet',id:'my-pets'});
+  wrapper.unmount();
  });
  it('opens the forum only after the share export succeeds',async()=>{
   vi.mocked(invoke).mockResolvedValue(true);const {wrapper}=create('local-demo');

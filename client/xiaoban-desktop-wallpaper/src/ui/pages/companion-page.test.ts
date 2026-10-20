@@ -6,9 +6,10 @@ import {beforeEach,describe,it,expect,vi} from 'vitest';
 import {defaults} from '../../bridge.ts';
 import type {ControlStore} from '../control-types.ts';
 import CompanionPage from './CompanionPage.vue';
+import { OFFICIAL_THEMES } from '../../pets/model.ts';
 vi.mock('../../pets/PetActor.vue',()=>({default:{template:'<div class="actor"/>',props:['definition','size','expression']}}));
 vi.mock('../../bridge.ts',async original=>({...await original<typeof import('../../bridge.ts')>(),desktop:false,invoke:vi.fn()}));
-function setup(){const settings=reactive({...defaults});const store={settings,desktop:false,notify:vi.fn(),startCreation:vi.fn().mockResolvedValue(undefined),setCompanion:vi.fn(async(enabled:boolean)=>{settings.companionEnabled=enabled;})} as unknown as ControlStore;return {store,view:mount(CompanionPage,{props:{store},attachTo:document.body})};}
+function setup(desktopUi=false){const settings=reactive({...defaults});const store={settings,desktop:desktopUi,notify:vi.fn(),startCreation:vi.fn().mockResolvedValue(undefined),setCompanion:vi.fn(async(enabled:boolean)=>{settings.companionEnabled=enabled;})} as unknown as ControlStore;return {store,view:mount(CompanionPage,{props:{store},attachTo:document.body})};}
 async function tab(view:ReturnType<typeof mount>,name:string){await view.findAll('.n-tabs-tab').find(t=>t.text().startsWith(name))!.trigger('click');await flushPromises();}
 async function add(view:ReturnType<typeof mount>,petId:string,layer:'desktop'|'topmost'='topmost'){await view.get(`[data-testid="pet-add-${petId}"]`).trigger('click');await flushPromises();const choice=document.body.querySelector<HTMLButtonElement>(`[data-testid="pet-placement-${layer}"]`);expect(choice).not.toBeNull();choice!.click();await flushPromises();}
 beforeEach(()=>{localStorage.clear();});
@@ -20,5 +21,30 @@ describe('theme-based desktop pet library',()=>{
  it('opens the requested pot in the desktop tab from both native entry paths',async()=>{const {view}=setup();await flushPromises();await add(view,'daisy');const {id}=JSON.parse(localStorage.getItem('xiaoban.pets.layout.v1')!).instances[0];await view.setProps({settingsRequest:{id}});await flushPromises();expect(view.find('[data-testid="desktop-pets"]').exists()).toBe(true);expect(view.findAllComponents(NSelect).some(c=>c.attributes('data-testid')==='pet-change-plant')).toBe(true);expect(view.emitted('settingsOpened')).toHaveLength(1);await tab(view,'官方主题');window.dispatchEvent(new CustomEvent('pets-manage',{detail:{id}}));await flushPromises();expect(view.find('[data-testid="desktop-pets"]').exists()).toBe(true);view.unmount();});
  it('offers the official library from an empty desktop tab',async()=>{const {view}=setup();await flushPromises();await tab(view,'桌面伙伴');expect(view.find('[data-testid="pet-custom-empty"]').exists()).toBe(false);await view.get('.desktop-pets-empty button').trigger('click');await flushPromises();expect(view.find('[data-testid="pet-add-daisy"]').exists()).toBe(true);view.unmount();});
  it('opens AI creation with a selected theme as context',async()=>{const {view,store}=setup();await flushPromises();await view.get('[data-testid="pet-create"]').trigger('click');await flushPromises();expect(store.startCreation).toHaveBeenCalledWith('pet');await view.get('[data-testid="pet-theme-flower-whispers"] .theme-actions button').trigger('click');await flushPromises();expect(store.creationDraft).toContain('flower-whispers');expect(store.creationDraft).toContain('现有主题');view.unmount();});
+ it('shows explicit export and forum sharing for custom themes only, without a duplicate JSON export',async()=>{
+  const custom={...OFFICIAL_THEMES[0],id:'my-pets',name:'我的宠物'};
+  localStorage.setItem('xiaoban.pets.themes.v1',JSON.stringify([custom]));
+  const {view}=setup(true);await flushPromises();
+  expect(view.find('[data-testid="pet-theme-flower-whispers"] [data-testid="export-resource"]').exists()).toBe(false);
+  expect(view.find('[data-testid="pet-theme-flower-whispers"] [data-testid="pet-export-reference"]').exists()).toBe(true);
+  await tab(view,'自定义主题');
+  const theme=view.get('[data-testid="pet-theme-my-pets"]');
+  expect(theme.findAll('[data-testid="export-resource"]')).toHaveLength(1);
+  expect(theme.find('[data-testid="pet-export-reference"]').exists()).toBe(false);
+  expect(theme.findAll('[data-testid="share-resource"]')).toHaveLength(1);
+  expect(theme.get('[data-testid="export-resource"]').text()).toContain('导出资源包');
+  expect(theme.get('[data-testid="share-resource"]').text()).toContain('分享到论坛');
+  expect(theme.get('[data-testid="pet-theme-export-note"]').text()).toContain('整套主题');
+  view.unmount();
+ });
+ it('allows exporting a custom pet theme from the instance settings, never an official theme',async()=>{
+  const custom={...OFFICIAL_THEMES[0],id:'my-pets',name:'我的宠物'};
+  localStorage.setItem('xiaoban.pets.themes.v1',JSON.stringify([custom]));
+  const {view}=setup(true);await flushPromises();await tab(view,'自定义主题');await add(view,'daisy');await tab(view,'桌面伙伴');
+  await view.get('.pet-manage').trigger('click');await flushPromises();
+  expect(document.body.querySelector('[data-testid="pet-instance-share"]')).not.toBeNull();
+  expect(document.body.querySelector('[data-testid="pet-instance-share"] [data-testid="share-resource"]')).not.toBeNull();
+  view.unmount();
+ });
  it('keeps the instance list in its own tab and the custom empty state in custom themes',async()=>{const {view}=setup();await flushPromises();await add(view,'daisy');await tab(view,'自定义主题');expect(view.find('[data-testid="pet-custom-empty"]').exists()).toBe(true);expect(view.find('[data-testid="desktop-pets"]').exists()).toBe(false);await tab(view,'桌面伙伴');expect(view.find('[data-testid="pet-custom-empty"]').exists()).toBe(false);expect(view.findAll('.desktop-pet-row')).toHaveLength(1);view.unmount();});
 });
