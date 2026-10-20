@@ -12,13 +12,18 @@ vi.mock('./Orb.vue', () => ({ default: { template: '<span />' } }));
 vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} });
 
 const wrappers: ReturnType<typeof mount>[] = [];
-beforeEach(()=>vi.clearAllMocks());
-afterEach(() => { wrappers.splice(0).forEach(w => w.unmount());document.body.replaceChildren(); });
+beforeEach(()=>{vi.clearAllMocks();vi.mocked(invoke).mockReset().mockResolvedValue(undefined);});
+afterEach(() => { wrappers.splice(0).forEach(w => w.unmount());document.body.replaceChildren();vi.useRealTimers(); });
 function setup() {
-  const store = reactive({ open: true, ball: false, phase: 'answering', hint: '', hintTab: '', question: '今天如何放松', answer: '可以先休息片刻。', working: '', failure: '', approval: null as null | { id: string; arguments: {}; tool: string }, ask: null, attachments: [] as string[], questionImages: [] as string[], prepareImages: vi.fn(), note: vi.fn(), input: '草稿', status: '正在回答…', hide: vi.fn(), submit: vi.fn(), interrupt: vi.fn(), openChat: vi.fn(),toggleListening:vi.fn(),unfold:vi.fn() });
+  const store = reactive({ open: true, ball: false, phase: 'answering', hint: '', hintTab: '', question: '今天如何放松', answer: '可以先休息片刻。', working: '', failure: '', approval: null as null | { id: string; arguments: {}; tool: string }, ask: null, attachments: [] as string[], questionImages: [] as string[], prepareImages: vi.fn(), note: vi.fn(), input: '草稿', status: '正在回答…', hide: vi.fn(), submit: vi.fn(), interrupt: vi.fn(), openChat: vi.fn(),openSettings:vi.fn(),toggleListening:vi.fn(),unfold:vi.fn() });
   const wrapper=mount(AssistantApp,{attachTo:document.body,props:{store:store as unknown as AssistantStore,asr:{level:0} as AsrStore},global:{stubs:{MarkdownView:true}}});
   wrappers.push(wrapper);
   return {store,wrapper};
+}
+
+async function openToolbar(wrapper: ReturnType<typeof setup>['wrapper']) {
+  await wrapper.get('[data-testid="assistant-primary"]').trigger('keydown', { key: 'ArrowUp' });
+  await nextTick();
 }
 
 describe('assistant response card', () => {
@@ -50,7 +55,7 @@ function finish(){window.dispatchEvent(new Event('assistant-drag-end'));}
 describe('assistant drag gestures',()=>{
  it('keeps a small orb movement as a click',async()=>{const {store,wrapper}=setup();const orb=wrapper.get('[data-testid="assistant-orb"]');await orb.trigger('pointerdown',{button:0,pointerId:1,clientX:10,clientY:10});move(13,12);window.dispatchEvent(new PointerEvent('pointerup',{pointerId:1}));await orb.trigger('click',{detail:1});expect(invoke).not.toHaveBeenCalledWith('assistant_drag');expect(store.toggleListening).toHaveBeenCalledOnce();});
  it('drags the orb after the threshold without toggling voice or losing the draft',async()=>{const {store,wrapper}=setup();const orb=wrapper.get('[data-testid="assistant-orb"]');await orb.trigger('pointerdown',{button:0,pointerId:1,clientX:10,clientY:10});move(18,10);await nextTick();expect(invoke).toHaveBeenCalledWith('assistant_drag');expect(wrapper.get('.stage').classes()).toContain('dragging');await orb.trigger('click',{detail:1});expect(store.toggleListening).not.toHaveBeenCalled();expect(store.interrupt).not.toHaveBeenCalled();expect(store.input).toBe('草稿');finish();await nextTick();expect(wrapper.get('.stage').classes()).not.toContain('dragging');});
- it('keeps text selection and control presses out of window dragging',async()=>{const {wrapper}=setup();for(const selector of ['[data-testid="assistant-input"]','.card-body','[data-testid="assistant-expand"]','[data-testid="assistant-copy"]']){await wrapper.get(selector).trigger('pointerdown',{button:0,pointerId:1,clientX:10,clientY:10});move(100,100);window.dispatchEvent(new PointerEvent('pointerup',{pointerId:1}));}expect(invoke).not.toHaveBeenCalledWith('assistant_drag');});
+ it('keeps text selection and control presses out of window dragging',async()=>{const {wrapper}=setup();await openToolbar(wrapper);for(const selector of ['[data-testid="assistant-input"]','.card-body','[data-testid="assistant-expand"]','[data-testid="assistant-copy"]']){await openToolbar(wrapper);await wrapper.get(selector).trigger('pointerdown',{button:0,pointerId:1,clientX:10,clientY:10});move(100,100);window.dispatchEvent(new PointerEvent('pointerup',{pointerId:1}));}expect(invoke).not.toHaveBeenCalledWith('assistant_drag');});
  it('uses the same threshold on the capsule edge and the folded ball',async()=>{const {store,wrapper}=setup();await wrapper.get('.capsule').trigger('pointerdown',{button:0,pointerId:1,clientX:10,clientY:10});move(17,10);expect(invoke).toHaveBeenCalledWith('assistant_drag');finish();store.open=false;store.ball=true;await nextTick();vi.mocked(invoke).mockClear();const ball=wrapper.get('[data-testid="assistant-ball"]');await ball.trigger('pointerdown',{button:0,pointerId:1,clientX:10,clientY:10});move(18,10);await ball.trigger('click',{detail:1});expect(invoke).toHaveBeenCalledWith('assistant_drag');expect(store.unfold).not.toHaveBeenCalled();finish();});
  it('does not treat a new input click after dragging as part of the drag',async()=>{const {wrapper}=setup();await wrapper.get('[data-testid="assistant-orb"]').trigger('pointerdown',{button:0,pointerId:1,clientX:10,clientY:10});move(20,10);finish();const field=wrapper.get('[data-testid="assistant-input"]');await field.trigger('pointerdown',{button:0,pointerId:2});const event=new MouseEvent('click',{bubbles:true,cancelable:true,detail:1});field.element.dispatchEvent(event);expect(event.defaultPrevented).toBe(false);});
 });
@@ -62,12 +67,13 @@ describe('copying assistant replies',()=>{
 
 const imageFile = () => new File(['test image'], 'photo.png', { type: 'image/png' });
 describe('assistant image input', () => {
-  it('places the small picker button immediately after the orb and opens a file picker without dragging', async () => {
+  it('opens the image picker from the compact toolbar without dragging', async () => {
     const { store, wrapper } = setup(); store.phase = 'idle'; await nextTick();
     const picker = wrapper.get<HTMLInputElement>('[data-testid="assistant-image-input"]');
     const click = vi.spyOn(picker.element, 'click').mockImplementation(() => {});
+    await openToolbar(wrapper);
     const button = wrapper.get('[data-testid="assistant-add-image"]');
-    expect(button.element.previousElementSibling?.getAttribute('data-testid')).toBe('assistant-orb');
+    expect(button.element.parentElement?.getAttribute('role')).toBe('toolbar');
     await button.trigger('pointerdown', { button: 0, pointerId: 1 }); move(80, 80);
     await button.trigger('click');
     expect(click).toHaveBeenCalledOnce(); expect(store.prepareImages).toHaveBeenCalledOnce();
@@ -99,6 +105,7 @@ describe('assistant image input', () => {
   });
   it('does not attach images while answering or after the capsule closes during reading', async () => {
     const { store, wrapper } = setup();
+    await openToolbar(wrapper);
     expect(wrapper.get<HTMLButtonElement>('[data-testid="assistant-add-image"]').element.disabled).toBe(true);
     await wrapper.get('.composer').trigger('drop', { dataTransfer: { files: [imageFile()], types: ['Files'] } });
     expect(store.attachments).toHaveLength(0);
@@ -107,5 +114,87 @@ describe('assistant image input', () => {
     await wrapper.get('.composer').trigger('drop', { dataTransfer: { files: [imageFile()], types: ['Files'] } });
     store.open = false; await nextTick(); await new Promise(resolve => setTimeout(resolve, 20));
     expect(store.attachments).toEqual([]); read.mockRestore();
+  });
+});
+
+describe('compact horizontal assistant tools', () => {
+  it('keeps one right-hand button and shows the exact five actions in order', async () => {
+    const { store, wrapper } = setup(); store.phase='idle'; store.input=''; await nextTick();
+    expect(wrapper.find('[data-testid="assistant-toolbar"]').exists()).toBe(false);
+    expect(wrapper.get('.capsule').findAll('button')).toHaveLength(2); // orb and one primary button
+    await wrapper.get('[data-testid="assistant-primary"]').trigger('click');
+    expect(wrapper.get('[role="toolbar"]').findAll('button').map(b=>b.attributes('aria-label'))).toEqual(['去超级小伴设置页','收起小伴','去聊天详情页','选择图片','截图']);
+    await wrapper.get('[data-testid="assistant-settings"]').trigger('click'); await flushPromises();
+    expect(store.openSettings).toHaveBeenCalledWith('assistant');
+    await openToolbar(wrapper); await wrapper.get('[data-testid="assistant-expand"]').trigger('click');
+    expect(store.openChat).toHaveBeenCalledOnce();
+    await openToolbar(wrapper); await wrapper.get('[data-testid="assistant-close"]').trigger('click');
+    expect(store.hide).toHaveBeenCalledOnce();
+  });
+  it('opens after a short hover and allows crossing into the toolbar before closing', async () => {
+    vi.useFakeTimers(); const { wrapper }=setup();
+    await wrapper.get('.tools-host').trigger('pointerenter'); await vi.advanceTimersByTimeAsync(219);
+    expect(wrapper.find('[role="toolbar"]').exists()).toBe(false);
+    await vi.advanceTimersByTimeAsync(1); expect(wrapper.find('[role="toolbar"]').exists()).toBe(true);
+    await wrapper.get('.tools-host').trigger('pointerleave'); await vi.advanceTimersByTimeAsync(150);
+    await wrapper.get('[role="toolbar"]').trigger('pointerenter'); await vi.advanceTimersByTimeAsync(500);
+    expect(wrapper.find('[role="toolbar"]').exists()).toBe(true);
+    await wrapper.get('.tools-host').trigger('pointerleave'); await vi.advanceTimersByTimeAsync(400);
+    expect(wrapper.find('[role="toolbar"]').exists()).toBe(false);
+  });
+  it('keeps send and stop as primary clicks while hovered tools are available', async () => {
+    const {store,wrapper}=setup(); store.phase='idle'; await nextTick(); await openToolbar(wrapper);
+    await wrapper.get('[data-testid="assistant-primary"]').trigger('click'); await flushPromises();
+    expect(store.submit).toHaveBeenCalledOnce(); expect(wrapper.find('[role="toolbar"]').exists()).toBe(false);
+    store.phase='answering'; await nextTick(); await wrapper.get('[data-testid="assistant-primary"]').trigger('click');
+    expect(store.interrupt).toHaveBeenCalledOnce();
+  });
+  it('supports keyboard navigation and closes tools on Esc without hiding the assistant', async () => {
+    const {store,wrapper}=setup(); await openToolbar(wrapper);
+    expect(document.activeElement?.getAttribute('data-testid')).toBe('assistant-settings');
+    await wrapper.get('[role="toolbar"]').trigger('keydown',{key:'ArrowRight'});
+    expect(document.activeElement?.getAttribute('data-testid')).toBe('assistant-close');
+    await wrapper.get('[role="toolbar"]').trigger('keydown',{key:'End'});
+    expect(document.activeElement?.getAttribute('data-testid')).toBe('assistant-expand'); // uploads disabled while answering
+    await wrapper.get('.stage').trigger('keydown',{key:'Escape'});
+    expect(wrapper.find('[role="toolbar"]').exists()).toBe(false); expect(store.hide).not.toHaveBeenCalled();
+    await wrapper.get('.stage').trigger('keydown',{key:'Escape'}); expect(store.hide).toHaveBeenCalledOnce();
+  });
+  it('grows the native window for an absolute popover above an empty capsule', async () => {
+    vi.useFakeTimers();
+    const bounds=vi.spyOn(HTMLElement.prototype,'getBoundingClientRect').mockImplementation(function(this:HTMLElement){
+      return {top:this.classList.contains('tools-toolbar')?-50:0,height:this.classList.contains('inner')?92:0,bottom:92,left:0,right:480,width:480,x:0,y:0,toJSON(){}} as DOMRect;
+    });
+    try {const {store,wrapper}=setup();store.answer='';store.question='';store.phase='idle';await nextTick();await openToolbar(wrapper);await vi.advanceTimersByTimeAsync(20);expect(invoke).toHaveBeenCalledWith('assistant_fit',{height:150});}
+    finally {bounds.mockRestore();}
+  });
+});
+describe('assistant region screenshots',()=>{
+  it('pauses voice and attaches a screenshot without sending or dropping the typed draft',async()=>{
+    const {store,wrapper}=setup();store.phase='idle';store.attachments=['existing'];await nextTick();
+    vi.mocked(invoke).mockImplementation(async command=>command==='assistant_screenshot'?'data:image/jpeg;base64,/9j/':undefined);
+    await openToolbar(wrapper);await wrapper.get('[data-testid="assistant-screenshot"]').trigger('click');await flushPromises();
+    expect(store.prepareImages).toHaveBeenCalledOnce();expect(store.attachments).toEqual(['existing','data:image/jpeg;base64,/9j/']);expect(store.input).toBe('草稿');expect(store.submit).not.toHaveBeenCalled();
+  });
+  it.each([null,Error('请允许屏幕录制')])('preserves the whole draft on cancellation or permission failure: %s',async result=>{
+    const {store,wrapper}=setup();store.phase='idle';store.attachments=['existing'];await nextTick();
+    vi.mocked(invoke).mockImplementation(async command=>{if(command==='assistant_screenshot'){if(result instanceof Error)throw result;return result;}});
+    await openToolbar(wrapper);await wrapper.get('[data-testid="assistant-screenshot"]').trigger('click');await flushPromises();
+    expect(store.attachments).toEqual(['existing']);expect(store.input).toBe('草稿');expect(store.submit).not.toHaveBeenCalled();
+    if(result instanceof Error)expect(store.note).toHaveBeenCalledWith('请允许屏幕录制');
+    expect(wrapper.get<HTMLButtonElement>('[data-testid="assistant-primary"]').element.disabled).toBe(false);
+  });
+  it('discards a late screenshot after closing and prevents duplicate capture requests',async()=>{
+    const {store,wrapper}=setup();store.phase='idle';await nextTick();let finish!:(value:string)=>void;
+    vi.mocked(invoke).mockImplementation(async command=>{if(command==='assistant_screenshot')return await new Promise<string>(resolve=>{finish=resolve;});});
+    await openToolbar(wrapper);await wrapper.get('[data-testid="assistant-screenshot"]').trigger('click');await flushPromises();
+    expect(wrapper.get<HTMLButtonElement>('[data-testid="assistant-primary"]').element.disabled).toBe(true);
+    expect(vi.mocked(invoke).mock.calls.filter(([command])=>command==='assistant_screenshot')).toHaveLength(1);
+    store.open=false;await nextTick();finish('data:image/jpeg;base64,/9j/');await flushPromises();expect(store.attachments).toEqual([]);
+  });
+  it('disables screenshot at the eight-image limit',async()=>{
+    const {store,wrapper}=setup();store.phase='idle';store.attachments=Array(8).fill('image');await nextTick();await openToolbar(wrapper);
+    expect(wrapper.get<HTMLButtonElement>('[data-testid="assistant-screenshot"]').element.disabled).toBe(true);
+    expect(wrapper.get<HTMLButtonElement>('[data-testid="assistant-add-image"]').element.disabled).toBe(true);
   });
 });
