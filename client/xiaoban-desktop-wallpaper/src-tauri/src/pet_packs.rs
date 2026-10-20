@@ -87,9 +87,9 @@ pub fn builtin() -> Vec<Theme> {
 fn image_extension(path: &str) -> Result<&str, String> {
     let parts: Vec<_> = path.split('/').collect();
     if parts.len() < 2 || parts.len() > 4 || parts[0] != "assets" || !parts.iter().all(|s| !s.is_empty() && !s.starts_with('.') && s.bytes().all(|b| b.is_ascii_alphanumeric() || b"._-".contains(&b))) {
-        return Err("植物素材必须使用 assets/ 下的普通文件路径".into());
+        return Err("宠物素材必须使用 assets/ 下的普通文件路径".into());
     }
-    match path.rsplit('.').next() { Some(ext @ ("png" | "webp" | "gif")) => Ok(ext), _ => Err("植物素材只支持 PNG、WebP 和 GIF".into()) }
+    match path.rsplit('.').next() { Some(ext @ ("png" | "webp" | "gif")) => Ok(ext), _ => Err("宠物素材只支持 PNG、WebP 和 GIF".into()) }
 }
 fn check_image(ext: &str, bytes: &[u8]) -> Result<(), String> {
     let valid = match ext {
@@ -98,7 +98,7 @@ fn check_image(ext: &str, bytes: &[u8]) -> Result<(), String> {
         "webp" => bytes.len() >= 12 && &bytes[..4] == b"RIFF" && &bytes[8..12] == b"WEBP",
         _ => false,
     };
-    if !valid || bytes.len() > MAX_IMAGE_BYTES { return Err("植物图片内容与格式不符或超过 4 MiB".into()); }
+    if !valid || bytes.len() > MAX_IMAGE_BYTES { return Err("宠物图片内容与格式不符或超过 4 MiB".into()); }
     Ok(())
 }
 fn image_data(path: &str, bytes: &[u8]) -> Result<String, String> {
@@ -107,24 +107,24 @@ fn image_data(path: &str, bytes: &[u8]) -> Result<String, String> {
     Ok(format!("data:image/{ext};base64,{}", STANDARD.encode(bytes)))
 }
 fn decode_image(src: &str) -> Result<(&str, Vec<u8>), String> {
-    if src.len() > MAX_IMAGE_BYTES.div_ceil(3) * 4 + 32 { return Err("植物图片超过 4 MiB".into()); }
-    let (header, encoded) = src.split_once(',').ok_or("植物图片必须是内嵌素材，不能含外链")?;
-    let ext = match header { "data:image/png;base64" => "png", "data:image/webp;base64" => "webp", "data:image/gif;base64" => "gif", _ => return Err("植物图片不能含 SVG、脚本或外链".into()) };
-    let bytes = STANDARD.decode(encoded).map_err(|_| "植物图片编码无效")?;
+    if src.len() > MAX_IMAGE_BYTES.div_ceil(3) * 4 + 32 { return Err("宠物图片超过 4 MiB".into()); }
+    let (header, encoded) = src.split_once(',').ok_or("宠物图片必须是内嵌素材，不能含外链")?;
+    let ext = match header { "data:image/png;base64" => "png", "data:image/webp;base64" => "webp", "data:image/gif;base64" => "gif", _ => return Err("宠物图片不能含 SVG、脚本或外链".into()) };
+    let bytes = STANDARD.decode(encoded).map_err(|_| "宠物图片编码无效")?;
     check_image(ext, &bytes)?;
     Ok((ext, bytes))
 }
 /// Resolve archive-local files before persisting. Runtime JSON is self-contained and needs no file access.
 pub fn import_assets(theme: &mut Theme, assets: &[(String, Vec<u8>)]) -> Result<(), String> {
-    if assets.len() > 60 || assets.iter().map(|(_, b)| b.len()).sum::<usize>() > 16 * 1024 * 1024 { return Err("植物素材总量超过限制".into()); }
+    if assets.len() > 60 || assets.iter().map(|(_, b)| b.len()).sum::<usize>() > 16 * 1024 * 1024 { return Err("宠物素材总量超过限制".into()); }
     for (path, bytes) in assets { image_data(path, bytes)?; }
     let mut used = std::collections::HashSet::new();
     for pet in &mut theme.pets { for part in &mut pet.parts { for shape in &mut part.shapes {
         if shape.kind == "image" {
-            let src = shape.src.as_deref().ok_or("植物图片缺少 src")?;
+            let src = shape.src.as_deref().ok_or("宠物图片缺少 src")?;
             if src.starts_with("data:") { decode_image(src)?; continue; }
             image_extension(src)?;
-            let (_, bytes) = assets.iter().find(|(path, _)| path == src).ok_or_else(||format!("缺少植物素材：{src}"))?;
+            let (_, bytes) = assets.iter().find(|(path, _)| path == src).ok_or_else(||format!("缺少宠物素材：{src}"))?;
             used.insert(src.to_string());
             shape.src = Some(image_data(src, bytes)?);
         }
@@ -192,8 +192,8 @@ fn shapes(items: &[Shape]) -> Result<(), String> {
     }
     for s in items {
         if s.kind == "image" {
-            decode_image(s.src.as_deref().ok_or("植物图片缺少 src")?)?;
-            if !s.x.is_some_and(|n|range(n,0.,320.)) || !s.y.is_some_and(|n|range(n,-64.,320.)) || !s.width.is_some_and(|n|range(n,1.,320.)) || !s.height.is_some_and(|n|range(n,1.,320.)) || s.opacity.is_some_and(|n|!range(n,0.,1.)) { return Err("植物图片尺寸无效".into()); }
+            decode_image(s.src.as_deref().ok_or("宠物图片缺少 src")?)?;
+            if !s.x.is_some_and(|n|range(n,0.,320.)) || !s.y.is_some_and(|n|range(n,-64.,320.)) || !s.width.is_some_and(|n|range(n,1.,320.)) || !s.height.is_some_and(|n|range(n,1.,320.)) || s.opacity.is_some_and(|n|!range(n,0.,1.)) { return Err("宠物图片尺寸无效".into()); }
             continue;
         }
         if !s.fill.as_deref().is_some_and(color)
@@ -264,7 +264,7 @@ pub fn validate(theme: &Theme) -> Result<(), String> {
             || !ids.insert(&p.id)
             || !text(&p.name, 24)
             || !text(&p.description, 160)
-            || p.kind != "plant"
+            || !valid_id(&p.kind)
         {
             return Err("宠物名称、类型或 id 无效".into());
         }
@@ -274,7 +274,7 @@ pub fn validate(theme: &Theme) -> Result<(), String> {
             || p.builtin_plant.is_some() && !p.parts.is_empty()
             || p.builtin_plant.is_none() && p.parts.is_empty()
         {
-            return Err("选择内置植物或定义植物部件，花盆与表情由宿主保留".into());
+            return Err("选择内置形象或定义宠物部件，表情由宿主保留".into());
         }
         if p.parts.len() > 16 {
             return Err("一只宠物最多 16 个活动部件".into());
@@ -292,10 +292,10 @@ pub fn validate(theme: &Theme) -> Result<(), String> {
             shapes(&part.shapes)?;
             for s in &part.shapes {
                 if s.kind == "image" {
-                    if theme.schema_version != 2 { return Err("图片植物需要 schemaVersion=2".into()); }
+                    if theme.schema_version != 2 { return Err("图片部件需要 schemaVersion=2".into()); }
                     image_bytes += decode_image(s.src.as_deref().unwrap())?.1.len();
                     image_count += 1;
-                    if image_bytes > 16 * 1024 * 1024 || image_count > 60 { return Err("植物素材总量超过限制".into()); }
+                    if image_bytes > 16 * 1024 * 1024 || image_count > 60 { return Err("宠物素材总量超过限制".into()); }
                 }
             }
         }
@@ -358,6 +358,10 @@ mod tests {
         for t in themes {
             validate(&t).unwrap();
         }
+        let mut custom = builtin().remove(0);
+        custom.id = "custom-pets".into();
+        custom.pets[0].kind = "animal".into();
+        validate(&custom).unwrap();
     }
     #[test]
     fn executable_art_and_external_references_are_rejected() {

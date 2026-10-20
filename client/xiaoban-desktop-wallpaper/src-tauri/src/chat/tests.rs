@@ -257,7 +257,6 @@ fn the_assistant_has_every_tool_it_needs_and_no_others() {
     names.sort();
     let mut expected = vec![
         "time_now", "todo", "ask_user", "read_file", "list_dir", "grep", "write_file", "edit_file", "shell", "web_fetch", "load_skill", "skill_manage",
-        "process_start", "process_read", "process_write", "process_stop",
         "memory_read", "memory_write", "desktop_status", "desktop_windows", "desktop_window_set", "wallpaper_list", "wallpaper_apply", "wallpaper_create", "wallpaper_delete", "effect_list", "effect_set", "effect_create", "effect_delete", "effect_read_format", "companion_set", "care_list",
         "care_set", "care_delete", "widget_list", "widget_add", "widget_create", "widget_delete_custom", "widget_update", "widget_remove", "game_list", "game_open", "game_close", "game_create", "game_delete",
         "request_accessibility_permission", "community_share", "community_open", "pet_read_format", "pet_catalog", "pet_theme_save", "pet_theme_delete", "pet_add", "pet_update", "pet_remove",
@@ -309,7 +308,7 @@ fn files_outside_the_working_folder_cannot_be_read_or_written() {
     let _ = run(&rig, "看看");
     let results = tool_results(&rig);
     assert_eq!(results.len(), 4);
-    assert!(results.iter().all(|r| r.contains("outside the allowed directories") || r.contains("cannot access") || r.contains("`..` is not allowed")), "{results:?}");
+    assert!(results.iter().all(|r| r.contains("outside the allowed directories") || r.contains("outside the authorized workspace") || r.contains("cannot access") || r.contains("`..` is not allowed") || r.contains("file unavailable")), "{results:?}");
     assert!(results.iter().all(|r| !r.contains("top secret")));
     assert!(!outside.path("planted.txt").exists());
 }

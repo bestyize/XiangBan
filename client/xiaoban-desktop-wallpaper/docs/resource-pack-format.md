@@ -309,6 +309,6 @@ cd hello-card && zip -r ../hello-card.zip .
 
 
 
-## 桌宠植物资源包
+## 桌宠资源包
 
-桌宠沿用 ZIP 导入导出入口，最外层 `manifest.json` 为 `{"schemaVersion":2,"kind":"pet"}`，作品写在 `pet.json`，图片放在 `assets/`。主题与图片格式、限制及完整示例见 [桌宠格式](pets.md)。第一版矢量主题 JSON 仍可从桌宠页单独导入。ZIP 只含创作素材，导入后在桌宠页自定义主题中选择并添加，不包含桌面实例与位置，也不会自动运行。
+桌宠沿用 ZIP 导入导出入口，最外层 `manifest.json` 为 `{"schemaVersion":2,"kind":"pet"}`，作品写在 `pet.json`，图片放在 `assets/`。主题与图片格式、限制及完整示例见 [桌宠格式](pets.md)。ZIP 只含创作素材，导入后在桌宠页自定义主题中选择并添加，不包含桌面实例与位置，也不会自动运行。

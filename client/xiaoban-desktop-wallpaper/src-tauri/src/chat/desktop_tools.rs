@@ -967,8 +967,8 @@ pub fn tools(desktop: Arc<dyn Desktop>) -> Vec<Arc<dyn Tool>> {
             companion_set,
         ),
         tool(&desktop,ToolSpec::new("pet_read_format","读取宠物主题创作格式和完整示例，创作或改造宠物前必读。",none()).risk(Risk::Read).parallel(),pet_read_format),
-        tool(&desktop,ToolSpec::new("pet_catalog","查看官方/自定义宠物主题及独立桌面实例。提供theme_id时读取该主题的完整作品，便于保留花盆、替换顶部植物。",object(json!({"theme_id":{"type":"string"}}),&[])).risk(Risk::Read).parallel(),pet_catalog),
-        tool(&desktop,ToolSpec::new("pet_theme_save","保存AI创作的宠物主题，格式先读pet_read_format。保留动态表情系统，保留原花盆，只创作顶部的花草植物。保存模板不会自动放到桌面，随后用pet_add。",object(json!({"theme":{"type":"object"},"overwrite":{"type":"boolean"}}),&["theme"])).risk(Risk::Write).serial(),|d,a|{let theme:crate::pet_packs::Theme=serde_json::from_value(a["theme"].clone()).map_err(|e|format!("主题格式无效：{e}"))?;let result=json!({"saved":true,"theme_id":theme.id,"name":theme.name,"pet_count":theme.pets.len()});d.pet_save_theme(theme,optional_bool(a,"overwrite")?.unwrap_or(false))?;Ok(result.to_string())}),
+        tool(&desktop,ToolSpec::new("pet_catalog","查看官方/自定义宠物主题及独立桌面实例。提供theme_id时读取该主题的完整作品，便于参考或调整形象。",object(json!({"theme_id":{"type":"string"}}),&[])).risk(Risk::Read).parallel(),pet_catalog),
+        tool(&desktop,ToolSpec::new("pet_theme_save","保存AI创作的宠物主题，格式先读pet_read_format。保留动态表情系统。保存模板不会自动放到桌面，随后用pet_add。",object(json!({"theme":{"type":"object"},"overwrite":{"type":"boolean"}}),&["theme"])).risk(Risk::Write).serial(),|d,a|{let theme:crate::pet_packs::Theme=serde_json::from_value(a["theme"].clone()).map_err(|e|format!("主题格式无效：{e}"))?;let result=json!({"saved":true,"theme_id":theme.id,"name":theme.name,"pet_count":theme.pets.len()});d.pet_save_theme(theme,optional_bool(a,"overwrite")?.unwrap_or(false))?;Ok(result.to_string())}),
         tool(&desktop,ToolSpec::new("pet_theme_delete","删除自定义宠物主题。官方主题受保护；先移除该主题的桌面实例。",object(json!({"id":{"type":"string"}}),&["id"])).risk(Risk::Write).serial(),|d,a|{let id=text_arg(a,"id")?;d.pet_delete_theme(id.into())?;Ok(json!({"deleted":true,"theme_id":id}).to_string())}),
         tool(&desktop,ToolSpec::new("pet_add","从官方或自定义主题添加一只独立桌面宠物，允许多只以及同款重复添加。返回桌面实例id。",object(json!({"theme_id":{"type":"string"},"pet_id":{"type":"string"},"layer":{"type":"string","enum":["desktop","topmost"]}}),&["theme_id","pet_id"])).risk(Risk::Write).self_managed().serial(),|d,a|d.pet_add(text_arg(a,"theme_id")?.into(),text_arg(a,"pet_id")?.into(),optional_text(a,"layer")?.map(String::from)).map(|v|v.to_string())),
         tool(&desktop,ToolSpec::new("pet_update","只调整指定桌面宠物实例，不影响同款其他宠物。id来自pet_catalog的instances。",object(json!({"id":{"type":"string"},"patch":{"type":"object","properties":{"name":{"type":"string"},"size":{"type":"number","minimum":80,"maximum":420},"expression":{"type":"string","enum":EXPRESSIONS},"enabled":{"type":"boolean"},"links":{"type":"boolean"},"x":{"type":"number","minimum":0,"maximum":1},"y":{"type":"number","minimum":0,"maximum":1},"layer":{"type":"string","enum":["desktop","topmost"]},"monitor":{"type":"string"},"themeId":{"type":"string"},"petId":{"type":"string"}},"additionalProperties":false}}),&["id","patch"])).risk(Risk::Write).self_managed().serial(),|d,a|{let patch=serde_json::from_value(a["patch"].clone()).map_err(|e|format!("宠物配置无效：{e}"))?;let id=text_arg(a,"id")?;d.pet_update(id,patch)?;Ok(json!({"updated":true,"id":id,"patch":a["patch"]}).to_string())}),
@@ -1344,7 +1344,7 @@ mod tests {
         let mut unique = names.clone();
         unique.dedup();
         assert_eq!(names, unique);
-        assert_eq!(names.len(), 30);
+        assert_eq!(names.len(), 37);
         for tool in &all {
             let spec = tool.spec();
             assert!(spec.name.len() <= 64 && spec.name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_'), "{}", spec.name);
@@ -1354,14 +1354,14 @@ mod tests {
         let read: Vec<&str> = all.iter().filter(|t| t.spec().risk == Risk::Read).map(|t| t.spec().name.as_str()).collect();
         let mut read = read;
         read.sort();
-        assert_eq!(read, vec!["care_list", "desktop_status", "desktop_windows", "effect_list", "effect_read_format", "game_list", "wallpaper_list", "widget_list"]);
+        assert_eq!(read, vec!["care_list", "desktop_status", "desktop_windows", "effect_list", "effect_read_format", "game_list", "pet_catalog", "pet_read_format", "wallpaper_list", "widget_list"]);
         for tool in all.iter().filter(|t| t.spec().risk == Risk::Write) {
             assert!(!tool.spec().parallel_safe, "{} changes shared settings, so it runs alone", tool.spec().name);
         }
     }
 
     #[test]
-    fn pet_tools_preserve_the_pot_and_create_only_plants_with_compact_results() {
+    fn pet_tools_preserve_the_pot_and_create_pets_with_compact_results() {
         let fake=Arc::new(Fake::default());
         let format:Value=serde_json::from_str(&call(&fake,"pet_read_format",json!({})).unwrap()).unwrap();
         let theme:crate::pet_packs::Theme=serde_json::from_value(format["example"].clone()).unwrap();

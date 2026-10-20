@@ -59,7 +59,7 @@ export function createControlStore(notify: ControlStore["notify"]): ControlStore
         effect: '帮我创作一个桌面特效：',
         widget: '帮我创作一个桌面小组件：',
         game: '帮我创作一款小游戏：',
-        pet: '帮我创作一个桌面植物主题。先读取 pet_read_format，保留小伴原来的圆肚白瓷花盆、材质、屏幕、表情和互动，只更换顶部的植物：',
+        pet: '帮我创作一个桌面宠物主题。先读取 pet_read_format：',
       };
       await store.chat.select(null);
       store.creationDraft = prompts[kind];

@@ -11,7 +11,7 @@ export interface Shape {
 }
 export interface Part { id: string; name: string; pivot: [number, number]; motion: 'none' | 'sway' | 'left' | 'right'; shapes: Shape[] }
 export interface PetDefinition {
-  id: string; name: string; description: string; kind: 'plant';
+  id: string; name: string; description: string; kind: string;
   builtinPlant?: 'pot' | 'pot-white-flower';
   parts: Part[];
 }
@@ -36,11 +36,11 @@ export function validateTheme(value: unknown): PetTheme {
     if(!Array.isArray(items)||!items.length||items.length>100)throw Error('宠物图形数量无效');
     for(const s of items){
       if(s?.type==='image'){
-        if(theme.schemaVersion!==2)throw Error('图片植物需要 schemaVersion=2');
+        if(theme.schemaVersion!==2)throw Error('包含图片部件需要 schemaVersion=2');
         const size=validateImage(s.src);
         imageBytes+=size;imageCount++;
-        if(imageCount>60||imageBytes>16*1024*1024)throw Error('植物素材总量超过限制');
-        if(!number(s.x,0,320)||!number(s.y,-64,320)||!number(s.width,1,320)||!number(s.height,1,320)||(s.opacity!=null&&!number(s.opacity,0,1)))throw Error('植物图片尺寸无效');
+        if(imageCount>60||imageBytes>16*1024*1024)throw Error('宠物素材总量超过限制');
+        if(!number(s.x,0,320)||!number(s.y,-64,320)||!number(s.width,1,320)||!number(s.height,1,320)||(s.opacity!=null&&!number(s.opacity,0,1)))throw Error('宠物图片尺寸无效');
         continue;
       }
       if(!s||!['path','ellipse','rect'].includes(s.type)||!color(s.fill)||(s.stroke!=null&&!color(s.stroke))||(s.strokeWidth!=null&&!number(s.strokeWidth,0,12))||(s.opacity!=null&&!number(s.opacity,0,1)))throw Error('宠物图形样式无效');
@@ -49,8 +49,8 @@ export function validateTheme(value: unknown): PetTheme {
     }
   };
   for(const pet of theme.pets){
-    if(!pet||!validId(pet.id)||ids.has(pet.id)||!text(pet.name,24)||!text(pet.description,160)||pet.kind!=='plant')throw Error('宠物名称或标识无效');ids.add(pet.id);
-    if(pet.builtinPlant!==undefined&&!['pot','pot-white-flower'].includes(pet.builtinPlant))throw Error('内置植物无效');
+    if(!pet||!validId(pet.id)||ids.has(pet.id)||!text(pet.name,24)||!text(pet.description,160)||!validId(pet.kind))throw Error('宠物名称或标识无效');ids.add(pet.id);
+    if(pet.builtinPlant!==undefined&&!['pot','pot-white-flower'].includes(pet.builtinPlant))throw Error('内置宠物形象无效');
     if(!Array.isArray(pet.parts)||pet.parts.length>16||(!pet.builtinPlant&&!pet.parts.length)||(pet.builtinPlant&&pet.parts.length>0))throw Error('宠物部件数量无效');
     const parts=new Set<string>();
     for(const part of pet.parts){if(!validId(part.id)||parts.has(part.id)||!text(part.name,24)||!['none','sway','left','right'].includes(part.motion)||!Array.isArray(part.pivot)||part.pivot.length!==2||!part.pivot.every(n=>number(n,0,320)))throw Error('宠物部件无效');parts.add(part.id);shapes(part.shapes);}

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import {computed,onDeactivated,onMounted,onBeforeUnmount,ref,watch} from 'vue';
 import {NAlert,NButton,NDrawer,NDrawerContent,NInput,NModal,NPopconfirm,NSelect,NSlider,NSwitch,NTabs,NTabPane} from 'naive-ui';
-import {Download,Monitor,Pin,Plus,Settings2,Sparkles,Trash2,Upload} from 'lucide-vue-next';
+import {Download,Monitor,Pin,Plus,Settings2,Sparkles,Trash2} from 'lucide-vue-next';
 import type {ControlStore} from '../control-types.ts';
 import {EXPRESSION_NAMES,EXPRESSIONS} from '../../companion/expressions.ts';
 import ResourceLibraryPage from '../components/ResourceLibraryPage.vue';
@@ -13,22 +13,22 @@ import {petImage} from '../../pets/render.ts';
 const props=defineProps<{store:ControlStore;settingsRequest?:{id:string}|null}>();
 const emit=defineEmits<{settingsOpened:[]}>();
 const client=createPetClient(),{catalog,ready,busy,error}=client;
-const category=ref<'builtin'|'custom'|'desktop'>('builtin'),hover=ref(''),editing=ref<string|null>(null),file=ref<HTMLInputElement>();
+const category=ref<'builtin'|'custom'|'desktop'>('builtin'),hover=ref(''),editing=ref<string|null>(null);
 const adding=ref<{themeId:string;petId:string;name:string}|null>(null),name=ref(''),draftSize=ref(210);
 const themes=computed(()=>catalog.value.themes.filter(t=>t.source===category.value));
 const instances=computed(()=>catalog.value.layout.instances);
 const current=computed(()=>instances.value.find(p=>p.id===editing.value));
 const currentDefinition=computed(()=>current.value?definitionOf(catalog.value.themes,current.value):undefined);
-const plants=computed(()=>catalog.value.themes.flatMap(t=>t.pets.map(p=>({label:`${t.name} · ${p.name}`,value:`${t.id}/${p.id}`}))));
+const petChoices=computed(()=>catalog.value.themes.flatMap(t=>t.pets.map(p=>({label:`${t.name} · ${p.name}`,value:`${t.id}/${p.id}`}))));
 function openManage(id:string){category.value='desktop';editing.value=id;}
-function changePlant(value:string){const [themeId,petId]=value.split('/');update({themeId,petId});}
+function changePet(value:string){const [themeId,petId]=value.split('/');update({themeId,petId});}
 const expressions=EXPRESSION_NAMES.map(value=>({label:EXPRESSIONS[value].label,value}));
 const layers=[{label:'悬浮陪伴 · 始终置顶',value:'topmost'},{label:'贴在桌面 · 不遮挡窗口',value:'desktop'}];
 async function act(action:()=>Promise<unknown>,success?:string){try{await action();if(success)props.store.notify(success);}catch(e){props.store.notify(e,'error');}}
 const placements=[{value:'topmost' as const,label:'始终置顶',hint:'显示在其他窗口上方，随时陪着你',icon:Pin},{value:'desktop' as const,label:'贴在桌面',hint:'放在桌面上，不遮挡其他窗口',icon:Monitor}];
 function requestAdd(themeId:string,petId:string,name:string){if(ready.value&&!busy.value)adding.value={themeId,petId,name};}
 async function add(layer:PetInstance['layer']){const target=adding.value;if(!target)return;adding.value=null;await act(async()=>{await client.add(target.themeId,target.petId,layer);if(!props.store.settings.companionEnabled)await props.store.setCompanion(true);},'已添加到桌面，可拖动位置，右键管理');}
-function create(base?:PetTheme){void props.store.startCreation('pet').then(()=>{if(base)props.store.creationDraft=`请以宠物主题「${base.name}」（${base.id}）为参考，创作我的自定义植物主题。先读取 pet_read_format 和现有主题，只更换顶部植物，保留小伴原来的花盆、材质和表情，按我的要求调整：`;});}
+function create(base?:PetTheme){void props.store.startCreation('pet').then(()=>{if(base)props.store.creationDraft=`请以宠物主题「${base.name}」（${base.id}）为参考，创作我的自定义宠物主题。先读取 pet_read_format 和现有主题，按我的要求调整：`;});}
 let sizeTimer:ReturnType<typeof setTimeout>|undefined,pendingSize:{id:string;size:number}|undefined;
 function flushSize(){clearTimeout(sizeTimer);const pending=pendingSize;pendingSize=undefined;if(pending)void act(()=>client.update(pending.id,{size:pending.size}));}
 function resizePet(size:number){draftSize.value=size;if(!current.value)return;pendingSize={id:current.value.id,size};clearTimeout(sizeTimer);sizeTimer=setTimeout(flushSize,300);}
@@ -36,7 +36,6 @@ function update(patch:Partial<PetInstance>){if(current.value)void act(()=>client
 watch([()=>props.settingsRequest,ready],([request,loaded])=>{if(request&&loaded){openManage(request.id);emit('settingsOpened');}},{immediate:true});
 watch(()=>current.value?.id,()=>{flushSize();name.value=current.value?.name||'';});
 watch(()=>current.value?.size,value=>{draftSize.value=value??210;});
-async function imported(e:Event){const input=e.target as HTMLInputElement;const chosen=input.files?.[0];if(!chosen)return;await act(async()=>{if(chosen.size>24*1024*1024)throw Error('宠物主题不能超过 24 MiB');const value=JSON.parse(await chosen.text());await client.saveTheme(value);category.value='custom';},'主题已导入');input.value='';}
 function manage(e:Event){const id=(e as CustomEvent<{id:string}>).detail?.id;void client.load().then(()=>{if(id)openManage(id);});}
 onMounted(()=>{void client.load();window.addEventListener('pets-manage',manage);});
 onDeactivated(()=>{hover.value='';});
@@ -44,11 +43,10 @@ onBeforeUnmount(()=>{flushSize();client.dispose();window.removeEventListener('pe
 </script>
 <template>
 <ResourceLibraryPage title="桌面宠物" :active-tab="category" class="pet-library" data-testid="companion-page">
- <template #actions><ResourceShareActions :store="store" kind="pet" import-label="导入资源包" :disabled="!ready||busy" @imported="async()=>{await client.load();category='custom';}"/><NButton round :disabled="!ready||busy" @click="file?.click()"><template #icon><Upload :size="15"/></template>导入主题 JSON</NButton><NButton round type="primary" data-testid="pet-create" @click="create()"><template #icon><Sparkles :size="16"/></template>创作植物</NButton></template>
+ <template #actions><ResourceShareActions :store="store" kind="pet" import-label="导入宠物" :disabled="!ready||busy" @imported="async()=>{await client.load();category='custom';}"/><NButton round type="primary" data-testid="pet-create" @click="create()"><template #icon><Sparkles :size="16"/></template>创作宠物</NButton></template>
  <template #tabs><NTabs v-model:value="category" type="line" size="large" class="pet-library-tabs"><NTabPane name="builtin"><template #tab>官方主题</template></NTabPane><NTabPane name="custom"><template #tab>自定义主题</template></NTabPane><NTabPane name="desktop"><template #tab>桌面伙伴<span class="pet-tab-count">{{ instances.length }}</span></template></NTabPane></NTabs></template>
- <input ref="file" type="file" hidden accept=".json,application/json" @change="imported"/>
  <NAlert v-if="error" type="error" :show-icon="false">{{ error }}<NButton text @click="client.load()">重新载入</NButton></NAlert>
- <div v-if="ready&&category==='custom'&&!themes.length" class="pet-empty surface" data-testid="pet-custom-empty"><Sparkles :size="28"/><h2>你想象中的小伙伴，在这里诞生。</h2><p>保留小伴原来的花盆与表情，让 AI 创作你喜欢的花草。</p><NButton type="primary" round @click="create()">开始创作</NButton></div>
+ <div v-if="ready&&category==='custom'&&!themes.length" class="pet-empty surface" data-testid="pet-custom-empty"><Sparkles :size="28"/><h2>你想象中的小伙伴，在这里诞生。</h2><p>让 AI 创作你喜欢的小伙伴，各种宠物与伙伴形象都能做。</p><NButton type="primary" round @click="create()">开始创作</NButton></div>
  <section v-for="theme in themes" :key="theme.id" class="pet-theme-detail" :data-testid="`pet-theme-${theme.id}`">
   <header class="pet-section-heading"><div><h2>{{ theme.name }}<span>{{ theme.pets.length }} 款宠物</span></h2><p>{{ theme.description }}</p></div><div class="theme-actions"><ResourceShareActions v-if="theme.source==='custom'" :store="store" kind="pet" :id="theme.id" :disabled="busy" icons/><button @click="create(theme)"><Sparkles :size="14"/>基于此主题创作</button><button :disabled="busy" @click="act(()=>client.exportTheme(theme.id))" title="导出主题"><Download :size="16"/></button><NPopconfirm v-if="theme.source==='custom'" @positive-click="act(()=>client.deleteTheme(theme.id))"><template #trigger><button :disabled="busy" title="删除主题"><Trash2 :size="16"/></button></template>删除这个自定义主题？已添加的宠物需先移除。</NPopconfirm></div></header>
   <div class="pet-cards"><article v-for="p in theme.pets" :key="p.id" class="pet-card surface" :data-testid="`pet-card-${p.id}`" @pointerenter="hover=`${theme.id}/${p.id}`" @pointerleave="hover=''">
@@ -56,7 +54,7 @@ onBeforeUnmount(()=>{flushSize();client.dispose();window.removeEventListener('pe
   </article></div>
  </section>
  <section v-if="category==='desktop'" class="desktop-pets surface" data-testid="desktop-pets"><header class="pet-section-heading"><div><h2>桌面上的伙伴<span>{{ instances.length }} 只</span></h2><p>每一只都有独立的心情和位置。同一款，也可以多养几只。</p></div><label class="all-pets-switch"><span>全部显示</span><NSwitch :value="store.settings.companionEnabled" @update:value="value=>act(()=>store.setCompanion(value))"/></label></header>
-  <div v-if="!instances.length" class="desktop-pets-empty">还没有小伙伴，挑一只喜欢的添加到桌面吧。<NButton text type="primary" @click="category='builtin'">去挑选植物</NButton></div>
+  <div v-if="!instances.length" class="desktop-pets-empty">还没有小伙伴，挑一只喜欢的添加到桌面吧。<NButton text type="primary" @click="category='builtin'">去挑选伙伴</NButton></div>
   <div v-else class="desktop-pet-list"><div v-for="p in instances" :key="p.id" class="desktop-pet-row" :data-testid="`pet-instance-${p.id}`"><img v-if="definitionOf(catalog.themes,p)" :src="petImage(definitionOf(catalog.themes,p)!)" alt="" width="58" height="58"/><div class="desktop-pet-name"><strong>{{ p.name }}</strong><small>{{ catalog.themes.find(t=>t.id===p.themeId)?.name||'作品暂不可用' }} · {{ p.size }}px · {{ p.layer==='desktop'?'贴在桌面':'悬浮陪伴' }}</small></div><span class="pet-mood">{{ EXPRESSIONS[p.expression].label }}</span><NSwitch :value="p.enabled" size="small" :disabled="busy" :aria-label="`显示${p.name}`" @update:value="enabled=>act(()=>client.update(p.id,{enabled}))"/><button class="pet-manage" :aria-label="`管理${p.name}`" :data-testid="`pet-manage-${p.id}`" @click="editing=p.id"><Settings2 :size="16"/></button></div></div>
  </section>
  <NModal :show="!!adding" @update:show="show=>{if(!show)adding=null}">
@@ -66,7 +64,7 @@ onBeforeUnmount(()=>{flushSize();client.dispose();window.removeEventListener('pe
    <NButton quaternary block data-testid="pet-placement-cancel" @click="adding=null">取消</NButton>
   </section>
  </NModal>
- <NDrawer :show="!!current" :width="390" placement="right" @update:show="value=>{if(!value)editing=null}"><NDrawerContent v-if="current" :title="current.name" closable><div class="pet-editor"><div class="pet-editor-stage"><PetActor v-if="currentDefinition" :definition="currentDefinition" :size="210" :expression="current.expression" :links="current.links" :paused="store.settings.paused"/></div><label>顶部植物<NSelect :value="`${current.themeId}/${current.petId}`" :options="plants" filterable data-testid="pet-change-plant" @update:value="changePlant"/></label><label>名字<NInput v-model:value="name" :maxlength="40" @blur="name.trim()&&update({name:name.trim()})"/></label><label>角色大小 <span>{{ draftSize }} px</span><NSlider :value="draftSize" :min="80" :max="420" :step="10" @update:value="resizePet" @dragend="flushSize"/></label><label>显示层级<NSelect :value="current.layer" :options="layers" @update:value="layer=>update({layer})"/></label><label>心情<NSelect :value="current.expression" :options="expressions" @update:value="expression=>update({expression})"/></label><div class="pet-editor-toggle"><div><b>回应桌面状态</b><p>特效、问候和离开后的重逢。</p></div><NSwitch :value="current.links" @update:value="links=>update({links})"/></div><NButton block @click="update({x:.5,y:.5})">移到屏幕中间</NButton><NButton block @click="create(catalog.themes.find(t=>t.id===current!.themeId))"><template #icon><Sparkles :size="15"/></template>让 AI 换一株植物</NButton><NPopconfirm @positive-click="act(async()=>{await client.remove(current!.id);editing=null;})"><template #trigger><NButton block quaternary type="error" :disabled="busy">从桌面移除</NButton></template>移除这只宠物？主题作品仍会保留。</NPopconfirm></div></NDrawerContent></NDrawer>
+ <NDrawer :show="!!current" :width="390" placement="right" @update:show="value=>{if(!value)editing=null}"><NDrawerContent v-if="current" :title="current.name" closable><div class="pet-editor"><div class="pet-editor-stage"><PetActor v-if="currentDefinition" :definition="currentDefinition" :size="210" :expression="current.expression" :links="current.links" :paused="store.settings.paused"/></div><label>宠物形象<NSelect :value="`${current.themeId}/${current.petId}`" :options="petChoices" filterable data-testid="pet-change-plant" @update:value="changePet"/></label><label>名字<NInput v-model:value="name" :maxlength="40" @blur="name.trim()&&update({name:name.trim()})"/></label><label>角色大小 <span>{{ draftSize }} px</span><NSlider :value="draftSize" :min="80" :max="420" :step="10" @update:value="resizePet" @dragend="flushSize"/></label><label>显示层级<NSelect :value="current.layer" :options="layers" @update:value="layer=>update({layer})"/></label><label>心情<NSelect :value="current.expression" :options="expressions" @update:value="expression=>update({expression})"/></label><div class="pet-editor-toggle"><div><b>回应桌面状态</b><p>特效、问候和离开后的重逢。</p></div><NSwitch :value="current.links" @update:value="links=>update({links})"/></div><NButton block @click="update({x:.5,y:.5})">移到屏幕中间</NButton><NButton block @click="create(catalog.themes.find(t=>t.id===current!.themeId))"><template #icon><Sparkles :size="15"/></template>让 AI 换一个形象</NButton><NPopconfirm @positive-click="act(async()=>{await client.remove(current!.id);editing=null;})"><template #trigger><NButton block quaternary type="error" :disabled="busy">从桌面移除</NButton></template>移除这只宠物？主题作品仍会保留。</NPopconfirm></div></NDrawerContent></NDrawer>
 </ResourceLibraryPage>
 </template>
 <style scoped>
