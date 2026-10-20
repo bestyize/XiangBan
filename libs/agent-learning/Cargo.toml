@@ -1,0 +1,9 @@
+[package]
+name = "agent-learning"
+version = "0.1.0"
+edition = "2021"
+description = "XiangBan local structured experience and evaluation storage"
+
+[dependencies]
+rusqlite = { version = "0.38", features = ["bundled"] }
+serde = { version = "1", features = ["derive"] }

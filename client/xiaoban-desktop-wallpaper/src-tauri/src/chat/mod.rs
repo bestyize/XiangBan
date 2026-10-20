@@ -10,6 +10,9 @@ mod danger;
 mod desktop_tools;
 mod prompt;
 mod run_history;
+mod task_outcome;
+mod learning;
+mod skill_evolution;
 mod sessions;
 
 use agent_computer_use_tools::{SKILL as COMPUTER_USE_SKILL, SKILL_NAME as COMPUTER_USE_SKILL_NAME, SKILL_ORIGIN_MARKER};
@@ -24,6 +27,8 @@ use agent_kernel::provider::wire::ProviderProfile;
 use agent_kernel::skills::Skills;
 use agent_kernel::{Agent, Approval, ApprovalRequest, ContextTrim, ContinueGuard, JsonlStore, RepeatGuard, Message, ModelProvider, Part, Permission, PermissionMode, Risk, RunOptions, RunEventBody, SessionStore, SpillOutput, ToolCtx};
 use agent_kernel::journal::JsonlRunLog;
+use agent_learning::LearningDb;
+use agent_skill_discovery::SkillDiscovery;
 use broker::Broker;
 use compact::{CompactingStore, ContextInfo};
 use desktop_tools::{Desktop, TauriDesktop};
@@ -147,7 +152,14 @@ impl ChatState {
 /// "完全信任" runs everything except what `danger::assess` flags, which is asked every time.
 /// Shared by the app and its tests so the tests exercise the rules that really apply.
 fn permission_with_danger_check(mode: PermissionMode, approver: impl agent_kernel::Approver + 'static, workspace: Arc<Mutex<Option<PathBuf>>>) -> Permission {
-    Permission::new(mode, approver).danger_check(move |tool, args| danger::assess(tool, args, lock(&workspace).as_deref()).map(str::to_string))
+    Permission::new(mode, approver).danger_check(move |tool, args| {
+        // In Auto mode, always_ask alone does not trigger approval when a danger
+        // policy is installed; third-party skill installation must be flagged here.
+        if tool == "skill_install" {
+            return Some("安装第三方 Skill 必须逐次经过用户确认".to_string());
+        }
+        danger::assess(tool, args, lock(&workspace).as_deref()).map(str::to_string)
+    })
 }
 
 fn emit<R: tauri::Runtime>(app: &tauri::AppHandle<R>, name: &str, payload: Value) {
@@ -219,6 +231,8 @@ impl Dirs {
     }
     fn sessions(&self) -> PathBuf { self.chat.join("sessions") }
     fn runs(&self) -> PathBuf { self.chat.join("runs") }
+    fn outcomes(&self) -> PathBuf { self.chat.join("outcomes") }
+    fn learning_db(&self) -> PathBuf { self.chat.join("agent-learning.sqlite") }
     fn spill(&self) -> PathBuf { self.chat.join("spill") }
     fn memory(&self) -> PathBuf { self.chat.join("memory") }
     fn skills(&self) -> PathBuf { self.chat.join("skills") }
@@ -323,6 +337,7 @@ fn assemble_with_files(parts: Parts<'_>, attachments: Vec<Attachment>) -> Result
     fs::write(file_skill.join("scripts/csv_summary.py"), agent_file_tools::CSV_SUMMARY_SCRIPT).map_err(|e| e.to_string())?;
     let skills = Arc::new(Skills::new().read_only_root(bundled).writable_root(dirs.skills()));
     let memory = Arc::new(Memory::new(dirs.memory()));
+    let discovery = SkillDiscovery::new(dirs.skills());
     // Started before the prompt is written, so the prompt can say honestly whether the tools exist.
     let computer_use = if open_computer_use { Some(spawn_computer_use()) } else { None };
     let computer_use_error = match &computer_use { Some(Err(error)) => Some(error.to_string()), _ => None };
@@ -342,6 +357,7 @@ fn assemble_with_files(parts: Parts<'_>, attachments: Vec<Attachment>) -> Result
         .tool(ask)
         .tool(Shell::new(workspace))
         .tool(WebFetch::new())
+        .tool(learning::Recall::new(dirs.learning_db()))
         .middleware(permission)
         // Before spilling, so it compares real outputs rather than previews that name a fresh file each time.
         .middleware(RepeatGuard::new())
@@ -355,7 +371,7 @@ fn assemble_with_files(parts: Parts<'_>, attachments: Vec<Attachment>) -> Result
     readable.retain(|tool| tool.spec().name != "read_file");
     readable.push(Arc::new(ReadFile::new(roots, AttachmentStore::new(dirs.chat.join("attachments"))).map_err(|e| e.to_string())?));
     let writable = fs_write_tools(vec![workspace.to_path_buf()]).map_err(|e| e.to_string())?;
-    for tool in readable.into_iter().chain(writable).chain(skills.tools()).chain(memory.tools()).chain(desktop_tools::tools(desktop)) {
+    for tool in readable.into_iter().chain(writable).chain(skills.tools()).chain(memory.tools()).chain(discovery.tools()).chain(desktop_tools::tools(desktop)) {
         builder = builder.tool_arc(tool);
     }
     if let Some(Ok(mcp_client)) = &computer_use {
@@ -586,7 +602,9 @@ pub fn chat_send(app: tauri::AppHandle, session_id: String, text: String, images
             Ok(dirs) => {
                 let journal = JsonlRunLog::new(dirs.runs().join(&id));
                 let options = RunOptions { max_tool_calls: Some(256), ..Default::default() };
-                let mut observe = |mut record| {
+                let mut observed_run_id: Option<String> = None;
+                let mut observe = |mut record: agent_kernel::RunEvent| {
+                    observed_run_id = Some(record.run_id.clone());
                     let terminal = matches!(&record.body, RunEventBody::Event { event:
                         agent_kernel::Event::Done | agent_kernel::Event::Cancelled | agent_kernel::Event::Error { .. }
                     });
@@ -601,11 +619,25 @@ pub fn chat_send(app: tauri::AppHandle, session_id: String, text: String, images
                     if terminal { terminal_delivered = true; }
                     Ok(())
                 };
-                if retry {
+                let executed = if retry {
                     agent.retry_last_observed(&id, options, &mut observe, &cancel)
                 } else {
                     agent.run_parts_observed(&id, parts_owned, options, &mut observe, &cancel)
+                };
+                // The trace is the source of truth. Do not turn a successful model reply into
+                // a verified business success automatically.
+                if let Some(run) = observed_run_id {
+                    if let Ok(outcome) = task_outcome::inspect(&journal, &id, &run) {
+                        let _ = task_outcome::save(&dirs.outcomes(), &outcome);
+                        if let Ok(db) = LearningDb::open(&dirs.learning_db()) {
+                            let _ = db.record_outcome(&outcome.run_id, &outcome.session_id,
+                                &format!("{:?}", outcome.status).to_lowercase(),
+                                &outcome.validator, &outcome.evidence);
+                        }
+                        emit(&sender, "chat-task-outcome", json!({ "session": id, "outcome": outcome }));
+                    }
                 }
+                executed
             }
             Err(error) => Err(agent_kernel::HarnessError::Store(error)),
         };
@@ -660,7 +692,106 @@ pub fn chat_run_history(
     if events.iter().any(|event| event.session_id != session_id) {
         return Err("运行轨迹与会话不匹配".into());
     }
-    Ok(json!({ "inspection": inspection, "events": events }))
+    let outcome = task_outcome::load(&Dirs::of(&app)?.outcomes(), &session_id, &run_id)?;
+    Ok(json!({ "inspection": inspection, "events": events, "outcome": outcome }))
+}
+
+/// Verify one specifically requested file artifact. This does NOT approve an entire
+/// multi-step task or let the model self-mark its result as successful.
+#[tauri::command]
+pub fn chat_verify_file_outcome(app: tauri::AppHandle, window: tauri::WebviewWindow,
+    session_id: String, run_id: String, relative_path: String, expected_sha256: String
+) -> Result<Value, String> {
+    if window.label() != "control" { return Err("仅控制台可以验收任务".into()); }
+    checked_session_id(&session_id)?;
+    let dirs = Dirs::of(&app)?;
+    let journal = JsonlRunLog::new(dirs.runs().join(&session_id));
+    let previous = task_outcome::inspect(&journal, &session_id, &run_id)?;
+    if !matches!(journal.inspect(&run_id).map_err(|e|e.to_string())?.state, Some(agent_kernel::RunState::Completed)) {
+        return Err("只有正常结束的运行才允许文件验收".into());
+    }
+    if matches!(previous.status, task_outcome::Status::Partial | task_outcome::Status::Failed) {
+        return Err("工具执行异常，请先调查运行记录".into());
+    }
+    let config = ai_config::current(&app)?;
+    let default = ai_config::default_workspace(&app)?;
+    let workspace = config.workspace_or(&default);
+    let outcome=task_outcome::verify_file(&dirs.outcomes(), &session_id, &run_id, workspace, &relative_path, &expected_sha256)?;
+    LearningDb::open(&dirs.learning_db())?.record_outcome(&run_id, &session_id,
+        "succeeded", &outcome.validator, &outcome.evidence)?;
+    Ok(json!(outcome))
+}
+
+/// Explicit opt-in: run an isolated one-shot reflection model call. No auto approval.
+#[tauri::command]
+pub async fn chat_reflect_run(
+    app: tauri::AppHandle, window: tauri::WebviewWindow,
+    session_id: String, run_id: String
+) -> Result<Value, String> {
+    if window.label() != "control" { return Err("只有控制台可以启动学习".into()); }
+    checked_session_id(&session_id)?;
+    let (tx, rx) = std::sync::mpsc::channel();
+    std::thread::Builder::new().name("xiaoban-reflection".into()).spawn(move || {
+        let result = learning::reflect_run(&app, &session_id, &run_id);
+        let _ = tx.send(result);
+    }).map_err(|e| e.to_string())?;
+    tauri::async_runtime::spawn_blocking(move || rx.recv().unwrap_or_else(|_| Err("学习线程意外退出".into())))
+        .await.map_err(|e|e.to_string())?
+}
+
+/// Only user control-plane review can promote a candidate into reusable memory.
+#[tauri::command]
+pub fn chat_review_experience(app: tauri::AppHandle, window: tauri::WebviewWindow,
+    experience_id: i64, approve: bool,
+) -> Result<Value,String> {
+    if window.label() != "control" {return Err("只有控制台可以审核经验".into());}
+    let db=LearningDb::open(&Dirs::of(&app)?.learning_db())?;
+    let record=db.get_experience(experience_id)?.ok_or("未找到经验")?;
+    if record.state!="candidate" {return Err("只有候选经验可以审核".into());}
+    db.set_experience_state(experience_id,if approve{"approved"}else{"rejected"})?;
+    Ok(json!(db.get_experience(experience_id)?))
+}
+
+/// Explicit proposal generation; reviewing and evaluating the proposal are separate steps.
+#[tauri::command]
+pub async fn chat_generate_skill_proposal(
+    app: tauri::AppHandle, window: tauri::WebviewWindow,
+    experience_id: i64, skill_name: String
+) -> Result<Value,String> {
+    if window.label() != "control" {return Err("只有控制台可以生成技能改进".into());}
+    let (tx,rx)=std::sync::mpsc::channel();
+    std::thread::Builder::new().name("xiaoban-skill-proposal".into()).spawn(move||{
+        let _=tx.send(skill_evolution::generate(&app,experience_id,&skill_name));
+    }).map_err(|e|e.to_string())?;
+    tauri::async_runtime::spawn_blocking(move||rx.recv().unwrap_or_else(|_|Err("提议生成失败".into())))
+       .await.map_err(|e|e.to_string())?
+}
+
+/// Records one external artifact-based eval; the model is not allowed to score itself.
+#[tauri::command]
+pub fn chat_record_skill_eval(app:tauri::AppHandle,window:tauri::WebviewWindow,
+    proposal_id:i64, case_id:String, description:String,
+    expected_sha256:String, artifact_path:String, baseline:bool,
+) -> Result<Value,String> {
+    if window.label()!="control"{return Err("只有控制台可以提交评测".into());}
+    skill_evolution::record_eval(&app,proposal_id,&case_id,&description,
+        &expected_sha256,&artifact_path,baseline)
+}
+
+#[tauri::command]
+pub fn chat_apply_skill_proposal(app:tauri::AppHandle,window:tauri::WebviewWindow,
+   proposal_id:i64,
+) -> Result<Value,String>{
+    if window.label()!="control"{return Err("只有控制台可以批准技能更新".into());}
+    skill_evolution::apply(&app,proposal_id)
+}
+
+#[tauri::command]
+pub fn chat_rollback_skill_proposal(app:tauri::AppHandle,window:tauri::WebviewWindow,
+    proposal_id:i64,
+) -> Result<Value,String>{
+    if window.label()!="control"{return Err("只有控制台可以恢复技能版本".into());}
+    skill_evolution::rollback(&app,proposal_id)
 }
 
 #[tauri::command]
@@ -689,6 +820,7 @@ pub fn chat_delete_session(app: tauri::AppHandle, session_id: String) -> Result<
             return Err(format!("无法删除运行记录：{error}"));
         }
     }
+    let _ = fs::remove_dir_all(Dirs::of(&app)?.outcomes().join(&session_id));
     state.permission.forget_session(&session_id);
     state.todo.clear_session(&session_id);
     state.auto_compact.forget(&session_id);

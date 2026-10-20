@@ -28,6 +28,8 @@ chrono = { version = "0.4", features = ["clock", "serde"] }
 getrandom = "0.3"
 agent-computer-use-tools = { path = "../../../libs/agent-tools/computer-use" }
 agent-file-tools = { path = "../../../libs/agent-tools/files" }
+agent-learning = { path = "../../../libs/agent-learning" }
+agent-skill-discovery = { path = "../../../libs/agent-tools/skill-discovery" }
 agent-kernel = { path = "../../../libs/agent-kernel", features = ["native-tls", "fs", "skills", "memory", "web", "shell", "mcp", "process", "journal"] }
 zip = { version = "=9.0.4", default-features = false, features = ["deflate-flate2-zlib-rs"] }
 
