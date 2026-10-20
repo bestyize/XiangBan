@@ -5,6 +5,7 @@
 //! no more than whether a key exists and its last four characters.
 
 use serde::{Deserialize, Serialize};
+use crate::ai_reasoning::{self, ReplyPreference};
 use std::{
     fmt, fs,
     io::{self, Write},
@@ -36,6 +37,7 @@ pub const DEFAULT_PROVIDERS: &[(&str, &str, &str, &str, &str)] = &[
 #[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 pub struct ProviderConfig {
+    pub reply_preference: ReplyPreference,
     #[serde(rename = "type")] pub provider_type: String,
     pub remote: bool,
     pub available: bool,
@@ -61,6 +63,7 @@ pub struct ModelConfig { pub id: String, pub name: String, pub description: Stri
 impl Default for ProviderConfig {
     fn default() -> Self {
         Self {
+            reply_preference: ReplyPreference::Default,
             provider_type: "custom".into(), remote: false, available: true,
             description: String::new(), default_model: String::new(), models: Vec::new(),
             endpoints: Default::default(), console_url: String::new(), console_text: String::new(),
@@ -78,6 +81,7 @@ impl Default for ProviderConfig {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ProviderConfigView {
+    pub reply_preference: ReplyPreference,
     #[serde(rename = "type")] pub provider_type: String,
     pub remote: bool, pub available: bool, pub description: String,
     pub default_model: String, pub models: Vec<ModelConfig>,
@@ -117,6 +121,7 @@ impl ProviderConfig {
 
     pub fn view(&self) -> ProviderConfigView {
         ProviderConfigView {
+            reply_preference: self.reply_preference,
             provider_type: if self.is_custom() { "custom".into() } else if self.provider_type == "custom" { "third".into() } else { self.provider_type.clone() },
             remote: self.remote, available: self.available, description: self.description.clone(),
             default_model: self.default_model.clone(), models: self.models.clone(), endpoints: self.endpoints.clone(),
@@ -217,6 +222,16 @@ impl AiConfig {
 
     pub fn workspace_or<'a>(&'a self, default: &'a Path) -> &'a Path {
         if self.workspace.is_empty() { default } else { Path::new(&self.workspace) }
+    }
+
+    /// Read from the provider actually in effect, rather than a global preference that could
+    /// leak into 小伴 AI or a different provider after switching or a catalogue update.
+    pub(crate) fn reply_preference(&self) -> ReplyPreference {
+        if self.active_provider == crate::ai_gateway::GATEWAY_ID { return ReplyPreference::Default; }
+        self.providers.iter().find(|p| p.id == self.active_provider
+            && !(p.remote && p.provider_type != "third")
+            && p.base_url == self.base_url && p.model == self.model && p.protocol == self.protocol)
+            .map(|p| p.reply_preference).unwrap_or_default()
     }
 }
 
@@ -589,6 +604,15 @@ fn selecting_after_save(config: &AiConfig, provider_id: &str, activate: bool) ->
         && config.providers.iter().any(|p| p.id == provider_id && p.is_usable())
 }
 
+fn clean_reply_preference(previous: &ProviderConfig, url: &str, model: &str, protocol: &str, requested: Option<ReplyPreference>) -> Result<ReplyPreference, String> {
+    let available = !(previous.remote && previous.provider_type != "third") && ai_reasoning::supported(url, model, protocol);
+    let preference = requested.unwrap_or(previous.reply_preference);
+    if !available && requested.is_some_and(|p| p != ReplyPreference::Default) {
+        return Err("当前模型暂不支持调整回答偏好，请使用默认设置".into());
+    }
+    Ok(if available { preference } else { ReplyPreference::Default })
+}
+
 #[tauri::command]
 pub fn save_ai_provider(
     app: tauri::AppHandle,
@@ -601,6 +625,7 @@ pub fn save_ai_provider(
     clear_key: bool,
     activate: bool,
     selection_mode: Option<String>,
+    reply_preference: Option<ReplyPreference>,
 ) -> Result<AiConfigView, String> {
     let path = path(&app)?;
     let state = app.state::<AiConfigState>();
@@ -626,6 +651,7 @@ pub fn save_ai_provider(
     let mode = selection_mode.as_deref().unwrap_or("manual");
     if !["manual", "recommended"].contains(&mode) { return Err("模型选择方式无效".into()); }
     let clean_mdl = if mode == "recommended" && !previous.default_model.is_empty() { previous.default_model.clone() } else { clean_mdl };
+    let preference = clean_reply_preference(&previous, &clean_url, &clean_mdl, &protocol, reply_preference)?;
     let (current_name, current_key) = match existing_idx {
         Some(i) => (config.providers[i].name.clone(), config.providers[i].api_key.clone()),
         None => (String::new(), String::new()),
@@ -643,6 +669,7 @@ pub fn save_ai_provider(
     };
 
     let updated_entry = ProviderConfig {
+        reply_preference: preference,
         id: provider_id.clone(),
         name: new_name,
         protocol: protocol.clone(),
@@ -1339,5 +1366,59 @@ mod tests {
         for bad in [0, 15_999, 1_000_001, u32::MAX] {
             assert!(clean_context_tokens(bad).unwrap_err().contains("16K 到 1M"), "{bad}");
         }
+    }
+}
+
+#[cfg(test)]
+mod reply_preference_tests {
+    use super::*;
+
+    fn configured() -> AiConfig {
+        let mut cfg = AiConfig {
+            active_provider: "custom_openai".into(), protocol: "responses".into(),
+            base_url: "https://api.openai.com/v1".into(), model: "gpt-6.1-sol".into(),
+            ..AiConfig::default()
+        };
+        cfg.providers.push(ProviderConfig {
+            id: cfg.active_provider.clone(), protocol: cfg.protocol.clone(), base_url: cfg.base_url.clone(),
+            model: cfg.model.clone(), reply_preference: ReplyPreference::Deeper, ..ProviderConfig::default()
+        });
+        cfg
+    }
+
+    #[test]
+    fn reply_preferences_survive_storage_and_old_files_keep_supplier_defaults() {
+        let nonce = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos();
+        let dir = std::env::temp_dir().join(format!("xiaoban-reply-pref-{}-{nonce}", std::process::id()));
+        let path = dir.join("ai.json");
+        let cfg = configured();
+        save(&path, &cfg).unwrap();
+        assert_eq!(load(&path).unwrap().reply_preference(), ReplyPreference::Deeper);
+        let mut old = serde_json::to_value(&cfg).unwrap();
+        for provider in old["providers"].as_array_mut().unwrap() { provider.as_object_mut().unwrap().remove("replyPreference"); }
+        std::fs::write(&path, serde_json::to_vec(&old).unwrap()).unwrap();
+        assert_eq!(load(&path).unwrap().reply_preference(), ReplyPreference::Default);
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn switching_provider_or_model_does_not_reuse_another_preference() {
+        let mut cfg = configured();
+        assert_eq!(cfg.reply_preference(), ReplyPreference::Deeper);
+        cfg.active_provider = "deepseek".into();
+        assert_eq!(cfg.reply_preference(), ReplyPreference::Default);
+        cfg.active_provider = crate::ai_gateway::GATEWAY_ID.into();
+        assert_eq!(cfg.reply_preference(), ReplyPreference::Default);
+        cfg.active_provider = "custom_openai".into();
+        cfg.model = "some-other-model".into();
+        assert_eq!(cfg.reply_preference(), ReplyPreference::Default);
+    }
+
+    #[test]
+    fn unsupported_preferences_are_rejected_and_stale_preferences_reset_on_save() {
+        let p = configured().providers.pop().unwrap();
+        assert!(clean_reply_preference(&p, "https://gateway.example/v1", &p.model, "responses", Some(ReplyPreference::Deeper)).is_err());
+        assert_eq!(clean_reply_preference(&p, "https://gateway.example/v1", &p.model, "responses", None).unwrap(), ReplyPreference::Default);
+        assert_eq!(clean_reply_preference(&p, &p.base_url, &p.model, &p.protocol, None).unwrap(), ReplyPreference::Deeper);
     }
 }

@@ -32,10 +32,10 @@ const unchanged = computed(() => gatewayActive.value && activeTier.value === pic
 const cardDescription = computed(() => {
   if (!props.store.desktop) return '在桌面应用中使用。';
   if (!uid.value) return '登录小伴账号即可使用，新用户有试用额度，不用自己准备密钥。';
-  return '官方模型服务，按额度计费。可用兑换码充值，档位由小伴维护。';
+  return '选择日常或深入模式，按额度使用，可用兑换码充值。';
 });
 const cardFact = computed(() => {
-  if (gatewayActive.value && activeTierName.value) return { label: '当前档位：', value: activeTierName.value };
+  if (gatewayActive.value && activeTierName.value) return { label: '当前模式：', value: activeTierName.value };
   if (uid.value && balance.value) return { label: '可用额度：', value: money(balance.value.total, perDollar.value) };
   return null;
 });
@@ -105,7 +105,7 @@ async function activate() {
   }
   if (!tiers.value.length) await load();
   if (!picked.value) {
-    props.store.notify('暂时没有可用的模型档位，请在配置里刷新后再试', 'info');
+    props.store.notify('暂时没有可用的模式，请稍后刷新再试', 'info');
     openModal();
     return;
   }
@@ -214,10 +214,10 @@ watch(uid, () => {
 
         <section v-if="tiers.length" class="gw-block" data-testid="gateway-use">
           <div class="gw-block-head">
-            <h4>用作聊天的模型</h4>
+            <h4>使用模式</h4>
             <NTag v-if="gatewayActive" type="success" size="small" :bordered="false" data-testid="gateway-active">当前使用中 · {{ activeTierName }}</NTag>
           </div>
-          <div class="gw-tiers" role="radiogroup" aria-label="模型档位">
+          <div class="gw-tiers" role="radiogroup" aria-label="使用模式">
             <button
               v-for="tier in tiers"
               :key="tier.tier"
@@ -230,13 +230,13 @@ watch(uid, () => {
               :data-testid="`gateway-tier-${tier.tier}`"
               @click="picked = tier.tier"
             >
-              <b>{{ tier.displayName }}</b>
+              <b>{{ tier.displayName }}<span v-if="tier.isDefault"> · 默认</span></b>
               <span v-if="tier.description">{{ tier.description }}</span>
               <em v-if="!tier.available">兑换付费额度后可用</em>
             </button>
           </div>
           <NButton type="primary" :disabled="!picked || unchanged" :loading="enabling" data-testid="gateway-use-btn" @click="enable">
-            {{ unchanged ? '当前使用中' : gatewayActive ? '切换档位' : '用小伴 AI 聊天' }}
+            {{ unchanged ? '当前使用中' : gatewayActive ? '切换模式' : '用小伴 AI 聊天' }}
           </NButton>
           <p v-if="enableError" class="gw-error" role="alert" data-testid="gateway-use-error">{{ enableError }}</p>
         </section>

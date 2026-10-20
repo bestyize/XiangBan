@@ -127,6 +127,16 @@ export const protocolOption = (protocol: AiProtocol) =>
 /** Trimmed, without trailing slashes: the form the host stores. */
 export const normalizeBaseUrl = (value: string) => value.trim().replace(/\/+$/, '');
 
+/** Explicitly verified endpoint/model pairs; keep aligned with ai_reasoning::supported. */
+export function supportsReplyPreference(protocol: AiProtocol, baseUrl: string, model: string): boolean {
+  if (protocol !== 'responses') return false;
+  const base = normalizeBaseUrl(baseUrl);
+  const name = model.trim();
+  if (base === 'https://api.openai.com/v1') return ['gpt-6-astra', 'gpt-6.1-sol', 'gpt-6-sol', 'gpt-6-luna'].includes(name);
+  if (['https://api.deepseek.com', 'https://api.deepseek.com/v1'].includes(base)) return ['deepseek-flash', 'deepseek-v4-pro'].includes(name);
+  return false;
+}
+
 /** The address a request will go to, spelled the same way the host builds it. */
 export function endpointPreview(protocol: AiProtocol, baseUrl: string): string {
   const base = normalizeBaseUrl(baseUrl);

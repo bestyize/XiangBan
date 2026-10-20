@@ -15,6 +15,7 @@ mod website;
 mod content;
 mod account;
 mod ai_config;
+mod ai_reasoning;
 mod tts;
 mod asr;
 mod ai_catalogue;

@@ -139,16 +139,16 @@ pub struct Tier {
 #[tauri::command]
 pub async fn ai_gateway_tiers(app: tauri::AppHandle) -> Result<Vec<Tier>, AccountFailure> {
     let mut value = call(&app, reqwest::Method::GET, "/api/ai/tiers", None).await?;
-    serde_json::from_value(value["tiers"].take()).map_err(|_| AccountFailure::from("小伴 AI 服务返回的档位格式不支持"))
+    serde_json::from_value(value["tiers"].take()).map_err(|_| AccountFailure::from("小伴 AI 服务返回的模式信息暂不支持，请更新客户端"))
 }
 
 fn clean_tier(raw: &str) -> Result<String, String> {
     let tier = raw.trim();
     if tier.is_empty() {
-        return Err("请先选择一个模型档位".into());
+        return Err("请先选择一个使用模式".into());
     }
     if tier.chars().count() > MAX_TIER_LEN || tier.chars().any(|c| c.is_control() || c.is_whitespace()) {
-        return Err("模型档位不对".into());
+        return Err("使用模式不对".into());
     }
     Ok(tier.to_string())
 }
@@ -204,7 +204,7 @@ pub fn readable_error(raw: &str) -> String {
 
 /// 小伴 AI 生效时，换上本次要用的地址、档位和有效令牌；其他服务商原样返回。
 fn resolve(mut config: AiConfig, token: &str, base_url: &str) -> Result<AiConfig, String> {
-    let tier = clean_tier(&config.gateway_tier).map_err(|_| "还没选小伴 AI 的模型档位，请到“设置 → AI 模型”选择".to_string())?;
+    let tier = clean_tier(&config.gateway_tier).map_err(|_| "还没选小伴 AI 的使用模式，请到“设置 → AI 模型”选择".to_string())?;
     select(&mut config, &tier, base_url);
     config.api_key = token.into();
     Ok(config)
@@ -283,7 +283,7 @@ mod tests {
         let mut config = on_other_provider();
         config.active_provider = GATEWAY_ID.into();
         config.gateway_tier.clear();
-        assert!(resolve(config, "t", BASE).unwrap_err().contains("模型档位"));
+        assert!(resolve(config, "t", BASE).unwrap_err().contains("使用模式"));
     }
 
     #[test]

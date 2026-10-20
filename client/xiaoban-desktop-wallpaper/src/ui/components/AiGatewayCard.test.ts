@@ -30,8 +30,8 @@ const afterMonthly: AiBalance = {
   ],
 };
 
-const standard: AiTier = { tier: 'standard', displayName: '标准', description: '日常对话', isDefault: true, requiresPaid: false, available: true };
-const premium: AiTier = { tier: 'premium', displayName: '高级', description: '更强的推理', isDefault: false, requiresPaid: true, available: false };
+const standard: AiTier = { tier: 'standard', displayName: '日常', description: '响应更快，额度更省', isDefault: true, requiresPaid: false, available: true };
+const premium: AiTier = { tier: 'premium', displayName: '深入', description: '适合复杂任务，耗时和额度更多', isDefault: false, requiresPaid: true, available: false };
 const premiumOpen: AiTier = { ...premium, available: true };
 
 const aiConfig = (patch: Partial<AiConfigView> = {}): AiConfigView => ({
@@ -119,7 +119,7 @@ describe('小伴 AI card', () => {
     mountCard(createStore(session('u1')), aiConfig({ activeProvider: 'xiaoban-ai', gatewayTier: 'premium' }));
     await flushPromises();
     expect(text('gateway-card-status')).toBe('当前使用');
-    expect(text('gateway-card-fact')).toBe('高级');
+    expect(text('gateway-card-fact')).toBe('深入');
     expect(wrapper!.find('[data-testid="ai-gateway-card"]').classes()).toContain('active');
   });
 
@@ -265,11 +265,11 @@ describe('小伴 AI dialog: chat model', () => {
     const emitted = wrapper!.emitted('config');
     expect(emitted).toHaveLength(1);
     expect((emitted![0][0] as AiConfigView).gatewayTier).toBe('premium');
-    expect(store.notify).toHaveBeenCalledWith(expect.stringContaining('高级'), 'success');
+    expect(store.notify).toHaveBeenCalledWith(expect.stringContaining('深入'), 'success');
 
     await wrapper!.setProps({ config: emitted![0][0] as AiConfigView });
     await flushPromises();
-    expect(text('gateway-active')).toContain('高级');
+    expect(text('gateway-active')).toContain('深入');
     expect(text('gateway-use-btn')).toBe('当前使用中');
     expect(q('gateway-use-btn')!.hasAttribute('disabled')).toBe(true);
     expect(text('gateway-card-status')).toBe('当前使用');
@@ -280,12 +280,12 @@ describe('小伴 AI dialog: chat model', () => {
     mountCard(createStore(session('u1')), aiConfig({ activeProvider: 'xiaoban-ai', gatewayTier: 'premium' }));
     await flushPromises();
     await openDialog();
-    expect(text('gateway-active')).toContain('高级');
+    expect(text('gateway-active')).toContain('深入');
     expect(q('gateway-tier-premium')!.getAttribute('aria-checked')).toBe('true');
     expect(q('gateway-use-btn')!.hasAttribute('disabled')).toBe(true);
 
     await click('gateway-tier-standard');
-    expect(text('gateway-use-btn')).toBe('切换档位');
+    expect(text('gateway-use-btn')).toBe('切换模式');
     expect(q('gateway-use-btn')!.hasAttribute('disabled')).toBe(false);
   });
 
@@ -358,7 +358,7 @@ describe('小伴 AI card: 启用此服务商', () => {
     const emitted = wrapper!.emitted('config');
     expect(emitted).toHaveLength(1);
     expect((emitted![0][0] as AiConfigView).activeProvider).toBe('xiaoban-ai');
-    expect(store.notify).toHaveBeenCalledWith(expect.stringContaining('标准'), 'success');
+    expect(store.notify).toHaveBeenCalledWith(expect.stringContaining('日常'), 'success');
   });
 
   it('becomes a disabled "正在使用中" once it is the provider in use, like the other cards', async () => {
@@ -391,7 +391,7 @@ describe('小伴 AI card: 启用此服务商', () => {
     await wrapper!.find('[data-testid="gateway-activate"]').trigger('click');
     await flushPromises();
     expect(useCalls()).toHaveLength(0);
-    expect(store.notify).toHaveBeenCalledWith(expect.stringContaining('没有可用的模型档位'), 'info');
+    expect(store.notify).toHaveBeenCalledWith(expect.stringContaining('没有可用的模式'), 'info');
     expect(has('gateway-modal') || has('gateway-redeem')).toBe(true);
   });
 

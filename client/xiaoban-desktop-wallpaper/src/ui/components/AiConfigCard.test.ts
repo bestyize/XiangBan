@@ -407,3 +407,46 @@ describe('global preferences settings', () => {
     expect(q('ai-workspace')?.textContent).toBe('/data/workspace');
   });
 });
+
+describe('reply preferences', () => {
+  const known: AiConfigView = {
+    ...configured, activeProvider: 'custom_openai', protocol: 'responses',
+    baseUrl: 'https://api.openai.com/v1', model: 'gpt-6.1-sol',
+    providers: [{ id: 'custom_openai', name: '我的模型', isCustom: true, protocol: 'responses', baseUrl: 'https://api.openai.com/v1', model: 'gpt-6.1-sol', hasKey: true, keyHint: '', replyPreference: 'deeper' }],
+  };
+
+  it('keeps advanced settings folded and saves the selected provider preference', async () => {
+    await open(known);
+    await openModal('custom_openai');
+    const advanced = q<HTMLDetailsElement>('ai-reply-advanced')!;
+    expect(advanced).not.toBeNull();
+    expect(advanced.open).toBe(false);
+    advanced.open = true;
+    await flushPromises();
+    const select = wrapper!.findAllComponents(NSelect).find(s => s.attributes('data-testid') === 'ai-reply-preference')!;
+    expect(select.props('value')).toBe('deeper');
+    select.vm.$emit('update:value', 'faster');
+    await flushPromises();
+    ipc.mockResolvedValueOnce(known as never);
+    saveButton().click();
+    await flushPromises();
+    expect(ipc).toHaveBeenCalledWith('save_ai_provider', expect.objectContaining({ providerId: 'custom_openai', replyPreference: 'faster' }));
+  });
+
+  it('hides unsupported options and clears a stale choice when the endpoint changes', async () => {
+    await open(known);
+    await openModal('custom_openai');
+    await type('ai-base-url', 'https://gateway.example/v1');
+    expect(q('ai-reply-advanced')).toBeNull();
+    ipc.mockResolvedValueOnce(known as never);
+    saveButton().click();
+    await flushPromises();
+    expect(ipc).toHaveBeenCalledWith('save_ai_provider', expect.objectContaining({ replyPreference: 'default' }));
+  });
+
+  it('does not show a nonfunctional option for unknown models', async () => {
+    await open(configured);
+    await openModal('deepseek');
+    expect(q('ai-reply-advanced')).toBeNull();
+  });
+});

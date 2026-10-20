@@ -1,7 +1,18 @@
 import { describe, expect, it } from 'vitest';
-import { aiProtocols, endpointPreview, insecureRemote, normalizeBaseUrl, protocolOption, validateAiForm, validateBaseUrl, validateKey } from './ai-config.ts';
+import { aiProtocols, endpointPreview, insecureRemote, normalizeBaseUrl, protocolOption, supportsReplyPreference, validateAiForm, validateBaseUrl, validateKey } from './ai-config.ts';
 
 describe('model service form helpers', () => {
+  it('only offers reply preferences for verified models and endpoints', () => {
+    expect(supportsReplyPreference('responses', ' https://api.openai.com/v1/ ', 'gpt-6.1-sol')).toBe(true);
+    expect(supportsReplyPreference('responses', 'https://api.deepseek.com', 'deepseek-flash')).toBe(true);
+    for (const [protocol, url, model] of [
+      ['responses', 'https://gateway.example/v1', 'gpt-6.1-sol'],
+      ['responses', 'https://api.openai.com.evil.example/v1', 'gpt-6.1-sol'],
+      ['responses', 'https://api.openai.com/v1', 'gpt-4o'],
+      ['chat', 'https://api.deepseek.com', 'deepseek-flash'],
+      ['anthropic', 'https://api.deepseek.com/anthropic', 'deepseek-flash'],
+    ] as const) expect(supportsReplyPreference(protocol, url, model)).toBe(false);
+  });
   it('previews the address each protocol will call', () => {
     expect(endpointPreview('chat', 'https://api.openai.com/v1')).toBe('https://api.openai.com/v1/chat/completions');
     expect(endpointPreview('chat', '  https://api.openai.com/v1//  ')).toBe('https://api.openai.com/v1/chat/completions');

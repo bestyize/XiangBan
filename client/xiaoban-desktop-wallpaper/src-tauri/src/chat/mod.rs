@@ -250,6 +250,7 @@ pub(crate) fn provider(config: &AiConfig) -> Result<Arc<dyn ModelProvider>, Stri
 
 fn provider_with(config: &AiConfig, key_source: Option<KeySource>) -> Result<Arc<dyn ModelProvider>, String> {
     let mut profile = ProviderProfile::new(config.base_url.clone(), config.api_key.clone(), config.model.clone());
+    profile.extra_body = crate::ai_reasoning::extra_body(&config.base_url, &config.model, &config.protocol, config.reply_preference());
     profile.max_request_bytes = Some(8 * 1024 * 1024);
     profile.max_output_tokens = Some(output_budget(config.context_tokens) as u32);
     if let Some(source) = key_source {

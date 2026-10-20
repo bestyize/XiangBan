@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { computed, onDeactivated, onMounted, onBeforeUnmount, ref } from 'vue';
+import { computed, onDeactivated, onMounted, onBeforeUnmount, ref, watch } from 'vue';
 import { NAlert, NButton, NInput, NModal, NPopconfirm, NSelect, NSwitch, NTag } from 'naive-ui';
 import { Bot, Cpu, ExternalLink, FolderOpen, Globe, Plus, RefreshCw, Settings, ShieldCheck, Sparkles, Trash2, Wrench } from 'lucide-vue-next';
-import { GATEWAY_PROVIDER, invoke, listen, type AiConfigView, type AiProtocol, type ProviderConfigView } from '../../bridge.ts';
+import { GATEWAY_PROVIDER, invoke, listen, type AiConfigView, type AiProtocol, type AiReplyPreference, type ProviderConfigView } from '../../bridge.ts';
 import AiGatewayCard from './AiGatewayCard.vue';
 import type { ControlStore } from '../control-types.ts';
 import {
@@ -14,6 +14,7 @@ import {
   insecureRemote,
   normalizeBaseUrl,
   protocolOption,
+  supportsReplyPreference,
   providerEndpoint,
   validateAiForm,
   validateBaseUrl,
@@ -57,6 +58,7 @@ const modalBaseUrl = ref('');
 const modalModel = ref('');
 const modalApiKey = ref('');
 const modalSelectionMode = ref<'manual' | 'recommended'>('manual');
+const modalReplyPreference = ref<AiReplyPreference>('default');
 const modalHasKey = ref(false);
 const modalKeyHint = ref('');
 const confirmingClear = ref(false);
@@ -75,6 +77,13 @@ function getProviderMeta(id: string): ProviderMeta {
   return p?.remote ? remoteProviderMeta(p) : fallbackMeta(id);
 }
 const isManaged = computed(() => ['free', 'paid'].includes(getProviderSaved(editingId.value)?.type ?? ''));
+const canSetReplyPreference = computed(() => !isManaged.value && supportsReplyPreference(modalProtocol.value, modalBaseUrl.value, modalModel.value));
+const replyPreferenceOptions = [
+  { label: '默认', value: 'default' },
+  { label: '更快', value: 'faster' },
+  { label: '更深入', value: 'deeper' },
+];
+watch(canSetReplyPreference, supported => { if (!supported) modalReplyPreference.value = 'default'; });
 const selectedModelDescription = computed(() => currentMeta.value.models?.find(m => m.id === modalModel.value)?.description ?? '');
 const currentMeta = computed<ProviderMeta>(() => getProviderMeta(editingId.value));
 const modalOption = computed(() => protocolOption(modalProtocol.value));
@@ -128,7 +137,7 @@ const activeStatusText = computed(() => {
   const activeId = saved.value.activeProvider;
   if (activeId === GATEWAY_PROVIDER) {
     return gatewayOffered.value
-      ? '当前生效：小伴 AI（点“小伴 AI”卡片的“配置”可查看额度、更换档位）'
+      ? '当前生效：小伴 AI（点“小伴 AI”卡片的“配置”可查看额度、更换模式）'
       : '小伴 AI 入口已被关闭，请选择其他服务商';
   }
   if (!activeId || !isProviderFullyConfigured(activeId)) {
@@ -248,6 +257,7 @@ function openConfigureModal(id: string) {
   }
 
   modalSelectionMode.value = p?.selectionMode ?? 'manual';
+  modalReplyPreference.value = p?.replyPreference ?? 'default';
   modalApiKey.value = '';
   confirmingClear.value = false;
   fetchedModels.value = [];
@@ -256,6 +266,7 @@ function openConfigureModal(id: string) {
 
 function openCreateCustomModal() {
   modalSelectionMode.value = 'manual';
+  modalReplyPreference.value = 'default';
   const newId = `custom_${Date.now()}`;
   editingId.value = newId;
   modalName.value = '自定义供应商';
@@ -310,6 +321,7 @@ async function saveProvider(activate: boolean) {
       clearKey: false,
       activate,
       selectionMode: modalSelectionMode.value,
+      replyPreference: canSetReplyPreference.value ? modalReplyPreference.value : 'default',
     });
     fill(updated);
     modalVisible.value = false;
@@ -735,6 +747,21 @@ function getProviderIcon(id: string) {
           </div>
         </div>
 
+        <details v-if="modalVisible && canSetReplyPreference" class="reply-preference" data-testid="ai-reply-advanced">
+          <summary>高级设置</summary>
+          <div class="field">
+            <label for="ai-reply-preference">回答偏好</label>
+            <NSelect
+              v-model:value="modalReplyPreference"
+              input-id="ai-reply-preference"
+              :options="replyPreferenceOptions"
+              :disabled="!store.desktop || !!busy"
+              data-testid="ai-reply-preference"
+            />
+            <small>默认沿用服务商设置。更深入可能耗时更久、消耗更多额度。</small>
+          </div>
+        </details>
+
         <small v-if="selectedModelDescription">{{ selectedModelDescription }}</small>
         <label v-if="currentMeta.defaultModel && !isEditingCustom" class="field">
           <span>跟随推荐模型 · {{ currentMeta.defaultModel }}</span>
@@ -977,6 +1004,8 @@ function getProviderIcon(id: string) {
 
 /* Modal form */
 .modal-form { display: grid; gap: 16px; padding: 4px 0; }
+.reply-preference summary { cursor: pointer; font-weight: 600; }
+.reply-preference[open] summary { margin-bottom: 12px; }
 .provider-console-tip .tip-content {
   display: flex;
   justify-content: space-between;
