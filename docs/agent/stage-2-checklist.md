@@ -9,7 +9,7 @@
 - [ ] 核对当前主分支及 `agent-kernel`、`agent-tools`、`chat/mod.rs`，记录版本与已有接线。
 - [ ] 选择首个用户场景：建议 PDF 发票整理或批量文件命名，固定输入和预期输出。
 - [ ] 构建首批可重复任务样本，并明确哪些任务会真实修改文件。
-- [ ] 确立 `task_id`、`run_id`、`session_id` 和父子关联关系；复用 Kernel 既有 `RunEvent`。
+- [ ] 确立 `task_id`、`run_id`、`session_id` 和父子关联关系；复用 Kernel 既有 `RunEvent`。（已开始接入 `run_id`/`session_id` 运行日志；`task_id` 尚待设计和验收）
 - [ ] 在桌面 Runtime 贯通结构化运行事件、ToolDispatched、ToolResult、结束状态及错误分类。
 - [ ] 记录执行意图和实际业务结果，不能把已派发动作等同完成。
 - [ ] 引入 `TaskOutcome`：`succeeded / failed / partial / cancelled / unknown`。

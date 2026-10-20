@@ -190,6 +190,31 @@ fn run(rig: &Rig, text: &str) -> (Result<agent_kernel::RunSummary, agent_kernel:
     (result, events)
 }
 
+#[test]
+fn observed_chat_run_persists_events_and_keeps_legacy_chat_stream() {
+    let rig = rig("observed-journal", vec![Step::text("任务已回答")], Approval::Once);
+    let journal = JsonlRunLog::new(rig.dirs.runs().join("s1"));
+    let mut delivered: Vec<(String, Value)> = Vec::new();
+    let result = rig.agent.run_parts_observed(
+        "s1", vec![Part::Text { text: "测试".into() }],
+        RunOptions { max_tool_calls: Some(256), ..Default::default() },
+        &mut |record| run_history::forward(&journal, record, "secret-test-key", |channel, payload| {
+            delivered.push((channel.into(), payload));
+        }),
+        &Arc::new(AtomicBool::new(false)),
+    ).unwrap();
+    let inspection = journal.inspect(&result.run_id).unwrap();
+    assert!(inspection.terminal);
+    assert_eq!(inspection.state, Some(agent_kernel::RunState::Completed));
+    assert!(inspection.incomplete_tools.is_empty());
+    assert!(inspection.last_sequence >= 3);
+    let records = journal.read_after(&result.run_id, 0, 100).unwrap();
+    assert!(records.windows(2).all(|items| items[1].sequence == items[0].sequence + 1));
+    assert!(delivered.iter().any(|(kind, value)| kind == "chat-event" && value["event"]["type"] == "done"));
+    assert!(delivered.iter().any(|(kind, value)| kind == "chat-run-state" && value["state"] == "completed"));
+    assert!(delivered.iter().all(|(_, value)| value["session"] == "s1"));
+}
+
 /// What the model was told about each tool call, in order.
 fn tool_results(rig: &Rig) -> Vec<String> {
     let requests = rig.provider.requests();

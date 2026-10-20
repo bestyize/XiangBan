@@ -9,6 +9,7 @@ mod compact;
 mod danger;
 mod desktop_tools;
 mod prompt;
+mod run_history;
 mod sessions;
 
 use agent_computer_use_tools::{SKILL as COMPUTER_USE_SKILL, SKILL_NAME as COMPUTER_USE_SKILL_NAME, SKILL_ORIGIN_MARKER};
@@ -21,7 +22,8 @@ use agent_kernel::provider::openai::OpenAiCompat;
 use agent_kernel::provider::responses::OpenAiResponses;
 use agent_kernel::provider::wire::ProviderProfile;
 use agent_kernel::skills::Skills;
-use agent_kernel::{Agent, Approval, ApprovalRequest, ContextTrim, ContinueGuard, JsonlStore, RepeatGuard, Message, ModelProvider, Part, Permission, PermissionMode, Risk, SessionStore, SpillOutput, ToolCtx};
+use agent_kernel::{Agent, Approval, ApprovalRequest, ContextTrim, ContinueGuard, JsonlStore, RepeatGuard, Message, ModelProvider, Part, Permission, PermissionMode, Risk, RunOptions, RunEventBody, SessionStore, SpillOutput, ToolCtx};
+use agent_kernel::journal::JsonlRunLog;
 use broker::Broker;
 use compact::{CompactingStore, ContextInfo};
 use desktop_tools::{Desktop, TauriDesktop};
@@ -216,6 +218,7 @@ impl Dirs {
         Ok(Self { chat: crate::storage::root(app)?.join("chat") })
     }
     fn sessions(&self) -> PathBuf { self.chat.join("sessions") }
+    fn runs(&self) -> PathBuf { self.chat.join("runs") }
     fn spill(&self) -> PathBuf { self.chat.join("spill") }
     fn memory(&self) -> PathBuf { self.chat.join("memory") }
     fn skills(&self) -> PathBuf { self.chat.join("skills") }
@@ -576,14 +579,50 @@ pub fn chat_send(app: tauri::AppHandle, session_id: String, text: String, images
                 return;
             }
         };
-        let mut callback = |mut event| {
-            if let agent_kernel::Event::Error { message } = &mut event {
-                if !config_owned.api_key.is_empty() { *message = message.replace(&config_owned.api_key, "<hidden>"); }
-                if ai_gateway::is_active(&config_owned) { *message = ai_gateway::readable_error(message); }
+        // Persist the kernel's full sequenced stream before emitting compatible UI events.
+        // If the journal cannot be written, do not continue dispatching tools.
+        let mut terminal_delivered = false;
+        let answered = match Dirs::of(&handle) {
+            Ok(dirs) => {
+                let journal = JsonlRunLog::new(dirs.runs().join(&id));
+                let options = RunOptions { max_tool_calls: Some(256), ..Default::default() };
+                let mut observe = |mut record| {
+                    let terminal = matches!(&record.body, RunEventBody::Event { event:
+                        agent_kernel::Event::Done | agent_kernel::Event::Cancelled | agent_kernel::Event::Error { .. }
+                    });
+                    if let RunEventBody::Event { event: agent_kernel::Event::Error { message } } = &mut record.body {
+                        if ai_gateway::is_active(&config_owned) {
+                            *message = ai_gateway::readable_error(message);
+                        }
+                    }
+                    run_history::forward(&journal, record, &config_owned.api_key, |channel, payload| {
+                        emit(&sender, channel, payload);
+                    })?;
+                    if terminal { terminal_delivered = true; }
+                    Ok(())
+                };
+                if retry {
+                    agent.retry_last_observed(&id, options, &mut observe, &cancel)
+                } else {
+                    agent.run_parts_observed(&id, parts_owned, options, &mut observe, &cancel)
+                }
             }
-            emit(&sender, "chat-event", json!({ "session": session, "event": event }));
+            Err(error) => Err(agent_kernel::HarnessError::Store(error)),
         };
-        let answered = if retry { agent.retry_last(&id, &mut callback, &cancel) } else { agent.run_parts(&id, parts_owned, &mut callback, &cancel) };
+        // An observer can fail before the kernel is able to publish its terminal event.
+        if !terminal_delivered {
+            if let Err(error) = &answered {
+                let mut message = error.to_string();
+                if !config_owned.api_key.is_empty() {
+                    message = message.replace(&config_owned.api_key, "<hidden>");
+                }
+                if ai_gateway::is_active(&config_owned) {
+                    message = ai_gateway::readable_error(&message);
+                }
+                emit(&sender, "chat-event", json!({ "session": session, "event": { "type": "error", "message": message } }));
+                emit(&sender, "chat-run-state", json!({ "session": session, "state": "failed", "reason": message }));
+            }
+        }
         if answered.is_ok() {
             auto_compact(&handle, &id, &config_owned, key_source, &cancel);
         }
@@ -602,6 +641,26 @@ pub fn chat_send(app: tauri::AppHandle, session_id: String, text: String, images
         return Err(format!("无法开始回答：{error}"));
     }
     Ok(summary)
+}
+
+/// Returns the persisted run trace for a console view, 50 events at a time.
+/// Kernel completion is not proof that the user's task was successful.
+#[tauri::command]
+pub fn chat_run_history(
+    app: tauri::AppHandle, window: tauri::WebviewWindow,
+    session_id: String, run_id: String, after: Option<u64>,
+) -> Result<Value, String> {
+    if window.label() != "control" {
+        return Err("运行轨迹仅可从控制台读取".into());
+    }
+    checked_session_id(&session_id)?;
+    let log = JsonlRunLog::new(Dirs::of(&app)?.runs().join(&session_id));
+    let inspection = log.inspect(&run_id).map_err(|e| e.to_string())?;
+    let events = log.read_after(&run_id, after.unwrap_or(0), 50).map_err(|e| e.to_string())?;
+    if events.iter().any(|event| event.session_id != session_id) {
+        return Err("运行轨迹与会话不匹配".into());
+    }
+    Ok(json!({ "inspection": inspection, "events": events }))
 }
 
 #[tauri::command]
@@ -624,6 +683,12 @@ pub fn chat_delete_session(app: tauri::AppHandle, session_id: String) -> Result<
     }
     JsonlStore::new(Dirs::of(&app)?.sessions()).remove(&session_id).map_err(|e| e.to_string())?;
     AttachmentStore::new(Dirs::of(&app)?.chat.join("attachments")).remove_session(&session_id)?;
+    let run_dir = Dirs::of(&app)?.runs().join(&session_id);
+    if let Err(error) = fs::remove_dir_all(&run_dir) {
+        if error.kind() != std::io::ErrorKind::NotFound {
+            return Err(format!("无法删除运行记录：{error}"));
+        }
+    }
     state.permission.forget_session(&session_id);
     state.todo.clear_session(&session_id);
     state.auto_compact.forget(&session_id);
