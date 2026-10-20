@@ -338,7 +338,7 @@ export function createAssistantStore(deps: AssistantDeps): AssistantStore {
     async openChat() { await deps.invoke('assistant_open_chat', { session: chat.currentId }); },
     async openSettings(tab) { await deps.invoke('assistant_open_settings', { tab }); },
     dispose() {
-      disposed = true; clearTimers(); stopWatch(); stopSessionWatch();
+      disposed = true; clearTimers(); stopWatch(); stopSessionWatch(); stopVoiceWatch();
       unsubscribers.splice(0).forEach(off => off());
       asr.deactivate(); void speech.stop();
     },
@@ -346,6 +346,10 @@ export function createAssistantStore(deps: AssistantDeps): AssistantStore {
   const stopWatch = watch(() => speech.status, (status, before) => {
     if (flags.awaitingSpeech && status === 'idle' && before !== 'idle') { flags.awaitingSpeech = false; afterTurn(); }
   });
+  const stopVoiceWatch = watch(() => asr.enabled, enabled => {
+    if (!enabled) { clearTimers(); heard = ''; voiceTurn = false; asr.deactivate(); }
+    else if (store.hint === '语音对话还没开启。在超级小伴设置里打开后，就能直接说话。') store.note('');
+  }, { flush: 'sync' });
   const stopSessionWatch = watch(() => chat.currentId, id => {
     if(id && !disposed) rememberSession(id);
   }, { flush: 'sync' });

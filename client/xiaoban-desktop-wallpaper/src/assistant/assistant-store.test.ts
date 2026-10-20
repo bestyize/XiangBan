@@ -517,3 +517,11 @@ describe('interrupting assistant output',()=>{
     store.interrupt();await nextTick();expect(store.phase).toBe('idle');expect(asr.activate).not.toHaveBeenCalled();expect(speech.status).toBe('idle');
   });
 });
+
+describe('assistant voice settings synchronization',()=>{
+  it('cancels the pending automatic send when settings disables voice, preserving the draft',async()=>{
+    const {store,asr,chat,say,advance}=setup();await store.opened();say('还没有发送的话');expect(store.input).toBe('还没有发送的话');
+    asr.enabled=false;advance(SEND_GRACE_MS+1);await nextTick();
+    expect(chat.send).not.toHaveBeenCalled();expect(asr.recordingRequested).toBe(false);expect(store.phase).toBe('idle');expect(store.input).toBe('还没有发送的话');
+  });
+});

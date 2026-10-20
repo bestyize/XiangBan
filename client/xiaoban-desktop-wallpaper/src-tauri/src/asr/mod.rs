@@ -170,6 +170,9 @@ pub async fn asr_set_enabled(app: tauri::AppHandle, enabled: bool) -> Result<Sta
         state.generation.fetch_add(1, Ordering::SeqCst);
         if !enabled { state.engine_ready.store(false, Ordering::SeqCst); }
     }
+    // Publish before waiting for an in-flight decode to release the engine so
+    // every window drops its microphone as soon as the saved switch is off.
+    announce(&app);
     if !enabled {
         let handle = app.clone();
         tauri::async_runtime::spawn_blocking(move || {
@@ -229,3 +232,4 @@ pub async fn asr_transcribe(app: tauri::AppHandle, samples: Vec<f32>) -> Result<
         Ok(text)
     }).await.map_err(|_| "语音识别任务失败")?
 }
+

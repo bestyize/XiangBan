@@ -23,14 +23,14 @@ function setup(options: { enabled?: boolean; modelReady?: boolean; prepare?: () 
   return { store, invoke, capture, notify, stop, off, phrase, progress: (payload: unknown) => progress?.(payload), hostState: (payload: unknown) => hostState?.(payload) };
 }
 describe('local ASR lifecycle', () => {
-  it('follows the host warming the engine up in the background, without changing the user\'s choice', async () => {
+  it('follows the saved switch and engine readiness from other windows without opening a microphone', async () => {
     const h = setup({ modelReady: false });
     await h.store.init();
     expect(h.store.engineReady).toBe(false);
     h.hostState({ enabled: true, modelReady: true, engineReady: false, warming: true });
-    expect(h.store.warming).toBe(true); expect(h.store.modelReady).toBe(true); expect(h.store.enabled).toBe(false);
-    h.hostState({ enabled: false, modelReady: true, engineReady: true, warming: false });
-    expect(h.store.engineReady).toBe(true); expect(h.store.warming).toBe(false);
+    expect(h.store.warming).toBe(true); expect(h.store.modelReady).toBe(true); expect(h.store.enabled).toBe(true); expect(h.capture).not.toHaveBeenCalled();
+    h.hostState({ enabled: false, modelReady: true, engineReady: false, warming: false });
+    expect(h.store.enabled).toBe(false); expect(h.store.engineReady).toBe(false); expect(h.store.warming).toBe(false);
     expect(h.off).not.toHaveBeenCalled();
     h.store.dispose();
     expect(h.off).toHaveBeenCalledTimes(2);
@@ -114,5 +114,27 @@ describe('local ASR lifecycle', () => {
     grant.resolve({ stop: lateStop }); await pending;
     expect(lateStop).toHaveBeenCalledOnce(); expect(h.store.listening).toBe(true);
     expect(h.store.recordingRequested).toBe(true); expect(h.stop).not.toHaveBeenCalled(); h.store.dispose();
+  });
+});
+
+
+describe('cross-window ASR settings',()=>{
+  it('releases recording and ignores in-flight recognition when another window disables voice',async()=>{
+    const pending=deferred<string>();const h=setup({enabled:true,transcribe:()=>pending.promise});const text=vi.fn();
+    await h.store.activate(text);h.phrase();await flushPromises();expect(h.store.recognizing).toBe(true);
+    h.hostState({enabled:false,modelReady:true,engineReady:false,warming:false});
+    expect(h.store.enabled).toBe(false);expect(h.store.recordingRequested).toBe(false);expect(h.store.listening).toBe(false);expect(h.stop).toHaveBeenCalledOnce();
+    pending.resolve('旧语音');await flushPromises();expect(text).not.toHaveBeenCalled();h.store.dispose();
+  });
+  it('does not let an old prepare completion re-enable voice after an external switch-off',async()=>{
+    const pending=deferred<unknown>();const h=setup({enabled:true,prepare:()=>pending.promise});h.store.activate(vi.fn());await flushPromises();
+    h.hostState({enabled:false,modelReady:true,engineReady:false,warming:false});expect(h.store.preparing).toBe(false);
+    pending.resolve({enabled:true,modelReady:true,engineReady:true});await flushPromises();expect(h.store.enabled).toBe(false);expect(h.store.engineReady).toBe(false);expect(h.capture).not.toHaveBeenCalled();h.store.dispose();
+  });
+  it('does not overwrite a newer event with a stale startup snapshot',async()=>{
+    const pending=deferred<unknown>();const h=setup();h.invoke.mockImplementationOnce(()=>pending.promise as never);
+    const init=h.store.init();await flushPromises();h.hostState({enabled:true,modelReady:true,engineReady:true});
+    pending.resolve({enabled:false,modelReady:false,engineReady:false});await init;
+    expect(h.store.enabled).toBe(true);expect(h.store.engineReady).toBe(true);expect(h.capture).not.toHaveBeenCalled();h.store.dispose();
   });
 });

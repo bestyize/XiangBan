@@ -131,8 +131,11 @@ it('stops on send and stays off after the assistant completes its response', asy
   expect(h.pressed()).toBe('false'); expect(h.capture).toHaveBeenCalledOnce();
 });
 
-it('does not restart on window focus, returning to the page, or remounting the chat', async () => {
-  const h = await open(); await h.clickMic(); window.dispatchEvent(new Event('blur')); await flushPromises();
+it('does not restart after the window was hidden, returning to the page, or remounting the chat', async () => {
+  const h = await open(); await h.clickMic();
+  const visibility=vi.spyOn(document,'visibilityState','get').mockReturnValue('hidden');
+  document.dispatchEvent(new Event('visibilitychange')); await flushPromises();
+  visibility.mockRestore();
   window.dispatchEvent(new Event('focus')); await flushPromises(); expect(h.pressed()).toBe('false'); expect(h.capture).toHaveBeenCalledOnce();
   await h.clickMic(); h.store.page = 'settings'; await flushPromises(); h.store.page = 'chat'; await flushPromises();
   expect(h.pressed()).toBe('false'); expect(h.capture).toHaveBeenCalledTimes(2);
@@ -179,3 +182,4 @@ it('clears a stale microphone error before the next capture request completes', 
   pending.resolve({ stop: h.stop }); await flushPromises();
   expect(h.asr.listening).toBe(true);
 });
+
