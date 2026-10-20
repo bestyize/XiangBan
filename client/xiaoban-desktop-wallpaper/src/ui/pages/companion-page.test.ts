@@ -22,8 +22,7 @@ describe('theme-based desktop pet library',()=>{
  it('offers the official library from an empty desktop tab',async()=>{const {view}=setup();await flushPromises();await tab(view,'桌面伙伴');expect(view.find('[data-testid="pet-custom-empty"]').exists()).toBe(false);await view.get('.desktop-pets-empty button').trigger('click');await flushPromises();expect(view.find('[data-testid="pet-add-daisy"]').exists()).toBe(true);view.unmount();});
  it('opens AI creation with a selected theme as context',async()=>{const {view,store}=setup();await flushPromises();await view.get('[data-testid="pet-create"]').trigger('click');await flushPromises();expect(store.startCreation).toHaveBeenCalledWith('pet');await view.get('[data-testid="pet-theme-flower-whispers"] .theme-actions button').trigger('click');await flushPromises();expect(store.creationDraft).toContain('flower-whispers');expect(store.creationDraft).toContain('现有主题');view.unmount();});
  it('shows explicit export and forum sharing for custom themes only, without a duplicate JSON export',async()=>{
-  const {source,..._unused}=OFFICIAL_THEMES[0] as typeof OFFICIAL_THEMES[0] & {source?:string};
-  const custom={..._unused,id:'my-pets',name:'我的宠物'};
+  const custom={...OFFICIAL_THEMES[0],id:'my-pets',name:'我的宠物'};
   localStorage.setItem('xiaoban.pets.themes.v1',JSON.stringify([custom]));
   const {view}=setup();await flushPromises();
   expect(view.find('[data-testid="pet-theme-flower-whispers"] [data-testid="export-resource"]').exists()).toBe(false);
