@@ -254,8 +254,10 @@ pub fn start_cursor_bridge(app: tauri::AppHandle) {
     std::thread::spawn(move || {
         let mut previous = (f64::NAN, f64::NAN);
         let mut previous_down = false;
+        let mut ticks = 0u32;
         loop {
             std::thread::sleep(Duration::from_millis(33));
+            ticks = ticks.wrapping_add(1);
             let handle = app.clone();
             let result = on_main(&app, move |mtm| {
                 let point = NSEvent::mouseLocation();
@@ -263,6 +265,9 @@ pub fn start_cursor_bridge(app: tauri::AppHandle) {
                 let moved = (point.x, point.y) != previous;
                 let pressed = down && !previous_down;
                 let released = !down && previous_down;
+                if !moved && !pressed && !released && ticks % 8 != 0 {
+                    return Ok(((point.x, point.y), down));
+                }
                 let desktop = pressed
                     && ["wallpaper", "media-a", "media-b"].iter().any(|label| handle.get_webview_window(label).is_some())
                     && desktop_at_point(point, mtm);

@@ -380,6 +380,11 @@ pub fn start_cursor_bridge(app: tauri::AppHandle) {
             previous = cursor;
             previous_down = down;
             ticks += 1;
+            // Keep a periodic sample for animated hit regions, but do not cross the
+            // native/WebView boundary thirty times a second while the cursor is idle.
+            if !moved && !pressed && !released && ticks % 8 != 0 {
+                continue;
+            }
             let under = unsafe { WindowFromPoint(cursor) };
             let desktop = ["WorkerW", "Progman", "SysListView32", "SHELLDLL_DefView"]
                 .contains(&class_name(under).as_str());

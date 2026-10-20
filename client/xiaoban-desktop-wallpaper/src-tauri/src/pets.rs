@@ -496,6 +496,7 @@ pub fn start(app: &tauri::AppHandle) {
     let handle = app.clone();
     std::thread::spawn(move || {
         let mut ticks = 0;
+        let mut previous_cursor = None;
         loop {
             std::thread::sleep(Duration::from_millis(33));
             ticks += 1;
@@ -503,6 +504,8 @@ pub fn start(app: &tauri::AppHandle) {
                 sync(&handle);
             }
             if let Ok((x, y)) = crate::widgets::cursor(&handle) {
+                if previous_cursor == Some((x, y)) && ticks % 8 != 0 { continue; }
+                previous_cursor = Some((x, y));
                 for (key, w) in handle.webview_windows() {
                     if !is_pet(&key) || !w.is_visible().unwrap_or(false) {
                         continue;

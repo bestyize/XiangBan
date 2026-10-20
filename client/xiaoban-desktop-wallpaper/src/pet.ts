@@ -15,7 +15,9 @@ export class PetView {
   private mind = new Mind(this.animator, { autoSleep: true })
   private id = `pet${Math.random().toString(36).slice(2)}`
   private frameId = 0
+  private tick: FrameRequestCallback | null = null
   private last = 0
+  private lastFaceMarkup = ''
   private lookTimer = 0
   private config: Settings
   private lastExpression = ''
@@ -48,8 +50,9 @@ export class PetView {
       if (event instanceof KeyboardEvent && ['Enter', ' '].includes(event.key)) { event.preventDefault(); this.poke() }
     })
     const tick = (now: number) => {
-      this.frameId = requestAnimationFrame(tick)
+      this.frameId = 0
       if (this.config.paused || document.hidden) { this.last = 0; return }
+      this.schedule()
       if (this.last && now - this.last < 1000 / this.config.fps - 1) return
       const dt = this.last ? (now - this.last) / 1000 : 1 / 60
       this.last = now
@@ -58,7 +61,11 @@ export class PetView {
       const frame = this.animator.step(dt)
       const { body, face, shadow, ears } = this.parts
       body?.setAttribute('transform', bodyTransform(frame))
-      if (face) { face.innerHTML = faceMarkup(frame, this.id, this.definition?petPalette(this.definition):faceStyleOf(skinOf(this.skin)).palette); face.setAttribute('opacity', faceOpacity(frame).toFixed(2)) }
+      if (face) {
+        const markup = faceMarkup(frame, this.id, this.definition?petPalette(this.definition):faceStyleOf(skinOf(this.skin)).palette)
+        if (markup !== this.lastFaceMarkup) { face.innerHTML = markup; this.lastFaceMarkup = markup }
+        face.setAttribute('opacity', faceOpacity(frame).toFixed(2))
+      }
       if(this.definition)for(const part of this.definition.parts)this.host.querySelector(`[data-pet-part="${part.id}"]`)?.setAttribute('transform',partTransform(part,frame))
       const light = earLight(frame)
       ears.forEach(({ group, halo, light: inner }, i) => {
@@ -70,10 +77,21 @@ export class PetView {
       const current = toSpec(this.mind.current()).expression
       if (current !== this.lastStatus) { this.lastStatus = current; this.status?.(current) }
     }
-    this.frameId = requestAnimationFrame(tick)
+    this.tick = tick
+    document.addEventListener('visibilitychange', this.onVisibility)
+    this.schedule()
+  }
+
+  private schedule() {
+    if (!this.frameId && this.tick && !this.config.paused && !document.hidden) this.frameId = requestAnimationFrame(this.tick)
+  }
+  private onVisibility = () => {
+    if (document.hidden) { cancelAnimationFrame(this.frameId); this.frameId = 0; this.last = 0 }
+    else this.schedule()
   }
 
   private bind() {
+    this.lastFaceMarkup = ''
     const q = (selector: string) => this.host.querySelector<SVGElement>(selector)
     const ears = (['L', 'R'] as const).map(side => {
       const group = q(`[data-part="ear${side}"]`)
@@ -86,6 +104,8 @@ export class PetView {
 
   update(settings: Settings) {
     this.config = settings
+    if (settings.paused) { cancelAnimationFrame(this.frameId); this.frameId = 0; this.last = 0 }
+    else this.schedule()
     const skin = skinOf(settings.companionSkin).id
     if (skin !== this.skin && !this.definition) {
       this.skin = skin
@@ -148,5 +168,5 @@ export class PetView {
     this.interact(Math.min(seconds, 10))
     this.mind.play([{ expr: expression, hold: Math.max(0.5, Math.min(seconds, 10)) }])
   }
-  destroy() { this.reactions.destroy(); cancelAnimationFrame(this.frameId); clearTimeout(this.lookTimer); window.removeEventListener('care-expression', this.careExpression); this.host.remove() }
+  destroy() { this.reactions.destroy(); cancelAnimationFrame(this.frameId); this.tick = null; clearTimeout(this.lookTimer); document.removeEventListener('visibilitychange', this.onVisibility); window.removeEventListener('care-expression', this.careExpression); this.host.remove() }
 }
