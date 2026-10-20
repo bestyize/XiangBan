@@ -4,10 +4,10 @@ import { reactive, nextTick } from 'vue';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import AssistantApp from './AssistantApp.vue';
 import type { AssistantStore } from './assistant-store.ts';
-import {invoke} from '../bridge.ts';
+import {invoke,listen} from '../bridge.ts';
 import type { AsrStore } from '../ui/asr/store.ts';
 
-vi.mock('../bridge.ts', () => ({ invoke: vi.fn(async () => {}) }));
+vi.mock('../bridge.ts', () => ({ invoke: vi.fn(async () => {}), listen: vi.fn(async () => () => {}) }));
 vi.mock('./Orb.vue', () => ({ default: { template: '<span />' } }));
 vi.stubGlobal('ResizeObserver', class { observe() {} disconnect() {} });
 
@@ -232,5 +232,19 @@ describe('assistant rainbow presentation',()=>{
     await button.trigger('click');expect(store.interrupt).toHaveBeenCalledOnce();
     store.phase='idle';await nextTick();expect(button.classes()).not.toContain('is-stop');expect(button.attributes('aria-label')).toBe('发送');
     store.input='';await nextTick();expect(button.attributes('aria-label')).toBe('展开工具');
+  });
+});
+
+describe('assistant native morph coordination',()=>{
+  it('acknowledges the outgoing shape before preparing and revealing the incoming shape',async()=>{
+    const animation=vi.spyOn(HTMLElement.prototype,'animate').mockReturnValue({finished:Promise.resolve(),cancel:vi.fn()} as unknown as Animation);
+    const {store,wrapper}=setup();await flushPromises();
+    const callback=vi.mocked(listen).mock.calls.find(([event])=>event==='assistant-transition')![1] as (value:any)=>void;
+    callback({id:1,target:'ball',step:'leave',right:true});await flushPromises();
+    expect(wrapper.get('.stage').classes()).toContain('morphing');
+    expect(invoke).toHaveBeenCalledWith('assistant_transition_ready',{id:1,step:'leave'});
+    store.open=false;store.ball=true;await nextTick();callback({id:1,target:'ball',step:'enter',right:true});await flushPromises();
+    expect(invoke).toHaveBeenCalledWith('assistant_transition_ready',{id:1,step:'enter'});
+    callback({id:1,target:'ball',step:'show',right:true});await flushPromises();expect(wrapper.get('.stage').classes()).not.toContain('morphing');animation.mockRestore();
   });
 });

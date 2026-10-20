@@ -5,11 +5,85 @@ import MarkdownView from '../ui/chat/MarkdownView.ts';
 import SelectionCopyMenu from '../ui/chat/SelectionCopyMenu.vue';
 import type { AsrStore } from '../ui/asr/store.ts';
 import type { ApprovalRequest } from '../ui/chat/types.ts';
-import { invoke } from '../bridge.ts';
+import { invoke, listen } from '../bridge.ts';
+import { morphGeometry, MORPH_DURATION } from './morph.ts';
 import { isDark } from '../ui/appearance.ts';
 import Orb from './Orb.vue';
 import { hitRegion, type HitRegion } from './hit-regions.ts';
 import type { AssistantStore } from './assistant-store.ts';
+
+const morphing = ref(false), morphShell = ref<HTMLElement>();
+const morphStyle = ref<Record<string, string>>({});
+const morphVisible = ref(false);
+interface MorphEvent { id: number; target: 'capsule' | 'ball'; step: 'leave' | 'enter' | 'show' | 'cancel'; right: boolean }
+let offMorph: (() => void) | undefined, morphDisposed = false, morphId = 0;
+let morphStep = '';
+let morphFallback: ReturnType<typeof setTimeout> | undefined;
+let morphAnimations: Animation[] = [];
+let enterMorph: (() => Promise<void>) | undefined;
+const reducedMotion = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+function resetMorph() {
+  clearTimeout(morphFallback);
+  morphAnimations.splice(0).forEach(a => a.cancel());
+  morphing.value = false; morphVisible.value = false; enterMorph = undefined;
+  void nextTick(() => { queueHitRegions(); fit(); });
+}
+async function animateMorph(el: Element | undefined | null, frames: Keyframe[], duration = MORPH_DURATION, delay = 0) {
+  if (!el?.animate || reducedMotion()) return;
+  const animation = el.animate(frames, { duration, delay, easing: 'cubic-bezier(.22,.75,.2,1)', fill: 'both' });
+  morphAnimations.push(animation);
+  try { await animation.finished; } catch { /* superseded or unmounted */ }
+}
+async function prepareMorph(right: boolean) {
+  const composer = document.querySelector<HTMLElement>('.composer');
+  if (!composer) return null;
+  const { full, ball } = morphGeometry(composer.getBoundingClientRect(), right);
+  morphStyle.value = { left: `${full.left}px`, top: `${full.top}px`, width: `${full.width}px`, height: `${full.height}px` };
+  morphVisible.value = true;
+  await nextTick();
+  return { full, ball };
+}
+const morphFrame = (frame: ReturnType<typeof morphGeometry>['full']) => ({ left: `${frame.left}px`, top: `${frame.top}px`, width: `${frame.width}px`, height: `${frame.height}px`, borderRadius: frame.borderRadius });
+async function handleMorph(event: MorphEvent) {
+  if (morphDisposed || event.id < morphId) return;
+  morphStep = event.step;
+  if (event.step === 'leave') {
+    resetMorph(); morphId = event.id; closeTools(); morphing.value = true;
+    morphFallback = setTimeout(resetMorph, 1800);
+    try {
+      const frames = event.target === 'ball' ? await prepareMorph(event.right) : null;
+      if (frames) await Promise.all([
+        animateMorph(morphShell.value, [morphFrame(frames.full), morphFrame(frames.ball)]),
+        animateMorph(document.querySelector('.card'), [{ opacity: 1, transform: 'translateY(0)' }, { opacity: 0, transform: 'translateY(6px)' }], 140),
+      ]);
+      else await animateMorph(document.querySelector('.ball'), [{ opacity: 1, transform: 'scale(1)' }, { opacity: 0, transform: 'scale(.92)' }], 100);
+    } finally { if (!morphDisposed && event.id === morphId && morphStep === 'leave') await invoke('assistant_transition_ready', { id: event.id, step: 'leave' }); }
+  } else if (event.step === 'enter') {
+    morphAnimations.splice(0).forEach(a => a.cancel()); morphVisible.value = false;
+    await nextTick();
+    if (event.target === 'capsule' && inner.value) {
+      await invoke('assistant_fit', { height: Math.max(156, Math.ceil(inner.value.getBoundingClientRect().height)) });
+      if (event.id !== morphId || morphStep !== 'enter') return;
+      await nextTick();
+    }
+    if (event.id !== morphId || morphStep !== 'enter') return;
+    // The native window has its final rectangle, but remains hidden until this acknowledgement.
+    const frames = event.target === 'capsule' && props.store.open ? await prepareMorph(event.right) : null;
+    if (frames) {
+      morphStyle.value = morphFrame(frames.ball);
+      enterMorph = async () => {
+        await Promise.all([
+          animateMorph(morphShell.value, [morphFrame(frames.ball), morphFrame(frames.full)]),
+          animateMorph(document.querySelector('.card'), [{ opacity: 0, transform: 'translateY(6px)' }, { opacity: 1, transform: 'translateY(0)' }], 150, 110),
+        ]);
+      };
+    } else enterMorph = () => animateMorph(document.querySelector('.ball'), [{ opacity: 0, transform: 'scale(.92)' }, { opacity: 1, transform: 'scale(1)' }], 140);
+    await nextTick();
+    await invoke('assistant_transition_ready', { id: event.id, step: 'enter' });
+  } else if (event.step === 'show') {
+    try { await enterMorph?.(); } finally { if (event.id === morphId) { resetMorph(); if (props.store.open) field.value?.focus(); } }
+  } else resetMorph();
+}
 
 const props = defineProps<{ store: AssistantStore; asr: AsrStore }>();
 const field = ref<HTMLInputElement>();
@@ -197,9 +271,9 @@ let observer: ResizeObserver | undefined;
 function fit() {
   queueHitRegions();
   cancelAnimationFrame(raf);
-  if(dragging.value || capturing.value)return;
+  if(dragging.value || capturing.value || morphing.value)return;
   raf = requestAnimationFrame(() => {
-    if(dragging.value || capturing.value)return;
+    if(dragging.value || capturing.value || morphing.value)return;
     const el = inner.value;
     if (!el) return;
     // Keep enough space for the toolbar even before hovering. Measuring its animated
@@ -251,19 +325,21 @@ function dragUp(event:PointerEvent){if(press?.id===event.pointerId)releasePress(
 function captureClick(event:MouseEvent){if(pulled&&event.detail!==0){event.preventDefault();event.stopImmediatePropagation();pulled=false;}}
 function dragEnded(){dragging.value=false;releasePress();fit();}
 function ballClick(){void props.store.unfold();}
-const onFocus=()=>{if(props.store.open&&!dragging.value&&!press)field.value?.focus();};
+const onFocus=()=>{if(props.store.open&&!dragging.value&&!press&&!morphing.value)field.value?.focus();};
 onMounted(()=>{
+  void listen<MorphEvent>('assistant-transition', event => { void handleMorph(event).catch(() => resetMorph()); }).then(off => { if (morphDisposed) off(); else offMorph = off; });
   void nextTick(queueHitRegions);window.addEventListener('resize',queueHitRegions);
   document.addEventListener('pointerdown',outsideTools);window.addEventListener('blur',closeTools);window.addEventListener('focus',onFocus);window.addEventListener('pointermove',dragMove);window.addEventListener('pointerup',dragUp);window.addEventListener('pointercancel',dragUp);window.addEventListener('blur',releasePress);window.addEventListener('assistant-drag-end',dragEnded);
 });
 onBeforeUnmount(()=>{
+  morphDisposed = true; clearTimeout(morphFallback); offMorph?.(); morphAnimations.splice(0).forEach(a => a.cancel());
   cancelAnimationFrame(hitRaf);window.removeEventListener('resize',queueHitRegions);
   clearToolTimers();window.removeEventListener('blur',closeTools);document.removeEventListener('pointerdown',outsideTools);imageVersion++; releasePress();copyVersion++;clearTimeout(copyTimer);window.removeEventListener('focus',onFocus);window.removeEventListener('pointermove',dragMove);window.removeEventListener('pointerup',dragUp);window.removeEventListener('pointercancel',dragUp);window.removeEventListener('blur',releasePress);window.removeEventListener('assistant-drag-end',dragEnded);observer?.disconnect();cancelAnimationFrame(raf);
 });
 </script>
 
 <template>
-  <div class="stage" :class="{ light: !isDark,dragging }" @dragover="dragOver" @drop="dropImages" @keydown.esc.prevent.stop="escape" @pointerdown="dragDown" @click.capture="captureClick">
+  <div class="stage" :class="{ light: !isDark,dragging,morphing }" @dragover="dragOver" @drop="dropImages" @keydown.esc.prevent.stop="escape" @pointerdown="dragDown" @click.capture="captureClick">
     <div v-if="store.ball && !store.open" class="ball-stage" data-testid="assistant-ball-stage">
       <button type="button" class="ball" data-phase="idle" title="点一下提问，按住可以拖动，右键打开设置" aria-label="打开超级小伴" data-testid="assistant-ball" data-drag-handle @click="ballClick" @contextmenu.prevent="store.openSettings('assistant')">
         <Orb phase="idle" :active="store.ball && !store.open" :size="38" />
@@ -325,6 +401,7 @@ onBeforeUnmount(()=>{
         <span class="sr" aria-live="polite">{{ store.status }}</span>
       </div>
     </Transition>
+    <div v-if="morphVisible" ref="morphShell" class="morph-shell" :style="morphStyle" aria-hidden="true"><Orb phase="idle" :size="38" flowing /></div>
     <SelectionCopyMenu :scope="scroller" @visibility-change="queueHitRegions" />
   </div>
 </template>
@@ -420,6 +497,13 @@ html,body,#app{background:transparent!important}
 @keyframes blink{to{visibility:hidden}}
 @keyframes dot{0%,80%,100%{opacity:.3;transform:translateY(0)}40%{opacity:1;transform:translateY(-3px)}}
 @media(prefers-reduced-motion:reduce){.pop-enter-active,.rise-enter-active{transition:none}.tools-toolbar{animation:none}.main-action svg{transition:none}.dots i,.cursor{animation:none}}
+.morph-shell{position:fixed;z-index:20;display:flex;align-items:center;justify-content:center;overflow:hidden;pointer-events:none;border-radius:32px;border:1px solid var(--line);background:var(--capsule);box-shadow:var(--capsule-shadow)}
+.morph-shell :deep(.orb-frame){position:absolute;left:5px}
+.morphing .composer{opacity:0;pointer-events:none}
+.morphing .card,.morphing .ball{opacity:0;pointer-events:none}
+.morphing .inner{transform:none!important;transition:none!important}
+.morphing .pop-enter-from{opacity:1}
+.morphing .tools-toolbar{display:none}
 </style>
 
 
