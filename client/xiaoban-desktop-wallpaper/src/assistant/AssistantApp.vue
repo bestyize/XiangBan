@@ -363,7 +363,8 @@ html,body,#app{background:transparent!important}
 .image-tray{display:flex;gap:8px;flex-wrap:wrap;padding:12px 16px 2px;cursor:default}
 .image-thumb{position:relative;width:44px;height:44px;flex:none}
 .image-thumb img,.sent-images img{width:44px;height:44px;object-fit:cover;border-radius:8px;background:var(--button)}
-.image-thumb button{position:absolute;right:-4px;top:-4px;width:17px;height:17px;padding:0;display:grid;place-items:center;border:1px solid var(--line);border-radius:50%;background:var(--card);color:var(--text);cursor:pointer}
+.image-thumb button{position:absolute;right:-4px;top:-4px;width:17px;height:17px;box-sizing:border-box;padding:0;line-height:1;display:grid;place-items:center;border:1px solid var(--line);border-radius:50%;background:var(--card);color:var(--text);cursor:pointer}
+.image-thumb button :deep(svg){display:block;width:11px;height:11px;flex-shrink:0}
 .image-thumb button:focus-visible{outline:2px solid var(--link)}
 .sent-images{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
 .image-status{font-size:11px;color:var(--link);margin:0;padding:0 20px 8px;cursor:default}
