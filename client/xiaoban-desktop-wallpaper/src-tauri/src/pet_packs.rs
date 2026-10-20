@@ -1,13 +1,19 @@
 //! Declarative, code-free pet themes shared with the frontend renderer.
 use serde::{Deserialize, Serialize};
+use base64::{engine::general_purpose::STANDARD, Engine};
+use sha2::{Digest, Sha256};
 use std::{fs, path::Path};
-pub const MAX_THEME_BYTES: usize = 512 * 1024;
+pub const MAX_THEME_BYTES: usize = 24 * 1024 * 1024;
+const MAX_IMAGE_BYTES: usize = 4 * 1024 * 1024;
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Shape {
     #[serde(rename = "type")]
     pub kind: String,
-    pub fill: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fill: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub src: Option<String>,
     pub stroke: Option<String>,
     pub stroke_width: Option<f64>,
     pub opacity: Option<f64>,
@@ -54,9 +60,118 @@ struct Catalog {
     themes: Vec<Theme>,
 }
 pub fn builtin() -> Vec<Theme> {
-    serde_json::from_str::<Catalog>(include_str!("../../public/pets/catalog.json"))
+    static THEMES: std::sync::OnceLock<Vec<Theme>> = std::sync::OnceLock::new();
+    THEMES.get_or_init(|| {
+    let mut catalog = serde_json::from_str::<Catalog>(include_str!("../../public/pets/catalog.json"))
         .expect("shipped pet themes")
-        .themes
+        .themes;
+    let assets: [(String, Vec<u8>); 5] = [
+        ("assets/sunflower.webp".into(), include_bytes!("../../src/pets/assets/sunflower.webp").to_vec()),
+        ("assets/tulip.webp".into(), include_bytes!("../../src/pets/assets/tulip.webp").to_vec()),
+        ("assets/echeveria.webp".into(), include_bytes!("../../src/pets/assets/echeveria.webp").to_vec()),
+        ("assets/jade.webp".into(), include_bytes!("../../src/pets/assets/jade.webp").to_vec()),
+        ("assets/bear-paw.webp".into(), include_bytes!("../../src/pets/assets/bear-paw.webp").to_vec()),
+    ];
+    for theme in &mut catalog {
+        for pet in &mut theme.pets { for part in &mut pet.parts { for shape in &mut part.shapes {
+            if shape.kind == "image" {
+                let (path, bytes) = assets.iter().find(|(path, _)| Some(path.as_str()) == shape.src.as_deref()).expect("shipped plant asset");
+                shape.src = Some(image_data(path, bytes).expect("shipped raster image"));
+            }
+        } } }
+    }
+    catalog
+    }).clone()
+}
+
+fn image_extension(path: &str) -> Result<&str, String> {
+    let parts: Vec<_> = path.split('/').collect();
+    if parts.len() < 2 || parts.len() > 4 || parts[0] != "assets" || !parts.iter().all(|s| !s.is_empty() && !s.starts_with('.') && s.bytes().all(|b| b.is_ascii_alphanumeric() || b"._-".contains(&b))) {
+        return Err("植物素材必须使用 assets/ 下的普通文件路径".into());
+    }
+    match path.rsplit('.').next() { Some(ext @ ("png" | "webp" | "gif")) => Ok(ext), _ => Err("植物素材只支持 PNG、WebP 和 GIF".into()) }
+}
+fn check_image(ext: &str, bytes: &[u8]) -> Result<(), String> {
+    let valid = match ext {
+        "png" => bytes.starts_with(b"\x89PNG\r\n\x1a\n"),
+        "gif" => bytes.starts_with(b"GIF87a") || bytes.starts_with(b"GIF89a"),
+        "webp" => bytes.len() >= 12 && &bytes[..4] == b"RIFF" && &bytes[8..12] == b"WEBP",
+        _ => false,
+    };
+    if !valid || bytes.len() > MAX_IMAGE_BYTES { return Err("植物图片内容与格式不符或超过 4 MiB".into()); }
+    Ok(())
+}
+fn image_data(path: &str, bytes: &[u8]) -> Result<String, String> {
+    let ext = image_extension(path)?;
+    check_image(ext, bytes)?;
+    Ok(format!("data:image/{ext};base64,{}", STANDARD.encode(bytes)))
+}
+fn decode_image(src: &str) -> Result<(&str, Vec<u8>), String> {
+    if src.len() > MAX_IMAGE_BYTES.div_ceil(3) * 4 + 32 { return Err("植物图片超过 4 MiB".into()); }
+    let (header, encoded) = src.split_once(',').ok_or("植物图片必须是内嵌素材，不能含外链")?;
+    let ext = match header { "data:image/png;base64" => "png", "data:image/webp;base64" => "webp", "data:image/gif;base64" => "gif", _ => return Err("植物图片不能含 SVG、脚本或外链".into()) };
+    let bytes = STANDARD.decode(encoded).map_err(|_| "植物图片编码无效")?;
+    check_image(ext, &bytes)?;
+    Ok((ext, bytes))
+}
+/// Resolve archive-local files before persisting. Runtime JSON is self-contained and needs no file access.
+pub fn import_assets(theme: &mut Theme, assets: &[(String, Vec<u8>)]) -> Result<(), String> {
+    if assets.len() > 60 || assets.iter().map(|(_, b)| b.len()).sum::<usize>() > 16 * 1024 * 1024 { return Err("植物素材总量超过限制".into()); }
+    for (path, bytes) in assets { image_data(path, bytes)?; }
+    let mut used = std::collections::HashSet::new();
+    for pet in &mut theme.pets { for part in &mut pet.parts { for shape in &mut part.shapes {
+        if shape.kind == "image" {
+            let src = shape.src.as_deref().ok_or("植物图片缺少 src")?;
+            if src.starts_with("data:") { decode_image(src)?; continue; }
+            image_extension(src)?;
+            let (_, bytes) = assets.iter().find(|(path, _)| path == src).ok_or_else(||format!("缺少植物素材：{src}"))?;
+            used.insert(src.to_string());
+            shape.src = Some(image_data(src, bytes)?);
+        }
+    } } }
+    if assets.iter().any(|(path, _)| !used.contains(path)) { return Err("植物包包含未引用的素材".into()); }
+    validate(theme)
+}
+/// Export only authoring content, with content-addressed filenames so shared images deduplicate.
+pub fn export_assets(theme: &Theme) -> Result<(Theme, Vec<(String, Vec<u8>)>), String> {
+    validate(theme)?;
+    let mut theme = theme.clone();
+    let mut files = std::collections::BTreeMap::new();
+    for pet in &mut theme.pets { for part in &mut pet.parts { for shape in &mut part.shapes {
+        if shape.kind == "image" {
+            let (ext, bytes) = decode_image(shape.src.as_deref().ok_or("植物图片缺少 src")?)?;
+            let path = format!("assets/{:x}.{ext}", Sha256::digest(&bytes));
+            files.insert(path.clone(), bytes);
+            shape.src = Some(path);
+        }
+    } } }
+    Ok((theme, files.into_iter().collect()))
+}
+/// The assistant edits metadata using stable references, without putting base64 image bytes in context.
+pub fn compact_images(theme: &mut Theme) -> Result<(), String> {
+    for pet in &mut theme.pets { for part in &mut pet.parts { for shape in &mut part.shapes {
+        if shape.kind == "image" {
+            let (_, bytes)=decode_image(shape.src.as_deref().ok_or("植物图片缺少 src")?)?;
+            shape.src=Some(format!("asset:{:x}",Sha256::digest(&bytes)));
+        }
+    } } }
+    Ok(())
+}
+pub fn resolve_image_refs(theme: &mut Theme, existing: &[Theme]) -> Result<(), String> {
+    let mut sources=std::collections::HashMap::new();
+    for t in existing { for pet in &t.pets { for part in &pet.parts { for shape in &part.shapes {
+        if shape.kind == "image" {
+            let src=shape.src.as_deref().ok_or("植物图片缺少 src")?;
+            let (_, bytes)=decode_image(src)?;
+            sources.insert(format!("asset:{:x}",Sha256::digest(&bytes)),src);
+        }
+    } } } }
+    for pet in &mut theme.pets { for part in &mut pet.parts { for shape in &mut part.shapes {
+        if let Some(src)=shape.src.as_deref().filter(|s|s.starts_with("asset:")) {
+            shape.src=Some((*sources.get(src).ok_or("图片素材引用不存在，请先导入对应资源包")?).to_string());
+        }
+    } } }
+    Ok(())
 }
 pub fn valid_id(id: &str) -> bool {
     crate::custom_widgets::valid_widget_id(id)
@@ -76,7 +191,12 @@ fn shapes(items: &[Shape]) -> Result<(), String> {
         return Err("图形数量需为 1–100".into());
     }
     for s in items {
-        if !color(&s.fill)
+        if s.kind == "image" {
+            decode_image(s.src.as_deref().ok_or("植物图片缺少 src")?)?;
+            if !s.x.is_some_and(|n|range(n,0.,320.)) || !s.y.is_some_and(|n|range(n,-64.,320.)) || !s.width.is_some_and(|n|range(n,1.,320.)) || !s.height.is_some_and(|n|range(n,1.,320.)) || s.opacity.is_some_and(|n|!range(n,0.,1.)) { return Err("植物图片尺寸无效".into()); }
+            continue;
+        }
+        if !s.fill.as_deref().is_some_and(color)
             || s.stroke.as_ref().is_some_and(|s| !color(s))
             || s.stroke_width.is_some_and(|n| !range(n, 0., 12.))
             || s.opacity.is_some_and(|n| !range(n, 0., 1.))
@@ -122,7 +242,7 @@ fn shapes(items: &[Shape]) -> Result<(), String> {
     Ok(())
 }
 pub fn validate(theme: &Theme) -> Result<(), String> {
-    if theme.schema_version != 1
+    if ![1,2].contains(&theme.schema_version)
         || !valid_id(&theme.id)
         || !text(&theme.name, 24)
         || !text(&theme.description, 160)
@@ -132,9 +252,12 @@ pub fn validate(theme: &Theme) -> Result<(), String> {
     {
         return Err("宠物主题格式无效".into());
     }
-    if serde_json::to_vec(theme).map_err(|e| e.to_string())?.len() > MAX_THEME_BYTES {
-        return Err("宠物主题不能超过 512 KiB".into());
+    let limit = if theme.schema_version == 1 { 512 * 1024 } else { MAX_THEME_BYTES };
+    if serde_json::to_vec(theme).map_err(|e| e.to_string())?.len() > limit {
+        return Err("宠物主题文件过大".into());
     }
+    let mut image_bytes = 0usize;
+    let mut image_count = 0usize;
     let mut ids = std::collections::HashSet::new();
     for p in &theme.pets {
         if !valid_id(&p.id)
@@ -167,6 +290,14 @@ pub fn validate(theme: &Theme) -> Result<(), String> {
                 return Err("活动部件无效".into());
             }
             shapes(&part.shapes)?;
+            for s in &part.shapes {
+                if s.kind == "image" {
+                    if theme.schema_version != 2 { return Err("图片植物需要 schemaVersion=2".into()); }
+                    image_bytes += decode_image(s.src.as_deref().unwrap())?.1.len();
+                    image_count += 1;
+                    if image_bytes > 16 * 1024 * 1024 || image_count > 60 { return Err("植物素材总量超过限制".into()); }
+                }
+            }
         }
     }
     Ok(())
@@ -231,10 +362,50 @@ mod tests {
     #[test]
     fn executable_art_and_external_references_are_rejected() {
         let mut theme = builtin().remove(0);
-        theme.pets[2].parts[0].shapes[0].fill = "url(https://example.com/a.svg)".into();
+        theme.pets[2].parts[0].shapes[0].kind = "path".into();
+        theme.pets[2].parts[0].shapes[0].fill = Some("url(https://example.com/a.svg)".into());
         assert!(validate(&theme).is_err());
         theme = builtin().remove(0);
+        theme.pets[2].parts[0].shapes[0].kind = "path".into();
+        theme.pets[2].parts[0].shapes[0].fill = Some("#ffffff".into());
         theme.pets[2].parts[0].shapes[0].d = Some("<script>alert(1)</script>".into());
         assert!(validate(&theme).is_err());
     }
+    #[test]
+    fn raster_assets_round_trip_and_legacy_themes_still_validate() {
+        let original = builtin().remove(0);
+        let (mut portable, files) = export_assets(&original).unwrap();
+        assert_eq!(files.len(), 2);
+        assert!(files.iter().all(|(p, _)|p.starts_with("assets/") && p.ends_with(".webp")));
+        import_assets(&mut portable, &files).unwrap();
+        assert_eq!(serde_json::to_value(portable).unwrap(), serde_json::to_value(&original).unwrap());
+        let mut old = original.clone(); old.schema_version=1; old.pets.truncate(2);
+        validate(&old).unwrap();
+        let mut wrong_version=original; wrong_version.schema_version=1;
+        assert!(validate(&wrong_version).is_err());
+    }
+    #[test]
+    fn assistant_image_references_preserve_bytes_without_echoing_base64() {
+        let original=builtin().remove(0);
+        let mut compact=original.clone();compact_images(&mut compact).unwrap();
+        let text=serde_json::to_string(&compact).unwrap();
+        assert!(!text.contains("base64"));assert!(text.len()<5000);
+        resolve_image_refs(&mut compact,&[original.clone()]).unwrap();
+        assert_eq!(serde_json::to_value(compact).unwrap(),serde_json::to_value(original).unwrap());
+    }
+    #[test]
+    fn missing_external_mislabeled_and_unused_assets_fail_before_save() {
+        let original=builtin().remove(0);
+        let (theme, files)=export_assets(&original).unwrap();
+        assert!(import_assets(&mut theme.clone(), &[]).is_err());
+        let mut bad=files.clone(); bad[0].1=b"not a picture".to_vec();
+        assert!(import_assets(&mut theme.clone(), &bad).is_err());
+        let mut extra=files.clone();extra.push(("assets/unused.webp".into(),files[0].1.clone()));
+        assert!(import_assets(&mut theme.clone(), &extra).is_err());
+        for src in ["https://example.com/a.webp","assets/../a.webp","data:image/svg+xml;base64,AAAA"] {
+            let mut bad=theme.clone();bad.pets[2].parts[0].shapes[0].src=Some(src.into());
+            assert!(import_assets(&mut bad, &files).is_err());
+        }
+    }
 }
+

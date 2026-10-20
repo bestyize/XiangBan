@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "themes": [
     {
-      "schemaVersion": 1,
+      "schemaVersion": 2,
       "id": "flower-whispers",
       "name": "花朵心语",
       "description": "把一朵小花的心情，留在桌面上。",
@@ -27,138 +27,25 @@
         {
           "id": "sunflower",
           "name": "向日葵",
-          "description": "保留原来的花盆与表情，换上向日葵。",
+          "description": "保留原来的花盆与表情，换上写实向日葵。",
           "kind": "plant",
           "parts": [
             {
-              "id": "flower",
+              "id": "plant",
               "name": "向日葵",
               "pivot": [
                 160,
-                157
+                156
               ],
               "motion": "sway",
               "shapes": [
                 {
-                  "type": "path",
-                  "d": "M160 154Q151 110 160 65",
-                  "fill": "none",
-                  "stroke": "#719655",
-                  "strokeWidth": 7
-                },
-                {
-                  "type": "path",
-                  "d": "M158 126Q118 92 107 117Q125 146 158 126Z",
-                  "fill": "#91af6a",
-                  "stroke": "#6d9256",
-                  "strokeWidth": 1.5
-                },
-                {
-                  "type": "path",
-                  "d": "M158 112Q196 77 213 101Q193 129 158 112Z",
-                  "fill": "#a8bf7b",
-                  "stroke": "#6d9256",
-                  "strokeWidth": 1.5
-                },
-                {
-                  "type": "ellipse",
-                  "x": 181.6,
-                  "y": 68.0,
-                  "rx": 14.7,
-                  "ry": 14.7,
-                  "fill": "#efc360",
-                  "stroke": "none",
-                  "strokeWidth": 1
-                },
-                {
-                  "type": "ellipse",
-                  "x": 175.27,
-                  "y": 83.27,
-                  "rx": 14.7,
-                  "ry": 14.7,
-                  "fill": "#efc360",
-                  "stroke": "none",
-                  "strokeWidth": 1
-                },
-                {
-                  "type": "ellipse",
-                  "x": 160.0,
-                  "y": 89.6,
-                  "rx": 14.7,
-                  "ry": 14.7,
-                  "fill": "#efc360",
-                  "stroke": "none",
-                  "strokeWidth": 1
-                },
-                {
-                  "type": "ellipse",
-                  "x": 144.73,
-                  "y": 83.27,
-                  "rx": 14.7,
-                  "ry": 14.7,
-                  "fill": "#efc360",
-                  "stroke": "none",
-                  "strokeWidth": 1
-                },
-                {
-                  "type": "ellipse",
-                  "x": 138.4,
-                  "y": 68.0,
-                  "rx": 14.7,
-                  "ry": 14.7,
-                  "fill": "#efc360",
-                  "stroke": "none",
-                  "strokeWidth": 1
-                },
-                {
-                  "type": "ellipse",
-                  "x": 144.73,
-                  "y": 52.73,
-                  "rx": 14.7,
-                  "ry": 14.7,
-                  "fill": "#efc360",
-                  "stroke": "none",
-                  "strokeWidth": 1
-                },
-                {
-                  "type": "ellipse",
-                  "x": 160.0,
-                  "y": 46.4,
-                  "rx": 14.7,
-                  "ry": 14.7,
-                  "fill": "#efc360",
-                  "stroke": "none",
-                  "strokeWidth": 1
-                },
-                {
-                  "type": "ellipse",
-                  "x": 175.27,
-                  "y": 52.73,
-                  "rx": 14.7,
-                  "ry": 14.7,
-                  "fill": "#efc360",
-                  "stroke": "none",
-                  "strokeWidth": 1
-                },
-                {
-                  "type": "ellipse",
-                  "x": 160,
-                  "y": 68,
-                  "rx": 11.4,
-                  "ry": 11.4,
-                  "fill": "#a77948",
-                  "stroke": "none",
-                  "strokeWidth": 1
-                },
-                {
-                  "type": "ellipse",
-                  "x": 157,
-                  "y": 65,
-                  "rx": 7,
-                  "ry": 5,
-                  "fill": "#b58a56",
-                  "stroke": "none",
-                  "strokeWidth": 1
+                  "type": "image",
+                  "src": "assets/sunflower.webp",
+                  "x": 96,
+                  "y": -29,
+                  "width": 128,
+                  "height": 185
                 }
               ]
             }
@@ -167,52 +54,25 @@
         {
           "id": "tulip",
           "name": "郁金香",
-          "description": "保留原来的花盆与表情，换上郁金香。",
+          "description": "保留原来的花盆与表情，换上写实郁金香。",
           "kind": "plant",
           "parts": [
             {
-              "id": "flower",
+              "id": "plant",
               "name": "郁金香",
               "pivot": [
                 160,
-                157
+                156
               ],
               "motion": "sway",
               "shapes": [
                 {
-                  "type": "path",
-                  "d": "M160 154Q151 110 160 65",
-                  "fill": "none",
-                  "stroke": "#719655",
-                  "strokeWidth": 7
-                },
-                {
-                  "type": "path",
-                  "d": "M158 126Q118 92 107 117Q125 146 158 126Z",
-                  "fill": "#91af6a",
-                  "stroke": "#6d9256",
-                  "strokeWidth": 1.5
-                },
-                {
-                  "type": "path",
-                  "d": "M158 112Q196 77 213 101Q193 129 158 112Z",
-                  "fill": "#a8bf7b",
-                  "stroke": "#6d9256",
-                  "strokeWidth": 1.5
-                },
-                {
-                  "type": "path",
-                  "d": "M132 50Q143 59 160 43Q177 58 188 49L185 79Q160 112 135 79Z",
-                  "fill": "#e9a7b0",
-                  "stroke": "#c98092",
-                  "strokeWidth": 2
-                },
-                {
-                  "type": "path",
-                  "d": "M160 52L160 89",
-                  "fill": "none",
-                  "stroke": "#f9d6da",
-                  "strokeWidth": 2
+                  "type": "image",
+                  "src": "assets/tulip.webp",
+                  "x": 115.5,
+                  "y": -34,
+                  "width": 89,
+                  "height": 190
                 }
               ]
             }
@@ -221,7 +81,7 @@
       ]
     },
     {
-      "schemaVersion": 1,
+      "schemaVersion": 2,
       "id": "succulent-dots",
       "name": "多肉点点",
       "description": "圆圆胖胖，安静生长的陪伴。",
@@ -230,73 +90,25 @@
         {
           "id": "echeveria",
           "name": "石莲小点",
-          "description": "保留原来的花盆与表情，换上石莲小点。",
+          "description": "保留原来的花盆与表情，换上写实蜜桃石莲。",
           "kind": "plant",
           "parts": [
             {
-              "id": "leaves",
-              "name": "莲叶",
+              "id": "plant",
+              "name": "蜜桃石莲",
               "pivot": [
                 160,
-                157
+                156
               ],
               "motion": "sway",
               "shapes": [
                 {
-                  "type": "path",
-                  "d": "M160 151Q190.0 91.0 212.0 87.0Q235.0 109.0 160 151Z",
-                  "fill": "#c6d2b1",
-                  "stroke": "#7d9b83",
-                  "strokeWidth": 1.5
-                },
-                {
-                  "type": "path",
-                  "d": "M160 151Q174.8 107.3 196.8 103.3Q219.8 125.3 160 151Z",
-                  "fill": "#a5b99e",
-                  "stroke": "#7d9b83",
-                  "strokeWidth": 1.5
-                },
-                {
-                  "type": "path",
-                  "d": "M160 151Q138.0 114.0 160.0 110.0Q183.0 132.0 160 151Z",
-                  "fill": "#92b19e",
-                  "stroke": "#7d9b83",
-                  "strokeWidth": 1.5
-                },
-                {
-                  "type": "path",
-                  "d": "M160 151Q101.2 107.3 123.2 103.3Q146.2 125.3 160 151Z",
-                  "fill": "#c6d2b1",
-                  "stroke": "#7d9b83",
-                  "strokeWidth": 1.5
-                },
-                {
-                  "type": "path",
-                  "d": "M160 151Q86.0 91.0 108.0 87.0Q131.0 109.0 160 151Z",
-                  "fill": "#a5b99e",
-                  "stroke": "#7d9b83",
-                  "strokeWidth": 1.5
-                },
-                {
-                  "type": "path",
-                  "d": "M160 151Q101.2 74.7 123.2 70.7Q146.2 92.7 160 151Z",
-                  "fill": "#92b19e",
-                  "stroke": "#7d9b83",
-                  "strokeWidth": 1.5
-                },
-                {
-                  "type": "path",
-                  "d": "M160 151Q138.0 68.0 160.0 64.0Q183.0 86.0 160 151Z",
-                  "fill": "#c6d2b1",
-                  "stroke": "#7d9b83",
-                  "strokeWidth": 1.5
-                },
-                {
-                  "type": "path",
-                  "d": "M160 151Q174.8 74.7 196.8 70.7Q219.8 92.7 160 151Z",
-                  "fill": "#a5b99e",
-                  "stroke": "#7d9b83",
-                  "strokeWidth": 1.5
+                  "type": "image",
+                  "src": "assets/echeveria.webp",
+                  "x": 72,
+                  "y": -1,
+                  "width": 176,
+                  "height": 158
                 }
               ]
             }
@@ -305,67 +117,25 @@
         {
           "id": "jade",
           "name": "玉露团团",
-          "description": "保留原来的花盆与表情，换上玉露团团。",
+          "description": "保留原来的花盆与表情，换上写实翡翠玉露。",
           "kind": "plant",
           "parts": [
             {
-              "id": "leaves",
-              "name": "玉露",
+              "id": "plant",
+              "name": "翡翠玉露",
               "pivot": [
                 160,
-                157
+                156
               ],
               "motion": "sway",
               "shapes": [
                 {
-                  "type": "ellipse",
-                  "x": 117,
-                  "y": 124,
-                  "rx": 19,
-                  "ry": 31,
-                  "fill": "#bbcfb3",
-                  "stroke": "#86a48d",
-                  "strokeWidth": 1.5
-                },
-                {
-                  "type": "ellipse",
-                  "x": 141,
-                  "y": 111,
-                  "rx": 19,
-                  "ry": 39,
-                  "fill": "#c1d8bb",
-                  "stroke": "#86a48d",
-                  "strokeWidth": 1.5
-                },
-                {
-                  "type": "ellipse",
-                  "x": 166,
-                  "y": 103,
-                  "rx": 19,
-                  "ry": 43,
-                  "fill": "#cce1c5",
-                  "stroke": "#86a48d",
-                  "strokeWidth": 1.5
-                },
-                {
-                  "type": "ellipse",
-                  "x": 189,
-                  "y": 118,
-                  "rx": 19,
-                  "ry": 34,
-                  "fill": "#a9c7a8",
-                  "stroke": "#86a48d",
-                  "strokeWidth": 1.5
-                },
-                {
-                  "type": "ellipse",
-                  "x": 211,
-                  "y": 130,
-                  "rx": 19,
-                  "ry": 25,
-                  "fill": "#c4d8b4",
-                  "stroke": "#86a48d",
-                  "strokeWidth": 1.5
+                  "type": "image",
+                  "src": "assets/jade.webp",
+                  "x": 80,
+                  "y": 5,
+                  "width": 160,
+                  "height": 151
                 }
               ]
             }
@@ -374,31 +144,25 @@
         {
           "id": "bear-paw",
           "name": "熊童子",
-          "description": "保留原来的花盆与表情，换上熊童子。",
+          "description": "保留原来的花盆与表情，换上写实熊童子。",
           "kind": "plant",
           "parts": [
             {
-              "id": "leaves",
-              "name": "熊掌叶",
+              "id": "plant",
+              "name": "熊童子",
               "pivot": [
                 160,
-                157
+                156
               ],
               "motion": "sway",
               "shapes": [
                 {
-                  "type": "path",
-                  "d": "M160 157Q121 151 112 116Q108 97 119 100L126 105Q122 87 133 92L141 103Q144 85 153 97L158 112Q175 149 160 157Z",
-                  "fill": "#a6ba85",
-                  "stroke": "#829967",
-                  "strokeWidth": 2
-                },
-                {
-                  "type": "path",
-                  "d": "M165 155Q166 116 186 105L191 92Q198 88 201 103L211 94Q222 92 215 113L225 106Q237 109 222 129Q202 158 165 155Z",
-                  "fill": "#bdcd9b",
-                  "stroke": "#829967",
-                  "strokeWidth": 2
+                  "type": "image",
+                  "src": "assets/bear-paw.webp",
+                  "x": 93.5,
+                  "y": 1,
+                  "width": 133,
+                  "height": 155
                 }
               ]
             }

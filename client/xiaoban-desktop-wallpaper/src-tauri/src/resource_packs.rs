@@ -1,6 +1,6 @@
 //! Portable authoring resources, shared as plain `.zip` files so any tool can make or open them.
 //! Packs contain templates, never runtime user data or saves. The layout is in docs/resource-pack-format.md.
-use crate::{custom_widgets, effect_packs, game_packs, local_media};
+use crate::{custom_widgets, effect_packs, game_packs, local_media, pet_packs};
 use serde_json::{json, Value};
 use std::{
     collections::HashSet,
@@ -88,6 +88,13 @@ fn collect_game_files(directory: &Path, prefix: &str, found: &mut GameFiles) -> 
 pub fn export(root: &Path, kind: &str, id: &str) -> Result<Pack, String> {
     let mut assets = Vec::new();
     let data = match kind {
+        "pet" => {
+            let themes = pet_packs::load(&root.join("pets/themes"))?;
+            let theme = themes.into_iter().find(|t| t.id == id).ok_or("只能导出自定义桌宠主题；官方主题请先另存创作")?;
+            let (theme, files) = pet_packs::export_assets(&theme)?;
+            assets = files;
+            serde_json::to_value(theme).map_err(|e| e.to_string())?
+        }
         "wallpaper" => {
             let item = local_media::read(&root.join("wallpapers"))?.items.into_iter()
                 .find(|item| item.id == id && item.kind == "web").ok_or("只能导出自己创作的动画壁纸")?;
@@ -132,10 +139,14 @@ fn zip_entries(pack: &Pack) -> Result<(Value, Vec<(String, Vec<u8>)>), String> {
     let data = &pack.data;
     // Text-only packs stay at version 1 so older apps still open them; pictures and sound need version 2.
     let desktop = pack.kind == "game" && game_packs::Layer::from_value(data)?.desktop;
-    let version = if pack.assets.is_empty() && !desktop { 1 } else { 2 };
+    let version = if pack.assets.is_empty() && !desktop && pack.kind != "pet" { 1 } else { 2 };
     let mut manifest = json!({"schemaVersion": version, "kind": pack.kind});
     let mut files: Vec<(String, Vec<u8>)> = Vec::new();
     match pack.kind.as_str() {
+        "pet" => {
+            files.push(("pet.json".into(), serde_json::to_vec_pretty(data).map_err(|e|e.to_string())?));
+            files.extend(pack.assets.iter().cloned());
+        }
         "wallpaper" => {
             manifest["title"] = json!(text(data, "title")?);
             manifest["description"] = json!(data["description"].as_str().unwrap_or(""));
@@ -158,12 +169,12 @@ fn zip_entries(pack: &Pack) -> Result<(Value, Vec<(String, Vec<u8>)>), String> {
         }
         _ => return Err("不支持的资源类型".into()),
     }
-    if !pack.assets.is_empty() && pack.kind != "game" { return Err("只有游戏包可以带资源文件".into()); }
+    if !pack.assets.is_empty() && !["game", "pet"].contains(&pack.kind.as_str()) { return Err("只有游戏和桌宠包可以带资源文件".into()); }
     Ok((manifest, files))
 }
 
 fn kind_label(kind: &str) -> &'static str {
-    match kind { "wallpaper" => "壁纸", "effect" => "特效", "widget" => "组件", _ => "游戏" }
+    match kind { "wallpaper" => "壁纸", "effect" => "特效", "widget" => "组件", "pet" => "桌宠", _ => "游戏" }
 }
 
 fn to_zip(pack: &Pack) -> Result<Vec<u8>, String> {
@@ -245,6 +256,15 @@ fn from_zip(bytes: &[u8]) -> Result<Pack, String> {
     }
     let mut assets: Vec<(String, Vec<u8>)> = Vec::new();
     let data = match kind.as_str() {
+        "pet" => {
+            if version != Some(2) { return Err("桌宠资源包需要 schemaVersion=2".into()); }
+            let mut theme: pet_packs::Theme = serde_json::from_slice(file("pet.json").ok_or("压缩包里缺少 pet.json")?).map_err(|e|format!("pet.json 格式无效：{e}"))?;
+            for (name, content) in entries.iter().filter(|(name, _)| !["manifest.json", "pet.json"].contains(&name.as_str())) {
+                assets.push((name.clone(), content.clone()));
+            }
+            pet_packs::import_assets(&mut theme, &assets)?;
+            serde_json::to_value(theme).map_err(|e|e.to_string())?
+        }
         "wallpaper" => json!({"title": text(&manifest, "title")?, "description": manifest["description"].as_str().unwrap_or(""), "html": page()?}),
         "effect" => serde_json::from_slice(file("effect.json").ok_or("压缩包里缺少 effect.json")?).map_err(|_| "effect.json 不是有效的 JSON".to_string())?,
         "widget" => {
@@ -274,9 +294,16 @@ fn from_zip(bytes: &[u8]) -> Result<Pack, String> {
 
 /// Imports a pack into the place its `kind` belongs to, whichever page the file was picked on.
 pub fn import(root: &Path, content: &[u8]) -> Result<Value, String> {
-    let pack = from_zip(content)?;
+    import_pack(root, from_zip(content)?)
+}
+fn import_pack(root: &Path, pack: Pack) -> Result<Value, String> {
     let data = &pack.data;
     let (id, name) = match pack.kind.as_str() {
+        "pet" => {
+            let theme: pet_packs::Theme = serde_json::from_value(data.clone()).map_err(|e|e.to_string())?;
+            pet_packs::save(&root.join("pets/themes"), &theme, false)?;
+            (theme.id, theme.name)
+        }
         "wallpaper" => {
             let item = local_media::save_local_html(&root.join("wallpapers"), text(data, "title")?, Some(text(data, "description")?), text(data, "html")?)?;
             (item.id, item.title)
@@ -333,17 +360,41 @@ pub async fn import_resource_pack(window: tauri::WebviewWindow) -> Result<Option
         let Some(file) = app.dialog().file().set_title("导入小伴资源包").add_filter("小伴资源包（zip）", &["zip"]).blocking_pick_file() else { return Ok(None); };
         let path = file.into_path().map_err(|_| "请选择本机文件")?;
         let content = read_bytes(&path, MAX_PACK)?;
+        let pack = from_zip(&content)?;
+        if pack.kind == "pet" {
+            let theme: pet_packs::Theme = serde_json::from_value(pack.data).map_err(|e|e.to_string())?;
+            let result = json!({"kind":"pet", "id":theme.id, "name":theme.name});
+            crate::pets::save_theme(&app, theme, false)?;
+            return Ok(Some(result));
+        }
         let root = crate::storage::root(&app)?;
         // Wallpaper creation and downloads share the same catalog lock.
         let state = app.state::<crate::content::ContentState>();
         let _guard = state.io.lock().unwrap();
-        import(&root, &content).map(Some)
+        import_pack(&root, pack).map(Some)
     }).await.map_err(|e| e.to_string())?
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn pet_zip_preserves_images_and_never_imports_instance_layout() {
+        let root=temp_root("pet-roundtrip");
+        let mut theme=pet_packs::builtin().remove(0);theme.id="shared-garden".into();
+        pet_packs::save(&root.join("a/pets/themes"),&theme,false).unwrap();
+        let pack=export(&root.join("a"),"pet",&theme.id).unwrap();
+        assert_eq!(pack.assets.len(),2);
+        let zip=to_zip(&pack).unwrap();
+        assert_eq!(import(&root.join("b"),&zip).unwrap()["kind"],"pet");
+        let restored=pet_packs::load(&root.join("b/pets/themes")).unwrap();
+        assert_eq!(serde_json::to_value(&restored[0]).unwrap(),serde_json::to_value(&theme).unwrap());
+        assert!(!root.join("b/config/pets.json").exists());
+        assert!(import(&root.join("b"),&zip).is_err(),"same-id imports never overwrite");
+        assert!(export(&root.join("a"),"pet","flower-whispers").is_err());
+        fs::remove_dir_all(root).unwrap();
+    }
 
     fn make_zip(files: &[(&str, &str)]) -> Vec<u8> {
         let mut writer = ZipWriter::new(Cursor::new(Vec::new()));
@@ -603,4 +654,5 @@ mod tests {
         assert!(!root.exists(), "nothing is written for a refused pack");
     }
 }
+
 

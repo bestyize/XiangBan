@@ -79,7 +79,7 @@ impl TauriDesktop {
 
 impl Desktop for TauriDesktop {
     fn pet_catalog(&self)->Result<Value,String>{crate::pets::catalog(&self.app)}
-    fn pet_save_theme(&self,theme:crate::pet_packs::Theme,overwrite:bool)->Result<Value,String>{crate::pets::save_theme(&self.app,theme,overwrite)}
+    fn pet_save_theme(&self,mut theme:crate::pet_packs::Theme,overwrite:bool)->Result<Value,String>{crate::pet_packs::resolve_image_refs(&mut theme,&crate::pets::themes(&self.app)?)?;crate::pets::save_theme(&self.app,theme,overwrite)}
     fn pet_delete_theme(&self,id:String)->Result<Value,String>{crate::pets::delete_pet_theme(self.app.clone(),id)}
     fn pet_add(&self,theme:String,pet:String,layer:Option<String>)->Result<Value,String>{let result=crate::pets::add(&self.app,theme,pet,layer)?;if !crate::settings(&self.app).companion_enabled{tauri::async_runtime::block_on(crate::set_companion_enabled(self.app.clone(),true))?;}Ok(result)}
     fn pet_update(&self,id:&str,patch:crate::pets::Patch)->Result<Value,String>{crate::pets::update(&self.app,id,patch)}
@@ -848,12 +848,12 @@ fn effect_read_format(_: &dyn Desktop, _: &Value) -> Result<String, String> {
 }
 
 fn pet_read_format(_: &dyn Desktop,_args:&Value)->Result<String,String>{
-    let mut example=crate::pet_packs::builtin().remove(0);example.id="my-garden".into();example.name="我的小花园".into();example.pets=vec![example.pets.remove(2)];
-    Ok(json!({"format":"本期只支持植物。必须保留小伴现有的圆肚白瓷花盆、材质、屏幕和25种表情，仅替换顶部植物。主题是声明式 JSON，不能写 HTML/JS、花盆身体或自定义脸型。schemaVersion=1，id 为小写字母数字和 - _，name 最多24字，description最多160字，color为6位hex。pets 数组每项含 id/name/description/kind(固定plant)/parts，可选builtinPlant。builtinPlant仅为pot(原绿叶)或pot-white-flower(原白色小雏菊)，使用内置植物时parts必须为空；自创植物不要写builtinPlant，而在parts定义植物。各部件含id/name/pivot:[x,y]/motion(none|sway|left|right)/shapes。图形支持path(d)、ellipse(x,y,rx,ry)、rect(x,y,width,height,rx)，fill/stroke为6位hex或none，可选strokeWidth/opacity。植物设计坐标320×320，宿主整体平移y=-100放在原花盆上；根部应到(160,157)，植物顶部不低于y=24，左右留24px，并预留摇摆空间，建议内容放在x=64..256、y=24..160范围内。可把茎叶花分成部件或整体摇摆。不要绘制花盆、五官、背景或投影，宿主提供原有设计和全部互动。单主题最多40款植物，文件512KiB，不能含代码、外链。先pet_catalog查看主题和实例，theme_id可读取整份植物；pet_theme_save保存自定义主题，新id不能与官方重复；改已有主题需保留其他植物并overwrite=true。保存后pet_add逐盆添加，同株可添加多盆。pet_update可调整单盆大小/心情/位置，也可通过themeId和petId换植物而保留该盆的位置与配置。不要用companion_set修改所有宠物。", "expressions":EXPRESSIONS,"example":example}).to_string())
+    let example=json!({"schemaVersion":1,"id":"my-garden","name":"我的小花园","description":"一株摇摆的新叶","color":"#91af6a","pets":[{"id":"leaf","name":"嫩芽","description":"原花盆上的小叶子","kind":"plant","parts":[{"id":"leaf","name":"叶片","pivot":[160,157],"motion":"sway","shapes":[{"type":"path","d":"M160 157L160 93","fill":"none","stroke":"#6b9653","strokeWidth":7},{"type":"path","d":"M160 108Q106 104 99 58Q151 57 160 108Z","fill":"#91af6a"}]}]}]});
+    Ok(json!({"format":include_str!("../../../docs/pets.md"),"expressions":EXPRESSIONS,"example":example}).to_string())
 }
 fn pet_catalog(desktop:&dyn Desktop,args:&Value)->Result<String,String>{
  let value=desktop.pet_catalog()?;
- if let Some(id)=optional_text(args,"theme_id")?{let mut theme=value["themes"].as_array().and_then(|items|items.iter().find(|t|t["id"]==id)).cloned().ok_or("主题不存在")?;theme.as_object_mut().unwrap().remove("source");return Ok(theme.to_string());}
+ if let Some(id)=optional_text(args,"theme_id")?{let mut value=value["themes"].as_array().and_then(|items|items.iter().find(|t|t["id"]==id)).cloned().ok_or("主题不存在")?;value.as_object_mut().unwrap().remove("source");let mut theme:crate::pet_packs::Theme=serde_json::from_value(value).map_err(|e|e.to_string())?;crate::pet_packs::compact_images(&mut theme)?;return serde_json::to_string(&theme).map_err(|e|e.to_string());}
  let themes=value["themes"].as_array().into_iter().flatten().map(|t|json!({"id":t["id"],"name":t["name"],"source":t["source"],"pets":t["pets"].as_array().into_iter().flatten().map(|p|json!({"id":p["id"],"name":p["name"],"kind":p["kind"]})).collect::<Vec<_>>()})).collect::<Vec<_>>();
  Ok(json!({"themes":themes,"instances":value["layout"]["instances"],"errors":value["errors"]}).to_string())
 }
@@ -1138,7 +1138,7 @@ pub fn tools(desktop: Arc<dyn Desktop>) -> Vec<Arc<dyn Tool>> {
             &desktop,
             ToolSpec::new(
                 "community_share",
-                "把用户自己创作的壁纸、特效、桌面组件或游戏分享到超级小伴论坛：先弹出保存对话框，把作品导出成 zip 资源包，再在浏览器打开对应板块（壁纸、特效、组件去「小伴壁纸」，游戏去「小伴游戏」）。发帖要用户自己登录论坛完成，本工具只负责导出和打开页面。id 来自 wallpaper_list、effect_list、widget_list、game_list，只能是用户自创的作品，内置的不能导出。用户说“分享到论坛”“发到论坛”“导出给别人用”时使用。",
+                "把用户自己创作的壁纸、特效、桌面组件、桌宠或游戏分享到超级小伴论坛：先弹出保存对话框，把作品导出成 zip 资源包，再在浏览器打开对应板块（壁纸、特效、组件、桌宠去「小伴壁纸」，游戏去「小伴游戏」）。发帖要用户自己登录论坛完成，本工具只负责导出和打开页面。id 来自 wallpaper_list、effect_list、widget_list、pet_catalog、game_list，只能是用户自创的作品，内置的不能导出。用户说“分享到论坛”“发到论坛”“导出给别人用”时使用。",
                 object(
                     json!({
                         "kind": {"type": "string", "enum": community::KINDS, "description": "作品类型"},
@@ -1811,4 +1811,5 @@ mod tests {
         assert_eq!(space, "已进入游戏空间并启动游戏：star-catcher");
     }
 }
+
 

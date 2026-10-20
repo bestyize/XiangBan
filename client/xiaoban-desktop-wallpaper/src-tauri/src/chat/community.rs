@@ -8,7 +8,7 @@ use serde_json::Value;
 /// The most a forum member can attach to one post.
 const FORUM_ATTACHMENT_BYTES: u64 = 5 * 1024 * 1024;
 
-pub const KINDS: [&str; 4] = ["wallpaper", "effect", "widget", "game"];
+pub const KINDS: [&str; 5] = ["wallpaper", "effect", "widget", "game", "pet"];
 
 /// (target, address, name shown to the user)
 pub const PAGES: [(&str, &str, &str); 9] = [
@@ -99,3 +99,4 @@ mod tests {
         assert_eq!(size_text(6 * 1024 * 1024), "6.0 MB");
     }
 }
+

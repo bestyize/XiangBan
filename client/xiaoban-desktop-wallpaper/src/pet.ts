@@ -8,6 +8,7 @@ import { faceStyleOf, skinOf, type SkinId } from './companion/skins.ts'
 import type { Settings } from './bridge.ts'
 import type { PetDefinition } from './pets/model.ts'
 import { petMarkup, petPalette, partTransform } from './pets/render.ts'
+import { hitImage } from './pets/images.ts'
 
 export class PetView {
   readonly host: HTMLDivElement
@@ -137,7 +138,7 @@ export class PetView {
   hit(x: number, y: number): boolean {
     const bounds = this.host.querySelector('.pet-art')!.getBoundingClientRect()
     if (x < bounds.left || x > bounds.right || y < bounds.top || y > bounds.bottom) return false
-    return [...this.host.querySelectorAll<SVGGeometryElement>('svg path, svg rect, svg ellipse, svg circle, svg polygon')].some(element => {
+    return [...this.host.querySelectorAll<SVGImageElement>('svg image[data-pet-image]')].some(element => hitImage(element,x,y)) || [...this.host.querySelectorAll<SVGGeometryElement>('svg path, svg rect, svg ellipse, svg circle, svg polygon')].some(element => {
       if (element.closest('defs') || element.matches('[data-part="halo"], [data-part="shadow"], [data-part="aura"]')) return false
       const fill = getComputedStyle(element).fill
       if (fill === 'none' || fill === 'transparent') return false
@@ -170,3 +171,4 @@ export class PetView {
   }
   destroy() { this.reactions.destroy(); cancelAnimationFrame(this.frameId); this.tick = null; clearTimeout(this.lookTimer); document.removeEventListener('visibilitychange', this.onVisibility); window.removeEventListener('care-expression', this.careExpression); this.host.remove() }
 }
+
