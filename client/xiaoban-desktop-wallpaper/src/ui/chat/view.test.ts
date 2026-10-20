@@ -229,3 +229,10 @@ describe('a stored summary in the history', () => {
     }
   });
 });
+
+
+it('restores a file-only message from saved attachment metadata', () => {
+  const items=itemsFromHistory(newView('s1'),[{role:'user',parts:[],structured_content:{attachments:[{id:'a',name:'报告.pdf',size:200,mime:'application/pdf',path:'/private/copy.pdf'}]}}]);
+  expect(items).toHaveLength(1);
+  expect(items[0]).toMatchObject({kind:'user',text:'',images:[],files:[{name:'报告.pdf',size:200}]});
+});

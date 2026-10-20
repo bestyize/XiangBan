@@ -1,0 +1,18 @@
+[package]
+name = "agent-file-tools"
+version = "0.1.0"
+edition = "2021"
+publish = false
+description = "Optional document reading tools for agent-kernel hosts"
+
+[dependencies]
+agent-kernel = { path = "../../agent-kernel", features = ["fs"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+base64 = "0.22"
+getrandom = "0.3"
+zip = { version = "=9.0.4", default-features = false, features = ["deflate-flate2-zlib-rs"] }
+quick-xml = "0.38"
+calamine = "0.36"
+pdf-extract = "0.12"
+

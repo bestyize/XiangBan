@@ -1,3 +1,4 @@
+import { attachmentCards } from './attachments.ts';
 import { modelFailure } from './model-errors.ts';
 import type { ChatItem, KernelEvent, SessionView, WireMessage } from './types.ts';
 
@@ -28,7 +29,8 @@ export function itemsFromHistory(view: SessionView, messages: WireMessage[]): Ch
     if (message.role === 'user') {
       const images = (message.parts ?? []).filter(part => part.type === 'image').map(part => (part as { url: string }).url);
       const text = textOf(message);
-      if (text || images.length) items.push({ kind: 'user', id: nextId(view), text, images });
+      const files = attachmentCards(message.structured_content);
+      if (text || images.length || files.length) items.push({ kind: 'user', id: nextId(view), text, images, ...(files.length ? { files } : {}) });
     } else if (message.role === 'assistant') {
       const text = textOf(message);
       if (text.trim()) items.push({ kind: 'assistant', id: nextId(view), text, streaming: false });
@@ -152,4 +154,5 @@ export function describeCall(name: string, argumentsJson: string): string {
   const line = (text ?? '').split('\n')[0].trim();
   return line.length > 90 ? `${line.slice(0, 90)}…` : line;
 }
+
 

@@ -718,3 +718,13 @@ describe('the context limit and the host compacting by itself', () => {
     expect(h.store.current()!.items.some(item => item.kind === 'notice' && item.details === '别的对话')).toBe(false);
   });
 });
+
+
+it('sends a named document with an image and retains the attachment card', async () => {
+  const h = harness({chat_new_session:()=>summary('s1'),chat_send:()=>summary('s1')});
+  await h.store.init();
+  const doc = {name:'预算.csv',size:9,mime:'text/csv',dataUrl:'data:text/csv;base64,YW1vdW50CjEy'};
+  expect(await h.store.send('',[doc,'data:image/png;base64,AA=='])).toBe(true);
+  expect(h.calls.find(([name])=>name==='chat_send')?.[1]).toEqual({sessionId:'s1',text:'',images:['data:image/png;base64,AA=='],attachments:[{name:doc.name,dataUrl:doc.dataUrl}]});
+  expect(h.store.current()?.items[0]).toMatchObject({kind:'user',files:[{name:'预算.csv',size:9}]});
+});

@@ -1,3 +1,4 @@
+import type { AttachmentCard } from './attachments.ts';
 /** What the host sends and accepts for the chat. Field names are the host's own (snake_case for kernel events). */
 
 export interface SessionSummary { id: string; title: string; createdAt: number; updatedAt: number; permissionMode?: 'ask' | 'auto'; /** The group it was moved into; empty or missing when it is not in one. */ group?: string }
@@ -71,7 +72,7 @@ export type ApprovalDecision = 'once' | 'always' | 'deny';
 export interface QuestionRequest { id: string; session: string; question: string; options: string[] }
 
 export type ChatItem =
-  | { kind: 'user'; id: string; text: string; images: string[] }
+  | { kind: 'user'; id: string; text: string; images: string[]; files?: AttachmentCard[] }
   | { kind: 'assistant'; id: string; text: string; streaming: boolean }
   | { kind: 'tool'; id: string; name: string; arguments: string; output: string; status: 'running' | 'done' | 'error' }
   | { kind: 'notice'; id: string; tone: 'info' | 'warning' | 'error'; text: string; canContinue?: boolean; canSwitchModel?: boolean; canRetry?: boolean; details?: string; /** The label on the fold-out `details`; "错误详情" when missing. */ detailsLabel?: string };
@@ -89,3 +90,4 @@ export interface SessionView {
   /** Counter for item ids. */
   seq: number;
 }
+
