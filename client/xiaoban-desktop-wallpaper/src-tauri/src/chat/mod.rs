@@ -25,6 +25,7 @@ use agent_kernel::provider::wire::ProviderProfile;
 use agent_kernel::skills::Skills;
 use agent_kernel::{Agent, Approval, ApprovalRequest, ContextTrim, ContinueGuard, JsonlStore, RepeatGuard, Message, ModelProvider, Part, Permission, PermissionMode, Risk, RunOptions, RunEventBody, SessionStore, SpillOutput, ToolCtx};
 use agent_kernel::journal::JsonlRunLog;
+use agent_learning::LearningDb;
 use broker::Broker;
 use compact::{CompactingStore, ContextInfo};
 use desktop_tools::{Desktop, TauriDesktop};
@@ -221,6 +222,7 @@ impl Dirs {
     fn sessions(&self) -> PathBuf { self.chat.join("sessions") }
     fn runs(&self) -> PathBuf { self.chat.join("runs") }
     fn outcomes(&self) -> PathBuf { self.chat.join("outcomes") }
+    fn learning_db(&self) -> PathBuf { self.chat.join("agent-learning.sqlite") }
     fn spill(&self) -> PathBuf { self.chat.join("spill") }
     fn memory(&self) -> PathBuf { self.chat.join("memory") }
     fn skills(&self) -> PathBuf { self.chat.join("skills") }
@@ -615,6 +617,11 @@ pub fn chat_send(app: tauri::AppHandle, session_id: String, text: String, images
                 if let Some(run) = observed_run_id {
                     if let Ok(outcome) = task_outcome::inspect(&journal, &id, &run) {
                         let _ = task_outcome::save(&dirs.outcomes(), &outcome);
+                        if let Ok(db) = LearningDb::open(&dirs.learning_db()) {
+                            let _ = db.record_outcome(&outcome.run_id, &outcome.session_id,
+                                &format!("{:?}", outcome.status).to_lowercase(),
+                                &outcome.validator, &outcome.evidence);
+                        }
                         emit(&sender, "chat-task-outcome", json!({ "session": id, "outcome": outcome }));
                     }
                 }
