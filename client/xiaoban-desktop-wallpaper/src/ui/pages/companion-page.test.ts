@@ -9,7 +9,7 @@ import CompanionPage from './CompanionPage.vue';
 import { OFFICIAL_THEMES } from '../../pets/model.ts';
 vi.mock('../../pets/PetActor.vue',()=>({default:{template:'<div class="actor"/>',props:['definition','size','expression']}}));
 vi.mock('../../bridge.ts',async original=>({...await original<typeof import('../../bridge.ts')>(),desktop:false,invoke:vi.fn()}));
-function setup(){const settings=reactive({...defaults});const store={settings,desktop:false,notify:vi.fn(),startCreation:vi.fn().mockResolvedValue(undefined),setCompanion:vi.fn(async(enabled:boolean)=>{settings.companionEnabled=enabled;})} as unknown as ControlStore;return {store,view:mount(CompanionPage,{props:{store},attachTo:document.body})};}
+function setup(desktopUi=false){const settings=reactive({...defaults});const store={settings,desktop:desktopUi,notify:vi.fn(),startCreation:vi.fn().mockResolvedValue(undefined),setCompanion:vi.fn(async(enabled:boolean)=>{settings.companionEnabled=enabled;})} as unknown as ControlStore;return {store,view:mount(CompanionPage,{props:{store},attachTo:document.body})};}
 async function tab(view:ReturnType<typeof mount>,name:string){await view.findAll('.n-tabs-tab').find(t=>t.text().startsWith(name))!.trigger('click');await flushPromises();}
 async function add(view:ReturnType<typeof mount>,petId:string,layer:'desktop'|'topmost'='topmost'){await view.get(`[data-testid="pet-add-${petId}"]`).trigger('click');await flushPromises();const choice=document.body.querySelector<HTMLButtonElement>(`[data-testid="pet-placement-${layer}"]`);expect(choice).not.toBeNull();choice!.click();await flushPromises();}
 beforeEach(()=>{localStorage.clear();});
@@ -24,7 +24,7 @@ describe('theme-based desktop pet library',()=>{
  it('shows explicit export and forum sharing for custom themes only, without a duplicate JSON export',async()=>{
   const custom={...OFFICIAL_THEMES[0],id:'my-pets',name:'我的宠物'};
   localStorage.setItem('xiaoban.pets.themes.v1',JSON.stringify([custom]));
-  const {view}=setup();await flushPromises();
+  const {view}=setup(true);await flushPromises();
   expect(view.find('[data-testid="pet-theme-flower-whispers"] [data-testid="export-resource"]').exists()).toBe(false);
   expect(view.find('[data-testid="pet-theme-flower-whispers"] [data-testid="pet-export-reference"]').exists()).toBe(true);
   await tab(view,'自定义主题');
@@ -40,7 +40,7 @@ describe('theme-based desktop pet library',()=>{
  it('allows exporting a custom pet theme from the instance settings, never an official theme',async()=>{
   const custom={...OFFICIAL_THEMES[0],id:'my-pets',name:'我的宠物'};
   localStorage.setItem('xiaoban.pets.themes.v1',JSON.stringify([custom]));
-  const {view}=setup();await flushPromises();await tab(view,'自定义主题');await add(view,'daisy');await tab(view,'桌面伙伴');
+  const {view}=setup(true);await flushPromises();await tab(view,'自定义主题');await add(view,'daisy');await tab(view,'桌面伙伴');
   await view.get('.pet-manage').trigger('click');await flushPromises();
   expect(document.body.querySelector('[data-testid="pet-instance-share"]')).not.toBeNull();
   expect(document.body.querySelector('[data-testid="pet-instance-share"] [data-testid="share-resource"]')).not.toBeNull();
