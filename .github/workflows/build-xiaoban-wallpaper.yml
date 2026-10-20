@@ -80,8 +80,12 @@ jobs:
         run: |
           $version = (Get-Content src-tauri/tauri.conf.json -Raw | ConvertFrom-Json).version
           # Re-running an existing release must not leave the old portable EXE side by side.
-          gh release delete-asset $env:TAG "XiaoBanWallpaper-$version-Windows-x64.exe" -y 2>$null
-          if ($LASTEXITCODE -ne 0) { Write-Host "No previous portable asset to remove." }
+          $assets = (gh release view $env:TAG --json assets | ConvertFrom-Json).assets
+          if ($LASTEXITCODE -ne 0) { throw "Failed to inspect existing release assets." }
+          if (@($assets | Where-Object { $_.name -eq "XiaoBanWallpaper-$version-Windows-x64.exe" }).Count -gt 0) {
+            gh release delete-asset $env:TAG "XiaoBanWallpaper-$version-Windows-x64.exe" --yes
+            if ($LASTEXITCODE -ne 0) { throw "Failed to remove previous portable asset." }
+          }
           gh release upload $env:TAG (Get-ChildItem out).FullName --clobber
           if ($LASTEXITCODE -ne 0) { throw "Failed to upload Windows installer." }
 
