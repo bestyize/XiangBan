@@ -1,6 +1,7 @@
 # 项目文档
 
 - [desktop-user-guide.md](desktop-user-guide.md)：小伴桌面全功能用户手册与 AI 玩法指南。
+- [agent](agent/README.md)：小伴 Agent 四阶段演进路线、第二阶段实施与验收清单。
 - [architecture/monorepo.md](architecture/monorepo.md)：当前边界与迁移映射。
 - [architecture/account-center.md](architecture/account-center.md)：统一账号中心设计取舍。
 - [product](product/README.md)：需求与商业规划。
