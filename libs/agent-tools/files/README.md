@@ -30,8 +30,8 @@ Files default to 10 MiB each, images to 3 MiB, 8 attachments / 30 MiB per messag
 ## Verification
 
 ```sh
-cargo test --manifest-path libs/agent-file-tools/Cargo.toml --locked
-python3 -m unittest discover -s libs/agent-file-tools/tests -p 'test_*.py'
+cargo test --manifest-path libs/agent-tools/files/Cargo.toml --locked
+python3 -m unittest discover -s libs/agent-tools/files/tests -p 'test_*.py'
 ```
 
 ## Limits

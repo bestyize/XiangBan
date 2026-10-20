@@ -13,6 +13,8 @@
 | 小伴桌面 | 文件选择/拖放/粘贴/截图、附件卡片、IPC、存储位置、运行与删除生命周期 |
 | 原有 Shell | 在当前权限规则下执行复杂统计、转换等脚本 |
 
+工具包统一归档在 `libs/agent-tools/` 下，文件能力位于 `libs/agent-tools/files/`，crate 名称仍为 `agent-file-tools`。后续工具类型按独立子包扩展，避免聚合全部依赖。
+
 依赖方向为小伴桌面 → agent-file-tools → agent-kernel。Kernel 源码保持不变。其他产品可以注册同一扩展工具、提供自己的存储目录，不需要重新实现解析器。
 
 ## 数据流程

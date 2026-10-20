@@ -6,7 +6,7 @@ publish = false
 description = "Optional document reading tools for agent-kernel hosts"
 
 [dependencies]
-agent-kernel = { path = "../agent-kernel", features = ["fs"] }
+agent-kernel = { path = "../../agent-kernel", features = ["fs"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 base64 = "0.22"

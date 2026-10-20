@@ -26,7 +26,7 @@ tauri-plugin-global-shortcut = "=2.4.1"
 dirs = "6"
 chrono = { version = "0.4", features = ["clock", "serde"] }
 getrandom = "0.3"
-agent-file-tools = { path = "../../../libs/agent-file-tools" }
+agent-file-tools = { path = "../../../libs/agent-tools/files" }
 agent-kernel = { path = "../../../libs/agent-kernel", features = ["native-tls", "fs", "skills", "memory", "web", "shell", "mcp", "process", "journal"] }
 zip = { version = "=9.0.4", default-features = false, features = ["deflate-flate2-zlib-rs"] }
 
