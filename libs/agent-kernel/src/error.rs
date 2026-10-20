@@ -17,6 +17,14 @@ impl HarnessError {
     pub fn provider(message: impl Into<String>, retryable: bool) -> Self {
         Self::Provider { message: message.into(), retryable }
     }
+
+    /// Recognize explicit overflow signals only. A generic 400 is never safe to guess at.
+    pub fn is_context_limit(&self) -> bool {
+        let Self::Provider { message, .. } = self else { return false };
+        let lower = message.to_lowercase();
+        ["context_length_exceeded", "context_window_exceeded", "maximum context length", "prompt is too long", "input token count exceeds", "too many input tokens"]
+            .iter().any(|needle| lower.contains(needle))
+    }
 }
 
 impl fmt::Display for HarnessError {

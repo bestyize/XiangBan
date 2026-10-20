@@ -1,6 +1,6 @@
 use crate::agent::{Agent, RetryPolicy};
 use crate::error::HarnessError;
-use crate::middleware::{Stop, StopDecision, Turn};
+use crate::middleware::{estimate_tokens, estimate_tool_tokens, ContextTrim, Middleware, Stop, StopDecision, Turn};
 use crate::provider::{ChatRequest, Reply};
 use crate::types::{Event, FinishReason, Message, Part, Role, Usage};
 use std::collections::HashSet;
@@ -216,6 +216,7 @@ impl Agent {
         let mut continuations_without_progress = 0;
         let mut successful_calls = Vec::new();
         let mut tool_calls = 0usize;
+        let mut recovered_context_budget = None;
         for index in 0..self.max_turns {
             if cancel.load(Ordering::Relaxed) {
                 return Err(HarnessError::Cancelled);
@@ -230,8 +231,8 @@ impl Agent {
             for mw in &self.middleware {
                 mw.before_model(&mut turn)?;
             }
-            let request = ChatRequest { messages: turn.messages, tools: turn.tools };
-            let mut reply = self.chat_with_retry(&request, on_event, cancel)?;
+            let mut request = ChatRequest { messages: turn.messages, tools: turn.tools };
+            let mut reply = self.chat_with_retry(&mut request, &mut recovered_context_budget, on_event, cancel)?;
             let turn = Turn { session: turn.session, index, messages: request.messages, tools: request.tools };
             for mw in &self.middleware {
                 mw.after_model(&turn, &mut reply.message)?;
@@ -320,11 +321,20 @@ impl Agent {
     /// Retries only when nothing was streamed yet, so the UI never sees a half answer replayed.
     fn chat_with_retry(
         &self,
-        request: &ChatRequest,
+        request: &mut ChatRequest,
+        recovered_budget: &mut Option<usize>,
         on_event: &mut dyn FnMut(Event),
         cancel: &AtomicBool,
     ) -> Result<Reply, HarnessError> {
         let mut attempt = 0;
+        let mut recoveries = 0;
+        let reduce = |request: &mut ChatRequest, budget| -> Result<(), HarnessError> {
+            let mut turn = Turn { session: String::new(), index: 0, messages: request.messages.clone(), tools: request.tools.clone() };
+            ContextTrim::new(budget).keep_recent(2).before_model(&mut turn)?;
+            request.messages = turn.messages;
+            Ok(())
+        };
+        if let Some(budget) = *recovered_budget { reduce(request, budget)?; }
         loop {
             let mut streamed = false;
             let result = self.provider.chat(
@@ -336,6 +346,20 @@ impl Agent {
                 cancel,
             );
             match result {
+                Err(error) if !streamed && error.is_context_limit() && recoveries < 2 => {
+                    let used = estimate_tokens(&request.messages) + estimate_tool_tokens(&request.tools);
+                    let budget = used.saturating_mul(3) / 4;
+                    let before = request.messages.clone();
+                    if reduce(request, budget).is_err() || request.messages == before {
+                        return Err(HarnessError::provider("context_length_exceeded: 当前输入和必要工具定义仍超出模型窗口，请调低上下文上限、减少本次输入或手动压缩会话。", false));
+                    }
+                    *recovered_budget = Some(budget);
+                    recoveries += 1;
+                    on_event(Event::Retrying { attempt: recoveries, delay_ms: 0, message: "模型上下文超限，已缩减旧工具结果和历史，正在重试；已执行的操作不会重放。".into() });
+                }
+                Err(error) if error.is_context_limit() && !streamed => {
+                    return Err(HarnessError::provider("context_length_exceeded: 缩减旧内容后仍超过模型窗口，请调低上下文上限或手动压缩会话后继续。", false));
+                }
                 Err(HarnessError::Provider { message, retryable: true })
                     if !streamed && attempt < self.retry.max_retries =>
                 {

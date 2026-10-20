@@ -118,6 +118,10 @@ impl Desktop for FakeDesktop {
         lock(&self.calls).push("request-permissions".to_string());
         Ok(json!({"ok": true}))
     }
+    fn computer_use_repair_permissions(&self, permission: &str) -> Result<Value, String> {
+        lock(&self.calls).push(format!("repair-permissions {permission}"));
+        Ok(json!({"reset": true, "permission": permission, "permissionCheckRequired": true}))
+    }
     fn export_pack(&self, kind: &str, id: &str) -> Result<Option<(String, u64)>, String> {
         lock(&self.calls).push(format!("export-pack {kind} {id}"));
         Ok(None)
@@ -284,7 +288,7 @@ fn the_assistant_has_every_tool_it_needs_and_no_others() {
         "time_now", "todo", "ask_user", "read_file", "list_dir", "grep", "write_file", "edit_file", "shell", "web_fetch", "load_skill", "skill_manage",
         "memory_read", "memory_write", "desktop_status", "desktop_windows", "desktop_window_set", "wallpaper_list", "wallpaper_apply", "wallpaper_create", "wallpaper_delete", "effect_list", "effect_set", "effect_create", "effect_delete", "effect_read_format", "companion_set", "care_list",
         "care_set", "care_delete", "widget_list", "widget_add", "widget_create", "widget_delete_custom", "widget_update", "widget_remove", "game_list", "game_open", "game_close", "game_create", "game_delete",
-        "request_accessibility_permission", "computer_use_diagnose", "community_share", "community_open", "pet_read_format", "pet_catalog", "pet_theme_save", "pet_theme_delete", "pet_add", "pet_update", "pet_remove",
+        "request_accessibility_permission", "computer_use_diagnose", "computer_use_repair_permissions", "community_share", "community_open", "pet_read_format", "pet_catalog", "pet_theme_save", "pet_theme_delete", "pet_add", "pet_update", "pet_remove",
         "experience_recall", "skill_search", "skill_inspect", "skill_install",
     ];
     expected.sort();
@@ -608,6 +612,34 @@ fn trusted_rig(tag: &str, steps: Vec<Step>) -> (Rig, Arc<Mutex<Vec<(String, Opti
     .unwrap();
     let rig = Rig { _dir: dir, workspace, dirs, desktop, asked: Arc::default(), provider, agent, todo };
     (rig, asked)
+}
+
+#[test]
+fn computer_use_repair_requires_confirmation_even_in_full_trust() {
+    let steps = vec![
+        call("1", "computer_use_repair_permissions", json!({"permission": "accessibility"})),
+        call("2", "computer_use_repair_permissions", json!({"permission": "All"})),
+        Step::text("等待授权"),
+    ];
+    let (rig, asked) = trusted_rig("cu-repair-denied", steps);
+    run(&rig, "修复旧授权").0.unwrap();
+    let asked = lock(&asked);
+    assert_eq!(asked.len(), 1, "invalid service is rejected before confirmation");
+    assert_eq!(asked[0].0, "computer_use_repair_permissions");
+    assert!(asked[0].1.as_ref().unwrap().contains("com.ifuryst.opencomputeruse"));
+    assert!(lock(&rig.desktop.calls).is_empty(), "a denied repair must not reach the host");
+    assert!(tool_results(&rig)[0].contains("denied"));
+}
+
+#[test]
+fn computer_use_repair_dispatches_only_the_approved_permission() {
+    let rig = rig("cu-repair-approved", vec![
+        call("1", "computer_use_repair_permissions", json!({"permission": "accessibility"})),
+        Step::text("请在系统界面重新授权"),
+    ], Approval::Once);
+    run(&rig, "清除旧的无障碍记录").0.unwrap();
+    assert_eq!(*lock(&rig.desktop.calls), vec!["repair-permissions accessibility"]);
+    assert!(tool_results(&rig)[0].contains("permissionCheckRequired"));
 }
 
 #[test]

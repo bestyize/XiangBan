@@ -12,6 +12,7 @@ const TOOL_LABELS: Record<string, string> = {
   community_share: '分享到论坛', community_open: '打开官网或论坛',
   request_accessibility_permission: '打开系统权限设置',
   computer_use_diagnose: '检查电脑控制权限',
+  computer_use_repair_permissions: '修复电脑控制旧授权',
   list_apps: '查看应用列表', get_app_state: '获取窗口状态', click: '模拟点击',
   type_text: '模拟键盘打字', press_key: '模拟按键', scroll: '模拟滚动',
   drag: '模拟拖拽', set_value: '设置控件值', perform_secondary_action: '触发辅助动作',
@@ -19,8 +20,8 @@ const TOOL_LABELS: Record<string, string> = {
 
 export const toolLabel = (name: string) => TOOL_LABELS[name] ?? (name || '工具');
 
-/** The range of the context limit slider. The host (`ai_config.rs`) holds the same range; the default is the smallest. */
-export const CONTEXT_MIN = 256_000;
+/** The range of the context limit slider. The host (`ai_config.rs`) holds the same range. */
+export const CONTEXT_MIN = 16_000;
 export const CONTEXT_MAX = 1_000_000;
 export const CONTEXT_STEP = 8_000;
 

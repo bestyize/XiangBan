@@ -62,6 +62,50 @@ fn retryable(msg: &str) -> Step {
 }
 
 #[test]
+fn explicit_context_overflow_recovers_without_replaying_actions_and_keeps_the_smaller_budget() {
+    use std::sync::atomic::AtomicUsize;
+    let executed = Arc::new(AtomicUsize::new(0));
+    let counter = executed.clone();
+    let call = |id: &str| ToolCall { id: id.into(), name: "act".into(), arguments: "{}".into() };
+    let h = harness(vec![
+        Step::tool_call("a", "act", "{}"),
+        Step::error(HarnessError::provider("HTTP 400: context_length_exceeded", false)),
+        Step::tool_call("b", "act", "{}"),
+        Step::text("done"),
+    ], |b| b.tool(FnTool::new(spec("act"), move |_, _| { counter.fetch_add(1, Ordering::SeqCst); Ok("performed".into()) })));
+    let old = vec![Message::user_text("old question"), Message::assistant("", vec![call("old")]), Message::tool("old", "x".repeat(80_000)), Message::assistant("old done", vec![])];
+    h.store.append("s1", &old).unwrap();
+    let (result, events) = run(&h.agent, "continue");
+    assert_eq!(result.unwrap().text, "done");
+    assert_eq!(executed.load(Ordering::SeqCst), 2, "each newly requested action runs exactly once");
+    let requests = h.provider.requests();
+    assert!(estimate_tokens(&requests[2].messages) < estimate_tokens(&requests[1].messages));
+    assert!(requests[3].messages.iter().all(|m| m.text().len() < 80_000), "later tool rounds keep the reduced budget");
+    assert_eq!(h.store.load("s1").unwrap()[2], old[2], "stored history is intact");
+    assert_eq!(events.iter().filter(|e| matches!(e, Event::Retrying { delay_ms: 0, .. })).count(), 1);
+    for request in requests {
+        let calls: Vec<_> = request.messages.iter().flat_map(|m| m.tool_calls.iter().map(|c| &c.id)).collect();
+        let results: Vec<_> = request.messages.iter().filter_map(|m| m.tool_call_id.as_ref()).collect();
+        assert_eq!(calls, results);
+    }
+}
+
+#[test]
+fn overflow_recovery_is_bounded_and_never_retries_generic_400_or_partial_answers() {
+    let fail = || Step::error(HarnessError::provider("prompt is too long", false));
+    let h = harness(vec![fail(), fail(), fail(), Step::text("must not run")], |b| b);
+    for _ in 0..4 { h.store.append("s1", &[Message::user_text("x".repeat(20_000)), Message::assistant("old answer", vec![])]).unwrap(); }
+    let (result, _) = run(&h.agent, "continue");
+    assert!(result.unwrap_err().is_context_limit());
+    assert_eq!(h.provider.requests().len(), 3);
+    for step in [Step::error(HarnessError::provider("HTTP 400: bad_request", false)), Step::text("partial").then_fail(HarnessError::provider("context_length_exceeded", false))] {
+        let h = harness(vec![step, Step::text("must not run")], |b| b);
+        assert!(run(&h.agent, "continue").0.is_err());
+        assert_eq!(h.provider.requests().len(), 1);
+    }
+}
+
+#[test]
 fn retryable_errors_are_retried_with_events() {
     let h = harness(vec![retryable("busy"), retryable("busy"), Step::text("ok")], |b| b);
     let (result, events) = run(&h.agent, "hi");

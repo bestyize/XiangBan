@@ -21,6 +21,9 @@ pub struct ProviderProfile {
     /// `max_output_tokens`, and chat completions sends nothing: endpoints disagree on the parameter
     /// name there, so set `max_tokens` or `max_completion_tokens` in `extra_body` instead.
     pub max_output_tokens: Option<u32>,
+    /// Serialized request cap. Older tool images may be omitted from the request only;
+    /// user images and the newest tool image result are preserved. None disables the cap.
+    pub max_request_bytes: Option<usize>,
     /// Asked for the key on every request, for credentials that expire while a long run is going.
     /// Empty means "use `api_key`".
     pub api_key_source: Option<Arc<dyn Fn() -> String + Send + Sync>>,
@@ -37,6 +40,7 @@ impl ProviderProfile {
             stream_usage: true,
             supports_tools: true,
             max_output_tokens: None,
+            max_request_bytes: None,
             api_key_source: None,
         }
     }

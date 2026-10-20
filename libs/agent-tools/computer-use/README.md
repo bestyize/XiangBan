@@ -35,7 +35,9 @@ for tool in agent_computer_use_tools::checked_tools(&client, &root) {
 - `executable(root)` / `config(root)`：只解析宿主传入的内置资源目录，检查版本、平台、程序存在及 Unix 执行权限；不会查找 PATH 或回退 npx。
 - `spawn(root)`：启动原生 MCP 服务并发现工具；空工具列表视为失败，风险为 Exec、调用超时 60 秒。
 - `checked_tools(client, root)`：宿主使用这些包装后的工具注册到 Agent；macOS 每次桌面操作前运行内置引擎的 `doctor --json` 检查真实授权，缺失时明确报错并指向诊断/引导，不执行原始动作、不自动改走脚本。保留 MCP 图片、结构化输出和清理接口。
-- `permissions::diagnose(root)`：无弹窗的真实引擎权限与签名检查，不截图、不读取目标应用；以 `accessibilityTrusted` 和 `screenCaptureGranted` 判定，不能用进程退出码或 MCP 连接代替授权状态。`permissions::request_permissions(root)` 通过同一个引擎运行原生 `doctor` 引导；不自动批准、重置 TCC 或修改权限数据库。宿主应单独注册诊断与引导工具，使 MCP 启动失败时仍可排障。
+- `permissions::diagnose(root)`：无弹窗检查真实权限、签名，以及只针对当前引擎的近期 TCC 签名冲突日志；以 `accessibilityTrusted` 和 `screenCaptureGranted` 判定权限，不能用退出码或 MCP 连接代替。`authorizationMismatch.services` 有项才表示找到对应旧签名冲突证据；日志不可用或空结果不证明授权有效。
+- `permissions::request_permissions(root)`：运行原生 `doctor` 引导并在 Finder 选中当前引擎，不自动批准或重置权限。`permissions::repair_permissions(root, permission)` 由宿主**逐次确认后**调用：仅执行固定 `com.ifuryst.opencomputeruse` 的 `tccutil reset Accessibility` 或 `ScreenCapture`，已生效的所选权限不重置；报告重置结果并打开重新授权入口，最终系统授权仍需用户点击。同标识独立安装版的所选权限也受影响。宿主即使完全信任也必须拦截确认，不能只依赖 `always_ask`。不提供全局重置或写权限数据库接口。诊断、引导和修复由宿主单独注册，MCP 启动失败时仍可排障。
+- 参数校验失败表示没执行工具，应修正并重试原调用；`list_apps` 最简参数是 `{}`，不能带 schema 未声明的 `reason` 或 `command`。不能因此重置权限或改用 Python/AppKit/AppleScript 绕过。
 - `SKILL` / `SKILL_NAME` / `SKILL_ORIGIN_MARKER`：随包操作规则与已有安装副本的识别标记。
 - macOS 引擎要求 14+ 及辅助功能、屏幕录制授权；不降低宿主自身对旧系统的兼容范围。Windows/Linux 需要已登录图形桌面。
 

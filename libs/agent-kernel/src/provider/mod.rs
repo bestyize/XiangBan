@@ -8,6 +8,7 @@ pub mod responses;
 pub mod scripted;
 pub mod stream;
 pub mod wire;
+mod budget;
 
 #[cfg(any(feature = "openai", feature = "anthropic"))]
 mod http;

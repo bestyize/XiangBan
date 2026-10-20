@@ -1,10 +1,13 @@
 use super::{Middleware, Turn};
 use crate::error::HarnessError;
 use crate::types::{Message, Part, Role};
+use crate::provider::ToolSchema;
 
 const CLEARED: &str = "[older tool output cleared to save context]";
 const OMITTED: &str = "[Earlier messages in this conversation were omitted to fit the context window.]";
-const IMAGE_TOKENS: usize = 800;
+// A conservative, size-sensitive allowance, not a provider tokenizer. Compressed images
+// and remote URLs can still cost more; explicit upstream overflow has a bounded recovery.
+const IMAGE_TOKENS: usize = 4096;
 const MESSAGE_OVERHEAD: usize = 4;
 
 /// Rough token count: ASCII at about four bytes per token, everything else at one per character.
@@ -19,7 +22,7 @@ fn estimate_message(message: &Message) -> usize {
         .iter()
         .map(|p| match p {
             Part::Text { text } => estimate_text(text),
-            Part::Image { .. } => IMAGE_TOKENS,
+            Part::Image { url } => IMAGE_TOKENS + if url.starts_with("data:") { url.len().div_ceil(128) } else { 0 },
         })
         .sum();
     let calls: usize = message.tool_calls.iter().map(|c| estimate_text(&c.name) + estimate_text(&c.arguments)).sum();
@@ -29,6 +32,12 @@ fn estimate_message(message: &Message) -> usize {
 
 pub fn estimate_tokens(messages: &[Message]) -> usize {
     messages.iter().map(estimate_message).sum()
+}
+
+pub fn estimate_tool_tokens(tools: &[ToolSchema]) -> usize {
+    tools.iter().map(|tool| {
+        MESSAGE_OVERHEAD + estimate_text(&tool.name) + estimate_text(&tool.description) + estimate_text(&tool.parameters.to_string())
+    }).sum()
 }
 
 /// Keeps requests under a token budget without calling a model: first clears old tool outputs,
@@ -59,9 +68,7 @@ impl ContextTrim {
 
 impl Middleware for ContextTrim {
     fn before_model(&self, turn: &mut Turn) -> Result<(), HarnessError> {
-        let tool_tokens: usize = turn.tools.iter().map(|tool| {
-            MESSAGE_OVERHEAD + estimate_text(&tool.name) + estimate_text(&tool.description) + estimate_text(&tool.parameters.to_string())
-        }).sum();
+        let tool_tokens = estimate_tool_tokens(&turn.tools);
         let budget = self.max_tokens.saturating_sub(self.reserve_output).saturating_sub(tool_tokens);
         let messages = &mut turn.messages;
         let mut total = estimate_tokens(messages);
@@ -93,7 +100,7 @@ impl Middleware for ContextTrim {
         let notice_cost = estimate_message(&Message::user_text(OMITTED));
         while total.saturating_add(if dropped { notice_cost } else { 0 }) > budget {
             // Cut only at user messages so a tool call is never separated from its result.
-            let Some(offset) = messages.get(first + 1..).and_then(|rest| rest.iter().position(|m| m.role == Role::User)) else {
+            let Some(offset) = messages.get(first + 1..).and_then(|rest| rest.iter().position(|m| m.role == Role::User && !m.synthetic)) else {
                 break;
             };
             let removed: usize = messages.drain(first..first + 1 + offset).map(|m| estimate_message(&m)).sum();

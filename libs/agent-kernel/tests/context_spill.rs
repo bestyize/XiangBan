@@ -23,6 +23,23 @@ fn exchange(n: usize, output_len: usize) -> Vec<Message> {
 }
 
 #[test]
+fn large_images_cost_more_and_output_space_is_reserved() {
+    let image = |size| Message::user(vec![Part::Image { url: format!("data:image/png;base64,{}", "A".repeat(size)) }]);
+    let small = estimate_tokens(&[image(100)]);
+    let large = estimate_tokens(&[image(128_000)]);
+    assert!(small >= 4_096 && large > small);
+    let mut t = turn(vec![Message::user_text("x".repeat(4_000))]);
+    assert!(ContextTrim::new(1_200).reserve_output(300).before_model(&mut t).is_err());
+}
+
+#[test]
+fn synthetic_continuation_does_not_turn_the_current_exchange_into_discardable_history() {
+    let mut t = turn(vec![Message::user_text("x".repeat(4_000)), Message::reminder("keep working"), Message::assistant("reply", vec![])]);
+    assert!(ContextTrim::new(100).before_model(&mut t).is_err());
+    assert_eq!(t.messages.len(), 3);
+}
+
+#[test]
 fn under_budget_nothing_changes() {
     let mut t = turn([vec![Message::system("sys")], exchange(1, 40)].concat());
     let before = t.messages.clone();

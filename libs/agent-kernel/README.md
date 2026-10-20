@@ -22,8 +22,8 @@
 - `ToolSpec::new` 默认 `Risk::Exec`、串行。已核实的只读工具显式加 `.risk(Risk::Read)`，确认能并行的再加 `.parallel()`。风险声明不代替权限执行：宿主仍需安装 `Permission` 或自己的中间件。内置工具与桌面业务工具已迁移。
 - 工具 Schema 在 `build` 时编译，调用前先验证参数为 JSON 对象并通过 Schema，再进入权限确认和执行。采用 `jsonschema` 0.33，关闭文件/HTTP 解析并显式拒绝外部引用；本地 `$defs`/`$ref`、类型、必填、枚举、边界、数组和组合规则由库校验。`format` 遵循库的草案默认规则；未知自定义关键字不视为安全策略。参数错误包含 JSON Pointer，不执行工具，不弹批准框。
 - 原有 `Tool::execute -> Result<String, String>` 继续可用；框架改为调用 `execute_result -> ToolResult`，默认适配旧实现。返回图片或 JSON 的工具覆盖新入口，可用 `with_part`、`with_structured_content`。`output` 仍是可供中间件编辑/落盘的文本；附加文本会合并到它。结构化 JSON 受工具 `max_output` 字节限制，附加媒体合计最多 6 MiB；超过上限返回明确错误，不截断二进制或 JSON。错误发生时动作可能已经执行，不能盲目重试。
-- `Message` 新增可选 `is_error`、`structured_content`、`context_summary`；`ToolEnd` 新增可选 `parts`、`structured_content`。工具错误写入历史后仍保留；Claude 使用 `is_error`，Chat Completions/Responses 使用错误文本标记。Responses 与 Claude 原生传图片结果，Chat Completions 在一组工具结果之后追加带调用标识的用户图片消息。是否能识图仍取决于模型，宿主按模型能力选择工具。
-- `Turn` 新增 `tools`，中间件可看到本轮工具定义。`ContextTrim` 将其计入估算，可用 `.reserve_output(tokens)` 为输出和估算误差留余量；当前轮仍超限会在请求模型前返回错误。估算不等于实际 tokenizer，不保证任意 Provider 都不会报上下文错误。
+- `Message` 新增可选 `is_error`、`structured_content`、`context_summary`；`ToolEnd` 新增可选 `parts`、`structured_content`。工具错误写入历史后仍保留；Claude 使用 `is_error`，Chat Completions/Responses 使用错误文本标记。Claude 原生传图片结果；Responses 与 Chat Completions 在一组工具结果之后追加带调用标识的用户图片消息，避免部分兼容网关将工具结果中的图片数组转成含 Base64 的文本，导致上下文异常膨胀。是否能识图仍取决于模型，宿主按模型能力选择工具。
+- `Turn` 新增 `tools`，中间件可看到本轮工具定义。`ContextTrim` 将其计入估算，可用 `.reserve_output(tokens)` 为输出和估算误差留余量；当前轮仍超限会在请求模型前返回错误。图片按保守基数和内嵌编码长度估算，不再固定按 800 token；估算不等于实际 tokenizer，不保证任意 Provider 都不会报上下文错误。
 - `McpConfig` 默认只继承启动所需环境变量（PATH、HOME/USERPROFILE、系统路径、语言与临时目录等），通过 `.env(k, v)` 配置服务变量，或 `.inherit_env(k)` 显式放行已有变量。默认不继承模型、云服务等密钥；它不限制子进程读取磁盘。结果默认标记不可信。文本、图片、文本资源与资源链接可用，其他块明确报错；图片最多 4 MiB，单行 JSON 最大 8 MiB。图片与 `structuredContent` 会保留到模型请求和历史中。无字节内容的资源链接只展示 URI，不自动读取。
 - `Subagent` 默认串行，需要并发委派时由宿主调用 `.parallel()` 并确保子任务可共享工作区。父子共享预算仍待实现。
 - JSONL 与 stdio 的新增字段可选，线协议仍为 v1；Rust 结构体字面量和精确枚举匹配需补字段或使用构造器及 `..`。旧历史可读，旧版错误记录无法补出原本未保存的错误状态；降级程序可能忽略新元数据。`context_summary` 只供可信宿主写入，核心不从用户正文推断摘要，也不自动对其做压缩。
@@ -61,9 +61,10 @@ fn execute_result(&self, args: serde_json::Value, ctx: &ToolCtx) -> ToolResult {
 | `OpenAiResponses` | `/responses` | `openai` | 同上 | 同上 |
 | `AnthropicMessages` | `/v1/messages` | `anthropic` | 不含 `/v1`，如 `https://api.anthropic.com`；已带 `/v1` 的也能用 | `x-api-key` 加 `anthropic-version: 2023-06-01` |
 
-三者共用 `ProviderProfile::new(base_url, api_key, model)`，换协议只换类型。其余配置：`extra_headers`（同名头会替换默认值，不会重复；网关要 `Authorization: Bearer` 时把 `api_key` 留空并在这里设置，也可设置 `anthropic-beta`）、`extra_body`（最后合并进请求体，如 `temperature`）、`supports_tools`、`max_output_tokens`、`stream_usage`（只对 chat completions 有效）。
+三者共用 `ProviderProfile::new(base_url, api_key, model)`，换协议只换类型。其余配置：`extra_headers`（同名头会替换默认值，不会重复；网关要 `Authorization: Bearer` 时把 `api_key` 留空并在这里设置，也可设置 `anthropic-beta`）、`extra_body`（最后合并进请求体，如 `temperature`）、`supports_tools`、`max_output_tokens`、`max_request_bytes`、`stream_usage`（只对 chat completions 有效）。
 
 - `max_output_tokens`：Claude 必须给出，未设置时用 8192；Responses 对应 `max_output_tokens`；chat completions 不发送，各家参数名不一致（`max_tokens` 或 `max_completion_tokens`），请放进 `extra_body`。
+- `max_request_bytes`：可选的序列化请求字节上限，默认不限制；按三种协议的实际 JSON（含工具定义、转义和图片）检查。超限时只在请求副本里逐步省略旧工具图片，保留最新工具图片结果和用户图片；仍放不下就明确报 `request_too_large`，不发送请求、不裁断二进制。
 - Responses：无状态，每次发送完整 `input`，默认 `store: false`（可在 `extra_body` 覆盖）；函数工具显式发送 `strict: false`，因为该协议默认 true，会拒绝带可选参数的 schema。
 - Claude：所有 system 消息合并进顶层 `system`；同一轮的多个工具结果合并成一条 user 消息，且排在文本之前；空白文本块会被丢弃（为避免被拒绝，文档里没找到这条的依据）；用量取累计值的最大值，`prompt_tokens` 含缓存读写。
 
@@ -87,7 +88,7 @@ agent.run("session-1", "你好", &mut |event| { /* 转给 UI */ }, &Arc::new(Ato
 - 同一轮的工具调用：`parallel_safe` 的并发执行，`serial()` 的单独执行；结果按调用顺序回填。
 - 工具不存在、参数不合法、超时、崩溃、被中间件阻止，都作为错误结果交还模型，不中断循环。
 - 取消后历史里每个 `tool_call` 都有对应结果，会话可继续使用。
-- 重试只发生在可重试错误（429、5xx、网络错误、流提前结束）且尚未流出任何文本时。
+- 普通重试只发生在可重试错误（429、5xx、网络错误、流提前结束）且尚未流出任何文本时。明确的上下文超限另有最多两次恢复：逐步缩减请求中的旧工具结果/完整旧轮次，本次运行后续工具轮继续使用收紧后的预算；不改原始历史、不重放已执行工具。普通 400、已流出文本或无法再缩减时不恢复。
 - 回答因长度被截断（`FinishReason::Length`，三种协议各自的 `length`、`max_tokens`、`max_output_tokens` 等都归到这里）：发出 `Event::Truncated`，`RunSummary::finish` 为 `Length`。截断的回答里若带工具调用，一个都不执行（半截参数不可信），改为回给模型一条"未执行，请缩短回复或拆小步骤"的错误结果让它重试；历史里解析不了的参数会被换成 `{}`，保证之后仍是合法 JSON。模型反复被截断时由 `max_turns` 兜底。
 - 取消能打断等人的地方：`Approver` 用 `request.wait_for(&rx)`、`AskUser` 回调用 `ctx.wait_for(&rx)` 等待用户时，取消运行会让它们立即返回；取消后给出的批准会被丢弃，工具不执行，也不记入"总是允许"。不配合的回调（直接阻塞）会拖到它自己返回为止，stdio 桥已经处理好了。
 - 工具超时靠协作式取消：超时后设置 `ToolCtx::is_cancelled`，不响应的工具线程会继续跑到结束，结果被丢弃。

@@ -1,21 +1,22 @@
 <script setup lang="ts">
 import { computed, h, nextTick, onMounted, onUnmounted, ref, watch, type Component, type HTMLAttributes } from 'vue';
 import { NButton, NDropdown, NInput, type DropdownOption } from 'naive-ui';
-import { ArrowDown, AudioLines, Check, ChevronDown, ChevronRight, Ellipsis, Folder, FolderInput, FolderPlus, Paperclip, LoaderCircle, MessageSquarePlus, Mic, Pencil, SendHorizontal, Settings, Volume2, Shield, ShieldAlert, Sparkles, Square, Trash2, X, Zap } from 'lucide-vue-next';
+import { ArrowDown, AudioLines, ChevronDown, ChevronRight, Ellipsis, Folder, FolderInput, FolderPlus, Paperclip, LoaderCircle, MessageSquarePlus, Mic, Pencil, SendHorizontal, Settings, Volume2, Shield, ShieldAlert, Sparkles, Square, Trash2, X, Zap } from 'lucide-vue-next';
 import { invoke } from '../../bridge.ts';
 import type { ControlStore } from '../control-types.ts';
 import ModelSwitchDialog from '../components/ModelSwitchDialog.vue';
 import ChatNameDialog from '../components/ChatNameDialog.vue';
 import ChatMoveDialog from '../components/ChatMoveDialog.vue';
 import ChatContextRing from '../components/ChatContextRing.vue';
+import ChatActivity from '../chat/ChatActivity.vue';
 import GuideModal from '../components/GuideModal.vue';
 import AsrStatus from '../components/AsrStatus.vue';
 import MarkdownView from '../chat/MarkdownView.ts';
 import SelectionCopyMenu from '../chat/SelectionCopyMenu.vue';
 import { ATTACHMENT_ACCEPT, MAX_ATTACHMENTS, MAX_TOTAL_BYTES, attachmentBytes, attachmentImage, attachmentName, readAttachment, type PendingAttachment } from '../chat/attachments.ts';
 import { CONTINUE_TEXT } from '../chat/chat-store.ts';
-import { approvalPreview, clip, formatAgo, isImeEnter, isNearBottom, prettyArguments, riskVerb, toolLabel } from '../chat/format.ts';
-import { describeCall } from '../chat/view.ts';
+import { approvalPreview, formatAgo, isImeEnter, isNearBottom, riskVerb, toolLabel } from '../chat/format.ts';
+import { replyBlocks } from '../chat/replies.ts';
 import { listRows, type ListRow } from '../chat/groups.ts';
 import type { ApprovalDecision, ApprovalRequest, ChatGroup, QuestionRequest, SessionSummary } from '../chat/types.ts';
 
@@ -53,6 +54,7 @@ const preview = ref<string | null>(null);
 const MAX_IMAGES = MAX_ATTACHMENTS;
 
 const view = computed(() => chat.current());
+const blocks = computed(() => replyBlocks(view.value?.items ?? []));
 const running = computed(() => !!view.value?.running);
 const title = computed(() => (chat.currentId && chat.sessions.find(s => s.id === chat.currentId)?.title) || '新对话');
 const compacting = computed(() => !!chat.currentId && chat.compactingId === chat.currentId);
@@ -116,7 +118,7 @@ const signature = computed(() => {
   const v = view.value;
   if (!v) return '';
   const last = v.items[v.items.length - 1];
-  return [v.id, v.items.length, last && 'text' in last ? last.text.length : 0, last && 'output' in last ? last.output.length : 0, v.approvals.length, v.questions.length].join('|');
+  return [v.id, v.items.length, last && 'text' in last ? last.text.length : 0, last && 'output' in last ? last.output.length : 0, v.approvals.length, v.questions.length, v.running].join('|');
 });
 watch(signature, async (value, before) => {
   if (value.split('|')[0] !== (before ?? '').split('|')[0]) stick.value = true;
@@ -424,7 +426,8 @@ async function openLink(href: string) {
           </div>
 
           <template v-if="view">
-            <template v-for="item in view.items" :key="item.id">
+            <template v-for="block in blocks" :key="block.id">
+            <template v-for="item in block.items" :key="item.id">
               <div v-if="item.kind === 'user'" class="msg user" data-testid="msg-user"><div class="bubble"><div v-if="item.images.length" class="bubble-images"><img v-for="(url, n) in item.images" :key="n" :src="url" :alt="`第 ${n + 1} 张图片`" :data-testid="`msg-user-image-${n}`" @click="preview = attachmentImage(url)" /></div><div v-if="item.files?.length" class="file-cards"><span v-for="(file, n) in item.files" :key="n" class="file-chip" :title="file.name">📄 {{ file.name }} · {{ Math.ceil(file.size / 1024) }} KB</span></div><template v-if="item.text">{{ item.text }}</template></div></div>
               <div v-else-if="item.kind === 'assistant'" class="msg assistant" data-testid="msg-assistant">
                 <img class="avatar" src="/xiaoban.svg" alt="" width="28" height="28" />
@@ -434,18 +437,6 @@ async function openLink(href: string) {
                   </button>
                 </div>
               </div>
-              <template v-else-if="item.kind === 'tool'">
-                <details v-if="!chat.hideToolCalls" class="tool" :class="item.status" :data-testid="`tool-${item.id}`">
-                  <summary>
-                    <LoaderCircle v-if="item.status === 'running'" class="spin" :size="14" /><Check v-else-if="item.status === 'done'" :size="14" /><X v-else :size="14" />
-                    <b>{{ toolLabel(item.name) }}</b><span class="tool-sub">{{ describeCall(item.name, item.arguments) }}</span>
-                  </summary>
-                  <div class="tool-body">
-                    <div v-if="item.arguments" class="tool-part"><small>内容</small><pre>{{ prettyArguments(item.arguments) }}</pre></div>
-                    <div v-if="item.output" class="tool-part"><small>结果</small><pre>{{ clip(item.output) }}</pre></div>
-                  </div>
-                </details>
-              </template>
               <div v-else-if="item.kind === 'notice'" class="notice" :class="item.tone" :data-testid="`notice-${item.tone}`" :role="item.tone === 'error' ? 'alert' : 'status'">
                 {{ item.text }}
                 <details v-if="item.details"><summary>{{ item.detailsLabel ?? '错误详情' }}</summary><span class="notice-details">{{ item.details }}</span></details>
@@ -453,6 +444,8 @@ async function openLink(href: string) {
                 <button v-if="item.canRetry && !view.running" type="button" class="link" @click="chat.retry()">重试</button>
                 <button v-if="item.canContinue && !view.running" type="button" class="link" data-testid="chat-continue" @click="continueAnswer">继续</button>
               </div>
+            </template>
+            <ChatActivity v-if="block.calls.length && !chat.hideToolCalls" :calls="block.calls" :active="view.running && block.id === blocks.at(-1)?.id" :waiting="waiting && block.id === blocks.at(-1)?.id" :status="block.id === blocks.at(-1)?.id ? statusLine : ''" />
             </template>
 
             <section v-for="request in view.approvals" :key="request.id" class="card approval" :class="{ exec: request.risk === 'exec', dangerous: !!request.danger }" data-testid="chat-approval" role="alertdialog" :aria-label="`需要你确认：${toolLabel(request.tool)}`">
@@ -478,7 +471,7 @@ async function openLink(href: string) {
               </footer>
             </section>
 
-            <p v-if="statusLine" class="status-line" data-testid="chat-status"><LoaderCircle class="spin" :size="14" />{{ statusLine }}</p>
+            <p v-if="statusLine && (chat.hideToolCalls || !blocks.at(-1)?.calls.length)" class="status-line" data-testid="chat-status"><LoaderCircle class="spin" :size="14" />{{ statusLine }}</p>
           </template>
         </div>
       </div>
@@ -588,16 +581,7 @@ async function openLink(href: string) {
 .answer{width:100%;max-width:100%;min-width:0;font-size:14.5px;line-height:1.8;color:var(--ui-text-primary);overflow-wrap:anywhere;word-break:break-word;box-sizing:border-box}
 .cursor{display:inline-block;width:7px;height:15px;background:var(--ui-primary);border-radius:2px;margin-left:2px;vertical-align:text-bottom;animation:blink 1s steps(2,start) infinite}
 @keyframes blink{to{visibility:hidden}}
-.tool{margin-left:40px;border:1px solid var(--ui-line);border-radius:10px;background:var(--ui-surface);font-size:13px;max-width:100%;min-width:0;box-sizing:border-box}
-.tool summary{cursor:pointer;padding:7px 12px;display:flex;gap:8px;align-items:center;color:var(--ui-text-secondary);list-style:none;min-width:0}
-.tool summary::-webkit-details-marker{display:none}
-.tool summary b{color:var(--ui-text-primary);font-weight:600;white-space:nowrap;flex-shrink:0}
-.tool-sub{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px}
-.tool.error summary svg{color:var(--ui-primary)}
-.tool.done summary svg{color:#1fb871}
-.tool-body{padding:2px 12px 10px;display:grid;gap:8px}
-.tool-part small{color:var(--ui-text-tertiary)}
-.tool-part pre,.preview{margin:4px 0 0;padding:9px 11px;background:var(--ui-surface-alt);border-radius:8px;overflow:auto;max-height:260px;font-size:12px;line-height:1.6;white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-word;font-family:ui-monospace,Menlo,Consolas,monospace}
+.preview{margin:4px 0 0;padding:9px 11px;background:var(--ui-surface-alt);border-radius:8px;overflow:auto;max-height:260px;font-size:12px;line-height:1.6;white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-word;font-family:ui-monospace,Menlo,Consolas,monospace}
 .notice{margin-left:40px;font-size:13px;padding:8px 12px;border-radius:10px;background:var(--ui-surface-alt);color:var(--ui-text-secondary);display:flex;gap:12px;align-items:center}
 .notice.error{background:var(--ui-primary-soft);color:var(--ui-primary-pressed)}
 .notice.warning{background:rgba(245,158,11,.14)}
@@ -664,7 +648,7 @@ async function openLink(href: string) {
   .chat-page{grid-template-columns:190px minmax(0,1fr)}
   .chat-column{padding:16px 14px 12px}
   .bubble{max-width:88%}
-  .tool,.notice,.card,.status-line{margin-left:0}
+  .notice,.card,.status-line{margin-left:0}
 }
 @media(max-width:680px){
   .chat-page{grid-template-columns:1fr}

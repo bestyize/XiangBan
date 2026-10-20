@@ -126,6 +126,8 @@ pub struct ChatState {
     index: Mutex<Option<Index>>,
     /// Conversations whose automatic compaction failed lately.
     auto_compact: compact::AutoCooldown,
+    /// Actual schemas from the latest registration, keyed by whether native GUI tools are enabled.
+    tool_tokens: Mutex<HashMap<bool, usize>>,
 }
 
 impl ChatState {
@@ -145,6 +147,7 @@ impl ChatState {
             runs: Mutex::new(HashMap::new()),
             index: Mutex::new(None),
             auto_compact: compact::AutoCooldown::default(),
+            tool_tokens: Mutex::new(HashMap::new()),
         }
     }
 }
@@ -157,6 +160,9 @@ fn permission_with_danger_check(mode: PermissionMode, approver: impl agent_kerne
         // policy is installed; third-party skill installation must be flagged here.
         if tool == "skill_install" {
             return Some("安装第三方 Skill 必须逐次经过用户确认".to_string());
+        }
+        if tool == "computer_use_repair_permissions" {
+            return Some("清除 com.ifuryst.opencomputeruse 的所选旧授权（同标识独立安装版也受影响），之后需重新授权；每次都需确认".to_string());
         }
         danger::assess(tool, args, lock(&workspace).as_deref()).map(str::to_string)
     })
@@ -244,6 +250,8 @@ pub(crate) fn provider(config: &AiConfig) -> Result<Arc<dyn ModelProvider>, Stri
 
 fn provider_with(config: &AiConfig, key_source: Option<KeySource>) -> Result<Arc<dyn ModelProvider>, String> {
     let mut profile = ProviderProfile::new(config.base_url.clone(), config.api_key.clone(), config.model.clone());
+    profile.max_request_bytes = Some(8 * 1024 * 1024);
+    profile.max_output_tokens = Some(output_budget(config.context_tokens) as u32);
     if let Some(source) = key_source {
         profile = profile.with_api_key_source(source);
     }
@@ -254,6 +262,9 @@ fn provider_with(config: &AiConfig, key_source: Option<KeySource>) -> Result<Arc
     };
     made.map_err(|e| format!("模型配置不能用：{e}"))
 }
+
+fn output_budget(limit: usize) -> usize { (limit / 8).clamp(1_024, 8_192) }
+fn context_reserve(limit: usize) -> usize { output_budget(limit) + limit / 20 }
 
 /// Deletes spilled tool output nobody will look at again.
 fn clean_spill(dir: &Path, keep: Duration) {
@@ -363,7 +374,7 @@ fn assemble_with_files(parts: Parts<'_>, attachments: Vec<Attachment>) -> Result
         .middleware(RepeatGuard::new())
         .middleware(SpillOutput::new(dirs.spill()))
         .middleware(AttachmentContext::new(attachments))
-        .middleware(ContextTrim::new(context_tokens))
+        .middleware(ContextTrim::new(context_tokens).reserve_output(context_reserve(context_tokens)))
         .middleware(ContinueGuard::new())
         .max_turns(MAX_TURNS);
     let roots = vec![workspace.to_path_buf(), dirs.spill()];
@@ -398,7 +409,7 @@ fn build_agent(app: &tauri::AppHandle, config: &AiConfig, key_source: Option<Key
             .join("agent-tools/computer-use");
         agent_computer_use_tools::spawn(&root)
     };
-    assemble_with_files(Parts {
+    let agent = assemble_with_files(Parts {
         provider: provider_with(config, key_source)?,
         dirs: &Dirs::of(app)?,
         workspace,
@@ -410,7 +421,9 @@ fn build_agent(app: &tauri::AppHandle, config: &AiConfig, key_source: Option<Key
         open_computer_use: config.open_computer_use,
         spawn_computer_use: &spawn_computer_use,
         context_tokens: config.context_tokens,
-    }, attachments)
+    }, attachments)?;
+    lock(&state.tool_tokens).insert(config.open_computer_use, agent_kernel::estimate_tool_tokens(&agent.tool_schemas()));
+    Ok(agent)
 }
 
 /// Runs `change` on the list of conversations and saves it; the first use loads it from disk.
@@ -833,7 +846,7 @@ pub fn chat_delete_session(app: tauri::AppHandle, session_id: String) -> Result<
 /// What the agent sends before any conversation: its instructions, the skill list and the note index.
 fn base_tokens(dirs: &Dirs, workspace: &Path, config: &AiConfig) -> usize {
     let environment = prompt::Environment { os: std::env::consts::OS, workspace, open_computer_use: config.open_computer_use, open_computer_use_error: None };
-    let skills = Arc::new(Skills::new().writable_root(dirs.skills()));
+    let skills = Arc::new(Skills::new().read_only_root(dirs.chat.join("bundled-skills")).writable_root(dirs.skills()));
     let memory = Arc::new(Memory::new(dirs.memory()));
     let (skills_section, memory_section) = (skills.prompt_section(), memory.prompt_section());
     let text = [prompt::system_prompt(&environment), skills_section(), memory_section()]
@@ -841,13 +854,16 @@ fn base_tokens(dirs: &Dirs, workspace: &Path, config: &AiConfig) -> usize {
         .filter(|part| !part.trim().is_empty())
         .collect::<Vec<_>>()
         .join("\n\n");
-    agent_kernel::estimate_tokens(&[Message::system(text)])
+    agent_kernel::estimate_tokens(&[Message::system(text)]) + context_reserve(config.context_tokens)
 }
 
 fn context_of(app: &tauri::AppHandle, config: &AiConfig, raw: &[Message]) -> Result<ContextInfo, String> {
     let dirs = Dirs::of(app)?;
     let default = ai_config::default_workspace(app)?;
-    Ok(compact::measure(raw, base_tokens(&dirs, config.workspace_or(&default), config), config.context_tokens))
+    // Until tools have been registered this launch, include a conservative allowance rather
+    // than displaying zero schema cost. Registration replaces it with the actual schemas.
+    let tool_tokens = lock(&app.state::<ChatState>().tool_tokens).get(&config.open_computer_use).copied().unwrap_or(32_000);
+    Ok(compact::measure(raw, base_tokens(&dirs, config.workspace_or(&default), config) + tool_tokens, config.context_tokens))
 }
 
 /// How big the next request in a conversation would be, against the limit chosen in settings.

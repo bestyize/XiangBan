@@ -202,8 +202,12 @@ fn three_protocols_preserve_error_json_and_images_without_breaking_tool_pairs() 
     assert_eq!(chat["messages"][4]["role"], "assistant");
     let responses = responses::build_request_body(&profile, &request);
     let output = &responses["input"][2]["output"];
-    assert_eq!(output[1]["type"], "input_image");
-    assert!(output[0]["text"].as_str().unwrap().starts_with("Error:"));
+    assert!(output.as_str().unwrap().starts_with("Error:"));
+    assert!(output.as_str().unwrap().contains("retryable"));
+    assert_eq!(responses["input"][3]["call_id"], "d");
+    assert_eq!(responses["input"][4]["role"], "user");
+    assert_eq!(responses["input"][4]["content"][1]["image_url"], "data:image/png;base64,AAAA");
+    assert_eq!(responses["input"][5]["role"], "assistant");
     let claude = anthropic::build_request_body(&profile, &request);
     let result = &claude["messages"][1]["content"][0];
     assert_eq!(result["is_error"], true);

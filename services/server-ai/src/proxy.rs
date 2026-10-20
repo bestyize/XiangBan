@@ -7,7 +7,7 @@
 use crate::{binding, error::AppError, extract::AuthUser, products, quota, state::AppState};
 use axum::{
     body::Body,
-    extract::State,
+    extract::{rejection::BytesRejection, State},
     http::{header, HeaderMap, StatusCode},
     response::{IntoResponse, Response},
     Json,
@@ -90,19 +90,23 @@ pub async fn list_models(State(state): State<AppState>, auth: Result<AuthUser, A
     result.unwrap_or_else(|e| error_response(Api::ChatCompletions, e))
 }
 
-pub async fn chat_completions(State(state): State<AppState>, auth: Result<AuthUser, AppError>, headers: HeaderMap, body: Bytes) -> Response {
+pub async fn chat_completions(State(state): State<AppState>, auth: Result<AuthUser, AppError>, headers: HeaderMap, body: Result<Bytes, BytesRejection>) -> Response {
     serve(Api::ChatCompletions, &state, auth, &headers, body).await
 }
 
-pub async fn responses(State(state): State<AppState>, auth: Result<AuthUser, AppError>, headers: HeaderMap, body: Bytes) -> Response {
+pub async fn responses(State(state): State<AppState>, auth: Result<AuthUser, AppError>, headers: HeaderMap, body: Result<Bytes, BytesRejection>) -> Response {
     serve(Api::Responses, &state, auth, &headers, body).await
 }
 
-pub async fn messages(State(state): State<AppState>, auth: Result<AuthUser, AppError>, headers: HeaderMap, body: Bytes) -> Response {
+pub async fn messages(State(state): State<AppState>, auth: Result<AuthUser, AppError>, headers: HeaderMap, body: Result<Bytes, BytesRejection>) -> Response {
     serve(Api::Messages, &state, auth, &headers, body).await
 }
 
-async fn serve(api: Api, state: &AppState, auth: Result<AuthUser, AppError>, headers: &HeaderMap, body: Bytes) -> Response {
+async fn serve(api: Api, state: &AppState, auth: Result<AuthUser, AppError>, headers: &HeaderMap, body: Result<Bytes, BytesRejection>) -> Response {
+    let body = match body {
+        Ok(body) => body,
+        Err(error) => return error_response(api, map_body_error(error.status())),
+    };
     match handle(api, state, auth, headers, body).await {
         Ok(response) => response,
         Err(err) => error_response(api, err),
@@ -196,10 +200,24 @@ fn map_upstream_error(status: StatusCode, body: &str) -> AppError {
             message: "额度暂时不足，若刚兑换过请稍候几秒再试".into(),
         };
     }
-    if status == StatusCode::BAD_REQUEST || status == StatusCode::PAYLOAD_TOO_LARGE {
-        return AppError::Coded { status, code: "bad_request", message: "请求被拒绝，请检查参数后重试".into() };
+    if status == StatusCode::PAYLOAD_TOO_LARGE {
+        return map_body_error(status);
+    }
+    if status == StatusCode::BAD_REQUEST {
+        if ["context_length_exceeded", "context_window_exceeded", "maximum context length", "prompt is too long", "input token count exceeds", "too many input tokens"].iter().any(|needle| lower.contains(needle)) {
+            return AppError::Coded { status, code: "context_length_exceeded", message: "对话超过模型的上下文上限，请压缩会话或调低上下文上限后继续".into() };
+        }
+        return AppError::Coded { status, code: "bad_request", message: "请求参数与模型不兼容，请检查模型协议、工具和图片支持".into() };
     }
     AppError::BadGateway("AI 服务暂时不可用，请稍后再试".into())
+}
+
+fn map_body_error(status: StatusCode) -> AppError {
+    if status == StatusCode::PAYLOAD_TOO_LARGE {
+        AppError::Coded { status, code: "request_too_large", message: "请求体积过大，请减少图片、降低截图尺寸或压缩会话后继续".into() }
+    } else {
+        AppError::BadRequest("请求内容无法读取，请重新发送".into())
+    }
 }
 
 fn set_model(fields: &mut Map<String, Value>, tier: &str) -> bool {
@@ -371,6 +389,26 @@ mod tests {
         let mut buffer = b"data: {\"model\":\"real\"}\r\n\r\n".to_vec();
         let out = String::from_utf8(drain_complete_lines(&mut buffer, "t")).unwrap();
         assert_eq!(out, "data: {\"model\":\"t\"}\r\n\r\n");
+    }
+
+    #[test]
+    fn overflow_errors_are_actionable_without_exposing_upstream_details() {
+        for body in [
+            r#"{"error":{"code":"context_length_exceeded","message":"private-model maximum context length is 128000"}}"#,
+            r#"{"error":{"message":"[400]: {\"error\":{\"message\":\"The input token count exceeds the maximum number of tokens allowed 1048576.\"}}"}}"#,
+            r#"{"error":{"message":"prompt is too long: 1214141 tokens > 1048576 maximum (channel secret)"}}"#,
+        ] {
+            let (_, code, message) = map_upstream_error(StatusCode::BAD_REQUEST, body).parts();
+            assert_eq!(code, "context_length_exceeded");
+            assert!(message.contains("压缩会话"));
+            assert!(!message.contains("private-model") && !message.contains("channel") && !message.contains("1048576"));
+        }
+        assert_eq!(map_upstream_error(StatusCode::PAYLOAD_TOO_LARGE, "private channel").parts().1, "request_too_large");
+        assert_eq!(map_body_error(StatusCode::PAYLOAD_TOO_LARGE).parts().1, "request_too_large");
+        assert_eq!(map_upstream_error(StatusCode::BAD_REQUEST, "unexpected parameter reason").parts().1, "bad_request");
+        for api in [Api::Responses, Api::Messages, Api::ChatCompletions] {
+            assert_eq!(error_body(api, StatusCode::BAD_REQUEST, "context_length_exceeded", "超限")["error"]["code"], "context_length_exceeded");
+        }
     }
 
     #[test]

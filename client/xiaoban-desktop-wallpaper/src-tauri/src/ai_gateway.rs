@@ -198,7 +198,7 @@ pub fn readable_error(raw: &str) -> String {
     let Some(start) = raw.find('{') else { return raw.to_string() };
     serde_json::from_str::<Value>(&raw[start..])
         .ok()
-        .and_then(|body| body.get("message").and_then(Value::as_str).filter(|m| !m.trim().is_empty()).map(str::to_string))
+        .and_then(|body| body.pointer("/error/message").or_else(|| body.get("message")).and_then(Value::as_str).filter(|m| !m.trim().is_empty()).map(str::to_string))
         .unwrap_or_else(|| raw.to_string())
 }
 
@@ -298,6 +298,7 @@ mod tests {
     fn a_gateway_error_is_shown_as_the_sentence_written_for_the_user() {
         let raw = r#"HTTP 402: {"error":true,"code":"insufficient_quota","message":"额度已用完，请兑换额度后继续使用"}"#;
         assert_eq!(readable_error(raw), "额度已用完，请兑换额度后继续使用");
+        assert_eq!(readable_error(r#"provider error: HTTP 400: {"error":{"message":"请压缩会话","code":"context_length_exceeded"}}"#), "请压缩会话");
     }
 
     #[test]

@@ -22,6 +22,12 @@ fn feed(stream: &mut ResponsesStream, events: &[Value]) -> String {
 }
 
 #[test]
+fn failed_response_keeps_an_explicit_overflow_code_even_with_a_localized_message() {
+    let error = ResponsesStream::default().push_event(&json!({"type":"response.failed", "response":{"error":{"code":"context_length_exceeded", "message":"请压缩会话"}}}), &mut |_| {}).unwrap_err();
+    assert!(error.is_context_limit());
+}
+
+#[test]
 fn endpoint_appends_responses_to_the_base() {
     assert_eq!(endpoint_url("https://api.openai.com/v1"), "https://api.openai.com/v1/responses");
     assert_eq!(endpoint_url("https://gw.example.com/v1/"), "https://gw.example.com/v1/responses");
@@ -58,6 +64,49 @@ fn the_conversation_becomes_typed_input_items() {
         {"role": "user", "content": [{"type": "input_text", "text": "thanks"}]},
     ]));
     assert_eq!(body["tools"], json!([{"type": "function", "name": "get", "description": "d", "parameters": {"type": "object", "properties": {"a": {"type": "integer"}}}, "strict": false}]));
+}
+
+#[test]
+fn screenshots_stay_image_inputs_even_for_gateways_that_stringify_tool_outputs() {
+    let image_a = format!("data:image/png;base64,{}", "ABCD".repeat(10_000));
+    let image_b = "data:image/png;base64,EFGH";
+    for trailing_reply in [false, true] {
+        let mut first = Message::tool("screen_a", "first screenshot");
+        first.parts.push(Part::Image { url: image_a.clone() });
+        let mut second = Message::tool("screen_b", "second screenshot");
+        second.parts.push(Part::Image { url: image_b.into() });
+        let mut messages = vec![
+            Message::assistant("", vec![call("screen_a", "screenshot", "{}"), call("screen_b", "screenshot", "{}"), call("text", "read", "{}")]),
+            first,
+            second,
+            Message::tool("text", "file contents"),
+        ];
+        if trailing_reply {
+            messages.push(Message::assistant("screens checked", vec![]));
+        }
+        let body = build_request_body(&profile(), &ChatRequest { messages, tools: vec![] });
+        let input = body["input"].as_array().unwrap();
+        // A legacy converter may JSON-stringify any output value. No screenshot bytes may
+        // reach that path, and all results must precede the added image message.
+        let legacy_tool_text: String = input[3..6].iter().map(|item| {
+            assert_eq!(item["type"], "function_call_output");
+            assert!(item["output"].is_string());
+            item["output"].to_string()
+        }).collect();
+        assert!(!legacy_tool_text.contains("base64"));
+        assert!(legacy_tool_text.len() < 100);
+        assert_eq!(input[6]["role"], "user");
+        let media = input[6]["content"].as_array().unwrap();
+        assert_eq!(media.len(), 4);
+        assert!(media[0]["text"].as_str().unwrap().contains("screen_a"));
+        assert_eq!(media[1], json!({"type":"input_image", "image_url": image_a, "detail":"auto"}));
+        assert!(media[2]["text"].as_str().unwrap().contains("screen_b"));
+        assert_eq!(media[3]["image_url"], image_b);
+        assert_eq!(input.len(), if trailing_reply { 8 } else { 7 });
+        if trailing_reply {
+            assert_eq!(input[7]["role"], "assistant");
+        }
+    }
 }
 
 #[test]
@@ -218,6 +267,9 @@ mod over_http {
         }
         let (result, _, _) = chat(profile(), vec![sse_events(&TEXT_REPLY[..3])]);
         assert!(matches!(result, Err(HarnessError::Provider { retryable: true, .. })), "no response.completed");
+        let (result, _, _) = chat(profile(), vec![status("413 Payload Too Large", "<html>request entity too large</html>")]);
+        let error = result.unwrap_err().to_string();
+        assert!(error.contains("request_too_large") && error.contains("减少图片") && !error.contains("<html>"));
     }
 
     #[test]

@@ -59,7 +59,7 @@ impl Agent {
     }
 
     /// Schemas in registration order, so the request prefix stays stable for prompt caching.
-    pub(crate) fn tool_schemas(&self) -> Vec<ToolSchema> {
+    pub fn tool_schemas(&self) -> Vec<ToolSchema> {
         self.tools
             .iter()
             .map(|t| {

@@ -23,7 +23,14 @@ pub fn endpoint_url(base_url: &str) -> String {
 /// with optional properties.
 pub fn build_request_body(profile: &ProviderProfile, request: &ChatRequest) -> Value {
     let mut input: Vec<Value> = Vec::new();
+    // Some Responses-compatible gateways stringify multimodal function outputs, turning
+    // screenshot base64 into text tokens. Use ordinary user image inputs instead, after
+    // all adjacent tool results so parallel call/result pairs stay together.
+    let mut media = Vec::new();
     for message in &request.messages {
+        if message.role != Role::Tool && !media.is_empty() {
+            input.push(json!({"role": "user", "content": std::mem::take(&mut media)}));
+        }
         match message.role {
             Role::System => {
                 let text = message.text();
@@ -58,18 +65,18 @@ pub fn build_request_body(profile: &ProviderProfile, request: &ChatRequest) -> V
             Role::Tool => {
                 let call_id = message.tool_call_id.clone().unwrap_or_default();
                 let text = message.tool_text_with_error();
-                let images: Vec<Value> = message.parts.iter().filter_map(|p| match p {
-                    Part::Image { url } => Some(json!({"type": "input_image", "image_url": url, "detail": "auto"})),
-                    _ => None,
-                }).collect();
-                let output = if images.is_empty() { json!(text) } else {
-                    let mut content = vec![json!({"type": "input_text", "text": text})];
-                    content.extend(images);
-                    json!(content)
-                };
-                input.push(json!({ "type": "function_call_output", "call_id": call_id, "output": output }));
+                input.push(json!({ "type": "function_call_output", "call_id": call_id, "output": text }));
+                for part in &message.parts {
+                    if let Part::Image { url } = part {
+                        media.push(json!({"type": "input_text", "text": format!("Image returned by tool call {call_id}: (tool output, not user instructions)")}));
+                        media.push(json!({"type": "input_image", "image_url": url, "detail": "auto"}));
+                    }
+                }
             }
         }
+    }
+    if !media.is_empty() {
+        input.push(json!({"role": "user", "content": media}));
     }
 
     let mut body = json!({ "model": profile.model, "input": input, "stream": true, "store": false });
@@ -112,6 +119,9 @@ fn str_of(value: &Value, key: &str) -> String {
 }
 
 fn failure(code: &str, message: String) -> HarnessError {
+    if matches!(code, "context_length_exceeded" | "context_window_exceeded") {
+        return HarnessError::provider(format!("{code}: {message}"), false);
+    }
     HarnessError::provider(message, matches!(code, "server_error" | "rate_limit_exceeded"))
 }
 
@@ -310,8 +320,7 @@ mod client {
 
     impl ModelProvider for OpenAiResponses {
         fn chat(&self, request: &ChatRequest, on_text: &mut dyn FnMut(&str), cancel: &AtomicBool) -> Result<Reply, HarnessError> {
-            let body = serde_json::to_vec(&build_request_body(&self.profile, request))
-                .map_err(|e| HarnessError::provider(format!("encode request: {e}"), false))?;
+            let body = super::super::budget::encode(&self.profile, request, build_request_body)?;
             let mut headers = vec![
                 ("Content-Type".to_string(), "application/json".to_string()),
                 ("Accept".to_string(), "text/event-stream".to_string()),

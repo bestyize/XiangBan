@@ -74,7 +74,11 @@ pub(crate) fn post_stream(
             let status = response.status().as_u16();
             let mut raw = Vec::new();
             let _ = response.take(ERROR_BODY_LIMIT).read_to_end(&mut raw);
-            let message = format!("HTTP {status}: {}", String::from_utf8_lossy(&raw).trim());
+            let message = if status == 413 {
+                "HTTP 413: request_too_large: 请求体积超过服务端限制，请减少图片、降低截图尺寸或压缩会话后继续。".to_string()
+            } else {
+                format!("HTTP {status}: {}", String::from_utf8_lossy(&raw).trim())
+            };
             let _ = tx.send(Incoming::Failed(message, status_is_retryable(status)));
             return;
         }

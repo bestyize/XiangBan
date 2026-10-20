@@ -63,6 +63,8 @@ cargo test --locked --manifest-path services/server-ai/Cargo.toml
 
 管理接口 `/api/admin/*` 与账号中心同一套做法：独立管理员表、HS256 令牌（由主密钥派生，与用户令牌不通用）、连续错 5 次锁 15 分钟、没有默认账号、写操作入审计表。包含登录与改密码、概览、网关连接（`GET /api/admin/settings`、`PUT /api/admin/settings/newapi` 先向网关验证再保存、`POST /api/admin/settings/newapi/test`；令牌只写不读，只返回来源和尾号）、产品与档位增改删、New API 模型列表（标记倍率疑似未配置的模型）、用户额度查看、补发与扣回、对账异常、操作日志，以及兑换码：`POST /api/admin/batches` 生成批次、`GET /api/admin/batches` 批次列表、`POST /api/admin/batches/{id}/void` 作废批次里未兑换的码、`POST /api/admin/codes/lookup` 查单个码（用 POST，码不进 URL 和访问日志）、`POST /api/admin/codes/{id}/void` 作废单个码。
 
+上下文超限返回稳定错误码 `context_length_exceeded`；请求体超过本服务或上游限制时返回 `request_too_large`（HTTP 413）。错误说明提示压缩会话、减少图片或检查协议，保留三种协议各自的错误形状，不回传上游模型、渠道或完整错误内容。客户端可按错误码恢复，普通参数错误仍为 `bad_request`。
+
 ## 兑换码
 
 - 格式：16 个字符，字母表去掉 0/O/1/I，前 15 个随机、最后 1 个是校验位，显示成 `XXXX-XXXX-XXXX-XXXX`。校验位能发现任何单个字符写错和绝大多数相邻字符颠倒，输错时不用查库就能拦下。输入时容忍小写、空格、各种连字符、全角字符和复制带来的零宽字符。

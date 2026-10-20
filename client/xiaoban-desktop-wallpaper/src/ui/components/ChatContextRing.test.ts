@@ -64,10 +64,10 @@ describe('the context ring', () => {
     mountRing();
     await openPopover();
     const row = body('ctx-slider')!.parentElement!;
-    expect(row.textContent).toContain('256K');
+    expect(row.textContent).toContain('16K');
     expect(row.textContent).toContain('1M');
     expect(row.textContent).toContain('用到 90% 自动压缩');
-    expect(slider().props()).toMatchObject({ value: 256_000, min: 256_000, max: 1_000_000, step: 8_000 });
+    expect(slider().props()).toMatchObject({ value: 256_000, min: 16_000, max: 1_000_000, step: 8_000 });
   });
 
   it('asks to compact when the button is pressed', async () => {
@@ -154,9 +154,11 @@ describe('the limit slider', () => {
   });
 
   it('shows a limit outside the range at the nearest end instead of off the track', async () => {
-    mountRing({ limit: 48_000 });
+    mountRing({ limit: 8_000 });
     await openPopover();
-    expect(slider().props('value')).toBe(256_000);
+    expect(slider().props('value')).toBe(16_000);
+    await wrapper!.setProps({ limit: 48_000 });
+    expect(slider().props('value')).toBe(48_000);
     await wrapper!.setProps({ limit: 5_000_000 });
     expect(slider().props('value')).toBe(1_000_000);
   });

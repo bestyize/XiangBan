@@ -136,16 +136,23 @@ pub fn spawn(root: &Path) -> Result<Arc<McpClient>, HarnessError> {
 /// Keep the MCP connection alive while checking actual OS access before every desktop tool.
 /// Diagnosis/onboarding are supplied separately by the host and remain usable when access is denied.
 pub fn checked_tools(client: &Arc<McpClient>, root: &Path) -> Vec<Arc<dyn agent_kernel::Tool>> {
-    client.tools().into_iter().map(|inner| Arc::new(PermissionCheckedTool { inner, root: root.to_path_buf() }) as Arc<dyn agent_kernel::Tool>).collect()
+    client.tools().into_iter().map(|inner| {
+        let mut spec = inner.spec().clone();
+        if spec.name == "list_apps" {
+            spec.description.push_str(" 最简调用参数为 {}，不得加入 schema 未声明的 reason 或 command。invalid arguments 表示未执行，应修正参数重试本工具，不要改用 Python/AppKit/AppleScript。");
+        }
+        Arc::new(PermissionCheckedTool { inner, spec, root: root.to_path_buf() }) as Arc<dyn agent_kernel::Tool>
+    }).collect()
 }
 
 struct PermissionCheckedTool {
     inner: Arc<dyn agent_kernel::Tool>,
+    spec: agent_kernel::ToolSpec,
     root: std::path::PathBuf,
 }
 
 impl agent_kernel::Tool for PermissionCheckedTool {
-    fn spec(&self) -> &agent_kernel::ToolSpec { self.inner.spec() }
+    fn spec(&self) -> &agent_kernel::ToolSpec { &self.spec }
     fn execute(&self, args: serde_json::Value, ctx: &agent_kernel::ToolCtx) -> Result<String, String> {
         let result = self.execute_result(args, ctx);
         if result.is_error { Err(result.output) } else { Ok(result.output) }
@@ -264,7 +271,7 @@ mod tests {
         let runtime = Runtime::new(&runtime_target());
         let doctor = runtime.0.join(executable_relative());
         let calls = Arc::new(AtomicUsize::new(0));
-        let tool = PermissionCheckedTool { root: runtime.0.clone(), inner: Arc::new(Action {
+        let tool = PermissionCheckedTool { root: runtime.0.clone(), spec: ToolSpec::new("click", "fixture", serde_json::json!({"type":"object"})), inner: Arc::new(Action {
             calls: calls.clone(), spec: ToolSpec::new("click", "fixture", serde_json::json!({"type":"object"})),
         }) };
         fs::write(&doctor, "#!/bin/sh\n[ \"$1\" = doctor ] && [ \"$2\" = --json ] || exit 1\nprintf '%s' '{\"allGranted\":true,\"accessibilityTrusted\":false,\"screenCaptureGranted\":true}'\n").unwrap();

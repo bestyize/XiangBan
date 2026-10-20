@@ -15,8 +15,8 @@ description: 操作电脑上其他应用（看窗口、点击、输入、滚动�
 
 ## 标准流程
 
-0. 首次操作、权限错误或用户说“开关已经开了仍不能用”时，先调用 `computer_use_diagnose`。MCP 已连接不代表系统授权有效。macOS 看 `engine.permissions` 的真实布尔状态；缺权限先用 `request_accessibility_permission` 启动引擎的原生引导，用户授权后重新诊断，不要反复盲点目标应用。诊断只读，可在引擎 MCP 未能启动时使用。
-1. `list_apps` 看有哪些应用在运行，用它返回的应用名或 bundle id 作为 `app` 参数。目标应用不在列表里时，如实告诉用户，不要悄悄换成别的应用。
+0. 首次操作、权限错误或用户说“开关已经开了仍不能用”时，先调用 `computer_use_diagnose`。MCP 已连接不代表系统授权有效。macOS 看 `engine.permissions` 的真实布尔状态；缺权限先用 `request_accessibility_permission` 启动原生引导，用户授权后复查。`engine.authorizationMismatch.services` 有对应项，表示系统日志确认旧签名冲突；先说明影响，再用 `computer_use_repair_permissions(permission="accessibility" 或 "screenRecording")`，由应用逐次确认后仅清除引擎所选旧授权，并打开当前 App 和系统设置。系统最后的授权点击由用户完成。日志不可用或没匹配时不能声称已确认签名问题。诊断可在 MCP 未启动时使用。
+1. `list_apps` 看有哪些应用在运行，最简参数是 `{}`；不要加 schema 没声明的 `reason`、`command` 等字段。用它返回的应用名或 bundle id 作为 `app` 参数。目标应用不在列表里时，如实告诉用户，不要悄悄换成别的应用。
 2. `get_app_state` 取目标应用当前的控件树。要用 `element_index` 的操作，都必须紧接在最近一次 `get_app_state` 之后；导航、弹窗出现、页面刷新、操作失败后都要重新取，不要凭记忆沿用旧编号，也不要跨对话猜编号。
 3. 优先用元素编号操作：可编辑的输入框、文本框先试 `set_value`，其次才是 `type_text`；按钮、菜单项用 `click` 带 `element_index`；右键菜单、展开等次要动作用 `perform_secondary_action`，并且只用状态结果里列出的动作。
 4. 只有控件树里找不到目标时，才改用坐标的 `click`、`scroll`、`drag`。
@@ -51,7 +51,8 @@ description: 操作电脑上其他应用（看窗口、点击、输入、滚动�
 
 ## 出问题时
 
-- 工具返回 `computer_use_permission_required`：这是系统授权阻挡，不是浏览器或网页不支持。运行诊断，启动授权引导，说明用户需要在哪个系统条目授权；等待后复查。系统开关开着但诊断仍失败，可能是旧签名的授权失效或进程缓存，先完全退出并重新打开小伴，仍失败再由用户移除旧条目并重新添加当前应用。禁止自动运行 `tccutil reset`、修改权限数据库或用脚本绕过。
+- `invalid arguments`、`Additional properties are not allowed`：本次工具没有执行；对照当前 schema 删除多余字段或补齐必填字段，再重试原工具。参数错误不构成权限或网站不支持的证据，不要因此重置授权，不要转用 shell/Python/AppKit/AppleScript。`python3 -c "import AppKit..."` 不能替代 `list_apps`。
+- `computer_use_permission_required`：运行诊断、启动授权引导，说明系统实际需要授权的条目；等待后复查。旧签名冲突可由 `computer_use_repair_permissions` 经用户确认后定向修复。不能在 shell 自行重置 TCC，更不能 reset All、直接写权限数据库或脚本绕过授权。有效权限受保护，修复工具不会清除已生效的所选权限。同 Bundle ID 的独立安装版也受所选权限重置影响，确认前要说明。
 - `stableSigningIdentity: false` 表示签名身份可能随构建变化，向用户指出当前引擎路径和签名问题；用户机器不需要导入构建证书，也不要让用户安装根证书。
 - 状态为空、没有截图：目标应用没有可见窗口，或窗口被最小化、隐藏；macOS 还可能缺屏幕录制权限。缺无障碍或屏幕录制权限时，请用户在系统设置 → 隐私与安全性中为系统显示的应用条目授权；内置 Open Computer Use 引擎可能单独列出。只有当前工具列表存在权限工具时才能调用，不要编造 `request_accessibility_permission`。
 - 元素动作失败：重新 `get_app_state`，确认编号还指向原来的控件；能 `set_value` 就 `set_value`；语义路线都不通了才用坐标。

@@ -17,10 +17,10 @@ pub const PROTOCOLS: &[&str] = &["responses", "chat", "anthropic"];
 const MAX_URL: usize = 2048;
 const MAX_MODEL: usize = 200;
 const MAX_KEY: usize = 2048;
-/// The context limit is chosen with a slider (`chat/format.ts` has the same range); the default is the smallest.
-pub const MIN_CONTEXT_TOKENS: usize = 256_000;
+/// The context limit is chosen with a slider (`chat/format.ts` has the same range).
+pub const MIN_CONTEXT_TOKENS: usize = 16_000;
 pub const MAX_CONTEXT_TOKENS: usize = 1_000_000;
-pub const DEFAULT_CONTEXT_TOKENS: usize = MIN_CONTEXT_TOKENS;
+pub const DEFAULT_CONTEXT_TOKENS: usize = 256_000;
 
 /// The built-in providers a fresh install starts with: id, display name, and the chat-completions
 /// address and default model. Each vendor also serves the Responses and Anthropic wire formats on
@@ -278,7 +278,7 @@ impl AiConfig {
     }
 
     fn normalize(&mut self) {
-        self.context_tokens = self.context_tokens.clamp(MIN_CONTEXT_TOKENS, MAX_CONTEXT_TOKENS);
+        self.context_tokens = if self.context_tokens == 0 { DEFAULT_CONTEXT_TOKENS } else { self.context_tokens.clamp(MIN_CONTEXT_TOKENS, MAX_CONTEXT_TOKENS) };
         if !PROTOCOLS.contains(&self.protocol.as_str()) {
             self.protocol = "responses".into();
         }
@@ -1320,10 +1320,9 @@ mod tests {
         let old: AiConfig = serde_json::from_str(r#"{"activeProvider":"deepseek","baseUrl":"https://a.example.com","model":"m"}"#).unwrap();
         assert_eq!(old.context_tokens, DEFAULT_CONTEXT_TOKENS, "a file written before the setting existed gets the default");
         assert_eq!(AiConfig::default().context_tokens, 256_000);
-        assert_eq!(DEFAULT_CONTEXT_TOKENS, MIN_CONTEXT_TOKENS, "the default is the smallest the slider allows");
 
-        // Sizes saved by an earlier build (48K and the like) are below the new floor and come up to it.
-        for (stored, expected) in [(0, DEFAULT_CONTEXT_TOKENS), (48_000, MIN_CONTEXT_TOKENS), (300_000, 300_000), (9_999_999, MAX_CONTEXT_TOKENS)] {
+        // Keep valid smaller windows from older builds; zero means use the default.
+        for (stored, expected) in [(0, DEFAULT_CONTEXT_TOKENS), (48_000, 48_000), (8_000, MIN_CONTEXT_TOKENS), (300_000, 300_000), (9_999_999, MAX_CONTEXT_TOKENS)] {
             let mut config = AiConfig { context_tokens: stored, ..AiConfig::default() };
             config.normalize();
             assert_eq!(config.context_tokens, expected, "stored {stored}");
@@ -1335,8 +1334,10 @@ mod tests {
         assert_eq!(clean_context_tokens(512_000), Ok(512_000));
         assert_eq!(clean_context_tokens(256_000), Ok(256_000));
         assert_eq!(clean_context_tokens(1_000_000), Ok(1_000_000));
-        for bad in [0, 255_999, 1_000_001, u32::MAX] {
-            assert!(clean_context_tokens(bad).unwrap_err().contains("256K 到 1M"), "{bad}");
+        assert_eq!(clean_context_tokens(16_000), Ok(16_000));
+        assert_eq!(clean_context_tokens(128_000), Ok(128_000));
+        for bad in [0, 15_999, 1_000_001, u32::MAX] {
+            assert!(clean_context_tokens(bad).unwrap_err().contains("16K 到 1M"), "{bad}");
         }
     }
 }

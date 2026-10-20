@@ -192,11 +192,14 @@ describe('talking', () => {
     expect(q('chat-send')).not.toBeNull();
   });
 
-  it('shows what the assistant did as cards that open to the details', async () => {
+  it('keeps live tool activity compact and opens the command/result history on request', async () => {
     const h = await open(startChat);
     await type('看看文件');
     await click('chat-send');
     await h.events('s1', { type: 'tool_start', id: 't1', name: 'shell', arguments: '{"command":"ls -la"}' });
+    expect(q('activity-live')!.textContent).toContain('ls -la');
+    expect(q('activity-history')).toBeNull();
+    await click('activity-toggle');
     const card = () => q<HTMLDetailsElement>('tool-t1')!;
     expect(card().querySelector('summary')!.textContent).toContain('运行命令');
     expect(card().querySelector('summary')!.textContent).toContain('ls -la');
@@ -206,6 +209,28 @@ describe('talking', () => {
     expect(card().querySelectorAll('pre')[1].textContent).toBe('a.txt\nb.txt');
     await h.events('s1', { type: 'tool_start', id: 't2', name: 'shell', arguments: '{"command":"boom"}' }, { type: 'tool_end', id: 't2', output: '命令失败', is_error: true });
     expect(q('tool-t2')!.classList.contains('error')).toBe(true);
+  });
+
+  it('places a turn’s tool history below its final reply and folds it when finished', async () => {
+    const h = await open(startChat);
+    await type('读取浏览器');
+    await click('chat-send');
+    await h.events('s1', { type: 'text_delta', text: '我先读取页面。' });
+    for (let n = 0; n < 12; n++) {
+      await h.events('s1', { type: 'tool_start', id: `t${n}`, name: 'get_app_state', arguments: '{}' }, { type: 'tool_end', id: `t${n}`, output: '窗口状态', is_error: false });
+    }
+    expect(all('[data-testid="chat-activity"]')).toHaveLength(1);
+    expect(all('[data-testid^="tool-"]')).toHaveLength(1);
+    expect(q('activity-toggle')!.textContent).toContain('12 步');
+    await h.events('s1', { type: 'text_delta', text: '页面读取完成。' }, { type: 'done' });
+    expect(q('activity-live')).toBeNull();
+    expect(q('activity-history')).toBeNull();
+    expect(q('activity-toggle')!.getAttribute('aria-expanded')).toBe('false');
+    const messages = all('[data-testid="msg-assistant"]');
+    expect(messages.at(-1)!.textContent).toContain('页面读取完成');
+    expect(messages.at(-1)!.compareDocumentPosition(q('chat-activity')!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    await click('activity-toggle');
+    expect(all('[data-testid^="tool-"]')).toHaveLength(12);
   });
 
   it('offers to continue a cut-off answer', async () => {
@@ -835,7 +860,7 @@ describe('the context ring in the composer', () => {
   const info = (used: number, canCompact = true) => ({ used, limit: 256_000, canCompact });
   const say = (value: string) => [{ type: 'text' as const, text: value }];
   const history: WireMessage[] = [{ role: 'user', parts: say('早') }, { role: 'assistant', parts: say('早上好') }];
-  const summarized: WireMessage[] = [...history, { role: 'user', parts: say('[[xiaoban-summary keep_from=2]]\n摘要正文') }];
+  const summarized: WireMessage[] = [...history, { role: 'user', synthetic: true, context_summary: { keep_from: 2, text: '摘要正文' } }];
   const listed = { chat_overview: () => overview({ sessions: [summary('s1', '整理文件')] }), chat_load_session: () => history };
 
   it('shows the ring next to the send button, with the numbers from the host in its popover', async () => {

@@ -63,6 +63,7 @@ pub trait Desktop: Send + Sync {
     fn request_permissions(&self) -> Result<Value, String>;
     fn computer_use_diagnose(&self) -> Result<Value, String> { Err("当前宿主不支持电脑控制诊断".into()) }
     fn computer_use_runtime_root(&self) -> Result<std::path::PathBuf, String> { Err("当前宿主不支持电脑控制资源".into()) }
+    fn computer_use_repair_permissions(&self, _permission: &str) -> Result<Value, String> { Err("当前宿主不支持电脑控制权限修复".into()) }
     /// Saves one of the user's own works as a `.zip` resource pack through the save dialog. `None` when they cancel; otherwise the file path and its size.
     fn export_pack(&self, kind: &str, id: &str) -> Result<Option<(String, u64)>, String>;
     /// Opens an https address in the system browser.
@@ -103,6 +104,7 @@ impl Desktop for TauriDesktop {
     }
     fn computer_use_diagnose(&self) -> Result<Value, String> { crate::computer_permissions::diagnose(&self.app) }
     fn computer_use_runtime_root(&self) -> Result<std::path::PathBuf, String> { crate::computer_permissions::runtime_root(&self.app) }
+    fn computer_use_repair_permissions(&self, permission: &str) -> Result<Value, String> { crate::computer_permissions::repair(&self.app, permission) }
     fn status(&self) -> Result<Value, String> {
         let s = crate::settings(&self.app);
         Ok(json!({
@@ -1170,8 +1172,19 @@ pub fn tools(desktop: Arc<dyn Desktop>) -> Vec<Arc<dyn Tool>> {
         tool(
             &desktop,
             ToolSpec::new(
+                "computer_use_repair_permissions",
+                "修复 macOS 内置引擎旧授权记录。先诊断；仅在确认旧签名冲突或用户明确要求定向修复时调用。逐次用户确认后，用 tccutil 只重置 com.ifuryst.opencomputeruse 的所选权限，再打开当前引擎与授权引导。同标识独立安装版的该权限也会被清除，需重新授权。不会授予权限、不重置其他应用或其他权限。参数校验失败应修正原调用，不能使用此修复。",
+                object(json!({"permission": {"type": "string", "enum": ["accessibility", "screenRecording"], "description": "只选择诊断失败的权限；保留其他有效授权"}}), &["permission"]),
+            ).risk(Risk::Write).always_ask().serial().timeout(std::time::Duration::from_secs(60)),
+            |d: &dyn Desktop, args: &Value| -> Result<String, String> {
+                Ok(d.computer_use_repair_permissions(text_arg(args, "permission")?)?.to_string())
+            },
+        ),
+        tool(
+            &desktop,
+            ToolSpec::new(
                 "computer_use_diagnose",
-                "检查电脑控制开关、内置引擎路径、真实无障碍/屏幕录制权限及签名是否稳定。只读，不截图、不打开弹窗、不修改 TCC。首次电脑控制、权限错误或开关已开仍不能操作时使用；MCP 连接成功不代表权限可用。",
+                "检查电脑控制开关、真实权限、稳定签名和本引擎近期 TCC 日志中的旧签名冲突。只读，不截图、不打开弹窗、不修改 TCC。参数校验失败应修正原调用，不等于权限错误。MCP 连接成功不代表权限可用。",
                 none(),
             ).risk(Risk::Read).serial().timeout(std::time::Duration::from_secs(25)),
             |d: &dyn Desktop, _: &Value| -> Result<String, String> { Ok(d.computer_use_diagnose()?.to_string()) },

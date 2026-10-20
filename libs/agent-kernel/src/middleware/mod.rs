@@ -10,7 +10,7 @@ mod permission;
 mod repeat;
 mod spill;
 
-pub use context::{estimate_tokens, ContextTrim};
+pub use context::{estimate_tokens, estimate_tool_tokens, ContextTrim};
 pub use continuation::ContinueGuard;
 pub use permission::{Approval, ApprovalRequest, Approver, Permission, PermissionMode};
 pub use repeat::RepeatGuard;

@@ -47,8 +47,7 @@ impl ModelProvider for OpenAiCompat {
         on_text: &mut dyn FnMut(&str),
         cancel: &AtomicBool,
     ) -> Result<Reply, HarnessError> {
-        let body = serde_json::to_vec(&build_request_body(&self.profile, request))
-            .map_err(|e| HarnessError::provider(format!("encode request: {e}"), false))?;
+        let body = super::budget::encode(&self.profile, request, build_request_body)?;
         let mut headers = vec![
             ("Content-Type".to_string(), "application/json".to_string()),
             ("Accept".to_string(), "text/event-stream".to_string()),
