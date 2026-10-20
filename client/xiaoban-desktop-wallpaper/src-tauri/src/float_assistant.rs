@@ -702,9 +702,11 @@ pub async fn assistant_screenshot(window: WebviewWindow) -> Result<Option<String
             }).await.map_err(|e| e.to_string())??;
         }
         window.hide().map_err(|e| e.to_string())?;
-        tauri::async_runtime::spawn_blocking(|| {
+        let capture_app = app.clone();
+        tauri::async_runtime::spawn_blocking(move || {
             std::thread::sleep(Duration::from_millis(180));
-            crate::assistant_capture::capture()
+            let frames = crate::assistant_capture::capture(&capture_app)?;
+            crate::capture_editor::edit(&capture_app, frames)
         }).await.map_err(|e| format!("截图失败：{e}")).and_then(|result| result)
     }.await;
     // No assistant-open event: that would reset the draft and turn the microphone back on.

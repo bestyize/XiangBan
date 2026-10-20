@@ -15,13 +15,12 @@ async function init() {
     await mountControl();
     return;
   }
-  await import("./style.css");
-  if (mode === "pet-instance") {
-    const { createApp } = await import("vue");
-    const { default: PetWindow } = await import("./pets/PetWindow.vue");
-    createApp(PetWindow).mount("#app");
+  if (mode === "capture") {
+    const { mountCapture } = await import("./capture/mount.ts");
+    await mountCapture();
     return;
   }
+  await import("./style.css");
   if (mode === "widget-settings") {
     const { mountWidgetSettings } = await import("./widgets/menu-mount.ts");
     await mountWidgetSettings();
