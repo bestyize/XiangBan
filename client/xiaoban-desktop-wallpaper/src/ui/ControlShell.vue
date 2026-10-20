@@ -3,7 +3,7 @@ import { computed, defineAsyncComponent, onMounted, onBeforeUnmount, ref, watch 
 import { NAlert, NButton, NModal, NSkeleton, useMessage } from 'naive-ui';
 import { MessageCircle, AudioLines, Images, Sparkles, Hand, Bot, Gamepad2, Bell, Settings2, PanelLeftClose, PanelLeftOpen, ArrowUpRight, Globe, LogOut } from 'lucide-vue-next';
 import { invoke, listen } from '../bridge.ts';
-import Orb from '../assistant/Orb.vue';
+import AssistantLauncher from './components/AssistantLauncher.vue';
 import { appearanceMode, publishAppearanceTo, reconcile } from './appearance.ts';
 import { createControlStore } from './control-store.ts';
 import type { ControlPage } from './control-types.ts';
@@ -177,9 +177,9 @@ onBeforeUnmount(() => { assistantListeners.splice(0).forEach(off => off()); stor
         <div v-if="!store.ready" class="workspace-loading"><NSkeleton height="36px" width="220px" /><NSkeleton height="18px" width="320px" /><NSkeleton height="380px" :sharp="false" /></div>
         <template v-else-if="!store.initialError"><KeepAlive><WallpaperPage v-if="store.page === 'wallpapers'" :store="store" /></KeepAlive><KeepAlive :max="4"><ChatPage v-if="store.page === 'chat'" :store="store" /><WidgetsPage v-else-if="store.page === 'widgets'" :store="store" :settings-request="widgetSettingsRequest" @settings-opened="widgetSettingsRequest = null" /><InteractivePage v-else-if="store.page === 'interactive'" :store="store" /><EffectsPage v-else-if="store.page === 'effects'" :store="store" /><CompanionPage v-else-if="store.page === 'companion'" :store="store" :settings-request="petSettingsRequest" @settings-opened="petSettingsRequest=null" /><GamesPage v-else-if="store.page === 'games'" :store="store" /><CarePage v-else-if="store.page === 'care'" :store="store" /><SettingsPage v-else-if="store.page === 'settings'" :store="store" /></KeepAlive></template>
       </main>
-      <button type="button" class="assistant-launcher" data-testid="open-assistant" aria-label="打开超级小伴对话框" title="超级小伴" :disabled="!store.desktop || openingAssistant" :aria-busy="openingAssistant" @click="openAssistant"><Orb phase="idle" :size="54" flowing /><span class="assistant-launcher-label">超级小伴</span></button>
       <footer class="control-statusbar"><span><span class="state-dot small"></span>{{ store.desktop ? (store.info.platform === 'windows' ? 'Windows 桌面已连接' : '桌面已连接') : '正在预览界面，桌面操作需在应用内使用' }}</span><span>{{ store.library.items.filter(item => item.installed).length }} 个本地壁纸</span></footer>
     </div>
+    <AssistantLauncher :disabled="!store.desktop" :busy="openingAssistant" :near-composer="store.page === 'chat'" @open="openAssistant" />
     <NModal v-model:show="accountOpen" preset="card" title="账号信息" style="width: 92vw; max-width: 380px;" data-testid="account-info-dialog">
       <div v-if="store.account" class="account-info">
         <div class="account-info-identity">

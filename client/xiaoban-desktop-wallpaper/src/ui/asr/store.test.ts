@@ -95,9 +95,11 @@ describe('local ASR lifecycle', () => {
     h.store.deactivate(); h.store.activate(after); await flushPromises(); pending.resolve('旧会话的话'); await flushPromises();
     expect(before).not.toHaveBeenCalled(); expect(after).not.toHaveBeenCalled(); h.store.dispose();
   });
-  it('surfaces microphone permission errors and permits retry', async () => {
+  it('keeps microphone permission diagnostics out of notifications and permits retry', async () => {
     const h = setup({ enabled: true, deny: true }); h.store.activate(vi.fn()); await flushPromises();
-    expect(h.store.listening).toBe(false); expect(h.store.recordingRequested).toBe(false); expect(h.store.error).toContain('麦克风');
+    expect(h.store.listening).toBe(false); expect(h.store.recordingRequested).toBe(false); expect(h.store.microphoneError).toContain('麦克风');
+    expect(h.notify).not.toHaveBeenCalledWith(expect.stringContaining('麦克风'), 'error');
+    expect(h.invoke).toHaveBeenCalledWith('asr_report_microphone', { error: '请允许麦克风' });
     await h.store.retry(); expect(h.capture).toHaveBeenCalledTimes(2); h.store.dispose();
   });
   it('reports a model download failure without opening the microphone', async () => {
@@ -119,6 +121,17 @@ describe('local ASR lifecycle', () => {
 
 
 describe('cross-window ASR settings',()=>{
+  it('receives microphone diagnostics from the assistant and clears them after successful capture', async () => {
+    const h = setup({ enabled: true, modelReady: true });
+    await h.store.init();
+    h.hostState({ enabled: true, modelReady: true, engineReady: true, microphoneError: '找不到可用麦克风' });
+    expect(h.store.microphoneError).toBe('找不到可用麦克风');
+    expect(h.notify).not.toHaveBeenCalled();
+    await h.store.activate(vi.fn());
+    expect(h.store.microphoneError).toBe('');
+    expect(h.invoke).toHaveBeenCalledWith('asr_report_microphone', { error: '' });
+    h.store.dispose();
+  });
   it('releases recording and ignores in-flight recognition when another window disables voice',async()=>{
     const pending=deferred<string>();const h=setup({enabled:true,transcribe:()=>pending.promise});const text=vi.fn();
     await h.store.activate(text);h.phrase();await flushPromises();expect(h.store.recognizing).toBe(true);

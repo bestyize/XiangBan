@@ -155,6 +155,7 @@ export function createAssistantStore(deps: AssistantDeps): AssistantStore {
     const version=draftVersion;
     await asr.init();
     if(version!==draftVersion)return false;
+    if (asr.microphoneSupported === false) return false;
     if (!asr.enabled) { store.note('语音对话还没开启。在超级小伴设置里打开后，就能直接说话。', 'assistant'); return false; }
     if (!(await asr.prepare())) { store.note(asr.error || '语音识别还没准备好，请稍后再试。'); return false; }
     if (!store.open || version!==draftVersion) return false;
@@ -190,7 +191,7 @@ export function createAssistantStore(deps: AssistantDeps): AssistantStore {
     open: false, ball: false, prefs: { open: 'voice', read: 'voice' }, input: '', attachments: [], hint: '', hintTab: '',
     get configured() { return chat.configured; },
     get changingSession() { return flags.changingSession; },
-    get voiceAvailable() { return asr.enabled; },
+    get voiceAvailable() { return asr.enabled && asr.microphoneSupported !== false; },
     get question() { return turn().question; },
     get questionImages() { return turn().questionImages; },
     prepareImages() {
@@ -217,7 +218,7 @@ export function createAssistantStore(deps: AssistantDeps): AssistantStore {
         case 'answering': return store.working || '正在回答…';
         case 'speaking': return '正在朗读，可随时停止';
         case 'listening': return asr.preparing ? '正在准备语音识别…' : asr.recognizing ? '正在识别…' : '我在听，请说…';
-        default: return asr.enabled ? '问点什么，或直接说话' : '问点什么';
+        default: return store.voiceAvailable ? '问点什么，或直接说话' : '问点什么';
       }
     },
     init() {

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, h, nextTick, onMounted, onUnmounted, ref, watch, type Component, type HTMLAttributes } from 'vue';
 import { NButton, NDropdown, NInput, type DropdownOption } from 'naive-ui';
-import { ArrowDown, AudioLines, Check, ChevronDown, ChevronRight, Ellipsis, Folder, FolderInput, FolderPlus, ImagePlus, LoaderCircle, MessageSquarePlus, Mic, Pencil, SendHorizontal, Settings, Volume2, Shield, ShieldAlert, Sparkles, Square, Trash2, X, Zap } from 'lucide-vue-next';
+import { ArrowDown, AudioLines, Check, ChevronDown, ChevronRight, Ellipsis, Folder, FolderInput, FolderPlus, Paperclip, LoaderCircle, MessageSquarePlus, Mic, Pencil, SendHorizontal, Settings, Volume2, Shield, ShieldAlert, Sparkles, Square, Trash2, X, Zap } from 'lucide-vue-next';
 import { invoke } from '../../bridge.ts';
 import type { ControlStore } from '../control-types.ts';
 import ModelSwitchDialog from '../components/ModelSwitchDialog.vue';
@@ -352,7 +352,7 @@ async function openLink(href: string) {
         </template>
         <li v-if="chat.ready && !chat.sessions.length" class="empty-list">还没有对话</li>
       </ul>
-      <button type="button" class="side-assistant" data-testid="chat-open-assistant" @click="store.navigate('assistant')"><AudioLines :size="15" /><span>超级小伴</span><small>随时呼出，直接对话</small></button>
+      <button type="button" class="side-assistant" data-testid="chat-open-assistant" @click="store.navigate('assistant')"><AudioLines :size="15" /><span>彩虹球</span><small>随时呼出，直接对话</small></button>
     </aside>
 
     <div class="chat-main">
@@ -498,10 +498,10 @@ async function openLink(href: string) {
           </div>
           <div class="composer-row">
             <input ref="filePicker" type="file" :accept="ATTACHMENT_ACCEPT" multiple hidden data-testid="chat-image-input" @change="onPick" />
-            <NButton quaternary circle size="small" data-testid="chat-pick-image" aria-label="添加附件" :disabled="!store.desktop || !chat.configured || running || attachmentReading || attachments.length >= MAX_IMAGES" @click="openPicker"><template #icon><ImagePlus :size="16" /></template></NButton>
+            <NButton quaternary circle size="small" data-testid="chat-pick-image" title="添加附件" aria-label="添加附件" :disabled="!store.desktop || !chat.configured || running || attachmentReading || attachments.length >= MAX_IMAGES" @click="openPicker"><template #icon><Paperclip :size="16" /></template></NButton>
             <button v-if="finishingVoice" type="button" class="voice-finish" data-testid="chat-asr-toggle" aria-label="正在转写并发送" aria-pressed="false" disabled><LoaderCircle class="spin" :size="13" aria-hidden="true" />正在发送</button>
             <button v-else-if="asr?.recordingRequested" type="button" class="voice-finish" data-testid="chat-asr-toggle" :aria-label="asr.listening ? '结束录音并发送' : '取消准备'" aria-pressed="true" @click="toggleVoice"><span v-if="asr.listening" class="recording-dot" aria-hidden="true" /><LoaderCircle v-else class="spin" :size="13" aria-hidden="true" />{{ asr.listening ? '结束并发送' : '取消准备' }}</button>
-            <NButton v-else-if="asr" quaternary circle size="small" data-testid="chat-asr-toggle" aria-label="开始语音输入" aria-pressed="false" :title="asr.error ? `${asr.error}（点击重试）` : '开始语音输入'" :disabled="!store.desktop || !asr.ready || !microphoneAllowed || asr.saving" @click="toggleVoice"><template #icon><Mic :size="16" /></template></NButton>
+            <NButton v-else-if="asr" quaternary circle size="small" data-testid="chat-asr-toggle" aria-label="开始语音输入" aria-pressed="false" title="开始语音输入" :disabled="!store.desktop || !asr.ready || asr.microphoneSupported === false || !microphoneAllowed || asr.saving" @click="toggleVoice"><template #icon><Mic :size="16" /></template></NButton>
             <NInput v-model:value="draft" type="textarea" :autosize="{ minRows: 1, maxRows: 8 }" :disabled="!store.desktop || !chat.configured" :placeholder="chat.configured ? '问点什么，或交给小伴去办就行' : '先到设置里配置模型'" data-testid="chat-input" @keydown="onKeydown" />
             <ChatContextRing v-if="store.desktop" :used="chat.context.used" :limit="chat.context.limit" :can-compact="chat.context.canCompact" :compacting="compacting" :busy="running" :disabled="!chat.currentId" @compact="chat.compact()" @resize="chat.setContextSize($event)" />
             <NButton v-if="running" type="error" circle data-testid="chat-stop" aria-label="停止" @click="chat.cancel()"><template #icon><Square :size="14" /></template></NButton>

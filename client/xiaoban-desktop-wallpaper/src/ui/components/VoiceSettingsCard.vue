@@ -3,9 +3,11 @@ import { computed, onMounted } from 'vue';
 import { NAlert, NButton, NSelect, NSlider, NSwitch } from 'naive-ui';
 import type { ControlStore } from '../control-types.ts';
 import AsrStatus from './AsrStatus.vue';
+import { MICROPHONE_UNSUPPORTED } from '../asr/capture.ts';
 const props = defineProps<{ store: ControlStore }>();
 const speech = props.store.speech;
 const asr = props.store.asr;
+const microphoneHint = computed(() => asr.microphoneSupported === false ? MICROPHONE_UNSUPPORTED : asr.microphoneError);
 const disabled = computed(() => !props.store.desktop || !speech.ready);
 const options = computed(() => {
   const voices = speech.voices.some(v => v.shortName === speech.settings.voice) ? speech.voices
@@ -22,6 +24,7 @@ onMounted(() => { void speech.init(); void asr.init(); });
     <div class="setting-row"><div><b>语音识别</b><p>开启本地识别能力，录音需在聊天中手动点击麦克风。首次开启从魔搭下载约 229 MiB 模型，关闭后保留。</p></div>
       <NSwitch :value="asr.enabled" :disabled="!store.desktop || !asr.ready || asr.saving" :loading="asr.saving" data-testid="asr-settings-switch" @update:value="value => asr.setEnabled(value)" />
     </div>
+    <NAlert v-if="store.desktop && microphoneHint" type="warning" :show-icon="false" data-testid="microphone-status">{{ microphoneHint }} 请在系统声音设置中检查输入设备；连接或切换麦克风后可回到聊天重试。</NAlert>
     <AsrStatus :asr="asr" />
     <div class="setting-row"><div><b>自动朗读回复</b><p>开启后，当前聊天的完整回复文本会发送给 Edge 在线合成；切换会话或发送新消息会停止朗读。</p></div>
       <NSwitch :value="speech.settings.autoRead" :disabled="disabled" :loading="speech.saving" @update:value="value => speech.save({ autoRead: value })" />

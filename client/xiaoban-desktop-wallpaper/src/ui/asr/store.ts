@@ -1,8 +1,8 @@
 import { reactive } from 'vue';
 import { UtteranceSegmenter } from './audio.ts';
-import { captureMicrophone, type Capture } from './capture.ts';
+import { captureMicrophone, MICROPHONE_UNSUPPORTED, supportsMicrophone, type Capture } from './capture.ts';
 
-interface HostStatus { enabled: boolean; modelReady: boolean; engineReady: boolean; warming?: boolean }
+interface HostStatus { enabled: boolean; modelReady: boolean; engineReady: boolean; warming?: boolean; microphoneError?: string }
 interface Progress { requestId: string; phase: 'downloading' | 'loading'; file: string; downloaded: number; total: number }
 export interface AsrDeps {
   desktop: boolean;
@@ -12,6 +12,9 @@ export interface AsrDeps {
   capture?: typeof captureMicrophone;
 }
 export interface AsrStore extends HostStatus {
+  microphoneSupported: boolean;
+  /** Device diagnostics appear only in sound settings, shared across native windows. */
+  microphoneError: string;
   ready: boolean; saving: boolean; preparing: boolean; listening: boolean; recognizing: boolean;
   /** Loudness of the microphone, 0..1, refreshed about fifteen times a second while listening. */
   level: number;
@@ -32,6 +35,7 @@ function loudness(frame: Float32Array): number {
 }
 const message = (error: unknown) => error instanceof Error ? error.message : String(error);
 export function createAsrStore(deps: AsrDeps): AsrStore {
+  const microphoneSupported = Boolean(deps.capture) || supportsMicrophone();
   let initialization: Promise<void> | undefined;
   let preparing: Promise<boolean> | undefined;
   let prepareGeneration = -1;
@@ -48,6 +52,11 @@ export function createAsrStore(deps: AsrDeps): AsrStore {
     store.recordingRequested = false; store.listening = false; store.recognizing = false; store.level = 0;
   }
   function fail(error: unknown) { stopCapture(); store.error = message(error); deps.notify(store.error, 'error'); }
+  function reportMicrophone(error: string) {
+    store.microphoneError = error;
+    void deps.invoke('asr_report_microphone', { error }).catch(() => {});
+  }
+  function captureFailed(error: unknown) { stopCapture(); reportMicrophone(message(error)); }
   async function drain(ticket: number): Promise<void> {
     if (draining) {
       await draining;
@@ -88,13 +97,14 @@ export function createAsrStore(deps: AsrDeps): AsrStore {
         if (!audio) return;
         if (queue.length >= 5) { fail('语音处理暂时跟不上，请稍后点击重试'); return; }
         queue.push(audio); void drain(ticket);
-      }, error => { if (ticket === recording && !disposed) fail(error); });
+      }, error => { if (ticket === recording && !disposed) captureFailed(error); });
       if (ticket !== recording || disposed || !receiver || !store.enabled || !store.recordingRequested) { microphone.stop(); return; }
-      capture = microphone; store.listening = true; store.error = '';
-    } catch (e) { if (ticket === recording && !disposed) fail(e); }
+      capture = microphone; store.listening = true; store.error = ''; reportMicrophone('');
+    } catch (e) { if (ticket === recording && !disposed) captureFailed(e); }
     finally { if (starting === ticket) starting = undefined; }
   }
   const store: AsrStore = reactive({
+    microphoneSupported, microphoneError: '',
     ready: false, enabled: false, modelReady: false, engineReady: false, saving: false, preparing: false, recordingRequested: false,
     listening: false, recognizing: false, level: 0, warming: false, phase: 'idle', downloaded: 0, total: 239549735, error: '',
     init() {
@@ -172,6 +182,7 @@ export function createAsrStore(deps: AsrDeps): AsrStore {
     },
     async activate(onText) {
       if (!deps.desktop || disposed) return;
+      if (!store.microphoneSupported) { reportMicrophone(MICROPHONE_UNSUPPORTED); return; }
       store.deactivate(); store.error = ''; receiver = onText; store.recordingRequested = true;
       const ticket = recording;
       await store.init();

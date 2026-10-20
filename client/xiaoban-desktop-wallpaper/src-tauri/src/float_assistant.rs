@@ -107,7 +107,7 @@ const SHARED_COMMANDS: &[&str] = &[
     "chat_overview", "chat_load_session", "chat_new_session", "chat_send", "chat_cancel", "chat_context",
     "chat_answer_approval", "chat_answer_question",
     "tts_get_settings", "tts_synthesize", "tts_cancel",
-    "asr_get_status", "asr_prepare", "asr_transcribe",
+    "asr_get_status", "asr_prepare", "asr_transcribe", "asr_report_microphone",
     "open_download_url",
 ];
 

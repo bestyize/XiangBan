@@ -1,6 +1,10 @@
 import { PcmResampler } from './audio.ts';
 import pcmWorkletUrl from './pcm-worklet.js?url&no-inline';
 export interface Capture { stop(): void }
+export const MICROPHONE_UNSUPPORTED = '当前设备或运行环境不支持麦克风，语音输入不可用。';
+export function supportsMicrophone(): boolean {
+  return typeof navigator !== 'undefined' && typeof navigator.mediaDevices?.getUserMedia === 'function';
+}
 function mediaError(error: unknown): { name: string; message: string } {
   if (error && typeof error === 'object') {
     const value = error as { name?: unknown; message?: unknown };
@@ -30,7 +34,7 @@ async function openMicrophone(): Promise<MediaStream> {
   }
 }
 export async function captureMicrophone(onFrame: (frame: Float32Array) => void, onError: (error: string) => void): Promise<Capture> {
-  if (!navigator.mediaDevices?.getUserMedia) throw new Error('当前运行环境无法使用麦克风，请在桌面应用中开启语音');
+  if (!supportsMicrophone()) throw new Error(MICROPHONE_UNSUPPORTED);
   let stream: MediaStream | undefined;
   let context: AudioContext | undefined;
   let source: MediaStreamAudioSourceNode | undefined;

@@ -8,16 +8,8 @@ body.desktop-control{background:var(--ui-app-bg);color:var(--ui-text-primary);ov
 .desktop-control button:disabled{cursor:not-allowed;opacity:.5}
 
 /* Shell */
-.control-app{height:100dvh;display:grid;grid-template-columns:var(--ui-sidebar-width) minmax(0,1fr);overflow:hidden}
+.control-app{position:relative;height:100dvh;display:grid;grid-template-columns:var(--ui-sidebar-width) minmax(0,1fr);overflow:hidden}
 .control-main{position:relative;display:flex;flex-direction:column;min-width:0;min-height:0}
-.assistant-launcher{position:absolute;right:24px;bottom:48px;z-index:30;display:grid;place-items:center;width:54px;height:54px;padding:0;border:0;border-radius:50%;background:transparent;cursor:pointer;transition:transform .15s}
-.assistant-launcher:hover:not(:disabled){transform:translateY(-2px)}
-.assistant-launcher:focus-visible{outline:3px solid var(--ui-primary-soft);outline-offset:4px}
-.assistant-launcher:disabled{opacity:.5;cursor:default}
-.assistant-launcher>.assistant-launcher-label{position:absolute;right:calc(100% + 10px);padding:6px 10px;border:1px solid var(--ui-border);border-radius:8px;background:var(--ui-surface);color:var(--ui-text-primary);font-size:12px;white-space:nowrap;opacity:0;pointer-events:none;transition:opacity .15s}
-.assistant-launcher:hover>.assistant-launcher-label,.assistant-launcher:focus-visible>.assistant-launcher-label{opacity:1}
-.control-main.has-chat .assistant-launcher{bottom:188px}
-@media(prefers-reduced-motion:reduce){.assistant-launcher,.assistant-launcher>.assistant-launcher-label{transition:none}}
 .control-workspace{flex:1;min-height:0;overflow:auto;padding:var(--ui-page-top) var(--ui-page-inset) 32px;scrollbar-width:thin;scrollbar-color:var(--ui-scrollbar) transparent;overscroll-behavior:none;scroll-behavior:auto}
 .desktop-control{overscroll-behavior:none}
 .control-workspace.wallpaper-workspace,.control-workspace.chat-workspace{padding:0;overflow:hidden;display:flex;flex-direction:column}

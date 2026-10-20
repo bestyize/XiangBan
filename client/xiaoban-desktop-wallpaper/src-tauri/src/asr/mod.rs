@@ -5,6 +5,7 @@ use tauri::{Emitter, Manager};
 
 #[derive(Default)]
 pub struct AsrState {
+    microphone_error: Mutex<String>,
     settings_io: Mutex<()>,
     prepare: Mutex<()>,
     generation: AtomicU64,
@@ -20,7 +21,7 @@ pub struct AsrState {
 struct Settings { enabled: bool }
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct Status { enabled: bool, model_ready: bool, engine_ready: bool, warming: bool }
+pub struct Status { enabled: bool, model_ready: bool, engine_ready: bool, warming: bool, microphone_error: String }
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct Progress<'a> { request_id: &'a str, phase: &'a str, file: &'a str, downloaded: u64, total: u64 }
@@ -39,7 +40,15 @@ fn check(app: &tauri::AppHandle, generation: u64) -> Result<(), String> {
 pub fn asr_get_status(app: tauri::AppHandle) -> Result<Status, String> {
     let state = app.state::<AsrState>();
     let _io = state.settings_io.lock().unwrap();
-    Ok(Status { enabled: settings(&app)?.enabled, model_ready: engine::present(&crate::storage::root(&app)?.join("asr")), engine_ready: state.engine_ready.load(Ordering::SeqCst), warming: state.warming.load(Ordering::SeqCst) })
+    let microphone_error = state.microphone_error.lock().unwrap().clone();
+    Ok(Status { enabled: settings(&app)?.enabled, model_ready: engine::present(&crate::storage::root(&app)?.join("asr")), engine_ready: state.engine_ready.load(Ordering::SeqCst), warming: state.warming.load(Ordering::SeqCst), microphone_error })
+}
+#[tauri::command]
+pub fn asr_report_microphone(app: tauri::AppHandle, error: String) -> Result<(), String> {
+    if error.len() > 4096 { return Err("麦克风状态过长".into()); }
+    *app.state::<AsrState>().microphone_error.lock().unwrap() = error;
+    announce(&app);
+    Ok(())
 }
 /// Tells every window what the speech engine is up to, so a page does not have to ask again.
 fn announce(app: &tauri::AppHandle) {

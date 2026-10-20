@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { afterEach, expect, it, vi } from 'vitest';
-import { captureMicrophone } from './capture.ts';
+import { captureMicrophone, supportsMicrophone } from './capture.ts';
 
 function setup(supported?: MediaTrackSupportedConstraints) {
   const track = { stop: vi.fn(), onended: null };
@@ -17,6 +17,12 @@ function setup(supported?: MediaTrackSupportedConstraints) {
   return { getUserMedia, stream, track, source, context, node };
 }
 afterEach(() => vi.unstubAllGlobals());
+
+it('detects an unsupported microphone environment without requesting permission', async () => {
+  vi.stubGlobal('navigator', {});
+  expect(supportsMicrophone()).toBe(false);
+  await expect(captureMicrophone(vi.fn(), vi.fn())).rejects.toThrow('不支持麦克风');
+});
 
 it('requests only supported processing options and lets the device choose its channel count', async () => {
   const h = setup({ echoCancellation: true, noiseSuppression: false });

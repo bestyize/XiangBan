@@ -21,6 +21,11 @@ async function init() {
     return;
   }
   await import("./style.css");
+  if (mode === "pet-instance") {
+    const { mountPet } = await import("./pets/mount.ts");
+    mountPet();
+    return;
+  }
   if (mode === "widget-settings") {
     const { mountWidgetSettings } = await import("./widgets/menu-mount.ts");
     await mountWidgetSettings();

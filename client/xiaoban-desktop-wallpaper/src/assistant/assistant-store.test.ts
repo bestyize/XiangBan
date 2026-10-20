@@ -31,7 +31,7 @@ function setup(options: { configured?: boolean; voice?: boolean; prefs?: { open:
   });
   let heard: (text: string) => void = () => {};
   const asr = reactive({
-    enabled: options.voice ?? true, listening: false, recognizing: false, preparing: false, recordingRequested: false, level: 0, error: '',
+    enabled: options.voice ?? true, microphoneSupported: true, listening: false, recognizing: false, preparing: false, recordingRequested: false, level: 0, error: '',
     init: vi.fn(async () => {}), prepare: vi.fn(async () => true),
     activate: vi.fn(async (callback: (text: string) => void) => { asr.recordingRequested = true; asr.listening = true; heard = callback; }),
     deactivate: vi.fn(() => { asr.recordingRequested = false; asr.listening = false; }),
@@ -61,6 +61,18 @@ const finishAnswer = (chat: ReturnType<typeof setup>['chat'], text = '好的，�
 };
 
 describe('floating assistant', () => {
+  it('silently falls back to typing when microphone capture is unsupported', async () => {
+    const { store, asr } = setup();
+    asr.microphoneSupported = false;
+    await store.opened();
+    await store.toggleListening();
+    expect(store.hint).toBe('');
+    expect(store.voiceAvailable).toBe(false);
+    expect(store.status).toBe('问点什么');
+    expect(asr.prepare).not.toHaveBeenCalled();
+    expect(asr.activate).not.toHaveBeenCalled();
+    store.dispose();
+  });
   it('starts a new conversation when opened, and listens when voice is on', async () => {
     const { store, chat, asr } = setup();
     await store.opened();

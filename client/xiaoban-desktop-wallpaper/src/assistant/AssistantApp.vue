@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ATTACHMENT_ACCEPT, MAX_TOTAL_BYTES, attachmentBytes, attachmentImage, attachmentName, readAttachment } from '../ui/chat/attachments.ts';
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
-import { ArrowUp, Square, X, Copy, Check, ImagePlus, Settings, ChevronDown, ChevronRight, MessageSquare, MessageSquarePlus, ScanLine, Plus } from 'lucide-vue-next';
+import { ArrowUp, Square, X, Copy, Check, Paperclip, Settings, ChevronDown, ChevronRight, MessageSquare, MessageSquarePlus, Scissors, Plus } from 'lucide-vue-next';
 import MarkdownView from '../ui/chat/MarkdownView.ts';
 import SelectionCopyMenu from '../ui/chat/SelectionCopyMenu.vue';
 import type { AsrStore } from '../ui/asr/store.ts';
@@ -162,7 +162,7 @@ function openPicker() {
 }
 async function addImages(files: File[]) {
   if (!files.length || !props.store.open) return;
-  if (!canAttach.value) { props.store.note('请等待当前操作完成后再添加图片。'); return; }
+  if (!canAttach.value) { props.store.note('请等待当前操作完成后再添加附件。'); return; }
   props.store.prepareImages();
   const version = imageVersion;
   imageReading.value = true;
@@ -419,8 +419,8 @@ onBeforeUnmount(()=>{
               <button type="button" class="tool-button" title="收起小伴" aria-label="收起小伴" data-testid="assistant-close" @click="toolAction('hide')"><ChevronDown :size="16" :stroke-width="1.7" /></button>
               <button type="button" class="tool-button" title="新会话" aria-label="新会话" data-testid="assistant-new-chat" :disabled="imageReading || submitting || capturing || store.changingSession" @click="toolAction('new')"><MessageSquarePlus :size="16" :stroke-width="1.7" /></button>
               <button type="button" class="tool-button" title="去聊天详情页" aria-label="去聊天详情页" data-testid="assistant-expand" @click="toolAction('chat')"><MessageSquare :size="16" :stroke-width="1.7" /></button>
-              <button type="button" class="tool-button" title="添加附件" aria-label="添加附件" data-testid="assistant-add-image" :disabled="!canAttach || store.attachments.length >= 8" @click="toolAction('image')"><ImagePlus :size="16" :stroke-width="1.7" /></button>
-              <button type="button" class="tool-button" title="截图" aria-label="截图" data-testid="assistant-screenshot" :disabled="!canAttach || store.attachments.length >= 8" @click="toolAction('screenshot')"><ScanLine :size="16" :stroke-width="1.7" /></button>
+              <button type="button" class="tool-button" title="添加附件" aria-label="添加附件" data-testid="assistant-add-image" :disabled="!canAttach || store.attachments.length >= 8" @click="toolAction('image')"><Paperclip :size="16" :stroke-width="1.7" /></button>
+              <button type="button" class="tool-button" title="截图" aria-label="截图" data-testid="assistant-screenshot" :disabled="!canAttach || store.attachments.length >= 8" @click="toolAction('screenshot')"><Scissors :size="16" :stroke-width="1.7" /></button>
             </div>
             <button ref="primaryButton" type="button" class="round main-action" :class="{ 'has-action': canSend, 'is-stop': busy, 'tools-open': toolsOpen && !canSend && !busy }" :aria-label="busy ? '停止' : canSend ? '发送' : toolsOpen ? '收起工具' : '展开工具'" :title="busy ? '停止回复 · 悬停展开工具' : canSend ? '发送 · 悬停展开工具' : '展开工具'" :aria-expanded="toolsOpen" aria-controls="assistant-toolbar" aria-keyshortcuts="ArrowUp ArrowDown" :disabled="imageReading || capturing || (submitting && !busy)" data-testid="assistant-primary" @keydown="primaryKeys" @click="primary"><Square v-if="busy" :size="12" fill="currentColor" :stroke-width="0" /><ArrowUp v-else-if="canSend" :size="18" /><Plus v-else :size="18" /></button>
           </div>
