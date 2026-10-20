@@ -3,7 +3,7 @@ import { beforeEach,afterEach,it,expect,vi } from 'vitest';
 import { invoke } from '../bridge.ts';
 import { mountCapture } from './mount.ts';
 vi.mock('../bridge.ts',()=>({invoke:vi.fn()}));
-const ctx={clearRect:vi.fn(),setTransform:vi.fn(),save:vi.fn(),restore:vi.fn(),strokeRect:vi.fn(),beginPath:vi.fn(),moveTo:vi.fn(),lineTo:vi.fn(),stroke:vi.fn(),closePath:vi.fn(),fill:vi.fn(),fillText:vi.fn(),clip:vi.fn(),drawImage:vi.fn()};
+const ctx={clearRect:vi.fn(),setTransform:vi.fn(),save:vi.fn(),restore:vi.fn(),strokeRect:vi.fn(),beginPath:vi.fn(),moveTo:vi.fn(),lineTo:vi.fn(),stroke:vi.fn(),closePath:vi.fn(),fill:vi.fn(),fillText:vi.fn(),clip:vi.fn(),drawImage:vi.fn(),strokeStyle:''};
 const output='data:image/jpeg;base64,/9j/';
 const el=(id:string)=>document.getElementById(id)!;
 const tick=()=>new Promise(resolve=>setTimeout(resolve,0));
