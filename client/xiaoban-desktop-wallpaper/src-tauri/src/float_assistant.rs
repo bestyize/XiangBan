@@ -95,7 +95,7 @@ pub struct AssistantState {
 
 const WINDOW_COMMANDS: &[&str] = &[
     "assistant_ready", "assistant_hide", "assistant_fit", "assistant_drag", "assistant_unfold", "assistant_prefs",
-    "assistant_open_chat", "assistant_open_settings", "assistant_screenshot",
+    "assistant_open_chat", "assistant_open_settings", "assistant_screenshot", "assistant_set_regions",
 ];
 const CONTROL_COMMANDS: &[&str] = &["assistant_status", "assistant_configure", "assistant_try"];
 /// What the capsule may ask of the host besides its own window commands: ask and answer, speak, listen.
@@ -132,7 +132,13 @@ pub fn plugin() -> tauri::plugin::TauriPlugin<tauri::Wry> {
         .build()
 }
 
+pub(crate) fn pointer_active(app:&tauri::AppHandle)->bool {
+    let state=app.state::<AssistantState>();
+    mode(app)!=Mode::Hidden && !state.capturing.load(Ordering::SeqCst)
+}
+
 pub fn start(app: &tauri::AppHandle) {
+    crate::assistant_hit_test::start(app);
     let settings = crate::settings(app);
     if let Err(error) = apply(app, settings.assistant_enabled, &settings.assistant_shortcut) {
         eprintln!("超级小伴快捷键没有注册：{error}");
