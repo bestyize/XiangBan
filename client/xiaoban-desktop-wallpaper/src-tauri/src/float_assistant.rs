@@ -29,7 +29,9 @@ pub const READ_MODES: &[&str] = &["voice", "always", "never"];
 const WIDTH: f64 = 480.0;
 // Reserve toolbar headroom from the start; hover must never resize the native window.
 const MIN_HEIGHT: f64 = 156.0;
-const MAX_HEIGHT: f64 = 620.0;
+// The reply card keeps a fixed body height and scrolls, so the capsule only needs room for its
+// tallest state (answer card, question block, attachment tray) — no streaming growth beyond it.
+const MAX_HEIGHT: f64 = 480.0;
 /// Space kept between the capsule and the bottom of the usable screen (above the Dock or taskbar).
 const BOTTOM_GAP: f64 = 56.0;
 /// The ball's window, in logical pixels. The ball itself is drawn a little smaller inside it.

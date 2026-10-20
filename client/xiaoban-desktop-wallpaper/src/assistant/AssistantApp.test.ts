@@ -171,6 +171,12 @@ describe('compact horizontal assistant tools', () => {
     expect(wrapper.find('[role="toolbar"]').exists()).toBe(false); expect(store.hide).not.toHaveBeenCalled();
     await wrapper.get('.stage').trigger('keydown',{key:'Escape'}); expect(store.hide).toHaveBeenCalledOnce();
   });
+  it('gives a streamed answer a fixed body height so growth scrolls instead of resizing the window', async () => {
+    const {store,wrapper}=setup();await nextTick();
+    expect(wrapper.get('.card-body').classes()).toContain('answer-body');
+    store.answer='';await nextTick();
+    expect(wrapper.get('.card-body').classes()).not.toContain('answer-body');
+  });
   it('reserves toolbar space once and never resizes while the toolbar animates or closes', async () => {
     vi.useFakeTimers();
     const bounds=vi.spyOn(HTMLElement.prototype,'getBoundingClientRect').mockImplementation(function(this:HTMLElement){

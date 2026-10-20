@@ -362,7 +362,7 @@ onBeforeUnmount(()=>{
         <Transition name="rise" @after-enter="queueHitRegions" @after-leave="queueHitRegions">
           <section v-if="hasCard" class="card" data-testid="assistant-card">
             <button type="button" class="round card-close" title="暂时关闭对话框" aria-label="暂时关闭对话框" data-testid="assistant-card-close" @click="cardDismissed = true"><X :size="15" /></button>
-            <div ref="scroller" class="card-body">
+            <div ref="scroller" class="card-body" :class="{ 'answer-body': store.answer && !store.ask }">
               <p v-if="store.hint" class="hint" data-testid="assistant-hint">
                 {{ store.hint }}
                 <button v-if="store.hintTab" type="button" class="link" @click="store.openSettings(store.hintTab)">{{ store.hintTab === 'ai' ? '去配置' : '去设置' }}</button>
@@ -453,7 +453,11 @@ html,body,#app{background:transparent!important}
 .inner{pointer-events:none;display:flex;flex-direction:column;gap:12px;padding:12px}
 .card{pointer-events:auto;cursor:grab;position:relative;border-radius:18px;background:var(--card);border:1px solid var(--line);box-shadow:var(--panel-shadow);overflow:hidden}
 .card .card-close{position:absolute;z-index:1;top:8px;right:8px;width:28px;height:28px}
-.card-body{cursor:auto;max-height:390px;overflow-y:auto;padding:16px 44px 18px 20px;user-select:text;scrollbar-width:thin;scrollbar-color:var(--scroll) transparent}
+/* The answer box has a fixed height on purpose: a streamed answer grows inside it and scrolls,
+   so the card, the composer and the native window never resize while the text arrives. Other
+   card states (question, approval, hint) size to their content, which changes only in steps. */
+.card-body{cursor:auto;max-height:280px;overflow-y:auto;padding:16px 44px 18px 20px;user-select:text;scrollbar-width:thin;scrollbar-color:var(--scroll) transparent}
+.card-body.answer-body{height:192px;max-height:192px}
 .you{margin:0 0 8px;font-size:12.5px;color:var(--text-soft);display:-webkit-box;-webkit-line-clamp:2;line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .reply{font-size:15px;line-height:1.75;color:var(--text);overflow-wrap:anywhere}
 .reply :deep(p){margin:0 0 .7em}
