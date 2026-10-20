@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
-import { ArrowUp, Square, X, Copy, Check, ImagePlus, Settings, ChevronDown, MessageSquare, MessageSquarePlus, ScanLine, Plus } from 'lucide-vue-next';
+import { ArrowUp, Square, X, Copy, Check, ImagePlus, Settings, ChevronDown, ChevronRight, MessageSquare, MessageSquarePlus, ScanLine, Plus } from 'lucide-vue-next';
 import MarkdownView from '../ui/chat/MarkdownView.ts';
 import SelectionCopyMenu from '../ui/chat/SelectionCopyMenu.vue';
 import type { AsrStore } from '../ui/asr/store.ts';
@@ -236,6 +236,16 @@ async function send() {
   cardDismissed.value = false; submitting.value = true;
   try { await props.store.submit(); } finally { submitting.value = false; }
 }
+// Number shortcuts apply only to the active Ask User question, never to text inputs.
+function onAskShortcut(event: KeyboardEvent) {
+  if (!props.store.open || !props.store.ask || event.defaultPrevented || event.repeat || event.isComposing || event.ctrlKey || event.altKey || event.metaKey) return;
+  if (event.target instanceof Element && event.target.closest('input, textarea, select, [contenteditable]')) return;
+  if (!/^[1-9]$/.test(event.key)) return;
+  const option = props.store.ask.options[Number(event.key) - 1];
+  if (option === undefined) return;
+  event.preventDefault();
+  void props.store.reply(option);
+}
 function onEnter(event: KeyboardEvent) {
   if (event.isComposing || composing.value) return;
   event.preventDefault();
@@ -302,6 +312,7 @@ watch(() => props.store.open, open => {
   void nextTick(() => { fit(); field.value?.focus(); });
 });
 watch(() => props.store.answer, () => { void nextTick(() => { if (scroller.value) scroller.value.scrollTop = scroller.value.scrollHeight; }); });
+watch(() => props.store.ask?.id, id => { if (id) void nextTick(() => { if (scroller.value) scroller.value.scrollTop = scroller.value.scrollHeight; }); });
 
 async function copyAnswer(){
   const text=props.store.answer;if(!text.trim()||copyState.value==='copying')return;
@@ -337,12 +348,12 @@ const onFocus=()=>{if(props.store.open&&!dragging.value&&!press&&!morphing.value
 onMounted(()=>{
   void listen<MorphEvent>('assistant-transition', event => { void handleMorph(event).catch(() => resetMorph()); }).then(off => { if (morphDisposed) off(); else offMorph = off; });
   void nextTick(queueHitRegions);window.addEventListener('resize',queueHitRegions);
-  document.addEventListener('pointerdown',outsideTools);window.addEventListener('blur',closeTools);window.addEventListener('focus',onFocus);window.addEventListener('pointermove',dragMove);window.addEventListener('pointerup',dragUp);window.addEventListener('pointercancel',dragUp);window.addEventListener('blur',releasePress);window.addEventListener('assistant-drag-end',dragEnded);
+  document.addEventListener('pointerdown',outsideTools);document.addEventListener('keydown',onAskShortcut);window.addEventListener('blur',closeTools);window.addEventListener('focus',onFocus);window.addEventListener('pointermove',dragMove);window.addEventListener('pointerup',dragUp);window.addEventListener('pointercancel',dragUp);window.addEventListener('blur',releasePress);window.addEventListener('assistant-drag-end',dragEnded);
 });
 onBeforeUnmount(()=>{
   morphDisposed = true; clearTimeout(morphFallback); offMorph?.(); morphAnimations.splice(0).forEach(a => a.cancel());
   cancelAnimationFrame(hitRaf);window.removeEventListener('resize',queueHitRegions);
-  clearToolTimers();window.removeEventListener('blur',closeTools);document.removeEventListener('pointerdown',outsideTools);imageVersion++; releasePress();copyVersion++;clearTimeout(copyTimer);window.removeEventListener('focus',onFocus);window.removeEventListener('pointermove',dragMove);window.removeEventListener('pointerup',dragUp);window.removeEventListener('pointercancel',dragUp);window.removeEventListener('blur',releasePress);window.removeEventListener('assistant-drag-end',dragEnded);observer?.disconnect();cancelAnimationFrame(raf);
+  clearToolTimers();window.removeEventListener('blur',closeTools);document.removeEventListener('pointerdown',outsideTools);document.removeEventListener('keydown',onAskShortcut);imageVersion++; releasePress();copyVersion++;clearTimeout(copyTimer);window.removeEventListener('focus',onFocus);window.removeEventListener('pointermove',dragMove);window.removeEventListener('pointerup',dragUp);window.removeEventListener('pointercancel',dragUp);window.removeEventListener('blur',releasePress);window.removeEventListener('assistant-drag-end',dragEnded);observer?.disconnect();cancelAnimationFrame(raf);
 });
 </script>
 
@@ -374,9 +385,25 @@ onBeforeUnmount(()=>{
                 <p class="gate-tool">{{ approvalLine(store.approval) }}</p>
                 <div class="gate-actions"><button type="button" class="ghost" @click="store.decide('deny')">拒绝</button><button type="button" class="solid" @click="store.decide('once')">允许这一次</button></div>
               </div>
-              <div v-if="store.ask" class="gate" data-testid="assistant-question">
-                <p class="gate-title">{{ store.ask.question }}</p>
-                <div class="gate-actions wrap"><button v-for="option in store.ask.options" :key="option" type="button" class="ghost" @click="store.reply(option)">{{ option }}</button><button type="button" class="ghost dim" @click="store.reply(null)">跳过</button></div>
+              <div v-if="store.ask" class="ask-user" data-testid="assistant-question" role="group" :aria-label="store.ask.question">
+                <div class="ask-user-overline">
+                  <span class="ask-user-tag"><span class="ask-user-mark" aria-hidden="true">✦</span>需要你的选择</span>
+                  <span class="ask-user-type">{{ store.ask.options.length ? '单选问题' : '自由回答' }}</span>
+                </div>
+                <p class="ask-user-question">{{ store.ask.question }}</p>
+                <div v-if="store.ask.options.length" class="ask-user-options" role="group" aria-label="回答选项">
+                  <button v-for="(option, index) in store.ask.options" :key="`${index}-${option}`" type="button" class="ask-user-option" @click="store.reply(option)">
+                    <span class="ask-user-index" aria-hidden="true">{{ index < 26 ? 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'[index] : index + 1 }}</span>
+                    <span class="ask-user-option-text">{{ option }}</span>
+                    <ChevronRight class="ask-user-option-arrow" :size="15" :stroke-width="1.8" aria-hidden="true" />
+                  </button>
+                </div>
+                <p v-else class="ask-user-help">可以直接在下方输入你的回答。</p>
+                <div class="ask-user-footer">
+                  <span v-if="store.ask.options.length" class="ask-user-tip">按 <kbd>1–{{ Math.min(9, store.ask.options.length) }}</kbd> 快捷选择 · 或在下方输入</span>
+                  <span v-else class="ask-user-tip">支持自由输入回答</span>
+                  <button type="button" class="ask-user-skip" @click="store.reply(null)">跳过此问题 <span aria-hidden="true">→</span></button>
+                </div>
               </div>
             </div>
             <footer v-if="store.answer.trim()" class="card-footer"><button type="button" class="copy-answer" data-testid="assistant-copy" :disabled="copyState==='copying'" :aria-label="copyState==='copied'?'已复制回复':copyState==='failed'?'复制失败，点击重试':'复制回复'" title="复制 AI 回复" @pointerdown.prevent @click="copyAnswer"><Check v-if="copyState==='copied'" :size="14"/><Copy v-else :size="14"/><span aria-live="polite">{{ copyState==='copied'?'已复制':copyState==='failed'?'复制失败，重试':copyState==='copying'?'复制中…':'复制' }}</span></button></footer>
@@ -457,6 +484,34 @@ html,body,#app{background:transparent!important}
 .gate .ghost{background:var(--ghost);color:var(--ghost-fg)}
 .gate .ghost.dim{color:var(--text-soft)}
 .gate .solid{background:var(--button);color:var(--text);font-weight:600}
+/* Isolated Ask User styling: the approval gate and composer retain their existing appearance. */
+.stage{--ask-accent:#EC9DA3;--ask-accent-bg:#4D383E;--ask-divider:#FFFFFF1E;--ask-border:#40454D;--ask-row:#292C31;--ask-hover:#3C4149;--ask-key-bg:#34383F;--ask-key-border:#4A5057;--ask-key-fg:#9EA7AD;--ask-arrow:#8D969E}
+.stage.light{--ask-accent:#D75D64;--ask-accent-bg:#FAEDED;--ask-divider:#E8EAE9;--ask-border:#E3E6E4;--ask-row:#FFFFFF;--ask-hover:#F7F8F7;--ask-key-bg:#F7F8F7;--ask-key-border:#E4E7E5;--ask-key-fg:#929A9A;--ask-arrow:#B7BEBC}
+.ask-user{margin-top:16px;padding-top:16px;border-top:1px solid var(--ask-divider)}
+.ask-user:first-child{margin-top:0;padding-top:0;border-top:0}
+.ask-user-overline{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:9px;font-size:11px}
+.ask-user-tag{display:inline-flex;align-items:center;gap:6px;color:var(--ask-accent);font-weight:650}
+.ask-user-mark{display:grid;place-items:center;width:15px;height:15px;border-radius:5px;background:var(--ask-accent-bg);color:var(--ask-accent);font-size:11px;line-height:1}
+.ask-user-type{font-size:10px;color:var(--text-soft)}
+.ask-user-question{margin:0 0 15px;color:var(--text);font-size:15px;font-weight:650;line-height:1.5;letter-spacing:-.02em;overflow-wrap:anywhere}
+.ask-user-options{display:flex;flex-direction:column;gap:7px}
+.ask-user-option{box-sizing:border-box;display:flex;align-items:center;gap:11px;width:100%;min-height:46px;padding:10px 11px;text-align:left;border:1px solid var(--ask-border);border-radius:11px;background:var(--ask-row);color:var(--text);font:inherit;cursor:pointer;transition:background .15s,border-color .15s}
+.ask-user-option:hover{background:var(--ask-hover);border-color:var(--ask-accent)}
+.ask-user-option:active{background:var(--ask-accent-bg)}
+.ask-user-option:focus-visible{outline:2px solid var(--ask-accent);outline-offset:2px}
+.ask-user-index{box-sizing:border-box;display:grid;place-items:center;flex:none;width:24px;height:24px;border:1px solid var(--ask-key-border);border-radius:7px;background:var(--ask-key-bg);color:var(--ask-key-fg);font-size:11px;font-weight:700}
+.ask-user-option:hover .ask-user-index{border-color:var(--ask-accent);color:var(--ask-accent)}
+.ask-user-option-text{flex:1;min-width:0;overflow-wrap:anywhere;font-size:12.8px;font-weight:550;line-height:1.45}
+.ask-user-option-arrow{flex:none;color:var(--ask-arrow);transition:color .15s,transform .15s}
+.ask-user-option:hover .ask-user-option-arrow{color:var(--ask-accent);transform:translateX(2px)}
+.ask-user-help{margin:0;color:var(--working);font-size:12.5px;line-height:1.75}
+.ask-user-footer{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:22px;margin-top:13px}
+.ask-user-tip{color:var(--text-soft);font-size:10.5px;line-height:1.5}
+.ask-user-tip kbd{padding:0 4px;border:1px solid var(--ask-border);border-radius:4px;font:inherit;font-size:10px}
+.ask-user-skip{flex:none;padding:4px 0 4px 8px;border:0;border-radius:5px;background:transparent;color:var(--text-soft);font:inherit;font-size:11px;cursor:pointer}
+.ask-user-skip:hover{color:var(--text)}
+.ask-user-skip:focus-visible{outline:2px solid var(--ask-accent);outline-offset:2px}
+@media(prefers-reduced-motion:reduce){.ask-user-option,.ask-user-option-arrow{transition:none}}
 .composer{pointer-events:auto;cursor:grab;position:relative;border-radius:32px;background:var(--capsule);border:1px solid var(--line);box-shadow:var(--capsule-shadow);transition:border-color .2s}
 .composer.drop-active{border-color:var(--link);box-shadow:inset 0 0 0 1px var(--link)}
 .tools-host{position:relative;flex:none;cursor:default}
