@@ -1,15 +1,39 @@
 {
-  "app": { "macOSPrivateApi": true },
+  "app": {
+    "macOSPrivateApi": true
+  },
   "bundle": {
     "active": true,
-    "targets": ["app"],
-    "icon": ["icons/icon.png", "icons/icon.icns"],
+    "targets": [
+      "app"
+    ],
+    "icon": [
+      "icons/icon.png",
+      "icons/icon.icns"
+    ],
     "macOS": {
       "minimumSystemVersion": "12.0",
       "infoPlist": "Info.plist",
       "entitlements": "Entitlements.plist",
-      "signingIdentity": "-"
+      "signingIdentity": "-",
+      "dmg": {
+        "background": "dmg/background.png",
+        "windowSize": {
+          "width": 760,
+          "height": 440
+        },
+        "appPosition": {
+          "x": 177,
+          "y": 220
+        },
+        "applicationFolderPosition": {
+          "x": 583,
+          "y": 220
+        }
+      }
     }
+  },
+  "build": {
+    "beforeBundleCommand": "swift src-tauri/dmg/render-background.swift src-tauri/dmg/background.png"
   }
 }
-

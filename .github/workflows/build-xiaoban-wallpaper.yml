@@ -114,6 +114,8 @@ jobs:
           workspaces: client/xiaoban-desktop-wallpaper/src-tauri
       - name: Install dependencies
         run: npm ci
+      - name: Validate custom DMG instructions
+        run: npm run test:macos:dmg
       # Use one unchanged certificate across releases so TCC can compare a stable signing requirement.
       # No Apple Developer ID or notarization; Gatekeeper will still require user approval.
       - name: Import persistent self-signed signing identity
@@ -149,7 +151,21 @@ jobs:
           echo "APPLE_SIGNING_IDENTITY=$identity" >> "$GITHUB_ENV"
 
       - name: Build app and dmg
+        # tauri.macos.conf.json -> beforeBundleCommand runs the Swift AppKit renderer.
         run: npx tauri build --target aarch64-apple-darwin --bundles app,dmg
+
+      - name: Verify custom DMG guide and disk image
+        shell: bash
+        run: |
+          set -euo pipefail
+          background="src-tauri/dmg/background.png"
+          test -s "$background"
+          sips -g pixelWidth -g pixelHeight "$background"
+          sips -g pixelWidth "$background" | grep -q 'pixelWidth: 760'
+          sips -g pixelHeight "$background" | grep -q 'pixelHeight: 440'
+          dmg="$(find src-tauri/target/aarch64-apple-darwin/release/bundle/dmg -maxdepth 1 -type f -name '*.dmg' -print -quit)"
+          test -n "$dmg"
+          hdiutil verify "$dmg"
 
       - name: Verify stable macOS signature
         shell: bash

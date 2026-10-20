@@ -67,6 +67,17 @@ npm run desktop:macos:build
 open 'src-tauri/target/aarch64-apple-darwin/release/bundle/macos/小伴.app'
 ```
 
+### DMG 首次安装指引
+
+Release DMG 不再使用默认空白安装窗口。Finder 打开磁盘镜像后可看到浅色中文指引：把真实的「小伴.app」拖向「应用程序」别名；下方介绍首次启动可能遇到的 Gatekeeper 提示，以及在「系统设置 → 隐私与安全性」中由用户主动选择「仍要打开」的方法。
+
+- 指引背景源文件：`src-tauri/dmg/render-background.swift`（使用 macOS 自带 AppKit 绘制；白/浅灰底、粉色点缀，无额外外部资源）。
+- `src-tauri/tauri.macos.conf.json` 使用 `bundle.macOS.dmg` 设置 760×440 安装窗口、背景与 App/Applications 图标位置。安装说明不是交互控件；不得渲染伪造的两个图标，Finder 会在背景上叠加真实图标。
+- `build.beforeBundleCommand` 每次 macOS 打包之前生成 `src-tauri/dmg/background.png`，已在 gitignore 中排除生成文件。可通过 `npm run test:macos:dmg` 检查配置与文案。
+- 本机生成带引导的完整 DMG：`npx tauri build --target aarch64-apple-darwin --bundles app,dmg`；CI 也使用这条命令并检查背景 PNG 尺寸及 `hdiutil verify`。
+- **重要**：这是安装说明，不是安全绕过。自签名仍未获得 Apple Developer ID 或公证；Gatekeeper 行为取决于系统版本、下载来源等情况。根据 Tauri 官方文档，部分 CI 环境生成的 DMG 图标位置可能不按设置应用，最终应在 macOS Finder 中打开 Release DMG 做人工验收。
+- App 身份、现有自签名证书、Entitlements 和用户数据路径均保持不变。DMG 仅服务首次安装，应用内自动升级仍需另行实现。
+
 应用使用系统 WKWebView，无需打包浏览器。macOS 配置自动读取 `src-tauri/tauri.macos.conf.json`，开启透明窗口并生成 `.app`，本地构建默认使用 ad-hoc 签名；GitHub Release 使用固定自签名证书（归档和密码存放在私有仓库中，安全风险与跨版本验收方法见 [.github/signing/README.md](../../.github/signing/README.md)）；尚未使用 Developer ID 签名或 Apple 公证。透明 WebView 目前使用 Tauri 的 macOS 私有透明接口，不以 Mac App Store 分发为目标。
 
 macOS 悬浮窗口使用 AppKit 浮动层；壁纸使用 Core Graphics 的 desktop window level + 1，位于原桌面背景与桌面图标之间，并忽略鼠标事件以保留 Finder 的操作。角色视线使用 NSEvent 的鼠标逻辑点位置，经过 NSWindow/NSView 转换，处理坐标翻转和 Retina 缩放；壁纸点击只有命中桌面层时才触发，Finder 普通文件夹窗口和其他应用遮挡时不触发。角色视线与桌面命中检测不读取屏幕图像；超级小伴截图仅在用户主动点击时读取屏幕，macOS 会按需申请屏幕录制权限。
