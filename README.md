@@ -7,7 +7,7 @@
 | 项目 | 状态 | 说明 |
 | --- | --- | --- |
 | [client/xiaban-web](client/xiaban-web/README.md) | 已实现 | 相伴网页/PWA，包含管理后台 |
-| [client/xiaoban-desktop-wallpaper](client/xiaoban-desktop-wallpaper/README.md) | 1.0.0 | 小伴壁纸桌面版：Windows/macOS 桌宠、动态壁纸、十二个桌面特效、游戏空间、关怀提醒与通用 Agent 聊天；接入自研 agent-kernel 内核与壁纸网站 |
+| [client/xiaoban-desktop-wallpaper](client/xiaoban-desktop-wallpaper/README.md) | 2.0.0 | 小伴壁纸桌面版：Windows/macOS 桌宠、动态壁纸、十二个桌面特效、游戏空间、关怀提醒与通用 Agent 聊天；接入自研 agent-kernel 内核与壁纸网站 |
 | [client/xiaoban-pot-garden](client/xiaoban-pot-garden/README.md) | 可运行原型 | 表情盆栽的 3D 质感原型（Vite + three.js），花盆养成游戏的起点，目前只有表情和质感，没有玩法 |
 | [client/xiaoban-mobile-wallpaper](client/xiaoban-mobile-wallpaper/README.md) | 1.0.0 | 小伴壁纸 Android 版：浏览与下载壁纸网站的图片和视频，Compose 瀑布流，可登录统一账号，收藏只存本机；release 只打 arm64-v8a |
 | [client/xiaoban-multiplatform](client/xiaoban-multiplatform/README.md) | 可运行原型 | 把 xiaban.xyz 套进原生壳：Android/iOS 用 KMP + Compose，桌面用 Rust + Tauri（`desktopApp/`）；Android 与 macOS 已运行验证，iOS 仅编译 |
