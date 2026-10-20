@@ -12,7 +12,6 @@ mod prompt;
 mod sessions;
 
 use agent_computer_use_tools::{SKILL as COMPUTER_USE_SKILL, SKILL_NAME as COMPUTER_USE_SKILL_NAME, SKILL_ORIGIN_MARKER};
-pub use agent_computer_use_tools::spawn as spawn_open_computer_use;
 use agent_kernel::builtin::fs::{fs_tools, fs_write_tools};
 use agent_file_tools::{Attachment, AttachmentInput, AttachmentStore, AttachmentHistory, AttachmentContext, ReadFile};
 use agent_kernel::builtin::{AskUser, Question, Shell, TimeNow, Todo, WebFetch};
@@ -294,7 +293,7 @@ struct Parts<'a> {
     utc_offset_minutes: i32,
     open_computer_use: bool,
     /// Starts the computer-control server; a parameter so tests never launch a real one.
-    spawn_computer_use: fn() -> Result<Arc<agent_kernel::mcp::McpClient>, agent_kernel::HarnessError>,
+    spawn_computer_use: &'a dyn Fn() -> Result<Arc<agent_kernel::mcp::McpClient>, agent_kernel::HarnessError>,
     /// Estimated tokens kept in a request before old tool output and old turns are dropped.
     context_tokens: usize,
 }
@@ -370,6 +369,16 @@ fn build_agent(app: &tauri::AppHandle, config: &AiConfig, key_source: Option<Key
         let (app, broker) = (app.clone(), state.broker.clone());
         AskUser::new(move |session, question, ctx| ask_question(&app, &broker, session, question, ctx))
     };
+    let spawn_computer_use = || {
+        // Development resources live in the source tree; installed apps use Tauri's resource root.
+        #[cfg(debug_assertions)]
+        let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("resources/computer-use");
+        #[cfg(not(debug_assertions))]
+        let root = app.path().resource_dir()
+            .map_err(|e| agent_kernel::HarnessError::Config(format!("无法定位内置电脑控制资源：{e}")))?
+            .join("agent-tools/computer-use");
+        agent_computer_use_tools::spawn(&root)
+    };
     assemble_with_files(Parts {
         provider: provider_with(config, key_source)?,
         dirs: &Dirs::of(app)?,
@@ -380,7 +389,7 @@ fn build_agent(app: &tauri::AppHandle, config: &AiConfig, key_source: Option<Key
         desktop: Arc::new(TauriDesktop { app: app.clone() }),
         utc_offset_minutes: chrono::Local::now().offset().local_minus_utc() / 60,
         open_computer_use: config.open_computer_use,
-        spawn_computer_use: spawn_open_computer_use,
+        spawn_computer_use: &spawn_computer_use,
         context_tokens: config.context_tokens,
     }, attachments)
 }

@@ -150,7 +150,7 @@ fn rig_with_failing_computer_use(tag: &str) -> Rig {
 }
 
 fn no_computer_use() -> Result<Arc<agent_kernel::mcp::McpClient>, agent_kernel::HarnessError> {
-    Err(agent_kernel::HarnessError::Config("cannot start MCP server `npx`: not found".into()))
+    Err(agent_kernel::HarnessError::Config("内置电脑控制引擎缺失".into()))
 }
 
 fn build_rig(tag: &str, steps: Vec<Step>, answer: Approval, computer_use: bool) -> Rig {
@@ -177,8 +177,7 @@ fn build_rig(tag: &str, steps: Vec<Step>, answer: Approval, computer_use: bool) 
         desktop: desktop.clone(),
         utc_offset_minutes: 480,
         open_computer_use: computer_use,
-        spawn_computer_use: no_computer_use,
-        processes: None,
+        spawn_computer_use: &no_computer_use,
         context_tokens: ai_config::DEFAULT_CONTEXT_TOKENS,
     })
     .expect("the tool set assembles");
@@ -355,8 +354,7 @@ fn the_folder_for_saved_output_can_be_read_but_not_written() {
             desktop: Arc::new(FakeDesktop::default()),
             utc_offset_minutes: 0,
             open_computer_use: false,
-            spawn_computer_use: no_computer_use,
-        processes: None,
+            spawn_computer_use: &no_computer_use,
         context_tokens: ai_config::DEFAULT_CONTEXT_TOKENS,
         })
         .unwrap()
@@ -538,8 +536,7 @@ fn in_auto_mode_all_write_tools_run_without_asking() {
         desktop: desktop.clone(),
         utc_offset_minutes: 0,
         open_computer_use: false,
-        spawn_computer_use: no_computer_use,
-        processes: None,
+        spawn_computer_use: &no_computer_use,
         context_tokens: ai_config::DEFAULT_CONTEXT_TOKENS,
     }).unwrap();
 
@@ -580,8 +577,7 @@ fn trusted_rig(tag: &str, steps: Vec<Step>) -> (Rig, Arc<Mutex<Vec<(String, Opti
         desktop: desktop.clone(),
         utc_offset_minutes: 0,
         open_computer_use: false,
-        spawn_computer_use: no_computer_use,
-        processes: None,
+        spawn_computer_use: &no_computer_use,
         context_tokens: ai_config::DEFAULT_CONTEXT_TOKENS,
     })
     .unwrap();
@@ -748,8 +744,7 @@ fn the_context_size_from_settings_is_what_the_agent_trims_to() {
             desktop: Arc::new(FakeDesktop::default()),
             utc_offset_minutes: 0,
             open_computer_use: false,
-            spawn_computer_use: no_computer_use,
-            processes: None,
+            spawn_computer_use: &no_computer_use,
         context_tokens: 32_000,
         })
         .unwrap();

@@ -149,6 +149,9 @@ impl McpClient {
         }
         #[cfg(unix)]
         std::os::unix::process::CommandExt::process_group(&mut cmd, 0);
+        // Native console MCP servers should not open a console window in desktop hosts.
+        #[cfg(windows)]
+        std::os::windows::process::CommandExt::creation_flags(&mut cmd, 0x08000000); // CREATE_NO_WINDOW
 
         let mut child = cmd.spawn().map_err(|e| {
             HarnessError::Config(format!("cannot start MCP server `{}`: {e}", config.command))
@@ -450,3 +453,4 @@ fn decode_result(res: &Value) -> Result<ToolResult, String> {
     }
     Ok(result)
 }
+

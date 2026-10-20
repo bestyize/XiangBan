@@ -7,6 +7,7 @@ name = "agent-computer-use-tools"
 version = "0.1.0"
 dependencies = [
  "agent-kernel",
+ "serde_json",
 ]
 
 [[package]]

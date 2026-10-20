@@ -8,3 +8,4 @@ description = "Open Computer Use MCP integration and bundled skill for agent-ker
 [dependencies]
 agent-kernel = { path = "../../agent-kernel", features = ["mcp"] }
 
+serde_json = "1"
