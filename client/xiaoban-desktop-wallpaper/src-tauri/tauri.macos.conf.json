@@ -15,7 +15,7 @@
       "minimumSystemVersion": "12.0",
       "infoPlist": "Info.plist",
       "entitlements": "Entitlements.plist",
-      "signingIdentity": "-",
+      "signingIdentity": "E8B36162292F910859DFDFD66D81D8D265764779",
       "dmg": {
         "background": "dmg/background.png",
         "windowSize": {

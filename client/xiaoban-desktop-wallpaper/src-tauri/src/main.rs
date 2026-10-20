@@ -45,6 +45,7 @@ mod effects;
 mod effects_smoke;
 mod float_assistant;
 mod assistant_capture;
+mod computer_permissions;
 mod capture_editor;
 mod assistant_hit_test;
 mod window_control;
@@ -358,23 +359,8 @@ async fn set_companion_enabled(app:tauri::AppHandle,enabled:bool)->Result<Settin
 }
 
 #[tauri::command]
-fn request_system_permissions() -> Result<serde_json::Value, String> {
-    #[cfg(target_os = "macos")]
-    {
-        let _ = std::process::Command::new("osascript")
-            .args(["-e", "tell application \"System Events\" to get name of first process"])
-            .status();
-        let _ = std::process::Command::new("/usr/bin/open")
-            .arg("x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")
-            .status();
-        let _ = std::process::Command::new("/usr/bin/open")
-            .arg("x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture")
-            .status();
-    }
-    Ok(serde_json::json!({
-        "ok": true,
-        "message": "已打开系统设置中的辅助功能与屏幕录制授权页面"
-    }))
+fn request_system_permissions(app: tauri::AppHandle) -> Result<serde_json::Value, String> {
+    computer_permissions::request(&app)
 }
 
 #[tauri::command]

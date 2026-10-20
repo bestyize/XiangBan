@@ -371,11 +371,11 @@ fn assemble_with_files(parts: Parts<'_>, attachments: Vec<Attachment>) -> Result
     readable.retain(|tool| tool.spec().name != "read_file");
     readable.push(Arc::new(ReadFile::new(roots, AttachmentStore::new(dirs.chat.join("attachments"))).map_err(|e| e.to_string())?));
     let writable = fs_write_tools(vec![workspace.to_path_buf()]).map_err(|e| e.to_string())?;
-    for tool in readable.into_iter().chain(writable).chain(skills.tools()).chain(memory.tools()).chain(discovery.tools()).chain(desktop_tools::tools(desktop)) {
+    for tool in readable.into_iter().chain(writable).chain(skills.tools()).chain(memory.tools()).chain(discovery.tools()).chain(desktop_tools::tools(desktop.clone())) {
         builder = builder.tool_arc(tool);
     }
     if let Some(Ok(mcp_client)) = &computer_use {
-        for tool in mcp_client.tools() {
+        for tool in agent_computer_use_tools::checked_tools(mcp_client, &desktop.computer_use_runtime_root()?) {
             builder = builder.tool_arc(tool);
         }
     }

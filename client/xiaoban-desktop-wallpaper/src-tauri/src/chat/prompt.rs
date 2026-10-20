@@ -55,13 +55,13 @@ pub fn system_prompt(env: &Environment<'_>) -> String {
          - 用 memory_write 记下用户希望长期记住的偏好，不要记临时内容。{ocu_section}",
         ocu_section = if env.open_computer_use {
             let permission_help = if env.os == "macos" {
-                "若工具报告缺少辅助功能或屏幕录制权限，请用户在系统设置 → 隐私与安全性中检查并授权，内置 Open Computer Use 引擎可能有独立授权条目，以系统实际显示为准。只有本轮工具列表确实存在的工具才能调用；不要编造权限工具。"
+                "macOS 首次操作前先用 computer_use_diagnose 检查引擎的真实权限和签名。MCP 连接成功或开关开启不代表授权有效；缺权限时用 request_accessibility_permission 启动内置引擎引导，等待用户在系统界面授权后再次诊断。旧签名记录可能失效，必要时说明如何移除失效条目、重新授权并重启小伴；不要自动重置 TCC。无障碍由引擎负责，不要通过 System Events/AppleScript 额外申请主程序权限或绕过失败；独立授权条目以系统实际显示为准。只有本轮工具列表确实存在的工具才能调用；不要编造权限工具。"
             } else {
                 "按具体工具返回的权限错误处理，不要在当前平台调用 macOS 权限工具或声称获得了 macOS 授权。"
             };
             format!("\n- 你已启用电脑屏幕与应用控制（open-computer-use），对应工具以本轮工具列表为准。第一次操作其他应用前先调用 load_skill 加载 open-computer-use，按技能流程读取应用和窗口状态，再按当前工具的实际名称与参数操作，不要凭记忆编造 MCP 工具名。文字被截断或控件树不全时按技能说明处理，发送、删除、提交等操作遵循用户授权。{permission_help}")
         } else if let Some(error) = env.open_computer_use_error {
-            format!("\n- 用户开启了电脑屏幕与应用控制（open-computer-use），但它这次没能启动：{error}。你现在没有操作其他应用的工具，不要假装能操作。用户让你操作其他应用时，如实说明没能启动和原因；此能力使用随安装包附带的原生引擎，无需安装 Node.js 或 npx。请按错误原因提示用户检查安装完整性、系统版本或系统权限。")
+            format!("\n- 用户开启了电脑屏幕与应用控制（open-computer-use），但它这次没能启动：{error}。你现在没有操作其他应用的工具，不要假装能操作。先用 computer_use_diagnose 诊断内置引擎、系统权限和签名；如缺权限，用 request_accessibility_permission 打开真实引导，用户授权后重新检查。此能力使用随安装包附带的原生引擎，无需安装 Node.js 或 npx。请按错误原因处理安装完整性、系统版本或系统权限，不要静默换成 AppleScript。")
         } else {
             String::new()
         },

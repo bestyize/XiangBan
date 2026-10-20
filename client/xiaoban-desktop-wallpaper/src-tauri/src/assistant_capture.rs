@@ -74,6 +74,9 @@ pub fn request_macos_permission() {
     if !unsafe { CGPreflightScreenCaptureAccess() } { unsafe { CGRequestScreenCaptureAccess(); } }
 }
 
+#[cfg(target_os = "macos")]
+pub fn macos_permission_status() -> bool { unsafe { CGPreflightScreenCaptureAccess() } }
+
 /// Reset only this app's ScreenCapture TCC record, after explicit confirmation in the
 /// trusted control window. Never invoke automatically on capture failures.
 pub const SCREEN_CAPTURE_BUNDLE_ID: &str = "xyz.xiaban.desktop-wallpaper";

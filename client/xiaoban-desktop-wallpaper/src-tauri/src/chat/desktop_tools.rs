@@ -61,6 +61,8 @@ pub trait Desktop: Send + Sync {
     /// Deletes a user game, closing the game space first when it is open.
     fn delete_game(&self, id: &str) -> Result<(), String>;
     fn request_permissions(&self) -> Result<Value, String>;
+    fn computer_use_diagnose(&self) -> Result<Value, String> { Err("当前宿主不支持电脑控制诊断".into()) }
+    fn computer_use_runtime_root(&self) -> Result<std::path::PathBuf, String> { Err("当前宿主不支持电脑控制资源".into()) }
     /// Saves one of the user's own works as a `.zip` resource pack through the save dialog. `None` when they cancel; otherwise the file path and its size.
     fn export_pack(&self, kind: &str, id: &str) -> Result<Option<(String, u64)>, String>;
     /// Opens an https address in the system browser.
@@ -97,24 +99,10 @@ impl Desktop for TauriDesktop {
     }
 
     fn request_permissions(&self) -> Result<Value, String> {
-        #[cfg(target_os = "macos")]
-        {
-            for (pane, label) in [("Privacy_Accessibility", "辅助功能"), ("Privacy_ScreenCapture", "屏幕录制")] {
-                let status = std::process::Command::new("/usr/bin/open")
-                    .arg(format!("x-apple.systempreferences:com.apple.preference.security?{pane}"))
-                    .status().map_err(|e| format!("无法打开{label}设置：{e}"))?;
-                if !status.success() { return Err(format!("无法打开{label}设置，请在系统设置中手动查看")); }
-            }
-            Ok(json!({
-                "ok": true,
-                "message": "已依次打开 macOS 辅助功能与屏幕录制设置页面。请用户检查并按需开启小伴的权限；打开设置不代表已经获得授权。"
-            }))
-        }
-        #[cfg(not(target_os = "macos"))]
-        {
-            Err("此权限设置引导仅适用于 macOS，当前平台未执行任何授权操作。请根据具体工具返回的错误处理当前系统权限。".into())
-        }
+        crate::computer_permissions::request(&self.app)
     }
+    fn computer_use_diagnose(&self) -> Result<Value, String> { crate::computer_permissions::diagnose(&self.app) }
+    fn computer_use_runtime_root(&self) -> Result<std::path::PathBuf, String> { crate::computer_permissions::runtime_root(&self.app) }
     fn status(&self) -> Result<Value, String> {
         let s = crate::settings(&self.app);
         Ok(json!({
@@ -1171,13 +1159,22 @@ pub fn tools(desktop: Arc<dyn Desktop>) -> Vec<Arc<dyn Tool>> {
             &desktop,
             ToolSpec::new(
                 "request_accessibility_permission",
-                "仅在 macOS 打开辅助功能与屏幕录制设置页面，供用户手动检查和授权。打开设置不等于已获授权；其他平台不支持此引导。",
+                "仅在 macOS 通过内置 Open Computer Use 引擎启动真实权限引导。先用 computer_use_diagnose 确认缺失项，用户在系统界面授权后再次检查；启动引导不代表已获授权。不重置权限，不通过 AppleScript 额外申请主程序无障碍。",
                 none(),
             ).risk(Risk::Write).self_managed().serial(),
             |d: &dyn Desktop, _: &Value| -> Result<String, String> {
                 let res = d.request_permissions()?;
                 Ok(res["message"].as_str().unwrap_or("已申请系统权限").to_string())
             },
+        ),
+        tool(
+            &desktop,
+            ToolSpec::new(
+                "computer_use_diagnose",
+                "检查电脑控制开关、内置引擎路径、真实无障碍/屏幕录制权限及签名是否稳定。只读，不截图、不打开弹窗、不修改 TCC。首次电脑控制、权限错误或开关已开仍不能操作时使用；MCP 连接成功不代表权限可用。",
+                none(),
+            ).risk(Risk::Read).serial().timeout(std::time::Duration::from_secs(25)),
+            |d: &dyn Desktop, _: &Value| -> Result<String, String> { Ok(d.computer_use_diagnose()?.to_string()) },
         ),
     ]
 }

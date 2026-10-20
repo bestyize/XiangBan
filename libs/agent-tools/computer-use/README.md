@@ -18,21 +18,24 @@ node libs/agent-tools/computer-use/scripts/prepare-runtime.mjs --target x86_64-p
 | Linux x64 / arm64（工具包支持，桌面客户端未发布） | 对应架构的 ELF 程序 |
 | Android / 其他目标 | 不支持；Android 独立构建流程不调用本工具、不包含桌面引擎 |
 
-准备资源时只提取所选平台目录及许可文件，并整体替换输出目录。构建前检查 runtime.json、PE/ELF/Mach-O 文件格式和实际 CPU 架构；残留其他平台、缺少资源、错误架构均中止构建。macOS 必须在 Mac 构建，使用 `lipo` 裁剪通用二进制，并使用 `APPLE_SIGNING_IDENTITY`（本地缺省为 ad-hoc）从内到外签名。安装包内的辅助 App 保留独立 Bundle ID；macOS 权限条目以系统实际显示为准。
+准备资源时只提取所选平台目录及许可文件，并整体替换输出目录。构建前检查 runtime.json、PE/ELF/Mach-O 文件格式和实际 CPU 架构；残留其他平台、缺少资源、错误架构均中止构建。macOS 必须在 Mac 构建，使用 `lipo` 裁剪通用二进制，并使用 `APPLE_SIGNING_IDENTITY` 或小伴的固定自签名证书从内到外签名；共享构建机设置见 [.github/signing](../../../.github/signing/README.md)。禁止 ad-hoc 回退，检查 designated requirement 不包含版本专属 `cdhash`。安装包内的辅助 App 保留独立 Bundle ID；macOS 权限条目以系统实际显示为准。
 
 小伴的 Tauri `beforeDevCommand` / `beforeBuildCommand` 自动准备资源；release 的 build.rs 再校验资源与 Cargo TARGET 一致。通过 `bundle.resources` 映射到 `$RESOURCE/agent-tools/computer-use`。资源及下载缓存均不提交 git。固定引擎升级需要一起修改 lock、Rust `RUNTIME_VERSION` 并重新验证。
 
 ## 运行接口
 
 ```rust,ignore
-let client = agent_computer_use_tools::spawn(&installed_resource_dir.join("agent-tools/computer-use"))?;
-for tool in client.tools() {
+let root = installed_resource_dir.join("agent-tools/computer-use");
+let client = agent_computer_use_tools::spawn(&root)?;
+for tool in agent_computer_use_tools::checked_tools(&client, &root) {
     builder = builder.tool_arc(tool);
 }
 ```
 
 - `executable(root)` / `config(root)`：只解析宿主传入的内置资源目录，检查版本、平台、程序存在及 Unix 执行权限；不会查找 PATH 或回退 npx。
 - `spawn(root)`：启动原生 MCP 服务并发现工具；空工具列表视为失败，风险为 Exec、调用超时 60 秒。
+- `checked_tools(client, root)`：宿主使用这些包装后的工具注册到 Agent；macOS 每次桌面操作前运行内置引擎的 `doctor --json` 检查真实授权，缺失时明确报错并指向诊断/引导，不执行原始动作、不自动改走脚本。保留 MCP 图片、结构化输出和清理接口。
+- `permissions::diagnose(root)`：无弹窗的真实引擎权限与签名检查，不截图、不读取目标应用；以 `accessibilityTrusted` 和 `screenCaptureGranted` 判定，不能用进程退出码或 MCP 连接代替授权状态。`permissions::request_permissions(root)` 通过同一个引擎运行原生 `doctor` 引导；不自动批准、重置 TCC 或修改权限数据库。宿主应单独注册诊断与引导工具，使 MCP 启动失败时仍可排障。
 - `SKILL` / `SKILL_NAME` / `SKILL_ORIGIN_MARKER`：随包操作规则与已有安装副本的识别标记。
 - macOS 引擎要求 14+ 及辅助功能、屏幕录制授权；不降低宿主自身对旧系统的兼容范围。Windows/Linux 需要已登录图形桌面。
 
@@ -43,6 +46,7 @@ cargo test --manifest-path libs/agent-tools/computer-use/Cargo.toml --locked
 node --test libs/agent-tools/computer-use/scripts/prepare-runtime.test.mjs
 node libs/agent-tools/computer-use/scripts/prepare-runtime.mjs --check --target x86_64-pc-windows-msvc --output <已准备目录>
 XIAOBAN_COMPUTER_USE_RUNTIME=<已准备目录> cargo test --manifest-path libs/agent-tools/computer-use/Cargo.toml --locked real_bundled_engine_discovers_tools -- --ignored --nocapture
+XIAOBAN_COMPUTER_USE_RUNTIME=<已准备目录> cargo test --manifest-path libs/agent-tools/computer-use/Cargo.toml --locked real_bundled_engine_permission_diagnosis -- --ignored --nocapture
 ```
 
 普通测试不启动控制服务。最后一项使用真实原生程序完成 MCP 握手和工具发现，不执行桌面操作。macOS/Windows 安装、权限、点击及输入回读仍需对应平台实机验收。CI 仅手动触发；macOS 打包后还检查实际 App 内的资源、辅助程序架构及签名。

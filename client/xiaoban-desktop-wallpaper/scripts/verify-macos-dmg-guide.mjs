@@ -13,7 +13,7 @@ assert.deepEqual(dmg.windowSize, { width: 760, height: 440 });
 assert.deepEqual(dmg.appPosition, { x: 177, y: 220 });
 assert.deepEqual(dmg.applicationFolderPosition, { x: 583, y: 220 });
 assert.match(conf.build.beforeBundleCommand, /^swift src-tauri\/dmg\/render-background\.swift src-tauri\/dmg\/background\.png$/);
-assert.equal(conf.bundle.macOS.signingIdentity, '-'); // CI sets APPLE_SIGNING_IDENTITY; unchanged
+assert.equal(conf.bundle.macOS.signingIdentity, 'E8B36162292F910859DFDFD66D81D8D265764779');
 assert.equal(conf.bundle.macOS.minimumSystemVersion, '12.0');
 assert.match(render, /private let width = 760/);
 assert.match(render, /private let height = 440/);

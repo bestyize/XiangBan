@@ -5,6 +5,7 @@ import { chmod, cp, mkdir, mkdtemp, readFile, readdir, rename, rm, writeFile } f
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { ensureSigningIdentity, signingKeychainArgs, verifyStableSignature } from '../../../../.github/signing/identity.mjs';
 
 export const lock = JSON.parse(await readFile(new URL('../runtime-lock.json', import.meta.url), 'utf8'));
 
@@ -49,7 +50,7 @@ export function binaryArchitectures(data, platform) {
 }
 
 function run(command, args) {
-  const result = spawnSync(command, args, { stdio: 'inherit', windowsHide: true });
+  const result = spawnSync(command, args, { stdio: 'inherit', windowsHide: true, timeout: 120_000 });
   if (result.error || result.status !== 0) throw new Error(`${command} failed: ${result.error?.message || result.status}`);
 }
 
@@ -110,9 +111,9 @@ export async function stageRuntime(packageRoot, output, spec, { sign = true } = 
         nativeFiles.push(file);
       }
       if (sign) {
-        const identity = process.env.APPLE_SIGNING_IDENTITY || '-';
+        const identity = ensureSigningIdentity();
         // Sign inside out with the same identity as the containing XiaoBan app.
-        for (const file of nativeFiles) run('/usr/bin/codesign', ['--force', '--sign', identity, '--preserve-metadata=entitlements', file]);
+        for (const file of nativeFiles) run('/usr/bin/codesign', ['--force', '--timestamp=none', '--sign', identity, ...signingKeychainArgs(), '--preserve-metadata=entitlements', file]);
         const bundles = new Set();
         for (const file of await filesIn(app)) {
           let parent = path.dirname(file);
@@ -122,8 +123,9 @@ export async function stageRuntime(packageRoot, output, spec, { sign = true } = 
             parent = path.dirname(parent);
           }
         }
-        for (const bundle of [...bundles].sort((a, b) => b.length - a.length)) run('/usr/bin/codesign', ['--force', '--sign', identity, '--preserve-metadata=entitlements', bundle]);
+        for (const bundle of [...bundles].sort((a, b) => b.length - a.length)) run('/usr/bin/codesign', ['--force', '--timestamp=none', '--sign', identity, ...signingKeychainArgs(), '--preserve-metadata=entitlements', bundle]);
         run('/usr/bin/codesign', ['--verify', '--deep', '--strict', app]);
+        verifyStableSignature(app);
       }
     } else if (spec.platform === 'linux') await chmod(path.join(stage, spec.executable), 0o755);
     await writeFile(path.join(stage, 'runtime.json'), JSON.stringify({ version: lock.version, target: spec.key, source: lock.url }, null, 2) + '\n');
@@ -140,7 +142,10 @@ export async function prepareRuntime(args = process.argv.slice(2)) {
   const output = path.resolve(args[outputIndex + 1]);
   if (args.includes('--check')) {
     await validateRuntime(output, spec);
-    if (spec.platform === 'darwin' && process.platform === 'darwin') run('/usr/bin/codesign', ['--verify', '--deep', '--strict', path.join(output, 'Open Computer Use.app')]);
+    if (spec.platform === 'darwin' && process.platform === 'darwin') {
+      run('/usr/bin/codesign', ['--verify', '--deep', '--strict', path.join(output, 'Open Computer Use.app')]);
+      verifyStableSignature(path.join(output, 'Open Computer Use.app'));
+    }
     console.log(`Verified Open Computer Use ${lock.version}: ${spec.key}`);
     return;
   }

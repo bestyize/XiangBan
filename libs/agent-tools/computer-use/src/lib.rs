@@ -1,5 +1,6 @@
 //! Open Computer Use service integration. The host owns its switch, permissions and UI.
 //! The MCP transport and tool implementation stay in agent-kernel and the external server.
+pub mod permissions;
 use agent_kernel::{
     mcp::{McpClient, McpConfig},
     HarnessError, Risk,
@@ -132,6 +133,36 @@ pub fn spawn(root: &Path) -> Result<Arc<McpClient>, HarnessError> {
     Ok(client)
 }
 
+/// Keep the MCP connection alive while checking actual OS access before every desktop tool.
+/// Diagnosis/onboarding are supplied separately by the host and remain usable when access is denied.
+pub fn checked_tools(client: &Arc<McpClient>, root: &Path) -> Vec<Arc<dyn agent_kernel::Tool>> {
+    client.tools().into_iter().map(|inner| Arc::new(PermissionCheckedTool { inner, root: root.to_path_buf() }) as Arc<dyn agent_kernel::Tool>).collect()
+}
+
+struct PermissionCheckedTool {
+    inner: Arc<dyn agent_kernel::Tool>,
+    root: std::path::PathBuf,
+}
+
+impl agent_kernel::Tool for PermissionCheckedTool {
+    fn spec(&self) -> &agent_kernel::ToolSpec { self.inner.spec() }
+    fn execute(&self, args: serde_json::Value, ctx: &agent_kernel::ToolCtx) -> Result<String, String> {
+        let result = self.execute_result(args, ctx);
+        if result.is_error { Err(result.output) } else { Ok(result.output) }
+    }
+    fn execute_result(&self, args: serde_json::Value, ctx: &agent_kernel::ToolCtx) -> agent_kernel::ToolResult {
+        if ctx.is_cancelled() { return agent_kernel::ToolResult::error("电脑控制已取消"); }
+        // The nine desktop operations (plus platform-specific query/select_text). Leave future
+        // diagnostic/onboarding MCP tools callable even before authorization.
+        if matches!(self.spec().name.as_str(), "list_apps" | "get_app_state" | "click" | "perform_secondary_action" | "scroll" | "drag" | "type_text" | "press_key" | "set_value" | "query" | "select_text") {
+            if let Err(error) = permissions::check_access(&self.root) { return agent_kernel::ToolResult::error(error); }
+        }
+        if ctx.is_cancelled() { return agent_kernel::ToolResult::error("电脑控制已取消"); }
+        self.inner.execute_result(args, ctx)
+    }
+    fn on_run_end(&self, end: &agent_kernel::RunEnd) -> Result<(), String> { self.inner.on_run_end(end) }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -215,6 +246,49 @@ mod tests {
         assert_eq!(lock["version"], RUNTIME_VERSION);
         assert!(SKILL.contains(&format!("name: {SKILL_NAME}")));
         assert!(SKILL.contains(SKILL_ORIGIN_MARKER));
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn denied_access_never_dispatches_a_desktop_action_and_a_fresh_grant_is_rechecked() {
+        use agent_kernel::{Tool, ToolCtx, ToolResult, ToolSpec};
+        use std::sync::atomic::AtomicUsize;
+        struct Action { spec: ToolSpec, calls: Arc<AtomicUsize> }
+        impl Tool for Action {
+            fn spec(&self) -> &ToolSpec { &self.spec }
+            fn execute_result(&self, _: serde_json::Value, _: &ToolCtx) -> ToolResult {
+                self.calls.fetch_add(1, Ordering::SeqCst);
+                ToolResult::ok("clicked").with_part(agent_kernel::Part::Image { url: "data:image/png;base64,AA==".into() })
+            }
+        }
+        let runtime = Runtime::new(&runtime_target());
+        let doctor = runtime.0.join(executable_relative());
+        let calls = Arc::new(AtomicUsize::new(0));
+        let tool = PermissionCheckedTool { root: runtime.0.clone(), inner: Arc::new(Action {
+            calls: calls.clone(), spec: ToolSpec::new("click", "fixture", serde_json::json!({"type":"object"})),
+        }) };
+        fs::write(&doctor, "#!/bin/sh\n[ \"$1\" = doctor ] && [ \"$2\" = --json ] || exit 1\nprintf '%s' '{\"allGranted\":true,\"accessibilityTrusted\":false,\"screenCaptureGranted\":true}'\n").unwrap();
+        let denied = tool.execute_result(serde_json::json!({}), &ToolCtx::detached("test"));
+        assert!(denied.is_error && denied.output.contains("computer_use_permission_required"));
+        assert_eq!(calls.load(Ordering::SeqCst), 0);
+        fs::write(&doctor, "#!/bin/sh\nprintf '%s' '{\"accessibilityTrusted\":true,\"screenCaptureGranted\":true}'\n").unwrap();
+        let granted = tool.execute_result(serde_json::json!({}), &ToolCtx::detached("test"));
+        assert!(!granted.is_error);
+        assert_eq!(calls.load(Ordering::SeqCst), 1);
+        assert_eq!(granted.parts.len(), 1, "the wrapper retains screenshot parts");
+    }
+
+    #[test]
+    #[ignore = "requires the prepared native runtime; read-only permission/signature diagnosis"]
+    fn real_bundled_engine_permission_diagnosis() {
+        let root = std::env::var_os("XIAOBAN_COMPUTER_USE_RUNTIME").expect("set XIAOBAN_COMPUTER_USE_RUNTIME");
+        let state = permissions::diagnose(Path::new(&root)).unwrap();
+        #[cfg(target_os = "macos")]
+        {
+            assert!(state["permissions"]["allGranted"].is_boolean());
+            assert_eq!(state["stableSigningIdentity"], true);
+        }
+        println!("{state}");
     }
 
     #[test]

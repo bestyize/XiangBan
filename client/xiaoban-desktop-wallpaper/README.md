@@ -80,7 +80,7 @@ Release DMG 不再使用默认空白安装窗口。Finder 打开磁盘镜像后�
 - **重要**：这是安装说明，不是安全绕过。自签名仍未获得 Apple Developer ID 或公证；Gatekeeper 行为取决于系统版本、下载来源等情况。根据 Tauri 官方文档，部分 CI 环境生成的 DMG 图标位置可能不按设置应用，最终应在 macOS Finder 中打开 Release DMG 做人工验收。
 - App 身份、现有自签名证书、Entitlements 和用户数据路径均保持不变。DMG 仅服务首次安装，应用内自动升级仍需另行实现。
 
-应用使用系统 WKWebView，无需打包浏览器。macOS 配置自动读取 `src-tauri/tauri.macos.conf.json`，开启透明窗口并生成 `.app`，本地构建默认使用 ad-hoc 签名；GitHub Release 使用固定自签名证书（归档和密码存放在私有仓库中，安全风险与跨版本验收方法见 [.github/signing/README.md](../../.github/signing/README.md)）；尚未使用 Developer ID 签名或 Apple 公证。透明 WebView 目前使用 Tauri 的 macOS 私有透明接口，不以 Mac App Store 分发为目标。
+应用使用系统 WKWebView，无需打包浏览器。macOS 配置自动读取 `src-tauri/tauri.macos.conf.json`，开启透明窗口并生成 `.app`；本地构建和 GitHub Release 均使用固定自签名证书（归档和密码存放在私有仓库中，构建机准备、安全风险与跨版本验收方法见 [.github/signing/README.md](../../.github/signing/README.md)），签名失败不回退 ad-hoc。`npm run desktop` 每次重编译后先生成并签名开发 App 再启动，开发数据仍独立；直接运行 `cargo run` 或 `npx tauri dev` 会绕过此启动器。尚未使用 Developer ID 签名或 Apple 公证。透明 WebView 目前使用 Tauri 的 macOS 私有透明接口，不以 Mac App Store 分发为目标。
 
 macOS 悬浮窗口使用 AppKit 浮动层；壁纸使用 Core Graphics 的 desktop window level + 1，位于原桌面背景与桌面图标之间，并忽略鼠标事件以保留 Finder 的操作。角色视线使用 NSEvent 的鼠标逻辑点位置，经过 NSWindow/NSView 转换，处理坐标翻转和 Retina 缩放；壁纸点击只有命中桌面层时才触发，Finder 普通文件夹窗口和其他应用遮挡时不触发。角色视线与桌面命中检测不读取屏幕图像；超级小伴截图仅在用户主动点击时读取屏幕，macOS 会按需申请屏幕录制权限。
 
@@ -259,3 +259,5 @@ Mac 实机还需检查：原角色的发光与连续表情、桌宠拖动、空�
 运行 `npm run desktop`、`npm run desktop:macos:build` 或 `npm run desktop:windows:build` 时，Tauri 自动准备固定版本原生引擎。也可执行 `npm run computer-use:prepare -- --target aarch64-apple-darwin`，按实际目标切换 triple。Windows 包只包含对应架构的 EXE；macOS 包只包含裁剪后的目标架构 App 及所需资源；不将整个跨平台 npm 包塞入安装包。开发时资源来自 `src-tauri/resources/computer-use`，安装后从 Tauri 的资源目录解析。实际构建目录不提交 git。
 
 针对性检查：`npm run test:computer-use`；工具包接口、校验规则及真实 MCP 握手命令见 [Computer Use 工具包](../../libs/agent-tools/computer-use/README.md)。macOS 主应用仍支持原有最低系统版本，但电脑控制引擎需要 macOS 14+；旧系统启用时给出明确错误。首次使用仍需系统权限，以系统显示的小伴或 Open Computer Use 授权条目为准。
+
+Agent 的 `computer_use_diagnose` 可在 MCP 启动失败时检查开关、内置路径、实际无障碍/屏幕录制权限和稳定签名；`request_accessibility_permission` 调用同一原生引擎的授权引导。每次电脑控制动作会先检查真实授权，不再把“工具已连接”当成“权限已有效”。旧签名授权失效、系统开关开启仍失败时，Agent 应说明重新授权和重启步骤并复查，最终系统授权仍由用户完成，不自动重置 TCC。旧的 `System Events` 主程序无障碍申请已移除，浏览器交互也不再用 AppleScript 额外申请；内置引擎仍是独立可执行 App，和主程序相同证书不会自动合并系统身份。小伴自身截图仍有单独的屏幕录制用途，归属以系统实际显示为准。
