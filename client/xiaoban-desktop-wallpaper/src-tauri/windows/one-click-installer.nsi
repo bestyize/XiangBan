@@ -81,6 +81,8 @@ Var NoShortcutMode
 Var WixMode
 Var OldMainBinaryName
 
+; Show a progress bar without exposing installation paths and copied-file lists.
+ShowInstDetails nevershow
 Name "${PRODUCTNAME}"
 BrandingText "${COPYRIGHT}"
 OutFile "${OUTFILE}"
@@ -721,12 +723,8 @@ Section Install
     Call CreateOrUpdateStartMenuShortcut
   !insertmacro MUI_STARTMENU_WRITE_END
 
-  ; Create desktop shortcut for silent and passive installers
-  ; because finish page will be skipped
-  ${If} $PassiveMode = 1
-  ${OrIf} ${Silent}
-    Call CreateOrUpdateDesktopShortcut
-  ${EndIf}
+  ; Only create the Start menu shortcut; do not clutter the desktop during installs or updates.
+  ; Users can still pin or create a shortcut themselves.
 
   !ifmacrodef NSIS_HOOK_POSTINSTALL
     !insertmacro NSIS_HOOK_POSTINSTALL
