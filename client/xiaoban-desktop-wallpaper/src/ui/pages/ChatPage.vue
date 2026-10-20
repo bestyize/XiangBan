@@ -12,6 +12,7 @@ import GuideModal from '../components/GuideModal.vue';
 import AsrStatus from '../components/AsrStatus.vue';
 import MarkdownView from '../chat/MarkdownView.ts';
 import SelectionCopyMenu from '../chat/SelectionCopyMenu.vue';
+import { ATTACHMENT_ACCEPT, MAX_ATTACHMENTS, MAX_TOTAL_BYTES, attachmentBytes, attachmentImage, attachmentName, readAttachment, type PendingAttachment } from '../chat/attachments.ts';
 import { CONTINUE_TEXT } from '../chat/chat-store.ts';
 import { approvalPreview, clip, formatAgo, isImeEnter, isNearBottom, prettyArguments, riskVerb, toolLabel } from '../chat/format.ts';
 import { describeCall } from '../chat/view.ts';
@@ -42,21 +43,20 @@ const answerText = ref('');
 const examples = ['帮我看看工作目录里有什么，整理一份清单', '把壁纸换成一张安静的风景', '每天下午三点提醒我喝水', '查一下今天是几号，再告诉我这周还剩几天'];
 
 /** Images waiting to be sent, as `data:` URLs. Cleared on send, alongside the draft. */
-const attachments = ref<string[]>([]);
+const attachments = ref<PendingAttachment[]>([]);
+const attachmentReading = ref(false);
+let attachmentVersion = 0;
 const filePicker = ref<HTMLInputElement | null>(null);
 /** The image shown enlarged, or null. */
 const preview = ref<string | null>(null);
 /** How many images one message may carry, matching the host's own limit. */
-const MAX_IMAGES = 8;
-/** The host refuses anything bigger; checking here keeps a huge paste from being read at all. */
-const MAX_IMAGE_BYTES = 3 * 1024 * 1024;
-const IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
+const MAX_IMAGES = MAX_ATTACHMENTS;
 
 const view = computed(() => chat.current());
 const running = computed(() => !!view.value?.running);
 const title = computed(() => (chat.currentId && chat.sessions.find(s => s.id === chat.currentId)?.title) || '新对话');
 const compacting = computed(() => !!chat.currentId && chat.compactingId === chat.currentId);
-const canSend = computed(() => chat.configured && !running.value && !compacting.value && (draft.value.trim() !== '' || attachments.value.length > 0));
+const canSend = computed(() => chat.configured && !running.value && !compacting.value && !attachmentReading.value && (draft.value.trim() !== '' || attachments.value.length > 0));
 const now = () => Math.floor(Date.now() / 1000);
 const waiting = computed(() => !!view.value && (view.value.approvals.length > 0 || view.value.questions.length > 0));
 const thinking = computed(() => {
@@ -68,7 +68,7 @@ const thinking = computed(() => {
 const statusLine = computed(() => view.value?.status || (waiting.value ? '等你确认后继续' : thinking.value ? '思考中…' : ''));
 
 const microphoneAllowed = computed(() => foreground.value && chat.configured && !running.value && (!props.store.speech || props.store.speech.status === 'idle'));
-watch(() => chat.currentId, () => asr?.deactivate(), { flush: 'sync' });
+watch(() => chat.currentId, () => { asr?.deactivate(); attachmentVersion++; attachments.value = []; }, { flush: 'sync' });
 watch(microphoneAllowed, allowed => { if (!allowed) asr?.deactivate(); }, { flush: 'sync' });
 watch(() => props.store.page, page => { if (page !== 'chat') asr?.deactivate(); }, { flush: 'sync' });
 async function toggleVoice() {
@@ -142,42 +142,27 @@ async function submit() {
   toBottom();
 }
 
-/** Reads a picked or pasted file into a `data:` URL, refusing anything the host would reject. */
-function readImage(file: File): Promise<string | null> {
-  return new Promise(resolve => {
-    if (!IMAGE_TYPES.includes(file.type)) {
-      props.store.notify('只能发送 PNG、JPEG、GIF 或 WebP 图片', 'error');
-      resolve(null);
-      return;
-    }
-    if (file.size > MAX_IMAGE_BYTES) {
-      props.store.notify('这张图片太大了，请换一张小于 3MB 的', 'error');
-      resolve(null);
-      return;
-    }
-    const reader = new FileReader();
-    reader.onerror = () => { props.store.notify('这张图片读不出来，请换一张', 'error'); resolve(null); };
-    reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : null);
-    reader.readAsDataURL(file);
-  });
-}
-
 async function addImages(files: File[]) {
-  if (!files.length) return;
-  const room = MAX_IMAGES - attachments.value.length;
-  if (room <= 0) {
-    props.store.notify(`一次最多发送 ${MAX_IMAGES} 张图片`, 'error');
-    return;
-  }
-  if (files.length > room) props.store.notify(`一次最多发送 ${MAX_IMAGES} 张图片，多余的没有加上`, 'info');
-  const read = await Promise.all(files.slice(0, room).map(readImage));
-  const accepted = read.filter((url): url is string => !!url);
-  if (accepted.length) attachments.value = [...attachments.value, ...accepted];
+  if (!files.length || attachmentReading.value || running.value) return;
+  const version = attachmentVersion;
+  attachmentReading.value = true;
+  try {
+    for (const file of files) {
+      if (version !== attachmentVersion) break;
+      if (attachments.value.length >= MAX_IMAGES) { props.store.notify('一次最多添加 8 个附件', 'info'); break; }
+      try {
+        const item = await readAttachment(file);
+        if (version !== attachmentVersion) break;
+        if (attachments.value.reduce((sum, a) => sum + attachmentBytes(a), 0) + attachmentBytes(item) > MAX_TOTAL_BYTES) { props.store.notify('附件合计不能超过 30MB', 'error'); continue; }
+        attachments.value.push(item);
+      } catch (error) { props.store.notify(error instanceof Error ? error.message : String(error), 'error'); }
+    }
+  } finally { attachmentReading.value = false; }
 }
-
+onUnmounted(() => { attachmentVersion++; });
 /** Images on the clipboard arrive as files; anything else is left to the normal paste. */
 function onPaste(event: ClipboardEvent) {
-  const files = Array.from(event.clipboardData?.files ?? []).filter(file => file.type.startsWith('image/'));
+  const files = Array.from(event.clipboardData?.files ?? []);
   if (!files.length) return;
   event.preventDefault();
   void addImages(files);
@@ -206,7 +191,7 @@ watch([() => props.store.creationDraft, () => chat.configured], ([text, configur
 }, { immediate: true });
 const continueAnswer = () => { asr?.deactivate(); stick.value = true; void chat.send(CONTINUE_TEXT); };
 
-const choose = (id: string | null) => { asr?.deactivate(); confirmingId.value = ''; void chat.select(id); };
+const choose = (id: string | null) => { attachmentVersion++; attachments.value = []; asr?.deactivate(); confirmingId.value = ''; void chat.select(id); };
 
 // The list: groups as folders, then the conversations in none.
 const COLLAPSED_KEY = 'xiaoban.chat.collapsed-groups';
@@ -440,7 +425,7 @@ async function openLink(href: string) {
 
           <template v-if="view">
             <template v-for="item in view.items" :key="item.id">
-              <div v-if="item.kind === 'user'" class="msg user" data-testid="msg-user"><div class="bubble"><div v-if="item.images.length" class="bubble-images"><img v-for="(url, n) in item.images" :key="n" :src="url" :alt="`第 ${n + 1} 张图片`" :data-testid="`msg-user-image-${n}`" @click="preview = url" /></div><template v-if="item.text">{{ item.text }}</template></div></div>
+              <div v-if="item.kind === 'user'" class="msg user" data-testid="msg-user"><div class="bubble"><div v-if="item.images.length" class="bubble-images"><img v-for="(url, n) in item.images" :key="n" :src="url" :alt="`第 ${n + 1} 张图片`" :data-testid="`msg-user-image-${n}`" @click="preview = attachmentImage(url)" /></div><div v-if="item.files?.length" class="file-cards"><span v-for="(file, n) in item.files" :key="n" class="file-chip" :title="file.name">📄 {{ file.name }} · {{ Math.ceil(file.size / 1024) }} KB</span></div><template v-if="item.text">{{ item.text }}</template></div></div>
               <div v-else-if="item.kind === 'assistant'" class="msg assistant" data-testid="msg-assistant">
                 <img class="avatar" src="/xiaoban.svg" alt="" width="28" height="28" />
                 <div class="answer"><MarkdownView :source="item.text" @open="openLink" /><span v-if="item.streaming" class="cursor" aria-hidden="true"></span>
@@ -500,19 +485,20 @@ async function openLink(href: string) {
 
       <button v-if="!stick && view?.items.length" type="button" class="to-bottom" data-testid="chat-bottom" aria-label="回到最新" @click="stick = true; toBottom()"><ArrowDown :size="16" /></button>
 
-      <footer class="composer" @compositionstart="composing = true" @compositionend="composing = false" @paste="onPaste">
+      <footer class="composer" @compositionstart="composing = true" @compositionend="composing = false" @paste="onPaste" @dragover.prevent @drop.prevent="addImages(Array.from($event.dataTransfer?.files ?? []))">
         <div class="composer-box" :class="{ 'has-attachments': attachments.length > 0, 'voice-active': asr?.listening }">
           <AsrStatus v-if="asr" :asr="asr" chat />
           <div v-if="attachments.length" class="attachments" data-testid="chat-attachments">
             <div v-for="(url, n) in attachments" :key="n" class="thumb">
-              <img :src="url" :alt="`待发送的第 ${n + 1} 张图片`" :data-testid="`chat-attachment-${n}`" @click="preview = url" />
-              <button type="button" class="thumb-remove" :data-testid="`chat-attachment-remove-${n}`" :aria-label="`移除第 ${n + 1} 张图片`" :disabled="running" @click="removeAttachment(n)"><X :size="12" /></button>
+              <img v-if="attachmentImage(url)" :src="attachmentImage(url)!" :alt="`待发送的第 ${n + 1} 张图片`" :data-testid="`chat-attachment-${n}`" @click="preview = attachmentImage(url)" />
+              <span v-if="!attachmentImage(url)" class="file-chip" :title="attachmentName(url)">📄 {{ attachmentName(url) }}</span>
+              <button type="button" class="thumb-remove" :data-testid="`chat-attachment-remove-${n}`" :aria-label="`移除第 ${n + 1} 个附件`" :disabled="running" @click="removeAttachment(n)"><X :size="12" /></button>
             </div>
-            <small class="attach-hint">{{ attachments.length }}/{{ MAX_IMAGES }} 张 · 发送时会一起交给小伴</small>
+            <small class="attach-hint">{{ attachments.length }}/{{ MAX_IMAGES }} 个附件 · 发送时会一起交给小伴</small>
           </div>
           <div class="composer-row">
-            <input ref="filePicker" type="file" accept="image/png,image/jpeg,image/gif,image/webp" multiple hidden data-testid="chat-image-input" @change="onPick" />
-            <NButton quaternary circle size="small" data-testid="chat-pick-image" aria-label="选择图片" :disabled="!store.desktop || !chat.configured || running || attachments.length >= MAX_IMAGES" @click="openPicker"><template #icon><ImagePlus :size="16" /></template></NButton>
+            <input ref="filePicker" type="file" :accept="ATTACHMENT_ACCEPT" multiple hidden data-testid="chat-image-input" @change="onPick" />
+            <NButton quaternary circle size="small" data-testid="chat-pick-image" aria-label="添加附件" :disabled="!store.desktop || !chat.configured || running || attachmentReading || attachments.length >= MAX_IMAGES" @click="openPicker"><template #icon><ImagePlus :size="16" /></template></NButton>
             <button v-if="finishingVoice" type="button" class="voice-finish" data-testid="chat-asr-toggle" aria-label="正在转写并发送" aria-pressed="false" disabled><LoaderCircle class="spin" :size="13" aria-hidden="true" />正在发送</button>
             <button v-else-if="asr?.recordingRequested" type="button" class="voice-finish" data-testid="chat-asr-toggle" :aria-label="asr.listening ? '结束录音并发送' : '取消准备'" aria-pressed="true" @click="toggleVoice"><span v-if="asr.listening" class="recording-dot" aria-hidden="true" /><LoaderCircle v-else class="spin" :size="13" aria-hidden="true" />{{ asr.listening ? '结束并发送' : '取消准备' }}</button>
             <NButton v-else-if="asr" quaternary circle size="small" data-testid="chat-asr-toggle" aria-label="开始语音输入" aria-pressed="false" :title="asr.error ? `${asr.error}（点击重试）` : '开始语音输入'" :disabled="!store.desktop || !asr.ready || !microphoneAllowed || asr.saving" @click="toggleVoice"><template #icon><Mic :size="16" /></template></NButton>
@@ -534,6 +520,7 @@ async function openLink(href: string) {
 </template>
 
 <style scoped>
+.file-cards{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px}.file-chip{display:inline-block;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;padding:8px;border-radius:8px;background:rgba(127,127,127,.1)}.thumb:has(.file-chip){width:auto;max-width:210px}.thumb .file-chip{padding-right:20px}
 .speech-button{display:inline-flex;align-items:center;gap:5px;margin-top:8px;font-size:12px}
 
 .chat-page{flex:1;min-height:0;display:grid;grid-template-columns:200px minmax(0,1fr);background:var(--ui-app-bg)}
@@ -686,6 +673,7 @@ async function openLink(href: string) {
 }
 @media(prefers-reduced-motion:reduce){.spin,.cursor,.recording-dot{animation:none}}
 </style>
+
 
 
 

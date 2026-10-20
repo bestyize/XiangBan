@@ -1,3 +1,4 @@
+import type { PendingAttachment } from './attachments.ts';
 import { modelFailure } from './model-errors.ts';
 import { reactive } from 'vue';
 import type { ApprovalDecision, ApprovalRequest, ChatEventPayload, ChatGroup, ContextInfo, Library, Overview, QuestionRequest, SessionSummary, SessionView, WireMessage } from './types.ts';
@@ -36,7 +37,7 @@ export interface ChatStore {
   dispose(): void;
   select(id: string | null): Promise<void>;
   /** Returns false when nothing was sent, so the caller can give the text back to the user. */
-  send(text: string, images?: string[]): Promise<boolean>;
+  send(text: string, attachments?: PendingAttachment[]): Promise<boolean>;
   retry(): Promise<boolean>;
   cancel(): Promise<void>;
   remove(id: string): Promise<void>;
@@ -206,7 +207,9 @@ export function createChatStore(deps: ChatDeps): ChatStore {
       }
     },
 
-    async send(text, images = []) {
+    async send(text, attachments = []) {
+      const images = attachments.filter((item): item is string => typeof item === "string");
+      const files = attachments.filter(item => typeof item !== "string");
       deps.onActivity?.();
       if (!deps.desktop) { deps.notify('请在桌面应用中使用聊天', 'error'); return false; }
       let id = store.currentId;
@@ -228,13 +231,13 @@ export function createChatStore(deps: ChatDeps): ChatStore {
       }
       const view = viewOf(id, true);
       if (view.running) return false;
-      const item = { kind: 'user' as const, id: nextId(view), text, images: [...images] };
+      const item = { kind: 'user' as const, id: nextId(view), text, images: [...images], ...(files.length ? { files: files.map(({ name, size, mime }) => ({ name, size, mime })) } : {}) };
       view.items.push(item);
       view.running = true;
       view.status = '';
       try {
         // Images are left out entirely when there are none, so a plain message keeps its old shape.
-        const args = images.length ? { sessionId: id, text, images } : { sessionId: id, text };
+        const args = { sessionId: id, text, ...(images.length ? { images } : {}), ...(files.length ? { attachments: files.map(({name,dataUrl}) => ({name,dataUrl})) } : {}) };
         upsert(await deps.invoke<SessionSummary>('chat_send', args));
         return true;
       } catch (error) {
@@ -412,3 +415,4 @@ export function createChatStore(deps: ChatDeps): ChatStore {
 
   return store;
 }
+

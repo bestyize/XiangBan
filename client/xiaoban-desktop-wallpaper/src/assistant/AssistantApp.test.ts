@@ -93,13 +93,13 @@ describe('assistant image input', () => {
     await vi.waitFor(() => expect(store.attachments).toHaveLength(1)); await nextTick();
     expect(store.attachments[0]).toMatch(/^data:image\/png;base64,/);
     expect(wrapper.get('[data-testid="assistant-attachments"] img').attributes('src')).toBe(store.attachments[0]);
-    await wrapper.get('[aria-label="移除图片 1"]').trigger('click'); expect(store.attachments).toEqual([]);
+    await wrapper.get('[aria-label="移除附件 1"]').trigger('click'); expect(store.attachments).toEqual([]);
   });
   it('allows image-only questions and rejects unsupported and oversized files', async () => {
     const { store, wrapper } = setup(); store.phase = 'idle'; store.input = ''; store.attachments = ['data:image/png;base64,AA==']; await nextTick();
     await wrapper.get('[data-testid="assistant-primary"]').trigger('click'); expect(store.submit).toHaveBeenCalledOnce();
     await wrapper.get('.composer').trigger('drop', { dataTransfer: { files: [new File(['x'], 'x.svg', { type: 'image/svg+xml' })], types: ['Files'] } });
-    await flushPromises(); expect(store.attachments).toHaveLength(1); expect(store.note).toHaveBeenCalledWith(expect.stringContaining('支持 PNG'));
+    await flushPromises(); expect(store.attachments).toHaveLength(1); expect(store.note).toHaveBeenCalledWith(expect.stringContaining('暂不支持这种文件'));
     const large = imageFile(); Object.defineProperty(large, 'size', { value: 3 * 1024 * 1024 + 1 });
     await wrapper.get('.composer').trigger('drop', { dataTransfer: { files: [large], types: ['Files'] } }); await flushPromises();
     expect(store.attachments).toHaveLength(1); expect(store.note).toHaveBeenCalledWith(expect.stringContaining('3MB'));
@@ -124,7 +124,7 @@ describe('compact horizontal assistant tools', () => {
     expect(wrapper.find('[data-testid="assistant-toolbar"]').exists()).toBe(false);
     expect(wrapper.get('.capsule').findAll('button')).toHaveLength(2); // orb and one primary button
     await wrapper.get('[data-testid="assistant-primary"]').trigger('click');
-    expect(wrapper.get('[role="toolbar"]').findAll('button').map(b=>b.attributes('aria-label'))).toEqual(['去超级小伴设置页','收起小伴','新会话','去聊天详情页','选择图片','截图']);
+    expect(wrapper.get('[role="toolbar"]').findAll('button').map(b=>b.attributes('aria-label'))).toEqual(['去超级小伴设置页','收起小伴','新会话','去聊天详情页','添加附件','截图']);
     await wrapper.get('[data-testid="assistant-settings"]').trigger('click'); await flushPromises();
     expect(store.openSettings).toHaveBeenCalledWith('assistant');
     await openToolbar(wrapper); await wrapper.get('[data-testid="assistant-expand"]').trigger('click');
@@ -247,4 +247,14 @@ describe('assistant native morph coordination',()=>{
     expect(invoke).toHaveBeenCalledWith('assistant_transition_ready',{id:1,step:'enter'});
     callback({id:1,target:'ball',step:'show',right:true});await flushPromises();expect(wrapper.get('.stage').classes()).not.toContain('morphing');animation.mockRestore();
   });
+});
+
+
+it('accepts a document drop in the capsule and renders a removable named card', async () => {
+  const {store,wrapper}=setup();store.phase='idle';await nextTick();
+  await wrapper.get('.composer').trigger('drop',{dataTransfer:{files:[new File(['amount\n12'],'预算.csv',{type:'text/csv'})],types:['Files']}});
+  await vi.waitFor(()=>expect(store.attachments).toHaveLength(1));
+  expect(store.attachments[0]).toMatchObject({name:'预算.csv',dataUrl:expect.stringMatching(/^data:text\/csv;base64,/)});
+  expect(wrapper.get('[data-testid="assistant-attachments"]').text()).toContain('预算.csv');
+  await wrapper.get('[aria-label="移除附件 1"]').trigger('click');expect(store.attachments).toHaveLength(0);
 });

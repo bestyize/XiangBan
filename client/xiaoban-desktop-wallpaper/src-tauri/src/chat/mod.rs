@@ -12,6 +12,7 @@ mod prompt;
 mod sessions;
 
 use agent_kernel::builtin::fs::{fs_tools, fs_write_tools};
+use agent_file_tools::{Attachment, AttachmentInput, AttachmentStore, AttachmentHistory, AttachmentContext, ReadFile};
 use agent_kernel::builtin::{AskUser, Question, Shell, TimeNow, Todo, WebFetch};
 use agent_kernel::memory::Memory;
 use agent_kernel::provider::anthropic::AnthropicMessages;
@@ -330,7 +331,12 @@ struct Parts<'a> {
 }
 
 /// Puts the kernel together: the model, the tools the assistant may use, and the rules around them.
+#[cfg(test)]
 fn assemble(parts: Parts<'_>) -> Result<Agent, String> {
+    assemble_with_files(parts, Vec::new())
+}
+
+fn assemble_with_files(parts: Parts<'_>, attachments: Vec<Attachment>) -> Result<Agent, String> {
     let Parts { provider, dirs, workspace, permission, todo, ask, desktop, utc_offset_minutes, open_computer_use, spawn_computer_use, context_tokens } = parts;
     for dir in [dirs.sessions(), dirs.spill(), dirs.memory(), dirs.skills()] {
         fs::create_dir_all(&dir).map_err(|e| format!("无法创建 {}：{e}", dir.display()))?;
@@ -338,7 +344,13 @@ fn assemble(parts: Parts<'_>) -> Result<Agent, String> {
     clean_spill(&dirs.spill(), SPILL_KEEP);
     sync_computer_use_skill(&dirs.skills(), open_computer_use);
     sync_community_skill(&dirs.skills());
-    let skills = Arc::new(Skills::new().writable_root(dirs.skills()));
+    let bundled = dirs.chat.join("bundled-skills");
+    let file_skill = bundled.join("file-analysis");
+    fs::create_dir_all(&file_skill).map_err(|e| e.to_string())?;
+    fs::write(file_skill.join("SKILL.md"), agent_file_tools::ANALYSIS_SKILL).map_err(|e| e.to_string())?;
+    fs::create_dir_all(file_skill.join("scripts")).map_err(|e| e.to_string())?;
+    fs::write(file_skill.join("scripts/csv_summary.py"), agent_file_tools::CSV_SUMMARY_SCRIPT).map_err(|e| e.to_string())?;
+    let skills = Arc::new(Skills::new().read_only_root(bundled).writable_root(dirs.skills()));
     let memory = Arc::new(Memory::new(dirs.memory()));
     // Started before the prompt is written, so the prompt can say honestly whether the tools exist.
     let computer_use = if open_computer_use { Some(spawn_computer_use()) } else { None };
@@ -350,7 +362,7 @@ fn assemble(parts: Parts<'_>) -> Result<Agent, String> {
         open_computer_use_error: computer_use_error.as_deref(),
     };
 
-    let mut builder = Agent::builder(provider, Arc::new(CompactingStore::new(JsonlStore::new(dirs.sessions()))))
+    let mut builder = Agent::builder(provider, Arc::new(AttachmentHistory::new(CompactingStore::new(JsonlStore::new(dirs.sessions())), attachments.clone())))
         .system_prompt(prompt::system_prompt(&environment))
         .prompt_section(skills.prompt_section())
         .prompt_section(memory.prompt_section())
@@ -363,10 +375,14 @@ fn assemble(parts: Parts<'_>) -> Result<Agent, String> {
         // Before spilling, so it compares real outputs rather than previews that name a fresh file each time.
         .middleware(RepeatGuard::new())
         .middleware(SpillOutput::new(dirs.spill()))
+        .middleware(AttachmentContext::new(attachments))
         .middleware(ContextTrim::new(context_tokens))
         .middleware(ContinueGuard::new())
         .max_turns(MAX_TURNS);
-    let readable = fs_tools(vec![workspace.to_path_buf(), dirs.spill()]).map_err(|e| e.to_string())?;
+    let roots = vec![workspace.to_path_buf(), dirs.spill()];
+    let mut readable = fs_tools(roots.clone()).map_err(|e| e.to_string())?;
+    readable.retain(|tool| tool.spec().name != "read_file");
+    readable.push(Arc::new(ReadFile::new(roots, AttachmentStore::new(dirs.chat.join("attachments"))).map_err(|e| e.to_string())?));
     let writable = fs_write_tools(vec![workspace.to_path_buf()]).map_err(|e| e.to_string())?;
     for tool in readable.into_iter().chain(writable).chain(skills.tools()).chain(memory.tools()).chain(desktop_tools::tools(desktop)) {
         builder = builder.tool_arc(tool);
@@ -379,13 +395,13 @@ fn assemble(parts: Parts<'_>) -> Result<Agent, String> {
     builder.build().map_err(|e| e.to_string())
 }
 
-fn build_agent(app: &tauri::AppHandle, config: &AiConfig, key_source: Option<KeySource>, workspace: &Path) -> Result<Agent, String> {
+fn build_agent(app: &tauri::AppHandle, config: &AiConfig, key_source: Option<KeySource>, workspace: &Path, attachments: Vec<Attachment>) -> Result<Agent, String> {
     let state = app.state::<ChatState>();
     let ask = {
         let (app, broker) = (app.clone(), state.broker.clone());
         AskUser::new(move |session, question, ctx| ask_question(&app, &broker, session, question, ctx))
     };
-    assemble(Parts {
+    assemble_with_files(Parts {
         provider: provider_with(config, key_source)?,
         dirs: &Dirs::of(app)?,
         workspace,
@@ -397,7 +413,7 @@ fn build_agent(app: &tauri::AppHandle, config: &AiConfig, key_source: Option<Key
         open_computer_use: config.open_computer_use,
         spawn_computer_use: spawn_open_computer_use,
         context_tokens: config.context_tokens,
-    })
+    }, attachments)
 }
 
 /// Runs `change` on the list of conversations and saves it; the first use loads it from disk.
@@ -478,18 +494,20 @@ pub fn chat_new_session(app: tauri::AppHandle, permission_mode: Option<String>) 
 }
 
 #[tauri::command]
-pub fn chat_send(app: tauri::AppHandle, session_id: String, text: String, images: Option<Vec<String>>, retry: Option<bool>) -> Result<SessionSummary, String> {
+pub fn chat_send(app: tauri::AppHandle, session_id: String, text: String, images: Option<Vec<String>>, retry: Option<bool>, attachments: Option<Vec<AttachmentInput>>) -> Result<SessionSummary, String> {
     if !sessions::valid_id(&session_id) {
         return Err("对话编号不对".into());
     }
     let retry = retry.unwrap_or(false);
+    let attachments = attachments.unwrap_or_default();
     let text = text.trim().to_string();
     let images = images.unwrap_or_default();
-    if images.len() > MAX_IMAGES {
-        return Err(format!("一次最多发送 {MAX_IMAGES} 张图片"));
+    if images.len() + attachments.len() > MAX_IMAGES {
+        return Err(format!("一次最多发送 {MAX_IMAGES} 个附件"));
     }
     let images = images.iter().map(|raw| clean_image(raw)).collect::<Result<Vec<_>, _>>()?;
-    if !retry && text.is_empty() && images.is_empty() {
+    if retry && (!attachments.is_empty() || !images.is_empty()) { return Err("重试不能添加新附件".into()); }
+    if !retry && text.is_empty() && images.is_empty() && attachments.is_empty() {
         return Err("请先输入内容".into());
     }
     if text.chars().count() > MAX_INPUT_CHARS {
@@ -534,10 +552,24 @@ pub fn chat_send(app: tauri::AppHandle, session_id: String, text: String, images
     state.permission.set_mode(perm_mode);
     *lock(&state.workspace) = Some(workspace.clone());
 
+    let history_dir = Dirs::of(&app)?.sessions();
+    let attachment_store = AttachmentStore::new(Dirs::of(&app)?.chat.join("attachments"));
     let cancel = Arc::new(AtomicBool::new(false));
-    if lock(&state.runs).insert(summary.id.clone(), cancel.clone()).is_some() {
-        return Err("这个对话还在回答或正在压缩，请等它结束或先停止".into());
+    {
+        let mut runs = lock(&state.runs);
+        if runs.contains_key(&summary.id) { return Err("这个对话还在回答或正在压缩，请等它结束或先停止".into()); }
+        runs.insert(summary.id.clone(), cancel.clone());
     }
+    let mut inputs = attachments;
+    for (index, image) in images.iter().enumerate() {
+        let extension = if image.starts_with("data:image/jpeg;") { "jpg" } else if image.starts_with("data:image/gif;") { "gif" } else if image.starts_with("data:image/webp;") { "webp" } else { "png" };
+        inputs.push(AttachmentInput { name: format!("图片-{}.{extension}", index + 1), data_url: image.clone() });
+    }
+    let saved = match attachment_store.import(&session_id, &inputs) {
+        Ok(saved) => saved,
+        Err(error) => { lock(&state.runs).remove(&session_id); return Err(error); }
+    };
+    let saved_for_thread = saved.clone();
 
     // Build the agent and run it entirely on a dedicated OS thread.
     // reqwest::blocking::Client internally manages its own current-thread runtime;
@@ -549,9 +581,10 @@ pub fn chat_send(app: tauri::AppHandle, session_id: String, text: String, images
         let session = id.clone();
         // 小伴 AI 要先拿到有效的账号令牌，可能需要联网刷新，所以放在这条线程里做，不卡住界面。
         let prepared = ai_gateway::prepare(&handle, config_owned).and_then(|(config, source)| {
-            build_agent(&handle, &config, source.clone(), &workspace_owned).map(|agent| (agent, config, source))
+            build_agent(&handle, &config, source.clone(), &workspace_owned, saved_for_thread.clone()).map(|agent| (agent, config, source))
         });
         if cancel.load(Ordering::SeqCst) {
+            attachment_store.rollback(&saved_for_thread);
             emit(&sender, "chat-event", json!({ "session": session, "event": { "type": "cancelled" } }));
             finish_run(&handle, &id);
             return;
@@ -559,6 +592,7 @@ pub fn chat_send(app: tauri::AppHandle, session_id: String, text: String, images
         let (agent, config_owned, key_source) = match prepared {
             Ok(ready) => ready,
             Err(error) => {
+                attachment_store.rollback(&saved_for_thread);
                 emit(&sender, "chat-event", json!({ "session": session, "event": { "type": "error", "message": error } }));
                 finish_run(&handle, &id);
                 return;
@@ -575,9 +609,17 @@ pub fn chat_send(app: tauri::AppHandle, session_id: String, text: String, images
         if answered.is_ok() {
             auto_compact(&handle, &id, &config_owned, key_source, &cancel);
         }
+        // Keep files if their user message was saved, including failed model calls that can be retried.
+        if let Ok(messages) = JsonlStore::new(history_dir).load(&id) {
+            let persisted = messages.iter().any(|m| m.structured_content.as_ref()
+                .and_then(|v| v.get("attachments")).and_then(Value::as_array)
+                .is_some_and(|items| items.iter().any(|item| saved_for_thread.iter().any(|a| item["id"].as_str() == Some(a.id.as_str())))));
+            if !persisted { attachment_store.rollback(&saved_for_thread); }
+        }
         finish_run(&handle, &id);
     });
     if let Err(error) = started {
+        AttachmentStore::new(Dirs::of(&app)?.chat.join("attachments")).rollback(&saved);
         lock(&state.runs).remove(&summary.id);
         return Err(format!("无法开始回答：{error}"));
     }
@@ -603,6 +645,7 @@ pub fn chat_delete_session(app: tauri::AppHandle, session_id: String) -> Result<
         return Err("这个对话还在回答，请先停止再删除".into());
     }
     JsonlStore::new(Dirs::of(&app)?.sessions()).remove(&session_id).map_err(|e| e.to_string())?;
+    AttachmentStore::new(Dirs::of(&app)?.chat.join("attachments")).remove_session(&session_id)?;
     state.permission.forget_session(&session_id);
     state.todo.clear_session(&session_id);
     state.auto_compact.forget(&session_id);
@@ -818,4 +861,5 @@ pub fn chat_set_permission_mode(app: tauri::AppHandle, session_id: Option<String
 
 #[cfg(test)]
 mod tests;
+
 

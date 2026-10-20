@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { ATTACHMENT_ACCEPT, MAX_TOTAL_BYTES, attachmentBytes, attachmentImage, attachmentName, readAttachment } from '../ui/chat/attachments.ts';
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { ArrowUp, Square, X, Copy, Check, ImagePlus, Settings, ChevronDown, MessageSquare, MessageSquarePlus, ScanLine, Plus } from 'lucide-vue-next';
 import MarkdownView from '../ui/chat/MarkdownView.ts';
@@ -151,20 +152,13 @@ async function takeScreenshot() {
 }
 // Toolbar visibility never changes native window geometry. Headroom is reserved on open.
 let imageVersion = 0, dropDepth = 0;
-const imageTypes = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
+
 const canAttach = computed(() => !busy.value && !props.store.ask && !props.store.approval && !imageReading.value && !submitting.value && !capturing.value && !props.store.changingSession);
 watch(() => props.store.open, () => { imageVersion++; dropDepth = 0; dropActive.value = false; closeTools(); });
+watch(() => props.store.changingSession, changing => { if (changing) imageVersion++; });
 function openPicker() {
   if (!canAttach.value) return;
   props.store.prepareImages(); filePicker.value?.click();
-}
-function readImage(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => typeof reader.result === 'string' ? resolve(reader.result) : reject(Error('图片读取失败，请重试。'));
-    reader.onerror = reader.onabort = () => reject(Error('图片读取失败，请重试。'));
-    reader.readAsDataURL(file);
-  });
 }
 async function addImages(files: File[]) {
   if (!files.length || !props.store.open) return;
@@ -176,11 +170,10 @@ async function addImages(files: File[]) {
   try {
     for (const file of files) {
       if (version !== imageVersion) break;
-      if (props.store.attachments.length >= 8) { warning = '一次最多添加 8 张图片。'; break; }
-      if (!imageTypes.includes(file.type)) { warning = '支持 PNG、JPEG、GIF 和 WebP 图片。'; continue; }
-      if (file.size > 3 * 1024 * 1024) { warning = '单张图片需小于 3MB，请换一张。'; continue; }
+      if (props.store.attachments.length >= 8) { warning = '一次最多添加 8 个附件。'; break; }
       try {
-        const image = await readImage(file);
+        const image = await readAttachment(file);
+        if (props.store.attachments.reduce((sum, a) => sum + attachmentBytes(a), 0) + attachmentBytes(image) > MAX_TOTAL_BYTES) { warning = '附件合计不能超过 30MB'; continue; }
         if (version === imageVersion) props.store.attachments.push(image);
       } catch (error) { warning = (error as Error).message; }
     }
@@ -200,7 +193,7 @@ function dropImages(event: DragEvent) {
   void addImages(Array.from(event.dataTransfer?.files ?? []));
 }
 function pasteImages(event: ClipboardEvent) {
-  const files = Array.from(event.clipboardData?.files ?? []).filter(file => file.type.startsWith('image/'));
+  const files = Array.from(event.clipboardData?.files ?? []);
   if (files.length) { event.preventDefault(); void addImages(files); }
 }
 const inner = ref<HTMLElement>();
@@ -218,7 +211,7 @@ watch(() => [props.store.approval?.id, props.store.ask?.id, props.store.hint, pr
 
 const busy = computed(() => ['thinking', 'answering', 'speaking'].includes(props.store.phase));
 const hasCard = computed(() => !cardDismissed.value && Boolean(
-  props.store.hint || props.store.question || props.store.questionImages?.length || props.store.answer || props.store.working || props.store.failure
+  props.store.hint || props.store.question || props.store.questionImages?.length || props.store.questionFiles?.length || props.store.answer || props.store.working || props.store.failure
   || props.store.approval || props.store.ask || props.store.phase === 'thinking',
 ));
 const canSend = computed(() => !busy.value && !props.store.approval && !imageReading.value && !submitting.value && !capturing.value && !props.store.changingSession && Boolean(props.store.input.trim() || props.store.attachments.length));
@@ -363,6 +356,7 @@ onBeforeUnmount(()=>{
                 {{ store.hint }}
                 <button v-if="store.hintTab" type="button" class="link" @click="store.openSettings(store.hintTab)">{{ store.hintTab === 'ai' ? '去配置' : '去设置' }}</button>
               </p>
+              <div v-if="store.questionFiles?.length" class="sent-files"><span v-for="(file, n) in store.questionFiles" :key="n" class="file-chip" :title="file.name">📄 {{ file.name }}</span></div>
               <div v-if="store.questionImages?.length" class="sent-images"><img v-for="(image, index) in store.questionImages" :key="index" :src="image" :alt="`已发送的图片 ${index + 1}`" draggable="false" /></div>
               <p v-if="store.question" class="you">{{ store.question }}</p>
               <div v-if="store.answer" class="reply"><MarkdownView :source="store.answer" @open="openLink" /><span v-if="store.phase === 'answering'" class="cursor" aria-hidden="true"></span></div>
@@ -383,9 +377,9 @@ onBeforeUnmount(()=>{
           </section>
         </Transition>
         <div class="composer" :class="{ 'drop-active': dropActive }" @dragenter="dragEnter" @dragleave="dragLeave" @dragover="dragOver" @drop.stop="dropImages" @paste="pasteImages">
-        <input ref="filePicker" class="sr" type="file" accept="image/png,image/jpeg,image/gif,image/webp" multiple tabindex="-1" aria-label="选择要发送的图片" data-testid="assistant-image-input" @change="onPick" />
+        <input ref="filePicker" class="sr" type="file" :accept="ATTACHMENT_ACCEPT" multiple tabindex="-1" aria-label="选择要发送的附件" data-testid="assistant-image-input" @change="onPick" />
         <div v-if="store.attachments.length" class="image-tray" data-no-drag data-testid="assistant-attachments">
-          <div v-for="(image, index) in store.attachments" :key="index" class="image-thumb"><img :src="image" :alt="`待发送的图片 ${index + 1}`" draggable="false" /><button type="button" :aria-label="`移除图片 ${index + 1}`" :disabled="submitting || imageReading" @click="store.attachments.splice(index, 1)"><X :size="11" /></button></div>
+          <div v-for="(image, index) in store.attachments" :key="index" class="image-thumb"><img v-if="attachmentImage(image)" :src="attachmentImage(image)!" :alt="`待发送的图片 ${index + 1}`" draggable="false" /><span v-if="!attachmentImage(image)" class="file-chip" :title="attachmentName(image)">📄 {{ attachmentName(image) }}</span><button type="button" :aria-label="`移除附件 ${index + 1}`" :disabled="submitting || imageReading" @click="store.attachments.splice(index, 1)"><X :size="11" /></button></div>
         </div>
         <div class="capsule" :data-phase="store.phase">
           <button type="button" class="orb-button" :title="store.phase === 'speaking' ? '停止朗读' : store.phase === 'listening' ? '暂停聆听 · 拖动可移动' : '点一下开始说话 · 拖动可移动'" :aria-label="store.phase === 'speaking' ? '停止朗读' : store.phase === 'listening' ? '暂停聆听' : '开始说话'" data-testid="assistant-orb" :disabled="imageReading || submitting || capturing" data-drag-handle @click="onOrb">
@@ -398,13 +392,13 @@ onBeforeUnmount(()=>{
               <button type="button" class="tool-button" title="收起小伴" aria-label="收起小伴" data-testid="assistant-close" @click="toolAction('hide')"><ChevronDown :size="16" :stroke-width="1.7" /></button>
               <button type="button" class="tool-button" title="新会话" aria-label="新会话" data-testid="assistant-new-chat" :disabled="imageReading || submitting || capturing || store.changingSession" @click="toolAction('new')"><MessageSquarePlus :size="16" :stroke-width="1.7" /></button>
               <button type="button" class="tool-button" title="去聊天详情页" aria-label="去聊天详情页" data-testid="assistant-expand" @click="toolAction('chat')"><MessageSquare :size="16" :stroke-width="1.7" /></button>
-              <button type="button" class="tool-button" title="选择图片" aria-label="选择图片" data-testid="assistant-add-image" :disabled="!canAttach || store.attachments.length >= 8" @click="toolAction('image')"><ImagePlus :size="16" :stroke-width="1.7" /></button>
+              <button type="button" class="tool-button" title="添加附件" aria-label="添加附件" data-testid="assistant-add-image" :disabled="!canAttach || store.attachments.length >= 8" @click="toolAction('image')"><ImagePlus :size="16" :stroke-width="1.7" /></button>
               <button type="button" class="tool-button" title="截图" aria-label="截图" data-testid="assistant-screenshot" :disabled="!canAttach || store.attachments.length >= 8" @click="toolAction('screenshot')"><ScanLine :size="16" :stroke-width="1.7" /></button>
             </div>
             <button ref="primaryButton" type="button" class="round main-action" :class="{ 'has-action': canSend, 'is-stop': busy, 'tools-open': toolsOpen && !canSend && !busy }" :aria-label="busy ? '停止' : canSend ? '发送' : toolsOpen ? '收起工具' : '展开工具'" :title="busy ? '停止回复 · 悬停展开工具' : canSend ? '发送 · 悬停展开工具' : '展开工具'" :aria-expanded="toolsOpen" aria-controls="assistant-toolbar" aria-keyshortcuts="ArrowUp ArrowDown" :disabled="imageReading || capturing || (submitting && !busy)" data-testid="assistant-primary" @keydown="primaryKeys" @click="primary"><Square v-if="busy" :size="12" fill="currentColor" :stroke-width="0" /><ArrowUp v-else-if="canSend" :size="18" /><Plus v-else :size="18" /></button>
           </div>
         </div>
-        <p v-if="dropActive || imageReading || capturing" class="image-status" aria-live="polite">{{ capturing ? '截图中，按 Esc 可以取消' : imageReading ? '正在读取图片…' : '松开添加图片' }}</p>
+        <p v-if="dropActive || imageReading || capturing" class="image-status" aria-live="polite">{{ capturing ? '截图中，按 Esc 可以取消' : imageReading ? '正在读取附件…' : '松开添加附件' }}</p>
         </div>
         <span class="sr" aria-live="polite">{{ store.status }}</span>
       </div>
@@ -418,6 +412,7 @@ onBeforeUnmount(()=>{
 html,body,#app{background:transparent!important}
 </style>
 <style scoped>
+.file-chip{display:inline-block;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;padding:10px 14px;border-radius:8px;background:var(--button)}.image-thumb:has(.file-chip){width:auto;max-width:190px}.sent-files{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
 .stage{--card:#292C31;--capsule:linear-gradient(175deg,#3E4147 0%,#35383E 48%,#2F3238 100%);--line:#A6B5CB22;--text:#DFE3E9;--text-soft:#878E99;--working:#A4AEBD;--placeholder:#919CAB;--field:#DFE3E9;--button:#353A43;--button-hover:#434750;--button-fg:#BAC4D1;--button-fg-hover:#DFE3E9;--code:#FFFFFF0B;--link:#B0C4D7;--hint:#D7BE92;--failure:#EEA5AD;--gate-bg:#C6AE7D0F;--gate-line:#C6AE7D30;--gate-title:#DDC8A5;--gate-tool:#BCC4CF;--ghost:#FFFFFF0D;--ghost-fg:#DFE3E9;--scroll:#FFFFFF25;--dot:#A8B6C6;--listen:#B2C8EA50;--busy:#A6B5CB30;--attention:#C6AE7D60;--panel-shadow:0 5px 14px #00000014,0 1px 2px #00000016;--capsule-shadow:inset 0 1px 0 #E8F0FF15,inset 0 -1px 0 #11182126,0 8px 25px #00000025;--stop:#484E56;--stop-fg:#B1BBC7;--stop-hover:#535B65;--stop-fg-hover:#CCD5DF;--ui-line:var(--line);--ui-surface-alt:var(--code);--ui-text-primary:var(--text);--ui-text-secondary:var(--working);--ui-text-tertiary:var(--text-soft);--ui-primary:var(--link);position:relative;display:flex;flex-direction:column;justify-content:flex-end;height:100vh;color:var(--text);font:14px/1.6 -apple-system,BlinkMacSystemFont,"PingFang SC","Segoe UI","Microsoft YaHei UI",sans-serif;-webkit-font-smoothing:antialiased;user-select:none;cursor:default;pointer-events:none;color-scheme:dark}
 .stage.light{--card:#FFFFFF;--capsule:linear-gradient(175deg,#FEFFFF 0%,#F3F6F9 45%,#EAF0F5 100%);--line:#D5DDE6;--text:#414851;--text-soft:#929BA7;--working:#718092;--placeholder:#A0A9B4;--field:#414851;--button:#EAEFF4;--button-hover:#DFE6ED;--button-fg:#657181;--button-fg-hover:#414851;--code:#71849A0D;--link:#657F95;--hint:#947445;--failure:#B95264;--gate-bg:#B9944B0B;--gate-line:#B9944B30;--gate-title:#886B3E;--gate-tool:#657181;--ghost:#71849A0D;--ghost-fg:#414851;--scroll:#71849A35;--dot:#899BAE;--listen:#B3C2D3;--busy:#C4CFDA;--attention:#C6AE7D;--panel-shadow:0 3px 12px #68788A07,0 1px 2px #58677805;--capsule-shadow:inset 0 1px 0 #FFFFFFF2,inset 0 -1px 0 #8F9DAC0C,0 7px 24px #71849A12;--stop:#E6EBEF;--stop-fg:#778491;--stop-hover:#DDE4EA;--stop-fg-hover:#5F7080;color-scheme:light}
 .ball-stage{display:grid;place-items:center;height:100vh}
@@ -518,3 +513,4 @@ html,body,#app{background:transparent!important}
 <style scoped>
 .card-footer{display:flex;justify-content:flex-end;padding:0 12px 9px}.copy-answer{display:inline-flex;align-items:center;gap:5px;padding:4px 7px;border:0;border-radius:7px;background:transparent;color:var(--text-soft);font:inherit;font-size:11px;line-height:1.5;cursor:pointer}.copy-answer:hover{background:var(--button-hover);color:var(--text)}.copy-answer:focus-visible{outline:2px solid var(--link);outline-offset:1px}.copy-answer:disabled{opacity:.5;cursor:default}
 </style>
+

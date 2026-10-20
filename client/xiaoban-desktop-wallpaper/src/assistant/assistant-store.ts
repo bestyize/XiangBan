@@ -1,3 +1,4 @@
+import type { AttachmentCard, PendingAttachment } from '../ui/chat/attachments.ts';
 import { reactive, watch } from 'vue';
 import type { ChatStore } from '../ui/chat/chat-store.ts';
 import type { AsrStore } from '../ui/asr/store.ts';
@@ -43,7 +44,7 @@ export interface AssistantStore {
   /** The text box. Voice fills it as words are recognised, then sends it. */
   input: string;
   /** Images staged for the next question, as data URLs. */
-  attachments: string[];
+  attachments: PendingAttachment[];
   /** Pause voice auto-send while choosing or dropping images. */
   prepareImages(): void;
   /** Why voice or the model is not ready, in a sentence. Empty when nothing is wrong. */
@@ -56,6 +57,7 @@ export interface AssistantStore {
   readonly status: string;
   readonly question: string;
   readonly questionImages: string[];
+  readonly questionFiles?: AttachmentCard[];
   readonly answer: string;
   readonly working: string;
   readonly failure: string;
@@ -128,7 +130,8 @@ export function createAssistantStore(deps: AssistantDeps): AssistantStore {
     const tool = [...rest].reverse().find((item): item is Extract<ChatItem, { kind: 'tool' }> => item.kind === 'tool' && item.status === 'running');
     const notice = [...rest].reverse().find((item): item is Extract<ChatItem, { kind: 'notice' }> => item.kind === 'notice' && item.tone === 'error');
     const questionImages = at >= 0 ? (items[at] as Extract<ChatItem, { kind: 'user' }>).images : [];
-    return { question, questionImages, answer, working: tool ? describeTool(tool.name) : '', failure: notice?.text ?? '' };
+    const questionFiles = at >= 0 ? (items[at] as Extract<ChatItem, { kind: 'user' }>).files ?? [] : [];
+    return { question, questionImages, questionFiles, answer, working: tool ? describeTool(tool.name) : '', failure: notice?.text ?? '' };
   }
 
   async function refreshModel() {
@@ -193,6 +196,7 @@ export function createAssistantStore(deps: AssistantDeps): AssistantStore {
     prepareImages() {
       clearTimers(); heard = ''; voiceTurn = false; asr.deactivate();
     },
+    get questionFiles() { return turn().questionFiles; },
     get answer() { return turn().answer; },
     get working() { return turn().working; },
     get failure() { return turn().failure; },
@@ -355,3 +359,4 @@ export function createAssistantStore(deps: AssistantDeps): AssistantStore {
   }, { flush: 'sync' });
   return store;
 }
+

@@ -772,7 +772,7 @@ describe('sending images', () => {
     expect(q('chat-attachment-0')).not.toBeNull();
 
     await pickFiles(Array.from({ length: 8 }, (_, n) => pngFile(`f${n}.png`)));
-    expect(h.notify).toHaveBeenCalledWith('一次最多发送 8 张图片，多余的没有加上', 'info');
+    expect(h.notify).toHaveBeenCalledWith('一次最多添加 8 个附件', 'info');
     expect(q<HTMLButtonElement>('chat-pick-image')!.disabled).toBe(true);
 
     await type('还是有文字');
@@ -783,7 +783,7 @@ describe('sending images', () => {
   it('refuses a type or a size the host would reject, and says why', async () => {
     const h = await open({ ...startChat });
     await pickFiles([new File(['<svg/>'], 'icon.svg', { type: 'image/svg+xml' })]);
-    expect(h.notify).toHaveBeenCalledWith('只能发送 PNG、JPEG、GIF 或 WebP 图片', 'error');
+    expect(h.notify).toHaveBeenCalledWith('暂不支持这种文件，请选择图片、PDF、Office 文档或文本文件', 'error');
     expect(q('chat-attachments')).toBeNull();
 
     const huge = new File([new Uint8Array(3 * 1024 * 1024 + 1)], 'big.png', { type: 'image/png' });
@@ -953,4 +953,15 @@ describe('the limit slider and automatic compaction in the composer', () => {
     expect(notice.querySelector('summary')!.textContent).toBe('查看摘要');
     expect(notice.querySelector('.notice-details')!.textContent).toBe('摘要正文');
   });
+});
+
+
+it('picks and sends a document-only question with its named attachment card', async () => {
+  const h=await open({...startChat});
+  await pickFiles([new File(['amount\n12'],'预算.csv',{type:'text/csv'})]);
+  expect(q('chat-attachments')?.textContent).toContain('预算.csv');
+  await click('chat-send');
+  const sent=h.calls.find(([command])=>command==='chat_send')?.[1];
+  expect(sent).toMatchObject({text:'',attachments:[{name:'预算.csv',dataUrl:expect.stringMatching(/^data:text\/csv;base64,/)}]});
+  expect(q('msg-user')?.textContent).toContain('预算.csv');
 });
