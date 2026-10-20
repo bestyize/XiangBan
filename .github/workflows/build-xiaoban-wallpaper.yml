@@ -111,7 +111,7 @@ jobs:
           cert_raw="$RUNNER_TEMP/xiaban-signing-raw.pem"
           cert="$RUNNER_TEMP/xiaban-signing.pem"
           keychain="$RUNNER_TEMP/xiaban-signing.keychain-db"
-          password="$(tr -d '\\r\\n' < "$signing_dir/macos-xiaoban.p12.password")"
+          password="$(cat "$signing_dir/macos-xiaoban.p12.password")"
           keychain_password="$(openssl rand -hex 24)"
 
           base64 --decode -i "$signing_dir/macos-xiaoban.p12.base64" -o "$p12"
@@ -145,10 +145,10 @@ jobs:
           test -n "$app"
           codesign --verify --deep --verbose=2 "$app"
           signature="$(codesign -dv --verbose=4 "$app" 2>&1)"
-          printf '%s\\n' "$signature" | grep -F 'Authority=XiangBan Self-Signed Code Signing 2026'
+          printf '%s\n' "$signature" | grep -F 'Authority=XiangBan Self-Signed Code Signing 2026'
           requirement="$(codesign -dr - "$app" 2>&1)"
-          printf '%s\\n' "$requirement"
-          if printf '%s\\n' "$requirement" | grep -q 'cdhash'; then
+          printf '%s\n' "$requirement"
+          if printf '%s\n' "$requirement" | grep -q 'cdhash'; then
             echo "::error::Code signature still has a version-specific cdhash requirement."
             exit 1
           fi
