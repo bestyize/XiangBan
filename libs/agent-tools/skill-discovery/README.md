@@ -25,7 +25,7 @@ SkillHub API 文档：https://github.com/Tencent/skillhub/blob/main/docs/api/REA
 - 多文件 SKILL.md + scripts/ + references/ + assets/，及其他一般文件，包括二进制素材。
 - 解释器格式：Python (.py)、Node.js (.js/.mjs/.cjs)、Shell (.sh)、PowerShell (.ps1)、Ruby (.rb)。
 - 脚本参数直接传给解释器，不通过 shell 插值。进程环境清理后只透传基本系统路径；限制输出和运行时间。
-- ZIP 可以包含单个顶层包装目录。完整包最多 100 个文件、解压后 12 MiB，单文件 4 MiB，ZIP 12 MiB，SKILL.md 100 KiB。
+- ZIP 可以包含单个顶层包装目录。完整包最多 512 个文件、解压后 12 MiB，单文件 4 MiB，ZIP 12 MiB，SKILL.md 100 KiB。读取文件清单时核对 SkillHub 返回的 `count` 和实际文件数；空清单、数量不一致和超过上限会明确报错，不会安装不完整的包。
 - 拒绝路径穿越、绝对路径、符号链接、Windows 保留路径、大小写重复路径、哈希不匹配和未经 API 文件清单列出的文件。
 - 用户在「完全信任」模式下，安装与运行第三方脚本仍须逐次确认。
 

@@ -11,7 +11,9 @@ use std::{
 };
 use zip::ZipArchive;
 
-const MAX_FILES: usize = 100;
+// Guard against oversized manifests without rejecting ordinary multi-file skill packs.
+// Byte, path and hash limits below remain independent of this count limit.
+const MAX_FILES: usize = 512;
 const MAX_FILE: u64 = 4 * 1024 * 1024;
 const MAX_TOTAL: u64 = 12 * 1024 * 1024;
 const MAX_ARCHIVE: usize = 12 * 1024 * 1024;
@@ -61,8 +63,14 @@ pub(crate) fn is_script(path: &str) -> bool {
 }
 
 pub(crate) fn plan(version: &str, values: &[Value]) -> Result<Plan, String> {
-    if values.is_empty() || values.len() > MAX_FILES {
-        return Err("invalid SkillHub file count".into());
+    if values.is_empty() {
+        return Err("SkillHub returned an empty file manifest; no files can be installed".into());
+    }
+    if values.len() > MAX_FILES {
+        return Err(format!(
+            "SkillHub manifest contains {} files, exceeding the supported limit of {MAX_FILES}",
+            values.len()
+        ));
     }
     let mut files = Vec::new();
     let mut folded = HashSet::new();
@@ -271,6 +279,38 @@ mod tests {
             writer.write_all(bytes).unwrap();
         }
         (plan, writer.finish().unwrap().into_inner())
+    }
+
+    #[test]
+    fn large_but_bounded_manifests_are_supported() {
+        let sha = format!("{:x}", Sha256::digest(b"x"));
+        let mut values = vec![json!({"path":"SKILL.md","size":1,"sha256":sha})];
+        // Regression: the previous 100-file cap rejected otherwise valid skills.
+        for i in 0..120 {
+            values.push(json!({"path":format!("references/doc-{i:03}.md"),"size":1,"sha256":sha}));
+        }
+        let package = plan("1.2.3", &values).unwrap();
+        assert_eq!(package.files.len(), 121);
+        assert_eq!(package.summary()["fileCount"], 121);
+        // Increasing file count must not bypass the 12 MiB overall limit.
+        values[1]["size"] = json!(4 * 1024 * 1024);
+        values[2]["size"] = json!(4 * 1024 * 1024);
+        values[3]["size"] = json!(4 * 1024 * 1024);
+        assert!(plan("1.2.3", &values).unwrap_err().contains("exceeds 12 MiB"));
+    }
+
+    #[test]
+    fn file_count_errors_distinguish_empty_and_excessive_manifests() {
+        assert!(plan("1.0.0", &[]).unwrap_err().contains("empty file manifest"));
+        let sha = "a".repeat(64);
+        let mut values = vec![json!({"path":"SKILL.md","size":1,"sha256":sha})];
+        for i in 1..MAX_FILES {
+            values.push(json!({"path":format!("references/ref-{i:04}.md"),"size":1,"sha256":sha}));
+        }
+        assert_eq!(plan("1.0.0", &values).unwrap().files.len(), MAX_FILES);
+        values.push(json!({"path":"references/extra.md","size":1,"sha256":sha}));
+        let err = plan("1.0.0", &values).unwrap_err();
+        assert!(err.contains("513 files") && err.contains("512"));
     }
 
     #[test]
