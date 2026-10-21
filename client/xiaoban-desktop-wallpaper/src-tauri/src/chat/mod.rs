@@ -10,7 +10,7 @@ mod danger;
 mod desktop_tools;
 mod prompt;
 mod run_history;
-mod task_outcome;
+pub(crate) mod task_outcome;
 mod learning;
 mod skill_evolution;
 mod sessions;
@@ -204,6 +204,7 @@ fn ask_approval(app: &tauri::AppHandle, broker: &Broker, request: &ApprovalReque
     // In full trust a tainted conversation is not asked because of the taint, so the card must not say it is.
     let tainted_by_policy = request.tainted && app.state::<ChatState>().permission.mode() != PermissionMode::Auto;
     let (id, rx) = broker.open_approval(request.session);
+    crate::proactivity::observe_task_state(app, agent_proactivity::context::TaskState::AwaitingUser);
     emit(
         app,
         "chat-approval",
@@ -216,14 +217,17 @@ fn ask_approval(app: &tauri::AppHandle, broker: &Broker, request: &ApprovalReque
     );
     let decision = request.wait_for(&rx).unwrap_or(Approval::Deny);
     broker.close_approval(&id);
+    crate::proactivity::observe_task_state(app, agent_proactivity::context::TaskState::Running);
     decision
 }
 
 fn ask_question(app: &tauri::AppHandle, broker: &Broker, session: &str, question: &Question, ctx: &ToolCtx) -> Option<String> {
     let (id, rx) = broker.open_question(session);
+    crate::proactivity::observe_task_state(app, agent_proactivity::context::TaskState::AwaitingUser);
     emit(app, "chat-question", json!({ "id": id, "session": session, "question": question.text, "options": question.options }));
     let answer = ctx.wait_for(&rx).flatten();
     broker.close_question(&id);
+    crate::proactivity::observe_task_state(app, agent_proactivity::context::TaskState::Running);
     answer
 }
 
@@ -609,6 +613,7 @@ pub fn chat_send(app: tauri::AppHandle, session_id: String, text: String, images
                 return;
             }
         };
+        crate::proactivity::observe_task_state(&handle, agent_proactivity::context::TaskState::Started);
         // Persist the kernel's full sequenced stream before emitting compatible UI events.
         // If the journal cannot be written, do not continue dispatching tools.
         let mut terminal_delivered = false;
@@ -648,6 +653,7 @@ pub fn chat_send(app: tauri::AppHandle, session_id: String, text: String, images
                                 &format!("{:?}", outcome.status).to_lowercase(),
                                 &outcome.validator, &outcome.evidence);
                         }
+                        crate::proactivity::observe_task_outcome(&sender, &outcome);
                         emit(&sender, "chat-task-outcome", json!({ "session": id, "outcome": outcome }));
                     }
                 }
@@ -733,6 +739,7 @@ pub fn chat_verify_file_outcome(app: tauri::AppHandle, window: tauri::WebviewWin
     let outcome=task_outcome::verify_file(&dirs.outcomes(), &session_id, &run_id, workspace, &relative_path, &expected_sha256)?;
     LearningDb::open(&dirs.learning_db())?.record_outcome(&run_id, &session_id,
         "succeeded", &outcome.validator, &outcome.evidence)?;
+    crate::proactivity::observe_task_outcome(&app, &outcome);
     Ok(json!(outcome))
 }
 

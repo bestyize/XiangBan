@@ -11,6 +11,17 @@ pub enum EventKind {
     PetPoked,
     ConversationFinished,
     TaskFinished,
+    TaskStarted,
+    TaskResumed,
+    TaskAwaitingUser,
+    TaskFailed,
+    TaskPartiallyFinished,
+    TaskCancelled,
+    TaskOutcomeUnknown,
+    LocalDayChanged,
+    CalendarClassificationChanged,
+    WeatherConditionChanged,
+    AttentionModeChanged,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
