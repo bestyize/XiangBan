@@ -118,7 +118,7 @@ impl Plan {
 }
 
 /// Validate every ZIP entry against the API's pinned list. No ZIP extraction API is used.
-pub(crate) fn verified_files(slug: &str, plan: &Plan, archive: &[u8]) -> Result<BTreeMap<String, Vec<u8>>, String> {
+pub(crate) fn verified_files(_slug: &str, plan: &Plan, archive: &[u8]) -> Result<BTreeMap<String, Vec<u8>>, String> {
     if archive.len() > MAX_ARCHIVE {
         return Err("SkillHub download exceeds 12 MiB".into());
     }
