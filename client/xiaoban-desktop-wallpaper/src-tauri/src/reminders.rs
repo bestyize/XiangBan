@@ -477,6 +477,15 @@ fn weather_for(app: &tauri::AppHandle, city: &City) -> Result<Weather, String> {
     if let Err(error) = save(app, &store) { store.error = Some(error); }
     result
 }
+/// Read-only weather sample; no extra network or IP-based location requests.
+pub fn cached_weather(app: &tauri::AppHandle, now: i64) -> Option<Weather> {
+    let store = app.state::<ReminderState>().store.lock().ok()?;
+    if store.config.weather_source.provider == "disabled" { return None; }
+    store.weather.clone().filter(|w|
+        (0..1800).contains(&(now - w.updated_at)) &&
+        (0..7200).contains(&(now - w.model_at))
+    )
+}
 pub fn widget_weather_source(app: &tauri::AppHandle) -> care_weather::Source {
     app.state::<ReminderState>().store.lock().unwrap().config.weather_source.clone()
 }
@@ -637,7 +646,12 @@ pub fn start(app: &tauri::AppHandle) {
             let elapsed = if seconds <= 15.0 && ((timestamp - wall) as f64 - seconds).abs() < 15.0 { seconds } else { 0.0 };
             previous = instant; wall = timestamp;
             let save_elapsed = checkpoint.elapsed() >= Duration::from_secs(60);
-            if !app.state::<ReminderState>().smoke_running.load(Ordering::Relaxed) { tick(&app, elapsed, save_elapsed); presence_tick(&app, elapsed); }
+            if !app.state::<ReminderState>().smoke_running.load(Ordering::Relaxed) {
+                tick(&app, elapsed, save_elapsed);
+                presence_tick(&app, elapsed);
+                // Reuse the same cadence. No additional OS polling or weather requests.
+                crate::proactivity::observe_environment(&app);
+            }
             if save_elapsed { checkpoint = Instant::now(); }
             std::thread::sleep(Duration::from_secs(5));
         }

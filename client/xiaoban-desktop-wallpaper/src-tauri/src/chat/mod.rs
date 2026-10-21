@@ -10,7 +10,7 @@ mod danger;
 mod desktop_tools;
 mod prompt;
 mod run_history;
-mod task_outcome;
+pub(crate) mod task_outcome;
 mod learning;
 mod skill_evolution;
 mod sessions;
@@ -609,6 +609,7 @@ pub fn chat_send(app: tauri::AppHandle, session_id: String, text: String, images
                 return;
             }
         };
+        crate::proactivity::observe_task_state(&handle, agent_proactivity::context::TaskState::Started);
         // Persist the kernel's full sequenced stream before emitting compatible UI events.
         // If the journal cannot be written, do not continue dispatching tools.
         let mut terminal_delivered = false;
@@ -648,6 +649,7 @@ pub fn chat_send(app: tauri::AppHandle, session_id: String, text: String, images
                                 &format!("{:?}", outcome.status).to_lowercase(),
                                 &outcome.validator, &outcome.evidence);
                         }
+                        crate::proactivity::observe_task_outcome(&sender, &outcome);
                         emit(&sender, "chat-task-outcome", json!({ "session": id, "outcome": outcome }));
                     }
                 }
@@ -733,6 +735,7 @@ pub fn chat_verify_file_outcome(app: tauri::AppHandle, window: tauri::WebviewWin
     let outcome=task_outcome::verify_file(&dirs.outcomes(), &session_id, &run_id, workspace, &relative_path, &expected_sha256)?;
     LearningDb::open(&dirs.learning_db())?.record_outcome(&run_id, &session_id,
         "succeeded", &outcome.validator, &outcome.evidence)?;
+    crate::proactivity::observe_task_outcome(&app, &outcome);
     Ok(json!(outcome))
 }
 

@@ -39,6 +39,7 @@ mod desk_windows;
 mod reminders;
 mod presence;
 mod proactivity;
+mod proactivity_context;
 mod care_system;
 mod care_weather;
 mod effect_choice;
