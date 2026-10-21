@@ -67,6 +67,9 @@ fn label(p: &Instance) -> String {
     }
 }
 pub fn permitted(label: &str, command: &str) -> Option<bool> {
+    if label == "companion-greeting" {
+        return Some(["get_companion_greeting", "respond_companion_greeting"].contains(&command));
+    }
     if is_pet(label) {
         return Some(
             [
@@ -74,6 +77,8 @@ pub fn permitted(label: &str, command: &str) -> Option<bool> {
                 "move_pet_instance",
                 "set_pet_hit_test",
                 "manage_pet_instance",
+                "pet_proactive_hover",
+                "pet_proactive_poke",
                 "scene_ready",
             ]
             .contains(&command),
@@ -87,6 +92,8 @@ pub fn permitted(label: &str, command: &str) -> Option<bool> {
         "save_pet_theme",
         "delete_pet_theme",
         "export_pet_theme",
+        "get_proactivity_settings",
+        "configure_proactivity",
     ]
     .contains(&command)
     {
@@ -97,6 +104,10 @@ pub fn permitted(label: &str, command: &str) -> Option<bool> {
         "move_pet_instance",
         "set_pet_hit_test",
         "manage_pet_instance",
+        "pet_proactive_hover",
+        "pet_proactive_poke",
+        "get_companion_greeting",
+        "respond_companion_greeting",
     ]
     .contains(&command)
     {
@@ -231,7 +242,7 @@ pub fn window_layer(app: &tauri::AppHandle, window_label: &str) -> Option<String
         .find(|p| label(p) == window_label)
         .map(|p| p.layer.clone())
 }
-fn own(window: &tauri::WebviewWindow) -> Result<Instance, String> {
+pub(crate) fn own(window: &tauri::WebviewWindow) -> Result<Instance, String> {
     window
         .app_handle()
         .state::<PetState>()

@@ -269,6 +269,14 @@ fn companion_visible(app: &tauri::AppHandle) -> bool {
     }
     app.get_webview_window("pet").is_some_and(|w| w.is_visible().unwrap_or(false))
 }
+/// Reuse care quiet-hours, game and focus gates for separately opted-in companion greetings.
+/// A pending care bubble has priority over optional greetings.
+pub fn proactive_silenced(app: &tauri::AppHandle) -> bool {
+    let state = app.state::<ReminderState>();
+    let is_quiet = quiet(&state.store.lock().unwrap().config, Local::now().time());
+    let runtime = state.runtime.lock().unwrap();
+    is_quiet || runtime.focus || runtime.active.is_some() || state.game.load(Ordering::Relaxed)
+}
 fn blocked(app: &tauri::AppHandle, activity: &care_system::Activity) -> bool {
     let state = app.state::<ReminderState>();
     let store = state.store.lock().unwrap();
