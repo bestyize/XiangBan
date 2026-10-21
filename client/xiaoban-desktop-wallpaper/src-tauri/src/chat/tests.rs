@@ -672,6 +672,30 @@ fn full_trust_runs_everyday_commands_and_stops_only_for_the_dangerous_ones() {
 }
 
 #[test]
+fn installed_skill_scripts_still_require_permission_in_full_trust() {
+    let steps = vec![
+        call("1", "skill_install", json!({
+            "slug": "demo-skill", "version": "1.0.0", "sha256": "a".repeat(64)
+        })),
+        call("2", "skill_run", json!({
+            "skill": "demo-skill", "script": "scripts/test.py", "args": ["--help"]
+        })),
+        Step::text("stopped"),
+    ];
+    let (rig, asked) = trusted_rig("trusted-3p-skill", steps);
+    let (result, _) = run(&rig, "go");
+    assert_eq!(result.unwrap().text, "stopped");
+    let asked = lock(&asked).clone();
+    assert_eq!(asked.iter().map(|(name, _)| name.as_str()).collect::<Vec<_>>(),
+        vec!["skill_install", "skill_run"]);
+    for (_, reason) in &asked {
+        assert!(reason.as_ref().is_some_and(|s| s.contains("必须逐次经过用户确认")));
+    }
+    assert!(!rig.dirs.skills().join("demo-skill").exists(),
+        "denied third-party package was not installed");
+}
+
+#[test]
 fn full_trust_is_not_taken_back_after_a_skill_change() {
     let steps = vec![
         call("1", "skill_manage", json!({"action": "create", "name": "tidy-notes", "description": "整理笔记", "content": "步骤"})),
