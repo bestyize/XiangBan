@@ -1,8 +1,9 @@
 import type { AttachmentCard, PendingAttachment } from '../ui/chat/attachments.ts';
 import { reactive, watch } from 'vue';
 import type { ChatStore } from '../ui/chat/chat-store.ts';
-import type { AsrStore } from '../ui/asr/store.ts';
+import type { AsrStore, TranscriptContext } from '../ui/asr/store.ts';
 import type { SpeechStore } from '../ui/speech/store.ts';
+import { isPlaybackEcho, isSpeechText } from './voice-guard.ts';
 import type { ApprovalDecision, ApprovalRequest, ChatItem, QuestionRequest, SessionSummary } from '../ui/chat/types.ts';
 
 export type OpenMode = 'voice' | 'type';
@@ -70,6 +71,8 @@ export interface AssistantStore {
   readonly changingSession: boolean;
   newConversation(): Promise<void>;
   toggleListening(): Promise<void>;
+  /** A real edit/IME composition, rather than programmatic ASR text or focus. */
+  inputStarted(): void;
   /** Stops speaking, or cancels the answer being written. */
   interrupt(): void;
   decide(decision: ApprovalDecision): Promise<void>;
@@ -116,8 +119,10 @@ export function createAssistantStore(deps: AssistantDeps): AssistantStore {
   let voiceTurn = false;
   /** Reactive, because the phase shows `speaking` from the moment a reply is handed to the voice until it ends. */
   const flags = reactive({ awaitingSpeech: false, submitting: false, changingSession: false });
-  let draftVersion = 0, speechVersion = 0;
+  let draftVersion = 0, speechVersion = 0, listenVersion = 0;
   let turnInterrupted = false;
+  let readingText = '', echoTailUntil = 0;
+  const now = deps.now ?? Date.now;
 
   const view = () => (chat.currentId ? chat.views[chat.currentId] ?? null : null);
   function turn() {
@@ -151,40 +156,75 @@ export function createAssistantStore(deps: AssistantDeps): AssistantStore {
   }
   function clearTimers() { clearTimer(listenTimer); clearTimer(sendTimer); listenTimer = sendTimer = undefined; }
 
-  async function startListening(): Promise<boolean> {
-    const version=draftVersion;
-    await asr.init();
-    if(version!==draftVersion)return false;
-    if (asr.microphoneSupported === false) return false;
-    if (!asr.enabled) { store.note('语音对话还没开启。在超级小伴设置里打开后，就能直接说话。', 'assistant'); return false; }
-    if (!(await asr.prepare())) { store.note(asr.error || '语音识别还没准备好，请稍后再试。'); return false; }
-    if (!store.open || version!==draftVersion) return false;
-    store.note(''); heard = '';
-    await asr.activate(text=>{if(version===draftVersion)onHeard(text);});
-    if (!asr.recordingRequested) return false;
-    // Nobody is talking: let the microphone go, but keep the capsule where it is.
+  function armListenTimer() {
     clearTimer(listenTimer);
     listenTimer = setTimer(() => {
-      if (disposed || !store.open || heard || !asr.recordingRequested) return;
+      if (disposed || !store.open || heard || !asr.recordingRequested || flags.awaitingSpeech) return;
+      if (asr.speechActive || asr.recognizing) { armListenTimer(); return; }
       asr.deactivate(); voiceTurn = false;
       store.note('没听到声音，点光球可以继续说话。');
     }, LISTEN_IDLE_MS);
+  }
+  function stopReading() {
+    turnInterrupted = true; speechVersion++;
+    flags.awaitingSpeech = false;
+    echoTailUntil = now() + 500;
+    void speech.stop();
+  }
+  function externalSpeech(text: string, context?: TranscriptContext): boolean {
+    return isSpeechText(text) && !(context?.playbackText && isPlaybackEcho(text, context.playbackText));
+  }
+  async function startListening(interruption = false): Promise<boolean> {
+    const version=draftVersion, ticket=++listenVersion;
+    const current = () => !disposed && version === draftVersion && ticket === listenVersion;
+    await asr.init();
+    if(!current())return false;
+    if (asr.microphoneSupported === false) return false;
+    if (!asr.enabled) { store.note('语音对话还没开启。在超级小伴设置里打开后，就能直接说话。', 'assistant'); return false; }
+    const prepared = await asr.prepare();
+    if (!store.open || !current()) return false;
+    if (!prepared) { store.note(asr.error || '语音识别还没准备好，请稍后再试。'); return false; }
+    store.note(''); heard = '';
+    await asr.activate((text, context)=>{if(current())onHeard(text, context);}, {
+      noiseGuard: true,
+      playbackText: () => (flags.awaitingSpeech && speech.status === 'playing') || now() < echoTailUntil ? readingText : '',
+      onPreview: (text, context) => {
+        if (!current() || !store.open || !flags.awaitingSpeech || !externalSpeech(text, context)) return;
+        // Keep this microphone and its full utterance buffer: stopping TTS must
+        // not discard the beginning of the user's interruption.
+        clearTimers(); voiceTurn = true; stopReading(); armListenTimer();
+      },
+    });
+    if (!current()) return false;
+    if (!asr.recordingRequested) return false;
+    if (!interruption || !flags.awaitingSpeech) armListenTimer();
     return true;
   }
-  function onHeard(text: string) {
+  function onHeard(text: string, context?: TranscriptContext) {
+    if (!externalSpeech(text, context)) return;
+    if (flags.awaitingSpeech) stopReading();
+    voiceTurn = true;
     clearTimer(listenTimer);
     heard = heard ? `${heard} ${text}` : text;
     store.input = heard;
     clearTimer(sendTimer);
     sendTimer = setTimer(function flush() {
       if (!store.open) return;
-      if (asr.recognizing) { sendTimer = setTimer(flush, 300); return; }
+      if (asr.recognizing || asr.speechActive) { sendTimer = setTimer(flush, 300); return; }
       void store.submit(heard, true);
     }, SEND_GRACE_MS);
   }
   /** What happens once an answer is complete and has been read: listen again if the user is talking. */
   function afterTurn() {
-    if (store.open && voiceTurn && asr.enabled) void startListening();
+    if (!store.open || !asr.enabled) return;
+    if (voiceTurn) {
+      if (asr.recordingRequested) armListenTimer();
+      else void startListening();
+    } else if (asr.recordingRequested) {
+      // A typed turn does not leave hands-free recording on. Flush any speech
+      // that overlapped the end of playback before releasing the microphone.
+      void asr.finish();
+    } else listenVersion++; // Do not open a late monitoring microphone after a typed readout ends.
   }
 
   const store: AssistantStore = reactive({
@@ -195,7 +235,7 @@ export function createAssistantStore(deps: AssistantDeps): AssistantStore {
     get question() { return turn().question; },
     get questionImages() { return turn().questionImages; },
     prepareImages() {
-      clearTimers(); heard = ''; voiceTurn = false; asr.deactivate();
+      store.inputStarted();
     },
     get questionFiles() { return turn().questionFiles; },
     get answer() { return turn().answer; },
@@ -216,7 +256,7 @@ export function createAssistantStore(deps: AssistantDeps): AssistantStore {
         case 'attention': return '需要你确认一下';
         case 'thinking': return store.working || '思考中…';
         case 'answering': return store.working || '正在回答…';
-        case 'speaking': return '正在朗读，可随时停止';
+        case 'speaking': return store.voiceAvailable ? '正在朗读，说话或输入可打断' : '正在朗读，输入可打断';
         case 'listening': return asr.preparing ? '正在准备语音识别…' : asr.recognizing ? '正在识别…' : '我在听，请说…';
         default: return store.voiceAvailable ? '问点什么，或直接说话' : '问点什么';
       }
@@ -293,7 +333,8 @@ export function createAssistantStore(deps: AssistantDeps): AssistantStore {
         return;
       }
       const images = [...store.attachments], version = draftVersion;
-      flags.submitting = true; turnInterrupted = false; speechVersion++;
+      flags.submitting = true; turnInterrupted = false; speechVersion++; listenVersion++;
+      flags.awaitingSpeech = false;
       clearTimers(); heard = '';
       asr.deactivate();
       store.input = ''; store.attachments = []; store.note('');
@@ -315,9 +356,14 @@ export function createAssistantStore(deps: AssistantDeps): AssistantStore {
       await speech.stop(); flags.awaitingSpeech = false;
       voiceTurn = await startListening();
     },
+    inputStarted() {
+      draftVersion++; clearTimers(); heard = ''; voiceTurn = false;
+      asr.deactivate();
+      if (flags.awaitingSpeech || speech.status !== 'idle') stopReading();
+    },
     interrupt() {
       // Stop both channels, including a reply that finishes while cancellation is in flight.
-      turnInterrupted = true; speechVersion++;
+      turnInterrupted = true; speechVersion++; listenVersion++;
       clearTimers(); heard = ''; voiceTurn = false; flags.awaitingSpeech = false;
       asr.deactivate(); void speech.stop();
       if (view()?.running) void chat.cancel();
@@ -328,14 +374,16 @@ export function createAssistantStore(deps: AssistantDeps): AssistantStore {
       if (!store.open || session !== chat.currentId || turnInterrupted) return;
       const version = ++speechVersion;
       if (store.prefs.read === 'always' || (store.prefs.read === 'voice' && voiceTurn)) {
+        readingText = text; echoTailUntil = 0;
         flags.awaitingSpeech = true;
+        if (asr.enabled && asr.microphoneSupported !== false) void startListening(true);
         void speech.speak(text, key ?? `assistant:${session}`, undefined, true).then(() => {
           if (version === speechVersion && flags.awaitingSpeech && speech.status === 'idle') { flags.awaitingSpeech = false; afterTurn(); }
         });
       } else afterTurn();
     },
     stopped() {
-      flags.awaitingSpeech = false; void speech.stop();
+      speechVersion++; listenVersion++; flags.awaitingSpeech = false; clearTimers(); asr.deactivate(); void speech.stop();
     },
     note(message, tab = '') { store.hint = message; store.hintTab = message ? tab : ''; },
     hide() { return deps.invoke<void>('assistant_hide').catch(() => {}); },
@@ -349,7 +397,9 @@ export function createAssistantStore(deps: AssistantDeps): AssistantStore {
     },
   });
   const stopWatch = watch(() => speech.status, (status, before) => {
-    if (flags.awaitingSpeech && status === 'idle' && before !== 'idle') { flags.awaitingSpeech = false; afterTurn(); }
+    if (flags.awaitingSpeech && status === 'idle' && before !== 'idle') {
+      echoTailUntil = now() + 500; flags.awaitingSpeech = false; afterTurn();
+    }
   });
   const stopVoiceWatch = watch(() => asr.enabled, enabled => {
     if (!enabled) { clearTimers(); heard = ''; voiceTurn = false; asr.deactivate(); }

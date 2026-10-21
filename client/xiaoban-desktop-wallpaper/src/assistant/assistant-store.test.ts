@@ -1,7 +1,11 @@
 import { nextTick, reactive } from 'vue';
+import { flushPromises } from '@vue/test-utils';
 import { describe, expect, it, vi } from 'vitest';
 import { createAssistantStore, LISTEN_IDLE_MS, SESSION_KEY, SEND_GRACE_MS } from './assistant-store.ts';
 import { createChatStore } from '../ui/chat/chat-store.ts';
+import type { AsrActivationOptions, TranscriptContext } from '../ui/asr/store.ts';
+import { createAsrStore } from '../ui/asr/store.ts';
+import { createSpeechStore, speechDefaults } from '../ui/speech/store.ts';
 
 function setup(options: { configured?: boolean; voice?: boolean; prefs?: { open: string; read: string; appearance?: string }; storage?: Pick<Storage,'getItem'|'setItem'|'removeItem'> } = {}) {
   let clock = 1_000_000;
@@ -29,11 +33,13 @@ function setup(options: { configured?: boolean; voice?: boolean; prefs?: { open:
     }),
     cancel: vi.fn(async () => {}), answerApproval: vi.fn(async () => {}), answerQuestion: vi.fn(async () => {}),
   });
-  let heard: (text: string) => void = () => {};
+  let heard: (text: string, context?: TranscriptContext) => void = () => {};
+  let captureOptions: AsrActivationOptions = {};
   const asr = reactive({
     enabled: options.voice ?? true, microphoneSupported: true, listening: false, recognizing: false, preparing: false, recordingRequested: false, level: 0, error: '',
     init: vi.fn(async () => {}), prepare: vi.fn(async () => true),
-    activate: vi.fn(async (callback: (text: string) => void) => { asr.recordingRequested = true; asr.listening = true; heard = callback; }),
+    activate: vi.fn(async (callback: typeof heard, options?: AsrActivationOptions) => { asr.recordingRequested = true; asr.listening = true; heard = callback; captureOptions = options ?? {}; }),
+    finish: vi.fn(async () => { asr.recordingRequested = false; asr.listening = false; }),
     deactivate: vi.fn(() => { asr.recordingRequested = false; asr.listening = false; }),
   });
   const speech = reactive({
@@ -53,12 +59,106 @@ function setup(options: { configured?: boolean; voice?: boolean; prefs?: { open:
     setTimer: (run, ms) => { const timer = { id: nextId++, at: clock + ms, run }; timers.push(timer); return timer.id; },
     clearTimer: id => { const at = timers.findIndex(timer => timer.id === id); if (at >= 0) timers.splice(at, 1); },
   });
-  return { store, chat, asr, speech, invoke, advance, say: (text: string) => heard(text), emit: (event: string, payload?: unknown) => handlers.get(event)?.(payload), appearance };
+  return { store, chat, asr, speech, invoke, advance, say: (text: string, context?: TranscriptContext) => heard(text, context), preview: (text: string, playbackText = captureOptions.playbackText?.() ?? '') => captureOptions.onPreview?.(text, {playbackText}), playback: () => captureOptions.playbackText?.() ?? '', emit: (event: string, payload?: unknown) => handlers.get(event)?.(payload), appearance };
 }
 const finishAnswer = (chat: ReturnType<typeof setup>['chat'], text = '好的，已经处理完了。') => {
   chat.views.s1.items.push({ kind: 'assistant', id: 'a', text, streaming: false });
   chat.views.s1.running = false;
 };
+
+describe('assistant barge-in', () => {
+  it('integrates microphone, partial ASR, echo rejection and immediate audio pause',async()=>{
+    const h=setup();h.store.dispose();
+    let feed!:(audio:Float32Array)=>void, transcript='山上有座庙';const releaseMic=vi.fn();
+    const invoke=vi.fn(async(command:string)=>{
+      if(command==='assistant_prefs')return {open:'type',read:'always'};
+      if(command==='asr_get_status')return {enabled:true,modelReady:true,engineReady:true};
+      if(command==='asr_transcribe')return transcript;
+      if(command==='tts_get_settings')return {...speechDefaults};
+      if(command==='tts_synthesize')return [1,2,3];
+      return undefined;
+    });
+    const notify=vi.fn(), listen=async()=>()=>{};
+    const asr=createAsrStore({desktop:true,invoke:invoke as never,listen,notify,capture:async cb=>{feed=cb;return {stop:releaseMic};}});
+    const audio={play:vi.fn(async()=>{}),pause:vi.fn(),src:'',onended:null,onerror:null};
+    const speech=createSpeechStore({desktop:true,invoke:invoke as never,notify,audio:()=>audio,url:()=> 'blob:test',revoke:vi.fn()});
+    const store=createAssistantStore({desktop:true,invoke:invoke as never,listen,chat:h.chat as never,asr,speech,setTimer:vi.fn(),clearTimer:vi.fn()});
+    await store.init();await store.opened();await store.submit('讲个故事',true);finishAnswer(h.chat,story);store.replied('s1',story,'a');
+    await vi.waitFor(()=>{expect(speech.status).toBe('playing');expect(asr.listening).toBe(true);});
+    const voice=Float32Array.from({length:1600},(_,i)=>.08*Math.sin(2*Math.PI*220*i/16000));
+    for(let i=0;i<8;i++)feed(voice);await flushPromises();
+    expect(speech.status).toBe('playing');expect(store.input).toBe('');
+    transcript='等等，换一个科幻故事';
+    for(let i=0;i<8;i++)feed(voice);await flushPromises();
+    expect(speech.status).toBe('idle');expect(audio.pause).toHaveBeenCalledOnce();expect(asr.listening).toBe(true);
+    for(let i=0;i<9;i++)feed(new Float32Array(1600));await flushPromises();
+    expect(store.input).toBe(transcript);expect(releaseMic).not.toHaveBeenCalled();
+    store.inputStarted();expect(asr.recordingRequested).toBe(false);expect(releaseMic).toHaveBeenCalledOnce();
+    store.dispose();asr.dispose();speech.dispose();
+  });
+  const story = '从前有座山，山上有座庙，庙里有人讲故事。';
+  async function reading() {
+    const h=setup({prefs:{open:'type',read:'always'}});
+    await h.store.init(); await h.store.opened(); await h.store.submit('讲一个故事',true);
+    finishAnswer(h.chat,story); h.store.replied('s1',story,'a');
+    await vi.waitFor(()=>expect(h.asr.recordingRequested).toBe(true));
+    h.speech.stop.mockClear(); h.asr.deactivate.mockClear();
+    return h;
+  }
+  it('keeps reading when partial and final recognition contain its own readout',async()=>{
+    const h=await reading(); expect(h.playback()).toBe(story);
+    h.preview('山上有座庙'); h.say('庙里有人讲故事',{playbackText:story});
+    h.advance(SEND_GRACE_MS+1);await nextTick();
+    expect(h.store.phase).toBe('speaking');expect(h.speech.stop).not.toHaveBeenCalled();
+    expect(h.store.input).toBe('');expect(h.chat.send).toHaveBeenCalledTimes(1);h.store.dispose();
+  });
+  it('stops on new speech without discarding the utterance, then sends the whole question',async()=>{
+    const h=await reading();
+    h.preview('等等，我想换一个问题');await nextTick();
+    expect(h.speech.stop).toHaveBeenCalledOnce();expect(h.asr.deactivate).not.toHaveBeenCalled();
+    expect(h.store.phase).toBe('listening');expect(h.store.input).toBe('');
+    h.say('等等，我想换一个问题，明天会下雨吗',{playbackText:story});
+    h.advance(SEND_GRACE_MS+1);await Promise.resolve();
+    expect(h.chat.send).toHaveBeenLastCalledWith('等等，我想换一个问题，明天会下雨吗');h.store.dispose();
+  });
+  it('filters a delayed echo result after playback ends while retaining new speech',async()=>{
+    const h=await reading(); h.speech.status='idle';await nextTick();
+    h.say('山上有座庙',{playbackText:story});expect(h.store.input).toBe('');
+    h.say('帮我改成一个科幻故事',{playbackText:story});
+    expect(h.store.input).toBe('帮我改成一个科幻故事');h.store.dispose();
+  });
+  it('manual editing stops reading and voice auto-send without losing the draft',async()=>{
+    const h=await reading();h.store.input='新的问题';h.store.inputStarted();await nextTick();
+    expect(h.speech.stop).toHaveBeenCalledOnce();expect(h.asr.recordingRequested).toBe(false);
+    h.say('旧识别结果');h.advance(LISTEN_IDLE_MS*2);await nextTick();
+    expect(h.store.input).toBe('新的问题');expect(h.store.phase).toBe('idle');
+    expect(h.chat.send).toHaveBeenCalledTimes(1);h.store.dispose();
+  });
+  it('does not restart a delayed microphone preparation after typing interrupts synthesis',async()=>{
+    const h=setup({prefs:{open:'type',read:'always'}});await h.store.init();await h.store.opened();await h.store.submit('你好');finishAnswer(h.chat);
+    let resolve!:(value:boolean)=>void;h.asr.prepare.mockImplementationOnce(()=>new Promise<boolean>(r=>{resolve=r;}));
+    h.speech.speak.mockImplementationOnce(async()=>{h.speech.status='synthesizing';});
+    h.store.replied('s1','你好呀','a');await nextTick();
+    h.store.inputStarted();resolve(true);await nextTick();await nextTick();
+    expect(h.asr.activate).not.toHaveBeenCalled();expect(h.speech.status).toBe('idle');h.store.dispose();
+  });
+  it('does not open the microphone for readout when voice is disabled',async()=>{
+    const h=setup({voice:false,prefs:{open:'type',read:'always'}});await h.store.init();await h.store.opened();await h.store.submit('你好');finishAnswer(h.chat);
+    h.store.replied('s1','你好呀','a');await nextTick();expect(h.speech.status).toBe('playing');
+    expect(h.asr.activate).not.toHaveBeenCalled();h.store.inputStarted();expect(h.speech.status).toBe('idle');h.store.dispose();
+  });
+  it('does not open a late monitoring microphone after a typed answer finishes',async()=>{
+    const h=setup({prefs:{open:'type',read:'always'}});await h.store.init();await h.store.opened();await h.store.submit('你好');finishAnswer(h.chat);
+    let resolve!:(value:boolean)=>void;h.asr.prepare.mockImplementationOnce(()=>new Promise<boolean>(r=>{resolve=r;}));
+    h.store.replied('s1','你好呀','a');await nextTick();h.speech.status='idle';await nextTick();
+    resolve(true);await nextTick();await nextTick();expect(h.asr.activate).not.toHaveBeenCalled();h.store.dispose();
+  });
+  it('releases the monitoring microphone when a typed readout finishes normally',async()=>{
+    const h=setup({prefs:{open:'type',read:'always'}});await h.store.init();await h.store.opened();await h.store.submit('你好');finishAnswer(h.chat);
+    h.store.replied('s1','你好呀','a');await vi.waitFor(()=>expect(h.asr.listening).toBe(true));
+    h.speech.status='idle';await nextTick();expect(h.asr.finish).toHaveBeenCalledOnce();expect(h.asr.recordingRequested).toBe(false);h.store.dispose();
+  });
+});
 
 describe('floating assistant', () => {
   it('silently falls back to typing when microphone capture is unsupported', async () => {

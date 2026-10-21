@@ -15,7 +15,7 @@ const wrappers: ReturnType<typeof mount>[] = [];
 beforeEach(()=>{vi.clearAllMocks();vi.mocked(invoke).mockReset().mockResolvedValue(undefined);});
 afterEach(() => { wrappers.splice(0).forEach(w => w.unmount());document.body.replaceChildren();vi.useRealTimers(); });
 function setup() {
-  const store = reactive({ open: true, ball: false, phase: 'answering', hint: '', hintTab: '', question: '今天如何放松', answer: '可以先休息片刻。', working: '', failure: '', approval: null as null | { id: string; arguments: {}; tool: string }, ask: null, attachments: [] as string[], questionImages: [] as string[], prepareImages: vi.fn(), note: vi.fn(), input: '草稿', status: '正在回答…', hide: vi.fn(), submit: vi.fn(), interrupt: vi.fn(), openChat: vi.fn(),newConversation:vi.fn(),openSettings:vi.fn(),toggleListening:vi.fn(),unfold:vi.fn() });
+  const store = reactive({ open: true, ball: false, phase: 'answering', hint: '', hintTab: '', question: '今天如何放松', answer: '可以先休息片刻。', working: '', failure: '', approval: null as null | { id: string; arguments: {}; tool: string }, ask: null, attachments: [] as string[], questionImages: [] as string[], prepareImages: vi.fn(), inputStarted: vi.fn(), note: vi.fn(), input: '草稿', status: '正在回答…', hide: vi.fn(), submit: vi.fn(), interrupt: vi.fn(), openChat: vi.fn(),newConversation:vi.fn(),openSettings:vi.fn(),toggleListening:vi.fn(),unfold:vi.fn() });
   const wrapper=mount(AssistantApp,{attachTo:document.body,props:{store:store as unknown as AssistantStore,asr:{level:0} as AsrStore},global:{stubs:{MarkdownView:true}}});
   wrappers.push(wrapper);
   return {store,wrapper};
@@ -27,6 +27,15 @@ async function openToolbar(wrapper: ReturnType<typeof setup>['wrapper']) {
 }
 
 describe('assistant response card', () => {
+  it('treats edits and IME composition as input, while focus alone keeps reading', async () => {
+    const {store,wrapper}=setup(); store.phase='speaking';
+    const field=wrapper.get('[data-testid="assistant-input"]');
+    await field.trigger('focus'); expect(store.inputStarted).not.toHaveBeenCalled();
+    await field.trigger('beforeinput'); expect(store.inputStarted).toHaveBeenCalledOnce();
+    await field.trigger('compositionstart'); expect(store.inputStarted).toHaveBeenCalledTimes(2);
+    await field.trigger('compositionend'); store.inputStarted.mockClear(); await field.setValue('新的问题');
+    expect(store.input).toBe('新的问题'); expect(store.inputStarted).toHaveBeenCalledOnce();
+  });
   it('closes only the upper card while leaving the capsule, draft and running reply untouched', async () => {
     const {store,wrapper}=setup();
     await wrapper.get('[data-testid="assistant-card-close"]').trigger('click');
@@ -208,7 +217,7 @@ describe('assistant region screenshots',()=>{
     vi.mocked(invoke).mockImplementation(async command=>{if(command==='assistant_screenshot'){if(result instanceof Error)throw result;return result;}});
     await openToolbar(wrapper);await wrapper.get('[data-testid="assistant-screenshot"]').trigger('click');await flushPromises();
     expect(store.attachments).toEqual(['existing']);expect(store.input).toBe('草稿');expect(store.submit).not.toHaveBeenCalled();
-    if(result instanceof Error)expect(store.note).toHaveBeenCalledWith('请允许屏幕录制');
+    if(result instanceof Error)expect(store.note).toHaveBeenCalledWith('请允许屏幕录制', '');
     expect(wrapper.get<HTMLButtonElement>('[data-testid="assistant-primary"]').element.disabled).toBe(false);
   });
   it('discards a late screenshot after closing and prevents duplicate capture requests',async()=>{

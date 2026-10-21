@@ -4,6 +4,14 @@ import { captureMicrophone, MICROPHONE_UNSUPPORTED, supportsMicrophone, type Cap
 
 interface HostStatus { enabled: boolean; modelReady: boolean; engineReady: boolean; warming?: boolean; microphoneError?: string }
 interface Progress { requestId: string; phase: 'downloading' | 'loading'; file: string; downloaded: number; total: number }
+export interface TranscriptContext { playbackText: string }
+export interface AsrActivationOptions {
+  noiseGuard?: boolean;
+  /** Snapshot at capture time, so delayed results retain their echo reference. */
+  playbackText?(): string;
+  /** Early recognition only; never inserted as a final utterance. */
+  onPreview?(text: string, context: TranscriptContext): void;
+}
 export interface AsrDeps {
   desktop: boolean;
   invoke<T>(command: string, args?: Record<string, unknown>): Promise<T>;
@@ -18,13 +26,14 @@ export interface AsrStore extends HostStatus {
   ready: boolean; saving: boolean; preparing: boolean; listening: boolean; recognizing: boolean;
   /** Loudness of the microphone, 0..1, refreshed about fifteen times a second while listening. */
   level: number;
+  speechActive: boolean;
   /** The host is fetching or loading the model on its own, in the background. */
   warming: boolean;
   /** Temporary user intent for the current conversation; never persisted. */
   recordingRequested: boolean;
   phase: 'idle' | 'downloading' | 'loading'; downloaded: number; total: number; error: string;
   init(): Promise<void>; setEnabled(enabled: boolean): Promise<void>; prepare(): Promise<boolean>;
-  activate(onText: (text: string) => void): Promise<void>; finish(): Promise<void>; deactivate(): void; retry(): Promise<void>; dispose(): void;
+  activate(onText: (text: string, context?: TranscriptContext) => void, options?: AsrActivationOptions): Promise<void>; finish(): Promise<void>; deactivate(): void; retry(): Promise<void>; dispose(): void;
 }
 /** Root-mean-square loudness mapped so ordinary speech lands around 0.4 to 0.9. */
 function loudness(frame: Float32Array): number {
@@ -42,14 +51,17 @@ export function createAsrStore(deps: AsrDeps): AsrStore {
   let unlisten: (() => void) | undefined;
   let disposed = false, generation = 0, recording = 0, hostRevision = 0, request = '';
   let capture: Capture | undefined;
-  let receiver: ((text: string) => void) | undefined;
+  let receiver: ((text: string, context?: TranscriptContext) => void) | undefined;
+  let options: AsrActivationOptions = {};
   let segmenter: UtteranceSegmenter | undefined;
-  let queue: Float32Array[] = [];
+  let queue: { audio: Float32Array; context?: TranscriptContext; preview?: boolean }[] = [];
+  let playbackText = '', previewSamples = 0, previewTicket: number | undefined;
   let draining: Promise<void> | undefined;
   let starting: number | undefined;
   function stopCapture() {
     recording++; starting = undefined; capture?.stop(); capture = undefined; queue = []; segmenter = undefined;
-    store.recordingRequested = false; store.listening = false; store.recognizing = false; store.level = 0;
+    playbackText = ''; previewSamples = 0; previewTicket = undefined;
+    store.recordingRequested = false; store.listening = false; store.recognizing = false; store.level = 0; store.speechActive = false;
   }
   function fail(error: unknown) { stopCapture(); store.error = message(error); deps.notify(store.error, 'error'); }
   function reportMicrophone(error: string) {
@@ -66,10 +78,16 @@ export function createAsrStore(deps: AsrDeps): AsrStore {
     const pending = (async () => {
       try {
         while (queue.length && ticket === recording && !disposed) {
-          const audio = queue.shift()!;
+          const item = queue.shift()!;
           store.recognizing = true;
-          const text = await deps.invoke<string>('asr_transcribe', { samples: Array.from(audio) });
-          if (ticket === recording && store.enabled && !disposed && text.trim()) receiver?.(text.trim());
+          try {
+            const text = await deps.invoke<string>('asr_transcribe', { samples: Array.from(item.audio) });
+            if (ticket === recording && store.enabled && !disposed && text.trim()) {
+              if (item.preview) options.onPreview?.(text.trim(), item.context!);
+              else if (item.context) receiver?.(text.trim(), item.context);
+              else receiver?.(text.trim());
+            }
+          } finally { if (item.preview && previewTicket === ticket) previewTicket = undefined; }
         }
       } catch (e) { if (ticket === recording && !disposed) fail(e); }
       finally {
@@ -85,7 +103,7 @@ export function createAsrStore(deps: AsrDeps): AsrStore {
     if (!receiver || !store.recordingRequested || disposed || !store.enabled || !store.engineReady || capture || starting !== undefined) return;
     const ticket = recording;
     starting = ticket;
-    const activeSegmenter = new UtteranceSegmenter();
+    const activeSegmenter = new UtteranceSegmenter(options.noiseGuard);
     segmenter = activeSegmenter;
     try {
       let levelAt = 0;
@@ -93,10 +111,27 @@ export function createAsrStore(deps: AsrDeps): AsrStore {
         if (ticket !== recording || disposed) return;
         const now = Date.now();
         if (now - levelAt >= 66) { levelAt = now; store.level = loudness(frame); }
+        const reference = options.playbackText?.() ?? '';
+        if (reference) playbackText = reference;
         const audio = activeSegmenter.push(frame);
-        if (!audio) return;
+        store.speechActive = activeSegmenter.active;
+        previewSamples += frame.length;
+        if (!audio) {
+          if (!activeSegmenter.pending) playbackText = '';
+          if (reference && options.onPreview && previewTicket === undefined && previewSamples >= 12800) {
+            const preview = activeSegmenter.preview();
+            if (preview) {
+              previewSamples = 0; previewTicket = ticket;
+              queue.push({ audio: preview, context: { playbackText: reference }, preview: true });
+              void drain(ticket);
+            }
+          }
+          return;
+        }
         if (queue.length >= 5) { fail('语音处理暂时跟不上，请稍后点击重试'); return; }
-        queue.push(audio); void drain(ticket);
+        queue.push({ audio, ...(playbackText ? { context: { playbackText } } : {}) });
+        playbackText = ''; previewSamples = 0;
+        void drain(ticket);
       }, error => { if (ticket === recording && !disposed) captureFailed(error); });
       if (ticket !== recording || disposed || !receiver || !store.enabled || !store.recordingRequested) { microphone.stop(); return; }
       capture = microphone; store.listening = true; store.error = ''; reportMicrophone('');
@@ -106,7 +141,7 @@ export function createAsrStore(deps: AsrDeps): AsrStore {
   const store: AsrStore = reactive({
     microphoneSupported, microphoneError: '',
     ready: false, enabled: false, modelReady: false, engineReady: false, saving: false, preparing: false, recordingRequested: false,
-    listening: false, recognizing: false, level: 0, warming: false, phase: 'idle', downloaded: 0, total: 239549735, error: '',
+    listening: false, recognizing: false, level: 0, speechActive: false, warming: false, phase: 'idle', downloaded: 0, total: 239549735, error: '',
     init() {
       initialization ??= (async () => {
         try {
@@ -180,10 +215,11 @@ export function createAsrStore(deps: AsrDeps): AsrStore {
       })();
       return preparing;
     },
-    async activate(onText) {
+    async activate(onText, activationOptions = {}) {
       if (!deps.desktop || disposed) return;
       if (!store.microphoneSupported) { reportMicrophone(MICROPHONE_UNSUPPORTED); return; }
       store.deactivate(); store.error = ''; receiver = onText; store.recordingRequested = true;
+      options = activationOptions;
       const ticket = recording;
       await store.init();
       if (ticket !== recording || disposed) return;
@@ -196,6 +232,7 @@ export function createAsrStore(deps: AsrDeps): AsrStore {
       const ticket = recording;
       store.listening = false;
       store.recordingRequested = false;
+      store.speechActive = false;
       const activeMic = capture;
       capture = undefined;
       activeMic?.stop();
@@ -203,7 +240,7 @@ export function createAsrStore(deps: AsrDeps): AsrStore {
         const remaining = segmenter.flush();
         segmenter = undefined;
         if (remaining && remaining.length >= 1600) {
-          queue.push(remaining);
+          queue.push({ audio: remaining, ...(playbackText ? { context: { playbackText } } : {}) });
         }
       }
       await drain(ticket);
@@ -214,7 +251,7 @@ export function createAsrStore(deps: AsrDeps): AsrStore {
     deactivate() { receiver = undefined; segmenter = undefined; stopCapture(); },
     async retry() {
       store.error = '';
-      if (receiver) await store.activate(receiver);
+      if (receiver) await store.activate(receiver, options);
       else await store.prepare();
     },
     dispose() { disposed = true; generation++; receiver = undefined; stopCapture(); unlisten?.(); },

@@ -20,9 +20,37 @@ function setup(options: { enabled?: boolean; modelReady?: boolean; prepare?: () 
   const store = createAsrStore({ desktop: true, invoke: invoke as AsrDeps['invoke'], notify, capture,
     listen: async (event, callback) => { if (event === 'asr-state') hostState = callback as (payload: unknown) => void; else progress = callback as (payload: unknown) => void; return off; } });
   function phrase() { for (let i = 0; i < 3; i++) frame?.(new Float32Array(1600).fill(0.1)); for (let i = 0; i < 9; i++) frame?.(new Float32Array(1600)); }
-  return { store, invoke, capture, notify, stop, off, phrase, progress: (payload: unknown) => progress?.(payload), hostState: (payload: unknown) => hostState?.(payload) };
+  return { store, invoke, capture, notify, stop, off, phrase, feed: (audio: Float32Array) => frame?.(audio), progress: (payload: unknown) => progress?.(payload), hostState: (payload: unknown) => hostState?.(payload) };
 }
 describe('local ASR lifecycle', () => {
+  it('previews speech during playback, then returns the full utterance with its original echo reference', async () => {
+    const h = setup({enabled:true}), text = vi.fn(), preview = vi.fn(); let playback = '正在朗读的内容';
+    await h.store.activate(text, {noiseGuard:true, playbackText:()=>playback, onPreview:preview});
+    const voice = Float32Array.from({length:1600}, (_, i)=>.08*Math.sin(2*Math.PI*220*i/16000));
+    for(let i=0;i<8;i++) h.feed(voice);
+    await flushPromises();
+    expect(preview).toHaveBeenCalledWith('你好，小伴。',{playbackText:'正在朗读的内容'});
+    expect(text).not.toHaveBeenCalled(); expect(h.store.listening).toBe(true);
+    playback = '';
+    for(let i=0;i<9;i++)h.feed(new Float32Array(1600));
+    await flushPromises();
+    expect(text).toHaveBeenCalledExactlyOnceWith('你好，小伴。',{playbackText:'正在朗读的内容'});
+    h.store.dispose();
+  });
+  it('keeps preview work bounded and discards late previews after stopping', async () => {
+    const pending=deferred<string>(), h=setup({enabled:true,transcribe:()=>pending.promise}), preview=vi.fn(), text=vi.fn();
+    await h.store.activate(text,{playbackText:()=> 'readout',onPreview:preview});
+    for(let i=0;i<30;i++) h.feed(new Float32Array(1600).fill(.1));
+    expect(h.invoke.mock.calls.filter(([c])=>c==='asr_transcribe')).toHaveLength(1);
+    h.store.deactivate(); pending.resolve('stale'); await flushPromises();
+    expect(preview).not.toHaveBeenCalled();expect(text).not.toHaveBeenCalled();h.store.dispose();
+  });
+  it('does not attach an old playback reference to later speech after a silent readout',async()=>{
+    const h=setup({enabled:true}), text=vi.fn();let playback='silent readout';
+    await h.store.activate(text,{playbackText:()=>playback,onPreview:vi.fn()});
+    for(let i=0;i<12;i++)h.feed(new Float32Array(1600));
+    playback='';h.phrase();await flushPromises();expect(text).toHaveBeenCalledExactlyOnceWith('你好，小伴。');h.store.dispose();
+  });
   it('follows the saved switch and engine readiness from other windows without opening a microphone', async () => {
     const h = setup({ modelReady: false });
     await h.store.init();
