@@ -137,7 +137,8 @@ pub fn observe_environment(app: &tauri::AppHandle, activity: &crate::care_system
     if !config.context_enabled { return; }
     let now = Local::now();
     let busy = crate::reminders::proactive_silenced(app) || crate::games::is_active(app);
-    let weather = crate::reminders::cached_weather(app, now.timestamp());
+    let weather = crate::reminders::cached_weather(app, now.timestamp())
+        .or_else(|| crate::widgets::cached_weather_for_proactivity(app, now.timestamp()));
     let mut next = crate::proactivity_context::collect(now, config.calendar_region.as_deref(),
         activity, busy, weather.as_ref());
     let updated = {

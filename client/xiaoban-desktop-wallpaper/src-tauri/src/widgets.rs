@@ -535,6 +535,27 @@ pub async fn resize_desktop_widget(window:tauri::WebviewWindow,phase:String)->Re
     if phase=="move"{place(app,&window,&resized)?;window.eval(format!("window.dispatchEvent(new CustomEvent('widget-config',{{detail:{}}}));",widget_payload(app,&resized)?)).map_err(|e|e.to_string())?;}
     else{state.resizes.lock().unwrap().remove(&original.id);sync(app);}Ok(())
 }
+/// Reuse a visible weather widget's cached sample without querying weather or disclosing location.
+pub fn cached_weather_for_proactivity(app:&tauri::AppHandle, now:i64)->Option<Weather>{
+    let state=app.state::<WidgetState>();
+    let city = {
+        let layout=state.layout.lock().ok()?;
+        let mut selected:Option<City>=None;
+        for widget in layout.widgets.iter().filter(|w|w.kind=="weather"&&w.enabled) {
+            if let Some(city)=widget.city.as_ref(){
+                if selected.as_ref().is_some_and(|s|s!=city){return None;} // ambiguous multiple cities
+                selected=Some(city.clone());
+            }
+        }
+        selected?
+    };
+    let source=crate::reminders::widget_weather_source(app);
+    if source.provider=="disabled"{return None;}
+    let key=format!("{}:{}:{}",city.latitude,city.longitude,serde_json::to_string(&source).ok()?);
+    state.weather.lock().ok()?.get(&key).filter(|w|
+        (0..1800).contains(&(now-w.updated_at))&&(0..7200).contains(&(now-w.model_at))
+    ).cloned()
+}
 #[tauri::command]
 pub async fn get_widget_weather(window:tauri::WebviewWindow)->Result<Weather,String>{
     let widget=own_widget(&window)?;if widget.kind!="weather"{return Err("此组件不读取天气".into());}
