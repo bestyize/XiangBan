@@ -343,8 +343,9 @@ impl DiscoveryTool {
     }
 }
 fn skill_namespace(skill: &Value) -> Option<&str> {
-    skill["namespace"]["handle"].as_str().or(skill["namespace"].as_str())
-        .or(skill["ownerName"].as_str()).filter(|s| catalog::valid_namespace(s))
+    skill["namespace"]["handle"].as_str().filter(|s| catalog::valid_namespace(s))
+        .or_else(|| skill["namespace"].as_str().filter(|s| catalog::valid_namespace(s)))
+        .or_else(|| skill["ownerName"].as_str().filter(|s| catalog::valid_namespace(s)))
 }
 fn browse_result(result: &Value, page: u32) -> Result<Value, String> {
     let items = result["data"]["skills"].as_array().ok_or("invalid SkillHub browse response")?;
@@ -396,6 +397,7 @@ mod tests {
         assert_eq!(v["results"][0]["namespace"],"publisher");
         assert_eq!(v["results"][0]["source"],"official");
         assert_eq!(v["results"][0]["downloads"],17);
+        assert_eq!(skill_namespace(&json!({"namespace":{"handle":"../unsafe"},"ownerName":"safe-publisher"})),Some("safe-publisher"));
     }
     #[test]
     fn resolves_default_publisher_before_pinning_files_and_downloads(){
