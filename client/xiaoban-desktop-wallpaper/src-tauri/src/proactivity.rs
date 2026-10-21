@@ -20,11 +20,13 @@ const HEIGHT: f64 = 138.0;
 pub struct GreetingSettings {
     pub enabled: bool,
     pub frequency: String,
+    /// Separate opt-in for environmental and Agent task observation, independent of pet bubbles.
+    pub context_enabled: bool,
     /// Chosen explicitly; None means we must not infer a jurisdiction from language or timezone.
     pub calendar_region: Option<String>,
 }
 impl Default for GreetingSettings {
-    fn default() -> Self { Self { enabled: false, frequency: "natural".into(), calendar_region: None } }
+    fn default() -> Self { Self { enabled: false, frequency: "natural".into(), context_enabled: false, calendar_region: None } }
 }
 impl GreetingSettings {
     fn validate(&self) -> Result<(), String> {
@@ -132,7 +134,7 @@ pub fn observe_environment(app: &tauri::AppHandle) {
     let _operation = state.operation.lock().unwrap();
     if state.read_error.load(Ordering::Relaxed) { return; }
     let config = state.settings.lock().unwrap().clone();
-    if !config.enabled { return; }
+    if !config.context_enabled { return; }
     let now = Local::now();
     let activity = crate::care_system::activity();
     let busy = crate::reminders::proactive_silenced(app) || crate::games::is_active(app);
@@ -179,7 +181,7 @@ pub fn observe_task_outcome(app: &tauri::AppHandle, outcome: &crate::chat::task_
 fn observe_task(app: &tauri::AppHandle, task: TaskContext) {
     let state = app.state::<ProactivityState>();
     let _operation = state.operation.lock().unwrap();
-    if state.read_error.load(Ordering::Relaxed) || !state.settings.lock().unwrap().enabled { return; }
+    if state.read_error.load(Ordering::Relaxed) || !state.settings.lock().unwrap().context_enabled { return; }
     let kind = match task.state {
         TaskState::Started => EventKind::TaskStarted,
         TaskState::Succeeded => EventKind::TaskFinished,
@@ -239,6 +241,7 @@ pub fn configure_proactivity(window: tauri::WebviewWindow, settings: GreetingSet
         *engine = Engine::restore(settings.policy(), snapshot);
     }
     *state.settings.lock().unwrap() = settings.clone();
+    if !settings.context_enabled { *state.context.lock().unwrap() = ContextSnapshot::default(); }
     if !settings.enabled {
         *state.context.lock().unwrap() = ContextSnapshot::default();
         close_bubble(app, &state);
