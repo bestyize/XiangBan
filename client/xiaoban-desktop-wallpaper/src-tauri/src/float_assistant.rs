@@ -321,7 +321,8 @@ fn capsule_from_ball(area: Area, scale: f64, x: i32, y: i32, size: i32) -> (i32,
 }
 fn place_from_ball(app: &tauri::AppHandle, window: &WebviewWindow) -> Result<(), String> {
     let (x, y, size) = ball_target(app)?;
-    let monitor = monitor_at_physical_point(app, f64::from(x + size / 2), f64::from(y + size / 2))?
+    let monitor = monitor_at_physical_point(app, f64::from(x + size / 2), f64::from(y + size / 2))
+        .ok().flatten()
         .or_else(|| window.current_monitor().ok().flatten())
         .or_else(|| app.primary_monitor().ok().flatten())
         .ok_or("没有找到可用显示器")?;
