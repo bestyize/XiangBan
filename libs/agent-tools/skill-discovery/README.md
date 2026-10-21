@@ -44,6 +44,12 @@ SkillHub API 文档：https://github.com/Tencent/skillhub/blob/main/docs/api/REA
     cargo test --manifest-path libs/agent-tools/skill-discovery/Cargo.toml
     cargo test --manifest-path client/xiaoban-desktop-wallpaper/src-tauri/Cargo.toml --locked
 
+## 技能目录检索
+
+AI 商店的技能页直接调用 SkillHub 公开的 `/api/skills`，使用独立的 `keyword`、`category`、`source`、`sortBy`、`page` 参数。可选分类由 `/api/v1/categories` 动态加载，中文显示名称不会拼入关键词，也不会写死分类 key。界面显示服务端的匹配总数与分页，提供综合评分、下载量、收藏量、安装量、更新时间排序及官方/社区来源筛选。分类接口失败时仍允许按「全部」搜索，可重试分类字典。
+
+Agent 的 `skill_search` 单次最多返回 20 条，含 `total`/`hasMore`，接受 `page`（1–5）与 `sortBy`；策略仍限制每轮任务至多 3 次不同的搜索或页面，不允许重复请求相同关键词+页码。这是检索改进，不自动安装、执行第三方技能，也不声称覆盖 WorkBuddy 私有市场或其他聚合站。
+
 ## 主动发现策略
 
 用户明确请求时，可以直接搜索 Skill。否则模型必须给出缺少的能力和检查过的现有工具/技能，再使用 `skill_search` 的 `reason=capability_gap` 参数。对于 `reason=repeated_failure`，同一个工具必须在本轮发生至少两次不同调用的实际失败；权限、网络、配额、参数错误不属于能力缺口。
