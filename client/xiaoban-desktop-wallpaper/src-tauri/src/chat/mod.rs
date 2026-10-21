@@ -374,6 +374,7 @@ fn assemble_with_files(parts: Parts<'_>, attachments: Vec<Attachment>) -> Result
         .tool(Shell::new(workspace))
         .tool(WebFetch::new())
         .tool(learning::Recall::new(dirs.learning_db()))
+        .middleware(discovery.acquisition_policy())
         .middleware(permission)
         // Before spilling, so it compares real outputs rather than previews that name a fresh file each time.
         .middleware(RepeatGuard::new())
