@@ -158,8 +158,8 @@ fn permission_with_danger_check(mode: PermissionMode, approver: impl agent_kerne
     Permission::new(mode, approver).danger_check(move |tool, args| {
         // In Auto mode, always_ask alone does not trigger approval when a danger
         // policy is installed; third-party skill installation must be flagged here.
-        if tool == "skill_install" {
-            return Some("安装第三方 Skill 必须逐次经过用户确认".to_string());
+        if tool == "skill_install" || tool == "skill_run" {
+            return Some("安装第三方 Skill 或执行其脚本必须逐次经过用户确认".to_string());
         }
         if tool == "computer_use_repair_permissions" {
             return Some("清除 com.ifuryst.opencomputeruse 的所选旧授权（同标识独立安装版也受影响），之后需重新授权；每次都需确认".to_string());
@@ -353,7 +353,7 @@ fn assemble_with_files(parts: Parts<'_>, attachments: Vec<Attachment>) -> Result
     fs::write(file_skill.join("scripts/csv_summary.py"), agent_file_tools::CSV_SUMMARY_SCRIPT).map_err(|e| e.to_string())?;
     let skills = Arc::new(Skills::new().read_only_root(bundled).writable_root(dirs.skills()));
     let memory = Arc::new(Memory::new(dirs.memory()));
-    let discovery = SkillDiscovery::new(dirs.skills());
+    let discovery = SkillDiscovery::new(dirs.skills(), workspace.to_path_buf());
     // Started before the prompt is written, so the prompt can say honestly whether the tools exist.
     let computer_use = if open_computer_use { Some(spawn_computer_use()) } else { None };
     let computer_use_error = match &computer_use { Some(Err(error)) => Some(error.to_string()), _ => None };
