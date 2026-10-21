@@ -695,4 +695,3 @@ describe('assistant voice settings synchronization',()=>{
     expect(chat.send).not.toHaveBeenCalled();expect(asr.recordingRequested).toBe(false);expect(store.phase).toBe('idle');expect(store.input).toBe('还没有发送的话');
   });
 });
-

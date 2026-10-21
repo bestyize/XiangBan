@@ -289,4 +289,3 @@ it('accepts a document drop in the capsule and renders a removable named card', 
   expect(wrapper.get('[data-testid="assistant-attachments"]').text()).toContain('预算.csv');
   await wrapper.get('[aria-label="移除附件 1"]').trigger('click');expect(store.attachments).toHaveLength(0);
 });
-
