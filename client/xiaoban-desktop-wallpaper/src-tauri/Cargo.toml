@@ -1,6 +1,6 @@
 [package]
 name = "xiaoban-desktop-wallpaper"
-version = "2.0.0"
+version = "2.1.0"
 description = "小伴：Windows / macOS 悬浮桌宠与动态壁纸"
 edition = "2021"
 

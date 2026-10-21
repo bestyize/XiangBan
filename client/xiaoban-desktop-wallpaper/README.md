@@ -10,6 +10,8 @@ MCP 连接器使用服务 README 中的标准配置，支持本机 stdio 与远�
 
 Windows / macOS 桌面应用：一个可拖动、透明处点击穿透的悬浮小伴，也可以切换成位于桌面图标下方的动态壁纸。内置通用 Agent 聊天与 AI 商店；默认连接 `https://wallpaper.xiangban.xyz` 获取在线图片、动态视频、版本与公告。Windows 缺少运行组件时会联网补齐；组件与缓存可用后可离线运行。角色、场景、控制台与互动逻辑共用，桌面宿主分平台接入。
 
+2.1.0（构建中，SHA-256 待出包后补）：界面与能力更新包括——桌面伙伴改为主题制，官方「花朵心语」「多肉点点」共七只，支持自定义主题、导入导出与每只独立取名/大小/心情/层级；桌面组件与特效、宠物、游戏统一为「官方 / 自定义」两栏，每个组件可选择“贴在桌面”或“始终置顶”，自定义组件单独归类；聊天回答下方可展开执行过程，支持粘贴图片与文件作为附件、选中文字复制；小伴 AI 面向用户只保留“日常 / 深入”两种使用模式，兼容端点可另设回答偏好；超级小伴新增紧凑工具栏、区域截图与标注、彩虹生命球，以及 macOS 截图权限的自助修复入口。
+
 2026-10-20 **2.0.0 正式版（重新出包）**：Windows x64 一键安装包 `XiaoBan-Setup-2.0.0-Windows-x64.exe`（12,196,799 bytes；SHA-256 `eb5ec63491d8fba3a6a143ecaf6c39e817b4a4b66fc7430b3406585488e6a80c`），macOS aarch64 dmg `XiaoBanWallpaper-2.0.0-MacOS-aarch64.dmg`（19,700,610 bytes；SHA-256 `8722b71b1f55c62673154db8971aca9ac79a3cf9fc58b68c96c7c0daf7e4e794`，固定自签名证书、未公证）。已上架 `wallpaper.xiangban.xyz`（含客户端更新接口）与 GitHub Release `xiaoban-wallpaper-v2.0.0`，下载后 SHA-256 与构建产物一致。
 
 此前 1.1.0 发布记录：2026-10-10 最新 Windows x64 网络恢复修复包：XiaoBan-UI-NetworkFix-Windows-x64.exe（本地：`artifacts/XiaoBan-UI-NetworkFix-Windows-x64.exe`）（6,017,024 bytes，约 5.74 MiB；SHA-256 `AC52792F39CAF2B239867E0B4AD84EB07C90A632A785F46332F0B0E528E58454`）。若先前版本仍在托盘运行，请退出旧实例再启动新版；单实例行为可能会唤起旧进程。此前 UI 版和 P0 版作为历史包保留：UI 版（本地：`artifacts/XiaoBan-UI-Windows-x64.exe`）（6,014,464 bytes；SHA-256 `7EF780BABBA7F2D545EDBF56D7018D3F80E1E58E65CE0DD0CDE1A388B2420278`）、P0 版（本地：`artifacts/XiaoBan-P0-Windows-x64.exe`）（5,814,272 bytes；SHA-256 `71AC7CFDB01BC65A2949400D047503F3B86D2F58739D542ABD1A452B3E8D04D0`）。2026-10-10 Rust 测试 60 项通过；本轮 UI 前端测试此前 51 tests / 11 files 通过，本次网络修复未修改前端且未重跑。自动化及人工验收状态见 [功能验证清单](docs/feature-validation.md)。
