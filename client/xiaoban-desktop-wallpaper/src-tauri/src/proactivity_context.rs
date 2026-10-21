@@ -121,6 +121,18 @@ mod tests {
         assert_eq!(calendar(local(2027,10,10),Some("CN")).day_kind,DayKind::Unknown);
     }
     #[test]
+    fn weather_is_taken_only_from_a_fresh_supported_cached_record() {
+        let base = crate::care_weather::Weather {
+            city: crate::care_weather::City::default(),
+            text: "北京：雨，当前约 18°C（天气模型数据）。".into(),
+            updated_at: 1000, model_at: 1000, source: "cached".into(),
+        };
+        assert_eq!(weather_from_cache(&base,1_001_000).unwrap().condition, WeatherCondition::Rain);
+        assert!(weather_from_cache(&base,3_000_000).is_none());
+        let unsupported = crate::care_weather::Weather { text: "不可信天气文案".into(), ..base };
+        assert!(weather_from_cache(&unsupported,1_001_000).is_none());
+    }
+    #[test]
     fn basic_system_context_does_not_assume_fullscreen_or_force_weather_network() {
         let sample = collect(local(2026,10,21),None,&crate::care_system::Activity{
             idle_seconds: 1.0,locked:false,available:true
