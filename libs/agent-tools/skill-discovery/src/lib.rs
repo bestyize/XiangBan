@@ -1,5 +1,6 @@
 //! Discover, review and install version-pinned SkillHub skills.
 //! Third-party instructions and scripts are untrusted. Installing never executes code.
+mod acquisition;
 mod package;
 mod runner;
 use agent_kernel::{Risk, Tool, ToolCtx, ToolSpec};
@@ -87,12 +88,19 @@ fn validate_skill(slug: &str, raw: &[u8], expected: &str) -> Result<String, Stri
 pub struct SkillDiscovery { root: PathBuf, workspace: PathBuf }
 impl SkillDiscovery {
     pub fn new(root: PathBuf, workspace: PathBuf) -> Self { Self { root, workspace } }
+    pub fn acquisition_policy(&self) -> acquisition::AcquisitionPolicy {
+        acquisition::AcquisitionPolicy::default()
+    }
     pub fn tools(&self) -> Vec<Arc<dyn Tool>> {
         let mut tools: Vec<Arc<dyn Tool>> = ["skill_search", "skill_inspect", "skill_install"]
             .into_iter().map(|name| {
                 let schema = match name {
                     "skill_search" => json!({"type":"object","properties":{
-                        "keyword":{"type":"string","minLength":2,"maxLength":80}},"required":["keyword"]}),
+                        "keyword":{"type":"string","minLength":2,"maxLength":80},
+                        "reason":{"type":"string","enum":["capability_gap","repeated_failure"],"description":"For proactive searches only; omit when user explicitly asks for Skill discovery."},
+                        "gap":{"type":"string","description":"Specific capability unavailable among installed tools and skills; required for proactive discovery."},
+                        "alternatives":{"type":"string","description":"Existing tools/skills considered and why they cannot solve the task; required for proactive discovery."}
+                    },"required":["keyword"]}),
                     "skill_inspect" => json!({"type":"object","properties":{
                         "slug":{"type":"string"},"version":{"type":"string"}},"required":["slug","version"]}),
                     _ => json!({"type":"object","properties":{

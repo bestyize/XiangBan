@@ -43,3 +43,11 @@ SkillHub API 文档：https://github.com/Tencent/skillhub/blob/main/docs/api/REA
 
     cargo test --manifest-path libs/agent-tools/skill-discovery/Cargo.toml
     cargo test --manifest-path client/xiaoban-desktop-wallpaper/src-tauri/Cargo.toml --locked
+
+## 主动发现策略
+
+用户明确请求时，可以直接搜索 Skill。否则模型必须给出缺少的能力和检查过的现有工具/技能，再使用 `skill_search` 的 `reason=capability_gap` 参数。对于 `reason=repeated_failure`，同一个工具必须在本轮发生至少两次不同调用的实际失败；权限、网络、配额、参数错误不属于能力缺口。
+
+策略还包括：单任务最多三个不同搜索词、相同词不重复搜索、离线要求下禁止在线检索。模型在重复失败后宣布无法完成时，最多收到一次重新考虑 Skill 的提示。发现候选不等于批准安装；安装与脚本运行依然需要用户分别确认。
+
+当前策略仅对单轮任务生效；没有后台搜索，也没有跨会话长期能力需求学习。
