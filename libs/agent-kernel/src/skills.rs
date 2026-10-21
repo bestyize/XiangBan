@@ -14,7 +14,6 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 const MAX_SKILLS: usize = 200;
-const HEAD_BYTES: u64 = 8192;
 const MAX_FILE_BYTES: u64 = 100 * 1024;
 const MAX_BODY_BYTES: usize = 20_000;
 const MAX_DESCRIPTION_CHARS: usize = 500;
@@ -160,29 +159,133 @@ fn read_limited(path: &Path) -> Result<String, String> {
     String::from_utf8(bytes).map_err(|_| format!("{} is not valid UTF-8", path.display()))
 }
 
-/// Returns the `key: value` lines of the leading `---` block and everything after it.
-fn split_frontmatter(text: &str) -> Option<(Vec<(&str, &str)>, &str)> {
+/// Metadata shared by installation validation and the installed-skill index.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SkillMetadata {
+    pub name: String,
+    pub description: String,
+    pub origin: Option<String>,
+}
+
+/// Parse the scalar metadata used by Skills, without evaluating YAML tags or aliases.
+/// The original document is never rewritten: its bytes may be pinned by a manifest.
+pub fn parse_skill_metadata(text: &str) -> Result<SkillMetadata, String> {
+    let (pairs, _) = split_frontmatter(text)
+        .ok_or("SKILL.md requires a closed --- frontmatter block with unique scalar metadata fields")?;
+    let get = |key: &str| pairs.iter().find(|(k, _)| *k == key).map(|(_, v)| v.as_str());
+    let name = get("name").filter(|v| !v.trim().is_empty())
+        .ok_or("SKILL.md frontmatter name is missing or empty")?;
+    let description = get("description").filter(|v| !v.trim().is_empty())
+        .ok_or("SKILL.md frontmatter description is missing or empty")?;
+    Ok(SkillMetadata {
+        name: name.to_string(),
+        description: description.split_whitespace().collect::<Vec<_>>().join(" "),
+        origin: get("origin").map(str::to_string),
+    })
+}
+
+/// The supported scalar subset includes quoted values, comments and indented descriptions.
+/// Ignore unrelated/nested metadata; only top-level identity fields are authoritative.
+fn split_frontmatter(text: &str) -> Option<(Vec<(&str, String)>, &str)> {
     let text = text.strip_prefix('\u{feff}').unwrap_or(text);
-    let mut rest = text.strip_prefix("---")?;
-    rest = rest.strip_prefix("\r\n").or_else(|| rest.strip_prefix('\n'))?;
-    let mut pairs = Vec::new();
-    let mut offset = 0;
-    for line in rest.split_inclusive('\n') {
-        offset += line.len();
-        let trimmed = line.trim_end_matches(['\r', '\n']);
-        if trimmed.trim_end() == "---" {
-            return Some((pairs, &rest[offset..]));
-        }
-        if let Some((key, value)) = trimmed.split_once(':') {
-            let value = value.trim();
-            let unquoted = [('"', '"'), ('\'', '\'')]
-                .iter()
-                .find_map(|&(open, close)| value.strip_prefix(open)?.strip_suffix(close))
-                .unwrap_or(value);
-            pairs.push((key.trim(), unquoted));
-        }
+    let opening = text.split_inclusive('\n').next()?;
+    if !opening.ends_with('\n') || opening.trim_end() != "---" {
+        return None;
     }
-    None
+    let rest = &text[opening.len()..];
+    let mut offset = 0;
+    let mut header_end = None;
+    for line in rest.split_inclusive('\n') {
+        if line.trim_end() == "---" {
+            header_end = Some((offset, offset + line.len()));
+            break;
+        }
+        offset += line.len();
+    }
+    let (end, body_start) = header_end?;
+    let mut lines = rest[..end].lines().peekable();
+    let mut pairs = Vec::new();
+    while let Some(line) = lines.next() {
+        if line.starts_with(char::is_whitespace) || line.starts_with('#') {
+            continue;
+        }
+        let Some((key, value)) = line.split_once(':') else { continue };
+        let key = key.trim();
+        if !matches!(key, "name" | "description" | "origin") {
+            continue;
+        }
+        if pairs.iter().any(|(k, _)| *k == key) {
+            return None;
+        }
+        let value = value.trim();
+        let indicator = value.split_whitespace().next().unwrap_or("");
+        let scalar = if matches!(indicator, "|" | "|-" | "|+" | ">" | ">-" | ">+")
+            || value.is_empty() || value.starts_with('#')
+        {
+            if !indicator.is_empty() && !indicator.starts_with('#')
+                && !value[indicator.len()..].trim_start().is_empty()
+                && !value[indicator.len()..].trim_start().starts_with('#') {
+                return None;
+            }
+            let mut block = Vec::new();
+            while lines.peek().is_some_and(|l| l.trim().is_empty() || l.starts_with(' ')) {
+                block.push(lines.next()?.trim());
+            }
+            block.join(if indicator.starts_with('|') { "\n" } else { " " })
+        } else {
+            scalar_value(value)?
+        };
+        pairs.push((key, scalar));
+    }
+    Some((pairs, &rest[body_start..]))
+}
+
+fn scalar_value(value: &str) -> Option<String> {
+    if value.starts_with('"') {
+        let mut escaped = false;
+        for (index, c) in value.char_indices().skip(1) {
+            if escaped {
+                escaped = false;
+            } else if c == '\\' {
+                escaped = true;
+            } else if c == '"' {
+                let suffix = value[index + 1..].trim_start();
+                if !suffix.is_empty() && !suffix.starts_with('#') {
+                    return None;
+                }
+                return serde_json::from_str(&value[..index + 1]).ok();
+            }
+        }
+        return None;
+    }
+    if value.starts_with('\'') {
+        let mut chars = value.char_indices().skip(1).peekable();
+        while let Some((index, c)) = chars.next() {
+            if c != '\'' { continue; }
+            if chars.peek().is_some_and(|(_, next)| *next == '\'') {
+                chars.next();
+                continue;
+            }
+            let suffix = value[index + 1..].trim_start();
+            if !suffix.is_empty() && !suffix.starts_with('#') {
+                return None;
+            }
+            return Some(value[1..index].replace("''", "'"));
+        }
+        return None;
+    }
+    if value.starts_with(['[', '{', '&', '*', '!']) {
+        return None;
+    }
+    let end = value.char_indices().find_map(|(index, c)| {
+        (c == '#' && (index == 0 || value[..index].ends_with(char::is_whitespace)))
+            .then_some(index)
+    }).unwrap_or(value.len());
+    let scalar = value[..end].trim_end();
+    if matches!(scalar, "~" | "null" | "Null" | "NULL") {
+        return Some(String::new());
+    }
+    Some(scalar.to_string())
 }
 
 fn read_info(root: &Root, name: &str) -> Option<SkillInfo> {
@@ -190,20 +293,16 @@ fn read_info(root: &Root, name: &str) -> Option<SkillInfo> {
     if !fs::symlink_metadata(&dir).ok()?.is_dir() {
         return None;
     }
-    let mut head = Vec::new();
-    File::open(dir.join("SKILL.md")).ok()?.take(HEAD_BYTES).read_to_end(&mut head).ok()?;
-    let head = String::from_utf8_lossy(&head);
-    let (pairs, _) = split_frontmatter(&head)?;
-    let get = |key: &str| pairs.iter().find(|(k, _)| *k == key).map(|(_, v)| *v);
-    if get("name")? != name {
+    let text = read_limited(&dir.join("SKILL.md")).ok()?;
+    let metadata = parse_skill_metadata(&text).ok()?;
+    if metadata.name != name {
         return None;
     }
-    let description = get("description").filter(|d| !d.is_empty())?;
     Some(SkillInfo {
         name: name.to_string(),
-        description: description.to_string(),
+        description: metadata.description,
         dir,
-        agent_created: get("origin") == Some("agent"),
+        agent_created: metadata.origin.as_deref() == Some("agent"),
         writable: root.writable,
     })
 }
@@ -281,6 +380,8 @@ impl SkillManage {
         fs::create_dir_all(&root.path).map_err(|e| format!("cannot create skill directory: {e}"))?;
         let dir = root.path.join(name);
         fs::create_dir(&dir).map_err(|e| format!("cannot create {}: {e}", dir.display()))?;
+        // Quote descriptions so colons, leading # and quotes remain scalar text.
+        let description = serde_json::to_string(description).map_err(|e| e.to_string())?;
         let text = format!("---\nname: {name}\ndescription: {description}\norigin: agent\n---\n\n{content}\n");
         atomic_write(&dir.join("SKILL.md"), text.as_bytes()).map_err(|e| {
             let _ = fs::remove_dir(&dir);
@@ -346,5 +447,81 @@ impl Tool for SkillManage {
             "delete" => self.delete(name),
             other => Err(format!("unknown action `{other}`; use create, patch or delete")),
         }
+    }
+}
+
+#[cfg(test)]
+mod frontmatter_tests {
+    use super::*;
+
+    #[test]
+    fn parses_common_scalar_formats_without_reading_body_metadata() {
+        for (field, expected) in [
+            ("'Use it''s data # safely' # comment", "Use it's data # safely"),
+            ("\"Read \\\"quoted\\\" text\" # comment", "Read \"quoted\" text"),
+            ("Plain text # comment", "Plain text"),
+            (">-\n  Read the report\n  and summarize it.", "Read the report and summarize it."),
+            ("| # comment\n  Read the report\n  and summarize it.", "Read the report and summarize it."),
+            ("\n  Read the report\n  and summarize it.", "Read the report and summarize it."),
+        ] {
+            let text = format!("---\nmetadata:\n  name: ignored\nname: 'demo-skill'\ndescription: {field}\n---\nname: body-only");
+            let metadata = parse_skill_metadata(&text).unwrap();
+            assert_eq!(metadata.name, "demo-skill");
+            assert_eq!(metadata.description, expected);
+        }
+    }
+
+    #[test]
+    fn rejects_missing_duplicate_nested_and_empty_metadata() {
+        for header in [
+            "description: example",
+            "name: demo-skill",
+            "name: demo-skill\ndescription: ''",
+            "name: demo-skill\ndescription: >-\n  ",
+            "name: demo-skill\ndescription: null",
+            "name: demo-skill\nname: other\ndescription: example",
+            "metadata:\n  name: demo-skill\n  description: example",
+            "name: demo-skill\ndescription: *alias",
+            "name: demo-skill\ndescription: \"unterminated",
+        ] {
+            let text = format!("---\n{header}\n---\nname: demo-skill\ndescription: body cannot supply metadata");
+            assert!(parse_skill_metadata(&text).is_err(), "{header}");
+        }
+        assert!(parse_skill_metadata("---\nname: demo-skill\ndescription: missing closing delimiter").is_err());
+    }
+
+    #[test]
+    fn reads_long_bom_crlf_headers_and_loads_the_original_body() {
+        let root = std::env::temp_dir().join(format!("skill-metadata-{}-{}", std::process::id(), now_millis()));
+        let dir = root.join("demo-skill");
+        fs::create_dir_all(&dir).unwrap();
+        let padding = "# extra metadata\r\n".repeat(600);
+        let text = format!("\u{feff}---\r\n{padding}name: 'demo-skill'\r\ndescription: >-\r\n  Read reports\r\n  and summarize.\r\n---\r\n\r\nOriginal body.\r\n");
+        fs::write(dir.join("SKILL.md"), &text).unwrap();
+        let skills = Skills::new().read_only_root(&root);
+        let info = skills.find("demo-skill").unwrap();
+        assert_eq!(info.description, "Read reports and summarize.");
+        assert_eq!(skills.list().len(), 1);
+        let loaded = skills.load("demo-skill").unwrap();
+        assert!(loaded.ends_with("Original body."));
+        assert!(!loaded.contains("# extra metadata"));
+        assert_eq!(fs::read_to_string(dir.join("SKILL.md")).unwrap(), text);
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn created_skills_with_special_descriptions_still_load_and_patch() {
+        let root = std::env::temp_dir().join(format!("skill-create-metadata-{}-{}", std::process::id(), now_millis()));
+        let skills = Arc::new(Skills::new().writable_root(&root));
+        let manager = SkillManage::new(skills.clone());
+        let description = "# Use \"reports\": it's useful";
+        manager.create(&json!({"description": description, "content": "Original body"}), "demo-skill").unwrap();
+        let info = skills.find("demo-skill").unwrap();
+        assert_eq!(info.description, description);
+        assert!(info.agent_created);
+        manager.patch(&json!({"old_string": "Original body", "new_string": "Updated body"}), "demo-skill").unwrap();
+        assert!(skills.load("demo-skill").unwrap().ends_with("Updated body"));
+        assert_eq!(skills.find("demo-skill").unwrap().description, description);
+        fs::remove_dir_all(root).unwrap();
     }
 }

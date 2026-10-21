@@ -75,12 +75,12 @@ fn validate_skill(slug: &str, raw: &[u8], expected: &str) -> Result<String, Stri
         return Err("SkillHub SKILL.md SHA256 mismatch".into());
     }
     let text = String::from_utf8(raw.to_vec()).map_err(|_| "SKILL.md is not UTF-8")?;
-    if !text.starts_with("---\n")
-        || !text.lines().take(20).any(|line| {
-            line.trim() == format!("name: {slug}") || line.trim() == format!("name: \"{slug}\"")
-        })
-        || !text.lines().take(25).any(|line| line.starts_with("description: ")) {
-        return Err("SKILL.md frontmatter name or description is invalid".into());
+    let metadata = agent_kernel::skills::parse_skill_metadata(&text)?;
+    if metadata.name != slug {
+        return Err(format!(
+            "SKILL.md frontmatter name {:?} does not match SkillHub slug {:?}",
+            metadata.name, slug
+        ));
     }
     Ok(text)
 }
@@ -230,6 +230,31 @@ fn browse_result(result: &Value, page: u32) -> Result<Value, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn skill_validation_preserves_reviewed_bytes_and_accepts_header_variants() {
+        for text in [
+            "---\nname: demo-skill\ndescription: Example\n---\nBody".to_string(),
+            "\u{feff}---\r\nname: 'demo-skill'\r\ndescription: >-\r\n  Read reports\r\n  and summarize.\r\n---\r\nBody".to_string(),
+            format!("---\n{}name: \"demo-skill\" # comment\ndescription: Example\n---\nBody", "# metadata\n".repeat(30)),
+        ] {
+            let hash = format!("{:x}", Sha256::digest(text.as_bytes()));
+            assert_eq!(validate_skill("demo-skill", text.as_bytes(), &hash).unwrap(), text);
+        }
+    }
+
+    #[test]
+    fn skill_validation_keeps_checksum_and_identity_checks() {
+        let text = "---\nname: other-skill\ndescription: Example\n---\nBody";
+        let hash = format!("{:x}", Sha256::digest(text.as_bytes()));
+        let error = validate_skill("demo-skill", text.as_bytes(), &hash).unwrap_err();
+        assert!(error.contains("other-skill") && error.contains("demo-skill"));
+        assert!(validate_skill("other-skill", text.as_bytes(), &"0".repeat(64))
+            .unwrap_err().contains("SHA256 mismatch"));
+        let text = "---\nname: demo-skill\n---\ndescription: Body is not metadata";
+        let hash = format!("{:x}", Sha256::digest(text.as_bytes()));
+        assert!(validate_skill("demo-skill", text.as_bytes(), &hash)
+            .unwrap_err().contains("description"));
+    }
     #[test]
     fn browsing_preserves_identity_and_paginates() {
         let result = browse_result(&json!({"data":{"skills":[{"slug":"demo-skill","name":"Demo",
