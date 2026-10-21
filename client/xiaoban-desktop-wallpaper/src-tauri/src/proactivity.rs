@@ -142,7 +142,10 @@ pub fn observe_environment(app: &tauri::AppHandle, activity: &crate::care_system
         activity, busy, weather.as_ref());
     let updated = {
         let mut context = state.context.lock().unwrap();
-        next.task = context.task.clone();
+        // Drop stale task status instead of retaining it forever in a long-lived desktop process.
+        let sample_at = next.temporal.as_ref().map(|v| v.sampled_at_ms).unwrap_or(0);
+        next.task = context.task.clone().filter(|task| task.at_ms <= sample_at &&
+            sample_at.saturating_sub(task.at_ms) < 24 * 60 * 60 * 1000);
         let changes = changes(&context, &next, Local::now().timestamp_millis());
         *context = next;
         changes
@@ -204,6 +207,10 @@ pub fn observe_presence(app: &tauri::AppHandle, kind: crate::presence::Kind, at_
     let state = app.state::<ProactivityState>();
     let _op = state.operation.lock().unwrap();
     if state.read_error.load(Ordering::Relaxed) { return; }
+    // Presence is collected only for an explicitly enabled user-facing feature.
+    let config = state.settings.lock().unwrap();
+    if !config.enabled && !config.context_enabled { return; }
+    drop(config);
     if state.engine.lock().unwrap().observe(&map_presence(kind, at_ms)) != Observation::Accepted { return; }
     if let Err(error) = save_state(app, &state) {
         state.read_error.store(true, Ordering::Relaxed);
@@ -241,8 +248,12 @@ pub fn configure_proactivity(window: tauri::WebviewWindow, settings: GreetingSet
         let snapshot = engine.snapshot();
         *engine = Engine::restore(settings.policy(), snapshot);
     }
+    let previous = state.settings.lock().unwrap().clone();
     *state.settings.lock().unwrap() = settings.clone();
-    if !settings.context_enabled { *state.context.lock().unwrap() = ContextSnapshot::default(); }
+    if !settings.context_enabled || previous.calendar_region != settings.calendar_region ||
+        previous.context_enabled != settings.context_enabled {
+        *state.context.lock().unwrap() = ContextSnapshot::default();
+    }
     if !settings.enabled {
         *state.context.lock().unwrap() = ContextSnapshot::default();
         close_bubble(app, &state);
