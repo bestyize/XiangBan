@@ -22,10 +22,18 @@ pub struct HttpMcpConfig {
     pub tool_prefix: String,
     pub timeout: Duration,
 }
+/// Host-owned credentials. Tokens never enter tool schemas or the model context.
+pub trait HttpAuthorization: Send + Sync {
+    fn access_token(&self, refresh: bool) -> Result<String, String>;
+    fn cached_token(&self) -> Option<String> {
+        None
+    }
+}
 pub struct HttpMcpClient {
     client: Client,
     url: String,
     headers: HeaderMap,
+    authorization: Option<Arc<dyn HttpAuthorization>>,
     session: Mutex<Option<String>>,
     protocol: Mutex<String>,
     next: AtomicU64,
@@ -34,6 +42,18 @@ pub struct HttpMcpClient {
 }
 impl HttpMcpClient {
     pub fn connect(config: HttpMcpConfig) -> Result<Arc<Self>, String> {
+        Self::connect_inner(config, None)
+    }
+    pub fn connect_with_authorization(
+        config: HttpMcpConfig,
+        authorization: Arc<dyn HttpAuthorization>,
+    ) -> Result<Arc<Self>, String> {
+        Self::connect_inner(config, Some(authorization))
+    }
+    fn connect_inner(
+        config: HttpMcpConfig,
+        authorization: Option<Arc<dyn HttpAuthorization>>,
+    ) -> Result<Arc<Self>, String> {
         let url = reqwest::Url::parse(&config.url).map_err(|_| "MCP 地址无效")?;
         if !(url.scheme() == "https"
             || (url.scheme() == "http"
@@ -74,10 +94,14 @@ impl HttpMcpClient {
             .timeout(config.timeout)
             .build()
             .map_err(|_| "无法创建 MCP HTTP 客户端")?;
+        if authorization.is_some() {
+            headers.remove("authorization");
+        }
         let mut this = Self {
             client,
             url: config.url,
             headers,
+            authorization,
             session: Mutex::new(None),
             protocol: Mutex::new("2025-06-18".into()),
             next: AtomicU64::new(1),
@@ -143,56 +167,67 @@ impl HttpMcpClient {
         if !notification {
             request["id"] = json!(id);
         }
-        let mut builder = self
-            .client
-            .post(&self.url)
-            .headers(self.headers.clone())
-            .header("Accept", "application/json, text/event-stream")
-            .header("Content-Type", "application/json");
-        if method != "initialize" {
-            builder = builder.header(
-                "MCP-Protocol-Version",
-                self.protocol
-                    .lock()
-                    .unwrap_or_else(|e| e.into_inner())
-                    .as_str(),
-            );
-        }
-        if let Some(session) = self
-            .session
-            .lock()
-            .unwrap_or_else(|e| e.into_inner())
-            .as_ref()
-        {
-            builder = builder.header("Mcp-Session-Id", session);
-        }
-        if matches!(method, "initialize" | "tools/list") {
-            builder = builder.timeout(Duration::from_secs(15));
-        }
-        let response = builder
-            .body(serde_json::to_vec(&request).map_err(|_| "MCP 请求序列化失败")?)
-            .send()
-            .map_err(|_| {
+        let body = serde_json::to_vec(&request).map_err(|_| "MCP 请求序列化失败")?;
+        for attempt in 0..2 {
+            let mut builder = self
+                .client
+                .post(&self.url)
+                .headers(self.headers.clone())
+                .header("Accept", "application/json, text/event-stream")
+                .header("Content-Type", "application/json");
+            if let Some(auth) = &self.authorization {
+                let token = auth.access_token(attempt != 0).map_err(|e| {
+                    self.closed.store(true, Ordering::SeqCst);
+                    e
+                })?;
+                builder = builder.bearer_auth(token);
+            }
+            if method != "initialize" {
+                builder = builder.header(
+                    "MCP-Protocol-Version",
+                    self.protocol
+                        .lock()
+                        .unwrap_or_else(|e| e.into_inner())
+                        .as_str(),
+                );
+            }
+            if let Some(session) = self
+                .session
+                .lock()
+                .unwrap_or_else(|e| e.into_inner())
+                .as_ref()
+            {
+                builder = builder.header("Mcp-Session-Id", session);
+            }
+            if matches!(method, "initialize" | "tools/list") {
+                builder = builder.timeout(Duration::from_secs(15));
+            }
+            let response = builder.body(body.clone()).send().map_err(|_| {
                 self.closed.store(true, Ordering::SeqCst);
                 "MCP 网络请求失败或超时，请检查地址和凭据"
             })?;
-        if !response.status().is_success() {
-            self.closed.store(true, Ordering::SeqCst);
-            return Err(format!(
-                "MCP HTTP {}；请检查鉴权与传输方式，旧式 SSE 暂不支持",
-                response.status().as_u16()
-            ));
-        }
-        if method == "initialize" {
-            if let Some(session) = response.headers().get("Mcp-Session-Id") {
-                *self.session.lock().unwrap_or_else(|e| e.into_inner()) =
-                    Some(session.to_str().map_err(|_| "MCP 会话头无效")?.to_string());
+            if response.status().as_u16() == 401 && self.authorization.is_some() && attempt == 0 {
+                continue;
             }
+            if !response.status().is_success() {
+                self.closed.store(true, Ordering::SeqCst);
+                return Err(format!(
+                    "MCP HTTP {}；请检查鉴权与传输方式，旧式 SSE 暂不支持",
+                    response.status().as_u16()
+                ));
+            }
+            if method == "initialize" {
+                if let Some(session) = response.headers().get("Mcp-Session-Id") {
+                    *self.session.lock().unwrap_or_else(|e| e.into_inner()) =
+                        Some(session.to_str().map_err(|_| "MCP 会话头无效")?.to_string());
+                }
+            }
+            if notification {
+                return Ok(Value::Null);
+            }
+            return read_response(response, id);
         }
-        if notification {
-            return Ok(Value::Null);
-        }
-        read_response(response, id)
+        Err("MCP 授权失效，请重新连接并授权".into())
     }
     pub fn is_connected(&self) -> bool {
         !self.closed.load(Ordering::SeqCst)
@@ -207,7 +242,7 @@ impl HttpMcpClient {
             .unwrap_or_else(|e| e.into_inner())
             .take();
         if let Some(session) = session {
-            let _ = self
+            let mut request = self
                 .client
                 .delete(&self.url)
                 .headers(self.headers.clone())
@@ -219,8 +254,14 @@ impl HttpMcpClient {
                         .unwrap_or_else(|e| e.into_inner())
                         .as_str(),
                 )
-                .timeout(Duration::from_secs(2))
-                .send();
+                .timeout(Duration::from_secs(2));
+            if let Some(auth) = &self.authorization {
+                let Some(token) = auth.cached_token() else {
+                    return;
+                };
+                request = request.bearer_auth(token);
+            }
+            let _ = request.send();
         }
     }
     pub fn tools(self: &Arc<Self>) -> Vec<Arc<dyn Tool>> {

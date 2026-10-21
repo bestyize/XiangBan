@@ -41,6 +41,9 @@ name = "agent-connector-tools"
 version = "0.1.0"
 dependencies = [
  "agent-kernel",
+ "base64 0.22.1",
+ "getrandom 0.3.4",
+ "reqwest",
  "serde",
  "serde_json",
  "sha2",

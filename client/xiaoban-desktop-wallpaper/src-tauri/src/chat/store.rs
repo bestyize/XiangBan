@@ -56,7 +56,7 @@ pub async fn ai_store_connector_status(app:tauri::AppHandle,window:tauri::Webvie
 #[tauri::command]
 pub async fn ai_store_connector_connect(app:tauri::AppHandle,window:tauri::WebviewWindow,id:String,name:String,config:Value,confirmed:bool)->Result<Value,String>{
     control(&window)?;
-    tauri::async_runtime::spawn_blocking(move||super::connector_manager(&app)?.connect(&id,&name,config,confirmed)).await.map_err(|e|e.to_string())?
+    tauri::async_runtime::spawn_blocking(move||super::connector_manager(&app)?.begin_connect(&id,&name,config,confirmed)).await.map_err(|e|e.to_string())?
 }
 #[tauri::command]
 pub async fn ai_store_connector_disconnect(app:tauri::AppHandle,window:tauri::WebviewWindow,id:String)->Result<(),String>{
@@ -66,7 +66,17 @@ pub async fn ai_store_connector_disconnect(app:tauri::AppHandle,window:tauri::We
 #[tauri::command]
 pub async fn ai_store_connector_reconnect(app:tauri::AppHandle,window:tauri::WebviewWindow,id:String)->Result<Value,String>{
     control(&window)?;
-    tauri::async_runtime::spawn_blocking(move||super::connector_manager(&app)?.reconnect(&id)).await.map_err(|e|e.to_string())?
+    tauri::async_runtime::spawn_blocking(move||super::connector_manager(&app)?.reconnect_with_authorization(&id)).await.map_err(|e|e.to_string())?
+}
+#[tauri::command]
+pub async fn ai_store_connector_auth_status(app:tauri::AppHandle,window:tauri::WebviewWindow,flow_id:String)->Result<Value,String>{
+    control(&window)?;
+    tauri::async_runtime::spawn_blocking(move||super::connector_manager(&app)?.authorization_status(&flow_id)).await.map_err(|e|e.to_string())?
+}
+#[tauri::command]
+pub async fn ai_store_connector_auth_cancel(app:tauri::AppHandle,window:tauri::WebviewWindow,flow_id:String)->Result<(),String>{
+    control(&window)?;
+    tauri::async_runtime::spawn_blocking(move||super::connector_manager(&app)?.cancel_authorization(&flow_id)).await.map_err(|e|e.to_string())?
 }
 
 fn control(window: &tauri::WebviewWindow) -> Result<(), String> {

@@ -1,0 +1,430 @@
+use agent_connector_tools::ConnectorManager;
+use agent_kernel::ToolCtx;
+use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
+use reqwest::{blocking::Client, Url};
+use serde_json::{json, Value};
+use sha2::{Digest, Sha256};
+use std::{
+    fs,
+    io::{BufRead, BufReader, Read, Write},
+    net::{TcpListener, TcpStream},
+    path::PathBuf,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc, Mutex,
+    },
+    time::{Duration, Instant},
+};
+
+#[derive(Default)]
+struct State {
+    redirect: String,
+    challenge: String,
+    refreshes: usize,
+    token_calls: usize,
+    expire: bool,
+    short_lived: bool,
+    wrong_resource: bool,
+    refuse_refresh: bool,
+}
+struct Server {
+    base: String,
+    state: Arc<Mutex<State>>,
+    stop: Arc<AtomicBool>,
+    thread: Option<std::thread::JoinHandle<()>>,
+}
+impl Server {
+    fn new() -> Self {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        listener.set_nonblocking(true).unwrap();
+        let base = format!("http://{}", listener.local_addr().unwrap());
+        let state = Arc::new(Mutex::new(State::default()));
+        let stop = Arc::new(AtomicBool::new(false));
+        let data = state.clone();
+        let quit = stop.clone();
+        let origin = base.clone();
+        let thread = std::thread::spawn(move || {
+            while !quit.load(Ordering::SeqCst) {
+                match listener.accept() {
+                    Ok((stream, _)) => handle(stream, &origin, &data),
+                    Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
+                        std::thread::sleep(Duration::from_millis(5))
+                    }
+                    Err(_) => break,
+                }
+            }
+        });
+        Self {
+            base,
+            state,
+            stop,
+            thread: Some(thread),
+        }
+    }
+    fn config(&self) -> Value {
+        json!({"url":format!("{}/mcp",self.base)})
+    }
+    fn callback(&self, result: &Value, valid: bool) -> u16 {
+        let url = Url::parse(result["authorizationUrl"].as_str().unwrap()).unwrap();
+        let pairs = url
+            .query_pairs()
+            .collect::<std::collections::HashMap<_, _>>();
+        assert_eq!(pairs["code_challenge_method"], "S256");
+        assert_eq!(pairs["scope"], "read");
+        assert_eq!(pairs["resource"], format!("{}/mcp", self.base));
+        self.state.lock().unwrap().challenge = pairs["code_challenge"].to_string();
+        let mut callback = Url::parse(&pairs["redirect_uri"]).unwrap();
+        callback
+            .query_pairs_mut()
+            .append_pair(
+                "state",
+                if valid {
+                    &pairs["state"]
+                } else {
+                    "wrong-state"
+                },
+            )
+            .append_pair("code", "one-use-code");
+        Client::new()
+            .get(callback)
+            .send()
+            .unwrap()
+            .status()
+            .as_u16()
+    }
+}
+impl Drop for Server {
+    fn drop(&mut self) {
+        self.stop.store(true, Ordering::SeqCst);
+        self.thread.take().unwrap().join().unwrap();
+    }
+}
+fn send(stream: &mut TcpStream, status: &str, body: Value, extra: &str) {
+    let body = body.to_string();
+    write!(stream,"HTTP/1.1 {status}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n{extra}\r\n{body}",body.len()).unwrap();
+}
+fn handle(mut stream: TcpStream, base: &str, state: &Mutex<State>) {
+    stream
+        .set_read_timeout(Some(Duration::from_secs(3)))
+        .unwrap();
+    let mut reader = BufReader::new(stream.try_clone().unwrap());
+    let mut line = String::new();
+    reader.read_line(&mut line).unwrap();
+    let first = line.clone();
+    let parts = first.split_whitespace().collect::<Vec<_>>();
+    let (method, path) = (parts[0], parts[1]);
+    let mut length = 0;
+    let mut auth = String::new();
+    loop {
+        line.clear();
+        reader.read_line(&mut line).unwrap();
+        if line.trim().is_empty() {
+            break;
+        }
+        if let Some((key, v)) = line.split_once(':') {
+            if key.eq_ignore_ascii_case("content-length") {
+                length = v.trim().parse().unwrap();
+            }
+            if key.eq_ignore_ascii_case("authorization") {
+                auth = v.trim().into();
+            }
+        }
+    }
+    let mut bytes = vec![0; length];
+    reader.read_exact(&mut bytes).unwrap();
+    let mut state = state.lock().unwrap();
+    match (method, path) {
+        ("GET", "/resource") => {
+            let resource = if state.wrong_resource {
+                "https://other.invalid/mcp".into()
+            } else {
+                format!("{base}/mcp")
+            };
+            send(
+                &mut stream,
+                "200 OK",
+                json!({"resource":resource,"authorization_servers":[base]}),
+                "",
+            );
+        }
+        ("GET", "/.well-known/oauth-authorization-server") => send(
+            &mut stream,
+            "200 OK",
+            json!({"issuer":base,"authorization_endpoint":format!("{base}/login"),"token_endpoint":format!("{base}/token"),"registration_endpoint":format!("{base}/register"),"code_challenge_methods_supported":["S256"]}),
+            "",
+        ),
+        ("POST", "/register") => {
+            let body: Value = serde_json::from_slice(&bytes).unwrap();
+            assert_eq!(body["token_endpoint_auth_method"], "none");
+            state.redirect = body["redirect_uris"][0].as_str().unwrap().into();
+            send(
+                &mut stream,
+                "201 Created",
+                json!({"client_id":"xiaoban-test","redirect_uris":[state.redirect],"token_endpoint_auth_method":"none"}),
+                "",
+            );
+        }
+        ("POST", "/token") => {
+            let body = Url::parse(&format!(
+                "https://form.invalid/?{}",
+                String::from_utf8(bytes).unwrap()
+            ))
+            .unwrap();
+            let p = body
+                .query_pairs()
+                .collect::<std::collections::HashMap<_, _>>();
+            assert_eq!(p["client_id"], "xiaoban-test");
+            assert_eq!(p["resource"], format!("{base}/mcp"));
+            state.token_calls += 1;
+            if p["grant_type"] == "authorization_code" {
+                assert_eq!(p["code"], "one-use-code");
+                assert_eq!(p["redirect_uri"], state.redirect);
+                assert_eq!(
+                    URL_SAFE_NO_PAD.encode(Sha256::digest(p["code_verifier"].as_bytes())),
+                    state.challenge
+                );
+                send(
+                    &mut stream,
+                    "200 OK",
+                    json!({"access_token":"access-secret-1","refresh_token":"refresh-secret-1","token_type":"Bearer","expires_in":if state.short_lived{1}else{3600}}),
+                    "",
+                );
+            } else {
+                state.refreshes += 1;
+                if state.refuse_refresh {
+                    send(
+                        &mut stream,
+                        "400 Bad Request",
+                        json!({"error":"invalid_grant","error_description":"do-not-display-this-secret"}),
+                        "",
+                    );
+                    return;
+                }
+                assert_eq!(
+                    p["refresh_token"],
+                    format!("refresh-secret-{}", state.refreshes)
+                );
+                let n = state.refreshes + 1;
+                send(
+                    &mut stream,
+                    "200 OK",
+                    json!({"access_token":format!("access-secret-{n}"),"refresh_token":format!("refresh-secret-{n}"),"token_type":"Bearer","expires_in":3600}),
+                    "",
+                );
+            }
+        }
+        ("DELETE", "/mcp") => {
+            assert!(auth.starts_with("Bearer access-secret-"));
+            send(&mut stream, "200 OK", json!({}), "");
+        }
+        ("POST", "/mcp") => {
+            if auth.is_empty()
+                || (state.expire && (auth == "Bearer access-secret-1" || state.refuse_refresh))
+            {
+                send(&mut stream,"401 Unauthorized",json!({}),&format!("WWW-Authenticate: Bearer resource_metadata=\"{base}/resource\", scope=\"read\"\r\n"));
+                return;
+            }
+            assert!(auth.starts_with("Bearer access-secret-"));
+            let body: Value = serde_json::from_slice(&bytes).unwrap();
+            let result = match body["method"].as_str().unwrap() {
+                "initialize" => {
+                    json!({"protocolVersion":"2025-06-18","serverInfo":{"name":"oauth-test","version":"1"},"capabilities":{"tools":{}}})
+                }
+                "notifications/initialized" => {
+                    send(&mut stream, "202 Accepted", json!({}), "");
+                    return;
+                }
+                "tools/list" => json!({"tools":[{"name":"echo","inputSchema":{"type":"object"}}]}),
+                "tools/call" => json!({"content":[{"type":"text","text":"authorized result"}]}),
+                _ => panic!("unexpected RPC"),
+            };
+            send(
+                &mut stream,
+                "200 OK",
+                json!({"jsonrpc":"2.0","id":body["id"],"result":result}),
+                "",
+            );
+        }
+        _ => send(&mut stream, "404 Not Found", json!({}), ""),
+    }
+}
+fn root() -> PathBuf {
+    std::env::temp_dir().join(format!(
+        "xiaoban-oauth-{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    ))
+}
+fn finish(manager: &ConnectorManager, flow: &Value) -> Value {
+    let start = Instant::now();
+    loop {
+        let status = manager
+            .authorization_status(flow["flowId"].as_str().unwrap())
+            .unwrap();
+        if status["status"] == "connected"
+            || status["status"] == "error"
+            || status["status"] == "cancelled"
+        {
+            return status;
+        }
+        assert!(start.elapsed() < Duration::from_secs(10));
+        std::thread::sleep(Duration::from_millis(10));
+    }
+}
+#[test]
+fn browser_authorization_checks_state_binds_resource_refreshes_and_restores() {
+    let server = Server::new();
+    let root = root();
+    let manager = Arc::new(ConnectorManager::new(root.clone(), root.clone()).unwrap());
+    let flow = manager
+        .begin_connect("oauth-test", "OAuth", server.config(), true)
+        .unwrap();
+    assert_eq!(flow["status"], "authorization_required");
+    assert_eq!(server.callback(&flow, false), 400);
+    assert!(manager.tools().is_empty());
+    assert_eq!(server.callback(&flow, true), 200);
+    let status = finish(&manager, &flow);
+    assert_eq!(status["status"], "connected", "{status}");
+    assert!(!manager.statuses().to_string().contains("secret"));
+    let records = fs::read_to_string(root.join("connections.json")).unwrap();
+    assert!(!records.contains("access-secret"));
+    assert!(!records.contains("refresh-secret"));
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        for file in fs::read_dir(&root).unwrap() {
+            assert_eq!(
+                file.unwrap().metadata().unwrap().permissions().mode() & 0o777,
+                0o600
+            );
+        }
+    }
+    let tools = manager.tools();
+    server.state.lock().unwrap().expire = true;
+    let result = tools[0]
+        .execute(json!({}), &ToolCtx::detached("oauth"))
+        .unwrap();
+    assert_eq!(result, "authorized result");
+    assert_eq!(server.state.lock().unwrap().refreshes, 1);
+    manager.disconnect("oauth-test").unwrap();
+    assert!(tools[0]
+        .execute(json!({}), &ToolCtx::detached("stale"))
+        .is_err());
+    manager.reconnect_with_authorization("oauth-test").unwrap();
+    assert_eq!(manager.tools().len(), 1);
+    manager.shutdown();
+    let restored = ConnectorManager::new(root.clone(), root.clone()).unwrap();
+    assert_eq!(restored.tools().len(), 1);
+    restored.shutdown();
+    fs::remove_dir_all(root).unwrap();
+}
+#[test]
+fn cancellation_does_not_save_credentials_or_report_connected() {
+    let server = Server::new();
+    let root = root();
+    let manager = Arc::new(ConnectorManager::new(root.clone(), root.clone()).unwrap());
+    let flow = manager
+        .begin_connect("oauth-test", "OAuth", server.config(), true)
+        .unwrap();
+    manager
+        .cancel_authorization(flow["flowId"].as_str().unwrap())
+        .unwrap();
+    assert_eq!(finish(&manager, &flow)["status"], "cancelled");
+    assert!(manager.tools().is_empty());
+    assert!(!root.join("connections.json").exists());
+    manager.shutdown();
+    std::thread::sleep(Duration::from_millis(100));
+    fs::remove_dir_all(root).unwrap();
+}
+#[test]
+fn credentials_refresh_before_expiry_and_failed_refresh_requires_reauthorization() {
+    let server = Server::new();
+    server.state.lock().unwrap().short_lived = true;
+    let root = root();
+    let manager = Arc::new(ConnectorManager::new(root.clone(), root.clone()).unwrap());
+    let flow = manager
+        .begin_connect("oauth-test", "OAuth", server.config(), true)
+        .unwrap();
+    server.callback(&flow, true);
+    let status = finish(&manager, &flow);
+    assert_eq!(status["status"], "connected", "{status}");
+    assert_eq!(server.state.lock().unwrap().refreshes, 1);
+    {
+        let mut state = server.state.lock().unwrap();
+        state.expire = true;
+        state.refuse_refresh = true;
+    }
+    let error = manager.tools()[0]
+        .execute(json!({}), &ToolCtx::detached("expired"))
+        .unwrap_err();
+    assert!(error.contains("需要重新授权"));
+    assert!(!error.contains("do-not-display-this-secret"));
+    assert_eq!(manager.statuses()[0]["connected"], false);
+    assert_eq!(server.state.lock().unwrap().refreshes, 2);
+    let next = manager.reconnect_with_authorization("oauth-test").unwrap();
+    assert_eq!(next["status"], "authorization_required");
+    manager
+        .cancel_authorization(next["flowId"].as_str().unwrap())
+        .unwrap();
+    manager.shutdown();
+    fs::remove_dir_all(root).unwrap();
+}
+#[test]
+fn replacing_disconnected_authorization_retires_only_the_old_generation() {
+    let server = Server::new();
+    let root = root();
+    let manager = Arc::new(ConnectorManager::new(root.clone(), root.clone()).unwrap());
+    let first = manager
+        .begin_connect("oauth-test", "OAuth", server.config(), true)
+        .unwrap();
+    server.callback(&first, true);
+    assert_eq!(finish(&manager, &first)["status"], "connected");
+    manager.disconnect("oauth-test").unwrap();
+    let next = manager
+        .begin_connect("oauth-test", "OAuth", server.config(), true)
+        .unwrap();
+    server.callback(&next, true);
+    assert_eq!(finish(&manager, &next)["status"], "connected");
+    let token_files = || {
+        fs::read_dir(&root)
+            .unwrap()
+            .filter(|file| {
+                file.as_ref()
+                    .unwrap()
+                    .file_name()
+                    .to_string_lossy()
+                    .starts_with("oauth-")
+            })
+            .count()
+    };
+    assert_eq!(token_files(), 1);
+    manager
+        .cancel_authorization(first["flowId"].as_str().unwrap())
+        .unwrap();
+    assert_eq!(manager.statuses()[0]["connected"], true);
+    assert_eq!(token_files(), 1);
+    manager
+        .cancel_authorization(next["flowId"].as_str().unwrap())
+        .unwrap();
+    assert!(manager.tools().is_empty());
+    assert_eq!(token_files(), 0);
+    manager.shutdown();
+    fs::remove_dir_all(root).unwrap();
+}
+#[test]
+fn refuses_resource_metadata_for_another_service() {
+    let server = Server::new();
+    server.state.lock().unwrap().wrong_resource = true;
+    let root = root();
+    let manager = Arc::new(ConnectorManager::new(root.clone(), root.clone()).unwrap());
+    let error = manager
+        .begin_connect("oauth-test", "OAuth", server.config(), true)
+        .unwrap_err();
+    assert!(error.contains("不匹配"));
+    assert!(manager.tools().is_empty());
+    manager.shutdown();
+    fs::remove_dir_all(root).unwrap();
+}

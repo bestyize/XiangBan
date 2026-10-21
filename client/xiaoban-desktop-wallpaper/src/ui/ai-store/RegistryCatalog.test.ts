@@ -38,6 +38,32 @@ beforeEach(() => {
 });
 afterEach(() => { wrappers.splice(0).forEach(w => w.unmount()); vi.useRealTimers(); });
 describe('SkillHub registry integration', () => {
+  it('opens browser authorization and waits for verified connection status',async()=>{
+    const original=vi.mocked(invoke).getMockImplementation()!;let checks=0,connected=false;
+    vi.mocked(invoke).mockImplementation(async(c,a)=>{
+      if(c==='ai_store_connector_connect')return {status:'authorization_required',flowId:'flow-one',authorizationUrl:'https://login.example.com/authorize'};
+      if(c==='open_download_url')return undefined;
+      if(c==='ai_store_connector_auth_status'){checks++;if(checks===1)return {status:'authorizing'};connected=true;return {status:'connected'};}
+      if(c==='ai_store_connector_status')return connected?[{id:entry.slug,name:entry.name,connected:true,toolCount:2}]:[];
+      return original(c,a);
+    });
+    const {wrapper,store}=setup('connectors');await settle();await wrapper.get('.connector-card .small-action').trigger('click');await flushPromises();await wrapper.get('.review-confirm input').setValue(true);await wrapper.get('.store-primary').trigger('click');await flushPromises();
+    expect(invoke).toHaveBeenCalledWith('open_download_url',{url:'https://login.example.com/authorize'});expect(wrapper.text()).toContain('等待网页授权');expect(wrapper.get('.connection-status').text()).toBe('未配置');expect(store.notify).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1000);await flushPromises();expect(wrapper.get('.connection-status').text()).toBe('未配置');
+    await vi.advanceTimersByTimeAsync(1000);await flushPromises();expect(wrapper.get('.connection-status').text()).toContain('已连接');expect(store.notify).toHaveBeenCalledWith('授权完成，连接成功');
+  });
+  it('cancels browser authorization without leaving an active poll or a connected card',async()=>{
+    const original=vi.mocked(invoke).getMockImplementation()!;
+    vi.mocked(invoke).mockImplementation(async(c,a)=>{
+      if(c==='ai_store_connector_connect')return {status:'authorization_required',flowId:'cancel-me',authorizationUrl:'https://login.example.com/authorize'};
+      if(c==='open_download_url'||c==='ai_store_connector_auth_cancel')return undefined;
+      return original(c,a);
+    });
+    const {wrapper}=setup('connectors');await settle();await wrapper.get('.connector-card .small-action').trigger('click');await flushPromises();await wrapper.get('.review-confirm input').setValue(true);await wrapper.get('.store-primary').trigger('click');await flushPromises();
+    await wrapper.get('.authorization-wait .store-secondary').trigger('click');await flushPromises();expect(invoke).toHaveBeenCalledWith('ai_store_connector_auth_cancel',{flowId:'cancel-me'});
+    await vi.advanceTimersByTimeAsync(2000);await flushPromises();expect(invoke).not.toHaveBeenCalledWith('ai_store_connector_auth_status',expect.anything());expect(wrapper.get('.connection-status').text()).toBe('未配置');
+    expect(wrapper.find('[role="alert"]').exists()).toBe(false);expect((wrapper.get('input[aria-label="服务地址"]').element as HTMLInputElement).value).toBe('https://example.com/mcp');expect((wrapper.get('.review-confirm input').element as HTMLInputElement).checked).toBe(false);
+  });
   it('reviews the whole expert pack before sending the pinned install request', async () => {
     const { wrapper } = setup(); await settle();
     await wrapper.get('.expert-card .small-action').trigger('click'); await flushPromises();

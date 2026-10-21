@@ -23,7 +23,7 @@ use std::time::Duration;
 #[cfg(any(feature = "openai", feature = "anthropic", feature = "web"))]
 mod http;
 #[cfg(any(feature = "openai", feature = "anthropic", feature = "web"))]
-pub use http::{HttpMcpClient, HttpMcpConfig};
+pub use http::{HttpAuthorization, HttpMcpClient, HttpMcpConfig};
 
 pub const DEFAULT_PROTOCOL_VERSION: &str = "2024-11-05";
 const MAX_FRAME_BYTES: u64 = 8 * 1024 * 1024;

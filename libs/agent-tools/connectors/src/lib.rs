@@ -1,4 +1,6 @@
 //! Connection lifecycle and consent belong to the host; tools share kernel permissions.
+mod authorization;
+mod oauth;
 use agent_kernel::mcp::{HttpMcpClient, HttpMcpConfig, McpClient, McpConfig};
 use agent_kernel::{Risk, Tool, ToolCtx, ToolResult, ToolSpec};
 use serde::{Deserialize, Serialize};
@@ -49,6 +51,7 @@ impl Client {
 struct Active {
     client: Client,
     valid: Arc<AtomicBool>,
+    oauth: Option<Arc<oauth::Session>>,
 }
 impl Active {
     fn close(&self) {
@@ -71,6 +74,8 @@ pub struct ConnectorManager {
     root: PathBuf,
     workspace: PathBuf,
     state: Mutex<State>,
+    authorizations: Mutex<std::collections::HashMap<String, Arc<authorization::Pending>>>,
+    shutting_down: AtomicBool,
 }
 fn valid_id(id: &str) -> bool {
     !id.is_empty()
@@ -116,7 +121,29 @@ fn normalized_config(value: &Value) -> Result<Value, String> {
         if obj.get("command").is_some() {
             return Err("不能同时配置远程地址和本地命令".into());
         }
-        return Ok(json!({"url":url,"headers":string_map(obj.get("headers"))?}));
+        let mode = obj
+            .get("authMode")
+            .and_then(Value::as_str)
+            .unwrap_or("auto");
+        if !matches!(mode, "auto" | "oauth" | "token" | "none") {
+            return Err("未知的认证方式".into());
+        }
+        let client_id = obj.get("clientId").and_then(Value::as_str).unwrap_or("");
+        let scope = obj.get("scope").and_then(Value::as_str).unwrap_or("");
+        if client_id.len() > 2048
+            || scope.len() > 2048
+            || client_id.chars().any(char::is_control)
+            || scope.chars().any(char::is_control)
+        {
+            return Err("授权参数无效".into());
+        }
+        let session = obj.get("oauthSession").and_then(Value::as_str);
+        if session.is_some_and(|s| !oauth::valid_session(s)) {
+            return Err("授权会话无效".into());
+        }
+        return Ok(
+            json!({"url":url,"headers":string_map(obj.get("headers"))?,"authMode":mode,"clientId":client_id,"scope":scope,"oauthSession":session}),
+        );
     }
     let command = obj
         .get("command")
@@ -205,6 +232,8 @@ impl ConnectorManager {
                 records,
                 ..State::default()
             }),
+            authorizations: Mutex::new(Default::default()),
+            shutting_down: AtomicBool::new(false),
         };
         {
             let mut state = this.state.lock().unwrap_or_else(|e| e.into_inner());
@@ -224,13 +253,25 @@ impl ConnectorManager {
     fn start(&self, id: &str, config: &Value) -> Result<Active, String> {
         let config = normalized_config(config)?;
         let prefix = format!("mcp_ext_{}_", id.replace('-', "_"));
+        let mut session = None;
         let client = if let Some(url) = config["url"].as_str() {
-            Client::Http(HttpMcpClient::connect(HttpMcpConfig {
+            let http = HttpMcpConfig {
                 url: url.into(),
                 headers: string_map(config.get("headers"))?.into_iter().collect(),
                 tool_prefix: prefix,
                 timeout: Duration::from_secs(45),
-            })?)
+            };
+            if config["authMode"] == "oauth" {
+                let key = config["oauthSession"]
+                    .as_str()
+                    .ok_or(oauth::AUTH_REQUIRED)?;
+                let auth = oauth::Session::load(oauth::token_path(&self.root, id, key)?, url)?;
+                let client = HttpMcpClient::connect_with_authorization(http, auth.clone())?;
+                session = Some(auth);
+                Client::Http(client)
+            } else {
+                Client::Http(HttpMcpClient::connect(http)?)
+            }
         } else {
             let mut mcp = McpConfig::new(config["command"].as_str().unwrap(), &[])
                 .tool_prefix(prefix)
@@ -256,6 +297,7 @@ impl ConnectorManager {
         Ok(Active {
             client,
             valid: Arc::new(AtomicBool::new(true)),
+            oauth: session,
         })
     }
     fn save(&self, records: &[Record]) -> Result<(), String> {
@@ -302,6 +344,9 @@ impl ConnectorManager {
         }
         let config = normalized_config(&config)?;
         let mut state = self.state.lock().unwrap_or_else(|e| e.into_inner());
+        if self.shutting_down.load(Ordering::SeqCst) {
+            return Err("应用正在退出".into());
+        }
         if state.records.len() >= 16 && !state.records.iter().any(|r| r.id == id) {
             return Err("最多配置 16 个连接器".into());
         }
@@ -319,7 +364,32 @@ impl ConnectorManager {
             records.push(record);
         }
         self.save(&records)?;
+        let previous = state.records.iter().find(|r| r.id == id);
+        let same_session = previous.is_some_and(|r| {
+            r.config["oauthSession"]
+                == records.iter().find(|r| r.id == id).unwrap().config["oauthSession"]
+        });
+        // A disconnected saved session can still be retained by old task tools.
+        if !same_session {
+            if let Some(record) = previous {
+                if let (Some(key), Some(server)) = (
+                    record.config["oauthSession"].as_str(),
+                    record.config["url"].as_str(),
+                ) {
+                    if let Ok(session) = oauth::token_path(&self.root, id, key)
+                        .and_then(|path| oauth::Session::load(path, server))
+                    {
+                        session.retire();
+                    }
+                }
+            }
+        }
         if let Some(old) = state.active.remove(id) {
+            if !same_session {
+                if let Some(session) = &old.oauth {
+                    session.retire();
+                }
+            }
             old.close();
         }
         state.records = records;
@@ -340,6 +410,7 @@ impl ConnectorManager {
         self.connect(id, &record.name, record.config, true)
     }
     pub fn disconnect(&self, id: &str) -> Result<(), String> {
+        self.cancel_for_connector(id);
         let mut state = self.state.lock().unwrap_or_else(|e| e.into_inner());
         let mut records = state.records.clone();
         let record = records
@@ -400,6 +471,15 @@ impl ConnectorManager {
             .collect()
     }
     pub fn shutdown(&self) {
+        self.shutting_down.store(true, Ordering::SeqCst);
+        for pending in self
+            .authorizations
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .values()
+        {
+            pending.cancel.store(true, Ordering::SeqCst);
+        }
         let mut state = self.state.lock().unwrap_or_else(|e| e.into_inner());
         for (_, active) in state.active.drain() {
             active.close();
@@ -410,7 +490,7 @@ fn status(state: &State, id: &str) -> Value {
     let record = state.records.iter().find(|r| r.id == id);
     let active = state.active.get(id);
     json!({"id":id,"name":record.map(|r|r.name.as_str()).unwrap_or(id),"connected":active.is_some_and(|a|a.client.is_connected()),
-        "enabled":record.is_some_and(|r|r.enabled),"toolCount":active.map(|a|a.client.tools().len()).unwrap_or(0),"error":state.errors.get(id)})
+        "enabled":record.is_some_and(|r|r.enabled),"authMode":record.and_then(|r|r.config["authMode"].as_str()).unwrap_or("auto"),"toolCount":active.map(|a|a.client.tools().len()).unwrap_or(0),"error":state.errors.get(id)})
 }
 struct GatedTool {
     tool: Arc<dyn Tool>,

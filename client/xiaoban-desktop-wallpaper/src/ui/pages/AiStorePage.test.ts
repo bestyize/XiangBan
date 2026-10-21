@@ -48,7 +48,7 @@ beforeEach(() => {
     if (command === 'ai_store_experts_installed') return localPacks;
     if (command === 'ai_store_connector_status') return connected ? [{id:'test-mcp',name:'测试 MCP 服务',connected:true,toolCount:2,enabled:true}] : [];
     if (command === 'ai_store_connector_detail') return {readme:'服务说明',configs:[{name:'test',config:{url:'https://example.com/mcp'}}]};
-    if (command === 'ai_store_connector_connect') {connected=true;return {};}
+    if (command === 'ai_store_connector_connect') {connected=true;return {status:'connected',connected:true};}
     if (command === 'ai_store_connector_disconnect') {connected=false;return;}
 
     if (command === 'get_ai_config') return { openComputerUse: enabled };
@@ -143,7 +143,7 @@ describe('AI 商店', () => {
     expect(wrapper.get('.test-modal .store-primary').attributes('disabled')).toBeDefined();
     await wrapper.get('.test-modal .review-confirm input').setValue(true);
     await wrapper.get('.test-modal .store-primary').trigger('click'); await flushPromises();
-    expect(invoke).toHaveBeenCalledWith('ai_store_connector_connect',{id:'test-mcp',name:'测试 MCP 服务',config:{url:'https://example.com/mcp'},confirmed:true});
+    expect(invoke).toHaveBeenCalledWith('ai_store_connector_connect',{id:'test-mcp',name:'测试 MCP 服务',config:{url:'https://example.com/mcp',authMode:'auto',clientId:'',scope:''},confirmed:true});
     expect(wrapper.findAll('.connector-card')[1].text()).toContain('已连接 · 2 个工具');
     await wrapper.get('.connector-card .small-action').trigger('click');
     await wrapper.get('.test-modal .store-primary').trigger('click'); await flushPromises();

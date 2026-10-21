@@ -5,6 +5,7 @@ import { Puzzle, Plug, ArrowRight, Download, ChevronLeft, ChevronRight } from 'l
 import { invoke } from '../../bridge.ts';
 import type { ControlStore } from '../control-types.ts';
 import type { SkillReview } from './catalog.ts';
+import ConnectorConfig from './ConnectorConfig.vue';
 
 interface Entry { slug: string; name: string; description: string; category?: string; iconUrl?: string | null; skillCount?: number }
 interface Page { results: Entry[]; page: number; total: number; hasMore: boolean }
@@ -12,6 +13,7 @@ interface Pack { slug: string; name: string; description: string; entrySkill: st
 interface PackReview extends Pack { content: string; skills: SkillReview[] }
 interface Connection { id: string; name: string; connected: boolean; enabled: boolean; toolCount: number; error?: string }
 interface ConnectorDetail { readme: string; configs: { name: string; config: Record<string, unknown> }[] }
+interface ConnectionResult { status?:string; connected?:boolean; flowId?:string; authorizationUrl?:string }
 const props = defineProps<{ kind: 'experts' | 'connectors'; query: string; category: string; store: ControlStore }>();
 const data = ref<Page>({ results: [], page: 1, total: 0, hasMore: false });
 const page = ref(1), loading = ref(false), error = ref(''), localError = ref(''), installedOnly = ref(false);
@@ -19,6 +21,11 @@ const packs = ref<Pack[]>([]), connections = ref<Connection[]>([]);
 const selected = ref<Entry | null>(null), packReview = ref<PackReview | null>(null), connectorDetail = ref<ConnectorDetail | null>(null);
 const detailLoading = ref(false), detailError = ref(''), confirmed = ref(false), busy = ref(false), removing = ref(false);
 const configText = ref(''), configIndex = ref(0);
+const configValid=ref(false), authorization=ref<{flowId:string;authorizationUrl:string}|null>(null);
+let authTimer:ReturnType<typeof setTimeout>|undefined;
+let pollingFlow:string|undefined;
+watch(configText,()=>{confirmed.value=false;});
+function abandonAuthorization(){clearTimeout(authTimer);const flow=authorization.value;authorization.value=null;if(flow)void invoke('ai_store_connector_auth_cancel',{flowId:flow.flowId}).catch(()=>{});}
 const brokenIcons = ref<Record<string, boolean>>({});
 const icon = (entry: Entry) => !brokenIcons.value[entry.slug] && entry.iconUrl?.startsWith('https://') ? entry.iconUrl : null;
 let requestId = 0, detailId = 0, localId = 0, timer: ReturnType<typeof setTimeout> | undefined;
@@ -69,11 +76,12 @@ watch(() => [props.kind, props.query, props.category, installedOnly.value], () =
 }, { immediate: true });
 watch(page, () => { void refresh(); });
 watch(() => props.kind, () => {
+  abandonAuthorization();
   ++detailId; selected.value = null; configText.value = ''; installedOnly.value = false;
   void refreshLocal();
 }, { immediate: true });
-onBeforeUnmount(() => { clearTimeout(timer); ++requestId; ++detailId; ++localId; configText.value = ''; });
-function close() { if (!busy.value) { selected.value = null; configText.value = ''; ++detailId; } }
+onBeforeUnmount(() => { abandonAuthorization();clearTimeout(timer); ++requestId; ++detailId; ++localId; configText.value = ''; });
+async function close() { if (!busy.value) {if(authorization.value&&!await cancelAuthorization())return;selected.value = null; configText.value = ''; ++detailId; } }
 async function open(entry: Entry) {
   if (busy.value) return;
   selected.value = entry; packReview.value = null; connectorDetail.value = null;
@@ -95,6 +103,39 @@ async function open(entry: Entry) {
 function chooseConfig() {
   configText.value = JSON.stringify(connectorDetail.value?.configs[configIndex.value]?.config || { url: '' }, null, 2);
   confirmed.value = false;
+}
+async function cancelAuthorization(){
+  const flow=authorization.value;if(!flow)return true;clearTimeout(authTimer);busy.value=true;
+  try{await invoke('ai_store_connector_auth_cancel',{flowId:flow.flowId});authorization.value=null;chooseConfig();return true;}
+  catch(e){detailError.value='取消授权失败：'+String(e);return false;}
+  finally{busy.value=false;}
+}
+async function openAuthorizationPage(){
+  if(!authorization.value)return;
+  try{await invoke('open_download_url',{url:authorization.value.authorizationUrl});}
+  catch(e){detailError.value='无法打开浏览器，请重试：'+String(e);}
+}
+async function pollAuthorization(){
+  clearTimeout(authTimer);
+  const flow=authorization.value;if(!flow||pollingFlow===flow.flowId)return;
+  pollingFlow=flow.flowId;
+  try{
+    const result=await invoke<{status:string;error?:string}>('ai_store_connector_auth_status',{flowId:flow.flowId});
+    if(authorization.value?.flowId!==flow.flowId)return;
+    if(result.status==='connected'){authorization.value=null;await refreshLocal();selected.value=null;configText.value='';props.store.notify('授权完成，连接成功');}
+    else if(result.status==='error'||result.status==='cancelled'){authorization.value=null;chooseConfig();detailError.value=result.error||'授权已取消，可重新连接。';}
+    else authTimer=setTimeout(()=>void pollAuthorization(),1000);
+  }catch(e){if(authorization.value?.flowId===flow.flowId)detailError.value='检查授权状态失败：'+String(e);}
+  finally{if(pollingFlow===flow.flowId)pollingFlow=undefined;}
+}
+async function handleConnectionResult(result:ConnectionResult|undefined,context:number){
+  if(result?.status==='authorization_required'&&result.flowId&&result.authorizationUrl){
+    if(context!==detailId){await invoke('ai_store_connector_auth_cancel',{flowId:result.flowId});return;}
+    authorization.value={flowId:result.flowId,authorizationUrl:result.authorizationUrl};
+    configText.value='';await openAuthorizationPage();authTimer=setTimeout(()=>void pollAuthorization(),1000);return;
+  }
+  if(result?.status!=='connected'&&result?.connected!==true)throw new Error('连接未返回成功状态，请重试。');
+  await refreshLocal();configText.value='';selected.value=null;props.store.notify('连接成功，工具将在新任务中可用');
 }
 async function installPack() {
   const review = packReview.value;
@@ -128,21 +169,23 @@ async function usePack(entry: Entry) {
   finally { busy.value = false; }
 }
 async function connect() {
-  if (!selected.value || !confirmed.value || busy.value) return;
+  if (!selected.value || !confirmed.value || busy.value || !configValid.value) return;
   busy.value = true; detailError.value = '';
+  const context=detailId;
   try {
     const config: unknown = JSON.parse(configText.value);
-    await invoke('ai_store_connector_connect', { id: selected.value.slug, name: selected.value.name, config, confirmed: true });
-    await refreshLocal(); configText.value = ''; selected.value = null;
-    props.store.notify('连接成功，工具将在新任务中可用');
+    const result=await invoke<ConnectionResult>('ai_store_connector_connect', { id: selected.value.slug, name: selected.value.name, config, confirmed: true });
+    await handleConnectionResult(result,context);
   } catch (e) { detailError.value = String(e); }
   finally { busy.value = false; }
 }
 async function connectionAction(action: 'disconnect' | 'reconnect') {
   if (!selected.value || busy.value) return;
   busy.value = true; detailError.value = '';
+  const context=detailId;
   try {
-    await invoke('ai_store_connector_' + action, { id: selected.value.slug });
+    const result=await invoke<ConnectionResult>('ai_store_connector_' + action, { id: selected.value.slug });
+    if(action==='reconnect'){await handleConnectionResult(result,context);return;}
     await refreshLocal(); selected.value = null; configText.value = '';
     props.store.notify(action === 'disconnect' ? '已断开连接，工具停止可用' : '已重新连接');
   } catch (e) { detailError.value = String(e); }
@@ -172,7 +215,7 @@ defineExpose({ refresh, refreshLocal });
       <template v-if="selected">
         <p>{{ selected.description }}</p>
         <div v-if="detailLoading" class="review-loading">正在读取说明与依赖…</div>
-        <NAlert v-if="detailError" type="error" :show-icon="false">{{ detailError }} <button v-if="!busy" class="text-action" @click="open(selected)">重新读取</button></NAlert>
+        <NAlert v-if="detailError" type="error" :show-icon="false">{{ detailError }} <button v-if="!busy&&!authorization" class="text-action" @click="open(selected)">重新读取</button></NAlert>
         <template v-if="kind === 'experts'">
           <template v-if="pack(selected.slug)">
             <p>{{ pack(selected.slug)?.ready ? '工作流与依赖技能已就绪。' : '依赖缺失或版本发生变化，请移除工作流后重新安装。' }}</p>
@@ -190,16 +233,18 @@ defineExpose({ refresh, refreshLocal });
           </template>
         </template>
         <template v-else>
+          <div v-if="authorization" class="authorization-wait" role="status"><h4>等待网页授权</h4><p>请在服务商页面登录并确认权限。完成后会自动检测连接结果。</p><div class="dialog-actions"><button class="store-secondary" :disabled="busy" @click="cancelAuthorization">取消授权</button><button class="store-secondary" :disabled="busy" @click="pollAuthorization">检查结果</button><button class="store-primary" :disabled="busy" @click="openAuthorizationPage">重新打开授权页</button></div></div>
+          <template v-else>
           <div v-if="connection(selected.slug)" class="connection-summary"><p>{{ connection(selected.slug)?.connected ? '已连接，发现 ' + connection(selected.slug)?.toolCount + ' 个工具。' : '已保存配置，可以重新连接。' }}</p><div class="dialog-actions"><button v-if="connection(selected.slug)?.connected" class="store-secondary" :disabled="busy" @click="connectionAction('disconnect')">断开连接</button><button v-else class="store-secondary" :disabled="busy" @click="connectionAction('reconnect')">使用已保存配置重连</button></div></div>
           <template v-if="connectorDetail">
           <details><summary>服务说明与凭据获取方式</summary><pre class="review-content">{{ connectorDetail.readme }}</pre></details>
           <h4>{{ connection(selected.slug) ? '重新配置' : '连接配置' }}</h4>
           <select v-if="connectorDetail.configs.length > 1" v-model="configIndex" aria-label="选择连接方式" @change="chooseConfig"><option v-for="(c, i) in connectorDetail.configs" :key="i" :value="i">{{ c.name }} · {{ c.config.type || c.config.transport || (c.config.command ? 'stdio' : 'HTTP') }}</option></select>
-          <p>填写服务所需的地址或凭据，支持标准 MCP 配置 JSON。</p>
-          <textarea v-model="configText" aria-label="MCP 连接配置" spellcheck="false" :disabled="busy" @input="confirmed = false" />
-          <p class="detail-note">支持 stdio 和 Streamable HTTP，暂不支持旧式 SSE。本地服务会启动配置中的命令（如 npx 可能下载依赖）；凭据保存在本机，不放进 Agent 提示词。</p>
+          <ConnectorConfig v-model="configText" :disabled="busy" @valid="configValid=$event" />
+          <p class="detail-note">支持 stdio 和 Streamable HTTP。标准网页登录授权会在浏览器中完成；部分服务需填写密钥或独立注册小伴客户端。本地服务会启动配置中的命令；凭据仅保存在本机。</p>
           <label class="review-confirm"><input v-model="confirmed" type="checkbox" :disabled="busy" />我已检查服务来源与配置，允许小伴连接此服务。</label>
-          <div class="dialog-actions"><button class="store-primary" :disabled="busy || !confirmed || !configText.trim()" @click="connect">{{ busy ? '正在连接…' : '保存并连接' }}<Plug :size="14" /></button></div>
+          <div class="dialog-actions"><button class="store-primary" :disabled="busy || !confirmed || !configText.trim() || !configValid" @click="connect">{{ busy ? '正在连接…' : '连接服务' }}<Plug :size="14" /></button></div>
+          </template>
           </template>
         </template>
       </template>
