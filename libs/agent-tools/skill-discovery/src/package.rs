@@ -128,18 +128,24 @@ pub(crate) fn verified_files(_slug: &str, plan: &Plan, archive: &[u8]) -> Result
     }
     // ZIPs may have no wrapper or one enclosing folder (slug or slug-version).
     // Never strip more than one component; every file still needs a manifest match.
-    let prefix = if (0..zip.len()).any(|n| zip.by_index(n).is_ok_and(|f| f.name() == "SKILL.md")) {
-        String::new()
-    } else {
-        let mut roots = Vec::new();
-        for n in 0..zip.len() {
-            let entry = zip.by_index(n).map_err(|e| e.to_string())?;
-            if let Some(root) = entry.name().strip_suffix("/SKILL.md") {
-                if !root.contains('/') && valid_path(root) {
-                    roots.push(root.to_string());
-                }
+    let mut has_root_skill = false;
+    let mut roots = Vec::new();
+    // ZIP 9 returns Result<Cow<str>, ZipError> from name(); reject invalid names.
+    for n in 0..zip.len() {
+        let entry = zip.by_index(n).map_err(|e| e.to_string())?;
+        let name = entry.name().map_err(|e| format!("invalid ZIP entry name: {e}"))?;
+        if name.as_ref() == "SKILL.md" {
+            has_root_skill = true;
+        }
+        if let Some(root) = name.strip_suffix("/SKILL.md") {
+            if !root.contains('/') && valid_path(root) {
+                roots.push(root.to_string());
             }
         }
+    }
+    let prefix = if has_root_skill {
+        String::new()
+    } else {
         if roots.len() != 1 {
             return Err("SkillHub zip must contain SKILL.md at root or under one folder".into());
         }
@@ -150,7 +156,9 @@ pub(crate) fn verified_files(_slug: &str, plan: &Plan, archive: &[u8]) -> Result
     let mut total = 0u64;
     for n in 0..zip.len() {
         let mut entry = zip.by_index(n).map_err(|e| e.to_string())?;
-        let raw = entry.name();
+        // Own the decoded name before consuming the entry; do not borrow from it
+        // across entry.take() below.
+        let raw = entry.name().map_err(|e| format!("invalid ZIP entry name: {e}"))?.into_owned();
         // Directory entries are not materialized, but still must have safe names.
         let bare = raw.trim_end_matches('/');
         if !valid_path(bare) {
@@ -254,6 +262,25 @@ mod tests {
         let mut wrong = plan.clone();
         wrong.files[1].sha256 = "0".repeat(64);
         assert!(verified_files("demo-skill", &wrong, &zip).is_err());
+    }
+
+    #[test]
+    fn wrapped_archive_with_directory_entry_validates() {
+        let (plan, bare_zip) = fixture();
+        let mut original = ZipArchive::new(Cursor::new(bare_zip)).unwrap();
+        let mut writer = zip::ZipWriter::new(Cursor::new(Vec::new()));
+        writer.add_directory("demo-skill/", SimpleFileOptions::default()).unwrap();
+        for n in 0..original.len() {
+            let mut entry = original.by_index(n).unwrap();
+            let name = entry.name().unwrap().into_owned();
+            let mut data = Vec::new();
+            entry.read_to_end(&mut data).unwrap();
+            writer.start_file(format!("demo-skill/{name}"), SimpleFileOptions::default()).unwrap();
+            writer.write_all(&data).unwrap();
+        }
+        let archive = writer.finish().unwrap().into_inner();
+        let extracted = verified_files("demo-skill", &plan, &archive).unwrap();
+        assert_eq!(extracted.len(), plan.files.len());
     }
 
     #[test]
