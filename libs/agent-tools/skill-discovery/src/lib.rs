@@ -69,6 +69,7 @@ fn file_info(slug: &str, version: &str, namespace: Option<&str>) -> Result<Plan,
     }
     if result["namespace"]["handle"]!=namespace {return Err("SkillHub file manifest publisher mismatch".into());}
     let files = result["files"].as_array().ok_or("SkillHub file list is missing")?;
+    validate_registry_file_count(&result, files.len())?;
     let mut plan = plan(version, files)?;
     plan.namespace = Some(namespace.clone());
     let description=detail["skill"]["summary_zh"].as_str().filter(|s|!s.trim().is_empty())
@@ -80,6 +81,20 @@ fn file_info(slug: &str, version: &str, namespace: Option<&str>) -> Result<Plan,
     plan.sha256=format!("{:x}",Sha256::digest(format!("{}\0{}",plan.sha256,binding).as_bytes()));
     Ok(plan)
 }
+// SkillHub promises a complete list plus a count. Refuse incomplete manifests:
+ // installing only the returned subset would break review and hash pinning.
+fn validate_registry_file_count(manifest: &Value, received: usize) -> Result<(), String> {
+    if let Some(raw) = manifest.get("count") {
+        let declared = raw.as_u64().ok_or("SkillHub reported an invalid file count")?;
+        if declared != received as u64 {
+            return Err(format!(
+                "SkillHub file manifest is incomplete: server reports {declared} files, but returned {received}"
+            ));
+        }
+    }
+    Ok(())
+}
+
 fn canonical_namespace(detail:&Value,slug:&str,requested:Option<&str>)->Result<String,String>{
     let namespace=detail["namespace"]["handle"].as_str().filter(|s|catalog::valid_namespace(s))
         .ok_or("SkillHub publisher missing or invalid")?;
@@ -293,6 +308,16 @@ fn browse_result(result: &Value, page: u32) -> Result<Value, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn rejects_incomplete_or_corrupt_registry_file_counts() {
+        let full=json!({"count":2,"files":[{"path":"SKILL.md"},{"path":"references/readme.md"}]});
+        assert!(validate_registry_file_count(&full,2).is_ok());
+        assert!(validate_registry_file_count(&full,1).unwrap_err().contains("incomplete"));
+        assert!(validate_registry_file_count(&json!({"count":"2"}),2).unwrap_err().contains("invalid"));
+        // Older registries may omit count; the package validator still requires SKILL.md.
+        assert!(validate_registry_file_count(&json!({"files":[]}),0).is_ok());
+    }
+
     #[test]
     fn resolves_default_publisher_before_pinning_files_and_downloads(){
         let detail=json!({"skill":{"slug":"demo-skill"},"namespace":{"handle":"actual-publisher"}});
