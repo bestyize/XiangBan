@@ -289,7 +289,7 @@ fn the_assistant_has_every_tool_it_needs_and_no_others() {
         "memory_read", "memory_write", "desktop_status", "desktop_windows", "desktop_window_set", "wallpaper_list", "wallpaper_apply", "wallpaper_create", "wallpaper_delete", "effect_list", "effect_set", "effect_create", "effect_delete", "effect_read_format", "companion_set", "care_list",
         "care_set", "care_delete", "widget_list", "widget_add", "widget_create", "widget_delete_custom", "widget_update", "widget_remove", "game_list", "game_open", "game_close", "game_create", "game_delete",
         "request_accessibility_permission", "computer_use_diagnose", "computer_use_repair_permissions", "community_share", "community_open", "pet_read_format", "pet_catalog", "pet_theme_save", "pet_theme_delete", "pet_add", "pet_update", "pet_remove",
-        "experience_recall", "skill_search", "skill_inspect", "skill_install",
+        "experience_recall", "skill_search", "skill_inspect", "skill_install", "skill_read", "skill_run",
     ];
     expected.sort();
     assert_eq!(names, expected);
@@ -669,6 +669,30 @@ fn full_trust_runs_everyday_commands_and_stops_only_for_the_dangerous_ones() {
     assert!(!results[1].contains("denied"), "a delete inside the working folder is not interrupted: {}", results[1]);
     assert!(results[2].contains("denied") && results[3].contains("denied"), "{results:?}");
     assert_eq!(fs::read_to_string(rig.workspace.join("notes.txt")).unwrap(), "ok");
+}
+
+#[test]
+fn installed_skill_scripts_still_require_permission_in_full_trust() {
+    let steps = vec![
+        call("1", "skill_install", json!({
+            "slug": "demo-skill", "version": "1.0.0", "sha256": "a".repeat(64)
+        })),
+        call("2", "skill_run", json!({
+            "skill": "demo-skill", "script": "scripts/test.py", "args": ["--help"]
+        })),
+        Step::text("stopped"),
+    ];
+    let (rig, asked) = trusted_rig("trusted-3p-skill", steps);
+    let (result, _) = run(&rig, "go");
+    assert_eq!(result.unwrap().text, "stopped");
+    let asked = lock(&asked).clone();
+    assert_eq!(asked.iter().map(|(name, _)| name.as_str()).collect::<Vec<_>>(),
+        vec!["skill_install", "skill_run"]);
+    for (_, reason) in &asked {
+        assert!(reason.as_ref().is_some_and(|s| s.contains("必须逐次经过用户确认")));
+    }
+    assert!(!rig.dirs.skills().join("demo-skill").exists(),
+        "denied third-party package was not installed");
 }
 
 #[test]
