@@ -108,6 +108,7 @@ impl SkillDiscovery {
                     else { spec.untrusted_output() };
                 Arc::new(DiscoveryTool { root: self.root.clone(), spec }) as Arc<dyn Tool>
             }).collect();
+        tools.push(Arc::new(runner::SkillRead::new(self.root.clone())));
         tools.push(Arc::new(runner::SkillRun::new(self.root.clone(), self.workspace.clone())));
         tools
     }
