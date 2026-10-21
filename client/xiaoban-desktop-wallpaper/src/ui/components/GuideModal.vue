@@ -195,7 +195,7 @@ async function openOnlineGuide() {
       <div class="lead-icon"><Sparkles :size="20" /></div>
       <div class="lead-copy">
         <strong>不止是聊天，更是你的桌面全能管家</strong>
-        <p>小伴接入了桌面控制与创作引擎，能直接替你写壁纸、调特效、放组件、设提醒，也能读写工作区、操作其他应用。点击任意示例即可一键填入试试。</p>
+        <p>小伴接入了桌面装扮与创作引擎，能直接替你写壁纸、调特效、放组件、设提醒，也能读写工作区、操作其他应用。点击任意示例即可一键填入试试。</p>
       </div>
     </div>
 
@@ -228,7 +228,7 @@ async function openOnlineGuide() {
         </div>
       </NTabPane>
 
-      <NTabPane name="control" tab="🪄 桌面控制">
+      <NTabPane name="control" tab="🪄 桌面装扮">
         <div class="guide-grid">
           <div v-for="item in controlCards" :key="item.id" class="guide-card">
             <div class="card-top">

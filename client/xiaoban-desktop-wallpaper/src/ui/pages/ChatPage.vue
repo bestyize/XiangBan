@@ -3,6 +3,7 @@ import { computed, h, nextTick, onMounted, onUnmounted, ref, watch, type Compone
 import { NButton, NDropdown, NInput, type DropdownOption } from 'naive-ui';
 import { ArrowDown, AudioLines, ChevronDown, ChevronRight, Ellipsis, Folder, FolderInput, FolderPlus, LoaderCircle, MessageSquarePlus, Mic, Pencil, SendHorizontal, Settings, Volume2, ShieldAlert, Sparkles, Square, Trash2, X } from 'lucide-vue-next';
 import { invoke } from '../../bridge.ts';
+import Orb from '../../assistant/Orb.vue';
 import type { ControlStore } from '../control-types.ts';
 import ModelSwitchDialog from '../components/ModelSwitchDialog.vue';
 import ChatWorkbenchTools from '../components/ChatWorkbenchTools.vue';
@@ -432,7 +433,7 @@ async function openLink(href: string) {
             <NButton type="primary" data-testid="chat-go-settings" @click="openSettings">去设置</NButton>
           </div>
           <div v-else-if="!view?.items.length" class="welcome" data-testid="chat-welcome">
-            <img src="/xiaoban.svg" alt="" width="56" height="56" />
+            <Orb phase="idle" :size="56" />
             <h3>有什么可以帮你？</h3>
             <p>我能回答问题，也能在你选的工作目录里读写文件、运行命令，还能替你调整壁纸、特效和提醒。改动之前我会先问你。</p>
             <div class="examples">
@@ -452,7 +453,7 @@ async function openLink(href: string) {
             <template v-for="item in block.items" :key="item.id">
               <div v-if="item.kind === 'user'" class="msg user" data-testid="msg-user"><div class="bubble"><div v-if="item.images.length" class="bubble-images"><img v-for="(url, n) in item.images" :key="n" :src="url" :alt="`第 ${n + 1} 张图片`" :data-testid="`msg-user-image-${n}`" @click="preview = attachmentImage(url)" /></div><div v-if="item.files?.length" class="file-cards"><span v-for="(file, n) in item.files" :key="n" class="file-chip" :title="file.name">📄 {{ file.name }} · {{ Math.ceil(file.size / 1024) }} KB</span></div><template v-if="item.text">{{ item.text }}</template></div></div>
               <div v-else-if="item.kind === 'assistant'" class="msg assistant" data-testid="msg-assistant">
-                <img class="avatar" src="/xiaoban.svg" alt="" width="28" height="28" />
+                <Orb class="avatar" :phase="item.streaming ? 'answering' : 'idle'" :active="item.streaming" :size="28" />
                 <div class="answer"><MarkdownView :source="item.text" @open="openLink" /><span v-if="item.streaming" class="cursor" aria-hidden="true"></span>
                   <button v-if="store.speech && !item.streaming && item.text.trim()" type="button" class="link speech-button" :disabled="!store.desktop" :aria-label="store.speech.currentKey === item.id ? '停止朗读' : '朗读回复'" data-testid="chat-read-reply" @click="store.speech.currentKey === item.id ? store.speech.stop() : store.speech.speak(item.text, item.id)">
                     <Volume2 :size="14" />{{ store.speech.currentKey === item.id ? (store.speech.status === 'synthesizing' ? '取消合成' : '停止朗读') : '朗读' }}
@@ -608,7 +609,7 @@ async function openLink(href: string) {
 .msg.user{display:flex;justify-content:flex-end;width:100%;max-width:100%;min-width:0;box-sizing:border-box}
 .bubble{background:var(--ui-primary-soft);color:var(--ui-text-primary);border-radius:16px 16px 4px 16px;padding:10px 14px;max-width:min(80%,100%);white-space:pre-wrap;word-break:break-word;overflow-wrap:anywhere;line-height:1.7;font-size:14.5px;min-width:0;box-sizing:border-box}
 .msg.assistant{display:grid;grid-template-columns:28px minmax(0,1fr);gap:12px;align-items:start;width:100%;max-width:100%;min-width:0;box-sizing:border-box}
-.avatar{border-radius:8px;margin-top:2px}
+.avatar{margin-top:2px}
 .answer{width:100%;max-width:100%;min-width:0;font-size:14.5px;line-height:1.8;color:var(--ui-text-primary);overflow-wrap:anywhere;word-break:break-word;box-sizing:border-box}
 .cursor{display:inline-block;width:7px;height:15px;background:var(--ui-primary);border-radius:2px;margin-left:2px;vertical-align:text-bottom;animation:blink 1s steps(2,start) infinite}
 @keyframes blink{to{visibility:hidden}}
