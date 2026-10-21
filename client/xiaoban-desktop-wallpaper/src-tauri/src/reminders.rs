@@ -579,6 +579,8 @@ fn presence_tick(app: &tauri::AppHandle, elapsed: f64) {
     };
     if let (Some(day), Some(path)) = (greeted, presence_path(app)) { let _ = crate::presence::save_first_today(&path, day); }
     if let Some(kind) = kind {
+        // Record an aggregated, non-content event. No extra greeting or model call is emitted.
+        crate::proactivity::observe_presence(app, kind, now.timestamp_millis());
         let payload = serde_json::json!({"kind": kind.as_str()});
         let _ = app.emit_to("pet", "companion-presence", payload.clone());
         for (label,window) in app.webview_windows(){if crate::pets::is_pet(&label){let _=window.eval(format!("window.dispatchEvent(new CustomEvent('pet-presence',{{detail:{payload}}}));"));}}

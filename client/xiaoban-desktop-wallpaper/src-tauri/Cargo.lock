@@ -73,6 +73,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "agent-proactivity"
+version = "0.1.0"
+dependencies = [
+ "serde",
+]
+
+[[package]]
 name = "agent-skill-discovery"
 version = "0.1.0"
 dependencies = [
@@ -5919,6 +5926,7 @@ dependencies = [
  "agent-file-tools",
  "agent-kernel",
  "agent-learning",
+ "agent-proactivity",
  "agent-skill-discovery",
  "base64 0.22.1",
  "chrono",

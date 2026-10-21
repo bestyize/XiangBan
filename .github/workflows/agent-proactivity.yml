@@ -1,0 +1,25 @@
+name: Agent Proactivity
+
+on:
+  pull_request:
+    paths:
+      - 'libs/agent-proactivity/**'
+      - 'client/xiaoban-desktop-wallpaper/src-tauri/src/proactivity.rs'
+      - 'client/xiaoban-desktop-wallpaper/src-tauri/src/reminders.rs'
+      - 'client/xiaoban-desktop-wallpaper/src-tauri/src/main.rs'
+      - 'client/xiaoban-desktop-wallpaper/src-tauri/Cargo.*'
+      - '.github/workflows/agent-proactivity.yml'
+  workflow_dispatch:
+
+jobs:
+  library-tests:
+    name: Rust policy unit tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: libs/agent-proactivity
+      - run: cargo test --manifest-path libs/agent-proactivity/Cargo.toml
