@@ -88,6 +88,7 @@ const view = computed(() => chat.current());
 const blocks = computed(() => replyBlocks(view.value?.items ?? []));
 const running = computed(() => !!view.value?.running);
 const title = computed(() => (chat.currentId && chat.sessions.find(s => s.id === chat.currentId)?.title) || '新对话');
+const workspaceName = computed(() => chat.workspace.replace(/\\/g, '/').split('/').filter(Boolean).at(-1) || '工作区');
 const compacting = computed(() => !!chat.currentId && chat.compactingId === chat.currentId);
 const canSend = computed(() => chat.configured && !running.value && !compacting.value && !attachmentReading.value && (draft.value.trim() !== '' || attachments.value.length > 0));
 const now = () => Math.floor(Date.now() / 1000);
@@ -391,7 +392,7 @@ async function openLink(href: string) {
 
     <div class="chat-main">
       <header class="chat-head">
-        <h2 data-testid="chat-title">{{ title }}</h2>
+        <div class="head-location"><h2 data-testid="chat-title">{{ title }}</h2><button v-if="store.desktop" type="button" class="workspace-chip" data-testid="chat-workspace" :title="'当前工作区：' + (chat.workspace || '默认工作目录') + '。前往设置修改。'" @click="openSettings"><Folder :size="13" /><span>{{ workspaceName }}</span></button></div>
         <div class="head-actions">
           <button v-if="store.speech && store.speech.status !== 'idle'" type="button" class="link" data-testid="chat-speech-status" @click="store.speech.stop()"><Volume2 :size="14" />{{ store.speech.status === 'synthesizing' ? '取消合成' : '停止朗读' }}</button>
           <button
@@ -562,6 +563,11 @@ async function openLink(href: string) {
 .chat-main{display:flex;flex-direction:column;min-height:0;min-width:0;position:relative}
 .chat-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 24px;border-bottom:1px solid var(--ui-border)}
 .chat-head h2{font-size:15px;margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.head-location{display:flex;align-items:center;min-width:0;gap:12px}
+.head-location h2{min-width:0;flex-shrink:1}
+.workspace-chip{border:0;background:var(--ui-surface-alt);color:var(--ui-text-secondary);border-radius:7px;padding:5px 8px;font:inherit;font-size:11px;cursor:pointer;display:flex;align-items:center;gap:5px;max-width:170px;flex:none}
+.workspace-chip span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.workspace-chip:hover{color:var(--ui-primary)}
 .head-actions{display:flex;align-items:center;gap:10px;flex-shrink:0}
 .guide-chip{border:1px solid var(--ui-border);background:var(--ui-surface);color:var(--ui-primary);border-radius:999px;padding:4px 10px;font-size:12px;display:inline-flex;gap:5px;align-items:center;cursor:pointer;font-weight:600;transition:all .15s}
 .guide-chip:hover{background:var(--ui-primary-soft);border-color:var(--ui-primary)}
