@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { computed, h, nextTick, onMounted, onUnmounted, ref, watch, type Component, type HTMLAttributes } from 'vue';
 import { NButton, NDropdown, NInput, type DropdownOption } from 'naive-ui';
-import { ArrowDown, AudioLines, ChevronDown, ChevronRight, Ellipsis, Folder, FolderInput, FolderPlus, Paperclip, LoaderCircle, MessageSquarePlus, Mic, Pencil, SendHorizontal, Settings, Volume2, Shield, ShieldAlert, Sparkles, Square, Trash2, X, Zap } from 'lucide-vue-next';
+import { ArrowDown, AudioLines, ChevronDown, ChevronRight, Ellipsis, Folder, FolderInput, FolderPlus, LoaderCircle, MessageSquarePlus, Mic, Pencil, SendHorizontal, Settings, Volume2, ShieldAlert, Sparkles, Square, Trash2, X, Code2 } from 'lucide-vue-next';
 import { invoke } from '../../bridge.ts';
 import type { ControlStore } from '../control-types.ts';
 import ModelSwitchDialog from '../components/ModelSwitchDialog.vue';
+import ChatWorkbenchTools from '../components/ChatWorkbenchTools.vue';
+import type { AiConfigView } from '../../bridge.ts';
 import ChatNameDialog from '../components/ChatNameDialog.vue';
 import ChatMoveDialog from '../components/ChatMoveDialog.vue';
 import ChatContextRing from '../components/ChatContextRing.vue';
@@ -35,7 +37,34 @@ const modelDialog = ref(false);
 const guideDialog = ref(false);
 const retryAfterSwitch = ref(false);
 function chooseModel(retry = false) { retryAfterSwitch.value = retry; modelDialog.value = true; }
-async function modelSwitched() { await chat.refresh(); if (retryAfterSwitch.value) await chat.retry(); props.store.notify('模型已切换', 'success'); }
+const modelLabel = ref('编程模型');
+async function readModelLabel() {
+  if (!props.store.desktop) return;
+  try {
+    const config = await invoke<AiConfigView>('get_ai_config');
+    const provider = config.providers?.find(p => p.id === config.activeProvider);
+    modelLabel.value = provider?.models?.find(m => m.id === config.model)?.name || config.model || '编程模型';
+  } catch { /* Preserve the last known label while preferences are unavailable. */ }
+}
+async function modelSwitched() { await chat.refresh(); await readModelLabel(); if (retryAfterSwitch.value) await chat.retry(); props.store.notify('模型已切换', 'success'); }
+function insertCapabilityPrompt(instruction: string) { draft.value = draft.value.trim() ? instruction + '\n\n' + draft.value : instruction; }
+function useExpert(entrySkill: string, name: string) { insertCapabilityPrompt(`请先使用 load_skill 加载已安装专家「${name}」的工作流（${entrySkill}），再帮助我完成以下任务：`); }
+function useSkill(slug: string, name: string) { insertCapabilityPrompt(`请先使用 load_skill 加载已安装技能「${name}」（${slug}），然后完成以下任务：`); }
+function useConnector(name: string) { insertCapabilityPrompt(`请在本次任务中优先使用已连接的「${name}」工具，完成以下任务：`); }
+const capturing = ref(false);
+async function takeChatScreenshot() {
+  if (!props.store.desktop || capturing.value || running.value || !chat.configured || attachments.value.length >= MAX_IMAGES) return;
+  const version = attachmentVersion;
+  capturing.value = true;
+  try {
+    const image = await invoke<string | null>('chat_screenshot');
+    if (version !== attachmentVersion || !image) return;
+    if (!image.startsWith('data:image/')) throw new Error('截图结果格式错误');
+    if (attachments.value.reduce((sum, a) => sum + attachmentBytes(a), 0) + attachmentBytes(image) > MAX_TOTAL_BYTES) throw new Error('附件合计不能超过 30MB');
+    attachments.value.push(image);
+  } catch (error) { if (version === attachmentVersion) props.store.notify(error instanceof Error ? error.message : String(error), 'error'); }
+  finally { capturing.value = false; }
+}
 const composing = ref(false);
 const scroller = ref<HTMLElement | null>(null);
 const stick = ref(true);
@@ -72,7 +101,7 @@ const statusLine = computed(() => view.value?.status || (waiting.value ? '等你
 const microphoneAllowed = computed(() => foreground.value && chat.configured && !running.value && (!props.store.speech || props.store.speech.status === 'idle'));
 watch(() => chat.currentId, () => { asr?.deactivate(); attachmentVersion++; attachments.value = []; }, { flush: 'sync' });
 watch(microphoneAllowed, allowed => { if (!allowed) asr?.deactivate(); }, { flush: 'sync' });
-watch(() => props.store.page, page => { if (page !== 'chat') asr?.deactivate(); }, { flush: 'sync' });
+watch(() => props.store.page, page => { if (page !== 'chat') asr?.deactivate(); else void readModelLabel(); }, { flush: 'sync' });
 async function toggleVoice() {
   if (!asr || finishingVoice.value) return;
   if (asr.recordingRequested) {
@@ -94,6 +123,7 @@ async function toggleVoice() {
 onMounted(() => {
   asr?.deactivate();
   void asr?.init();
+  void readModelLabel();
   document.addEventListener('visibilitychange', updateVisibility);
   window.addEventListener('blur', blurChat); window.addEventListener('focus', focusChat);
 });
@@ -372,30 +402,6 @@ async function openLink(href: string) {
             <Sparkles :size="13" />
             <span>玩法指南</span>
           </button>
-          <div class="permission-toggle" role="group" aria-label="权限模式" data-testid="chat-permission-toggle">
-            <button
-              type="button"
-              class="perm-btn"
-              :class="{ active: chat.permissionMode === 'ask' }"
-              data-testid="perm-ask"
-              title="默认权限：读操作自动执行，写文件、运行命令与修改设置前需确认"
-              @click="chat.setPermissionMode('ask')"
-            >
-              <Shield :size="12" />
-              <span>默认权限</span>
-            </button>
-            <button
-              type="button"
-              class="perm-btn"
-              :class="{ active: chat.permissionMode === 'auto' }"
-              data-testid="perm-auto"
-              title="完全信任：自动执行所有操作（文件修改、命令等无需逐一确认）"
-              @click="chat.setPermissionMode('auto')"
-            >
-              <Zap :size="12" />
-              <span>完全信任</span>
-            </button>
-          </div>
           <button type="button" class="ai-config-chip" data-testid="chat-ai-config" title="设置 → AI 模型：选择小伴 AI，或配置自己的模型服务" @click="openSettings"><Settings :size="14" />AI 模型配置</button>
         </div>
       </header>
