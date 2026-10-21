@@ -36,7 +36,7 @@ function setup(options: { configured?: boolean; voice?: boolean; prefs?: { open:
   let heard: (text: string, context?: TranscriptContext) => void = () => {};
   let captureOptions: AsrActivationOptions = {};
   const asr = reactive({
-    enabled: options.voice ?? true, microphoneSupported: true, listening: false, recognizing: false, preparing: false, recordingRequested: false, level: 0, error: '',
+    enabled: options.voice ?? true, microphoneSupported: true, microphoneError: '', warming: false, listening: false, recognizing: false, preparing: false, recordingRequested: false, level: 0, error: '',
     init: vi.fn(async () => {}), prepare: vi.fn(async () => true),
     activate: vi.fn(async (callback: typeof heard, options?: AsrActivationOptions) => { asr.recordingRequested = true; asr.listening = true; heard = callback; captureOptions = options ?? {}; }),
     finish: vi.fn(async () => { asr.recordingRequested = false; asr.listening = false; }),
@@ -65,6 +65,40 @@ const finishAnswer = (chat: ReturnType<typeof setup>['chat'], text = '好的，�
   chat.views.s1.items.push({ kind: 'assistant', id: 'a', text, streaming: false });
   chat.views.s1.running = false;
 };
+
+describe('truthful voice prompts', () => {
+  it('only announces listening after capture starts and returns to typing after stopping', async () => {
+    const {store,asr}=setup({prefs:{open:'type',read:'never'}});await store.init();await store.opened();
+    expect(store.status).toBe('问点什么…');
+    let captured!:()=>void;const pending=new Promise<void>(resolve=>{captured=resolve;});
+    asr.activate.mockImplementation(async()=>{asr.recordingRequested=true;await pending;asr.listening=true;});
+    const starting=store.toggleListening();await flushPromises();
+    expect(store.phase).toBe('idle');expect(store.status).toBe('问点什么…');expect(store.voiceStatus).toBe('正在启动麦克风…');
+    captured();await starting;
+    expect(store.phase).toBe('listening');expect(store.status).toBe('正在聆听…');
+    await store.toggleListening();expect(store.status).toBe('问点什么…');store.dispose();
+  });
+  it('keeps preparation separate and cancels pending voice activation when the user types',async()=>{
+    const {store,asr}=setup({prefs:{open:'type',read:'never'}});await store.init();await store.opened();
+    let ready!:(value:boolean)=>void;const pending=new Promise<boolean>(resolve=>{ready=resolve;});
+    asr.prepare.mockImplementation(async()=>{asr.preparing=true;return pending;});
+    const starting=store.toggleListening();await flushPromises();
+    expect(store.status).toBe('问点什么…');expect(store.phase).toBe('idle');expect(store.voiceStatus).toContain('正在准备');
+    store.input='继续用文字提问';store.inputStarted();asr.preparing=false;ready(true);await starting;
+    expect(asr.activate).not.toHaveBeenCalled();expect(store.input).toBe('继续用文字提问');store.dispose();
+  });
+  it('expires microphone failures without replacing the input or model hint',async()=>{
+    const {store,asr,advance}=setup({prefs:{open:'type',read:'never'}});await store.init();await store.opened();
+    store.input='保留我的草稿';store.note('模型设置提示','ai');asr.microphoneError='麦克风不可用';
+    expect(store.voiceStatus).toBe('麦克风不可用');expect(store.status).toBe('问点什么…');
+    advance(5001);expect(store.voiceStatus).toBe('');expect(store.input).toBe('保留我的草稿');expect(store.hint).toBe('模型设置提示');store.dispose();
+  });
+  it('keeps unsupported devices in typing mode with a temporary explanation',async()=>{
+    const {store,asr,advance}=setup({prefs:{open:'type',read:'never'}});asr.microphoneSupported=false;await store.opened();await store.toggleListening();
+    expect(store.status).toBe('问点什么…');expect(store.voiceStatus).toContain('不支持语音输入');expect(asr.activate).not.toHaveBeenCalled();
+    advance(5001);expect(store.voiceStatus).toBe('');store.dispose();
+  });
+});
 
 describe('assistant barge-in', () => {
   it('integrates microphone, partial ASR, echo rejection and immediate audio pause',async()=>{
@@ -171,7 +205,7 @@ describe('floating assistant', () => {
     await store.toggleListening();
     expect(store.hint).toBe('');
     expect(store.voiceAvailable).toBe(false);
-    expect(store.status).toBe('问点什么');
+    expect(store.status).toBe('问点什么…');
     expect(asr.prepare).not.toHaveBeenCalled();
     expect(asr.activate).not.toHaveBeenCalled();
     store.dispose();
@@ -183,7 +217,7 @@ describe('floating assistant', () => {
     expect(chat.select).toHaveBeenCalledWith(null);
     expect(asr.activate).toHaveBeenCalledTimes(1);
     expect(store.phase).toBe('listening');
-    expect(store.status).toBe('我在听，请说…');
+    expect(store.status).toBe('正在聆听…');
   });
 
   it.each([true, false])('creates capsule conversations in full trust (spoken: %s)', async spoken => {
@@ -320,7 +354,8 @@ describe('floating assistant', () => {
     await noVoice.store.opened();
     expect(noVoice.store.hint).toBe('');
     await noVoice.store.toggleListening();
-    expect(noVoice.store.hintTab).toBe('assistant');
+    expect(noVoice.store.hint).toBe('');
+    expect(noVoice.invoke).toHaveBeenCalledWith('assistant_open_settings', { tab: 'assistant' });
     expect(noVoice.asr.activate).not.toHaveBeenCalled();
     await noVoice.store.openSettings('assistant');
     expect(noVoice.invoke).toHaveBeenCalledWith('assistant_open_settings', { tab: 'assistant' });
@@ -451,7 +486,7 @@ describe('floating assistant', () => {
     advance(2000);
     expect(asr.recordingRequested).toBe(false);
     expect(store.open).toBe(true);
-    expect(store.hint).toContain('没听到声音');
+    expect(store.voiceStatus).toContain('没听到声音');
     await store.toggleListening();
     expect(asr.recordingRequested).toBe(true);
     expect(store.hint).toBe('');
@@ -660,3 +695,4 @@ describe('assistant voice settings synchronization',()=>{
     expect(chat.send).not.toHaveBeenCalled();expect(asr.recordingRequested).toBe(false);expect(store.phase).toBe('idle');expect(store.input).toBe('还没有发送的话');
   });
 });
+

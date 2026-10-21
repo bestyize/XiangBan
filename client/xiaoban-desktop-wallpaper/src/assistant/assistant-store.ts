@@ -56,6 +56,8 @@ export interface AssistantStore {
   readonly configured: boolean;
   readonly voiceAvailable: boolean;
   readonly status: string;
+  /** Voice preparation and temporary errors, separate from the text input placeholder. */
+  readonly voiceStatus: string;
   readonly question: string;
   readonly questionImages: string[];
   readonly questionFiles?: AttachmentCard[];
@@ -83,6 +85,8 @@ export interface AssistantStore {
   stopped(): void;
   /** Shows a line in the card, optionally with a way to the settings tab that fixes it. */
   note(message: string, tab?: '' | SettingsTarget): void;
+  /** Short-lived voice notices leave the text input and conversation card available. */
+  noteVoice(message: string): void;
   hide(): Promise<void>;
   /** The ball was clicked: open the capsule. */
   unfold(): Promise<void>;
@@ -112,13 +116,13 @@ export function createAssistantStore(deps: AssistantDeps): AssistantStore {
   const unsubscribers: (() => void)[] = [];
   let starting: Promise<void> | null = null;
   let disposed = false;
-  let listenTimer: unknown, sendTimer: unknown;
+  let listenTimer: unknown, sendTimer: unknown, voiceNoticeTimer: unknown;
   /** Words recognised so far in this utterance; sent together when speaking pauses. */
   let heard = '';
   /** The last question was spoken, so the answer is read aloud and listening resumes afterwards. */
   let voiceTurn = false;
   /** Reactive, because the phase shows `speaking` from the moment a reply is handed to the voice until it ends. */
-  const flags = reactive({ awaitingSpeech: false, submitting: false, changingSession: false });
+  const flags = reactive({ awaitingSpeech: false, submitting: false, changingSession: false, voiceNotice: '' });
   let draftVersion = 0, speechVersion = 0, listenVersion = 0;
   let turnInterrupted = false;
   let readingText = '', echoTailUntil = 0;
@@ -155,6 +159,10 @@ export function createAssistantStore(deps: AssistantDeps): AssistantStore {
     if (read === 'voice' || read === 'always' || read === 'never') store.prefs.read = read;
   }
   function clearTimers() { clearTimer(listenTimer); clearTimer(sendTimer); listenTimer = sendTimer = undefined; }
+  function noteVoice(message: string) {
+    clearTimer(voiceNoticeTimer); voiceNoticeTimer = undefined; flags.voiceNotice = message;
+    if (message) voiceNoticeTimer = setTimer(() => { flags.voiceNotice = ''; voiceNoticeTimer = undefined; }, 5000);
+  }
 
   function armListenTimer() {
     clearTimer(listenTimer);
@@ -162,7 +170,7 @@ export function createAssistantStore(deps: AssistantDeps): AssistantStore {
       if (disposed || !store.open || heard || !asr.recordingRequested || flags.awaitingSpeech) return;
       if (asr.speechActive || asr.recognizing) { armListenTimer(); return; }
       asr.deactivate(); voiceTurn = false;
-      store.note('没听到声音，点光球可以继续说话。');
+      noteVoice('没听到声音，点击生命球可重新开始。');
     }, LISTEN_IDLE_MS);
   }
   function stopReading() {
@@ -179,12 +187,12 @@ export function createAssistantStore(deps: AssistantDeps): AssistantStore {
     const current = () => !disposed && version === draftVersion && ticket === listenVersion;
     await asr.init();
     if(!current())return false;
-    if (asr.microphoneSupported === false) return false;
-    if (!asr.enabled) { store.note('语音对话还没开启。在超级小伴设置里打开后，就能直接说话。', 'assistant'); return false; }
+    if (asr.microphoneSupported === false) { noteVoice('当前设备不支持语音输入，可以继续打字。'); return false; }
+    if (!asr.enabled) { await store.openSettings('assistant'); return false; }
     const prepared = await asr.prepare();
     if (!store.open || !current()) return false;
-    if (!prepared) { store.note(asr.error || '语音识别还没准备好，请稍后再试。'); return false; }
-    store.note(''); heard = '';
+    if (!prepared) { noteVoice(asr.error || '语音识别还没准备好，可以继续打字。'); return false; }
+    noteVoice(''); heard = '';
     await asr.activate((text, context)=>{if(current())onHeard(text, context);}, {
       noiseGuard: true,
       playbackText: () => (flags.awaitingSpeech && speech.status === 'playing') || now() < echoTailUntil ? readingText : '',
@@ -248,7 +256,7 @@ export function createAssistantStore(deps: AssistantDeps): AssistantStore {
       if (current && (current.approvals.length || current.questions.length)) return 'attention';
       if (flags.awaitingSpeech) return 'speaking';
       if (current?.running) return turn().answer ? 'answering' : 'thinking';
-      if (asr.listening || asr.recognizing || asr.preparing || asr.recordingRequested) return 'listening';
+      if (asr.listening) return 'listening';
       return 'idle';
     },
     get status() {
@@ -256,10 +264,16 @@ export function createAssistantStore(deps: AssistantDeps): AssistantStore {
         case 'attention': return '需要你确认一下';
         case 'thinking': return store.working || '思考中…';
         case 'answering': return store.working || '正在回答…';
-        case 'speaking': return asr.recordingRequested ? '正在朗读，说话或发送可打断' : '正在朗读，发送可打断';
-        case 'listening': return asr.preparing ? '正在准备语音识别…' : asr.recognizing ? '正在识别…' : '我在听，请说…';
-        default: return store.voiceAvailable ? '问点什么，或直接说话' : '问点什么';
+        case 'speaking': return asr.listening ? '正在朗读，说话或发送可打断' : '正在朗读，发送可打断';
+        case 'listening': return '正在聆听…';
+        default: return '问点什么…';
       }
+    },
+    get voiceStatus() {
+      if (flags.voiceNotice) return flags.voiceNotice;
+      if (asr.enabled && (asr.preparing || asr.warming)) return '正在准备语音引擎…';
+      if (asr.recordingRequested && !asr.listening) return '正在启动麦克风…';
+      return '';
     },
     init() {
       starting ??= (async () => {
@@ -286,6 +300,7 @@ export function createAssistantStore(deps: AssistantDeps): AssistantStore {
       // Native transitions re-announce state after showing the WebView.
       // A duplicate event must never erase a draft or restart voice capture.
       if (disposed || store.open) return;
+      noteVoice('');
       clearTimers();
       draftVersion++; store.attachments = [];
       store.open = true; store.ball = false; store.note(''); store.input = ''; heard = ''; voiceTurn = false; flags.awaitingSpeech = false;
@@ -305,6 +320,7 @@ export function createAssistantStore(deps: AssistantDeps): AssistantStore {
       if (store.open && asr.enabled && store.prefs.open === 'voice') { voiceTurn = await startListening(); }
     },
     closed() {
+      noteVoice('');
       draftVersion++; store.attachments = [];
       clearTimers();
       asr.deactivate(); void speech.stop();
@@ -312,6 +328,7 @@ export function createAssistantStore(deps: AssistantDeps): AssistantStore {
     },
     async newConversation() {
       if (flags.changingSession || flags.submitting) return;
+      noteVoice('');
       flags.changingSession = true;draftVersion++;
       clearTimers(); heard = ''; voiceTurn = false; flags.awaitingSpeech = false; asr.deactivate();
       try {
@@ -387,12 +404,13 @@ export function createAssistantStore(deps: AssistantDeps): AssistantStore {
       speechVersion++; listenVersion++; flags.awaitingSpeech = false; clearTimers(); asr.deactivate(); void speech.stop();
     },
     note(message, tab = '') { store.hint = message; store.hintTab = message ? tab : ''; },
+    noteVoice,
     hide() { return deps.invoke<void>('assistant_hide').catch(() => {}); },
     async unfold() { await deps.invoke('assistant_unfold'); },
     async openChat() { await deps.invoke('assistant_open_chat', { session: chat.currentId }); },
     async openSettings(tab) { await deps.invoke('assistant_open_settings', { tab }); },
     dispose() {
-      disposed = true; clearTimers(); stopWatch(); stopSessionWatch(); stopVoiceWatch();
+      disposed = true; clearTimers(); noteVoice(''); stopWatch(); stopSessionWatch(); stopVoiceWatch(); stopVoiceErrorWatch();
       unsubscribers.splice(0).forEach(off => off());
       asr.deactivate(); void speech.stop();
     },
@@ -404,11 +422,16 @@ export function createAssistantStore(deps: AssistantDeps): AssistantStore {
   });
   const stopVoiceWatch = watch(() => asr.enabled, enabled => {
     if (!enabled) { clearTimers(); heard = ''; voiceTurn = false; asr.deactivate(); }
-    else if (store.hint === '语音对话还没开启。在超级小伴设置里打开后，就能直接说话。') store.note('');
+  }, { flush: 'sync' });
+  const stopVoiceErrorWatch = watch(() => [asr.error, asr.microphoneError], (errors, before) => {
+    if (!store.open || disposed) return;
+    const message = errors.find((error, i) => error && error !== before[i]);
+    if (message) noteVoice(message);
   }, { flush: 'sync' });
   const stopSessionWatch = watch(() => chat.currentId, id => {
     if(id && !disposed) rememberSession(id);
   }, { flush: 'sync' });
   return store;
 }
+
 

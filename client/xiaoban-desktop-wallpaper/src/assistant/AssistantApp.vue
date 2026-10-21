@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ATTACHMENT_ACCEPT, MAX_TOTAL_BYTES, attachmentBytes, attachmentImage, attachmentName, readAttachment } from '../ui/chat/attachments.ts';
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
-import { ArrowUp, Square, X, Copy, Check, Paperclip, Settings, ChevronDown, ChevronRight, MessageSquare, MessageSquarePlus, Scissors, Plus } from 'lucide-vue-next';
+import { ArrowUp, Square, X, Copy, Check, Paperclip, Settings, ChevronDown, ChevronRight, PanelsTopLeft, SquarePen, Scissors, Plus } from 'lucide-vue-next';
 import MarkdownView from '../ui/chat/MarkdownView.ts';
 import SelectionCopyMenu from '../ui/chat/SelectionCopyMenu.vue';
 import type { AsrStore } from '../ui/asr/store.ts';
@@ -87,6 +87,16 @@ async function handleMorph(event: MorphEvent) {
 }
 
 const props = defineProps<{ store: AssistantStore; asr: AsrStore }>();
+const orbLabel = computed(() => {
+  if (props.store.phase === 'speaking') return '停止朗读';
+  if (props.asr.listening) return '停止聆听';
+  if (props.asr.recordingRequested) return '取消语音启动';
+  if (props.asr.preparing) return '正在准备语音输入';
+  if (props.asr.microphoneSupported === false) return '当前设备不支持语音输入';
+  if (props.asr.enabled === false) return '开启语音输入';
+  if (props.asr.microphoneError) return '重试语音输入';
+  return '点击开始说话';
+});
 const field = ref<HTMLInputElement>();
 const filePicker = ref<HTMLInputElement>();
 const imageReading = ref(false), submitting = ref(false), dropActive = ref(false), capturing = ref(false);
@@ -410,7 +420,7 @@ onBeforeUnmount(()=>{
           <div v-for="(image, index) in store.attachments" :key="index" class="image-thumb"><img v-if="attachmentImage(image)" :src="attachmentImage(image)!" :alt="`待发送的图片 ${index + 1}`" draggable="false" /><span v-if="!attachmentImage(image)" class="file-chip" :title="attachmentName(image)">📄 {{ attachmentName(image) }}</span><button type="button" :aria-label="`移除附件 ${index + 1}`" :disabled="submitting || imageReading" @click="store.attachments.splice(index, 1)"><X :size="11" /></button></div>
         </div>
         <div class="capsule" :data-phase="store.phase">
-          <button type="button" class="orb-button" :title="store.phase === 'speaking' ? '停止朗读' : store.phase === 'listening' ? '暂停聆听 · 拖动可移动' : '点一下开始说话 · 拖动可移动'" :aria-label="store.phase === 'speaking' ? '停止朗读' : store.phase === 'listening' ? '暂停聆听' : '开始说话'" data-testid="assistant-orb" :disabled="imageReading || submitting || capturing" data-drag-handle @click="onOrb">
+          <button type="button" class="orb-button" :title="orbLabel + ' · 拖动可移动'" :aria-label="orbLabel" data-testid="assistant-orb" :disabled="imageReading || submitting || capturing || (asr.preparing && store.phase !== 'speaking')" data-drag-handle @click="onOrb">
             <Orb :phase="store.phase" :level="asr.level" :active="store.open" :size="34" :dark="isDark" />
           </button>
           <input ref="field" v-model="store.input" :disabled="store.changingSession" class="field" type="text" autocomplete="off" spellcheck="false" :placeholder="store.status" aria-label="向小伴提问" data-testid="assistant-input" @beforeinput="store.inputStarted()" @input="store.inputStarted()" @keydown.enter="onEnter" @compositionstart="composing = true; store.inputStarted()" @compositionend="composing = false" />
@@ -418,8 +428,8 @@ onBeforeUnmount(()=>{
             <div v-if="toolsOpen" ref="toolbar" id="assistant-toolbar" class="tools-toolbar" role="toolbar" aria-label="小伴工具" aria-orientation="horizontal" data-testid="assistant-toolbar" @animationend="queueHitRegions" @keydown="toolbarKeys" @pointerenter="focusTools" @pointerleave="leaveTools">
               <button type="button" class="tool-button" title="去超级小伴设置页" aria-label="去超级小伴设置页" data-testid="assistant-settings" @click="toolAction('settings')"><Settings :size="16" :stroke-width="1.7" /></button>
               <button type="button" class="tool-button" title="收起小伴" aria-label="收起小伴" data-testid="assistant-close" @click="toolAction('hide')"><ChevronDown :size="16" :stroke-width="1.7" /></button>
-              <button type="button" class="tool-button" title="新会话" aria-label="新会话" data-testid="assistant-new-chat" :disabled="imageReading || submitting || capturing || store.changingSession" @click="toolAction('new')"><MessageSquarePlus :size="16" :stroke-width="1.7" /></button>
-              <button type="button" class="tool-button" title="去聊天详情页" aria-label="去聊天详情页" data-testid="assistant-expand" @click="toolAction('chat')"><MessageSquare :size="16" :stroke-width="1.7" /></button>
+              <button type="button" class="tool-button" title="新会话" aria-label="新会话" data-testid="assistant-new-chat" :disabled="imageReading || submitting || capturing || store.changingSession" @click="toolAction('new')"><SquarePen :size="16" :stroke-width="1.7" /></button>
+              <button type="button" class="tool-button" title="去聊天详情页" aria-label="去聊天详情页" data-testid="assistant-expand" @click="toolAction('chat')"><PanelsTopLeft :size="16" :stroke-width="1.7" /></button>
               <button type="button" class="tool-button" title="选择文件" aria-label="选择文件" data-testid="assistant-add-image" :disabled="!canAttach || store.attachments.length >= 8" @click="toolAction('image')"><Paperclip :size="16" :stroke-width="1.7" /></button>
               <button type="button" class="tool-button" title="截图" aria-label="截图" data-testid="assistant-screenshot" :disabled="!canAttach || store.attachments.length >= 8" @click="toolAction('screenshot')"><Scissors :size="16" :stroke-width="1.7" /></button>
             </div>
@@ -427,6 +437,7 @@ onBeforeUnmount(()=>{
           </div>
         </div>
         <p v-if="dropActive || imageReading || capturing" class="image-status" aria-live="polite">{{ capturing ? '截图中，按 Esc 可以取消' : imageReading ? '正在读取附件…' : '松开添加附件' }}</p>
+        <p v-else-if="store.voiceStatus" class="image-status" data-testid="assistant-voice-status" role="status">{{ store.voiceStatus }}</p>
         </div>
         <span class="sr" aria-live="polite">{{ store.status }}</span>
       </div>
@@ -573,4 +584,5 @@ html,body,#app{background:transparent!important}
 <style scoped>
 .card-footer{display:flex;justify-content:flex-end;padding:0 12px 9px}.copy-answer{display:inline-flex;align-items:center;gap:5px;padding:4px 7px;border:0;border-radius:7px;background:transparent;color:var(--text-soft);font:inherit;font-size:11px;line-height:1.5;cursor:pointer}.copy-answer:hover{background:var(--button-hover);color:var(--text)}.copy-answer:focus-visible{outline:2px solid var(--link);outline-offset:1px}.copy-answer:disabled{opacity:.5;cursor:default}
 </style>
+
 

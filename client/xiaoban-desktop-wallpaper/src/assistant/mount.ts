@@ -15,7 +15,7 @@ export async function mountAssistant() {
   document.body.className = 'assistant';
   const host = document.querySelector<HTMLElement>('#app');
   if (!host) throw new Error('超级小伴的挂载节点不存在');
-  // This window has no toast area: what the stores would announce is shown as the capsule's hint instead.
+  // Chat and playback notices use the reply card; recording notices are temporary.
   const notify = (message: unknown, type: 'success' | 'error' | 'info' = 'success') => {
     if (type !== 'success') assistant.note(message instanceof Error ? message.message : String(message));
   };
@@ -25,7 +25,9 @@ export async function mountAssistant() {
     onReply: (session, text, key) => assistant.replied(session, text, key),
     onActivity: () => assistant.stopped(),
   });
-  const asr = createAsrStore({ desktop, invoke, listen, notify });
+  const asr = createAsrStore({ desktop, invoke, listen, notify: (message, type = 'success') => {
+    if (type !== 'success') assistant.noteVoice(message instanceof Error ? message.message : String(message));
+  } });
   const speech = createSpeechStore({ desktop, invoke, notify });
   assistant = createAssistantStore({ desktop, invoke, listen, chat, asr, speech, onAppearance: followHost });
   const app = createApp(AssistantApp, { store: assistant, asr });
@@ -33,3 +35,4 @@ export async function mountAssistant() {
   window.addEventListener('beforeunload', () => { assistant.dispose(); app.unmount(); }, { once: true });
   await assistant.init();
 }
+

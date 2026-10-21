@@ -16,9 +16,10 @@ beforeEach(()=>{vi.clearAllMocks();vi.mocked(invoke).mockReset().mockResolvedVal
 afterEach(() => { wrappers.splice(0).forEach(w => w.unmount());document.body.replaceChildren();vi.useRealTimers(); });
 function setup() {
   const store = reactive({ open: true, ball: false, phase: 'answering', hint: '', hintTab: '', question: '今天如何放松', answer: '可以先休息片刻。', working: '', failure: '', approval: null as null | { id: string; arguments: {}; tool: string }, ask: null, attachments: [] as string[], questionImages: [] as string[], prepareImages: vi.fn(), inputStarted: vi.fn(), note: vi.fn(), input: '草稿', status: '正在回答…', hide: vi.fn(), submit: vi.fn(), interrupt: vi.fn(), openChat: vi.fn(),newConversation:vi.fn(),openSettings:vi.fn(),toggleListening:vi.fn(),unfold:vi.fn() });
-  const wrapper=mount(AssistantApp,{attachTo:document.body,props:{store:store as unknown as AssistantStore,asr:{level:0} as AsrStore},global:{stubs:{MarkdownView:true}}});
+  const asr=reactive({level:0,enabled:true,microphoneSupported:true,listening:false,preparing:false,recordingRequested:false,microphoneError:''});
+  const wrapper=mount(AssistantApp,{attachTo:document.body,props:{store:store as unknown as AssistantStore,asr:asr as AsrStore},global:{stubs:{MarkdownView:true}}});
   wrappers.push(wrapper);
-  return {store,wrapper};
+  return {store,asr,wrapper};
 }
 
 async function openToolbar(wrapper: ReturnType<typeof setup>['wrapper']) {
@@ -27,6 +28,13 @@ async function openToolbar(wrapper: ReturnType<typeof setup>['wrapper']) {
 }
 
 describe('assistant response card', () => {
+ it('uses actual capture state for the orb action and keeps typing available during preparation',async()=>{
+   const {store,asr,wrapper}=setup();store.phase='idle';await nextTick();const orb=wrapper.get('[data-testid="assistant-orb"]');
+   asr.enabled=false;await nextTick();expect(orb.attributes('aria-label')).toBe('开启语音输入');
+   asr.enabled=true;asr.preparing=true;await nextTick();expect(orb.attributes('aria-label')).toBe('正在准备语音输入');expect(wrapper.get('[data-testid="assistant-input"]').attributes('disabled')).toBeUndefined();
+   asr.preparing=false;asr.recordingRequested=true;await nextTick();expect(orb.attributes('aria-label')).toBe('取消语音启动');
+   asr.listening=true;await nextTick();expect(orb.attributes('aria-label')).toBe('停止聆听');
+ });
   it.each(['enter','button'])('can send during readout using %s without stopping on edit',async method=>{
     const {store,wrapper}=setup();store.phase='speaking';store.input='';await nextTick();
     const field=wrapper.get('[data-testid="assistant-input"]');await field.setValue('新的问题');
@@ -281,3 +289,4 @@ it('accepts a document drop in the capsule and renders a removable named card', 
   expect(wrapper.get('[data-testid="assistant-attachments"]').text()).toContain('预算.csv');
   await wrapper.get('[aria-label="移除附件 1"]').trigger('click');expect(store.attachments).toHaveLength(0);
 });
+
