@@ -1,7 +1,7 @@
 //! Skill acquisition policy: search only for a user request or a justified capability gap.
 //! This middleware does not install anything and cannot grant script execution permission.
 use agent_kernel::{
-    FinishReason, Message, Middleware, Nudge, Role, Stop, StopDecision, ToolCall, ToolCtx,
+    FinishReason, Middleware, Nudge, Role, Stop, StopDecision, ToolCall, ToolCtx,
     ToolGate, ToolResult, ToolSpec, Turn,
 };
 use serde_json::Value;
