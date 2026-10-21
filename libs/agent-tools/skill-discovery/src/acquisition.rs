@@ -126,6 +126,14 @@ impl Middleware for AcquisitionPolicy {
         if keyword.len() < 2 || keyword.len() > 80 {
             return ToolGate::Block("Skill search keyword must be 2–80 characters.".into());
         }
+        let page = match args.get("page") {
+            None => 1,
+            Some(v) => match v.as_u64().filter(|p| (1..=5).contains(p)) {
+                Some(n) => n,
+                None => return ToolGate::Block("Skill search page must be 1–5.".into()),
+            },
+        };
+        let search_key = format!("{keyword}#{page}");
         let explicit = user_requests_skill(&state.user_text);
         if !explicit {
             let reason = args.get("reason").and_then(Value::as_str).unwrap_or("");
@@ -156,13 +164,13 @@ impl Middleware for AcquisitionPolicy {
                 }
             }
         }
-        if state.searched.contains(&keyword) {
-            return ToolGate::Block("Already searched this keyword in the current task; inspect results or try an existing tool instead.".into());
+        if state.searched.contains(&search_key) {
+            return ToolGate::Block("Already searched this keyword and page in the current task; inspect results or choose a different page.".into());
         }
         if state.searched.len() >= MAX_SEARCHES_PER_TASK {
-            return ToolGate::Block("Skill search budget reached (three distinct searches per task). Compare existing candidates or ask the user.".into());
+            return ToolGate::Block("Skill search budget reached (three pages or searches per task). Compare existing candidates or ask the user.".into());
         }
-        state.searched.insert(keyword);
+        state.searched.insert(search_key);
         ToolGate::Proceed
     }
 
@@ -219,6 +227,17 @@ mod tests {
         let policy = policy_with_task("帮我找一个处理 Excel 的 Skill");
         assert!(is_allowed(search(&policy, serde_json::json!({"keyword":"Excel"}))));
         assert!(!is_allowed(search(&policy, serde_json::json!({"keyword":"excel"}))));
+    }
+
+    #[test]
+    fn repeated_keywords_allow_limited_pagination_not_duplicate_pages() {
+        let policy = policy_with_task("帮我找一个 Excel Skill");
+        assert!(is_allowed(search(&policy, serde_json::json!({"keyword":"excel"}))));
+        assert!(is_allowed(search(&policy, serde_json::json!({"keyword":"excel","page":2}))));
+        assert!(!is_allowed(search(&policy, serde_json::json!({"keyword":"excel","page":2}))));
+        assert!(!is_allowed(search(&policy, serde_json::json!({"keyword":"excel","page":6}))));
+        assert!(is_allowed(search(&policy, serde_json::json!({"keyword":"excel","page":3}))));
+        assert!(!is_allowed(search(&policy, serde_json::json!({"keyword":"excel","page":4}))));
     }
 
     #[test]

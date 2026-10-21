@@ -117,9 +117,19 @@ pub async fn ai_store_installed(app: tauri::AppHandle, window: tauri::WebviewWin
 }
 
 #[tauri::command]
-pub async fn ai_store_browse(window: tauri::WebviewWindow, keyword: String, page: u32) -> Result<Value, String> {
+pub async fn ai_store_skill_categories(window: tauri::WebviewWindow) -> Result<Value, String> {
     control(&window)?;
-    tauri::async_runtime::spawn_blocking(move || SkillDiscovery::browse(&keyword, page))
+    tauri::async_runtime::spawn_blocking(SkillDiscovery::categories)
+        .await.map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+pub async fn ai_store_browse(
+    window: tauri::WebviewWindow, keyword: String, page: u32,
+    category: String, source: String, sort_by: String,
+) -> Result<Value, String> {
+    control(&window)?;
+    tauri::async_runtime::spawn_blocking(move || SkillDiscovery::browse(&keyword, page, &category, &source, &sort_by))
         .await.map_err(|e| e.to_string())?
 }
 

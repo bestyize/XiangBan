@@ -137,20 +137,56 @@ fn validate_registry_skill(slug:&str,raw:&[u8],expected:&str,metadata:Option<&Va
     Ok(text.to_string())
 }
 
+
+const SKILL_SORTS: &[&str] = &["score", "downloads", "stars", "installs", "updated_at"];
+
+fn valid_category(key: &str) -> bool {
+    key.len() <= 80 && key.bytes().all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-')
+}
+fn validate_browse_filters(category: &str, source: &str, sort_by: &str) -> Result<(), String> {
+    if !valid_category(category) || !matches!(source, "" | "official" | "community")
+        || !SKILL_SORTS.contains(&sort_by) {
+        return Err("invalid SkillHub category, source or sort".into());
+    }
+    Ok(())
+}
+fn normalize_skill_categories(raw: &Value) -> Result<Value, String> {
+    let entries = raw["items"].as_array().ok_or("SkillHub categories response is invalid")?;
+    let mut result = Vec::new();
+    for item in entries {
+        if item["active"] == false || item["level"].as_u64() != Some(1) { continue; }
+        let key = item["key"].as_str().ok_or("SkillHub category key missing")?;
+        let name = item["name"].as_str().ok_or("SkillHub category name missing")?;
+        if key.is_empty() || !valid_category(key) || name.trim().is_empty() {
+            return Err("SkillHub category dictionary contains invalid entries".into());
+        }
+        result.push(json!({"key": key, "name": name}));
+    }
+    if result.is_empty() { return Err("SkillHub returned no active categories".into()); }
+    Ok(json!({"results": result}))
+}
+
 pub struct SkillDiscovery { root: PathBuf, workspace: PathBuf }
 impl SkillDiscovery {
     pub fn new(root: PathBuf, workspace: PathBuf) -> Self { Self { root, workspace } }
     /// Product UI browsing; no model invocation or installation is involved.
-    pub fn browse(keyword: &str, page: u32) -> Result<Value, String> {
+    pub fn browse(keyword: &str, page: u32, category: &str, source: &str, sort_by: &str) -> Result<Value, String> {
         let keyword = keyword.trim();
         if keyword.chars().count() > 80 || !(1..=1000).contains(&page) {
             return Err("invalid SkillHub query/page".into());
         }
+        validate_browse_filters(category, source, sort_by)?;
         let page_text = page.to_string();
+        // Category and source are independent API filters, never concatenated to a search term.
         let url = endpoint("/api/skills", &[("keyword", keyword), ("page", &page_text),
-            ("pageSize", "24"), ("sortBy", "downloads"), ("order", "desc")])?;
+            ("pageSize", "24"), ("category", category), ("source", source),
+            ("sortBy", sort_by), ("order", "desc")])?;
         let result = json_url(&url)?;
         browse_result(&result, page)
+    }
+    /// Read live publisher categories; category IDs may change upstream.
+    pub fn categories() -> Result<Value, String> {
+        normalize_skill_categories(&json_url(&endpoint("/api/v1/categories", &[])?)?)
     }
     /// UI callers must display this review before offering an install confirmation.
     pub fn inspect(&self, slug: &str, version: &str) -> Result<Value, String> {
@@ -192,6 +228,8 @@ impl SkillDiscovery {
                 let schema = match name {
                     "skill_search" => json!({"type":"object","properties":{
                         "keyword":{"type":"string","minLength":2,"maxLength":80},
+                        "page":{"type":"integer","minimum":1,"maximum":5,"description":"Result page, 1–5. Review the first page before fetching more."},
+                        "sortBy":{"type":"string","enum":["score","downloads","stars","installs","updated_at"]},
                         "reason":{"type":"string","enum":["capability_gap","repeated_failure"],"description":"For proactive searches only; omit when user explicitly asks for Skill discovery."},
                         "gap":{"type":"string","description":"Specific capability unavailable among installed tools and skills; required for proactive discovery."},
                         "alternatives":{"type":"string","description":"Existing tools/skills considered and why they cannot solve the task; required for proactive discovery."}
@@ -229,14 +267,24 @@ impl DiscoveryTool {
         if self.spec.name == "skill_search" {
             let keyword = args["keyword"].as_str().ok_or("keyword required")?.trim();
             if keyword.len() < 2 || keyword.len() > 80 { return Err("invalid keyword".into()); }
-            let url = endpoint("/api/skills", &[("keyword", keyword), ("pageSize", "10")])?;
+            let page = args.get("page").map(Value::as_u64).unwrap_or(Some(1))
+                .filter(|p| (1..=5).contains(p)).ok_or("Skill search page must be 1–5")?;
+            let sort_by = args["sortBy"].as_str().unwrap_or("score");
+            validate_browse_filters("", "", sort_by)?;
+            let page_text = page.to_string();
+            let url = endpoint("/api/skills", &[("keyword", keyword), ("page", &page_text),
+                ("pageSize", "20"), ("sortBy", sort_by), ("order", "desc")])?;
             let j = json_url(&url)?;
             let items = j["data"]["skills"].as_array().ok_or("invalid SkillHub search response")?;
-            return Ok(json!({"provider":"skillhub","results":items.iter().take(10).map(|s|json!({
-                "slug":s["slug"],"name":s["name"],"version":s["version"],"namespace":s["namespace"]["handle"].as_str().or(s["namespace"].as_str()),
-                "description":s["description_zh"].as_str().or(s["description"].as_str()).unwrap_or(""),
-                "homepage":s["homepage"]
-            })).collect::<Vec<_>>()}).to_string());
+            let total = j["data"]["total"].as_u64();
+            return Ok(json!({"provider":"skillhub","page":page,"total":total,
+                "hasMore":total.map(|n| page*20<n).unwrap_or(items.len()>=20),
+                "results":items.iter().take(20).map(|s|json!({
+                    "slug":s["slug"],"name":s["name"],"version":s["version"],
+                    "namespace":skill_namespace(s),"source":s["source"],
+                    "description":s["description_zh"].as_str().or(s["description"].as_str()).unwrap_or(""),
+                    "homepage":s["homepage"]
+                })).collect::<Vec<_>>()}).to_string());
         }
         let slug = args["slug"].as_str().ok_or("slug required")?;
         let version = args["version"].as_str().ok_or("version required")?;
@@ -294,12 +342,17 @@ impl DiscoveryTool {
             package.files.len(), package.files.iter().filter(|f| is_script(&f.path)).count(), package.sha256))
     }
 }
+fn skill_namespace(skill: &Value) -> Option<&str> {
+    skill["namespace"]["handle"].as_str().filter(|s| catalog::valid_namespace(s))
+        .or_else(|| skill["namespace"].as_str().filter(|s| catalog::valid_namespace(s)))
+        .or_else(|| skill["ownerName"].as_str().filter(|s| catalog::valid_namespace(s)))
+}
 fn browse_result(result: &Value, page: u32) -> Result<Value, String> {
     let items = result["data"]["skills"].as_array().ok_or("invalid SkillHub browse response")?;
     let total = result["data"]["total"].as_u64();
     let results = items.iter().take(24).map(|s| json!({
-        "slug":s["slug"], "name":s["name"], "version":s["version"],"namespace":s["namespace"]["handle"].as_str().or(s["namespace"].as_str()),
-        "iconUrl":s["iconUrl"],
+        "slug":s["slug"], "name":s["name"], "version":s["version"],"namespace":skill_namespace(s),
+        "iconUrl":s["iconUrl"],"source":s["source"],"downloads":s["downloads"],"stars":s["stars"],
         "description":s["description_zh"].as_str().or(s["description"].as_str()).unwrap_or("")
     })).collect::<Vec<_>>();
     Ok(json!({"results":results, "page":page, "total":total,
@@ -318,6 +371,34 @@ mod tests {
         assert!(validate_registry_file_count(&json!({"files":[]}),0).is_ok());
     }
 
+    #[test]
+    fn categories_use_real_registry_ids_and_skip_inactive_entries() {
+        let raw=json!({"items":[
+            {"key":"office-efficiency","name":"办公效率","level":1,"active":true},
+            {"key":"content-creation","name":"内容创作","level":1,"active":true},
+            {"key":"obsolete","name":"停用","level":1,"active":false},
+            {"key":"sub","name":"二级","level":2,"active":true}]});
+        let v=normalize_skill_categories(&raw).unwrap();
+        assert_eq!(v["results"].as_array().unwrap().len(),2);
+        assert_eq!(v["results"][0]["key"],"office-efficiency");
+        assert!(normalize_skill_categories(&json!({"items":[]})).is_err());
+    }
+    #[test]
+    fn skill_search_filters_and_pagination_are_independent() {
+        assert!(validate_browse_filters("office-efficiency","official","score").is_ok());
+        assert!(validate_browse_filters("办公","community","downloads").is_err());
+        assert!(validate_browse_filters("","third-party","score").is_err());
+        assert!(validate_browse_filters("","","bogus").is_err());
+        let v=browse_result(&json!({"data":{"total":49,"skills":[{
+            "slug":"demo-skill","name":"Demo","version":"1.0","ownerName":"publisher",
+            "source":"official","category":"office-efficiency","downloads":17
+        }]}}),2).unwrap();
+        assert_eq!(v["hasMore"],true);
+        assert_eq!(v["results"][0]["namespace"],"publisher");
+        assert_eq!(v["results"][0]["source"],"official");
+        assert_eq!(v["results"][0]["downloads"],17);
+        assert_eq!(skill_namespace(&json!({"namespace":{"handle":"../unsafe"},"ownerName":"safe-publisher"})),Some("safe-publisher"));
+    }
     #[test]
     fn resolves_default_publisher_before_pinning_files_and_downloads(){
         let detail=json!({"skill":{"slug":"demo-skill"},"namespace":{"handle":"actual-publisher"}});
