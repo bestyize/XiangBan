@@ -126,19 +126,25 @@ pub(crate) fn verified_files(slug: &str, plan: &Plan, archive: &[u8]) -> Result<
     if zip.len() > MAX_FILES * 3 {
         return Err("SkillHub archive has too many entries".into());
     }
-    // Support root-level archives and the common slug/ directory wrapper.
-    let wrapper = if (0..zip.len()).any(|n| zip.by_index(n).is_ok_and(|f| f.name() == "SKILL.md")) {
-        ""
+    // ZIPs may have no wrapper or one enclosing folder (slug or slug-version).
+    // Never strip more than one component; every file still needs a manifest match.
+    let prefix = if (0..zip.len()).any(|n| zip.by_index(n).is_ok_and(|f| f.name() == "SKILL.md")) {
+        String::new()
     } else {
-        let candidate = format!("{slug}/SKILL.md");
-        if !(0..zip.len()).any(|n| zip.by_index(n).is_ok_and(|f| f.name() == candidate)) {
-            return Err("SkillHub zip must contain SKILL.md at root or under its slug".into());
+        let mut roots = Vec::new();
+        for n in 0..zip.len() {
+            let entry = zip.by_index(n).map_err(|e| e.to_string())?;
+            if let Some(root) = entry.name().strip_suffix("/SKILL.md") {
+                if !root.contains('/') && valid_path(root) {
+                    roots.push(root.to_string());
+                }
+            }
         }
-        // Prefix matching below is exact and cannot swallow an unrelated file.
-        // Retain ownership of the wrapper string.
-        "slug/"
+        if roots.len() != 1 {
+            return Err("SkillHub zip must contain SKILL.md at root or under one folder".into());
+        }
+        format!("{}/", roots[0])
     };
-    let prefix = if wrapper.is_empty() { String::new() } else { format!("{slug}/") };
     let listed: BTreeMap<&str, &Item> = plan.files.iter().map(|f| (f.path.as_str(), f)).collect();
     let mut found = BTreeMap::new();
     let mut total = 0u64;
