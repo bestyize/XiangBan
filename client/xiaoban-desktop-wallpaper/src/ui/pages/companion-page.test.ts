@@ -36,6 +36,7 @@ describe('theme-based desktop pet library',()=>{
   vi.mocked(invoke).mockImplementation((async(command:string,args?:{settings?:unknown})=>{
     if(command==='get_proactivity_settings')return {enabled:false,frequency:'natural',contextEnabled:false,calendarRegion:null};
     if(command==='configure_proactivity')return args?.settings;
+    if(command==='get_proactivity_context')return {temporal:{localDay:20261021,hour:10,minute:20},calendar:{dayKind:'workday'},weather:{condition:'rain'},activity:{mode:'available'}};
     return undefined;
   }) as typeof invoke);
   const {view}=setup(true);await flushPromises();await tab(view,'桌面伙伴');
@@ -45,6 +46,10 @@ describe('theme-based desktop pet library',()=>{
   const region=view.findAllComponents(NSelect).find(c=>c.attributes('data-testid')==='pet-proactivity-calendar')!;
   region.vm.$emit('update:value','CN');await flushPromises();
   expect(invoke).toHaveBeenCalledWith('configure_proactivity',{settings:{enabled:false,frequency:'natural',contextEnabled:true,calendarRegion:'CN'}});
+  await view.get('[data-testid="pet-inspect-context"]').trigger('click');await flushPromises();
+  expect(invoke).toHaveBeenCalledWith('get_proactivity_context');
+  expect(view.get('[data-testid="pet-context-summary"]').text()).toContain('工作日');
+  expect(view.get('[data-testid="pet-context-summary"]').text()).toContain('雨');
   view.unmount();
  });
  it('shows official families and their members instead of a single active skin',async()=>{const {view}=setup();await flushPromises();expect(view.text()).toContain('官方主题');expect(view.text()).toContain('自定义主题');for(const name of ['花朵心语','多肉点点'])expect(view.text()).toContain(name);expect(view.findAll('.pet-theme-card')).toHaveLength(0);expect(view.text()).not.toContain('新宠物放在');expect(view.findAll('.pet-theme-detail').map(s=>s.find('h2').text())).toEqual(['花朵心语4 款宠物','多肉点点3 款宠物']);expect(view.find('[data-testid="pet-add-jade"]').exists()).toBe(true);expect(view.find('[data-testid="pet-add-daisy"]').exists()).toBe(true);expect(view.find('[data-testid="desktop-pets"]').exists()).toBe(false);expect(view.findAll('.n-tabs-tab').map(t=>t.text())).toEqual(['官方主题','自定义主题','桌面伙伴0']);view.unmount();});
