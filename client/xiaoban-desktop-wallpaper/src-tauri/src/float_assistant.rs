@@ -241,6 +241,26 @@ fn area_of(monitor: &tauri::Monitor) -> Area {
     Area { x: area.position.x, y: area.position.y, w: area.size.width as i32, h: area.size.height as i32 }
 }
 
+/// A monitor's full rectangle uses physical screen coordinates (not logical
+/// points or the work area, which excludes the Dock and menu bar).
+fn physical_monitor_area(monitor: &tauri::Monitor) -> Area {
+    let position = monitor.position();
+    let size = monitor.size();
+    Area { x: position.x, y: position.y, w: size.width as i32, h: size.height as i32 }
+}
+
+fn contains_physical_point(area: Area, x: f64, y: f64) -> bool {
+    x >= f64::from(area.x) && x < f64::from(area.x) + f64::from(area.w)
+        && y >= f64::from(area.y) && y < f64::from(area.y) + f64::from(area.h)
+}
+
+/// Tauri's monitor_from_point can return None for valid macOS/Retina physical
+/// coordinates. Enumerate physical monitor rectangles instead.
+fn monitor_at_physical_point(app: &tauri::AppHandle, x: f64, y: f64) -> Result<Option<tauri::Monitor>, String> {
+    let monitors = app.available_monitors().map_err(|e| e.to_string())?;
+    Ok(monitors.into_iter().find(|monitor| contains_physical_point(physical_monitor_area(monitor), x, y)))
+}
+
 /// The left edge and the bottom edge of a capsule `width` wide, for the given usable area and offset. It always stays
 /// fully on the screen, so a spot saved on a bigger screen still works on a smaller one.
 fn anchor(area: Area, scale: f64, width: i32, min_height: i32, offset: Offset) -> (i32, i32) {
@@ -301,7 +321,10 @@ fn capsule_from_ball(area: Area, scale: f64, x: i32, y: i32, size: i32) -> (i32,
 }
 fn place_from_ball(app: &tauri::AppHandle, window: &WebviewWindow) -> Result<(), String> {
     let (x, y, size) = ball_target(app)?;
-    let monitor = app.monitor_from_point(f64::from(x + size / 2), f64::from(y + size / 2)).map_err(|e| e.to_string())?.ok_or("没有找到悬浮球所在显示器")?;
+    let monitor = monitor_at_physical_point(app, f64::from(x + size / 2), f64::from(y + size / 2))?
+        .or_else(|| window.current_monitor().ok().flatten())
+        .or_else(|| app.primary_monitor().ok().flatten())
+        .ok_or("没有找到可用显示器")?;
     let (x, y, width, height) = capsule_from_ball(area_of(&monitor), monitor.scale_factor(), x, y, size);
     window.set_position(PhysicalPosition::new(x, y)).map_err(|e| e.to_string())?;
     window.set_size(PhysicalSize::new(width as u32, height as u32)).map_err(|e| e.to_string())?;
@@ -313,7 +336,8 @@ fn place(app: &tauri::AppHandle, window: &WebviewWindow) -> Result<(), String> {
     let monitor = app
         .cursor_position()
         .ok()
-        .and_then(|point| app.monitor_from_point(point.x, point.y).ok().flatten())
+        .and_then(|point| monitor_at_physical_point(app, point.x, point.y).ok().flatten())
+        .or_else(|| app.get_webview_window(LABEL).and_then(|window| window.current_monitor().ok().flatten()))
         .or_else(|| app.primary_monitor().ok().flatten())
         .ok_or("没有找到显示器")?;
     let scale = monitor.scale_factor();
@@ -394,7 +418,7 @@ fn announce(app: &tauri::AppHandle, window: &WebviewWindow) {
 fn ball_target(app: &tauri::AppHandle) -> Result<(i32, i32, i32), String> {
     let seen = *app.state::<AssistantState>().ball_at.lock().unwrap();
     if let Some((x, y)) = seen {
-        if let Ok(Some(monitor)) = app.monitor_from_point(f64::from(x) + 1.0, f64::from(y) + 1.0) {
+        if let Ok(Some(monitor)) = monitor_at_physical_point(app, f64::from(x) + 1.0, f64::from(y) + 1.0) {
             let size = (BALL_WINDOW * monitor.scale_factor()).round() as i32;
             let (x, y) = keep_inside(area_of(&monitor), x, y, size);
             return Ok((x, y, size));
@@ -830,6 +854,22 @@ mod tests {
     fn only_the_assistant_can_request_a_screen_capture() {
         assert_eq!(permitted(LABEL, "assistant_screenshot"), Some(true));
         for label in ["control", "pet", "widget-example", "content"] { assert_eq!(permitted(label, "assistant_screenshot"), Some(false)); }
+    }
+
+    #[test]
+    fn physical_display_lookup_handles_retina_and_multiple_monitors() {
+        // Regression: Tauri's monitor_from_point returned None on macOS for
+        // physical coordinates on a Retina external monitor.
+        let external = Area { x: 0, y: 0, w: 3840, h: 2160 };
+        let laptop = Area { x: 350, y: 2160, w: 3024, h: 1964 };
+        let left = Area { x: -1920, y: 0, w: 1920, h: 1080 };
+        assert!(contains_physical_point(external, 1512.0, 534.0));
+        assert!(contains_physical_point(external, 3839.0, 2159.0));
+        assert!(!contains_physical_point(external, 3840.0, 10.0));
+        assert!(contains_physical_point(laptop, 500.0, 2774.0));
+        assert!(!contains_physical_point(external, 500.0, 2774.0));
+        assert!(contains_physical_point(left, -1.0, 300.0));
+        assert!(!contains_physical_point(left, 0.0, 300.0));
     }
 
     #[test]
