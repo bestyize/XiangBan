@@ -87,7 +87,7 @@ dependencies = [
  "reqwest",
  "serde_json",
  "sha2",
- "zip",
+ "zip 9.0.4",
 ]
 
 [[package]]
