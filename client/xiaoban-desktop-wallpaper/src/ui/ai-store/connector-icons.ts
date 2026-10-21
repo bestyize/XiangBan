@@ -9,4 +9,3 @@ slack:svg('<rect x="12" y="1" width="7" height="15" rx="3.5" fill="#36c5f0"/><re
 gmail:svg('<path d="M4 27V9l14 11L32 9v18" fill="none" stroke="#ea4335" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 10v18" stroke="#4285f4" stroke-width="5"/><path d="M32 10v18" stroke="#34a853" stroke-width="5"/>'),
 linear:svg('<circle cx="18" cy="18" r="15" fill="#5e6ad2"/><path d="M6 12 24 30M9 8l19 19M13 5l18 18" stroke="#fff" stroke-width="2.4" stroke-linecap="round"/>')};
 export function connectorIcon(id: string) { return "data:image/svg+xml," + encodeURIComponent(marks[id] ?? ""); }
-

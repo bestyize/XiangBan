@@ -27,4 +27,3 @@ export interface SkillReview {
   manifest: { version: string; fileCount: number; totalBytes: number; files: { path: string; size: number; sha256: string; executableScript: boolean }[] };
   scripts: { path: string; sha256: string; preview: string | null; previewTruncated: boolean }[];
 }
-

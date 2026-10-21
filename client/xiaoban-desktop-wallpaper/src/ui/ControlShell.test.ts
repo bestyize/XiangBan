@@ -247,4 +247,3 @@ describe('ControlShell sidebar', () => {
     quiet.unmount();
   });
 });
-
