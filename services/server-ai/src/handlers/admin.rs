@@ -290,6 +290,8 @@ pub async fn list_tiers(State(state): State<AppState>, _admin: AuthAdmin, Path(p
 
 #[derive(Deserialize)]
 pub struct TierReq {
+    #[serde(default)]
+    reasoning_efforts: Option<Vec<String>>,
     display_name: String,
     #[serde(default)]
     description: String,
@@ -308,6 +310,9 @@ pub async fn upsert_tier(
 ) -> Result<Json<Value>, AppError> {
     if !products::valid_slug(&tier) {
         return Err(AppError::BadRequest("档位标识需为小写字母开头，由小写字母、数字、连字符或下划线组成，最长 40 位".into()));
+    }
+    if req.reasoning_efforts.as_ref().is_some_and(|v| !crate::reasoning::valid(v)) {
+        return Err(AppError::BadRequest("思考等级必须是不重复的 low、medium、high、xhigh、max".into()));
     }
     let display_name = req.display_name.trim().to_string();
     if display_name.is_empty() || display_name.chars().count() > 20 {
@@ -349,10 +354,10 @@ pub async fn upsert_tier(
             .await?;
     }
     sqlx::query(
-        "INSERT INTO product_tiers (product_id, tier, display_name, description, model, requires_paid, is_default, sort_order, enabled)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        "INSERT INTO product_tiers (product_id, tier, display_name, description, model, requires_paid, is_default, sort_order, enabled, reasoning_efforts)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
          ON CONFLICT (product_id, tier) DO UPDATE SET display_name = $3, description = $4, model = $5,
-             requires_paid = $6, is_default = $7, sort_order = $8, enabled = $9, updated_at = now()",
+             requires_paid = $6, is_default = $7, sort_order = $8, enabled = $9, reasoning_efforts = $10, updated_at = now()",
     )
     .bind(&product_id)
     .bind(&tier)
@@ -363,6 +368,7 @@ pub async fn upsert_tier(
     .bind(req.is_default)
     .bind(req.sort_order)
     .bind(req.enabled)
+    .bind(&req.reasoning_efforts)
     .execute(&mut *tx)
     .await?;
     tx.commit().await?;

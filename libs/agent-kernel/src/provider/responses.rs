@@ -3,8 +3,8 @@
 //! Stateless: the whole conversation is sent as `input` on every call, and `store` is false unless
 //! `extra_body` says otherwise. Request and stream formats are written from the public protocol
 //! description and checked only against local fake servers, not against a live endpoint.
-//! Not supported: reasoning items (they are not carried between turns), built-in tools such as
-//! web search, `previous_response_id`.
+//! Reasoning items are retained as opaque protocol state across tool calls.
+//! Not supported: built-in tools such as web search, `previous_response_id`.
 
 use super::wire::ProviderProfile;
 use super::{ChatRequest, Reply};
@@ -53,6 +53,9 @@ pub fn build_request_body(profile: &ProviderProfile, request: &ChatRequest) -> V
                 }
             }
             Role::Assistant => {
+                if let Some(items) = super::wire::matching_state(message, profile, "responses").and_then(|s| s["items"].as_array()) {
+                    input.extend(items.iter().filter(|item| item["type"] == "reasoning").cloned());
+                }
                 let text = message.text();
                 if !text.trim().is_empty() {
                     input.push(json!({ "role": "assistant", "content": text }));
@@ -109,6 +112,7 @@ struct PartialCall {
 pub struct ResponsesStream {
     text: String,
     calls: Vec<Option<PartialCall>>,
+    reasoning: std::collections::BTreeMap<usize, Value>,
     usage: Option<Usage>,
     finish: FinishReason,
     done: bool,
@@ -169,6 +173,11 @@ impl ResponsesStream {
             }
             "response.output_item.done" => {
                 let item = event.get("item").unwrap_or(&Value::Null);
+                if item["type"] == "reasoning" {
+                    if let Some(i) = event["output_index"].as_u64().filter(|i| *i < MAX_ITEMS as u64) {
+                        self.reasoning.insert(i as usize, item.clone());
+                    }
+                }
                 if item.get("type").and_then(Value::as_str) == Some("function_call") {
                     if let Some(call) = self.call_slot(event) {
                         for (field, key) in [(&mut call.call_id, "call_id"), (&mut call.name, "name"), (&mut call.item_id, "id")] {
@@ -234,6 +243,11 @@ impl ResponsesStream {
     /// Some gateways only send the final `response` object. If nothing arrived incrementally,
     /// take the content from its `output` list.
     fn reconcile(&mut self, response: &Value, on_text: &mut dyn FnMut(&str)) {
+        for (i, item) in response.get("output").and_then(Value::as_array).into_iter().flatten().take(MAX_ITEMS).enumerate() {
+            if item["type"] == "reasoning" && item["status"] != "in_progress" && item["status"] != "incomplete" {
+                self.reasoning.insert(i, item.clone());
+            }
+        }
         let has_calls = self.calls.iter().any(Option::is_some);
         if !self.text.is_empty() || has_calls {
             return;
@@ -278,7 +292,11 @@ impl ResponsesStream {
             })
             .collect();
         let finish = self.finish.settle(!calls.is_empty());
-        Reply { message: Message::assistant(self.text, calls), usage: self.usage, finish }
+        let mut message = Message::assistant(self.text, calls);
+        if !self.reasoning.is_empty() {
+            message.provider_state = Some(json!({"protocol":"responses", "items":self.reasoning.into_values().collect::<Vec<_>>()}));
+        }
+        Reply { message, usage: self.usage, finish }
     }
 }
 
@@ -332,7 +350,9 @@ mod client {
             let call = Call { url: endpoint_url(&self.profile.base_url), headers: http::merge_headers(headers, &self.profile.extra_headers), body };
             let mut decoder = ResponsesStream::default();
             http::post_stream(&self.client, call, &mut decoder, on_text, cancel)?;
-            Ok(decoder.finish())
+            let mut reply = decoder.finish();
+            super::super::wire::bind_state(&mut reply.message, &self.profile);
+            Ok(reply)
         }
     }
 }

@@ -105,7 +105,7 @@ fn cancel_returns_promptly_while_the_server_stalls() {
 
 #[test]
 fn agent_runs_a_tool_round_trip_over_http() {
-    let call = r#"{"choices":[{"delta":{"tool_calls":[{"index":0,"id":"c1","function":{"name":"echo","arguments":"{\"x\":1}"}}]},"finish_reason":"tool_calls"}]}"#;
+    let call = r#"{"choices":[{"delta":{"reasoning_content":"opaque thought state","tool_calls":[{"index":0,"id":"c1","function":{"name":"echo","arguments":"{\"x\":1}"}}]},"finish_reason":"tool_calls"}]}"#;
     let (url, server) = serve(vec![sse(&[call, "[DONE]"]), sse(&HELLO)]);
     struct Echo(ToolSpec);
     impl Tool for Echo {
@@ -122,4 +122,5 @@ fn agent_runs_a_tool_round_trip_over_http() {
     assert_eq!((summary.text.as_str(), summary.turns), ("Hello", 2));
     let second = server.join().unwrap().remove(1);
     assert!(second.contains(r#""tool_call_id":"c1""#) && second.contains("echo 1"));
+    assert!(second.contains(r#""reasoning_content":"opaque thought state""#));
 }

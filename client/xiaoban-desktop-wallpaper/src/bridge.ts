@@ -37,16 +37,18 @@ export interface Settings {
 
 /** `chat` is /chat/completions, `responses` is /responses and `anthropic` is /v1/messages. */
 export type AiProtocol = "chat" | "responses" | "anthropic";
-export type AiReplyPreference = "default" | "faster" | "deeper";
+export type AiReplyPreference = "default" | "faster" | "medium" | "deeper" | "xhigh" | "max";
+export type AiReasoningEffort = "low" | "medium" | "high" | "xhigh" | "max";
 
 export type ProviderType = "third" | "free" | "paid" | "custom";
 export interface ProviderConfigView {
   maxOutputTokens?: number;
   replyPreference?: AiReplyPreference;
+  reasoningEfforts?: AiReasoningEffort[] | null;
   type?: ProviderType;
   remote?: boolean; available?: boolean; description?: string;
   defaultModel?: string;
-  models?: { id: string; name: string; description?: string; maxOutputTokens?: number | null }[];
+  models?: { id: string; name: string; description?: string; reasoningEfforts?: AiReasoningEffort[] | null; maxOutputTokens?: number | null }[];
   endpoints?: Partial<Record<AiProtocol, string>>;
   consoleUrl?: string; consoleText?: string;
   selectionMode?: "manual" | "recommended";
@@ -81,6 +83,8 @@ export interface AiConfigView {
   openComputerUse: boolean;
   /** The 小伴 AI tier picked in settings; only in use while `activeProvider` is the gateway. */
   gatewayTier?: string;
+  gatewayReplyPreference?: AiReplyPreference;
+  gatewayReasoningEfforts?: AiReasoningEffort[];
   /** False once the site has closed the 小伴 AI entry; missing means on. */
   gatewayEnabled?: boolean;
 }
@@ -167,6 +171,7 @@ export interface AiBalance {
 
 /** A model level the gateway offers. The real model behind it is never sent to the client. */
 export interface AiTier {
+  reasoningEfforts?: AiReasoningEffort[];
   tier: string;
   displayName: string;
   description: string;

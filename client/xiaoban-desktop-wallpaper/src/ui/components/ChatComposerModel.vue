@@ -2,7 +2,7 @@
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue';
 import { Check, ChevronDown, ChevronRight, Code2, Settings } from 'lucide-vue-next';
 import { GATEWAY_PROVIDER, invoke, toAccountError, type AiConfigView, type AiReplyPreference, type AiTier, type ProviderConfigView } from '../../bridge.ts';
-import { supportsReplyPreference } from '../ai-config.ts';
+import { providerReasoningLevels, preferenceOptions } from '../ai-config.ts';
 
 const props = defineProps<{ label: string; disabled?: boolean }>();
 const emit = defineEmits<{ switched: []; settings: [] }>();
@@ -30,21 +30,21 @@ type ReasoningTarget = { kind: 'model'; entry: ModelChoice } | { kind: 'gateway'
 const reasoningTarget = ref<ReasoningTarget | null>(null);
 const reasoningPanel = ref<HTMLElement | null>(null);
 const reasoningPosition = ref({ left: '0px', top: '0px', width: '210px', maxHeight: '300px' });
-const canTune = (entry: ModelChoice) => !(entry.provider.remote && entry.provider.type !== 'third')
-  && supportsReplyPreference(entry.provider.protocol, entry.provider.baseUrl, entry.model);
-const reasoningOptions = computed<{ value: AiReplyPreference; label: string }[]>(() => [
-  { value: 'default', label: '默认' },
-  ...(reasoningTarget.value?.kind === 'model' && canTune(reasoningTarget.value.entry)
-    ? [{ value: 'faster' as const, label: '低 · 更快' }, { value: 'deeper' as const, label: '高 · 更深入' }] : []),
-]);
-const reasoningNote = computed(() => reasoningTarget.value?.kind === 'gateway' ? '思考强度由小伴 AI 当前模式管理。'
-  : reasoningOptions.value.length === 1 ? '此模型服务暂未开放思考强度设置，使用默认配置。' : '选择强度后使用此模型。');
+const canTune = (entry: ModelChoice) => providerReasoningLevels(entry.provider, entry.model).length > 0;
+const reasoningOptions = computed(() => preferenceOptions(reasoningTarget.value?.kind === 'model'
+  ? providerReasoningLevels(reasoningTarget.value.entry.provider, reasoningTarget.value.entry.model)
+  : reasoningTarget.value?.tier.reasoningEfforts ?? []));
+const reasoningNote = computed(() => reasoningOptions.value.length === 1
+  ? reasoningTarget.value?.kind === 'gateway' ? '此模式尚未提供可选等级，请更新网关或由管理员配置。'
+    : reasoningTarget.value?.entry.provider.protocol === 'anthropic' ? '此协议暂未接入思考等级，可切换为 OpenAI 兼容协议。'
+    : '尚未识别此模型的等级，可在模型设置的高级设置中声明。'
+  : '默认沿用服务商设置。更高等级可能耗时更久、消耗更多额度。');
 const targetModel = (entry: ModelChoice) => reasoningTarget.value?.kind === 'model'
   && reasoningTarget.value.entry.provider.id === entry.provider.id && reasoningTarget.value.entry.model === entry.model;
 const targetTier = (tier: AiTier) => reasoningTarget.value?.kind === 'gateway' && reasoningTarget.value.tier.tier === tier.tier;
 function selectedStrength(value: AiReplyPreference) {
   const target = reasoningTarget.value;
-  return target?.kind === 'gateway' ? currentTier(target.tier) && value === 'default'
+  return target?.kind === 'gateway' ? currentTier(target.tier) && value === (config.value?.gatewayReplyPreference ?? 'default')
     : !!target && current(target.entry) && (canTune(target.entry) ? target.entry.provider.replyPreference ?? 'default' : 'default') === value;
 }
 let hoverTimer: ReturnType<typeof setTimeout> | undefined;
@@ -70,7 +70,7 @@ async function showReasoning(target: ReasoningTarget, event: Event, focus = fals
 async function chooseStrength(preference: AiReplyPreference) {
   const target = reasoningTarget.value;
   if (target?.kind === 'model') await choose(target.entry, preference);
-  else if (target?.kind === 'gateway') await chooseGateway(target.tier);
+  else if (target?.kind === 'gateway') await chooseGateway(target.tier, preference);
 }
 let generation = 0;
 function outside(e: PointerEvent) { if (root.value && !root.value.contains(e.target as Node) && !reasoningPanel.value?.contains(e.target as Node)) close(); }
@@ -96,17 +96,22 @@ async function toggle() {
     ]);
     if (id !== generation) return;
     if (refresh.status === 'fulfilled') config.value = refresh.value;
-    if (modes.status === 'fulfilled') tiers.value = modes.value;
+    if (modes.status === 'fulfilled') {
+      tiers.value = modes.value;
+      const latest = await invoke<AiConfigView>('get_ai_config');
+      if (id !== generation) return;
+      config.value = latest;
+    }
     else gatewayError.value = toAccountError(modes.reason).message;
   } catch (e) { if (id === generation) error.value = String(e); }
   finally { if (id === generation) busy.value = false; }
 }
-async function chooseGateway(tier: AiTier) {
+async function chooseGateway(tier: AiTier, preference?: AiReplyPreference) {
   if (busy.value || props.disabled || !tier.available || !gatewayEnabled.value) return;
-  if (currentTier(tier)) { close(); return; }
+  if (currentTier(tier) && (preference === undefined || preference === (config.value?.gatewayReplyPreference ?? 'default'))) { close(); return; }
   busy.value = true; error.value = '';
   try {
-    await invoke('use_ai_gateway', { tier: tier.tier });
+    await invoke('use_ai_gateway', { tier: tier.tier, ...(preference !== undefined ? { replyPreference: preference } : {}) });
     close();
     emit('switched');
   } catch (e) { error.value = toAccountError(e).message; }

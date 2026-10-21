@@ -149,11 +149,26 @@ async fn handle(api: Api, state: &AppState, auth: Result<AuthUser, AppError>, he
     }
 
     fields.insert("model".into(), Value::String(tier.model.clone()));
+    validate_reasoning(api, fields, &crate::reasoning::levels(&tier.model, tier.reasoning_efforts.as_deref()))?;
     sqlx::query("UPDATE bindings SET last_used_at = now() WHERE id = $1").bind(active.id).execute(&state.pool).await?;
 
     let payload = serde_json::to_vec(&request).map_err(|e| AppError::Internal(e.to_string()))?;
     let upstream = state.newapi.relay(api.path(), &active.key, payload, &forwarded_headers(api, headers)).await?;
     respond(upstream, &tier.tier).await
+}
+
+fn validate_reasoning(api: Api, fields: &Map<String, Value>, levels: &[String]) -> Result<(), AppError> {
+    let value = match api {
+        Api::Responses => fields.get("reasoning").and_then(|v| v.get("effort")),
+        Api::ChatCompletions => fields.get("reasoning_effort"),
+        Api::Messages => fields.get("output_config").and_then(|v| v.get("effort")),
+    };
+    if let Some(value) = value {
+        if !value.as_str().is_some_and(|s| levels.iter().any(|level| level == s)) {
+            return Err(AppError::Coded { status: StatusCode::BAD_REQUEST, code: "unsupported_reasoning_effort", message: "该模式不支持所选思考等级，请刷新模式列表后重试".into() });
+        }
+    }
+    Ok(())
 }
 
 async fn respond(upstream: reqwest::Response, tier: &str) -> Result<Response, AppError> {
@@ -468,5 +483,26 @@ mod tests {
         assert!(forwarded_headers(Api::Responses, &headers).is_empty());
         assert!(forwarded_headers(Api::ChatCompletions, &headers).is_empty());
         assert!(forwarded_headers(Api::Messages, &HeaderMap::new()).is_empty());
+    }
+}
+
+#[cfg(test)]
+mod reasoning_tests {
+    use super::*;
+    #[test]
+    fn effort_is_validated_for_each_protocol_without_rewriting_the_payload() {
+        let levels = vec!["low".into(), "high".into(), "max".into()];
+        for (api, payload) in [
+            (Api::Responses, json!({"reasoning":{"effort":"max"}})),
+            (Api::ChatCompletions, json!({"reasoning_effort":"high"})),
+            (Api::Messages, json!({"output_config":{"effort":"low"}})),
+        ] {
+            let fields = payload.as_object().unwrap();
+            assert!(validate_reasoning(api, fields, &levels).is_ok());
+            assert!(validate_reasoning(api, fields, &[]).is_err());
+            assert_eq!(Value::Object(fields.clone()), payload);
+        }
+        assert!(validate_reasoning(Api::Responses, json!({}).as_object().unwrap(), &[]).is_ok());
+        assert!(validate_reasoning(Api::ChatCompletions, json!({"reasoning_effort":123}).as_object().unwrap(), &levels).is_err());
     }
 }

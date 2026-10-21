@@ -126,6 +126,8 @@ pub async fn ai_gateway_redeem(app: tauri::AppHandle, code: String) -> Result<Re
 #[derive(Debug, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all(serialize = "camelCase", deserialize = "snake_case"))]
 pub struct Tier {
+    #[serde(default)]
+    pub reasoning_efforts: Vec<String>,
     pub tier: String,
     pub display_name: String,
     #[serde(default)]
@@ -139,7 +141,27 @@ pub struct Tier {
 #[tauri::command]
 pub async fn ai_gateway_tiers(app: tauri::AppHandle) -> Result<Vec<Tier>, AccountFailure> {
     let mut value = call(&app, reqwest::Method::GET, "/api/ai/tiers", None).await?;
-    serde_json::from_value(value["tiers"].take()).map_err(|_| AccountFailure::from("小伴 AI 服务返回的模式信息暂不支持，请更新客户端"))
+    let tiers: Vec<Tier> = serde_json::from_value(value["tiers"].take()).map_err(|_| AccountFailure::from("小伴 AI 服务返回的模式信息暂不支持，请更新客户端"))?;
+    for tier in &tiers { crate::ai_reasoning::validate(&tier.reasoning_efforts).map_err(AccountFailure::from)?; }
+    let path = ai_config::path(&app)?;
+    let state = app.state::<ai_config::AiConfigState>();
+    let mut changed = None;
+    let io = state.io.lock().unwrap();
+    let mut config = ai_config::load(&path).map_err(|e| e.to_string())?;
+    if is_active(&config) {
+        let levels = tiers.iter().find(|t| t.tier == config.gateway_tier).map(|t| t.reasoning_efforts.clone()).unwrap_or_default();
+        if config.gateway_reasoning_efforts != levels {
+            config.gateway_reasoning_efforts = levels;
+            if config.gateway_reply_preference.effort().is_some_and(|e| !config.gateway_reasoning_efforts.iter().any(|s| s == e)) {
+                config.gateway_reply_preference = Default::default();
+            }
+            ai_config::save(&path, &config).map_err(|e| e.to_string())?;
+            changed = Some(config.view(&ai_config::default_workspace(&app)?));
+        }
+    }
+    drop(io);
+    if let Some(view) = changed { ai_config::emit_changed(&app, &view); }
+    Ok(tiers)
 }
 
 fn clean_tier(raw: &str) -> Result<String, String> {
@@ -165,8 +187,10 @@ fn select(config: &mut AiConfig, tier: &str, base_url: &str) {
 }
 
 #[tauri::command]
-pub fn use_ai_gateway(app: tauri::AppHandle, tier: String) -> Result<AiConfigView, String> {
+pub async fn use_ai_gateway(app: tauri::AppHandle, tier: String, reply_preference: Option<crate::ai_reasoning::ReplyPreference>) -> Result<AiConfigView, String> {
     let tier = clean_tier(&tier)?;
+    let tiers = ai_gateway_tiers(app.clone()).await.map_err(|e| e.message)?;
+    let selected = tiers.iter().find(|t| t.tier == tier && t.available).ok_or("该模式暂不可用，请刷新后重试")?;
     let path = ai_config::path(&app)?;
     let view = {
         let state = app.state::<ai_config::AiConfigState>();
@@ -175,7 +199,13 @@ pub fn use_ai_gateway(app: tauri::AppHandle, tier: String) -> Result<AiConfigVie
         if !config.gateway_enabled {
             return Err("小伴 AI 入口已被关闭，暂时不能启用".into());
         }
+        let preference = reply_preference.unwrap_or(if config.gateway_tier == tier { config.gateway_reply_preference } else { Default::default() });
+        if preference.effort().is_some_and(|e| !selected.reasoning_efforts.iter().any(|s| s == e)) {
+            return Err("该模式未声明支持所选思考等级，请更新服务端或刷新模式列表".into());
+        }
         select(&mut config, &tier, &format!("{}/v1", ai_base_url()));
+        config.gateway_reasoning_efforts = selected.reasoning_efforts.clone();
+        config.gateway_reply_preference = preference;
         ai_config::save(&path, &config).map_err(|e| format!("无法保存模型配置：{e}"))?;
         config.view(&ai_config::default_workspace(&app)?)
     };

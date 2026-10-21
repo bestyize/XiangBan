@@ -12,6 +12,7 @@ mod ledger;
 mod newapi;
 mod password;
 mod products;
+mod reasoning;
 mod proxy;
 mod quota;
 mod ratelimit;

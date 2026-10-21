@@ -433,22 +433,58 @@ describe('reply preferences', () => {
     expect(ipc).toHaveBeenCalledWith('save_ai_provider', expect.objectContaining({ providerId: 'custom_openai', replyPreference: 'faster' }));
   });
 
-  it('hides unsupported options and clears a stale choice when the endpoint changes', async () => {
+  it('keeps supported preferences when switching to a proxy', async () => {
     await open(known);
     await openModal('custom_openai');
     await type('ai-base-url', 'https://gateway.example/v1');
-    expect(q('ai-reply-preference')).toBeNull();
+    expect(q('ai-reply-preference')).not.toBeNull();
     expect(q('ai-max-output-tokens')).not.toBeNull();
     ipc.mockResolvedValueOnce(known as never);
     saveButton().click();
     await flushPromises();
-    expect(ipc).toHaveBeenCalledWith('save_ai_provider', expect.objectContaining({ replyPreference: 'default' }));
+    expect(ipc).toHaveBeenCalledWith('save_ai_provider', expect.objectContaining({ replyPreference: 'deeper' }));
   });
 
-  it('does not show a nonfunctional option for unknown models', async () => {
+  it('allows declaring capabilities for unknown models', async () => {
     await open(configured);
     await openModal('deepseek');
-    expect(q('ai-reply-advanced')).toBeNull();
+    expect(q('ai-reply-advanced')).not.toBeNull();
+    expect(q('ai-reasoning-mode')).not.toBeNull();
+  });
+
+  it('persists declared grades and a selected effort for an alias model', async () => {
+    const alias = structuredClone(known);
+    alias.model = 'private-alias';
+    alias.providers![0].model = 'private-alias';
+    alias.providers![0].replyPreference = 'default';
+    await open(alias);
+    await openModal('custom_openai');
+    const select = (id: string) => wrapper!.findAllComponents(NSelect).find(s => s.attributes('data-testid') === id)!;
+    select('ai-reasoning-mode').vm.$emit('update:value', 'manual');
+    await flushPromises();
+    select('ai-reasoning-levels').vm.$emit('update:value', ['medium', 'high']);
+    await flushPromises();
+    expect(select('ai-reply-preference').props('options')).toEqual([
+      {value:'default',label:'默认'}, {value:'medium',label:'中'}, {value:'deeper',label:'高 · 更深入'},
+    ]);
+    select('ai-reply-preference').vm.$emit('update:value', 'medium');
+    await flushPromises();
+    ipc.mockResolvedValueOnce(alias as never);
+    saveButton().click();
+    await flushPromises();
+    expect(ipc).toHaveBeenCalledWith('save_ai_provider', expect.objectContaining({
+      model:'private-alias', reasoningEfforts:['medium','high'], clearReasoningEfforts:false, replyPreference:'medium',
+    }));
+  });
+
+  it('preserves Anthropic output limit settings while leaving thinking controls unavailable', async () => {
+    await open(known);
+    await openModal('custom_openai');
+    await pickProtocol('anthropic');
+    expect(q('ai-reply-advanced')).not.toBeNull();
+    expect(q('ai-max-output-tokens')).not.toBeNull();
+    expect(q('ai-reply-preference')).toBeNull();
+    expect(q('ai-reasoning-mode')).toBeNull();
   });
 
   it('saves an independent output limit and resets it when switching endpoint', async () => {

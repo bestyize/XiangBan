@@ -43,6 +43,7 @@ struct PartialCall {
 #[derive(Default)]
 pub struct StreamAccumulator {
     text: String,
+    reasoning: String,
     calls: Vec<PartialCall>,
     usage: Option<Usage>,
     finish_reason: Option<String>,
@@ -71,6 +72,9 @@ impl StreamAccumulator {
         }
         let Some(choice) = chunk.get("choices").and_then(|c| c.get(0)) else { return Ok(()) };
         if let Some(delta) = choice.get("delta") {
+            if let Some(text) = delta.get("reasoning_content").and_then(Value::as_str) {
+                self.reasoning.push_str(text);
+            }
             if let Some(text) = delta.get("content").and_then(Value::as_str).filter(|t| !t.is_empty()) {
                 self.text.push_str(text);
                 on_text(text);
@@ -135,6 +139,10 @@ impl StreamAccumulator {
             })
             .collect();
         let finish = chat_finish(self.finish_reason.as_deref()).settle(!tool_calls.is_empty());
-        Reply { message: Message::assistant(self.text, tool_calls), usage: self.usage, finish }
+        let mut message = Message::assistant(self.text, tool_calls);
+        if !self.reasoning.is_empty() {
+            message.provider_state = Some(serde_json::json!({"protocol":"chat", "reasoning_content": self.reasoning}));
+        }
+        Reply { message, usage: self.usage, finish }
     }
 }

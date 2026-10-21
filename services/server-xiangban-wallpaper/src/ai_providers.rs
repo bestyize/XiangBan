@@ -12,6 +12,7 @@ fn interval() -> u64 { 21600 }
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Model {
+    #[serde(default, skip_serializing_if = "Option::is_none")] pub reasoning_efforts: Option<Vec<String>>,
     pub id: String,
     pub name: String,
     #[serde(default)] pub description: String,
@@ -102,6 +103,10 @@ impl Catalogue {
             let mut models = HashSet::new();
             if p.models.len() > 200 { return Err(bad("单个供应商最多配置 200 个模型")); }
             for m in &p.models {
+                if m.reasoning_efforts.as_ref().is_some_and(|levels| levels.len() > 5 || levels.iter().enumerate().any(|(i, level)|
+                    !["low", "medium", "high", "xhigh", "max"].contains(&level.as_str()) || levels[..i].contains(level))) {
+                    return Err(bad("模型思考等级无效或重复"));
+                }
                 if m.id.trim().is_empty() || m.id.len() > 200 || m.id != m.id.trim()
                     || m.name.trim().is_empty() || m.name.len() > 200 || m.description.len() > 2000
                     || !models.insert(&m.id) { return Err(bad("模型 ID、名称无效或重复")); }
@@ -169,7 +174,7 @@ impl Catalogue {
                 _ => return None,
             };
             let models: Vec<_> = p.models.iter().filter(|m| m.enabled)
-                .map(|m| serde_json::json!({"id":m.id,"name":m.name,"description":m.description})).collect();
+                .map(|m| serde_json::json!({"id":m.id,"name":m.name,"description":m.description,"reasoningEfforts":m.reasoning_efforts})).collect();
             let mut value = serde_json::json!({
                 "id":p.id,"provider":p.provider,"description":p.description,"endPoint":p.end_point,
                 "protocol":p.protocol,"type":p.provider_type,"defaultModel":p.default_model,
@@ -224,6 +229,14 @@ mod tests {
         let mut p = c.providers[0].clone();
         p.id = "official".into(); p.provider_type = "free".into(); p.apikey = Some("restricted-token".into());
         c.providers.push(p); c
+    }
+    #[test] fn model_reasoning_capabilities_are_validated_and_reach_the_desktop() {
+        let mut c = Catalogue::default();
+        c.providers[0].models[0].reasoning_efforts = Some(vec!["low".into(), "high".into()]);
+        c.validate().unwrap();
+        assert_eq!(c.public(None)["providers"][0]["models"][0]["reasoningEfforts"], serde_json::json!(["low","high"]));
+        c.providers[0].models[0].reasoning_efforts = Some(vec!["invalid".into()]);
+        assert!(c.validate().is_err());
     }
     #[test] fn defaults_are_valid_and_never_send_user_keys() {
         let c = Catalogue::default(); c.validate().unwrap();

@@ -31,6 +31,7 @@ pub async fn tiers(State(state): State<AppState>, auth: AuthUser) -> Result<Json
                 "is_default": t.is_default,
                 "requires_paid": t.requires_paid,
                 "available": !t.requires_paid || paid,
+                "reasoning_efforts": crate::reasoning::levels(&t.model, t.reasoning_efforts.as_deref()),
             })
         })
         .collect();

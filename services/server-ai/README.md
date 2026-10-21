@@ -63,6 +63,8 @@ cargo test --locked --manifest-path services/server-ai/Cargo.toml
 
 管理接口 `/api/admin/*` 与账号中心同一套做法：独立管理员表、HS256 令牌（由主密钥派生，与用户令牌不通用）、连续错 5 次锁 15 分钟、没有默认账号、写操作入审计表。包含登录与改密码、概览、网关连接（`GET /api/admin/settings`、`PUT /api/admin/settings/newapi` 先向网关验证再保存、`POST /api/admin/settings/newapi/test`；令牌只写不读，只返回来源和尾号）、产品与档位增改删、New API 模型列表（标记倍率疑似未配置的模型）、用户额度查看、补发与扣回、对账异常、操作日志，以及兑换码：`POST /api/admin/batches` 生成批次、`GET /api/admin/batches` 批次列表、`POST /api/admin/batches/{id}/void` 作废批次里未兑换的码、`POST /api/admin/codes/lookup` 查单个码（用 POST，码不进 URL 和访问日志）、`POST /api/admin/codes/{id}/void` 作废单个码。
 
+公开档位列表通过 `reasoning_efforts` 返回允许的思考等级，不返回真实模型。管理后台可逐档位选择自动识别、手动声明或不支持；数据库 `product_tiers.reasoning_efforts` 为 nullable `TEXT[]`，缺省自动识别，空列表禁用。Responses 的 `reasoning.effort`、Chat Completions 的 `reasoning_effort` 与 Messages 的 `output_config.effort` 在转发前按档位校验，非法选择返回 `unsupported_reasoning_effort`。省略参数保持上游默认；网关不会替不支持的模型模拟等级。
+
 上下文超限返回稳定错误码 `context_length_exceeded`；请求体超过本服务或上游限制时返回 `request_too_large`（HTTP 413）。错误说明提示压缩会话、减少图片或检查协议，保留三种协议各自的错误形状，不回传上游模型、渠道或完整错误内容。客户端可按错误码恢复，普通参数错误仍为 `bad_request`。
 
 ## 兑换码

@@ -37,6 +37,7 @@ pub const DEFAULT_PROVIDERS: &[(&str, &str, &str, &str, &str)] = &[
 #[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 pub struct ProviderConfig {
+    pub reasoning_efforts: Option<Vec<String>>,
     /// Zero follows model metadata, falling back to a conservative 8K for unknown endpoints.
     pub max_output_tokens: u32,
     pub reply_preference: ReplyPreference,
@@ -61,6 +62,8 @@ pub struct ProviderConfig {
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 pub struct ModelConfig {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reasoning_efforts: Option<Vec<String>>,
     pub id: String, pub name: String, pub description: String,
     #[serde(alias = "max_output_tokens", skip_serializing_if = "Option::is_none")]
     pub max_output_tokens: Option<u32>,
@@ -69,6 +72,7 @@ pub struct ModelConfig {
 impl Default for ProviderConfig {
     fn default() -> Self {
         Self {
+            reasoning_efforts: None,
             max_output_tokens: 0,
             reply_preference: ReplyPreference::Default,
             provider_type: "custom".into(), remote: false, available: true,
@@ -88,6 +92,7 @@ impl Default for ProviderConfig {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ProviderConfigView {
+    pub reasoning_efforts: Option<Vec<String>>,
     pub max_output_tokens: u32,
     pub reply_preference: ReplyPreference,
     #[serde(rename = "type")] pub provider_type: String,
@@ -129,6 +134,7 @@ impl ProviderConfig {
 
     pub fn view(&self) -> ProviderConfigView {
         ProviderConfigView {
+            reasoning_efforts: self.reasoning_efforts.clone(),
             max_output_tokens: self.max_output_tokens,
             reply_preference: self.reply_preference,
             provider_type: if self.is_custom() { "custom".into() } else if self.provider_type == "custom" { "third".into() } else { self.provider_type.clone() },
@@ -160,6 +166,8 @@ impl ProviderConfig {
 #[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 pub struct AiConfig {
+    pub gateway_reply_preference: ReplyPreference,
+    pub gateway_reasoning_efforts: Vec<String>,
     pub catalogue_received: bool,
     pub catalogue_owner: String,
     pub catalogue_fetched_at: u64,
@@ -191,6 +199,8 @@ pub struct AiConfig {
 impl Default for AiConfig {
     fn default() -> Self {
         let mut cfg = Self {
+            gateway_reply_preference: ReplyPreference::Default,
+            gateway_reasoning_efforts: Vec::new(),
             catalogue_received: false, catalogue_owner: String::new(), catalogue_fetched_at: 0,
             catalogue_etag: String::new(), catalogue_refresh_after: 21600,
             active_provider: String::new(),
@@ -253,11 +263,17 @@ impl AiConfig {
     /// Read from the provider actually in effect, rather than a global preference that could
     /// leak into 小伴 AI or a different provider after switching or a catalogue update.
     pub(crate) fn reply_preference(&self) -> ReplyPreference {
-        if self.active_provider == crate::ai_gateway::GATEWAY_ID { return ReplyPreference::Default; }
+        if self.active_provider == crate::ai_gateway::GATEWAY_ID { return self.gateway_reply_preference; }
         self.providers.iter().find(|p| p.id == self.active_provider
-            && !(p.remote && p.provider_type != "third")
             && p.base_url == self.base_url && p.model == self.model && p.protocol == self.protocol)
             .map(|p| p.reply_preference).unwrap_or_default()
+    }
+
+    pub(crate) fn reasoning_levels(&self) -> Vec<String> {
+        if self.active_provider == crate::ai_gateway::GATEWAY_ID { return self.gateway_reasoning_efforts.clone(); }
+        let provider = self.providers.iter().find(|p| p.id == self.active_provider && p.base_url == self.base_url && p.model == self.model && p.protocol == self.protocol);
+        let declared = provider.and_then(|p| p.reasoning_efforts.as_deref().or_else(|| p.models.iter().find(|m| m.id == self.model).and_then(|m| m.reasoning_efforts.as_deref())));
+        ai_reasoning::levels(&self.model, &self.protocol, declared)
     }
 }
 
@@ -278,6 +294,8 @@ impl fmt::Debug for AiConfig {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AiConfigView {
+    pub gateway_reply_preference: ReplyPreference,
+    pub gateway_reasoning_efforts: Vec<String>,
     pub catalogue_received: bool,
     pub catalogue_fetched_at: u64,
     pub active_provider: String,
@@ -301,6 +319,8 @@ impl AiConfig {
     pub fn view(&self, default_workspace: &Path) -> AiConfigView {
         let providers_view = self.providers.iter().map(|p| p.view()).collect();
         AiConfigView {
+            gateway_reply_preference: self.gateway_reply_preference,
+            gateway_reasoning_efforts: self.gateway_reasoning_efforts.clone(),
             catalogue_received: self.catalogue_received, catalogue_fetched_at: self.catalogue_fetched_at,
             active_provider: self.active_provider.clone(),
             providers: providers_view,
@@ -631,11 +651,14 @@ fn selecting_after_save(config: &AiConfig, provider_id: &str, activate: bool) ->
         && config.providers.iter().any(|p| p.id == provider_id && p.is_usable())
 }
 
-fn clean_reply_preference(previous: &ProviderConfig, url: &str, model: &str, protocol: &str, requested: Option<ReplyPreference>) -> Result<ReplyPreference, String> {
-    let available = !(previous.remote && previous.provider_type != "third") && ai_reasoning::supported(url, model, protocol);
+fn clean_reply_preference(previous: &ProviderConfig, _url: &str, model: &str, protocol: &str, requested: Option<ReplyPreference>) -> Result<ReplyPreference, String> {
+    let declared = previous.reasoning_efforts.as_deref().or_else(|| previous.models.iter().find(|m| m.id == model).and_then(|m| m.reasoning_efforts.as_deref()));
+    let levels = ai_reasoning::levels(model, protocol, declared);
+    let available = !levels.is_empty();
     let preference = requested.unwrap_or(previous.reply_preference);
-    if !available && requested.is_some_and(|p| p != ReplyPreference::Default) {
-        return Err("当前模型暂不支持调整回答偏好，请使用默认设置".into());
+    if preference.effort().is_some_and(|effort| !levels.iter().any(|l| l == effort)) {
+        if requested.is_some() { return Err("此模型未声明支持所选思考等级，请检查模型能力配置".into()); }
+        return Ok(ReplyPreference::Default);
     }
     Ok(if available { preference } else { ReplyPreference::Default })
 }
@@ -668,6 +691,8 @@ pub fn save_ai_provider(
     selection_mode: Option<String>,
     reply_preference: Option<ReplyPreference>,
     max_output_tokens: Option<u32>,
+    reasoning_efforts: Option<Vec<String>>,
+    clear_reasoning_efforts: Option<bool>,
 ) -> Result<AiConfigView, String> {
     let path = path(&app)?;
     let state = app.state::<AiConfigState>();
@@ -682,7 +707,18 @@ pub fn save_ai_provider(
     }
 
     let existing_idx = config.providers.iter().position(|p| p.id == provider_id);
-    let previous = existing_idx.map(|i| config.providers[i].clone()).unwrap_or_default();
+    let mut previous = existing_idx.map(|i| config.providers[i].clone()).unwrap_or_default();
+    let mode = selection_mode.as_deref().unwrap_or("manual");
+    if !["manual", "recommended"].contains(&mode) { return Err("模型选择方式无效".into()); }
+    let clean_mdl = if mode == "recommended" && !previous.default_model.is_empty() { previous.default_model.clone() } else { clean_mdl };
+    if previous.remote && previous.provider_type != "third" && (reasoning_efforts.is_some() || clear_reasoning_efforts.unwrap_or(false)) {
+        return Err("官方服务的模型能力由服务端管理".into());
+    }
+    if previous.model != clean_mdl || previous.protocol != protocol {
+        previous.reasoning_efforts = None;
+    }
+    if let Some(levels) = reasoning_efforts { ai_reasoning::validate(&levels)?; previous.reasoning_efforts = Some(levels); }
+    if clear_reasoning_efforts.unwrap_or(false) { previous.reasoning_efforts = None; }
     if previous.remote && !previous.available { return Err("该供应商已停用，请选择其他模型".into()); }
     if previous.remote && previous.provider_type != "third" {
         if clean_url != previous.base_url || protocol != previous.protocol || api_key.is_some() || clear_key {
@@ -690,9 +726,6 @@ pub fn save_ai_provider(
         }
         if !previous.models.iter().any(|m| m.id == clean_mdl) { return Err("该模型已停用，请选择其他模型".into()); }
     }
-    let mode = selection_mode.as_deref().unwrap_or("manual");
-    if !["manual", "recommended"].contains(&mode) { return Err("模型选择方式无效".into()); }
-    let clean_mdl = if mode == "recommended" && !previous.default_model.is_empty() { previous.default_model.clone() } else { clean_mdl };
     let preference = clean_reply_preference(&previous, &clean_url, &clean_mdl, &protocol, reply_preference)?;
     let output = clean_output_tokens(&previous, &clean_url, &clean_mdl, &protocol, max_output_tokens)?;
     let (current_name, current_key) = match existing_idx {
@@ -1431,6 +1464,25 @@ mod reply_preference_tests {
     }
 
     #[test]
+    fn managed_models_and_gateway_keep_declared_levels_and_preferences() {
+        let mut cfg = configured();
+        let idx = cfg.providers.iter().position(|p| p.id == cfg.active_provider).unwrap();
+        cfg.providers[idx].remote = true;
+        cfg.providers[idx].provider_type = "free".into();
+        assert_eq!(cfg.reply_preference(), ReplyPreference::Deeper);
+        assert!(cfg.reasoning_levels().contains(&"max".into()));
+        cfg.providers[idx].reasoning_efforts = Some(vec!["high".into()]);
+        assert_eq!(cfg.reasoning_levels(), vec!["high"]);
+        assert_eq!(clean_reply_preference(&cfg.providers[idx], &cfg.base_url, &cfg.model, &cfg.protocol, Some(ReplyPreference::Max)).unwrap_err(), "此模型未声明支持所选思考等级，请检查模型能力配置");
+        cfg.active_provider = crate::ai_gateway::GATEWAY_ID.into();
+        cfg.gateway_reasoning_efforts = vec!["low".into(), "high".into()];
+        cfg.gateway_reply_preference = ReplyPreference::Deeper;
+        let restored: AiConfig = serde_json::from_value(serde_json::to_value(cfg).unwrap()).unwrap();
+        assert_eq!(restored.reply_preference(), ReplyPreference::Deeper);
+        assert_eq!(ai_reasoning::body("responses", restored.reply_preference(), &restored.reasoning_levels())["reasoning"]["effort"], "high");
+    }
+
+    #[test]
     fn reply_preferences_survive_storage_and_old_files_keep_supplier_defaults() {
         let nonce = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos();
         let dir = std::env::temp_dir().join(format!("xiaoban-reply-pref-{}-{nonce}", std::process::id()));
@@ -1459,10 +1511,10 @@ mod reply_preference_tests {
     }
 
     #[test]
-    fn unsupported_preferences_are_rejected_and_stale_preferences_reset_on_save() {
+    fn proxy_preferences_work_and_unsupported_model_preferences_reset_on_save() {
         let p = configured().providers.pop().unwrap();
-        assert!(clean_reply_preference(&p, "https://gateway.example/v1", &p.model, "responses", Some(ReplyPreference::Deeper)).is_err());
-        assert_eq!(clean_reply_preference(&p, "https://gateway.example/v1", &p.model, "responses", None).unwrap(), ReplyPreference::Default);
+        assert_eq!(clean_reply_preference(&p, "https://gateway.example/v1", &p.model, "responses", Some(ReplyPreference::Deeper)).unwrap(), ReplyPreference::Deeper);
+        assert_eq!(clean_reply_preference(&p, "https://gateway.example/v1", "unknown", "responses", None).unwrap(), ReplyPreference::Default);
         assert_eq!(clean_reply_preference(&p, &p.base_url, &p.model, &p.protocol, None).unwrap(), ReplyPreference::Deeper);
     }
 }

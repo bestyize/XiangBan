@@ -189,15 +189,44 @@ describe('hovering a model to choose thinking strength', () => {
     expect(panel()).toBeNull();
   });
 
-  it('only offers default for unsupported endpoints and gateway-managed modes', async () => {
+  it('explains undeclared model and old gateway capabilities', async () => {
     const view = await composer();
     await view.get('[data-testid="chat-model-local-local-model"]').trigger('mouseenter');
     expect(strength('default')).not.toBeNull();
     expect(strength('deeper')).toBeNull();
-    expect(panel()?.textContent).toContain('暂未开放');
+    expect(panel()?.textContent).toContain('尚未识别');
     await view.get('[data-testid="chat-model-xiaoban-ai-standard"]').trigger('mouseenter');
-    expect(panel()?.textContent).toContain('由小伴 AI 当前模式管理');
+    expect(panel()?.textContent).toContain('尚未提供可选等级');
     expect(strength('faster')).toBeNull();
+  });
+
+  it('lets the active gateway mode change strength using server capabilities', async () => {
+    ipc.mockImplementation(async command => {
+      if (command === 'ai_gateway_tiers') return [{...tiers[0], reasoningEfforts:['low','high','max']}] as never;
+      return {...structuredClone(config), gatewayReplyPreference:'deeper'} as never;
+    });
+    const view = await composer();
+    await view.get('[data-testid="chat-model-xiaoban-ai-standard"]').trigger('mouseenter');
+    expect(strength('deeper').getAttribute('aria-checked')).toBe('true');
+    expect(strength('medium')).toBeNull();
+    strength('max').click();
+    await flushPromises();
+    expect(ipc).toHaveBeenCalledWith('use_ai_gateway', {tier:'standard', replyPreference:'max'});
+    expect(view.emitted('switched')).toHaveLength(1);
+  });
+
+  it('supports managed aliases and compatible proxy models without domain checks', async () => {
+    ipc.mockImplementation(async command => {
+      if (command === 'ai_gateway_tiers') return [] as never;
+      return {...structuredClone(config), providers:[{...provider, remote:true, type:'free', isCustom:false,
+        baseUrl:'https://proxy.example/v1', model:'alias', models:[{id:'alias',name:'托管模型',reasoningEfforts:['medium','high']}]}]} as never;
+    });
+    const view = await composer();
+    await view.get('[data-testid="chat-model-my-openai-alias"]').trigger('mouseenter');
+    expect(strength('faster')).toBeNull();
+    strength('medium').click();
+    await flushPromises();
+    expect(ipc).toHaveBeenCalledWith('save_ai_provider', expect.objectContaining({model:'alias', replyPreference:'medium'}));
   });
 
   it('allows keyboard entry and closes the submenu before the model list on Escape', async () => {

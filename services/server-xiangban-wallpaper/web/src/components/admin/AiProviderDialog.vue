@@ -183,6 +183,12 @@ function removeModel(index: number) {
               <input v-model="m.id" class="a-input mono" placeholder="调用 ID" :aria-label="`第 ${i + 1} 个模型的调用 ID`" />
               <input v-model="m.name" class="a-input" placeholder="展示名称" :aria-label="`第 ${i + 1} 个模型的展示名称`" />
               <input v-model="m.description" class="a-input" placeholder="描述（可选）" :aria-label="`第 ${i + 1} 个模型的描述`" />
+              <label class="a-field"><span>思考等级</span>
+                <select class="a-select" :value="m.reasoningEfforts == null ? 'auto' : m.reasoningEfforts.length ? 'manual' : 'off'" @change="m.reasoningEfforts = ($event.target as HTMLSelectElement).value === 'auto' ? null : ($event.target as HTMLSelectElement).value === 'off' ? [] : ['low','high','max']">
+                  <option value="auto">自动识别</option><option value="manual">手动声明</option><option value="off">不支持</option>
+                </select>
+                <span v-if="m.reasoningEfforts?.length"><label v-for="level in ['low','medium','high','xhigh','max']" :key="level"><input v-model="m.reasoningEfforts" type="checkbox" :value="level" />{{ level }}</label></span>
+              </label>
               <div class="model-end">
                 <span class="on-label" aria-hidden="true">启用</span>
                 <ToggleSwitch v-model="m.enabled" :label="`启用模型 ${m.id || i + 1}`" />

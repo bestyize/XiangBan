@@ -127,3 +127,28 @@ fn chat_finish_reasons_are_mapped_and_settled_against_the_calls() {
         assert_eq!(chat_finish(reason, with_call), expected, "finish_reason={reason:?} calls={with_call}");
     }
 }
+
+#[test]
+fn thinking_chat_tool_history_is_preserved_without_becoming_visible_text() {
+    let mut acc = StreamAccumulator::default();
+    let visible = feed(&mut acc, &[
+        json!({"choices":[{"delta":{"reasoning_content":"first "}}]}),
+        json!({"choices":[{"delta":{"reasoning_content":"second", "content":"Checking"}}]}),
+        json!({"choices":[{"delta":{"tool_calls":[{"index":0,"id":"c1","function":{"name":"ping","arguments":"{}"}}]},"finish_reason":"tool_calls"}]}),
+    ]);
+    assert_eq!(visible, "Checking");
+    let message = acc.finish().message;
+    assert_eq!(message.text(), "Checking");
+    let message: Message = serde_json::from_value(serde_json::to_value(&message).unwrap()).unwrap();
+    let req = ChatRequest {messages:vec![Message::user_text("ping"),message.clone(),Message::tool("c1","ok")],tools:vec![]};
+    let mut p = ProviderProfile::new("https://proxy.example/v1", "", "kimi-k3");
+    p.extra_body.insert("reasoning_effort".into(), json!("high"));
+    let body = build_request_body(&p, &req);
+    assert_eq!(body["reasoning_effort"], "high");
+    assert_eq!(body["messages"][1]["reasoning_content"], "first second");
+    assert_eq!(body["messages"][2]["tool_call_id"], "c1");
+    let mut other = message;
+    other.provider_state.as_mut().unwrap()["source"] = json!({"base_url":"https://other.example/v1","model":"kimi-k3"});
+    let body = build_request_body(&p, &ChatRequest {messages:vec![other],tools:vec![]});
+    assert!(body["messages"][0].get("reasoning_content").is_none());
+}

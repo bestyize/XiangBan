@@ -240,13 +240,15 @@ Mac 实机还需检查：原角色的发光与连续表情、桌宠拖动、空�
 品牌插画使用 `public/xiaoban.svg`，由本工程原有猫脸角色 `robotMarkup(stillFrame("idle"))` 导出；网站维护一份相同的静态 SVG，不导入客户端源码。
 
 
-## 自定义模型的回答偏好
+## 模型的思考等级
 
-用户自行配置的服务商可在配置弹窗的折叠“高级设置”中选择“回答偏好：默认／更快／更深入”，按服务商保存为 `replyPreference`。默认不发送任何额外思考参数；更快与更深入分别在 Responses 请求中发送 `reasoning.effort=low/high`。偏好随当前服务商生效，聊天、摘要与子任务共用同一请求配置；小伴 AI 的日常／深入模式仍由后台管理，不受此设置影响。
+点击聊天输入框右下角的模型按钮，悬停具体模型或小伴 AI 模式，在二级菜单选择思考等级。模型配置弹窗的“高级设置”也提供“思考等级”。默认不添加额外参数；Responses 使用 `reasoning.effort`，Chat Completions 使用 `reasoning_effort`。旧的 `faster/deeper` 配置仍对应 low/high，偏好用于下一次聊天、摘要与子任务请求。
 
-首批只开放已核对官方协议的端点与模型组合：OpenAI `https://api.openai.com/v1` 的 `gpt-6-astra`、`gpt-6.1-sol`、`gpt-6-sol`、`gpt-6-luna`，以及 DeepSeek `https://api.deepseek.com`（可带 `/v1`）的 `deepseek-flash`、`deepseek-v4-pro`，均要求 Responses 协议。第三方转发地址、未知模型、Chat Completions 与 Anthropic 协议暂不展示这个控件并沿用服务商默认；原生端也核对相同能力范围。切换到不支持的配置后保存会恢复默认。旧配置缺少该字段时按默认处理。
+等级按模型和协议识别，不限制官方域名，也不排除托管服务。已识别 GPT-6 系列的 low/medium/high/xhigh/max，以及 DeepSeek V4、Kimi K3、GLM 5.2/5.3 的 low/high/max。模型能力有差异，不把“支持思考”等同于“支持所有等级”。自定义或第三方模型使用别名时，可以在高级设置中手动声明 `reasoningEfforts`；`null` 或缺省为自动识别，空列表为禁用。切换模型或协议时清除本机声明，避免套用旧模型的能力。官方托管模型由壁纸网站管理后台逐模型声明，小伴 AI 由 `server-ai` 管理后台逐档位声明，只返回等级，不公开真实模型。网关需要更新服务端后才能返回此元数据；旧网关保持默认选项。
 
-针对性验证：`npx vitest run src/ui/ai-config.test.ts src/ui/components/AiConfigCard.test.ts`、`npx vue-tsc --noEmit`；`cargo test --manifest-path src-tauri/Cargo.toml --bin xiaoban-desktop-wallpaper ai_reasoning:: --locked` 与 `cargo test --manifest-path src-tauri/Cargo.toml --bin xiaoban-desktop-wallpaper reply_preference --locked`。已验证配置兼容、隔离与真实序列化请求体，未使用生产密钥调用这些官方端点。
+原生端再次校验选择；菜单只显示该模型支持的等级。Anthropic Messages 暂未接入可调等级，仍使用服务商默认。内核保留 Chat 的 `reasoning_content` 和 Responses 的 reasoning 项，用于工具调用后继续请求；状态随历史保存但不作为可见回答，并按模型、地址和协议隔离。
+
+针对性验证：`npx vitest run src/ui/ai-config.test.ts src/ui/components/AiConfigCard.test.ts src/ui/components/chat-model-selection.test.ts`、`npx vue-tsc --noEmit`；`cargo test --manifest-path src-tauri/Cargo.toml --bin xiaoban-desktop-wallpaper ai_reasoning:: --locked` 与同命令筛选 `reply_preference`、`ai_gateway::`。协议测试使用本地假服务，未使用生产密钥调用真实模型。
 
 ## Edge TTS 语音朗读
 

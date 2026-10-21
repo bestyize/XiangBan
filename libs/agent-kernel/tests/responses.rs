@@ -275,10 +275,11 @@ mod over_http {
     #[test]
     fn an_agent_completes_a_tool_round_trip_over_the_responses_protocol() {
         let first = sse_events(&[
-            ("response.output_item.added", r#"{"type":"response.output_item.added","output_index":0,"item":{"type":"function_call","id":"fc_1","call_id":"call_77","name":"echo","arguments":""}}"#),
-            ("response.function_call_arguments.delta", r#"{"type":"response.function_call_arguments.delta","output_index":0,"item_id":"fc_1","delta":"{\"x\":"}"#),
-            ("response.function_call_arguments.delta", r#"{"type":"response.function_call_arguments.delta","output_index":0,"item_id":"fc_1","delta":"5}"}"#),
-            ("response.output_item.done", r#"{"type":"response.output_item.done","output_index":0,"item":{"type":"function_call","id":"fc_1","call_id":"call_77","name":"echo","arguments":"{\"x\":5}"}}"#),
+            ("response.output_item.done", r#"{"type":"response.output_item.done","output_index":0,"item":{"type":"reasoning","id":"rs_77","summary":[],"encrypted_content":"encrypted-test-state"}}"#),
+            ("response.output_item.added", r#"{"type":"response.output_item.added","output_index":1,"item":{"type":"function_call","id":"fc_1","call_id":"call_77","name":"echo","arguments":""}}"#),
+            ("response.function_call_arguments.delta", r#"{"type":"response.function_call_arguments.delta","output_index":1,"item_id":"fc_1","delta":"{\"x\":"}"#),
+            ("response.function_call_arguments.delta", r#"{"type":"response.function_call_arguments.delta","output_index":1,"item_id":"fc_1","delta":"5}"}"#),
+            ("response.output_item.done", r#"{"type":"response.output_item.done","output_index":1,"item":{"type":"function_call","id":"fc_1","call_id":"call_77","name":"echo","arguments":"{\"x\":5}"}}"#),
             ("response.completed", r#"{"type":"response.completed","response":{"usage":{"input_tokens":4,"output_tokens":1}}}"#),
         ]);
         let (url, server) = serve(vec![first, sse_events(&TEXT_REPLY)]);
@@ -293,8 +294,9 @@ mod over_http {
         let tool = &body_json(&seen[0])["tools"][0];
         assert_eq!((tool["name"].clone(), tool["strict"].clone()), (json!("echo"), json!(false)));
         let input = body_json(&seen[1])["input"].clone();
-        assert_eq!(input[1], json!({"type": "function_call", "call_id": "call_77", "name": "echo", "arguments": "{\"x\":5}"}));
-        assert_eq!(input[2], json!({"type": "function_call_output", "call_id": "call_77", "output": "echoed 5"}));
+        assert_eq!(input[1]["encrypted_content"], "encrypted-test-state");
+        assert_eq!(input[2], json!({"type": "function_call", "call_id": "call_77", "name": "echo", "arguments": "{\"x\":5}"}));
+        assert_eq!(input[3], json!({"type": "function_call_output", "call_id": "call_77", "output": "echoed 5"}));
     }
 }
 
@@ -319,4 +321,40 @@ fn response_statuses_are_mapped_to_finish_reasons() {
     assert_eq!(responses_finish(incomplete("content_filter"), false), ContentFilter);
     assert_eq!(responses_finish(incomplete("something_else"), false), Other);
     assert_eq!(responses_finish(json!({"type": "response.incomplete", "response": {}}), false), Other);
+}
+
+#[test]
+fn reasoning_items_survive_streaming_storage_and_the_next_tool_request() {
+    let reasoning = json!({"type":"reasoning","id":"rs_1","summary":[],"encrypted_content":"opaque-state","status":"completed"});
+    let mut stream = ResponsesStream::default();
+    let mut text = String::new();
+    stream.push_event(&json!({"type":"response.output_item.done","output_index":0,"item":reasoning}), &mut |s|text.push_str(s)).unwrap();
+    stream.push_event(&json!({"type":"response.output_item.done","output_index":1,"item":{"type":"function_call","id":"fc_1","call_id":"c1","name":"ping","arguments":"{}"}}), &mut |_|{}).unwrap();
+    // A final response repeats the same reasoning item: it must not be duplicated.
+    stream.push_event(&json!({"type":"response.completed","response":{"output":[reasoning],"status":"completed"}}), &mut |_|{}).unwrap();
+    let message = stream.finish().message;
+    assert!(text.is_empty());
+    let message: Message = serde_json::from_value(serde_json::to_value(message).unwrap()).unwrap();
+    let request = ChatRequest {messages:vec![Message::user_text("ping"),message,Message::tool("c1","ok")], tools:vec![]};
+    let body = build_request_body(&profile(), &request);
+    assert_eq!(body["input"][1], reasoning);
+    assert_eq!(body["input"][2]["type"], "function_call");
+    assert_eq!(body["input"][3]["type"], "function_call_output");
+    assert_eq!(body["input"].as_array().unwrap().iter().filter(|v|v["type"] == "reasoning").count(), 1);
+    let mut other = request.clone();
+    other.messages[1].provider_state.as_mut().unwrap()["source"] = json!({"base_url":"https://elsewhere.example","model":"other"});
+    assert_eq!(build_request_body(&profile(), &other)["input"][1]["type"], "function_call");
+}
+
+#[test]
+fn final_only_reasoning_and_foreign_protocol_state_are_handled() {
+    let reasoning = json!({"type":"reasoning","content":[{"type":"reasoning_text","text":"provider state"}]});
+    let mut stream = ResponsesStream::default();
+    stream.push_event(&json!({"type":"response.completed","response":{"output":[reasoning,{"type":"message","content":[{"type":"output_text","text":"answer"}]}]}}), &mut |_|{}).unwrap();
+    let mut message = stream.finish().message;
+    assert_eq!(message.text(), "answer");
+    assert_eq!(message.provider_state.as_ref().unwrap()["items"][0], reasoning);
+    message.provider_state = Some(json!({"protocol":"chat","reasoning_content":"other protocol"}));
+    let body = build_request_body(&profile(), &ChatRequest {messages:vec![message],tools:vec![]});
+    assert_eq!(body["input"], json!([{"role":"assistant","content":"answer"}]));
 }

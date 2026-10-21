@@ -1,4 +1,4 @@
-export interface AiModel { id: string; name: string; description: string; enabled: boolean }
+export interface AiModel { reasoningEfforts?: string[] | null; id: string; name: string; description: string; enabled: boolean }
 export interface AiAccess { uid: string; apikey?: string; hasKey?: boolean }
 export type AiProviderType = 'third' | 'free' | 'paid'
 export interface AiProvider {

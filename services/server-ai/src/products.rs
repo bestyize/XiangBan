@@ -19,6 +19,7 @@ pub struct Product {
 
 #[derive(Debug, Clone, FromRow, Serialize)]
 pub struct Tier {
+    pub reasoning_efforts: Option<Vec<String>>,
     pub product_id: String,
     pub tier: String,
     pub display_name: String,
@@ -31,7 +32,7 @@ pub struct Tier {
 }
 
 const PRODUCT_COLUMNS: &str = "product_id, name, client_ids, trial_quota, trial_days, enabled, created_at, updated_at";
-const TIER_COLUMNS: &str = "product_id, tier, display_name, description, model, requires_paid, is_default, sort_order, enabled";
+const TIER_COLUMNS: &str = "product_id, tier, display_name, description, model, requires_paid, is_default, sort_order, enabled, reasoning_efforts";
 
 /// 令牌 `aud` 属于哪个已启用的产品；一个客户端只能属于一个产品。
 pub async fn for_client(pool: &PgPool, client_id: &str) -> Result<Option<Product>, AppError> {
@@ -85,6 +86,7 @@ mod tests {
 
     fn tier(name: &str, is_default: bool, enabled: bool) -> Tier {
         Tier {
+            reasoning_efforts: None,
             product_id: "p".into(),
             tier: name.into(),
             display_name: name.into(),

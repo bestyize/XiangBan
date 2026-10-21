@@ -10,6 +10,7 @@ export interface Product {
 }
 
 export interface Tier {
+  reasoning_efforts?: string[] | null;
   product_id: string;
   tier: string;
   display_name: string;

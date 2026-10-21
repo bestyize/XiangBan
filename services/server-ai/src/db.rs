@@ -31,6 +31,7 @@ CREATE TABLE IF NOT EXISTS product_tiers (
     PRIMARY KEY (product_id, tier)
 );
 CREATE UNIQUE INDEX IF NOT EXISTS product_tiers_default_idx ON product_tiers (product_id) WHERE is_default;
+ALTER TABLE product_tiers ADD COLUMN IF NOT EXISTS reasoning_efforts TEXT[] DEFAULT NULL;
 
 -- 每个 (账号, 产品) 对应 New API 里一个独立用户和一个无限额度的令牌，额度只由用户钱包决定。
 -- change_seq 在额度桶变化时自增，synced_seq 记录已推送到哪一版，二者不等说明还有变化没同步到 New API。

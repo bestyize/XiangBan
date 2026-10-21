@@ -68,7 +68,7 @@ fn execute_result(&self, args: serde_json::Value, ctx: &ToolCtx) -> ToolResult {
 - Responses：无状态，每次发送完整 `input`，默认 `store: false`（可在 `extra_body` 覆盖）；函数工具显式发送 `strict: false`，因为该协议默认 true，会拒绝带可选参数的 schema。
 - Claude：所有 system 消息合并进顶层 `system`；同一轮的多个工具结果合并成一条 user 消息，且排在文本之前；空白文本块会被丢弃（为避免被拒绝，文档里没找到这条的依据）；用量取累计值的最大值，`prompt_tokens` 含缓存读写。
 
-**Responses 和 Claude 这两个协议已按官方资料核对过流式事件和请求字段（Anthropic 的流式与工具调用文档，OpenAI Python SDK 的类型定义），但只用本地假服务测过，没有连过真实端点**，各家兼容网关的差异也没验证。Responses 的 `phase` 字段没有支持：SDK 注释说较新的 codex 类模型在后续请求里应回传它，丢掉可能降低效果。思考内容（Claude 的 thinking、Responses 的 reasoning）不会带回下一轮，所以带工具循环时不要通过 `extra_body` 开启扩展思考。
+**Responses 和 Claude 这两个协议已按官方资料核对过流式事件和请求字段（Anthropic 的流式与工具调用文档，OpenAI Python SDK 的类型定义），但只用本地假服务测过，没有连过真实端点**，各家兼容网关的差异也没验证。Responses 的 `phase` 字段没有支持：SDK 注释说较新的 codex 类模型在后续请求里应回传它，丢掉可能降低效果。Chat Completions 的 `reasoning_content` 与 Responses 的 reasoning 项作为 `Message.provider_state` 保留、持久化并回传，不作为可见文本输出；状态按协议、端点和模型隔离，并计入上下文预算。Claude 的 thinking 尚未保留，带工具循环时不要通过 `extra_body` 开启 Claude 扩展思考。
 
 ```rust
 let agent = Agent::builder(Arc::new(OpenAiCompat::new(profile)?), Arc::new(JsonlStore::new(dir)))

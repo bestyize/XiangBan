@@ -1,17 +1,25 @@
 import { describe, expect, it } from 'vitest';
-import { aiProtocols, endpointPreview, insecureRemote, normalizeBaseUrl, protocolOption, supportsReplyPreference, validateAiForm, validateBaseUrl, validateKey } from './ai-config.ts';
+import { aiProtocols, endpointPreview, insecureRemote, normalizeBaseUrl, protocolOption, supportsReplyPreference, reasoningLevels, preferenceOptions, providerReasoningLevels, validateAiForm, validateBaseUrl, validateKey } from './ai-config.ts';
 
 describe('model service form helpers', () => {
-  it('only offers reply preferences for verified models and endpoints', () => {
+  it('uses model and protocol capabilities regardless of endpoint domain', () => {
     expect(supportsReplyPreference('responses', ' https://api.openai.com/v1/ ', 'gpt-6.1-sol')).toBe(true);
     expect(supportsReplyPreference('responses', 'https://api.deepseek.com', 'deepseek-flash')).toBe(true);
+    expect(supportsReplyPreference('responses', 'https://gateway.example/v1', 'gpt-6.1-sol')).toBe(true);
+    expect(supportsReplyPreference('chat', 'https://gateway.example/v1', 'glm-5.3')).toBe(true);
     for (const [protocol, url, model] of [
-      ['responses', 'https://gateway.example/v1', 'gpt-6.1-sol'],
-      ['responses', 'https://api.openai.com.evil.example/v1', 'gpt-6.1-sol'],
       ['responses', 'https://api.openai.com/v1', 'gpt-4o'],
-      ['chat', 'https://api.deepseek.com', 'deepseek-flash'],
       ['anthropic', 'https://api.deepseek.com/anthropic', 'deepseek-flash'],
     ] as const) expect(supportsReplyPreference(protocol, url, model)).toBe(false);
+  });
+  it('supports declared aliases, disabled capabilities and only valid grades', () => {
+    expect(reasoningLevels('chat', 'private-alias', ['medium', 'high'])).toEqual(['medium', 'high']);
+    expect(reasoningLevels('responses', 'gpt-6.1-sol', [])).toEqual([]);
+    expect(reasoningLevels('responses', 'moonshot/kimi-k3')).toEqual(['low', 'high', 'max']);
+    expect(preferenceOptions(['high', 'low']).map(o => o.value)).toEqual(['default', 'faster', 'deeper']);
+    const p = {id:'test', name:'t', isCustom:false, model:'alias', protocol:'responses' as const, baseUrl:'https://proxy.example', hasKey:true, keyHint:'', reasoningEfforts:['high'] as const};
+    expect(providerReasoningLevels({...p,reasoningEfforts:['high']}, 'alias')).toEqual(['high']);
+    expect(providerReasoningLevels({...p,reasoningEfforts:['high']}, 'other')).toEqual([]);
   });
   it('previews the address each protocol will call', () => {
     expect(endpointPreview('chat', 'https://api.openai.com/v1')).toBe('https://api.openai.com/v1/chat/completions');

@@ -27,7 +27,8 @@ fn estimate_message(message: &Message) -> usize {
         .sum();
     let calls: usize = message.tool_calls.iter().map(|c| estimate_text(&c.name) + estimate_text(&c.arguments)).sum();
     let structured = message.structured_content.as_ref().map_or(0, |v| estimate_text(&v.to_string()));
-    MESSAGE_OVERHEAD + parts + calls + structured
+    let state = message.provider_state.as_ref().map_or(0, |v| estimate_text(&v.to_string()));
+    MESSAGE_OVERHEAD + parts + calls + structured + state
 }
 
 pub fn estimate_tokens(messages: &[Message]) -> usize {

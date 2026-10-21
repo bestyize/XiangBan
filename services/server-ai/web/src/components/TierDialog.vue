@@ -19,6 +19,8 @@ const requiresPaid = ref(props.tier?.requires_paid ?? false);
 const isDefault = ref(props.tier?.is_default ?? false);
 const sortOrder = ref(props.tier?.sort_order ?? 10);
 const enabled = ref(props.tier?.enabled ?? true);
+const reasoningMode = ref(props.tier?.reasoning_efforts == null ? 'auto' : props.tier.reasoning_efforts.length ? 'manual' : 'off');
+const reasoningLevels = ref(props.tier?.reasoning_efforts ?? ['low', 'high', 'max']);
 const busy = ref(false);
 const error = ref('');
 
@@ -49,6 +51,7 @@ async function submit() {
       is_default: isDefault.value,
       sort_order: Number(sortOrder.value) || 0,
       enabled: enabled.value,
+      reasoning_efforts: reasoningMode.value === 'auto' ? null : reasoningMode.value === 'off' ? [] : reasoningLevels.value,
     });
     emit('saved', result.warnings);
   } catch (e) {
@@ -101,6 +104,16 @@ async function submit() {
           这个模型的倍率和 New API 未配置时的默认值相同，很可能还没设置真实定价。继续保存可能导致扣费与成本不符，建议先去 New API 核对。
         </div>
         <div v-else-if="model && !picked" class="notice error">AI 网关里已经找不到这个模型，请换一个。</div>
+        <div class="field">
+          <label for="t-reasoning">客户端可选思考等级</label>
+          <select id="t-reasoning" v-model="reasoningMode" class="select">
+            <option value="auto">按实际模型自动识别</option><option value="manual">手动声明兼容等级</option><option value="off">不开放调整</option>
+          </select>
+          <div v-if="reasoningMode === 'manual'">
+            <label v-for="level in ['low', 'medium', 'high', 'xhigh', 'max']" :key="level" class="check"><input v-model="reasoningLevels" type="checkbox" :value="level" />{{ level }}</label>
+          </div>
+          <span class="hint">中转别名或未知模型请手动填写上游支持的等级；只向客户端公开等级，不公开真实模型。</span>
+        </div>
       </fieldset>
 
       <div class="rules">

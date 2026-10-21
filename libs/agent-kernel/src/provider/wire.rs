@@ -66,6 +66,17 @@ impl fmt::Debug for ProviderProfile {
     }
 }
 
+/// Bind opaque continuation state to the endpoint/model that produced it, never to credentials.
+pub(crate) fn state_source(profile: &ProviderProfile) -> Value {
+    json!({"base_url":profile.base_url.trim().trim_end_matches('/'), "model":profile.model})
+}
+pub(crate) fn matching_state<'a>(message: &'a Message, profile: &ProviderProfile, protocol: &str) -> Option<&'a Value> {
+    message.provider_state.as_ref().filter(|s| s["protocol"] == protocol && s.get("source").is_none_or(|source| source == &state_source(profile)))
+}
+pub(crate) fn bind_state(message: &mut Message, profile: &ProviderProfile) {
+    if let Some(state) = message.provider_state.as_mut() { state["source"] = state_source(profile); }
+}
+
 pub fn message_to_wire(message: &Message) -> Value {
     match message.role {
         Role::Tool => json!({
@@ -76,6 +87,9 @@ pub fn message_to_wire(message: &Message) -> Value {
         Role::Assistant => {
             let text = message.text();
             let mut wire = json!({ "role": "assistant", "content": if text.is_empty() { Value::Null } else { Value::String(text) } });
+            if let Some(reasoning) = message.provider_state.as_ref().filter(|s| s["protocol"] == "chat").and_then(|s| s.get("reasoning_content")).filter(|v| v.is_string()) {
+                wire["reasoning_content"] = reasoning.clone();
+            }
             if !message.tool_calls.is_empty() {
                 wire["tool_calls"] = message
                     .tool_calls
@@ -114,7 +128,9 @@ pub fn build_request_body(profile: &ProviderProfile, request: &ChatRequest) -> V
         if message.role != Role::Tool && !media.is_empty() {
             messages.push(json!({"role": "user", "content": std::mem::take(&mut media)}));
         }
-        messages.push(message_to_wire(message));
+        let mut wire = message_to_wire(message);
+        if matching_state(message, profile, "chat").is_none() { wire.as_object_mut().unwrap().remove("reasoning_content"); }
+        messages.push(wire);
         for part in &message.parts {
             if let (Role::Tool, Part::Image { url }) = (message.role, part) {
                 media.push(json!({"type": "text", "text": format!("Image returned by tool call {}:", message.tool_call_id.as_deref().unwrap_or_default())}));

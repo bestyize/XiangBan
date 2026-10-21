@@ -55,11 +55,14 @@ pub struct Message {
     pub structured_content: Option<serde_json::Value>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub context_summary: Option<ContextSummary>,
+    /// Opaque protocol continuation state. It is persisted, but is not visible assistant text.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub provider_state: Option<serde_json::Value>,
 }
 
 impl Message {
     fn with(role: Role, parts: Vec<Part>) -> Self {
-        Self { role, parts, tool_calls: Vec::new(), tool_call_id: None, synthetic: false, is_error: false, structured_content: None, context_summary: None }
+        Self { role, parts, tool_calls: Vec::new(), tool_call_id: None, synthetic: false, is_error: false, structured_content: None, context_summary: None, provider_state: None }
     }
 
     /// A user-role message from the harness itself (see `synthetic`).

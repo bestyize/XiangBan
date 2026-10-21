@@ -64,7 +64,7 @@ pub fn merge(config: &mut AiConfig, catalogue: Catalogue) -> Result<(), String> 
             return Err("模型供应商配置无效".into());
         }
         let mut models = HashSet::new();
-        if p.models.iter().any(|m| m.id.trim().is_empty() || !models.insert(m.id.clone())) { return Err("模型列表无效".into()); }
+        if p.models.iter().any(|m| m.reasoning_efforts.as_ref().is_some_and(|v| crate::ai_reasoning::validate(v).is_err()) || m.id.trim().is_empty() || !models.insert(m.id.clone())) { return Err("模型列表无效".into()); }
         if p.provider_type == "paid" && p.apikey.is_empty() { return Err("官方服务未提供调用凭证".into()); }
         let proto = protocol(&p.protocol)?;
         let mut endpoints = BTreeMap::new();
@@ -87,6 +87,7 @@ pub fn merge(config: &mut AiConfig, catalogue: Catalogue) -> Result<(), String> 
         if first || local.selection_mode == "recommended" { local.model = p.default_model.clone(); }
         if p.provider_type != "third" || previous_endpoint != (local.base_url.clone(), local.model.clone(), local.protocol.clone()) {
             local.max_output_tokens = 0;
+            local.reasoning_efforts = None;
         }
         local.id = p.id; local.name = p.provider; local.description = p.description;
         local.provider_type = p.provider_type; local.remote = true; local.available = true;

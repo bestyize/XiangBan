@@ -2,7 +2,7 @@
 import { computed, onDeactivated, onMounted, onBeforeUnmount, ref, watch } from 'vue';
 import { NAlert, NButton, NInput, NInputNumber, NModal, NPopconfirm, NSelect, NSwitch, NTag } from 'naive-ui';
 import { Bot, Cpu, ExternalLink, FolderOpen, Globe, Plus, RefreshCw, Settings, ShieldCheck, Sparkles, Trash2, Wrench } from 'lucide-vue-next';
-import { GATEWAY_PROVIDER, invoke, listen, type AiConfigView, type AiProtocol, type AiReplyPreference, type ProviderConfigView } from '../../bridge.ts';
+import { GATEWAY_PROVIDER, invoke, listen, type AiConfigView, type AiProtocol, type AiReplyPreference, type AiReasoningEffort, type ProviderConfigView } from '../../bridge.ts';
 import AiGatewayCard from './AiGatewayCard.vue';
 import type { ControlStore } from '../control-types.ts';
 import {
@@ -14,7 +14,9 @@ import {
   insecureRemote,
   normalizeBaseUrl,
   protocolOption,
-  supportsReplyPreference,
+  reasoningLevels,
+  reasoningEfforts,
+  preferenceOptions,
   providerEndpoint,
   validateAiForm,
   validateBaseUrl,
@@ -59,6 +61,11 @@ const modalModel = ref('');
 const modalApiKey = ref('');
 const modalSelectionMode = ref<'manual' | 'recommended'>('manual');
 const modalReplyPreference = ref<AiReplyPreference>('default');
+const modalReasoningMode = ref<'auto' | 'manual' | 'off'>('auto');
+const modalReasoningLevels = ref<AiReasoningEffort[]>(['low', 'high', 'max']);
+watch([modalModel, modalProtocol], () => {
+  if (modalVisible.value) { modalReasoningMode.value = 'auto'; modalReplyPreference.value = 'default'; }
+}, { flush: 'sync' });
 const modalMaxOutputTokens = ref<number | null>(null);
 watch([modalBaseUrl, modalModel, modalProtocol], () => {
   if (modalVisible.value) modalMaxOutputTokens.value = null;
@@ -81,15 +88,14 @@ function getProviderMeta(id: string): ProviderMeta {
   return p?.remote ? remoteProviderMeta(p) : fallbackMeta(id);
 }
 const isManaged = computed(() => ['free', 'paid'].includes(getProviderSaved(editingId.value)?.type ?? ''));
-const canSetReplyPreference = computed(() => !isManaged.value && supportsReplyPreference(modalProtocol.value, modalBaseUrl.value, modalModel.value));
-const replyPreferenceOptions = [
-  { label: '默认', value: 'default' },
-  { label: '更快', value: 'faster' },
-  { label: '更深入', value: 'deeper' },
-];
-watch(canSetReplyPreference, supported => { if (!supported) modalReplyPreference.value = 'default'; });
-const selectedModelDescription = computed(() => currentMeta.value.models?.find(m => m.id === modalModel.value)?.description ?? '');
 const currentMeta = computed<ProviderMeta>(() => getProviderMeta(editingId.value));
+const modalLevels = computed(() => reasoningLevels(modalProtocol.value, modalModel.value,
+  modalReasoningMode.value === 'off' ? [] : modalReasoningMode.value === 'manual' ? modalReasoningLevels.value
+    : currentMeta.value.models?.find(m => m.id === modalModel.value)?.reasoningEfforts));
+const canSetReplyPreference = computed(() => modalLevels.value.length > 0);
+const replyPreferenceOptions = computed(() => preferenceOptions(modalLevels.value));
+watch(replyPreferenceOptions, options => { if (!options.some(o => o.value === modalReplyPreference.value)) modalReplyPreference.value = 'default'; });
+const selectedModelDescription = computed(() => currentMeta.value.models?.find(m => m.id === modalModel.value)?.description ?? '');
 const modalOption = computed(() => protocolOption(modalProtocol.value));
 const modalPreview = computed(() => validateBaseUrl(modalBaseUrl.value) ? '' : endpointPreview(modalProtocol.value, modalBaseUrl.value));
 
@@ -260,6 +266,8 @@ function openConfigureModal(id: string) {
     modalKeyHint.value = '';
   }
 
+  modalReasoningMode.value = p?.reasoningEfforts == null ? 'auto' : p.reasoningEfforts.length ? 'manual' : 'off';
+  modalReasoningLevels.value = p?.reasoningEfforts?.length ? [...p.reasoningEfforts] : ['low', 'high', 'max'];
   modalSelectionMode.value = p?.selectionMode ?? 'manual';
   modalReplyPreference.value = p?.replyPreference ?? 'default';
   modalMaxOutputTokens.value = p?.maxOutputTokens || null;
@@ -270,6 +278,8 @@ function openConfigureModal(id: string) {
 }
 
 function openCreateCustomModal() {
+  modalReasoningMode.value = 'auto';
+  modalReasoningLevels.value = ['low', 'high', 'max'];
   modalSelectionMode.value = 'manual';
   modalReplyPreference.value = 'default';
   const newId = `custom_${Date.now()}`;
@@ -326,6 +336,7 @@ async function saveProvider(activate: boolean) {
       clearKey: false,
       activate,
       selectionMode: modalSelectionMode.value,
+      ...(!isManaged.value ? { reasoningEfforts: modalReasoningMode.value === 'manual' ? modalReasoningLevels.value : modalReasoningMode.value === 'off' ? [] : null, clearReasoningEfforts: modalReasoningMode.value === 'auto' } : {}),
       replyPreference: canSetReplyPreference.value ? modalReplyPreference.value : 'default',
       maxOutputTokens: !isManaged.value && modalProtocol.value !== 'chat' ? modalMaxOutputTokens.value ?? 0 : 0,
     });
@@ -753,10 +764,10 @@ function getProviderIcon(id: string) {
           </div>
         </div>
 
-        <details v-if="modalVisible && !isManaged && modalProtocol !== 'chat'" class="reply-preference" data-testid="ai-reply-advanced">
+        <details v-if="modalVisible && (!isManaged || canSetReplyPreference)" class="reply-preference" data-testid="ai-reply-advanced">
           <summary>高级设置</summary>
           <div v-if="canSetReplyPreference" class="field">
-            <label for="ai-reply-preference">回答偏好</label>
+            <label for="ai-reply-preference">思考等级</label>
             <NSelect
               v-model:value="modalReplyPreference"
               input-id="ai-reply-preference"
@@ -766,7 +777,13 @@ function getProviderIcon(id: string) {
             />
             <small>默认沿用服务商设置。更深入可能耗时更久、消耗更多额度。</small>
           </div>
-          <div class="field">
+          <div v-if="!isManaged && modalProtocol !== 'anthropic'" class="field">
+            <label for="ai-reasoning-mode">模型支持的思考等级</label>
+            <NSelect v-model:value="modalReasoningMode" input-id="ai-reasoning-mode" :options="[{label:'自动识别',value:'auto'},{label:'手动声明',value:'manual'},{label:'不支持',value:'off'}]" data-testid="ai-reasoning-mode" />
+            <NSelect v-if="modalReasoningMode === 'manual'" v-model:value="modalReasoningLevels" multiple :options="reasoningEfforts.map(value => ({value,label:value}))" data-testid="ai-reasoning-levels" />
+            <small>代理地址同样支持自动识别；模型使用别名时，可按服务商文档声明支持的等级。</small>
+          </div>
+          <div v-if="!isManaged && modalProtocol !== 'chat'" class="field">
             <label for="ai-max-output-tokens">单次输出上限</label>
             <NInputNumber v-model:value="modalMaxOutputTokens" input-id="ai-max-output-tokens" :min="1024" :max="131072" :precision="0" placeholder="自动" :disabled="!store.desktop || !!busy" data-testid="ai-max-output-tokens" />
             <small>单位为 token，与上下文容量分别设置。留空按模型信息选择，未知模型使用 8192；手动填写前请确认服务商支持的上限。</small>

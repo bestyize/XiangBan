@@ -63,6 +63,8 @@ impl ModelProvider for OpenAiCompat {
         };
         let mut decoder = ChatDecoder::default();
         http::post_stream(&self.client, call, &mut decoder, on_text, cancel)?;
-        Ok(decoder.0.finish())
+        let mut reply = decoder.0.finish();
+        super::wire::bind_state(&mut reply.message, &self.profile);
+        Ok(reply)
     }
 }

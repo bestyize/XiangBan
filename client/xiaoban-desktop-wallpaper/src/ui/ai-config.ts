@@ -1,8 +1,8 @@
-import type { AiProtocol, ProviderConfigView } from '../bridge.ts';
+import type { AiProtocol, AiReasoningEffort, AiReplyPreference, ProviderConfigView } from '../bridge.ts';
 
 export interface ProviderMeta {
   type?: "third" | "free" | "paid";
-  models?: { id: string; name: string; description?: string }[];
+  models?: { id: string; name: string; description?: string; reasoningEfforts?: AiReasoningEffort[] | null }[];
   id: string;
   name: string;
   desc: string;
@@ -127,14 +127,28 @@ export const protocolOption = (protocol: AiProtocol) =>
 /** Trimmed, without trailing slashes: the form the host stores. */
 export const normalizeBaseUrl = (value: string) => value.trim().replace(/\/+$/, '');
 
-/** Explicitly verified endpoint/model pairs; keep aligned with ai_reasoning::supported. */
-export function supportsReplyPreference(protocol: AiProtocol, baseUrl: string, model: string): boolean {
-  if (protocol !== 'responses') return false;
-  const base = normalizeBaseUrl(baseUrl);
-  const name = model.trim();
-  if (base === 'https://api.openai.com/v1') return ['gpt-6-astra', 'gpt-6.1-sol', 'gpt-6-sol', 'gpt-6-luna'].includes(name);
-  if (['https://api.deepseek.com', 'https://api.deepseek.com/v1'].includes(base)) return ['deepseek-flash', 'deepseek-v4-pro'].includes(name);
-  return false;
+/** Keep model/protocol inference aligned with the native ai_reasoning module. */
+export const reasoningEfforts: AiReasoningEffort[] = ['low', 'medium', 'high', 'xhigh', 'max'];
+export function reasoningLevels(protocol: AiProtocol, model: string, declared?: AiReasoningEffort[] | null): AiReasoningEffort[] {
+  if (protocol !== 'responses' && protocol !== 'chat') return [];
+  if (declared != null) return reasoningEfforts.filter(level => declared.includes(level));
+  const name = model.trim().split('/').pop()?.toLowerCase();
+  if (['gpt-6-astra', 'gpt-6.1-sol', 'gpt-6-sol', 'gpt-6-luna'].includes(name ?? '')) return [...reasoningEfforts];
+  if (['deepseek-flash', 'deepseek-v4-pro', 'kimi-k3', 'glm-5.2', 'glm-5.3', 'glm-5.3-flash'].includes(name ?? '')) return ['low', 'high', 'max'];
+  return [];
+}
+export function providerReasoningLevels(provider: ProviderConfigView, model: string): AiReasoningEffort[] {
+  return reasoningLevels(provider.protocol, model, (model === provider.model ? provider.reasoningEfforts : undefined) ?? provider.models?.find(m => m.id === model)?.reasoningEfforts);
+}
+export function preferenceOptions(levels: AiReasoningEffort[]): { value: AiReplyPreference; label: string }[] {
+  const options: Record<AiReasoningEffort, { value: AiReplyPreference; label: string }> = {
+    low: { value: 'faster', label: '低 · 更快' }, medium: { value: 'medium', label: '中' },
+    high: { value: 'deeper', label: '高 · 更深入' }, xhigh: { value: 'xhigh', label: '超高' }, max: { value: 'max', label: '最高' },
+  };
+  return [{ value: 'default', label: '默认' }, ...reasoningEfforts.filter(level => levels.includes(level)).map(level => options[level])];
+}
+export function supportsReplyPreference(protocol: AiProtocol, _baseUrl: string, model: string): boolean {
+  return reasoningLevels(protocol, model).length > 0;
 }
 
 /** The address a request will go to, spelled the same way the host builds it. */
