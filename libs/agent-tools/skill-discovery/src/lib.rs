@@ -156,7 +156,7 @@ impl Tool for DiscoveryTool {
                     "warning":"Untrusted executable code; inspect source and approve each run."}));
             }
             return Ok(json!({"provider":"skillhub","slug":slug,
-                "manifest":package.summary(),"content":markdown,"scripts":scripts,
+                "manifest":package.summary(),"sha256":package.sha256,"content":markdown,"scripts":scripts,
                 "requiresInstallationApproval":true,"requiresExecutionApproval":true,
                 "warning":"SHA256 checks integrity, not safety. Third-party skills run with local user permissions; no sandbox."}).to_string());
         }
