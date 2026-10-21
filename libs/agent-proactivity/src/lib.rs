@@ -4,6 +4,7 @@
 //! A host supplies approved events and an explicit context, then owns all delivery and permissions.
 //! Raw user activity content is deliberately not stored.
 pub mod attention;
+pub mod context;
 pub mod engine;
 pub mod event;
 pub mod feedback;
@@ -13,3 +14,5 @@ pub use engine::{suggest, Action, Decision, Engine, EngineState, Observation, Su
 pub use event::{Event, EventKind, EventSource};
 pub use feedback::Feedback;
 pub use policy::{ActionKind, Candidate, Channel, Context, Policy};
+
+pub use context::{ContextSnapshot, ContextChange, changes};
