@@ -9,7 +9,7 @@ pub mod event;
 pub mod feedback;
 pub mod policy;
 
-pub use engine::{Action, Decision, Engine, EngineState, Observation, Suppression};
+pub use engine::{suggest, Action, Decision, Engine, EngineState, Observation, Suppression};
 pub use event::{Event, EventKind, EventSource};
 pub use feedback::Feedback;
 pub use policy::{ActionKind, Candidate, Channel, Context, Policy};

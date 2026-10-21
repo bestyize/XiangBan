@@ -45,7 +45,7 @@ impl Attention {
         if let Some(topic) = &candidate.topic_id {
             self.topics.retain(|seen| &seen.id != topic);
             self.topics.push(TopicSeen { id: topic.clone(), at_ms: now });
-            if self.topics.len() > 64 { self.topics.drain(..self.topics.len()-64); }
+            if self.topics.len() > 64 { let excess = self.topics.len() - 64; self.topics.drain(..excess); }
         }
     }
 }

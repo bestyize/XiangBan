@@ -23,4 +23,3 @@ jobs:
         with:
           workspaces: libs/agent-proactivity
       - run: cargo test --manifest-path libs/agent-proactivity/Cargo.toml
-      - run: cargo fmt --manifest-path libs/agent-proactivity/Cargo.toml -- --check

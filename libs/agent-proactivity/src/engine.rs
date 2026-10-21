@@ -85,7 +85,7 @@ impl Engine {
         self.state.next_id += 1;
         self.state.attention.reserve(&candidate, ctx.local_day, now);
         self.state.receipts.push(Receipt { id, feedback_recorded: false });
-        if self.state.receipts.len() > 64 { self.state.receipts.drain(..self.state.receipts.len()-64); }
+        if self.state.receipts.len() > 64 { let excess = self.state.receipts.len() - 64; self.state.receipts.drain(..excess); }
         Decision::Allowed(Action { id, kind: candidate.kind, channel: candidate.channel, topic_id: candidate.topic_id })
     }
 
