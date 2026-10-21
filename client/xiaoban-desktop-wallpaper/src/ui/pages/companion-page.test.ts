@@ -15,11 +15,11 @@ async function add(view:ReturnType<typeof mount>,petId:string,layer:'desktop'|'t
 beforeEach(()=>{localStorage.clear();vi.mocked(invoke).mockReset();});
 describe('theme-based desktop pet library',()=>{
  it('only allows enabling deliberate, native companion greetings from the desktop pet tab',async()=>{
-  vi.mocked(invoke).mockImplementation(async (command:string, args?:any)=>{
+  vi.mocked(invoke).mockImplementation((async (command:string, args?:{settings?:unknown})=>{
    if(command==='get_proactivity_settings')return {enabled:false,frequency:'natural'};
-   if(command==='configure_proactivity')return args.settings;
+   if(command==='configure_proactivity')return args?.settings;
    return undefined;
-  });
+  }) as typeof invoke);
   const {view}=setup(true);await flushPromises();
   expect(view.find('[data-testid="pet-proactivity-settings"]').exists()).toBe(false);
   await tab(view,'桌面伙伴');
