@@ -111,11 +111,18 @@ describe('chat workbench composer actions', () => {
     expect(h.commands()).not.toContain('chat_send');
   });
 
-  it('opens the installed-model switch dialog from the composer', async () => {
-    await open({ refresh_ai_providers: () => ({ model: 'coding-model', activeProvider: 'demo', providers: [] }) });
+  it('lists configured providers and their models in a compact composer menu', async () => {
+    const config = { model: 'coding-model', activeProvider: 'demo', providers: [{
+      id: 'demo', name: '演示供应商', protocol: 'chat', baseUrl: 'https://example.com', model: 'coding-model',
+      hasKey: true, isCustom: true, models: [{ id: 'coding-model', name: 'Coding Model' }, { id: 'reasoning', name: '推理模型' }],
+    }] };
+    const h = await open({ get_ai_config: () => config, refresh_ai_providers: () => config,
+      save_ai_provider: () => undefined });
     expect(q('chat-workbench-model')!.textContent).toContain('Coding Model');
     await click('chat-workbench-model');
-    expect(document.body.textContent).toContain('选择供应商和模型');
+    expect(wrapper!.element.textContent).toContain('演示供应商');
+    await click('chat-model-demo-reasoning');
+    expect(h.commands()).toContain('save_ai_provider');
   });
 });
 
