@@ -216,10 +216,10 @@ mod tests {
     fn autonomous_discovery_requires_specific_gap_and_alternatives() {
         let policy = policy_with_task("帮我整理文件");
         assert!(!is_allowed(search(&policy, serde_json::json!({"keyword":"excel"}))));
-        assert!(!is_allowed(search(&policy, serde_json::json!({
+        assert!(is_allowed(search(&policy, serde_json::json!({
             "keyword":"excel", "reason":"capability_gap", "gap":"没有可用的电子表格分析工具",
             "alternatives":"试过的方案只有内置的文件读取，不足以操作公式"
-        }))) == false);
+        }))));
         // The first blocked search must not consume the search budget.
         assert!(!is_allowed(search(&policy, serde_json::json!({"keyword":"excel"}))));
     }
