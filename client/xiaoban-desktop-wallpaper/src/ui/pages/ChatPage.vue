@@ -7,7 +7,7 @@ import type { ControlStore } from '../control-types.ts';
 import ModelSwitchDialog from '../components/ModelSwitchDialog.vue';
 import ChatWorkbenchTools from '../components/ChatWorkbenchTools.vue';
 import ChatComposerModel from '../components/ChatComposerModel.vue';
-import type { AiConfigView } from '../../bridge.ts';
+import { GATEWAY_PROVIDER, type AiConfigView, type AiTier } from '../../bridge.ts';
 import ChatNameDialog from '../components/ChatNameDialog.vue';
 import ChatMoveDialog from '../components/ChatMoveDialog.vue';
 import ChatContextRing from '../components/ChatContextRing.vue';
@@ -39,10 +39,23 @@ const guideDialog = ref(false);
 const retryAfterSwitch = ref(false);
 function chooseModel(retry = false) { retryAfterSwitch.value = retry; modelDialog.value = true; }
 const modelLabel = ref('编程模型');
+let modelLabelGeneration = 0;
 async function readModelLabel() {
   if (!props.store.desktop) return;
+  const generation = ++modelLabelGeneration;
   try {
     const config = await invoke<AiConfigView>('get_ai_config');
+    if (generation !== modelLabelGeneration) return;
+    if (config.activeProvider === GATEWAY_PROVIDER) {
+      modelLabel.value = '小伴 AI';
+      try {
+        const tiers = await invoke<AiTier[]>('ai_gateway_tiers');
+        if (generation !== modelLabelGeneration) return;
+        const tier = tiers.find(t => t.tier === (config.gatewayTier || config.model));
+        if (tier) modelLabel.value = `小伴 AI · ${tier.displayName}`;
+      } catch { /* Keep a readable gateway label when login or the network is unavailable. */ }
+      return;
+    }
     const provider = config.providers?.find(p => p.id === config.activeProvider);
     modelLabel.value = provider?.models?.find(m => m.id === config.model)?.name || config.model || '编程模型';
   } catch { /* Preserve the last known label while preferences are unavailable. */ }

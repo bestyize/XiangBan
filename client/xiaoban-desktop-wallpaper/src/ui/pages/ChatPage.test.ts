@@ -124,6 +124,21 @@ describe('chat workbench composer actions', () => {
     await click('chat-model-demo-reasoning');
     expect(h.commands()).toContain('save_ai_provider');
   });
+
+  it('shows a friendly gateway mode label and updates it after switching', async () => {
+    const config = { activeProvider: 'xiaoban-ai', gatewayEnabled: true, gatewayTier: 'standard', model: 'standard', providers: [] };
+    const tiers = [
+      { tier: 'standard', displayName: '日常', available: true },
+      { tier: 'advanced', displayName: '深入', available: true },
+    ];
+    const h = await open({ get_ai_config: () => config, refresh_ai_providers: () => config, ai_gateway_tiers: () => tiers,
+      use_ai_gateway: args => { config.gatewayTier = config.model = args!.tier as string; return config; } });
+    expect(q('chat-workbench-model')!.textContent).toContain('小伴 AI · 日常');
+    await click('chat-workbench-model');
+    await click('chat-model-xiaoban-ai-advanced');
+    expect(h.calls).toContainEqual(['use_ai_gateway', { tier: 'advanced' }]);
+    expect(q('chat-workbench-model')!.textContent).toContain('小伴 AI · 深入');
+  });
 });
 
 describe('the chat page before a conversation', () => {
@@ -291,7 +306,7 @@ describe('talking', () => {
     await type('写');
     await click('chat-send');
     await h.events('s1', { type: 'text_delta', text: '写到一半' }, { type: 'truncated' }, { type: 'done' });
-    expect(q('notice-warning')!.textContent).toContain('被截断');
+    expect(q('notice-warning')!.textContent).toContain('单次输出上限');
     await click('chat-continue');
     expect(h.calls.at(-1)).toEqual(['chat_send', { sessionId: 's1', text: CONTINUE_TEXT }]);
     expect(q('chat-continue'), 'hidden while the new answer runs').toBeNull();
