@@ -208,6 +208,16 @@ fn show_bubble(app: &tauri::AppHandle, pet: &tauri::WebviewWindow) -> Result<(),
     let bubble = builder.build().map_err(|e| e.to_string())?;
     #[cfg(target_os = "macos")]
     crate::macos::configure_scene(&bubble, false, false)?;
+    let layer = crate::pets::window_layer(app, pet.label()).unwrap_or_else(|| "topmost".into());
+    crate::window_control::apply_layer(&bubble, &layer)?;
+    #[cfg(windows)]
+    if layer == "desktop" {
+        let scale = bubble.scale_factor().map_err(|e| e.to_string())?;
+        crate::windows::place_widget(&bubble, pos, (WIDTH * scale).round() as i32, (HEIGHT * scale).round() as i32)?;
+    } else {
+        bubble.set_position(pos).map_err(|e| e.to_string())?;
+    }
+    #[cfg(not(windows))]
     bubble.set_position(pos).map_err(|e| e.to_string())?;
     bubble.show().map_err(|e| e.to_string())
 }
