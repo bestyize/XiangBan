@@ -775,19 +775,26 @@ fn game_open(desktop: &dyn Desktop, args: &Value) -> Result<String, String> {
     })
 }
 
-fn game_create(desktop: &dyn Desktop, args: &Value) -> Result<String, String> {
+fn game_create(desktop: &dyn Desktop, args: &Value, workspace: &std::path::Path) -> Result<String, String> {
     let id = text_arg(args, "id")?;
     let name = text_arg(args, "name")?;
     let description = text_arg(args, "description")?;
     let save = optional_bool(args, "save")?.unwrap_or(false);
     let overwrite = optional_bool(args, "overwrite")?.unwrap_or(false);
-    let items = args.get("files").and_then(Value::as_array).ok_or("`files` is required and must be an array of { path, content }")?;
-    let mut files = Vec::with_capacity(items.len());
-    for item in items {
-        let path = item.get("path").and_then(Value::as_str).ok_or("each file needs a string `path`")?;
-        let content = item.get("content").and_then(Value::as_str).ok_or_else(|| format!("文件 {path} 缺少文本 `content`"))?;
-        files.push((path.to_string(), content.to_string()));
-    }
+    let mut files = if let Some(source) = optional_text(args, "source_dir")? {
+        if args.get("files").is_some() { return Err("files 和 source_dir 只能提供一个".into()); }
+        super::game_draft::read(workspace, source)?
+    } else {
+        let items = args.get("files").and_then(Value::as_array).ok_or("请提供 files 或 source_dir")?;
+        let mut files = Vec::with_capacity(items.len());
+        for item in items {
+            let path = item.get("path").and_then(Value::as_str).ok_or("each file needs a string `path`")?;
+            let content = item.get("content").and_then(Value::as_str).ok_or_else(|| format!("文件 {path} 缺少文本 `content`"))?;
+            files.push((path.to_string(), content.to_string()));
+        }
+        files
+    };
+    files.sort_by(|a, b| a.0.cmp(&b.0));
     // Same checks the writer runs, so a bad request is refused before the desktop is involved.
     crate::game_packs::validate_request(id, name, description, &files)?;
     let made = desktop.create_game(id, name, description, &files, save, overwrite)?;
@@ -806,6 +813,7 @@ fn game_delete(desktop: &dyn Desktop, args: &Value) -> Result<String, String> {
 }
 
 const GAME_CREATE_DESCRIPTION: &str = "为用户创作一款离线小游戏，保存成游戏文件夹（用户数据目录 games/packs/<id>/，文件夹即游戏）。保存后不会自动打开，试玩请再调用 game_open(id)；可用 game_list 查看、game_delete 删除。\n\
+优先分步创作：在当前工作目录的专用子目录（如 game-drafts/<id>/）使用 write_file 逐个写入 index.html、style.css、game.js 等，较长脚本继续拆分；用 edit_file 局部修改，保留已完成文件。完成后调用本工具，source_dir 指向该草稿目录，无需在参数中重传源码。files 和 source_dir 必须二选一；files 仅适合简短作品。安装失败不会改动已有游戏，修正草稿后再安装。不要通过缩减玩法或反复重写整包来应付输出超限。\n\
 游戏包规范：\n\
 1. 文件：files 必须包含 index.html 作为入口，其余文件用相对路径引用（如 <script src=\"game.js\"></script>、<link rel=\"stylesheet\" href=\"style.css\">）。只能写 html、js、css、json、svg、md、txt 文本文件，最多 40 个，单个不超过 1 MB，合计不超过 4 MB；路径只用字母数字和 . _ -，用 / 分层，最多 4 层，不以 . 开头。不要写 manifest.json（由本工具生成）；若包含 cover.svg 会用作封面。\n\
 2. 脚本：用普通经典脚本（<script src>），不要 ES modules（type=module、import/export），所有资源用相对路径，不联网、不引用任何外部 CDN、字体或图片；图片用内联 SVG 或 canvas 绘制。\n\
@@ -847,7 +855,13 @@ fn pet_catalog(desktop:&dyn Desktop,args:&Value)->Result<String,String>{
  let themes=value["themes"].as_array().into_iter().flatten().map(|t|json!({"id":t["id"],"name":t["name"],"source":t["source"],"pets":t["pets"].as_array().into_iter().flatten().map(|p|json!({"id":p["id"],"name":p["name"],"kind":p["kind"]})).collect::<Vec<_>>()})).collect::<Vec<_>>();
  Ok(json!({"themes":themes,"instances":value["layout"]["instances"],"errors":value["errors"]}).to_string())
 }
+#[cfg(test)]
 pub fn tools(desktop: Arc<dyn Desktop>) -> Vec<Arc<dyn Tool>> {
+    tools_in_workspace(desktop, std::path::Path::new("."))
+}
+
+pub fn tools_in_workspace(desktop: Arc<dyn Desktop>, workspace: &std::path::Path) -> Vec<Arc<dyn Tool>> {
+    let game_workspace = workspace.to_path_buf();
     let none = || object(json!({}), &[]);
     let status_run = |d: &dyn Desktop, _: &Value| -> Result<String, String> { Ok(d.status()?.to_string()) };
     vec![
@@ -1090,11 +1104,13 @@ pub fn tools(desktop: Arc<dyn Desktop>) -> Vec<Arc<dyn Tool>> {
             ToolSpec::new(
                 "game_create",
                 GAME_CREATE_DESCRIPTION,
-                object(
+                {
+                let mut schema = object(
                     json!({
                         "id": { "type": "string", "description": "游戏英文标识（小写字母、数字、-，2 到 40 个字符，如 star-catcher；不能与内置游戏重名）" },
                         "name": { "type": "string", "description": "游戏中文名称（最多 24 字）" },
                         "description": { "type": "string", "description": "一句话介绍（最多 80 字）" },
+                        "source_dir": { "type": "string", "description": "当前工作目录内的游戏草稿子目录，与 files 二选一；用文件工具逐步创作后再安装，无需重传源码" },
                         "files": {
                             "type": "array",
                             "maxItems": 40,
@@ -1111,12 +1127,15 @@ pub fn tools(desktop: Arc<dyn Desktop>) -> Vec<Arc<dyn Tool>> {
                         "save": { "type": "boolean", "description": "游戏是否需要本机存档，默认 false" },
                         "overwrite": { "type": "boolean", "description": "true 时覆盖同 id 的已有自创游戏，默认 false" }
                     }),
-                    &["id", "name", "description", "files"],
-                ),
+                    &["id", "name", "description"],
+                );
+                schema["oneOf"] = json!([{"required": ["files"], "not": {"required": ["source_dir"]}}, {"required": ["source_dir"], "not": {"required": ["files"]}}]);
+                schema
+                },
             )
             .risk(Risk::Write)
             .serial(),
-            game_create,
+            move |desktop, args| game_create(desktop, args, &game_workspace),
         ),
         tool(
             &desktop,
@@ -1354,7 +1373,7 @@ mod tests {
         let mut unique = names.clone();
         unique.dedup();
         assert_eq!(names, unique);
-        assert_eq!(names.len(), 37);
+        assert_eq!(names.len(), 39);
         for tool in &all {
             let spec = tool.spec();
             assert!(spec.name.len() <= 64 && spec.name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_'), "{}", spec.name);
@@ -1364,7 +1383,7 @@ mod tests {
         let read: Vec<&str> = all.iter().filter(|t| t.spec().risk == Risk::Read).map(|t| t.spec().name.as_str()).collect();
         let mut read = read;
         read.sort();
-        assert_eq!(read, vec!["care_list", "desktop_status", "desktop_windows", "effect_list", "effect_read_format", "game_list", "pet_catalog", "pet_read_format", "wallpaper_list", "widget_list"]);
+        assert_eq!(read, vec!["care_list", "computer_use_diagnose", "desktop_status", "desktop_windows", "effect_list", "effect_read_format", "game_list", "pet_catalog", "pet_read_format", "wallpaper_list", "widget_list"]);
         for tool in all.iter().filter(|t| t.spec().risk == Risk::Write) {
             assert!(!tool.spec().parallel_safe, "{} changes shared settings, so it runs alone", tool.spec().name);
         }

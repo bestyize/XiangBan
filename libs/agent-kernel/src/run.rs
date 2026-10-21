@@ -19,7 +19,9 @@ pub struct RunSummary {
 }
 
 const CUT_OFF_MESSAGE: &str = "Not run: your reply hit the output length limit, so this tool call may be incomplete. \
-                               Try again with a shorter reply, or split the work into smaller steps.";
+                               No calls in this batch were executed. Do not continue or concatenate partial JSON. \
+                               Retry with complete, smaller tool calls: write files separately and use targeted edits \
+                               instead of sending the entire artifact again. Keep all previously successful work.";
 
 struct SessionGuard<'a> {
     agent: &'a Agent,
@@ -215,6 +217,7 @@ impl Agent {
         let mut continuations = 0;
         let mut continuations_without_progress = 0;
         let mut successful_calls = Vec::new();
+        let mut truncated_tool_retries = 0usize;
         let mut tool_calls = 0usize;
         let mut recovered_context_budget = None;
         for index in 0..self.max_turns {
@@ -247,7 +250,6 @@ impl Agent {
             let cut_off = finish == FinishReason::Length;
             let cut_calls = cut_off && !assistant.tool_calls.is_empty();
             if cut_calls {
-                on_event(Event::Truncated);
                 // Half-written arguments would be sent back to the model as history; keep them parseable.
                 for call in &mut assistant.tool_calls {
                     if !serde_json::from_str::<serde_json::Value>(&call.arguments).is_ok_and(|v| v.is_object()) {
@@ -300,6 +302,16 @@ impl Agent {
             self.store.append(session, &tool_messages)?;
             history.extend(tool_messages);
             if over_budget { return Err(HarnessError::BudgetExceeded("tool calls".into())); }
+            if cut_calls {
+                if cancel.load(Ordering::Relaxed) { return Err(HarnessError::Cancelled); }
+                if truncated_tool_retries >= self.max_truncated_tool_retries {
+                    return Err(HarnessError::Paused("output_length_limit".into()));
+                }
+                if index + 1 == self.max_turns { return Err(HarnessError::MaxTurns(self.max_turns)); }
+                truncated_tool_retries += 1;
+                on_event(Event::Continuing { reason: "tool_call_length".into() });
+                continue;
+            }
             for (call, result) in calls.iter().zip(&results) {
                 if result.is_error || matches!(call.name.as_str(), "todo" | "ask_user" | "time_now") {
                     continue;
@@ -309,6 +321,7 @@ impl Agent {
                 if !successful_calls.contains(&key) {
                     successful_calls.push(key);
                     continuations_without_progress = 0;
+                    truncated_tool_retries = 0;
                 }
             }
         }

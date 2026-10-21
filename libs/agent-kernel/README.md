@@ -89,7 +89,7 @@ agent.run("session-1", "你好", &mut |event| { /* 转给 UI */ }, &Arc::new(Ato
 - 工具不存在、参数不合法、超时、崩溃、被中间件阻止，都作为错误结果交还模型，不中断循环。
 - 取消后历史里每个 `tool_call` 都有对应结果，会话可继续使用。
 - 普通重试只发生在可重试错误（429、5xx、网络错误、流提前结束）且尚未流出任何文本时。明确的上下文超限另有最多两次恢复：逐步缩减请求中的旧工具结果/完整旧轮次，本次运行后续工具轮继续使用收紧后的预算；不改原始历史、不重放已执行工具。普通 400、已流出文本或无法再缩减时不恢复。
-- 回答因长度被截断（`FinishReason::Length`，三种协议各自的 `length`、`max_tokens`、`max_output_tokens` 等都归到这里）：发出 `Event::Truncated`，`RunSummary::finish` 为 `Length`。截断的回答里若带工具调用，一个都不执行（半截参数不可信），改为回给模型一条"未执行，请缩短回复或拆小步骤"的错误结果让它重试；历史里解析不了的参数会被换成 `{}`，保证之后仍是合法 JSON。模型反复被截断时由 `max_turns` 兜底。
+- 回答因长度被截断（`FinishReason::Length`）：纯文字在未自动续写、将返回时发出 `Event::Truncated`，`RunSummary::finish` 为 `Length`；安装 `ContinueGuard` 后可有界续写。截断回复若带工具调用，整批不执行（半截参数不可信），回填“未执行，拆小步骤、逐文件写入或局部编辑”的错误结果；无效参数换成 `{}`，保证历史合法。自动恢复只发 `Continuing { reason: "tool_call_length" }`，不把中间失败报告成最终截断。默认最多重试 3 次（共 4 次被截断后暂停），由 `AgentBuilder::max_truncated_tool_retries` 配置，0 表示第一次即暂停。新的成功工具调用会重置该预算；重复调用、失败、todo/ask_user/time_now 不重置。耗尽返回 `Paused("output_length_limit")`，已成功动作不重放，失败调用和结果仍成对保存；`max_turns` 继续兜底。
 - 取消能打断等人的地方：`Approver` 用 `request.wait_for(&rx)`、`AskUser` 回调用 `ctx.wait_for(&rx)` 等待用户时，取消运行会让它们立即返回；取消后给出的批准会被丢弃，工具不执行，也不记入"总是允许"。不配合的回调（直接阻塞）会拖到它自己返回为止，stdio 桥已经处理好了。
 - 工具超时靠协作式取消：超时后设置 `ToolCtx::is_cancelled`，不响应的工具线程会继续跑到结束，结果被丢弃。
 - 宿主若启用 `panic = "abort"`，工具里的 panic 会直接终止进程。工具内部不要 panic。

@@ -32,6 +32,7 @@ pub struct Agent {
     pub(crate) system_prompt: String,
     pub(crate) prompt_sections: Vec<PromptSection>,
     pub(crate) max_turns: usize,
+    pub(crate) max_truncated_tool_retries: usize,
     pub(crate) retry: RetryPolicy,
     pub(crate) running: Mutex<HashSet<String>>,
 }
@@ -46,6 +47,7 @@ impl Agent {
             system_prompt: String::new(),
             prompt_sections: Vec::new(),
             max_turns: 25,
+            max_truncated_tool_retries: 3,
             retry: RetryPolicy::default(),
         }
     }
@@ -78,6 +80,7 @@ pub struct AgentBuilder {
     system_prompt: String,
     prompt_sections: Vec<PromptSection>,
     max_turns: usize,
+    max_truncated_tool_retries: usize,
     retry: RetryPolicy,
 }
 
@@ -111,6 +114,13 @@ impl AgentBuilder {
 
     pub fn max_turns(mut self, max_turns: usize) -> Self {
         self.max_turns = max_turns;
+        self
+    }
+
+    /// Recoveries after tool-call arguments hit the output limit without new successful tool
+    /// progress. Zero pauses on the first cutoff. Completed calls are never replayed.
+    pub fn max_truncated_tool_retries(mut self, retries: usize) -> Self {
+        self.max_truncated_tool_retries = retries;
         self
     }
 
@@ -152,6 +162,7 @@ impl AgentBuilder {
             system_prompt: self.system_prompt,
             prompt_sections: self.prompt_sections,
             max_turns: self.max_turns,
+            max_truncated_tool_retries: self.max_truncated_tool_retries,
             retry: self.retry,
             running: Mutex::new(HashSet::new()),
         })

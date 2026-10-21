@@ -56,6 +56,12 @@ function endStreaming(view: SessionView) {
   for (const item of view.items) if (item.kind === 'assistant' && item.streaming) item.streaming = false;
 }
 
+/** Compatibility with hosts that reported a cutoff before attempting automatic recovery. */
+function clearRecoveredCutoff(view: SessionView) {
+  const start = view.items.map(item => item.kind).lastIndexOf('user');
+  view.items = view.items.filter((item, at) => at <= start || item.kind !== 'notice' || item.code !== 'truncated');
+}
+
 function settle(view: SessionView) {
   endStreaming(view);
   for (const item of view.items) if (item.kind === 'tool' && item.status === 'running') { item.status = 'error'; item.output = item.output || '已中断'; }
@@ -88,6 +94,7 @@ export function applyEvent(view: SessionView, event: KernelEvent): void {
       const output = toolOutput(event.output, event.structured_content);
       if (item) { item.output = output; item.status = event.is_error ? 'error' : 'done'; }
       else view.items.push({ kind: 'tool', id: event.id, name: '', arguments: '', output, status: event.is_error ? 'error' : 'done' });
+      if (!event.is_error) clearRecoveredCutoff(view);
       break;
     }
     case 'retrying':
@@ -95,12 +102,16 @@ export function applyEvent(view: SessionView, event: KernelEvent): void {
       break;
     case 'truncated':
       endStreaming(view);
-      view.items.push({ kind: 'notice', id: nextId(view), tone: 'warning', text: '回答太长，被截断了。', canContinue: true });
+      view.items.push({ kind: 'notice', id: nextId(view), tone: 'warning', code: 'truncated', text: '回答达到单次输出上限，尚未完成。', canContinue: true });
       break;
     case 'continuing':
       // The next reply is a new message, not more of the one that just stopped.
       endStreaming(view);
-      view.status = '还没做完，小伴继续处理中…';
+      clearRecoveredCutoff(view);
+      view.status = event.reason === 'tool_call_length'
+        ? '代码生成超过单次输出上限，小伴正在调整步骤重试…'
+        : event.reason === 'length' ? '回答达到单次输出上限，小伴正在接着写…'
+          : '还没做完，小伴继续处理中…';
       break;
     case 'done':
       settle(view);
@@ -118,7 +129,9 @@ export function applyEvent(view: SessionView, event: KernelEvent): void {
         break;
       }
       if (/^run paused by continuation guard:/.test(event.message)) {
-        const text = event.message.endsWith(': no_progress')
+        const text = event.message.endsWith(': output_length_limit')
+          ? '连续多次生成的工具参数超过输出上限，小伴已暂停。已完成的操作已保留，点“继续”可以接着处理。'
+          : event.message.endsWith(': no_progress')
           ? '连续多次未取得新进展，小伴已暂停。点“继续”可以接着尝试。'
           : '已达到自动续跑次数上限，小伴已暂停。点“继续”可以接着做。';
         view.items.push({ kind: 'notice', id: nextId(view), tone: 'warning', text, canContinue: true, details: event.message });

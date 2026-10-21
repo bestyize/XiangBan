@@ -53,7 +53,8 @@ fn tool_calls_in_a_cut_off_reply_are_not_run_and_the_model_can_retry() {
     assert_eq!((summary.text.as_str(), summary.finish, summary.turns), ("recovered", FinishReason::Stop, 3));
     assert_eq!(runs.load(Ordering::SeqCst), 1, "only the retried call ran; the two from the cut-off reply did not");
 
-    assert_eq!(events.iter().filter(|e| matches!(e, Event::Truncated)).count(), 1);
+    assert!(!events.contains(&Event::Truncated), "a recovered cutoff is not a final truncation");
+    assert!(events.contains(&Event::Continuing { reason: "tool_call_length".into() }));
     let rejected: Vec<&Event> = events.iter().filter(|e| matches!(e, Event::ToolEnd { is_error: true, .. })).collect();
     assert_eq!(rejected.len(), 2, "both calls are reported as failed");
 
@@ -102,4 +103,45 @@ fn wire_forms_are_stable() {
         assert_eq!(serde_json::to_value(reason).unwrap(), json!(text));
         assert_eq!(serde_json::from_value::<FinishReason>(json!(text)).unwrap(), reason);
     }
+}
+
+#[test]
+fn repeated_truncated_tool_calls_pause_after_bounded_recovery_and_keep_history_paired() {
+    let runs = Arc::new(AtomicUsize::new(0));
+    let steps = (0..5).map(|i| Step::tool_call(&format!("cut-{i}"), "echo", "{\"").finish(FinishReason::Length)).collect();
+    let h = harness(steps, |b| b.tool(counting_tool(&runs)));
+    let (result, events) = run(&h.agent, "go");
+    assert_eq!(result.unwrap_err(), HarnessError::Paused("output_length_limit".into()));
+    assert_eq!(runs.load(Ordering::SeqCst), 0);
+    assert_eq!(events.iter().filter(|e| matches!(e, Event::Continuing { reason } if reason == "tool_call_length")).count(), 3);
+    assert!(!events.contains(&Event::Truncated));
+    assert!(!events.contains(&Event::Done));
+    let history = h.store.load("s1").unwrap();
+    assert_eq!(history.iter().filter(|m| m.role == Role::Tool).count(), 4);
+    for pair in history[1..].chunks_exact(2) {
+        assert_eq!(pair[1].tool_call_id.as_deref(), Some(pair[0].tool_calls[0].id.as_str()));
+        assert!(pair[1].is_error);
+    }
+}
+
+#[test]
+fn new_successful_work_resets_tool_cutoff_budget_without_replaying_old_work() {
+    let runs = Arc::new(AtomicUsize::new(0));
+    let cut = |id| Step::tool_call(id, "echo", "{\"").finish(FinishReason::Length);
+    let h = harness(vec![
+        Step::tool_call("saved", "echo", r#"{"file":"one"}"#), cut("a"),
+        Step::tool_call("next", "echo", r#"{"file":"two"}"#), cut("b"), Step::text("done"),
+    ], |b| b.tool(counting_tool(&runs)).max_truncated_tool_retries(1));
+    assert_eq!(run(&h.agent, "go").0.unwrap().text, "done");
+    assert_eq!(runs.load(Ordering::SeqCst), 2);
+}
+
+#[test]
+fn tool_cutoff_recovery_can_be_disabled() {
+    let h = harness(vec![Step::tool_call("cut", "echo", "{").finish(FinishReason::Length)],
+        |b| b.max_truncated_tool_retries(0));
+    let (result, events) = run(&h.agent, "go");
+    assert_eq!(result.unwrap_err(), HarnessError::Paused("output_length_limit".into()));
+    assert!(!events.iter().any(|e| matches!(e, Event::Continuing { .. })));
+    assert_eq!(h.store.load("s1").unwrap().iter().filter(|m| m.role == Role::Tool).count(), 1);
 }

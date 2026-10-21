@@ -499,7 +499,7 @@ fn valid_asset(path: &str, bytes: &[u8]) -> Result<(), String> {
     Ok(())
 }
 
-fn valid_file_path(path: &str) -> Result<(), String> {
+pub(crate) fn valid_file_path(path: &str) -> Result<(), String> {
     let bad = || format!("文件路径「{path}」不合法：只能用字母、数字、. _ - 组成的分段，用 / 分隔，最多 4 层，不能以 . 开头");
     let segments: Vec<&str> = path.split('/').collect();
     if segments.len() > 4

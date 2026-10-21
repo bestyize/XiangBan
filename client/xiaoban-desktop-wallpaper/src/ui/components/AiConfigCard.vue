@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onDeactivated, onMounted, onBeforeUnmount, ref, watch } from 'vue';
-import { NAlert, NButton, NInput, NModal, NPopconfirm, NSelect, NSwitch, NTag } from 'naive-ui';
+import { NAlert, NButton, NInput, NInputNumber, NModal, NPopconfirm, NSelect, NSwitch, NTag } from 'naive-ui';
 import { Bot, Cpu, ExternalLink, FolderOpen, Globe, Plus, RefreshCw, Settings, ShieldCheck, Sparkles, Trash2, Wrench } from 'lucide-vue-next';
 import { GATEWAY_PROVIDER, invoke, listen, type AiConfigView, type AiProtocol, type AiReplyPreference, type ProviderConfigView } from '../../bridge.ts';
 import AiGatewayCard from './AiGatewayCard.vue';
@@ -59,6 +59,10 @@ const modalModel = ref('');
 const modalApiKey = ref('');
 const modalSelectionMode = ref<'manual' | 'recommended'>('manual');
 const modalReplyPreference = ref<AiReplyPreference>('default');
+const modalMaxOutputTokens = ref<number | null>(null);
+watch([modalBaseUrl, modalModel, modalProtocol], () => {
+  if (modalVisible.value) modalMaxOutputTokens.value = null;
+}, { flush: 'sync' });
 const modalHasKey = ref(false);
 const modalKeyHint = ref('');
 const confirmingClear = ref(false);
@@ -258,6 +262,7 @@ function openConfigureModal(id: string) {
 
   modalSelectionMode.value = p?.selectionMode ?? 'manual';
   modalReplyPreference.value = p?.replyPreference ?? 'default';
+  modalMaxOutputTokens.value = p?.maxOutputTokens || null;
   modalApiKey.value = '';
   confirmingClear.value = false;
   fetchedModels.value = [];
@@ -322,6 +327,7 @@ async function saveProvider(activate: boolean) {
       activate,
       selectionMode: modalSelectionMode.value,
       replyPreference: canSetReplyPreference.value ? modalReplyPreference.value : 'default',
+      maxOutputTokens: !isManaged.value && modalProtocol.value !== 'chat' ? modalMaxOutputTokens.value ?? 0 : 0,
     });
     fill(updated);
     modalVisible.value = false;
@@ -747,9 +753,9 @@ function getProviderIcon(id: string) {
           </div>
         </div>
 
-        <details v-if="modalVisible && canSetReplyPreference" class="reply-preference" data-testid="ai-reply-advanced">
+        <details v-if="modalVisible && !isManaged && modalProtocol !== 'chat'" class="reply-preference" data-testid="ai-reply-advanced">
           <summary>高级设置</summary>
-          <div class="field">
+          <div v-if="canSetReplyPreference" class="field">
             <label for="ai-reply-preference">回答偏好</label>
             <NSelect
               v-model:value="modalReplyPreference"
@@ -759,6 +765,11 @@ function getProviderIcon(id: string) {
               data-testid="ai-reply-preference"
             />
             <small>默认沿用服务商设置。更深入可能耗时更久、消耗更多额度。</small>
+          </div>
+          <div class="field">
+            <label for="ai-max-output-tokens">单次输出上限</label>
+            <NInputNumber v-model:value="modalMaxOutputTokens" input-id="ai-max-output-tokens" :min="1024" :max="131072" :precision="0" placeholder="自动" :disabled="!store.desktop || !!busy" data-testid="ai-max-output-tokens" />
+            <small>单位为 token，与上下文容量分别设置。留空按模型信息选择，未知模型使用 8192；手动填写前请确认服务商支持的上限。</small>
           </div>
         </details>
 

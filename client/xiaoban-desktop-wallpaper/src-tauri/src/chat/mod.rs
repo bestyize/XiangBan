@@ -8,6 +8,7 @@ mod community;
 mod compact;
 mod danger;
 mod desktop_tools;
+mod game_draft;
 mod prompt;
 mod run_history;
 pub(crate) mod task_outcome;
@@ -255,11 +256,16 @@ pub(crate) fn provider(config: &AiConfig) -> Result<Arc<dyn ModelProvider>, Stri
     provider_with(config, None)
 }
 
-fn provider_with(config: &AiConfig, key_source: Option<KeySource>) -> Result<Arc<dyn ModelProvider>, String> {
+fn provider_profile(config: &AiConfig) -> ProviderProfile {
     let mut profile = ProviderProfile::new(config.base_url.clone(), config.api_key.clone(), config.model.clone());
     profile.extra_body = crate::ai_reasoning::extra_body(&config.base_url, &config.model, &config.protocol, config.reply_preference());
     profile.max_request_bytes = Some(8 * 1024 * 1024);
-    profile.max_output_tokens = Some(output_budget(config.context_tokens) as u32);
+    profile.max_output_tokens = Some(config.output_tokens() as u32);
+    profile
+}
+
+fn provider_with(config: &AiConfig, key_source: Option<KeySource>) -> Result<Arc<dyn ModelProvider>, String> {
+    let mut profile = provider_profile(config);
     if let Some(source) = key_source {
         profile = profile.with_api_key_source(source);
     }
@@ -271,8 +277,7 @@ fn provider_with(config: &AiConfig, key_source: Option<KeySource>) -> Result<Arc
     made.map_err(|e| format!("模型配置不能用：{e}"))
 }
 
-fn output_budget(limit: usize) -> usize { (limit / 8).clamp(1_024, 8_192) }
-fn context_reserve(limit: usize) -> usize { output_budget(limit) + limit / 20 }
+fn context_reserve(limit: usize, output: usize) -> usize { output + limit / 20 }
 
 /// Deletes spilled tool output nobody will look at again.
 fn clean_spill(dir: &Path, keep: Duration) {
@@ -332,6 +337,7 @@ struct Parts<'a> {
     spawn_computer_use: &'a dyn Fn() -> Result<Arc<agent_kernel::mcp::McpClient>, agent_kernel::HarnessError>,
     /// Estimated tokens kept in a request before old tool output and old turns are dropped.
     context_tokens: usize,
+    output_tokens: usize,
 }
 
 /// Puts the kernel together: the model, the tools the assistant may use, and the rules around them.
@@ -344,7 +350,7 @@ fn assemble_with_files(parts: Parts<'_>, attachments: Vec<Attachment>) -> Result
     assemble_with_connectors(parts, attachments, Vec::new())
 }
 fn assemble_with_connectors(parts: Parts<'_>, attachments: Vec<Attachment>, connector_tools: Vec<Arc<dyn agent_kernel::Tool>>) -> Result<Agent, String> {
-    let Parts { provider, dirs, workspace, permission, todo, ask, desktop, utc_offset_minutes, open_computer_use, spawn_computer_use, context_tokens } = parts;
+    let Parts { provider, dirs, workspace, permission, todo, ask, desktop, utc_offset_minutes, open_computer_use, spawn_computer_use, context_tokens, output_tokens } = parts;
     for dir in [dirs.sessions(), dirs.spill(), dirs.memory(), dirs.skills()] {
         fs::create_dir_all(&dir).map_err(|e| format!("无法创建 {}：{e}", dir.display()))?;
     }
@@ -386,7 +392,7 @@ fn assemble_with_connectors(parts: Parts<'_>, attachments: Vec<Attachment>, conn
         .middleware(RepeatGuard::new())
         .middleware(SpillOutput::new(dirs.spill()))
         .middleware(AttachmentContext::new(attachments))
-        .middleware(ContextTrim::new(context_tokens).reserve_output(context_reserve(context_tokens)))
+        .middleware(ContextTrim::new(context_tokens).reserve_output(context_reserve(context_tokens, output_tokens)))
         .middleware(ContinueGuard::new())
         .max_turns(MAX_TURNS);
     let roots = vec![workspace.to_path_buf(), dirs.spill()];
@@ -394,7 +400,7 @@ fn assemble_with_connectors(parts: Parts<'_>, attachments: Vec<Attachment>, conn
     readable.retain(|tool| tool.spec().name != "read_file");
     readable.push(Arc::new(ReadFile::new(roots, AttachmentStore::new(dirs.chat.join("attachments"))).map_err(|e| e.to_string())?));
     let writable = fs_write_tools(vec![workspace.to_path_buf()]).map_err(|e| e.to_string())?;
-    for tool in readable.into_iter().chain(writable).chain(skills.tools()).chain(memory.tools()).chain(discovery.tools()).chain(desktop_tools::tools(desktop.clone())) {
+    for tool in readable.into_iter().chain(writable).chain(skills.tools()).chain(memory.tools()).chain(discovery.tools()).chain(desktop_tools::tools_in_workspace(desktop.clone(), workspace)) {
         builder = builder.tool_arc(tool);
     }
     if let Some(Ok(mcp_client)) = &computer_use {
@@ -448,6 +454,7 @@ fn build_agent(app: &tauri::AppHandle, config: &AiConfig, key_source: Option<Key
         open_computer_use: config.open_computer_use,
         spawn_computer_use: &spawn_computer_use,
         context_tokens: config.context_tokens,
+        output_tokens: config.output_tokens(),
     }, attachments, connector_manager(app).map(|m|m.tools()).unwrap_or_default())?;
     lock(&state.tool_tokens).insert(config.open_computer_use, agent_kernel::estimate_tool_tokens(&agent.tool_schemas()));
     Ok(agent)
@@ -884,7 +891,7 @@ fn base_tokens(dirs: &Dirs, workspace: &Path, config: &AiConfig) -> usize {
         .filter(|part| !part.trim().is_empty())
         .collect::<Vec<_>>()
         .join("\n\n");
-    agent_kernel::estimate_tokens(&[Message::system(text)]) + context_reserve(config.context_tokens)
+    agent_kernel::estimate_tokens(&[Message::system(text)]) + context_reserve(config.context_tokens, config.output_tokens())
 }
 
 fn context_of(app: &tauri::AppHandle, config: &AiConfig, raw: &[Message]) -> Result<ContextInfo, String> {

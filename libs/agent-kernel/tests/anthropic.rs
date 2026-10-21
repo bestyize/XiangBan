@@ -378,7 +378,8 @@ mod truncated_over_http {
 
         assert_eq!((summary.text.as_str(), summary.finish, summary.turns), ("Shorter now.", FinishReason::Stop, 2));
         assert_eq!(runs.load(Ordering::SeqCst), 0, "the half-written call never ran");
-        assert!(events.contains(&Event::Truncated));
+        assert!(!events.contains(&Event::Truncated));
+        assert!(events.contains(&Event::Continuing { reason: "tool_call_length".into() }));
 
         let second = body_json(&server.join().unwrap()[1]);
         let messages = second["messages"].as_array().unwrap();

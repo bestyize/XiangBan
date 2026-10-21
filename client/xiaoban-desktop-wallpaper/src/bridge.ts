@@ -41,11 +41,12 @@ export type AiReplyPreference = "default" | "faster" | "deeper";
 
 export type ProviderType = "third" | "free" | "paid" | "custom";
 export interface ProviderConfigView {
+  maxOutputTokens?: number;
   replyPreference?: AiReplyPreference;
   type?: ProviderType;
   remote?: boolean; available?: boolean; description?: string;
   defaultModel?: string;
-  models?: { id: string; name: string; description?: string }[];
+  models?: { id: string; name: string; description?: string; maxOutputTokens?: number | null }[];
   endpoints?: Partial<Record<AiProtocol, string>>;
   consoleUrl?: string; consoleText?: string;
   selectionMode?: "manual" | "recommended";

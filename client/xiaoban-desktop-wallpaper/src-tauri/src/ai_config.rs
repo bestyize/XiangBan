@@ -37,6 +37,8 @@ pub const DEFAULT_PROVIDERS: &[(&str, &str, &str, &str, &str)] = &[
 #[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 pub struct ProviderConfig {
+    /// Zero follows model metadata, falling back to a conservative 8K for unknown endpoints.
+    pub max_output_tokens: u32,
     pub reply_preference: ReplyPreference,
     #[serde(rename = "type")] pub provider_type: String,
     pub remote: bool,
@@ -58,11 +60,16 @@ pub struct ProviderConfig {
 
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
-pub struct ModelConfig { pub id: String, pub name: String, pub description: String }
+pub struct ModelConfig {
+    pub id: String, pub name: String, pub description: String,
+    #[serde(alias = "max_output_tokens", skip_serializing_if = "Option::is_none")]
+    pub max_output_tokens: Option<u32>,
+}
 
 impl Default for ProviderConfig {
     fn default() -> Self {
         Self {
+            max_output_tokens: 0,
             reply_preference: ReplyPreference::Default,
             provider_type: "custom".into(), remote: false, available: true,
             description: String::new(), default_model: String::new(), models: Vec::new(),
@@ -81,6 +88,7 @@ impl Default for ProviderConfig {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ProviderConfigView {
+    pub max_output_tokens: u32,
     pub reply_preference: ReplyPreference,
     #[serde(rename = "type")] pub provider_type: String,
     pub remote: bool, pub available: bool, pub description: String,
@@ -121,6 +129,7 @@ impl ProviderConfig {
 
     pub fn view(&self) -> ProviderConfigView {
         ProviderConfigView {
+            max_output_tokens: self.max_output_tokens,
             reply_preference: self.reply_preference,
             provider_type: if self.is_custom() { "custom".into() } else if self.provider_type == "custom" { "third".into() } else { self.provider_type.clone() },
             remote: self.remote, available: self.available, description: self.description.clone(),
@@ -206,6 +215,23 @@ impl AiConfig {
     /// Enough to send a request.
     pub fn is_complete(&self) -> bool {
         !self.base_url.trim().is_empty() && !self.model.trim().is_empty()
+    }
+
+    /// Output and input budgets are independent. Unknown model limits are not guessed from names.
+    /// Chat Completions keeps endpoint defaults because its output parameter varies by provider.
+    pub(crate) fn output_tokens(&self) -> usize {
+        let provider = self.providers.iter().find(|p| p.id == self.active_provider
+            && p.base_url == self.base_url && p.model == self.model && p.protocol == self.protocol);
+        let output = if self.protocol == "chat" || self.active_provider == crate::ai_gateway::GATEWAY_ID {
+            8_192
+        } else if let Some(p) = provider {
+            let maximum = p.models.iter().find(|m| m.id == self.model)
+                .and_then(|m| m.max_output_tokens).filter(|n| *n > 0);
+            let requested = if p.max_output_tokens == 0 || (p.remote && p.provider_type != "third") { maximum.unwrap_or(8_192).min(32_768) }
+                else { p.max_output_tokens.clamp(1_024, 131_072) };
+            maximum.map_or(requested, |max| requested.min(max)) as usize
+        } else { 8_192 };
+        output.min(self.context_tokens / 2)
     }
 
     /// Whether the selected provider is ready to use. Saving another provider must not steal the
@@ -465,6 +491,7 @@ pub fn apply(current: &AiConfig, input: &Input<'_>) -> Result<AiConfig, String> 
     }
 
     if let Some(p) = next.providers.iter_mut().find(|p| p.id == next.active_provider) {
+        if p.protocol != protocol || p.base_url != base_url || p.model != model { p.max_output_tokens = 0; }
         p.protocol = protocol;
         p.base_url = base_url;
         p.model = model;
@@ -613,6 +640,20 @@ fn clean_reply_preference(previous: &ProviderConfig, url: &str, model: &str, pro
     Ok(if available { preference } else { ReplyPreference::Default })
 }
 
+fn clean_output_tokens(previous: &ProviderConfig, url: &str, model: &str, protocol: &str, requested: Option<u32>) -> Result<u32, String> {
+    if protocol == "chat" || (previous.remote && previous.provider_type != "third") { return Ok(0); }
+    let unchanged = previous.base_url == url && previous.model == model && previous.protocol == protocol;
+    let tokens = requested.unwrap_or(if unchanged { previous.max_output_tokens } else { 0 });
+    if tokens != 0 && !(1_024..=131_072).contains(&tokens) {
+        return Err("单次输出上限需要是 1024 到 131072 之间的整数，或 0（自动）".into());
+    }
+    if tokens > 0 && previous.models.iter().find(|m| m.id == model).and_then(|m| m.max_output_tokens)
+        .filter(|max| *max > 0).is_some_and(|max| tokens > max) {
+        return Err("单次输出上限超过该模型声明的最大值".into());
+    }
+    Ok(tokens)
+}
+
 #[tauri::command]
 pub fn save_ai_provider(
     app: tauri::AppHandle,
@@ -626,6 +667,7 @@ pub fn save_ai_provider(
     activate: bool,
     selection_mode: Option<String>,
     reply_preference: Option<ReplyPreference>,
+    max_output_tokens: Option<u32>,
 ) -> Result<AiConfigView, String> {
     let path = path(&app)?;
     let state = app.state::<AiConfigState>();
@@ -652,6 +694,7 @@ pub fn save_ai_provider(
     if !["manual", "recommended"].contains(&mode) { return Err("模型选择方式无效".into()); }
     let clean_mdl = if mode == "recommended" && !previous.default_model.is_empty() { previous.default_model.clone() } else { clean_mdl };
     let preference = clean_reply_preference(&previous, &clean_url, &clean_mdl, &protocol, reply_preference)?;
+    let output = clean_output_tokens(&previous, &clean_url, &clean_mdl, &protocol, max_output_tokens)?;
     let (current_name, current_key) = match existing_idx {
         Some(i) => (config.providers[i].name.clone(), config.providers[i].api_key.clone()),
         None => (String::new(), String::new()),
@@ -669,6 +712,7 @@ pub fn save_ai_provider(
     };
 
     let updated_entry = ProviderConfig {
+        max_output_tokens: output,
         reply_preference: preference,
         id: provider_id.clone(),
         name: new_name,
@@ -1420,5 +1464,60 @@ mod reply_preference_tests {
         assert!(clean_reply_preference(&p, "https://gateway.example/v1", &p.model, "responses", Some(ReplyPreference::Deeper)).is_err());
         assert_eq!(clean_reply_preference(&p, "https://gateway.example/v1", &p.model, "responses", None).unwrap(), ReplyPreference::Default);
         assert_eq!(clean_reply_preference(&p, &p.base_url, &p.model, &p.protocol, None).unwrap(), ReplyPreference::Deeper);
+    }
+}
+
+
+#[cfg(test)]
+mod output_budget_tests {
+    use super::*;
+    fn config() -> AiConfig {
+        serde_json::from_value(serde_json::json!({
+            "activeProvider": "custom-output", "protocol": "responses", "baseUrl": "https://model.example/v1", "model": "test-model",
+            "providers": [{"id":"custom-output", "protocol":"responses", "baseUrl":"https://model.example/v1", "model":"test-model"}]
+        })).unwrap()
+    }
+
+    #[test]
+    fn output_budget_is_independent_of_context_and_old_files_have_a_safe_default() {
+        let mut config = config();
+        assert_eq!(config.output_tokens(), 8192);
+        config.context_tokens = 608_000;
+        assert_eq!(config.output_tokens(), 8192);
+        config.providers[0].max_output_tokens = 32_768;
+        assert_eq!(config.output_tokens(), 32_768);
+        let saved = serde_json::to_vec(&config).unwrap();
+        assert_eq!(serde_json::from_slice::<AiConfig>(&saved).unwrap().output_tokens(), 32_768);
+        config.context_tokens = 16_000;
+        assert_eq!(config.output_tokens(), 8000);
+    }
+
+    #[test]
+    fn declared_model_limits_cap_overrides_and_do_not_leak_to_other_providers() {
+        let mut config = config();
+        config.providers[0].models = vec![serde_json::from_value(serde_json::json!({"id":"test-model","maxOutputTokens":16384})).unwrap()];
+        assert_eq!(config.output_tokens(), 16384);
+        config.providers[0].max_output_tokens = 32768;
+        assert_eq!(config.output_tokens(), 16384);
+        config.active_provider = "different".into();
+        assert_eq!(config.output_tokens(), 8192);
+        config.active_provider = crate::ai_gateway::GATEWAY_ID.into();
+        assert_eq!(config.output_tokens(), 8192);
+    }
+
+    #[test]
+    fn output_setting_is_validated_and_resets_when_model_or_endpoint_changes() {
+        let mut previous = config().providers.remove(0);
+        previous.max_output_tokens = 32768;
+        let clean = |p: &ProviderConfig, value| clean_output_tokens(p, &p.base_url, &p.model, &p.protocol, value);
+        assert_eq!(clean(&previous, None).unwrap(), 32768);
+        assert_eq!(clean(&previous, Some(0)).unwrap(), 0);
+        for value in [1, 1023, 131073] { assert!(clean(&previous, Some(value)).is_err()); }
+        assert_eq!(clean_output_tokens(&previous, "https://other.example", "other", "responses", None).unwrap(), 0);
+        previous.models = vec![serde_json::from_value(serde_json::json!({"id":"test-model","maxOutputTokens":8192})).unwrap()];
+        assert!(clean(&previous, Some(16384)).is_err());
+        previous.remote = true;
+        previous.provider_type = "paid".into();
+        assert_eq!(clean(&previous, Some(65536)).unwrap(), 0);
     }
 }

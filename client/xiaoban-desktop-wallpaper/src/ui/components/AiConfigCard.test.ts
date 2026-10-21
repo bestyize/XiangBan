@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils';
-import { NSelect } from 'naive-ui';
+import { NInputNumber, NSelect } from 'naive-ui';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { reactive } from 'vue';
 import AiConfigCard from './AiConfigCard.vue';
@@ -437,7 +437,8 @@ describe('reply preferences', () => {
     await open(known);
     await openModal('custom_openai');
     await type('ai-base-url', 'https://gateway.example/v1');
-    expect(q('ai-reply-advanced')).toBeNull();
+    expect(q('ai-reply-preference')).toBeNull();
+    expect(q('ai-max-output-tokens')).not.toBeNull();
     ipc.mockResolvedValueOnce(known as never);
     saveButton().click();
     await flushPromises();
@@ -448,5 +449,27 @@ describe('reply preferences', () => {
     await open(configured);
     await openModal('deepseek');
     expect(q('ai-reply-advanced')).toBeNull();
+  });
+
+  it('saves an independent output limit and resets it when switching endpoint', async () => {
+    const initial = structuredClone(known);
+    initial.providers![0].maxOutputTokens = 16384;
+    await open(initial);
+    await openModal('custom_openai');
+    const input = wrapper!.findComponent(NInputNumber);
+    expect(input.props('value')).toBe(16384);
+    input.vm.$emit('update:value', 32768);
+    await flushPromises();
+    ipc.mockResolvedValueOnce(initial as never);
+    saveButton().click();
+    await flushPromises();
+    expect(ipc).toHaveBeenCalledWith('save_ai_provider', expect.objectContaining({ maxOutputTokens: 32768 }));
+    await openModal('custom_openai');
+    await type('ai-base-url', 'https://another.example/v1');
+    expect(wrapper!.findComponent(NInputNumber).props('value')).toBeNull();
+    ipc.mockResolvedValueOnce(initial as never);
+    saveButton().click();
+    await flushPromises();
+    expect(ipc).toHaveBeenLastCalledWith('save_ai_provider', expect.objectContaining({ maxOutputTokens: 0 }));
   });
 });

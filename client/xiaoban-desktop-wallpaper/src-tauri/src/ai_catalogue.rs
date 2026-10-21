@@ -72,6 +72,7 @@ pub fn merge(config: &mut AiConfig, catalogue: Catalogue) -> Result<(), String> 
         endpoints.entry(proto.clone()).or_insert_with(|| p.end_point.trim_end_matches('/').to_string());
         let index = next.providers.iter().position(|v| v.id == p.id);
         let mut local = index.map(|i| next.providers[i].clone()).unwrap_or_default();
+        let previous_endpoint = (local.base_url.clone(), local.model.clone(), local.protocol.clone());
         if index.is_some() && local.is_custom() { return Err("远端供应商 ID 与本地自定义配置冲突".into()); }
         let first = index.is_none();
         let old_type = if !local.is_custom() && local.provider_type == "custom" { "third".into() } else { local.provider_type.clone() };
@@ -84,6 +85,9 @@ pub fn merge(config: &mut AiConfig, catalogue: Catalogue) -> Result<(), String> 
         else if old_type != "third" && old_type != "custom" { local.api_key.clear(); }
         if first { local.selection_mode = "recommended".into(); }
         if first || local.selection_mode == "recommended" { local.model = p.default_model.clone(); }
+        if p.provider_type != "third" || previous_endpoint != (local.base_url.clone(), local.model.clone(), local.protocol.clone()) {
+            local.max_output_tokens = 0;
+        }
         local.id = p.id; local.name = p.provider; local.description = p.description;
         local.provider_type = p.provider_type; local.remote = true; local.available = true;
         local.default_model = p.default_model; local.models = p.models; local.endpoints = endpoints;
@@ -240,10 +244,13 @@ mod tests {
         let mut c = AiConfig::default();
         c.providers[0].api_key = "user-key".into();
         c.providers[0].selection_mode = "manual".into(); c.providers[0].model = "chosen".into();
+        c.providers[0].max_output_tokens = 32768;
         merge(&mut c, catalogue("new-default")).unwrap();
         assert_eq!(c.providers[0].model, "chosen"); assert_eq!(c.providers[0].api_key, "user-key");
+        assert_eq!(c.providers[0].max_output_tokens, 32768, "manual model and endpoint did not change");
         c.providers[0].selection_mode = "recommended".into();
         merge(&mut c, catalogue("next-default")).unwrap(); assert_eq!(c.providers[0].model, "next-default");
+        assert_eq!(c.providers[0].max_output_tokens, 0, "a new recommended model must not inherit an old output override");
     }
     #[test] fn the_xiaoban_ai_entry_follows_the_catalogue_and_is_on_when_the_site_says_nothing() {
         let mut c = AiConfig::default();

@@ -164,6 +164,16 @@ Canvas 运行在独立的低权限壁纸窗口和 opaque-origin iframe 中，不
 
 本轮针对性验证：`npx vue-tsc --noEmit`、`npx vitest run src/widgets`。新增 Rust 校验/权限回归用例，当前环境没有 Rust 工具链，未运行原生构建或 Windows/macOS 实机验收；需验证桌面输入焦点与文件持久化。浏览器预览环境缺少 Chromium，未完成截图审稿。
 
+### 长输出恢复与游戏草稿
+
+工具调用因输出超限而不完整时，内核拒绝整批执行，并自动要求拆分步骤；界面只显示重试状态，恢复成功后不遗留截断警告或“继续”按钮。无新工具进展时最多自动重试 3 次，再暂停供用户继续；纯文字达到上限时由 ContinueGuard 续写，最终截断才显示警告。既有成功操作不会重放。
+
+`game_create` 兼容原有 `files`，新增与其二选一的 `source_dir`。较长游戏先在当前工作目录的专用子目录（如 `game-drafts/my-game/`）用 `write_file` 分文件创作、`edit_file` 局部修改，再传 `id/name/description/source_dir` 安装，避免重复传输整包源码。草稿保留供之后修改；它只接受工作目录内的普通 UTF-8 文本文件，拒绝越界、符号链接、manifest 与非支持类型，沿用 40 文件 / 单文件 1 MiB / 合计 4 MiB / 路径 4 层限制。校验通过后复用原子安装流程；无效草稿不会替换已安装游戏。保存成功不代表玩法或视觉已经实机验证。
+
+自定义及第三方服务商使用 Responses / Anthropic 协议时，可在配置弹窗的“高级设置”单独设置单次输出上限（1024–131072 token）；留空优先读取模型目录可选的 `maxOutputTokens`（自动最多 32768），未知模型保守使用 8192，不根据模型名称猜测能力。显式设置仍受模型声明上限和上下文一半的约束，真实请求与上下文预留使用同一有效预算。更换模型、地址或协议时恢复自动；目录更新更换推荐模型时也会清除旧设置。小伴 AI 继续采用保守预算；Chat Completions 保留端点默认输出参数，暂不提供此控件。旧配置可直接读取。
+
+针对性验证：`npx vitest run src/ui/chat/view.test.ts src/ui/chat/chat-store.test.ts src/ui/components/AiConfigCard.test.ts`、`npx vue-tsc --noEmit`；原生运行 `cargo test --manifest-path src-tauri/Cargo.toml --locked --bin xiaoban-desktop-wallpaper chat::`、相同命令筛选 `ai_config::` 与 `ai_catalogue::`。内核回归测试在仓库根运行 `cargo test --manifest-path libs/agent-kernel/Cargo.toml --locked --features openai,anthropic --test truncation --test guards --test anthropic --test responses --test openai_http`，使用脚本模型与本地假服务，不消耗生产模型额度。
+
 ## 验证
 
 正式用户数据固定在 `~/.xiaobanwallpaper`。`config/preferences.json` 保存设置，`wallpapers/imports` 保存自定义媒体的持久副本，`wallpapers/local.json` 保存本地壁纸元数据，`wallpapers/cache` 保存订阅资源，`cache/webview` 是 Windows 浏览器运行数据。“关于小伴”提供打开目录按钮；首次迁移复制旧配置与缓存、保留原数据和备份，不覆盖已有新配置。完整子目录职责和迁移约束见 [user-data.md](docs/user-data.md)。设置通过临时文件替换保存。Windows 使用当前用户 `Run` 启动项 `XiaoBanDesktop`，兼容带空格/中文的 EXE 路径，并识别任务管理器中的禁用状态；macOS 使用 `~/Library/LaunchAgents/XiaoBanDesktop.plist`，随用户登录启动。便携 EXE 或 `.app` 移动后，手动打开一次可刷新已启用的启动路径；macOS 建议放到 Applications，避免下载目录或临时路径失效。登记失败会在设置中提示，不阻止桌宠运行。

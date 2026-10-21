@@ -183,6 +183,7 @@ fn build_rig(tag: &str, steps: Vec<Step>, answer: Approval, computer_use: bool) 
         open_computer_use: computer_use,
         spawn_computer_use: &no_computer_use,
         context_tokens: ai_config::DEFAULT_CONTEXT_TOKENS,
+        output_tokens: 8_192,
     })
     .expect("the tool set assembles");
     Rig { _dir: dir, workspace, dirs, desktop, asked, provider, agent, todo }
@@ -385,6 +386,7 @@ fn the_folder_for_saved_output_can_be_read_but_not_written() {
             open_computer_use: false,
             spawn_computer_use: &no_computer_use,
         context_tokens: ai_config::DEFAULT_CONTEXT_TOKENS,
+        output_tokens: 8_192,
         })
         .unwrap()
     };
@@ -567,6 +569,7 @@ fn in_auto_mode_all_write_tools_run_without_asking() {
         open_computer_use: false,
         spawn_computer_use: &no_computer_use,
         context_tokens: ai_config::DEFAULT_CONTEXT_TOKENS,
+        output_tokens: 8_192,
     }).unwrap();
 
     let mut events = Vec::new();
@@ -608,6 +611,7 @@ fn trusted_rig(tag: &str, steps: Vec<Step>) -> (Rig, Arc<Mutex<Vec<(String, Opti
         open_computer_use: false,
         spawn_computer_use: &no_computer_use,
         context_tokens: ai_config::DEFAULT_CONTEXT_TOKENS,
+        output_tokens: 8_192,
     })
     .unwrap();
     let rig = Rig { _dir: dir, workspace, dirs, desktop, asked: Arc::default(), provider, agent, todo };
@@ -827,6 +831,7 @@ fn the_context_size_from_settings_is_what_the_agent_trims_to() {
             open_computer_use: false,
             spawn_computer_use: &no_computer_use,
         context_tokens: 32_000,
+        output_tokens: 8_192,
         })
         .unwrap();
         let file = JsonlStore::new(dirs.sessions());
@@ -855,4 +860,54 @@ fn a_chat_event_reaches_a_global_listener_once_even_with_two_chat_windows() {
     handle.listen_any("chat-event", move |_| { counter.fetch_add(1, Ordering::SeqCst); });
     emit(handle, "chat-event", json!({ "session": "s", "event": { "type": "text_delta", "text": "你好" } }));
     assert_eq!(seen.load(Ordering::SeqCst), 1);
+}
+
+
+#[test]
+fn game_draft_can_be_written_edited_and_installed_in_separate_tool_turns() {
+    let steps = vec![
+        call("write-page", "write_file", json!({"path":"game-drafts/test/index.html", "content":"<html><head></head><script src='game.js'></script></html>"})),
+        call("write-script", "write_file", json!({"path":"game-drafts/test/game.js", "content":"let score = 0;"})),
+        call("edit-script", "edit_file", json!({"path":"game-drafts/test/game.js", "old_string":"score = 0", "new_string":"score = 10"})),
+        call("install", "game_create", json!({"id":"draft-game", "name":"测试游戏", "description":"分步创作", "source_dir":"game-drafts/test"})),
+        Step::text("已保存"),
+    ];
+    let rig = rig("game-draft-workflow", steps, Approval::Once);
+    let (result, events) = run(&rig, "分步做一个游戏");
+    assert_eq!(result.unwrap().text, "已保存");
+    assert_eq!(fs::read_to_string(rig.workspace.join("game-drafts/test/game.js")).unwrap(), "let score = 10;");
+    assert!(lock(&rig.desktop.calls).iter().any(|c| c.starts_with("create-game draft-game")));
+    assert!(!events.iter().any(|e| matches!(e, Event::ToolEnd { is_error: true, .. })));
+}
+
+#[test]
+fn game_create_requires_exactly_one_source_and_rejects_paths_outside_workspace() {
+    let steps = vec![
+        call("both", "game_create", json!({"id":"draft-game", "name":"游戏", "description":"测试", "source_dir":"draft", "files":[{"path":"index.html", "content":"x"}]})),
+        call("neither", "game_create", json!({"id":"draft-game", "name":"游戏", "description":"测试"})),
+        call("outside", "game_create", json!({"id":"draft-game", "name":"游戏", "description":"测试", "source_dir":".."})),
+        Step::text("未安装"),
+    ];
+    let rig = rig("game-draft-schema", steps, Approval::Once);
+    let (result, events) = run(&rig, "测试错误参数");
+    assert!(result.is_ok());
+    assert_eq!(events.iter().filter(|e| matches!(e, Event::ToolEnd { is_error: true, .. })).count(), 3);
+    assert!(!lock(&rig.desktop.calls).iter().any(|c| c.starts_with("create-game")));
+}
+
+#[test]
+fn configured_output_limit_reaches_responses_and_anthropic_wire_requests_and_context_reserve() {
+    let mut config: AiConfig = serde_json::from_value(json!({
+        "activeProvider":"custom-output", "protocol":"responses", "baseUrl":"https://model.example/v1", "model":"test-model",
+        "contextTokens":256000,
+        "providers":[{"id":"custom-output", "protocol":"responses", "baseUrl":"https://model.example/v1", "model":"test-model", "maxOutputTokens":32768}]
+    })).unwrap();
+    let request = agent_kernel::provider::ChatRequest { messages: vec![Message::user(vec![Part::Text { text: "hello".into() }])], tools: vec![] };
+    let body = agent_kernel::provider::responses::build_request_body(&provider_profile(&config), &request);
+    assert_eq!(body["max_output_tokens"], 32768);
+    assert_eq!(context_reserve(config.context_tokens, config.output_tokens()), 32768 + 12800);
+    config.protocol = "anthropic".into();
+    config.providers[0].protocol = "anthropic".into();
+    let body = agent_kernel::provider::anthropic::build_request_body(&provider_profile(&config), &request);
+    assert_eq!(body["max_tokens"], 32768);
 }

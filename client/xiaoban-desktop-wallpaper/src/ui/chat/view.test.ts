@@ -132,6 +132,42 @@ describe('events while an answer is running', () => {
     expect(view.items[1]).toMatchObject({ kind: 'notice', tone: 'warning', canContinue: true });
   });
 
+  it('shows tool cutoff recovery as transient status and finishes without a continue warning', () => {
+    const view = newView('s1', true);
+    view.running = true;
+    applyEvent(view, { type: 'truncated' }); // Older hosts reported this before recovering.
+    applyEvent(view, { type: 'tool_end', id: 'cut', output: 'Not run', is_error: true });
+    expect(view.items.some(i => i.kind === 'notice')).toBe(true);
+    applyEvent(view, { type: 'continuing', reason: 'tool_call_length' });
+    expect(view.status).toContain('调整步骤重试');
+    expect(view.running).toBe(true);
+    expect(view.items.some(i => i.kind === 'notice')).toBe(false);
+    applyEvent(view, { type: 'tool_end', id: 'saved', output: 'saved', is_error: false });
+    applyEvent(view, { type: 'text_delta', text: '已完成' });
+    applyEvent(view, { type: 'done' });
+    expect(view.items.some(i => i.kind === 'notice')).toBe(false);
+    expect(view.running).toBe(false);
+    expect(view.status).toBe('');
+  });
+
+  it('clears an older host cutoff after a successful tool but keeps final truncations visible', () => {
+    const view = newView('s1');
+    applyEvent(view, { type: 'truncated' });
+    applyEvent(view, { type: 'tool_end', id: 'saved', output: 'ok', is_error: false });
+    expect(view.items.some(i => i.kind === 'notice')).toBe(false);
+    applyEvent(view, { type: 'text_delta', text: '最后的说明' });
+    applyEvent(view, { type: 'truncated' });
+    applyEvent(view, { type: 'done' });
+    expect(view.items.at(-1)).toMatchObject({ kind: 'notice', code: 'truncated', canContinue: true });
+  });
+
+  it('offers continue only after output recovery is exhausted', () => {
+    const view = newView('s1');
+    applyEvent(view, { type: 'error', message: 'run paused by continuation guard: output_length_limit' });
+    expect(view.items.at(-1)).toMatchObject({ kind: 'notice', tone: 'warning', canContinue: true, text: expect.stringContaining('工具参数超过输出上限') });
+    expect(view.items.at(-1)).not.toHaveProperty('canSwitchModel');
+  });
+
   it('starts a new message when the harness keeps a stopped answer going', () => {
     const view = newView('s1', true);
     view.running = true;
