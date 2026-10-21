@@ -31,6 +31,11 @@ async function act(key: string, action: () => Promise<unknown>, success?: string
   </section>
 </template>
 <style scoped>
+.settings-page{flex:1;min-height:0;width:100%;padding:var(--ui-page-top) var(--ui-page-inset) 0;display:flex;flex-direction:column;overflow:hidden}
+.settings-tabs{flex:1;min-height:0;display:flex;flex-direction:column}
+.settings-tabs :deep(.n-tabs-nav){flex:none}
+.settings-tabs :deep(.n-tabs-pane-wrapper){flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden}
+.settings-tabs :deep(.n-tab-pane){flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain;padding-bottom:32px;scrollbar-width:thin;scrollbar-color:var(--ui-scrollbar) transparent}
 .appearance-options{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
 .appearance-options>button{border:2px solid transparent;background:var(--ui-surface-alt);border-radius:16px;padding:12px 12px 14px;cursor:pointer;display:grid;gap:10px;justify-items:center;color:var(--ui-text-primary)}
 .appearance-options>button:hover{border-color:var(--ui-border)}

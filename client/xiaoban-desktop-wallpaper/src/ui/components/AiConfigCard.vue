@@ -642,7 +642,10 @@ function getProviderIcon(id: string) {
       v-model:show="modalVisible"
       preset="card"
       :title="isEditingCustom ? `配置自定义服务商 · ${modalName || '自定义'}` : `配置服务商 · ${currentMeta.name}`"
-      style="max-width: 620px; width: 92vw;"
+      style="max-width: 620px; width: 92vw; max-height: min(480px, 80vh); display: flex; flex-direction: column; overflow: hidden;"
+      :header-style="{ flexShrink: 0 }"
+      :content-style="{ minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain' }"
+      :footer-style="{ flexShrink: 0 }"
       :mask-closable="false"
       data-testid="ai-provider-modal"
     >
