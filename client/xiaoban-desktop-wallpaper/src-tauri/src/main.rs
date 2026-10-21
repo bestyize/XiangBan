@@ -767,6 +767,7 @@ fn main() {
             chat::chat_overview, chat::chat_load_session, chat::chat_new_session, chat::chat_send, chat::chat_cancel, chat::chat_delete_session, chat::chat_run_history, chat::chat_verify_file_outcome, chat::chat_reflect_run, chat::chat_review_experience,
             chat::chat_context, chat::chat_compact, chat::chat_rename_session, chat::chat_move_session, chat::chat_create_group, chat::chat_rename_group, chat::chat_delete_group,
             chat::chat_answer_approval, chat::chat_answer_question, chat::chat_set_permission_mode,
+            chat::ai_store_installed, chat::ai_store_browse, chat::ai_store_inspect, chat::ai_store_install, chat::ai_store_uninstall,
             float_assistant::assistant_status, float_assistant::assistant_configure, float_assistant::assistant_ready, float_assistant::assistant_hide,
             assistant_hit_test::assistant_set_regions, capture_editor::capture_frame, capture_editor::capture_show, capture_editor::capture_finish,
             float_assistant::assistant_screenshot, float_assistant::assistant_fit, float_assistant::assistant_drag, float_assistant::assistant_unfold,
@@ -934,5 +935,6 @@ fn main() {
         }
     });
 }
+
 
 

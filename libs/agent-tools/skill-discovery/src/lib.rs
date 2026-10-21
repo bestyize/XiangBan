@@ -88,6 +88,32 @@ fn validate_skill(slug: &str, raw: &[u8], expected: &str) -> Result<String, Stri
 pub struct SkillDiscovery { root: PathBuf, workspace: PathBuf }
 impl SkillDiscovery {
     pub fn new(root: PathBuf, workspace: PathBuf) -> Self { Self { root, workspace } }
+    /// Product UI browsing; no model invocation or installation is involved.
+    pub fn browse(keyword: &str, page: u32) -> Result<Value, String> {
+        let keyword = keyword.trim();
+        if keyword.chars().count() > 80 || !(1..=1000).contains(&page) {
+            return Err("invalid SkillHub query/page".into());
+        }
+        let page_text = page.to_string();
+        let url = endpoint("/api/skills", &[("keyword", keyword), ("page", &page_text),
+            ("pageSize", "24"), ("sortBy", "downloads"), ("order", "desc")])?;
+        let result = json_url(&url)?;
+        browse_result(&result, page)
+    }
+    /// UI callers must display this review before offering an install confirmation.
+    pub fn inspect(&self, slug: &str, version: &str) -> Result<Value, String> {
+        let raw = self.ui_tool("skill_inspect").run(json!({"slug":slug,"version":version}), &|| false)?;
+        serde_json::from_str(&raw).map_err(|e| e.to_string())
+    }
+    /// Only call after a user confirms the exact reviewed version and manifest hash.
+    /// This shares all package validation with the Agent tool and never runs scripts.
+    pub fn install_reviewed(&self, slug: &str, version: &str, sha256: &str) -> Result<(), String> {
+        self.ui_tool("skill_install").run(json!({"slug":slug,"version":version,"sha256":sha256}), &|| false)?;
+        Ok(())
+    }
+    fn ui_tool(&self, name: &str) -> DiscoveryTool {
+        DiscoveryTool { root: self.root.clone(), spec: ToolSpec::new(name, "", json!({"type":"object"})) }
+    }
     pub fn acquisition_policy(&self) -> acquisition::AcquisitionPolicy {
         acquisition::AcquisitionPolicy::default()
     }
@@ -125,7 +151,12 @@ struct DiscoveryTool { spec: ToolSpec, root: PathBuf }
 impl Tool for DiscoveryTool {
     fn spec(&self) -> &ToolSpec { &self.spec }
     fn execute(&self, args: Value, ctx: &ToolCtx) -> Result<String, String> {
-        if ctx.is_cancelled() { return Err("cancelled".into()); }
+        self.run(args, &|| ctx.is_cancelled())
+    }
+}
+impl DiscoveryTool {
+    fn run(&self, args: Value, cancelled: &dyn Fn() -> bool) -> Result<String, String> {
+        if cancelled() { return Err("cancelled".into()); }
         if self.spec.name == "skill_search" {
             let keyword = args["keyword"].as_str().ok_or("keyword required")?.trim();
             if keyword.len() < 2 || keyword.len() > 80 { return Err("invalid keyword".into()); }
@@ -150,7 +181,7 @@ impl Tool for DiscoveryTool {
                 &content(slug, version, "SKILL.md", 100 * 1024)?, &skill_file.sha256)?;
             let mut scripts = Vec::new();
             for item in package.files.iter().filter(|f| is_script(&f.path)) {
-                if ctx.is_cancelled() { return Err("cancelled".into()); }
+                if cancelled() { return Err("cancelled".into()); }
                 // Truncated display is not a security audit. Every byte is still pinned by SHA256.
                 let preview = if item.size <= 1024 * 1024 {
                     match content(slug, version, &item.path, 1024 * 1024) {
@@ -173,10 +204,10 @@ impl Tool for DiscoveryTool {
             || package.sha256 != expected.to_ascii_lowercase() {
             return Err("SkillHub file manifest differs from the reviewed SHA256".into());
         }
-        if ctx.is_cancelled() { return Err("cancelled".into()); }
+        if cancelled() { return Err("cancelled".into()); }
         let url = endpoint("/api/v1/download", &[("slug", slug), ("version", version)])?;
         let archive = bytes(&url, 12 * 1024 * 1024)?;
-        if ctx.is_cancelled() { return Err("cancelled".into()); }
+        if cancelled() { return Err("cancelled".into()); }
         // Validate SKILL.md metadata after unpacking and before materializing any file.
         let files = package::verified_files(slug, &package, &archive)?;
         let skill_file = package.files.iter().find(|f| f.path == "SKILL.md").ok_or("SKILL.md missing")?;
@@ -186,9 +217,29 @@ impl Tool for DiscoveryTool {
             package.files.len(), package.files.iter().filter(|f| is_script(&f.path)).count(), package.sha256))
     }
 }
+fn browse_result(result: &Value, page: u32) -> Result<Value, String> {
+    let items = result["data"]["skills"].as_array().ok_or("invalid SkillHub browse response")?;
+    let total = result["data"]["total"].as_u64();
+    let results = items.iter().take(24).map(|s| json!({
+        "slug":s["slug"], "name":s["name"], "version":s["version"],
+        "description":s["description_zh"].as_str().or(s["description"].as_str()).unwrap_or("")
+    })).collect::<Vec<_>>();
+    Ok(json!({"results":results, "page":page, "total":total,
+        "hasMore":total.map(|n| u64::from(page)*24 < n).unwrap_or(items.len() >= 24)}))
+}
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn browsing_preserves_identity_and_paginates() {
+        let result = browse_result(&json!({"data":{"skills":[{"slug":"demo-skill","name":"Demo",
+            "version":"1.2.3","description":"English","description_zh":"中文"}],"total":25}}), 1).unwrap();
+        assert_eq!(result["results"][0]["description"], "中文");
+        assert_eq!(result["results"][0]["version"], "1.2.3");
+        assert_eq!(result["hasMore"], true);
+        assert_eq!(browse_result(&json!({"data":{"skills":[],"total":25}}),2).unwrap()["hasMore"],false);
+        assert!(browse_result(&json!({"error":"offline"}),1).is_err());
+    }
     #[test]
     fn rejects_unsafe_identity() {
         assert!(!valid_slug("../evil"));
@@ -197,3 +248,4 @@ mod tests {
         assert!(!valid_version("1/2"));
     }
 }
+

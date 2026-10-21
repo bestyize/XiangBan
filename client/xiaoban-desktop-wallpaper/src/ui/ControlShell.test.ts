@@ -27,6 +27,9 @@ vi.mock('../bridge.ts', async (importOriginal) => {
       if (command === 'get_game_status') return Promise.resolve({ desktopDoubleClick: false });
       if (command === 'get_website_status') return Promise.resolve({ announcements: [], update: null, dismissed: {}, errors: [] });
       if (command === 'open_official_site') return Promise.resolve();
+      if (command === 'ai_store_installed') return Promise.resolve([]);
+      if (command === 'get_ai_config') return Promise.resolve({ openComputerUse: false });
+      if (command === 'ai_store_browse') return Promise.resolve({ results: [], page: 1, hasMore: false, total: 0 });
       if (command === 'assistant_status') return Promise.resolve({enabled:true,shortcut:'default',shortcutLabel:'⌥ Space',shortcuts:[],ball:true,open:'type',read:'never',hintSeen:true,registered:true,error:''});
       return Promise.resolve();
     }),
@@ -35,6 +38,21 @@ vi.mock('../bridge.ts', async (importOriginal) => {
 });
 
 describe('ControlShell sidebar', () => {
+  it('places AI store between chat and wallpapers and keeps its selected tab', async () => {
+    const wrapper = mount(ControlShell, { attachTo: document.body });
+    try {
+      await flushPromises();
+      expect(wrapper.findAll('#control-navigation > button').slice(0, 3).map(b => b.attributes('data-testid')))
+        .toEqual(['nav-chat', 'nav-ai-store', 'nav-wallpapers']);
+      await wrapper.get('[data-testid="nav-ai-store"]').trigger('click');
+      await vi.waitFor(async () => { await flushPromises(); expect(wrapper.find('[data-testid="ai-store-page"]').exists()).toBe(true); });
+      expect(wrapper.get('.control-workspace').classes()).toContain('fixed-page-workspace');
+      await wrapper.get('#store-tab-connectors').trigger('click');
+      await wrapper.get('[data-testid="nav-wallpapers"]').trigger('click');
+      await wrapper.get('[data-testid="nav-ai-store"]').trigger('click'); await flushPromises();
+      expect(wrapper.get('#store-tab-connectors').attributes('aria-selected')).toBe('true');
+    } finally { wrapper.unmount(); }
+  });
   it('reuses a page when returning through the sidebar', async () => {
     const wrapper = mount(ControlShell, { attachTo: document.body });
     try {
@@ -229,3 +247,4 @@ describe('ControlShell sidebar', () => {
     quiet.unmount();
   });
 });
+

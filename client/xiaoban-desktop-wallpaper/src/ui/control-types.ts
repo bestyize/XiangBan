@@ -9,7 +9,7 @@ import type { GameCatalog } from "../games/catalog.ts";
 
 export type { GameCatalog };
 
-export type ControlPage = "chat" | "assistant" | "wallpapers" | "widgets" | "interactive" | "effects" | "companion" | "games" | "care" | "settings";
+export type ControlPage = "chat" | "ai-store" | "assistant" | "wallpapers" | "widgets" | "interactive" | "effects" | "companion" | "games" | "care" | "settings";
 export interface ControlStore {
   settings: Settings;
   info: AppInfo;
@@ -78,4 +78,5 @@ export interface ControlStore {
   setAutomaticUpdates(enabled: boolean): Promise<void>;
   checkWebsite(): Promise<void>;
 }
+
 

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, defineAsyncComponent, onMounted, onBeforeUnmount, ref, watch } from 'vue';
 import { NAlert, NButton, NModal, NSkeleton, useMessage } from 'naive-ui';
-import { MessageCircle, AudioLines, Images, Sparkles, Hand, Bot, Gamepad2, Bell, Settings2, PanelLeftClose, PanelLeftOpen, ArrowUpRight, Globe, LogOut } from 'lucide-vue-next';
+import { MessageCircle, Store, AudioLines, Images, Sparkles, Hand, Bot, Gamepad2, Bell, Settings2, PanelLeftClose, PanelLeftOpen, ArrowUpRight, Globe, LogOut } from 'lucide-vue-next';
 import { invoke, listen } from '../bridge.ts';
 import AssistantLauncher from './components/AssistantLauncher.vue';
 import { appearanceMode, publishAppearanceTo, reconcile } from './appearance.ts';
@@ -9,6 +9,7 @@ import { createControlStore } from './control-store.ts';
 import type { ControlPage } from './control-types.ts';
 const pageLoaders = {
   chat: () => import('./pages/ChatPage.vue'),
+  'ai-store': () => import('./pages/AiStorePage.vue'),
   wallpapers: () => import('./pages/WallpaperPage.vue'),
   effects: () => import('./pages/EffectsPage.vue'),
   interactive: () => import('./pages/InteractivePage.vue'),
@@ -19,6 +20,7 @@ const pageLoaders = {
   settings: () => import('./pages/SettingsPage.vue'),
 };
 const ChatPage = defineAsyncComponent(pageLoaders.chat);
+const AiStorePage = defineAsyncComponent(pageLoaders['ai-store']);
 const WallpaperPage = defineAsyncComponent(pageLoaders.wallpapers);
 const EffectsPage = defineAsyncComponent(pageLoaders.effects);
 const InteractivePage = defineAsyncComponent(pageLoaders.interactive);
@@ -35,6 +37,7 @@ const collapsed = ref(false);
 function toggleNavigation() { collapsed.value = !collapsed.value; }
 const items = [
   { id: 'chat', label: '聊天', hint: '和小伴说话，让它帮忙', icon: MessageCircle },
+  { id: 'ai-store', label: 'AI 商店', hint: '发现专家、技能与连接器', icon: Store },
   { id: 'wallpapers', label: '壁纸库', hint: '发现喜欢的风景', icon: Images },
   { id: 'widgets', label: '桌面组件', hint: '把小物件留在桌面上', icon: Hand },
   { id: 'effects', label: '桌面特效', hint: '雨雪花瓣与流星', icon: Sparkles },
@@ -171,11 +174,11 @@ onBeforeUnmount(() => { assistantListeners.splice(0).forEach(off => off()); stor
       <div class="sidebar-bottom"><button class="website-nav" data-testid="nav-website" @click="openOfficialSite"><Globe :size="18" /><span>小伴官网</span><ArrowUpRight :size="14" class="external-icon" /></button><button class="settings-nav" data-testid="nav-settings" :class="{ selected: store.page === 'settings' }" @pointerenter="preload('settings')" @focus="preload('settings')" @click="navigate('settings')"><Settings2 :size="18" /><span>设置</span><em v-if="store.website.update?.available" class="new-badge" data-testid="nav-settings-new">新版本</em><i v-else-if="unread" class="notice-dot"></i></button><div class="sidebar-meta"><span>v{{ store.info.version }}</span><NButton quaternary size="tiny" :title="collapsed ? '展开导航' : '收起导航'" :aria-label="collapsed ? '展开导航' : '收起导航'" :aria-expanded="!collapsed" aria-controls="control-navigation"  @click="toggleNavigation"><component :is="collapsed ? PanelLeftOpen : PanelLeftClose" :size="16" /></NButton></div></div>
     </aside>
     <div class="control-main" :class="{ 'has-chat': store.page === 'chat' }">
-      <main class="control-workspace" :class="{'wallpaper-workspace':store.page==='wallpapers','chat-workspace':store.page==='chat','fixed-page-workspace':['effects','widgets','companion','games'].includes(store.page)}">
+      <main class="control-workspace" :class="{'wallpaper-workspace':store.page==='wallpapers','chat-workspace':store.page==='chat','fixed-page-workspace':['ai-store','effects','widgets','companion','games'].includes(store.page)}">
         <NAlert v-if="store.initialError" class="workspace-alert" type="error" title="桌面配置暂时无法读取">{{ store.initialError }} <NButton size="small" @click="store.initialize()">重试</NButton></NAlert>
         <div v-if="store.website.update?.available && store.page !== 'settings' && store.page !== 'wallpapers' && store.page !== 'chat'" class="update-strip"><span><span class="notice-dot"></span>小伴有新版本 v{{ store.website.update.version }}</span><button @click="navigate('settings')">查看更新<ArrowUpRight :size="14" /></button></div>
         <div v-if="!store.ready" class="workspace-loading"><NSkeleton height="36px" width="220px" /><NSkeleton height="18px" width="320px" /><NSkeleton height="380px" :sharp="false" /></div>
-        <template v-else-if="!store.initialError"><KeepAlive><WallpaperPage v-if="store.page === 'wallpapers'" :store="store" /></KeepAlive><KeepAlive :max="4"><ChatPage v-if="store.page === 'chat'" :store="store" /><WidgetsPage v-else-if="store.page === 'widgets'" :store="store" :settings-request="widgetSettingsRequest" @settings-opened="widgetSettingsRequest = null" /><InteractivePage v-else-if="store.page === 'interactive'" :store="store" /><EffectsPage v-else-if="store.page === 'effects'" :store="store" /><CompanionPage v-else-if="store.page === 'companion'" :store="store" :settings-request="petSettingsRequest" @settings-opened="petSettingsRequest=null" /><GamesPage v-else-if="store.page === 'games'" :store="store" /><CarePage v-else-if="store.page === 'care'" :store="store" /><SettingsPage v-else-if="store.page === 'settings'" :store="store" /></KeepAlive></template>
+        <template v-else-if="!store.initialError"><KeepAlive><WallpaperPage v-if="store.page === 'wallpapers'" :store="store" /></KeepAlive><KeepAlive :max="4"><ChatPage v-if="store.page === 'chat'" :store="store" /><AiStorePage v-else-if="store.page === 'ai-store'" :store="store" /><WidgetsPage v-else-if="store.page === 'widgets'" :store="store" :settings-request="widgetSettingsRequest" @settings-opened="widgetSettingsRequest = null" /><InteractivePage v-else-if="store.page === 'interactive'" :store="store" /><EffectsPage v-else-if="store.page === 'effects'" :store="store" /><CompanionPage v-else-if="store.page === 'companion'" :store="store" :settings-request="petSettingsRequest" @settings-opened="petSettingsRequest=null" /><GamesPage v-else-if="store.page === 'games'" :store="store" /><CarePage v-else-if="store.page === 'care'" :store="store" /><SettingsPage v-else-if="store.page === 'settings'" :store="store" /></KeepAlive></template>
       </main>
       <footer class="control-statusbar"><span><span class="state-dot small"></span>{{ store.desktop ? (store.info.platform === 'windows' ? 'Windows 桌面已连接' : '桌面已连接') : '正在预览界面，桌面操作需在应用内使用' }}</span><span>{{ store.library.items.filter(item => item.installed).length }} 个本地壁纸</span></footer>
     </div>
@@ -196,3 +199,4 @@ onBeforeUnmount(() => { assistantListeners.splice(0).forEach(off => off()); stor
     <LoginModal :store="store" />
   </div>
 </template>
+
