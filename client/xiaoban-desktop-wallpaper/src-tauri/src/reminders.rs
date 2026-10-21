@@ -609,6 +609,8 @@ fn presence_tick(app: &tauri::AppHandle, elapsed: f64) {
             }
         }
     }
+    // Reuse the existing OS activity sample; do not sample keyboard/lock state twice.
+    crate::proactivity::observe_environment(app, &activity);
 }
 pub fn start(app: &tauri::AppHandle) {
     let state = app.state::<ReminderState>();
@@ -649,8 +651,6 @@ pub fn start(app: &tauri::AppHandle) {
             if !app.state::<ReminderState>().smoke_running.load(Ordering::Relaxed) {
                 tick(&app, elapsed, save_elapsed);
                 presence_tick(&app, elapsed);
-                // Reuse the same cadence. No additional OS polling or weather requests.
-                crate::proactivity::observe_environment(&app);
             }
             if save_elapsed { checkpoint = Instant::now(); }
             std::thread::sleep(Duration::from_secs(5));

@@ -129,18 +129,17 @@ pub fn start(app: &tauri::AppHandle) {
 }
 
 /// Called by the existing 5-second presence/reminder loop. Silent, local, non-identifying.
-pub fn observe_environment(app: &tauri::AppHandle) {
+pub fn observe_environment(app: &tauri::AppHandle, activity: &crate::care_system::Activity) {
     let state = app.state::<ProactivityState>();
     let _operation = state.operation.lock().unwrap();
     if state.read_error.load(Ordering::Relaxed) { return; }
     let config = state.settings.lock().unwrap().clone();
     if !config.context_enabled { return; }
     let now = Local::now();
-    let activity = crate::care_system::activity();
     let busy = crate::reminders::proactive_silenced(app) || crate::games::is_active(app);
     let weather = crate::reminders::cached_weather(app, now.timestamp());
     let mut next = crate::proactivity_context::collect(now, config.calendar_region.as_deref(),
-        &activity, busy, weather.as_ref());
+        activity, busy, weather.as_ref());
     let updated = {
         let mut context = state.context.lock().unwrap();
         next.task = context.task.clone();
