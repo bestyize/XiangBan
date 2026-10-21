@@ -381,9 +381,12 @@ fn announce(app: &tauri::AppHandle, window: &WebviewWindow) {
     if !app.state::<AssistantState>().ready.load(Ordering::SeqCst) {
         return;
     }
-    let _ = window.emit("assistant-ball", mode(app) == Mode::Ball);
-    if mode(app) == Mode::Capsule {
-        let _ = window.emit("assistant-open", ());
+    let current = mode(app);
+    let _ = window.emit("assistant-ball", current == Mode::Ball);
+    match current {
+        Mode::Capsule => { let _ = window.emit("assistant-open", ()); }
+        Mode::Ball => { let _ = window.emit("assistant-close", ()); }
+        Mode::Hidden => {}
     }
 }
 
