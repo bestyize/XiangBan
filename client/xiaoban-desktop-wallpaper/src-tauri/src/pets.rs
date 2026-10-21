@@ -93,6 +93,7 @@ pub fn permitted(label: &str, command: &str) -> Option<bool> {
         "delete_pet_theme",
         "export_pet_theme",
         "get_proactivity_settings",
+        "get_proactivity_context",
         "configure_proactivity",
     ]
     .contains(&command)
