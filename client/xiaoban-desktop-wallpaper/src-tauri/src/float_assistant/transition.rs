@@ -53,7 +53,7 @@ pub(super) fn begin(app: &tauri::AppHandle, target: &'static str) -> Result<bool
             .map(|(position, size)| (position.x, position.y, size.width as i32)).ok_or("没有找到悬浮球位置".to_string())
     } else { ball_target(app) };
     if let Ok((x, y, size)) = ball {
-        if let Ok(Some(monitor)) = app.monitor_from_point(f64::from(x + size / 2), f64::from(y + size / 2)) {
+        if let Ok(Some(monitor)) = monitor_at_physical_point(app, f64::from(x + size / 2), f64::from(y + size / 2)) {
             let area = area_of(&monitor);
             state.transition.right.store(x + size / 2 >= area.x + area.w / 2, Ordering::SeqCst);
         }
