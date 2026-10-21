@@ -44,6 +44,10 @@ beforeEach(() => {
   vi.useFakeTimers(); local = []; enabled = false; localPacks = []; connected = false;
   vi.mocked(invoke).mockReset().mockImplementation(async (command, args) => {
     if (command === 'ai_store_installed') return local;
+    if (command === 'ai_store_skill_categories') return { results: [
+      { key: 'office-efficiency', name: '办公效率' },
+      { key: 'content-creation', name: '内容创作' },
+    ] };
     if (command === 'ai_store_catalog') return {results:args?.kind === 'experts' ? (args?.keyword ? [] : [remotePack]) : [remoteConnector],page:1,total:1,hasMore:false};
     if (command === 'ai_store_experts_installed') return localPacks;
     if (command === 'ai_store_connector_status') return connected ? [{id:'test-mcp',name:'测试 MCP 服务',connected:true,toolCount:2,enabled:true}] : [];
@@ -88,7 +92,7 @@ describe('AI 商店', () => {
   });
   it('requires review before installing the exact pinned package and refreshes real state', async () => {
     const { wrapper } = setup(); await skills(wrapper);
-    expect(invoke).toHaveBeenCalledWith('ai_store_browse', { keyword: '', page: 1 });
+    expect(invoke).toHaveBeenCalledWith('ai_store_browse', { keyword: '', page: 1, category: '', source: '', sortBy: 'score' });
     await wrapper.get('.skill-card .small-action').trigger('click'); await flushPromises();
     expect(invoke).toHaveBeenCalledWith('ai_store_inspect', { slug: 'demo-skill', version: '1.2.3' });
     expect(wrapper.get('.test-modal').text()).toContain('scripts/run.py');
@@ -109,6 +113,34 @@ describe('AI 商店', () => {
     vi.mocked(invoke).mockImplementation(original);
     await wrapper.get('.test-modal .text-action').trigger('click'); await flushPromises();
     expect(wrapper.find('.review-confirm').exists()).toBe(true);
+  });
+  it('filters by the official SkillHub category key, separately from the search keyword', async () => {
+    const { wrapper } = setup(); await skills(wrapper);
+    expect(invoke).toHaveBeenCalledWith('ai_store_skill_categories');
+    expect(wrapper.findAll('.store-filters button').some(b => b.text() === '办公效率')).toBe(true);
+    await wrapper.get('input[aria-label="搜索专家、技能或连接器"]').setValue('Excel');
+    await wrapper.findAll('.store-filters button').find(b => b.text() === '办公效率')!.trigger('click');
+    await wrapper.get('select[aria-label="技能排序"]').setValue('updated_at');
+    await wrapper.get('select[aria-label="技能来源"]').setValue('official');
+    await settle();
+    expect(invoke).toHaveBeenCalledWith('ai_store_browse', {
+      keyword: 'Excel', category: 'office-efficiency', source: 'official', sortBy: 'updated_at', page: 1,
+    });
+    expect(wrapper.get('.store-section-heading').text()).toContain('共 1 项匹配技能');
+  });
+  it('shows the server count and requests a subsequent page without losing filters', async () => {
+    const original = vi.mocked(invoke).getMockImplementation()!;
+    vi.mocked(invoke).mockImplementation((command, args) => command === 'ai_store_browse'
+      ? Promise.resolve({ results: [remoteSkill], page: args?.page, total: 27, hasMore: args?.page === 1 })
+      : original(command, args));
+    const { wrapper } = setup(); await skills(wrapper);
+    expect(wrapper.get('.store-section-heading').text()).toContain('共 27 项匹配技能');
+    await wrapper.get('button[aria-label="下一页"]').trigger('click'); await settle();
+    expect(invoke).toHaveBeenCalledWith('ai_store_browse', {
+      keyword: '', category: '', source: '', sortBy: 'score', page: 2,
+    });
+    expect(wrapper.get('.store-pagination').text()).toContain('第 2 页');
+    expect(wrapper.get('button[aria-label="下一页"]').attributes('disabled')).toBeDefined();
   });
   it('does not replace newer search results with a late response', async () => {
     const { wrapper } = setup(); await skills(wrapper);
