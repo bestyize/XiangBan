@@ -14,6 +14,10 @@ const tab = ref<Tab>('experts');
 const query = ref('');
 const category = ref('全部');
 const installedOnly = ref(false);
+const skillSort = ref('score');
+const skillSource = ref('');
+const skillCategories = ref<{ key: string; name: string }[]>([]);
+const categoriesError = ref('');
 const localSkills = ref<Skill[]>([]);
 const brokenIcons = ref<Record<string, boolean>>({});
 function skillIcon(s: Skill) {
@@ -37,17 +41,24 @@ const reviewed = ref(false);
 const removing = ref(false);
 const busy = ref(false);
 let browseId = 0;
+let categoryRequestId = 0;
 let reviewId = 0;
 let localLoading = false;
 let timer: ReturnType<typeof setTimeout> | undefined;
 
-const categories = computed(() => tab.value === 'experts' ? ['全部', '开发', '办公', '创作', '金融', '学习', '生活'] : tab.value === 'connectors' ? ['全部', '腾讯产品MCP', '搜索与信息检索', '设计与创意', '本机'] : installedOnly.value ? ['全部'] : ['全部', '办公', '创作', '工具', '自动化']);
+const categories = computed<{ key: string; name: string }[]>(() => {
+  if (tab.value === 'skills') return installedOnly.value ? [{ key: '全部', name: '全部' }] : [{ key: '全部', name: '全部' }, ...skillCategories.value];
+  const labels = tab.value === 'experts'
+    ? ['全部', '开发', '办公', '创作', '金融', '学习', '生活']
+    : ['全部', '腾讯产品MCP', '搜索与信息检索', '设计与创意', '本机'];
+  return labels.map(key => ({ key, name: key }));
+});
 const matches = (text: string) => text.toLocaleLowerCase().includes(query.value.trim().toLocaleLowerCase());
 const showComputer = computed(() => ['全部', '本机'].includes(category.value) && matches('本机电脑控制 Computer Use 截图 鼠标 键盘'));
 const visibleSkills = computed(() => installedOnly.value ? localSkills.value.filter(s => matches(s.name + s.description)) : remote.value.results);
 const installed = (slug: string) => localSkills.value.find(s => s.slug === slug);
 const heading = computed(() => installedOnly.value ? '已安装技能' : '发现技能');
-const description = computed(() => installedOnly.value ? visibleSkills.value.length + ' 项技能' : '来自 SkillHub');
+const description = computed(() => installedOnly.value ? visibleSkills.value.length + ' 项技能' : remote.value.total === null ? '来自 SkillHub' : `共 ${remote.value.total.toLocaleString('zh-CN')} 项匹配技能 · SkillHub`);
 const empty = computed(() => tab.value === 'skills' && !loading.value && !visibleSkills.value.length);
 
 async function refreshLocal() {
@@ -64,14 +75,29 @@ async function refreshLocal() {
   else localError.value += `${localError.value ? '；' : ''}无法读取连接器配置：${String(configResult.reason)}`;
   localLoading = false;
 }
+async function loadSkillCategories() {
+  if (!props.store.desktop || skillCategories.value.length) return;
+  const id = ++categoryRequestId;
+  try {
+    const response = await invoke<{ results: { key: string; name: string }[] }>('ai_store_skill_categories');
+    if (id !== categoryRequestId) return;
+    skillCategories.value = response.results;
+    categoriesError.value = '';
+  } catch (e) {
+    if (id === categoryRequestId) categoriesError.value = '无法加载 SkillHub 分类：' + String(e);
+  }
+}
 async function browse() {
   clearTimeout(timer);
   const id = ++browseId;
   if (!props.store.desktop || tab.value !== 'skills' || installedOnly.value) { loading.value = false; return; }
   loading.value = true; error.value = ''; remote.value = { results: [], page: page.value, total: null, hasMore: false };
   try {
-    const keyword = [query.value.trim(), category.value === '全部' ? '' : category.value].filter(Boolean).join(' ').slice(0, 80);
-    const result = await invoke<SkillPage>('ai_store_browse', { keyword, page: page.value });
+    const result = await invoke<SkillPage>('ai_store_browse', {
+      keyword: query.value.trim().slice(0, 80), page: page.value,
+      category: category.value === '全部' ? '' : category.value,
+      source: skillSource.value, sortBy: skillSort.value,
+    });
     if (id === browseId) remote.value = result;
   } catch (e) { if (id === browseId) error.value = `暂时无法加载 SkillHub：${String(e)}`; }
   finally { if (id === browseId) loading.value = false; }
@@ -93,12 +119,12 @@ function tabKey(event: KeyboardEvent) {
   switchTab(tabs[next].id);
   (event.currentTarget as HTMLElement).querySelector<HTMLButtonElement>(`#store-tab-${tab.value}`)?.focus();
 }
-watch([query, category, installedOnly], () => { page.value = 1; scheduleBrowse(); });
+watch([query, category, installedOnly, skillSort, skillSource], () => { page.value = 1; scheduleBrowse(); });
 watch(tab, () => { scheduleBrowse(); });
 watch(page, () => { scheduleBrowse(); });
-onActivated(() => { void refreshLocal(); if (tab.value === 'skills') void browse(); else { void registry.value?.refresh(); void registry.value?.refreshLocal(); } });
-onMounted(() => { void refreshLocal(); });
-onBeforeUnmount(() => { clearTimeout(timer); ++browseId; ++reviewId; });
+onActivated(() => { void refreshLocal(); if (tab.value === 'skills') { void loadSkillCategories(); void browse(); } else { void registry.value?.refresh(); void registry.value?.refreshLocal(); } });
+onMounted(() => { void refreshLocal(); void loadSkillCategories(); });
+onBeforeUnmount(() => { clearTimeout(timer); ++browseId; ++reviewId; ++categoryRequestId; });
 
 async function startConversation(text: string) {
   if (busy.value) return;
@@ -156,7 +182,7 @@ async function toggleComputer() {
   } catch (e) { props.store.notify(e, 'error'); }
   finally { busy.value = false; }
 }
-function reset() { query.value = ''; category.value = '全部'; installedOnly.value = false; }
+function reset() { query.value = ''; category.value = '全部'; installedOnly.value = false; skillSort.value = 'score'; skillSource.value = ''; }
 const bytes = (n: number) => n < 1024 ? `${n} B` : `${(n / 1024).toFixed(1)} KB`;
 </script>
 
@@ -174,12 +200,23 @@ const bytes = (n: number) => n < 1024 ? `${n} B` : `${(n / 1024).toFixed(1)} KB`
     <div :id="`store-panel-${tab}`" class="store-content" role="tabpanel" :aria-labelledby="`store-tab-${tab}`">
       <div class="store-toolbar">
         <div class="store-filters" aria-label="按领域筛选">
-          <button v-for="c in categories" :key="c" :class="{ active: category === c }" :aria-pressed="category === c" @click="category = c">{{ c }}</button>
+          <button v-for="c in categories" :key="c.key" :class="{ active: category === c.key }" :aria-pressed="category === c.key" @click="category = c.key">{{ c.name }}</button>
+        </div>
+        <div v-if="tab === 'skills' && !installedOnly" class="skill-query-options">
+          <label>排序 <select v-model="skillSort" aria-label="技能排序">
+            <option value="score">综合评分</option><option value="downloads">最多下载</option>
+            <option value="stars">最多收藏</option><option value="installs">最多安装</option>
+            <option value="updated_at">最近更新</option>
+          </select></label>
+          <label>来源 <select v-model="skillSource" aria-label="技能来源">
+            <option value="">全部</option><option value="official">官方</option><option value="community">社区</option>
+          </select></label>
         </div>
         <button v-if="tab === 'skills'" class="installed-filter" :class="{ selected: installedOnly }" :aria-pressed="installedOnly" @click="installedOnly = !installedOnly; category = '全部'"><SlidersHorizontal :size="13" />已安装<span>{{ localSkills.length }}</span></button>
       </div>
       <div v-if="tab === 'skills'" class="store-section-heading"><h2>{{ heading }}</h2><span>{{ description }}</span></div>
       <NAlert v-if="!store.desktop && tab === 'skills'" type="info" :show-icon="false">请在小伴桌面客户端中浏览技能和管理连接器。</NAlert>
+      <NAlert v-if="categoriesError && tab === 'skills' && !installedOnly" class="store-alert" type="warning" :show-icon="false">{{ categoriesError }} <button class="text-action" @click="loadSkillCategories">重试</button></NAlert>
       <NAlert v-if="localError" class="store-alert" type="warning" :show-icon="false">{{ localError }} <button class="text-action" @click="refreshLocal">重试</button></NAlert>
       <NAlert v-if="error && tab === 'skills' && !installedOnly" class="store-alert" type="error" :show-icon="false">{{ error }} <button class="text-action" @click="browse">重试</button></NAlert>
 
@@ -189,7 +226,7 @@ const bytes = (n: number) => n < 1024 ? `${n} B` : `${(n / 1024).toFixed(1)} KB`
           <article v-for="s in visibleSkills" :key="s.slug" class="store-card skill-card">
             <div class="skill-top"><div class="skill-icon"><img v-if="skillIcon(s)" :src="skillIcon(s)!" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" @error="brokenIcons[skillIcon(s)!] = true" /><Puzzle v-else :size="23" :stroke-width="1.7" /></div><div class="skill-copy"><h3>{{ s.name || s.slug }}</h3><span>{{ s.version ? `v${s.version}` : s.slug }}</span></div></div>
             <p class="skill-desc">{{ s.description || '查看技能说明与使用方法' }}</p>
-            <div class="skill-bottom"><span class="store-tag">{{ s.source || 'SkillHub' }}</span><button class="small-action" :class="{ installed: installed(s.slug) }" :disabled="!store.desktop || !localReady" @click="openSkill(s)"><Check v-if="installed(s.slug)" :size="12" /><Download v-else :size="12" />{{ installed(s.slug) ? '已安装' : '安装' }}</button></div>
+            <div class="skill-bottom"><span class="store-tag">{{ installed(s.slug)?.source || (s.source === 'official' ? 'SkillHub · 官方' : s.source === 'community' ? 'SkillHub · 社区' : 'SkillHub') }}</span><button class="small-action" :class="{ installed: installed(s.slug) }" :disabled="!store.desktop || !localReady" @click="openSkill(s)"><Check v-if="installed(s.slug)" :size="12" /><Download v-else :size="12" />{{ installed(s.slug) ? '已安装' : '安装' }}</button></div>
           </article>
         </div>
         <div v-if="!installedOnly && !error && !loading && store.desktop && (page > 1 || remote.hasMore)" class="store-pagination"><button :disabled="page <= 1" aria-label="上一页" @click="page--"><ChevronLeft :size="16" /></button><span>第 {{ page }} 页</span><button :disabled="!remote.hasMore" aria-label="下一页" @click="page++"><ChevronRight :size="16" /></button></div>
@@ -235,7 +272,7 @@ const bytes = (n: number) => n < 1024 ? `${n} B` : `${(n / 1024).toFixed(1)} KB`
 .store-search:focus-within{border-color:var(--store-red);background:var(--ui-surface)}.store-search input{flex:1;min-width:0;font:inherit;font-size:12px;color:var(--ui-text-primary);background:transparent;border:0;outline:0}.store-search input::placeholder{color:var(--ui-text-tertiary)}
 .ai-store-page button,.store-dialog button{font:inherit;cursor:pointer;border:0;color:inherit;background:none}.ai-store-page button:disabled,.store-dialog button:disabled{opacity:.5;cursor:not-allowed}.store-search button{font-size:20px;color:var(--ui-text-tertiary)}
 .store-tabs{display:flex;width:420px;max-width:100%;padding:4px;background:var(--ui-surface-alt);border-radius:11px;margin:17px 0 23px;gap:2px}.store-tabs button{flex:1;height:35px;border-radius:8px;font-size:13px;font-weight:600;color:var(--ui-text-secondary)}.store-tabs button.active{background:var(--store-red);color:#fff;box-shadow:0 3px 9px color-mix(in srgb,var(--store-red) 20%,transparent)}.store-tabs button:hover:not(.active){background:var(--ui-border)}
-.store-content{overflow:auto;flex:1;min-height:0;padding:0 38px 38px;scrollbar-width:thin;scrollbar-color:var(--ui-scrollbar) transparent}.store-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:18px}.store-filters{display:flex;align-items:center;flex-wrap:wrap;gap:7px}.store-filters button{padding:8px 13px;border-radius:8px;background:var(--ui-surface-alt);color:var(--ui-text-secondary);font-size:11px;white-space:nowrap}.store-filters button.active{background:var(--store-soft);color:var(--ui-primary-text);font-weight:700}.store-filters button:hover{color:var(--store-red)}
+.store-content{overflow:auto;flex:1;min-height:0;padding:0 38px 38px;scrollbar-width:thin;scrollbar-color:var(--ui-scrollbar) transparent}.store-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:18px;flex-wrap:wrap}.skill-query-options{display:flex;align-items:center;gap:12px}.skill-query-options label{display:flex;align-items:center;gap:6px;white-space:nowrap;font-size:11px;color:var(--ui-text-secondary)}.skill-query-options select{max-width:120px;border:0;border-radius:8px;padding:8px;background:var(--ui-surface-alt);color:var(--ui-text-primary);font:inherit;font-size:11px}.store-filters{display:flex;align-items:center;flex-wrap:wrap;gap:7px}.store-filters button{padding:8px 13px;border-radius:8px;background:var(--ui-surface-alt);color:var(--ui-text-secondary);font-size:11px;white-space:nowrap}.store-filters button.active{background:var(--store-soft);color:var(--ui-primary-text);font-weight:700}.store-filters button:hover{color:var(--store-red)}
 .installed-filter{display:flex;align-items:center;gap:5px;white-space:nowrap;font-size:11px!important;color:var(--ui-text-secondary)!important}.installed-filter.selected{color:var(--ui-primary-text)!important}.installed-filter span{padding:1px 5px;background:var(--ui-surface-alt);border-radius:5px}.store-section-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0 0 14px}.store-section-heading h2{font-size:15px;letter-spacing:-.2px;margin:0;font-weight:650}.store-section-heading>span{font-size:11px;color:var(--ui-text-tertiary)}
 .store-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;align-items:stretch}.store-card{min-width:0;background:var(--ui-surface);border:1px solid var(--ui-border);border-radius:13px;padding:16px;box-shadow:0 3px 18px color-mix(in srgb,var(--ui-text-primary) 3%,transparent);transition:box-shadow .18s,border-color .18s,transform .18s}.store-card:hover{border-color:color-mix(in srgb,var(--store-red) 24%,var(--ui-border));box-shadow:0 9px 28px color-mix(in srgb,var(--ui-text-primary) 6%,transparent);transform:translateY(-2px)}
 .store-card h3{font-size:13px;font-weight:700;line-height:1.5;margin:0;overflow-wrap:anywhere}.expert-card{display:flex;flex-direction:column;min-height:223px;padding:15px}.expert-top{display:flex;align-items:flex-start;gap:11px}.expert-meta{min-width:0;padding-top:5px}.expert-meta h3{margin:0 0 7px}.expert-desc{color:var(--ui-text-secondary);font-size:11px;line-height:1.75;margin:12px 0 10px;min-height:38px}.expert-special{font-size:10px;color:var(--ui-text-tertiary);margin-bottom:14px}.expert-special b{font-weight:500;color:var(--ui-text-secondary);margin-left:5px}.store-tag{display:inline-block;color:var(--ui-text-tertiary);background:var(--ui-surface-alt);border-radius:5px;font-size:10px;padding:5px 7px;line-height:1.3}
