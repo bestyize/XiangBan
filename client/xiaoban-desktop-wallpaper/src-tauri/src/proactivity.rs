@@ -2,6 +2,7 @@
 //! No keyboard hooks, screenshots, ambient audio, background LLM calls or OS polling.
 use agent_proactivity::{suggest, ActionKind, Channel, Context, Decision, Engine, EngineState, Event, EventKind, EventSource, Feedback, Observation, Policy};
 use chrono::Local;
+use agent_proactivity::context::{changes, ContextChange, ContextSnapshot, TaskContext, TaskState};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::{
@@ -19,15 +20,18 @@ const HEIGHT: f64 = 138.0;
 pub struct GreetingSettings {
     pub enabled: bool,
     pub frequency: String,
+    /// Chosen explicitly; None means we must not infer a jurisdiction from language or timezone.
+    pub calendar_region: Option<String>,
 }
 impl Default for GreetingSettings {
-    fn default() -> Self { Self { enabled: false, frequency: "natural".into() } }
+    fn default() -> Self { Self { enabled: false, frequency: "natural".into(), calendar_region: None } }
 }
 impl GreetingSettings {
     fn validate(&self) -> Result<(), String> {
         if !["quiet", "natural", "lively"].contains(&self.frequency.as_str()) {
             return Err("主动陪伴频率无效".into());
         }
+        if self.calendar_region.as_deref().is_some_and(|v| v != "CN") { return Err("该地区的官方节假日数据尚未接入".into()); }
         Ok(())
     }
     fn policy(&self) -> Policy {
@@ -56,6 +60,8 @@ pub struct ProactivityState {
     engine: Mutex<Engine>,
     settings: Mutex<GreetingSettings>,
     active: Mutex<Option<Greeting>>,
+    /// Live context only. Never stored on disk; no raw personal, location or task identifiers.
+    context: Mutex<ContextSnapshot>,
     /// Prevent concurrent read/modify/write snapshots for multiple pet windows.
     operation: Mutex<()>,
     /// Damaged state is never overwritten by an apparently fresh default.
@@ -67,6 +73,7 @@ impl Default for ProactivityState {
             engine: Mutex::new(Engine::new(Policy::default())),
             settings: Mutex::new(GreetingSettings::default()),
             active: Mutex::new(None),
+            context: Mutex::new(ContextSnapshot::default()),
             operation: Mutex::new(()),
             read_error: AtomicBool::new(false),
         }
@@ -119,6 +126,77 @@ pub fn start(app: &tauri::AppHandle) {
     }
 }
 
+/// Called by the existing 5-second presence/reminder loop. Silent, local, non-identifying.
+pub fn observe_environment(app: &tauri::AppHandle) {
+    let state = app.state::<ProactivityState>();
+    let _operation = state.operation.lock().unwrap();
+    if state.read_error.load(Ordering::Relaxed) { return; }
+    let config = state.settings.lock().unwrap().clone();
+    if !config.enabled { return; }
+    let now = Local::now();
+    let activity = crate::care_system::activity();
+    let busy = crate::reminders::proactive_silenced(app) || crate::games::is_active(app);
+    let weather = crate::reminders::cached_weather(app, now.timestamp());
+    let mut next = crate::proactivity_context::collect(now, config.calendar_region.as_deref(),
+        &activity, busy, weather.as_ref());
+    let updated = {
+        let mut context = state.context.lock().unwrap();
+        next.task = context.task.clone();
+        let changes = changes(&context, &next, Local::now().timestamp_millis());
+        *context = next;
+        changes
+    };
+    if updated.is_empty() { return; }
+    let at = Local::now().timestamp_millis();
+    let mut engine = state.engine.lock().unwrap();
+    for changed in updated {
+        let kind = match changed {
+            ContextChange::LocalDay => EventKind::LocalDayChanged,
+            ContextChange::CalendarClassification => EventKind::CalendarClassificationChanged,
+            ContextChange::WeatherCondition => EventKind::WeatherConditionChanged,
+            ContextChange::AttentionMode => EventKind::AttentionModeChanged,
+            ContextChange::TaskState => continue,
+        };
+        let _ = engine.observe(&Event::new(kind, EventSource::Desktop, at));
+    }
+    drop(engine);
+    if let Err(error) = save_state(app, &state) {
+        state.read_error.store(true, Ordering::Relaxed);
+        eprintln!("proactivity: context change write failed: {error}");
+    }
+}
+
+/// The Agent Kernel supplies coarse lifecycle events. A model reply alone is never success.
+pub fn observe_task_state(app: &tauri::AppHandle, kind: TaskState) {
+    let at = Local::now().timestamp_millis();
+    let Some(task) = TaskContext::observed(kind, false, at) else { return };
+    observe_task(app, task);
+}
+pub fn observe_task_outcome(app: &tauri::AppHandle, outcome: &crate::chat::task_outcome::TaskOutcome) {
+    let at = Local::now().timestamp_millis();
+    observe_task(app, crate::proactivity_context::task_from_outcome(outcome, at));
+}
+fn observe_task(app: &tauri::AppHandle, task: TaskContext) {
+    let state = app.state::<ProactivityState>();
+    let _operation = state.operation.lock().unwrap();
+    if state.read_error.load(Ordering::Relaxed) || !state.settings.lock().unwrap().enabled { return; }
+    let kind = match task.state {
+        TaskState::Started => EventKind::TaskStarted,
+        TaskState::Succeeded => EventKind::TaskFinished,
+        TaskState::Failed => EventKind::TaskFailed,
+        TaskState::Partial => EventKind::TaskPartiallyFinished,
+        TaskState::Cancelled => EventKind::TaskCancelled,
+        TaskState::Unknown => EventKind::TaskOutcomeUnknown,
+    };
+    let at_ms = task.at_ms;
+    state.context.lock().unwrap().task = Some(task);
+    if state.engine.lock().unwrap().observe(&Event::new(kind,EventSource::Agent,at_ms)) != Observation::Accepted { return; }
+    if let Err(error) = save_state(app, &state) {
+        state.read_error.store(true, Ordering::Relaxed);
+        eprintln!("proactivity: task outcome write failed: {error}");
+    }
+}
+
 pub fn observe_presence(app: &tauri::AppHandle, kind: crate::presence::Kind, at_ms: i64) {
     let state = app.state::<ProactivityState>();
     let _op = state.operation.lock().unwrap();
@@ -128,6 +206,15 @@ pub fn observe_presence(app: &tauri::AppHandle, kind: crate::presence::Kind, at_
         state.read_error.store(true, Ordering::Relaxed);
         eprintln!("proactivity: cannot persist event aggregates: {error}");
     }
+}
+
+/// Only the control console sees the current coarse status. No private location or task ID.
+#[tauri::command]
+pub fn get_proactivity_context(window: tauri::WebviewWindow) -> Result<ContextSnapshot, String> {
+    if window.label() != "control" { return Err("只能从小伴控制台查看感知状态".into()); }
+    let state = window.app_handle().state::<ProactivityState>();
+    if state.read_error.load(Ordering::Relaxed) { return Err("主动感知状态暂不可用".into()); }
+    Ok(state.context.lock().unwrap().clone())
 }
 
 #[tauri::command]
@@ -152,7 +239,10 @@ pub fn configure_proactivity(window: tauri::WebviewWindow, settings: GreetingSet
         *engine = Engine::restore(settings.policy(), snapshot);
     }
     *state.settings.lock().unwrap() = settings.clone();
-    if !settings.enabled { close_bubble(app, &state); }
+    if !settings.enabled {
+        *state.context.lock().unwrap() = ContextSnapshot::default();
+        close_bubble(app, &state);
+    }
     Ok(settings)
 }
 
@@ -333,11 +423,11 @@ mod tests {
         assert!(!defaults.enabled);
         assert!(!defaults.policy().enabled);
         for (frequency, units) in [("quiet", 2), ("natural", 4), ("lively", 8)] {
-            let config = GreetingSettings { enabled: true, frequency: frequency.into() };
+            let config = GreetingSettings { enabled: true, frequency: frequency.into(), ..GreetingSettings::default() };
             assert_eq!(config.policy().max_daily_units, units);
             assert!(config.validate().is_ok());
         }
-        assert!(GreetingSettings { enabled: true, frequency: "no".into() }.validate().is_err());
+        assert!(GreetingSettings { enabled: true, frequency: "no".into(), ..GreetingSettings::default() }.validate().is_err());
     }
     #[test]
     fn mapped_presence_does_not_contain_personal_content() {
