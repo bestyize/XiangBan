@@ -17,6 +17,7 @@ struct TaskState {
     user_text: String,
     searched: HashSet<String>,
     failures: HashMap<String, HashSet<String>>,
+    environment_errors: usize,
     nudged: bool,
 }
 
@@ -96,14 +97,17 @@ impl Middleware for AcquisitionPolicy {
     }
 
     fn after_tool(&self, session: &str, call: &ToolCall, result: &mut ToolResult) {
-        if !result.is_error || environmental_failure(&result.output)
-            || call.name.starts_with("skill_")
+        if !result.is_error || call.name.starts_with("skill_")
             || matches!(call.name.as_str(), "todo" | "ask_user" | "time_now") {
             return;
         }
         if let Some(task) = lock(&self.tasks).get_mut(session) {
-            // Distinct tool_call IDs, not error log lines or retries of the same result.
-            task.failures.entry(call.name.clone()).or_default().insert(call.id.clone());
+            if environmental_failure(&result.output) {
+                task.environment_errors = task.environment_errors.saturating_add(1);
+            } else {
+                // Distinct tool_call IDs, not error log lines or retries of the same result.
+                task.failures.entry(call.name.clone()).or_default().insert(call.id.clone());
+            }
         }
     }
 
@@ -133,6 +137,11 @@ impl Middleware for AcquisitionPolicy {
                 );
             }
             match reason {
+                "capability_gap" if state.environment_errors > 0 && state.failures.is_empty() => {
+                    return ToolGate::Block(
+                        "The only observed failure is environmental (permissions, credentials, network, quota or arguments); diagnose it before searching for a Skill.".into()
+                    )
+                }
                 "capability_gap" => {}
                 "repeated_failure" if recent_nonenvironment_failures(state) => {}
                 "repeated_failure" => {
@@ -252,6 +261,10 @@ mod tests {
         assert!(!is_allowed(search(&policy, serde_json::json!({
             "keyword":"file converter", "reason":"repeated_failure",
             "gap":"当前无法读取受系统保护的文件", "alternatives":"现有文件读取工具提示权限不足"
+        }))));
+        assert!(!is_allowed(search(&policy, serde_json::json!({
+            "keyword":"alternative converter", "reason":"capability_gap",
+            "gap":"读取受保护文件时权限不足", "alternatives":"现有读取工具失败，需要先授权"
         }))));
     }
 
