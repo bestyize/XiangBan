@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
-import { Check, ChevronDown, ChevronRight, Camera, FilePlus2, Plus, Search, Shield, ShieldCheck, Sparkles, Wrench, Plug, ArrowUpRight } from 'lucide-vue-next';
+import { Check, ChevronDown, ChevronRight, Camera, FilePlus2, Plus, Search, Shield, ShieldCheck, Sparkles, Wrench, Plug, ArrowUpRight, Zap } from 'lucide-vue-next';
 import { invoke } from '../../bridge.ts';
 import type { ControlStore } from '../control-types.ts';
 import type { Skill, SkillPage } from '../ai-store/catalog.ts';
@@ -12,7 +12,7 @@ interface CatalogEntry { slug: string; name: string; description: string }
 interface CatalogPage { results: CatalogEntry[] }
 type Entry = { id: string; title: string; detail: string; installed: boolean; ready: boolean; entrySkill?: string };
 
-const props = defineProps<{ store: ControlStore; disabled?: boolean }>();
+const props = defineProps<{ store: ControlStore; disabled?: boolean; fileDisabled?: boolean; screenshotDisabled?: boolean }>();
 const emit = defineEmits<{
   file: []; screenshot: [];
   'use-expert': [entrySkill: string, name: string];
@@ -122,8 +122,8 @@ function permission(mode: 'ask' | 'auto') { void props.store.chat.setPermissionM
     <div class="wb-anchor">
       <button type="button" class="wb-tool wb-plus" data-testid="chat-add-menu" aria-label="添加附件或能力" aria-haspopup="menu" :aria-expanded="panel === 'add'" :disabled="disabled" @click="toggle('add')"><Plus :size="18" /></button>
       <div v-show="panel === 'add'" class="wb-menu wb-main" role="menu" aria-label="添加">
-        <button type="button" class="wb-menu-item" data-testid="chat-add-screenshot" role="menuitem" @click="takeScreenshot"><Camera :size="15" /><span>截图</span></button>
-        <button type="button" class="wb-menu-item" data-testid="chat-pick-image" role="menuitem" @click="attachFile"><FilePlus2 :size="15" /><span>文件</span></button>
+        <button type="button" class="wb-menu-item" data-testid="chat-add-screenshot" role="menuitem" :disabled="screenshotDisabled" @click="takeScreenshot"><Camera :size="15" /><span>截图</span></button>
+        <button type="button" class="wb-menu-item" data-testid="chat-pick-image" role="menuitem" :disabled="fileDisabled" @click="attachFile"><FilePlus2 :size="15" /><span>文件</span></button>
         <div class="wb-separator" />
         <button type="button" class="wb-menu-item" data-testid="chat-add-experts" role="menuitem" :class="{ selected: kind === 'experts' }" @mouseenter="chooseKind('experts')" @focus="chooseKind('experts')" @click="chooseKind('experts')"><Sparkles :size="15" /><span>专家</span><ChevronRight :size="14" /></button>
         <button type="button" class="wb-menu-item" data-testid="chat-add-skills" role="menuitem" :class="{ selected: kind === 'skills' }" @mouseenter="chooseKind('skills')" @focus="chooseKind('skills')" @click="chooseKind('skills')"><Wrench :size="15" /><span>技能</span><ChevronRight :size="14" /></button>
@@ -160,16 +160,13 @@ function permission(mode: 'ask' | 'auto') { void props.store.chat.setPermissionM
         <div class="wb-separator" />
         <button type="button" class="wb-menu-item" data-testid="perm-ask" :class="{ active: store.chat.permissionMode === 'ask' }" @click="permission('ask')"><Shield :size="15" /><span>默认权限</span><Check v-if="store.chat.permissionMode === 'ask'" :size="14" /></button>
         <button type="button" class="wb-menu-item wb-switch-row" data-testid="perm-auto" role="switch" :aria-checked="store.chat.permissionMode === 'auto'" :class="{ active: store.chat.permissionMode === 'auto' }" @click="permission(store.chat.permissionMode === 'auto' ? 'ask' : 'auto')">
-          <ZapIcon /><span>完全信任</span><span class="wb-switch" :class="{ on: store.chat.permissionMode === 'auto' }"><i /></span>
+          <Zap :size="15" /><span>完全信任</span><span class="wb-switch" :class="{ on: store.chat.permissionMode === 'auto' }"><i /></span>
         </button>
       </div>
     </div>
   </div>
 </template>
 
-<script lang="ts">
-import { Zap as ZapIcon } from 'lucide-vue-next';
-</script>
 
 <style scoped>
 .wb-controls{display:flex;align-items:center;gap:3px;flex:none}
@@ -181,7 +178,7 @@ import { Zap as ZapIcon } from 'lucide-vue-next';
 .wb-menu{position:absolute;z-index:40;background:var(--ui-surface);border:1px solid var(--ui-border);border-radius:12px;box-shadow:0 12px 32px rgba(0,0,0,.14);padding:5px;box-sizing:border-box;color:var(--ui-text-primary)}
 .wb-main{left:0;bottom:calc(100% + 8px);width:159px}
 .wb-menu-item{display:flex;gap:10px;align-items:center;width:100%;height:33px;padding:0 9px;background:none;border:0;border-radius:7px;color:var(--ui-text-primary);font:inherit;font-size:12.5px;text-align:left;cursor:pointer;white-space:nowrap}
-.wb-menu-item span:first-of-type{flex:1}.wb-menu-item:hover,.wb-menu-item.selected,.wb-menu-item.active{background:var(--ui-surface-alt)}
+.wb-menu-item:disabled{opacity:.45;cursor:not-allowed}.wb-menu-item span:first-of-type{flex:1}.wb-menu-item:hover,.wb-menu-item.selected,.wb-menu-item.active{background:var(--ui-surface-alt)}
 .wb-menu-item svg:last-child:not(:first-child){margin-left:auto}
 .wb-separator{height:1px;background:var(--ui-border);margin:5px 4px}
 .wb-submenu{left:calc(100% + 7px);bottom:0;width:min(278px,calc(100vw - 210px));min-width:205px;max-height:355px;display:flex;flex-direction:column}
