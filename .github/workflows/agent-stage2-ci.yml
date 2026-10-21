@@ -1,14 +1,6 @@
 name: Agent Stage II Checks
 on:
-  push:
-    branches:
-      - feat/agent-stage2-learning-foundations
-  pull_request:
-    paths:
-      - 'libs/agent-learning/**'
-      - 'libs/agent-tools/skill-discovery/**'
-      - 'client/xiaoban-desktop-wallpaper/src-tauri/**'
-      - '.github/workflows/agent-stage2-ci.yml'
+  workflow_dispatch:
 permissions:
   contents: read
 jobs:

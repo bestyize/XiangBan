@@ -6,6 +6,9 @@
 - **禁止所有自动触发**，包括但不限于 `push`、`pull_request`、`pull_request_target`、`schedule`、`release`、`workflow_run`、`repository_dispatch`、`workflow_call`。
 - 新增或修改 Workflow 时，应删除其他触发器；禁止通过推送代码、标签、PR、定时事件或其他 Workflow 自动发起 CI、构建、测试、打包和部署。
 - 本规范覆盖所有子项目与平台，任何 AI 编码助手均不得擅自添加自动触发 Workflow。需要构建时，由用户在 GitHub Actions 页面手动运行。
+- **禁止新建自动触发的 Workflow**：包括测试、lint、CI、构建、部署、发布、定时任务等任何用途。即使只是「顺手加个 PR 检查」也不允许，PR 检查一律由用户手动触发。
+- 新增 Workflow 必须是 `on: workflow_dispatch:` 单一触发器；若复用模板或从别处复制，必须先删掉全部 `push` / `pull_request` / `schedule` 等自动触发器再提交。
+- 发现现有 Workflow 含自动触发器时，应作为缺陷修正为手动触发，不要以「保持原样」为由保留。
 
 先阅读根目录 README.md，再阅读本次修改涉及的子项目 README.md，确认职责、实现状态、依赖边界和验证命令。
 
