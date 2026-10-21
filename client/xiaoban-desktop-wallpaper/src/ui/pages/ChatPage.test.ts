@@ -165,7 +165,7 @@ describe('the chat page before a conversation', () => {
   it('has an AI model settings button in the header that opens the AI tab', async () => {
     const h = await open();
     expect(q('chat-ai-config')!.textContent).toContain('AI 模型配置');
-    expect(q('chat-workspace')).toBeNull();
+    expect(q('chat-workspace')?.textContent).toContain('工作区');
     await click('chat-ai-config');
     expect(h.store.settingsTab).toBe('ai');
   });
