@@ -13,8 +13,7 @@ mod run_history;
 pub(crate) mod task_outcome;
 mod learning;
 mod skill_evolution;
-mod store;
-pub use store::{ai_store_installed, ai_store_browse, ai_store_inspect, ai_store_install, ai_store_uninstall};
+pub(crate) mod store;
 mod sessions;
 
 use agent_computer_use_tools::{SKILL as COMPUTER_USE_SKILL, SKILL_NAME as COMPUTER_USE_SKILL_NAME, SKILL_ORIGIN_MARKER};
