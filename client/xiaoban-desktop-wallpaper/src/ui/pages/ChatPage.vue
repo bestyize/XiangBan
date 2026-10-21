@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { computed, h, nextTick, onMounted, onUnmounted, ref, watch, type Component, type HTMLAttributes } from 'vue';
 import { NButton, NDropdown, NInput, type DropdownOption } from 'naive-ui';
-import { ArrowDown, AudioLines, ChevronDown, ChevronRight, Ellipsis, Folder, FolderInput, FolderPlus, LoaderCircle, MessageSquarePlus, Mic, Pencil, SendHorizontal, Settings, Volume2, ShieldAlert, Sparkles, Square, Trash2, X, Code2 } from 'lucide-vue-next';
+import { ArrowDown, AudioLines, ChevronDown, ChevronRight, Ellipsis, Folder, FolderInput, FolderPlus, LoaderCircle, MessageSquarePlus, Mic, Pencil, SendHorizontal, Settings, Volume2, ShieldAlert, Sparkles, Square, Trash2, X } from 'lucide-vue-next';
 import { invoke } from '../../bridge.ts';
 import type { ControlStore } from '../control-types.ts';
 import ModelSwitchDialog from '../components/ModelSwitchDialog.vue';
 import ChatWorkbenchTools from '../components/ChatWorkbenchTools.vue';
+import ChatComposerModel from '../components/ChatComposerModel.vue';
 import type { AiConfigView } from '../../bridge.ts';
 import ChatNameDialog from '../components/ChatNameDialog.vue';
 import ChatMoveDialog from '../components/ChatMoveDialog.vue';
@@ -47,6 +48,7 @@ async function readModelLabel() {
   } catch { /* Preserve the last known label while preferences are unavailable. */ }
 }
 async function modelSwitched() { await chat.refresh(); await readModelLabel(); if (retryAfterSwitch.value) await chat.retry(); props.store.notify('模型已切换', 'success'); }
+function composerModelSwitched() { retryAfterSwitch.value = false; void modelSwitched(); }
 function insertCapabilityPrompt(instruction: string) { draft.value = draft.value.trim() ? instruction + '\n\n' + draft.value : instruction; }
 function useExpert(entrySkill: string, name: string) { insertCapabilityPrompt(`请先使用 load_skill 加载已安装专家「${name}」的工作流（${entrySkill}），再帮助我完成以下任务：`); }
 function useSkill(slug: string, name: string) { insertCapabilityPrompt(`请先使用 load_skill 加载已安装技能「${name}」（${slug}），然后完成以下任务：`); }
@@ -503,7 +505,7 @@ async function openLink(href: string) {
              <ChatWorkbenchTools :store="store" :disabled="!store.desktop" :file-disabled="!store.desktop || !chat.configured || running || attachmentReading || attachments.length >= MAX_IMAGES" :screenshot-disabled="!store.desktop || !chat.configured || running || capturing || attachments.length >= MAX_IMAGES" @file="openPicker" @screenshot="takeChatScreenshot" @use-expert="useExpert" @use-skill="useSkill" @use-connector="useConnector" />
              <span class="composer-spacer" />
              <ChatContextRing v-if="store.desktop" :used="chat.context.used" :limit="chat.context.limit" :can-compact="chat.context.canCompact" :compacting="compacting" :busy="running" :disabled="!chat.currentId" @compact="chat.compact()" @resize="chat.setContextSize($event)" />
-             <button type="button" class="composer-model" data-testid="chat-workbench-model" :title="modelLabel" @click="chooseModel()"><Code2 :size="14" /><span>{{ modelLabel }}</span><ChevronDown :size="12" /></button>
+             <ChatComposerModel :label="modelLabel" :disabled="!store.desktop || running" @switched="composerModelSwitched" @settings="openSettings" />
              <button v-if="finishingVoice" type="button" class="voice-finish" data-testid="chat-asr-toggle" aria-label="正在转写并发送" aria-pressed="false" disabled><LoaderCircle class="spin" :size="13" aria-hidden="true" />正在发送</button>
              <button v-else-if="asr?.recordingRequested" type="button" class="voice-finish" data-testid="chat-asr-toggle" :aria-label="asr.listening ? '结束录音并发送' : '取消准备'" aria-pressed="true" @click="toggleVoice"><span v-if="asr.listening" class="recording-dot" aria-hidden="true" /><LoaderCircle v-else class="spin" :size="13" aria-hidden="true" />{{ asr.listening ? '结束并发送' : '取消准备' }}</button>
              <NButton v-else-if="asr" quaternary circle size="small" data-testid="chat-asr-toggle" aria-label="开始语音输入" aria-pressed="false" title="开始语音输入" :disabled="!store.desktop || !asr.ready || asr.microphoneSupported === false || !microphoneAllowed || asr.saving" @click="toggleVoice"><template #icon><Mic :size="16" /></template></NButton>
@@ -618,10 +620,6 @@ async function openLink(href: string) {
 .composer-editor{display:flex;min-width:0;padding:2px 4px 5px}
 .composer-editor :deep(.n-input){width:100%}
 .composer-spacer{flex:1;min-width:4px}
-.composer-model{display:flex;align-items:center;gap:5px;min-width:0;max-width:162px;height:30px;padding:0 7px;border:0;border-radius:8px;background:none;color:var(--ui-text-secondary);cursor:pointer;font:inherit;font-size:12px}
-.composer-model:hover{background:var(--ui-surface-alt);color:var(--ui-text-primary)}
-.composer-model span{max-width:118px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.composer-model svg{flex:none}
 .composer-editor :deep(.n-input){flex:1;min-width:0}
 .voice-finish{display:inline-flex;align-items:center;justify-content:center;gap:7px;align-self:flex-end;min-height:28px;flex:none;padding:3px 10px;border:1px solid var(--ui-primary);border-radius:999px;background:var(--ui-primary-soft);color:var(--ui-primary);font:inherit;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap}
 .voice-finish:hover{background:var(--ui-primary);color:#fff}
@@ -671,8 +669,6 @@ async function openLink(href: string) {
   .chat-page{grid-template-columns:1fr}
   .chat-side{display:none}
   .bubble{max-width:92%}
-  .composer-model{max-width:96px}
-  .composer-model span{max-width:52px}
   .composer{padding-left:10px;padding-right:10px}
 }
 @media(prefers-reduced-motion:reduce){.spin,.cursor,.recording-dot{animation:none}}
