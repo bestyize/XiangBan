@@ -47,6 +47,8 @@ pub struct Greeting {
     id: u64,
     pet_name: String,
     text: String,
+    #[serde(skip_serializing)]
+    pet_label: String,
 }
 
 pub struct ProactivityState {
@@ -242,7 +244,7 @@ pub fn pet_proactive_hover(window: tauri::WebviewWindow, duration_ms: u64) -> Re
     let _ = engine.observe(&event);
     let Decision::Allowed(action) = engine.consider(candidate, &context, now.timestamp_millis()) else { return Ok(false); };
     if action.kind != ActionKind::CompanionGreeting || action.channel != Channel::Bubble { return Ok(false); }
-    let offer = Greeting { id: action.id, pet_name: p.name, text: greeting_text(action.id).into() };
+    let offer = Greeting { id: action.id, pet_name: p.name, text: greeting_text(action.id).into(), pet_label: window.label().into() };
     drop(engine);
     if let Err(error) = save_state(app, &state) {
         state.read_error.store(true, Ordering::Relaxed);
@@ -260,7 +262,7 @@ pub fn pet_proactive_poke(window: tauri::WebviewWindow) -> Result<(), String> {
     if !crate::pets::is_pet(window.label()) { return Err("仅桌宠可发送互动事件".into()); }
     crate::pets::own(&window)?;
     let app = window.app_handle(); let state = app.state::<ProactivityState>();
-    if state.read_error.load(Ordering::Relaxed) { return Ok(()); }
+    if state.read_error.load(Ordering::Relaxed) || !state.settings.lock().unwrap().enabled { return Ok(()); }
     let _op = state.operation.lock().unwrap();
     let now = Local::now().timestamp_millis();
     let event = Event::new(EventKind::PetPoked, EventSource::Pet, now);
@@ -302,7 +304,7 @@ pub fn respond_companion_greeting(window: tauri::WebviewWindow, id: u64, outcome
     match outcome.as_str() {
         "chat" => crate::float_assistant::assistant_open_chat(app.clone(), None),
         "poke" => {
-            if let Some(pet) = app.webview_windows().into_values().find(|w| crate::pets::is_pet(w.label())) {
+            if let Some(pet) = app.get_webview_window(&current.pet_label) {
                 let _ = pet.eval("window.dispatchEvent(new Event('pet-greeting-poke'))");
             }
             Ok(())
