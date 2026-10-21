@@ -91,7 +91,7 @@ pub fn collect(
 
 pub fn task_from_outcome(outcome: &crate::chat::task_outcome::TaskOutcome, at_ms: i64) -> TaskContext {
     use crate::chat::task_outcome::Status;
-    let state = match outcome.status {
+    let state = match &outcome.status {
         Status::Succeeded => TaskState::Succeeded,
         Status::Failed => TaskState::Failed,
         Status::Partial => TaskState::Partial,
@@ -116,7 +116,7 @@ mod tests {
     #[test]
     fn official_cn_makeup_overrides_saturday_but_unknown_region_remains_unknown() {
         let day = local(2026,10,10);
-        assert_eq!(calendar(day,Some("CN")).day_kind,DayKind::MakeupWorkday);
+        assert_eq!(calendar(day.clone(),Some("CN")).day_kind,DayKind::MakeupWorkday);
         assert_eq!(calendar(day,Some("KR")).day_kind,DayKind::Unknown);
         assert_eq!(calendar(local(2027,10,10),Some("CN")).day_kind,DayKind::Unknown);
     }
