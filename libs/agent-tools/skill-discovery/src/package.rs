@@ -41,7 +41,7 @@ pub(crate) fn valid_path(path: &str) -> bool {
     }
     parts.iter().all(|p| {
         if p.is_empty() || *p == "." || *p == ".." || p.len() > 100
-            || p.ends_with([' ', '.']) || p.starts_with('.') {
+            || (p.ends_with(' ') || p.ends_with('.')) || p.starts_with('.') {
             return false;
         }
         let stem = p.split('.').next().unwrap_or("").to_ascii_uppercase();
