@@ -21,6 +21,11 @@ async function init() {
     return;
   }
   await import("./style.css");
+  if (mode === "pet-greeting") {
+    const { mountGreetingBubble } = await import("./pets/greeting-mount.ts");
+    mountGreetingBubble();
+    return;
+  }
   if (mode === "pet-instance") {
     const { mountPet } = await import("./pets/mount.ts");
     mountPet();

@@ -46,6 +46,7 @@ describe('native pet scene entry', () => {
     document.body.replaceChildren();
     document.body.className = '';
     window.history.replaceState({}, '', '/');
+    vi.useRealTimers();
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
     vi.resetModules();
@@ -95,6 +96,23 @@ describe('native pet scene entry', () => {
     expect(bridge.invoke).toHaveBeenCalledWith('set_pet_hit_test', { hit: false });
     surface.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
     expect(bridge.invoke).toHaveBeenCalledWith('manage_pet_instance');
+  });
+
+  it('waits for a real hit dwell and cancels a pending greeting after pointer exit',async()=>{
+    const {PetView}=await import('../pet.ts');
+    const hit=vi.spyOn(PetView.prototype,'hit').mockReturnValue(true);
+    await open('sunflower');
+    vi.useFakeTimers();
+    const point=()=>window.dispatchEvent(new CustomEvent('pet-pointer',{detail:{x:100,y:120}}));
+    point();
+    await vi.advanceTimersByTimeAsync(899);
+    expect(bridge.invoke).not.toHaveBeenCalledWith('pet_proactive_hover',expect.anything());
+    hit.mockReturnValue(false);point();
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(bridge.invoke).not.toHaveBeenCalledWith('pet_proactive_hover',expect.anything());
+    hit.mockReturnValue(true);point();
+    await vi.advanceTimersByTimeAsync(920);
+    expect(bridge.invoke).toHaveBeenCalledWith('pet_proactive_hover',expect.objectContaining({durationMs:expect.any(Number)}));
   });
 
   it('refreshes the selected plant when the host changes its definition', async () => {

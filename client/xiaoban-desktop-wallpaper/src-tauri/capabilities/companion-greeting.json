@@ -1,0 +1,8 @@
+{
+  "identifier": "companion-greeting",
+  "description": "The ephemeral pet greeting bubble has no Tauri core or plugin permissions. Its only custom commands are guarded by its exact window label.",
+  "windows": [
+    "companion-greeting"
+  ],
+  "permissions": []
+}

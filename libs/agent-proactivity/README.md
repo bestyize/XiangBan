@@ -23,14 +23,18 @@
 快照不保存它。话题键必须为不含个人文本的短 ID。每天按宿主提供的本地 `YYYYMMDD`
 重置注意力额度；系统时间倒退时不恢复额度。
 
-## 桌面接入（基础阶段）
+## 桌面接入
 
-`client/xiaoban-desktop-wallpaper/src-tauri/src/proactivity.rs` 是宿主适配层。
-它复用已有 `presence_tick` 检测出的首次活跃/归来/深夜事件，
-调用 `Engine::observe` 并以限量 JSON 聚合快照写入应用私有目录 `config/proactivity.json`。
-不新增系统轮询、无悬停问候、无背景网络请求、不会修改既有宠物动画或提醒流程。
-未来启用主动气泡前，必须由设置页显式打开开关，并将宿主的真实状态转换为
-`Context` 后调用 `consider`，最后接入 UI 回执。
+`client/xiaoban-desktop-wallpaper/src-tauri/src/proactivity.rs` 是宿主适配层：
+复用 `presence_tick` 的首次活跃/归来/深夜事件，只保存聚合计数。
+Stage II 进一步把宠物 hit-test 的悬停和点击接入本模块；**只有用户手动开启
+「桌面宠物 → 桌面伙伴 → 主动陪伴」后**，宿主才可能调用 `consider` 授权展示
+本地短句气泡，并通过 action id 记录反馈。未开启时不展示、不上报宠物点击聚合。
+不新增操作系统轮询，不需要 LLM，不会保存屏幕内容或鼠标坐标。
+
+注意力额度作用于当前新增的主动气泡；已有的休息提醒与欢迎表情尚未统一调度。
+当前宿主没有 OS 级全屏识别，因此暂不能保证全屏时的静默；这是下一次整合的工作，
+不能在当前文档里宣称已具备这一能力。
 
 ## 验证
 
