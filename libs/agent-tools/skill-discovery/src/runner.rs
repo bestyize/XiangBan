@@ -9,7 +9,7 @@ use std::{
     io::Read,
     path::{Path, PathBuf},
     process::{Command, Stdio},
-    sync::{mpsc, Arc},
+    sync::mpsc,
     thread,
     time::{Duration, Instant},
 };
@@ -135,10 +135,46 @@ impl Tool for SkillRun {
     }
 }
 
+/// Read a referenced source or document without granting general filesystem access.
+pub(crate) struct SkillRead { spec: ToolSpec, root: PathBuf }
+impl SkillRead {
+    pub(crate) fn new(root: PathBuf) -> Self {
+        let spec = ToolSpec::new("skill_read",
+            "Read one UTF-8 file from a verified installed SkillHub package (references, scripts, assets or SKILL.md); binary assets are not supported by this reader.",
+            json!({"type":"object","properties":{"skill":{"type":"string"},"path":{"type":"string"}},
+                "required":["skill","path"]}))
+            .risk(Risk::Read).parallel().untrusted_output();
+        Self { spec, root }
+    }
+}
+impl Tool for SkillRead {
+    fn spec(&self) -> &ToolSpec { &self.spec }
+    fn execute(&self, args: Value, ctx: &ToolCtx) -> Result<String, String> {
+        if ctx.is_cancelled() { return Err("cancelled".into()); }
+        let slug = args["skill"].as_str().ok_or("skill is required")?;
+        let path = args["path"].as_str().ok_or("path is required")?;
+        if slug.len() < 2 || slug.len() > 64 ||
+            !slug.bytes().all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-')
+            || slug.starts_with('-') || slug.ends_with('-') || !valid_path(path) {
+            return Err("invalid skill or path".into());
+        }
+        let file = verified_package_file(&self.root, slug, path)?;
+        if fs::metadata(&file).map_err(|e|e.to_string())?.len() > 100 * 1024 {
+            return Err("skill_read only supports files <=100 KiB".into());
+        }
+        fs::read_to_string(file).map_err(|_| "not a UTF-8 text file".into())
+    }
+}
+
 fn verified_script(root: &Path, skill: &str, path: &str) -> Result<PathBuf, String> {
     if !valid_path(path) || !is_script(path) {
         return Err("only files under scripts/ with a supported extension may run".into());
     }
+    verified_package_file(root, skill, path)
+}
+
+fn verified_package_file(root: &Path, skill: &str, path: &str) -> Result<PathBuf, String> {
+    if !valid_path(path) { return Err("invalid skill file path".into()); }
     let dir = root.join(skill);
     let root_real = dir.canonicalize().map_err(|_| "SkillHub skill is not installed")?;
     let lock: Value = serde_json::from_slice(&fs::read(dir.join(".skillhub-lock.json"))
@@ -171,7 +207,7 @@ fn verified_script(root: &Path, skill: &str, path: &str) -> Result<PathBuf, Stri
         }
         if name == path { script_exists = true; }
     }
-    if !script_exists { return Err("script not listed in verified SkillHub package".into()); }
+    if !script_exists { return Err("file not listed in verified SkillHub package".into()); }
     let script = dir.join(path).canonicalize().map_err(|e| e.to_string())?;
     if !script.starts_with(root_real) { return Err("script escapes skill directory".into()); }
     Ok(script)
