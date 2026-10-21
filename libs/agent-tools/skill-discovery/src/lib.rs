@@ -74,6 +74,7 @@ fn file_info(slug: &str, version: &str, namespace: Option<&str>) -> Result<Plan,
     let description=detail["skill"]["summary_zh"].as_str().filter(|s|!s.trim().is_empty())
         .or(detail["skill"]["summary"].as_str()).filter(|s|!s.trim().is_empty()).ok_or("SkillHub description missing")?;
     plan.metadata=Some(json!({"name":slug,"description":description}));
+    plan.icon_url=detail["skill"]["iconUrl"].as_str().filter(|s|s.starts_with("https://")).map(str::to_string);
     // Pin registry metadata too: headerless legacy documents keep their original bytes.
     let binding=json!({"namespace":namespace,"metadata":plan.metadata});
     plan.sha256=format!("{:x}",Sha256::digest(format!("{}\0{}",plan.sha256,binding).as_bytes()));
@@ -283,6 +284,7 @@ fn browse_result(result: &Value, page: u32) -> Result<Value, String> {
     let total = result["data"]["total"].as_u64();
     let results = items.iter().take(24).map(|s| json!({
         "slug":s["slug"], "name":s["name"], "version":s["version"],"namespace":s["namespace"]["handle"].as_str().or(s["namespace"].as_str()),
+        "iconUrl":s["iconUrl"],
         "description":s["description_zh"].as_str().or(s["description"].as_str()).unwrap_or("")
     })).collect::<Vec<_>>();
     Ok(json!({"results":results, "page":page, "total":total,

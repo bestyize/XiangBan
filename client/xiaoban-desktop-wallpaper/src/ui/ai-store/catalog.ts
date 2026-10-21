@@ -1,4 +1,4 @@
-export interface Skill { slug: string; name: string; description: string; version: string; namespace?: string; source?: string; removable?: boolean }
+export interface Skill { slug: string; name: string; description: string; version: string; namespace?: string; iconUrl?: string | null; source?: string; removable?: boolean }
 export interface SkillPage { results: Skill[]; page: number; total: number | null; hasMore: boolean }
 export interface SkillReview {
   slug: string; namespace?: string; sha256: string; content: string;

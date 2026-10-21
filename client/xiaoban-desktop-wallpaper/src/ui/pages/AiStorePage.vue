@@ -15,6 +15,11 @@ const query = ref('');
 const category = ref('全部');
 const installedOnly = ref(false);
 const localSkills = ref<Skill[]>([]);
+const brokenIcons = ref<Record<string, boolean>>({});
+function skillIcon(s: Skill) {
+  const url = s.iconUrl?.trim();
+  return url?.startsWith('https://') && !brokenIcons.value[url] ? url : null;
+}
 const remote = ref<SkillPage>({ results: [], page: 1, total: null, hasMore: false });
 const page = ref(1);
 const loading = ref(false);
@@ -182,7 +187,7 @@ const bytes = (n: number) => n < 1024 ? `${n} B` : `${(n / 1024).toFixed(1)} KB`
         <div v-if="loading" class="store-grid" aria-label="正在加载技能" aria-busy="true"><NSkeleton v-for="n in 8" :key="n" height="183px" :sharp="false" /></div>
         <div v-else class="store-grid skill-grid">
           <article v-for="s in visibleSkills" :key="s.slug" class="store-card skill-card">
-            <div class="skill-top"><div class="skill-icon"><Puzzle :size="23" :stroke-width="1.7" /></div><div class="skill-copy"><h3>{{ s.name || s.slug }}</h3><span>{{ s.version ? `v${s.version}` : s.slug }}</span></div></div>
+            <div class="skill-top"><div class="skill-icon"><img v-if="skillIcon(s)" :src="skillIcon(s)!" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" @error="brokenIcons[skillIcon(s)!] = true" /><Puzzle v-else :size="23" :stroke-width="1.7" /></div><div class="skill-copy"><h3>{{ s.name || s.slug }}</h3><span>{{ s.version ? `v${s.version}` : s.slug }}</span></div></div>
             <p class="skill-desc">{{ s.description || '查看技能说明与使用方法' }}</p>
             <div class="skill-bottom"><span class="store-tag">{{ s.source || 'SkillHub' }}</span><button class="small-action" :class="{ installed: installed(s.slug) }" :disabled="!store.desktop || !localReady" @click="openSkill(s)"><Check v-if="installed(s.slug)" :size="12" /><Download v-else :size="12" />{{ installed(s.slug) ? '已安装' : '安装' }}</button></div>
           </article>
@@ -224,6 +229,7 @@ const bytes = (n: number) => n < 1024 ? `${n} B` : `${(n / 1024).toFixed(1)} KB`
 </template>
 
 <style scoped>
+.skill-icon img{width:100%;height:100%;object-fit:cover;border-radius:inherit}
 .ai-store-page{--store-red:var(--ui-primary);--store-soft:var(--ui-primary-soft);display:flex;flex-direction:column;flex:1;min-height:0;min-width:0;color:var(--ui-text-primary);background:var(--ui-surface);container-type:inline-size}
 .store-header{padding:30px 38px 0;flex:none}.store-search{display:flex;align-items:center;gap:10px;width:min(480px,100%);height:40px;padding:0 12px;border:1px solid transparent;background:var(--ui-surface-alt);border-radius:10px;color:var(--ui-text-tertiary)}
 .store-search:focus-within{border-color:var(--store-red);background:var(--ui-surface)}.store-search input{flex:1;min-width:0;font:inherit;font-size:12px;color:var(--ui-text-primary);background:transparent;border:0;outline:0}.store-search input::placeholder{color:var(--ui-text-tertiary)}

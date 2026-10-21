@@ -28,6 +28,8 @@ pub(crate) struct Plan {
     pub version: String,
     pub namespace: Option<String>,
     pub metadata: Option<Value>,
+    // Display metadata only; changing an icon does not invalidate reviewed package bytes.
+    pub icon_url: Option<String>,
     pub files: Vec<Item>,
     pub sha256: String,
 }
@@ -101,7 +103,7 @@ pub(crate) fn plan(version: &str, values: &[Value]) -> Result<Plan, String> {
         hash.update(f.sha256.as_bytes());
         hash.update(b"\n");
     }
-    Ok(Plan { version: version.to_string(), namespace: None, metadata: None, files, sha256: format!("{:x}", hash.finalize()) })
+    Ok(Plan { version: version.to_string(), namespace: None, metadata: None, icon_url: None, files, sha256: format!("{:x}", hash.finalize()) })
 }
 
 impl Plan {
@@ -239,7 +241,7 @@ pub(crate) fn install(root: &Path, slug: &str, plan: &Plan, files: &BTreeMap<Str
         fs::write(target, data).map_err(|e| e.to_string())?;
     }
     let lock = json!({"provider":"skillhub","slug":slug,"version":plan.version,
-        "namespace":plan.namespace,"metadata":plan.metadata,"manifestSha256":plan.sha256,
+        "namespace":plan.namespace,"metadata":plan.metadata,"iconUrl":plan.icon_url,"manifestSha256":plan.sha256,
         "files":plan.files.iter().map(|i|json!({"path":i.path,"sha256":i.sha256})).collect::<Vec<_>>()});
     fs::write(stage.0.join(".skillhub-lock.json"), lock.to_string()).map_err(|e| e.to_string())?;
     if destination.exists() {

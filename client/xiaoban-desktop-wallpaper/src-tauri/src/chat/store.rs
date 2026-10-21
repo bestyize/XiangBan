@@ -100,7 +100,7 @@ pub async fn ai_store_installed(app: tauri::AppHandle, window: tauri::WebviewWin
             let lock = fs::read_to_string(s.dir.join(".skillhub-lock.json")).ok()
                 .and_then(|s| serde_json::from_str::<Value>(&s).ok()).unwrap_or(Value::Null);
             json!({"slug":s.name,"name":s.name,"description":s.description,
-                "version":lock["version"].as_str().unwrap_or(""),"namespace":lock["namespace"],"removable":managed,
+                "version":lock["version"].as_str().unwrap_or(""),"namespace":lock["namespace"],"iconUrl":lock["iconUrl"],"removable":managed,
                 "source":if managed {"SkillHub"} else if s.agent_created {"自建"} else {"本地"}})
         }).collect::<Vec<_>>()))
     }).await.map_err(|e| e.to_string())?
