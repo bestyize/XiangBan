@@ -71,7 +71,11 @@ impl Engine {
             || candidate.topic_id.as_deref().is_some_and(|id| !valid_key(id)) {
             return Decision::Suppressed(Suppression::Invalid);
         }
-        if ctx.locked || !ctx.user_active || !ctx.pet_visible { return Decision::Suppressed(Suppression::Unavailable); }
+        if ctx.locked || !ctx.user_active { return Decision::Suppressed(Suppression::Unavailable); }
+        // The engine also serves non-pet actions: hiding pets must not disable all suggestions.
+        if matches!(candidate.kind, ActionKind::PetMotion | ActionKind::CompanionGreeting) && !ctx.pet_visible {
+            return Decision::Suppressed(Suppression::Unavailable);
+        }
         if ctx.quiet || ctx.game || ctx.fullscreen { return Decision::Suppressed(Suppression::Busy); }
         if candidate.expires_at_ms.is_some_and(|expires| now > expires) {
             return Decision::Suppressed(Suppression::Expired);
@@ -140,6 +144,14 @@ mod tests {
             }
             assert!(matches!(Engine::new(on()).consider(Candidate::new(ActionKind::PetMotion, Channel::Ambient), &c, 1000), Decision::Suppressed(_)));
         }
+    }
+    #[test] fn non_pet_actions_do_not_require_a_visible_pet() {
+        let mut e = Engine::new(on());
+        let mut context = ctx(DAY);
+        context.pet_visible = false;
+        let suggestion = Candidate::new(ActionKind::AgentSuggestion, Channel::Bubble).topic("task_update");
+        emitted(e.consider(suggestion, &context, HOUR));
+        assert_eq!(e.consider(candidate("pet_only"), &context, 3*HOUR), Decision::Suppressed(Suppression::Unavailable));
     }
     #[test] fn global_cooldown_budget_and_topic_repeat() {
         let mut e = Engine::new(on());
