@@ -81,8 +81,20 @@ pub(super) fn begin(app: &tauri::AppHandle, target: &'static str) -> Result<bool
                     if ready_app.run_on_main_thread(move || {
                         if let Some(window) = visible_app.get_webview_window(LABEL) {
                             if mode(&visible_app) != Mode::Hidden {
-                                let _ = window.show();
-                                if mode(&visible_app) == Mode::Capsule { let _ = window.set_focus(); }
+                                // Hidden WebViews may miss events sent during the native
+                                // resize. Re-announce the final state after showing the
+                                // window so the capsule and ball cannot get out of sync.
+                                match window.show() {
+                                    Ok(()) => {
+                                        announce(&visible_app, &window);
+                                        if mode(&visible_app) == Mode::Capsule {
+                                            if let Err(error) = window.set_focus() {
+                                                eprintln!("超级小伴窗口无法聚焦：{error}");
+                                            }
+                                        }
+                                    }
+                                    Err(error) => eprintln!("超级小伴窗口无法显示：{error}"),
+                                }
                             }
                         }
                         signal(&visible_app, id, target, "show");
