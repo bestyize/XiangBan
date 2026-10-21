@@ -12,9 +12,9 @@
 
 ## 生命周期
 
-1. 通过 skill_search 找到目标，再选择固定版本。
+1. 通过 skill_search 找到目标，再选择固定版本。若未指定发布者，先从详情解析 namespace，再在文件清单、原文和下载请求中固定使用该发布者，校验清单返回的发布者身份。
 2. skill_inspect 展示完整文件清单、各文件 SHA256、SKILL.md 正文和脚本预览；返回 manifest.sha256，即整个版本清单的摘要。
-3. skill_install 用该 manifest.sha256 校验锁定版本，使用 SkillHub 下载 API 取 ZIP。每个 ZIP 路径都与清单比对，限制文件数量、体积、文件类型和哈希；安装阶段绝不执行代码。
+3. skill_install 用该 manifest.sha256 校验锁定版本，使用 SkillHub 下载 API 取 ZIP。每个 ZIP 路径都与清单比对，限制文件数量、体积、文件类型和哈希。若上游 ZIP 与清单不一致，改从同一发布者、同一版本的文件接口逐项下载，仍须全部满足原清单的大小与 SHA256；安装阶段绝不执行代码。
 4. 全部验证成功后写入临时目录，并原子移动到用户的 chat/skills/<slug>。没有覆盖操作。
 5. load_skill 按需加载 SKILL.md；skill_read 读取引用文件；只有用户再次批准 skill_run 才调用本机解释器。运行前复核整包内容与锁文件一致。
 
@@ -51,3 +51,18 @@ SkillHub API 文档：https://github.com/Tencent/skillhub/blob/main/docs/api/REA
 策略还包括：单任务最多三个不同搜索词、相同词不重复搜索、离线要求下禁止在线检索。模型在重复失败后宣布无法完成时，最多收到一次重新考虑 Skill 的提示。发现候选不等于批准安装；安装与脚本运行依然需要用户分别确认。
 
 当前策略仅对单轮任务生效；没有后台搜索，也没有跨会话长期能力需求学习。
+
+
+## 专家包与 MCP 目录
+
+AI 商店专家页读取 `/api/v1/skillsets`，连接器页读取 `/api/v1/mcp/servers`。这两组接口已对照 SkillHub 网站实现及线上响应验证，目前尚未列入公开 Open API 总览；返回结构变化会显示错误，不回退到示例卡片。
+
+专家包审查固定工作流正文、依赖发布者命名空间、版本、文件清单与脚本预览，生成整包摘要。安装时再次审查，摘要不一致则拒绝；所有依赖验证完成后发布工作流，失败回滚本次新增目录，不覆盖已有不同来源或版本。移除工作流保留共享依赖。依赖缺失或内容改变时标记未就绪。
+
+部分历史技能没有 YAML frontmatter。仅对注册中心提供了匹配身份及非空描述的技能，允许将元数据写进本机锁文件；元数据同样纳入审查摘要，原始 SKILL.md 字节及文件 SHA256 保持不变，安装与加载共用此约定。有头部的文件仍使用标准 YAML 解析并核对名称，不用注册中心描述掩盖损坏头部。
+
+MCP 目录读取详情与 README，并在平台提供摘要时校验 README SHA256；JSON 配置模板只用于展示，用户填写凭据并确认后才交给连接器管理器启动。WorkBuddy 专用注册脚本或路径不会自动在小伴执行。
+
+只读线上验证（可选专家包标识）：
+
+    cargo run --manifest-path libs/agent-tools/skill-discovery/Cargo.toml --example catalog-smoke -- tech-test-automation

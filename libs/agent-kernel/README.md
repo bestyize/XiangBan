@@ -162,7 +162,8 @@ Skills：`<根>/<name>/SKILL.md`，开头 `---` 块含 `name`、`description`，
 | `mcp` | 轻量通用 MCP 客户端（JSON-RPC 2.0 over stdio），连接外部 MCP 工具服务（如 open-computer-use） |
 | `process` | 可选受管进程会话；Unix 引入 libc，Windows 引入 windows-sys 的进程与 Job API，不引入网络或异步运行时 |
 | `journal` | 可选 JSONL 执行日志，与 SessionStore 及模型上下文独立 |
-| `fs` `skills` `memory` `web` `shell` `stdio` `mcp` | 见上；只有 `web`、`openai`、`anthropic` 引入 `reqwest`，其余无额外依赖 |
+| `skills` | 标准 YAML 元数据解析（可选 `serde_yaml_ng`）；支持注册中心锁文件提供的无头部技能元数据 |
+| `fs` `memory` `web` `shell` `stdio` `mcp` | 见上；只有 `web`、`openai`、`anthropic` 引入 `reqwest`，其余无额外依赖 |
 
 0.1 历史 macOS arm64 实测（本 crate 的发布配置）：启用全部特性并用上全部工具、中间件和 stdio 的示例程序为 1.63 MiB。0.2 增加 Schema 校验依赖后的体积未重新测量；Windows 与宿主已有 `reqwest` 时的增量未测。
 
@@ -178,3 +179,9 @@ cargo test --manifest-path libs/agent-kernel/Cargo.toml --locked --all-features
 0.2 第一阶段验证：`cargo test --manifest-path libs/agent-kernel/Cargo.toml --locked --offline --all-features`，226 项通过；无默认 feature 测试通过。MCP 假服务测试需要开发机器上的 `python3`，产品使用内核本身不因此依赖 Python。
 
 0.3 执行基础验证（macOS arm64）：同一全 feature 命令 246 项通过；`--no-default-features` 146 项通过；无 Tauri 的 `stdio_agent` 参考宿主带 `native-tls,stdio,fs,process,journal` 编译通过。Windows x86_64 MSVC、Linux x86_64 的 `process,journal` 交叉编译检查通过，尚未运行对应平台进程测试。桌面聊天 Rust 115 项、前端聊天 116 项及 TypeScript 检查通过。未连接真实模型端点，未验收干净机器自动准备运行时或应用崩溃后恢复。
+
+## MCP HTTP 与宿主连接器
+
+启用 `mcp` 和 `native-tls`（或其他提供 reqwest 的网络 feature）后，可通过 `HttpMcpClient` 连接 Streamable HTTP 服务，支持 JSON / 响应 SSE、会话头、协议协商与工具分页。旧式 HTTP+SSE 暂不支持，返回明确错误。连接器的保存、恢复、撤销和凭据管理由 `libs/agent-tools/connectors` 负责；不进入内核。
+
+`McpClient::close` 可以主动终止仍被旧 Agent 工具引用的本地连接；HTTP 客户端同样支持关闭。宿主还应为外部工具设置名称空间、权限与断开后的调用门禁。

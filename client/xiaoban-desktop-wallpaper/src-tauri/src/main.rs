@@ -768,6 +768,7 @@ fn main() {
             chat::chat_context, chat::chat_compact, chat::chat_rename_session, chat::chat_move_session, chat::chat_create_group, chat::chat_rename_group, chat::chat_delete_group,
             chat::chat_answer_approval, chat::chat_answer_question, chat::chat_set_permission_mode,
             chat::store::ai_store_installed, chat::store::ai_store_browse, chat::store::ai_store_inspect, chat::store::ai_store_install, chat::store::ai_store_uninstall,
+            chat::store::ai_store_catalog, chat::store::ai_store_experts_installed, chat::store::ai_store_expert_review, chat::store::ai_store_expert_install, chat::store::ai_store_expert_remove, chat::store::ai_store_connector_detail, chat::store::ai_store_connector_status, chat::store::ai_store_connector_connect, chat::store::ai_store_connector_disconnect, chat::store::ai_store_connector_reconnect,
             float_assistant::assistant_status, float_assistant::assistant_configure, float_assistant::assistant_ready, float_assistant::assistant_hide,
             assistant_hit_test::assistant_set_regions, capture_editor::capture_frame, capture_editor::capture_show, capture_editor::capture_finish,
             float_assistant::assistant_screenshot, float_assistant::assistant_fit, float_assistant::assistant_drag, float_assistant::assistant_unfold,
@@ -917,6 +918,7 @@ fn main() {
     #[cfg(not(windows))]
     let app = app.expect("小伴启动失败");
     app.run(|_handle, _event| {
+        if matches!(_event, tauri::RunEvent::Exit) { chat::shutdown_connectors(_handle); }
         if matches!(_event, tauri::RunEvent::Exit) && _handle.state::<DesktopState>().isolated {
             let _ = startup::set(_handle, false);
         }
@@ -935,6 +937,3 @@ fn main() {
         }
     });
 }
-
-
-

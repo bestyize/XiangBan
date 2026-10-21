@@ -173,7 +173,7 @@ fn verified_script(root: &Path, skill: &str, path: &str) -> Result<PathBuf, Stri
     verified_package_file(root, skill, path)
 }
 
-fn verified_package_file(root: &Path, skill: &str, path: &str) -> Result<PathBuf, String> {
+pub(crate) fn verified_package_file(root: &Path, skill: &str, path: &str) -> Result<PathBuf, String> {
     if !valid_path(path) { return Err("invalid skill file path".into()); }
     let dir = root.join(skill);
     let root_real = dir.canonicalize().map_err(|_| "SkillHub skill is not installed")?;

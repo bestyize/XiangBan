@@ -20,6 +20,11 @@ use std::sync::{Arc, Mutex};
 use std::thread::{self, JoinHandle};
 use std::time::Duration;
 
+#[cfg(any(feature = "openai", feature = "anthropic", feature = "web"))]
+mod http;
+#[cfg(any(feature = "openai", feature = "anthropic", feature = "web"))]
+pub use http::{HttpMcpClient, HttpMcpConfig};
+
 pub const DEFAULT_PROTOCOL_VERSION: &str = "2024-11-05";
 const MAX_FRAME_BYTES: u64 = 8 * 1024 * 1024;
 const MAX_IMAGE_BYTES: usize = 4 * 1024 * 1024;
@@ -131,6 +136,20 @@ impl Drop for McpClient {
 }
 
 impl McpClient {
+    pub fn is_connected(&self) -> bool {
+        !self.closed.load(Ordering::SeqCst)
+    }
+
+    /// Revoke a connection even when an in-flight Agent still owns tool wrappers.
+    pub fn close(&self) {
+        self.closed.store(true, Ordering::SeqCst);
+        if let Some(mut child) = self.child.lock().unwrap_or_else(|e|e.into_inner()).take() {
+            kill_tree(child.id());
+            let _ = child.kill();
+            let _ = child.wait();
+        }
+    }
+
     pub fn spawn(config: McpConfig) -> Result<Arc<Self>, HarnessError> {
         let mut cmd = Command::new(&config.command);
         cmd.args(&config.args)
@@ -453,4 +472,3 @@ fn decode_result(res: &Value) -> Result<ToolResult, String> {
     }
     Ok(result)
 }
-

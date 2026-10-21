@@ -4,9 +4,8 @@ import { NAlert, NModal, NSkeleton } from 'naive-ui';
 import { Search, SlidersHorizontal, RefreshCw, ArrowRight, Download, Check, Puzzle, Monitor, ChevronLeft, ChevronRight } from 'lucide-vue-next';
 import { invoke, type AiConfigView } from '../../bridge.ts';
 import type { ControlStore } from '../control-types.ts';
-import { experts, connectors, type Expert, type Connector, type Skill, type SkillPage, type SkillReview } from '../ai-store/catalog.ts';
-import { connectorIcon } from '../ai-store/connector-icons.ts';
-import ExpertAvatar from '../ai-store/ExpertAvatar.vue';
+import { type Skill, type SkillPage, type SkillReview } from '../ai-store/catalog.ts';
+import RegistryCatalog from '../ai-store/RegistryCatalog.vue';
 
 const props = defineProps<{ store: ControlStore }>();
 type Tab = 'experts' | 'skills' | 'connectors';
@@ -23,9 +22,8 @@ const error = ref('');
 const localError = ref('');
 const computerEnabled = ref(false);
 const localReady = ref(false);
-const expert = ref<Expert | null>(null);
+const registry = ref<InstanceType<typeof RegistryCatalog> | null>(null);
 const skill = ref<Skill | null>(null);
-const connector = ref<Connector | null>(null);
 const computerOpen = ref(false);
 const review = ref<SkillReview | null>(null);
 const reviewError = ref('');
@@ -38,16 +36,14 @@ let reviewId = 0;
 let localLoading = false;
 let timer: ReturnType<typeof setTimeout> | undefined;
 
-const categories = computed(() => tab.value === 'experts' ? ['全部', '研究', '开发', '创作', '生活'] : tab.value === 'connectors' ? ['全部', '办公', '开发', '创作', '本机'] : installedOnly.value ? ['全部'] : ['全部', '办公', '创作', '工具', '自动化']);
+const categories = computed(() => tab.value === 'experts' ? ['全部', '开发', '办公', '创作', '金融', '学习', '生活'] : tab.value === 'connectors' ? ['全部', '腾讯产品MCP', '搜索与信息检索', '设计与创意', '本机'] : installedOnly.value ? ['全部'] : ['全部', '办公', '创作', '工具', '自动化']);
 const matches = (text: string) => text.toLocaleLowerCase().includes(query.value.trim().toLocaleLowerCase());
-const visibleExperts = computed(() => experts.filter(e => (category.value === '全部' || e.cat === category.value) && matches([e.name, e.desc, ...e.tags].join(' '))));
-const visibleConnectors = computed(() => connectors.filter(c => (category.value === '全部' || c.cat === category.value) && matches(c.name + c.desc)));
 const showComputer = computed(() => ['全部', '本机'].includes(category.value) && matches('本机电脑控制 Computer Use 截图 鼠标 键盘'));
 const visibleSkills = computed(() => installedOnly.value ? localSkills.value.filter(s => matches(s.name + s.description)) : remote.value.results);
 const installed = (slug: string) => localSkills.value.find(s => s.slug === slug);
-const heading = computed(() => tab.value === 'experts' ? '专家预设' : tab.value === 'connectors' ? '全部连接器' : installedOnly.value ? '已安装技能' : '发现技能');
-const description = computed(() => tab.value === 'experts' ? '按擅长领域选择，开启一段专业对话' : tab.value === 'connectors' ? '连接你的工具与数据' : installedOnly.value ? `${visibleSkills.value.length} 项技能` : '来自 SkillHub');
-const empty = computed(() => tab.value === 'experts' ? !visibleExperts.value.length : tab.value === 'connectors' ? !visibleConnectors.value.length && !showComputer.value : !loading.value && !visibleSkills.value.length);
+const heading = computed(() => installedOnly.value ? '已安装技能' : '发现技能');
+const description = computed(() => installedOnly.value ? visibleSkills.value.length + ' 项技能' : '来自 SkillHub');
+const empty = computed(() => tab.value === 'skills' && !loading.value && !visibleSkills.value.length);
 
 async function refreshLocal() {
   if (!props.store.desktop) { localReady.value = true; return; }
@@ -95,7 +91,7 @@ function tabKey(event: KeyboardEvent) {
 watch([query, category, installedOnly], () => { page.value = 1; scheduleBrowse(); });
 watch(tab, () => { scheduleBrowse(); });
 watch(page, () => { scheduleBrowse(); });
-onActivated(() => { void refreshLocal(); if (tab.value === 'skills') void browse(); });
+onActivated(() => { void refreshLocal(); if (tab.value === 'skills') void browse(); else { void registry.value?.refresh(); void registry.value?.refreshLocal(); } });
 onMounted(() => { void refreshLocal(); });
 onBeforeUnmount(() => { clearTimeout(timer); ++browseId; ++reviewId; });
 
@@ -105,13 +101,10 @@ async function startConversation(text: string) {
   try {
     await props.store.chat.select(null);
     props.store.creationDraft = text;
-    expert.value = null; skill.value = null;
+    skill.value = null;
     props.store.navigate('chat');
   } catch (e) { props.store.notify(e, 'error'); }
   finally { busy.value = false; }
-}
-function talkToExpert(e: Expert) {
-  return startConversation(`请作为${e.name}帮助我。${e.desc}\n请先了解我的具体目标、背景和约束，再提供适合我的方案。\n我的需求是：`);
 }
 function useSkill(s: Skill) { return startConversation(`请读取已安装的技能「${s.slug}」，按其中的流程帮助我完成以下任务：`); }
 async function openSkill(s: Skill) {
@@ -121,7 +114,7 @@ async function openSkill(s: Skill) {
   if (!s.version) { reviewing.value = false; reviewError.value = '此技能暂未提供可安装的版本。'; return; }
   reviewing.value = true;
   try {
-    const result = await invoke<SkillReview>('ai_store_inspect', { slug: s.slug, version: s.version });
+    const result = await invoke<SkillReview>('ai_store_inspect', { slug: s.slug, version: s.version, ...(s.namespace ? { namespace: s.namespace } : {}) });
     if (id === reviewId) review.value = result;
   } catch (e) { if (id === reviewId) reviewError.value = String(e); }
   finally { if (id === reviewId) reviewing.value = false; }
@@ -131,7 +124,7 @@ async function installSkill() {
   busy.value = true;
   const s = skill.value; const r = review.value;
   try {
-    await invoke('ai_store_install', { slug: s.slug, version: r.manifest.version, sha256: r.sha256 });
+    await invoke('ai_store_install', { slug: s.slug, version: r.manifest.version, sha256: r.sha256, ...(s.namespace ? { namespace: s.namespace } : {}) });
     await refreshLocal();
     props.store.notify(`已安装「${s.name}」，可在新任务中使用`);
     skill.value = null;
@@ -165,7 +158,7 @@ const bytes = (n: number) => n < 1024 ? `${n} B` : `${(n / 1024).toFixed(1)} KB`
 <template>
   <section class="ai-store-page" data-testid="ai-store-page" aria-label="AI 商店">
     <header class="store-header">
-      <form class="store-search" role="search" @submit.prevent="browse">
+      <form class="store-search" role="search" @submit.prevent="tab === 'skills' ? browse() : registry?.refresh()">
         <Search :size="17" aria-hidden="true" /><input v-model="query" maxlength="70" aria-label="搜索专家、技能或连接器" :placeholder="`搜索${tabs.find(t => t.id === tab)?.label}…`" />
         <button v-if="query" type="button" aria-label="清空搜索" @click="query = ''">×</button>
       </form>
@@ -180,19 +173,12 @@ const bytes = (n: number) => n < 1024 ? `${n} B` : `${(n / 1024).toFixed(1)} KB`
         </div>
         <button v-if="tab === 'skills'" class="installed-filter" :class="{ selected: installedOnly }" :aria-pressed="installedOnly" @click="installedOnly = !installedOnly; category = '全部'"><SlidersHorizontal :size="13" />已安装<span>{{ localSkills.length }}</span></button>
       </div>
-      <div class="store-section-heading"><h2>{{ heading }}</h2><span>{{ description }}</span></div>
-      <NAlert v-if="!store.desktop && tab !== 'experts'" type="info" :show-icon="false">请在小伴桌面客户端中浏览技能和管理连接器。</NAlert>
+      <div v-if="tab === 'skills'" class="store-section-heading"><h2>{{ heading }}</h2><span>{{ description }}</span></div>
+      <NAlert v-if="!store.desktop && tab === 'skills'" type="info" :show-icon="false">请在小伴桌面客户端中浏览技能和管理连接器。</NAlert>
       <NAlert v-if="localError" class="store-alert" type="warning" :show-icon="false">{{ localError }} <button class="text-action" @click="refreshLocal">重试</button></NAlert>
       <NAlert v-if="error && tab === 'skills' && !installedOnly" class="store-alert" type="error" :show-icon="false">{{ error }} <button class="text-action" @click="browse">重试</button></NAlert>
 
-      <div v-if="tab === 'experts'" class="store-grid expert-grid">
-        <article v-for="e in visibleExperts" :key="e.id" class="store-card expert-card">
-          <div class="expert-top"><ExpertAvatar :id="e.id" /><div class="expert-meta"><h3>{{ e.name }}</h3><span class="store-tag">{{ e.role }}</span></div></div>
-          <p class="expert-desc">{{ e.desc }}</p><div class="expert-special">擅长 <b>{{ e.tags.join(' · ') }}</b></div>
-          <div class="card-actions"><button class="store-primary" :disabled="busy" @click="talkToExpert(e)">与专家对话 <ArrowRight :size="13" /></button><button class="store-secondary" :aria-label="`查看${e.name}详情`" @click="expert = e">详情</button></div>
-        </article>
-      </div>
-      <template v-else-if="tab === 'skills'">
+      <template v-if="tab === 'skills'">
         <div v-if="loading" class="store-grid" aria-label="正在加载技能" aria-busy="true"><NSkeleton v-for="n in 8" :key="n" height="183px" :sharp="false" /></div>
         <div v-else class="store-grid skill-grid">
           <article v-for="s in visibleSkills" :key="s.slug" class="store-card skill-card">
@@ -203,24 +189,18 @@ const bytes = (n: number) => n < 1024 ? `${n} B` : `${(n / 1024).toFixed(1)} KB`
         </div>
         <div v-if="!installedOnly && !error && !loading && store.desktop && (page > 1 || remote.hasMore)" class="store-pagination"><button :disabled="page <= 1" aria-label="上一页" @click="page--"><ChevronLeft :size="16" /></button><span>第 {{ page }} 页</span><button :disabled="!remote.hasMore" aria-label="下一页" @click="page++"><ChevronRight :size="16" /></button></div>
       </template>
-      <div v-else class="store-grid connector-grid">
+      <RegistryCatalog v-else ref="registry" :kind="tab" :query="query" :category="category" :store="store">
+        <template v-if="tab === 'connectors' && showComputer" #prefix>
         <article v-if="showComputer" class="store-card connector-card">
           <div class="connector-top"><div class="provider-icon computer"><Monitor :size="25" /></div><span class="connection-status" :class="{ enabled: computerEnabled }">{{ computerEnabled ? '已启用' : '未启用' }}</span></div>
           <h3>本机电脑控制</h3><p class="connector-desc">通过截图、鼠标和键盘操作电脑上的应用</p>
           <div class="connector-bottom"><small>Computer Use</small><button class="small-action" :disabled="!store.desktop || !!localError" @click="computerOpen = true">{{ computerEnabled ? '管理' : '启用' }}</button></div>
         </article>
-        <article v-for="c in visibleConnectors" :key="c.id" class="store-card connector-card">
-          <div class="connector-top"><div class="provider-icon" :class="c.id"><img :src="connectorIcon(c.id)" alt="" /></div><span class="connection-status">尚未接入</span></div>
-          <h3>{{ c.name }}</h3><p class="connector-desc">{{ c.desc }}</p>
-          <div class="connector-bottom"><small>{{ c.kind }}</small><button class="small-action neutral" :aria-label="`查看${c.name}连接器详情`" @click="connector = c">查看详情</button></div>
-        </article>
-      </div>
+        </template>
+      </RegistryCatalog>
       <div v-if="empty && !error && (tab !== 'skills' || store.desktop)" class="store-empty"><Search :size="26" /><b>{{ installedOnly ? '暂无匹配的已安装技能' : '没有找到匹配内容' }}</b><span>试试其他关键词或分类</span><button class="text-action" @click="reset">清除筛选</button></div>
     </div>
 
-    <NModal :show="!!expert" preset="card" :title="expert?.name" class="store-dialog" style="width:510px;max-width:calc(100vw - 36px)" @update:show="!$event && (expert = null)">
-      <template v-if="expert"><div class="detail-intro"><ExpertAvatar :id="expert.id" /><div><span class="store-tag">专家预设</span><p>{{ expert.desc }}</p></div></div><h4>擅长领域</h4><div class="detail-tags"><span v-for="tag in expert.tags" :key="tag" class="store-tag">{{ tag }}</span></div><h4>建议搭配的技能</h4><p>{{ expert.skills.join('、') }}</p><h4>相关连接器</h4><p>{{ expert.connectors.join('、') }}</p><p class="detail-note">以角色预设开启新会话。关联能力需安装或授权后使用。</p><div class="dialog-actions"><button class="store-secondary" @click="expert = null; switchTab('skills')">查看技能</button><button class="store-primary" :disabled="busy" @click="talkToExpert(expert)">与专家对话 <ArrowRight :size="14" /></button></div></template>
-    </NModal>
     <NModal :show="!!skill" preset="card" :title="skill?.name || skill?.slug" class="store-dialog skill-dialog" :mask-closable="!busy" :closable="!busy" style="width:680px;max-width:calc(100vw - 36px)" @update:show="!$event && !busy && (skill = null)">
       <template v-if="skill"><p>{{ skill.description }}</p><div class="detail-tags"><span class="store-tag">{{ installed(skill.slug)?.source || 'SkillHub' }}</span><span v-if="skill.version" class="store-tag">v{{ skill.version }}</span></div>
         <div v-if="reviewing" class="review-loading"><RefreshCw :size="17" />正在读取固定版本的文件与脚本…</div>
@@ -236,9 +216,6 @@ const bytes = (n: number) => n < 1024 ? `${n} B` : `${(n / 1024).toFixed(1)} KB`
         <p v-if="removing" class="detail-note">确认卸载此技能？卸载后新任务将无法加载它，进行中的任务可能受影响。</p>
         <div class="dialog-actions"><template v-if="installed(skill.slug)"><button v-if="installed(skill.slug)?.removable" class="store-secondary" :disabled="busy" @click="removing ? uninstallSkill() : (removing = true)">{{ busy ? '正在卸载…' : removing ? '确认卸载' : '卸载' }}</button><button class="store-primary" :disabled="busy" @click="useSkill(skill)">使用技能 <ArrowRight :size="14" /></button></template><button v-else class="store-primary" :disabled="!review || !reviewed || reviewing || busy || !localReady" @click="installSkill">{{ busy ? '正在安装…' : '确认安装' }}<Download :size="14" /></button></div>
       </template>
-    </NModal>
-    <NModal :show="!!connector" preset="card" :title="connector?.name" class="store-dialog" style="width:460px;max-width:calc(100vw - 36px)" @update:show="!$event && (connector = null)">
-      <template v-if="connector"><p>{{ connector.desc }}</p><h4>计划支持的能力</h4><ul class="connector-scopes"><li v-for="scope in connector.scopes" :key="scope">{{ scope }}</li></ul><p class="detail-note">此连接器尚未接入。开放后可在这里授权账号、选择权限并管理连接。</p><div class="dialog-actions"><button class="store-secondary" @click="connector = null">知道了</button><button class="store-primary" disabled>暂未开放</button></div></template>
     </NModal>
     <NModal v-model:show="computerOpen" preset="card" title="本机电脑控制" class="store-dialog" :mask-closable="!busy" :closable="!busy" style="width:460px;max-width:calc(100vw - 36px)">
       <p>允许小伴在任务中调用内置 Computer Use 引擎，通过截图、鼠标与键盘操作应用。</p><p class="detail-note">首次使用按系统提示授予屏幕录制与辅助功能权限。开关表示能力已启用，实际权限以系统授权为准。</p><div class="dialog-actions"><button class="store-secondary" :disabled="busy" @click="computerOpen = false">取消</button><button class="store-primary" :disabled="busy" @click="toggleComputer">{{ busy ? '正在保存…' : computerEnabled ? '停用电脑控制' : '启用电脑控制' }}</button></div>

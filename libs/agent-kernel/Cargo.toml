@@ -11,7 +11,7 @@ openai = ["dep:reqwest"]
 anthropic = ["dep:reqwest"]
 native-tls = ["openai", "anthropic", "reqwest/native-tls-no-alpn"]
 fs = []
-skills = []
+skills = ["dep:serde_yaml_ng"]
 memory = []
 web = ["dep:reqwest"]
 shell = []
@@ -23,6 +23,7 @@ process = ["dep:libc", "dep:windows-sys"]
 [dependencies]
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+serde_yaml_ng = { version = "0.10.0", optional = true }
 jsonschema = { version = "0.33", default-features = false }
 base64 = { version = "0.22", optional = true }
 reqwest = { version = "0.13", default-features = false, features = ["blocking"], optional = true }

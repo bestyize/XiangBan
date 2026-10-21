@@ -167,125 +167,68 @@ pub struct SkillMetadata {
     pub origin: Option<String>,
 }
 
-/// Parse the scalar metadata used by Skills, without evaluating YAML tags or aliases.
-/// The original document is never rewritten: its bytes may be pinned by a manifest.
+fn yaml_scalar_string<'de,D:serde::Deserializer<'de>>(deserializer:D)->Result<String,D::Error>{
+    let value:serde_yaml_ng::Value=serde::Deserialize::deserialize(deserializer)?;
+    match value {
+        serde_yaml_ng::Value::String(value)=>Ok(value),
+        _=>Err(serde::de::Error::custom("metadata field must be a string")),
+    }
+}
+
+/// Parse standard YAML metadata, preserving the original pinned document bytes.
 pub fn parse_skill_metadata(text: &str) -> Result<SkillMetadata, String> {
-    let (pairs, _) = split_frontmatter(text)
-        .ok_or("SKILL.md requires a closed --- frontmatter block with unique scalar metadata fields")?;
-    let get = |key: &str| pairs.iter().find(|(k, _)| *k == key).map(|(_, v)| v.as_str());
-    let name = get("name").filter(|v| !v.trim().is_empty())
-        .ok_or("SKILL.md frontmatter name is missing or empty")?;
-    let description = get("description").filter(|v| !v.trim().is_empty())
-        .ok_or("SKILL.md frontmatter description is missing or empty")?;
-    Ok(SkillMetadata {
-        name: name.to_string(),
-        description: description.split_whitespace().collect::<Vec<_>>().join(" "),
-        origin: get("origin").map(str::to_string),
-    })
-}
-
-/// The supported scalar subset includes quoted values, comments and indented descriptions.
-/// Ignore unrelated/nested metadata; only top-level identity fields are authoritative.
-fn split_frontmatter(text: &str) -> Option<(Vec<(&str, String)>, &str)> {
-    let text = text.strip_prefix('\u{feff}').unwrap_or(text);
-    let opening = text.split_inclusive('\n').next()?;
-    if !opening.ends_with('\n') || opening.trim_end() != "---" {
-        return None;
+    let (header, _) = split_frontmatter(text)
+        .ok_or("SKILL.md requires a closed --- frontmatter block")?;
+    #[derive(serde::Deserialize)]
+    struct Metadata {
+        #[serde(deserialize_with="yaml_scalar_string")]
+        name: String,
+        #[serde(deserialize_with="yaml_scalar_string")]
+        description: String,
+        origin: Option<String>,
     }
-    let rest = &text[opening.len()..];
-    let mut offset = 0;
-    let mut header_end = None;
-    for line in rest.split_inclusive('\n') {
-        if line.trim_end() == "---" {
-            header_end = Some((offset, offset + line.len()));
-            break;
-        }
-        offset += line.len();
-    }
-    let (end, body_start) = header_end?;
-    let mut lines = rest[..end].lines().peekable();
-    let mut pairs = Vec::new();
+    // A number of published skills use legacy unquoted descriptions containing ': '.
+    // Quote only these scalar fields in the parsing buffer, never in the installed file.
+    let mut normalized = String::new();
+    let mut lines = header.lines().peekable();
     while let Some(line) = lines.next() {
-        if line.starts_with(char::is_whitespace) || line.starts_with('#') {
-            continue;
-        }
-        let Some((key, value)) = line.split_once(':') else { continue };
-        let key = key.trim();
-        if !matches!(key, "name" | "description" | "origin") {
-            continue;
-        }
-        if pairs.iter().any(|(k, _)| *k == key) {
-            return None;
-        }
-        let value = value.trim();
-        let indicator = value.split_whitespace().next().unwrap_or("");
-        let scalar = if matches!(indicator, "|" | "|-" | "|+" | ">" | ">-" | ">+")
-            || value.is_empty() || value.starts_with('#')
-        {
-            if !indicator.is_empty() && !indicator.starts_with('#')
-                && !value[indicator.len()..].trim_start().is_empty()
-                && !value[indicator.len()..].trim_start().starts_with('#') {
-                return None;
-            }
-            let mut block = Vec::new();
-            while lines.peek().is_some_and(|l| l.trim().is_empty() || l.starts_with(' ')) {
-                block.push(lines.next()?.trim());
-            }
-            block.join(if indicator.starts_with('|') { "\n" } else { " " })
-        } else {
-            scalar_value(value)?
-        };
-        pairs.push((key, scalar));
-    }
-    Some((pairs, &rest[body_start..]))
-}
-
-fn scalar_value(value: &str) -> Option<String> {
-    if value.starts_with('"') {
-        let mut escaped = false;
-        for (index, c) in value.char_indices().skip(1) {
-            if escaped {
-                escaped = false;
-            } else if c == '\\' {
-                escaped = true;
-            } else if c == '"' {
-                let suffix = value[index + 1..].trim_start();
-                if !suffix.is_empty() && !suffix.starts_with('#') {
-                    return None;
+        let field = if !line.starts_with(char::is_whitespace) { line.split_once(':') } else { None };
+        if let Some((key, value)) = field {
+            let value = value.trim();
+            if matches!(key.trim(), "name" | "description")
+                && !value.starts_with(['\'', '"', '|', '>', '[', '{', '&', '*', '!'])
+                && (value.contains(": ") || value.ends_with(':')) {
+                let mut value = value.to_string();
+                while lines.peek().is_some_and(|l| l.starts_with(' ')) {
+                    value.push(' '); value.push_str(lines.next().unwrap().trim());
                 }
-                return serde_json::from_str(&value[..index + 1]).ok();
-            }
-        }
-        return None;
-    }
-    if value.starts_with('\'') {
-        let mut chars = value.char_indices().skip(1).peekable();
-        while let Some((index, c)) = chars.next() {
-            if c != '\'' { continue; }
-            if chars.peek().is_some_and(|(_, next)| *next == '\'') {
-                chars.next();
+                normalized.push_str(key); normalized.push_str(": ");
+                normalized.push_str(&serde_json::to_string(&value).map_err(|e|e.to_string())?);
+                normalized.push('\n');
                 continue;
             }
-            let suffix = value[index + 1..].trim_start();
-            if !suffix.is_empty() && !suffix.starts_with('#') {
-                return None;
-            }
-            return Some(value[1..index].replace("''", "'"));
         }
-        return None;
+        normalized.push_str(line); normalized.push('\n');
     }
-    if value.starts_with(['[', '{', '&', '*', '!']) {
-        return None;
+    let raw: Metadata = serde_yaml_ng::from_str(&normalized)
+        .map_err(|e|format!("SKILL.md frontmatter YAML invalid: {e}"))?;
+    if raw.name.trim().is_empty() { return Err("SKILL.md frontmatter name is missing or empty".into()); }
+    if raw.description.trim().is_empty() { return Err("SKILL.md frontmatter description is missing or empty".into()); }
+    Ok(SkillMetadata { name: raw.name, description: raw.description.split_whitespace().collect::<Vec<_>>().join(" "), origin: raw.origin })
+}
+
+/// Locate the complete leading YAML block, without inspecting its nested values.
+fn split_frontmatter(text: &str) -> Option<(&str, &str)> {
+    let text = text.strip_prefix('\u{feff}').unwrap_or(text);
+    let opening = text.split_inclusive('\n').next()?;
+    if !opening.ends_with('\n') || opening.trim_end() != "---" { return None; }
+    let rest = &text[opening.len()..];
+    let mut offset = 0;
+    for line in rest.split_inclusive('\n') {
+        if line.trim_end() == "---" { return Some((&rest[..offset], &rest[offset + line.len()..])); }
+        offset += line.len();
     }
-    let end = value.char_indices().find_map(|(index, c)| {
-        (c == '#' && (index == 0 || value[..index].ends_with(char::is_whitespace)))
-            .then_some(index)
-    }).unwrap_or(value.len());
-    let scalar = value[..end].trim_end();
-    if matches!(scalar, "~" | "null" | "Null" | "NULL") {
-        return Some(String::new());
-    }
-    Some(scalar.to_string())
+    None
 }
 
 fn read_info(root: &Root, name: &str) -> Option<SkillInfo> {
@@ -294,7 +237,16 @@ fn read_info(root: &Root, name: &str) -> Option<SkillInfo> {
         return None;
     }
     let text = read_limited(&dir.join("SKILL.md")).ok()?;
-    let metadata = parse_skill_metadata(&text).ok()?;
+    let metadata = match parse_skill_metadata(&text) {
+        Ok(metadata)=>metadata,
+        Err(_) if !text.trim_start_matches('\u{feff}').starts_with("---")=>{
+            let lock:Value=serde_json::from_str(&read_limited(&dir.join(".skillhub-lock.json")).ok()?).ok()?;
+            if lock["provider"]!="skillhub" || lock["slug"]!=name || lock["metadata"]["name"]!=name {return None;}
+            let description=lock["metadata"]["description"].as_str().filter(|s|!s.trim().is_empty())?;
+            SkillMetadata{name:name.to_string(),description:description.split_whitespace().collect::<Vec<_>>().join(" "),origin:None}
+        },
+        Err(_)=>return None,
+    };
     if metadata.name != name {
         return None;
     }
@@ -453,6 +405,24 @@ impl Tool for SkillManage {
 #[cfg(test)]
 mod frontmatter_tests {
     use super::*;
+    #[test]
+    fn headerless_skills_load_only_with_matching_registry_metadata() {
+        let root=std::env::temp_dir().join(format!("headerless-skill-{}-{}",std::process::id(),now_millis()));
+        let dir=root.join("legacy-skill");fs::create_dir_all(&dir).unwrap();
+        let body="# Legacy skill\nOriginal body, unchanged.";
+        fs::write(dir.join("SKILL.md"),body).unwrap();
+        let skills=Skills::new().writable_root(&root);
+        assert!(skills.find("legacy-skill").is_none());
+        let mut lock=json!({"provider":"skillhub","slug":"legacy-skill","metadata":{"name":"legacy-skill","description":"Verified registry description"}});
+        fs::write(dir.join(".skillhub-lock.json"),lock.to_string()).unwrap();
+        let info=skills.find("legacy-skill").unwrap();
+        assert!(!info.agent_created);
+        assert!(skills.load("legacy-skill").unwrap().ends_with(body));
+        lock["slug"]=json!("different");
+        fs::write(dir.join(".skillhub-lock.json"),lock.to_string()).unwrap();
+        assert!(skills.find("legacy-skill").is_none());
+        fs::remove_dir_all(root).unwrap();
+    }
 
     #[test]
     fn parses_common_scalar_formats_without_reading_body_metadata() {
@@ -469,6 +439,15 @@ mod frontmatter_tests {
             assert_eq!(metadata.name, "demo-skill");
             assert_eq!(metadata.description, expected);
         }
+    }
+
+    #[test]
+    fn parses_multiline_quotes_and_legacy_colons_without_rewriting_source() {
+        let quoted = "---\nname: demo-skill\ndescription: \"First line\n  second line with \\\"quotes\\\"\"\nmetadata:\n  settings: {enabled: true, tags: [one, two]}\n---\nBody";
+        assert_eq!(parse_skill_metadata(quoted).unwrap().description, "First line second line with \"quotes\"");
+        let legacy = "---\nname: demo-skill\ndescription: Follow the workflow: read, analyze, deliver\n---\nBody";
+        assert_eq!(parse_skill_metadata(legacy).unwrap().description, "Follow the workflow: read, analyze, deliver");
+        assert_eq!(split_frontmatter(legacy).unwrap().1, "Body");
     }
 
     #[test]

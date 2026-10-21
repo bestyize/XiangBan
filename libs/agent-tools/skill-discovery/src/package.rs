@@ -26,6 +26,8 @@ pub(crate) struct Item {
 #[derive(Clone)]
 pub(crate) struct Plan {
     pub version: String,
+    pub namespace: Option<String>,
+    pub metadata: Option<Value>,
     pub files: Vec<Item>,
     pub sha256: String,
 }
@@ -99,7 +101,7 @@ pub(crate) fn plan(version: &str, values: &[Value]) -> Result<Plan, String> {
         hash.update(f.sha256.as_bytes());
         hash.update(b"\n");
     }
-    Ok(Plan { version: version.to_string(), files, sha256: format!("{:x}", hash.finalize()) })
+    Ok(Plan { version: version.to_string(), namespace: None, metadata: None, files, sha256: format!("{:x}", hash.finalize()) })
 }
 
 impl Plan {
@@ -175,8 +177,9 @@ pub(crate) fn verified_files(_slug: &str, plan: &Plan, archive: &[u8]) -> Result
         }
         let path = raw.strip_prefix(&prefix).ok_or("unexpected SkillHub archive root")?;
         let file = listed.get(path).ok_or_else(|| format!("unlisted ZIP file: {path}"))?;
-        if found.contains_key(path) || entry.size() != file.size {
-            return Err(format!("duplicate or incorrectly sized ZIP entry: {path}"));
+        if found.contains_key(path) { return Err(format!("duplicate ZIP entry: {path}")); }
+        if entry.size() != file.size {
+            return Err(format!("incorrectly sized ZIP entry: {path} (expected {}, received {})", file.size, entry.size()));
         }
         total = total.checked_add(file.size).ok_or("SkillHub package too large")?;
         if total > MAX_TOTAL {
@@ -203,8 +206,22 @@ impl Drop for Stage {
     }
 }
 
-pub(crate) fn install(root: &Path, slug: &str, plan: &Plan, archive: &[u8]) -> Result<(), String> {
-    let files = verified_files(slug, plan, archive)?;
+/// Canonical file endpoints avoid registry ZIPs which resolve a different publisher.
+pub(crate) fn canonical_files(plan:&Plan,mut read:impl FnMut(&Item)->Result<Vec<u8>,String>)->Result<BTreeMap<String,Vec<u8>>,String>{
+    let mut files=BTreeMap::new();
+    for item in &plan.files{
+        let data=read(item)?;
+        if data.len() as u64!=item.size || format!("{:x}",Sha256::digest(&data))!=item.sha256{
+            return Err(format!("SkillHub canonical file SHA256 or size mismatch: {}",item.path));
+        }
+        files.insert(item.path.clone(),data);
+    }
+    Ok(files)
+}
+pub(crate) fn install(root: &Path, slug: &str, plan: &Plan, files: &BTreeMap<String,Vec<u8>>) -> Result<(), String> {
+    if files.len()!=plan.files.len(){return Err("incomplete SkillHub package".into());}
+    // Validate the entire set again before any filesystem writes, independent of transport.
+    canonical_files(plan,|item|files.get(&item.path).cloned().ok_or("missing SkillHub file".into()))?;
     fs::create_dir_all(root).map_err(|e| e.to_string())?;
     let destination = root.join(slug);
     if destination.exists() {
@@ -222,7 +239,7 @@ pub(crate) fn install(root: &Path, slug: &str, plan: &Plan, archive: &[u8]) -> R
         fs::write(target, data).map_err(|e| e.to_string())?;
     }
     let lock = json!({"provider":"skillhub","slug":slug,"version":plan.version,
-        "manifestSha256":plan.sha256,
+        "namespace":plan.namespace,"metadata":plan.metadata,"manifestSha256":plan.sha256,
         "files":plan.files.iter().map(|i|json!({"path":i.path,"sha256":i.sha256})).collect::<Vec<_>>()});
     fs::write(stage.0.join(".skillhub-lock.json"), lock.to_string()).map_err(|e| e.to_string())?;
     if destination.exists() {
@@ -300,5 +317,17 @@ mod tests {
         let mut m = p.files.iter().map(|i| json!({"path":i.path,"size":i.size,"sha256":i.sha256})).collect::<Vec<_>>();
         m[1]["sha256"] = json!("f".repeat(64));
         assert_ne!(p.sha256, plan("1.0.0", &m).unwrap().sha256);
+    }
+    #[test]
+    fn canonical_downloads_require_all_reviewed_bytes_before_publishing(){
+        let (plan,archive)=fixture();let files=verified_files("demo-skill",&plan,&archive).unwrap();
+        assert_eq!(canonical_files(&plan,|item|Ok(files[&item.path].clone())).unwrap(),files);
+        assert!(canonical_files(&plan,|_|Ok(b"changed".to_vec())).is_err());
+        let root=std::env::temp_dir().join(format!("canonical-skill-test-{}-{}",std::process::id(),SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos()));
+        let mut tampered=files.clone();tampered.insert("scripts/hello.py".into(),b"bad".to_vec());
+        assert!(install(&root,"demo-skill",&plan,&tampered).is_err());assert!(!root.exists());
+        let mut missing=files.clone();missing.remove("SKILL.md");assert!(install(&root,"demo-skill",&plan,&missing).is_err());
+        install(&root,"demo-skill",&plan,&files).unwrap();assert_eq!(fs::read(root.join("demo-skill/SKILL.md")).unwrap(),files["SKILL.md"]);
+        fs::remove_dir_all(root).unwrap();
     }
 }

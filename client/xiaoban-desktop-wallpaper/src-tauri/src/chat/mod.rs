@@ -129,6 +129,7 @@ pub struct ChatState {
     auto_compact: compact::AutoCooldown,
     /// Actual schemas from the latest registration, keyed by whether native GUI tools are enabled.
     tool_tokens: Mutex<HashMap<bool, usize>>,
+    connectors: Mutex<Option<Arc<agent_connector_tools::ConnectorManager>>>,
 }
 
 impl ChatState {
@@ -149,6 +150,7 @@ impl ChatState {
             index: Mutex::new(None),
             auto_compact: compact::AutoCooldown::default(),
             tool_tokens: Mutex::new(HashMap::new()),
+            connectors: Mutex::new(None),
         }
     }
 }
@@ -159,8 +161,8 @@ fn permission_with_danger_check(mode: PermissionMode, approver: impl agent_kerne
     Permission::new(mode, approver).danger_check(move |tool, args| {
         // In Auto mode, always_ask alone does not trigger approval when a danger
         // policy is installed; third-party skill installation must be flagged here.
-        if tool == "skill_install" || tool == "skill_run" {
-            return Some("安装第三方 Skill 或执行其脚本必须逐次经过用户确认".to_string());
+        if tool == "skill_install" || tool == "skill_run" || tool.starts_with("mcp_ext_") {
+            return Some("安装第三方 Skill、执行脚本或调用外部 MCP 工具必须逐次经过用户确认".to_string());
         }
         if tool == "computer_use_repair_permissions" {
             return Some("清除 com.ifuryst.opencomputeruse 的所选旧授权（同标识独立安装版也受影响），之后需重新授权；每次都需确认".to_string());
@@ -339,6 +341,9 @@ fn assemble(parts: Parts<'_>) -> Result<Agent, String> {
 }
 
 fn assemble_with_files(parts: Parts<'_>, attachments: Vec<Attachment>) -> Result<Agent, String> {
+    assemble_with_connectors(parts, attachments, Vec::new())
+}
+fn assemble_with_connectors(parts: Parts<'_>, attachments: Vec<Attachment>, connector_tools: Vec<Arc<dyn agent_kernel::Tool>>) -> Result<Agent, String> {
     let Parts { provider, dirs, workspace, permission, todo, ask, desktop, utc_offset_minutes, open_computer_use, spawn_computer_use, context_tokens } = parts;
     for dir in [dirs.sessions(), dirs.spill(), dirs.memory(), dirs.skills()] {
         fs::create_dir_all(&dir).map_err(|e| format!("无法创建 {}：{e}", dir.display()))?;
@@ -397,7 +402,22 @@ fn assemble_with_files(parts: Parts<'_>, attachments: Vec<Attachment>) -> Result
             builder = builder.tool_arc(tool);
         }
     }
+    for tool in connector_tools { builder = builder.tool_arc(tool); }
     builder.build().map_err(|e| e.to_string())
+}
+
+fn connector_manager(app: &tauri::AppHandle) -> Result<Arc<agent_connector_tools::ConnectorManager>, String> {
+    let state=app.state::<ChatState>();
+    let mut slot=lock(&state.connectors);
+    if let Some(manager)=slot.as_ref(){return Ok(manager.clone());}
+    let config=ai_config::current(app)?;
+    let default=ai_config::default_workspace(app)?;
+    let manager=Arc::new(agent_connector_tools::ConnectorManager::new(Dirs::of(app)?.chat.join("connectors"),config.workspace_or(&default).to_path_buf())?);
+    *slot=Some(manager.clone());
+    Ok(manager)
+}
+pub fn shutdown_connectors(app:&tauri::AppHandle){
+    if let Some(manager)=lock(&app.state::<ChatState>().connectors).as_ref(){manager.shutdown();}
 }
 
 fn build_agent(app: &tauri::AppHandle, config: &AiConfig, key_source: Option<KeySource>, workspace: &Path, attachments: Vec<Attachment>) -> Result<Agent, String> {
@@ -416,7 +436,7 @@ fn build_agent(app: &tauri::AppHandle, config: &AiConfig, key_source: Option<Key
             .join("agent-tools/computer-use");
         agent_computer_use_tools::spawn(&root)
     };
-    let agent = assemble_with_files(Parts {
+    let agent = assemble_with_connectors(Parts {
         provider: provider_with(config, key_source)?,
         dirs: &Dirs::of(app)?,
         workspace,
@@ -428,7 +448,7 @@ fn build_agent(app: &tauri::AppHandle, config: &AiConfig, key_source: Option<Key
         open_computer_use: config.open_computer_use,
         spawn_computer_use: &spawn_computer_use,
         context_tokens: config.context_tokens,
-    }, attachments)?;
+    }, attachments, connector_manager(app).map(|m|m.tools()).unwrap_or_default())?;
     lock(&state.tool_tokens).insert(config.open_computer_use, agent_kernel::estimate_tool_tokens(&agent.tool_schemas()));
     Ok(agent)
 }
@@ -1062,6 +1082,3 @@ pub fn chat_set_permission_mode(app: tauri::AppHandle, session_id: Option<String
 
 #[cfg(test)]
 mod tests;
-
-
-

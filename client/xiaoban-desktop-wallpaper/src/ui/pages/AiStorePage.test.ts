@@ -25,6 +25,10 @@ const review = { slug: remoteSkill.slug, sha256: manifestHash, content: '---\nna
   ] }, scripts: [{ path: 'scripts/run.py', sha256: 'c'.repeat(64), preview: 'print("hello")', previewTruncated: false }] };
 let local: Skill[];
 let enabled: boolean;
+let localPacks: {slug:string;name:string;description:string;ready:boolean;entrySkill:string;dependencies:unknown[]}[];
+let connected: boolean;
+const remotePack = {slug:'tech-test-automation',name:'自动化测试专家包',description:'真实测试工作流',category:'tech',skillCount:1};
+const remoteConnector = {slug:'test-mcp',name:'测试 MCP 服务',description:'真实 MCP 目录',category:'开发'};
 const wrappers: ReturnType<typeof mount>[] = [];
 function setup() {
   const store = reactive({ desktop: true, chat: { select: vi.fn().mockResolvedValue(undefined) },
@@ -37,9 +41,16 @@ async function settle() { await vi.advanceTimersByTimeAsync(300); await flushPro
 async function skills(wrapper: ReturnType<typeof mount>) { await wrapper.get('#store-tab-skills').trigger('click'); await settle(); }
 
 beforeEach(() => {
-  vi.useFakeTimers(); local = []; enabled = false;
+  vi.useFakeTimers(); local = []; enabled = false; localPacks = []; connected = false;
   vi.mocked(invoke).mockReset().mockImplementation(async (command, args) => {
     if (command === 'ai_store_installed') return local;
+    if (command === 'ai_store_catalog') return {results:args?.kind === 'experts' ? (args?.keyword ? [] : [remotePack]) : [remoteConnector],page:1,total:1,hasMore:false};
+    if (command === 'ai_store_experts_installed') return localPacks;
+    if (command === 'ai_store_connector_status') return connected ? [{id:'test-mcp',name:'测试 MCP 服务',connected:true,toolCount:2,enabled:true}] : [];
+    if (command === 'ai_store_connector_detail') return {readme:'服务说明',configs:[{name:'test',config:{url:'https://example.com/mcp'}}]};
+    if (command === 'ai_store_connector_connect') {connected=true;return {};}
+    if (command === 'ai_store_connector_disconnect') {connected=false;return;}
+
     if (command === 'get_ai_config') return { openComputerUse: enabled };
     if (command === 'ai_store_browse') return { results: [remoteSkill], page: 1, total: 1, hasMore: false };
     if (command === 'ai_store_inspect') return review;
@@ -52,24 +63,27 @@ beforeEach(() => {
 afterEach(() => { wrappers.splice(0).forEach(w => w.unmount()); vi.useRealTimers(); });
 
 describe('AI 商店', () => {
-  it('shows the compact expert grid with search and category filters', async () => {
-    const { wrapper } = setup(); await flushPromises();
-    expect(wrapper.findAll('.expert-card')).toHaveLength(6);
+  it('loads real expert packs with remote search and scene filters', async () => {
+    const { wrapper } = setup(); await settle();
+    expect(wrapper.findAll('.expert-card')).toHaveLength(1);
+    expect(wrapper.get('.expert-card').text()).toContain('自动化测试专家包');
     expect(wrapper.find('h1').exists()).toBe(false);
     expect(wrapper.find('.hero').exists()).toBe(false);
     expect(wrapper.find('aside').exists()).toBe(false);
-    await wrapper.get('input[aria-label="搜索专家、技能或连接器"]').setValue('编程');
-    expect(wrapper.findAll('.expert-card')).toHaveLength(1);
-    expect(wrapper.get('.expert-card').text()).toContain('编程开发专家');
+    await wrapper.get('input[aria-label="搜索专家、技能或连接器"]').setValue('编程'); await settle();
+    expect(invoke).toHaveBeenCalledWith('ai_store_catalog',{kind:'experts',keyword:'编程',page:1,category:''});
+    expect(wrapper.findAll('.expert-card')).toHaveLength(0);
     await wrapper.get('input').setValue('');
-    await wrapper.findAll('.store-filters button').find(b => b.text() === '创作')!.trigger('click');
-    expect(wrapper.findAll('.expert-card')).toHaveLength(2);
+    await wrapper.findAll('.store-filters button').find(b => b.text() === '创作')!.trigger('click'); await settle();
+    expect(invoke).toHaveBeenCalledWith('ai_store_catalog',{kind:'experts',keyword:'',page:1,category:'creative'});
   });
-  it('starts a new expert conversation with a draft for the user to complete', async () => {
-    const { wrapper, store } = setup(); await flushPromises();
-    await wrapper.findAll('.expert-card')[0].get('.store-primary').trigger('click'); await flushPromises();
+  it('starts installed experts by loading the actual workflow skill', async () => {
+    localPacks=[{...remotePack,ready:true,entrySkill:'expert-tech-test-automation',dependencies:[]}];
+    const { wrapper, store } = setup(); await settle();
+    await wrapper.get('.expert-card .small-action').trigger('click'); await flushPromises();
     expect(store.chat.select).toHaveBeenCalledWith(null);
-    expect(store.creationDraft).toContain('请作为深度研究专家帮助我');
+    expect(store.creationDraft).toContain('load_skill');
+    expect(store.creationDraft).toContain('expert-tech-test-automation');
     expect(store.navigate).toHaveBeenCalledWith('chat');
   });
   it('requires review before installing the exact pinned package and refreshes real state', async () => {
@@ -120,14 +134,17 @@ describe('AI 商店', () => {
     await wrapper.get('.test-modal .store-secondary').trigger('click'); await flushPromises();
     expect(invoke).toHaveBeenCalledWith('ai_store_uninstall', { slug: 'demo-skill' });
   });
-  it('distinguishes planned connectors from the working computer-control preference', async () => {
-    const { wrapper } = setup(); await flushPromises();
-    await wrapper.get('#store-tab-connectors').trigger('click');
-    expect(wrapper.findAll('.connector-card')).toHaveLength(9);
-    await wrapper.findAll('.connector-card')[1].get('.small-action').trigger('click');
-    expect(wrapper.get('.test-modal').text()).toContain('此连接器尚未接入');
+  it('connects registry MCP services after explicit configuration confirmation', async () => {
+    const { wrapper } = setup(); await settle();
+    await wrapper.get('#store-tab-connectors').trigger('click'); await settle();
+    expect(wrapper.findAll('.connector-card')).toHaveLength(2);
+    await wrapper.findAll('.connector-card')[1].get('.small-action').trigger('click'); await flushPromises();
+    expect((wrapper.get('.test-modal textarea').element as HTMLTextAreaElement).value).toContain('https://example.com/mcp');
     expect(wrapper.get('.test-modal .store-primary').attributes('disabled')).toBeDefined();
-    await wrapper.get('.test-modal .store-secondary').trigger('click');
+    await wrapper.get('.test-modal .review-confirm input').setValue(true);
+    await wrapper.get('.test-modal .store-primary').trigger('click'); await flushPromises();
+    expect(invoke).toHaveBeenCalledWith('ai_store_connector_connect',{id:'test-mcp',name:'测试 MCP 服务',config:{url:'https://example.com/mcp'},confirmed:true});
+    expect(wrapper.findAll('.connector-card')[1].text()).toContain('已连接 · 2 个工具');
     await wrapper.get('.connector-card .small-action').trigger('click');
     await wrapper.get('.test-modal .store-primary').trigger('click'); await flushPromises();
     expect(invoke).toHaveBeenCalledWith('save_ai_preferences', { openComputerUse: true });
