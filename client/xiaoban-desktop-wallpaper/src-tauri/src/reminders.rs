@@ -479,7 +479,8 @@ fn weather_for(app: &tauri::AppHandle, city: &City) -> Result<Weather, String> {
 }
 /// Read-only weather sample; no extra network or IP-based location requests.
 pub fn cached_weather(app: &tauri::AppHandle, now: i64) -> Option<Weather> {
-    let store = app.state::<ReminderState>().store.lock().ok()?;
+    let state = app.state::<ReminderState>();
+    let store = state.store.lock().ok()?;
     if store.config.weather_source.provider == "disabled" { return None; }
     store.weather.clone().filter(|w|
         (0..1800).contains(&(now - w.updated_at)) &&

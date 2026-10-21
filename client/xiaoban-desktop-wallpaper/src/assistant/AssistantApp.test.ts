@@ -27,6 +27,14 @@ async function openToolbar(wrapper: ReturnType<typeof setup>['wrapper']) {
 }
 
 describe('assistant response card', () => {
+  it.each(['enter','button'])('can send during readout using %s without stopping on edit',async method=>{
+    const {store,wrapper}=setup();store.phase='speaking';store.input='';await nextTick();
+    const field=wrapper.get('[data-testid="assistant-input"]');await field.setValue('新的问题');
+    expect(store.interrupt).not.toHaveBeenCalled();expect(store.submit).not.toHaveBeenCalled();
+    const button=wrapper.get('[data-testid="assistant-primary"]');expect(button.attributes('aria-label')).toBe('发送');expect(button.classes()).not.toContain('is-stop');
+    if(method==='enter')await field.trigger('keydown',{key:'Enter'});else await button.trigger('click');
+    expect(store.submit).toHaveBeenCalledOnce();expect(store.interrupt).not.toHaveBeenCalled();
+  });
   it('treats edits and IME composition as input, while focus alone keeps reading', async () => {
     const {store,wrapper}=setup(); store.phase='speaking';
     const field=wrapper.get('[data-testid="assistant-input"]');
@@ -242,10 +250,10 @@ describe('assistant rainbow presentation',()=>{
     expect(wrapper.find('[data-testid="assistant-primary"]').exists()).toBe(false);
   });
   it.each(['thinking','answering','speaking'])('uses a dedicated stop style during %s and restores send or plus afterwards',async phase=>{
-    const {store,wrapper}=setup();store.phase=phase;await nextTick();
+    const {store,wrapper}=setup();store.phase=phase;store.input='';await nextTick();
     const button=wrapper.get('[data-testid="assistant-primary"]');expect(button.classes()).toContain('is-stop');
     await button.trigger('click');expect(store.interrupt).toHaveBeenCalledOnce();
-    store.phase='idle';await nextTick();expect(button.classes()).not.toContain('is-stop');expect(button.attributes('aria-label')).toBe('发送');
+    store.phase='idle';store.input='草稿';await nextTick();expect(button.classes()).not.toContain('is-stop');expect(button.attributes('aria-label')).toBe('发送');
     store.input='';await nextTick();expect(button.attributes('aria-label')).toBe('展开工具');
   });
 });

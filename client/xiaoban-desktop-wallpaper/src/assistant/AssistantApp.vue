@@ -214,7 +214,8 @@ const hasCard = computed(() => !cardDismissed.value && Boolean(
   props.store.hint || props.store.question || props.store.questionImages?.length || props.store.questionFiles?.length || props.store.answer || props.store.working || props.store.failure
   || props.store.approval || props.store.ask || props.store.phase === 'thinking',
 ));
-const canSend = computed(() => !busy.value && !props.store.approval && !imageReading.value && !submitting.value && !capturing.value && !props.store.changingSession && Boolean(props.store.input.trim() || props.store.attachments.length));
+const canSend = computed(() => (!busy.value || props.store.phase === 'speaking') && !props.store.approval && !imageReading.value && !submitting.value && !capturing.value && !props.store.changingSession && Boolean(props.store.input.trim() || props.store.attachments.length));
+const stopping = computed(() => busy.value && !canSend.value);
 
 function approvalLine(request: ApprovalRequest) {
   const raw = typeof request.arguments === 'string' ? request.arguments : JSON.stringify(request.arguments);
@@ -225,7 +226,7 @@ async function send() {
   const text = props.store.input.trim();
   if (!canSend.value) return;
   if (props.store.ask) { if (text) { props.store.input = ''; void props.store.reply(text); } return; }
-  if (busy.value || props.store.approval) return;
+  if ((busy.value && props.store.phase !== 'speaking') || props.store.approval) return;
   cardDismissed.value = false; submitting.value = true;
   try { await props.store.submit(); } finally { submitting.value = false; }
 }
@@ -422,7 +423,7 @@ onBeforeUnmount(()=>{
               <button type="button" class="tool-button" title="选择文件" aria-label="选择文件" data-testid="assistant-add-image" :disabled="!canAttach || store.attachments.length >= 8" @click="toolAction('image')"><Paperclip :size="16" :stroke-width="1.7" /></button>
               <button type="button" class="tool-button" title="截图" aria-label="截图" data-testid="assistant-screenshot" :disabled="!canAttach || store.attachments.length >= 8" @click="toolAction('screenshot')"><Scissors :size="16" :stroke-width="1.7" /></button>
             </div>
-            <button ref="primaryButton" type="button" class="round main-action" :class="{ 'has-action': canSend, 'is-stop': busy, 'tools-open': toolsOpen && !canSend && !busy }" :aria-label="busy ? '停止' : canSend ? '发送' : toolsOpen ? '收起工具' : '展开工具'" :title="busy ? '停止回复 · 悬停展开工具' : canSend ? '发送 · 悬停展开工具' : '展开工具'" :aria-expanded="toolsOpen" aria-controls="assistant-toolbar" aria-keyshortcuts="ArrowUp ArrowDown" :disabled="imageReading || capturing || (submitting && !busy)" data-testid="assistant-primary" @keydown="primaryKeys" @click="primary"><Square v-if="busy" :size="12" fill="currentColor" :stroke-width="0" /><ArrowUp v-else-if="canSend" :size="18" /><Plus v-else :size="18" /></button>
+            <button ref="primaryButton" type="button" class="round main-action" :class="{ 'has-action': canSend, 'is-stop': stopping, 'tools-open': toolsOpen && !canSend && !busy }" :aria-label="canSend ? '发送' : stopping ? '停止' : toolsOpen ? '收起工具' : '展开工具'" :title="canSend ? (store.phase === 'speaking' ? '发送并停止当前朗读' : '发送 · 悬停展开工具') : stopping ? '停止回复 · 悬停展开工具' : '展开工具'" :aria-expanded="toolsOpen" aria-controls="assistant-toolbar" aria-keyshortcuts="ArrowUp ArrowDown" :disabled="imageReading || capturing || (submitting && !busy)" data-testid="assistant-primary" @keydown="primaryKeys" @click="primary"><ArrowUp v-if="canSend" :size="18" /><Square v-else-if="stopping" :size="12" fill="currentColor" :stroke-width="0" /><Plus v-else :size="18" /></button>
           </div>
         </div>
         <p v-if="dropActive || imageReading || capturing" class="image-status" aria-live="polite">{{ capturing ? '截图中，按 Esc 可以取消' : imageReading ? '正在读取附件…' : '松开添加附件' }}</p>

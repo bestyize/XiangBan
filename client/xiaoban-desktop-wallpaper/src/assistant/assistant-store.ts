@@ -71,7 +71,7 @@ export interface AssistantStore {
   readonly changingSession: boolean;
   newConversation(): Promise<void>;
   toggleListening(): Promise<void>;
-  /** A real edit/IME composition, rather than programmatic ASR text or focus. */
+  /** Pause voice input for an edit/IME composition without stopping readout. */
   inputStarted(): void;
   /** Stops speaking, or cancels the answer being written. */
   interrupt(): void;
@@ -256,7 +256,7 @@ export function createAssistantStore(deps: AssistantDeps): AssistantStore {
         case 'attention': return '需要你确认一下';
         case 'thinking': return store.working || '思考中…';
         case 'answering': return store.working || '正在回答…';
-        case 'speaking': return store.voiceAvailable ? '正在朗读，说话或输入可打断' : '正在朗读，输入可打断';
+        case 'speaking': return asr.recordingRequested ? '正在朗读，说话或发送可打断' : '正在朗读，发送可打断';
         case 'listening': return asr.preparing ? '正在准备语音识别…' : asr.recognizing ? '正在识别…' : '我在听，请说…';
         default: return store.voiceAvailable ? '问点什么，或直接说话' : '问点什么';
       }
@@ -359,7 +359,6 @@ export function createAssistantStore(deps: AssistantDeps): AssistantStore {
     inputStarted() {
       draftVersion++; clearTimers(); heard = ''; voiceTurn = false;
       asr.deactivate();
-      if (flags.awaitingSpeech || speech.status !== 'idle') stopReading();
     },
     interrupt() {
       // Stop both channels, including a reply that finishes while cancellation is in flight.

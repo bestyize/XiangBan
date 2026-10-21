@@ -225,7 +225,8 @@ pub fn get_proactivity_context(window: tauri::WebviewWindow) -> Result<ContextSn
     if window.label() != "control" { return Err("只能从小伴控制台查看感知状态".into()); }
     let state = window.app_handle().state::<ProactivityState>();
     if state.read_error.load(Ordering::Relaxed) { return Err("主动感知状态暂不可用".into()); }
-    Ok(state.context.lock().unwrap().clone())
+    let context = state.context.lock().unwrap().clone();
+    Ok(context)
 }
 
 #[tauri::command]

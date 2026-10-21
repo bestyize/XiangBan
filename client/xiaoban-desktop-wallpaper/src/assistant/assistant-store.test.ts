@@ -127,25 +127,28 @@ describe('assistant barge-in', () => {
     h.say('帮我改成一个科幻故事',{playbackText:story});
     expect(h.store.input).toBe('帮我改成一个科幻故事');h.store.dispose();
   });
-  it('manual editing stops reading and voice auto-send without losing the draft',async()=>{
+  it('manual editing preserves readout and the draft, then sending stops readout',async()=>{
     const h=await reading();h.store.input='新的问题';h.store.inputStarted();await nextTick();
-    expect(h.speech.stop).toHaveBeenCalledOnce();expect(h.asr.recordingRequested).toBe(false);
+    expect(h.speech.stop).not.toHaveBeenCalled();expect(h.asr.recordingRequested).toBe(false);
     h.say('旧识别结果');h.advance(LISTEN_IDLE_MS*2);await nextTick();
-    expect(h.store.input).toBe('新的问题');expect(h.store.phase).toBe('idle');
-    expect(h.chat.send).toHaveBeenCalledTimes(1);h.store.dispose();
+    expect(h.store.input).toBe('新的问题');expect(h.store.phase).toBe('speaking');
+    expect(h.chat.send).toHaveBeenCalledTimes(1);
+    await h.store.submit();expect(h.speech.stop).toHaveBeenCalledOnce();expect(h.chat.send).toHaveBeenLastCalledWith('新的问题');h.store.dispose();
   });
-  it('does not restart a delayed microphone preparation after typing interrupts synthesis',async()=>{
+  it('typing cancels delayed microphone preparation but lets synthesis continue',async()=>{
     const h=setup({prefs:{open:'type',read:'always'}});await h.store.init();await h.store.opened();await h.store.submit('你好');finishAnswer(h.chat);
     let resolve!:(value:boolean)=>void;h.asr.prepare.mockImplementationOnce(()=>new Promise<boolean>(r=>{resolve=r;}));
     h.speech.speak.mockImplementationOnce(async()=>{h.speech.status='synthesizing';});
     h.store.replied('s1','你好呀','a');await nextTick();
     h.store.inputStarted();resolve(true);await nextTick();await nextTick();
-    expect(h.asr.activate).not.toHaveBeenCalled();expect(h.speech.status).toBe('idle');h.store.dispose();
+    expect(h.asr.activate).not.toHaveBeenCalled();expect(h.speech.status).toBe('synthesizing');
+    h.store.input='新的问题';await h.store.submit();expect(h.speech.status).toBe('idle');h.store.dispose();
   });
   it('does not open the microphone for readout when voice is disabled',async()=>{
     const h=setup({voice:false,prefs:{open:'type',read:'always'}});await h.store.init();await h.store.opened();await h.store.submit('你好');finishAnswer(h.chat);
     h.store.replied('s1','你好呀','a');await nextTick();expect(h.speech.status).toBe('playing');
-    expect(h.asr.activate).not.toHaveBeenCalled();h.store.inputStarted();expect(h.speech.status).toBe('idle');h.store.dispose();
+    expect(h.asr.activate).not.toHaveBeenCalled();h.store.inputStarted();expect(h.speech.status).toBe('playing');
+    h.store.input='新的问题';await h.store.submit();expect(h.speech.status).toBe('idle');h.store.dispose();
   });
   it('does not open a late monitoring microphone after a typed answer finishes',async()=>{
     const h=setup({prefs:{open:'type',read:'always'}});await h.store.init();await h.store.opened();await h.store.submit('你好');finishAnswer(h.chat);
