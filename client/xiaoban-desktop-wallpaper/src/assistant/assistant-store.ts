@@ -283,7 +283,9 @@ export function createAssistantStore(deps: AssistantDeps): AssistantStore {
       return starting;
     },
     async opened() {
-      if (disposed) return;
+      // Native transitions re-announce state after showing the WebView.
+      // A duplicate event must never erase a draft or restart voice capture.
+      if (disposed || store.open) return;
       clearTimers();
       draftVersion++; store.attachments = [];
       store.open = true; store.ball = false; store.note(''); store.input = ''; heard = ''; voiceTurn = false; flags.awaitingSpeech = false;
