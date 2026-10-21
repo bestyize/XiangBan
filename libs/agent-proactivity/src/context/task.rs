@@ -4,7 +4,7 @@ use super::Source;
 /// Completion of a model loop is *not* proof of task success.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum TaskState { Started, Succeeded, Failed, Partial, Cancelled, Unknown }
+pub enum TaskState { Started, Running, AwaitingUser, Succeeded, Failed, Partial, Cancelled, Unknown }
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TaskContext {

@@ -204,6 +204,7 @@ fn ask_approval(app: &tauri::AppHandle, broker: &Broker, request: &ApprovalReque
     // In full trust a tainted conversation is not asked because of the taint, so the card must not say it is.
     let tainted_by_policy = request.tainted && app.state::<ChatState>().permission.mode() != PermissionMode::Auto;
     let (id, rx) = broker.open_approval(request.session);
+    crate::proactivity::observe_task_state(app, agent_proactivity::context::TaskState::AwaitingUser);
     emit(
         app,
         "chat-approval",
@@ -216,14 +217,17 @@ fn ask_approval(app: &tauri::AppHandle, broker: &Broker, request: &ApprovalReque
     );
     let decision = request.wait_for(&rx).unwrap_or(Approval::Deny);
     broker.close_approval(&id);
+    crate::proactivity::observe_task_state(app, agent_proactivity::context::TaskState::Running);
     decision
 }
 
 fn ask_question(app: &tauri::AppHandle, broker: &Broker, session: &str, question: &Question, ctx: &ToolCtx) -> Option<String> {
     let (id, rx) = broker.open_question(session);
+    crate::proactivity::observe_task_state(app, agent_proactivity::context::TaskState::AwaitingUser);
     emit(app, "chat-question", json!({ "id": id, "session": session, "question": question.text, "options": question.options }));
     let answer = ctx.wait_for(&rx).flatten();
     broker.close_question(&id);
+    crate::proactivity::observe_task_state(app, agent_proactivity::context::TaskState::Running);
     answer
 }
 

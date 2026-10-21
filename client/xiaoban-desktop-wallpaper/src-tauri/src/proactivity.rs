@@ -184,6 +184,8 @@ fn observe_task(app: &tauri::AppHandle, task: TaskContext) {
     if state.read_error.load(Ordering::Relaxed) || !state.settings.lock().unwrap().context_enabled { return; }
     let kind = match task.state {
         TaskState::Started => EventKind::TaskStarted,
+        TaskState::Running => EventKind::TaskResumed,
+        TaskState::AwaitingUser => EventKind::TaskAwaitingUser,
         TaskState::Succeeded => EventKind::TaskFinished,
         TaskState::Failed => EventKind::TaskFailed,
         TaskState::Partial => EventKind::TaskPartiallyFinished,

@@ -12,6 +12,8 @@ pub enum EventKind {
     ConversationFinished,
     TaskFinished,
     TaskStarted,
+    TaskResumed,
+    TaskAwaitingUser,
     TaskFailed,
     TaskPartiallyFinished,
     TaskCancelled,
