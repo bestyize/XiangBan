@@ -26,7 +26,8 @@ async function open(responders: Record<string, Responder> = {}, options: { deskt
   // The ring's numbers are read on their own schedule, so they are kept apart from the calls a test is about.
   const contextCalls: (Record<string, unknown> | undefined)[] = [];
   const invoke = vi.fn(async (command: string, args?: Record<string, unknown>) => {
-    if (command === 'chat_context') contextCalls.push(args); else calls.push([command, args]);
+    if (command === 'chat_context') contextCalls.push(args); else if (command !== 'get_ai_config') calls.push([command, args]);
+    if (command === 'get_ai_config' && !table[command]) return { model: 'coding-model', activeProvider: 'demo', providers: [{ id: 'demo', name: '演示模型', models: [{ id: 'coding-model', name: 'Coding Model' }] }] } as never;
     const respond = table[command];
     if (!respond) throw new Error(`unexpected ${command}`);
     return respond(args) as never;
@@ -73,6 +74,58 @@ const approval = (patch: Partial<ApprovalRequest> = {}): ApprovalRequest => ({ i
 beforeEach(() => { vi.resetAllMocks(); localStorage.clear(); });
 afterEach(() => { wrapper?.unmount(); wrapper = undefined; });
 
+describe('chat workbench composer actions', () => {
+  it('keeps capability menus in the composer and uses the desktop AI Store inventories', async () => {
+    const h = await open({
+      ai_store_experts_installed: () => [{ slug: 'reviewer', name: '代码专家', description: '代码审阅', entrySkill: 'code-review', ready: true }],
+      ai_store_installed: () => [{ slug: 'check', name: '质量检查', description: '分析测试' }],
+      ai_store_connector_status: () => [{ id: 'github', name: 'GitHub', connected: true, enabled: true, toolCount: 8 }],
+    });
+    await click('chat-add-menu');
+    expect(q('chat-add-screenshot')).not.toBeNull();
+    expect(q('chat-pick-image')).not.toBeNull();
+    expect(q('chat-add-experts')).not.toBeNull();
+    await click('chat-add-experts');
+    expect(q('chat-installed-reviewer')?.textContent).toContain('代码专家');
+    await click('chat-installed-reviewer');
+    expect(textarea().value).toContain('load_skill');
+    expect(textarea().value).toContain('code-review');
+    await click('chat-add-menu');
+    await click('chat-add-skills');
+    await click('chat-installed-check');
+    expect(textarea().value).toContain('质量检查');
+    await click('chat-add-menu');
+    await click('chat-add-connectors');
+    await click('chat-installed-github');
+    expect(textarea().value).toContain('GitHub');
+    expect(h.commands()).toContain('ai_store_connector_status');
+  });
+
+  it('uses a dedicated control-window screenshot command and adds the result without sending', async () => {
+    const shot = 'data:image/png;base64,iVBORw0KGgo=';
+    const h = await open({ chat_screenshot: () => shot });
+    await click('chat-add-menu');
+    await click('chat-add-screenshot');
+    expect(h.commands()).toContain('chat_screenshot');
+    expect(q('chat-attachment-0')).not.toBeNull();
+    expect(h.commands()).not.toContain('chat_send');
+  });
+
+  it('lists configured providers and their models in a compact composer menu', async () => {
+    const config = { model: 'coding-model', activeProvider: 'demo', providers: [{
+      id: 'demo', name: '演示供应商', protocol: 'chat', baseUrl: 'https://example.com', model: 'coding-model',
+      hasKey: true, isCustom: true, models: [{ id: 'coding-model', name: 'Coding Model' }, { id: 'reasoning', name: '推理模型' }],
+    }] };
+    const h = await open({ get_ai_config: () => config, refresh_ai_providers: () => config,
+      save_ai_provider: () => undefined });
+    expect(q('chat-workbench-model')!.textContent).toContain('Coding Model');
+    await click('chat-workbench-model');
+    expect(wrapper!.element.textContent).toContain('演示供应商');
+    await click('chat-model-demo-reasoning');
+    expect(h.commands()).toContain('save_ai_provider');
+  });
+});
+
 describe('the chat page before a conversation', () => {
   it('sends people to the model settings when no model is set up', async () => {
     const h = await open({ chat_overview: () => overview({ configured: false }) });
@@ -112,7 +165,7 @@ describe('the chat page before a conversation', () => {
   it('has an AI model settings button in the header that opens the AI tab', async () => {
     const h = await open();
     expect(q('chat-ai-config')!.textContent).toContain('AI 模型配置');
-    expect(q('chat-workspace')).toBeNull();
+    expect(q('chat-workspace')?.textContent).toContain('工作区');
     await click('chat-ai-config');
     expect(h.store.settingsTab).toBe('ai');
   });
@@ -691,6 +744,8 @@ describe('permission mode toggle', () => {
       chat_set_permission_mode: ({ mode }: any) => mode,
     });
     expect(q('perm-ask')?.classList.contains('active')).toBe(true);
+    await click('chat-permission-toggle');
+    expect(q('chat-permission-toggle')?.getAttribute('aria-expanded')).toBe('true');
     expect(q('perm-auto')?.classList.contains('active')).toBe(false);
 
     await click('perm-auto');
@@ -867,7 +922,8 @@ describe('the context ring in the composer', () => {
     await open({ ...listed, chat_context: () => info(12_300) });
     await flushPromises();
     expect(q('chat-context')).not.toBeNull();
-    expect(q('chat-send')!.previousElementSibling).toBe(q('chat-context'));
+    expect(q('chat-context')!.compareDocumentPosition(q('chat-workbench-model')!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(q('chat-workbench-model')!.compareDocumentPosition(q('chat-send')!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     await click('chat-context');
     expect(inBody('ctx-numbers')!.textContent).toBe('12.3K / 256K');
   });

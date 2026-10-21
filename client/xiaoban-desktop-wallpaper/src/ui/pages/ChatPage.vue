@@ -1,10 +1,13 @@
 <script setup lang="ts">
 import { computed, h, nextTick, onMounted, onUnmounted, ref, watch, type Component, type HTMLAttributes } from 'vue';
 import { NButton, NDropdown, NInput, type DropdownOption } from 'naive-ui';
-import { ArrowDown, AudioLines, ChevronDown, ChevronRight, Ellipsis, Folder, FolderInput, FolderPlus, Paperclip, LoaderCircle, MessageSquarePlus, Mic, Pencil, SendHorizontal, Settings, Volume2, Shield, ShieldAlert, Sparkles, Square, Trash2, X, Zap } from 'lucide-vue-next';
+import { ArrowDown, AudioLines, ChevronDown, ChevronRight, Ellipsis, Folder, FolderInput, FolderPlus, LoaderCircle, MessageSquarePlus, Mic, Pencil, SendHorizontal, Settings, Volume2, ShieldAlert, Sparkles, Square, Trash2, X } from 'lucide-vue-next';
 import { invoke } from '../../bridge.ts';
 import type { ControlStore } from '../control-types.ts';
 import ModelSwitchDialog from '../components/ModelSwitchDialog.vue';
+import ChatWorkbenchTools from '../components/ChatWorkbenchTools.vue';
+import ChatComposerModel from '../components/ChatComposerModel.vue';
+import type { AiConfigView } from '../../bridge.ts';
 import ChatNameDialog from '../components/ChatNameDialog.vue';
 import ChatMoveDialog from '../components/ChatMoveDialog.vue';
 import ChatContextRing from '../components/ChatContextRing.vue';
@@ -35,7 +38,35 @@ const modelDialog = ref(false);
 const guideDialog = ref(false);
 const retryAfterSwitch = ref(false);
 function chooseModel(retry = false) { retryAfterSwitch.value = retry; modelDialog.value = true; }
-async function modelSwitched() { await chat.refresh(); if (retryAfterSwitch.value) await chat.retry(); props.store.notify('模型已切换', 'success'); }
+const modelLabel = ref('编程模型');
+async function readModelLabel() {
+  if (!props.store.desktop) return;
+  try {
+    const config = await invoke<AiConfigView>('get_ai_config');
+    const provider = config.providers?.find(p => p.id === config.activeProvider);
+    modelLabel.value = provider?.models?.find(m => m.id === config.model)?.name || config.model || '编程模型';
+  } catch { /* Preserve the last known label while preferences are unavailable. */ }
+}
+async function modelSwitched() { await chat.refresh(); await readModelLabel(); if (retryAfterSwitch.value) await chat.retry(); props.store.notify('模型已切换', 'success'); }
+function composerModelSwitched() { retryAfterSwitch.value = false; void modelSwitched(); }
+function insertCapabilityPrompt(instruction: string) { draft.value = draft.value.trim() ? instruction + '\n\n' + draft.value : instruction; }
+function useExpert(entrySkill: string, name: string) { insertCapabilityPrompt(`请先使用 load_skill 加载已安装专家「${name}」的工作流（${entrySkill}），再帮助我完成以下任务：`); }
+function useSkill(slug: string, name: string) { insertCapabilityPrompt(`请先使用 load_skill 加载已安装技能「${name}」（${slug}），然后完成以下任务：`); }
+function useConnector(name: string) { insertCapabilityPrompt(`请在本次任务中优先使用已连接的「${name}」工具，完成以下任务：`); }
+const capturing = ref(false);
+async function takeChatScreenshot() {
+  if (!props.store.desktop || capturing.value || running.value || !chat.configured || attachments.value.length >= MAX_IMAGES) return;
+  const version = attachmentVersion;
+  capturing.value = true;
+  try {
+    const image = await invoke<string | null>('chat_screenshot');
+    if (version !== attachmentVersion || !image) return;
+    if (!image.startsWith('data:image/')) throw new Error('截图结果格式错误');
+    if (attachments.value.reduce((sum, a) => sum + attachmentBytes(a), 0) + attachmentBytes(image) > MAX_TOTAL_BYTES) throw new Error('附件合计不能超过 30MB');
+    attachments.value.push(image);
+  } catch (error) { if (version === attachmentVersion) props.store.notify(error instanceof Error ? error.message : String(error), 'error'); }
+  finally { capturing.value = false; }
+}
 const composing = ref(false);
 const scroller = ref<HTMLElement | null>(null);
 const stick = ref(true);
@@ -57,6 +88,7 @@ const view = computed(() => chat.current());
 const blocks = computed(() => replyBlocks(view.value?.items ?? []));
 const running = computed(() => !!view.value?.running);
 const title = computed(() => (chat.currentId && chat.sessions.find(s => s.id === chat.currentId)?.title) || '新对话');
+const workspaceName = computed(() => chat.workspace.replace(/\\/g, '/').split('/').filter(Boolean).at(-1) || '工作区');
 const compacting = computed(() => !!chat.currentId && chat.compactingId === chat.currentId);
 const canSend = computed(() => chat.configured && !running.value && !compacting.value && !attachmentReading.value && (draft.value.trim() !== '' || attachments.value.length > 0));
 const now = () => Math.floor(Date.now() / 1000);
@@ -72,7 +104,7 @@ const statusLine = computed(() => view.value?.status || (waiting.value ? '等你
 const microphoneAllowed = computed(() => foreground.value && chat.configured && !running.value && (!props.store.speech || props.store.speech.status === 'idle'));
 watch(() => chat.currentId, () => { asr?.deactivate(); attachmentVersion++; attachments.value = []; }, { flush: 'sync' });
 watch(microphoneAllowed, allowed => { if (!allowed) asr?.deactivate(); }, { flush: 'sync' });
-watch(() => props.store.page, page => { if (page !== 'chat') asr?.deactivate(); }, { flush: 'sync' });
+watch(() => props.store.page, page => { if (page !== 'chat') asr?.deactivate(); else void readModelLabel(); }, { flush: 'sync' });
 async function toggleVoice() {
   if (!asr || finishingVoice.value) return;
   if (asr.recordingRequested) {
@@ -94,6 +126,7 @@ async function toggleVoice() {
 onMounted(() => {
   asr?.deactivate();
   void asr?.init();
+  void readModelLabel();
   document.addEventListener('visibilitychange', updateVisibility);
   window.addEventListener('blur', blurChat); window.addEventListener('focus', focusChat);
 });
@@ -359,7 +392,7 @@ async function openLink(href: string) {
 
     <div class="chat-main">
       <header class="chat-head">
-        <h2 data-testid="chat-title">{{ title }}</h2>
+        <div class="head-location"><h2 data-testid="chat-title">{{ title }}</h2><button v-if="store.desktop" type="button" class="workspace-chip" data-testid="chat-workspace" :title="'当前工作区：' + (chat.workspace || '默认工作目录') + '。前往设置修改。'" @click="openSettings"><Folder :size="13" /><span>{{ workspaceName }}</span></button></div>
         <div class="head-actions">
           <button v-if="store.speech && store.speech.status !== 'idle'" type="button" class="link" data-testid="chat-speech-status" @click="store.speech.stop()"><Volume2 :size="14" />{{ store.speech.status === 'synthesizing' ? '取消合成' : '停止朗读' }}</button>
           <button
@@ -372,30 +405,6 @@ async function openLink(href: string) {
             <Sparkles :size="13" />
             <span>玩法指南</span>
           </button>
-          <div class="permission-toggle" role="group" aria-label="权限模式" data-testid="chat-permission-toggle">
-            <button
-              type="button"
-              class="perm-btn"
-              :class="{ active: chat.permissionMode === 'ask' }"
-              data-testid="perm-ask"
-              title="默认权限：读操作自动执行，写文件、运行命令与修改设置前需确认"
-              @click="chat.setPermissionMode('ask')"
-            >
-              <Shield :size="12" />
-              <span>默认权限</span>
-            </button>
-            <button
-              type="button"
-              class="perm-btn"
-              :class="{ active: chat.permissionMode === 'auto' }"
-              data-testid="perm-auto"
-              title="完全信任：自动执行所有操作（文件修改、命令等无需逐一确认）"
-              @click="chat.setPermissionMode('auto')"
-            >
-              <Zap :size="12" />
-              <span>完全信任</span>
-            </button>
-          </div>
           <button type="button" class="ai-config-chip" data-testid="chat-ai-config" title="设置 → AI 模型：选择小伴 AI，或配置自己的模型服务" @click="openSettings"><Settings :size="14" />AI 模型配置</button>
         </div>
       </header>
@@ -489,17 +498,21 @@ async function openLink(href: string) {
             </div>
             <small class="attach-hint">{{ attachments.length }}/{{ MAX_IMAGES }} 个附件 · 发送时会一起交给小伴</small>
           </div>
-          <div class="composer-row">
-            <input ref="filePicker" type="file" :accept="ATTACHMENT_ACCEPT" multiple hidden data-testid="chat-image-input" @change="onPick" />
-            <NButton quaternary circle size="small" data-testid="chat-pick-image" title="选择文件" aria-label="选择文件" :disabled="!store.desktop || !chat.configured || running || attachmentReading || attachments.length >= MAX_IMAGES" @click="openPicker"><template #icon><Paperclip :size="16" /></template></NButton>
-            <button v-if="finishingVoice" type="button" class="voice-finish" data-testid="chat-asr-toggle" aria-label="正在转写并发送" aria-pressed="false" disabled><LoaderCircle class="spin" :size="13" aria-hidden="true" />正在发送</button>
-            <button v-else-if="asr?.recordingRequested" type="button" class="voice-finish" data-testid="chat-asr-toggle" :aria-label="asr.listening ? '结束录音并发送' : '取消准备'" aria-pressed="true" @click="toggleVoice"><span v-if="asr.listening" class="recording-dot" aria-hidden="true" /><LoaderCircle v-else class="spin" :size="13" aria-hidden="true" />{{ asr.listening ? '结束并发送' : '取消准备' }}</button>
-            <NButton v-else-if="asr" quaternary circle size="small" data-testid="chat-asr-toggle" aria-label="开始语音输入" aria-pressed="false" title="开始语音输入" :disabled="!store.desktop || !asr.ready || asr.microphoneSupported === false || !microphoneAllowed || asr.saving" @click="toggleVoice"><template #icon><Mic :size="16" /></template></NButton>
-            <NInput v-model:value="draft" type="textarea" :autosize="{ minRows: 1, maxRows: 8 }" :disabled="!store.desktop || !chat.configured" :placeholder="chat.configured ? '问点什么，或交给小伴去办就行' : '先到设置里配置模型'" data-testid="chat-input" @keydown="onKeydown" />
-            <ChatContextRing v-if="store.desktop" :used="chat.context.used" :limit="chat.context.limit" :can-compact="chat.context.canCompact" :compacting="compacting" :busy="running" :disabled="!chat.currentId" @compact="chat.compact()" @resize="chat.setContextSize($event)" />
-            <NButton v-if="running" type="error" circle data-testid="chat-stop" aria-label="停止" @click="chat.cancel()"><template #icon><Square :size="14" /></template></NButton>
-            <NButton v-else type="primary" circle data-testid="chat-send" aria-label="发送" :disabled="!canSend" @click="submit"><template #icon><SendHorizontal :size="16" /></template></NButton>
-          </div>
+          <input ref="filePicker" type="file" :accept="ATTACHMENT_ACCEPT" multiple hidden data-testid="chat-image-input" @change="onPick" />
+           <div class="composer-editor">
+             <NInput v-model:value="draft" type="textarea" :autosize="{ minRows: 1, maxRows: 8 }" :disabled="!store.desktop || !chat.configured" :placeholder="chat.configured ? '问点什么，或交给小伴去办就行' : '先到设置里配置模型'" data-testid="chat-input" @keydown="onKeydown" />
+           </div>
+           <div class="composer-row">
+             <ChatWorkbenchTools :store="store" :disabled="!store.desktop" :file-disabled="!store.desktop || !chat.configured || running || attachmentReading || attachments.length >= MAX_IMAGES" :screenshot-disabled="!store.desktop || !chat.configured || running || capturing || attachments.length >= MAX_IMAGES" @file="openPicker" @screenshot="takeChatScreenshot" @use-expert="useExpert" @use-skill="useSkill" @use-connector="useConnector" />
+             <span class="composer-spacer" />
+             <ChatContextRing v-if="store.desktop" :used="chat.context.used" :limit="chat.context.limit" :can-compact="chat.context.canCompact" :compacting="compacting" :busy="running" :disabled="!chat.currentId" @compact="chat.compact()" @resize="chat.setContextSize($event)" />
+             <ChatComposerModel :label="modelLabel" :disabled="!store.desktop || running" @switched="composerModelSwitched" @settings="openSettings" />
+             <button v-if="finishingVoice" type="button" class="voice-finish" data-testid="chat-asr-toggle" aria-label="正在转写并发送" aria-pressed="false" disabled><LoaderCircle class="spin" :size="13" aria-hidden="true" />正在发送</button>
+             <button v-else-if="asr?.recordingRequested" type="button" class="voice-finish" data-testid="chat-asr-toggle" :aria-label="asr.listening ? '结束录音并发送' : '取消准备'" aria-pressed="true" @click="toggleVoice"><span v-if="asr.listening" class="recording-dot" aria-hidden="true" /><LoaderCircle v-else class="spin" :size="13" aria-hidden="true" />{{ asr.listening ? '结束并发送' : '取消准备' }}</button>
+             <NButton v-else-if="asr" quaternary circle size="small" data-testid="chat-asr-toggle" aria-label="开始语音输入" aria-pressed="false" title="开始语音输入" :disabled="!store.desktop || !asr.ready || asr.microphoneSupported === false || !microphoneAllowed || asr.saving" @click="toggleVoice"><template #icon><Mic :size="16" /></template></NButton>
+             <NButton v-if="running" type="error" circle data-testid="chat-stop" aria-label="停止" @click="chat.cancel()"><template #icon><Square :size="14" /></template></NButton>
+             <NButton v-else type="primary" circle data-testid="chat-send" aria-label="发送" :disabled="!canSend" @click="submit"><template #icon><SendHorizontal :size="16" /></template></NButton>
+           </div>
         </div>
       </footer>
     </div>
@@ -550,6 +563,11 @@ async function openLink(href: string) {
 .chat-main{display:flex;flex-direction:column;min-height:0;min-width:0;position:relative}
 .chat-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 24px;border-bottom:1px solid var(--ui-border)}
 .chat-head h2{font-size:15px;margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.head-location{display:flex;align-items:center;min-width:0;gap:12px}
+.head-location h2{min-width:0;flex-shrink:1}
+.workspace-chip{border:0;background:var(--ui-surface-alt);color:var(--ui-text-secondary);border-radius:7px;padding:5px 8px;font:inherit;font-size:11px;cursor:pointer;display:flex;align-items:center;gap:5px;max-width:170px;flex:none}
+.workspace-chip span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.workspace-chip:hover{color:var(--ui-primary)}
 .head-actions{display:flex;align-items:center;gap:10px;flex-shrink:0}
 .guide-chip{border:1px solid var(--ui-border);background:var(--ui-surface);color:var(--ui-primary);border-radius:999px;padding:4px 10px;font-size:12px;display:inline-flex;gap:5px;align-items:center;cursor:pointer;font-weight:600;transition:all .15s}
 .guide-chip:hover{background:var(--ui-primary-soft);border-color:var(--ui-primary)}
@@ -604,8 +622,11 @@ async function openLink(href: string) {
 .composer{padding:10px 24px 18px;width:100%;box-sizing:border-box}
 .composer-box{max-width:820px;margin:0 auto;display:flex;flex-direction:column;gap:8px;background:var(--ui-surface);border:1px solid var(--ui-border);border-radius:18px;padding:8px 10px 8px 14px}
 .composer-box.voice-active{border-color:var(--ui-primary);box-shadow:0 0 0 2px var(--ui-primary-soft)}
-.composer-row{display:flex;gap:10px;align-items:flex-end;min-width:0}
-.composer-row :deep(.n-input){flex:1;min-width:0}
+.composer-row{display:flex;gap:6px;align-items:center;min-width:0}
+.composer-editor{display:flex;min-width:0;padding:2px 4px 5px}
+.composer-editor :deep(.n-input){width:100%}
+.composer-spacer{flex:1;min-width:4px}
+.composer-editor :deep(.n-input){flex:1;min-width:0}
 .voice-finish{display:inline-flex;align-items:center;justify-content:center;gap:7px;align-self:flex-end;min-height:28px;flex:none;padding:3px 10px;border:1px solid var(--ui-primary);border-radius:999px;background:var(--ui-primary-soft);color:var(--ui-primary);font:inherit;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap}
 .voice-finish:hover{background:var(--ui-primary);color:#fff}
 .voice-finish:disabled{cursor:wait;opacity:.75}
@@ -654,6 +675,7 @@ async function openLink(href: string) {
   .chat-page{grid-template-columns:1fr}
   .chat-side{display:none}
   .bubble{max-width:92%}
+  .composer{padding-left:10px;padding-right:10px}
 }
 @media(prefers-reduced-motion:reduce){.spin,.cursor,.recording-dot{animation:none}}
 </style>

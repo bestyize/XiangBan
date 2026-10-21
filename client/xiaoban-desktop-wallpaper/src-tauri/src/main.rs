@@ -98,6 +98,43 @@ fn ui_smoke_report(app: tauri::AppHandle, window: tauri::WebviewWindow, report: 
     Ok(())
 }
 
+/// User-initiated capture for the full chat page. The floating assistant's capture path is unchanged.
+#[tauri::command]
+async fn chat_screenshot(window: tauri::WebviewWindow) -> Result<Option<String>, String> {
+    if window.label() != "control" { return Err("只能从聊天详情页发起截图".into()); }
+    static CAPTURING: AtomicBool = AtomicBool::new(false);
+    if CAPTURING.swap(true, Ordering::SeqCst) { return Err("正在截图，请稍候。".into()); }
+    let app = window.app_handle().clone();
+    let result = async {
+        #[cfg(target_os = "macos")]
+        {
+            // Ask while the trusted control window is visible; preflight must not veto capture.
+            let permission_app = app.clone();
+            tauri::async_runtime::spawn_blocking(move || {
+                let (tx, rx) = std::sync::mpsc::channel();
+                permission_app.run_on_main_thread(move || {
+                    assistant_capture::request_macos_permission();
+                    let _ = tx.send(());
+                }).map_err(|e| e.to_string())?;
+                rx.recv_timeout(Duration::from_secs(120)).map_err(|_| "屏幕录制授权未完成，请重试。".to_string())
+            }).await.map_err(|e| e.to_string())??;
+        }
+        window.hide().map_err(|e| e.to_string())?;
+        tauri::async_runtime::spawn_blocking(move || {
+            std::thread::sleep(Duration::from_millis(180));
+            let frames = assistant_capture::capture(&app)?;
+            capture_editor::edit(&app, frames)
+        }).await.map_err(|e| format!("截图失败：{e}")).and_then(|result| result)
+    }.await;
+    // Restore even if the user cancelled the editor or native capture returned an error.
+    let restore = if window.is_visible().unwrap_or(false) { Ok(()) } else {
+        window.show().and_then(|_| window.set_focus()).map_err(|e| e.to_string())
+    };
+    CAPTURING.store(false, Ordering::SeqCst);
+    restore?;
+    result
+}
+
 async fn wait_ui_smoke(app: &tauri::AppHandle) -> Result<serde_json::Value, String> {
     let deadline = Instant::now() + Duration::from_secs(20);
     loop {
@@ -772,7 +809,7 @@ fn main() {
             chat::store::ai_store_connector_auth_status, chat::store::ai_store_connector_auth_cancel,
             float_assistant::assistant_status, float_assistant::assistant_configure, float_assistant::assistant_ready, float_assistant::assistant_hide,
             assistant_hit_test::assistant_set_regions, capture_editor::capture_frame, capture_editor::capture_show, capture_editor::capture_finish,
-            float_assistant::assistant_screenshot, float_assistant::assistant_fit, float_assistant::assistant_drag, float_assistant::assistant_unfold,
+            chat_screenshot, float_assistant::assistant_screenshot, float_assistant::assistant_fit, float_assistant::assistant_drag, float_assistant::assistant_unfold,
              assistant_capture::reset_screen_capture_permission, assistant_capture::open_screen_capture_settings,
             float_assistant::assistant_transition_ready, float_assistant::assistant_prefs, float_assistant::assistant_try, float_assistant::assistant_open_chat, float_assistant::assistant_open_settings]);
     let app = builder.manage(state).manage(content::ContentState::default()).manage(website::WebsiteState::default())
@@ -787,7 +824,7 @@ fn main() {
             }
             let allowed=capture_editor::permitted(label,command).or_else(||pets::permitted(label,command)).or_else(||float_assistant::permitted(label,command)).or_else(|| desk_game::permitted(label,command)).or_else(|| widgets::permitted(label,command)).or_else(|| rituals::permitted(label,command)).or_else(|| games::permitted(label,command)).unwrap_or_else(|| {
                 if matches!(command, "reset_screen_capture_permission" | "open_screen_capture_settings") { return label=="control"; }
-                 if command=="ui_smoke_report" {return label=="control";}
+                 if command=="ui_smoke_report" || command=="chat_screenshot" {return label=="control";}
                 if command=="set_appearance" || command=="get_appearance" || command=="set_companion_enabled" || command=="set_companion_links" || command=="set_companion_skin" || command=="set_desktop_effects" || command=="list_desktop_effects" || command=="open_effects_directory" || command=="import_effect_pack" {return label=="control";}
                 if label=="care" { return ["get_care_delivery","care_ready","dismiss_care","snooze_care","care_synthesize"].contains(&command); }
                 if command.contains("care") { return label=="control"; }
