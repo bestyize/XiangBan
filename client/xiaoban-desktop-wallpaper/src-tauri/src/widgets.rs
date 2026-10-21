@@ -552,7 +552,8 @@ pub fn cached_weather_for_proactivity(app:&tauri::AppHandle, now:i64)->Option<We
     let source=crate::reminders::widget_weather_source(app);
     if source.provider=="disabled"{return None;}
     let key=format!("{}:{}:{}",city.latitude,city.longitude,serde_json::to_string(&source).ok()?);
-    state.weather.lock().ok()?.get(&key).filter(|w|
+    let cache=state.weather.lock().ok()?;
+    cache.get(&key).filter(|w|
         (0..1800).contains(&(now-w.updated_at))&&(0..7200).contains(&(now-w.model_at))
     ).cloned()
 }
