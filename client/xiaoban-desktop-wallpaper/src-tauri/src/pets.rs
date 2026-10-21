@@ -667,8 +667,10 @@ pub fn save_theme(app: &tauri::AppHandle, theme: Theme, overwrite: bool) -> Resu
 pub fn get_pet_catalog(app: tauri::AppHandle) -> Result<Value, String> {
     catalog(&app)
 }
+// Synchronization may create WebView2 windows. Async IPC keeps that work off
+// the Windows event loop, where synchronous window creation would deadlock.
 #[tauri::command]
-pub fn add_pet(
+pub async fn add_pet(
     app: tauri::AppHandle,
     theme_id: String,
     pet_id: String,
@@ -677,15 +679,15 @@ pub fn add_pet(
     add(&app, theme_id, pet_id, layer)
 }
 #[tauri::command]
-pub fn update_pet(app: tauri::AppHandle, id: String, patch: Patch) -> Result<Value, String> {
+pub async fn update_pet(app: tauri::AppHandle, id: String, patch: Patch) -> Result<Value, String> {
     update(&app, &id, patch)
 }
 #[tauri::command]
-pub fn remove_pet(app: tauri::AppHandle, id: String) -> Result<Value, String> {
+pub async fn remove_pet(app: tauri::AppHandle, id: String) -> Result<Value, String> {
     remove(&app, &id)
 }
 #[tauri::command]
-pub fn save_pet_theme(
+pub async fn save_pet_theme(
     app: tauri::AppHandle,
     theme: Theme,
     overwrite: Option<bool>,
@@ -742,7 +744,7 @@ pub fn manage_pet_instance(window: tauri::WebviewWindow) -> Result<(), String> {
     Ok(())
 }
 #[tauri::command]
-pub fn move_pet_instance(
+pub async fn move_pet_instance(
     window: tauri::WebviewWindow,
     grab_x: f64,
     grab_y: f64,

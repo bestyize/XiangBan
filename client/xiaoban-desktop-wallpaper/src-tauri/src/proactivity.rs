@@ -233,7 +233,8 @@ pub fn get_proactivity_settings(window: tauri::WebviewWindow) -> Result<Greeting
     if window.label() != "control" { return Err("只能从小伴控制台查看主动陪伴设置".into()); }
     let state = window.app_handle().state::<ProactivityState>();
     if state.read_error.load(Ordering::Relaxed) { return Err("主动陪伴配置损坏，请先备份并修复数据文件".into()); }
-    Ok(state.settings.lock().unwrap().clone())
+    let settings = state.settings.lock().unwrap().clone();
+    Ok(settings)
 }
 #[tauri::command]
 pub fn configure_proactivity(window: tauri::WebviewWindow, settings: GreetingSettings) -> Result<GreetingSettings, String> {
