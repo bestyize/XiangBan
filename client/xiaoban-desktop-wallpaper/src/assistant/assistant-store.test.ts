@@ -505,6 +505,26 @@ describe('floating assistant', () => {
     expect(store.ball).toBe(false);
   });
 
+  it('preserves the open draft when the host re-announces the capsule after showing its window', async () => {
+    const { store, emit, asr } = setup({ prefs: { open: 'type', read: 'never' } });
+    await store.init();
+    emit('assistant-ball', true);
+    emit('assistant-open');
+    await flushPromises();
+    expect(store.open).toBe(true);
+    store.input = '还没有发送的消息';
+    const deactivations = asr.deactivate.mock.calls.length;
+    emit('assistant-open');
+    await flushPromises();
+    expect(store.open).toBe(true);
+    expect(store.input).toBe('还没有发送的消息');
+    expect(asr.deactivate.mock.calls.length).toBe(deactivations);
+    emit('assistant-ball', true);
+    emit('assistant-close');
+    expect(store.ball).toBe(true);
+    expect(store.open).toBe(false);
+  });
+
   it('tells the host to open the capsule when the ball is clicked', async () => {
     const { store, invoke } = setup({ voice: false });
     await store.unfold();
