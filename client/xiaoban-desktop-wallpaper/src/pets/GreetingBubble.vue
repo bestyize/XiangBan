@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import {onBeforeUnmount,onMounted,ref} from 'vue';
 import {invoke} from '../bridge.ts';
-interface Greeting {id:number;petName:string;text:string}
+interface Greeting {id:number;petName:string;text:string;appearance:'system'|'light'|'dark'}
 const greeting=ref<Greeting|null>(null),error=ref('');
 let timeout:ReturnType<typeof setTimeout>|undefined;
 async function finish(outcome:'chat'|'poke'|'dismissed'|'ignored'|'snoozed'){
@@ -20,7 +20,7 @@ onMounted(async()=>{
 onBeforeUnmount(()=>{if(timeout)clearTimeout(timeout);});
 </script>
 <template>
- <div class="greeting-shell">
+ <div class="greeting-shell" :data-appearance="greeting?.appearance||'system'">
   <section v-if="greeting" class="greeting-card" role="status" aria-live="polite">
    <header><span class="greeting-name">{{greeting.petName}}</span><button class="greeting-close" title="关闭问候" aria-label="关闭问候" @click="finish('dismissed')">×</button></header>
    <p>{{greeting.text}}</p>
@@ -39,5 +39,6 @@ html:has(body.pet-greeting-scene),body.pet-greeting-scene,body.pet-greeting-scen
 .greeting-card footer{display:flex;gap:8px;align-items:center}.greeting-card footer button{border:0;background:#f5f4f2;border-radius:8px;color:#4c4744;font:inherit;font-size:10px;cursor:pointer;padding:6px 8px;white-space:nowrap}
 .greeting-card footer button:hover{background:#ece9e6}.greeting-card footer .greeting-later{background:transparent;color:#938d89;margin-left:auto;padding-right:0}
 .greeting-error{font-size:11px;color:#8d8783}
-@media(prefers-color-scheme:dark){.greeting-card{background:#292827;color:#f3f2f0;box-shadow:0 8px 24px #0007}.greeting-card footer button{background:#42403d;color:#efedeb}.greeting-card footer .greeting-later{background:transparent;color:#aaa39b}}
+.greeting-shell[data-appearance="dark"] .greeting-card{background:#292827;color:#f3f2f0;box-shadow:0 8px 24px #0007}.greeting-shell[data-appearance="dark"] .greeting-card footer button{background:#42403d;color:#efedeb}.greeting-shell[data-appearance="dark"] .greeting-card footer .greeting-later{background:transparent;color:#aaa39b}
+@media(prefers-color-scheme:dark){.greeting-shell[data-appearance="system"] .greeting-card{background:#292827;color:#f3f2f0;box-shadow:0 8px 24px #0007}.greeting-shell[data-appearance="system"] .greeting-card footer button{background:#42403d;color:#efedeb}.greeting-shell[data-appearance="system"] .greeting-card footer .greeting-later{background:transparent;color:#aaa39b}}
 </style>

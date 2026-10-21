@@ -47,6 +47,7 @@ pub struct Greeting {
     id: u64,
     pet_name: String,
     text: String,
+    appearance: String,
     #[serde(skip_serializing)]
     pet_label: String,
 }
@@ -254,7 +255,7 @@ pub fn pet_proactive_hover(window: tauri::WebviewWindow, duration_ms: u64) -> Re
     let _ = engine.observe(&event);
     let Decision::Allowed(action) = engine.consider(candidate, &context, now.timestamp_millis()) else { return Ok(false); };
     if action.kind != ActionKind::CompanionGreeting || action.channel != Channel::Bubble { return Ok(false); }
-    let offer = Greeting { id: action.id, pet_name: p.name, text: greeting_text(action.id).into(), pet_label: window.label().into() };
+    let offer = Greeting { id: action.id, pet_name: p.name, text: greeting_text(action.id).into(), appearance: settings.appearance, pet_label: window.label().into() };
     drop(engine);
     if let Err(error) = save_state(app, &state) {
         state.read_error.store(true, Ordering::Relaxed);
