@@ -263,7 +263,9 @@ fn provider_profile(config: &AiConfig) -> ProviderProfile {
     profile.max_request_bytes = Some(8 * 1024 * 1024);
     // Central model policy: compatible APIs use endpoint defaults; Anthropic
     // receives a required model/endpoint-specific max_tokens value.
-    profile.max_output_tokens = config.model_capabilities().request_output_limit();
+    let capabilities = config.model_capabilities();
+    profile.max_output_tokens = capabilities.request_output_limit();
+    profile.supports_tools = capabilities.supports_tools.unwrap_or(true);
     profile
 }
 
