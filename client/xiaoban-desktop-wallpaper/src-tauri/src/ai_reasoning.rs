@@ -124,7 +124,9 @@ mod tests {
         let declared = vec!["low".into(), "high".into()];
         assert_eq!(levels("private-alias", "responses", Some(&declared)), declared);
         assert!(levels("gpt-6.1-sol", "responses", Some(&[])).is_empty());
-        assert!(body("responses", ReplyPreference::Max, &declared).is_empty());
+        let undeclared = body("responses", ReplyPreference::Max, &declared);
+        assert!(undeclared["reasoning"].get("effort").is_none(), "an undeclared level is not sent");
+        assert_eq!(undeclared["reasoning"]["summary"], "auto", "the summary is still asked for");
         assert!(levels("unknown", "chat", None).is_empty());
         assert!(validate(&["bogus".into()]).is_err());
         assert!(validate(&["high".into(), "high".into()]).is_err());

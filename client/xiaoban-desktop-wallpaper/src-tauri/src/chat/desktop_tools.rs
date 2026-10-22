@@ -453,7 +453,8 @@ fn describe_rule(rule: &Value) -> String {
         _ => format!("每天 {}", rule["time"].as_str().unwrap_or("")),
     };
     let state = if rule["enabled"].as_bool().unwrap_or(true) { "" } else { " | 已停用" };
-    format!("{id} | {when} | {text}{state}")
+    let task = if rule["kind"] == "agent" { "定时任务：" } else { "" };
+    format!("{id} | {when} | {task}{text}{state}")
 }
 
 fn care_list(desktop: &dyn Desktop, _: &Value) -> Result<String, String> {
@@ -472,8 +473,8 @@ fn rule_from_args(args: &Value, existing: Option<Rule>) -> Result<Rule, String> 
         rule.text = text.to_string();
     }
     if let Some(kind) = optional_text(args, "kind")? {
-        if !["custom", "off-work", "rest"].contains(&kind) {
-            return Err("kind 只能是 custom（普通提醒）、off-work（下班提醒）或 rest（定时休息）；天气提醒请让用户在界面里设置".into());
+        if !["custom", "off-work", "rest", "agent"].contains(&kind) {
+            return Err("kind 只能是 custom（普通提醒）、off-work（下班提醒）、rest（定时休息）或 agent（定时任务）；天气提醒请让用户在界面里设置".into());
         }
         rule.kind = kind.to_string();
     }
@@ -515,6 +516,10 @@ fn care_set(desktop: &dyn Desktop, args: &Value) -> Result<String, String> {
         }
         None => None,
     };
+    // The confirmation for scheduled tasks keys on `kind` in the call, so a change to one must say so.
+    if existing.as_ref().is_some_and(|rule| rule.kind == "agent") && optional_text(args, "kind")? != Some("agent") {
+        return Err("这是一条定时任务，修改时请带上 kind=agent".into());
+    }
     let creating = existing.is_none();
     let rule = rule_from_args(args, existing)?;
     desktop.care_upsert(rule.clone())?;
@@ -652,6 +657,62 @@ fn widget_remove(desktop: &dyn Desktop, args: &Value) -> Result<String, String> 
     Ok(format!("已从桌面移除组件 {id}"))
 }
 
+/// Whether a CSS background value draws nothing.
+fn clear_background(value: &str) -> bool {
+    let value = value.trim().trim_end_matches("!important").trim().to_ascii_lowercase();
+    if ["transparent", "none", "inherit", "initial", "unset", ""].contains(&value.as_str()) || value.starts_with("var(") {
+        return true;
+    }
+    let alpha = |inner: &str| inner.rsplit([',', '/']).next().map(str::trim).is_some_and(|a| a.trim_end_matches('%').parse::<f64>().is_ok_and(|a| a == 0.0));
+    ["rgba(", "hsla(", "rgb(", "hsl("].iter().any(|f| value.strip_prefix(f).and_then(|v| v.strip_suffix(')')).is_some_and(|inner| (inner.contains(',') && inner.split(',').count() == 4 || inner.contains('/')) && alpha(inner)))
+}
+
+/// The widget rules a page can be checked against before it is saved (see `WIDGET_FORMAT`). Only what is clearly
+/// wrong: drag regions or Tauri the host already provides, and a background drawn on the whole page.
+fn widget_html_problems(html: &str) -> Vec<String> {
+    let lower = html.to_ascii_lowercase();
+    let mut problems = Vec::new();
+    if lower.contains("-webkit-app-region") {
+        problems.push("不要使用 -webkit-app-region：宿主已经提供按住空白处拖动".to_string());
+    }
+    if lower.contains("__tauri") || lower.contains("@tauri-apps") {
+        problems.push("不要直接调用 Tauri，组件在沙盒里运行".to_string());
+    }
+    let mut opaque = |what: &str, declarations: &str| {
+        for declaration in declarations.split(';') {
+            let Some((property, value)) = declaration.split_once(':') else { continue };
+            let property = property.trim();
+            if (property == "background" || property == "background-color") && !clear_background(value) {
+                problems.push(format!("{what} 的背景是 `{}`：页面和主体要保持透明，需要底板时画在组件内容里", value.trim()));
+                return;
+            }
+        }
+    };
+    let mut rest = lower.as_str();
+    while let Some(start) = rest.find("<style") {
+        let after = &rest[start..];
+        let Some(open) = after.find('>') else { break };
+        let end = after.find("</style").unwrap_or(after.len());
+        let css = &after[(open + 1).min(end)..end];
+        let mut selector_start = 0;
+        while let Some(brace) = css[selector_start..].find('{').map(|i| i + selector_start) {
+            let Some(close) = css[brace..].find('}').map(|i| i + brace) else { break };
+            let selector = css[selector_start..brace].rsplit("*/").next().unwrap_or("");
+            if let Some(page) = selector.split(',').map(str::trim).find(|s| *s == "html" || *s == "body" || *s == ":root") {
+                opaque(page, &css[brace + 1..close]);
+            }
+            selector_start = close + 1;
+        }
+        rest = &after[end..];
+    }
+    if let Some(tag) = lower.find("<body").map(|i| &lower[i..]).and_then(|t| t.split_once('>').map(|(tag, _)| tag)) {
+        if let Some(style) = tag.split_once("style=").map(|(_, v)| v.trim_start_matches(['"', '\'']).split(['"', '\'']).next().unwrap_or("")) {
+            opaque("body", style);
+        }
+    }
+    problems
+}
+
 fn widget_create(desktop: &dyn Desktop, args: &Value) -> Result<String, String> {
     let id = text_arg(args, "id")?;
     let name = text_arg(args, "name")?;
@@ -661,6 +722,10 @@ fn widget_create(desktop: &dyn Desktop, args: &Value) -> Result<String, String> 
     let height = args.get("height").and_then(Value::as_f64);
     let overwrite = optional_bool(args, "overwrite")?.unwrap_or(false);
     let place_now = optional_bool(args, "place_now")?.unwrap_or(true);
+    let problems = widget_html_problems(html);
+    if !problems.is_empty() {
+        return Err(format!("小组件没有保存：\n- {}\n请按 widget_read_format 的规范修改后再保存。", problems.join("\n- ")));
+    }
 
     let mut pack = json!({
         "schemaVersion": 1,
@@ -1002,12 +1067,12 @@ pub fn tools_in_workspace(desktop: Arc<dyn Desktop>, workspace: &std::path::Path
             &desktop,
             ToolSpec::new(
                 "care_set",
-                "添加或修改一条关怀提醒。不给 id 是添加，给了 id 是修改那一条（没给的字段保持不变）。时间用 24 小时制的本地时间。",
+                "添加或修改一条关怀提醒。不给 id 是添加，给了 id 是修改那一条（没给的字段保持不变）。时间用 24 小时制的本地时间。kind=agent 是定时任务：到时小伴在后台只用读取类工具（读文件、搜索、网页）完成 text 里写的事，结果显示在提醒里；每次添加或修改都要用户确认。",
                 object(
                     json!({
                         "id": {"type": "string", "description": "要修改的提醒 id，添加时不填"},
-                        "text": {"type": "string", "description": "提醒的文字，最多 240 字"},
-                        "kind": {"type": "string", "enum": ["custom", "off-work", "rest"], "description": "custom 普通提醒（默认），off-work 下班提醒，rest 每隔一段时间提醒休息"},
+                        "text": {"type": "string", "description": "提醒的文字，最多 240 字；定时任务写要小伴做的事，最多 1000 字"},
+                        "kind": {"type": "string", "enum": ["custom", "off-work", "rest", "agent"], "description": "custom 普通提醒（默认），off-work 下班提醒，rest 每隔一段时间提醒休息，agent 定时任务（修改定时任务时也要带上）"},
                         "repeat": {"type": "string", "enum": ["daily", "weekdays", "once"], "description": "每天 / 每周的指定几天 / 只提醒一次"},
                         "time": {"type": "string", "description": "HH:MM，例如 15:00"},
                         "onceAt": {"type": "string", "description": "repeat 为 once 时的本地日期时间，格式 YYYY-MM-DDTHH:MM，必须是未来的时间"},
@@ -1561,6 +1626,46 @@ mod tests {
         assert_eq!(out, "已更新提醒：喝水");
         assert_eq!(fake.calls(), vec!["upsert care-1 custom daily \"16:00\" [] 喝水 false"]);
         assert!(call(&fake, "care_set", json!({"id": "care-404", "text": "x"})).unwrap_err().contains("care_list"));
+    }
+
+    #[test]
+    fn a_widget_that_breaks_the_clear_rules_is_explained_and_not_saved() {
+        let ok = [
+            "<style>html,body{margin:0;background:transparent}.card{background:#fff;border-radius:12px}</style><div class=card>好</div>",
+            "<style>body { background: rgba(0, 0, 0, 0) !important }</style>",
+            "<style>:root{--c:#fff} body{background:var(--clear)}</style><body style=\"margin:0\">",
+            "<style>/* body */ .body{background:#000}</style>",
+        ];
+        for html in ok {
+            assert!(widget_html_problems(html).is_empty(), "{html}: {:?}", widget_html_problems(html));
+        }
+        for (html, fragment) in [
+            ("<style>body{background:#fffaf0}</style>", "body 的背景"),
+            ("<style>html , body{background-color: white}</style>", "背景"),
+            ("<body style=\"background:linear-gradient(#fff,#eee)\">", "body 的背景"),
+            ("<style>.drag{-webkit-app-region:drag}</style>", "app-region"),
+            ("<script>window.__TAURI__.core.invoke('x')</script>", "Tauri"),
+        ] {
+            let problems = widget_html_problems(html).join("\n");
+            assert!(problems.contains(fragment), "{html}: {problems}");
+        }
+        let fake = Arc::new(Fake::default());
+        let error = call(&fake, "widget_create", json!({"id": "card", "name": "卡片", "html": "<style>body{background:#fff}</style>"})).unwrap_err();
+        assert!(error.contains("没有保存") && error.contains("widget_read_format"), "{error}");
+        assert!(fake.calls().is_empty(), "nothing is saved");
+    }
+
+    #[test]
+    fn a_scheduled_task_is_set_with_kind_agent_and_changed_only_by_saying_so() {
+        let fake = Arc::new(Fake::default());
+        assert_eq!(call(&fake, "care_set", json!({"text": "总结昨天改过的文件", "kind": "agent", "time": "08:00"})).unwrap(), "已添加提醒：总结昨天改过的文件");
+        assert_eq!(fake.calls(), vec!["upsert  agent daily \"08:00\" [] 总结昨天改过的文件 true"]);
+        let saved = Rule { id: "task".into(), kind: "agent".into(), text: "看待办".into(), time: "09:00".into(), ..Default::default() };
+        fake.rules.lock().unwrap_or_else(|e| e.into_inner()).push(serde_json::to_value(&saved).unwrap());
+        assert!(call(&fake, "care_set", json!({"id": "task", "text": "删掉所有文件"})).unwrap_err().contains("kind=agent"), "the confirmation must see it");
+        assert!(call(&fake, "care_set", json!({"id": "task", "kind": "custom", "text": "x"})).unwrap_err().contains("kind=agent"));
+        assert_eq!(call(&fake, "care_set", json!({"id": "task", "kind": "agent", "time": "10:00"})).unwrap(), "已更新提醒：看待办");
+        assert!(call(&fake, "care_list", json!({})).unwrap().contains("task | 每天 09:00 | 定时任务：看待办"));
     }
 
     #[test]

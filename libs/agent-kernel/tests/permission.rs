@@ -356,3 +356,41 @@ fn self_managed_tools_run_unasked_in_ask_mode_and_after_external_content() {
     let out = run_set(&flagged, "s2", &["own"], &runs);
     assert!(out[0].contains("denied"), "a flagged call is asked and the refusal holds: {out:?}");
 }
+
+#[test]
+fn two_conversations_waiting_for_answers_at_once_get_their_own_answers_and_modes() {
+    use std::sync::mpsc;
+    // Each conversation's question waits for its own answer; the two are answered in the opposite order.
+    let (asked_tx, asked_rx) = mpsc::channel::<String>();
+    let answers: Arc<Mutex<std::collections::HashMap<String, mpsc::Receiver<Approval>>>> = Arc::default();
+    let (a_tx, a_rx) = mpsc::channel();
+    let (b_tx, b_rx) = mpsc::channel();
+    answers.lock().unwrap().insert("a".into(), a_rx);
+    answers.lock().unwrap().insert("b".into(), b_rx);
+    let waiting = answers.clone();
+    let permission = Arc::new(Permission::new(PermissionMode::Ask, move |req: &ApprovalRequest<'_>| {
+        asked_tx.send(req.session.to_string()).unwrap();
+        let answer = waiting.lock().unwrap().remove(req.session);
+        answer.map_or(Approval::Deny, |rx| rx.recv().unwrap_or(Approval::Deny))
+    }));
+    let fx = Arc::new(Fixture { runs: Arc::new(AtomicUsize::new(0)), asked: Arc::default() });
+    let start = |session: &'static str| {
+        let (fx, permission) = (fx.clone(), permission.clone());
+        std::thread::spawn(move || run_calls(&fx, &permission, session, &["writer"]))
+    };
+    let (a, b) = (start("a"), start("b"));
+    let mut waiting_for: Vec<String> = vec![asked_rx.recv().unwrap(), asked_rx.recv().unwrap()];
+    waiting_for.sort();
+    assert_eq!(waiting_for, ["a", "b"], "both ask at the same time");
+    // While both wait, conversation b is switched to full trust: it is still answered by its own question.
+    permission.set_session_mode("b", PermissionMode::Auto);
+    b_tx.send(Approval::Deny).unwrap();
+    a_tx.send(Approval::Once).unwrap();
+    assert_eq!(a.join().unwrap(), vec!["ran"]);
+    assert!(b.join().unwrap()[0].contains("denied permission"), "b's own answer, not a's");
+    assert_eq!(fx.runs.load(Ordering::SeqCst), 1);
+    // From now on b runs without asking and a still asks.
+    assert_eq!(run_calls(&fx, &permission, "b", &["writer"]), vec!["ran"]);
+    assert!(run_calls(&fx, &permission, "a", &["writer"])[0].contains("denied permission"), "a asks again and gets no answer");
+    assert_eq!(asked_rx.try_iter().collect::<Vec<_>>(), ["a"]);
+}

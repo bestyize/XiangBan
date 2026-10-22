@@ -75,6 +75,21 @@ struct Store {
     weather: Option<Weather>,
     weather_error: Option<String>,
     error: Option<String>,
+    /// By rule id.
+    agent_runs: BTreeMap<String, AgentRun>,
+}
+/// The last run of a scheduled agent task, shown on the care page.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct AgentRun {
+    pub at: i64,
+    pub ok: bool,
+    pub summary: String,
+    pub session: Option<String>,
+    pub input_tokens: u64,
+    pub output_tokens: u64,
+    /// Runs so far, this one included.
+    pub count: u64,
 }
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -218,7 +233,7 @@ fn status(app: &tauri::AppHandle) -> serde_json::Value {
     let store = state.store.lock().unwrap_or_else(|e| e.into_inner()).clone();
     let activity = care_system::activity();
     serde_json::json!({"config":store.config,"rules":store.rules,"pendingCount":store.pending.len(),"weather":store.weather,
-        "weatherError":store.weather_error,"error":store.error,"systemNotificationsAvailable":false,"activityAvailable":activity.available})
+        "weatherError":store.weather_error,"error":store.error,"agentRuns":store.agent_runs,"systemNotificationsAvailable":false,"activityAvailable":activity.available})
 }
 fn publish(app: &tauri::AppHandle) { let _ = app.emit_to("control", "care-settings-changed", status(app)); }
 
@@ -611,13 +626,12 @@ fn start_agent_tasks(app: &tauri::AppHandle) {
         let (app, thread_key) = (app.clone(), key.clone());
         let started = std::thread::Builder::new().name(format!("care-agent-{rule_id}")).spawn(move || {
             let key = thread_key;
-            let text = match crate::chat::scheduled::run(&app, &rule_id, &prompt) {
-                Ok(text) => text,
-                Err(error) => format!("定时任务没有完成：{error}"),
-            };
+            let outcome = crate::chat::scheduled::run(&app, &rule_id, &prompt);
+            let text = outcome.bubble.clone();
             let state = app.state::<ReminderState>();
             {
                 let mut store = state.store.lock().unwrap_or_else(|e| e.into_inner());
+                record_agent_run(&mut store, &rule_id, &outcome, Local::now().timestamp());
                 // Edited or deleted meanwhile: the item is gone, and the answer stays in the conversation only.
                 if let Some(item) = store.pending.iter_mut().find(|p| p.key == key) {
                     item.text = text;
@@ -632,6 +646,19 @@ fn start_agent_tasks(app: &tauri::AppHandle) {
             state.runtime.lock().unwrap_or_else(|e| e.into_inner()).agent_running.remove(&key);
         }
     }
+}
+fn record_agent_run(store: &mut Store, rule_id: &str, outcome: &crate::chat::scheduled::Outcome, at: i64) {
+    let ids: HashSet<&str> = store.rules.iter().filter(|r| r.kind == "agent").map(|r| r.id.as_str()).collect();
+    let mut runs = std::mem::take(&mut store.agent_runs);
+    runs.retain(|id, _| ids.contains(id.as_str()));
+    if ids.contains(rule_id) {
+        let count = runs.get(rule_id).map_or(0, |run| run.count) + 1;
+        runs.insert(rule_id.to_string(), AgentRun {
+            at, ok: outcome.ok, summary: outcome.bubble.clone(), session: outcome.session.clone(),
+            input_tokens: outcome.usage.prompt_tokens.into(), output_tokens: outcome.usage.completion_tokens.into(), count,
+        });
+    }
+    store.agent_runs = runs;
 }
 fn presence_path(app: &tauri::AppHandle) -> Option<std::path::PathBuf> {
     crate::storage::root(app).ok().map(|root| root.join("config/presence.json"))
@@ -871,6 +898,21 @@ mod tests {
         let item = &store.pending[0];
         assert!(!item.weather_ready, "not shown before the task has run");
         assert_eq!(item.expires_at - item.due_at, AGENT_VALID_SECONDS);
+    }
+    #[test] fn the_last_run_of_each_scheduled_task_is_kept_with_its_cost() {
+        let task = Rule { id: "task".into(), kind: "agent".into(), text: "总结".into(), ..Rule::default() };
+        let mut store = Store { rules: vec![task, scheduled()], ..Store::default() };
+        store.agent_runs.insert("deleted".into(), AgentRun::default());
+        let done = crate::chat::scheduled::Outcome { ok: true, bubble: "三个文件改过".into(), session: Some("s1".into()),
+            usage: agent_kernel::Usage { prompt_tokens: 1200, completion_tokens: 80 } };
+        record_agent_run(&mut store, "task", &done, 100);
+        record_agent_run(&mut store, "task", &crate::chat::scheduled::Outcome { bubble: "定时任务没有完成：没有模型".into(), ..Default::default() }, 200);
+        let run = &store.agent_runs["task"];
+        assert_eq!((run.at, run.ok, run.count, run.input_tokens), (200, false, 2, 0));
+        assert!(run.summary.contains("没有完成"));
+        assert!(!store.agent_runs.contains_key("deleted"), "runs of deleted tasks are dropped");
+        record_agent_run(&mut store, &scheduled().id, &done, 300);
+        assert_eq!(store.agent_runs.len(), 1, "only scheduled tasks are recorded");
     }
     #[test] fn quiet_hours_wrap_midnight() { let config = CareConfig { quiet_enabled: true, ..CareConfig::default() }; assert!(quiet(&config,time("23:00").unwrap())); assert!(quiet(&config,time("07:59").unwrap())); assert!(!quiet(&config,time("08:00").unwrap())); }
     #[test] fn disabled_or_edited_rules_cancel_queued_items() {

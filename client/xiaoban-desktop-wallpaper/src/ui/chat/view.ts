@@ -17,6 +17,15 @@ export function summaryNotice(view: SessionView, summary: string): ChatItem {
 }
 
 /** Shown after an answer that changed files with the file tools; its button puts them back. */
+/** The last answer stopped because the app quit or crashed while it ran: say what may already have happened. */
+export function interruptedNotice(view: SessionView, tools: string[], label: (name: string) => string): ChatItem {
+  const names = [...new Set(tools.map(label))];
+  const text = names.length
+    ? `上次回答在中途中断了（小伴被关闭或意外退出）。这些操作可能已经执行：${names.join('、')}。请先检查结果，再决定是否继续。`
+    : '上次回答在中途中断了（小伴被关闭或意外退出），没有完成。可以点“继续”接着做。';
+  return { kind: 'notice', id: nextId(view), tone: 'warning', text, canContinue: true };
+}
+
 export function checkpointNotice(view: SessionView, runId: string, files: string[]): ChatItem {
   return { kind: 'notice', id: nextId(view), tone: 'info', text: `这轮回答修改了 ${files.length} 个文件，可以撤销。`, details: files.join('\n'), detailsLabel: '查看文件', undoRun: runId };
 }

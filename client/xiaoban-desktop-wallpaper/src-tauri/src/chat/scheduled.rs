@@ -63,8 +63,30 @@ fn conversation(app: &tauri::AppHandle, rule_id: &str, title: &str) -> Result<St
     Ok(summary.id)
 }
 
-/// Runs one scheduled task to its end and returns what the care bubble should say. Blocks: call it on its own thread.
-pub fn run(app: &tauri::AppHandle, rule_id: &str, prompt: &str) -> Result<String, String> {
+/// How one run went: what the care bubble says, where the whole answer is, and what it cost.
+#[derive(Debug, Clone, Default)]
+pub struct Outcome {
+    pub ok: bool,
+    pub bubble: String,
+    pub session: Option<String>,
+    pub usage: agent_kernel::Usage,
+}
+
+/// Runs one scheduled task to its end. Blocks: call it on its own thread.
+pub fn run(app: &tauri::AppHandle, rule_id: &str, prompt: &str) -> Outcome {
+    let mut session = None;
+    match attempt(app, rule_id, prompt, &mut session) {
+        Ok((answer, usage)) => Outcome {
+            ok: true,
+            bubble: if answer.trim().is_empty() { "定时任务已完成，结果在聊天里。".into() } else { bubble_text(&answer) },
+            session,
+            usage,
+        },
+        Err(error) => Outcome { ok: false, bubble: format!("定时任务没有完成：{error}"), session, usage: Default::default() },
+    }
+}
+
+fn attempt(app: &tauri::AppHandle, rule_id: &str, prompt: &str, conversation_id: &mut Option<String>) -> Result<(String, agent_kernel::Usage), String> {
     let config = ai_config::current(app)?;
     if !config.is_complete() {
         return Err("还没有配置 AI 模型，定时任务没有运行".into());
@@ -72,6 +94,7 @@ pub fn run(app: &tauri::AppHandle, rule_id: &str, prompt: &str) -> Result<String
     crate::ai_catalogue::usable(app, &config)?;
     let short: String = prompt.chars().take(16).collect();
     let session = conversation(app, rule_id, &format!("定时任务：{short}"))?;
+    *conversation_id = Some(session.clone());
     let state = app.state::<ChatState>();
     let cancel = Arc::new(AtomicBool::new(false));
     {
@@ -82,7 +105,7 @@ pub fn run(app: &tauri::AppHandle, rule_id: &str, prompt: &str) -> Result<String
         runs.insert(session.clone(), cancel.clone());
     }
     let dirs = Dirs::of(app)?;
-    let result = (|| -> Result<String, String> {
+    let result = (|| -> Result<(String, agent_kernel::Usage), String> {
         let _lease = agent_kernel::supervisor::SessionLease::acquire(dirs.leases(), &session)?;
         let (config, key_source) = ai_gateway::prepare(app, config)?;
         let default = ai_config::default_workspace(app)?;
@@ -100,10 +123,10 @@ pub fn run(app: &tauri::AppHandle, rule_id: &str, prompt: &str) -> Result<String
             let message = error.to_string().replace(&config.api_key, "<hidden>");
             if ai_gateway::is_active(&config) { ai_gateway::readable_error(&message) } else { message }
         })?;
-        Ok(summary.text)
+        Ok((summary.text, summary.usage))
     })();
     finish_run(app, &session);
-    result.map(|answer| if answer.trim().is_empty() { "定时任务已完成，结果在聊天里。".into() } else { bubble_text(&answer) })
+    result
 }
 
 #[cfg(test)]

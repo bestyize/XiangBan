@@ -3,7 +3,8 @@
 //!
 //! When the working folder is in a git repository, the first shell command or background process of an answer also
 //! takes a snapshot of the working files (see `git_snapshot`), so what commands changed is put back too. Ignored
-//! files (`node_modules`, build output) are not in it; outside a repository commands are not covered.
+//! files (`node_modules`, build output) are not in it. Outside a repository the snapshot goes into a private one
+//! kept in `chat/snapshots`, unless the folder is too big, the home folder or a disk's root.
 //!
 //! Layout: `chat/checkpoints/<session>/<run>/manifest.json` plus one numbered copy per file that existed before.
 
@@ -56,6 +57,15 @@ pub struct GitSnapshot {
     /// The working folder inside the repository, `.` at its root.
     pub pathspec: String,
     pub tree: String,
+    /// The private repository's git folder, for a working folder outside any repository.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub git_dir: Option<String>,
+}
+
+impl GitSnapshot {
+    fn repo(&self) -> git_snapshot::Repo {
+        git_snapshot::Repo { root: PathBuf::from(&self.root), git_dir: self.git_dir.as_ref().map(PathBuf::from) }
+    }
 }
 
 /// What undo did, for the page to report.
@@ -143,13 +153,22 @@ impl Checkpoints {
     /// The first command of an answer in a git working folder: remember the working files as they are.
     fn record_git(&self, session: &str, run_id: &str) -> Result<(), String> {
         let workspace = self.workspace.clone();
+        let snapshots = self.root.with_file_name("snapshots");
         self.with_manifest(session, run_id, |_, manifest| {
             if manifest.git.is_some() {
                 return Ok(false);
             }
-            let Some((root, pathspec)) = git_snapshot::locate(&workspace) else { return Ok(false) };
-            let tree = git_snapshot::snapshot(&root, &pathspec)?;
-            manifest.git = Some(GitSnapshot { root: root.display().to_string(), pathspec, tree });
+            let (repo, pathspec) = match git_snapshot::locate(&workspace) {
+                Some((root, pathspec)) => (git_snapshot::Repo::user(root), pathspec),
+                None => match git_snapshot::private(&workspace, &snapshots)? {
+                    Some(repo) => (repo, ".".to_string()),
+                    None => return Ok(false),
+                },
+            };
+            let tree = git_snapshot::snapshot(&repo, &pathspec)?;
+            manifest.git = Some(GitSnapshot {
+                root: repo.root.display().to_string(), pathspec, tree, git_dir: repo.git_dir.map(|d| d.display().to_string()),
+            });
             Ok(true)
         })
     }
@@ -232,9 +251,9 @@ pub fn list(root: &Path, session: &str) -> Vec<Manifest> {
 
 /// What commands changed since the snapshot: added, and changed or deleted, relative to the working folder.
 fn git_changes(snapshot: &GitSnapshot) -> Result<(Vec<String>, Vec<String>), String> {
-    let root = PathBuf::from(&snapshot.root);
-    let now = git_snapshot::snapshot(&root, &snapshot.pathspec)?;
-    let (added, changed) = git_snapshot::changes(&root, &snapshot.tree, &now)?;
+    let repo = snapshot.repo();
+    let now = git_snapshot::snapshot(&repo, &snapshot.pathspec)?;
+    let (added, changed) = git_snapshot::changes(&repo, &snapshot.tree, &now)?;
     Ok((added, changed))
 }
 
@@ -285,7 +304,7 @@ pub fn undo(root: &Path, session: &str, run_id: &str) -> Result<UndoReport, Stri
                         Err(e) => report.failed.push((relative_to_workspace(snapshot, path), e.to_string())),
                     }
                 }
-                match git_snapshot::restore(&root, &snapshot.tree, &changed) {
+                match git_snapshot::restore(&snapshot.repo(), &snapshot.tree, &changed) {
                     Ok(()) => report.restored.extend(changed.iter().map(|p| relative_to_workspace(snapshot, p))),
                     Err(e) => report.failed.extend(changed.iter().map(|p| (relative_to_workspace(snapshot, p), e.clone()))),
                 }

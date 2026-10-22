@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { careRuleError, deliverySummary, describeCareRule, newCareRule, weatherIsFresh, type CareWeather, type CareDelivery } from "./care-model.ts";
+import { careRuleError, deliverySummary, describeAgentRun, describeCareRule, newCareRule, weatherIsFresh, type CareWeather, type CareDelivery } from "./care-model.ts";
 
 describe("care rule editing", () => {
   it("does not infer working weekdays", () => {
@@ -18,6 +18,12 @@ describe("care rule editing", () => {
     task.text = "看".repeat(1001); expect(careRuleError(task)).not.toBeNull();
     task.text = " "; expect(careRuleError(task)).not.toBeNull();
     const plain = newCareRule(); plain.text = "喝".repeat(241); expect(careRuleError(plain)).not.toBeNull();
+  });
+  it("describes a scheduled task's last run with its cost", () => {
+    const now = new Date(2026, 9, 22, 12, 0);
+    const run = { at: new Date(2026, 9, 22, 8, 5).getTime() / 1000, ok: true, summary: "", session: "s", inputTokens: 12_400, outputTokens: 1_250, count: 3 };
+    expect(describeAgentRun(run, now)).toBe("上次运行：今天 08:05 · 已完成 · 输入 12k / 输出 1.3k token · 共 3 次");
+    expect(describeAgentRun({ ...run, ok: false, inputTokens: 0, outputTokens: 0, at: new Date(2026, 9, 20, 8, 0).getTime() / 1000 }, now)).toBe("上次运行：10月20日 08:00 · 没有完成 · 共 3 次");
   });
   it("rejects out-of-range intervals and clock times", () => {
     const rule = newCareRule("rest"); rule.intervalMinutes = 4; expect(careRuleError(rule)).toContain("5–480");

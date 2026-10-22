@@ -42,6 +42,9 @@ describe('PetView animation lifecycle', () => {
   })
 
   it('keeps the face nodes when two frames have identical markup', () => {
+    // With reduced motion the face holds still, so two frames draw the same markup. Otherwise the gaze springs
+    // keep moving and whether two frames match is down to rounding.
+    vi.stubGlobal('matchMedia', () => ({ matches: true }))
     const pet = new PetView(document.body, { ...defaults })
     const run = (time: number) => {
       const [id, callback] = [...frames][0]

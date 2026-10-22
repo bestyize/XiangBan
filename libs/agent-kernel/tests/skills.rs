@@ -81,7 +81,9 @@ fn load_returns_the_body_without_frontmatter_and_names_alternatives_on_miss() {
     assert!(miss.contains("no skill named `deplyo`") && miss.contains("deploy"));
     assert!(skills.load("../etc").is_err() && skills.find("a/b").is_none());
     shared.write("huge/SKILL.md", &skill_file("huge", "too big", None, &"x".repeat(200_000)));
-    assert!(skills.load("huge").unwrap_err().contains("larger than"));
+    assert!(skills.load("huge").unwrap_err().contains("larger than"), "an oversized skill says why it cannot load");
+    shared.write("broken/SKILL.md", "no frontmatter");
+    assert!(skills.load("broken").unwrap_err().contains("frontmatter"));
 }
 
 #[test]
@@ -131,7 +133,8 @@ fn a_skill_created_during_a_run_appears_in_the_next_model_call() {
     assert!(requests[0].messages.iter().all(|m| m.role != Role::System), "no skills yet, so no system message");
     assert!(requests[1].messages[0].text().contains("- release-notes: Write release notes"));
     let file = std::fs::read_to_string(user.path("release-notes/SKILL.md")).unwrap();
-    assert_eq!(file, "---\nname: release-notes\ndescription: Write release notes\norigin: agent\n---\n\nList changes by area.\n");
+    // The description is written quoted, so any text is valid YAML.
+    assert_eq!(file, "---\nname: release-notes\ndescription: \"Write release notes\"\norigin: agent\n---\n\nList changes by area.\n");
 }
 
 #[test]

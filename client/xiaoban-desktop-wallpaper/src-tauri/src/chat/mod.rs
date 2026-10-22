@@ -192,7 +192,10 @@ fn permission_with_danger_check(mode: PermissionMode, approver: impl agent_kerne
         if tool == "skill_install" || tool == "skill_run" || tool.starts_with("mcp_ext_") {
             return Some("安装第三方 Skill、执行脚本或调用外部 MCP 工具必须逐次经过用户确认".to_string());
         }
-        if tool == "computer_use_repair_permissions" {
+        if tool == "care_set" && args["kind"] == "agent" {
+            return Some("定时任务会在你不在时自动运行，添加或修改都需要你确认".to_string());
+        }
+                if tool == "computer_use_repair_permissions" {
             return Some("清除 com.ifuryst.opencomputeruse 的所选旧授权（同标识独立安装版也受影响），之后需重新授权；每次都需确认".to_string());
         }
         danger::assess(tool, args, lock(&workspace).as_deref()).map(str::to_string)
@@ -705,7 +708,38 @@ pub fn chat_load_session(app: tauri::AppHandle, window: tauri::WebviewWindow, se
     // Only reported to the page: the mode is applied to this conversation alone when it runs, so opening one
     // never changes how another conversation that is answering right now is asked.
     emit(&app, "chat-permission-mode-changed", json!({ "sessionId": session_id, "mode": summary.permission_mode }));
-    JsonlStore::new(Dirs::of(&app)?.sessions()).load(&session_id).map_err(|e| e.to_string())
+    let dirs = Dirs::of(&app)?;
+    let running = lock(&app.state::<ChatState>().runs).contains_key(&session_id);
+    if !running {
+        if let Some((run_id, tools)) = interrupted_run(&dirs.runs().join(&session_id)) {
+            emit(&app, "chat-run-interrupted", json!({ "session": session_id, "runId": run_id, "tools": tools }));
+        }
+    }
+    JsonlStore::new(dirs.sessions()).load(&session_id).map_err(|e| e.to_string())
+}
+
+/// The conversation's last answer, when it never finished (the app quit or crashed while it ran) and has not been
+/// reported yet: its id and the tools that were started and may have done their work. Reported once.
+fn interrupted_run(journal_dir: &Path) -> Option<(String, Vec<String>)> {
+    let newest = fs::read_dir(journal_dir).ok()?.flatten()
+        .filter_map(|entry| {
+            let name = entry.file_name().to_string_lossy().into_owned();
+            let run = name.strip_prefix("run-")?.strip_suffix(".jsonl")?.to_string();
+            Some((entry.metadata().ok()?.modified().ok()?, run))
+        })
+        .max()?.1;
+    let marker = journal_dir.join(format!("run-{newest}.interrupted"));
+    if marker.exists() {
+        return None;
+    }
+    let inspection = JsonlRunLog::new(journal_dir).inspect(&newest).ok()?;
+    if inspection.terminal {
+        return None;
+    }
+    let _ = fs::write(&marker, "");
+    let mut tools: Vec<String> = inspection.incomplete_tools.into_iter().filter(|t| t.dispatched).map(|t| t.name).collect();
+    tools.dedup();
+    Some((newest, tools))
 }
 
 /// An empty conversation. The chat page makes one when the first message is sent, so the page

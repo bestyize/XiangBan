@@ -1,8 +1,9 @@
 import type { PendingAttachment } from './attachments.ts';
 import { modelFailure } from './model-errors.ts';
 import { reactive } from 'vue';
-import type { ApprovalDecision, ApprovalRequest, ChatEventPayload, ChatGroup, ContextInfo, Library, Overview, QuestionRequest, SessionSummary, SessionView, WireMessage } from './types.ts';
-import { applyEvent, checkpointNotice, itemsFromHistory, newView, nextId, summaryNotice } from './view.ts';
+import type { ApprovalDecision, ApprovalRequest, ChatEventPayload, ChatGroup, ChatItem, ContextInfo, Library, Overview, QuestionRequest, SessionSummary, SessionView, WireMessage } from './types.ts';
+import { applyEvent, checkpointNotice, interruptedNotice, itemsFromHistory, newView, nextId, summaryNotice } from './view.ts';
+import { toolLabel } from './format.ts';
 
 export interface ChatDeps {
   onReply?(session: string, text: string, key?: string): void;
@@ -77,6 +78,7 @@ export function createChatStore(deps: ChatDeps): ChatStore {
   const unsubscribers: (() => void)[] = [];
   let starting: Promise<void> | null = null;
   let disposed = false;
+  const interruptions: Record<string, ChatItem> = {};
   let refreshedAfterErrorAt = 0;
 
   const store: ChatStore = reactive({
@@ -147,6 +149,13 @@ export function createChatStore(deps: ChatDeps): ChatStore {
             }),
             deps.listen<{ enabled: boolean }>('chat-hide-tool-calls-changed', payload => { if (!disposed) store.hideToolCalls = payload.enabled; }),
             deps.listen<CompactingEvent>('chat-compacting', payload => { if (!disposed) onCompacting(payload); }),
+            // Sent while the conversation loads, before its history replaces the items: kept until then.
+            deps.listen<{ session: string; runId: string; tools: string[] }>('chat-run-interrupted', ({ session, tools }) => {
+              if (disposed) return;
+              const view = viewOf(session, true);
+              const notice = interruptedNotice(view, tools ?? [], toolLabel);
+              if (view.loaded) view.items.push(notice); else interruptions[session] = notice;
+            }),
             deps.listen<{ session: string; runId: string; files: string[] }>('chat-checkpoint', ({ session, runId, files }) => {
               if (disposed || !files.length) return;
               const view = viewOf(session, true);
@@ -208,6 +217,8 @@ export function createChatStore(deps: ChatDeps): ChatStore {
         const messages = await deps.invoke<WireMessage[]>('chat_load_session', { sessionId: id });
         if (view.loaded) return;
         view.items = itemsFromHistory(view, messages ?? []);
+        const interrupted = interruptions[id];
+        if (interrupted) { view.items.push(interrupted); delete interruptions[id]; }
         view.loaded = true;
       } catch (error) {
         deps.notify(error, 'error');

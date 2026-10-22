@@ -78,6 +78,7 @@ export interface QuestionRequest { id: string; session: string; question: string
 
 export type ChatItem =
   | { kind: 'user'; id: string; text: string; images: string[]; files?: AttachmentCard[] }
+  | { kind: 'reasoning'; id: string; text: string; reasoningKind: 'summary' | 'text'; streaming: boolean }
   | { kind: 'assistant'; id: string; text: string; streaming: boolean; /** Tokens of the whole answer, research helpers included. */ usage?: TokenUsage }
   | { kind: 'tool'; id: string; name: string; arguments: string; output: string; status: 'running' | 'done' | 'error' }
   | { kind: 'notice'; id: string; tone: 'info' | 'warning' | 'error'; text: string; code?: 'truncated'; canContinue?: boolean; canSwitchModel?: boolean; canRetry?: boolean; details?: string; /** The label on the fold-out `details`; "错误详情" when missing. */ detailsLabel?: string; /** The answer whose file changes this notice can undo. */ undoRun?: string };

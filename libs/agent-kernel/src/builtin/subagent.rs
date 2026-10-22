@@ -124,7 +124,9 @@ impl Tool for Subagent {
                     thread::sleep(POLL);
                 }
             });
-            let options = crate::RunOptions { parent_run_id: Some(ctx.run_id().into()), ephemeral_session: true, ..Default::default() };
+            let options = crate::RunOptions {
+                parent_run_id: Some(ctx.run_id().into()), ephemeral_session: true, shared_budget: ctx.tool_budget().cloned(), ..Default::default()
+            };
             let result = self.child.run_parts_observed(&child_session, vec![crate::Part::Text { text: task.into() }], options, &mut |record| {
                 if let Some(observer) = &self.run_observer { observer(&record)?; }
                 if let (Some(observer), crate::RunEventBody::Event { event }) = (&self.observer, record.body) {

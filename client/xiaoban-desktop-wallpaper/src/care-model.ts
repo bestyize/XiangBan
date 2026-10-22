@@ -50,6 +50,19 @@ export interface CareStatus {
   error: string | null;
   systemNotificationsAvailable: boolean;
   activityAvailable: boolean;
+  /** The last run of each scheduled task, by rule id. */
+  agentRuns?: Record<string, CareAgentRun>;
+}
+export interface CareAgentRun { at: number; ok: boolean; summary: string; session: string | null; inputTokens: number; outputTokens: number; count: number }
+const tokens = (n: number) => n >= 10_000 ? `${Math.round(n / 1000)}k` : n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n);
+/** One line for the care page: when it last ran, whether it finished, and what it cost. */
+export function describeAgentRun(run: CareAgentRun, now = new Date()): string {
+  const at = new Date(run.at * 1000);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const clock = `${pad(at.getHours())}:${pad(at.getMinutes())}`;
+  const day = at.toDateString() === now.toDateString() ? `今天 ${clock}` : `${at.getMonth() + 1}月${at.getDate()}日 ${clock}`;
+  const cost = run.inputTokens || run.outputTokens ? ` · 输入 ${tokens(run.inputTokens)} / 输出 ${tokens(run.outputTokens)} token` : '';
+  return `上次运行：${day} · ${run.ok ? '已完成' : '没有完成'}${cost} · 共 ${run.count} 次`;
 }
 export interface CarePending {
   key: string;

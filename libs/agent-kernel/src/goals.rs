@@ -106,7 +106,7 @@ impl GoalStore {
     }
     pub fn load(&self, id: &str) -> Result<Option<GoalRecord>, String> {
         let path = self.path(id)?;
-        let mut file = match File::open(path) {
+        let file = match File::open(path) {
             Ok(f) => f,
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None),
             Err(e) => return Err(e.to_string()),

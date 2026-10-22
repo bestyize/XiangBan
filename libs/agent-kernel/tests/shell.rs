@@ -22,8 +22,15 @@ fn sh(dir: &TempDir, command: &str) -> String {
     run_shell(Shell::new(&dir.0), command).0
 }
 
+/// A killed process whose parent never reaps it stays a zombie (state `Z`); it is not running. That happens in
+/// containers whose first process does not reap orphans.
 fn process_alive(pid: &str) -> bool {
-    Command::new("kill").args(["-0", pid]).stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null()).status().is_ok_and(|s| s.success())
+    let out = Command::new("ps").args(["-o", "stat=", "-p", pid]).stdin(Stdio::null()).stderr(Stdio::null()).output();
+    out.is_ok_and(|out| {
+        let state = String::from_utf8_lossy(&out.stdout);
+        let state = state.trim();
+        !state.is_empty() && !state.starts_with('Z')
+    })
 }
 
 fn assert_dies(pid: &str) {
@@ -157,4 +164,15 @@ fn it_asks_before_running_and_is_blocked_in_read_only_mode() {
         assert!(tool_messages(&h)[0].1.contains(expect));
         assert!(!dir.path("ran").exists());
     }
+}
+
+#[test]
+fn a_working_folder_with_spaces_and_chinese_characters_is_used_as_is() {
+    let base = TempDir::new("sh-unicode");
+    let dir = base.path("我的 项目");
+    std::fs::create_dir_all(&dir).unwrap();
+    let real = dir.canonicalize().unwrap();
+    let (out, _) = run_shell(Shell::new(&dir), "pwd; echo 内容 > \"新 文件.txt\"; ls");
+    assert!(out.contains(&real.display().to_string()) && out.contains("新 文件.txt"), "{out}");
+    assert_eq!(std::fs::read_to_string(dir.join("新 文件.txt")).unwrap(), "内容\n");
 }
