@@ -79,7 +79,7 @@ pub async fn open(app: &tauri::AppHandle, id: &str) -> Result<(), String> {
         let token = crate::games::issue_token(app)?;
         let init = json!({"manifest": game, "screen": {"width": screen.w, "height": screen.h}, "capabilities": capabilities});
         let generation = state.generation.fetch_add(1, Ordering::SeqCst) + 1;
-        *state.session.lock().unwrap() = Some(Session { id: id.to_string(), capabilities, screen, scale, regions: Vec::new() });
+        *state.session.lock().unwrap_or_else(|e| e.into_inner()) = Some(Session { id: id.to_string(), capabilities, screen, scale, regions: Vec::new() });
 
         let builder = WebviewWindowBuilder::new(app, LABEL, WebviewUrl::App("index.html?scene=desk".into()))
             .initialization_script(format!("if(window===window.top){{window.__XIAOBAN_GAME_TOKEN__={};window.__XIAOBAN_DESK__={init};}}", json!(token)))
@@ -122,7 +122,7 @@ pub async fn close(app: &tauri::AppHandle) -> Result<(), String> {
 async fn stop(app: &tauri::AppHandle) -> Result<(), String> {
     let state = app.state::<DeskState>();
     state.generation.fetch_add(1, Ordering::SeqCst);
-    state.session.lock().unwrap().take();
+    state.session.lock().unwrap_or_else(|e| e.into_inner()).take();
     let _ = app.emit("desk-game-active", Value::Null);
     if let Some(window) = app.get_webview_window(LABEL) {
         window.destroy().map_err(|e| e.to_string())?;
@@ -180,7 +180,7 @@ fn sample(app: tauri::AppHandle, generation: u64) {
         if state.generation.load(Ordering::SeqCst) != generation {
             break;
         }
-        let (screen, scale, capabilities, regions) = match state.session.lock().unwrap().as_ref() {
+        let (screen, scale, capabilities, regions) = match state.session.lock().unwrap_or_else(|e| e.into_inner()).as_ref() {
             Some(session) => (session.screen, session.scale, session.capabilities.clone(), session.regions.clone()),
             None => break,
         };
@@ -217,7 +217,7 @@ pub fn desk_set_regions(app: tauri::AppHandle, window: tauri::WebviewWindow, rec
     deskgame_only(&window)?;
     crate::games::authorize(&app, &host_token)?;
     let state = app.state::<DeskState>();
-    let mut guard = state.session.lock().unwrap();
+    let mut guard = state.session.lock().unwrap_or_else(|e| e.into_inner());
     let session = guard.as_mut().ok_or("桌面游戏没有在运行")?;
     session.regions = desk_windows::regions_from(&rects, session.screen.w, session.screen.h);
     Ok(())

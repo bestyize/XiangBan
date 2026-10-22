@@ -67,7 +67,7 @@ struct DownloadGuard<'a> {
 impl<'a> DownloadGuard<'a> {
     fn start(state: &'a WebsiteState) -> Self {
         let cancel = Arc::new(AtomicBool::new(false));
-        if let Some(previous) = state.download.lock().unwrap().replace(cancel.clone()) {
+        if let Some(previous) = state.download.lock().unwrap_or_else(|e| e.into_inner()).replace(cancel.clone()) {
             previous.store(true, Ordering::Relaxed);
         }
         Self { state, cancel }
@@ -82,7 +82,7 @@ impl<'a> DownloadGuard<'a> {
 }
 impl Drop for DownloadGuard<'_> {
     fn drop(&mut self) {
-        let mut current = self.state.download.lock().unwrap();
+        let mut current = self.state.download.lock().unwrap_or_else(|e| e.into_inner());
         if current.as_ref().is_some_and(|flag| Arc::ptr_eq(flag, &self.cancel)) {
             *current = None;
         }
@@ -114,7 +114,7 @@ fn save(app: &tauri::AppHandle, status: &Status) -> Result<(), String> {
 }
 fn snapshot(app: &tauri::AppHandle) -> Value {
     let state = app.state::<WebsiteState>();
-    let status = state.status.lock().unwrap().clone();
+    let status = state.status.lock().unwrap_or_else(|e| e.into_inner()).clone();
     serde_json::to_value(status).unwrap()
 }
 #[tauri::command]
@@ -124,11 +124,11 @@ pub fn get_website_status(app: tauri::AppHandle) -> Value {
 #[tauri::command]
 pub fn set_automatic_updates(app: tauri::AppHandle, enabled: bool) -> Result<crate::Settings, String> {
     let desktop_state = app.state::<DesktopState>();
-    let _update = desktop_state.update_lock.lock().unwrap();
+    let _update = desktop_state.update_lock.lock().unwrap_or_else(|e| e.into_inner());
     let mut config = settings(&app);
     config.automatic_updates = enabled;
     crate::persist(&app, &config)?;
-    *desktop_state.settings.lock().unwrap() = config;
+    *desktop_state.settings.lock().unwrap_or_else(|e| e.into_inner()) = config;
     crate::publish(&app);
     Ok(settings(&app))
 }
@@ -146,16 +146,16 @@ async fn use_test_website(app: tauri::AppHandle, url: String) -> Result<crate::S
     let url = site_url(&url)?;
     let state = app.state::<WebsiteState>();
     let desktop_state = app.state::<DesktopState>();
-    let _update = desktop_state.update_lock.lock().unwrap();
+    let _update = desktop_state.update_lock.lock().unwrap_or_else(|e| e.into_inner());
     let mut config = settings(&app);
     let changed = config.website_url != url;
     config.website_url = url.clone();
     config.automatic_updates = false;
     config.update_url = format!("{url}/api/v1/desktop/updates");
     crate::persist(&app, &config)?;
-    *app.state::<DesktopState>().settings.lock().unwrap() = config;
+    *app.state::<DesktopState>().settings.lock().unwrap_or_else(|e| e.into_inner()) = config;
     if changed {
-        let mut status = state.status.lock().unwrap();
+        let mut status = state.status.lock().unwrap_or_else(|e| e.into_inner());
         *status = Status::default();
         save(&app, &status)?;
         drop(status);
@@ -442,7 +442,7 @@ pub async fn download_site_wallpaper(app: tauri::AppHandle, id: String) -> Resul
             let plain = manifest_url(&app, &id, false)?;
             let resolved = tauri::async_runtime::spawn_blocking(move || {
                 let state = handle.state::<content::ContentState>();
-                let _io = state.io.lock().unwrap();
+                let _io = state.io.lock().unwrap_or_else(|e| e.into_inner());
                 resolve_manifest(
                     manifest,
                     |id, version| saved_resource(&directory, id, version),
@@ -482,7 +482,7 @@ pub async fn download_site_wallpaper(app: tauri::AppHandle, id: String) -> Resul
         let (handle, cancel) = (app.clone(), guard.cancel.clone());
         tauri::async_runtime::spawn_blocking(move || {
             let state = handle.state::<content::ContentState>();
-            let _io = state.io.lock().unwrap();
+            let _io = state.io.lock().unwrap_or_else(|e| e.into_inner());
             library::prepare_cancellable(&handle, &root, &item, &cancel)
         })
         .await
@@ -494,7 +494,7 @@ pub async fn download_site_wallpaper(app: tauri::AppHandle, id: String) -> Resul
 /// Returns whether there was one to stop.
 #[tauri::command]
 pub fn cancel_site_download(app: tauri::AppHandle) -> bool {
-    match app.state::<WebsiteState>().download.lock().unwrap().as_ref() {
+    match app.state::<WebsiteState>().download.lock().unwrap_or_else(|e| e.into_inner()).as_ref() {
         Some(flag) => {
             flag.store(true, Ordering::Relaxed);
             true
@@ -539,13 +539,13 @@ pub async fn check_website(app: tauri::AppHandle) -> Result<Value, String> {
     let update = content::check_updates(app.clone()).await;
     let notices = notices_task.await.map_err(|e| e.to_string())?;
     let desktop_state = app.state::<DesktopState>();
-    let _update = desktop_state.update_lock.lock().unwrap();
+    let _update = desktop_state.update_lock.lock().unwrap_or_else(|e| e.into_inner());
     let current = settings(&app);
     if current.website_url != config.website_url || current.update_url != config.update_url {
         return Ok(snapshot(&app));
     }
     {
-        let mut status = state.status.lock().unwrap();
+        let mut status = state.status.lock().unwrap_or_else(|e| e.into_inner());
         status.errors.clear();
         match notices {
             Ok(items) => status.announcements = items,
@@ -571,7 +571,7 @@ pub async fn check_website(app: tauri::AppHandle) -> Result<Value, String> {
 fn update_tray(app: &tauri::AppHandle) {
     if let Some(tray) = app.tray_by_id("xiaoban-tray") {
         let state = app.state::<WebsiteState>();
-        let status = state.status.lock().unwrap();
+        let status = state.status.lock().unwrap_or_else(|e| e.into_inner());
         let unread = status
             .announcements
             .iter()
@@ -595,7 +595,7 @@ pub fn dismiss_website_message(
 ) -> Result<Value, String> {
     let state = app.state::<WebsiteState>();
     {
-        let mut status = state.status.lock().unwrap();
+        let mut status = state.status.lock().unwrap_or_else(|e| e.into_inner());
         let valid = if id == "update" {
             status.update.as_ref().and_then(|u| u["version"].as_str()) == Some(&revision)
         } else {
@@ -623,14 +623,14 @@ pub fn start(app: &tauri::AppHandle) {
     if let Ok(root) = crate::storage::root(app) {
         if let Ok(text) = std::fs::read(root.join("config/website-messages.json")) {
             if let Ok(status) = serde_json::from_slice::<Status>(&text) {
-                *app.state::<WebsiteState>().status.lock().unwrap() = status;
+                *app.state::<WebsiteState>().status.lock().unwrap_or_else(|e| e.into_inner()) = status;
             }
         }
     }
     let handle = app.clone();
     update_tray(app);
     std::thread::spawn(move || loop {
-        let last_checked = handle.state::<WebsiteState>().status.lock().unwrap().last_checked;
+        let last_checked = handle.state::<WebsiteState>().status.lock().unwrap_or_else(|e| e.into_inner()).last_checked;
         if settings(&handle).automatic_updates && check_due(last_checked, now_secs()) {
             let _ = tauri::async_runtime::block_on(check_website(handle.clone()));
         }
@@ -764,7 +764,7 @@ mod tests {
         assert!(library::cached(&root, resource));
         // No file is stored for our copy's hash: it was never fetched.
         assert!(!root.join("cache").join(hex(&copy)).exists());
-        assert_eq!(server.hits.lock().unwrap().len(), 1);
+        assert_eq!(server.hits.lock().unwrap_or_else(|e| e.into_inner()).len(), 1);
         std::fs::remove_dir_all(root).unwrap();
     }
 
@@ -794,11 +794,11 @@ mod tests {
         let second = DownloadGuard::start(&state);
         assert!(first_flag.load(Ordering::Relaxed), "a newer download stops the older one");
         drop(first);
-        assert!(state.download.lock().unwrap().is_some(), "the older guard leaves the newer flag in place");
-        state.download.lock().unwrap().as_ref().unwrap().store(true, Ordering::Relaxed);
+        assert!(state.download.lock().unwrap_or_else(|e| e.into_inner()).is_some(), "the older guard leaves the newer flag in place");
+        state.download.lock().unwrap_or_else(|e| e.into_inner()).as_ref().unwrap().store(true, Ordering::Relaxed);
         assert_eq!(second.check(), Err(library::CANCELLED.to_string()));
         drop(second);
-        assert!(state.download.lock().unwrap().is_none());
+        assert!(state.download.lock().unwrap_or_else(|e| e.into_inner()).is_none());
     }
 
     #[test]

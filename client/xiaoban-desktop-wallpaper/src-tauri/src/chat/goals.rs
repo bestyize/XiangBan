@@ -82,7 +82,8 @@ pub fn chat_goal_get(
 ) -> Result<Option<GoalRecord>, String> {
     require_control(&window)?;
     exists(&app, &session_id)?;
-    let _write = lock(&app.state::<ChatState>().goal_io);
+    let state = app.state::<ChatState>();
+    let _write = lock(&state.goal_io);
     let _metadata_lease = metadata_lease(&app, &session_id)?;
     current(&app, &session_id)
 }
@@ -95,7 +96,8 @@ pub fn chat_goal_set(
     require_control(&window)?;
     exists(&app, &session_id)?;
     ensure_not_owned_elsewhere(&app, &session_id)?;
-    let _write = lock(&app.state::<ChatState>().goal_io);
+    let state = app.state::<ChatState>();
+    let _write = lock(&state.goal_io);
     let _metadata_lease = metadata_lease(&app, &session_id)?;
     if running(&app, &session_id) { return Err("运行期间不能修改目标".into()); }
     let existing = current(&app, &session_id)?;
@@ -134,14 +136,15 @@ pub fn chat_goal_start(
     // Hold the goal lock until chat_send has registered the run or refused it.
     // Otherwise a simultaneous read could mistake the brief dispatch gap
     // for a crashed process and mark an in-flight goal NeedsReview.
-    let _write = lock(&app.state::<ChatState>().goal_io);
+    let state = app.state::<ChatState>();
+    let _write = lock(&state.goal_io);
     let _metadata_lease = metadata_lease(&app, &session_id)?;
     if running(&app, &session_id) { return Err("当前会话正在运行".into()); }
     let mut goal = current(&app, &session_id)?.ok_or("请先设定目标")?;
     let previous = goal.clone();
     goal.begin(millis())?;
     store(&app)?.save(&goal)?;
-    match super::chat_send(app.clone(), session_id.clone(), prompt(&goal), None, Some(false), None) {
+    match super::send(app.clone(), session_id.clone(), prompt(&goal), None, Some(false), None) {
         Ok(_) => {
             changed(&app, &session_id, Some(&goal));
             Ok(goal)
@@ -163,8 +166,9 @@ pub fn chat_goal_pause(
     ensure_not_owned_elsewhere(&app, &session_id)?;
     // Cancel an active run first; never wait for its blocking tool while
     // holding the goal metadata lock.
-    if running(&app, &session_id) { super::chat_cancel(app.clone(), session_id.clone()); }
-    let _write = lock(&app.state::<ChatState>().goal_io);
+    if running(&app, &session_id) { super::cancel_run(&app, &session_id); }
+    let state = app.state::<ChatState>();
+    let _write = lock(&state.goal_io);
     let _metadata_lease = metadata_lease(&app, &session_id)?;
     let mut goal = current(&app, &session_id)?.ok_or("没有长期目标")?;
     goal.pause(millis())?;
@@ -183,7 +187,8 @@ pub fn chat_goal_acknowledge(
     require_control(&window)?;
     exists(&app, &session_id)?;
     ensure_not_owned_elsewhere(&app, &session_id)?;
-    let _write = lock(&app.state::<ChatState>().goal_io);
+    let state = app.state::<ChatState>();
+    let _write = lock(&state.goal_io);
     let _metadata_lease = metadata_lease(&app, &session_id)?;
     if running(&app, &session_id) { return Err("仍有运行中的任务".into()); }
     let mut goal = current(&app, &session_id)?.ok_or("没有长期目标")?;
@@ -210,7 +215,8 @@ pub fn chat_goal_finish(
     require_control(&window)?;
     exists(&app, &session_id)?;
     ensure_not_owned_elsewhere(&app, &session_id)?;
-    let _write = lock(&app.state::<ChatState>().goal_io);
+    let state = app.state::<ChatState>();
+    let _write = lock(&state.goal_io);
     let _metadata_lease = metadata_lease(&app, &session_id)?;
     if running(&app, &session_id) { return Err("任务仍在执行，不能验收完成".into()); }
     let mut goal = current(&app, &session_id)?.ok_or("没有长期目标")?;
@@ -227,7 +233,8 @@ pub fn chat_goal_delete(
     require_control(&window)?;
     exists(&app, &session_id)?;
     ensure_not_owned_elsewhere(&app, &session_id)?;
-    let _write = lock(&app.state::<ChatState>().goal_io);
+    let state = app.state::<ChatState>();
+    let _write = lock(&state.goal_io);
     let _metadata_lease = metadata_lease(&app, &session_id)?;
     if running(&app, &session_id) { return Err("先暂停并停止当前任务".into()); }
     store(&app)?.delete(&session_id)?;
@@ -239,7 +246,8 @@ pub fn chat_goal_delete(
 /// to JsonlRunLog. If updating a goal fails, the observer fails closed.
 pub(super) fn observe(app: &tauri::AppHandle, record: &RunEvent) -> Result<(), String> {
     let RunEventBody::State { state, .. } = &record.body else { return Ok(()) };
-    let _write = lock(&app.state::<ChatState>().goal_io);
+    let chat = app.state::<ChatState>();
+    let _write = lock(&chat.goal_io);
     let _metadata_lease = metadata_lease(app, &record.session_id)?;
     let db = store(app)?;
     if let Some(mut goal) = db.load(&record.session_id)? {

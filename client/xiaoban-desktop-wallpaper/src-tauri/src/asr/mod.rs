@@ -39,14 +39,14 @@ fn check(app: &tauri::AppHandle, generation: u64) -> Result<(), String> {
 #[tauri::command]
 pub fn asr_get_status(app: tauri::AppHandle) -> Result<Status, String> {
     let state = app.state::<AsrState>();
-    let _io = state.settings_io.lock().unwrap();
-    let microphone_error = state.microphone_error.lock().unwrap().clone();
+    let _io = state.settings_io.lock().unwrap_or_else(|e| e.into_inner());
+    let microphone_error = state.microphone_error.lock().unwrap_or_else(|e| e.into_inner()).clone();
     Ok(Status { enabled: settings(&app)?.enabled, model_ready: engine::present(&crate::storage::root(&app)?.join("asr")), engine_ready: state.engine_ready.load(Ordering::SeqCst), warming: state.warming.load(Ordering::SeqCst), microphone_error })
 }
 #[tauri::command]
 pub fn asr_report_microphone(app: tauri::AppHandle, error: String) -> Result<(), String> {
     if error.len() > 4096 { return Err("麦克风状态过长".into()); }
-    *app.state::<AsrState>().microphone_error.lock().unwrap() = error;
+    *app.state::<AsrState>().microphone_error.lock().unwrap_or_else(|e| e.into_inner()) = error;
     announce(&app);
     Ok(())
 }
@@ -58,7 +58,7 @@ fn announce(app: &tauri::AppHandle) {
 /// reported to the page that asked; without one it is silent.
 fn prepare_blocking(handle: &tauri::AppHandle, generation: u64, request_id: Option<&str>, locked: impl FnOnce()) -> Result<(), String> {
     let state = handle.state::<AsrState>();
-    let _prepare = state.prepare.lock().unwrap();
+    let _prepare = state.prepare.lock().unwrap_or_else(|e| e.into_inner());
     locked();
     check(handle, generation)?;
     if !settings(handle)?.enabled { return Err("请先开启语音识别".into()); }
@@ -74,9 +74,9 @@ fn prepare_blocking(handle: &tauri::AppHandle, generation: u64, request_id: Opti
         let _ = handle.emit_to("control", "asr-progress", Progress { request_id, phase: "loading", file: "", downloaded: engine::TOTAL_BYTES, total: engine::TOTAL_BYTES });
     }
     // Serialize model creation, decoding and disposal; never run two recognizers concurrently.
-    let mut slot = state.recognizer.lock().unwrap();
+    let mut slot = state.recognizer.lock().unwrap_or_else(|e| e.into_inner());
     let recognizer = engine::load(&directory)?;
-    let _io = state.settings_io.lock().unwrap();
+    let _io = state.settings_io.lock().unwrap_or_else(|e| e.into_inner());
     check(handle, generation)?;
     *slot = Some(recognizer);
     state.engine_ready.store(true, Ordering::SeqCst);
@@ -121,7 +121,7 @@ fn next_step(enabled: bool, model_present: bool, engine_ready: bool) -> Step {
 /// asks for the engine in the meantime, and the page then downloads with its own progress.
 fn fetch_blocking(handle: &tauri::AppHandle) -> Result<(), String> {
     let state = handle.state::<AsrState>();
-    let _prepare = state.prepare.lock().unwrap();
+    let _prepare = state.prepare.lock().unwrap_or_else(|e| e.into_inner());
     let directory = crate::storage::root(handle)?.join("asr");
     engine::ensure_model(&directory, || {
         if state.urgent.load(Ordering::SeqCst) { Err("有页面正在使用语音识别，后台下载让路".into()) } else { Ok(()) }
@@ -174,7 +174,7 @@ fn continue_with_engine(app: &tauri::AppHandle) {
 pub async fn asr_set_enabled(app: tauri::AppHandle, enabled: bool) -> Result<Status, String> {
     {
         let state = app.state::<AsrState>();
-        let _io = state.settings_io.lock().unwrap();
+        let _io = state.settings_io.lock().unwrap_or_else(|e| e.into_inner());
         crate::library::save_json(&settings_path(&app)?, &Settings { enabled })?;
         state.generation.fetch_add(1, Ordering::SeqCst);
         if !enabled { state.engine_ready.store(false, Ordering::SeqCst); }
@@ -187,7 +187,7 @@ pub async fn asr_set_enabled(app: tauri::AppHandle, enabled: bool) -> Result<Sta
         tauri::async_runtime::spawn_blocking(move || {
             // A decode already in progress may finish, but its result is fenced by generation.
             let state = handle.state::<AsrState>();
-            let mut recognizer = state.recognizer.lock().unwrap();
+            let mut recognizer = state.recognizer.lock().unwrap_or_else(|e| e.into_inner());
             if !settings(&handle).map(|s| s.enabled).unwrap_or(false) { recognizer.take(); }
         }).await.map_err(|_| "语音引擎释放失败")?;
     }
@@ -233,7 +233,7 @@ pub async fn asr_transcribe(app: tauri::AppHandle, samples: Vec<f32>) -> Result<
     tauri::async_runtime::spawn_blocking(move || {
         let state = app.state::<AsrState>();
         if !settings(&app)?.enabled { return Err("语音识别未开启".into()); }
-        let mut slot = state.recognizer.lock().unwrap();
+        let mut slot = state.recognizer.lock().unwrap_or_else(|e| e.into_inner());
         check(&app, generation)?;
         let recognizer = slot.as_mut().ok_or("语音引擎尚未加载，请重试")?;
         let text = engine::transcribe(recognizer, &samples)?;

@@ -2,7 +2,7 @@ import type { PendingAttachment } from './attachments.ts';
 import { modelFailure } from './model-errors.ts';
 import { reactive } from 'vue';
 import type { ApprovalDecision, ApprovalRequest, ChatEventPayload, ChatGroup, ContextInfo, Library, Overview, QuestionRequest, SessionSummary, SessionView, WireMessage } from './types.ts';
-import { applyEvent, itemsFromHistory, newView, nextId, summaryNotice } from './view.ts';
+import { applyEvent, checkpointNotice, itemsFromHistory, newView, nextId, summaryNotice } from './view.ts';
 
 export interface ChatDeps {
   onReply?(session: string, text: string, key?: string): void;
@@ -62,6 +62,8 @@ export interface ChatStore {
   removeGroup(id: string): Promise<boolean>;
   answerApproval(request: ApprovalRequest, decision: ApprovalDecision): Promise<void>;
   answerQuestion(request: QuestionRequest, answer: string | null): Promise<void>;
+  /** Puts back the files the answer behind a checkpoint notice changed. Returns whether it was done. */
+  undoRun(session: string, itemId: string): Promise<boolean>;
   current(): SessionView | null;
 }
 
@@ -145,6 +147,11 @@ export function createChatStore(deps: ChatDeps): ChatStore {
             }),
             deps.listen<{ enabled: boolean }>('chat-hide-tool-calls-changed', payload => { if (!disposed) store.hideToolCalls = payload.enabled; }),
             deps.listen<CompactingEvent>('chat-compacting', payload => { if (!disposed) onCompacting(payload); }),
+            deps.listen<{ session: string; runId: string; files: string[] }>('chat-checkpoint', ({ session, runId, files }) => {
+              if (disposed || !files.length) return;
+              const view = viewOf(session, true);
+              view.items.push(checkpointNotice(view, runId, files));
+            }),
           ]);
           if (disposed) { listeners.forEach(stop => stop()); return; }
           unsubscribers.push(...listeners);
@@ -351,7 +358,33 @@ export function createChatStore(deps: ChatDeps): ChatStore {
       try {
         await deps.invoke('chat_answer_approval', { id: request.id, decision });
       } catch (error) {
-        if (!String(error).includes(STALE)) deps.notify(error, 'error');
+        if (String(error).includes(STALE)) return;
+        // The run is still waiting on this answer: put the card back so it can be answered again.
+        if (view) addPending(view.approvals, request);
+        deps.notify(error, 'error');
+      }
+    },
+
+    async undoRun(session, itemId) {
+      const view = store.views[session];
+      const item = view?.items.find(i => i.id === itemId);
+      if (!view || !item || item.kind !== 'notice' || !item.undoRun || view.running) return false;
+      try {
+        const report = await deps.invoke<{ restored: string[]; removed: string[]; failed: [string, string][] }>('chat_undo_run', { sessionId: session, runId: item.undoRun });
+        item.undoRun = undefined;
+        const done = report.restored.length + report.removed.length;
+        item.text = `这轮回答的 ${done} 个文件改动已撤销。`;
+        if (report.failed.length) {
+          item.tone = 'warning';
+          item.text += `另有 ${report.failed.length} 个没能恢复。`;
+          item.details = report.failed.map(([path, reason]) => `${path}：${reason}`).join('\n');
+          item.detailsLabel = '查看原因';
+        }
+        deps.notify(item.text, report.failed.length ? 'info' : 'success');
+        return true;
+      } catch (error) {
+        deps.notify(error, 'error');
+        return false;
       }
     },
 
@@ -361,7 +394,9 @@ export function createChatStore(deps: ChatDeps): ChatStore {
       try {
         await deps.invoke('chat_answer_question', { id: request.id, answer });
       } catch (error) {
-        if (!String(error).includes('这个问题已经结束')) deps.notify(error, 'error');
+        if (String(error).includes('这个问题已经结束')) return;
+        if (view) addPending(view.questions, request);
+        deps.notify(error, 'error');
       }
     },
   }) as ChatStore;

@@ -370,7 +370,7 @@ pub async fn import_resource_pack(window: tauri::WebviewWindow) -> Result<Option
         let root = crate::storage::root(&app)?;
         // Wallpaper creation and downloads share the same catalog lock.
         let state = app.state::<crate::content::ContentState>();
-        let _guard = state.io.lock().unwrap();
+        let _guard = state.io.lock().unwrap_or_else(|e| e.into_inner());
         import_pack(&root, pack).map(Some)
     }).await.map_err(|e| e.to_string())?
 }

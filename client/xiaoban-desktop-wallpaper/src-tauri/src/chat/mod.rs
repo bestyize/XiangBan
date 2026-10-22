@@ -4,13 +4,15 @@
 //! window only (one `emit_filter`): wallpaper pages run content from outside and must not see a chat.
 
 mod broker;
+mod checkpoints;
 mod community;
 mod compact;
 mod danger;
 mod desktop_tools;
 mod game_draft;
-mod goals;
-pub use goals::{chat_goal_get, chat_goal_set, chat_goal_start, chat_goal_pause, chat_goal_acknowledge, chat_goal_finish, chat_goal_delete};
+// Public so `generate_handler!` can reach the commands by their own module path: a `pub use` re-export of a command
+// does not carry the hidden items Tauri's macro generates next to it.
+pub mod goals;
 mod prompt;
 mod run_history;
 pub(crate) mod task_outcome;
@@ -33,6 +35,7 @@ use agent_kernel::skills::Skills;
 use agent_kernel::{Agent, Approval, ApprovalRequest, ContextTrim, ContinueGuard, JsonlStore, RepeatGuard, Message, ModelProvider, Part, Permission, PermissionMode, Risk, RunOptions, RunEventBody, SessionStore, SpillOutput, ToolCtx};
 use agent_kernel::journal::JsonlRunLog;
 use agent_kernel::supervisor::SessionLease;
+use agent_kernel::process::ProcessManager;
 use agent_learning::LearningDb;
 use agent_skill_discovery::SkillDiscovery;
 use broker::Broker;
@@ -139,6 +142,9 @@ pub struct ChatState {
     /// Actual schemas from the latest registration, keyed by whether native GUI tools are enabled.
     tool_tokens: Mutex<HashMap<bool, usize>>,
     connectors: Mutex<Option<Arc<agent_connector_tools::ConnectorManager>>>,
+    /// Background processes (dev servers, long builds) for the current working folder; kept across answers so a
+    /// `keep_alive` process outlives the answer that started it.
+    processes: Mutex<Option<Arc<ProcessManager>>>,
 }
 
 impl ChatState {
@@ -162,6 +168,7 @@ impl ChatState {
             auto_compact: compact::AutoCooldown::default(),
             tool_tokens: Mutex::new(HashMap::new()),
             connectors: Mutex::new(None),
+            processes: Mutex::new(None),
         }
     }
 }
@@ -180,6 +187,8 @@ fn permission_with_danger_check(mode: PermissionMode, approver: impl agent_kerne
         }
         danger::assess(tool, args, lock(&workspace).as_deref()).map(str::to_string)
     })
+    // "这类命令都允许" for one kind of simple command (`npm test`), never for commands in general.
+    .remember_exec_as(danger::remember_key)
 }
 
 fn emit<R: tauri::Runtime>(app: &tauri::AppHandle<R>, name: &str, payload: Value) {
@@ -216,7 +225,7 @@ fn risk_name(risk: Risk) -> &'static str {
 
 fn ask_approval(app: &tauri::AppHandle, broker: &Broker, request: &ApprovalRequest<'_>) -> Approval {
     // In full trust a tainted conversation is not asked because of the taint, so the card must not say it is.
-    let tainted_by_policy = request.tainted && app.state::<ChatState>().permission.mode() != PermissionMode::Auto;
+    let tainted_by_policy = request.tainted && app.state::<ChatState>().permission.mode_for(request.session) != PermissionMode::Auto;
     let (id, rx) = broker.open_approval(request.session);
     crate::proactivity::observe_task_state(app, agent_proactivity::context::TaskState::AwaitingUser);
     emit(
@@ -225,8 +234,10 @@ fn ask_approval(app: &tauri::AppHandle, broker: &Broker, request: &ApprovalReque
         json!({
             "id": id, "session": request.session, "tool": request.tool, "risk": risk_name(request.risk),
             "arguments": shorten(request.arguments, 0), "tainted": tainted_by_policy, "danger": request.danger,
-            // Commands, skill changes and flagged calls are asked every time, so "always" would only mislead.
-            "canRemember": request.risk != Risk::Exec && request.tool != "skill_manage" && request.danger.is_none(),
+            // Skill changes, flagged calls and commands without a kind to remember are asked every time,
+            // so "always" would only mislead.
+            "canRemember": (request.risk != Risk::Exec || request.remember_as.is_some()) && request.tool != "skill_manage" && request.danger.is_none(),
+            "rememberAs": request.remember_as,
         }),
     );
     let decision = request.wait_for(&rx).unwrap_or(Approval::Deny);
@@ -261,6 +272,7 @@ impl Dirs {
     fn spill(&self) -> PathBuf { self.chat.join("spill") }
     fn memory(&self) -> PathBuf { self.chat.join("memory") }
     fn skills(&self) -> PathBuf { self.chat.join("skills") }
+    fn checkpoints(&self) -> PathBuf { self.chat.join("checkpoints") }
 }
 
 pub(crate) fn provider(config: &AiConfig) -> Result<Arc<dyn ModelProvider>, String> {
@@ -276,6 +288,9 @@ fn provider_profile(config: &AiConfig) -> ProviderProfile {
     let capabilities = config.model_capabilities();
     profile.max_output_tokens = capabilities.request_output_limit();
     profile.supports_tools = capabilities.supports_tools.unwrap_or(true);
+    // A run re-sends the same instructions, tools and history on every step; caching them cuts cost and latency.
+    // Anthropic-compatible gateways built for Claude clients accept `cache_control`.
+    profile.prompt_cache = config.protocol == "anthropic";
     profile
 }
 
@@ -350,6 +365,10 @@ struct Parts<'a> {
     spawn_computer_use: &'a dyn Fn() -> Result<Arc<agent_kernel::mcp::McpClient>, agent_kernel::HarnessError>,
     /// Estimated tokens kept in a request before old tool output and old turns are dropped.
     budget: TokenBudget,
+    /// Background process tools; `None` in tests that do not need them.
+    processes: Option<Arc<ProcessManager>>,
+    /// Compaction inside one long answer; `None` in tests that do not need it.
+    mid_run: Option<compact::MidRunCompact>,
 }
 
 /// Puts the kernel together: the model, the tools the assistant may use, and the rules around them.
@@ -362,7 +381,7 @@ fn assemble_with_files(parts: Parts<'_>, attachments: Vec<Attachment>) -> Result
     assemble_with_connectors(parts, attachments, Vec::new())
 }
 fn assemble_with_connectors(parts: Parts<'_>, attachments: Vec<Attachment>, connector_tools: Vec<Arc<dyn agent_kernel::Tool>>) -> Result<Agent, String> {
-    let Parts { provider, dirs, workspace, permission, todo, ask, desktop, utc_offset_minutes, open_computer_use, spawn_computer_use, budget } = parts;
+    let Parts { provider, dirs, workspace, permission, todo, ask, desktop, utc_offset_minutes, open_computer_use, spawn_computer_use, budget, processes, mid_run } = parts;
     for dir in [dirs.sessions(), dirs.spill(), dirs.memory(), dirs.skills()] {
         fs::create_dir_all(&dir).map_err(|e| format!("无法创建 {}：{e}", dir.display()))?;
     }
@@ -400,10 +419,18 @@ fn assemble_with_connectors(parts: Parts<'_>, attachments: Vec<Attachment>, conn
         .tool(learning::Recall::new(dirs.learning_db()))
         .middleware(discovery.acquisition_policy())
         .middleware(permission)
+        // After the permission check, so a refused write leaves nothing behind.
+        .middleware(checkpoints::Checkpoints::new(dirs.checkpoints(), workspace))
         // Before spilling, so it compares real outputs rather than previews that name a fresh file each time.
-        .middleware(RepeatGuard::new())
+        // Polling a process's output is legitimate repetition; the per-answer call budget still bounds it.
+        .middleware(RepeatGuard::new().ignore_tool("process_read"))
         .middleware(SpillOutput::new(dirs.spill()))
-        .middleware(AttachmentContext::new(attachments))
+        .middleware(AttachmentContext::new(attachments));
+    // Before trimming: summarize first, and drop old output only if the request is still too large.
+    if let Some(mid_run) = mid_run {
+        builder = builder.middleware(mid_run);
+    }
+    builder = builder
         .middleware(ContextTrim::new(budget.context_limit).reserve_output(budget.trim_headroom))
         .middleware(ContinueGuard::new())
         .max_turns(MAX_TURNS);
@@ -421,6 +448,7 @@ fn assemble_with_connectors(parts: Parts<'_>, attachments: Vec<Attachment>, conn
         }
     }
     for tool in connector_tools { builder = builder.tool_arc(tool); }
+    for tool in processes.iter().flat_map(|manager| manager.tools()) { builder = builder.tool_arc(tool); }
     builder.build().map_err(|e| e.to_string())
 }
 
@@ -436,9 +464,26 @@ fn connector_manager(app: &tauri::AppHandle) -> Result<Arc<agent_connector_tools
 }
 pub fn shutdown_connectors(app:&tauri::AppHandle){
     if let Some(manager)=lock(&app.state::<ChatState>().connectors).as_ref(){manager.shutdown();}
+    if let Some(manager)=lock(&app.state::<ChatState>().processes).take(){let _=manager.shutdown();}
 }
 
-fn build_agent(app: &tauri::AppHandle, config: &AiConfig, key_source: Option<KeySource>, workspace: &Path, attachments: Vec<Attachment>) -> Result<Agent, String> {
+/// The process manager for `workspace`. A different folder than last time stops the old folder's processes first,
+/// so nothing keeps running in a folder the assistant no longer works in.
+fn process_manager(app: &tauri::AppHandle, workspace: &Path) -> Result<Arc<ProcessManager>, String> {
+    let state = app.state::<ChatState>();
+    let mut slot = lock(&state.processes);
+    if let Some(manager) = slot.as_ref() {
+        if manager.workspace() == workspace.canonicalize().unwrap_or_else(|_| workspace.to_path_buf()) {
+            return Ok(manager.clone());
+        }
+        let _ = manager.shutdown();
+    }
+    let manager = Arc::new(ProcessManager::new(workspace)?);
+    *slot = Some(manager.clone());
+    Ok(manager)
+}
+
+fn build_agent(app: &tauri::AppHandle, config: &AiConfig, key_source: Option<KeySource>, workspace: &Path, attachments: Vec<Attachment>, session: &str, cancel: &Arc<AtomicBool>) -> Result<Agent, String> {
     let state = app.state::<ChatState>();
     let ask = {
         let (app, broker) = (app.clone(), state.broker.clone());
@@ -454,8 +499,21 @@ fn build_agent(app: &tauri::AppHandle, config: &AiConfig, key_source: Option<Key
             .join("agent-tools/computer-use");
         agent_computer_use_tools::spawn(&root)
     };
+    let provider = provider_with(config, key_source)?;
+    let mid_run = {
+        let (app, session) = (app.clone(), session.to_string());
+        compact::MidRunCompact::new(provider.clone(), config.token_budget().context_limit, cancel.clone(), move |state, detail| {
+            let mut payload = json!({ "session": session, "state": state });
+            match state {
+                "done" => payload["summary"] = json!(detail),
+                "failed" => payload["message"] = json!(detail),
+                _ => {}
+            }
+            emit(&app, "chat-compacting", payload);
+        })
+    };
     let agent = assemble_with_connectors(Parts {
-        provider: provider_with(config, key_source)?,
+        provider,
         dirs: &Dirs::of(app)?,
         workspace,
         permission: state.permission.clone(),
@@ -466,6 +524,8 @@ fn build_agent(app: &tauri::AppHandle, config: &AiConfig, key_source: Option<Key
         open_computer_use: config.open_computer_use,
         spawn_computer_use: &spawn_computer_use,
         budget: config.token_budget(),
+        processes: Some(process_manager(app, workspace)?),
+        mid_run: Some(mid_run),
     }, attachments, connector_manager(app).map(|m|m.tools()).unwrap_or_default())?;
     lock(&state.tool_tokens).insert(config.open_computer_use, agent_kernel::estimate_tool_tokens(&agent.tool_schemas()));
     Ok(agent)
@@ -505,7 +565,8 @@ fn finish_run(app: &tauri::AppHandle, session: &str) {
 }
 
 #[tauri::command]
-pub fn chat_overview(app: tauri::AppHandle) -> Result<Value, String> {
+pub fn chat_overview(app: tauri::AppHandle, window: tauri::WebviewWindow) -> Result<Value, String> {
+    chat_window(&window)?;
     let config = ai_config::current(&app)?;
     let default = ai_config::default_workspace(&app)?;
     let running: Vec<String> = lock(&app.state::<ChatState>().runs).keys().cloned().collect();
@@ -522,7 +583,8 @@ pub fn chat_overview(app: tauri::AppHandle) -> Result<Value, String> {
 }
 
 #[tauri::command]
-pub fn chat_load_session(app: tauri::AppHandle, session_id: String) -> Result<Vec<Message>, String> {
+pub fn chat_load_session(app: tauri::AppHandle, window: tauri::WebviewWindow, session_id: String) -> Result<Vec<Message>, String> {
+    chat_window(&window)?;
     if !sessions::valid_id(&session_id) {
         return Err("对话编号不对".into());
     }
@@ -530,8 +592,8 @@ pub fn chat_load_session(app: tauri::AppHandle, session_id: String) -> Result<Ve
     let Some(summary) = summary else {
         return Ok(Vec::new());
     };
-    let perm_mode = if summary.permission_mode == "auto" { PermissionMode::Auto } else { PermissionMode::Ask };
-    app.state::<ChatState>().permission.set_mode(perm_mode);
+    // Only reported to the page: the mode is applied to this conversation alone when it runs, so opening one
+    // never changes how another conversation that is answering right now is asked.
     emit(&app, "chat-permission-mode-changed", json!({ "sessionId": session_id, "mode": summary.permission_mode }));
     JsonlStore::new(Dirs::of(&app)?.sessions()).load(&session_id).map_err(|e| e.to_string())
 }
@@ -539,7 +601,8 @@ pub fn chat_load_session(app: tauri::AppHandle, session_id: String) -> Result<Ve
 /// An empty conversation. The chat page makes one when the first message is sent, so the page
 /// already knows the id when the answer's events start to arrive.
 #[tauri::command]
-pub fn chat_new_session(app: tauri::AppHandle, permission_mode: Option<String>) -> Result<SessionSummary, String> {
+pub fn chat_new_session(app: tauri::AppHandle, window: tauri::WebviewWindow, permission_mode: Option<String>) -> Result<SessionSummary, String> {
+    chat_window(&window)?;
     let mode = match permission_mode.as_deref() {
         None => "ask",
         Some(mode @ ("ask" | "auto")) => mode,
@@ -550,7 +613,13 @@ pub fn chat_new_session(app: tauri::AppHandle, permission_mode: Option<String>) 
 }
 
 #[tauri::command]
-pub fn chat_send(app: tauri::AppHandle, session_id: String, text: String, images: Option<Vec<String>>, retry: Option<bool>, attachments: Option<Vec<AttachmentInput>>) -> Result<SessionSummary, String> {
+pub fn chat_send(app: tauri::AppHandle, window: tauri::WebviewWindow, session_id: String, text: String, images: Option<Vec<String>>, retry: Option<bool>, attachments: Option<Vec<AttachmentInput>>) -> Result<SessionSummary, String> {
+    chat_window(&window)?;
+    send(app, session_id, text, images, retry, attachments)
+}
+
+/// Starts an answer. The command above checks who is asking; the host's own callers (long-term goals) come here.
+pub(crate) fn send(app: tauri::AppHandle, session_id: String, text: String, images: Option<Vec<String>>, retry: Option<bool>, attachments: Option<Vec<AttachmentInput>>) -> Result<SessionSummary, String> {
     if !sessions::valid_id(&session_id) {
         return Err("对话编号不对".into());
     }
@@ -605,7 +674,7 @@ pub fn chat_send(app: tauri::AppHandle, session_id: String, text: String, images
     })??;
 
     let perm_mode = if summary.permission_mode == "auto" { PermissionMode::Auto } else { PermissionMode::Ask };
-    state.permission.set_mode(perm_mode);
+    state.permission.set_session_mode(&summary.id, perm_mode);
     *lock(&state.workspace) = Some(workspace.clone());
 
     let history_dir = Dirs::of(&app)?.sessions();
@@ -639,7 +708,7 @@ pub fn chat_send(app: tauri::AppHandle, session_id: String, text: String, images
         let session = id.clone();
         // 小伴 AI 要先拿到有效的账号令牌，可能需要联网刷新，所以放在这条线程里做，不卡住界面。
         let prepared = ai_gateway::prepare(&handle, config_owned).and_then(|(config, source)| {
-            build_agent(&handle, &config, source.clone(), &workspace_owned, saved_for_thread.clone()).map(|agent| (agent, config, source))
+            build_agent(&handle, &config, source.clone(), &workspace_owned, saved_for_thread.clone(), &id, &cancel).map(|agent| (agent, config, source))
         });
         if cancel.load(Ordering::SeqCst) {
             attachment_store.rollback(&saved_for_thread);
@@ -699,6 +768,11 @@ pub fn chat_send(app: tauri::AppHandle, session_id: String, text: String, images
                         }
                         crate::proactivity::observe_task_outcome(&sender, &outcome);
                         emit(&sender, "chat-task-outcome", json!({ "session": id, "outcome": outcome }));
+                    }
+                    // Offer "撤销这轮的文件改动" when this answer changed files with the file tools.
+                    if let Some(manifest) = checkpoints::list(&dirs.checkpoints(), &id).into_iter().find(|m| m.run_id == run) {
+                        let files: Vec<&str> = manifest.entries.iter().map(|e| e.path.as_str()).collect();
+                        emit(&sender, "chat-checkpoint", json!({ "session": id, "runId": run, "files": files }));
                     }
                 }
                 executed
@@ -861,16 +935,23 @@ pub fn chat_rollback_skill_proposal(app:tauri::AppHandle,window:tauri::WebviewWi
 }
 
 #[tauri::command]
-pub fn chat_cancel(app: tauri::AppHandle, session_id: String) {
+pub fn chat_cancel(app: tauri::AppHandle, window: tauri::WebviewWindow, session_id: String) {
+    if chat_window(&window).is_err() { return; }
+    cancel_run(&app, &session_id);
+}
+
+/// Asks a running answer to stop; nothing happens when none is running.
+pub(crate) fn cancel_run(app: &tauri::AppHandle, session_id: &str) {
     let state = app.state::<ChatState>();
     let runs = lock(&state.runs);
-    if let Some(cancel) = runs.get(&session_id) {
+    if let Some(cancel) = runs.get(session_id) {
         cancel.store(true, Ordering::SeqCst);
     }
 }
 
 #[tauri::command]
-pub fn chat_delete_session(app: tauri::AppHandle, session_id: String) -> Result<Vec<SessionSummary>, String> {
+pub fn chat_delete_session(app: tauri::AppHandle, window: tauri::WebviewWindow, session_id: String) -> Result<Vec<SessionSummary>, String> {
+    chat_window(&window)?;
     if !sessions::valid_id(&session_id) {
         return Err("对话编号不对".into());
     }
@@ -894,6 +975,10 @@ pub fn chat_delete_session(app: tauri::AppHandle, session_id: String) -> Result<
     }
     let _ = fs::remove_dir_all(Dirs::of(&app)?.outcomes().join(&session_id));
     agent_kernel::goals::GoalStore::new(Dirs::of(&app)?.chat.join("goals")).delete(&session_id)?;
+    let _ = fs::remove_dir_all(Dirs::of(&app)?.checkpoints().join(&session_id));
+    if let Some(manager) = lock(&state.processes).as_ref() {
+        let _ = manager.forget_session(&session_id);
+    }
     state.permission.forget_session(&session_id);
     state.todo.clear_session(&session_id);
     state.auto_compact.forget(&session_id);
@@ -929,7 +1014,8 @@ fn context_of(app: &tauri::AppHandle, config: &AiConfig, raw: &[Message]) -> Res
 /// How big the next request in a conversation would be, against the limit chosen in settings.
 /// `None` is a conversation that has not been started yet.
 #[tauri::command]
-pub fn chat_context(app: tauri::AppHandle, session_id: Option<String>) -> Result<ContextInfo, String> {
+pub fn chat_context(app: tauri::AppHandle, window: tauri::WebviewWindow, session_id: Option<String>) -> Result<ContextInfo, String> {
+    chat_window(&window)?;
     let config = ai_config::current(&app)?;
     let raw = match session_id.as_deref() {
         Some(id) => {
@@ -989,7 +1075,8 @@ fn auto_compact(app: &tauri::AppHandle, id: &str, config: &AiConfig, key_source:
 /// Replaces the older part of a conversation, for the model only, with a summary the model writes.
 /// The saved conversation and what the user sees are untouched. While it runs the conversation counts as busy.
 #[tauri::command]
-pub async fn chat_compact(app: tauri::AppHandle, session_id: String) -> Result<ContextInfo, String> {
+pub async fn chat_compact(app: tauri::AppHandle, window: tauri::WebviewWindow, session_id: String) -> Result<ContextInfo, String> {
+    chat_window(&window)?;
     checked_session_id(&session_id)?;
     let cancel = Arc::new(AtomicBool::new(false));
     {
@@ -1017,6 +1104,15 @@ pub async fn chat_compact(app: tauri::AppHandle, session_id: String) -> Result<C
         .map_err(|e| e.to_string())?
 }
 
+/// The conversation commands are for the control window and the floating assistant only. Every window can reach
+/// the app's commands, and the others show wallpapers, widgets and games, some of them made by the assistant itself.
+fn chat_window(window: &tauri::WebviewWindow) -> Result<(), String> {
+    match window.label() {
+        "control" | crate::float_assistant::LABEL => Ok(()),
+        _ => Err("这个窗口不能使用对话功能".into()),
+    }
+}
+
 fn checked_session_id(id: &str) -> Result<(), String> {
     if sessions::valid_id(id) { Ok(()) } else { Err("对话编号不对".into()) }
 }
@@ -1027,14 +1123,16 @@ fn checked_group_id(id: &str) -> Result<(), String> {
 
 /// Renaming works while the conversation is answering: the title is only a label.
 #[tauri::command]
-pub fn chat_rename_session(app: tauri::AppHandle, session_id: String, title: String) -> Result<Library, String> {
+pub fn chat_rename_session(app: tauri::AppHandle, window: tauri::WebviewWindow, session_id: String, title: String) -> Result<Library, String> {
+    chat_window(&window)?;
     checked_session_id(&session_id)?;
     mutate(&app, |index| index.rename(&session_id, &title).map(|()| index.library()))?
 }
 
 /// An empty or missing `group_id` takes the conversation out of its group.
 #[tauri::command]
-pub fn chat_move_session(app: tauri::AppHandle, session_id: String, group_id: Option<String>) -> Result<Library, String> {
+pub fn chat_move_session(app: tauri::AppHandle, window: tauri::WebviewWindow, session_id: String, group_id: Option<String>) -> Result<Library, String> {
+    chat_window(&window)?;
     checked_session_id(&session_id)?;
     if let Some(group) = group_id.as_deref().filter(|g| !g.is_empty()) {
         checked_group_id(group)?;
@@ -1044,7 +1142,8 @@ pub fn chat_move_session(app: tauri::AppHandle, session_id: String, group_id: Op
 
 /// With `session_id`, the conversation moves into the new group in the same step, so a failed name leaves it where it was.
 #[tauri::command]
-pub fn chat_create_group(app: tauri::AppHandle, name: String, session_id: Option<String>) -> Result<Library, String> {
+pub fn chat_create_group(app: tauri::AppHandle, window: tauri::WebviewWindow, name: String, session_id: Option<String>) -> Result<Library, String> {
+    chat_window(&window)?;
     if let Some(id) = session_id.as_deref() {
         checked_session_id(id)?;
     }
@@ -1062,20 +1161,42 @@ pub fn chat_create_group(app: tauri::AppHandle, name: String, session_id: Option
 }
 
 #[tauri::command]
-pub fn chat_rename_group(app: tauri::AppHandle, group_id: String, name: String) -> Result<Library, String> {
+pub fn chat_rename_group(app: tauri::AppHandle, window: tauri::WebviewWindow, group_id: String, name: String) -> Result<Library, String> {
+    chat_window(&window)?;
     checked_group_id(&group_id)?;
     mutate(&app, |index| index.rename_group(&group_id, &name).map(|()| index.library()))?
 }
 
 /// The conversations inside are kept and go back to the top level.
 #[tauri::command]
-pub fn chat_delete_group(app: tauri::AppHandle, group_id: String) -> Result<Library, String> {
+pub fn chat_delete_group(app: tauri::AppHandle, window: tauri::WebviewWindow, group_id: String) -> Result<Library, String> {
+    chat_window(&window)?;
     checked_group_id(&group_id)?;
     mutate(&app, |index| index.delete_group(&group_id).map(|()| index.library()))?
 }
 
+/// The answers of a conversation whose file changes can be undone, newest first.
 #[tauri::command]
-pub fn chat_answer_approval(app: tauri::AppHandle, id: String, decision: String) -> Result<(), String> {
+pub fn chat_checkpoints(app: tauri::AppHandle, window: tauri::WebviewWindow, session_id: String) -> Result<Value, String> {
+    chat_window(&window)?;
+    checked_session_id(&session_id)?;
+    Ok(json!(checkpoints::list(&Dirs::of(&app)?.checkpoints(), &session_id)))
+}
+
+/// Puts back the files one answer changed with the file tools. Not while the conversation is answering.
+#[tauri::command]
+pub fn chat_undo_run(app: tauri::AppHandle, window: tauri::WebviewWindow, session_id: String, run_id: String) -> Result<Value, String> {
+    chat_window(&window)?;
+    checked_session_id(&session_id)?;
+    if lock(&app.state::<ChatState>().runs).contains_key(&session_id) {
+        return Err("这个对话还在回答，请等它结束或先停止再撤销".into());
+    }
+    Ok(json!(checkpoints::undo(&Dirs::of(&app)?.checkpoints(), &session_id, &run_id)?))
+}
+
+#[tauri::command]
+pub fn chat_answer_approval(app: tauri::AppHandle, window: tauri::WebviewWindow, id: String, decision: String) -> Result<(), String> {
+    chat_window(&window)?;
     let decision = match decision.as_str() {
         "once" => Approval::Once,
         "always" => Approval::Always,
@@ -1086,19 +1207,27 @@ pub fn chat_answer_approval(app: tauri::AppHandle, id: String, decision: String)
 }
 
 #[tauri::command]
-pub fn chat_answer_question(app: tauri::AppHandle, id: String, answer: Option<String>) -> Result<(), String> {
+pub fn chat_answer_question(app: tauri::AppHandle, window: tauri::WebviewWindow, id: String, answer: Option<String>) -> Result<(), String> {
+    chat_window(&window)?;
     let answer = answer.map(|a| a.trim().to_string()).filter(|a| !a.is_empty());
     app.state::<ChatState>().broker.answer_question(&id, answer)
 }
 
 #[tauri::command]
-pub fn chat_set_permission_mode(app: tauri::AppHandle, session_id: Option<String>, mode: String) -> Result<String, String> {
+pub fn chat_set_permission_mode(app: tauri::AppHandle, window: tauri::WebviewWindow, session_id: Option<String>, mode: String) -> Result<String, String> {
+    chat_window(&window)?;
     if !["ask", "auto"].contains(&mode.as_str()) {
         return Err("不支持的权限模式".into());
     }
     let perm_mode = if mode == "auto" { PermissionMode::Auto } else { PermissionMode::Ask };
     let state = app.state::<ChatState>();
-    state.permission.set_mode(perm_mode);
+    match session_id.as_deref() {
+        // A running conversation picks the change up at its next tool call; no other conversation is affected.
+        Some(sid) if sessions::valid_id(sid) => state.permission.set_session_mode(sid, perm_mode),
+        Some(_) => return Err("对话编号不对".into()),
+        // No conversation yet: the default for the next new one.
+        None => state.permission.set_mode(perm_mode),
+    }
 
     if let Some(ref sid) = session_id {
         let _ = mutate(&app, |index| {

@@ -69,6 +69,8 @@ export interface ApprovalRequest {
   /** Why this was asked even in full trust: a dangerous operation. Absent or null for an ordinary request. */
   danger?: string | null;
   canRemember: boolean;
+  /** For a command: the kind of command "always" would allow in this conversation, e.g. `npm test`. */
+  rememberAs?: string | null;
 }
 export type ApprovalDecision = 'once' | 'always' | 'deny';
 
@@ -78,7 +80,7 @@ export type ChatItem =
   | { kind: 'user'; id: string; text: string; images: string[]; files?: AttachmentCard[] }
   | { kind: 'assistant'; id: string; text: string; streaming: boolean }
   | { kind: 'tool'; id: string; name: string; arguments: string; output: string; status: 'running' | 'done' | 'error' }
-  | { kind: 'notice'; id: string; tone: 'info' | 'warning' | 'error'; text: string; code?: 'truncated'; canContinue?: boolean; canSwitchModel?: boolean; canRetry?: boolean; details?: string; /** The label on the fold-out `details`; "错误详情" when missing. */ detailsLabel?: string };
+  | { kind: 'notice'; id: string; tone: 'info' | 'warning' | 'error'; text: string; code?: 'truncated'; canContinue?: boolean; canSwitchModel?: boolean; canRetry?: boolean; details?: string; /** The label on the fold-out `details`; "错误详情" when missing. */ detailsLabel?: string; /** The answer whose file changes this notice can undo. */ undoRun?: string };
 
 export interface SessionView {
   id: string;

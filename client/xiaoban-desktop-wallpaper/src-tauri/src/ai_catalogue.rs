@@ -122,7 +122,7 @@ fn owner(app: &tauri::AppHandle) -> String {
 pub fn account_changed(app: &tauri::AppHandle) {
     let Ok(path) = ai_config::path(app) else { return };
     let state = app.state::<ai_config::AiConfigState>();
-    let _io = state.io.lock().unwrap();
+    let _io = state.io.lock().unwrap_or_else(|e| e.into_inner());
     if let Ok(mut config) = ai_config::load(&path) {
         let uid = owner(app);
         if config.catalogue_owner == uid { return; }
@@ -167,12 +167,12 @@ pub async fn refresh_ai_providers(app: tauri::AppHandle, force: Option<bool>) ->
         Ok(guard) => guard,
         Err(_) => {
             let _guard = state.operation.lock().await;
-            let last = state.last_result.lock().unwrap().clone();
+            let last = state.last_result.lock().unwrap_or_else(|e| e.into_inner()).clone();
             return last.unwrap_or_else(|| ai_config::get_ai_config(app.clone()));
         }
     };
     let result = refresh_inner(app.clone(), force).await;
-    *state.last_result.lock().unwrap() = Some(result.clone());
+    *state.last_result.lock().unwrap_or_else(|e| e.into_inner()) = Some(result.clone());
     result
 }
 async fn refresh_inner(app: tauri::AppHandle, force: Option<bool>) -> Result<AiConfigView, String> {
@@ -181,12 +181,12 @@ async fn refresh_inner(app: tauri::AppHandle, force: Option<bool>) -> Result<AiC
     let current = ai_config::current(&app)?;
     let uid = owner(&app);
     let time = now();
-    let attempted = *state.attempted_at.lock().unwrap();
+    let attempted = *state.attempted_at.lock().unwrap_or_else(|e| e.into_inner());
     if !force.unwrap_or(false) && (time.saturating_sub(current.catalogue_fetched_at) < current.catalogue_refresh_after
         || time.saturating_sub(attempted) < 60) {
         return ai_config::get_ai_config(app.clone());
     }
-    *state.attempted_at.lock().unwrap() = time;
+    *state.attempted_at.lock().unwrap_or_else(|e| e.into_inner()) = time;
     let origin = crate::website::site_url(&crate::settings(&app).website_url)?;
     if origin != crate::website::DEFAULT_SITE && !app.state::<crate::DesktopState>().isolated {
         return Err("登录模型配置只能从官方站点获取".into());
@@ -211,7 +211,7 @@ async fn refresh_inner(app: tauri::AppHandle, force: Option<bool>) -> Result<AiC
     if uid != owner(&app) { return Err("账号已切换，请重新拉取模型配置".into()); }
     let view = {
         let path = ai_config::path(&app)?;
-        let io = app.state::<ai_config::AiConfigState>(); let _io = io.io.lock().unwrap();
+        let io = app.state::<ai_config::AiConfigState>(); let _io = io.io.lock().unwrap_or_else(|e| e.into_inner());
         let mut next = ai_config::load(&path).map_err(|_| "模型配置读取失败")?;
         if let Some(catalogue) = catalogue { merge(&mut next, catalogue)?; }
         next.catalogue_owner = uid; next.catalogue_fetched_at = time; next.catalogue_etag = etag;

@@ -136,10 +136,36 @@ pub fn build_request_body(profile: &ProviderProfile, request: &ChatRequest) -> V
             .map(|t| json!({ "name": t.name, "description": t.description, "input_schema": t.parameters }))
             .collect();
     }
+    if profile.prompt_cache {
+        mark_cacheable(&mut body);
+    }
     for (key, value) in &profile.extra_body {
         body[key] = value.clone();
     }
     body
+}
+
+/// Three of the four allowed cache breakpoints: the end of the tools (which come first in the prompt), the end of
+/// the system prompt, and the last block of the newest message. The API looks back from a breakpoint for an earlier
+/// cached prefix, so the moving last one keeps hitting what the previous turn wrote.
+fn mark_cacheable(body: &mut Value) {
+    let ephemeral = || json!({ "type": "ephemeral" });
+    if let Some(last) = body.get_mut("tools").and_then(Value::as_array_mut).and_then(|tools| tools.last_mut()) {
+        last["cache_control"] = ephemeral();
+    }
+    if let Some(text) = body.get("system").and_then(Value::as_str).map(str::to_string) {
+        body["system"] = json!([{ "type": "text", "text": text, "cache_control": ephemeral() }]);
+    }
+    let last_block = body
+        .get_mut("messages")
+        .and_then(Value::as_array_mut)
+        .and_then(|messages| messages.last_mut())
+        .and_then(|message| message.get_mut("content"))
+        .and_then(Value::as_array_mut)
+        .and_then(|content| content.last_mut());
+    if let Some(block) = last_block {
+        block["cache_control"] = ephemeral();
+    }
 }
 
 enum Block {

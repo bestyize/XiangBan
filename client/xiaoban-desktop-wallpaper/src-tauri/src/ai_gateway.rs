@@ -146,7 +146,7 @@ pub async fn ai_gateway_tiers(app: tauri::AppHandle) -> Result<Vec<Tier>, Accoun
     let path = ai_config::path(&app)?;
     let state = app.state::<ai_config::AiConfigState>();
     let mut changed = None;
-    let io = state.io.lock().unwrap();
+    let io = state.io.lock().unwrap_or_else(|e| e.into_inner());
     let mut config = ai_config::load(&path).map_err(|e| e.to_string())?;
     if is_active(&config) {
         let levels = tiers.iter().find(|t| t.tier == config.gateway_tier).map(|t| t.reasoning_efforts.clone()).unwrap_or_default();
@@ -194,7 +194,7 @@ pub async fn use_ai_gateway(app: tauri::AppHandle, tier: String, reply_preferenc
     let path = ai_config::path(&app)?;
     let view = {
         let state = app.state::<ai_config::AiConfigState>();
-        let _io = state.io.lock().unwrap();
+        let _io = state.io.lock().unwrap_or_else(|e| e.into_inner());
         let mut config = ai_config::load(&path).unwrap_or_default();
         if !config.gateway_enabled {
             return Err("小伴 AI 入口已被关闭，暂时不能启用".into());

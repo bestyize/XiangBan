@@ -110,7 +110,7 @@ fn bubble(window: &tauri::WebviewWindow) -> Result<(), String> {
     Ok(())
 }
 fn save(app: &tauri::AppHandle, store: &Store) -> Result<(), String> {
-    if app.state::<ReminderState>().runtime.lock().unwrap().read_error {
+    if app.state::<ReminderState>().runtime.lock().unwrap_or_else(|e| e.into_inner()).read_error {
         return Err("原关怀配置无法读取，已保留原文件；请先在用户数据目录备份并修复 care-reminders.json".into());
     }
     crate::library::save_json(&crate::storage::root(app)?.join("config/care-reminders.json"), store)
@@ -203,7 +203,7 @@ fn collect_with_widgets(store: &mut Store, now: DateTime<Local>, active_seconds:
 }
 fn status(app: &tauri::AppHandle) -> serde_json::Value {
     let state = app.state::<ReminderState>();
-    let store = state.store.lock().unwrap().clone();
+    let store = state.store.lock().unwrap_or_else(|e| e.into_inner()).clone();
     let activity = care_system::activity();
     serde_json::json!({"config":store.config,"rules":store.rules,"pendingCount":store.pending.len(),"weather":store.weather,
         "weatherError":store.weather_error,"error":store.error,"systemNotificationsAvailable":false,"activityAvailable":activity.available})
@@ -217,7 +217,7 @@ pub fn get_care_settings(window: tauri::WebviewWindow) -> Result<serde_json::Val
 pub fn configure_care(window: tauri::WebviewWindow, config: CareConfig) -> Result<serde_json::Value, String> {
     control(&window)?; time(&config.quiet_start)?; time(&config.quiet_end)?; config.weather_source.validate()?;
     let app = window.app_handle(); let state = app.state::<ReminderState>();
-    let mut store = state.store.lock().unwrap(); let mut next = store.clone();
+    let mut store = state.store.lock().unwrap_or_else(|e| e.into_inner()); let mut next = store.clone();
     if next.config.weather_source != config.weather_source {
         next.weather = None; next.weather_error = None;
         next.pending.retain(|p| p.kind != "weather");
@@ -225,7 +225,7 @@ pub fn configure_care(window: tauri::WebviewWindow, config: CareConfig) -> Resul
     next.config = config;
     if !next.config.enabled { next.pending.clear(); }
     save(app, &next)?; *store = next; drop(store);
-    if !state.store.lock().unwrap().config.enabled { close_active(app); }
+    if !state.store.lock().unwrap_or_else(|e| e.into_inner()).config.enabled { close_active(app); }
     publish(app); Ok(status(app))
 }
 
@@ -233,7 +233,7 @@ pub fn configure_care(window: tauri::WebviewWindow, config: CareConfig) -> Resul
 pub fn upsert_care_rule(window: tauri::WebviewWindow, mut rule: Rule) -> Result<serde_json::Value, String> {
     control(&window)?; let app = window.app_handle(); let state = app.state::<ReminderState>();
     let now = Local::now().timestamp();
-    let mut store = state.store.lock().unwrap(); let mut next = store.clone();
+    let mut store = state.store.lock().unwrap_or_else(|e| e.into_inner()); let mut next = store.clone();
     if rule.id.is_empty() {
         if next.rules.len() >= 50 { return Err("最多保存 50 条提醒".into()); }
         rule.id = format!("care-{}-{}", now, std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().subsec_nanos());
@@ -256,7 +256,7 @@ pub fn upsert_care_rule(window: tauri::WebviewWindow, mut rule: Rule) -> Result<
 #[tauri::command]
 pub fn delete_care_rule(window: tauri::WebviewWindow, id: String) -> Result<serde_json::Value, String> {
     control(&window)?; let app = window.app_handle(); let state = app.state::<ReminderState>();
-    let mut store = state.store.lock().unwrap(); let mut next = store.clone();
+    let mut store = state.store.lock().unwrap_or_else(|e| e.into_inner()); let mut next = store.clone();
     next.rules.retain(|r| r.id != id); next.pending.retain(|p| p.rule_id != id); next.rest_seconds.remove(&id);
     save(app, &next)?; *store = next; drop(store); cancel_active_rule(app, &id); publish(app); Ok(status(app))
 }
@@ -273,15 +273,15 @@ fn companion_visible(app: &tauri::AppHandle) -> bool {
 /// A pending care bubble has priority over optional greetings.
 pub fn proactive_silenced(app: &tauri::AppHandle) -> bool {
     let state = app.state::<ReminderState>();
-    let is_quiet = quiet(&state.store.lock().unwrap().config, Local::now().time());
-    let runtime = state.runtime.lock().unwrap();
+    let is_quiet = quiet(&state.store.lock().unwrap_or_else(|e| e.into_inner()).config, Local::now().time());
+    let runtime = state.runtime.lock().unwrap_or_else(|e| e.into_inner());
     is_quiet || runtime.focus || runtime.active.is_some() || state.game.load(Ordering::Relaxed)
 }
 fn blocked(app: &tauri::AppHandle, activity: &care_system::Activity) -> bool {
     let state = app.state::<ReminderState>();
-    let store = state.store.lock().unwrap();
+    let store = state.store.lock().unwrap_or_else(|e| e.into_inner());
     !store.config.enabled || quiet(&store.config, Local::now().time()) || activity.locked
-        || state.game.load(Ordering::Relaxed) || state.runtime.lock().unwrap().focus
+        || state.game.load(Ordering::Relaxed) || state.runtime.lock().unwrap_or_else(|e| e.into_inner()).focus
 }
 fn position(app: &tauri::AppHandle, window: &tauri::WebviewWindow) -> Result<(), String> {
     #[cfg(windows)] let point = care_system::foreground_point();
@@ -303,7 +303,7 @@ fn open_bubble(app: &tauri::AppHandle) -> Result<(), String> {
     if let Some(window) = app.get_webview_window("care") {
         position(app, &window)?;
         let state = app.state::<ReminderState>();
-        let ready = { let runtime = state.runtime.lock().unwrap(); runtime.ready && runtime.active.is_some() };
+        let ready = { let runtime = state.runtime.lock().unwrap_or_else(|e| e.into_inner()); runtime.ready && runtime.active.is_some() };
         if ready && !blocked(app, &care_system::activity()) { care_system::show_bubble(&window)?; }
         return Ok(());
     }
@@ -319,7 +319,7 @@ fn open_bubble(app: &tauri::AppHandle) -> Result<(), String> {
 }
 fn close_active(app: &tauri::AppHandle) {
     let state = app.state::<ReminderState>();
-    let mut runtime = state.runtime.lock().unwrap(); runtime.active = None; runtime.shown_at = None; drop(runtime);
+    let mut runtime = state.runtime.lock().unwrap_or_else(|e| e.into_inner()); runtime.active = None; runtime.shown_at = None; drop(runtime);
     if let Some(window) = app.get_webview_window("care") { let _ = care_system::hide_bubble(&window); let _ = window.emit("care-delivery", Option::<Delivery>::None); }
 }
 fn remove_active_rule(runtime: &mut Runtime, id: &str) -> bool {
@@ -336,7 +336,7 @@ fn remove_active_rule(runtime: &mut Runtime, id: &str) -> bool {
 fn cancel_active_rule(app: &tauri::AppHandle, id: &str) {
     let state = app.state::<ReminderState>();
     let next = {
-        let mut runtime = state.runtime.lock().unwrap();
+        let mut runtime = state.runtime.lock().unwrap_or_else(|e| e.into_inner());
         if !remove_active_rule(&mut runtime, id) { return; }
         runtime.active.clone()
     };
@@ -350,15 +350,15 @@ fn cancel_active_rule(app: &tauri::AppHandle, id: &str) {
 }
 fn show(app: &tauri::AppHandle, items: Vec<Pending>) -> Result<(), String> {
     let state = app.state::<ReminderState>();
-    let config = state.store.lock().unwrap().config.clone();
+    let config = state.store.lock().unwrap_or_else(|e| e.into_inner()).config.clone();
     let delivery = Delivery { id: format!("bubble-{}", Local::now().timestamp_millis()), items, sound: config.sound, voice: config.voice,
         display_seconds: if config.voice { 30 } else { BUBBLE_SECONDS } };
-    { let mut runtime = state.runtime.lock().unwrap(); runtime.active = Some(delivery.clone()); runtime.shown_at = if runtime.ready { Some(Local::now().timestamp()) } else { None }; }
+    { let mut runtime = state.runtime.lock().unwrap_or_else(|e| e.into_inner()); runtime.active = Some(delivery.clone()); runtime.shown_at = if runtime.ready { Some(Local::now().timestamp()) } else { None }; }
     if let Err(error) = open_bubble(app) { close_active(app); return Err(error); }
     if blocked(app, &care_system::activity()) { defer_active(app); return Ok(()); }
-    if state.runtime.lock().unwrap().active.as_ref().is_none_or(|d| d.id != delivery.id) { return Ok(()); }
+    if state.runtime.lock().unwrap_or_else(|e| e.into_inner()).active.as_ref().is_none_or(|d| d.id != delivery.id) { return Ok(()); }
     if let Some(window) = app.get_webview_window("care") { let _ = window.emit("care-delivery", &delivery); }
-    if state.runtime.lock().unwrap().ready && delivery.sound { care_system::play_sound(); }
+    if state.runtime.lock().unwrap_or_else(|e| e.into_inner()).ready && delivery.sound { care_system::play_sound(); }
     // Events into low-permission media scenes are deliberately browser-local,
     // produced only by native trusted code, and carry no caller-provided JS.
     for label in ["pet", "wallpaper", "media-a", "media-b"] {
@@ -370,26 +370,26 @@ fn show(app: &tauri::AppHandle, items: Vec<Pending>) -> Result<(), String> {
 pub fn care_ready(window: tauri::WebviewWindow) -> Result<Option<Delivery>, String> {
     if window.label() != "care" { return Err("只有关怀气泡可确认就绪".into()); }
     let app = window.app_handle(); let state = app.state::<ReminderState>();
-    let delivery = state.runtime.lock().unwrap().active.clone();
+    let delivery = state.runtime.lock().unwrap_or_else(|e| e.into_inner()).active.clone();
     if delivery.is_some() && !blocked(app, &care_system::activity()) {
         care_system::show_bubble(&window)?;
         if delivery.as_ref().is_some_and(|d| d.sound) { care_system::play_sound(); }
     }
     // Readiness is published only after the native show call completes. The
     // smoke observer and scheduler must not see a ready-but-still-hidden window.
-    { let mut runtime = state.runtime.lock().unwrap(); runtime.ready = true;
+    { let mut runtime = state.runtime.lock().unwrap_or_else(|e| e.into_inner()); runtime.ready = true;
       if runtime.active.is_some() { runtime.shown_at = Some(Local::now().timestamp()); } }
     Ok(delivery)
 }
 #[tauri::command]
 pub fn get_care_delivery(window: tauri::WebviewWindow) -> Result<Option<Delivery>, String> {
-    bubble(&window)?; Ok(window.app_handle().state::<ReminderState>().runtime.lock().unwrap().active.clone())
+    bubble(&window)?; Ok(window.app_handle().state::<ReminderState>().runtime.lock().unwrap_or_else(|e| e.into_inner()).active.clone())
 }
 #[tauri::command]
 pub async fn care_synthesize(window: tauri::WebviewWindow, id: String) -> Result<tauri::ipc::Response, String> {
     if window.label() != "care" { return Err("只有关怀气泡可以播报提醒".into()); }
     let app = window.app_handle().clone();
-    let delivery = app.state::<ReminderState>().runtime.lock().unwrap().active.clone()
+    let delivery = app.state::<ReminderState>().runtime.lock().unwrap_or_else(|e| e.into_inner()).active.clone()
         .filter(|delivery| delivery.id == id && delivery.voice).ok_or("提醒已关闭或未开启语音播报")?;
     if blocked(&app, &care_system::activity()) { return Err("当前不适合播报提醒".into()); }
     let texts: Vec<_> = delivery.items.iter().filter_map(|item| {
@@ -399,7 +399,7 @@ pub async fn care_synthesize(window: tauri::WebviewWindow, id: String) -> Result
         else { texts.join("。") };
     if text.is_empty() { return Err("提醒没有可播报的文字".into()); }
     let audio = crate::tts::tts_synthesize(app.clone(), text, None).await?;
-    if app.state::<ReminderState>().runtime.lock().unwrap().active.as_ref().is_none_or(|active| active.id != id)
+    if app.state::<ReminderState>().runtime.lock().unwrap_or_else(|e| e.into_inner()).active.as_ref().is_none_or(|active| active.id != id)
         || blocked(&app, &care_system::activity()) { return Err("提醒已关闭".into()); }
     let _ = app.emit_to("control", "care-voice-start", ());
     Ok(audio)
@@ -407,14 +407,14 @@ pub async fn care_synthesize(window: tauri::WebviewWindow, id: String) -> Result
 #[tauri::command]
 pub fn dismiss_care(window: tauri::WebviewWindow, id: String) -> Result<(), String> {
     bubble(&window)?; let app = window.app_handle();
-    if app.state::<ReminderState>().runtime.lock().unwrap().active.as_ref().is_some_and(|d| d.id == id) { close_active(app); }
+    if app.state::<ReminderState>().runtime.lock().unwrap_or_else(|e| e.into_inner()).active.as_ref().is_some_and(|d| d.id == id) { close_active(app); }
     Ok(())
 }
 #[tauri::command]
 pub fn snooze_care(window: tauri::WebviewWindow, id: String) -> Result<(), String> {
     bubble(&window)?; let app = window.app_handle(); let state = app.state::<ReminderState>();
-    let delivery = state.runtime.lock().unwrap().active.clone().filter(|d| d.id == id).ok_or("这条提醒已关闭")?;
-    let now = Local::now().timestamp(); let mut store = state.store.lock().unwrap(); let mut next = store.clone();
+    let delivery = state.runtime.lock().unwrap_or_else(|e| e.into_inner()).active.clone().filter(|d| d.id == id).ok_or("这条提醒已关闭")?;
+    let now = Local::now().timestamp(); let mut store = state.store.lock().unwrap_or_else(|e| e.into_inner()); let mut next = store.clone();
     for mut item in delivery.items.into_iter().filter(|p| !p.preview) {
         item.available_at = now + SNOOZE_SECONDS; item.expires_at = item.available_at + VALID_SECONDS;
         next.pending.retain(|p| p.key != item.key); next.pending.push(item);
@@ -440,8 +440,8 @@ pub async fn preview_care_rule(window: tauri::WebviewWindow, mut rule: Rule) -> 
 pub async fn search_care_cities(window: tauri::WebviewWindow, query: String) -> Result<Vec<City>, String> {
     control(&window)?; let app = window.app_handle(); let state = app.state::<ReminderState>();
     let now = Local::now().timestamp();
-    { let mut runtime = state.runtime.lock().unwrap(); if now - runtime.city_attempt < 2 { return Err("城市查询太快，请稍后再试".into()); } runtime.city_attempt = now; }
-    let source = state.store.lock().unwrap().config.weather_source.clone();
+    { let mut runtime = state.runtime.lock().unwrap_or_else(|e| e.into_inner()); if now - runtime.city_attempt < 2 { return Err("城市查询太快，请稍后再试".into()); } runtime.city_attempt = now; }
+    let source = state.store.lock().unwrap_or_else(|e| e.into_inner()).config.weather_source.clone();
     tauri::async_runtime::spawn_blocking(move || care_weather::search(&source, &query)).await.map_err(|e| e.to_string())?
 }
 /// Pre-fills the city of a weather reminder from the network location. Only the control window may ask,
@@ -450,9 +450,9 @@ pub async fn search_care_cities(window: tauri::WebviewWindow, query: String) -> 
 pub async fn detect_care_city(window: tauri::WebviewWindow) -> Result<City, String> {
     control(&window)?;
     let state = window.app_handle().state::<ReminderState>();
-    if state.store.lock().unwrap().config.weather_source.provider == "disabled" { return Err("请先开启天气来源".into()); }
+    if state.store.lock().unwrap_or_else(|e| e.into_inner()).config.weather_source.provider == "disabled" { return Err("请先开启天气来源".into()); }
     let now = chrono::Utc::now().timestamp();
-    { let mut runtime = state.runtime.lock().unwrap(); if now - runtime.locate_attempt < 5 { return Err("定位太快，请稍后再试".into()); } runtime.locate_attempt = now; }
+    { let mut runtime = state.runtime.lock().unwrap_or_else(|e| e.into_inner()); if now - runtime.locate_attempt < 5 { return Err("定位太快，请稍后再试".into()); } runtime.locate_attempt = now; }
     tauri::async_runtime::spawn_blocking(care_weather::locate_by_ip).await.map_err(|e| e.to_string())?
 }
 #[tauri::command]
@@ -465,13 +465,13 @@ pub async fn check_care_weather(window: tauri::WebviewWindow, city: City) -> Res
 fn weather_for(app: &tauri::AppHandle, city: &City) -> Result<Weather, String> {
     let state = app.state::<ReminderState>(); let now = Local::now().timestamp();
     let source;
-    { let store = state.store.lock().unwrap();
+    { let store = state.store.lock().unwrap_or_else(|e| e.into_inner());
         if let Some(weather) = store.weather.as_ref().filter(|w| w.city == *city && (0..1800).contains(&(now - w.updated_at)) && now - w.model_at < 7200) { return Ok(weather.clone()); }
         source = store.config.weather_source.clone();
     }
-    { let mut runtime = state.runtime.lock().unwrap(); if now - runtime.weather_attempt < 60 { return Err("天气查询每分钟最多一次，请稍后再试".into()); } runtime.weather_attempt = now; }
+    { let mut runtime = state.runtime.lock().unwrap_or_else(|e| e.into_inner()); if now - runtime.weather_attempt < 60 { return Err("天气查询每分钟最多一次，请稍后再试".into()); } runtime.weather_attempt = now; }
     let result = care_weather::fetch(&source, city, now);
-    let mut store = state.store.lock().unwrap();
+    let mut store = state.store.lock().unwrap_or_else(|e| e.into_inner());
     if store.config.weather_source != source { return Err("天气来源已改变，请重新查询".into()); }
     match &result { Ok(weather) => { store.weather = Some(weather.clone()); store.weather_error = None; }, Err(error) => { store.weather_error = Some(error.clone()); } }
     if let Err(error) = save(app, &store) { store.error = Some(error); }
@@ -488,7 +488,7 @@ pub fn cached_weather(app: &tauri::AppHandle, now: i64) -> Option<Weather> {
     )
 }
 pub fn widget_weather_source(app: &tauri::AppHandle) -> care_weather::Source {
-    app.state::<ReminderState>().store.lock().unwrap().config.weather_source.clone()
+    app.state::<ReminderState>().store.lock().unwrap_or_else(|e| e.into_inner()).config.weather_source.clone()
 }
 pub fn set_game_active(app: &tauri::AppHandle, active: bool) {
     app.state::<ReminderState>().game.store(active, Ordering::Relaxed);
@@ -497,19 +497,19 @@ pub fn set_game_active(app: &tauri::AppHandle, active: bool) {
 /// Called if the OS closes the bubble; future due reminders can create it again.
 pub fn window_closed(app: &tauri::AppHandle) {
     close_active(app);
-    app.state::<ReminderState>().runtime.lock().unwrap().ready = false;
+    app.state::<ReminderState>().runtime.lock().unwrap_or_else(|e| e.into_inner()).ready = false;
 }
 /// Reserved for native focus state; a low-permission scene cannot set this flag.
 #[allow(dead_code)]
 pub fn set_focus_active(app: &tauri::AppHandle, active: bool) {
-    app.state::<ReminderState>().runtime.lock().unwrap().focus = active;
+    app.state::<ReminderState>().runtime.lock().unwrap_or_else(|e| e.into_inner()).focus = active;
     if active { defer_active(app); }
 }
 fn defer_active(app: &tauri::AppHandle) {
     let state = app.state::<ReminderState>();
-    let active = state.runtime.lock().unwrap().active.clone();
+    let active = state.runtime.lock().unwrap_or_else(|e| e.into_inner()).active.clone();
     if let Some(active) = active {
-        let mut store = state.store.lock().unwrap();
+        let mut store = state.store.lock().unwrap_or_else(|e| e.into_inner());
         for item in active.items.into_iter().filter(|p| !p.preview) {
             if !store.pending.iter().any(|p| p.key == item.key) { store.pending.push(item); }
         }
@@ -519,7 +519,7 @@ fn defer_active(app: &tauri::AppHandle) {
 }
 fn prune_widget_delivery(app:&tauri::AppHandle,rules:&[Rule]){
  let state=app.state::<ReminderState>();
- let mut runtime=state.runtime.lock().unwrap();let Some(active)=runtime.active.as_mut() else{return;};
+ let mut runtime=state.runtime.lock().unwrap_or_else(|e| e.into_inner());let Some(active)=runtime.active.as_mut() else{return;};
  let before=active.items.len();
  active.items.retain(|p|!p.rule_id.starts_with("widget-")||rules.iter().any(|r|r.id==p.rule_id&&r.revision==p.revision));
  if active.items.len()==before{return;}
@@ -532,23 +532,23 @@ fn tick(app: &tauri::AppHandle, elapsed: f64, checkpoint: bool) {
     let widget_rules=crate::widgets::reminder_rules(app,now);
     prune_widget_delivery(app,&widget_rules);
     let changed;
-    { let mut store = state.store.lock().unwrap(); changed = collect_with_widgets(&mut store, now, active_seconds,&widget_rules);
+    { let mut store = state.store.lock().unwrap_or_else(|e| e.into_inner()); changed = collect_with_widgets(&mut store, now, active_seconds,&widget_rules);
         if changed || checkpoint { if let Err(error) = save(app, &store) { store.error = Some(error); } }
     }
     if blocked(app, &activity) { defer_active(app); if changed { publish(app); } return; }
-    let active = state.runtime.lock().unwrap().active.clone();
+    let active = state.runtime.lock().unwrap_or_else(|e| e.into_inner()).active.clone();
     if let Some(active) = active {
-        let shown_at = state.runtime.lock().unwrap().shown_at;
+        let shown_at = state.runtime.lock().unwrap_or_else(|e| e.into_inner()).shown_at;
         if shown_at.is_some_and(|at| now.timestamp() - at >= active.display_seconds) { close_active(app); }
         else if let Some(window) = app.get_webview_window("care") { let _ = position(app, &window); }
         return;
     }
-    let pending = state.store.lock().unwrap().pending.iter().find(|p| p.available_at <= now.timestamp()).cloned();
+    let pending = state.store.lock().unwrap_or_else(|e| e.into_inner()).pending.iter().find(|p| p.available_at <= now.timestamp()).cloned();
     if let Some(pending) = pending.filter(|p| p.kind == "weather" && !p.weather_ready) {
-        let rule = state.store.lock().unwrap().rules.iter().find(|r| r.id == pending.rule_id && r.revision == pending.revision).cloned();
+        let rule = state.store.lock().unwrap_or_else(|e| e.into_inner()).rules.iter().find(|r| r.id == pending.rule_id && r.revision == pending.revision).cloned();
         if let Some(city) = rule.as_ref().and_then(|r| r.city.as_ref()) {
             let result = weather_for(app, city);
-            let mut store = state.store.lock().unwrap();
+            let mut store = state.store.lock().unwrap_or_else(|e| e.into_inner());
             match result {
                 Ok(weather) => if let Some(item) = store.pending.iter_mut().find(|p| p.key == pending.key) {
                     item.text = format!("{} {}", item.text, weather.text); item.weather_ready = true; item.weather_at = Some(weather.model_at);
@@ -564,7 +564,7 @@ fn tick(app: &tauri::AppHandle, elapsed: f64, checkpoint: bool) {
     // editing. Recheck both suppression and the expiry before selecting a summary.
     if blocked(app, &care_system::activity()) { return; }
     let mut items = Vec::new();
-    { let mut store = state.store.lock().unwrap();
+    { let mut store = state.store.lock().unwrap_or_else(|e| e.into_inner());
         let mut rest = false;
         store.pending.retain(|p| {
             if p.expires_at < Local::now().timestamp() { return false; }
@@ -576,7 +576,7 @@ fn tick(app: &tauri::AppHandle, elapsed: f64, checkpoint: bool) {
     }
     if !items.is_empty() {
         if let Err(error) = show(app, items.clone()) {
-            let mut store = state.store.lock().unwrap(); store.pending.extend(items); store.error = Some(error); let _ = save(app, &store);
+            let mut store = state.store.lock().unwrap_or_else(|e| e.into_inner()); store.pending.extend(items); store.error = Some(error); let _ = save(app, &store);
         }
         publish(app);
     } else if changed { publish(app); }
@@ -587,12 +587,12 @@ fn presence_path(app: &tauri::AppHandle) -> Option<std::path::PathBuf> {
 /// Reuses the care idle/lock sample and its quiet/game gates; the only output is one event to the pet window.
 fn presence_tick(app: &tauri::AppHandle, elapsed: f64) {
     let state = app.state::<ReminderState>(); let activity = care_system::activity(); let now = Local::now();
-    let silenced = { let store = state.store.lock().unwrap(); !store.config.enabled || quiet(&store.config, now.time()) }
-        || state.runtime.lock().unwrap().focus || !companion_visible(app);
+    let silenced = { let store = state.store.lock().unwrap_or_else(|e| e.into_inner()); !store.config.enabled || quiet(&store.config, now.time()) }
+        || state.runtime.lock().unwrap_or_else(|e| e.into_inner()).focus || !companion_visible(app);
     let input = crate::presence::Input { local: now.naive_local(), unix: now.timestamp(), idle_seconds: activity.idle_seconds, elapsed,
         locked: activity.locked, available: activity.available, quiet: silenced, game: state.game.load(Ordering::Relaxed) };
     let (kind, greeted) = {
-        let mut presence = state.presence.lock().unwrap(); let before = presence.first_today_date();
+        let mut presence = state.presence.lock().unwrap_or_else(|e| e.into_inner()); let before = presence.first_today_date();
         let kind = presence.step(input); (kind, presence.first_today_date().filter(|day| Some(*day) != before))
     };
     if let (Some(day), Some(path)) = (greeted, presence_path(app)) { let _ = crate::presence::save_first_today(&path, day); }
@@ -629,15 +629,15 @@ pub fn start(app: &tauri::AppHandle) {
             if time(&store.config.quiet_start).is_err() { store.config.quiet_start = "22:00".into(); }
             if time(&store.config.quiet_end).is_err() { store.config.quiet_end = "08:00".into(); }
             if store.config.weather_source.validate().is_err() { store.config.weather_source = Source::default(); }
-            *state.store.lock().unwrap() = store;
+            *state.store.lock().unwrap_or_else(|e| e.into_inner()) = store;
         },
         Err(error) => {
-            let mut store = state.store.lock().unwrap(); store.config.enabled = false; store.error = Some(error);
-            state.runtime.lock().unwrap().read_error = true;
+            let mut store = state.store.lock().unwrap_or_else(|e| e.into_inner()); store.config.enabled = false; store.error = Some(error);
+            state.runtime.lock().unwrap_or_else(|e| e.into_inner()).read_error = true;
         },
     }
     if let Some(path) = presence_path(app) {
-        *state.presence.lock().unwrap() = crate::presence::Presence::with_first_today(crate::presence::load_first_today(&path, Local::now().date_naive()));
+        *state.presence.lock().unwrap_or_else(|e| e.into_inner()) = crate::presence::Presence::with_first_today(crate::presence::load_first_today(&path, Local::now().date_naive()));
     }
     let app = app.clone();
     std::thread::spawn(move || {
@@ -669,14 +669,14 @@ pub async fn smoke(app: &tauri::AppHandle) -> Result<serde_json::Value, String> 
 fn smoke_sync(app: &tauri::AppHandle) -> Result<serde_json::Value, String> {
     let state = app.state::<ReminderState>();
     state.smoke_running.store(true, Ordering::Relaxed);
-    let original_store = state.store.lock().unwrap().clone();
-    let original_runtime = state.runtime.lock().unwrap().clone();
+    let original_store = state.store.lock().unwrap_or_else(|e| e.into_inner()).clone();
+    let original_runtime = state.runtime.lock().unwrap_or_else(|e| e.into_inner()).clone();
     let original_game = state.game.swap(false, Ordering::Relaxed);
     close_active(app);
     let result = (|| {
         let control = app.get_webview_window("control").ok_or("缺少隔离设置窗口")?;
-        *state.store.lock().unwrap() = Store::default();
-        *state.runtime.lock().unwrap() = Runtime { ready: app.get_webview_window("care").is_some(), ..Runtime::default() };
+        *state.store.lock().unwrap_or_else(|e| e.into_inner()) = Store::default();
+        *state.runtime.lock().unwrap_or_else(|e| e.into_inner()) = Runtime { ready: app.get_webview_window("care").is_some(), ..Runtime::default() };
         let now = Local::now();
         let rule = Rule { id: "smoke-care-rule".into(), text: "隔离验证：喝水".into(), time: now.format("%H:%M").to_string(), ..Rule::default() };
         upsert_care_rule(control.clone(), rule.clone())?;
@@ -687,7 +687,7 @@ fn smoke_sync(app: &tauri::AppHandle) -> Result<serde_json::Value, String> {
             kind: "custom".into(), text: rule.text.clone(), due_at: now.timestamp(), available_at: now.timestamp(), expires_at: now.timestamp() + VALID_SECONDS, preview, weather_ready: true, weather_at: None };
         show(app, vec![pending(true)])?;
         let deadline = Instant::now() + Duration::from_secs(20);
-        while !state.runtime.lock().unwrap().ready {
+        while !state.runtime.lock().unwrap_or_else(|e| e.into_inner()).ready {
             if Instant::now() > deadline { return Err("关怀前端未完成原生就绪握手".into()); }
             std::thread::sleep(Duration::from_millis(30));
         }
@@ -708,7 +708,7 @@ fn smoke_sync(app: &tauri::AppHandle) -> Result<serde_json::Value, String> {
             return Err(format!("关怀气泡原生不激活检查失败：{bubble_state}"));
         }
         let preview = get_care_delivery(care.clone())?.ok_or("没有预览气泡")?;
-        if !preview.items[0].preview || !state.store.lock().unwrap().pending.is_empty() { return Err("预览错误地创建了真实待展示任务".into()); }
+        if !preview.items[0].preview || !state.store.lock().unwrap_or_else(|e| e.into_inner()).pending.is_empty() { return Err("预览错误地创建了真实待展示任务".into()); }
         dismiss_care(care.clone(), preview.id)?;
         let hide_deadline = Instant::now() + Duration::from_secs(2);
         while care.is_visible().map_err(|e| e.to_string())? && Instant::now() < hide_deadline {
@@ -728,26 +728,26 @@ fn smoke_sync(app: &tauri::AppHandle) -> Result<serde_json::Value, String> {
         let disk: Store = serde_json::from_slice(&std::fs::read(&disk_path).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
         if disk.pending.len() != 1 || disk.pending[0].available_at < now.timestamp() + SNOOZE_SECONDS { return Err("稍后提醒没有按 10 分钟持久化".into()); }
         upsert_care_rule(control.clone(), Rule { enabled: false, ..rule.clone() })?;
-        if !state.store.lock().unwrap().pending.is_empty() { return Err("关闭规则没有取消稍后提醒".into()); }
+        if !state.store.lock().unwrap_or_else(|e| e.into_inner()).pending.is_empty() { return Err("关闭规则没有取消稍后提醒".into()); }
 
         upsert_care_rule(control.clone(), rule.clone())?;
-        let revision = state.store.lock().unwrap().rules[0].revision;
+        let revision = state.store.lock().unwrap_or_else(|e| e.into_inner()).rules[0].revision;
         let mut item = pending(false); item.revision = revision;
-        state.store.lock().unwrap().pending.push(item.clone());
+        state.store.lock().unwrap_or_else(|e| e.into_inner()).pending.push(item.clone());
         set_game_active(app, true);
         tick(app, 0.0, true);
-        if state.runtime.lock().unwrap().active.is_some() || state.store.lock().unwrap().pending.len() != 1 { return Err("游戏期间提醒没有延后".into()); }
+        if state.runtime.lock().unwrap_or_else(|e| e.into_inner()).active.is_some() || state.store.lock().unwrap_or_else(|e| e.into_inner()).pending.len() != 1 { return Err("游戏期间提醒没有延后".into()); }
         set_game_active(app, false);
         tick(app, 0.0, true);
-        if state.runtime.lock().unwrap().active.is_none() { return Err("游戏退出后有效提示没有恢复".into()); }
+        if state.runtime.lock().unwrap_or_else(|e| e.into_inner()).active.is_none() { return Err("游戏退出后有效提示没有恢复".into()); }
         let active = get_care_delivery(care.clone())?.ok_or("没有恢复气泡")?;
         dismiss_care(care.clone(), active.id)?;
         let mut expired = item.clone(); expired.key = "smoke-expired".into(); expired.expires_at = Local::now().timestamp() - 1;
-        state.store.lock().unwrap().pending.push(expired);
+        state.store.lock().unwrap_or_else(|e| e.into_inner()).pending.push(expired);
         tick(app, 0.0, true);
-        if !state.store.lock().unwrap().pending.is_empty() || state.runtime.lock().unwrap().active.is_some() { return Err("过期提醒被补发".into()); }
+        if !state.store.lock().unwrap_or_else(|e| e.into_inner()).pending.is_empty() || state.runtime.lock().unwrap_or_else(|e| e.into_inner()).active.is_some() { return Err("过期提醒被补发".into()); }
         delete_care_rule(control, rule.id.clone())?;
-        if !state.store.lock().unwrap().rules.is_empty() { return Err("删除规则没有生效".into()); }
+        if !state.store.lock().unwrap_or_else(|e| e.into_inner()).rules.is_empty() { return Err("删除规则没有生效".into()); }
         let mut fixture = Store { rules: vec![Rule { id: "dedup".into(), revision: 1, kind: "custom".into(), repeat: "once".into(), once_at: (now - CalendarDuration::minutes(1)).format("%Y-%m-%dT%H:%M").to_string(), text: "fixture".into(), ..Rule::default() }], ..Store::default() };
         collect(&mut fixture, now, 0.0);
         let mut restored: Store = serde_json::from_slice(&serde_json::to_vec(&fixture).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
@@ -757,8 +757,8 @@ fn smoke_sync(app: &tauri::AppHandle) -> Result<serde_json::Value, String> {
             "disableCancels":true,"delete":true,"gameDeferred":true,"gameResumeSummary":true,"expiry":true,"restartDedup":true,"weatherNetworkUsed":false,"bubbleState":bubble_state,"afterDismiss":after_dismiss}))
     })();
     close_active(app);
-    *state.store.lock().unwrap() = original_store.clone();
-    *state.runtime.lock().unwrap() = Runtime { ready: app.get_webview_window("care").is_some(), active: None, shown_at: None, ..original_runtime };
+    *state.store.lock().unwrap_or_else(|e| e.into_inner()) = original_store.clone();
+    *state.runtime.lock().unwrap_or_else(|e| e.into_inner()) = Runtime { ready: app.get_webview_window("care").is_some(), active: None, shown_at: None, ..original_runtime };
     state.game.store(original_game, Ordering::Relaxed);
     let restore = save(app, &original_store);
     state.smoke_running.store(false, Ordering::Relaxed);

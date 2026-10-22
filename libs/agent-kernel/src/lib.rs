@@ -4,6 +4,8 @@
 //! else (permissions, context trimming, budgets) plugs in as [`Middleware`].
 
 mod agent;
+#[allow(dead_code)]
+mod child_env;
 pub mod builtin;
 mod error;
 mod exec;

@@ -54,6 +54,29 @@ fn the_request_has_the_required_fields_and_tools_in_messages_format() {
 }
 
 #[test]
+fn prompt_cache_marks_tools_system_and_the_newest_block_only_when_enabled() {
+    let mut req = request(vec![Message::system("rules"), Message::user_text("first"), Message::assistant("ok", vec![]), Message::user_text("second")]);
+    req.tools = vec![
+        ToolSchema { name: "a".into(), description: "d".into(), parameters: json!({"type": "object"}) },
+        ToolSchema { name: "b".into(), description: "d".into(), parameters: json!({"type": "object"}) },
+    ];
+    let plain = build_request_body(&profile(), &req);
+    assert!(!plain.to_string().contains("cache_control"), "off by default");
+    assert_eq!(plain["system"], json!("rules"));
+
+    let mut p = profile();
+    p.prompt_cache = true;
+    let body = build_request_body(&p, &req);
+    let ephemeral = json!({"type": "ephemeral"});
+    assert_eq!(body["system"], json!([{"type": "text", "text": "rules", "cache_control": ephemeral}]));
+    assert!(body["tools"][0].get("cache_control").is_none());
+    assert_eq!(body["tools"][1]["cache_control"], ephemeral);
+    let messages = body["messages"].as_array().unwrap();
+    assert_eq!(messages.last().unwrap()["content"][0]["cache_control"], ephemeral);
+    assert_eq!(body.to_string().matches("cache_control").count(), 3, "at most four breakpoints are allowed");
+}
+
+#[test]
 fn anthropic_uses_endpoint_metadata_or_a_model_agnostic_protocol_default() {
     for model in ["claude-3-5-sonnet-20241022", "claude-opus-4-6", "new-model-2030", "MiniMax-M3"] {
         assert_eq!(model_max_output_tokens(model), 128_000,

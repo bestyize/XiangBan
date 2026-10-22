@@ -2,7 +2,7 @@ use super::Middleware;
 use crate::tool::{Risk, ToolCtx, ToolGate, ToolSpec};
 use crate::types::ToolCall;
 use serde_json::Value;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::sync::atomic::{AtomicU8, Ordering};
 use std::sync::mpsc::Receiver;
 use std::sync::{Arc, Mutex};
@@ -45,6 +45,9 @@ pub struct ApprovalRequest<'a> {
     /// Why the host's `danger_check` flagged this call, if it did. Such a call is asked even in `Auto` mode
     /// and is never remembered.
     pub danger: Option<&'a str>,
+    /// For a command tool: what "always" would remember (see `Permission::remember_exec_as`), e.g. `npm test`.
+    /// `None` means "always" is not offered for this call: it is asked every time.
+    pub remember_as: Option<&'a str>,
     pub(crate) ctx: &'a ToolCtx,
 }
 
@@ -64,7 +67,8 @@ impl ApprovalRequest<'_> {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Approval {
     Once,
-    /// Skip asking for this tool for the rest of this session. `Risk::Exec` tools ignore it.
+    /// Skip asking for this tool for the rest of this session. `Risk::Exec` tools ignore it unless the host
+    /// named the kind of call to remember (`Permission::remember_exec_as`); then only that kind is remembered.
     Always,
     Deny,
 }
@@ -87,15 +91,19 @@ where
 }
 
 type DangerCheck = Arc<dyn Fn(&str, &Value) -> Option<String> + Send + Sync>;
+type RememberKey = Arc<dyn Fn(&str, &Value) -> Option<String> + Send + Sync>;
 
 pub struct Permission {
     mode: AtomicU8,
     approver: Arc<dyn Approver>,
     danger: Option<DangerCheck>,
+    remember: Option<RememberKey>,
     allow: HashSet<String>,
     deny: HashSet<String>,
     always: Mutex<HashSet<(String, String)>>,
     tainted: Mutex<HashSet<String>>,
+    /// Modes set for single sessions. They win over `mode`, so concurrent sessions never see each other's choice.
+    session_modes: Mutex<HashMap<String, PermissionMode>>,
 }
 
 impl Permission {
@@ -104,10 +112,12 @@ impl Permission {
             mode: AtomicU8::new(mode.to_u8()),
             approver: Arc::new(approver),
             danger: None,
+            remember: None,
             allow: HashSet::new(),
             deny: HashSet::new(),
             always: Mutex::new(HashSet::new()),
             tainted: Mutex::new(HashSet::new()),
+            session_modes: Mutex::new(HashMap::new()),
         }
     }
 
@@ -127,6 +137,15 @@ impl Permission {
         self
     }
 
+    /// Lets "always" apply to a kind of command instead of never applying to `Risk::Exec` tools. `key` gets the
+    /// tool name and arguments and returns what to remember, e.g. `npm test` for `npm test -- --watch`, or `None`
+    /// for a call that must be asked every time. A later call is skipped only when its key is exactly the same, in the
+    /// same session. Flagged (`danger_check`), `always_ask` and tainted calls are still asked.
+    pub fn remember_exec_as(mut self, key: impl Fn(&str, &Value) -> Option<String> + Send + Sync + 'static) -> Self {
+        self.remember = Some(Arc::new(key));
+        self
+    }
+
     /// Always refuses this tool, in every mode.
     pub fn deny_tool(mut self, name: &str) -> Self {
         self.deny.insert(name.to_string());
@@ -137,14 +156,27 @@ impl Permission {
         PermissionMode::from_u8(self.mode.load(Ordering::Relaxed))
     }
 
+    /// The default for sessions without a mode of their own.
     pub fn set_mode(&self, mode: PermissionMode) {
         self.mode.store(mode.to_u8(), Ordering::Relaxed);
+    }
+
+    /// The mode that applies to `session`: its own when one was set, the default otherwise.
+    pub fn mode_for(&self, session: &str) -> PermissionMode {
+        self.session_modes.lock().unwrap_or_else(|e| e.into_inner()).get(session).copied().unwrap_or_else(|| self.mode())
+    }
+
+    /// Sets the mode of one session only. A host running several sessions at once should use this
+    /// instead of `set_mode`, which every session without its own mode shares.
+    pub fn set_session_mode(&self, session: &str, mode: PermissionMode) {
+        self.session_modes.lock().unwrap_or_else(|e| e.into_inner()).insert(session.to_string(), mode);
     }
 
     /// Drops the "always allow" grants and the taint of one session, e.g. when it is closed.
     pub fn forget_session(&self, session: &str) {
         self.always.lock().unwrap_or_else(|e| e.into_inner()).retain(|(s, _)| s != session);
         self.tainted.lock().unwrap_or_else(|e| e.into_inner()).remove(session);
+        self.session_modes.lock().unwrap_or_else(|e| e.into_inner()).remove(session);
     }
 
     /// Taint is kept in memory only: after a restart a resumed session starts untainted.
@@ -160,7 +192,7 @@ impl Middleware for Permission {
         if self.deny.contains(name) {
             return ToolGate::Block(format!("`{name}` is disabled by policy."));
         }
-        let mode = self.mode();
+        let mode = self.mode_for(session);
         if mode == PermissionMode::ReadOnly && spec.risk != Risk::Read {
             return ToolGate::Block(format!("Read-only mode: `{name}` is not allowed because it can change state."));
         }
@@ -170,8 +202,15 @@ impl Middleware for Permission {
             Some(check) if spec.risk != Risk::Read => check(name, args),
             _ => None,
         };
-        let sticky = spec.risk == Risk::Exec || spec.always_ask || danger.is_some();
-        let key = (session.to_string(), name.to_string());
+        let exec_key = match &self.remember {
+            Some(key) if spec.risk == Risk::Exec && !spec.always_ask && danger.is_none() => key(name, args),
+            _ => None,
+        };
+        let sticky = (spec.risk == Risk::Exec && exec_key.is_none()) || spec.always_ask || danger.is_some();
+        let key = match &exec_key {
+            Some(kind) => (session.to_string(), format!("{name}\u{0}{kind}")),
+            None => (session.to_string(), name.to_string()),
+        };
         let needs_ask = if self.danger.is_some() && mode == PermissionMode::Auto {
             danger.is_some()
         } else if spec.always_ask {
@@ -189,7 +228,7 @@ impl Middleware for Permission {
         };
 
         if needs_ask {
-            let request = ApprovalRequest { session, tool: name, risk: spec.risk, arguments: args, tainted, danger: danger.as_deref(), ctx };
+            let request = ApprovalRequest { session, tool: name, risk: spec.risk, arguments: args, tainted, danger: danger.as_deref(), remember_as: exec_key.as_deref(), ctx };
             let decision = self.approver.approve(&request);
             if ctx.is_cancelled() {
                 return ToolGate::Block("cancelled".to_string());

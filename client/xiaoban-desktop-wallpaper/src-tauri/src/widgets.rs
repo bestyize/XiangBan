@@ -106,12 +106,12 @@ pub struct WidgetState {
     forecasts: Mutex<HashMap<String,(i64,Value)>>,
 }
 pub fn reminder_rules(app:&tauri::AppHandle,now:chrono::DateTime<chrono::Local>)->Vec<crate::reminders::Rule>{
- let layout=app.state::<WidgetState>().layout.lock().unwrap().clone();crate::widget_schedule::rules(&layout,now)
+ let layout=app.state::<WidgetState>().layout.lock().unwrap_or_else(|e| e.into_inner()).clone();crate::widget_schedule::rules(&layout,now)
 }
 pub fn is_widget(label: &str) -> bool { label.starts_with("widget-") }
 pub(crate) fn window_layer(app:&tauri::AppHandle,label:&str)->Option<String>{
     let id=label.strip_prefix("widget-")?;
-    let state=app.state::<WidgetState>();let value=state.layout.lock().unwrap().widgets.iter().find(|w|w.id==id).map(|w|w.layer.clone());value
+    let state=app.state::<WidgetState>();let value=state.layout.lock().unwrap_or_else(|e| e.into_inner()).widgets.iter().find(|w|w.id==id).map(|w|w.layer.clone());value
 }
 #[cfg(target_os="macos")]
 pub(crate) fn restore_window_layer(app:&tauri::AppHandle,label:&str){
@@ -122,8 +122,8 @@ pub(crate) fn restore_window_layer(app:&tauri::AppHandle,label:&str){
 
 fn own_widget(window: &tauri::WebviewWindow) -> Result<Widget, String> {
     let state=window.app_handle().state::<WidgetState>();
-    let target=if window.label()=="widgetmenu"{state.menu_target.lock().unwrap().clone()}else{None};
-    let result=state.layout.lock().unwrap().widgets.iter()
+    let target=if window.label()=="widgetmenu"{state.menu_target.lock().unwrap_or_else(|e| e.into_inner()).clone()}else{None};
+    let result=state.layout.lock().unwrap_or_else(|e| e.into_inner()).widgets.iter()
         .find(|widget| target.as_ref().map_or_else(||format!("widget-{}",widget.id)==window.label(),|id|id==&widget.id)).cloned().ok_or("没有找到这个桌面组件".into());result
 }
 pub fn permitted(label: &str, command: &str) -> Option<bool> {
@@ -160,7 +160,7 @@ pub fn validate(layout: &Layout) -> Result<(), String> {
     Ok(())
 }
 fn ensure_writable(app: &tauri::AppHandle) -> Result<(), String> {
-    if let Some(error) = app.state::<WidgetState>().load_error.lock().unwrap().clone() { return Err(error); }
+    if let Some(error) = app.state::<WidgetState>().load_error.lock().unwrap_or_else(|e| e.into_inner()).clone() { return Err(error); }
     Ok(())
 }
 fn persist(app: &tauri::AppHandle, layout: &Layout) -> Result<(), String> {
@@ -186,12 +186,12 @@ pub(crate) fn cursor(app:&tauri::AppHandle)->Result<(f64,f64),String>{
     #[cfg(not(target_os="macos"))] {let p=app.cursor_position().map_err(|e|e.to_string())?;Ok((p.x,p.y))}
 }
 fn snapshot(app: &tauri::AppHandle) -> Value {
-    let state=app.state::<WidgetState>();let layout=state.layout.lock().unwrap().clone();
+    let state=app.state::<WidgetState>();let layout=state.layout.lock().unwrap_or_else(|e| e.into_inner()).clone();
     let areas=monitors(app).unwrap_or_default();
     let displays:Vec<_>=areas.iter().map(|m|json!({"id":m.id,"name":m.name,"width":m.width/m.scale,"height":m.height/m.scale,"primary":m.primary})).collect();
     let desktop=crate::widget_geometry::resolve(&areas,None).map(|m|json!({"width":m.width/m.scale,"height":m.height/m.scale}));
     let widgets:Vec<_> = layout.widgets.iter().map(|w| attach_custom_data(app, w)).collect();
-    json!({"version":2,"widgets":widgets,"editing":state.editing.load(Ordering::Relaxed),"errors":state.errors.lock().unwrap().clone(),"desktop":desktop,"monitors":displays})
+    json!({"version":2,"widgets":widgets,"editing":state.editing.load(Ordering::Relaxed),"errors":state.errors.lock().unwrap_or_else(|e| e.into_inner()).clone(),"desktop":desktop,"monitors":displays})
 }
 pub fn base_size(kind:&str)->(f64,f64){match kind {"clock"=>(596.,306.),"weather"=>(326.,306.),"notes"=>(352.,306.),"reminders"=>(480.,332.),"stocks"=>(404.,338.),"woodfish"=>(390.,332.),"calendar"=>(500.,286.),"countdown"=>(790.,286.),"custom"=>(280.,240.),_=>(352.,306.)}}
 pub fn widget_base_size(app:&tauri::AppHandle,widget:&Widget)->(f64,f64){
@@ -239,8 +239,8 @@ fn place(app: &tauri::AppHandle, window: &tauri::WebviewWindow, widget: &Widget)
     #[cfg(not(any(windows,target_os="macos")))] {window.set_size(tauri::LogicalSize::new(width/dpi,height/dpi)).and_then(|_|window.set_position(tauri::PhysicalPosition::new(x,y))).map_err(|e|e.to_string())}
 }
 pub fn sync(app: &tauri::AppHandle) {
-    let state = app.state::<WidgetState>(); let layout = state.layout.lock().unwrap().clone(); let mut errors = vec![];
-    state.resizes.lock().unwrap().retain(|id,_|layout.widgets.iter().any(|w|&w.id==id));
+    let state = app.state::<WidgetState>(); let layout = state.layout.lock().unwrap_or_else(|e| e.into_inner()).clone(); let mut errors = vec![];
+    state.resizes.lock().unwrap_or_else(|e| e.into_inner()).retain(|id,_|layout.widgets.iter().any(|w|&w.id==id));
     let enabled: Vec<_> = layout.widgets.iter().filter(|w| w.enabled && !crate::games::is_active(app)).collect();
     for (label, window) in app.webview_windows() {
         if is_widget(&label) && !enabled.iter().any(|w| label == format!("widget-{}",w.id)) { let _ = window.destroy(); }
@@ -280,12 +280,12 @@ pub fn sync(app: &tauri::AppHandle) {
         })();
         if let Err(error) = result { errors.push(format!("{}：{error}",widget.kind)); }
     }
-    *state.errors.lock().unwrap() = errors;
-    let menu_id=state.menu_target.lock().unwrap().clone();
+    *state.errors.lock().unwrap_or_else(|e| e.into_inner()) = errors;
+    let menu_id=state.menu_target.lock().unwrap_or_else(|e| e.into_inner()).clone();
     if let Some(menu)=app.get_webview_window("widgetmenu"){
         if menu_id.as_ref().is_some_and(|id|layout.widgets.iter().any(|w|&w.id==id))&&!crate::games::is_active(app){
             if let Ok(data)=menu_payload(app){let _=menu.eval(format!("window.dispatchEvent(new CustomEvent('widget-menu-config',{{detail:{data}}}));"));}
-        }else{let _=menu.hide();*state.menu_target.lock().unwrap()=None;}
+        }else{let _=menu.hide();*state.menu_target.lock().unwrap_or_else(|e| e.into_inner())=None;}
     }
     if let Some(control) = app.get_webview_window("control") { let _ = control.eval(format!("window.dispatchEvent(new CustomEvent('widgets-changed',{{detail:{}}}));",snapshot(app))); }
 }
@@ -306,7 +306,7 @@ pub fn start(app: &tauri::AppHandle) {
         validate(&layout)?; Ok(layout)
     })();
     let state=app.state::<WidgetState>();
-    match result { Ok(layout)=>*state.layout.lock().unwrap()=layout,Err(error)=>*state.load_error.lock().unwrap()=Some(error) }
+    match result { Ok(layout)=>*state.layout.lock().unwrap_or_else(|e| e.into_inner())=layout,Err(error)=>*state.load_error.lock().unwrap_or_else(|e| e.into_inner())=Some(error) }
     sync(app);
     let app=app.clone();std::thread::spawn(move||{
         let mut previous=String::new();
@@ -331,7 +331,7 @@ pub async fn add_desktop_widget(app: tauri::AppHandle, kind: String, layer: Opti
         None
     };
     let state=app.state::<WidgetState>();let _operation=state.operation.lock().await;
-    let mut next=state.layout.lock().unwrap().clone();
+    let mut next=state.layout.lock().unwrap_or_else(|e| e.into_inner()).clone();
     let mut random=[0u8;8];getrandom::fill(&mut random).map_err(|e|e.to_string())?;
     let index=next.widgets.len();
     let note=if kind=="notes"{Some(NoteData{title:"今日待办".into(),mode:"todo".into(),text:String::new(),items:vec![]})}else{None};
@@ -340,7 +340,7 @@ pub async fn add_desktop_widget(app: tauri::AppHandle, kind: String, layer: Opti
     let theme="ivory".to_string();
     let scale=crate::widget_geometry::resolve(&monitors(&app).unwrap_or_default(),None).map_or(0.5,|m|crate::widget_geometry::default_scale(m.width/m.scale,m.height/m.scale)).clamp(0.5,1.5);
     next.widgets.push(Widget{id:random.iter().map(|b|format!("{b:02x}")).collect(),kind,theme,layer,scale,x:((if index%3==1{0.88}else{0.52})-(index/3) as f64*0.25).max(0.05),y:if index%3==2{0.94}else{0.06},enabled:true,city:None,note,countdown,living,monitor:None,custom_id});
-    persist(&app,&next)?; *state.layout.lock().unwrap()=next; sync(&app); Ok(snapshot(&app))
+    persist(&app,&next)?; *state.layout.lock().unwrap_or_else(|e| e.into_inner())=next; sync(&app); Ok(snapshot(&app))
 }
 #[derive(Deserialize)]
 #[serde(rename_all="camelCase",deny_unknown_fields)]
@@ -348,12 +348,12 @@ pub struct Patch { layer:Option<String>, monitor: Option<String>, theme: Option<
 #[tauri::command]
 pub async fn update_desktop_widget(app: tauri::AppHandle, id: String, patch: Patch) -> Result<Value,String> {
     let state=app.state::<WidgetState>();let _operation=state.operation.lock().await;
-    let mut next=state.layout.lock().unwrap().clone();let widget=next.widgets.iter_mut().find(|w|w.id==id).ok_or("没有找到这个组件")?;
+    let mut next=state.layout.lock().unwrap_or_else(|e| e.into_inner()).clone();let widget=next.widgets.iter_mut().find(|w|w.id==id).ok_or("没有找到这个组件")?;
     let old_layer=widget.layer.clone();if let Some(v)=patch.layer{widget.layer=v;}
     if let Some(v)=patch.monitor{widget.monitor=Some(v);}if let Some(v)=patch.theme{widget.theme=v;}if let Some(v)=patch.scale{widget.scale=v;}if let Some(v)=patch.x{widget.x=v;}if let Some(v)=patch.y{widget.y=v;}if let Some(v)=patch.enabled{widget.enabled=v;}if let Some(v)=patch.city{widget.city=Some(v);}if let Some(v)=patch.note{widget.note=Some(v);}if let Some(v)=patch.countdown{widget.countdown=Some(v);}if let Some(v)=patch.living{widget.living=Some(v);}
     let layer_changed=old_layer!=widget.layer;
-    persist(&app,&next)?;*state.layout.lock().unwrap()=next;
-    if layer_changed{state.resizes.lock().unwrap().remove(&id);
+    persist(&app,&next)?;*state.layout.lock().unwrap_or_else(|e| e.into_inner())=next;
+    if layer_changed{state.resizes.lock().unwrap_or_else(|e| e.into_inner()).remove(&id);
         // Rebuild the Windows window with the correct Tao parent, not just HWND styles.
         #[cfg(windows)] if let Some(window)=app.get_webview_window(&format!("widget-{id}")){
             let handle=app.clone();
@@ -396,11 +396,11 @@ pub async fn remove_custom_widget(app:tauri::AppHandle,id:String)->Result<Value,
 /// Removes every card that renders the given custom template, and saves the layout if anything went.
 pub fn drop_custom_cards(app:&tauri::AppHandle,id:&str)->Result<usize,String>{
     let state=app.state::<WidgetState>();
-    let mut next=state.layout.lock().unwrap().clone();
+    let mut next=state.layout.lock().unwrap_or_else(|e| e.into_inner()).clone();
     let before=next.widgets.len();
     next.widgets.retain(|w|!(w.kind=="custom"&&w.custom_id.as_deref()==Some(id)));
     let removed=before-next.widgets.len();
-    if removed>0{persist(app,&next)?;*state.layout.lock().unwrap()=next;sync(app);}
+    if removed>0{persist(app,&next)?;*state.layout.lock().unwrap_or_else(|e| e.into_inner())=next;sync(app);}
     Ok(removed)
 }
 
@@ -410,7 +410,7 @@ pub async fn save_desktop_widget_content(window:tauri::WebviewWindow,content:Wid
     let app=window.app_handle();let state=app.state::<WidgetState>();let _operation=state.operation.lock().await;
     let original=own_widget(&window)?;
     if state.editing.load(Ordering::Relaxed){return Err("请先完成组件摆放".into());}
-    let mut next=state.layout.lock().unwrap().clone();
+    let mut next=state.layout.lock().unwrap_or_else(|e| e.into_inner()).clone();
     let widget=next.widgets.iter_mut().find(|w|w.id==original.id).ok_or("没有找到这个组件")?;
     match widget.kind.as_str() {
         "notes" if content.note.is_some() && content.countdown.is_none() && content.living.is_none() => widget.note=content.note,
@@ -418,18 +418,18 @@ pub async fn save_desktop_widget_content(window:tauri::WebviewWindow,content:Wid
         "reminders" | "stocks" | "woodfish" if content.living.is_some() && content.note.is_none() && content.countdown.is_none() => widget.living=content.living,
         _=>return Err("此组件不能保存这类内容".into())
     }
-    persist(app,&next)?;*state.layout.lock().unwrap()=next;sync(app);Ok(())
+    persist(app,&next)?;*state.layout.lock().unwrap_or_else(|e| e.into_inner())=next;sync(app);Ok(())
 }
 #[tauri::command]
 pub async fn remove_desktop_widget(app: tauri::AppHandle,id:String)->Result<Value,String>{
     let state=app.state::<WidgetState>();let _operation=state.operation.lock().await;
-    let mut next=state.layout.lock().unwrap().clone();next.widgets.retain(|w|w.id!=id);
-    persist(&app,&next)?;*state.layout.lock().unwrap()=next;sync(&app);Ok(snapshot(&app))
+    let mut next=state.layout.lock().unwrap_or_else(|e| e.into_inner()).clone();next.widgets.retain(|w|w.id!=id);
+    persist(&app,&next)?;*state.layout.lock().unwrap_or_else(|e| e.into_inner())=next;sync(&app);Ok(snapshot(&app))
 }
 #[tauri::command]
 pub async fn set_widgets_editing(app:tauri::AppHandle,editing:bool)->Result<Value,String>{
     let state=app.state::<WidgetState>();let _operation=state.operation.lock().await;
-    persist(&app,&state.layout.lock().unwrap().clone())?;state.editing.store(editing,Ordering::Relaxed);sync(&app);Ok(snapshot(&app))
+    persist(&app,&state.layout.lock().unwrap_or_else(|e| e.into_inner()).clone())?;state.editing.store(editing,Ordering::Relaxed);sync(&app);Ok(snapshot(&app))
 }
 #[tauri::command]
 pub fn get_desktop_widget(window:tauri::WebviewWindow)->Result<Value,String>{widget_payload(window.app_handle(),&own_widget(&window)?)}
@@ -441,14 +441,14 @@ pub async fn move_desktop_widget(window:tauri::WebviewWindow,grab_x:f64,grab_y:f
     let monitor=crate::widget_geometry::at_point(&areas,point.0,point.1).ok_or("没有找到显示器")?;
     let (base_w,base_h)=widget_base_size(app,&original);let width=(base_w*original.scale+16.0)*monitor.scale;let height=(base_h*original.scale+16.0)*monitor.scale;
     let (x,y)=crate::widget_geometry::drag_position(monitor,width,height,point,(grab_x,grab_y));
-    let mut next=state.layout.lock().unwrap().clone();let widget=next.widgets.iter_mut().find(|w|w.id==original.id).ok_or("没有找到组件")?;
+    let mut next=state.layout.lock().unwrap_or_else(|e| e.into_inner()).clone();let widget=next.widgets.iter_mut().find(|w|w.id==original.id).ok_or("没有找到组件")?;
     widget.x=x;widget.y=y;widget.monitor=Some(monitor.id.clone());let moved=widget.clone();
-    if commit{persist(app,&next)?;}*state.layout.lock().unwrap()=next;place(app,&window,&moved)?;
+    if commit{persist(app,&next)?;}*state.layout.lock().unwrap_or_else(|e| e.into_inner())=next;place(app,&window,&moved)?;
     if commit{sync(app);}else{window.eval(format!("window.dispatchEvent(new CustomEvent('widget-config',{{detail:{}}}));",widget_payload(app,&moved)?)).map_err(|e|e.to_string())?;}Ok(())
 }
 fn menu_payload(app:&tauri::AppHandle)->Result<Value,String>{
-    let state=app.state::<WidgetState>();let id=state.menu_target.lock().unwrap().clone().ok_or("组件菜单已关闭")?;
-    let widget=state.layout.lock().unwrap().widgets.iter().find(|w|w.id==id).cloned().ok_or("组件已移除")?;
+    let state=app.state::<WidgetState>();let id=state.menu_target.lock().unwrap_or_else(|e| e.into_inner()).clone().ok_or("组件菜单已关闭")?;
+    let widget=state.layout.lock().unwrap_or_else(|e| e.into_inner()).widgets.iter().find(|w|w.id==id).cloned().ok_or("组件已移除")?;
     let areas=monitors(app)?;let monitor=crate::widget_geometry::resolve(&areas,widget.monitor.as_deref()).ok_or("没有找到显示器")?;
     Ok(json!({"widget":widget,"monitors":snapshot(app)["monitors"],"appearance":crate::settings(app).appearance,"maxHeight":(monitor.height/monitor.scale-24.).clamp(160.,560.)}))
 }
@@ -468,7 +468,7 @@ fn place_menu(app:&tauri::AppHandle,menu:&tauri::WebviewWindow,height:f64)->Resu
 #[tauri::command]
 pub async fn show_widget_settings(window:tauri::WebviewWindow)->Result<(),String>{
     let widget=own_widget(&window)?;let app=window.app_handle();let state=app.state::<WidgetState>();
-    *state.menu_target.lock().unwrap()=Some(widget.id);
+    *state.menu_target.lock().unwrap_or_else(|e| e.into_inner())=Some(widget.id);
     let data=menu_payload(app)?;
     let menu=if let Some(menu)=app.get_webview_window("widgetmenu"){
         menu.eval(format!("window.dispatchEvent(new CustomEvent('widget-menu-open',{{detail:{data}}}));")).map_err(|e|e.to_string())?;menu
@@ -503,7 +503,7 @@ pub fn size_widget_settings(window:tauri::WebviewWindow,height:f64)->Result<(),S
 pub async fn search_widget_cities(window:tauri::WebviewWindow,query:String)->Result<Vec<City>,String>{
     menu_only(&window)?;if own_widget(&window)?.kind!="weather"{return Err("此组件不支持城市查询".into());}
     let app=window.app_handle();let state=app.state::<WidgetState>();let now=chrono::Utc::now().timestamp();
-    {let mut attempts=state.attempts.lock().unwrap();if attempts.get("menu-city").is_some_and(|at|now-*at<2){return Err("请稍后再查询城市".into());}attempts.insert("menu-city".into(),now);}
+    {let mut attempts=state.attempts.lock().unwrap_or_else(|e| e.into_inner());if attempts.get("menu-city").is_some_and(|at|now-*at<2){return Err("请稍后再查询城市".into());}attempts.insert("menu-city".into(),now);}
     let source=crate::reminders::widget_weather_source(app);
     tauri::async_runtime::spawn_blocking(move||crate::care_weather::search(&source,&query)).await.map_err(|e|e.to_string())?
 }
@@ -514,11 +514,11 @@ pub async fn resize_desktop_widget(window:tauri::WebviewWindow,phase:String)->Re
     if phase=="begin"{
         let (x,y,_,_,_)=geometry(app,&original)?;let areas=monitors(app)?;
         let monitor=crate::widget_geometry::resolve(&areas,original.monitor.as_deref()).ok_or("没有找到显示器")?.clone();
-        let point=cursor(app)?;state.resizes.lock().unwrap().insert(original.id.clone(),ResizeSession{original,anchor:(x,y),cursor:point,monitor});return Ok(());
+        let point=cursor(app)?;state.resizes.lock().unwrap_or_else(|e| e.into_inner()).insert(original.id.clone(),ResizeSession{original,anchor:(x,y),cursor:point,monitor});return Ok(());
     }
     if !["move","end","cancel"].contains(&phase.as_str()){return Err("无效的缩放操作".into());}
-    let session=state.resizes.lock().unwrap().get(&original.id).cloned().ok_or("请先开始缩放")?;
-    let mut next=state.layout.lock().unwrap().clone();let widget=next.widgets.iter_mut().find(|w|w.id==original.id).ok_or("组件已移除")?;
+    let session=state.resizes.lock().unwrap_or_else(|e| e.into_inner()).get(&original.id).cloned().ok_or("请先开始缩放")?;
+    let mut next=state.layout.lock().unwrap_or_else(|e| e.into_inner()).clone();let widget=next.widgets.iter_mut().find(|w|w.id==original.id).ok_or("组件已移除")?;
     if phase=="cancel"{widget.scale=session.original.scale;widget.x=session.original.x;widget.y=session.original.y;widget.monitor=session.original.monitor.clone();}
     else{
         let point=cursor(app)?;let base=widget_base_size(app,widget);
@@ -528,12 +528,12 @@ pub async fn resize_desktop_widget(window:tauri::WebviewWindow,phase:String)->Re
     }
     let resized=widget.clone();
     if phase=="end"{if let Err(error)=persist(app,&next){
-        let mut restored=state.layout.lock().unwrap();if let Some(w)=restored.widgets.iter_mut().find(|w|w.id==original.id){w.scale=session.original.scale;w.x=session.original.x;w.y=session.original.y;w.monitor=session.original.monitor;}
-        state.resizes.lock().unwrap().remove(&original.id);drop(restored);sync(app);return Err(error);
+        let mut restored=state.layout.lock().unwrap_or_else(|e| e.into_inner());if let Some(w)=restored.widgets.iter_mut().find(|w|w.id==original.id){w.scale=session.original.scale;w.x=session.original.x;w.y=session.original.y;w.monitor=session.original.monitor;}
+        state.resizes.lock().unwrap_or_else(|e| e.into_inner()).remove(&original.id);drop(restored);sync(app);return Err(error);
     }}
-    *state.layout.lock().unwrap()=next;
+    *state.layout.lock().unwrap_or_else(|e| e.into_inner())=next;
     if phase=="move"{place(app,&window,&resized)?;window.eval(format!("window.dispatchEvent(new CustomEvent('widget-config',{{detail:{}}}));",widget_payload(app,&resized)?)).map_err(|e|e.to_string())?;}
-    else{state.resizes.lock().unwrap().remove(&original.id);sync(app);}Ok(())
+    else{state.resizes.lock().unwrap_or_else(|e| e.into_inner()).remove(&original.id);sync(app);}Ok(())
 }
 /// Reuse a visible weather widget's cached sample without querying weather or disclosing location.
 pub fn cached_weather_for_proactivity(app:&tauri::AppHandle, now:i64)->Option<Weather>{
@@ -564,10 +564,10 @@ pub async fn get_widget_weather(window:tauri::WebviewWindow)->Result<Weather,Str
     let _operation=state.weather_operation.lock().await;let source=crate::reminders::widget_weather_source(&app);
     let key=format!("{}:{}:{}",city.latitude,city.longitude,serde_json::to_string(&source).map_err(|e|e.to_string())?);
     let now=chrono::Utc::now().timestamp();
-    if let Some(weather)=state.weather.lock().unwrap().get(&key).filter(|w|(0..1800).contains(&(now-w.updated_at))&&(-1800..7200).contains(&(now-w.model_at))).cloned(){return Ok(weather);}
-    {let mut attempts=state.attempts.lock().unwrap();if attempts.get(&key).is_some_and(|last|(0..60).contains(&(now-last))){return Err("天气查询每分钟最多一次，请稍后再试".into());}attempts.insert(key.clone(),now);if attempts.len()>48{attempts.retain(|_,t|(0..3600).contains(&(now-*t)));}}
+    if let Some(weather)=state.weather.lock().unwrap_or_else(|e| e.into_inner()).get(&key).filter(|w|(0..1800).contains(&(now-w.updated_at))&&(-1800..7200).contains(&(now-w.model_at))).cloned(){return Ok(weather);}
+    {let mut attempts=state.attempts.lock().unwrap_or_else(|e| e.into_inner());if attempts.get(&key).is_some_and(|last|(0..60).contains(&(now-last))){return Err("天气查询每分钟最多一次，请稍后再试".into());}attempts.insert(key.clone(),now);if attempts.len()>48{attempts.retain(|_,t|(0..3600).contains(&(now-*t)));}}
     let weather=tauri::async_runtime::spawn_blocking(move||crate::care_weather::fetch(&source,&city,now)).await.map_err(|e|e.to_string())??;
-    let mut cache=state.weather.lock().unwrap();if cache.len()>48{cache.clear();}cache.insert(key,weather.clone());Ok(weather)
+    let mut cache=state.weather.lock().unwrap_or_else(|e| e.into_inner());if cache.len()>48{cache.clear();}cache.insert(key,weather.clone());Ok(weather)
 }
 
 /// A narrow, read-only market-data adapter; no arbitrary host or symbol supplied by a webview.
@@ -580,9 +580,9 @@ pub async fn get_widget_forecast(window:tauri::WebviewWindow)->Result<Value,Stri
     let _lock=state.forecast_operation.lock().await;let now=chrono::Utc::now().timestamp();
     let source=crate::reminders::widget_weather_source(&app);
     let key=format!("{}:{}:{}",city.latitude,city.longitude,serde_json::to_string(&source).map_err(|e|e.to_string())?);
-    if let Some((when,value))=state.forecasts.lock().unwrap().get(&key).filter(|(when,_)|(0..1800).contains(&(now-*when))).cloned(){return Ok(value);}
+    if let Some((when,value))=state.forecasts.lock().unwrap_or_else(|e| e.into_inner()).get(&key).filter(|(when,_)|(0..1800).contains(&(now-*when))).cloned(){return Ok(value);}
     let result=tauri::async_runtime::spawn_blocking(move||crate::care_weather::forecast(&source,&city)).await.map_err(|e|e.to_string())??;
-    let mut cache=state.forecasts.lock().unwrap();if cache.len()>48{cache.clear();}cache.insert(key,(now,result.clone()));
+    let mut cache=state.forecasts.lock().unwrap_or_else(|e| e.into_inner());if cache.len()>48{cache.clear();}cache.insert(key,(now,result.clone()));
     Ok(result)
 }
 
@@ -591,9 +591,9 @@ pub async fn get_widget_air_quality(window:tauri::WebviewWindow)->Result<Value,S
  let widget=own_widget(&window)?;if widget.kind!="weather"{return Err("此组件不能读取空气质量".into());}
  let city=widget.city.ok_or("请先选择城市")?;let app=window.app_handle().clone();let state=app.state::<WidgetState>();
  let _lock=state.forecast_operation.lock().await;let now=chrono::Utc::now().timestamp();let key=format!("air:{}:{}",city.latitude,city.longitude);
- if let Some((_,value))=state.forecasts.lock().unwrap().get(&key).filter(|(at,_)|(0..1800).contains(&(now-*at))).cloned(){return Ok(value);}
+ if let Some((_,value))=state.forecasts.lock().unwrap_or_else(|e| e.into_inner()).get(&key).filter(|(at,_)|(0..1800).contains(&(now-*at))).cloned(){return Ok(value);}
  let value=tauri::async_runtime::spawn_blocking(move||crate::care_weather::air_quality(&city,now)).await.map_err(|e|e.to_string())??;
- let mut cache=state.forecasts.lock().unwrap();if cache.len()>48{cache.clear();}cache.insert(key,(now,value.clone()));Ok(value)
+ let mut cache=state.forecasts.lock().unwrap_or_else(|e| e.into_inner());if cache.len()>48{cache.clear();}cache.insert(key,(now,value.clone()));Ok(value)
 }
 fn market_number(value:Option<&Value>)->Option<f64>{value.and_then(|v|v.as_f64().or_else(||v.as_str().and_then(|s|s.parse::<f64>().ok()))).filter(|v|v.is_finite())}
 fn watchlist_values(value:&Value,symbols:&[String],now:i64)->Result<Value,String>{
@@ -614,7 +614,7 @@ pub async fn get_widget_stock_watchlist(window:tauri::WebviewWindow)->Result<Val
  let d=widget.living.unwrap_or_default();let symbols=if d.symbols.is_empty(){vec![d.symbol]}else{d.symbols};
  let app=window.app_handle().clone();let state=app.state::<WidgetState>();let _lock=state.market_operation.lock().await;
  let now=chrono::Utc::now().timestamp();let key=format!("list:{}",symbols.join(","));
- if let Some((_,value))=state.market.lock().unwrap().get(&key).filter(|(at,_)|(0..60).contains(&(now-*at))).cloned(){return Ok(value);}
+ if let Some((_,value))=state.market.lock().unwrap_or_else(|e| e.into_inner()).get(&key).filter(|(at,_)|(0..60).contains(&(now-*at))).cloned(){return Ok(value);}
  let result=tauri::async_runtime::spawn_blocking(move||->Result<Value,String>{
   let mut url=url::Url::parse("https://push2.eastmoney.com/api/qt/ulist.np/get").map_err(|e|e.to_string())?;
   url.query_pairs_mut().append_pair("secids",&symbols.join(",")).append_pair("fields","f2,f3,f4,f12,f13,f14,f124").append_pair("fltt","2");
@@ -623,7 +623,7 @@ pub async fn get_widget_stock_watchlist(window:tauri::WebviewWindow)->Result<Val
   let mut bytes=Vec::new();response.take(256*1024+1).read_to_end(&mut bytes).map_err(|e|e.to_string())?;if bytes.len()>256*1024{return Err("自选行情响应过大".into());}
   let value:Value=serde_json::from_slice(&bytes).map_err(|_|"自选行情格式无效")?;watchlist_values(&value,&symbols,now)
  }).await.map_err(|e|e.to_string())??;
- let mut cache=state.market.lock().unwrap();if cache.len()>20{cache.clear();}cache.insert(key,(now,result.clone()));Ok(result)
+ let mut cache=state.market.lock().unwrap_or_else(|e| e.into_inner());if cache.len()>20{cache.clear();}cache.insert(key,(now,result.clone()));Ok(result)
 }
 #[tauri::command]
 pub async fn get_widget_stocks(window: tauri::WebviewWindow, period:String, symbol:Option<String>)->Result<Value,String>{
@@ -637,7 +637,7 @@ pub async fn get_widget_stocks(window: tauri::WebviewWindow, period:String, symb
     let app=window.app_handle();let state=app.state::<WidgetState>();
     let _operation=state.market_operation.lock().await;
     let key=format!("{symbol}/{period}");let now=chrono::Utc::now().timestamp();
-    if let Some((when,value))=state.market.lock().unwrap().get(&key).filter(|(when,_)|(0..60).contains(&(now-*when))).cloned(){return Ok(value);}
+    if let Some((when,value))=state.market.lock().unwrap_or_else(|e| e.into_inner()).get(&key).filter(|(when,_)|(0..60).contains(&(now-*when))).cloned(){return Ok(value);}
     let stock=symbol.clone();let range=period.clone();let historical=period=="1M"||period=="1Y";let days=if period=="1D"{1}else if period=="5D"{5}else if period=="1M"{23}else{251};
     let response=tauri::async_runtime::spawn_blocking(move||->Result<Value,String>{
         if let Ok(quote)=crate::widget_market::fetch(&stock,&range){return Ok(quote);}
@@ -670,7 +670,7 @@ pub async fn get_widget_stocks(window: tauri::WebviewWindow, period:String, symb
     }).await.map_err(|e|e.to_string())??;
     let mut response=response;
     response["symbol"]=json!(symbol);response["period"]=json!(period);
-    let mut cache=state.market.lock().unwrap();if cache.len()>20{cache.clear();}cache.insert(key,(now,response.clone()));
+    let mut cache=state.market.lock().unwrap_or_else(|e| e.into_inner());if cache.len()>20{cache.clear();}cache.insert(key,(now,response.clone()));
     Ok(response)
 }
 

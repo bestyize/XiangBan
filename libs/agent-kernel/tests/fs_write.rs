@@ -141,6 +141,19 @@ fn edit_file_replaces_exact_text_once_or_everywhere() {
 }
 
 #[test]
+fn a_multi_line_edit_matches_a_crlf_file_and_keeps_its_line_endings() {
+    let ws = Ws::new("fsw-edit-crlf");
+    ws.write("w.txt", "one\r\ntwo\r\nthree\r\n");
+    assert!(ws.edit("w.txt", "one\ntwo\n", "1\n2\n2.5\n", false).starts_with("Edited w.txt (1 replacement)"));
+    assert_eq!(std::fs::read_to_string(ws.root("w.txt")).unwrap(), "1\r\n2\r\n2.5\r\nthree\r\n");
+    // Mixed endings are left as they are: only exact text matches there.
+    ws.write("m.txt", "a\r\nb\nc\r\n");
+    assert!(ws.edit("m.txt", "a\nb", "x", false).contains("was not found"));
+    assert!(ws.edit("m.txt", "a\r\nb", "x", false).starts_with("Edited"));
+    assert_eq!(std::fs::read_to_string(ws.root("m.txt")).unwrap(), "x\nc\r\n");
+}
+
+#[test]
 fn edit_file_refuses_binary_oversized_and_outside_files() {
     let ws = Ws::new("fsw-edit-bad");
     std::fs::write(ws.root("blob.bin"), b"abc\0def").unwrap();

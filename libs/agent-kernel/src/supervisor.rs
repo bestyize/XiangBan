@@ -2,7 +2,7 @@
 //! The OS releases a file lock when its process dies, unlike a persistent
 //! "running" flag or a PID file. It is a local-machine advisory lease, not
 //! distributed exactly-once execution and not a replacement for sandboxing.
-use std::{fs::{self, File, OpenOptions}, io, path::{Path, PathBuf}};
+use std::{fs::{self, File, OpenOptions}, path::{Path, PathBuf}};
 
 fn valid_id(id: &str) -> bool {
     !id.is_empty() && id.len() <= 128 &&
@@ -27,9 +27,10 @@ impl SessionLease {
         #[cfg(unix)]
         { use std::os::unix::fs::OpenOptionsExt; opts.mode(0o600); }
         let file = opts.open(path).map_err(|e| e.to_string())?;
-        file.try_lock().map_err(|e| {
-            if e.kind() == io::ErrorKind::WouldBlock { "session is already owned by another process".into() }
-            else { format!("cannot acquire session lease: {e}") }
+        // Since Rust 1.89 `try_lock` reports a held lock as `TryLockError::WouldBlock`, not as an io::Error kind.
+        file.try_lock().map_err(|e| match e {
+            fs::TryLockError::WouldBlock => "session is already owned by another process".to_string(),
+            fs::TryLockError::Error(e) => format!("cannot acquire session lease: {e}"),
         })?;
         Ok(Self { _handle: file })
     }

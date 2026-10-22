@@ -64,25 +64,25 @@ pub(crate) fn issue_token(app: &tauri::AppHandle) -> Result<String, String> {
     let mut random = [0u8; 32];
     getrandom::fill(&mut random).map_err(|e| format!("安全宿主初始化失败：{e}"))?;
     let token = random.iter().map(|b| format!("{b:02x}")).collect::<String>();
-    *app.state::<GameState>().host_token.lock().unwrap() = token.clone();
+    *app.state::<GameState>().host_token.lock().unwrap_or_else(|e| e.into_inner()) = token.clone();
     Ok(token)
 }
 pub(crate) fn authorize(app: &tauri::AppHandle, token: &str) -> Result<(), String> {
-    let state = app.state::<GameState>(); let expected=state.host_token.lock().unwrap();
+    let state = app.state::<GameState>(); let expected=state.host_token.lock().unwrap_or_else(|e| e.into_inner());
     if expected.is_empty() || token != expected.as_str() { return Err("游戏资源没有原生宿主权限".into()); } Ok(())
 }
 #[tauri::command]
 pub fn set_game_desktop_double_click(app: tauri::AppHandle, enabled: bool) -> Result<crate::Settings,String> {
     if enabled && !app.state::<GameState>().desktop_entry_ready.load(Ordering::Relaxed) { return Err("桌面双击入口不可用，请使用玩一玩按钮".into()); }
-    let state=app.state::<crate::DesktopState>(); let _update=state.update_lock.lock().unwrap();
+    let state=app.state::<crate::DesktopState>(); let _update=state.update_lock.lock().unwrap_or_else(|e| e.into_inner());
     let mut config=crate::settings(&app); config.game_desktop_double_click=enabled; crate::persist(&app,&config)?;
-    *state.settings.lock().unwrap()=config.clone(); crate::publish(&app); Ok(config)
+    *state.settings.lock().unwrap_or_else(|e| e.into_inner())=config.clone(); crate::publish(&app); Ok(config)
 }
 #[tauri::command]
 pub fn get_game_status(app: tauri::AppHandle) -> Value {
     let state = app.state::<GameState>();
     json!({"active":is_active(&app), "desk":{"active":crate::desk_game::active_id(&app).is_some(),"id":crate::desk_game::active_id(&app)}, "desktopDoubleClickSupported":state.desktop_entry_ready.load(Ordering::Relaxed),
-        "desktopEntryError":state.desktop_entry_error.lock().unwrap().clone(),
+        "desktopEntryError":state.desktop_entry_error.lock().unwrap_or_else(|e| e.into_inner()).clone(),
         "platform":std::env::consts::OS, "games":catalog(&app).map(|c|c.ids()).unwrap_or_else(|_|IDS.iter().map(|id|id.to_string()).collect())})
 }
 /// Shipped games may only persist when their manifest says so (ink-blade, kept under its old file name);
@@ -107,7 +107,7 @@ pub fn validate_save(value: &Value) -> Result<Vec<u8>, String> {
 #[tauri::command]
 pub fn load_game_save(app: tauri::AppHandle, game_id: String, host_token: String) -> Result<Option<Value>, String> {
     authorize(&app,&host_token)?;
-    let state = app.state::<GameState>(); let _io = state.io.lock().unwrap();
+    let state = app.state::<GameState>(); let _io = state.io.lock().unwrap_or_else(|e| e.into_inner());
     let path = save_path(&app, &game_id)?;
     match fs::metadata(&path) { Ok(metadata) if metadata.len()>32768=>return Err("存档过大，原进度已保留".into()),Err(e) if e.kind()==std::io::ErrorKind::NotFound=>return Ok(None),Err(e)=>return Err(format!("存档读取失败，原进度已保留：{e}")),_=>{} }
     let bytes = match fs::read(&path) { Ok(bytes) => bytes, Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None), Err(e) => return Err(format!("存档读取失败，原进度已保留：{e}")) };
@@ -118,7 +118,7 @@ pub fn load_game_save(app: tauri::AppHandle, game_id: String, host_token: String
 #[tauri::command]
 pub fn save_game_save(app: tauri::AppHandle, game_id: String, data: Value, host_token: String) -> Result<(), String> {
     authorize(&app,&host_token)?;
-    let state = app.state::<GameState>(); let _io = state.io.lock().unwrap();
+    let state = app.state::<GameState>(); let _io = state.io.lock().unwrap_or_else(|e| e.into_inner());
     let bytes = validate_save(&data)?; let path = save_path(&app, &game_id)?;
     let directory = path.parent().ok_or("没有存档目录")?;
     fs::create_dir_all(directory).map_err(|e| e.to_string())?;
@@ -174,7 +174,7 @@ async fn open_selected(app: &tauri::AppHandle, game_id: Option<String>) -> Resul
         window.unminimize().map_err(|e|e.to_string())?; window.show().map_err(|e|e.to_string())?; return window.set_focus().map_err(|e|e.to_string()); }
     let token=issue_token(app)?;
     let smoke=app.state::<crate::DesktopState>().isolated && std::env::var_os("XIAOBAN_GAMES_SMOKE").is_some();
-    *state.smoke_report.lock().unwrap()=None;
+    *state.smoke_report.lock().unwrap_or_else(|e| e.into_inner())=None;
     let builder = WebviewWindowBuilder::new(app, "games", WebviewUrl::App(format!("index.html?scene=games&game={game_id}").into()))
         .initialization_script(format!("if(window===window.top){{window.__XIAOBAN_GAME_TOKEN__={};window.__XIAOBAN_GAME_SMOKE__={smoke};}}",json!(token)))
         // A normal decorated window: the system title bar owns close / minimize / full screen, so the game
@@ -186,14 +186,14 @@ async fn open_selected(app: &tauri::AppHandle, game_id: Option<String>) -> Resul
     #[cfg(windows)] let builder = builder.data_directory(crate::storage::webview(&crate::storage::root(app)?));
     #[cfg(target_os="macos")] let builder = builder.incognito(true);
     let window = builder.build().map_err(|e|e.to_string())?;
-    *state.pet_position.lock().unwrap() = app.get_webview_window("pet").and_then(|w| w.outer_position().ok());
+    *state.pet_position.lock().unwrap_or_else(|e| e.into_inner()) = app.get_webview_window("pet").and_then(|w| w.outer_position().ok());
     state.active.store(true, Ordering::SeqCst);
     crate::pets::sync(app);
     crate::widgets::sync(app);
     crate::reminders::set_game_active(app, true);
     let _ = app.emit("games-active", true);
     for label in ["pet", "wallpaper", "media-a", "media-b", "media-preview", crate::effects::LABEL] {
-        app.state::<crate::DesktopState>().ready_scenes.lock().unwrap().remove(label);
+        app.state::<crate::DesktopState>().ready_scenes.lock().unwrap_or_else(|e| e.into_inner()).remove(label);
         if let Some(background) = app.get_webview_window(label) { if let Err(e) = background.destroy() { state.active.store(false,Ordering::SeqCst); let _=window.destroy(); restore_background(app); return Err(e.to_string()); } }
     }
     if let Err(error)=wait_gone(app,&["pet","wallpaper","media-a","media-b","media-preview",crate::effects::LABEL]).await {
@@ -212,7 +212,7 @@ fn restore_background(app: &tauri::AppHandle) {
     if let Err(e) = crate::open_scene(app,&config.mode) { let _=app.emit("desktop-error",e); }
     crate::effects::sync(app);
     crate::widgets::sync(app);
-    if let Some(position) = app.state::<GameState>().pet_position.lock().unwrap().take() {
+    if let Some(position) = app.state::<GameState>().pet_position.lock().unwrap_or_else(|e| e.into_inner()).take() {
         if let Some(pet) = app.get_webview_window("pet") { let _ = pet.set_position(position); }
     }
 }
@@ -251,7 +251,7 @@ pub async fn delete_user_game_by_id(app: &tauri::AppHandle, id: &str) -> Result<
     if fs::symlink_metadata(crate::game_packs::packs_dir(&root).join(id)).is_err() { return Err(format!("没有找到自创游戏「{id}」")); }
     if is_active(app) { close(app).await?; }
     if crate::desk_game::active_id(app).as_deref() == Some(id) { crate::desk_game::close(app).await?; }
-    let state = app.state::<GameState>(); let _io = state.io.lock().unwrap();
+    let state = app.state::<GameState>(); let _io = state.io.lock().unwrap_or_else(|e| e.into_inner());
     crate::game_packs::remove_pack(&root, id)
 }
 #[tauri::command]
@@ -268,14 +268,14 @@ pub fn open_user_games_folder(window: tauri::WebviewWindow) -> Result<(), String
 }
 pub fn start(app: &tauri::AppHandle) {
     #[cfg(windows)] crate::windows::start_desktop_game_entry(app.clone());
-    #[cfg(not(windows))] { *app.state::<GameState>().desktop_entry_error.lock().unwrap()=Some("此平台尚未提供可靠的桌面空白双击判断，请使用设置或菜单栏的玩一玩。".into()); }
+    #[cfg(not(windows))] { *app.state::<GameState>().desktop_entry_error.lock().unwrap_or_else(|e| e.into_inner())=Some("此平台尚未提供可靠的桌面空白双击判断，请使用设置或菜单栏的玩一玩。".into()); }
 }
 #[tauri::command]
 pub fn game_smoke_report(app:tauri::AppHandle,host_token:String,report:Value)->Result<(),String>{
     authorize(&app,&host_token)?;
     if !app.state::<crate::DesktopState>().isolated || std::env::var_os("XIAOBAN_GAMES_SMOKE").is_none() { return Err("仅隔离验证可使用诊断命令".into()); }
     if report.to_string().len()>16384 { return Err("报告过大".into()); }
-    *app.state::<GameState>().smoke_report.lock().unwrap()=Some(report); Ok(())
+    *app.state::<GameState>().smoke_report.lock().unwrap_or_else(|e| e.into_inner())=Some(report); Ok(())
 }
 pub async fn smoke(app:&tauri::AppHandle)->Result<Value,String>{
     let before=crate::settings(app);
@@ -284,7 +284,7 @@ pub async fn smoke(app:&tauri::AppHandle)->Result<Value,String>{
     if !is_active(app) || app.get_webview_window("pet").is_some() || app.get_webview_window("wallpaper").is_some() || app.get_webview_window("media-a").is_some() || app.get_webview_window("media-b").is_some(){return Err("游戏窗口未暂停背景".into());}
     let deadline=std::time::Instant::now()+std::time::Duration::from_secs(145);
     let report=loop {
-        if let Some(report)=app.state::<GameState>().smoke_report.lock().unwrap().clone(){break report;}
+        if let Some(report)=app.state::<GameState>().smoke_report.lock().unwrap_or_else(|e| e.into_inner()).clone(){break report;}
         if std::time::Instant::now()>deadline{let _=close(app).await;return Err("游戏前端验证超时".into());}
         tokio_sleep().await;
     };

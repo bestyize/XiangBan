@@ -29,6 +29,8 @@ const R_BLIND: &str = "经过编码、无法审查的命令";
 const R_INFRA: &str = "删除或销毁容器、集群、云资源或代码仓库";
 const R_PUBLISH: &str = "发布到公共仓库";
 const R_DATABASE: &str = "删除数据库或数据表";
+const R_PIPE_RUN: &str = "把其他命令的输出当作脚本执行";
+const R_INLINE: &str = "内联脚本会删除文件或执行系统命令";
 
 const MAX_DEPTH: usize = 4;
 
@@ -38,7 +40,7 @@ pub fn assess(tool: &str, args: &Value, workspace: Option<&Path>) -> Option<&'st
     if !matches!(tool, "shell" | "process_start") {
         return None;
     }
-    assess_command(args.get("command")?.as_str()?, &Ctx { workspace, depth: 0, stdin_targets: false })
+    assess_command(args.get("command")?.as_str()?, &Ctx { workspace, depth: 0, stdin_targets: false, cwd_left: false })
 }
 
 #[derive(Clone, Copy)]
@@ -47,6 +49,9 @@ struct Ctx<'a> {
     depth: usize,
     /// The targets of this command arrive on standard input (`xargs`), so they cannot be checked.
     stdin_targets: bool,
+    /// An earlier command changed the directory away from the working folder (`cd /`) or made a link out of it
+    /// (`ln -s / root`), so a relative path no longer says where it points.
+    cwd_left: bool,
 }
 
 struct Word {
@@ -135,6 +140,56 @@ fn split(command: &str) -> Vec<Segment> {
     segments
 }
 
+/// What "这类命令都允许" remembers for a command line: the program and up to two words that pick what it does
+/// (`npm run build`, `cargo test`, `git status`), so approving `npm test` never approves `npm publish`.
+/// `None` means the call is asked every time: anything with several commands, pipes, redirections or substitutions,
+/// a program given by path, and programs that run arbitrary code or delete, move or send data whatever their words.
+pub fn remember_key(tool: &str, args: &Value) -> Option<String> {
+    if !matches!(tool, "shell" | "process_start") {
+        return None;
+    }
+    let command = args.get("command")?.as_str()?.trim();
+    // Any separator at all, even quoted: such a line is simply asked again rather than parsed cleverly.
+    if command.is_empty() || command.contains(['\n', '\r', '`', ';', '|', '&']) || command.contains("$(") || command.contains("${") {
+        return None;
+    }
+    let segments = split(command);
+    let [segment] = segments.as_slice() else { return None };
+    let words = &segment.words;
+    // `FOO=1 npm test`, `nohup …` and `timeout 5 …` change how the command runs; keep them asked.
+    if command_index(words)? != 0 || words.iter().any(|w| !w.quoted && (w.text.contains(['>', '<']) || w.text.contains('&'))) {
+        return None;
+    }
+    let program = &words[0];
+    if program.quoted || program.text.contains(['/', '\\', '$', '%', '=']) {
+        return None;
+    }
+    let cmd = name(program);
+    const NEVER: &[&str] = &[
+        "eval", "xargs", "find", "sudo", "doas", "su", "runas", "pkexec", "rm", "del", "erase", "rd", "rmdir", "remove-item", "ri", "mv", "move",
+        "move-item", "cp", "copy", "dd", "shred", "chmod", "chown", "chgrp", "kill", "pkill", "killall", "taskkill", "stop-process", "curl", "wget", "iwr",
+        "irm", "invoke-webrequest", "invoke-restmethod", "ssh", "scp", "sftp", "rsync", "nc", "ncat", "netcat", "socat", "telnet", "ftp", "osascript",
+        "open", "start", "start-process", "explorer", "reg", "schtasks", "launchctl", "systemctl", "crontab", "security", "docker", "kubectl", "deno", "bun",
+        "npx", "uvx", "pnpx", "dlx",
+    ];
+    if NEVER.contains(&cmd.as_str()) || SHELLS.contains(&cmd.as_str()) || INTERPRETERS.contains(&cmd.as_str()) || WRAPPERS.contains(&cmd.as_str()) {
+        return None;
+    }
+    let mut key = vec![cmd];
+    for word in &words[1..] {
+        let text = word.text.as_str();
+        if key.len() == 3 || text.starts_with('-') || text.starts_with('/') || word.quoted {
+            break;
+        }
+        // A path or a value is not a subcommand: `cat src/a.rs` is remembered as `cat`.
+        if !text.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | ':')) {
+            break;
+        }
+        key.push(text.to_lowercase());
+    }
+    Some(key.join(" "))
+}
+
 fn assess_command(command: &str, ctx: &Ctx) -> Option<&'static str> {
     if ctx.depth > MAX_DEPTH {
         return None;
@@ -143,18 +198,44 @@ fn assess_command(command: &str, ctx: &Ctx) -> Option<&'static str> {
         return Some(reason);
     }
     let mut previous: Option<String> = None;
+    let mut ctx = *ctx;
     for segment in split(command) {
-        if let Some(reason) = assess_words(&segment.words, segment.piped, previous.as_deref(), ctx) {
+        if let Some(reason) = assess_words(&segment.words, segment.piped, previous.as_deref(), &ctx) {
             return Some(reason);
+        }
+        if leaves_working_folder(&segment.words, &ctx) {
+            ctx.cwd_left = true;
         }
         previous = command_index(&segment.words).map(|i| name(&segment.words[i]));
     }
     None
 }
 
+/// `cd` somewhere outside the working folder (or home, with no argument), or a symbolic link to such a place.
+/// Relative paths in later commands are then no longer known to be inside.
+fn leaves_working_folder(words: &[Word], ctx: &Ctx) -> bool {
+    let Some(start) = command_index(words) else { return false };
+    let args = &words[start + 1..];
+    match name(&words[start]).as_str() {
+        "cd" | "pushd" | "chdir" | "set-location" | "sl" | "push-location" => {
+            let found = targets(args, false);
+            found.first().is_none_or(|target| *target != "-" && !inside_ctx(target, ctx))
+        }
+        cmd @ ("ln" | "mklink" | "new-item") => {
+            let symbolic = args.iter().any(|w| (w.text.starts_with('-') && !w.text.starts_with("--") && w.text.contains('s')) || w.text == "--symbolic"
+                || w.text.eq_ignore_ascii_case("/d") || w.text.eq_ignore_ascii_case("/j") || w.text.eq_ignore_ascii_case("symboliclink") || w.text.eq_ignore_ascii_case("junction"));
+            symbolic && targets(args, cmd == "mklink").iter().any(|t| !inside_ctx(t, ctx))
+        }
+        _ => false,
+    }
+}
+
 /// Patterns that are dangerous wherever they appear in the text, however the command around them is built.
 fn assess_text(raw: &str) -> Option<&'static str> {
     let has = |needle: &str| raw.contains(needle);
+    if substitution_runs_as_command(raw) {
+        return Some(R_BLIND);
+    }
     if has(":(){") || has(":() {") {
         return Some(R_POWER);
     }
@@ -177,11 +258,64 @@ fn assess_text(raw: &str) -> Option<&'static str> {
     None
 }
 
+/// `$(echo rm) -rf /` or `` `x` arg ``: a substitution where a command name belongs, so the command itself is hidden.
+/// `echo $(date)` and `x=$(pwd)` are ordinary and are not matched.
+fn substitution_runs_as_command(raw: &str) -> bool {
+    let chars: Vec<char> = raw.chars().collect();
+    let separator = |ch: Option<&char>| ch.is_none_or(|ch| matches!(ch, ';' | '|' | '&' | '(' | '\n'));
+    let previous = |end: usize| chars[..end].iter().rposition(|ch| !ch.is_whitespace());
+    let (mut in_single, mut backticks) = (false, 0usize);
+    for (i, &c) in chars.iter().enumerate() {
+        match c {
+            '\'' => in_single = !in_single,
+            '`' if !in_single => backticks += 1,
+            _ => {}
+        }
+        // Only an opening backtick starts a substitution.
+        let opens = !in_single && ((c == '$' && chars.get(i + 1) == Some(&'(')) || (c == '`' && backticks % 2 == 1));
+        if !opens {
+            continue;
+        }
+        let mut before = previous(i);
+        // `"$(…)" args` hides the command just as well as the unquoted form.
+        if before.is_some_and(|at| chars[at] == '"') {
+            before = before.and_then(previous);
+        }
+        if separator(before.map(|at| &chars[at])) {
+            return true;
+        }
+    }
+    false
+}
+
+/// Inline programs (`python -c`, `node -e`, `perl -e`, `osascript -e`, …) are ordinary for printing or parsing,
+/// but one that deletes files, runs commands or talks to the network bypasses every check above.
+fn assess_inline_code(cmd: &str, args: &[Word]) -> Option<&'static str> {
+    let flags: &[&str] = match cmd {
+        "python" | "python3" | "py" => &["-c"],
+        "node" | "deno" | "bun" => &["-e", "--eval", "-p", "--print", "eval"],
+        "perl" | "ruby" => &["-e", "-E"],
+        "php" => &["-r"],
+        "osascript" => &["-e"],
+        _ => return None,
+    };
+    let at = args.iter().position(|w| flags.contains(&w.text.as_str()))?;
+    let code = args[at + 1..].iter().map(|w| w.text.to_lowercase()).collect::<Vec<_>>().join(" ");
+    const RISKY: &[&str] = &[
+        "rmtree", "rmsync", "rmdirsync", "unlink", "os.remove", "os.rmdir", "shutil.", "remove_dir", "fs.rm", "rm -", "remove-item",
+        "system(", "subprocess", "popen", "exec(", "execsync", "spawn", "child_process", "os.exec", "do shell script", "deno.command",
+        "socket", "chmod", "chown", "eval(", "__import__",
+    ];
+    RISKY.iter().any(|needle| code.contains(needle)).then_some(R_INLINE)
+}
+
 const WRAPPERS: &[&str] = &["env", "command", "nohup", "time", "nice", "exec", "builtin", "stdbuf", "setsid", "timeout", "caffeinate", "ionice"];
 const INTERPRETERS: &[&str] = &["sh", "bash", "zsh", "dash", "ksh", "fish", "python", "python3", "perl", "ruby", "node", "powershell", "pwsh", "iex", "invoke-expression"];
 const DOWNLOADERS: &[&str] = &["curl", "wget", "iwr", "irm", "invoke-webrequest", "invoke-restmethod", "fetch"];
 const SHELLS: &[&str] = &["sh", "bash", "zsh", "dash", "ksh", "fish", "cmd", "powershell", "pwsh"];
 const SECRET_PATHS: &[&str] = &[
+    ".config/gh/", ".git-credentials", ".config/gcloud", ".azure/", ".password-store", ".config/op/", "login data", "/cookies", "local state",
+    "/keychain", "credentials.json", ".vault-token", ".terraform.d/credentials", "/.kube/",
     "/.ssh", ".ssh/", ".aws/", ".gnupg", "id_rsa", "id_ed25519", "id_ecdsa", "id_dsa", ".netrc", ".kube/config", "login.keychain", "/keychains/",
     "/etc/shadow", "/etc/sudoers", "gcloud/credentials", "gcloud/application_default", "/.docker/config.json", ".npmrc", ".pypirc",
 ];
@@ -241,6 +375,29 @@ fn inside(target: &str, workspace: Option<&Path>) -> bool {
     !root.is_empty() && (path == root || path.starts_with(&format!("{root}/")))
 }
 
+/// `inside`, and also: a relative path after the folder was left is unknown, and a path that exists on disk
+/// must really be inside once symbolic links are followed (`rm -rf link/` where `link` points at `/`).
+fn inside_ctx(target: &str, ctx: &Ctx) -> bool {
+    if !inside(target, ctx.workspace) {
+        return false;
+    }
+    let path = target.replace('\\', "/");
+    let absolute = path.starts_with('/') || (path.len() >= 2 && path.as_bytes()[0].is_ascii_alphabetic() && path.as_bytes()[1] == b':');
+    if ctx.cwd_left && !absolute {
+        return false;
+    }
+    let Some(workspace) = ctx.workspace else { return true };
+    if target.contains('*') || target.contains('?') {
+        return true;
+    }
+    let joined = if absolute { Path::new(target).to_path_buf() } else { workspace.join(target) };
+    match (joined.canonicalize(), workspace.canonicalize()) {
+        (Ok(real), Ok(root)) => real.starts_with(root),
+        // Not there (yet), or the working folder itself cannot be read: the textual check stands.
+        _ => true,
+    }
+}
+
 /// The non-option words of a command. `/s`-style options are skipped when `slash_options` is set (Windows `del`, `rd`).
 fn targets(args: &[Word], slash_options: bool) -> Vec<&str> {
     let mut found = Vec::new();
@@ -264,11 +421,17 @@ fn reaches_outside(found: &[&str], ctx: &Ctx) -> bool {
     if found.is_empty() {
         return ctx.stdin_targets;
     }
-    found.iter().any(|t| !inside(t, ctx.workspace))
+    found.iter().any(|t| !inside_ctx(t, ctx))
 }
 
 fn assess_words(words: &[Word], piped: bool, previous: Option<&str>, ctx: &Ctx) -> Option<&'static str> {
     let start = command_index(words)?;
+    // `$CMD -rf /` or `${tool} …`: what runs is decided only when the shell expands it.
+    let program = words[start].text.to_lowercase().replace('\\', "/");
+    let from_home = ["$home/", "${home}/", "%userprofile%/", "$env:userprofile/"].iter().any(|p| program.starts_with(p));
+    if !words[start].quoted && !from_home && (program.starts_with('$') || program.starts_with('%')) {
+        return Some(R_BLIND);
+    }
     let cmd = name(&words[start]);
     let cmd = cmd.as_str();
     let args = &words[start + 1..];
@@ -284,6 +447,14 @@ fn assess_words(words: &[Word], piped: bool, previous: Option<&str>, ctx: &Ctx) 
     if piped && INTERPRETERS.contains(&cmd) && previous.is_some_and(|p| DOWNLOADERS.contains(&p)) {
         return Some(R_DOWNLOAD_RUN);
     }
+    // `… | sh`: whatever the earlier command printed is run as a script (`base64 -d | sh`, `cat x | bash`).
+    // A shell reading a script from a pipe has no `-c`; with `-c` it runs its own text and is checked below.
+    if piped && SHELLS.contains(&cmd) && !args.iter().any(|w| ["-c", "/c", "/k", "-command"].contains(&w.text.to_lowercase().as_str())) {
+        return Some(R_PIPE_RUN);
+    }
+    if let Some(reason) = assess_inline_code(cmd, args) {
+        return Some(reason);
+    }
     let normalized = |w: &Word| w.text.to_lowercase().replace('\\', "/");
     if args.iter().any(|w| SECRET_PATHS.iter().any(|p| normalized(w).contains(p))) || ["cmdkey", "vaultcmd", "mimikatz", "lazagne"].contains(&cmd) {
         return Some(R_SECRET);
@@ -291,9 +462,9 @@ fn assess_words(words: &[Word], piped: bool, previous: Option<&str>, ctx: &Ctx) 
     if cmd == "security" && ["find-generic-password", "find-internet-password", "dump-keychain", "export", "find-identity"].contains(&first) {
         return Some(R_SECRET);
     }
-    let redirects = args.iter().any(|w| !w.quoted && w.text.contains('>'));
+    let redirects = words.iter().any(|w| !w.quoted && w.text.contains('>'));
     let writes = redirects || WRITERS.contains(&cmd) || (cmd == "sed" && starts("-i"));
-    if writes && args.iter().any(|w| STARTUP_PATHS.iter().any(|p| normalized(w).contains(p))) {
+    if writes && words.iter().any(|w| STARTUP_PATHS.iter().any(|p| normalized(w).contains(p))) {
         return Some(R_STARTUP);
     }
 
@@ -310,6 +481,9 @@ fn assess_words(words: &[Word], piped: bool, previous: Option<&str>, ctx: &Ctx) 
             if (recursive || wildcard) && reaches_outside(&found, ctx) {
                 return Some(R_DELETE);
             }
+        }
+        "mv" | "move" | "move-item" if targets(args, cmd == "move").last().is_some_and(|t| ["/dev/null", "nul", "$null"].contains(&t.to_lowercase().as_str())) => {
+            return Some(R_WIPE);
         }
         "shred" | "srm" | "sdelete" => {
             if reaches_outside(&targets(args, false), ctx) {
@@ -401,7 +575,7 @@ fn assess_words(words: &[Word], piped: bool, previous: Option<&str>, ctx: &Ctx) 
         "find" => {
             let roots: Vec<&str> = args.iter().map(|w| w.text.as_str()).take_while(|t| !t.starts_with('-') && !t.starts_with('!')).collect();
             let roots = if roots.is_empty() { vec!["."] } else { roots };
-            if has("-delete") && roots.iter().any(|t| !inside(t, ctx.workspace)) {
+            if has("-delete") && roots.iter().any(|t| !inside_ctx(t, ctx)) {
                 return Some(R_DELETE);
             }
             if let Some(at) = lower.iter().position(|a| ["-exec", "-execdir", "-ok", "-okdir"].contains(&a.as_str())) {
@@ -439,6 +613,10 @@ fn assess_words(words: &[Word], piped: bool, previous: Option<&str>, ctx: &Ctx) 
 }
 
 fn assess_git(args: &[Word]) -> Option<&'static str> {
+    // `git -c alias.x='push --force' x` runs a command spelled out only in the configuration.
+    if args.windows(2).any(|pair| pair[0].text == "-c" && pair[1].text.to_lowercase().starts_with("alias.")) {
+        return Some(R_BLIND);
+    }
     let mut at = 0;
     while at < args.len() {
         let a = args[at].text.as_str();
@@ -564,6 +742,74 @@ mod tests {
         assert_eq!(check("echo ok\nrm -rf /"), Some(R_DELETE));
         assert_eq!(check("echo \"a > b\" ~/.zshrc"), None, "a quoted > is not a redirection");
         assert_eq!(check("echo x > ~/.zshrc"), Some(R_STARTUP));
+    }
+
+    #[test]
+    fn known_bypasses_are_flagged() {
+        for (command, reason) in [
+            ("cd / && rm -rf *", R_DELETE), ("cd ~; rm -rf .", R_DELETE), ("cd; rm -rf ./x", R_DELETE), ("cd .. && rm -rf work", R_DELETE),
+            ("pushd /etc && chmod -R 777 .", R_PERM), ("Set-Location C:\\ ; Remove-Item -Recurse x", R_DELETE),
+            ("ln -s / root && rm -rf root/", R_DELETE),
+            ("echo cm0gLXJmIC8= | base64 -d | sh", R_PIPE_RUN), ("cat install.sh | bash", R_PIPE_RUN), ("printf x | powershell", R_PIPE_RUN),
+            ("$(echo rm) -rf /etc", R_BLIND), ("`echo rm` -rf /etc", R_BLIND), ("ls; \"$(which rm)\" -rf /x", R_BLIND), ("$CMD -rf /", R_BLIND),
+            ("git -c alias.p='push --force' p", R_BLIND),
+            ("python3 -c \"import shutil;shutil.rmtree('/home/u')\"", R_INLINE), ("node -e \"require('fs').rmSync('/',{recursive:true})\"", R_INLINE),
+            ("perl -e 'system(\"rm -rf /\")'", R_INLINE), ("ruby -e 'exec(\"x\")'", R_INLINE), ("osascript -e 'do shell script \"x\"'", R_INLINE),
+            ("> ~/.bashrc", R_STARTUP), ("mv ~/Documents /dev/null", R_WIPE), ("move C:\\x NUL", R_WIPE),
+            ("cat ~/.config/gh/hosts.yml", R_SECRET), ("cp ~/.git-credentials .", R_SECRET),
+            ("cat \"~/Library/Application Support/Google/Chrome/Default/Login Data\"", R_SECRET),
+        ] {
+            assert_eq!(check(command), Some(reason), "{command}");
+        }
+    }
+
+    #[test]
+    fn hardening_leaves_ordinary_work_alone() {
+        for command in [
+            "cd src && rm -rf build", "cd /work/app && rm -rf dist", "cd - && ls", "echo $(date)", "x=$(pwd) && echo $x", "echo \"`date`\"",
+            "ls | grep x", "echo '{}' | python3 -m json.tool", "sh -c 'echo hi' | sort", "python3 -c \"import json;print(json.dumps({}))\"",
+            "node -e 'console.log(`a ${1}`)'", "$HOME/.cargo/bin/cargo build", "mv a.txt b.txt", "ln -s ./dist ./public", "git -c user.name=x commit -m y",
+        ] {
+            assert_eq!(check(command), None, "{command}");
+        }
+    }
+
+    #[test]
+    fn a_link_inside_the_working_folder_that_points_outside_is_followed() {
+        let root = std::env::temp_dir().join(format!("xiaoban-danger-{}", std::process::id()));
+        let (work, outside) = (root.join("work"), root.join("outside"));
+        std::fs::create_dir_all(&work).unwrap();
+        std::fs::create_dir_all(&outside).unwrap();
+        #[cfg(unix)]
+        std::os::unix::fs::symlink(&outside, work.join("link")).unwrap();
+        std::fs::create_dir_all(work.join("real")).unwrap();
+        let check_in = |command: &str| assess("shell", &json!({ "command": command }), Some(&work));
+        #[cfg(unix)]
+        assert_eq!(check_in("rm -rf link/"), Some(R_DELETE));
+        assert_eq!(check_in("rm -rf real/"), None);
+        assert_eq!(check_in("rm -rf not-there-yet"), None);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn approving_one_kind_of_command_names_only_that_kind() {
+        let key = |command: &str| remember_key("shell", &json!({ "command": command }));
+        assert_eq!(key("npm test"), Some("npm test".into()));
+        assert_eq!(key("npm test -- --watch"), Some("npm test".into()));
+        assert_eq!(key("npm run build"), Some("npm run build".into()));
+        assert_eq!(key("cargo test --lib chat"), Some("cargo test".into()));
+        assert_eq!(key("git status"), Some("git status".into()));
+        assert_eq!(key("cat src/main.rs"), Some("cat".into()));
+        assert_eq!(key("git commit -m \"rm -rf\""), Some("git commit".into()));
+        assert_eq!(remember_key("process_start", &json!({ "command": "npm run dev" })), Some("npm run dev".into()));
+        for command in [
+            "npm test && npm publish", "npm test; rm -rf x", "npm test | tee log", "npm test > log", "echo $(whoami)", "FOO=1 npm test",
+            "nohup npm start", "./run.sh", "C:\\tools\\x.exe", "python3 -c 'x'", "node app.js", "bash build.sh", "rm -rf build", "mv a b",
+            "curl https://x", "sudo ls", "npx create-vite", "find . -delete", "npm test &", "",
+        ] {
+            assert_eq!(key(command), None, "{command}");
+        }
+        assert_eq!(remember_key("write_file", &json!({ "command": "npm test" })), None);
     }
 
     #[test]

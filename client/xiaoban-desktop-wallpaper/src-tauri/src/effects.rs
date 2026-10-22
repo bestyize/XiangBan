@@ -67,7 +67,7 @@ pub fn reconcile(app: &tauri::AppHandle) {
 
 /// Destroys the overlay and waits until Tauri has forgotten the label, so it can be opened again at once.
 pub fn close(app: &tauri::AppHandle) -> Result<(), String> {
-    app.state::<DesktopState>().ready_scenes.lock().unwrap().remove(LABEL);
+    app.state::<DesktopState>().ready_scenes.lock().unwrap_or_else(|e| e.into_inner()).remove(LABEL);
     if let Some(window) = app.get_webview_window(LABEL) {
         window.destroy().map_err(|e| e.to_string())?;
         let deadline = Instant::now() + Duration::from_secs(3);
@@ -80,8 +80,8 @@ pub fn close(app: &tauri::AppHandle) -> Result<(), String> {
 }
 
 fn open(app: &tauri::AppHandle, current: &Settings, pack: &Value) -> Result<(), String> {
-    app.state::<DesktopState>().ready_scenes.lock().unwrap().remove(LABEL);
-    app.state::<crate::content::ContentState>().reports.lock().unwrap().remove(LABEL);
+    app.state::<DesktopState>().ready_scenes.lock().unwrap_or_else(|e| e.into_inner()).remove(LABEL);
+    app.state::<crate::content::ContentState>().reports.lock().unwrap_or_else(|e| e.into_inner()).remove(LABEL);
     let monitor = app.primary_monitor().map_err(|e| e.to_string())?.ok_or("没有主显示器")?;
     let scale = monitor.scale_factor();
     #[cfg(windows)]

@@ -1228,14 +1228,14 @@ mod tests {
 
     impl Fake {
         fn log(&self, entry: impl Into<String>) -> Result<(), String> {
-            self.calls.lock().unwrap().push(entry.into());
-            match self.fail.lock().unwrap().clone() {
+            self.calls.lock().unwrap_or_else(|e| e.into_inner()).push(entry.into());
+            match self.fail.lock().unwrap_or_else(|e| e.into_inner()).clone() {
                 Some(error) => Err(error),
                 None => Ok(()),
             }
         }
         fn calls(&self) -> Vec<String> {
-            self.calls.lock().unwrap().clone()
+            self.calls.lock().unwrap_or_else(|e| e.into_inner()).clone()
         }
     }
 
@@ -1286,7 +1286,7 @@ mod tests {
             self.log(format!("companion {change:?}"))
         }
         fn care(&self) -> Result<Value, String> {
-            Ok(json!({"config": {"enabled": true}, "rules": self.rules.lock().unwrap().clone()}))
+            Ok(json!({"config": {"enabled": true}, "rules": self.rules.lock().unwrap_or_else(|e| e.into_inner()).clone()}))
         }
         fn care_upsert(&self, rule: Rule) -> Result<(), String> {
             self.log(format!("upsert {} {} {} {:?} {:?} {} {}", rule.id, rule.kind, rule.repeat, rule.time, rule.weekdays, rule.text, rule.enabled))
@@ -1306,14 +1306,14 @@ mod tests {
         }
         fn widget_update(&self, id: &str, patch: Value) -> Result<Value, String> {
             self.log(format!("widget-update {id} {patch}"))?;
-            if let Some(error) = self.fail_widget_update.lock().unwrap().clone() { return Err(error); }
+            if let Some(error) = self.fail_widget_update.lock().unwrap_or_else(|e| e.into_inner()).clone() { return Err(error); }
             Ok(json!({}))
         }
         fn widget_remove(&self, id: &str) -> Result<(), String> {
             self.log(format!("widget-remove {id}"))
         }
         fn custom_widgets(&self) -> Result<Value, String> {
-            Ok(json!(self.templates.lock().unwrap().clone()))
+            Ok(json!(self.templates.lock().unwrap_or_else(|e| e.into_inner()).clone()))
         }
         fn create_custom_widget(&self, pack: &Value, place_now: bool, overwrite: bool) -> Result<Value, String> {
             let id = pack["id"].as_str().unwrap_or("?");
@@ -1346,7 +1346,7 @@ mod tests {
         }
         fn export_pack(&self, kind: &str, id: &str) -> Result<Option<(String, u64)>, String> {
             self.log(format!("export-pack {kind} {id}"))?;
-            Ok(self.saved.lock().unwrap().clone())
+            Ok(self.saved.lock().unwrap_or_else(|e| e.into_inner()).clone())
         }
         fn open_url(&self, url: &str) -> Result<(), String> {
             self.log(format!("open-url {url}"))
@@ -1485,7 +1485,7 @@ mod tests {
     #[test]
     fn the_effect_pack_is_refused_by_the_host_with_its_reason() {
         let fake = Arc::new(Fake::default());
-        *fake.fail.lock().unwrap() = Some("id「rain」是内置特效的名字，请换一个".into());
+        *fake.fail.lock().unwrap_or_else(|e| e.into_inner()) = Some("id「rain」是内置特效的名字，请换一个".into());
         let pack = json!({"schemaVersion": 1, "id": "rain", "name": "冒名", "layers": []});
         assert_eq!(call(&fake, "effect_create", json!({"pack": pack})).unwrap_err(), "id「rain」是内置特效的名字，请换一个");
     }
@@ -1493,7 +1493,7 @@ mod tests {
     #[test]
     fn desktop_failures_come_back_as_the_tool_error() {
         let fake = Arc::new(Fake::default());
-        *fake.fail.lock().unwrap() = Some("请先退出游戏空间".into());
+        *fake.fail.lock().unwrap_or_else(|e| e.into_inner()) = Some("请先退出游戏空间".into());
         assert_eq!(call(&fake, "wallpaper_apply", json!({"id": "w1"})).unwrap_err(), "请先退出游戏空间");
     }
 
@@ -1534,7 +1534,7 @@ mod tests {
     fn editing_starts_from_the_saved_reminder_and_unknown_ids_are_refused() {
         let fake = Arc::new(Fake::default());
         let saved = Rule { id: "care-1".into(), text: "喝水".into(), time: "15:00".into(), revision: 4, ..Default::default() };
-        fake.rules.lock().unwrap().push(serde_json::to_value(&saved).unwrap());
+        fake.rules.lock().unwrap_or_else(|e| e.into_inner()).push(serde_json::to_value(&saved).unwrap());
         let out = call(&fake, "care_set", json!({"id": "care-1", "time": "16:00", "enabled": false})).unwrap();
         assert_eq!(out, "已更新提醒：喝水");
         assert_eq!(fake.calls(), vec!["upsert care-1 custom daily \"16:00\" [] 喝水 false"]);
@@ -1571,7 +1571,7 @@ mod tests {
             Rule { id: "c".into(), text: "起来走走".into(), kind: "rest".into(), interval_minutes: 45, ..Default::default() },
             Rule { id: "d".into(), text: "生日".into(), repeat: "once".into(), once_at: "2030-01-02T08:00".into(), ..Default::default() },
         ];
-        *fake.rules.lock().unwrap() = rules.iter().map(|r| serde_json::to_value(r).unwrap()).collect();
+        *fake.rules.lock().unwrap_or_else(|e| e.into_inner()) = rules.iter().map(|r| serde_json::to_value(r).unwrap()).collect();
         let out = call(&fake, "care_list", json!({})).unwrap();
         assert_eq!(
             out,
@@ -1608,7 +1608,7 @@ mod tests {
         for (kind, label) in [("notes", "待办事项"), ("countdown", "倒数日／纪念日"), ("woodfish", "电子木鱼")] {
             assert!(call(&fake, "widget_add", json!({"kind":kind})).unwrap().contains(label));
         }
-        *fake.templates.lock().unwrap() = vec![json!({"id":"my-clock","name":"专注时钟"})];
+        *fake.templates.lock().unwrap_or_else(|e| e.into_inner()) = vec![json!({"id":"my-clock","name":"专注时钟"})];
         assert!(call(&fake, "widget_list", json!({})).unwrap().contains("my-clock | 专注时钟"));
         let all = tools(fake.clone());
         let add = all.iter().find(|tool| tool.spec().name == "widget_add").unwrap().spec();
@@ -1622,7 +1622,7 @@ mod tests {
     #[test]
     fn widget_add_reports_a_failed_theme_update_instead_of_claiming_success() {
         let fake = Arc::new(Fake::default());
-        *fake.fail_widget_update.lock().unwrap() = Some("写入失败".into());
+        *fake.fail_widget_update.lock().unwrap_or_else(|e| e.into_inner()) = Some("写入失败".into());
         let error = call(&fake, "widget_add", json!({"kind":"notes","theme":"ivory"})).unwrap_err();
         assert!(error.contains("组件已添加") && error.contains("设置外观失败") && error.contains("写入失败"));
     }
@@ -1786,7 +1786,7 @@ mod tests {
     #[test]
     fn sharing_a_work_exports_it_then_opens_the_matching_forum_board() {
         let fake = Arc::new(Fake::default());
-        *fake.saved.lock().unwrap() = Some(("/Users/a/effect-stars.zip".to_string(), 2048));
+        *fake.saved.lock().unwrap_or_else(|e| e.into_inner()) = Some(("/Users/a/effect-stars.zip".to_string(), 2048));
         let out = call(&fake, "community_share", json!({"kind": "effect", "id": "stars"})).unwrap();
         assert_eq!(fake.calls(), vec!["export-pack effect stars", "open-url https://chat.xiangban.xyz/c/xiaoban-wallpaper"]);
         assert!(out.contains("/Users/a/effect-stars.zip") && out.contains("小伴壁纸") && out.contains("不能代发"), "{out}");
@@ -1803,7 +1803,7 @@ mod tests {
         assert!(out.contains("取消"), "{out}");
         assert_eq!(fake.calls(), vec!["export-pack wallpaper local-1"]);
 
-        *fake.saved.lock().unwrap() = Some(("/tmp/a.zip".to_string(), 6 * 1024 * 1024));
+        *fake.saved.lock().unwrap_or_else(|e| e.into_inner()) = Some(("/tmp/a.zip".to_string(), 6 * 1024 * 1024));
         let out = call(&fake, "community_share", json!({"kind": "wallpaper", "id": "local-1", "open_forum": false})).unwrap();
         assert!(out.contains("没有打开论坛") && out.contains("超过 5 MB"), "{out}");
         assert_eq!(fake.calls().len(), 2, "no browser call");

@@ -25,7 +25,7 @@ pub struct HitState { regions: Mutex<Vec<Region>>, ignored: Mutex<Option<bool>> 
 pub fn assistant_set_regions(window:WebviewWindow,regions:Vec<Region>)->Result<(),String>{
     if window.label()!=crate::float_assistant::LABEL {return Err("只有超级小伴可以更新鼠标区域".into());}
     if regions.len()>8 || regions.iter().any(|r|!r.valid()) {return Err("鼠标区域无效".into());}
-    *window.state::<HitState>().regions.lock().unwrap()=regions;
+    *window.state::<HitState>().regions.lock().unwrap_or_else(|e| e.into_inner())=regions;
     Ok(())
 }
 
@@ -51,12 +51,12 @@ pub fn start(app:&tauri::AppHandle){
         if !window.is_visible().unwrap_or(false){continue;}
         let Ok((x,y,height,down))=pointer(&window) else {continue;};
         let state=app.state::<HitState>();
-        let hit=state.regions.lock().unwrap().iter().any(|r|r.contains(x,y,height));
+        let hit=state.regions.lock().unwrap_or_else(|e| e.into_inner()).iter().any(|r|r.contains(x,y,height));
         let ignored=!hit;
         // Do not release an assistant press, selection or native drag before mouse-up.
         // Entering a visible surface stays possible during an external image drag.
         if down && ignored {continue;}
-        let mut previous=state.ignored.lock().unwrap();
+        let mut previous=state.ignored.lock().unwrap_or_else(|e| e.into_inner());
         if *previous!=Some(ignored) && window.set_ignore_cursor_events(ignored).is_ok(){*previous=Some(ignored);}
     });
 }

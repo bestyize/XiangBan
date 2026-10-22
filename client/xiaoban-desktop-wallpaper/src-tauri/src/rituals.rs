@@ -60,7 +60,7 @@ fn validate_journal(data: &Value) -> Result<(), String> {
 }
 #[tauri::command]
 pub fn read_ritual_journal(app: tauri::AppHandle) -> Result<Value, String> {
-    let state = app.state::<RitualState>(); let _io = state.io.lock().unwrap();
+    let state = app.state::<RitualState>(); let _io = state.io.lock().unwrap_or_else(|e| e.into_inner());
     let path = crate::storage::root(&app)?.join("config/rituals.json");
     match fs::metadata(&path) {
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(json!({"version": 1, "saved": [], "wishes": []})),
@@ -74,7 +74,7 @@ pub fn read_ritual_journal(app: tauri::AppHandle) -> Result<Value, String> {
 #[tauri::command]
 pub fn write_ritual_journal(app: tauri::AppHandle, data: Value) -> Result<(), String> {
     validate_journal(&data)?;
-    let state = app.state::<RitualState>(); let _io = state.io.lock().unwrap();
+    let state = app.state::<RitualState>(); let _io = state.io.lock().unwrap_or_else(|e| e.into_inner());
     let folder = crate::storage::root(&app)?.join("config");
     fs::create_dir_all(&folder).map_err(|e| e.to_string())?;
     let temporary = folder.join("rituals.tmp");

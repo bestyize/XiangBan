@@ -9,6 +9,7 @@
 
 1. [小伴 Agent 演进与第二阶段实施手册](evolution-roadmap.md)：完整战略、技术架构、功能设计、开发路径、数据与安全策略。
 2. [第二阶段开发与验收清单](stage-2-checklist.md)：可直接用于 GitHub Issue / 研发排期的任务与验收门槛。
+3. [小伴桌面 Agent 加固](harness-hardening.md)：对照 Claude Code / Codex / Hermes 的差距、已修复的问题与验证情况、沙箱等后续路线。
 
 ## 一句话共识
 

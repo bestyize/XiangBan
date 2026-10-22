@@ -29,10 +29,6 @@ pub const DEFAULT_PROTOCOL_VERSION: &str = "2024-11-05";
 const MAX_FRAME_BYTES: u64 = 8 * 1024 * 1024;
 const MAX_IMAGE_BYTES: usize = 4 * 1024 * 1024;
 
-#[cfg(not(windows))]
-const BASE_ENV: &[&str] = &["PATH", "HOME", "USER", "LOGNAME", "LANG", "LC_ALL", "LC_CTYPE", "TMPDIR", "TZ"];
-#[cfg(windows)]
-const BASE_ENV: &[&str] = &["PATH", "SystemRoot", "ComSpec", "PATHEXT", "TEMP", "TMP", "USERPROFILE", "windir"];
 
 #[derive(Clone, Debug)]
 pub struct McpConfig {
@@ -151,15 +147,12 @@ impl McpClient {
     }
 
     pub fn spawn(config: McpConfig) -> Result<Arc<Self>, HarnessError> {
-        let mut cmd = Command::new(&config.command);
+        let mut cmd = Command::new(crate::child_env::program(&config.command));
         cmd.args(&config.args)
-            .env_clear()
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::null());
-        for key in BASE_ENV.iter().copied().chain(config.inherited_env.iter().map(String::as_str)) {
-            if let Some(value) = std::env::var_os(key) { cmd.env(key, value); }
-        }
+        crate::child_env::apply(&mut cmd, &config.inherited_env);
         for (k, v) in &config.env {
             cmd.env(k, v);
         }

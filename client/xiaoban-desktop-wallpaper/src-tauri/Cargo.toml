@@ -76,7 +76,8 @@ opt-level = "s"
 lto = "thin"
 codegen-units = 1
 strip = true
-panic = "abort"
+# Unwind, not abort: a panic in one tool thread or command must not take the wallpaper, pets and every chat down with it.
+panic = "unwind"
 
 [dev-dependencies]
 tauri = { version = "2", features = ["test"] }

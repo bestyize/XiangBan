@@ -161,7 +161,7 @@ fn definition(app: &tauri::AppHandle, p: &Instance) -> Result<Pet, String> {
 }
 fn persist(app: &tauri::AppHandle, layout: &Layout) -> Result<(), String> {
     validate(layout)?;
-    if let Some(error) = app.state::<PetState>().error.lock().unwrap().clone() {
+    if let Some(error) = app.state::<PetState>().error.lock().unwrap_or_else(|e| e.into_inner()).clone() {
         return Err(error);
     }
     let bytes = serde_json::to_vec_pretty(layout).map_err(|e| e.to_string())?;
@@ -180,11 +180,11 @@ fn mutate(
 ) -> Result<Value, String> {
     {
         let state = app.state::<PetState>();
-        let _operation = state.operation.lock().unwrap();
-        let mut next = state.layout.lock().unwrap().clone();
+        let _operation = state.operation.lock().unwrap_or_else(|e| e.into_inner());
+        let mut next = state.layout.lock().unwrap_or_else(|e| e.into_inner()).clone();
         change(&mut next)?;
         persist(app, &next)?;
-        *state.layout.lock().unwrap() = next;
+        *state.layout.lock().unwrap_or_else(|e| e.into_inner()) = next;
     }
     sync(app);
     let data = catalog(app)?;
@@ -228,7 +228,7 @@ pub fn catalog(app: &tauri::AppHandle) -> Result<Value, String> {
             value
         })
         .collect();
-    Ok(json!({"themes":list,"layout":state.layout.lock().unwrap().clone(),"errors":errors}))
+    Ok(json!({"themes":list,"layout":state.layout.lock().unwrap_or_else(|e| e.into_inner()).clone(),"errors":errors}))
 }
 pub fn window_layer(app: &tauri::AppHandle, window_label: &str) -> Option<String> {
     if !active(app) {
@@ -306,13 +306,13 @@ pub fn sync(app: &tauri::AppHandle) {
     if !active(app) || state.syncing.swap(true, Ordering::SeqCst) {
         return;
     }
-    let all = state.layout.lock().unwrap().instances.clone();
+    let all = state.layout.lock().unwrap_or_else(|e| e.into_inner()).instances.clone();
     let s = crate::settings(app);
     let hidden = !s.companion_enabled || crate::games::is_active(app);
     for (key, w) in app.webview_windows() {
         if is_pet(&key) && !all.iter().any(|p| label(p) == key && p.enabled) {
             let _ = w.destroy();
-            state.applied.lock().unwrap().remove(&key);
+            state.applied.lock().unwrap_or_else(|e| e.into_inner()).remove(&key);
         }
     }
     for p in all.iter().filter(|p| p.enabled) {
@@ -329,12 +329,12 @@ pub fn sync(app: &tauri::AppHandle) {
                     if let Some(w) = app.get_webview_window(&label(p)) {
                         let _ = w.destroy();
                     }
-                    state.applied.lock().unwrap().remove(&label(p));
+                    state.applied.lock().unwrap_or_else(|e| e.into_inner()).remove(&label(p));
                     return Err(error);
                 }
             };
             let signature = format!("{data}:{:?}", geometry(app, p)?);
-            if state.applied.lock().unwrap().get(&label(p)) == Some(&signature)
+            if state.applied.lock().unwrap_or_else(|e| e.into_inner()).get(&label(p)) == Some(&signature)
                 && app
                     .get_webview_window(&label(p))
                     .is_some_and(|w| w.is_visible().unwrap_or(false))
@@ -385,7 +385,7 @@ pub fn sync(app: &tauri::AppHandle) {
                 .map_err(|e| e.to_string())?;
             window.show().map_err(|e| e.to_string())?;
             crate::window_control::apply_layer(&window, &p.layer)?;
-            state.applied.lock().unwrap().insert(label(p), signature);
+            state.applied.lock().unwrap_or_else(|e| e.into_inner()).insert(label(p), signature);
             Ok(())
         })();
         if let Err(e) = result {
@@ -492,15 +492,15 @@ pub fn start(app: &tauri::AppHandle) {
             persist(app, &layout)?;
         }
         let state = app.state::<PetState>();
-        *state.layout.lock().unwrap() = layout;
-        *state.last_preferences.lock().unwrap() =
+        *state.layout.lock().unwrap_or_else(|e| e.into_inner()) = layout;
+        *state.last_preferences.lock().unwrap_or_else(|e| e.into_inner()) =
             Some((s.size, s.expression, s.companion_skin, s.mode));
         state.active.store(true, Ordering::Relaxed);
         Ok(())
     })();
     if let Err(error) = init {
         let state = app.state::<PetState>();
-        *state.error.lock().unwrap() = Some(error);
+        *state.error.lock().unwrap_or_else(|e| e.into_inner()) = Some(error);
         state.active.store(true, Ordering::Relaxed);
         return;
     }
@@ -647,8 +647,8 @@ pub fn remove(app: &tauri::AppHandle, id: &str) -> Result<Value, String> {
 pub fn save_theme(app: &tauri::AppHandle, theme: Theme, overwrite: bool) -> Result<Value, String> {
     let state = app.state::<PetState>();
     {
-        let _op = state.operation.lock().unwrap();
-        let current = state.layout.lock().unwrap().clone();
+        let _op = state.operation.lock().unwrap_or_else(|e| e.into_inner());
+        let current = state.layout.lock().unwrap_or_else(|e| e.into_inner()).clone();
         if current
             .instances
             .iter()
@@ -701,7 +701,7 @@ pub fn delete_pet_theme(app: tauri::AppHandle, id: String) -> Result<Value, Stri
     }
     {
         let state = app.state::<PetState>();
-        let _op = state.operation.lock().unwrap();
+        let _op = state.operation.lock().unwrap_or_else(|e| e.into_inner());
         if state
             .layout
             .lock()

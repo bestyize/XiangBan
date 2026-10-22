@@ -166,7 +166,7 @@ fn shortcut_label(shortcut: &str) -> String {
 /// Registers `shortcut` (and drops the one registered before). On failure the previous shortcut stays in force.
 pub fn apply(app: &tauri::AppHandle, enabled: bool, shortcut: &str) -> Result<(), String> {
     let state = app.state::<AssistantState>();
-    let mut current = state.registered.lock().unwrap();
+    let mut current = state.registered.lock().unwrap_or_else(|e| e.into_inner());
     if enabled && current.as_deref() == Some(shortcut) {
         return Ok(());
     }
@@ -175,13 +175,13 @@ pub fn apply(app: &tauri::AppHandle, enabled: bool, shortcut: &str) -> Result<()
         let _ = app.global_shortcut().unregister(old.as_str());
     }
     if !enabled {
-        state.error.lock().unwrap().clear();
+        state.error.lock().unwrap_or_else(|e| e.into_inner()).clear();
         return Ok(());
     }
     match app.global_shortcut().register(shortcut) {
         Ok(()) => {
             *current = Some(shortcut.to_string());
-            state.error.lock().unwrap().clear();
+            state.error.lock().unwrap_or_else(|e| e.into_inner()).clear();
             Ok(())
         }
         Err(error) => {
@@ -191,7 +191,7 @@ pub fn apply(app: &tauri::AppHandle, enabled: bool, shortcut: &str) -> Result<()
                 }
             }
             let message = format!("快捷键 {} 无法使用，可能已被其他应用占用（{error}）", shortcut_label(shortcut));
-            *state.error.lock().unwrap() = message.clone();
+            *state.error.lock().unwrap_or_else(|e| e.into_inner()) = message.clone();
             Err(message)
         }
     }
@@ -200,8 +200,8 @@ pub fn apply(app: &tauri::AppHandle, enabled: bool, shortcut: &str) -> Result<()
 fn status(app: &tauri::AppHandle) -> Value {
     let settings = crate::settings(app);
     let state = app.state::<AssistantState>();
-    let registered = state.registered.lock().unwrap().is_some();
-    let error = state.error.lock().unwrap().clone();
+    let registered = state.registered.lock().unwrap_or_else(|e| e.into_inner()).is_some();
+    let error = state.error.lock().unwrap_or_else(|e| e.into_inner()).clone();
     json!({
         "enabled": settings.assistant_enabled,
         "shortcut": settings.assistant_shortcut,
@@ -344,7 +344,7 @@ fn place(app: &tauri::AppHandle, window: &WebviewWindow) -> Result<(), String> {
     let scale = monitor.scale_factor();
     let width = (WIDTH * scale).round() as i32;
     let height = (MIN_HEIGHT * scale).round() as i32;
-    let offset = *app.state::<AssistantState>().moved.lock().unwrap();
+    let offset = *app.state::<AssistantState>().moved.lock().unwrap_or_else(|e| e.into_inner());
     let (x, bottom) = anchor(area_of(&monitor), scale, width, height, offset);
     // Move first so a window arriving on another screen takes that screen's scale before it is sized.
     let top = bottom - height;
@@ -381,17 +381,17 @@ fn remember(app: &tauri::AppHandle, window: &WebviewWindow) {
         return;
     };
     let offset = offset_of(area_of(&monitor), scale, position.x, size.width as i32, position.y + size.height as i32);
-    *app.state::<AssistantState>().moved.lock().unwrap() = offset;
+    *app.state::<AssistantState>().moved.lock().unwrap_or_else(|e| e.into_inner()) = offset;
 }
 
 pub(crate) fn remember_position(app: &tauri::AppHandle, window: &WebviewWindow) { remember(app, window); }
 
 fn mode(app: &tauri::AppHandle) -> Mode {
-    *app.state::<AssistantState>().mode.lock().unwrap()
+    *app.state::<AssistantState>().mode.lock().unwrap_or_else(|e| e.into_inner())
 }
 
 fn set_mode(app: &tauri::AppHandle, mode: Mode) {
-    *app.state::<AssistantState>().mode.lock().unwrap() = mode;
+    *app.state::<AssistantState>().mode.lock().unwrap_or_else(|e| e.into_inner()) = mode;
 }
 
 fn window(app: &tauri::AppHandle) -> Result<WebviewWindow, String> {
@@ -417,7 +417,7 @@ fn announce(app: &tauri::AppHandle, window: &WebviewWindow) {
 
 /// Where the ball goes: where it was last seen on a screen that still exists, else the saved offset on the main screen.
 fn ball_target(app: &tauri::AppHandle) -> Result<(i32, i32, i32), String> {
-    let seen = *app.state::<AssistantState>().ball_at.lock().unwrap();
+    let seen = *app.state::<AssistantState>().ball_at.lock().unwrap_or_else(|e| e.into_inner());
     if let Some((x, y)) = seen {
         if let Ok(Some(monitor)) = monitor_at_physical_point(app, f64::from(x) + 1.0, f64::from(y) + 1.0) {
             let size = (BALL_WINDOW * monitor.scale_factor()).round() as i32;
@@ -535,7 +535,7 @@ pub fn toggle(app: &tauri::AppHandle) {
 
 fn persist_ball(app: &tauri::AppHandle, offset: Offset) {
     let state = app.state::<crate::DesktopState>();
-    let _update = state.update_lock.lock().unwrap();
+    let _update = state.update_lock.lock().unwrap_or_else(|e| e.into_inner());
     let mut next = crate::settings(app);
     if (next.assistant_ball_dx - offset.dx).abs() < 0.5 && (next.assistant_ball_dy - offset.dy).abs() < 0.5 {
         return;
@@ -543,7 +543,7 @@ fn persist_ball(app: &tauri::AppHandle, offset: Offset) {
     next.assistant_ball_dx = offset.dx;
     next.assistant_ball_dy = offset.dy;
     if crate::persist(app, &next).is_ok() {
-        *state.settings.lock().unwrap() = next;
+        *state.settings.lock().unwrap_or_else(|e| e.into_inner()) = next;
     }
 }
 
@@ -557,7 +557,7 @@ fn save_ball(app: &tauri::AppHandle, window: &WebviewWindow) {
     else {
         return;
     };
-    *app.state::<AssistantState>().ball_at.lock().unwrap() = Some((position.x, position.y));
+    *app.state::<AssistantState>().ball_at.lock().unwrap_or_else(|e| e.into_inner()) = Some((position.x, position.y));
     persist_ball(app, ball_offset(area_of(&monitor), scale, size.width as i32, position.x, position.y));
 }
 
@@ -627,7 +627,7 @@ pub fn assistant_configure(app: tauri::AppHandle, patch: Patch) -> Result<Value,
         return Err("不支持的朗读方式".into());
     }
     let state = app.state::<crate::DesktopState>();
-    let _update = state.update_lock.lock().unwrap();
+    let _update = state.update_lock.lock().unwrap_or_else(|e| e.into_inner());
     let mut next = crate::settings(&app);
     if let Some(enabled) = patch.enabled {
         next.assistant_enabled = enabled;
@@ -654,10 +654,10 @@ pub fn assistant_configure(app: tauri::AppHandle, patch: Patch) -> Result<Value,
     }
     apply(&app, next.assistant_enabled, &next.assistant_shortcut)?;
     crate::persist(&app, &next)?;
-    *state.settings.lock().unwrap() = next;
+    *state.settings.lock().unwrap_or_else(|e| e.into_inner()) = next;
     if reset {
-        *app.state::<AssistantState>().ball_at.lock().unwrap() = None;
-        *app.state::<AssistantState>().moved.lock().unwrap() = Offset::default();
+        *app.state::<AssistantState>().ball_at.lock().unwrap_or_else(|e| e.into_inner()) = None;
+        *app.state::<AssistantState>().moved.lock().unwrap_or_else(|e| e.into_inner()) = Offset::default();
         match mode(&app) {
             Mode::Ball => show_ball(&app)?,
             Mode::Capsule => {
@@ -721,7 +721,7 @@ pub fn assistant_fit(window: WebviewWindow, height: f64) -> Result<(), String> {
         return Ok(());
     }
     let state=window.app_handle().state::<AssistantState>();
-    if state.dragging.load(Ordering::SeqCst){*state.pending_height.lock().unwrap()=Some(height);return Ok(());}
+    if state.dragging.load(Ordering::SeqCst){*state.pending_height.lock().unwrap_or_else(|e| e.into_inner())=Some(height);return Ok(());}
     resize(&window, height)
 }
 
@@ -746,7 +746,7 @@ pub fn assistant_drag(window: WebviewWindow) -> Result<(), String> {
         }
         state.dragging.store(false,Ordering::SeqCst);
         match mode(app){Mode::Capsule=>remember(app,&target),Mode::Ball=>save_ball(app,&target),_=>{}}
-        let pending=state.pending_height.lock().unwrap().take();
+        let pending=state.pending_height.lock().unwrap_or_else(|e| e.into_inner()).take();
         if let Some(height)=pending{if mode(app)==Mode::Capsule{let _=resize(&target,height);}}
         let _=target.eval("window.dispatchEvent(new Event('assistant-drag-end'));".to_string());
     });

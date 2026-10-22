@@ -5,11 +5,11 @@
 //! The model sees the summary, then the messages from that point on, then whatever was said after the
 //! summary. The conversation shown to the user is the whole file.
 
-use agent_kernel::{estimate_tokens, ChatRequest, ContextSummary, HarnessError, JsonlStore, Message, ModelProvider, Part, Role, SessionStore};
+use agent_kernel::{estimate_tokens, estimate_tool_tokens, ChatRequest, ContextSummary, HarnessError, JsonlStore, Message, Middleware, ModelProvider, Part, Role, SessionStore, Turn};
 use serde::Serialize;
 use std::collections::HashMap;
-use std::sync::atomic::AtomicBool;
-use std::sync::Mutex;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 /// Legacy marker kept for tests/documentation only. Never used to recognize a control record.
@@ -246,6 +246,111 @@ pub fn compact_into(file: &JsonlStore, provider: &dyn ModelProvider, context_tok
     }
     file.append(session, &[summary_message(plan.keep_from, &summary)]).map_err(|e| e.to_string())?;
     Ok(summary)
+}
+
+/// Share of the context limit at which a request inside one answer is compacted before it is sent.
+const MID_RUN_SHARE_PERCENT: usize = 85;
+/// How much of the newest work stays word for word after compacting inside an answer, as a share of the limit.
+const MID_RUN_KEEP_PERCENT: usize = 35;
+
+/// What one answer has already folded into a summary: the first `upto` history messages of the request.
+struct Folded {
+    upto: usize,
+    summary: String,
+    /// The user's latest question when it was folded; it is still shown word for word, since it is the task.
+    question: Option<Message>,
+}
+
+/// Compacts inside a long answer. Automatic compaction otherwise runs only after an answer, so one long task (a game,
+/// a set of files) could only drop old tool output (`ContextTrim`) and lose what it had done. When a request reaches
+/// 85% of the limit, the older part of it is summarized and replaced; the newest work, the system prompt and the
+/// question stay as they are. Only the requests change: the saved conversation is untouched, and the usual
+/// after-answer compaction still writes the lasting summary. One agent serves one answer, so the state is per answer.
+pub struct MidRunCompact {
+    provider: Arc<dyn ModelProvider>,
+    limit: usize,
+    cancel: Arc<AtomicBool>,
+    notify: Box<dyn Fn(&str, Option<&str>) + Send + Sync>,
+    folded: Mutex<Option<Folded>>,
+    failed: AtomicBool,
+}
+
+impl MidRunCompact {
+    /// `notify` is told `start`, then `done` with the summary or `failed` with the reason.
+    pub fn new(provider: Arc<dyn ModelProvider>, limit: usize, cancel: Arc<AtomicBool>, notify: impl Fn(&str, Option<&str>) + Send + Sync + 'static) -> Self {
+        Self { provider, limit, cancel, notify: Box::new(notify), folded: Mutex::new(None), failed: AtomicBool::new(false) }
+    }
+
+    fn rebuild(system: &[Message], history: &[Message], folded: Option<&Folded>) -> Vec<Message> {
+        let Some(folded) = folded.filter(|f| f.upto <= history.len()) else {
+            return system.iter().chain(history).cloned().collect();
+        };
+        let kept = &history[folded.upto..];
+        let question = folded.question.as_ref().filter(|q| !kept.iter().any(|m| m.role == Role::User && !m.synthetic && m.parts == q.parts));
+        system.iter().cloned().chain(std::iter::once(summary_for_model(&folded.summary))).chain(question.cloned()).chain(kept.iter().cloned()).collect()
+    }
+
+    /// Where the part kept word for word begins: the newest messages worth `keep` tokens, never starting on a tool
+    /// result (it must follow the call that asked for it).
+    fn cut(history: &[Message], from: usize, keep: usize) -> Option<usize> {
+        let mut size = 0;
+        let mut cut = history.len();
+        while cut > from {
+            size += estimate_tokens(std::slice::from_ref(&history[cut - 1]));
+            if size > keep {
+                break;
+            }
+            cut -= 1;
+        }
+        if cut == history.len() {
+            // The newest step alone is larger than the share kept: keep that step (its call and results) and fold the rest.
+            cut = history.iter().rposition(|m| m.role != Role::Tool)?;
+        }
+        while cut < history.len() && history[cut].role == Role::Tool {
+            cut += 1;
+        }
+        // Nothing new to fold, or nothing would be left to work on.
+        (cut > from && cut < history.len()).then_some(cut)
+    }
+}
+
+impl Middleware for MidRunCompact {
+    fn before_model(&self, turn: &mut Turn) -> Result<(), HarnessError> {
+        let system_len = turn.messages.iter().take_while(|m| m.role == Role::System).count();
+        let (system, history) = turn.messages.split_at(system_len);
+        let (system, history) = (system.to_vec(), history.to_vec());
+        let mut folded = self.folded.lock().unwrap_or_else(|e| e.into_inner());
+        let mut messages = Self::rebuild(&system, &history, folded.as_ref());
+        let size = estimate_tokens(&messages) + estimate_tool_tokens(&turn.tools);
+        if self.limit == 0 || size * 100 < self.limit * MID_RUN_SHARE_PERCENT || self.failed.load(Ordering::Relaxed) {
+            turn.messages = messages;
+            return Ok(());
+        }
+        let from = folded.as_ref().map_or(0, |f| f.upto);
+        let Some(cut) = Self::cut(&history, from, self.limit * MID_RUN_KEEP_PERCENT / 100) else {
+            turn.messages = messages;
+            return Ok(());
+        };
+        let question = history[..cut].iter().rev().find(|m| m.role == Role::User && !m.synthetic).cloned()
+            .or_else(|| folded.as_ref().and_then(|f| f.question.clone()));
+        (self.notify)("start", None);
+        let record = transcript(folded.as_ref().map(|f| f.summary.as_str()), &history[from..cut], budget_for(self.limit));
+        match summarize(self.provider.as_ref(), &record, &self.cancel) {
+            Ok(summary) => {
+                (self.notify)("done", Some(&summary));
+                *folded = Some(Folded { upto: cut, summary, question });
+                messages = Self::rebuild(&system, &history, folded.as_ref());
+            }
+            Err(_) if self.cancel.load(Ordering::Relaxed) => return Err(HarnessError::Cancelled),
+            Err(reason) => {
+                // Not tried again in this answer; `ContextTrim` still keeps the request under the limit.
+                self.failed.store(true, Ordering::Relaxed);
+                (self.notify)("failed", Some(&reason));
+            }
+        }
+        turn.messages = messages;
+        Ok(())
+    }
 }
 
 /// The agent's store: reads give the model's view, writes go to the saved file as they are.
@@ -614,5 +719,81 @@ mod tests {
         assert_eq!(saved.len(), 6, "the saved conversation still has every message plus the summary");
         assert_eq!(saved[0].text(), "旧问题");
         fs::remove_dir_all(dir).unwrap();
+    }
+
+    fn mid_run(steps: Vec<agent_kernel::provider::scripted::Step>, limit: usize) -> (MidRunCompact, Arc<agent_kernel::provider::scripted::ScriptedProvider>, Arc<Mutex<Vec<String>>>) {
+        let provider = Arc::new(agent_kernel::provider::scripted::ScriptedProvider::new(steps));
+        let seen: Arc<Mutex<Vec<String>>> = Arc::default();
+        let log = seen.clone();
+        let compact = MidRunCompact::new(provider.clone(), limit, Arc::new(AtomicBool::new(false)), move |state, _| log.lock().unwrap().push(state.to_string()));
+        (compact, provider, seen)
+    }
+
+    /// One question, then `steps` tool calls each returning `size` characters of output.
+    fn long_task(steps: usize, size: usize) -> Vec<Message> {
+        let mut messages = vec![Message::system("规则"), ask("做一个游戏")];
+        for i in 0..steps {
+            messages.push(Message::assistant("", vec![ToolCall { id: format!("c{i}"), name: "write_file".into(), arguments: "{}".into() }]));
+            messages.push(Message::tool(format!("c{i}"), "x".repeat(size)));
+        }
+        messages
+    }
+
+    fn turn(messages: Vec<Message>) -> Turn {
+        Turn { session: "s".into(), index: 0, messages, tools: Vec::new() }
+    }
+
+    #[test]
+    fn a_long_answer_is_compacted_before_it_overflows_and_keeps_the_question_and_the_newest_work() {
+        let (compact, provider, seen) = mid_run(vec![agent_kernel::provider::scripted::Step::text("已写好 index.html 和 game.js")], 10_000);
+        let original = long_task(10, 4_000);
+        let mut t = turn(original.clone());
+        compact.before_model(&mut t).unwrap();
+        assert_eq!(*seen.lock().unwrap(), vec!["start", "done"]);
+        assert_eq!(provider.requests().len(), 1);
+        assert_eq!(t.messages[0].role, Role::System);
+        assert!(t.messages[1].text().contains("已写好 index.html"), "the summary comes right after the instructions");
+        assert_eq!(t.messages[2].text(), "做一个游戏", "the task itself stays word for word");
+        assert_ne!(t.messages[3].role, Role::Tool, "the kept part never starts with an orphaned tool result");
+        assert_eq!(t.messages.last(), original.last());
+        assert!(estimate_tokens(&t.messages) * 100 < 10_000 * MID_RUN_SHARE_PERCENT);
+
+        // The next step reuses the summary without asking the model again while it fits.
+        let mut next = original.clone();
+        next.push(Message::assistant("", vec![ToolCall { id: "c10".into(), name: "read_file".into(), arguments: "{}".into() }]));
+        next.push(Message::tool("c10", "ok"));
+        let mut t = turn(next.clone());
+        compact.before_model(&mut t).unwrap();
+        assert_eq!(provider.requests().len(), 1);
+        assert!(t.messages[1].text().contains("已写好 index.html"));
+        assert_eq!(t.messages.last(), next.last());
+    }
+
+    #[test]
+    fn a_short_answer_is_left_alone_and_a_failure_is_not_retried() {
+        let (compact, provider, seen) = mid_run(vec![agent_kernel::provider::scripted::Step::error(HarnessError::Provider { message: "down".into(), retryable: false })], 10_000);
+        let short = long_task(2, 100);
+        let mut t = turn(short.clone());
+        compact.before_model(&mut t).unwrap();
+        assert_eq!(t.messages, short);
+        assert!(provider.requests().is_empty());
+
+        let long = long_task(10, 4_000);
+        let mut t = turn(long.clone());
+        compact.before_model(&mut t).unwrap();
+        assert_eq!(t.messages, long, "a failed summary leaves the request to ContextTrim");
+        let mut t = turn(long.clone());
+        compact.before_model(&mut t).unwrap();
+        assert_eq!(provider.requests().len(), 1, "not tried again in the same answer");
+        assert_eq!(*seen.lock().unwrap(), vec!["start", "failed"]);
+    }
+
+    #[test]
+    fn one_huge_newest_result_still_lets_the_older_part_be_folded() {
+        let mut history = long_task(4, 4_000);
+        history.push(Message::assistant("", vec![ToolCall { id: "big".into(), name: "read_file".into(), arguments: "{}".into() }]));
+        history.push(Message::tool("big", "y".repeat(30_000)));
+        let cut = MidRunCompact::cut(&history[1..], 0, 3_500).unwrap();
+        assert_eq!(history[1..][cut].tool_calls[0].id, "big");
     }
 }

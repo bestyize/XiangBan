@@ -97,7 +97,7 @@ fn read_optional<T: serde::de::DeserializeOwned>(path: &std::path::Path) -> Resu
     }
 }
 fn save_state(app: &tauri::AppHandle, state: &ProactivityState) -> Result<(), String> {
-    crate::library::save_json(&data_path(app)?, &state.engine.lock().unwrap().snapshot())
+    crate::library::save_json(&data_path(app)?, &state.engine.lock().unwrap_or_else(|e| e.into_inner()).snapshot())
 }
 fn map_presence(kind: crate::presence::Kind, at_ms: i64) -> Event {
     let kind = match kind {
@@ -118,8 +118,8 @@ pub fn start(app: &tauri::AppHandle) {
     })();
     match loaded {
         Ok((settings, history)) => {
-            *state.engine.lock().unwrap() = Engine::restore(settings.policy(), history);
-            *state.settings.lock().unwrap() = settings;
+            *state.engine.lock().unwrap_or_else(|e| e.into_inner()) = Engine::restore(settings.policy(), history);
+            *state.settings.lock().unwrap_or_else(|e| e.into_inner()) = settings;
         }
         Err(error) => {
             state.read_error.store(true, Ordering::Relaxed);
@@ -131,9 +131,9 @@ pub fn start(app: &tauri::AppHandle) {
 /// Called by the existing 5-second presence/reminder loop. Silent, local, non-identifying.
 pub fn observe_environment(app: &tauri::AppHandle, activity: &crate::care_system::Activity) {
     let state = app.state::<ProactivityState>();
-    let _operation = state.operation.lock().unwrap();
+    let _operation = state.operation.lock().unwrap_or_else(|e| e.into_inner());
     if state.read_error.load(Ordering::Relaxed) { return; }
-    let config = state.settings.lock().unwrap().clone();
+    let config = state.settings.lock().unwrap_or_else(|e| e.into_inner()).clone();
     if !config.context_enabled { return; }
     let now = Local::now();
     let busy = crate::reminders::proactive_silenced(app) || crate::games::is_active(app);
@@ -142,7 +142,7 @@ pub fn observe_environment(app: &tauri::AppHandle, activity: &crate::care_system
     let mut next = crate::proactivity_context::collect(now, config.calendar_region.as_deref(),
         activity, busy, weather.as_ref());
     let updated = {
-        let mut context = state.context.lock().unwrap();
+        let mut context = state.context.lock().unwrap_or_else(|e| e.into_inner());
         // Drop stale task status instead of retaining it forever in a long-lived desktop process.
         let sample_at = next.temporal.as_ref().map(|v| v.sampled_at_ms).unwrap_or(0);
         next.task = context.task.clone().filter(|task| task.at_ms <= sample_at &&
@@ -153,7 +153,7 @@ pub fn observe_environment(app: &tauri::AppHandle, activity: &crate::care_system
     };
     if updated.is_empty() { return; }
     let at = Local::now().timestamp_millis();
-    let mut engine = state.engine.lock().unwrap();
+    let mut engine = state.engine.lock().unwrap_or_else(|e| e.into_inner());
     for changed in updated {
         let kind = match changed {
             ContextChange::LocalDay => EventKind::LocalDayChanged,
@@ -183,8 +183,8 @@ pub fn observe_task_outcome(app: &tauri::AppHandle, outcome: &crate::chat::task_
 }
 fn observe_task(app: &tauri::AppHandle, task: TaskContext) {
     let state = app.state::<ProactivityState>();
-    let _operation = state.operation.lock().unwrap();
-    if state.read_error.load(Ordering::Relaxed) || !state.settings.lock().unwrap().context_enabled { return; }
+    let _operation = state.operation.lock().unwrap_or_else(|e| e.into_inner());
+    if state.read_error.load(Ordering::Relaxed) || !state.settings.lock().unwrap_or_else(|e| e.into_inner()).context_enabled { return; }
     let kind = match task.state {
         TaskState::Started => EventKind::TaskStarted,
         TaskState::Running => EventKind::TaskResumed,
@@ -196,8 +196,8 @@ fn observe_task(app: &tauri::AppHandle, task: TaskContext) {
         TaskState::Unknown => EventKind::TaskOutcomeUnknown,
     };
     let at_ms = task.at_ms;
-    state.context.lock().unwrap().task = Some(task);
-    if state.engine.lock().unwrap().observe(&Event::new(kind,EventSource::Agent,at_ms)) != Observation::Accepted { return; }
+    state.context.lock().unwrap_or_else(|e| e.into_inner()).task = Some(task);
+    if state.engine.lock().unwrap_or_else(|e| e.into_inner()).observe(&Event::new(kind,EventSource::Agent,at_ms)) != Observation::Accepted { return; }
     if let Err(error) = save_state(app, &state) {
         state.read_error.store(true, Ordering::Relaxed);
         eprintln!("proactivity: task outcome write failed: {error}");
@@ -206,13 +206,13 @@ fn observe_task(app: &tauri::AppHandle, task: TaskContext) {
 
 pub fn observe_presence(app: &tauri::AppHandle, kind: crate::presence::Kind, at_ms: i64) {
     let state = app.state::<ProactivityState>();
-    let _op = state.operation.lock().unwrap();
+    let _op = state.operation.lock().unwrap_or_else(|e| e.into_inner());
     if state.read_error.load(Ordering::Relaxed) { return; }
     // Presence is collected only for an explicitly enabled user-facing feature.
-    let config = state.settings.lock().unwrap();
+    let config = state.settings.lock().unwrap_or_else(|e| e.into_inner());
     if !config.enabled && !config.context_enabled { return; }
     drop(config);
-    if state.engine.lock().unwrap().observe(&map_presence(kind, at_ms)) != Observation::Accepted { return; }
+    if state.engine.lock().unwrap_or_else(|e| e.into_inner()).observe(&map_presence(kind, at_ms)) != Observation::Accepted { return; }
     if let Err(error) = save_state(app, &state) {
         state.read_error.store(true, Ordering::Relaxed);
         eprintln!("proactivity: cannot persist event aggregates: {error}");
@@ -225,7 +225,7 @@ pub fn get_proactivity_context(window: tauri::WebviewWindow) -> Result<ContextSn
     if window.label() != "control" { return Err("只能从小伴控制台查看感知状态".into()); }
     let state = window.app_handle().state::<ProactivityState>();
     if state.read_error.load(Ordering::Relaxed) { return Err("主动感知状态暂不可用".into()); }
-    let context = state.context.lock().unwrap().clone();
+    let context = state.context.lock().unwrap_or_else(|e| e.into_inner()).clone();
     Ok(context)
 }
 
@@ -234,7 +234,7 @@ pub fn get_proactivity_settings(window: tauri::WebviewWindow) -> Result<Greeting
     if window.label() != "control" { return Err("只能从小伴控制台查看主动陪伴设置".into()); }
     let state = window.app_handle().state::<ProactivityState>();
     if state.read_error.load(Ordering::Relaxed) { return Err("主动陪伴配置损坏，请先备份并修复数据文件".into()); }
-    let settings = state.settings.lock().unwrap().clone();
+    let settings = state.settings.lock().unwrap_or_else(|e| e.into_inner()).clone();
     Ok(settings)
 }
 #[tauri::command]
@@ -243,29 +243,29 @@ pub fn configure_proactivity(window: tauri::WebviewWindow, settings: GreetingSet
     settings.validate()?;
     let app = window.app_handle();
     let state = app.state::<ProactivityState>();
-    let _op = state.operation.lock().unwrap();
+    let _op = state.operation.lock().unwrap_or_else(|e| e.into_inner());
     if state.read_error.load(Ordering::Relaxed) { return Err("主动陪伴配置损坏，请先备份并修复数据文件".into()); }
     crate::library::save_json(&settings_path(app)?, &settings)?;
     {
-        let mut engine = state.engine.lock().unwrap();
+        let mut engine = state.engine.lock().unwrap_or_else(|e| e.into_inner());
         let snapshot = engine.snapshot();
         *engine = Engine::restore(settings.policy(), snapshot);
     }
-    let previous = state.settings.lock().unwrap().clone();
-    *state.settings.lock().unwrap() = settings.clone();
+    let previous = state.settings.lock().unwrap_or_else(|e| e.into_inner()).clone();
+    *state.settings.lock().unwrap_or_else(|e| e.into_inner()) = settings.clone();
     if !settings.context_enabled || previous.calendar_region != settings.calendar_region ||
         previous.context_enabled != settings.context_enabled {
-        *state.context.lock().unwrap() = ContextSnapshot::default();
+        *state.context.lock().unwrap_or_else(|e| e.into_inner()) = ContextSnapshot::default();
     }
     if !settings.enabled {
-        *state.context.lock().unwrap() = ContextSnapshot::default();
+        *state.context.lock().unwrap_or_else(|e| e.into_inner()) = ContextSnapshot::default();
         close_bubble(app, &state);
     }
     Ok(settings)
 }
 
 fn close_bubble(app: &tauri::AppHandle, state: &ProactivityState) {
-    *state.active.lock().unwrap() = None;
+    *state.active.lock().unwrap_or_else(|e| e.into_inner()) = None;
     if let Some(window) = app.get_webview_window(BUBBLE_LABEL) { let _ = window.destroy(); }
 }
 fn greeting_text(id: u64) -> &'static str {
@@ -342,8 +342,8 @@ pub fn pet_proactive_hover(window: tauri::WebviewWindow, duration_ms: u64) -> Re
     let settings = crate::settings(app);
     if !settings.companion_enabled || !settings.companion_links { return Ok(false); }
     let state = app.state::<ProactivityState>();
-    let _op = state.operation.lock().unwrap();
-    if state.read_error.load(Ordering::Relaxed) || state.active.lock().unwrap().is_some() { return Ok(false); }
+    let _op = state.operation.lock().unwrap_or_else(|e| e.into_inner());
+    if state.read_error.load(Ordering::Relaxed) || state.active.lock().unwrap_or_else(|e| e.into_inner()).is_some() { return Ok(false); }
     let now = Local::now();
     let event = Event::new(EventKind::PetHovered, EventSource::Pet, now.timestamp_millis())
         .duration(duration_ms).subject(p.id.clone());
@@ -351,7 +351,7 @@ pub fn pet_proactive_hover(window: tauri::WebviewWindow, duration_ms: u64) -> Re
     let activity = crate::care_system::activity();
     let context = Context {
         local_day: now.format("%Y%m%d").to_string().parse().unwrap_or(0),
-        opted_in: state.settings.lock().unwrap().enabled,
+        opted_in: state.settings.lock().unwrap_or_else(|e| e.into_inner()).enabled,
         user_active: activity.available && !activity.locked && activity.idle_seconds < 60.0,
         pet_visible: window.is_visible().unwrap_or(false),
         locked: activity.locked,
@@ -359,7 +359,7 @@ pub fn pet_proactive_hover(window: tauri::WebviewWindow, duration_ms: u64) -> Re
         game: crate::games::is_active(app),
         fullscreen: false, // Unknown OS state: do not claim fullscreen detection.
     };
-    let mut engine = state.engine.lock().unwrap();
+    let mut engine = state.engine.lock().unwrap_or_else(|e| e.into_inner());
     let _ = engine.observe(&event);
     let Decision::Allowed(action) = engine.consider(candidate, &context, now.timestamp_millis()) else { return Ok(false); };
     if action.kind != ActionKind::CompanionGreeting || action.channel != Channel::Bubble { return Ok(false); }
@@ -369,7 +369,7 @@ pub fn pet_proactive_hover(window: tauri::WebviewWindow, duration_ms: u64) -> Re
         state.read_error.store(true, Ordering::Relaxed);
         return Err(format!("主动陪伴状态保存失败：{error}"));
     }
-    *state.active.lock().unwrap() = Some(offer);
+    *state.active.lock().unwrap_or_else(|e| e.into_inner()) = Some(offer);
     if let Err(error) = show_bubble(app, &window) {
         close_bubble(app, &state);
         return Err(error);
@@ -381,11 +381,11 @@ pub fn pet_proactive_poke(window: tauri::WebviewWindow) -> Result<(), String> {
     if !crate::pets::is_pet(window.label()) { return Err("仅桌宠可发送互动事件".into()); }
     crate::pets::own(&window)?;
     let app = window.app_handle(); let state = app.state::<ProactivityState>();
-    if state.read_error.load(Ordering::Relaxed) || !state.settings.lock().unwrap().enabled { return Ok(()); }
-    let _op = state.operation.lock().unwrap();
+    if state.read_error.load(Ordering::Relaxed) || !state.settings.lock().unwrap_or_else(|e| e.into_inner()).enabled { return Ok(()); }
+    let _op = state.operation.lock().unwrap_or_else(|e| e.into_inner());
     let now = Local::now().timestamp_millis();
     let event = Event::new(EventKind::PetPoked, EventSource::Pet, now);
-    if state.engine.lock().unwrap().observe(&event) == Observation::Accepted {
+    if state.engine.lock().unwrap_or_else(|e| e.into_inner()).observe(&event) == Observation::Accepted {
         if let Err(error) = save_state(app, &state) {
             state.read_error.store(true, Ordering::Relaxed);
             eprintln!("proactivity: poke observation persist failed: {error}");
@@ -396,7 +396,7 @@ pub fn pet_proactive_poke(window: tauri::WebviewWindow) -> Result<(), String> {
 #[tauri::command]
 pub fn get_companion_greeting(window: tauri::WebviewWindow) -> Result<Greeting, String> {
     if window.label() != BUBBLE_LABEL { return Err("不是陪伴气泡窗口".into()); }
-    window.app_handle().state::<ProactivityState>().active.lock().unwrap().clone()
+    window.app_handle().state::<ProactivityState>().active.lock().unwrap_or_else(|e| e.into_inner()).clone()
         .ok_or("问候已经结束".into())
 }
 #[tauri::command]
@@ -408,10 +408,10 @@ pub fn respond_companion_greeting(window: tauri::WebviewWindow, id: u64, outcome
         _ => return Err("未知的主动陪伴反馈".into()),
     };
     let app = window.app_handle(); let state = app.state::<ProactivityState>();
-    let _op = state.operation.lock().unwrap();
-    let current = state.active.lock().unwrap().clone().ok_or("问候已经结束")?;
+    let _op = state.operation.lock().unwrap_or_else(|e| e.into_inner());
+    let current = state.active.lock().unwrap_or_else(|e| e.into_inner()).clone().ok_or("问候已经结束")?;
     if current.id != id { return Err("问候已经失效".into()); }
-    if !state.engine.lock().unwrap().feedback(id, feedback, Local::now().timestamp_millis()) {
+    if !state.engine.lock().unwrap_or_else(|e| e.into_inner()).feedback(id, feedback, Local::now().timestamp_millis()) {
         return Err("重复的问候反馈".into());
     }
     if let Err(error) = save_state(app, &state) {
