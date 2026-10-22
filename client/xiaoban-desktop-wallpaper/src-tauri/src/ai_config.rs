@@ -690,6 +690,7 @@ pub fn save_ai_provider(
     reply_preference: Option<ReplyPreference>,
     reasoning_efforts: Option<Vec<String>>,
     clear_reasoning_efforts: Option<bool>,
+    discovered_model: Option<ModelConfig>,
 ) -> Result<AiConfigView, String> {
     let path = path(&app)?;
     let state = app.state::<AiConfigState>();
@@ -713,6 +714,30 @@ pub fn save_ai_provider(
     }
     if previous.model != clean_mdl || previous.protocol != protocol {
         previous.reasoning_efforts = None;
+    }
+    // Model facts are scoped to the exact endpoint. An old provider catalogue
+    // must never leak capabilities into a newly configured proxy URL.
+    if (previous.base_url != clean_url || previous.protocol != protocol)
+        && (!previous.remote || previous.provider_type == "third")
+    {
+        previous.models.clear();
+    }
+    if let Some(model) = discovered_model {
+        if previous.remote && previous.provider_type != "third" {
+            return Err("官方模型能力由服务端目录管理".into());
+        }
+        if model.id != clean_mdl || model.id.len() > MAX_MODEL
+            || model.max_output_tokens.is_some_and(|n| n == 0 || n > 2_000_000)
+            || model.context_window_tokens.is_some_and(|n| n == 0 || n > 16_000_000)
+            || model.name.len() > 250 || model.description.len() > 500
+            || model.reasoning_efforts.as_ref().is_some_and(|v| ai_reasoning::validate(v).is_err())
+        {
+            return Err("服务商模型能力数据无效".into());
+        }
+        // Only the selected discovered model is persisted; the list of IDs
+        // can be large, and all other models will be re-resolved when selected.
+        previous.models.retain(|m| m.id != model.id);
+        previous.models.push(model);
     }
     if let Some(levels) = reasoning_efforts { ai_reasoning::validate(&levels)?; previous.reasoning_efforts = Some(levels); }
     if clear_reasoning_efforts.unwrap_or(false) { previous.reasoning_efforts = None; }
@@ -899,44 +924,76 @@ pub fn candidate_models_urls(protocol: &str, base_url: &str) -> Vec<String> {
     }
 }
 
+/// Parse optional capabilities from the *selected endpoint* rather than deriving
+/// them from hard-coded model names. Many /models APIs return IDs only; keep all
+/// absent fields as None so the kernel can use protocol-specific recovery.
+pub fn parse_model_details_json(raw: &str, protocol: &str) -> Result<Vec<ModelConfig>, String> {
+    let value: serde_json::Value = serde_json::from_str(raw)
+        .map_err(|e| format!("解析服务商返回的 JSON 失败：{e}"))?;
+    let models = value.get("data").and_then(|v| v.as_array())
+        .or_else(|| value.get("models").and_then(|v| v.as_array()))
+        .or_else(|| value.as_array())
+        .ok_or_else(|| "服务商返回的数据中未包含模型列表".to_string())?;
+
+    fn number(value: &serde_json::Value, keys: &[&str], ceiling: u64) -> Option<u64> {
+        keys.iter().filter_map(|key| value.get(*key).and_then(|v| v.as_u64()))
+            .find(|n| *n > 0 && *n <= ceiling)
+    }
+    fn flag(value: &serde_json::Value, keys: &[&str]) -> Option<bool> {
+        keys.iter().find_map(|key| value.get(*key).and_then(|v| v.as_bool()))
+    }
+    let mut parsed = Vec::new();
+    for item in models {
+        let id = item.as_str().or_else(|| item.get("id").and_then(|v| v.as_str()))
+            .or_else(|| item.get("name").and_then(|v| v.as_str()))
+            .unwrap_or("").trim();
+        if id.is_empty() || id.len() > MAX_MODEL || id.chars().any(char::is_control) { continue; }
+        let mut model = ModelConfig { id: id.into(), name: id.into(), ..ModelConfig::default() };
+        if let Some(name) = item.get("display_name").or_else(|| item.get("displayName"))
+            .and_then(|v| v.as_str()).filter(|v| !v.is_empty() && v.len() <= 250)
+        {
+            model.name = name.into();
+        }
+        if let Some(description) = item.get("description").and_then(|v| v.as_str())
+            .filter(|v| v.len() <= 500)
+        {
+            model.description = description.into();
+        }
+        let output_keys = if protocol == "anthropic" {
+            &["max_output_tokens", "maxOutputTokens", "max_completion_tokens", "max_tokens"][..]
+        } else {
+            &["max_output_tokens", "maxOutputTokens", "max_completion_tokens", "maxCompletionTokens"][..]
+        };
+        model.max_output_tokens = number(item, output_keys, 2_000_000).map(|n| n as u32)
+            .or_else(|| item.get("top_provider")
+                .and_then(|v| number(v, &["max_completion_tokens"], 2_000_000))
+                .map(|n| n as u32));
+        let context_keys = if protocol == "anthropic" {
+            &["max_input_tokens", "context_window_tokens", "context_window", "context_length", "contextLength"][..]
+        } else {
+            &["context_window_tokens", "context_window", "context_length", "contextLength", "max_model_len"][..]
+        };
+        model.context_window_tokens = number(item, context_keys, 16_000_000).map(|n| n as usize);
+        model.supports_tools = flag(item, &["supports_tools", "supportsTools", "tool_calling", "toolCalling"]);
+        model.supports_vision = flag(item, &["supports_vision", "supportsVision", "vision"]);
+        // Models APIs may also expose a nested capabilities object.
+        if let Some(capabilities) = item.get("capabilities") {
+            model.supports_tools = model.supports_tools.or_else(|| capabilities.get("tool_use")
+                .and_then(|v| flag(v, &["supported"])));
+            model.supports_vision = model.supports_vision.or_else(|| capabilities.get("vision")
+                .and_then(|v| flag(v, &["supported"])));
+        }
+        parsed.push(model);
+    }
+    parsed.sort_by(|a, b| a.id.cmp(&b.id));
+    parsed.dedup_by(|a, b| a.id == b.id);
+    if parsed.is_empty() { return Err("服务商返回的数据中未包含任何模型".into()); }
+    Ok(parsed)
+}
+
+/// Backwards-compatible ID-only parser used by earlier clients and tests.
 pub fn parse_model_list_json(raw: &str) -> Result<Vec<String>, String> {
-    let value: serde_json::Value = serde_json::from_str(raw).map_err(|e| format!("解析服务商返回的 JSON 失败：{e}"))?;
-    let mut models = Vec::new();
-
-    if let Some(data) = value.get("data").and_then(|v| v.as_array()) {
-        for item in data {
-            if let Some(id) = item.get("id").and_then(|id| id.as_str()) {
-                models.push(id.trim().to_string());
-            } else if let Some(id) = item.as_str() {
-                models.push(id.trim().to_string());
-            }
-        }
-    } else if let Some(items) = value.get("models").and_then(|v| v.as_array()) {
-        for item in items {
-            if let Some(id) = item.get("name").and_then(|n| n.as_str()).or_else(|| item.get("id").and_then(|i| i.as_str())) {
-                models.push(id.trim().to_string());
-            } else if let Some(id) = item.as_str() {
-                models.push(id.trim().to_string());
-            }
-        }
-    } else if let Some(items) = value.as_array() {
-        for item in items {
-            if let Some(id) = item.get("id").and_then(|i| i.as_str()).or_else(|| item.get("name").and_then(|n| n.as_str())) {
-                models.push(id.trim().to_string());
-            } else if let Some(id) = item.as_str() {
-                models.push(id.trim().to_string());
-            }
-        }
-    }
-
-    models.retain(|m| !m.is_empty());
-    models.sort();
-    models.dedup();
-
-    if models.is_empty() {
-        return Err("服务商返回的数据中未包含任何模型".into());
-    }
-    Ok(models)
+    Ok(parse_model_details_json(raw, "chat")?.into_iter().map(|m| m.id).collect())
 }
 
 #[tauri::command]
@@ -945,7 +1002,7 @@ pub async fn fetch_ai_models(
     protocol: String,
     base_url: String,
     api_key: Option<String>,
-) -> Result<Vec<String>, String> {
+) -> Result<Vec<ModelConfig>, String> {
     let base_url = clean_base_url(&base_url)?;
     let protocol = if PROTOCOLS.contains(&protocol.as_str()) { protocol } else { "chat".into() };
 
@@ -1008,7 +1065,7 @@ pub async fn fetch_ai_models(
             }
 
             let body = resp.text().map_err(|e| format!("读取响应失败：{e}"))?;
-            return parse_model_list_json(&body);
+            return parse_model_details_json(&body, &protocol);
         }
 
         if last_error.is_empty() {
@@ -1367,6 +1424,37 @@ mod tests {
         // 空或无模型应返回 Err
         assert!(parse_model_list_json(r#"{"data":[]}"#).is_err());
         assert!(parse_model_list_json(r#"{"other":"field"}"#).is_err());
+    }
+
+    #[test]
+    fn model_discovery_retains_live_capabilities_without_guessing_from_names() {
+        let anthropic = r#"{"data":[{
+            "id":"new-claude-family-2030", "display_name":"Claude Future",
+            "max_input_tokens":1000000, "max_tokens":128000,
+            "capabilities":{"tool_use":{"supported":true},"vision":{"supported":false}}
+        }]}"#;
+        let models = parse_model_details_json(anthropic, "anthropic").unwrap();
+        assert_eq!(models.len(), 1);
+        let model = &models[0];
+        assert_eq!(model.id, "new-claude-family-2030");
+        assert_eq!(model.name, "Claude Future");
+        assert_eq!(model.context_window_tokens, Some(1_000_000));
+        assert_eq!(model.max_output_tokens, Some(128_000));
+        assert_eq!(model.supports_tools, Some(true));
+        assert_eq!(model.supports_vision, Some(false));
+
+        let proxied = r#"{"data":[
+          {"id":"future-model","context_length":262144,"top_provider":{"max_completion_tokens":65536}},
+          {"id":"id-only","max_tokens":1024}
+        ]}"#;
+        let models = parse_model_details_json(proxied, "chat").unwrap();
+        assert_eq!(models[0].id, "future-model");
+        assert_eq!(models[0].context_window_tokens, Some(262_144));
+        assert_eq!(models[0].max_output_tokens, Some(65_536));
+        assert_eq!(models[1].max_output_tokens, None,
+            "an arbitrary OpenAI-compatible max_tokens field is not trusted as a cap");
+        assert_eq!(parse_model_details_json(r#"{"models":[{"name":"local:latest"}]}"#, "responses")
+            .unwrap()[0].max_output_tokens, None);
     }
 
     #[test]
