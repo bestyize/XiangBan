@@ -44,3 +44,19 @@ impl fmt::Display for HarnessError {
 }
 
 impl std::error::Error for HarnessError {}
+
+#[cfg(test)]
+mod model_limit_tests {
+    use super::*;
+
+    #[test]
+    fn output_limits_do_not_trigger_context_recovery() {
+        assert!(!HarnessError::provider(
+            "max_tokens exceeds model's maximum output tokens (65536)", false
+        ).is_context_limit());
+        assert!(HarnessError::provider(
+            "context_length_exceeded: input token count exceeds model window", false
+        ).is_context_limit());
+        assert!(!HarnessError::provider("HTTP 400: invalid request", false).is_context_limit());
+    }
+}
