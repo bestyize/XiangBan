@@ -1,7 +1,7 @@
 # 小伴桌面 Agent 加固：差距分析、已修复项与后续路线
 
 **编制日期：** 2026-10-22
-**分支：** `fix/agent-harness-hardening-20261022`
+**分支：** `fix/agent-harness-hardening-20261022`（已合并到 main）、`feat/agent-harness-stage2-20261022`（第二批）
 **范围：** `client/xiaoban-desktop-wallpaper` 的聊天 Agent（`src-tauri/src/chat/`、`src/ui/chat/`）与 `libs/agent-kernel`
 
 本文记录一次对照 Claude Code、Codex、Hermes Agent 等 harness 的审查：发现的问题、本分支已经修复的部分、验证方式，以及还没做的部分和建议做法。标注 **[已修复]** 的条目有对应提交和测试；标注 **[待建]** 的条目尚未实现，不能对外宣称。
@@ -10,15 +10,15 @@
 
 | 维度 | 审查时的现状 | 成熟 harness 的做法 | 本分支之后 |
 |---|---|---|---|
-| 执行隔离 | 无沙箱；“完全信任”只靠关键词规则（`danger.rs`）把关 | Codex 用系统沙箱（Seatbelt / Landlock）限制写入和网络；Claude Code 有沙箱模式；Hermes 可把终端放进 Docker/SSH | 规则已加固 **[已修复]**；系统沙箱 **[待建]** |
+| 执行隔离 | 无沙箱；“完全信任”只靠关键词规则（`danger.rs`）把关 | Codex 用系统沙箱（Seatbelt / Landlock）限制写入和网络；Claude Code 有沙箱模式；Hermes 可把终端放进 Docker/SSH | 规则已加固 **[已修复]**；macOS 沙箱 **[已实现，待真机验证]**；Windows **[待建]** |
 | 权限粒度 | 全局一个模式；执行类工具“总是允许”不可用 | 按会话；按命令前缀记住授权 | 按会话 **[已修复]**；按命令种类记住 **[已修复]** |
 | 上下文压缩 | 只在一轮回答结束后压缩 | 回答进行中也会自动压缩 | **[已修复]** |
 | Prompt 缓存 | Claude 协议未发 `cache_control` | 缓存系统提示、工具和历史 | **[已修复]** |
 | 后台进程 | 内核有 `ProcessManager`，桌面端未接入（运行文档写着已接入） | 后台 shell、轮询输出 | **[已修复]** |
 | 编辑回滚 | 无 | Claude Code 检查点；Codex 基于 git 撤销 | 文件工具改动可整轮撤销 **[已修复]** |
-| 子 Agent | 内核有 `Subagent`，桌面端未用 | 常规能力 | **[待建]** |
+| 子 Agent | 内核有 `Subagent`，桌面端未用 | 常规能力 | 只读调研子 Agent **[已实现]** |
 | 网页搜索 | 只有 `web_fetch` | 自带搜索 | **[待建]**（需搜索后端） |
-| 项目指令与 hooks | 只有 skills 与记忆 | 读取 AGENTS.md / CLAUDE.md，工具前后 hooks | **[待建]** |
+| 项目指令与 hooks | 只有 skills 与记忆 | 读取 AGENTS.md / CLAUDE.md，工具前后 hooks | 项目指令 **[已实现]**；hooks **[待建]** |
 | Claude 思考模式 | thinking 块不在轮次间保留，带工具时不能开 | 支持 | **[待建]** |
 
 ## 2. 已修复的问题
@@ -50,6 +50,15 @@
 14. **撤销一轮回答的文件改动**（`17541f3`）：文件工具第一次改动某个文件前备份原文件；回答结束后显示“这轮回答修改了 N 个文件”，两步确认后恢复。每个对话保留最近 20 轮。只覆盖文件工具，shell 和后台进程改动的文件不在其中。
 15. 桌宠与进程工具补上中文名称（`6d642e9`）。
 
+### 2.5 第二批（`feat/agent-harness-stage2-20261022`）
+
+16. **项目说明**：工作目录根下的 `AGENTS.md`、`CLAUDE.md`、`.claude/CLAUDE.md` 加入系统提示，每次调用模型前重新读取；单个文件最多 16 KB、合计 24 KB；不跟随符号链接。提示中写明这些内容只是工作约定，不能扩大权限或改变确认流程。
+17. **只读调研子 Agent**（`research` 工具）：子助手只有 `read_file` / `list_dir` / `grep`，只把结论带回对话；不会弹确认框，可以并行。
+18. **macOS 沙箱**：“完全信任”下的 shell 与后台进程运行在 Seatbelt 里，只能写工作目录、临时目录和软件包缓存，读不到 `~/.ssh` 等密钥目录；网络默认开放。要求沙箱但系统不支持时拒绝执行，不会退回无保护运行。用户明确允许的高风险命令在沙箱外执行一次。询问模式和 Windows 行为不变。
+19. **GBK/GB18030 文件**：`read_file`、`grep` 能正确显示和搜索；`edit_file` 编辑后按原编码写回。
+
+合并 #93（长期目标）时，顺带修正了 main 上的三处编译错误：`File::try_lock` 的错误类型、`pub use` 重新导出 Tauri 命令、`app.state()` 临时值的借用。
+
 ## 3. 验证情况
 
 - `libs/agent-kernel`：`cargo test --all-features` 新增测试全部通过。以下 5 个测试在 main 上本来就失败，本分支没有新增失败：`output_limit_errors_reduce_only_the_generation_cap`、`a_skill_created_during_a_run_appears_in_the_next_model_call`、`load_returns_the_body_without_frontmatter_and_names_alternatives_on_miss`，以及 shell 的两个进程清理测试。`cargo check` 对 `x86_64-pc-windows-msvc` 与 `aarch64-apple-darwin` 都通过。
@@ -65,11 +74,11 @@ npm ci --registry=https://registry.npmjs.org/ --replace-registry-host=registry.n
 
 ## 4. 后续路线
 
-### 4.1 系统沙箱 [待建]，最重要
+### 4.1 系统沙箱：macOS 已实现，Windows [待建]
 
 关键词规则挡不住 `python script.py` 这类由模型先写脚本再执行的路径，“完全信任”需要真正的隔离作为前提：
 
-- macOS：用 `sandbox-exec` 配置文件包裹 shell 与 `process_start`。写入只允许工作目录、`$TMPDIR` 与工具缓存目录（npm、cargo），网络按会话开关；配置文件随应用发布，不由模型生成。
+- macOS：已实现（见 2.5 第 18 条），尚需真机验证；后续可在设置里提供“完全信任时关闭网络”的选项（`SandboxPolicy.network`）。
 - Windows：受限令牌或 AppContainer 加现有的 Job Object；先只限制写入范围。
 - 沙箱不可用（系统版本过低、启动失败）时，“完全信任”自动降级为“询问”并在界面说明。
 - 验收：沙箱内 `rm -rf ~`、写 `~/.zshrc`、`curl -d` 均失败；`npm test`、`cargo build` 正常。
@@ -81,12 +90,11 @@ npm ci --registry=https://registry.npmjs.org/ --replace-registry-host=registry.n
 
 ### 4.3 能力补齐 [待建]
 
-- **子 Agent**：接入内核 `Subagent`，先做只读调研子任务（并行读取与搜索），共享父任务的权限与工具调用预算。
+- **子 Agent**：只读调研已实现；子任务的用量尚未计入父任务的预算。
 - **网页搜索**：`web_search` 需要宿主提供 `SearchBackend`，建议走 server-ai 网关统一计费与限流。
-- **项目指令**：读取工作目录的 `AGENTS.md` / `CLAUDE.md` 作为提示片段，限制大小并标注来源。
+- **hooks**：工具调用前后执行用户配置的命令（类似 Claude Code 的 hooks）。
 - **Claude 思考模式**：内核保留并回传 thinking 块后，才能在带工具的循环里开启扩展思考。
 - **Agent 复用**：现在每条消息都会重建 Agent；开启电脑控制时，每条消息还会重启一次 MCP 子进程。可改为按配置缓存，配置变化时再重建。
-- **GBK 等非 UTF-8 文件**：文件工具目前直接拒绝，可在读取时检测编码并提示，或支持转码写回。
 - **检查点的覆盖范围**：可在工作目录是 git 仓库时，额外用 `git stash create` 记录 shell 改动。
 
 ### 4.4 需要补的边界测试

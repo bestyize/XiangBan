@@ -30,6 +30,7 @@ pub struct Shell {
     cwd: PathBuf,
     env: Vec<(String, String)>,
     extra_inherited: Vec<String>,
+    sandbox: Option<crate::sandbox::SandboxHook>,
 }
 
 impl Shell {
@@ -43,7 +44,13 @@ impl Shell {
                            There is no terminal and no input, so never start interactive programs. Prefer the file tools \
                            for reading and editing files.";
         let spec = ToolSpec::new("shell", description, schema).risk(Risk::Exec).serial().timeout(Duration::from_secs(120));
-        Self { spec, cwd: cwd.into(), env: Vec::new(), extra_inherited: Vec::new() }
+        Self { spec, cwd: cwd.into(), env: Vec::new(), extra_inherited: Vec::new(), sandbox: None }
+    }
+
+    /// Runs commands for which `hook` returns a policy inside the OS sandbox (see `crate::sandbox`).
+    pub fn sandbox(mut self, hook: crate::sandbox::SandboxHook) -> Self {
+        self.sandbox = Some(hook);
+        self
     }
 
     /// Sets one variable for the command. Everything not listed here or passed through is removed.
@@ -141,18 +148,16 @@ impl Tool for Shell {
             return Err(format!("`command` must be 1 to {MAX_COMMAND_CHARS} characters"));
         }
 
+        let policy = self.sandbox.as_ref().and_then(|hook| hook.policy(ctx.session(), command));
         #[cfg(windows)]
         let mut cmd = {
+            crate::sandbox::refuse_on_windows(policy.as_ref())?;
             let mut c = crate::child_env::windows_shell(command);
             crate::child_env::no_window(&mut c);
             c
         };
         #[cfg(not(windows))]
-        let mut cmd = {
-            let mut c = Command::new("sh");
-            c.args(["-c", command]);
-            c
-        };
+        let mut cmd = crate::sandbox::unix_shell(command, policy.as_ref())?;
         cmd.current_dir(&self.cwd).stdin(Stdio::null()).stdout(Stdio::piped()).stderr(Stdio::piped());
         crate::child_env::apply(&mut cmd, &self.extra_inherited);
         cmd.envs(self.env.iter().map(|(k, v)| (k, v)));
@@ -198,6 +203,9 @@ impl Tool for Shell {
 
         let output = capture.lock().unwrap_or_else(|e| e.into_inner()).text();
         let output = output.trim_end();
+        let blocked = policy.is_some() && crate::sandbox::looks_blocked(output);
+        let output = if blocked { format!("{output}\n{}", crate::sandbox::BLOCKED_HINT) } else { output.to_string() };
+        let output = output.as_str();
         match status {
             None => Err(format!("{output}\n[stopped: the command was cancelled or timed out and was killed]").trim_start().to_string()),
             Some(status) if status.success() => Ok(if output.is_empty() { "(no output)\n[exit code: 0]".to_string() } else { format!("{output}\n[exit code: 0]") }),

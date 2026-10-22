@@ -30,6 +30,27 @@ const GREP_FILE_BYTES: u64 = 2 * 1024 * 1024;
 const GREP_MAX_DEPTH: usize = 20;
 const GREP_LINE_CHARS: usize = 300;
 
+/// One line of a file as text. UTF-8 first; otherwise GB18030 (a superset of GBK and GB2312, still common for
+/// Chinese text saved on Windows) when it decodes without errors. Its multi-byte sequences never contain a newline
+/// byte, so decoding line by line is safe. `None` when neither fits.
+pub(crate) fn decode_line(bytes: &[u8]) -> (std::borrow::Cow<'_, str>, LineEncoding) {
+    if let Ok(text) = std::str::from_utf8(bytes) {
+        return (text.into(), LineEncoding::Utf8);
+    }
+    match encoding_rs::GB18030.decode_without_bom_handling_and_without_replacement(bytes) {
+        Some(text) => (text, LineEncoding::Gb18030),
+        None => (String::from_utf8_lossy(bytes), LineEncoding::Unknown),
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum LineEncoding {
+    Utf8,
+    Gb18030,
+    /// Neither: shown with replacement characters.
+    Unknown,
+}
+
 struct Roots {
     list: Vec<PathBuf>,
 }
@@ -159,6 +180,7 @@ impl Tool for ReadFile {
         let (mut number, mut emitted) = (0u64, 0u64);
         let mut line = Vec::new();
         let mut more_from = None;
+        let (mut gb18030, mut undecodable) = (false, false);
         loop {
             if ctx.is_cancelled() {
                 return Err("cancelled".to_string());
@@ -175,7 +197,9 @@ impl Tool for ReadFile {
                 more_from = Some(number);
                 break;
             }
-            let text = String::from_utf8_lossy(&line);
+            let (text, encoding) = decode_line(&line);
+            gb18030 |= encoding == LineEncoding::Gb18030;
+            undecodable |= encoding == LineEncoding::Unknown;
             out.push_str(&format!("{number:>6}\t{}\n", clip_chars(text.trim_end_matches(['\n', '\r']), LINE_CHAR_LIMIT)));
             emitted += 1;
         }
@@ -184,6 +208,11 @@ impl Tool for ReadFile {
         }
         if let Some(next) = more_from {
             out.push_str(&format!("[more lines follow; continue with offset={next}]"));
+        }
+        if undecodable {
+            out.push_str("\n[encoding: some lines are neither UTF-8 nor GBK/GB18030 and were shown with \u{FFFD} in place of what could not be decoded; do not copy those characters into edits or claim to know them]");
+        } else if gb18030 {
+            out.push_str("\n[encoding: this file is GBK/GB18030, shown decoded; edit_file keeps that encoding when it writes]");
         }
         Ok(out)
     }
@@ -290,7 +319,9 @@ impl Search<'_> {
             return;
         }
         let shown = self.roots.display(path);
-        for (i, line) in String::from_utf8_lossy(&bytes).lines().enumerate() {
+        // Decoded like read_file, so a Chinese pattern also finds GBK files.
+        let (text, _) = decode_line(&bytes);
+        for (i, line) in text.lines().enumerate() {
             let found = if self.ignore_case { line.to_lowercase().contains(&self.needle) } else { line.contains(&self.needle) };
             if !found {
                 continue;

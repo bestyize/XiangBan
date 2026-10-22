@@ -6,6 +6,7 @@
 mod agent;
 #[allow(dead_code)]
 mod child_env;
+pub mod sandbox;
 pub mod builtin;
 mod error;
 mod exec;
