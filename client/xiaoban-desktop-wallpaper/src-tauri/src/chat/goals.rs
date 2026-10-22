@@ -2,7 +2,7 @@
 use super::*;
 use agent_kernel::{goals::{GoalContract, GoalRecord, GoalState, GoalStore}, recovery};
 use agent_kernel::{RunEvent, RunState};
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -106,34 +106,23 @@ pub fn chat_goal_start(
 ) -> Result<GoalRecord, String> {
     require_control(&window)?;
     exists(&app, &session_id)?;
-    let previous = {
-        let _write = lock(&app.state::<ChatState>().goal_io);
-        if running(&app, &session_id) { return Err("当前会话正在运行".into()); }
-        let mut goal = current(&app, &session_id)?.ok_or("请先设定目标")?;
-        let previous = goal.clone();
-        goal.begin(millis())?;
-        store(&app)?.save(&goal)?;
-        previous
-    };
-    let next = {
-        let mut goal = previous.clone();
-        goal.begin(millis())?;
-        goal
-    };
-    match super::chat_send(app.clone(), session_id.clone(), prompt(&next), None, Some(false), None) {
+    // Hold the goal lock until chat_send has registered the run or refused it.
+    // Otherwise a simultaneous read could mistake the brief dispatch gap
+    // for a crashed process and mark an in-flight goal NeedsReview.
+    let _write = lock(&app.state::<ChatState>().goal_io);
+    if running(&app, &session_id) { return Err("当前会话正在运行".into()); }
+    let mut goal = current(&app, &session_id)?.ok_or("请先设定目标")?;
+    let previous = goal.clone();
+    goal.begin(millis())?;
+    store(&app)?.save(&goal)?;
+    match super::chat_send(app.clone(), session_id.clone(), prompt(&goal), None, Some(false), None) {
         Ok(_) => {
-            changed(&app, &session_id, Some(&next));
-            Ok(next)
+            changed(&app, &session_id, Some(&goal));
+            Ok(goal)
         }
         Err(error) => {
-            let _write = lock(&app.state::<ChatState>().goal_io);
-            // Restore only if no run has attached a run_id in the meantime.
-            if store(&app)?.load(&session_id)?.is_some_and(|g|
-                g.state == GoalState::Running && g.last_run_id.is_none()
-            ) {
-                store(&app)?.save(&previous)?;
-                changed(&app, &session_id, Some(&previous));
-            }
+            store(&app)?.save(&previous)?;
+            changed(&app, &session_id, Some(&previous));
             Err(error)
         }
     }
