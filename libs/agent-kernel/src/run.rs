@@ -358,7 +358,7 @@ impl Agent {
                     request,
                     &mut |text| {
                         streamed_flag.set(true);
-                        (sink.borrow_mut())(Event::TextDelta { text: text.to_string() });
+                        (*sink.borrow_mut())(Event::TextDelta { text: text.to_string() });
                     },
                     &mut |kind, text| {
                         if text.is_empty() { return; }
@@ -368,7 +368,7 @@ impl Agent {
                         } else {
                             visible_reasoning.push(crate::ReasoningSegment { kind, text: text.to_owned() });
                         }
-                        (sink.borrow_mut())(Event::ReasoningDelta { kind, text: text.to_owned() });
+                        (*sink.borrow_mut())(Event::ReasoningDelta { kind, text: text.to_owned() });
                     },
                     cancel,
                 )
@@ -398,7 +398,7 @@ impl Agent {
                     sleep_unless_cancelled(delay, cancel)?;
                 }
                 Ok(mut reply) => {
-                    reply.message.reasoning = visible_reasoning;
+                    if !visible_reasoning.is_empty() { reply.message.reasoning = visible_reasoning; }
                     return Ok(reply);
                 }
                 other => return other,
