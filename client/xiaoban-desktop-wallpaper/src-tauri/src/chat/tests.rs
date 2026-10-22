@@ -1055,3 +1055,16 @@ fn the_window_filter_keeps_conversation_commands_where_they_belong() {
         assert!(!decide("assistant", command), "{command} is for the control window only");
     }
 }
+
+/// The ring's allowance before the first answer must stay close to what the tools really cost: over by at most
+/// half, never under. Adding or trimming tools moves the real size, and this test says when to update it.
+#[test]
+fn the_tool_allowance_before_the_first_answer_matches_the_real_tool_set() {
+    let rig = rig("tool-allowance", vec![Step::text("好")], Approval::Once);
+    let real = agent_kernel::estimate_tool_tokens(&rig.agent.tool_schemas());
+    assert!(TOOL_TOKENS_BEFORE_FIRST_ANSWER >= real && TOOL_TOKENS_BEFORE_FIRST_ANSWER <= real * 3 / 2,
+        "real tool definitions are about {real} tokens; update TOOL_TOKENS_BEFORE_FIRST_ANSWER ({TOOL_TOKENS_BEFORE_FIRST_ANSWER})");
+    save_tool_tokens(&rig.dirs, false, real);
+    assert_eq!(saved_tool_tokens(&rig.dirs, false), Some(real), "a restart uses the last measurement");
+    assert_eq!(saved_tool_tokens(&rig.dirs, true), None);
+}
