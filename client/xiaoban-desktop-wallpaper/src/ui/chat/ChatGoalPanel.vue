@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue';
+import { onMounted, onUnmounted, ref, watch } from 'vue';
 import { NButton, NInput } from 'naive-ui';
-import { invoke } from '../../bridge.ts';
+import { invoke, listen } from '../../bridge.ts';
 import type { SessionSummary } from './types.ts';
 
 type GoalState = 'draft' | 'running' | 'awaiting_verification' | 'paused' | 'interrupted' | 'needs_review' | 'completed';
@@ -28,6 +28,15 @@ const boundaries = ref('');
 const stopWhen = ref('');
 const evidence = ref('');
 const busy = ref(false);
+let disposed = false;
+let stopEvents: () => void = () => {};
+onMounted(async () => {
+  const stop = await listen<{ session: string; goal: GoalRecord | null }>('chat-goal-changed', payload => {
+    if (!disposed && props.sessionId === payload.session) goal.value = payload.goal;
+  });
+  if (disposed) stop(); else stopEvents = stop;
+});
+onUnmounted(() => { disposed = true; stopEvents(); });
 const error = ref('');
 const stateLabel: Record<GoalState, string> = {
   draft: '待开始', running: '执行中', awaiting_verification: '等待验收',
