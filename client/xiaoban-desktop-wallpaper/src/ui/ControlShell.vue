@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, defineAsyncComponent, nextTick, onMounted, onBeforeUnmount, reactive, ref, watch } from 'vue';
 import { NAlert, NButton, NSkeleton, useMessage } from 'naive-ui';
-import { Bell, BookOpen, Check, ChevronDown, Ellipsis, Folder, FolderPlus, Gamepad2, Globe, Inbox, LogIn, LogOut, Palette, PanelLeft, Pencil, Plus, Puzzle, RefreshCw, Search, SlidersHorizontal, Sparkles, SquarePen, Sprout, Trash2, Zap } from 'lucide-vue-next';
+import { Bell, BookOpen, Check, ChevronDown, Ellipsis, Folder, FolderPlus, Gamepad2, Globe, Inbox, LogIn, LogOut, Palette, PanelLeft, Pencil, Plus, Puzzle, RefreshCw, Search, SlidersHorizontal, Sparkles, SquarePen, Trash2, Zap } from 'lucide-vue-next';
 import { invoke, listen } from '../bridge.ts';
 import { accent, accents, isDark, appearanceMode, appearanceModes, publishAppearanceTo, reconcile, setAccent } from './appearance.ts';
 import { createControlStore } from './control-store.ts';
@@ -310,7 +310,7 @@ const fixedPages = ['new-task', 'chat', 'ai-store', 'library', 'studio', 'games'
         <button type="button" class="xb-icon-btn sidebar-search" aria-label="搜索" title="搜索（即将推出）" disabled><Search :size="17" /></button>
       </div>
       <div class="control-brand">
-        <span class="xb-mark"><Sprout :size="19" :stroke-width="2" /></span>
+        <span class="xb-mark"><Sparkles :size="19" :stroke-width="2" /></span>
         <div class="brand-copy"><strong>小伴桌面</strong><span>v{{ store.info.version }}</span></div>
       </div>
 
