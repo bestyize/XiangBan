@@ -1125,8 +1125,8 @@ pub fn chat_delete_session(app: tauri::AppHandle, window: tauri::WebviewWindow, 
 }
 
 /// Estimated tokens of the tool definitions before any answer has measured them: the built-in tool set is about
-/// 9,600 (60 tools, mostly the desktop's own), plus room for connectors. A test keeps it close to the real size.
-const TOOL_TOKENS_BEFORE_FIRST_ANSWER: usize = 11_000;
+/// 7,900 (62 tools, mostly the desktop's own), plus room for connectors. A test keeps it close to the real size.
+const TOOL_TOKENS_BEFORE_FIRST_ANSWER: usize = 9_500;
 const TOOL_TOKENS_FILE: &str = "tool-tokens.json";
 
 /// What the latest answer measured, kept so the ring is right after a restart too.

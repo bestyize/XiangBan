@@ -812,15 +812,35 @@ fn game_delete(desktop: &dyn Desktop, args: &Value) -> Result<String, String> {
     Ok(format!("已删除自创游戏 {id}（游戏空间若正在运行已先关闭，它的本机存档也一并清除）。"))
 }
 
-const GAME_CREATE_DESCRIPTION: &str = "为用户创作一款离线小游戏，保存成游戏文件夹（用户数据目录 games/packs/<id>/，文件夹即游戏）。保存后不会自动打开，试玩请再调用 game_open(id)；可用 game_list 查看、game_delete 删除。\n\
-优先分步创作：在当前工作目录的专用子目录（如 game-drafts/<id>/）使用 write_file 逐个写入 index.html、style.css、game.js 等，较长脚本继续拆分；用 edit_file 局部修改，保留已完成文件。完成后调用本工具，source_dir 指向该草稿目录，无需在参数中重传源码。files 和 source_dir 必须二选一；files 仅适合简短作品。安装失败不会改动已有游戏，修正草稿后再安装。不要通过缩减玩法或反复重写整包来应付输出超限。\n\
-游戏包规范：\n\
-1. 文件：files 必须包含 index.html 作为入口，其余文件用相对路径引用（如 <script src=\"game.js\"></script>、<link rel=\"stylesheet\" href=\"style.css\">）。只能写 html、js、css、json、svg、md、txt 文本文件，最多 40 个，单个不超过 1 MB，合计不超过 4 MB；路径只用字母数字和 . _ -，用 / 分层，最多 4 层，不以 . 开头。不要写 manifest.json（由本工具生成）；若包含 cover.svg 会用作封面。\n\
+const GAME_CREATE_DESCRIPTION: &str = "为用户创作一款离线小游戏，保存成游戏文件夹（文件夹即游戏）。先调用 game_read_format 阅读游戏包规范（文件、脚本、运行环境、握手、成绩、存档）再写。\
+优先在工作目录的草稿子目录（如 game-drafts/<id>/）用 write_file 分文件写、edit_file 局部改，完成后用 source_dir 安装；files 仅适合简短作品，二者必须二选一。\
+安装失败不会改动已有游戏。保存后不会自动打开，试玩用 game_open(id)。";
+
+/// What `game_read_format` returns: the full game pack rules, read only when a game is being made.
+const GAME_FORMAT: &str = "游戏包规范（小伴程序内置，无需查找本地文件）：\n\
+0. 创作方式：在当前工作目录的专用子目录（如 game-drafts/<id>/）使用 write_file 逐个写入 index.html、style.css、game.js 等，较长脚本继续拆分；用 edit_file 局部修改，保留已完成文件。完成后调用 game_create，source_dir 指向该草稿目录，无需在参数中重传源码。安装失败不会改动已有游戏，修正草稿后再安装。不要通过缩减玩法或反复重写整包来应付输出超限。游戏保存在用户数据目录 games/packs/<id>/；可用 game_list 查看、game_delete 删除。\n\
+1. 文件：files 必须包含 index.html 作为入口，其余文件用相对路径引用（如 <script src=\"game.js\"></script>、<link rel=\"stylesheet\" href=\"style.css\">）。只能写 html、js、css、json、svg、md、txt 文本文件，最多 40 个，单个不超过 1 MB，合计不超过 4 MB；路径只用字母数字和 . _ -，用 / 分层，最多 4 层，不以 . 开头。不要写 manifest.json（由 game_create 生成）；若包含 cover.svg 会用作封面。\n\
 2. 脚本：用普通经典脚本（<script src>），不要 ES modules（type=module、import/export），所有资源用相对路径，不联网、不引用任何外部 CDN、字体或图片；图片用内联 SVG 或 canvas 绘制。\n\
 3. 运行环境：游戏在沙盒 iframe 里运行，没有网络、localStorage、cookie、IndexedDB 和任何系统权限。画布与布局适配 100vw × 100vh，同时支持键盘和鼠标/触摸。宿主会自动注入 desktop-host.js，由它处理 Esc 退出，游戏不要自己再处理 Esc，也不要自己引用它。\n\
 4. 握手协议（宿主注入的 desktop-host.js 会在收到 host.init 时自动回复 game.ready，所以不读存档的游戏可以不写；需要存档或成绩时按下面实现）：在页面脚本顶层同步监听 window 的 message。宿主在 iframe 加载完成后发送 {channel:'xiaban.game-host', protocol:1, type:'host.init', nonce, save, safeArea}，其中 save 是上次存档对象或 null。只接受 event.source === window.parent 且 channel、protocol、nonce 都匹配的消息；nonce 与地址栏参数 hostNonce 相同（new URLSearchParams(location.search).get('hostNonce')）。收到 host.init 后回复 window.parent.postMessage({channel:'xiaban.game-pack', protocol:1, nonce, type:'game.ready'}, '*')；game.ready 之前发出的其它消息会被忽略。\n\
 5. 可选成绩：开始一局发 type:'game.start'，之后可发 type:'game.progress' 和一次 type:'game.result'，都带非负整数 score（消息结构同上，channel 为 'xiaban.game-pack'，带 nonce）。\n\
 6. 存档（仅 save=true 时有效）：游戏在 game.ready 之后用 {channel:'xiaban.game-pack', protocol:1, nonce, type:'game.save', data:{…}} 提交存档，data 必须是普通 JSON 对象，序列化后不超过 32 KiB；宿主存在本机，下次启动时放进 host.init 的 save 字段。进度变化时就发送，不要依赖退出时才存。save=false 时不要发送 game.save，宿主会忽略。";
+
+fn game_read_format(_: &dyn Desktop, _: &Value) -> Result<String, String> {
+    Ok(GAME_FORMAT.into())
+}
+
+/// What `widget_read_format` returns: the rules for a custom widget's HTML.
+const WIDGET_FORMAT: &str = "自定义小组件规范（小伴程序内置，无需查找本地文件）：\n\
+1. 形式：一个完整的自包含单文件 HTML（包含 <style>、DOM 结构与 <script> 逻辑），如番茄钟、极简时钟、每日诗词、倒数日、喝水提醒、趣味小工具。默认宽 280、高 240，内容在声明的 width、height 视口内自适应，避免横向溢出和滚动条。\n\
+2. 透明：宿主固定透明无底，不提供外壳主题、底板或纹理。html、body 背景透明，默认不绘制铺满组件的底板；仅在用户明确需要时，在组件内容中绘制底板。\n\
+3. 阴影：允许小范围、低透明度的柔和投影，建议 box-shadow:0 1px 3px -2px rgba(0,0,0,0.12)，filter:drop-shadow(0 1px 1px rgba(0,0,0,0.08))，周围留至少 4px 空间；避免大模糊、大偏移、多层外投影以及贴着视口边缘画阴影，防止被截断。\n\
+4. 裁切：宿主按声明的矩形视口裁切。角色头部、耳朵、蝴蝶结、突出装饰及动画最大位移都必须包含在视口内，并预留透明安全边距。绝对定位前确认实际的 position 容器；探出卡片的角色应以卡片为定位父级，并在整体视口中预留顶部空间，不能用负 top 让内容伸出整个视口，不能依赖 overflow:visible 越过 iframe 或窗口边界。\n\
+5. 拖动：宿主统一提供按住非交互区域拖动和位置保存，无需自行实现窗口拖拽；不要使用 Electron 的 -webkit-app-region 或直接调用 Tauri。按钮、输入框等使用语义化元素；自定义手势区域加 data-no-drag，保留可拖动的背景区域。";
+
+fn widget_read_format(_: &dyn Desktop, _: &Value) -> Result<String, String> {
+    Ok(WIDGET_FORMAT.into())
+}
 
 fn game_close(desktop: &dyn Desktop, _: &Value) -> Result<String, String> {
     desktop.game_close()?;
@@ -924,7 +944,7 @@ pub fn tools_in_workspace(desktop: Arc<dyn Desktop>, workspace: &std::path::Path
             &desktop,
             ToolSpec::new(
                 "effect_create",
-                format!("为用户创作一个新的桌面特效包并保存到特效文件夹，保存后它就能像内置特效一样被选用。先调用 effect_read_format 阅读内置的完整格式和示例，再按下面的格式写一份完整的 JSON 放进 pack。pack 是一个 JSON 对象（也可写成 JSON 字符串），必须包含 schemaVersion、id、name、layers。{}", crate::effects::format_help()),
+                "为用户创作一个新的桌面特效包并保存到特效文件夹，保存后它就能像内置特效一样被选用。先调用 effect_read_format 阅读内置的完整格式和示例，再写一份完整的 JSON 放进 pack（对象或 JSON 字符串），必须包含 schemaVersion、id、name、layers。",
                 object(
                     json!({
                         "pack": {
@@ -1019,16 +1039,17 @@ pub fn tools_in_workspace(desktop: Arc<dyn Desktop>, workspace: &std::path::Path
             ).risk(Risk::Write).self_managed().serial(),
             widget_add,
         ),
+        tool(&desktop, ToolSpec::new("widget_read_format", "读取自定义小组件的 HTML 规范（透明、阴影、裁切、拖动）。用 widget_create 创作前先调用；规范已内置在程序中。", none()).risk(Risk::Read).parallel(), widget_read_format),
         tool(
             &desktop,
             ToolSpec::new(
                 "widget_create",
-                "为用户创作一个新的自定义单文件 HTML 桌面小组件。可编写包含完整 HTML、CSS 样式与 JavaScript 交互逻辑的独立微卡片（如番茄钟、极简时钟、每日诗词、倒数日、健康喝水提醒、趣味小工具等）。宿主固定透明无底，不提供外壳主题、底板或纹理。HTML 的页面和主体保持透明，默认不绘制铺满组件的底板；仅在用户明确需要时，在组件内容中绘制底板。允许小范围、低透明度的柔和投影增加立体感：建议 box-shadow:0 1px 3px -2px rgba(0,0,0,0.12)，filter:drop-shadow(0 1px 1px rgba(0,0,0,0.08))，周围留至少 4px 空间；避免大模糊、大偏移、多层外投影以及贴着视口边缘画阴影，防止被截断。默认宽 280、高 240。创作完成后默认自动放置到桌面上。",
+                "为用户创作一个新的自定义单文件 HTML 桌面小组件（番茄钟、每日诗词、倒数日等），默认宽 280、高 240，完成后默认放到桌面。先调用 widget_read_format 阅读透明、裁切、拖动等规范再写。",
                 object(
                     json!({
                         "id": { "type": "string", "description": "小组件英文标识（小写字母、数字、-、_，如 pomodoro-timer）" },
                         "name": { "type": "string", "description": "小组件中文名称（最多 24 字，如 专注番茄钟）" },
-                        "html": { "type": "string", "description": "完整的自包含单文件 HTML 内容（包含 <style>、DOM 结构与 <script> 逻辑）；默认让 html、body 背景透明，不绘制铺满组件的底板；内容应在指定 width、height 的视口内自适应，避免横向溢出和滚动条。宿主会按声明的矩形视口裁切：角色头部、耳朵、蝴蝶结、突出装饰及动画最大位移都必须包含在视口内，并预留透明安全边距。绝对定位前确认实际的 position 容器；探出卡片的角色应以卡片为定位父级，并在整体视口中预留顶部空间，不能用负 top 让内容伸出整个视口，不能依赖 overflow:visible 越过 iframe 或窗口边界。宿主统一提供按住非交互区域拖动和位置保存，无需自行实现窗口拖拽；不要使用 Electron 的 -webkit-app-region 或直接调用 Tauri。按钮、输入框等使用语义化元素；自定义手势区域加 data-no-drag，保留可拖动的背景区域" },
+                        "html": { "type": "string", "description": "完整的自包含单文件 HTML，按 widget_read_format 的规范编写" },
                         "description": { "type": "string", "description": "一句话介绍（最多 80 字）" },
                         "width": { "type": "number", "minimum": 100, "maximum": 800, "description": "建议默认宽度（像素，默认 280）" },
                         "height": { "type": "number", "minimum": 80, "maximum": 800, "description": "建议默认高度（像素，默认 240）" },
@@ -1099,6 +1120,7 @@ pub fn tools_in_workspace(desktop: Arc<dyn Desktop>, workspace: &std::path::Path
             ).risk(Risk::Write).self_managed().serial(),
             game_open,
         ),
+        tool(&desktop, ToolSpec::new("game_read_format", "读取游戏包规范（文件、脚本、运行环境、握手协议、成绩、存档）。用 game_create 创作前先调用；规范已内置在程序中。", none()).risk(Risk::Read).parallel(), game_read_format),
         tool(
             &desktop,
             ToolSpec::new(
@@ -1373,7 +1395,7 @@ mod tests {
         let mut unique = names.clone();
         unique.dedup();
         assert_eq!(names, unique);
-        assert_eq!(names.len(), 39);
+        assert_eq!(names.len(), 41);
         for tool in &all {
             let spec = tool.spec();
             assert!(spec.name.len() <= 64 && spec.name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_'), "{}", spec.name);
@@ -1383,7 +1405,7 @@ mod tests {
         let read: Vec<&str> = all.iter().filter(|t| t.spec().risk == Risk::Read).map(|t| t.spec().name.as_str()).collect();
         let mut read = read;
         read.sort();
-        assert_eq!(read, vec!["care_list", "computer_use_diagnose", "desktop_status", "desktop_windows", "effect_list", "effect_read_format", "game_list", "pet_catalog", "pet_read_format", "wallpaper_list", "widget_list"]);
+        assert_eq!(read, vec!["care_list", "computer_use_diagnose", "desktop_status", "desktop_windows", "effect_list", "effect_read_format", "game_list", "game_read_format", "pet_catalog", "pet_read_format", "wallpaper_list", "widget_list", "widget_read_format"]);
         for tool in all.iter().filter(|t| t.spec().risk == Risk::Write) {
             assert!(!tool.spec().parallel_safe, "{} changes shared settings, so it runs alone", tool.spec().name);
         }
@@ -1721,10 +1743,12 @@ mod tests {
         assert!(bad(&|a| a["name"] = json!("字".repeat(25))).is_err());
         assert!(bad(&|a| a["save"] = json!("yes")).is_err());
         assert_eq!(fake.calls().len(), calls_before, "refused requests never reach the desktop");
-        let spec_text = tools(fake.clone()).iter().find(|t| t.spec().name == "game_create").unwrap().spec().description.clone();
-        for needle in ["host.init", "game.ready", "game.save", "32 KiB", "xiaban.game-pack", "hostNonce", "ES modules", "desktop-host.js"] {
-            assert!(spec_text.contains(needle), "description mentions {needle}");
+        let format = call(&fake, "game_read_format", json!({})).unwrap();
+        for needle in ["host.init", "game.ready", "game.save", "32 KiB", "xiaban.game-pack", "hostNonce", "ES modules", "desktop-host.js", "source_dir"] {
+            assert!(format.contains(needle), "the format mentions {needle}");
         }
+        let spec_text = tools(fake.clone()).iter().find(|t| t.spec().name == "game_create").unwrap().spec().description.clone();
+        assert!(spec_text.contains("game_read_format") && !spec_text.contains("host.init"), "the long rules are read on demand");
     }
 
     #[test]
