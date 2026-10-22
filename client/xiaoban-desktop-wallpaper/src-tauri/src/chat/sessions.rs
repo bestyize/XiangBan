@@ -30,6 +30,9 @@ pub struct SessionSummary {
     pub permission_mode: String,
     /// The group this conversation was moved into; empty when it is not in one.
     pub group: String,
+    /// The folder this conversation works in. Empty for one made before conversations had their own: it works in
+    /// the default working folder (the setting), as it always did.
+    pub workspace: String,
 }
 
 impl Default for SessionSummary {
@@ -41,6 +44,7 @@ impl Default for SessionSummary {
             updated_at: 0,
             permission_mode: "ask".into(),
             group: String::new(),
+            workspace: String::new(),
         }
     }
 }
@@ -231,12 +235,29 @@ impl Index {
 
     /// A new conversation starts in the mode the top bar was showing, so what the user sees is what takes effect.
     pub fn create(&mut self, now: i64, now_millis: u128, permission_mode: &str) -> Result<SessionSummary, String> {
+        self.create_in(now, now_millis, permission_mode, "")
+    }
+
+    /// `create` in a working folder of its own.
+    pub fn create_in(&mut self, now: i64, now_millis: u128, permission_mode: &str, workspace: &str) -> Result<SessionSummary, String> {
         if self.sessions.len() >= MAX_SESSIONS {
             return Err(format!("对话最多保存 {MAX_SESSIONS} 个，请先删除一些旧对话"));
         }
-        let summary = SessionSummary { id: new_id(now_millis), created_at: now, updated_at: now, permission_mode: permission_mode.into(), ..SessionSummary::default() };
+        let summary = SessionSummary {
+            id: new_id(now_millis), created_at: now, updated_at: now, permission_mode: permission_mode.into(), workspace: workspace.into(),
+            ..SessionSummary::default()
+        };
         self.sessions.push(summary.clone());
         Ok(summary)
+    }
+
+    pub fn set_workspace(&mut self, id: &str, workspace: &str) -> bool {
+        if let Some(s) = self.sessions.iter_mut().find(|s| s.id == id) {
+            s.workspace = workspace.to_string();
+            true
+        } else {
+            false
+        }
     }
 
     pub fn set_permission_mode(&mut self, id: &str, mode: &str) -> bool {

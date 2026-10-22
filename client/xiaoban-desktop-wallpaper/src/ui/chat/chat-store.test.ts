@@ -789,3 +789,84 @@ describe('undoing an answer\'s file changes', () => {
     expect(h.deps.notify).toHaveBeenCalledWith('这个对话还在回答', 'error');
   });
 });
+
+describe('each conversation works in its own folder', () => {
+  const folders = [{ path: '/p/site', name: 'site', exists: true, wide: false }, { path: '/p/gone', name: 'gone', exists: false, wide: false }];
+  const withHistory: WireMessage[] = [{ role: 'user', parts: [{ type: 'text', text: '改一下首页' }] }];
+
+  it('a new conversation starts in the folder chosen before its first message', async () => {
+    const h = harness({
+      chat_overview: () => overview({ workspace: '/default', recentWorkspaces: folders }),
+      chat_new_session: args => ({ ...summary('s1'), workspace: String(args?.workspace ?? '/p/site') }),
+      chat_send: () => ({ ...summary('s1', 'x', 2), workspace: '/p/other' }),
+    });
+    await h.store.init();
+    expect(h.store.currentWorkspace).toBe('/p/site'); // the folder used last that still exists
+    expect(await h.store.switchWorkspace('/p/other')).toBe('done');
+    expect(h.store.currentWorkspace).toBe('/p/other');
+    await h.store.send('你好');
+    expect(h.calls.find(([c]) => c === 'chat_new_session')?.[1]).toEqual({ permissionMode: 'ask', workspace: '/p/other' });
+    expect(h.store.pendingWorkspace).toBe('');
+    expect(h.store.currentWorkspace).toBe('/p/other');
+  });
+
+  it('an empty conversation switches at once, one with messages asks first', async () => {
+    const result = (id: string, workspace: string) => ({ session: { ...summary(id), workspace }, wide: false, recentWorkspaces: folders });
+    const h = harness({
+      chat_overview: () => overview({ sessions: [summary('empty'), { ...summary('used'), workspace: '/p/site' }], workspace: '/default' }),
+      chat_load_session: args => (args?.sessionId === 'used' ? withHistory : []),
+      chat_set_workspace: args => result(String(args?.sessionId), String(args?.workspace)),
+    });
+    await h.store.init();
+    await h.store.select('empty');
+    expect(h.store.currentWorkspace).toBe('/default'); // an old conversation uses the default folder
+    expect(await h.store.switchWorkspace('/p/b')).toBe('done');
+    expect(h.store.currentWorkspace).toBe('/p/b');
+    expect(h.store.views.empty.items).toEqual([]);
+
+    await h.store.select('used');
+    expect(await h.store.switchWorkspace('/p/b')).toBe('ask');
+    expect(h.calls.filter(([c]) => c === 'chat_set_workspace')).toHaveLength(1); // nothing changed yet
+    expect(await h.store.switchWorkspace('/p/b', 'here')).toBe('done');
+    expect(h.store.currentWorkspace).toBe('/p/b');
+    const last = h.store.views.used.items.at(-1);
+    expect(last?.kind === 'notice' && last.text).toContain('工作区已切换到 /p/b');
+  });
+
+  it('“新开对话” leaves the old conversation where it was', async () => {
+    const h = harness({
+      chat_overview: () => overview({ sessions: [{ ...summary('used'), workspace: '/p/site' }] }),
+      chat_load_session: () => withHistory,
+      chat_new_session: args => ({ ...summary('fresh', '新对话', 5), workspace: String(args?.workspace) }),
+    });
+    await h.store.init();
+    await h.store.select('used');
+    expect(await h.store.switchWorkspace('/p/b', 'new')).toBe('done');
+    expect(h.store.currentId).toBe('fresh');
+    expect(h.store.currentWorkspace).toBe('/p/b');
+    expect(h.store.sessions.find(s => s.id === 'used')?.workspace).toBe('/p/site');
+    expect(h.calls.some(([c]) => c === 'chat_set_workspace')).toBe(false);
+  });
+
+  it('a running conversation is not moved, and a refusal is shown', async () => {
+    const h = harness({
+      chat_overview: () => overview({ sessions: [summary('s1')], running: ['s1'] }),
+      chat_load_session: () => withHistory,
+    });
+    await h.store.init();
+    await h.store.select('s1');
+    expect(await h.store.switchWorkspace('/p/b', 'here')).toBe('failed');
+    expect(h.deps.notify).toHaveBeenCalled();
+  });
+
+  it('the note saved when a folder changed is shown as a notice when the conversation is opened again', async () => {
+    const h = harness({
+      chat_overview: () => overview({ sessions: [summary('s1')] }),
+      chat_load_session: () => [...withHistory, { role: 'user', synthetic: true, parts: [{ type: 'text', text: '【工作区已切换】从现在起这个对话在“/p/b”里工作（之前是“/p/a”）。' }] }],
+    });
+    await h.store.init();
+    await h.store.select('s1');
+    const notice = h.store.views.s1.items[1];
+    expect(notice.kind === 'notice' && notice.text).toContain('工作区已切换到 /p/b');
+  });
+});

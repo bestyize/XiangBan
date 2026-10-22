@@ -1,8 +1,8 @@
 import type { PendingAttachment } from './attachments.ts';
 import { modelFailure } from './model-errors.ts';
 import { reactive } from 'vue';
-import type { ApprovalDecision, ApprovalRequest, ChatEventPayload, ChatGroup, ChatItem, ContextInfo, Library, Overview, QuestionRequest, SessionSummary, SessionView, WireMessage } from './types.ts';
-import { applyEvent, checkpointNotice, interruptedNotice, itemsFromHistory, newView, nextId, summaryNotice } from './view.ts';
+import type { ApprovalDecision, ApprovalRequest, ChatEventPayload, ChatGroup, ChatItem, ContextInfo, Library, Overview, QuestionRequest, RecentWorkspace, SessionSummary, SessionView, WireMessage } from './types.ts';
+import { applyEvent, checkpointNotice, interruptedNotice, itemsFromHistory, newView, nextId, summaryNotice, workspaceNotice } from './view.ts';
 import { toolLabel } from './format.ts';
 
 export interface ChatDeps {
@@ -19,8 +19,22 @@ export interface ChatStore {
   ready: boolean;
   /** A model address and name are saved, so a message can be sent. */
   configured: boolean;
-  /** The folder the assistant's file and command tools work in. */
+  /** The default working folder (the setting): old conversations work there, and the first new one starts there. */
   workspace: string;
+  /** Folders used lately, newest first, for the folder menu. */
+  recentWorkspaces: RecentWorkspace[];
+  /** The folder chosen for the new conversation the page shows, before its first message; empty when none was. */
+  pendingWorkspace: string;
+  /** The folder the open conversation works in, or a new one would. */
+  readonly currentWorkspace: string;
+  /** Moves the open conversation to `path`. A conversation with messages is not moved unless `how` says how:
+   *  `new` starts a new conversation there, `here` moves this one and tells the model. Returns `ask` when the
+   *  page should ask which, `failed` when the host refused (the reason is shown). */
+  switchWorkspace(path: string, how?: 'new' | 'here'): Promise<'done' | 'ask' | 'failed'>;
+  /** The system folder picker; `null` when nothing was chosen. */
+  pickWorkspace(): Promise<string | null>;
+  /** Shows the open conversation's folder in Finder or Explorer. */
+  revealWorkspace(): Promise<void>;
   permissionMode: 'ask' | 'auto';
   setPermissionMode(mode: 'ask' | 'auto'): Promise<void>;
   hideToolCalls: boolean;
@@ -85,6 +99,59 @@ export function createChatStore(deps: ChatDeps): ChatStore {
     ready: false,
     configured: false,
     workspace: '',
+    recentWorkspaces: [] as RecentWorkspace[],
+    pendingWorkspace: '',
+    get currentWorkspace() {
+      if (store.currentId) return store.sessions.find(s => s.id === store.currentId)?.workspace || store.workspace;
+      return store.pendingWorkspace || store.recentWorkspaces.find(w => w.exists)?.path || store.workspace;
+    },
+    async switchWorkspace(path: string, how?: 'new' | 'here') {
+      deps.onActivity?.();
+      const id = store.currentId;
+      const view = id ? store.views[id] : null;
+      // No conversation yet: the folder is used when the first message creates it.
+      if (!id) { store.pendingWorkspace = path; void store.refreshContext(); return 'done'; }
+      if (view?.running) { deps.notify('这个对话还在回答，请等它结束或先停止，再切换工作区', 'error'); return 'failed'; }
+      const used = !!view?.items.length;
+      if (used && !how) return 'ask';
+      try {
+        if (used && how === 'new') {
+          const summary = await deps.invoke<SessionSummary>('chat_new_session', { permissionMode: store.permissionMode, workspace: path });
+          upsert(summary);
+          store.views[summary.id] = newView(summary.id, true);
+          store.currentId = summary.id;
+          store.pendingWorkspace = '';
+          void store.refreshContext();
+          return 'done';
+        }
+        const result = await deps.invoke<{ session: SessionSummary; wide: boolean; recentWorkspaces: RecentWorkspace[] }>('chat_set_workspace', { sessionId: id, workspace: path });
+        store.sessions = store.sessions.map(s => s.id === result.session.id ? result.session : s);
+        store.recentWorkspaces = result.recentWorkspaces ?? store.recentWorkspaces;
+        if (used && view) view.items.push(workspaceNotice(view, path));
+        if (result.wide) deps.notify('这个文件夹范围很大（主目录或磁盘根目录），小伴在里面删除文件前都会先问你', 'info');
+        void store.refreshContext();
+        return 'done';
+      } catch (error) {
+        deps.notify(error, 'error');
+        return 'failed';
+      }
+    },
+    async pickWorkspace() {
+      if (!deps.desktop) return null;
+      try {
+        return await deps.invoke<string | null>('pick_workspace') ?? null;
+      } catch (error) {
+        deps.notify(error, 'error');
+        return null;
+      }
+    },
+    async revealWorkspace() {
+      try {
+        await deps.invoke('chat_reveal_workspace', store.currentId ? { sessionId: store.currentId } : {});
+      } catch (error) {
+        deps.notify(error, 'error');
+      }
+    },
     permissionMode: 'ask' as 'ask' | 'auto',
     hideToolCalls: false,
     async setPermissionMode(mode: 'ask' | 'auto') {
@@ -179,6 +246,7 @@ export function createChatStore(deps: ChatDeps): ChatStore {
         if (disposed || !overview) return;
         store.configured = overview.configured;
         store.workspace = overview.workspace;
+        store.recentWorkspaces = overview.recentWorkspaces ?? [];
         if (overview.permissionMode) store.permissionMode = overview.permissionMode;
         if (typeof overview.hideToolCalls === 'boolean') store.hideToolCalls = overview.hideToolCalls;
         store.sessions = overview.sessions;
@@ -236,7 +304,8 @@ export function createChatStore(deps: ChatDeps): ChatStore {
         if (!id) {
           // The host runs each conversation in the mode saved with it, so a new one must be created in the
           // mode the top bar shows now; otherwise "完全信任" would be displayed but not applied.
-          const summary = await deps.invoke<SessionSummary>('chat_new_session', { permissionMode: store.permissionMode });
+          const summary = await deps.invoke<SessionSummary>('chat_new_session', { permissionMode: store.permissionMode, ...(store.pendingWorkspace ? { workspace: store.pendingWorkspace } : {}) });
+          store.pendingWorkspace = '';
           id = summary.id;
           created = true;
           upsert(summary);

@@ -90,7 +90,7 @@ where
     }
 }
 
-type DangerCheck = Arc<dyn Fn(&str, &Value) -> Option<String> + Send + Sync>;
+type DangerCheck = Arc<dyn Fn(&str, &str, &Value) -> Option<String> + Send + Sync>;
 type RememberKey = Arc<dyn Fn(&str, &Value) -> Option<String> + Send + Sync>;
 
 pub struct Permission {
@@ -132,7 +132,13 @@ impl Permission {
     /// calls; reading external content (taint) and `always_ask` no longer force a prompt there. The other modes
     /// behave as before, and a flagged call is reported in `ApprovalRequest::danger` and never remembered.
     /// Without a check, `Auto` keeps the stricter behaviour described in the README.
-    pub fn danger_check(mut self, check: impl Fn(&str, &Value) -> Option<String> + Send + Sync + 'static) -> Self {
+    pub fn danger_check(self, check: impl Fn(&str, &Value) -> Option<String> + Send + Sync + 'static) -> Self {
+        self.danger_check_in_session(move |_, tool, args| check(tool, args))
+    }
+
+    /// `danger_check` for a host whose rules depend on the conversation, e.g. each one working in its own folder:
+    /// `check` also gets the session id first.
+    pub fn danger_check_in_session(mut self, check: impl Fn(&str, &str, &Value) -> Option<String> + Send + Sync + 'static) -> Self {
         self.danger = Some(Arc::new(check));
         self
     }
@@ -218,7 +224,7 @@ impl Middleware for Permission {
 
         let tainted = self.is_tainted(session);
         let danger = match &self.danger {
-            Some(check) if spec.risk != Risk::Read => check(name, args),
+            Some(check) if spec.risk != Risk::Read => check(session, name, args),
             _ => None,
         };
         let exec_key = match &self.remember {

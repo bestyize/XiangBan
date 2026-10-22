@@ -17,6 +17,13 @@ export function summaryNotice(view: SessionView, summary: string): ChatItem {
 }
 
 /** Shown after an answer that changed files with the file tools; its button puts them back. */
+/** Starts the note the host adds to a conversation when its folder changes (`chat/workspace.rs`). */
+export const WORKSPACE_SWITCH_MARK = '【工作区已切换】';
+
+export function workspaceNotice(view: SessionView, path: string): ChatItem {
+  return { kind: 'notice', id: nextId(view), tone: 'info', text: `工作区已切换到 ${path}，之后的操作都在这个文件夹里进行。` };
+}
+
 /** The last answer stopped because the app quit or crashed while it ran: say what may already have happened. */
 export function interruptedNotice(view: SessionView, tools: string[], label: (name: string) => string): ChatItem {
   const names = [...new Set(tools.map(label))];
@@ -39,7 +46,11 @@ export function itemsFromHistory(view: SessionView, messages: WireMessage[]): Ch
       items.push(summaryNotice(view, message.context_summary.text));
       continue;
     }
-    if (message.synthetic) continue;
+    if (message.synthetic) {
+      const text = textOf(message);
+      if (text.startsWith(WORKSPACE_SWITCH_MARK)) items.push(workspaceNotice(view, /在“(.+?)”里工作/.exec(text)?.[1] ?? '新文件夹'));
+      continue;
+    }
     if (message.role === 'user') {
       const images = (message.parts ?? []).filter(part => part.type === 'image').map(part => (part as { url: string }).url);
       const text = textOf(message);

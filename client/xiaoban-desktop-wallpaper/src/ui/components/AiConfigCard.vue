@@ -871,7 +871,7 @@ function getProviderIcon(id: string) {
       </div>
 
       <div class="field workspace-field">
-        <label>工作目录</label>
+        <label>默认工作区</label>
         <div class="workspace-row">
           <code data-testid="ai-workspace">{{ shownWorkspace }}</code>
           <NButton :disabled="!store.desktop || !!busy" data-testid="ai-workspace-pick" @click="chooseFolder">
@@ -882,7 +882,7 @@ function getProviderIcon(id: string) {
             恢复默认
           </NButton>
         </div>
-        <small>小伴的文件操作仅在此目录中进行。运行命令以当前用户权限执行，请谨慎授权。</small>
+        <small>每个对话在自己的文件夹里工作，可以在聊天输入框下方切换；新对话默认用上次用过的文件夹，这里选的会作为下一个新对话的文件夹，较早的对话也一直用它。运行命令以当前用户权限执行，请谨慎授权。</small>
       </div>
 
       <div class="prefs-actions">

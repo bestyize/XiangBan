@@ -597,7 +597,7 @@ fn trusted_rig(tag: &str, steps: Vec<Step>) -> (Rig, Arc<Mutex<Vec<(String, Opti
     let dirs = Dirs { chat: dir.path("chat") };
     let asked: Arc<Mutex<Vec<(String, Option<String>)>>> = Arc::default();
     let log = asked.clone();
-    let shared = Arc::new(Mutex::new(Some(workspace.clone())));
+    let shared: Workspaces = Arc::new(Mutex::new(HashMap::from([("s1".to_string(), workspace.clone())])));
     let permission = Arc::new(permission_with_danger_check(PermissionMode::Auto, move |request: &ApprovalRequest<'_>| {
         lock(&log).push((request.tool.to_string(), request.danger.map(str::to_string)));
         Approval::Deny
@@ -959,7 +959,7 @@ fn background_process_tools_are_registered_and_asked_like_the_shell() {
     let manager = Arc::new(ProcessManager::new(&workspace).unwrap());
     let asked: Arc<Mutex<Vec<String>>> = Arc::default();
     let log = asked.clone();
-    let workspace_slot = Arc::new(Mutex::new(Some(workspace.clone())));
+    let workspace_slot: Workspaces = Arc::new(Mutex::new(HashMap::from([("s1".to_string(), workspace.clone())])));
     let permission = Arc::new(permission_with_danger_check(PermissionMode::Auto, move |request: &ApprovalRequest<'_>| {
         lock(&log).push(request.tool.to_string());
         Approval::Deny
@@ -1116,4 +1116,20 @@ fn an_answer_cut_off_by_a_crash_is_reported_once_with_the_tools_that_may_have_ru
     assert_eq!(interrupted_run(&journal_dir), Some(("cut".to_string(), vec!["shell".to_string()])), "only a started tool may have run");
     assert_eq!(interrupted_run(&journal_dir), None, "reported once");
     assert_eq!(interrupted_run(&dir.path("runs/none")), None);
+}
+
+#[test]
+fn two_conversations_in_different_folders_are_each_checked_against_their_own() {
+    let a = TempDir::new("folder-a");
+    let b = TempDir::new("folder-b");
+    let workspaces: Workspaces = Arc::new(Mutex::new(HashMap::from([
+        ("sa".to_string(), a.0.clone()),
+        ("sb".to_string(), b.0.clone()),
+    ])));
+    let delete_in = |folder: &Path| json!({ "command": format!("rm -rf {}/build", folder.display()) });
+    let check = |session: &str, args: &Value| danger::assess("shell", args, folder_for(&workspaces, session).as_deref());
+    assert_eq!(check("sa", &delete_in(&a.0)), None, "a's own folder");
+    assert!(check("sa", &delete_in(&b.0)).is_some(), "b's folder is outside a's");
+    assert_eq!(check("sb", &delete_in(&b.0)), None);
+    assert_eq!(check("sa#research-1", &delete_in(&a.0)), None, "a research helper works in its parent's folder");
 }
