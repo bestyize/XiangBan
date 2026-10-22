@@ -1427,6 +1427,37 @@ mod tests {
     }
 
     #[test]
+    fn model_discovery_retains_live_capabilities_without_guessing_from_names() {
+        let anthropic = r#"{"data":[{
+            "id":"new-claude-family-2030", "display_name":"Claude Future",
+            "max_input_tokens":1000000, "max_tokens":128000,
+            "capabilities":{"tool_use":{"supported":true},"vision":{"supported":false}}
+        }]}"#;
+        let models = parse_model_details_json(anthropic, "anthropic").unwrap();
+        assert_eq!(models.len(), 1);
+        let model = &models[0];
+        assert_eq!(model.id, "new-claude-family-2030");
+        assert_eq!(model.name, "Claude Future");
+        assert_eq!(model.context_window_tokens, Some(1_000_000));
+        assert_eq!(model.max_output_tokens, Some(128_000));
+        assert_eq!(model.supports_tools, Some(true));
+        assert_eq!(model.supports_vision, Some(false));
+
+        let proxied = r#"{"data":[
+          {"id":"future-model","context_length":262144,"top_provider":{"max_completion_tokens":65536}},
+          {"id":"id-only","max_tokens":1024}
+        ]}"#;
+        let models = parse_model_details_json(proxied, "chat").unwrap();
+        assert_eq!(models[0].id, "future-model");
+        assert_eq!(models[0].context_window_tokens, Some(262_144));
+        assert_eq!(models[0].max_output_tokens, Some(65_536));
+        assert_eq!(models[1].max_output_tokens, None,
+            "an arbitrary OpenAI-compatible max_tokens field is not trusted as a cap");
+        assert_eq!(parse_model_details_json(r#"{"models":[{"name":"local:latest"}]}"#, "responses")
+            .unwrap()[0].max_output_tokens, None);
+    }
+
+    #[test]
     fn default_providers_are_initialized_and_accessible() {
         let mut cfg = AiConfig::default();
         cfg.normalize();
