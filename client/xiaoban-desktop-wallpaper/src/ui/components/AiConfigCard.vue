@@ -69,7 +69,15 @@ watch([modalModel, modalProtocol], () => {
 const modalHasKey = ref(false);
 const modalKeyHint = ref('');
 const confirmingClear = ref(false);
-const fetchedModels = ref<string[]>([]);
+type DiscoveredModel = NonNullable<ProviderConfigView['models']>[number];
+const fetchedModels = ref<DiscoveredModel[]>([]);
+const fetchedFor = ref('');
+watch([modalBaseUrl, modalProtocol], () => {
+  if (modalVisible.value) {
+    fetchedModels.value = [];
+    fetchedFor.value = '';
+  }
+}, { flush: 'sync' });
 
 const isEditingCustom = computed(() => {
   return getProviderSaved(editingId.value)?.isCustom ?? !catalogueProviders.value.some(p => p.id === editingId.value);
@@ -160,9 +168,13 @@ const customProviders = computed<ProviderConfigView[]>(() => {
 // Dropdown options for models in modal
 const allModelOptions = computed(() => {
   const set = new Set<string>();
-  fetchedModels.value.forEach(m => set.add(m));
+  fetchedModels.value.forEach(m => set.add(m.id));
   currentMeta.value.suggestedModels.forEach(m => set.add(m));
-  return Array.from(set).map(m => ({ label: currentMeta.value.models?.find(v => v.id === m)?.name || m, value: m }));
+  return Array.from(set).map(m => ({
+    label: fetchedModels.value.find(v => v.id === m)?.name
+      || currentMeta.value.models?.find(v => v.id === m)?.name || m,
+    value: m,
+  }));
 });
 
 const modalFormError = computed(() => {
@@ -269,6 +281,7 @@ function openConfigureModal(id: string) {
   modalApiKey.value = '';
   confirmingClear.value = false;
   fetchedModels.value = [];
+  fetchedFor.value = '';
   modalVisible.value = true;
 }
 
@@ -288,6 +301,7 @@ function openCreateCustomModal() {
   modalKeyHint.value = '';
   confirmingClear.value = false;
   fetchedModels.value = [];
+  fetchedFor.value = '';
   modalVisible.value = true;
 }
 
@@ -333,6 +347,9 @@ async function saveProvider(activate: boolean) {
       selectionMode: modalSelectionMode.value,
       ...(!isManaged.value ? { reasoningEfforts: modalReasoningMode.value === 'manual' ? modalReasoningLevels.value : modalReasoningMode.value === 'off' ? [] : null, clearReasoningEfforts: modalReasoningMode.value === 'auto' } : {}),
       replyPreference: canSetReplyPreference.value ? modalReplyPreference.value : 'default',
+      discoveredModel: fetchedFor.value === `${modalProtocol.value}\n${modalBaseUrl.value.trim()}`
+        ? fetchedModels.value.find(m => m.id === modalModel.value.trim()) ?? null
+        : null,
     });
     fill(updated);
     modalVisible.value = false;
@@ -402,13 +419,14 @@ async function fetchModels() {
   }
   busy.value = 'models';
   try {
-    const list = await invoke<string[]>('fetch_ai_models', {
+    const list = await invoke<DiscoveredModel[]>('fetch_ai_models', {
       protocol: modalProtocol.value,
       baseUrl: cleanUrl,
       apiKey: modalApiKey.value.trim() || null,
     });
     if (list && list.length > 0) {
       fetchedModels.value = list;
+      fetchedFor.value = `${modalProtocol.value}\n${cleanUrl}`;
       props.store.notify(`成功获取到 ${list.length} 个模型`, 'success');
     } else {
       props.store.notify('未获取到可用模型', 'info');
