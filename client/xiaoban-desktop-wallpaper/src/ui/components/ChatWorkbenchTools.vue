@@ -20,6 +20,7 @@ const emit = defineEmits<{
   'use-connector': [name: string];
 }>();
 const root = ref<HTMLElement | null>(null);
+let closeTimer: ReturnType<typeof setTimeout> | undefined;
 const panel = ref<'add' | null>(null);
 const kind = ref<Kind | null>(null);
 const term = ref('');
@@ -54,18 +55,34 @@ const remoteEntries = computed<Entry[]>(() => {
     id: e.slug, title: e.name, detail: e.description, installed: false, ready: false,
   }));
 });
-function close() { panel.value = null; kind.value = null; term.value = ''; ++requestId; clearTimeout(searchTimer); }
+function cancelClose() { if (closeTimer !== undefined) clearTimeout(closeTimer); closeTimer = undefined; }
+function scheduleClose() {
+  cancelClose();
+  closeTimer = setTimeout(() => {
+    closeTimer = undefined;
+    const active = document.activeElement;
+    const trigger = root.value?.querySelector('.wb-plus');
+    if (active && active !== trigger && root.value?.contains(active)) return;
+    close();
+  }, 180);
+}
+function onFocusOut(event: FocusEvent) {
+  if (event.relatedTarget instanceof Node && root.value?.contains(event.relatedTarget)) return;
+  scheduleClose();
+}
+function close() { cancelClose(); panel.value = null; kind.value = null; term.value = ''; ++requestId; clearTimeout(searchTimer); }
 function onOutside(e: PointerEvent) { if (root.value && !root.value.contains(e.target as Node)) close(); }
 function onKey(e: KeyboardEvent) { if (e.key === 'Escape') close(); }
 watch(panel, p => {
   if (p) { document.addEventListener('pointerdown', onOutside); document.addEventListener('keydown', onKey); }
   else { document.removeEventListener('pointerdown', onOutside); document.removeEventListener('keydown', onKey); }
 });
-onBeforeUnmount(() => { ++requestId; clearTimeout(searchTimer); document.removeEventListener('pointerdown', onOutside); document.removeEventListener('keydown', onKey); });
-function toggle(next: 'add') {
-  if (panel.value === next) { close(); return; }
-  close(); panel.value = next;
-  if (next === 'add') void refreshInstalled();
+onBeforeUnmount(() => { ++requestId; clearTimeout(searchTimer); cancelClose(); document.removeEventListener('pointerdown', onOutside); document.removeEventListener('keydown', onKey); });
+function openAddMenu() {
+  cancelClose();
+  if (props.disabled || panel.value === 'add') return;
+  close(); panel.value = 'add';
+  void refreshInstalled();
 }
 async function refreshInstalled() {
   if (!props.store.desktop) return;
@@ -117,17 +134,17 @@ function takeScreenshot() { close(); emit('screenshot'); }
 </script>
 
 <template>
-  <div ref="root" class="wb-controls">
+  <div ref="root" class="wb-controls" @mouseenter="cancelClose" @mouseleave="scheduleClose" @focusout="onFocusOut">
     <div class="wb-anchor">
-      <button type="button" class="wb-tool wb-plus" data-testid="chat-add-menu" aria-label="添加附件或能力" aria-haspopup="menu" :aria-expanded="panel === 'add'" :disabled="disabled" @click="toggle('add')"><Plus :size="18" /></button>
-      <div v-show="panel === 'add'" class="wb-menu xb-menu wb-main" role="menu" aria-label="添加">
+      <button type="button" class="wb-tool wb-plus" data-testid="chat-add-menu" aria-label="添加附件或能力" aria-haspopup="menu" :aria-expanded="panel === 'add'" :disabled="disabled" @mouseenter="openAddMenu" @focus="openAddMenu" @click="openAddMenu"><Plus :size="18" /></button>
+      <div v-show="panel === 'add'" class="wb-menu xb-menu wb-main" role="menu" aria-label="添加" @mouseenter="cancelClose">
         <button type="button" class="wb-menu-item" data-testid="chat-add-screenshot" role="menuitem" :disabled="screenshotDisabled" @click="takeScreenshot"><Camera :size="15" /><span>截图</span></button>
         <button type="button" class="wb-menu-item" data-testid="chat-pick-image" role="menuitem" :disabled="fileDisabled" @click="attachFile"><FilePlus2 :size="15" /><span>文件</span></button>
         <div class="wb-separator" />
         <button type="button" class="wb-menu-item" data-testid="chat-add-experts" role="menuitem" :class="{ selected: kind === 'experts' }" @mouseenter="chooseKind('experts')" @focus="chooseKind('experts')" @click="chooseKind('experts')"><Sparkles :size="15" /><span>专家</span><ChevronRight :size="14" /></button>
         <button type="button" class="wb-menu-item" data-testid="chat-add-skills" role="menuitem" :class="{ selected: kind === 'skills' }" @mouseenter="chooseKind('skills')" @focus="chooseKind('skills')" @click="chooseKind('skills')"><Wrench :size="15" /><span>技能</span><ChevronRight :size="14" /></button>
         <button type="button" class="wb-menu-item" data-testid="chat-add-connectors" role="menuitem" :class="{ selected: kind === 'connectors' }" @mouseenter="chooseKind('connectors')" @focus="chooseKind('connectors')" @click="chooseKind('connectors')"><Plug :size="15" /><span>连接器</span><ChevronRight :size="14" /></button>
-        <div v-if="kind" class="wb-menu xb-menu wb-submenu" role="group" :aria-label="labels[kind]">
+        <div v-if="kind" class="wb-menu xb-menu wb-submenu" role="group" :aria-label="labels[kind]" @mouseenter="cancelClose">
           <label class="wb-search"><Search :size="14" /><input v-model="term" data-testid="chat-capability-search" :placeholder="`搜索${labels[kind]}…`" maxlength="80" @input="scheduleSearch" /></label>
           <div class="wb-results">
             <div class="wb-section">已安装的{{ labels[kind] }}</div>
