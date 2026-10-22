@@ -6,6 +6,7 @@
 
 use serde::{Deserialize, Serialize};
 use crate::ai_reasoning::{self, ReplyPreference};
+use agent_kernel::model::{ModelCapabilities, ModelProtocol, TokenBudget};
 use std::{
     fmt, fs,
     io::{self, Write},
@@ -65,6 +66,10 @@ pub struct ModelConfig {
     pub id: String, pub name: String, pub description: String,
     #[serde(alias = "max_output_tokens", skip_serializing_if = "Option::is_none")]
     pub max_output_tokens: Option<u32>,
+    /// Optional service-declared total context window. Unknown means unknown,
+    /// not the client slider value; aliases accept common provider catalogue formats.
+    #[serde(alias = "contextLength", alias = "context_length", alias = "contextWindow", alias = "context_window_tokens", skip_serializing_if = "Option::is_none")]
+    pub context_window_tokens: Option<usize>,
 }
 
 impl Default for ProviderConfig {
@@ -222,16 +227,26 @@ impl AiConfig {
         !self.base_url.trim().is_empty() && !self.model.trim().is_empty()
     }
 
-    /// Optional provider-declared OUTPUT capability, not a user override or context budget.
-    /// OpenAI-compatible protocols leave the request limit unset; Anthropic uses this
-    /// metadata when available and otherwise resolves its required max_tokens by model.
-    pub(crate) fn model_output_limit(&self) -> Option<u32> {
-        self.providers.iter()
-            .find(|p| p.id == self.active_provider && p.base_url == self.base_url
-                && p.model == self.model && p.protocol == self.protocol)
-            .and_then(|p| p.models.iter().find(|m| m.id == self.model))
-            .and_then(|m| m.max_output_tokens)
-            .filter(|limit| *limit > 0)
+    /// Resolve only the currently selected endpoint, never capabilities from another
+    /// service's model with the same ID. Protocol fallback belongs to the kernel.
+    pub(crate) fn model_capabilities(&self) -> ModelCapabilities {
+        let protocol = match self.protocol.as_str() {
+            "anthropic" => ModelProtocol::AnthropicMessages,
+            "responses" => ModelProtocol::Responses,
+            _ => ModelProtocol::ChatCompletions,
+        };
+        let declared = self.providers.iter().find(|p| p.id == self.active_provider
+            && p.base_url == self.base_url && p.model == self.model && p.protocol == self.protocol)
+            .and_then(|p| p.models.iter().find(|m| m.id == self.model));
+        ModelCapabilities::resolve(
+            protocol, &self.model,
+            declared.and_then(|m| m.context_window_tokens),
+            declared.and_then(|m| m.max_output_tokens),
+        )
+    }
+
+    pub(crate) fn token_budget(&self) -> TokenBudget {
+        TokenBudget::resolve(self.context_tokens, self.model_capabilities().context_window_tokens)
     }
 
     /// Whether the selected provider is ready to use. Saving another provider must not steal the
@@ -1495,6 +1510,7 @@ mod reply_preference_tests {
 #[cfg(test)]
 mod output_budget_tests {
     use super::*;
+    use agent_kernel::model::CapabilitySource;
 
     fn config() -> AiConfig {
         serde_json::from_value(serde_json::json!({
@@ -1503,19 +1519,22 @@ mod output_budget_tests {
             "providers": [{
                 "id":"custom-output", "protocol":"anthropic",
                 "baseUrl":"https://model.example/v1", "model":"test-model",
-                "models":[{"id":"test-model","maxOutputTokens":65536}]
+                "models":[{"id":"test-model","maxOutputTokens":65536, "contextLength":128000}]
             }]
         })).unwrap()
     }
 
     #[test]
-    fn model_output_metadata_is_not_capped_by_the_local_context_budget() {
+    fn provider_metadata_changes_context_window_not_output_reservation() {
         let mut config = config();
-        assert_eq!(config.model_output_limit(), Some(65_536));
+        assert_eq!(config.model_capabilities().request_output_limit(), Some(65_536));
+        assert_eq!(config.model_capabilities().context_window_tokens, Some(128_000));
+        config.context_tokens = 256_000;
+        assert_eq!(config.token_budget().context_limit, 128_000);
+        assert_eq!(config.token_budget().trim_headroom, 22_784);
         config.context_tokens = 16_000;
-        assert_eq!(config.model_output_limit(), Some(65_536));
-        config.context_tokens = 1_000_000;
-        assert_eq!(config.model_output_limit(), Some(65_536));
+        assert_eq!(config.model_capabilities().request_output_limit(), Some(65_536));
+        assert_eq!(config.token_budget().context_limit, 16_000);
     }
 
     #[test]
@@ -1523,20 +1542,22 @@ mod output_budget_tests {
         let mut value = serde_json::to_value(config()).unwrap();
         value["providers"][0]["maxOutputTokens"] = serde_json::json!(1024);
         let loaded: AiConfig = serde_json::from_value(value).unwrap();
-        assert_eq!(loaded.model_output_limit(), Some(65_536));
+        assert_eq!(loaded.model_capabilities().request_output_limit(), Some(65_536));
         let saved = serde_json::to_value(loaded).unwrap();
         assert!(saved["providers"][0].get("maxOutputTokens").is_none());
     }
 
     #[test]
-    fn model_capability_never_leaks_between_providers_or_models() {
+    fn capability_does_not_leak_between_providers_or_models() {
         let mut config = config();
         config.active_provider = "different".into();
-        assert_eq!(config.model_output_limit(), None);
+        assert_eq!(config.model_capabilities().output_source, CapabilitySource::ProtocolFallback);
+        assert_eq!(config.model_capabilities().context_window_tokens, None);
         config.active_provider = "custom-output".into();
         config.model = "other".into();
-        assert_eq!(config.model_output_limit(), None);
+        assert_eq!(config.model_capabilities().context_window_tokens, None);
         config.model = "test-model".into();
-        assert_eq!(config.model_output_limit(), Some(65_536));
+        assert_eq!(config.model_capabilities().output_source, CapabilitySource::ProviderMetadata);
+        assert_eq!(config.model_capabilities().request_output_limit(), Some(65_536));
     }
 }
