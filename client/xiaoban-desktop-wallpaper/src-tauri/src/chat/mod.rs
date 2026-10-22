@@ -10,6 +10,7 @@ mod compact;
 mod danger;
 mod desktop_tools;
 mod game_draft;
+mod hooks;
 // Public so `generate_handler!` can reach the commands by their own module path: a `pub use` re-export of a command
 // does not carry the hidden items Tauri's macro generates next to it.
 pub mod goals;
@@ -432,6 +433,8 @@ fn assemble_with_connectors(parts: Parts<'_>, attachments: Vec<Attachment>, conn
         .tool(WebFetch::new())
         .tool(learning::Recall::new(dirs.learning_db()))
         .middleware(discovery.acquisition_policy())
+        // The user's own checks run first: a call they stop is never put to them for approval.
+        .middleware(hooks::Hooks::new(dirs.chat.join("hooks.json"), workspace))
         .middleware(permission)
         // After the permission check, so a refused write leaves nothing behind.
         .middleware(checkpoints::Checkpoints::new(dirs.checkpoints(), workspace))

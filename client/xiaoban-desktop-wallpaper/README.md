@@ -233,6 +233,22 @@ Mac 实机还需检查：原角色的发光与连续表情、桌宠拖动、空�
 - `src-tauri/src/macos.rs`：AppKit 窗口层级、空间行为、鼠标逻辑点与桌面点击判断。
 - `src-tauri/src/coordinates.rs`：坐标转换和桌面层判断的独立测试。
 
+## 工具 hooks
+
+可以让自己的命令在小伴调用工具前后运行，类似 Claude Code 的 hooks。在应用数据目录的 `chat/hooks.json` 中配置（与 `chat/sessions` 同级），每次工具调用都会重新读取，修改后立即生效：
+
+```json
+{ "hooks": [
+  { "event": "before_tool", "tools": ["shell", "write_file"], "command": "python3 ~/check.py", "timeout_seconds": 10 },
+  { "event": "after_tool", "tools": ["edit_file"], "command": "npx prettier --check ." }
+] }
+```
+
+- 命令在工作目录中运行，调用信息以 JSON 从标准输入传入：`event`、`session`、`tool`、`arguments`；`after_tool` 另有 `output` 与 `is_error`。`tools` 省略或写 `"*"` 表示所有工具。
+- `before_tool` 在权限确认之前运行：退出码 0 放行；其他退出码、超时（默认 10 秒，最长 120 秒）或无法启动都会拦下这次调用，标准错误输出作为原因告诉小伴。配置文件无法解析时，所有工具调用都会停下，便于发现错误。
+- `after_tool` 退出码非 0 时，标准错误输出会附在工具结果后面交给小伴，例如格式检查没有通过。
+- hooks 是你自己写的命令，会以你的身份运行。在 Windows 和“默认权限”下，小伴的 shell 命令也能改到这个文件，重要的安全检查不要只依赖 hooks。
+
 ## 大仓开发边界
 
 本项目是桌面客户端，不承担网页、账户或后端业务。角色可以有自己的实现，修改角色行为时运行本地 npm test；不引用 client/xiaban-web 或主后端的私有文件。两种窗口模式共用本应用场景，Windows/macOS 接入分文件。新增能力按本次需求，当前无聊天/账号/云端依赖。
