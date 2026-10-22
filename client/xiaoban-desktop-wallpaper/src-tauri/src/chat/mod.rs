@@ -497,7 +497,8 @@ fn finish_run(app: &tauri::AppHandle, session: &str) {
 }
 
 #[tauri::command]
-pub fn chat_overview(app: tauri::AppHandle) -> Result<Value, String> {
+pub fn chat_overview(app: tauri::AppHandle, window: tauri::WebviewWindow) -> Result<Value, String> {
+    chat_window(&window)?;
     let config = ai_config::current(&app)?;
     let default = ai_config::default_workspace(&app)?;
     let running: Vec<String> = lock(&app.state::<ChatState>().runs).keys().cloned().collect();
@@ -514,7 +515,8 @@ pub fn chat_overview(app: tauri::AppHandle) -> Result<Value, String> {
 }
 
 #[tauri::command]
-pub fn chat_load_session(app: tauri::AppHandle, session_id: String) -> Result<Vec<Message>, String> {
+pub fn chat_load_session(app: tauri::AppHandle, window: tauri::WebviewWindow, session_id: String) -> Result<Vec<Message>, String> {
+    chat_window(&window)?;
     if !sessions::valid_id(&session_id) {
         return Err("对话编号不对".into());
     }
@@ -531,7 +533,8 @@ pub fn chat_load_session(app: tauri::AppHandle, session_id: String) -> Result<Ve
 /// An empty conversation. The chat page makes one when the first message is sent, so the page
 /// already knows the id when the answer's events start to arrive.
 #[tauri::command]
-pub fn chat_new_session(app: tauri::AppHandle, permission_mode: Option<String>) -> Result<SessionSummary, String> {
+pub fn chat_new_session(app: tauri::AppHandle, window: tauri::WebviewWindow, permission_mode: Option<String>) -> Result<SessionSummary, String> {
+    chat_window(&window)?;
     let mode = match permission_mode.as_deref() {
         None => "ask",
         Some(mode @ ("ask" | "auto")) => mode,
@@ -542,7 +545,8 @@ pub fn chat_new_session(app: tauri::AppHandle, permission_mode: Option<String>) 
 }
 
 #[tauri::command]
-pub fn chat_send(app: tauri::AppHandle, session_id: String, text: String, images: Option<Vec<String>>, retry: Option<bool>, attachments: Option<Vec<AttachmentInput>>) -> Result<SessionSummary, String> {
+pub fn chat_send(app: tauri::AppHandle, window: tauri::WebviewWindow, session_id: String, text: String, images: Option<Vec<String>>, retry: Option<bool>, attachments: Option<Vec<AttachmentInput>>) -> Result<SessionSummary, String> {
+    chat_window(&window)?;
     if !sessions::valid_id(&session_id) {
         return Err("对话编号不对".into());
     }
@@ -849,7 +853,8 @@ pub fn chat_rollback_skill_proposal(app:tauri::AppHandle,window:tauri::WebviewWi
 }
 
 #[tauri::command]
-pub fn chat_cancel(app: tauri::AppHandle, session_id: String) {
+pub fn chat_cancel(app: tauri::AppHandle, window: tauri::WebviewWindow, session_id: String) {
+    if chat_window(&window).is_err() { return; }
     let state = app.state::<ChatState>();
     let runs = lock(&state.runs);
     if let Some(cancel) = runs.get(&session_id) {
@@ -858,7 +863,8 @@ pub fn chat_cancel(app: tauri::AppHandle, session_id: String) {
 }
 
 #[tauri::command]
-pub fn chat_delete_session(app: tauri::AppHandle, session_id: String) -> Result<Vec<SessionSummary>, String> {
+pub fn chat_delete_session(app: tauri::AppHandle, window: tauri::WebviewWindow, session_id: String) -> Result<Vec<SessionSummary>, String> {
+    chat_window(&window)?;
     if !sessions::valid_id(&session_id) {
         return Err("对话编号不对".into());
     }
@@ -910,7 +916,8 @@ fn context_of(app: &tauri::AppHandle, config: &AiConfig, raw: &[Message]) -> Res
 /// How big the next request in a conversation would be, against the limit chosen in settings.
 /// `None` is a conversation that has not been started yet.
 #[tauri::command]
-pub fn chat_context(app: tauri::AppHandle, session_id: Option<String>) -> Result<ContextInfo, String> {
+pub fn chat_context(app: tauri::AppHandle, window: tauri::WebviewWindow, session_id: Option<String>) -> Result<ContextInfo, String> {
+    chat_window(&window)?;
     let config = ai_config::current(&app)?;
     let raw = match session_id.as_deref() {
         Some(id) => {
@@ -970,7 +977,8 @@ fn auto_compact(app: &tauri::AppHandle, id: &str, config: &AiConfig, key_source:
 /// Replaces the older part of a conversation, for the model only, with a summary the model writes.
 /// The saved conversation and what the user sees are untouched. While it runs the conversation counts as busy.
 #[tauri::command]
-pub async fn chat_compact(app: tauri::AppHandle, session_id: String) -> Result<ContextInfo, String> {
+pub async fn chat_compact(app: tauri::AppHandle, window: tauri::WebviewWindow, session_id: String) -> Result<ContextInfo, String> {
+    chat_window(&window)?;
     checked_session_id(&session_id)?;
     let cancel = Arc::new(AtomicBool::new(false));
     {
@@ -998,6 +1006,15 @@ pub async fn chat_compact(app: tauri::AppHandle, session_id: String) -> Result<C
         .map_err(|e| e.to_string())?
 }
 
+/// The conversation commands are for the control window and the floating assistant only. Every window can reach
+/// the app's commands, and the others show wallpapers, widgets and games, some of them made by the assistant itself.
+fn chat_window(window: &tauri::WebviewWindow) -> Result<(), String> {
+    match window.label() {
+        "control" | crate::float_assistant::LABEL => Ok(()),
+        _ => Err("这个窗口不能使用对话功能".into()),
+    }
+}
+
 fn checked_session_id(id: &str) -> Result<(), String> {
     if sessions::valid_id(id) { Ok(()) } else { Err("对话编号不对".into()) }
 }
@@ -1008,14 +1025,16 @@ fn checked_group_id(id: &str) -> Result<(), String> {
 
 /// Renaming works while the conversation is answering: the title is only a label.
 #[tauri::command]
-pub fn chat_rename_session(app: tauri::AppHandle, session_id: String, title: String) -> Result<Library, String> {
+pub fn chat_rename_session(app: tauri::AppHandle, window: tauri::WebviewWindow, session_id: String, title: String) -> Result<Library, String> {
+    chat_window(&window)?;
     checked_session_id(&session_id)?;
     mutate(&app, |index| index.rename(&session_id, &title).map(|()| index.library()))?
 }
 
 /// An empty or missing `group_id` takes the conversation out of its group.
 #[tauri::command]
-pub fn chat_move_session(app: tauri::AppHandle, session_id: String, group_id: Option<String>) -> Result<Library, String> {
+pub fn chat_move_session(app: tauri::AppHandle, window: tauri::WebviewWindow, session_id: String, group_id: Option<String>) -> Result<Library, String> {
+    chat_window(&window)?;
     checked_session_id(&session_id)?;
     if let Some(group) = group_id.as_deref().filter(|g| !g.is_empty()) {
         checked_group_id(group)?;
@@ -1025,7 +1044,8 @@ pub fn chat_move_session(app: tauri::AppHandle, session_id: String, group_id: Op
 
 /// With `session_id`, the conversation moves into the new group in the same step, so a failed name leaves it where it was.
 #[tauri::command]
-pub fn chat_create_group(app: tauri::AppHandle, name: String, session_id: Option<String>) -> Result<Library, String> {
+pub fn chat_create_group(app: tauri::AppHandle, window: tauri::WebviewWindow, name: String, session_id: Option<String>) -> Result<Library, String> {
+    chat_window(&window)?;
     if let Some(id) = session_id.as_deref() {
         checked_session_id(id)?;
     }
@@ -1043,20 +1063,23 @@ pub fn chat_create_group(app: tauri::AppHandle, name: String, session_id: Option
 }
 
 #[tauri::command]
-pub fn chat_rename_group(app: tauri::AppHandle, group_id: String, name: String) -> Result<Library, String> {
+pub fn chat_rename_group(app: tauri::AppHandle, window: tauri::WebviewWindow, group_id: String, name: String) -> Result<Library, String> {
+    chat_window(&window)?;
     checked_group_id(&group_id)?;
     mutate(&app, |index| index.rename_group(&group_id, &name).map(|()| index.library()))?
 }
 
 /// The conversations inside are kept and go back to the top level.
 #[tauri::command]
-pub fn chat_delete_group(app: tauri::AppHandle, group_id: String) -> Result<Library, String> {
+pub fn chat_delete_group(app: tauri::AppHandle, window: tauri::WebviewWindow, group_id: String) -> Result<Library, String> {
+    chat_window(&window)?;
     checked_group_id(&group_id)?;
     mutate(&app, |index| index.delete_group(&group_id).map(|()| index.library()))?
 }
 
 #[tauri::command]
-pub fn chat_answer_approval(app: tauri::AppHandle, id: String, decision: String) -> Result<(), String> {
+pub fn chat_answer_approval(app: tauri::AppHandle, window: tauri::WebviewWindow, id: String, decision: String) -> Result<(), String> {
+    chat_window(&window)?;
     let decision = match decision.as_str() {
         "once" => Approval::Once,
         "always" => Approval::Always,
@@ -1067,13 +1090,15 @@ pub fn chat_answer_approval(app: tauri::AppHandle, id: String, decision: String)
 }
 
 #[tauri::command]
-pub fn chat_answer_question(app: tauri::AppHandle, id: String, answer: Option<String>) -> Result<(), String> {
+pub fn chat_answer_question(app: tauri::AppHandle, window: tauri::WebviewWindow, id: String, answer: Option<String>) -> Result<(), String> {
+    chat_window(&window)?;
     let answer = answer.map(|a| a.trim().to_string()).filter(|a| !a.is_empty());
     app.state::<ChatState>().broker.answer_question(&id, answer)
 }
 
 #[tauri::command]
-pub fn chat_set_permission_mode(app: tauri::AppHandle, session_id: Option<String>, mode: String) -> Result<String, String> {
+pub fn chat_set_permission_mode(app: tauri::AppHandle, window: tauri::WebviewWindow, session_id: Option<String>, mode: String) -> Result<String, String> {
+    chat_window(&window)?;
     if !["ask", "auto"].contains(&mode.as_str()) {
         return Err("不支持的权限模式".into());
     }
