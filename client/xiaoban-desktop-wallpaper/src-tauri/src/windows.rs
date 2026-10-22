@@ -575,7 +575,7 @@ pub fn start_desktop_game_entry(app: tauri::AppHandle) {
     std::thread::spawn(move || unsafe {
         let hook=SetWindowsHookExW(WH_MOUSE_LL,Some(game_mouse_hook),null_mut(),0);
         let state=hook_app.state::<crate::games::GameState>();
-        if hook.is_null() { *state.desktop_entry_error.lock().unwrap()=Some(format!("桌面双击入口初始化失败（{}），请使用玩一玩按钮",GetLastError())); return; }
+        if hook.is_null() { *state.desktop_entry_error.lock().unwrap_or_else(|e| e.into_inner())=Some(format!("桌面双击入口初始化失败（{}），请使用玩一玩按钮",GetLastError())); return; }
         state.desktop_entry_ready.store(true,Ordering::Relaxed);
         let mut message=MSG::default();
         while GetMessageW(&mut message,null_mut(),0,0)>0 { TranslateMessage(&message); DispatchMessageW(&message); }
@@ -589,7 +589,7 @@ pub fn start_desktop_game_entry(app: tauri::AppHandle) {
                 let state=app.state::<crate::games::GameState>();
                 if state.desktop_entry_ready.swap(false,Ordering::Relaxed) {
                     let error="Explorer 桌面判断连续超时，已停用双击入口，请使用玩一玩按钮";
-                    *state.desktop_entry_error.lock().unwrap()=Some(error.into());let _=app.emit("desktop-error",error);
+                    *state.desktop_entry_error.lock().unwrap_or_else(|e| e.into_inner())=Some(error.into());let _=app.emit("desktop-error",error);
                 }
             }
             if GAME_CLICK_OVERFLOW.swap(false,Ordering::Relaxed) { previous=None; }

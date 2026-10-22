@@ -345,7 +345,7 @@ pub async fn import_local_wallpaper(
         let Some(chosen) = chosen else { return Ok(None); };
         let source = chosen.into_path().map_err(|e| e.to_string())?;
         let state = app.state::<crate::content::ContentState>();
-        let _io = state.io.lock().unwrap();
+        let _io = state.io.lock().unwrap_or_else(|e| e.into_inner());
         let item = import_file(&crate::content::root(&app)?, &source)?;
         Ok(Some(serde_json::json!({"id":item.id,"library":crate::content::get_wallpaper_library(app.clone())?})))
     }).await.map_err(|e| e.to_string())?

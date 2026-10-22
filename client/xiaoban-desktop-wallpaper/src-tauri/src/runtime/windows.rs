@@ -413,7 +413,7 @@ fn ui_smoke() {
                 Stage::Install,
                 Stage::Recheck,
             ] {
-                progress.lock().unwrap().stage = stage;
+                progress.lock().unwrap_or_else(|e| e.into_inner()).stage = stage;
                 std::thread::sleep(Duration::from_millis(250));
             }
             Ok(())

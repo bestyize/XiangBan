@@ -83,7 +83,7 @@ struct DesktopState {
 }
 
 fn settings(app: &tauri::AppHandle) -> Settings {
-    app.state::<DesktopState>().settings.lock().unwrap().clone()
+    app.state::<DesktopState>().settings.lock().unwrap_or_else(|e| e.into_inner()).clone()
 }
 
 fn ui_smoke_enabled(app: &tauri::AppHandle) -> bool {
@@ -94,7 +94,7 @@ fn ui_smoke_enabled(app: &tauri::AppHandle) -> bool {
 fn ui_smoke_report(app: tauri::AppHandle, window: tauri::WebviewWindow, report: serde_json::Value) -> Result<(), String> {
     if window.label() != "control" || !ui_smoke_enabled(&app) { return Err("UI smoke is only available to the isolated control window".into()); }
     if serde_json::to_vec(&report).map_err(|error| error.to_string())?.len() > 16 * 1024 { return Err("UI smoke report exceeds 16 KiB".into()); }
-    *app.state::<DesktopState>().ui_report.lock().unwrap() = Some(report);
+    *app.state::<DesktopState>().ui_report.lock().unwrap_or_else(|e| e.into_inner()) = Some(report);
     Ok(())
 }
 
@@ -138,7 +138,7 @@ async fn chat_screenshot(window: tauri::WebviewWindow) -> Result<Option<String>,
 async fn wait_ui_smoke(app: &tauri::AppHandle) -> Result<serde_json::Value, String> {
     let deadline = Instant::now() + Duration::from_secs(20);
     loop {
-        if let Some(report) = app.state::<DesktopState>().ui_report.lock().unwrap().clone() {
+        if let Some(report) = app.state::<DesktopState>().ui_report.lock().unwrap_or_else(|e| e.into_inner()).clone() {
             if report["ok"] == true { return Ok(report); }
             return Err(report["error"].as_str().unwrap_or("UI smoke reported failure without details").to_string());
         }
@@ -149,7 +149,7 @@ async fn wait_ui_smoke(app: &tauri::AppHandle) -> Result<serde_json::Value, Stri
 
 fn publish(app: &tauri::AppHandle) {
     let settings = settings(app);
-    let item = app.state::<DesktopState>().startup_menu.lock().unwrap().clone();
+    let item = app.state::<DesktopState>().startup_menu.lock().unwrap_or_else(|e| e.into_inner()).clone();
     if let Some(item) = item { let _ = item.set_checked(settings.autostart); }
     if let Some(menu)=app.get_webview_window("widgetmenu"){let _=menu.eval(format!("window.dispatchEvent(new CustomEvent('widget-menu-appearance',{{detail:{}}}));",serde_json::json!(settings.appearance)));}
     let _ = app.emit("settings-changed", settings);
@@ -160,8 +160,8 @@ fn publish(app: &tauri::AppHandle) {
 
 fn persist(app: &tauri::AppHandle, settings: &Settings) -> Result<(), String> {
     let state = app.state::<DesktopState>();
-    let _write = state.preferences_io.lock().unwrap();
-    let path = state.preferences_path.lock().unwrap().clone().ok_or("无法找到设置目录")?;
+    let _write = state.preferences_io.lock().unwrap_or_else(|e| e.into_inner());
+    let path = state.preferences_path.lock().unwrap_or_else(|e| e.into_inner()).clone().ok_or("无法找到设置目录")?;
     preferences::save(&path, &Preferences { settings: settings.clone(),
         autostart_initialized: state.autostart_initialized.load(Ordering::Relaxed) })
         .map_err(|error| format!("无法保存设置：{error}"))
@@ -176,13 +176,13 @@ fn initialize_preferences(app: &tauri::AppHandle) -> Result<(), String> {
     let prefs = match preferences::load(&path) {
         Ok(prefs) => prefs,
         Err(error) => {
-            *state.startup_error.lock().unwrap() = Some(format!("设置读取失败，已使用默认场景：{error}"));
+            *state.startup_error.lock().unwrap_or_else(|e| e.into_inner()) = Some(format!("设置读取失败，已使用默认场景：{error}"));
             // An unreadable file must never silently turn startup back on.
             Preferences { autostart_initialized: true, ..Default::default() }
         }
     };
-    *state.preferences_path.lock().unwrap() = Some(path);
-    *state.settings.lock().unwrap() = prefs.settings;
+    *state.preferences_path.lock().unwrap_or_else(|e| e.into_inner()) = Some(path);
+    *state.settings.lock().unwrap_or_else(|e| e.into_inner()) = prefs.settings;
     state.autostart_initialized.store(prefs.autostart_initialized, Ordering::Relaxed);
     if state.startup_allowed {
         let result = if !prefs.autostart_initialized {
@@ -198,23 +198,23 @@ fn initialize_preferences(app: &tauri::AppHandle) -> Result<(), String> {
             Ok(())
         };
         if let Err(error) = result {
-            *state.startup_error.lock().unwrap() = Some(format!("开机自动启动未能设置：{error}"));
+            *state.startup_error.lock().unwrap_or_else(|e| e.into_inner()) = Some(format!("开机自动启动未能设置：{error}"));
         }
         match startup::enabled(app) {
-            Ok(enabled) => state.settings.lock().unwrap().autostart = enabled,
+            Ok(enabled) => state.settings.lock().unwrap_or_else(|e| e.into_inner()).autostart = enabled,
             Err(error) => {
-                state.settings.lock().unwrap().autostart = false;
-                *state.startup_error.lock().unwrap() = Some(format!("无法读取系统启动设置：{error}"));
+                state.settings.lock().unwrap_or_else(|e| e.into_inner()).autostart = false;
+                *state.startup_error.lock().unwrap_or_else(|e| e.into_inner()) = Some(format!("无法读取系统启动设置：{error}"));
             }
         }
         if let Err(error) = persist(app, &settings(app)) {
-            *state.startup_error.lock().unwrap() = Some(error);
+            *state.startup_error.lock().unwrap_or_else(|e| e.into_inner()) = Some(error);
         }
     } else {
-        state.settings.lock().unwrap().autostart = false;
+        state.settings.lock().unwrap_or_else(|e| e.into_inner()).autostart = false;
     }
     if std::env::args().any(|argument| argument == "--wallpaper") {
-        state.settings.lock().unwrap().mode = "wallpaper".into();
+        state.settings.lock().unwrap_or_else(|e| e.into_inner()).mode = "wallpaper".into();
     }
     Ok(())
 }
@@ -225,14 +225,14 @@ struct StartupStatus { available: bool, error: Option<String> }
 #[tauri::command]
 fn get_startup_status(app: tauri::AppHandle) -> StartupStatus {
     let state = app.state::<DesktopState>();
-    let error = state.startup_error.lock().unwrap().clone();
+    let error = state.startup_error.lock().unwrap_or_else(|e| e.into_inner()).clone();
     StartupStatus { available: state.startup_allowed, error }
 }
 
 #[tauri::command]
 fn set_autostart(app: tauri::AppHandle, enabled: bool) -> Result<Settings, String> {
     let state = app.state::<DesktopState>();
-    let _update = state.update_lock.lock().unwrap();
+    let _update = state.update_lock.lock().unwrap_or_else(|e| e.into_inner());
     if !state.startup_allowed { return Err("开发预览不登记开机启动，请使用正式应用设置。".into()); }
     let previous = settings(&app);
     startup::set(&app, enabled)?;
@@ -244,8 +244,8 @@ fn set_autostart(app: tauri::AppHandle, enabled: bool) -> Result<Settings, Strin
         let _ = startup::set(&app, previous.autostart);
         return Err(error);
     }
-    *state.settings.lock().unwrap() = next;
-    *state.startup_error.lock().unwrap() = None;
+    *state.settings.lock().unwrap_or_else(|e| e.into_inner()) = next;
+    *state.startup_error.lock().unwrap_or_else(|e| e.into_inner()) = None;
     publish(&app);
     Ok(settings(&app))
 }
@@ -301,7 +301,7 @@ fn get_platform() -> &'static str {
 #[tauri::command]
 fn get_settings(app: tauri::AppHandle) -> Settings {
     if app.state::<DesktopState>().startup_allowed {
-        if let Ok(enabled) = startup::enabled(&app) { app.state::<DesktopState>().settings.lock().unwrap().autostart = enabled; }
+        if let Ok(enabled) = startup::enabled(&app) { app.state::<DesktopState>().settings.lock().unwrap_or_else(|e| e.into_inner()).autostart = enabled; }
     }
     settings(&app)
 }
@@ -310,7 +310,7 @@ fn get_settings(app: tauri::AppHandle) -> Settings {
 async fn set_mode(app: tauri::AppHandle, mode: String) -> Result<Settings, String> {
     if games::is_active(&app) { return Err("请先退出游戏空间，再切换桌面模式".into()); }
     let state = app.state::<DesktopState>();
-    let _update = state.update_lock.lock().unwrap();
+    let _update = state.update_lock.lock().unwrap_or_else(|e| e.into_inner());
     if !["floating", "wallpaper"].contains(&mode.as_str()) {
         return Err("不支持的显示模式".into());
     }
@@ -322,7 +322,7 @@ async fn set_mode(app: tauri::AppHandle, mode: String) -> Result<Settings, Strin
         let _ = persist(&app, &previous);
         return Err(error);
     }
-    *state.settings.lock().unwrap() = next;
+    *state.settings.lock().unwrap_or_else(|e| e.into_inner()) = next;
     publish(&app);
     Ok(settings(&app))
 }
@@ -337,7 +337,7 @@ fn update_settings(
     fps: u32,
 ) -> Result<Settings, String> {
     let state = app.state::<DesktopState>();
-    let _update = state.update_lock.lock().unwrap();
+    let _update = state.update_lock.lock().unwrap_or_else(|e| e.into_inner());
     if !preferences::EXPRESSIONS.contains(&expression.as_str()) {
         return Err("不支持的表情".into());
     }
@@ -361,7 +361,7 @@ fn update_settings(
             return Err(error.to_string());
         }
     }
-    *state.settings.lock().unwrap() = next;
+    *state.settings.lock().unwrap_or_else(|e| e.into_inner()) = next;
     publish(&app);
     Ok(settings(&app))
 }
@@ -370,7 +370,7 @@ fn update_settings(
 #[tauri::command]
 fn set_desktop_effects(app: tauri::AppHandle, effects: serde_json::Value) -> Result<Settings, String> {
     let state = app.state::<DesktopState>();
-    let _update = state.update_lock.lock().unwrap();
+    let _update = state.update_lock.lock().unwrap_or_else(|e| e.into_inner());
     let previous = settings(&app);
     let mut next = previous.clone();
     next.effects = effect_choice::EffectsChoice::from_value(&effects);
@@ -378,7 +378,7 @@ fn set_desktop_effects(app: tauri::AppHandle, effects: serde_json::Value) -> Res
         return Err(format!("没有找到特效“{}”，它可能已被移出特效文件夹", next.effects.selected));
     }
     persist(&app, &next)?;
-    *state.settings.lock().unwrap() = next;
+    *state.settings.lock().unwrap_or_else(|e| e.into_inner()) = next;
     publish(&app);
     Ok(settings(&app))
 }
@@ -386,14 +386,14 @@ fn set_desktop_effects(app: tauri::AppHandle, effects: serde_json::Value) -> Res
 #[tauri::command]
 async fn set_companion_enabled(app:tauri::AppHandle,enabled:bool)->Result<Settings,String>{
     if games::is_active(&app){return Err("请先退出游戏空间，再更改小伴显示".into());}
-    let state=app.state::<DesktopState>(); let _update=state.update_lock.lock().unwrap();
+    let state=app.state::<DesktopState>(); let _update=state.update_lock.lock().unwrap_or_else(|e| e.into_inner());
     let previous=settings(&app); let mut next=previous.clone(); next.companion_enabled=enabled;
-    persist(&app,&next)?; *state.settings.lock().unwrap()=next.clone();
+    persist(&app,&next)?; *state.settings.lock().unwrap_or_else(|e| e.into_inner())=next.clone();
     if !enabled {
         if let Some(pet)=app.get_webview_window("pet"){let _=pet.destroy();}
-        state.ready_scenes.lock().unwrap().remove("pet");
+        state.ready_scenes.lock().unwrap_or_else(|e| e.into_inner()).remove("pet");
     } else {
-        if let Err(error)=open_scene(&app,&next.mode){*state.settings.lock().unwrap()=previous.clone();let _=persist(&app,&previous);return Err(error);}
+        if let Err(error)=open_scene(&app,&next.mode){*state.settings.lock().unwrap_or_else(|e| e.into_inner())=previous.clone();let _=persist(&app,&previous);return Err(error);}
     }
     publish(&app);Ok(next)
 }
@@ -406,11 +406,11 @@ fn request_system_permissions(app: tauri::AppHandle) -> Result<serde_json::Value
 #[tauri::command]
 fn set_companion_links(app: tauri::AppHandle, enabled: bool) -> Result<Settings, String> {
     let state = app.state::<DesktopState>();
-    let _update = state.update_lock.lock().unwrap();
+    let _update = state.update_lock.lock().unwrap_or_else(|e| e.into_inner());
     let mut next = settings(&app);
     next.companion_links = enabled;
     persist(&app, &next)?;
-    *state.settings.lock().unwrap() = next.clone();
+    *state.settings.lock().unwrap_or_else(|e| e.into_inner()) = next.clone();
     publish(&app);
     Ok(next)
 }
@@ -433,13 +433,13 @@ fn apply_window_appearance(app: &tauri::AppHandle, mode: &str) {
 fn set_appearance(app: tauri::AppHandle, mode: String) -> Result<Settings, String> {
     if !preferences::APPEARANCES.contains(&mode.as_str()) { return Err(format!("没有这个外观：{mode}")); }
     let state = app.state::<DesktopState>();
-    let _update = state.update_lock.lock().unwrap();
+    let _update = state.update_lock.lock().unwrap_or_else(|e| e.into_inner());
     let mut next = settings(&app);
     if next.appearance == mode && next.appearance_kept { return Ok(next); }
     next.appearance = mode;
     next.appearance_kept = true;
     persist(&app, &next)?;
-    *state.settings.lock().unwrap() = next.clone();
+    *state.settings.lock().unwrap_or_else(|e| e.into_inner()) = next.clone();
     publish(&app);
     apply_window_appearance(&app, &next.appearance);
     Ok(next)
@@ -456,11 +456,11 @@ fn get_appearance(app: tauri::AppHandle) -> serde_json::Value {
 fn set_companion_skin(app: tauri::AppHandle, skin: String) -> Result<Settings, String> {
     if !preferences::SKINS.contains(&skin.as_str()) { return Err(format!("没有这个外壳：{skin}")); }
     let state = app.state::<DesktopState>();
-    let _update = state.update_lock.lock().unwrap();
+    let _update = state.update_lock.lock().unwrap_or_else(|e| e.into_inner());
     let mut next = settings(&app);
     next.companion_skin = skin;
     persist(&app, &next)?;
-    *state.settings.lock().unwrap() = next.clone();
+    *state.settings.lock().unwrap_or_else(|e| e.into_inner()) = next.clone();
     publish(&app);
     Ok(next)
 }
@@ -481,7 +481,7 @@ fn scene_ready(window: tauri::WebviewWindow, report: Option<serde_json::Value>) 
         if let Some(report) = report {
             if report.to_string().len() > 16384 { return Err("场景报告过大".into()); }
             let failed = report.get("error").is_some();
-            window.app_handle().state::<content::ContentState>().reports.lock().unwrap().insert(window.label().into(), report);
+            window.app_handle().state::<content::ContentState>().reports.lock().unwrap_or_else(|e| e.into_inner()).insert(window.label().into(), report);
             if failed { return Ok(()); }
         }
     }
@@ -585,13 +585,13 @@ fn get_diagnostics(app: tauri::AppHandle) -> serde_json::Value {
     let mut report =
         serde_json::json!({"platform": std::env::consts::OS, "wallpaperSupported": false});
     let state = app.state::<DesktopState>();
-    let ready = state.ready_scenes.lock().unwrap();
+    let ready = state.ready_scenes.lock().unwrap_or_else(|e| e.into_inner());
     for (key, label) in [("floating", "pet"), ("wallpaper", "wallpaper")] {
         if let Some(scene) = report.get_mut(key).filter(|value| value.is_object()) {
             scene["frontendReady"] = serde_json::json!(ready.contains(label));
         }
     }
-    report["contentReports"] = serde_json::to_value(app.state::<content::ContentState>().reports.lock().unwrap().clone()).unwrap();
+    report["contentReports"] = serde_json::to_value(app.state::<content::ContentState>().reports.lock().unwrap_or_else(|e| e.into_inner()).clone()).unwrap();
     report["games"] = games::get_game_status(app.clone());
     report
 }
@@ -661,7 +661,7 @@ fn smoke_lifecycle(app: &tauri::AppHandle) -> Result<serde_json::Value, String> 
     let initially_enabled = startup::enabled(app)?;
     if !initially_enabled { return Err("首次启动没有默认开启自启动".into()); }
     set_autostart(app.clone(), false)?;
-    let path = app.state::<DesktopState>().preferences_path.lock().unwrap().clone().ok_or("没有设置路径")?;
+    let path = app.state::<DesktopState>().preferences_path.lock().unwrap_or_else(|e| e.into_inner()).clone().ok_or("没有设置路径")?;
     let disabled = preferences::load(&path).map_err(|e| e.to_string())?;
     if disabled.settings.autostart || !disabled.autostart_initialized || startup::enabled(app)? {
         return Err("关闭自启动后没有保存或移除系统启动项".into());
@@ -695,7 +695,7 @@ fn setup_tray(app: &tauri::App) -> tauri::Result<()> {
         app.state::<DesktopState>().startup_allowed, settings(app.handle()).autostart, None::<&str>)?;
     let exit = MenuItem::with_id(app, "exit", "退出小伴", true, None::<&str>)?;
     let menu = Menu::with_items(app, &[&control, &assistant, &games, &stop_desk, &poke, &autostart, &exit])?;
-    *app.state::<DesktopState>().startup_menu.lock().unwrap() = Some(autostart);
+    *app.state::<DesktopState>().startup_menu.lock().unwrap_or_else(|e| e.into_inner()) = Some(autostart);
     // The app icon at 64x64 as raw RGBA (icons/tray.rgba), so the tray needs no image decoder.
     const TRAY_ICON: &[u8] = include_bytes!("../icons/tray.rgba");
     let builder = TrayIconBuilder::with_id("xiaoban-tray")
@@ -839,7 +839,7 @@ fn main() {
         .setup(|app| {
             initialize_preferences(app.handle()).map_err(std::io::Error::other)?;
             if let Some(session) = account::load_session(app.handle()) {
-                *app.state::<account::AccountState>().session.lock().unwrap() = Some(session);
+                *app.state::<account::AccountState>().session.lock().unwrap_or_else(|e| e.into_inner()) = Some(session);
             }
             app.manage(chat::ChatState::new(app.handle()));
             float_assistant::start(app.handle());
@@ -852,8 +852,8 @@ fn main() {
             let _media_active = match content::restore(app.handle()) {
                 Ok(active) => active,
                 Err(error) => {
-                    *app.state::<DesktopState>().startup_error.lock().unwrap() = Some(error);
-                    app.state::<DesktopState>().settings.lock().unwrap().wallpaper_id = "companion".into();
+                    *app.state::<DesktopState>().startup_error.lock().unwrap_or_else(|e| e.into_inner()) = Some(error);
+                    app.state::<DesktopState>().settings.lock().unwrap_or_else(|e| e.into_inner()).wallpaper_id = "companion".into();
                     false
                 }
             };

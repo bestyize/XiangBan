@@ -29,7 +29,7 @@ fn path(app: &tauri::AppHandle) -> Result<std::path::PathBuf, String> { Ok(crate
 fn now() -> i64 { chrono::Utc::now().timestamp() }
 #[tauri::command]
 pub fn tts_get_settings(app: tauri::AppHandle) -> Result<Settings, String> {
-    let state = app.state::<TtsState>(); let _io = state.io.lock().unwrap();
+    let state = app.state::<TtsState>(); let _io = state.io.lock().unwrap_or_else(|e| e.into_inner());
     match std::fs::read(path(&app)?) {
         Ok(bytes) => {
             let value: Settings = serde_json::from_slice(&bytes).map_err(|_| "语音设置无法读取，请重新保存")?;
@@ -42,7 +42,7 @@ pub fn tts_get_settings(app: tauri::AppHandle) -> Result<Settings, String> {
 #[tauri::command]
 pub fn tts_save_settings(app: tauri::AppHandle, settings: Settings) -> Result<Settings, String> {
     settings.options.validate()?;
-    let state = app.state::<TtsState>(); let _io = state.io.lock().unwrap();
+    let state = app.state::<TtsState>(); let _io = state.io.lock().unwrap_or_else(|e| e.into_inner());
     crate::library::save_json(&path(&app)?, &settings)?;
     let _ = app.emit_to("control", "tts-settings-changed", &settings);
     Ok(settings)
@@ -72,7 +72,7 @@ fn synthesize(app: &tauri::AppHandle, id: u64, text: &str, options: &Options) ->
     let parts = protocol::chunks(text)?;
     let key = format!("{:x}", Sha256::digest(serde_json::to_vec(&(text, options)).map_err(|_| "语音参数无效")?));
     cancelled(app, id)?;
-    if let Some((_, audio)) = app.state::<TtsState>().cache.lock().unwrap().iter().find(|(k, _)| *k == key) { return Ok(audio.clone()); }
+    if let Some((_, audio)) = app.state::<TtsState>().cache.lock().unwrap_or_else(|e| e.into_inner()).iter().find(|(k, _)| *k == key) { return Ok(audio.clone()); }
     let mut output = Vec::new();
     for text in parts {
         cancelled(app, id)?;
@@ -130,7 +130,7 @@ fn synthesize(app: &tauri::AppHandle, id: u64, text: &str, options: &Options) ->
         if !ended || output.len() == initial_size { return Err("语音服务未返回完整音频，请稍后重试".into()); }
     }
     cancelled(app, id)?;
-    let state = app.state::<TtsState>(); let mut cache = state.cache.lock().unwrap();
+    let state = app.state::<TtsState>(); let mut cache = state.cache.lock().unwrap_or_else(|e| e.into_inner());
     if output.len() <= 8 * 1024 * 1024 {
         cache.push_back((key, output.clone()));
         while cache.len() > 4 || cache.iter().map(|(_, v)| v.len()).sum::<usize>() > 8 * 1024 * 1024 { cache.pop_front(); }

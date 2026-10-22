@@ -14,11 +14,11 @@ pub(super) fn active(app: &tauri::AppHandle) -> bool {
     app.state::<AssistantState>().transition.active.load(Ordering::SeqCst)
 }
 pub(super) fn fitting_allowed(app: &tauri::AppHandle) -> bool {
-    app.state::<AssistantState>().transition.pending.lock().unwrap().as_ref().is_some_and(|(_, step, _)| *step == "enter")
+    app.state::<AssistantState>().transition.pending.lock().unwrap_or_else(|e| e.into_inner()).as_ref().is_some_and(|(_, step, _)| *step == "enter")
 }
 fn finish(app: &tauri::AppHandle) {
     let state = app.state::<AssistantState>();
-    state.transition.pending.lock().unwrap().take();
+    state.transition.pending.lock().unwrap_or_else(|e| e.into_inner()).take();
     state.transition.active.store(false, Ordering::SeqCst);
 }
 fn signal(app: &tauri::AppHandle, id: u64, target: &str, step: &str) {
@@ -28,13 +28,13 @@ fn signal(app: &tauri::AppHandle, id: u64, target: &str, step: &str) {
 }
 fn wait_for(app: &tauri::AppHandle, id: u64, step: &'static str) -> mpsc::Receiver<()> {
     let (tx, rx) = mpsc::channel();
-    *app.state::<AssistantState>().transition.pending.lock().unwrap() = Some((id, step, tx));
+    *app.state::<AssistantState>().transition.pending.lock().unwrap_or_else(|e| e.into_inner()) = Some((id, step, tx));
     rx
 }
 pub(super) fn ready(window: &WebviewWindow, id: u64, step: &str) -> Result<(), String> {
     if window.label() != LABEL { return Err("只有超级小伴可以完成形态切换".into()); }
     let state = window.state::<AssistantState>();
-    let mut pending = state.transition.pending.lock().unwrap();
+    let mut pending = state.transition.pending.lock().unwrap_or_else(|e| e.into_inner());
     if pending.as_ref().is_some_and(|(own_id, own_step, _)| *own_id == id && *own_step == step) {
         if let Some((_, _, sender)) = pending.take() { let _ = sender.send(()); }
     }

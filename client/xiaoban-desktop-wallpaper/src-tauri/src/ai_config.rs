@@ -588,7 +588,7 @@ pub fn default_workspace(app: &tauri::AppHandle) -> Result<PathBuf, String> {
 pub fn current(app: &tauri::AppHandle) -> Result<AiConfig, String> {
     let path = path(app)?;
     let state = app.state::<AiConfigState>();
-    let _io = state.io.lock().unwrap();
+    let _io = state.io.lock().unwrap_or_else(|e| e.into_inner());
     load(&path).map_err(|e| format!("模型配置读取失败：{e}"))
 }
 
@@ -607,7 +607,7 @@ fn configuration_target(target: &tauri::EventTarget) -> bool {
 pub fn get_ai_config(app: tauri::AppHandle) -> Result<AiConfigView, String> {
     let path = path(&app)?;
     let state = app.state::<AiConfigState>();
-    let _io = state.io.lock().unwrap();
+    let _io = state.io.lock().unwrap_or_else(|e| e.into_inner());
     let default = default_workspace(&app)?;
     load(&path).map(|config| config.view(&default)).map_err(|e| format!("模型配置读取失败：{e}"))
 }
@@ -641,7 +641,7 @@ pub fn save_ai_config(
 ) -> Result<AiConfigView, String> {
     let path = path(&app)?;
     let state = app.state::<AiConfigState>();
-    let _io = state.io.lock().unwrap();
+    let _io = state.io.lock().unwrap_or_else(|e| e.into_inner());
     // A damaged file must not stop the user from writing a new one over it.
     let current = load(&path).unwrap_or_default();
     let next = apply(&current, &Input { protocol: &protocol, base_url: &base_url, model: &model, api_key: api_key.as_deref(), clear_key, workspace: workspace.as_deref(), hide_tool_calls, open_computer_use })?;
@@ -694,7 +694,7 @@ pub fn save_ai_provider(
 ) -> Result<AiConfigView, String> {
     let path = path(&app)?;
     let state = app.state::<AiConfigState>();
-    let _io = state.io.lock().unwrap();
+    let _io = state.io.lock().unwrap_or_else(|e| e.into_inner());
     let mut config = load(&path).unwrap_or_default();
     config.normalize();
 
@@ -806,7 +806,7 @@ pub fn delete_ai_provider(
 ) -> Result<AiConfigView, String> {
     let path = path(&app)?;
     let state = app.state::<AiConfigState>();
-    let _io = state.io.lock().unwrap();
+    let _io = state.io.lock().unwrap_or_else(|e| e.into_inner());
     let mut config = load(&path).unwrap_or_default();
     config.normalize();
 
@@ -836,7 +836,7 @@ pub fn switch_ai_provider(
 ) -> Result<AiConfigView, String> {
     let path = path(&app)?;
     let state = app.state::<AiConfigState>();
-    let _io = state.io.lock().unwrap();
+    let _io = state.io.lock().unwrap_or_else(|e| e.into_inner());
     let mut config = load(&path).unwrap_or_default();
     config.normalize();
 
@@ -876,7 +876,7 @@ pub fn save_ai_preferences(
 ) -> Result<AiConfigView, String> {
     let path = path(&app)?;
     let state = app.state::<AiConfigState>();
-    let _io = state.io.lock().unwrap();
+    let _io = state.io.lock().unwrap_or_else(|e| e.into_inner());
     let mut config = load(&path).unwrap_or_default();
     config.normalize();
 
@@ -903,7 +903,7 @@ pub fn set_context_tokens(app: tauri::AppHandle, tokens: u32) -> Result<(), Stri
     let size = clean_context_tokens(tokens)?;
     let path = path(&app)?;
     let state = app.state::<AiConfigState>();
-    let _io = state.io.lock().unwrap();
+    let _io = state.io.lock().unwrap_or_else(|e| e.into_inner());
     let mut config = load(&path).unwrap_or_default();
     config.context_tokens = size;
     save(&path, &config).map_err(|e| format!("无法保存上下文大小：{e}"))
@@ -1011,7 +1011,7 @@ pub async fn fetch_ai_models(
         _ => {
             let path = path(&app)?;
             let state = app.state::<AiConfigState>();
-            let _io = state.io.lock().unwrap();
+            let _io = state.io.lock().unwrap_or_else(|e| e.into_inner());
             let cfg = load(&path).unwrap_or_default();
             if let Some(p) = cfg.providers.iter().find(|p| !p.api_key.is_empty() && (clean_base_url(&p.base_url).ok().as_deref() == Some(&base_url) || p.base_url.is_empty())) {
                 p.api_key.clone()

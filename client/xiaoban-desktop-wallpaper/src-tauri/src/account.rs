@@ -246,14 +246,14 @@ pub fn activated(app: &tauri::AppHandle) {
     tauri::async_runtime::spawn(async move {
         let state = app.state::<AccountState>();
         let Ok(_guard) = state.refreshing.try_lock() else { return };
-        let current = state.session.lock().unwrap().clone();
+        let current = state.session.lock().unwrap_or_else(|e| e.into_inner()).clone();
         let Some(current) = current else { return };
-        if !activation_due(Some(&current), *state.activation_retry_at.lock().unwrap(), Instant::now(), now_secs()) {
+        if !activation_due(Some(&current), *state.activation_retry_at.lock().unwrap_or_else(|e| e.into_inner()), Instant::now(), now_secs()) {
             return;
         }
         if let Err(failure) = refresh_session(&app, &current).await {
-            if same_session(&state.session.lock().unwrap(), &current) {
-                *state.activation_retry_at.lock().unwrap() = Some(Instant::now() + Duration::from_secs(300));
+            if same_session(&state.session.lock().unwrap_or_else(|e| e.into_inner()), &current) {
+                *state.activation_retry_at.lock().unwrap_or_else(|e| e.into_inner()) = Some(Instant::now() + Duration::from_secs(300));
             }
             eprintln!("账号每日续期失败：{}", failure.message);
         }
@@ -262,7 +262,7 @@ pub fn activated(app: &tauri::AppHandle) {
 
 pub async fn fresh_access_token(app: &tauri::AppHandle) -> Result<String, AccountFailure> {
     let state = app.state::<AccountState>();
-    let signed_in = || state.session.lock().unwrap().clone().ok_or_else(|| AccountFailure::from("请先登录小伴账号"));
+    let signed_in = || state.session.lock().unwrap_or_else(|e| e.into_inner()).clone().ok_or_else(|| AccountFailure::from("请先登录小伴账号"));
     let current = signed_in()?;
     if is_fresh(&current, now_secs()) {
         return Ok(current.access_token);
@@ -288,7 +288,7 @@ async fn refresh_session(app: &tauri::AppHandle, current: &AccountSession) -> Re
         Err(failure) => {
             if failure.code.as_deref() == Some("unauthorized") {
                 let cleared = {
-                    let mut slot = state.session.lock().unwrap();
+                    let mut slot = state.session.lock().unwrap_or_else(|e| e.into_inner());
                     if same_session(&slot, current) {
                         *slot = None;
                         let _ = clear_session(app);
@@ -305,7 +305,7 @@ async fn refresh_session(app: &tauri::AppHandle, current: &AccountSession) -> Re
     };
     let next = parse_refresh(current, &val, now_secs())?;
     {
-        let mut slot = state.session.lock().unwrap();
+        let mut slot = state.session.lock().unwrap_or_else(|e| e.into_inner());
         if !same_session(&slot, current) {
             return Err("账号已切换，请重试".into());
         }
@@ -315,7 +315,7 @@ async fn refresh_session(app: &tauri::AppHandle, current: &AccountSession) -> Re
         }
         let _ = app.emit("account-changed", Some(next.clone()));
     }
-    *state.activation_retry_at.lock().unwrap() = None;
+    *state.activation_retry_at.lock().unwrap_or_else(|e| e.into_inner()) = None;
     Ok(next.access_token)
 }
 
@@ -339,10 +339,10 @@ fn require_identifier(identifier: &str) -> Result<String, AccountFailure> {
 fn remember(app: &tauri::AppHandle, result: &LoginResult) -> Result<(), AccountFailure> {
     {
         let state = app.state::<AccountState>();
-        let mut slot = state.session.lock().unwrap();
+        let mut slot = state.session.lock().unwrap_or_else(|e| e.into_inner());
         save_session(app, &result.session)?;
         *slot = Some(result.session.clone());
-        *state.activation_retry_at.lock().unwrap() = None;
+        *state.activation_retry_at.lock().unwrap_or_else(|e| e.into_inner()) = None;
     }
     crate::ai_catalogue::account_changed(app);
     let _ = app.emit("account-changed", Some(result.session.clone()));
@@ -458,17 +458,17 @@ pub async fn get_signup_methods() -> SignupMethods {
 
 #[tauri::command]
 pub fn get_account_session(app: tauri::AppHandle) -> Option<AccountSession> {
-    app.state::<AccountState>().session.lock().unwrap().clone()
+    app.state::<AccountState>().session.lock().unwrap_or_else(|e| e.into_inner()).clone()
 }
 
 #[tauri::command]
 pub async fn logout_account(app: tauri::AppHandle) -> Result<(), String> {
     let session = {
         let state = app.state::<AccountState>();
-        let mut slot = state.session.lock().unwrap();
+        let mut slot = state.session.lock().unwrap_or_else(|e| e.into_inner());
         let session = slot.take();
         let _ = clear_session(&app);
-        *state.activation_retry_at.lock().unwrap() = None;
+        *state.activation_retry_at.lock().unwrap_or_else(|e| e.into_inner()) = None;
         session
     };
     crate::ai_catalogue::account_changed(&app);
@@ -581,10 +581,10 @@ mod tests {
         let guard = state.refreshing.try_lock().unwrap();
         assert!(state.refreshing.try_lock().is_err());
         let next = parse_refresh(&old, &json!({"access_token":"a2", "refresh_token":"r2", "expires_in":2592000}), 2000).unwrap();
-        *state.session.lock().unwrap() = Some(next);
+        *state.session.lock().unwrap_or_else(|e| e.into_inner()) = Some(next);
         drop(guard);
         let _next_activation = state.refreshing.try_lock().unwrap();
-        assert!(!daily_refresh_due(state.session.lock().unwrap().as_ref().unwrap(), 2001));
+        assert!(!daily_refresh_due(state.session.lock().unwrap_or_else(|e| e.into_inner()).as_ref().unwrap(), 2001));
     }
 
     #[test]

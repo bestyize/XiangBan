@@ -39,7 +39,7 @@ pub fn media_label(label: &str) -> bool {
 }
 
 pub fn composing(app: &tauri::AppHandle) -> bool {
-    cfg!(windows) && app.state::<ContentState>().label.lock().unwrap().as_ref()
+    cfg!(windows) && app.state::<ContentState>().label.lock().unwrap_or_else(|e| e.into_inner()).as_ref()
         .is_some_and(|label| app.get_webview_window(label).is_some())
 }
 
@@ -84,7 +84,7 @@ fn open(
     let state = app.state::<ContentState>();
     let label = if preview {
         "media-preview"
-    } else if state.label.lock().unwrap().as_deref() == Some("media-a") {
+    } else if state.label.lock().unwrap_or_else(|e| e.into_inner()).as_deref() == Some("media-a") {
         "media-b"
     } else {
         "media-a"
@@ -104,7 +104,7 @@ fn open(
         .lock()
         .unwrap()
         .remove(label);
-    state.reports.lock().unwrap().remove(label);
+    state.reports.lock().unwrap_or_else(|e| e.into_inner()).remove(label);
     let monitor = app
         .primary_monitor()
         .map_err(|e| e.to_string())?
@@ -239,8 +239,8 @@ pub fn restore(app: &tauri::AppHandle) -> Result<bool, String> {
     }
     let options = library::validate_options(&item, config.wallpaper_options)?;
     let label = open(app, &item, &options, false)?;
-    *app.state::<ContentState>().active.lock().unwrap() = Some(item);
-    *app.state::<ContentState>().label.lock().unwrap() = Some(label);
+    *app.state::<ContentState>().active.lock().unwrap_or_else(|e| e.into_inner()) = Some(item);
+    *app.state::<ContentState>().label.lock().unwrap_or_else(|e| e.into_inner()) = Some(label);
     Ok(true)
 }
 
@@ -281,8 +281,8 @@ pub fn close_active(app: &tauri::AppHandle) {
             let _ = window.destroy();
         }
     }
-    *app.state::<ContentState>().active.lock().unwrap() = None;
-    *app.state::<ContentState>().label.lock().unwrap() = None;
+    *app.state::<ContentState>().active.lock().unwrap_or_else(|e| e.into_inner()) = None;
+    *app.state::<ContentState>().label.lock().unwrap_or_else(|e| e.into_inner()) = None;
 }
 
 #[tauri::command]
@@ -319,7 +319,7 @@ pub async fn import_wallpaper_catalog(
     let handle = app.clone();
     tauri::async_runtime::spawn_blocking(move || {
         let state = handle.state::<ContentState>();
-        let _io = state.io.lock().unwrap();
+        let _io = state.io.lock().unwrap_or_else(|e| e.into_inner());
         let root = root(&handle)?;
         let mut previous = library::read_catalog(&root);
         for item in catalog.items {
@@ -346,7 +346,7 @@ pub async fn delete_local_wallpaper(
     let hash = {
         let root_path = root(&app)?;
         let state = app.state::<ContentState>();
-        let _io = state.io.lock().unwrap();
+        let _io = state.io.lock().unwrap_or_else(|e| e.into_inner());
         crate::local_media::delete_local_wallpaper(&root_path, &id)?
     };
 
@@ -372,7 +372,7 @@ pub async fn subscribe_wallpapers(app: tauri::AppHandle, url: String) -> Result<
     let mut config = settings(&app);
     config.catalog_url = url;
     crate::persist(&app, &config)?;
-    *app.state::<DesktopState>().settings.lock().unwrap() = config;
+    *app.state::<DesktopState>().settings.lock().unwrap_or_else(|e| e.into_inner()) = config;
     crate::publish(&app);
     Ok(result)
 }
@@ -397,7 +397,7 @@ pub async fn apply_wallpaper(
         let mut config = previous.clone();
         config.wallpaper_id = id;
         crate::persist(&app, &config)?;
-        *app.state::<DesktopState>().settings.lock().unwrap() = config;
+        *app.state::<DesktopState>().settings.lock().unwrap_or_else(|e| e.into_inner()) = config;
         close_active(&app);
         crate::publish(&app);
         return Ok(json!(settings(&app)));
@@ -413,7 +413,7 @@ pub async fn apply_wallpaper(
     let prepared = item.clone();
     tauri::async_runtime::spawn_blocking(move || {
         let state = handle.state::<ContentState>();
-        let _io = state.io.lock().unwrap();
+        let _io = state.io.lock().unwrap_or_else(|e| e.into_inner());
         library::prepare(&handle, &directory, &prepared)
     })
     .await
@@ -444,7 +444,7 @@ pub async fn apply_wallpaper(
     config.wallpaper_id = id;
     config.wallpaper_options = options;
     let active_path = root(&app)?.join("active.json");
-    let previous = app.state::<ContentState>().active.lock().unwrap().clone();
+    let previous = app.state::<ContentState>().active.lock().unwrap_or_else(|e| e.into_inner()).clone();
     if let Err(error) = library::save_json(&active_path, &item) {
         if let Some(window) = app.get_webview_window(&label) {
             let _ = window.destroy();
@@ -468,8 +468,8 @@ pub async fn apply_wallpaper(
         .lock()
         .unwrap()
         .replace(label.clone());
-    *app.state::<ContentState>().active.lock().unwrap() = Some(item);
-    *app.state::<DesktopState>().settings.lock().unwrap() = config;
+    *app.state::<ContentState>().active.lock().unwrap_or_else(|e| e.into_inner()) = Some(item);
+    *app.state::<DesktopState>().settings.lock().unwrap_or_else(|e| e.into_inner()) = config;
     if let Some(old) = old.filter(|old| old != &label) {
         if let Some(window) = app.get_webview_window(&old) {
             let _ = window.destroy();
@@ -507,7 +507,7 @@ fn set_update_source(app: tauri::AppHandle, url: String) -> Result<crate::Settin
     let mut config = settings(&app);
     config.update_url = url;
     crate::persist(&app, &config)?;
-    *app.state::<DesktopState>().settings.lock().unwrap() = config;
+    *app.state::<DesktopState>().settings.lock().unwrap_or_else(|e| e.into_inner()) = config;
     crate::publish(&app);
     Ok(settings(&app))
 }
@@ -603,8 +603,8 @@ mod tests {
 }
 
 pub(crate) fn smoke_render_report(app: &tauri::AppHandle, id: &str) -> Result<Value, String> {
-    let label = app.state::<ContentState>().label.lock().unwrap().clone().ok_or("没有背景窗口")?;
-    let report = app.state::<ContentState>().reports.lock().unwrap().get(&label).cloned().ok_or("没有渲染报告")?;
+    let label = app.state::<ContentState>().label.lock().unwrap_or_else(|e| e.into_inner()).clone().ok_or("没有背景窗口")?;
+    let report = app.state::<ContentState>().reports.lock().unwrap_or_else(|e| e.into_inner()).get(&label).cloned().ok_or("没有渲染报告")?;
     if report.get("privilegedIpcBlocked") != Some(&Value::Bool(true)) { return Err("壁纸窗口没有隔离桌面接口".into()); }
     #[allow(unused_mut)]
     let mut case = json!({"id":id,"report":report});
@@ -675,7 +675,7 @@ pub async fn smoke(app: &tauri::AppHandle) -> Result<Value, String> {
     if crate::local_media::read(&root(app)?)?.items.len() != 2 { return Err("本地导入重复保存了元数据".into()); }
     close_active(app);
     if !restore(app)? { return Err("无法恢复本地壁纸".into()); }
-    let restored_label = app.state::<ContentState>().label.lock().unwrap().clone().ok_or("没有恢复窗口")?;
+    let restored_label = app.state::<ContentState>().label.lock().unwrap_or_else(|e| e.into_inner()).clone().ok_or("没有恢复窗口")?;
     let handle = app.clone();
     tauri::async_runtime::spawn_blocking(move || wait(&handle, &restored_label)).await.map_err(|e| e.to_string())??;
     smoke_render_report(app, &settings(app).wallpaper_id)?;

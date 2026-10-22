@@ -958,14 +958,14 @@ pub(crate) mod test_http {
                         .nth(1)
                         .unwrap_or("/")
                         .to_string();
-                    log.lock().unwrap().push(path.clone());
+                    log.lock().unwrap_or_else(|e| e.into_inner()).push(path.clone());
                     let route = path.split('?').next().unwrap_or("/");
                     let sequence_body;
                     let (status, kind, body, length) = match routes.get(route) {
                         Some(Reply::Body(s, k, b)) => (*s, *k, b, true),
                         Some(Reply::Streamed(s, k, b)) => (*s, *k, b, false),
                         Some(Reply::Sequence(replies)) => {
-                            let mut replies = replies.lock().unwrap();
+                            let mut replies = replies.lock().unwrap_or_else(|e| e.into_inner());
                             let (status, body) = if replies.len() > 1 {
                                 replies.pop_front().unwrap()
                             } else {
@@ -1011,7 +1011,7 @@ mod tests {
         for status in [502, 503, 504] {
             let server = metadata_sequence(&[status, 200]);
             assert_eq!(metadata_get(&server).unwrap().as_deref(), Some("{\"ok\":true}"));
-            assert_eq!(server.hits.lock().unwrap().len(), 2);
+            assert_eq!(server.hits.lock().unwrap_or_else(|e| e.into_inner()).len(), 2);
         }
     }
 
@@ -1020,21 +1020,21 @@ mod tests {
         let server = metadata_sequence(&[502]);
         let error = metadata_get(&server).unwrap_err();
         assert!(error.contains("服务请求失败") && error.contains("502"), "{error}");
-        assert_eq!(server.hits.lock().unwrap().len(), 3);
+        assert_eq!(server.hits.lock().unwrap_or_else(|e| e.into_inner()).len(), 3);
     }
 
     #[test]
     fn metadata_does_not_retry_client_errors_or_oversized_bodies() {
         let missing = metadata_sequence(&[404, 200]);
         assert!(metadata_get(&missing).unwrap_err().contains("404"));
-        assert_eq!(missing.hits.lock().unwrap().len(), 1);
+        assert_eq!(missing.hits.lock().unwrap_or_else(|e| e.into_inner()).len(), 1);
         for reply in [
             Reply::Body(200, "application/json", vec![b' '; MAX_JSON + 1]),
             Reply::Streamed(200, "application/json", vec![b' '; MAX_JSON + 1]),
         ] {
             let server = serve(vec![("/json", reply)]);
             assert!(metadata_get(&server).unwrap_err().contains("超过 1 MB"));
-            assert_eq!(server.hits.lock().unwrap().len(), 1);
+            assert_eq!(server.hits.lock().unwrap_or_else(|e| e.into_inner()).len(), 1);
         }
     }
 
@@ -1047,7 +1047,7 @@ mod tests {
             })).collect();
             for handle in handles { handle.join().unwrap(); }
         });
-        for server in servers { assert_eq!(server.hits.lock().unwrap().len(), 2); }
+        for server in servers { assert_eq!(server.hits.lock().unwrap_or_else(|e| e.into_inner()).len(), 2); }
     }
 
     #[test]
@@ -1056,7 +1056,7 @@ mod tests {
         assert_eq!(metadata_get(&empty).unwrap(), None);
         let invalid = serve(vec![("/json", Reply::Body(200, "application/json", vec![255]))]);
         assert!(metadata_get(&invalid).unwrap_err().contains("UTF-8"));
-        assert_eq!(invalid.hits.lock().unwrap().len(), 1);
+        assert_eq!(invalid.hits.lock().unwrap_or_else(|e| e.into_inner()).len(), 1);
     }
 
     #[test]
@@ -1198,9 +1198,9 @@ mod tests {
         assert_eq!(error, CANCELLED);
         assert!(leftovers(&root).is_empty(), "{:?}", leftovers(&root));
         // Set before the request: nothing is fetched at all.
-        let hits = server.hits.lock().unwrap().len();
+        let hits = server.hits.lock().unwrap_or_else(|e| e.into_inner()).len();
         assert_eq!(download_source_cancellable(&root, &url, "image", &cancel, |_, _| {}).unwrap_err(), CANCELLED);
-        assert_eq!(server.hits.lock().unwrap().len(), hits);
+        assert_eq!(server.hits.lock().unwrap_or_else(|e| e.into_inner()).len(), hits);
         // Without cancellation the same file still downloads.
         download_cancellable(&root, &resource, &NEVER, |_| {}).unwrap();
         assert!(cached(&root, &resource));

@@ -16,7 +16,7 @@ fn owns(session: &Session, label: &str) -> bool { session.frames.contains_key(la
 #[tauri::command]
 pub fn capture_frame(window: WebviewWindow) -> Result<Frame, String> {
     let state = window.state::<CaptureState>();
-    let result = state.0.lock().unwrap().as_ref()
+    let result = state.0.lock().unwrap_or_else(|e| e.into_inner()).as_ref()
         .and_then(|session| session.frames.get(window.label()).cloned()).ok_or("截图已结束".into());
     result
 }
@@ -24,7 +24,7 @@ pub fn capture_frame(window: WebviewWindow) -> Result<Frame, String> {
 pub fn capture_show(window: WebviewWindow) -> Result<(), String> {
     {
         let state = window.state::<CaptureState>();
-        let mut guard = state.0.lock().unwrap();
+        let mut guard = state.0.lock().unwrap_or_else(|e| e.into_inner());
         let session = guard.as_mut().filter(|s| owns(s, window.label())).ok_or("截图已结束")?;
         session.ready.insert(window.label().to_string());
     }
@@ -34,7 +34,7 @@ pub fn capture_show(window: WebviewWindow) -> Result<(), String> {
 pub fn capture_finish(window: WebviewWindow, image: Option<String>, error: Option<String>) -> Result<(), String> {
     if let Some(ref image) = image { crate::assistant_capture::validate_data_url(image)?; }
     let state = window.state::<CaptureState>();
-    let mut guard = state.0.lock().unwrap();
+    let mut guard = state.0.lock().unwrap_or_else(|e| e.into_inner());
     if !guard.as_ref().is_some_and(|s| owns(s, window.label())) { return Err("截图已结束".into()); }
     let session = guard.take().unwrap();
     let outcome = if let Some(error) = error { Err(error.chars().take(300).collect()) } else { Ok(image) };
@@ -43,7 +43,7 @@ pub fn capture_finish(window: WebviewWindow, image: Option<String>, error: Optio
 }
 fn closed(app: &tauri::AppHandle, label: &str) {
     let state = app.state::<CaptureState>();
-    let mut guard = state.0.lock().unwrap();
+    let mut guard = state.0.lock().unwrap_or_else(|e| e.into_inner());
     if guard.as_ref().is_some_and(|s| owns(s, label)) {
         if let Some(session) = guard.take() { let _ = session.sender.send(Ok(None)); }
     }
@@ -57,10 +57,10 @@ pub fn edit(app: &tauri::AppHandle, frames: Vec<Frame>) -> Outcome {
     let labels: Vec<_> = entries.keys().cloned().collect();
     let geometries: Vec<_> = entries.iter().map(|(l,f)|(l.clone(), f.x, f.y, f.width, f.height)).collect();
     let (sender, receiver) = mpsc::channel();
-    *app.state::<CaptureState>().0.lock().unwrap() = Some(Session { frames: entries, ready: HashSet::new(), sender });
+    *app.state::<CaptureState>().0.lock().unwrap_or_else(|e| e.into_inner()) = Some(Session { frames: entries, ready: HashSet::new(), sender });
     let result = (|| {
         for (label,x,y,width,height) in geometries {
-            if app.state::<CaptureState>().0.lock().unwrap().is_none() { break; }
+            if app.state::<CaptureState>().0.lock().unwrap_or_else(|e| e.into_inner()).is_none() { break; }
             let builder = WebviewWindowBuilder::new(app, &label, WebviewUrl::App("index.html?scene=capture".into()))
                 .title("小伴 · 截图").decorations(false).shadow(false).resizable(false)
                 .skip_taskbar(true).always_on_top(true).visible(false).focused(false)
@@ -88,12 +88,12 @@ pub fn edit(app: &tauri::AppHandle, frames: Vec<Frame>) -> Outcome {
                 Err(mpsc::RecvTimeoutError::Disconnected) => break Ok(None),
                 Err(mpsc::RecvTimeoutError::Timeout) => {}
             }
-            let loading = app.state::<CaptureState>().0.lock().unwrap().as_ref().is_some_and(|s| s.ready.len() < s.frames.len());
+            let loading = app.state::<CaptureState>().0.lock().unwrap_or_else(|e| e.into_inner()).as_ref().is_some_and(|s| s.ready.len() < s.frames.len());
             if loading && start.elapsed() > Duration::from_secs(25) { break Err("截图窗口加载超时，请重试。".into()); }
             if start.elapsed() > Duration::from_secs(600) { break Err("截图已超时，请重新截取。".into()); }
         }
     })();
-    app.state::<CaptureState>().0.lock().unwrap().take();
+    app.state::<CaptureState>().0.lock().unwrap_or_else(|e| e.into_inner()).take();
     for label in labels { if let Some(window) = app.get_webview_window(&label) { let _ = window.destroy(); } }
     result
 }

@@ -16,8 +16,8 @@ async fn settle(app: &tauri::AppHandle, expect_ready: bool) -> Result<(), String
     tauri::async_runtime::spawn_blocking(move || {
         let deadline = Instant::now() + Duration::from_secs(25);
         while Instant::now() < deadline {
-            let ready = handle.state::<DesktopState>().ready_scenes.lock().unwrap().contains(LABEL);
-            if ready && handle.state::<crate::content::ContentState>().reports.lock().unwrap().contains_key(LABEL) { return Ok(()); }
+            let ready = handle.state::<DesktopState>().ready_scenes.lock().unwrap_or_else(|e| e.into_inner()).contains(LABEL);
+            if ready && handle.state::<crate::content::ContentState>().reports.lock().unwrap_or_else(|e| e.into_inner()).contains_key(LABEL) { return Ok(()); }
             std::thread::sleep(Duration::from_millis(100));
         }
         Err("桌面特效窗口没有在 25 秒内完成加载".to_string())
@@ -25,7 +25,7 @@ async fn settle(app: &tauri::AppHandle, expect_ready: bool) -> Result<(), String
 }
 
 fn report_of(app: &tauri::AppHandle, id: &str, expected: &EffectsChoice) -> Result<Value, String> {
-    let mut report = app.state::<crate::content::ContentState>().reports.lock().unwrap().get(LABEL).cloned().ok_or("特效验证没有收到场景报告")?;
+    let mut report = app.state::<crate::content::ContentState>().reports.lock().unwrap_or_else(|e| e.into_inner()).get(LABEL).cloned().ok_or("特效验证没有收到场景报告")?;
     let effects = &report["effects"];
     let current = settings(app);
     let params = serde_json::to_value(expected.params_of(id)).map_err(|e| e.to_string())?;
@@ -82,9 +82,9 @@ pub async fn run(app: &tauri::AppHandle) -> Result<Value, String> {
         #[cfg(windows)]
         {
             state["native"] = crate::windows::diagnostics(app);
-            let active = app.state::<crate::content::ContentState>().label.lock().unwrap().clone();
+            let active = app.state::<crate::content::ContentState>().label.lock().unwrap_or_else(|e| e.into_inner()).clone();
             if let Some(label) = active {
-                state["composition"] = app.state::<crate::content::ContentState>().reports.lock().unwrap()
+                state["composition"] = app.state::<crate::content::ContentState>().reports.lock().unwrap_or_else(|e| e.into_inner())
                     .get(&label).cloned().unwrap_or(Value::Null);
             }
         }
