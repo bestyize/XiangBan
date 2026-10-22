@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import {computed,onActivated,onDeactivated,onMounted,onBeforeUnmount,ref,watch} from 'vue';
-import {Check,ChevronLeft,ChevronRight,Heart,MapPin,MoreHorizontal,Plus,Sunrise,Leaf,ArrowUp,ArrowDown,Volume2,VolumeX,Trash2,Pencil,List} from 'lucide-vue-next';
+import {Check,ChevronLeft,ChevronRight,Heart,MapPin,Settings2,Plus,Sunrise,Leaf,ArrowUp,ArrowDown,Volume2,VolumeX,Trash2,Pencil,List} from 'lucide-vue-next';
 import {desktop,invoke} from '../bridge.ts';
 import {baseSize,calendarDays,type DesktopWidget,type WidgetPayload,type WidgetContent,type LivingData,type NoteData,type ReminderItem,type TodoItem} from './model.ts';
 import {dateKey,lunarDate} from './calendar.ts';
@@ -129,7 +129,9 @@ async function movePending(){if(moving)return;moving=true;try{while(pending){con
 function startDrag(e:PointerEvent){if(e.button!==0||props.preview||!props.payload)return;if((e.target as Element).closest('button,input,textarea,select,form,[data-no-drag]'))return;suppressClick=false;drag={x:e.screenX,y:e.screenY,grabX:e.clientX/Math.max(1,innerWidth),grabY:e.clientY/Math.max(1,innerHeight),moved:false};(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);}
 function move(e:Pick<PointerEvent,'screenX'|'screenY'>,commit=false){if(!drag)return;if(Math.hypot(e.screenX-drag.x,e.screenY-drag.y)>5)drag.moved=true;if(drag.moved){suppressClick=true;pending={grabX:drag.grabX,grabY:drag.grabY,commit};void movePending();}if(commit){drag=null;clickTimer=setTimeout(()=>suppressClick=false,0);}}
 function customDrag(event:MessageEvent){
- if(props.preview||!props.payload||props.editing||!customFrame.value?.contentWindow||event.source!==customFrame.value.contentWindow||!isCustomDragMessage(event.data))return;
+ if(props.preview||!props.payload||!customFrame.value?.contentWindow||event.source!==customFrame.value.contentWindow)return;
+ if(event.data?.type==='xiaoban-widget-settings'){settings();return;}
+ if(props.editing||!isCustomDragMessage(event.data))return;
  const data=event.data;
  if(data.phase==='start'){
   const rect=customFrame.value.getBoundingClientRect();
@@ -138,7 +140,7 @@ function customDrag(event:MessageEvent){
 }
 onMounted(()=>window.addEventListener('message',customDrag));
 onBeforeUnmount(()=>window.removeEventListener('message',customDrag));
-function capture(e:MouseEvent){if(suppressClick||props.editing){e.stopImmediatePropagation();e.preventDefault();}}
+function capture(e:MouseEvent){if((e.target as Element).closest('.widget-settings-button'))return;if(suppressClick||props.editing){e.stopImmediatePropagation();e.preventDefault();}}
 let clockTimer:ReturnType<typeof setTimeout>|undefined,networkTimer:ReturnType<typeof setInterval>|undefined,active=true;
 function scheduleClock(){if(!active||clockTimer)return;clockTimer=setTimeout(()=>{clockTimer=undefined;now.value=new Date();scheduleClock();},60000-Date.now()%60000+20);}
 function startTimers(){scheduleClock();if(!props.preview&&(props.widget.kind==='weather'||props.widget.kind==='stocks')&&!networkTimer)networkTimer=setInterval(visible,props.widget.kind==='stocks'?60000:1800000);}
@@ -150,34 +152,34 @@ onDeactivated(()=>{active=false;stopTimers();});
 onBeforeUnmount(()=>{resizer.finish(true);document.removeEventListener('keydown',resizeKey);alive=false;stopTimers();clearTimeout(hitTimer);clearTimeout(clickTimer);document.removeEventListener('visibilitychange',visible);void audio?.close();});
 </script>
 <template>
-<article class="xb-widget" :class="[widget.kind,{editing,resizing,falling:!up}]" :style="{width:`${size.width*surfaceScale}px`,height:`${size.height*surfaceScale}px`,'--widget-scale':widget.kind==='custom'?1:widget.scale}" @pointerdown="startDrag" @pointermove="move($event)" @pointerup="move($event,true)" @pointercancel="move($event,true)" @click.capture="capture">
+<article class="xb-widget" :class="[widget.kind,{editing,resizing,falling:!up}]" :style="{width:`${size.width*surfaceScale}px`,height:`${size.height*surfaceScale}px`,'--widget-scale':widget.kind==='custom'?1:widget.scale}" @pointerdown="startDrag" @pointermove="move($event)" @pointerup="move($event,true)" @pointercancel="move($event,true)" @click.capture="capture" @contextmenu.prevent.stop="settings">
  <template v-if="widget.kind==='clock'">
   <div class="clock-art" aria-hidden="true"/><div class="clock-greeting"><Sunrise :size="31"/><div><span>{{ greeting }}</span><small>新的一天，也要好好生活</small></div></div>
-  <div class="clock-time">{{ clock }}</div><div class="clock-date">{{ now.getMonth()+1 }}月{{ now.getDate() }}日 <span>{{ now.toLocaleDateString('zh-CN',{weekday:'long'}) }}</span></div><p class="clock-lunar">{{ lunarLabel }}</p><button class="more hover-more" aria-label="时钟设置" @click="settings"><MoreHorizontal/></button>
+  <div class="clock-time">{{ clock }}</div><div class="clock-date">{{ now.getMonth()+1 }}月{{ now.getDate() }}日 <span>{{ now.toLocaleDateString('zh-CN',{weekday:'long'}) }}</span></div><p class="clock-lunar">{{ lunarLabel }}</p>
  </template>
  <template v-else-if="widget.kind==='weather'">
-  <header><span class="city-label"><MapPin :size="21" fill="currentColor"/>{{ demo?'杭州市':widget.city?.name||'选择城市' }}</span><button class="more" aria-label="天气设置" @click="settings"><MoreHorizontal/></button></header>
+  <header><span class="city-label"><MapPin :size="21" fill="currentColor"/>{{ demo?'杭州市':widget.city?.name||'选择城市' }}</span></header>
   <div class="weather-art" :class="{'is-rain':weatherText.includes('雨'),'is-sun':weatherText==='晴'}" aria-hidden="true"><i class="weather-sun"/><i class="weather-cloud"/></div>
   <div class="weather-temperature">{{ temperature }}<sup>°C</sup></div><div class="weather-description">{{ weatherText }} <span class="air-quality" :title="airTitle">{{ airLabel }}<small v-if="!demo&&air">US AQI {{ Math.round(air.aqi) }}</small><Leaf v-if="demo||air&&air.aqi<=50" :size="17" fill="#9bc378"/></span></div>
   <div v-if="highLow" class="weather-range"><ArrowUp :size="18"/>{{ highLow.high }}° <ArrowDown :size="18"/>{{ highLow.low }}°</div>
   <button v-if="!preview&&!widget.city" class="inline-link weather-configure" @click="settings">设置天气城市</button><small v-if="!preview&&weather" class="data-source">{{ weather.source }} · {{ new Date(weather.updatedAt*1000).toLocaleTimeString('zh-CN',{hour:'2-digit',minute:'2-digit'}) }}</small><small v-if="weatherBusy" class="data-source">正在更新…</small>
  </template>
  <template v-else-if="widget.kind==='notes'">
-  <header><h2>待办事项</h2><div class="widget-header-actions"><button class="more" aria-label="待办设置" @click="settings"><MoreHorizontal :size="18"/></button><button class="add-button" :disabled="locked||saving" aria-label="添加待办" @click="openItem()"><Plus/></button></div></header>
+  <header><h2>待办事项</h2><div class="widget-header-actions"><button class="add-button" :disabled="locked||saving" aria-label="添加待办" @click="openItem()"><Plus/></button></div></header>
   <div class="todo-list"><div v-for="item in note.items" :key="item.id" class="todo-row" :class="{done:itemDone(item,now)}"><button class="check-circle" :aria-pressed="itemDone(item,now)" :aria-label="`${itemDone(item,now)?'恢复':'完成'}${item.text}`" :disabled="locked||saving" @click="toggleTask(item.id)"><Check v-if="itemDone(item,now)" :size="19"/></button><button class="item-text" :disabled="locked||saving" aria-label="编辑待办" @click="openItem(item)">{{ item.text }}</button><small v-if="item.time||item.date">{{ taskWhen(item) }}</small><button class="row-remove" :disabled="locked||saving" aria-label="删除待办" @click="removeTask(item.id)"><Trash2 :size="13"/></button></div><p v-if="!note.items.length" class="empty-state">把今天想做的事，记在这里。<button @click="openItem()">添加第一件小事</button></p></div>
  </template>
  <template v-else-if="widget.kind==='reminders'">
-  <header><h2>今日日程</h2><div class="widget-header-actions"><button class="more" aria-label="全部日程设置" @click="settings"><MoreHorizontal :size="18"/></button><button class="agenda-date" aria-label="添加日程" :disabled="locked" @click="openItem()">{{ now.getMonth()+1 }}月{{ now.getDate() }}日 周{{ ['日','一','二','三','四','五','六'][now.getDay()] }} <Plus :size="14"/></button></div></header>
+  <header><h2>今日日程</h2><div class="widget-header-actions"><button class="agenda-date" aria-label="添加日程" :disabled="locked" @click="openItem()">{{ now.getMonth()+1 }}月{{ now.getDate() }}日 周{{ ['日','一','二','三','四','五','六'][now.getDay()] }} <Plus :size="14"/></button></div></header>
   <div class="agenda-list"><div v-for="event in events" :key="event.id" class="agenda-row" :class="{current:isCurrent(event),done:itemDone(event,now)}"><button class="agenda-check" :class="{on:itemDone(event,now)}" :aria-label="`${itemDone(event,now)?'恢复':'完成'}${event.title}`" :disabled="locked||saving" @click="toggleEvent(event)"><Check v-if="itemDone(event,now)" :size="12"/></button><div><button class="event-title" :disabled="locked||saving" aria-label="编辑日程" @click="openItem(event)">{{ event.title }}</button><p>{{ event.at.slice(11) }}<template v-if="event.end"> — {{ event.end }}</template></p><p v-if="event.location" class="location"><MapPin :size="17" fill="currentColor"/>{{ event.location }}</p></div><span v-if="isCurrent(event)" class="event-status">进行中</span><button class="row-remove" :disabled="locked||saving" aria-label="删除日程" @click="removeEvent(event.id)"><Trash2 :size="14"/></button></div><p v-if="!events.length" class="empty-state">今天的时间，留给喜欢的事。<button @click="openItem()">安排一个日程</button></p></div>
  </template>
  <template v-else-if="widget.kind==='stocks'">
-  <header><span><strong>{{ displayQuote?.name||'股票行情' }}</strong><small class="stock-code">{{ living.symbol.startsWith('116.')?living.symbol.split('.')[1]+'.HK':living.symbol.split('.')[1] }}</small></span><div class="widget-header-actions"><button class="stock-list-open" aria-label="查看自选列表" @click="listOpen=!listOpen;loadWatchlist()">自选 {{ watchlist.length }}</button><button class="more" aria-label="股票设置" @click="settings"><MoreHorizontal/></button></div></header>
+  <header><span><strong>{{ displayQuote?.name||'股票行情' }}</strong><small class="stock-code">{{ living.symbol.startsWith('116.')?living.symbol.split('.')[1]+'.HK':living.symbol.split('.')[1] }}</small></span><div class="widget-header-actions"><button class="stock-list-open" aria-label="查看自选列表" @click="listOpen=!listOpen;loadWatchlist()">自选 {{ watchlist.length }}</button></div></header>
   <div class="stock-price">{{ displayQuote?displayQuote.price.toFixed(3):'—' }}</div><div class="stock-change">{{ displayQuote?(up?'+':'')+displayQuote.change.toFixed(3):'等待行情' }}<span v-if="displayQuote">{{ up?'+':'' }}{{ displayQuote.percent.toFixed(2) }}%</span></div>
   <svg v-if="chart" class="stock-chart" viewBox="0 0 340 140" preserveAspectRatio="none" role="img" aria-label="价格走势"><defs><linearGradient :id="`chart-${widget.id}`" x2="0" y2="1"><stop stop-color="currentColor" stop-opacity=".32"/><stop offset="1" stop-color="currentColor" stop-opacity="0"/></linearGradient></defs><polygon :points="`0,140 ${chart} 340,140`" :fill="`url(#chart-${widget.id})`"/><polyline :points="chart" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/><circle :cx="chart.split(' ').at(-1)?.split(',')[0]" :cy="chart.split(' ').at(-1)?.split(',')[1]" r="4" fill="currentColor" stroke="#ffe8e2" stroke-width="1.5"/></svg><div v-else class="stock-chart no-chart">{{ quoteBusy?'正在读取行情…':displayQuote?'暂未形成完整走势':'联网后显示真实走势' }}</div>
   <nav class="stock-periods" aria-label="行情周期"><button v-for="p in periods" :key="p.value" :class="{on:period===p.value}" :aria-pressed="period===p.value" :disabled="locked||quoteBusy" @click="period=p.value">{{ p.label }}</button></nav><small v-if="!preview&&quote" class="stock-source">{{ quote.updatedAt }} · {{ quote.source }}</small>
  </template>
  <template v-else-if="widget.kind==='woodfish'">
-  <header><h2 class="fish-title"><i/>电子木鱼</h2><button class="more" aria-label="木鱼设置" @click="settings"><MoreHorizontal/></button></header>
+  <header><h2 class="fish-title"><i/>电子木鱼</h2></header>
   <button class="fish-hit" :class="{striking}" :disabled="locked" aria-label="敲木鱼" @click="tap"><div class="fish-photo-body"/><div class="fish-photo-mallet"/></button><div class="merit-bubble" :class="{show:striking}" :key="pulse">功德 <b>+1</b></div>
   <div class="fish-footer"><div><strong>{{ count }}<small>次</small></strong><p>心平气和 · 万事顺遂</p></div><button class="fish-knock" :disabled="locked" @click="tap">敲一敲</button></div><button class="sound-toggle" :aria-label="sound?'关闭木鱼声音':'打开木鱼声音'" :disabled="saving||locked" @click="toggleSound"><Volume2 v-if="sound" :size="16"/><VolumeX v-else :size="16"/></button>
  </template>
@@ -186,12 +188,12 @@ onBeforeUnmount(()=>{resizer.finish(true);document.removeEventListener('keydown'
   <div class="calendar-week"><span v-for="d in ['日','一','二','三','四','五','六']" :key="d">{{ d }}</span></div><div class="calendar-grid"><button v-for="d in days" :key="dateKey(d.date)" :class="{muted:!d.current,today:dateKey(d.date)===dateKey(now),selected:selectedDay===dateKey(d.date)}" :aria-label="dateKey(d.date)" :aria-pressed="selectedDay===dateKey(d.date)" @click="selectedDay=dateKey(d.date)">{{ d.day }}</button></div>
  </template>
  <template v-else-if="widget.kind==='countdown'">
-  <div class="lake-art" aria-hidden="true"/><header><h2 class="anniversary-title"><Heart :size="23" fill="#ef796b" stroke="#ec6c5c"/>{{ countdown.title }}</h2><button class="more hover-more" aria-label="纪念日设置" @click="settings"><MoreHorizontal/></button></header><p class="countdown-date">{{ remaining.date.replace('-','年').replace('-','月') }}日 {{ new Date(remaining.date+'T12:00').toLocaleDateString('zh-CN',{weekday:'long'}) }}</p><div class="countdown-value"><strong>{{ remaining.days }}</strong><span>{{ remaining.label==='还有'?'天后':remaining.label==='已经'?'天了':remaining.label==='就是今天'?'就是今天':'天前' }}</span></div><p class="anniversary-quote"><span>“</span> 和你在一起的每一天，<br>　 都是值得期待的日子。 <span>”</span></p>
+  <div class="lake-art" aria-hidden="true"/><header><h2 class="anniversary-title"><Heart :size="23" fill="#ef796b" stroke="#ec6c5c"/>{{ countdown.title }}</h2></header><p class="countdown-date">{{ remaining.date.replace('-','年').replace('-','月') }}日 {{ new Date(remaining.date+'T12:00').toLocaleDateString('zh-CN',{weekday:'long'}) }}</p><div class="countdown-value"><strong>{{ remaining.days }}</strong><span>{{ remaining.label==='还有'?'天后':remaining.label==='已经'?'天了':remaining.label==='就是今天'?'就是今天':'天前' }}</span></div><p class="anniversary-quote"><span>“</span> 和你在一起的每一天，<br>　 都是值得期待的日子。 <span>”</span></p>
  </template>
  <template v-else-if="widget.kind==='custom'">
   <header class="custom-widget-header">
    <span class="custom-widget-title">{{ widget.custom?.name||'自创组件' }}</span>
-   <button class="more hover-more" aria-label="组件设置" @click="settings"><MoreHorizontal/></button>
+   
   </header>
   <div class="custom-widget-box" :data-testid="`custom-${widget.customId||'widget'}`">
    <iframe
@@ -205,9 +207,11 @@ onBeforeUnmount(()=>{resizer.finish(true);document.removeEventListener('keydown'
    />
   </div>
  </template>
+ <button v-if="!demo" type="button" class="widget-settings-button" aria-label="小组件设置" title="设置" data-testid="widget-settings" data-no-drag @pointerdown.stop @click.stop="settings"><Settings2 :size="16"/></button>
  <button v-if="!preview&&payload" class="resize-corner" aria-label="按比例调整组件大小" title="拖动调整大小 · Esc 取消" data-no-drag @pointerdown.stop.prevent="startResize" @pointermove.stop="resizer.move()" @pointerup.stop="finishResize()" @pointercancel.stop="finishResize(true)" @lostpointercapture="finishResize()"><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 15 15 5M10 15l5-5M15 15h.01" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></button>
  <div v-if="addOpen" class="widget-popover" data-no-drag><ItemForm :key="editingItem?.id||'new'" :mode="widget.kind==='notes'?'todo':'agenda'" :item="editingItem" :busy="saving" @save="commitItem" @cancel="addOpen=false"/></div>
  <section v-if="listOpen&&widget.kind==='stocks'" class="stock-list-panel" data-no-drag><header><strong>我的自选</strong><button aria-label="关闭自选列表" @click="listOpen=false">×</button></header><button v-for="symbol in watchlist" :key="symbol" :class="{selected:symbol===living.symbol}" :disabled="saving" @click="chooseStock(symbol)"><span>{{ quoteFor(symbol)?.name||symbol }}<small>{{ symbol }}</small></span><strong>{{ quoteFor(symbol)?.price.toFixed(3)||'—' }}</strong><small :class="{down:(quoteFor(symbol)?.change??0)<0}">{{ quoteFor(symbol)?((quoteFor(symbol)!.percent>=0?'+':'')+quoteFor(symbol)!.percent.toFixed(2)+'%'):'暂无数据' }}</small></button><p v-if="listBusy">正在更新…</p><p v-if="listError" role="alert">{{ listError }}<button @click="loadWatchlist">重试</button></p><p>点击证券查看走势；在组件设置中管理自选。</p></section>
  <p v-if="error" class="widget-error" role="alert">{{ error }}<button aria-label="关闭错误提示" @click="error=''">×</button></p><div v-if="editing" class="drag-cover">按住卡片拖动</div>
 </article>
 </template>
+

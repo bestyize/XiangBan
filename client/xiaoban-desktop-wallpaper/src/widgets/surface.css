@@ -22,3 +22,10 @@
 .xb-widget.custom.editing .custom-widget-frame{pointer-events:none}
 .xb-widget.custom .custom-widget-title{font-size:12px;color:rgba(0,0,0,0.45);font-weight:500;opacity:0;transition:opacity .15s}
 .xb-widget.custom:hover .custom-widget-title{opacity:1}
+
+
+/* Every widget exposes the same settings entry, above custom iframe content. */
+.xb-widget .widget-settings-button{position:absolute;top:6px;right:6px;z-index:26;width:calc(26px / var(--widget-scale,1));height:calc(26px / var(--widget-scale,1));display:grid;place-items:center;border-radius:8px;background:#fffaf3ed;color:#756656;box-shadow:0 1px 5px #201c1826;opacity:0;pointer-events:none;cursor:pointer;transition:opacity .15s}
+.xb-widget .widget-settings-button svg{width:65%;height:65%;pointer-events:none}
+.xb-widget:hover .widget-settings-button,.xb-widget .widget-settings-button:focus-visible{opacity:1;pointer-events:auto}
+.xb-widget.stocks .widget-settings-button{background:#36393af0;color:#eee}

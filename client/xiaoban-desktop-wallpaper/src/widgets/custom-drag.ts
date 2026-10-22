@@ -36,6 +36,11 @@ export function installCustomDrag() {
   document.addEventListener('click', event => {
     if (suppressClick) { event.preventDefault(); event.stopImmediatePropagation(); }
   }, true);
+  document.addEventListener('contextmenu', event => {
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    window.parent.postMessage({ type: 'xiaoban-widget-settings' }, '*');
+  }, true);
   document.addEventListener('dragstart', event => { if (pointer) event.preventDefault(); }, true);
 }
 
@@ -71,3 +76,4 @@ export function isCustomDragMessage(value: unknown): value is CustomDragMessage 
     && [data.screenX, data.screenY, data.x, data.y].every(v => typeof v === 'number' && Number.isFinite(v))
     && (data.phase !== 'start' || data.x >= 0 && data.x <= 1 && data.y >= 0 && data.y <= 1);
 }
+

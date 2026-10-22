@@ -66,3 +66,11 @@ describe('custom widget iframe dragging',()=>{
     expect(isCustomDragMessage(null)).toBe(false);
   });
 });
+
+
+
+it('opens settings directly from a custom widget context click without starting a drag',()=>{
+ const {card,postMessage}=frame();const event=new MouseEvent('contextmenu',{bubbles:true,cancelable:true});
+ card.dispatchEvent(event);expect(event.defaultPrevented).toBe(true);
+ expect(postMessage).toHaveBeenCalledExactlyOnceWith({type:'xiaoban-widget-settings'},'*');
+});

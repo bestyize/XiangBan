@@ -65,3 +65,30 @@ describe('custom widget host drag',()=>{
   }
  });
 });
+
+
+
+describe('direct widget settings',()=>{
+ it.each(['clock','weather','notes','reminders','stocks','woodfish','calendar','countdown'] as const)('opens %s settings from the right click and the common button',async kind=>{
+  vi.mocked(invoke).mockClear();const view=mount(WidgetSurface,{props:{widget:one(kind)}});
+  await view.get('.xb-widget').trigger('contextmenu');await flushPromises();
+  expect(invoke).toHaveBeenCalledWith('show_widget_settings');
+  vi.mocked(invoke).mockClear();await view.get('[data-testid="widget-settings"]').trigger('click');await flushPromises();
+  expect(invoke).toHaveBeenCalledExactlyOnceWith('show_widget_settings');view.unmount();
+ });
+ it('accepts a custom settings request only from its own iframe',async()=>{
+  vi.mocked(invoke).mockClear();const widget={...one('custom'),custom:{schemaVersion:1 as const,id:'local',name:'Local',html:'<div/>',width:280,height:240,theme:'transparent' as const}};
+  const view=mount(WidgetSurface,{attachTo:document.body,props:{widget,payload:{widget,editing:false,screenX:0,screenY:0}}});
+  const source=(view.get('iframe').element as HTMLIFrameElement).contentWindow;
+  window.dispatchEvent(new MessageEvent('message',{source:window,data:{type:'xiaoban-widget-settings'}}));
+  await flushPromises();expect(invoke).not.toHaveBeenCalled();
+  window.dispatchEvent(new MessageEvent('message',{source,data:{type:'xiaoban-widget-settings'}}));
+  await flushPromises();expect(invoke).toHaveBeenCalledExactlyOnceWith('show_widget_settings');view.unmount();
+ });
+});
+
+it('keeps the settings button usable while arranging widgets',async()=>{
+ vi.mocked(invoke).mockClear();const view=mount(WidgetSurface,{props:{widget:one('clock'),editing:true}});
+ await view.get('[data-testid="widget-settings"]').trigger('click');await flushPromises();
+ expect(invoke).toHaveBeenCalledExactlyOnceWith('show_widget_settings');view.unmount();
+});
