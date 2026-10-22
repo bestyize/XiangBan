@@ -207,7 +207,7 @@ fn risk_name(risk: Risk) -> &'static str {
 
 fn ask_approval(app: &tauri::AppHandle, broker: &Broker, request: &ApprovalRequest<'_>) -> Approval {
     // In full trust a tainted conversation is not asked because of the taint, so the card must not say it is.
-    let tainted_by_policy = request.tainted && app.state::<ChatState>().permission.mode() != PermissionMode::Auto;
+    let tainted_by_policy = request.tainted && app.state::<ChatState>().permission.mode_for(request.session) != PermissionMode::Auto;
     let (id, rx) = broker.open_approval(request.session);
     crate::proactivity::observe_task_state(app, agent_proactivity::context::TaskState::AwaitingUser);
     emit(
@@ -519,8 +519,8 @@ pub fn chat_load_session(app: tauri::AppHandle, session_id: String) -> Result<Ve
     let Some(summary) = summary else {
         return Ok(Vec::new());
     };
-    let perm_mode = if summary.permission_mode == "auto" { PermissionMode::Auto } else { PermissionMode::Ask };
-    app.state::<ChatState>().permission.set_mode(perm_mode);
+    // Only reported to the page: the mode is applied to this conversation alone when it runs, so opening one
+    // never changes how another conversation that is answering right now is asked.
     emit(&app, "chat-permission-mode-changed", json!({ "sessionId": session_id, "mode": summary.permission_mode }));
     JsonlStore::new(Dirs::of(&app)?.sessions()).load(&session_id).map_err(|e| e.to_string())
 }
@@ -594,7 +594,7 @@ pub fn chat_send(app: tauri::AppHandle, session_id: String, text: String, images
     })??;
 
     let perm_mode = if summary.permission_mode == "auto" { PermissionMode::Auto } else { PermissionMode::Ask };
-    state.permission.set_mode(perm_mode);
+    state.permission.set_session_mode(&summary.id, perm_mode);
     *lock(&state.workspace) = Some(workspace.clone());
 
     let history_dir = Dirs::of(&app)?.sessions();
@@ -1076,7 +1076,13 @@ pub fn chat_set_permission_mode(app: tauri::AppHandle, session_id: Option<String
     }
     let perm_mode = if mode == "auto" { PermissionMode::Auto } else { PermissionMode::Ask };
     let state = app.state::<ChatState>();
-    state.permission.set_mode(perm_mode);
+    match session_id.as_deref() {
+        // A running conversation picks the change up at its next tool call; no other conversation is affected.
+        Some(sid) if sessions::valid_id(sid) => state.permission.set_session_mode(sid, perm_mode),
+        Some(_) => return Err("对话编号不对".into()),
+        // No conversation yet: the default for the next new one.
+        None => state.permission.set_mode(perm_mode),
+    }
 
     if let Some(ref sid) = session_id {
         let _ = mutate(&app, |index| {

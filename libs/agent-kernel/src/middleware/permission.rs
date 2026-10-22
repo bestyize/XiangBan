@@ -2,7 +2,7 @@ use super::Middleware;
 use crate::tool::{Risk, ToolCtx, ToolGate, ToolSpec};
 use crate::types::ToolCall;
 use serde_json::Value;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::sync::atomic::{AtomicU8, Ordering};
 use std::sync::mpsc::Receiver;
 use std::sync::{Arc, Mutex};
@@ -96,6 +96,8 @@ pub struct Permission {
     deny: HashSet<String>,
     always: Mutex<HashSet<(String, String)>>,
     tainted: Mutex<HashSet<String>>,
+    /// Modes set for single sessions. They win over `mode`, so concurrent sessions never see each other's choice.
+    session_modes: Mutex<HashMap<String, PermissionMode>>,
 }
 
 impl Permission {
@@ -108,6 +110,7 @@ impl Permission {
             deny: HashSet::new(),
             always: Mutex::new(HashSet::new()),
             tainted: Mutex::new(HashSet::new()),
+            session_modes: Mutex::new(HashMap::new()),
         }
     }
 
@@ -137,14 +140,27 @@ impl Permission {
         PermissionMode::from_u8(self.mode.load(Ordering::Relaxed))
     }
 
+    /// The default for sessions without a mode of their own.
     pub fn set_mode(&self, mode: PermissionMode) {
         self.mode.store(mode.to_u8(), Ordering::Relaxed);
+    }
+
+    /// The mode that applies to `session`: its own when one was set, the default otherwise.
+    pub fn mode_for(&self, session: &str) -> PermissionMode {
+        self.session_modes.lock().unwrap_or_else(|e| e.into_inner()).get(session).copied().unwrap_or_else(|| self.mode())
+    }
+
+    /// Sets the mode of one session only. A host running several sessions at once should use this
+    /// instead of `set_mode`, which every session without its own mode shares.
+    pub fn set_session_mode(&self, session: &str, mode: PermissionMode) {
+        self.session_modes.lock().unwrap_or_else(|e| e.into_inner()).insert(session.to_string(), mode);
     }
 
     /// Drops the "always allow" grants and the taint of one session, e.g. when it is closed.
     pub fn forget_session(&self, session: &str) {
         self.always.lock().unwrap_or_else(|e| e.into_inner()).retain(|(s, _)| s != session);
         self.tainted.lock().unwrap_or_else(|e| e.into_inner()).remove(session);
+        self.session_modes.lock().unwrap_or_else(|e| e.into_inner()).remove(session);
     }
 
     /// Taint is kept in memory only: after a restart a resumed session starts untainted.
@@ -160,7 +176,7 @@ impl Middleware for Permission {
         if self.deny.contains(name) {
             return ToolGate::Block(format!("`{name}` is disabled by policy."));
         }
-        let mode = self.mode();
+        let mode = self.mode_for(session);
         if mode == PermissionMode::ReadOnly && spec.risk != Risk::Read {
             return ToolGate::Block(format!("Read-only mode: `{name}` is not allowed because it can change state."));
         }

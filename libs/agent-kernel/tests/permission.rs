@@ -102,6 +102,24 @@ fn allow_deny_lists_and_auto_mode() {
     assert!(out[1].contains("disabled by policy"), "deny wins even in auto mode");
 }
 
+#[test]
+fn a_session_mode_applies_to_that_session_only() {
+    let (fx, p) = setup(PermissionMode::Ask, vec![Approval::Deny, Approval::Deny], |p| p);
+    p.set_session_mode("trusted", PermissionMode::Auto);
+    assert_eq!(p.mode_for("trusted"), PermissionMode::Auto);
+    assert_eq!(p.mode_for("careful"), PermissionMode::Ask, "other sessions keep the default");
+    assert_eq!(run_calls(&fx, &p, "trusted", &["writer"]), vec!["ran"]);
+    let out = run_calls(&fx, &p, "careful", &["writer"]);
+    assert!(out[0].contains("denied permission"), "a trusted session does not make another one trusted");
+
+    p.set_session_mode("careful", PermissionMode::Ask);
+    p.set_mode(PermissionMode::Auto);
+    let out = run_calls(&fx, &p, "careful", &["writer"]);
+    assert!(out[0].contains("denied permission"), "changing the default does not override a session's own mode");
+    p.forget_session("careful");
+    assert_eq!(p.mode_for("careful"), PermissionMode::Auto, "a forgotten session falls back to the default");
+}
+
 fn net_tool(name: &str, risk: Risk, untrusted: bool, always_ask: bool, runs: &Arc<AtomicUsize>) -> FnTool {
     let mut s = spec(name).risk(risk);
     if untrusted {
