@@ -43,7 +43,9 @@ fn changed(app: &tauri::AppHandle, id: &str, record: Option<&GoalRecord>) {
 fn current(app: &tauri::AppHandle, id: &str) -> Result<Option<GoalRecord>, String> {
     let store = store(app)?;
     let Some(mut goal) = store.load(id)? else { return Ok(None) };
-    if goal.state == GoalState::Running && !running(app, id) {
+    if goal.state == GoalState::Running && !running(app, id)
+        && !agent_kernel::supervisor::SessionLease::held(Dirs::of(app)?.leases(), id)?
+    {
         let trace = goal.last_run_id.as_deref().and_then(|run_id| {
             let log = JsonlRunLog::new(Dirs::of(app).ok()?.runs().join(id));
             log.inspect(run_id).ok()
