@@ -73,9 +73,11 @@ export function createControlStore(notify: ControlStore["notify"]): ControlStore
         game: '帮我创作一款小游戏：',
         pet: '帮我创作一个桌面宠物主题。先读取 pet_read_format：',
       };
+      // With nothing open the draft goes to 新建任务; with a conversation open it starts a new one on the chat page as before.
+      const hadConversation = !!store.chat.currentId;
       await store.chat.select(null);
       store.creationDraft = prompts[kind];
-      store.navigate('chat');
+      store.navigate(hadConversation ? 'chat' : 'new-task');
     },
     openLogin() { store.showLoginModal = true; },
     closeLogin() { store.showLoginModal = false; },

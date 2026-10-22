@@ -373,6 +373,9 @@ async function openOnlineGuide() {
 .guide-badge.blue{background:#e0f2fe;color:#0284c7}
 .guide-badge.green{background:#ecfdf5;color:#059669}
 .guide-badge.purple{background:#f3e8ff;color:#7c3aed}
+:root[data-theme=dark] .guide-badge.blue{background:#1E2F44;color:#8FC1F2}
+:root[data-theme=dark] .guide-badge.green{background:#1D3328;color:#72D6A2}
+:root[data-theme=dark] .guide-badge.purple{background:#2A2342;color:#BBA8FF}
 .card-top h4{margin:0;font-size:14px;font-weight:600;color:var(--ui-text-primary)}
 .card-desc{font-size:12px;color:var(--ui-text-secondary);line-height:1.6;margin:0}
 .card-prompt{background:var(--ui-surface-alt);border-radius:8px;padding:8px 10px;margin-top:auto}

@@ -1,13 +1,14 @@
 <script setup lang="ts">
-import { computed, defineAsyncComponent, onMounted, onBeforeUnmount, reactive, ref, watch } from 'vue';
+import { computed, defineAsyncComponent, nextTick, onMounted, onBeforeUnmount, reactive, ref, watch } from 'vue';
 import { NAlert, NButton, NSkeleton, useMessage } from 'naive-ui';
-import { Bell, BookOpen, ChevronDown, Folder, Gamepad2, Globe, Inbox, LogIn, LogOut, Palette, PanelLeft, Plus, Puzzle, RefreshCw, Search, SlidersHorizontal, Sparkles, SquarePen, Sprout, Zap } from 'lucide-vue-next';
+import { Bell, BookOpen, Check, ChevronDown, Ellipsis, Folder, FolderPlus, Gamepad2, Globe, Inbox, LogIn, LogOut, Palette, PanelLeft, Pencil, Plus, Puzzle, RefreshCw, Search, SlidersHorizontal, Sparkles, SquarePen, Sprout, Trash2, Zap } from 'lucide-vue-next';
 import { invoke, listen } from '../bridge.ts';
 import { accent, accents, isDark, appearanceMode, appearanceModes, publishAppearanceTo, reconcile, setAccent } from './appearance.ts';
 import { createControlStore } from './control-store.ts';
 import type { ControlPage } from './control-types.ts';
 import type { SessionSummary } from './chat/types.ts';
 import SettingsDialog from './components/SettingsDialog.vue';
+import ChatNameDialog from './components/ChatNameDialog.vue';
 const pageLoaders = {
   'new-task': () => import('./pages/NewTaskPage.vue'),
   chat: () => import('./pages/ChatPage.vue'),
@@ -95,6 +96,62 @@ async function addWorkspace() {
   if (store.chat.currentId) await store.chat.select(null);
   if (await store.chat.switchWorkspace(path) === 'done') { expanded.add(path); navigate('new-task'); }
 }
+/*
+ * A conversation's menu in the space tree (hover ⋯ or right click): rename, move to a working folder, delete.
+ * Working folders took the place of the old groups; groups the host still keeps are left as they are, just not shown.
+ */
+interface SessionMenu { id: string; x: number; y: number; confirming: boolean }
+const sessionMenu = ref<SessionMenu | null>(null);
+const sessionMenuEl = ref<HTMLElement | null>(null);
+const menuSession = computed(() => store.chat.sessions.find(item => item.id === sessionMenu.value?.id) ?? null);
+const menuBusy = computed(() => !!(sessionMenu.value && store.chat.views[sessionMenu.value.id]?.running));
+const workspaceTargets = computed(() => spaces.value.filter(space => space.path));
+function openSessionMenu(id: string, event: MouseEvent, anchor?: EventTarget | null) {
+  closeMenu();
+  if (sessionMenu.value?.id === id && anchor) { sessionMenu.value = null; return; }
+  const box = anchor instanceof HTMLElement ? anchor.getBoundingClientRect() : null;
+  sessionMenu.value = { id, x: box ? box.left : event.clientX, y: box ? box.bottom + 4 : event.clientY, confirming: false };
+  void placeSessionMenu();
+}
+/** Keeps the menu inside the window, opening upwards near the bottom. */
+async function placeSessionMenu() {
+  await nextTick();
+  const menu = sessionMenu.value, el = sessionMenuEl.value;
+  if (!menu || !el) return;
+  const { width, height } = el.getBoundingClientRect();
+  menu.x = Math.max(8, Math.min(menu.x, window.innerWidth - width - 8));
+  menu.y = Math.max(8, Math.min(menu.y, window.innerHeight - height - 8));
+}
+function closeSessionMenu() { sessionMenu.value = null; }
+const renamingId = ref('');
+const renameBusy = ref(false);
+const renamingTitle = computed(() => store.chat.sessions.find(item => item.id === renamingId.value)?.title ?? '');
+function startRename() { if (sessionMenu.value) renamingId.value = sessionMenu.value.id; closeSessionMenu(); }
+async function submitRename(value: string) {
+  const id = renamingId.value;
+  if (!id || renameBusy.value) return;
+  renameBusy.value = true;
+  const done = value.trim() === renamingTitle.value ? true : await store.chat.rename(id, value);
+  renameBusy.value = false;
+  if (done) renamingId.value = '';
+}
+async function moveSession(path: string | null) {
+  const id = sessionMenu.value?.id;
+  closeSessionMenu();
+  if (!id) return;
+  if (!store.desktop) { store.notify('请在桌面应用中选择工作区文件夹', 'info'); return; }
+  const target = path ?? await store.chat.pickWorkspace();
+  if (!target) return;
+  if (await store.chat.moveToWorkspace(id, target)) { expanded.add(target); store.notify(`已移动到「${folderName(target)}」`, 'success'); }
+}
+async function deleteSession() {
+  const id = sessionMenu.value?.id;
+  closeSessionMenu();
+  if (!id) return;
+  await store.chat.remove(id);
+  if (store.page === 'chat' && !store.chat.currentId) navigate('new-task');
+}
+
 /** The first message of a new task creates a conversation: from then on it is that conversation's page. */
 watch(() => store.chat.currentId, id => { if (id && store.page === 'new-task') store.navigate('chat'); });
 
@@ -103,7 +160,11 @@ const menuOpen = ref(false);
 const menuRoot = ref<HTMLElement | null>(null);
 function toggleMenu() { menuOpen.value = !menuOpen.value; }
 function closeMenu() { menuOpen.value = false; }
-function onPointerDown(event: PointerEvent) { if (menuOpen.value && menuRoot.value && !menuRoot.value.contains(event.target as Node)) closeMenu(); }
+function onPointerDown(event: PointerEvent) {
+  if (menuOpen.value && menuRoot.value && !menuRoot.value.contains(event.target as Node)) closeMenu();
+  const target = event.target as Element | null;
+  if (sessionMenu.value && !sessionMenuEl.value?.contains(target) && !target?.closest?.('.nav-session-more')) closeSessionMenu();
+}
 const displayName = computed(() => store.account?.user.username ?? '未登录');
 const modeLabel = computed(() => appearanceModes.find(mode => mode.value === appearanceMode.value)?.label ?? '');
 const unread = computed(() => store.website.announcements.filter(item => store.website.dismissed[item.id] !== item.revision).length);
@@ -198,6 +259,7 @@ async function listenForAssistant() {
   assistantListeners.push(...off);
 }
 function onKeydown(event: KeyboardEvent) {
+  if (event.key === 'Escape' && sessionMenu.value) { closeSessionMenu(); return; }
   if (event.key === 'Escape' && menuOpen.value) { closeMenu(); return; }
   if (!(event.metaKey || event.ctrlKey) || event.altKey || event.shiftKey) return;
   if (event.key === ',') { event.preventDefault(); openSettings(); }
@@ -257,9 +319,12 @@ const fixedPages = ['new-task', 'chat', 'ai-store', 'library', 'studio', 'games'
               <span class="nav-hint">{{ space.sessions.length || '' }}</span>
             </button>
             <template v-if="expanded.has(space.key)">
-              <button v-for="session in space.sessions" :key="session.id" type="button" class="nav-session" :class="{ selected: store.page === 'chat' && store.chat.currentId === session.id }" :aria-current="store.page === 'chat' && store.chat.currentId === session.id ? 'page' : undefined" :data-testid="`session-${session.id}`" :title="session.title" @click="openSession(session.id)">
-                <span>{{ session.title || '新对话' }}</span><i v-if="waiting(session.id)" class="xb-dot" aria-label="等你确认"></i>
-              </button>
+              <div v-for="session in space.sessions" :key="session.id" class="nav-session-row" :class="{ 'menu-open': sessionMenu?.id === session.id }" @contextmenu.prevent="openSessionMenu(session.id, $event)">
+                <button type="button" class="nav-session" :class="{ selected: store.page === 'chat' && store.chat.currentId === session.id }" :aria-current="store.page === 'chat' && store.chat.currentId === session.id ? 'page' : undefined" :data-testid="`session-${session.id}`" :title="session.title" @click="openSession(session.id)">
+                  <span>{{ session.title || '新对话' }}</span><i v-if="waiting(session.id)" class="xb-dot" aria-label="等你确认"></i>
+                </button>
+                <button type="button" class="xb-icon-btn is-sm nav-session-more" aria-haspopup="menu" :aria-expanded="sessionMenu?.id === session.id" :aria-label="`更多操作：${session.title || '新对话'}`" title="更多" :data-testid="`session-more-${session.id}`" @click.stop="openSessionMenu(session.id, $event, $event.currentTarget)"><Ellipsis :size="14" /></button>
+              </div>
               <p v-if="!space.sessions.length" class="nav-empty">{{ space.key === '__recent__' ? '还没有任务' : '新任务会出现在这里' }}</p>
             </template>
           </template>
@@ -302,6 +367,28 @@ const fixedPages = ['new-task', 'chat', 'ai-store', 'library', 'studio', 'games'
         </div>
       </div>
     </aside>
+    <div v-if="sessionMenu" ref="sessionMenuEl" class="xb-menu session-menu" role="menu" :aria-label="`对话：${menuSession?.title || '新对话'}`" data-testid="session-menu" :style="{ left: `${sessionMenu.x}px`, top: `${sessionMenu.y}px` }">
+      <template v-if="!sessionMenu.confirming">
+        <button type="button" class="xb-menu-item" role="menuitem" data-testid="session-menu-rename" @click="startRename"><Pencil :size="15" />重命名</button>
+        <div class="xb-menu-sep"></div>
+        <div class="xb-menu-label">移动到工作区</div>
+        <button v-for="space in workspaceTargets" :key="space.key" type="button" class="xb-menu-item" role="menuitemradio" :aria-checked="menuSession?.workspace === space.path" :disabled="menuBusy" :title="space.path" :data-testid="`session-move-${space.name}`" @click="moveSession(space.path)">
+          <Folder :size="15" /><span class="session-menu-name">{{ space.name }}</span><Check v-if="menuSession?.workspace === space.path" :size="14" class="xb-menu-check" />
+        </button>
+        <button type="button" class="xb-menu-item" role="menuitem" :disabled="menuBusy" data-testid="session-move-pick" @click="moveSession(null)"><FolderPlus :size="15" />选择文件夹…</button>
+        <div class="xb-menu-sep"></div>
+        <button type="button" class="xb-menu-item is-danger" role="menuitem" :disabled="menuBusy" :title="menuBusy ? '回答结束后才能删除' : undefined" data-testid="session-menu-delete" @click="sessionMenu.confirming = true; placeSessionMenu()"><Trash2 :size="15" />删除</button>
+      </template>
+      <div v-else class="session-confirm" role="alertdialog" aria-label="删除对话" data-testid="session-delete-confirm">
+        <b>删除「{{ menuSession?.title || '新对话' }}」？</b>
+        <span>对话记录会从这台电脑上清除，无法恢复。</span>
+        <div class="session-confirm-actions">
+          <button type="button" class="xb-btn is-sm" @click="closeSessionMenu">取消</button>
+          <button type="button" class="xb-btn is-sm is-danger" data-testid="session-delete-yes" @click="deleteSession">删除</button>
+        </div>
+      </div>
+    </div>
+    <ChatNameDialog :show="!!renamingId" title="重命名对话" placeholder="给这个对话起个名字" :initial="renamingTitle" :max-length="60" confirm-text="保存" :busy="renameBusy" @close="renamingId = ''" @submit="submitRename" />
     <div class="control-main">
       <main class="control-workspace" :class="{ 'fixed-page-workspace': fixedPages.includes(store.page) }">
         <NAlert v-if="store.initialError" class="workspace-alert" type="error" title="桌面配置暂时无法读取">{{ store.initialError }} <NButton size="small" @click="store.initialize()">重试</NButton></NAlert>
@@ -353,6 +440,19 @@ const fixedPages = ['new-task', 'chat', 'ai-store', 'library', 'studio', 'games'
 .nav-session:hover{background:var(--ui-surface-hover);opacity:1}
 .nav-session>span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .nav-session.selected{background:var(--ui-soft);color:var(--ui-ink);opacity:1;font-weight:500}
+.nav-session-row{position:relative;flex-shrink:0}
+.nav-session-row>.nav-session-more{position:absolute;top:3px;right:4px;opacity:0;pointer-events:none}
+.nav-session-row:hover .nav-session-more,.nav-session-row:focus-within .nav-session-more,.nav-session-row.menu-open .nav-session-more{opacity:1;pointer-events:auto}
+.nav-session-row:hover .nav-session,.nav-session-row:focus-within .nav-session,.nav-session-row.menu-open .nav-session{padding-right:32px}
+.nav-session-row.menu-open .nav-session{background:var(--ui-surface-hover);opacity:1}
+.nav-session-row.menu-open .nav-session.selected{background:var(--ui-soft)}
+.session-menu{position:fixed;width:232px;z-index:60}
+.session-menu .xb-menu-item:disabled{opacity:.45;cursor:not-allowed}
+.session-menu-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.session-confirm{display:flex;flex-direction:column;gap:4px;padding:8px 10px}
+.session-confirm b{font-size:13.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.session-confirm span{font-size:12px;line-height:1.5;color:var(--ui-text-secondary)}
+.session-confirm-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:8px}
 .nav-empty{margin:0;padding:4px 10px 4px 36px;font-size:12px;color:var(--ui-text-tertiary)}
 .nav-sep{height:1px;flex-shrink:0;margin:8px 10px;background:var(--ui-line)}
 
@@ -387,7 +487,7 @@ const fixedPages = ['new-task', 'chat', 'ai-store', 'library', 'studio', 'games'
 /* Whole sidebar folded to an icon rail. */
 .is-collapsed .control-sidebar{padding:0 8px 12px}
 .is-collapsed .sidebar-top{justify-content:center}
-.is-collapsed .sidebar-search,.is-collapsed .brand-copy,.is-collapsed .nav-label,.is-collapsed .nav-hint,.is-collapsed .nav-chevron,.is-collapsed .nav-caption,.is-collapsed .space-row,.is-collapsed .nav-session,.is-collapsed .nav-empty,.is-collapsed .notices{display:none}
+.is-collapsed .sidebar-search,.is-collapsed .brand-copy,.is-collapsed .nav-label,.is-collapsed .nav-hint,.is-collapsed .nav-chevron,.is-collapsed .nav-caption,.is-collapsed .space-row,.is-collapsed .nav-session-row,.is-collapsed .nav-session,.is-collapsed .nav-empty,.is-collapsed .notices{display:none}
 .is-collapsed .control-brand{justify-content:center;padding:2px 0 16px}
 .is-collapsed .nav-sub{padding-left:0}
 .is-collapsed .nav-item{justify-content:center;padding:0;height:36px}

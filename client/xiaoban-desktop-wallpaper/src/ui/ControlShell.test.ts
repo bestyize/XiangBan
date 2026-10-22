@@ -131,6 +131,56 @@ describe('ControlShell sidebar', () => {
     } finally { wrapper.unmount(); }
   });
 
+  it('renames, moves and deletes a conversation from its menu in the space tree', async () => {
+    const wrapper = mount(ControlShell, { attachTo: document.body, global: { stubs: { ChatPage: { name: 'ChatPage', template: '<div data-testid="chat-stub" />' }, NewTaskPage: { name: 'NewTaskPage', template: '<div />' } } } });
+    try {
+      await flushPromises();
+      const store = storeOf(wrapper);
+      store.chat.sessions = [
+        { id: 'a', title: '周计划', createdAt: 1, updatedAt: 1 },
+        { id: 'b', title: '改首页', createdAt: 1, updatedAt: 1, workspace: '/Users/me/site' },
+      ];
+      store.chat.groups = [{ id: 'g1', name: '旧分组' }] as never;
+      await flushPromises();
+      expect(wrapper.text()).not.toContain('旧分组'); // groups are kept but no longer shown
+      // Right click opens the same menu as the hover ⋯ button.
+      await wrapper.get('[data-testid="session-a"]').element.parentElement!.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, clientX: 40, clientY: 300 }));
+      await flushPromises();
+      expect(wrapper.find('[data-testid="session-menu"]').exists()).toBe(true);
+      await wrapper.get('[data-testid="session-menu-rename"]').trigger('click');
+      await flushPromises();
+      expect(wrapper.find('[data-testid="session-menu"]').exists()).toBe(false);
+      const rename = vi.spyOn(store.chat, 'rename').mockResolvedValue(true);
+      const input = document.querySelector('[data-testid="chat-name-input"] input') as HTMLInputElement;
+      input.value = '下周计划'; input.dispatchEvent(new Event('input'));
+      (document.querySelector('[data-testid="chat-name-ok"]') as HTMLButtonElement).click();
+      await flushPromises();
+      expect(rename).toHaveBeenCalledWith('a', '下周计划');
+
+      const move = vi.spyOn(store.chat, 'moveToWorkspace').mockImplementation(async (id: string, path: string) => { store.chat.sessions = store.chat.sessions.map(s => s.id === id ? { ...s, workspace: path } : s); return true; });
+      await wrapper.get('[data-testid="session-more-a"]').trigger('click');
+      await wrapper.get('[data-testid="session-move-site"]').trigger('click');
+      await flushPromises();
+      expect(move).toHaveBeenCalledWith('a', '/Users/me/site');
+      expect(wrapper.find('[data-testid="session-a"]').exists()).toBe(true); // its folder is unfolded
+      vi.spyOn(store.chat, 'pickWorkspace').mockResolvedValue('/Users/me/新项目');
+      await wrapper.get('[data-testid="session-more-b"]').trigger('click');
+      await wrapper.get('[data-testid="session-move-pick"]').trigger('click');
+      await flushPromises();
+      expect(move).toHaveBeenLastCalledWith('b', '/Users/me/新项目');
+
+      const remove = vi.spyOn(store.chat, 'remove').mockImplementation(async (id: string) => { store.chat.sessions = store.chat.sessions.filter(s => s.id !== id); });
+      await wrapper.get('[data-testid="session-more-a"]').trigger('click');
+      await wrapper.get('[data-testid="session-menu-delete"]').trigger('click');
+      expect(remove).not.toHaveBeenCalled(); // asks first
+      expect(wrapper.get('[data-testid="session-delete-confirm"]').text()).toContain('周计划');
+      await wrapper.get('[data-testid="session-delete-yes"]').trigger('click');
+      await flushPromises();
+      expect(remove).toHaveBeenCalledWith('a');
+      expect(store.chat.groups).toHaveLength(1);
+    } finally { wrapper.unmount(); }
+  });
+
   it('starts a new task in a picked folder from the 空间 plus button', async () => {
     const wrapper = mount(ControlShell, { attachTo: document.body, global: { stubs: { NewTaskPage: { name: 'NewTaskPage', template: '<div data-testid="new-task-stub" />' } } } });
     try {

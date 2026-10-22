@@ -35,6 +35,7 @@ describe('control state with native settings', () => {
     expect(store.page).toBe('chat');
     expect(store.creationDraft).toBe('帮我创作一个桌面特效：');
     await store.startCreation('widget');
+    expect(store.page).toBe('new-task'); // nothing open any more: the draft goes to 新建任务
     expect(store.creationDraft).toBe('帮我创作一个桌面小组件：');
     await store.startCreation('game');
     expect(store.creationDraft).toBe('帮我创作一款小游戏：');

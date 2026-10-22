@@ -62,12 +62,14 @@
 
 **全局工具类**（`src/ui/control.css`）：
 
-- 按钮：`.xb-btn-primary`（渐变主按钮）、`.xb-btn`（白底细描边）、`.is-sm`/`.is-lg` 尺寸，`.xb-btn-ghost`、`.xb-icon-btn`（30×30，`.is-sm` 24×24）、`.xb-link`。
+- 按钮：`.xb-btn-primary`（渐变主按钮）、`.xb-btn`（白底细描边）、`.is-sm`/`.is-lg` 尺寸，`.xb-btn-ghost`、`.xb-icon-btn`（30×30，`.is-sm` 24×24）、`.xb-link`；危险操作加 `.is-danger`（`.xb-btn.is-danger` 红字次按钮）。
 - 容器：`.xb-page`（内容区内边距 22px 28px）、`.xb-page-head` + `.xb-page-title` + `.xb-page-actions`、`.xb-card`（`.is-hover`、`.is-selected`）、`.xb-empty`（+ `.xb-empty-icon`）、`.xb-scroll`。
 - 标签与分段：`.xb-tabs-lg`（页面顶部大标签 20px/600，未选 #A1A1A6，选中项加 `aria-selected="true"`）、`.xb-seg`（分段控件，选中按钮加 `.is-active` 或 aria-pressed/selected/checked）。
-- 浮层菜单：`.xb-menu`、`.xb-menu-item`（`.is-active`/`aria-checked` 为 soft 底）、`.xb-menu-hint`、`.xb-menu-check`、`.xb-menu-sep`、`.xb-menu-label`。
+- 浮层菜单：`.xb-menu`、`.xb-menu-item`（`.is-active`/`aria-checked` 为 soft 底，`.is-danger` 红字）、`.xb-menu-hint`、`.xb-menu-check`、`.xb-menu-sep`、`.xb-menu-label`。
 - 设置分组：`.xb-group-title`、`.xb-group`、`.xb-row`、`.xb-row-text`（内含 `<b>` 标题与 `<span>` 说明）。
 - 小件：`.xb-dot`、`.xb-badge`、`.xb-chip`、`.xb-ok`、`.xb-kbd`、`.xb-mark`（渐变品牌方块）、`.xb-search`。
 
 **路由**：`ControlPage` 为 `new-task`、`chat`、`ai-store`、`library`、`studio`、`games`、`care`（以及 `interactive`）。旧 id 仍可传给 `navigate`：`wallpapers`/`effects`/`widgets`/`companion` 打开装扮对应标签（`store.studioTab`：`wallpapers`/`effects`/`widgets`/`pets`），`settings`/`assistant` 打开设置弹窗。装扮内页可用 `<Teleport defer to="#studio-actions">` 把按钮放到标签行右侧。
+
+**会话管理**：侧栏空间树的会话行悬停出现 ⋯（右键同一菜单）：重命名、移动到工作区（`chat.moveToWorkspace`，可选已有工作区或另选文件夹）、删除（菜单内二次确认）。工作区取代了旧的“分组”：不再有分组界面，宿主里已有的分组数据原样保留、不显示。页面统一自带 `.xb-page` 内边距，`.control-workspace` 本身不加内边距。
 

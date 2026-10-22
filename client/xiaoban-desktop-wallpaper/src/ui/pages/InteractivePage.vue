@@ -23,7 +23,7 @@ async function applyPond() {
 }
 </script>
 <template>
-  <section class="ui-page interactive-page" data-testid="interactive-page">
+  <section class="xb-page ui-page interactive-page" data-testid="interactive-page">
     <header class="xb-page-head"><h1 class="xb-page-title">互动壁纸</h1><span class="collection-label"><Sparkles :size="14" /> 心愿集 · 壹</span></header>
     <div class="ritual-intro"><span>一方风景，一点心意</span><p>求一支好签，放一盏心灯。把愿望轻轻交给此刻。</p></div>
     <div class="ritual-grid">

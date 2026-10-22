@@ -833,6 +833,25 @@ describe('each conversation works in its own folder', () => {
     expect(last?.kind === 'notice' && last.text).toContain('工作区已切换到 /p/b');
   });
 
+  it('the sidebar moves any conversation to a folder, not only the open one', async () => {
+    const h = harness({
+      chat_overview: () => overview({ sessions: [summary('open'), { ...summary('other'), workspace: '/p/site' }], workspace: '/default' }),
+      chat_load_session: () => withHistory,
+      chat_set_workspace: args => ({ session: { ...summary(String(args?.sessionId)), workspace: String(args?.workspace) }, wide: false, recentWorkspaces: [] }),
+    });
+    await h.store.init();
+    await h.store.select('open');
+    expect(await h.store.moveToWorkspace('other', '/p/b')).toBe(true);
+    expect(h.calls.find(([c]) => c === 'chat_set_workspace')?.[1]).toEqual({ sessionId: 'other', workspace: '/p/b' });
+    expect(h.store.sessions.find(s => s.id === 'other')?.workspace).toBe('/p/b');
+    expect(h.store.currentId).toBe('open'); // the open conversation stays open
+    expect(await h.store.moveToWorkspace('open', '/p/c')).toBe(true);
+    const last = h.store.views.open.items.at(-1);
+    expect(last?.kind === 'notice' && last.text).toContain('工作区已切换到 /p/c');
+    expect(await h.store.moveToWorkspace('open', '/p/c')).toBe(true); // already there: nothing to do
+    expect(h.calls.filter(([c]) => c === 'chat_set_workspace')).toHaveLength(2);
+  });
+
   it('“新开对话” leaves the old conversation where it was', async () => {
     const h = harness({
       chat_overview: () => overview({ sessions: [{ ...summary('used'), workspace: '/p/site' }] }),

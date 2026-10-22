@@ -8,7 +8,7 @@ defineProps<{ store: ControlStore }>();
     <header class="xb-page-head"><h1 class="xb-page-title">资料库</h1></header>
     <div class="xb-empty library-empty">
       <span class="xb-empty-icon library-icon"><BookOpen :size="26" /></span>
-      <h2>资料库</h2>
+      <h2>还没有资料</h2>
       <p>把常用文件、网页和笔记放进来，小伴回答时会参考它们。</p>
       <span class="library-soon">即将上线</span>
       <div class="library-kinds" aria-hidden="true">

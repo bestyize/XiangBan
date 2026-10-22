@@ -84,7 +84,7 @@ onActivated(() => { if (opened) void loadGames(); else opened = true; });
         <button v-for="tab in tabs" :key="tab.id" type="button" role="tab" :aria-selected="category === tab.id" :data-testid="`games-tab-${tab.id}`" @click="category = tab.id">{{ tab.label }}</button>
       </div>
       <div class="xb-page-actions">
-        <ResourceShareActions :store="store" kind="game" import-label="导入" :disabled="opening" @imported="imported"/>
+        <ResourceShareActions :store="store" kind="game" variant="xb" import-label="导入" :disabled="opening" @imported="imported"/>
         <button type="button" class="xb-btn-primary" :disabled="!store.desktop" data-testid="games-create" @click="store.startCreation('game')"><Sparkles :size="14"/>让小伴创作</button>
       </div>
     </header>
@@ -130,7 +130,7 @@ onActivated(() => { if (opened) void loadGames(); else opened = true; });
 /* Local tokens for the card edge and the orientation badge; they follow light and dark mode. */
 .games-page{--game-edge:0 0 0 1px var(--ui-border);flex:1;min-height:0;min-width:0;display:flex;flex-direction:column;gap:18px;padding:22px 28px 0}
 .games-head{flex-shrink:0}
-.games-body{flex:1;min-height:0;display:flex;flex-direction:column;gap:16px;padding:4px 4px 28px}
+.games-body{flex:1;min-height:0;display:flex;flex-direction:column;gap:16px;margin:0 -4px;padding:4px 4px 28px}
 .game-running-actions{display:flex;justify-content:flex-end}
 .games-section{display:flex;flex-direction:column;gap:14px}
 .catalog-error{border-radius:12px}

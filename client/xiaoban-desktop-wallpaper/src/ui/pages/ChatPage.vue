@@ -266,7 +266,7 @@ async function openLink(href: string) {
       <div v-if="confirmingDelete" class="delete-bar" data-testid="chat-delete-confirm" role="alertdialog" aria-label="删除对话">
         <span>删除“{{ title }}”？删除后无法恢复。</span>
         <button type="button" class="xb-btn is-sm" @click="confirmingDelete = ''">取消</button>
-        <button type="button" class="xb-btn is-sm danger" :data-testid="`chat-delete-yes-${confirmingDelete}`" @click="remove(confirmingDelete)">删除</button>
+        <button type="button" class="xb-btn is-sm is-danger" :data-testid="`chat-delete-yes-${confirmingDelete}`" @click="remove(confirmingDelete)">删除</button>
       </div>
       <ChatGoalPanel v-if="goalOpen" class="goal-panel" :session-id="chat.currentId" :running="running"
         :configured="chat.configured" :desktop="store.desktop"
@@ -443,10 +443,8 @@ async function openLink(href: string) {
 .more-menu{position:absolute;right:0;top:calc(100% + 6px);width:200px}
 .more-menu .xb-menu-item:disabled{opacity:.45;cursor:not-allowed}
 .more-menu .xb-menu-item:disabled:hover{background:transparent}
-.more-menu .xb-menu-item.is-danger>svg:first-child{color:var(--ui-danger)}
 .delete-bar{display:flex;align-items:center;gap:8px;margin:0 24px 8px;padding:8px 10px 8px 14px;border-radius:10px;background:color-mix(in srgb,var(--ui-danger) 8%,var(--ui-surface));font-size:13px;color:var(--ui-text-primary)}
 .delete-bar span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.delete-bar .danger{color:var(--ui-danger)}
 .goal-panel{margin:0 24px 8px}
 
 /* Messages */
