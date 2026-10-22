@@ -646,6 +646,10 @@ pub fn save_ai_config(
     let current = load(&path).unwrap_or_default();
     let next = apply(&current, &Input { protocol: &protocol, base_url: &base_url, model: &model, api_key: api_key.as_deref(), clear_key, workspace: workspace.as_deref(), hide_tool_calls, open_computer_use })?;
     save(&path, &next).map_err(|e| format!("无法保存模型配置：{e}"))?;
+    if next.workspace != current.workspace {
+        let chosen = next.workspace_or(&default_workspace(&app)?).display().to_string();
+        crate::chat::remember_workspace(&app, &chosen);
+    }
     let _ = app.emit_to("control", "chat-hide-tool-calls-changed", serde_json::json!({ "enabled": next.hide_tool_calls }));
     let view = next.view(&default_workspace(&app)?);
     emit_changed(&app, &view);

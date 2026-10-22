@@ -356,7 +356,7 @@ fn command_index(words: &[Word]) -> Option<usize> {
 
 /// A working folder too wide to count as a project: a disk's root, the home folder or a folder of homes. Nothing
 /// in it is treated as safely inside, so `rm -rf *` there is asked about like anywhere else.
-fn too_wide(workspace: &Path) -> bool {
+pub(super) fn too_wide(workspace: &Path) -> bool {
     let text = workspace.to_string_lossy().replace('\\', "/");
     let text = text.trim_end_matches('/');
     let drive_root = text.len() == 2 && text.as_bytes()[0].is_ascii_alphabetic() && text.as_bytes()[1] == b':';

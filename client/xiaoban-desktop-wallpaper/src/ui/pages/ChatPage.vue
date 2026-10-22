@@ -8,6 +8,7 @@ import type { ControlStore } from '../control-types.ts';
 import ModelSwitchDialog from '../components/ModelSwitchDialog.vue';
 import ChatWorkbenchTools from '../components/ChatWorkbenchTools.vue';
 import ChatComposerModel from '../components/ChatComposerModel.vue';
+import ChatWorkspaceMenu from '../components/ChatWorkspaceMenu.vue';
 import { GATEWAY_PROVIDER, type AiConfigView, type AiTier } from '../../bridge.ts';
 import ChatNameDialog from '../components/ChatNameDialog.vue';
 import ChatMoveDialog from '../components/ChatMoveDialog.vue';
@@ -105,7 +106,7 @@ const view = computed(() => chat.current());
 const blocks = computed(() => replyBlocks(view.value?.items ?? []));
 const running = computed(() => !!view.value?.running);
 const title = computed(() => (chat.currentId && chat.sessions.find(s => s.id === chat.currentId)?.title) || '新对话');
-const workspaceName = computed(() => chat.workspace.replace(/\\/g, '/').split('/').filter(Boolean).at(-1) || '工作区');
+const workspaceName = computed(() => chat.currentWorkspace.replace(/\\/g, '/').split('/').filter(Boolean).at(-1) || '工作区');
 const compacting = computed(() => !!chat.currentId && chat.compactingId === chat.currentId);
 const canSend = computed(() => chat.configured && !running.value && !compacting.value && !attachmentReading.value && (draft.value.trim() !== '' || attachments.value.length > 0));
 const now = () => Math.floor(Date.now() / 1000);
@@ -418,7 +419,7 @@ async function openLink(href: string) {
 
     <div class="chat-main">
       <header class="chat-head">
-        <div class="head-location"><h2 data-testid="chat-title">{{ title }}</h2><button v-if="store.desktop" type="button" class="workspace-chip" data-testid="chat-workspace" :title="'当前工作区：' + (chat.workspace || '默认工作目录') + '。前往设置修改。'" @click="openSettings"><Folder :size="13" /><span>{{ workspaceName }}</span></button></div>
+        <div class="head-location"><h2 data-testid="chat-title">{{ title }}</h2><button v-if="store.desktop" type="button" class="workspace-chip" data-testid="chat-workspace" :title="'当前工作区：' + (chat.currentWorkspace || '默认工作目录') + '。点击在文件管理器中打开，在输入框下方切换。'" @click="chat.revealWorkspace()"><Folder :size="13" /><span>{{ workspaceName }}</span></button></div>
         <div class="head-actions">
           <button type="button" class="guide-chip" data-testid="chat-goal-toggle"
             :aria-expanded="goalOpen" @click="goalOpen = !goalOpen">
@@ -551,6 +552,7 @@ async function openLink(href: string) {
            </div>
            <div class="composer-row">
              <ChatWorkbenchTools :store="store" :disabled="!store.desktop" :file-disabled="!store.desktop || !chat.configured || running || attachmentReading || attachments.length >= MAX_IMAGES" :screenshot-disabled="!store.desktop || !chat.configured || running || capturing || attachments.length >= MAX_IMAGES" @file="openPicker" @screenshot="takeChatScreenshot" @use-expert="useExpert" @use-skill="useSkill" @use-connector="useConnector" />
+             <ChatWorkspaceMenu v-if="store.desktop" :chat="chat" :disabled="running" />
              <span class="composer-spacer" />
              <ChatContextRing v-if="store.desktop" :used="chat.context.used" :limit="chat.context.limit" :can-compact="chat.context.canCompact" :compacting="compacting" :busy="running" :disabled="!chat.currentId" @compact="chat.compact()" @resize="chat.setContextSize($event)" />
              <ChatComposerModel :label="modelLabel" :disabled="!store.desktop || running" @switched="composerModelSwitched" @settings="openSettings" />

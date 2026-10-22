@@ -29,15 +29,18 @@ pub struct AgentSettings {
     pub labelled: Vec<String>,
     /// The conversation each scheduled agent task (a care rule) adds its runs to, by rule id.
     pub scheduled_sessions: BTreeMap<String, String>,
+    /// Working folders chosen lately, newest first, for the chat page's folder menu.
+    pub recent_workspaces: Vec<String>,
 }
 
 impl Default for AgentSettings {
     fn default() -> Self {
-        Self { sandbox_network: true, grants: BTreeMap::new(), windows_sandbox: false, labelled: Vec::new(), scheduled_sessions: BTreeMap::new() }
+        Self { sandbox_network: true, grants: BTreeMap::new(), windows_sandbox: false, labelled: Vec::new(), scheduled_sessions: BTreeMap::new(), recent_workspaces: Vec::new() }
     }
 }
 
 const FILE: &str = "agent-settings.json";
+pub const RECENT_WORKSPACES: usize = 8;
 
 /// A missing or unreadable file gives the defaults: settings are conveniences, never needed to run.
 pub fn load(chat: &Path) -> AgentSettings {
@@ -72,6 +75,13 @@ impl AgentSettings {
             self.grants.remove(session);
         }
         removed
+    }
+
+    /// Puts a folder first in the recent list, keeping `RECENT_WORKSPACES` of them.
+    pub fn remember_workspace(&mut self, path: &str) {
+        self.recent_workspaces.retain(|p| p != path);
+        self.recent_workspaces.insert(0, path.to_string());
+        self.recent_workspaces.truncate(RECENT_WORKSPACES);
     }
 
     pub fn forget_session(&mut self, session: &str) -> bool {

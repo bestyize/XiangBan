@@ -20,6 +20,12 @@ mod prompt;
 mod project_rules;
 mod sandbox_gate;
 pub mod scheduled;
+pub mod workspace;
+
+/// A folder chosen as the default working folder in the settings is where the next new conversation starts.
+pub fn remember_workspace(app: &tauri::AppHandle, folder: &str) {
+    workspace::remember(app, folder);
+}
 mod run_history;
 pub(crate) mod task_outcome;
 mod learning;
@@ -134,8 +140,9 @@ fn now() -> (i64, u128) {
 pub struct ChatState {
     broker: Arc<Broker>,
     permission: Arc<Permission>,
-    /// The folder the shell works in, as of the latest message. The danger check needs it to tell work inside from outside.
-    workspace: Arc<Mutex<Option<PathBuf>>>,
+    /// The folder each conversation works in, as of its latest message. The danger check needs it to tell work
+    /// inside from outside, and two conversations may be answering in different folders at once.
+    workspaces: Workspaces,
     todo: Arc<Todo>,
     runs: Mutex<HashMap<String, Arc<AtomicBool>>>,
     /// Held for every active model/tool run, independent of whether its window is open.
@@ -148,9 +155,9 @@ pub struct ChatState {
     /// Actual schemas from the latest registration, keyed by whether native GUI tools are enabled.
     tool_tokens: Mutex<HashMap<bool, usize>>,
     connectors: Mutex<Option<Arc<agent_connector_tools::ConnectorManager>>>,
-    /// Background processes (dev servers, long builds) for the current working folder; kept across answers so a
-    /// `keep_alive` process outlives the answer that started it.
-    processes: Mutex<Option<Arc<ProcessManager>>>,
+    /// Background processes (dev servers, long builds), one manager per working folder; kept across answers so a
+    /// `keep_alive` process outlives the answer that started it, and switching folders stops nothing.
+    processes: Mutex<HashMap<PathBuf, Arc<ProcessManager>>>,
     /// The computer-control server, started once and shared by answers while it stays connected, instead of a
     /// new process for every message.
     computer_use: Mutex<Option<Arc<agent_kernel::mcp::McpClient>>>,
@@ -163,12 +170,12 @@ impl ChatState {
             let (app, broker) = (app.clone(), broker.clone());
             move |request: &ApprovalRequest<'_>| ask_approval(&app, &broker, request)
         };
-        let workspace = Arc::new(Mutex::new(None));
+        let workspaces = Workspaces::default();
         Self {
             broker,
             // Each conversation carries its own mode and sets it again before every run.
-            permission: Arc::new(permission_with_danger_check(PermissionMode::Ask, approver, workspace.clone())),
-            workspace,
+            permission: Arc::new(permission_with_danger_check(PermissionMode::Ask, approver, workspaces.clone())),
+            workspaces,
             todo: Arc::new(Todo::new()),
             runs: Mutex::new(HashMap::new()),
             leases: Mutex::new(HashMap::new()),
@@ -177,16 +184,25 @@ impl ChatState {
             auto_compact: compact::AutoCooldown::default(),
             tool_tokens: Mutex::new(HashMap::new()),
             connectors: Mutex::new(None),
-            processes: Mutex::new(None),
+            processes: Mutex::new(HashMap::new()),
             computer_use: Mutex::new(None),
         }
     }
 }
 
+/// Conversation id → the folder it works in.
+type Workspaces = Arc<Mutex<HashMap<String, PathBuf>>>;
+
+/// The folder a call works in: its conversation's, or for a research helper (`s1#research-…`) its parent's.
+fn folder_for(workspaces: &Workspaces, session: &str) -> Option<PathBuf> {
+    let map = lock(workspaces);
+    map.get(session).or_else(|| map.get(session.split('#').next().unwrap_or(session))).cloned()
+}
+
 /// "完全信任" runs everything except what `danger::assess` flags, which is asked every time.
 /// Shared by the app and its tests so the tests exercise the rules that really apply.
-fn permission_with_danger_check(mode: PermissionMode, approver: impl agent_kernel::Approver + 'static, workspace: Arc<Mutex<Option<PathBuf>>>) -> Permission {
-    Permission::new(mode, approver).danger_check(move |tool, args| {
+fn permission_with_danger_check(mode: PermissionMode, approver: impl agent_kernel::Approver + 'static, workspaces: Workspaces) -> Permission {
+    Permission::new(mode, approver).danger_check_in_session(move |session, tool, args| {
         // In Auto mode, always_ask alone does not trigger approval when a danger
         // policy is installed; third-party skill installation must be flagged here.
         if tool == "skill_install" || tool == "skill_run" || tool.starts_with("mcp_ext_") {
@@ -198,7 +214,7 @@ fn permission_with_danger_check(mode: PermissionMode, approver: impl agent_kerne
                 if tool == "computer_use_repair_permissions" {
             return Some("清除 com.ifuryst.opencomputeruse 的所选旧授权（同标识独立安装版也受影响），之后需重新授权；每次都需确认".to_string());
         }
-        danger::assess(tool, args, lock(&workspace).as_deref()).map(str::to_string)
+        danger::assess(tool, args, folder_for(&workspaces, session).as_deref()).map(str::to_string)
     })
     // "这类命令都允许" for one kind of simple command (`npm test`), never for commands in general.
     .remember_exec_as(danger::remember_key)
@@ -550,24 +566,22 @@ fn connector_manager(app: &tauri::AppHandle) -> Result<Arc<agent_connector_tools
 }
 pub fn shutdown_connectors(app:&tauri::AppHandle){
     if let Some(manager)=lock(&app.state::<ChatState>().connectors).as_ref(){manager.shutdown();}
-    if let Some(manager)=lock(&app.state::<ChatState>().processes).take(){let _=manager.shutdown();}
+    for (_, manager) in lock(&app.state::<ChatState>().processes).drain(){let _=manager.shutdown();}
     if let Some(client)=lock(&app.state::<ChatState>().computer_use).take(){client.close();}
 }
 
-/// The process manager for `workspace`. A different folder than last time stops the old folder's processes first,
-/// so nothing keeps running in a folder the assistant no longer works in.
+/// The process manager for `workspace`, made the first time a conversation works there. Conversations in other
+/// folders keep theirs, so one conversation switching folders never stops another's dev server.
 fn process_manager(app: &tauri::AppHandle, workspace: &Path) -> Result<Arc<ProcessManager>, String> {
     let state = app.state::<ChatState>();
-    let mut slot = lock(&state.processes);
-    if let Some(manager) = slot.as_ref() {
-        if manager.workspace() == workspace.canonicalize().unwrap_or_else(|_| workspace.to_path_buf()) {
-            return Ok(manager.clone());
-        }
-        let _ = manager.shutdown();
+    let mut managers = lock(&state.processes);
+    let key = workspace.canonicalize().unwrap_or_else(|_| workspace.to_path_buf());
+    if let Some(manager) = managers.get(&key) {
+        return Ok(manager.clone());
     }
     let config = agent_kernel::process::ProcessConfig { sandbox: Some(sandbox_gate::hook(state.permission.clone(), workspace)), ..Default::default() };
     let manager = Arc::new(ProcessManager::with_config(workspace, config)?);
-    *slot = Some(manager.clone());
+    managers.insert(key, manager.clone());
     Ok(manager)
 }
 
@@ -690,6 +704,7 @@ pub fn chat_overview(app: tauri::AppHandle, window: tauri::WebviewWindow) -> Res
         "groups": mutate(&app, |index| index.groups())?,
         "running": running,
         "workspace": config.workspace_or(&default).display().to_string(),
+        "recentWorkspaces": workspace::recent(&app)?,
         "permissionMode": mode,
         "hideToolCalls": config.hide_tool_calls,
     }))
@@ -745,15 +760,24 @@ fn interrupted_run(journal_dir: &Path) -> Option<(String, Vec<String>)> {
 /// An empty conversation. The chat page makes one when the first message is sent, so the page
 /// already knows the id when the answer's events start to arrive.
 #[tauri::command]
-pub fn chat_new_session(app: tauri::AppHandle, window: tauri::WebviewWindow, permission_mode: Option<String>) -> Result<SessionSummary, String> {
+pub fn chat_new_session(app: tauri::AppHandle, window: tauri::WebviewWindow, permission_mode: Option<String>, workspace: Option<String>) -> Result<SessionSummary, String> {
     chat_window(&window)?;
     let mode = match permission_mode.as_deref() {
         None => "ask",
         Some(mode @ ("ask" | "auto")) => mode,
         Some(_) => return Err("不支持的权限模式".into()),
     };
+    // A new conversation starts where the user last worked, or in the folder the page asked for.
+    let folder = match workspace.as_deref().map(str::trim).filter(|w| !w.is_empty()) {
+        Some(raw) => workspace::checked(raw)?,
+        None => workspace::for_new_conversation(&app)?,
+    };
     let (seconds, millis) = now();
-    mutate(&app, |index| index.create(seconds, millis, mode))?
+    let summary = mutate(&app, |index| index.create_in(seconds, millis, mode, &folder))??;
+    if !folder.is_empty() {
+        workspace::remember(&app, &folder);
+    }
+    Ok(summary)
 }
 
 #[tauri::command]
@@ -798,12 +822,13 @@ pub(crate) fn send(app: tauri::AppHandle, session_id: String, text: String, imag
         return Err("还没有配置模型，请先到“设置 → AI 模型”填写".into());
     }
     let default = ai_config::default_workspace(&app)?;
-    let workspace = config.workspace_or(&default).to_path_buf();
+    let saved = mutate(&app, |index| index.get(&session_id).cloned())?.ok_or("这个对话已经不存在")?;
+    let workspace = workspace::of(&saved, &config, &default);
     if workspace == default {
         fs::create_dir_all(&workspace).map_err(|e| format!("无法创建工作目录：{e}"))?;
     }
     if !workspace.is_dir() {
-        return Err(format!("工作目录不存在：{}，请到“设置 → AI 模型”重新选择", workspace.display()));
+        return Err(format!("工作目录不存在：{}，请在输入框下方换一个文件夹", workspace.display()));
     }
 
     let (seconds, _) = now();
@@ -827,7 +852,7 @@ pub(crate) fn send(app: tauri::AppHandle, session_id: String, text: String, imag
             state.permission.grant(&summary.id, &grant.tool, grant.kind.as_deref());
         }
     }
-    *lock(&state.workspace) = Some(workspace.clone());
+    lock(&state.workspaces).insert(summary.id.clone(), workspace.clone());
 
     let history_dir = Dirs::of(&app)?.sessions();
     let attachment_store = AttachmentStore::new(Dirs::of(&app)?.chat.join("attachments"));
@@ -1019,7 +1044,8 @@ pub fn chat_verify_file_outcome(app: tauri::AppHandle, window: tauri::WebviewWin
     }
     let config = ai_config::current(&app)?;
     let default = ai_config::default_workspace(&app)?;
-    let workspace = config.workspace_or(&default);
+    let summary = mutate(&app, |index| index.get(&session_id).cloned())?.ok_or("这个对话已经不存在")?;
+    let workspace = &workspace::of(&summary, &config, &default);
     let outcome=task_outcome::verify_file(&dirs.outcomes(), &session_id, &run_id, workspace, &relative_path, &expected_sha256)?;
     LearningDb::open(&dirs.learning_db())?.record_outcome(&run_id, &session_id,
         "succeeded", &outcome.validator, &outcome.evidence)?;
@@ -1141,9 +1167,10 @@ pub fn chat_delete_session(app: tauri::AppHandle, window: tauri::WebviewWindow, 
     let _ = fs::remove_dir_all(Dirs::of(&app)?.outcomes().join(&session_id));
     agent_kernel::goals::GoalStore::new(Dirs::of(&app)?.chat.join("goals")).delete(&session_id)?;
     let _ = fs::remove_dir_all(Dirs::of(&app)?.checkpoints().join(&session_id));
-    if let Some(manager) = lock(&state.processes).as_ref() {
+    for manager in lock(&state.processes).values() {
         let _ = manager.forget_session(&session_id);
     }
+    lock(&state.workspaces).remove(&session_id);
     state.permission.forget_session(&session_id);
     let chat_dir = Dirs::of(&app)?.chat;
     let mut settings = agent_settings::load(&chat_dir);
@@ -1190,14 +1217,19 @@ fn base_tokens(dirs: &Dirs, workspace: &Path, config: &AiConfig) -> usize {
     agent_kernel::estimate_tokens(&[Message::system(text)]) + config.token_budget().trim_headroom
 }
 
-fn context_of(app: &tauri::AppHandle, config: &AiConfig, raw: &[Message]) -> Result<ContextInfo, String> {
+fn context_of(app: &tauri::AppHandle, config: &AiConfig, session: Option<&str>, raw: &[Message]) -> Result<ContextInfo, String> {
     let dirs = Dirs::of(app)?;
     let default = ai_config::default_workspace(app)?;
+    // The conversation's own folder's rules count; a conversation not started yet would work where new ones do.
+    let workspace = match session.and_then(|id| mutate(app, |index| index.get(id).cloned()).ok().flatten()) {
+        Some(summary) => workspace::of(&summary, config, &default),
+        None => workspace::for_new_conversation(app).ok().filter(|w| !w.is_empty()).map(PathBuf::from).unwrap_or_else(|| config.workspace_or(&default).to_path_buf()),
+    };
     // The actual schemas once tools were registered this launch, else what the last launch measured, else an
     // allowance close to the real size (see `TOOL_TOKENS_BEFORE_FIRST_ANSWER`), so the ring is neither empty nor inflated.
     let measured = lock(&app.state::<ChatState>().tool_tokens).get(&config.open_computer_use).copied();
     let tool_tokens = measured.or_else(|| saved_tool_tokens(&dirs, config.open_computer_use)).unwrap_or(TOOL_TOKENS_BEFORE_FIRST_ANSWER);
-    Ok(compact::measure(raw, base_tokens(&dirs, config.workspace_or(&default), config) + tool_tokens, config.token_budget().context_limit))
+    Ok(compact::measure(raw, base_tokens(&dirs, &workspace, config) + tool_tokens, config.token_budget().context_limit))
 }
 
 /// How big the next request in a conversation would be, against the limit chosen in settings.
@@ -1213,7 +1245,7 @@ pub fn chat_context(app: tauri::AppHandle, window: tauri::WebviewWindow, session
         }
         None => Vec::new(),
     };
-    context_of(&app, &config, &raw)
+    context_of(&app, &config, session_id.as_deref(), &raw)
 }
 
 /// Has the model summarize the older part of a conversation and saves the summary. Returns its text.
@@ -1233,7 +1265,7 @@ fn compact_session(app: &tauri::AppHandle, id: &str, cancel: &AtomicBool) -> Res
     let (config, key_source) = ai_gateway::prepare(app, config)?;
     write_summary(app, &config, key_source, id, cancel)?;
     let raw = JsonlStore::new(Dirs::of(app)?.sessions()).load(id).map_err(|e| e.to_string())?;
-    context_of(app, &config, &raw)
+    context_of(app, &config, Some(id), &raw)
 }
 
 /// After an answer went through: once the next request would use 90% of the context limit, the older part is
@@ -1243,7 +1275,7 @@ fn compact_session(app: &tauri::AppHandle, id: &str, cancel: &AtomicBool) -> Res
 fn auto_compact(app: &tauri::AppHandle, id: &str, config: &AiConfig, key_source: Option<KeySource>, cancel: &AtomicBool) {
     let Ok(dirs) = Dirs::of(app) else { return };
     let Ok(raw) = JsonlStore::new(dirs.sessions()).load(id) else { return };
-    let Ok(info) = context_of(app, config, &raw) else { return };
+    let Ok(info) = context_of(app, config, Some(id), &raw) else { return };
     let state = app.state::<ChatState>();
     if !compact::due(&info) || !state.auto_compact.allowed(id, std::time::Instant::now()) {
         return;
