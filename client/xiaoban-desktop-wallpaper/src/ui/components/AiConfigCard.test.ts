@@ -357,7 +357,11 @@ describe('fetching model list in modal', () => {
     const fetchBtn = q<HTMLButtonElement>('ai-fetch-models');
     expect(fetchBtn?.disabled).toBe(false);
 
-    ipc.mockResolvedValueOnce(['deepseek-chat', 'deepseek-reasoner', 'deepseek-coder'] as never);
+    ipc.mockResolvedValueOnce([
+      { id: 'deepseek-chat', name: 'DeepSeek Chat' },
+      { id: 'deepseek-reasoner', name: 'DeepSeek Reasoner', maxOutputTokens: 65536, contextWindowTokens: 128000 },
+      { id: 'deepseek-coder', name: 'DeepSeek Coder' },
+    ] as never);
     await click('ai-fetch-models');
 
     expect(ipc).toHaveBeenLastCalledWith('fetch_ai_models', {
@@ -375,6 +379,28 @@ describe('fetching model list in modal', () => {
     await flushPromises();
 
     expect(field('ai-model').value).toBe('deepseek-reasoner');
+
+    ipc.mockResolvedValueOnce(configured as never);
+    saveButton().click();
+    await flushPromises();
+    expect(ipc).toHaveBeenCalledWith('save_ai_provider', expect.objectContaining({
+      model: 'deepseek-reasoner',
+      discoveredModel: expect.objectContaining({
+        id: 'deepseek-reasoner', maxOutputTokens: 65536, contextWindowTokens: 128000,
+      }),
+    }));
+  });
+
+  it('never saves endpoint metadata after changing the API address', async () => {
+    await open(configured);
+    await openModal('deepseek');
+    ipc.mockResolvedValueOnce([{ id: 'model-a', name: 'model-a', maxOutputTokens: 65536 }] as never);
+    await click('ai-fetch-models');
+    await type('ai-base-url', 'https://different.example.com/v1');
+    ipc.mockResolvedValueOnce(configured as never);
+    saveButton().click();
+    await flushPromises();
+    expect(ipc).toHaveBeenCalledWith('save_ai_provider', expect.objectContaining({ discoveredModel: null }));
   });
 
   it('notifies error when fetch fails', async () => {
