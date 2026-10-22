@@ -64,7 +64,7 @@ const attention = computed(() => store.chat.attention);
 
 interface Space { key: string; name: string; path: string; sessions: SessionSummary[] }
 const RECENT = '__recent__';
-const folderName = (path: string) => path.split(/[\\/]+/).filter(Boolean).pop() || path;
+const folderName = (path: string) => path === store.chat.workspace ? '默认分组' : path.split(/[\\/]+/).filter(Boolean).pop() || path;
 /** 空间: 最近任务 (conversations without a folder) first, then one entry per working folder, named after the folder. */
 const spaces = computed<Space[]>(() => {
   const recent: Space = { key: RECENT, name: '最近任务', path: '', sessions: [] };
@@ -520,4 +520,5 @@ const fixedPages = ['new-task', 'chat', 'ai-store', 'library', 'studio', 'games'
 .is-collapsed .account-chip{justify-content:center;padding:0}
 .is-collapsed .sidebar-scroll{margin:0;padding:0}
 </style>
+
 
