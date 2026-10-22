@@ -42,7 +42,6 @@ export type AiReasoningEffort = "low" | "medium" | "high" | "xhigh" | "max";
 
 export type ProviderType = "third" | "free" | "paid" | "custom";
 export interface ProviderConfigView {
-  maxOutputTokens?: number;
   replyPreference?: AiReplyPreference;
   reasoningEfforts?: AiReasoningEffort[] | null;
   type?: ProviderType;
