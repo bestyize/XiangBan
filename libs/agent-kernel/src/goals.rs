@@ -69,6 +69,31 @@ fn valid_id(id: &str) -> bool {
         id.bytes().all(|c| c.is_ascii_alphanumeric() || c == b'-' || c == b'_')
 }
 
+/// Replaces an existing record without exposing partially written JSON.
+/// Windows std::fs::rename cannot reliably replace an existing destination;
+/// use MoveFileExW with REPLACE_EXISTING and WRITE_THROUGH instead.
+#[cfg(windows)]
+fn replace_atomically(from: &Path, to: &Path) -> Result<(), String> {
+    use std::os::windows::ffi::OsStrExt;
+    #[link(name = "kernel32")]
+    extern "system" {
+        fn MoveFileExW(from: *const u16, to: *const u16, flags: u32) -> i32;
+    }
+    let src: Vec<u16> = from.as_os_str().encode_wide().chain(Some(0)).collect();
+    let dst: Vec<u16> = to.as_os_str().encode_wide().chain(Some(0)).collect();
+    const MOVEFILE_REPLACE_EXISTING: u32 = 1;
+    const MOVEFILE_WRITE_THROUGH: u32 = 8;
+    if unsafe { MoveFileExW(src.as_ptr(), dst.as_ptr(),
+        MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH) } == 0 {
+        return Err(std::io::Error::last_os_error().to_string());
+    }
+    Ok(())
+}
+#[cfg(not(windows))]
+fn replace_atomically(from: &Path, to: &Path) -> Result<(), String> {
+    fs::rename(from, to).map_err(|e| e.to_string())
+}
+
 /// Disk-backed goal metadata. Atomic file replacement prevents torn JSON;
 /// the embedding host must serialize writes per session. It is *not* a
 /// cross-process transaction or a distributed lease.
@@ -115,7 +140,7 @@ impl GoalStore {
             { use std::os::unix::fs::OpenOptionsExt; options.mode(0o600); }
             let mut file = options.open(&temp).map_err(|e| e.to_string())?;
             file.write_all(&bytes).and_then(|_| file.sync_all()).map_err(|e| e.to_string())?;
-            fs::rename(&temp, &path).map_err(|e| e.to_string())?;
+            replace_atomically(&temp, &path)?;
             #[cfg(unix)]
             File::open(&self.root).and_then(|f| f.sync_all()).map_err(|e| e.to_string())?;
             Ok(())
@@ -180,5 +205,68 @@ impl GoalRecord {
         self.note = evidence.into();
         self.updated_at_ms = now_ms;
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn contract() -> GoalContract {
+        GoalContract { outcome: "修复测试失败".into(), verification: "测试全部通过".into(),
+            constraints: "不修改公开接口".into(), boundaries: "libs/agent-kernel".into(),
+            stop_when: "需要新的密钥".into() }
+    }
+    fn dir() -> PathBuf {
+        let name = format!("agent-goal-test-{}-{}",
+            std::process::id(), TEMP.fetch_add(1, Ordering::Relaxed));
+        std::env::temp_dir().join(name)
+    }
+    #[test]
+    fn persisted_goal_is_roundtrippable_and_model_completion_is_not_acceptance() {
+        let root = dir();
+        let store = GoalStore::new(&root);
+        let mut goal = GoalRecord::draft("session-1".into(), contract(), 1).unwrap();
+        store.save(&goal).unwrap();
+        assert_eq!(store.load("session-1").unwrap(), Some(goal.clone()));
+        goal.begin(2).unwrap();
+        goal.observe("run-1", crate::RunState::Running, 3).unwrap();
+        goal.observe("run-1", crate::RunState::Completed, 4).unwrap();
+        assert_eq!(goal.state, GoalState::AwaitingVerification);
+        assert!(goal.finish_verified("", 5).is_err());
+        store.save(&goal).unwrap(); // exercises replacing an existing file
+        assert_eq!(store.load("session-1").unwrap(), Some(goal.clone()));
+        goal.finish_verified("已核验测试报告，全部通过", 6).unwrap();
+        assert_eq!(goal.state, GoalState::Completed);
+        assert!(goal.begin(7).is_err());
+        store.save(&goal).unwrap();
+        store.delete("session-1").unwrap();
+        assert_eq!(store.load("session-1").unwrap(), None);
+        let _ = fs::remove_dir_all(root);
+    }
+    #[test]
+    fn unexpected_identity_or_corrupt_data_fail_closed() {
+        let root = dir();
+        let store = GoalStore::new(&root);
+        assert!(store.load("../elsewhere").is_err());
+        let mut goal = GoalRecord::draft("session-2".into(), contract(), 1).unwrap();
+        goal.begin(2).unwrap();
+        assert!(goal.observe("run-x", crate::RunState::Running, 3).is_ok());
+        assert!(goal.observe("run-y", crate::RunState::Completed, 4).is_err());
+        store.save(&goal).unwrap();
+        let mut data: serde_json::Value =
+            serde_json::from_slice(&fs::read(root.join("session-2.json")).unwrap()).unwrap();
+        data["sessionId"] = serde_json::json!("different");
+        fs::write(root.join("session-2.json"), serde_json::to_vec(&data).unwrap()).unwrap();
+        assert!(store.load("session-2").is_err());
+        let _ = fs::remove_dir_all(root);
+    }
+    #[test]
+    fn invalid_or_unbounded_contract_is_rejected() {
+        let mut c = contract();
+        c.outcome = " ".into();
+        assert!(c.validate().is_err());
+        c.outcome = "a".repeat(2_001);
+        assert!(c.validate().is_err());
     }
 }
