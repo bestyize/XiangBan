@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { flushPromises, mount } from '@vue/test-utils';
+import { flushPromises, mount, type VueWrapper } from '@vue/test-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import ChatGoalPanel from './ChatGoalPanel.vue';
 
@@ -17,7 +17,7 @@ const goal = (state: string) => ({
   attempts: 1, lastRunId: 'r-1', updatedAtMs: 1, note: '',
 });
 
-const wrappers: ReturnType<typeof mount>[] = [];
+const wrappers: VueWrapper[] = [];
 function open(props: Partial<typeof baseProps> = {}) {
   const wrapper = mount(ChatGoalPanel, { props: { ...baseProps, ...props } });
   wrappers.push(wrapper);
