@@ -899,44 +899,76 @@ pub fn candidate_models_urls(protocol: &str, base_url: &str) -> Vec<String> {
     }
 }
 
+/// Parse optional capabilities from the *selected endpoint* rather than deriving
+/// them from hard-coded model names. Many /models APIs return IDs only; keep all
+/// absent fields as None so the kernel can use protocol-specific recovery.
+pub fn parse_model_details_json(raw: &str, protocol: &str) -> Result<Vec<ModelConfig>, String> {
+    let value: serde_json::Value = serde_json::from_str(raw)
+        .map_err(|e| format!("解析服务商返回的 JSON 失败：{e}"))?;
+    let models = value.get("data").and_then(|v| v.as_array())
+        .or_else(|| value.get("models").and_then(|v| v.as_array()))
+        .or_else(|| value.as_array())
+        .ok_or_else(|| "服务商返回的数据中未包含模型列表".to_string())?;
+
+    fn number(value: &serde_json::Value, keys: &[&str], ceiling: u64) -> Option<u64> {
+        keys.iter().filter_map(|key| value.get(*key).and_then(|v| v.as_u64()))
+            .find(|n| *n > 0 && *n <= ceiling)
+    }
+    fn flag(value: &serde_json::Value, keys: &[&str]) -> Option<bool> {
+        keys.iter().find_map(|key| value.get(*key).and_then(|v| v.as_bool()))
+    }
+    let mut parsed = Vec::new();
+    for item in models {
+        let id = item.as_str().or_else(|| item.get("id").and_then(|v| v.as_str()))
+            .or_else(|| item.get("name").and_then(|v| v.as_str()))
+            .unwrap_or("").trim();
+        if id.is_empty() || id.len() > MAX_MODEL || id.chars().any(char::is_control) { continue; }
+        let mut model = ModelConfig { id: id.into(), name: id.into(), ..ModelConfig::default() };
+        if let Some(name) = item.get("display_name").or_else(|| item.get("displayName"))
+            .and_then(|v| v.as_str()).filter(|v| !v.is_empty() && v.len() <= 250)
+        {
+            model.name = name.into();
+        }
+        if let Some(description) = item.get("description").and_then(|v| v.as_str())
+            .filter(|v| v.len() <= 500)
+        {
+            model.description = description.into();
+        }
+        let output_keys = if protocol == "anthropic" {
+            &["max_output_tokens", "maxOutputTokens", "max_completion_tokens", "max_tokens"][..]
+        } else {
+            &["max_output_tokens", "maxOutputTokens", "max_completion_tokens", "maxCompletionTokens"][..]
+        };
+        model.max_output_tokens = number(item, output_keys, 2_000_000).map(|n| n as u32)
+            .or_else(|| item.get("top_provider")
+                .and_then(|v| number(v, &["max_completion_tokens"], 2_000_000))
+                .map(|n| n as u32));
+        let context_keys = if protocol == "anthropic" {
+            &["max_input_tokens", "context_window_tokens", "context_window", "context_length", "contextLength"][..]
+        } else {
+            &["context_window_tokens", "context_window", "context_length", "contextLength", "max_model_len"][..]
+        };
+        model.context_window_tokens = number(item, context_keys, 16_000_000).map(|n| n as usize);
+        model.supports_tools = flag(item, &["supports_tools", "supportsTools", "tool_calling", "toolCalling"]);
+        model.supports_vision = flag(item, &["supports_vision", "supportsVision", "vision"]);
+        // Models APIs may also expose a nested capabilities object.
+        if let Some(capabilities) = item.get("capabilities") {
+            model.supports_tools = model.supports_tools.or_else(|| capabilities.get("tool_use")
+                .and_then(|v| flag(v, &["supported"])));
+            model.supports_vision = model.supports_vision.or_else(|| capabilities.get("vision")
+                .and_then(|v| flag(v, &["supported"])));
+        }
+        parsed.push(model);
+    }
+    parsed.sort_by(|a, b| a.id.cmp(&b.id));
+    parsed.dedup_by(|a, b| a.id == b.id);
+    if parsed.is_empty() { return Err("服务商返回的数据中未包含任何模型".into()); }
+    Ok(parsed)
+}
+
+/// Backwards-compatible ID-only parser used by earlier clients and tests.
 pub fn parse_model_list_json(raw: &str) -> Result<Vec<String>, String> {
-    let value: serde_json::Value = serde_json::from_str(raw).map_err(|e| format!("解析服务商返回的 JSON 失败：{e}"))?;
-    let mut models = Vec::new();
-
-    if let Some(data) = value.get("data").and_then(|v| v.as_array()) {
-        for item in data {
-            if let Some(id) = item.get("id").and_then(|id| id.as_str()) {
-                models.push(id.trim().to_string());
-            } else if let Some(id) = item.as_str() {
-                models.push(id.trim().to_string());
-            }
-        }
-    } else if let Some(items) = value.get("models").and_then(|v| v.as_array()) {
-        for item in items {
-            if let Some(id) = item.get("name").and_then(|n| n.as_str()).or_else(|| item.get("id").and_then(|i| i.as_str())) {
-                models.push(id.trim().to_string());
-            } else if let Some(id) = item.as_str() {
-                models.push(id.trim().to_string());
-            }
-        }
-    } else if let Some(items) = value.as_array() {
-        for item in items {
-            if let Some(id) = item.get("id").and_then(|i| i.as_str()).or_else(|| item.get("name").and_then(|n| n.as_str())) {
-                models.push(id.trim().to_string());
-            } else if let Some(id) = item.as_str() {
-                models.push(id.trim().to_string());
-            }
-        }
-    }
-
-    models.retain(|m| !m.is_empty());
-    models.sort();
-    models.dedup();
-
-    if models.is_empty() {
-        return Err("服务商返回的数据中未包含任何模型".into());
-    }
-    Ok(models)
+    Ok(parse_model_details_json(raw, "chat")?.into_iter().map(|m| m.id).collect())
 }
 
 #[tauri::command]
@@ -945,7 +977,7 @@ pub async fn fetch_ai_models(
     protocol: String,
     base_url: String,
     api_key: Option<String>,
-) -> Result<Vec<String>, String> {
+) -> Result<Vec<ModelConfig>, String> {
     let base_url = clean_base_url(&base_url)?;
     let protocol = if PROTOCOLS.contains(&protocol.as_str()) { protocol } else { "chat".into() };
 
@@ -1008,7 +1040,7 @@ pub async fn fetch_ai_models(
             }
 
             let body = resp.text().map_err(|e| format!("读取响应失败：{e}"))?;
-            return parse_model_list_json(&body);
+            return parse_model_details_json(&body, &protocol);
         }
 
         if last_error.is_empty() {
