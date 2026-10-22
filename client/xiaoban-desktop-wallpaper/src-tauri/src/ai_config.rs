@@ -239,9 +239,9 @@ impl AiConfig {
             "responses" => ModelProtocol::Responses,
             _ => ModelProtocol::ChatCompletions,
         };
-        let declared = self.providers.iter().find(|p| p.id == self.active_provider
-            && p.base_url == self.base_url && p.model == self.model && p.protocol == self.protocol)
-            .and_then(|p| p.models.iter().find(|m| m.id == self.model));
+        let provider = self.providers.iter().find(|p| p.id == self.active_provider
+            && p.base_url == self.base_url && p.model == self.model && p.protocol == self.protocol);
+        let declared = provider.and_then(|p| p.models.iter().find(|m| m.id == self.model));
         ModelCapabilities::resolve(
             protocol, &self.model,
             declared.and_then(|m| m.context_window_tokens),
@@ -249,7 +249,8 @@ impl AiConfig {
         ).with_declared_features(
             declared.and_then(|m| m.supports_tools),
             declared.and_then(|m| m.supports_vision),
-            declared.and_then(|m| m.reasoning_efforts.clone()),
+            provider.and_then(|p| p.reasoning_efforts.clone())
+                .or_else(|| declared.and_then(|m| m.reasoning_efforts.clone())),
         )
     }
 
@@ -284,9 +285,8 @@ impl AiConfig {
 
     pub(crate) fn reasoning_levels(&self) -> Vec<String> {
         if self.active_provider == crate::ai_gateway::GATEWAY_ID { return self.gateway_reasoning_efforts.clone(); }
-        let provider = self.providers.iter().find(|p| p.id == self.active_provider && p.base_url == self.base_url && p.model == self.model && p.protocol == self.protocol);
-        let declared = provider.and_then(|p| p.reasoning_efforts.as_deref().or_else(|| p.models.iter().find(|m| m.id == self.model).and_then(|m| m.reasoning_efforts.as_deref())));
-        ai_reasoning::levels(&self.model, &self.protocol, declared)
+        let capabilities = self.model_capabilities();
+        ai_reasoning::levels(&self.model, &self.protocol, capabilities.reasoning_efforts.as_deref())
     }
 }
 
