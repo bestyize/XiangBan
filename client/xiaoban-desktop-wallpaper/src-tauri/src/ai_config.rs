@@ -690,6 +690,7 @@ pub fn save_ai_provider(
     reply_preference: Option<ReplyPreference>,
     reasoning_efforts: Option<Vec<String>>,
     clear_reasoning_efforts: Option<bool>,
+    discovered_model: Option<ModelConfig>,
 ) -> Result<AiConfigView, String> {
     let path = path(&app)?;
     let state = app.state::<AiConfigState>();
@@ -713,6 +714,30 @@ pub fn save_ai_provider(
     }
     if previous.model != clean_mdl || previous.protocol != protocol {
         previous.reasoning_efforts = None;
+    }
+    // Model facts are scoped to the exact endpoint. An old provider catalogue
+    // must never leak capabilities into a newly configured proxy URL.
+    if (previous.base_url != clean_url || previous.protocol != protocol)
+        && (!previous.remote || previous.provider_type == "third")
+    {
+        previous.models.clear();
+    }
+    if let Some(model) = discovered_model {
+        if previous.remote && previous.provider_type != "third" {
+            return Err("官方模型能力由服务端目录管理".into());
+        }
+        if model.id != clean_mdl || model.id.len() > MAX_MODEL
+            || model.max_output_tokens.is_some_and(|n| n == 0 || n > 2_000_000)
+            || model.context_window_tokens.is_some_and(|n| n == 0 || n > 16_000_000)
+            || model.name.len() > 250 || model.description.len() > 500
+            || model.reasoning_efforts.as_ref().is_some_and(|v| ai_reasoning::validate(v).is_err())
+        {
+            return Err("服务商模型能力数据无效".into());
+        }
+        // Only the selected discovered model is persisted; the list of IDs
+        // can be large, and all other models will be re-resolved when selected.
+        previous.models.retain(|m| m.id != model.id);
+        previous.models.push(model);
     }
     if let Some(levels) = reasoning_efforts { ai_reasoning::validate(&levels)?; previous.reasoning_efforts = Some(levels); }
     if clear_reasoning_efforts.unwrap_or(false) { previous.reasoning_efforts = None; }
