@@ -501,6 +501,8 @@ const fixedPages = ['new-task', 'chat', 'ai-store', 'library', 'studio', 'games'
 .is-collapsed .control-sidebar{padding:0 8px 12px}
 .is-collapsed .sidebar-top{justify-content:center}
 .window-drag{position:absolute;top:0;left:0;right:0;height:8px;z-index:20}
+/* Native macOS traffic lights need 88px even when the navigation is folded. */
+.control-app.is-mac.is-collapsed{--ui-sidebar-collapsed:88px}
 .is-mac .sidebar-top{padding-left:68px}
 .is-mac.is-collapsed .sidebar-top{height:72px;padding-left:0;align-items:flex-end}
 .is-win .window-drag{height:34px}
@@ -518,3 +520,4 @@ const fixedPages = ['new-task', 'chat', 'ai-store', 'library', 'studio', 'games'
 .is-collapsed .account-chip{justify-content:center;padding:0}
 .is-collapsed .sidebar-scroll{margin:0;padding:0}
 </style>
+
