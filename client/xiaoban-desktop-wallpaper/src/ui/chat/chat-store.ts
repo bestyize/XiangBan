@@ -351,7 +351,10 @@ export function createChatStore(deps: ChatDeps): ChatStore {
       try {
         await deps.invoke('chat_answer_approval', { id: request.id, decision });
       } catch (error) {
-        if (!String(error).includes(STALE)) deps.notify(error, 'error');
+        if (String(error).includes(STALE)) return;
+        // The run is still waiting on this answer: put the card back so it can be answered again.
+        if (view) addPending(view.approvals, request);
+        deps.notify(error, 'error');
       }
     },
 
@@ -361,7 +364,9 @@ export function createChatStore(deps: ChatDeps): ChatStore {
       try {
         await deps.invoke('chat_answer_question', { id: request.id, answer });
       } catch (error) {
-        if (!String(error).includes('这个问题已经结束')) deps.notify(error, 'error');
+        if (String(error).includes('这个问题已经结束')) return;
+        if (view) addPending(view.questions, request);
+        deps.notify(error, 'error');
       }
     },
   }) as ChatStore;

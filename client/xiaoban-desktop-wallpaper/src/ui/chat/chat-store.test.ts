@@ -408,6 +408,18 @@ describe('confirmations and questions', () => {
     expect(h.deps.notify).toHaveBeenCalledWith('连接断开', 'error');
   });
 
+  it('puts a card back when the answer could not be delivered, so the run is not left waiting', async () => {
+    const h = harness({ chat_answer_approval: () => { throw '连接断开'; }, chat_answer_question: () => { throw '连接断开'; } });
+    await h.store.init();
+    h.emit('chat-approval', approval('a1'));
+    h.emit('chat-question', question('q1'));
+    await h.store.answerApproval(approval('a1'), 'once');
+    await h.store.answerQuestion(question('q1'), '桌面');
+    expect(h.store.views.s1.approvals.map(a => a.id)).toEqual(['a1']);
+    expect(h.store.views.s1.questions.map(q => q.id)).toEqual(['q1']);
+    expect(h.store.attention).toBe(2);
+  });
+
   it('drops them when the answer ends, however it ends', async () => {
     const h = harness();
     await h.store.init();
