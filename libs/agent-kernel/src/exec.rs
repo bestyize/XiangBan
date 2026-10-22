@@ -48,7 +48,11 @@ fn await_call(call: &Inflight, cancel: &AtomicBool) -> ToolResult {
                 }
                 if call.deadline.is_some_and(|d| Instant::now() >= d) {
                     call.call_cancel.store(true, Ordering::Relaxed);
-                    return ToolResult::error(format!("tool timed out after {}s", call.timeout.as_secs()));
+                    // Cancellation is cooperative: a tool that does not check it may still be running and finish its action.
+                    return ToolResult::error(format!(
+                        "tool timed out after {}s and was asked to stop. It may still finish in the background, so its action may already have happened or happen shortly. Check the actual state before retrying; do not repeat it blindly.",
+                        call.timeout.as_secs()
+                    ));
                 }
             }
         }
