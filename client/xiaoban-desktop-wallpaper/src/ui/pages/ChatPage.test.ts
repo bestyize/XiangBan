@@ -5,7 +5,6 @@ import { NSlider } from 'naive-ui';
 import { reactive } from 'vue';
 import ChatPage from './ChatPage.vue';
 import ChatNameDialog from '../components/ChatNameDialog.vue';
-import ChatMoveDialog from '../components/ChatMoveDialog.vue';
 import { createChatStore, CONTINUE_TEXT, type ChatDeps } from '../chat/chat-store.ts';
 import type { ControlStore } from '../control-types.ts';
 import type { ApprovalRequest, ChatGroup, KernelEvent, Overview, SessionSummary, WireMessage } from '../chat/types.ts';
@@ -18,6 +17,7 @@ const overview = (patch: Partial<Overview> = {}): Overview => ({ configured: tru
 
 type Responder = (args: Record<string, unknown> | undefined) => unknown;
 let wrapper: VueWrapper | undefined;
+let currentStore: ControlStore | undefined;
 
 async function open(responders: Record<string, Responder> = {}, options: { desktop?: boolean } = {}) {
   const handlers = new Map<string, (payload: never) => void>();
@@ -37,7 +37,9 @@ async function open(responders: Record<string, Responder> = {}, options: { deskt
   const deps: ChatDeps = { desktop, invoke, notify, listen: async (event, callback) => { handlers.set(event, callback as never); return () => {}; } };
   vi.mocked(bridgeInvoke).mockImplementation(invoke as never);
   const chat = createChatStore(deps);
-  const store = reactive({ desktop, chat, settingsTab: 'general', page: 'chat', navigate: vi.fn(), notify }) as unknown as ControlStore;
+  const store = reactive({ desktop, chat, settingsTab: 'general', page: 'chat', navigate: vi.fn(), notify, openSettings: vi.fn() }) as unknown as ControlStore;
+  vi.mocked(store.openSettings).mockImplementation(tab => { if (tab) store.settingsTab = tab; });
+  currentStore = store;
   wrapper = mount(ChatPage, { props: { store }, attachTo: document.body });
   await flushPromises();
   const emit = (event: string, payload: unknown) => handlers.get(event)!(payload as never);
@@ -52,14 +54,15 @@ async function click(id: string) { q<HTMLButtonElement>(id)!.click(); await flus
 // Menus and dialogs are teleported out of the page, so they are looked up on the whole document.
 const inBody = <T extends HTMLElement = HTMLElement>(id: string) => document.body.querySelector(`[data-testid="${id}"]`) as T | null;
 async function clickBody(id: string) { const el = inBody(id); if (!el) throw new Error(`missing ${id}`); el.click(); await flushPromises(); }
-async function openMenu(id: string) { await click(`chat-menu-${id}`); await flushPromises(); }
-async function openGroupMenu(id: string) { await click(`chat-group-menu-${id}`); await flushPromises(); }
+/** Conversations are opened from the 空间 tree in the sidebar, which selects them in the chat store. */
+async function openSession(id: string) { await currentStore!.chat.select(id); await flushPromises(); }
+/** The title bar's ⋯ menu of the open conversation. */
+async function openMenu(id: string) { await openSession(id); await click('chat-more'); }
 async function typeName(value: string) { const input = inBody('chat-name-input')!.querySelector('input')!; input.value = value; input.dispatchEvent(new Event('input')); await flushPromises(); }
 async function submitName() { inBody('chat-name-ok')!.closest('form')!.dispatchEvent(new Event('submit', { cancelable: true })); await flushPromises(); }
 const nameInput = () => inBody('chat-name-input')?.querySelector('input')?.value;
 // A closed modal stays in the document until its leave transition ends, which never happens here, so ask the component.
 const nameDialogOpen = () => wrapper!.findComponent(ChatNameDialog).props('show');
-const moveDialogOpen = () => wrapper!.findComponent(ChatMoveDialog).props('show');
 async function type(value: string) { const t = textarea(); t.value = value; t.dispatchEvent(new Event('input', { bubbles: true })); await flushPromises(); }
 async function press(init: KeyboardEventInit & { keyCode?: number }) {
   const event = new KeyboardEvent('keydown', { bubbles: true, cancelable: true, ...init });
@@ -149,7 +152,7 @@ describe('the chat page before a conversation', () => {
     expect(textarea().placeholder).toContain('先到设置里配置模型');
     await click('chat-go-settings');
     expect(h.store.settingsTab).toBe('ai');
-    expect(h.store.navigate).toHaveBeenCalledWith('settings');
+    expect(h.store.openSettings).toHaveBeenCalledWith('ai');
   });
 
   it('offers things to try and fills the box with the one picked', async () => {
@@ -177,19 +180,39 @@ describe('the chat page before a conversation', () => {
     expect(textarea().disabled).toBe(true);
   });
 
-  it('has an AI model settings button in the header that opens the AI tab', async () => {
+  it('keeps AI model settings in the title bar\'s more menu and opens the AI tab of the settings dialog', async () => {
     const h = await open();
+    await click('chat-more');
+    expect(q('chat-more')!.getAttribute('aria-expanded')).toBe('true');
     expect(q('chat-ai-config')!.textContent).toContain('AI 模型配置');
-    expect(q('chat-workspace')?.textContent).toContain('工作区');
     await click('chat-ai-config');
     expect(h.store.settingsTab).toBe('ai');
+    expect(h.store.openSettings).toHaveBeenCalledWith('ai');
+    expect(q('chat-more')!.getAttribute('aria-expanded')).toBe('false');
   });
 
-  it('opens the capability guide from the header or welcome screen', async () => {
+  it('shows where a new conversation will go in the title bar: 最近任务, or the folder chosen for it', async () => {
+    const h = await open();
+    expect(q('chat-workspace')!.textContent).toBe('最近任务');
+    expect(q('chat-title')!.textContent).toBe('新对话');
+    h.chat.pendingWorkspace = '/Users/me/官网改版';
+    await flushPromises();
+    expect(q('chat-workspace')!.textContent).toBe('官网改版');
+  });
+
+  it('opens the capability guide from the more menu or welcome screen', async () => {
     await open();
-    expect(q('chat-open-guide')).not.toBeNull();
+    await click('chat-more');
     await click('chat-open-guide');
     expect(document.body.textContent).toContain('小伴桌面 · AI 玩法指南');
+  });
+
+  it('toggles the long-term goal panel from the more menu', async () => {
+    await open();
+    expect(q('chat-goal-toggle')!.getAttribute('aria-checked')).toBe('false');
+    await click('chat-more');
+    await click('chat-goal-toggle');
+    expect(q('chat-goal-toggle')!.getAttribute('aria-checked')).toBe('true');
   });
 });
 
@@ -279,7 +302,7 @@ describe('talking', () => {
     expect(q('tool-t2')!.classList.contains('error')).toBe(true);
   });
 
-  it('places a turn’s tool history below its final reply and folds it when finished', async () => {
+  it('puts a turn’s tool history under the 小伴 heading, above its replies, and folds it to a summary when finished', async () => {
     const h = await open(startChat);
     await type('读取浏览器');
     await click('chat-send');
@@ -294,9 +317,12 @@ describe('talking', () => {
     expect(q('activity-live')).toBeNull();
     expect(q('activity-history')).toBeNull();
     expect(q('activity-toggle')!.getAttribute('aria-expanded')).toBe('false');
+    expect(q('activity-toggle')!.textContent).toContain('已完成');
+    expect(q('activity-toggle')!.textContent).toMatch(/用时 \d+ 秒/);
     const messages = all('[data-testid="msg-assistant"]');
     expect(messages.at(-1)!.textContent).toContain('页面读取完成');
-    expect(messages.at(-1)!.compareDocumentPosition(q('chat-activity')!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(q('chat-activity')!.compareDocumentPosition(messages[0]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(q('chat-activity')!.closest('[data-testid="chat-reply"]')!.querySelector('.reply-head')!.textContent).toContain('小伴');
     await click('activity-toggle');
     expect(all('[data-testid^="tool-"]')).toHaveLength(12);
   });
@@ -447,58 +473,85 @@ describe('asking the user', () => {
   });
 });
 
-describe('the list of conversations', () => {
+describe('a conversation in the page', () => {
   const history: WireMessage[] = [{ role: 'user', parts: [{ type: 'text', text: '早' }] }, { role: 'assistant', parts: [{ type: 'text', text: '早上好，**今天**天气不错' }] }];
-  const listed = { chat_overview: () => overview({ sessions: [summary('s1', '整理文件'), summary('s2', '写周报', 1)] }), chat_load_session: () => history };
+  const listed = { chat_overview: () => overview({ sessions: [summary('s1', '整理文件'), { ...summary('s2', '写周报', 1), workspace: '/Users/me/周报自动化' }] }), chat_load_session: () => history };
 
-  it('lists them with titles and times, newest as the server sent them, and opens one', async () => {
+  it('has no list of its own: the sidebar opens one, and the title bar shows its space and title', async () => {
     const h = await open(listed);
-    expect(all('.session-title').map(t => t.textContent)).toEqual(['整理文件', '写周报']);
-    expect(q('chat-session-s1')!.textContent).toContain('刚刚');
-    await click('chat-session-s1');
+    expect(q('chat-session-s1'), 'the 空间 tree in the sidebar lists conversations').toBeNull();
+    expect(q('chat-new-group')).toBeNull();
+    await openSession('s1');
     expect(h.calls.at(-1)).toEqual(['chat_load_session', { sessionId: 's1' }]);
     expect(q('chat-title')!.textContent).toBe('整理文件');
+    expect(q('chat-workspace')!.textContent).toBe('最近任务');
     expect(wrapper!.find('.answer strong').text()).toBe('今天');
-    expect(q('chat-session-s1')!.getAttribute('aria-current')).toBe('true');
+    await openSession('s2');
+    expect(q('chat-workspace')!.textContent).toBe('周报自动化');
   });
 
-  it('goes back to an empty conversation with the new button', async () => {
-    await open(listed);
-    expect(q<HTMLButtonElement>('chat-new')!.disabled).toBe(true);
-    await click('chat-session-s1');
-    await click('chat-new');
-    expect(q('chat-welcome')).not.toBeNull();
-    expect(q('chat-title')!.textContent).toBe('新对话');
+  it('shows a reply with the 小伴 heading, a light user bubble and copy / regenerate actions', async () => {
+    const h = await open({ ...listed, chat_send: () => summary('s1', '整理文件') });
+    await openSession('s1');
+    expect(q('msg-user')!.querySelector('.bubble')!.textContent).toBe('早');
+    expect(q('chat-reply')!.querySelector('.reply-head')!.textContent).toContain('小伴');
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
+    await click('chat-copy-reply');
+    expect(writeText).toHaveBeenCalledWith('早上好，**今天**天气不错');
+    await click('chat-regenerate');
+    expect(h.calls.at(-1)).toEqual(['chat_send', { sessionId: 's1', text: '早' }]);
   });
 
-  it('keeps rename, move and delete in a menu on each row, and asks before deleting', async () => {
+  it('keeps delete in the title bar menu, asks first, then goes back to 新建任务', async () => {
     const h = await open({ ...listed, chat_delete_session: () => [summary('s2', '写周报', 1)] });
-    expect(q('chat-delete-s1')).toBeNull();
     await openMenu('s1');
-    expect(['chat-menu-rename', 'chat-menu-move', 'chat-menu-delete'].map(id => inBody(id)?.textContent?.trim())).toEqual(['重命名', '移动', '删除']);
-    await clickBody('chat-menu-delete');
+    expect(['chat-menu-rename', 'chat-menu-delete'].map(id => q(id)?.textContent?.trim())).toEqual(['重命名', '删除对话']);
+    await click('chat-menu-delete');
     expect(q('chat-delete-confirm')).not.toBeNull();
     expect(h.commands()).not.toContain('chat_delete_session');
     await click('chat-delete-yes-s1');
     expect(h.calls.at(-1)).toEqual(['chat_delete_session', { sessionId: 's1' }]);
-    expect(all('.session-title').map(t => t.textContent)).toEqual(['写周报']);
+    expect(q('chat-delete-confirm')).toBeNull();
+    expect(h.store.navigate).toHaveBeenCalledWith('new-task');
   });
 
-  it('marks a conversation that is waiting for the user, and one that is still answering', async () => {
-    const h = await open({ chat_overview: () => overview({ sessions: [summary('s1', '整理文件'), summary('s2', '写周报')], running: ['s2'] }) });
-    expect(q('chat-session-s2')!.querySelector('.spin')).not.toBeNull();
-    await openMenu('s2');
-    expect(inBody('chat-menu-delete')!.classList.contains('n-dropdown-option-body--disabled')).toBe(true);
-    expect(inBody('chat-menu-rename')!.classList.contains('n-dropdown-option-body--disabled')).toBe(false);
-    h.emit('chat-approval', approval({ session: 's1' }));
+  it('does not offer to delete a conversation that is still answering, nor rename one that has not started', async () => {
+    await open({ chat_overview: () => overview({ sessions: [summary('s1', '整理文件')], running: ['s1'] }), chat_load_session: () => history });
+    expect(q<HTMLButtonElement>('chat-menu-rename')!.disabled).toBe(true);
+    await openMenu('s1');
+    expect(q<HTMLButtonElement>('chat-menu-delete')!.disabled).toBe(true);
+    expect(q<HTMLButtonElement>('chat-menu-rename')!.disabled).toBe(false);
+  });
+
+  it('finds text in the conversation from the search button', async () => {
+    await open(listed);
+    await openSession('s1');
+    await click('chat-search-toggle');
+    const input = q<HTMLInputElement>('chat-search-input')!;
+    input.value = '天气';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
     await flushPromises();
-    expect(q('chat-attention-s1')).not.toBeNull();
-    expect(q('chat-attention-s2')).toBeNull();
+    expect(q('chat-search-count')!.textContent).toBe('1/1');
+    expect(wrapper!.find('.answer').classes()).toContain('is-hit');
+    input.value = '没有的词';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    await flushPromises();
+    expect(q('chat-search-count')!.textContent).toBe('无结果');
   });
 
-  it('says so when there is nothing yet', async () => {
-    await open();
-    expect(wrapper!.find('.empty-list').text()).toBe('还没有对话');
+  it('shows the execution panel with the steps of the conversation, and remembers it', async () => {
+    const h = await open(startChat);
+    expect(q('chat-exec-panel')).toBeNull();
+    await click('chat-panel-toggle');
+    expect(q('chat-exec-panel')!.textContent).toContain('还没有执行操作');
+    await type('看看文件');
+    await click('chat-send');
+    await h.events('s1', { type: 'tool_start', id: 't1', name: 'write_file', arguments: '{"path":"/w/周计划.md","content":"x"}' }, { type: 'tool_end', id: 't1', output: 'ok', is_error: false }, { type: 'done' });
+    expect(q('chat-exec-panel')!.textContent).toContain('写入文件');
+    expect(q('chat-exec-panel')!.textContent).toContain('周计划.md');
+    expect(q('chat-file-card')!.textContent).toContain('周计划.md');
+    expect(localStorage.getItem('xiaoban.chat.exec-panel')).toBe('1');
   });
 });
 
@@ -509,6 +562,7 @@ function hostList(sessions: SessionSummary[], groups: ChatGroup[] = []) {
   const edit = (id: string, change: (s: SessionSummary) => void) => { const s = state.sessions.find(item => item.id === id); if (!s) throw new Error('这个对话已经不存在'); change(s); };
   const responders: Record<string, Responder> = {
     chat_overview: () => ({ ...overview({ sessions: library().sessions }), groups: library().groups }),
+    chat_load_session: () => [],
     chat_rename_session: a => {
       const title = String(a?.title).split(/\s+/).filter(Boolean).join(' ');
       if (!title) throw new Error('对话名称不能为空');
@@ -533,8 +587,7 @@ function hostList(sessions: SessionSummary[], groups: ChatGroup[] = []) {
   };
   return { state, responders };
 }
-const titles = () => all('.session-title').map(t => t.textContent);
-const groupRows = () => all('.group-name').map(t => t.textContent);
+const titles = () => currentStore!.chat.sessions.map(s => s.title);
 
 describe('renaming conversations', () => {
   const two = () => hostList([summary('s1', '整理文件'), summary('s2', '写周报', 1)]);
@@ -556,9 +609,8 @@ describe('renaming conversations', () => {
   it('shows the new name in the header of the open conversation', async () => {
     const host = hostList([summary('s1', '整理文件')]);
     await open({ ...host.responders, chat_load_session: () => [] });
-    await click('chat-session-s1');
-    expect(q('chat-title')!.textContent).toBe('整理文件');
     await openMenu('s1');
+    expect(q('chat-title')!.textContent).toBe('整理文件');
     await clickBody('chat-menu-rename');
     await typeName('新标题');
     await submitName();
@@ -603,156 +655,10 @@ describe('renaming conversations', () => {
   });
 });
 
-describe('groups of conversations', () => {
-  const work = { id: 'g1', name: '工作' };
-  const inGroup = (id: string, title: string, group: string, at = Math.floor(Date.now() / 1000)): SessionSummary => ({ ...summary(id, title, at), group });
-
-  it('shows no group furniture until there is a group', async () => {
-    const host = hostList([summary('s1', '整理文件')]);
-    await open(host.responders);
-    expect(groupRows()).toEqual([]);
-    expect(all('.list-label')).toHaveLength(0);
-    expect(q('chat-new-group')).not.toBeNull();
-  });
-
-  it('lays groups out as folders above the conversations that are in none', async () => {
-    const host = hostList([inGroup('s1', '季度报告', 'g1'), summary('s2', '随便聊聊'), inGroup('s3', '会议纪要', 'g1')], [work]);
-    await open(host.responders);
-    expect(groupRows()).toEqual(['工作']);
-    expect(q('chat-group-g1')!.textContent).toContain('2');
-    expect(titles()).toEqual(['季度报告', '会议纪要', '随便聊聊']);
-    expect(all('.list-label').map(l => l.textContent)).toEqual(['未分组']);
-    expect(q('chat-session-s1')!.closest('li')!.classList.contains('grouped')).toBe(true);
-    expect(q('chat-session-s2')!.closest('li')!.classList.contains('grouped')).toBe(false);
-  });
-
-  it('folds a group away, remembers it, and opens it again', async () => {
-    const host = hostList([inGroup('s1', '季度报告', 'g1'), summary('s2', '随便聊聊')], [work]);
-    await open(host.responders);
-    expect(q('chat-group-g1')!.getAttribute('aria-expanded')).toBe('true');
-    await click('chat-group-g1');
-    expect(titles()).toEqual(['随便聊聊']);
-    expect(q('chat-group-g1')!.getAttribute('aria-expanded')).toBe('false');
-    expect(q('chat-group-g1')!.textContent).toContain('1');
-    expect(JSON.parse(localStorage.getItem('xiaoban.chat.collapsed-groups')!)).toEqual(['g1']);
-
-    wrapper!.unmount();
-    await open(host.responders);
-    expect(titles()).toEqual(['随便聊聊']);
-    await click('chat-group-g1');
-    expect(titles()).toEqual(['季度报告', '随便聊聊']);
-  });
-
-  it('creates a group from the button above the list', async () => {
-    const host = hostList([summary('s1', '整理文件')]);
-    const h = await open(host.responders);
-    await click('chat-new-group');
-    expect(nameInput()).toBe('');
-    expect(inBody('chat-name-dialog')!.textContent).toContain('新建分组');
-    await typeName(' 生活 ');
-    await submitName();
-    expect(h.calls.at(-1)).toEqual(['chat_create_group', { name: ' 生活 ' }]);
-    expect(groupRows()).toEqual(['生活']);
-    expect(wrapper!.find('.group-empty').exists()).toBe(true);
-    expect(nameDialogOpen()).toBe(false);
-  });
-
-  it('keeps the dialog open when the group name is taken', async () => {
-    const host = hostList([summary('s1', '整理文件')], [work]);
-    await open(host.responders);
-    await click('chat-new-group');
-    await typeName('工作');
-    await submitName();
-    expect(nameDialogOpen()).toBe(true);
-    expect(groupRows()).toEqual(['工作']);
-  });
-
-  it('moves a conversation into a group from the menu, and back out', async () => {
-    const host = hostList([summary('s1', '整理文件'), summary('s2', '写周报', 1)], [work]);
-    const h = await open(host.responders);
-    await openMenu('s1');
-    await clickBody('chat-menu-move');
-    expect(moveDialogOpen()).toBe(true);
-    expect(inBody('chat-move-to-none')!.getAttribute('aria-checked')).toBe('true');
-    expect(inBody('chat-move-to-g1')!.getAttribute('aria-checked')).toBe('false');
-    await clickBody('chat-move-to-g1');
-    expect(h.calls.at(-1)).toEqual(['chat_move_session', { sessionId: 's1', groupId: 'g1' }]);
-    expect(moveDialogOpen()).toBe(false);
-    expect(titles()).toEqual(['整理文件', '写周报']);
-    expect(q('chat-session-s1')!.closest('li')!.classList.contains('grouped')).toBe(true);
-
-    await openMenu('s1');
-    await clickBody('chat-menu-move');
-    expect(inBody('chat-move-to-g1')!.getAttribute('aria-checked')).toBe('true');
-    await clickBody('chat-move-to-none');
-    expect(h.calls.at(-1)).toEqual(['chat_move_session', { sessionId: 's1', groupId: null }]);
-    expect(q('chat-session-s1')!.closest('li')!.classList.contains('grouped')).toBe(false);
-  });
-
-  it('does not call the host when the conversation is already where it is picked, and opens a folded target', async () => {
-    const host = hostList([inGroup('s1', '季度报告', 'g1'), summary('s2', '随便聊聊')], [work]);
-    localStorage.setItem('xiaoban.chat.collapsed-groups', JSON.stringify(['g1']));
-    const h = await open(host.responders);
-    expect(titles()).toEqual(['随便聊聊']);
-    await openMenu('s2');
-    await clickBody('chat-menu-move');
-    await clickBody('chat-move-to-none');
-    expect(h.commands()).not.toContain('chat_move_session');
-    expect(moveDialogOpen()).toBe(false);
-
-    await openMenu('s2');
-    await clickBody('chat-menu-move');
-    await clickBody('chat-move-to-g1');
-    // The folded group opens so the move is visible.
-    expect(titles()).toEqual(['季度报告', '随便聊聊']);
-  });
-
-  it('creates a group while moving, and the conversation lands in it', async () => {
-    const host = hostList([summary('s1', '整理文件')]);
-    const h = await open(host.responders);
-    await openMenu('s1');
-    await clickBody('chat-menu-move');
-    expect(inBody('chat-move-dialog')!.querySelectorAll('[role="radio"]')).toHaveLength(1);
-    await clickBody('chat-move-new-group');
-    expect(moveDialogOpen()).toBe(false);
-    await typeName('归档');
-    await submitName();
-    expect(h.calls.at(-1)).toEqual(['chat_create_group', { name: '归档', sessionId: 's1' }]);
-    expect(groupRows()).toEqual(['归档']);
-    expect(q('chat-session-s1')!.closest('li')!.classList.contains('grouped')).toBe(true);
-  });
-
-  it('renames a group from its menu', async () => {
-    const host = hostList([inGroup('s1', '季度报告', 'g1')], [work]);
-    const h = await open(host.responders);
-    await openGroupMenu('g1');
-    await clickBody('chat-group-menu-rename');
-    expect(nameInput()).toBe('工作');
-    expect(inBody('chat-name-dialog')!.textContent).toContain('重命名分组');
-    await typeName('项目');
-    await submitName();
-    expect(h.calls.at(-1)).toEqual(['chat_rename_group', { groupId: 'g1', name: '项目' }]);
-    expect(groupRows()).toEqual(['项目']);
-  });
-
-  it('asks before deleting a group and keeps its conversations', async () => {
-    const host = hostList([inGroup('s1', '季度报告', 'g1'), summary('s2', '随便聊聊')], [work]);
-    const h = await open(host.responders);
-    await openGroupMenu('g1');
-    await clickBody('chat-group-menu-delete');
-    expect(q('chat-group-delete-confirm')!.textContent).toContain('里面的对话会保留');
-    expect(h.commands()).not.toContain('chat_delete_group');
-    await click('chat-group-delete-yes-g1');
-    expect(h.calls.at(-1)).toEqual(['chat_delete_group', { groupId: 'g1' }]);
-    expect(groupRows()).toEqual([]);
-    expect(titles()).toEqual(['季度报告', '随便聊聊']);
-  });
-});
-
 describe('links in answers', () => {
   async function withLink() {
     const h = await open({ chat_overview: () => overview({ sessions: [summary('s1', '链接')] }), chat_load_session: () => [{ role: 'assistant', parts: [{ type: 'text', text: '看 [文档](https://example.com/doc#part) 吧' }] }] as WireMessage[], open_download_url: () => undefined });
-    await click('chat-session-s1');
+    await openSession('s1');
     return h;
   }
 
@@ -934,7 +840,7 @@ describe('sending images', () => {
       { role: 'assistant', parts: [{ type: 'text', text: '看到了' }] },
     ];
     await open({ chat_overview: () => overview({ sessions: [summary('s1', '看这张图')] }), chat_load_session: () => history });
-    await click('chat-session-s1');
+    await openSession('s1');
 
     const shown = q<HTMLImageElement>('msg-user-image-0');
     expect(shown).not.toBeNull();
@@ -976,7 +882,7 @@ describe('the context ring in the composer', () => {
     await flushPromises();
     await click('chat-context');
     expect(inBody('ctx-numbers')!.textContent).toBe('3K / 256K');
-    await click('chat-session-s1');
+    await openSession('s1');
     await vi.waitFor(() => expect(inBody('ctx-numbers')!.textContent).toBe('30K / 256K'));
     expect(h.contextCalls.at(-1)).toEqual({ sessionId: 's1' });
   });
@@ -989,7 +895,7 @@ describe('the context ring in the composer', () => {
       chat_context: () => (compacted ? info(2_000, false) : info(40_000)),
       chat_compact: () => { compacted = true; return info(2_000, false); },
     });
-    await click('chat-session-s1');
+    await openSession('s1');
     await click('chat-context');
     await vi.waitFor(() => expect(inBody('ctx-numbers')!.textContent).toBe('40K / 256K'));
     await clickBody('ctx-compact');
@@ -1006,7 +912,7 @@ describe('the context ring in the composer', () => {
     let release!: () => void;
     const gate = new Promise<void>(resolve => { release = resolve; });
     await open({ ...listed, chat_context: () => info(40_000), chat_compact: async () => { await gate; return info(2_000, false); } });
-    await click('chat-session-s1');
+    await openSession('s1');
     await type('接着聊');
     expect(q<HTMLButtonElement>('chat-send')!.disabled).toBe(false);
     await click('chat-context');
@@ -1020,7 +926,7 @@ describe('the context ring in the composer', () => {
 
   it('cannot compact while the conversation is answering', async () => {
     await open({ chat_overview: () => overview({ sessions: [summary('s1', '整理文件')], running: ['s1'] }), chat_load_session: () => history, chat_context: () => info(40_000) });
-    await click('chat-session-s1');
+    await openSession('s1');
     await click('chat-context');
     expect(inBody<HTMLButtonElement>('ctx-compact')!.disabled).toBe(true);
     expect(inBody('ctx-compact')!.parentElement!.getAttribute('title')).toBe('回答结束后才能压缩');
@@ -1055,7 +961,7 @@ describe('the limit slider and automatic compaction in the composer', () => {
 
   it('shows "正在压缩…" and blocks sending while the host compacts a full conversation by itself', async () => {
     const h = await open({ ...listed, chat_context: () => info(240_000) });
-    await click('chat-session-s1');
+    await openSession('s1');
     await type('接着聊');
     expect(q<HTMLButtonElement>('chat-send')!.disabled).toBe(false);
     await click('chat-context');

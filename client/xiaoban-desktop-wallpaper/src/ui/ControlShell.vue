@@ -1,61 +1,199 @@
 <script setup lang="ts">
-import { computed, defineAsyncComponent, onMounted, onBeforeUnmount, ref, watch } from 'vue';
-import { NAlert, NButton, NModal, NSkeleton, useMessage } from 'naive-ui';
-import { MessageCircle, Store, AudioLines, Images, Sparkles, Hand, Bot, Gamepad2, Bell, Settings2, PanelLeftClose, PanelLeftOpen, ArrowUpRight, Globe, LogOut } from 'lucide-vue-next';
+import { computed, defineAsyncComponent, nextTick, onMounted, onBeforeUnmount, reactive, ref, watch } from 'vue';
+import { NAlert, NButton, NSkeleton, useMessage } from 'naive-ui';
+import { Bell, BookOpen, Check, ChevronDown, Ellipsis, Folder, FolderPlus, Gamepad2, Globe, Inbox, LogIn, LogOut, Palette, PanelLeft, Pencil, Plus, Puzzle, RefreshCw, Search, SlidersHorizontal, Sparkles, SquarePen, Sprout, Trash2, Zap } from 'lucide-vue-next';
 import { invoke, listen } from '../bridge.ts';
-import AssistantLauncher from './components/AssistantLauncher.vue';
-import { appearanceMode, publishAppearanceTo, reconcile } from './appearance.ts';
+import { accent, accents, isDark, appearanceMode, appearanceModes, publishAppearanceTo, reconcile, setAccent } from './appearance.ts';
 import { createControlStore } from './control-store.ts';
 import type { ControlPage } from './control-types.ts';
+import type { SessionSummary } from './chat/types.ts';
+import SettingsDialog from './components/SettingsDialog.vue';
+import ChatNameDialog from './components/ChatNameDialog.vue';
 const pageLoaders = {
+  'new-task': () => import('./pages/NewTaskPage.vue'),
   chat: () => import('./pages/ChatPage.vue'),
   'ai-store': () => import('./pages/AiStorePage.vue'),
-  wallpapers: () => import('./pages/WallpaperPage.vue'),
-  effects: () => import('./pages/EffectsPage.vue'),
+  library: () => import('./pages/LibraryPage.vue'),
+  studio: () => import('./pages/StudioPage.vue'),
   interactive: () => import('./pages/InteractivePage.vue'),
-  widgets: () => import('./pages/WidgetsPage.vue'),
-  companion: () => import('./pages/CompanionPage.vue'),
   games: () => import('./pages/GamesPage.vue'),
   care: () => import('./pages/CarePage.vue'),
-  settings: () => import('./pages/SettingsPage.vue'),
 };
+const NewTaskPage = defineAsyncComponent(pageLoaders['new-task']);
 const ChatPage = defineAsyncComponent(pageLoaders.chat);
 const AiStorePage = defineAsyncComponent(pageLoaders['ai-store']);
-const WallpaperPage = defineAsyncComponent(pageLoaders.wallpapers);
-const EffectsPage = defineAsyncComponent(pageLoaders.effects);
+const LibraryPage = defineAsyncComponent(pageLoaders.library);
+const StudioPage = defineAsyncComponent(pageLoaders.studio);
 const InteractivePage = defineAsyncComponent(pageLoaders.interactive);
-const WidgetsPage = defineAsyncComponent(pageLoaders.widgets);
-const CompanionPage = defineAsyncComponent(pageLoaders.companion);
 const GamesPage = defineAsyncComponent(pageLoaders.games);
 const CarePage = defineAsyncComponent(pageLoaders.care);
-const SettingsPage = defineAsyncComponent(pageLoaders.settings);
 const LoginModal = defineAsyncComponent(() => import('./components/LoginModal.vue'));
 
 const message = useMessage();
 const store = createControlStore((text, type = 'success') => message[type](String(text), { duration: type === 'error' ? 6500 : 3500 }));
+const mac = computed(() => store.info.platform === 'macos' || (store.info.platform === 'preview' && typeof navigator !== 'undefined' && /Mac/i.test(navigator.platform)));
+const mod = computed(() => mac.value ? '⌘' : 'Ctrl+');
+
+/* ── Sidebar ─────────────────────────────────────────────────────────── */
 const collapsed = ref(false);
 function toggleNavigation() { collapsed.value = !collapsed.value; }
-const items = [
-  { id: 'chat', label: '聊天', hint: '和小伴说话，让它帮忙', icon: MessageCircle },
-  { id: 'ai-store', label: 'AI 商店', hint: '发现专家、技能与连接器', icon: Store },
-  { id: 'wallpapers', label: '壁纸库', hint: '发现喜欢的风景', icon: Images },
-  { id: 'widgets', label: '桌面组件', hint: '把小物件留在桌面上', icon: Hand },
-  { id: 'effects', label: '桌面特效', hint: '雨雪花瓣与流星', icon: Sparkles },
-  { id: 'companion', label: '桌面宠物', hint: '外观与陪伴方式', icon: Bot },
-  { id: 'games', label: '游戏空间', hint: '给自己放个小假', icon: Gamepad2 },
-  { id: 'care', label: '关怀提醒', hint: '照顾日常的小事', icon: Bell },
+const aiOpen = ref(true);
+const bottomItems = [
+  { id: 'studio', label: '装扮', icon: Palette },
+  { id: 'games', label: '游玩', icon: Gamepad2 },
+  { id: 'care', label: '提醒', icon: Bell },
 ] as const;
-const activeWallpaper = computed(() => store.settings.wallpaperId === 'companion' ? '系统桌面' : store.library.items.find(item => item.definition.id === store.settings.wallpaperId)?.definition.title ?? '已保存的壁纸');
-const unread = computed(() => store.website.announcements.filter(item => store.website.dismissed[item.id] !== item.revision).length);
+const aiItems = computed(() => [
+  { id: 'new-task', label: '新建任务', icon: SquarePen, hint: `${mod.value}N` },
+  { id: 'ai-store', label: 'AI 插件', icon: Puzzle, hint: '' },
+  { id: 'library', label: '资料库', icon: BookOpen, hint: '' },
+] as const);
+/** 新建任务 stays lit on the chat page while no conversation is open. */
+function isCurrent(id: string) {
+  if (id === 'new-task') return store.page === 'new-task' || (store.page === 'chat' && !store.chat.currentId);
+  return store.page === id;
+}
+const attention = computed(() => store.chat.attention);
+
+interface Space { key: string; name: string; path: string; sessions: SessionSummary[] }
+const RECENT = '__recent__';
+const folderName = (path: string) => path.split(/[\\/]+/).filter(Boolean).pop() || path;
+/** 空间: 最近任务 (conversations without a folder) first, then one entry per working folder, named after the folder. */
+const spaces = computed<Space[]>(() => {
+  const recent: Space = { key: RECENT, name: '最近任务', path: '', sessions: [] };
+  const byPath = new Map<string, Space>();
+  for (const session of store.chat.sessions) {
+    const path = session.workspace?.trim();
+    if (!path) { recent.sessions.push(session); continue; }
+    let space = byPath.get(path);
+    if (!space) { space = { key: path, name: folderName(path), path, sessions: [] }; byPath.set(path, space); }
+    space.sessions.push(session);
+  }
+  const pending = store.chat.pendingWorkspace;
+  if (pending && !byPath.has(pending)) byPath.set(pending, { key: pending, name: folderName(pending), path: pending, sessions: [] });
+  return [recent, ...byPath.values()];
+});
+const expanded = reactive(new Set<string>([RECENT]));
+function toggleSpace(key: string) { if (expanded.has(key)) expanded.delete(key); else expanded.add(key); }
+/** Keep the folder of the open conversation unfolded. */
+watch(() => store.chat.currentId, id => {
+  const space = spaces.value.find(item => item.sessions.some(session => session.id === id));
+  if (space) expanded.add(space.key);
+});
+function waiting(id: string) { const view = store.chat.views[id]; return !!view && view.approvals.length + view.questions.length > 0; }
+function spaceWaiting(space: Space) { return space.sessions.some(session => waiting(session.id)); }
+
 function navigate(page: ControlPage) { store.navigate(page); document.querySelector('.control-workspace')?.scrollTo(0, 0); }
-function preload(page: ControlPage) {
+function preload(page: string) {
   if (page in pageLoaders) void pageLoaders[page as keyof typeof pageLoaders]().catch(() => {});
 }
+async function newTask() { if (store.chat.currentId) await store.chat.select(null); navigate('new-task'); }
+async function openSession(id: string) { navigate('chat'); await store.chat.select(id); }
+async function addWorkspace() {
+  if (!store.desktop) { store.notify('请在桌面应用中选择工作区文件夹', 'info'); return; }
+  const path = await store.chat.pickWorkspace();
+  if (!path) return;
+  if (store.chat.currentId) await store.chat.select(null);
+  if (await store.chat.switchWorkspace(path) === 'done') { expanded.add(path); navigate('new-task'); }
+}
+/*
+ * A conversation's menu in the space tree (hover ⋯ or right click): rename, move to a working folder, delete.
+ * Working folders took the place of the old groups; groups the host still keeps are left as they are, just not shown.
+ */
+interface SessionMenu { id: string; x: number; y: number; confirming: boolean }
+const sessionMenu = ref<SessionMenu | null>(null);
+const sessionMenuEl = ref<HTMLElement | null>(null);
+const menuSession = computed(() => store.chat.sessions.find(item => item.id === sessionMenu.value?.id) ?? null);
+const menuBusy = computed(() => !!(sessionMenu.value && store.chat.views[sessionMenu.value.id]?.running));
+const workspaceTargets = computed(() => spaces.value.filter(space => space.path));
+function openSessionMenu(id: string, event: MouseEvent, anchor?: EventTarget | null) {
+  closeMenu();
+  if (sessionMenu.value?.id === id && anchor) { sessionMenu.value = null; return; }
+  const box = anchor instanceof HTMLElement ? anchor.getBoundingClientRect() : null;
+  sessionMenu.value = { id, x: box ? box.left : event.clientX, y: box ? box.bottom + 4 : event.clientY, confirming: false };
+  void placeSessionMenu();
+}
+/** Keeps the menu inside the window, opening upwards near the bottom. */
+async function placeSessionMenu() {
+  await nextTick();
+  const menu = sessionMenu.value, el = sessionMenuEl.value;
+  if (!menu || !el) return;
+  const { width, height } = el.getBoundingClientRect();
+  menu.x = Math.max(8, Math.min(menu.x, window.innerWidth - width - 8));
+  menu.y = Math.max(8, Math.min(menu.y, window.innerHeight - height - 8));
+}
+function closeSessionMenu() { sessionMenu.value = null; }
+const renamingId = ref('');
+const renameBusy = ref(false);
+const renamingTitle = computed(() => store.chat.sessions.find(item => item.id === renamingId.value)?.title ?? '');
+function startRename() { if (sessionMenu.value) renamingId.value = sessionMenu.value.id; closeSessionMenu(); }
+async function submitRename(value: string) {
+  const id = renamingId.value;
+  if (!id || renameBusy.value) return;
+  renameBusy.value = true;
+  const done = value.trim() === renamingTitle.value ? true : await store.chat.rename(id, value);
+  renameBusy.value = false;
+  if (done) renamingId.value = '';
+}
+async function moveSession(path: string | null) {
+  const id = sessionMenu.value?.id;
+  closeSessionMenu();
+  if (!id) return;
+  if (!store.desktop) { store.notify('请在桌面应用中选择工作区文件夹', 'info'); return; }
+  const target = path ?? await store.chat.pickWorkspace();
+  if (!target) return;
+  if (await store.chat.moveToWorkspace(id, target)) { expanded.add(target); store.notify(`已移动到「${folderName(target)}」`, 'success'); }
+}
+async function deleteSession() {
+  const id = sessionMenu.value?.id;
+  closeSessionMenu();
+  if (!id) return;
+  await store.chat.remove(id);
+  if (store.page === 'chat' && !store.chat.currentId) navigate('new-task');
+}
+
+/** The first message of a new task creates a conversation: from then on it is that conversation's page. */
+watch(() => store.chat.currentId, id => { if (id && store.page === 'new-task') store.navigate('chat'); });
+
+/* ── Account menu ────────────────────────────────────────────────────── */
+const menuOpen = ref(false);
+const menuRoot = ref<HTMLElement | null>(null);
+function toggleMenu() { menuOpen.value = !menuOpen.value; }
+function closeMenu() { menuOpen.value = false; }
+function onPointerDown(event: PointerEvent) {
+  if (menuOpen.value && menuRoot.value && !menuRoot.value.contains(event.target as Node)) closeMenu();
+  const target = event.target as Element | null;
+  if (sessionMenu.value && !sessionMenuEl.value?.contains(target) && !target?.closest?.('.nav-session-more')) closeSessionMenu();
+}
+const displayName = computed(() => store.account?.user.username ?? '未登录');
+const modeLabel = computed(() => appearanceModes.find(mode => mode.value === appearanceMode.value)?.label ?? '');
+const unread = computed(() => store.website.announcements.filter(item => store.website.dismissed[item.id] !== item.revision).length);
+const hasUpdate = computed(() => !!store.website.update?.available);
+function openSettings(tab?: Parameters<typeof store.openSettings>[0]) { closeMenu(); store.openSettings(tab); }
+function login() { closeMenu(); store.openLogin(); }
+const loggingOut = ref(false);
+async function handleLogout() {
+  if (loggingOut.value) return;
+  loggingOut.value = true;
+  try {
+    await store.logoutAccount();
+    closeMenu();
+    store.notify('已退出当前账号', 'info');
+  } catch (error) {
+    store.notify(error, 'error');
+  } finally {
+    loggingOut.value = false;
+  }
+}
+
+const assistantShortcut = ref(mac.value ? '⌥ Space' : 'Alt+Space');
 const openingAssistant = ref(false);
 async function openAssistant() {
-  if (openingAssistant.value || !store.desktop) return;
+  closeMenu();
+  if (openingAssistant.value) return;
+  if (!store.desktop) { store.notify('超级小伴需要在桌面应用中使用', 'info'); return; }
   if (!store.settings.assistantEnabled) {
-    store.settingsTab = 'assistant'; navigate('settings');
+    store.openSettings('assistant');
     store.notify('开启超级小伴后即可使用悬浮对话', 'info'); return;
   }
   openingAssistant.value = true;
@@ -64,6 +202,7 @@ async function openAssistant() {
   finally { openingAssistant.value = false; }
 }
 async function openOfficialSite() {
+  closeMenu();
   if (store.desktop) {
     store.notify('正在通过系统浏览器打开小伴官网...', 'info');
     try {
@@ -75,34 +214,17 @@ async function openOfficialSite() {
     window.location.href = 'https://wallpaper.xiangban.xyz';
   }
 }
-const accountOpen = ref(false);
-const loggingOut = ref(false);
-function openAccount() {
-  if (store.account) accountOpen.value = true;
-  else store.openLogin();
-}
-watch(() => store.account, account => { if (!account) accountOpen.value = false; });
-async function handleLogout() {
-  if (loggingOut.value) return;
-  loggingOut.value = true;
-  try {
-    await store.logoutAccount();
-    accountOpen.value = false;
-    store.notify('已退出当前账号', 'info');
-  } catch (error) {
-    store.notify(error, 'error');
-  } finally {
-    loggingOut.value = false;
-  }
-}
+
+/* ── Studio requests from desktop widgets and pets ───────────────────── */
 const petSettingsRequest = ref<{ id: string } | null>(null);
-function managePets(event: Event) { petSettingsRequest.value=(event as CustomEvent<{id:string}>).detail; navigate('companion'); }
+function managePets(event: Event) { petSettingsRequest.value = (event as CustomEvent<{ id: string }>).detail; navigate('companion'); }
 const widgetSettingsRequest = ref<{ id: string } | null>(null);
 function manageWidgets(event: Event) {
   const id = (event as CustomEvent<{ id?: string }>).detail?.id;
   widgetSettingsRequest.value = typeof id === 'string' && id ? { id } : null;
   navigate('widgets');
 }
+
 /**
  * The colour scheme is kept by the host so the floating assistant, which cannot read this window's storage, can match.
  * The first time, what this window already had is sent up (it is the user's choice from before the host kept one);
@@ -121,7 +243,8 @@ async function shareAppearance() {
 async function introduceAssistant() {
   try {
     const assistant = await invoke<{ enabled: boolean; hintSeen: boolean; shortcutLabel: string; ball: boolean }>('assistant_status');
-    if (assistant.hintSeen || !assistant.enabled) return;
+    if (assistant?.shortcutLabel) assistantShortcut.value = assistant.shortcutLabel;
+    if (!assistant || assistant.hintSeen || !assistant.enabled) return;
     store.notify(`新功能：按 ${assistant.shortcutLabel} 随时呼出超级小伴${assistant.ball ? '，也可以点屏幕边缘的小球' : ''}`, 'info');
     await invoke('assistant_configure', { patch: { hintSeen: true } });
   } catch { /* the hint is a courtesy; it can wait for the next start */ }
@@ -129,11 +252,18 @@ async function introduceAssistant() {
 const assistantListeners: (() => void)[] = [];
 async function listenForAssistant() {
   const off = await Promise.all([
-    listen<{ session: string | null }>('assistant-open-chat', ({ session }) => { navigate('chat'); if (session) void store.chat.select(session); }),
-    listen<{ tab: 'ai' | 'assistant' }>('assistant-open-settings', ({ tab }) => { store.settingsTab = tab; navigate('settings'); }),
+    listen<{ session: string | null }>('assistant-open-chat', ({ session }) => { if (session) void openSession(session); else void newTask(); }),
+    listen<{ tab: 'ai' | 'assistant' }>('assistant-open-settings', ({ tab }) => { store.openSettings(tab); }),
     listen<unknown>('games-open', () => { navigate('games'); }),
   ]);
   assistantListeners.push(...off);
+}
+function onKeydown(event: KeyboardEvent) {
+  if (event.key === 'Escape' && sessionMenu.value) { closeSessionMenu(); return; }
+  if (event.key === 'Escape' && menuOpen.value) { closeMenu(); return; }
+  if (!(event.metaKey || event.ctrlKey) || event.altKey || event.shiftKey) return;
+  if (event.key === ',') { event.preventDefault(); openSettings(); }
+  else if (event.key.toLowerCase() === 'n') { event.preventDefault(); void newTask(); }
 }
 const focus = () => store.refreshSettings().catch(error => store.notify(error, 'error'));
 onMounted(() => {
@@ -148,55 +278,220 @@ onMounted(() => {
   window.addEventListener('focus', focus);
   window.addEventListener('widgets-manage', manageWidgets);
   window.addEventListener('pets-manage', managePets);
+  window.addEventListener('keydown', onKeydown);
+  document.addEventListener('pointerdown', onPointerDown, true);
   if (store.desktop) { void listenForAssistant(); void introduceAssistant(); void shareAppearance(); }
 });
-onBeforeUnmount(() => { assistantListeners.splice(0).forEach(off => off()); store.dispose(); window.removeEventListener('focus', focus); window.removeEventListener('widgets-manage', manageWidgets); window.removeEventListener('pets-manage', managePets); });
+onBeforeUnmount(() => {
+  assistantListeners.splice(0).forEach(off => off()); store.dispose();
+  window.removeEventListener('focus', focus); window.removeEventListener('widgets-manage', manageWidgets); window.removeEventListener('pets-manage', managePets);
+  window.removeEventListener('keydown', onKeydown); document.removeEventListener('pointerdown', onPointerDown, true);
+});
+const fixedPages = ['new-task', 'chat', 'ai-store', 'library', 'studio', 'games'];
 </script>
 <template>
-  <div class="control-app" :class="{ 'is-collapsed': collapsed, 'is-wallpapers': store.page === 'wallpapers' }">
-    <aside class="control-sidebar">
+  <div class="control-app" :class="{ 'is-collapsed': collapsed }">
+    <aside class="control-sidebar" aria-label="侧栏">
+      <div class="sidebar-top">
+        <button type="button" class="xb-icon-btn" :title="collapsed ? '展开侧栏' : '收起侧栏'" :aria-label="collapsed ? '展开侧栏' : '收起侧栏'" :aria-expanded="!collapsed" aria-controls="control-navigation" data-testid="sidebar-toggle" @click="toggleNavigation"><PanelLeft :size="17" /></button>
+        <button type="button" class="xb-icon-btn sidebar-search" aria-label="搜索" title="搜索（即将推出）" disabled><Search :size="17" /></button>
+      </div>
       <div class="control-brand">
-        <button type="button" class="control-brand-mark" :class="{ 'is-signed-in': store.account }" data-testid="account-entry" :title="store.account ? '查看账号信息' : '登录 / 注册小伴账号'" :aria-label="store.account ? '查看账号信息' : '登录 / 注册小伴账号'" aria-haspopup="dialog" @click="openAccount">
-          <img v-if="store.account?.user.avatarUrl" class="brand-avatar" :src="store.account.user.avatarUrl" alt="" />
-          <span v-else-if="store.account">{{ Array.from(store.account.user.username)[0]?.toUpperCase() }}</span>
-          <span v-else class="brand-login-text">登录</span>
-        </button>
-        <div class="brand-copy"><strong>小伴桌面</strong></div>
+        <span class="xb-mark"><Sprout :size="19" :stroke-width="2" /></span>
+        <div class="brand-copy"><strong>小伴桌面</strong><span>v{{ store.info.version }}</span></div>
       </div>
 
-      <div class="sidebar-scroll">
-        <div class="sidebar-group-label">我的桌面</div>
-        <nav id="control-navigation" class="control-navigation" aria-label="功能分区">
-          <button v-for="item in items" :key="item.id" :data-testid="`nav-${item.id}`" :class="{ selected: store.page === item.id }" :aria-current="store.page === item.id ? 'page' : undefined" :title="item.label" @pointerenter="preload(item.id)" @focus="preload(item.id)" @click="navigate(item.id)"><component :is="item.icon" :size="19" /><span><b>{{ item.label }}</b></span><i v-if="item.id === 'chat' && store.chat.attention && store.page !== 'chat'" class="notice-dot nav-attention" data-testid="chat-attention" aria-label="小伴在等你确认"></i></button>
-        </nav>
-        <div class="sidebar-desktop-state"><span class="state-dot" :class="{ idle: store.settings.paused || !store.settings.companionEnabled }"></span><b>{{ store.settings.companionEnabled ? (store.settings.paused ? '小伴休息中' : '小伴正在陪伴') : '小伴已隐藏' }}</b><small>{{ activeWallpaper }}</small></div>
-      </div>
-      <div class="sidebar-bottom"><button class="website-nav" data-testid="nav-website" @click="openOfficialSite"><Globe :size="18" /><span>小伴官网</span><ArrowUpRight :size="14" class="external-icon" /></button><button class="settings-nav" data-testid="nav-settings" :class="{ selected: store.page === 'settings' }" @pointerenter="preload('settings')" @focus="preload('settings')" @click="navigate('settings')"><Settings2 :size="18" /><span>设置</span><em v-if="store.website.update?.available" class="new-badge" data-testid="nav-settings-new">新版本</em><i v-else-if="unread" class="notice-dot"></i></button><div class="sidebar-meta"><span>v{{ store.info.version }}</span><NButton quaternary size="tiny" :title="collapsed ? '展开导航' : '收起导航'" :aria-label="collapsed ? '展开导航' : '收起导航'" :aria-expanded="!collapsed" aria-controls="control-navigation"  @click="toggleNavigation"><component :is="collapsed ? PanelLeftOpen : PanelLeftClose" :size="16" /></NButton></div></div>
-    </aside>
-    <div class="control-main" :class="{ 'has-chat': store.page === 'chat' }">
-      <main class="control-workspace" :class="{'wallpaper-workspace':store.page==='wallpapers','chat-workspace':store.page==='chat','fixed-page-workspace':['ai-store','effects','widgets','companion','games','settings'].includes(store.page)}">
-        <NAlert v-if="store.initialError" class="workspace-alert" type="error" title="桌面配置暂时无法读取">{{ store.initialError }} <NButton size="small" @click="store.initialize()">重试</NButton></NAlert>
-        <div v-if="store.website.update?.available && store.page !== 'settings' && store.page !== 'wallpapers' && store.page !== 'chat'" class="update-strip"><span><span class="notice-dot"></span>小伴有新版本 v{{ store.website.update.version }}</span><button @click="navigate('settings')">查看更新<ArrowUpRight :size="14" /></button></div>
-        <div v-if="!store.ready" class="workspace-loading"><NSkeleton height="36px" width="220px" /><NSkeleton height="18px" width="320px" /><NSkeleton height="380px" :sharp="false" /></div>
-        <template v-else-if="!store.initialError"><KeepAlive><WallpaperPage v-if="store.page === 'wallpapers'" :store="store" /></KeepAlive><KeepAlive :max="4"><ChatPage v-if="store.page === 'chat'" :store="store" /><AiStorePage v-else-if="store.page === 'ai-store'" :store="store" /><WidgetsPage v-else-if="store.page === 'widgets'" :store="store" :settings-request="widgetSettingsRequest" @settings-opened="widgetSettingsRequest = null" /><InteractivePage v-else-if="store.page === 'interactive'" :store="store" /><EffectsPage v-else-if="store.page === 'effects'" :store="store" /><CompanionPage v-else-if="store.page === 'companion'" :store="store" :settings-request="petSettingsRequest" @settings-opened="petSettingsRequest=null" /><GamesPage v-else-if="store.page === 'games'" :store="store" /><CarePage v-else-if="store.page === 'care'" :store="store" /><SettingsPage v-else-if="store.page === 'settings'" :store="store" /></KeepAlive></template>
-      </main>
-      <footer class="control-statusbar"><span><span class="state-dot small"></span>{{ store.desktop ? (store.info.platform === 'windows' ? 'Windows 桌面已连接' : '桌面已连接') : '正在预览界面，桌面操作需在应用内使用' }}</span><span>{{ store.library.items.filter(item => item.installed).length }} 个本地壁纸</span></footer>
-    </div>
-    <AssistantLauncher :disabled="!store.desktop" :busy="openingAssistant" :near-composer="store.page === 'chat'" @open="openAssistant" />
-    <NModal v-model:show="accountOpen" preset="card" title="账号信息" style="width: 92vw; max-width: 380px;" data-testid="account-info-dialog">
-      <div v-if="store.account" class="account-info">
-        <div class="account-info-identity">
-          <div class="account-info-avatar">
-            <img v-if="store.account.user.avatarUrl" :src="store.account.user.avatarUrl" alt="" />
-            <span v-else>{{ Array.from(store.account.user.username)[0]?.toUpperCase() }}</span>
-          </div>
-          <div><strong data-testid="account-username">{{ store.account.user.username }}</strong><span>已登录小伴账号</span></div>
+      <nav id="control-navigation" class="sidebar-scroll" aria-label="功能分区">
+        <button type="button" class="nav-item nav-group" :aria-expanded="aiOpen" data-testid="nav-ai-group" :title="'小伴 AI'" @click="collapsed ? newTask() : (aiOpen = !aiOpen)">
+          <Sparkles :size="17" class="nav-icon ink" /><span class="nav-label">小伴 AI</span>
+          <i v-if="attention && (!aiOpen || collapsed)" class="xb-dot nav-attention" data-testid="chat-attention" :title="`有 ${attention} 个任务等你确认`" aria-label="小伴在等你确认"></i>
+          <ChevronDown :size="13" class="nav-chevron" :class="{ shut: !aiOpen }" />
+        </button>
+        <div v-show="aiOpen || collapsed" class="nav-sub">
+          <button v-for="item in aiItems" :key="item.id" type="button" class="nav-item" :class="{ selected: isCurrent(item.id) }" :aria-current="isCurrent(item.id) ? 'page' : undefined" :data-testid="`nav-${item.id}`" :title="item.label" @pointerenter="preload(item.id)" @focus="preload(item.id)" @click="item.id === 'new-task' ? newTask() : navigate(item.id)">
+            <component :is="item.icon" :size="16" class="nav-icon" /><span class="nav-label">{{ item.label }}</span><span v-if="item.hint" class="nav-hint">{{ item.hint }}</span>
+          </button>
+          <div class="nav-caption"><span>空间</span><button type="button" class="xb-icon-btn is-sm" aria-label="新建工作区" title="新建工作区" data-testid="nav-new-workspace" @click="addWorkspace"><Plus :size="14" :stroke-width="2" /></button></div>
+          <template v-for="space in spaces" :key="space.key">
+            <button type="button" class="nav-item space-row" :aria-expanded="expanded.has(space.key)" :title="space.path || space.name" :data-testid="space.key === '__recent__' ? 'space-recent' : `space-${space.name}`" @click="toggleSpace(space.key)">
+              <component :is="space.key === '__recent__' ? Inbox : Folder" :size="16" class="nav-icon" /><span class="nav-label">{{ space.name }}</span>
+              <i v-if="!expanded.has(space.key) && spaceWaiting(space)" class="xb-dot"></i>
+              <span class="nav-hint">{{ space.sessions.length || '' }}</span>
+            </button>
+            <template v-if="expanded.has(space.key)">
+              <div v-for="session in space.sessions" :key="session.id" class="nav-session-row" :class="{ 'menu-open': sessionMenu?.id === session.id }" @contextmenu.prevent="openSessionMenu(session.id, $event)">
+                <button type="button" class="nav-session" :class="{ selected: store.page === 'chat' && store.chat.currentId === session.id }" :aria-current="store.page === 'chat' && store.chat.currentId === session.id ? 'page' : undefined" :data-testid="`session-${session.id}`" :title="session.title" @click="openSession(session.id)">
+                  <span>{{ session.title || '新对话' }}</span><i v-if="waiting(session.id)" class="xb-dot" aria-label="等你确认"></i>
+                </button>
+                <button type="button" class="xb-icon-btn is-sm nav-session-more" aria-haspopup="menu" :aria-expanded="sessionMenu?.id === session.id" :aria-label="`更多操作：${session.title || '新对话'}`" title="更多" :data-testid="`session-more-${session.id}`" @click.stop="openSessionMenu(session.id, $event, $event.currentTarget)"><Ellipsis :size="14" /></button>
+              </div>
+              <p v-if="!space.sessions.length" class="nav-empty">{{ space.key === '__recent__' ? '还没有任务' : '新任务会出现在这里' }}</p>
+            </template>
+          </template>
         </div>
-        <dl><dt>账号 ID</dt><dd data-testid="account-uid">{{ store.account.user.uid }}</dd></dl>
-        <NButton block :loading="loggingOut" :disabled="loggingOut" data-testid="account-logout" @click="handleLogout"><template #icon><LogOut :size="16" /></template>退出登录</NButton>
+        <div class="nav-sep"></div>
+        <button v-for="item in bottomItems" :key="item.id" type="button" class="nav-item" :class="{ selected: isCurrent(item.id) }" :aria-current="isCurrent(item.id) ? 'page' : undefined" :data-testid="`nav-${item.id}`" :title="item.label" @pointerenter="preload(item.id)" @focus="preload(item.id)" @click="navigate(item.id)">
+          <component :is="item.icon" :size="17" class="nav-icon" /><span class="nav-label">{{ item.label }}</span>
+        </button>
+      </nav>
+
+      <div ref="menuRoot" class="sidebar-bottom">
+        <button type="button" class="account-chip" data-testid="account-entry" :aria-label="store.account ? `账号菜单：${displayName}` : '账号菜单（未登录）'" aria-haspopup="menu" :aria-expanded="menuOpen" @click="toggleMenu">
+          <span class="account-avatar" :class="{ 'is-signed-in': store.account }"><img v-if="store.account?.user.avatarUrl" class="brand-avatar" :src="store.account.user.avatarUrl" alt="" /><img v-else src="/xiaoban.svg" alt="" class="mascot" /></span>
+          <span class="nav-label account-name">{{ displayName }}</span>
+        </button>
+        <button type="button" class="xb-icon-btn notices" aria-label="通知" :title="hasUpdate ? '有新版本' : unread ? `${unread} 条未读公告` : '通知'" data-testid="nav-notices" @click="openSettings('about')"><Bell :size="16" /><i v-if="hasUpdate || unread" class="xb-dot notices-dot"></i></button>
+
+        <div v-if="menuOpen" class="xb-menu account-menu" role="menu" aria-label="账号菜单" data-testid="account-menu">
+          <div v-if="store.account" class="account-head" data-testid="account-info">
+            <span class="account-avatar lg"><img v-if="store.account.user.avatarUrl" :src="store.account.user.avatarUrl" alt="" /><img v-else src="/xiaoban.svg" alt="" class="mascot" /></span>
+            <div><b data-testid="account-username">{{ store.account.user.username }}</b><span>账号 ID <span data-testid="account-uid">{{ store.account.user.uid }}</span></span></div>
+          </div>
+          <button v-else type="button" class="xb-menu-item account-login" role="menuitem" data-testid="account-login" @click="login">
+            <span class="account-avatar lg"><img src="/xiaoban.svg" alt="" class="mascot" /></span>
+            <span class="login-copy"><b>登录 / 注册</b><small>登录后即可使用小伴 AI</small></span><LogIn :size="15" class="xb-menu-hint" />
+          </button>
+          <div class="xb-menu-sep"></div>
+          <button type="button" class="xb-menu-item" role="menuitem" data-testid="nav-settings" @click="openSettings()"><SlidersHorizontal :size="16" />设置<span class="xb-menu-hint">{{ mod }},</span></button>
+          <button type="button" class="xb-menu-item" role="menuitem" data-testid="nav-appearance" @click="openSettings('appearance')"><Palette :size="16" />外观<span class="xb-menu-hint">{{ modeLabel }}</span></button>
+          <div class="accent-row" role="radiogroup" aria-label="主题色">
+            <button v-for="item in accents" :key="item.id" type="button" role="radio" class="accent-dot" :class="{ on: accent === item.id }" :aria-checked="accent === item.id" :aria-label="item.name" :title="item.name" :data-testid="`accent-${item.id}`" :style="{ background: (isDark ? item.dark : item.light).btn, '--ring': (isDark ? item.dark : item.light).btn }" @click="setAccent(item.id)"></button>
+          </div>
+          <button type="button" class="xb-menu-item" role="menuitem" data-testid="open-assistant" :disabled="openingAssistant" @click="openAssistant"><Zap :size="16" />超级小伴<span class="xb-menu-hint">{{ assistantShortcut }}</span></button>
+          <button type="button" class="xb-menu-item" role="menuitem" data-testid="nav-check-update" @click="openSettings('about')"><RefreshCw :size="16" />检查更新<em v-if="hasUpdate" class="xb-menu-hint update-mark" data-testid="nav-settings-new">新版本</em><i v-else-if="unread" class="xb-dot xb-menu-hint" data-testid="nav-notice-dot"></i></button>
+          <button type="button" class="xb-menu-item" role="menuitem" data-testid="nav-website" @click="openOfficialSite"><Globe :size="16" />小伴官网<span class="xb-menu-hint">↗</span></button>
+          <template v-if="store.account">
+            <div class="xb-menu-sep"></div>
+            <button type="button" class="xb-menu-item" role="menuitem" data-testid="account-logout" :disabled="loggingOut" @click="handleLogout"><LogOut :size="16" />退出登录</button>
+          </template>
+        </div>
       </div>
-    </NModal>
+    </aside>
+    <div v-if="sessionMenu" ref="sessionMenuEl" class="xb-menu session-menu" role="menu" :aria-label="`对话：${menuSession?.title || '新对话'}`" data-testid="session-menu" :style="{ left: `${sessionMenu.x}px`, top: `${sessionMenu.y}px` }">
+      <template v-if="!sessionMenu.confirming">
+        <button type="button" class="xb-menu-item" role="menuitem" data-testid="session-menu-rename" @click="startRename"><Pencil :size="15" />重命名</button>
+        <div class="xb-menu-sep"></div>
+        <div class="xb-menu-label">移动到工作区</div>
+        <button v-for="space in workspaceTargets" :key="space.key" type="button" class="xb-menu-item" role="menuitemradio" :aria-checked="menuSession?.workspace === space.path" :disabled="menuBusy" :title="space.path" :data-testid="`session-move-${space.name}`" @click="moveSession(space.path)">
+          <Folder :size="15" /><span class="session-menu-name">{{ space.name }}</span><Check v-if="menuSession?.workspace === space.path" :size="14" class="xb-menu-check" />
+        </button>
+        <button type="button" class="xb-menu-item" role="menuitem" :disabled="menuBusy" data-testid="session-move-pick" @click="moveSession(null)"><FolderPlus :size="15" />选择文件夹…</button>
+        <div class="xb-menu-sep"></div>
+        <button type="button" class="xb-menu-item is-danger" role="menuitem" :disabled="menuBusy" :title="menuBusy ? '回答结束后才能删除' : undefined" data-testid="session-menu-delete" @click="sessionMenu.confirming = true; placeSessionMenu()"><Trash2 :size="15" />删除</button>
+      </template>
+      <div v-else class="session-confirm" role="alertdialog" aria-label="删除对话" data-testid="session-delete-confirm">
+        <b>删除「{{ menuSession?.title || '新对话' }}」？</b>
+        <span>对话记录会从这台电脑上清除，无法恢复。</span>
+        <div class="session-confirm-actions">
+          <button type="button" class="xb-btn is-sm" @click="closeSessionMenu">取消</button>
+          <button type="button" class="xb-btn is-sm is-danger" data-testid="session-delete-yes" @click="deleteSession">删除</button>
+        </div>
+      </div>
+    </div>
+    <ChatNameDialog :show="!!renamingId" title="重命名对话" placeholder="给这个对话起个名字" :initial="renamingTitle" :max-length="60" confirm-text="保存" :busy="renameBusy" @close="renamingId = ''" @submit="submitRename" />
+    <div class="control-main">
+      <main class="control-workspace" :class="{ 'fixed-page-workspace': fixedPages.includes(store.page) }">
+        <NAlert v-if="store.initialError" class="workspace-alert" type="error" title="桌面配置暂时无法读取">{{ store.initialError }} <NButton size="small" @click="store.initialize()">重试</NButton></NAlert>
+        <div v-if="!store.ready" class="workspace-loading xb-page"><NSkeleton height="32px" width="220px" /><NSkeleton height="18px" width="320px" /><NSkeleton height="380px" :sharp="false" /></div>
+        <template v-else-if="!store.initialError"><KeepAlive :max="5">
+          <NewTaskPage v-if="store.page === 'new-task'" :store="store" />
+          <ChatPage v-else-if="store.page === 'chat'" :store="store" />
+          <AiStorePage v-else-if="store.page === 'ai-store'" :store="store" />
+          <LibraryPage v-else-if="store.page === 'library'" :store="store" />
+          <StudioPage v-else-if="store.page === 'studio'" :store="store" :widget-settings-request="widgetSettingsRequest" :pet-settings-request="petSettingsRequest" @widget-settings-opened="widgetSettingsRequest = null" @pet-settings-opened="petSettingsRequest = null" />
+          <InteractivePage v-else-if="store.page === 'interactive'" :store="store" />
+          <GamesPage v-else-if="store.page === 'games'" :store="store" />
+          <CarePage v-else-if="store.page === 'care'" :store="store" />
+        </KeepAlive></template>
+      </main>
+    </div>
+    <SettingsDialog :store="store" @open-site="openOfficialSite" />
     <LoginModal :store="store" />
   </div>
 </template>
+<style>
+/* Sidebar (方案四): tint background, 264 wide, soft + ink selection. */
+.control-sidebar{position:relative;display:flex;flex-direction:column;min-height:0;padding:0 12px 12px;background:var(--ui-tint);color:var(--ui-text-primary)}
+.sidebar-top{height:48px;flex-shrink:0;display:flex;align-items:center;justify-content:flex-end;gap:2px}
+.sidebar-top .xb-icon-btn:disabled{opacity:.45}
+.control-brand{display:flex;align-items:center;gap:10px;padding:2px 6px 16px;flex-shrink:0}
+.brand-copy{display:flex;flex-direction:column;line-height:1.25;white-space:nowrap;min-width:0}
+.brand-copy strong{font-size:15px;font-weight:600}
+.brand-copy span{font-size:11px;color:var(--ui-text-secondary)}
+.sidebar-scroll{flex:1;min-height:0;display:flex;flex-direction:column;gap:1px;overflow-y:auto;overflow-x:hidden;margin:0 -4px;padding:0 4px;scrollbar-width:thin;scrollbar-color:var(--ui-scrollbar) transparent;overscroll-behavior:contain}
+.nav-item{position:relative;display:flex;align-items:center;gap:9px;width:100%;height:32px;flex-shrink:0;padding:0 10px;border:0;border-radius:8px;background:transparent;color:var(--ui-text-primary);font-size:14px;text-align:left;cursor:pointer}
+.nav-item:hover{background:var(--ui-surface-hover)}
+.nav-item .nav-icon{flex-shrink:0;color:var(--ui-text-secondary)}
+.nav-item .nav-icon.ink{color:var(--ui-ink)}
+.nav-item.selected{background:var(--ui-soft);color:var(--ui-ink);font-weight:500}
+.nav-item.selected .nav-icon{color:var(--ui-ink)}
+.nav-label{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.nav-hint{margin-left:auto;font-size:11.5px;color:var(--ui-text-secondary);white-space:nowrap}
+.nav-group{font-weight:600}
+.nav-group .nav-attention{margin-left:auto}
+.nav-chevron{flex-shrink:0;color:var(--ui-text-tertiary);transition:transform 160ms}
+.nav-chevron.shut{transform:rotate(-90deg)}
+.nav-sub{display:flex;flex-direction:column;gap:1px;padding-left:10px}
+.nav-caption{display:flex;align-items:center;height:30px;margin-top:6px;padding:0 4px 0 10px;font-size:12px;font-weight:500;color:var(--ui-text-secondary)}
+.nav-caption .xb-icon-btn{margin-left:auto}
+.space-row .xb-dot{margin-left:auto}
+.space-row .xb-dot+.nav-hint{margin-left:6px}
+.nav-session{display:flex;align-items:center;gap:8px;width:100%;height:30px;flex-shrink:0;padding:0 10px 0 36px;border:0;border-radius:8px;background:transparent;color:var(--ui-text-primary);opacity:.86;font-size:13px;text-align:left;cursor:pointer}
+.nav-session:hover{background:var(--ui-surface-hover);opacity:1}
+.nav-session>span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.nav-session.selected{background:var(--ui-soft);color:var(--ui-ink);opacity:1;font-weight:500}
+.nav-session-row{position:relative;flex-shrink:0}
+.nav-session-row>.nav-session-more{position:absolute;top:3px;right:4px;opacity:0;pointer-events:none}
+.nav-session-row:hover .nav-session-more,.nav-session-row:focus-within .nav-session-more,.nav-session-row.menu-open .nav-session-more{opacity:1;pointer-events:auto}
+.nav-session-row:hover .nav-session,.nav-session-row:focus-within .nav-session,.nav-session-row.menu-open .nav-session{padding-right:32px}
+.nav-session-row.menu-open .nav-session{background:var(--ui-surface-hover);opacity:1}
+.nav-session-row.menu-open .nav-session.selected{background:var(--ui-soft)}
+.session-menu{position:fixed;width:232px;z-index:60}
+.session-menu .xb-menu-item:disabled{opacity:.45;cursor:not-allowed}
+.session-menu-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.session-confirm{display:flex;flex-direction:column;gap:4px;padding:8px 10px}
+.session-confirm b{font-size:13.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.session-confirm span{font-size:12px;line-height:1.5;color:var(--ui-text-secondary)}
+.session-confirm-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:8px}
+.nav-empty{margin:0;padding:4px 10px 4px 36px;font-size:12px;color:var(--ui-text-tertiary)}
+.nav-sep{height:1px;flex-shrink:0;margin:8px 10px;background:var(--ui-line)}
 
+.sidebar-bottom{position:relative;display:flex;align-items:center;gap:6px;padding-top:10px;border-top:1px solid var(--ui-line);flex-shrink:0}
+.account-chip{flex:1;min-width:0;display:flex;align-items:center;gap:10px;height:40px;padding:0 6px;border:0;border-radius:9px;background:transparent;color:var(--ui-text-primary);text-align:left;cursor:pointer}
+.account-chip:hover,.account-chip[aria-expanded=true]{background:var(--ui-surface-hover)}
+.account-name{font-size:13px;font-weight:500}
+.account-avatar{width:30px;height:30px;flex-shrink:0;border-radius:50%;overflow:hidden;background:#fff;box-shadow:0 0 0 1px rgba(0,0,0,.08);display:grid;place-items:center}
+.account-avatar.is-signed-in{box-shadow:0 0 0 2px var(--ui-btn)}
+.account-avatar img{width:100%;height:100%;object-fit:cover}
+.account-avatar img.mascot{width:26px;height:26px;object-fit:contain}
+.account-avatar.lg{width:38px;height:38px}
+.account-avatar.lg img.mascot{width:32px;height:32px}
+.notices-dot{position:absolute;top:6px;right:6px;width:6px;height:6px}
+.account-menu{position:absolute;left:-2px;bottom:52px;width:300px;padding:8px;z-index:50}
+.account-head{display:flex;align-items:center;gap:10px;padding:8px 10px 12px}
+.account-head>div{display:flex;flex-direction:column;min-width:0}
+.account-head b{font-size:14px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.account-head>div>span{font-size:12px;color:var(--ui-text-secondary);overflow-wrap:anywhere}
+.account-login{min-height:54px;padding:6px 10px}
+.login-copy{display:flex;flex-direction:column;line-height:1.35}
+.login-copy b{font-size:14px;font-weight:600;color:var(--ui-ink)}
+.login-copy small{font-size:12px;color:var(--ui-text-secondary)}
+.account-menu .xb-menu-item:disabled{opacity:.5}
+.update-mark{color:var(--ui-ink)!important;font-weight:500;font-style:normal}
+.accent-row{display:flex;align-items:center;gap:9px;padding:4px 10px 10px 36px}
+.accent-dot{width:14px;height:14px;padding:0;border:0;border-radius:50%;box-shadow:inset 0 0 0 1px rgba(0,0,0,.1);cursor:pointer}
+:root[data-theme=dark] .accent-dot{box-shadow:inset 0 0 0 1px rgba(255,255,255,.18)}
+.accent-dot.on,:root[data-theme=dark] .accent-dot.on{box-shadow:0 0 0 2px var(--ui-surface),0 0 0 3.5px var(--ring)}
+.accent-dot:hover{transform:scale(1.12)}
+
+/* Whole sidebar folded to an icon rail. */
+.is-collapsed .control-sidebar{padding:0 8px 12px}
+.is-collapsed .sidebar-top{justify-content:center}
+.is-collapsed .sidebar-search,.is-collapsed .brand-copy,.is-collapsed .nav-label,.is-collapsed .nav-hint,.is-collapsed .nav-chevron,.is-collapsed .nav-caption,.is-collapsed .space-row,.is-collapsed .nav-session-row,.is-collapsed .nav-session,.is-collapsed .nav-empty,.is-collapsed .notices{display:none}
+.is-collapsed .control-brand{justify-content:center;padding:2px 0 16px}
+.is-collapsed .nav-sub{padding-left:0}
+.is-collapsed .nav-item{justify-content:center;padding:0;height:36px}
+.is-collapsed .nav-group .nav-attention{position:absolute;top:6px;right:8px;margin:0}
+.is-collapsed .account-chip{justify-content:center;padding:0}
+.is-collapsed .sidebar-scroll{margin:0;padding:0}
+</style>

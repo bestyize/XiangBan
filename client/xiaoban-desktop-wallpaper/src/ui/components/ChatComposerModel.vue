@@ -1,10 +1,18 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue';
-import { Check, ChevronDown, ChevronRight, Code2, Settings } from 'lucide-vue-next';
+import { Check, ChevronDown, ChevronRight, Settings } from 'lucide-vue-next';
 import { GATEWAY_PROVIDER, invoke, toAccountError, type AiConfigView, type AiReplyPreference, type AiTier, type ProviderConfigView } from '../../bridge.ts';
 import { providerReasoningLevels, preferenceOptions } from '../ai-config.ts';
 
-const props = defineProps<{ label: string; disabled?: boolean }>();
+const props = defineProps<{ label: string; disabled?: boolean; /** The service the model comes from, for the small badge; empty when unknown. */ provider?: string; /** The model is 小伴 AI. */ gateway?: boolean }>();
+/** Two letters of the service's name (or its first character), like a tiny logo. */
+const badge = computed(() => {
+  if (props.gateway) return '伴';
+  const name = (props.provider || props.label || '').trim();
+  const latin = name.replace(/[^A-Za-z0-9]/g, '');
+  return latin ? latin.slice(0, 2).toUpperCase() : name.slice(0, 1) || 'AI';
+});
+const providerBadge = (name: string) => { const latin = name.replace(/[^A-Za-z0-9]/g, ''); return latin ? latin.slice(0, 2).toUpperCase() : name.slice(0, 1); };
 const emit = defineEmits<{ switched: []; settings: [] }>();
 const root = ref<HTMLElement | null>(null);
 const open = ref(false);
@@ -136,12 +144,12 @@ function settings() { close(); emit('settings'); }
 
 <template>
   <div ref="root" class="model-anchor">
-    <button type="button" class="composer-model" data-testid="chat-workbench-model" :title="label" :disabled="disabled" :aria-expanded="open" aria-haspopup="menu" @click="toggle"><Code2 :size="14" /><span>{{ label }}</span><ChevronDown :size="12" /></button>
-    <div v-if="open" class="model-panel" role="menu" aria-label="选择模型" @scroll="hideReasoning">
+    <button type="button" class="composer-model" data-testid="chat-workbench-model" :title="provider ? `${provider} · ${label}` : label" :disabled="disabled" :aria-expanded="open" aria-haspopup="menu" @click="toggle"><i class="model-badge" :class="{ brand: gateway }" aria-hidden="true">{{ badge }}</i><span>{{ label }}</span><ChevronDown :size="11" :stroke-width="2.4" /></button>
+    <div v-if="open" class="model-panel xb-menu" role="menu" aria-label="选择模型" @scroll="hideReasoning">
       <div class="model-heading">选择模型</div>
       <div v-if="busy && !config" class="model-state">读取已配置模型…</div>
       <div v-if="gatewayEnabled" class="model-group" data-testid="chat-model-gateway">
-        <div class="provider-name">小伴 AI</div>
+        <div class="provider-name"><i class="model-badge brand" aria-hidden="true">伴</i>小伴 AI</div>
         <button v-for="tier in tiers" :key="tier.tier" type="button" class="model-choice" :title="tier.description" :disabled="busy || !tier.available" :class="{ selected: currentTier(tier) }" :data-testid="`chat-model-xiaoban-ai-${tier.tier}`" aria-haspopup="menu" :aria-expanded="targetTier(tier)" @mouseenter="showReasoning({ kind: 'gateway', tier }, $event)" @mouseleave="leaveReasoning" @focus="showReasoning({ kind: 'gateway', tier }, $event)" @keydown.right.prevent="showReasoning({ kind: 'gateway', tier }, $event, true)" @click="chooseGateway(tier)">
           <span>{{ tier.displayName }}{{ !tier.available ? '（暂不可用）' : '' }}</span><Check v-if="currentTier(tier)" :size="14" /><ChevronRight :size="12" />
         </button>
@@ -149,7 +157,7 @@ function settings() { close(); emit('settings'); }
         <p v-else-if="!tiers.length" class="model-state">{{ busy ? '读取使用模式…' : '暂无可用模式，请到模型设置查看。' }}</p>
       </div>
       <div v-for="group in providers" :key="group.provider.id" class="model-group">
-        <div class="provider-name">{{ group.provider.name }}</div>
+        <div class="provider-name"><i class="model-badge" aria-hidden="true">{{ providerBadge(group.provider.name) }}</i>{{ group.provider.name }}</div>
         <button v-for="item in group.models" :key="item.model" type="button" class="model-choice" :title="item.model" :disabled="busy" :class="{ selected: current(item) }" :data-testid="`chat-model-${group.provider.id}-${item.model}`" aria-haspopup="menu" :aria-expanded="targetModel(item)" @mouseenter="showReasoning({ kind: 'model', entry: item }, $event)" @mouseleave="leaveReasoning" @focus="showReasoning({ kind: 'model', entry: item }, $event)" @keydown.right.prevent="showReasoning({ kind: 'model', entry: item }, $event, true)" @click="choose(item)">
           <span>{{ item.name }}</span><Check v-if="current(item)" :size="14" /><ChevronRight :size="12" />
         </button>
@@ -160,7 +168,7 @@ function settings() { close(); emit('settings'); }
     </div>
   </div>
   <Teleport to="body">
-    <div v-if="open && reasoningTarget" ref="reasoningPanel" class="reasoning-panel" :style="reasoningPosition" role="menu" aria-label="思考强度" data-testid="chat-model-reasoning" @mouseenter="keepReasoning" @mouseleave="leaveReasoning" @keydown.left.prevent="hideReasoning">
+    <div v-if="open && reasoningTarget" ref="reasoningPanel" class="reasoning-panel xb-menu" :style="reasoningPosition" role="menu" aria-label="思考强度" data-testid="chat-model-reasoning" @mouseenter="keepReasoning" @mouseleave="leaveReasoning" @keydown.left.prevent="hideReasoning">
       <div class="model-heading">思考强度</div>
       <div class="reasoning-model">{{ reasoningTarget.kind === 'model' ? reasoningTarget.entry.name : `小伴 AI · ${reasoningTarget.tier.displayName}` }}</div>
       <button v-for="option in reasoningOptions" :key="option.value" type="button" class="model-choice" role="menuitemradio" :aria-checked="selectedStrength(option.value)" :disabled="busy" :data-testid="`chat-model-strength-${option.value}`" @click="chooseStrength(option.value)">
@@ -173,23 +181,28 @@ function settings() { close(); emit('settings'); }
 
 <style scoped>
 .model-anchor{position:relative;display:flex;flex:none;min-width:0}
-.composer-model{display:flex;align-items:center;gap:5px;min-width:0;max-width:166px;height:30px;padding:0 7px;border:0;border-radius:8px;background:none;color:var(--ui-text-secondary);cursor:pointer;font:inherit;font-size:12px}
-.composer-model:hover,.composer-model[aria-expanded="true"]{background:var(--ui-surface-alt);color:var(--ui-text-primary)}
+.composer-model{display:flex;align-items:center;gap:6px;min-width:0;max-width:200px;height:28px;padding:0 8px;border:0;border-radius:8px;background:none;color:var(--ui-text-primary);cursor:pointer;font:inherit;font-size:12px;font-weight:500}
+.composer-model:hover,.composer-model[aria-expanded="true"]{background:var(--ui-control)}
 .composer-model:disabled{opacity:.5;cursor:not-allowed}
-.composer-model span{max-width:118px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.composer-model svg{flex:none}
-.model-panel{position:absolute;z-index:40;bottom:calc(100% + 8px);right:0;width:max-content;min-width:210px;max-width:min(305px,calc(100vw - 20px));max-height:350px;overflow-y:auto;padding:7px 5px 4px;border-radius:12px;background:var(--ui-surface);border:1px solid var(--ui-border);box-shadow:0 12px 32px rgba(0,0,0,.14);box-sizing:border-box;scrollbar-width:thin}
-.model-heading{font-size:12px;font-weight:650;padding:6px 9px}
-.provider-name{font-size:11px;color:var(--ui-text-tertiary);padding:10px 9px 4px;border-top:1px solid var(--ui-border);margin-top:3px}
-.model-choice{width:100%;height:33px;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:0 9px;background:none;color:var(--ui-text-primary);border:0;border-radius:7px;cursor:pointer;text-align:left;font:inherit;font-size:12px}
-.model-choice:hover,.model-choice.selected{background:var(--ui-surface-alt)}
+.composer-model span{max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:var(--ui-font-mono);font-size:12px}
+.composer-model svg{flex:none;color:var(--ui-text-secondary)}
+.model-badge{flex:none;width:16px;height:16px;border-radius:4px;background:var(--ui-soft);color:var(--ui-ink);font-style:normal;font-size:8.5px;font-weight:600;line-height:16px;text-align:center;letter-spacing:-.02em;font-family:var(--ui-font-family)}
+.model-badge.brand{background:linear-gradient(160deg,var(--ui-btn-hi),var(--ui-btn));color:var(--ui-text-on-btn);font-size:9px}
+.model-panel{position:absolute;bottom:calc(100% + 8px);right:0;width:max-content;min-width:230px;max-width:min(320px,calc(100vw - 20px));max-height:360px;overflow-y:auto;box-sizing:border-box;scrollbar-width:thin}
+.model-heading{font-size:12px;font-weight:500;color:var(--ui-text-tertiary);padding:6px 10px 4px}
+.provider-name{display:flex;align-items:center;gap:7px;font-size:11.5px;font-weight:500;color:var(--ui-text-secondary);padding:9px 10px 4px;border-top:1px solid var(--ui-line);margin-top:4px}
+.model-choice{width:100%;height:32px;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:0 10px;background:none;color:var(--ui-text-primary);border:0;border-radius:8px;cursor:pointer;text-align:left;font:inherit;font-size:13px}
+.model-choice:hover,.model-choice[aria-expanded="true"]{background:var(--ui-surface-hover)}
+.model-choice.selected,.model-choice[aria-checked="true"]{background:var(--ui-soft);color:var(--ui-ink)}
 .model-choice>span{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .model-choice svg{flex:none}
-.model-choice:disabled{cursor:wait;opacity:.7}
-.model-state{color:var(--ui-text-tertiary);font-size:11px;line-height:1.6;padding:4px 9px}
-.model-state.error{color:var(--ui-primary)}
-.reasoning-panel{position:fixed;z-index:1000;overflow-y:auto;padding:7px 5px 4px;border:1px solid var(--ui-border);border-radius:12px;background:var(--ui-surface);color:var(--ui-text-primary);box-shadow:0 12px 32px rgba(0,0,0,.14);box-sizing:border-box}
-.reasoning-model{padding:0 9px 6px;color:var(--ui-text-tertiary);font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.model-settings{display:flex;align-items:center;justify-content:center;gap:6px;width:100%;padding:10px 7px 7px;margin-top:6px;border:0;border-top:1px solid var(--ui-border);background:none;color:var(--ui-primary);cursor:pointer;font:inherit;font-size:12px}
-@media(max-width:680px){.composer-model{max-width:96px}.composer-model span{max-width:52px}}
+.model-choice svg:last-child{color:var(--ui-text-tertiary)}
+.model-choice:disabled{cursor:not-allowed;opacity:.55}
+.model-state{color:var(--ui-text-tertiary);font-size:11.5px;line-height:1.6;padding:4px 10px;margin:0}
+.model-state.error{color:var(--ui-danger)}
+.reasoning-panel{position:fixed;z-index:1000;overflow-y:auto;box-sizing:border-box}
+.reasoning-model{padding:0 10px 6px;color:var(--ui-text-tertiary);font-size:11.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.model-settings{display:flex;align-items:center;gap:8px;width:100%;min-height:32px;padding:0 10px;margin-top:4px;border:0;border-top:1px solid var(--ui-line);border-radius:0 0 8px 8px;background:none;color:var(--ui-text-secondary);cursor:pointer;font:inherit;font-size:12.5px}
+.model-settings:hover{color:var(--ui-text-primary)}
+@media(max-width:680px){.composer-model{max-width:110px}.composer-model span{max-width:60px}}
 </style>

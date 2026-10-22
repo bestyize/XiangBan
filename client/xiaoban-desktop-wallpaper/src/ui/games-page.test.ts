@@ -20,17 +20,17 @@ function setup(catalog: { games: unknown[]; errors?: string[] }, desktop = true)
   return { store, openGames, wrapper: mount(GamesPage, { props: { store }, global: { stubs } }) };
 }
 
-async function customTab(wrapper:ReturnType<typeof mount>){await wrapper.findAll('.n-tabs-tab').find(t=>t.text()==='自定义游戏')!.trigger('click');await flushPromises();}
+async function customTab(wrapper:ReturnType<typeof mount>){await wrapper.findAll('.xb-tabs-lg [role=tab]').find(t=>t.text()==='我的游戏')!.trigger('click');await flushPromises();}
 
 it('opens the selected local game on a single click and supports keyboard entry', async () => {
   const { wrapper, openGames } = setup({ games: [builtin] });
   try {
     await flushPromises();
-    expect(wrapper.get('.resource-library-header h1').text()).toBe('游戏空间');expect(wrapper.find('.resource-library-header p').exists()).toBe(false);expect(wrapper.findAll('.n-tabs-tab').map(t=>t.text())).toEqual(['官方游戏','自定义游戏']);
+    expect(wrapper.findAll('.xb-tabs-lg [role=tab]').map(t=>t.text())).toEqual(['官方游戏','我的游戏']);expect(wrapper.find('.resource-library-header').exists()).toBe(false);
     expect(wrapper.get('.game-card img').attributes('src')).toBe('/game-packs/merge-2048/cover.svg');
     await wrapper.get('.game-card').trigger('click'); await flushPromises();
     expect(openGames).toHaveBeenCalledWith('merge-2048');
-    expect(wrapper.find('.shortcut-card').exists()).toBe(false);expect(wrapper.find('h2').exists()).toBe(false);expect(wrapper.find('.section-heading').exists()).toBe(false);expect(wrapper.find('.resource-library-body').text()).not.toContain('离线可玩');
+    expect(wrapper.find('.shortcut-card').exists()).toBe(false);expect(wrapper.find('h2').exists()).toBe(false);expect(wrapper.find('.section-heading').exists()).toBe(false);expect(wrapper.find('.games-body').text()).not.toContain('离线可玩');
     await wrapper.get('.game-card').trigger('keydown', { key: 'Enter' }); await flushPromises();
     expect(openGames).toHaveBeenCalledTimes(2);
   } finally { wrapper.unmount(); }

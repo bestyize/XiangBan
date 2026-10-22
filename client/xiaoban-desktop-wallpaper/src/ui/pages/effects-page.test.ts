@@ -19,6 +19,8 @@ const pack = (id: string, name: string, source: 'builtin' | 'user' = 'builtin'):
   if (!parsed.ok) throw new Error(parsed.error);
   return parsed.pack;
 };
+/** The card previews only; the inspector on the right has its own, always playing preview. */
+const cards = (wrapper: ReturnType<typeof mount>) => wrapper.findAllComponents(EffectPreview).filter(preview => preview.element.closest('.effect-grid'));
 const none: EffectsChoice = { selected: '', params: {} };
 
 function setup(effects: EffectsChoice = none, packs = [pack('rain', '下雨'), pack('maple', '枫叶飘落'), pack('glitter', '星尘', 'user')], errors: string[] = [], imported: ImportOutcome = { status: 'imported', id: 'glitter', name: '星尘', file: 'glitter.json' }) {
@@ -36,7 +38,7 @@ function setup(effects: EffectsChoice = none, packs = [pack('rain', '下雨'), p
 describe('desktop effects page', () => {
   it('plays hovered cards temporarily without changing the desktop selection', async () => {
     const { wrapper, store } = setup({ selected: 'rain', params: {} });
-    const playing = () => wrapper.findAllComponents(EffectPreview).filter(preview => preview.props('playing')).map(preview => preview.props('pack').id);
+    const playing = () => cards(wrapper).filter(preview => preview.props('playing')).map(preview => preview.props('pack').id);
     const maple = wrapper.get('[data-testid="effect-maple"]');
     await maple.trigger('mouseenter');
     expect(playing()).toEqual(['maple']);
@@ -53,7 +55,7 @@ describe('desktop effects page', () => {
   });
   it('keeps saved selections static until clicked and plays only the clicked card', async () => {
     const { wrapper } = setup({ selected: 'rain', params: {} });
-    const previews = () => wrapper.findAllComponents(EffectPreview);
+    const previews = () => cards(wrapper);
     const playing = () => previews().filter(preview => preview.props('playing')).map(preview => preview.props('pack').id);
     expect(previews()).toHaveLength(2);
     expect(playing()).toEqual([]);
@@ -65,7 +67,7 @@ describe('desktop effects page', () => {
     expect(playing()).toEqual([]);
     wrapper.unmount();
     const reopened = setup({ selected: 'maple', params: {} });
-    expect(reopened.wrapper.findAllComponents(EffectPreview).every(preview => !preview.props('playing'))).toBe(true);
+    expect(cards(reopened.wrapper).every(preview => !preview.props('playing'))).toBe(true);
     reopened.wrapper.unmount();
   });
   it('separates official and custom effects without changing the desktop selection', async () => {
@@ -75,10 +77,11 @@ describe('desktop effects page', () => {
     expect(wrapper.find('[data-testid="effect-glitter"]').exists()).toBe(false);
     expect(wrapper.get('[data-testid="effect-rain"]').text()).not.toContain('我的');
     expect(wrapper.find('[data-testid="effect-tuning"]').exists()).toBe(false);
-    expect(wrapper.find('h1').text()).toBe('桌面特效');
+    expect(wrapper.find('h1').exists()).toBe(false);
+    expect(wrapper.findAll('.xb-seg button').map(button => button.text())).toEqual(['官方 2', '我的 1']);
     expect(store.loadEffects).toHaveBeenCalledOnce();
-    await wrapper.findAll('.n-tabs-tab').find(t=>t.text()==='自定义特效')!.trigger('click');await flushPromises();
-    expect(wrapper.get('[data-testid="effect-glitter"]').text()).toContain('我的');
+    await wrapper.get('[data-testid="effects-scope-custom"]').trigger('click');await flushPromises();
+    expect(wrapper.get('[data-testid="effect-glitter"]').text()).toContain('星尘');
     expect(wrapper.find('[data-testid="effect-rain"]').exists()).toBe(false);
     expect(store.setEffects).not.toHaveBeenCalled();
     wrapper.unmount();

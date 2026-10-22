@@ -210,3 +210,29 @@ export function remoteProviderMeta(p: ProviderConfigView): ProviderMeta {
     models: p.models,
   };
 }
+
+/** Tile for a provider in lists and the dialog header: a short mark and a hue class (see AiConfigCard styles). */
+export function providerTile(id: string, name: string): { mono: string; hue: string } {
+  const known: Record<string, [string, string]> = { deepseek: ['DS', 'blue'], zhipu: ['智', 'sky'], kimi: ['K', 'gray'], minimax: ['M', 'orange'] };
+  if (known[id]) return { mono: known[id][0], hue: known[id][1] };
+  const hues = ['blue', 'sky', 'gray', 'orange', 'green', 'pink'];
+  let hash = 0;
+  for (const ch of id) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0;
+  return { mono: (name.trim().charAt(0) || '+').toUpperCase(), hue: hues[hash % hues.length] };
+}
+
+export const reasoningLevelLabels: Record<AiReasoningEffort, string> = { low: '低', medium: '中', high: '高', xhigh: '更高', max: '最高' };
+export type ReasoningMode = 'auto' | 'manual' | 'off';
+
+/** How a model's thinking levels read in the list: what is declared, or that they are detected. */
+export function reasoningSummary(mode: ReasoningMode, levels: AiReasoningEffort[], inferred: AiReasoningEffort[]): string {
+  if (mode === 'off') return '不支持';
+  if (mode === 'manual') return levels.length ? reasoningEfforts.filter(l => levels.includes(l)).map(l => reasoningLevelLabels[l]).join(' / ') : '未勾选';
+  return inferred.length ? `自动识别 · ${inferred.map(l => reasoningLevelLabels[l]).join(' / ')}` : '自动识别';
+}
+
+export const reasoningModes: { value: ReasoningMode; label: string; hint: string }[] = [
+  { value: 'auto', label: '自动识别', hint: '按模型名自动判断可用的思考等级' },
+  { value: 'manual', label: '手动声明', hint: '只提供你勾选的等级；使用别名或代理时可按服务商文档声明' },
+  { value: 'off', label: '不支持', hint: '这个模型不支持调节思考深度' },
+];

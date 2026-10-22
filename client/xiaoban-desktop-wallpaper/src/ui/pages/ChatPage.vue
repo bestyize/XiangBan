@@ -1,115 +1,63 @@
 <script setup lang="ts">
-import { computed, h, nextTick, onMounted, onUnmounted, ref, watch, type Component, type HTMLAttributes } from 'vue';
-import { NButton, NDropdown, NInput, type DropdownOption } from 'naive-ui';
-import { ArrowDown, AudioLines, ChevronDown, ChevronRight, Ellipsis, Folder, FolderInput, FolderPlus, LoaderCircle, MessageSquarePlus, Mic, Pencil, SendHorizontal, Settings, Volume2, ShieldAlert, Sparkles, Square, Target, Trash2, X } from 'lucide-vue-next';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { NButton, NInput } from 'naive-ui';
+import { ArrowDown, ArrowUpRight, Check, ChevronDown, ChevronRight, ChevronUp, Copy, Ellipsis, FileText, LoaderCircle, PanelRight, Pencil, RefreshCw, Search, Settings, ShieldAlert, ShieldCheck, Sparkles, Sprout, Target, Trash2, Volume2, X } from 'lucide-vue-next';
 import { invoke } from '../../bridge.ts';
-import Orb from '../../assistant/Orb.vue';
 import type { ControlStore } from '../control-types.ts';
 import ModelSwitchDialog from '../components/ModelSwitchDialog.vue';
-import ChatWorkbenchTools from '../components/ChatWorkbenchTools.vue';
-import ChatComposerModel from '../components/ChatComposerModel.vue';
+import ChatComposer from '../components/ChatComposer.vue';
 import ChatWorkspaceMenu from '../components/ChatWorkspaceMenu.vue';
-import { GATEWAY_PROVIDER, type AiConfigView, type AiTier } from '../../bridge.ts';
 import ChatNameDialog from '../components/ChatNameDialog.vue';
-import ChatMoveDialog from '../components/ChatMoveDialog.vue';
-import ChatContextRing from '../components/ChatContextRing.vue';
 import ChatActivity from '../chat/ChatActivity.vue';
 import ChatReasoning from '../chat/ChatReasoning.vue';
 import ChatGoalPanel from '../chat/ChatGoalPanel.vue';
 import GuideModal from '../components/GuideModal.vue';
-import AsrStatus from '../components/AsrStatus.vue';
 import MarkdownView from '../chat/MarkdownView.ts';
 import SelectionCopyMenu from '../chat/SelectionCopyMenu.vue';
-import { ATTACHMENT_ACCEPT, MAX_ATTACHMENTS, MAX_TOTAL_BYTES, attachmentBytes, attachmentImage, attachmentName, readAttachment, type PendingAttachment } from '../chat/attachments.ts';
+import { attachmentImage } from '../chat/attachments.ts';
 import { CONTINUE_TEXT } from '../chat/chat-store.ts';
-import { approvalPreview, formatAgo, formatTokens, isImeEnter, isNearBottom, riskVerb, toolLabel } from '../chat/format.ts';
-import { replyBlocks } from '../chat/replies.ts';
-import { listRows, type ListRow } from '../chat/groups.ts';
-import type { ApprovalDecision, ApprovalRequest, ChatGroup, QuestionRequest, SessionSummary } from '../chat/types.ts';
+import { approvalPreview, formatTokens, isImeEnter, isNearBottom, riskVerb, toolLabel } from '../chat/format.ts';
+import { describeCall } from '../chat/view.ts';
+import { replyBlocks, type ReplyBlock, type ToolCall } from '../chat/replies.ts';
+import type { ApprovalDecision, ApprovalRequest, ChatItem, QuestionRequest } from '../chat/types.ts';
 
 const props = defineProps<{ store: ControlStore }>();
 const chat = props.store.chat;
+const composer = ref<InstanceType<typeof ChatComposer> | null>(null);
 
-const draft = ref('');
-const goalOpen = ref(false);
-const asr = props.store.asr;
-const voiceHasText = ref(false);
-const finishingVoice = ref(false);
-const foreground = ref(document.visibilityState !== 'hidden');
-function updateVisibility() { foreground.value = document.visibilityState !== 'hidden'; }
-function blurChat() { if (document.visibilityState === 'hidden') foreground.value = false; }
-function focusChat() { updateVisibility(); }
 const modelDialog = ref(false);
 const guideDialog = ref(false);
+const goalOpen = ref(false);
 const retryAfterSwitch = ref(false);
 function chooseModel(retry = false) { retryAfterSwitch.value = retry; modelDialog.value = true; }
-const modelLabel = ref('编程模型');
-let modelLabelGeneration = 0;
-async function readModelLabel() {
-  if (!props.store.desktop) return;
-  const generation = ++modelLabelGeneration;
-  try {
-    const config = await invoke<AiConfigView>('get_ai_config');
-    if (generation !== modelLabelGeneration) return;
-    if (config.activeProvider === GATEWAY_PROVIDER) {
-      modelLabel.value = '小伴 AI';
-      try {
-        const tiers = await invoke<AiTier[]>('ai_gateway_tiers');
-        if (generation !== modelLabelGeneration) return;
-        const tier = tiers.find(t => t.tier === (config.gatewayTier || config.model));
-        if (tier) modelLabel.value = `小伴 AI · ${tier.displayName}`;
-      } catch { /* Keep a readable gateway label when login or the network is unavailable. */ }
-      return;
-    }
-    const provider = config.providers?.find(p => p.id === config.activeProvider);
-    modelLabel.value = provider?.models?.find(m => m.id === config.model)?.name || config.model || '编程模型';
-  } catch { /* Preserve the last known label while preferences are unavailable. */ }
+async function modelSwitched() {
+  await chat.refresh();
+  await composer.value?.refreshModel();
+  if (retryAfterSwitch.value) await chat.retry();
+  props.store.notify('模型已切换', 'success');
 }
-async function modelSwitched() { await chat.refresh(); await readModelLabel(); if (retryAfterSwitch.value) await chat.retry(); props.store.notify('模型已切换', 'success'); }
-function composerModelSwitched() { retryAfterSwitch.value = false; void modelSwitched(); }
-function insertCapabilityPrompt(instruction: string) { draft.value = draft.value.trim() ? instruction + '\n\n' + draft.value : instruction; }
-function useExpert(entrySkill: string, name: string) { insertCapabilityPrompt(`请先使用 load_skill 加载已安装专家「${name}」的工作流（${entrySkill}），再帮助我完成以下任务：`); }
-function useSkill(slug: string, name: string) { insertCapabilityPrompt(`请先使用 load_skill 加载已安装技能「${name}」（${slug}），然后完成以下任务：`); }
-function useConnector(name: string) { insertCapabilityPrompt(`请在本次任务中优先使用已连接的「${name}」工具，完成以下任务：`); }
-const capturing = ref(false);
-async function takeChatScreenshot() {
-  if (!props.store.desktop || capturing.value || running.value || !chat.configured || attachments.value.length >= MAX_IMAGES) return;
-  const version = attachmentVersion;
-  capturing.value = true;
-  try {
-    const image = await invoke<string | null>('chat_screenshot');
-    if (version !== attachmentVersion || !image) return;
-    if (!image.startsWith('data:image/')) throw new Error('截图结果格式错误');
-    if (attachments.value.reduce((sum, a) => sum + attachmentBytes(a), 0) + attachmentBytes(image) > MAX_TOTAL_BYTES) throw new Error('附件合计不能超过 30MB');
-    attachments.value.push(image);
-  } catch (error) { if (version === attachmentVersion) props.store.notify(error instanceof Error ? error.message : String(error), 'error'); }
-  finally { capturing.value = false; }
-}
-const composing = ref(false);
+/** 设置 → AI 模型, in the settings dialog. */
+function openAiSettings() { modelDialog.value = false; closeMore(); props.store.openSettings('ai'); }
+
 const scroller = ref<HTMLElement | null>(null);
 const stick = ref(true);
-const confirmingId = ref('');
 const answerText = ref('');
-const examples = ['帮我看看工作目录里有什么，整理一份清单', '把壁纸换成一张安静的风景', '每天下午三点提醒我喝水', '查一下今天是几号，再告诉我这周还剩几天'];
-
-/** Images waiting to be sent, as `data:` URLs. Cleared on send, alongside the draft. */
-const attachments = ref<PendingAttachment[]>([]);
-const attachmentReading = ref(false);
-let attachmentVersion = 0;
-const filePicker = ref<HTMLInputElement | null>(null);
-/** The image shown enlarged, or null. */
+const composing = ref(false);
 const preview = ref<string | null>(null);
-/** How many images one message may carry, matching the host's own limit. */
-const MAX_IMAGES = MAX_ATTACHMENTS;
+const examples = ['帮我看看工作目录里有什么，整理一份清单', '把壁纸换成一张安静的风景', '每天下午三点提醒我喝水', '查一下今天是几号，再告诉我这周还剩几天'];
+const exampleTags = ['工作区', '壁纸', '关怀', '日常'];
 
 const view = computed(() => chat.current());
 const blocks = computed(() => replyBlocks(view.value?.items ?? []));
 const running = computed(() => !!view.value?.running);
-const title = computed(() => (chat.currentId && chat.sessions.find(s => s.id === chat.currentId)?.title) || '新对话');
-const workspaceName = computed(() => chat.currentWorkspace.replace(/\\/g, '/').split('/').filter(Boolean).at(-1) || '工作区');
-const compacting = computed(() => !!chat.currentId && chat.compactingId === chat.currentId);
-const canSend = computed(() => chat.configured && !running.value && !compacting.value && !attachmentReading.value && (draft.value.trim() !== '' || attachments.value.length > 0));
-const now = () => Math.floor(Date.now() / 1000);
+const session = computed(() => (chat.currentId ? chat.sessions.find(s => s.id === chat.currentId) ?? null : null));
+const title = computed(() => session.value?.title || '新对话');
+const folderName = (path: string) => path.replace(/\\/g, '/').split('/').filter(Boolean).at(-1) || path;
+/** The 空间 the conversation sits in, as the sidebar names it: its folder, or 最近任务 when it has none. */
+const spaceName = computed(() => {
+  const path = session.value ? session.value.workspace?.trim() : chat.pendingWorkspace;
+  return path ? folderName(path) : '最近任务';
+});
 const waiting = computed(() => !!view.value && (view.value.approvals.length > 0 || view.value.questions.length > 0));
 const thinking = computed(() => {
   const v = view.value;
@@ -118,53 +66,17 @@ const thinking = computed(() => {
   return !(last?.kind === 'assistant' && last.streaming);
 });
 const statusLine = computed(() => view.value?.status || (waiting.value ? '等你确认后继续' : thinking.value ? '思考中…' : ''));
+const lastBlockId = computed(() => blocks.value.at(-1)?.id);
 
-const microphoneAllowed = computed(() => foreground.value && chat.configured && !running.value && (!props.store.speech || props.store.speech.status === 'idle'));
-watch(() => chat.currentId, () => { asr?.deactivate(); attachmentVersion++; attachments.value = []; }, { flush: 'sync' });
-watch(microphoneAllowed, allowed => { if (!allowed) asr?.deactivate(); }, { flush: 'sync' });
-watch(() => props.store.page, page => { if (page !== 'chat') asr?.deactivate(); else void readModelLabel(); }, { flush: 'sync' });
-async function toggleVoice() {
-  if (!asr || finishingVoice.value) return;
-  if (asr.recordingRequested) {
-    const wasListening = asr.listening;
-    const sessionId = chat.currentId;
-    finishingVoice.value = true;
-    try {
-      await asr.finish();
-      if (!wasListening || asr.error || props.store.page !== 'chat' || !foreground.value || chat.currentId !== sessionId || running.value) return;
-      if (!voiceHasText.value) { props.store.notify('没有识别到语音，请重试', 'info'); return; }
-      await submit();
-    } finally { finishingVoice.value = false; }
-    return;
-  }
-  if (!microphoneAllowed.value || props.store.page !== 'chat') return;
-  voiceHasText.value = false;
-  void asr.activate(text => { voiceHasText.value = true; draft.value += (draft.value && !/\s$/.test(draft.value) ? ' ' : '') + text; });
-}
-onMounted(() => {
-  asr?.deactivate();
-  void asr?.init();
-  void readModelLabel();
-  document.addEventListener('visibilitychange', updateVisibility);
-  window.addEventListener('blur', blurChat); window.addEventListener('focus', focusChat);
-});
-onUnmounted(() => {
-  asr?.deactivate(); document.removeEventListener('visibilitychange', updateVisibility);
-  window.removeEventListener('blur', blurChat); window.removeEventListener('focus', focusChat);
-});
 onMounted(async () => {
   const first = !chat.ready;
   await chat.init();
   if (!first) await chat.refresh();
 });
 
-function toBottom() {
-  const el = scroller.value;
-  if (el) el.scrollTop = el.scrollHeight;
-}
-function onScroll() {
-  if (scroller.value) stick.value = isNearBottom(scroller.value);
-}
+/* ── Scrolling ───────────────────────────────────────────────────────── */
+function toBottom() { const el = scroller.value; if (el) el.scrollTop = el.scrollHeight; }
+function onScroll() { if (scroller.value) stick.value = isNearBottom(scroller.value); }
 const signature = computed(() => {
   const v = view.value;
   if (!v) return '';
@@ -176,182 +88,132 @@ watch(signature, async (value, before) => {
   await nextTick();
   if (stick.value) toBottom();
 });
-
-async function submit() {
-  const text = draft.value.trim();
-  if ((!text && !attachments.value.length) || !canSend.value) return;
-  asr?.deactivate();
-  const images = [...attachments.value];
-  const kept = text;
-  draft.value = '';
-  attachments.value = [];
-  stick.value = true;
-  if (!(await chat.send(text, images)) && !draft.value) {
-    // The host refused, so nothing was sent: hand the whole message back untouched.
-    draft.value = kept;
-    attachments.value = images;
-  }
-  await nextTick();
-  toBottom();
-}
-
-async function addImages(files: File[]) {
-  if (!files.length || attachmentReading.value || running.value) return;
-  const version = attachmentVersion;
-  attachmentReading.value = true;
-  try {
-    for (const file of files) {
-      if (version !== attachmentVersion) break;
-      if (attachments.value.length >= MAX_IMAGES) { props.store.notify('一次最多添加 8 个附件', 'info'); break; }
-      try {
-        const item = await readAttachment(file);
-        if (version !== attachmentVersion) break;
-        if (attachments.value.reduce((sum, a) => sum + attachmentBytes(a), 0) + attachmentBytes(item) > MAX_TOTAL_BYTES) { props.store.notify('附件合计不能超过 30MB', 'error'); continue; }
-        attachments.value.push(item);
-      } catch (error) { props.store.notify(error instanceof Error ? error.message : String(error), 'error'); }
-    }
-  } finally { attachmentReading.value = false; }
-}
-onUnmounted(() => { attachmentVersion++; });
-/** Images on the clipboard arrive as files; anything else is left to the normal paste. */
-function onPaste(event: ClipboardEvent) {
-  const files = Array.from(event.clipboardData?.files ?? []);
-  if (!files.length) return;
-  event.preventDefault();
-  void addImages(files);
-}
-
-function onPick(event: Event) {
-  const input = event.target as HTMLInputElement;
-  void addImages(Array.from(input.files ?? []));
-  // Let the same file be chosen again after it is removed.
-  input.value = '';
-}
-
-const removeAttachment = (index: number) => { attachments.value = attachments.value.filter((_, n) => n !== index); };
-const openPicker = () => filePicker.value?.click();
-
-function onKeydown(event: KeyboardEvent) {
-  if (event.key !== 'Enter' || event.shiftKey || isImeEnter(event, composing.value)) return;
-  event.preventDefault();
-  void submit();
-}
-const useExample = (text: string) => { draft.value = text; };
-watch([() => props.store.creationDraft, () => chat.configured], ([text, configured]) => {
-  if (!text || !configured) return;
-  useExample(text);
-  props.store.creationDraft = null;
-}, { immediate: true });
+const useExample = (text: string) => composer.value?.setDraft(text);
+const continueAnswer = () => { props.store.asr?.deactivate(); stick.value = true; void chat.send(CONTINUE_TEXT); };
 const confirmingUndo = ref('');
-async function undoRun(itemId: string) {
-  confirmingUndo.value = '';
-  if (view.value) await chat.undoRun(view.value.id, itemId);
-}
-const continueAnswer = () => { asr?.deactivate(); stick.value = true; void chat.send(CONTINUE_TEXT); };
+async function undoRun(itemId: string) { confirmingUndo.value = ''; if (view.value) await chat.undoRun(view.value.id, itemId); }
 
-const choose = (id: string | null) => { attachmentVersion++; attachments.value = []; asr?.deactivate(); confirmingId.value = ''; void chat.select(id); };
-
-// The list: groups as folders, then the conversations in none.
-const COLLAPSED_KEY = 'xiaoban.chat.collapsed-groups';
-function savedCollapsed(): string[] {
-  try {
-    const saved: unknown = JSON.parse(localStorage.getItem(COLLAPSED_KEY) ?? '[]');
-    return Array.isArray(saved) ? saved.filter((id): id is string => typeof id === 'string') : [];
-  } catch { return []; }
+/* ── Replies ─────────────────────────────────────────────────────────── */
+type Assistant = Extract<ChatItem, { kind: 'assistant' }>;
+const isUserBlock = (block: ReplyBlock) => block.items[0]?.kind === 'user';
+const answers = (block: ReplyBlock) => block.items.filter((item): item is Assistant => item.kind === 'assistant');
+/** The 小伴 heading: a reply that says or does something, not one made only of notices. */
+const speaks = (block: ReplyBlock) => block.calls.length > 0 || block.items.some(item => item.kind === 'assistant' || item.kind === 'reasoning');
+const replyText = (block: ReplyBlock) => answers(block).map(item => item.text.trim()).filter(Boolean).join('\n\n');
+const finished = (block: ReplyBlock) => !answers(block).some(item => item.streaming) && !(running.value && block.id === lastBlockId.value);
+const replyUsage = (block: ReplyBlock) => [...answers(block)].reverse().find(item => item.usage)?.usage;
+const speechKey = (block: ReplyBlock) => answers(block).at(-1)?.id ?? block.id;
+interface FileCard { path: string; name: string; ext: string; changed: boolean }
+function filesOf(calls: ToolCall[]): FileCard[] {
+  const cards = new Map<string, FileCard>();
+  for (const call of calls) {
+    if (call.status !== 'done' || (call.name !== 'write_file' && call.name !== 'edit_file')) continue;
+    let path = '';
+    try { const args = JSON.parse(call.arguments) as { path?: unknown }; path = typeof args.path === 'string' ? args.path : ''; } catch { /* half-written arguments */ }
+    if (!path) continue;
+    const name = folderName(path);
+    const ext = (name.includes('.') ? name.split('.').pop()! : 'txt').slice(0, 4).toUpperCase();
+    cards.set(path, { path, name, ext, changed: call.name === 'edit_file' || !!cards.get(path)?.changed });
+  }
+  return [...cards.values()];
 }
-const collapsed = ref(new Set(savedCollapsed()));
-const rows = computed(() => listRows(chat.sessions, chat.groups, collapsed.value));
-const rowKey = (row: ListRow) => row.kind === 'group' ? `g:${row.group.id}` : row.kind === 'session' ? `s:${row.session.id}` : row.kind === 'empty' ? `e:${row.groupId}` : 'label';
-function setCollapsed(id: string, hide: boolean) {
-  const next = new Set(collapsed.value);
-  if (hide) next.add(id); else next.delete(id);
-  collapsed.value = next;
-  // Only groups that still exist are remembered, so deleted ones do not pile up.
-  try { localStorage.setItem(COLLAPSED_KEY, JSON.stringify([...next].filter(known => chat.groups.some(g => g.id === known)))); } catch { /* the folders just open again next time */ }
+async function copyReply(block: ReplyBlock) {
+  try { await navigator.clipboard.writeText(replyText(block)); props.store.notify('已复制', 'success'); }
+  catch { props.store.notify('复制失败，请选中文字后复制', 'error'); }
 }
-const toggleGroup = (id: string) => setCollapsed(id, !collapsed.value.has(id));
-
-const menuIcon = (icon: Component) => () => h(icon, { size: 14 });
-const optionId = (id: string) => ({ 'data-testid': id }) as HTMLAttributes;
-function sessionMenu(s: SessionSummary): DropdownOption[] {
-  return [
-    { label: '重命名', key: 'rename', icon: menuIcon(Pencil), props: optionId('chat-menu-rename') },
-    { label: '移动', key: 'move', icon: menuIcon(FolderInput), props: optionId('chat-menu-move') },
-    { type: 'divider', key: 'divider' },
-    { label: '删除', key: 'delete', icon: menuIcon(Trash2), disabled: !!chat.views[s.id]?.running, props: optionId('chat-menu-delete') },
-  ];
+function speakReply(block: ReplyBlock) {
+  const speech = props.store.speech;
+  if (!speech) return;
+  const key = speechKey(block);
+  if (speech.currentKey === key) speech.stop(); else speech.speak(replyText(block), key);
 }
-const groupMenu: DropdownOption[] = [
-  { label: '重命名分组', key: 'rename', icon: menuIcon(Pencil), props: optionId('chat-group-menu-rename') },
-  { label: '删除分组', key: 'delete', icon: menuIcon(Trash2), props: optionId('chat-group-menu-delete') },
-];
-/** The row whose menu is open, so its button stays visible while the pointer is over the menu. */
-const menuOpenFor = ref('');
-const trackMenu = (id: string, open: boolean) => { if (open) menuOpenFor.value = id; else if (menuOpenFor.value === id) menuOpenFor.value = ''; };
-
-type NameDialog = { mode: 'rename' | 'new-group' | 'rename-group'; id: string; moveId: string; initial: string };
-const nameDialog = ref<NameDialog | null>(null);
-const nameBusy = ref(false);
-const nameText = computed(() => {
-  const mode = nameDialog.value?.mode;
-  return mode === 'rename'
-    ? { title: '重命名对话', placeholder: '给这个对话起个名字', max: 60, ok: '保存' }
-    : mode === 'rename-group'
-      ? { title: '重命名分组', placeholder: '分组名称', max: 20, ok: '保存' }
-      : { title: '新建分组', placeholder: '分组名称，例如：工作', max: 20, ok: '创建' };
-});
-const moveFor = ref<SessionSummary | null>(null);
-const moveBusy = ref(false);
-const confirmingGroup = ref('');
-
-function onSessionMenu(s: SessionSummary, key: string | number) {
-  if (key === 'rename') nameDialog.value = { mode: 'rename', id: s.id, moveId: '', initial: s.title };
-  else if (key === 'move') moveFor.value = s;
-  else if (key === 'delete') confirmingId.value = s.id;
+/** The question that led to this reply, sent again. */
+function questionBefore(block: ReplyBlock) {
+  const index = blocks.value.findIndex(item => item.id === block.id);
+  const before = index > 0 ? blocks.value[index - 1].items[0] : undefined;
+  return before?.kind === 'user' ? before.text.trim() : '';
 }
-function onGroupMenu(group: ChatGroup, key: string | number) {
-  if (key === 'rename') nameDialog.value = { mode: 'rename-group', id: group.id, moveId: '', initial: group.name };
-  else if (key === 'delete') confirmingGroup.value = group.id;
-}
-async function submitName(value: string) {
-  const dialog = nameDialog.value;
-  if (!dialog || nameBusy.value) return;
-  nameBusy.value = true;
-  const done = dialog.mode === 'rename' ? (value.trim() === dialog.initial ? true : await chat.rename(dialog.id, value))
-    : dialog.mode === 'rename-group' ? (value.trim() === dialog.initial ? true : await chat.renameGroup(dialog.id, value))
-      : await chat.createGroup(value, dialog.moveId || undefined);
-  nameBusy.value = false;
-  if (done) nameDialog.value = null;
-}
-async function pickGroup(groupId: string | null) {
-  const s = moveFor.value;
-  if (!s || moveBusy.value) return;
-  if ((s.group || null) === groupId) { moveFor.value = null; return; }
-  moveBusy.value = true;
-  const done = await chat.move(s.id, groupId);
-  moveBusy.value = false;
-  if (!done) return;
-  moveFor.value = null;
-  if (groupId && collapsed.value.has(groupId)) setCollapsed(groupId, false);
-}
-function newGroupFromMove() {
-  const s = moveFor.value;
-  moveFor.value = null;
-  if (s) nameDialog.value = { mode: 'new-group', id: '', moveId: s.id, initial: '' };
-}
-async function removeGroup(id: string) { confirmingGroup.value = ''; await chat.removeGroup(id); }
-async function remove(id: string) { confirmingId.value = ''; await chat.remove(id); }
-function openSettings() { modelDialog.value = false; props.store.settingsTab = 'ai'; props.store.navigate('settings'); }
-async function goalSessionCreated(id: string) {
-  await chat.refresh();
-  await chat.select(id);
+function regenerate(block: ReplyBlock) {
+  const text = questionBefore(block);
+  if (!text || running.value) return;
+  stick.value = true;
+  void chat.send(text);
 }
 
+/* ── Title bar: more menu, rename, delete ────────────────────────────── */
+const moreRoot = ref<HTMLElement | null>(null);
+const moreOpen = ref(false);
+function closeMore() { moreOpen.value = false; }
+function onOutside(event: PointerEvent) { if (moreRoot.value && !moreRoot.value.contains(event.target as Node)) closeMore(); }
+watch(moreOpen, open => { if (open) document.addEventListener('pointerdown', onOutside); else document.removeEventListener('pointerdown', onOutside); });
+onBeforeUnmount(() => document.removeEventListener('pointerdown', onOutside));
+function toggleGoal() { closeMore(); goalOpen.value = !goalOpen.value; }
+function openGuide() { closeMore(); guideDialog.value = true; }
+
+const renaming = ref(false);
+const renameBusy = ref(false);
+function startRename() { closeMore(); if (session.value) renaming.value = true; }
+async function submitRename(value: string) {
+  const s = session.value;
+  if (!s || renameBusy.value) return;
+  renameBusy.value = true;
+  const done = value.trim() === s.title ? true : await chat.rename(s.id, value);
+  renameBusy.value = false;
+  if (done) renaming.value = false;
+}
+const confirmingDelete = ref('');
+function askDelete() { closeMore(); if (session.value && !running.value) confirmingDelete.value = session.value.id; }
+watch(() => chat.currentId, () => { confirmingDelete.value = ''; renaming.value = false; clearSearch(); });
+async function remove(id: string) {
+  confirmingDelete.value = '';
+  await chat.remove(id);
+  if (!chat.currentId) props.store.navigate('new-task');
+}
+async function goalSessionCreated(id: string) { await chat.refresh(); await chat.select(id); }
+
+/* ── Search in the conversation ──────────────────────────────────────── */
+const searchOpen = ref(false);
+const searchText = ref('');
+const searchInput = ref<HTMLInputElement | null>(null);
+const hits = ref<HTMLElement[]>([]);
+const hitIndex = ref(-1);
+function markHits(active: HTMLElement | null) { scroller.value?.querySelectorAll('.is-hit').forEach(el => el.classList.remove('is-hit')); active?.classList.add('is-hit'); }
+function runSearch(step: number) {
+  const query = searchText.value.trim().toLowerCase();
+  hits.value = query && scroller.value ? [...scroller.value.querySelectorAll<HTMLElement>('[data-search]')].filter(el => (el.textContent ?? '').toLowerCase().includes(query)) : [];
+  if (!hits.value.length) { hitIndex.value = -1; markHits(null); return; }
+  const count = hits.value.length;
+  hitIndex.value = ((hitIndex.value < 0 ? (step > 0 ? -1 : 0) : hitIndex.value) + step + count) % count;
+  const el = hits.value[hitIndex.value];
+  markHits(el);
+  stick.value = false;
+  el.scrollIntoView?.({ block: 'center', behavior: 'smooth' });
+}
+function onSearchInput() { hitIndex.value = -1; runSearch(1); }
+function onSearchKey(event: KeyboardEvent) {
+  if (event.key === 'Escape') { event.preventDefault(); clearSearch(); return; }
+  if (event.key !== 'Enter' || isImeEnter(event, false)) return;
+  event.preventDefault();
+  runSearch(event.shiftKey ? -1 : 1);
+}
+function toggleSearch() {
+  if (searchOpen.value) { clearSearch(); return; }
+  searchOpen.value = true;
+  void nextTick(() => searchInput.value?.focus());
+}
+function clearSearch() { searchOpen.value = false; searchText.value = ''; hits.value = []; hitIndex.value = -1; markHits(null); }
+
+/* ── Execution panel ─────────────────────────────────────────────────── */
+const PANEL_KEY = 'xiaoban.chat.exec-panel';
+function savedPanel() { try { return localStorage.getItem(PANEL_KEY) === '1'; } catch { return false; } }
+const panelOpen = ref(savedPanel());
+function togglePanel() { panelOpen.value = !panelOpen.value; try { localStorage.setItem(PANEL_KEY, panelOpen.value ? '1' : '0'); } catch { /* remembered for this visit only */ } }
+const allCalls = computed(() => (view.value?.items ?? []).filter((item): item is ToolCall => item.kind === 'tool'));
+const panelFiles = computed(() => filesOf(allCalls.value));
+
+/* ── Asking the user ─────────────────────────────────────────────────── */
 const decide = (request: ApprovalRequest, decision: ApprovalDecision) => chat.answerApproval(request, decision);
-function answer(request: QuestionRequest, value: string | null) {
-  answerText.value = '';
-  return chat.answerQuestion(request, value);
-}
+function answer(request: QuestionRequest, value: string | null) { answerText.value = ''; return chat.answerQuestion(request, value); }
 
 async function openLink(href: string) {
   const url = href.split('#')[0];
@@ -365,144 +227,123 @@ async function openLink(href: string) {
 </script>
 
 <template>
-  <ModelSwitchDialog v-model:show="modelDialog" :retry="retryAfterSwitch" @switched="modelSwitched" @settings="openSettings" />
-  <GuideModal v-model:show="guideDialog" :desktop="store.desktop" @select-prompt="useExample" @open-settings="openSettings" />
-  <ChatNameDialog :show="!!nameDialog" :title="nameText.title" :placeholder="nameText.placeholder" :initial="nameDialog?.initial ?? ''" :max-length="nameText.max" :confirm-text="nameText.ok" :busy="nameBusy" @close="nameDialog = null" @submit="submitName" />
-  <ChatMoveDialog :show="!!moveFor" :conversation="moveFor?.title ?? ''" :groups="chat.groups" :current="moveFor?.group ?? ''" :busy="moveBusy" @close="moveFor = null" @pick="pickGroup" @create="newGroupFromMove" />
+  <ModelSwitchDialog v-model:show="modelDialog" :retry="retryAfterSwitch" @switched="modelSwitched" @settings="openAiSettings" />
+  <GuideModal v-model:show="guideDialog" :desktop="store.desktop" @select-prompt="useExample" @open-settings="openAiSettings" />
+  <ChatNameDialog :show="renaming" title="重命名对话" placeholder="给这个对话起个名字" :initial="session?.title ?? ''" :max-length="60" confirm-text="保存" :busy="renameBusy" @close="renaming = false" @submit="submitRename" />
   <section class="chat-page" data-testid="chat-page">
-    <aside class="chat-side" aria-label="对话列表">
-      <div class="side-head">
-        <NButton type="primary" class="side-new" data-testid="chat-new" :disabled="!chat.currentId" @click="choose(null)"><template #icon><MessageSquarePlus :size="16" /></template>新对话</NButton>
-        <NButton secondary title="新建分组" aria-label="新建分组" data-testid="chat-new-group" :disabled="!store.desktop" @click="nameDialog = { mode: 'new-group', id: '', moveId: '', initial: '' }"><template #icon><FolderPlus :size="16" /></template></NButton>
-      </div>
-      <ul class="session-list">
-        <template v-for="row in rows" :key="rowKey(row)">
-          <li v-if="row.kind === 'group'" class="group-row" :class="{ 'menu-open': menuOpenFor === `g:${row.group.id}` }" :data-testid="`chat-group-row-${row.group.id}`">
-            <div v-if="confirmingGroup === row.group.id" class="confirm-row" data-testid="chat-group-delete-confirm"><span>删除分组“{{ row.group.name }}”？里面的对话会保留</span><button type="button" class="link danger" :data-testid="`chat-group-delete-yes-${row.group.id}`" @click="removeGroup(row.group.id)">删除</button><button type="button" class="link" @click="confirmingGroup = ''">取消</button></div>
-            <template v-else>
-              <button type="button" class="group-toggle" :aria-expanded="!row.collapsed" :data-testid="`chat-group-${row.group.id}`" @click="toggleGroup(row.group.id)">
-                <component :is="row.collapsed ? ChevronRight : ChevronDown" :size="14" />
-                <Folder :size="14" />
-                <span class="group-name">{{ row.group.name }}</span>
-                <span class="group-count">{{ row.count }}</span>
-              </button>
-              <NDropdown trigger="click" placement="bottom-end" :options="groupMenu" @select="key => onGroupMenu(row.group, key)" @update:show="open => trackMenu(`g:${row.group.id}`, open)">
-                <button type="button" class="row-more" :aria-label="`${row.group.name} 的更多操作`" aria-haspopup="menu" :data-testid="`chat-group-menu-${row.group.id}`"><Ellipsis :size="16" /></button>
-              </NDropdown>
-            </template>
-          </li>
-          <li v-else-if="row.kind === 'session'" :class="{ current: row.session.id === chat.currentId, grouped: row.grouped, 'menu-open': menuOpenFor === `s:${row.session.id}` }">
-            <template v-if="confirmingId === row.session.id">
-              <div class="confirm-row" data-testid="chat-delete-confirm"><span>删除这段对话？</span><button type="button" class="link danger" :data-testid="`chat-delete-yes-${row.session.id}`" @click="remove(row.session.id)">删除</button><button type="button" class="link" @click="confirmingId = ''">取消</button></div>
-            </template>
-            <template v-else>
-              <button type="button" class="session" :data-testid="`chat-session-${row.session.id}`" :aria-current="row.session.id === chat.currentId ? 'true' : undefined" @click="choose(row.session.id)">
-                <span class="session-title">{{ row.session.title }}</span>
-                <span class="session-meta">
-                  <LoaderCircle v-if="chat.views[row.session.id]?.running" class="spin" :size="12" aria-label="正在回答" />
-                  <i v-if="chat.views[row.session.id] && (chat.views[row.session.id].approvals.length || chat.views[row.session.id].questions.length)" class="attention-dot" :data-testid="`chat-attention-${row.session.id}`" aria-label="需要你确认"></i>
-                  {{ formatAgo(row.session.updatedAt, now()) }}
-                </span>
-              </button>
-              <NDropdown trigger="click" placement="bottom-end" :options="sessionMenu(row.session)" @select="key => onSessionMenu(row.session, key)" @update:show="open => trackMenu(`s:${row.session.id}`, open)">
-                <button type="button" class="row-more" :aria-label="`${row.session.title} 的更多操作`" aria-haspopup="menu" :data-testid="`chat-menu-${row.session.id}`"><Ellipsis :size="16" /></button>
-              </NDropdown>
-            </template>
-          </li>
-          <li v-else-if="row.kind === 'empty'" class="group-empty">还没有对话，用对话右侧的“⋯ → 移动”放进来</li>
-          <li v-else class="list-label">{{ row.text }}</li>
-        </template>
-        <li v-if="chat.ready && !chat.sessions.length" class="empty-list">还没有对话</li>
-      </ul>
-      <button type="button" class="side-assistant" data-testid="chat-open-assistant" @click="store.navigate('assistant')"><AudioLines :size="15" /><span>彩虹球</span><small>随时呼出，直接对话</small></button>
-    </aside>
-
     <div class="chat-main">
       <header class="chat-head">
-        <div class="head-location"><h2 data-testid="chat-title">{{ title }}</h2><button v-if="store.desktop" type="button" class="workspace-chip" data-testid="chat-workspace" :title="'当前工作区：' + (chat.currentWorkspace || '默认工作目录') + '。点击在文件管理器中打开，在输入框下方切换。'" @click="chat.revealWorkspace()"><Folder :size="13" /><span>{{ workspaceName }}</span></button></div>
+        <nav class="head-crumbs" aria-label="位置">
+          <button type="button" class="crumb-space" data-testid="chat-workspace" :disabled="!store.desktop" :title="'工作区：' + (chat.currentWorkspace || '默认工作目录') + (store.desktop ? '。点击在文件管理器中打开' : '')" @click="chat.revealWorkspace()">{{ spaceName }}</button>
+          <ChevronRight :size="12" :stroke-width="2.2" class="crumb-sep" aria-hidden="true" />
+          <h1 data-testid="chat-title">{{ title }}</h1>
+        </nav>
         <div class="head-actions">
-          <button type="button" class="guide-chip" data-testid="chat-goal-toggle"
-            :aria-expanded="goalOpen" @click="goalOpen = !goalOpen">
-            <Target :size="14" /><span>长期目标</span>
-          </button>
-          <button v-if="store.speech && store.speech.status !== 'idle'" type="button" class="link" data-testid="chat-speech-status" @click="store.speech.stop()"><Volume2 :size="14" />{{ store.speech.status === 'synthesizing' ? '取消合成' : '停止朗读' }}</button>
-          <button
-            type="button"
-            class="guide-chip"
-            data-testid="chat-open-guide"
-            title="查看小伴 AI 玩法指南与提示词手册"
-            @click="guideDialog = true"
-          >
-            <Sparkles :size="13" />
-            <span>玩法指南</span>
-          </button>
-          <button type="button" class="ai-config-chip" data-testid="chat-ai-config" title="设置 → AI 模型：选择小伴 AI，或配置自己的模型服务" @click="openSettings"><Settings :size="14" />AI 模型配置</button>
+          <button v-if="store.speech && store.speech.status !== 'idle'" type="button" class="head-link" data-testid="chat-speech-status" @click="store.speech.stop()"><Volume2 :size="14" />{{ store.speech.status === 'synthesizing' ? '取消合成' : '停止朗读' }}</button>
+          <div v-if="searchOpen" class="head-search" role="search">
+            <Search :size="14" aria-hidden="true" />
+            <input ref="searchInput" v-model="searchText" type="search" placeholder="在会话中搜索" aria-label="在会话中搜索" data-testid="chat-search-input" @input="onSearchInput" @keydown="onSearchKey" />
+            <small v-if="searchText.trim()" class="search-count" data-testid="chat-search-count">{{ hits.length ? `${hitIndex + 1}/${hits.length}` : '无结果' }}</small>
+            <button type="button" class="xb-icon-btn is-sm" aria-label="上一个" :disabled="!hits.length" @click="runSearch(-1)"><ChevronUp :size="14" /></button>
+            <button type="button" class="xb-icon-btn is-sm" aria-label="下一个" :disabled="!hits.length" @click="runSearch(1)"><ChevronDown :size="14" /></button>
+          </div>
+          <button type="button" class="xb-icon-btn" data-testid="chat-search-toggle" :aria-pressed="searchOpen" :aria-label="searchOpen ? '关闭搜索' : '在会话中搜索'" :title="searchOpen ? '关闭搜索' : '在会话中搜索'" :disabled="!view?.items.length && !searchOpen" @click="toggleSearch"><X v-if="searchOpen" :size="16" /><Search v-else :size="16" /></button>
+          <ChatWorkspaceMenu v-if="store.desktop" variant="icon" :chat="chat" :disabled="running" />
+          <button type="button" class="xb-icon-btn" data-testid="chat-panel-toggle" :aria-pressed="panelOpen" :aria-label="panelOpen ? '隐藏执行面板' : '显示执行面板'" :title="panelOpen ? '隐藏执行面板' : '显示执行面板'" @click="togglePanel"><PanelRight :size="16" /></button>
+          <div ref="moreRoot" class="more-anchor">
+            <button type="button" class="xb-icon-btn" data-testid="chat-more" aria-haspopup="menu" :aria-expanded="moreOpen" aria-label="更多" title="更多" @click="moreOpen = !moreOpen"><Ellipsis :size="16" /></button>
+            <div v-show="moreOpen" class="xb-menu more-menu" role="menu" aria-label="更多">
+              <button type="button" class="xb-menu-item" role="menuitem" data-testid="chat-menu-rename" :disabled="!session" @click="startRename"><Pencil :size="15" />重命名</button>
+              <button type="button" class="xb-menu-item" role="menuitemcheckbox" data-testid="chat-goal-toggle" :aria-checked="goalOpen" :aria-expanded="goalOpen" @click="toggleGoal"><Target :size="15" />长期目标<Check v-if="goalOpen" :size="14" class="xb-menu-check" /></button>
+              <button type="button" class="xb-menu-item" role="menuitem" data-testid="chat-open-guide" title="查看小伴 AI 玩法指南与提示词手册" @click="openGuide"><Sparkles :size="15" />玩法指南</button>
+              <button type="button" class="xb-menu-item" role="menuitem" data-testid="chat-ai-config" title="设置 → AI 模型：选择小伴 AI，或配置自己的模型服务" @click="openAiSettings"><Settings :size="15" />AI 模型配置</button>
+              <div class="xb-menu-sep" />
+              <button type="button" class="xb-menu-item is-danger" role="menuitem" data-testid="chat-menu-delete" :disabled="!session || running" @click="askDelete"><Trash2 :size="15" />删除对话</button>
+            </div>
+          </div>
         </div>
       </header>
-      <ChatGoalPanel v-if="goalOpen" :session-id="chat.currentId" :running="running"
+      <div v-if="confirmingDelete" class="delete-bar" data-testid="chat-delete-confirm" role="alertdialog" aria-label="删除对话">
+        <span>删除“{{ title }}”？删除后无法恢复。</span>
+        <button type="button" class="xb-btn is-sm" @click="confirmingDelete = ''">取消</button>
+        <button type="button" class="xb-btn is-sm is-danger" :data-testid="`chat-delete-yes-${confirmingDelete}`" @click="remove(confirmingDelete)">删除</button>
+      </div>
+      <ChatGoalPanel v-if="goalOpen" class="goal-panel" :session-id="chat.currentId" :running="running"
         :configured="chat.configured" :desktop="store.desktop"
         :permission-mode="chat.permissionMode"
         @session-created="goalSessionCreated" @changed="chat.refresh()" />
 
       <div ref="scroller" class="chat-scroll" data-testid="chat-messages" @scroll.passive="onScroll">
         <div class="chat-column">
-          <p v-if="!chat.ready" class="muted state-line">正在读取对话…</p>
+          <p v-if="!chat.ready" class="state-line">正在读取对话…</p>
           <div v-else-if="!store.desktop" class="info-card" data-testid="chat-preview-only"><b>请在桌面应用中使用聊天</b><p>浏览器预览里只能看到界面。</p></div>
           <div v-else-if="!chat.configured && !view?.items.length" class="info-card" data-testid="chat-unconfigured">
             <b>先给小伴接上一个模型</b>
             <p>在“设置 → AI 模型”里登录后可以直接用小伴 AI，也可以填写自己的接口地址、模型名和密钥。设置好后回到这里就能聊天。</p>
-            <NButton type="primary" data-testid="chat-go-settings" @click="openSettings">去设置</NButton>
+            <button type="button" class="xb-btn-primary" data-testid="chat-go-settings" @click="openAiSettings">去设置</button>
           </div>
           <div v-else-if="!view?.items.length" class="welcome" data-testid="chat-welcome">
-            <Orb phase="idle" :size="56" />
-            <h3>有什么可以帮你？</h3>
+            <span class="brand-mark is-lg" aria-hidden="true"><Sprout :size="22" :stroke-width="2.2" /></span>
+            <h2>有什么可以帮你？</h2>
             <p>我能回答问题，也能在你选的工作目录里读写文件、运行命令，还能替你调整壁纸、特效和提醒。改动之前我会先问你。</p>
             <div class="examples">
+              <span class="examples-cap">试试这样问</span>
               <button v-for="(text, n) in examples" :key="text" type="button" :data-testid="`chat-example-${n}`" @click="useExample(text)">
-                <span class="example-tag">{{ ['📁 工作区', '🖼️ 壁纸', '🍵 关怀', '📅 日常'][n] ?? '💡 尝试' }}</span>
-                <span>{{ text }}</span>
+                <span class="example-tag">{{ exampleTags[n] ?? '尝试' }}</span><span class="example-text">{{ text }}</span><ArrowUpRight :size="14" />
               </button>
             </div>
-            <button type="button" class="more-guides-link" data-testid="chat-welcome-more-guides" @click="guideDialog = true">
-              <Sparkles :size="14" />
-              <span>查看更多 AI 精彩玩法与咒语手册 →</span>
-            </button>
+            <button type="button" class="xb-link more-guides" data-testid="chat-welcome-more-guides" @click="guideDialog = true"><Sparkles :size="14" />查看更多 AI 玩法与咒语手册</button>
           </div>
 
           <template v-if="view">
             <template v-for="block in blocks" :key="block.id">
-            <template v-for="item in block.items" :key="item.id">
-              <div v-if="item.kind === 'user'" class="msg user" data-testid="msg-user"><div class="bubble"><div v-if="item.images.length" class="bubble-images"><img v-for="(url, n) in item.images" :key="n" :src="url" :alt="`第 ${n + 1} 张图片`" :data-testid="`msg-user-image-${n}`" @click="preview = attachmentImage(url)" /></div><div v-if="item.files?.length" class="file-cards"><span v-for="(file, n) in item.files" :key="n" class="file-chip" :title="file.name">📄 {{ file.name }} · {{ Math.ceil(file.size / 1024) }} KB</span></div><template v-if="item.text">{{ item.text }}</template></div></div>
-              <ChatReasoning
-                v-else-if="item.kind === 'reasoning'"
-                :text="item.text" :reasoning-kind="item.reasoningKind" :streaming="item.streaming"
-              />
-              <div v-else-if="item.kind === 'assistant'" class="msg assistant" data-testid="msg-assistant">
-                <Orb class="avatar" :phase="item.streaming ? 'answering' : 'idle'" :active="item.streaming" :size="28" />
-                <div class="answer"><MarkdownView :source="item.text" @open="openLink" /><span v-if="item.streaming" class="cursor" aria-hidden="true"></span>
-                  <button v-if="store.speech && !item.streaming && item.text.trim()" type="button" class="link speech-button" :disabled="!store.desktop" :aria-label="store.speech.currentKey === item.id ? '停止朗读' : '朗读回复'" data-testid="chat-read-reply" @click="store.speech.currentKey === item.id ? store.speech.stop() : store.speech.speak(item.text, item.id)">
-                    <Volume2 :size="14" />{{ store.speech.currentKey === item.id ? (store.speech.status === 'synthesizing' ? '取消合成' : '停止朗读') : '朗读' }}
-                  </button>
-                  <small v-if="item.usage && !item.streaming" class="usage" data-testid="msg-usage" title="这一轮所有模型调用的合计，输入含重复发送的上下文与缓存">用量：输入 {{ formatTokens(item.usage.prompt) }} · 输出 {{ formatTokens(item.usage.completion) }} tokens</small>
+              <div v-if="isUserBlock(block)" class="msg user" data-testid="msg-user">
+                <div v-for="item in block.items" :key="item.id" class="bubble" data-search>
+                  <template v-if="item.kind === 'user'">
+                    <div v-if="item.images.length" class="bubble-images"><img v-for="(url, n) in item.images" :key="n" :src="url" :alt="`第 ${n + 1} 张图片`" :data-testid="`msg-user-image-${n}`" @click="preview = attachmentImage(url)" /></div>
+                    <div v-if="item.files?.length" class="bubble-files"><span v-for="(file, n) in item.files" :key="n" class="bubble-file" :title="file.name"><FileText :size="13" />{{ file.name }} · {{ Math.ceil(file.size / 1024) }} KB</span></div>
+                    <template v-if="item.text">{{ item.text }}</template>
+                  </template>
                 </div>
               </div>
-              <div v-else-if="item.kind === 'notice'" class="notice" :class="item.tone" :data-testid="`notice-${item.tone}`" :role="item.tone === 'error' ? 'alert' : 'status'">
-                {{ item.text }}
-                <details v-if="item.details"><summary>{{ item.detailsLabel ?? '错误详情' }}</summary><span class="notice-details">{{ item.details }}</span></details>
-                <button v-if="item.canSwitchModel && !view.running" type="button" class="link" @click="chooseModel(!!item.canRetry)">切换模型</button>
-                <button v-if="item.canRetry && !view.running" type="button" class="link" @click="chat.retry()">重试</button>
-                <button v-if="item.canContinue && !view.running" type="button" class="link" data-testid="chat-continue" @click="continueAnswer">继续</button>
-                <template v-if="item.undoRun && !view.running">
-                  <button v-if="confirmingUndo !== item.id" type="button" class="link" data-testid="chat-undo-run" @click="confirmingUndo = item.id">撤销这些改动</button>
-                  <template v-else>
-                    <span class="undo-warning">这些文件会回到这轮回答之前的样子，之后对它们的修改也会被覆盖。</span>
-                    <button type="button" class="link" data-testid="chat-undo-confirm" @click="undoRun(item.id)">确认撤销</button>
-                    <button type="button" class="link" @click="confirmingUndo = ''">取消</button>
-                  </template>
+              <section v-else class="reply" data-testid="chat-reply">
+                <header v-if="speaks(block)" class="reply-head"><span class="brand-mark" aria-hidden="true"><Sprout :size="14" :stroke-width="2.2" /></span><b>小伴</b></header>
+                <ChatActivity v-if="block.calls.length && !chat.hideToolCalls" :calls="block.calls" :active="view.running && block.id === lastBlockId" :waiting="waiting && block.id === lastBlockId" :status="block.id === lastBlockId ? statusLine : ''" />
+                <template v-for="item in block.items" :key="item.id">
+                  <ChatReasoning v-if="item.kind === 'reasoning'" :text="item.text" :reasoning-kind="item.reasoningKind" :streaming="item.streaming" />
+                  <div v-else-if="item.kind === 'assistant'" class="msg assistant" data-testid="msg-assistant">
+                    <div class="answer" data-search><MarkdownView :source="item.text" @open="openLink" /><span v-if="item.streaming" class="cursor" aria-hidden="true"></span></div>
+                  </div>
+                  <div v-else-if="item.kind === 'notice'" class="notice" :class="item.tone" :data-testid="`notice-${item.tone}`" :role="item.tone === 'error' ? 'alert' : 'status'">
+                    {{ item.text }}
+                    <details v-if="item.details"><summary>{{ item.detailsLabel ?? '错误详情' }}</summary><span class="notice-details">{{ item.details }}</span></details>
+                    <button v-if="item.canSwitchModel && !view.running" type="button" class="xb-link" @click="chooseModel(!!item.canRetry)">切换模型</button>
+                    <button v-if="item.canRetry && !view.running" type="button" class="xb-link" @click="chat.retry()">重试</button>
+                    <button v-if="item.canContinue && !view.running" type="button" class="xb-link" data-testid="chat-continue" @click="continueAnswer">继续</button>
+                    <template v-if="item.undoRun && !view.running">
+                      <button v-if="confirmingUndo !== item.id" type="button" class="xb-link" data-testid="chat-undo-run" @click="confirmingUndo = item.id">撤销这些改动</button>
+                      <template v-else>
+                        <span class="undo-warning">这些文件会回到这轮回答之前的样子，之后对它们的修改也会被覆盖。</span>
+                        <button type="button" class="xb-link" data-testid="chat-undo-confirm" @click="undoRun(item.id)">确认撤销</button>
+                        <button type="button" class="xb-link" @click="confirmingUndo = ''">取消</button>
+                      </template>
+                    </template>
+                  </div>
                 </template>
-              </div>
-            </template>
-            <ChatActivity v-if="block.calls.length && !chat.hideToolCalls" :calls="block.calls" :active="view.running && block.id === blocks.at(-1)?.id" :waiting="waiting && block.id === blocks.at(-1)?.id" :status="block.id === blocks.at(-1)?.id ? statusLine : ''" />
+                <div v-if="finished(block) && filesOf(block.calls).length" class="file-cards">
+                  <div v-for="file in filesOf(block.calls)" :key="file.path" class="file-card" data-testid="chat-file-card" :title="file.path">
+                    <span class="file-ext" aria-hidden="true">{{ file.ext }}</span>
+                    <span class="file-text"><b>{{ file.name }}</b><small>{{ file.changed ? '已修改' : '已写入' }} · {{ spaceName }}</small></span>
+                    <button v-if="store.desktop" type="button" class="xb-btn is-sm" @click="chat.revealWorkspace()">打开文件夹</button>
+                  </div>
+                </div>
+                <div v-if="finished(block) && replyText(block)" class="reply-actions">
+                  <button type="button" class="act" data-testid="chat-copy-reply" aria-label="复制" title="复制" @click="copyReply(block)"><Copy :size="15" /></button>
+                  <button v-if="store.speech" type="button" class="act" :class="{ 'is-on': store.speech.currentKey === speechKey(block) }" :disabled="!store.desktop" :aria-label="store.speech.currentKey === speechKey(block) ? '停止朗读' : '朗读'" :title="store.speech.currentKey === speechKey(block) ? (store.speech.status === 'synthesizing' ? '取消合成' : '停止朗读') : '朗读'" data-testid="chat-read-reply" @click="speakReply(block)"><Volume2 :size="15" /></button>
+                  <button v-if="block.id === lastBlockId && questionBefore(block)" type="button" class="act" data-testid="chat-regenerate" aria-label="重新生成" title="重新生成：把上一个问题再发一次" :disabled="running || !chat.configured" @click="regenerate(block)"><RefreshCw :size="15" /></button>
+                  <small v-if="replyUsage(block)" class="usage" data-testid="msg-usage" title="这一轮所有模型调用的合计，输入含重复发送的上下文与缓存">输入 {{ formatTokens(replyUsage(block)!.prompt) }} · 输出 {{ formatTokens(replyUsage(block)!.completion) }} tokens</small>
+                </div>
+              </section>
             </template>
 
             <section v-for="request in view.approvals" :key="request.id" class="card approval" :class="{ exec: request.risk === 'exec', dangerous: !!request.danger }" data-testid="chat-approval" role="alertdialog" :aria-label="`需要你确认：${toolLabel(request.tool)}`">
@@ -520,9 +361,9 @@ async function openLink(href: string) {
             <section v-for="request in view.questions" :key="request.id" class="card question" data-testid="chat-question" role="alertdialog" aria-label="小伴想问你">
               <header><span>{{ request.question }}</span></header>
               <div v-if="request.options.length" class="options"><NButton v-for="(option, n) in request.options" :key="option" size="small" :data-testid="`question-option-${n}`" @click="answer(request, option)">{{ option }}</NButton></div>
-              <footer>
-                <button type="button" class="link" :disabled="running" @click="chooseModel()">切换模型</button>
-          <NInput v-model:value="answerText" size="small" placeholder="或者自己回答" data-testid="question-input" @keydown.enter="!isImeEnter($event, composing) && answerText.trim() && answer(request, answerText)" />
+              <footer @compositionstart="composing = true" @compositionend="composing = false">
+                <button type="button" class="xb-link" :disabled="running" @click="chooseModel()">切换模型</button>
+                <NInput v-model:value="answerText" size="small" placeholder="或者自己回答" data-testid="question-input" @keydown.enter="!isImeEnter($event, composing) && answerText.trim() && answer(request, answerText)" />
                 <NButton type="primary" size="small" :disabled="!answerText.trim()" data-testid="question-submit" @click="answer(request, answerText)">回答</NButton>
                 <NButton size="small" quaternary data-testid="question-skip" @click="answer(request, null)">跳过</NButton>
               </footer>
@@ -535,36 +376,40 @@ async function openLink(href: string) {
 
       <button v-if="!stick && view?.items.length" type="button" class="to-bottom" data-testid="chat-bottom" aria-label="回到最新" @click="stick = true; toBottom()"><ArrowDown :size="16" /></button>
 
-      <footer class="composer" @compositionstart="composing = true" @compositionend="composing = false" @paste="onPaste" @dragover.prevent @drop.prevent="addImages(Array.from($event.dataTransfer?.files ?? []))">
-        <div class="composer-box" :class="{ 'has-attachments': attachments.length > 0, 'voice-active': asr?.listening }">
-          <AsrStatus v-if="asr" :asr="asr" chat />
-          <div v-if="attachments.length" class="attachments" data-testid="chat-attachments">
-            <div v-for="(url, n) in attachments" :key="n" class="thumb">
-              <img v-if="attachmentImage(url)" :src="attachmentImage(url)!" :alt="`待发送的第 ${n + 1} 张图片`" :data-testid="`chat-attachment-${n}`" @click="preview = attachmentImage(url)" />
-              <span v-if="!attachmentImage(url)" class="file-chip" :title="attachmentName(url)">📄 {{ attachmentName(url) }}</span>
-              <button type="button" class="thumb-remove" :data-testid="`chat-attachment-remove-${n}`" :aria-label="`移除第 ${n + 1} 个附件`" :disabled="running" @click="removeAttachment(n)"><X :size="12" /></button>
-            </div>
-            <small class="attach-hint">{{ attachments.length }}/{{ MAX_IMAGES }} 个附件 · 发送时会一起交给小伴</small>
-          </div>
-          <input ref="filePicker" type="file" :accept="ATTACHMENT_ACCEPT" multiple hidden data-testid="chat-image-input" @change="onPick" />
-           <div class="composer-editor">
-             <NInput v-model:value="draft" type="textarea" :autosize="{ minRows: 1, maxRows: 8 }" :disabled="!store.desktop || !chat.configured" :placeholder="chat.configured ? '问点什么，或交给小伴去办就行' : '先到设置里配置模型'" data-testid="chat-input" @keydown="onKeydown" />
-           </div>
-           <div class="composer-row">
-             <ChatWorkbenchTools :store="store" :disabled="!store.desktop" :file-disabled="!store.desktop || !chat.configured || running || attachmentReading || attachments.length >= MAX_IMAGES" :screenshot-disabled="!store.desktop || !chat.configured || running || capturing || attachments.length >= MAX_IMAGES" @file="openPicker" @screenshot="takeChatScreenshot" @use-expert="useExpert" @use-skill="useSkill" @use-connector="useConnector" />
-             <ChatWorkspaceMenu v-if="store.desktop" :chat="chat" :disabled="running" />
-             <span class="composer-spacer" />
-             <ChatContextRing v-if="store.desktop" :used="chat.context.used" :limit="chat.context.limit" :can-compact="chat.context.canCompact" :compacting="compacting" :busy="running" :disabled="!chat.currentId" @compact="chat.compact()" @resize="chat.setContextSize($event)" />
-             <ChatComposerModel :label="modelLabel" :disabled="!store.desktop || running" @switched="composerModelSwitched" @settings="openSettings" />
-             <button v-if="finishingVoice" type="button" class="voice-finish" data-testid="chat-asr-toggle" aria-label="正在转写并发送" aria-pressed="false" disabled><LoaderCircle class="spin" :size="13" aria-hidden="true" />正在发送</button>
-             <button v-else-if="asr?.recordingRequested" type="button" class="voice-finish" data-testid="chat-asr-toggle" :aria-label="asr.listening ? '结束录音并发送' : '取消准备'" aria-pressed="true" @click="toggleVoice"><span v-if="asr.listening" class="recording-dot" aria-hidden="true" /><LoaderCircle v-else class="spin" :size="13" aria-hidden="true" />{{ asr.listening ? '结束并发送' : '取消准备' }}</button>
-             <NButton v-else-if="asr" quaternary circle size="small" data-testid="chat-asr-toggle" aria-label="开始语音输入" aria-pressed="false" title="开始语音输入" :disabled="!store.desktop || !asr.ready || asr.microphoneSupported === false || !microphoneAllowed || asr.saving" @click="toggleVoice"><template #icon><Mic :size="16" /></template></NButton>
-             <NButton v-if="running" type="error" circle data-testid="chat-stop" aria-label="停止" @click="chat.cancel()"><template #icon><Square :size="14" /></template></NButton>
-             <NButton v-else type="primary" circle data-testid="chat-send" aria-label="发送" :disabled="!canSend" @click="submit"><template #icon><SendHorizontal :size="16" /></template></NButton>
-           </div>
-        </div>
-      </footer>
+      <div class="composer-wrap">
+        <ChatComposer ref="composer" :store="store" page="chat" pet="sm" placeholder="继续说，或交给小伴去办" @sending="stick = true" @sent="toBottom" @settings="openAiSettings" @preview="preview = $event" />
+        <p class="disclaimer">内容由 AI 生成，请核对重要信息</p>
+      </div>
     </div>
+
+    <aside v-if="panelOpen" class="exec-panel" data-testid="chat-exec-panel" aria-label="执行面板">
+      <header class="panel-head"><b>执行面板</b><button type="button" class="xb-icon-btn is-sm" aria-label="隐藏执行面板" @click="togglePanel"><X :size="14" /></button></header>
+      <div class="panel-body xb-scroll">
+        <section class="panel-section">
+          <h3>工作区</h3>
+          <p class="panel-path" :title="chat.currentWorkspace">{{ chat.currentWorkspace || '默认工作目录' }}</p>
+          <button v-if="store.desktop" type="button" class="xb-btn is-sm" @click="chat.revealWorkspace()">在文件管理器中打开</button>
+        </section>
+        <section class="panel-section">
+          <h3>权限</h3>
+          <p class="panel-mode" :class="{ danger: chat.permissionMode === 'auto' }"><ShieldAlert v-if="chat.permissionMode === 'auto'" :size="14" /><ShieldCheck v-else :size="14" />{{ chat.permissionMode === 'auto' ? '完全信任：不再询问直接执行' : '默认权限：执行前先问你' }}</p>
+        </section>
+        <section class="panel-section">
+          <h3>执行步骤<small v-if="allCalls.length">{{ allCalls.length }}</small></h3>
+          <p v-if="!allCalls.length" class="panel-empty">小伴还没有执行操作。读写文件、运行命令时会在这里列出来。</p>
+          <ol v-else class="panel-steps">
+            <li v-for="call in allCalls" :key="call.id" :class="call.status">
+              <LoaderCircle v-if="call.status === 'running'" :size="13" class="spin" /><Check v-else-if="call.status === 'done'" :size="13" /><X v-else :size="13" />
+              <span><b>{{ toolLabel(call.name) }}</b><small :title="describeCall(call.name, call.arguments)">{{ describeCall(call.name, call.arguments) }}</small></span>
+            </li>
+          </ol>
+        </section>
+        <section v-if="panelFiles.length" class="panel-section">
+          <h3>改动的文件<small>{{ panelFiles.length }}</small></h3>
+          <ul class="panel-files"><li v-for="file in panelFiles" :key="file.path" :title="file.path"><FileText :size="13" /><span>{{ file.name }}</span><small>{{ file.changed ? '已修改' : '已写入' }}</small></li></ul>
+        </section>
+      </div>
+    </aside>
 
     <div v-if="preview" class="lightbox" data-testid="chat-image-preview" role="dialog" aria-label="图片预览" @click="preview = null">
       <img :src="preview" alt="图片预览" />
@@ -575,164 +420,162 @@ async function openLink(href: string) {
 </template>
 
 <style scoped>
-.file-cards{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px}.file-chip{display:inline-block;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;padding:8px;border-radius:8px;background:rgba(127,127,127,.1)}.thumb:has(.file-chip){width:auto;max-width:210px}.thumb .file-chip{padding-right:20px}
-.speech-button{display:inline-flex;align-items:center;gap:5px;margin-top:8px;font-size:12px}
+.chat-page{flex:1;min-height:0;min-width:0;display:flex;background:var(--ui-surface);position:relative}
+.chat-main{flex:1;display:flex;flex-direction:column;min-height:0;min-width:0;position:relative}
 
-.chat-page{flex:1;min-height:0;display:grid;grid-template-columns:200px minmax(0,1fr);background:var(--ui-app-bg)}
-.chat-side{border-right:1px solid var(--ui-border);display:flex;flex-direction:column;min-height:0;background:var(--ui-surface)}
-.side-assistant{flex:none;display:flex;align-items:center;gap:8px;margin:8px 12px 12px;padding:10px 12px;border:1px solid var(--ui-border);border-radius:12px;background:var(--ui-surface-alt);color:var(--ui-text-primary);font:inherit;font-size:13px;cursor:pointer;text-align:left}
-.side-assistant small{margin-left:auto;font-size:11px;color:var(--ui-text-tertiary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.side-assistant:hover{border-color:var(--ui-primary)}
-.side-head{padding:16px 14px 10px;display:flex;gap:8px}
-.side-new{flex:1}
-.session-list{list-style:none;margin:0;padding:4px 8px 12px;overflow:auto;flex:1;scrollbar-width:thin}
-.session-list li{position:relative;display:flex;align-items:center;border-radius:10px}
-.session-list li:hover,.session-list li.current{background:var(--ui-surface-alt)}
-.session-list li.grouped{margin-left:14px}
-.group-row{margin-top:4px}
-.group-toggle{flex:1;min-width:0;display:flex;align-items:center;gap:6px;background:none;border:0;color:var(--ui-text-secondary);cursor:pointer;padding:8px 10px;font:inherit;font-size:13px;font-weight:600;text-align:left}
-.group-toggle:hover{color:var(--ui-text-primary)}
-.group-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.group-count{font-size:12px;font-weight:400;color:var(--ui-text-tertiary)}
-.group-empty,.list-label{font-size:12px;color:var(--ui-text-tertiary)}
-.session-list li.group-empty{margin-left:14px;padding:6px 10px;background:none}
-.session-list li.list-label{margin-top:8px;padding:6px 10px 2px;background:none}
-.session{flex:1;min-width:0;text-align:left;background:none;border:0;color:var(--ui-text-primary);cursor:pointer;padding:9px 10px;display:grid;gap:3px;font:inherit}
-.session-title{font-size:13.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.session-meta{font-size:12px;color:var(--ui-text-tertiary);display:flex;gap:6px;align-items:center}
-.row-more{opacity:0;border:0;background:none;color:var(--ui-text-tertiary);cursor:pointer;padding:6px;margin-right:4px;border-radius:6px;display:inline-flex}
-.session-list li:hover .row-more,.row-more:focus-visible,.session-list li.current .row-more,.session-list li.menu-open .row-more{opacity:1}
-.row-more:hover{color:var(--ui-primary)}
-.row-more:focus-visible{outline:2px solid var(--ui-primary);outline-offset:1px}
-.confirm-row{flex:1;display:flex;gap:10px;align-items:center;padding:9px 10px;font-size:13px}
-.empty-list{justify-content:center;padding:24px 0;color:var(--ui-text-tertiary);font-size:13px}
-.attention-dot{width:7px;height:7px;border-radius:50%;background:var(--ui-primary);display:inline-block}
-.link{border:0;background:none;color:var(--ui-primary);cursor:pointer;font:inherit;padding:0}
-.link.danger{color:var(--ui-primary-pressed);font-weight:650}
-.chat-main{display:flex;flex-direction:column;min-height:0;min-width:0;position:relative}
-.chat-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 24px;border-bottom:1px solid var(--ui-border)}
-.chat-head h2{font-size:15px;margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.head-location{display:flex;align-items:center;min-width:0;gap:12px}
-.head-location h2{min-width:0;flex-shrink:1}
-.workspace-chip{border:0;background:var(--ui-surface-alt);color:var(--ui-text-secondary);border-radius:7px;padding:5px 8px;font:inherit;font-size:11px;cursor:pointer;display:flex;align-items:center;gap:5px;max-width:170px;flex:none}
-.workspace-chip span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.workspace-chip:hover{color:var(--ui-primary)}
-.head-actions{display:flex;align-items:center;gap:10px;flex-shrink:0}
-.guide-chip{border:1px solid var(--ui-border);background:var(--ui-surface);color:var(--ui-primary);border-radius:999px;padding:4px 10px;font-size:12px;display:inline-flex;gap:5px;align-items:center;cursor:pointer;font-weight:600;transition:all .15s}
-.guide-chip:hover{background:var(--ui-primary-soft);border-color:var(--ui-primary)}
-.permission-toggle{display:inline-flex;padding:2px;background:var(--ui-surface-alt);border:1px solid var(--ui-line);border-radius:999px;gap:2px}
-.perm-btn{border:0;background:none;color:var(--ui-text-tertiary);border-radius:999px;padding:3px 9px;font-size:12px;cursor:pointer;display:inline-flex;gap:4px;align-items:center;transition:all .15s}
-.perm-btn:hover{color:var(--ui-text-primary)}
-.perm-btn.active{background:var(--ui-surface);color:var(--ui-text-primary);box-shadow:0 1px 3px rgba(0,0,0,.08);font-weight:600}
-.perm-btn.active svg{color:var(--ui-primary)}
-.ai-config-chip{border:1px solid var(--ui-border);background:var(--ui-surface);color:var(--ui-text-secondary);border-radius:999px;padding:4px 10px;font-size:12px;display:inline-flex;gap:6px;align-items:center;cursor:pointer;white-space:nowrap}
-.ai-config-chip:hover{color:var(--ui-text-primary)}
-.ai-config-chip:focus-visible{outline:2px solid var(--ui-primary);outline-offset:2px}
+/* Title bar */
+.chat-head{height:52px;flex-shrink:0;display:flex;align-items:center;gap:12px;padding:0 14px 0 24px;box-sizing:border-box}
+.head-crumbs{display:flex;align-items:center;gap:8px;min-width:0;flex:1}
+.crumb-space{flex:none;max-width:180px;border:0;background:none;padding:2px 4px;margin-left:-4px;border-radius:6px;font:inherit;font-size:13px;color:var(--ui-text-secondary);cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.crumb-space:hover:not(:disabled){background:var(--ui-surface-hover);color:var(--ui-text-primary)}
+.crumb-space:disabled{cursor:default}
+.crumb-sep{flex:none;color:var(--ui-text-disabled)}
+.chat-head h1{margin:0;font-size:14px;font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.head-actions{display:flex;align-items:center;gap:2px;flex-shrink:0}
+.head-actions .xb-icon-btn:disabled{opacity:.4;cursor:default}
+.head-actions .xb-icon-btn:disabled:hover{background:transparent}
+.head-link{display:inline-flex;align-items:center;gap:5px;height:28px;padding:0 9px;margin-right:4px;border:0;border-radius:8px;background:var(--ui-soft);color:var(--ui-ink);font:inherit;font-size:12px;cursor:pointer}
+.head-search{display:flex;align-items:center;gap:4px;height:30px;padding:0 4px 0 10px;margin-right:4px;border-radius:8px;background:var(--ui-control);color:var(--ui-text-tertiary)}
+.head-search input{width:160px;border:0;outline:none;background:none;color:var(--ui-text-primary);font:inherit;font-size:13px}
+.head-search input::-webkit-search-cancel-button{display:none}
+.search-count{font-size:11.5px;color:var(--ui-text-tertiary);white-space:nowrap;font-variant-numeric:tabular-nums;margin-right:2px}
+.more-anchor{position:relative;display:flex}
+.more-menu{position:absolute;right:0;top:calc(100% + 6px);width:200px}
+.more-menu .xb-menu-item:disabled{opacity:.45;cursor:not-allowed}
+.more-menu .xb-menu-item:disabled:hover{background:transparent}
+.delete-bar{display:flex;align-items:center;gap:8px;margin:0 24px 8px;padding:8px 10px 8px 14px;border-radius:10px;background:color-mix(in srgb,var(--ui-danger) 8%,var(--ui-surface));font-size:13px;color:var(--ui-text-primary)}
+.delete-bar span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.goal-panel{margin:0 24px 8px}
+
+/* Messages */
 .chat-scroll{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;scrollbar-width:thin;scrollbar-color:var(--ui-scrollbar) transparent;overscroll-behavior:contain}
-.chat-column{width:100%;max-width:820px;margin:0 auto;padding:22px 24px 12px;display:grid;gap:14px;box-sizing:border-box;min-width:0;overflow-x:hidden}
-.state-line{text-align:center;padding:40px 0}
+.chat-column{width:100%;max-width:760px;margin:0 auto;padding:12px 40px 24px;display:flex;flex-direction:column;gap:20px;box-sizing:border-box;min-width:0}
+.state-line{text-align:center;padding:40px 0;margin:0;color:var(--ui-text-tertiary);font-size:13px}
 .info-card,.welcome{text-align:center;padding:48px 16px;display:grid;gap:10px;justify-items:center}
-.info-card{background:var(--ui-surface);border:1px solid var(--ui-border);border-radius:16px;margin-top:40px}
-.info-card p,.welcome p{color:var(--ui-text-secondary);max-width:520px;line-height:1.8;margin:0;font-size:14px}
-.welcome h3{margin:4px 0 0;font-size:20px}
-.examples{display:grid;gap:8px;margin-top:14px;width:min(520px,100%)}
-.examples button{text-align:left;border:1px solid var(--ui-border);background:var(--ui-surface);color:var(--ui-text-primary);border-radius:12px;padding:11px 14px;cursor:pointer;font:inherit;font-size:13.5px}
-.examples button:hover{border-color:var(--ui-primary);background:var(--ui-primary-soft)}
-.example-tag{font-size:11px;padding:1px 6px;border-radius:4px;background:var(--ui-surface-alt);color:var(--ui-text-tertiary);margin-right:8px;font-weight:normal}
-.more-guides-link{display:inline-flex;align-items:center;gap:6px;border:0;background:none;color:var(--ui-primary);font-size:13px;font-weight:600;cursor:pointer;margin-top:6px;padding:5px 12px;border-radius:8px;transition:background .15s}
-.more-guides-link:hover{background:var(--ui-primary-soft)}
-.msg.user{display:flex;justify-content:flex-end;width:100%;max-width:100%;min-width:0;box-sizing:border-box}
-.bubble{background:var(--ui-primary-soft);color:var(--ui-text-primary);border-radius:16px 16px 4px 16px;padding:10px 14px;max-width:min(80%,100%);white-space:pre-wrap;word-break:break-word;overflow-wrap:anywhere;line-height:1.7;font-size:14.5px;min-width:0;box-sizing:border-box}
-.msg.assistant{display:grid;grid-template-columns:28px minmax(0,1fr);gap:12px;align-items:start;width:100%;max-width:100%;min-width:0;box-sizing:border-box}
-.avatar{margin-top:2px}
-.answer{width:100%;max-width:100%;min-width:0;font-size:14.5px;line-height:1.8;color:var(--ui-text-primary);overflow-wrap:anywhere;word-break:break-word;box-sizing:border-box}
-.cursor{display:inline-block;width:7px;height:15px;background:var(--ui-primary);border-radius:2px;margin-left:2px;vertical-align:text-bottom;animation:blink 1s steps(2,start) infinite}
+.info-card{background:var(--ui-surface-sunken);border-radius:16px;margin-top:40px}
+.info-card b{font-size:15px;font-weight:600}
+.info-card p,.welcome p{color:var(--ui-text-secondary);max-width:520px;line-height:1.8;margin:0;font-size:13.5px}
+.welcome{padding-top:56px}
+.welcome h2{margin:6px 0 0;font-size:22px;font-weight:600}
+.examples{display:flex;flex-direction:column;align-items:stretch;gap:2px;margin-top:22px;width:min(560px,100%);text-align:left}
+.examples-cap{font-size:12px;font-weight:500;color:var(--ui-text-secondary);padding:0 12px 6px}
+.examples button{display:flex;align-items:center;gap:10px;height:38px;padding:0 12px;border:0;border-radius:10px;background:transparent;color:var(--ui-text-primary);cursor:pointer;font:inherit;font-size:13.5px;text-align:left}
+.examples button:hover{background:var(--ui-control)}
+.examples button svg{flex:none;color:var(--ui-text-tertiary);margin-left:auto}
+.example-tag{flex:none;font-size:11px;padding:1px 6px;border-radius:5px;background:var(--ui-control);color:var(--ui-text-secondary)}
+.examples button:hover .example-tag{background:var(--ui-surface)}
+.example-text{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.more-guides{display:inline-flex;align-items:center;gap:6px;margin-top:10px;font-size:13px}
+.brand-mark{flex:none;width:24px;height:24px;border-radius:7px;background:linear-gradient(160deg,var(--ui-btn-hi),var(--ui-btn));color:var(--ui-text-on-btn);display:grid;place-items:center;box-shadow:inset 0 1px 0 rgba(255,255,255,.25)}
+.brand-mark.is-lg{width:44px;height:44px;border-radius:13px;box-shadow:inset 0 1px 0 rgba(255,255,255,.3),0 4px 12px rgba(0,0,0,.12)}
+
+.msg.user{display:flex;flex-direction:column;align-items:flex-end;width:100%;min-width:0}
+.bubble{background:var(--ui-control);color:var(--ui-text-primary);border-radius:16px;padding:11px 15px;max-width:80%;white-space:pre-wrap;word-break:break-word;overflow-wrap:anywhere;line-height:1.7;font-size:14px;min-width:0;box-sizing:border-box}
+.bubble-images{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px}
+.bubble-images img{max-width:180px;max-height:180px;border-radius:10px;box-shadow:0 0 0 1px var(--ui-border);cursor:zoom-in;display:block}
+.bubble-files{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px}
+.bubble-file{display:inline-flex;align-items:center;gap:5px;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;padding:6px 9px;border-radius:8px;background:var(--ui-surface);color:var(--ui-text-secondary)}
+.reply{display:flex;flex-direction:column;gap:12px;min-width:0}
+.reply-head{display:flex;align-items:center;gap:8px}
+.reply-head b{font-size:13.5px;font-weight:600}
+.msg.assistant{min-width:0}
+.answer{min-width:0;font-size:14.5px;line-height:1.8;color:var(--ui-text-primary);overflow-wrap:anywhere;word-break:break-word}
+.cursor{display:inline-block;width:7px;height:15px;background:var(--ui-btn);border-radius:2px;margin-left:2px;vertical-align:text-bottom;animation:blink 1s steps(2,start) infinite}
 @keyframes blink{to{visibility:hidden}}
-.preview{margin:4px 0 0;padding:9px 11px;background:var(--ui-surface-alt);border-radius:8px;overflow:auto;max-height:260px;font-size:12px;line-height:1.6;white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-word;font-family:ui-monospace,Menlo,Consolas,monospace}
-.usage{display:block;margin-top:4px;font-size:11px;color:var(--ui-text-secondary)}
-.notice{margin-left:40px;font-size:13px;padding:8px 12px;border-radius:10px;background:var(--ui-surface-alt);color:var(--ui-text-secondary);display:flex;gap:12px;align-items:center}
-.notice{flex-wrap:wrap}
-.undo-warning{color:var(--ui-text-secondary)}
-.notice.error{background:var(--ui-primary-soft);color:var(--ui-primary-pressed)}
-.notice.warning{background:rgba(245,158,11,.14)}
+.bubble.is-hit,.answer.is-hit{box-shadow:0 0 0 2px var(--ui-btn);border-radius:12px}
+.answer.is-hit{background:var(--ui-soft)}
+.file-cards{display:flex;flex-direction:column;gap:8px}
+.file-card{display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:12px;background:var(--ui-surface-sunken);box-shadow:inset 0 0 0 1px var(--ui-line);max-width:420px;box-sizing:border-box}
+.file-ext{flex:none;width:36px;height:36px;border-radius:9px;background:var(--ui-surface);box-shadow:0 0 0 1px var(--ui-border);display:grid;place-items:center;color:var(--ui-ink);font-size:10px;font-weight:600}
+.file-text{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
+.file-text b{font-size:13.5px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.file-text small{font-size:12px;color:var(--ui-text-secondary)}
+.reply-actions{display:flex;align-items:center;gap:2px;margin-top:-4px}
+.act{width:28px;height:28px;border:0;border-radius:7px;background:transparent;color:var(--ui-text-tertiary);display:grid;place-items:center;cursor:pointer;padding:0}
+.act:hover:not(:disabled){background:var(--ui-surface-hover);color:var(--ui-text-primary)}
+.act.is-on{color:var(--ui-ink);background:var(--ui-soft)}
+.act:disabled{opacity:.4;cursor:not-allowed}
+.usage{margin-left:8px;font-size:11.5px;color:var(--ui-text-tertiary);font-variant-numeric:tabular-nums}
+.notice{font-size:13px;padding:8px 12px;border-radius:10px;background:var(--ui-surface-sunken);color:var(--ui-text-secondary);display:flex;flex-wrap:wrap;gap:12px;align-items:center;line-height:1.6}
+.notice.error{background:color-mix(in srgb,var(--ui-danger) 9%,var(--ui-surface));color:var(--ui-danger)}
+.notice.warning{background:color-mix(in srgb,var(--ui-warning) 14%,var(--ui-surface));color:var(--ui-warning-text)}
 .notice details{flex:1;min-width:0}
 .notice summary{cursor:pointer}
 .notice-details{display:block;margin-top:6px;white-space:pre-wrap;overflow-wrap:anywhere;max-height:240px;overflow:auto;color:var(--ui-text-secondary)}
-.card{margin-left:40px;border:1px solid var(--ui-border);border-radius:14px;background:var(--ui-surface);padding:14px 16px;display:grid;gap:10px;box-shadow:var(--ui-shadow-pop);max-width:100%;min-width:0;box-sizing:border-box}
-.card.exec{border-color:var(--ui-primary)}
+.undo-warning{color:var(--ui-text-secondary)}
+.card{border-radius:14px;background:var(--ui-surface);padding:14px 16px;display:grid;gap:10px;box-shadow:var(--ui-shadow-card),0 6px 20px rgba(0,0,0,.05);min-width:0;box-sizing:border-box}
+.card.exec{box-shadow:0 0 0 1px var(--ui-btn),0 6px 20px rgba(0,0,0,.05)}
 .card header{display:flex;gap:8px;align-items:center;font-size:14px}
-.card header svg{color:var(--ui-primary);flex:none}
+.card header svg{color:var(--ui-ink);flex:none}
 .card footer{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-.caution{margin:0;font-size:12.5px;color:var(--ui-text-secondary);background:rgba(245,158,11,.14);border-radius:8px;padding:7px 10px;line-height:1.6}
-.danger-note{background:rgba(239,68,68,.12);color:var(--ui-text-primary)}
-.approval.dangerous{outline:1.5px solid rgba(239,68,68,.55)}
+.caution{margin:0;font-size:12.5px;color:var(--ui-text-secondary);background:color-mix(in srgb,var(--ui-warning) 14%,transparent);border-radius:8px;padding:7px 10px;line-height:1.6}
+.danger-note{background:color-mix(in srgb,var(--ui-danger) 11%,transparent);color:var(--ui-text-primary)}
+.approval.dangerous{box-shadow:0 0 0 1.5px var(--ui-danger),0 6px 20px rgba(0,0,0,.05)}
+.preview{margin:0;padding:9px 11px;background:var(--ui-control);border-radius:8px;overflow:auto;max-height:260px;font-size:12px;line-height:1.6;white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-word;font-family:var(--ui-font-mono)}
 .options{display:flex;gap:8px;flex-wrap:wrap}
-.status-line{margin:0 0 0 40px;font-size:13px;color:var(--ui-text-tertiary);display:flex;gap:8px;align-items:center}
+.status-line{margin:0;font-size:13px;color:var(--ui-text-tertiary);display:flex;gap:8px;align-items:center}
 .spin{animation:spin 1s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
-.to-bottom{position:absolute;right:28px;bottom:96px;width:34px;height:34px;border-radius:50%;border:1px solid var(--ui-border);background:var(--ui-surface);color:var(--ui-text-primary);cursor:pointer;display:grid;place-items:center;box-shadow:var(--ui-shadow-pop)}
-.composer{padding:10px 24px 18px;width:100%;box-sizing:border-box}
-.composer-box{max-width:820px;margin:0 auto;display:flex;flex-direction:column;gap:8px;background:var(--ui-surface);border:1px solid var(--ui-border);border-radius:18px;padding:8px 10px 8px 14px}
-.composer-box.voice-active{border-color:var(--ui-primary);box-shadow:0 0 0 2px var(--ui-primary-soft)}
-.composer-row{display:flex;gap:6px;align-items:center;min-width:0}
-.composer-editor{display:flex;min-width:0;padding:2px 4px 5px}
-.composer-editor :deep(.n-input){width:100%}
-.composer-spacer{flex:1;min-width:4px}
-.composer-editor :deep(.n-input){flex:1;min-width:0}
-.voice-finish{display:inline-flex;align-items:center;justify-content:center;gap:7px;align-self:flex-end;min-height:28px;flex:none;padding:3px 10px;border:1px solid var(--ui-primary);border-radius:999px;background:var(--ui-primary-soft);color:var(--ui-primary);font:inherit;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap}
-.voice-finish:hover{background:var(--ui-primary);color:#fff}
-.voice-finish:disabled{cursor:wait;opacity:.75}
-.voice-finish:focus-visible{outline:2px solid var(--ui-primary);outline-offset:2px}
-.recording-dot{width:7px;height:7px;border-radius:50%;background:currentColor;animation:recording-pulse 1.3s ease-in-out infinite}
-@keyframes recording-pulse{50%{opacity:.3}}
-.attachments{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:2px 2px 0}
-.thumb{position:relative;width:56px;height:56px;border-radius:10px;overflow:hidden;border:1px solid var(--ui-line);background:var(--ui-surface-alt);flex:none}
-.thumb img{width:100%;height:100%;object-fit:cover;cursor:zoom-in;display:block}
-.thumb-remove{position:absolute;top:2px;right:2px;width:17px;height:17px;border-radius:50%;border:0;background:rgba(0,0,0,.58);color:#fff;display:grid;place-items:center;cursor:pointer;padding:0}
-.thumb-remove:hover:not(:disabled){background:rgba(0,0,0,.78)}
-.thumb-remove:disabled{cursor:not-allowed;opacity:.5}
-.attach-hint{color:var(--ui-text-tertiary);font-size:12px}
-.bubble-images{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px}
-.bubble-images img{max-width:180px;max-height:180px;border-radius:10px;border:1px solid var(--ui-line);cursor:zoom-in;display:block}
+.to-bottom{position:absolute;right:28px;bottom:150px;width:34px;height:34px;border-radius:50%;border:0;background:var(--ui-surface-raised);color:var(--ui-text-primary);cursor:pointer;display:grid;place-items:center;box-shadow:var(--ui-shadow-menu)}
+
+/* Composer */
+.composer-wrap{flex-shrink:0;width:100%;max-width:840px;margin:0 auto;padding:0 40px 10px;box-sizing:border-box}
+.disclaimer{margin:8px 0 0;text-align:center;font-size:11px;color:var(--ui-text-tertiary)}
+
+/* Execution panel */
+.exec-panel{width:280px;flex-shrink:0;display:flex;flex-direction:column;min-height:0;border-left:1px solid var(--ui-line);background:var(--ui-surface)}
+.panel-head{height:52px;flex-shrink:0;display:flex;align-items:center;justify-content:space-between;padding:0 12px 0 18px;box-sizing:border-box}
+.panel-head b{font-size:13.5px;font-weight:600}
+.panel-body{flex:1;min-height:0;overflow-y:auto;padding:0 18px 18px;display:flex;flex-direction:column;gap:18px}
+.panel-section{display:flex;flex-direction:column;gap:8px;align-items:flex-start}
+.panel-section h3{margin:0;font-size:12px;font-weight:500;color:var(--ui-text-tertiary);display:flex;align-items:center;gap:6px}
+.panel-section h3 small{font-size:11px;padding:0 6px;border-radius:999px;background:var(--ui-control);color:var(--ui-text-secondary)}
+.panel-path{margin:0;font-size:12px;font-family:var(--ui-font-mono);color:var(--ui-text-secondary);word-break:break-all;line-height:1.5}
+.panel-mode{margin:0;display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--ui-text-primary)}
+.panel-mode svg{color:var(--ui-ink)}
+.panel-mode.danger,.panel-mode.danger svg{color:var(--ui-danger)}
+.panel-empty{margin:0;font-size:12px;line-height:1.6;color:var(--ui-text-tertiary)}
+.panel-steps,.panel-files{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px;width:100%}
+.panel-steps li{display:flex;gap:8px;align-items:flex-start;padding:5px 0;font-size:12.5px;min-width:0}
+.panel-steps li>svg{flex:none;margin-top:3px;color:var(--ui-text-tertiary)}
+.panel-steps li.done>svg{color:var(--ui-success)}
+.panel-steps li.error>svg{color:var(--ui-danger)}
+.panel-steps li>span{min-width:0;display:flex;flex-direction:column;gap:1px}
+.panel-steps b{font-weight:500}
+.panel-steps small{font-size:11.5px;color:var(--ui-text-tertiary);font-family:var(--ui-font-mono);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.panel-files li{display:flex;align-items:center;gap:7px;font-size:12.5px;padding:4px 0;min-width:0}
+.panel-files li>svg{flex:none;color:var(--ui-ink)}
+.panel-files li span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.panel-files li small{font-size:11px;color:var(--ui-text-tertiary)}
+
 .lightbox{position:fixed;inset:0;z-index:60;background:rgba(0,0,0,.78);display:grid;place-items:center;padding:40px;cursor:zoom-out}
 .lightbox img{max-width:100%;max-height:100%;border-radius:12px;box-shadow:0 18px 60px rgba(0,0,0,.5)}
 .lightbox-close{position:absolute;top:18px;right:18px;width:36px;height:36px;border-radius:50%;border:0;background:rgba(255,255,255,.16);color:#fff;display:grid;place-items:center;cursor:pointer}
 .lightbox-close:hover{background:rgba(255,255,255,.3)}
-.composer-box :deep(.n-input){--n-border:none;--n-border-hover:none;--n-border-focus:none;--n-box-shadow-focus:none;background:transparent}
-.composer-box :deep(.n-input .n-input__border),.composer-box :deep(.n-input .n-input__state-border){display:none}
-.composer-box :deep(.n-input-wrapper){padding-left:0}
+
 .chat-page :deep(.markdown){width:100%;max-width:100%;min-width:0;word-break:break-word;overflow-wrap:anywhere;box-sizing:border-box}
 .chat-page :deep(.markdown>*:first-child){margin-top:0}
 .chat-page :deep(.markdown>*:last-child){margin-bottom:0}
 .chat-page :deep(.markdown p),.chat-page :deep(.markdown li){margin:0 0 .75em;word-break:break-word;overflow-wrap:anywhere}
-.chat-page :deep(.markdown .md-heading){margin:1.1em 0 .5em;line-height:1.4;word-break:break-word;overflow-wrap:anywhere}
-.chat-page :deep(.markdown h3){font-size:1.25em}.chat-page :deep(.markdown h4){font-size:1.12em}.chat-page :deep(.markdown h5),.chat-page :deep(.markdown h6){font-size:1em}
+.chat-page :deep(.markdown strong){font-weight:600}
+.chat-page :deep(.markdown .md-heading){margin:1.1em 0 .5em;line-height:1.4;font-weight:600;word-break:break-word;overflow-wrap:anywhere}
+.chat-page :deep(.markdown h3){font-size:1.2em}.chat-page :deep(.markdown h4){font-size:1.08em}.chat-page :deep(.markdown h5),.chat-page :deep(.markdown h6){font-size:1em}
 .chat-page :deep(.markdown ul),.chat-page :deep(.markdown ol){margin:0 0 .75em;padding-left:1.5em;max-width:100%;box-sizing:border-box}
 .chat-page :deep(.markdown li>p){margin:.3em 0}
-.chat-page :deep(.markdown blockquote){margin:0 0 .75em;padding:2px 14px;border-left:3px solid var(--ui-border);color:var(--ui-text-secondary);word-break:break-word;overflow-wrap:anywhere}
+.chat-page :deep(.markdown blockquote){margin:0 0 .75em;padding:2px 14px;border-left:3px solid var(--ui-border-strong);color:var(--ui-text-secondary);word-break:break-word;overflow-wrap:anywhere}
 .chat-page :deep(.markdown hr){border:0;border-top:1px solid var(--ui-line);margin:1em 0}
-.chat-page :deep(.markdown .md-code){background:var(--ui-surface-alt);border-radius:5px;padding:1px 6px;font-size:.88em;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;word-break:break-word;overflow-wrap:anywhere}
-.chat-page :deep(.markdown .md-link){color:var(--ui-primary);cursor:pointer;text-decoration:underline;text-underline-offset:2px;overflow-wrap:anywhere;word-break:break-word}
+.chat-page :deep(.markdown .md-code){background:var(--ui-soft);color:var(--ui-ink);border-radius:6px;padding:1px 6px;font-size:.88em;font-family:var(--ui-font-mono);word-break:break-word;overflow-wrap:anywhere}
+.chat-page :deep(.markdown .md-link){color:var(--ui-ink);cursor:pointer;text-decoration:underline;text-underline-offset:2px;overflow-wrap:anywhere;word-break:break-word}
 .chat-page :deep(.markdown .md-table){overflow:auto;margin:0 0 .75em;max-width:100%}
 .chat-page :deep(.markdown table){border-collapse:collapse;font-size:13.5px}
 .chat-page :deep(.markdown th),.chat-page :deep(.markdown td){border:1px solid var(--ui-line);padding:6px 12px;text-align:left}
-.chat-page :deep(.markdown th){background:var(--ui-surface-alt);font-weight:600}
-@media(max-width:900px){
-  .chat-page{grid-template-columns:190px minmax(0,1fr)}
-  .chat-column{padding:16px 14px 12px}
-  .bubble{max-width:88%}
-  .notice,.card,.status-line{margin-left:0}
+.chat-page :deep(.markdown th){background:var(--ui-surface-sunken);font-weight:600}
+@media(max-width:1100px){.exec-panel{position:absolute;right:0;top:0;bottom:0;z-index:5;box-shadow:var(--ui-shadow-menu)}}
+@media(max-width:760px){
+  .chat-column{padding:12px 16px 20px}
+  .composer-wrap{padding:0 12px 8px}
+  .bubble{max-width:90%}
+  .head-search input{width:100px}
 }
-@media(max-width:680px){
-  .chat-page{grid-template-columns:1fr}
-  .chat-side{display:none}
-  .bubble{max-width:92%}
-  .composer{padding-left:10px;padding-right:10px}
-}
-@media(prefers-reduced-motion:reduce){.spin,.cursor,.recording-dot{animation:none}}
+@media(prefers-reduced-motion:reduce){.spin,.cursor{animation:none}}
 </style>
-
-
-
-
-

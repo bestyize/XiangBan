@@ -35,7 +35,7 @@
 
 ## 视觉规范
 
-- 使用蓝、白、浅灰作为主要色彩：强调色 `#2563eb`，页面背景 `#f5f7fb`，表面白色 `#ffffff`，边线 `#e5eaf1`。Naive UI 主题在 `src/ui/theme.ts` 中定义；控制台 CSS 变量在 `src/ui/control.css` 中定义。错误和警告使用 Naive UI 语义色。
+- 色彩以中性灰白为底，配合用户可选的 6 套主题色（默认小伴红）。具体令牌、深色模式与工具类见文末「方案四令牌与工具类」；Naive UI 主题在 `src/ui/theme.ts` 中随主题色与深浅色生成，控制台 CSS 变量由 `src/ui/design-tokens.ts` 写入。错误和警告使用 Naive UI 语义色。
 - 间距基于 8 px：常用 8、16、24 px；卡片内边距通常 16–24 px，区块间距 16–24 px。卡片圆角约 12 px，阴影轻，避免厚重边框。
 - 主操作使用 Naive UI primary 按钮；开关、标签、提示和骨架屏采用 Naive UI 对应组件。Lucide 图标用于导航和操作提示，不用图标替代文字标签。
 - 桌面卡片网格在宽屏采用三列，中等宽度两列，窄屏一列。封面使用资源自身比例与裁切，不以占位图冒充真实封面。
@@ -44,4 +44,32 @@
 ## 验证状态
 
 2026-10-10 UI 重构后，前端全量测试 51 tests / 11 files、Rust 55 tests、Windows x64 桌面生产构建均已通过。桌面宠物页和壁纸库视觉参考：companion-blue.jpg（本地：`../artifacts/ui/companion-blue.jpg`）、wallpapers-blue.jpg（本地：`../artifacts/ui/wallpapers-blue.jpg`）。
+
+## 方案四令牌与工具类
+
+2026-10 起控制台采用「方案四」外壳：左侧 264 px 侧栏（底色 `--ui-tint`），右侧白色内容面板浮在侧栏底色上（`margin:8px 8px 8px 0`、圆角 12、细描边 + 轻阴影）。设置改为居中弹窗（940×660），由账号菜单或 `store.openSettings(tab)` 打开。
+
+**主题色**：`src/ui/appearance.ts` 导出 `accents`（`red` 小伴红 / `green` 薄荷绿 / `blue` 海湾蓝 / `purple` 暮紫 / `amber` 琥珀 / `graphite` 石墨，各含 `light`、`dark` 两套色值）、`accent`（当前 id，localStorage `xiaoban.control.accent` 持久化）与 `setAccent(id)`。每套主题色有 6 个角色，映射为 CSS 变量：
+
+| 变量 | 用途 |
+| --- | --- |
+| `--ui-btn` / `--ui-btn-hi` | 主按钮底色 / 渐变高光 |
+| `--ui-soft` / `--ui-ink` | 选中浅底 / 选中与链接文字 |
+| `--ui-tint` | 侧栏与窗口底色（= `--ui-app-bg`） |
+| `--ui-dot` | 待确认、未读等标记点 |
+
+**中性色**：`--ui-text-primary/secondary/tertiary/disabled`、`--ui-surface`（内容面板）、`--ui-surface-alt`/`--ui-control`（灰底控件）、`--ui-surface-sunken`（弹窗内容底）、`--ui-surface-hover`、`--ui-surface-raised`（浮层）、`--ui-border`、`--ui-border-strong`、`--ui-line`（分隔线）、`--ui-success/warning/danger`，阴影 `--ui-shadow-panel/card/menu/dialog/btn/btn-secondary`，字体 `--ui-font-family`、`--ui-font-mono`。深色模式下面板为 #1C1C1E → #232325 → #2C2C2E，主题色整体提亮。旧变量继续可用：`--ui-primary*` 指向主题色，`--ui-sidebar-bg` 指向 tint，`--ui-accent` 仍是成功绿。组件里只用变量，不要写死主题色。
+
+**全局工具类**（`src/ui/control.css`）：
+
+- 按钮：`.xb-btn-primary`（渐变主按钮）、`.xb-btn`（白底细描边）、`.is-sm`/`.is-lg` 尺寸，`.xb-btn-ghost`、`.xb-icon-btn`（30×30，`.is-sm` 24×24）、`.xb-link`；危险操作加 `.is-danger`（`.xb-btn.is-danger` 红字次按钮）。
+- 容器：`.xb-page`（内容区内边距 22px 28px）、`.xb-page-head` + `.xb-page-title` + `.xb-page-actions`、`.xb-card`（`.is-hover`、`.is-selected`）、`.xb-empty`（+ `.xb-empty-icon`）、`.xb-scroll`。
+- 标签与分段：`.xb-tabs-lg`（页面顶部大标签 20px/600，未选 #A1A1A6，选中项加 `aria-selected="true"`）、`.xb-seg`（分段控件，选中按钮加 `.is-active` 或 aria-pressed/selected/checked）。
+- 浮层菜单：`.xb-menu`、`.xb-menu-item`（`.is-active`/`aria-checked` 为 soft 底，`.is-danger` 红字）、`.xb-menu-hint`、`.xb-menu-check`、`.xb-menu-sep`、`.xb-menu-label`。
+- 设置分组：`.xb-group-title`、`.xb-group`、`.xb-row`、`.xb-row-text`（内含 `<b>` 标题与 `<span>` 说明）。
+- 小件：`.xb-dot`、`.xb-badge`、`.xb-chip`、`.xb-ok`、`.xb-kbd`、`.xb-mark`（渐变品牌方块）、`.xb-search`。
+
+**路由**：`ControlPage` 为 `new-task`、`chat`、`ai-store`、`library`、`studio`、`games`、`care`（以及 `interactive`）。旧 id 仍可传给 `navigate`：`wallpapers`/`effects`/`widgets`/`companion` 打开装扮对应标签（`store.studioTab`：`wallpapers`/`effects`/`widgets`/`pets`），`settings`/`assistant` 打开设置弹窗。装扮内页可用 `<Teleport defer to="#studio-actions">` 把按钮放到标签行右侧。
+
+**会话管理**：侧栏空间树的会话行悬停出现 ⋯（右键同一菜单）：重命名、移动到工作区（`chat.moveToWorkspace`，可选已有工作区或另选文件夹）、删除（菜单内二次确认）。工作区取代了旧的“分组”：不再有分组界面，宿主里已有的分组数据原样保留、不显示。页面统一自带 `.xb-page` 内边距，`.control-workspace` 本身不加内边距。
 

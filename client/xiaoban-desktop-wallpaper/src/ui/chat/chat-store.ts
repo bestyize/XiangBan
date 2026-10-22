@@ -31,6 +31,9 @@ export interface ChatStore {
    *  `new` starts a new conversation there, `here` moves this one and tells the model. Returns `ask` when the
    *  page should ask which, `failed` when the host refused (the reason is shown). */
   switchWorkspace(path: string, how?: 'new' | 'here'): Promise<'done' | 'ask' | 'failed'>;
+  /** Moves any saved conversation (not only the open one) to `path`, as the sidebar's “移动到工作区” does. The host tells
+   *  the model about the new folder; an open, loaded conversation also shows the notice. Returns whether it was moved. */
+  moveToWorkspace(id: string, path: string): Promise<boolean>;
   /** The system folder picker; `null` when nothing was chosen. */
   pickWorkspace(): Promise<string | null>;
   /** Shows the open conversation's folder in Finder or Explorer. */
@@ -134,6 +137,26 @@ export function createChatStore(deps: ChatDeps): ChatStore {
       } catch (error) {
         deps.notify(error, 'error');
         return 'failed';
+      }
+    },
+    async moveToWorkspace(id: string, path: string) {
+      if (!deps.desktop) return false;
+      const view = store.views[id];
+      if (view?.running) { deps.notify('这个对话还在回答，请等它结束或先停止，再切换工作区', 'error'); return false; }
+      const before = store.sessions.find(s => s.id === id)?.workspace;
+      if (before && before === path) return true;
+      try {
+        const result = await deps.invoke<{ session: SessionSummary; wide: boolean; recentWorkspaces: RecentWorkspace[] }>('chat_set_workspace', { sessionId: id, workspace: path });
+        if (disposed) return false;
+        store.sessions = store.sessions.map(s => s.id === result.session.id ? result.session : s);
+        store.recentWorkspaces = result.recentWorkspaces ?? store.recentWorkspaces;
+        if (view?.items.length) view.items.push(workspaceNotice(view, path));
+        if (result.wide) deps.notify('这个文件夹范围很大（主目录或磁盘根目录），小伴在里面删除文件前都会先问你', 'info');
+        if (id === store.currentId) void store.refreshContext();
+        return true;
+      } catch (error) {
+        deps.notify(error, 'error');
+        return false;
       }
     },
     async pickWorkspace() {

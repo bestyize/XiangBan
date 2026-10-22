@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import { NButton, NModal } from 'naive-ui';
-import { Check, ChevronDown, Folder, FolderOpen, FolderPlus, House, TriangleAlert } from 'lucide-vue-next';
+import { Check, ChevronDown, Folder, FolderInput, FolderOpen, FolderPlus, House, TriangleAlert } from 'lucide-vue-next';
 import type { ChatStore } from '../chat/chat-store.ts';
 
 /** The folder the open conversation works in, under the message box next to the permission mode: recent folders,
  *  another one from the system picker, and showing it in Finder or Explorer. */
-const props = defineProps<{ chat: ChatStore; disabled?: boolean }>();
+const props = withDefaults(defineProps<{ chat: ChatStore; disabled?: boolean;
+  /** `pill`: folder and name under the message box. `icon`: a single folder button, for the conversation's title bar. */
+  variant?: 'pill' | 'icon' }>(), { variant: 'pill' });
 
 const root = ref<HTMLElement | null>(null);
 const open = ref(false);
@@ -49,10 +51,13 @@ function reveal() { close(); void props.chat.revealWorkspace(); }
 
 <template>
   <div ref="root" class="ws-anchor">
-    <button type="button" class="ws-trigger" data-testid="chat-workspace-menu" aria-haspopup="menu" :aria-expanded="open" :title="'工作区：' + (current || '默认工作目录')" :disabled="disabled" @click="open = !open">
-      <Folder :size="14" /><span class="ws-name">{{ currentName }}</span><ChevronDown :size="12" />
+    <button v-if="variant === 'icon'" type="button" class="xb-icon-btn ws-icon" data-testid="chat-workspace-menu" aria-haspopup="menu" :aria-expanded="open" aria-label="移动到工作区" :title="'移动到工作区（当前：' + (current || '默认工作目录') + '）'" :disabled="disabled" @click="open = !open">
+      <FolderInput :size="16" />
     </button>
-    <div v-show="open" class="ws-menu" role="menu" aria-label="工作区">
+    <button v-else type="button" class="ws-trigger" data-testid="chat-workspace-menu" aria-haspopup="menu" :aria-expanded="open" :title="'工作区：' + (current || '默认工作目录')" :disabled="disabled" @click="open = !open">
+      <Folder :size="14" /><span class="ws-name">{{ currentName }}</span><ChevronDown :size="11" :stroke-width="2.4" />
+    </button>
+    <div v-show="open" class="ws-menu xb-menu" :class="`is-${variant}`" role="menu" aria-label="工作区">
       <p class="ws-path" :title="current">{{ current || '默认工作目录' }}</p>
       <div class="ws-separator" />
       <div v-if="recent.length" class="ws-section">最近使用</div>
@@ -81,24 +86,26 @@ function reveal() { close(); void props.chat.revealWorkspace(); }
 
 <style scoped>
 .ws-anchor{position:relative;display:flex;align-items:center;min-width:0}
-.ws-trigger{display:flex;align-items:center;gap:5px;height:30px;padding:0 6px;border:0;border-radius:8px;background:none;color:var(--ui-text-secondary);font:inherit;font-size:12px;cursor:pointer;white-space:nowrap;min-width:0;max-width:150px}
-.ws-trigger:hover,.ws-trigger[aria-expanded="true"]{background:var(--ui-surface-alt);color:var(--ui-text-primary)}
-.ws-trigger:disabled{opacity:.5;cursor:not-allowed}
+.ws-trigger{display:flex;align-items:center;gap:5px;height:28px;padding:0 9px;border:0;border-radius:8px;background:none;color:var(--ui-text-secondary);font:inherit;font-size:12.5px;cursor:pointer;white-space:nowrap;min-width:0;max-width:160px}
+.ws-trigger:hover,.ws-trigger[aria-expanded="true"]{background:var(--ui-control);color:var(--ui-text-primary)}
+.ws-trigger:disabled,.ws-icon:disabled{opacity:.5;cursor:not-allowed}
 .ws-trigger svg{flex:none}
+.ws-icon[aria-expanded="true"]{background:var(--ui-control);color:var(--ui-text-primary)}
 .ws-name{overflow:hidden;text-overflow:ellipsis}
-.ws-menu{position:absolute;z-index:40;left:0;bottom:calc(100% + 8px);width:280px;max-width:calc(100vw - 32px);background:var(--ui-surface);border:1px solid var(--ui-border);border-radius:12px;box-shadow:0 12px 32px rgba(0,0,0,.14);padding:5px;box-sizing:border-box;color:var(--ui-text-primary)}
-.ws-path{font-size:11px;color:var(--ui-text-tertiary);margin:5px 8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;direction:rtl;text-align:left}
-.ws-section{font-size:11px;color:var(--ui-text-tertiary);padding:6px 8px 3px}
-.ws-separator{height:1px;background:var(--ui-border);margin:5px 4px}
-.ws-item{display:flex;gap:9px;align-items:center;width:100%;min-height:33px;padding:5px 9px;background:none;border:0;border-radius:7px;color:var(--ui-text-primary);font:inherit;font-size:12.5px;text-align:left;cursor:pointer}
-.ws-item:hover{background:var(--ui-surface-alt)}
-.ws-item>svg{flex:none}
-.ws-item>svg:last-child:not(:first-child){margin-left:auto;color:var(--ui-primary)}
+.ws-menu{position:absolute;left:0;bottom:calc(100% + 8px);width:290px;max-width:calc(100vw - 32px);box-sizing:border-box}
+.ws-menu.is-icon{left:auto;right:0;bottom:auto;top:calc(100% + 6px)}
+.ws-path{font-size:11.5px;color:var(--ui-text-tertiary);margin:6px 10px 4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;direction:rtl;text-align:left}
+.ws-section{font-size:12px;font-weight:500;color:var(--ui-text-tertiary);padding:6px 10px 3px}
+.ws-separator{height:1px;background:var(--ui-line);margin:5px 6px}
+.ws-item{display:flex;gap:10px;align-items:center;width:100%;min-height:34px;padding:5px 10px;background:none;border:0;border-radius:8px;color:var(--ui-text-primary);font:inherit;font-size:13px;text-align:left;cursor:pointer}
+.ws-item:hover{background:var(--ui-surface-hover)}
+.ws-item>svg{flex:none;color:var(--ui-text-secondary)}
+.ws-item>svg:last-child:not(:first-child){margin-left:auto;color:var(--ui-ink)}
 .ws-item>span:only-of-type{flex:1}
 .ws-item-text{flex:1;min-width:0;display:grid;gap:2px}
-.ws-item-text strong{font-size:12px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.ws-item-text small{font-size:10.5px;color:var(--ui-text-tertiary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.ws-wide{color:var(--ui-warning, #d08700)}
+.ws-item-text strong{font-size:13px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ws-item-text small{font-size:11px;color:var(--ui-text-tertiary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ws-item>svg.ws-wide{color:var(--ui-warning)}
 .ws-ask{font-size:13px;line-height:1.7;margin:0 0 16px;color:var(--ui-text-secondary)}
 .ws-ask-actions{display:flex;justify-content:flex-end;gap:8px}
 </style>

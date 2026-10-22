@@ -29,8 +29,9 @@ export async function runUiSmoke(store: ControlStore): Promise<void> {
     const native = await invoke<Settings>('get_settings');
     if (typeof native.companionEnabled !== 'boolean' || native.fps !== store.settings.fps || native.size !== store.settings.size) throw new Error('Native settings were not bound to the Vue control store');
     if (!store.info.version || store.info.platform === 'preview') throw new Error('Native application identity missing');
+    // The studio kinds are tabs of 装扮 and "settings" is a dialog now; the old ids still route there.
     for (const page of ['wallpapers', 'effects', 'companion', 'games', 'care', 'settings'] as ControlPage[]) {
-      store.navigate(page);
+      if (page === 'settings') store.openSettings('general'); else store.navigate(page);
       await wait(() => !!document.querySelector(`[data-testid="${page}-page"]`), `mount ${page}`);
       mounted.push(page);
       if (page === 'companion') {
@@ -52,7 +53,7 @@ export async function runUiSmoke(store: ControlStore): Promise<void> {
   } catch (error) {
     report = { ok: false, marker: 'vue-native-control-readonly', pages: mounted, error: error instanceof Error ? error.message : String(error) };
   } finally {
-    store.navigate(originalPage); await nextTick();
+    store.closeSettings(); store.navigate(originalPage); await nextTick();
     window.removeEventListener('error', onError); window.removeEventListener('unhandledrejection', onRejection);
   }
   await invoke('ui_smoke_report', { report });
