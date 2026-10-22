@@ -27,6 +27,19 @@ fn millis() -> u64 { now().1.min(u128::from(u64::MAX)) as u64 }
 fn store(app: &tauri::AppHandle) -> Result<GoalStore, String> {
     Ok(GoalStore::new(Dirs::of(app)?.chat.join("goals")))
 }
+pub(super) fn metadata_lease(app: &tauri::AppHandle, id: &str) -> Result<agent_kernel::supervisor::SessionLease, String> {
+    let root = Dirs::of(app)?.chat.join("goal-leases");
+    for _ in 0..50 {
+        match agent_kernel::supervisor::SessionLease::acquire(&root, id) {
+            Ok(lease) => return Ok(lease),
+            Err(e) if e == "session is already owned by another process" => {
+                std::thread::sleep(std::time::Duration::from_millis(10));
+            }
+            Err(e) => return Err(e),
+        }
+    }
+    Err("目标记录正在另一个实例中更新，请稍后重试".into())
+}
 fn exists(app: &tauri::AppHandle, id: &str) -> Result<(), String> {
     if !sessions::valid_id(id) { return Err("无效的会话编号".into()); }
     if mutate(app, |index| index.get(id).is_some())? { Ok(()) }
@@ -70,6 +83,7 @@ pub fn chat_goal_get(
     require_control(&window)?;
     exists(&app, &session_id)?;
     let _write = lock(&app.state::<ChatState>().goal_io);
+    let _metadata_lease = metadata_lease(&app, &session_id)?;
     current(&app, &session_id)
 }
 
@@ -82,6 +96,7 @@ pub fn chat_goal_set(
     exists(&app, &session_id)?;
     ensure_not_owned_elsewhere(&app, &session_id)?;
     let _write = lock(&app.state::<ChatState>().goal_io);
+    let _metadata_lease = metadata_lease(&app, &session_id)?;
     if running(&app, &session_id) { return Err("运行期间不能修改目标".into()); }
     let existing = current(&app, &session_id)?;
     if existing.as_ref().is_some_and(|g| !matches!(g.state, GoalState::Draft | GoalState::Completed)) {
@@ -120,6 +135,7 @@ pub fn chat_goal_start(
     // Otherwise a simultaneous read could mistake the brief dispatch gap
     // for a crashed process and mark an in-flight goal NeedsReview.
     let _write = lock(&app.state::<ChatState>().goal_io);
+    let _metadata_lease = metadata_lease(&app, &session_id)?;
     if running(&app, &session_id) { return Err("当前会话正在运行".into()); }
     let mut goal = current(&app, &session_id)?.ok_or("请先设定目标")?;
     let previous = goal.clone();
@@ -149,6 +165,7 @@ pub fn chat_goal_pause(
     // holding the goal metadata lock.
     if running(&app, &session_id) { super::chat_cancel(app.clone(), session_id.clone()); }
     let _write = lock(&app.state::<ChatState>().goal_io);
+    let _metadata_lease = metadata_lease(&app, &session_id)?;
     let mut goal = current(&app, &session_id)?.ok_or("没有长期目标")?;
     goal.pause(millis())?;
     store(&app)?.save(&goal)?;
@@ -167,6 +184,7 @@ pub fn chat_goal_acknowledge(
     exists(&app, &session_id)?;
     ensure_not_owned_elsewhere(&app, &session_id)?;
     let _write = lock(&app.state::<ChatState>().goal_io);
+    let _metadata_lease = metadata_lease(&app, &session_id)?;
     if running(&app, &session_id) { return Err("仍有运行中的任务".into()); }
     let mut goal = current(&app, &session_id)?.ok_or("没有长期目标")?;
     if !matches!(goal.state, GoalState::Interrupted | GoalState::NeedsReview) {
@@ -193,6 +211,7 @@ pub fn chat_goal_finish(
     exists(&app, &session_id)?;
     ensure_not_owned_elsewhere(&app, &session_id)?;
     let _write = lock(&app.state::<ChatState>().goal_io);
+    let _metadata_lease = metadata_lease(&app, &session_id)?;
     if running(&app, &session_id) { return Err("任务仍在执行，不能验收完成".into()); }
     let mut goal = current(&app, &session_id)?.ok_or("没有长期目标")?;
     goal.finish_verified(&evidence, millis())?;
@@ -209,6 +228,7 @@ pub fn chat_goal_delete(
     exists(&app, &session_id)?;
     ensure_not_owned_elsewhere(&app, &session_id)?;
     let _write = lock(&app.state::<ChatState>().goal_io);
+    let _metadata_lease = metadata_lease(&app, &session_id)?;
     if running(&app, &session_id) { return Err("先暂停并停止当前任务".into()); }
     store(&app)?.delete(&session_id)?;
     changed(&app, &session_id, None);
@@ -220,6 +240,7 @@ pub fn chat_goal_delete(
 pub(super) fn observe(app: &tauri::AppHandle, record: &RunEvent) -> Result<(), String> {
     let RunEventBody::State { state, .. } = &record.body else { return Ok(()) };
     let _write = lock(&app.state::<ChatState>().goal_io);
+    let _metadata_lease = metadata_lease(app, &record.session_id)?;
     let db = store(app)?;
     if let Some(mut goal) = db.load(&record.session_id)? {
         if goal.state == GoalState::Running {
