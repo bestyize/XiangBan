@@ -47,4 +47,16 @@ pub trait ModelProvider: Send + Sync {
         on_text: &mut dyn FnMut(&str),
         cancel: &AtomicBool,
     ) -> Result<Reply, HarnessError>;
+
+    /// A display-only reasoning channel. Older/custom providers may implement
+    /// just `chat`; the default preserves binary-free source compatibility.
+    fn chat_with_reasoning(
+        &self,
+        request: &ChatRequest,
+        on_text: &mut dyn FnMut(&str),
+        _on_reasoning: &mut dyn FnMut(crate::ReasoningKind, &str),
+        cancel: &AtomicBool,
+    ) -> Result<Reply, HarnessError> {
+        self.chat(request, on_text, cancel)
+    }
 }
