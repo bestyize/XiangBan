@@ -27,11 +27,22 @@ pub fn validate(levels: &[String]) -> Result<(), String> {
 /// Explicit declarations override inference, including an empty list to disable the capability.
 /// Inference accepts qualified model IDs (provider/model) on compatible gateways.
 pub fn levels(model: &str, protocol: &str, declared: Option<&[String]>) -> Vec<String> {
-    if !matches!(protocol, "responses" | "chat") { return Vec::new(); }
+    if !matches!(protocol, "responses" | "chat" | "anthropic") { return Vec::new(); }
     if let Some(levels) = declared {
         return if validate(levels).is_ok() { levels.to_vec() } else { Vec::new() };
     }
     let name = model.trim().rsplit('/').next().unwrap_or_default().to_ascii_lowercase();
+    if protocol == "anthropic" {
+        // Claude models with adaptive thinking and `output_config.effort`. Older ones (Haiku 4.5, Sonnet 4.5, …)
+        // take `budget_tokens` instead and are left alone.
+        let list: &[&str] = match name.as_str() {
+            "claude-fable-5-1" | "claude-fable-5" | "claude-opus-5-5" | "claude-opus-5" | "claude-opus-4-8" | "claude-opus-4-7"
+            | "claude-sonnet-5-5" | "claude-sonnet-5" | "claude-haiku-5-5" => &["low", "medium", "high", "xhigh", "max"],
+            "claude-opus-4-6" | "claude-sonnet-4-6" => &["low", "medium", "high", "max"],
+            _ => &[],
+        };
+        return list.iter().map(|s| (*s).into()).collect();
+    }
     let list: &[&str] = match name.as_str() {
         "gpt-6-astra" | "gpt-6.1-sol" | "gpt-6-sol" | "gpt-6-luna" => &["low", "medium", "high", "xhigh", "max"],
         "deepseek-flash" | "deepseek-v4-pro" | "kimi-k3" | "glm-5.2" | "glm-5.3" | "glm-5.3-flash" => &["low", "high", "max"],
@@ -53,9 +64,39 @@ pub fn body(protocol: &str, preference: ReplyPreference, levels: &[String]) -> M
         }
         "chat" => effort.map_or_else(Map::new, |effort|
             Map::from_iter([("reasoning_effort".into(), json!(effort))])),
+        // Adaptive thinking with a readable summary (the default display leaves thinking text empty, so the
+        // reasoning panel would stay blank); the kernel sends the signed blocks back during tool use.
+        "anthropic" if !levels.is_empty() => {
+            let mut body = Map::from_iter([("thinking".into(), json!({"type": "adaptive", "display": "summarized"}))]);
+            if let Some(effort) = effort { body.insert("output_config".into(), json!({"effort": effort})); }
+            body
+        }
         _ => Map::new(),
     }
 }
+#[cfg(test)]
+mod claude_tests {
+    use super::*;
+
+    #[test]
+    fn claude_models_get_adaptive_thinking_and_effort_and_others_nothing() {
+        let opus = levels("claude-opus-5-5", "anthropic", None);
+        assert_eq!(opus, ["low", "medium", "high", "xhigh", "max"]);
+        assert_eq!(levels("anthropic/claude-sonnet-4-6", "anthropic", None), ["low", "medium", "high", "max"], "a gateway's qualified id");
+        assert!(levels("claude-haiku-4-5", "anthropic", None).is_empty(), "budget_tokens models are left alone");
+        assert!(levels("kimi-k3", "anthropic", None).is_empty(), "a non-Claude model behind an Anthropic-style endpoint");
+        let deeper = body("anthropic", ReplyPreference::Deeper, &opus);
+        assert_eq!(serde_json::Value::Object(deeper), json!({"thinking": {"type": "adaptive", "display": "summarized"}, "output_config": {"effort": "high"}}));
+        let default = body_default(&opus);
+        assert_eq!(default, json!({"thinking": {"type": "adaptive", "display": "summarized"}}), "the endpoint's own effort when none is chosen");
+        assert!(body("anthropic", ReplyPreference::Max, &[]).is_empty());
+    }
+
+    fn body_default(levels: &[String]) -> serde_json::Value {
+        serde_json::Value::Object(body("anthropic", ReplyPreference::Default, levels))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

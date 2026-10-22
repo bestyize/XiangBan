@@ -16,6 +16,9 @@ describe('model service form helpers', () => {
     expect(reasoningLevels('chat', 'private-alias', ['medium', 'high'])).toEqual(['medium', 'high']);
     expect(reasoningLevels('responses', 'gpt-6.1-sol', [])).toEqual([]);
     expect(reasoningLevels('responses', 'moonshot/kimi-k3')).toEqual(['low', 'high', 'max']);
+    expect(reasoningLevels('anthropic', 'claude-opus-5-5')).toEqual(['low', 'medium', 'high', 'xhigh', 'max']);
+    expect(reasoningLevels('anthropic', 'anthropic/claude-sonnet-4-6')).toEqual(['low', 'medium', 'high', 'max']);
+    expect(reasoningLevels('anthropic', 'claude-haiku-4-5'), 'budget_tokens models are left alone').toEqual([]);
     expect(preferenceOptions(['high', 'low']).map(o => o.value)).toEqual(['default', 'faster', 'deeper']);
     const p = {id:'test', name:'t', isCustom:false, model:'alias', protocol:'responses' as const, baseUrl:'https://proxy.example', hasKey:true, keyHint:'', reasoningEfforts:['high'] as const};
     expect(providerReasoningLevels({...p,reasoningEfforts:['high']}, 'alias')).toEqual(['high']);

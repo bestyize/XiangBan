@@ -130,9 +130,16 @@ export const normalizeBaseUrl = (value: string) => value.trim().replace(/\/+$/, 
 /** Keep model/protocol inference aligned with the native ai_reasoning module. */
 export const reasoningEfforts: AiReasoningEffort[] = ['low', 'medium', 'high', 'xhigh', 'max'];
 export function reasoningLevels(protocol: AiProtocol, model: string, declared?: AiReasoningEffort[] | null): AiReasoningEffort[] {
-  if (protocol !== 'responses' && protocol !== 'chat') return [];
+  if (protocol !== 'responses' && protocol !== 'chat' && protocol !== 'anthropic') return [];
   if (declared != null) return reasoningEfforts.filter(level => declared.includes(level));
   const name = model.trim().split('/').pop()?.toLowerCase();
+  if (protocol === 'anthropic') {
+    // Claude models with adaptive thinking and effort; older budget_tokens models are left alone.
+    if (['claude-fable-5-1', 'claude-fable-5', 'claude-opus-5-5', 'claude-opus-5', 'claude-opus-4-8', 'claude-opus-4-7',
+      'claude-sonnet-5-5', 'claude-sonnet-5', 'claude-haiku-5-5'].includes(name ?? '')) return [...reasoningEfforts];
+    if (['claude-opus-4-6', 'claude-sonnet-4-6'].includes(name ?? '')) return ['low', 'medium', 'high', 'max'];
+    return [];
+  }
   if (['gpt-6-astra', 'gpt-6.1-sol', 'gpt-6-sol', 'gpt-6-luna'].includes(name ?? '')) return [...reasoningEfforts];
   if (['deepseek-flash', 'deepseek-v4-pro', 'kimi-k3', 'glm-5.2', 'glm-5.3', 'glm-5.3-flash'].includes(name ?? '')) return ['low', 'high', 'max'];
   return [];
