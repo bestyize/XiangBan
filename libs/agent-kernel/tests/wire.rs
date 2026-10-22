@@ -44,6 +44,41 @@ fn accumulator_assembles_fragmented_tool_calls_and_trailing_usage() {
 }
 
 #[test]
+fn reasoning_content_is_streamed_separately_and_never_mixed_with_answer() {
+    let mut acc = StreamAccumulator::default();
+    let mut answer = String::new();
+    let mut reasoning = String::new();
+    for chunk in [
+        json!({"choices":[{"delta":{"reasoning_content":"Plan "}}]}),
+        json!({"choices":[{"delta":{"reasoning_content":"first","content":"Done."},"finish_reason":"stop"}]}),
+    ] {
+        acc.push_with_reasoning(
+            &chunk, &mut |text| answer.push_str(text),
+            &mut |kind, text| { assert_eq!(kind, ReasoningKind::Text); reasoning.push_str(text); }
+        ).unwrap();
+    }
+    assert_eq!(reasoning, "Plan first");
+    assert_eq!(answer, "Done.");
+    assert_eq!(acc.finish().message.text(), "Done.");
+}
+
+#[test]
+fn displayable_reasoning_round_trips_without_exposing_opaque_protocol_state() {
+    let mut message = Message::assistant("result", vec![]);
+    message.reasoning.push(ReasoningSegment { kind: ReasoningKind::Summary, text: "User-visible summary".into() });
+    message.provider_state = Some(json!({"opaque":"state"}));
+    let saved = serde_json::to_string(&message).unwrap();
+    let loaded: Message = serde_json::from_str(&saved).unwrap();
+    assert_eq!(loaded.reasoning, message.reasoning);
+    assert_eq!(loaded.provider_state, message.provider_state);
+    assert_eq!(serde_json::to_value(Event::ReasoningDelta {
+        kind: ReasoningKind::Summary, text: "x".into()
+    }).unwrap(), json!({"type":"reasoning_delta","kind":"summary","text":"x"}));
+    let legacy: Message = serde_json::from_value(json!({"role":"assistant","parts":[{"type":"text","text":"old"}]})).unwrap();
+    assert!(legacy.reasoning.is_empty());
+}
+
+#[test]
 fn accumulator_tolerates_missing_index_id_and_arguments() {
     let mut acc = StreamAccumulator::default();
     feed(&mut acc, &[json!({"choices": [{"delta": {"tool_calls": [{"function": {"name": "ping", "arguments": ""}}]}, "finish_reason": "stop"}]})]);
