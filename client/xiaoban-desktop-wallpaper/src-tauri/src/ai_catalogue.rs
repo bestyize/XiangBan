@@ -86,7 +86,6 @@ pub fn merge(config: &mut AiConfig, catalogue: Catalogue) -> Result<(), String> 
         if first { local.selection_mode = "recommended".into(); }
         if first || local.selection_mode == "recommended" { local.model = p.default_model.clone(); }
         if p.provider_type != "third" || previous_endpoint != (local.base_url.clone(), local.model.clone(), local.protocol.clone()) {
-            local.max_output_tokens = 0;
             local.reasoning_efforts = None;
         }
         local.id = p.id; local.name = p.provider; local.description = p.description;
@@ -245,13 +244,10 @@ mod tests {
         let mut c = AiConfig::default();
         c.providers[0].api_key = "user-key".into();
         c.providers[0].selection_mode = "manual".into(); c.providers[0].model = "chosen".into();
-        c.providers[0].max_output_tokens = 32768;
         merge(&mut c, catalogue("new-default")).unwrap();
         assert_eq!(c.providers[0].model, "chosen"); assert_eq!(c.providers[0].api_key, "user-key");
-        assert_eq!(c.providers[0].max_output_tokens, 32768, "manual model and endpoint did not change");
         c.providers[0].selection_mode = "recommended".into();
         merge(&mut c, catalogue("next-default")).unwrap(); assert_eq!(c.providers[0].model, "next-default");
-        assert_eq!(c.providers[0].max_output_tokens, 0, "a new recommended model must not inherit an old output override");
     }
     #[test] fn the_xiaoban_ai_entry_follows_the_catalogue_and_is_on_when_the_site_says_nothing() {
         let mut c = AiConfig::default();

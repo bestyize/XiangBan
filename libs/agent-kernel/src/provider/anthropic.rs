@@ -11,7 +11,72 @@ use crate::error::HarnessError;
 use crate::types::{FinishReason, Message, Part, Role, ToolCall, Usage};
 use serde_json::{json, Value};
 
-pub const DEFAULT_MAX_TOKENS: u32 = 8192;
+// The Anthropic Messages protocol requires max_tokens, unlike OpenAI-compatible
+// endpoints. Track model-family capabilities instead of imposing a global 8K cap.
+pub const DEFAULT_MAX_TOKENS: u32 = 128_000;
+
+/// Longest-match model family lookup, including date-stamped and proxy-prefixed IDs.
+/// Model metadata provided by the configured service takes precedence at call time.
+pub fn model_max_output_tokens(model: &str) -> u32 {
+    const KNOWN: &[(&str, u32)] = &[
+        ("claude-fable", 128_000), ("claude-sonnet-5", 128_000),
+        ("claude-opus-4-8", 128_000), ("claude-opus-4-7", 128_000),
+        ("claude-opus-4-6", 128_000), ("claude-sonnet-4-6", 64_000),
+        ("claude-opus-4-5", 64_000), ("claude-sonnet-4-5", 64_000),
+        ("claude-haiku-4-5", 64_000), ("claude-opus-4", 32_000),
+        ("claude-sonnet-4", 64_000), ("claude-3-7-sonnet", 128_000),
+        ("claude-3-5-sonnet", 8_192), ("claude-3-5-haiku", 8_192),
+        ("claude-3-opus", 4_096), ("claude-3-sonnet", 4_096),
+        ("claude-3-haiku", 4_096), ("minimax", 131_072),
+        ("qwen3", 65_536),
+    ];
+    let normalized = model.to_ascii_lowercase().replace('.', "-");
+    KNOWN.iter()
+        .filter(|(prefix, _)| normalized.contains(*prefix))
+        .max_by_key(|(prefix, _)| prefix.len())
+        .map_or(DEFAULT_MAX_TOKENS, |(_, limit)| *limit)
+}
+
+/// Reduce a rejected OUTPUT request without shrinking conversation context or
+/// retrying unrelated bad requests. Known server caps are preferred over halving.
+pub fn next_max_tokens_from_error(message: &str, requested: u32) -> Option<u32> {
+    if requested <= 1 { return None; }
+    let text = message.to_ascii_lowercase();
+    if !text.contains("max_tokens") && !text.contains("maximum output tokens") { return None; }
+    if text.contains("too many input tokens") || text.contains("prompt is too long")
+        || text.contains("input token count exceeds") { return None; }
+    let limit_error = [
+        "too large", "exceeds", "cannot exceed", "greater than", "at most",
+        "maximum allowed", "maximum output tokens", "output limit", "limited to",
+        "less than or equal", "must be <", "range of max_tokens",
+        "available_tokens", "available tokens",
+    ].iter().any(|signal| text.contains(signal));
+    if !limit_error { return None; }
+
+    fn after(text: &str, marker: &str) -> Option<u32> {
+        let tail = text.split_once(marker)?.1;
+        let first = tail.find(|c: char| c.is_ascii_digit())?;
+        let digits: String = tail[first..].chars()
+            .take_while(|c| c.is_ascii_digit() || *c == '_').filter(|c| *c != '_').collect();
+        digits.parse::<u32>().ok().filter(|n| *n > 0)
+    }
+
+    let reported = [
+        "available_tokens:", "available tokens:", "output limit of ",
+        "output limit is ", "supports at most ", "limited to ",
+        "less than or equal to ", "maximum output tokens (",
+        "max_tokens should be [1,", "max_tokens should be [1, ",
+    ].iter().find_map(|marker| after(&text, marker))
+        .or_else(|| {
+            // Anthropic: "max_tokens: 100000 > 64000, which is the maximum allowed..."
+            if text.contains("max_tokens:") && text.contains(" > ") && text.contains("maximum allowed") {
+                after(&text, " > ")
+            } else { None }
+        });
+    // Keep modest slack when the server reports the number of tokens remaining.
+    let target = reported.map_or(requested / 2, |value| value.saturating_sub(1));
+    (target > 0 && target < requested).then_some(target)
+}
 pub const DEFAULT_VERSION: &str = "2023-06-01";
 const MAX_BLOCKS: usize = 128;
 
@@ -109,7 +174,7 @@ pub fn build_request_body(profile: &ProviderProfile, request: &ChatRequest) -> V
 
     let mut body = json!({
         "model": profile.model,
-        "max_tokens": profile.max_output_tokens.unwrap_or(DEFAULT_MAX_TOKENS),
+        "max_tokens": profile.max_output_tokens.unwrap_or_else(|| model_max_output_tokens(&profile.model)),
         "stream": true,
         "messages": turns.into_iter().map(|(role, content)| json!({ "role": role, "content": content })).collect::<Vec<_>>(),
     });
@@ -337,20 +402,48 @@ mod client {
 
     impl ModelProvider for AnthropicMessages {
         fn chat(&self, request: &ChatRequest, on_text: &mut dyn FnMut(&str), cancel: &AtomicBool) -> Result<Reply, HarnessError> {
-            let body = super::super::budget::encode(&self.profile, request, build_request_body)?;
-            let mut headers = vec![
-                ("Content-Type".to_string(), "application/json".to_string()),
-                ("Accept".to_string(), "text/event-stream".to_string()),
-                ("anthropic-version".to_string(), DEFAULT_VERSION.to_string()),
-            ];
-            let key = self.profile.current_api_key();
-            if !key.is_empty() {
-                headers.push(("x-api-key".to_string(), key));
+            let mut profile = self.profile.clone();
+            let mut max_tokens = profile.max_output_tokens
+                .unwrap_or_else(|| model_max_output_tokens(&profile.model));
+            // An invalid max_tokens request is rejected before inference begins.
+            // Retry only explicit output-limit errors, and only before any text is streamed.
+            for attempt in 0..=4 {
+                profile.max_output_tokens = Some(max_tokens);
+                let body = super::super::budget::encode(&profile, request, build_request_body)?;
+                let mut headers = vec![
+                    ("Content-Type".to_string(), "application/json".to_string()),
+                    ("Accept".to_string(), "text/event-stream".to_string()),
+                    ("anthropic-version".to_string(), DEFAULT_VERSION.to_string()),
+                ];
+                let key = profile.current_api_key();
+                if !key.is_empty() {
+                    headers.push(("x-api-key".to_string(), key));
+                }
+                let call = Call { url: endpoint_url(&profile.base_url), headers: http::merge_headers(headers, &profile.extra_headers), body };
+                let mut decoder = AnthropicStream::default();
+                let mut emitted = false;
+                let result = http::post_stream(&self.client, call, &mut decoder, &mut |text| {
+                    emitted = true;
+                    on_text(text);
+                }, cancel);
+                match result {
+                    Ok(()) => return Ok(decoder.finish()),
+                    Err(error) if !emitted && attempt < 4 => {
+                        let next = match &error {
+                            HarnessError::Provider { message, .. } =>
+                                next_max_tokens_from_error(message, max_tokens),
+                            _ => None,
+                        };
+                        if let Some(reduced) = next {
+                            max_tokens = reduced;
+                            continue;
+                        }
+                        return Err(error);
+                    }
+                    Err(error) => return Err(error),
+                }
             }
-            let call = Call { url: endpoint_url(&self.profile.base_url), headers: http::merge_headers(headers, &self.profile.extra_headers), body };
-            let mut decoder = AnthropicStream::default();
-            http::post_stream(&self.client, call, &mut decoder, on_text, cancel)?;
-            Ok(decoder.finish())
+            unreachable!("bounded Anthropic output-limit attempts always return")
         }
     }
 }

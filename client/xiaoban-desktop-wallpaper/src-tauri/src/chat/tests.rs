@@ -183,7 +183,6 @@ fn build_rig(tag: &str, steps: Vec<Step>, answer: Approval, computer_use: bool) 
         open_computer_use: computer_use,
         spawn_computer_use: &no_computer_use,
         context_tokens: ai_config::DEFAULT_CONTEXT_TOKENS,
-        output_tokens: 8_192,
     })
     .expect("the tool set assembles");
     Rig { _dir: dir, workspace, dirs, desktop, asked, provider, agent, todo }
@@ -386,7 +385,6 @@ fn the_folder_for_saved_output_can_be_read_but_not_written() {
             open_computer_use: false,
             spawn_computer_use: &no_computer_use,
         context_tokens: ai_config::DEFAULT_CONTEXT_TOKENS,
-        output_tokens: 8_192,
         })
         .unwrap()
     };
@@ -569,7 +567,6 @@ fn in_auto_mode_all_write_tools_run_without_asking() {
         open_computer_use: false,
         spawn_computer_use: &no_computer_use,
         context_tokens: ai_config::DEFAULT_CONTEXT_TOKENS,
-        output_tokens: 8_192,
     }).unwrap();
 
     let mut events = Vec::new();
@@ -611,7 +608,6 @@ fn trusted_rig(tag: &str, steps: Vec<Step>) -> (Rig, Arc<Mutex<Vec<(String, Opti
         open_computer_use: false,
         spawn_computer_use: &no_computer_use,
         context_tokens: ai_config::DEFAULT_CONTEXT_TOKENS,
-        output_tokens: 8_192,
     })
     .unwrap();
     let rig = Rig { _dir: dir, workspace, dirs, desktop, asked: Arc::default(), provider, agent, todo };
@@ -831,7 +827,6 @@ fn the_context_size_from_settings_is_what_the_agent_trims_to() {
             open_computer_use: false,
             spawn_computer_use: &no_computer_use,
         context_tokens: 32_000,
-        output_tokens: 8_192,
         })
         .unwrap();
         let file = JsonlStore::new(dirs.sessions());
@@ -896,18 +891,31 @@ fn game_create_requires_exactly_one_source_and_rejects_paths_outside_workspace()
 }
 
 #[test]
-fn configured_output_limit_reaches_responses_and_anthropic_wire_requests_and_context_reserve() {
+fn automatic_output_limits_are_protocol_specific_and_independent_of_context_headroom() {
     let mut config: AiConfig = serde_json::from_value(json!({
-        "activeProvider":"custom-output", "protocol":"responses", "baseUrl":"https://model.example/v1", "model":"test-model",
-        "contextTokens":256000,
-        "providers":[{"id":"custom-output", "protocol":"responses", "baseUrl":"https://model.example/v1", "model":"test-model", "maxOutputTokens":32768}]
+        "activeProvider":"custom-output", "protocol":"responses",
+        "baseUrl":"https://model.example/v1", "model":"test-model", "contextTokens":256000,
+        "providers":[{"id":"custom-output", "protocol":"responses",
+            "baseUrl":"https://model.example/v1", "model":"test-model",
+            "maxOutputTokens":1024,
+            "models":[{"id":"test-model","maxOutputTokens":65536}]}]
     })).unwrap();
-    let request = agent_kernel::provider::ChatRequest { messages: vec![Message::user(vec![Part::Text { text: "hello".into() }])], tools: vec![] };
+    let request = agent_kernel::provider::ChatRequest {
+        messages: vec![Message::user(vec![Part::Text { text: "hello".into() }])], tools: vec![]
+    };
     let body = agent_kernel::provider::responses::build_request_body(&provider_profile(&config), &request);
-    assert_eq!(body["max_output_tokens"], 32768);
-    assert_eq!(context_reserve(config.context_tokens, config.output_tokens()), 32768 + 12800);
+    assert!(body.get("max_output_tokens").is_none(), "Responses must use the endpoint default");
+    assert_eq!(context_reserve(config.context_tokens), 16_384 + 12_800);
+    assert_eq!(context_reserve(16_000), 4_000 + 800);
+
     config.protocol = "anthropic".into();
     config.providers[0].protocol = "anthropic".into();
     let body = agent_kernel::provider::anthropic::build_request_body(&provider_profile(&config), &request);
-    assert_eq!(body["max_tokens"], 32768);
+    assert_eq!(body["max_tokens"], 65_536, "Anthropic uses model metadata, not legacy overrides");
+
+    config.protocol = "chat".into();
+    config.providers[0].protocol = "chat".into();
+    let body = agent_kernel::provider::wire::build_request_body(&provider_profile(&config), &request);
+    assert!(body.get("max_tokens").is_none());
+    assert!(body.get("max_completion_tokens").is_none());
 }

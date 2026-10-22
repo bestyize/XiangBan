@@ -260,7 +260,9 @@ fn provider_profile(config: &AiConfig) -> ProviderProfile {
     let mut profile = ProviderProfile::new(config.base_url.clone(), config.api_key.clone(), config.model.clone());
     profile.extra_body = crate::ai_reasoning::body(&config.protocol, config.reply_preference(), &config.reasoning_levels());
     profile.max_request_bytes = Some(8 * 1024 * 1024);
-    profile.max_output_tokens = Some(config.output_tokens() as u32);
+    // Only Anthropic requires an explicit output limit. Responses and Chat Completions
+    // must not inherit a made-up cap from the local conversation context budget.
+    profile.max_output_tokens = (config.protocol == "anthropic").then(|| config.model_output_limit()).flatten();
     profile
 }
 
@@ -277,7 +279,10 @@ fn provider_with(config: &AiConfig, key_source: Option<KeySource>) -> Result<Arc
     made.map_err(|e| format!("模型配置不能用：{e}"))
 }
 
-fn context_reserve(limit: usize, output: usize) -> usize { output + limit / 20 }
+/// Estimate *context trimming* headroom independently of the model's generation ceiling.
+fn context_reserve(limit: usize) -> usize {
+    (limit / 4).min(16_384) + limit / 20
+}
 
 /// Deletes spilled tool output nobody will look at again.
 fn clean_spill(dir: &Path, keep: Duration) {
@@ -337,7 +342,6 @@ struct Parts<'a> {
     spawn_computer_use: &'a dyn Fn() -> Result<Arc<agent_kernel::mcp::McpClient>, agent_kernel::HarnessError>,
     /// Estimated tokens kept in a request before old tool output and old turns are dropped.
     context_tokens: usize,
-    output_tokens: usize,
 }
 
 /// Puts the kernel together: the model, the tools the assistant may use, and the rules around them.
@@ -350,7 +354,7 @@ fn assemble_with_files(parts: Parts<'_>, attachments: Vec<Attachment>) -> Result
     assemble_with_connectors(parts, attachments, Vec::new())
 }
 fn assemble_with_connectors(parts: Parts<'_>, attachments: Vec<Attachment>, connector_tools: Vec<Arc<dyn agent_kernel::Tool>>) -> Result<Agent, String> {
-    let Parts { provider, dirs, workspace, permission, todo, ask, desktop, utc_offset_minutes, open_computer_use, spawn_computer_use, context_tokens, output_tokens } = parts;
+    let Parts { provider, dirs, workspace, permission, todo, ask, desktop, utc_offset_minutes, open_computer_use, spawn_computer_use, context_tokens } = parts;
     for dir in [dirs.sessions(), dirs.spill(), dirs.memory(), dirs.skills()] {
         fs::create_dir_all(&dir).map_err(|e| format!("无法创建 {}：{e}", dir.display()))?;
     }
@@ -392,7 +396,7 @@ fn assemble_with_connectors(parts: Parts<'_>, attachments: Vec<Attachment>, conn
         .middleware(RepeatGuard::new())
         .middleware(SpillOutput::new(dirs.spill()))
         .middleware(AttachmentContext::new(attachments))
-        .middleware(ContextTrim::new(context_tokens).reserve_output(context_reserve(context_tokens, output_tokens)))
+        .middleware(ContextTrim::new(context_tokens).reserve_output(context_reserve(context_tokens)))
         .middleware(ContinueGuard::new())
         .max_turns(MAX_TURNS);
     let roots = vec![workspace.to_path_buf(), dirs.spill()];
@@ -454,7 +458,6 @@ fn build_agent(app: &tauri::AppHandle, config: &AiConfig, key_source: Option<Key
         open_computer_use: config.open_computer_use,
         spawn_computer_use: &spawn_computer_use,
         context_tokens: config.context_tokens,
-        output_tokens: config.output_tokens(),
     }, attachments, connector_manager(app).map(|m|m.tools()).unwrap_or_default())?;
     lock(&state.tool_tokens).insert(config.open_computer_use, agent_kernel::estimate_tool_tokens(&agent.tool_schemas()));
     Ok(agent)
@@ -891,7 +894,7 @@ fn base_tokens(dirs: &Dirs, workspace: &Path, config: &AiConfig) -> usize {
         .filter(|part| !part.trim().is_empty())
         .collect::<Vec<_>>()
         .join("\n\n");
-    agent_kernel::estimate_tokens(&[Message::system(text)]) + context_reserve(config.context_tokens, config.output_tokens())
+    agent_kernel::estimate_tokens(&[Message::system(text)]) + context_reserve(config.context_tokens)
 }
 
 fn context_of(app: &tauri::AppHandle, config: &AiConfig, raw: &[Message]) -> Result<ContextInfo, String> {

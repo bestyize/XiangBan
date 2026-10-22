@@ -1,6 +1,6 @@
 mod common;
 
-use agent_kernel::provider::anthropic::{build_request_body, endpoint_url, AnthropicStream};
+use agent_kernel::provider::anthropic::{build_request_body, endpoint_url, model_max_output_tokens, next_max_tokens_from_error, AnthropicStream};
 use agent_kernel::provider::wire::ProviderProfile;
 use agent_kernel::*;
 use serde_json::{json, Value};
@@ -40,7 +40,7 @@ fn the_request_has_the_required_fields_and_tools_in_messages_format() {
     let mut req = request(vec![Message::user_text("hi")]);
     req.tools = vec![ToolSchema { name: "get".into(), description: "d".into(), parameters: json!({"type": "object", "properties": {}}) }];
     let body = build_request_body(&p, &req);
-    assert_eq!((body["model"].clone(), body["max_tokens"].clone(), body["stream"].clone()), (json!("claude-test"), json!(8192), json!(true)));
+    assert_eq!((body["model"].clone(), body["max_tokens"].clone(), body["stream"].clone()), (json!("claude-test"), json!(128000), json!(true)));
     assert_eq!(body["temperature"], json!(0.2));
     assert_eq!(body["tools"], json!([{"name": "get", "description": "d", "input_schema": {"type": "object", "properties": {}}}]));
     assert_eq!(body["messages"], json!([{"role": "user", "content": [{"type": "text", "text": "hi"}]}]));
@@ -51,6 +51,29 @@ fn the_request_has_the_required_fields_and_tools_in_messages_format() {
     let body = build_request_body(&p, &req);
     assert_eq!(body["max_tokens"], json!(1024));
     assert!(body.get("tools").is_none());
+}
+
+#[test]
+fn automatic_anthropic_limits_follow_model_family_and_not_a_global_8k_default() {
+    assert_eq!(model_max_output_tokens("claude-opus-4.6-20261022"), 128_000);
+    assert_eq!(model_max_output_tokens("anthropic/claude-sonnet-4-5:fast"), 64_000);
+    assert_eq!(model_max_output_tokens("claude-3-5-sonnet-20241022"), 8_192);
+    assert_eq!(model_max_output_tokens("MiniMax-M3"), 131_072);
+    assert_eq!(model_max_output_tokens("future-claude-model"), 128_000);
+    let mut p = profile();
+    p.model = "claude-sonnet-4.5".into();
+    assert_eq!(build_request_body(&p, &request(vec![Message::user_text("hi")]))["max_tokens"], json!(64_000));
+}
+
+#[test]
+fn output_limit_errors_reduce_only_the_generation_cap() {
+    let cap = "HTTP 400: max_tokens: 128000 > 64000, which is the maximum allowed number of output tokens";
+    assert_eq!(next_max_tokens_from_error(cap, 128_000), Some(63_999));
+    assert_eq!(next_max_tokens_from_error("max_tokens cannot exceed the output limit of 16384", 128_000), Some(16_383));
+    assert_eq!(next_max_tokens_from_error("range of max_tokens should be [1, 65536]", 128_000), Some(65_535));
+    assert_eq!(next_max_tokens_from_error("max_tokens is too large", 128_000), Some(64_000));
+    assert_eq!(next_max_tokens_from_error("input token count exceeds context; max_tokens too large", 128_000), None);
+    assert_eq!(next_max_tokens_from_error("max_tokens must be greater than zero", 128_000), None);
 }
 
 #[test]
@@ -346,6 +369,29 @@ mod truncated_over_http {
     use common::*;
     use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
     use std::sync::Arc;
+
+    #[test]
+    fn rejected_large_max_tokens_retries_with_server_declared_limit() {
+        let bad = status("400 Bad Request",
+            r#"{"error":{"message":"max_tokens: 128000 > 64000, which is the maximum allowed number of output tokens"}}"#);
+        let success = sse_events(&[
+            ("message_start", r#"{"type":"message_start","message":{"usage":{"input_tokens":5,"output_tokens":1}}}"#),
+            ("content_block_start", r#"{"type":"content_block_start","index":0,"content_block":{"type":"text","text":"ok"}}"#),
+            ("message_delta", r#"{"type":"message_delta","delta":{"stop_reason":"end_turn"},"usage":{"output_tokens":2}}"#),
+            ("message_stop", r#"{"type":"message_stop"}"#),
+        ]);
+        let (url, server) = serve(vec![bad, success]);
+        let provider = AnthropicMessages::new(ProviderProfile::new(url, "k", "unknown-future-model")).unwrap();
+        let mut streamed = String::new();
+        let reply = provider.chat(&request(vec![Message::user_text("hello")]),
+            &mut |text| streamed.push_str(text), &AtomicBool::new(false)).unwrap();
+        let seen = server.join().unwrap();
+        assert_eq!(seen.len(), 2);
+        assert_eq!(body_json(&seen[0])["max_tokens"], json!(128_000));
+        assert_eq!(body_json(&seen[1])["max_tokens"], json!(63_999));
+        assert_eq!(streamed, "ok");
+        assert_eq!(reply.finish, FinishReason::Stop);
+    }
 
     #[test]
     fn a_tool_call_cut_off_by_max_tokens_is_not_run_and_history_stays_valid() {

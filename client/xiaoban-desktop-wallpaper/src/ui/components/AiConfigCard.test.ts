@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils';
-import { NInputNumber, NSelect } from 'naive-ui';
+import { NSelect } from 'naive-ui';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { reactive } from 'vue';
 import AiConfigCard from './AiConfigCard.vue';
@@ -477,35 +477,27 @@ describe('reply preferences', () => {
     }));
   });
 
-  it('preserves Anthropic output limit settings while leaving thinking controls unavailable', async () => {
+  it('uses automatic output management for Anthropic and hides manual token controls', async () => {
     await open(known);
     await openModal('custom_openai');
     await pickProtocol('anthropic');
     expect(q('ai-reply-advanced')).not.toBeNull();
-    expect(q('ai-max-output-tokens')).not.toBeNull();
+    expect(q('ai-max-output-tokens')).toBeNull();
     expect(q('ai-reply-preference')).toBeNull();
     expect(q('ai-reasoning-mode')).toBeNull();
   });
 
-  it('saves an independent output limit and resets it when switching endpoint', async () => {
-    const initial = structuredClone(known);
-    initial.providers![0].maxOutputTokens = 16384;
+  it('never saves a manual output limit, even when loading a legacy configuration', async () => {
+    const initial = structuredClone(known) as typeof known & { providers: Array<{ maxOutputTokens?: number }> };
+    initial.providers[0].maxOutputTokens = 1024;
     await open(initial);
     await openModal('custom_openai');
-    const input = wrapper!.findComponent(NInputNumber);
-    expect(input.props('value')).toBe(16384);
-    input.vm.$emit('update:value', 32768);
-    await flushPromises();
+    expect(q('ai-max-output-tokens')).toBeNull();
     ipc.mockResolvedValueOnce(initial as never);
     saveButton().click();
     await flushPromises();
-    expect(ipc).toHaveBeenCalledWith('save_ai_provider', expect.objectContaining({ maxOutputTokens: 32768 }));
-    await openModal('custom_openai');
-    await type('ai-base-url', 'https://another.example/v1');
-    expect(wrapper!.findComponent(NInputNumber).props('value')).toBeNull();
-    ipc.mockResolvedValueOnce(initial as never);
-    saveButton().click();
-    await flushPromises();
-    expect(ipc).toHaveBeenLastCalledWith('save_ai_provider', expect.objectContaining({ maxOutputTokens: 0 }));
+    expect(ipc).toHaveBeenCalledWith('save_ai_provider', expect.not.objectContaining({
+      maxOutputTokens: expect.anything(),
+    }));
   });
 });
