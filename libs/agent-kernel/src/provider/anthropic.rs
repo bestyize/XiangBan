@@ -11,72 +11,20 @@ use crate::error::HarnessError;
 use crate::types::{FinishReason, Message, Part, Role, ToolCall, Usage};
 use serde_json::{json, Value};
 
-// The Anthropic Messages protocol requires max_tokens, unlike OpenAI-compatible
-// endpoints. Track model-family capabilities instead of imposing a global 8K cap.
+// Deprecated compatibility surface; the policy and recovery are now shared
+// through `agent_kernel::model` rather than implemented separately by this provider.
 pub const DEFAULT_MAX_TOKENS: u32 = 128_000;
 
-/// Longest-match model family lookup, including date-stamped and proxy-prefixed IDs.
-/// Model metadata provided by the configured service takes precedence at call time.
 pub fn model_max_output_tokens(model: &str) -> u32 {
-    const KNOWN: &[(&str, u32)] = &[
-        ("claude-fable", 128_000), ("claude-sonnet-5", 128_000),
-        ("claude-opus-4-8", 128_000), ("claude-opus-4-7", 128_000),
-        ("claude-opus-4-6", 128_000), ("claude-sonnet-4-6", 64_000),
-        ("claude-opus-4-5", 64_000), ("claude-sonnet-4-5", 64_000),
-        ("claude-haiku-4-5", 64_000), ("claude-opus-4", 32_000),
-        ("claude-sonnet-4", 64_000), ("claude-3-7-sonnet", 128_000),
-        ("claude-3-5-sonnet", 8_192), ("claude-3-5-haiku", 8_192),
-        ("claude-3-opus", 4_096), ("claude-3-sonnet", 4_096),
-        ("claude-3-haiku", 4_096), ("minimax", 131_072),
-        ("qwen3", 65_536),
-    ];
-    let normalized = model.to_ascii_lowercase().replace('.', "-");
-    KNOWN.iter()
-        .filter(|(prefix, _)| normalized.contains(*prefix))
-        .max_by_key(|(prefix, _)| prefix.len())
-        .map_or(DEFAULT_MAX_TOKENS, |(_, limit)| *limit)
+    crate::model::ModelCapabilities::resolve(
+        crate::model::ModelProtocol::AnthropicMessages, model, None, None
+    ).request_output_limit().unwrap_or(DEFAULT_MAX_TOKENS)
 }
 
-/// Reduce a rejected OUTPUT request without shrinking conversation context or
-/// retrying unrelated bad requests. Known server caps are preferred over halving.
 pub fn next_max_tokens_from_error(message: &str, requested: u32) -> Option<u32> {
-    if requested <= 1 { return None; }
-    let text = message.to_ascii_lowercase();
-    if !text.contains("max_tokens") && !text.contains("maximum output tokens") { return None; }
-    if text.contains("too many input tokens") || text.contains("prompt is too long")
-        || text.contains("input token count exceeds") { return None; }
-    let limit_error = [
-        "too large", "exceeds", "cannot exceed", "greater than", "at most",
-        "maximum allowed", "maximum output tokens", "output limit", "limited to",
-        "less than or equal", "must be <", "range of max_tokens",
-        "available_tokens", "available tokens",
-    ].iter().any(|signal| text.contains(signal));
-    if !limit_error { return None; }
-
-    fn after(text: &str, marker: &str) -> Option<u32> {
-        let tail = text.split_once(marker)?.1;
-        let first = tail.find(|c: char| c.is_ascii_digit())?;
-        let digits: String = tail[first..].chars()
-            .take_while(|c| c.is_ascii_digit() || *c == '_').filter(|c| *c != '_').collect();
-        digits.parse::<u32>().ok().filter(|n| *n > 0)
-    }
-
-    let reported = [
-        "available_tokens:", "available tokens:", "output limit of ",
-        "output limit is ", "supports at most ", "limited to ",
-        "less than or equal to ", "maximum output tokens (",
-        "max_tokens should be [1,", "max_tokens should be [1, ",
-    ].iter().find_map(|marker| after(&text, marker))
-        .or_else(|| {
-            // Anthropic: "max_tokens: 100000 > 64000, which is the maximum allowed..."
-            if text.contains("max_tokens:") && text.contains(" > ") && text.contains("maximum allowed") {
-                after(&text, " > ")
-            } else { None }
-        });
-    // Keep modest slack when the server reports the number of tokens remaining.
-    let target = reported.map_or(requested / 2, |value| value.saturating_sub(1));
-    (target > 0 && target < requested).then_some(target)
+    crate::model::recovery::next_output_limit(message, requested)
 }
+
 pub const DEFAULT_VERSION: &str = "2023-06-01";
 const MAX_BLOCKS: usize = 128;
 
