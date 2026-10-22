@@ -65,6 +65,37 @@ describe('history to chat items', () => {
   });
 });
 
+describe('reasoning summary and answer streams', () => {
+  it('restores displayable reasoning but never renders opaque provider state', () => {
+    const items = itemsFromHistory(newView('s1'), [
+      { role: 'assistant', parts: text('答案'), reasoning: [
+        { kind: 'summary', text: '检查需求，整理结论。' },
+        { kind: 'text', text: '模型明确公开的思考文本' },
+      ], provider_state: { private: 'unrendered' } } as WireMessage,
+    ]);
+    expect(items.map(i => i.kind)).toEqual(['reasoning', 'reasoning', 'assistant']);
+    expect(items[0]).toMatchObject({ text: '检查需求，整理结论。', reasoningKind: 'summary', streaming: false });
+    expect(JSON.stringify(items)).not.toContain('unrendered');
+  });
+
+  it('streams reasoning incrementally, separates answer text, and closes on tool dispatch', () => {
+    const view = newView('s1', true);
+    view.running = true;
+    applyEvent(view, { type: 'reasoning_delta', kind: 'summary', text: '分析' });
+    applyEvent(view, { type: 'reasoning_delta', kind: 'summary', text: '完成' });
+    expect(view.items).toHaveLength(1);
+    expect(view.items[0]).toMatchObject({ kind: 'reasoning', text: '分析完成', streaming: true });
+    applyEvent(view, { type: 'text_delta', text: '答案' });
+    expect(view.items[0]).toMatchObject({ streaming: false });
+    expect(view.items[1]).toMatchObject({ kind: 'assistant', text: '答案' });
+    applyEvent(view, { type: 'tool_start', id: 't1', name: 'shell', arguments: '{}' });
+    applyEvent(view, { type: 'reasoning_delta', kind: 'text', text: '下一步' });
+    expect(view.items.at(-1)).toMatchObject({ kind: 'reasoning', text: '下一步' });
+    applyEvent(view, { type: 'cancelled' });
+    expect(view.items.at(-2)).toMatchObject({ kind: 'reasoning', streaming: false });
+  });
+});
+
 describe('events while an answer is running', () => {
   it('streams text into one growing message and starts a new one after a tool', () => {
     const view = newView('s1', true);

@@ -62,6 +62,13 @@ fn chat_finish(reason: Option<&str>) -> FinishReason {
 
 impl StreamAccumulator {
     pub fn push(&mut self, chunk: &Value, on_text: &mut dyn FnMut(&str)) -> Result<(), HarnessError> {
+        self.push_with_reasoning(chunk, on_text, &mut |_, _| {})
+    }
+
+    pub fn push_with_reasoning(
+        &mut self, chunk: &Value, on_text: &mut dyn FnMut(&str),
+        on_reasoning: &mut dyn FnMut(crate::ReasoningKind, &str),
+    ) -> Result<(), HarnessError> {
         if let Some(error) = chunk.get("error").filter(|e| !e.is_null()) {
             let message = error.get("message").and_then(Value::as_str).map_or_else(|| error.to_string(), str::to_string);
             return Err(HarnessError::provider(message, false));
@@ -72,8 +79,9 @@ impl StreamAccumulator {
         }
         let Some(choice) = chunk.get("choices").and_then(|c| c.get(0)) else { return Ok(()) };
         if let Some(delta) = choice.get("delta") {
-            if let Some(text) = delta.get("reasoning_content").and_then(Value::as_str) {
+            if let Some(text) = delta.get("reasoning_content").and_then(Value::as_str).filter(|text| !text.is_empty()) {
                 self.reasoning.push_str(text);
+                on_reasoning(crate::ReasoningKind::Text, text);
             }
             if let Some(text) = delta.get("content").and_then(Value::as_str).filter(|t| !t.is_empty()) {
                 self.text.push_str(text);

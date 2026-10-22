@@ -36,10 +36,13 @@ export interface WireMessage {
   is_error?: boolean;
   structured_content?: unknown;
   context_summary?: { keep_from: number; text: string };
+  /** Only displayable model-provided content; opaque provider_state is never shown. */
+  reasoning?: { kind: 'summary' | 'text'; text: string }[];
 }
 
 export type KernelEvent =
   | { type: 'text_delta'; text: string }
+  | { type: 'reasoning_delta'; kind: 'summary' | 'text'; text: string }
   | { type: 'tool_start'; id: string; name: string; arguments: string }
   | { type: 'tool_dispatched'; id: string }
   | { type: 'tool_end'; id: string; output: string; is_error: boolean; parts?: WirePart[]; structured_content?: unknown }

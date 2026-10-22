@@ -113,6 +113,8 @@ pub struct ResponsesStream {
     text: String,
     calls: Vec<Option<PartialCall>>,
     reasoning: std::collections::BTreeMap<usize, Value>,
+    /// Summary text already emitted to the UI, keyed by output/summary part.
+    displayed_summaries: std::collections::BTreeMap<(usize, usize), String>,
     usage: Option<Usage>,
     finish: FinishReason,
     done: bool,
@@ -131,17 +133,46 @@ fn failure(code: &str, message: String) -> HarnessError {
 
 impl ResponsesStream {
     pub fn push_payload(&mut self, payload: &str, on_text: &mut dyn FnMut(&str)) -> Result<bool, HarnessError> {
+        self.push_payload_with_reasoning(payload, on_text, &mut |_, _| {})
+    }
+
+    pub fn push_payload_with_reasoning(
+        &mut self, payload: &str, on_text: &mut dyn FnMut(&str),
+        on_reasoning: &mut dyn FnMut(crate::ReasoningKind, &str),
+    ) -> Result<bool, HarnessError> {
         let event = serde_json::from_str(payload).map_err(|e| HarnessError::provider(format!("bad stream event: {e}"), false))?;
-        self.push_event(&event, on_text)
+        self.push_event_with_reasoning(&event, on_text, on_reasoning)
     }
 
     /// Returns `Ok(true)` once the response is completed or ended early (`incomplete`).
     pub fn push_event(&mut self, event: &Value, on_text: &mut dyn FnMut(&str)) -> Result<bool, HarnessError> {
+        self.push_event_with_reasoning(event, on_text, &mut |_, _| {})
+    }
+
+    pub fn push_event_with_reasoning(
+        &mut self, event: &Value, on_text: &mut dyn FnMut(&str),
+        on_reasoning: &mut dyn FnMut(crate::ReasoningKind, &str),
+    ) -> Result<bool, HarnessError> {
         match event.get("type").and_then(Value::as_str).unwrap_or("") {
             "response.output_text.delta" | "response.refusal.delta" => {
                 if let Some(delta) = event.get("delta").and_then(Value::as_str).filter(|d| !d.is_empty()) {
                     self.text.push_str(delta);
                     on_text(delta);
+                }
+            }
+            "response.reasoning_summary_text.delta" => {
+                let key = (event.get("output_index").and_then(Value::as_u64).unwrap_or(0) as usize,
+                    event.get("summary_index").and_then(Value::as_u64).unwrap_or(0) as usize);
+                if let Some(delta) = event.get("delta").and_then(Value::as_str).filter(|s| !s.is_empty()) {
+                    self.displayed_summaries.entry(key).or_default().push_str(delta);
+                    on_reasoning(crate::ReasoningKind::Summary, delta);
+                }
+            }
+            "response.reasoning_summary_text.done" => {
+                let key = (event.get("output_index").and_then(Value::as_u64).unwrap_or(0) as usize,
+                    event.get("summary_index").and_then(Value::as_u64).unwrap_or(0) as usize);
+                if let Some(text) = event.get("text").and_then(Value::as_str) {
+                    self.emit_summary_suffix(key, text, on_reasoning);
                 }
             }
             "response.output_item.added" => {
@@ -175,6 +206,7 @@ impl ResponsesStream {
                 let item = event.get("item").unwrap_or(&Value::Null);
                 if item["type"] == "reasoning" {
                     if let Some(i) = event["output_index"].as_u64().filter(|i| *i < MAX_ITEMS as u64) {
+                        self.emit_item_summaries(i as usize, item, on_reasoning);
                         self.reasoning.insert(i as usize, item.clone());
                     }
                 }
@@ -204,7 +236,7 @@ impl ResponsesStream {
                     _ => FinishReason::Stop,
                 };
                 self.read_usage(response.get("usage"));
-                self.reconcile(response, on_text);
+                self.reconcile(response, on_text, on_reasoning);
                 self.done = true;
                 return Ok(true);
             }
@@ -221,6 +253,33 @@ impl ResponsesStream {
             _ => {}
         }
         Ok(false)
+    }
+
+    fn emit_summary_suffix(
+        &mut self, key: (usize, usize), full: &str,
+        on_reasoning: &mut dyn FnMut(crate::ReasoningKind, &str),
+    ) {
+        let previous = self.displayed_summaries.entry(key).or_default();
+        if let Some(suffix) = full.strip_prefix(previous.as_str()) {
+            if !suffix.is_empty() {
+                on_reasoning(crate::ReasoningKind::Summary, suffix);
+                previous.push_str(suffix);
+            }
+        }
+        // Inconsistent server snapshots must not duplicate streamed reasoning.
+    }
+
+    fn emit_item_summaries(
+        &mut self, output_index: usize, item: &Value,
+        on_reasoning: &mut dyn FnMut(crate::ReasoningKind, &str),
+    ) {
+        for (summary_index, part) in item.get("summary").and_then(Value::as_array)
+            .into_iter().flatten().enumerate()
+        {
+            if let Some(text) = part.get("text").and_then(Value::as_str) {
+                self.emit_summary_suffix((output_index, summary_index), text, on_reasoning);
+            }
+        }
     }
 
     fn call_slot(&mut self, event: &Value) -> Option<&mut PartialCall> {
@@ -242,9 +301,10 @@ impl ResponsesStream {
 
     /// Some gateways only send the final `response` object. If nothing arrived incrementally,
     /// take the content from its `output` list.
-    fn reconcile(&mut self, response: &Value, on_text: &mut dyn FnMut(&str)) {
+    fn reconcile(&mut self, response: &Value, on_text: &mut dyn FnMut(&str), on_reasoning: &mut dyn FnMut(crate::ReasoningKind, &str)) {
         for (i, item) in response.get("output").and_then(Value::as_array).into_iter().flatten().take(MAX_ITEMS).enumerate() {
             if item["type"] == "reasoning" && item["status"] != "in_progress" && item["status"] != "incomplete" {
+                self.emit_item_summaries(i, item, on_reasoning);
                 self.reasoning.insert(i, item.clone());
             }
         }
@@ -316,6 +376,13 @@ mod client {
             self.push_payload(payload, on_text)
         }
 
+        fn push_with_reasoning(
+            &mut self, payload: &str, on_text: &mut dyn FnMut(&str),
+            on_reasoning: &mut dyn FnMut(crate::ReasoningKind, &str),
+        ) -> Result<bool, HarnessError> {
+            self.push_payload_with_reasoning(payload, on_text, on_reasoning)
+        }
+
         fn complete(&self) -> bool {
             self.is_complete()
         }
@@ -338,6 +405,14 @@ mod client {
 
     impl ModelProvider for OpenAiResponses {
         fn chat(&self, request: &ChatRequest, on_text: &mut dyn FnMut(&str), cancel: &AtomicBool) -> Result<Reply, HarnessError> {
+            self.chat_with_reasoning(request, on_text, &mut |_, _| {}, cancel)
+        }
+
+        fn chat_with_reasoning(
+            &self, request: &ChatRequest, on_text: &mut dyn FnMut(&str),
+            on_reasoning: &mut dyn FnMut(crate::ReasoningKind, &str),
+            cancel: &AtomicBool,
+        ) -> Result<Reply, HarnessError> {
             let body = super::super::budget::encode(&self.profile, request, build_request_body)?;
             let mut headers = vec![
                 ("Content-Type".to_string(), "application/json".to_string()),
@@ -349,7 +424,7 @@ mod client {
             }
             let call = Call { url: endpoint_url(&self.profile.base_url), headers: http::merge_headers(headers, &self.profile.extra_headers), body };
             let mut decoder = ResponsesStream::default();
-            http::post_stream(&self.client, call, &mut decoder, on_text, cancel)?;
+            http::post_stream_with_reasoning(&self.client, call, &mut decoder, on_text, on_reasoning, cancel)?;
             let mut reply = decoder.finish();
             super::super::wire::bind_state(&mut reply.message, &self.profile);
             Ok(reply)

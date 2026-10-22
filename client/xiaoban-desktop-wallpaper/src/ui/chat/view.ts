@@ -32,6 +32,12 @@ export function itemsFromHistory(view: SessionView, messages: WireMessage[]): Ch
       const files = attachmentCards(message.structured_content);
       if (text || images.length || files.length) items.push({ kind: 'user', id: nextId(view), text, images, ...(files.length ? { files } : {}) });
     } else if (message.role === 'assistant') {
+      for (const segment of message.reasoning ?? []) {
+        if (segment.text.trim()) items.push({
+          kind: 'reasoning', id: nextId(view), text: segment.text,
+          reasoningKind: segment.kind, streaming: false,
+        });
+      }
       const text = textOf(message);
       if (text.trim()) items.push({ kind: 'assistant', id: nextId(view), text, streaming: false });
       for (const call of message.tool_calls ?? []) {
@@ -53,7 +59,7 @@ export function itemsFromHistory(view: SessionView, messages: WireMessage[]): Ch
 const TURN_LIMIT = /stopped after reaching the turn limit/;
 
 function endStreaming(view: SessionView) {
-  for (const item of view.items) if (item.kind === 'assistant' && item.streaming) item.streaming = false;
+  for (const item of view.items) if ((item.kind === 'assistant' || item.kind === 'reasoning') && item.streaming) item.streaming = false;
 }
 
 /** Compatibility with hosts that reported a cutoff before attempting automatic recovery. */
@@ -74,8 +80,25 @@ function settle(view: SessionView) {
 /** Folds one event of a running answer into the conversation shown. */
 export function applyEvent(view: SessionView, event: KernelEvent): void {
   switch (event.type) {
+    case 'reasoning_delta': {
+      if (!event.text) break;
+      view.status = '';
+      const last = view.items[view.items.length - 1];
+      if (last?.kind === 'reasoning' && last.streaming && last.reasoningKind === event.kind) {
+        last.text += event.text;
+      } else {
+        endStreaming(view);
+        view.items.push({
+          kind: 'reasoning', id: nextId(view), reasoningKind: event.kind,
+          text: event.text, streaming: true,
+        });
+      }
+      break;
+    }
     case 'text_delta': {
       view.status = '';
+      const current = view.items[view.items.length - 1];
+      if (current?.kind === 'reasoning') endStreaming(view);
       const last = view.items[view.items.length - 1];
       if (last?.kind === 'assistant' && last.streaming) last.text += event.text;
       else view.items.push({ kind: 'assistant', id: nextId(view), text: event.text, streaming: true });
@@ -122,7 +145,7 @@ export function applyEvent(view: SessionView, event: KernelEvent): void {
       break;
     case 'error': {
       const lastUser = view.items.map(i => i.kind).lastIndexOf('user');
-      const partial = view.items.slice(lastUser + 1).some(i => i.kind === 'tool' || i.kind === 'assistant');
+      const partial = view.items.slice(lastUser + 1).some(i => i.kind === 'tool' || i.kind === 'assistant' || i.kind === 'reasoning');
       settle(view);
       if (/^run budget exceeded:/.test(event.message)) {
         view.items.push({ kind: 'notice', id: nextId(view), tone: 'warning', text: '本轮操作次数已达到上限，已暂停。点“继续”可以从已保存的进展接着处理。', canContinue: true, details: event.message });

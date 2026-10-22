@@ -35,6 +35,19 @@ impl Decoder for ChatDecoder {
         Ok(false)
     }
 
+    fn push_with_reasoning(
+        &mut self, payload: &str, on_text: &mut dyn FnMut(&str),
+        on_reasoning: &mut dyn FnMut(crate::ReasoningKind, &str),
+    ) -> Result<bool, HarnessError> {
+        if payload.trim() == "[DONE]" {
+            self.0.mark_done();
+            return Ok(true);
+        }
+        let chunk = serde_json::from_str(payload).map_err(|e| HarnessError::provider(format!("bad stream chunk: {e}"), false))?;
+        self.0.push_with_reasoning(&chunk, on_text, on_reasoning)?;
+        Ok(false)
+    }
+
     fn complete(&self) -> bool {
         self.0.is_finished()
     }
@@ -45,6 +58,16 @@ impl ModelProvider for OpenAiCompat {
         &self,
         request: &ChatRequest,
         on_text: &mut dyn FnMut(&str),
+        cancel: &AtomicBool,
+    ) -> Result<Reply, HarnessError> {
+        self.chat_with_reasoning(request, on_text, &mut |_, _| {}, cancel)
+    }
+
+    fn chat_with_reasoning(
+        &self,
+        request: &ChatRequest,
+        on_text: &mut dyn FnMut(&str),
+        on_reasoning: &mut dyn FnMut(crate::ReasoningKind, &str),
         cancel: &AtomicBool,
     ) -> Result<Reply, HarnessError> {
         let body = super::budget::encode(&self.profile, request, build_request_body)?;
@@ -62,7 +85,7 @@ impl ModelProvider for OpenAiCompat {
             body,
         };
         let mut decoder = ChatDecoder::default();
-        http::post_stream(&self.client, call, &mut decoder, on_text, cancel)?;
+        http::post_stream_with_reasoning(&self.client, call, &mut decoder, on_text, on_reasoning, cancel)?;
         let mut reply = decoder.0.finish();
         super::wire::bind_state(&mut reply.message, &self.profile);
         Ok(reply)

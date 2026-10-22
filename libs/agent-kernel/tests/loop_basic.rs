@@ -31,6 +31,45 @@ fn plain_reply_streams_text_and_persists_history() {
 }
 
 #[test]
+fn kernel_streams_and_persists_model_exposed_reasoning_without_polluting_answer() {
+    struct SummaryProvider;
+    impl ModelProvider for SummaryProvider {
+        fn chat(&self, request: &ChatRequest, on_text: &mut dyn FnMut(&str), cancel: &AtomicBool)
+            -> Result<Reply, HarnessError>
+        {
+            self.chat_with_reasoning(request, on_text, &mut |_, _| {}, cancel)
+        }
+
+        fn chat_with_reasoning(&self, _request: &ChatRequest, on_text: &mut dyn FnMut(&str),
+            on_reasoning: &mut dyn FnMut(ReasoningKind, &str), _cancel: &AtomicBool)
+            -> Result<Reply, HarnessError>
+        {
+            on_reasoning(ReasoningKind::Summary, "检查问题");
+            on_reasoning(ReasoningKind::Summary, "，给出答案");
+            on_text("最终答案");
+            Ok(Reply { message: Message::assistant("最终答案", vec![]), usage: None, finish: FinishReason::Stop })
+        }
+    }
+    let store = Arc::new(MemoryStore::new());
+    let agent = Agent::builder(Arc::new(SummaryProvider), store.clone()).build().unwrap();
+    let mut events = Vec::new();
+    let summary = agent.run("reasoning-1", "请回答", &mut |e| events.push(e),
+        &Arc::new(AtomicBool::new(false))).unwrap();
+    assert_eq!(summary.text, "最终答案");
+    assert_eq!(&events[..3], &[
+        Event::ReasoningDelta { kind: ReasoningKind::Summary, text: "检查问题".into() },
+        Event::ReasoningDelta { kind: ReasoningKind::Summary, text: "，给出答案".into() },
+        Event::TextDelta { text: "最终答案".into() },
+    ]);
+    let history = store.load("reasoning-1").unwrap();
+    let answer = history.iter().find(|m| m.role == Role::Assistant).unwrap();
+    assert_eq!(answer.text(), "最终答案");
+    assert_eq!(answer.reasoning, vec![ReasoningSegment {
+        kind: ReasoningKind::Summary, text: "检查问题，给出答案".into(),
+    }]);
+}
+
+#[test]
 fn tool_round_trip_feeds_result_back() {
     let echo = FnTool::new(spec("echo"), |args, _| Ok(format!("got {}", args["x"])));
     let steps = vec![Step::tool_call("c1", "echo", r#"{"x":1}"#), Step::text("done")];

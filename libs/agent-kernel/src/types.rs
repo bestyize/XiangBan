@@ -20,6 +20,17 @@ pub enum Part {
     Image { url: String },
 }
 
+/// Only provider-exposed displayable reasoning; opaque continuation state stays in provider_state.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ReasoningKind { Summary, Text }
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ReasoningSegment {
+    pub kind: ReasoningKind,
+    pub text: String,
+}
+
 /// `arguments` stays the raw JSON string from the model so history round-trips exactly.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ToolCall {
@@ -58,11 +69,14 @@ pub struct Message {
     /// Opaque protocol continuation state. It is persisted, but is not visible assistant text.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub provider_state: Option<serde_json::Value>,
+    /// Persist only text the endpoint explicitly exposed for display, never opaque reasoning items.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub reasoning: Vec<ReasoningSegment>,
 }
 
 impl Message {
     fn with(role: Role, parts: Vec<Part>) -> Self {
-        Self { role, parts, tool_calls: Vec::new(), tool_call_id: None, synthetic: false, is_error: false, structured_content: None, context_summary: None, provider_state: None }
+        Self { role, parts, tool_calls: Vec::new(), tool_call_id: None, synthetic: false, is_error: false, structured_content: None, context_summary: None, provider_state: None, reasoning: Vec::new() }
     }
 
     /// A user-role message from the harness itself (see `synthetic`).
@@ -170,6 +184,7 @@ impl AddAssign for Usage {
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum Event {
     TextDelta { text: String },
+    ReasoningDelta { kind: ReasoningKind, text: String },
     ToolStart { id: String, name: String, arguments: String },
     /// Emitted after validation and approval, immediately before dispatch. Observers may fail
     /// closed at this point. A crash after this event leaves the action's outcome uncertain.
