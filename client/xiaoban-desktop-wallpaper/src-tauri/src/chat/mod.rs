@@ -9,6 +9,8 @@ mod compact;
 mod danger;
 mod desktop_tools;
 mod game_draft;
+mod goals;
+pub use goals::{chat_goal_get, chat_goal_set, chat_goal_start, chat_goal_pause, chat_goal_acknowledge, chat_goal_finish, chat_goal_delete};
 mod prompt;
 mod run_history;
 pub(crate) mod task_outcome;
@@ -127,6 +129,8 @@ pub struct ChatState {
     todo: Arc<Todo>,
     runs: Mutex<HashMap<String, Arc<AtomicBool>>>,
     index: Mutex<Option<Index>>,
+    /// Serializes goal record read/modify/write operations inside this host.
+    goal_io: Mutex<()>,
     /// Conversations whose automatic compaction failed lately.
     auto_compact: compact::AutoCooldown,
     /// Actual schemas from the latest registration, keyed by whether native GUI tools are enabled.
@@ -150,6 +154,7 @@ impl ChatState {
             todo: Arc::new(Todo::new()),
             runs: Mutex::new(HashMap::new()),
             index: Mutex::new(None),
+            goal_io: Mutex::new(()),
             auto_compact: compact::AutoCooldown::default(),
             tool_tokens: Mutex::new(HashMap::new()),
             connectors: Mutex::new(None),
@@ -662,9 +667,10 @@ pub fn chat_send(app: tauri::AppHandle, session_id: String, text: String, images
                             *message = ai_gateway::readable_error(message);
                         }
                     }
-                    run_history::forward(&journal, record, &config_owned.api_key, |channel, payload| {
+                    run_history::forward(&journal, record.clone(), &config_owned.api_key, |channel, payload| {
                         emit(&sender, channel, payload);
                     })?;
+                    goals::observe(&handle, &record).map_err(agent_kernel::HarnessError::Store)?;
                     if terminal { terminal_delivered = true; }
                     Ok(())
                 };
