@@ -34,7 +34,7 @@ async function movePending(){if(moving)return;moving=true;try{while(pending){con
 function down(e:PointerEvent){if(e.button!==0||!actor.value?.hit(e.clientX,e.clientY))return;cancelHover();drag={x:e.screenX,y:e.screenY,grabX:e.clientX/innerWidth,grabY:e.clientY/innerHeight,moved:false};suppress=false;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);}
 function move(e:PointerEvent,commit=false){if(!drag)return;if(Math.hypot(e.screenX-drag.x,e.screenY-drag.y)>5)drag.moved=true;if(drag.moved){suppress=true;pending={grabX:drag.grabX,grabY:drag.grabY,commit};void movePending();}if(commit){drag=undefined;}}
 function click(e:MouseEvent){if(suppress){e.preventDefault();e.stopImmediatePropagation();suppress=false;}else {actor.value?.poke();void invoke('pet_proactive_poke').catch(()=>{});}}
-function menu(){void invoke('manage_pet_instance').catch(e=>error.value=String(e));}
+function menu(){cancelHover();void invoke('manage_pet_instance').catch(e=>error.value=String(e));}
 watch(()=>payload.value?.effect,value=>{if(value)actor.value?.effect(value);},{flush:'post'});
 onMounted(async()=>{
  document.documentElement.style.background='transparent';document.body.className='pet-instance-scene';
@@ -46,7 +46,8 @@ function presence(e:Event){actor.value?.presence((e as CustomEvent<{kind:string}
 function greetingPoke(){actor.value?.poke();}
 onBeforeUnmount(()=>{cancelHover();window.removeEventListener('pet-greeting-poke',greetingPoke);window.removeEventListener('pet-config',config);window.removeEventListener('pet-pointer',pointer);window.removeEventListener('resize',resize);window.removeEventListener('pet-presence',presence);});
 </script>
-<template><div v-if="payload" class="pet-window" :style="{padding:`${8*ratio}px`}" @pointerdown="down" @pointermove="move($event)" @pointerup="move($event,true)" @pointercancel="move($event,true)" @click.capture="click" @contextmenu.prevent="menu"><PetActor ref="actor" :definition="payload.definition" :size="size" :expression="payload.instance.expression" :paused="payload.paused" :fps="payload.fps" :links="payload.links&&payload.instance.links" :interactive="false"/><p v-if="error" class="pet-window-error">{{ error }}</p></div></template>
+<template><div v-if="payload" class="pet-window" :style="{padding:`${8*ratio}px`}" @pointerdown="down" @pointermove="move($event)" @pointerup="move($event,true)" @pointercancel="move($event,true)" @click.capture="click" @contextmenu.prevent.stop="menu"><PetActor ref="actor" :definition="payload.definition" :size="size" :expression="payload.instance.expression" :paused="payload.paused" :fps="payload.fps" :links="payload.links&&payload.instance.links" :interactive="false"/><p v-if="error" class="pet-window-error">{{ error }}</p></div></template>
 <style>
 html:has(body.pet-instance-scene),body.pet-instance-scene,body.pet-instance-scene #app{margin:0;width:100%;height:100%;background:transparent!important;overflow:hidden}.pet-window{position:relative;width:max-content;box-sizing:content-box;cursor:grab;touch-action:none}.pet-window:active{cursor:grabbing}.pet-window-error{position:absolute;bottom:12px;left:12px;right:12px;border-radius:8px;padding:8px;color:#fff;background:#453a33e8;font-size:11px}
 </style>
+

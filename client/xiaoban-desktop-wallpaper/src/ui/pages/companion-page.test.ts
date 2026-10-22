@@ -121,3 +121,15 @@ describe('theme-based desktop pet library',()=>{
   view.unmount();
  });
 });
+
+
+
+it('opens the exact desktop partner settings on a context click',async()=>{
+ const {view}=setup();await flushPromises();await add(view,'daisy');await add(view,'sunflower');
+ const instances=JSON.parse(localStorage.getItem('xiaoban.pets.layout.v1')!).instances;
+ await tab(view,'桌面伙伴');
+ await view.get(`[data-testid="pet-instance-${instances[1].id}"]`).trigger('contextmenu');await flushPromises();
+ expect(body('[data-testid="pet-settings-dialog"]')).not.toBeNull();
+ expect(body('[data-testid="pet-settings-dialog"]')!.textContent).toContain(instances[1].name);
+ view.unmount();
+});

@@ -60,7 +60,7 @@ const calendarRegions=[{label:'未指定 · 不推断法定工作日',value:'non
 const greetingModes=[{label:'安静陪伴 · 最多每天 1 次',value:'quiet'},{label:'自然陪伴 · 最多每天 2 次',value:'natural'},{label:'活泼伙伴 · 最多每天 4 次',value:'lively'}];
 async function loadGreeting(){if(!props.store.desktop)return;try{const result=await invoke<GreetingSettings>('get_proactivity_settings');if(result){greetingSettings.value=result;greetingReady.value=true;}}catch(e){props.store.notify(e,'error');}}
 async function changeGreeting(patch:Partial<GreetingSettings>){if(!greetingReady.value||greetingBusy.value)return;greetingBusy.value=true;try{greetingSettings.value=await invoke<GreetingSettings>('configure_proactivity',{settings:{...greetingSettings.value,...patch}});environment.value=null;props.store.notify('感知与陪伴设置已保存');}catch(e){props.store.notify(e,'error');}finally{greetingBusy.value=false;}}
-function openManage(id:string){editing.value=id;}
+function openManage(id:string){if(!instances.value.some(p=>p.id===id)){props.store.notify('这个伙伴已不在桌面上','info');return;}editing.value=id;}
 async function act(action:()=>Promise<unknown>,success?:string){try{await action();if(success)props.store.notify(success);}catch(e){props.store.notify(e,'error');}}
 const placements=[{value:'topmost' as const,label:'始终置顶',hint:'显示在其他窗口上方，随时陪着你',icon:Pin},{value:'desktop' as const,label:'贴在桌面',hint:'放在桌面上，不遮挡其他窗口',icon:Monitor}];
 function requestAdd(themeId:string,petId:string,name:string){if(ready.value&&!busy.value)adding.value={themeId,petId,name};}
@@ -71,7 +71,7 @@ function saveSettings(patch:PetSettingsPatch){update(patch);}
 function removeCurrent(){const id=current.value?.id;editing.value=null;if(id)void act(()=>client.remove(id));}
 function centerCurrent(){update({x:.5,y:.5});}
 function createFromCurrent(){const theme=currentTheme.value;editing.value=null;create(theme);}
-watch([()=>props.settingsRequest,ready],([request,loaded])=>{if(request&&loaded){openManage(request.id);emit('settingsOpened');}},{immediate:true});
+watch(()=>props.settingsRequest,async request=>{if(!request)return;await client.load();if(props.settingsRequest!==request)return;openManage(request.id);emit('settingsOpened');},{immediate:true});
 function manage(e:Event){const id=(e as CustomEvent<{id:string}>).detail?.id;void client.load().then(()=>{if(id)openManage(id);});}
 onMounted(()=>{void client.load();void loadGreeting();window.addEventListener('pets-manage',manage);});
 onDeactivated(()=>{hover.value='';editing.value=null;adding.value=null;proactivityOpen.value=false;});
@@ -126,7 +126,7 @@ onBeforeUnmount(()=>{client.dispose();window.removeEventListener('pets-manage',m
    <section v-for="group in deskGroups" :key="group.theme?.id??'orphans'" class="pet-theme-detail">
     <header class="th-head"><h2>{{ group.theme?.name??'作品暂不可用' }}</h2><span class="sub">{{ group.items.length }} 只在桌面上</span></header>
     <div class="pet-cards">
-     <article v-for="p in group.items" :key="p.id" class="pc pet-card instance" :class="{off:!p.enabled}" :data-testid="`pet-instance-${p.id}`" @pointerenter="hover=p.id" @pointerleave="hover=''">
+     <article v-for="p in group.items" :key="p.id" class="pc pet-card instance" :class="{off:!p.enabled}" :data-testid="`pet-instance-${p.id}`" @contextmenu.prevent.stop="openManage(p.id)" @pointerenter="hover=p.id" @pointerleave="hover=''">
       <div class="st" :style="{'--theme-color':group.theme?.color}">
        <template v-if="definitionOf(catalog.themes,p)"><PetActor v-if="hover===p.id" :definition="definitionOf(catalog.themes,p)!" :size="150" :expression="p.expression" :links="p.links" :paused="store.settings.paused"/><img v-else :src="petImage(definitionOf(catalog.themes,p)!)" :alt="p.name" width="150" height="150"/></template>
        <span v-else class="gone">作品暂不可用</span>
@@ -167,7 +167,7 @@ onBeforeUnmount(()=>{client.dispose();window.removeEventListener('pets-manage',m
 </section>
 </template>
 <style scoped>
-.pets-page{height:100%;min-height:0;display:flex;flex-direction:column}
+.pets-page{height:100%;min-height:0;min-width:0;display:flex;flex-direction:column;overflow:hidden}
 .pt-toolbar{flex:none;display:flex;align-items:center;gap:10px;padding:16px 28px 0}
 .pt-toolbar .cnt{font-weight:600;color:var(--ui-ink)}
 .pt-tools{margin-left:auto;display:flex;align-items:center;gap:10px}
@@ -227,3 +227,4 @@ onBeforeUnmount(()=>{client.dispose();window.removeEventListener('pets-manage',m
 .pet-context-preview span{flex:1;min-width:200px}
 @media(max-width:1000px){.pet-cards{grid-template-columns:repeat(3,minmax(0,1fr))}}
 </style>
+
