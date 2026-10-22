@@ -1,13 +1,7 @@
 name: Agent Kernel and Chat UI
 
+# Manual only, as every workflow in this repository (see CLAUDE.md).
 on:
-  pull_request:
-    paths:
-      - 'libs/agent-kernel/**'
-      - 'client/xiaoban-desktop-wallpaper/src/ui/chat/**'
-      - 'client/xiaoban-desktop-wallpaper/src/ui/pages/ChatPage.vue'
-      - 'client/xiaoban-desktop-wallpaper/src-tauri/src/ai_reasoning.rs'
-      - '.github/workflows/agent-chat-tests.yml'
   workflow_dispatch:
 
 permissions:

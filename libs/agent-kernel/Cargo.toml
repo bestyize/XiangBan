@@ -55,3 +55,8 @@ panic = "abort"
 [[example]]
 name = "stdio_agent"
 required-features = ["native-tls", "stdio", "fs"]
+
+[[test]]
+name = "os_sandbox"
+harness = false
+required-features = ["shell", "sandbox"]
