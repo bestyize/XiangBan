@@ -22,8 +22,8 @@ impl HarnessError {
     pub fn is_context_limit(&self) -> bool {
         let Self::Provider { message, .. } = self else { return false };
         let lower = message.to_lowercase();
-        ["context_length_exceeded", "context_window_exceeded", "maximum context length", "prompt is too long", "input token count exceeds", "too many input tokens"]
-            .iter().any(|needle| lower.contains(needle))
+        crate::model::recovery::classify_limit_failure(&lower)
+            == crate::model::recovery::LimitFailure::InputContextOverflow
     }
 }
 
@@ -44,3 +44,19 @@ impl fmt::Display for HarnessError {
 }
 
 impl std::error::Error for HarnessError {}
+
+#[cfg(test)]
+mod model_limit_tests {
+    use super::*;
+
+    #[test]
+    fn output_limits_do_not_trigger_context_recovery() {
+        assert!(!HarnessError::provider(
+            "max_tokens exceeds model's maximum output tokens (65536)", false
+        ).is_context_limit());
+        assert!(HarnessError::provider(
+            "context_length_exceeded: input token count exceeds model window", false
+        ).is_context_limit());
+        assert!(!HarnessError::provider("HTTP 400: invalid request", false).is_context_limit());
+    }
+}

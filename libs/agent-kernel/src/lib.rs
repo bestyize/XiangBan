@@ -11,6 +11,7 @@ mod exec;
 pub mod memory;
 mod middleware;
 pub mod provider;
+pub mod model;
 mod run;
 mod runtime;
 #[cfg(feature = "journal")]
