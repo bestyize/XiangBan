@@ -41,13 +41,18 @@ pub fn levels(model: &str, protocol: &str, declared: Option<&[String]>) -> Vec<S
 }
 pub fn supported(_base_url: &str, model: &str, protocol: &str) -> bool { !levels(model, protocol, None).is_empty() }
 pub fn body(protocol: &str, preference: ReplyPreference, levels: &[String]) -> Map<String, Value> {
-    let Some(effort) = preference.effort().filter(|e| levels.iter().any(|v| v == e)) else { return Map::new() };
+    let effort = preference.effort().filter(|e| levels.iter().any(|v| v == e));
     match protocol {
-        // Summary is displayable model output; effort only tunes inference compute.
-        // Keep it opt-in when a supported effort is explicitly selected, as some
-        // compatible gateways reject unfamiliar reasoning.summary fields.
-        "responses" => Map::from_iter([("reasoning".into(), json!({"effort": effort, "summary": "auto"}))]),
-        "chat" => Map::from_iter([("reasoning_effort".into(), json!(effort))]),
+        // Request a public reasoning summary for models whose capability is known,
+        // independently of whether the user adjusted the inference effort.
+        // Unknown-compatible endpoints are not sent an unsupported summary field.
+        "responses" if !levels.is_empty() => {
+            let mut reasoning = json!({"summary": "auto"});
+            if let Some(effort) = effort { reasoning["effort"] = json!(effort); }
+            Map::from_iter([("reasoning".into(), reasoning)])
+        }
+        "chat" => effort.map_or_else(Map::new, |effort|
+            Map::from_iter([("reasoning_effort".into(), json!(effort))])),
         _ => Map::new(),
     }
 }
@@ -63,7 +68,13 @@ mod tests {
                 let wire = body(protocol, ReplyPreference::Max, &levels);
                 assert_eq!(if protocol == "chat" { &wire["reasoning_effort"] } else { &wire["reasoning"]["effort"] }, "max");
                 if protocol == "responses" { assert_eq!(wire["reasoning"]["summary"], "auto"); }
-                assert!(body(protocol, ReplyPreference::Default, &levels).is_empty());
+                let automatic = body(protocol, ReplyPreference::Default, &levels);
+                if protocol == "responses" {
+                    assert_eq!(automatic["reasoning"]["summary"], "auto");
+                    assert!(automatic["reasoning"].get("effort").is_none());
+                } else {
+                    assert!(automatic.is_empty());
+                }
             }
         }
     }
