@@ -13,6 +13,13 @@ use std::collections::HashSet;
 use std::path::Path;
 use std::sync::{Arc, Mutex, OnceLock};
 
+/// "完全信任时允许命令联网" in settings; on by default, since installing dependencies needs it.
+static NETWORK: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(true);
+
+pub fn set_network(allowed: bool) {
+    NETWORK.store(allowed, std::sync::atomic::Ordering::Relaxed);
+}
+
 fn escapes() -> &'static Mutex<HashSet<(String, String)>> {
     static ESCAPES: OnceLock<Mutex<HashSet<(String, String)>>> = OnceLock::new();
     ESCAPES.get_or_init(Default::default)
@@ -37,7 +44,10 @@ fn decide(available: bool, mode: PermissionMode, allowed_once: impl FnOnce() -> 
 
 pub fn hook(permission: Arc<Permission>, workspace: &Path) -> SandboxHook {
     let policy = SandboxPolicy::for_workspace(workspace);
-    SandboxHook::new(move |session, command| decide(sandbox::available(), permission.mode_for(session), || take(session, command), &policy))
+    SandboxHook::new(move |session, command| {
+        let policy = SandboxPolicy { network: NETWORK.load(std::sync::atomic::Ordering::Relaxed), ..policy.clone() };
+        decide(sandbox::available(), permission.mode_for(session), || take(session, command), &policy)
+    })
 }
 
 #[cfg(test)]

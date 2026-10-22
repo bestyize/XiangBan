@@ -3,6 +3,7 @@
 //! Everything the assistant says, asks or runs is sent to the control window and the floating assistant's
 //! window only (one `emit_filter`): wallpaper pages run content from outside and must not see a chat.
 
+mod agent_settings;
 mod broker;
 mod checkpoints;
 mod community;
@@ -227,6 +228,9 @@ fn risk_name(risk: Risk) -> &'static str {
 }
 
 fn ask_approval(app: &tauri::AppHandle, broker: &Broker, request: &ApprovalRequest<'_>) -> Approval {
+    // Skill changes, flagged calls and commands without a kind to remember are asked every time,
+    // so "always" would only mislead.
+    let can_remember = (request.risk != Risk::Exec || request.remember_as.is_some()) && request.tool != "skill_manage" && request.danger.is_none();
     // In full trust a tainted conversation is not asked because of the taint, so the card must not say it is.
     let tainted_by_policy = request.tainted && app.state::<ChatState>().permission.mode_for(request.session) != PermissionMode::Auto;
     let (id, rx) = broker.open_approval(request.session);
@@ -237,14 +241,22 @@ fn ask_approval(app: &tauri::AppHandle, broker: &Broker, request: &ApprovalReque
         json!({
             "id": id, "session": request.session, "tool": request.tool, "risk": risk_name(request.risk),
             "arguments": shorten(request.arguments, 0), "tainted": tainted_by_policy, "danger": request.danger,
-            // Skill changes, flagged calls and commands without a kind to remember are asked every time,
-            // so "always" would only mislead.
-            "canRemember": (request.risk != Risk::Exec || request.remember_as.is_some()) && request.tool != "skill_manage" && request.danger.is_none(),
+            "canRemember": can_remember,
             "rememberAs": request.remember_as,
         }),
     );
     let decision = request.wait_for(&rx).unwrap_or(Approval::Deny);
     broker.close_approval(&id);
+    // Kept on disk so "这段对话都允许" still holds after the app restarts.
+    if decision == Approval::Always && can_remember {
+        if let Ok(dirs) = Dirs::of(app) {
+            let mut settings = agent_settings::load(&dirs.chat);
+            let grant = agent_settings::Grant { tool: request.tool.to_string(), kind: request.remember_as.map(str::to_string) };
+            if settings.add_grant(request.session, grant) {
+                let _ = agent_settings::save(&dirs.chat, &settings);
+            }
+        }
+    }
     // A flagged command the user allowed is meant as written, usually outside the working folder: run it once
     // outside the full-trust sandbox, or the approval would change nothing.
     if decision == Approval::Once && request.danger.is_some() && matches!(request.tool, "shell" | "process_start") {
@@ -732,6 +744,13 @@ pub(crate) fn send(app: tauri::AppHandle, session_id: String, text: String, imag
 
     let perm_mode = if summary.permission_mode == "auto" { PermissionMode::Auto } else { PermissionMode::Ask };
     state.permission.set_session_mode(&summary.id, perm_mode);
+    {
+        let settings = agent_settings::load(&Dirs::of(&app)?.chat);
+        sandbox_gate::set_network(settings.sandbox_network);
+        for grant in settings.grants.get(&summary.id).into_iter().flatten() {
+            state.permission.grant(&summary.id, &grant.tool, grant.kind.as_deref());
+        }
+    }
     *lock(&state.workspace) = Some(workspace.clone());
 
     let history_dir = Dirs::of(&app)?.sessions();
@@ -1039,6 +1058,11 @@ pub fn chat_delete_session(app: tauri::AppHandle, window: tauri::WebviewWindow, 
         let _ = manager.forget_session(&session_id);
     }
     state.permission.forget_session(&session_id);
+    let chat_dir = Dirs::of(&app)?.chat;
+    let mut settings = agent_settings::load(&chat_dir);
+    if settings.forget_session(&session_id) {
+        let _ = agent_settings::save(&chat_dir, &settings);
+    }
     state.todo.clear_session(&session_id);
     state.auto_compact.forget(&session_id);
     mutate(&app, |index| {
@@ -1232,6 +1256,72 @@ pub fn chat_delete_group(app: tauri::AppHandle, window: tauri::WebviewWindow, gr
     chat_window(&window)?;
     checked_group_id(&group_id)?;
     mutate(&app, |index| index.delete_group(&group_id).map(|()| index.library()))?
+}
+
+/// The "安全与权限" settings page: sandbox state, the hooks file and the saved "always allow" answers.
+#[tauri::command]
+pub fn chat_agent_settings(app: tauri::AppHandle, window: tauri::WebviewWindow) -> Result<Value, String> {
+    if window.label() != "control" { return Err("只能在设置里查看".into()); }
+    let dirs = Dirs::of(&app)?;
+    let settings = agent_settings::load(&dirs.chat);
+    let titles: HashMap<String, String> = mutate(&app, |index| index.list())?.into_iter().map(|s| (s.id.clone(), s.title.clone())).collect();
+    let grants: Vec<Value> = settings.grants.iter().flat_map(|(session, list)| {
+        let title = titles.get(session).cloned().unwrap_or_else(|| "已删除的对话".into());
+        list.iter().map(move |g| json!({ "session": session, "title": title, "tool": g.tool, "kind": g.kind }))
+    }).collect();
+    let hooks_file = dirs.chat.join("hooks.json");
+    Ok(json!({
+        "sandboxAvailable": agent_kernel::sandbox::available(),
+        "sandboxNetwork": settings.sandbox_network,
+        "hooks": fs::read_to_string(&hooks_file).unwrap_or_default(),
+        "hooksPath": hooks_file.display().to_string(),
+        "grants": grants,
+    }))
+}
+
+#[tauri::command]
+pub fn chat_set_sandbox_network(app: tauri::AppHandle, window: tauri::WebviewWindow, allowed: bool) -> Result<(), String> {
+    if window.label() != "control" { return Err("只能在设置里修改".into()); }
+    let chat = Dirs::of(&app)?.chat;
+    let mut settings = agent_settings::load(&chat);
+    settings.sandbox_network = allowed;
+    agent_settings::save(&chat, &settings)?;
+    sandbox_gate::set_network(allowed);
+    Ok(())
+}
+
+/// Saves the hooks file after checking it; an empty text removes every hook. Returns how many there are.
+#[tauri::command]
+pub fn chat_save_hooks(app: tauri::AppHandle, window: tauri::WebviewWindow, text: String) -> Result<usize, String> {
+    if window.label() != "control" { return Err("只能在设置里修改".into()); }
+    let count = hooks::validate(&text)?;
+    let chat = Dirs::of(&app)?.chat;
+    fs::create_dir_all(&chat).map_err(|e| e.to_string())?;
+    let file = chat.join("hooks.json");
+    if text.trim().is_empty() {
+        match fs::remove_file(&file) {
+            Err(e) if e.kind() != std::io::ErrorKind::NotFound => return Err(format!("无法删除 hooks 配置：{e}")),
+            _ => return Ok(0),
+        }
+    }
+    let temporary = chat.join("hooks.json.tmp");
+    fs::write(&temporary, &text).map_err(|e| format!("无法保存 hooks 配置：{e}"))?;
+    fs::rename(&temporary, &file).map_err(|e| format!("无法保存 hooks 配置：{e}"))?;
+    Ok(count)
+}
+
+/// Takes back one saved "always allow" answer, on disk and in a conversation that is open now.
+#[tauri::command]
+pub fn chat_revoke_grant(app: tauri::AppHandle, window: tauri::WebviewWindow, session_id: String, tool: String, kind: Option<String>) -> Result<(), String> {
+    if window.label() != "control" { return Err("只能在设置里修改".into()); }
+    checked_session_id(&session_id)?;
+    let chat = Dirs::of(&app)?.chat;
+    let mut settings = agent_settings::load(&chat);
+    let grant = agent_settings::Grant { tool, kind };
+    settings.remove_grant(&session_id, &grant);
+    agent_settings::save(&chat, &settings)?;
+    app.state::<ChatState>().permission.revoke(&session_id, &grant.tool, grant.kind.as_deref());
+    Ok(())
 }
 
 /// The answers of a conversation whose file changes can be undone, newest first.

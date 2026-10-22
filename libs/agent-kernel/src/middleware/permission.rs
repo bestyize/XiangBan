@@ -179,6 +179,25 @@ impl Permission {
         self.session_modes.lock().unwrap_or_else(|e| e.into_inner()).remove(session);
     }
 
+    /// Records an "always" grant, as if the user had answered "always": `kind` is what `remember_exec_as`
+    /// named for a command tool, `None` for any other tool. A host uses it to restore grants it saved, so
+    /// remembering survives a restart; it never applies to flagged, `always_ask` or tainted calls.
+    pub fn grant(&self, session: &str, tool: &str, kind: Option<&str>) {
+        self.always.lock().unwrap_or_else(|e| e.into_inner()).insert(Self::grant_key(session, tool, kind));
+    }
+
+    /// Takes back one grant made by an "always" answer or by `grant`.
+    pub fn revoke(&self, session: &str, tool: &str, kind: Option<&str>) {
+        self.always.lock().unwrap_or_else(|e| e.into_inner()).remove(&Self::grant_key(session, tool, kind));
+    }
+
+    fn grant_key(session: &str, tool: &str, kind: Option<&str>) -> (String, String) {
+        match kind {
+            Some(kind) => (session.to_string(), format!("{tool}\u{0}{kind}")),
+            None => (session.to_string(), tool.to_string()),
+        }
+    }
+
     /// Taint is kept in memory only: after a restart a resumed session starts untainted.
     pub fn is_tainted(&self, session: &str) -> bool {
         self.tainted.lock().unwrap_or_else(|e| e.into_inner()).contains(session)
@@ -207,10 +226,7 @@ impl Middleware for Permission {
             _ => None,
         };
         let sticky = (spec.risk == Risk::Exec && exec_key.is_none()) || spec.always_ask || danger.is_some();
-        let key = match &exec_key {
-            Some(kind) => (session.to_string(), format!("{name}\u{0}{kind}")),
-            None => (session.to_string(), name.to_string()),
-        };
+        let key = Self::grant_key(session, name, exec_key.as_deref());
         let needs_ask = if self.danger.is_some() && mode == PermissionMode::Auto {
             danger.is_some()
         } else if spec.always_ask {
