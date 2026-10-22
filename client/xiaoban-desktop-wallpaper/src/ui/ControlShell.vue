@@ -505,9 +505,13 @@ const fixedPages = ['new-task', 'chat', 'ai-store', 'library', 'studio', 'games'
 .control-app.is-mac.is-collapsed{--ui-sidebar-collapsed:88px}
 .is-mac .sidebar-top{padding-left:68px}
 .is-mac.is-collapsed .sidebar-top{height:72px;padding-left:0;align-items:flex-end}
-.is-win .window-drag{height:34px}
-.is-win .control-main{margin-top:34px}
-.is-win .sidebar-top{height:34px;margin-bottom:6px}
+/* Keep Windows caption controls inside the content panel, without a separate title strip. */
+.is-win .control-main{margin-top:8px;padding-top:26px}
+.is-win .sidebar-top{height:48px}
+.is-win .window-drag{top:8px;left:var(--ui-sidebar-width);right:122px;height:26px}
+.is-win.is-collapsed .window-drag{left:var(--ui-sidebar-collapsed)}
+.is-win .window-controls{top:8px;right:8px;height:26px;overflow:hidden;border-top-right-radius:12px}
+.is-win .window-controls button{width:38px;height:26px}
 .window-controls{position:absolute;top:0;right:0;z-index:21;display:flex;height:34px}
 .window-controls button{width:46px;height:34px;border:0;padding:0;background:transparent;color:var(--ui-text-secondary);display:grid;place-items:center;cursor:default}
 .window-controls button:hover{background:var(--ui-surface-hover);color:var(--ui-text-primary)}
