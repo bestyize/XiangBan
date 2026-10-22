@@ -13,6 +13,7 @@ mod middleware;
 pub mod provider;
 pub mod model;
 pub mod goals;
+pub mod supervisor;
 #[cfg(feature = "journal")]
 pub mod recovery;
 mod run;
