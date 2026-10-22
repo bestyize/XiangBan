@@ -32,6 +32,7 @@ use agent_kernel::model::TokenBudget;
 use agent_kernel::skills::Skills;
 use agent_kernel::{Agent, Approval, ApprovalRequest, ContextTrim, ContinueGuard, JsonlStore, RepeatGuard, Message, ModelProvider, Part, Permission, PermissionMode, Risk, RunOptions, RunEventBody, SessionStore, SpillOutput, ToolCtx};
 use agent_kernel::journal::JsonlRunLog;
+use agent_kernel::supervisor::SessionLease;
 use agent_learning::LearningDb;
 use agent_skill_discovery::SkillDiscovery;
 use broker::Broker;
@@ -128,6 +129,8 @@ pub struct ChatState {
     workspace: Arc<Mutex<Option<PathBuf>>>,
     todo: Arc<Todo>,
     runs: Mutex<HashMap<String, Arc<AtomicBool>>>,
+    /// Held for every active model/tool run, independent of whether its window is open.
+    leases: Mutex<HashMap<String, SessionLease>>,
     index: Mutex<Option<Index>>,
     /// Serializes goal record read/modify/write operations inside this host.
     goal_io: Mutex<()>,
@@ -153,6 +156,7 @@ impl ChatState {
             workspace,
             todo: Arc::new(Todo::new()),
             runs: Mutex::new(HashMap::new()),
+            leases: Mutex::new(HashMap::new()),
             index: Mutex::new(None),
             goal_io: Mutex::new(()),
             auto_compact: compact::AutoCooldown::default(),
@@ -251,6 +255,7 @@ impl Dirs {
     }
     fn sessions(&self) -> PathBuf { self.chat.join("sessions") }
     fn runs(&self) -> PathBuf { self.chat.join("runs") }
+    fn leases(&self) -> PathBuf { self.chat.join("leases") }
     fn outcomes(&self) -> PathBuf { self.chat.join("outcomes") }
     fn learning_db(&self) -> PathBuf { self.chat.join("agent-learning.sqlite") }
     fn spill(&self) -> PathBuf { self.chat.join("spill") }
@@ -489,6 +494,7 @@ fn list(app: &tauri::AppHandle) -> Result<Vec<SessionSummary>, String> {
 fn finish_run(app: &tauri::AppHandle, session: &str) {
     let state = app.state::<ChatState>();
     lock(&state.runs).remove(session);
+    lock(&state.leases).remove(session);
     state.broker.drop_session(session);
     if let Ok(sessions) = mutate(app, |index| {
         index.touch(session, now().0);
@@ -608,6 +614,8 @@ pub fn chat_send(app: tauri::AppHandle, session_id: String, text: String, images
     {
         let mut runs = lock(&state.runs);
         if runs.contains_key(&summary.id) { return Err("这个对话还在回答或正在压缩，请等它结束或先停止".into()); }
+        let lease = SessionLease::acquire(Dirs::of(&app)?.leases(), &summary.id)?;
+        lock(&state.leases).insert(summary.id.clone(), lease);
         runs.insert(summary.id.clone(), cancel.clone());
     }
     let mut inputs = attachments;
@@ -617,7 +625,7 @@ pub fn chat_send(app: tauri::AppHandle, session_id: String, text: String, images
     }
     let saved = match attachment_store.import(&session_id, &inputs) {
         Ok(saved) => saved,
-        Err(error) => { lock(&state.runs).remove(&session_id); return Err(error); }
+        Err(error) => { lock(&state.runs).remove(&session_id); lock(&state.leases).remove(&session_id); return Err(error); }
     };
     let saved_for_thread = saved.clone();
 
@@ -726,6 +734,7 @@ pub fn chat_send(app: tauri::AppHandle, session_id: String, text: String, images
     if let Err(error) = started {
         AttachmentStore::new(Dirs::of(&app)?.chat.join("attachments")).rollback(&saved);
         lock(&state.runs).remove(&summary.id);
+        lock(&state.leases).remove(&summary.id);
         return Err(format!("无法开始回答：{error}"));
     }
     Ok(summary)
@@ -866,8 +875,8 @@ pub fn chat_delete_session(app: tauri::AppHandle, session_id: String) -> Result<
         return Err("对话编号不对".into());
     }
     let state = app.state::<ChatState>();
-    if lock(&state.runs).contains_key(&session_id) {
-        return Err("这个对话还在回答，请先停止再删除".into());
+    if lock(&state.runs).contains_key(&session_id) || SessionLease::held(Dirs::of(&app)?.leases(), &session_id)? {
+        return Err("这个对话正在其他实例或当前窗口中运行，请先停止再删除".into());
     }
     JsonlStore::new(Dirs::of(&app)?.sessions()).remove(&session_id).map_err(|e| e.to_string())?;
     AttachmentStore::new(Dirs::of(&app)?.chat.join("attachments")).remove_session(&session_id)?;
@@ -878,6 +887,7 @@ pub fn chat_delete_session(app: tauri::AppHandle, session_id: String) -> Result<
         }
     }
     let _ = fs::remove_dir_all(Dirs::of(&app)?.outcomes().join(&session_id));
+    { let _write = lock(&state.goal_io); agent_kernel::goals::GoalStore::new(Dirs::of(&app)?.chat.join("goals")).delete(&session_id)?; }
     state.permission.forget_session(&session_id);
     state.todo.clear_session(&session_id);
     state.auto_compact.forget(&session_id);
