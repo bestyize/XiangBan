@@ -32,7 +32,7 @@ pub fn model_max_output_tokens(model: &str) -> u32 {
     ];
     let normalized = model.to_ascii_lowercase().replace('.', "-");
     KNOWN.iter()
-        .filter(|(prefix, _)| normalized.contains(prefix))
+        .filter(|(prefix, _)| normalized.contains(*prefix))
         .max_by_key(|(prefix, _)| prefix.len())
         .map_or(DEFAULT_MAX_TOKENS, |(_, limit)| *limit)
 }
