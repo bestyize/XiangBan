@@ -303,3 +303,27 @@ it('restores a file-only message from saved attachment metadata', () => {
   expect(items).toHaveLength(1);
   expect(items[0]).toMatchObject({kind:'user',text:'',images:[],files:[{name:'报告.pdf',size:200}]});
 });
+
+describe('the tokens of an answer', () => {
+  it('adds every model call, research helpers included, and puts the total on the last reply', () => {
+    const view = newView('s1', true);
+    view.items.push({ kind: 'user', id: 'u1', text: '做个游戏', images: [] });
+    applyEvent(view, { type: 'text_delta', text: '先看看' });
+    applyEvent(view, { type: 'usage', prompt_tokens: 12_000, completion_tokens: 300 });
+    applyEvent(view, { type: 'usage', prompt_tokens: 3_000, completion_tokens: 200 });
+    applyEvent(view, { type: 'text_delta', text: '好了' });
+    applyEvent(view, { type: 'usage', prompt_tokens: 13_000, completion_tokens: 500 });
+    applyEvent(view, { type: 'done' });
+    const replies = view.items.filter(i => i.kind === 'assistant');
+    expect(replies.at(-1)).toMatchObject({ usage: { prompt: 28_000, completion: 1_000 } });
+    expect(view.usage).toBeUndefined();
+  });
+
+  it('starts again for the next answer and leaves an answer without usage alone', () => {
+    const view = newView('s1', true);
+    view.items.push({ kind: 'user', id: 'u1', text: '你好', images: [] });
+    applyEvent(view, { type: 'text_delta', text: '你好' });
+    applyEvent(view, { type: 'done' });
+    expect(view.items.at(-1)).not.toHaveProperty('usage');
+  });
+});

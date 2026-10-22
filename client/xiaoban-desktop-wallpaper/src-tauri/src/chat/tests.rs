@@ -185,6 +185,7 @@ fn build_rig(tag: &str, steps: Vec<Step>, answer: Approval, computer_use: bool) 
         budget: TokenBudget::resolve(ai_config::DEFAULT_CONTEXT_TOKENS, None),
         processes: None,
         mid_run: None,
+        research_events: None,
     })
     .expect("the tool set assembles");
     Rig { _dir: dir, workspace, dirs, desktop, asked, provider, agent, todo }
@@ -389,6 +390,7 @@ fn the_folder_for_saved_output_can_be_read_but_not_written() {
         budget: TokenBudget::resolve(ai_config::DEFAULT_CONTEXT_TOKENS, None),
         processes: None,
         mid_run: None,
+        research_events: None,
         })
         .unwrap()
     };
@@ -573,6 +575,7 @@ fn in_auto_mode_all_write_tools_run_without_asking() {
         budget: TokenBudget::resolve(ai_config::DEFAULT_CONTEXT_TOKENS, None),
         processes: None,
         mid_run: None,
+        research_events: None,
     }).unwrap();
 
     let mut events = Vec::new();
@@ -616,6 +619,7 @@ fn trusted_rig(tag: &str, steps: Vec<Step>) -> (Rig, Arc<Mutex<Vec<(String, Opti
         budget: TokenBudget::resolve(ai_config::DEFAULT_CONTEXT_TOKENS, None),
         processes: None,
         mid_run: None,
+        research_events: None,
     })
     .unwrap();
     let rig = Rig { _dir: dir, workspace, dirs, desktop, asked: Arc::default(), provider, agent, todo };
@@ -837,6 +841,7 @@ fn the_context_size_from_settings_is_what_the_agent_trims_to() {
         budget: TokenBudget::resolve(32_000, None),
         processes: None,
         mid_run: None,
+        research_events: None,
         })
         .unwrap();
         let file = JsonlStore::new(dirs.sessions());
@@ -959,6 +964,7 @@ fn background_process_tools_are_registered_and_asked_like_the_shell() {
         budget: TokenBudget::resolve(ai_config::DEFAULT_CONTEXT_TOKENS, None),
         processes: Some(manager.clone()),
         mid_run: None,
+        research_events: None,
     })
     .unwrap();
     let names: Vec<String> = agent.tool_schemas().iter().map(|t| t.name.clone()).collect();

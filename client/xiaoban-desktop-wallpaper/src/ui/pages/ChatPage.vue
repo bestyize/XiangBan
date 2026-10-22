@@ -21,7 +21,7 @@ import MarkdownView from '../chat/MarkdownView.ts';
 import SelectionCopyMenu from '../chat/SelectionCopyMenu.vue';
 import { ATTACHMENT_ACCEPT, MAX_ATTACHMENTS, MAX_TOTAL_BYTES, attachmentBytes, attachmentImage, attachmentName, readAttachment, type PendingAttachment } from '../chat/attachments.ts';
 import { CONTINUE_TEXT } from '../chat/chat-store.ts';
-import { approvalPreview, formatAgo, isImeEnter, isNearBottom, riskVerb, toolLabel } from '../chat/format.ts';
+import { approvalPreview, formatAgo, formatTokens, isImeEnter, isNearBottom, riskVerb, toolLabel } from '../chat/format.ts';
 import { replyBlocks } from '../chat/replies.ts';
 import { listRows, type ListRow } from '../chat/groups.ts';
 import type { ApprovalDecision, ApprovalRequest, ChatGroup, QuestionRequest, SessionSummary } from '../chat/types.ts';
@@ -482,6 +482,7 @@ async function openLink(href: string) {
                   <button v-if="store.speech && !item.streaming && item.text.trim()" type="button" class="link speech-button" :disabled="!store.desktop" :aria-label="store.speech.currentKey === item.id ? '停止朗读' : '朗读回复'" data-testid="chat-read-reply" @click="store.speech.currentKey === item.id ? store.speech.stop() : store.speech.speak(item.text, item.id)">
                     <Volume2 :size="14" />{{ store.speech.currentKey === item.id ? (store.speech.status === 'synthesizing' ? '取消合成' : '停止朗读') : '朗读' }}
                   </button>
+                  <small v-if="item.usage && !item.streaming" class="usage" data-testid="msg-usage" title="这一轮所有模型调用的合计，输入含重复发送的上下文与缓存">用量：输入 {{ formatTokens(item.usage.prompt) }} · 输出 {{ formatTokens(item.usage.completion) }} tokens</small>
                 </div>
               </div>
               <div v-else-if="item.kind === 'notice'" class="notice" :class="item.tone" :data-testid="`notice-${item.tone}`" :role="item.tone === 'error' ? 'alert' : 'status'">
@@ -646,6 +647,7 @@ async function openLink(href: string) {
 .cursor{display:inline-block;width:7px;height:15px;background:var(--ui-primary);border-radius:2px;margin-left:2px;vertical-align:text-bottom;animation:blink 1s steps(2,start) infinite}
 @keyframes blink{to{visibility:hidden}}
 .preview{margin:4px 0 0;padding:9px 11px;background:var(--ui-surface-alt);border-radius:8px;overflow:auto;max-height:260px;font-size:12px;line-height:1.6;white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-word;font-family:ui-monospace,Menlo,Consolas,monospace}
+.usage{display:block;margin-top:4px;font-size:11px;color:var(--ui-text-secondary)}
 .notice{margin-left:40px;font-size:13px;padding:8px 12px;border-radius:10px;background:var(--ui-surface-alt);color:var(--ui-text-secondary);display:flex;gap:12px;align-items:center}
 .notice{flex-wrap:wrap}
 .undo-warning{color:var(--ui-text-secondary)}

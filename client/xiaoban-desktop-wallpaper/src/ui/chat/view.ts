@@ -75,6 +75,12 @@ function clearRecoveredCutoff(view: SessionView) {
 
 function settle(view: SessionView) {
   endStreaming(view);
+  if (view.usage) {
+    const lastUser = view.items.map(i => i.kind).lastIndexOf('user');
+    const reply = view.items.slice(lastUser + 1).reverse().find(i => i.kind === 'assistant');
+    if (reply?.kind === 'assistant') reply.usage = view.usage;
+    view.usage = undefined;
+  }
   for (const item of view.items) if (item.kind === 'tool' && item.status === 'running') { item.status = 'error'; item.output = item.output || '已中断'; }
   view.running = false;
   view.approvals = [];
@@ -176,6 +182,8 @@ export function applyEvent(view: SessionView, event: KernelEvent): void {
       break;
     }
     case 'usage':
+      // One per model call: the answer's total is their sum, research helpers' calls included.
+      view.usage = { prompt: (view.usage?.prompt ?? 0) + event.prompt_tokens, completion: (view.usage?.completion ?? 0) + event.completion_tokens };
       break;
   }
 }
