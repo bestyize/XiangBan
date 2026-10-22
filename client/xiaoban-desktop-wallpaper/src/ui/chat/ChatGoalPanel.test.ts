@@ -3,7 +3,7 @@ import { flushPromises, mount } from '@vue/test-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import ChatGoalPanel from './ChatGoalPanel.vue';
 
-vi.mock('../../bridge.ts', () => ({ invoke: vi.fn() }));
+vi.mock('../../bridge.ts', () => ({ invoke: vi.fn(), listen: vi.fn(async () => () => {}) }));
 import { invoke } from '../../bridge.ts';
 
 const baseProps = {
