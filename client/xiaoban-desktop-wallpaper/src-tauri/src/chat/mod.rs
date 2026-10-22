@@ -149,6 +149,9 @@ pub struct ChatState {
     /// Background processes (dev servers, long builds) for the current working folder; kept across answers so a
     /// `keep_alive` process outlives the answer that started it.
     processes: Mutex<Option<Arc<ProcessManager>>>,
+    /// The computer-control server, started once and shared by answers while it stays connected, instead of a
+    /// new process for every message.
+    computer_use: Mutex<Option<Arc<agent_kernel::mcp::McpClient>>>,
 }
 
 impl ChatState {
@@ -173,6 +176,7 @@ impl ChatState {
             tool_tokens: Mutex::new(HashMap::new()),
             connectors: Mutex::new(None),
             processes: Mutex::new(None),
+            computer_use: Mutex::new(None),
         }
     }
 }
@@ -533,6 +537,7 @@ fn connector_manager(app: &tauri::AppHandle) -> Result<Arc<agent_connector_tools
 pub fn shutdown_connectors(app:&tauri::AppHandle){
     if let Some(manager)=lock(&app.state::<ChatState>().connectors).as_ref(){manager.shutdown();}
     if let Some(manager)=lock(&app.state::<ChatState>().processes).take(){let _=manager.shutdown();}
+    if let Some(client)=lock(&app.state::<ChatState>().computer_use).take(){client.close();}
 }
 
 /// The process manager for `workspace`. A different folder than last time stops the old folder's processes first,
@@ -558,7 +563,17 @@ fn build_agent(app: &tauri::AppHandle, config: &AiConfig, key_source: Option<Key
         let (app, broker) = (app.clone(), state.broker.clone());
         AskUser::new(move |session, question, ctx| ask_question(&app, &broker, session, question, ctx))
     };
+    if !config.open_computer_use {
+        // Switched off: the shared server is not needed any more.
+        if let Some(client) = lock(&state.computer_use).take() {
+            client.close();
+        }
+    }
     let spawn_computer_use = || {
+        let mut slot = lock(&state.computer_use);
+        if let Some(client) = slot.as_ref().filter(|client| client.is_connected()) {
+            return Ok(client.clone());
+        }
         // Development resources live in the source tree; installed apps use Tauri's resource root.
         #[cfg(debug_assertions)]
         let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("resources/computer-use");
@@ -566,7 +581,9 @@ fn build_agent(app: &tauri::AppHandle, config: &AiConfig, key_source: Option<Key
         let root = app.path().resource_dir()
             .map_err(|e| agent_kernel::HarnessError::Config(format!("无法定位内置电脑控制资源：{e}")))?
             .join("agent-tools/computer-use");
-        agent_computer_use_tools::spawn(&root)
+        let client = agent_computer_use_tools::spawn(&root)?;
+        *slot = Some(client.clone());
+        Ok(client)
     };
     let provider = provider_with(config, key_source)?;
     let mid_run = {
