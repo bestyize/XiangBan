@@ -13,6 +13,7 @@ import ChatNameDialog from '../components/ChatNameDialog.vue';
 import ChatMoveDialog from '../components/ChatMoveDialog.vue';
 import ChatContextRing from '../components/ChatContextRing.vue';
 import ChatActivity from '../chat/ChatActivity.vue';
+import ChatReasoning from '../chat/ChatReasoning.vue';
 import GuideModal from '../components/GuideModal.vue';
 import AsrStatus from '../components/AsrStatus.vue';
 import MarkdownView from '../chat/MarkdownView.ts';
@@ -452,6 +453,10 @@ async function openLink(href: string) {
             <template v-for="block in blocks" :key="block.id">
             <template v-for="item in block.items" :key="item.id">
               <div v-if="item.kind === 'user'" class="msg user" data-testid="msg-user"><div class="bubble"><div v-if="item.images.length" class="bubble-images"><img v-for="(url, n) in item.images" :key="n" :src="url" :alt="`第 ${n + 1} 张图片`" :data-testid="`msg-user-image-${n}`" @click="preview = attachmentImage(url)" /></div><div v-if="item.files?.length" class="file-cards"><span v-for="(file, n) in item.files" :key="n" class="file-chip" :title="file.name">📄 {{ file.name }} · {{ Math.ceil(file.size / 1024) }} KB</span></div><template v-if="item.text">{{ item.text }}</template></div></div>
+              <ChatReasoning
+                v-else-if="item.kind === 'reasoning'"
+                :text="item.text" :reasoning-kind="item.reasoningKind" :streaming="item.streaming"
+              />
               <div v-else-if="item.kind === 'assistant'" class="msg assistant" data-testid="msg-assistant">
                 <Orb class="avatar" :phase="item.streaming ? 'answering' : 'idle'" :active="item.streaming" :size="28" />
                 <div class="answer"><MarkdownView :source="item.text" @open="openLink" /><span v-if="item.streaming" class="cursor" aria-hidden="true"></span>
