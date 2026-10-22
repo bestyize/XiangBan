@@ -38,11 +38,18 @@ describe('wallpaper page interaction',()=>{
  });
 });
 
-describe('wallpaper tabs rendering',()=>{
- it('renders actual Naive tabs and keeps custom subscription UI away',async()=>{
+describe('wallpaper scope rendering',()=>{
+ it('offers 官方 / 我的 / 在线资源 as a segmented control and keeps imports in the header menu',async()=>{
  const store=reactive({desktop:false,settings:JSON.parse(JSON.stringify(defaults)),library:{items:[],source:'https://example.test/catalog.json',activeId:''},applyWallpaper:vi.fn(),notify:vi.fn(),refreshSettings:vi.fn().mockResolvedValue(undefined)} as unknown as ControlStore);
  const wrapper=mount(WallpaperPage,{attachTo:document.body,props:{store},global:{stubs:{NButton:{template:'<button><slot /></button>'},NInput:stub,NSelect:stub,NSlider:stub,NSwitch:stub,NModal:stub,NEmpty:stub,NAlert:stub,NPagination:stub,NCollapse:stub,NCollapseItem:stub,NColorPicker:stub,NSpin:stub}}});
- await flushPromises();expect(wrapper.findAll('.n-tabs-tab__label').map(node=>node.text())).toEqual(['我的壁纸','在线资源']);expect(wrapper.find('h1').exists()).toBe(false);expect(wrapper.find('.desktop-overview').exists()).toBe(false);expect(wrapper.findAll('button').some(button=>button.text()==='订阅与清单')).toBe(false);expect(wrapper.find('[data-testid="import-media"]').exists()).toBe(true);wrapper.unmount();
+ await flushPromises();expect(wrapper.findAll('.xb-seg button').map(node=>node.text())).toEqual(['官方','我的','在线资源']);expect(wrapper.find('h1').exists()).toBe(false);expect(wrapper.find('.n-tabs').exists()).toBe(false);expect(wrapper.find('[data-testid="wallpapers-on-desktop"]').exists()).toBe(true);expect(wrapper.findAll('button').some(button=>button.text()==='订阅与清单')).toBe(false);
+ expect(wrapper.find('[data-testid="import-media"]').exists()).toBe(false);await wrapper.get('[data-testid="wallpapers-import"]').trigger('click');expect(wrapper.find('[data-testid="import-media"]').exists()).toBe(true);wrapper.unmount();
+ });
+ it('shows a use-now button on hover that applies the wallpaper without opening the drawer',async()=>{
+ const apply=vi.fn().mockResolvedValue(undefined);const store=reactive({desktop:false,settings:JSON.parse(JSON.stringify(defaults)),library:{items:[{definition:{id:'a-img',title:'图',kind:'image',version:'1',resource:{url:'',sha256:'',bytes:0,mime:'image/png'}},installed:true,coverUrl:'',source:'builtin'}],source:'',activeId:''},applyWallpaper:apply,notify:vi.fn()} as unknown as ControlStore);
+ const wrapper=mount(WallpaperPage,{attachTo:document.body,props:{store},global:{stubs:{NButton:{template:'<button><slot /></button>'},NInput:stub,NSelect:stub,NSlider:stub,NSwitch:stub,NModal:stub,NEmpty:stub,NAlert:stub,NPagination:stub,NCollapse:stub,NCollapseItem:stub,NColorPicker:stub,NSpin:stub}}});
+ await wrapper.get('[data-testid="wallpaper-use-a-img"]').trigger('click');await flushPromises();expect(apply).toHaveBeenCalledWith('a-img',expect.any(Object),false);
+ await wrapper.get('[data-testid="wallpaper-preview-a-img"]').trigger('click');await flushPromises();expect(wrapper.find('[data-testid="wallpaper-inspector"]').exists()).toBe(true);wrapper.unmount();
  });
 });
 
@@ -50,7 +57,8 @@ describe('wallpaper tabs rendering',()=>{
 it('labels authored HTML as animation and offers a preview without changing the desktop',async()=>{
  const store=reactive({desktop:false,settings:JSON.parse(JSON.stringify(defaults)),library:{items:[{definition:{id:'local-stars',title:'星空',kind:'web',version:'1.0.0',resource:{url:'local://hash',sha256:'',bytes:100,mime:'text/html'}},installed:true,coverUrl:null,previewUrl:'wallpaper-asset://localhost/hash',source:'local'}],source:'',activeId:''},applyWallpaper:vi.fn().mockResolvedValue(undefined),notify:vi.fn()} as unknown as ControlStore);
  const wrapper=mount(WallpaperPage,{props:{store},global:{stubs:{NButton:{template:'<button><slot /></button>'},NInput:stub,NSelect:stub,NSlider:stub,NSwitch:stub,NTabs:stub,NTabPane:stub,NEmpty:stub,NAlert:stub,NPagination:stub,NCollapse:stub,NCollapseItem:stub,NColorPicker:stub,NSpin:stub,NPopconfirm:stub}}});
- expect(wrapper.get('[data-testid="wallpaper-card-local-stars"] .type-badge').text()).toBe('动画');
+ await wrapper.get('[data-testid="wallpaper-scope-mine"]').trigger('click');await flushPromises();
+ expect(wrapper.get('[data-testid="wallpaper-card-local-stars"]').element.closest('.wc')!.querySelector('.wc-type')!.textContent).toBe('动画');
  await wrapper.get('[data-testid="wallpaper-card-local-stars"]').trigger('click');await flushPromises();
  const preview=wrapper.findAll('button').find(button=>button.text()==='独立窗口预览');
  expect(preview).toBeDefined();await preview!.trigger('click');await flushPromises();
@@ -67,11 +75,10 @@ it('spins only on the online tab while a fetch is pending', async () => {
  const spinning = () => String(document.body.querySelector('.n-spin-body') !== null);
  expect(spinning()).toBe('false');
  expect(invoke).not.toHaveBeenCalled();
- const tabs = wrapper.findAll('.n-tabs-tab');
- await tabs[1]!.trigger('click'); await flushPromises();
+ await wrapper.get('[data-testid="wallpaper-scope-online"]').trigger('click'); await flushPromises();
  expect(invoke).toHaveBeenCalledWith('fetch_site_wallpapers', expect.any(Object));
  expect(spinning()).toBe('true');
- await tabs[0]!.trigger('click'); await flushPromises();
+ await wrapper.get('[data-testid="wallpaper-scope-official"]').trigger('click'); await flushPromises();
  expect(spinning()).toBe('false');
  wrapper.unmount();
 });
@@ -84,7 +91,7 @@ it('keeps the online feed when the page is kept alive and navigated away', async
  const host = { components: { WallpaperPage }, setup: () => ({ shown, store }), template: '<KeepAlive><WallpaperPage v-if="shown" :store="store" /></KeepAlive>' };
  const wrapper = mount(host, { global: { stubs: { NButton: { template: '<button><slot /></button>' }, NInput: stub, NSelect: stub, NSlider: stub, NSwitch: stub, NModal: stub, NEmpty: stub, NAlert: stub, NPagination: stub, NCollapse: stub, NCollapseItem: stub, NColorPicker: stub, NPopconfirm: stub } } });
  await flushPromises();
- await wrapper.findAll('.n-tabs-tab')[1]!.trigger('click'); await flushPromises();
+ await wrapper.get('[data-testid="wallpaper-scope-online"]').trigger('click'); await flushPromises();
  const calls = vi.mocked(invoke).mock.calls.length;
  expect(calls).toBeGreaterThan(0);
  shown.value = false; await flushPromises();

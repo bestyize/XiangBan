@@ -21,7 +21,7 @@ describe('replacement widget library',()=>{
   expect(v.get('[data-testid="add-clock"]').attributes('disabled')).toBeUndefined();
   await addWith(v,'clock','desktop');
   expect(JSON.parse(localStorage.getItem('xiaoban.widgets.v2')!).widgets).toHaveLength(13);
-  await v.findAll('.n-tabs-tab').find(t=>t.text().includes('自定义组件'))!.trigger('click');await flushPromises();
+  await v.get('[data-testid="widgets-scope-custom"]').trigger('click');await flushPromises();
   const button=v.get('[data-testid="add-custom-kitty"]');expect(button.attributes('disabled')).toBeUndefined();
   await button.trigger('click');await flushPromises();
   (document.body.querySelector('[data-testid="layer-topmost-kitty"]') as HTMLElement).click();await flushPromises();
@@ -29,15 +29,15 @@ describe('replacement widget library',()=>{
   expect(widgets).toHaveLength(14);expect(widgets[13]).toMatchObject({kind:'custom',customId:'kitty',layer:'topmost'});
   v.unmount();
  });
- it('shows all eight reference cards and import/create buttons in header',async()=>{
+ it('shows all eight gallery cards and import/create buttons in header',async()=>{
   const s=store();
   const v=mount(WidgetsPage,{props:{store:s},attachTo:document.body});
   await flushPromises();
   expect(v.findAll('.xb-widget-slot')).toHaveLength(8);
   for(const old of ['成长小白花','求签','外观样式','已添加']) expect(v.text()).not.toContain(old);
   expect(v.find('[data-testid="widgets-create"]').exists()).toBe(true);
-  expect(v.text()).toContain('导入组件');
-  expect(v.text()).toContain('创作组件');
+  expect(v.text()).toContain('导入');
+  expect(v.text()).toContain('让小伴创作');
   await addWith(v,'clock','desktop');
   expect(JSON.parse(localStorage.getItem('xiaoban.widgets.v2')!).widgets[0]).toMatchObject({kind:'clock',theme:'ivory',layer:'desktop'});
   v.unmount();
@@ -67,12 +67,8 @@ describe('replacement widget library',()=>{
  it('switches to custom category and shows empty state',async()=>{
   const s=store(),v=mount(WidgetsPage,{props:{store:s},attachTo:document.body});
   await flushPromises();
-  expect(v.text()).toContain('官方组件');
-  expect(v.text()).toContain('自定义组件');
-  const tabs=[...v.findAll('.n-tabs-tab')];
-  const customTab=tabs.find(t=>t.text().includes('自定义组件'));
-  expect(customTab).toBeDefined();
-  await customTab!.trigger('click');
+  expect(v.findAll('.add-section .xb-seg button').map(b=>b.text())).toEqual(['官方','我的']);
+  await v.get('[data-testid="widgets-scope-custom"]').trigger('click');
   await flushPromises();
   expect(v.find('[data-testid="custom-empty"]').exists()).toBe(true);
   expect(v.text()).toContain('还没有自定义组件');
@@ -83,6 +79,22 @@ describe('replacement widget library',()=>{
   await flushPromises();
   expect(v.emitted('settingsOpened')).toHaveLength(1);
   expect(s.notify).toHaveBeenCalledWith('这个组件已不在桌面上','info');
+  v.unmount();
+ });
+});
+
+describe('widgets on the desktop',()=>{
+ beforeEach(()=>localStorage.clear());
+ it('lists every widget on the desktop with its own layer switch and a more menu',async()=>{
+  localStorage.setItem('xiaoban.widgets.v2',JSON.stringify({version:2,widgets:[{id:'clock1',kind:'clock',theme:'ivory',scale:1,x:0,y:0,enabled:true,city:null,layer:'desktop'}]}));
+  const v=mount(WidgetsPage,{props:{store:store()},attachTo:document.body});await flushPromises();
+  expect(v.find('[data-testid="desk-widget-clock1"]').exists()).toBe(true);
+  expect(v.get('[data-testid="widgets-on-desktop"]').text()).toContain('1 个');
+  await v.get('[data-testid="desk-layer-topmost-clock1"]').trigger('click');await flushPromises();
+  expect(JSON.parse(localStorage.getItem('xiaoban.widgets.v2')!).widgets[0].layer).toBe('topmost');
+  await v.get('[data-testid="desk-more-clock1"]').trigger('click');
+  await v.get('[data-testid="desk-remove-clock1"]').trigger('click');await flushPromises();
+  expect(JSON.parse(localStorage.getItem('xiaoban.widgets.v2')!).widgets).toHaveLength(0);
   v.unmount();
  });
 });

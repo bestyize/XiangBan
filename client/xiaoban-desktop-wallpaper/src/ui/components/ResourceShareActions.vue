@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 import { NButton } from 'naive-ui';
-import { FileDown, Share2 } from 'lucide-vue-next';
+import { FileDown, FileUp, Share2, Upload } from 'lucide-vue-next';
 import { invoke } from '../../bridge.ts';
 import type { ControlStore } from '../control-types.ts';
 // `icons` drops the wording and keeps only the two marks, for the narrow strip at a card's lower right.
-const props = defineProps<{ store: ControlStore; kind: 'wallpaper' | 'effect' | 'widget' | 'game' | 'pet'; id?: string; disabled?: boolean; importLabel?: string; icons?: boolean }>();
+const props = defineProps<{ store: ControlStore; kind: 'wallpaper' | 'effect' | 'widget' | 'game' | 'pet'; id?: string; disabled?: boolean; importLabel?: string; icons?: boolean; /** `xb` is the console's secondary button, `menu` a row of a dropdown menu; both only for the import button. */ variant?: 'default' | 'xb' | 'menu' }>();
 const emit = defineEmits<{ imported: [result: { kind: string; id: string; name: string }] }>();
 const busy = ref(false);
 // Where each kind of pack lands, for the note shown when a pack is picked on another kind's page.
@@ -34,8 +34,10 @@ async function run(share = false) {
 }
 </script>
 <template>
-  <div v-if="store.desktop || importLabel" class="resource-share-actions" :class="{ icons }" @click.stop @keydown.stop>
-    <NButton :size="importLabel && !icons ? 'medium' : 'small'" :round="!!importLabel && !icons" :circle="!!icons" secondary :loading="busy" :disabled="busy || disabled || !store.desktop" :title="id ? '导出资源包' : importLabel || '导入资源包'" :aria-label="id ? '导出资源包' : importLabel || '导入资源包'" :data-testid="id ? 'export-resource' : 'import-resource'" @click="run()">
+  <div v-if="store.desktop || importLabel" class="resource-share-actions" :class="{ icons, plain: !id && (variant === 'xb' || variant === 'menu') }" @click.stop @keydown.stop>
+    <button v-if="!id && variant === 'xb'" type="button" class="xb-btn" :disabled="busy || disabled || !store.desktop" :title="importLabel || '导入资源包'" data-testid="import-resource" @click="run()"><Upload :size="14" />{{ importLabel || '导入资源包' }}</button>
+    <button v-else-if="!id && variant === 'menu'" type="button" role="menuitem" class="xb-menu-item" :disabled="busy || disabled || !store.desktop" data-testid="import-resource" @click="run()"><FileUp :size="15" />{{ importLabel || '导入资源包' }}</button>
+    <NButton v-else :size="importLabel && !icons ? 'medium' : 'small'" :round="!!importLabel && !icons" :circle="!!icons" secondary :loading="busy" :disabled="busy || disabled || !store.desktop" :title="id ? '导出资源包' : importLabel || '导入资源包'" :aria-label="id ? '导出资源包' : importLabel || '导入资源包'" :data-testid="id ? 'export-resource' : 'import-resource'" @click="run()">
       <template v-if="icons" #icon><FileDown :size="15" /></template>
       <template v-if="!icons">{{ id ? '导出资源包' : importLabel || '导入资源包' }}</template>
     </NButton>
@@ -48,5 +50,6 @@ async function run(share = false) {
 <style scoped>
 .resource-share-actions{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
 .resource-share-actions.icons{gap:4px;flex-wrap:nowrap}
+.resource-share-actions.plain{display:contents}
 </style>
 
