@@ -63,7 +63,8 @@ fn execute_result(&self, args: serde_json::Value, ctx: &ToolCtx) -> ToolResult {
 
 三者共用 `ProviderProfile::new(base_url, api_key, model)`，换协议只换类型。其余配置：`extra_headers`（同名头会替换默认值，不会重复；网关要 `Authorization: Bearer` 时把 `api_key` 留空并在这里设置，也可设置 `anthropic-beta`）、`extra_body`（最后合并进请求体，如 `temperature`）、`supports_tools`、`max_output_tokens`、`max_request_bytes`、`stream_usage`（只对 chat completions 有效）。
 
-- `max_output_tokens`：Claude 必须给出，未设置时用 8192；Responses 对应 `max_output_tokens`；chat completions 不发送，各家参数名不一致（`max_tokens` 或 `max_completion_tokens`），请放进 `extra_body`。
+- `max_output_tokens`：由宿主传入当前端点声明的模型能力，不维护内置模型名称/版本表。Responses 和 Chat Completions 在自动模式不附加输出上限；Anthropic Messages 必须提供 `max_tokens`，缺少服务商元数据时临时尝试 128000，遇到明确的上限错误会有界降低并在当前 Provider 生命周期内记忆。这个数字是协议回退值，**不是**对某个模型能力的断言。
+- `model::ModelCapabilities`：以端点元数据为优先来源，缺少上下文或输出能力时保持未知。TokenBudget 独立计算上下文留存和预留空间；错误分类明确区分输入溢出与输出上限，避免把后者当成上下文压缩信号。模型目录实时查询和模型账号信息由宿主负责；内核不定期下载模型数据库，也不硬编码厂商型号。
 - `max_request_bytes`：可选的序列化请求字节上限，默认不限制；按三种协议的实际 JSON（含工具定义、转义和图片）检查。超限时只在请求副本里逐步省略旧工具图片，保留最新工具图片结果和用户图片；仍放不下就明确报 `request_too_large`，不发送请求、不裁断二进制。
 - Responses：无状态，每次发送完整 `input`，默认 `store: false`（可在 `extra_body` 覆盖）；函数工具显式发送 `strict: false`，因为该协议默认 true，会拒绝带可选参数的 schema。
 - Claude：所有 system 消息合并进顶层 `system`；同一轮的多个工具结果合并成一条 user 消息，且排在文本之前；空白文本块会被丢弃（为避免被拒绝，文档里没找到这条的依据）；用量取累计值的最大值，`prompt_tokens` 含缓存读写。
