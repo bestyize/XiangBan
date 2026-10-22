@@ -19,7 +19,7 @@ export interface CareConfig {
   quietEnd: string;
   weatherSource: CareSource;
 }
-export type CareKind = "custom" | "off-work" | "rest" | "weather";
+export type CareKind = "custom" | "off-work" | "rest" | "weather" | "agent";
 export interface CareRule {
   id: string;
   revision: number;
@@ -71,13 +71,14 @@ export interface CareDelivery {
   displaySeconds: number;
 }
 export const careNames: Record<CareKind, string> = {
-  custom: "自定义", "off-work": "下班", rest: "休息", weather: "天气",
+  custom: "自定义", "off-work": "下班", rest: "休息", weather: "天气", agent: "定时任务",
 };
 export const dayNames = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"];
 export function newCareRule(kind: CareKind = "custom"): CareRule {
-  return { id: "", revision: 0, enabled: true, kind, repeat: "daily", time: kind === "off-work" ? "18:00" : kind === "weather" ? "08:00" : "15:00",
+  return { id: "", revision: 0, enabled: true, kind, repeat: "daily", time: kind === "off-work" ? "18:00" : kind === "weather" || kind === "agent" ? "08:00" : "15:00",
     onceAt: "", weekdays: [], intervalMinutes: 60, city: null, notBefore: 0,
-    text: kind === "off-work" ? "到点啦，今天也辛苦了。" : kind === "rest" ? "起来走走，看看远处吧。" : kind === "weather" ? "" : "记得喝水。" };
+    text: kind === "off-work" ? "到点啦，今天也辛苦了。" : kind === "rest" ? "起来走走，看看远处吧。" : kind === "weather" ? ""
+      : kind === "agent" ? "看看工作目录里昨天新增或修改了哪些文件，用三句话总结。" : "记得喝水。" };
 }
 export function describeCareRule(rule: CareRule): string {
   if (rule.kind === "rest") return `有效使用电脑 ${rule.intervalMinutes} 分钟`;
@@ -85,8 +86,11 @@ export function describeCareRule(rule: CareRule): string {
   const repeat = rule.repeat === "daily" ? "每天" : [...new Set(rule.weekdays)].sort().map(day => dayNames[day - 1]).filter(Boolean).join("、");
   return `${repeat} ${rule.time}${rule.kind === "weather" && rule.city ? ` · ${rule.city.name}` : ""}`;
 }
+/** How long the text of a rule may be: an agent task's instructions may say more than a reminder. */
+export const careTextLimit = (kind: CareKind) => kind === "agent" ? 1000 : 240;
 export function careRuleError(rule: CareRule): string | null {
-  if (Array.from(rule.text).length > 240) return "提醒文案最多 240 个字";
+  if (rule.kind === "agent" && !rule.text.trim()) return "请写下要小伴定时做的事";
+  if (Array.from(rule.text).length > careTextLimit(rule.kind)) return rule.kind === "agent" ? "任务说明最多 1000 个字" : "提醒文案最多 240 个字";
   if (rule.kind !== "weather" && !rule.text.trim()) return "请填写提醒文案";
   if (rule.kind === "rest") {
     if (!Number.isInteger(rule.intervalMinutes) || rule.intervalMinutes < 5 || rule.intervalMinutes > 480) return "休息间隔应为 5–480 分钟";

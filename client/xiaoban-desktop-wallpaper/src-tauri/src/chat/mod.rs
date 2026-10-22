@@ -19,6 +19,7 @@ pub mod goals;
 mod prompt;
 mod project_rules;
 mod sandbox_gate;
+pub mod scheduled;
 mod run_history;
 pub(crate) mod task_outcome;
 mod learning;

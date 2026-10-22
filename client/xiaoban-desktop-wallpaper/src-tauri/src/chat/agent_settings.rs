@@ -27,11 +27,13 @@ pub struct AgentSettings {
     pub windows_sandbox: bool,
     /// Working folders already labelled low integrity for it.
     pub labelled: Vec<String>,
+    /// The conversation each scheduled agent task (a care rule) adds its runs to, by rule id.
+    pub scheduled_sessions: BTreeMap<String, String>,
 }
 
 impl Default for AgentSettings {
     fn default() -> Self {
-        Self { sandbox_network: true, grants: BTreeMap::new(), windows_sandbox: false, labelled: Vec::new() }
+        Self { sandbox_network: true, grants: BTreeMap::new(), windows_sandbox: false, labelled: Vec::new(), scheduled_sessions: BTreeMap::new() }
     }
 }
 
