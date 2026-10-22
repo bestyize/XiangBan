@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, h, nextTick, onMounted, onUnmounted, ref, watch, type Component, type HTMLAttributes } from 'vue';
 import { NButton, NDropdown, NInput, type DropdownOption } from 'naive-ui';
-import { ArrowDown, AudioLines, ChevronDown, ChevronRight, Ellipsis, Folder, FolderInput, FolderPlus, LoaderCircle, MessageSquarePlus, Mic, Pencil, SendHorizontal, Settings, Volume2, ShieldAlert, Sparkles, Square, Trash2, X } from 'lucide-vue-next';
+import { ArrowDown, AudioLines, ChevronDown, ChevronRight, Ellipsis, Folder, FolderInput, FolderPlus, LoaderCircle, MessageSquarePlus, Mic, Pencil, SendHorizontal, Settings, Volume2, ShieldAlert, Sparkles, Square, Target, Trash2, X } from 'lucide-vue-next';
 import { invoke } from '../../bridge.ts';
 import Orb from '../../assistant/Orb.vue';
 import type { ControlStore } from '../control-types.ts';
@@ -14,6 +14,7 @@ import ChatMoveDialog from '../components/ChatMoveDialog.vue';
 import ChatContextRing from '../components/ChatContextRing.vue';
 import ChatActivity from '../chat/ChatActivity.vue';
 import ChatReasoning from '../chat/ChatReasoning.vue';
+import ChatGoalPanel from '../chat/ChatGoalPanel.vue';
 import GuideModal from '../components/GuideModal.vue';
 import AsrStatus from '../components/AsrStatus.vue';
 import MarkdownView from '../chat/MarkdownView.ts';
@@ -29,6 +30,7 @@ const props = defineProps<{ store: ControlStore }>();
 const chat = props.store.chat;
 
 const draft = ref('');
+const goalOpen = ref(false);
 const asr = props.store.asr;
 const voiceHasText = ref(false);
 const finishingVoice = ref(false);
@@ -334,6 +336,10 @@ function newGroupFromMove() {
 async function removeGroup(id: string) { confirmingGroup.value = ''; await chat.removeGroup(id); }
 async function remove(id: string) { confirmingId.value = ''; await chat.remove(id); }
 function openSettings() { modelDialog.value = false; props.store.settingsTab = 'ai'; props.store.navigate('settings'); }
+async function goalSessionCreated(id: string) {
+  await chat.refresh();
+  await chat.select(id);
+}
 
 const decide = (request: ApprovalRequest, decision: ApprovalDecision) => chat.answerApproval(request, decision);
 function answer(request: QuestionRequest, value: string | null) {
@@ -409,6 +415,10 @@ async function openLink(href: string) {
       <header class="chat-head">
         <div class="head-location"><h2 data-testid="chat-title">{{ title }}</h2><button v-if="store.desktop" type="button" class="workspace-chip" data-testid="chat-workspace" :title="'当前工作区：' + (chat.workspace || '默认工作目录') + '。前往设置修改。'" @click="openSettings"><Folder :size="13" /><span>{{ workspaceName }}</span></button></div>
         <div class="head-actions">
+          <button type="button" class="guide-chip" data-testid="chat-goal-toggle"
+            :aria-expanded="goalOpen" @click="goalOpen = !goalOpen">
+            <Target :size="14" /><span>长期目标</span>
+          </button>
           <button v-if="store.speech && store.speech.status !== 'idle'" type="button" class="link" data-testid="chat-speech-status" @click="store.speech.stop()"><Volume2 :size="14" />{{ store.speech.status === 'synthesizing' ? '取消合成' : '停止朗读' }}</button>
           <button
             type="button"
@@ -423,6 +433,10 @@ async function openLink(href: string) {
           <button type="button" class="ai-config-chip" data-testid="chat-ai-config" title="设置 → AI 模型：选择小伴 AI，或配置自己的模型服务" @click="openSettings"><Settings :size="14" />AI 模型配置</button>
         </div>
       </header>
+      <ChatGoalPanel v-if="goalOpen" :session-id="chat.currentId" :running="running"
+        :configured="chat.configured" :desktop="store.desktop"
+        :permission-mode="chat.permissionMode"
+        @session-created="goalSessionCreated" @changed="chat.refresh()" />
 
       <div ref="scroller" class="chat-scroll" data-testid="chat-messages" @scroll.passive="onScroll">
         <div class="chat-column">

@@ -4,6 +4,12 @@
 
 状态：0.3.0，已接入小伴桌面。内核循环、三种模型协议（chat completions、Responses、Claude Messages）、权限/上下文/输出落盘中间件、JSONL 存储、文件/网页/Shell、skills、记忆、子 Agent、MCP 与 stdio；支持工具 Schema 校验、结构化结果与图片。0.3 增加运行身份、可失败观察者、可选执行日志和进程管理。演进设计见 [框架审视](../../docs/architecture/agent-framework-review.md)，已实现架构图与使用约定见 [运行与进程基础](../../docs/architecture/agent-runtime.md)。
 
+## 长期目标与运行监督（第一阶段）
+
+可选的宿主目标调度无需污染 Agent Loop：新增无 Tauri 依赖的 `goals::GoalContract`、`GoalRecord`、`GoalStore`，保存目标、验收条件和目标运行状态；`recovery::reconcile`（`journal` feature）依据既有 `JsonlRunLog::inspect` 判断异常中断，以及是否存在已派发但结果未知的工具；`supervisor::SessionLease` 使用操作系统文件锁，在同机多个进程之间互斥一段会话的运行。
+
+这是**安全的手动恢复底座**：目标的 `Completed` 必须由外部验证证据或用户确认产生，模型 `RunState::Completed` 仅意味着进入 `AwaitingVerification`。已派发但无工具结果的调用绝不自动重放。桌面端目前在聊天工作台提供创建、开始、暂停、核验与继续；没有独立后台守护调度器、自动质量门禁和跨设备的任务锁。完整约定见 [长期目标架构](../../docs/architecture/durable-goals.md)。
+
 ## 0.3 运行与进程
 
 - 保留 `run` / `run_parts` / `retry_last`；新增 `run_parts_observed` / `retry_last_observed`，事件带独立 run_id、连续 sequence、时间戳和可选父 run。`RunSummary` 新增 run_id。运行状态与模型消息分开；completed 表示循环正常结束，不替代业务验收。
