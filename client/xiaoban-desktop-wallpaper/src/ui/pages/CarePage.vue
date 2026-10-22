@@ -62,7 +62,7 @@ onUnmounted(() => { if (clockTimer) clearInterval(clockTimer); care.dispose(); }
 
 <template>
   <main class="xb-page care-page" data-testid="care-page">
-    <header class="xb-page-head care-head">
+    <header class="xb-page-head care-head" data-tauri-drag-region>
       <div class="xb-tabs-lg" role="tablist" aria-label="提醒类型">
         <button type="button" role="tab" data-testid="care-tab-reminders" :aria-selected="tab === 'reminders'" @click="tab = 'reminders'">关怀提醒 <span class="care-count">{{ reminders.length }}</span></button>
         <button type="button" role="tab" data-testid="care-tab-tasks" :aria-selected="tab === 'tasks'" @click="tab = 'tasks'">定时任务 <span class="care-count">{{ tasks.length }}</span></button>

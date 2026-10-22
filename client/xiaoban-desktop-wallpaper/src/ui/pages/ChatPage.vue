@@ -232,7 +232,7 @@ async function openLink(href: string) {
   <ChatNameDialog :show="renaming" title="重命名对话" placeholder="给这个对话起个名字" :initial="session?.title ?? ''" :max-length="60" confirm-text="保存" :busy="renameBusy" @close="renaming = false" @submit="submitRename" />
   <section class="chat-page" data-testid="chat-page">
     <div class="chat-main">
-      <header class="chat-head">
+      <header class="chat-head" data-tauri-drag-region>
         <nav class="head-crumbs" aria-label="位置">
           <button type="button" class="crumb-space" data-testid="chat-workspace" :disabled="!store.desktop" :title="'工作区：' + (chat.currentWorkspace || '默认工作目录') + (store.desktop ? '。点击在文件管理器中打开' : '')" @click="chat.revealWorkspace()">{{ spaceName }}</button>
           <ChevronRight :size="12" :stroke-width="2.2" class="crumb-sep" aria-hidden="true" />

@@ -79,7 +79,7 @@ onActivated(() => { if (opened) void loadGames(); else opened = true; });
 
 <template>
   <main class="xb-page games-page" data-testid="games-page" aria-label="游玩">
-    <header class="xb-page-head games-head">
+    <header class="xb-page-head games-head" data-tauri-drag-region>
       <div class="xb-tabs-lg" role="tablist" aria-label="游戏分类">
         <button v-for="tab in tabs" :key="tab.id" type="button" role="tab" :aria-selected="category === tab.id" :data-testid="`games-tab-${tab.id}`" @click="category = tab.id">{{ tab.label }}</button>
       </div>

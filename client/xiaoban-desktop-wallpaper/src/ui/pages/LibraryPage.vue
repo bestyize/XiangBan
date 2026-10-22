@@ -5,7 +5,7 @@ defineProps<{ store: ControlStore }>();
 </script>
 <template>
   <section class="library-page xb-page" data-testid="library-page" aria-label="资料库">
-    <header class="xb-page-head"><h1 class="xb-page-title">资料库</h1></header>
+    <header class="xb-page-head" data-tauri-drag-region><h1 class="xb-page-title">资料库</h1></header>
     <div class="xb-empty library-empty">
       <span class="xb-empty-icon library-icon"><BookOpen :size="26" /></span>
       <h2>还没有资料</h2>

@@ -33,6 +33,13 @@ const message = useMessage();
 const store = createControlStore((text, type = 'success') => message[type](String(text), { duration: type === 'error' ? 6500 : 3500 }));
 const mac = computed(() => store.info.platform === 'macos' || (store.info.platform === 'preview' && typeof navigator !== 'undefined' && /Mac/i.test(navigator.platform)));
 const mod = computed(() => mac.value ? '⌘' : 'Ctrl+');
+/** The console draws its own title bar: macOS keeps the traffic lights over the sidebar, Windows gets drawn caption buttons. */
+const win = computed(() => store.info.platform === 'windows');
+type NativeWindow = { minimize(): Promise<void>; toggleMaximize(): Promise<void>; close(): Promise<void> };
+function nativeWindow(): NativeWindow | null {
+  return (window as unknown as { __TAURI__?: { window?: { getCurrentWindow?: () => NativeWindow } } }).__TAURI__?.window?.getCurrentWindow?.() ?? null;
+}
+function windowAction(action: 'minimize' | 'toggleMaximize' | 'close') { void nativeWindow()?.[action]().catch(() => {}); }
 
 /* ── Sidebar ─────────────────────────────────────────────────────────── */
 const collapsed = ref(false);
@@ -290,9 +297,15 @@ onBeforeUnmount(() => {
 const fixedPages = ['new-task', 'chat', 'ai-store', 'library', 'studio', 'games'];
 </script>
 <template>
-  <div class="control-app" :class="{ 'is-collapsed': collapsed }">
+  <div class="control-app" :class="{ 'is-collapsed': collapsed, 'is-mac': mac && store.desktop, 'is-win': win }">
+    <div class="window-drag" data-tauri-drag-region aria-hidden="true"></div>
+    <div v-if="win" class="window-controls" data-testid="window-controls">
+      <button type="button" aria-label="最小化" title="最小化" @click="windowAction('minimize')"><svg viewBox="0 0 10 10" width="10" height="10" aria-hidden="true"><path d="M0 5h10" stroke="currentColor" stroke-width="1"/></svg></button>
+      <button type="button" aria-label="最大化" title="最大化" @click="windowAction('toggleMaximize')"><svg viewBox="0 0 10 10" width="10" height="10" aria-hidden="true"><rect x=".5" y=".5" width="9" height="9" rx="1" fill="none" stroke="currentColor" stroke-width="1"/></svg></button>
+      <button type="button" class="is-close" aria-label="关闭" title="关闭" @click="windowAction('close')"><svg viewBox="0 0 10 10" width="10" height="10" aria-hidden="true"><path d="M0 0l10 10M10 0 0 10" stroke="currentColor" stroke-width="1"/></svg></button>
+    </div>
     <aside class="control-sidebar" aria-label="侧栏">
-      <div class="sidebar-top">
+      <div class="sidebar-top" data-tauri-drag-region>
         <button type="button" class="xb-icon-btn" :title="collapsed ? '展开侧栏' : '收起侧栏'" :aria-label="collapsed ? '展开侧栏' : '收起侧栏'" :aria-expanded="!collapsed" aria-controls="control-navigation" data-testid="sidebar-toggle" @click="toggleNavigation"><PanelLeft :size="17" /></button>
         <button type="button" class="xb-icon-btn sidebar-search" aria-label="搜索" title="搜索（即将推出）" disabled><Search :size="17" /></button>
       </div>
@@ -487,6 +500,16 @@ const fixedPages = ['new-task', 'chat', 'ai-store', 'library', 'studio', 'games'
 /* Whole sidebar folded to an icon rail. */
 .is-collapsed .control-sidebar{padding:0 8px 12px}
 .is-collapsed .sidebar-top{justify-content:center}
+.window-drag{position:absolute;top:0;left:0;right:0;height:8px;z-index:20}
+.is-mac .sidebar-top{padding-left:68px}
+.is-mac.is-collapsed .sidebar-top{height:72px;padding-left:0;align-items:flex-end}
+.is-win .window-drag{height:34px}
+.is-win .control-main{margin-top:34px}
+.is-win .sidebar-top{height:34px;margin-bottom:6px}
+.window-controls{position:absolute;top:0;right:0;z-index:21;display:flex;height:34px}
+.window-controls button{width:46px;height:34px;border:0;padding:0;background:transparent;color:var(--ui-text-secondary);display:grid;place-items:center;cursor:default}
+.window-controls button:hover{background:var(--ui-surface-hover);color:var(--ui-text-primary)}
+.window-controls button.is-close:hover{background:#E81123;color:#fff}
 .is-collapsed .sidebar-search,.is-collapsed .brand-copy,.is-collapsed .nav-label,.is-collapsed .nav-hint,.is-collapsed .nav-chevron,.is-collapsed .nav-caption,.is-collapsed .space-row,.is-collapsed .nav-session-row,.is-collapsed .nav-session,.is-collapsed .nav-empty,.is-collapsed .notices{display:none}
 .is-collapsed .control-brand{justify-content:center;padding:2px 0 16px}
 .is-collapsed .nav-sub{padding-left:0}
