@@ -14,6 +14,7 @@ mod game_draft;
 // does not carry the hidden items Tauri's macro generates next to it.
 pub mod goals;
 mod prompt;
+mod project_rules;
 mod run_history;
 pub(crate) mod task_outcome;
 mod learning;
@@ -411,6 +412,11 @@ fn assemble_with_connectors(parts: Parts<'_>, attachments: Vec<Attachment>, conn
         .system_prompt(prompt::system_prompt(&environment))
         .prompt_section(skills.prompt_section())
         .prompt_section(memory.prompt_section())
+        // Read again before every model call, so an edit to AGENTS.md applies to the next step.
+        .prompt_section({
+            let workspace = workspace.to_path_buf();
+            move || project_rules::section(&workspace)
+        })
         .tool(TimeNow::new().utc_offset_minutes(utc_offset_minutes))
         .tool_arc(todo)
         .tool(ask)
@@ -994,7 +1000,7 @@ fn base_tokens(dirs: &Dirs, workspace: &Path, config: &AiConfig) -> usize {
     let skills = Arc::new(Skills::new().read_only_root(dirs.chat.join("bundled-skills")).writable_root(dirs.skills()));
     let memory = Arc::new(Memory::new(dirs.memory()));
     let (skills_section, memory_section) = (skills.prompt_section(), memory.prompt_section());
-    let text = [prompt::system_prompt(&environment), skills_section(), memory_section()]
+    let text = [prompt::system_prompt(&environment), skills_section(), memory_section(), project_rules::section(workspace)]
         .into_iter()
         .filter(|part| !part.trim().is_empty())
         .collect::<Vec<_>>()

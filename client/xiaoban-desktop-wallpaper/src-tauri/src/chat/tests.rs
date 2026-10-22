@@ -988,3 +988,15 @@ fn an_answer_that_wrote_files_can_be_undone() {
     assert_eq!(fs::read_to_string(rig.workspace.join("notes.md")).unwrap(), "我自己写的");
     assert!(!rig.workspace.join("new/plan.md").exists());
 }
+
+#[test]
+fn the_working_folder_s_agents_md_reaches_the_model_and_edits_apply_next_step() {
+    let rig = rig("project-rules", vec![call("1", "time_now", json!({})), Step::text("好")], Approval::Once);
+    fs::write(rig.workspace.join("AGENTS.md"), "测试命令：pnpm test").unwrap();
+    let provider = rig.provider.clone();
+    let (result, _) = run(&rig, "跑测试");
+    result.unwrap();
+    let requests = provider.requests();
+    let system = requests[0].messages[0].text();
+    assert!(system.contains("工作目录里的项目说明") && system.contains("测试命令：pnpm test"), "{system}");
+}
