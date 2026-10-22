@@ -266,6 +266,9 @@ fn provider_profile(config: &AiConfig) -> ProviderProfile {
     let capabilities = config.model_capabilities();
     profile.max_output_tokens = capabilities.request_output_limit();
     profile.supports_tools = capabilities.supports_tools.unwrap_or(true);
+    // A run re-sends the same instructions, tools and history on every step; caching them cuts cost and latency.
+    // Anthropic-compatible gateways built for Claude clients accept `cache_control`.
+    profile.prompt_cache = config.protocol == "anthropic";
     profile
 }
 

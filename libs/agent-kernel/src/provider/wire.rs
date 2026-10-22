@@ -27,6 +27,10 @@ pub struct ProviderProfile {
     /// Asked for the key on every request, for credentials that expire while a long run is going.
     /// Empty means "use `api_key`".
     pub api_key_source: Option<Arc<dyn Fn() -> String + Send + Sync>>,
+    /// Claude Messages only: mark the system prompt, the tool list and the newest message as cacheable
+    /// (`cache_control`), so a long run re-sends its unchanged prefix at the cached rate. Off by default because
+    /// some compatible gateways reject unknown fields.
+    pub prompt_cache: bool,
 }
 
 impl ProviderProfile {
@@ -42,6 +46,7 @@ impl ProviderProfile {
             max_output_tokens: None,
             max_request_bytes: None,
             api_key_source: None,
+            prompt_cache: false,
         }
     }
 
