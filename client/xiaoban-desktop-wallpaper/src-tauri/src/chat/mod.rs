@@ -6,6 +6,7 @@
 mod agent_settings;
 mod broker;
 mod checkpoints;
+mod git_snapshot;
 mod community;
 mod compact;
 mod danger;
@@ -864,8 +865,10 @@ pub(crate) fn send(app: tauri::AppHandle, session_id: String, text: String, imag
                     }
                     // Offer "撤销这轮的文件改动" when this answer changed files with the file tools.
                     if let Some(manifest) = checkpoints::list(&dirs.checkpoints(), &id).into_iter().find(|m| m.run_id == run) {
-                        let files: Vec<&str> = manifest.entries.iter().map(|e| e.path.as_str()).collect();
-                        emit(&sender, "chat-checkpoint", json!({ "session": id, "runId": run, "files": files }));
+                        let files = checkpoints::changed_files(&manifest);
+                        if !files.is_empty() {
+                            emit(&sender, "chat-checkpoint", json!({ "session": id, "runId": run, "files": files }));
+                        }
                     }
                 }
                 executed
