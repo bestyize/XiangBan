@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import { NAlert, NModal, NSkeleton } from 'naive-ui';
-import { Puzzle, Plug, ArrowRight, Download, ChevronLeft, ChevronRight } from 'lucide-vue-next';
+import { Plug, ArrowRight, Download, Check, Plus, Sparkles, ChevronLeft, ChevronRight } from 'lucide-vue-next';
 import { invoke } from '../../bridge.ts';
 import type { ControlStore } from '../control-types.ts';
 import type { SkillReview } from './catalog.ts';
 import ConnectorConfig from './ConnectorConfig.vue';
+import { categoryIcon, hueStyle } from './hues.ts';
+import './store-cards.css';
 
 interface Entry { slug: string; name: string; description: string; category?: string; iconUrl?: string | null; skillCount?: number }
 interface Page { results: Entry[]; page: number; total: number; hasMore: boolean }
@@ -14,9 +16,11 @@ interface PackReview extends Pack { content: string; skills: SkillReview[] }
 interface Connection { id: string; name: string; connected: boolean; enabled: boolean; toolCount: number; error?: string }
 interface ConnectorDetail { readme: string; configs: { name: string; config: Record<string, unknown> }[] }
 interface ConnectionResult { status?:string; connected?:boolean; flowId?:string; authorizationUrl?:string }
-const props = defineProps<{ kind: 'experts' | 'connectors'; query: string; category: string; store: ControlStore }>();
+const props = withDefaults(defineProps<{ kind: 'experts' | 'connectors'; query: string; category: string; store: ControlStore; installedOnly?: boolean }>(), { installedOnly: false });
 const data = ref<Page>({ results: [], page: 1, total: 0, hasMore: false });
-const page = ref(1), loading = ref(false), error = ref(''), localError = ref(''), installedOnly = ref(false);
+const page = ref(1), loading = ref(false), error = ref(''), localError = ref('');
+const installedOnly = computed(() => props.installedOnly);
+const installedCount = computed(() => props.kind === 'experts' ? packs.value.length : connections.value.length);
 const packs = ref<Pack[]>([]), connections = ref<Connection[]>([]);
 const selected = ref<Entry | null>(null), packReview = ref<PackReview | null>(null), connectorDetail = ref<ConnectorDetail | null>(null);
 const detailLoading = ref(false), detailError = ref(''), confirmed = ref(false), busy = ref(false), removing = ref(false);
@@ -77,7 +81,7 @@ watch(() => [props.kind, props.query, props.category, installedOnly.value], () =
 watch(page, () => { void refresh(); });
 watch(() => props.kind, () => {
   abandonAuthorization();
-  ++detailId; selected.value = null; configText.value = ''; installedOnly.value = false;
+  ++detailId; selected.value = null; configText.value = '';
   void refreshLocal();
 }, { immediate: true });
 onBeforeUnmount(() => { abandonAuthorization();clearTimeout(timer); ++requestId; ++detailId; ++localId; configText.value = ''; });
@@ -191,25 +195,37 @@ async function connectionAction(action: 'disconnect' | 'reconnect') {
   } catch (e) { detailError.value = String(e); }
   finally { busy.value = false; }
 }
-defineExpose({ refresh, refreshLocal });
+defineExpose({ refresh, refreshLocal, installedCount });
 </script>
 
 <template>
   <div class="registry">
-    <div class="registry-heading"><h2>{{ kind === 'experts' ? '专家包' : 'MCP 连接器' }}</h2><span>来自 SkillHub</span><button class="small-action installed-filter" :class="{ selected: installedOnly }" :aria-pressed="installedOnly" @click="installedOnly = !installedOnly">{{ kind === 'experts' ? '已安装' : '已配置' }}</button></div>
     <NAlert v-if="!store.desktop" type="info" :show-icon="false">请在小伴桌面客户端中浏览和安装。</NAlert>
     <NAlert v-if="error" type="error" :show-icon="false">{{ error }} <button class="text-action" @click="refresh">重试</button></NAlert>
     <NAlert v-if="localError" type="warning" :show-icon="false">{{ localError }} <button class="text-action" @click="refreshLocal">重试</button></NAlert>
-    <div v-if="loading" class="store-grid" aria-busy="true"><NSkeleton v-for="n in 8" :key="n" height="200px" /></div>
-    <div v-else class="store-grid">
+    <div v-if="loading" class="xc-grid" aria-busy="true"><NSkeleton v-for="n in 6" :key="n" height="170px" :sharp="false" /></div>
+    <div v-else class="xc-grid">
       <slot name="prefix" />
-      <article v-for="entry in entries" :key="entry.slug" class="store-card" :class="kind === 'experts' ? 'expert-card' : 'connector-card'">
-        <div class="card-top"><div class="entry-icon"><img v-if="icon(entry)" :src="icon(entry)!" alt="" referrerpolicy="no-referrer" @error="brokenIcons[entry.slug] = true" /><Puzzle v-else-if="kind === 'experts'" :size="25" /><Plug v-else :size="25" /></div><span class="connection-status">{{ kind === 'experts' ? (pack(entry.slug) ? (pack(entry.slug)?.ready ? '已安装' : '依赖缺失') : (entry.skillCount || 0) + ' 个技能') : (connection(entry.slug)?.connected ? '已连接 · ' + connection(entry.slug)?.toolCount + ' 个工具' : connection(entry.slug) ? '未连接' : '未配置') }}</span></div>
-        <h3>{{ entry.name }}</h3><p class="entry-desc">{{ entry.description }}</p>
-        <div class="card-actions"><span class="store-tag">{{ entry.category || 'SkillHub' }}</span><button class="small-action" :disabled="busy || !store.desktop || !!localError" @click="kind === 'experts' && pack(entry.slug)?.ready ? usePack(entry) : open(entry)">{{ kind === 'experts' ? (pack(entry.slug)?.ready ? '使用专家' : '查看与安装') : connection(entry.slug) ? '管理' : '连接' }}<ArrowRight :size="12" /></button><button v-if="kind === 'experts' && pack(entry.slug)" class="text-action" aria-label="管理专家包" @click="open(entry)">管理</button></div>
+      <article v-for="entry in entries" :key="entry.slug" class="xc store-card" :class="kind === 'experts' ? 'expert-card' : 'connector-card'" :style="hueStyle(entry.category, entry.slug)">
+        <div class="xc-top">
+          <div class="xc-ic" :class="{ 'has-img': icon(entry), 'is-contain': icon(entry) && kind === 'connectors' }"><img v-if="icon(entry)" :src="icon(entry)!" alt="" referrerpolicy="no-referrer" @error="brokenIcons[entry.slug] = true" /><component :is="categoryIcon(kind === 'experts' ? entry.category : undefined)" v-else-if="kind === 'experts'" :size="24" :stroke-width="1.9" aria-hidden="true" /><Plug v-else :size="24" :stroke-width="1.9" aria-hidden="true" /></div>
+          <div class="xc-main"><div class="xc-title"><h3>{{ entry.name }}</h3></div><p class="xc-desc">{{ entry.description }}</p></div>
+        </div>
+        <div class="xc-foot">
+          <span class="xc-tag">{{ entry.category || 'SkillHub' }}</span>
+          <span v-if="kind === 'experts' && entry.skillCount !== undefined" class="xc-meta"><Sparkles :size="13" aria-hidden="true" />{{ entry.skillCount }} 个技能</span>
+          <span v-if="kind === 'connectors'" class="connection-status" :class="{ 'xb-ok': connection(entry.slug)?.connected }">{{ connection(entry.slug)?.connected ? '已连接 · ' + connection(entry.slug)?.toolCount + ' 个工具' : connection(entry.slug) ? '未连接' : '未配置' }}</span>
+          <div class="xc-act">
+            <button v-if="kind === 'experts' && pack(entry.slug)" class="xc-link" aria-label="管理专家包" @click="open(entry)">管理</button>
+            <button class="small-action xc-pill" :class="{ 'is-done': kind === 'experts' ? !!pack(entry.slug) : !!connection(entry.slug) }" :disabled="busy || !store.desktop || !!localError" @click="kind === 'experts' && pack(entry.slug)?.ready ? usePack(entry) : open(entry)">
+              <template v-if="kind === 'experts'"><template v-if="pack(entry.slug)?.ready"><Check :size="12" :stroke-width="3" />使用专家</template><template v-else-if="pack(entry.slug)">依赖缺失</template><template v-else><Plus :size="12" :stroke-width="2.6" />安装</template></template>
+              <template v-else>{{ connection(entry.slug) ? '管理' : '连接' }}<ArrowRight v-if="!connection(entry.slug)" :size="12" /></template>
+            </button>
+          </div>
+        </div>
       </article>
     </div>
-    <div v-if="!loading && !error && store.desktop && !entries.length && category !== '本机'" class="store-empty">没有找到匹配的{{ kind === 'experts' ? '专家包' : '连接器' }}</div>
+    <div v-if="!loading && !error && store.desktop && !entries.length && category !== '本机'" class="xb-empty store-empty"><p>没有找到匹配的{{ kind === 'experts' ? '专家包' : '连接器' }}</p></div>
     <div v-if="!installedOnly && !loading && !error && (page > 1 || data.hasMore)" class="pagination"><button :disabled="page <= 1" aria-label="上一页" @click="page--"><ChevronLeft :size="16" /></button><span>第 {{ page }} 页</span><button :disabled="!data.hasMore" aria-label="下一页" @click="page++"><ChevronRight :size="16" /></button></div>
     <NModal :show="!!selected" preset="card" :title="selected?.name" class="registry-dialog" :closable="!busy" :mask-closable="!busy" style="width:720px;max-width:calc(100vw - 36px)" @update:show="!$event && close()">
       <template v-if="selected">
@@ -253,9 +269,13 @@ defineExpose({ refresh, refreshLocal });
 </template>
 
 <style scoped>
-.registry-heading{display:flex;align-items:center;gap:10px;margin-bottom:20px}.registry-heading h2{font-size:15px;margin:0}.registry-heading>span{font-size:11px;color:var(--ui-text-tertiary)}.registry-heading>.small-action{margin-left:auto}
-.store-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:15px}.store-card{display:flex;flex-direction:column;min-width:0;min-height:215px;padding:17px;border:1px solid var(--ui-border);border-radius:13px;background:var(--ui-surface)}.entry-icon img{width:100%;height:100%;object-fit:cover;border-radius:12px}.card-top{display:flex;align-items:center;justify-content:space-between;gap:8px}.entry-icon{display:grid;place-items:center;width:45px;height:45px;border-radius:12px;background:var(--ui-primary-soft);color:var(--ui-primary)}h3{font-size:13px;margin:15px 0 8px}.connection-status,.store-tag{font-size:10px;color:var(--ui-text-tertiary);padding:5px 7px;border-radius:6px;background:var(--ui-surface-alt)}.entry-desc{font-size:11px;line-height:1.8;color:var(--ui-text-secondary);display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;overflow:hidden;margin:0 0 17px}.card-actions{display:flex;align-items:center;gap:8px;margin-top:auto}.card-actions>.small-action{margin-left:auto}
-button{font:inherit;cursor:pointer}button:disabled{opacity:.45;cursor:not-allowed}.small-action,.store-secondary{display:inline-flex;align-items:center;justify-content:center;gap:5px;border:1px solid var(--ui-border);border-radius:7px;background:var(--ui-surface);color:var(--ui-text-primary);padding:7px 9px;font-size:11px}.small-action.selected{color:var(--ui-primary);background:var(--ui-primary-soft)}.store-primary{display:inline-flex;align-items:center;justify-content:center;gap:7px;background:var(--ui-primary);color:white;border:0;border-radius:8px;padding:9px 14px;font-size:12px}.text-action{color:var(--ui-primary);background:none;border:0;font-size:11px}.store-empty{padding:55px 10px;text-align:center;color:var(--ui-text-tertiary);font-size:12px}.pagination{display:flex;align-items:center;justify-content:center;gap:15px;margin:25px}.pagination button{border:0;background:var(--ui-surface-alt);border-radius:6px;padding:7px}.pagination span{font-size:11px}
-.registry-dialog p,.registry-dialog li{font-size:12px;line-height:1.8;color:var(--ui-text-secondary)}.registry-dialog h4{font-size:13px;margin:20px 0 10px}.registry-dialog details{font-size:12px;margin:12px 0}.registry-dialog summary{cursor:pointer;overflow-wrap:anywhere}.review-content,.dependency-review pre{white-space:pre-wrap;overflow-wrap:anywhere;max-height:260px;overflow:auto;padding:12px;background:var(--ui-surface-alt);border-radius:8px;font-size:11px;line-height:1.7}.dependency-review{border-bottom:1px solid var(--ui-border);padding:10px 0}.dependency-review small{display:block;font-size:10px;overflow-wrap:anywhere}.detail-note{padding:12px;background:var(--ui-surface-alt);border-radius:9px}.review-confirm{display:flex;align-items:flex-start;gap:8px;font-size:12px;line-height:1.8}.review-confirm input{margin-top:5px;accent-color:var(--ui-primary)}.dialog-actions{display:flex;gap:9px;justify-content:flex-end;margin-top:20px}.review-loading{padding:20px 0;font-size:12px}textarea{box-sizing:border-box;width:100%;height:200px;resize:vertical;background:var(--ui-surface-alt);color:var(--ui-text-primary);border:1px solid var(--ui-border);border-radius:9px;font:11px/1.7 monospace;padding:12px}select{width:100%;padding:8px;border:1px solid var(--ui-border);background:var(--ui-surface);color:var(--ui-text-primary);border-radius:7px}
-@container(max-width:1050px){.store-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}@container(max-width:780px){.store-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}@container(max-width:480px){.store-grid{grid-template-columns:1fr}}
+.registry{min-width:0}
+.registry :deep(.n-alert){margin-bottom:14px}
+.text-action{color:var(--ui-ink);background:none;border:0;font:inherit;font-size:12px;cursor:pointer}
+.pagination{display:flex;align-items:center;justify-content:center;gap:15px;margin:24px 0 4px;font-size:12px;color:var(--ui-text-secondary)}
+.pagination button{display:grid;place-items:center;width:30px;height:30px;border:0;border-radius:8px;background:var(--ui-control);color:var(--ui-text-primary);cursor:pointer}
+.pagination button:disabled{opacity:.45;cursor:not-allowed}
+.connection-status{display:inline-flex;align-items:center;margin-left:4px;font-size:12px;color:var(--ui-text-secondary);white-space:nowrap}
+.connection-status.xb-ok{color:var(--ui-success-text)}
+.store-empty{min-height:200px}
 </style>

@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { computed, onActivated, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { NAlert, NModal, NSkeleton } from 'naive-ui';
-import { Search, SlidersHorizontal, RefreshCw, ArrowRight, Download, Check, Puzzle, Monitor, ChevronLeft, ChevronRight } from 'lucide-vue-next';
+import { Search, RefreshCw, ArrowRight, Download, Check, Plus, Puzzle, Monitor, ChevronLeft, ChevronRight } from 'lucide-vue-next';
 import { invoke, type AiConfigView } from '../../bridge.ts';
 import type { ControlStore } from '../control-types.ts';
 import { type Skill, type SkillPage, type SkillReview } from '../ai-store/catalog.ts';
 import RegistryCatalog from '../ai-store/RegistryCatalog.vue';
+import { hueStyle } from '../ai-store/hues.ts';
+import '../ai-store/store-cards.css';
 
 const props = defineProps<{ store: ControlStore }>();
 type Tab = 'experts' | 'skills' | 'connectors';
@@ -110,7 +112,8 @@ function scheduleBrowse() {
     timer = setTimeout(() => void browse(), 250);
   }
 }
-function switchTab(value: Tab) { tab.value = value; category.value = '全部'; page.value = 1; }
+function switchTab(value: Tab) { tab.value = value; category.value = '全部'; page.value = 1; installedOnly.value = false; }
+const installedCount = computed(() => tab.value === 'skills' ? localSkills.value.length : (registry.value?.installedCount ?? 0));
 function tabKey(event: KeyboardEvent) {
   if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
   event.preventDefault();
@@ -187,60 +190,77 @@ const bytes = (n: number) => n < 1024 ? `${n} B` : `${(n / 1024).toFixed(1)} KB`
 </script>
 
 <template>
-  <section class="ai-store-page" data-testid="ai-store-page" aria-label="AI 商店">
-    <header class="store-header">
-      <form class="store-search" role="search" @submit.prevent="tab === 'skills' ? browse() : registry?.refresh()">
-        <Search :size="17" aria-hidden="true" /><input v-model="query" maxlength="70" aria-label="搜索专家、技能或连接器" :placeholder="`搜索${tabs.find(t => t.id === tab)?.label}…`" />
-        <button v-if="query" type="button" aria-label="清空搜索" @click="query = ''">×</button>
-      </form>
-      <div class="store-tabs" role="tablist" aria-label="商店分类" @keydown="tabKey">
-        <button v-for="t in tabs" :id="`store-tab-${t.id}`" :key="t.id" type="button" role="tab" :aria-controls="`store-panel-${t.id}`" :aria-selected="tab === t.id" :tabindex="tab === t.id ? 0 : -1" :class="{ active: tab === t.id }" @click="switchTab(t.id)">{{ t.label }}</button>
+  <section class="ai-store-page xb-page" data-testid="ai-store-page" aria-label="AI 插件">
+    <header class="xb-page-head store-header">
+      <div class="xb-tabs-lg store-tabs" role="tablist" aria-label="插件类型" @keydown="tabKey">
+        <button v-for="t in tabs" :id="`store-tab-${t.id}`" :key="t.id" type="button" role="tab" :aria-controls="`store-panel-${t.id}`" :aria-selected="tab === t.id" :tabindex="tab === t.id ? 0 : -1" @click="switchTab(t.id)">{{ t.label }}</button>
+      </div>
+      <div class="xb-page-actions">
+        <form class="xb-search store-search" role="search" @submit.prevent="tab === 'skills' ? browse() : registry?.refresh()">
+          <Search :size="14" aria-hidden="true" /><input v-model="query" maxlength="70" aria-label="搜索专家、技能或连接器" :placeholder="`搜索${tabs.find(t => t.id === tab)?.label}`" />
+          <button v-if="query" type="button" class="clear" aria-label="清空搜索" @click="query = ''">×</button>
+        </form>
+        <button type="button" class="xb-btn installed-filter" :class="{ selected: installedOnly }" :aria-pressed="installedOnly" @click="installedOnly = !installedOnly; category = '全部'">{{ tab === 'connectors' ? '已配置' : '已安装' }}<span class="count">{{ installedCount }}</span></button>
       </div>
     </header>
-    <div :id="`store-panel-${tab}`" class="store-content" role="tabpanel" :aria-labelledby="`store-tab-${tab}`">
-      <div class="store-toolbar">
-        <div class="store-filters" aria-label="按领域筛选">
-          <button v-for="c in categories" :key="c.key" :class="{ active: category === c.key }" :aria-pressed="category === c.key" @click="category = c.key">{{ c.name }}</button>
-        </div>
-        <div v-if="tab === 'skills' && !installedOnly" class="skill-query-options">
-          <label>排序 <select v-model="skillSort" aria-label="技能排序">
-            <option value="score">综合评分</option><option value="downloads">最多下载</option>
-            <option value="stars">最多收藏</option><option value="installs">最多安装</option>
-            <option value="updated_at">最近更新</option>
-          </select></label>
-          <label>来源 <select v-model="skillSource" aria-label="技能来源">
-            <option value="">全部</option><option value="official">官方</option><option value="community">社区</option>
-          </select></label>
-        </div>
-        <button v-if="tab === 'skills'" class="installed-filter" :class="{ selected: installedOnly }" :aria-pressed="installedOnly" @click="installedOnly = !installedOnly; category = '全部'"><SlidersHorizontal :size="13" />已安装<span>{{ localSkills.length }}</span></button>
+    <div class="store-toolbar">
+      <div class="store-filters" aria-label="按领域筛选">
+        <button v-for="c in categories" :key="c.key" type="button" :class="{ active: category === c.key }" :aria-pressed="category === c.key" @click="category = c.key">{{ c.name }}</button>
       </div>
+      <div v-if="tab === 'skills' && !installedOnly" class="skill-query-options">
+        <label>排序 <select v-model="skillSort" aria-label="技能排序">
+          <option value="score">综合评分</option><option value="downloads">最多下载</option>
+          <option value="stars">最多收藏</option><option value="installs">最多安装</option>
+          <option value="updated_at">最近更新</option>
+        </select></label>
+        <label>来源 <select v-model="skillSource" aria-label="技能来源">
+          <option value="">全部</option><option value="official">官方</option><option value="community">社区</option>
+        </select></label>
+      </div>
+    </div>
+    <div :id="`store-panel-${tab}`" class="store-content xb-scroll" role="tabpanel" :aria-labelledby="`store-tab-${tab}`">
       <div v-if="tab === 'skills'" class="store-section-heading"><h2>{{ heading }}</h2><span>{{ description }}</span></div>
-      <NAlert v-if="!store.desktop && tab === 'skills'" type="info" :show-icon="false">请在小伴桌面客户端中浏览技能和管理连接器。</NAlert>
+      <NAlert v-if="!store.desktop && tab === 'skills'" class="store-alert" type="info" :show-icon="false">请在小伴桌面客户端中浏览技能和管理连接器。</NAlert>
       <NAlert v-if="categoriesError && tab === 'skills' && !installedOnly" class="store-alert" type="warning" :show-icon="false">{{ categoriesError }} <button class="text-action" @click="loadSkillCategories">重试</button></NAlert>
       <NAlert v-if="localError" class="store-alert" type="warning" :show-icon="false">{{ localError }} <button class="text-action" @click="refreshLocal">重试</button></NAlert>
       <NAlert v-if="error && tab === 'skills' && !installedOnly" class="store-alert" type="error" :show-icon="false">{{ error }} <button class="text-action" @click="browse">重试</button></NAlert>
 
       <template v-if="tab === 'skills'">
-        <div v-if="loading" class="store-grid" aria-label="正在加载技能" aria-busy="true"><NSkeleton v-for="n in 8" :key="n" height="183px" :sharp="false" /></div>
-        <div v-else class="store-grid skill-grid">
-          <article v-for="s in visibleSkills" :key="s.slug" class="store-card skill-card">
-            <div class="skill-top"><div class="skill-icon"><img v-if="skillIcon(s)" :src="skillIcon(s)!" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" @error="brokenIcons[skillIcon(s)!] = true" /><Puzzle v-else :size="23" :stroke-width="1.7" /></div><div class="skill-copy"><h3>{{ s.name || s.slug }}</h3><span>{{ s.version ? `v${s.version}` : s.slug }}</span></div></div>
-            <p class="skill-desc">{{ s.description || '查看技能说明与使用方法' }}</p>
-            <div class="skill-bottom"><span class="store-tag">{{ installed(s.slug)?.source || (s.source === 'official' ? 'SkillHub · 官方' : s.source === 'community' ? 'SkillHub · 社区' : 'SkillHub') }}</span><button class="small-action" :class="{ installed: installed(s.slug) }" :disabled="!store.desktop || !localReady" @click="openSkill(s)"><Check v-if="installed(s.slug)" :size="12" /><Download v-else :size="12" />{{ installed(s.slug) ? '已安装' : '安装' }}</button></div>
+        <div v-if="loading" class="xc-grid" aria-label="正在加载技能" aria-busy="true"><NSkeleton v-for="n in 6" :key="n" height="170px" :sharp="false" /></div>
+        <div v-else class="xc-grid skill-grid">
+          <article v-for="s in visibleSkills" :key="s.slug" class="xc store-card skill-card" :style="hueStyle(undefined, s.slug)">
+            <div class="xc-top">
+              <div class="xc-ic" :class="{ 'has-img': skillIcon(s) }"><img v-if="skillIcon(s)" :src="skillIcon(s)!" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer" @error="brokenIcons[skillIcon(s)!] = true" /><Puzzle v-else :size="24" :stroke-width="1.9" aria-hidden="true" /></div>
+              <div class="xc-main">
+                <div class="xc-title"><h3>{{ s.name || s.slug }}</h3><svg v-if="s.source === 'official'" class="xc-verified" role="img" aria-label="官方认证" width="14" height="14" viewBox="0 0 24 24"><path d="M12 2.5l2.4 1.8 3-.2.9 2.9 2.4 1.8-1 2.8 1 2.8-2.4 1.8-.9 2.9-3-.2L12 21.5l-2.4-1.8-3 .2-.9-2.9-2.4-1.8 1-2.8-1-2.8 2.4-1.8.9-2.9 3 .2z" fill="currentColor" /><path d="m8.5 12 2.4 2.4 4.6-4.8" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg></div>
+                <p class="xc-desc">{{ s.description || '查看技能说明与使用方法' }}</p>
+              </div>
+            </div>
+            <div class="xc-foot">
+              <span class="xc-tag">{{ installed(s.slug)?.source || (s.source === 'official' ? 'SkillHub · 官方' : s.source === 'community' ? 'SkillHub · 社区' : 'SkillHub') }}</span>
+              <span v-if="s.version" class="xc-meta">v{{ s.version }}</span>
+              <div class="xc-act"><button class="small-action xc-pill" :class="{ installed: installed(s.slug), 'is-done': installed(s.slug) }" :disabled="!store.desktop || !localReady" @click="openSkill(s)"><Check v-if="installed(s.slug)" :size="12" :stroke-width="3" /><Plus v-else :size="12" :stroke-width="2.6" />{{ installed(s.slug) ? '已安装' : '安装' }}</button></div>
+            </div>
           </article>
         </div>
         <div v-if="!installedOnly && !error && !loading && store.desktop && (page > 1 || remote.hasMore)" class="store-pagination"><button :disabled="page <= 1" aria-label="上一页" @click="page--"><ChevronLeft :size="16" /></button><span>第 {{ page }} 页</span><button :disabled="!remote.hasMore" aria-label="下一页" @click="page++"><ChevronRight :size="16" /></button></div>
       </template>
-      <RegistryCatalog v-else ref="registry" :kind="tab" :query="query" :category="category" :store="store">
+      <RegistryCatalog v-else ref="registry" :kind="tab" :query="query" :category="category" :store="store" :installed-only="installedOnly">
         <template v-if="tab === 'connectors' && showComputer" #prefix>
-        <article v-if="showComputer" class="store-card connector-card">
-          <div class="connector-top"><div class="provider-icon computer"><Monitor :size="25" /></div><span class="connection-status" :class="{ enabled: computerEnabled }">{{ computerEnabled ? '已启用' : '未启用' }}</span></div>
-          <h3>本机电脑控制</h3><p class="connector-desc">通过截图、鼠标和键盘操作电脑上的应用</p>
-          <div class="connector-bottom"><small>Computer Use</small><button class="small-action" :disabled="!store.desktop || !!localError" @click="computerOpen = true">{{ computerEnabled ? '管理' : '启用' }}</button></div>
+        <article v-if="showComputer" class="xc store-card connector-card" style="--h-hi:#7C8CF8;--h:#4A57D0">
+          <div class="xc-top">
+            <div class="xc-ic"><Monitor :size="24" :stroke-width="1.9" aria-hidden="true" /></div>
+            <div class="xc-main"><div class="xc-title"><h3>本机电脑控制</h3></div><p class="xc-desc">通过截图、鼠标和键盘操作电脑上的应用</p></div>
+          </div>
+          <div class="xc-foot">
+            <span class="xc-tag">Computer Use</span>
+            <span class="connection-status" :class="{ enabled: computerEnabled, 'xb-ok': computerEnabled }">{{ computerEnabled ? '已启用' : '未启用' }}</span>
+            <div class="xc-act"><button class="small-action xc-pill" :class="{ 'is-done': computerEnabled }" :disabled="!store.desktop || !!localError" @click="computerOpen = true">{{ computerEnabled ? '管理' : '启用' }}</button></div>
+          </div>
         </article>
         </template>
       </RegistryCatalog>
-      <div v-if="empty && !error && (tab !== 'skills' || store.desktop)" class="store-empty"><Search :size="26" /><b>{{ installedOnly ? '暂无匹配的已安装技能' : '没有找到匹配内容' }}</b><span>试试其他关键词或分类</span><button class="text-action" @click="reset">清除筛选</button></div>
+      <div v-if="empty && !error && (tab !== 'skills' || store.desktop)" class="xb-empty store-empty"><div class="xb-empty-icon"><Search :size="24" /></div><h3>{{ installedOnly ? '暂无匹配的已安装技能' : '没有找到匹配内容' }}</h3><p>试试其他关键词或分类</p><button class="xb-btn is-sm" @click="reset">清除筛选</button></div>
     </div>
 
     <NModal :show="!!skill" preset="card" :title="skill?.name || skill?.slug" class="store-dialog skill-dialog" :mask-closable="!busy" :closable="!busy" style="width:680px;max-width:calc(100vw - 36px)" @update:show="!$event && !busy && (skill = null)">
@@ -266,23 +286,30 @@ const bytes = (n: number) => n < 1024 ? `${n} B` : `${(n / 1024).toFixed(1)} KB`
 </template>
 
 <style scoped>
-.skill-icon img{width:100%;height:100%;object-fit:cover;border-radius:inherit}
-.ai-store-page{--store-red:var(--ui-primary);--store-soft:var(--ui-primary-soft);display:flex;flex-direction:column;flex:1;min-height:0;min-width:0;color:var(--ui-text-primary);background:var(--ui-surface);container-type:inline-size}
-.store-header{padding:30px 38px 0;flex:none}.store-search{display:flex;align-items:center;gap:10px;width:min(480px,100%);height:40px;padding:0 12px;border:1px solid transparent;background:var(--ui-surface-alt);border-radius:10px;color:var(--ui-text-tertiary)}
-.store-search:focus-within{border-color:var(--store-red);background:var(--ui-surface)}.store-search input{flex:1;min-width:0;font:inherit;font-size:12px;color:var(--ui-text-primary);background:transparent;border:0;outline:0}.store-search input::placeholder{color:var(--ui-text-tertiary)}
-.ai-store-page button,.store-dialog button{font:inherit;cursor:pointer;border:0;color:inherit;background:none}.ai-store-page button:disabled,.store-dialog button:disabled{opacity:.5;cursor:not-allowed}.store-search button{font-size:20px;color:var(--ui-text-tertiary)}
-.store-tabs{display:flex;width:420px;max-width:100%;padding:4px;background:var(--ui-surface-alt);border-radius:11px;margin:17px 0 23px;gap:2px}.store-tabs button{flex:1;height:35px;border-radius:8px;font-size:13px;font-weight:600;color:var(--ui-text-secondary)}.store-tabs button.active{background:var(--store-red);color:#fff;box-shadow:0 3px 9px color-mix(in srgb,var(--store-red) 20%,transparent)}.store-tabs button:hover:not(.active){background:var(--ui-border)}
-.store-content{overflow:auto;flex:1;min-height:0;padding:0 38px 38px;scrollbar-width:thin;scrollbar-color:var(--ui-scrollbar) transparent}.store-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:18px;flex-wrap:wrap}.skill-query-options{display:flex;align-items:center;gap:12px}.skill-query-options label{display:flex;align-items:center;gap:6px;white-space:nowrap;font-size:11px;color:var(--ui-text-secondary)}.skill-query-options select{max-width:120px;border:0;border-radius:8px;padding:8px;background:var(--ui-surface-alt);color:var(--ui-text-primary);font:inherit;font-size:11px}.store-filters{display:flex;align-items:center;flex-wrap:wrap;gap:7px}.store-filters button{padding:8px 13px;border-radius:8px;background:var(--ui-surface-alt);color:var(--ui-text-secondary);font-size:11px;white-space:nowrap}.store-filters button.active{background:var(--store-soft);color:var(--ui-primary-text);font-weight:700}.store-filters button:hover{color:var(--store-red)}
-.installed-filter{display:flex;align-items:center;gap:5px;white-space:nowrap;font-size:11px!important;color:var(--ui-text-secondary)!important}.installed-filter.selected{color:var(--ui-primary-text)!important}.installed-filter span{padding:1px 5px;background:var(--ui-surface-alt);border-radius:5px}.store-section-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0 0 14px}.store-section-heading h2{font-size:15px;letter-spacing:-.2px;margin:0;font-weight:650}.store-section-heading>span{font-size:11px;color:var(--ui-text-tertiary)}
-.store-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;align-items:stretch}.store-card{min-width:0;background:var(--ui-surface);border:1px solid var(--ui-border);border-radius:13px;padding:16px;box-shadow:0 3px 18px color-mix(in srgb,var(--ui-text-primary) 3%,transparent);transition:box-shadow .18s,border-color .18s,transform .18s}.store-card:hover{border-color:color-mix(in srgb,var(--store-red) 24%,var(--ui-border));box-shadow:0 9px 28px color-mix(in srgb,var(--ui-text-primary) 6%,transparent);transform:translateY(-2px)}
-.store-card h3{font-size:13px;font-weight:700;line-height:1.5;margin:0;overflow-wrap:anywhere}.expert-card{display:flex;flex-direction:column;min-height:223px;padding:15px}.expert-top{display:flex;align-items:flex-start;gap:11px}.expert-meta{min-width:0;padding-top:5px}.expert-meta h3{margin:0 0 7px}.expert-desc{color:var(--ui-text-secondary);font-size:11px;line-height:1.75;margin:12px 0 10px;min-height:38px}.expert-special{font-size:10px;color:var(--ui-text-tertiary);margin-bottom:14px}.expert-special b{font-weight:500;color:var(--ui-text-secondary);margin-left:5px}.store-tag{display:inline-block;color:var(--ui-text-tertiary);background:var(--ui-surface-alt);border-radius:5px;font-size:10px;padding:5px 7px;line-height:1.3}
-.card-actions{display:flex;gap:7px;margin-top:auto}.card-actions .store-primary{flex:1;min-width:0;padding:0 10px}.store-primary,.store-secondary{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:35px;min-height:35px;padding:0 15px;border-radius:9px;font-size:11px!important;font-weight:650!important;white-space:nowrap}.ai-store-page .store-primary,.store-dialog .store-primary{background:var(--ui-primary);color:#fff}.store-primary:hover:enabled{background:var(--ui-primary-hover)}.ai-store-page .store-secondary,.store-dialog .store-secondary{background:var(--ui-surface-alt);color:var(--ui-text-secondary)}.card-actions .store-secondary{padding:0 10px}
-.skill-card{display:flex;flex-direction:column;min-height:183px}.skill-top{display:flex;align-items:flex-start;gap:10px}.skill-icon{width:44px;height:44px;border-radius:12px;background:var(--store-soft);color:var(--ui-primary-text);display:grid;place-items:center;flex:none}.skill-copy{min-width:0}.skill-copy h3{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}.skill-copy>span{display:block;font-size:10px;color:var(--ui-text-tertiary);margin-top:5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.skill-desc{font-size:11px;color:var(--ui-text-secondary);line-height:1.65;margin:12px 0;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere}.skill-bottom{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:auto;padding-top:5px}.small-action{display:flex;align-items:center;justify-content:center;gap:4px;padding:8px 10px;border-radius:8px;font-size:11px!important;font-weight:650!important;white-space:nowrap}.ai-store-page .small-action{color:var(--ui-primary-text);background:var(--store-soft)}.ai-store-page .small-action.installed,.ai-store-page .small-action.neutral{color:var(--ui-text-secondary);background:var(--ui-surface-alt)}
-.connector-card{display:flex;flex-direction:column;min-height:193px;padding:17px}.connector-top{display:flex;align-items:flex-start;justify-content:space-between;gap:6px}.provider-icon{width:45px;height:45px;display:grid;place-items:center;flex:none;border-radius:12px;background:var(--ui-surface-alt);overflow:hidden}.provider-icon img{width:29px;height:29px}.provider-icon.computer{color:var(--ui-primary-text);background:var(--store-soft)}.connection-status{font-size:10px;padding:5px 6px;background:var(--ui-surface-alt);color:var(--ui-text-tertiary);border-radius:7px}.connection-status.enabled{color:var(--ui-accent)}.connector-card h3{margin:14px 0 6px}.connector-desc{font-size:11px;color:var(--ui-text-secondary);line-height:1.6;margin:0 0 12px;overflow-wrap:anywhere}.connector-bottom{display:flex;align-items:center;justify-content:space-between;gap:5px;margin-top:auto}.connector-bottom small{font-size:10px;color:var(--ui-text-tertiary)}
-.store-alert{margin-bottom:16px}.text-action{color:var(--ui-primary-text)!important;font-size:12px!important}.store-empty{min-height:230px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;color:var(--ui-text-tertiary)}.store-empty b{font-size:13px;color:var(--ui-text-secondary)}.store-empty>span{font-size:11px}.store-pagination{display:flex;align-items:center;justify-content:center;gap:14px;margin:26px 0 0;font-size:12px;color:var(--ui-text-secondary)}.store-pagination button{display:grid;place-items:center;width:30px;height:30px;border-radius:8px;background:var(--ui-surface-alt)}
-.store-dialog p{font-size:12px;line-height:1.85;color:var(--ui-text-secondary);margin:12px 0;overflow-wrap:anywhere}.store-dialog h4{font-size:13px;margin:22px 0 10px}.store-dialog h4 small{font-size:11px;font-weight:400;margin-left:8px;color:var(--ui-text-tertiary)}.detail-intro{display:flex;gap:15px;align-items:center}.detail-tags{display:flex;gap:7px;flex-wrap:wrap}.store-dialog .detail-note{padding:12px;background:var(--ui-surface-alt);border-radius:10px;color:var(--ui-text-secondary);font-size:11px}.dialog-actions{display:flex;gap:9px;justify-content:flex-end;margin-top:23px}.dialog-actions .store-primary{font-size:12px!important}.review-loading,.installed-detail{display:flex;align-items:center;gap:9px;font-size:12px;color:var(--ui-text-secondary);padding:15px 0}.review-content,.script-preview pre{font-size:11px;line-height:1.7;white-space:pre-wrap;overflow-wrap:anywhere;max-height:240px;overflow:auto;padding:12px;background:var(--ui-surface-alt);border-radius:8px}.review-files{list-style:none;margin:0;padding:0;max-height:200px;overflow:auto}.review-files li{padding:8px 0;border-bottom:1px solid var(--ui-border)}.review-files li>div{display:flex;justify-content:space-between;gap:12px;font-size:11px}.review-files code{overflow-wrap:anywhere}.review-files small{display:block;font-size:9px;color:var(--ui-text-tertiary);word-break:break-all;margin-top:4px}.script-preview{font-size:11px;padding:10px 0}.script-preview summary{cursor:pointer;overflow-wrap:anywhere}.review-confirm{display:flex;gap:8px;align-items:flex-start;font-size:12px;line-height:1.7}.review-confirm input{accent-color:var(--ui-primary);margin-top:4px;flex:none}.connector-scopes{font-size:12px;color:var(--ui-text-secondary);line-height:2;padding-left:20px}
-@container(max-width:1120px){.store-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
-@container(max-width:820px){.store-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.store-header{padding:24px 24px 0}.store-content{padding:0 24px 28px}}
-@container(max-width:520px){.store-grid{grid-template-columns:minmax(0,1fr)}.store-header{padding:20px 16px 0}.store-content{padding:0 16px 24px}.store-toolbar{align-items:flex-start}.store-filters{gap:5px}.store-filters button{padding:7px 10px}.store-section-heading>span{display:none}.installed-filter{padding-top:7px!important}}
-@media(prefers-reduced-motion:reduce){.store-card{transition:none}.store-card:hover{transform:none}}
+.ai-store-page{display:flex;flex-direction:column;flex:1;min-height:0;min-width:0;padding-bottom:0;color:var(--ui-text-primary);background:var(--ui-surface);container-type:inline-size}
+.store-header{flex:none}
+.store-header .xb-page-actions .xb-search{width:220px;height:32px;padding:0 10px;gap:8px;border-radius:9px;background:var(--ui-control);box-sizing:border-box}
+.store-search .clear{border:0;background:none;color:var(--ui-text-tertiary);font-size:16px;line-height:1;cursor:pointer;padding:0}
+.installed-filter .count{min-width:18px;height:18px;padding:0 5px;box-sizing:border-box;border-radius:999px;background:var(--ui-soft);color:var(--ui-ink);font-size:11px;font-weight:600;display:inline-grid;place-items:center}
+.installed-filter.selected{box-shadow:inset 0 0 0 1.5px var(--ui-btn);color:var(--ui-ink)}
+.store-toolbar{flex:none;margin-top:18px;display:flex;align-items:center;gap:12px;padding-bottom:12px;border-bottom:1px solid var(--ui-line);flex-wrap:wrap}
+.store-filters{display:flex;align-items:center;flex-wrap:wrap;gap:4px;min-width:0}
+.store-filters button{height:30px;padding:0 12px;border:0;border-radius:8px;background:transparent;color:var(--ui-text-secondary);font:inherit;font-size:13px;white-space:nowrap;cursor:pointer}
+.store-filters button:hover{background:var(--ui-control)}
+.store-filters button.active{background:var(--ui-soft);color:var(--ui-ink);font-weight:600}
+.skill-query-options{margin-left:auto;display:flex;align-items:center;gap:12px}
+.skill-query-options label{display:flex;align-items:center;gap:6px;white-space:nowrap;font-size:12px;color:var(--ui-text-secondary)}
+.skill-query-options select{max-width:120px;height:28px;border:0;border-radius:8px;padding:0 8px;background:var(--ui-control);color:var(--ui-text-primary);font:inherit;font-size:12px}
+.store-content{flex:1;min-height:0;overflow-y:auto;margin:0 -28px;padding:16px 28px 28px}
+.store-section-heading{display:flex;align-items:baseline;gap:10px;margin:0 0 12px}
+.store-section-heading h2{font-size:14px;font-weight:600;margin:0}
+.store-section-heading>span{font-size:12px;color:var(--ui-text-tertiary)}
+.store-alert{margin-bottom:14px}
+.text-action{border:0;background:none;color:var(--ui-ink);font:inherit;font-size:12px;cursor:pointer}
+.store-empty{min-height:230px}
+.store-pagination{display:flex;align-items:center;justify-content:center;gap:14px;margin:24px 0 0;font-size:12px;color:var(--ui-text-secondary)}
+.store-pagination button{display:grid;place-items:center;width:30px;height:30px;border:0;border-radius:8px;background:var(--ui-control);color:var(--ui-text-primary);cursor:pointer}
+.store-pagination button:disabled{opacity:.45;cursor:not-allowed}
+.connection-status{display:inline-flex;align-items:center;margin-left:4px;font-size:12px;color:var(--ui-text-secondary);white-space:nowrap}
+.connection-status.xb-ok{color:var(--ui-success-text)}
 </style>

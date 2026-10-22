@@ -78,5 +78,13 @@ function editRaw(event:Event){const text=(event.target as HTMLTextAreaElement).v
   </div>
 </template>
 <style scoped>
-.connector-fields{display:grid;gap:14px;margin:15px 0}.connector-fields label{display:grid;gap:7px;font-size:12px;color:var(--ui-text-secondary)}input,select,textarea{box-sizing:border-box;width:100%;padding:10px 12px;border:1px solid var(--ui-border);border-radius:8px;background:var(--ui-surface-alt);color:var(--ui-text-primary);font:inherit;font-size:12px;line-height:1.6}input:focus,select:focus,textarea:focus{outline:2px solid var(--ui-primary);outline-offset:1px}.form-note{margin:0;font-size:12px;color:var(--ui-text-secondary)}details{font-size:12px}summary{cursor:pointer;color:var(--ui-text-secondary)}details label{margin-top:12px}textarea{height:200px;font-family:monospace;resize:vertical;margin-top:10px}.form-error{font-size:12px;color:var(--ui-danger,#b94b53)}
+.connector-fields{display:grid;gap:12px;margin:14px 0;padding:14px;background:var(--ui-surface);border-radius:12px;box-shadow:0 0 0 1px var(--ui-border)}
+.connector-fields label{display:grid;gap:6px;font-size:12px;font-weight:500;color:var(--ui-text-secondary)}
+input,select,textarea{box-sizing:border-box;width:100%;padding:8px 11px;border:0;border-radius:9px;background:var(--ui-control);box-shadow:inset 0 0 0 1px transparent;color:var(--ui-text-primary);font:inherit;font-size:13px;line-height:1.6;outline:none;transition:box-shadow .15s,background .15s}
+input:focus,select:focus,textarea:focus{background:var(--ui-surface);box-shadow:inset 0 0 0 1.5px var(--ui-btn)}
+input::placeholder,textarea::placeholder{color:var(--ui-text-tertiary)}
+.form-note{margin:0;font-size:12px;color:var(--ui-text-secondary)}
+details{font-size:12px}summary{cursor:pointer;color:var(--ui-text-secondary)}details label{margin-top:12px}
+textarea{height:200px;font-family:var(--ui-font-mono,monospace);font-size:12px;resize:vertical;margin-top:10px;background:var(--ui-surface-sunken)}
+.form-error{margin:0;font-size:12px;color:var(--ui-danger)}
 </style>
