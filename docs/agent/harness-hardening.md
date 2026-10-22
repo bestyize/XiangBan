@@ -1,7 +1,7 @@
 # 小伴桌面 Agent 加固：差距分析、已修复项与后续路线
 
 **编制日期：** 2026-10-22
-**分支：** `fix/agent-harness-hardening-20261022`、`feat/agent-harness-stage2-20261022`（均已合并到 main）、`feat/agent-harness-stage3-20261022`（第三批）
+**分支：** `fix/agent-harness-hardening-20261022`、`feat/agent-harness-stage2-20261022`（均已合并到 main）、`feat/agent-harness-stage3-20261022`（第三批，均已合并到 main）、`feat/agent-harness-stage4-20261022`（第四批）
 **范围：** `client/xiaoban-desktop-wallpaper` 的聊天 Agent（`src-tauri/src/chat/`、`src/ui/chat/`）与 `libs/agent-kernel`
 
 本文记录一次对照 Claude Code、Codex、Hermes Agent 等 harness 的审查：发现的问题、本分支已经修复的部分、验证方式，以及还没做的部分和建议做法。标注 **[已修复]** 的条目有对应提交和测试；标注 **[待建]** 的条目尚未实现，不能对外宣称。
@@ -10,15 +10,15 @@
 
 | 维度 | 审查时的现状 | 成熟 harness 的做法 | 本分支之后 |
 |---|---|---|---|
-| 执行隔离 | 无沙箱；“完全信任”只靠关键词规则（`danger.rs`）把关 | Codex 用系统沙箱（Seatbelt / Landlock）限制写入和网络；Claude Code 有沙箱模式；Hermes 可把终端放进 Docker/SSH | 规则已加固 **[已修复]**；macOS 沙箱 **[已实现，待真机验证]**；Windows **[待建]** |
+| 执行隔离 | 无沙箱；“完全信任”只靠关键词规则（`danger.rs`）把关 | Codex 用系统沙箱（Seatbelt / Landlock）限制写入和网络；Claude Code 有沙箱模式；Hermes 可把终端放进 Docker/SSH | 规则已加固 **[已修复]**；macOS 沙箱 **[已实现，待真机验证]**；Windows 低完整性沙箱 **[实验性，默认关闭]** |
 | 权限粒度 | 全局一个模式；执行类工具“总是允许”不可用 | 按会话；按命令前缀记住授权 | 按会话 **[已修复]**；按命令种类记住 **[已修复]** |
 | 上下文压缩 | 只在一轮回答结束后压缩 | 回答进行中也会自动压缩 | **[已修复]** |
 | Prompt 缓存 | Claude 协议未发 `cache_control` | 缓存系统提示、工具和历史 | **[已修复]** |
 | 后台进程 | 内核有 `ProcessManager`，桌面端未接入（运行文档写着已接入） | 后台 shell、轮询输出 | **[已修复]** |
-| 编辑回滚 | 无 | Claude Code 检查点；Codex 基于 git 撤销 | 文件工具改动可整轮撤销 **[已修复]** |
+| 编辑回滚 | 无 | Claude Code 检查点；Codex 基于 git 撤销 | 整轮撤销 **[已实现]**：文件工具改动全部覆盖；git 仓库内命令的改动也能恢复 |
 | 子 Agent | 内核有 `Subagent`，桌面端未用 | 常规能力 | 只读调研子 Agent **[已实现]** |
 | 网页搜索 | 只有 `web_fetch` | 自带搜索 | **[待建]**（需搜索后端） |
-| 项目指令与 hooks | 只有 skills 与记忆 | 读取 AGENTS.md / CLAUDE.md，工具前后 hooks | 项目指令、hooks **[已实现]**（hooks 暂无设置界面） |
+| 项目指令与 hooks | 只有 skills 与记忆 | 读取 AGENTS.md / CLAUDE.md，工具前后 hooks | 项目指令、hooks **[已实现]**，可在设置中编辑 |
 | Claude 思考模式 | thinking 块不在轮次间保留，带工具时不能开 | 支持 | **[已实现]**，前缀改变时不回传 |
 
 ## 2. 已修复的问题
@@ -63,6 +63,15 @@
 21. **工具 hooks**：`chat/hooks.json` 配置调用前后的命令，调用前的 hook 失败即拦截，调用后的 hook 把问题反馈给模型。用法见桌面端 README“工具 hooks”。
 22. **子任务运行记录**：research 子 Agent 的运行写入父对话的执行日志，带 `parent_run_id`。
 
+### 2.7 第四批（`feat/agent-harness-stage4-20261022`）
+
+23. **设置“安全与权限”**：沙箱联网开关（macOS）、hooks 编辑与校验、已记住的授权列表与撤销。“这段对话都允许”现在保存到 `chat/agent-settings.json`，重启后仍有效（内核 `Permission::grant` / `revoke`）。
+24. **电脑控制引擎复用**：computer-use MCP 进程跨消息复用，连接断开才重启。
+25. **git 检查点**：工作目录在 git 仓库时，一轮回答第一次运行命令前，用临时索引做工作文件快照。撤销时恢复命令的改动，不碰用户的索引、分支和 stash；被忽略的文件不在其中。
+26. **命令的窗口白名单**：确认 `main.rs` 已有按窗口过滤（见 2.1 第 3 条的更正），补回归测试。
+27. **每轮用量**：回答下方显示这一轮的输入与输出 token，含调研子任务。
+28. **Windows 低完整性沙箱（实验性，默认关闭）**：宿主可执行文件充当启动器，用低完整性令牌启动 `cmd`；开启时把工作目录标记为低完整性。只限制写入，不限制读取与联网。已在 Linux 上对 Windows 目标做类型检查，尚未在真机运行。
+
 合并 #93（长期目标）时，顺带修正了 main 上的三处编译错误：`File::try_lock` 的错误类型、`pub use` 重新导出 Tauri 命令、`app.state()` 临时值的借用。
 
 ## 3. 验证情况
@@ -80,26 +89,24 @@ npm ci --registry=https://registry.npmjs.org/ --replace-registry-host=registry.n
 
 ## 4. 后续路线
 
-### 4.1 系统沙箱：macOS 已实现，Windows [待建]
+### 4.1 系统沙箱：macOS 已实现，Windows 实验性
 
 关键词规则挡不住 `python script.py` 这类由模型先写脚本再执行的路径，“完全信任”需要真正的隔离作为前提：
 
-- macOS：已实现（见 2.5 第 18 条），尚需真机验证；后续可在设置里提供“完全信任时关闭网络”的选项（`SandboxPolicy.network`）。
-- Windows：受限令牌或 AppContainer 加现有的 Job Object；先只限制写入范围。
+- macOS：已实现（见 2.5 第 18 条），联网开关已在设置中提供，尚需真机验证。
+- Windows：低完整性方案已实现并默认关闭（见 2.7 第 28 条）。真机验证通过后再考虑默认开启；若要限制读取，需要改用 AppContainer。
 - 沙箱不可用（系统版本过低、启动失败）时，“完全信任”自动降级为“询问”并在界面说明。
 - 验收：沙箱内 `rm -rf ~`、写 `~/.zshrc`、`curl -d` 均失败；`npm test`、`cargo build` 正常。
 
 ### 4.2 命令权限的进一步收敛 [待建]
 
-- 记住的命令种类目前只在内存里、按会话保存；需要时可持久化，并在设置里列出与撤销。
 
 ### 4.3 能力补齐 [待建]
 
-- **子 Agent**：只读调研已实现，运行记录已进入父对话日志；子任务的用量尚未计入父任务的调用预算，界面也还没有展示用量。
+- **子 Agent**：只读调研已实现，运行记录进入父对话日志，用量在界面上计入父回答；子任务的工具调用次数尚未计入父任务的调用预算。
 - **网页搜索**：`web_search` 需要宿主提供 `SearchBackend`，建议走 server-ai 网关统一计费与限流。
-- **hooks 设置界面**：现在只能手动编辑 `chat/hooks.json`。
-- **Agent 复用**：现在每条消息都会重建 Agent；开启电脑控制时，每条消息还会重启一次 MCP 子进程。可改为按配置缓存，配置变化时再重建。
-- **检查点的覆盖范围**：可在工作目录是 git 仓库时，额外用 `git stash create` 记录 shell 改动。
+- **Agent 复用**：电脑控制进程已复用；Agent 本身仍按消息重建（开销小，换来配置与工作目录变化即时生效）。
+- **检查点的覆盖范围**：不在 git 仓库的工作目录里，命令改动的文件仍无法撤销。
 
 ### 4.4 需要补的边界测试
 
