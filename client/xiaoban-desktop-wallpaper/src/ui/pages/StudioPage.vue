@@ -35,8 +35,9 @@ const tabs: { id: StudioTab; label: string }[] = [
   </section>
 </template>
 <style scoped>
-.studio-page{flex:1;min-height:0;min-width:0;display:flex;flex-direction:column}
-.studio-head{flex-shrink:0;display:flex;align-items:center;gap:22px;padding:22px 28px 0}
+.studio-page{flex:1;height:100%;min-height:0;min-width:0;display:flex;flex-direction:column;overflow:hidden}
+.studio-head{flex-shrink:0;position:relative;z-index:2;background:var(--ui-surface);display:flex;align-items:center;gap:22px;padding:22px 28px 0}
 .studio-body{flex:1;min-height:0;min-width:0;display:flex;flex-direction:column;overflow:hidden}
 .studio-body>:deep(*){flex:1;min-height:0}
 </style>
+

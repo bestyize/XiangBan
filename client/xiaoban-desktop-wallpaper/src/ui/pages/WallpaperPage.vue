@@ -2,7 +2,7 @@
 import ResourceShareActions from "../components/ResourceShareActions.vue";
 import {computed,ref,watch,nextTick,onBeforeUnmount,onActivated,onDeactivated} from "vue";
 import {NButton,NSelect,NSlider,NSwitch,NEmpty,NAlert,NPagination,NCollapse,NCollapseItem,NColorPicker,NSpin,NPopconfirm} from "naive-ui";
-import {Search,Maximize2,X,Monitor,Trash2,Upload,Sparkles,ChevronDown,Check,Image as ImageIcon} from "lucide-vue-next";
+import {Search,Maximize2,X,Monitor,Trash2,Download,Sparkles,ChevronDown,Check,Image as ImageIcon} from "lucide-vue-next";
 import {invoke,wallpaperDefaults,type WallpaperLibrary,type WallpaperOptions} from "../../bridge.ts";
 import {siteMedia,siteFullMedia,isAnimatedWallpaper} from "../../wallpaper-media.ts";
 import type {ControlStore} from "../control-types.ts";
@@ -104,11 +104,11 @@ onActivated(()=>window.addEventListener("keydown",onKey));
 <template>
 <section class="wallpaper-workbench" data-testid="wallpapers-page">
 <StudioActions>
-<div class="import-wrap"><button type="button" class="xb-btn" aria-haspopup="menu" :aria-expanded="importMenu" :disabled="busy" data-testid="wallpapers-import" @click="importMenu=!importMenu"><Upload :size="14"/>导入<ChevronDown :size="13"/></button>
+<div class="import-wrap"><button type="button" class="xb-btn" aria-haspopup="menu" :aria-expanded="importMenu" :disabled="busy" data-testid="wallpapers-import" @click="importMenu=!importMenu"><Download :size="14"/>导入<ChevronDown :size="13"/></button>
 <template v-if="importMenu"><div class="menu-dismiss" @pointerdown="importMenu=false"></div><div class="xb-menu import-menu" role="menu" @click.capture="importMenu=false"><button type="button" role="menuitem" class="xb-menu-item" data-testid="import-media" :disabled="busy" @click="importMedia"><ImageIcon :size="15"/>导入图片 / 视频</button><ResourceShareActions :store="store" kind="wallpaper" variant="menu" import-label="导入资源包" :disabled="busy" @imported="importedResource"/></div></template></div>
 <button type="button" class="xb-btn-primary" :disabled="!store.desktop" data-testid="wallpapers-create" @click="store.startCreation('wallpaper')"><Sparkles :size="14"/>让小伴创作</button>
 </StudioActions>
-<div class="wp-scroll" data-testid="wallpapers-scroll">
+<div class="wp-toolbar" data-testid="wallpapers-toolbar">
 <div class="filters">
 <div class="xb-seg" role="group" aria-label="壁纸来源"><button v-for="item in scopes" :key="item.id" type="button" :disabled="busy" :aria-pressed="scope===item.id" :data-testid="`wallpaper-scope-${item.id}`" @click="scope=item.id">{{item.label}}</button></div>
 <span class="divider"></span>
@@ -116,6 +116,8 @@ onActivated(()=>window.addEventListener("keydown",onKey));
 <div class="filters-end"><label class="xb-search search-box"><Search :size="14"/><input v-model="query" :disabled="busy" placeholder="搜索素材" data-testid="wallpaper-search" @keyup.enter="page=1;load()"/></label><button v-if="tab==='online'" type="button" class="xb-btn is-sm" :disabled="busy" @click="page=1;load()">搜索</button><span class="count">{{tab==='online'?feed.total:cards.length+(scope==='official'?1:0)}} 张</span></div>
 </div>
 <div v-if="tab==='online'&&categoryOptions.length>1" class="chips cat-row" role="group" aria-label="分类"><button v-for="option in categoryOptions" :key="option.value" type="button" class="fchip" :class="{on:category===option.value}" :disabled="busy" :aria-pressed="category===option.value" @click="category=option.value">{{option.label}}</button></div>
+</div>
+<div class="wp-scroll" data-testid="wallpapers-scroll">
 <NAlert v-if="error" type="error" class="feed-alert">{{error}}<NButton size="small" @click="load">重试</NButton></NAlert>
 <NAlert v-if="tab==='online'&&!store.desktop" type="info" class="feed-alert">在线资源需要桌面应用连接真实网站。浏览器预览可查看官方与我的壁纸。</NAlert>
 <NSpin :show="tab==='online'&&loading"><div class="gallery">
@@ -139,7 +141,8 @@ onActivated(()=>window.addEventListener("keydown",onKey));
 </template>
 <style scoped>
 .wallpaper-workbench{position:relative;height:100%;width:100%;min-height:0;display:flex;flex-direction:column;overflow:hidden}
-.wp-scroll{flex:1;min-height:0;overflow:auto;padding:18px 28px 28px;scrollbar-width:thin;scrollbar-color:var(--ui-scrollbar) transparent;overscroll-behavior:contain}
+.wp-toolbar{flex:none;padding:18px 28px 0;background:var(--ui-surface)}
+.wp-scroll{flex:1;min-height:0;overflow:auto;padding:0 28px 28px;scrollbar-width:thin;scrollbar-color:var(--ui-scrollbar) transparent;overscroll-behavior:contain}
 .import-wrap{position:relative}
 .menu-dismiss{position:fixed;inset:0;z-index:30}
 .import-menu{position:absolute;right:0;top:38px;z-index:31;min-width:180px}

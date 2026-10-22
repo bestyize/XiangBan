@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 import { NButton } from 'naive-ui';
-import { FileDown, FileUp, Share2, Upload } from 'lucide-vue-next';
+import { FileDown, Share2, Download } from 'lucide-vue-next';
 import { invoke } from '../../bridge.ts';
 import type { ControlStore } from '../control-types.ts';
 // `icons` drops the wording and keeps only the two marks, for the narrow strip at a card's lower right.
@@ -35,8 +35,8 @@ async function run(share = false) {
 </script>
 <template>
   <div v-if="store.desktop || importLabel" class="resource-share-actions" :class="{ icons, plain: !id && (variant === 'xb' || variant === 'menu') }" @click.stop @keydown.stop>
-    <button v-if="!id && variant === 'xb'" type="button" class="xb-btn" :disabled="busy || disabled || !store.desktop" :title="importLabel || '导入资源包'" data-testid="import-resource" @click="run()"><Upload :size="14" />{{ importLabel || '导入资源包' }}</button>
-    <button v-else-if="!id && variant === 'menu'" type="button" role="menuitem" class="xb-menu-item" :disabled="busy || disabled || !store.desktop" data-testid="import-resource" @click="run()"><FileUp :size="15" />{{ importLabel || '导入资源包' }}</button>
+    <button v-if="!id && variant === 'xb'" type="button" class="xb-btn" :disabled="busy || disabled || !store.desktop" :title="importLabel || '导入资源包'" data-testid="import-resource" @click="run()"><Download :size="14" />{{ importLabel || '导入资源包' }}</button>
+    <button v-else-if="!id && variant === 'menu'" type="button" role="menuitem" class="xb-menu-item" :disabled="busy || disabled || !store.desktop" data-testid="import-resource" @click="run()"><FileDown :size="15" />{{ importLabel || '导入资源包' }}</button>
     <NButton v-else :size="importLabel && !icons ? 'medium' : 'small'" :round="!!importLabel && !icons" :circle="!!icons" secondary :loading="busy" :disabled="busy || disabled || !store.desktop" :title="id ? '导出资源包' : importLabel || '导入资源包'" :aria-label="id ? '导出资源包' : importLabel || '导入资源包'" :data-testid="id ? 'export-resource' : 'import-resource'" @click="run()">
       <template v-if="icons" #icon><FileDown :size="15" /></template>
       <template v-if="!icons">{{ id ? '导出资源包' : importLabel || '导入资源包' }}</template>
@@ -52,4 +52,5 @@ async function run(share = false) {
 .resource-share-actions.icons{gap:4px;flex-wrap:nowrap}
 .resource-share-actions.plain{display:contents}
 </style>
+
 

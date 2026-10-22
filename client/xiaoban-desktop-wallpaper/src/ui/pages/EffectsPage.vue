@@ -3,7 +3,7 @@ import StudioActions from '../components/StudioActions.vue';
 import ResourceShareActions from "../components/ResourceShareActions.vue";
 import { computed, onBeforeUnmount, onDeactivated, onMounted, ref, watch } from 'vue';
 import { NAlert, NPopconfirm, NSlider, NSwitch } from 'naive-ui';
-import { Ban, Sparkles, Trash2, Upload } from 'lucide-vue-next';
+import { Ban, Sparkles, Trash2, Download } from 'lucide-vue-next';
 import { normalizeChoice, paramsOf } from '../../effects/parse.ts';
 import { defaultParams, limits, type EffectsChoice } from '../../effects/types.ts';
 import type { ControlStore } from '../control-types.ts';
@@ -84,14 +84,15 @@ onBeforeUnmount(() => { if (timer) { clearTimeout(timer); commit(); } });
 <template>
   <section class="effects-page" data-testid="effects-page">
     <StudioActions>
-      <button type="button" class="xb-btn" data-testid="effects-import" @click="importPack"><Upload :size="14" />导入</button>
+      <button type="button" class="xb-btn" data-testid="effects-import" @click="importPack"><Download :size="14" />导入</button>
       <button type="button" class="xb-btn-primary" :disabled="!store.desktop" data-testid="effects-create" @click="store.startCreation('effect')"><Sparkles :size="14" />让小伴创作</button>
     </StudioActions>
-    <div class="fx-main">
+    <div class="fx-browser">
       <div class="fx-toolbar">
         <div class="xb-seg" role="group" aria-label="特效来源"><button type="button" :aria-pressed="category === 'builtin'" data-testid="effects-scope-builtin" @click="category = 'builtin'">官方 {{ counts.builtin }}</button><button type="button" :aria-pressed="category === 'custom'" data-testid="effects-scope-custom" @click="category = 'custom'">我的 {{ counts.custom }}</button></div>
         <span class="fx-hint">特效叠在任何壁纸之上，点一下立即生效</span>
       </div>
+      <div class="fx-main">
       <NAlert v-if="missing" type="warning" :show-icon="false" data-testid="effect-missing">所选的特效「{{ choice.selected }}」已经找不到（可能被移出了特效文件夹），桌面上暂时没有特效。重新选一个即可。</NAlert>
       <NAlert v-if="store.effectList.errors.length" type="warning" :show-icon="false" data-testid="effect-errors">有 {{ store.effectList.errors.length }} 个自定义特效无法使用：{{ store.effectList.errors.join('；') }}</NAlert>
       <div class="effect-grid" role="group" aria-label="特效">
@@ -116,6 +117,7 @@ onBeforeUnmount(() => { if (timer) { clearTimeout(timer); commit(); } });
       <div v-if="category === 'custom' && !visiblePacks.length" class="xb-empty" data-testid="custom-effects-empty"><span class="xb-empty-icon"><Sparkles :size="24" /></span><h3>还没有自定义特效</h3><p>点右上角“导入”选一个特效包文件（JSON），也可以直接在聊天里让小伴为你写一个。</p></div>
       <p class="fx-notes">特效显示在桌面图片之上、桌面图标和其他窗口之下，鼠标可以穿过它。{{ store.settings.paused ? '桌面动画目前已暂停，特效会静止。' : '' }}{{ store.game.active ? '游戏空间打开期间特效会先隐藏，退出后自动回来。' : '' }}</p>
     </div>
+    </div>
     <aside class="fx-inspector" aria-label="特效设置" data-testid="effect-inspector">
       <div class="fx-preview" :class="{ none: !chosen }">
         <EffectPreview v-if="chosen" :pack="chosen" :playing="true" :paused="store.settings.paused" :fps="store.settings.fps" />
@@ -133,10 +135,11 @@ onBeforeUnmount(() => { if (timer) { clearTimeout(timer); commit(); } });
   </section>
 </template>
 <style scoped>
-.effects-page{height:100%;min-height:0;display:flex;margin-top:18px}
+.effects-page{height:100%;min-height:0;min-width:0;display:flex;margin-top:18px;overflow:hidden}
+.fx-browser{flex:1;min-height:0;min-width:0;display:flex;flex-direction:column}
 .fx-main{flex:1;min-width:0;min-height:0;display:flex;flex-direction:column;gap:12px;padding:0 24px 28px 28px;overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--ui-scrollbar) transparent;overscroll-behavior:contain}
 .fx-main>*{flex-shrink:0}
-.fx-toolbar{display:flex;align-items:center;gap:8px}
+.fx-toolbar{flex:none;display:flex;align-items:center;gap:8px;padding:0 24px 12px 28px;background:var(--ui-surface)}
 .fx-hint{margin-left:auto;font-size:12px;color:var(--ui-text-secondary)}
 .effect-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px 14px;margin-top:2px}
 .effect-card-wrapper{position:relative;min-width:0}
@@ -170,3 +173,4 @@ onBeforeUnmount(() => { if (timer) { clearTimeout(timer); commit(); } });
 .fx-buttons .xb-btn{flex:1}
 @media(max-width:1000px){.effect-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 </style>
+
