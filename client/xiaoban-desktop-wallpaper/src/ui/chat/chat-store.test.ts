@@ -35,13 +35,29 @@ function harness(responders: Record<string, Responder> = {}, desktop = true) {
   return { store, deps, emit, events, calls, contextCalls, commands, handlers, stopped, table };
 }
 
+describe('an answer cut off by a crash', () => {
+  it('says so after the history loads, naming what may already have run', async () => {
+    const h = harness({
+      chat_overview: () => overview({ sessions: [summary('s1')] }),
+      chat_load_session: () => { h.emit('chat-run-interrupted', { session: 's1', runId: 'r1', tools: ['shell', 'write_file', 'shell'] }); return [{ role: 'user', parts: [{ type: 'text', text: '整理文件' }] }]; },
+    });
+    await h.store.init();
+    await h.store.select('s1');
+    const items = h.store.views.s1.items;
+    expect(items.map(i => i.kind)).toEqual(['user', 'notice']);
+    const notice = items[1];
+    expect(notice.kind === 'notice' && notice.text).toContain('可能已经执行：运行命令、写入文件');
+    expect(notice.kind === 'notice' && notice.canContinue).toBe(true);
+  });
+});
+
 describe('starting up', () => {
   it('listens once, reads the list and the saved settings', async () => {
     const h = harness({ chat_overview: () => overview({ sessions: [summary('s1', '第一个')], workspace: '/Users/me/work', configured: true }) });
     await Promise.all([h.store.init(), h.store.init()]);
     await h.store.init();
-    expect([...h.handlers.keys()].sort()).toEqual(['chat-approval', 'chat-checkpoint', 'chat-compacting', 'chat-event', 'chat-hide-tool-calls-changed', 'chat-permission-mode-changed', 'chat-question', 'chat-sessions-changed']);
-    expect(h.deps.listen).toHaveBeenCalledTimes(8);
+    expect([...h.handlers.keys()].sort()).toEqual(['chat-approval', 'chat-checkpoint', 'chat-compacting', 'chat-event', 'chat-hide-tool-calls-changed', 'chat-permission-mode-changed', 'chat-question', 'chat-run-interrupted', 'chat-sessions-changed']);
+    expect(h.deps.listen).toHaveBeenCalledTimes(9);
     expect(h.commands()).toEqual(['chat_overview']);
     expect(h.store).toMatchObject({ ready: true, configured: true, workspace: '/Users/me/work' });
     expect(h.store.sessions.map(s => s.title)).toEqual(['第一个']);
@@ -435,7 +451,7 @@ describe('shutting down', () => {
     const h = harness();
     await h.store.init();
     h.store.dispose();
-    expect(h.stopped.sort()).toEqual(['chat-approval', 'chat-checkpoint', 'chat-compacting', 'chat-event', 'chat-hide-tool-calls-changed', 'chat-permission-mode-changed', 'chat-question', 'chat-sessions-changed']);
+    expect(h.stopped.sort()).toEqual(['chat-approval', 'chat-checkpoint', 'chat-compacting', 'chat-event', 'chat-hide-tool-calls-changed', 'chat-permission-mode-changed', 'chat-question', 'chat-run-interrupted', 'chat-sessions-changed']);
     h.events('s1', { type: 'text_delta', text: 'late' });
     h.emit('chat-approval', approval('a1'));
     expect(h.store.views.s1).toBeUndefined();
@@ -446,7 +462,7 @@ describe('shutting down', () => {
     const starting = h.store.init();
     h.store.dispose();
     await starting;
-    expect(h.stopped.sort()).toEqual(['chat-approval', 'chat-checkpoint', 'chat-compacting', 'chat-event', 'chat-hide-tool-calls-changed', 'chat-permission-mode-changed', 'chat-question', 'chat-sessions-changed']);
+    expect(h.stopped.sort()).toEqual(['chat-approval', 'chat-checkpoint', 'chat-compacting', 'chat-event', 'chat-hide-tool-calls-changed', 'chat-permission-mode-changed', 'chat-question', 'chat-run-interrupted', 'chat-sessions-changed']);
     expect(h.store.sessions).toEqual([]);
   });
 });

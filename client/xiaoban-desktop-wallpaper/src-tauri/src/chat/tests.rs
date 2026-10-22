@@ -1088,3 +1088,32 @@ fn the_tool_allowance_before_the_first_answer_matches_the_real_tool_set() {
     assert_eq!(saved_tool_tokens(&rig.dirs, false), Some(real), "a restart uses the last measurement");
     assert_eq!(saved_tool_tokens(&rig.dirs, true), None);
 }
+
+#[test]
+fn an_answer_cut_off_by_a_crash_is_reported_once_with_the_tools_that_may_have_run() {
+    use agent_kernel::{RunEvent, RunEventBody, RunState};
+    let dir = TempDir::new("interrupted-run");
+    let journal_dir = dir.path("runs/s1");
+    let record = |run: &str, sequence: u64, body: RunEventBody| RunEvent {
+        run_id: run.into(), session_id: "s1".into(), parent_run_id: None, sequence, timestamp_ms: 0, body,
+    };
+    let log = JsonlRunLog::new(&journal_dir);
+    log.append(&record("finished", 1, RunEventBody::State { state: RunState::Running, reason: None })).unwrap();
+    log.append(&record("finished", 2, RunEventBody::State { state: RunState::Completed, reason: None })).unwrap();
+    assert_eq!(interrupted_run(&journal_dir), None, "a finished answer is not reported");
+
+    std::thread::sleep(std::time::Duration::from_millis(20));
+    let events = [
+        RunEventBody::State { state: RunState::Running, reason: None },
+        RunEventBody::Event { event: Event::ToolStart { id: "a".into(), name: "shell".into(), arguments: "{}".into() } },
+        RunEventBody::Event { event: Event::ToolDispatched { id: "a".into() } },
+        RunEventBody::Event { event: Event::ToolStart { id: "b".into(), name: "write_file".into(), arguments: "{}".into() } },
+    ];
+    for (i, body) in events.into_iter().enumerate() {
+        log.append(&record("cut", i as u64 + 1, body)).unwrap();
+    }
+    drop(log);
+    assert_eq!(interrupted_run(&journal_dir), Some(("cut".to_string(), vec!["shell".to_string()])), "only a started tool may have run");
+    assert_eq!(interrupted_run(&journal_dir), None, "reported once");
+    assert_eq!(interrupted_run(&dir.path("runs/none")), None);
+}

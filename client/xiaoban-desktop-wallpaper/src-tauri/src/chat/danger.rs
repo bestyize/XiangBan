@@ -354,9 +354,30 @@ fn command_index(words: &[Word]) -> Option<usize> {
     None
 }
 
+/// A working folder too wide to count as a project: a disk's root, the home folder or a folder of homes. Nothing
+/// in it is treated as safely inside, so `rm -rf *` there is asked about like anywhere else.
+fn too_wide(workspace: &Path) -> bool {
+    let text = workspace.to_string_lossy().replace('\\', "/");
+    let text = text.trim_end_matches('/');
+    let drive_root = text.len() == 2 && text.as_bytes()[0].is_ascii_alphabetic() && text.as_bytes()[1] == b':';
+    if text.is_empty() || drive_root || workspace.parent().is_none() {
+        return true;
+    }
+    let lower = text.to_lowercase();
+    let homes = ["/users", "/home", "/root", "/var/root"];
+    if homes.contains(&lower.as_str()) || (lower.len() > 2 && lower.as_bytes()[1] == b':' && &lower[2..] == "/users") {
+        return true;
+    }
+    let home = std::env::var_os(if cfg!(windows) { "USERPROFILE" } else { "HOME" }).map(|h| h.to_string_lossy().replace('\\', "/").trim_end_matches('/').to_lowercase());
+    home.is_some_and(|home| !home.is_empty() && home == lower)
+}
+
 /// Whether `target` is surely inside the working folder: relative, with no `..`, no variable and no `~`.
-/// An absolute path counts only when it starts with the working folder.
+/// An absolute path counts only when it starts with the working folder. Never inside a folder that is `too_wide`.
 fn inside(target: &str, workspace: Option<&Path>) -> bool {
+    if workspace.is_some_and(too_wide) {
+        return false;
+    }
     if target.contains('$') || target.contains('{') || target.starts_with('~') || target.starts_with('%') {
         return false;
     }
@@ -704,6 +725,18 @@ mod tests {
         let windows = |command: &str| assess("shell", &json!({ "command": command }), Some(Path::new("C:\\Users\\a\\work")));
         assert_eq!(windows("rd /s /q C:\\users\\A\\work\\build"), None);
         assert!(windows("rd /s /q C:\\Users\\a\\other").is_some());
+    }
+
+    #[test]
+    fn a_working_folder_that_is_the_home_folder_or_a_disk_root_protects_everything_in_it() {
+        let home = std::env::var(if cfg!(windows) { "USERPROFILE" } else { "HOME" }).unwrap();
+        for workspace in ["/", "C:\\", "C:/Users", "/Users", "/home", home.as_str(), &format!("{home}/")] {
+            for command in ["rm -rf *", "rm -rf .", "rm -rf ./Documents", "find . -name '*.txt' -delete", "rd /s /q Documents"] {
+                assert!(assess("shell", &json!({ "command": command }), Some(Path::new(workspace))).is_some(), "{workspace}: {command}");
+            }
+            assert_eq!(assess("shell", &json!({ "command": "ls -la" }), Some(Path::new(workspace))), None, "{workspace}: looking is fine");
+        }
+        assert_eq!(assess("shell", &json!({ "command": "rm -rf ./build" }), Some(Path::new(&format!("{home}/project")))), None, "a project in the home folder is fine");
     }
 
     #[test]

@@ -141,3 +141,60 @@ fn removing_a_session_deletes_only_that_session_and_tolerates_missing_ones() {
     assert_eq!(store.load("drop").unwrap().len(), 1, "the id can be used again");
     assert_eq!(std::fs::read_dir(&dir.0).unwrap().count(), 2);
 }
+
+/// Like a full disk: appends fail once `allowed` of them have been written.
+struct FullDisk {
+    inner: MemoryStore,
+    allowed: std::sync::atomic::AtomicUsize,
+}
+
+impl SessionStore for FullDisk {
+    fn load(&self, session: &str) -> Result<Vec<Message>, HarnessError> {
+        self.inner.load(session)
+    }
+    fn append(&self, session: &str, messages: &[Message]) -> Result<(), HarnessError> {
+        use std::sync::atomic::Ordering;
+        if self.allowed.fetch_update(Ordering::SeqCst, Ordering::SeqCst, |n| n.checked_sub(1)).is_err() {
+            return Err(HarnessError::Store("No space left on device".into()));
+        }
+        self.inner.append(session, messages)
+    }
+}
+
+struct Touch(ToolSpec, Arc<std::sync::atomic::AtomicUsize>);
+
+impl Tool for Touch {
+    fn spec(&self) -> &ToolSpec {
+        &self.0
+    }
+    fn execute(&self, _: serde_json::Value, _: &ToolCtx) -> Result<String, String> {
+        self.1.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        Ok("ok".into())
+    }
+}
+
+#[test]
+fn a_full_disk_stops_the_run_with_a_store_error_before_anything_unsaved_happens() {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    // Nothing can be saved: the message is not sent to the model at all.
+    let provider = Arc::new(agent_kernel::provider::scripted::ScriptedProvider::new(vec![Step::text("hi")]));
+    let store = Arc::new(FullDisk { inner: MemoryStore::new(), allowed: AtomicUsize::new(0) });
+    let agent = Agent::builder(provider.clone(), store).build().unwrap();
+    let result = agent.run("s1", "hello", &mut |_| {}, &Arc::new(Default::default()));
+    assert!(matches!(result, Err(HarnessError::Store(ref m)) if m.contains("No space")), "{result:?}");
+    assert!(provider.requests().is_empty());
+
+    // The disk fills after the question is saved: the tool the model asked for is not run, since its call could
+    // not be recorded.
+    let ran = Arc::new(AtomicUsize::new(0));
+    let counter = ran.clone();
+    let provider = Arc::new(agent_kernel::provider::scripted::ScriptedProvider::new(vec![Step::tool_call("c", "touch", "{}"), Step::text("done")]));
+    let store = Arc::new(FullDisk { inner: MemoryStore::new(), allowed: AtomicUsize::new(1) });
+    let agent = Agent::builder(provider, store.clone())
+        .tool(Touch(ToolSpec::new("touch", "t", serde_json::json!({"type": "object"})), counter))
+        .build().unwrap();
+    let result = agent.run("s1", "hello", &mut |_| {}, &Arc::new(Default::default()));
+    assert!(matches!(result, Err(HarnessError::Store(_))), "{result:?}");
+    assert_eq!(ran.load(Ordering::SeqCst), 0, "no action without a record of it");
+    assert_eq!(store.inner.load("s1").unwrap().len(), 1, "what was saved stays readable");
+}

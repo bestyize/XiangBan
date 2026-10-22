@@ -208,3 +208,31 @@ fn gbk_files_are_read_searched_and_edited_in_their_own_encoding() {
     assert!(ws.call("read_file", serde_json::json!({"path": "bad.txt"})).contains("neither UTF-8 nor GBK"));
     assert!(ws.edit("bad.txt", "x", "y", false).contains("cannot be edited safely"));
 }
+
+#[test]
+fn a_working_folder_and_files_with_spaces_and_chinese_names_work_with_every_file_tool() {
+    let base = TempDir::new("fs-unicode");
+    let root = base.path("我的 工作 目录");
+    std::fs::create_dir_all(&root).unwrap();
+    let mut tools = fs_write_tools(vec![root.clone()]).unwrap();
+    tools.extend(fs_tools(vec![root.clone()]).unwrap());
+    let call = |tool: &str, args: serde_json::Value| {
+        let h = harness(vec![Step::tool_call("c", tool, &args.to_string()), Step::text("ok")], |mut b| {
+            for t in tools.iter().cloned() {
+                b = b.tool_arc(t);
+            }
+            b
+        });
+        assert!(run(&h.agent, "go").0.is_ok());
+        tool_messages(&h).remove(0).1
+    };
+    let file = "季度 报告/第 1 版.md";
+    call("write_file", serde_json::json!({"path": file, "content": "收入 增长\n支出 持平\n"}));
+    assert_eq!(std::fs::read_to_string(root.join(file)).unwrap(), "收入 增长\n支出 持平\n");
+    call("edit_file", serde_json::json!({"path": file, "old_string": "持平", "new_string": "下降"}));
+    assert!(call("read_file", serde_json::json!({"path": file})).contains("支出 下降"));
+    assert!(call("list_dir", serde_json::json!({"path": "季度 报告"})).contains("第 1 版.md"));
+    assert!(call("grep", serde_json::json!({"pattern": "收入", "path": "."})).contains("第 1 版.md"));
+    let absolute = root.join(file).display().to_string();
+    assert!(call("read_file", serde_json::json!({"path": absolute})).contains("收入 增长"), "an absolute path with spaces too");
+}

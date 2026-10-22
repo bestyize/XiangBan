@@ -79,13 +79,24 @@
 31. **定时 Agent 任务**：关怀提醒新增“定时任务”类型。到点后小伴只用只读工具执行（读文件、列目录、搜索、时间、网页），没有需要确认的操作；每条规则的运行追加到它自己的会话，气泡显示答案开头，结果最多保留 12 小时。
 32. **精简创作类工具定义**：游戏、小组件、特效的长篇规范移到 `game_read_format`、`widget_read_format`、`effect_read_format`，创作时才读取。工具列表本身固定，不影响提示缓存。内置工具定义由约 9,600 token 降到约 7,900；测试限制单个工具定义不超过 600 token。
 
+### 2.9 第六批（`feat/agent-cleanup-20261022`）
+
+33. **已有失败测试清零**：内核 5 个、桌面端 1 个、前端 7 个，vue-tsc 13 个类型错误。其中两处是真实问题：Debian/Ubuntu 上 `sh` 是 dash，`kill -KILL -- -pid` 会失败，命令留下的后台进程一直没被清理（改用 `killpg`）；“max_tokens 必须大于 0”被误判为超过输出上限。
+34. **AI 创建定时任务**：`care_set` 支持 `kind=agent`，添加或修改都要用户确认，完全信任模式也一样。
+35. **定时任务上次运行**：关怀页显示每条定时任务上次运行的时间、是否完成、token 用量和累计次数。
+36. **小组件保存前检查**：`-webkit-app-region`、直接调用 Tauri、给 html/body 画不透明背景时，说明原因并不保存。
+37. **子任务计入调用预算**：内核 `ToolBudget` 由一轮回答和它启动的子 Agent 共享。
+38. **非 git 目录的命令撤销**：私有快照仓库放在 `chat/snapshots`，工作目录里不加 `.git`，依赖与构建输出不纳入。
+39. **中断的回答**：打开对话时，若最近一轮没有正常结束，提示一次，并列出可能已经执行的工具。
+40. **过宽的工作目录**：工作目录是主目录或磁盘根目录时，其中的删除不再视为“在工作目录内”。
+
 合并 #93（长期目标）时，顺带修正了 main 上的三处编译错误：`File::try_lock` 的错误类型、`pub use` 重新导出 Tauri 命令、`app.state()` 临时值的借用。
 
 ## 3. 验证情况
 
-- `libs/agent-kernel`：`cargo test --all-features` 新增测试全部通过。以下 5 个测试在 main 上本来就失败，本分支没有新增失败：`output_limit_errors_reduce_only_the_generation_cap`、`a_skill_created_during_a_run_appears_in_the_next_model_call`、`load_returns_the_body_without_frontmatter_and_names_alternatives_on_miss`，以及 shell 的两个进程清理测试。`cargo check` 对 `x86_64-pc-windows-msvc` 与 `aarch64-apple-darwin` 都通过。
-- 桌面端 Rust：在 Linux 上编译需要给 `startup.rs` 加临时桩（应用只支持 Windows/macOS），桩没有提交。聊天模块 143 个测试通过；全量唯一失败是 `ai_reasoning::tests::explicit_alias_capabilities_can_enable_disable_or_restrict_levels`，本分支未改动该模块。
-- 前端：`src/ui/chat` 与 `ChatPage` 共 268 个测试通过。全量里 ControlShell、AiConfigCard、assistant-page 的 5 个失败在 main 上同样存在；`pet.test.ts` 的动画测试在 main 上也时好时坏。`vue-tsc` 的 13 个类型错误在 main 上同样存在。
+- `libs/agent-kernel`：`cargo test --all-features` 312 个测试全部通过；`cargo check` 对 `x86_64-pc-windows-msvc` 与 `aarch64-apple-darwin` 都通过。
+- 桌面端 Rust：在 Linux 上编译需要给 `startup.rs` 加临时桩（应用只支持 Windows/macOS），桩没有提交。466 个测试全部通过；`cargo check --target x86_64-pc-windows-gnu` 通过。
+- 前端：95 个文件 875 个测试全部通过，`vue-tsc` 没有类型错误。
 - **尚未在真机验证**：Windows 的引号与环境变量、macOS 的 PATH 读取、`npx` 启动 MCP 连接器、Claude 端点接受 `cache_control`。建议用手动触发的 Actions（仅 `workflow_dispatch`）或真机冒烟。
 
 在受限网络里装前端依赖时，`package-lock.json` 指向 `registry.npmmirror.com`，若该源不可达，可临时改走官方源而不改 lock 文件：
@@ -105,22 +116,28 @@ npm ci --registry=https://registry.npmjs.org/ --replace-registry-host=registry.n
 - 沙箱不可用（系统版本过低、启动失败）时，“完全信任”自动降级为“询问”并在界面说明。
 - 验收：沙箱内 `rm -rf ~`、写 `~/.zshrc`、`curl -d` 均失败；`npm test`、`cargo build` 正常。
 
-### 4.2 命令权限的进一步收敛 [待建]
+### 4.2 命令权限的进一步收敛 [已完成]
 
+- 按窗口限定可调用的命令：`main.rs` 的命令分发处按窗口标签过滤（见 2.7 第 26 条），有回归测试。
+- 记住的授权持久化，并在设置里列出、撤销（见 2.7 第 23 条）。
 
-### 4.3 能力补齐 [待建]
+### 4.3 能力补齐
 
-- **子 Agent**：只读调研已实现，运行记录进入父对话日志，用量在界面上计入父回答；子任务的工具调用次数尚未计入父任务的调用预算。
-- **网页搜索**：`web_search` 需要宿主提供 `SearchBackend`，建议走 server-ai 网关统一计费与限流。
+- **子 Agent** [已完成]：子任务的工具调用计入父任务的调用预算（见 2.9 第 37 条）。
+- **检查点的覆盖范围** [已完成]：不在 git 仓库的工作目录用私有仓库做快照（见 2.9 第 38 条）。超过 2 万个文件或 512 MB 的目录、用户主目录和磁盘根目录仍不覆盖。
+- **网页搜索** [待定]：需要选定方案。现有的搜索是 xiaban-api 后台配置的 SearXNG；走 server-ai 网关要新增带鉴权、限流和计费的搜索接口并部署，桌面端再接 `SearchBackend`。
 - **Agent 复用**：电脑控制进程已复用；Agent 本身仍按消息重建（开销小，换来配置与工作目录变化即时生效）。
-- **检查点的覆盖范围**：不在 git 仓库的工作目录里，命令改动的文件仍无法撤销。
 
-### 4.4 需要补的边界测试
+### 4.4 边界测试
 
-- 两个对话同时运行、各自弹出确认，再分别切换权限模式。
-- 任务进行中修改设置里的工作目录或模型，以及模型 key 过期。
-- 回答中途杀掉进程后重启：执行日志里有未完成的工具时，提示“动作可能已发生”。
-- 磁盘写满时的会话文件、索引与检查点写入。
-- 工作目录设为用户主目录或磁盘根目录时的危险命令判断。
-- 路径含空格、中文，Windows 长路径，网络盘。
-- 系统休眠唤醒后，进行中的流式请求与确认框。
+已补：
+
+- 两个对话同时等待确认，其中一个在等待时切换权限模式：各自收到自己的答复，模式只影响自己（内核 `tests/permission.rs`）。
+- 回答中途程序退出后重开对话：提示这轮中断，并列出已经开始执行、可能已生效的工具（见 2.9 第 39 条）。
+- 磁盘写满：保存不了问题时不发给模型；工具调用记录不下来时不执行该工具，已保存的内容仍可读（`tests/store_jsonl.rs`）。检查点写入失败不影响任务。
+- 工作目录是用户主目录、`/Users`、磁盘根目录时，`rm -rf *` 等删除一律需要确认（见 2.9 第 40 条）。
+- 路径含空格和中文：文件工具与命令在这样的工作目录里都正常（`tests/fs_write.rs`、`tests/shell.rs`，Windows 在 `tests/os_sandbox.rs`）。
+- 模型 key 失效：报错转成“认证失败，请修改配置或切换模型”（`model-errors.ts`）。
+- 任务进行中修改工作目录或模型：Agent 按消息构建，进行中的回答不受影响，下一条消息生效。
+
+仍需真机验证：Windows 长路径与网络盘；系统休眠唤醒后进行中的流式请求与确认框。

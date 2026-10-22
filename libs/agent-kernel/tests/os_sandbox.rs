@@ -66,6 +66,11 @@ fn windows(failures: &mut Vec<String>) {
     let out = shell(Shell::new(&dir.0), "echo %APPDATA%");
     check(failures, !out.contains("%APPDATA%"), "Windows shell: APPDATA is passed to commands", &out);
 
+    let unicode = dir.path("我的 项目");
+    std::fs::create_dir_all(&unicode).unwrap();
+    let out = shell(Shell::new(&unicode), r#"echo ok> "新 文件.txt""#);
+    check(failures, unicode.join("新 文件.txt").exists(), "Windows shell: a folder and file with spaces and Chinese names", &out);
+
     let work = dir.path("work");
     let low = dir.path("low");
     if let Err(error) = label_low(&work).and_then(|_| label_low(&low)) {

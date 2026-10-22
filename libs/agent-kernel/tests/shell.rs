@@ -165,3 +165,14 @@ fn it_asks_before_running_and_is_blocked_in_read_only_mode() {
         assert!(!dir.path("ran").exists());
     }
 }
+
+#[test]
+fn a_working_folder_with_spaces_and_chinese_characters_is_used_as_is() {
+    let base = TempDir::new("sh-unicode");
+    let dir = base.path("我的 项目");
+    std::fs::create_dir_all(&dir).unwrap();
+    let real = dir.canonicalize().unwrap();
+    let (out, _) = run_shell(Shell::new(&dir), "pwd; echo 内容 > \"新 文件.txt\"; ls");
+    assert!(out.contains(&real.display().to_string()) && out.contains("新 文件.txt"), "{out}");
+    assert_eq!(std::fs::read_to_string(dir.join("新 文件.txt")).unwrap(), "内容\n");
+}

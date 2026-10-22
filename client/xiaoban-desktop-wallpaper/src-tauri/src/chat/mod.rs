@@ -708,7 +708,38 @@ pub fn chat_load_session(app: tauri::AppHandle, window: tauri::WebviewWindow, se
     // Only reported to the page: the mode is applied to this conversation alone when it runs, so opening one
     // never changes how another conversation that is answering right now is asked.
     emit(&app, "chat-permission-mode-changed", json!({ "sessionId": session_id, "mode": summary.permission_mode }));
-    JsonlStore::new(Dirs::of(&app)?.sessions()).load(&session_id).map_err(|e| e.to_string())
+    let dirs = Dirs::of(&app)?;
+    let running = lock(&app.state::<ChatState>().runs).contains_key(&session_id);
+    if !running {
+        if let Some((run_id, tools)) = interrupted_run(&dirs.runs().join(&session_id)) {
+            emit(&app, "chat-run-interrupted", json!({ "session": session_id, "runId": run_id, "tools": tools }));
+        }
+    }
+    JsonlStore::new(dirs.sessions()).load(&session_id).map_err(|e| e.to_string())
+}
+
+/// The conversation's last answer, when it never finished (the app quit or crashed while it ran) and has not been
+/// reported yet: its id and the tools that were started and may have done their work. Reported once.
+fn interrupted_run(journal_dir: &Path) -> Option<(String, Vec<String>)> {
+    let newest = fs::read_dir(journal_dir).ok()?.flatten()
+        .filter_map(|entry| {
+            let name = entry.file_name().to_string_lossy().into_owned();
+            let run = name.strip_prefix("run-")?.strip_suffix(".jsonl")?.to_string();
+            Some((entry.metadata().ok()?.modified().ok()?, run))
+        })
+        .max()?.1;
+    let marker = journal_dir.join(format!("run-{newest}.interrupted"));
+    if marker.exists() {
+        return None;
+    }
+    let inspection = JsonlRunLog::new(journal_dir).inspect(&newest).ok()?;
+    if inspection.terminal {
+        return None;
+    }
+    let _ = fs::write(&marker, "");
+    let mut tools: Vec<String> = inspection.incomplete_tools.into_iter().filter(|t| t.dispatched).map(|t| t.name).collect();
+    tools.dedup();
+    Some((newest, tools))
 }
 
 /// An empty conversation. The chat page makes one when the first message is sent, so the page
