@@ -9,7 +9,18 @@ import type { GameCatalog } from "../games/catalog.ts";
 
 export type { GameCatalog };
 
-export type ControlPage = "chat" | "ai-store" | "assistant" | "wallpapers" | "widgets" | "interactive" | "effects" | "companion" | "games" | "care" | "settings";
+/** The pages the shell shows (方案四). */
+export type MainPage = "new-task" | "chat" | "ai-store" | "library" | "studio" | "games" | "care" | "interactive";
+/**
+ * Older ids that still work with `navigate`: the four studio kinds open 装扮 on that tab,
+ * "settings" / "assistant" open the settings dialog instead of a page.
+ */
+export type LegacyPage = "wallpapers" | "effects" | "widgets" | "companion" | "settings" | "assistant";
+export type ControlPage = MainPage | LegacyPage;
+/** The tabs of 装扮. */
+export type StudioTab = "wallpapers" | "effects" | "widgets" | "pets";
+/** The categories of the settings dialog. */
+export type SettingsTab = "general" | "appearance" | "ai" | "assistant" | "voice" | "safety" | "about";
 export interface ControlStore {
   settings: Settings;
   info: AppInfo;
@@ -22,8 +33,15 @@ export interface ControlStore {
   page: ControlPage;
   creationDraft: string | null;
   startCreation(kind: "wallpaper" | "effect" | "widget" | "game" | "pet"): Promise<void>;
-  /** Which tab of the settings page opens next; the chat sends people to "ai" when no model is set up. */
-  settingsTab: "general" | "ai" | "safety" | "assistant" | "voice" | "about";
+  /** The settings dialog's category; the chat sends people to "ai" when no model is set up. */
+  settingsTab: SettingsTab;
+  /** Whether the settings dialog is open. Use `openSettings` / `closeSettings`, or `navigate('settings')`. */
+  settingsOpen: boolean;
+  /** Opens the settings dialog, on `tab` when given (otherwise on the last category). */
+  openSettings(tab?: SettingsTab): void;
+  closeSettings(): void;
+  /** The tab 装扮 shows. `navigate('wallpapers' | 'effects' | 'widgets' | 'companion')` sets it. */
+  studioTab: StudioTab;
   /** The assistant's conversations. Lives here so an answer keeps arriving while another page is open. */
   chat: ChatStore;
   speech: SpeechStore;
@@ -32,6 +50,7 @@ export interface ControlStore {
   initialError: string;
   desktop: boolean;
   notify(message: unknown, type?: "success" | "error" | "info"): void;
+  /** Goes to a page. Legacy ids are mapped (see `ControlPage`); "settings"/"assistant" open the dialog and leave the page as it is. */
   navigate(page: ControlPage): void;
   openLogin(): void;
   closeLogin(): void;

@@ -5,7 +5,7 @@ import { desktop, defaults, invoke, listen, toAccountError, type AiConfigView, t
 import type { WebsiteStatus } from "./website-types.ts";
 import { loadBuiltinCatalog, readCatalog } from "../games/catalog.ts";
 import { loadBuiltinPacks, noPacks, readImported, readList } from "../effects/catalog.ts";
-import type { ControlStore } from "./control-types.ts";
+import type { ControlPage, ControlStore, StudioTab } from "./control-types.ts";
 import { createChatStore } from "./chat/chat-store.ts";
 
 export const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value));
@@ -31,6 +31,10 @@ function mockLogin(username: string, isNewUser: boolean): LoginResult {
     },
   };
 }
+/** Where the older page ids went: the studio kinds are tabs of 装扮 now. */
+const studioTabs: Partial<Record<ControlPage, StudioTab>> = { wallpapers: "wallpapers", effects: "effects", widgets: "widgets", companion: "pets" };
+/** The new-task page and an open conversation share the composer, so going between them is not leaving the chat. */
+const chatLike = (page: ControlPage) => page === "chat" || page === "new-task";
 export function createControlStore(notify: ControlStore["notify"]): ControlStore {
   let disposed = false;
   const unsubscribers: (() => void)[] = [];
@@ -48,11 +52,19 @@ export function createControlStore(notify: ControlStore["notify"]): ControlStore
     effectList: noPacks(),
     account: null,
     showLoginModal: false,
-    page: "wallpapers", creationDraft: null, settingsTab: "general", asr: createAsrStore({ desktop, invoke, listen, notify }), speech: createSpeechStore({ desktop, invoke, notify }), chat: createChatStore({ desktop, invoke, listen, notify,
+    page: "new-task", creationDraft: null, settingsTab: "general", settingsOpen: false, studioTab: "wallpapers", asr: createAsrStore({ desktop, invoke, listen, notify }), speech: createSpeechStore({ desktop, invoke, notify }), chat: createChatStore({ desktop, invoke, listen, notify,
       onActivity: () => { store.asr.deactivate(); void store.speech.stop(); },
-      onReply: (session, text, key) => { if (store.page === 'chat' && store.speech.settings.autoRead && document.visibilityState !== 'hidden') void store.speech.speak(text, key ?? 'auto:' + session, undefined, true); },
+      onReply: (session, text, key) => { if (chatLike(store.page) && store.speech.settings.autoRead && document.visibilityState !== 'hidden') void store.speech.speak(text, key ?? 'auto:' + session, undefined, true); },
     }), ready: false, initialError: "", desktop, notify,
-    navigate(page) { if (page === 'assistant') { store.settingsTab = 'assistant'; page = 'settings'; } if (store.page !== page) { void store.speech.stop(); store.asr.deactivate(); } store.page = page; },
+    navigate(page) {
+      if (page === 'assistant' || page === 'settings') { store.openSettings(page === 'assistant' ? 'assistant' : undefined); return; }
+      const tab = studioTabs[page];
+      if (tab) { store.studioTab = tab; page = 'studio'; }
+      if (store.page !== page && !(chatLike(store.page) && chatLike(page))) { void store.speech.stop(); store.asr.deactivate(); }
+      store.page = page;
+    },
+    openSettings(tab) { if (tab) store.settingsTab = tab; store.settingsOpen = true; },
+    closeSettings() { store.settingsOpen = false; },
     async startCreation(kind) {
       const prompts = {
         wallpaper: '帮我创作一张动态壁纸：',

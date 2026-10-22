@@ -7,10 +7,24 @@ vi.mock('../bridge.ts', async (importOriginal) => ({ ...await importOriginal<typ
 const ipc = vi.mocked(invoke);
 beforeEach(() => { vi.resetAllMocks(); vi.mocked(listen).mockResolvedValue(() => {}); });
 describe('control state with native settings', () => {
-  it('routes previous assistant settings links into the settings tab', () => {
+  it('routes previous assistant settings links into the settings dialog without leaving the page', () => {
     const store=createControlStore(vi.fn());
+    const before = store.page;
     store.navigate('assistant');
-    expect(store.page).toBe('settings');expect(store.settingsTab).toBe('assistant');
+    expect(store.settingsOpen).toBe(true);expect(store.settingsTab).toBe('assistant');expect(store.page).toBe(before);
+    store.closeSettings(); store.settingsTab = 'ai';
+    store.navigate('settings');
+    expect(store.settingsOpen).toBe(true);expect(store.settingsTab).toBe('ai');
+    store.dispose();
+  });
+  it('maps the old studio pages to tabs of 装扮', () => {
+    const store=createControlStore(vi.fn());
+    store.navigate('companion');
+    expect(store.page).toBe('studio');expect(store.studioTab).toBe('pets');
+    store.navigate('effects');
+    expect(store.page).toBe('studio');expect(store.studioTab).toBe('effects');
+    store.navigate('wallpapers');
+    expect(store.studioTab).toBe('wallpapers');
     store.dispose();
   });
   it('starts each creative action in a fresh chat with an editable prompt', async () => {

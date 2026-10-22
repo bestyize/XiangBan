@@ -4,10 +4,10 @@ import { NConfigProvider, NMessageProvider, NDialogProvider, darkTheme, zhCN, da
 import ControlShell from './ControlShell.vue';
 import { themeFor } from './theme.ts';
 import { applyUiTokens } from './design-tokens.ts';
-import { isDark } from './appearance.ts';
+import { accent, isDark } from './appearance.ts';
 import './control.css';
 const naiveTheme = computed(() => isDark.value ? darkTheme : null);
-const overrides = computed(() => themeFor(isDark.value));
-watchEffect(() => { applyUiTokens(isDark.value); document.documentElement.dataset.theme = isDark.value ? 'dark' : 'light'; });
+const overrides = computed(() => themeFor(isDark.value, accent.value));
+watchEffect(() => { applyUiTokens(isDark.value, accent.value); document.documentElement.dataset.theme = isDark.value ? 'dark' : 'light'; });
 </script>
 <template><NConfigProvider :theme="naiveTheme" :theme-overrides="overrides" :locale="zhCN" :date-locale="dateZhCN"><NMessageProvider placement="top-right"><NDialogProvider><ControlShell /></NDialogProvider></NMessageProvider></NConfigProvider></template>
