@@ -188,17 +188,18 @@ onUnmounted(() => { if (clockTimer) clearInterval(clockTimer); care.dispose(); }
 
 <style scoped>
 /* Kind colours are local tokens so the icon squares follow light and dark mode. */
-.care-page{--care-blue-bg:#E8F2FB;--care-blue-fg:#1F6AA8;--care-green-bg:#EDF5E8;--care-green-fg:#3C7A2C;--care-purple-bg:#F1EEFB;--care-purple-fg:#5E43B8;--care-orange-bg:#FFF2E2;--care-orange-fg:#A65A0A;display:flex;flex-direction:column;gap:18px;padding:22px 28px;min-width:0}
+.care-page{--care-blue-bg:#E8F2FB;--care-blue-fg:#1F6AA8;--care-green-bg:#EDF5E8;--care-green-fg:#3C7A2C;--care-purple-bg:#F1EEFB;--care-purple-fg:#5E43B8;--care-orange-bg:#FFF2E2;--care-orange-fg:#A65A0A;display:flex;flex-direction:column;gap:18px;padding:22px 28px;min-width:0;container:care-page / inline-size}
 html[data-theme=dark] .care-page{--care-blue-bg:#1E2F44;--care-blue-fg:#8FC1F2;--care-green-bg:#213A29;--care-green-fg:#9ED49A;--care-purple-bg:#2C2745;--care-purple-fg:#B7A8F0;--care-orange-bg:#3B2C17;--care-orange-fg:#F0BE7D}
 .care-head{align-items:center}
 .care-count{margin-left:4px;font-size:13px;font-weight:500;color:var(--ui-text-tertiary)}
 .care-layout{display:grid;grid-template-columns:minmax(0,1fr) 280px;gap:20px;align-items:start}
+.care-main{container:care-main / inline-size}
 .care-main,.care-side{display:flex;flex-direction:column;gap:18px;min-width:0}
 .care-note{margin:0}
 .care-behavior{margin:0;font-size:12px;line-height:1.8}
 .care-section-title{margin:0 4px 10px;font-size:13px;font-weight:600;color:var(--ui-text-primary)}
 .care-rule{display:flex;align-items:center;gap:14px}
-.care-rule .xb-row-text{gap:3px}
+.care-rule .xb-row-text{gap:3px;overflow-wrap:anywhere}
 .care-rule .xb-row-text>b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .care-rule .xb-row-text>small{font-size:11.5px;line-height:1.5}
 .care-next{flex-shrink:0;padding:3px 8px;border-radius:6px;background:var(--ui-soft);color:var(--ui-ink);font-size:12px;font-weight:500;white-space:nowrap}
@@ -243,6 +244,24 @@ input[type=time],input[type=datetime-local]{border:0;border-radius:8px;padding:6
 .care-form-group>p{margin:6px 16px}
 .dialog-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:16px}
 .dialog-actions .xb-btn-primary,.dialog-actions .xb-btn{height:32px}
-@media(max-width:1000px){.care-tpl-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
-@media(max-width:850px){.care-layout{grid-template-columns:minmax(0,1fr)}.care-rule{flex-wrap:wrap}.care-rule-actions{width:100%;justify-content:flex-end}}
+/* Use the available page/column width: the expanded sidebar consumes 264px. */
+@container care-page (max-width:780px){
+  .care-layout{grid-template-columns:minmax(0,1fr)}
+}
+@container care-main (max-width:620px){
+  .care-rule{display:grid;grid-template-columns:36px minmax(0,1fr) auto;gap:8px 12px}
+  .care-rule>.care-ico{grid-column:1;grid-row:1}
+  .care-rule>.xb-row-text{grid-column:2;grid-row:1}
+  .care-rule .xb-row-text>b{white-space:normal}
+  .care-rule>.care-switch{grid-column:3;grid-row:1}
+  .care-rule>.care-next{grid-column:2 / -1;grid-row:2;justify-self:start;max-width:100%;white-space:normal;overflow-wrap:anywhere}
+  .care-rule-actions{grid-column:2 / -1;grid-row:3;flex-wrap:wrap}
+}
+@container care-main (max-width:460px){
+  .care-tpl-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@container care-main (max-width:280px){
+  .care-tpl-grid{grid-template-columns:minmax(0,1fr)}
+}
 </style>
+
