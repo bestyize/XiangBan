@@ -22,6 +22,46 @@ fn feed(stream: &mut ResponsesStream, events: &[Value]) -> String {
 }
 
 #[test]
+fn stream_reasoning_summary_delta_done_and_final_reconciliation_do_not_duplicate() {
+    let mut stream = ResponsesStream::default();
+    let mut visible = String::new();
+    let mut answer = String::new();
+    let events = [
+        json!({"type":"response.reasoning_summary_text.delta","output_index":0,"summary_index":0,"delta":"分析"}),
+        json!({"type":"response.reasoning_summary_text.delta","output_index":0,"summary_index":0,"delta":"完成"}),
+        json!({"type":"response.reasoning_summary_text.done","output_index":0,"summary_index":0,"text":"分析完成"}),
+        json!({"type":"response.output_item.done","output_index":0,"item":{
+            "type":"reasoning","status":"completed","id":"rs_test",
+            "summary":[{"type":"summary_text","text":"分析完成"}]}}),
+        json!({"type":"response.output_text.delta","delta":"回答"}),
+        json!({"type":"response.completed","response":{"output":[{
+            "type":"reasoning","status":"completed","id":"rs_test",
+            "summary":[{"type":"summary_text","text":"分析完成"}]}]}}),
+    ];
+    for event in &events {
+        stream.push_event_with_reasoning(event,
+            &mut |t| answer.push_str(t),
+            &mut |kind, t| { assert_eq!(kind, ReasoningKind::Summary); visible.push_str(t); }
+        ).unwrap();
+    }
+    assert_eq!(visible, "分析完成");
+    assert_eq!(answer, "回答");
+    assert!(stream.finish().message.provider_state.is_some());
+}
+
+#[test]
+fn final_only_responses_reasoning_summary_is_still_displayed() {
+    let mut stream = ResponsesStream::default();
+    let mut visible = String::new();
+    stream.push_event_with_reasoning(&json!({"type":"response.completed","response":{"output":[{
+        "type":"reasoning","status":"completed",
+        "summary":[{"type":"summary_text","text":"只在最终响应中返回"}]}]}}),
+        &mut |_| {}, &mut |kind, t| { assert_eq!(kind, ReasoningKind::Summary); visible.push_str(t); }
+    ).unwrap();
+    assert_eq!(visible, "只在最终响应中返回");
+}
+
+#[test]
 fn failed_response_keeps_an_explicit_overflow_code_even_with_a_localized_message() {
     let error = ResponsesStream::default().push_event(&json!({"type":"response.failed", "response":{"error":{"code":"context_length_exceeded", "message":"请压缩会话"}}}), &mut |_| {}).unwrap_err();
     assert!(error.is_context_limit());
