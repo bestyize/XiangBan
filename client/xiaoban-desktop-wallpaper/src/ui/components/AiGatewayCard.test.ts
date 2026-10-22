@@ -136,7 +136,7 @@ describe('小伴 AI card', () => {
     backend(defaults);
     mountCard(createStore(session('u1')));
     await flushPromises();
-    const buttons = wrapper!.findAll('.gw-actions button').map(b => b.text());
+    const buttons = wrapper!.findAll('.gw-row button').map(b => b.text());
     expect(buttons).toEqual(['配置', '启用此服务商']);
     await wrapper!.find('[data-testid="ai-gateway-card"]').trigger('click');
     await flushPromises();

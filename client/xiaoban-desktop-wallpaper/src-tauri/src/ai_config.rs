@@ -667,6 +667,30 @@ fn selecting_after_save(config: &AiConfig, provider_id: &str, activate: bool) ->
         && config.providers.iter().any(|p| p.id == provider_id && p.is_usable())
 }
 
+/// Whether the facts a model carries are sane; shared by the one discovered model and the edited list.
+fn model_facts_valid(model: &ModelConfig) -> bool {
+    !(model.id.len() > MAX_MODEL
+        || model.max_output_tokens.is_some_and(|n| n == 0 || n > 2_000_000)
+        || model.context_window_tokens.is_some_and(|n| n == 0 || n > 16_000_000)
+        || model.name.len() > 250 || model.description.len() > 500
+        || model.reasoning_efforts.as_ref().is_some_and(|v| ai_reasoning::validate(v).is_err()))
+}
+
+/// The model list edited in the provider dialog: every id valid and unique, every fact sane, and the
+/// selected model among them. Order is kept (the first is just the first the user added).
+pub(crate) fn clean_model_list(list: Vec<ModelConfig>, selected: &str) -> Result<Vec<ModelConfig>, String> {
+    if list.len() > 200 { return Err("模型列表太长，最多 200 个".into()); }
+    let mut seen = std::collections::HashSet::new();
+    let mut out = Vec::with_capacity(list.len());
+    for mut model in list {
+        model.id = clean_model(&model.id)?;
+        if !model_facts_valid(&model) { return Err("服务商模型能力数据无效".into()); }
+        if seen.insert(model.id.clone()) { out.push(model); }
+    }
+    if !out.iter().any(|m| m.id == selected) { return Err("默认模型必须在模型列表中".into()); }
+    Ok(out)
+}
+
 fn clean_reply_preference(previous: &ProviderConfig, _url: &str, model: &str, protocol: &str, requested: Option<ReplyPreference>) -> Result<ReplyPreference, String> {
     let declared = previous.reasoning_efforts.as_deref().or_else(|| previous.models.iter().find(|m| m.id == model).and_then(|m| m.reasoning_efforts.as_deref()));
     let levels = ai_reasoning::levels(model, protocol, declared);
@@ -695,6 +719,7 @@ pub fn save_ai_provider(
     reasoning_efforts: Option<Vec<String>>,
     clear_reasoning_efforts: Option<bool>,
     discovered_model: Option<ModelConfig>,
+    models: Option<Vec<ModelConfig>>,
 ) -> Result<AiConfigView, String> {
     let path = path(&app)?;
     let state = app.state::<AiConfigState>();
@@ -730,18 +755,21 @@ pub fn save_ai_provider(
         if previous.remote && previous.provider_type != "third" {
             return Err("官方模型能力由服务端目录管理".into());
         }
-        if model.id != clean_mdl || model.id.len() > MAX_MODEL
-            || model.max_output_tokens.is_some_and(|n| n == 0 || n > 2_000_000)
-            || model.context_window_tokens.is_some_and(|n| n == 0 || n > 16_000_000)
-            || model.name.len() > 250 || model.description.len() > 500
-            || model.reasoning_efforts.as_ref().is_some_and(|v| ai_reasoning::validate(v).is_err())
-        {
+        if model.id != clean_mdl || !model_facts_valid(&model) {
             return Err("服务商模型能力数据无效".into());
         }
         // Only the selected discovered model is persisted; the list of IDs
         // can be large, and all other models will be re-resolved when selected.
         previous.models.retain(|m| m.id != model.id);
         previous.models.push(model);
+    }
+    // The whole list the user edited (several models, each with its own thinking levels) replaces the
+    // saved one. Official services keep their catalogue; a catalogue refresh re-adds its own models.
+    if let Some(list) = models {
+        if previous.remote && previous.provider_type != "third" {
+            return Err("官方模型列表由服务端目录管理".into());
+        }
+        previous.models = clean_model_list(list, &clean_mdl)?;
     }
     if let Some(levels) = reasoning_efforts { ai_reasoning::validate(&levels)?; previous.reasoning_efforts = Some(levels); }
     if clear_reasoning_efforts.unwrap_or(false) { previous.reasoning_efforts = None; }
@@ -1385,6 +1413,22 @@ mod tests {
                 assert!(!crate::content::permitted(label, command), "{label} must not reach {command}");
             }
         }
+    }
+
+    #[test]
+    fn an_edited_model_list_is_cleaned_and_must_contain_the_default() {
+        let model = |id: &str, efforts: Option<Vec<&str>>| ModelConfig { id: id.into(), name: id.into(), reasoning_efforts: efforts.map(|v| v.into_iter().map(String::from).collect()), ..ModelConfig::default() };
+        let list = clean_model_list(vec![model(" a ", None), model("b", Some(vec!["low", "high"])), model("a", None), model("c", Some(vec![]))], "b").unwrap();
+        assert_eq!(list.iter().map(|m| m.id.as_str()).collect::<Vec<_>>(), ["a", "b", "c"], "trimmed, duplicates dropped, order kept");
+        assert_eq!(list[1].reasoning_efforts, Some(vec!["low".to_string(), "high".to_string()]));
+        assert_eq!(list[2].reasoning_efforts, Some(vec![]), "an empty declaration means no thinking levels");
+        assert!(clean_model_list(vec![model("a", None)], "b").is_err(), "the default must be listed");
+        assert!(clean_model_list(vec![model("", None)], "a").is_err());
+        assert!(clean_model_list(vec![model("a", Some(vec!["low", "low"]))], "a").is_err(), "levels must be valid and unique");
+        let mut huge = model("a", None);
+        huge.max_output_tokens = Some(0);
+        assert!(clean_model_list(vec![huge], "a").is_err());
+        assert!(clean_model_list((0..201).map(|i| model(&format!("m{i}"), None)).collect(), "m0").is_err());
     }
 
     #[test]

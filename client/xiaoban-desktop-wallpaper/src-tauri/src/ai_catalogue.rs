@@ -51,6 +51,19 @@ fn address(raw: &str) -> bool {
     url::Url::parse(raw).is_ok_and(|u| u.scheme() == "https" && u.host_str().is_some()
         && u.username().is_empty() && u.password().is_none() && u.query().is_none() && u.fragment().is_none())
 }
+/// A third-party preset lists its own models, but the user may have added more and declared thinking
+/// levels for them. The catalogue wins for what it names (a declaration there replaces the user's);
+/// models only the user added, and levels the catalogue stays silent about, are kept.
+fn keep_user_models(local: &[ModelConfig], mut catalogue: Vec<ModelConfig>) -> Vec<ModelConfig> {
+    for model in &mut catalogue {
+        if model.reasoning_efforts.is_none() {
+            model.reasoning_efforts = local.iter().find(|m| m.id == model.id).and_then(|m| m.reasoning_efforts.clone());
+        }
+    }
+    let named: HashSet<String> = catalogue.iter().map(|m| m.id.clone()).collect();
+    catalogue.extend(local.iter().filter(|m| !named.contains(&m.id)).cloned());
+    catalogue
+}
 pub fn merge(config: &mut AiConfig, catalogue: Catalogue) -> Result<(), String> {
     if catalogue.version != 1 || !(300..=86400).contains(&catalogue.refresh_after_seconds) || catalogue.providers.len() > 50 {
         return Err("模型配置版本或刷新周期不支持".into());
@@ -90,7 +103,7 @@ pub fn merge(config: &mut AiConfig, catalogue: Catalogue) -> Result<(), String> 
         }
         local.id = p.id; local.name = p.provider; local.description = p.description;
         local.provider_type = p.provider_type; local.remote = true; local.available = true;
-        local.default_model = p.default_model; local.models = p.models; local.endpoints = endpoints;
+        local.default_model = p.default_model; local.models = if local.provider_type == "third" { keep_user_models(&local.models, p.models) } else { p.models }; local.endpoints = endpoints;
         local.console_url = p.console_url; local.console_text = p.console_text;
         if let Some(i) = index { next.providers[i] = local; } else { next.providers.push(local); }
     }
@@ -248,6 +261,17 @@ mod tests {
         assert_eq!(c.providers[0].model, "chosen"); assert_eq!(c.providers[0].api_key, "user-key");
         c.providers[0].selection_mode = "recommended".into();
         merge(&mut c, catalogue("next-default")).unwrap(); assert_eq!(c.providers[0].model, "next-default");
+    }
+    #[test] fn a_third_party_refresh_keeps_models_the_user_added_and_their_levels() {
+        let mut c = AiConfig::default();
+        merge(&mut c, catalogue("listed")).unwrap();
+        let user = |id: &str, efforts: Option<Vec<String>>| ModelConfig { id: id.into(), name: id.into(), reasoning_efforts: efforts, ..ModelConfig::default() };
+        c.providers[0].models = vec![user("listed", Some(vec!["low".into()])), user("mine", Some(vec!["high".into()]))];
+        merge(&mut c, catalogue("listed")).unwrap();
+        let models = &c.providers[0].models;
+        assert_eq!(models.iter().map(|m| m.id.as_str()).collect::<Vec<_>>(), ["listed", "mine"]);
+        assert_eq!(models[0].reasoning_efforts, Some(vec!["low".to_string()]), "the catalogue is silent, so the user's levels stay");
+        assert_eq!(models[1].reasoning_efforts, Some(vec!["high".to_string()]));
     }
     #[test] fn the_xiaoban_ai_entry_follows_the_catalogue_and_is_on_when_the_site_says_nothing() {
         let mut c = AiConfig::default();

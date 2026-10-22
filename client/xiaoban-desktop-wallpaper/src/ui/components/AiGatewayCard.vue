@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 import { NAlert, NButton, NInput, NModal, NTag } from 'naive-ui';
-import { Settings, Wallet } from 'lucide-vue-next';
+import { Settings, Sprout } from 'lucide-vue-next';
 import { GATEWAY_PROVIDER, invoke, toAccountError, type AiBalance, type AiConfigView, type AiRedeemed, type AiTier } from '../../bridge.ts';
 import type { ControlStore } from '../control-types.ts';
 import { bucketLabel, expiryText, money, pickTier } from '../ai-gateway.ts';
@@ -27,6 +27,7 @@ const perDollar = computed(() => balance.value?.quotaPerUnit ?? 500_000);
 const gatewayActive = computed(() => props.config?.activeProvider === GATEWAY_PROVIDER);
 const activeTier = computed(() => (gatewayActive.value ? props.config?.gatewayTier ?? '' : ''));
 const activeTierName = computed(() => tiers.value.find(t => t.tier === activeTier.value)?.displayName ?? activeTier.value);
+const pickedTier = computed(() => tiers.value.find(t => t.tier === picked.value));
 const unchanged = computed(() => gatewayActive.value && activeTier.value === picked.value);
 
 const cardDescription = computed(() => {
@@ -95,6 +96,12 @@ async function enable() {
   }
 }
 
+/** The mode switch in settings: choosing is enough once 小伴 AI is in use; otherwise it only preselects. */
+function pickMode(tier: string) {
+  picked.value = tier;
+  if (gatewayActive.value && tier !== activeTier.value) void enable();
+}
+
 /** The card's own "启用此服务商": the tier that would be preselected in the dialog, with no dialog in between. */
 async function activate() {
   if (!props.store.desktop || enabling.value) return;
@@ -133,42 +140,34 @@ watch(uid, () => {
 </script>
 
 <template>
-  <article class="provider-card gateway-card" :class="{ active: gatewayActive }" data-testid="ai-gateway-card">
-    <div class="gw-top">
-      <div class="gw-badge">
-        <Wallet :size="20" />
-        <div>
-          <h3>小伴 AI</h3>
-          <span class="gw-sub">官方服务 · 额度制</span>
+  <div class="xb-group gateway-card" :class="{ active: gatewayActive }" data-testid="ai-gateway-card">
+    <div class="xb-row gw-row">
+      <span class="gw-logo" aria-hidden="true"><Sprout :size="22" :stroke-width="2" /></span>
+      <div class="xb-row-text">
+        <b>小伴 AI</b>
+        <span>{{ cardDescription }}</span>
+        <span v-if="cardFact" class="gw-fact">{{ cardFact.label }}<strong data-testid="gateway-card-fact">{{ cardFact.value }}</strong></span>
+      </div>
+      <span v-if="gatewayActive" class="xb-ok" data-testid="gateway-card-status">当前使用</span>
+      <span v-else-if="uid" class="gw-status" data-testid="gateway-card-status">可使用</span>
+      <span v-else class="gw-status is-warn" data-testid="gateway-card-status">需登录</span>
+      <button type="button" class="xb-btn" :disabled="!store.desktop || enabling" data-testid="gateway-open" @click="openModal"><Settings :size="13" />配置</button>
+      <button v-if="!gatewayActive" type="button" class="xb-btn-primary" :disabled="!store.desktop || enabling" data-testid="gateway-activate" @click="activate">启用此服务商</button>
+      <button v-else type="button" class="xb-btn" disabled data-testid="gateway-in-use">正在使用中</button>
+    </div>
+  </div>
+
+  <template v-if="tiers.length && uid">
+    <div class="xb-group-title">使用模式</div>
+    <div class="xb-group" data-testid="gateway-modes">
+      <div class="xb-row">
+        <div class="xb-row-text"><b>小伴 AI 模式</b><span>{{ pickedTier?.description || '日常更快；深入会多想一步，适合复杂任务' }}{{ gatewayActive ? '' : '。选好后点“启用此服务商”生效' }}</span></div>
+        <div class="xb-seg" role="radiogroup" aria-label="小伴 AI 模式">
+          <button v-for="tier in tiers" :key="tier.tier" type="button" role="radio" :aria-checked="picked === tier.tier" :disabled="!tier.available || enabling" :title="tier.available ? undefined : '兑换付费额度后可用'" :data-testid="`gateway-mode-${tier.tier}`" @click="pickMode(tier.tier)">{{ tier.displayName }}</button>
         </div>
       </div>
-      <NTag v-if="gatewayActive" type="success" size="small" :bordered="false" data-testid="gateway-card-status">当前使用</NTag>
-      <NTag v-else-if="uid" type="info" size="small" :bordered="false" data-testid="gateway-card-status">可使用</NTag>
-      <NTag v-else type="warning" size="small" :bordered="false" data-testid="gateway-card-status">需登录</NTag>
     </div>
-
-    <p class="gw-desc">{{ cardDescription }}</p>
-
-    <div class="gw-fact">
-      <template v-if="cardFact">
-        <span>{{ cardFact.label }}</span>
-        <b data-testid="gateway-card-fact">{{ cardFact.value }}</b>
-      </template>
-    </div>
-
-    <div class="gw-actions">
-      <NButton size="small" secondary :disabled="!store.desktop || enabling" data-testid="gateway-open" @click="openModal">
-        <template #icon><Settings :size="13" /></template>
-        配置
-      </NButton>
-      <NButton v-if="!gatewayActive" size="small" type="primary" secondary :loading="enabling" :disabled="!store.desktop || enabling" data-testid="gateway-activate" @click="activate">
-        启用此服务商
-      </NButton>
-      <NButton v-else size="small" disabled quaternary type="success" data-testid="gateway-in-use">
-        正在使用中
-      </NButton>
-    </div>
-  </article>
+  </template>
 
   <NModal v-model:show="open" preset="card" title="小伴 AI" style="max-width: 600px; width: 92vw;" data-testid="gateway-modal">
     <div class="gw-modal">
@@ -246,38 +245,16 @@ watch(uid, () => {
 </template>
 
 <style scoped>
-/* Two root nodes (card + dialog), so the parent's scoped .provider-card rules do not reach the card. */
-.gateway-card {
-  display: flex;
-  flex-direction: column;
-  padding: 16px;
-  border: 1px solid var(--ui-border);
-  border-radius: 14px;
-  transition: all 0.2s ease;
-  background: linear-gradient(135deg, var(--ui-primary-soft), var(--ui-surface-alt) 60%);
-}
-.gateway-card.active { border-color: var(--ui-primary); }
-.gw-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
-.gw-badge { display: flex; align-items: center; gap: 10px; }
-.gw-badge svg { color: var(--ui-primary); flex-shrink: 0; }
-.gw-badge h3 { margin: 0; font-size: 15px; font-weight: 650; color: var(--ui-text-primary); }
-.gw-sub { display: block; margin-top: 2px; font-size: 11px; color: var(--ui-text-secondary); }
-.gw-desc {
-  margin: 12px 0;
-  min-height: 36px;
-  font-size: 12px;
-  line-height: 1.5;
-  color: var(--ui-text-secondary);
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-.gw-fact { display: flex; align-items: center; gap: 6px; min-height: 22px; margin-bottom: 14px; font-size: 12px; }
-.gw-fact span { color: var(--ui-muted); }
-.gw-fact b { font-variant-numeric: tabular-nums; }
-.gw-actions { display: flex; gap: 8px; margin-top: auto; align-items: center; }
-
+/* Several root nodes (card, mode group, dialog): everything here is scoped to this file. */
+.gateway-card{background:linear-gradient(120deg,var(--ui-surface) 40%,var(--ui-soft))}
+.gw-row{padding:16px;gap:14px}
+.gw-logo{width:44px;height:44px;flex-shrink:0;border-radius:12px;display:grid;place-items:center;color:#fff;background:linear-gradient(160deg,var(--ui-btn-hi),var(--ui-btn));box-shadow:inset 0 1px 0 rgba(255,255,255,.3)}
+.gateway-card .xb-row-text>b{font-size:14px;font-weight:600}
+.gw-fact{display:flex;align-items:baseline;gap:4px}
+.gw-fact strong{font-weight:600;color:var(--ui-text-primary);font-variant-numeric:tabular-nums}
+.gw-status{font-size:12px;color:var(--ui-text-secondary)}
+.gw-status.is-warn{color:var(--ui-warning-text)}
+.gw-row .xb-btn,.gw-row .xb-btn-primary{flex-shrink:0}
 .gw-modal { display: grid; gap: 18px; }
 .gw-signin { display: grid; gap: 14px; justify-items: start; }
 .gw-signin p { margin: 0; line-height: 1.7; color: var(--ui-text-secondary); }

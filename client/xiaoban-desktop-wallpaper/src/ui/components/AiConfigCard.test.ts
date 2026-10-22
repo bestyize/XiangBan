@@ -81,11 +81,12 @@ async function openModal(providerId = 'deepseek') {
 // Without a usable provider only 保存并启用 is offered, so the helper follows whichever exists.
 const saveButton = () => q<HTMLButtonElement>('ai-save') ?? q<HTMLButtonElement>('ai-save-and-activate')!;
 const pickProtocol = async (value: string) => {
-  const selects = wrapper!.findAllComponents(NSelect);
-  const protoSelect = selects.find(s => s.attributes('data-testid') === 'ai-protocol');
-  protoSelect?.vm.$emit('update:value', value);
-  await flushPromises();
+  if (!q('ai-protocol-menu')) await click('ai-protocol');
+  await click(`ai-protocol-${value}`);
 };
+/** Add a model by name, the way the dialog's input does (type, then 添加). */
+const addModel = async (name: string) => { await type('ai-model', name); await click('ai-model-add'); };
+const expandModel = (id: string) => click(`ai-model-expand-${id}`);
 
 beforeEach(() => { vi.resetAllMocks(); });
 afterEach(() => { wrapper?.unmount(); wrapper = undefined; });
@@ -99,18 +100,21 @@ describe('AI model settings card and provider templates', () => {
     }] };
     await open(remote);
     expect(q('ai-provider-card-deepseek')).toBeNull();
-    expect(q('ai-provider-card-official-free')?.textContent).toContain('免费服务说明');
+    expect(q('ai-provider-card-official-free')?.textContent).toContain('免费服务');
     await openModal('official-free');
     expect(q('ai-api-key')).toBeNull();
     expect(field('ai-base-url').disabled).toBe(true);
-    expect(field('ai-model').value).toBe('model-a');
+    expect(q('ai-model-row-model-a')).not.toBeNull();
+    expect(q('ai-model-default-model-a')?.getAttribute('aria-pressed')).toBe('true');
+    expect(q('ai-model-remove-model-a')).toBeNull(); // managed lists are the catalogue's
+    expect(q('ai-model')).toBeNull();
   });
 
   it('puts the 小伴 AI card first, ahead of every provider, and tells the status line when it is in use', async () => {
     await open();
-    const cards = Array.from(document.querySelectorAll('.providers-grid > article'));
-    expect(cards[0]?.getAttribute('data-testid')).toBe('ai-gateway-card');
-    expect(cards.map(c => c.getAttribute('data-testid'))).toContain('ai-provider-card-deepseek');
+    const first = document.querySelector('[data-testid="ai-gateway-card"], [data-testid^="ai-provider-card-"]');
+    expect(first?.getAttribute('data-testid')).toBe('ai-gateway-card');
+    expect(q('ai-provider-card-deepseek')).not.toBeNull();
     expect(q('ai-gateway-card')?.textContent).toContain('需登录');
     expect(q('ai-status')?.textContent).not.toContain('小伴 AI');
     wrapper?.unmount();
@@ -155,7 +159,8 @@ describe('AI model settings card and provider templates', () => {
     expect(q('ai-provider-card-deepseek')?.textContent).toContain('待配置');
     expect(q('ai-provider-card-deepseek')?.textContent).not.toContain('当前使用');
     expect(q('ai-provider-card-deepseek')?.textContent).not.toContain('正在使用中');
-    expect(q('ai-provider-activate-deepseek')).not.toBeNull();
+    expect(q('ai-provider-activate-deepseek')).toBeNull(); // nothing to activate until it is configured
+    expect(q('ai-provider-config-deepseek')?.textContent).toContain('配置');
     expect(q('ai-status')!.textContent).toContain('尚未配置');
   });
 
@@ -163,29 +168,31 @@ describe('AI model settings card and provider templates', () => {
     await open();
     await openModal('deepseek');
     expect(field('ai-base-url').value).toBe('https://api.example.com/v1');
-    expect(field('ai-model').value).toBe('model-a');
+    expect(q('ai-model-row-model-a')).not.toBeNull();
     expect(field('ai-api-key').value).toBe('');
     expect(field('ai-api-key').placeholder).toContain('••••9876');
     expect(q('ai-endpoint-preview')!.textContent).toContain('https://api.example.com/v1/chat/completions');
     expect(document.body.textContent).not.toContain(KEY);
   });
 
-  it('prompts to configure when trying to activate unconfigured provider', async () => {
-    const store = await open();
-    await click('ai-provider-activate-zhipu');
-    expect(store.notify).toHaveBeenCalledWith('该服务商尚未完整配置（缺少密钥或地址），请先配置', 'info');
+  it('offers 启用 only for providers that are configured, and 配置 for the rest', async () => {
+    await open();
+    expect(q('ai-provider-activate-zhipu')).toBeNull();
+    await click('ai-provider-config-zhipu');
     expect(q('ai-provider-modal')?.style.display).not.toBe('none');
+    expect(q('ai-provider-dialog')?.textContent).toContain('智谱 BigModel');
   });
 
   it('opens modal to create a custom provider with custom name field', async () => {
     await open();
     await click('ai-add-custom-card');
     expect(q('ai-provider-name')).not.toBeNull();
-    expect(field('ai-provider-name').value).toBe('自定义供应商');
+    expect(field('ai-provider-name').value).toBe('');
+    expect(q('ai-provider-dialog')?.textContent).toContain('添加自定义供应商');
 
     await type('ai-provider-name', '本地 Ollama');
     await type('ai-base-url', 'http://localhost:11434/v1');
-    await type('ai-model', 'llama3');
+    await addModel('llama3');
 
     ipc.mockResolvedValueOnce({
       ...configured,
@@ -220,7 +227,7 @@ describe('AI model settings card and provider templates', () => {
     expect(q('ai-form-error')!.textContent).toContain('模型名');
     expect(saveButton().disabled).toBe(true);
 
-    await type('ai-model', 'model-a');
+    await addModel('model-a');
     expect(q('ai-form-error')).toBeNull();
     expect(saveButton().disabled).toBe(false);
 
@@ -239,9 +246,15 @@ describe('AI model settings card and provider templates', () => {
 
   it('keeps the plain 保存配置 once a provider is in effect', async () => {
     await open(configured);
-    await openModal('deepseek');
+    await openModal('zhipu');
     expect(q('ai-save')).not.toBeNull();
     expect(q('ai-save-and-activate')).not.toBeNull();
+    // The provider already in use has nothing to activate: one 保存 button.
+    wrapper?.unmount();
+    await open(configured);
+    await openModal('deepseek');
+    expect(q('ai-save')).not.toBeNull();
+    expect(q('ai-save-and-activate')).toBeNull();
   });
 
   it('tells the user when saving what they configured made it take effect', async () => {
@@ -249,7 +262,7 @@ describe('AI model settings card and provider templates', () => {
     await click('ai-add-custom-card');
     await type('ai-provider-name', '我的服务商');
     await type('ai-base-url', 'https://api.example.com/v1');
-    await type('ai-model', 'model-a');
+    await addModel('model-a');
 
     // Answer the save once it is sent, with the view the host would return for this provider.
     ipc.mockImplementationOnce(async (command, args) => {
@@ -272,7 +285,8 @@ describe('AI model settings card and provider templates', () => {
   it('saves provider configuration via modal', async () => {
     const store = await open(configured);
     await openModal('deepseek');
-    await type('ai-model', 'deepseek-reasoner');
+    await addModel('deepseek-reasoner');
+    await click('ai-model-default-deepseek-reasoner');
 
     ipc.mockResolvedValueOnce({
       ...configured,
@@ -284,9 +298,9 @@ describe('AI model settings card and provider templates', () => {
       providerId: 'deepseek',
       model: 'deepseek-reasoner',
       activate: false,
+      models: [expect.objectContaining({ id: 'model-a' }), expect.objectContaining({ id: 'deepseek-reasoner' })],
     }));
     expect(store.notify).toHaveBeenCalledWith('DeepSeek 配置已保存', 'success');
-    expect(q('ai-provider-modal')?.style.display).toBe('none');
   });
 
   it('follows the protocol with its example address, but keeps an address typed by hand', async () => {
@@ -372,13 +386,10 @@ describe('fetching model list in modal', () => {
     expect(store.notify).toHaveBeenCalledWith('成功获取到 3 个模型', 'success');
     expect(q('ai-model-select-wrapper')).not.toBeNull();
 
-    const selects = wrapper!.findAllComponents(NSelect);
-    const modelSelect = selects.find(s => s.attributes('data-testid') === 'ai-model-select');
-    expect(modelSelect).toBeDefined();
-    modelSelect!.vm.$emit('update:value', 'deepseek-reasoner');
-    await flushPromises();
-
-    expect(field('ai-model').value).toBe('deepseek-reasoner');
+    await click('ai-model-chip-deepseek-reasoner');
+    expect(q('ai-model-row-deepseek-reasoner')).not.toBeNull();
+    expect(q('ai-model-chip-deepseek-reasoner')).toBeNull();
+    await click('ai-model-default-deepseek-reasoner');
 
     ipc.mockResolvedValueOnce(configured as never);
     saveButton().click();
@@ -388,6 +399,7 @@ describe('fetching model list in modal', () => {
       discoveredModel: expect.objectContaining({
         id: 'deepseek-reasoner', maxOutputTokens: 65536, contextWindowTokens: 128000,
       }),
+      models: expect.arrayContaining([expect.objectContaining({ id: 'deepseek-reasoner', maxOutputTokens: 65536, contextWindowTokens: 128000 })]),
     }));
   });
 
@@ -401,6 +413,19 @@ describe('fetching model list in modal', () => {
     saveButton().click();
     await flushPromises();
     expect(ipc).toHaveBeenCalledWith('save_ai_provider', expect.objectContaining({ discoveredModel: null }));
+  });
+
+  it('tests the connection with the list request and reports it inline', async () => {
+    const store = await open(configured);
+    await openModal('deepseek');
+    ipc.mockResolvedValueOnce([{ id: 'a' }, { id: 'b' }] as never);
+    await click('ai-test-connection');
+    expect(ipc).toHaveBeenLastCalledWith('fetch_ai_models', { protocol: 'chat', baseUrl: 'https://api.example.com/v1', apiKey: null });
+    expect(q('ai-test-result')!.textContent).toContain('连接成功');
+    expect(store.notify).not.toHaveBeenCalled();
+    ipc.mockRejectedValueOnce(new Error('鉴权失败（HTTP 401）'));
+    await click('ai-test-connection');
+    expect(q('ai-test-result')!.textContent).toContain('鉴权失败');
   });
 
   it('notifies error when fetch fails', async () => {
@@ -417,19 +442,17 @@ describe('global preferences settings', () => {
   it('toggles open-computer-use and saves preferences', async () => {
     await open();
     expect(q('ai-open-computer-use')?.getAttribute('aria-checked')).toBe('false');
-    await q('ai-open-computer-use')?.click();
-    await flushPromises();
-    expect(q<HTMLButtonElement>('ai-save-preferences')?.disabled).toBe(false);
-
     ipc.mockResolvedValueOnce({ ...configured, openComputerUse: true } as never);
-    await click('ai-save-preferences');
+    await click('ai-open-computer-use'); // applies at once, no separate save button
     expect(ipc).toHaveBeenCalledWith('save_ai_preferences', expect.objectContaining({ openComputerUse: true }));
   });
 
   it('resets workspace folder', async () => {
     await open({ ...configured, workspace: '/Users/me/work' });
     expect(q('ai-workspace')?.textContent).toBe('/Users/me/work');
+    ipc.mockResolvedValueOnce({ ...configured, workspace: '' } as never);
     await click('ai-workspace-reset');
+    expect(ipc).toHaveBeenCalledWith('save_ai_preferences', expect.objectContaining({ workspace: '' }));
     expect(q('ai-workspace')?.textContent).toBe('/data/workspace');
   });
 });
@@ -444,11 +467,7 @@ describe('reply preferences', () => {
   it('keeps advanced settings folded and saves the selected provider preference', async () => {
     await open(known);
     await openModal('custom_openai');
-    const advanced = q<HTMLDetailsElement>('ai-reply-advanced')!;
-    expect(advanced).not.toBeNull();
-    expect(advanced.open).toBe(false);
-    advanced.open = true;
-    await flushPromises();
+    expect(q('ai-reply-advanced')).not.toBeNull();
     const select = wrapper!.findAllComponents(NSelect).find(s => s.attributes('data-testid') === 'ai-reply-preference')!;
     expect(select.props('value')).toBe('deeper');
     select.vm.$emit('update:value', 'faster');
@@ -475,6 +494,8 @@ describe('reply preferences', () => {
     await open(configured);
     await openModal('deepseek');
     expect(q('ai-reply-advanced')).not.toBeNull();
+    expect(q('ai-reasoning-mode')).toBeNull(); // folded until the model's settings are opened
+    await expandModel('model-a');
     expect(q('ai-reasoning-mode')).not.toBeNull();
   });
 
@@ -486,21 +507,41 @@ describe('reply preferences', () => {
     await open(alias);
     await openModal('custom_openai');
     const select = (id: string) => wrapper!.findAllComponents(NSelect).find(s => s.attributes('data-testid') === id)!;
-    select('ai-reasoning-mode').vm.$emit('update:value', 'manual');
-    await flushPromises();
-    select('ai-reasoning-levels').vm.$emit('update:value', ['medium', 'high']);
-    await flushPromises();
+    await expandModel('private-alias');
+    await click('ai-reasoning-mode-manual');
+    for (const level of ['low', 'max', 'medium']) await click(`ai-reasoning-level-${level}`); // default low/high/max -> medium/high
+    expect(q('ai-model-row-private-alias')!.textContent).toContain('思考等级：中 / 高');
     expect(select('ai-reply-preference').props('options')).toEqual([
       {value:'default',label:'默认'}, {value:'medium',label:'中'}, {value:'deeper',label:'高 · 更深入'},
     ]);
     select('ai-reply-preference').vm.$emit('update:value', 'medium');
     await flushPromises();
+    // A second model keeps its own, separate declaration (here: none, detected from the name).
+    await addModel('second-model');
     ipc.mockResolvedValueOnce(alias as never);
     saveButton().click();
     await flushPromises();
+    const sent = ipc.mock.calls.find(c => c[0] === 'save_ai_provider')![1] as { models: Record<string, unknown>[] };
     expect(ipc).toHaveBeenCalledWith('save_ai_provider', expect.objectContaining({
-      model:'private-alias', reasoningEfforts:['medium','high'], clearReasoningEfforts:false, replyPreference:'medium',
+      model:'private-alias', clearReasoningEfforts:true, replyPreference:'medium',
     }));
+    expect(sent.models.map(m => [m.id, m.reasoningEfforts])).toEqual([['private-alias', ['medium','high']], ['second-model', undefined]]);
+  });
+
+  it('saves several models, a model turned off, and drops a removed one', async () => {
+    await open(known);
+    await openModal('custom_openai');
+    await addModel('m-two');
+    await addModel('m-three');
+    await expandModel('m-two');
+    await click('ai-reasoning-mode-off');
+    await click('ai-model-remove-m-three');
+    ipc.mockResolvedValueOnce(known as never);
+    saveButton().click();
+    await flushPromises();
+    const sent = ipc.mock.calls.find(c => c[0] === 'save_ai_provider')![1] as { model: string; models: Record<string, unknown>[] };
+    expect(sent.model).toBe('gpt-6.1-sol');
+    expect(sent.models.map(m => [m.id, m.reasoningEfforts])).toEqual([['gpt-6.1-sol', undefined], ['m-two', []]]);
   });
 
   it('uses automatic output management for Anthropic and hides manual token controls', async () => {
@@ -510,6 +551,7 @@ describe('reply preferences', () => {
     expect(q('ai-reply-advanced')).not.toBeNull();
     expect(q('ai-max-output-tokens')).toBeNull();
     expect(q('ai-reply-preference')).toBeNull();
+    expect(q('ai-model-expand-gpt-6.1-sol')).toBeNull();
     expect(q('ai-reasoning-mode')).toBeNull();
   });
 
