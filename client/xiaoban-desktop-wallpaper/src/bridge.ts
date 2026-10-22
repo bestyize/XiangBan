@@ -47,7 +47,7 @@ export interface ProviderConfigView {
   type?: ProviderType;
   remote?: boolean; available?: boolean; description?: string;
   defaultModel?: string;
-  models?: { id: string; name: string; description?: string; reasoningEfforts?: AiReasoningEffort[] | null; maxOutputTokens?: number | null; contextWindowTokens?: number | null }[];
+  models?: { id: string; name: string; description?: string; reasoningEfforts?: AiReasoningEffort[] | null; maxOutputTokens?: number | null; contextWindowTokens?: number | null; supportsTools?: boolean | null; supportsVision?: boolean | null }[];
   endpoints?: Partial<Record<AiProtocol, string>>;
   consoleUrl?: string; consoleText?: string;
   selectionMode?: "manual" | "recommended";
