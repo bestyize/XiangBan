@@ -70,6 +70,10 @@ pub struct ModelConfig {
     /// not the client slider value; aliases accept common provider catalogue formats.
     #[serde(alias = "contextLength", alias = "context_length", alias = "contextWindow", alias = "context_window_tokens", skip_serializing_if = "Option::is_none")]
     pub context_window_tokens: Option<usize>,
+    #[serde(alias = "supportsToolCalling", alias = "toolCalling", skip_serializing_if = "Option::is_none")]
+    pub supports_tools: Option<bool>,
+    #[serde(alias = "vision", skip_serializing_if = "Option::is_none")]
+    pub supports_vision: Option<bool>,
 }
 
 impl Default for ProviderConfig {
@@ -242,6 +246,10 @@ impl AiConfig {
             protocol, &self.model,
             declared.and_then(|m| m.context_window_tokens),
             declared.and_then(|m| m.max_output_tokens),
+        ).with_declared_features(
+            declared.and_then(|m| m.supports_tools),
+            declared.and_then(|m| m.supports_vision),
+            declared.and_then(|m| m.reasoning_efforts.clone()),
         )
     }
 
