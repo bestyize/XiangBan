@@ -45,6 +45,9 @@ pub struct ApprovalRequest<'a> {
     /// Why the host's `danger_check` flagged this call, if it did. Such a call is asked even in `Auto` mode
     /// and is never remembered.
     pub danger: Option<&'a str>,
+    /// For a command tool: what "always" would remember (see `Permission::remember_exec_as`), e.g. `npm test`.
+    /// `None` means "always" is not offered for this call: it is asked every time.
+    pub remember_as: Option<&'a str>,
     pub(crate) ctx: &'a ToolCtx,
 }
 
@@ -64,7 +67,8 @@ impl ApprovalRequest<'_> {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Approval {
     Once,
-    /// Skip asking for this tool for the rest of this session. `Risk::Exec` tools ignore it.
+    /// Skip asking for this tool for the rest of this session. `Risk::Exec` tools ignore it unless the host
+    /// named the kind of call to remember (`Permission::remember_exec_as`); then only that kind is remembered.
     Always,
     Deny,
 }
@@ -87,11 +91,13 @@ where
 }
 
 type DangerCheck = Arc<dyn Fn(&str, &Value) -> Option<String> + Send + Sync>;
+type RememberKey = Arc<dyn Fn(&str, &Value) -> Option<String> + Send + Sync>;
 
 pub struct Permission {
     mode: AtomicU8,
     approver: Arc<dyn Approver>,
     danger: Option<DangerCheck>,
+    remember: Option<RememberKey>,
     allow: HashSet<String>,
     deny: HashSet<String>,
     always: Mutex<HashSet<(String, String)>>,
@@ -106,6 +112,7 @@ impl Permission {
             mode: AtomicU8::new(mode.to_u8()),
             approver: Arc::new(approver),
             danger: None,
+            remember: None,
             allow: HashSet::new(),
             deny: HashSet::new(),
             always: Mutex::new(HashSet::new()),
@@ -127,6 +134,15 @@ impl Permission {
     /// Without a check, `Auto` keeps the stricter behaviour described in the README.
     pub fn danger_check(mut self, check: impl Fn(&str, &Value) -> Option<String> + Send + Sync + 'static) -> Self {
         self.danger = Some(Arc::new(check));
+        self
+    }
+
+    /// Lets "always" apply to a kind of command instead of never applying to `Risk::Exec` tools. `key` gets the
+    /// tool name and arguments and returns what to remember, e.g. `npm test` for `npm test -- --watch`, or `None`
+    /// for a call that must be asked every time. A later call is skipped only when its key is exactly the same, in the
+    /// same session. Flagged (`danger_check`), `always_ask` and tainted calls are still asked.
+    pub fn remember_exec_as(mut self, key: impl Fn(&str, &Value) -> Option<String> + Send + Sync + 'static) -> Self {
+        self.remember = Some(Arc::new(key));
         self
     }
 
@@ -186,8 +202,15 @@ impl Middleware for Permission {
             Some(check) if spec.risk != Risk::Read => check(name, args),
             _ => None,
         };
-        let sticky = spec.risk == Risk::Exec || spec.always_ask || danger.is_some();
-        let key = (session.to_string(), name.to_string());
+        let exec_key = match &self.remember {
+            Some(key) if spec.risk == Risk::Exec && !spec.always_ask && danger.is_none() => key(name, args),
+            _ => None,
+        };
+        let sticky = (spec.risk == Risk::Exec && exec_key.is_none()) || spec.always_ask || danger.is_some();
+        let key = match &exec_key {
+            Some(kind) => (session.to_string(), format!("{name}\u{0}{kind}")),
+            None => (session.to_string(), name.to_string()),
+        };
         let needs_ask = if self.danger.is_some() && mode == PermissionMode::Auto {
             danger.is_some()
         } else if spec.always_ask {
@@ -205,7 +228,7 @@ impl Middleware for Permission {
         };
 
         if needs_ask {
-            let request = ApprovalRequest { session, tool: name, risk: spec.risk, arguments: args, tainted, danger: danger.as_deref(), ctx };
+            let request = ApprovalRequest { session, tool: name, risk: spec.risk, arguments: args, tainted, danger: danger.as_deref(), remember_as: exec_key.as_deref(), ctx };
             let decision = self.approver.approve(&request);
             if ctx.is_cancelled() {
                 return ToolGate::Block("cancelled".to_string());

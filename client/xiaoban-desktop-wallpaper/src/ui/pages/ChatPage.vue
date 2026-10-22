@@ -483,7 +483,7 @@ async function openLink(href: string) {
               <pre class="preview" data-testid="approval-preview">{{ approvalPreview(request) }}</pre>
               <footer>
                 <NButton type="primary" size="small" data-testid="approval-once" @click="decide(request, 'once')">允许一次</NButton>
-                <NButton v-if="request.canRemember" size="small" data-testid="approval-always" @click="decide(request, 'always')">这段对话都允许</NButton>
+                <NButton v-if="request.canRemember" size="small" data-testid="approval-always" @click="decide(request, 'always')">{{ request.rememberAs ? `这段对话里 ${request.rememberAs} 都允许` : '这段对话都允许' }}</NButton>
                 <NButton size="small" quaternary data-testid="approval-deny" @click="decide(request, 'deny')">拒绝</NButton>
               </footer>
             </section>

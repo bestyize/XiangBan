@@ -176,6 +176,8 @@ fn permission_with_danger_check(mode: PermissionMode, approver: impl agent_kerne
         }
         danger::assess(tool, args, lock(&workspace).as_deref()).map(str::to_string)
     })
+    // "这类命令都允许" for one kind of simple command (`npm test`), never for commands in general.
+    .remember_exec_as(danger::remember_key)
 }
 
 fn emit<R: tauri::Runtime>(app: &tauri::AppHandle<R>, name: &str, payload: Value) {
@@ -221,8 +223,10 @@ fn ask_approval(app: &tauri::AppHandle, broker: &Broker, request: &ApprovalReque
         json!({
             "id": id, "session": request.session, "tool": request.tool, "risk": risk_name(request.risk),
             "arguments": shorten(request.arguments, 0), "tainted": tainted_by_policy, "danger": request.danger,
-            // Commands, skill changes and flagged calls are asked every time, so "always" would only mislead.
-            "canRemember": request.risk != Risk::Exec && request.tool != "skill_manage" && request.danger.is_none(),
+            // Skill changes, flagged calls and commands without a kind to remember are asked every time,
+            // so "always" would only mislead.
+            "canRemember": (request.risk != Risk::Exec || request.remember_as.is_some()) && request.tool != "skill_manage" && request.danger.is_none(),
+            "rememberAs": request.remember_as,
         }),
     );
     let decision = request.wait_for(&rx).unwrap_or(Approval::Deny);

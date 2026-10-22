@@ -69,6 +69,8 @@ export interface ApprovalRequest {
   /** Why this was asked even in full trust: a dangerous operation. Absent or null for an ordinary request. */
   danger?: string | null;
   canRemember: boolean;
+  /** For a command: the kind of command "always" would allow in this conversation, e.g. `npm test`. */
+  rememberAs?: string | null;
 }
 export type ApprovalDecision = 'once' | 'always' | 'deny';
 

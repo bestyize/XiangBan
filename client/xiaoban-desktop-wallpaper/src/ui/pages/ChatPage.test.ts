@@ -361,6 +361,15 @@ describe('asking the user', () => {
     expect(q('chat-approval')).toBeNull();
   });
 
+  it('offers to remember one kind of command and names it', async () => {
+    const h = await running();
+    h.emit('chat-approval', approval({ id: 'a7', arguments: { command: 'npm test' }, canRemember: true, rememberAs: 'npm test' }));
+    await flushPromises();
+    expect(q('approval-always')!.textContent).toContain('npm test');
+    await click('approval-always');
+    expect(h.calls.at(-1)).toEqual(['chat_answer_approval', { id: 'a7', decision: 'always' }]);
+  });
+
   it('says why a dangerous operation is asked even in full trust, and never offers to remember it', async () => {
     const h = await running();
     h.emit('chat-approval', approval({ id: 'a9', arguments: { command: 'sudo rm -rf /tmp/x' }, danger: '以管理员权限运行', canRemember: false }));

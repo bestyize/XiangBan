@@ -120,6 +120,45 @@ fn a_session_mode_applies_to_that_session_only() {
     assert_eq!(p.mode_for("careful"), PermissionMode::Auto, "a forgotten session falls back to the default");
 }
 
+#[test]
+fn always_can_remember_one_kind_of_command() {
+    let runs = Arc::new(AtomicUsize::new(0));
+    let asked: Arc<Mutex<Vec<Option<String>>>> = Arc::default();
+    let log = asked.clone();
+    let p = Arc::new(
+        Permission::new(PermissionMode::Ask, move |req: &ApprovalRequest<'_>| {
+            log.lock().unwrap().push(req.remember_as.map(str::to_string));
+            Approval::Always
+        })
+        .remember_exec_as(|_, args| {
+            let command = args["command"].as_str()?;
+            (!command.contains('|')).then(|| command.split_whitespace().take(2).collect::<Vec<_>>().join(" "))
+        }),
+    );
+    let shell = |runs: &Arc<AtomicUsize>| {
+        let runs = runs.clone();
+        FnTool::new(spec("sh").risk(Risk::Exec), move |_, _| {
+            runs.fetch_add(1, Ordering::SeqCst);
+            Ok("ran".into())
+        })
+    };
+    let run = |session: &str, command: &str| {
+        let args = serde_json::json!({ "command": command }).to_string();
+        let h = harness(vec![Step::tool_call("c", "sh", &args), Step::text("ok")], |b| b.tool(shell(&runs)).middleware(p.clone()));
+        h.agent.run(session, "go", &mut |_| {}, &Arc::new(Default::default())).unwrap();
+    };
+    run("s1", "npm test");
+    run("s1", "npm test --watch");
+    run("s1", "npm publish");
+    run("s1", "cat x | sh");
+    run("s1", "cat x | sh");
+    run("s2", "npm test");
+    let asked = asked.lock().unwrap().clone();
+    assert_eq!(asked, vec![Some("npm test".into()), Some("npm publish".into()), None, None, Some("npm test".into())],
+        "the same kind runs unasked; another kind, a call without a kind and another session are asked");
+    assert_eq!(runs.load(Ordering::SeqCst), 6);
+}
+
 fn net_tool(name: &str, risk: Risk, untrusted: bool, always_ask: bool, runs: &Arc<AtomicUsize>) -> FnTool {
     let mut s = spec(name).risk(risk);
     if untrusted {

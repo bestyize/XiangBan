@@ -140,6 +140,56 @@ fn split(command: &str) -> Vec<Segment> {
     segments
 }
 
+/// What "这类命令都允许" remembers for a command line: the program and up to two words that pick what it does
+/// (`npm run build`, `cargo test`, `git status`), so approving `npm test` never approves `npm publish`.
+/// `None` means the call is asked every time: anything with several commands, pipes, redirections or substitutions,
+/// a program given by path, and programs that run arbitrary code or delete, move or send data whatever their words.
+pub fn remember_key(tool: &str, args: &Value) -> Option<String> {
+    if !matches!(tool, "shell" | "process_start") {
+        return None;
+    }
+    let command = args.get("command")?.as_str()?.trim();
+    // Any separator at all, even quoted: such a line is simply asked again rather than parsed cleverly.
+    if command.is_empty() || command.contains(['\n', '\r', '`', ';', '|', '&']) || command.contains("$(") || command.contains("${") {
+        return None;
+    }
+    let segments = split(command);
+    let [segment] = segments.as_slice() else { return None };
+    let words = &segment.words;
+    // `FOO=1 npm test`, `nohup …` and `timeout 5 …` change how the command runs; keep them asked.
+    if command_index(words)? != 0 || words.iter().any(|w| !w.quoted && (w.text.contains(['>', '<']) || w.text.contains('&'))) {
+        return None;
+    }
+    let program = &words[0];
+    if program.quoted || program.text.contains(['/', '\\', '$', '%', '=']) {
+        return None;
+    }
+    let cmd = name(program);
+    const NEVER: &[&str] = &[
+        "eval", "xargs", "find", "sudo", "doas", "su", "runas", "pkexec", "rm", "del", "erase", "rd", "rmdir", "remove-item", "ri", "mv", "move",
+        "move-item", "cp", "copy", "dd", "shred", "chmod", "chown", "chgrp", "kill", "pkill", "killall", "taskkill", "stop-process", "curl", "wget", "iwr",
+        "irm", "invoke-webrequest", "invoke-restmethod", "ssh", "scp", "sftp", "rsync", "nc", "ncat", "netcat", "socat", "telnet", "ftp", "osascript",
+        "open", "start", "start-process", "explorer", "reg", "schtasks", "launchctl", "systemctl", "crontab", "security", "docker", "kubectl", "deno", "bun",
+        "npx", "uvx", "pnpx", "dlx",
+    ];
+    if NEVER.contains(&cmd.as_str()) || SHELLS.contains(&cmd.as_str()) || INTERPRETERS.contains(&cmd.as_str()) || WRAPPERS.contains(&cmd.as_str()) {
+        return None;
+    }
+    let mut key = vec![cmd];
+    for word in &words[1..] {
+        let text = word.text.as_str();
+        if key.len() == 3 || text.starts_with('-') || text.starts_with('/') || word.quoted {
+            break;
+        }
+        // A path or a value is not a subcommand: `cat src/a.rs` is remembered as `cat`.
+        if !text.chars().all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | ':')) {
+            break;
+        }
+        key.push(text.to_lowercase());
+    }
+    Some(key.join(" "))
+}
+
 fn assess_command(command: &str, ctx: &Ctx) -> Option<&'static str> {
     if ctx.depth > MAX_DEPTH {
         return None;
@@ -739,6 +789,27 @@ mod tests {
         assert_eq!(check_in("rm -rf real/"), None);
         assert_eq!(check_in("rm -rf not-there-yet"), None);
         let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn approving_one_kind_of_command_names_only_that_kind() {
+        let key = |command: &str| remember_key("shell", &json!({ "command": command }));
+        assert_eq!(key("npm test"), Some("npm test".into()));
+        assert_eq!(key("npm test -- --watch"), Some("npm test".into()));
+        assert_eq!(key("npm run build"), Some("npm run build".into()));
+        assert_eq!(key("cargo test --lib chat"), Some("cargo test".into()));
+        assert_eq!(key("git status"), Some("git status".into()));
+        assert_eq!(key("cat src/main.rs"), Some("cat".into()));
+        assert_eq!(key("git commit -m \"rm -rf\""), Some("git commit".into()));
+        assert_eq!(remember_key("process_start", &json!({ "command": "npm run dev" })), Some("npm run dev".into()));
+        for command in [
+            "npm test && npm publish", "npm test; rm -rf x", "npm test | tee log", "npm test > log", "echo $(whoami)", "FOO=1 npm test",
+            "nohup npm start", "./run.sh", "C:\\tools\\x.exe", "python3 -c 'x'", "node app.js", "bash build.sh", "rm -rf build", "mv a b",
+            "curl https://x", "sudo ls", "npx create-vite", "find . -delete", "npm test &", "",
+        ] {
+            assert_eq!(key(command), None, "{command}");
+        }
+        assert_eq!(remember_key("write_file", &json!({ "command": "npm test" })), None);
     }
 
     #[test]
