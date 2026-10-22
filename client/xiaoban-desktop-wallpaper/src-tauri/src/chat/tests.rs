@@ -182,7 +182,7 @@ fn build_rig(tag: &str, steps: Vec<Step>, answer: Approval, computer_use: bool) 
         utc_offset_minutes: 480,
         open_computer_use: computer_use,
         spawn_computer_use: &no_computer_use,
-        context_tokens: ai_config::DEFAULT_CONTEXT_TOKENS,
+        budget: TokenBudget::resolve(ai_config::DEFAULT_CONTEXT_TOKENS, None),
     })
     .expect("the tool set assembles");
     Rig { _dir: dir, workspace, dirs, desktop, asked, provider, agent, todo }
@@ -384,7 +384,7 @@ fn the_folder_for_saved_output_can_be_read_but_not_written() {
             utc_offset_minutes: 0,
             open_computer_use: false,
             spawn_computer_use: &no_computer_use,
-        context_tokens: ai_config::DEFAULT_CONTEXT_TOKENS,
+        budget: TokenBudget::resolve(ai_config::DEFAULT_CONTEXT_TOKENS, None),
         })
         .unwrap()
     };
@@ -566,7 +566,7 @@ fn in_auto_mode_all_write_tools_run_without_asking() {
         utc_offset_minutes: 0,
         open_computer_use: false,
         spawn_computer_use: &no_computer_use,
-        context_tokens: ai_config::DEFAULT_CONTEXT_TOKENS,
+        budget: TokenBudget::resolve(ai_config::DEFAULT_CONTEXT_TOKENS, None),
     }).unwrap();
 
     let mut events = Vec::new();
@@ -607,7 +607,7 @@ fn trusted_rig(tag: &str, steps: Vec<Step>) -> (Rig, Arc<Mutex<Vec<(String, Opti
         utc_offset_minutes: 0,
         open_computer_use: false,
         spawn_computer_use: &no_computer_use,
-        context_tokens: ai_config::DEFAULT_CONTEXT_TOKENS,
+        budget: TokenBudget::resolve(ai_config::DEFAULT_CONTEXT_TOKENS, None),
     })
     .unwrap();
     let rig = Rig { _dir: dir, workspace, dirs, desktop, asked: Arc::default(), provider, agent, todo };
@@ -826,7 +826,7 @@ fn the_context_size_from_settings_is_what_the_agent_trims_to() {
             utc_offset_minutes: 0,
             open_computer_use: false,
             spawn_computer_use: &no_computer_use,
-        context_tokens: 32_000,
+        budget: TokenBudget::resolve(32_000, None),
         })
         .unwrap();
         let file = JsonlStore::new(dirs.sessions());
@@ -905,8 +905,8 @@ fn automatic_output_limits_are_protocol_specific_and_independent_of_context_head
     };
     let body = agent_kernel::provider::responses::build_request_body(&provider_profile(&config), &request);
     assert!(body.get("max_output_tokens").is_none(), "Responses must use the endpoint default");
-    assert_eq!(context_reserve(config.context_tokens), 16_384 + 12_800);
-    assert_eq!(context_reserve(16_000), 4_000 + 800);
+    assert_eq!(config.token_budget().trim_headroom, 16_384 + 12_800);
+    assert_eq!(TokenBudget::resolve(16_000, None).trim_headroom, 4_000 + 800);
 
     config.protocol = "anthropic".into();
     config.providers[0].protocol = "anthropic".into();
