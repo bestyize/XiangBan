@@ -17,9 +17,9 @@ pub struct ProviderProfile {
     pub stream_usage: bool,
     /// Send tool schemas. Turn off for models without function calling.
     pub supports_tools: bool,
-    /// Cap on generated tokens. Anthropic requires one (8192 when unset), Responses sends
-    /// `max_output_tokens`, and chat completions sends nothing: endpoints disagree on the parameter
-    /// name there, so set `max_tokens` or `max_completion_tokens` in `extra_body` instead.
+    /// Optional output ceiling. Leave unset for automatic Chat Completions and
+    /// Responses calls (server default). Anthropic requires max_tokens, so it
+    /// resolves model-family capabilities when this field is unset.
     pub max_output_tokens: Option<u32>,
     /// Serialized request cap. Older tool images may be omitted from the request only;
     /// user images and the newest tool image result are preserved. None disables the cap.
