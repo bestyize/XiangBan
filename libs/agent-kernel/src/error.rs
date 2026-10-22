@@ -22,8 +22,8 @@ impl HarnessError {
     pub fn is_context_limit(&self) -> bool {
         let Self::Provider { message, .. } = self else { return false };
         let lower = message.to_lowercase();
-        ["context_length_exceeded", "context_window_exceeded", "maximum context length", "prompt is too long", "input token count exceeds", "too many input tokens"]
-            .iter().any(|needle| lower.contains(needle))
+        crate::model::recovery::classify_limit_failure(&lower)
+            == crate::model::recovery::LimitFailure::InputContextOverflow
     }
 }
 
