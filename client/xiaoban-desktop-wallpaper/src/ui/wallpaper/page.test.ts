@@ -42,7 +42,7 @@ describe('wallpaper scope rendering',()=>{
  it('offers 官方 / 我的 / 在线资源 as a segmented control and keeps imports in the header menu',async()=>{
  const store=reactive({desktop:false,settings:JSON.parse(JSON.stringify(defaults)),library:{items:[],source:'https://example.test/catalog.json',activeId:''},applyWallpaper:vi.fn(),notify:vi.fn(),refreshSettings:vi.fn().mockResolvedValue(undefined)} as unknown as ControlStore);
  const wrapper=mount(WallpaperPage,{attachTo:document.body,props:{store},global:{stubs:{NButton:{template:'<button><slot /></button>'},NInput:stub,NSelect:stub,NSlider:stub,NSwitch:stub,NModal:stub,NEmpty:stub,NAlert:stub,NPagination:stub,NCollapse:stub,NCollapseItem:stub,NColorPicker:stub,NSpin:stub}}});
- await flushPromises();expect(wrapper.findAll('.xb-seg button').map(node=>node.text())).toEqual(['官方','我的','在线资源']);expect(wrapper.find('h1').exists()).toBe(false);expect(wrapper.find('.n-tabs').exists()).toBe(false);expect(wrapper.find('[data-testid="wallpapers-on-desktop"]').exists()).toBe(true);expect(wrapper.findAll('button').some(button=>button.text()==='订阅与清单')).toBe(false);
+ await flushPromises();expect(wrapper.findAll('.xb-seg button').map(node=>node.text())).toEqual(['官方','我的','在线资源']);expect(wrapper.find('h1').exists()).toBe(false);expect(wrapper.find('.n-tabs').exists()).toBe(false);expect(wrapper.find('[data-testid="wallpapers-on-desktop"]').exists()).toBe(false);expect(wrapper.findAll('button').some(button=>button.text()==='订阅与清单')).toBe(false);
  expect(wrapper.find('[data-testid="import-media"]').exists()).toBe(false);await wrapper.get('[data-testid="wallpapers-import"]').trigger('click');expect(wrapper.find('[data-testid="import-media"]').exists()).toBe(true);wrapper.unmount();
  });
  it('shows a use-now button on hover that applies the wallpaper without opening the drawer',async()=>{
@@ -99,3 +99,4 @@ it('keeps the online feed when the page is kept alive and navigated away', async
  expect(vi.mocked(invoke).mock.calls.length).toBe(calls);
  wrapper.unmount();
 });
+

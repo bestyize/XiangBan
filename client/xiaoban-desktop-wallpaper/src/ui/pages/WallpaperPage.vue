@@ -1,17 +1,14 @@
 <script setup lang="ts">
 import ResourceShareActions from "../components/ResourceShareActions.vue";
-import {computed,ref,watch,nextTick,onBeforeUnmount,onActivated,onDeactivated,onMounted} from "vue";
+import {computed,ref,watch,nextTick,onBeforeUnmount,onActivated,onDeactivated} from "vue";
 import {NButton,NSelect,NSlider,NSwitch,NEmpty,NAlert,NPagination,NCollapse,NCollapseItem,NColorPicker,NSpin,NPopconfirm} from "naive-ui";
-import {Search,Maximize2,X,Monitor,Trash2,Upload,Sparkles,Pause,Play,ChevronDown,Check,Image as ImageIcon} from "lucide-vue-next";
+import {Search,Maximize2,X,Monitor,Trash2,Upload,Sparkles,ChevronDown,Check,Image as ImageIcon} from "lucide-vue-next";
 import {invoke,wallpaperDefaults,type WallpaperLibrary,type WallpaperOptions} from "../../bridge.ts";
 import {siteMedia,siteFullMedia,isAnimatedWallpaper} from "../../wallpaper-media.ts";
 import type {ControlStore} from "../control-types.ts";
 import {useWallpaperWorkspace,type Selection} from "../wallpaper/useWallpaperWorkspace.ts";
 import MediaPreview from "../wallpaper/MediaPreview.vue";
 import StudioActions from "../components/StudioActions.vue";
-import {createPetClient} from "../../pets/client.ts";
-import {definitionOf} from "../../pets/model.ts";
-import {petImage} from "../../pets/render.ts";
 import {createWallpaperContextMenu,type ContextAction} from "../wallpaper/context-menu.ts";
 const props=defineProps<{store:ControlStore}>();
 const {progress,progressPercent,saved,tab,media,query,category,page,localSource,selection,draft,busy,downloading,cancelling,loading,error,feed,categories,kind,select,cancel,cancelDownload,load,localItems,action}=useWallpaperWorkspace(props.store);
@@ -29,20 +26,6 @@ const kindLabel=(card:Selection)=>{const kind=cardKind(card);return kind==='vide
 /** 预览 opens the settings drawer; 设为壁纸 applies with the wallpaper's own defaults at once. */
 function inspect(card:Selection){if(!busy.value)select(card);}
 async function applyNow(card:Selection){if(busy.value)return;select(card);await action(true);}
-// ── The strip at the top: what is on the desktop right now.
-const pets=createPetClient();
-const onDesktop=computed(()=>{
-  const id=props.store.settings.wallpaperId,entry=props.store.library.items.find(item=>item.definition.id===id);
-  const wallpaper=id==='companion'||!entry?{title:id==='companion'||!id?'原生壁纸':'壁纸',cover:''}:{title:entry.definition.title,cover:sources({source:'local',item:entry}).poster};
-  const pack=props.store.effectList?.packs.find(item=>item.id===props.store.settings.effects?.selected);
-  const instances=pets.catalog.value.layout.instances;
-  const first=instances[0],definition=first?definitionOf(pets.catalog.value.themes,first):undefined;
-  const petText=!first?'还没有':instances.length>1?`${first.name} 等 ${instances.length} 只`:first.name;
-  return {wallpaper,effect:{title:pack?.name??'无特效',sky:pack?`linear-gradient(${pack.sky.join(',')})`:''},pet:{title:petText,image:definition?petImage(definition):''}};
-});
-const paused=computed(()=>!!props.store.settings.paused);
-function togglePause(){void props.store.updateAppearance({paused:!paused.value}).catch(e=>props.store.notify(e,'error'));}
-onMounted(()=>{void pets.load();});
 const importMenu=ref(false);
 const cardId=(card:Selection)=>card.source==='local'?card.item.definition.id:card.item.id;
 const cardTitle=(card:Selection)=>card.source==='local'?card.item.definition.title:card.item.title;
@@ -114,7 +97,7 @@ async function openContext(event:MouseEvent,card:Selection){
 }
 function onKey(event:KeyboardEvent){if(event.key==="Escape"){if(viewer.value)viewer.value=false;else if(context.value)context.value=null;else cancel();}}
 window.addEventListener("keydown",onKey);
-onBeforeUnmount(()=>{pets.dispose();nativeContext.dispose();window.removeEventListener("keydown",onKey);});
+onBeforeUnmount(()=>{nativeContext.dispose();window.removeEventListener("keydown",onKey);});
 onDeactivated(()=>{window.removeEventListener("keydown",onKey);viewer.value=false;context.value=null;});
 onActivated(()=>window.addEventListener("keydown",onKey));
 </script>
@@ -126,13 +109,6 @@ onActivated(()=>window.addEventListener("keydown",onKey));
 <button type="button" class="xb-btn-primary" :disabled="!store.desktop" data-testid="wallpapers-create" @click="store.startCreation('wallpaper')"><Sparkles :size="14"/>让小伴创作</button>
 </StudioActions>
 <div class="wp-scroll" data-testid="wallpapers-scroll">
-<section class="on-desk" aria-label="桌面上正在使用" data-testid="wallpapers-on-desktop">
-<span class="on-desk-title">桌面上</span>
-<div class="lay"><span class="lay-thumb"><img v-if="onDesktop.wallpaper.cover" :src="onDesktop.wallpaper.cover" alt=""/><Monitor v-else :size="15"/></span><div class="lay-text"><span>壁纸</span><b>{{onDesktop.wallpaper.title}}</b></div></div>
-<div class="lay"><span class="lay-thumb" :style="onDesktop.effect.sky?{background:onDesktop.effect.sky}:undefined"><Sparkles :size="15"/></span><div class="lay-text"><span>特效</span><b>{{onDesktop.effect.title}}</b></div></div>
-<div class="lay"><span class="lay-thumb pet-thumb"><img v-if="onDesktop.pet.image" :src="onDesktop.pet.image" alt=""/></span><div class="lay-text"><span>伙伴</span><b>{{onDesktop.pet.title}}</b></div></div>
-<button type="button" class="xb-btn is-sm pause-btn" :aria-pressed="paused" data-testid="wallpapers-pause" @click="togglePause"><component :is="paused?Play:Pause" :size="13"/>{{paused?'恢复动画':'暂停动画'}}</button>
-</section>
 <div class="filters">
 <div class="xb-seg" role="group" aria-label="壁纸来源"><button v-for="item in scopes" :key="item.id" type="button" :disabled="busy" :aria-pressed="scope===item.id" :data-testid="`wallpaper-scope-${item.id}`" @click="scope=item.id">{{item.label}}</button></div>
 <span class="divider"></span>
@@ -167,20 +143,7 @@ onActivated(()=>window.addEventListener("keydown",onKey));
 .import-wrap{position:relative}
 .menu-dismiss{position:fixed;inset:0;z-index:30}
 .import-menu{position:absolute;right:0;top:38px;z-index:31;min-width:180px}
-.on-desk{display:flex;align-items:center;gap:10px;padding:10px;border-radius:14px;background:var(--ui-surface-sunken)}
-.on-desk-title{font-size:12.5px;font-weight:500;color:var(--ui-text-secondary);padding:0 6px}
-.lay{display:flex;align-items:center;gap:10px;min-width:0;padding:6px 14px 6px 6px;border-radius:12px;background:var(--ui-surface);box-shadow:0 0 0 1px var(--ui-line)}
-.lay-thumb{width:44px;height:30px;flex:none;border-radius:7px;overflow:hidden;display:grid;place-items:center;background:var(--ui-control);color:var(--ui-text-secondary)}
-.lay-thumb img{width:100%;height:100%;object-fit:cover;display:block}
-.lay-thumb.pet-thumb{background:var(--ui-soft)}
-.lay-thumb.pet-thumb img{width:26px;height:26px;object-fit:contain}
-.lay-thumb :deep(svg){color:#fff;filter:drop-shadow(0 1px 2px rgba(0,0,0,.3))}
-.lay-thumb:not([style]) :deep(svg){color:var(--ui-text-secondary);filter:none}
-.lay-text{display:flex;flex-direction:column;min-width:0}
-.lay-text span{font-size:11px;color:var(--ui-text-secondary);line-height:1.3}
-.lay-text b{font-size:13px;font-weight:500;line-height:1.3;max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.pause-btn{margin-left:auto}
-.filters{margin-top:20px;display:flex;align-items:center;gap:8px;min-width:0}
+.filters{display:flex;align-items:center;gap:8px;min-width:0}
 .divider{width:1px;height:16px;background:var(--ui-border-strong);margin:0 6px;flex:none}
 .chips{display:flex;align-items:center;gap:4px;min-width:0}
 .cat-row{margin-top:10px;flex-wrap:wrap}
@@ -250,3 +213,4 @@ onActivated(()=>window.addEventListener("keydown",onKey));
 .material-context button:disabled{color:var(--ui-text-tertiary);cursor:default}
 @media(max-width:900px){.gallery{grid-template-columns:repeat(2,minmax(0,1fr))}.filters{flex-wrap:wrap}}
 </style>
+
