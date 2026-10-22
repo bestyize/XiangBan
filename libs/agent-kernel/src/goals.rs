@@ -142,7 +142,10 @@ impl GoalStore {
             file.write_all(&bytes).and_then(|_| file.sync_all()).map_err(|e| e.to_string())?;
             replace_atomically(&temp, &path)?;
             #[cfg(unix)]
-            File::open(&self.root).and_then(|f| f.sync_all()).map_err(|e| e.to_string())?;
+            { let _ = File::open(&self.root).and_then(|f| f.sync_all()); }
+            // The file has already been atomically published. Failure to sync
+            // the parent directory on a filesystem that forbids directory
+            // fsync must not be reported as an aborted transaction.
             Ok(())
         })();
         if write.is_err() { let _ = fs::remove_file(&temp); }
