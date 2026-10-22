@@ -90,7 +90,15 @@ impl Skills {
 
     /// The skill body with a short header, ready to hand to the model.
     pub fn load(&self, name: &str) -> Result<String, String> {
-        let info = self.find(name).ok_or_else(|| format!("no skill named `{name}`. Available: {}", self.names_hint()))?;
+        let Some(info) = self.find(name) else {
+            // A folder that is there but cannot be listed: say why, rather than that it does not exist.
+            let file = valid_slug(name).then(|| self.roots.iter().map(|r| r.path.join(name).join("SKILL.md")).find(|f| f.is_file())).flatten();
+            if let Some(file) = file {
+                read_limited(&file)?;
+                return Err(format!("{} has no valid frontmatter (`name: {name}` and a description)", file.display()));
+            }
+            return Err(format!("no skill named `{name}`. Available: {}", self.names_hint()));
+        };
         let text = read_limited(&info.dir.join("SKILL.md"))?;
         let body = split_frontmatter(&text).map_or(text.as_str(), |(_, body)| body);
         Ok(format!("Skill `{}` (directory: {})\n\n{}", info.name, info.dir.display(), body.trim()))

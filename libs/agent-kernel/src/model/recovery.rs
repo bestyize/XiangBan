@@ -37,7 +37,10 @@ fn is_output_cap_error(text: &str) -> bool {
         "less than or equal", "must be <", "range of max_tokens",
         "available_tokens", "available tokens",
     ].iter().any(|s| text.contains(s));
-    output_field && cap_signal
+    // "must be greater than zero" and the like reject a value that is too small: lowering it would not help.
+    let lower_bound = ["greater than zero", "greater than 0", "at least 1", "must be positive", "must be a positive"]
+        .iter().any(|s| text.contains(s));
+    output_field && cap_signal && !lower_bound
 }
 
 /// Reduce only an explicitly rejected max_tokens request. An ambiguous error
@@ -83,5 +86,6 @@ mod tests {
         assert_eq!(next_output_limit("range of max_tokens should be [1, 65536]", 128_000), Some(65_535));
         assert_eq!(next_output_limit("max_tokens is too large", 128_000), Some(64_000));
         assert_eq!(next_output_limit("prompt is too long; max_tokens is too large", 128_000), None);
+        assert_eq!(next_output_limit("max_tokens must be greater than zero", 128_000), None, "a lower bound is not a cap");
     }
 }

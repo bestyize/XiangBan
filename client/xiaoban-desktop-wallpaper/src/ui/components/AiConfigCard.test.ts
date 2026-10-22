@@ -464,7 +464,7 @@ describe('reply preferences', () => {
     await openModal('custom_openai');
     await type('ai-base-url', 'https://gateway.example/v1');
     expect(q('ai-reply-preference')).not.toBeNull();
-    expect(q('ai-max-output-tokens')).not.toBeNull();
+    expect(q('ai-max-output-tokens')).toBeNull(); // the output limit is automatic
     ipc.mockResolvedValueOnce(known as never);
     saveButton().click();
     await flushPromises();

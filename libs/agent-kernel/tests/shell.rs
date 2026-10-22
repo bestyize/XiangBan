@@ -22,8 +22,15 @@ fn sh(dir: &TempDir, command: &str) -> String {
     run_shell(Shell::new(&dir.0), command).0
 }
 
+/// A killed process whose parent never reaps it stays a zombie (state `Z`); it is not running. That happens in
+/// containers whose first process does not reap orphans.
 fn process_alive(pid: &str) -> bool {
-    Command::new("kill").args(["-0", pid]).stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null()).status().is_ok_and(|s| s.success())
+    let out = Command::new("ps").args(["-o", "stat=", "-p", pid]).stdin(Stdio::null()).stderr(Stdio::null()).output();
+    out.is_ok_and(|out| {
+        let state = String::from_utf8_lossy(&out.stdout);
+        let state = state.trim();
+        !state.is_empty() && !state.starts_with('Z')
+    })
 }
 
 fn assert_dies(pid: &str) {

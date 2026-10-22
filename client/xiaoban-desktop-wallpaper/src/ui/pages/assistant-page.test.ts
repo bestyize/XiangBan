@@ -22,7 +22,7 @@ function setup(voice: Record<string, unknown> = {}, settings: Record<string, unk
     notify: vi.fn(), refreshSettings: vi.fn(async () => {}), navigate: vi.fn((page: ControlPage) => { store.page = page; }),
   }) as unknown as ControlStore;
   return { wrapper: mount(AssistantPage, { props: { store }, global: { stubs: {
-    NModal: { name: 'NModal', props: ['show'], template: '<div v-if="show" data-testid="capture-reset-dialog"><slot /></div>' },
+    Modal: { name: 'Modal', props: ['show'], template: '<div v-if="show" data-testid="capture-reset-dialog"><slot /></div>' },
   } } }), store, asr };
 }
 const click = async (wrapper: ReturnType<typeof setup>['wrapper'], id: string) => { await wrapper.get(`[data-testid="${id}"]`).trigger('click'); await flushPromises(); };
