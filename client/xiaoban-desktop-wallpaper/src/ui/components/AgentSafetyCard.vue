@@ -6,7 +6,10 @@ import type { ControlStore } from '../control-types.ts';
 import { toolLabel } from '../chat/format.ts';
 
 interface SavedGrant { session: string; title: string; tool: string; kind?: string | null }
-interface AgentSettingsView { sandboxAvailable: boolean; sandboxNetwork: boolean; hooks: string; hooksPath: string; grants: SavedGrant[] }
+interface AgentSettingsView {
+  sandboxAvailable: boolean; sandboxNetwork: boolean; hooks: string; hooksPath: string; grants: SavedGrant[];
+  platform?: string; windowsSandbox?: boolean;
+}
 
 const props = defineProps<{ store: ControlStore }>();
 const view = ref<AgentSettingsView | null>(null);
@@ -36,6 +39,8 @@ async function act(key: string, action: () => Promise<unknown>, success?: string
 }
 
 const setNetwork = (allowed: boolean) => act('network', () => invoke('chat_set_sandbox_network', { allowed }));
+const setWindowsSandbox = (enabled: boolean) => act('windows', () => invoke('chat_set_windows_sandbox', { enabled }),
+  enabled ? '已开启 Windows 沙箱，完全信任下的命令改为低完整性运行' : '已关闭 Windows 沙箱');
 const saveHooks = () => act('hooks', async () => {
   const count = await invoke<number>('chat_save_hooks', { text: hooks.value });
   props.store.notify(count ? `已保存 ${count} 条 hook，下次工具调用起生效` : '已清除所有 hook', 'success');
@@ -56,6 +61,13 @@ onMounted(load);
         <div><b>允许沙箱中的命令联网</b><p>安装依赖、拉取代码需要联网。关闭后只能访问本机服务。</p></div>
         <NSwitch :value="view.sandboxNetwork" :loading="busy === 'network'" :disabled="!!busy" data-testid="sandbox-network" @update:value="setNetwork" />
       </div>
+      <template v-else-if="view.platform === 'windows'">
+        <div class="setting-row">
+          <div><b>Windows 沙箱（实验性）</b><p>完全信任下的命令以“低完整性”运行，只能写工作目录和小伴自己的临时目录，不能改动你的其他文件；不限制读取，也不限制联网。</p></div>
+          <NSwitch :value="!!view.windowsSandbox" :loading="busy === 'windows'" :disabled="!!busy" data-testid="windows-sandbox" @update:value="setWindowsSandbox" />
+        </div>
+        <NAlert type="warning" :show-icon="false" data-testid="windows-sandbox-note">开启时会把工作目录及其中的文件标记为“低完整性”（修改的是这些文件的系统安全标签，不改内容），之后换的工作目录也会在第一次使用前标记。标记较多文件需要一点时间。部分需要写入用户目录的工具（如全局安装、某些编译器缓存）可能在沙箱里失败，遇到时可关闭此选项。</NAlert>
+      </template>
       <NAlert v-else type="warning" :show-icon="false" data-testid="sandbox-unavailable">当前系统还不支持沙箱（目前仅 macOS）。“完全信任”下的命令不受系统隔离，只有高风险操作会停下来询问。</NAlert>
 
       <div class="section-heading"><div><h2>已记住的授权</h2><p>在确认卡片上选“这段对话都允许”的操作，会一直记到撤销为止。</p></div></div>

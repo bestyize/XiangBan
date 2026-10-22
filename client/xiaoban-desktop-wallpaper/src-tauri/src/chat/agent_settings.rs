@@ -23,11 +23,15 @@ pub struct AgentSettings {
     pub sandbox_network: bool,
     /// Saved grants, by conversation.
     pub grants: BTreeMap<String, Vec<Grant>>,
+    /// Windows, experimental: full-trust commands run at low integrity. Off until the user turns it on.
+    pub windows_sandbox: bool,
+    /// Working folders already labelled low integrity for it.
+    pub labelled: Vec<String>,
 }
 
 impl Default for AgentSettings {
     fn default() -> Self {
-        Self { sandbox_network: true, grants: BTreeMap::new() }
+        Self { sandbox_network: true, grants: BTreeMap::new(), windows_sandbox: false, labelled: Vec::new() }
     }
 }
 

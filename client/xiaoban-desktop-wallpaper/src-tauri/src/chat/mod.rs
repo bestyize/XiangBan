@@ -783,6 +783,7 @@ pub(crate) fn send(app: tauri::AppHandle, session_id: String, text: String, imag
     {
         let settings = agent_settings::load(&Dirs::of(&app)?.chat);
         sandbox_gate::set_network(settings.sandbox_network);
+        sandbox_gate::set_windows(settings.windows_sandbox);
         for grant in settings.grants.get(&summary.id).into_iter().flatten() {
             state.permission.grant(&summary.id, &grant.tool, grant.kind.as_deref());
         }
@@ -818,6 +819,15 @@ pub(crate) fn send(app: tauri::AppHandle, session_id: String, text: String, imag
     let started = std::thread::Builder::new().name(format!("chat-{id}")).spawn(move || {
         let sender = handle.clone();
         let session = id.clone();
+        // A working folder chosen after the Windows sandbox was turned on is labelled before its first command;
+        // labelling a large folder takes a moment, so it happens here and not on the page's thread.
+        if let Ok(dirs) = Dirs::of(&handle) {
+            if let Err(error) = sandbox_gate::ensure_labelled(&dirs.chat, &workspace_owned) {
+                emit(&sender, "chat-event", json!({ "session": session, "event": { "type": "error", "message": format!("无法为 Windows 沙箱准备工作目录：{error}") } }));
+                finish_run(&handle, &id);
+                return;
+            }
+        }
         // 小伴 AI 要先拿到有效的账号令牌，可能需要联网刷新，所以放在这条线程里做，不卡住界面。
         let prepared = ai_gateway::prepare(&handle, config_owned).and_then(|(config, source)| {
             build_agent(&handle, &config, source.clone(), &workspace_owned, saved_for_thread.clone(), &id, &cancel).map(|agent| (agent, config, source))
@@ -1311,6 +1321,8 @@ pub fn chat_agent_settings(app: tauri::AppHandle, window: tauri::WebviewWindow) 
     Ok(json!({
         "sandboxAvailable": agent_kernel::sandbox::available(),
         "sandboxNetwork": settings.sandbox_network,
+        "platform": std::env::consts::OS,
+        "windowsSandbox": settings.windows_sandbox,
         "hooks": fs::read_to_string(&hooks_file).unwrap_or_default(),
         "hooksPath": hooks_file.display().to_string(),
         "grants": grants,
@@ -1326,6 +1338,30 @@ pub fn chat_set_sandbox_network(app: tauri::AppHandle, window: tauri::WebviewWin
     agent_settings::save(&chat, &settings)?;
     sandbox_gate::set_network(allowed);
     Ok(())
+}
+
+/// Windows, experimental: turns the low-integrity sandbox for full-trust commands on or off. Turning it on labels
+/// the sandbox's own folder and the current working folder low integrity (a lasting change to their security label).
+#[tauri::command]
+pub async fn chat_set_windows_sandbox(app: tauri::AppHandle, window: tauri::WebviewWindow, enabled: bool) -> Result<(), String> {
+    if window.label() != "control" { return Err("只能在设置里修改".into()); }
+    if enabled && !cfg!(windows) { return Err("这个选项只用于 Windows".into()); }
+    tauri::async_runtime::spawn_blocking(move || -> Result<(), String> {
+        let chat = Dirs::of(&app)?.chat;
+        if enabled {
+            let folder = sandbox_gate::low_folder().ok_or("找不到用户目录")?;
+            agent_kernel::sandbox::label_low(&folder)?;
+            sandbox_gate::set_windows(true);
+            let config = ai_config::current(&app)?;
+            let default = ai_config::default_workspace(&app)?;
+            sandbox_gate::ensure_labelled(&chat, config.workspace_or(&default))?;
+        }
+        let mut settings = agent_settings::load(&chat);
+        settings.windows_sandbox = enabled;
+        agent_settings::save(&chat, &settings)?;
+        sandbox_gate::set_windows(enabled);
+        Ok(())
+    }).await.map_err(|e| e.to_string())?
 }
 
 /// Saves the hooks file after checking it; an empty text removes every hook. Returns how many there are.

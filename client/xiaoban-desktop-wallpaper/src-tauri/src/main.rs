@@ -738,6 +738,11 @@ fn setup_tray(app: &tauri::App) -> tauri::Result<()> {
 }
 
 fn main() {
+    // Started as the sandbox launcher for one command (Windows, experimental): run it and leave, before anything
+    // of the app starts.
+    if let Some(code) = agent_kernel::sandbox::windows_launcher_main() {
+        std::process::exit(code);
+    }
     // This must run before Builder::build: even the settings window needs WebView2.
     #[cfg(windows)]
     if !runtime::windows::before_start() {
@@ -804,7 +809,7 @@ fn main() {
             chat::chat_overview, chat::chat_load_session, chat::chat_new_session, chat::chat_send, chat::chat_cancel, chat::chat_delete_session,
             chat::goals::chat_goal_get, chat::goals::chat_goal_set, chat::goals::chat_goal_start, chat::goals::chat_goal_pause, chat::goals::chat_goal_acknowledge, chat::goals::chat_goal_finish, chat::goals::chat_goal_delete, chat::chat_run_history, chat::chat_verify_file_outcome, chat::chat_reflect_run, chat::chat_review_experience,
             chat::chat_context, chat::chat_compact, chat::chat_rename_session, chat::chat_move_session, chat::chat_create_group, chat::chat_rename_group, chat::chat_delete_group,
-            chat::chat_answer_approval, chat::chat_answer_question, chat::chat_set_permission_mode, chat::chat_checkpoints, chat::chat_undo_run, chat::chat_agent_settings, chat::chat_set_sandbox_network, chat::chat_save_hooks, chat::chat_revoke_grant,
+            chat::chat_answer_approval, chat::chat_answer_question, chat::chat_set_permission_mode, chat::chat_checkpoints, chat::chat_undo_run, chat::chat_agent_settings, chat::chat_set_sandbox_network, chat::chat_save_hooks, chat::chat_revoke_grant, chat::chat_set_windows_sandbox,
             chat::store::ai_store_installed, chat::store::ai_store_browse, chat::store::ai_store_skill_categories, chat::store::ai_store_inspect, chat::store::ai_store_install, chat::store::ai_store_uninstall,
             chat::store::ai_store_catalog, chat::store::ai_store_experts_installed, chat::store::ai_store_expert_review, chat::store::ai_store_expert_install, chat::store::ai_store_expert_remove, chat::store::ai_store_connector_detail, chat::store::ai_store_connector_status, chat::store::ai_store_connector_connect, chat::store::ai_store_connector_disconnect, chat::store::ai_store_connector_reconnect,
             chat::store::ai_store_connector_auth_status, chat::store::ai_store_connector_auth_cancel,

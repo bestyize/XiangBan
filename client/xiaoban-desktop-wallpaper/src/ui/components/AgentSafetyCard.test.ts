@@ -53,6 +53,15 @@ describe('安全与权限', () => {
     expect(other.wrapper.find('[data-testid="sandbox-network"]').exists()).toBe(false);
   });
 
+  it('offers the experimental sandbox on Windows and turns it on', async () => {
+    const { wrapper } = await open(view({ sandboxAvailable: false, platform: 'windows', windowsSandbox: false }));
+    expect(wrapper.find('[data-testid="sandbox-unavailable"]').exists()).toBe(false);
+    expect(wrapper.get('[data-testid="windows-sandbox-note"]').text()).toContain('低完整性');
+    await wrapper.getComponent(NSwitch).vm.$emit('update:value', true);
+    await flushPromises();
+    expect(ipc).toHaveBeenCalledWith('chat_set_windows_sandbox', { enabled: true });
+  });
+
   it('saves hooks only after a change and reports what the host says', async () => {
     const { wrapper, store } = await open();
     const save = wrapper.get('[data-testid="hooks-save"]');

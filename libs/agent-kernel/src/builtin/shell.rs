@@ -151,8 +151,7 @@ impl Tool for Shell {
         let policy = self.sandbox.as_ref().and_then(|hook| hook.policy(ctx.session(), command));
         #[cfg(windows)]
         let mut cmd = {
-            crate::sandbox::refuse_on_windows(policy.as_ref())?;
-            let mut c = crate::child_env::windows_shell(command);
+            let mut c = crate::sandbox::windows_shell(command, policy.as_ref())?;
             crate::child_env::no_window(&mut c);
             c
         };
@@ -160,6 +159,8 @@ impl Tool for Shell {
         let mut cmd = crate::sandbox::unix_shell(command, policy.as_ref())?;
         cmd.current_dir(&self.cwd).stdin(Stdio::null()).stdout(Stdio::piped()).stderr(Stdio::piped());
         crate::child_env::apply(&mut cmd, &self.extra_inherited);
+        #[cfg(windows)]
+        crate::sandbox::windows_launcher_env(&mut cmd, command, policy.as_ref());
         cmd.envs(self.env.iter().map(|(k, v)| (k, v)));
         #[cfg(unix)]
         std::os::unix::process::CommandExt::process_group(&mut cmd, 0);

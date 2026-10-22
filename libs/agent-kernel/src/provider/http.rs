@@ -54,6 +54,7 @@ fn status_is_retryable(status: u16) -> bool {
     matches!(status, 408 | 425 | 429) || status >= 500
 }
 
+#[cfg_attr(not(test), allow(dead_code))]
 pub(crate) fn post_stream(
     client: &Client,
     call: Call,

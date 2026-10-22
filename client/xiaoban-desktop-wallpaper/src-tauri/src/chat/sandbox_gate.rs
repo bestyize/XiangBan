@@ -20,6 +20,35 @@ pub fn set_network(allowed: bool) {
     NETWORK.store(allowed, std::sync::atomic::Ordering::Relaxed);
 }
 
+/// Windows, experimental: the low-integrity launcher, once the user turned it on in settings.
+static WINDOWS: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+pub fn set_windows(enabled: bool) {
+    WINDOWS.store(enabled && cfg!(windows), std::sync::atomic::Ordering::Relaxed);
+}
+
+/// The low-integrity folder sandboxed commands use for temporary files and caches, under `LocalLow`, which is
+/// low integrity already.
+pub fn low_folder() -> Option<std::path::PathBuf> {
+    let profile = std::env::var_os("USERPROFILE")?;
+    Some(std::path::PathBuf::from(profile).join("AppData").join("LocalLow").join("XiaoBan").join("sandbox"))
+}
+
+/// Labels the working folder for the Windows sandbox once; folders already labelled are remembered.
+pub fn ensure_labelled(chat: &Path, workspace: &Path) -> Result<(), String> {
+    if !WINDOWS.load(std::sync::atomic::Ordering::Relaxed) {
+        return Ok(());
+    }
+    let mut settings = super::agent_settings::load(chat);
+    let key = workspace.display().to_string();
+    if settings.labelled.contains(&key) {
+        return Ok(());
+    }
+    sandbox::label_low(workspace)?;
+    settings.labelled.push(key);
+    super::agent_settings::save(chat, &settings)
+}
+
 fn escapes() -> &'static Mutex<HashSet<(String, String)>> {
     static ESCAPES: OnceLock<Mutex<HashSet<(String, String)>>> = OnceLock::new();
     ESCAPES.get_or_init(Default::default)
@@ -43,10 +72,11 @@ fn decide(available: bool, mode: PermissionMode, allowed_once: impl FnOnce() -> 
 }
 
 pub fn hook(permission: Arc<Permission>, workspace: &Path) -> SandboxHook {
-    let policy = SandboxPolicy::for_workspace(workspace);
+    let policy = SandboxPolicy { launcher: std::env::current_exe().ok(), low_folder: low_folder(), ..SandboxPolicy::for_workspace(workspace) };
     SandboxHook::new(move |session, command| {
         let policy = SandboxPolicy { network: NETWORK.load(std::sync::atomic::Ordering::Relaxed), ..policy.clone() };
-        decide(sandbox::available(), permission.mode_for(session), || take(session, command), &policy)
+        let available = sandbox::available() || WINDOWS.load(std::sync::atomic::Ordering::Relaxed);
+        decide(available, permission.mode_for(session), || take(session, command), &policy)
     })
 }
 
