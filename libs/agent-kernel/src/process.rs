@@ -17,22 +17,6 @@ use std::time::{Duration, Instant};
 const POLL: Duration = Duration::from_millis(20);
 static PROCESS_SEQUENCE: AtomicU64 = AtomicU64::new(0);
 
-#[cfg(unix)]
-const BASE_ENV: &[&str] = &[
-    "PATH", "HOME", "USER", "LOGNAME", "LANG", "LC_ALL", "LC_CTYPE", "TMPDIR", "TZ",
-];
-#[cfg(windows)]
-const BASE_ENV: &[&str] = &[
-    "PATH",
-    "SystemRoot",
-    "ComSpec",
-    "PATHEXT",
-    "TEMP",
-    "TMP",
-    "USERPROFILE",
-    "windir",
-];
-
 fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
     mutex.lock().unwrap_or_else(|e| e.into_inner())
 }
@@ -215,26 +199,15 @@ impl ProcessManager {
         };
         #[cfg(windows)]
         let mut cmd = {
-            use std::os::windows::process::CommandExt;
-            let mut cmd = Command::new("cmd");
-            cmd.args(["/C", command]);
-            cmd.creation_flags(windows_sys::Win32::System::Threading::CREATE_NO_WINDOW);
+            let mut cmd = crate::child_env::windows_shell(command);
+            crate::child_env::no_window(&mut cmd);
             cmd
         };
         cmd.current_dir(&self.root)
-            .env_clear()
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
-        for key in BASE_ENV
-            .iter()
-            .copied()
-            .chain(self.config.inherited_env.iter().map(String::as_str))
-        {
-            if let Some(value) = std::env::var_os(key) {
-                cmd.env(key, value);
-            }
-        }
+        crate::child_env::apply(&mut cmd, &self.config.inherited_env);
         cmd.envs(self.config.env.iter().map(|(k, v)| (k, v)));
         let mut owned = ManagedChild::spawn(&mut cmd)?;
         let id = crate::runtime::new_id("p");

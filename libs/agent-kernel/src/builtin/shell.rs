@@ -24,10 +24,6 @@ const MAX_COMMAND_CHARS: usize = 8000;
 const READER_GRACE: Duration = Duration::from_millis(500);
 const POLL: Duration = Duration::from_millis(20);
 
-#[cfg(not(windows))]
-const PASS_THROUGH: &[&str] = &["PATH", "HOME", "USER", "LOGNAME", "LANG", "LC_ALL", "LC_CTYPE", "TMPDIR", "TZ"];
-#[cfg(windows)]
-const PASS_THROUGH: &[&str] = &["PATH", "SystemRoot", "ComSpec", "PATHEXT", "TEMP", "TMP", "USERPROFILE", "windir"];
 
 pub struct Shell {
     spec: ToolSpec,
@@ -147,8 +143,8 @@ impl Tool for Shell {
 
         #[cfg(windows)]
         let mut cmd = {
-            let mut c = Command::new("cmd");
-            c.args(["/C", command]);
+            let mut c = crate::child_env::windows_shell(command);
+            crate::child_env::no_window(&mut c);
             c
         };
         #[cfg(not(windows))]
@@ -157,12 +153,8 @@ impl Tool for Shell {
             c.args(["-c", command]);
             c
         };
-        cmd.current_dir(&self.cwd).env_clear().stdin(Stdio::null()).stdout(Stdio::piped()).stderr(Stdio::piped());
-        for key in PASS_THROUGH.iter().copied().chain(self.extra_inherited.iter().map(String::as_str)) {
-            if let Some(value) = std::env::var_os(key) {
-                cmd.env(key, value);
-            }
-        }
+        cmd.current_dir(&self.cwd).stdin(Stdio::null()).stdout(Stdio::piped()).stderr(Stdio::piped());
+        crate::child_env::apply(&mut cmd, &self.extra_inherited);
         cmd.envs(self.env.iter().map(|(k, v)| (k, v)));
         #[cfg(unix)]
         std::os::unix::process::CommandExt::process_group(&mut cmd, 0);
