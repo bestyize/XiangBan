@@ -1,7 +1,7 @@
 //! Desktop adapter for durable goals. All writes are serialized through ChatState.
 use super::*;
 use agent_kernel::{goals::{GoalContract, GoalRecord, GoalState, GoalStore}, recovery};
-use agent_kernel::{RunEvent, RunState};
+use agent_kernel::RunEvent;
 use serde::Deserialize;
 
 #[derive(Debug, Clone, Deserialize)]
