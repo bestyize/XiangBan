@@ -1,6 +1,6 @@
 mod common;
 
-use agent_kernel::provider::anthropic::{build_request_body, endpoint_url, model_max_output_tokens, next_max_tokens_from_error, AnthropicStream};
+use agent_kernel::provider::anthropic::{build_request_body, endpoint_url, model_max_output_tokens, next_max_tokens_from_error, request_prefix, AnthropicStream};
 use agent_kernel::provider::wire::ProviderProfile;
 use agent_kernel::*;
 use serde_json::{json, Value};
@@ -481,4 +481,67 @@ mod truncated_over_http {
         assert_eq!((result["type"].clone(), result["tool_use_id"].clone()), (json!("tool_result"), json!("toolu_cut")));
         assert!(result["content"].as_str().unwrap().starts_with("Not run: your reply hit the output length limit"));
     }
+}
+
+#[test]
+fn thinking_streams_as_reasoning_and_goes_back_first_with_its_signature() {
+    let mut stream = AnthropicStream::default();
+    let mut reasoning = String::new();
+    for event in [
+        json!({"type": "content_block_start", "index": 0, "content_block": {"type": "thinking", "thinking": "", "signature": ""}}),
+        json!({"type": "content_block_delta", "index": 0, "delta": {"type": "thinking_delta", "thinking": "先读文件，"}}),
+        json!({"type": "content_block_delta", "index": 0, "delta": {"type": "thinking_delta", "thinking": "再改。"}}),
+        json!({"type": "content_block_delta", "index": 0, "delta": {"type": "signature_delta", "signature": "sig-abc"}}),
+        json!({"type": "content_block_start", "index": 1, "content_block": {"type": "redacted_thinking", "data": "opaque"}}),
+        json!({"type": "content_block_start", "index": 2, "content_block": {"type": "tool_use", "id": "t1", "name": "read_file", "input": {}}}),
+        json!({"type": "content_block_delta", "index": 2, "delta": {"type": "input_json_delta", "partial_json": "{\"path\":\"a\"}"}}),
+        json!({"type": "message_delta", "delta": {"stop_reason": "tool_use"}}),
+        json!({"type": "message_stop"}),
+    ] {
+        stream.push_event_with_reasoning(&event, &mut |_| {}, &mut |_, text| reasoning.push_str(text)).unwrap();
+    }
+    assert_eq!(reasoning, "先读文件，再改。");
+    let mut reply = stream.finish();
+    assert_eq!(reply.message.text(), "", "thinking is not answer text");
+    assert_eq!(reply.message.provider_state.as_ref().unwrap()["blocks"], json!([
+        {"type": "thinking", "thinking": "先读文件，再改。", "signature": "sig-abc"},
+        {"type": "redacted_thinking", "data": "opaque"},
+    ]));
+
+    // Bound to the endpoint, the model and the request that produced it, the way the client does it.
+    let asked = request(vec![Message::user_text("改一下 a")]);
+    let state = reply.message.provider_state.as_mut().unwrap();
+    state["source"] = json!({"base_url": "https://api.anthropic.com", "model": "claude-test"});
+    state["prefix"] = json!(request_prefix(&profile(), &asked));
+    let req = request(vec![Message::user_text("改一下 a"), reply.message.clone(), Message::tool("t1", "内容")]);
+    let body = build_request_body(&profile(), &req);
+    let assistant = &body["messages"][1]["content"];
+    assert_eq!(assistant[0]["type"], "thinking");
+    assert_eq!(assistant[0]["signature"], "sig-abc");
+    assert_eq!(assistant[1]["type"], "redacted_thinking");
+    assert_eq!(assistant[2]["type"], "tool_use");
+
+    // An edited history before the reply (trimming, compaction) would be refused with the blocks: they are left out.
+    let edited = request(vec![Message::user_text("改一下 a（已压缩）"), reply.message.clone(), Message::tool("t1", "内容")]);
+    assert_eq!(build_request_body(&profile(), &edited)["messages"][1]["content"][0]["type"], "tool_use");
+
+    // Another model cannot verify those signatures: its requests leave the blocks out.
+    let other = ProviderProfile::new("https://api.anthropic.com", "k", "claude-other");
+    let body = build_request_body(&other, &req);
+    assert_eq!(body["messages"][1]["content"][0]["type"], "tool_use");
+}
+
+#[test]
+fn thinking_without_a_signature_is_not_kept() {
+    let mut stream = AnthropicStream::default();
+    for event in [
+        json!({"type": "content_block_start", "index": 0, "content_block": {"type": "thinking", "thinking": "想了想"}}),
+        json!({"type": "content_block_start", "index": 1, "content_block": {"type": "text", "text": "好"}}),
+        json!({"type": "message_stop"}),
+    ] {
+        stream.push_event(&event, &mut |_| {}).unwrap();
+    }
+    let reply = stream.finish();
+    assert_eq!(reply.message.text(), "好");
+    assert!(reply.message.provider_state.is_none(), "an unsigned block would be rejected if sent back");
 }

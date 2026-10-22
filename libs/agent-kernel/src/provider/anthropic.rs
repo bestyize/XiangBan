@@ -1,9 +1,10 @@
 //! Anthropic Messages protocol (`/v1/messages`) with streaming.
 //!
 //! Request and stream formats are written from the public protocol description and checked only
-//! against local fake servers, not against a live endpoint. Not supported: extended thinking
-//! (thinking blocks are not carried between turns, so do not enable it in `extra_body` when tools
-//! are in use), server-side tools, prompt-cache markers.
+//! against local fake servers, not against a live endpoint. Extended thinking: `thinking_delta` text is streamed as
+//! visible reasoning, and the complete signed `thinking` / `redacted_thinking` blocks are kept in the assistant
+//! message's `provider_state` and sent back first in that message, which the API requires during tool use. They
+//! are bound to the endpoint and model that wrote them. Not supported: server-side tools.
 
 use super::wire::ProviderProfile;
 use super::{ChatRequest, Reply};
@@ -60,19 +61,45 @@ fn push_turn(turns: &mut Vec<(&'static str, Vec<Value>)>, role: &'static str, bl
     }
 }
 
-/// System messages anywhere in the history are joined into the top-level `system` field.
-/// Empty text is dropped because the API rejects empty text blocks.
-pub fn build_request_body(profile: &ProviderProfile, request: &ChatRequest) -> Value {
-    let mut system: Vec<String> = Vec::new();
+/// FNV-1a: a stable digest of a request prefix, the same in every process and version.
+fn digest(parts: &[&str]) -> String {
+    let mut hash: u64 = 0xcbf2_9ce4_8422_2325;
+    for part in parts {
+        for byte in part.bytes().chain(std::iter::once(0xff)) {
+            hash ^= u64::from(byte);
+            hash = hash.wrapping_mul(0x0100_0000_01b3);
+        }
+    }
+    format!("{hash:016x}")
+}
+
+/// What a request is made of before cache markers are added: the system text, the tool list and the turns.
+struct Parts {
+    system: String,
+    tools: Value,
+    turns: Vec<(&'static str, Vec<Value>)>,
+}
+
+impl Parts {
+    /// Identifies everything the model saw before a point in the conversation (`turns` so far).
+    fn prefix(&self, turns: &[(&'static str, Vec<Value>)]) -> String {
+        let turns = serde_json::to_string(turns).unwrap_or_default();
+        digest(&[&self.system, &self.tools.to_string(), &turns])
+    }
+}
+
+fn build_parts(profile: &ProviderProfile, request: &ChatRequest) -> Parts {
+    let system: Vec<String> = request.messages.iter().filter(|m| m.role == Role::System).map(Message::text).filter(|t| !t.trim().is_empty()).collect();
+    let tools: Value = if profile.supports_tools && !request.tools.is_empty() {
+        request.tools.iter().map(|t| json!({ "name": t.name, "description": t.description, "input_schema": t.parameters })).collect()
+    } else {
+        Value::Null
+    };
+    let mut parts = Parts { system: system.join("\n\n"), tools, turns: Vec::new() };
     let mut turns: Vec<(&'static str, Vec<Value>)> = Vec::new();
     for message in &request.messages {
         match message.role {
-            Role::System => {
-                let text = message.text();
-                if !text.trim().is_empty() {
-                    system.push(text);
-                }
-            }
+            Role::System => {}
             Role::User => {
                 let blocks = message
                     .parts
@@ -85,13 +112,24 @@ pub fn build_request_body(profile: &ProviderProfile, request: &ChatRequest) -> V
                 push_turn(&mut turns, "user", blocks);
             }
             Role::Assistant => {
-                let mut blocks: Vec<Value> = message
+                // The thinking that led to this reply goes first and unchanged. The API accepts it only while
+                // everything before it is exactly what the model saw then; after trimming or compaction the
+                // blocks are left out (the reply's reasoning is lost, the request is not refused).
+                let unchanged = super::wire::matching_state(message, profile, "anthropic")
+                    .filter(|state| state["prefix"].as_str() == Some(parts.prefix(&turns).as_str()));
+                let thinking = unchanged
+                    .and_then(|state| state["blocks"].as_array())
+                    .into_iter()
+                    .flatten()
+                    .filter(|block| matches!(block["type"].as_str(), Some("thinking" | "redacted_thinking")))
+                    .cloned();
+                let mut blocks: Vec<Value> = thinking.chain(message
                     .parts
                     .iter()
                     .filter_map(|part| match part {
                         Part::Text { text } => text_block(text),
                         Part::Image { .. } => None,
-                    })
+                    }))
                     .collect();
                 for call in &message.tool_calls {
                     let input = serde_json::from_str::<Value>(&call.arguments).ok().filter(Value::is_object).unwrap_or_else(|| json!({}));
@@ -120,6 +158,21 @@ pub fn build_request_body(profile: &ProviderProfile, request: &ChatRequest) -> V
         }
     }
 
+    parts.turns = turns;
+    parts
+}
+
+/// The digest of a whole request, kept with the reply it produced: the next request replays that reply's thinking
+/// only if its prefix has the same digest.
+pub fn request_prefix(profile: &ProviderProfile, request: &ChatRequest) -> String {
+    let parts = build_parts(profile, request);
+    parts.prefix(&parts.turns)
+}
+
+/// System messages anywhere in the history are joined into the top-level `system` field.
+/// Empty text is dropped because the API rejects empty text blocks.
+pub fn build_request_body(profile: &ProviderProfile, request: &ChatRequest) -> Value {
+    let Parts { system, tools, turns } = build_parts(profile, request);
     let mut body = json!({
         "model": profile.model,
         "max_tokens": profile.max_output_tokens.unwrap_or_else(|| model_max_output_tokens(&profile.model)),
@@ -127,14 +180,10 @@ pub fn build_request_body(profile: &ProviderProfile, request: &ChatRequest) -> V
         "messages": turns.into_iter().map(|(role, content)| json!({ "role": role, "content": content })).collect::<Vec<_>>(),
     });
     if !system.is_empty() {
-        body["system"] = Value::String(system.join("\n\n"));
+        body["system"] = Value::String(system);
     }
-    if profile.supports_tools && !request.tools.is_empty() {
-        body["tools"] = request
-            .tools
-            .iter()
-            .map(|t| json!({ "name": t.name, "description": t.description, "input_schema": t.parameters }))
-            .collect();
+    if !tools.is_null() {
+        body["tools"] = tools;
     }
     if profile.prompt_cache {
         mark_cacheable(&mut body);
@@ -170,6 +219,9 @@ fn mark_cacheable(body: &mut Value) {
 
 enum Block {
     Text(String),
+    /// Extended thinking; only a block with its signature can be sent back.
+    Thinking { text: String, signature: String },
+    Redacted(String),
     Tool { id: String, name: String, partial: String, initial: String },
     Ignored,
 }
@@ -208,16 +260,29 @@ fn stream_error(event: &Value) -> HarnessError {
 
 impl AnthropicStream {
     pub fn push_payload(&mut self, payload: &str, on_text: &mut dyn FnMut(&str)) -> Result<bool, HarnessError> {
+        self.push_payload_with_reasoning(payload, on_text, &mut |_, _| {})
+    }
+
+    pub fn push_payload_with_reasoning(
+        &mut self, payload: &str, on_text: &mut dyn FnMut(&str), on_reasoning: &mut dyn FnMut(crate::ReasoningKind, &str),
+    ) -> Result<bool, HarnessError> {
         let event = serde_json::from_str(payload).map_err(|e| HarnessError::provider(format!("bad stream event: {e}"), false))?;
-        self.push_event(&event, on_text)
+        self.push_event_with_reasoning(&event, on_text, on_reasoning)
     }
 
     /// Returns `Ok(true)` after `message_stop`.
     pub fn push_event(&mut self, event: &Value, on_text: &mut dyn FnMut(&str)) -> Result<bool, HarnessError> {
+        self.push_event_with_reasoning(event, on_text, &mut |_, _| {})
+    }
+
+    /// Like `push_event`, and thinking text goes to `on_reasoning` as it arrives.
+    pub fn push_event_with_reasoning(
+        &mut self, event: &Value, on_text: &mut dyn FnMut(&str), on_reasoning: &mut dyn FnMut(crate::ReasoningKind, &str),
+    ) -> Result<bool, HarnessError> {
         match event.get("type").and_then(Value::as_str).unwrap_or("") {
             "message_start" => self.read_usage(event.pointer("/message/usage")),
-            "content_block_start" => self.block_start(event, on_text),
-            "content_block_delta" => self.block_delta(event, on_text),
+            "content_block_start" => self.block_start(event, on_text, on_reasoning),
+            "content_block_delta" => self.block_delta(event, on_text, on_reasoning),
             "message_delta" => {
                 self.read_usage(event.get("usage"));
                 if let Some(reason) = event.pointer("/delta/stop_reason").and_then(Value::as_str) {
@@ -261,7 +326,7 @@ impl AnthropicStream {
         Some(&mut self.blocks[index])
     }
 
-    fn block_start(&mut self, event: &Value, on_text: &mut dyn FnMut(&str)) {
+    fn block_start(&mut self, event: &Value, on_text: &mut dyn FnMut(&str), on_reasoning: &mut dyn FnMut(crate::ReasoningKind, &str)) {
         let Some(block) = event.get("content_block").cloned() else { return };
         let Some(slot) = self.slot(event) else { return };
         let text_of = |key: &str| block.get(key).and_then(Value::as_str).unwrap_or("").to_string();
@@ -273,6 +338,14 @@ impl AnthropicStream {
                 }
                 Block::Text(initial)
             }
+            Some("thinking") => {
+                let initial = text_of("thinking");
+                if !initial.is_empty() {
+                    on_reasoning(crate::ReasoningKind::Text, &initial);
+                }
+                Block::Thinking { text: initial, signature: text_of("signature") }
+            }
+            Some("redacted_thinking") => Block::Redacted(text_of("data")),
             Some("tool_use") => {
                 let initial = block.get("input").filter(|i| i.as_object().is_some_and(|o| !o.is_empty())).map(Value::to_string);
                 Block::Tool { id: text_of("id"), name: text_of("name"), partial: String::new(), initial: initial.unwrap_or_default() }
@@ -281,7 +354,7 @@ impl AnthropicStream {
         });
     }
 
-    fn block_delta(&mut self, event: &Value, on_text: &mut dyn FnMut(&str)) {
+    fn block_delta(&mut self, event: &Value, on_text: &mut dyn FnMut(&str), on_reasoning: &mut dyn FnMut(crate::ReasoningKind, &str)) {
         let Some(delta) = event.get("delta") else { return };
         let Some(slot) = self.slot(event) else { return };
         match delta.get("type").and_then(Value::as_str) {
@@ -293,6 +366,18 @@ impl AnthropicStream {
                     Some(_) => return,
                 }
                 on_text(text);
+            }
+            Some("thinking_delta") => {
+                let Some(text) = delta.get("thinking").and_then(Value::as_str).filter(|t| !t.is_empty()) else { return };
+                if let Some(Block::Thinking { text: existing, .. }) = slot {
+                    existing.push_str(text);
+                    on_reasoning(crate::ReasoningKind::Text, text);
+                }
+            }
+            Some("signature_delta") => {
+                if let (Some(Block::Thinking { signature, .. }), Some(part)) = (slot, delta.get("signature").and_then(Value::as_str)) {
+                    signature.push_str(part);
+                }
             }
             Some("input_json_delta") => {
                 if let (Some(Block::Tool { partial, .. }), Some(json)) = (slot, delta.get("partial_json").and_then(Value::as_str)) {
@@ -311,9 +396,14 @@ impl AnthropicStream {
     pub fn finish(self) -> Reply {
         let mut text = String::new();
         let mut calls = Vec::new();
+        let mut thinking = Vec::new();
         for (i, block) in self.blocks.into_iter().enumerate() {
             match block {
                 Some(Block::Text(t)) => text.push_str(&t),
+                Some(Block::Thinking { text, signature }) if !signature.is_empty() => {
+                    thinking.push(json!({ "type": "thinking", "thinking": text, "signature": signature }));
+                }
+                Some(Block::Redacted(data)) if !data.is_empty() => thinking.push(json!({ "type": "redacted_thinking", "data": data })),
                 Some(Block::Tool { id, name, partial, initial }) if !name.is_empty() => {
                     let arguments = if !partial.trim().is_empty() {
                         partial
@@ -332,7 +422,11 @@ impl AnthropicStream {
             completion_tokens: self.output_tokens,
         });
         let finish = anthropic_finish(self.stop_reason.as_deref()).settle(!calls.is_empty());
-        Reply { message: Message::assistant(text, calls), usage, finish }
+        let mut message = Message::assistant(text, calls);
+        if !thinking.is_empty() {
+            message.provider_state = Some(json!({ "protocol": "anthropic", "blocks": thinking }));
+        }
+        Reply { message, usage, finish }
     }
 }
 
@@ -350,6 +444,13 @@ mod client {
     impl Decoder for AnthropicStream {
         fn push(&mut self, payload: &str, on_text: &mut dyn FnMut(&str)) -> Result<bool, HarnessError> {
             self.push_payload(payload, on_text)
+        }
+
+        fn push_with_reasoning(
+            &mut self, payload: &str, on_text: &mut dyn FnMut(&str),
+            on_reasoning: &mut dyn FnMut(crate::ReasoningKind, &str),
+        ) -> Result<bool, HarnessError> {
+            self.push_payload_with_reasoning(payload, on_text, on_reasoning)
         }
 
         fn complete(&self) -> bool {
@@ -379,6 +480,14 @@ mod client {
 
     impl ModelProvider for AnthropicMessages {
         fn chat(&self, request: &ChatRequest, on_text: &mut dyn FnMut(&str), cancel: &AtomicBool) -> Result<Reply, HarnessError> {
+            self.chat_with_reasoning(request, on_text, &mut |_, _| {}, cancel)
+        }
+
+        fn chat_with_reasoning(
+            &self, request: &ChatRequest, on_text: &mut dyn FnMut(&str),
+            on_reasoning: &mut dyn FnMut(crate::ReasoningKind, &str),
+            cancel: &AtomicBool,
+        ) -> Result<Reply, HarnessError> {
             let mut profile = self.profile.clone();
             let mut max_tokens = profile.max_output_tokens
                 .unwrap_or_else(|| model_max_output_tokens(&profile.model))
@@ -399,14 +508,25 @@ mod client {
                 }
                 let call = Call { url: endpoint_url(&profile.base_url), headers: http::merge_headers(headers, &profile.extra_headers), body };
                 let mut decoder = AnthropicStream::default();
-                let mut emitted = false;
-                let result = http::post_stream(&self.client, call, &mut decoder, &mut |text| {
-                    emitted = true;
+                // Anything streamed (answer or thinking) means the request was accepted: no retry with a lower limit.
+                let emitted = std::cell::Cell::new(false);
+                let result = http::post_stream_with_reasoning(&self.client, call, &mut decoder, &mut |text| {
+                    emitted.set(true);
                     on_text(text);
+                }, &mut |kind, text| {
+                    emitted.set(true);
+                    on_reasoning(kind, text);
                 }, cancel);
                 match result {
-                    Ok(()) => return Ok(decoder.finish()),
-                    Err(error) if !emitted && attempt < 4 => {
+                    Ok(()) => {
+                        let mut reply = decoder.finish();
+                        super::super::wire::bind_state(&mut reply.message, &self.profile);
+                        if let Some(state) = reply.message.provider_state.as_mut() {
+                            state["prefix"] = json!(request_prefix(&profile, request));
+                        }
+                        return Ok(reply);
+                    }
+                    Err(error) if !emitted.get() && attempt < 4 => {
                         let next = match &error {
                             HarnessError::Provider { message, .. } =>
                                 next_max_tokens_from_error(message, max_tokens),

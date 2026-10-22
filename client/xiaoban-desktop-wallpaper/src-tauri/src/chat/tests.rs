@@ -1022,4 +1022,10 @@ fn research_runs_a_read_only_helper_and_returns_only_its_findings() {
     let helper_requests: Vec<_> = rig.provider.requests().into_iter().filter(|r| r.messages[0].text().contains("调研助手")).collect();
     let helper_tools: Vec<String> = helper_requests[0].tools.iter().map(|t| t.name.clone()).collect();
     assert!(helper_tools.iter().all(|t| ["read_file", "list_dir", "grep"].contains(&t.as_str())), "{helper_tools:?}");
+
+    // The helper's run is in the conversation's run history, marked with the run that started it.
+    let runs: Vec<_> = fs::read_dir(rig.dirs.runs().join("s1")).unwrap().flatten().collect();
+    assert_eq!(runs.len(), 1, "only the helper's run is journaled here: the main run in this test is not observed");
+    let text = fs::read_to_string(runs[0].path()).unwrap();
+    assert!(text.contains("\"parent_run_id\"") && text.contains("s1#research-") && text.contains("read_file"), "{text}");
 }

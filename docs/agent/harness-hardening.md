@@ -1,7 +1,7 @@
 # 小伴桌面 Agent 加固：差距分析、已修复项与后续路线
 
 **编制日期：** 2026-10-22
-**分支：** `fix/agent-harness-hardening-20261022`（已合并到 main）、`feat/agent-harness-stage2-20261022`（第二批）
+**分支：** `fix/agent-harness-hardening-20261022`、`feat/agent-harness-stage2-20261022`（均已合并到 main）、`feat/agent-harness-stage3-20261022`（第三批）
 **范围：** `client/xiaoban-desktop-wallpaper` 的聊天 Agent（`src-tauri/src/chat/`、`src/ui/chat/`）与 `libs/agent-kernel`
 
 本文记录一次对照 Claude Code、Codex、Hermes Agent 等 harness 的审查：发现的问题、本分支已经修复的部分、验证方式，以及还没做的部分和建议做法。标注 **[已修复]** 的条目有对应提交和测试；标注 **[待建]** 的条目尚未实现，不能对外宣称。
@@ -18,8 +18,8 @@
 | 编辑回滚 | 无 | Claude Code 检查点；Codex 基于 git 撤销 | 文件工具改动可整轮撤销 **[已修复]** |
 | 子 Agent | 内核有 `Subagent`，桌面端未用 | 常规能力 | 只读调研子 Agent **[已实现]** |
 | 网页搜索 | 只有 `web_fetch` | 自带搜索 | **[待建]**（需搜索后端） |
-| 项目指令与 hooks | 只有 skills 与记忆 | 读取 AGENTS.md / CLAUDE.md，工具前后 hooks | 项目指令 **[已实现]**；hooks **[待建]** |
-| Claude 思考模式 | thinking 块不在轮次间保留，带工具时不能开 | 支持 | **[待建]** |
+| 项目指令与 hooks | 只有 skills 与记忆 | 读取 AGENTS.md / CLAUDE.md，工具前后 hooks | 项目指令、hooks **[已实现]**（hooks 暂无设置界面） |
+| Claude 思考模式 | thinking 块不在轮次间保留，带工具时不能开 | 支持 | **[已实现]**，前缀改变时不回传 |
 
 ## 2. 已修复的问题
 
@@ -57,6 +57,12 @@
 18. **macOS 沙箱**：“完全信任”下的 shell 与后台进程运行在 Seatbelt 里，只能写工作目录、临时目录和软件包缓存，读不到 `~/.ssh` 等密钥目录；网络默认开放。要求沙箱但系统不支持时拒绝执行，不会退回无保护运行。用户明确允许的高风险命令在沙箱外执行一次。询问模式和 Windows 行为不变。
 19. **GBK/GB18030 文件**：`read_file`、`grep` 能正确显示和搜索；`edit_file` 编辑后按原编码写回。
 
+### 2.6 第三批（`feat/agent-harness-stage3-20261022`）
+
+20. **Claude 扩展思考**：内核解析带签名的 `thinking` / `redacted_thinking` 块，实时显示推理摘要，并在后续请求中原样回传。回传只在请求前缀（系统提示、工具与历史）与产生它时完全一致时进行：Claude 的“保留思考”会校验前缀，而上下文裁剪和回答中途压缩都会改历史，无条件回传会让 2026-08-31 之后创建的账号收到 400。桌面端对支持 adaptive thinking 的 Claude 模型发送 `thinking: {type: "adaptive", display: "summarized"}`，选了等级时加 `output_config.effort`。已确认请求不发送 2026-10-21 起会被拒绝的 `temperature` / `top_p` / `top_k`。
+21. **工具 hooks**：`chat/hooks.json` 配置调用前后的命令，调用前的 hook 失败即拦截，调用后的 hook 把问题反馈给模型。用法见桌面端 README“工具 hooks”。
+22. **子任务运行记录**：research 子 Agent 的运行写入父对话的执行日志，带 `parent_run_id`。
+
 合并 #93（长期目标）时，顺带修正了 main 上的三处编译错误：`File::try_lock` 的错误类型、`pub use` 重新导出 Tauri 命令、`app.state()` 临时值的借用。
 
 ## 3. 验证情况
@@ -90,10 +96,9 @@ npm ci --registry=https://registry.npmjs.org/ --replace-registry-host=registry.n
 
 ### 4.3 能力补齐 [待建]
 
-- **子 Agent**：只读调研已实现；子任务的用量尚未计入父任务的预算。
+- **子 Agent**：只读调研已实现，运行记录已进入父对话日志；子任务的用量尚未计入父任务的调用预算，界面也还没有展示用量。
 - **网页搜索**：`web_search` 需要宿主提供 `SearchBackend`，建议走 server-ai 网关统一计费与限流。
-- **hooks**：工具调用前后执行用户配置的命令（类似 Claude Code 的 hooks）。
-- **Claude 思考模式**：内核保留并回传 thinking 块后，才能在带工具的循环里开启扩展思考。
+- **hooks 设置界面**：现在只能手动编辑 `chat/hooks.json`。
 - **Agent 复用**：现在每条消息都会重建 Agent；开启电脑控制时，每条消息还会重启一次 MCP 子进程。可改为按配置缓存，配置变化时再重建。
 - **检查点的覆盖范围**：可在工作目录是 git 仓库时，额外用 `git stash create` 记录 shell 改动。
 
