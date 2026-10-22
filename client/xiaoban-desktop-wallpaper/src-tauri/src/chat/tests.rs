@@ -290,7 +290,7 @@ fn the_assistant_has_every_tool_it_needs_and_no_others() {
     let mut expected = vec![
         "time_now", "todo", "ask_user", "read_file", "list_dir", "grep", "write_file", "edit_file", "shell", "web_fetch", "load_skill", "skill_manage",
         "memory_read", "memory_write", "desktop_status", "desktop_windows", "desktop_window_set", "wallpaper_list", "wallpaper_apply", "wallpaper_create", "wallpaper_delete", "effect_list", "effect_set", "effect_create", "effect_delete", "effect_read_format", "companion_set", "care_list",
-        "care_set", "care_delete", "widget_list", "widget_add", "widget_create", "widget_delete_custom", "widget_update", "widget_remove", "game_list", "game_open", "game_close", "game_create", "game_delete",
+        "care_set", "care_delete", "widget_list", "widget_add", "widget_read_format", "widget_create", "widget_delete_custom", "widget_update", "widget_remove", "game_list", "game_open", "game_close", "game_read_format", "game_create", "game_delete",
         "request_accessibility_permission", "computer_use_diagnose", "computer_use_repair_permissions", "community_share", "community_open", "pet_read_format", "pet_catalog", "pet_theme_save", "pet_theme_delete", "pet_add", "pet_update", "pet_remove", "research",
         "experience_recall", "skill_search", "skill_inspect", "skill_install", "skill_read", "skill_run",
     ];
@@ -1054,4 +1054,22 @@ fn the_window_filter_keeps_conversation_commands_where_they_belong() {
     for command in ["chat_set_permission_mode", "chat_undo_run", "chat_save_hooks", "chat_revoke_grant", "chat_delete_session"] {
         assert!(!decide("assistant", command), "{command} is for the control window only");
     }
+}
+
+/// The ring's allowance before the first answer must stay close to what the tools really cost: over by at most
+/// half, never under. Adding or trimming tools moves the real size, and this test says when to update it.
+#[test]
+fn the_tool_allowance_before_the_first_answer_matches_the_real_tool_set() {
+    let rig = rig("tool-allowance", vec![Step::text("好")], Approval::Once);
+    let real = agent_kernel::estimate_tool_tokens(&rig.agent.tool_schemas());
+    assert!(TOOL_TOKENS_BEFORE_FIRST_ANSWER >= real && TOOL_TOKENS_BEFORE_FIRST_ANSWER <= real * 3 / 2,
+        "real tool definitions are about {real} tokens; update TOOL_TOKENS_BEFORE_FIRST_ANSWER ({TOOL_TOKENS_BEFORE_FIRST_ANSWER})");
+    // Long formats are returned by the *_read_format tools when needed, not sent with every request.
+    for schema in rig.agent.tool_schemas() {
+        let size = agent_kernel::estimate_tool_tokens(std::slice::from_ref(&schema));
+        assert!(size <= 600, "{} is about {size} tokens; move its long rules into a read_format tool", schema.name);
+    }
+    save_tool_tokens(&rig.dirs, false, real);
+    assert_eq!(saved_tool_tokens(&rig.dirs, false), Some(real), "a restart uses the last measurement");
+    assert_eq!(saved_tool_tokens(&rig.dirs, true), None);
 }

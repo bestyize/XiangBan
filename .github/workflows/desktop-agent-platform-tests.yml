@@ -1,0 +1,52 @@
+name: Desktop Agent Platform Tests
+
+# Runs the agent kernel and the desktop app's Rust tests on real Windows and macOS: shell quoting and environment,
+# CRLF and GBK file edits, the macOS Seatbelt sandbox and the Windows low-integrity sandbox (tests/os_sandbox.rs),
+# none of which a Linux run can exercise. Manual only, as every workflow in this repository: run it from the Actions tab.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  kernel:
+    name: Agent kernel (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: libs/agent-kernel
+      # Its own step, so the sandbox result is visible apart from the rest of the suite.
+      - name: Operating system sandbox and shell checks
+        run: cargo test --manifest-path libs/agent-kernel/Cargo.toml --all-features --test os_sandbox
+      - name: Full kernel test suite
+        run: cargo test --manifest-path libs/agent-kernel/Cargo.toml --all-features --no-fail-fast
+
+  desktop:
+    name: Desktop app Rust tests (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: client/xiaoban-desktop-wallpaper/src-tauri
+      # A debug build only needs the bundled computer-use resource folder to exist; release builds prepare it.
+      - name: Placeholder for the computer-use resources
+        shell: bash
+        run: mkdir -p client/xiaoban-desktop-wallpaper/src-tauri/resources/computer-use
+      - name: Desktop Rust tests
+        run: cargo test --manifest-path client/xiaoban-desktop-wallpaper/src-tauri/Cargo.toml --no-fail-fast

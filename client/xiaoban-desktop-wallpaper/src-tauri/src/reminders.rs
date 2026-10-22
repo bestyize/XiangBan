@@ -8,6 +8,11 @@ use tauri::{Emitter, Manager, WebviewUrl, WebviewWindowBuilder};
 const VALID_SECONDS: i64 = 30 * 60;
 const BUBBLE_SECONDS: i64 = 10;
 const SNOOZE_SECONDS: i64 = 10 * 60;
+/// A scheduled agent task's result may wait this long for the user (away, quiet hours) before it is dropped; the
+/// whole answer stays in its conversation either way.
+const AGENT_VALID_SECONDS: i64 = 12 * 3600;
+/// What one agent task may ask of the assistant.
+const AGENT_PROMPT_CHARS: usize = 1000;
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
@@ -90,6 +95,8 @@ struct Runtime {
     city_attempt: i64,
     locate_attempt: i64,
     read_error: bool,
+    /// Scheduled agent tasks running now, by pending key, so a tick never starts one twice.
+    agent_running: HashSet<String>,
 }
 #[derive(Default)]
 pub struct ReminderState {
@@ -121,8 +128,11 @@ fn time(value: &str) -> Result<NaiveTime, String> {
 }
 fn validate(rule: &Rule) -> Result<(), String> {
     if rule.id.len() > 100 || !rule.id.chars().all(|c| c.is_ascii_alphanumeric() || c == '-') { return Err("提醒标识无效".into()); }
-    if !["custom", "off-work", "rest", "weather"].contains(&rule.kind.as_str()) { return Err("提醒类型无效".into()); }
-    if rule.text.chars().count() > 240 { return Err("提醒文案最多 240 个字".into()); }
+    if !["custom", "off-work", "rest", "weather", "agent"].contains(&rule.kind.as_str()) { return Err("提醒类型无效".into()); }
+    if rule.kind == "agent" {
+        if rule.text.chars().count() > AGENT_PROMPT_CHARS { return Err(format!("任务说明最多 {AGENT_PROMPT_CHARS} 个字")); }
+        if rule.text.trim().is_empty() { return Err("请写下要小伴定时做的事".into()); }
+    } else if rule.text.chars().count() > 240 { return Err("提醒文案最多 240 个字".into()); }
     if rule.kind != "weather" && rule.text.trim().is_empty() { return Err("请填写提醒文案".into()); }
     if rule.kind == "rest" {
         if !(5..=480).contains(&rule.interval_minutes) { return Err("休息间隔应为 5–480 分钟".into()); }
@@ -191,8 +201,10 @@ fn collect_with_widgets(store: &mut Store, now: DateTime<Local>, active_seconds:
             if store.seen.contains_key(&key) { continue; }
             store.seen.insert(key.clone(), timestamp);
             if rule.kind == "rest" && store.pending.iter().any(|item| item.kind == "rest") { changed = true; continue; }
+            // Weather and agent items wait for their text (`weather_ready`); an agent's result may wait longer to be seen.
+            let expires_at = due + if rule.kind == "agent" { AGENT_VALID_SECONDS } else { VALID_SECONDS };
             store.pending.push(Pending { key, rule_id: rule.id.clone(), revision: rule.revision, kind: rule.kind.clone(), text: rule.text.clone(),
-                due_at: due, available_at: due, expires_at: due + VALID_SECONDS, preview: false, weather_ready: rule.kind != "weather", weather_at: None });
+                due_at: due, available_at: due, expires_at, preview: false, weather_ready: !matches!(rule.kind.as_str(), "weather" | "agent"), weather_at: None });
             changed = true;
         }
     }
@@ -432,6 +444,8 @@ pub async fn preview_care_rule(window: tauri::WebviewWindow, mut rule: Rule) -> 
         rule.text = format!("{} {}", rule.text, weather.text);
     }
     if blocked(&app, &care_system::activity()) { return Err("预览期间进入免打扰状态，提示已取消".into()); }
+    // A preview shows the task, not its result: running it here would spend model calls on every preview.
+    if rule.kind == "agent" { rule.text = format!("到时小伴会去做：{}", rule.text.chars().take(80).collect::<String>()); }
     let now = Local::now().timestamp();
     show(&app, vec![Pending { key: "preview".into(), rule_id: rule.id, revision: rule.revision, kind: rule.kind, text: rule.text,
         due_at: now, available_at: now, expires_at: now + VALID_SECONDS, preview: true, weather_ready: true, weather_at: None }])
@@ -535,6 +549,8 @@ fn tick(app: &tauri::AppHandle, elapsed: f64, checkpoint: bool) {
     { let mut store = state.store.lock().unwrap_or_else(|e| e.into_inner()); changed = collect_with_widgets(&mut store, now, active_seconds,&widget_rules);
         if changed || checkpoint { if let Err(error) = save(app, &store) { store.error = Some(error); } }
     }
+    // Agent tasks run at their time even in quiet hours or while the user is away; only the bubble waits.
+    start_agent_tasks(app);
     if blocked(app, &activity) { defer_active(app); if changed { publish(app); } return; }
     let active = state.runtime.lock().unwrap_or_else(|e| e.into_inner()).active.clone();
     if let Some(active) = active {
@@ -580,6 +596,42 @@ fn tick(app: &tauri::AppHandle, elapsed: f64, checkpoint: bool) {
         }
         publish(app);
     } else if changed { publish(app); }
+}
+/// Starts each due agent task that is not running yet, on its own thread; its result becomes the bubble's text.
+fn start_agent_tasks(app: &tauri::AppHandle) {
+    let state = app.state::<ReminderState>();
+    let due: Vec<(String, String, String)> = {
+        let store = state.store.lock().unwrap_or_else(|e| e.into_inner());
+        store.pending.iter().filter(|p| p.kind == "agent" && !p.weather_ready && !p.preview)
+            .filter_map(|p| store.rules.iter().find(|r| r.id == p.rule_id && r.revision == p.revision).map(|r| (p.key.clone(), r.id.clone(), r.text.clone())))
+            .collect()
+    };
+    for (key, rule_id, prompt) in due {
+        if !state.runtime.lock().unwrap_or_else(|e| e.into_inner()).agent_running.insert(key.clone()) { continue; }
+        let (app, thread_key) = (app.clone(), key.clone());
+        let started = std::thread::Builder::new().name(format!("care-agent-{rule_id}")).spawn(move || {
+            let key = thread_key;
+            let text = match crate::chat::scheduled::run(&app, &rule_id, &prompt) {
+                Ok(text) => text,
+                Err(error) => format!("定时任务没有完成：{error}"),
+            };
+            let state = app.state::<ReminderState>();
+            {
+                let mut store = state.store.lock().unwrap_or_else(|e| e.into_inner());
+                // Edited or deleted meanwhile: the item is gone, and the answer stays in the conversation only.
+                if let Some(item) = store.pending.iter_mut().find(|p| p.key == key) {
+                    item.text = text;
+                    item.weather_ready = true;
+                }
+                if let Err(error) = save(&app, &store) { store.error = Some(error); }
+            }
+            state.runtime.lock().unwrap_or_else(|e| e.into_inner()).agent_running.remove(&key);
+            publish(&app);
+        });
+        if started.is_err() {
+            state.runtime.lock().unwrap_or_else(|e| e.into_inner()).agent_running.remove(&key);
+        }
+    }
 }
 fn presence_path(app: &tauri::AppHandle) -> Option<std::path::PathBuf> {
     crate::storage::root(app).ok().map(|root| root.join("config/presence.json"))
@@ -808,6 +860,17 @@ mod tests {
         let mut store = Store { rules: vec![rule], ..Store::default() }; collect(&mut store, date(), 299.0); assert!(store.pending.is_empty());
         collect(&mut store, date(), 0.0); assert!(store.pending.is_empty()); collect(&mut store, date(), 1.0); assert_eq!(store.pending.len(), 1);
         collect(&mut store, date() + CalendarDuration::minutes(5), 300.0); assert_eq!(store.pending.len(), 1);
+    }
+    #[test] fn an_agent_task_waits_for_its_result_and_may_wait_longer_to_be_seen() {
+        let rule = Rule { id: "task".into(), kind: "agent".into(), text: "看看下载文件夹里有什么新文件".into(), revision: 1, ..Rule::default() };
+        assert!(validate(&rule).is_ok());
+        assert!(validate(&Rule { text: "长".repeat(AGENT_PROMPT_CHARS + 1), ..rule.clone() }).is_err());
+        assert!(validate(&Rule { text: "长".repeat(500), ..rule.clone() }).is_ok(), "longer than an ordinary reminder's text");
+        let mut store = Store { rules: vec![rule], ..Store::default() };
+        assert!(collect(&mut store, date(), 0.0));
+        let item = &store.pending[0];
+        assert!(!item.weather_ready, "not shown before the task has run");
+        assert_eq!(item.expires_at - item.due_at, AGENT_VALID_SECONDS);
     }
     #[test] fn quiet_hours_wrap_midnight() { let config = CareConfig { quiet_enabled: true, ..CareConfig::default() }; assert!(quiet(&config,time("23:00").unwrap())); assert!(quiet(&config,time("07:59").unwrap())); assert!(!quiet(&config,time("08:00").unwrap())); }
     #[test] fn disabled_or_edited_rules_cancel_queued_items() {

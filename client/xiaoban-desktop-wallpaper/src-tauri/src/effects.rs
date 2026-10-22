@@ -229,19 +229,4 @@ pub fn delete_desktop_effect(window: tauri::WebviewWindow, id: String) -> Result
     Ok(json!({ "ok": true, "id": id, "file": file }))
 }
 
-/// The rules a pack must follow, in the words the assistant needs. Kept next to the checks themselves.
-pub fn format_help() -> &'static str {
-    "特效包是一个 JSON 对象：schemaVersion 必须是 1；id 用小写字母、数字、- 和 _（不超过 48 字符，不能与内置的 12 个重名）；\
-     name 最多 24 字；description 可选，最多 80 字；sky 可选，2 到 4 个十六进制颜色，用作预览卡片背景；\
-     layers 是 1 到 6 层，每层：count（0 到 1500，各层合计不超过 3000，也不能都是 0）、shape（必填）、colors（必填，1 到 24 个颜色，\
-     写成 \"#rrggbb\" 或 [\"#上色\", \"#下色\"]）。\
-     shape.kind 可为 circle（实心圆）、glow（柔光斑，core 0-0.9、aspect 0.1-4）、streak（雨丝/流星，length、width、head 0-8）、\
-     ring（涟漪，width、aspect 0.1-1）、beam（极光光幕，length、focus 0-0.9）、path（自定义 SVG 路径，d 画在 -1 到 1 的方框里，\
-     可带 style fill/stroke/both、lineWidth、vein 叶脉、halo 背光）。\
-     每层还可写：size [最小,最大] 像素（默认 [10,20]）、speed 像素每秒（默认 0）、direction 度数（0 右 90 下，默认 90）、\
-     alpha [0.5,1]、wind 阵风、sway {amplitude,frequency} 左右摇摆、wander 游荡、spin 自转弧度每秒、pendulum 摆动幅度、\
-     scatter 0-1、flip {rate,min} 翻面、twinkle {rate,depth} 闪烁、blend normal/add（发光用 add）、orient fixed/motion；\
-     另有 burst（隔一会儿出现一次，用于流星、烟花、涟漪）和 band（聚在一条带上，用于银河、极光）。\
-     完整字段说明和可用示例由 effect_read_format 工具提供，已内置在程序中；不要在工作目录查找源码文档。"
-}
 

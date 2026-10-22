@@ -19,6 +19,7 @@ pub mod goals;
 mod prompt;
 mod project_rules;
 mod sandbox_gate;
+pub mod scheduled;
 mod run_history;
 pub(crate) mod task_outcome;
 mod learning;
@@ -632,7 +633,11 @@ fn build_agent(app: &tauri::AppHandle, config: &AiConfig, key_source: Option<Key
             })
         }),
     }, attachments, connector_manager(app).map(|m|m.tools()).unwrap_or_default())?;
-    lock(&state.tool_tokens).insert(config.open_computer_use, agent_kernel::estimate_tool_tokens(&agent.tool_schemas()));
+    let tokens = agent_kernel::estimate_tool_tokens(&agent.tool_schemas());
+    lock(&state.tool_tokens).insert(config.open_computer_use, tokens);
+    if let Ok(dirs) = Dirs::of(app) {
+        save_tool_tokens(&dirs, config.open_computer_use, tokens);
+    }
     Ok(agent)
 }
 
@@ -1119,6 +1124,24 @@ pub fn chat_delete_session(app: tauri::AppHandle, window: tauri::WebviewWindow, 
     })
 }
 
+/// Estimated tokens of the tool definitions before any answer has measured them: the built-in tool set is about
+/// 7,900 (62 tools, mostly the desktop's own), plus room for connectors. A test keeps it close to the real size.
+const TOOL_TOKENS_BEFORE_FIRST_ANSWER: usize = 9_500;
+const TOOL_TOKENS_FILE: &str = "tool-tokens.json";
+
+/// What the latest answer measured, kept so the ring is right after a restart too.
+fn saved_tool_tokens(dirs: &Dirs, computer_use: bool) -> Option<usize> {
+    let saved: HashMap<String, usize> = serde_json::from_slice(&fs::read(dirs.chat.join(TOOL_TOKENS_FILE)).ok()?).ok()?;
+    saved.get(&computer_use.to_string()).copied()
+}
+
+fn save_tool_tokens(dirs: &Dirs, computer_use: bool, tokens: usize) {
+    let mut saved: HashMap<String, usize> = fs::read(dirs.chat.join(TOOL_TOKENS_FILE)).ok().and_then(|b| serde_json::from_slice(&b).ok()).unwrap_or_default();
+    if saved.insert(computer_use.to_string(), tokens) != Some(tokens) {
+        let _ = fs::write(dirs.chat.join(TOOL_TOKENS_FILE), serde_json::to_vec(&saved).unwrap_or_default());
+    }
+}
+
 /// What the agent sends before any conversation: its instructions, the skill list and the note index.
 fn base_tokens(dirs: &Dirs, workspace: &Path, config: &AiConfig) -> usize {
     let environment = prompt::Environment { os: std::env::consts::OS, workspace, open_computer_use: config.open_computer_use, open_computer_use_error: None };
@@ -1136,9 +1159,10 @@ fn base_tokens(dirs: &Dirs, workspace: &Path, config: &AiConfig) -> usize {
 fn context_of(app: &tauri::AppHandle, config: &AiConfig, raw: &[Message]) -> Result<ContextInfo, String> {
     let dirs = Dirs::of(app)?;
     let default = ai_config::default_workspace(app)?;
-    // Until tools have been registered this launch, include a conservative allowance rather
-    // than displaying zero schema cost. Registration replaces it with the actual schemas.
-    let tool_tokens = lock(&app.state::<ChatState>().tool_tokens).get(&config.open_computer_use).copied().unwrap_or(32_000);
+    // The actual schemas once tools were registered this launch, else what the last launch measured, else an
+    // allowance close to the real size (see `TOOL_TOKENS_BEFORE_FIRST_ANSWER`), so the ring is neither empty nor inflated.
+    let measured = lock(&app.state::<ChatState>().tool_tokens).get(&config.open_computer_use).copied();
+    let tool_tokens = measured.or_else(|| saved_tool_tokens(&dirs, config.open_computer_use)).unwrap_or(TOOL_TOKENS_BEFORE_FIRST_ANSWER);
     Ok(compact::measure(raw, base_tokens(&dirs, config.workspace_or(&default), config) + tool_tokens, config.token_budget().context_limit))
 }
 

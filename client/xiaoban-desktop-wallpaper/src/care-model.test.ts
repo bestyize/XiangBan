@@ -12,6 +12,13 @@ describe("care rule editing", () => {
     const weather = newCareRule("weather"); expect(careRuleError(weather)).toContain("城市");
     weather.city = { name: "北京", admin1: "北京", country: "中国", latitude: 39.9, longitude: 116.4 }; expect(careRuleError(weather)).toBeNull();
   });
+  it("lets a scheduled agent task carry a longer request but never an empty one", () => {
+    const task = newCareRule("agent"); expect(careRuleError(task)).toBeNull();
+    task.text = "看".repeat(1000); expect(careRuleError(task)).toBeNull();
+    task.text = "看".repeat(1001); expect(careRuleError(task)).not.toBeNull();
+    task.text = " "; expect(careRuleError(task)).not.toBeNull();
+    const plain = newCareRule(); plain.text = "喝".repeat(241); expect(careRuleError(plain)).not.toBeNull();
+  });
   it("rejects out-of-range intervals and clock times", () => {
     const rule = newCareRule("rest"); rule.intervalMinutes = 4; expect(careRuleError(rule)).toContain("5–480");
     const timed = newCareRule(); timed.time = "24:00"; expect(careRuleError(timed)).toContain("时间");

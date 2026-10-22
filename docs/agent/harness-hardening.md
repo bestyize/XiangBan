@@ -72,6 +72,13 @@
 27. **每轮用量**：回答下方显示这一轮的输入与输出 token，含调研子任务。
 28. **Windows 低完整性沙箱（实验性，默认关闭）**：宿主可执行文件充当启动器，用低完整性令牌启动 `cmd`；开启时把工作目录标记为低完整性。只限制写入，不限制读取与联网。已在 Linux 上对 Windows 目标做类型检查，尚未在真机运行。
 
+### 2.8 第五批（`feat/agent-scheduled-tasks-20261022`）
+
+29. **上下文圆环的工具开销**：第一次回答前按实测值估算（上次启动保存在 `chat/tool-tokens.json`），没有实测值时用接近真实大小的默认值，测试保证默认值不偏离太多。
+30. **多平台测试工作流**：`.github/workflows/desktop-agent-platform-tests.yml` 只能手动运行，在 Windows 与 macOS 上跑内核和桌面端测试，其中 `tests/os_sandbox.rs` 检查 Seatbelt 沙箱、Windows 低完整性沙箱和 cmd 引号。顺带去掉 `agent-chat-tests.yml` 的自动触发。
+31. **定时 Agent 任务**：关怀提醒新增“定时任务”类型。到点后小伴只用只读工具执行（读文件、列目录、搜索、时间、网页），没有需要确认的操作；每条规则的运行追加到它自己的会话，气泡显示答案开头，结果最多保留 12 小时。
+32. **精简创作类工具定义**：游戏、小组件、特效的长篇规范移到 `game_read_format`、`widget_read_format`、`effect_read_format`，创作时才读取。工具列表本身固定，不影响提示缓存。内置工具定义由约 9,600 token 降到约 7,900；测试限制单个工具定义不超过 600 token。
+
 合并 #93（长期目标）时，顺带修正了 main 上的三处编译错误：`File::try_lock` 的错误类型、`pub use` 重新导出 Tauri 命令、`app.state()` 临时值的借用。
 
 ## 3. 验证情况
