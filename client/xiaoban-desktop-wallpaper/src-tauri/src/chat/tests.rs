@@ -627,6 +627,21 @@ fn trusted_rig(tag: &str, steps: Vec<Step>) -> (Rig, Arc<Mutex<Vec<(String, Opti
 }
 
 #[test]
+fn a_scheduled_task_is_confirmed_even_in_full_trust_and_an_ordinary_reminder_is_not() {
+    let steps = vec![
+        call("1", "care_set", json!({"text": "喝水", "time": "15:00"})),
+        call("2", "care_set", json!({"text": "看看待办", "kind": "agent", "time": "08:00"})),
+        Step::text("好"),
+    ];
+    let (rig, asked) = trusted_rig("care-agent-confirm", steps);
+    run(&rig, "设置提醒").0.unwrap();
+    let asked = lock(&asked);
+    assert_eq!(asked.len(), 1, "{asked:?}");
+    assert_eq!(asked[0].0, "care_set");
+    assert!(asked[0].1.as_deref().unwrap_or("").contains("定时任务"));
+}
+
+#[test]
 fn computer_use_repair_requires_confirmation_even_in_full_trust() {
     let steps = vec![
         call("1", "computer_use_repair_permissions", json!({"permission": "accessibility"})),

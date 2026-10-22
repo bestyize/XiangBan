@@ -192,7 +192,10 @@ fn permission_with_danger_check(mode: PermissionMode, approver: impl agent_kerne
         if tool == "skill_install" || tool == "skill_run" || tool.starts_with("mcp_ext_") {
             return Some("安装第三方 Skill、执行脚本或调用外部 MCP 工具必须逐次经过用户确认".to_string());
         }
-        if tool == "computer_use_repair_permissions" {
+        if tool == "care_set" && args["kind"] == "agent" {
+            return Some("定时任务会在你不在时自动运行，添加或修改都需要你确认".to_string());
+        }
+                if tool == "computer_use_repair_permissions" {
             return Some("清除 com.ifuryst.opencomputeruse 的所选旧授权（同标识独立安装版也受影响），之后需重新授权；每次都需确认".to_string());
         }
         danger::assess(tool, args, lock(&workspace).as_deref()).map(str::to_string)
