@@ -418,15 +418,21 @@ async function fetchModels() {
     return;
   }
   busy.value = 'models';
+  const requestedProtocol = modalProtocol.value;
+  const requestedProvider = editingId.value;
   try {
     const list = await invoke<DiscoveredModel[]>('fetch_ai_models', {
-      protocol: modalProtocol.value,
+      protocol: requestedProtocol,
       baseUrl: cleanUrl,
       apiKey: modalApiKey.value.trim() || null,
     });
+    if (!modalVisible.value || editingId.value !== requestedProvider
+        || modalBaseUrl.value.trim() !== cleanUrl || modalProtocol.value !== requestedProtocol) {
+      return; // A stale async response must never attach capabilities to another endpoint.
+    }
     if (list && list.length > 0) {
       fetchedModels.value = list;
-      fetchedFor.value = `${modalProtocol.value}\n${cleanUrl}`;
+      fetchedFor.value = `${requestedProtocol}\n${cleanUrl}`;
       props.store.notify(`成功获取到 ${list.length} 个模型`, 'success');
     } else {
       props.store.notify('未获取到可用模型', 'info');
