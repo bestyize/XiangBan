@@ -35,6 +35,12 @@ fn exists(app: &tauri::AppHandle, id: &str) -> Result<(), String> {
 fn running(app: &tauri::AppHandle, id: &str) -> bool {
     lock(&app.state::<ChatState>().runs).contains_key(id)
 }
+fn ensure_not_owned_elsewhere(app: &tauri::AppHandle, id: &str) -> Result<(), String> {
+    if !running(app, id) && agent_kernel::supervisor::SessionLease::held(Dirs::of(app)?.leases(), id)? {
+        return Err("该会话正在另一个小伴实例中执行，请在那个实例里停止任务".into());
+    }
+    Ok(())
+}
 fn changed(app: &tauri::AppHandle, id: &str, record: Option<&GoalRecord>) {
     emit(app, "chat-goal-changed", json!({"session": id, "goal": record}));
 }
@@ -74,6 +80,7 @@ pub fn chat_goal_set(
 ) -> Result<GoalRecord, String> {
     require_control(&window)?;
     exists(&app, &session_id)?;
+    ensure_not_owned_elsewhere(&app, &session_id)?;
     let _write = lock(&app.state::<ChatState>().goal_io);
     if running(&app, &session_id) { return Err("运行期间不能修改目标".into()); }
     let existing = current(&app, &session_id)?;
@@ -108,6 +115,7 @@ pub fn chat_goal_start(
 ) -> Result<GoalRecord, String> {
     require_control(&window)?;
     exists(&app, &session_id)?;
+    ensure_not_owned_elsewhere(&app, &session_id)?;
     // Hold the goal lock until chat_send has registered the run or refused it.
     // Otherwise a simultaneous read could mistake the brief dispatch gap
     // for a crashed process and mark an in-flight goal NeedsReview.
@@ -136,6 +144,7 @@ pub fn chat_goal_pause(
 ) -> Result<GoalRecord, String> {
     require_control(&window)?;
     exists(&app, &session_id)?;
+    ensure_not_owned_elsewhere(&app, &session_id)?;
     // Cancel an active run first; never wait for its blocking tool while
     // holding the goal metadata lock.
     if running(&app, &session_id) { super::chat_cancel(app.clone(), session_id.clone()); }
@@ -156,6 +165,7 @@ pub fn chat_goal_acknowledge(
 ) -> Result<GoalRecord, String> {
     require_control(&window)?;
     exists(&app, &session_id)?;
+    ensure_not_owned_elsewhere(&app, &session_id)?;
     let _write = lock(&app.state::<ChatState>().goal_io);
     if running(&app, &session_id) { return Err("仍有运行中的任务".into()); }
     let mut goal = current(&app, &session_id)?.ok_or("没有长期目标")?;
@@ -181,6 +191,7 @@ pub fn chat_goal_finish(
 ) -> Result<GoalRecord, String> {
     require_control(&window)?;
     exists(&app, &session_id)?;
+    ensure_not_owned_elsewhere(&app, &session_id)?;
     let _write = lock(&app.state::<ChatState>().goal_io);
     if running(&app, &session_id) { return Err("任务仍在执行，不能验收完成".into()); }
     let mut goal = current(&app, &session_id)?.ok_or("没有长期目标")?;
@@ -196,6 +207,7 @@ pub fn chat_goal_delete(
 ) -> Result<(), String> {
     require_control(&window)?;
     exists(&app, &session_id)?;
+    ensure_not_owned_elsewhere(&app, &session_id)?;
     let _write = lock(&app.state::<ChatState>().goal_io);
     if running(&app, &session_id) { return Err("先暂停并停止当前任务".into()); }
     store(&app)?.delete(&session_id)?;
