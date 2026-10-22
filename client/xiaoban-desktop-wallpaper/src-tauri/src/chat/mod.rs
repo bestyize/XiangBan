@@ -26,6 +26,7 @@ use agent_kernel::provider::anthropic::AnthropicMessages;
 use agent_kernel::provider::openai::OpenAiCompat;
 use agent_kernel::provider::responses::OpenAiResponses;
 use agent_kernel::provider::wire::ProviderProfile;
+use agent_kernel::model::TokenBudget;
 use agent_kernel::skills::Skills;
 use agent_kernel::{Agent, Approval, ApprovalRequest, ContextTrim, ContinueGuard, JsonlStore, RepeatGuard, Message, ModelProvider, Part, Permission, PermissionMode, Risk, RunOptions, RunEventBody, SessionStore, SpillOutput, ToolCtx};
 use agent_kernel::journal::JsonlRunLog;
@@ -260,9 +261,9 @@ fn provider_profile(config: &AiConfig) -> ProviderProfile {
     let mut profile = ProviderProfile::new(config.base_url.clone(), config.api_key.clone(), config.model.clone());
     profile.extra_body = crate::ai_reasoning::body(&config.protocol, config.reply_preference(), &config.reasoning_levels());
     profile.max_request_bytes = Some(8 * 1024 * 1024);
-    // Only Anthropic requires an explicit output limit. Responses and Chat Completions
-    // must not inherit a made-up cap from the local conversation context budget.
-    profile.max_output_tokens = (config.protocol == "anthropic").then(|| config.model_output_limit()).flatten();
+    // Central model policy: compatible APIs use endpoint defaults; Anthropic
+    // receives a required model/endpoint-specific max_tokens value.
+    profile.max_output_tokens = config.model_capabilities().request_output_limit();
     profile
 }
 
@@ -277,11 +278,6 @@ fn provider_with(config: &AiConfig, key_source: Option<KeySource>) -> Result<Arc
         _ => OpenAiCompat::new(profile).map(|p| Arc::new(p) as Arc<dyn ModelProvider>),
     };
     made.map_err(|e| format!("模型配置不能用：{e}"))
-}
-
-/// Estimate *context trimming* headroom independently of the model's generation ceiling.
-fn context_reserve(limit: usize) -> usize {
-    (limit / 4).min(16_384) + limit / 20
 }
 
 /// Deletes spilled tool output nobody will look at again.
@@ -341,7 +337,7 @@ struct Parts<'a> {
     /// Starts the computer-control server; a parameter so tests never launch a real one.
     spawn_computer_use: &'a dyn Fn() -> Result<Arc<agent_kernel::mcp::McpClient>, agent_kernel::HarnessError>,
     /// Estimated tokens kept in a request before old tool output and old turns are dropped.
-    context_tokens: usize,
+    budget: TokenBudget,
 }
 
 /// Puts the kernel together: the model, the tools the assistant may use, and the rules around them.
@@ -354,7 +350,7 @@ fn assemble_with_files(parts: Parts<'_>, attachments: Vec<Attachment>) -> Result
     assemble_with_connectors(parts, attachments, Vec::new())
 }
 fn assemble_with_connectors(parts: Parts<'_>, attachments: Vec<Attachment>, connector_tools: Vec<Arc<dyn agent_kernel::Tool>>) -> Result<Agent, String> {
-    let Parts { provider, dirs, workspace, permission, todo, ask, desktop, utc_offset_minutes, open_computer_use, spawn_computer_use, context_tokens } = parts;
+    let Parts { provider, dirs, workspace, permission, todo, ask, desktop, utc_offset_minutes, open_computer_use, spawn_computer_use, budget } = parts;
     for dir in [dirs.sessions(), dirs.spill(), dirs.memory(), dirs.skills()] {
         fs::create_dir_all(&dir).map_err(|e| format!("无法创建 {}：{e}", dir.display()))?;
     }
@@ -396,7 +392,7 @@ fn assemble_with_connectors(parts: Parts<'_>, attachments: Vec<Attachment>, conn
         .middleware(RepeatGuard::new())
         .middleware(SpillOutput::new(dirs.spill()))
         .middleware(AttachmentContext::new(attachments))
-        .middleware(ContextTrim::new(context_tokens).reserve_output(context_reserve(context_tokens)))
+        .middleware(ContextTrim::new(budget.context_limit).reserve_output(budget.trim_headroom))
         .middleware(ContinueGuard::new())
         .max_turns(MAX_TURNS);
     let roots = vec![workspace.to_path_buf(), dirs.spill()];
@@ -457,7 +453,7 @@ fn build_agent(app: &tauri::AppHandle, config: &AiConfig, key_source: Option<Key
         utc_offset_minutes: chrono::Local::now().offset().local_minus_utc() / 60,
         open_computer_use: config.open_computer_use,
         spawn_computer_use: &spawn_computer_use,
-        context_tokens: config.context_tokens,
+        budget: config.token_budget(),
     }, attachments, connector_manager(app).map(|m|m.tools()).unwrap_or_default())?;
     lock(&state.tool_tokens).insert(config.open_computer_use, agent_kernel::estimate_tool_tokens(&agent.tool_schemas()));
     Ok(agent)
@@ -894,7 +890,7 @@ fn base_tokens(dirs: &Dirs, workspace: &Path, config: &AiConfig) -> usize {
         .filter(|part| !part.trim().is_empty())
         .collect::<Vec<_>>()
         .join("\n\n");
-    agent_kernel::estimate_tokens(&[Message::system(text)]) + context_reserve(config.context_tokens)
+    agent_kernel::estimate_tokens(&[Message::system(text)]) + config.token_budget().trim_headroom
 }
 
 fn context_of(app: &tauri::AppHandle, config: &AiConfig, raw: &[Message]) -> Result<ContextInfo, String> {
@@ -903,7 +899,7 @@ fn context_of(app: &tauri::AppHandle, config: &AiConfig, raw: &[Message]) -> Res
     // Until tools have been registered this launch, include a conservative allowance rather
     // than displaying zero schema cost. Registration replaces it with the actual schemas.
     let tool_tokens = lock(&app.state::<ChatState>().tool_tokens).get(&config.open_computer_use).copied().unwrap_or(32_000);
-    Ok(compact::measure(raw, base_tokens(&dirs, config.workspace_or(&default), config) + tool_tokens, config.context_tokens))
+    Ok(compact::measure(raw, base_tokens(&dirs, config.workspace_or(&default), config) + tool_tokens, config.token_budget().context_limit))
 }
 
 /// How big the next request in a conversation would be, against the limit chosen in settings.
@@ -925,7 +921,7 @@ pub fn chat_context(app: tauri::AppHandle, session_id: Option<String>) -> Result
 fn write_summary(app: &tauri::AppHandle, config: &AiConfig, key_source: Option<KeySource>, id: &str, cancel: &AtomicBool) -> Result<String, String> {
     let file = JsonlStore::new(Dirs::of(app)?.sessions());
     let provider = provider_with(config, key_source)?;
-    compact::compact_into(&file, provider.as_ref(), config.context_tokens, id, cancel)
+    compact::compact_into(&file, provider.as_ref(), config.token_budget().context_limit, id, cancel)
         .map_err(|error| if ai_gateway::is_active(config) { ai_gateway::readable_error(&error) } else { error })
 }
 
