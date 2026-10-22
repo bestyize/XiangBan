@@ -69,6 +69,7 @@ name = "agent-kernel"
 version = "0.3.0"
 dependencies = [
  "base64 0.22.1",
+ "encoding_rs",
  "jsonschema",
  "libc",
  "reqwest",

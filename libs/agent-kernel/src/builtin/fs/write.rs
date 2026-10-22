@@ -107,7 +107,14 @@ impl Tool for EditFile {
         if looks_binary(&bytes) {
             return Err("this looks like a binary file".to_string());
         }
-        let text = String::from_utf8(bytes).map_err(|_| "the file is not valid UTF-8".to_string())?;
+        // A GBK/GB18030 file is edited as text and written back in its own encoding, not silently turned into UTF-8.
+        let (text, gb18030) = match String::from_utf8(bytes) {
+            Ok(text) => (text, false),
+            Err(error) => match encoding_rs::GB18030.decode_without_bom_handling_and_without_replacement(error.as_bytes()) {
+                Some(text) => (text.into_owned(), true),
+                None => return Err("the file is neither UTF-8 nor GBK/GB18030 text; it cannot be edited safely".to_string()),
+            },
+        };
         // `read_file` shows lines without their `\r`, so on a Windows (CRLF) file a multi-line `old_string` written
         // from what the model saw never matches. Such a file is edited with plain newlines and written back as CRLF.
         let crlf = !old.contains('\r') && old.contains('\n') && text.contains("\r\n") && !text.replace("\r\n", "").contains('\n');
@@ -128,7 +135,9 @@ impl Tool for EditFile {
         if updated.len() > MAX_WRITE_BYTES * 2 {
             return Err("the edited file would be too large".to_string());
         }
-        atomic_write(&path, updated.as_bytes()).map_err(|e| format!("cannot write file: {e}"))?;
-        Ok(format!("Edited {} ({count} replacement{}).", self.roots.display(&path), if count == 1 { "" } else { "s" }))
+        let bytes = if gb18030 { encoding_rs::GB18030.encode(&updated).0.into_owned() } else { updated.into_bytes() };
+        atomic_write(&path, &bytes).map_err(|e| format!("cannot write file: {e}"))?;
+        let kept = if gb18030 { " The file stays GBK/GB18030." } else { "" };
+        Ok(format!("Edited {} ({count} replacement{}).{kept}", self.roots.display(&path), if count == 1 { "" } else { "s" }))
     }
 }

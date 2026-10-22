@@ -1,7 +1,7 @@
 #![cfg(feature = "fs")]
 mod common;
 
-use agent_kernel::builtin::fs::fs_write_tools;
+use agent_kernel::builtin::fs::{fs_tools, fs_write_tools};
 use agent_kernel::provider::scripted::Step;
 use agent_kernel::*;
 use common::*;
@@ -23,7 +23,8 @@ impl Ws {
     }
 
     fn call(&self, tool: &str, args: serde_json::Value) -> String {
-        let tools = fs_write_tools(vec![self.base.path("root")]).unwrap();
+        let mut tools = fs_write_tools(vec![self.base.path("root")]).unwrap();
+        tools.extend(fs_tools(vec![self.base.path("root")]).unwrap());
         let h = harness(vec![Step::tool_call("c", tool, &args.to_string()), Step::text("ok")], |mut b| {
             for t in tools {
                 b = b.tool_arc(t);
@@ -162,7 +163,7 @@ fn edit_file_refuses_binary_oversized_and_outside_files() {
     std::fs::create_dir_all(ws.root("adir")).unwrap();
     ws.base.write("outside/o.txt", "abc");
     assert!(ws.edit("blob.bin", "abc", "x", false).contains("binary"));
-    assert!(ws.edit("latin1.txt", "caf", "x", false).contains("not valid UTF-8"));
+    assert!(ws.edit("latin1.txt", "caf", "x", false).contains("neither UTF-8 nor GBK"), "Latin-1 is still refused");
     assert!(ws.edit("huge.txt", "a", "b", false).contains("larger than"));
     assert!(ws.edit("adir", "a", "b", false).contains("not a regular file"));
     assert!(ws.edit(&ws.base.path("outside/o.txt").display().to_string(), "abc", "x", false).contains("outside the allowed"));
@@ -184,4 +185,26 @@ fn write_tools_are_blocked_in_read_only_mode() {
     assert!(run(&h.agent, "go").0.is_ok());
     assert!(tool_messages(&h)[0].1.contains("Read-only mode"));
     assert!(!ws.root("x.txt").exists());
+}
+
+#[test]
+fn gbk_files_are_read_searched_and_edited_in_their_own_encoding() {
+    let ws = Ws::new("fsw-gbk");
+    let (gbk, _, _) = encoding_rs::GBK.encode("第一行：你好\r\n第二行：世界\r\n");
+    std::fs::write(ws.root("old.txt"), &gbk).unwrap();
+    let shown = ws.call("read_file", serde_json::json!({"path": "old.txt"}));
+    assert!(shown.contains("你好") && shown.contains("世界") && shown.contains("GBK/GB18030"), "{shown}");
+    let found = ws.call("grep", serde_json::json!({"pattern": "世界"}));
+    assert!(found.contains("old.txt"), "{found}");
+    let edited = ws.edit("old.txt", "第一行：你好\n第二行", "第一行：您好\n第二行", false);
+    assert!(edited.contains("stays GBK/GB18030"), "{edited}");
+    let bytes = std::fs::read(ws.root("old.txt")).unwrap();
+    assert!(std::str::from_utf8(&bytes).is_err(), "still GBK on disk");
+    let (text, _, errors) = encoding_rs::GBK.decode(&bytes);
+    assert!(!errors);
+    assert_eq!(text, "第一行：您好\r\n第二行：世界\r\n", "CRLF kept as well");
+
+    std::fs::write(ws.root("bad.txt"), [0x80, 0x80, 0xff, b'\n']).unwrap();
+    assert!(ws.call("read_file", serde_json::json!({"path": "bad.txt"})).contains("neither UTF-8 nor GBK"));
+    assert!(ws.edit("bad.txt", "x", "y", false).contains("cannot be edited safely"));
 }
