@@ -350,6 +350,8 @@ struct Parts<'a> {
     budget: TokenBudget,
     /// Background process tools; `None` in tests that do not need them.
     processes: Option<Arc<ProcessManager>>,
+    /// Compaction inside one long answer; `None` in tests that do not need it.
+    mid_run: Option<compact::MidRunCompact>,
 }
 
 /// Puts the kernel together: the model, the tools the assistant may use, and the rules around them.
@@ -362,7 +364,7 @@ fn assemble_with_files(parts: Parts<'_>, attachments: Vec<Attachment>) -> Result
     assemble_with_connectors(parts, attachments, Vec::new())
 }
 fn assemble_with_connectors(parts: Parts<'_>, attachments: Vec<Attachment>, connector_tools: Vec<Arc<dyn agent_kernel::Tool>>) -> Result<Agent, String> {
-    let Parts { provider, dirs, workspace, permission, todo, ask, desktop, utc_offset_minutes, open_computer_use, spawn_computer_use, budget, processes } = parts;
+    let Parts { provider, dirs, workspace, permission, todo, ask, desktop, utc_offset_minutes, open_computer_use, spawn_computer_use, budget, processes, mid_run } = parts;
     for dir in [dirs.sessions(), dirs.spill(), dirs.memory(), dirs.skills()] {
         fs::create_dir_all(&dir).map_err(|e| format!("无法创建 {}：{e}", dir.display()))?;
     }
@@ -404,7 +406,12 @@ fn assemble_with_connectors(parts: Parts<'_>, attachments: Vec<Attachment>, conn
         // Polling a process's output is legitimate repetition; the per-answer call budget still bounds it.
         .middleware(RepeatGuard::new().ignore_tool("process_read"))
         .middleware(SpillOutput::new(dirs.spill()))
-        .middleware(AttachmentContext::new(attachments))
+        .middleware(AttachmentContext::new(attachments));
+    // Before trimming: summarize first, and drop old output only if the request is still too large.
+    if let Some(mid_run) = mid_run {
+        builder = builder.middleware(mid_run);
+    }
+    builder = builder
         .middleware(ContextTrim::new(budget.context_limit).reserve_output(budget.trim_headroom))
         .middleware(ContinueGuard::new())
         .max_turns(MAX_TURNS);
@@ -457,7 +464,7 @@ fn process_manager(app: &tauri::AppHandle, workspace: &Path) -> Result<Arc<Proce
     Ok(manager)
 }
 
-fn build_agent(app: &tauri::AppHandle, config: &AiConfig, key_source: Option<KeySource>, workspace: &Path, attachments: Vec<Attachment>) -> Result<Agent, String> {
+fn build_agent(app: &tauri::AppHandle, config: &AiConfig, key_source: Option<KeySource>, workspace: &Path, attachments: Vec<Attachment>, session: &str, cancel: &Arc<AtomicBool>) -> Result<Agent, String> {
     let state = app.state::<ChatState>();
     let ask = {
         let (app, broker) = (app.clone(), state.broker.clone());
@@ -473,8 +480,21 @@ fn build_agent(app: &tauri::AppHandle, config: &AiConfig, key_source: Option<Key
             .join("agent-tools/computer-use");
         agent_computer_use_tools::spawn(&root)
     };
+    let provider = provider_with(config, key_source)?;
+    let mid_run = {
+        let (app, session) = (app.clone(), session.to_string());
+        compact::MidRunCompact::new(provider.clone(), config.token_budget().context_limit, cancel.clone(), move |state, detail| {
+            let mut payload = json!({ "session": session, "state": state });
+            match state {
+                "done" => payload["summary"] = json!(detail),
+                "failed" => payload["message"] = json!(detail),
+                _ => {}
+            }
+            emit(&app, "chat-compacting", payload);
+        })
+    };
     let agent = assemble_with_connectors(Parts {
-        provider: provider_with(config, key_source)?,
+        provider,
         dirs: &Dirs::of(app)?,
         workspace,
         permission: state.permission.clone(),
@@ -486,6 +506,7 @@ fn build_agent(app: &tauri::AppHandle, config: &AiConfig, key_source: Option<Key
         spawn_computer_use: &spawn_computer_use,
         budget: config.token_budget(),
         processes: Some(process_manager(app, workspace)?),
+        mid_run: Some(mid_run),
     }, attachments, connector_manager(app).map(|m|m.tools()).unwrap_or_default())?;
     lock(&state.tool_tokens).insert(config.open_computer_use, agent_kernel::estimate_tool_tokens(&agent.tool_schemas()));
     Ok(agent)
@@ -660,7 +681,7 @@ pub fn chat_send(app: tauri::AppHandle, window: tauri::WebviewWindow, session_id
         let session = id.clone();
         // 小伴 AI 要先拿到有效的账号令牌，可能需要联网刷新，所以放在这条线程里做，不卡住界面。
         let prepared = ai_gateway::prepare(&handle, config_owned).and_then(|(config, source)| {
-            build_agent(&handle, &config, source.clone(), &workspace_owned, saved_for_thread.clone()).map(|agent| (agent, config, source))
+            build_agent(&handle, &config, source.clone(), &workspace_owned, saved_for_thread.clone(), &id, &cancel).map(|agent| (agent, config, source))
         });
         if cancel.load(Ordering::SeqCst) {
             attachment_store.rollback(&saved_for_thread);
