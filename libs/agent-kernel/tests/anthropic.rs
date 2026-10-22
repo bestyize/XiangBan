@@ -394,6 +394,28 @@ mod truncated_over_http {
     }
 
     #[test]
+    fn a_provider_reuses_an_observed_cap_on_later_calls_in_the_same_run() {
+        let bad = status("400 Bad Request",
+            r#"{"error":{"message":"max_tokens: 128000 > 64000, which is the maximum allowed number of output tokens"}}"#);
+        let success = || sse_events(&[
+            ("message_start", r#"{"type":"message_start","message":{"usage":{"input_tokens":5,"output_tokens":1}}}"#),
+            ("content_block_start", r#"{"type":"content_block_start","index":0,"content_block":{"type":"text","text":"ok"}}"#),
+            ("message_delta", r#"{"type":"message_delta","delta":{"stop_reason":"end_turn"},"usage":{"output_tokens":2}}"#),
+            ("message_stop", r#"{"type":"message_stop"}"#),
+        ]);
+        let (url, server) = serve(vec![bad, success(), success()]);
+        let provider = AnthropicMessages::new(ProviderProfile::new(url, "k", "unknown-model")).unwrap();
+        for _ in 0..2 {
+            let reply = provider.chat(&request(vec![Message::user_text("hello")]),
+                &mut |_| {}, &AtomicBool::new(false)).unwrap();
+            assert_eq!(reply.finish, FinishReason::Stop);
+        }
+        let requests = server.join().unwrap();
+        let caps: Vec<_> = requests.iter().map(|r| body_json(r)["max_tokens"].as_u64().unwrap()).collect();
+        assert_eq!(caps, vec![128_000, 63_999, 63_999]);
+    }
+
+    #[test]
     fn a_tool_call_cut_off_by_max_tokens_is_not_run_and_history_stays_valid() {
         let cut = sse_events(&[
             ("message_start", r#"{"type":"message_start","message":{"usage":{"input_tokens":5,"output_tokens":1}}}"#),
