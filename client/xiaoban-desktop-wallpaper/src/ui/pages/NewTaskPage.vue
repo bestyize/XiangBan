@@ -67,7 +67,7 @@ function openAiSettings() { props.store.openSettings('ai'); }
 </script>
 
 <template>
-  <div class="new-task-page" data-testid="new-task-page">
+  <div class="new-task-page" data-testid="new-task-page" data-tauri-drag-region>
     <div class="hero">
       <h1 class="greeting" data-testid="new-task-greeting">{{ greeting }}，今天让小伴帮你做点什么？</h1>
       <div class="scenes" role="tablist" aria-label="场景">

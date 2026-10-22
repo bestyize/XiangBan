@@ -191,7 +191,7 @@ const bytes = (n: number) => n < 1024 ? `${n} B` : `${(n / 1024).toFixed(1)} KB`
 
 <template>
   <section class="ai-store-page xb-page" data-testid="ai-store-page" aria-label="AI 插件">
-    <header class="xb-page-head store-header">
+    <header class="xb-page-head store-header" data-tauri-drag-region>
       <div class="xb-tabs-lg store-tabs" role="tablist" aria-label="插件类型" @keydown="tabKey">
         <button v-for="t in tabs" :id="`store-tab-${t.id}`" :key="t.id" type="button" role="tab" :aria-controls="`store-panel-${t.id}`" :aria-selected="tab === t.id" :tabindex="tab === t.id ? 0 : -1" @click="switchTab(t.id)">{{ t.label }}</button>
       </div>

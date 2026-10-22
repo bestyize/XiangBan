@@ -19,5 +19,21 @@
         "template": "windows/one-click-installer.nsi"
       }
     }
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "control",
+        "title": "小伴桌面",
+        "width": 1280,
+        "height": 800,
+        "minWidth": 960,
+        "minHeight": 600,
+        "center": true,
+        "visible": false,
+        "decorations": false,
+        "shadow": true
+      }
+    ]
   }
 }

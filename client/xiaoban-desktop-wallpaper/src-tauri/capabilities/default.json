@@ -1,6 +1,17 @@
 {
   "identifier": "desktop",
   "description": "Local control and scene events",
-  "windows": ["control", "pet", "wallpaper"],
-  "permissions": ["core:default", "core:window:allow-start-dragging"]
+  "windows": [
+    "control",
+    "pet",
+    "wallpaper"
+  ],
+  "permissions": [
+    "core:default",
+    "core:window:allow-start-dragging",
+    "core:window:allow-minimize",
+    "core:window:allow-toggle-maximize",
+    "core:window:allow-internal-toggle-maximize",
+    "core:window:allow-close"
+  ]
 }

@@ -18,7 +18,7 @@ const tabs: { id: StudioTab; label: string }[] = [
 </script>
 <template>
   <section class="studio-page" data-testid="studio-page" aria-label="装扮">
-    <header class="studio-head">
+    <header class="studio-head" data-tauri-drag-region>
       <div class="xb-tabs-lg" role="tablist" aria-label="装扮类型">
         <button v-for="tab in tabs" :id="`studio-tab-${tab.id}`" :key="tab.id" type="button" role="tab" :aria-selected="store.studioTab === tab.id" :data-testid="`studio-tab-${tab.id}`" @click="store.studioTab = tab.id">{{ tab.label }}</button>
       </div>
