@@ -290,7 +290,7 @@ fn the_assistant_has_every_tool_it_needs_and_no_others() {
         "time_now", "todo", "ask_user", "read_file", "list_dir", "grep", "write_file", "edit_file", "shell", "web_fetch", "load_skill", "skill_manage",
         "memory_read", "memory_write", "desktop_status", "desktop_windows", "desktop_window_set", "wallpaper_list", "wallpaper_apply", "wallpaper_create", "wallpaper_delete", "effect_list", "effect_set", "effect_create", "effect_delete", "effect_read_format", "companion_set", "care_list",
         "care_set", "care_delete", "widget_list", "widget_add", "widget_create", "widget_delete_custom", "widget_update", "widget_remove", "game_list", "game_open", "game_close", "game_create", "game_delete",
-        "request_accessibility_permission", "computer_use_diagnose", "computer_use_repair_permissions", "community_share", "community_open", "pet_read_format", "pet_catalog", "pet_theme_save", "pet_theme_delete", "pet_add", "pet_update", "pet_remove",
+        "request_accessibility_permission", "computer_use_diagnose", "computer_use_repair_permissions", "community_share", "community_open", "pet_read_format", "pet_catalog", "pet_theme_save", "pet_theme_delete", "pet_add", "pet_update", "pet_remove", "research",
         "experience_recall", "skill_search", "skill_inspect", "skill_install", "skill_read", "skill_run",
     ];
     expected.sort();
@@ -999,4 +999,27 @@ fn the_working_folder_s_agents_md_reaches_the_model_and_edits_apply_next_step() 
     let requests = provider.requests();
     let system = requests[0].messages[0].text();
     assert!(system.contains("工作目录里的项目说明") && system.contains("测试命令：pnpm test"), "{system}");
+}
+
+#[test]
+fn research_runs_a_read_only_helper_and_returns_only_its_findings() {
+    let rig = rig("research", vec![
+        call("1", "research", json!({"task": "看看 notes.md 里写了什么"})),
+        // The helper's own steps: it reads, tries to write, then answers.
+        call("h1", "read_file", json!({"path": "notes.md"})),
+        call("h2", "write_file", json!({"path": "notes.md", "content": "被改了"})),
+        Step::text("结论：notes.md 记录了周五要交报告。"),
+        Step::text("好的"),
+    ], Approval::Once);
+    fs::write(rig.workspace.join("notes.md"), "周五交报告").unwrap();
+    let (result, _) = run(&rig, "帮我查一下");
+    result.unwrap();
+    let messages = JsonlStore::new(rig.dirs.sessions()).load("s1").unwrap();
+    let results: Vec<String> = messages.iter().filter(|m| m.role == Role::Tool).map(|m| m.text()).collect();
+    assert_eq!(results, vec!["结论：notes.md 记录了周五要交报告。".to_string()], "only the findings reach the conversation");
+    assert_eq!(fs::read_to_string(rig.workspace.join("notes.md")).unwrap(), "周五交报告", "the helper cannot write");
+    assert!(lock(&rig.asked).is_empty(), "a read-only helper never needs a confirmation");
+    let helper_requests: Vec<_> = rig.provider.requests().into_iter().filter(|r| r.messages[0].text().contains("调研助手")).collect();
+    let helper_tools: Vec<String> = helper_requests[0].tools.iter().map(|t| t.name.clone()).collect();
+    assert!(helper_tools.iter().all(|t| ["read_file", "list_dir", "grep"].contains(&t.as_str())), "{helper_tools:?}");
 }
