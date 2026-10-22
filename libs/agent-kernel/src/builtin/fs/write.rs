@@ -108,6 +108,15 @@ impl Tool for EditFile {
             return Err("this looks like a binary file".to_string());
         }
         let text = String::from_utf8(bytes).map_err(|_| "the file is not valid UTF-8".to_string())?;
+        // `read_file` shows lines without their `\r`, so on a Windows (CRLF) file a multi-line `old_string` written
+        // from what the model saw never matches. Such a file is edited with plain newlines and written back as CRLF.
+        let crlf = !old.contains('\r') && old.contains('\n') && text.contains("\r\n") && !text.replace("\r\n", "").contains('\n');
+        let (text, old, new) = if crlf {
+            (text.replace("\r\n", "\n"), old.to_string(), new.replace("\r\n", "\n"))
+        } else {
+            (text, old.to_string(), new.to_string())
+        };
+        let (old, new) = (old.as_str(), new.as_str());
         let count = text.matches(old).count();
         match (count, replace_all) {
             (0, _) => return Err("`old_string` was not found; read the file again and copy the text exactly".to_string()),
@@ -115,6 +124,7 @@ impl Tool for EditFile {
             _ => {}
         }
         let updated = if replace_all { text.replace(old, new) } else { text.replacen(old, new, 1) };
+        let updated = if crlf { updated.replace('\n', "\r\n") } else { updated };
         if updated.len() > MAX_WRITE_BYTES * 2 {
             return Err("the edited file would be too large".to_string());
         }
