@@ -219,6 +219,9 @@ impl Agent {
         let mut successful_calls = Vec::new();
         let mut truncated_tool_retries = 0usize;
         let mut tool_calls = 0usize;
+        // Shared with sub-agents this run starts, so their calls count against `max_tool_calls` too.
+        let budget = options.shared_budget.clone().or_else(|| options.max_tool_calls.map(|limit| Arc::new(crate::ToolBudget::new(limit))));
+        let own_limit = options.max_tool_calls.filter(|_| options.shared_budget.is_some());
         let mut recovered_context_budget = None;
         for index in 0..self.max_turns {
             if cancel.load(Ordering::Relaxed) {
@@ -288,14 +291,15 @@ impl Agent {
                 continue;
             }
 
-            let over_budget = options.max_tool_calls.is_some_and(|limit| tool_calls.saturating_add(calls.len()) > limit);
+            let over_own = own_limit.is_some_and(|limit| tool_calls.saturating_add(calls.len()) > limit);
+            let over_budget = !budget.as_ref().map_or(true, |budget| budget.take(calls.len())) || over_own;
             tool_calls = tool_calls.saturating_add(calls.len());
             let results = if over_budget {
                 self.reject_calls(session, &calls, "Not run: this batch exceeds the run tool-call budget. No calls in the batch were executed.", on_event)
             } else if cut_calls {
                 self.reject_calls(session, &calls, CUT_OFF_MESSAGE, on_event)
             } else {
-                self.execute_calls(session, run_id, &calls, cancel, on_event)
+                self.execute_calls(session, run_id, &calls, cancel, budget.as_ref(), on_event)
             };
             let tool_messages: Vec<Message> =
                 calls.iter().zip(&results).map(|(c, r)| r.message(c.id.as_str())).collect();

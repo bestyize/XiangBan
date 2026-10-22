@@ -67,13 +67,14 @@ impl Agent {
         run_id: &str,
         calls: &[ToolCall],
         cancel: &Arc<AtomicBool>,
+        budget: Option<&Arc<crate::ToolBudget>>,
         on_event: &mut dyn FnMut(Event),
     ) -> Vec<ToolResult> {
         let mut results: Vec<Option<ToolResult>> = vec![None; calls.len()];
         let mut inflight = Vec::new();
         for (i, call) in calls.iter().enumerate() {
             on_event(Event::ToolStart { id: call.id.clone(), name: call.name.clone(), arguments: call.arguments.clone() });
-            match self.prepare(session, run_id, call, cancel) {
+            match self.prepare(session, run_id, call, cancel, budget) {
                 Prepared::Done(result) => results[i] = Some(self.finalize(session, call, result, on_event)),
                 Prepared::Run { tool, args, ctx } => {
                     let serial = !tool.spec().parallel_safe;
@@ -111,7 +112,7 @@ impl Agent {
             .collect()
     }
 
-    fn prepare(&self, session: &str, run_id: &str, call: &ToolCall, cancel: &Arc<AtomicBool>) -> Prepared {
+    fn prepare(&self, session: &str, run_id: &str, call: &ToolCall, cancel: &Arc<AtomicBool>, budget: Option<&Arc<crate::ToolBudget>>) -> Prepared {
         let Some(&index) = self.tool_index.get(&call.name) else {
             let mut names: Vec<&str> = self.tools.iter().map(|tool| tool.spec().name.as_str()).collect();
             names.sort_unstable();
@@ -149,6 +150,7 @@ impl Agent {
             run_id: run_id.to_string(),
             run_cancel: cancel.clone(),
             call_cancel: Arc::new(AtomicBool::new(false)),
+            budget: budget.cloned(),
         };
         for mw in &self.middleware {
             if let ToolGate::Block(reason) = mw.before_tool(&ctx, call, &args, tool.spec()) {

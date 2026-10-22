@@ -2,7 +2,8 @@
 
 use crate::{Event, HarnessError};
 use serde::{Deserialize, Serialize};
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
+use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 static RUN_SEQUENCE: AtomicU64 = AtomicU64::new(0);
@@ -16,6 +17,36 @@ pub struct RunOptions {
     /// Counts requested tool calls, including invalid or denied ones. An oversized batch is
     /// rejected in its entirety and the run pauses, without executing a partial batch.
     pub max_tool_calls: Option<usize>,
+    /// A budget shared with the run that started this one: a sub-agent's calls count against its parent's
+    /// `max_tool_calls`. `Subagent` passes it on by itself; hosts rarely set it.
+    pub shared_budget: Option<Arc<ToolBudget>>,
+}
+
+/// Tool calls left for a run and the sub-agent runs it starts.
+#[derive(Debug)]
+pub struct ToolBudget {
+    limit: usize,
+    used: AtomicUsize,
+}
+
+impl ToolBudget {
+    pub fn new(limit: usize) -> Self {
+        Self { limit, used: AtomicUsize::new(0) }
+    }
+
+    /// Counts `calls` and returns whether they still fit. Calls that do not fit are counted too, so once the
+    /// budget is spent every later batch is refused as well.
+    pub fn take(&self, calls: usize) -> bool {
+        self.used.fetch_add(calls, Ordering::SeqCst).saturating_add(calls) <= self.limit
+    }
+
+    pub fn used(&self) -> usize {
+        self.used.load(Ordering::SeqCst)
+    }
+
+    pub fn limit(&self) -> usize {
+        self.limit
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

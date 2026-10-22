@@ -102,6 +102,7 @@ pub struct ToolCtx {
     pub(crate) run_id: String,
     pub(crate) run_cancel: Arc<AtomicBool>,
     pub(crate) call_cancel: Arc<AtomicBool>,
+    pub(crate) budget: Option<Arc<crate::ToolBudget>>,
 }
 
 impl ToolCtx {
@@ -111,9 +112,12 @@ impl ToolCtx {
 
     pub fn run_id(&self) -> &str { &self.run_id }
 
+    /// The run's tool-call budget, when it has one; a tool that starts a run of its own passes it on.
+    pub fn tool_budget(&self) -> Option<&Arc<crate::ToolBudget>> { self.budget.as_ref() }
+
     /// A context that is never cancelled, for calling a tool directly, for example in a host's tests.
     pub fn detached(session: &str) -> Self {
-        Self { session: session.to_string(), run_id: format!("detached-{session}"), run_cancel: Arc::new(AtomicBool::new(false)), call_cancel: Arc::new(AtomicBool::new(false)) }
+        Self { session: session.to_string(), run_id: format!("detached-{session}"), run_cancel: Arc::new(AtomicBool::new(false)), call_cancel: Arc::new(AtomicBool::new(false)), budget: None }
     }
 
     /// True after the user cancels the run or this call hits its timeout.

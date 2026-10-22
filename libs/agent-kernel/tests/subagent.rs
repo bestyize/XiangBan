@@ -234,3 +234,35 @@ fn on_finish_reports_each_child_session_even_when_the_job_fails() {
     assert_eq!(reported, stored, "the hook gets exactly the sessions the child ran in");
     assert!(reported.iter().all(|id| id.starts_with("s1#task-")));
 }
+
+#[test]
+fn a_childs_tool_calls_count_against_the_parents_budget() {
+    let probes = |n: usize| (0..n).map(|i| Step::tool_call(&format!("p{i}"), "probe", "{}")).collect::<Vec<_>>();
+    let mut steps = probes(3);
+    steps.push(Step::text("found it"));
+    let c = child(steps, |b| b.tool(FnTool::new(spec("probe"), |_, _| Ok("data".into()))));
+    let h = harness(vec![Step::tool_call("c", "task", r#"{"task":"look"}"#), Step::text("done")], |b| b.tool(delegate(&c, |s| s)));
+    let options = RunOptions { max_tool_calls: Some(3), ..Default::default() };
+    let result = h.agent.run_parts_observed("s1", vec![Part::Text { text: "go".into() }], options, &mut |_| Ok(()), &Arc::new(AtomicBool::new(false)));
+    // The parent's call and the child's first two fit in three; the child's third does not.
+    assert_eq!(c.provider.requests().len(), 3, "the child stops when the shared budget is spent");
+    assert!(tool_messages(&h).remove(0).1.contains("sub-agent failed"), "the parent hears why");
+    assert!(matches!(result, Ok(_) | Err(HarnessError::BudgetExceeded(_))), "{result:?}");
+
+    let roomy = child(vec![Step::tool_call("p", "probe", "{}"), Step::text("found it")], |b| b.tool(FnTool::new(spec("probe"), |_, _| Ok("data".into()))));
+    let h = harness(vec![Step::tool_call("c", "task", r#"{"task":"look"}"#), Step::text("done")], |b| b.tool(delegate(&roomy, |s| s)));
+    let options = RunOptions { max_tool_calls: Some(5), ..Default::default() };
+    let summary = h.agent.run_parts_observed("s1", vec![Part::Text { text: "go".into() }], options, &mut |_| Ok(()), &Arc::new(AtomicBool::new(false))).unwrap();
+    assert_eq!(summary.text, "done");
+    assert_eq!(tool_messages(&h).remove(0).1, "found it");
+}
+
+#[test]
+fn a_tool_budget_counts_every_call_once_spent() {
+    let budget = ToolBudget::new(3);
+    assert!(budget.take(2));
+    assert!(budget.take(1));
+    assert!(!budget.take(1));
+    assert!(!budget.take(0), "spent stays spent");
+    assert_eq!((budget.used(), budget.limit()), (4, 3));
+}

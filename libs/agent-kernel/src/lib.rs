@@ -44,7 +44,7 @@ pub use middleware::{
 };
 pub use provider::{ChatRequest, ModelProvider, Reply, ToolSchema};
 pub use run::RunSummary;
-pub use runtime::{RunEnd, RunEvent, RunEventBody, RunOptions, RunState};
+pub use runtime::{RunEnd, RunEvent, RunEventBody, RunOptions, RunState, ToolBudget};
 pub use store::{JsonlStore, MemoryStore, SessionStore};
 pub use tool::{Risk, Tool, ToolCtx, ToolGate, ToolResult, ToolSpec, DEFAULT_MAX_OUTPUT};
 pub use types::{ContextSummary, Event, FinishReason, Message, Part, Role, ToolCall, Usage, ReasoningKind, ReasoningSegment, PROTOCOL_VERSION};
