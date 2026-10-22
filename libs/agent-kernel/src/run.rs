@@ -350,11 +350,22 @@ impl Agent {
         if let Some(budget) = *recovered_budget { reduce(request, budget)?; }
         loop {
             let mut streamed = false;
-            let result = self.provider.chat(
+            let mut visible_reasoning: Vec<crate::ReasoningSegment> = Vec::new();
+            let result = self.provider.chat_with_reasoning(
                 request,
                 &mut |text| {
                     streamed = true;
                     on_event(Event::TextDelta { text: text.to_string() });
+                },
+                &mut |kind, text| {
+                    if text.is_empty() { return; }
+                    streamed = true; // Never replay a partially displayed reasoning stream.
+                    if let Some(last) = visible_reasoning.last_mut().filter(|part| part.kind == kind) {
+                        last.text.push_str(text);
+                    } else {
+                        visible_reasoning.push(crate::ReasoningSegment { kind, text: text.to_owned() });
+                    }
+                    on_event(Event::ReasoningDelta { kind, text: text.to_owned() });
                 },
                 cancel,
             );
@@ -380,6 +391,10 @@ impl Agent {
                     let delay = backoff(&self.retry, attempt);
                     on_event(Event::Retrying { attempt, delay_ms: delay.as_millis() as u64, message });
                     sleep_unless_cancelled(delay, cancel)?;
+                }
+                Ok(mut reply) => {
+                    reply.message.reasoning = visible_reasoning;
+                    return Ok(reply);
                 }
                 other => return other,
             }
