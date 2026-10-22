@@ -54,15 +54,17 @@ fn the_request_has_the_required_fields_and_tools_in_messages_format() {
 }
 
 #[test]
-fn automatic_anthropic_limits_follow_model_family_and_not_a_global_8k_default() {
-    assert_eq!(model_max_output_tokens("claude-opus-4.6-20261022"), 128_000);
-    assert_eq!(model_max_output_tokens("anthropic/claude-sonnet-4-5:fast"), 64_000);
-    assert_eq!(model_max_output_tokens("claude-3-5-sonnet-20241022"), 8_192);
-    assert_eq!(model_max_output_tokens("MiniMax-M3"), 131_072);
-    assert_eq!(model_max_output_tokens("future-claude-model"), 128_000);
+fn anthropic_uses_endpoint_metadata_or_a_model_agnostic_protocol_default() {
+    for model in ["claude-3-5-sonnet-20241022", "claude-opus-4-6", "new-model-2030", "MiniMax-M3"] {
+        assert_eq!(model_max_output_tokens(model), 128_000,
+            "model names must not select stale built-in output limits");
+    }
     let mut p = profile();
-    p.model = "claude-sonnet-4.5".into();
-    assert_eq!(build_request_body(&p, &request(vec![Message::user_text("hi")]))["max_tokens"], json!(64_000));
+    p.model = "new-model-2030".into();
+    assert_eq!(build_request_body(&p, &request(vec![Message::user_text("hi")]))["max_tokens"], json!(128_000));
+    p.max_output_tokens = Some(262_144);
+    assert_eq!(build_request_body(&p, &request(vec![Message::user_text("hi")]))["max_tokens"], json!(262_144),
+        "declared metadata may exceed the protocol fallback");
 }
 
 #[test]
