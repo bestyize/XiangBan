@@ -881,6 +881,9 @@ pub fn chat_delete_session(app: tauri::AppHandle, session_id: String) -> Result<
     // Keep ownership across the *entire* destructive deletion, not merely a
     // probe followed by a time-of-check/time-of-use race with another host.
     let _lease = SessionLease::acquire(Dirs::of(&app)?.leases(), &session_id)?;
+    // A second instance must not publish goal metadata while deletion is underway.
+    let _goal_io = lock(&state.goal_io);
+    let _goal_lease = goals::metadata_lease(&app, &session_id)?;
     JsonlStore::new(Dirs::of(&app)?.sessions()).remove(&session_id).map_err(|e| e.to_string())?;
     AttachmentStore::new(Dirs::of(&app)?.chat.join("attachments")).remove_session(&session_id)?;
     let run_dir = Dirs::of(&app)?.runs().join(&session_id);
@@ -890,7 +893,7 @@ pub fn chat_delete_session(app: tauri::AppHandle, session_id: String) -> Result<
         }
     }
     let _ = fs::remove_dir_all(Dirs::of(&app)?.outcomes().join(&session_id));
-    { let _write = lock(&state.goal_io); agent_kernel::goals::GoalStore::new(Dirs::of(&app)?.chat.join("goals")).delete(&session_id)?; }
+    agent_kernel::goals::GoalStore::new(Dirs::of(&app)?.chat.join("goals")).delete(&session_id)?;
     state.permission.forget_session(&session_id);
     state.todo.clear_session(&session_id);
     state.auto_compact.forget(&session_id);
