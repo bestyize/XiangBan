@@ -43,7 +43,10 @@ pub fn supported(_base_url: &str, model: &str, protocol: &str) -> bool { !levels
 pub fn body(protocol: &str, preference: ReplyPreference, levels: &[String]) -> Map<String, Value> {
     let Some(effort) = preference.effort().filter(|e| levels.iter().any(|v| v == e)) else { return Map::new() };
     match protocol {
-        "responses" => Map::from_iter([("reasoning".into(), json!({"effort": effort}))]),
+        // Summary is displayable model output; effort only tunes inference compute.
+        // Keep it opt-in when a supported effort is explicitly selected, as some
+        // compatible gateways reject unfamiliar reasoning.summary fields.
+        "responses" => Map::from_iter([("reasoning".into(), json!({"effort": effort, "summary": "auto"}))]),
         "chat" => Map::from_iter([("reasoning_effort".into(), json!(effort))]),
         _ => Map::new(),
     }
@@ -59,6 +62,7 @@ mod tests {
                 let levels = levels(model, protocol, None);
                 let wire = body(protocol, ReplyPreference::Max, &levels);
                 assert_eq!(if protocol == "chat" { &wire["reasoning_effort"] } else { &wire["reasoning"]["effort"] }, "max");
+                if protocol == "responses" { assert_eq!(wire["reasoning"]["summary"], "auto"); }
                 assert!(body(protocol, ReplyPreference::Default, &levels).is_empty());
             }
         }
