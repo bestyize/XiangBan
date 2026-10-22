@@ -361,6 +361,20 @@ describe('asking the user', () => {
     expect(q('chat-approval')).toBeNull();
   });
 
+  it('undoes an answer\'s file changes only after a second, explicit confirmation', async () => {
+    const h = await open({ ...startChat, chat_undo_run: () => ({ restored: ['a.md'], removed: [], failed: [] }) });
+    await type('干活');
+    await click('chat-send');
+    await h.events('s1', { type: 'done' });
+    h.emit('chat-checkpoint', { session: 's1', runId: 'r1', files: ['a.md'] });
+    await flushPromises();
+    await click('chat-undo-run');
+    expect(h.calls.some(([command]) => command === 'chat_undo_run'), 'the first click only asks').toBe(false);
+    await click('chat-undo-confirm');
+    expect(h.calls.at(-1)).toEqual(['chat_undo_run', { sessionId: 's1', runId: 'r1' }]);
+    expect(q('chat-undo-run')).toBeNull();
+  });
+
   it('offers to remember one kind of command and names it', async () => {
     const h = await running();
     h.emit('chat-approval', approval({ id: 'a7', arguments: { command: 'npm test' }, canRemember: true, rememberAs: 'npm test' }));

@@ -969,3 +969,22 @@ fn background_process_tools_are_registered_and_asked_like_the_shell() {
     assert_eq!(*lock(&asked), vec!["process_start".to_string()], "full trust still asks before a flagged background command");
     manager.shutdown().unwrap();
 }
+
+#[test]
+fn an_answer_that_wrote_files_can_be_undone() {
+    let rig = rig("checkpoint-undo", vec![
+        call("1", "write_file", json!({"path": "notes.md", "content": "小伴改过"})),
+        call("2", "write_file", json!({"path": "new/plan.md", "content": "新建"})),
+        Step::text("好了"),
+    ], Approval::Once);
+    fs::write(rig.workspace.join("notes.md"), "我自己写的").unwrap();
+    let (result, _) = run(&rig, "整理笔记");
+    result.unwrap();
+    assert_eq!(fs::read_to_string(rig.workspace.join("notes.md")).unwrap(), "小伴改过");
+    let runs = checkpoints::list(&rig.dirs.checkpoints(), "s1");
+    assert_eq!(runs.len(), 1);
+    let report = checkpoints::undo(&rig.dirs.checkpoints(), "s1", &runs[0].run_id).unwrap();
+    assert_eq!((report.restored, report.removed), (vec!["notes.md".to_string()], vec!["new/plan.md".to_string()]));
+    assert_eq!(fs::read_to_string(rig.workspace.join("notes.md")).unwrap(), "我自己写的");
+    assert!(!rig.workspace.join("new/plan.md").exists());
+}

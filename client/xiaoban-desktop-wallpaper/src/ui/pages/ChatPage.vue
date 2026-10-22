@@ -239,6 +239,11 @@ watch([() => props.store.creationDraft, () => chat.configured], ([text, configur
   useExample(text);
   props.store.creationDraft = null;
 }, { immediate: true });
+const confirmingUndo = ref('');
+async function undoRun(itemId: string) {
+  confirmingUndo.value = '';
+  if (view.value) await chat.undoRun(view.value.id, itemId);
+}
 const continueAnswer = () => { asr?.deactivate(); stick.value = true; void chat.send(CONTINUE_TEXT); };
 
 const choose = (id: string | null) => { attachmentVersion++; attachments.value = []; asr?.deactivate(); confirmingId.value = ''; void chat.select(id); };
@@ -471,6 +476,14 @@ async function openLink(href: string) {
                 <button v-if="item.canSwitchModel && !view.running" type="button" class="link" @click="chooseModel(!!item.canRetry)">切换模型</button>
                 <button v-if="item.canRetry && !view.running" type="button" class="link" @click="chat.retry()">重试</button>
                 <button v-if="item.canContinue && !view.running" type="button" class="link" data-testid="chat-continue" @click="continueAnswer">继续</button>
+                <template v-if="item.undoRun && !view.running">
+                  <button v-if="confirmingUndo !== item.id" type="button" class="link" data-testid="chat-undo-run" @click="confirmingUndo = item.id">撤销这些改动</button>
+                  <template v-else>
+                    <span class="undo-warning">这些文件会回到这轮回答之前的样子，之后对它们的修改也会被覆盖。</span>
+                    <button type="button" class="link" data-testid="chat-undo-confirm" @click="undoRun(item.id)">确认撤销</button>
+                    <button type="button" class="link" @click="confirmingUndo = ''">取消</button>
+                  </template>
+                </template>
               </div>
             </template>
             <ChatActivity v-if="block.calls.length && !chat.hideToolCalls" :calls="block.calls" :active="view.running && block.id === blocks.at(-1)?.id" :waiting="waiting && block.id === blocks.at(-1)?.id" :status="block.id === blocks.at(-1)?.id ? statusLine : ''" />
@@ -620,6 +633,8 @@ async function openLink(href: string) {
 @keyframes blink{to{visibility:hidden}}
 .preview{margin:4px 0 0;padding:9px 11px;background:var(--ui-surface-alt);border-radius:8px;overflow:auto;max-height:260px;font-size:12px;line-height:1.6;white-space:pre-wrap;overflow-wrap:anywhere;word-break:break-word;font-family:ui-monospace,Menlo,Consolas,monospace}
 .notice{margin-left:40px;font-size:13px;padding:8px 12px;border-radius:10px;background:var(--ui-surface-alt);color:var(--ui-text-secondary);display:flex;gap:12px;align-items:center}
+.notice{flex-wrap:wrap}
+.undo-warning{color:var(--ui-text-secondary)}
 .notice.error{background:var(--ui-primary-soft);color:var(--ui-primary-pressed)}
 .notice.warning{background:rgba(245,158,11,.14)}
 .notice details{flex:1;min-width:0}

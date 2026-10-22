@@ -803,7 +803,7 @@ fn main() {
             ai_config::save_ai_provider, ai_config::switch_ai_provider, ai_config::delete_ai_provider, ai_config::save_ai_preferences, ai_config::set_context_tokens, request_system_permissions,
             chat::chat_overview, chat::chat_load_session, chat::chat_new_session, chat::chat_send, chat::chat_cancel, chat::chat_delete_session, chat::chat_run_history, chat::chat_verify_file_outcome, chat::chat_reflect_run, chat::chat_review_experience,
             chat::chat_context, chat::chat_compact, chat::chat_rename_session, chat::chat_move_session, chat::chat_create_group, chat::chat_rename_group, chat::chat_delete_group,
-            chat::chat_answer_approval, chat::chat_answer_question, chat::chat_set_permission_mode,
+            chat::chat_answer_approval, chat::chat_answer_question, chat::chat_set_permission_mode, chat::chat_checkpoints, chat::chat_undo_run,
             chat::store::ai_store_installed, chat::store::ai_store_browse, chat::store::ai_store_skill_categories, chat::store::ai_store_inspect, chat::store::ai_store_install, chat::store::ai_store_uninstall,
             chat::store::ai_store_catalog, chat::store::ai_store_experts_installed, chat::store::ai_store_expert_review, chat::store::ai_store_expert_install, chat::store::ai_store_expert_remove, chat::store::ai_store_connector_detail, chat::store::ai_store_connector_status, chat::store::ai_store_connector_connect, chat::store::ai_store_connector_disconnect, chat::store::ai_store_connector_reconnect,
             chat::store::ai_store_connector_auth_status, chat::store::ai_store_connector_auth_cancel,

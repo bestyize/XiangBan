@@ -40,8 +40,8 @@ describe('starting up', () => {
     const h = harness({ chat_overview: () => overview({ sessions: [summary('s1', '第一个')], workspace: '/Users/me/work', configured: true }) });
     await Promise.all([h.store.init(), h.store.init()]);
     await h.store.init();
-    expect([...h.handlers.keys()].sort()).toEqual(['chat-approval', 'chat-compacting', 'chat-event', 'chat-hide-tool-calls-changed', 'chat-permission-mode-changed', 'chat-question', 'chat-sessions-changed']);
-    expect(h.deps.listen).toHaveBeenCalledTimes(7);
+    expect([...h.handlers.keys()].sort()).toEqual(['chat-approval', 'chat-checkpoint', 'chat-compacting', 'chat-event', 'chat-hide-tool-calls-changed', 'chat-permission-mode-changed', 'chat-question', 'chat-sessions-changed']);
+    expect(h.deps.listen).toHaveBeenCalledTimes(8);
     expect(h.commands()).toEqual(['chat_overview']);
     expect(h.store).toMatchObject({ ready: true, configured: true, workspace: '/Users/me/work' });
     expect(h.store.sessions.map(s => s.title)).toEqual(['第一个']);
@@ -435,7 +435,7 @@ describe('shutting down', () => {
     const h = harness();
     await h.store.init();
     h.store.dispose();
-    expect(h.stopped.sort()).toEqual(['chat-approval', 'chat-compacting', 'chat-event', 'chat-hide-tool-calls-changed', 'chat-permission-mode-changed', 'chat-question', 'chat-sessions-changed']);
+    expect(h.stopped.sort()).toEqual(['chat-approval', 'chat-checkpoint', 'chat-compacting', 'chat-event', 'chat-hide-tool-calls-changed', 'chat-permission-mode-changed', 'chat-question', 'chat-sessions-changed']);
     h.events('s1', { type: 'text_delta', text: 'late' });
     h.emit('chat-approval', approval('a1'));
     expect(h.store.views.s1).toBeUndefined();
@@ -446,7 +446,7 @@ describe('shutting down', () => {
     const starting = h.store.init();
     h.store.dispose();
     await starting;
-    expect(h.stopped.sort()).toEqual(['chat-approval', 'chat-compacting', 'chat-event', 'chat-hide-tool-calls-changed', 'chat-permission-mode-changed', 'chat-question', 'chat-sessions-changed']);
+    expect(h.stopped.sort()).toEqual(['chat-approval', 'chat-checkpoint', 'chat-compacting', 'chat-event', 'chat-hide-tool-calls-changed', 'chat-permission-mode-changed', 'chat-question', 'chat-sessions-changed']);
     expect(h.store.sessions).toEqual([]);
   });
 });
@@ -739,4 +739,37 @@ it('sends a named document with an image and retains the attachment card', async
   expect(await h.store.send('',[doc,'data:image/png;base64,AA=='])).toBe(true);
   expect(h.calls.find(([name])=>name==='chat_send')?.[1]).toEqual({sessionId:'s1',text:'',images:['data:image/png;base64,AA=='],attachments:[{name:doc.name,dataUrl:doc.dataUrl}]});
   expect(h.store.current()?.items[0]).toMatchObject({kind:'user',files:[{name:'预算.csv',size:9}]});
+});
+
+describe('undoing an answer\'s file changes', () => {
+  it('offers undo after an answer changed files, puts them back once, and reports what could not be restored', async () => {
+    let report = { restored: ['notes.md'], removed: ['new.md'], failed: [] as [string, string][] };
+    const h = harness({ chat_undo_run: () => report });
+    await h.store.init();
+    h.emit('chat-checkpoint', { session: 's1', runId: 'r1', files: ['notes.md', 'new.md'] });
+    const notice = h.store.views.s1.items.at(-1)!;
+    expect(notice).toMatchObject({ kind: 'notice', undoRun: 'r1', details: 'notes.md\nnew.md' });
+    expect(await h.store.undoRun('s1', notice.id)).toBe(true);
+    expect(h.calls.at(-1)).toEqual(['chat_undo_run', { sessionId: 's1', runId: 'r1' }]);
+    expect(notice).toMatchObject({ undoRun: undefined, text: '这轮回答的 2 个文件改动已撤销。' });
+    expect(await h.store.undoRun('s1', notice.id), 'undone once').toBe(false);
+
+    report = { restored: [], removed: [], failed: [['big.bin', '文件太大，当时没有备份']] };
+    h.emit('chat-checkpoint', { session: 's1', runId: 'r2', files: ['big.bin'] });
+    const second = h.store.views.s1.items.at(-1)!;
+    await h.store.undoRun('s1', second.id);
+    expect(second).toMatchObject({ tone: 'warning', details: 'big.bin：文件太大，当时没有备份' });
+  });
+
+  it('ignores an answer that changed nothing and keeps the button when the host refuses', async () => {
+    const h = harness({ chat_undo_run: () => { throw '这个对话还在回答'; } });
+    await h.store.init();
+    h.emit('chat-checkpoint', { session: 's1', runId: 'r0', files: [] });
+    expect(h.store.views.s1?.items ?? []).toHaveLength(0);
+    h.emit('chat-checkpoint', { session: 's1', runId: 'r1', files: ['a.txt'] });
+    const notice = h.store.views.s1.items.at(-1)!;
+    expect(await h.store.undoRun('s1', notice.id)).toBe(false);
+    expect(notice).toMatchObject({ undoRun: 'r1' });
+    expect(h.deps.notify).toHaveBeenCalledWith('这个对话还在回答', 'error');
+  });
 });

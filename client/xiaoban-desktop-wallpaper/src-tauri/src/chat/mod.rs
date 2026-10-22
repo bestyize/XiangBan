@@ -4,6 +4,7 @@
 //! window only (one `emit_filter`): wallpaper pages run content from outside and must not see a chat.
 
 mod broker;
+mod checkpoints;
 mod community;
 mod compact;
 mod danger;
@@ -260,6 +261,7 @@ impl Dirs {
     fn spill(&self) -> PathBuf { self.chat.join("spill") }
     fn memory(&self) -> PathBuf { self.chat.join("memory") }
     fn skills(&self) -> PathBuf { self.chat.join("skills") }
+    fn checkpoints(&self) -> PathBuf { self.chat.join("checkpoints") }
 }
 
 pub(crate) fn provider(config: &AiConfig) -> Result<Arc<dyn ModelProvider>, String> {
@@ -406,6 +408,8 @@ fn assemble_with_connectors(parts: Parts<'_>, attachments: Vec<Attachment>, conn
         .tool(learning::Recall::new(dirs.learning_db()))
         .middleware(discovery.acquisition_policy())
         .middleware(permission)
+        // After the permission check, so a refused write leaves nothing behind.
+        .middleware(checkpoints::Checkpoints::new(dirs.checkpoints(), workspace))
         // Before spilling, so it compares real outputs rather than previews that name a fresh file each time.
         // Polling a process's output is legitimate repetition; the per-answer call budget still bounds it.
         .middleware(RepeatGuard::new().ignore_tool("process_read"))
@@ -745,6 +749,11 @@ pub fn chat_send(app: tauri::AppHandle, window: tauri::WebviewWindow, session_id
                         crate::proactivity::observe_task_outcome(&sender, &outcome);
                         emit(&sender, "chat-task-outcome", json!({ "session": id, "outcome": outcome }));
                     }
+                    // Offer "撤销这轮的文件改动" when this answer changed files with the file tools.
+                    if let Some(manifest) = checkpoints::list(&dirs.checkpoints(), &id).into_iter().find(|m| m.run_id == run) {
+                        let files: Vec<&str> = manifest.entries.iter().map(|e| e.path.as_str()).collect();
+                        emit(&sender, "chat-checkpoint", json!({ "session": id, "runId": run, "files": files }));
+                    }
                 }
                 executed
             }
@@ -933,6 +942,7 @@ pub fn chat_delete_session(app: tauri::AppHandle, window: tauri::WebviewWindow, 
         }
     }
     let _ = fs::remove_dir_all(Dirs::of(&app)?.outcomes().join(&session_id));
+    let _ = fs::remove_dir_all(Dirs::of(&app)?.checkpoints().join(&session_id));
     if let Some(manager) = lock(&state.processes).as_ref() {
         let _ = manager.forget_session(&session_id);
     }
@@ -1130,6 +1140,25 @@ pub fn chat_delete_group(app: tauri::AppHandle, window: tauri::WebviewWindow, gr
     chat_window(&window)?;
     checked_group_id(&group_id)?;
     mutate(&app, |index| index.delete_group(&group_id).map(|()| index.library()))?
+}
+
+/// The answers of a conversation whose file changes can be undone, newest first.
+#[tauri::command]
+pub fn chat_checkpoints(app: tauri::AppHandle, window: tauri::WebviewWindow, session_id: String) -> Result<Value, String> {
+    chat_window(&window)?;
+    checked_session_id(&session_id)?;
+    Ok(json!(checkpoints::list(&Dirs::of(&app)?.checkpoints(), &session_id)))
+}
+
+/// Puts back the files one answer changed with the file tools. Not while the conversation is answering.
+#[tauri::command]
+pub fn chat_undo_run(app: tauri::AppHandle, window: tauri::WebviewWindow, session_id: String, run_id: String) -> Result<Value, String> {
+    chat_window(&window)?;
+    checked_session_id(&session_id)?;
+    if lock(&app.state::<ChatState>().runs).contains_key(&session_id) {
+        return Err("这个对话还在回答，请等它结束或先停止再撤销".into());
+    }
+    Ok(json!(checkpoints::undo(&Dirs::of(&app)?.checkpoints(), &session_id, &run_id)?))
 }
 
 #[tauri::command]

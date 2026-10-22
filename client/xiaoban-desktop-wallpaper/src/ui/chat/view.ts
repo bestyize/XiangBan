@@ -16,6 +16,11 @@ export function summaryNotice(view: SessionView, summary: string): ChatItem {
   return { kind: 'notice', id: nextId(view), tone: 'info', text: '较早的对话已压缩成摘要，小伴之后会参考摘要和最近的内容。', details: summary, detailsLabel: '查看摘要' };
 }
 
+/** Shown after an answer that changed files with the file tools; its button puts them back. */
+export function checkpointNotice(view: SessionView, runId: string, files: string[]): ChatItem {
+  return { kind: 'notice', id: nextId(view), tone: 'info', text: `这轮回答修改了 ${files.length} 个文件，可以撤销。`, details: files.join('\n'), detailsLabel: '查看文件', undoRun: runId };
+}
+
 /** The conversation as it was saved: tool results are put onto the calls they answer. */
 export function itemsFromHistory(view: SessionView, messages: WireMessage[]): ChatItem[] {
   const items: ChatItem[] = [];
