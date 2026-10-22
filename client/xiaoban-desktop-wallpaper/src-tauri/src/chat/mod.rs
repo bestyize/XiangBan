@@ -30,6 +30,7 @@ use agent_kernel::model::TokenBudget;
 use agent_kernel::skills::Skills;
 use agent_kernel::{Agent, Approval, ApprovalRequest, ContextTrim, ContinueGuard, JsonlStore, RepeatGuard, Message, ModelProvider, Part, Permission, PermissionMode, Risk, RunOptions, RunEventBody, SessionStore, SpillOutput, ToolCtx};
 use agent_kernel::journal::JsonlRunLog;
+use agent_kernel::process::ProcessManager;
 use agent_learning::LearningDb;
 use agent_skill_discovery::SkillDiscovery;
 use broker::Broker;
@@ -132,6 +133,9 @@ pub struct ChatState {
     /// Actual schemas from the latest registration, keyed by whether native GUI tools are enabled.
     tool_tokens: Mutex<HashMap<bool, usize>>,
     connectors: Mutex<Option<Arc<agent_connector_tools::ConnectorManager>>>,
+    /// Background processes (dev servers, long builds) for the current working folder; kept across answers so a
+    /// `keep_alive` process outlives the answer that started it.
+    processes: Mutex<Option<Arc<ProcessManager>>>,
 }
 
 impl ChatState {
@@ -153,6 +157,7 @@ impl ChatState {
             auto_compact: compact::AutoCooldown::default(),
             tool_tokens: Mutex::new(HashMap::new()),
             connectors: Mutex::new(None),
+            processes: Mutex::new(None),
         }
     }
 }
@@ -343,6 +348,8 @@ struct Parts<'a> {
     spawn_computer_use: &'a dyn Fn() -> Result<Arc<agent_kernel::mcp::McpClient>, agent_kernel::HarnessError>,
     /// Estimated tokens kept in a request before old tool output and old turns are dropped.
     budget: TokenBudget,
+    /// Background process tools; `None` in tests that do not need them.
+    processes: Option<Arc<ProcessManager>>,
 }
 
 /// Puts the kernel together: the model, the tools the assistant may use, and the rules around them.
@@ -355,7 +362,7 @@ fn assemble_with_files(parts: Parts<'_>, attachments: Vec<Attachment>) -> Result
     assemble_with_connectors(parts, attachments, Vec::new())
 }
 fn assemble_with_connectors(parts: Parts<'_>, attachments: Vec<Attachment>, connector_tools: Vec<Arc<dyn agent_kernel::Tool>>) -> Result<Agent, String> {
-    let Parts { provider, dirs, workspace, permission, todo, ask, desktop, utc_offset_minutes, open_computer_use, spawn_computer_use, budget } = parts;
+    let Parts { provider, dirs, workspace, permission, todo, ask, desktop, utc_offset_minutes, open_computer_use, spawn_computer_use, budget, processes } = parts;
     for dir in [dirs.sessions(), dirs.spill(), dirs.memory(), dirs.skills()] {
         fs::create_dir_all(&dir).map_err(|e| format!("无法创建 {}：{e}", dir.display()))?;
     }
@@ -394,7 +401,8 @@ fn assemble_with_connectors(parts: Parts<'_>, attachments: Vec<Attachment>, conn
         .middleware(discovery.acquisition_policy())
         .middleware(permission)
         // Before spilling, so it compares real outputs rather than previews that name a fresh file each time.
-        .middleware(RepeatGuard::new())
+        // Polling a process's output is legitimate repetition; the per-answer call budget still bounds it.
+        .middleware(RepeatGuard::new().ignore_tool("process_read"))
         .middleware(SpillOutput::new(dirs.spill()))
         .middleware(AttachmentContext::new(attachments))
         .middleware(ContextTrim::new(budget.context_limit).reserve_output(budget.trim_headroom))
@@ -414,6 +422,7 @@ fn assemble_with_connectors(parts: Parts<'_>, attachments: Vec<Attachment>, conn
         }
     }
     for tool in connector_tools { builder = builder.tool_arc(tool); }
+    for tool in processes.iter().flat_map(|manager| manager.tools()) { builder = builder.tool_arc(tool); }
     builder.build().map_err(|e| e.to_string())
 }
 
@@ -429,6 +438,23 @@ fn connector_manager(app: &tauri::AppHandle) -> Result<Arc<agent_connector_tools
 }
 pub fn shutdown_connectors(app:&tauri::AppHandle){
     if let Some(manager)=lock(&app.state::<ChatState>().connectors).as_ref(){manager.shutdown();}
+    if let Some(manager)=lock(&app.state::<ChatState>().processes).take(){let _=manager.shutdown();}
+}
+
+/// The process manager for `workspace`. A different folder than last time stops the old folder's processes first,
+/// so nothing keeps running in a folder the assistant no longer works in.
+fn process_manager(app: &tauri::AppHandle, workspace: &Path) -> Result<Arc<ProcessManager>, String> {
+    let state = app.state::<ChatState>();
+    let mut slot = lock(&state.processes);
+    if let Some(manager) = slot.as_ref() {
+        if manager.workspace() == workspace.canonicalize().unwrap_or_else(|_| workspace.to_path_buf()) {
+            return Ok(manager.clone());
+        }
+        let _ = manager.shutdown();
+    }
+    let manager = Arc::new(ProcessManager::new(workspace)?);
+    *slot = Some(manager.clone());
+    Ok(manager)
 }
 
 fn build_agent(app: &tauri::AppHandle, config: &AiConfig, key_source: Option<KeySource>, workspace: &Path, attachments: Vec<Attachment>) -> Result<Agent, String> {
@@ -459,6 +485,7 @@ fn build_agent(app: &tauri::AppHandle, config: &AiConfig, key_source: Option<Key
         open_computer_use: config.open_computer_use,
         spawn_computer_use: &spawn_computer_use,
         budget: config.token_budget(),
+        processes: Some(process_manager(app, workspace)?),
     }, attachments, connector_manager(app).map(|m|m.tools()).unwrap_or_default())?;
     lock(&state.tool_tokens).insert(config.open_computer_use, agent_kernel::estimate_tool_tokens(&agent.tool_schemas()));
     Ok(agent)
@@ -881,6 +908,9 @@ pub fn chat_delete_session(app: tauri::AppHandle, window: tauri::WebviewWindow, 
         }
     }
     let _ = fs::remove_dir_all(Dirs::of(&app)?.outcomes().join(&session_id));
+    if let Some(manager) = lock(&state.processes).as_ref() {
+        let _ = manager.forget_session(&session_id);
+    }
     state.permission.forget_session(&session_id);
     state.todo.clear_session(&session_id);
     state.auto_compact.forget(&session_id);

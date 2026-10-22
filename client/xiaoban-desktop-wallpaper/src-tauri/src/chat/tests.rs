@@ -183,6 +183,7 @@ fn build_rig(tag: &str, steps: Vec<Step>, answer: Approval, computer_use: bool) 
         open_computer_use: computer_use,
         spawn_computer_use: &no_computer_use,
         budget: TokenBudget::resolve(ai_config::DEFAULT_CONTEXT_TOKENS, None),
+        processes: None,
     })
     .expect("the tool set assembles");
     Rig { _dir: dir, workspace, dirs, desktop, asked, provider, agent, todo }
@@ -385,6 +386,7 @@ fn the_folder_for_saved_output_can_be_read_but_not_written() {
             open_computer_use: false,
             spawn_computer_use: &no_computer_use,
         budget: TokenBudget::resolve(ai_config::DEFAULT_CONTEXT_TOKENS, None),
+        processes: None,
         })
         .unwrap()
     };
@@ -567,6 +569,7 @@ fn in_auto_mode_all_write_tools_run_without_asking() {
         open_computer_use: false,
         spawn_computer_use: &no_computer_use,
         budget: TokenBudget::resolve(ai_config::DEFAULT_CONTEXT_TOKENS, None),
+        processes: None,
     }).unwrap();
 
     let mut events = Vec::new();
@@ -608,6 +611,7 @@ fn trusted_rig(tag: &str, steps: Vec<Step>) -> (Rig, Arc<Mutex<Vec<(String, Opti
         open_computer_use: false,
         spawn_computer_use: &no_computer_use,
         budget: TokenBudget::resolve(ai_config::DEFAULT_CONTEXT_TOKENS, None),
+        processes: None,
     })
     .unwrap();
     let rig = Rig { _dir: dir, workspace, dirs, desktop, asked: Arc::default(), provider, agent, todo };
@@ -827,6 +831,7 @@ fn the_context_size_from_settings_is_what_the_agent_trims_to() {
             open_computer_use: false,
             spawn_computer_use: &no_computer_use,
         budget: TokenBudget::resolve(32_000, None),
+        processes: None,
         })
         .unwrap();
         let file = JsonlStore::new(dirs.sessions());
@@ -918,4 +923,43 @@ fn automatic_output_limits_are_protocol_specific_and_independent_of_context_head
     let body = agent_kernel::provider::wire::build_request_body(&provider_profile(&config), &request);
     assert!(body.get("max_tokens").is_none());
     assert!(body.get("max_completion_tokens").is_none());
+}
+
+#[test]
+fn background_process_tools_are_registered_and_asked_like_the_shell() {
+    let dir = TempDir::new("process-tools");
+    let workspace = dir.path("work");
+    fs::create_dir_all(&workspace).unwrap();
+    let dirs = Dirs { chat: dir.path("chat") };
+    let manager = Arc::new(ProcessManager::new(&workspace).unwrap());
+    let asked: Arc<Mutex<Vec<String>>> = Arc::default();
+    let log = asked.clone();
+    let workspace_slot = Arc::new(Mutex::new(Some(workspace.clone())));
+    let permission = Arc::new(permission_with_danger_check(PermissionMode::Auto, move |request: &ApprovalRequest<'_>| {
+        lock(&log).push(request.tool.to_string());
+        Approval::Deny
+    }, workspace_slot));
+    let steps = vec![call("1", "process_start", json!({"command": "sudo true"})), Step::text("好")];
+    let agent = assemble(Parts {
+        provider: Arc::new(ScriptedProvider::new(steps)),
+        dirs: &dirs,
+        workspace: &workspace,
+        permission,
+        todo: Arc::new(Todo::new()),
+        ask: AskUser::new(|_, _, _| None),
+        desktop: Arc::new(FakeDesktop::default()),
+        utc_offset_minutes: 0,
+        open_computer_use: false,
+        spawn_computer_use: &no_computer_use,
+        budget: TokenBudget::resolve(ai_config::DEFAULT_CONTEXT_TOKENS, None),
+        processes: Some(manager.clone()),
+    })
+    .unwrap();
+    let names: Vec<String> = agent.tool_schemas().iter().map(|t| t.name.clone()).collect();
+    for tool in ["process_start", "process_read", "process_write", "process_stop"] {
+        assert!(names.contains(&tool.to_string()), "{tool} missing from {names:?}");
+    }
+    agent.run("s1", "go", &mut |_| {}, &Arc::new(AtomicBool::new(false))).unwrap();
+    assert_eq!(*lock(&asked), vec!["process_start".to_string()], "full trust still asks before a flagged background command");
+    manager.shutdown().unwrap();
 }
