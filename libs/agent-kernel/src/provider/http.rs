@@ -22,6 +22,11 @@ pub(crate) struct Call {
 pub(crate) trait Decoder {
     /// Handles one event payload. `Ok(true)` means the terminal event arrived and reading can stop.
     fn push(&mut self, payload: &str, on_text: &mut dyn FnMut(&str)) -> Result<bool, HarnessError>;
+    /// Only protocol-supplied displayable text goes to this independent channel.
+    fn push_with_reasoning(
+        &mut self, payload: &str, on_text: &mut dyn FnMut(&str),
+        _on_reasoning: &mut dyn FnMut(crate::ReasoningKind, &str),
+    ) -> Result<bool, HarnessError> { self.push(payload, on_text) }
     /// Whether the stream may end here without a terminal event and still count as complete.
     fn complete(&self) -> bool;
 }
@@ -54,6 +59,17 @@ pub(crate) fn post_stream(
     call: Call,
     decoder: &mut dyn Decoder,
     on_text: &mut dyn FnMut(&str),
+    cancel: &AtomicBool,
+) -> Result<(), HarnessError> {
+    post_stream_with_reasoning(client, call, decoder, on_text, &mut |_, _| {}, cancel)
+}
+
+pub(crate) fn post_stream_with_reasoning(
+    client: &Client,
+    call: Call,
+    decoder: &mut dyn Decoder,
+    on_text: &mut dyn FnMut(&str),
+    on_reasoning: &mut dyn FnMut(crate::ReasoningKind, &str),
     cancel: &AtomicBool,
 ) -> Result<(), HarnessError> {
     let mut builder = client.post(call.url);
@@ -121,7 +137,7 @@ pub(crate) fn post_stream(
             Err(RecvTimeoutError::Disconnected) => (parser.flush(), true),
         };
         if let Some(payload) = event {
-            if decoder.push(&payload, on_text)? {
+            if decoder.push_with_reasoning(&payload, on_text, on_reasoning)? {
                 return Ok(());
             }
         }
