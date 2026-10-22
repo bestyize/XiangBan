@@ -875,9 +875,12 @@ pub fn chat_delete_session(app: tauri::AppHandle, session_id: String) -> Result<
         return Err("对话编号不对".into());
     }
     let state = app.state::<ChatState>();
-    if lock(&state.runs).contains_key(&session_id) || SessionLease::held(Dirs::of(&app)?.leases(), &session_id)? {
-        return Err("这个对话正在其他实例或当前窗口中运行，请先停止再删除".into());
+    if lock(&state.runs).contains_key(&session_id) {
+        return Err("这个对话正在当前窗口运行，请先停止再删除".into());
     }
+    // Keep ownership across the *entire* destructive deletion, not merely a
+    // probe followed by a time-of-check/time-of-use race with another host.
+    let _lease = SessionLease::acquire(Dirs::of(&app)?.leases(), &session_id)?;
     JsonlStore::new(Dirs::of(&app)?.sessions()).remove(&session_id).map_err(|e| e.to_string())?;
     AttachmentStore::new(Dirs::of(&app)?.chat.join("attachments")).remove_session(&session_id)?;
     let run_dir = Dirs::of(&app)?.runs().join(&session_id);
