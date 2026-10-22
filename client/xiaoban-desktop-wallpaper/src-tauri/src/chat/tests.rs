@@ -185,6 +185,7 @@ fn build_rig(tag: &str, steps: Vec<Step>, answer: Approval, computer_use: bool) 
         budget: TokenBudget::resolve(ai_config::DEFAULT_CONTEXT_TOKENS, None),
         processes: None,
         mid_run: None,
+        research_events: None,
     })
     .expect("the tool set assembles");
     Rig { _dir: dir, workspace, dirs, desktop, asked, provider, agent, todo }
@@ -389,6 +390,7 @@ fn the_folder_for_saved_output_can_be_read_but_not_written() {
         budget: TokenBudget::resolve(ai_config::DEFAULT_CONTEXT_TOKENS, None),
         processes: None,
         mid_run: None,
+        research_events: None,
         })
         .unwrap()
     };
@@ -573,6 +575,7 @@ fn in_auto_mode_all_write_tools_run_without_asking() {
         budget: TokenBudget::resolve(ai_config::DEFAULT_CONTEXT_TOKENS, None),
         processes: None,
         mid_run: None,
+        research_events: None,
     }).unwrap();
 
     let mut events = Vec::new();
@@ -616,6 +619,7 @@ fn trusted_rig(tag: &str, steps: Vec<Step>) -> (Rig, Arc<Mutex<Vec<(String, Opti
         budget: TokenBudget::resolve(ai_config::DEFAULT_CONTEXT_TOKENS, None),
         processes: None,
         mid_run: None,
+        research_events: None,
     })
     .unwrap();
     let rig = Rig { _dir: dir, workspace, dirs, desktop, asked: Arc::default(), provider, agent, todo };
@@ -837,6 +841,7 @@ fn the_context_size_from_settings_is_what_the_agent_trims_to() {
         budget: TokenBudget::resolve(32_000, None),
         processes: None,
         mid_run: None,
+        research_events: None,
         })
         .unwrap();
         let file = JsonlStore::new(dirs.sessions());
@@ -959,6 +964,7 @@ fn background_process_tools_are_registered_and_asked_like_the_shell() {
         budget: TokenBudget::resolve(ai_config::DEFAULT_CONTEXT_TOKENS, None),
         processes: Some(manager.clone()),
         mid_run: None,
+        research_events: None,
     })
     .unwrap();
     let names: Vec<String> = agent.tool_schemas().iter().map(|t| t.name.clone()).collect();
@@ -1028,4 +1034,24 @@ fn research_runs_a_read_only_helper_and_returns_only_its_findings() {
     assert_eq!(runs.len(), 1, "only the helper's run is journaled here: the main run in this test is not observed");
     let text = fs::read_to_string(runs[0].path()).unwrap();
     assert!(text.contains("\"parent_run_id\"") && text.contains("s1#research-") && text.contains("read_file"), "{text}");
+}
+
+/// The app's command filter in `main.rs` decides per window before any command runs. Conversation commands, including
+/// the ones that change permissions, undo files or edit hooks, reach the control window only; the floating assistant
+/// gets its short list; wallpaper, widget, pet and game windows get none.
+#[test]
+fn the_window_filter_keeps_conversation_commands_where_they_belong() {
+    let decide = |label: &str, command: &str| crate::float_assistant::permitted(label, command).unwrap_or_else(|| crate::content::permitted(label, command));
+    for command in ["chat_send", "chat_set_permission_mode", "chat_undo_run", "chat_save_hooks", "chat_revoke_grant", "chat_set_sandbox_network", "chat_agent_settings", "chat_delete_session"] {
+        assert!(decide("control", command), "{command} in the control window");
+        for label in ["widget-1", "pet-1", "games", "deskgame", "effects", "media-a", "care", "ritual"] {
+            assert!(!decide(label, command), "{command} must not reach {label}");
+        }
+    }
+    for command in ["chat_send", "chat_cancel", "chat_answer_approval", "chat_load_session"] {
+        assert!(decide("assistant", command), "{command} in the floating assistant");
+    }
+    for command in ["chat_set_permission_mode", "chat_undo_run", "chat_save_hooks", "chat_revoke_grant", "chat_delete_session"] {
+        assert!(!decide("assistant", command), "{command} is for the control window only");
+    }
 }

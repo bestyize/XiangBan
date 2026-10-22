@@ -71,6 +71,18 @@ enum Outcome {
     CouldNotRun(String),
 }
 
+/// Checks hooks configuration text before it is saved; `Ok` with the number of hooks.
+pub fn validate(text: &str) -> Result<usize, String> {
+    if text.trim().is_empty() {
+        return Ok(0);
+    }
+    let config: Config = serde_json::from_str(text).map_err(|e| format!("不是有效的 hooks 配置：{e}"))?;
+    if let Some(hook) = config.hooks.iter().find(|h| h.command.trim().is_empty()) {
+        return Err(format!("有一条 {:?} hook 没有填写 command", hook.event));
+    }
+    Ok(config.hooks.len())
+}
+
 pub struct Hooks {
     file: PathBuf,
     workspace: PathBuf,

@@ -159,6 +159,16 @@ fn always_can_remember_one_kind_of_command() {
     assert_eq!(runs.load(Ordering::SeqCst), 6);
 }
 
+#[test]
+fn saved_grants_can_be_restored_and_revoked() {
+    let (fx, p) = setup(PermissionMode::Ask, vec![Approval::Deny, Approval::Deny], |p| p);
+    p.grant("s1", "writer", None);
+    assert_eq!(run_calls(&fx, &p, "s1", &["writer"]), vec!["ran"], "a restored grant skips the question");
+    assert!(run_calls(&fx, &p, "s2", &["writer"])[0].contains("denied"), "only in its own session");
+    p.revoke("s1", "writer", None);
+    assert!(run_calls(&fx, &p, "s1", &["writer"])[0].contains("denied"), "asked again after revoking");
+}
+
 fn net_tool(name: &str, risk: Risk, untrusted: bool, always_ask: bool, runs: &Arc<AtomicUsize>) -> FnTool {
     let mut s = spec(name).risk(risk);
     if untrusted {

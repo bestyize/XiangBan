@@ -202,8 +202,7 @@ impl ProcessManager {
         };
         #[cfg(windows)]
         let mut cmd = {
-            crate::sandbox::refuse_on_windows(policy.as_ref())?;
-            let mut cmd = crate::child_env::windows_shell(command);
+            let mut cmd = crate::sandbox::windows_shell(command, policy.as_ref())?;
             crate::child_env::no_window(&mut cmd);
             cmd
         };
@@ -212,6 +211,8 @@ impl ProcessManager {
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
         crate::child_env::apply(&mut cmd, &self.config.inherited_env);
+        #[cfg(windows)]
+        crate::sandbox::windows_launcher_env(&mut cmd, command, policy.as_ref());
         cmd.envs(self.config.env.iter().map(|(k, v)| (k, v)));
         let mut owned = ManagedChild::spawn(&mut cmd)?;
         let id = crate::runtime::new_id("p");

@@ -19,6 +19,8 @@ stdio = []
 mcp = ["dep:base64"]
 journal = []
 process = ["dep:libc", "dep:windows-sys"]
+# The Windows low-integrity launcher for sandboxed commands (see `sandbox`).
+sandbox = ["dep:windows-sys"]
 
 [dependencies]
 encoding_rs = { version = "0.8", optional = true }
@@ -33,7 +35,7 @@ reqwest = { version = "0.13", default-features = false, features = ["blocking"],
 libc = { version = "0.2", optional = true }
 
 [target.'cfg(windows)'.dependencies]
-windows-sys = { version = "0.61", optional = true, features = ["Win32_Foundation", "Win32_Security", "Win32_System_JobObjects", "Win32_System_Threading"] }
+windows-sys = { version = "0.61", optional = true, features = ["Win32_Foundation", "Win32_Security", "Win32_Security_Authorization", "Win32_System_Console", "Win32_System_JobObjects", "Win32_System_Threading"] }
 
 [profile.dev]
 debug = false

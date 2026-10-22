@@ -1,11 +1,13 @@
 //! "撤销这轮的文件改动": before an answer first changes a file in the working folder with `write_file` or
 //! `edit_file`, the file as it was is copied aside, so the whole answer's file changes can be put back later.
 //!
-//! Only the file tools are covered. What a shell command or a background process changes is not recorded, the same
-//! limit Claude Code's checkpoints have; the run history still shows those commands.
+//! When the working folder is in a git repository, the first shell command or background process of an answer also
+//! takes a snapshot of the working files (see `git_snapshot`), so what commands changed is put back too. Ignored
+//! files (`node_modules`, build output) are not in it; outside a repository commands are not covered.
 //!
 //! Layout: `chat/checkpoints/<session>/<run>/manifest.json` plus one numbered copy per file that existed before.
 
+use super::git_snapshot;
 use agent_kernel::{Middleware, ToolCall, ToolCtx, ToolGate, ToolSpec};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -42,6 +44,18 @@ pub struct Manifest {
     pub entries: Vec<Entry>,
     #[serde(default)]
     pub undone: bool,
+    /// The working files before the answer's first command, when the folder is in a git repository.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub git: Option<GitSnapshot>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct GitSnapshot {
+    pub root: String,
+    /// The working folder inside the repository, `.` at its root.
+    pub pathspec: String,
+    pub tree: String,
 }
 
 /// What undo did, for the page to report.
@@ -101,11 +115,11 @@ impl Checkpoints {
         (!relative.is_empty() && !relative.split('/').any(|p| p == "..")).then_some((real, relative))
     }
 
-    fn record(&self, session: &str, run_id: &str, args: &Value) -> Result<(), String> {
+    /// Runs `change` on this answer's manifest and saves it when `change` says it changed something.
+    fn with_manifest(&self, session: &str, run_id: &str, change: impl FnOnce(&Path, &mut Manifest) -> Result<bool, String>) -> Result<(), String> {
         if !safe(session) || !safe(run_id) {
             return Ok(());
         }
-        let Some((file, relative)) = self.target(args) else { return Ok(()) };
         let mut current = self.current.lock().unwrap_or_else(|e| e.into_inner());
         let dir = self.root.join(session).join(run_id);
         if current.as_ref().is_none_or(|(d, _)| *d != dir) {
@@ -119,23 +133,49 @@ impl Checkpoints {
             prune(&self.root.join(session), run_id);
         }
         let (dir, manifest) = current.as_mut().expect("set above");
-        if manifest.entries.iter().any(|e| e.path == relative) {
-            return Ok(());
-        }
         fs::create_dir_all(&*dir).map_err(|e| e.to_string())?;
-        let entry = match fs::symlink_metadata(&file) {
+        if change(dir, manifest)? {
+            save(dir, manifest)?;
+        }
+        Ok(())
+    }
+
+    /// The first command of an answer in a git working folder: remember the working files as they are.
+    fn record_git(&self, session: &str, run_id: &str) -> Result<(), String> {
+        let workspace = self.workspace.clone();
+        self.with_manifest(session, run_id, |_, manifest| {
+            if manifest.git.is_some() {
+                return Ok(false);
+            }
+            let Some((root, pathspec)) = git_snapshot::locate(&workspace) else { return Ok(false) };
+            let tree = git_snapshot::snapshot(&root, &pathspec)?;
+            manifest.git = Some(GitSnapshot { root: root.display().to_string(), pathspec, tree });
+            Ok(true)
+        })
+    }
+
+    fn record(&self, session: &str, run_id: &str, args: &Value) -> Result<(), String> {
+        let Some((file, relative)) = self.target(args) else { return Ok(()) };
+        self.with_manifest(session, run_id, |dir, manifest| Self::add_entry(dir, manifest, &file, relative))
+    }
+
+    fn add_entry(dir: &Path, manifest: &mut Manifest, file: &Path, relative: String) -> Result<bool, String> {
+        if manifest.entries.iter().any(|e| e.path == relative) {
+            return Ok(false);
+        }
+        let entry = match fs::symlink_metadata(file) {
             Ok(meta) if meta.is_file() && meta.len() <= MAX_BACKUP_BYTES => {
                 let name = format!("{}.bak", manifest.entries.len());
-                fs::copy(&file, dir.join(&name)).map_err(|e| e.to_string())?;
+                fs::copy(file, dir.join(&name)).map_err(|e| e.to_string())?;
                 Entry { path: relative, created: false, backup: Some(name), skipped: false }
             }
             Ok(meta) if meta.is_file() => Entry { path: relative, created: false, backup: None, skipped: true },
             // A folder or a link: the file tools refuse those, nothing to keep.
-            Ok(_) => return Ok(()),
+            Ok(_) => return Ok(false),
             Err(_) => Entry { path: relative, created: true, backup: None, skipped: false },
         };
         manifest.entries.push(entry);
-        save(dir, manifest)
+        Ok(true)
     }
 }
 
@@ -165,9 +205,15 @@ fn prune(session_dir: &Path, keep: &str) {
 
 impl Middleware for Checkpoints {
     fn before_tool(&self, ctx: &ToolCtx, _call: &ToolCall, args: &Value, spec: &ToolSpec) -> ToolGate {
-        if matches!(spec.name.as_str(), "write_file" | "edit_file") {
-            // A copy that cannot be made must not stop the work; undo then simply has less to put back.
-            let _ = self.record(ctx.session(), ctx.run_id(), args);
+        // A copy or snapshot that cannot be made must not stop the work; undo then simply has less to put back.
+        match spec.name.as_str() {
+            "write_file" | "edit_file" => {
+                let _ = self.record(ctx.session(), ctx.run_id(), args);
+            }
+            "shell" | "process_start" => {
+                let _ = self.record_git(ctx.session(), ctx.run_id());
+            }
+            _ => {}
         }
         ToolGate::Proceed
     }
@@ -179,9 +225,39 @@ pub fn list(root: &Path, session: &str) -> Vec<Manifest> {
         return Vec::new();
     }
     let Ok(read) = fs::read_dir(root.join(session)) else { return Vec::new() };
-    let mut runs: Vec<Manifest> = read.flatten().filter_map(|e| load(&e.path())).filter(|m| !m.entries.is_empty()).collect();
+    let mut runs: Vec<Manifest> = read.flatten().filter_map(|e| load(&e.path())).filter(|m| !m.entries.is_empty() || m.git.is_some()).collect();
     runs.sort_by(|a, b| b.created_at.cmp(&a.created_at));
     runs
+}
+
+/// What commands changed since the snapshot: added, and changed or deleted, relative to the working folder.
+fn git_changes(snapshot: &GitSnapshot) -> Result<(Vec<String>, Vec<String>), String> {
+    let root = PathBuf::from(&snapshot.root);
+    let now = git_snapshot::snapshot(&root, &snapshot.pathspec)?;
+    let (added, changed) = git_snapshot::changes(&root, &snapshot.tree, &now)?;
+    Ok((added, changed))
+}
+
+fn relative_to_workspace(snapshot: &GitSnapshot, path: &str) -> String {
+    match snapshot.pathspec.as_str() {
+        "." => path.to_string(),
+        prefix => path.strip_prefix(&format!("{prefix}/")).unwrap_or(path).to_string(),
+    }
+}
+
+/// Every file an answer changed, for the notice after it: the file tools' and, in a git folder, the commands'.
+pub fn changed_files(manifest: &Manifest) -> Vec<String> {
+    let mut files: Vec<String> = manifest.entries.iter().map(|e| e.path.clone()).collect();
+    if let Some(snapshot) = &manifest.git {
+        if let Ok((added, changed)) = git_changes(snapshot) {
+            for path in added.iter().chain(&changed).map(|p| relative_to_workspace(snapshot, p)) {
+                if !files.contains(&path) {
+                    files.push(path);
+                }
+            }
+        }
+    }
+    files
 }
 
 /// Puts back every file one answer changed. Files are restored even if they were changed again since; the page
@@ -197,6 +273,26 @@ pub fn undo(root: &Path, session: &str, run_id: &str) -> Result<UndoReport, Stri
     }
     let workspace = PathBuf::from(&manifest.workspace);
     let mut report = UndoReport::default();
+    // Commands first: the file tools' copies are older (taken before each first edit) and are written last.
+    if let Some(snapshot) = &manifest.git {
+        let root = PathBuf::from(&snapshot.root);
+        match git_changes(snapshot) {
+            Ok((added, changed)) => {
+                for path in &added {
+                    match fs::remove_file(root.join(path)) {
+                        Ok(()) => report.removed.push(relative_to_workspace(snapshot, path)),
+                        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+                        Err(e) => report.failed.push((relative_to_workspace(snapshot, path), e.to_string())),
+                    }
+                }
+                match git_snapshot::restore(&root, &snapshot.tree, &changed) {
+                    Ok(()) => report.restored.extend(changed.iter().map(|p| relative_to_workspace(snapshot, p))),
+                    Err(e) => report.failed.extend(changed.iter().map(|p| (relative_to_workspace(snapshot, p), e.clone()))),
+                }
+            }
+            Err(e) => report.failed.push(("（命令改动的文件）".into(), format!("无法读取 git 快照：{e}"))),
+        }
+    }
     for entry in manifest.entries.iter().rev() {
         if entry.path.split(['/', '\\']).any(|p| p == "..") || Path::new(&entry.path).is_absolute() {
             report.failed.push((entry.path.clone(), "路径不在工作目录内".into()));
@@ -205,14 +301,14 @@ pub fn undo(root: &Path, session: &str, run_id: &str) -> Result<UndoReport, Stri
         let file = workspace.join(&entry.path);
         if entry.created {
             match fs::remove_file(&file) {
-                Ok(()) => report.removed.push(entry.path.clone()),
-                Err(e) if e.kind() == std::io::ErrorKind::NotFound => report.removed.push(entry.path.clone()),
+                Ok(()) => push_once(&mut report.removed, &entry.path),
+                Err(e) if e.kind() == std::io::ErrorKind::NotFound => push_once(&mut report.removed, &entry.path),
                 Err(e) => report.failed.push((entry.path.clone(), e.to_string())),
             }
         } else if let Some(backup) = &entry.backup {
             let restored = file.parent().map_or(Ok(()), fs::create_dir_all).and_then(|()| fs::copy(dir.join(backup), &file).map(|_| ()));
             match restored {
-                Ok(()) => report.restored.push(entry.path.clone()),
+                Ok(()) => push_once(&mut report.restored, &entry.path),
                 Err(e) => report.failed.push((entry.path.clone(), e.to_string())),
             }
         } else {
@@ -222,6 +318,12 @@ pub fn undo(root: &Path, session: &str, run_id: &str) -> Result<UndoReport, Stri
     manifest.undone = true;
     save(&dir, &manifest)?;
     Ok(report)
+}
+
+fn push_once(list: &mut Vec<String>, path: &str) {
+    if !list.iter().any(|p| p == path) {
+        list.push(path.to_string());
+    }
 }
 
 #[cfg(test)]
@@ -267,12 +369,42 @@ mod tests {
     }
 
     #[test]
+    fn in_a_git_folder_undo_also_puts_back_what_commands_changed() {
+        let dir = temp("git");
+        let work = dir.join("work");
+        let git = |args: &[&str]| assert!(std::process::Command::new("git").arg("-C").arg(&work).args(args).output().unwrap().status.success(), "{args:?}");
+        git(&["init", "-q"]);
+        fs::write(work.join("a.txt"), "原始").unwrap();
+        fs::write(work.join("b.txt"), "原始 b").unwrap();
+        let checkpoints = Checkpoints::new(dir.join("cp"), &work);
+        // The answer edits a.txt with a file tool, then runs commands that change b.txt and create c.txt.
+        checkpoints.record("s1", "r1", &json!({"path": "a.txt"})).unwrap();
+        fs::write(work.join("a.txt"), "小伴改过").unwrap();
+        checkpoints.record_git("s1", "r1").unwrap();
+        fs::write(work.join("a.txt"), "命令又改了").unwrap();
+        fs::write(work.join("b.txt"), "命令改了 b").unwrap();
+        fs::write(work.join("c.txt"), "命令生成").unwrap();
+
+        let manifest = list(&dir.join("cp"), "s1").remove(0);
+        let mut files = changed_files(&manifest);
+        files.sort();
+        assert_eq!(files, vec!["a.txt", "b.txt", "c.txt"]);
+
+        let report = undo(&dir.join("cp"), "s1", "r1").unwrap();
+        assert!(report.failed.is_empty(), "{:?}", report.failed);
+        assert_eq!(fs::read_to_string(work.join("a.txt")).unwrap(), "原始", "the file tool's older copy wins");
+        assert_eq!(fs::read_to_string(work.join("b.txt")).unwrap(), "原始 b");
+        assert!(!work.join("c.txt").exists());
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
     fn only_the_newest_answers_are_kept() {
         let dir = temp("prune");
         let work = dir.join("work");
         let root = dir.join("cp");
         for run in 0..(KEEP_RUNS + 3) {
-            let manifest = Manifest { run_id: format!("r{run}"), workspace: work.display().to_string(), created_at: run as i64, entries: vec![], undone: false };
+            let manifest = Manifest { run_id: format!("r{run}"), workspace: work.display().to_string(), created_at: run as i64, entries: vec![], undone: false, git: None };
             fs::create_dir_all(root.join("s1").join(format!("r{run}"))).unwrap();
             save(&root.join("s1").join(format!("r{run}")), &manifest).unwrap();
         }
