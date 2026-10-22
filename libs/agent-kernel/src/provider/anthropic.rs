@@ -319,7 +319,7 @@ mod client {
     use super::super::{ModelProvider, Reply};
     use super::*;
     use reqwest::blocking::Client;
-    use std::sync::atomic::AtomicBool;
+    use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 
     impl Decoder for AnthropicStream {
         fn push(&mut self, payload: &str, on_text: &mut dyn FnMut(&str)) -> Result<bool, HarnessError> {
@@ -337,6 +337,9 @@ mod client {
     pub struct AnthropicMessages {
         profile: ProviderProfile,
         client: Client,
+        /// Observed endpoint ceiling for the lifetime of this Agent provider.
+        /// u32::MAX means no server correction has been observed.
+        learned_output_limit: AtomicU32,
     }
 
     impl AnthropicMessages {
@@ -344,7 +347,7 @@ mod client {
             if profile.base_url.trim().is_empty() || profile.model.trim().is_empty() {
                 return Err(HarnessError::Config("base_url and model are required".into()));
             }
-            Ok(Self { profile, client: http::new_client()? })
+            Ok(Self { profile, client: http::new_client()?, learned_output_limit: AtomicU32::new(u32::MAX) })
         }
     }
 
@@ -352,7 +355,8 @@ mod client {
         fn chat(&self, request: &ChatRequest, on_text: &mut dyn FnMut(&str), cancel: &AtomicBool) -> Result<Reply, HarnessError> {
             let mut profile = self.profile.clone();
             let mut max_tokens = profile.max_output_tokens
-                .unwrap_or_else(|| model_max_output_tokens(&profile.model));
+                .unwrap_or_else(|| model_max_output_tokens(&profile.model))
+                .min(self.learned_output_limit.load(Ordering::Relaxed));
             // An invalid max_tokens request is rejected before inference begins.
             // Retry only explicit output-limit errors, and only before any text is streamed.
             for attempt in 0..=4 {
@@ -383,6 +387,7 @@ mod client {
                             _ => None,
                         };
                         if let Some(reduced) = next {
+                            self.learned_output_limit.fetch_min(reduced, Ordering::Relaxed);
                             max_tokens = reduced;
                             continue;
                         }
