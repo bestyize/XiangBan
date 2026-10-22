@@ -26,6 +26,11 @@ pub struct ModelCapabilities {
     pub max_output_tokens: Option<u32>,
     pub context_source: CapabilitySource,
     pub output_source: CapabilitySource,
+    /// Optional, endpoint-declared modalities; unknown is not the same as false.
+    pub supports_tools: Option<bool>,
+    pub supports_vision: Option<bool>,
+    /// Raw supported reasoning levels, if the service provides them.
+    pub reasoning_efforts: Option<Vec<String>>,
 }
 
 impl ModelCapabilities {
@@ -57,7 +62,24 @@ impl ModelCapabilities {
                 CapabilitySource::Unknown
             },
             output_source,
+            supports_tools: None,
+            supports_vision: None,
+            reasoning_efforts: None,
         }
+    }
+
+    /// Incorporate only declared capability data; do not guess abilities from a
+    /// model alias or assume that an absent flag means the model lacks a feature.
+    pub fn with_declared_features(
+        mut self,
+        supports_tools: Option<bool>,
+        supports_vision: Option<bool>,
+        reasoning_efforts: Option<Vec<String>>,
+    ) -> Self {
+        self.supports_tools = supports_tools;
+        self.supports_vision = supports_vision;
+        self.reasoning_efforts = reasoning_efforts;
+        self
     }
 
     /// Automatic output policy: do not cap the Responses or Chat Completions
@@ -108,6 +130,17 @@ mod tests {
             assert_eq!(declared.request_output_limit(), None);
             assert_eq!(declared.context_source, CapabilitySource::ProviderMetadata);
         }
+    }
+
+    #[test]
+    fn declared_features_preserve_unknown_and_explicit_false() {
+        let unknown = ModelCapabilities::resolve(ModelProtocol::Responses, "alias", None, None);
+        assert_eq!((unknown.supports_tools, unknown.supports_vision, unknown.reasoning_efforts), (None, None, None));
+        let declared = ModelCapabilities::resolve(ModelProtocol::Responses, "alias", None, None)
+            .with_declared_features(Some(false), Some(true), Some(vec!["high".into()]));
+        assert_eq!(declared.supports_tools, Some(false));
+        assert_eq!(declared.supports_vision, Some(true));
+        assert_eq!(declared.reasoning_efforts, Some(vec!["high".to_string()]));
     }
 
     #[test]
