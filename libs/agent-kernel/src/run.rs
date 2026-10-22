@@ -349,26 +349,31 @@ impl Agent {
         };
         if let Some(budget) = *recovered_budget { reduce(request, budget)?; }
         loop {
-            let mut streamed = false;
+            let streamed_flag = std::cell::Cell::new(false);
             let mut visible_reasoning: Vec<crate::ReasoningSegment> = Vec::new();
-            let result = self.provider.chat_with_reasoning(
-                request,
-                &mut |text| {
-                    streamed = true;
-                    on_event(Event::TextDelta { text: text.to_string() });
-                },
-                &mut |kind, text| {
-                    if text.is_empty() { return; }
-                    streamed = true; // Never replay a partially displayed reasoning stream.
-                    if let Some(last) = visible_reasoning.last_mut().filter(|part| part.kind == kind) {
-                        last.text.push_str(text);
-                    } else {
-                        visible_reasoning.push(crate::ReasoningSegment { kind, text: text.to_owned() });
-                    }
-                    on_event(Event::ReasoningDelta { kind, text: text.to_owned() });
-                },
-                cancel,
-            );
+            // Both provider callbacks share one observer without aliasing two &mut borrows.
+            let result = {
+                let sink = std::cell::RefCell::new(&mut *on_event);
+                self.provider.chat_with_reasoning(
+                    request,
+                    &mut |text| {
+                        streamed_flag.set(true);
+                        (sink.borrow_mut())(Event::TextDelta { text: text.to_string() });
+                    },
+                    &mut |kind, text| {
+                        if text.is_empty() { return; }
+                        streamed_flag.set(true); // Do not replay a partially displayed reasoning stream.
+                        if let Some(last) = visible_reasoning.last_mut().filter(|part| part.kind == kind) {
+                            last.text.push_str(text);
+                        } else {
+                            visible_reasoning.push(crate::ReasoningSegment { kind, text: text.to_owned() });
+                        }
+                        (sink.borrow_mut())(Event::ReasoningDelta { kind, text: text.to_owned() });
+                    },
+                    cancel,
+                )
+            };
+            let streamed = streamed_flag.get();
             match result {
                 Err(error) if !streamed && error.is_context_limit() && recoveries < 2 => {
                     let used = estimate_tokens(&request.messages) + estimate_tool_tokens(&request.tools);
