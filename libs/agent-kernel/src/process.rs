@@ -29,6 +29,8 @@ pub struct ProcessConfig {
     pub max_runtime: Duration,
     pub env: Vec<(String, String)>,
     pub inherited_env: Vec<String>,
+    /// Runs commands for which the hook returns a policy inside the OS sandbox (see `crate::sandbox`).
+    pub sandbox: Option<crate::sandbox::SandboxHook>,
 }
 
 impl Default for ProcessConfig {
@@ -40,6 +42,7 @@ impl Default for ProcessConfig {
             max_runtime: Duration::from_secs(3600),
             env: Vec::new(),
             inherited_env: Vec::new(),
+            sandbox: None,
         }
     }
 }
@@ -190,15 +193,16 @@ impl ProcessManager {
                 }
             }
         }
+        let policy = self.config.sandbox.as_ref().and_then(|hook| hook.policy(ctx.session(), command));
         #[cfg(unix)]
         let mut cmd = {
-            let mut cmd = Command::new("sh");
-            cmd.args(["-c", command]);
+            let mut cmd = crate::sandbox::unix_shell(command, policy.as_ref())?;
             std::os::unix::process::CommandExt::process_group(&mut cmd, 0);
             cmd
         };
         #[cfg(windows)]
         let mut cmd = {
+            crate::sandbox::refuse_on_windows(policy.as_ref())?;
             let mut cmd = crate::child_env::windows_shell(command);
             crate::child_env::no_window(&mut cmd);
             cmd

@@ -15,6 +15,7 @@ mod game_draft;
 pub mod goals;
 mod prompt;
 mod project_rules;
+mod sandbox_gate;
 mod run_history;
 pub(crate) mod task_outcome;
 mod learning;
@@ -243,6 +244,13 @@ fn ask_approval(app: &tauri::AppHandle, broker: &Broker, request: &ApprovalReque
     );
     let decision = request.wait_for(&rx).unwrap_or(Approval::Deny);
     broker.close_approval(&id);
+    // A flagged command the user allowed is meant as written, usually outside the working folder: run it once
+    // outside the full-trust sandbox, or the approval would change nothing.
+    if decision == Approval::Once && request.danger.is_some() && matches!(request.tool, "shell" | "process_start") {
+        if let Some(command) = request.arguments.get("command").and_then(Value::as_str) {
+            sandbox_gate::allow_once(request.session, command);
+        }
+    }
     crate::proactivity::observe_task_state(app, agent_proactivity::context::TaskState::Running);
     decision
 }
@@ -420,7 +428,7 @@ fn assemble_with_connectors(parts: Parts<'_>, attachments: Vec<Attachment>, conn
         .tool(TimeNow::new().utc_offset_minutes(utc_offset_minutes))
         .tool_arc(todo)
         .tool(ask)
-        .tool(Shell::new(workspace))
+        .tool(Shell::new(workspace).sandbox(sandbox_gate::hook(permission.clone(), workspace)))
         .tool(WebFetch::new())
         .tool(learning::Recall::new(dirs.learning_db()))
         .middleware(discovery.acquisition_policy())
@@ -509,7 +517,8 @@ fn process_manager(app: &tauri::AppHandle, workspace: &Path) -> Result<Arc<Proce
         }
         let _ = manager.shutdown();
     }
-    let manager = Arc::new(ProcessManager::new(workspace)?);
+    let config = agent_kernel::process::ProcessConfig { sandbox: Some(sandbox_gate::hook(state.permission.clone(), workspace)), ..Default::default() };
+    let manager = Arc::new(ProcessManager::with_config(workspace, config)?);
     *slot = Some(manager.clone());
     Ok(manager)
 }
