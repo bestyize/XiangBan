@@ -35,6 +35,7 @@ pub struct Agent {
     pub(crate) max_truncated_tool_retries: usize,
     pub(crate) retry: RetryPolicy,
     pub(crate) running: Mutex<HashSet<String>>,
+    discovery: Option<Arc<crate::discovery::ToolDiscovery>>,
 }
 
 impl Agent {
@@ -43,6 +44,7 @@ impl Agent {
             provider,
             store,
             tools: Vec::new(),
+            deferred: HashSet::new(),
             middleware: Vec::new(),
             system_prompt: String::new(),
             prompt_sections: Vec::new(),
@@ -70,12 +72,25 @@ impl Agent {
             })
             .collect()
     }
+
+    /// Initial model-visible schemas; the complete registry remains available via tool_schemas.
+    pub fn initial_tool_schemas(&self) -> Vec<ToolSchema> {
+        let mut schemas = self.tool_schemas();
+        if let Some(discovery) = &self.discovery { discovery.initial_schemas(&mut schemas); }
+        schemas
+    }
+
+    /// Compact deferred-tool directory, included before context budgeting on each model call.
+    pub fn tool_catalog(&self) -> String {
+        self.discovery.as_ref().map_or_else(String::new, |d| d.catalog())
+    }
 }
 
 pub struct AgentBuilder {
     provider: Arc<dyn ModelProvider>,
     store: Arc<dyn SessionStore>,
     tools: Vec<Arc<dyn Tool>>,
+    deferred: HashSet<String>,
     middleware: Vec<Arc<dyn Middleware>>,
     system_prompt: String,
     prompt_sections: Vec<PromptSection>,
@@ -107,6 +122,14 @@ impl AgentBuilder {
         self
     }
 
+    /// Register normally for validation, permissions, execution and cleanup, but expose the
+    /// full schema only after tool_search/tool_load. Does not install or connect anything.
+    pub fn deferred_tool_arc(mut self, tool: Arc<dyn Tool>) -> Self {
+        self.deferred.insert(tool.spec().name.clone());
+        self.tools.push(tool);
+        self
+    }
+
     pub fn middleware(mut self, middleware: impl Middleware + 'static) -> Self {
         self.middleware.push(Arc::new(middleware));
         self
@@ -129,7 +152,18 @@ impl AgentBuilder {
         self
     }
 
-    pub fn build(self) -> Result<Agent, HarnessError> {
+    pub fn build(mut self) -> Result<Agent, HarnessError> {
+        let discovery = if self.deferred.is_empty() { None } else {
+            let schemas = self.tools.iter().filter(|t| self.deferred.contains(&t.spec().name)).map(|t| {
+                let s = t.spec();
+                ToolSchema { name: s.name.clone(), description: s.description.clone(), parameters: s.schema.clone() }
+            }).collect();
+            let discovery = Arc::new(crate::discovery::ToolDiscovery::new(schemas));
+            self.tools.extend(discovery.tools());
+            // Filter and add the directory before hooks, compaction and ContextTrim.
+            self.middleware.insert(0, discovery.clone());
+            Some(discovery)
+        };
         let mut tool_index = HashMap::new();
         let mut validators = Vec::with_capacity(self.tools.len());
         for (i, tool) in self.tools.iter().enumerate() {
@@ -165,6 +199,7 @@ impl AgentBuilder {
             max_truncated_tool_retries: self.max_truncated_tool_retries,
             retry: self.retry,
             running: Mutex::new(HashSet::new()),
+            discovery,
         })
     }
 }
