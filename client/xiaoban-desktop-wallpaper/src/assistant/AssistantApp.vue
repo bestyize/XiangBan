@@ -262,10 +262,14 @@ async function act(action: () => Promise<void> | void) {
 async function newChat() { await act(() => props.store.newConversation()); cardShown.value = false; void nextTick(() => field.value?.focus()); }
 async function pickSession(id: string) { await act(() => props.store.switchSession(id)); cardShown.value = true; }
 
-/** The text box grows with its text, up to four lines, then scrolls. */
+/**
+ * The text box grows with its text, up to four lines, then scrolls. Empty, it is one line whatever its width:
+ * measured while the window is still narrow, the placeholder would wrap and leave the box tall.
+ */
 function grow() {
   const el = field.value;
   if (!el) return;
+  if (!el.value) { el.style.height = ''; return; }
   el.style.height = 'auto';
   el.style.height = `${Math.min(el.scrollHeight, 96)}px`;
 }
@@ -395,12 +399,12 @@ function ballClick(){void props.store.unfold();}
 const onFocus=()=>{picking.value=false;clearTimeout(blurTimer);if(props.store.open&&!dragging.value&&!press&&!morphing.value)field.value?.focus();};
 onMounted(()=>{
   void listen<MorphEvent>('assistant-transition', event => { void handleMorph(event).catch(() => resetMorph()); }).then(off => { if (morphDisposed) off(); else offMorph = off; });
-  void nextTick(queueHitRegions);window.addEventListener('resize',queueHitRegions);
+  void nextTick(queueHitRegions);window.addEventListener('resize',queueHitRegions);window.addEventListener('resize',grow);
   document.addEventListener('pointerdown',outsideMenus);document.addEventListener('keydown',onAskShortcut);window.addEventListener('blur',onBlur);window.addEventListener('focus',onFocus);window.addEventListener('pointermove',dragMove);window.addEventListener('pointerup',dragUp);window.addEventListener('pointercancel',dragUp);window.addEventListener('blur',releasePress);window.addEventListener('assistant-drag-end',dragEnded);
 });
 onBeforeUnmount(()=>{
   morphDisposed = true; clearTimeout(morphFallback); offMorph?.(); morphAnimations.splice(0).forEach(a => a.cancel());
-  cancelAnimationFrame(hitRaf);window.removeEventListener('resize',queueHitRegions);clearTimeout(blurTimer);clearTimeout(bubbleTimer);clearTimeout(copyTimer);bubbleVersion++;
+  cancelAnimationFrame(hitRaf);window.removeEventListener('resize',queueHitRegions);window.removeEventListener('resize',grow);clearTimeout(blurTimer);clearTimeout(bubbleTimer);clearTimeout(copyTimer);bubbleVersion++;
   window.removeEventListener('blur',onBlur);document.removeEventListener('pointerdown',outsideMenus);document.removeEventListener('keydown',onAskShortcut);imageVersion++; releasePress();window.removeEventListener('focus',onFocus);window.removeEventListener('pointermove',dragMove);window.removeEventListener('pointerup',dragUp);window.removeEventListener('pointercancel',dragUp);window.removeEventListener('blur',releasePress);window.removeEventListener('assistant-drag-end',dragEnded);observer?.disconnect();cancelAnimationFrame(raf);
 });
 </script>
