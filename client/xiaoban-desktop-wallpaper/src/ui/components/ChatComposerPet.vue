@@ -66,10 +66,11 @@ async function poke() {
 <style scoped>
 .composer-pet{position:absolute;right:26px;top:-92px;width:100px;z-index:2;user-select:none}
 .composer-pet.is-lg{right:32px;top:-106px;width:116px}
-.composer-pet-touch{position:relative;display:block;width:100%;margin:0;padding:0;border:0;background:none;color:inherit;cursor:pointer;line-height:0;appearance:none;filter:drop-shadow(0 4px 6px rgba(0,0,0,.12));transition:filter .15s ease}
+/* Match PetActor's square viewport so still/live swaps keep the same scale and anchor. */
+.composer-pet-touch{position:relative;display:block;width:100%;aspect-ratio:1;margin:0;padding:0;border:0;background:none;color:inherit;cursor:pointer;line-height:0;appearance:none;filter:drop-shadow(0 4px 6px rgba(0,0,0,.12));transition:filter .15s ease}
 .composer-pet-touch:hover{filter:drop-shadow(0 5px 8px rgba(0,0,0,.16))}
 .composer-pet-touch:focus-visible{outline:2px solid var(--ui-primary,#bd8c70);outline-offset:3px;border-radius:12px}
-.composer-pet-picture{display:block;width:100%;height:auto;pointer-events:none}
+.composer-pet-picture{display:block;width:100%;height:100%;object-fit:contain;pointer-events:none}
 .composer-pet-picture.is-hidden{visibility:hidden}
 .composer-pet-live{position:absolute!important;left:0;top:0;pointer-events:none}
 .composer-pet-live :deep(.pet-stage),.composer-pet-live :deep(.pet-art){pointer-events:none}
@@ -79,3 +80,4 @@ async function poke() {
 @keyframes pet-reply-in{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
 @media(prefers-reduced-motion:reduce){.composer-pet-touch,.composer-pet.is-reacting .composer-pet-touch,.composer-pet-reply{animation:none;transition:none}}
 </style>
+
