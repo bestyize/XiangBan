@@ -11,6 +11,7 @@ import { ArrowUp, LoaderCircle, Mic, Square, X } from 'lucide-vue-next';
 import { GATEWAY_PROVIDER, invoke, type AiConfigView, type AiTier } from '../../bridge.ts';
 import type { ControlPage, ControlStore } from '../control-types.ts';
 import ChatWorkbenchTools from './ChatWorkbenchTools.vue';
+import ChatComposerPet from './ChatComposerPet.vue';
 import ChatComposerModel from './ChatComposerModel.vue';
 import ChatWorkspaceMenu from './ChatWorkspaceMenu.vue';
 import ChatPermissionMenu from './ChatPermissionMenu.vue';
@@ -205,24 +206,13 @@ watch([() => props.store.creationDraft, () => chat.configured, shown], ([text, c
   props.store.creationDraft = null;
 }, { immediate: true });
 
-/* ── The companion over the edge ─────────────────────────────────────── */
-const petUrl = ref('');
-onMounted(async () => {
-  if (!props.pet) return;
-  try {
-    const [{ OFFICIAL_THEMES }, { petImage }] = await Promise.all([import('../../pets/model.ts'), import('../../pets/render.ts')]);
-    const sunflower = OFFICIAL_THEMES.flatMap(theme => theme.pets).find(pet => pet.id === 'sunflower');
-    if (sunflower) petUrl.value = petImage(sunflower);
-  } catch { /* The box is complete without it. */ }
-});
-
 const placeholderText = computed(() => !props.store.desktop ? '请在桌面应用中使用小伴 AI' : !chat.configured ? '先到设置里配置模型' : props.placeholder || '问点什么，或交给小伴去办就行');
 defineExpose({ setDraft, insertPrompt, refreshModel: readModelLabel, draft });
 </script>
 
 <template>
   <footer class="composer" :class="[`page-${page}`]" @compositionstart="composing = true" @compositionend="composing = false" @paste="onPaste" @dragover.prevent @drop.prevent="addFiles(Array.from($event.dataTransfer?.files ?? []))">
-    <img v-if="pet && petUrl" class="composer-pet" :class="`is-${pet}`" :src="petUrl" alt="" aria-hidden="true" draggable="false" data-testid="composer-pet" />
+    <ChatComposerPet v-if="pet" :size="pet" :paused="store.settings?.paused ?? false" />
     <div class="composer-box" :class="{ 'voice-active': asr?.listening }">
       <AsrStatus v-if="asr" :asr="asr" chat />
       <div v-if="attachments.length" class="attachments" data-testid="chat-attachments">
@@ -256,8 +246,6 @@ defineExpose({ setDraft, insertPrompt, refreshModel: readModelLabel, draft });
 
 <style scoped>
 .composer{position:relative;width:100%;box-sizing:border-box}
-.composer-pet{position:absolute;right:26px;top:-92px;width:100px;height:auto;pointer-events:none;user-select:none;filter:drop-shadow(0 4px 6px rgba(0,0,0,.12))}
-.composer-pet.is-lg{right:32px;top:-106px;width:116px}
 .composer-box{position:relative;display:flex;flex-direction:column;gap:4px;background:var(--ui-surface);border-radius:18px;box-shadow:0 0 0 1px var(--ui-border),0 2px 4px rgba(0,0,0,.03),0 12px 32px rgba(0,0,0,.07);padding:14px 12px 8px 16px;transition:box-shadow .15s}
 html[data-theme=dark] .composer-box{background:var(--ui-surface-alt);box-shadow:0 0 0 1px var(--ui-border-strong),0 12px 32px rgba(0,0,0,.35)}
 .composer-box:focus-within{box-shadow:0 0 0 1px var(--ui-border-strong),0 2px 4px rgba(0,0,0,.03),0 12px 32px rgba(0,0,0,.09)}
