@@ -176,7 +176,7 @@ const CONTROL_COMMANDS: &[&str] = &["assistant_status", "assistant_configure", "
 /// What the capsule may ask of the host besides its own window commands: ask and answer, speak, listen.
 /// Deleting, renaming, compacting or changing the trust mode of conversations stays with the control window.
 const SHARED_COMMANDS: &[&str] = &[
-    "chat_overview", "chat_load_session", "chat_new_session", "chat_send", "chat_cancel", "chat_context",
+    "chat_overview", "chat_load_session", "chat_session_snapshot", "chat_new_session", "chat_send", "chat_cancel", "chat_context",
     "chat_answer_approval", "chat_answer_question",
     "tts_get_settings", "tts_synthesize", "tts_synthesize_part", "tts_cancel",
     "asr_get_status", "asr_prepare", "asr_transcribe", "asr_report_microphone",
@@ -1201,7 +1201,7 @@ mod tests {
 
     #[test]
     fn the_capsule_may_chat_speak_and_listen_but_not_manage_conversations_or_voice_settings() {
-        for command in ["chat_send", "chat_cancel", "chat_answer_approval", "tts_synthesize", "asr_transcribe", "assistant_set_regions"] {
+        for command in ["chat_send", "chat_cancel", "chat_session_snapshot", "chat_answer_approval", "tts_synthesize", "asr_transcribe", "assistant_set_regions"] {
             assert_eq!(permitted(LABEL, command), Some(true), "{command}");
         }
         for command in ["chat_delete_session", "chat_set_permission_mode", "chat_compact", "asr_set_enabled", "tts_save_settings", "get_ai_config", "assistant_configure", "quit"] {
@@ -1219,6 +1219,8 @@ mod tests {
         assert_eq!(permitted("control", "assistant_unknown"), Some(false));
         assert_eq!(permitted("control", "chat_send"), None);
         assert_eq!(permitted("media-a", "chat_send"), None);
+        assert_eq!(permitted("wallpaper", "chat_session_snapshot"), None);
+        assert_eq!(permitted("pet", "chat_session_snapshot"), None);
     }
 }
 
