@@ -53,7 +53,7 @@ export function createControlStore(notify: ControlStore["notify"]): ControlStore
     effectList: noPacks(),
     account: null,
     showLoginModal: false,
-    page: "new-task", creationDraft: null, settingsTab: "general", settingsOpen: false, studioTab: "wallpapers", asr: createAsrStore({ desktop, invoke, listen, notify, turnModels: () => loadTurnModels() }), speech: createSpeechStore({ desktop, invoke, notify }), chat: createChatStore({ desktop, invoke, listen, notify,
+    page: "new-task", creationDraft: null, settingsTab: "general", settingsOpen: false, studioTab: "wallpapers", asr: createAsrStore({ desktop, invoke, listen, notify, turnModels: () => loadTurnModels(invoke) }), speech: createSpeechStore({ desktop, invoke, notify }), chat: createChatStore({ desktop, invoke, listen, notify,
       onActivity: () => { store.asr.deactivate(); void store.speech.stop(); },
       onReply: (session, text, key) => { if (chatLike(store.page) && store.speech.settings.autoRead && document.visibilityState !== 'hidden') void store.speech.speak(text, key ?? 'auto:' + session, undefined, true); },
     }), ready: false, initialError: "", desktop, notify,

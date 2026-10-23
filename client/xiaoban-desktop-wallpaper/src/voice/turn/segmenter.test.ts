@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { flushPromises } from '@vue/test-utils';
 import { SmartSegmenter } from './segmenter.ts';
-import type { SileroVad } from './models.ts';
+import type { Vad } from './models.ts';
 
 const FRAME = 640; // 40 ms at 16 kHz
 /** A fake VAD that treats loud samples as speech, one probability per 512 samples like Silero. */
@@ -15,7 +15,7 @@ function fakeVad() {
       while (pending.length >= 512) { const w = pending.splice(0, 512); out.push(Math.abs(w[0]) > 0.05 ? 0.9 : 0.05); }
       return out;
     }),
-  } as unknown as SileroVad;
+  } as Vad;
 }
 const speech = () => new Float32Array(FRAME).fill(0.2);
 const quiet = () => new Float32Array(FRAME);

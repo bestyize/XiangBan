@@ -1,4 +1,4 @@
-import type { SileroVad } from './models.ts';
+import type { TurnJudge, Vad } from './models.ts';
 
 /** What the speech recogniser needs from an endpointer; the energy `UtteranceSegmenter` has the same shape. */
 export interface Segmenter {
@@ -13,8 +13,6 @@ export interface Segmenter {
   readonly pending: boolean;
   readonly active: boolean;
 }
-
-export interface TurnJudge { predict(audio: Float32Array): Promise<number> }
 
 const RATE = 16000;
 /** Speech probability at which Silero counts a window as voiced. */
@@ -51,7 +49,7 @@ export class SmartSegmenter implements Segmenter {
   private chain: Promise<void> = Promise.resolve();
   private broken = false;
 
-  constructor(private vad: SileroVad, private judge: TurnJudge, private onError: (error: unknown) => void = () => {}) {}
+  constructor(private vad: Vad, private judge: TurnJudge, private onError: (error: unknown) => void = () => {}) {}
 
   get pending() { return this.speechStart !== null; }
   get active() { return this.speechStart !== null && this.silence < GIVE_UP_AFTER; }

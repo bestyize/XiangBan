@@ -52,6 +52,7 @@ mod computer_permissions;
 mod capture_editor;
 mod assistant_hit_test;
 mod window_control;
+mod voice_turn;
 
 use preferences::{Preferences, Settings};
 use serde::Serialize;
@@ -816,7 +817,7 @@ fn main() {
             account::send_account_code, account::login_account_with_code, account::login_account_with_password,
             account::register_account, account::reset_account_password, account::check_account_username, account::get_signup_methods,
             account::get_account_session, account::logout_account,
-            tts::tts_get_settings, tts::tts_save_settings, tts::tts_list_voices, tts::tts_synthesize, tts::tts_synthesize_part, tts::tts_cancel,
+            tts::tts_get_settings, tts::tts_save_settings, tts::tts_list_voices, tts::tts_synthesize, tts::tts_synthesize_part, tts::tts_cancel, voice_turn::voice_turn_ready, voice_turn::voice_vad, voice_turn::voice_vad_reset, voice_turn::voice_turn_complete,
             asr::asr_get_status, asr::asr_set_enabled, asr::asr_prepare, asr::asr_transcribe, asr::asr_report_microphone,
             ai_gateway::ai_gateway_balance, ai_gateway::ai_gateway_redeem, ai_gateway::ai_gateway_tiers, ai_gateway::use_ai_gateway,
             ai_catalogue::refresh_ai_providers, ai_config::get_ai_config, ai_config::save_ai_config, ai_config::pick_workspace, ai_config::fetch_ai_models,
@@ -834,7 +835,7 @@ fn main() {
              assistant_capture::reset_screen_capture_permission, assistant_capture::open_screen_capture_settings,
             float_assistant::assistant_transition_ready, float_assistant::assistant_prefs, float_assistant::assistant_try, float_assistant::assistant_open_chat, float_assistant::assistant_open_settings]);
     let app = builder.manage(state).manage(content::ContentState::default()).manage(website::WebsiteState::default())
-        .manage(games::GameState::default()).manage(desk_game::DeskState::default()).manage(rituals::RitualState::default()).manage(widgets::WidgetState::default()).manage(pets::PetState::default()).manage(reminders::ReminderState::default()).manage(proactivity::ProactivityState::default()).manage(account::AccountState::default()).manage(ai_config::AiConfigState::default()).manage(tts::TtsState::default()).manage(asr::AsrState::default()).manage(ai_catalogue::CatalogueState::default()).manage(float_assistant::AssistantState::default()).manage(capture_editor::CaptureState::default()).manage(assistant_hit_test::HitState::default()).manage(window_control::WindowState::default())
+        .manage(games::GameState::default()).manage(desk_game::DeskState::default()).manage(rituals::RitualState::default()).manage(widgets::WidgetState::default()).manage(pets::PetState::default()).manage(reminders::ReminderState::default()).manage(proactivity::ProactivityState::default()).manage(account::AccountState::default()).manage(ai_config::AiConfigState::default()).manage(tts::TtsState::default()).manage(asr::AsrState::default()).manage(ai_catalogue::CatalogueState::default()).manage(float_assistant::AssistantState::default()).manage(capture_editor::CaptureState::default()).manage(assistant_hit_test::HitState::default()).manage(window_control::WindowState::default()).manage(voice_turn::VoiceTurnState::default())
         .register_uri_scheme_protocol("wallpaper-asset", |context, request| library::serve(context.app_handle(), request))
         .register_uri_scheme_protocol("game-pack", |context, request| game_packs::serve(context.app_handle(), request))
         .invoke_handler(move |invoke| {

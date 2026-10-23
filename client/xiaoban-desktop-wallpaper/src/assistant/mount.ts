@@ -26,7 +26,7 @@ export async function mountAssistant() {
     onReply: (session, text, key) => assistant.replied(session, text, key),
     onActivity: () => assistant.stopped(),
   });
-  const asr = createAsrStore({ desktop, invoke, listen, turnModels: () => loadTurnModels(), notify: (message, type = 'success') => {
+  const asr = createAsrStore({ desktop, invoke, listen, turnModels: () => loadTurnModels(invoke), notify: (message, type = 'success') => {
     if (type !== 'success') assistant.noteVoice(message instanceof Error ? message.message : String(message));
   } });
   const speech = createSpeechStore({ desktop, invoke, notify });
