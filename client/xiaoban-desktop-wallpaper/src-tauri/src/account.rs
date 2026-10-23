@@ -109,10 +109,10 @@ pub fn account_base_url() -> String {
 }
 
 fn client() -> Result<reqwest::blocking::Client, String> {
-    reqwest::blocking::Client::builder()
+    crate::network::blocking_builder(reqwest::blocking::Client::builder()
         .timeout(Duration::from_secs(15))
         .connect_timeout(Duration::from_secs(8))
-        .user_agent(concat!("XiaoBanDesktop/", env!("CARGO_PKG_VERSION")))
+        .user_agent(concat!("XiaoBanDesktop/", env!("CARGO_PKG_VERSION"))))?
         .build()
         .map_err(|e| format!("创建网络连接失败：{e}"))
 }
