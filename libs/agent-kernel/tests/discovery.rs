@@ -120,6 +120,7 @@ fn catalog_overflow_remains_searchable_and_no_match_is_explicit() {
         b
     });
     assert!(h.agent.tool_catalog().contains("omitted"));
+    assert!(h.agent.tool_catalog().contains("tool_149"), "a tool without room for its summary is still named");
     assert!(run(&h.agent, "go").0.is_ok());
     assert!(h.provider.requests()[1].tools.iter().any(|s| s.name == "tool_149"));
     let no_match: serde_json::Value = serde_json::from_str(&tool_messages(&h)[1].1).unwrap();

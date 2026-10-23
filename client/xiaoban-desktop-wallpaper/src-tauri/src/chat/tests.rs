@@ -232,6 +232,11 @@ fn call(id: &str, tool: &str, args: Value) -> Step {
     Step::tool_call(id, tool, &args.to_string())
 }
 
+/// Desktop tools are deferred: the model loads their schemas by name before calling them.
+fn load(names: &[&str]) -> Step {
+    call("load", "tool_load", json!({ "names": names }))
+}
+
 /// A tiny valid PNG as a data URL, the shape the web side sends.
 const PNG: &str = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
 
@@ -288,15 +293,27 @@ fn the_assistant_has_every_tool_it_needs_and_no_others() {
     let mut names: Vec<&str> = request.tools.iter().map(|t| t.name.as_str()).collect();
     names.sort();
     let mut expected = vec![
-        "time_now", "todo", "ask_user", "read_file", "list_dir", "grep", "write_file", "edit_file", "shell", "web_fetch", "load_skill", "skill_manage",
-        "memory_read", "memory_write", "desktop_status", "desktop_windows", "desktop_window_set", "wallpaper_list", "wallpaper_apply", "wallpaper_create", "wallpaper_delete", "effect_list", "effect_set", "effect_create", "effect_delete", "effect_read_format", "companion_set", "care_list",
-        "care_set", "care_delete", "widget_list", "widget_add", "widget_read_format", "widget_create", "widget_delete_custom", "widget_update", "widget_remove", "game_list", "game_open", "game_close", "game_read_format", "game_create", "game_delete",
-        "request_accessibility_permission", "computer_use_diagnose", "computer_use_repair_permissions", "community_share", "community_open", "pet_read_format", "pet_catalog", "pet_theme_save", "pet_theme_delete", "pet_add", "pet_update", "pet_remove", "research",
-        "experience_recall", "skill_search", "skill_inspect", "skill_install", "skill_read", "skill_run",
+        "time_now", "todo", "ask_user", "read_file", "list_dir", "grep", "write_file", "edit_file", "shell", "web_fetch", "load_skill", "skill_manage", "skill_find",
+        "memory_read", "memory_write", "research", "experience_recall", "skill_search", "skill_inspect", "skill_install", "skill_read", "skill_run",
+        "tool_search", "tool_load",
     ];
     expected.sort();
-    assert_eq!(names, expected);
+    assert_eq!(names, expected, "only everyday tools are sent with every turn");
     let system = request.messages[0].text();
+    let deferred = [
+        "desktop_status", "desktop_windows", "desktop_window_set", "wallpaper_list", "wallpaper_apply", "wallpaper_create", "wallpaper_delete", "effect_list", "effect_set", "effect_create", "effect_delete", "effect_read_format", "companion_set", "care_list",
+        "care_set", "care_delete", "widget_list", "widget_add", "widget_read_format", "widget_create", "widget_delete_custom", "widget_update", "widget_remove", "game_list", "game_open", "game_close", "game_read_format", "game_create", "game_delete",
+        "request_accessibility_permission", "computer_use_diagnose", "computer_use_repair_permissions", "community_share", "community_open", "pet_read_format", "pet_catalog", "pet_theme_save", "pet_theme_delete", "pet_add", "pet_update", "pet_remove",
+    ];
+    let directory = system.split("## Additional tools").nth(1).expect("deferred tools are listed in the prompt");
+    let missing: Vec<_> = deferred.iter().filter(|name| !directory.contains(*name)).collect();
+    assert!(missing.is_empty(), "{missing:?} cannot be found to load");
+    assert!(!directory.contains("additional tools omitted"), "every desktop tool is named");
+    let mut registered: Vec<String> = rig.agent.tool_schemas().into_iter().map(|t| t.name).collect();
+    registered.sort();
+    let mut all: Vec<String> = expected.iter().chain(deferred.iter()).map(|n| n.to_string()).collect();
+    all.sort();
+    assert_eq!(registered, all, "and nothing else is registered");
     assert!(system.contains("小伴") && system.contains(&rig.workspace.display().to_string()), "the prompt names the working folder");
 }
 
@@ -429,6 +446,7 @@ fn a_refused_command_never_runs() {
 #[test]
 fn changing_the_desktop_is_the_apps_own_work_and_goes_through_the_desktop_unasked() {
     let steps = vec![
+        load(&["wallpaper_list", "wallpaper_apply", "care_set", "widget_add", "desktop_window_set"]),
         call("1", "wallpaper_list", json!({})),
         call("2", "wallpaper_apply", json!({"id": "companion"})),
         call("3", "care_set", json!({"text": "喝水", "time": "15:00"})),
@@ -545,6 +563,7 @@ fn dropping_a_conversation_releases_a_run_that_is_waiting_for_the_user() {
 fn in_auto_mode_all_write_tools_run_without_asking() {
     let steps = vec![
         call("1", "write_file", json!({"path": "auto.txt", "content": "auto created"})),
+        load(&["care_set"]),
         call("2", "care_set", json!({"text": "auto reminder", "time": "12:00"})),
         Step::text("all done"),
     ];
@@ -629,6 +648,7 @@ fn trusted_rig(tag: &str, steps: Vec<Step>) -> (Rig, Arc<Mutex<Vec<(String, Opti
 #[test]
 fn a_scheduled_task_is_confirmed_even_in_full_trust_and_an_ordinary_reminder_is_not() {
     let steps = vec![
+        load(&["care_set"]),
         call("1", "care_set", json!({"text": "喝水", "time": "15:00"})),
         call("2", "care_set", json!({"text": "看看待办", "kind": "agent", "time": "08:00"})),
         Step::text("好"),
@@ -644,6 +664,7 @@ fn a_scheduled_task_is_confirmed_even_in_full_trust_and_an_ordinary_reminder_is_
 #[test]
 fn computer_use_repair_requires_confirmation_even_in_full_trust() {
     let steps = vec![
+        load(&["computer_use_repair_permissions"]),
         call("1", "computer_use_repair_permissions", json!({"permission": "accessibility"})),
         call("2", "computer_use_repair_permissions", json!({"permission": "All"})),
         Step::text("等待授权"),
@@ -655,18 +676,19 @@ fn computer_use_repair_requires_confirmation_even_in_full_trust() {
     assert_eq!(asked[0].0, "computer_use_repair_permissions");
     assert!(asked[0].1.as_ref().unwrap().contains("com.ifuryst.opencomputeruse"));
     assert!(lock(&rig.desktop.calls).is_empty(), "a denied repair must not reach the host");
-    assert!(tool_results(&rig)[0].contains("denied"));
+    assert!(tool_results(&rig)[1].contains("denied"));
 }
 
 #[test]
 fn computer_use_repair_dispatches_only_the_approved_permission() {
     let rig = rig("cu-repair-approved", vec![
+        load(&["computer_use_repair_permissions"]),
         call("1", "computer_use_repair_permissions", json!({"permission": "accessibility"})),
         Step::text("请在系统界面重新授权"),
     ], Approval::Once);
     run(&rig, "清除旧的无障碍记录").0.unwrap();
     assert_eq!(*lock(&rig.desktop.calls), vec!["repair-permissions accessibility"]);
-    assert!(tool_results(&rig)[0].contains("permissionCheckRequired"));
+    assert!(tool_results(&rig)[1].contains("permissionCheckRequired"));
 }
 
 #[test]
@@ -894,6 +916,7 @@ fn game_draft_can_be_written_edited_and_installed_in_separate_tool_turns() {
         call("write-page", "write_file", json!({"path":"game-drafts/test/index.html", "content":"<html><head></head><script src='game.js'></script></html>"})),
         call("write-script", "write_file", json!({"path":"game-drafts/test/game.js", "content":"let score = 0;"})),
         call("edit-script", "edit_file", json!({"path":"game-drafts/test/game.js", "old_string":"score = 0", "new_string":"score = 10"})),
+        load(&["game_create"]),
         call("install", "game_create", json!({"id":"draft-game", "name":"测试游戏", "description":"分步创作", "source_dir":"game-drafts/test"})),
         Step::text("已保存"),
     ];
@@ -908,6 +931,7 @@ fn game_draft_can_be_written_edited_and_installed_in_separate_tool_turns() {
 #[test]
 fn game_create_requires_exactly_one_source_and_rejects_paths_outside_workspace() {
     let steps = vec![
+        load(&["game_create"]),
         call("both", "game_create", json!({"id":"draft-game", "name":"游戏", "description":"测试", "source_dir":"draft", "files":[{"path":"index.html", "content":"x"}]})),
         call("neither", "game_create", json!({"id":"draft-game", "name":"游戏", "description":"测试"})),
         call("outside", "game_create", json!({"id":"draft-game", "name":"游戏", "description":"测试", "source_dir":".."})),

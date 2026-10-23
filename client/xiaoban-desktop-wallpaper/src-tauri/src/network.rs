@@ -34,7 +34,8 @@ fn validate(mode: String, proxy_url: String) -> Result<NetworkConfig, String> {
         { return Err("代理只支持 HTTP、HTTPS，且地址不能包含凭据或路径".into()); }
         reqwest::Proxy::all(proxy_url.as_str()).map_err(|_| "无法识别代理服务器".to_string())?;
     }
-    Ok(NetworkConfig { mode, proxy_url: if mode == "manual" { proxy_url } else { String::new() } })
+    let proxy_url = if mode == "manual" { proxy_url } else { String::new() };
+    Ok(NetworkConfig { mode, proxy_url })
 }
 fn path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
     Ok(crate::storage::root(app)?.join("network.json"))
