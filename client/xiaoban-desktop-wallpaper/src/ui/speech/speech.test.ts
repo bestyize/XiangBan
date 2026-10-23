@@ -7,7 +7,7 @@ function fixture() {
     if (command === 'tts_get_settings') return { ...speechDefaults };
     if (command === 'tts_save_settings') return args?.settings;
     if (command === 'tts_list_voices') throw new Error('network unavailable');
-    if (command === 'tts_synthesize') return [1, 2, 3];
+    if (command === 'tts_synthesize' || command === 'tts_synthesize_part') return [1, 2, 3];
   });
   const revoke = vi.fn(), notify = vi.fn();
   const store = createSpeechStore({
@@ -48,5 +48,30 @@ describe('speech lifecycle', () => {
     expect(h.store.error).toContain('network');
     h.store.dispose(); await h.store.speak('你好', 'm');
     expect(h.audios).toHaveLength(0);
+  });
+});
+
+describe('reading a streamed answer', () => {
+  it('synthesises sentences as they appear, plays them in turn and goes idle after the last', async () => {
+    const { store, invoke, audios } = fixture(); await store.init();
+    const onStart = vi.fn();
+    const stream = store.stream!('a1', undefined, { onStart });
+    stream.push('第一句。第二');
+    await vi.waitFor(() => expect(audios).toHaveLength(1));
+    expect(invoke).toHaveBeenCalledWith('tts_synthesize_part', { text: '第一句。', options: null });
+    expect(store.status).toBe('playing'); expect(onStart).toHaveBeenCalledOnce();
+    const done = stream.end('第一句。第二句。');
+    (audios[0].onended as () => void)();
+    await vi.waitFor(() => expect(audios).toHaveLength(2));
+    (audios[1].onended as () => void)(); await done;
+    expect(store.status).toBe('idle'); expect(stream.spoken).toBe('第一句。第二句。');
+  });
+  it('stops with the rest of reading: stop() ends the stream and cancels on the host', async () => {
+    const { store, invoke, audios } = fixture(); await store.init();
+    const stream = store.stream!('a1');
+    stream.push('一。二。'); await vi.waitFor(() => expect(audios).toHaveLength(1));
+    await store.stop();
+    expect(audios[0].pause).toHaveBeenCalled(); expect(invoke).toHaveBeenCalledWith('tts_cancel');
+    expect(store.status).toBe('idle'); expect(stream.active).toBe(false);
   });
 });

@@ -113,7 +113,8 @@ impl Default for Settings {
             assistant_ball: true,
             assistant_ball_dx: 0.0,
             assistant_ball_dy: 0.0,
-            assistant_open: "voice".into(),
+            // Voice is push to talk (hold the shortcut), so the capsule waits for typing by default.
+            assistant_open: "type".into(),
             assistant_read: "voice".into(),
             assistant_hint_seen: false,
             effects: Default::default(),
@@ -319,7 +320,7 @@ mod tests {
     fn the_assistant_ball_and_its_voice_preferences_default_on_and_repair_bad_values() {
         let defaults = Settings::default();
         assert!(defaults.assistant_ball && !defaults.assistant_hint_seen);
-        assert_eq!((defaults.assistant_open.as_str(), defaults.assistant_read.as_str()), ("voice", "voice"));
+        assert_eq!((defaults.assistant_open.as_str(), defaults.assistant_read.as_str()), ("type", "voice"));
         let mut chosen: Preferences = serde_json::from_str(
             r#"{"settings":{"assistantBall":false,"assistantBallDx":-120.5,"assistantBallDy":30,"assistantOpen":"type","assistantRead":"never"}}"#,
         ).unwrap();
@@ -332,7 +333,7 @@ mod tests {
         ).unwrap();
         bad.settings.normalize();
         assert_eq!((bad.settings.assistant_ball_dx, bad.settings.assistant_ball_dy), (0.0, 0.0));
-        assert_eq!((bad.settings.assistant_open.as_str(), bad.settings.assistant_read.as_str()), ("voice", "voice"));
+        assert_eq!((bad.settings.assistant_open.as_str(), bad.settings.assistant_read.as_str()), ("type", "voice"));
     }
     #[test]
     fn effects_chosen_per_wallpaper_become_the_desktop_wide_choice_once() {

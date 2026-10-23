@@ -102,7 +102,7 @@ onMounted(() => { void read(); void asr.value.init(); });
 
     <div class="xb-group-title">呼出方式</div>
     <div class="xb-group">
-      <div class="xb-row"><div class="xb-row-text"><b>呼出快捷键</b><span>与其他应用冲突时，可更换组合。</span></div>
+      <div class="xb-row"><div class="xb-row-text"><b>呼出快捷键</b><span>短按呼出或收起；按住说话，松开发送。与其他应用冲突时可更换组合。</span></div>
         <kbd class="xb-kbd" aria-label="当前快捷键" data-testid="assistant-shortcut-label">{{ status.shortcutLabel }}</kbd>
         <NSelect class="select" :value="status.shortcut" :options="shortcutOptions" :disabled="!store.desktop || !status.enabled || busy === 'assistant'" aria-label="呼出快捷键" data-testid="assistant-shortcut" @update:value="change({ shortcut: $event })" /></div>
       <div class="xb-row"><div class="xb-row-text"><b>悬浮球</b><span>点击展开，按住拖动。关闭后用快捷键呼出。</span></div>

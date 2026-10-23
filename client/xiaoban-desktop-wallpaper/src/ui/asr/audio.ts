@@ -50,6 +50,8 @@ class AdaptiveVoiceGate {
   }
 }
 
+/** Silence (16 kHz samples, 0.6 s) that ends an utterance. */
+export const END_SILENCE = 9600;
 /** Energy endpointing with pre-roll, minimum speech and bounded utterances. No audio is persisted. */
 export class UtteranceSegmenter {
   private pre: number[] = [];
@@ -61,7 +63,7 @@ export class UtteranceSegmenter {
   private gate?: AdaptiveVoiceGate;
   constructor(noiseGuard = false) { if (noiseGuard) this.gate = new AdaptiveVoiceGate(); }
   get pending(): boolean { return this.audio.length > 0; }
-  get active(): boolean { return this.speech >= 1600 && this.silence < 14400; }
+  get active(): boolean { return this.speech >= 1600 && this.silence < END_SILENCE; }
   /** Bounded early recognition while TTS is playing; final segmentation stays intact. */
   preview(): Float32Array | null {
     if (this.speech < 9600 || this.silence > 3200 || (this.gate && this.longestRun < 3200)) return null;
@@ -85,7 +87,7 @@ export class UtteranceSegmenter {
       this.silence += frame.length;
       if (this.silence > 640) this.speechRun = 0;
     }
-    if (this.audio.length < 320000 && this.silence < 14400) return null;
+    if (this.audio.length < 320000 && this.silence < END_SILENCE) return null;
     const result = this.speech >= 2880 && (!this.gate || this.longestRun >= 3200) ? Float32Array.from(this.audio) : null;
     this.audio = Array.from(frame.subarray(available)); this.speech = this.audio.length && voiced ? this.audio.length : 0; this.silence = 0;
     this.speechRun = this.longestRun = this.speech;

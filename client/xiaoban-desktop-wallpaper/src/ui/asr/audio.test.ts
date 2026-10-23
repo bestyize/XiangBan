@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { PcmResampler, UtteranceSegmenter } from './audio.ts';
+import { PcmResampler, UtteranceSegmenter, END_SILENCE } from './audio.ts';
 describe('microphone PCM', () => {
   it.each([44100, 48000])('converts %i Hz to 16 kHz across arbitrary frame boundaries', rate => {
     const input = Float32Array.from({ length: rate }, (_, i) => Math.sin(i / 20));
@@ -18,8 +18,8 @@ describe('microphone PCM', () => {
     const segmenter = new UtteranceSegmenter();
     for (let i = 0; i < 3; i++) expect(segmenter.push(new Float32Array(1600).fill(0.1))).toBeNull();
     let phrase: Float32Array | null = null;
-    for (let i = 0; i < 9; i++) phrase = segmenter.push(new Float32Array(1600));
-    expect(phrase?.length).toBe(19200);
+    for (let i = 0; i < 9; i++) phrase = segmenter.push(new Float32Array(1600)) ?? phrase;
+    expect(phrase?.length).toBe(4800 + END_SILENCE);
     const continuous = new UtteranceSegmenter(); const parts: number[] = [];
     for (let i = 0; i < 400; i++) { const part = continuous.push(new Float32Array(1600).fill(0.1)); if (part) parts.push(part.length); }
     expect(parts).toEqual([320000, 320000]);
