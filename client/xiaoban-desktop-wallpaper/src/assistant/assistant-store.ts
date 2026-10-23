@@ -133,6 +133,8 @@ export interface AssistantStore {
   unfold(peek?: boolean): Promise<void>;
   /** A capsule opened on hover is being used: it takes the keyboard focus and stays. */
   engage(): void;
+  /** "存到资料库" under an answer: kept in 资料库 → 收藏 with a way back to this conversation. */
+  saveAnswer(text: string): Promise<boolean>;
   /** Carries the conversation over to the full chat page. */
   openChat(): Promise<void>;
   openSettings(tab: SettingsTarget): Promise<void>;
@@ -595,6 +597,10 @@ export function createAssistantStore(deps: AssistantDeps): AssistantStore {
     hide() { return deps.invoke<void>('assistant_hide').catch(() => {}); },
     async unfold(peek = false) { await deps.invoke('assistant_unfold', { peek }); },
     engage() { if (!store.peek) return; store.peek = false; void deps.invoke('assistant_focus').catch(() => {}); },
+    async saveAnswer(text) {
+      try { await deps.invoke('library_save', { item: { kind: 'answer', title: '', text, sessionId: chat.currentId, sessionTitle: store.title } }); return true; }
+      catch (error) { store.note(error instanceof Error ? error.message : String(error)); return false; }
+    },
     async openChat() { await deps.invoke('assistant_open_chat', { session: chat.currentId }); },
     async openSettings(tab) { await deps.invoke('assistant_open_settings', { tab }); },
     dispose() {

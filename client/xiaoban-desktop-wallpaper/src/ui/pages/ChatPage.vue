@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { NButton, NInput } from 'naive-ui';
-import { ArrowDown, ArrowUpRight, Check, ChevronDown, ChevronRight, ChevronUp, Copy, Ellipsis, FileText, LoaderCircle, PanelRight, Pencil, RefreshCw, Search, Settings, ShieldAlert, ShieldCheck, Sparkles, Sprout, Target, Trash2, Volume2, X } from 'lucide-vue-next';
+import { ArrowDown, ArrowUpRight, Check, ChevronDown, ChevronRight, ChevronUp, Copy, Ellipsis, FileText, LoaderCircle, PanelRight, Pencil, RefreshCw, Search, Settings, ShieldAlert, ShieldCheck, Sparkles, Sprout, Star, Target, Trash2, Volume2, X } from 'lucide-vue-next';
 import { invoke } from '../../bridge.ts';
 import type { ControlStore } from '../control-types.ts';
 import ModelSwitchDialog from '../components/ModelSwitchDialog.vue';
@@ -120,6 +120,16 @@ function filesOf(calls: ToolCall[]): FileCard[] {
 async function copyReply(block: ReplyBlock) {
   try { await navigator.clipboard.writeText(replyText(block)); props.store.notify('已复制', 'success'); }
   catch { props.store.notify('复制失败，请选中文字后复制', 'error'); }
+}
+/** Answers saved to 资料库 → 收藏 in this view, so the star shows they are kept. */
+const savedReplies = ref(new Set<string>());
+async function saveReply(block: ReplyBlock) {
+  if (savedReplies.value.has(block.id)) return;
+  try {
+    await invoke('library_save', { item: { kind: 'answer', title: '', text: replyText(block), sessionId: chat.currentId, sessionTitle: title.value } });
+    savedReplies.value = new Set([...savedReplies.value, block.id]);
+    props.store.notify('已存到资料库', 'success');
+  } catch (error) { props.store.notify(error, 'error'); }
 }
 function speakReply(block: ReplyBlock) {
   const speech = props.store.speech;
@@ -339,6 +349,7 @@ async function openLink(href: string) {
                 </div>
                 <div v-if="finished(block) && replyText(block)" class="reply-actions">
                   <button type="button" class="act" data-testid="chat-copy-reply" aria-label="复制" title="复制" @click="copyReply(block)"><Copy :size="15" /></button>
+                  <button type="button" class="act" :class="{ 'is-on': savedReplies.has(block.id) }" :disabled="!store.desktop" :aria-label="savedReplies.has(block.id) ? '已存到资料库' : '存到资料库'" :title="savedReplies.has(block.id) ? '已存到资料库' : '存到资料库'" data-testid="chat-save-reply" @click="saveReply(block)"><Star :size="15" :fill="savedReplies.has(block.id) ? 'currentColor' : 'none'" /></button>
                   <button v-if="store.speech" type="button" class="act" :class="{ 'is-on': store.speech.currentKey === speechKey(block) }" :disabled="!store.desktop" :aria-label="store.speech.currentKey === speechKey(block) ? '停止朗读' : '朗读'" :title="store.speech.currentKey === speechKey(block) ? (store.speech.status === 'synthesizing' ? '取消合成' : '停止朗读') : '朗读'" data-testid="chat-read-reply" @click="speakReply(block)"><Volume2 :size="15" /></button>
                   <button v-if="block.id === lastBlockId && questionBefore(block)" type="button" class="act" data-testid="chat-regenerate" aria-label="重新生成" title="重新生成：把上一个问题再发一次" :disabled="running || !chat.configured" @click="regenerate(block)"><RefreshCw :size="15" /></button>
                   <small v-if="replyUsage(block)" class="usage" data-testid="msg-usage" title="这一轮所有模型调用的合计，输入含重复发送的上下文与缓存">输入 {{ formatTokens(replyUsage(block)!.prompt) }} · 输出 {{ formatTokens(replyUsage(block)!.completion) }} tokens</small>

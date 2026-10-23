@@ -1,0 +1,28 @@
+/* 资料库: shared by its four tabs. */
+.lib-chips{display:flex;align-items:center;flex-wrap:wrap;gap:4px;min-width:0}
+.lib-chips button{height:30px;padding:0 12px;border:0;border-radius:8px;background:transparent;color:var(--ui-text-secondary);font:inherit;font-size:13px;white-space:nowrap;cursor:pointer}
+.lib-chips button:hover{background:var(--ui-control)}
+.lib-chips button.active{background:var(--ui-soft);color:var(--ui-ink);font-weight:600}
+.lib-toolbar{flex:none;display:flex;align-items:center;gap:12px;padding:8px 0 10px;border-bottom:1px solid var(--ui-line);flex-wrap:wrap}
+.lib-pill{display:inline-flex;align-items:center;gap:5px;height:22px;padding:0 8px;border-radius:999px;font-size:11.5px;font-weight:500;white-space:nowrap;background:var(--ui-control);color:var(--ui-text-secondary)}
+.lib-pill i{width:6px;height:6px;border-radius:50%;background:currentColor;opacity:.8}
+.lib-pill.ok{background:rgba(52,163,109,.13);color:#1E6A45}
+.lib-pill.busy{background:rgba(224,154,43,.15);color:#87500A}
+.lib-pill.accent{background:var(--ui-soft);color:var(--ui-ink)}
+.lib-tag{display:inline-flex;align-items:center;height:22px;padding:0 8px;border-radius:6px;background:var(--ui-control);color:var(--ui-text-secondary);font-size:11.5px;border:0;font-family:inherit}
+.lib-card{border-radius:14px;background:var(--ui-surface);box-shadow:0 0 0 1px var(--ui-line),0 1px 2px rgba(0,0,0,.03)}
+.lib-card:hover{box-shadow:0 0 0 1px var(--ui-border-strong,var(--ui-line)),0 8px 20px rgba(0,0,0,.06)}
+.lib-icon-btn{display:grid;place-items:center;width:28px;height:28px;flex:none;border:0;border-radius:8px;background:transparent;color:var(--ui-text-secondary);cursor:pointer}
+.lib-icon-btn:hover:not(:disabled){background:var(--ui-control);color:var(--ui-text-primary)}
+.lib-icon-btn:disabled{opacity:.4;cursor:default}
+.lib-link{border:0;background:transparent;padding:0;font:inherit;font-size:12.5px;cursor:pointer;color:var(--ui-ink);display:inline-flex;align-items:center;gap:4px}
+.lib-link.muted{color:var(--ui-text-secondary)}
+.lib-link.danger{color:var(--ui-danger)}
+.lib-muted{color:var(--ui-text-tertiary);font-size:12px}
+.lib-section{display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:600;color:var(--ui-text-secondary)}
+.lib-scroll{flex:1;min-height:0;overflow-y:auto}
+.lib-dropping{box-shadow:inset 0 0 0 2px var(--ui-btn);border-radius:12px}
+.lib-badge{display:grid;place-items:center;flex:none;font-weight:700;color:#fff}
+.lib-form{display:grid;gap:14px}
+.lib-form label{display:grid;gap:6px;font-size:12.5px;color:var(--ui-text-secondary)}
+.lib-form-actions{display:flex;justify-content:flex-end;gap:10px}

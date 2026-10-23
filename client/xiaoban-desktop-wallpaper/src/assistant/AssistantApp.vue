@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ATTACHMENT_ACCEPT, MAX_TOTAL_BYTES, attachmentBytes, attachmentImage, attachmentName, readAttachment } from '../ui/chat/attachments.ts';
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
-import { ArrowUp, ArrowUpRight, Check, ChevronDown, Copy, Minus, Pin, Plus, RotateCcw, Settings, SquareDashed, SquarePen, TriangleAlert, X, History } from 'lucide-vue-next';
+import { ArrowUp, ArrowUpRight, Check, ChevronDown, Copy, Minus, Pin, Plus, RotateCcw, Settings, SquareDashed, SquarePen, Star, TriangleAlert, X, History } from 'lucide-vue-next';
 import MarkdownView from '../ui/chat/MarkdownView.ts';
 import SelectionCopyMenu from '../ui/chat/SelectionCopyMenu.vue';
 import type { AsrStore } from '../ui/asr/store.ts';
@@ -400,6 +400,11 @@ watch(() => [props.store.answer, turns.value.length, props.store.ask?.id, props.
 
 const copied = ref(''), copyFailed = ref('');
 let copyTimer: ReturnType<typeof setTimeout> | undefined;
+const savedAnswers = ref(new Set<string>());
+async function saveAnswer(id: string, text: string) {
+  if (savedAnswers.value.has(id) || !text.trim()) return;
+  if (await props.store.saveAnswer(text)) savedAnswers.value = new Set([...savedAnswers.value, id]);
+}
 async function copyText(id: string, text: string) {
   if (!text.trim()) return;
   clearTimeout(copyTimer);
@@ -524,6 +529,7 @@ onBeforeUnmount(()=>{
                   <MarkdownView :source="item.text" @open="openLink" /><span v-if="item.streaming" class="cursor" aria-hidden="true"></span>
                   <div v-if="!item.streaming" class="reply-actions" :class="{ last: item === lastAnswer }">
                     <button type="button" class="reply-btn" :data-testid="item === lastAnswer ? 'assistant-copy' : undefined" :aria-label="copied === item.id ? '已复制回复' : copyFailed === item.id ? '复制失败，点击重试' : '复制回复'" @pointerdown.prevent @click="copyText(item.id, item.text)"><Check v-if="copied === item.id" :size="13" /><Copy v-else :size="13" :stroke-width="1.8" /><span aria-live="polite">{{ copied === item.id ? '已复制' : copyFailed === item.id ? '复制失败，重试' : '复制' }}</span></button>
+                    <button type="button" class="reply-btn" :class="{ on: savedAnswers.has(item.id) }" :aria-label="savedAnswers.has(item.id) ? '已存到资料库' : '存到资料库'" :title="savedAnswers.has(item.id) ? '已存到资料库' : '存到资料库'" :data-testid="item === lastAnswer ? 'assistant-save' : undefined" @pointerdown.prevent @click="saveAnswer(item.id, item.text)"><Star :size="13" :stroke-width="1.8" :fill="savedAnswers.has(item.id) ? 'currentColor' : 'none'" /><span>{{ savedAnswers.has(item.id) ? '已收藏' : '存到资料库' }}</span></button>
                     <button v-if="item === lastAnswer && !busy" type="button" class="reply-btn" aria-label="重新生成" title="重新生成" data-testid="assistant-retry" @click="act(() => store.retry())"><RotateCcw :size="13" :stroke-width="1.8" /></button>
                   </div>
                 </div>
@@ -713,6 +719,7 @@ button{font:inherit}
 .reply-actions:not(.last){position:absolute;top:-8px;right:0;margin:0;padding:2px;border-radius:9px;background:var(--glass-card);box-shadow:0 0 0 .5px var(--edge),0 4px 12px rgba(0,0,0,.08)}
 .reply-btn{display:inline-flex;align-items:center;gap:5px;height:26px;padding:0 8px;border:0;border-radius:7px;background:transparent;color:var(--text-3);font-size:12px;cursor:pointer}
 .reply-btn:hover{background:var(--hover);color:var(--text)}
+.reply-btn.on{color:var(--accent-ink)}
 .cursor{display:inline-block;width:7px;height:15px;margin-left:2px;vertical-align:-2px;border-radius:2px;background:var(--accent-dot);animation:blink 1s steps(2,start) infinite}
 .working{margin:0;display:flex;align-items:center;gap:10px;color:var(--text-3);font-size:13px}
 .dots{display:inline-flex;gap:4px}

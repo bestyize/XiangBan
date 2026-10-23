@@ -60,6 +60,34 @@ impl Memory {
     }
 
     /// For `AgentBuilder::prompt_section`: the note index, rebuilt on every model call.
+    /// A note's text, for a host that shows notes to the user.
+    pub fn read(&self, name: &str) -> Result<String, String> {
+        let path = self.path(name)?;
+        check_not_symlink(&path)?;
+        fs::read_to_string(&path).map_err(|_| format!("no note named `{name}`"))
+    }
+
+    /// Replaces (or creates) a note, under the same limits the assistant's own writes obey.
+    pub fn write(&self, name: &str, text: &str) -> Result<(), String> {
+        let path = self.path(name)?;
+        check_not_symlink(&path)?;
+        let text = text.trim_end();
+        if text.trim().is_empty() || text.len() > MAX_NOTE_BYTES {
+            return Err(format!("a note must be 1 to {MAX_NOTE_BYTES} bytes"));
+        }
+        if !path.exists() && self.list().len() >= MAX_NOTES {
+            return Err(format!("the limit of {MAX_NOTES} notes is reached; delete one first"));
+        }
+        fs::create_dir_all(&self.dir).map_err(|e| format!("cannot create the notes directory: {e}"))?;
+        atomic_write(&path, format!("{text}\n").as_bytes()).map_err(|e| format!("cannot save the note: {e}"))
+    }
+
+    pub fn remove(&self, name: &str) -> Result<(), String> {
+        let path = self.path(name)?;
+        check_not_symlink(&path)?;
+        fs::remove_file(&path).map_err(|_| format!("no note named `{name}`"))
+    }
+
     pub fn prompt_section(self: &Arc<Self>) -> impl Fn() -> String + Send + Sync + 'static {
         let memory = self.clone();
         move || {
@@ -187,5 +215,25 @@ impl Tool for MemoryWrite {
         fs::create_dir_all(&self.memory.dir).map_err(|e| format!("cannot create the notes directory: {e}"))?;
         atomic_write(&path, format!("{text}\n").as_bytes()).map_err(|e| format!("cannot save the note: {e}"))?;
         Ok(format!("Saved note `{name}` ({} bytes).", text.len() + 1))
+    }
+}
+
+#[cfg(test)]
+mod host_tests {
+    use super::*;
+
+    #[test]
+    fn the_host_reads_writes_and_removes_notes_under_the_same_rules() {
+        let dir = std::env::temp_dir().join(format!("xiaoban-notes-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        let memory = Memory::new(&dir);
+        memory.write("about-me", "称呼我小王\n").unwrap();
+        assert_eq!(memory.read("about-me").unwrap(), "称呼我小王\n");
+        assert_eq!(memory.list()[0].preview, "称呼我小王");
+        assert!(memory.write("Bad Name", "x").is_err(), "names stay slugs");
+        assert!(memory.write("empty", "  ").is_err());
+        memory.remove("about-me").unwrap();
+        assert!(memory.read("about-me").is_err() && memory.list().is_empty());
+        let _ = fs::remove_dir_all(&dir);
     }
 }

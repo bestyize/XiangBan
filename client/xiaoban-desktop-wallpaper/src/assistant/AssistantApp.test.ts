@@ -23,7 +23,7 @@ function setup(overrides: Record<string, unknown> = {}, stubs: Record<string, un
     items: conversation() as unknown[], title: '放松一下', currentId: 's1' as string | null, recent: [{ id: 's1', title: '放松一下', createdAt: 1, updatedAt: 2 }, { id: 's2', title: '周报整理', createdAt: 1, updatedAt: 1 }],
     unread: false, notice: null as null | { kind: string; text: string }, dismissNotice: vi.fn(), switchSession: vi.fn(async () => {}), retry: vi.fn(async () => {}), decide: vi.fn(), reply: vi.fn(),
     attachments: [] as unknown[], questionImages: [] as string[], prepareImages: vi.fn(), inputStarted: vi.fn(), note: vi.fn(), input: '草稿', status: '正在回答…', hide: vi.fn(), submit: vi.fn(), interrupt: vi.fn(), openChat: vi.fn(),newConversation:vi.fn(),openSettings:vi.fn(),toggleListening:vi.fn(),unfold:vi.fn(),
-    layout: { ball: null as null | { x: number; y: number; size: number }, right: true }, prefs: { open: 'type', read: 'voice', hover: true }, peek: false, hovering: false, reanchoring: 0, reanchorReady: vi.fn(), engage: vi.fn(), ...overrides });
+    layout: { ball: null as null | { x: number; y: number; size: number }, right: true }, prefs: { open: 'type', read: 'voice', hover: true }, peek: false, hovering: false, reanchoring: 0, reanchorReady: vi.fn(), engage: vi.fn(), saveAnswer: vi.fn(async () => true), ...overrides });
   store.dismissNotice.mockImplementation(() => { store.notice = null; });
   const asr=reactive({level:0,enabled:true,microphoneSupported:true,listening:false,preparing:false,recordingRequested:false,microphoneError:''});
   const wrapper=mount(AssistantApp,{attachTo:document.body,props:{store:store as unknown as AssistantStore,asr:asr as AsrStore},global:{stubs:{MarkdownView:true,...stubs}}});
@@ -164,6 +164,16 @@ describe('assistant conversation card', () => {
     expect(menu().exists()).toBe(true);
     document.body.dispatchEvent(new PointerEvent('pointerdown',{bubbles:true}));await nextTick();
     expect(menu().exists()).toBe(false);expect(body.style.display).toBe('');
+  });
+  it('saves an answer to 资料库 once and shows it is kept', async () => {
+    const {store,wrapper}=setup();store.phase='idle';await nextTick();
+    const save=wrapper.get('[data-testid="assistant-save"]');
+    expect(save.text()).toBe('存到资料库');
+    await save.trigger('click');await flushPromises();
+    expect(store.saveAnswer).toHaveBeenCalledWith('可以先休息片刻。');
+    expect(save.text()).toBe('已收藏');
+    await save.trigger('click');await flushPromises();
+    expect(store.saveAnswer).toHaveBeenCalledOnce();
   });
   it('continues in the main window and folds away from the header', async () => {
     const {store,wrapper}=setup();store.phase='idle';await nextTick();

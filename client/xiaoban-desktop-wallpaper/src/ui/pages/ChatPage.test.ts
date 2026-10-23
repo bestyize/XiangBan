@@ -503,6 +503,14 @@ describe('a conversation in the page', () => {
     expect(h.calls.at(-1)).toEqual(['chat_send', { sessionId: 's1', text: '早' }]);
   });
 
+  it('saves a reply to 资料库 with the conversation it came from', async () => {
+    const h = await open({ ...listed, library_save: () => 'saved-1' });
+    await openSession('s1');
+    await click('chat-save-reply');
+    expect(h.calls.find(([command]) => command === 'library_save')).toEqual(['library_save', { item: { kind: 'answer', title: '', text: '早上好，**今天**天气不错', sessionId: 's1', sessionTitle: expect.any(String) } }]);
+    expect(q('chat-save-reply')!.getAttribute('aria-label')).toBe('已存到资料库');
+  });
+
   it('keeps delete in the title bar menu, asks first, then goes back to 新建任务', async () => {
     const h = await open({ ...listed, chat_delete_session: () => [summary('s2', '写周报', 1)] });
     await openMenu('s1');

@@ -181,7 +181,7 @@ const SHARED_COMMANDS: &[&str] = &[
     "tts_get_settings", "tts_synthesize", "tts_synthesize_part", "tts_cancel",
     "asr_get_status", "asr_prepare", "asr_transcribe", "asr_report_microphone",
     "voice_turn_ready", "voice_vad", "voice_vad_reset", "voice_turn_complete",
-    "open_download_url",
+    "open_download_url", "library_save",
 ];
 
 /// `Some(answer)` when this module decides for the window, `None` to let the other rules decide.
@@ -1204,7 +1204,10 @@ mod tests {
         for command in ["chat_send", "chat_cancel", "chat_answer_approval", "tts_synthesize", "asr_transcribe", "assistant_set_regions"] {
             assert_eq!(permitted(LABEL, command), Some(true), "{command}");
         }
-        for command in ["chat_delete_session", "chat_set_permission_mode", "chat_compact", "asr_set_enabled", "tts_save_settings", "get_ai_config", "assistant_configure", "quit"] {
+        // It can put an answer into 资料库, but not see, change or remove anything there.
+        assert_eq!(permitted(LABEL, "library_save"), Some(true));
+        for command in ["chat_delete_session", "chat_set_permission_mode", "chat_compact", "asr_set_enabled", "tts_save_settings", "get_ai_config", "assistant_configure", "quit",
+            "library_state", "library_remove", "library_attachment", "chat_memory_overview", "chat_memory_clear"] {
             assert_eq!(permitted(LABEL, command), Some(false), "{command}");
         }
     }

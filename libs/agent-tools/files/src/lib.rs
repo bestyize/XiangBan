@@ -1,5 +1,7 @@
 //! Product-independent file capabilities. The kernel has no dependency on this crate.
 mod documents;
+/// Text of a PDF or Office document, for hosts that show or index documents outside a tool call.
+pub use documents::extract as extract_document_text;
 mod storage;
 use agent_kernel::{
     builtin::fs::fs_tools, HarnessError, Part, Risk, Tool, ToolCtx, ToolResult, ToolSpec,

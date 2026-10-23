@@ -30,6 +30,7 @@ pub fn remember_workspace(app: &tauri::AppHandle, folder: &str) {
 mod run_history;
 pub(crate) mod task_outcome;
 mod learning;
+pub mod memory_center;
 mod skill_evolution;
 pub(crate) mod store;
 mod sessions;
@@ -524,6 +525,8 @@ fn assemble_with_connectors(parts: Parts<'_>, attachments: Vec<Attachment>, conn
     fs::write(file_skill.join("scripts/csv_summary.py"), agent_file_tools::CSV_SUMMARY_SCRIPT).map_err(|e| e.to_string())?;
     let skills = Arc::new(Skills::new().read_only_root(bundled).writable_root(dirs.skills()));
     let memory = Arc::new(Memory::new(dirs.memory()));
+    // 资料库 → 记忆 can switch remembering off: no notes in the prompt, no note tools, nothing recalled.
+    let remember = memory_center::remembering(&dirs);
     let discovery = SkillDiscovery::new(dirs.skills(), workspace.to_path_buf());
     // Started before the prompt is written, so the prompt can say honestly whether the tools exist.
     let computer_use = if open_computer_use { Some(spawn_computer_use()) } else { None };
@@ -538,7 +541,10 @@ fn assemble_with_connectors(parts: Parts<'_>, attachments: Vec<Attachment>, conn
     let mut builder = Agent::builder(provider.clone(), Arc::new(AttachmentHistory::new(CompactingStore::new(JsonlStore::new(dirs.sessions())), attachments.clone())))
         .system_prompt(prompt::system_prompt(&environment))
         .prompt_section(skills.prompt_section())
-        .prompt_section(memory.prompt_section())
+        .prompt_section({
+            let section = memory.prompt_section();
+            move || if remember { section() } else { String::new() }
+        })
         // Read again before every model call, so an edit to AGENTS.md applies to the next step.
         .prompt_section({
             let workspace = workspace.to_path_buf();
@@ -549,7 +555,7 @@ fn assemble_with_connectors(parts: Parts<'_>, attachments: Vec<Attachment>, conn
         .tool(ask)
         .tool(Shell::new(workspace).sandbox(sandbox_gate::hook(permission.clone(), workspace)))
         .tool(WebFetch::new())
-        .tool(learning::Recall::new(dirs.learning_db()))
+        .tool(learning::Recall::new(dirs.learning_db()).paused(!remember))
         .middleware(discovery.acquisition_policy())
         // The user's own checks run first: a call they stop is never put to them for approval.
         .middleware(hooks::Hooks::new(dirs.chat.join("hooks.json"), workspace))
@@ -575,7 +581,7 @@ fn assemble_with_connectors(parts: Parts<'_>, attachments: Vec<Attachment>, conn
     readable.retain(|tool| tool.spec().name != "read_file");
     readable.push(Arc::new(ReadFile::new(roots, AttachmentStore::new(dirs.chat.join("attachments"))).map_err(|e| e.to_string())?));
     let writable = fs_write_tools(vec![workspace.to_path_buf()]).map_err(|e| e.to_string())?;
-    for tool in readable.into_iter().chain(writable).chain(skills.tools()).chain(memory.tools()).chain(discovery.tools()) {
+    for tool in readable.into_iter().chain(writable).chain(skills.tools()).chain(if remember { memory.tools() } else { Vec::new() }).chain(discovery.tools()) {
         builder = builder.tool_arc(tool);
     }
     // Product-specific desktop actions are discoverable without paying for every schema

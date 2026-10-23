@@ -13,7 +13,7 @@ import { invoke as bridgeInvoke } from '../../bridge.ts';
 const overview = (patch: Partial<Overview> = {}): Overview => ({ configured: true, sessions: [], running: [], workspace: '/Users/me/小伴/工作区', permissionMode: 'ask', hideToolCalls: false, ...patch });
 let wrapper: VueWrapper | undefined;
 
-async function open(patch: Partial<Overview> = {}, page = 'new-task') {
+async function open(patch: Partial<Overview> = {}, page = 'new-task', handed: { draft: string | null; attachments: unknown[] | null } = { draft: null, attachments: null }) {
   const calls: string[] = [];
   const invoke = vi.fn(async (command: string, args?: Record<string, unknown>) => {
     calls.push(command);
@@ -29,7 +29,7 @@ async function open(patch: Partial<Overview> = {}, page = 'new-task') {
   const deps: ChatDeps = { desktop: true, invoke, notify: vi.fn(), listen: async () => () => {} };
   const chat = createChatStore(deps);
   const asr = reactive({ ready: true, microphoneSupported: true, saving: false, recordingRequested: false, listening: false, preparing: false, recognizing: false, enabled: true, error: '', init: vi.fn(async () => {}), activate: vi.fn(async () => {}), deactivate: vi.fn(), finish: vi.fn(async () => {}) });
-  const store = reactive({ desktop: true, chat, asr, page, settingsTab: 'general', creationDraft: null, navigate: vi.fn(), notify: vi.fn(), openSettings: vi.fn() }) as unknown as ControlStore;
+  const store = reactive({ desktop: true, chat, asr, page, settingsTab: 'general', creationDraft: handed.draft, creationAttachments: handed.attachments, navigate: vi.fn(), notify: vi.fn(), openSettings: vi.fn() }) as unknown as ControlStore;
   wrapper = mount(NewTaskPage, { props: { store }, attachTo: document.body });
   await flushPromises();
   return { store, chat, asr, calls };
@@ -55,6 +55,15 @@ describe('新建任务', () => {
     vi.setSystemTime(new Date(2026, 9, 22, 21, 0));
     await open();
     expect(q('new-task-greeting')!.textContent).toContain('晚上好');
+  });
+
+  it('takes a file handed over from 资料库 into the box, unsent, along with its prompt', async () => {
+    const file = { name: '预算.xlsx', size: 286_000, mime: 'application/vnd', dataUrl: 'data:application/vnd;base64,AA==' };
+    const { store, calls } = await open({}, 'new-task', { draft: '请参考资料库里的「预算.xlsx」：', attachments: [file] });
+    expect(textarea().value).toBe('请参考资料库里的「预算.xlsx」：');
+    expect(q('chat-attachments')!.textContent).toContain('预算.xlsx');
+    expect(store.creationAttachments).toBeNull();
+    expect(calls).not.toContain('chat_send');
   });
 
   it('switches the quick starts with the scene and puts one in the box without sending', async () => {

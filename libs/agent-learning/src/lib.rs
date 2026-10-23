@@ -126,6 +126,30 @@ impl LearningDb {
         params![id],|r|Ok(Experience{id:r.get(0)?,scope:r.get(1)?,source_run_id:r.get(2)?,
          kind:r.get(3)?,content:r.get(4)?,state:r.get(5)?,evidence:r.get(6)?})).optional().map_err(|e|e.to_string())
     }
+    /// Every candidate and approved experience in a scope, newest first, for the user to review and edit.
+    pub fn list_experiences(&self,scope:&str)->Result<Vec<(Experience,i64)>,String>{
+        let mut stmt=self.conn.prepare("SELECT id,scope,source_run_id,kind,content,state,evidence,created_at FROM experiences
+            WHERE scope=?1 AND state IN ('candidate','approved') ORDER BY created_at DESC,id DESC LIMIT 500").map_err(|e|e.to_string())?;
+        let rows=stmt.query_map(params![scope],|r|Ok((Experience{id:r.get(0)?,scope:r.get(1)?,source_run_id:r.get(2)?,
+            kind:r.get(3)?,content:r.get(4)?,state:r.get(5)?,evidence:r.get(6)?},r.get::<_,i64>(7)?))).map_err(|e|e.to_string())?;
+        rows.collect::<Result<Vec<_>,_>>().map_err(|e|e.to_string())
+    }
+    /// The user's own correction of an experience. The search index follows through its trigger.
+    pub fn update_experience(&self,id:i64,content:&str)->Result<(),String>{
+        if content.trim().is_empty() || content.len()>8000 { return Err("invalid experience length".into()); }
+        let n=self.conn.execute("UPDATE experiences SET content=?1 WHERE id=?2",params![content.trim(),id]).map_err(|e|e.to_string())?;
+        if n==0{return Err("experience not found".into());}
+        Ok(())
+    }
+    /// Forgets an experience for good, with any skill proposals made from it.
+    pub fn delete_experience(&self,id:i64)->Result<(),String>{
+        self.conn.execute("DELETE FROM experiences WHERE id=?1",params![id]).map_err(|e|e.to_string())?;
+        Ok(())
+    }
+    pub fn clear_experiences(&self,scope:&str)->Result<(),String>{
+        self.conn.execute("DELETE FROM experiences WHERE scope=?1",params![scope]).map_err(|e|e.to_string())?;
+        Ok(())
+    }
     pub fn search_experiences(&self,scope:&str,query:&str,limit:usize)->Result<Vec<Experience>,String>{
         if query.trim().is_empty() || query.len()>256 {return Ok(Vec::new());}
         // FTS syntax is not exposed to the model: quote literals to avoid operators and malformed queries.
@@ -203,5 +227,25 @@ mod tests {
         let _=std::fs::remove_file(&p);
         let _=std::fs::remove_file(p.with_extension("sqlite-wal"));
         let _=std::fs::remove_file(p.with_extension("sqlite-shm"));
+    }
+    #[test] fn the_user_can_list_correct_and_forget_experiences() {
+        let p=std::env::temp_dir().join(format!("xiaoban-learning-edit-{}.sqlite",std::process::id()));
+        let _=std::fs::remove_file(&p);
+        let db=LearningDb::open(&p).unwrap();
+        let a=db.add_experience("personal","r1","procedure","weekly report on friday","seen twice").unwrap();
+        let b=db.add_experience("personal","r2","failure","tables before conclusions","asked once").unwrap();
+        let c=db.add_experience("personal","r3","procedure","rejected idea","n/a").unwrap();
+        db.set_experience_state(a,"approved").unwrap();db.set_experience_state(c,"rejected").unwrap();
+        // Rejected ones are gone from the list; the rest keep their state.
+        let listed=db.list_experiences("personal").unwrap();
+        assert_eq!(listed.iter().map(|(e,_)|(e.id,e.state.as_str())).collect::<Vec<_>>(),vec![(b,"candidate"),(a,"approved")]);
+        db.update_experience(a,"weekly report on friday afternoon").unwrap();
+        assert_eq!(db.search_experiences("personal","afternoon",8).unwrap().len(),1,"the index follows the edit");
+        db.delete_experience(a).unwrap();
+        assert!(db.search_experiences("personal","friday",8).unwrap().is_empty());
+        db.clear_experiences("personal").unwrap();
+        assert!(db.list_experiences("personal").unwrap().is_empty());
+        drop(db);
+        for ext in ["sqlite","sqlite-wal","sqlite-shm"] { let _=std::fs::remove_file(p.with_extension(ext)); }
     }
 }
