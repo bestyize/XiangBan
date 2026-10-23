@@ -409,7 +409,7 @@ onBeforeUnmount(()=>{
   <div class="stage" :class="{ light: !isDark, dragging, morphing }" @dragover="dragOver" @drop="dropImages" @keydown.esc.prevent.stop="escape" @pointerdown="dragDown" @click.capture="captureClick">
     <div v-if="store.ball && !store.open" class="ball-stage" :class="{ 'has-bubble': bubbleLeft !== null, 'bubble-left': bubbleLeft === true }" data-testid="assistant-ball-stage">
       <button type="button" class="ball" :data-phase="store.phase" :data-badge="ballBadge || undefined" title="点一下打开，按住可以拖动，右键打开设置" :aria-label="ballLabel" data-testid="assistant-ball" data-drag-handle @click="ballClick" @contextmenu.prevent="store.openSettings('assistant')">
-        <Orb :phase="store.phase === 'attention' ? 'idle' : store.phase" :active="store.ball && !store.open" :size="34" />
+        <Orb :phase="store.phase === 'attention' ? 'idle' : store.phase" :active="store.ball && !store.open" :muted="ballBadge === 'error'" :size="44" />
         <svg v-if="ballRing" class="ball-ring" viewBox="0 0 50 50" aria-hidden="true" data-testid="assistant-ball-ring"><circle cx="25" cy="25" r="23" class="ring-track" /><circle cx="25" cy="25" r="23" class="ring-arc" /></svg>
         <span v-if="ballBadge" class="badge" :class="ballBadge" aria-hidden="true" data-testid="assistant-ball-badge"><template v-if="ballBadge === 'attention'">!</template><X v-else-if="ballBadge === 'error'" :size="9" :stroke-width="3.4" /></span>
       </button>
@@ -499,7 +499,7 @@ onBeforeUnmount(()=>{
           </div>
           <div class="capsule">
             <button type="button" class="orb-button" :title="orbLabel + ' · 拖动可移动'" :aria-label="orbLabel" data-testid="assistant-orb" :disabled="imageReading || submitting || capturing || (asr.preparing && store.phase !== 'speaking')" data-drag-handle @click="onOrb">
-              <Orb :phase="store.phase" :level="asr.level" :active="store.open" :size="32" :dark="isDark" />
+              <Orb :phase="store.phase" :level="asr.level" :active="store.open" :size="32" />
             </button>
             <textarea ref="field" v-model="store.input" rows="1" :disabled="store.changingSession" class="field" autocomplete="off" spellcheck="false" :placeholder="store.phase === 'idle' ? '问小伴，或点左边的球说话…' : store.status" aria-label="向小伴提问" data-testid="assistant-input" @beforeinput="store.inputStarted()" @input="store.inputStarted(); grow()" @keydown.enter="onEnter" @compositionstart="composing = true; store.inputStarted()" @compositionend="composing = false" />
             <button type="button" class="tool" title="添加文件 · 也可以拖入或粘贴" aria-label="添加文件" data-testid="assistant-add-image" :disabled="!canAttach || store.attachments.length >= 8" @click="openPicker"><Plus :size="18" :stroke-width="1.75" /></button>
@@ -512,7 +512,7 @@ onBeforeUnmount(()=>{
         <span class="sr" aria-live="polite">{{ store.status }}</span>
       </div>
     </Transition>
-    <div v-if="morphVisible" ref="morphShell" class="morph-shell" :style="morphStyle" aria-hidden="true"><Orb phase="idle" :size="34" flowing /></div>
+    <div v-if="morphVisible" ref="morphShell" class="morph-shell" :style="morphStyle" aria-hidden="true"><Orb phase="idle" :size="38" /></div>
     <SelectionCopyMenu :scope="scroller" @visibility-change="queueHitRegions" />
   </div>
 </template>
@@ -534,12 +534,12 @@ button{font:inherit}
 .ball-stage{display:flex;align-items:center;height:100vh;padding:0 14px;box-sizing:border-box;gap:10px}
 .ball-stage:not(.has-bubble){justify-content:center;padding:0}
 .ball-stage.bubble-left{flex-direction:row-reverse}
-.ball{pointer-events:auto;touch-action:none;position:relative;flex:none;display:grid;place-items:center;width:44px;height:44px;padding:0;border:0;border-radius:50%;background:var(--glass);backdrop-filter:blur(20px) saturate(1.6);box-shadow:0 0 0 .5px var(--edge),0 1px 3px rgba(0,0,0,.2),0 3px 8px rgba(0,0,0,.18),inset 0 1px 0 rgba(255,255,255,.12);cursor:grab;transition:transform .2s}
-.stage.light .ball{box-shadow:0 0 0 .5px var(--edge),0 1px 3px rgba(0,0,0,.08),0 3px 8px rgba(0,0,0,.1),inset 0 1px 0 rgba(255,255,255,.9)}
+.ball{pointer-events:auto;touch-action:none;position:relative;flex:none;display:grid;place-items:center;width:44px;height:44px;padding:0;border:0;border-radius:50%;background:none;box-shadow:0 0 0 .5px var(--edge),0 1px 3px rgba(0,0,0,.2),0 3px 8px rgba(0,0,0,.18);cursor:grab;transition:transform .2s}
+.stage.light .ball{box-shadow:0 0 0 .5px var(--edge),0 1px 3px rgba(0,0,0,.1),0 3px 8px rgba(0,0,0,.12)}
 .ball:hover{transform:scale(1.06)}
 .ball:active{transform:scale(.96)}
 .ball:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
-.ball-ring{position:absolute;inset:-3px;width:50px;height:50px;pointer-events:none;animation:spin 1.1s linear infinite}
+.ball-ring{position:absolute;inset:-6px;width:56px;height:56px;pointer-events:none;animation:spin 1.1s linear infinite}
 .ring-track{fill:none;stroke:var(--line);stroke-width:2.5}
 .ring-arc{fill:none;stroke:var(--accent);stroke-width:2.5;stroke-linecap:round;stroke-dasharray:44 101}
 .badge{position:absolute;top:-3px;right:-3px;display:grid;place-items:center;min-width:16px;height:16px;border-radius:8px;color:#fff;font-size:10.5px;font-weight:600;line-height:1;box-shadow:0 0 0 2px var(--glass)}
@@ -680,7 +680,7 @@ button{font:inherit}
 @keyframes nudge{0%{transform:translateY(0)}40%{transform:translateY(-3px)}100%{transform:translateY(0)}}
 @media(prefers-reduced-motion:reduce){.pop-enter-active,.rise-enter-active,.bubble-enter-active,.bubble-leave-active{transition:none}.dots i,.cursor,.ball-ring,.badge{animation:none}}
 .morph-shell{position:fixed;z-index:20;display:flex;align-items:center;justify-content:center;overflow:hidden;pointer-events:none;border-radius:26px;background:var(--glass);box-shadow:0 0 0 .5px var(--edge),var(--shadow)}
-.morph-shell :deep(.orb-frame){position:absolute;left:5px}
+.morph-shell :deep(.orb-frame){position:absolute;left:3px}
 .morphing .composer,.morphing .chips{opacity:0;pointer-events:none}
 .morphing .card,.morphing .ball{opacity:0;pointer-events:none}
 .morphing .inner{transform:none!important;transition:none!important}

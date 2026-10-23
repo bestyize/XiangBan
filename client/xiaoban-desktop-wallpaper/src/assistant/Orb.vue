@@ -1,37 +1,41 @@
 <script setup lang="ts">
+import { computed } from 'vue';
 import type { Phase } from './assistant-store.ts';
 
-// Keep the shared orb API; CSS animation replaces continuous canvas redraws.
-withDefaults(defineProps<{ phase: Phase; level?: number; active?: boolean; flowing?: boolean; size?: number; dark?: boolean; fps?: number }>(), { level: 0, active: true, flowing: false, size: 34, dark: true, fps: 60 });
+// The brand mark (the Sparkles before 小伴 AI) in white on a theme-colour disc. It turns into sound bars while
+// listening or reading aloud, and its small sparkles twinkle while thinking. The disc fills `size`.
+const props = withDefaults(defineProps<{ phase: Phase; level?: number; active?: boolean; muted?: boolean; size?: number }>(), { level: 0, active: true, muted: false, size: 34 });
+const voice = computed(() => props.phase === 'listening' || props.phase === 'speaking');
+const loud = computed(() => props.phase === 'listening' ? Math.max(0, Math.min(1, props.level)) : 0.6);
 </script>
 
 <template>
-  <span class="orb-frame" :class="{ paused: !active, flowing }" :data-phase="phase" :style="{ width: `${size}px`, height: `${size}px` }" aria-hidden="true">
-    <span class="orb-body"><i v-if="flowing" class="orb-colours"></i><i class="mist"></i></span>
+  <span class="orb-frame" :class="{ paused: !active, muted }" :data-phase="phase" :style="{ width: `${size}px`, height: `${size}px`, '--loud': loud }" aria-hidden="true">
+    <span v-if="voice" class="bars"><i></i><i></i><i></i><i></i></span>
+    <svg v-else class="mark" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path fill="#fff" d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z" />
+      <path class="twinkle" d="M20 2v4M22 4h-4" />
+      <circle class="twinkle late" cx="4" cy="20" r="2" />
+    </svg>
   </span>
 </template>
 
 <style scoped>
-.orb-frame{display:grid;place-items:center;flex:none;pointer-events:none}
-.orb-body{display:block;position:relative;isolation:isolate;overflow:hidden;width:85.3%;height:85.3%;border-radius:50%;background:radial-gradient(ellipse at 25% 20%,#FFE47A,transparent 56%),radial-gradient(ellipse at 78% 28%,#F26BAA,transparent 60%),radial-gradient(ellipse at 80% 85%,#55BEEB,transparent 58%),radial-gradient(ellipse at 18% 78%,#43D6A2,transparent 62%),#AF8DE2;box-shadow:inset 0 0 0 1px #ffffff40,inset 1px 2px 3px #ffffff35,inset -2px -2px 4px #17404c22;animation:breathe 5s ease-in-out infinite}
-.orb-body:before{content:'';position:absolute;inset:-15%;border-radius:43%;background:radial-gradient(ellipse at 28% 25%,#FFECA47D,transparent 60%);filter:blur(2px);animation:flow 12s linear infinite}
-.orb-body:after{content:'';position:absolute;inset:0;border-radius:50%;background:radial-gradient(ellipse at 35% 17%,#ffffff9c,transparent 28%),radial-gradient(ellipse at 70% 85%,#ffffff24,transparent 40%);box-shadow:inset 0 -1px 2px #ffffff35}
-.mist{position:absolute;inset:12%;border-radius:45%;border:1px solid #ffffff35;filter:blur(2px);animation:flow 16s linear infinite reverse}
-[data-phase=listening] .orb-body{animation:listen 1.35s ease-in-out infinite}
-[data-phase=listening] .mist{opacity:.9;filter:blur(1px);animation-duration:2.8s}
-[data-phase=listening] .orb-body:before{animation-duration:4s}
-[data-phase=thinking] .orb-body{animation:ponder 2.5s linear infinite}
-[data-phase=thinking] .orb-body:before{animation-duration:1.4s}
-[data-phase=thinking] .mist{filter:blur(.5px);animation-duration:1.2s}
-[data-phase=answering] .orb-body,[data-phase=speaking] .orb-body{animation:speak 3s ease-in-out infinite}
-[data-phase=answering] .orb-body:before,[data-phase=speaking] .orb-body:before{animation-duration:2.3s}
-[data-phase=answering] .mist,[data-phase=speaking] .mist{animation-duration:2s}
-.orb-colours{position:absolute;inset:-22%;border-radius:43%;background:radial-gradient(ellipse at 25% 20%,#FFE47A,transparent 56%),radial-gradient(ellipse at 78% 28%,#F26BAA,transparent 60%),radial-gradient(ellipse at 80% 85%,#55BEEB,transparent 58%),radial-gradient(ellipse at 18% 78%,#43D6A2,transparent 62%),#AF8DE2;animation:colour-flow 12s linear infinite}.flowing .orb-body:before{opacity:.45}@keyframes colour-flow{0%{transform:rotate(0deg) scale(1.05)}50%{transform:rotate(180deg) scale(1.18)}100%{transform:rotate(360deg) scale(1.05)}}
-.paused .orb-colours,.paused .orb-body,.paused .orb-body:before,.paused .mist{animation-play-state:paused}
-@keyframes breathe{50%{transform:scale(.965) translateY(-1px)}}
-@keyframes flow{to{transform:rotate(360deg)}}
-@keyframes listen{0%,100%{transform:scale(.88)}50%{transform:scale(1.08)}}
-@keyframes ponder{0%{transform:rotate(0) scale(.97)}50%{transform:rotate(180deg) scale(1.03)}100%{transform:rotate(360deg) scale(.97)}}
-@keyframes speak{0%,100%{transform:scale(1,.958)}18%{transform:scale(.909,1.098)}36%{transform:scale(1.084,.916)}55%{transform:scale(.958,1.049)}72%{transform:scale(1.049,.951)}88%{transform:scale(.944,1.077)}}
-@media(prefers-reduced-motion:reduce){.orb-colours,.orb-body,.orb-body:before,.mist{animation:none}}
+.orb-frame{display:grid;place-items:center;flex:none;pointer-events:none;border-radius:50%;background:var(--accent,#D93A44);box-shadow:inset 0 0 0 .5px rgba(255,255,255,.18),inset 0 1px 0 rgba(255,255,255,.28),inset 0 -2px 6px rgba(0,0,0,.14);transition:background .2s}
+.muted{background:#8E8E93}
+.mark{display:block;width:50%;height:50%;filter:drop-shadow(0 1px 1px rgba(0,0,0,.18))}
+[data-phase=idle]{animation:breathe 4s ease-in-out infinite}
+[data-phase=thinking] .mark,[data-phase=answering] .mark{animation:sway 2.4s ease-in-out infinite}
+[data-phase=thinking] .twinkle,[data-phase=answering] .twinkle{animation:twinkle 1.2s ease-in-out infinite}
+.twinkle.late{animation-delay:.4s!important}
+.bars{display:flex;align-items:center;gap:8%;height:46%;transform:scaleY(calc(.55 + var(--loud) * .45));transition:transform .12s}
+.bars i{display:block;width:3px;height:55%;border-radius:2px;background:#fff;animation:bar 1s ease-in-out infinite}
+.bars i:nth-child(2){height:80%;animation-delay:.15s}.bars i:nth-child(3){height:100%;animation-delay:.3s}.bars i:nth-child(4){height:62%;animation-delay:.45s}
+[data-phase=speaking] .bars i{animation-duration:1.4s}
+.paused,.paused *{animation-play-state:paused!important}
+@keyframes breathe{50%{transform:scale(1.035)}}
+@keyframes sway{50%{transform:rotate(12deg)}}
+@keyframes twinkle{50%{opacity:.15}}
+@keyframes bar{0%,100%{transform:scaleY(.45)}50%{transform:scaleY(1)}}
+@media(prefers-reduced-motion:reduce){.orb-frame,.orb-frame *{animation:none!important}}
 </style>

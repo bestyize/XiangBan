@@ -10,7 +10,7 @@
 | [语音引擎方案](voice-engine.md) | 级联与全双工两条语音路线、模块结构、云端能力经小伴 AI 网关、分期计划 |
 | [悬浮按钮 HTML 设计稿](prototypes/assistant-floating-tools.html) | 旧版：右侧单按钮、横排工具浮层（已被方案四取代） |
 | [对话框与停止按钮设计稿](prototypes/assistant-conversation.html) | 月白 / 夜银配色、彩虹球、可打断回复的最终视觉参考 |
-| [生命球动效设计稿](prototypes/assistant-living-orb.html) | 彩虹配色与待机、聆听、思考、说话动效参考 |
+| [生命球动效设计稿](prototypes/assistant-living-orb.html) | 旧版：彩虹生命球动效（已改为品牌标志，见超级小伴设计规范） |
 | [截图工具 HTML 设计稿](prototypes/assistant-capture-overlay.html) | 压暗蒙层、框选与调整、标注工具栏、完成后回填演示 |
 
 以上 HTML 均自包含，可下载或在本地直接用浏览器打开，无需安装依赖、启动开发服务或授权屏幕录制。稿中的桌面与模型回答为模拟内容。截图的最终交互以截图工具稿为准，悬浮按钮稿内的简化截图仅用于串联入口流程。
