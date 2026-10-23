@@ -77,12 +77,12 @@ fn plain_answers_and_questions_end_the_run() {
 }
 
 #[test]
-fn a_last_item_left_in_progress_is_taken_as_forgotten_not_unfinished() {
+fn a_last_item_in_progress_requires_an_explicit_completion() {
     let plan = r#"{"todos": [{"content": "设计", "status": "completed"}, {"content": "写文件", "status": "in_progress"}]}"#;
-    let h = guarded(vec![Step::tool_call("t1", "todo", plan), Step::text("写好了")], &Arc::new(AtomicUsize::new(0)));
+    let h = guarded(vec![Step::tool_call("t1", "todo", plan), Step::text("写好了"),Step::tool_call("t2","todo",DONE),Step::text("已核验写入")], &Arc::new(AtomicUsize::new(0)));
     let (result, events) = run(&h.agent, "写");
-    assert_eq!(result.unwrap().turns, 2);
-    assert!(reasons(&events).is_empty());
+    assert_eq!(result.unwrap().turns, 4);
+    assert_eq!(reasons(&events), vec!["unfinished_todos"]);
 }
 
 #[test]
@@ -96,9 +96,9 @@ fn a_question_to_the_user_is_not_overridden_by_open_todos() {
 
 #[test]
 fn todos_left_open_by_an_earlier_run_do_not_hold_up_a_new_one() {
-    let h = guarded(vec![Step::tool_call("t1", "todo", PLAN), Step::text("先停在这里，等你确认方案。"), Step::text("你好！")], &Arc::new(AtomicUsize::new(0)));
+    let h = guarded(vec![Step::tool_call("t1", "todo", PLAN), Step::text("请先确认方案吗？"), Step::text("你好！")], &Arc::new(AtomicUsize::new(0)));
     let (_, first) = run(&h.agent, "做个游戏");
-    assert_eq!(reasons(&first), vec!["unfinished_todos"], "the first run is nudged once");
+    assert!(reasons(&first).is_empty(), "an explicit user handoff does not trigger more actions");
     let h = guarded(vec![Step::tool_call("t1", "todo", PLAN), Step::text("你确认一下方案吗？"), Step::text("你好！")], &Arc::new(AtomicUsize::new(0)));
     run(&h.agent, "做个游戏").0.unwrap();
     let (result, events) = run(&h.agent, "hi");
@@ -278,7 +278,7 @@ fn repeated_length_cutoffs_pause_and_safety_stops_are_not_overridden() {
     let h = harness(vec![Step::text("").finish(FinishReason::ContentFilter)],
         |b| b.middleware(ContinueGuard::new()));
     let (result, events) = run(&h.agent, "go");
-    assert_eq!(result.unwrap().finish, FinishReason::ContentFilter);
+    assert!(matches!(result,Err(HarnessError::Paused(_))));
     assert!(reasons(&events).is_empty());
 }
 

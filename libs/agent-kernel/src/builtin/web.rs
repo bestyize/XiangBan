@@ -275,7 +275,7 @@ impl Tool for WebFetch {
             if let Some((domain, addrs)) = &pinned {
                 builder = builder.resolve_to_addrs(domain, addrs);
             }
-            let client = builder.build().map_err(|e| format!("cannot start the request: {e}"))?;
+            let client = crate::net::blocking_builder(builder)?.build().map_err(|e| format!("cannot start the request: {e}"))?;
             let response = client
                 .get(url.clone())
                 .header(header::ACCEPT, "text/html,text/plain,application/json;q=0.9,*/*;q=0.5")

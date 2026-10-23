@@ -100,7 +100,8 @@ pub fn config(root: &Path) -> Result<McpConfig, HarnessError> {
 }
 
 /// The host supplies its installed resource directory. The native engine speaks MCP directly.
-pub fn spawn(root: &Path) -> Result<Arc<McpClient>, HarnessError> {
+pub fn spawn(root: &Path) -> Result<Arc<McpClient>, HarnessError> {spawn_cancellable(root,Arc::new(std::sync::atomic::AtomicBool::new(false)))}
+pub fn spawn_cancellable(root:&Path,cancel:Arc<std::sync::atomic::AtomicBool>)->Result<Arc<McpClient>,HarnessError>{
     #[cfg(target_os = "macos")]
     {
         let version = std::process::Command::new("/usr/bin/sw_vers")
@@ -120,7 +121,7 @@ pub fn spawn(root: &Path) -> Result<Arc<McpClient>, HarnessError> {
     }
     let config = config(root)?;
     let command = config.command.clone();
-    let client = McpClient::spawn(config).map_err(|e| {
+    let client = McpClient::spawn_cancellable(config,cancel).map_err(|e| {
         config_error(format!(
             "内置电脑控制引擎启动失败（{command}）：{e}。macOS 请检查辅助功能和屏幕录制权限。"
         ))

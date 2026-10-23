@@ -13,7 +13,8 @@ use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::io::{BufRead, BufReader, Read, Write};
 use std::path::PathBuf;
-use std::process::{Child, ChildStdin, Command, Stdio};
+use std::process::{ChildStdin, Command, Stdio};
+use crate::process_tree::ChildTree;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::mpsc::{self, Sender};
 use std::sync::{Arc, Mutex};
@@ -91,12 +92,6 @@ impl McpConfig {
     }
 }
 
-fn kill_tree(pid: u32) {
-    #[cfg(unix)]
-    let _ = Command::new("sh").args(["-c", &format!("kill -KILL -- -{pid}")]).stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null()).status();
-    #[cfg(windows)]
-    let _ = Command::new("taskkill").args(["/PID", &pid.to_string(), "/T", "/F"]).stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null()).status();
-}
 
 struct McpToolInfo {
     original_name: String,
@@ -108,7 +103,7 @@ pub struct McpClient {
     pending: Arc<Mutex<HashMap<u64, Sender<Result<Value, String>>>>>,
     next_id: AtomicU64,
     tools: Vec<McpToolInfo>,
-    child: Mutex<Option<Child>>,
+    child: Mutex<Option<ChildTree>>,
     reader: Mutex<Option<JoinHandle<()>>>,
     closed: Arc<AtomicBool>,
 }
@@ -118,14 +113,16 @@ impl Drop for McpClient {
         self.closed.store(true, Ordering::SeqCst);
         if let Ok(mut child_lock) = self.child.lock() {
             if let Some(mut child) = child_lock.take() {
-                kill_tree(child.id());
+                child.terminate();
                 let _ = child.kill();
                 let _ = child.wait();
             }
         }
         if let Ok(mut r) = self.reader.lock() {
             if let Some(h) = r.take() {
-                let _ = h.join();
+                let deadline = std::time::Instant::now()+Duration::from_secs(1);
+                while !h.is_finished() && std::time::Instant::now()<deadline { thread::sleep(Duration::from_millis(10)); }
+                if h.is_finished() { let _=h.join(); }
             }
         }
     }
@@ -139,14 +136,17 @@ impl McpClient {
     /// Revoke a connection even when an in-flight Agent still owns tool wrappers.
     pub fn close(&self) {
         self.closed.store(true, Ordering::SeqCst);
+        for (_,tx) in self.pending.lock().unwrap_or_else(|e|e.into_inner()).drain(){let _=tx.send(Err("MCP closed".into()));}
         if let Some(mut child) = self.child.lock().unwrap_or_else(|e|e.into_inner()).take() {
-            kill_tree(child.id());
+            child.terminate();
             let _ = child.kill();
             let _ = child.wait();
         }
     }
 
-    pub fn spawn(config: McpConfig) -> Result<Arc<Self>, HarnessError> {
+    pub fn spawn(config: McpConfig) -> Result<Arc<Self>, HarnessError> {Self::spawn_cancellable(config,Arc::new(AtomicBool::new(false)))}
+    pub fn spawn_cancellable(config:McpConfig,cancel:Arc<AtomicBool>)->Result<Arc<Self>,HarnessError>{
+        if cancel.load(Ordering::SeqCst){return Err(HarnessError::Cancelled);}
         let mut cmd = Command::new(crate::child_env::program(&config.command));
         cmd.args(&config.args)
             .stdin(Stdio::piped())
@@ -165,7 +165,7 @@ impl McpClient {
         #[cfg(windows)]
         std::os::windows::process::CommandExt::creation_flags(&mut cmd, 0x08000000); // CREATE_NO_WINDOW
 
-        let mut child = cmd.spawn().map_err(|e| {
+        let mut child = ChildTree::spawn(&mut cmd).map_err(|e| {
             HarnessError::Config(format!("cannot start MCP server `{}`: {e}", config.command))
         })?;
 
@@ -239,6 +239,8 @@ impl McpClient {
             closed,
         });
 
+        let c=client.clone();let deadline=std::time::Instant::now()+Duration::from_secs(45);
+        let watch=crate::StopWatch::new(move||cancel.load(Ordering::SeqCst)||std::time::Instant::now()>=deadline,move||c.close());
         // 1. Handshake: initialize
         let init_params = json!({
             "protocolVersion": DEFAULT_PROTOCOL_VERSION,
@@ -256,34 +258,26 @@ impl McpClient {
         client.send_notification("notifications/initialized", json!({}))
             .map_err(|e| HarnessError::Config(format!("MCP initialized notification failed: {e}")))?;
 
-        // 3. Query tools/list
-        let tools_res = client.send_request("tools/list", json!({}), Duration::from_secs(15))
-            .map_err(|e| HarnessError::Config(format!("MCP tools/list failed: {e}")))?;
-
         let mut tool_infos = Vec::new();
-        if let Some(tools_arr) = tools_res.get("tools").and_then(Value::as_array) {
-            for t in tools_arr {
-                if let Some(orig_name) = t.get("name").and_then(Value::as_str) {
-                    let desc = t.get("description").and_then(Value::as_str).unwrap_or("").to_string();
-                    let schema = t.get("inputSchema").cloned().unwrap_or_else(|| json!({"type": "object"}));
-                    let exposed_name = if config.tool_prefix.is_empty() {
-                        orig_name.to_string()
-                    } else {
-                        format!("{}{}", config.tool_prefix, orig_name)
-                    };
-                    let spec = ToolSpec::new(&exposed_name, &desc, schema)
-                        .risk(config.default_risk)
-                        .untrusted_output()
-                        .serial()
-                        .timeout(config.timeout);
-                    tool_infos.push(McpToolInfo {
-                        original_name: orig_name.to_string(),
-                        spec,
-                    });
-                }
+        let mut cursor: Option<String> = None;
+        let mut cursors = std::collections::HashSet::new();
+        let mut names = std::collections::HashSet::new();
+        for page in 0..20 {
+            let params=cursor.as_ref().map_or_else(||json!({}),|c|json!({"cursor":c}));
+            let result=client.send_request("tools/list",params,Duration::from_secs(15)).map_err(HarnessError::Config)?;
+            let tools=result["tools"].as_array().ok_or_else(||HarnessError::Config("invalid MCP catalog".into()))?;
+            for t in tools {
+                let name=t["name"].as_str().filter(|n|!n.is_empty()).ok_or_else(||HarnessError::Config("missing MCP name".into()))?;
+                if !names.insert(name.to_string()) || tool_infos.len()>=500 {return Err(HarnessError::Config("duplicate/oversized MCP catalog".into()));}
+                let spec=ToolSpec::new(format!("{}{name}",config.tool_prefix),t["description"].as_str().unwrap_or(""),t.get("inputSchema").cloned().unwrap_or_else(||json!({"type":"object"}))).risk(config.default_risk).untrusted_output().serial().timeout(config.timeout);
+                tool_infos.push(McpToolInfo{original_name:name.into(),spec});
             }
+            cursor=match result.get("nextCursor") {None|Some(Value::Null)=>None,Some(Value::String(c)) if !c.is_empty()=>Some(c.clone()),_=>return Err(HarnessError::Config("invalid MCP cursor".into()))};
+            let Some(c)=&cursor else {break;};
+            if page==19 || !cursors.insert(c.clone()){return Err(HarnessError::Config("MCP pagination did not terminate".into()));}
         }
 
+        drop(watch);
         // Drop the temporary ref and place tool_infos inside client
         let mut final_client = match Arc::try_unwrap(client) {
             Ok(c) => c,
@@ -386,10 +380,11 @@ impl McpClient {
         }
 
         let res = match ctx.wait_for(&rx) {
-            Some(res) => res?,
+            Some(Ok(res)) => res,
+            Some(Err(e))=>return Ok(ToolResult::unknown(&e)),
             None => {
                 self.pending.lock().unwrap_or_else(|p| p.into_inner()).remove(&id);
-                return Err("cancelled or timed out".into());
+                return Ok(ToolResult::unknown("MCP call cancelled without an execution result"));
             }
         };
 

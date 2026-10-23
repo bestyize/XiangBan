@@ -11,7 +11,7 @@ use std::{
     io::Write,
     path::PathBuf,
     sync::{
-        atomic::{AtomicBool, Ordering},
+        atomic::{AtomicBool, AtomicU64, Ordering},
         Arc, Mutex,
     },
     time::Duration,
@@ -76,6 +76,8 @@ pub struct ConnectorManager {
     state: Mutex<State>,
     authorizations: Mutex<std::collections::HashMap<String, Arc<authorization::Pending>>>,
     shutting_down: AtomicBool,
+    generation:AtomicU64,
+    restoring:Mutex<()>,
 }
 fn valid_id(id: &str) -> bool {
     !id.is_empty()
@@ -188,7 +190,8 @@ fn string_map(value: Option<&Value>) -> Result<std::collections::BTreeMap<String
     }
 }
 impl ConnectorManager {
-    pub fn new(root: PathBuf, workspace: PathBuf) -> Result<Self, String> {
+    pub fn new(root:PathBuf,workspace:PathBuf)->Result<Self,String>{let this=Self::new_lazy(root,workspace)?;this.restore(Arc::new(AtomicBool::new(false)))?;Ok(this)}
+    pub fn new_lazy(root: PathBuf, workspace: PathBuf) -> Result<Self, String> {
         fs::create_dir_all(&root).map_err(|e| e.to_string())?;
         if fs::symlink_metadata(&root)
             .map_err(|e| e.to_string())?
@@ -234,23 +237,27 @@ impl ConnectorManager {
             }),
             authorizations: Mutex::new(Default::default()),
             shutting_down: AtomicBool::new(false),
+            generation:AtomicU64::new(0),
+            restoring:Mutex::new(()),
         };
-        {
-            let mut state = this.state.lock().unwrap_or_else(|e| e.into_inner());
-            for record in state.records.clone().into_iter().filter(|r| r.enabled) {
-                match this.start(&record.id, &record.config) {
-                    Ok(active) => {
-                        state.active.insert(record.id, active);
-                    }
-                    Err(error) => {
-                        state.errors.insert(record.id, error);
-                    }
-                }
-            }
-        }
         Ok(this)
     }
-    fn start(&self, id: &str, config: &Value) -> Result<Active, String> {
+    pub fn restore(&self,cancel:Arc<AtomicBool>)->Result<(),String>{
+        let _restore=self.restoring.try_lock().map_err(|_|"MCP 正在初始化，请稍后重试")?;
+        let records=self.state.lock().unwrap_or_else(|e|e.into_inner()).records.clone();
+        let deadline=std::time::Instant::now()+Duration::from_secs(45);let stop=Arc::new(AtomicBool::new(false));let flag=stop.clone();
+        let _watch=agent_kernel::StopWatch::new(move||cancel.load(Ordering::SeqCst)||std::time::Instant::now()>=deadline,move||flag.store(true,Ordering::SeqCst));
+        for record in records.into_iter().filter(|r|r.enabled){
+            if stop.load(Ordering::SeqCst)||self.shutting_down.load(Ordering::SeqCst){return Err("MCP 初始化已取消或超时".into());}
+            {let state=self.state.lock().unwrap_or_else(|e|e.into_inner());if state.active.get(&record.id).is_some_and(|a|a.client.is_connected()){continue;} if state.errors.contains_key(&record.id){continue;}}
+            let generation=self.generation.load(Ordering::SeqCst);
+            let result=self.start(&record.id,&record.config,stop.clone());
+            let mut state=self.state.lock().unwrap_or_else(|e|e.into_inner());
+            if self.shutting_down.load(Ordering::SeqCst)||self.generation.load(Ordering::SeqCst)!=generation||!state.records.iter().any(|r|r.id==record.id&&r.enabled&&r.config==record.config){continue;}
+            match result{Ok(active)=>{state.active.insert(record.id,active);},Err(e)=>{state.errors.insert(record.id,e);}}
+        }Ok(())
+    }
+    fn start(&self, id: &str, config: &Value,cancel:Arc<AtomicBool>) -> Result<Active, String> {
         let config = normalized_config(config)?;
         let prefix = format!("mcp_ext_{}_", id.replace('-', "_"));
         let mut session = None;
@@ -266,11 +273,11 @@ impl ConnectorManager {
                     .as_str()
                     .ok_or(oauth::AUTH_REQUIRED)?;
                 let auth = oauth::Session::load(oauth::token_path(&self.root, id, key)?, url)?;
-                let client = HttpMcpClient::connect_with_authorization(http, auth.clone())?;
+                let client = HttpMcpClient::connect_cancellable(http, Some(auth.clone()),cancel.clone())?;
                 session = Some(auth);
                 Client::Http(client)
             } else {
-                Client::Http(HttpMcpClient::connect(http)?)
+                Client::Http(HttpMcpClient::connect_cancellable(http,None,cancel.clone())?)
             }
         } else {
             let mut mcp = McpConfig::new(config["command"].as_str().unwrap(), &[])
@@ -286,7 +293,7 @@ impl ConnectorManager {
                 .collect();
             mcp.env = string_map(config.get("env"))?.into_iter().collect();
             Client::Stdio(
-                McpClient::spawn(mcp)
+                McpClient::spawn_cancellable(mcp,cancel.clone())
                     .map_err(|_| "MCP 启动或初始化失败，请检查本机依赖、命令及凭据")?,
             )
         };
@@ -350,7 +357,11 @@ impl ConnectorManager {
         if state.records.len() >= 16 && !state.records.iter().any(|r| r.id == id) {
             return Err("最多配置 16 个连接器".into());
         }
-        let active = self.start(id, &config)?;
+        let generation=self.generation.fetch_add(1,Ordering::SeqCst)+1;
+        drop(state);
+        let active=self.start(id,&config,Arc::new(AtomicBool::new(false)))?;
+        let mut state=self.state.lock().unwrap_or_else(|e|e.into_inner());
+        if self.shutting_down.load(Ordering::SeqCst)||self.generation.load(Ordering::SeqCst)!=generation{return Err("连接配置已在初始化期间变化，请重试".into());}
         let record = Record {
             id: id.into(),
             name: name.into(),
@@ -410,6 +421,7 @@ impl ConnectorManager {
         self.connect(id, &record.name, record.config, true)
     }
     pub fn disconnect(&self, id: &str) -> Result<(), String> {
+        self.generation.fetch_add(1,Ordering::SeqCst);
         self.cancel_for_connector(id);
         let mut state = self.state.lock().unwrap_or_else(|e| e.into_inner());
         let mut records = state.records.clone();
@@ -434,6 +446,10 @@ impl ConnectorManager {
             .iter()
             .map(|r| status(&state, &r.id))
             .collect::<Vec<_>>())
+    }
+    pub fn status_tool(self:&Arc<Self>)->Arc<dyn Tool>{
+        let counts=self.statuses();let unavailable=counts.as_array().map_or(0,|a|a.iter().filter(|s|s["enabled"]==true&&s["connected"]!=true).count());
+        Arc::new(StatusTool{manager:self.clone(),spec:ToolSpec::new("connector_status",format!("Inspect configured MCP availability and initialization errors. {unavailable} enabled connector(s) currently unavailable. Do not assume unavailable tools can be called."),json!({"type":"object","properties":{},"additionalProperties":false})).risk(Risk::Read).untrusted_output()})
     }
     pub fn tools(&self) -> Vec<Arc<dyn Tool>> {
         let state = self.state.lock().unwrap_or_else(|e| e.into_inner());
@@ -472,6 +488,7 @@ impl ConnectorManager {
     }
     pub fn shutdown(&self) {
         self.shutting_down.store(true, Ordering::SeqCst);
+        self.generation.fetch_add(1,Ordering::SeqCst);
         for pending in self
             .authorizations
             .lock()
@@ -491,6 +508,11 @@ fn status(state: &State, id: &str) -> Value {
     let active = state.active.get(id);
     json!({"id":id,"name":record.map(|r|r.name.as_str()).unwrap_or(id),"connected":active.is_some_and(|a|a.client.is_connected()),
         "enabled":record.is_some_and(|r|r.enabled),"authMode":record.and_then(|r|r.config["authMode"].as_str()).unwrap_or("auto"),"toolCount":active.map(|a|a.client.tools().len()).unwrap_or(0),"error":state.errors.get(id)})
+}
+struct StatusTool{manager:Arc<ConnectorManager>,spec:ToolSpec}
+impl Tool for StatusTool{
+ fn spec(&self)->&ToolSpec{&self.spec}
+ fn execute_result(&self,_:Value,_:&ToolCtx)->ToolResult{ToolResult::ok("Configured connector availability").with_structured_content(self.manager.statuses())}
 }
 struct GatedTool {
     tool: Arc<dyn Tool>,

@@ -81,7 +81,7 @@ impl Tool for SkillRun {
         }
         #[cfg(unix)]
         std::os::unix::process::CommandExt::process_group(&mut command, 0);
-        let mut child = command.spawn().map_err(|e| format!("unable to start script interpreter: {e}"))?;
+        let mut child = agent_kernel::process_tree::ChildTree::spawn(&mut command).map_err(|e| format!("unable to start script interpreter: {e}"))?;
         let pid = child.id();
         let (tx, rx) = mpsc::channel();
         for (label, pipe) in [
@@ -119,6 +119,7 @@ impl Tool for SkillRun {
                 }
             }
         };
+        child.terminate();
         let mut outputs = Vec::new();
         for _ in 0..2 {
             if let Ok((kind, result)) = rx.recv_timeout(Duration::from_secs(1)) {
@@ -213,14 +214,7 @@ pub(crate) fn verified_package_file(root: &Path, skill: &str, path: &str) -> Res
     Ok(script)
 }
 
-fn terminate_tree(pid: u32) {
-    #[cfg(unix)]
-    let _ = Command::new("sh").args(["-c", &format!("kill -KILL -- -{pid}")])
-        .stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null()).status();
-    #[cfg(windows)]
-    let _ = Command::new("taskkill").args(["/PID", &pid.to_string(), "/T", "/F"])
-        .stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null()).status();
-}
+fn terminate_tree(pid: u32) { agent_kernel::process_tree::terminate(pid); }
 
 #[cfg(test)]
 mod tests {

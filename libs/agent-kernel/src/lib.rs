@@ -11,6 +11,12 @@ pub mod sandbox;
 pub mod builtin;
 mod error;
 mod exec;
+mod control;
+pub use control::{RunControl,StopWatch};
+#[cfg(any(feature="openai",feature="anthropic",feature="web"))]
+pub mod net;
+#[cfg(any(feature="process-tree",feature="shell",feature="mcp",feature="process"))]
+pub mod process_tree;
 #[cfg(feature = "memory")]
 pub mod memory;
 mod middleware;

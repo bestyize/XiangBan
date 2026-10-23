@@ -67,8 +67,8 @@ fn timeout_cancels_the_call_and_reports_an_error() {
 fn panicking_tool_becomes_an_error_result() {
     let tool = FnTool::new(spec("boom"), |_, _| panic!("tool bug"));
     let h = harness(vec![Step::tool_call("c", "boom", "{}"), Step::text("ok")], |b| b.tool(tool));
-    assert!(run(&h.agent, "go").0.is_ok());
-    assert!(tool_messages(&h)[0].1.contains("crashed"));
+    assert!(matches!(run(&h.agent, "go").0,Err(HarnessError::Paused(_))));
+    assert!(h.store.load("s1").unwrap().iter().any(|m|m.text().contains("crashed")));
 }
 
 #[test]

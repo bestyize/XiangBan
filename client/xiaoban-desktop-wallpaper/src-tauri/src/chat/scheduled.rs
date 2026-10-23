@@ -32,6 +32,7 @@ pub(super) fn assemble_scheduled(provider: Arc<dyn ModelProvider>, dirs: &Dirs, 
         .tool(TimeNow::new().utc_offset_minutes(utc_offset_minutes))
         .tool(WebFetch::new())
         .middleware(RepeatGuard::new())
+        .middleware(ContinueGuard::new())
         .middleware(SpillOutput::new(dirs.spill()))
         .middleware(ContextTrim::new(budget.context_limit).reserve_output(budget.trim_headroom))
         .max_turns(TURNS);
@@ -78,7 +79,7 @@ pub fn run(app: &tauri::AppHandle, rule_id: &str, prompt: &str) -> Outcome {
     match attempt(app, rule_id, prompt, &mut session) {
         Ok((answer, usage)) => Outcome {
             ok: true,
-            bubble: if answer.trim().is_empty() { "定时任务已完成，结果在聊天里。".into() } else { bubble_text(&answer) },
+            bubble:bubble_text(&format!("定时任务报告（待核验）：{answer}")),
             session,
             usage,
         },
@@ -104,9 +105,12 @@ fn attempt(app: &tauri::AppHandle, rule_id: &str, prompt: &str, conversation_id:
         }
         runs.insert(session.clone(), cancel.clone());
     }
+    let _cleanup=HostRunCleanup{app:app.clone(),session:session.clone()};
     let dirs = Dirs::of(app)?;
     let result = (|| -> Result<(String, agent_kernel::Usage), String> {
         let _lease = agent_kernel::supervisor::SessionLease::acquire(dirs.leases(), &session)?;
+        let control=agent_kernel::RunControl::bounded(Duration::from_secs(10*60),200_000);
+        let _watch=control.watch(cancel.clone());
         let (config, key_source) = ai_gateway::prepare(app, config)?;
         let default = ai_config::default_workspace(app)?;
         let workspace = config.workspace_or(&default).to_path_buf();
@@ -114,7 +118,7 @@ fn attempt(app: &tauri::AppHandle, rule_id: &str, prompt: &str, conversation_id:
         let agent = assemble_scheduled(provider_with(&config, key_source)?, &dirs, &workspace, config.token_budget(),
             chrono::Local::now().offset().local_minus_utc() / 60)?;
         let journal = JsonlRunLog::new(dirs.runs().join(&session));
-        let options = RunOptions { max_tool_calls: Some(TOOL_CALLS), ..Default::default() };
+        let options = RunOptions {control:Some(control.clone()),max_no_progress_rounds:Some(6),max_tool_calls: Some(TOOL_CALLS), ..Default::default() };
         let text = format!("【定时任务】{prompt}");
         let summary = agent.run_parts_observed(&session, user_parts(&text, &[]), options, &mut |record| {
             // Shown live if the user has the conversation open.
@@ -123,9 +127,12 @@ fn attempt(app: &tauri::AppHandle, rule_id: &str, prompt: &str, conversation_id:
             let message = error.to_string().replace(&config.api_key, "<hidden>");
             if ai_gateway::is_active(&config) { ai_gateway::readable_error(&message) } else { message }
         })?;
+        if summary.finish!=agent_kernel::FinishReason::Stop||summary.text.trim().is_empty(){return Err("模型未给出完整结果".into());}
+        let outcome=task_outcome::inspect(&journal,&session,&summary.run_id)?;
+        if outcome.status!=task_outcome::Status::Unknown||!journal.inspect(&summary.run_id).map_err(|e|e.to_string())?.incomplete_tools.is_empty(){return Err("执行包含失败或结果未知的工具操作，请查看会话".into());}
+        task_outcome::save(&dirs.outcomes(),&outcome)?;
         Ok((summary.text, summary.usage))
     })();
-    finish_run(app, &session);
     result
 }
 

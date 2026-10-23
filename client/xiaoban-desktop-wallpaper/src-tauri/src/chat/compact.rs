@@ -103,13 +103,14 @@ fn visible(raw: &[Message]) -> (Option<String>, Vec<usize>) {
 }
 
 fn summary_for_model(summary: &str) -> Message {
-    Message::user_text(format!("以下是这段对话较早部分的摘要，原文已经省略。把它当作已经发生过的事，据此接着办：\n\n{summary}"))
+    Message::reminder(format!("以下是这段对话较早部分的摘要，原文已经省略。把它当作已经发生过的事，据此接着办：\n\n{summary}"))
 }
 
 /// What the model is sent as history.
 pub fn view(raw: &[Message]) -> Vec<Message> {
     let (summary, kept) = visible(raw);
-    summary.as_deref().map(summary_for_model).into_iter().chain(kept.into_iter().map(|at| raw[at].clone())).collect()
+    let original=raw.iter().enumerate().filter(|(i,m)|!kept.contains(i)&&m.role==Role::User&&!m.synthetic).map(|(_,m)|m.clone()).collect::<Vec<_>>();
+    summary.as_deref().map(summary_for_model).into_iter().chain(original).chain(kept.into_iter().map(|at|raw[at].clone())).collect()
 }
 
 /// What to summarize, and where the part that stays begins.
@@ -176,7 +177,7 @@ fn block(message: &Message) -> Option<String> {
             }
             Some(format!("小伴：{}", lines.join("\n")))
         }
-        Role::Tool => Some(format!("工具结果：{}", clip(&message.text(), MAX_OUTPUT_CHARS))),
+        Role::Tool => Some(format!("工具结果 call_id={} is_error={} structured={}：{}",message.tool_call_id.as_deref().unwrap_or("unknown"),message.is_error,clip(&message.structured_content.as_ref().map_or(String::new(),ToString::to_string),MAX_OUTPUT_CHARS),clip(&message.text(),MAX_OUTPUT_CHARS))),
     }
 }
 
@@ -187,9 +188,10 @@ pub fn budget_for(limit: usize) -> usize {
 
 /// The record handed to the summarizer. The newest messages win when it is too long; the earlier summary is always kept.
 pub fn transcript(previous: Option<&str>, messages: &[Message], budget_tokens: usize) -> String {
+    let originals=messages.iter().filter(|m|m.role==Role::User&&!m.synthetic).map(|m|format!("用户原文：{}",m.text())).collect::<Vec<_>>().join("\n\n");
     let head = previous.map(|summary| format!("【此前的摘要】\n{}", clip(summary, MAX_SUMMARY_CHARS)));
-    let mut remaining = budget_tokens.saturating_sub(head.as_deref().map_or(0, tokens_of));
-    let blocks: Vec<String> = messages.iter().filter_map(block).collect();
+    let mut remaining = budget_tokens.saturating_sub(tokens_of(&originals)).saturating_sub(head.as_deref().map_or(0, tokens_of));
+    let blocks: Vec<String> = messages.iter().filter(|m|m.role!=Role::User).filter_map(block).collect();
     let mut kept = 0;
     for text in blocks.iter().rev() {
         let cost = tokens_of(text);
@@ -202,6 +204,7 @@ pub fn transcript(previous: Option<&str>, messages: &[Message], budget_tokens: u
     let omitted = blocks.len() - kept;
     let mut parts = Vec::new();
     parts.extend(head);
+    if !originals.is_empty(){parts.push(format!("【用户原文（后续更正优先）】\n{originals}"));}
     if omitted > 0 {
         parts.push(format!("（更早的 {omitted} 条消息太长，没有放进来）"));
     }
@@ -222,13 +225,14 @@ pub fn summarize(provider: &dyn ModelProvider, transcript: &str, cancel: &Atomic
         HarnessError::Cancelled => "已取消压缩".to_string(),
         other => other.to_string(),
     })?;
+    if reply.finish!=agent_kernel::FinishReason::Stop||!reply.message.tool_calls.is_empty(){return Err("摘要未完整结束，对话保持原样".into());}
     let text = reply.message.text();
     let text = text.trim();
     if text.is_empty() {
         return Err("模型没有返回摘要，对话保持原样".into());
     }
     if text.chars().count() > MAX_SUMMARY_CHARS {
-        return Ok(format!("{}…", text.chars().take(MAX_SUMMARY_CHARS).collect::<String>()));
+        return Err("摘要过长，拒绝截断；对话保持原样".into());
     }
     Ok(text.to_string())
 }
@@ -239,6 +243,7 @@ pub fn compact_into(file: &JsonlStore, provider: &dyn ModelProvider, context_tok
     let raw = file.load(session).map_err(|e| e.to_string())?;
     let plan = plan(&raw).ok_or("这段对话还很短，不需要压缩")?;
     let record = transcript(plan.previous.as_deref(), &plan.input, budget_for(context_tokens));
+    if tokens_of(&record)>budget_for(context_tokens){return Err("用户原文超出压缩预算，请明确缩小任务范围；对话保持原样".into());}
     let summary = summarize(provider, &record, cancel)?;
     let replaced = estimate_tokens(&plan.input) + plan.previous.as_deref().map_or(0, |p| estimate_tokens(&[summary_for_model(p)]));
     if estimate_tokens(&[Message::user_text(&summary)]) * 10 >= replaced * 9 {
@@ -286,8 +291,8 @@ impl MidRunCompact {
             return system.iter().chain(history).cloned().collect();
         };
         let kept = &history[folded.upto..];
-        let question = folded.question.as_ref().filter(|q| !kept.iter().any(|m| m.role == Role::User && !m.synthetic && m.parts == q.parts));
-        system.iter().cloned().chain(std::iter::once(summary_for_model(&folded.summary))).chain(question.cloned()).chain(kept.iter().cloned()).collect()
+        let questions=history[..folded.upto].iter().filter(|m|m.role==Role::User&&!m.synthetic).cloned();
+        system.iter().cloned().chain(std::iter::once(summary_for_model(&folded.summary))).chain(questions).chain(kept.iter().cloned()).collect()
     }
 
     /// Where the part kept word for word begins: the newest messages worth `keep` tokens, never starting on a tool
@@ -335,7 +340,8 @@ impl Middleware for MidRunCompact {
             .or_else(|| folded.as_ref().and_then(|f| f.question.clone()));
         (self.notify)("start", None);
         let record = transcript(folded.as_ref().map(|f| f.summary.as_str()), &history[from..cut], budget_for(self.limit));
-        match summarize(self.provider.as_ref(), &record, &self.cancel) {
+        let result=if tokens_of(&record)>budget_for(self.limit){Err("用户原文超过压缩预算，保留原文".into())}else{summarize(self.provider.as_ref(),&record,&self.cancel)};
+        match result {
             Ok(summary) => {
                 (self.notify)("done", Some(&summary));
                 *folded = Some(Folded { upto: cut, summary, question });
@@ -448,16 +454,16 @@ mod tests {
             ask("之后的问题"), answer("之后的回答"),
         ];
         let seen = texts(&view(&raw));
-        assert_eq!(seen.len(), 5);
+        assert_eq!(seen.len(), 6);
         assert!(seen[0].contains("摘要正文") && !seen[0].contains(MARK), "the marker line is not shown to the model: {}", seen[0]);
-        assert_eq!(&seen[1..], ["最近的问题", "最近的回答", "之后的问题", "之后的回答"]);
-        assert!(!seen.iter().any(|t| t.contains("旧问题")), "what was summarized is gone from the request");
+        assert_eq!(&seen[1..], ["旧问题", "最近的问题", "最近的回答", "之后的问题", "之后的回答"]);
+        assert!(seen.iter().any(|t|t.contains("旧问题")), "original constraints survive the summary");
     }
 
     #[test]
     fn a_marker_pointing_past_itself_keeps_nothing_and_an_older_summary_in_the_kept_part_is_skipped() {
         let raw = vec![ask("a"), answer("b"), summary_message(99, "S")];
-        assert_eq!(view(&raw).len(), 1, "a keep_from beyond the marker is clamped to it");
+        assert_eq!(view(&raw).len(), 2, "a keep_from beyond the marker is clamped to it");
 
         let twice = vec![
             ask("1"), answer("2"), ask("3"), answer("4"),
@@ -466,9 +472,9 @@ mod tests {
             ask("5"),
         ];
         let seen = texts(&view(&twice));
-        assert_eq!(seen.len(), 4);
+        assert_eq!(seen.len(), 5);
         assert!(seen[0].contains("第二份") && !seen.iter().any(|t| t.contains("第一份")));
-        assert_eq!(&seen[1..], ["3", "4", "5"]);
+        assert_eq!(&seen[1..], ["1", "3", "4", "5"]);
     }
 
     #[test]
@@ -522,9 +528,9 @@ mod tests {
             answer("看完了"),
         ];
         let text = transcript(None, &raw, 50_000);
-        assert!(text.starts_with("用户：帮我看目录"));
+        assert!(text.contains("用户原文：帮我看目录"));
         assert!(text.contains("小伴：好的\n（调用工具 shell："));
-        assert!(text.contains("工具结果：") && text.contains("中间省略"));
+        assert!(text.contains("工具结果 call_id=t1 is_error=false") && text.contains("中间省略"));
         assert!(text.chars().count() < 4_000, "5000-byte output and 2000-byte arguments were both cut: {}", text.chars().count());
         assert!(text.ends_with("小伴：看完了"));
     }
@@ -535,8 +541,8 @@ mod tests {
         let text = transcript(Some("早先的摘要"), &raw, 8_000);
         assert!(text.starts_with("【此前的摘要】\n早先的摘要"));
         assert!(text.contains("没有放进来"));
-        assert!(text.contains("答19") && !text.contains("问0："), "the newest are in and the oldest are out");
-        assert!(estimate_tokens(&[ask(&text)]) <= 8_200, "stays inside the budget");
+        assert!(text.contains("答19") && text.contains("问0："), "the newest are in and the oldest are out");
+        assert!(estimate_tokens(&[ask(&text)]) > 8_000, "oversized original requests are never silently omitted; caller rejects over-budget compaction");
         let q = text.find("问18").unwrap();
         assert!(q < text.find("答19").unwrap(), "still in time order");
     }
@@ -560,7 +566,7 @@ mod tests {
         let mut after = before.clone();
         after.push(summary_message(4, "一份很短的摘要"));
         let small = measure(&after, 3_000, 48_000);
-        assert!(small.used < full.used / 2, "compacting made the request smaller: {} vs {}", small.used, full.used);
+        assert!(small.used < full.used, "compacting made the request smaller: {} vs {}", small.used, full.used);
         assert!(!small.can_compact, "what is left is short");
         assert_eq!(measure(&[], 3_000, 48_000), ContextInfo { used: 3_000, limit: 48_000, can_compact: false });
     }
@@ -593,12 +599,21 @@ mod tests {
     }
 
     #[test]
-    fn a_runaway_summary_is_cut_to_a_sane_length() {
+    fn a_runaway_summary_is_rejected_without_committing_truncated_constraints() {
         use agent_kernel::provider::scripted::{ScriptedProvider, Step};
         let provider = ScriptedProvider::new(vec![Step::text(&"字".repeat(20_000))]);
-        let summary = summarize(&provider, "x", &AtomicBool::new(false)).unwrap();
-        assert_eq!(summary.chars().count(), MAX_SUMMARY_CHARS + 1);
-        assert!(summary.ends_with('…'));
+        assert!(summarize(&provider,"x",&AtomicBool::new(false)).is_err());
+    }
+
+    #[test]
+    fn partial_and_filtered_summaries_are_rejected_and_tool_failures_remain_distinct(){
+        use agent_kernel::provider::scripted::{ScriptedProvider,Step};
+        for finish in [agent_kernel::FinishReason::Length,agent_kernel::FinishReason::ContentFilter,agent_kernel::FinishReason::Other]{
+            let provider=ScriptedProvider::new(vec![Step::text("部分摘要").finish(finish)]);
+            assert!(summarize(&provider,"x",&AtomicBool::new(false)).is_err());
+        }
+        let ok=Message::tool("call","saved");let mut failed=ok.clone();failed.is_error=true;
+        assert_ne!(transcript(None,&[ok],6000),transcript(None,&[failed],6000));
     }
 
     fn script(steps: Vec<agent_kernel::provider::scripted::Step>) -> agent_kernel::provider::scripted::ScriptedProvider {
@@ -619,9 +634,10 @@ mod tests {
         assert_eq!(saved.len(), 7, "every message is still there, plus the summary");
         assert_eq!(parse(&saved[6]), Some((4, summary.clone())), "it points at the latest question");
         let seen = texts(&view(&saved));
-        assert_eq!(seen.len(), 3);
+        assert_eq!(seen.len(), 5);
         assert!(seen[0].contains("做了两件事"));
-        assert_eq!(&seen[1..], ["最后的问题", "最后的回答"]);
+        assert!(seen[1].contains("问1")&&seen[2].contains("问2"));
+        assert_eq!(&seen[3..], ["最后的问题", "最后的回答"]);
 
         let sent = provider.requests()[0].messages[1].text();
         assert!(sent.contains("问1") && sent.contains("答2"), "the older part went to the summarizer");
@@ -711,9 +727,9 @@ mod tests {
         file.append("c1-aa-0", &[summary_message(2, "摘要")]).unwrap();
         store.append("c1-aa-0", &[ask("新问题")]).unwrap();
         let seen = texts(&store.load("c1-aa-0").unwrap());
-        assert_eq!(seen.len(), 4);
+        assert_eq!(seen.len(), 5);
         assert!(seen[0].contains("摘要"));
-        assert_eq!(&seen[1..], ["最近的问题", "最近的回答", "新问题"]);
+        assert_eq!(&seen[1..], ["旧问题", "最近的问题", "最近的回答", "新问题"]);
 
         let saved = file.load("c1-aa-0").unwrap();
         assert_eq!(saved.len(), 6, "the saved conversation still has every message plus the summary");

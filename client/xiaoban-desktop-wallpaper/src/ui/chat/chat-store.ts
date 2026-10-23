@@ -101,11 +101,15 @@ export function createChatStore(deps: ChatDeps): ChatStore {
   const interruptions: Record<string, ChatItem> = {};
   let refreshedAfterErrorAt = 0;
   let supportsSnapshots = false;
+  let supportsPending = false;
+  const revisions = new Map<string,number>();
+  interface PendingSnapshot {revision:number;approvals:ApprovalRequest[];questions:QuestionRequest[]}
   const pendingEvents: Record<string, ChatEventPayload[]> = {};
   const loading = new Map<string, Promise<void>>();
   const activeRun = new Map<string, string>();
   const cursors = new Map<string, number>();
-  interface Snapshot { messages: WireMessage[]; runId?: string; sequence?: number; events?: ChatEventPayload[]; running?: boolean; ready?: boolean; warning?: string; interrupted?: boolean }
+  interface Outcome {runId:string;status:string;validator:string;evidence:string}
+  interface Snapshot { outcome?:Outcome; pending?: PendingSnapshot; messages: WireMessage[]; runId?: string; sequence?: number; events?: ChatEventPayload[]; running?: boolean; ready?: boolean; warning?: string; interrupted?: boolean }
 
 
   const store: ChatStore = reactive({
@@ -218,8 +222,10 @@ export function createChatStore(deps: ChatDeps): ChatStore {
         try {
           const listeners = await Promise.all([
             deps.listen<ChatEventPayload>('chat-event', payload => { if (!disposed) receive(payload); }),
-            deps.listen<ApprovalRequest>('chat-approval', request => { if (!disposed) addPending(viewOf(request.session, true).approvals, request); }),
-            deps.listen<QuestionRequest>('chat-question', request => { if (!disposed) addPending(viewOf(request.session, true).questions, request); }),
+            deps.listen<ApprovalRequest>('chat-approval', request => { if (!disposed && !supportsPending) addPending(viewOf(request.session, true).approvals, request); }),
+            deps.listen<QuestionRequest>('chat-question', request => { if (!disposed && !supportsPending) addPending(viewOf(request.session, true).questions, request); }),
+            deps.listen<{session:string;pending:PendingSnapshot}>('chat-pending-changed', p=>{if(!disposed) applyPending(p.session,p.pending);}),
+            deps.listen<{session:string;outcome:Outcome}>('chat-task-outcome',p=>{if(!disposed)applyOutcome(p.session,p.outcome);}),
             deps.listen<SessionSummary[]>('chat-sessions-changed', sessions => { if (!disposed) store.sessions = sessions; }),
             deps.listen<{ sessionId?: string; mode: 'ask' | 'auto' }>('chat-permission-mode-changed', payload => {
               if (!disposed) {
@@ -265,6 +271,7 @@ export function createChatStore(deps: ChatDeps): ChatStore {
         const overview = await deps.invoke<Overview | undefined>('chat_overview');
         if (disposed || !overview) return;
         supportsSnapshots = overview.snapshotProtocol === 1;
+      supportsPending = overview.pendingProtocol === 1;
         store.configured = overview.configured;
         store.workspace = overview.workspace;
         store.recentWorkspaces = overview.recentWorkspaces ?? [];
@@ -524,6 +531,19 @@ export function createChatStore(deps: ChatDeps): ChatStore {
     }
   }
 
+  function applyOutcome(session:string,outcome:Outcome){
+    const v=viewOf(session,true);if(!v.items.some(i=>i.kind==='tool'))return;
+    const id=`outcome:${outcome.runId}`;if(v.items.some(i=>i.id===id))return;
+    const succeeded=outcome.status==='succeeded'&&outcome.validator==='expected_file_sha256';
+    v.items.push({kind:'notice',id,tone:succeeded?'info':'warning',text:succeeded?'指定文件已通过 SHA256 验收。':'本轮执行已结束，任务结果尚未通过验收。请核对交付物；遇到结果未知的操作，勿直接重复执行。',details:outcome.evidence,detailsLabel:'查看执行依据'});
+  }
+
+  function applyPending(id:string,p:PendingSnapshot) {
+    if(p.revision < (revisions.get(id) ?? -1)) return;
+    revisions.set(id,p.revision);const v=viewOf(id,true);
+    v.approvals=p.approvals.filter(x=>x.session===id);v.questions=p.questions.filter(x=>x.session===id);
+  }
+
   async function loadView(id: string): Promise<void> {
     const existing = loading.get(id);
     if (existing) return existing;
@@ -542,9 +562,11 @@ export function createChatStore(deps: ChatDeps): ChatStore {
         }
         if (disposed || !store.views[id]) return;
         view.items = itemsFromHistory(view, snapshot.messages);
+        if(snapshot.pending) applyPending(id,snapshot.pending);
         view.usage = undefined;
         view.status = '';
         for (const payload of snapshot.events ?? []) applyEvent(view, payload.event);
+        if(snapshot.outcome)applyOutcome(id,snapshot.outcome);
         view.loaded = snapshot.ready !== false;
         if (snapshot.runId) {
           activeRun.set(id, snapshot.runId);

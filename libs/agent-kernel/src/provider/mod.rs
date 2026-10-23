@@ -60,3 +60,9 @@ pub trait ModelProvider: Send + Sync {
         self.chat(request, on_text, cancel)
     }
 }
+
+/// For auxiliary calls outside Agent::run (e.g. compression). Root/child loops already meter themselves.
+pub struct MeteredProvider{pub provider:std::sync::Arc<dyn ModelProvider>,pub control:crate::RunControl}
+impl ModelProvider for MeteredProvider{
+ fn chat(&self,r:&ChatRequest,text:&mut dyn FnMut(&str),cancel:&AtomicBool)->Result<Reply,HarnessError>{self.control.check()?;let reply=self.provider.chat(r,text,cancel)?;if let Some(u)=reply.usage{self.control.record(u);}self.control.check()?;Ok(reply)}
+}

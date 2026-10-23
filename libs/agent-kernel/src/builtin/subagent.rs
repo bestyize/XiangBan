@@ -105,6 +105,10 @@ impl Tool for Subagent {
         &self.spec
     }
 
+    fn execute_result(&self,args:Value,ctx:&ToolCtx)->crate::ToolResult{
+        match self.execute(args,ctx){Ok(text)=>crate::ToolResult::ok(text),Err(error)if error.contains("tool_outcome_needs_review")=>crate::ToolResult::unknown(&error),Err(error)=>crate::ToolResult::error(error)}
+    }
+
     fn execute(&self, args: Value, ctx: &ToolCtx) -> Result<String, String> {
         let task = str_arg(&args, "task")?.trim();
         if task.is_empty() || task.chars().count() > MAX_TASK_CHARS {
@@ -124,8 +128,11 @@ impl Tool for Subagent {
                     thread::sleep(POLL);
                 }
             });
+            struct Finished<'a>(&'a AtomicBool);
+            impl Drop for Finished<'_>{fn drop(&mut self){self.0.store(true,Ordering::SeqCst);}}
+            let _finished=Finished(&finished);
             let options = crate::RunOptions {
-                parent_run_id: Some(ctx.run_id().into()), ephemeral_session: true, shared_budget: ctx.tool_budget().cloned(), ..Default::default()
+                parent_run_id: Some(ctx.run_id().into()), ephemeral_session: true, shared_budget: ctx.tool_budget().cloned(), control:Some(ctx.control().clone()), max_no_progress_rounds:Some(6), ..Default::default()
             };
             let result = self.child.run_parts_observed(&child_session, vec![crate::Part::Text { text: task.into() }], options, &mut |record| {
                 if let Some(observer) = &self.run_observer { observer(&record)?; }

@@ -24,7 +24,7 @@ fn valid_version(s: &str) -> bool {
 }
 
 fn client() -> Result<Client, String> {
-    Client::builder().timeout(Duration::from_secs(30))
+    agent_kernel::net::blocking_builder(Client::builder().timeout(Duration::from_secs(30))
         // Objects live behind HTTPS redirects; never send to a literal private IP.
         .redirect(Policy::custom(|attempt| {
             let u = attempt.url();
@@ -36,7 +36,7 @@ fn client() -> Result<Client, String> {
             } else {
                 attempt.follow()
             }
-        })).build().map_err(|e| e.to_string())
+        })))?.build().map_err(|e| e.to_string())
 }
 fn bytes(url: &str, max: u64) -> Result<Vec<u8>, String> {
     let mut response = client()?.get(url).send().map_err(|e| e.to_string())?;

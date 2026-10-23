@@ -52,8 +52,10 @@ pub fn initialize(app: &tauri::AppHandle) -> Result<(), String> {
         eprintln!("[network] invalid saved settings, using system proxy: {error}");
         NetworkConfig::default()
     });
+    sync_tool_policy()?;
     Ok(())
 }
+fn sync_tool_policy()->Result<(),String>{let c=current();agent_kernel::net::set_policy(agent_kernel::net::NetworkPolicy{mode:c.mode,proxy_url:c.proxy_url})}
 pub fn async_builder(builder: reqwest::ClientBuilder) -> Result<reqwest::ClientBuilder, String> {
     let config = current();
     Ok(match config.mode.as_str() {
@@ -85,6 +87,7 @@ pub fn save_network_config(app: tauri::AppHandle, window: tauri::WebviewWindow, 
     fs::write(&temporary, serde_json::to_vec_pretty(&config).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
     fs::rename(&temporary, &file).map_err(|e| e.to_string())?;
     *active().write().unwrap_or_else(|e| e.into_inner()) = config.clone();
+    sync_tool_policy()?;
     Ok(config)
 }
 #[tauri::command]

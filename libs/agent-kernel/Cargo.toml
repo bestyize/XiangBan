@@ -7,22 +7,24 @@ publish = false
 
 [features]
 default = []
-openai = ["dep:reqwest"]
-anthropic = ["dep:reqwest"]
+openai = ["dep:reqwest", "dep:tokio"]
+anthropic = ["dep:reqwest", "dep:tokio"]
 native-tls = ["openai", "anthropic", "reqwest/native-tls-no-alpn"]
 fs = ["dep:encoding_rs"]
 skills = ["dep:serde_yaml_ng"]
 memory = []
-web = ["dep:reqwest"]
-shell = ["dep:libc"]
+web = ["dep:reqwest", "dep:tokio"]
+shell = ["process-tree"]
 stdio = []
-mcp = ["dep:base64"]
+mcp = ["dep:base64", "process-tree"]
+process-tree = ["dep:libc", "dep:windows-sys"]
 journal = []
 process = ["dep:libc", "dep:windows-sys"]
 # The Windows low-integrity launcher for sandboxed commands (see `sandbox`).
 sandbox = ["dep:windows-sys"]
 
 [dependencies]
+tokio = { version="1", features=["rt","time","net"], optional=true }
 encoding_rs = { version = "0.8", optional = true }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

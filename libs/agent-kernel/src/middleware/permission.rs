@@ -102,6 +102,7 @@ pub struct Permission {
     deny: HashSet<String>,
     always: Mutex<HashSet<(String, String)>>,
     tainted: Mutex<HashSet<String>>,
+    trust_dir: Mutex<Option<std::path::PathBuf>>,
     /// Modes set for single sessions. They win over `mode`, so concurrent sessions never see each other's choice.
     session_modes: Mutex<HashMap<String, PermissionMode>>,
 }
@@ -117,6 +118,7 @@ impl Permission {
             deny: HashSet::new(),
             always: Mutex::new(HashSet::new()),
             tainted: Mutex::new(HashSet::new()),
+            trust_dir: Mutex::new(None),
             session_modes: Mutex::new(HashMap::new()),
         }
     }
@@ -204,10 +206,38 @@ impl Permission {
         }
     }
 
-    /// Taint is kept in memory only: after a restart a resumed session starts untainted.
-    pub fn is_tainted(&self, session: &str) -> bool {
-        self.tainted.lock().unwrap_or_else(|e| e.into_inner()).contains(session)
+    /// Initialize trust before restoring remembered grants. Legacy tool histories are conservative.
+    pub fn restore_trust(&self,dir:&std::path::Path,session:&str,legacy_tools:bool)->Result<(),String>{
+        use std::io::Write;
+        if session.is_empty() || !session.bytes().all(|c|c.is_ascii_alphanumeric() || matches!(c,b'-'|b'_')) {return Err("invalid trust identity".into());}
+        std::fs::create_dir_all(dir).map_err(|e|e.to_string())?;
+        let path=dir.join(session);let mut opts=std::fs::OpenOptions::new();opts.write(true).create_new(true);
+        #[cfg(unix)] {use std::os::unix::fs::OpenOptionsExt;opts.mode(0o600);}
+        match opts.open(path){Ok(mut f)=>{f.write_all(if legacy_tools{b"tainted"}else{b"clean"}).and_then(|_|f.sync_all()).map_err(|e|e.to_string())?;},Err(e) if e.kind()==std::io::ErrorKind::AlreadyExists=>{},Err(e)=>return Err(e.to_string())}
+        *self.trust_dir.lock().unwrap_or_else(|e|e.into_inner())=Some(dir.into());
+        if self.is_tainted(session){self.tainted.lock().unwrap_or_else(|e|e.into_inner()).insert(session.into());}Ok(())
     }
+    pub fn needs_review(&self,session:&str)->bool{self.trust_dir.lock().unwrap_or_else(|e|e.into_inner()).as_ref().is_some_and(|d|!matches!(std::fs::read(d.join(session)).ok().as_deref(),Some(b"clean" | b"tainted")))}
+    pub fn require_review(&self,session:&str)->Result<(),String>{
+        use std::io::Write;
+        let root=self.trust_dir.lock().unwrap_or_else(|e|e.into_inner());let dir=root.as_ref().ok_or("trust store not initialized")?;
+        if !session.bytes().all(|c|c.is_ascii_alphanumeric()||matches!(c,b'-'|b'_')){return Err("invalid trust identity".into());}
+        let mut f=std::fs::OpenOptions::new().write(true).truncate(true).open(dir.join(session)).map_err(|e|e.to_string())?;
+        f.write_all(b"review").and_then(|_|f.sync_all()).map_err(|e|e.to_string())
+    }
+    fn mark_tainted(&self,session:&str)->Result<(),String>{
+        if self.needs_review(session){return Ok(());}
+        use std::io::Write;
+        if let Some(dir)=self.trust_dir.lock().unwrap_or_else(|e|e.into_inner()).as_ref(){
+            let mut file=std::fs::OpenOptions::new().write(true).truncate(true).open(dir.join(session)).map_err(|e|e.to_string())?;
+            file.write_all(b"tainted").and_then(|_|file.sync_all()).map_err(|e|e.to_string())?;
+        }
+        self.tainted.lock().unwrap_or_else(|e|e.into_inner()).insert(session.into());Ok(())
+    }
+    pub fn is_tainted(&self,session:&str)->bool{
+        self.tainted.lock().unwrap_or_else(|e|e.into_inner()).contains(session) || self.trust_dir.lock().unwrap_or_else(|e|e.into_inner()).as_ref().is_some_and(|d|std::fs::read(d.join(session)).ok().as_deref()!=Some(b"clean"))
+    }
+
 }
 
 impl Middleware for Permission {
@@ -231,9 +261,10 @@ impl Middleware for Permission {
             Some(key) if spec.risk == Risk::Exec && !spec.always_ask && danger.is_none() => key(name, args),
             _ => None,
         };
-        let sticky = (spec.risk == Risk::Exec && exec_key.is_none()) || spec.always_ask || danger.is_some();
+        let review=self.needs_review(session)&&spec.risk!=Risk::Read;
+        let sticky = review || (spec.risk == Risk::Exec && exec_key.is_none()) || spec.always_ask || danger.is_some();
         let key = Self::grant_key(session, name, exec_key.as_deref());
-        let needs_ask = if self.danger.is_some() && mode == PermissionMode::Auto {
+        let needs_ask = if review {true} else if self.danger.is_some() && mode == PermissionMode::Auto {
             danger.is_some()
         } else if spec.always_ask {
             true
@@ -266,7 +297,7 @@ impl Middleware for Permission {
             }
         }
         if spec.untrusted_output {
-            self.tainted.lock().unwrap_or_else(|e| e.into_inner()).insert(session.to_string());
+            if let Err(e)=self.mark_tainted(session){return ToolGate::Block(format!("cannot persist trust boundary: {e}"));}
         }
         ToolGate::Proceed
     }

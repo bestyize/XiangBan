@@ -394,3 +394,18 @@ fn two_conversations_waiting_for_answers_at_once_get_their_own_answers_and_modes
     assert!(run_calls(&fx, &permission, "a", &["writer"])[0].contains("denied permission"), "a asks again and gets no answer");
     assert_eq!(asked_rx.try_iter().collect::<Vec<_>>(), ["a"]);
 }
+
+#[test] fn trust_is_durable_before_external_content_and_legacy_histories_fail_closed(){
+ let dir=std::env::temp_dir().join(format!("trust-restart-{}",std::process::id()));let _=std::fs::remove_dir_all(&dir);
+ let p=Arc::new(Permission::new(PermissionMode::Ask,|_:&ApprovalRequest<'_>|Approval::Once));p.restore_trust(&dir,"s1",false).unwrap();assert!(!p.is_tainted("s1"));
+ let h=harness(vec![Step::tool_call("c","reader","{}"),Step::text("done")],|b|b.middleware(p.clone()).tool(FnTool::new(spec("reader").risk(Risk::Read).untrusted_output(),|_,_|Ok("untrusted".into()))));run(&h.agent,"read").0.unwrap();
+ let restarted=Permission::new(PermissionMode::Ask,|_:&ApprovalRequest<'_>|Approval::Deny);restarted.restore_trust(&dir,"s1",false).unwrap();assert!(restarted.is_tainted("s1"));restarted.restore_trust(&dir,"legacy",true).unwrap();assert!(restarted.is_tainted("legacy"));let _=std::fs::remove_dir_all(dir);
+}
+
+#[test]fn unknown_side_effects_require_fresh_approval_even_in_auto_mode_after_restart(){
+ let dir=std::env::temp_dir().join(format!("review-policy-{}",std::process::id()));let _=std::fs::remove_dir_all(&dir);
+ let p=Permission::new(PermissionMode::Auto,|_:&ApprovalRequest<'_>|Approval::Deny);p.restore_trust(&dir,"s1",false).unwrap();p.require_review("s1").unwrap();drop(p);
+ let p=Arc::new(Permission::new(PermissionMode::Auto,|_:&ApprovalRequest<'_>|Approval::Deny));p.restore_trust(&dir,"s1",false).unwrap();p.grant("s1","write",None);
+ let count=Arc::new(AtomicUsize::new(0));let c=count.clone();let h=harness(vec![Step::tool_call("c","write","{}"),Step::text("blocked")],|b|b.middleware(p.clone()).tool(FnTool::new(spec("write").risk(Risk::Write),move|_,_|{c.fetch_add(1,Ordering::SeqCst);Ok("changed".into())})));
+ run(&h.agent,"resume").0.unwrap();assert_eq!(count.load(Ordering::SeqCst),0);assert!(p.needs_review("s1"));let _=std::fs::remove_dir_all(dir);
+}

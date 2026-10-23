@@ -2,13 +2,12 @@
 use super::{decode_result, MAX_FRAME_BYTES};
 use crate::{Risk, Tool, ToolCtx, ToolResult, ToolSpec};
 use reqwest::{
-    blocking::{Client, Response},
+    Client, Response,
     header::{HeaderMap, HeaderName, HeaderValue},
     redirect::Policy,
 };
 use serde_json::{json, Value};
 use std::{
-    io::{BufRead, BufReader, Read},
     sync::{
         atomic::{AtomicBool, AtomicU64, Ordering},
         Arc, Mutex,
@@ -39,20 +38,24 @@ pub struct HttpMcpClient {
     next: AtomicU64,
     closed: AtomicBool,
     specs: Vec<(String, ToolSpec)>,
+    startup_cancel:Option<Arc<AtomicBool>>,
+    startup_deadline:Option<std::time::Instant>,
 }
 impl HttpMcpClient {
     pub fn connect(config: HttpMcpConfig) -> Result<Arc<Self>, String> {
-        Self::connect_inner(config, None)
+        Self::connect_inner(config, None, None)
     }
     pub fn connect_with_authorization(
         config: HttpMcpConfig,
         authorization: Arc<dyn HttpAuthorization>,
     ) -> Result<Arc<Self>, String> {
-        Self::connect_inner(config, Some(authorization))
+        Self::connect_inner(config, Some(authorization), None)
     }
+    pub fn connect_cancellable(config:HttpMcpConfig,auth:Option<Arc<dyn HttpAuthorization>>,cancel:Arc<AtomicBool>)->Result<Arc<Self>,String>{Self::connect_inner(config,auth,Some(cancel))}
     fn connect_inner(
         config: HttpMcpConfig,
         authorization: Option<Arc<dyn HttpAuthorization>>,
+        startup_cancel:Option<Arc<AtomicBool>>,
     ) -> Result<Arc<Self>, String> {
         let url = reqwest::Url::parse(&config.url).map_err(|_| "MCP 地址无效")?;
         if !(url.scheme() == "https"
@@ -88,10 +91,10 @@ impl HttpMcpClient {
                 HeaderValue::from_str(&value).map_err(|_| "MCP 请求头值无效")?,
             );
         }
-        let client = Client::builder()
+        let client = crate::net::async_builder(Client::builder()
             .redirect(Policy::none())
             .connect_timeout(Duration::from_secs(10))
-            .timeout(config.timeout)
+            .timeout(config.timeout))?
             .build()
             .map_err(|_| "无法创建 MCP HTTP 客户端")?;
         if authorization.is_some() {
@@ -107,12 +110,14 @@ impl HttpMcpClient {
             next: AtomicU64::new(1),
             closed: AtomicBool::new(false),
             specs: Vec::new(),
+            startup_cancel,
+            startup_deadline:Some(std::time::Instant::now()+Duration::from_secs(45)),
         };
         let result = this.request(
             "initialize",
             json!({"protocolVersion":"2025-06-18","capabilities":{},
             "clientInfo":{"name":"xiaoban","version":env!("CARGO_PKG_VERSION")}}),
-            false,
+            false, None,
         )?;
         let version = result["protocolVersion"]
             .as_str()
@@ -121,7 +126,7 @@ impl HttpMcpClient {
             return Err("此 MCP 协议版本暂不支持，请选择 Streamable HTTP 或 stdio 配置".into());
         }
         *this.protocol.lock().unwrap_or_else(|e| e.into_inner()) = version.into();
-        this.request("notifications/initialized", json!({}), true)?;
+        this.request("notifications/initialized", json!({}), true, None)?;
         let mut cursor = None;
         let mut seen = std::collections::HashSet::new();
         for _ in 0..20 {
@@ -129,7 +134,7 @@ impl HttpMcpClient {
                 .as_ref()
                 .map(|v| json!({"cursor":v}))
                 .unwrap_or(json!({}));
-            let result = this.request("tools/list", params, false)?;
+            let result = this.request("tools/list", params, false, None)?;
             for tool in result["tools"]
                 .as_array()
                 .ok_or("MCP tools/list 格式无效")?
@@ -153,12 +158,14 @@ impl HttpMcpClient {
             }
             cursor = result["nextCursor"].as_str().map(str::to_string);
             if cursor.is_none() {
+                this.startup_cancel=None;
+                this.startup_deadline=None;
                 return Ok(Arc::new(this));
             }
         }
         Err("MCP 工具分页超限".into())
     }
-    fn request(&self, method: &str, params: Value, notification: bool) -> Result<Value, String> {
+    fn request(&self, method: &str, params: Value, notification: bool, ctx:Option<&ToolCtx>) -> Result<Value, String> {
         if self.closed.load(Ordering::SeqCst) {
             return Err("MCP 已断开".into());
         }
@@ -168,6 +175,9 @@ impl HttpMcpClient {
             request["id"] = json!(id);
         }
         let body = serde_json::to_vec(&request).map_err(|_| "MCP 请求序列化失败")?;
+        let runtime=tokio::runtime::Builder::new_current_thread().enable_all().build().map_err(|e|e.to_string())?;
+        let cancelled=||self.startup_deadline.is_some_and(|d|std::time::Instant::now()>=d)||self.closed.load(Ordering::SeqCst)||self.startup_cancel.as_ref().is_some_and(|c|c.load(Ordering::SeqCst))||ctx.is_some_and(ToolCtx::is_cancelled);
+        runtime.block_on(async {
         for attempt in 0..2 {
             let mut builder = self
                 .client
@@ -202,7 +212,7 @@ impl HttpMcpClient {
             if matches!(method, "initialize" | "tools/list") {
                 builder = builder.timeout(Duration::from_secs(15));
             }
-            let response = builder.body(body.clone()).send().map_err(|_| {
+            let response = crate::net::wait(builder.body(body.clone()).send(), &cancelled, Duration::from_secs(45)).await.map_err(|e|e.to_string())?.map_err(|_| {
                 self.closed.store(true, Ordering::SeqCst);
                 "MCP 网络请求失败或超时，请检查地址和凭据"
             })?;
@@ -225,17 +235,17 @@ impl HttpMcpClient {
             if notification {
                 return Ok(Value::Null);
             }
-            return read_response(response, id);
+            return read_response(response, id, &cancelled).await;
         }
         Err("MCP 授权失效，请重新连接并授权".into())
+            })
     }
+
     pub fn is_connected(&self) -> bool {
         !self.closed.load(Ordering::SeqCst)
     }
     pub fn close(&self) {
-        if self.closed.swap(true, Ordering::SeqCst) {
-            return;
-        }
+        self.closed.store(true,Ordering::SeqCst);
         let session = self
             .session
             .lock()
@@ -261,7 +271,7 @@ impl HttpMcpClient {
                 };
                 request = request.bearer_auth(token);
             }
-            let _ = request.send();
+            let _=std::thread::Builder::new().name("mcp-session-close".into()).spawn(move||{if let Ok(rt)=tokio::runtime::Builder::new_current_thread().enable_all().build(){let _=rt.block_on(request.send());}});
         }
     }
     pub fn tools(self: &Arc<Self>) -> Vec<Arc<dyn Tool>> {
@@ -277,6 +287,8 @@ impl HttpMcpClient {
             .collect()
     }
 }
+impl Drop for HttpMcpClient{fn drop(&mut self){self.close();}}
+
 fn rpc_result(value: Value, id: u64) -> Result<Value, String> {
     if value["id"].as_u64() != Some(id) {
         return Err("MCP 响应请求编号不匹配".into());
@@ -289,59 +301,22 @@ fn rpc_result(value: Value, id: u64) -> Result<Value, String> {
         .cloned()
         .ok_or("MCP 响应缺少结果".into())
 }
-fn read_response(response: Response, id: u64) -> Result<Value, String> {
-    let sse = response
-        .headers()
-        .get("content-type")
-        .and_then(|v| v.to_str().ok())
-        .is_some_and(|v| v.starts_with("text/event-stream"));
-    let mut reader = BufReader::new(response.take(MAX_FRAME_BYTES + 1));
-    if !sse {
-        let mut bytes = Vec::new();
-        reader
-            .read_to_end(&mut bytes)
-            .map_err(|_| "MCP 响应读取失败")?;
-        if bytes.len() as u64 > MAX_FRAME_BYTES {
-            return Err("MCP 响应超过 8 MiB".into());
-        }
-        return rpc_result(
-            serde_json::from_slice(&bytes).map_err(|_| "MCP 响应不是 JSON")?,
-            id,
-        );
-    }
-    let mut event = String::new();
-    let mut count = 0u64;
-    loop {
-        let mut line = String::new();
-        let n = reader
-            .read_line(&mut line)
-            .map_err(|_| "MCP SSE 读取失败")?;
-        count += n as u64;
-        if count > MAX_FRAME_BYTES {
-            return Err("MCP SSE 响应超过 8 MiB".into());
-        }
-        if n == 0 || line.trim().is_empty() {
-            if !event.is_empty() {
-                let value: Value =
-                    serde_json::from_str(event.trim()).map_err(|_| "MCP SSE JSON 无效")?;
-                if value["id"].as_u64() == Some(id) && value.get("method").is_none() {
-                    return rpc_result(value, id);
-                }
-                event.clear();
-            }
-            if n == 0 {
-                return Err("MCP SSE 在结果返回前断开".into());
-            }
-        } else if let Some(data) = line.strip_prefix("data:") {
-            event.push_str(
-                data.strip_prefix(' ')
-                    .unwrap_or(data)
-                    .trim_end_matches(['\r', '\n']),
-            );
-            event.push('\n');
-        }
-    }
+async fn read_response(mut response:Response,id:u64,cancel:impl Fn()->bool)->Result<Value,String>{
+ let sse=response.headers().get("content-type").and_then(|v|v.to_str().ok()).is_some_and(|v|v.starts_with("text/event-stream"));
+ let mut bytes=Vec::new();let mut total=0u64;let mut event=String::new();
+ loop{
+  let chunk=crate::net::wait(response.chunk(),&cancel,Duration::from_secs(30)).await.map_err(|e|e.to_string())?.map_err(|_|"MCP response read failed")?;
+  let Some(chunk)=chunk else{break;};total+=chunk.len() as u64;if total>MAX_FRAME_BYTES{return Err("MCP response exceeds 8 MiB".into());}bytes.extend_from_slice(&chunk);
+  if sse{while let Some(end)=bytes.iter().position(|b|*b==b'\n'){
+   let line:Vec<_>=bytes.drain(..=end).collect();let line=std::str::from_utf8(&line).map_err(|_|"invalid MCP UTF-8")?;
+   if line.trim().is_empty(){if !event.is_empty(){let value:Value=serde_json::from_str(&event).map_err(|_|"invalid MCP SSE JSON")?;event.clear();if value["id"].as_u64()==Some(id)&&value.get("method").is_none(){return rpc_result(value,id);}}}
+   else if let Some(data)=line.strip_prefix("data:"){event.push_str(data.strip_prefix(' ').unwrap_or(data).trim_end_matches(['\r','\n']));event.push('\n');}
+  }}
+ }
+ if sse{return Err("MCP SSE closed before complete result".into());}
+ rpc_result(serde_json::from_slice(&bytes).map_err(|_|"invalid MCP JSON")?,id)
 }
+
 struct HttpTool {
     client: Arc<HttpMcpClient>,
     name: String,
@@ -367,9 +342,9 @@ impl Tool for HttpTool {
             .request(
                 "tools/call",
                 json!({"name":self.name,"arguments":args}),
-                false,
+                false, Some(ctx),
             )
             .and_then(|v| decode_result(&v))
-            .unwrap_or_else(ToolResult::error)
+            .unwrap_or_else(|e|ToolResult::unknown(&e))
     }
 }

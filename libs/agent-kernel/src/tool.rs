@@ -102,6 +102,7 @@ pub struct ToolCtx {
     pub(crate) run_id: String,
     pub(crate) run_cancel: Arc<AtomicBool>,
     pub(crate) call_cancel: Arc<AtomicBool>,
+    pub(crate) control: crate::RunControl,
     pub(crate) budget: Option<Arc<crate::ToolBudget>>,
 }
 
@@ -110,6 +111,8 @@ impl ToolCtx {
         &self.session
     }
 
+    pub fn control(&self)->&crate::RunControl{&self.control}
+
     pub fn run_id(&self) -> &str { &self.run_id }
 
     /// The run's tool-call budget, when it has one; a tool that starts a run of its own passes it on.
@@ -117,7 +120,7 @@ impl ToolCtx {
 
     /// A context that is never cancelled, for calling a tool directly, for example in a host's tests.
     pub fn detached(session: &str) -> Self {
-        Self { session: session.to_string(), run_id: format!("detached-{session}"), run_cancel: Arc::new(AtomicBool::new(false)), call_cancel: Arc::new(AtomicBool::new(false)), budget: None }
+        Self { session: session.to_string(), run_id: format!("detached-{session}"), run_cancel: Arc::new(AtomicBool::new(false)), call_cancel: Arc::new(AtomicBool::new(false)), budget: None, control: Default::default() }
     }
 
     /// True after the user cancels the run or this call hits its timeout.
@@ -180,6 +183,8 @@ impl ToolResult {
         Self { is_error: true, ..Self::ok(output) }
     }
 
+    pub(crate) fn unknown(reason:&str)->Self{Self::error(format!("Execution outcome unknown: {reason}. Inspect external state before retrying; do not replay automatically.")).with_structured_content(serde_json::json!({"harness_status":"outcome_unknown"}))}
+    pub(crate) fn halts_dispatch(&self)->bool{self.structured_content.as_ref().and_then(|v|v.get("harness_status")).and_then(Value::as_str).is_some_and(|v|matches!(v,"outcome_unknown"|"resource_busy"))}
     pub fn with_part(mut self, part: Part) -> Self {
         self.parts.push(part);
         self

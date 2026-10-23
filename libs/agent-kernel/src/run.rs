@@ -124,10 +124,12 @@ impl Agent {
     }
 
     fn run_observed_inner(
-        &self, session: &str, input: Option<Vec<Part>>, options: crate::RunOptions,
+        &self, session: &str, input: Option<Vec<Part>>, mut options: crate::RunOptions,
         observe: &mut dyn FnMut(crate::RunEvent) -> Result<(), HarnessError>, cancel: &Arc<AtomicBool>,
     ) -> Result<RunSummary, HarnessError> {
         use crate::{RunEnd, RunEventBody, RunState};
+        let control=options.control.get_or_insert_with(Default::default).clone();
+        let _watch=control.watch(cancel.clone());
         let mut emitter = crate::runtime::RunEmitter::new(session, &options, observe);
         let run_id = emitter.run_id.clone();
         // Keep the session locked through cleanup and terminal observation. A rejected competing
@@ -154,6 +156,7 @@ impl Agent {
             self.run_inner(session, &run_id, input, &options, &mut forward, cancel)
         };
         if let Some(error) = observation_error { result = Err(error); }
+        if !matches!(&result,Err(HarnessError::Paused(reason))if reason=="tool_outcome_needs_review"){if let Err(e)=control.check(){result=Err(e);}}
         let end = RunEnd { run_id, session_id: session.into(), state: crate::runtime::state_of(&result), ephemeral_session: options.ephemeral_session };
         for tool in &self.tools {
             if let Err(error) = tool.on_run_end(&end) {
@@ -223,7 +226,10 @@ impl Agent {
         let budget = options.shared_budget.clone().or_else(|| options.max_tool_calls.map(|limit| Arc::new(crate::ToolBudget::new(limit))));
         let own_limit = options.max_tool_calls.filter(|_| options.shared_budget.is_some());
         let mut recovered_context_budget = None;
+        let control=options.control.clone().unwrap_or_default();
+        let mut idle_rounds=0;
         for index in 0..self.max_turns {
+            control.check()?;
             if cancel.load(Ordering::Relaxed) {
                 return Err(HarnessError::Cancelled);
             }
@@ -245,6 +251,7 @@ impl Agent {
             }
             if let Some(u) = reply.usage {
                 usage += u;
+                control.record(u);
                 on_event(Event::Usage { prompt_tokens: u.prompt_tokens, completion_tokens: u.completion_tokens });
             }
 
@@ -260,9 +267,27 @@ impl Agent {
                     }
                 }
             }
+            let mut identities=HashSet::new();
+            let invalid_ids=assistant.tool_calls.iter().any(|c|c.id.trim().is_empty()||!identities.insert(c.id.clone()));
+            if invalid_ids {
+                // Never persist an invalid protocol history that makes the next authorized turn fail too.
+                assistant.structured_content=Some(serde_json::json!({"rejected_model_calls":assistant.tool_calls}));
+                assistant.provider_state=None;
+                for (i,call) in assistant.tool_calls.iter_mut().enumerate(){
+                    call.id=format!("rejected_{}_{}_{}",run_id.replace('-',"_"),index,i);
+                    if !serde_json::from_str::<serde_json::Value>(&call.arguments).is_ok_and(|v|v.is_object()){call.arguments="{}".into();}
+                }
+            }
             self.store.append(session, std::slice::from_ref(&assistant))?;
             let (calls, text) = (assistant.tool_calls.clone(), assistant.text());
             history.push(assistant);
+            control.check()?;
+            if matches!(finish, FinishReason::ContentFilter | FinishReason::Other) || invalid_ids {
+                let results = self.reject_calls(session, &calls, "Not run: abnormal model terminal state or duplicate/empty tool identity. The entire batch was rejected.", on_event);
+                let messages: Vec<_> = calls.iter().zip(results).map(|(c,r)|r.message(&c.id)).collect();
+                self.store.append(session, &messages)?;
+                return Err(HarnessError::Paused("invalid_model_terminal_or_call_identity".into()));
+            }
             if calls.is_empty() {
                 if cancel.load(Ordering::Relaxed) {
                     return Err(HarnessError::Cancelled);
@@ -299,12 +324,13 @@ impl Agent {
             } else if cut_calls {
                 self.reject_calls(session, &calls, CUT_OFF_MESSAGE, on_event)
             } else {
-                self.execute_calls(session, run_id, &calls, cancel, budget.as_ref(), on_event)
+                self.execute_calls(session, run_id, &calls, cancel, budget.as_ref(), &control, on_event)
             };
             let tool_messages: Vec<Message> =
                 calls.iter().zip(&results).map(|(c, r)| r.message(c.id.as_str())).collect();
             self.store.append(session, &tool_messages)?;
             history.extend(tool_messages);
+            if results.iter().any(crate::ToolResult::halts_dispatch){let unknown=results.iter().any(|r|r.structured_content.as_ref().is_some_and(|v|v["harness_status"]=="outcome_unknown"));return Err(HarnessError::Paused(if unknown{"tool_outcome_needs_review"}else{"resources_busy"}.into()));}
             if over_budget { return Err(HarnessError::BudgetExceeded("tool calls".into())); }
             if cut_calls {
                 if cancel.load(Ordering::Relaxed) { return Err(HarnessError::Cancelled); }
@@ -316,18 +342,25 @@ impl Agent {
                 on_event(Event::Continuing { reason: "tool_call_length".into() });
                 continue;
             }
+            let previous_successes=successful_calls.len();
             for (call, result) in calls.iter().zip(&results) {
                 if result.is_error || matches!(call.name.as_str(), "todo" | "ask_user" | "time_now") {
                     continue;
                 }
                 let Ok(args) = serde_json::from_str::<serde_json::Value>(&call.arguments) else { continue };
-                let key = (call.name.clone(), args);
+                use std::hash::{Hash,Hasher};
+                let mut hash=std::collections::hash_map::DefaultHasher::new();
+                result.output.hash(&mut hash);
+                if let Some(v)=&result.structured_content{v.to_string().hash(&mut hash);}
+                let key = (call.name.clone(), args,hash.finish());
                 if !successful_calls.contains(&key) {
                     successful_calls.push(key);
                     continuations_without_progress = 0;
                     truncated_tool_retries = 0;
                 }
             }
+            idle_rounds=if previous_successes==successful_calls.len(){idle_rounds+1}else{0};
+            if options.max_no_progress_rounds.is_some_and(|limit|idle_rounds>=limit){return Err(HarnessError::Paused("no_progress_tool_rounds".into()));}
         }
         if cancel.load(Ordering::Relaxed) {
             return Err(HarnessError::Cancelled);

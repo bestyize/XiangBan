@@ -257,10 +257,12 @@ fn risk_name(risk: Risk) -> &'static str {
 fn ask_approval(app: &tauri::AppHandle, broker: &Broker, request: &ApprovalRequest<'_>) -> Approval {
     // Skill changes, flagged calls and commands without a kind to remember are asked every time,
     // so "always" would only mislead.
-    let can_remember = (request.risk != Risk::Exec || request.remember_as.is_some()) && request.tool != "skill_manage" && request.danger.is_none();
+    let can_remember = (request.risk != Risk::Exec || request.remember_as.is_some()) && request.tool != "skill_manage" && request.danger.is_none() && !app.state::<ChatState>().permission.needs_review(request.session);
     // In full trust a tainted conversation is not asked because of the taint, so the card must not say it is.
     let tainted_by_policy = request.tainted && app.state::<ChatState>().permission.mode_for(request.session) != PermissionMode::Auto;
-    let (id, rx) = broker.open_approval(request.session);
+    let payload=json!({"tool":request.tool,"risk":risk_name(request.risk),"arguments":shorten(request.arguments,0),"tainted":tainted_by_policy,"danger":request.danger,"canRemember":can_remember,"rememberAs":request.remember_as});
+    let (id, rx) = broker.open_approval_payload(request.session,payload);
+    emit(app,"chat-pending-changed",json!({"session":request.session,"pending":broker.snapshot(request.session)}));
     crate::proactivity::observe_task_state(app, agent_proactivity::context::TaskState::AwaitingUser);
     emit(
         app,
@@ -274,6 +276,7 @@ fn ask_approval(app: &tauri::AppHandle, broker: &Broker, request: &ApprovalReque
     );
     let decision = request.wait_for(&rx).unwrap_or(Approval::Deny);
     broker.close_approval(&id);
+    emit(app,"chat-pending-changed",json!({"session":request.session,"pending":broker.snapshot(request.session)}));
     // Kept on disk so "这段对话都允许" still holds after the app restarts.
     if decision == Approval::Always && can_remember {
         if let Ok(dirs) = Dirs::of(app) {
@@ -296,11 +299,13 @@ fn ask_approval(app: &tauri::AppHandle, broker: &Broker, request: &ApprovalReque
 }
 
 fn ask_question(app: &tauri::AppHandle, broker: &Broker, session: &str, question: &Question, ctx: &ToolCtx) -> Option<String> {
-    let (id, rx) = broker.open_question(session);
+    let (id, rx) = broker.open_question_payload(session,json!({"question":question.text,"options":question.options}));
+    emit(app,"chat-pending-changed",json!({"session":session,"pending":broker.snapshot(session)}));
     crate::proactivity::observe_task_state(app, agent_proactivity::context::TaskState::AwaitingUser);
     emit(app, "chat-question", json!({ "id": id, "session": session, "question": question.text, "options": question.options }));
     let answer = ctx.wait_for(&rx).flatten();
     broker.close_question(&id);
+    emit(app,"chat-pending-changed",json!({"session":session,"pending":broker.snapshot(session)}));
     crate::proactivity::observe_task_state(app, agent_proactivity::context::TaskState::Running);
     answer
 }
@@ -657,7 +662,7 @@ fn connector_manager(app: &tauri::AppHandle) -> Result<Arc<agent_connector_tools
     if let Some(manager)=slot.as_ref(){return Ok(manager.clone());}
     let config=ai_config::current(app)?;
     let default=ai_config::default_workspace(app)?;
-    let manager=Arc::new(agent_connector_tools::ConnectorManager::new(Dirs::of(app)?.chat.join("connectors"),config.workspace_or(&default).to_path_buf())?);
+    let manager=Arc::new(agent_connector_tools::ConnectorManager::new_lazy(Dirs::of(app)?.chat.join("connectors"),config.workspace_or(&default).to_path_buf())?);
     *slot=Some(manager.clone());
     Ok(manager)
 }
@@ -682,7 +687,7 @@ fn process_manager(app: &tauri::AppHandle, workspace: &Path) -> Result<Arc<Proce
     Ok(manager)
 }
 
-fn build_agent(app: &tauri::AppHandle, config: &AiConfig, key_source: Option<KeySource>, workspace: &Path, attachments: Vec<Attachment>, session: &str, cancel: &Arc<AtomicBool>) -> Result<Agent, String> {
+fn build_agent(app: &tauri::AppHandle, config: &AiConfig, key_source: Option<KeySource>, workspace: &Path, attachments: Vec<Attachment>, session: &str, cancel: &Arc<AtomicBool>, control:&agent_kernel::RunControl) -> Result<Agent, String> {
     let state = app.state::<ChatState>();
     let ask = {
         let (app, broker) = (app.clone(), state.broker.clone());
@@ -706,14 +711,20 @@ fn build_agent(app: &tauri::AppHandle, config: &AiConfig, key_source: Option<Key
         let root = app.path().resource_dir()
             .map_err(|e| agent_kernel::HarnessError::Config(format!("无法定位内置电脑控制资源：{e}")))?
             .join("agent-tools/computer-use");
-        let client = agent_computer_use_tools::spawn(&root)?;
+        let client = agent_computer_use_tools::spawn_cancellable(&root,cancel.clone())?;
         *slot = Some(client.clone());
         Ok(client)
     };
+    if cancel.load(Ordering::SeqCst){return Err("任务已取消".into());}
+    let connectors=connector_manager(app)?;
+    if let Err(e)=connectors.restore(cancel.clone()){if cancel.load(Ordering::SeqCst){return Err("任务已取消".into());}eprintln!("部分 MCP 能力暂不可用：{e}");}
+    let mut connector_tools=connectors.tools();
+    if connectors.statuses().as_array().is_some_and(|a|!a.is_empty()){connector_tools.push(connectors.status_tool());}
+    if cancel.load(Ordering::SeqCst){return Err("任务已取消".into());}
     let provider = provider_with(config, key_source)?;
     let mid_run = {
         let (app, session) = (app.clone(), session.to_string());
-        compact::MidRunCompact::new(provider.clone(), config.token_budget().context_limit, cancel.clone(), move |state, detail| {
+        compact::MidRunCompact::new(Arc::new(agent_kernel::provider::MeteredProvider{provider:provider.clone(),control:control.clone()}), config.token_budget().context_limit, cancel.clone(), move |state, detail| {
             let mut payload = json!({ "session": session, "state": state });
             match state {
                 "done" => payload["summary"] = json!(detail),
@@ -746,7 +757,7 @@ fn build_agent(app: &tauri::AppHandle, config: &AiConfig, key_source: Option<Key
                 }
             })
         }),
-    }, attachments, connector_manager(app).map(|m|m.tools()).unwrap_or_default())?;
+    }, attachments, connector_tools)?;
     let tokens = agent_kernel::estimate_tool_tokens(&agent.initial_tool_schemas())
         + agent_kernel::estimate_tokens(&[Message::system(agent.tool_catalog())]);
     lock(&state.tool_tokens).insert(config.open_computer_use, tokens);
@@ -776,11 +787,15 @@ fn list(app: &tauri::AppHandle) -> Result<Vec<SessionSummary>, String> {
     mutate(app, |index| index.list())
 }
 
+struct HostRunCleanup{app:tauri::AppHandle,session:String}
+impl Drop for HostRunCleanup{fn drop(&mut self){if std::thread::panicking(){emit(&self.app,"chat-event",json!({"session":self.session,"event":{"type":"error","message":"任务异常中断；已派发操作可能产生结果，请核对后继续。"}}));}finish_run(&self.app,&self.session);}}
+
 fn finish_run(app: &tauri::AppHandle, session: &str) {
     let state = app.state::<ChatState>();
     lock(&state.runs).remove(session);
     lock(&state.leases).remove(session);
     state.broker.drop_session(session);
+    emit(app,"chat-pending-changed",json!({"session":session,"pending":state.broker.snapshot(session)}));
     if let Ok(sessions) = mutate(app, |index| {
         index.touch(session, now().0);
         index.list()
@@ -797,7 +812,7 @@ pub fn chat_overview(app: tauri::AppHandle, window: tauri::WebviewWindow) -> Res
     let running: Vec<String> = lock(&app.state::<ChatState>().runs).keys().cloned().collect();
     let mode = if app.state::<ChatState>().permission.mode() == PermissionMode::Auto { "auto" } else { "ask" };
     Ok(json!({
-        "snapshotProtocol": 1,
+        "pendingProtocol":1, "snapshotProtocol": 1,
         "configured": config.is_complete(),
         "sessions": list(&app)?,
         "groups": mutate(&app, |index| index.groups())?,
@@ -857,10 +872,13 @@ pub fn chat_session_snapshot(app: tauri::AppHandle, window: tauri::WebviewWindow
             Ok((run_id, sequence, events)) => {
                 // A new run can start between the trace and history reads.
                 if run_history::latest_run_id(&dirs.runs().join(&session_id), &session_id).ok().flatten() != run_id { continue; }
-                return Ok(run_history::snapshot_projection(messages, run_id, sequence, events, running));
+                let mut snapshot=run_history::snapshot_projection(messages, run_id, sequence, events, running);
+                snapshot["pending"]=app.state::<ChatState>().broker.snapshot(&session_id);
+                if let Some(run)=snapshot["runId"].as_str(){if let Ok(Some(outcome))=task_outcome::load(&dirs.outcomes(),&session_id,run){snapshot["outcome"]=json!(outcome);}}
+                return Ok(snapshot);
             }
             Err(_) => return Ok(json!({"messages":messages,"events":[],"running":running,"ready":true,
-                "warning":"运行日志无法读取，已加载正常会话历史。"})),
+                "pending":app.state::<ChatState>().broker.snapshot(&session_id),"warning":"运行日志无法读取，已加载正常会话历史。"})),
         }
     }
     Err("会话正在切换运行，请稍后重试。".into())
@@ -875,7 +893,7 @@ fn interrupted_run(journal_dir: &Path, session: &str) -> Option<(String, Vec<Str
         return None;
     }
     let inspection = JsonlRunLog::new(journal_dir).inspect(&newest).ok()?;
-    if inspection.terminal {
+    if inspection.terminal && inspection.incomplete_tools.is_empty() {
         return None;
     }
     let _ = fs::write(&marker, "");
@@ -971,8 +989,14 @@ pub(crate) fn send(app: tauri::AppHandle, session_id: String, text: String, imag
 
     let perm_mode = if summary.permission_mode == "auto" { PermissionMode::Auto } else { PermissionMode::Ask };
     state.permission.set_session_mode(&summary.id, perm_mode);
+    let trust_history=JsonlStore::new(Dirs::of(&app)?.sessions()).load(&summary.id).map_err(|e|e.to_string())?;
+    state.permission.restore_trust(&Dirs::of(&app)?.chat.join("trust"),&summary.id,trust_history.iter().any(|m|m.role==agent_kernel::Role::Tool))?;
     {
-        let settings = agent_settings::load(&Dirs::of(&app)?.chat);
+        let dirs=Dirs::of(&app)?;
+        if let Some(run)=run_history::latest_run_id(&dirs.runs().join(&summary.id),&summary.id).ok().flatten(){
+            if JsonlRunLog::new(dirs.runs().join(&summary.id)).inspect(&run).is_ok_and(|i|!i.incomplete_tools.is_empty()){state.permission.require_review(&summary.id)?;}
+        }
+        let settings = agent_settings::load(&dirs.chat);
         sandbox_gate::set_network(settings.sandbox_network);
         sandbox_gate::set_windows(settings.windows_sandbox);
         for grant in settings.grants.get(&summary.id).into_iter().flatten() {
@@ -1011,6 +1035,9 @@ pub(crate) fn send(app: tauri::AppHandle, session_id: String, text: String, imag
     let parts = user_parts(&text, &images);
     let (handle, id, parts_owned, config_owned, workspace_owned) = (app.clone(), summary.id.clone(), parts, config, workspace);
     let started = std::thread::Builder::new().name(format!("chat-{id}")).spawn(move || {
+        let _cleanup=HostRunCleanup{app:handle.clone(),session:id.clone()};
+        let control=agent_kernel::RunControl::bounded(Duration::from_secs(45*60),1_000_000);
+        let _watch=control.watch(cancel.clone());
         let sender = handle.clone();
         let session = id.clone();
         // A working folder chosen after the Windows sandbox was turned on is labelled before its first command;
@@ -1018,18 +1045,16 @@ pub(crate) fn send(app: tauri::AppHandle, session_id: String, text: String, imag
         if let Ok(dirs) = Dirs::of(&handle) {
             if let Err(error) = sandbox_gate::ensure_labelled(&dirs.chat, &workspace_owned) {
                 emit(&sender, "chat-event", json!({ "session": session, "event": { "type": "error", "message": format!("无法为 Windows 沙箱准备工作目录：{error}") } }));
-                finish_run(&handle, &id);
                 return;
             }
         }
         // 小伴 AI 要先拿到有效的账号令牌，可能需要联网刷新，所以放在这条线程里做，不卡住界面。
         let prepared = ai_gateway::prepare(&handle, config_owned).and_then(|(config, source)| {
-            build_agent(&handle, &config, source.clone(), &workspace_owned, saved_for_thread.clone(), &id, &cancel).map(|agent| (agent, config, source))
+            build_agent(&handle, &config, source.clone(), &workspace_owned, saved_for_thread.clone(), &id, &cancel, &control).map(|agent| (agent, config, source))
         });
         if cancel.load(Ordering::SeqCst) {
             attachment_store.rollback(&saved_for_thread);
             emit(&sender, "chat-event", json!({ "session": session, "event": { "type": "cancelled" } }));
-            finish_run(&handle, &id);
             return;
         }
         let (agent, config_owned, key_source) = match prepared {
@@ -1037,7 +1062,6 @@ pub(crate) fn send(app: tauri::AppHandle, session_id: String, text: String, imag
             Err(error) => {
                 attachment_store.rollback(&saved_for_thread);
                 emit(&sender, "chat-event", json!({ "session": session, "event": { "type": "error", "message": error } }));
-                finish_run(&handle, &id);
                 return;
             }
         };
@@ -1048,10 +1072,15 @@ pub(crate) fn send(app: tauri::AppHandle, session_id: String, text: String, imag
         let answered = match Dirs::of(&handle) {
             Ok(dirs) => {
                 let journal = JsonlRunLog::new(dirs.runs().join(&id));
-                let options = RunOptions { max_tool_calls: Some(256), ..Default::default() };
+                let options = RunOptions { control:Some(control.clone()),max_no_progress_rounds:Some(6),max_tool_calls: Some(256), ..Default::default() };
                 let mut observed_run_id: Option<String> = None;
                 let mut observe = |mut record: agent_kernel::RunEvent| {
                     observed_run_id = Some(record.run_id.clone());
+                    if matches!(&record.body,RunEventBody::State{state:agent_kernel::RunState::Running,..}){
+                        let path=dirs.runs().join(&id).join(format!("run-{}.workspace.json",record.run_id));
+                        fs::create_dir_all(path.parent().unwrap()).map_err(|e|agent_kernel::HarnessError::Store(e.to_string()))?;
+                        fs::write(path,serde_json::to_vec(&workspace_owned).map_err(|e|agent_kernel::HarnessError::Store(e.to_string()))?).map_err(|e|agent_kernel::HarnessError::Store(e.to_string()))?;
+                    }
                     let terminal = matches!(&record.body, RunEventBody::Event { event:
                         agent_kernel::Event::Done | agent_kernel::Event::Cancelled | agent_kernel::Event::Error { .. }
                     });
@@ -1075,6 +1104,7 @@ pub(crate) fn send(app: tauri::AppHandle, session_id: String, text: String, imag
                 // The trace is the source of truth. Do not turn a successful model reply into
                 // a verified business success automatically.
                 if let Some(run) = observed_run_id {
+                    if journal.inspect(&run).is_ok_and(|i|!i.incomplete_tools.is_empty()){if let Err(e)=handle.state::<ChatState>().permission.require_review(&id){eprintln!("无法保存结果复核要求：{e}");}}
                     if let Ok(outcome) = task_outcome::inspect(&journal, &id, &run) {
                         let _ = task_outcome::save(&dirs.outcomes(), &outcome);
                         if let Ok(db) = LearningDb::open(&dirs.learning_db()) {
@@ -1085,6 +1115,7 @@ pub(crate) fn send(app: tauri::AppHandle, session_id: String, text: String, imag
                         crate::proactivity::observe_task_outcome(&sender, &outcome);
                         emit(&sender, "chat-task-outcome", json!({ "session": id, "outcome": outcome }));
                     }
+                    if journal.inspect(&run).is_ok_and(|i|i.incomplete_tools.is_empty()){if let Err(e)=checkpoints::seal(&dirs.checkpoints(),&id,&run){eprintln!("无法核验撤销记录：{e}");}}
                     // Offer "撤销这轮的文件改动" when this answer changed files with the file tools.
                     if let Some(manifest) = checkpoints::list(&dirs.checkpoints(), &id).into_iter().find(|m| m.run_id == run) {
                         let files = checkpoints::changed_files(&manifest);
@@ -1112,7 +1143,7 @@ pub(crate) fn send(app: tauri::AppHandle, session_id: String, text: String, imag
             }
         }
         if answered.is_ok() {
-            auto_compact(&handle, &id, &config_owned, key_source, &cancel);
+            auto_compact(&handle, &id, &config_owned, key_source, &cancel,&control);
         }
         // Keep files if their user message was saved, including failed model calls that can be retried.
         if let Ok(messages) = JsonlStore::new(history_dir).load(&id) {
@@ -1121,7 +1152,6 @@ pub(crate) fn send(app: tauri::AppHandle, session_id: String, text: String, imag
                 .is_some_and(|items| items.iter().any(|item| saved_for_thread.iter().any(|a| item["id"].as_str() == Some(a.id.as_str())))));
             if !persisted { attachment_store.rollback(&saved_for_thread); }
         }
-        finish_run(&handle, &id);
     });
     if let Err(error) = started {
         AttachmentStore::new(Dirs::of(&app)?.chat.join("attachments")).rollback(&saved);
@@ -1172,11 +1202,9 @@ pub fn chat_verify_file_outcome(app: tauri::AppHandle, window: tauri::WebviewWin
     if matches!(previous.status, task_outcome::Status::Partial | task_outcome::Status::Failed) {
         return Err("工具执行异常，请先调查运行记录".into());
     }
-    let config = ai_config::current(&app)?;
-    let default = ai_config::default_workspace(&app)?;
-    let summary = mutate(&app, |index| index.get(&session_id).cloned())?.ok_or("这个对话已经不存在")?;
-    let workspace = &workspace::of(&summary, &config, &default);
-    let outcome=task_outcome::verify_file(&dirs.outcomes(), &session_id, &run_id, workspace, &relative_path, &expected_sha256)?;
+    let run_workspace=dirs.runs().join(&session_id).join(format!("run-{run_id}.workspace.json"));
+    let workspace:PathBuf=serde_json::from_slice(&fs::read(run_workspace).map_err(|_|"缺少该次运行的工作区记录，拒绝用当前工作区替代")?).map_err(|e|e.to_string())?;
+    let outcome=task_outcome::verify_file(&dirs.outcomes(), &session_id, &run_id, &workspace, &relative_path, &expected_sha256)?;
     LearningDb::open(&dirs.learning_db())?.record_outcome(&run_id, &session_id,
         "succeeded", &outcome.validator, &outcome.evidence)?;
     crate::proactivity::observe_task_outcome(&app, &outcome);
@@ -1379,9 +1407,10 @@ pub fn chat_context(app: tauri::AppHandle, window: tauri::WebviewWindow, session
 }
 
 /// Has the model summarize the older part of a conversation and saves the summary. Returns its text.
-fn write_summary(app: &tauri::AppHandle, config: &AiConfig, key_source: Option<KeySource>, id: &str, cancel: &AtomicBool) -> Result<String, String> {
+fn write_summary(app: &tauri::AppHandle, config: &AiConfig, key_source: Option<KeySource>, id: &str, cancel: &AtomicBool, control:Option<&agent_kernel::RunControl>) -> Result<String, String> {
     let file = JsonlStore::new(Dirs::of(app)?.sessions());
     let provider = provider_with(config, key_source)?;
+    let provider:Arc<dyn ModelProvider>=match control{Some(c)=>Arc::new(agent_kernel::provider::MeteredProvider{provider,control:c.clone()}),None=>provider};
     compact::compact_into(&file, provider.as_ref(), config.token_budget().context_limit, id, cancel)
         .map_err(|error| if ai_gateway::is_active(config) { ai_gateway::readable_error(&error) } else { error })
 }
@@ -1393,7 +1422,7 @@ fn compact_session(app: &tauri::AppHandle, id: &str, cancel: &AtomicBool) -> Res
         return Err("还没有配置模型，请先到“设置 → AI 模型”填写".into());
     }
     let (config, key_source) = ai_gateway::prepare(app, config)?;
-    write_summary(app, &config, key_source, id, cancel)?;
+    write_summary(app, &config, key_source, id, cancel, None)?;
     let raw = JsonlStore::new(Dirs::of(app)?.sessions()).load(id).map_err(|e| e.to_string())?;
     context_of(app, &config, Some(id), &raw)
 }
@@ -1402,7 +1431,7 @@ fn compact_session(app: &tauri::AppHandle, id: &str, cancel: &AtomicBool) -> Res
 /// replaced by a summary, so a long conversation does not lose its beginning. Runs on the answer's thread, so the
 /// conversation stays busy meanwhile. A failure is reported once and not tried again for a while; `ContextTrim`
 /// still keeps every request under the limit.
-fn auto_compact(app: &tauri::AppHandle, id: &str, config: &AiConfig, key_source: Option<KeySource>, cancel: &AtomicBool) {
+fn auto_compact(app: &tauri::AppHandle, id: &str, config: &AiConfig, key_source: Option<KeySource>, cancel: &AtomicBool,control:&agent_kernel::RunControl) {
     let Ok(dirs) = Dirs::of(app) else { return };
     let Ok(raw) = JsonlStore::new(dirs.sessions()).load(id) else { return };
     let Ok(info) = context_of(app, config, Some(id), &raw) else { return };
@@ -1411,7 +1440,7 @@ fn auto_compact(app: &tauri::AppHandle, id: &str, config: &AiConfig, key_source:
         return;
     }
     emit(app, "chat-compacting", json!({ "session": id, "state": "start" }));
-    match write_summary(app, config, key_source, id, cancel) {
+    match write_summary(app, config, key_source, id, cancel,Some(control)) {
         Ok(summary) => {
             state.auto_compact.forget(id);
             emit(app, "chat-compacting", json!({ "session": id, "state": "done", "summary": summary }));
@@ -1634,6 +1663,8 @@ pub fn chat_undo_run(app: tauri::AppHandle, window: tauri::WebviewWindow, sessio
     if lock(&app.state::<ChatState>().runs).contains_key(&session_id) {
         return Err("这个对话还在回答，请等它结束或先停止再撤销".into());
     }
+    let control=agent_kernel::RunControl::bounded(Duration::from_secs(60),100);
+    control.claim()?;
     Ok(json!(checkpoints::undo(&Dirs::of(&app)?.checkpoints(), &session_id, &run_id)?))
 }
 

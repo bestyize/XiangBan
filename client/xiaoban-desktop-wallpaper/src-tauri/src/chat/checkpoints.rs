@@ -12,6 +12,8 @@ use super::git_snapshot;
 use agent_kernel::{Middleware, ToolCall, ToolCtx, ToolGate, ToolSpec};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use sha2::{Digest,Sha256};
+use std::io::Read;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
@@ -34,6 +36,8 @@ pub struct Entry {
     /// Too large to copy: undo cannot restore it and says so.
     #[serde(default)]
     pub skipped: bool,
+    #[serde(default)]
+    pub after:Option<String>,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
@@ -45,6 +49,8 @@ pub struct Manifest {
     pub entries: Vec<Entry>,
     #[serde(default)]
     pub undone: bool,
+    #[serde(default)]
+    pub final_tree:Option<String>,
     /// The working files before the answer's first command, when the folder is in a git repository.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub git: Option<GitSnapshot>,
@@ -186,12 +192,12 @@ impl Checkpoints {
             Ok(meta) if meta.is_file() && meta.len() <= MAX_BACKUP_BYTES => {
                 let name = format!("{}.bak", manifest.entries.len());
                 fs::copy(file, dir.join(&name)).map_err(|e| e.to_string())?;
-                Entry { path: relative, created: false, backup: Some(name), skipped: false }
+                Entry { path: relative, created: false, backup: Some(name), skipped: false, after:None }
             }
-            Ok(meta) if meta.is_file() => Entry { path: relative, created: false, backup: None, skipped: true },
+            Ok(meta) if meta.is_file() => Entry { path: relative, created: false, backup: None, skipped: true, after:None },
             // A folder or a link: the file tools refuse those, nothing to keep.
             Ok(_) => return Ok(false),
-            Err(_) => Entry { path: relative, created: true, backup: None, skipped: false },
+            Err(_) => Entry { path: relative, created: true, backup: None, skipped: false, after:None },
         };
         manifest.entries.push(entry);
         Ok(true)
@@ -268,7 +274,8 @@ fn relative_to_workspace(snapshot: &GitSnapshot, path: &str) -> String {
 pub fn changed_files(manifest: &Manifest) -> Vec<String> {
     let mut files: Vec<String> = manifest.entries.iter().map(|e| e.path.clone()).collect();
     if let Some(snapshot) = &manifest.git {
-        if let Ok((added, changed)) = git_changes(snapshot) {
+        let changes=match &manifest.final_tree{Some(tree)=>git_snapshot::changes(&snapshot.repo(),&snapshot.tree,tree),None=>git_changes(snapshot)};
+        if let Ok((added, changed)) = changes {
             for path in added.iter().chain(&changed).map(|p| relative_to_workspace(snapshot, p)) {
                 if !files.contains(&path) {
                     files.push(path);
@@ -279,8 +286,17 @@ pub fn changed_files(manifest: &Manifest) -> Vec<String> {
     files
 }
 
-/// Puts back every file one answer changed. Files are restored even if they were changed again since; the page
-/// asks the user first and says so.
+fn fingerprint(path:&Path)->Result<String,String>{
+ match fs::symlink_metadata(path){Err(e)if e.kind()==std::io::ErrorKind::NotFound=>return Ok("missing".into()),Ok(m)if m.is_file()&&m.len()<=MAX_BACKUP_BYTES=>{},_=>return Err("目标不再是可安全核验的普通文件".into())}
+ let mut f=fs::File::open(path).map_err(|e|e.to_string())?;let mut hash=Sha256::new();let mut buf=[0;8192];loop{let n=f.read(&mut buf).map_err(|e|e.to_string())?;if n==0{break;}hash.update(&buf[..n]);}Ok(format!("{:x}",hash.finalize()))
+}
+/// Capture the run's final state before releasing its shared resource lease.
+pub fn seal(root:&Path,session:&str,run:&str)->Result<(),String>{
+ if !safe(session)||!safe(run){return Err("invalid checkpoint identity".into());}let dir=root.join(session).join(run);let Some(mut m)=load(&dir)else{return Ok(());};
+ for e in &mut m.entries{e.after=fingerprint(&Path::new(&m.workspace).join(&e.path)).ok();}
+ if let Some(g)=&m.git{m.final_tree=Some(git_snapshot::snapshot(&g.repo(),&g.pathspec)?);}save(&dir,&m)
+}
+/// Refuse stale/legacy checkpoints before mutating any file.
 pub fn undo(root: &Path, session: &str, run_id: &str) -> Result<UndoReport, String> {
     if !safe(session) || !safe(run_id) {
         return Err("记录编号不对".into());
@@ -291,6 +307,13 @@ pub fn undo(root: &Path, session: &str, run_id: &str) -> Result<UndoReport, Stri
         return Err("这轮回答的文件改动已经撤销过了".into());
     }
     let workspace = PathBuf::from(&manifest.workspace);
+    let base=workspace.canonicalize().map_err(|e|e.to_string())?;
+    for e in &manifest.entries{let path=workspace.join(&e.path);
+        if e.path.split(['/', '\\']).any(|s|s=="..")||Path::new(&e.path).is_absolute(){return Err("撤销路径无效".into());}
+        if !path.parent().and_then(|p|p.canonicalize().ok()).is_some_and(|p|p.starts_with(&base)){return Err("撤销路径已变化，请手动核对".into());}
+        if e.after.as_deref()!=Some(fingerprint(&path)?.as_str()){return Err(format!("{} 在本轮后已变化或缺少核验记录，拒绝覆盖",e.path));}
+    }
+    if let Some(g)=&manifest.git{if manifest.final_tree.as_deref()!=Some(git_snapshot::snapshot(&g.repo(),&g.pathspec)?.as_str()){return Err("工作区在本轮结束后已变化或缺少核验记录，拒绝覆盖".into());}}
     let mut report = UndoReport::default();
     // Commands first: the file tools' copies are older (taken before each first edit) and are written last.
     if let Some(snapshot) = &manifest.git {
@@ -377,6 +400,7 @@ mod tests {
         assert_eq!(runs[0].entries.iter().map(|e| (e.path.as_str(), e.created)).collect::<Vec<_>>(), vec![("a.txt", false), ("new/b.txt", true)],
             "each file once, its state before the first change; nothing outside the working folder");
 
+        seal(&dir.join("cp"),"s1","r1").unwrap();
         let report = undo(&dir.join("cp"), "s1", "r1").unwrap();
         assert_eq!(report.restored, vec!["a.txt"]);
         assert_eq!(report.removed, vec!["new/b.txt"]);
@@ -385,6 +409,15 @@ mod tests {
         assert!(undo(&dir.join("cp"), "s1", "r1").is_err(), "an answer is undone once");
         assert!(undo(&dir.join("cp"), "s1", "../x").is_err());
         let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn undo_refuses_a_later_edit_before_changing_any_file(){
+        let dir=temp("conflict");let work=dir.join("work");fs::write(work.join("a.txt"),"before").unwrap();
+        let c=Checkpoints::new(dir.join("cp"),&work);c.record("s1","r1",&json!({"path":"a.txt"})).unwrap();
+        fs::write(work.join("a.txt"),"agent result").unwrap();seal(&dir.join("cp"),"s1","r1").unwrap();
+        fs::write(work.join("a.txt"),"later external edit").unwrap();assert!(undo(&dir.join("cp"),"s1","r1").is_err());
+        assert_eq!(fs::read_to_string(work.join("a.txt")).unwrap(),"later external edit");let _=fs::remove_dir_all(dir);
     }
 
     #[test]
@@ -409,6 +442,7 @@ mod tests {
         files.sort();
         assert_eq!(files, vec!["a.txt", "b.txt", "c.txt"]);
 
+        seal(&dir.join("cp"),"s1","r1").unwrap();
         let report = undo(&dir.join("cp"), "s1", "r1").unwrap();
         assert!(report.failed.is_empty(), "{:?}", report.failed);
         assert_eq!(fs::read_to_string(work.join("a.txt")).unwrap(), "原始", "the file tool's older copy wins");
@@ -423,7 +457,7 @@ mod tests {
         let work = dir.join("work");
         let root = dir.join("cp");
         for run in 0..(KEEP_RUNS + 3) {
-            let manifest = Manifest { run_id: format!("r{run}"), workspace: work.display().to_string(), created_at: run as i64, entries: vec![], undone: false, git: None };
+            let manifest = Manifest { run_id: format!("r{run}"), workspace: work.display().to_string(), created_at: run as i64, entries: vec![], undone: false, final_tree:None, git: None };
             fs::create_dir_all(root.join("s1").join(format!("r{run}"))).unwrap();
             save(&root.join("s1").join(format!("r{run}")), &manifest).unwrap();
         }

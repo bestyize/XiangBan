@@ -10,6 +10,8 @@ static RUN_SEQUENCE: AtomicU64 = AtomicU64::new(0);
 
 #[derive(Debug, Clone, Default)]
 pub struct RunOptions {
+    pub control: Option<crate::RunControl>,
+    pub max_no_progress_rounds: Option<usize>,
     pub parent_run_id: Option<String>,
     /// Release session-owned runtime resources at run end (for temporary delegated sessions).
     /// Conversation retention remains the SessionStore/host's decision.

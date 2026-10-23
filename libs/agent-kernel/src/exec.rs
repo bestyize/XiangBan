@@ -14,7 +14,7 @@ struct Inflight {
     index: usize,
     rx: Receiver<ToolResult>,
     deadline: Option<Instant>,
-    timeout: Duration,
+
     call_cancel: Arc<AtomicBool>,
 }
 
@@ -33,30 +33,14 @@ fn spawn(index: usize, tool: Arc<dyn Tool>, args: Value, ctx: ToolCtx) -> Result
             let _ = tx.send(tool.execute_result(args, &ctx));
         })
         .map_err(|e| ToolResult::error(format!("could not start tool: {e}")))?;
-    Ok(Inflight { index, rx, deadline: Instant::now().checked_add(timeout), timeout, call_cancel })
+    Ok(Inflight { index, rx, deadline: Instant::now().checked_add(timeout), call_cancel })
 }
 
-fn await_call(call: &Inflight, cancel: &AtomicBool) -> ToolResult {
-    loop {
-        match call.rx.recv_timeout(POLL) {
-            Ok(result) => return result,
-            Err(RecvTimeoutError::Disconnected) => return ToolResult::error("tool crashed before returning a result"),
-            Err(RecvTimeoutError::Timeout) => {
-                if cancel.load(Ordering::Relaxed) {
-                    call.call_cancel.store(true, Ordering::Relaxed);
-                    return ToolResult::error("cancelled");
-                }
-                if call.deadline.is_some_and(|d| Instant::now() >= d) {
-                    call.call_cancel.store(true, Ordering::Relaxed);
-                    // Cancellation is cooperative: a tool that does not check it may still be running and finish its action.
-                    return ToolResult::error(format!(
-                        "tool timed out after {}s and was asked to stop. It may still finish in the background, so its action may already have happened or happen shortly. Check the actual state before retrying; do not repeat it blindly.",
-                        call.timeout.as_secs()
-                    ));
-                }
-            }
-        }
-    }
+fn await_call(call:&Inflight,cancel:&AtomicBool)->ToolResult{
+ loop{match call.rx.recv_timeout(POLL){Ok(result)=>return result,Err(RecvTimeoutError::Disconnected)=>return ToolResult::unknown("worker crashed without a result"),Err(RecvTimeoutError::Timeout)=>{
+  if cancel.load(Ordering::Relaxed)||call.deadline.is_some_and(|d|Instant::now()>=d){call.call_cancel.store(true,Ordering::SeqCst);let timed_out=!cancel.load(Ordering::Relaxed);
+                    return match call.rx.recv_timeout(Duration::from_millis(250)){Ok(mut result)=>{if timed_out {result.output=format!("Tool timed out; final worker report (action may have completed): {}",result.output);}result},Err(_)=>ToolResult::unknown("worker did not acknowledge cancellation/deadline")};}
+ }}}
 }
 
 impl Agent {
@@ -68,19 +52,22 @@ impl Agent {
         calls: &[ToolCall],
         cancel: &Arc<AtomicBool>,
         budget: Option<&Arc<crate::ToolBudget>>,
+        control: &crate::RunControl,
         on_event: &mut dyn FnMut(Event),
     ) -> Vec<ToolResult> {
         let mut results: Vec<Option<ToolResult>> = vec![None; calls.len()];
         let mut inflight = Vec::new();
         for (i, call) in calls.iter().enumerate() {
             on_event(Event::ToolStart { id: call.id.clone(), name: call.name.clone(), arguments: call.arguments.clone() });
-            match self.prepare(session, run_id, call, cancel, budget) {
+            if results.iter().flatten().any(ToolResult::halts_dispatch){results[i]=Some(self.finalize(session,call,ToolResult::error("Not dispatched: earlier action needs review"),on_event));continue;}
+            match self.prepare(session, run_id, call, cancel, budget, control) {
                 Prepared::Done(result) => results[i] = Some(self.finalize(session, call, result, on_event)),
                 Prepared::Run { tool, args, ctx } => {
                     let serial = !tool.spec().parallel_safe;
                     if serial {
                         self.drain(session, &mut inflight, &mut results, calls, cancel, on_event);
                     }
+                    if results.iter().flatten().any(ToolResult::halts_dispatch){results[i]=Some(self.finalize(session,call,ToolResult::error("Not dispatched: earlier action needs review"),on_event));continue;}
                     on_event(Event::ToolDispatched { id: call.id.clone() });
                     if cancel.load(Ordering::Relaxed) {
                         results[i] = Some(self.finalize(session, call, ToolResult::error("cancelled before dispatch"), on_event));
@@ -112,7 +99,7 @@ impl Agent {
             .collect()
     }
 
-    fn prepare(&self, session: &str, run_id: &str, call: &ToolCall, cancel: &Arc<AtomicBool>, budget: Option<&Arc<crate::ToolBudget>>) -> Prepared {
+    fn prepare(&self, session: &str, run_id: &str, call: &ToolCall, cancel: &Arc<AtomicBool>, budget: Option<&Arc<crate::ToolBudget>>,control:&crate::RunControl) -> Prepared {
         let Some(&index) = self.tool_index.get(&call.name) else {
             let mut names: Vec<&str> = self.tools.iter().map(|tool| tool.spec().name.as_str()).collect();
             names.sort_unstable();
@@ -151,7 +138,9 @@ impl Agent {
             run_cancel: cancel.clone(),
             call_cancel: Arc::new(AtomicBool::new(false)),
             budget: budget.cloned(),
+            control: control.clone(),
         };
+        if let Err(e)=control.claim(){return Prepared::Done(ToolResult::error(e).with_structured_content(serde_json::json!({"harness_status":"resource_busy"})));}
         for mw in &self.middleware {
             if let ToolGate::Block(reason) = mw.before_tool(&ctx, call, &args, tool.spec()) {
                 return Prepared::Done(ToolResult::error(reason));

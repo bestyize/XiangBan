@@ -47,8 +47,7 @@ impl ContinueGuard {
         self
     }
 
-    /// Open items of the latest successful todo update made in this run, when any of them was never
-    /// started. A lone item left `in_progress` usually means the model finished and forgot to tick it.
+    /// Every item not explicitly completed remains unfinished.
     fn open_todos(&self, run: &[Message]) -> Vec<String> {
         for (at, message) in run.iter().enumerate().rev() {
             let Some(call) = message.tool_calls.iter().rev().find(|c| c.name == self.todo_tool) else {
@@ -68,9 +67,6 @@ impl ContinueGuard {
                 .flatten()
                 .filter_map(|item| Some((item.get("content")?.as_str()?, item.get("status")?.as_str()?)))
                 .collect();
-            if !items.iter().any(|&(_, status)| status == "pending") {
-                return Vec::new();
-            }
             return items.into_iter().filter(|&(_, status)| status != "completed").map(|(content, _)| content.to_string()).collect();
         }
         Vec::new()
@@ -130,8 +126,7 @@ impl Middleware for ContinueGuard {
         } else {
             let run = stop.history.get(stop.run_start..).unwrap_or_default();
             let open = self.open_todos(run);
-            let after_nudge = stop.history.len() >= 2 && stop.history[stop.history.len() - 2].synthetic;
-            if open.is_empty() || after_nudge {
+            if open.is_empty() {
                 if announces_action(&text) {
                     return self.decide(stop, Nudge { reason: "announced_action".into(), message: ANNOUNCED.into() });
                 }

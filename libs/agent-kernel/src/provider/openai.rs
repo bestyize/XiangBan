@@ -3,7 +3,7 @@ use super::stream::StreamAccumulator;
 use super::wire::{build_request_body, ProviderProfile};
 use super::{ChatRequest, ModelProvider, Reply};
 use crate::error::HarnessError;
-use reqwest::blocking::Client;
+use reqwest::Client;
 use std::sync::atomic::AtomicBool;
 
 /// Streaming `/chat/completions` client for any OpenAI-compatible endpoint.
