@@ -1079,8 +1079,8 @@ pub async fn fetch_ai_models(
     };
 
     tauri::async_runtime::spawn_blocking(move || {
-        let client = reqwest::blocking::Client::builder()
-            .timeout(std::time::Duration::from_secs(15))
+        let client = crate::network::blocking_builder(reqwest::blocking::Client::builder()
+            .timeout(std::time::Duration::from_secs(15)))?
             .build()
             .map_err(|e| format!("无法创建网络请求客户端：{e}"))?;
 
