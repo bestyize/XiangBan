@@ -411,7 +411,7 @@ pub fn save_json(path: &Path, value: &impl Serialize) -> Result<(), String> {
 }
 
 fn client() -> Result<reqwest::blocking::Client, String> {
-    reqwest::blocking::Client::builder()
+    crate::network::blocking_builder(reqwest::blocking::Client::builder()
         .timeout(Duration::from_secs(120))
         .connect_timeout(Duration::from_secs(10))
         .user_agent(concat!("XiaoBanDesktop/", env!("CARGO_PKG_VERSION")))
@@ -421,7 +421,7 @@ fn client() -> Result<reqwest::blocking::Client, String> {
             } else {
                 attempt.follow()
             }
-        }))
+        })))?
         .build()
         .map_err(|e| e.to_string())
 }
@@ -430,14 +430,15 @@ pub fn fetch_json(value: &str) -> Result<Option<String>, String> {
 }
 
 fn metadata_client() -> Result<reqwest::blocking::Client, String> {
-    static CLIENT: std::sync::Mutex<Option<reqwest::blocking::Client>> = std::sync::Mutex::new(None);
+    static CLIENT: std::sync::Mutex<Option<(crate::network::NetworkConfig, reqwest::blocking::Client)>> = std::sync::Mutex::new(None);
     let mut shared = CLIENT.lock().map_err(|_| "网络客户端初始化失败")?;
-    if let Some(client) = shared.as_ref() {
-        return Ok(client.clone());
+    let network = crate::network::current();
+    if let Some((configured, client)) = shared.as_ref() {
+        if *configured == network { return Ok(client.clone()); }
     }
-    // Only successful initialization is cached. Media downloads retain their own client/timeouts.
+    // A saved proxy change invalidates this cached client; existing downloads keep their client.
     let client = client()?;
-    *shared = Some(client.clone());
+    *shared = Some((network, client.clone()));
     Ok(client)
 }
 
