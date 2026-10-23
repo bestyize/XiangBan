@@ -23,8 +23,7 @@
   "bundle": {
     "active": false,
     "resources": {
-      "resources/computer-use/": "agent-tools/computer-use/",
-      "resources/voice/": "voice/"
+      "resources/computer-use/": "agent-tools/computer-use/"
     },
     "icon": ["icons/icon.png", "icons/icon.ico"],
     "windows": { "webviewInstallMode": { "type": "downloadBootstrapper" } }

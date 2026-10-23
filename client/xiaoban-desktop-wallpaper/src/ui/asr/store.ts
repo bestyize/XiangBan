@@ -228,7 +228,7 @@ export function createAsrStore(deps: AsrDeps): AsrStore {
       request = `asr-${Date.now()}-${ticket}`;
       const requestId = request;
       store.preparing = true; store.phase = store.modelReady ? 'loading' : 'downloading'; store.downloaded = 0; store.error = '';
-      if (!store.modelReady) deps.notify('正在加载语音识别引擎，请稍后。首次使用需从魔搭下载约 229 MiB 模型。', 'info');
+      if (!store.modelReady) deps.notify('正在加载语音识别引擎，请稍后。首次使用需从魔搭下载约 240 MiB 模型。', 'info');
       preparing = (async () => {
         try {
           const value = await deps.invoke<HostStatus>('asr_prepare', { requestId });

@@ -16,10 +16,6 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 base64 = "0.22"
 reqwest = { version = "0.13", default-features = false, features = ["blocking", "native-tls-no-alpn"] }
-# Voice turn detection (Silero VAD, Smart Turn v3). Prebuilt onnxruntime is downloaded at build time;
-# set ORT_LIB_LOCATION to a local onnxruntime build where that download is not reachable.
-ort = { version = "=2.0.0-rc.10", default-features = false, features = ["std", "download-binaries"] }
-rustfft = "6"
 sha2 = "0.10"
 tungstenite = { version = "=0.28.0", default-features = false, features = ["handshake", "native-tls"] }
 semver = "1"

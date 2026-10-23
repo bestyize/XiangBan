@@ -12,12 +12,16 @@ use std::{
 pub const SOURCE: &str = "https://modelscope.cn/api/v1/models/bestyize/xiaoban-asr/repo?Revision=master&FilePath=";
 
 // Runtime fallback download source (official site / release)
-pub const RUNTIME_FALLBACK: &str = "https://wallpaper.xiangban.xyz/app-packages/xiaoban-asr.exe";
+pub const RUNTIME_FALLBACK: &str = "https://wallpaper.xiangban.xyz/app-packages/";
 
+/// The runtime this app expects: recognition plus turn detection (`--turn`). A new name, so that installs which
+/// already have the first runtime fetch this one; until it arrives the first runtime keeps recognising speech.
 #[cfg(windows)]
-pub const RUNTIME_NAME: &str = "xiaoban-asr.exe";
+pub const RUNTIME_NAME: &str = "xiaoban-asr-v2.exe";
 #[cfg(not(windows))]
-pub const RUNTIME_NAME: &str = "xiaoban-asr-macos-arm64";
+pub const RUNTIME_NAME: &str = "xiaoban-asr-v2-macos-arm64";
+/// Earlier runtimes: recognition only.
+const LEGACY_RUNTIMES: [&str; 3] = ["xiaoban-asr.exe", "xiaoban-asr-macos-arm64", "xiaoban-asr"];
 
 pub struct ModelFile { pub name: &'static str, pub bytes: u64, pub sha256: &'static str }
 pub const FILES: [ModelFile; 2] = [
@@ -25,10 +29,27 @@ pub const FILES: [ModelFile; 2] = [
     ModelFile { name: "tokens.txt", bytes: 315894, sha256: "f449eb28dc567533d7fa59be34e2abca8784f771850c78a47fb731a31429a1dc" },
 ];
 pub const TOTAL_BYTES: u64 = FILES[0].bytes + FILES[1].bytes;
+/// Turn detection models (Silero VAD v5, MIT; Smart Turn v3.2 CPU, BSD-2 — as shipped in pipecat-ai 1.13.0).
+/// Fetched after the recognition model, best effort: without them speech is still recognised and pauses are
+/// judged by loudness.
+pub const TURN_FILES: [ModelFile; 2] = [
+    ModelFile { name: "silero_vad.onnx", bytes: 2327524, sha256: "1a153a22f4509e292a94e67d6f9b85e8deb25b4988682b7e174c65279d8788e3" },
+    ModelFile { name: "smart-turn-v3.2.onnx", bytes: 8679182, sha256: "2bb026316b14a660486a75b1733cd3fbab8c2fd0314dc9af7be49f8cca967e4f" },
+];
 pub const MAX_SAMPLES: usize = 20 * 16000;
 
+/// The runtime to recognise speech with: this app's, else an earlier one.
 pub fn resolve_exe(directory: &Path) -> Option<PathBuf> {
-    for name in [RUNTIME_NAME, "xiaoban-asr", "xiaoban-asr.exe"] {
+    resolve_named(directory, &[RUNTIME_NAME]).or_else(|| resolve_named(directory, &LEGACY_RUNTIMES))
+}
+/// The runtime that can also detect turns, if it is here.
+pub fn resolve_turn_exe(directory: &Path) -> Option<PathBuf> { resolve_named(directory, &[RUNTIME_NAME]) }
+pub fn turn_present(directory: &Path) -> bool {
+    TURN_FILES.iter().all(|file| fs::metadata(directory.join(file.name)).is_ok_and(|m| m.is_file() && m.len() == file.bytes))
+        && resolve_turn_exe(directory).is_some()
+}
+fn resolve_named(directory: &Path, names: &[&str]) -> Option<PathBuf> {
+    for name in names.iter().copied() {
         let in_dir = directory.join(name);
         if in_dir.is_file() {
             return Some(in_dir);
@@ -91,13 +112,30 @@ pub fn ensure_model(directory: &Path, check: impl Fn() -> Result<(), String>, pr
         .https_only(true).connect_timeout(Duration::from_secs(15))
         .timeout(Duration::from_secs(600)).build().map_err(|e| e.to_string())?;
     let mut completed = 0;
-    for spec in &FILES {
+    download_files(&client, directory, &FILES, &check, &progress, &mut completed)?;
+    // Ensure runtime executable. An earlier runtime still recognises speech, so failing to fetch this one only
+    // costs turn detection.
+    if resolve_turn_exe(directory).is_none() {
+        let fetched = fetch_runtime(&client, directory, &check, &progress, completed);
+        if let Err(error) = fetched {
+            if resolve_exe(directory).is_none() { return Err(error); }
+            eprintln!("新版语音引擎下载失败，暂用旧版（无智能判停）：{error}");
+        }
+    }
+    if let Err(error) = download_files(&client, directory, &TURN_FILES, &check, &|_: &str, _: u64| {}, &mut 0) {
+        eprintln!("判停模型下载失败，暂按音量判停：{error}");
+    }
+    Ok(())
+}
+
+fn download_files(client: &reqwest::blocking::Client, directory: &Path, files: &[ModelFile], check: &impl Fn() -> Result<(), String>, progress: &impl Fn(&str, u64), completed: &mut u64) -> Result<(), String> {
+    for spec in files {
         check()?;
         let target = directory.join(spec.name);
-        if verified(&target, spec, &check)? { completed += spec.bytes; progress(spec.name, completed); continue; }
+        if verified(&target, spec, check)? { *completed += spec.bytes; progress(spec.name, *completed); continue; }
         let temporary = directory.join(format!("{}.part", spec.name));
         let result: Result<(), String> = (|| {
-            progress(spec.name, completed);
+            progress(spec.name, *completed);
             let mut response = client.get(format!("{SOURCE}{}", spec.name)).send()
                 .and_then(reqwest::blocking::Response::error_for_status).map_err(|e| format!("魔搭模型下载失败，请检查网络后重试：{e}"))?;
             if response.content_length().is_some_and(|n| n != spec.bytes) { return Err("魔搭返回的模型大小不匹配，请稍后重试".into()); }
@@ -114,7 +152,7 @@ pub fn ensure_model(directory: &Path, check: impl Fn() -> Result<(), String>, pr
                 if received > spec.bytes { return Err("下载的模型文件过大".into()); }
                 digest.update(&buffer[..n]);
                 file.write_all(&buffer[..n]).map_err(|e| format!("模型写入失败，请检查剩余空间：{e}"))?;
-                if last_event.elapsed() >= Duration::from_millis(150) { progress(spec.name, completed + received); last_event = Instant::now(); }
+                if last_event.elapsed() >= Duration::from_millis(150) { progress(spec.name, *completed + received); last_event = Instant::now(); }
             }
             if received != spec.bytes || format!("{:x}", digest.finalize()) != spec.sha256 { return Err("语音模型完整性校验失败，请重试".into()); }
             file.sync_all().map_err(|e| e.to_string())?;
@@ -128,12 +166,13 @@ pub fn ensure_model(directory: &Path, check: impl Fn() -> Result<(), String>, pr
         })();
         if result.is_err() { let _ = fs::remove_file(&temporary); }
         result?;
-        completed += spec.bytes;
-        progress(spec.name, completed);
+        *completed += spec.bytes;
+        progress(spec.name, *completed);
     }
+    Ok(())
+}
 
-    // Ensure runtime executable
-    if resolve_exe(directory).is_none() {
+fn fetch_runtime(client: &reqwest::blocking::Client, directory: &Path, check: &impl Fn() -> Result<(), String>, progress: &impl Fn(&str, u64), completed: u64) -> Result<(), String> {
         let target = directory.join(RUNTIME_NAME);
         let temporary = directory.join(format!("{RUNTIME_NAME}.part"));
         let result: Result<(), String> = (|| {
@@ -143,7 +182,7 @@ pub fn ensure_model(directory: &Path, check: impl Fn() -> Result<(), String>, pr
                 Ok(resp) => resp,
                 Err(err) => {
                     eprintln!("从魔搭下载语音运行时失败，尝试备用源：{err}");
-                    client.get(RUNTIME_FALLBACK).send()
+                    client.get(format!("{RUNTIME_FALLBACK}{RUNTIME_NAME}")).send()
                         .and_then(reqwest::blocking::Response::error_for_status)
                         .map_err(|e| format!("语音引擎组件下载失败：{e}"))?
                 }
@@ -168,10 +207,7 @@ pub fn ensure_model(directory: &Path, check: impl Fn() -> Result<(), String>, pr
             Ok(())
         })();
         if result.is_err() { let _ = fs::remove_file(&temporary); }
-        result?;
-    }
-
-    Ok(())
+        result
 }
 
 pub struct AsrProcess {
@@ -185,8 +221,12 @@ impl AsrProcess {
         let exe_path = resolve_exe(directory).ok_or_else(|| {
             format!("找不到语音识别引擎组件（{}），请重新开启语音识别自动下载", RUNTIME_NAME)
         })?;
-
-        let mut cmd = Command::new(&exe_path);
+        Self::start(&exe_path, directory, false).map(|(process, _)| process)
+    }
+    /// Starts the runtime and waits for its ready line, which is returned (newer runtimes list their features).
+    fn start(exe_path: &Path, directory: &Path, turn: bool) -> Result<(Self, serde_json::Value), String> {
+        let mut cmd = Command::new(exe_path);
+        if turn { cmd.arg("--turn"); }
         cmd.arg("--dir")
             .arg(directory)
             .stdin(Stdio::piped())
@@ -214,8 +254,18 @@ impl AsrProcess {
             let error = resp.get("error").and_then(|e| e.as_str()).unwrap_or("引擎启动异常");
             return Err(format!("语音引擎初始化失败：{error}"));
         }
-
-        Ok(Self { child, stdin, stdout })
+        Ok((Self { child, stdin, stdout }, resp))
+    }
+    fn request(&mut self, request: &serde_json::Value) -> Result<serde_json::Value, String> {
+        writeln!(self.stdin, "{request}").map_err(|e| format!("语音引擎通信失败：{e}"))?;
+        self.stdin.flush().map_err(|e| format!("语音引擎通信失败：{e}"))?;
+        let mut line = String::new();
+        self.stdout.read_line(&mut line).map_err(|e| format!("语音引擎通信失败：{e}"))?;
+        let response: serde_json::Value = serde_json::from_str(line.trim()).map_err(|e| format!("语音引擎响应解析失败：{e}"))?;
+        if response.get("status").and_then(|s| s.as_str()) == Some("error") {
+            return Err(response.get("error").and_then(|e| e.as_str()).unwrap_or("语音引擎出错").to_string());
+        }
+        Ok(response)
     }
 
     pub fn transcribe(&mut self, samples: &[f32]) -> Result<String, String> {
@@ -253,6 +303,32 @@ impl Drop for AsrProcess {
         let _ = self.stdin.flush();
         let _ = self.child.kill();
         let _ = self.child.wait();
+    }
+}
+
+/// The runtime in `--turn` mode: Silero VAD and Smart Turn on the onnxruntime it already contains. Its own process,
+/// so recognition never holds up per-frame speech detection.
+pub struct TurnProcess(AsrProcess);
+
+impl TurnProcess {
+    pub fn spawn(directory: &Path) -> Result<Self, String> {
+        if !turn_present(directory) { return Err("判停组件尚未下载".into()); }
+        let exe = resolve_turn_exe(directory).ok_or("判停组件尚未下载")?;
+        let (process, ready) = AsrProcess::start(&exe, directory, true)?;
+        let supported = ready.get("features").and_then(|f| f.as_array()).is_some_and(|f| f.iter().any(|v| v == "turn"));
+        if !supported { return Err("语音引擎版本过旧，不支持智能判停".into()); }
+        Ok(Self(process))
+    }
+    pub fn vad(&mut self, stream: &str, pcm: &[i16]) -> Result<Vec<f32>, String> {
+        let response = self.0.request(&serde_json::json!({ "type": "vad", "stream": stream, "pcm": pcm }))?;
+        Ok(response.get("values").and_then(|v| v.as_array()).map(|v| v.iter().filter_map(|p| p.as_f64()).map(|p| p as f32).collect()).unwrap_or_default())
+    }
+    pub fn reset(&mut self, stream: &str) -> Result<(), String> {
+        self.0.request(&serde_json::json!({ "type": "vadReset", "stream": stream })).map(|_| ())
+    }
+    pub fn complete(&mut self, pcm: &[i16]) -> Result<f32, String> {
+        let response = self.0.request(&serde_json::json!({ "type": "turn", "pcm": pcm }))?;
+        response.get("value").and_then(|v| v.as_f64()).map(|v| v as f32).ok_or_else(|| "判停结果无效".to_string())
     }
 }
 
@@ -303,5 +379,21 @@ mod tests {
         fs::write(stamp_path(&path), "garbage").unwrap();
         assert!(!verified(&path, &spec, &counting).unwrap());
         let _ = fs::remove_dir_all(dir);
+    }
+
+    /// Talks to a real runtime: set XIAOBAN_ASR_TURN_DIR to a folder holding this app's runtime (named
+    /// RUNTIME_NAME) and the two turn models.
+    #[test]
+    #[ignore = "needs the xiaoban-asr runtime and turn models; set XIAOBAN_ASR_TURN_DIR"]
+    fn the_turn_process_detects_speech_and_judges_turns() {
+        let Some(dir) = std::env::var_os("XIAOBAN_ASR_TURN_DIR") else { return };
+        let mut process = TurnProcess::spawn(Path::new(&dir)).unwrap();
+        let silence = process.vad("test", &[0i16; 1600]).unwrap();
+        assert_eq!(silence.len(), 3);
+        assert!(silence.iter().all(|p| *p < 0.5));
+        process.reset("test").unwrap();
+        let tone: Vec<i16> = (0..16000).map(|i| (9000.0 * (i as f32 * 0.0864).sin()) as i16).collect();
+        let p = process.complete(&tone).unwrap();
+        assert!((0.0..=1.0).contains(&p));
     }
 }

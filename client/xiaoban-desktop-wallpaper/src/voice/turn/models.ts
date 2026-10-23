@@ -1,6 +1,6 @@
 /**
- * Endpointing models, run natively by the host (Silero VAD and Smart Turn v3 on onnxruntime). The page only
- * streams audio to them; audio crosses the IPC as 16-bit samples.
+ * Endpointing models: Silero VAD and Smart Turn v3, run by the xiaoban-asr runtime (`--turn`) through the host.
+ * The page only streams audio to them; audio crosses the IPC as 16-bit samples.
  */
 type Invoke = <T>(command: string, args?: Record<string, unknown>) => Promise<T>;
 
