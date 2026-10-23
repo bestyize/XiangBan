@@ -15,6 +15,9 @@ const busy = ref(false), testing = ref(false), loading = ref(true);
 const message = ref(''), failed = ref(false);
 const target = ref('https://api.openai.com/v1/models');
 
+function selectMode(value: string | number | null) {
+  if (value === 'system' || value === 'direct' || value === 'manual') draft.mode = value;
+}
 onMounted(async () => {
   try {
     if (!desktop) return;
@@ -51,7 +54,7 @@ async function test() {
     <div class="xb-group">
       <div class="xb-row">
         <div class="xb-row-text"><b>代理模式</b><span>选择小伴内置网络请求的连接方式</span></div>
-        <NSelect v-model:value="draft.mode" aria-label="代理模式" :options="options" style="width:160px" :disabled="loading || busy || !desktop" />
+        <NSelect  :value="draft.mode" @update:value="selectMode" aria-label="代理模式" :options="options" style="width:160px" :disabled="loading || busy || !desktop" />
       </div>
       <div v-if="draft.mode === 'manual'" class="xb-row proxy-url-row">
         <div class="xb-row-text"><b>代理服务器</b><span>支持 HTTP、HTTPS；示例：<code>http://127.0.0.1:7890</code></span></div>
