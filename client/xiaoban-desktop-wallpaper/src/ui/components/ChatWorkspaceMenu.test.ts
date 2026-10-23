@@ -36,6 +36,20 @@ describe('the folder menu under the message box', () => {
     wrapper.unmount();
   });
 
+  it('shows 默认工作区 for the configured default folder without changing its path', async () => {
+    const { wrapper, chat } = setup();
+    Object.assign(chat, { workspace: '/p/workspace', currentWorkspace: '/p/workspace' });
+    await flushPromises();
+    const button = wrapper.get('[data-testid="chat-workspace-menu"]');
+    expect(button.text()).toContain('默认工作区');
+    expect(button.attributes('title')).toBe('工作区：/p/workspace');
+    Object.assign(chat, { currentWorkspace: '/p/site' });
+    await flushPromises();
+    expect(button.text()).toContain('site');
+    expect(button.text()).not.toContain('默认工作区');
+    wrapper.unmount();
+  });
+
   it('switches at once when the conversation has no messages', async () => {
     const { wrapper, chat } = setup('done');
     await click(wrapper, 'chat-workspace-menu');
