@@ -2,15 +2,22 @@ import { reactive } from 'vue';
 import { speechText } from './text.ts';
 import { createStreamPlayer, type StreamPlayer } from '../../voice/stream-player.ts';
 export interface VoiceOptions { voice: string; rate: number; volume: number; pitch: number }
-export interface SpeechSettings extends VoiceOptions { autoRead: boolean }
+/** Where speech comes from; online voices fall back to the system voice when they fail. */
+export type SpeechProvider = 'edge' | 'gateway' | 'system';
+export interface SpeechSettings extends VoiceOptions { autoRead: boolean; provider: SpeechProvider }
 export interface Voice { shortName: string; gender: string; locale: string; friendlyName: string }
-export const speechDefaults: SpeechSettings = { autoRead: false, voice: 'zh-CN-XiaoxiaoNeural', rate: 0, volume: 100, pitch: 0 };
+export const speechDefaults: SpeechSettings = { autoRead: false, provider: 'edge', voice: 'zh-CN-XiaoxiaoNeural', rate: 0, volume: 100, pitch: 0 };
 export const defaultVoices: Voice[] = [
   { shortName: 'zh-CN-XiaoxiaoNeural', friendlyName: '晓晓 · 女声', gender: 'Female', locale: 'zh-CN' },
   { shortName: 'zh-CN-XiaoyiNeural', friendlyName: '晓伊 · 女声', gender: 'Female', locale: 'zh-CN' },
   { shortName: 'zh-CN-YunxiNeural', friendlyName: '云希 · 男声', gender: 'Male', locale: 'zh-CN' },
   { shortName: 'zh-CN-YunyangNeural', friendlyName: '云扬 · 男声', gender: 'Male', locale: 'zh-CN' },
 ];
+/** MP3 from the online voices, WAV from the system voice: tell them apart by their header. */
+export function audioType(data: ArrayBuffer | Uint8Array): string {
+  const bytes = data instanceof Uint8Array ? data : new Uint8Array(data);
+  return bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46 ? 'audio/wav' : 'audio/mpeg';
+}
 type AudioHandle = Pick<HTMLAudioElement, 'play' | 'pause' | 'src' | 'onended' | 'onerror'>;
 
 export interface SpeechDeps {
@@ -93,7 +100,7 @@ export function createSpeechStore(deps: SpeechDeps): SpeechStore {
         if (ticket !== generation || disposed) return;
         const data = bytes instanceof ArrayBuffer ? bytes : new Uint8Array(bytes);
         if (!data.byteLength) throw new Error('语音服务没有返回音频');
-        objectUrl = createUrl(new Blob([data], { type: 'audio/mpeg' }));
+        objectUrl = createUrl(new Blob([data], { type: audioType(data) }));
         audio = deps.audio ? deps.audio(objectUrl) : new Audio(objectUrl);
         audio.onended = () => { if (ticket === generation) release(); };
         audio.onerror = () => { if (ticket === generation) { store.error = '音频播放失败，请重试'; release(); deps.notify(store.error, 'error'); } };
@@ -121,7 +128,7 @@ export function createSpeechStore(deps: SpeechDeps): SpeechStore {
           return data;
         },
         async play(data) {
-          const url = createUrl(new Blob([data as BlobPart], { type: 'audio/mpeg' }));
+          const url = createUrl(new Blob([data as BlobPart], { type: audioType(data) }));
           const clip = deps.audio ? deps.audio(url) : new Audio(url);
           let settle!: () => void;
           const done = new Promise<void>(resolve => { settle = resolve; });

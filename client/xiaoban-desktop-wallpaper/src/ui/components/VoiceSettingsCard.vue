@@ -17,6 +17,16 @@ const options = computed(() => {
 });
 const sliders = [{ key: 'rate' as const, label: '语速', min: -50, max: 100, suffix: '%' }, { key: 'volume' as const, label: '音量', min: 0, max: 100, suffix: '%' }, { key: 'pitch' as const, label: '音调', min: -50, max: 50, suffix: 'Hz' }];
 onMounted(() => { void speech.init(); void asr.init(); });
+const providerOptions = [
+  { label: 'Edge 在线（默认）', value: 'edge' },
+  { label: '小伴 AI（需登录）', value: 'gateway' },
+  { label: '系统朗读（离线）', value: 'system' },
+];
+const providerHint = computed(() => ({
+  edge: '微软 Edge 在线音色，免费；连不上时自动改用系统朗读。',
+  gateway: '由小伴 AI 合成，消耗账号额度；连不上时自动改用系统朗读。',
+  system: '使用电脑自带的语音，不联网、无延迟，音色较普通。',
+} as Record<string, string>)[speech.settings.provider ?? 'edge'] ?? '');
 </script>
 <template>
   <section class="voice-settings" data-testid="voice-settings">
@@ -31,8 +41,10 @@ onMounted(() => { void speech.init(); void asr.init(); });
 
     <div class="xb-group-title">朗读</div>
     <div class="xb-group">
-      <div class="xb-row"><div class="xb-row-text"><b>自动朗读回复</b><span>开启后，当前聊天的完整回复文本会发送给 Edge 在线合成；切换会话或发送新消息会停止朗读。</span></div>
+      <div class="xb-row"><div class="xb-row-text"><b>自动朗读回复</b><span>开启后，回复会一边生成一边朗读；切换会话或发送新消息会停止朗读。</span></div>
         <NSwitch :value="speech.settings.autoRead" :disabled="disabled" :loading="speech.saving" aria-label="自动朗读回复" @update:value="value => speech.save({ autoRead: value })" /></div>
+      <div class="xb-row"><div class="xb-row-text"><b>语音来源</b><span>{{ providerHint }}</span></div>
+        <NSelect class="provider" :value="speech.settings.provider ?? 'edge'" :options="providerOptions" :disabled="disabled" aria-label="语音来源" data-testid="speech-provider" @update:value="value => speech.save({ provider: value })" /></div>
       <div class="xb-row"><div class="xb-row-text"><b>音色</b><span>内置常用中文声音，也可以刷新完整音色列表。</span></div>
         <div class="voice-picker"><NSelect :value="speech.settings.voice" :options="options" filterable :disabled="disabled" @update:value="value => speech.save({ voice: value })" />
           <button type="button" class="xb-btn is-sm" :disabled="disabled || speech.loadingVoices" @click="speech.loadVoices()">{{ speech.loadingVoices ? '刷新中…' : '刷新音色' }}</button></div></div>

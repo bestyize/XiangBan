@@ -1,5 +1,7 @@
 pub(crate) mod drm;
+mod gateway;
 mod protocol;
+mod system;
 use protocol::{Options, HOST, MAX_AUDIO};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -11,6 +13,9 @@ use tungstenite::{client::IntoClientRequest, stream::MaybeTlsStream, Message};
 #[serde(default, rename_all = "camelCase")]
 pub struct Settings {
     pub auto_read: bool,
+    /// Where speech comes from: `edge` (default), `gateway` (小伴 AI) or `system`. Online voices fall back to
+    /// the system voice when they fail.
+    pub provider: String,
     #[serde(flatten)] pub options: Options,
 }
 #[derive(Default)]
@@ -25,6 +30,7 @@ pub struct Voice { pub short_name: String, pub gender: String, pub locale: Strin
 #[derive(Deserialize)]
 #[serde(rename_all = "PascalCase")]
 struct VoiceDto { short_name: String, gender: String, locale: String, friendly_name: String }
+const PROVIDERS: &[&str] = &["edge", "gateway", "system"];
 fn path(app: &tauri::AppHandle) -> Result<std::path::PathBuf, String> { Ok(crate::storage::root(app)?.join("config/tts.json")) }
 fn now() -> i64 { chrono::Utc::now().timestamp() }
 #[tauri::command]
@@ -32,16 +38,20 @@ pub fn tts_get_settings(app: tauri::AppHandle) -> Result<Settings, String> {
     let state = app.state::<TtsState>(); let _io = state.io.lock().unwrap_or_else(|e| e.into_inner());
     match std::fs::read(path(&app)?) {
         Ok(bytes) => {
-            let value: Settings = serde_json::from_slice(&bytes).map_err(|_| "语音设置无法读取，请重新保存")?;
-            value.options.validate()?; Ok(value)
+            let mut value: Settings = serde_json::from_slice(&bytes).map_err(|_| "语音设置无法读取，请重新保存")?;
+            value.options.validate()?;
+            if !PROVIDERS.contains(&value.provider.as_str()) { value.provider = "edge".into(); }
+            Ok(value)
         }
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(Settings::default()),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(Settings { provider: "edge".into(), ..Settings::default() }),
         Err(_) => Err("语音设置读取失败".into()),
     }
 }
 #[tauri::command]
-pub fn tts_save_settings(app: tauri::AppHandle, settings: Settings) -> Result<Settings, String> {
+pub fn tts_save_settings(app: tauri::AppHandle, mut settings: Settings) -> Result<Settings, String> {
     settings.options.validate()?;
+    if settings.provider.is_empty() { settings.provider = "edge".into(); }
+    if !PROVIDERS.contains(&settings.provider.as_str()) { return Err("没有这个语音来源".into()); }
     let state = app.state::<TtsState>(); let _io = state.io.lock().unwrap_or_else(|e| e.into_inner());
     crate::library::save_json(&path(&app)?, &settings)?;
     let _ = app.emit_to("control", "tts-settings-changed", &settings);
@@ -67,8 +77,38 @@ pub async fn tts_list_voices() -> Result<Vec<Voice>, String> {
         Ok(voices.into_iter().map(|v| Voice { short_name:v.short_name,gender:v.gender,locale:v.locale,friendly_name:v.friendly_name }).collect())
     }).await.map_err(|_| "音色列表任务失败")?
 }
+/// Speech from the chosen provider; an online voice that fails is replaced by the system voice, so reading
+/// carries on (the cached audio of either is reused).
 fn synthesize(app: &tauri::AppHandle, id: u64, text: &str, options: &Options) -> Result<Vec<u8>, String> {
     options.validate()?;
+    let provider = tts_get_settings(app.clone()).map(|s| s.provider).unwrap_or_default();
+    let online = match provider.as_str() {
+        "system" => Err(String::new()),
+        "gateway" => cached(app, &("gateway", text, options.rate), || gateway::speak(app, text, options.rate)),
+        _ => synthesize_edge(app, id, text, options),
+    };
+    cancelled(app, id)?;
+    match online {
+        Ok(audio) => Ok(audio),
+        Err(error) => cached(app, &("system", text, options.rate), || system::speak(text, options.rate))
+            .map_err(|fallback| if error.is_empty() { fallback } else { error }),
+    }
+}
+fn cached(app: &tauri::AppHandle, key: &impl serde::Serialize, make: impl FnOnce() -> Result<Vec<u8>, String>) -> Result<Vec<u8>, String> {
+    let key = format!("{:x}", Sha256::digest(serde_json::to_vec(key).map_err(|_| "语音参数无效")?));
+    if let Some((_, audio)) = app.state::<TtsState>().cache.lock().unwrap_or_else(|e| e.into_inner()).iter().find(|(k, _)| *k == key) { return Ok(audio.clone()); }
+    let audio = make()?;
+    remember(app, key, &audio);
+    Ok(audio)
+}
+fn remember(app: &tauri::AppHandle, key: String, audio: &[u8]) {
+    let state = app.state::<TtsState>(); let mut cache = state.cache.lock().unwrap_or_else(|e| e.into_inner());
+    if audio.len() <= 8 * 1024 * 1024 {
+        cache.push_back((key, audio.to_vec()));
+        while cache.len() > 4 || cache.iter().map(|(_, v)| v.len()).sum::<usize>() > 8 * 1024 * 1024 { cache.pop_front(); }
+    }
+}
+fn synthesize_edge(app: &tauri::AppHandle, id: u64, text: &str, options: &Options) -> Result<Vec<u8>, String> {
     let parts = protocol::chunks(text)?;
     let key = format!("{:x}", Sha256::digest(serde_json::to_vec(&(text, options)).map_err(|_| "语音参数无效")?));
     cancelled(app, id)?;
@@ -130,11 +170,7 @@ fn synthesize(app: &tauri::AppHandle, id: u64, text: &str, options: &Options) ->
         if !ended || output.len() == initial_size { return Err("语音服务未返回完整音频，请稍后重试".into()); }
     }
     cancelled(app, id)?;
-    let state = app.state::<TtsState>(); let mut cache = state.cache.lock().unwrap_or_else(|e| e.into_inner());
-    if output.len() <= 8 * 1024 * 1024 {
-        cache.push_back((key, output.clone()));
-        while cache.len() > 4 || cache.iter().map(|(_, v)| v.len()).sum::<usize>() > 8 * 1024 * 1024 { cache.pop_front(); }
-    }
+    remember(app, key, &output);
     Ok(output)
 }
 #[tauri::command]
