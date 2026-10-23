@@ -62,8 +62,8 @@ impl Source {
     }
 }
 fn get(url: url::Url) -> Result<Value, String> {
-    let client = reqwest::blocking::Client::builder().timeout(Duration::from_secs(12))
-        .redirect(reqwest::redirect::Policy::none()).user_agent("XiaoBanDesktop/0.1 weather")
+    let client = crate::network::blocking_builder(reqwest::blocking::Client::builder().timeout(Duration::from_secs(12))
+        .redirect(reqwest::redirect::Policy::none()).user_agent("XiaoBanDesktop/0.1 weather"))?
         .build().map_err(|e| e.to_string())?;
     let response = client.get(url).send().map_err(|e| format!("天气服务连接失败：{e}"))?
         .error_for_status().map_err(|e| format!("天气服务返回错误：{e}"))?;

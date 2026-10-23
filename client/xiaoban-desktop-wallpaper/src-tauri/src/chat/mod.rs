@@ -46,7 +46,7 @@ use agent_kernel::provider::responses::OpenAiResponses;
 use agent_kernel::provider::wire::ProviderProfile;
 use agent_kernel::model::TokenBudget;
 use agent_kernel::skills::Skills;
-use agent_kernel::{Agent, Approval, ApprovalRequest, ContextTrim, ContinueGuard, JsonlStore, RepeatGuard, Message, ModelProvider, Part, Permission, PermissionMode, Risk, RunOptions, RunEventBody, SessionStore, SpillOutput, ToolCtx};
+use agent_kernel::{Agent, Approval, ApprovalRequest, ContextTrim, ContinueGuard, JsonlStore, RepeatGuard, Message, ModelProvider, Part, Permission, PermissionMode, Risk, RunOptions, RunEventBody, SessionStore, SpillOutput, ToolCtx, RetryPolicy};
 use agent_kernel::journal::JsonlRunLog;
 use agent_kernel::supervisor::SessionLease;
 use agent_kernel::process::ProcessManager;
@@ -332,6 +332,9 @@ fn provider_profile(config: &AiConfig) -> ProviderProfile {
     let mut profile = ProviderProfile::new(config.base_url.clone(), config.api_key.clone(), config.model.clone());
     profile.extra_body = config.reasoning_body();
     profile.max_request_bytes = Some(8 * 1024 * 1024);
+    let network = crate::network::current();
+    profile.proxy_mode = network.mode;
+    profile.proxy_url = network.proxy_url;
     // Central model policy: compatible APIs use endpoint defaults; Anthropic
     // receives a required model/endpoint-specific max_tokens value.
     let capabilities = config.model_capabilities();
@@ -574,6 +577,8 @@ fn assemble_with_connectors(parts: Parts<'_>, attachments: Vec<Attachment>, conn
     builder = builder
         .middleware(ContextTrim::new(budget.context_limit).reserve_output(budget.trim_headroom))
         .middleware(ContinueGuard::new())
+        // An offline provider should fail promptly rather than repeat the same 45s wait four times.
+        .retry(RetryPolicy { max_retries: 1, ..Default::default() })
         .max_turns(MAX_TURNS);
     let roots = vec![workspace.to_path_buf(), dirs.spill()];
     builder = builder.tool(research_subagent(provider.clone(), &roots, budget, dirs.runs(), research_events)?);

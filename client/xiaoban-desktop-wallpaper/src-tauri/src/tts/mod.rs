@@ -65,7 +65,7 @@ fn cancelled(app: &tauri::AppHandle, id: u64) -> Result<(), String> {
 #[tauri::command]
 pub async fn tts_list_voices() -> Result<Vec<Voice>, String> {
     tauri::async_runtime::spawn_blocking(|| {
-        let client = reqwest::blocking::Client::builder().timeout(Duration::from_secs(15)).build().map_err(|_| "无法创建语音连接")?;
+        let client = crate::network::blocking_builder(reqwest::blocking::Client::builder().timeout(Duration::from_secs(15)))?.build().map_err(|_| "无法创建语音连接")?;
         let response = client.get(protocol::voices_url(now())).header("User-Agent", protocol::USER_AGENT)
             .header("Accept-Language", "en-US,en;q=0.9").header("Accept", "*/*")
             .header("Cookie", format!("muid={};", protocol::random_id()?))

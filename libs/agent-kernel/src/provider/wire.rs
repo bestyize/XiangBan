@@ -10,6 +10,9 @@ pub struct ProviderProfile {
     pub base_url: String,
     pub api_key: String,
     pub model: String,
+    /// Transport routing supplied by the host. Not sent to model APIs.
+    pub proxy_mode: String,
+    pub proxy_url: String,
     pub extra_headers: Vec<(String, String)>,
     /// Merged into the request body last, e.g. `{"temperature": 0.3}`.
     pub extra_body: Map<String, Value>,
@@ -39,6 +42,8 @@ impl ProviderProfile {
             base_url: base_url.into(),
             api_key: api_key.into(),
             model: model.into(),
+            proxy_mode: "system".into(),
+            proxy_url: String::new(),
             extra_headers: Vec::new(),
             extra_body: Map::new(),
             stream_usage: true,

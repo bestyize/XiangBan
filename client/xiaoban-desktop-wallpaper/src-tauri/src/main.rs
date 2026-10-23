@@ -56,6 +56,7 @@ mod data_library;
 mod window_control;
 mod voice_turn;
 mod inference;
+mod network;
 
 use preferences::{Preferences, Settings};
 use serde::Serialize;
@@ -800,7 +801,7 @@ fn main() {
     let builder = builder.plugin(tauri_plugin_autostart::Builder::new().app_name(startup_name).arg("--autostart").build());
     let command_handler: Box<dyn Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Sync> = Box::new(tauri::generate_handler![resource_packs::export_resource_pack, resource_packs::import_resource_pack, get_platform, get_settings, set_mode, update_settings, set_desktop_effects, effects::list_desktop_effects, effects::open_effects_directory, effects::import_effect_pack, effects::delete_desktop_effect, set_companion_enabled, set_appearance, set_accent, get_appearance, set_companion_links, set_companion_skin, poke,
             scene_ready, set_hit_test, start_drag, hide_control, show_control, quit, get_diagnostics, ui_smoke_report,
-            get_startup_status, set_autostart, content::get_wallpaper_library, content::import_wallpaper_catalog, content::delete_local_wallpaper,
+            get_startup_status, set_autostart, network::get_network_config, network::save_network_config, network::test_network_connection, content::get_wallpaper_library, content::import_wallpaper_catalog, content::delete_local_wallpaper,
             desk_game::open_desktop_game, desk_game::close_desktop_game, desk_game::desk_set_regions,
             games::open_game_space, games::close_game_space, games::get_game_catalog, games::load_game_save,
             games::save_game_save, games::get_game_status, games::set_game_desktop_double_click,
@@ -850,6 +851,7 @@ fn main() {
                 return true;
             }
             let allowed=capture_editor::permitted(label,command).or_else(||companion_dialogue::permitted(label,command)).or_else(||pets::permitted(label,command)).or_else(||float_assistant::permitted(label,command)).or_else(|| desk_game::permitted(label,command)).or_else(|| widgets::permitted(label,command)).or_else(|| rituals::permitted(label,command)).or_else(|| games::permitted(label,command)).unwrap_or_else(|| {
+                if matches!(command, "get_network_config" | "save_network_config" | "test_network_connection") { return label=="control"; }
                 if matches!(command, "reset_screen_capture_permission" | "open_screen_capture_settings") { return label=="control"; }
                 // 资料库 is managed from the console; 超级小伴 may only save into it (see float_assistant's shared list).
                 if command.starts_with("library_") { return label=="control"; }
@@ -867,6 +869,7 @@ fn main() {
         })
         .setup(|app| {
             initialize_preferences(app.handle()).map_err(std::io::Error::other)?;
+            network::initialize(app.handle()).map_err(std::io::Error::other)?;
             if let Some(session) = account::load_session(app.handle()) {
                 *app.state::<account::AccountState>().session.lock().unwrap_or_else(|e| e.into_inner()) = Some(session);
             }
