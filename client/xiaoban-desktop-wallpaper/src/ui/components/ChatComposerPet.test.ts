@@ -37,9 +37,9 @@ describe('small pet above the chat composer', () => {
   });
 
   it('reacts with the existing pet actor only after a click, then returns to the light still image', async () => {
-    vi.useFakeTimers();
     const wrapper = mount(ChatComposerPet, { props: { size: 'lg' }, attachTo: document.body });
     await flushPromises();
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
     expect(wrapper.get('.composer-pet').classes()).toContain('is-lg');
     expect(wrapper.find('.composer-pet-live').exists()).toBe(false);
     expect(actorPoke).not.toHaveBeenCalled();
@@ -60,9 +60,9 @@ describe('small pet above the chat composer', () => {
   });
 
   it('tapping again resets the reply timer rather than creating duplicate actors', async () => {
-    vi.useFakeTimers();
     const wrapper = mount(ChatComposerPet, { props: { size: 'sm' }, attachTo: document.body });
     await flushPromises();
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
     await wrapper.get('[data-testid="composer-pet"]').trigger('click');
     await flushPromises();
     vi.advanceTimersByTime(1800);
