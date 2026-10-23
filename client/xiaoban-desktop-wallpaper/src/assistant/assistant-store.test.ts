@@ -79,7 +79,7 @@ describe('truthful voice prompts', () => {
     const starting=store.toggleListening();await flushPromises();
     expect(store.phase).toBe('idle');expect(store.status).toBe('问点什么…');expect(store.voiceStatus).toBe('正在启动麦克风…');
     captured();await starting;
-    expect(store.phase).toBe('listening');expect(store.status).toBe('正在录音，再点一下结束，文字留在输入框');
+    expect(store.phase).toBe('listening');expect(store.status).toBe('正在录音，再点球结束');
     await store.toggleListening();expect(store.status).toBe('问点什么…');store.dispose();
   });
   it('keeps preparation separate and cancels pending voice activation when the user types',async()=>{
@@ -225,7 +225,7 @@ describe('floating assistant', () => {
     expect(chat.select).toHaveBeenCalledWith(null);
     expect(asr.activate).toHaveBeenCalledTimes(1);
     expect(store.phase).toBe('listening');
-    expect(store.status).toBe('正在录音，再点一下结束，文字留在输入框');
+    expect(store.status).toBe('正在录音，再点球结束');
   });
 
   it.each([true, false])('creates capsule conversations in full trust (spoken: %s)', async spoken => {
@@ -1070,6 +1070,16 @@ describe('sharing the voice with the console', () => {
     h.chat.sentHere = vi.fn(() => true);
     h.store.replied('s1', '你好呀。', 'a');
     expect(h.speech.speak).toHaveBeenCalled();
+    h.store.dispose();
+  });
+});
+
+describe('what the capsule says while recording', () => {
+  it('keeps the placeholder short enough for one line and explains the rest below the capsule', async () => {
+    const h = setup();
+    await h.store.init(); await h.store.opened();
+    expect(h.store.status.length).toBeLessThanOrEqual(12); // a longer line wraps, and a one-line box then grows a scrollbar
+    expect(h.store.voiceStatus).toContain('文字会留在输入框');
     h.store.dispose();
   });
 });

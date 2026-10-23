@@ -502,7 +502,7 @@ export function createAssistantStore(deps: AssistantDeps): AssistantStore {
         case 'thinking': return store.working || '思考中…';
         case 'answering': return store.working || '正在回答…';
         case 'speaking': return asr.listening ? '正在朗读，说话或发送可打断' : '正在朗读，发送可打断';
-        case 'listening': return store.live ? '正在聆听…' : '正在录音，再点一下结束，文字留在输入框';
+        case 'listening': return store.live ? '正在聆听…' : '正在录音，再点球结束';
         default: return '问点什么…';
       }
     },
@@ -510,6 +510,7 @@ export function createAssistantStore(deps: AssistantDeps): AssistantStore {
       if (flags.voiceNotice) return flags.voiceNotice;
       if (flags.ptt) return !asr.listening ? '正在启动麦克风…' : flags.partial ? `${flags.partial}… · 松开发送` : '正在听，松开快捷键发送';
       if (flags.partial && asr.listening) return `${flags.partial}…`;
+      if (asr.listening && !store.live) return '录音中，文字会留在输入框，再点一下球结束，由你发送';
       if (asr.enabled && (asr.preparing || asr.warming)) return '正在准备语音引擎…';
       if (asr.recordingRequested && !asr.listening) return '正在启动麦克风…';
       return '';
