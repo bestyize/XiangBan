@@ -284,6 +284,26 @@ pub async fn upsert_product(
 
 // ---- 档位 ----
 
+/// 模型必须是 AI 网关里已启用的；倍率像是没配置时照样保存，但带上提醒。
+async fn checked_model(state: &AppState, raw: &str) -> Result<(String, Vec<String>), AppError> {
+    let model = raw.trim().to_string();
+    let available = state.newapi.list_models().await.map_err(|e| {
+        tracing::warn!("保存时读取模型列表失败: {e}");
+        AppError::BadGateway("读不到 AI 网关的模型列表，暂时无法保存".into())
+    })?;
+    let Some(pricing) = available.iter().find(|m| m.model_name == model) else {
+        return Err(AppError::BadRequest(format!("AI 网关里没有已启用的模型 {model}，请先在 New API 配置渠道")));
+    };
+    let mut warnings = Vec::new();
+    if pricing.model_price == 0.0 && (pricing.model_ratio - state.config.newapi_default_ratio).abs() < f64::EPSILON {
+        warnings.push(format!(
+            "模型 {model} 的倍率与 New API 未配置时的默认值 {} 相同，很可能还没设置真实定价，请先核对再上线",
+            state.config.newapi_default_ratio
+        ));
+    }
+    Ok((model, warnings))
+}
+
 pub async fn list_tiers(State(state): State<AppState>, _admin: AuthAdmin, Path(product_id): Path<String>) -> Result<Json<Value>, AppError> {
     Ok(Json(json!({ "items": products::tiers(&state.pool, &product_id, false).await? })))
 }
@@ -329,21 +349,7 @@ pub async fn upsert_tier(
         return Err(AppError::NotFound("产品不存在".into()));
     }
 
-    let model = req.model.trim().to_string();
-    let available = state.newapi.list_models().await.map_err(|e| {
-        tracing::warn!("保存档位时读取模型列表失败: {e}");
-        AppError::BadGateway("读不到 AI 网关的模型列表，暂时无法保存".into())
-    })?;
-    let Some(pricing) = available.iter().find(|m| m.model_name == model) else {
-        return Err(AppError::BadRequest(format!("AI 网关里没有已启用的模型 {model}，请先在 New API 配置渠道")));
-    };
-    let mut warnings = Vec::new();
-    if pricing.model_price == 0.0 && (pricing.model_ratio - state.config.newapi_default_ratio).abs() < f64::EPSILON {
-        warnings.push(format!(
-            "模型 {model} 的倍率与 New API 未配置时的默认值 {} 相同，很可能还没设置真实定价，请先核对再上线",
-            state.config.newapi_default_ratio
-        ));
-    }
+    let (model, warnings) = checked_model(&state, &req.model).await?;
 
     let mut tx = state.pool.begin().await?;
     if req.is_default {
@@ -398,6 +404,104 @@ pub async fn delete_tier(
         return Err(AppError::NotFound("档位不存在".into()));
     }
     audit(&state, &admin, "tier.delete", Some(&format!("{product_id}/{tier}")), None).await?;
+    Ok(Json(json!({ "ok": true })))
+}
+
+// ---- 媒体能力 ----
+
+pub async fn list_media(State(state): State<AppState>, _admin: AuthAdmin, Path(product_id): Path<String>) -> Result<Json<Value>, AppError> {
+    Ok(Json(json!({ "items": products::media_settings(&state.pool, &product_id).await? })))
+}
+
+#[derive(Deserialize)]
+pub struct MediaReq {
+    model: String,
+    enabled: bool,
+    requires_paid: bool,
+    #[serde(default)]
+    voices: Vec<String>,
+    #[serde(default)]
+    sizes: Vec<String>,
+    max_secs: Option<i32>,
+}
+
+/// 去掉首尾空白和重复项，保留填写顺序（第一个是默认）。
+fn choices(values: &[String]) -> Vec<String> {
+    let mut out: Vec<String> = Vec::new();
+    for value in values.iter().map(|v| v.trim()).filter(|v| !v.is_empty()) {
+        if !out.iter().any(|v| v == value) {
+            out.push(value.to_string());
+        }
+    }
+    out
+}
+
+pub async fn upsert_media(
+    State(state): State<AppState>,
+    AuthAdmin(admin): AuthAdmin,
+    Path((product_id, capability)): Path<(String, String)>,
+    Json(req): Json<MediaReq>,
+) -> Result<Json<Value>, AppError> {
+    let capability = products::Capability::parse(&capability).ok_or_else(|| AppError::NotFound("没有这项能力".into()))?;
+    let voices = if capability == products::Capability::Speech { choices(&req.voices) } else { Vec::new() };
+    let sizes = if capability == products::Capability::Image { choices(&req.sizes) } else { Vec::new() };
+    if capability == products::Capability::Speech && (voices.is_empty() || voices.len() > 20 || !voices.iter().all(|v| products::valid_voice(v))) {
+        return Err(AppError::BadRequest("请填写 1-20 个音色，音色名只能有字母、数字和 - _ .，每家的音色名不同，以上游文档为准".into()));
+    }
+    if capability == products::Capability::Image && (sizes.is_empty() || sizes.len() > 10 || !sizes.iter().all(|v| products::valid_size(v))) {
+        return Err(AppError::BadRequest("请填写 1-10 个尺寸，格式如 1024x1024，或 auto".into()));
+    }
+    let max_secs = req.max_secs.unwrap_or(1800);
+    if capability == products::Capability::Realtime && !products::REALTIME_SECS.contains(&max_secs) {
+        return Err(AppError::BadRequest("单次实时对话最长需为 60-14400 秒".into()));
+    }
+    if products::get(&state.pool, &product_id).await?.is_none() {
+        return Err(AppError::NotFound("产品不存在".into()));
+    }
+    let (model, warnings) = checked_model(&state, &req.model).await?;
+
+    sqlx::query(
+        "INSERT INTO product_media (product_id, capability, model, enabled, requires_paid, voices, sizes, max_secs)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+         ON CONFLICT (product_id, capability) DO UPDATE SET model = $3, enabled = $4, requires_paid = $5,
+             voices = $6, sizes = $7, max_secs = $8, updated_at = now()",
+    )
+    .bind(&product_id)
+    .bind(capability.as_str())
+    .bind(&model)
+    .bind(req.enabled)
+    .bind(req.requires_paid)
+    .bind(&voices)
+    .bind(&sizes)
+    .bind(max_secs)
+    .execute(&state.pool)
+    .await?;
+
+    audit(
+        &state,
+        &admin,
+        "media.save",
+        Some(&format!("{product_id}/{}", capability.as_str())),
+        Some(format!("model={model} paid={} enabled={}", req.requires_paid, req.enabled)),
+    )
+    .await?;
+    Ok(Json(json!({ "ok": true, "warnings": warnings })))
+}
+
+pub async fn delete_media(
+    State(state): State<AppState>,
+    AuthAdmin(admin): AuthAdmin,
+    Path((product_id, capability)): Path<(String, String)>,
+) -> Result<Json<Value>, AppError> {
+    let result = sqlx::query("DELETE FROM product_media WHERE product_id = $1 AND capability = $2")
+        .bind(&product_id)
+        .bind(&capability)
+        .execute(&state.pool)
+        .await?;
+    if result.rows_affected() == 0 {
+        return Err(AppError::NotFound("这项能力还没有配置".into()));
+    }
+    audit(&state, &admin, "media.delete", Some(&format!("{product_id}/{capability}")), None).await?;
     Ok(Json(json!({ "ok": true })))
 }
 

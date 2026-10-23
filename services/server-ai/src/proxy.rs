@@ -170,7 +170,7 @@ const SPEECH_MAX_CHARS: usize = 1000;
 /// The largest audio relayed back for one request.
 const SPEECH_MAX_AUDIO: usize = 8 * 1024 * 1024;
 
-/// OpenAI-style speech request for the configured upstream model. The client never names the model; it may
+/// OpenAI-style speech request for the product's configured model. The client never names the model; it may
 /// ask for one of the offered voices.
 fn speech_payload(model: &str, voices: &[String], body: &[u8]) -> Result<Value, AppError> {
     let request: Value = serde_json::from_slice(body).map_err(|_| AppError::BadRequest("请求体不是有效的 JSON".into()))?;
@@ -194,15 +194,9 @@ pub async fn audio_speech(State(state): State<AppState>, auth: Result<AuthUser, 
     let result = async {
         let body = body.map_err(|error| map_body_error(error.status()))?;
         let auth = auth?;
-        let model = state.config.speech_model.clone().ok_or(AppError::Coded {
-            status: StatusCode::SERVICE_UNAVAILABLE,
-            code: "speech_unavailable",
-            message: "小伴 AI 语音暂未开放".into(),
-        })?;
-        let payload = speech_payload(&model, &state.config.speech_voices, &body)?;
-        let active = binding::ensure_active(&state, auth.uid, &auth.product).await?;
-        require_quota(&state, active.id).await?;
-        sqlx::query("UPDATE bindings SET last_used_at = now() WHERE id = $1").bind(active.id).execute(&state.pool).await?;
+        let setting = crate::media::setting(&state, &auth, products::Capability::Speech).await?;
+        let payload = speech_payload(&setting.model, &setting.voices, &body)?;
+        let active = crate::media::caller(&state, auth, &setting).await?;
         let payload = serde_json::to_vec(&payload).map_err(|e| AppError::Internal(e.to_string()))?;
         let upstream = state.newapi.relay("/v1/audio/speech", &active.key, payload, &[]).await?;
         let status = upstream.status();

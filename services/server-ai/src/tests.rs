@@ -202,6 +202,10 @@ async fn mock_pricing() -> Response {
         { "model_name": REAL_STANDARD, "model_ratio": 0.07, "completion_ratio": 1.0, "model_price": 0 },
         { "model_name": REAL_PREMIUM, "model_ratio": 1.5, "completion_ratio": 5.0, "model_price": 0 },
         { "model_name": "unpriced-model", "model_ratio": 37.5, "completion_ratio": 1.0, "model_price": 0 },
+        { "model_name": REAL_SPEECH, "model_ratio": 0.3, "completion_ratio": 20.0, "model_price": 0 },
+        { "model_name": REAL_IMAGE, "model_ratio": 2.5, "completion_ratio": 8.0, "model_price": 0 },
+        { "model_name": REAL_TRANSCRIBE, "model_ratio": 3.0, "completion_ratio": 1.0, "model_price": 0 },
+        { "model_name": REAL_REALTIME, "model_ratio": 2.0, "completion_ratio": 4.0, "model_price": 0 },
     ]}))
     .into_response()
 }
@@ -253,6 +257,13 @@ async fn mock_images(State(m): State<Arc<Mock>>, headers: HeaderMap, Json(body):
     record(&m, "/v1/images/generations", &headers, body.clone());
     m.consume(id, 2_000);
     Json(json!({ "created": 1, "model": body["model"], "data": [{ "b64_json": "iVBORw0K", "revised_prompt": "一只猫" }], "usage": { "total_tokens": 10 } })).into_response()
+}
+
+async fn mock_speech(State(m): State<Arc<Mock>>, headers: HeaderMap, Json(body): Json<Value>) -> Response {
+    let Some(id) = mock_caller(&m, &headers) else { return StatusCode::UNAUTHORIZED.into_response() };
+    record(&m, "/v1/audio/speech", &headers, body);
+    m.consume(id, 1_000);
+    ([(header::CONTENT_TYPE, "audio/mpeg")], b"ID3audio".to_vec()).into_response()
 }
 
 async fn mock_transcribe(State(m): State<Arc<Mock>>, headers: HeaderMap, mut form: axum::extract::Multipart) -> Response {
@@ -370,6 +381,7 @@ async fn start_mock() -> (Arc<Mock>, String) {
         .route("/v1/responses", post(mock_relay))
         .route("/v1/messages", post(mock_relay))
         .route("/v1/images/generations", post(mock_images))
+        .route("/v1/audio/speech", post(mock_speech))
         .route("/v1/audio/transcriptions", post(mock_transcribe).layer(axum::extract::DefaultBodyLimit::disable()))
         .route("/v1/realtime", get(mock_realtime))
         .route("/v1/tools/search", post(mock_tools))
@@ -1779,20 +1791,28 @@ async fn web_search_goes_through_new_api_first_and_the_gateway_charges_only_what
 
 // ---- 图片、语音识别、实时语音 ----
 
+const REAL_SPEECH: &str = "gpt-4o-mini-tts";
 const REAL_IMAGE: &str = "gpt-image-2";
 const REAL_TRANSCRIBE: &str = "whisper-3";
 const REAL_REALTIME: &str = "qwen-omni-realtime";
 
 impl Harness {
-    /// Turns on images, recognition and realtime voice with these upstream models.
-    fn with_media(&mut self) {
-        let mut config = (*self.state.config).clone();
-        config.image_model = Some(REAL_IMAGE.into());
-        config.image_sizes = vec!["1024x1024".into(), "1536x1024".into()];
-        config.transcribe_model = Some(REAL_TRANSCRIBE.into());
-        config.realtime_model = Some(REAL_REALTIME.into());
-        self.state.config = Arc::new(config);
-        self.app = build_router(self.state.clone());
+    async fn save_media(&self, capability: &str, body: Value) -> (StatusCode, Value) {
+        let admin = self.admin_token().await;
+        self.call(Method::PUT, &format!("/api/admin/products/wallpaper/media/{capability}"), Some(&admin), body).await
+    }
+
+    /// Turns on speech, images, recognition and realtime voice for the wallpaper product, in the admin.
+    async fn with_media(&self) {
+        for (capability, body) in [
+            ("speech", json!({ "model": REAL_SPEECH, "enabled": true, "requires_paid": false, "voices": ["alloy", "nova"] })),
+            ("image", json!({ "model": REAL_IMAGE, "enabled": true, "requires_paid": false, "sizes": ["1024x1024", "1536x1024"] })),
+            ("transcribe", json!({ "model": REAL_TRANSCRIBE, "enabled": true, "requires_paid": false })),
+            ("realtime", json!({ "model": REAL_REALTIME, "enabled": true, "requires_paid": false, "max_secs": 600 })),
+        ] {
+            let (status, body) = self.save_media(capability, body).await;
+            assert_eq!(status, StatusCode::OK, "{capability}: {body}");
+        }
     }
 
     async fn upload(&self, token: &str, parts: &[(&str, Option<&str>, &str, Vec<u8>)]) -> (StatusCode, Value) {
@@ -1819,13 +1839,13 @@ impl Harness {
 
 #[tokio::test]
 async fn images_use_the_configured_model_and_return_images_only() {
-    let mut h = harness!();
+    let h = harness!();
     h.seed_wallpaper().await;
     let token = h.token(Uuid::new_v4(), CLIENT);
     let (status, body) = h.call(Method::POST, "/v1/images/generations", Some(&token), json!({ "prompt": "一只猫" })).await;
     assert_eq!((status, body["error"]["code"].as_str()), (StatusCode::SERVICE_UNAVAILABLE, Some("image_unavailable")), "{body}");
 
-    h.with_media();
+    h.with_media().await;
     let (status, body) = h.call(Method::POST, "/v1/images/generations", Some(&token), json!({ "prompt": "一只猫", "model": "something-else", "size": "1536x1024" })).await;
     assert_eq!(status, StatusCode::OK, "{body}");
     assert_eq!(body, json!({ "created": 1, "data": [{ "b64_json": "iVBORw0K", "revised_prompt": "一只猫" }] }));
@@ -1843,14 +1863,14 @@ async fn images_use_the_configured_model_and_return_images_only() {
 
 #[tokio::test]
 async fn recordings_are_recognised_by_the_configured_model_even_above_the_usual_body_limit() {
-    let mut h = harness!();
+    let h = harness!();
     h.seed_wallpaper().await;
     let token = h.token(Uuid::new_v4(), CLIENT);
     let audio = |size: usize| vec![7u8; size];
     let (status, body) = h.upload(&token, &[("file", Some("a.wav"), "audio/wav", audio(10))]).await;
     assert_eq!((status, body["error"]["code"].as_str()), (StatusCode::SERVICE_UNAVAILABLE, Some("transcribe_unavailable")));
 
-    h.with_media();
+    h.with_media().await;
     let big = 9 * 1024 * 1024;
     let (status, body) = h.upload(&token, &[
         ("model", None, "", b"evil".to_vec()),
@@ -1875,9 +1895,9 @@ async fn recordings_are_recognised_by_the_configured_model_even_above_the_usual_
 async fn realtime_relays_events_both_ways_with_the_model_kept_out_of_sight() {
     use futures_util::{SinkExt, StreamExt};
     use tokio_tungstenite::tungstenite::{client::IntoClientRequest, Message};
-    let mut h = harness!();
+    let h = harness!();
     h.seed_wallpaper().await;
-    h.with_media();
+    h.with_media().await;
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let addr = listener.local_addr().unwrap();
     let app = build_router(h.state.clone());
@@ -1907,5 +1927,70 @@ async fn realtime_relays_events_both_ways_with_the_model_kept_out_of_sight() {
         Err(tokio_tungstenite::tungstenite::Error::Http(response)) => assert_eq!(response.status(), StatusCode::UNAUTHORIZED),
         other => panic!("an anonymous socket must be refused: {:?}", other.map(|_| ())),
     }
+    h.cleanup().await;
+}
+
+#[tokio::test]
+async fn media_models_are_set_per_product_in_the_admin_and_can_require_paid_quota() {
+    let h = harness!();
+    h.seed_wallpaper().await;
+    let admin = h.admin_token().await;
+    let uid = Uuid::new_v4();
+    let token = h.token(uid, CLIENT);
+    let (status, body) = h.call(Method::POST, "/v1/audio/speech", Some(&token), json!({ "input": "你好" })).await;
+    assert_eq!((status, body["error"]["code"].as_str()), (StatusCode::SERVICE_UNAVAILABLE, Some("speech_unavailable")), "nothing is open until the admin sets it up");
+    let (_, body) = h.call(Method::GET, "/api/ai/tiers", Some(&token), Value::Null).await;
+    assert_eq!(body["media"], json!({}));
+
+    // The admin refuses settings that could not work.
+    for (capability, body, expected) in [
+        ("speech", json!({ "model": "no-such-model", "enabled": true, "requires_paid": false, "voices": ["alloy"] }), StatusCode::BAD_REQUEST),
+        ("speech", json!({ "model": REAL_SPEECH, "enabled": true, "requires_paid": false, "voices": [] }), StatusCode::BAD_REQUEST),
+        ("image", json!({ "model": REAL_IMAGE, "enabled": true, "requires_paid": false, "sizes": ["1024*1024"] }), StatusCode::BAD_REQUEST),
+        ("realtime", json!({ "model": REAL_REALTIME, "enabled": true, "requires_paid": false, "max_secs": 5 }), StatusCode::BAD_REQUEST),
+        ("video", json!({ "model": REAL_IMAGE, "enabled": true, "requires_paid": false }), StatusCode::NOT_FOUND),
+    ] {
+        let (status, reply) = h.save_media(capability, body).await;
+        assert_eq!(status, expected, "{capability}: {reply}");
+    }
+    let (status, body) = h
+        .save_media("speech", json!({ "model": REAL_SPEECH, "enabled": true, "requires_paid": true, "voices": [" zh_female_shuangkuaisisi_moon_bigtts ", "alloy", "alloy"] }))
+        .await;
+    assert_eq!((status, &body["warnings"]), (StatusCode::OK, &json!([])), "{body}");
+
+    // Clients learn what is open and which voices exist, never the model.
+    let (_, body) = h.call(Method::GET, "/api/ai/tiers", Some(&token), Value::Null).await;
+    assert_eq!(body["media"], json!({ "speech": { "requires_paid": true, "available": false, "voices": ["zh_female_shuangkuaisisi_moon_bigtts", "alloy"] } }));
+    assert!(!body.to_string().contains(REAL_SPEECH));
+
+    let (status, body) = h.call(Method::POST, "/v1/audio/speech", Some(&token), json!({ "input": "你好" })).await;
+    assert_eq!((status, body["error"]["code"].as_str()), (StatusCode::FORBIDDEN, Some("paid_required")), "trial quota does not unlock it: {body}");
+    let codes = h.make_batch("topup", 1_000_000, 365, 1).await;
+    assert_eq!(h.redeem(uid, CLIENT, &codes[0]).await.0, StatusCode::OK);
+    let (status, audio) = h.raw(Method::POST, "/v1/audio/speech", Some(&token), json!({ "input": "你好", "model": "evil" })).await;
+    assert_eq!((status, audio.as_str()), (StatusCode::OK, "ID3audio"));
+    assert_eq!(
+        h.mock.relayed("/v1/audio/speech")[0].body,
+        json!({ "model": REAL_SPEECH, "input": "你好", "voice": "zh_female_shuangkuaisisi_moon_bigtts", "speed": 1.0, "response_format": "mp3" }),
+        "the first voice is the default and the model is the admin's"
+    );
+
+    // Switched off, then removed: the capability closes again and every change is audited.
+    let (status, _) = h.save_media("speech", json!({ "model": REAL_SPEECH, "enabled": false, "requires_paid": false, "voices": ["alloy"] })).await;
+    assert_eq!(status, StatusCode::OK);
+    let (status, _) = h.call(Method::POST, "/v1/audio/speech", Some(&token), json!({ "input": "你好" })).await;
+    assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE);
+    let (status, list) = h.call(Method::GET, "/api/admin/products/wallpaper/media", Some(&admin), Value::Null).await;
+    assert_eq!((status, list["items"][0]["enabled"].as_bool()), (StatusCode::OK, Some(false)), "{list}");
+    let (status, _) = h.call(Method::DELETE, "/api/admin/products/wallpaper/media/speech", Some(&admin), Value::Null).await;
+    assert_eq!(status, StatusCode::OK);
+    let (status, _) = h.call(Method::DELETE, "/api/admin/products/wallpaper/media/speech", Some(&admin), Value::Null).await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+    let (_, audit) = h.call(Method::GET, "/api/admin/audit", Some(&admin), Value::Null).await;
+    let actions: Vec<&str> = audit["items"].as_array().unwrap().iter().filter_map(|row| row["action"].as_str()).filter(|a| a.starts_with("media.")).collect();
+    assert_eq!(actions, ["media.delete", "media.save", "media.save"]);
+
+    let (status, _) = h.call(Method::GET, "/api/admin/products/wallpaper/media", None, Value::Null).await;
+    assert_eq!(status, StatusCode::UNAUTHORIZED, "only admins see the real models");
     h.cleanup().await;
 }

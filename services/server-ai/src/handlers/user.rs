@@ -14,7 +14,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use sqlx::FromRow;
 
-/// 当前产品的可用档位。只返回档位名和展示信息，永远不返回真实模型名。
+/// 当前产品的可用档位，以及开放了哪些媒体能力（语音的可选音色、图片的可选尺寸、实时语音的时长上限）。
+/// 只返回档位名和展示信息，永远不返回真实模型名。
 pub async fn tiers(State(state): State<AppState>, auth: AuthUser) -> Result<Json<Value>, AppError> {
     let tiers = products::tiers(&state.pool, &auth.product.product_id, true).await?;
     let paid = match binding::find_active(&state, auth.uid, &auth.product.product_id).await? {
@@ -35,7 +36,18 @@ pub async fn tiers(State(state): State<AppState>, auth: AuthUser) -> Result<Json
             })
         })
         .collect();
-    Ok(Json(json!({ "tiers": items })))
+    let mut media = serde_json::Map::new();
+    for setting in products::media_settings(&state.pool, &auth.product.product_id).await?.into_iter().filter(|m| m.enabled) {
+        let mut entry = json!({ "requires_paid": setting.requires_paid, "available": !setting.requires_paid || paid });
+        match products::Capability::parse(&setting.capability) {
+            Some(products::Capability::Speech) => entry["voices"] = json!(setting.voices),
+            Some(products::Capability::Image) => entry["sizes"] = json!(setting.sizes),
+            Some(products::Capability::Realtime) => entry["max_secs"] = json!(setting.max_secs),
+            _ => {}
+        }
+        media.insert(setting.capability, entry);
+    }
+    Ok(Json(json!({ "tiers": items, "media": media })))
 }
 
 /// 给用户看的额度桶：不含来源（里面有补发的管理员用户名）和内部关闭原因。

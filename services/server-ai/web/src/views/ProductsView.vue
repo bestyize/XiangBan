@@ -2,12 +2,14 @@
 import { computed, onMounted, ref, watch } from 'vue';
 import { api, errorMessage } from '../api';
 import { notify } from '../toast';
-import type { ModelOption, Product, Tier } from '../types';
+import type { MediaSetting, ModelOption, Product, Tier } from '../types';
+import { CAPABILITIES, type CapabilityInfo } from '../media';
 import EmptyState from '../components/EmptyState.vue';
 import Icon from '../components/Icon.vue';
 import Money from '../components/Money.vue';
 import PageHead from '../components/PageHead.vue';
 import ProductDialog from '../components/ProductDialog.vue';
+import MediaDialog from '../components/MediaDialog.vue';
 import TierDialog from '../components/TierDialog.vue';
 
 const emit = defineEmits<{ go: [string]; changed: [] }>();
@@ -22,10 +24,13 @@ const error = ref('');
 
 const editingProduct = ref<Product | 'new' | null>(null);
 const editingTier = ref<Tier | 'new' | null>(null);
+const media = ref<MediaSetting[]>([]);
+const editingMedia = ref<CapabilityInfo | null>(null);
 
 const selected = computed(() => products.value.find((p) => p.product_id === selectedId.value) ?? null);
 const modelInfo = computed(() => new Map(models.value.map((m) => [m.model_name, m])));
 const span = computed(() => Math.max(tiers.value.length, 1) + 1);
+const mediaFor = (id: string) => media.value.find((m) => m.capability === id) ?? null;
 
 async function loadProducts(keep?: string) {
   loading.value = true;
@@ -51,6 +56,42 @@ async function loadTiers() {
   }
 }
 
+async function loadMedia() {
+  media.value = [];
+  if (!selectedId.value) return;
+  try {
+    media.value = (await api.media(selectedId.value)).items;
+  } catch (e) {
+    error.value = errorMessage(e);
+  }
+}
+
+/** 卡片上那一行：语音的音色、图片的尺寸、实时语音的时长，识别没有额外选项。 */
+function mediaDetail(m: MediaSetting): string {
+  if (m.capability === 'speech') return `音色：${m.voices.join('、')}（默认 ${m.voices[0] ?? '—'}）`;
+  if (m.capability === 'image') return `尺寸：${m.sizes.join('、')}`;
+  if (m.capability === 'realtime') return `单次最长 ${Math.round(m.max_secs / 60)} 分钟`;
+  return '';
+}
+
+async function mediaSaved(warnings: string[]) {
+  editingMedia.value = null;
+  if (warnings.length) notify(`已保存，但请注意：${warnings.join('；')}`, 'warn');
+  else notify('已保存，新请求立即生效');
+  await Promise.all([loadMedia(), loadModels()]);
+}
+
+async function removeMedia(capability: CapabilityInfo) {
+  if (!window.confirm(`关闭「${capability.label}」？客户端再使用会收到“暂未开放”。`)) return;
+  try {
+    await api.deleteMedia(selectedId.value, capability.id);
+    notify(`${capability.label}已关闭`);
+    await loadMedia();
+  } catch (e) {
+    error.value = errorMessage(e);
+  }
+}
+
 async function loadModels() {
   modelsError.value = '';
   try {
@@ -65,7 +106,7 @@ onMounted(async () => {
   await loadProducts();
   loadModels();
 });
-watch(selectedId, loadTiers, { immediate: true });
+watch(selectedId, () => Promise.all([loadTiers(), loadMedia()]), { immediate: true });
 
 async function productSaved(id: string) {
   editingProduct.value = null;
@@ -196,9 +237,55 @@ async function removeTier(tier: Tier) {
         <p class="hint">倍率决定每次调用扣多少额度。换模型前，先到 New API 确认新模型的倍率已经设置，否则会按默认倍率多扣或少扣。</p>
         <button v-if="tiers.length" type="button" class="btn" @click="editingTier = 'new'"><Icon name="plus" :size="16" />添加档位</button>
       </div>
+
+      <section class="media" aria-labelledby="media-heading">
+        <div class="media-head">
+          <h2 id="media-heading">媒体能力</h2>
+          <p class="hint">语音、图片、识别和实时语音各用哪个模型。客户端只知道开放了哪些能力、能选哪些音色和尺寸，看不到模型名；没开放的能力会收到“暂未开放”。</p>
+        </div>
+        <div class="media-grid">
+          <article v-for="c in CAPABILITIES" :key="c.id" class="panel media-card" :class="{ off: !mediaFor(c.id)?.enabled }">
+            <div class="mc-head">
+              <span class="mc-icon"><Icon :name="c.icon" :size="17" /></span>
+              <strong>{{ c.label }}</strong>
+              <span v-if="!mediaFor(c.id)" class="tag">未开放</span>
+              <span v-else-if="!mediaFor(c.id)!.enabled" class="tag">已停用</span>
+              <span v-else class="tag green">已开放</span>
+              <span v-if="mediaFor(c.id)?.requires_paid" class="tag amber" title="需要先兑换额度才能使用"><Icon name="lock" :size="12" />需兑换额度</span>
+            </div>
+            <template v-if="mediaFor(c.id)">
+              <div class="mn mono">{{ mediaFor(c.id)!.model }}</div>
+              <div class="mm">
+                <template v-if="modelInfo.get(mediaFor(c.id)!.model)">
+                  <span class="tag">倍率 {{ modelInfo.get(mediaFor(c.id)!.model)!.model_ratio }}</span>
+                  <span v-if="modelInfo.get(mediaFor(c.id)!.model)!.ratio_warning" class="tag amber" title="倍率与 New API 未配置时的默认值相同，可能还没设置真实定价"><Icon name="alert" :size="12" />倍率可能未配置</span>
+                </template>
+                <span v-else-if="models.length" class="tag rose" title="AI 网关里已经找不到这个模型"><Icon name="circle-alert" :size="12" />模型已不可用</span>
+              </div>
+              <div v-if="mediaDetail(mediaFor(c.id)!)" class="mc-detail">{{ mediaDetail(mediaFor(c.id)!) }}</div>
+            </template>
+            <p v-else class="mc-detail muted">{{ c.usedBy }}</p>
+            <div class="mc-acts">
+              <button type="button" class="btn small" :disabled="Boolean(modelsError)" @click="editingMedia = c">
+                <Icon :name="mediaFor(c.id) ? 'pencil' : 'plus'" :size="14" />{{ mediaFor(c.id) ? '修改' : '开放' }}
+              </button>
+              <button v-if="mediaFor(c.id)" type="button" class="btn icon small quiet" :aria-label="`关闭${c.label}`" title="关闭" @click="removeMedia(c)"><Icon name="trash" :size="15" /></button>
+            </div>
+          </article>
+        </div>
+      </section>
     </template>
 
     <ProductDialog v-if="editingProduct" :product="editingProduct === 'new' ? null : editingProduct" @close="editingProduct = null" @saved="productSaved" />
+    <MediaDialog
+      v-if="editingMedia && selected"
+      :product="selected"
+      :capability="editingMedia"
+      :setting="mediaFor(editingMedia.id)"
+      :models="models"
+      @close="editingMedia = null"
+      @saved="mediaSaved"
+    />
     <TierDialog v-if="editingTier && selected" :product="selected" :tier="editingTier === 'new' ? null : editingTier" :models="models" @close="editingTier = null" @saved="tierSaved" />
   </div>
 </template>
@@ -272,6 +359,19 @@ async function removeTier(tier: Tier) {
 
 .below { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 14px; flex-wrap: wrap; }
 .below .hint { max-width: 66ch; }
+
+/* ---- 媒体能力 ---- */
+.media { margin-top: 34px; }
+.media-head { display: flex; flex-direction: column; gap: 4px; margin-bottom: 14px; }
+.media-head .hint { max-width: 76ch; }
+.media-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 14px; }
+.media-card { display: flex; flex-direction: column; gap: 9px; padding: 16px; min-width: 0; }
+.media-card.off { background: transparent; box-shadow: none; border-style: dashed; }
+.mc-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.mc-icon { display: inline-flex; padding: 6px; border-radius: 9px; background: var(--tide-soft); color: var(--tide); }
+.media-card.off .mc-icon { background: #eaeff0; color: var(--muted); }
+.mc-detail { font-size: 13px; color: var(--muted); overflow-wrap: anywhere; }
+.mc-acts { margin-top: auto; display: flex; align-items: center; gap: 6px; padding-top: 4px; }
 
 @media (max-width: 860px) {
   .stage { grid-template-columns: 1fr; border-radius: 16px; }

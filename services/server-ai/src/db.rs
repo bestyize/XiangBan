@@ -33,6 +33,21 @@ CREATE TABLE IF NOT EXISTS product_tiers (
 CREATE UNIQUE INDEX IF NOT EXISTS product_tiers_default_idx ON product_tiers (product_id) WHERE is_default;
 ALTER TABLE product_tiers ADD COLUMN IF NOT EXISTS reasoning_efforts TEXT[] DEFAULT NULL;
 
+-- 每个产品的语音、图片、识别、实时语音各用哪个模型；没有这一行就是没开放。客户端看不到模型名。
+-- voices 只用于语音、sizes 只用于图片（第一个为默认），max_secs 只用于实时语音。
+CREATE TABLE IF NOT EXISTS product_media (
+    product_id    TEXT NOT NULL REFERENCES products(product_id) ON DELETE CASCADE,
+    capability    TEXT NOT NULL CHECK (capability IN ('speech', 'image', 'transcribe', 'realtime')),
+    model         TEXT NOT NULL,
+    enabled       BOOLEAN NOT NULL DEFAULT true,
+    requires_paid BOOLEAN NOT NULL DEFAULT false,
+    voices        TEXT[] NOT NULL DEFAULT '{}',
+    sizes         TEXT[] NOT NULL DEFAULT '{}',
+    max_secs      INT NOT NULL DEFAULT 1800,
+    updated_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (product_id, capability)
+);
+
 -- 每个 (账号, 产品) 对应 New API 里一个独立用户和一个无限额度的令牌，额度只由用户钱包决定。
 -- change_seq 在额度桶变化时自增，synced_seq 记录已推送到哪一版，二者不等说明还有变化没同步到 New API。
 CREATE TABLE IF NOT EXISTS bindings (

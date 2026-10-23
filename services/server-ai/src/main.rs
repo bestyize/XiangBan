@@ -59,6 +59,8 @@ pub fn build_router(state: AppState) -> Router {
         .route("/admin/products/{product_id}", put(admin::upsert_product))
         .route("/admin/products/{product_id}/tiers", get(admin::list_tiers))
         .route("/admin/products/{product_id}/tiers/{tier}", put(admin::upsert_tier).delete(admin::delete_tier))
+        .route("/admin/products/{product_id}/media", get(admin::list_media))
+        .route("/admin/products/{product_id}/media/{capability}", put(admin::upsert_media).delete(admin::delete_media))
         .route("/admin/models", get(admin::models))
         .route("/admin/bindings", get(admin::list_bindings))
         .route("/admin/bindings/{id}", get(admin::get_binding))
