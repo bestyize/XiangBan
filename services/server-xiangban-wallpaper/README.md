@@ -11,6 +11,26 @@
 
 ## 小伴桌面官网与客户端服务
 
+### AI 插件市场（上游 API 模式）
+
+公开页面 `/plugins` 使用本站 Vue 页面，提供技能搜索、分类、来源筛选（官方 / 社区 / 企业）、排序、分页、详情、SKILL.md 文本预览、固定版本 ZIP 下载和安装指令复制。支持分享筛选条件和详情链接；失败、限流与空结果分别展示，不使用虚构目录。内容注明来自 SkillHub；“官方发布”只表示上游来源，不表示小伴额外安全认证。专家包和 MCP 继续使用客户端现有入口，本页首版只接 Skills。
+
+桌面客户端 AI 插件的**技能列表与分类**改走设置中网站地址下的本站接口；已安装技能仍在本地读取，安装、脚本审查、发布者 / 版本 / 文件 SHA-256 校验继续复用原有 SkillHub 流程。先部署本服务再发布新客户端；不因网站失败自动绕过本站目录。网页下载不会自动安装或执行脚本，安装指令需由用户粘贴到桌面聊天确认执行。
+
+| 本站接口 | 用途 |
+| --- | --- |
+| `GET /api/v1/ai/plugins` | `keyword`、`category`、`source`、`sortBy`、`page`；每页固定 24 条 |
+| `GET /api/v1/ai/plugins/categories` | 一级分类 |
+| `GET /api/v1/ai/plugins/{slug}?namespace=...` | 最新发布信息、发布者与来源链接 |
+| `GET /api/v1/ai/plugins/{slug}/readme?version=...&namespace=...` | 固定版本 SKILL.md，最多 100 KiB，按纯文本展示 |
+| `GET /api/v1/ai/plugins/{slug}/download?version=...&namespace=...` | 固定版本 ZIP，最多 12 MiB，临时中转，不落盘 |
+
+服务端可配置 `SKILLHUB_API_KEY`，客户端和网页不持有该 Key。上游固定为 `https://api.skillhub.cn`，不接受浏览器指定代理目标；对象下载只允许 HTTPS 的腾讯 COS 域名，独立客户端不携带团队密钥。缓存仅存成功的元数据，TTL 180 秒、最多 128 项 / 16 MiB 原始响应；签名下载地址和文件不缓存。出站请求并发上限 8，上游 429 后按 Retry-After 暂停新请求。服务重启清空缓存，无新增数据库表，无全量采集任务。
+
+服务端目录代理仍依赖 SkillHub 的可用性与数据；本期未建立自有审核、镜像、推荐运营和下架后台。正式产品接入、批量同步或商业分发按 [SkillHub 使用说明](https://github.com/Tencent/skillhub/blob/main/docs/apply.md) 确认接入范围。
+
+针对性验证：`npm --prefix web run test:plugins`、`npm --prefix web run build`、`cargo test --locked ai_plugins::`。前端构建应先于 Rust 构建（现有静态资源嵌入机制）。
+
 正式域名 `wallpaper.xiangban.xyz`。网站首页 `/` 展示小伴桌面介绍、分平台下载与公告，左侧猫脸品牌“小伴桌面”链接到首页；图片 `/images`、视频 `/videos` 保留独立导航。旧 `/desktop` 地址重定向到首页，旧图片分类 `/c/:id` 作为 `/images/c/:id` 的别名保留。后台 `/admin/apps` 支持 Windows/macOS/Android 安装包上传（EXE/MSI/DMG/PKG/APK/ZIP）、版本上架 / 下架和更新说明，官网与升级检测同步生效；`/admin/desktop` 配置官网介绍、网站源站和公告有效时间。站内包自动计算大小和 SHA-256，单包最多 512 MiB，草稿不公开，保存在独立的持久目录 `app-packages/`。
 
 首页在首屏演示之后依次介绍动态视频壁纸（macOS 实机录屏动图）、超级小伴、对话创作、玩法指南、壁纸库、桌面特效、桌面伙伴和桌面组件，再用三张卡片带过关怀提醒、游戏空间与模型选择，文案见[产品介绍](../../docs/product/小伴桌面_产品介绍.md)。素材在 `web/public/desktop/`：`live-desktop.webp`（1280×720、15 帧/秒、约 6 MB 的动图，偏好减少动态效果时改用静帧 `live-desktop-still.webp`）和十张 1280×800 的浅色控制台截图（assistant、chat、chatguide、wallpapers、effects、companion、widgets、care、games、models，全部按 2.1.0 界面从 macOS 实机窗口截取，裁掉标题栏后转为 WebP）。图片均为 WebP，不进 PWA 预缓存，但会随 `web/dist` 编入服务端程序。
@@ -236,3 +256,4 @@ cargo run --release
 本项目基于 [MIT](LICENSE) OR [Apache-2.0](LICENSE) 双协议开源。
 
 网页角色核心位于 `web/src/companion`，初始从桌面客户端角色核心复制，不跨项目导入源码；交互适配在 `InteractiveXiaoban.vue`，演示桌面在 `WindowsDesktopDemo.vue`。角色和视频在离开该栏目时暂停。验证时检查深浅主题往返切换、桌面 / 手机 16:9、点击 / 拖动、开始菜单与文件夹，以及键盘访问。
+
