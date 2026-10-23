@@ -56,6 +56,10 @@ pub struct Greeting {
     appearance: String,
     #[serde(skip_serializing)]
     pet_label: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    dialogue: Option<crate::companion_dialogue::core::Reply>,
+    #[serde(skip_serializing)]
+    dialogue_key: Option<String>,
 }
 
 pub struct ProactivityState {
@@ -265,8 +269,31 @@ pub fn configure_proactivity(window: tauri::WebviewWindow, settings: GreetingSet
 }
 
 fn close_bubble(app: &tauri::AppHandle, state: &ProactivityState) {
-    *state.active.lock().unwrap_or_else(|e| e.into_inner()) = None;
+    let previous = state.active.lock().unwrap_or_else(|e| e.into_inner()).take();
+    if let Some(key) = previous.and_then(|g| g.dialogue_key) { crate::companion_dialogue::cancel(app, &key); }
     if let Some(window) = app.get_webview_window(BUBBLE_LABEL) { let _ = window.destroy(); }
+}
+pub(crate) fn close_dialogue(app: &tauri::AppHandle) {
+    let state = app.state::<ProactivityState>();
+    let active = state.active.lock().unwrap_or_else(|e| e.into_inner()).as_ref().is_some_and(|g| g.dialogue.is_some());
+    if active { close_bubble(app, &state); }
+}
+pub(crate) fn dialogue_identity(app: &tauri::AppHandle) -> Result<(String, String, String), String> {
+    let state = app.state::<ProactivityState>();
+    let active = state.active.lock().unwrap_or_else(|e| e.into_inner());
+    let greeting = active.as_ref().filter(|g| g.dialogue.is_some()).ok_or("伙伴对话已结束")?;
+    Ok((greeting.dialogue_key.clone().ok_or("伙伴对话已结束")?, greeting.pet_name.clone(), "warm".into()))
+}
+pub(crate) fn show_dialogue(app: &tauri::AppHandle, pet: &tauri::WebviewWindow, key: String,
+    reply: crate::companion_dialogue::core::Reply) -> Result<(), String> {
+    let state = app.state::<ProactivityState>();
+    close_bubble(app, &state);
+    *state.active.lock().unwrap_or_else(|e| e.into_inner()) = Some(Greeting {
+        id: reply.id, pet_name: reply.pet_name.clone(), text: reply.text.clone(),
+        appearance: crate::settings(app).appearance, pet_label: pet.label().into(), dialogue: Some(reply), dialogue_key: Some(key),
+    });
+    if let Err(error) = show_bubble(app, pet) { close_bubble(app, &state); return Err(error); }
+    Ok(())
 }
 fn greeting_text(id: u64) -> &'static str {
     const TEXTS: &[&str] = &[
@@ -281,7 +308,7 @@ fn greeting_text(id: u64) -> &'static str {
     ];
     TEXTS[(id as usize).wrapping_sub(1) % TEXTS.len()]
 }
-fn bubble_position(pet: &tauri::WebviewWindow) -> Result<PhysicalPosition<i32>, String> {
+fn bubble_position(pet: &tauri::WebviewWindow, logical_width: f64, logical_height: f64) -> Result<PhysicalPosition<i32>, String> {
     let origin = pet.outer_position().map_err(|e| e.to_string())?;
     let size = pet.outer_size().map_err(|e| e.to_string())?;
     let monitor = pet.current_monitor().map_err(|e| e.to_string())?
@@ -289,8 +316,8 @@ fn bubble_position(pet: &tauri::WebviewWindow) -> Result<PhysicalPosition<i32>, 
     let m_origin = monitor.position();
     let m_size = monitor.size();
     let scale = monitor.scale_factor();
-    let width = (WIDTH * scale).round() as i32;
-    let height = (HEIGHT * scale).round() as i32;
+    let width = (logical_width * scale).round() as i32;
+    let height = (logical_height * scale).round() as i32;
     let edge = (10.0 * scale).round() as i32;
     let right = m_origin.x.saturating_add(m_size.width as i32);
     let bottom = m_origin.y.saturating_add(m_size.height as i32);
@@ -304,11 +331,13 @@ fn bubble_position(pet: &tauri::WebviewWindow) -> Result<PhysicalPosition<i32>, 
 }
 fn show_bubble(app: &tauri::AppHandle, pet: &tauri::WebviewWindow) -> Result<(), String> {
     if let Some(previous) = app.get_webview_window(BUBBLE_LABEL) { let _ = previous.destroy(); }
-    let pos = bubble_position(pet)?;
+    let dialogue = app.state::<ProactivityState>().active.lock().unwrap_or_else(|e| e.into_inner()).as_ref().is_some_and(|g| g.dialogue.is_some());
+    let (width, height) = if dialogue { (320.0, 240.0) } else { (WIDTH, HEIGHT) };
+    let pos = bubble_position(pet, width, height)?;
     let builder = WebviewWindowBuilder::new(app, BUBBLE_LABEL, WebviewUrl::App("index.html?scene=pet-greeting".into()))
         .title("小伴 · 轻声问候").decorations(false).shadow(false).transparent(true)
         .resizable(false).skip_taskbar(true).always_on_top(true).visible(false).focused(false)
-        .inner_size(WIDTH, HEIGHT);
+        .inner_size(width, height);
     #[cfg(windows)]
     let builder = builder.data_directory(crate::storage::webview(&crate::storage::root(app)?));
     #[cfg(target_os = "macos")]
@@ -322,7 +351,7 @@ fn show_bubble(app: &tauri::AppHandle, pet: &tauri::WebviewWindow) -> Result<(),
     #[cfg(windows)]
     if layer == "desktop" {
         let scale = bubble.scale_factor().map_err(|e| e.to_string())?;
-        crate::windows::place_widget(&bubble, pos, (WIDTH * scale).round() as i32, (HEIGHT * scale).round() as i32)?;
+        crate::windows::place_widget(&bubble, pos, (width * scale).round() as i32, (height * scale).round() as i32)?;
     } else {
         bubble.set_position(pos).map_err(|e| e.to_string())?;
     }
@@ -363,7 +392,7 @@ pub fn pet_proactive_hover(window: tauri::WebviewWindow, duration_ms: u64) -> Re
     let _ = engine.observe(&event);
     let Decision::Allowed(action) = engine.consider(candidate, &context, now.timestamp_millis()) else { return Ok(false); };
     if action.kind != ActionKind::CompanionGreeting || action.channel != Channel::Bubble { return Ok(false); }
-    let offer = Greeting { id: action.id, pet_name: p.name, text: greeting_text(action.id).into(), appearance: settings.appearance, pet_label: window.label().into() };
+    let offer = Greeting { id: action.id, pet_name: p.name, text: greeting_text(action.id).into(), appearance: settings.appearance, pet_label: window.label().into(), dialogue: None, dialogue_key: None };
     drop(engine);
     if let Err(error) = save_state(app, &state) {
         state.read_error.store(true, Ordering::Relaxed);
@@ -411,6 +440,7 @@ pub fn respond_companion_greeting(window: tauri::WebviewWindow, id: u64, outcome
     let _op = state.operation.lock().unwrap_or_else(|e| e.into_inner());
     let current = state.active.lock().unwrap_or_else(|e| e.into_inner()).clone().ok_or("问候已经结束")?;
     if current.id != id { return Err("问候已经失效".into()); }
+    if current.dialogue.is_some() { close_bubble(app, &state); return Ok(()); }
     if !state.engine.lock().unwrap_or_else(|e| e.into_inner()).feedback(id, feedback, Local::now().timestamp_millis()) {
         return Err("重复的问候反馈".into());
     }

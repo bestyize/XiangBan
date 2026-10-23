@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import {onBeforeUnmount,onMounted,ref} from 'vue';
 import {invoke} from '../bridge.ts';
-interface Greeting {id:number;petName:string;text:string;appearance:'system'|'light'|'dark'}
+import CompanionReplyCard from '../companion-dialogue/CompanionReplyCard.vue';
+import type {CompanionReply} from '../companion-dialogue/dialogue.ts';
+interface Greeting {id:number;petName:string;text:string;appearance:'system'|'light'|'dark';dialogue?:CompanionReply}
 const greeting=ref<Greeting|null>(null),error=ref('');
 let timeout:ReturnType<typeof setTimeout>|undefined;
 async function finish(outcome:'chat'|'poke'|'dismissed'|'ignored'|'snoozed'){
@@ -14,14 +16,15 @@ onMounted(async()=>{
  document.documentElement.style.background='transparent';document.body.className='pet-greeting-scene';
  try{
   greeting.value=await invoke<Greeting>('get_companion_greeting');
-  timeout=setTimeout(()=>void finish('ignored'),8000);
+   if(!greeting.value.dialogue)timeout=setTimeout(()=>void finish('ignored'),8000);
  }catch(e){error.value=String(e);}
 });
 onBeforeUnmount(()=>{if(timeout)clearTimeout(timeout);});
 </script>
 <template>
  <div class="greeting-shell" :data-appearance="greeting?.appearance||'system'">
-  <section v-if="greeting" class="greeting-card" role="status" aria-live="polite">
+   <CompanionReplyCard v-if="greeting?.dialogue" class="greeting-dialogue" :initial="greeting.dialogue" @close="greeting=null"/>
+   <section v-else-if="greeting" class="greeting-card" role="status" aria-live="polite">
    <header><span class="greeting-name">{{greeting.petName}}</span><button class="greeting-close" title="关闭问候" aria-label="关闭问候" @click="finish('dismissed')">×</button></header>
    <p>{{greeting.text}}</p>
    <footer><button class="greeting-action" @click="finish('chat')">聊两句</button><button class="greeting-action" @click="finish('poke')">摸摸头</button><button class="greeting-later" @click="finish('snoozed')">暂不打扰</button></footer>
@@ -39,6 +42,9 @@ html:has(body.pet-greeting-scene),body.pet-greeting-scene,body.pet-greeting-scen
 .greeting-card footer{display:flex;gap:8px;align-items:center}.greeting-card footer button{border:0;background:#f5f4f2;border-radius:8px;color:#4c4744;font:inherit;font-size:10px;cursor:pointer;padding:6px 8px;white-space:nowrap}
 .greeting-card footer button:hover{background:#ece9e6}.greeting-card footer .greeting-later{background:transparent;color:#938d89;margin-left:auto;padding-right:0}
 .greeting-error{font-size:11px;color:#8d8783}
+.greeting-dialogue{max-height:100%;overflow:auto}
+.greeting-shell[data-appearance="dark"]{--ui-surface:#292827;--ui-text-primary:#f3f2f0;--ui-text-secondary:#c1b3ba;--ui-control:#42403d;--ui-border:#5a4b53;--ui-ink:#f3a7bf;--ui-soft:#50303d}
+@media(prefers-color-scheme:dark){.greeting-shell[data-appearance="system"]{--ui-surface:#292827;--ui-text-primary:#f3f2f0;--ui-text-secondary:#c1b3ba;--ui-control:#42403d;--ui-border:#5a4b53;--ui-ink:#f3a7bf;--ui-soft:#50303d}}
 .greeting-shell[data-appearance="dark"] .greeting-card{background:#292827;color:#f3f2f0;box-shadow:0 8px 24px #0007}.greeting-shell[data-appearance="dark"] .greeting-card footer button{background:#42403d;color:#efedeb}.greeting-shell[data-appearance="dark"] .greeting-card footer .greeting-later{background:transparent;color:#aaa39b}
 @media(prefers-color-scheme:dark){.greeting-shell[data-appearance="system"] .greeting-card{background:#292827;color:#f3f2f0;box-shadow:0 8px 24px #0007}.greeting-shell[data-appearance="system"] .greeting-card footer button{background:#42403d;color:#efedeb}.greeting-shell[data-appearance="system"] .greeting-card footer .greeting-later{background:transparent;color:#aaa39b}}
 </style>

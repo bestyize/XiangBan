@@ -97,6 +97,7 @@ pub struct AssistantState {
     capturing: AtomicBool,
     drag_epoch: AtomicU64,
     pending_height: Mutex<Option<f64>>,
+    companion_session: Mutex<Option<String>>,
     transition: transition::State,
     /// The ball's window is widened for a notice: `Some(true)` when the notice sits to the ball's left.
     bubble: Mutex<Option<bool>>,
@@ -147,6 +148,7 @@ fn shortcut_released(app: &tauri::AppHandle) {
 }
 
 const WINDOW_COMMANDS: &[&str] = &[
+    "assistant_take_companion_session",
     "assistant_ready", "assistant_hide", "assistant_fit", "assistant_drag", "assistant_unfold", "assistant_prefs",
     "assistant_open_chat", "assistant_open_settings", "assistant_screenshot", "assistant_set_regions", "assistant_transition_ready",
     "assistant_ball_bubble",
@@ -888,6 +890,23 @@ pub async fn assistant_screenshot(window: WebviewWindow) -> Result<Option<String
     state.capturing.store(false, Ordering::SeqCst);
     restore?;
     result
+}
+
+/// Brings the control window forward on the chat page, with the conversation the capsule was using.
+pub(crate) fn open_companion_session(app: &tauri::AppHandle, session: String) -> Result<(), String> {
+    if !crate::settings(app).assistant_enabled { return assistant_open_chat(app.clone(), Some(session)); }
+    *app.state::<AssistantState>().companion_session.lock().unwrap_or_else(|e| e.into_inner()) = Some(session.clone());
+    if expand(app).is_err() {
+        app.state::<AssistantState>().companion_session.lock().unwrap_or_else(|e| e.into_inner()).take();
+        return assistant_open_chat(app.clone(), Some(session));
+    }
+    if let Some(window) = app.get_webview_window(LABEL) { let _ = window.emit("assistant-companion-session", ()); }
+    Ok(())
+}
+#[tauri::command]
+pub fn assistant_take_companion_session(window: WebviewWindow) -> Result<Option<String>, String> {
+    if window.label() != LABEL { return Err("只能从超级小伴打开伙伴会话".into()); }
+    Ok(window.app_handle().state::<AssistantState>().companion_session.lock().unwrap_or_else(|e| e.into_inner()).take())
 }
 
 /// Brings the control window forward on the chat page, with the conversation the capsule was using.

@@ -33,6 +33,10 @@ pub struct SessionSummary {
     /// The folder this conversation works in. Empty for one made before conversations had their own: it works in
     /// the default working folder (the setting), as it always did.
     pub workspace: String,
+    /// A companion is an identity, not a filesystem workspace. Empty for ordinary tasks.
+    pub companion_id: String,
+    pub companion_name: String,
+    pub companion_cursor: u64,
 }
 
 impl Default for SessionSummary {
@@ -45,6 +49,7 @@ impl Default for SessionSummary {
             permission_mode: "ask".into(),
             group: String::new(),
             workspace: String::new(),
+            companion_id: String::new(), companion_name: String::new(), companion_cursor: 0,
         }
     }
 }
@@ -257,6 +262,14 @@ impl Index {
             true
         } else {
             false
+        }
+    }
+
+    pub fn set_companion(&mut self, id: &str, key: &str, name: &str, cursor: u64) {
+        if let Some(session) = self.sessions.iter_mut().find(|s| s.id == id) {
+            if session.companion_id.is_empty() || session.title == session.companion_name { session.title = name.chars().take(MAX_NAME_CHARS).collect(); }
+            session.companion_id = key.into(); session.companion_name = name.into();
+            session.companion_cursor = cursor;
         }
     }
 

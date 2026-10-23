@@ -10,6 +10,7 @@ let hit:boolean|undefined,drag:{x:number;y:number;grabX:number;grabY:number;move
 let pending:{grabX:number;grabY:number;commit:boolean}|undefined;
 let lastPointer:{x:number;y:number}|undefined;
 let hoverTimer:ReturnType<typeof setTimeout>|undefined,hoverStart=0,hoverToken=0;
+let dialogueTimer:ReturnType<typeof setTimeout>|undefined;
 function cancelHover(){if(hoverTimer)clearTimeout(hoverTimer);hoverTimer=undefined;hoverToken++;}
 function scheduleHover(){
  cancelHover();if(!payload.value||payload.value.paused||!payload.value.instance.links||!payload.value.links)return;
@@ -31,10 +32,17 @@ function pointer(event:Event){
  if(next!==hit){hit=next;if(next)scheduleHover();else cancelHover();void invoke('set_pet_hit_test',{hit:next}).catch(()=>{hit=undefined;cancelHover();});}
 }
 async function movePending(){if(moving)return;moving=true;try{while(pending){const p=pending;pending=undefined;await invoke('move_pet_instance',p);}}catch(e){error.value=String(e);}finally{moving=false;}}
-function down(e:PointerEvent){if(e.button!==0||!actor.value?.hit(e.clientX,e.clientY))return;cancelHover();drag={x:e.screenX,y:e.screenY,grabX:e.clientX/innerWidth,grabY:e.clientY/innerHeight,moved:false};suppress=false;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);}
+function down(e:PointerEvent){if(e.button!==0||!actor.value?.hit(e.clientX,e.clientY))return;clearTimeout(dialogueTimer);cancelHover();drag={x:e.screenX,y:e.screenY,grabX:e.clientX/innerWidth,grabY:e.clientY/innerHeight,moved:false};suppress=false;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);}
 function move(e:PointerEvent,commit=false){if(!drag)return;if(Math.hypot(e.screenX-drag.x,e.screenY-drag.y)>5)drag.moved=true;if(drag.moved){suppress=true;pending={grabX:drag.grabX,grabY:drag.grabY,commit};void movePending();}if(commit){drag=undefined;}}
-function click(e:MouseEvent){if(suppress){e.preventDefault();e.stopImmediatePropagation();suppress=false;}else {actor.value?.poke();void invoke('pet_proactive_poke').catch(()=>{});}}
-function menu(){cancelHover();void invoke('manage_pet_instance').catch(e=>error.value=String(e));}
+function click(e:MouseEvent){
+ if(suppress){e.preventDefault();e.stopImmediatePropagation();suppress=false;return;}
+ if(!actor.value?.hit(e.clientX,e.clientY))return;
+ cancelHover();actor.value.poke();clearTimeout(dialogueTimer);
+ // A quick burst gets an immediate animation but only one conversation/model request.
+ dialogueTimer=setTimeout(()=>{void invoke('companion_dialogue_click').catch(e=>error.value=String(e));},150);
+ void invoke('pet_proactive_poke').catch(()=>{});
+}
+function menu(){clearTimeout(dialogueTimer);cancelHover();void invoke('manage_pet_instance').catch(e=>error.value=String(e));}
 watch(()=>payload.value?.effect,value=>{if(value)actor.value?.effect(value);},{flush:'post'});
 onMounted(async()=>{
  document.documentElement.style.background='transparent';document.body.className='pet-instance-scene';
@@ -44,7 +52,7 @@ onMounted(async()=>{
 });
 function presence(e:Event){actor.value?.presence((e as CustomEvent<{kind:string}>).detail.kind);}
 function greetingPoke(){actor.value?.poke();}
-onBeforeUnmount(()=>{cancelHover();window.removeEventListener('pet-greeting-poke',greetingPoke);window.removeEventListener('pet-config',config);window.removeEventListener('pet-pointer',pointer);window.removeEventListener('resize',resize);window.removeEventListener('pet-presence',presence);});
+onBeforeUnmount(()=>{clearTimeout(dialogueTimer);cancelHover();window.removeEventListener('pet-greeting-poke',greetingPoke);window.removeEventListener('pet-config',config);window.removeEventListener('pet-pointer',pointer);window.removeEventListener('resize',resize);window.removeEventListener('pet-presence',presence);});
 </script>
 <template><div v-if="payload" class="pet-window" :style="{padding:`${8*ratio}px`}" @pointerdown="down" @pointermove="move($event)" @pointerup="move($event,true)" @pointercancel="move($event,true)" @click.capture="click" @contextmenu.prevent.stop="menu"><PetActor ref="actor" :definition="payload.definition" :size="size" :expression="payload.instance.expression" :paused="payload.paused" :fps="payload.fps" :links="payload.links&&payload.instance.links" :interactive="false"/><p v-if="error" class="pet-window-error">{{ error }}</p></div></template>
 <style>

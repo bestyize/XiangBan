@@ -165,6 +165,30 @@ export function createAssistantStore(deps: AssistantDeps): AssistantStore {
   const now = deps.now ?? Date.now;
 
   const view = () => (chat.currentId ? chat.views[chat.currentId] ?? null : null);
+  let takingCompanion = false;
+  async function adoptCompanionSession(): Promise<boolean> {
+    if (takingCompanion) return true;
+    takingCompanion = true;
+    let ownsSessionChange = false;
+    try {
+      const session = await deps.invoke<string | null>('assistant_take_companion_session');
+      if (typeof session !== 'string' || !session) return false;
+      // A companion must not erase another conversation's unsent draft or interrupt its run.
+      if (flags.changingSession || flags.submitting || view()?.running || store.input.trim() || store.attachments.length) {
+        await deps.invoke('assistant_open_chat', { session });
+        return true;
+      }
+      ownsSessionChange = true; flags.changingSession = true; draftVersion++; speechVersion++; clearTimers(); asr.deactivate();
+      heard = ''; voiceTurn = false; flags.awaitingSpeech = false; flags.ptt = false; pendingPtt = false; reading = null; turnInterrupted = true;
+      await speech.stop();
+      const overview = await deps.invoke<{ sessions: SessionSummary[] }>('chat_overview');
+      if (disposed || !store.open) return true;
+      if (overview?.sessions) chat.sessions = overview.sessions;
+      await chat.select(session); store.note('');
+      return true;
+    } catch (error) { store.note(error instanceof Error ? error.message : String(error)); return true; }
+    finally { takingCompanion = false; if (ownsSessionChange) flags.changingSession = false; }
+  }
   function turn() {
     const items = view()?.items ?? [];
     let at = items.length - 1;
@@ -370,6 +394,7 @@ export function createAssistantStore(deps: AssistantDeps): AssistantStore {
         if (!deps.desktop) return;
         unsubscribers.push(
           await deps.listen('assistant-open', () => { void store.opened(); }),
+          await deps.listen('assistant-companion-session', () => { if (store.open) void adoptCompanionSession(); else void store.opened(); }),
           await deps.listen('assistant-close', () => store.closed()),
           await deps.listen<string>('assistant-ptt', state => { void store.pushToTalk(state === 'start'); }),
           await deps.listen('ai-config-changed', () => { if (!disposed) void refreshModel(); }),
@@ -401,6 +426,7 @@ export function createAssistantStore(deps: AssistantDeps): AssistantStore {
       await refreshModel();
       if (disposed || !store.open || flags.changingSession) return;
       if (chat.loadError) { store.note('无法加载上次会话，请稍后重新打开小伴。'); return; }
+      if (await adoptCompanionSession()) return;
       if (!chat.configured) { store.note(MODEL_REQUIRED, 'ai'); return; }
       const id = chat.currentId ?? readSession();
       if (id && chat.sessions.some(session => session.id === id)) {

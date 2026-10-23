@@ -39,6 +39,7 @@ mod desk_windows;
 mod reminders;
 mod presence;
 mod proactivity;
+mod companion_dialogue;
 mod proactivity_context;
 mod care_system;
 mod care_weather;
@@ -804,6 +805,8 @@ fn main() {
             games::game_smoke_report, games::list_games, games::delete_user_game, games::open_user_games_folder, rituals::open_ritual_space, rituals::close_ritual_space, rituals::read_ritual_journal, rituals::write_ritual_journal,
             pets::get_pet_catalog, pets::add_pet, pets::update_pet, pets::remove_pet, pets::save_pet_theme, pets::delete_pet_theme, pets::export_pet_theme, pets::get_pet_instance, pets::move_pet_instance, pets::set_pet_hit_test, pets::manage_pet_instance,
              proactivity::get_proactivity_settings, proactivity::get_proactivity_context, proactivity::configure_proactivity, proactivity::pet_proactive_hover, proactivity::pet_proactive_poke, proactivity::get_companion_greeting, proactivity::respond_companion_greeting,
+            companion_dialogue::companion_dialogue_click, companion_dialogue::companion_dialogue_choose, companion_dialogue::companion_dialogue_model, companion_dialogue::companion_dialogue_continue, companion_dialogue::companion_dialogue_close,
+            float_assistant::assistant_take_companion_session,
             widgets::get_desktop_widgets, widgets::add_desktop_widget, widgets::update_desktop_widget, widgets::remove_desktop_widget,
             widgets::set_widgets_editing, widgets::get_desktop_widget, widgets::move_desktop_widget, widgets::show_widget_settings, widgets::resize_desktop_widget, widgets::get_widget_settings, widgets::update_widget_settings, widgets::remove_widget_settings, widgets::close_widget_settings, widgets::size_widget_settings, widgets::search_widget_cities, widgets::get_widget_weather, widgets::get_widget_forecast, widgets::get_widget_air_quality, widgets::get_widget_stock_watchlist, widgets::get_widget_stocks, widgets::save_desktop_widget_content,
             widgets::list_custom_widgets, widgets::save_custom_widget, widgets::remove_custom_widget,
@@ -835,7 +838,7 @@ fn main() {
              assistant_capture::reset_screen_capture_permission, assistant_capture::open_screen_capture_settings,
             float_assistant::assistant_transition_ready, float_assistant::assistant_prefs, float_assistant::assistant_try, float_assistant::assistant_open_chat, float_assistant::assistant_open_settings]);
     let app = builder.manage(state).manage(content::ContentState::default()).manage(website::WebsiteState::default())
-        .manage(games::GameState::default()).manage(desk_game::DeskState::default()).manage(rituals::RitualState::default()).manage(widgets::WidgetState::default()).manage(pets::PetState::default()).manage(reminders::ReminderState::default()).manage(proactivity::ProactivityState::default()).manage(account::AccountState::default()).manage(ai_config::AiConfigState::default()).manage(tts::TtsState::default()).manage(asr::AsrState::default()).manage(ai_catalogue::CatalogueState::default()).manage(float_assistant::AssistantState::default()).manage(capture_editor::CaptureState::default()).manage(assistant_hit_test::HitState::default()).manage(window_control::WindowState::default()).manage(voice_turn::VoiceTurnState::default())
+        .manage(games::GameState::default()).manage(desk_game::DeskState::default()).manage(rituals::RitualState::default()).manage(widgets::WidgetState::default()).manage(pets::PetState::default()).manage(reminders::ReminderState::default()).manage(proactivity::ProactivityState::default()).manage(companion_dialogue::DialogueState::default()).manage(account::AccountState::default()).manage(ai_config::AiConfigState::default()).manage(tts::TtsState::default()).manage(asr::AsrState::default()).manage(ai_catalogue::CatalogueState::default()).manage(float_assistant::AssistantState::default()).manage(capture_editor::CaptureState::default()).manage(assistant_hit_test::HitState::default()).manage(window_control::WindowState::default()).manage(voice_turn::VoiceTurnState::default())
         .register_uri_scheme_protocol("wallpaper-asset", |context, request| library::serve(context.app_handle(), request))
         .register_uri_scheme_protocol("game-pack", |context, request| game_packs::serve(context.app_handle(), request))
         .invoke_handler(move |invoke| {
@@ -844,7 +847,7 @@ fn main() {
                 invoke.resolver.reject("只能在聊天和声音设置中使用语音识别");
                 return true;
             }
-            let allowed=capture_editor::permitted(label,command).or_else(||pets::permitted(label,command)).or_else(||float_assistant::permitted(label,command)).or_else(|| desk_game::permitted(label,command)).or_else(|| widgets::permitted(label,command)).or_else(|| rituals::permitted(label,command)).or_else(|| games::permitted(label,command)).unwrap_or_else(|| {
+            let allowed=capture_editor::permitted(label,command).or_else(||companion_dialogue::permitted(label,command)).or_else(||pets::permitted(label,command)).or_else(||float_assistant::permitted(label,command)).or_else(|| desk_game::permitted(label,command)).or_else(|| widgets::permitted(label,command)).or_else(|| rituals::permitted(label,command)).or_else(|| games::permitted(label,command)).unwrap_or_else(|| {
                 if matches!(command, "reset_screen_capture_permission" | "open_screen_capture_settings") { return label=="control"; }
                  if command=="ui_smoke_report" || command=="chat_screenshot" {return label=="control";}
                 if command=="set_appearance" || command=="set_accent" || command=="get_appearance" || command=="set_companion_enabled" || command=="set_companion_links" || command=="set_companion_skin" || command=="set_desktop_effects" || command=="list_desktop_effects" || command=="open_effects_directory" || command=="import_effect_pack" {return label=="control";}

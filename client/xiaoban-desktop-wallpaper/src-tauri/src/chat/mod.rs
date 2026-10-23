@@ -354,6 +354,76 @@ fn provider_with(config: &AiConfig, key_source: Option<KeySource>) -> Result<Arc
     made.map_err(|e| format!("模型配置不能用：{e}"))
 }
 
+/// A single bounded, tool-free generation for an explicit companion touch. Uses the selected protocol and account.
+pub(crate) fn companion_line(app: &tauri::AppHandle, config: AiConfig, key: &str,
+    record: &crate::companion_dialogue::core::Record, cancel: &AtomicBool) -> Result<String, String> {
+    if cancel.load(Ordering::Relaxed) { return Err("互动已结束".into()); }
+    let (config, source) = ai_gateway::prepare(app, config)?;
+    let mut profile = provider_profile(&config);
+    profile.supports_tools = false;
+    let thinking = profile.extra_body.get("thinking").and_then(|v| v.get("budget_tokens")).and_then(Value::as_u64).unwrap_or(0).min(u32::MAX as u64) as u32;
+    profile.max_output_tokens = Some(thinking.saturating_add(256).max(1024));
+    if let Some(source) = source { profile = profile.with_api_key_source(source); }
+    let provider: Arc<dyn ModelProvider> = match config.protocol.as_str() {
+        "responses" => Arc::new(OpenAiResponses::new(profile).map_err(|e| e.to_string())?),
+        "anthropic" => Arc::new(AnthropicMessages::new(profile).map_err(|e| e.to_string())?),
+        _ => Arc::new(OpenAiCompat::new(profile).map_err(|e| e.to_string())?),
+    };
+    let reply = record.current.as_ref().ok_or("互动已结束")?;
+    let mut messages = vec![Message::system(format!(
+        "你是桌面伙伴{}，性格为{}。用户主动点击你，希望得到贴合眼下心情的简短陪伴。现在当地时间{}。\n结合下方这只伙伴自己的最近互动，先判断心情和适合的话题，再只输出最终回复：1至2句、最多90个汉字，纯文本。不要输出推理、标签、选项或Markdown。不要宣称看过屏幕或知道未提供的事情；不要重复上次回复，不说教。用户无需每次回答问题。你没有任何工具。",
+        reply.pet_name, record.personality, chrono::Local::now().format("%A %H:%M")))];
+    let session = mutate(app, |index| index.list().into_iter().find(|s| s.companion_id == key))?;
+    let mut cursor = 0;
+    if let Some(session) = session {
+        if lock(&app.state::<ChatState>().runs).contains_key(&session.id) { return Err("这位伙伴正在回复".into()); }
+        cursor = session.companion_cursor;
+        let saved = JsonlStore::new(Dirs::of(app)?.sessions()).load(&session.id).map_err(|e| e.to_string())?;
+        let recent: Vec<_> = saved.iter().filter(|m| matches!(m.role, agent_kernel::Role::User | agent_kernel::Role::Assistant)).rev().take(6).collect();
+        for message in recent.into_iter().rev() {
+            let text: String = message.text().chars().take(240).collect();
+            messages.push(if message.role == agent_kernel::Role::User { Message::user_text(text) } else { Message::assistant(text, vec![]) });
+        }
+    }
+    // The final assistant entry is the instant local fallback, not another turn the model must answer.
+    for turn in record.history.iter().take(record.history.len().saturating_sub(1)).filter(|t| t.interaction > cursor) {
+        messages.push(if turn.role == "user" { Message::user_text(&turn.text) } else { Message::assistant(&turn.text, vec![]) });
+    }
+    provider.chat(&agent_kernel::ChatRequest { messages, tools: vec![] }, &mut |_| {}, cancel)
+        .map(|reply| reply.message.text()).map_err(|e| e.to_string())
+}
+
+/// Lazily creates or resumes this instance's companion session, appending each bubble interaction once.
+pub(crate) fn companion_session(app: &tauri::AppHandle, key: &str, name: &str, tone: &str, id: u64,
+    history: &[crate::companion_dialogue::core::Turn]) -> Result<String, String> {
+    let (seconds, millis) = now();
+    let session = mutate(app, |index| -> Result<String, String> {
+        let existing = index.list().into_iter().find(|s| s.companion_id == key);
+        let summary = match existing { Some(s) => s, None => index.create(seconds, millis, "ask")? };
+        if lock(&app.state::<ChatState>().runs).contains_key(&summary.id) { return Ok(summary.id); }
+        let store = JsonlStore::new(Dirs::of(app)?.sessions());
+        let marker = format!("伙伴气泡交接编号：{key}:{id}。这位伙伴现在叫{name}，性格为{tone}。这是互动记录的边界标记，无需复述。");
+        let saved = store.load(&summary.id).map_err(|e| e.to_string())?;
+        if !saved.iter().any(|m| m.role == agent_kernel::Role::System && m.text() == marker) && id > summary.companion_cursor {
+            let mut messages = Vec::new();
+            if saved.is_empty() { messages.push(Message::system(format!("这是你作为伙伴{name}的专属陪伴会话，性格为{tone}。接着下面的真实互动自然聊天，保持称呼和语气连贯。"))); }
+            messages.push(Message::system(marker));
+            for turn in history.iter().filter(|t| t.interaction > summary.companion_cursor) {
+                messages.push(if turn.role == "user" { Message::user_text(&turn.text) } else { Message::assistant(&turn.text, vec![]) });
+            }
+            if let Err(error) = store.append(&summary.id, &messages) {
+                if saved.is_empty() { index.remove(&summary.id); }
+                return Err(error.to_string());
+            }
+        }
+        index.set_companion(&summary.id, key, name, id.max(summary.companion_cursor));
+        index.touch(&summary.id, seconds);
+        Ok(summary.id)
+    })??;
+    if let Ok(sessions) = list(app) { emit(app, "chat-sessions-changed", json!(sessions)); }
+    Ok(session)
+}
+
 /// Deletes spilled tool output nobody will look at again.
 fn clean_spill(dir: &Path, keep: Duration) {
     let Ok(read) = fs::read_dir(dir) else { return };

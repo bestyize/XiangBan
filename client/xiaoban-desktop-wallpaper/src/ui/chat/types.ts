@@ -1,7 +1,7 @@
 import type { AttachmentCard } from './attachments.ts';
 /** What the host sends and accepts for the chat. Field names are the host's own (snake_case for kernel events). */
 
-export interface SessionSummary { id: string; title: string; createdAt: number; updatedAt: number; permissionMode?: 'ask' | 'auto'; /** The group it was moved into; empty or missing when it is not in one. */ group?: string; /** The folder it works in; empty or missing for an old conversation, which uses the default folder. */ workspace?: string }
+export interface SessionSummary { id: string; title: string; createdAt: number; updatedAt: number; permissionMode?: 'ask' | 'auto'; /** The group it was moved into; empty or missing when it is not in one. */ group?: string; /** The folder it works in; empty or missing for an old conversation, which uses the default folder. */ workspace?: string; companionId?: string; companionName?: string; companionCursor?: number }
 
 /** A working folder in the chat page's folder menu. `wide` is a home folder or a disk's root. */
 export interface RecentWorkspace { path: string; name: string; exists: boolean; wide: boolean }

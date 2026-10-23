@@ -46,7 +46,7 @@ describe('small pet above the chat composer', () => {
 
     await wrapper.get('[data-testid="composer-pet"]').trigger('click');
     await flushPromises();
-    expect(wrapper.get('[data-testid="composer-pet-reply"]').text()).toContain('嘿嘿');
+    expect(wrapper.get('[data-testid="composer-pet-reply"]').text()).toContain('收到这一点温柔');
     expect(wrapper.find('.composer-pet-live').exists()).toBe(true);
     expect(actorPoke).toHaveBeenCalledTimes(1);
     expect(wrapper.get('.pet-art').attributes('tabindex')).toBe('-1');
@@ -54,6 +54,8 @@ describe('small pet above the chat composer', () => {
     vi.advanceTimersByTime(2400);
     await flushPromises();
     expect(wrapper.find('.composer-pet-live').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="composer-pet-reply"]').exists()).toBe(true);
+    vi.advanceTimersByTime(9600); await flushPromises();
     expect(wrapper.find('[data-testid="composer-pet-reply"]').exists()).toBe(false);
     expect(wrapper.get('.composer-pet-picture').classes()).not.toContain('is-hidden');
     wrapper.unmount();
@@ -74,7 +76,10 @@ describe('small pet above the chat composer', () => {
     expect(wrapper.find('[data-testid="composer-pet-reply"]').exists()).toBe(true);
     vi.advanceTimersByTime(1400);
     await flushPromises();
+    expect(wrapper.find('[data-testid="composer-pet-reply"]').exists()).toBe(true);
+    vi.advanceTimersByTime(9600); await flushPromises();
     expect(wrapper.find('[data-testid="composer-pet-reply"]').exists()).toBe(false);
     wrapper.unmount();
   });
 });
+

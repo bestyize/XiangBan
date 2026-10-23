@@ -64,6 +64,7 @@ const attention = computed(() => store.chat.attention);
 
 interface Space { key: string; name: string; path: string; sessions: SessionSummary[] }
 const RECENT = '__recent__';
+const COMPANIONS = '__companions__';
 const WORKSPACE_NAMES_KEY = 'xiaoban.workspace-names';
 const WORKSPACES_OPEN_KEY = 'xiaoban.workspaces-open';
 const REMOVED_WORKSPACES_KEY = 'xiaoban.removed-workspaces';
@@ -114,8 +115,10 @@ const folderName = (path: string) => Object.hasOwn(workspaceNames.value, path) ?
 /** 空间: 最近任务 (conversations without a folder) first, then one entry per working folder, named after the folder. */
 const spaces = computed<Space[]>(() => {
   const recent: Space = { key: RECENT, name: '最近任务', path: '', sessions: [] };
+  const companions: Space = { key: COMPANIONS, name: '伙伴', path: '', sessions: [] };
   const byPath = new Map<string, Space>();
   for (const session of store.chat.sessions) {
+    if (session.companionId && !session.workspace?.trim()) { companions.sessions.push(session); continue; }
     const path = session.workspace?.trim();
     if (!path || removedWorkspaces.value.has(path)) { recent.sessions.push(session); continue; }
     let space = byPath.get(path);
@@ -124,9 +127,9 @@ const spaces = computed<Space[]>(() => {
   }
   const pending = store.chat.pendingWorkspace;
   if (pending && !removedWorkspaces.value.has(pending) && !byPath.has(pending)) byPath.set(pending, { key: pending, name: folderName(pending), path: pending, sessions: [] });
-  return [recent, ...byPath.values()];
+  return [recent, ...(companions.sessions.length ? [companions] : []), ...byPath.values()];
 });
-const expanded = reactive(new Set<string>([RECENT]));
+const expanded = reactive(new Set<string>([RECENT, COMPANIONS]));
 function toggleSpace(key: string) { if (expanded.has(key)) expanded.delete(key); else expanded.add(key); }
 /** Keep the folder of the open conversation unfolded. */
 watch(() => store.chat.currentId, id => {
@@ -429,7 +432,7 @@ const fixedPages = ['new-task', 'chat', 'ai-store', 'library', 'studio', 'games'
           <template v-for="space in spaces" :key="space.key">
             <div class="nav-space-row" :class="{ 'menu-open': workspaceMenu?.key === space.key }" @contextmenu.prevent="openWorkspaceMenu(space, $event)">
             <button type="button" class="nav-item space-row" :aria-expanded="expanded.has(space.key)" :title="space.path || space.name" :data-testid="space.key === '__recent__' ? 'space-recent' : `space-${space.name}`" @click="toggleSpace(space.key)">
-              <component :is="space.key === '__recent__' ? Inbox : Folder" :size="16" class="nav-icon" /><span class="nav-label">{{ space.name }}</span>
+              <component :is="space.key === '__recent__' ? Inbox : space.key === '__companions__' ? Sparkles : Folder" :size="16" class="nav-icon" /><span class="nav-label">{{ space.name }}</span>
               <i v-if="!expanded.has(space.key) && spaceWaiting(space)" class="xb-dot"></i>
               <span class="nav-hint">{{ space.sessions.length || '' }}</span>
             </button>
