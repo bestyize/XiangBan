@@ -74,10 +74,18 @@ function readAccent(): AccentId {
 }
 /** The chosen theme colour. Kept in this window's storage; every console page reads colours through CSS variables. */
 export const accent = ref<AccentId>(readAccent());
+/** Where a theme colour is also sent, so the host can tell windows that cannot read this storage. Set by the console. */
+let publishAccent: ((id: AccentId) => void) | undefined;
+export function publishAccentTo(callback: (id: AccentId) => void) { publishAccent = callback; }
 export function setAccent(id: AccentId) {
   if (!validAccent(id)) return;
   accent.value = id;
   try { localStorage.setItem(ACCENT_KEY, id); } catch { /* still applies for this session */ }
+  publishAccent?.(id);
+}
+/** The theme colour as the host reports it, for windows that do not share the console's storage. */
+export function followAccent(value: unknown) {
+  if (validAccent(value) && value !== accent.value) accent.value = value;
 }
 /** The palette of a theme colour in light or dark. Unknown ids fall back to the default. */
 export function accentPalette(id: AccentId = accent.value, dark = false): AccentPalette {

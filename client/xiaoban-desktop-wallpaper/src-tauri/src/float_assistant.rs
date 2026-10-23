@@ -31,11 +31,13 @@ const WIDTH: f64 = 480.0;
 const MIN_HEIGHT: f64 = 156.0;
 // The reply card keeps a fixed body height and scrolls, so the capsule only needs room for its
 // tallest state (answer card, question block, attachment tray) — no streaming growth beyond it.
-const MAX_HEIGHT: f64 = 480.0;
+const MAX_HEIGHT: f64 = 600.0;
 /// Space kept between the capsule and the bottom of the usable screen (above the Dock or taskbar).
 const BOTTOM_GAP: f64 = 56.0;
 /// The ball's window, in logical pixels. The ball itself is drawn a little smaller inside it.
 const BALL_WINDOW: f64 = 72.0;
+/// Extra width the ball's window takes while a one-line notice ("已完成…") shows beside the ball.
+const BUBBLE_WIDTH: f64 = 340.0;
 /// Where the ball starts: close to the right edge, a little above the Dock.
 const BALL_RIGHT_GAP: f64 = 16.0;
 const BALL_BOTTOM_GAP: f64 = 160.0;
@@ -96,11 +98,14 @@ pub struct AssistantState {
     drag_epoch: AtomicU64,
     pending_height: Mutex<Option<f64>>,
     transition: transition::State,
+    /// The ball's window is widened for a notice: `Some(true)` when the notice sits to the ball's left.
+    bubble: Mutex<Option<bool>>,
 }
 
 const WINDOW_COMMANDS: &[&str] = &[
     "assistant_ready", "assistant_hide", "assistant_fit", "assistant_drag", "assistant_unfold", "assistant_prefs",
     "assistant_open_chat", "assistant_open_settings", "assistant_screenshot", "assistant_set_regions", "assistant_transition_ready",
+    "assistant_ball_bubble",
 ];
 const CONTROL_COMMANDS: &[&str] = &["assistant_status", "assistant_configure", "assistant_try"];
 /// What the capsule may ask of the host besides its own window commands: ask and answer, speak, listen.
@@ -440,6 +445,7 @@ fn show_ball_surface(app: &tauri::AppHandle, visible: bool) -> Result<(), String
     let window = window(app)?;
     let (x, y, size) = ball_target(app)?;
     set_mode(app, Mode::Ball);
+    *app.state::<AssistantState>().bubble.lock().unwrap_or_else(|e| e.into_inner()) = None;
     // Move first so a window arriving on another screen takes that screen's scale before it is sized.
     window.set_position(PhysicalPosition::new(x, y)).map_err(|e| e.to_string())?;
     window.set_size(PhysicalSize::new(size as u32, size as u32)).map_err(|e| e.to_string())?;
@@ -466,6 +472,8 @@ pub(crate) fn hide_surface(app: &tauri::AppHandle) -> Result<(), String> { hide_
 
 /// Opens the capsule, from the ball or from nothing.
 pub fn expand(app: &tauri::AppHandle) -> Result<(), String> {
+    // The morph starts from the ball's own square, never from a window widened for a notice.
+    if let Some(window) = app.get_webview_window(LABEL) { let _ = set_bubble(app, &window, false); }
     if mode(app) == Mode::Ball && crate::settings(app).assistant_enabled && transition::begin(app, "capsule")? { return Ok(()); }
     expand_surface(app, true)
 }
@@ -552,13 +560,48 @@ fn save_ball(app: &tauri::AppHandle, window: &WebviewWindow) {
     if mode(app) != Mode::Ball {
         return;
     }
-    let (Ok(position), Ok(size), Ok(Some(monitor)), Ok(scale)) =
-        (window.outer_position(), window.outer_size(), window.current_monitor(), window.scale_factor())
+    let (Some((x, y, size)), Ok(Some(monitor)), Ok(scale)) = (ball_rect(app, window), window.current_monitor(), window.scale_factor())
     else {
         return;
     };
-    *app.state::<AssistantState>().ball_at.lock().unwrap_or_else(|e| e.into_inner()) = Some((position.x, position.y));
-    persist_ball(app, ball_offset(area_of(&monitor), scale, size.width as i32, position.x, position.y));
+    *app.state::<AssistantState>().ball_at.lock().unwrap_or_else(|e| e.into_inner()) = Some((x, y));
+    persist_ball(app, ball_offset(area_of(&monitor), scale, size, x, y));
+}
+
+/// The ball's own square in physical pixels, also while its window is widened for a notice.
+fn ball_rect(app: &tauri::AppHandle, window: &WebviewWindow) -> Option<(i32, i32, i32)> {
+    let (position, size) = (window.outer_position().ok()?, window.outer_size().ok()?);
+    let ball = size.height as i32;
+    let left = *app.state::<AssistantState>().bubble.lock().unwrap_or_else(|e| e.into_inner()) == Some(true);
+    Some((if left { position.x + size.width as i32 - ball } else { position.x }, position.y, ball))
+}
+
+/// Widens the ball's window toward the middle of the screen for a notice, or narrows it back; the ball stays put.
+/// Returns whether the notice sits to the left of the ball, or `None` when nothing is widened.
+fn set_bubble(app: &tauri::AppHandle, window: &WebviewWindow, open: bool) -> Result<Option<bool>, String> {
+    let state = app.state::<AssistantState>();
+    let current = *state.bubble.lock().unwrap_or_else(|e| e.into_inner());
+    if mode(app) != Mode::Ball || current.is_some() == open { return Ok(if open { current } else { None }); }
+    let (x, y, size) = ball_rect(app, window).ok_or("没有找到悬浮球位置")?;
+    if !open {
+        *state.bubble.lock().unwrap_or_else(|e| e.into_inner()) = None;
+        window.set_position(PhysicalPosition::new(x, y)).map_err(|e| e.to_string())?;
+        window.set_size(PhysicalSize::new(size as u32, size as u32)).map_err(|e| e.to_string())?;
+        window.set_position(PhysicalPosition::new(x, y)).map_err(|e| e.to_string())?;
+        return Ok(None);
+    }
+    let monitor = monitor_at_physical_point(app, f64::from(x + size / 2), f64::from(y + size / 2))?
+        .or_else(|| window.current_monitor().ok().flatten())
+        .ok_or("没有找到显示器")?;
+    let area = area_of(&monitor);
+    let left = x + size / 2 >= area.x + area.w / 2;
+    let wide = size + (BUBBLE_WIDTH * monitor.scale_factor()).round() as i32;
+    let start = if left { x + size - wide } else { x };
+    *state.bubble.lock().unwrap_or_else(|e| e.into_inner()) = Some(left);
+    window.set_position(PhysicalPosition::new(start, y)).map_err(|e| e.to_string())?;
+    window.set_size(PhysicalSize::new(wide as u32, size as u32)).map_err(|e| e.to_string())?;
+    window.set_position(PhysicalPosition::new(start, y)).map_err(|e| e.to_string())?;
+    Ok(Some(left))
 }
 
 /// The window moved. A ball being dragged moves many times a second; its spot is saved once it has been still.
@@ -683,13 +726,21 @@ pub fn assistant_try(app: tauri::AppHandle) -> Result<(), String> {
 #[tauri::command]
 pub fn assistant_prefs(app: tauri::AppHandle) -> Value {
     let settings = crate::settings(&app);
-    json!({ "open": settings.assistant_open, "read": settings.assistant_read, "appearance": settings.appearance })
+    json!({ "open": settings.assistant_open, "read": settings.assistant_read, "appearance": settings.appearance, "accent": settings.accent })
 }
 
 /// The ball was clicked.
 #[tauri::command]
 pub fn assistant_transition_ready(window: WebviewWindow, id: u64, step: String) -> Result<(), String> {
     transition::ready(&window, id, &step)
+}
+
+/// The page shows (or clears) a one-line notice beside the ball.
+#[tauri::command]
+pub fn assistant_ball_bubble(window: WebviewWindow, open: bool) -> Result<Option<bool>, String> {
+    if window.label() != LABEL { return Err("只有超级小伴可以显示提示".into()); }
+    if window.app_handle().state::<AssistantState>().dragging.load(Ordering::SeqCst) { return Ok(None); }
+    set_bubble(window.app_handle(), &window, open)
 }
 
 #[tauri::command]

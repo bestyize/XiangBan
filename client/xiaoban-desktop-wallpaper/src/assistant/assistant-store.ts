@@ -31,9 +31,14 @@ export interface AssistantDeps {
   storage?: Pick<Storage, 'getItem' | 'setItem' | 'removeItem'>;
   /** The console's colour scheme, as the host reports it (at start and whenever it changes). */
   onAppearance?(value: string): void;
+  /** The console's theme colour, as the host reports it. */
+  onAccent?(value: string): void;
   setTimer?(callback: () => void, ms: number): unknown;
   clearTimer?(id: unknown): void;
 }
+
+/** A line shown beside the ball while the capsule is away: an answer finished, or something needs the user. */
+export interface BallNotice { kind: 'done' | 'attention' | 'error'; text: string }
 
 export interface AssistantStore {
   /** The capsule is showing. */
@@ -66,6 +71,23 @@ export interface AssistantStore {
   readonly failure: string;
   readonly approval: ApprovalRequest | null;
   readonly ask: QuestionRequest | null;
+  /** Everything in the open conversation, for the multi-turn card. */
+  readonly items: ChatItem[];
+  /** The open conversation, if any. */
+  readonly currentId: string | null;
+  /** The open conversation's title; empty for a conversation not started yet. */
+  readonly title: string;
+  /** The latest conversations, newest first, for the switcher in the card. */
+  readonly recent: SessionSummary[];
+  /** An answer finished (or failed) while only the ball was showing. Cleared when the capsule opens. */
+  unread: boolean;
+  /** What the ball says beside itself, if anything. */
+  notice: BallNotice | null;
+  dismissNotice(): void;
+  /** Opens another recent conversation in the card. */
+  switchSession(id: string): Promise<void>;
+  /** Asks the last question again. */
+  retry(): Promise<void>;
   init(): Promise<void>;
   opened(): Promise<void>;
   closed(): void;
@@ -94,6 +116,12 @@ export interface AssistantStore {
   openChat(): Promise<void>;
   openSettings(tab: SettingsTarget): Promise<void>;
   dispose(): void;
+}
+
+/** One short line of an answer, for the notice beside the ball. */
+export function noticeLine(text: string, max = 28): string {
+  const line = text.replace(/[#>*`~]/g, '').split('\n').map(part => part.trim()).find(Boolean) ?? '';
+  return line.length > max ? `${line.slice(0, max)}…` : line;
 }
 
 export function describeTool(name: string): string {
@@ -237,6 +265,25 @@ export function createAssistantStore(deps: AssistantDeps): AssistantStore {
 
   const store: AssistantStore = reactive({
     open: false, ball: false, prefs: { open: 'voice', read: 'voice' }, input: '', attachments: [], hint: '', hintTab: '',
+    unread: false, notice: null,
+    get items() { return view()?.items ?? []; },
+    get currentId() { return chat.currentId; },
+    get title() { const id = chat.currentId; return (id && chat.sessions.find(session => session.id === id)?.title) || ''; },
+    get recent() { return [...chat.sessions].sort((a, b) => b.updatedAt - a.updatedAt).slice(0, 6); },
+    dismissNotice() { store.notice = null; },
+    async switchSession(id) {
+      if (flags.changingSession || flags.submitting || id === chat.currentId || !chat.sessions.some(session => session.id === id)) return;
+      noteVoice(''); flags.changingSession = true; draftVersion++;
+      clearTimers(); heard = ''; voiceTurn = false; flags.awaitingSpeech = false; asr.deactivate();
+      try { await speech.stop(); await chat.select(id); store.note(''); }
+      catch (error) { store.note(error instanceof Error ? error.message : String(error)); }
+      finally { flags.changingSession = false; }
+    },
+    async retry() {
+      if (flags.submitting || flags.changingSession || view()?.running) return;
+      turnInterrupted = false; voiceTurn = false;
+      await chat.retry();
+    },
     get configured() { return chat.configured; },
     get changingSession() { return flags.changingSession; },
     get voiceAvailable() { return asr.enabled && asr.microphoneSupported !== false; },
@@ -284,12 +331,13 @@ export function createAssistantStore(deps: AssistantDeps): AssistantStore {
           await deps.listen('ai-config-changed', () => { if (!disposed) void refreshModel(); }),
           await deps.listen<boolean>('assistant-ball', shown => { store.ball = Boolean(shown); }),
           // The settings page lives in another window; its choices arrive with every settings change.
-          await deps.listen<{ assistantOpen?: string; assistantRead?: string; appearance?: string }>('settings-changed', value => { readPrefs(value.assistantOpen, value.assistantRead); if (value.appearance) deps.onAppearance?.(value.appearance); }),
+          await deps.listen<{ assistantOpen?: string; assistantRead?: string; appearance?: string; accent?: string }>('settings-changed', value => { readPrefs(value.assistantOpen, value.assistantRead); if (value.appearance) deps.onAppearance?.(value.appearance); if (value.accent) deps.onAccent?.(value.accent); }),
         );
         try {
-          const saved = await deps.invoke<{ open?: string; read?: string; appearance?: string }>('assistant_prefs');
+          const saved = await deps.invoke<{ open?: string; read?: string; appearance?: string; accent?: string }>('assistant_prefs');
           readPrefs(saved?.open, saved?.read);
           if (saved?.appearance) deps.onAppearance?.(saved.appearance);
+          if (saved?.accent) deps.onAccent?.(saved.accent);
         } catch { /* the defaults stand */ }
         await Promise.all([chat.init(), asr.init(), speech.init()]);
         await deps.invoke('assistant_ready');
@@ -302,8 +350,9 @@ export function createAssistantStore(deps: AssistantDeps): AssistantStore {
       if (disposed || store.open) return;
       noteVoice('');
       clearTimers();
-      draftVersion++; store.attachments = [];
-      store.open = true; store.ball = false; store.note(''); store.input = ''; heard = ''; voiceTurn = false; flags.awaitingSpeech = false;
+      // A draft and its attachments wait while the capsule is folded away; only voice capture starts afresh.
+      draftVersion++;
+      store.open = true; store.ball = false; store.unread = false; store.notice = null; store.note(''); heard = ''; voiceTurn = false; flags.awaitingSpeech = false;
       await Promise.all([chat.init(), asr.init()]);
       await refreshModel();
       if (disposed || !store.open || flags.changingSession) return;
@@ -317,14 +366,14 @@ export function createAssistantStore(deps: AssistantDeps): AssistantStore {
         await chat.select(null);
       }
       // Typing first: the capsule waits, and a tap on the ball starts listening.
-      if (store.open && asr.enabled && store.prefs.open === 'voice') { voiceTurn = await startListening(); }
+      if (store.open && asr.enabled && store.prefs.open === 'voice' && !store.input && !store.attachments.length) { voiceTurn = await startListening(); }
     },
     closed() {
       noteVoice('');
-      draftVersion++; store.attachments = [];
+      draftVersion++;
       clearTimers();
       asr.deactivate(); void speech.stop();
-      store.open = false; store.input = ''; store.note(''); heard = ''; voiceTurn = false; flags.awaitingSpeech = false;
+      store.open = false; store.note(''); heard = ''; voiceTurn = false; flags.awaitingSpeech = false;
     },
     async newConversation() {
       if (flags.changingSession || flags.submitting) return;
@@ -389,6 +438,11 @@ export function createAssistantStore(deps: AssistantDeps): AssistantStore {
     async decide(decision) { const request = store.approval; if (request) await chat.answerApproval(request, decision); },
     async reply(answer) { const request = store.ask; if (request) await chat.answerQuestion(request, answer); },
     replied(session, text, key) {
+      if (!store.open && session === chat.currentId && !turnInterrupted) {
+        store.unread = true;
+        store.notice = { kind: 'done', text: noticeLine(text) || '回答好了' };
+        return;
+      }
       if (!store.open || session !== chat.currentId || turnInterrupted) return;
       const version = ++speechVersion;
       if (store.prefs.read === 'always' || (store.prefs.read === 'voice' && voiceTurn)) {
@@ -401,6 +455,8 @@ export function createAssistantStore(deps: AssistantDeps): AssistantStore {
       } else afterTurn();
     },
     stopped() {
+      const failure = turn().failure;
+      if (!store.open && failure && !turnInterrupted) { store.unread = true; store.notice = { kind: 'error', text: noticeLine(failure) }; }
       speechVersion++; listenVersion++; flags.awaitingSpeech = false; clearTimers(); asr.deactivate(); void speech.stop();
     },
     note(message, tab = '') { store.hint = message; store.hintTab = message ? tab : ''; },
@@ -410,7 +466,7 @@ export function createAssistantStore(deps: AssistantDeps): AssistantStore {
     async openChat() { await deps.invoke('assistant_open_chat', { session: chat.currentId }); },
     async openSettings(tab) { await deps.invoke('assistant_open_settings', { tab }); },
     dispose() {
-      disposed = true; clearTimers(); noteVoice(''); stopWatch(); stopSessionWatch(); stopVoiceWatch(); stopVoiceErrorWatch();
+      disposed = true; clearTimers(); noteVoice(''); stopWatch(); stopSessionWatch(); stopVoiceWatch(); stopVoiceErrorWatch(); stopAttentionWatch();
       unsubscribers.splice(0).forEach(off => off());
       asr.deactivate(); void speech.stop();
     },
@@ -428,6 +484,12 @@ export function createAssistantStore(deps: AssistantDeps): AssistantStore {
     const message = errors.find((error, i) => error && error !== before[i]);
     if (message) noteVoice(message);
   }, { flush: 'sync' });
+  // Something waits for the user while only the ball shows: say so beside it.
+  const stopAttentionWatch = watch(() => store.phase === 'attention' && !store.open, waiting => {
+    if (!waiting || disposed) return;
+    const approval = store.approval, ask = store.ask;
+    store.notice = { kind: 'attention', text: noticeLine(ask?.question ?? (approval ? `${approval.tool} 需要你许可` : '需要你确认一下')) };
+  });
   const stopSessionWatch = watch(() => chat.currentId, id => {
     if(id && !disposed) rememberSession(id);
   }, { flush: 'sync' });

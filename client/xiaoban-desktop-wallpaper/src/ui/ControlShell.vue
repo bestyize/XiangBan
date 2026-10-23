@@ -3,7 +3,7 @@ import { computed, defineAsyncComponent, nextTick, onMounted, onBeforeUnmount, r
 import { NAlert, NButton, NSkeleton, useMessage } from 'naive-ui';
 import { Bell, BookOpen, Check, ChevronDown, Ellipsis, Folder, FolderPlus, Gamepad2, Globe, Inbox, LogIn, LogOut, Palette, PanelLeft, Pencil, Plus, Puzzle, RefreshCw, Search, SlidersHorizontal, Sparkles, SquarePen, Sprout, Trash2, Zap } from 'lucide-vue-next';
 import { invoke, listen } from '../bridge.ts';
-import { accent, accents, isDark, appearanceMode, appearanceModes, publishAppearanceTo, reconcile, setAccent } from './appearance.ts';
+import { accent, accents, isDark, appearanceMode, appearanceModes, publishAccentTo, publishAppearanceTo, reconcile, setAccent } from './appearance.ts';
 import { createControlStore } from './control-store.ts';
 import type { ControlPage } from './control-types.ts';
 import type { SessionSummary } from './chat/types.ts';
@@ -239,6 +239,9 @@ function manageWidgets(event: Event) {
  */
 async function shareAppearance() {
   publishAppearanceTo(mode => { store.setAppearance(mode).catch(error => store.notify(error, 'error')); });
+  // The theme colour lives in this window's storage; the host only relays it to the floating assistant.
+  publishAccentTo(id => { void invoke('set_accent', { accent: id }).catch(() => {}); });
+  void invoke('set_accent', { accent: accent.value }).catch(() => {});
   try {
     const kept = await invoke<{ appearance: string; appearanceKept?: boolean }>('get_appearance');
     const step = reconcile(kept, appearanceMode.value);

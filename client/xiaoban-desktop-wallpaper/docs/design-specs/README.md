@@ -6,8 +6,8 @@
 
 | 文件 | 用途 |
 | --- | --- |
-| [超级小伴设计规范](super-assistant.md) | 悬浮按钮、截图工具的交互约定与代码位置 |
-| [悬浮按钮 HTML 设计稿](prototypes/assistant-floating-tools.html) | 右侧单按钮、横排工具浮层、选图与页面跳转演示 |
+| [超级小伴设计规范](super-assistant.md) | 小球 / 胶囊 / 卡片三种形态、截图工具的交互约定与代码位置 |
+| [悬浮按钮 HTML 设计稿](prototypes/assistant-floating-tools.html) | 旧版：右侧单按钮、横排工具浮层（已被方案四取代） |
 | [对话框与停止按钮设计稿](prototypes/assistant-conversation.html) | 月白 / 夜银配色、彩虹球、可打断回复的最终视觉参考 |
 | [生命球动效设计稿](prototypes/assistant-living-orb.html) | 彩虹配色与待机、聆听、思考、说话动效参考 |
 | [截图工具 HTML 设计稿](prototypes/assistant-capture-overlay.html) | 压暗蒙层、框选与调整、标注工具栏、完成后回填演示 |
