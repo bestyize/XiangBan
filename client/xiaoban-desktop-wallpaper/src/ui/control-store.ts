@@ -7,6 +7,7 @@ import { loadBuiltinCatalog, readCatalog } from "../games/catalog.ts";
 import { loadBuiltinPacks, noPacks, readImported, readList } from "../effects/catalog.ts";
 import type { ControlPage, ControlStore, StudioTab } from "./control-types.ts";
 import { createChatStore } from "./chat/chat-store.ts";
+import { loadTurnModels } from '../voice/turn/models.ts';
 
 export const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value));
 
@@ -52,7 +53,7 @@ export function createControlStore(notify: ControlStore["notify"]): ControlStore
     effectList: noPacks(),
     account: null,
     showLoginModal: false,
-    page: "new-task", creationDraft: null, settingsTab: "general", settingsOpen: false, studioTab: "wallpapers", asr: createAsrStore({ desktop, invoke, listen, notify }), speech: createSpeechStore({ desktop, invoke, notify }), chat: createChatStore({ desktop, invoke, listen, notify,
+    page: "new-task", creationDraft: null, settingsTab: "general", settingsOpen: false, studioTab: "wallpapers", asr: createAsrStore({ desktop, invoke, listen, notify, turnModels: () => loadTurnModels() }), speech: createSpeechStore({ desktop, invoke, notify }), chat: createChatStore({ desktop, invoke, listen, notify,
       onActivity: () => { store.asr.deactivate(); void store.speech.stop(); },
       onReply: (session, text, key) => { if (chatLike(store.page) && store.speech.settings.autoRead && document.visibilityState !== 'hidden') void store.speech.speak(text, key ?? 'auto:' + session, undefined, true); },
     }), ready: false, initialError: "", desktop, notify,

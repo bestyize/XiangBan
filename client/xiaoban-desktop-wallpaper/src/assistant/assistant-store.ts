@@ -152,7 +152,7 @@ export function createAssistantStore(deps: AssistantDeps): AssistantStore {
   /** The last question was spoken, so the answer is read aloud and listening resumes afterwards. */
   let voiceTurn = false;
   /** Reactive, because the phase shows `speaking` from the moment a reply is handed to the voice until it ends. */
-  const flags = reactive({ awaitingSpeech: false, submitting: false, changingSession: false, voiceNotice: '', ptt: false });
+  const flags = reactive({ awaitingSpeech: false, submitting: false, changingSession: false, voiceNotice: '', ptt: false, partial: '' });
   /** The shortcut went down before the capsule had opened; start talking once it has. */
   let pendingPtt = false;
   /** The answer being read aloud while it is still being written. */
@@ -194,7 +194,7 @@ export function createAssistantStore(deps: AssistantDeps): AssistantStore {
     if (open === 'voice' || open === 'type') store.prefs.open = open;
     if (read === 'voice' || read === 'always' || read === 'never') store.prefs.read = read;
   }
-  function clearTimers() { clearTimer(listenTimer); clearTimer(sendTimer); listenTimer = sendTimer = undefined; }
+  function clearTimers() { clearTimer(listenTimer); clearTimer(sendTimer); listenTimer = sendTimer = undefined; flags.partial = ''; }
   function noteVoice(message: string) {
     clearTimer(voiceNoticeTimer); voiceNoticeTimer = undefined; flags.voiceNotice = message;
     if (message) voiceNoticeTimer = setTimer(() => { flags.voiceNotice = ''; voiceNoticeTimer = undefined; }, 5000);
@@ -260,6 +260,7 @@ export function createAssistantStore(deps: AssistantDeps): AssistantStore {
     noteVoice(''); heard = '';
     await asr.activate((text, context)=>{if(current())onHeard(text, context);}, {
       noiseGuard: true,
+      onPartial: text => { if (current() && store.open && !flags.awaitingSpeech) flags.partial = text; },
       playbackText: () => (flags.awaitingSpeech && speech.status === 'playing') || now() < echoTailUntil ? readingText : '',
       onPreview: (text, context) => {
         if (!current() || !store.open || !flags.awaitingSpeech || !externalSpeech(text, context)) return;
@@ -274,6 +275,7 @@ export function createAssistantStore(deps: AssistantDeps): AssistantStore {
     return true;
   }
   function onHeard(text: string, context?: TranscriptContext) {
+    flags.partial = '';
     if (!externalSpeech(text, context)) return;
     if (flags.awaitingSpeech) bargeIn();
     voiceTurn = true;
@@ -357,7 +359,8 @@ export function createAssistantStore(deps: AssistantDeps): AssistantStore {
     },
     get voiceStatus() {
       if (flags.voiceNotice) return flags.voiceNotice;
-      if (flags.ptt) return asr.listening ? '正在听，松开快捷键发送' : '正在启动麦克风…';
+      if (flags.ptt) return !asr.listening ? '正在启动麦克风…' : flags.partial ? `${flags.partial}… · 松开发送` : '正在听，松开快捷键发送';
+      if (flags.partial && asr.listening) return `${flags.partial}…`;
       if (asr.enabled && (asr.preparing || asr.warming)) return '正在准备语音引擎…';
       if (asr.recordingRequested && !asr.listening) return '正在启动麦克风…';
       return '';

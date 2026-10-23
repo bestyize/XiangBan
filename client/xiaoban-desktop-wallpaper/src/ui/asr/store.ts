@@ -1,5 +1,7 @@
 import { reactive } from 'vue';
 import { UtteranceSegmenter } from './audio.ts';
+import { SmartSegmenter, type Segmenter } from '../../voice/turn/segmenter.ts';
+import type { TurnModels } from '../../voice/turn/models.ts';
 import { captureMicrophone, MICROPHONE_UNSUPPORTED, supportsMicrophone, type Capture } from './capture.ts';
 
 interface HostStatus { enabled: boolean; modelReady: boolean; engineReady: boolean; warming?: boolean; microphoneError?: string }
@@ -11,6 +13,8 @@ export interface AsrActivationOptions {
   playbackText?(): string;
   /** Early recognition only; never inserted as a final utterance. */
   onPreview?(text: string, context: TranscriptContext): void;
+  /** Live captions: what has been said so far in the utterance still being spoken, about once a second. */
+  onPartial?(text: string): void;
 }
 export interface AsrDeps {
   desktop: boolean;
@@ -18,6 +22,8 @@ export interface AsrDeps {
   listen<T>(event: string, callback: (payload: T) => void): Promise<() => void>;
   notify(message: unknown, type?: 'success' | 'error' | 'info'): void;
   capture?: typeof captureMicrophone;
+  /** Silero VAD + Smart Turn endpointing. Without it (or until it has loaded) pauses are judged by loudness. */
+  turnModels?(): Promise<TurnModels | null>;
 }
 export interface AsrStore extends HostStatus {
   microphoneSupported: boolean;
@@ -53,14 +59,20 @@ export function createAsrStore(deps: AsrDeps): AsrStore {
   let capture: Capture | undefined;
   let receiver: ((text: string, context?: TranscriptContext) => void) | undefined;
   let options: AsrActivationOptions = {};
-  let segmenter: UtteranceSegmenter | undefined;
-  let queue: { audio: Float32Array; context?: TranscriptContext; preview?: boolean }[] = [];
-  let playbackText = '', previewSamples = 0, previewTicket: number | undefined;
+  let segmenter: Segmenter | undefined;
+  let queue: { audio: Float32Array; context?: TranscriptContext; preview?: boolean; partial?: boolean }[] = [];
+  let playbackText = '', previewSamples = 0, previewTicket: number | undefined, partialSamples = 0;
+  /** The endpointing models, once they have loaded in this window; loading never delays listening. */
+  let modelsReady = false, modelsLoading: Promise<TurnModels | null> | undefined;
+  function loadModels() {
+    if (!deps.turnModels || modelsLoading) return;
+    modelsLoading = deps.turnModels().then(models => { modelsReady = Boolean(models); if (!models) modelsLoading = undefined; return models; }, () => { modelsLoading = undefined; return null; });
+  }
   let draining: Promise<void> | undefined;
   let starting: number | undefined;
   function stopCapture() {
     recording++; starting = undefined; capture?.stop(); capture = undefined; queue = []; segmenter = undefined;
-    playbackText = ''; previewSamples = 0; previewTicket = undefined;
+    playbackText = ''; previewSamples = 0; previewTicket = undefined; partialSamples = 0;
     store.recordingRequested = false; store.listening = false; store.recognizing = false; store.level = 0; store.speechActive = false;
   }
   function fail(error: unknown) { stopCapture(); store.error = message(error); deps.notify(store.error, 'error'); }
@@ -83,11 +95,12 @@ export function createAsrStore(deps: AsrDeps): AsrStore {
           try {
             const text = await deps.invoke<string>('asr_transcribe', { samples: Array.from(item.audio) });
             if (ticket === recording && store.enabled && !disposed && text.trim()) {
-              if (item.preview) options.onPreview?.(text.trim(), item.context!);
+              if (item.partial) options.onPartial?.(text.trim());
+              else if (item.preview) options.onPreview?.(text.trim(), item.context!);
               else if (item.context) receiver?.(text.trim(), item.context);
               else receiver?.(text.trim());
             }
-          } finally { if (item.preview && previewTicket === ticket) previewTicket = undefined; }
+          } finally { if ((item.preview || item.partial) && previewTicket === ticket) previewTicket = undefined; }
         }
       } catch (e) { if (ticket === recording && !disposed) fail(e); }
       finally {
@@ -103,7 +116,10 @@ export function createAsrStore(deps: AsrDeps): AsrStore {
     if (!receiver || !store.recordingRequested || disposed || !store.enabled || !store.engineReady || capture || starting !== undefined) return;
     const ticket = recording;
     starting = ticket;
-    const activeSegmenter = new UtteranceSegmenter(options.noiseGuard);
+    const models = modelsReady && deps.turnModels ? await deps.turnModels() : null;
+    const activeSegmenter: Segmenter = models
+      ? new SmartSegmenter(models.vad, models.turn, error => console.warn('语音判停出错，改用长停顿判停', error))
+      : new UtteranceSegmenter(options.noiseGuard);
     segmenter = activeSegmenter;
     try {
       let levelAt = 0;
@@ -116,8 +132,18 @@ export function createAsrStore(deps: AsrDeps): AsrStore {
         const audio = activeSegmenter.push(frame);
         store.speechActive = activeSegmenter.active;
         previewSamples += frame.length;
+        partialSamples += frame.length;
         if (!audio) {
-          if (!activeSegmenter.pending) playbackText = '';
+          if (!activeSegmenter.pending) { playbackText = ''; partialSamples = 0; }
+          // Live captions: re-recognise the utterance so far about once a second, when nothing else is waiting.
+          if (!reference && options.onPartial && activeSegmenter.partial && previewTicket === undefined && !queue.length && partialSamples >= 16000) {
+            const partial = activeSegmenter.partial();
+            if (partial) {
+              partialSamples = 0; previewTicket = ticket;
+              queue.push({ audio: partial, partial: true });
+              void drain(ticket);
+            }
+          }
           if (reference && options.onPreview && previewTicket === undefined && previewSamples >= 12800) {
             const preview = activeSegmenter.preview();
             if (preview) {
@@ -130,7 +156,7 @@ export function createAsrStore(deps: AsrDeps): AsrStore {
         }
         if (queue.length >= 5) { fail('语音处理暂时跟不上，请稍后点击重试'); return; }
         queue.push({ audio, ...(playbackText ? { context: { playbackText } } : {}) });
-        playbackText = ''; previewSamples = 0;
+        playbackText = ''; previewSamples = 0; partialSamples = 0;
         void drain(ticket);
       }, error => { if (ticket === recording && !disposed) captureFailed(error); });
       if (ticket !== recording || disposed || !receiver || !store.enabled || !store.recordingRequested) { microphone.stop(); return; }
@@ -195,6 +221,7 @@ export function createAsrStore(deps: AsrDeps): AsrStore {
     prepare() {
       if (preparing) return prepareGeneration === generation ? preparing : preparing.then(() => store.prepare());
       if (!deps.desktop || !store.enabled || disposed) return Promise.resolve(false);
+      loadModels();
       if (store.engineReady) return Promise.resolve(true);
       const ticket = generation;
       prepareGeneration = ticket;
@@ -220,6 +247,7 @@ export function createAsrStore(deps: AsrDeps): AsrStore {
       if (!store.microphoneSupported) { reportMicrophone(MICROPHONE_UNSUPPORTED); return; }
       store.deactivate(); store.error = ''; receiver = onText; store.recordingRequested = true;
       options = activationOptions;
+      loadModels();
       const ticket = recording;
       await store.init();
       if (ticket !== recording || disposed) return;
