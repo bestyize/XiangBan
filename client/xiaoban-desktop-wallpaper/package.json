@@ -12,7 +12,8 @@
     "desktop:build": "node scripts/desktop.mjs build --no-bundle",
     "desktop:macos:build": "node scripts/desktop.mjs build --target aarch64-apple-darwin --bundles app",
     "test:macos": "node scripts/smoke-test.mjs",
-    "test": "vitest run",
+    "test": "vitest run && npm run test:scripts",
+    "test:scripts": "node --test scripts/generate-icon.test.mjs",
     "desktop:windows:build": "tauri build --bundles nsis",
     "test:windows:installer": "node scripts/verify-windows-installer.mjs",
     "test:macos:dmg": "node scripts/verify-macos-dmg-guide.mjs"
