@@ -6,7 +6,7 @@ import { invoke, desktop } from '../../../bridge.ts';
 type Mode = 'system' | 'direct' | 'manual';
 interface NetworkConfig { mode: Mode; proxyUrl: string }
 const options = [
-  { label: '跟随系统', value: 'system' },
+  { label: '自动检测', value: 'system' },
   { label: '直接连接', value: 'direct' },
   { label: '手动代理', value: 'manual' },
 ];
@@ -54,9 +54,9 @@ async function test() {
         <NSelect v-model:value="draft.mode" aria-label="代理模式" :options="options" style="width:160px" :disabled="loading || busy || !desktop" />
       </div>
       <div v-if="draft.mode === 'manual'" class="xb-row proxy-url-row">
-        <div class="xb-row-text"><b>代理服务器</b><span>支持 HTTP、HTTPS、SOCKS5 / SOCKS5H；示例：<code>http://127.0.0.1:7890</code></span></div>
+        <div class="xb-row-text"><b>代理服务器</b><span>支持 HTTP、HTTPS；示例：<code>http://127.0.0.1:7890</code></span></div>
         <input v-model.trim="draft.proxyUrl" class="net-input" aria-label="代理服务器地址" placeholder="http://127.0.0.1:7890" autocomplete="off" spellcheck="false" :disabled="loading || busy || !desktop" />
-        <small>暂不支持包含账号密码的代理地址。SOCKS5H 由代理服务器解析目标域名。</small>
+        <small>暂不支持 SOCKS 或包含账号密码的代理地址。</small>
       </div>
       <div class="xb-row">
         <div class="xb-row-text"><b>应用更改</b><span>不会中断已经开始的对话；新连接立即使用修改后的配置</span></div>
@@ -73,7 +73,7 @@ async function test() {
     </div>
     <NAlert v-if="message" :type="failed ? 'error' : 'success'" :show-icon="false" style="margin-top:12px">{{ message }}</NAlert>
     <NAlert v-if="!desktop" type="info" :show-icon="false" style="margin-top:12px">请在桌面应用中管理网络配置。</NAlert>
-    <p class="network-notice">系统代理沿用操作系统及环境代理设置。手动代理优先于系统代理；直连将显式禁用代理。此设置适用于接入的原生 HTTP 客户端，不会修改浏览器 WebView、Shell 命令或第三方程序的网络配置。</p>
+    <p class="network-notice">自动模式沿用 reqwest 检测到的环境代理；如需使用本机代理软件，请选择手动代理并填写 HTTP 监听端口。手动代理优先于系统代理；直连将显式禁用代理。此设置适用于接入的原生 HTTP 客户端，不会修改浏览器 WebView、Shell 命令或第三方程序的网络配置。</p>
   </div>
 </template>
 <style scoped>
