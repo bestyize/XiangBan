@@ -17,7 +17,7 @@ impl OpenAiCompat {
         if profile.base_url.trim().is_empty() || profile.model.trim().is_empty() {
             return Err(HarnessError::Config("base_url and model are required".into()));
         }
-        Ok(Self { profile, client: http::new_client()? })
+        Ok(Self { client: http::new_client(&profile)?, profile })
     }
 }
 
