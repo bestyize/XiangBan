@@ -1,0 +1,245 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>对话框 · 听写与语音对话</title>
+<style>
+:root{
+  --bg:#F1F2F4;--surface:#fff;--sunken:#F6F7F8;--line:#E4E6EA;--line-strong:#CDD1D7;
+  --text:#2B2F36;--text-2:#667085;--text-3:#98A2B3;
+  --accent:#4F6BED;--accent-soft:#E9EDFE;--accent-ink:#3550D9;
+  --ok:#2E9E6B;--warn:#C77A1B;--warn-soft:#FBF1E0;--danger:#D4483B;--danger-soft:#FBE9E7;
+  --shadow:0 1px 2px rgba(16,24,40,.06),0 12px 32px rgba(16,24,40,.08);
+}
+:root[data-theme=dark]{
+  --bg:#14161A;--surface:#1D2025;--sunken:#24282E;--line:#2E333A;--line-strong:#434A54;
+  --text:#E8EAED;--text-2:#9AA3AF;--text-3:#6B7480;
+  --accent:#7B91FF;--accent-soft:#262E52;--accent-ink:#A9B8FF;
+  --ok:#52C28F;--warn:#E5A04A;--warn-soft:#3A2F1C;--danger:#F0766A;--danger-soft:#3C2420;
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 12px 32px rgba(0,0,0,.35);
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:14px/1.6 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif}
+button{font:inherit;color:inherit;cursor:pointer}
+svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none}
+
+/* ── review chrome ─────────────────────────────────────── */
+.review{max-width:1180px;margin:0 auto;padding:28px 24px 48px}
+.review h1{margin:0;font-size:22px;font-weight:650}
+.review .lead{margin:6px 0 18px;color:var(--text-2);max-width:760px}
+.bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:18px}
+.bar .label{color:var(--text-3);font-size:12px;margin-right:2px}
+.chip{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:4px 12px;font-size:12.5px;color:var(--text-2)}
+.chip.on{background:var(--accent-soft);border-color:transparent;color:var(--accent-ink);font-weight:600}
+.grid{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:20px;align-items:start}
+@media(max-width:900px){.grid{grid-template-columns:1fr}}
+
+/* ── the chat window ───────────────────────────────────── */
+.window{background:var(--surface);border-radius:16px;box-shadow:var(--shadow);overflow:hidden;display:flex;flex-direction:column;height:640px}
+.titlebar{display:flex;align-items:center;gap:10px;padding:12px 18px;border-bottom:1px solid var(--line);font-weight:600}
+.titlebar small{color:var(--text-3);font-weight:400}
+.live{margin-left:auto;display:none;align-items:center;gap:6px;font-size:12px;font-weight:500;color:var(--accent-ink);background:var(--accent-soft);padding:3px 10px;border-radius:999px}
+.live i{width:7px;height:7px;border-radius:50%;background:var(--accent);animation:blink 1.4s infinite}
+[data-mode=voice] .live{display:inline-flex}
+.thread{flex:1;overflow:auto;padding:22px 24px;display:flex;flex-direction:column;gap:14px}
+.msg{max-width:78%;padding:9px 14px;border-radius:14px;position:relative}
+.msg.user{align-self:flex-end;background:var(--accent-soft);color:var(--text);border-bottom-right-radius:4px}
+.msg.bot{align-self:flex-start;background:var(--sunken);border-bottom-left-radius:4px}
+.tag{display:inline-flex;align-items:center;gap:4px;font-size:11px;color:var(--accent-ink);margin-bottom:2px}
+.tag svg{width:12px;height:12px}
+.speaking-line{display:inline-flex;align-items:center;gap:6px;margin-top:4px;font-size:12px;color:var(--accent-ink)}
+.ack{align-self:flex-start;font-size:12px;color:var(--text-3);padding-left:6px}
+.card{align-self:flex-start;width:min(420px,90%);border:1px solid var(--line-strong);border-radius:12px;padding:12px 14px;background:var(--surface)}
+.card b{display:block;margin-bottom:2px}
+.card .acts{display:flex;gap:8px;margin-top:10px}
+.card .acts button{border:1px solid var(--line-strong);background:var(--surface);border-radius:8px;padding:4px 12px;font-size:12.5px}
+.card .acts .go{background:var(--accent);border-color:var(--accent);color:#fff}
+.fail{align-self:flex-start;background:var(--danger-soft);color:var(--danger);border-radius:10px;padding:8px 12px;font-size:13px}
+
+/* ── composer ──────────────────────────────────────────── */
+.composer{padding:0 20px 18px}
+.box{border:1px solid var(--line-strong);border-radius:16px;background:var(--surface);padding:10px 12px;transition:box-shadow .2s,border-color .2s}
+.box.rec{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+.field{width:100%;min-height:44px;border:0;outline:0;resize:none;background:transparent;color:var(--text);font:inherit;padding:2px 2px 6px}
+.field::placeholder{color:var(--text-3)}
+.row{display:flex;align-items:center;gap:6px}
+.row .sp{flex:1}
+.model{font-size:12.5px;color:var(--text-2);padding:3px 8px}
+.ib{width:32px;height:32px;display:grid;place-items:center;border:0;border-radius:9px;background:transparent;color:var(--text-2);position:relative}
+.ib:hover{background:var(--sunken);color:var(--text)}
+.ib.on{background:var(--accent-soft);color:var(--accent-ink)}
+.ib.send{background:var(--accent);color:#fff;border-radius:50%}
+.ib.send:disabled{background:var(--sunken);color:var(--text-3);cursor:default}
+.ib.new::after{content:"";position:absolute;top:5px;right:5px;width:6px;height:6px;border-radius:50%;background:var(--accent)}
+.divider{width:1px;height:18px;background:var(--line);margin:0 2px}
+.dict-note{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--accent-ink);padding:0 2px 6px}
+.dict-note[hidden]{display:none}
+.rec-dot{width:8px;height:8px;border-radius:50%;background:var(--danger);animation:blink 1s infinite}
+.tip{position:absolute;bottom:40px;left:50%;transform:translateX(-50%);white-space:nowrap;background:var(--text);color:var(--bg);font-size:12px;padding:4px 9px;border-radius:7px;opacity:0;pointer-events:none;transition:opacity .15s}
+.ib:hover .tip{opacity:1}
+
+/* ── voice bar (replaces the text box while in voice mode) ─ */
+.vbar{display:none;align-items:center;gap:14px;padding:6px 4px}
+[data-mode=voice] .vbar{display:flex}
+[data-mode=voice] .plain{display:none}
+.orb{width:46px;height:46px;border-radius:50%;flex:none;position:relative;background:radial-gradient(circle at 30% 25%,#9fb0ff,var(--accent) 60%,#3a4fc4);display:grid;place-items:center;color:#fff}
+.orb::before,.orb::after{content:"";position:absolute;inset:0;border-radius:50%;border:2px solid var(--accent);opacity:0}
+.s-listening .orb::before{animation:ring 1.8s infinite}.s-listening .orb::after{animation:ring 1.8s .9s infinite}
+.s-thinking .orb{animation:spin 1.6s linear infinite;background:conic-gradient(from 0deg,var(--accent),#c7d0ff,var(--accent))}
+.s-speaking .orb{background:radial-gradient(circle at 30% 25%,#b3f0d1,var(--ok) 60%,#1f7a50)}
+.s-muted .orb,.s-approval .orb{background:var(--line-strong)}
+.s-approval .orb{background:var(--warn)}
+.s-error .orb{background:var(--danger)}
+.eq{display:none;gap:3px;align-items:center;height:18px}
+.s-speaking .eq{display:flex}.s-speaking .orb svg{display:none}
+.eq i{width:3px;background:#fff;border-radius:2px;animation:eq 1s infinite ease-in-out}
+.eq i:nth-child(2){animation-delay:.15s}.eq i:nth-child(3){animation-delay:.3s}.eq i:nth-child(4){animation-delay:.45s}
+.vtext{flex:1;min-width:0}
+.vstate{font-weight:600}
+.vcap{color:var(--text-2);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-height:21px}
+.vcap em{font-style:normal;color:var(--text-3)}
+.vbtn{display:flex;align-items:center;gap:6px;border:1px solid var(--line-strong);background:var(--surface);border-radius:999px;padding:6px 14px;font-size:13px}
+.vbtn.on{background:var(--warn-soft);border-color:transparent;color:var(--warn)}
+.vbtn.end{background:var(--text);color:var(--bg);border-color:var(--text)}
+@keyframes blink{50%{opacity:.35}}
+@keyframes ring{0%{transform:scale(1);opacity:.55}100%{transform:scale(1.7);opacity:0}}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes eq{0%,100%{height:5px}50%{height:17px}}
+@media(prefers-reduced-motion:reduce){*{animation:none!important}}
+
+/* ── notes ─────────────────────────────────────────────── */
+.notes{background:var(--surface);border-radius:14px;box-shadow:var(--shadow);padding:16px 18px;position:sticky;top:16px}
+.notes h2{margin:0 0 4px;font-size:15px}
+.notes p{margin:0 0 10px;color:var(--text-2);font-size:13px}
+.notes ul{margin:0;padding-left:18px;color:var(--text-2);font-size:13px}
+.notes li{margin:3px 0}
+</style>
+</head>
+<body>
+<svg style="position:absolute;width:0;height:0" aria-hidden="true"><defs>
+<symbol id="plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+<symbol id="mic" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></symbol>
+<symbol id="micoff" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3M4 4l16 16"/></symbol>
+<symbol id="wave" viewBox="0 0 24 24"><path d="M4 10v4M8 7v10M12 4v16M16 8v8M20 11v2"/></symbol>
+<symbol id="up" viewBox="0 0 24 24"><path d="M12 19V5m-6 6 6-6 6 6"/></symbol>
+<symbol id="sound" viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9H4zM17 8a5 5 0 0 1 0 8"/></symbol>
+</defs></svg>
+
+<div class="review">
+  <h1>对话框 · 听写与语音对话</h1>
+  <p class="lead">输入框右侧并排两个入口：<b>麦克风 = 听写</b>（说的话变成文字，留在输入框里由你确认再发送）；<b>声波 = 语音对话</b>（连续、免提、可打断，直到你点“结束”）。点击下面的状态可以直接查看，也可以在对话框里自己点。</p>
+  <div class="bar" id="states"><span class="label">状态</span></div>
+  <div class="bar"><span class="label">外观</span>
+    <button class="chip on" data-theme-btn="light">月白</button><button class="chip" data-theme-btn="dark">夜银</button>
+    <button class="chip" id="demo" style="margin-left:auto">▶ 演示一轮语音对话</button>
+  </div>
+
+  <div class="grid">
+    <section class="window" id="win" data-mode="text" aria-label="对话框预览">
+      <div class="titlebar">整理今天的待办 <small>· 小伴</small><span class="live"><i></i>语音对话中</span></div>
+      <div class="thread" id="thread"></div>
+      <div class="composer">
+        <div class="box" id="box">
+          <div class="dict-note" id="dictNote" hidden><span class="rec-dot"></span><span>正在听写，文字会出现在输入框里；再点一次麦克风结束，由你确认后发送。</span></div>
+          <textarea class="field plain" id="field" rows="2" placeholder="问小伴，或点右边的麦克风听写、声波开始语音对话…"></textarea>
+          <div class="vbar s-listening" id="vbar">
+            <div class="orb"><svg><use href="#mic"/></svg><span class="eq"><i></i><i></i><i></i><i></i></span></div>
+            <div class="vtext"><div class="vstate" id="vstate">正在听</div><div class="vcap" id="vcap"></div></div>
+            <button class="vbtn" id="mute"><svg><use href="#micoff"/></svg><span>静音</span></button>
+            <button class="vbtn end" id="end">结束</button>
+          </div>
+          <div class="row plain">
+            <button class="ib" aria-label="添加文件"><svg><use href="#plus"/></svg></button>
+            <span class="sp"></span>
+            <span class="model">默认模型</span>
+            <button class="ib" id="dictate" aria-label="听写"><svg><use href="#mic"/></svg><span class="tip">听写 · 说完留在输入框</span></button>
+            <button class="ib new" id="voice" aria-label="语音对话"><svg><use href="#wave"/></svg><span class="tip">语音对话 · 连续、可打断</span></button>
+            <span class="divider"></span>
+            <button class="ib send" id="send" aria-label="发送" disabled><svg><use href="#up"/></svg></button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <aside class="notes" id="notes"></aside>
+  </div>
+</div>
+
+<script>
+const $ = s => document.querySelector(s);
+const win = $('#win'), vbar = $('#vbar'), field = $('#field'), box = $('#box');
+const STATES = {
+  text:       {name:'默认', mode:'text', note:['两个入口并排，图标不同、提示不同。','听写 / 语音对话在没有麦克风权限或语音识别未启用时点击，会先走现有的启用与下载引导。','回答进行中两个入口都置灰，和现在的麦克风一致。']},
+  dictating:  {name:'听写中', mode:'text', note:['输入框描边变色，上方一行小字说明正在做什么。','识别结果实时追加到输入框，可以随时手改。','再点麦克风结束：文字留在输入框里，不自动发送（与 Claude、ChatGPT 一致）。','这是对现有“结束并发送”行为的改动，需要确认。']},
+  listening:  {name:'语音·正在听', mode:'voice', vs:'listening', label:'正在听', note:['输入区换成语音条：生命球、状态、实时字幕、静音、结束。','你说的话变成一条带“语音”标记的用户消息进入对话。','没有 15 秒超时；只有点“结束”、按 Esc、离开页面或切换对话才退出。']},
+  thinking:   {name:'语音·思考中', mode:'voice', vs:'thinking', label:'思考中', note:['发送后 0.7 秒内回答还没开始，播一声“好的 / 嗯，我看看”。','对话里显示一行淡色小字，说明刚才那声不是回答。','这时可以直接说话打断，也可以点“结束”。']},
+  speaking:   {name:'语音·朗读中', mode:'voice', vs:'speaking', label:'正在朗读 · 直接说话可打断', note:['回答边生成边按句朗读，当前句旁有朗读标记。','朗读时麦克风保持开着，开口说话（不是“嗯”）就停止朗读和生成。','被打断的回答在对话里保留，下一轮模型知道你只听到了哪一部分。']},
+  approval:   {name:'语音·需要确认', mode:'voice', vs:'approval', label:'需要你确认', note:['小伴要执行的操作仍然显示现有的审批卡，只能点击确认。','语音模型不代替你确认；这时麦克风暂停，卡片处理完自动继续。']},
+  muted:      {name:'语音·已静音', mode:'voice', vs:'muted', label:'麦克风已静音', note:['静音只关麦克风，对话模式不退出，小伴正在说的话照常读完。','再点一次恢复；要打字就点“结束”回到普通输入框。']},
+  error:      {name:'语音·出错', mode:'voice', vs:'error', label:'麦克风不可用', note:['语音条变成错误状态并给出原因与“重试”。','点“结束”回到普通输入框；已发出的消息和已有回答不受影响。']},
+};
+const msgs = {
+  base: [['user','帮我把今天要做的事理一理。'],['bot','好的。你先告诉我最想完成的一件事，剩下的我们再排。']],
+};
+function voiceTag(){return '<span class="tag"><svg><use href="#mic"/></svg>语音</span><br>'}
+function renderThread(key){
+  const t = $('#thread'); t.innerHTML = '';
+  const add = (cls, html) => { const d = document.createElement('div'); d.className = cls; d.innerHTML = html; t.append(d); };
+  msgs.base.forEach(([who, text]) => add('msg ' + who, text));
+  if (!STATES[key].vs) return;
+  add('msg user', voiceTag() + '把周报写完，然后回复张工的邮件。');
+  if (key === 'listening') return;
+  if (key === 'thinking') { add('ack', '小伴说了“好的”'); return; }
+  if (key === 'approval') { add('msg bot', '好，我先读一下周报草稿。'); add('card', '<b>读取文件 周报.md</b><span style="color:var(--text-2);font-size:13px">小伴想读取工作区里的这个文件。</span><div class="acts"><button>拒绝</button><button class="go">允许这一次</button></div>'); return; }
+  if (key === 'error') { add('fail', '麦克风不可用：找不到可用的输入设备。<u style="margin-left:8px;cursor:pointer">重试</u>'); return; }
+  add('msg bot', '先写周报，再回邮件，这个顺序可以。<br>周报我已经看过了，<b>还差两段总结没写</b>，要我先补上吗？' + (key === 'speaking' ? '<br><span class="speaking-line"><svg style="width:13px;height:13px"><use href="#sound"/></svg>正在朗读</span>' : ''));
+}
+let current = 'text', timers = [];
+function apply(key){
+  current = key; const s = STATES[key];
+  win.dataset.mode = s.mode;
+  box.classList.toggle('rec', key === 'dictating' || s.mode === 'voice');
+  $('#dictNote').hidden = key !== 'dictating';
+  $('#dictate').classList.toggle('on', key === 'dictating');
+  if (s.vs) {
+    vbar.className = 'vbar s-' + s.vs; $('#vstate').textContent = s.label;
+    $('#vcap').innerHTML = key === 'listening' ? '把周报写完，然后回复张工的邮件<em>…</em>' : key === 'thinking' ? '' : key === 'error' ? '请检查系统声音设置里的输入设备' : '';
+    $('#mute span').textContent = key === 'muted' ? '取消静音' : '静音'; $('#mute').classList.toggle('on', key === 'muted');
+  }
+  renderThread(key);
+  document.querySelectorAll('#states .chip').forEach(c => c.classList.toggle('on', c.dataset.key === key));
+  $('#notes').innerHTML = '<h2>' + s.name + '</h2><p>这个状态下：</p><ul>' + s.note.map(n => '<li>' + n + '</li>').join('') + '</ul>';
+  const t = $('#thread'); t.scrollTop = t.scrollHeight;
+}
+Object.entries(STATES).forEach(([key, s]) => { const b = document.createElement('button'); b.className = 'chip'; b.dataset.key = key; b.textContent = s.name; b.onclick = () => { stop(); apply(key); }; $('#states').append(b); });
+function stop(){ timers.forEach(clearTimeout); timers = []; }
+const later = (ms, fn) => timers.push(setTimeout(fn, ms));
+
+$('#dictate').onclick = () => {
+  stop();
+  if (current === 'dictating') { apply('text'); field.value = '帮我把今天的想法理一理'; $('#send').disabled = false; field.focus(); return; }
+  apply('dictating'); field.value = '';
+  const words = '帮我把今天的想法理一理'.split(''); let i = 0;
+  (function tick(){ if (current !== 'dictating' || i >= words.length) return; field.value += words[i++]; later(140, tick); })();
+};
+$('#voice').onclick = () => { stop(); apply('listening'); };
+$('#mute').onclick = () => { stop(); apply(current === 'muted' ? 'listening' : 'muted'); };
+$('#end').onclick = () => { stop(); apply('text'); };
+field.oninput = () => { $('#send').disabled = !field.value.trim(); };
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && win.dataset.mode === 'voice') { stop(); apply('text'); } });
+document.querySelectorAll('[data-theme-btn]').forEach(b => b.onclick = () => {
+  document.documentElement.dataset.theme = b.dataset.themeBtn;
+  document.querySelectorAll('[data-theme-btn]').forEach(x => x.classList.toggle('on', x === b));
+});
+$('#demo').onclick = () => {
+  stop(); apply('listening');
+  later(2200, () => apply('thinking'));
+  later(3800, () => apply('speaking'));
+  later(8200, () => apply('listening'));
+};
+if (matchMedia('(prefers-color-scheme: dark)').matches) document.querySelector('[data-theme-btn=dark]').click();
+apply('text');
+</script>
+</body>
+</html>
