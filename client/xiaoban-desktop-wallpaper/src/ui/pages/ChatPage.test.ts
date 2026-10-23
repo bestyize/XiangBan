@@ -19,7 +19,7 @@ type Responder = (args: Record<string, unknown> | undefined) => unknown;
 let wrapper: VueWrapper | undefined;
 let currentStore: ControlStore | undefined;
 
-async function open(responders: Record<string, Responder> = {}, options: { desktop?: boolean } = {}) {
+async function open(responders: Record<string, Responder> = {}, options: { desktop?: boolean; extra?: Record<string, unknown> } = {}) {
   const handlers = new Map<string, (payload: never) => void>();
   const calls: [string, Record<string, unknown> | undefined][] = [];
   const table: Record<string, Responder> = { chat_overview: () => overview(), chat_context: () => ({ used: 0, limit: 256_000, canCompact: false }), ...responders };
@@ -37,7 +37,7 @@ async function open(responders: Record<string, Responder> = {}, options: { deskt
   const deps: ChatDeps = { desktop, invoke, notify, listen: async (event, callback) => { handlers.set(event, callback as never); return () => {}; } };
   vi.mocked(bridgeInvoke).mockImplementation(invoke as never);
   const chat = createChatStore(deps);
-  const store = reactive({ desktop, chat, settingsTab: 'general', page: 'chat', navigate: vi.fn(), notify, openSettings: vi.fn() }) as unknown as ControlStore;
+  const store = reactive({ desktop, chat, settingsTab: 'general', page: 'chat', navigate: vi.fn(), notify, openSettings: vi.fn(), ...options.extra }) as unknown as ControlStore;
   vi.mocked(store.openSettings).mockImplementation(tab => { if (tab) store.settingsTab = tab; });
   currentStore = store;
   wrapper = mount(ChatPage, { props: { store }, attachTo: document.body });
@@ -213,6 +213,23 @@ describe('the chat page before a conversation', () => {
     await click('chat-more');
     await click('chat-goal-toggle');
     expect(q('chat-goal-toggle')!.getAttribute('aria-checked')).toBe('true');
+  });
+});
+
+describe('实时对话', () => {
+  it('takes the send button\'s place while the box is empty and turns the box into a voice bar', async () => {
+    const asr = reactive({ enabled: true, ready: true, microphoneSupported: true, listening: false, recordingRequested: false, saving: false, init: vi.fn(async () => {}), deactivate: vi.fn() });
+    const live = reactive({ active: false, muted: false, since: 0, partial: '', heard: '', status: '', start: vi.fn(async () => { live.active = true; live.status = '在听'; live.since = Date.now(); }), end: vi.fn(() => { live.active = false; }), toggleMute: vi.fn(async () => {}) });
+    await open({}, { extra: { asr, live } });
+    expect(q('chat-send')).toBeNull();
+    await click('chat-live-start');
+    expect(live.start).toHaveBeenCalledOnce();
+    expect(q('chat-input')).toBeNull();
+    expect(q('chat-live-status')!.textContent).toContain('在听');
+    await click('chat-live-mute'); expect(live.toggleMute).toHaveBeenCalledOnce();
+    await click('chat-live-end'); expect(live.end).toHaveBeenCalledOnce();
+    await type('打字就变回发送');
+    expect(q('chat-live-start')).toBeNull(); expect(q('chat-send')).not.toBeNull();
   });
 });
 

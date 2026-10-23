@@ -7,7 +7,7 @@
  */
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 import { NInput } from 'naive-ui';
-import { ArrowUp, LoaderCircle, Mic, Square, X } from 'lucide-vue-next';
+import { ArrowUp, AudioLines, LoaderCircle, Mic, MicOff, Square, X } from 'lucide-vue-next';
 import { GATEWAY_PROVIDER, invoke, type AiConfigView, type AiTier } from '../../bridge.ts';
 import type { ControlPage, ControlStore } from '../control-types.ts';
 import ChatWorkbenchTools from './ChatWorkbenchTools.vue';
@@ -86,9 +86,41 @@ const foreground = ref(document.visibilityState !== 'hidden');
 function updateVisibility() { foreground.value = document.visibilityState !== 'hidden'; }
 function blurWindow() { if (document.visibilityState === 'hidden') foreground.value = false; }
 const microphoneAllowed = computed(() => shown.value && foreground.value && chat.configured && !running.value && (!props.store.speech || props.store.speech.status === 'idle'));
-watch(() => chat.currentId, () => { if (shown.value) asr?.deactivate(); attachmentVersion++; attachments.value = []; }, { flush: 'sync' });
-watch(microphoneAllowed, allowed => { if (!allowed && shown.value) asr?.deactivate(); }, { flush: 'sync' });
-watch(shown, now => { if (!now) asr?.deactivate(); else void readModelLabel(); }, { flush: 'sync' });
+/** 实时对话 owns the microphone and the voice while it runs, across the new-task and chat pages. */
+const live = props.store.live;
+const liveActive = computed(() => Boolean(live?.active));
+watch(() => chat.currentId, (id, before) => {
+  // Another conversation was opened; the first message of a new one only gives it an id.
+  if (before && id !== before) live?.end();
+  if (shown.value && !liveActive.value) asr?.deactivate();
+  attachmentVersion++; attachments.value = [];
+}, { flush: 'sync' });
+watch(microphoneAllowed, allowed => { if (!allowed && shown.value && !liveActive.value) asr?.deactivate(); }, { flush: 'sync' });
+watch(shown, now => { if (!now && !liveActive.value) asr?.deactivate(); else if (now) void readModelLabel(); }, { flush: 'sync' });
+/** With nothing typed and nothing running, the send button starts a 实时对话 instead. */
+const offersLive = computed(() => Boolean(live && asr) && props.store.desktop && chat.configured && !running.value && !compacting.value && !attachmentReading.value
+  && !draft.value.trim() && !attachments.value.length && !asr!.recordingRequested && !finishingVoice.value && asr!.microphoneSupported !== false);
+const liveNow = ref(Date.now());
+let liveClockTimer: ReturnType<typeof setInterval> | undefined;
+watch(liveActive, active => {
+  clearInterval(liveClockTimer); liveClockTimer = undefined;
+  if (active) { liveNow.value = Date.now(); liveClockTimer = setInterval(() => { liveNow.value = Date.now(); }, 1000); }
+}, { immediate: true });
+const liveClock = computed(() => {
+  const seconds = live?.since ? Math.max(0, Math.floor((liveNow.value - live.since) / 1000)) : 0;
+  return `${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`;
+});
+const liveHint = computed(() => {
+  switch (live?.status) {
+    case '已静音': return '小伴听不到你，点麦克风恢复';
+    case '在说': return '直接开口就能打断它';
+    case '在想': return '马上回答';
+    case '等你确认': return '在上面的对话里确认后继续';
+    case '正在连接…': return '第一次使用需要允许麦克风';
+    default: return live?.heard || live?.partial ? `${[live.heard, live.partial].filter(Boolean).join(' ')}…` : '说完停一下就会回答';
+  }
+});
+async function startLive() { if (offersLive.value) await live?.start(); }
 async function toggleVoice() {
   if (!asr || finishingVoice.value) return;
   if (asr.recordingRequested) {
@@ -116,7 +148,8 @@ onMounted(() => {
 });
 onUnmounted(() => {
   attachmentVersion++;
-  if (shown.value) asr?.deactivate();
+  clearInterval(liveClockTimer);
+  if (shown.value && !liveActive.value) asr?.deactivate();
   document.removeEventListener('visibilitychange', updateVisibility);
   window.removeEventListener('blur', blurWindow); window.removeEventListener('focus', updateVisibility);
 });
@@ -216,7 +249,14 @@ defineExpose({ setDraft, insertPrompt, refreshModel: readModelLabel, draft });
 <template>
   <footer class="composer" :class="[`page-${page}`]" @compositionstart="composing = true" @compositionend="composing = false" @paste="onPaste" @dragover.prevent @drop.prevent="addFiles(Array.from($event.dataTransfer?.files ?? []))">
     <ChatComposerPet v-if="pet" :size="pet" :paused="store.settings?.paused ?? false" />
-    <div class="composer-box" :class="{ 'voice-active': asr?.listening }">
+    <div v-if="live && liveActive" class="composer-box live-bar" :class="{ muted: live.muted }" data-testid="chat-live">
+      <span class="live-orb" :class="live.status === '在说' ? 'speak' : live.status === '在听' ? 'listen' : 'wait'" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+      <div class="live-text" role="status" aria-live="polite" data-testid="chat-live-status"><b>{{ live.status }}</b><span>{{ liveHint }}</span></div>
+      <span class="live-clock" aria-label="通话时长">{{ liveClock }}</span>
+      <button type="button" class="live-mute" :class="{ on: live.muted }" :aria-label="live.muted ? '取消静音' : '静音'" :title="live.muted ? '取消静音' : '静音'" :aria-pressed="live.muted" data-testid="chat-live-mute" @click="live.toggleMute()"><MicOff v-if="live.muted" :size="16" /><Mic v-else :size="16" /></button>
+      <button type="button" class="live-end" data-testid="chat-live-end" @click="live.end()"><Square :size="10" fill="currentColor" />结束</button>
+    </div>
+    <div v-else class="composer-box" :class="{ 'voice-active': asr?.listening }">
       <AsrStatus v-if="asr" :asr="asr" chat />
       <div v-if="attachments.length" class="attachments" data-testid="chat-attachments">
         <div v-for="(url, n) in attachments" :key="n" class="thumb">
@@ -241,6 +281,7 @@ defineExpose({ setDraft, insertPrompt, refreshModel: readModelLabel, draft });
         <button v-else-if="asr?.recordingRequested" type="button" class="voice-finish" data-testid="chat-asr-toggle" :aria-label="asr.listening ? '结束录音并发送' : '取消准备'" aria-pressed="true" @click="toggleVoice"><span v-if="asr.listening" class="recording-dot" aria-hidden="true" /><LoaderCircle v-else class="spin" :size="13" aria-hidden="true" />{{ asr.listening ? '结束并发送' : '取消准备' }}</button>
         <button v-else-if="asr" type="button" class="xb-icon-btn voice" data-testid="chat-asr-toggle" aria-label="开始语音输入" aria-pressed="false" title="开始语音输入" :disabled="!store.desktop || !asr.ready || asr.microphoneSupported === false || !microphoneAllowed || asr.saving" @click="toggleVoice"><Mic :size="17" /></button>
         <button v-if="running" type="button" class="send-btn is-stop" data-testid="chat-stop" aria-label="停止" title="停止" @click="chat.cancel()"><Square :size="12" fill="currentColor" /></button>
+        <button v-else-if="offersLive" type="button" class="send-btn" data-testid="chat-live-start" aria-label="实时对话" title="实时对话：像打电话一样和小伴说，随时可以打断" @click="startLive"><AudioLines :size="17" :stroke-width="2.2" /></button>
         <button v-else type="button" class="send-btn" data-testid="chat-send" aria-label="发送" title="发送（Enter）" :disabled="!canSend" @click="submit"><ArrowUp :size="17" :stroke-width="2.4" /></button>
       </div>
     </div>
@@ -285,6 +326,29 @@ html[data-theme=dark] .composer-box{background:var(--ui-surface-alt);box-shadow:
 .thumb-remove:hover:not(:disabled){background:rgba(0,0,0,.78)}
 .thumb-remove:disabled{cursor:not-allowed;opacity:.5}
 .attach-hint{color:var(--ui-text-tertiary);font-size:12px}
+.live-bar{flex-direction:row;align-items:center;gap:12px;padding:10px 10px 10px 12px;box-shadow:0 0 0 1.5px var(--ui-btn),0 0 0 4px var(--ui-soft),0 12px 32px rgba(0,0,0,.07)}
+.live-bar.muted{box-shadow:0 0 0 1px var(--ui-border),0 12px 32px rgba(0,0,0,.07)}
+.live-orb{flex:none;width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;gap:3px;background:var(--ui-soft);color:var(--ui-btn)}
+.live-bar.muted .live-orb{background:var(--ui-control);color:var(--ui-text-tertiary)}
+.live-orb i{display:block;width:3.5px;height:6px;border-radius:2px;background:currentColor}
+.live-orb.listen i{animation:live-listen 1.1s ease-in-out infinite}
+.live-orb.speak i{animation:live-speak .75s ease-in-out infinite}
+.live-orb.wait i{height:5px;animation:live-wait 1.2s ease-in-out infinite}
+.live-orb i:nth-child(2){animation-delay:.12s}.live-orb i:nth-child(3){animation-delay:.24s}.live-orb i:nth-child(4){animation-delay:.36s}
+.live-bar.muted .live-orb i{animation:none;height:3px}
+@keyframes live-listen{50%{height:13px}}
+@keyframes live-speak{50%{height:22px}}
+@keyframes live-wait{50%{opacity:.3}}
+.live-text{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
+.live-text b{font-size:14.5px;font-weight:600;color:var(--ui-text-primary)}
+.live-text span{font-size:12px;color:var(--ui-text-secondary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.live-clock{flex:none;font:12.5px 'SF Mono',Menlo,Consolas,monospace;font-variant-numeric:tabular-nums;color:var(--ui-text-secondary)}
+.live-mute{flex:none;width:40px;height:40px;border:0;border-radius:50%;display:grid;place-items:center;background:var(--ui-control);color:var(--ui-text-primary);cursor:pointer}
+.live-mute:hover{background:var(--ui-control-hover)}
+.live-mute.on{background:var(--ui-text-primary);color:var(--ui-surface)}
+.live-end{flex:none;display:inline-flex;align-items:center;gap:6px;height:40px;padding:0 16px;border:0;border-radius:20px;background:var(--ui-text-primary);color:var(--ui-surface);font:inherit;font-size:13.5px;font-weight:500;cursor:pointer}
+.live-end:hover{filter:brightness(1.1)}
+.live-mute:focus-visible,.live-end:focus-visible{outline:2px solid var(--ui-btn);outline-offset:2px}
 @media(max-width:620px){.composer-pet{display:none}}
-@media(prefers-reduced-motion:reduce){.spin,.recording-dot{animation:none}}
+@media(prefers-reduced-motion:reduce){.spin,.recording-dot,.live-orb i{animation:none}}
 </style>

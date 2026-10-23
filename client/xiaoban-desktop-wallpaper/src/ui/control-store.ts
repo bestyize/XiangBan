@@ -8,6 +8,7 @@ import { loadBuiltinPacks, noPacks, readImported, readList } from "../effects/ca
 import type { ControlPage, ControlStore, StudioTab } from "./control-types.ts";
 import { createChatStore } from "./chat/chat-store.ts";
 import { loadTurnModels } from '../voice/turn/models.ts';
+import { createLiveTalk } from '../voice/live-talk.ts';
 
 export const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value));
 
@@ -54,14 +55,14 @@ export function createControlStore(notify: ControlStore["notify"]): ControlStore
     account: null,
     showLoginModal: false,
     page: "new-task", creationDraft: null, creationAttachments: null, settingsTab: "general", settingsOpen: false, studioTab: "wallpapers", asr: createAsrStore({ desktop, invoke, listen, notify, turnModels: () => loadTurnModels(invoke) }), speech: createSpeechStore({ desktop, invoke, notify }), chat: createChatStore({ desktop, invoke, listen, notify,
-      onActivity: () => { store.asr.deactivate(); void store.speech.stop(); },
-      onReply: (session, text, key) => { if (chatLike(store.page) && store.speech.settings.autoRead && document.visibilityState !== 'hidden') void store.speech.speak(text, key ?? 'auto:' + session, undefined, true); },
+      onActivity: () => { if (store.live?.activity()) return; store.asr.deactivate(); void store.speech.stop(); },
+      onReply: (session, text, key) => { if (store.live?.active) { store.live.replied(session, text, key); return; } if (chatLike(store.page) && store.speech.settings.autoRead && document.visibilityState !== 'hidden') void store.speech.speak(text, key ?? 'auto:' + session, undefined, true); },
     }), ready: false, initialError: "", desktop, notify,
     navigate(page) {
       if (page === 'assistant' || page === 'settings') { store.openSettings(page === 'assistant' ? 'assistant' : undefined); return; }
       const tab = studioTabs[page];
       if (tab) { store.studioTab = tab; page = 'studio'; }
-      if (store.page !== page && !(chatLike(store.page) && chatLike(page))) { void store.speech.stop(); store.asr.deactivate(); }
+      if (store.page !== page && !(chatLike(store.page) && chatLike(page))) { store.live?.end(); void store.speech.stop(); store.asr.deactivate(); }
       store.page = page;
     },
     openSettings(tab) { if (tab) store.settingsTab = tab; store.settingsOpen = true; },
@@ -296,6 +297,7 @@ export function createControlStore(notify: ControlStore["notify"]): ControlStore
       store.account = null;
     },
   } as ControlStore);
+  store.live = createLiveTalk({ chat: store.chat, asr: store.asr, speech: store.speech, notify: (message, type) => store.notify(message, type) });
   return store;
 }
 
