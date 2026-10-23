@@ -66,6 +66,30 @@ interface Space { key: string; name: string; path: string; sessions: SessionSumm
 const RECENT = '__recent__';
 const WORKSPACE_NAMES_KEY = 'xiaoban.workspace-names';
 const WORKSPACES_OPEN_KEY = 'xiaoban.workspaces-open';
+const REMOVED_WORKSPACES_KEY = 'xiaoban.removed-workspaces';
+function readRemovedWorkspaces(): string[] {
+  try {
+    const saved: unknown = JSON.parse(localStorage.getItem(REMOVED_WORKSPACES_KEY) || '[]');
+    if (Array.isArray(saved)) return saved.filter((path): path is string => typeof path === 'string' && !!path);
+  } catch { /* Ignore an unreadable sidebar preference. */ }
+  return [];
+}
+const removedWorkspaces = ref(new Set(readRemovedWorkspaces()));
+function saveRemovedWorkspaces(paths: Set<string>): boolean {
+  try {
+    localStorage.setItem(REMOVED_WORKSPACES_KEY, JSON.stringify([...paths]));
+    removedWorkspaces.value = paths;
+    return true;
+  } catch { store.notify('项目列表保存失败，请重试', 'error'); return false; }
+}
+function restoreWorkspace(path: string) {
+  if (!removedWorkspaces.value.has(path)) return;
+  const paths = new Set(removedWorkspaces.value);
+  paths.delete(path);
+  saveRemovedWorkspaces(paths);
+}
+// Selecting a folder again explicitly adds its project back to the sidebar.
+watch(() => store.chat.pendingWorkspace, path => { if (path) restoreWorkspace(path); });
 function readWorkspaceNames(): Record<string, string> {
   try {
     const saved: unknown = JSON.parse(localStorage.getItem(WORKSPACE_NAMES_KEY) || '{}');
@@ -93,13 +117,13 @@ const spaces = computed<Space[]>(() => {
   const byPath = new Map<string, Space>();
   for (const session of store.chat.sessions) {
     const path = session.workspace?.trim();
-    if (!path) { recent.sessions.push(session); continue; }
+    if (!path || removedWorkspaces.value.has(path)) { recent.sessions.push(session); continue; }
     let space = byPath.get(path);
     if (!space) { space = { key: path, name: folderName(path), path, sessions: [] }; byPath.set(path, space); }
     space.sessions.push(session);
   }
   const pending = store.chat.pendingWorkspace;
-  if (pending && !byPath.has(pending)) byPath.set(pending, { key: pending, name: folderName(pending), path: pending, sessions: [] });
+  if (pending && !removedWorkspaces.value.has(pending) && !byPath.has(pending)) byPath.set(pending, { key: pending, name: folderName(pending), path: pending, sessions: [] });
   return [recent, ...byPath.values()];
 });
 const expanded = reactive(new Set<string>([RECENT]));
@@ -123,10 +147,11 @@ async function addWorkspace() {
   const path = await store.chat.pickWorkspace();
   if (!path) return;
   if (store.chat.currentId) await store.chat.select(null);
-  if (await store.chat.switchWorkspace(path) === 'done') { workspacesOpen.value = true; expanded.add(path); navigate('new-task'); }
+  if (await store.chat.switchWorkspace(path) === 'done') { restoreWorkspace(path); workspacesOpen.value = true; expanded.add(path); navigate('new-task'); }
 }
-const workspaceMenu = ref<{ key: string; x: number; y: number } | null>(null);
+const workspaceMenu = ref<{ key: string; x: number; y: number; confirming: boolean } | null>(null);
 const workspaceMenuEl = ref<HTMLElement | null>(null);
+const menuWorkspace = computed(() => spaces.value.find(space => space.key === workspaceMenu.value?.key));
 const renamingWorkspace = ref('');
 const renamingWorkspaceTitle = computed(() => renamingWorkspace.value ? folderName(renamingWorkspace.value) : '');
 function closeWorkspaceMenu() { workspaceMenu.value = null; }
@@ -136,7 +161,10 @@ async function openWorkspaceMenu(space: Space, event: MouseEvent, anchor?: Event
   closeSessionMenu();
   if (workspaceMenu.value?.key === space.key && anchor) { closeWorkspaceMenu(); return; }
   const box = anchor instanceof HTMLElement ? anchor.getBoundingClientRect() : null;
-  workspaceMenu.value = { key: space.key, x: box ? box.left : event.clientX, y: box ? box.bottom + 4 : event.clientY };
+  workspaceMenu.value = { key: space.key, x: box ? box.left : event.clientX, y: box ? box.bottom + 4 : event.clientY, confirming: false };
+  await placeWorkspaceMenu();
+}
+async function placeWorkspaceMenu() {
   await nextTick();
   const menu = workspaceMenu.value, el = workspaceMenuEl.value;
   if (!menu || !el) return;
@@ -147,6 +175,17 @@ async function openWorkspaceMenu(space: Space, event: MouseEvent, anchor?: Event
 function startWorkspaceRename() {
   renamingWorkspace.value = workspaceMenu.value?.key || '';
   closeWorkspaceMenu();
+}
+function deleteWorkspace() {
+  const space = menuWorkspace.value;
+  if (!space?.path) return;
+  const paths = new Set(removedWorkspaces.value);
+  paths.add(space.path);
+  if (!saveRemovedWorkspaces(paths)) return;
+  expanded.delete(space.key);
+  expanded.add(RECENT);
+  closeWorkspaceMenu();
+  store.notify('项目已删除，任务记录和文件已保留', 'success');
 }
 function submitWorkspaceRename(value: string) {
   const path = renamingWorkspace.value, name = value.trim();
@@ -205,7 +244,7 @@ async function moveSession(path: string | null) {
   if (!store.desktop) { store.notify('请在桌面应用中选择工作区文件夹', 'info'); return; }
   const target = path ?? await store.chat.pickWorkspace();
   if (!target) return;
-  if (await store.chat.moveToWorkspace(id, target)) { expanded.add(target); store.notify(`已移动到「${folderName(target)}」`, 'success'); }
+  if (await store.chat.moveToWorkspace(id, target)) { restoreWorkspace(target); expanded.add(target); store.notify(`已移动到「${folderName(target)}」`, 'success'); }
 }
 async function deleteSession() {
   const id = sessionMenu.value?.id;
@@ -447,7 +486,19 @@ const fixedPages = ['new-task', 'chat', 'ai-store', 'library', 'studio', 'games'
       </div>
     </aside>
     <div v-if="workspaceMenu" ref="workspaceMenuEl" class="xb-menu session-menu" role="menu" aria-label="工作空间项目" data-testid="workspace-menu" :style="{ left: `${workspaceMenu.x}px`, top: `${workspaceMenu.y}px` }">
+      <template v-if="!workspaceMenu.confirming">
       <button type="button" class="xb-menu-item" role="menuitem" data-testid="workspace-menu-rename" @click="startWorkspaceRename"><Pencil :size="15" />重命名</button>
+      <div class="xb-menu-sep"></div>
+      <button type="button" class="xb-menu-item is-danger" role="menuitem" data-testid="workspace-menu-delete" @click="workspaceMenu.confirming = true; placeWorkspaceMenu()"><Trash2 :size="15" />删除</button>
+      </template>
+      <div v-else class="session-confirm" role="alertdialog" aria-label="删除项目" data-testid="workspace-delete-confirm">
+        <b>删除「{{ menuWorkspace?.name }}」？</b>
+        <span>从工作空间移除此项目。{{ menuWorkspace?.sessions.length ? `${menuWorkspace.sessions.length} 个任务将保留在“最近任务”中。` : '' }}实际文件夹和文件不会删除。</span>
+        <div class="session-confirm-actions">
+          <button type="button" class="xb-btn is-sm" @click="closeWorkspaceMenu">取消</button>
+          <button type="button" class="xb-btn is-sm is-danger" data-testid="workspace-delete-yes" @click="deleteWorkspace">删除项目</button>
+        </div>
+      </div>
     </div>
     <div v-if="sessionMenu" ref="sessionMenuEl" class="xb-menu session-menu" role="menu" :aria-label="`对话：${menuSession?.title || '新对话'}`" data-testid="session-menu" :style="{ left: `${sessionMenu.x}px`, top: `${sessionMenu.y}px` }">
       <template v-if="!sessionMenu.confirming">
