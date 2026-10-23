@@ -8,7 +8,7 @@ pub(super) async fn fetch(origin: &str, path: &str, pairs: &[(&str, String)]) ->
     // existing URL dependency so this also compiles with the desktop's minimal features.
     let url = url::Url::parse_with_params(&format!("{origin}{path}"), pairs)
         .map_err(|_| "插件市场地址无效".to_string())?;
-    let mut response = reqwest::Client::builder().timeout(std::time::Duration::from_secs(20))
+    let mut response = crate::network::async_builder(reqwest::Client::builder().timeout(std::time::Duration::from_secs(20)))?
         .build().map_err(|e| e.to_string())?
         .get(url).send().await
         .map_err(|_| "暂时无法连接小伴插件市场，请检查网站连接设置".to_string())?;
