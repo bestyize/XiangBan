@@ -1127,7 +1127,7 @@ pub fn tools_in_workspace(desktop: Arc<dyn Desktop>, workspace: &std::path::Path
             &desktop,
             ToolSpec::new(
                 "widget_add",
-                "在桌面放置新版时钟、天气、待办、今日日程、股票、电子木鱼、月历或纪念日组件，可同时设层级（layer=topmost 置顶）。固定 ivory 材质，支持多实例，不设组件数量上限。",
+                "在桌面放置新版时钟、天气、待办、今日日程、股票、电子木鱼、月历或纪念日组件。kind 必填；用户没说要哪种时先用 ask_user 问，不要空参数调用。可同时设层级（layer=topmost 置顶）。固定 ivory 材质，支持多实例，不设组件数量上限。",
                 object(
                     json!({
                         "kind": {"type": "string", "enum": crate::widgets::KINDS, "description": "组件类型"},
