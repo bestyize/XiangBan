@@ -8,7 +8,7 @@ use tauri::Manager;
 #[serde(default, rename_all = "camelCase")]
 pub struct NetworkConfig {
     /// system = reqwest OS/env discovery, direct = explicitly disable proxies,
-    /// manual = send HTTP(S) through the configured HTTP(S)/SOCKS5 proxy.
+    /// manual = send HTTP(S) through the configured HTTP(S) proxy.
     pub mode: String,
     pub proxy_url: String,
 }
@@ -27,11 +27,11 @@ fn validate(mode: String, proxy_url: String) -> Result<NetworkConfig, String> {
             return Err("请填写合法的代理地址".into());
         }
         let url = reqwest::Url::parse(&proxy_url).map_err(|_| "代理地址无效，请包含协议和主机".to_string())?;
-        if !["http", "https", "socks5", "socks5h"].contains(&url.scheme())
+        if !["http", "https"].contains(&url.scheme())
             || url.host_str().is_none() || url.cannot_be_a_base()
             || url.username() != "" || url.password().is_some()
             || url.query().is_some() || url.fragment().is_some() || url.path() != "/"
-        { return Err("代理只支持 HTTP、HTTPS、SOCKS5/SOCKS5H，且地址不能包含凭据或路径".into()); }
+        { return Err("代理只支持 HTTP、HTTPS，且地址不能包含凭据或路径".into()); }
         reqwest::Proxy::all(proxy_url.as_str()).map_err(|_| "无法识别代理服务器".to_string())?;
     }
     Ok(NetworkConfig { mode, proxy_url: if mode == "manual" { proxy_url } else { String::new() } })
@@ -109,7 +109,7 @@ mod tests {
         assert_eq!(validate("system".into(), "ignored".into()).unwrap(), NetworkConfig::default());
         assert_eq!(validate("direct".into(), "ignored".into()).unwrap().mode, "direct");
         assert!(validate("manual".into(), "http://127.0.0.1:7890".into()).is_ok());
-        assert!(validate("manual".into(), "socks5h://127.0.0.1:1080".into()).is_ok());
+        assert!(validate("manual".into(), "socks5h://127.0.0.1:1080".into()).is_err());
         for url in ["", "ftp://host", "http://u:p@host:1234", "http://host/a", "http://host/?x=1"] {
             assert!(validate("manual".into(), url.into()).is_err(), "{url}");
         }
