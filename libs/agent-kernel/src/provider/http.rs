@@ -32,14 +32,19 @@ pub(crate) trait Decoder {
     fn complete(&self) -> bool;
 }
 
-pub(crate) fn new_client() -> Result<Client, HarnessError> {
+pub(crate) fn new_client(profile: &super::wire::ProviderProfile) -> Result<Client, HarnessError> {
     // Allow long reasoning streams, but bound a blocking worker that no longer has a consumer.
     // The first response header and SSE idle have separate, shorter watchdogs below.
-    Client::builder()
+    let builder = Client::builder()
         .connect_timeout(Duration::from_secs(15))
-        .timeout(Duration::from_secs(300))
-        .build()
-        .map_err(|e| HarnessError::Config(format!("http client: {e}")))
+        .timeout(Duration::from_secs(300));
+    let builder = match profile.proxy_mode.as_str() {
+        "direct" => builder.no_proxy(),
+        "manual" => builder.no_proxy().proxy(reqwest::Proxy::all(&profile.proxy_url)
+            .map_err(|e| HarnessError::Config(format!("invalid model proxy: {e}")))?),
+        _ => builder,
+    };
+    builder.build().map_err(|e| HarnessError::Config(format!("http client: {e}")))
 }
 
 /// `extra` replaces defaults of the same name (case-insensitively) instead of adding a duplicate.
