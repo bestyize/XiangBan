@@ -173,7 +173,7 @@ const STATES = {
   text:       {name:'默认', mode:'text', note:['两个入口并排，图标不同、提示不同。','听写 / 语音对话在没有麦克风权限或语音识别未启用时点击，会先走现有的启用与下载引导。','回答进行中两个入口都置灰，和现在的麦克风一致。']},
   dictating:  {name:'听写中', mode:'text', note:['输入框描边变色，上方一行小字说明正在做什么。','识别结果实时追加到输入框，可以随时手改。','再点麦克风结束：文字留在输入框里，不自动发送（与 Claude、ChatGPT 一致）。','这是对现有“结束并发送”行为的改动，需要确认。']},
   listening:  {name:'语音·正在听', mode:'voice', vs:'listening', label:'正在听', note:['输入区换成语音条：生命球、状态、实时字幕、静音、结束。','你说的话变成一条带“语音”标记的用户消息进入对话。','没有 15 秒超时；只有点“结束”、按 Esc、离开页面或切换对话才退出。']},
-  thinking:   {name:'语音·思考中', mode:'voice', vs:'thinking', label:'思考中', note:['发送后 0.7 秒内回答还没开始，播一声“好的 / 嗯，我看看”。','对话里显示一行淡色小字，说明刚才那声不是回答。','这时可以直接说话打断，也可以点“结束”。']},
+  thinking:   {name:'语音·思考中', mode:'voice', vs:'thinking', label:'思考中', note:['发送后 0.7 秒内回答还没开始，按请求类型播一声：做事说“好的，我来看看”，问题说“我想想”；问候、感谢、倾诉不出声。','对话里显示一行淡色小字，说明刚才那声不是回答。','这时可以直接说话打断，也可以点“结束”。']},
   speaking:   {name:'语音·朗读中', mode:'voice', vs:'speaking', label:'正在朗读 · 直接说话可打断', note:['回答边生成边按句朗读，当前句旁有朗读标记。','朗读时麦克风保持开着，开口说话（不是“嗯”）就停止朗读和生成。','被打断的回答在对话里保留，下一轮模型知道你只听到了哪一部分。']},
   approval:   {name:'语音·需要确认', mode:'voice', vs:'approval', label:'需要你确认', note:['小伴要执行的操作仍然显示现有的审批卡，只能点击确认。','语音模型不代替你确认；这时麦克风暂停，卡片处理完自动继续。']},
   muted:      {name:'语音·已静音', mode:'voice', vs:'muted', label:'麦克风已静音', note:['静音只关麦克风，对话模式不退出，小伴正在说的话照常读完。','再点一次恢复；要打字就点“结束”回到普通输入框。']},
@@ -190,7 +190,7 @@ function renderThread(key){
   if (!STATES[key].vs) return;
   add('msg user', voiceTag() + '把周报写完，然后回复张工的邮件。');
   if (key === 'listening') return;
-  if (key === 'thinking') { add('ack', '小伴说了“好的”'); return; }
+  if (key === 'thinking') { add('ack', '小伴说了“好的，我来看看”'); return; }
   if (key === 'approval') { add('msg bot', '好，我先读一下周报草稿。'); add('card', '<b>读取文件 周报.md</b><span style="color:var(--text-2);font-size:13px">小伴想读取工作区里的这个文件。</span><div class="acts"><button>拒绝</button><button class="go">允许这一次</button></div>'); return; }
   if (key === 'error') { add('fail', '麦克风不可用：找不到可用的输入设备。<u style="margin-left:8px;cursor:pointer">重试</u>'); return; }
   add('msg bot', '先写周报，再回邮件，这个顺序可以。<br>周报我已经看过了，<b>还差两段总结没写</b>，要我先补上吗？' + (key === 'speaking' ? '<br><span class="speaking-line"><svg style="width:13px;height:13px"><use href="#sound"/></svg>正在朗读</span>' : ''));

@@ -1,7 +1,7 @@
 import { reactive } from 'vue';
 import { speechText } from './text.ts';
 import { createStreamPlayer, type StreamPlayer } from '../../voice/stream-player.ts';
-import { ACK_PHRASES, chooseAck } from '../../voice/ack.ts';
+import { ACK_PHRASES, ALL_ACK_PHRASES, chooseAck, type AckKind } from '../../voice/ack.ts';
 export interface VoiceOptions { voice: string; rate: number; volume: number; pitch: number }
 /** Where speech comes from; online voices fall back to the system voice when they fail. */
 export type SpeechProvider = 'edge' | 'gateway' | 'system';
@@ -41,8 +41,8 @@ export interface SpeechStore {
   stream?(key: string, options?: VoiceOptions, events?: SpeechStreamEvents): SpeechStream;
   /** Synthesises the short acknowledgements for the current voice, once; later calls with the same voice do nothing. */
   prepareAck?(): Promise<void>;
-  /** Plays one acknowledgement ("好的") unless something is being read already. Returns whether it started. */
-  ack?(): boolean;
+  /** Plays an acknowledgement that fits the kind of request ("好的，我来看看") unless something is being read already. Returns whether it started. */
+  ack?(kind: AckKind): boolean;
   stop(): Promise<void>; dispose(): void;
 }
 export function createSpeechStore(deps: SpeechDeps): SpeechStore {
@@ -166,7 +166,7 @@ export function createSpeechStore(deps: SpeechDeps): SpeechStore {
     },
     prepareAck() {
       if (!deps.desktop || disposed || !playable()) return Promise.resolve();
-      const missing = ACK_PHRASES.filter(phrase => !acks.has(ackKey(phrase)));
+      const missing = ALL_ACK_PHRASES.filter(phrase => !acks.has(ackKey(phrase)));
       if (!missing.length) return Promise.resolve();
       return ackBusy ??= (async () => {
         for (const phrase of missing) {
@@ -179,9 +179,9 @@ export function createSpeechStore(deps: SpeechDeps): SpeechStore {
         }
       })().finally(() => { ackBusy = null; });
     },
-    ack() {
+    ack(kind) {
       if (!deps.desktop || disposed || !playable() || store.status !== 'idle' || ackClip) return false;
-      const phrases = ACK_PHRASES.filter(phrase => acks.has(ackKey(phrase)));
+      const phrases = ACK_PHRASES[kind].filter(phrase => acks.has(ackKey(phrase)));
       const phrase = chooseAck(phrases, lastAck);
       const data = phrase && acks.get(ackKey(phrase));
       if (!phrase || !data) return false;

@@ -862,8 +862,16 @@ describe('acknowledging a spoken question', () => {
     const h = await asked();
     expect(h.speech.prepareAck).toHaveBeenCalled();
     h.advance(ACK_DELAY_MS - 1); expect(h.speech.ack).not.toHaveBeenCalled();
-    h.advance(2); expect(h.speech.ack).toHaveBeenCalledOnce();
+    h.advance(2); expect(h.speech.ack).toHaveBeenCalledExactlyOnceWith('task');
     h.store.dispose();
+  });
+  it('says what fits the question, and nothing to a greeting', async () => {
+    const question = await asked('明天北京会下雨吗');
+    question.advance(ACK_DELAY_MS + 1); expect(question.speech.ack).toHaveBeenCalledExactlyOnceWith('question'); question.store.dispose();
+    for (const text of ['你好', '谢谢你', '今天好累']) {
+      const social = await asked(text);
+      social.advance(ACK_DELAY_MS + 1); expect(social.speech.ack).not.toHaveBeenCalled(); social.store.dispose();
+    }
   });
   it('says nothing when the answer has already started', async () => {
     const h = await asked();
