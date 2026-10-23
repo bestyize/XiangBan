@@ -485,7 +485,7 @@ mod client {
     use super::super::http::{self, Call, Decoder};
     use super::super::{ModelProvider, Reply};
     use super::*;
-    use reqwest::blocking::Client;
+    use reqwest::Client;
     use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 
     impl Decoder for AnthropicStream {

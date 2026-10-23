@@ -91,13 +91,16 @@ fn explicit_context_overflow_recovers_without_replaying_actions_and_keeps_the_sm
 }
 
 #[test]
-fn overflow_recovery_is_bounded_and_never_retries_generic_400_or_partial_answers() {
+fn overflow_recovery_preserves_user_requests_and_never_retries_generic_400_or_partial_answers() {
     let fail = || Step::error(HarnessError::provider("prompt is too long", false));
     let h = harness(vec![fail(), fail(), fail(), Step::text("must not run")], |b| b);
     for _ in 0..4 { h.store.append("s1", &[Message::user_text("x".repeat(20_000)), Message::assistant("old answer", vec![])]).unwrap(); }
     let (result, _) = run(&h.agent, "continue");
     assert!(result.unwrap_err().is_context_limit());
-    assert_eq!(h.provider.requests().len(), 3);
+    // Old user requests are now pinned constraints. If they alone exceed the
+    // reduced budget, fail without deleting them or retrying an unchanged request.
+    assert_eq!(h.provider.requests().len(), 1);
+    assert_eq!(h.provider.requests()[0].messages.iter().filter(|m| m.role == Role::User && !m.synthetic).count(), 5);
     for step in [Step::error(HarnessError::provider("HTTP 400: bad_request", false)), Step::text("partial").then_fail(HarnessError::provider("context_length_exceeded", false))] {
         let h = harness(vec![step, Step::text("must not run")], |b| b);
         assert!(run(&h.agent, "continue").0.is_err());

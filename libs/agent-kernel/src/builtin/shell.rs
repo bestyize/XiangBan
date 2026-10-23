@@ -125,16 +125,7 @@ fn spawn_reader(mut source: impl Read + Send + 'static, capture: Arc<Mutex<Captu
     })
 }
 
-fn kill_tree(pid: u32) {
-    // The command leads its own process group, so this reaches what it left running too. Called directly: dash,
-    // the `sh` of Debian and Ubuntu, rejects `kill -KILL -- -pid`.
-    #[cfg(unix)]
-    unsafe {
-        libc::killpg(pid as libc::pid_t, libc::SIGKILL);
-    }
-    #[cfg(windows)]
-    let _ = Command::new("taskkill").args(["/PID", &pid.to_string(), "/T", "/F"]).stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null()).status();
-}
+fn kill_tree(pid: u32) { crate::process_tree::terminate(pid); }
 
 fn describe(status: ExitStatus) -> String {
     match status.code() {
@@ -171,7 +162,7 @@ impl Tool for Shell {
         #[cfg(unix)]
         std::os::unix::process::CommandExt::process_group(&mut cmd, 0);
 
-        let mut child = cmd.spawn().map_err(|e| format!("cannot start the shell in {}: {e}", self.cwd.display()))?;
+        let mut child = crate::process_tree::ChildTree::spawn(&mut cmd).map_err(|e| format!("cannot start the shell in {}: {e}", self.cwd.display()))?;
         let pid = child.id();
         let capture = Arc::new(Mutex::new(Capture::default()));
         let readers: Vec<JoinHandle<()>> = [
@@ -190,6 +181,7 @@ impl Tool for Shell {
                 Err(e) => return Err(format!("cannot wait for the command: {e}")),
             }
         };
+        child.terminate();
         if status.is_none() {
             kill_tree(pid);
             let _ = child.kill();

@@ -16,11 +16,10 @@ pub enum RecoveryDecision {
 }
 
 pub fn classify(inspection: &RunInspection) -> RecoveryDecision {
-    if inspection.terminal {
-        return RecoveryDecision::Terminal;
-    }
     if inspection.incomplete_tools.iter().any(|t| t.dispatched) {
         RecoveryDecision::NeedsReview
+    } else if inspection.terminal {
+        RecoveryDecision::Terminal
     } else {
         RecoveryDecision::Interrupted
     }
@@ -95,7 +94,7 @@ mod tests {
     #[test]
     fn durable_terminal_requires_external_verification() {
         let mut g = goal();
-        assert_eq!(reconcile(&mut g, Some(&inspection(true, Some(RunState::Completed), true)), 3),
+        assert_eq!(reconcile(&mut g, Some(&RunInspection{incomplete_tools:vec![],..inspection(true,Some(RunState::Completed),false)}), 3),
             RecoveryDecision::Terminal);
         assert_eq!(g.state, GoalState::AwaitingVerification);
         assert!(g.begin(4).is_ok());

@@ -56,8 +56,8 @@ describe('starting up', () => {
     const h = harness({ chat_overview: () => overview({ sessions: [summary('s1', '第一个')], workspace: '/Users/me/work', configured: true }) });
     await Promise.all([h.store.init(), h.store.init()]);
     await h.store.init();
-    expect([...h.handlers.keys()].sort()).toEqual(['chat-approval', 'chat-checkpoint', 'chat-compacting', 'chat-event', 'chat-hide-tool-calls-changed', 'chat-permission-mode-changed', 'chat-question', 'chat-run-interrupted', 'chat-sessions-changed']);
-    expect(h.deps.listen).toHaveBeenCalledTimes(9);
+    expect([...h.handlers.keys()].sort()).toEqual(['chat-approval', 'chat-checkpoint', 'chat-compacting', 'chat-event', 'chat-hide-tool-calls-changed', 'chat-pending-changed', 'chat-permission-mode-changed', 'chat-question', 'chat-run-interrupted', 'chat-sessions-changed', 'chat-task-outcome']);
+    expect(h.deps.listen).toHaveBeenCalledTimes(11);
     expect(h.commands()).toEqual(['chat_overview']);
     expect(h.store).toMatchObject({ ready: true, configured: true, workspace: '/Users/me/work' });
     expect(h.store.sessions.map(s => s.title)).toEqual(['第一个']);
@@ -451,7 +451,7 @@ describe('shutting down', () => {
     const h = harness();
     await h.store.init();
     h.store.dispose();
-    expect(h.stopped.sort()).toEqual(['chat-approval', 'chat-checkpoint', 'chat-compacting', 'chat-event', 'chat-hide-tool-calls-changed', 'chat-permission-mode-changed', 'chat-question', 'chat-run-interrupted', 'chat-sessions-changed']);
+    expect(h.stopped.sort()).toEqual(['chat-approval', 'chat-checkpoint', 'chat-compacting', 'chat-event', 'chat-hide-tool-calls-changed', 'chat-pending-changed', 'chat-permission-mode-changed', 'chat-question', 'chat-run-interrupted', 'chat-sessions-changed', 'chat-task-outcome']);
     h.events('s1', { type: 'text_delta', text: 'late' });
     h.emit('chat-approval', approval('a1'));
     expect(h.store.views.s1).toBeUndefined();
@@ -462,7 +462,7 @@ describe('shutting down', () => {
     const starting = h.store.init();
     h.store.dispose();
     await starting;
-    expect(h.stopped.sort()).toEqual(['chat-approval', 'chat-checkpoint', 'chat-compacting', 'chat-event', 'chat-hide-tool-calls-changed', 'chat-permission-mode-changed', 'chat-question', 'chat-run-interrupted', 'chat-sessions-changed']);
+    expect(h.stopped.sort()).toEqual(['chat-approval', 'chat-checkpoint', 'chat-compacting', 'chat-event', 'chat-hide-tool-calls-changed', 'chat-pending-changed', 'chat-permission-mode-changed', 'chat-question', 'chat-run-interrupted', 'chat-sessions-changed', 'chat-task-outcome']);
     expect(h.store.sessions).toEqual([]);
   });
 });
@@ -909,6 +909,12 @@ describe('sequenced session snapshots', () => {
   });
 });
 
+describe('recoverable pending interactions',()=>{it('restores cards from snapshot and ignores stale revisions',async()=>{
+ const h=harness({chat_overview:()=>overview({sessions:[summary('s1')],snapshotProtocol:1,pendingProtocol:1}),chat_session_snapshot:()=>({messages:[],ready:true,running:true,pending:{revision:4,approvals:[approval('a1')],questions:[question('q1')]}})});
+ await h.store.init();await h.store.select('s1');expect(h.store.views.s1.approvals).toHaveLength(1);expect(h.store.views.s1.questions).toHaveLength(1);
+ h.emit('chat-pending-changed',{session:'s1',pending:{revision:3,approvals:[],questions:[]}});expect(h.store.views.s1.approvals).toHaveLength(1);
+ h.emit('chat-pending-changed',{session:'s1',pending:{revision:5,approvals:[],questions:[]}});expect(h.store.views.s1.approvals).toHaveLength(0);
+});});
 describe('which window asked', () => {
   it('knows the question was asked here until its answer is done, and not for a question the other window asked', async () => {
     const onReply = vi.fn();

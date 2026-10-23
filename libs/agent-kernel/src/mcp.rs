@@ -13,7 +13,8 @@ use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::io::{BufRead, BufReader, Read, Write};
 use std::path::PathBuf;
-use std::process::{Child, ChildStdin, Command, Stdio};
+use std::process::{ChildStdin, Command, Stdio};
+use crate::process_tree::ChildTree;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::mpsc::{self, Sender};
 use std::sync::{Arc, Mutex};
@@ -91,24 +92,25 @@ impl McpConfig {
     }
 }
 
-fn kill_tree(pid: u32) {
-    #[cfg(unix)]
-    let _ = Command::new("sh").args(["-c", &format!("kill -KILL -- -{pid}")]).stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null()).status();
-    #[cfg(windows)]
-    let _ = Command::new("taskkill").args(["/PID", &pid.to_string(), "/T", "/F"]).stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null()).status();
-}
 
 struct McpToolInfo {
     original_name: String,
     spec: ToolSpec,
 }
 
+struct PendingRequest {
+    tx: Sender<Result<Value, String>>,
+    // Cancellation ends the caller's wait, not the server's operation. Retain ownership
+    // until a response arrives or the local process is explicitly closed.
+    _control: Option<crate::RunControl>,
+}
+
 pub struct McpClient {
     stdin: Mutex<ChildStdin>,
-    pending: Arc<Mutex<HashMap<u64, Sender<Result<Value, String>>>>>,
+    pending: Arc<Mutex<HashMap<u64, PendingRequest>>>,
     next_id: AtomicU64,
     tools: Vec<McpToolInfo>,
-    child: Mutex<Option<Child>>,
+    child: Arc<Mutex<Option<ChildTree>>>,
     reader: Mutex<Option<JoinHandle<()>>>,
     closed: Arc<AtomicBool>,
 }
@@ -118,14 +120,16 @@ impl Drop for McpClient {
         self.closed.store(true, Ordering::SeqCst);
         if let Ok(mut child_lock) = self.child.lock() {
             if let Some(mut child) = child_lock.take() {
-                kill_tree(child.id());
+                child.terminate();
                 let _ = child.kill();
                 let _ = child.wait();
             }
         }
         if let Ok(mut r) = self.reader.lock() {
             if let Some(h) = r.take() {
-                let _ = h.join();
+                let deadline = std::time::Instant::now()+Duration::from_secs(1);
+                while !h.is_finished() && std::time::Instant::now()<deadline { thread::sleep(Duration::from_millis(10)); }
+                if h.is_finished() { let _=h.join(); }
             }
         }
     }
@@ -140,13 +144,16 @@ impl McpClient {
     pub fn close(&self) {
         self.closed.store(true, Ordering::SeqCst);
         if let Some(mut child) = self.child.lock().unwrap_or_else(|e|e.into_inner()).take() {
-            kill_tree(child.id());
+            child.terminate();
             let _ = child.kill();
             let _ = child.wait();
         }
+        for (_,request) in self.pending.lock().unwrap_or_else(|e|e.into_inner()).drain(){let _=request.tx.send(Err("MCP closed".into()));}
     }
 
-    pub fn spawn(config: McpConfig) -> Result<Arc<Self>, HarnessError> {
+    pub fn spawn(config: McpConfig) -> Result<Arc<Self>, HarnessError> {Self::spawn_cancellable(config,Arc::new(AtomicBool::new(false)))}
+    pub fn spawn_cancellable(config:McpConfig,cancel:Arc<AtomicBool>)->Result<Arc<Self>,HarnessError>{
+        if cancel.load(Ordering::SeqCst){return Err(HarnessError::Cancelled);}
         let mut cmd = Command::new(crate::child_env::program(&config.command));
         cmd.args(&config.args)
             .stdin(Stdio::piped())
@@ -165,7 +172,7 @@ impl McpClient {
         #[cfg(windows)]
         std::os::windows::process::CommandExt::creation_flags(&mut cmd, 0x08000000); // CREATE_NO_WINDOW
 
-        let mut child = cmd.spawn().map_err(|e| {
+        let mut child = ChildTree::spawn(&mut cmd).map_err(|e| {
             HarnessError::Config(format!("cannot start MCP server `{}`: {e}", config.command))
         })?;
 
@@ -176,11 +183,13 @@ impl McpClient {
             HarnessError::Config("failed to capture MCP server stdout".into())
         })?;
 
-        let pending: Arc<Mutex<HashMap<u64, Sender<Result<Value, String>>>>> = Arc::default();
+        let pending: Arc<Mutex<HashMap<u64, PendingRequest>>> = Arc::default();
         let closed = Arc::new(AtomicBool::new(false));
+        let child = Arc::new(Mutex::new(Some(child)));
 
         let reader_pending = pending.clone();
         let reader_closed = closed.clone();
+        let reader_child = child.clone();
         let reader_thread = thread::Builder::new()
             .name(format!("mcp-{}", config.command))
             .spawn(move || {
@@ -202,7 +211,8 @@ impl McpClient {
                                         let mut lock = reader_pending.lock().unwrap_or_else(|e| e.into_inner());
                                         lock.remove(&id)
                                     };
-                                    if let Some(tx) = tx {
+                                    if let Some(request) = tx {
+                                        let tx = request.tx;
                                         if let Some(err) = val.get("error") {
                                             let msg = err.get("message")
                                                 .and_then(Value::as_str)
@@ -221,10 +231,16 @@ impl McpClient {
                     }
                 }
                 reader_closed.store(true, Ordering::SeqCst);
+                // EOF is not proof of process termination: a server can close stdout
+                // and keep changing state. Stop its process tree before dropping leases.
+                if let Some(mut child) = reader_child.lock().unwrap_or_else(|e| e.into_inner()).take() {
+                    child.terminate();
+                    let _ = child.wait();
+                }
                 // Drop all remaining pending requests with an error so they do not hang
                 let mut lock = reader_pending.lock().unwrap_or_else(|e| e.into_inner());
-                for (_, tx) in lock.drain() {
-                    let _ = tx.send(Err("MCP server closed".into()));
+                for (_, request) in lock.drain() {
+                    let _ = request.tx.send(Err("MCP server closed".into()));
                 }
             })
             .map_err(|e| HarnessError::Config(format!("failed to start MCP reader thread: {e}")))?;
@@ -234,11 +250,13 @@ impl McpClient {
             pending,
             next_id: AtomicU64::new(1),
             tools: Vec::new(),
-            child: Mutex::new(Some(child)),
+            child,
             reader: Mutex::new(Some(reader_thread)),
             closed,
         });
 
+        let c=client.clone();let deadline=std::time::Instant::now()+Duration::from_secs(45);
+        let watch=crate::StopWatch::new(move||cancel.load(Ordering::SeqCst)||std::time::Instant::now()>=deadline,move||c.close());
         // 1. Handshake: initialize
         let init_params = json!({
             "protocolVersion": DEFAULT_PROTOCOL_VERSION,
@@ -256,34 +274,26 @@ impl McpClient {
         client.send_notification("notifications/initialized", json!({}))
             .map_err(|e| HarnessError::Config(format!("MCP initialized notification failed: {e}")))?;
 
-        // 3. Query tools/list
-        let tools_res = client.send_request("tools/list", json!({}), Duration::from_secs(15))
-            .map_err(|e| HarnessError::Config(format!("MCP tools/list failed: {e}")))?;
-
         let mut tool_infos = Vec::new();
-        if let Some(tools_arr) = tools_res.get("tools").and_then(Value::as_array) {
-            for t in tools_arr {
-                if let Some(orig_name) = t.get("name").and_then(Value::as_str) {
-                    let desc = t.get("description").and_then(Value::as_str).unwrap_or("").to_string();
-                    let schema = t.get("inputSchema").cloned().unwrap_or_else(|| json!({"type": "object"}));
-                    let exposed_name = if config.tool_prefix.is_empty() {
-                        orig_name.to_string()
-                    } else {
-                        format!("{}{}", config.tool_prefix, orig_name)
-                    };
-                    let spec = ToolSpec::new(&exposed_name, &desc, schema)
-                        .risk(config.default_risk)
-                        .untrusted_output()
-                        .serial()
-                        .timeout(config.timeout);
-                    tool_infos.push(McpToolInfo {
-                        original_name: orig_name.to_string(),
-                        spec,
-                    });
-                }
+        let mut cursor: Option<String> = None;
+        let mut cursors = std::collections::HashSet::new();
+        let mut names = std::collections::HashSet::new();
+        for page in 0..20 {
+            let params=cursor.as_ref().map_or_else(||json!({}),|c|json!({"cursor":c}));
+            let result=client.send_request("tools/list",params,Duration::from_secs(15)).map_err(HarnessError::Config)?;
+            let tools=result["tools"].as_array().ok_or_else(||HarnessError::Config("invalid MCP catalog".into()))?;
+            for t in tools {
+                let name=t["name"].as_str().filter(|n|!n.is_empty()).ok_or_else(||HarnessError::Config("missing MCP name".into()))?;
+                if !names.insert(name.to_string()) || tool_infos.len()>=500 {return Err(HarnessError::Config("duplicate/oversized MCP catalog".into()));}
+                let spec=ToolSpec::new(format!("{}{name}",config.tool_prefix),t["description"].as_str().unwrap_or(""),t.get("inputSchema").cloned().unwrap_or_else(||json!({"type":"object"}))).risk(config.default_risk).untrusted_output().serial().timeout(config.timeout);
+                tool_infos.push(McpToolInfo{original_name:name.into(),spec});
             }
+            cursor=match result.get("nextCursor") {None|Some(Value::Null)=>None,Some(Value::String(c)) if !c.is_empty()=>Some(c.clone()),_=>return Err(HarnessError::Config("invalid MCP cursor".into()))};
+            let Some(c)=&cursor else {break;};
+            if page==19 || !cursors.insert(c.clone()){return Err(HarnessError::Config("MCP pagination did not terminate".into()));}
         }
 
+        drop(watch);
         // Drop the temporary ref and place tool_infos inside client
         let mut final_client = match Arc::try_unwrap(client) {
             Ok(c) => c,
@@ -318,7 +328,7 @@ impl McpClient {
         let (tx, rx) = mpsc::channel();
         {
             let mut pending = self.pending.lock().unwrap_or_else(|e| e.into_inner());
-            pending.insert(id, tx);
+            pending.insert(id, PendingRequest { tx, _control: None });
         }
 
         let req = json!({
@@ -355,14 +365,14 @@ impl McpClient {
     }
 
     pub fn call_tool_result(&self, original_name: &str, args: Value, ctx: &ToolCtx) -> Result<ToolResult, String> {
-        if ctx.is_cancelled() {
+        if ctx.is_cancelled() || !self.is_connected() {
             return Err("cancelled".into());
         }
         let id = self.next_request_id();
         let (tx, rx) = mpsc::channel();
         {
             let mut pending = self.pending.lock().unwrap_or_else(|e| e.into_inner());
-            pending.insert(id, tx);
+            pending.insert(id, PendingRequest { tx, _control: Some(ctx.control().clone()) });
         }
 
         let req = json!({
@@ -380,16 +390,20 @@ impl McpClient {
         {
             let mut stdin = self.stdin.lock().unwrap_or_else(|e| e.into_inner());
             if let Err(e) = stdin.write_all(&data).and_then(|_| stdin.flush()) {
-                self.pending.lock().unwrap_or_else(|p| p.into_inner()).remove(&id);
-                return Err(format!("failed to send to MCP stdin: {e}"));
+                return Ok(ToolResult::unknown(&format!("failed to send to MCP stdin: {e}")));
             }
         }
 
         let res = match ctx.wait_for(&rx) {
-            Some(res) => res?,
+            Some(Ok(res)) => res,
+            Some(Err(e))=>return Ok(ToolResult::unknown(&e)),
             None => {
-                self.pending.lock().unwrap_or_else(|p| p.into_inner()).remove(&id);
-                return Err("cancelled or timed out".into());
+                // MCP cancellation is advisory. Acknowledgement is the eventual execution
+                // response, so do not remove the request or its resource lease here.
+                let _ = self.send_notification("notifications/cancelled", json!({
+                    "requestId": id, "reason": "caller cancelled or tool deadline expired"
+                }));
+                return Ok(ToolResult::unknown("MCP call cancelled without an execution result"));
             }
         };
 
@@ -423,7 +437,11 @@ impl Tool for McpToolWrapper {
     }
 
     fn execute_result(&self, args: Value, ctx: &ToolCtx) -> ToolResult {
-        self.client.call_tool_result(&self.original_name, args, ctx).unwrap_or_else(ToolResult::error)
+        if ctx.is_cancelled() || !self.client.is_connected() {
+            return ToolResult::error("MCP call was not dispatched: cancelled or disconnected");
+        }
+        self.client.call_tool_result(&self.original_name, args, ctx)
+            .unwrap_or_else(|error| ToolResult::unknown(&error))
     }
 }
 

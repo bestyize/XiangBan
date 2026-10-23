@@ -90,27 +90,25 @@ impl Middleware for ContextTrim {
             if cost <= placeholder_cost {
                 continue;
             }
-            message.parts = vec![Part::Text { text: CLEARED.to_string() }];
+            message.parts = vec![Part::Text { text: format!("{CLEARED}; is_error={}; call_id={}",message.is_error,message.tool_call_id.as_deref().unwrap_or("unknown")) }];
             message.structured_content = None;
-            total = total - cost + placeholder_cost;
+            total = total - cost + estimate_message(message);
         }
 
         let first = messages.iter().position(|m| m.role != Role::System).unwrap_or(messages.len());
         let mut dropped = false;
-        // Account for the omission notice before choosing how many old exchanges to remove.
-        let notice_cost = estimate_message(&Message::user_text(OMITTED));
-        while total.saturating_add(if dropped { notice_cost } else { 0 }) > budget {
-            // Cut only at user messages so a tool call is never separated from its result.
-            let Some(offset) = messages.get(first + 1..).and_then(|rest| rest.iter().position(|m| m.role == Role::User && !m.synthetic)) else {
-                break;
-            };
-            let removed: usize = messages.drain(first..first + 1 + offset).map(|m| estimate_message(&m)).sum();
-            total = total.saturating_sub(removed);
-            dropped = true;
+        let mut requests=Vec::new();
+        let pinned = |requests:&[String]| {
+            let mut m=Message::reminder(format!("{OMITTED}\nOriginal user requests, in order; later corrections take precedence:\n{}",requests.join("\n\n")));
+            m.structured_content=Some(serde_json::json!({"harness_context":"user_requests"}));m
+        };
+        while total.saturating_add(if dropped {estimate_message(&pinned(&requests))}else{0})>budget {
+            let Some(offset)=messages.get(first+1..).and_then(|rest|rest.iter().position(|m|m.role==Role::User&&!m.synthetic))else{break;};
+            let removed:usize=messages.drain(first..first+1+offset).map(|m|{
+                if m.role==Role::User&&(!m.synthetic||m.structured_content.as_ref().is_some_and(|v|v["harness_context"]=="user_requests")){requests.push(m.text());}estimate_message(&m)
+            }).sum();total=total.saturating_sub(removed);dropped=true;
         }
-        if dropped {
-            messages.insert(first, Message::user_text(OMITTED));
-        }
+        if dropped{messages.insert(first,pinned(&requests));}
         let used = estimate_tokens(messages).saturating_add(tool_tokens).saturating_add(self.reserve_output);
         if used > self.max_tokens {
             return Err(HarnessError::Middleware(format!(

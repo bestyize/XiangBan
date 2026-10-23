@@ -208,10 +208,10 @@ fn skill_manage_is_only_offered_with_a_writable_root() {
     let dir = TempDir::new("skills-ro");
     let read_only = Arc::new(Skills::new().read_only_root(&dir.0));
     let names: Vec<String> = read_only.tools().iter().map(|t| t.spec().name.clone()).collect();
-    assert_eq!(names, vec!["load_skill"]);
+    assert_eq!(names, vec!["load_skill", "skill_find"]);
     let writable = Arc::new(Skills::new().writable_root(&dir.0));
     let names: Vec<String> = writable.tools().iter().map(|t| t.spec().name.clone()).collect();
-    assert_eq!(names, vec!["load_skill", "skill_manage"]);
+    assert_eq!(names, vec!["load_skill", "skill_find", "skill_manage"]);
 }
 
 #[test]

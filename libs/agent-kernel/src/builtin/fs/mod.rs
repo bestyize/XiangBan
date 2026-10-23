@@ -6,7 +6,7 @@ pub use write::fs_write_tools;
 
 use super::{opt_str_arg, opt_uint_arg, str_arg};
 use crate::error::HarnessError;
-use crate::tool::{Risk, Tool, ToolCtx, ToolSpec};
+use crate::tool::{Risk, Tool, ToolCtx, ToolResult, ToolSpec};
 use crate::util::nearest_boundary;
 use serde_json::{json, Value};
 use std::fs::{self, File};
@@ -161,6 +161,28 @@ impl ReadFile {
 impl Tool for ReadFile {
     fn spec(&self) -> &ToolSpec {
         &self.spec
+    }
+
+    fn execute_result(&self, args: Value, ctx: &ToolCtx) -> ToolResult {
+        use sha2::{Digest, Sha256};
+        // Version evidence for editable files must describe the same bytes the model
+        // read. Do not attach a hash from a later, independently changed version.
+        let snapshot = str_arg(&args, "path").ok().and_then(|requested| self.roots.resolve(requested).ok())
+            .filter(|path| fs::metadata(path).is_ok_and(|m| m.is_file() && m.len() <= 2 * 1024 * 1024))
+            .and_then(|path| fs::read(&path).ok().map(|bytes| (path, bytes)));
+        match self.execute(args, ctx) {
+            Err(error) => ToolResult::error(error),
+            Ok(text) => {
+                if let Some((path, before)) = snapshot {
+                    if fs::read(&path).ok().as_deref() != Some(before.as_slice()) {
+                        return ToolResult::error("file changed while reading; read it again before editing");
+                    }
+                    ToolResult::ok(text).with_structured_content(json!({
+                        "path": self.roots.display(&path), "sha256": format!("{:x}", Sha256::digest(&before))
+                    }))
+                } else { ToolResult::ok(text) }
+            }
+        }
     }
 
     fn execute(&self, args: Value, ctx: &ToolCtx) -> Result<String, String> {

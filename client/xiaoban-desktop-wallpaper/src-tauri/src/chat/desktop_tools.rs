@@ -290,7 +290,8 @@ impl Tool for DesktopTool {
         &self.spec
     }
 
-    fn execute(&self, args: Value, _ctx: &ToolCtx) -> Result<String, String> {
+    fn execute(&self, args: Value, ctx: &ToolCtx) -> Result<String, String> {
+        if ctx.is_cancelled() { return Err("操作开始前已取消".into()); }
         (self.run)(self.desktop.as_ref(), &args)
     }
 }
@@ -2040,5 +2041,3 @@ mod tests {
         assert_eq!(space, "已进入游戏空间并启动游戏：star-catcher");
     }
 }
-
-

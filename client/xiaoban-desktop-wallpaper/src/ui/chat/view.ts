@@ -185,16 +185,22 @@ export function applyEvent(view: SessionView, event: KernelEvent): void {
       const partial = view.items.slice(lastUser + 1).some(i => i.kind === 'tool' || i.kind === 'assistant' || i.kind === 'reasoning');
       settle(view);
       if (/^run budget exceeded:/.test(event.message)) {
-        view.items.push({ kind: 'notice', id: nextId(view), tone: 'warning', text: '本轮操作次数已达到上限，已暂停。点“继续”可以从已保存的进展接着处理。', canContinue: true, details: event.message });
+        view.items.push({ kind: 'notice', id: nextId(view), tone: 'warning', text: event.message.endsWith('elapsed time') ? '本轮运行时间已达到上限，已暂停。已完成的进展已保存。' : event.message.endsWith('reported tokens') ? '本轮累计模型用量已达到上限，已暂停。请评估剩余工作后继续。' : '本轮操作次数已达到上限，已暂停。点“继续”可以从已保存的进展接着处理。', canContinue: true, details: event.message });
         break;
       }
       if (/^run paused by continuation guard:/.test(event.message)) {
-        const text = event.message.endsWith(': output_length_limit')
+        const uncertain = event.message.endsWith(': tool_outcome_needs_review');
+        const invalid = event.message.endsWith(': invalid_model_terminal_or_call_identity');
+        const text = uncertain ? '操作结果尚未确认，已暂停。请先核对实际状态，勿直接重复执行；后续修改会重新请求授权。'
+          : invalid ? '模型返回了不完整或无效的终态，本批操作未执行。请调整请求或模型后再继续。'
+          : event.message.endsWith(': resources_busy') ? '另一个任务仍占用共享工具，当前任务已暂停。等它结束后再继续。'
+          : event.message.endsWith(': no_progress_tool_rounds') ? '连续工具调用未取得新结果，已暂停。请调整方案后继续。'
+          : event.message.endsWith(': output_length_limit')
           ? '连续多次生成的工具参数超过输出上限，小伴已暂停。已完成的操作已保留，点“继续”可以接着处理。'
           : event.message.endsWith(': no_progress')
           ? '连续多次未取得新进展，小伴已暂停。点“继续”可以接着尝试。'
           : '已达到自动续跑次数上限，小伴已暂停。点“继续”可以接着做。';
-        view.items.push({ kind: 'notice', id: nextId(view), tone: 'warning', text, canContinue: true, details: event.message });
+        view.items.push({ kind: 'notice', id: nextId(view), tone: 'warning', text, canContinue: !uncertain && !invalid, ...(invalid ? {canSwitchModel:true}:{}), details: event.message });
         break;
       }
       if (TURN_LIMIT.test(event.message)) {

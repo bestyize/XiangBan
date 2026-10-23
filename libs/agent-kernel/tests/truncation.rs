@@ -34,7 +34,8 @@ fn normal_replies_report_stop_and_emit_no_truncation() {
     for reason in [FinishReason::ContentFilter, FinishReason::Other] {
         let h = harness(vec![Step::text("x").finish(reason)], |b| b);
         let (result, events) = run(&h.agent, "hi");
-        assert_eq!(result.unwrap().finish, reason);
+        assert!(matches!(result, Err(HarnessError::Paused(ref code)) if code == "invalid_model_terminal_or_call_identity"));
+        assert!(!events.contains(&Event::Done), "abnormal terminal states cannot report ordinary completion");
         assert!(!events.contains(&Event::Truncated), "{reason:?} is not a length cut-off");
     }
 }

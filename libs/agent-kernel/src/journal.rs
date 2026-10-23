@@ -212,9 +212,9 @@ impl JsonlRunLog {
                     }
                 }
                 RunEventBody::Event {
-                    event: Event::ToolEnd { id, .. },
+                    event: Event::ToolEnd { id, structured_content, .. },
                 } => {
-                    pending.remove(&id);
+                    if structured_content.as_ref().and_then(|v|v.get("harness_status")).and_then(serde_json::Value::as_str)!=Some("outcome_unknown"){pending.remove(&id);}
                 }
                 _ => {}
             }

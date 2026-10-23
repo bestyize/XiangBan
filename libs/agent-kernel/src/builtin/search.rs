@@ -50,6 +50,7 @@ impl WebSearch {
 }
 
 impl Tool for WebSearch {
+    fn resource(&self, _: &Value) -> Result<Option<crate::ToolResource>, String> { Ok(None) }
     fn spec(&self) -> &ToolSpec {
         &self.spec
     }

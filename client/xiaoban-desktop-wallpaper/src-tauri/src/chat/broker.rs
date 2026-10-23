@@ -1,86 +1,36 @@
-//! Questions the assistant asks the user while it works: "may I run this?" and "which one?".
-//!
-//! The run waits on a channel; the web side answers by id. Answers for ids that no longer exist
-//! (the run was cancelled, or the id is made up) are refused instead of being delivered to someone else.
-
+//! Pending user interactions are host state, recoverable by a rebuilt window.
 use agent_kernel::Approval;
-use std::collections::HashMap;
-use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::mpsc::{self, Receiver, Sender};
-use std::sync::{Mutex, MutexGuard};
-
-type Waiting<T> = HashMap<String, (String, Sender<T>)>;
-
-#[derive(Default)]
-pub struct Broker {
-    approvals: Mutex<Waiting<Approval>>,
-    questions: Mutex<Waiting<Option<String>>>,
-    next: AtomicU64,
-}
-
-fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
-    mutex.lock().unwrap_or_else(|e| e.into_inner())
-}
-
+use serde_json::{Value,json};
+use std::{collections::HashMap,sync::{Mutex,MutexGuard,atomic::{AtomicU64,Ordering},mpsc::{self,Sender,Receiver}}};
+type Waiting<T> = HashMap<String,(String,Sender<T>,Value)>;
+#[derive(Default)]struct State { approvals:Waiting<Approval>,questions:Waiting<Option<String>>,revision:u64 }
+#[derive(Default)]pub struct Broker {state:Mutex<State>,next:AtomicU64}
+fn lock<T>(m:&Mutex<T>)->MutexGuard<'_,T>{m.lock().unwrap_or_else(|e|e.into_inner())}
 impl Broker {
-    fn id(&self, prefix: char) -> String {
-        format!("{prefix}{}", self.next.fetch_add(1, Ordering::Relaxed) + 1)
-    }
-
-    pub fn open_approval(&self, session: &str) -> (String, Receiver<Approval>) {
-        let (tx, rx) = mpsc::channel();
-        let id = self.id('a');
-        lock(&self.approvals).insert(id.clone(), (session.to_string(), tx));
-        (id, rx)
-    }
-
-    pub fn answer_approval(&self, id: &str, decision: Approval) -> Result<(), String> {
-        let waiting = lock(&self.approvals).remove(id);
-        match waiting {
-            Some((_, tx)) => tx.send(decision).map_err(|_| "这个确认已经结束".to_string()),
-            None => Err("这个确认已经结束".into()),
-        }
-    }
-
-    pub fn close_approval(&self, id: &str) {
-        lock(&self.approvals).remove(id);
-    }
-
-    pub fn open_question(&self, session: &str) -> (String, Receiver<Option<String>>) {
-        let (tx, rx) = mpsc::channel();
-        let id = self.id('q');
-        lock(&self.questions).insert(id.clone(), (session.to_string(), tx));
-        (id, rx)
-    }
-
-    pub fn answer_question(&self, id: &str, answer: Option<String>) -> Result<(), String> {
-        let waiting = lock(&self.questions).remove(id);
-        match waiting {
-            Some((_, tx)) => tx.send(answer).map_err(|_| "这个问题已经结束".to_string()),
-            None => Err("这个问题已经结束".into()),
-        }
-    }
-
-    pub fn close_question(&self, id: &str) {
-        lock(&self.questions).remove(id);
-    }
-
-    /// Ends everything a conversation is waiting on; the runs see their waits fail.
-    pub fn drop_session(&self, session: &str) {
-        lock(&self.approvals).retain(|_, (s, _)| s != session);
-        lock(&self.questions).retain(|_, (s, _)| s != session);
-    }
-
-    #[cfg(test)]
-    pub fn pending(&self) -> usize {
-        lock(&self.approvals).len() + lock(&self.questions).len()
-    }
+ fn id(&self,p:char)->String{format!("{p}{}",self.next.fetch_add(1,Ordering::Relaxed)+1)}
+ pub fn open_approval(&self,s:&str)->(String,Receiver<Approval>){self.open_approval_payload(s,json!({}))}
+ pub fn open_approval_payload(&self,s:&str,mut value:Value)->(String,Receiver<Approval>){let id=self.id('a');let(tx,rx)=mpsc::channel();value["id"]=json!(id);value["session"]=json!(s);let mut state=lock(&self.state);state.approvals.insert(id.clone(),(s.into(),tx,value));state.revision+=1;(id,rx)}
+ pub fn open_question(&self,s:&str)->(String,Receiver<Option<String>>){self.open_question_payload(s,json!({}))}
+ pub fn open_question_payload(&self,s:&str,mut value:Value)->(String,Receiver<Option<String>>){let id=self.id('q');let(tx,rx)=mpsc::channel();value["id"]=json!(id);value["session"]=json!(s);let mut state=lock(&self.state);state.questions.insert(id.clone(),(s.into(),tx,value));state.revision+=1;(id,rx)}
+ pub fn answer_approval(&self,id:&str,value:Approval)->Result<(),String>{let mut s=lock(&self.state);let item=s.approvals.remove(id);s.revision+=1;item.ok_or("这个确认已经结束")?.1.send(value).map_err(|_|"这个确认已经结束".into())}
+ pub fn answer_question(&self,id:&str,value:Option<String>)->Result<(),String>{let mut s=lock(&self.state);let item=s.questions.remove(id);s.revision+=1;item.ok_or("这个问题已经结束")?.1.send(value).map_err(|_|"这个问题已经结束".into())}
+ pub fn close_approval(&self,id:&str){let mut s=lock(&self.state);s.approvals.remove(id);s.revision+=1;}
+ pub fn close_question(&self,id:&str){let mut s=lock(&self.state);s.questions.remove(id);s.revision+=1;}
+ pub fn drop_session(&self,id:&str){let mut s=lock(&self.state);s.approvals.retain(|_,(session,_,_)|session!=id);s.questions.retain(|_,(session,_,_)|session!=id);s.revision+=1;}
+ pub fn snapshot(&self,id:&str)->Value{let s=lock(&self.state);json!({"revision":s.revision,"approvals":s.approvals.values().filter(|(session,_,_)|session==id).map(|(_,_,v)|v).collect::<Vec<_>>(),"questions":s.questions.values().filter(|(session,_,_)|session==id).map(|(_,_,v)|v).collect::<Vec<_>>()})}
+ #[cfg(test)]pub fn pending(&self)->usize{let s=lock(&self.state);s.approvals.len()+s.questions.len()}
 }
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use std::time::Duration;
+
+    #[test]
+    fn pending_snapshots_retain_payloads_and_version_consumption(){
+        let b=Broker::default();let(id,_)=b.open_approval_payload("s1",json!({"tool":"shell","arguments":{"command":"pwd"}}));
+        let before=b.snapshot("s1");assert_eq!(before["approvals"][0]["tool"],"shell");assert_eq!(before["approvals"][0]["id"],id);assert_eq!(b.snapshot("s2")["approvals"],json!([]));
+        b.close_approval(&id);let after=b.snapshot("s1");assert!(after["approvals"].as_array().unwrap().is_empty());assert!(after["revision"].as_u64()>before["revision"].as_u64());
+    }
 
     #[test]
     fn an_approval_reaches_the_waiting_run_once() {

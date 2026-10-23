@@ -25,7 +25,7 @@ pub(crate) struct Item {
     pub sha256: String,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub(crate) struct Plan {
     pub version: String,
     pub namespace: Option<String>,

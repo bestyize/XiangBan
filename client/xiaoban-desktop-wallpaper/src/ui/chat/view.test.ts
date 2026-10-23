@@ -339,3 +339,19 @@ it('restores interrupted reasoning and answer with an explicit continuation noti
   expect(items[1]).toMatchObject({ text: 'answer prefix', streaming: false });
   expect(items[2]).toMatchObject({ tone: 'warning', canContinue: true });
 });
+
+describe('reliability pause reasons', () => {
+  it('requires inspecting unknown actions instead of offering blind continuation', () => {
+    const view = newView('s1');
+    applyEvent(view, { type: 'error', message: 'run paused by continuation guard: tool_outcome_needs_review' });
+    expect(view.items[0]).toMatchObject({ kind: 'notice', tone: 'warning', canContinue: false });
+    expect(view.items[0]).toHaveProperty('text', expect.stringContaining('勿直接重复执行'));
+  });
+  it('describes elapsed time and token budgets separately from tool count', () => {
+    const view = newView('s1');
+    applyEvent(view, { type: 'error', message: 'run budget exceeded: elapsed time' });
+    applyEvent(view, { type: 'error', message: 'run budget exceeded: reported tokens' });
+    expect(view.items[0]).toHaveProperty('text', expect.stringContaining('运行时间'));
+    expect(view.items[1]).toHaveProperty('text', expect.stringContaining('模型用量'));
+  });
+});

@@ -69,10 +69,10 @@ pub fn private_write(path: &Path, bytes: &[u8]) -> Result<(), String> {
     Ok(result?)
 }
 fn client() -> Result<Client, String> {
-    Client::builder()
+    agent_kernel::net::blocking_builder(Client::builder()
         .timeout(Duration::from_secs(15))
         .connect_timeout(Duration::from_secs(8))
-        .redirect(Policy::none())
+        .redirect(Policy::none()))?
         .build()
         .map_err(|_| "无法创建授权客户端".into())
 }

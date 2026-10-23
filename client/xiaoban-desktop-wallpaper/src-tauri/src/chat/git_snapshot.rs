@@ -12,6 +12,9 @@
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output, Stdio};
 use std::time::{Duration, Instant};
+use std::sync::atomic::{AtomicU64, Ordering};
+
+static NEXT_INDEX: AtomicU64 = AtomicU64::new(0);
 
 /// A large repository's first `add -A` may take a while; a snapshot that takes longer is skipped, not waited for.
 const TIMEOUT: Duration = Duration::from_secs(20);
@@ -140,7 +143,9 @@ pub fn private(workspace: &Path, store: &Path) -> Result<Option<Repo>, String> {
 
 /// A tree of the working folder's current files (see the module comment).
 pub fn snapshot(repo: &Repo, pathspec: &str) -> Result<String, String> {
-    let index = std::env::temp_dir().join(format!("xiaoban-snapshot-{}-{}.index", std::process::id(), super::now().1));
+    let index = std::env::temp_dir().join(format!("xiaoban-snapshot-{}-{}-{}.index", std::process::id(),
+        std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_nanos(),
+        NEXT_INDEX.fetch_add(1, Ordering::Relaxed)));
     let user_index = PathBuf::from(text(git(repo, &["rev-parse", "--path-format=absolute", "--git-path", "index"], None)?));
     // Starting from the user's index only saves time; without one the throwaway index starts empty.
     let _ = std::fs::copy(&user_index, &index);

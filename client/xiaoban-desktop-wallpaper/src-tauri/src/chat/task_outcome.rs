@@ -56,13 +56,33 @@ pub fn inspect(journal: &JsonlRunLog, session: &str, run: &str) -> Result<TaskOu
     // Read all tool end statuses using a bounded cursor, not model text.
     let mut after = 0;
     let mut failed_tools = 0usize;
+    let mut calls = std::collections::HashMap::new();
+    let mut unresolved = Vec::new();
     loop {
         let batch = journal.read_after(run, after, 100).map_err(|e| e.to_string())?;
         if batch.is_empty() { break; }
         for record in &batch {
             if record.session_id != session { return Err("run belongs to another session".into()); }
-            if let RunEventBody::Event { event: Event::ToolEnd { is_error: true, .. } } = &record.body {
-                failed_tools += 1;
+            if let RunEventBody::Event { event } = &record.body {
+                match event {
+                    Event::ToolStart { id, name, arguments } => {
+                        let arguments = serde_json::from_str::<serde_json::Value>(arguments)
+                            .unwrap_or_else(|_| serde_json::Value::String(arguments.clone()));
+                        calls.insert(id.clone(), (name.clone(), arguments));
+                    }
+                    Event::ToolEnd { id, is_error, .. } => {
+                        let key = calls.remove(id).unwrap_or_else(|| (id.clone(), serde_json::Value::Null));
+                        if *is_error {
+                            failed_tools += 1;
+                            if !unresolved.contains(&key) { unresolved.push(key); }
+                        } else {
+                            // A later successful retry of the same operation can repair a
+                            // failed attempt. A different tool/target is not proof of repair.
+                            unresolved.retain(|old| old != &key);
+                        }
+                    }
+                    _ => {}
+                }
             }
         }
         after = batch.last().map_or(after, |r| r.sequence);
@@ -74,15 +94,15 @@ pub fn inspect(journal: &JsonlRunLog, session: &str, run: &str) -> Result<TaskOu
         match inspection.state {
             Some(RunState::Cancelled) => Status::Cancelled,
             Some(RunState::Failed) => Status::Failed,
-            Some(RunState::Completed) if failed_tools > 0 => Status::Partial,
+            Some(RunState::Completed) if !unresolved.is_empty() => Status::Partial,
             // Even with no tool errors, completion is not proof of user task success.
             _ => Status::Unknown,
         }
     };
     Ok(TaskOutcome { run_id: run.into(), session_id: session.into(), status,
         validator: "run_trace_only".into(),
-        evidence: format!("terminal={}; tool_errors={failed_tools}; incomplete_tools={}",
-            inspection.terminal, inspection.incomplete_tools.len()),
+        evidence: format!("terminal={}; tool_errors={failed_tools}; unresolved_tool_errors={}; incomplete_tools={}",
+            inspection.terminal, unresolved.len(), inspection.incomplete_tools.len()),
         verified_at_ms: None })
 }
 
@@ -136,5 +156,44 @@ mod tests {
     }
     assert_eq!(inspect(&j,"s1","r1").unwrap().status,Status::Unknown);
     let _=fs::remove_dir_all(base);
+ }
+
+ #[test]
+ fn a_successful_retry_repairs_the_same_failed_operation_but_not_a_different_target() {
+    use agent_kernel::{RunEvent, ToolSpec, Tool, ToolCtx, ToolResult, Part, Risk, Agent, MemoryStore, RunOptions};
+    use agent_kernel::provider::scripted::{ScriptedProvider, Step};
+    use std::sync::{Arc, atomic::{AtomicBool, AtomicUsize, Ordering}};
+    struct RetryTool { spec: ToolSpec, calls: AtomicUsize }
+    impl Tool for RetryTool {
+        fn spec(&self) -> &ToolSpec { &self.spec }
+        fn execute_result(&self, _: serde_json::Value, _: &ToolCtx) -> ToolResult {
+            if self.calls.fetch_add(1, Ordering::SeqCst) == 0 { ToolResult::error("temporary failure") }
+            else { ToolResult::ok("recovered") }
+        }
+    }
+    for (case, second_args, expected) in [
+        ("same", r#"{"path":"a"}"#, Status::Unknown),
+        ("different", r#"{"path":"b"}"#, Status::Partial),
+    ] {
+        let base=std::env::temp_dir().join(format!("xiaoban-outcome-retry-{case}-{}",std::process::id()));
+        let _=fs::remove_dir_all(&base);
+        let journal=JsonlRunLog::new(base.join("runs"));
+        let provider=Arc::new(ScriptedProvider::new(vec![
+            Step::tool_call("one","read",r#"{"path":"a"}"#),
+            Step::tool_call("two","read",second_args), Step::text("report"),
+        ]));
+        let agent=Agent::builder(provider, Arc::new(MemoryStore::new())).tool(RetryTool {
+            spec:ToolSpec::new("read","read test file",serde_json::json!({"type":"object"})).risk(Risk::Read),
+            calls:AtomicUsize::new(0),
+        }).build().unwrap();
+        let mut observe=|record:RunEvent|journal.append(&record);
+        let summary=agent.run_parts_observed("s1",vec![Part::Text {text:"read a".into()}],RunOptions::default(),
+            &mut observe,&Arc::new(AtomicBool::new(false))).unwrap();
+        let outcome=inspect(&journal,"s1",&summary.run_id).unwrap();
+        assert_eq!(outcome.status,expected,"{case}: {}",outcome.evidence);
+        assert!(outcome.evidence.contains("tool_errors=1"),"keep the original failure as evidence");
+        assert_ne!(outcome.status,Status::Succeeded,"successful tool execution is not business verification");
+        let _=fs::remove_dir_all(base);
+    }
  }
 }

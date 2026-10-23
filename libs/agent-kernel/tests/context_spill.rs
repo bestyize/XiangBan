@@ -76,7 +76,8 @@ fn oldest_exchanges_are_dropped_at_user_boundaries_keeping_system_and_pairs() {
     ContextTrim::new(one * 2 + 40).keep_recent(1000).before_model(&mut t).unwrap();
     assert_eq!(t.messages[0].text(), "sys");
     assert!(t.messages[1].text().contains("omitted"));
-    assert_eq!(t.messages[2].text(), "question 3", "starts again at a user message");
+    assert_eq!(t.messages[2].text(), "question 4", "old prose is dropped, original requests are retained");
+    for n in 1..=3 {assert!(t.messages[1].text().contains(&format!("question {n}")));}
     let ids: Vec<_> = t.messages.iter().filter_map(|m| m.tool_call_id.clone()).collect();
     let called: Vec<_> = t.messages.iter().flat_map(|m| m.tool_calls.iter().map(|c| c.id.clone())).collect();
     assert_eq!(ids, called, "every kept tool result still has its call");

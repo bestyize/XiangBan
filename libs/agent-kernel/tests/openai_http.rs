@@ -124,3 +124,10 @@ fn agent_runs_a_tool_round_trip_over_http() {
     assert!(second.contains(r#""tool_call_id":"c1""#) && second.contains("echo 1"));
     assert!(second.contains(r#""reasoning_content":"opaque thought state""#));
 }
+
+#[test]fn cancellation_releases_the_stream_socket(){
+ use std::{net::TcpListener,io::{Read,Write}};
+ let l=TcpListener::bind("127.0.0.1:0").unwrap();let url=format!("http://{}/v1",l.local_addr().unwrap());let(ready,rx)=std::sync::mpsc::channel();
+ let server=thread::spawn(move||{let(mut s,_)=l.accept().unwrap();s.set_read_timeout(Some(Duration::from_secs(2))).unwrap();read_request(&mut s);s.write_all(SSE.as_bytes()).unwrap();ready.send(()).unwrap();let mut byte=[0];assert_eq!(s.read(&mut byte).unwrap(),0,"cancel must close the socket");});
+ let cancel=Arc::new(AtomicBool::new(false));let c=cancel.clone();let call=thread::spawn(move||provider(&url).chat(&request("x"),&mut |_|{},&c));rx.recv_timeout(Duration::from_secs(2)).unwrap();cancel.store(true,Ordering::SeqCst);assert_eq!(call.join().unwrap().unwrap_err(),HarnessError::Cancelled);server.join().unwrap();
+}

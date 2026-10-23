@@ -85,6 +85,42 @@ fn replacing_a_file_keeps_its_permissions() {
 }
 
 #[test]
+fn file_versions_reject_stale_edits_and_two_writers_cannot_both_replace_one_version() {
+    use std::sync::{Arc, Barrier};
+    let ws = Ws::new("fsw-version");
+    ws.write("version.txt", "original");
+    let readers = fs_tools(vec![ws.base.path("root")]).unwrap();
+    let read = readers.iter().find(|t| t.spec().name == "read_file").unwrap();
+    let snapshot = read.execute_result(serde_json::json!({"path":"version.txt"}), &ToolCtx::detached("read"));
+    assert!(!snapshot.is_error);
+    let version = snapshot.structured_content.unwrap()["sha256"].as_str().unwrap().to_owned();
+    assert_eq!(version.len(), 64);
+    let barrier = Arc::new(Barrier::new(2));
+    let root = ws.base.path("root");
+    let writers: Vec<_> = ["one", "two"].into_iter().map(|content| {
+        let barrier=barrier.clone(); let version=version.clone(); let root=root.clone();
+        std::thread::spawn(move || {
+            let tools=fs_write_tools(vec![root]).unwrap();
+            let write=tools.iter().find(|t| t.spec().name=="write_file").unwrap();
+            barrier.wait();
+            write.execute(serde_json::json!({"path":"version.txt","content":content,"expected_sha256":version}), &ToolCtx::detached(content))
+        })
+    }).collect();
+    let results: Vec<_> = writers.into_iter().map(|w| w.join().unwrap()).collect();
+    assert_eq!(results.iter().filter(|r| r.is_ok()).count(), 1, "only one writer can consume the original version: {results:?}");
+    let current=std::fs::read_to_string(ws.root("version.txt")).unwrap();
+    let tools=fs_write_tools(vec![ws.base.path("root")]).unwrap();
+    let edit=tools.iter().find(|t| t.spec().name=="edit_file").unwrap();
+    assert!(edit.execute(serde_json::json!({"path":"version.txt","old_string":current,"new_string":"stale overwrite","expected_sha256":version}),
+        &ToolCtx::detached("stale")).unwrap_err().contains("version conflict"));
+    assert_eq!(std::fs::read_to_string(ws.root("version.txt")).unwrap(), current);
+    let write=tools.iter().find(|t| t.spec().name=="write_file").unwrap();
+    let args=serde_json::json!({"path":"new.txt","content":"created once","expected_sha256":"missing"});
+    assert!(write.execute(args.clone(), &ToolCtx::detached("new")).is_ok());
+    assert!(write.execute(args, &ToolCtx::detached("new-again")).is_err());
+}
+
+#[test]
 fn write_file_refuses_escapes_directories_and_oversized_content() {
     let ws = Ws::new("fsw-escape");
     let outside = ws.base.path("outside/target.txt").display().to_string();
