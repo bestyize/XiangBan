@@ -439,16 +439,38 @@ fn ball_stage(app: &tauri::AppHandle) -> Result<Stage, String> {
 /// would move is visible: the window hidden, or the page faded out for a re-anchor.
 fn set_stage(app: &tauri::AppHandle, window: &WebviewWindow, stage: Stage) -> Result<(), String> {
     let r = stage.rect;
-    let same = matches!((window.outer_position(), window.outer_size()), (Ok(p), Ok(s)) if p.x == r.x && p.y == r.y && s.width as i32 == r.w && s.height as i32 == r.h);
-    if !same {
+    if page_area(window) != Some(r) {
         // Move first so a window arriving on another screen takes that screen's scale before it is sized.
         window.set_position(PhysicalPosition::new(r.x, r.y)).map_err(|e| e.to_string())?;
         window.set_size(PhysicalSize::new(r.w as u32, r.h as u32)).map_err(|e| e.to_string())?;
         window.set_position(PhysicalPosition::new(r.x, r.y)).map_err(|e| e.to_string())?;
+        // A borderless window should have no frame, but Windows can still keep one, and the page then loses that
+        // much at the bottom (the ball was cut in half). Measure where the page really is and allow for it.
+        if let Some(fixed) = page_area(window).and_then(|actual| allow_for_frame(r, actual)) {
+            window.set_size(PhysicalSize::new(fixed.w as u32, fixed.h as u32)).map_err(|e| e.to_string())?;
+            window.set_position(PhysicalPosition::new(fixed.x, fixed.y)).map_err(|e| e.to_string())?;
+        }
     }
     *app.state::<AssistantState>().stage.lock().unwrap_or_else(|e| e.into_inner()) = Some(stage);
     emit_stage(app, window);
     Ok(())
+}
+
+/// Where the page is on the screen: the window's client area, which is the whole window unless it has a frame.
+fn page_area(window: &WebviewWindow) -> Option<Area> {
+    let (position, size) = (window.inner_position().ok()?, window.inner_size().ok()?);
+    Some(Area { x: position.x, y: position.y, w: size.width as i32, h: size.height as i32 })
+}
+
+/// Asked for the page at `wanted`, it landed at `actual`: the frame's share is the difference. Returns the position
+/// and the size to ask for so the page lands on `wanted`, or None when it already does.
+fn allow_for_frame(wanted: Area, actual: Area) -> Option<Area> {
+    (actual != wanted).then(|| Area {
+        x: wanted.x - (actual.x - wanted.x),
+        y: wanted.y - (actual.y - wanted.y),
+        w: (wanted.w + (wanted.w - actual.w)).max(1),
+        h: (wanted.h + (wanted.h - actual.h)).max(1),
+    })
 }
 
 fn current_stage(app: &tauri::AppHandle) -> Option<Stage> {
@@ -482,7 +504,7 @@ fn settle_ball(app: &tauri::AppHandle) {
     let state = app.state::<AssistantState>();
     if mode(app) != Mode::Ball || state.dragging.load(Ordering::SeqCst) { return; }
     let Some(window) = app.get_webview_window(LABEL) else { return };
-    let (Some(stage), Ok(position)) = (current_stage(app), window.outer_position()) else { return };
+    let (Some(stage), Ok(position)) = (current_stage(app), window.inner_position()) else { return };
     let Some((x, y, size)) = ball_on_screen(&stage, position.x, position.y) else { return };
     let Ok(monitor) = screen_at(app, Some(&window), x + size / 2, y + size / 2) else { return };
     let scale = monitor.scale_factor();
@@ -508,7 +530,7 @@ fn still_fits(stage: &Stage, area: Area, scale: f64, x: i32, y: i32, size: i32) 
 /// Remembers where the user left the capsule, so the next time it opens it is there and not back at the default.
 fn remember(app: &tauri::AppHandle, window: &WebviewWindow) {
     let (Ok(position), Ok(size), Ok(Some(monitor)), Ok(scale)) =
-        (window.outer_position(), window.outer_size(), window.current_monitor(), window.scale_factor())
+        (window.inner_position(), window.inner_size(), window.current_monitor(), window.scale_factor())
     else {
         return;
     };
@@ -730,7 +752,7 @@ fn save_ball(app: &tauri::AppHandle, window: &WebviewWindow) {
 
 /// The ball's own square in physical pixels: where it sits in the stage, wherever the stage is now.
 fn ball_rect(app: &tauri::AppHandle, window: &WebviewWindow) -> Option<(i32, i32, i32)> {
-    let position = window.outer_position().ok()?;
+    let position = window.inner_position().ok()?;
     ball_on_screen(&current_stage(app)?, position.x, position.y)
 }
 
@@ -1034,6 +1056,18 @@ mod tests {
     fn only_the_assistant_can_request_a_screen_capture() {
         assert_eq!(permitted(LABEL, "assistant_screenshot"), Some(true));
         for label in ["control", "pet", "widget-example", "content"] { assert_eq!(permitted(label, "assistant_screenshot"), Some(false)); }
+    }
+
+    #[test]
+    fn a_frame_windows_keeps_on_a_borderless_window_is_allowed_for() {
+        let wanted = Area { x: 1400, y: 300, w: 600, h: 750 };
+        assert_eq!(allow_for_frame(wanted, wanted), None, "no frame, nothing to fix");
+        // A 39 px caption on top: the page starts lower and is that much shorter.
+        let actual = Area { x: 1400, y: 339, w: 600, h: 711 };
+        assert_eq!(allow_for_frame(wanted, actual), Some(Area { x: 1400, y: 261, w: 600, h: 789 }));
+        // Thin borders all round.
+        let actual = Area { x: 1401, y: 301, w: 598, h: 748 };
+        assert_eq!(allow_for_frame(wanted, actual), Some(Area { x: 1399, y: 299, w: 602, h: 752 }));
     }
 
     #[test]
