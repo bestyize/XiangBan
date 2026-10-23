@@ -777,6 +777,7 @@ pub fn chat_overview(app: tauri::AppHandle, window: tauri::WebviewWindow) -> Res
     let running: Vec<String> = lock(&app.state::<ChatState>().runs).keys().cloned().collect();
     let mode = if app.state::<ChatState>().permission.mode() == PermissionMode::Auto { "auto" } else { "ask" };
     Ok(json!({
+        "snapshotProtocol": 1,
         "configured": config.is_complete(),
         "sessions": list(&app)?,
         "groups": mutate(&app, |index| index.groups())?,
@@ -803,31 +804,52 @@ pub fn chat_load_session(app: tauri::AppHandle, window: tauri::WebviewWindow, se
     emit(&app, "chat-permission-mode-changed", json!({ "sessionId": session_id, "mode": summary.permission_mode }));
     let dirs = Dirs::of(&app)?;
     let running = lock(&app.state::<ChatState>().runs).contains_key(&session_id);
+    let store = JsonlStore::new(dirs.sessions());
     if !running {
-        if let Some((run_id, tools)) = interrupted_run(&dirs.runs().join(&session_id)) {
-            emit(&app, "chat-run-interrupted", json!({ "session": session_id, "runId": run_id, "tools": tools }));
+        // A different process may own this session. A failed lease never licenses
+        // recovery writes; ordinary reads can still return the saved history.
+        if let Ok(_lease) = SessionLease::acquire(dirs.leases(), &session_id) {
+            if let Some((run_id, tools)) = interrupted_run(&dirs.runs().join(&session_id), &session_id) {
+                emit(&app, "chat-run-interrupted", json!({"session":session_id,"runId":run_id,"tools":tools}));
+            }
+            if let Some(warning) = run_history::persist_visible_tail(&dirs.runs().join(&session_id), &session_id, &store)
+                .map_err(|e| e.to_string())? { eprintln!("{warning}"); }
         }
     }
-    let mut messages = JsonlStore::new(dirs.sessions()).load(&session_id).map_err(|e| e.to_string())?;
-    if !running {
-        if let Some(partial) = run_history::recover_visible_tail(&dirs.runs().join(&session_id), &session_id, &messages)
-            .map_err(|e| e.to_string())? {
-            messages.push(partial);
+    store.load(&session_id).map_err(|e| e.to_string())
+}
+
+/// A cursor and a projection from the same run trace. Persisted messages after
+/// the run's user input are replaced by that trace, never combined twice.
+#[tauri::command]
+pub fn chat_session_snapshot(app: tauri::AppHandle, window: tauri::WebviewWindow, session_id: String) -> Result<Value, String> {
+    chat_window(&window)?;
+    checked_session_id(&session_id)?;
+    let _ = chat_load_session(app.clone(), window, session_id.clone())?;
+    let dirs = Dirs::of(&app)?;
+    // Capture the trace before reading messages. Messages can advance past this
+    // cursor safely: this run's assistant tail is discarded from the projection.
+    for _ in 0..3 {
+        let trace = run_history::latest_events(&dirs.runs().join(&session_id), &session_id);
+        let messages = JsonlStore::new(dirs.sessions()).load(&session_id).map_err(|e| e.to_string())?;
+        let running = lock(&app.state::<ChatState>().runs).contains_key(&session_id);
+        match trace {
+            Ok((run_id, sequence, events)) => {
+                // A new run can start between the trace and history reads.
+                if run_history::latest_run_id(&dirs.runs().join(&session_id), &session_id).ok().flatten() != run_id { continue; }
+                return Ok(run_history::snapshot_projection(messages, run_id, sequence, events, running));
+            }
+            Err(_) => return Ok(json!({"messages":messages,"events":[],"running":running,"ready":true,
+                "warning":"运行日志无法读取，已加载正常会话历史。"})),
         }
     }
-    Ok(messages)
+    Err("会话正在切换运行，请稍后重试。".into())
 }
 
 /// The conversation's last answer, when it never finished (the app quit or crashed while it ran) and has not been
 /// reported yet: its id and the tools that were started and may have done their work. Reported once.
-fn interrupted_run(journal_dir: &Path) -> Option<(String, Vec<String>)> {
-    let newest = fs::read_dir(journal_dir).ok()?.flatten()
-        .filter_map(|entry| {
-            let name = entry.file_name().to_string_lossy().into_owned();
-            let run = name.strip_prefix("run-")?.strip_suffix(".jsonl")?.to_string();
-            Some((entry.metadata().ok()?.modified().ok()?, run))
-        })
-        .max()?.1;
+fn interrupted_run(journal_dir: &Path, session: &str) -> Option<(String, Vec<String>)> {
+    let newest = run_history::latest_run_id(journal_dir, session).ok()??;
     let marker = journal_dir.join(format!("run-{newest}.interrupted"));
     if marker.exists() {
         return None;
@@ -946,6 +968,9 @@ pub(crate) fn send(app: tauri::AppHandle, session_id: String, text: String, imag
         let mut runs = lock(&state.runs);
         if runs.contains_key(&summary.id) { return Err("这个对话还在回答或正在压缩，请等它结束或先停止".into()); }
         let lease = SessionLease::acquire(Dirs::of(&app)?.leases(), &summary.id)?;
+        let dirs = Dirs::of(&app)?;
+        if let Some(warning) = run_history::persist_visible_tail(&dirs.runs().join(&summary.id), &summary.id, &JsonlStore::new(dirs.sessions()))
+            .map_err(|e| e.to_string())? { eprintln!("{warning}"); }
         lock(&state.leases).insert(summary.id.clone(), lease);
         runs.insert(summary.id.clone(), cancel.clone());
     }

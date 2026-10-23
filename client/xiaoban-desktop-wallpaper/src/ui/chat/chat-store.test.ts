@@ -244,12 +244,12 @@ describe('opening and removing conversations', () => {
     expect(h.store.current()!.items.map(i => i.kind)).toEqual(['user', 'assistant']);
   });
 
-  it('does not reload over an answer that is being written', async () => {
+  it('loads history and preserves events for an answer that is being written', async () => {
     const h = harness({ chat_overview: () => overview({ sessions: [summary('s1')], running: ['s1'] }), chat_load_session: () => history });
     await h.store.init();
     h.events('s1', { type: 'text_delta', text: '写到一半' });
     await h.store.select('s1');
-    expect(h.commands()).not.toContain('chat_load_session');
+    expect(h.commands()).toContain('chat_load_session');
     expect(JSON.stringify(h.store.current()!.items)).toContain('写到一半');
   });
 
@@ -887,5 +887,24 @@ describe('each conversation works in its own folder', () => {
     await h.store.select('s1');
     const notice = h.store.views.s1.items[1];
     expect(notice.kind === 'notice' && notice.text).toContain('工作区已切换到 /p/b');
+  });
+});
+
+
+describe('sequenced session snapshots', () => {
+  it('keeps history, buffers concurrent deltas and deduplicates repeated sequences', async () => {
+    let resolve!: (value: unknown) => void;
+    const h = harness({ chat_overview: () => ({ ...overview({ sessions: [summary('s1')], running: ['s1'] }), snapshotProtocol: 1 }),
+      chat_session_snapshot: () => new Promise(r => { resolve = r; }) });
+    await h.store.init();
+    const selected = h.store.select('s1');
+    const delta = { session: 's1', runId: 'r1', sequence: 3, event: { type: 'text_delta', text: ' world' } };
+    h.emit('chat-event', delta); h.emit('chat-event', delta);
+    resolve({ messages: [{ role: 'user', parts: [{ type: 'text', text: 'question' }] }], runId: 'r1', sequence: 2,
+      events: [{ session: 's1', runId: 'r1', sequence: 2, event: { type: 'text_delta', text: 'hello' } }], running: true });
+    await selected;
+    expect(h.store.current()!.items.map(item => 'text' in item ? item.text : '')).toEqual(['question', 'hello world']);
+    h.emit('chat-event', delta);
+    expect(h.store.current()!.items.at(-1)).toMatchObject({ text: 'hello world' });
   });
 });

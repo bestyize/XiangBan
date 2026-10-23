@@ -97,6 +97,13 @@ export function createChatStore(deps: ChatDeps): ChatStore {
   let disposed = false;
   const interruptions: Record<string, ChatItem> = {};
   let refreshedAfterErrorAt = 0;
+  let supportsSnapshots = false;
+  const pendingEvents: Record<string, ChatEventPayload[]> = {};
+  const loading = new Map<string, Promise<void>>();
+  const activeRun = new Map<string, string>();
+  const cursors = new Map<string, number>();
+  interface Snapshot { messages: WireMessage[]; runId?: string; sequence?: number; events?: ChatEventPayload[]; running?: boolean; ready?: boolean; warning?: string; interrupted?: boolean }
+
 
   const store: ChatStore = reactive({
     ready: false,
@@ -207,20 +214,7 @@ export function createChatStore(deps: ChatDeps): ChatStore {
         if (!deps.desktop) { store.ready = true; return; }
         try {
           const listeners = await Promise.all([
-            deps.listen<ChatEventPayload>('chat-event', ({ session, event }) => { if (!disposed) {
-              const view = viewOf(session, true);
-              applyEvent(view, event);
-              if (event.type === 'done' && store.currentId === session) {
-                const last = view.items.at(-1);
-                if (last?.kind === 'assistant' && last.text.trim()) deps.onReply?.(session, last.text, last.id);
-              }
-              if ((event.type === 'cancelled' || event.type === 'error') && store.currentId === session) deps.onActivity?.();
-              if ((event.type === 'done' || event.type === 'cancelled' || event.type === 'error') && store.currentId === session) void store.refreshContext();
-              if (event.type === 'error' && modelFailure(event.message).refresh && Date.now() - refreshedAfterErrorAt > 300000) {
-                refreshedAfterErrorAt = Date.now();
-                void deps.invoke('refresh_ai_providers', { force: true }).catch(() => {});
-              }
-            } }),
+            deps.listen<ChatEventPayload>('chat-event', payload => { if (!disposed) receive(payload); }),
             deps.listen<ApprovalRequest>('chat-approval', request => { if (!disposed) addPending(viewOf(request.session, true).approvals, request); }),
             deps.listen<QuestionRequest>('chat-question', request => { if (!disposed) addPending(viewOf(request.session, true).questions, request); }),
             deps.listen<SessionSummary[]>('chat-sessions-changed', sessions => { if (!disposed) store.sessions = sessions; }),
@@ -267,6 +261,7 @@ export function createChatStore(deps: ChatDeps): ChatStore {
       try {
         const overview = await deps.invoke<Overview | undefined>('chat_overview');
         if (disposed || !overview) return;
+        supportsSnapshots = overview.snapshotProtocol === 1;
         store.configured = overview.configured;
         store.workspace = overview.workspace;
         store.recentWorkspaces = overview.recentWorkspaces ?? [];
@@ -274,7 +269,7 @@ export function createChatStore(deps: ChatDeps): ChatStore {
         if (typeof overview.hideToolCalls === 'boolean') store.hideToolCalls = overview.hideToolCalls;
         store.sessions = overview.sessions;
         store.groups = overview.groups ?? [];
-        for (const id of overview.running) viewOf(id, true).running = true;
+        for (const id of overview.running) viewOf(id, false).running = true;
         store.loadError = '';
         void store.refreshContext();
       } catch (error) {
@@ -302,18 +297,7 @@ export function createChatStore(deps: ChatDeps): ChatStore {
       if (curSession?.permissionMode) {
         store.permissionMode = curSession.permissionMode;
       }
-      const view = viewOf(id, false);
-      if (view.loaded) return;
-      try {
-        const messages = await deps.invoke<WireMessage[]>('chat_load_session', { sessionId: id });
-        if (view.loaded) return;
-        view.items = itemsFromHistory(view, messages ?? []);
-        const interrupted = interruptions[id];
-        if (interrupted) { view.items.push(interrupted); delete interruptions[id]; }
-        view.loaded = true;
-      } catch (error) {
-        deps.notify(error, 'error');
-      }
+      if (!viewOf(id, false).loaded) await loadView(id);
     },
 
     async send(text, attachments = []) {
@@ -504,7 +488,101 @@ export function createChatStore(deps: ChatDeps): ChatStore {
     },
   }) as ChatStore;
 
-  /** The view of a conversation; one made for a live event counts as loaded because its history is the event stream. */
+  function receive(payload: ChatEventPayload) {
+    const { session, runId, sequence } = payload;
+    const key = `${session}/${runId ?? ''}`;
+    if (runId && sequence !== undefined && sequence <= (cursors.get(key) ?? 0)) return;
+    const view = viewOf(session, !runId); // legacy hosts have no cursor/snapshot contract
+    if (!runId) {
+      present(view, payload);
+      if (!view.loaded) { (pendingEvents[session] ??= []).push(payload); void loadView(session); }
+      return;
+    }
+    if (!view.loaded || (runId && activeRun.get(session) !== runId)) {
+      (pendingEvents[session] ??= []).push(payload);
+      void loadView(session);
+      return;
+    }
+    if (runId && sequence !== undefined) cursors.set(key, sequence);
+    present(view, payload);
+  }
+
+  function present(view: SessionView, { session, event }: ChatEventPayload) {
+    applyEvent(view, event);
+    if (event.type === 'done' && store.currentId === session) {
+      const last = view.items.at(-1);
+      if (last?.kind === 'assistant' && last.text.trim()) deps.onReply?.(session, last.text, last.id);
+    }
+    if ((event.type === 'cancelled' || event.type === 'error') && store.currentId === session) deps.onActivity?.();
+    if ((event.type === 'done' || event.type === 'cancelled' || event.type === 'error') && store.currentId === session) void store.refreshContext();
+    if (event.type === 'error' && modelFailure(event.message).refresh && Date.now() - refreshedAfterErrorAt > 300000) {
+      refreshedAfterErrorAt = Date.now();
+      void deps.invoke('refresh_ai_providers', { force: true }).catch(() => {});
+    }
+  }
+
+  async function loadView(id: string): Promise<void> {
+    const existing = loading.get(id);
+    if (existing) return existing;
+    const beforeRequest = new Set(pendingEvents[id] ?? []);
+    const task = (async () => {
+      const view = viewOf(id, false);
+      try {
+        let snapshot: Snapshot | undefined;
+        try { if (supportsSnapshots) snapshot = await deps.invoke<Snapshot>('chat_session_snapshot', { sessionId: id }); }
+        catch (error) {
+          // Only an old host lacking the command uses the legacy path.
+          if (!/unknown|not found|unexpected chat_session_snapshot/i.test(String(error))) throw error;
+        }
+        if (!snapshot || !Array.isArray(snapshot.messages)) {
+          snapshot = { messages: await deps.invoke<WireMessage[]>('chat_load_session', { sessionId: id }) ?? [] };
+        }
+        if (disposed || !store.views[id]) return;
+        view.items = itemsFromHistory(view, snapshot.messages);
+        view.usage = undefined;
+        view.status = '';
+        for (const payload of snapshot.events ?? []) applyEvent(view, payload.event);
+        view.loaded = snapshot.ready !== false;
+        if (snapshot.runId) {
+          activeRun.set(id, snapshot.runId);
+          cursors.set(`${id}/${snapshot.runId}`, snapshot.sequence ?? 0);
+        }
+        if (typeof snapshot.running === 'boolean') {
+          view.running = snapshot.running;
+          if (!snapshot.running) {
+            for (const item of view.items) if (item.kind === 'assistant' || item.kind === 'reasoning') item.streaming = false;
+          }
+        }
+        if (snapshot.interrupted && !interruptions[id]) view.items.push({ kind: 'notice', id: nextId(view), tone: 'warning', text: '上次回答在中途中断，生成的内容已保存。', canContinue: true });
+        const interrupted = interruptions[id];
+        if (interrupted) { view.items.push(interrupted); delete interruptions[id]; }
+        if (snapshot.warning) deps.notify(snapshot.warning, 'info');
+        const queued = (pendingEvents[id] ?? []).sort((a, b) => a.runId === b.runId ? (a.sequence ?? 0) - (b.sequence ?? 0) : 0);
+        pendingEvents[id] = [];
+        for (const payload of queued) {
+          if (payload.runId && snapshot.runId && payload.runId !== snapshot.runId) {
+            // Events received before this request are already represented by the
+            // snapshot or an older persisted run. A newer run arriving during the
+            // request requires one fresh snapshot instead of appending blindly.
+            if (!beforeRequest.has(payload)) pendingEvents[id].push(payload);
+          } else if (!payload.runId || payload.sequence === undefined || payload.sequence > (cursors.get(`${id}/${payload.runId}`) ?? snapshot.sequence ?? 0)) {
+            if (payload.runId && payload.sequence !== undefined) cursors.set(`${id}/${payload.runId}`, payload.sequence);
+            if (payload.runId) present(view, payload); else applyEvent(view, payload.event);
+          }
+        }
+      } catch (error) {
+        pendingEvents[id] = [];
+        if (!disposed) deps.notify(error, 'error');
+      }
+    })();
+    loading.set(id, task);
+    try { await task; } finally {
+      loading.delete(id);
+      if (!disposed && pendingEvents[id]?.length) void loadView(id);
+    }
+  }
+
+  /** A live delta never proves that persisted history has been loaded. */
   function viewOf(id: string, loaded: boolean): SessionView {
     // Read it back after storing it: the value of an assignment is the plain object, and changes to
     // that would never reach the page. Only what comes out of the reactive store is watched.
@@ -553,4 +631,3 @@ export function createChatStore(deps: ChatDeps): ChatStore {
 
   return store;
 }
-

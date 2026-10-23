@@ -16,6 +16,7 @@ export interface ChatGroup { id: string; name: string }
 export interface Library { sessions: SessionSummary[]; groups: ChatGroup[] }
 
 export interface Overview {
+  snapshotProtocol?: number;
   configured: boolean;
   sessions: SessionSummary[];
   groups?: ChatGroup[];
@@ -105,4 +106,3 @@ export interface SessionView {
 }
 
 export interface TokenUsage { prompt: number; completion: number }
-

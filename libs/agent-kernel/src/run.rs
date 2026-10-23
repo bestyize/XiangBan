@@ -238,7 +238,7 @@ impl Agent {
                 mw.before_model(&mut turn)?;
             }
             let mut request = ChatRequest { messages: turn.messages, tools: turn.tools };
-            let mut reply = self.chat_with_retry(session, &mut request, &mut recovered_context_budget, on_event, cancel)?;
+            let mut reply = self.chat_with_retry(session, run_id, &mut request, &mut recovered_context_budget, on_event, cancel)?;
             let turn = Turn { session: turn.session, index, messages: request.messages, tools: request.tools };
             for mw in &self.middleware {
                 mw.after_model(&turn, &mut reply.message)?;
@@ -339,6 +339,7 @@ impl Agent {
     fn chat_with_retry(
         &self,
         session: &str,
+        run_id: &str,
         request: &mut ChatRequest,
         recovered_budget: &mut Option<usize>,
         on_event: &mut dyn FnMut(Event),
@@ -416,7 +417,7 @@ impl Agent {
                     if streamed {
                         let mut partial = Message::assistant(visible_text, Vec::new());
                         partial.reasoning = visible_reasoning;
-                        partial.structured_content = Some(serde_json::json!({"interrupted": true}));
+                        partial.structured_content = Some(serde_json::json!({"interrupted": true, "recovery_run_id": run_id}));
                         self.store.append(session, &[partial])?;
                     }
                     return Err(error);

@@ -87,29 +87,95 @@ impl VisibleTail {
     }
 }
 
-/// Presentation-only recovery: persisted protocol history is not rewritten when opening
-/// a conversation, and no tools or model requests are replayed.
+/// Build the final visible tail without inventing calls or continuation state.
+/// The caller persists it once, while holding the session lease.
 pub(super) fn recover_visible_tail(
     dir: &std::path::Path, session: &str, saved: &[agent_kernel::Message],
 ) -> Result<Option<agent_kernel::Message>, HarnessError> {
-    let entries = match std::fs::read_dir(dir) {
-        Ok(entries) => entries,
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
-        Err(error) => return Err(HarnessError::Store(error.to_string())),
-    };
-    let newest = entries.flatten().filter_map(|entry| {
-        let name = entry.file_name().to_string_lossy().into_owned();
-        let run = name.strip_prefix("run-")?.strip_suffix(".jsonl")?.to_owned();
-        Some((entry.metadata().ok()?.modified().ok()?, run))
-    }).max();
-    let Some((_, run)) = newest else { return Ok(None); };
+    let Some(run) = latest_run_id(dir, session)? else { return Ok(None); };
     let log = JsonlRunLog::new(dir);
     let mut tail = VisibleTail::default();
     log.visit(&run, |record| {
         if record.session_id != session || record.parent_run_id.is_some() { return; }
         if let RunEventBody::Event { event } = record.body { tail.push(&event); }
     })?;
-    Ok(tail.message(saved))
+    if saved.iter().any(|message| message.structured_content.as_ref()
+        .and_then(|v| v["recovery_run_id"].as_str()) == Some(run.as_str())) { return Ok(None); }
+    Ok(tail.message(saved).map(|mut message| {
+        message.structured_content.as_mut().unwrap()["recovery_run_id"] = json!(run);
+        message
+    }))
+}
+
+/// Caller holds the session lease. Trace corruption must not hide valid session
+/// history; only a failed write to the actual session store is fatal.
+pub(super) fn persist_visible_tail(
+    dir: &std::path::Path, session: &str, store: &impl agent_kernel::SessionStore,
+) -> Result<Option<String>, HarnessError> {
+    let saved = store.load(session)?;
+    match recover_visible_tail(dir, session, &saved) {
+        Ok(Some(message)) => { store.append(session, &[message])?; Ok(None) }
+        Ok(None) => Ok(None),
+        Err(_) => Ok(Some("运行日志无法恢复，已保留正常会话历史。".into())),
+    }
+}
+
+/// Root runs only: research-child files share this directory and must never
+/// replace the parent session's snapshot or recovery cursor.
+pub(super) fn latest_run_id(dir: &std::path::Path, session: &str) -> Result<Option<String>, HarnessError> {
+    use std::io::{BufRead, Read};
+    let entries = match std::fs::read_dir(dir) {
+        Ok(entries) => entries,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(error) => return Err(HarnessError::Store(error.to_string())),
+    };
+    let latest = entries.flatten().filter_map(|entry| {
+        let name = entry.file_name().to_string_lossy().into_owned();
+        let run = name.strip_prefix("run-")?.strip_suffix(".jsonl")?.to_owned();
+        let file = std::fs::File::open(entry.path()).ok()?;
+        let mut first = String::new();
+        std::io::BufReader::new(file).take(64 * 1024).read_line(&mut first).ok()?;
+        if !first.ends_with('\n') { return None; }
+        let record: Value = serde_json::from_str(&first).ok()?;
+        let event = &record["event"];
+        if event["session_id"] != session || !event["parent_run_id"].is_null() || event["run_id"] != run { return None; }
+        Some((entry.metadata().ok()?.modified().ok()?, run))
+    }).max();
+    Ok(latest.map(|(_, run)| run))
+}
+
+pub(super) fn latest_events(
+    dir: &std::path::Path, session: &str,
+) -> Result<(Option<String>, u64, Vec<Value>), HarnessError> {
+    let Some(run) = latest_run_id(dir, session)? else { return Ok((None, 0, Vec::new())); };
+    let mut sequence = 0;
+    let mut events = Vec::new();
+    JsonlRunLog::new(dir).visit(&run, |record| {
+        if record.session_id != session || record.parent_run_id.is_some() { return; }
+        sequence = record.sequence;
+        if let RunEventBody::Event { event } = record.body {
+            events.push(json!({"session":session,"runId":run,"sequence":record.sequence,"event":event}));
+        }
+    })?;
+    Ok((Some(run), sequence, events))
+}
+
+pub(super) fn snapshot_projection(
+    mut messages: Vec<agent_kernel::Message>, run_id: Option<String>, sequence: u64, events: Vec<Value>, running: bool,
+) -> Value {
+    let terminal = events.iter().any(|v| matches!(v["event"]["type"].as_str(), Some("done" | "cancelled" | "error")));
+    let running = running && !terminal;
+    let has_output = events.iter().any(|v| matches!(v["event"]["type"].as_str(),
+        Some("text_delta" | "reasoning_delta" | "tool_start" | "done" | "cancelled" | "error")));
+    // Model callbacks only begin after the user's message is saved. Prior to
+    // that boundary the UI keeps waiting and retries on the first model event.
+    if let Some(index) = has_output.then(|| messages.iter().rposition(|m| m.role == agent_kernel::Role::User && !m.synthetic)).flatten() {
+        messages.truncate(index + 1);
+        let interrupted = !running && !events.iter().any(|v| matches!(v["event"]["type"].as_str(), Some("done" | "cancelled" | "error")));
+        json!({"messages":messages,"runId":run_id,"sequence":sequence,"events":events,"running":running,"ready":true,"interrupted":interrupted})
+    } else {
+        json!({"messages":messages,"runId":run_id,"sequence":sequence,"events":[],"running":running,"ready":!running})
+    }
 }
 
 #[cfg(test)]
@@ -203,5 +269,41 @@ mod visible_recovery_tests {
         assert!(recover_visible_tail(&dir, "other-session", &[]).unwrap().is_none());
         drop(journal);
         std::fs::remove_dir_all(dir).unwrap();
+    }
+}
+
+#[cfg(test)]
+mod durable_recovery_tests {
+    use super::*;
+    use agent_kernel::{JsonlStore, Message, SessionStore, RunState};
+    #[test]
+    fn recovery_is_durable_idempotent_and_ignores_research_children() {
+        let dir=std::env::temp_dir().join(format!("durable-chat-{}-{}",std::process::id(),std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()));
+        let runs=dir.join("runs"); let store=JsonlStore::new(dir.join("sessions")); store.append("s",&[Message::user_text("question")]).unwrap();
+        let log=JsonlRunLog::new(&runs);
+        log.append(&RunEvent{run_id:"root".into(),session_id:"s".into(),parent_run_id:None,sequence:1,timestamp_ms:1,body:RunEventBody::Event{event:Event::TextDelta{text:"partial".into()}}}).unwrap();
+        log.append(&RunEvent{run_id:"child".into(),session_id:"s#research".into(),parent_run_id:Some("root".into()),sequence:1,timestamp_ms:2,body:RunEventBody::State{state:RunState::Running,reason:None}}).unwrap();
+        assert_eq!(latest_run_id(&runs,"s").unwrap().as_deref(),Some("root"));
+        assert!(persist_visible_tail(&runs,"s",&store).unwrap().is_none());
+        assert!(persist_visible_tail(&runs,"s",&store).unwrap().is_none());
+        assert_eq!(store.load("s").unwrap().len(),2); assert_eq!(store.load("s").unwrap()[1].text(),"partial");
+        log.append(&RunEvent{run_id:"new".into(),session_id:"s".into(),parent_run_id:None,sequence:1,timestamp_ms:3,body:RunEventBody::State{state:RunState::Running,reason:None}}).unwrap();
+        use std::io::Write;
+        std::fs::OpenOptions::new().append(true).open(runs.join("run-new.jsonl")).unwrap().write_all(b"{broken}\n").unwrap();
+        assert!(persist_visible_tail(&runs,"s",&store).unwrap().is_some());
+        assert_eq!(store.load("s").unwrap()[1].text(),"partial");
+        drop(log); std::fs::remove_dir_all(dir).unwrap();
+    }
+    #[test]
+    fn snapshot_has_one_history_prefix_and_one_cursor_bound_trace() {
+        let saved=vec![Message::user_text("old"),Message::assistant("old reply",vec![]),Message::user_text("current"),Message::assistant("new reply",vec![])];
+        let events=vec![json!({"session":"s","runId":"r","sequence":2,"event":{"type":"text_delta","text":"new reply"}})];
+        let result=snapshot_projection(saved,Some("r".into()),2,events,true);
+        assert_eq!(result["messages"].as_array().unwrap().len(),3); assert_eq!(result["events"].as_array().unwrap().len(),1); assert_eq!(result["sequence"],2);
+        assert_eq!(snapshot_projection(vec![],Some("new".into()),1,vec![],true)["ready"],false);
+        let done=snapshot_projection(vec![Message::user_text("q")],Some("done".into()),3,vec![json!({"event":{"type":"done"}})],true);
+        assert_eq!(done["running"],false);
+        let failed=snapshot_projection(vec![Message::user_text("q")],Some("failed".into()),3,vec![json!({"event":{"type":"error","message":"network"}})],true);
+        assert_eq!(failed["events"].as_array().unwrap().len(),1); assert_eq!(failed["running"],false);
     }
 }
