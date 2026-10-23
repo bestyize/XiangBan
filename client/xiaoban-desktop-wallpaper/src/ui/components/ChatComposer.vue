@@ -204,6 +204,9 @@ watch([() => props.store.creationDraft, () => chat.configured, shown], ([text, c
   if (!text || !configured || !now) return;
   draft.value = text;
   props.store.creationDraft = null;
+  const handed = props.store.creationAttachments ?? [];
+  props.store.creationAttachments = null;
+  for (const item of handed) if (attachments.value.length < MAX_IMAGES) attachments.value.push(item);
 }, { immediate: true });
 
 const placeholderText = computed(() => !props.store.desktop ? '请在桌面应用中使用小伴 AI' : !chat.configured ? '先到设置里配置模型' : props.placeholder || '问点什么，或交给小伴去办就行');

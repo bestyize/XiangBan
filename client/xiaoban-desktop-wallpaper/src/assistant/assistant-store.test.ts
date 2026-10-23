@@ -568,6 +568,15 @@ describe('floating assistant', () => {
     expect(invoke).toHaveBeenCalledWith('assistant_unfold', { peek: true });
   });
 
+  it('saves an answer to 资料库 with the conversation it came from, and says so when it cannot', async () => {
+    const { store, invoke } = setup({ voice: false });
+    await store.init();
+    expect(await store.saveAnswer('结论在前')).toBe(true);
+    expect(invoke).toHaveBeenCalledWith('library_save', { item: expect.objectContaining({ kind: 'answer', text: '结论在前' }) });
+    invoke.mockImplementationOnce(async () => { throw new Error('资料库无法保存'); });
+    expect(await store.saveAnswer('再存一次')).toBe(false);
+  });
+
   it('opens for a glance without listening, and takes the focus once used', async () => {
     const { store, asr, invoke, emit } = setup();
     await store.init();

@@ -32,6 +32,8 @@ export interface ControlStore {
   showLoginModal: boolean;
   page: ControlPage;
   creationDraft: string | null;
+  /** Files handed to the next message along with `creationDraft` (资料库 → 用这份资料提问). */
+  creationAttachments: import('./chat/attachments.ts').PendingAttachment[] | null;
   startCreation(kind: "wallpaper" | "effect" | "widget" | "game" | "pet"): Promise<void>;
   /** The settings dialog's category; the chat sends people to "ai" when no model is set up. */
   settingsTab: SettingsTab;
