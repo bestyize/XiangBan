@@ -985,7 +985,7 @@ pub fn tools_in_workspace(desktop: Arc<dyn Desktop>, workspace: &std::path::Path
             Ok(match tab { Some(tab) => format!("已打开 {page} 页面的 {tab}"), None => format!("已打开 {page} 页面") })
         }),
         tool(&desktop, ToolSpec::new("desktop_windows", "查看小伴自己的窗口和显示器：盆栽 companion、超级小伴 assistant、控制台 control、桌面组件 widget:<id> 的位置、显示状态和层级。移动前用本工具确认目标与显示器。", none()).risk(Risk::Read).parallel(), |d, _| d.windows().map(|v| v.to_string())),
-        tool(&desktop, ToolSpec::new("desktop_window_set", "调整小伴自己窗口的位置、层级（置顶/贴桌面）、显示/隐藏，不操作其他应用。target: companion 是盆栽，assistant 是超级小伴悬浮条（用户让你收起来时用 action=collapse），control 是设置控制台，widget:<id> 是组件。移动 x/y 使用屏内比例（0 左/上，0.5 中间，1 右/下），可指定 desktop_windows 返回的 monitor。layer: desktop 贴桌面、normal 普通窗口（组件只能 desktop/topmost）、topmost 置顶；组件的层级会保存，其他窗口的层级本次运行有效。隐藏盆栽或组件会保存开关；收起助手不退出应用、不取消任务。", object(json!({
+        tool(&desktop, ToolSpec::new("desktop_window_set", "调整小伴自己窗口的位置、层级（置顶/贴桌面）、显示/隐藏，不操作其他应用。target: companion 是盆栽，assistant 是超级小伴悬浮条（用户让你收起来时用 action=collapse），control 是设置控制台，widget:<id> 是组件。移动 x/y 使用屏内比例（0 左/上，0.5 中间，1 右/下），可指定 desktop_windows 返回的 monitor。layer: desktop 贴桌面、normal 普通窗口（组件只能 desktop/topmost）、topmost 置顶；组件（widget:<id>）的层级会保存、重启后仍保持；盆栽、超级小伴、控制台的层级只在本次运行有效。隐藏盆栽或组件会保存开关；收起助手不退出应用、不取消任务。", object(json!({
             "target":{"type":"string"},"action":{"type":"string","enum":["show","hide","collapse"]},
             "x":{"type":"number","minimum":0,"maximum":1},"y":{"type":"number","minimum":0,"maximum":1},
             "monitor":{"type":"string"},"layer":{"type":"string","enum":["desktop","normal","topmost"]}
@@ -1093,8 +1093,8 @@ pub fn tools_in_workspace(desktop: Arc<dyn Desktop>, workspace: &std::path::Path
         tool(&desktop,ToolSpec::new("pet_catalog","查看官方/自定义宠物主题及独立桌面实例。提供theme_id时读取该主题的完整作品，便于参考或调整形象。",object(json!({"theme_id":{"type":"string"}}),&[])).risk(Risk::Read).parallel(),pet_catalog),
         tool(&desktop,ToolSpec::new("pet_theme_save","保存AI创作的宠物主题，格式先读pet_read_format。保留动态表情系统。保存模板不会自动放到桌面，随后用pet_add。",object(json!({"theme":{"type":"object"},"overwrite":{"type":"boolean"}}),&["theme"])).risk(Risk::Write).serial(),|d,a|{let theme:crate::pet_packs::Theme=serde_json::from_value(a["theme"].clone()).map_err(|e|format!("主题格式无效：{e}"))?;let result=json!({"saved":true,"theme_id":theme.id,"name":theme.name,"pet_count":theme.pets.len()});d.pet_save_theme(theme,optional_bool(a,"overwrite")?.unwrap_or(false))?;Ok(result.to_string())}),
         tool(&desktop,ToolSpec::new("pet_theme_delete","删除自定义宠物主题。官方主题受保护；先移除该主题的桌面实例。",object(json!({"id":{"type":"string"}}),&["id"])).risk(Risk::Write).serial(),|d,a|{let id=text_arg(a,"id")?;d.pet_delete_theme(id.into())?;Ok(json!({"deleted":true,"theme_id":id}).to_string())}),
-        tool(&desktop,ToolSpec::new("pet_add","从官方或自定义主题添加一只独立桌面宠物，允许多只以及同款重复添加。返回桌面实例id。",object(json!({"theme_id":{"type":"string"},"pet_id":{"type":"string"},"layer":{"type":"string","enum":["desktop","topmost"]}}),&["theme_id","pet_id"])).risk(Risk::Write).self_managed().serial(),|d,a|d.pet_add(text_arg(a,"theme_id")?.into(),text_arg(a,"pet_id")?.into(),optional_text(a,"layer")?.map(String::from)).map(|v|v.to_string())),
-        tool(&desktop,ToolSpec::new("pet_update","只调整指定桌面宠物实例，不影响同款其他宠物。id来自pet_catalog的instances。",object(json!({"id":{"type":"string"},"patch":{"type":"object","properties":{"name":{"type":"string"},"size":{"type":"number","minimum":80,"maximum":420},"expression":{"type":"string","enum":EXPRESSIONS},"enabled":{"type":"boolean"},"links":{"type":"boolean"},"x":{"type":"number","minimum":0,"maximum":1},"y":{"type":"number","minimum":0,"maximum":1},"layer":{"type":"string","enum":["desktop","topmost"]},"monitor":{"type":"string"},"themeId":{"type":"string"},"petId":{"type":"string"}},"additionalProperties":false}}),&["id","patch"])).risk(Risk::Write).self_managed().serial(),|d,a|{let patch=serde_json::from_value(a["patch"].clone()).map_err(|e|format!("宠物配置无效：{e}"))?;let id=text_arg(a,"id")?;d.pet_update(id,patch)?;Ok(json!({"updated":true,"id":id,"patch":a["patch"]}).to_string())}),
+        tool(&desktop,ToolSpec::new("pet_add","从官方或自定义主题添加一只独立桌面宠物，允许多只以及同款重复添加。返回桌面实例id。",object(json!({"theme_id":{"type":"string"},"pet_id":{"type":"string"},"layer":{"type":"string","enum":["desktop","topmost"],"description":"desktop 贴桌面，topmost 始终置顶；会保存，重启后仍保持"}}),&["theme_id","pet_id"])).risk(Risk::Write).self_managed().serial(),|d,a|d.pet_add(text_arg(a,"theme_id")?.into(),text_arg(a,"pet_id")?.into(),optional_text(a,"layer")?.map(String::from)).map(|v|v.to_string())),
+        tool(&desktop,ToolSpec::new("pet_update","只调整指定桌面宠物实例，不影响同款其他宠物。id来自pet_catalog的instances。",object(json!({"id":{"type":"string"},"patch":{"type":"object","properties":{"name":{"type":"string"},"size":{"type":"number","minimum":80,"maximum":420},"expression":{"type":"string","enum":EXPRESSIONS},"enabled":{"type":"boolean"},"links":{"type":"boolean"},"x":{"type":"number","minimum":0,"maximum":1},"y":{"type":"number","minimum":0,"maximum":1},"layer":{"type":"string","enum":["desktop","topmost"],"description":"desktop 贴桌面，topmost 始终置顶；会保存，重启后仍保持"},"monitor":{"type":"string"},"themeId":{"type":"string"},"petId":{"type":"string"}},"additionalProperties":false}}),&["id","patch"])).risk(Risk::Write).self_managed().serial(),|d,a|{let patch=serde_json::from_value(a["patch"].clone()).map_err(|e|format!("宠物配置无效：{e}"))?;let id=text_arg(a,"id")?;d.pet_update(id,patch)?;Ok(json!({"updated":true,"id":id,"patch":a["patch"]}).to_string())}),
         tool(&desktop,ToolSpec::new("pet_remove","移除指定桌面宠物实例，主题作品仍保留，其他实例不受影响。",object(json!({"id":{"type":"string"}}),&["id"])).risk(Risk::Write).self_managed().serial(),|d,a|{let id=text_arg(a,"id")?;d.pet_remove(id)?;Ok(json!({"removed":true,"id":id}).to_string())}),
         tool(&desktop, ToolSpec::new("care_list", "列出关怀提醒的规则（id、时间、文案）和总开关状态。", none()).risk(Risk::Read).parallel(), care_list),
         tool(
@@ -1132,7 +1132,7 @@ pub fn tools_in_workspace(desktop: Arc<dyn Desktop>, workspace: &std::path::Path
                     json!({
                         "kind": {"type": "string", "enum": crate::widgets::KINDS, "description": "组件类型"},
                         "theme": {"type": "string", "enum": ["ivory"], "description": "可选外观风格，固定 ivory（设计稿材质）"},
-                        "layer": {"type": "string", "enum": ["desktop", "topmost"], "description": "可选层级：desktop 贴在桌面（默认），topmost 始终置顶（浮在其他窗口上方）"},
+                        "layer": {"type": "string", "enum": ["desktop", "topmost"], "description": "可选层级：desktop 贴在桌面（默认），topmost 始终置顶（浮在其他窗口上方）。会保存，重启后仍保持，不是临时的"},
                     }),
                     &["kind"],
                 ),
@@ -1177,7 +1177,7 @@ pub fn tools_in_workspace(desktop: Arc<dyn Desktop>, workspace: &std::path::Path
                     json!({
                         "id": {"type": "string", "description": "组件 id，来自 widget_list"},
                         "theme": {"type": "string", "enum": ["ivory"]},
-                        "layer": {"type": "string", "enum": ["desktop", "topmost"], "description": "desktop 贴在桌面，topmost 始终置顶（浮在其他窗口上方）"},
+                        "layer": {"type": "string", "enum": ["desktop", "topmost"], "description": "desktop 贴在桌面，topmost 始终置顶（浮在其他窗口上方）。会保存，重启后仍保持，不是临时的"},
                         "scale": {"type": "number", "minimum": 0.75, "maximum": 1.5, "description": "缩放比例"},
                         "enabled": {"type": "boolean", "description": "true 显示，false 隐藏"},
                         "x": {"type": "number", "minimum": 0.0, "maximum": 1.0, "description": "水平位置比例"},
