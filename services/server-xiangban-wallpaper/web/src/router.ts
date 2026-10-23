@@ -10,6 +10,7 @@ export const router = createRouter({
     { path: '/desktop', redirect: to => ({ path: '/', query: to.query, hash: to.hash }) },
     { path: '/', name: 'desktop', component: () => import('./views/DesktopView.vue'), meta: { tab: 'desktop' } },
     { path: '/guide', name: 'guide', component: () => import('./views/GuideView.vue'), meta: { tab: 'guide' } },
+    { path: '/plugins', name: 'plugins', component: () => import('./views/PluginsView.vue'), meta: { tab: 'plugins' } },
     { path: '/images', name: 'home', component: () => import('./views/BrowseView.vue'), meta: { tab: 'home' } },
     { path: '/images/c/:id', alias: '/c/:id', name: 'category', component: () => import('./views/BrowseView.vue'), meta: { tab: 'home' } },
     { path: '/videos', name: 'videos', component: () => import('./views/BrowseView.vue'), meta: { tab: 'videos' } },
@@ -74,3 +75,4 @@ router.afterEach(async (to, from) => {
   await nextTick()
   window.scrollTo({ top: scrollByPath.get(to.path) ?? 0, behavior: 'instant' })
 })
+
