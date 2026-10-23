@@ -65,6 +65,15 @@ describe('assistant capsule', () => {
     expect(wrapper.get('.capsule').findAll('button').map(b=>b.attributes('data-testid'))).toEqual(['assistant-orb','assistant-add-image','assistant-screenshot','assistant-primary']);
     expect(wrapper.find('[role="toolbar"]').exists()).toBe(false);
   });
+  it('keeps the empty text box one line high and refits a draft when the window widens', async () => {
+    const {store,wrapper}=setup({input:''});await nextTick();
+    const field=wrapper.get('[data-testid="assistant-input"]').element as HTMLTextAreaElement;
+    // A narrow window wraps the placeholder: its height must not be taken for the text's.
+    let scroll=80;Object.defineProperty(field,'scrollHeight',{configurable:true,get:()=>scroll});
+    window.dispatchEvent(new Event('resize'));expect(field.style.height).toBe('');
+    store.input='一段比较长的草稿';await nextTick();await nextTick();expect(field.style.height).toBe('80px');
+    scroll=36;window.dispatchEvent(new Event('resize'));expect(field.style.height).toBe('36px');
+  });
   it.each(['thinking','answering','speaking'])('keeps stop enabled during %s even before submit has returned',async phase=>{
     const {store,wrapper}=setup();store.phase='idle';let finish!:()=>void;
     store.submit.mockImplementationOnce(()=>{store.phase=phase;return new Promise<void>(resolve=>{finish=resolve;});});
