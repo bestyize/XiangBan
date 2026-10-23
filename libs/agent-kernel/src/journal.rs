@@ -16,6 +16,8 @@ struct Writer {
     parent: Option<String>,
     sequence: u64,
     poisoned: bool,
+    last_sync: std::time::Instant,
+    unsynced_bytes: usize,
 }
 
 #[derive(Deserialize)]
@@ -80,8 +82,9 @@ impl JsonlRunLog {
         Ok(self.dir.join(format!("run-{run_id}.jsonl")))
     }
 
-    /// State and tool boundaries are synced to disk. Text deltas are written without a sync
-    /// per chunk and become durable at the next boundary. A failed write poisons that writer.
+    /// State and tool boundaries sync immediately. Text and reasoning deltas sync
+    /// together at most once per 500 ms or 64 KiB, and at the next boundary.
+    /// A failed write poisons that writer.
     pub fn append(&self, event: &RunEvent) -> Result<(), HarnessError> {
         let path = self.path(&event.run_id)?;
         let mut data = serde_json::to_vec(&RecordRef { v: 1, event }).map_err(error)?;
@@ -108,6 +111,8 @@ impl JsonlRunLog {
                     parent: event.parent_run_id.clone(),
                     sequence: 0,
                     poisoned: false,
+                    last_sync: std::time::Instant::now(),
+                    unsynced_bytes: 0,
                 },
             );
         }
@@ -126,9 +131,11 @@ impl JsonlRunLog {
         let sync = !matches!(
             &event.body,
             RunEventBody::Event {
-                event: Event::TextDelta { .. }
+                event: Event::TextDelta { .. } | Event::ReasoningDelta { .. }
             }
         );
+        writer.unsynced_bytes = writer.unsynced_bytes.saturating_add(data.len());
+        let sync = sync || writer.unsynced_bytes >= 64 * 1024 || writer.last_sync.elapsed() >= std::time::Duration::from_millis(500);
         if let Err(e) = writer.file.write_all(&data).and_then(|_| {
             if sync {
                 writer.file.sync_data()
@@ -139,6 +146,7 @@ impl JsonlRunLog {
             writer.poisoned = true;
             return Err(error(e));
         }
+        if sync { writer.last_sync = std::time::Instant::now(); writer.unsynced_bytes = 0; }
         writer.sequence = event.sequence;
         if matches!(event.body, RunEventBody::State { state, .. } if state != RunState::Running) {
             writers.remove(&event.run_id);
