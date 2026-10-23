@@ -117,20 +117,45 @@ pub async fn ai_store_installed(app: tauri::AppHandle, window: tauri::WebviewWin
 }
 
 #[tauri::command]
-pub async fn ai_store_skill_categories(window: tauri::WebviewWindow) -> Result<Value, String> {
+pub async fn ai_store_skill_categories(app: tauri::AppHandle, window: tauri::WebviewWindow) -> Result<Value, String> {
     control(&window)?;
-    tauri::async_runtime::spawn_blocking(SkillDiscovery::categories)
-        .await.map_err(|e| e.to_string())?
+    catalog_json(&app, "/api/v1/ai/plugins/categories", &[]).await
 }
 
 #[tauri::command]
 pub async fn ai_store_browse(
-    window: tauri::WebviewWindow, keyword: String, page: u32,
+    app: tauri::AppHandle, window: tauri::WebviewWindow, keyword: String, page: u32,
     category: String, source: String, sort_by: String,
 ) -> Result<Value, String> {
     control(&window)?;
-    tauri::async_runtime::spawn_blocking(move || SkillDiscovery::browse(&keyword, page, &category, &source, &sort_by))
-        .await.map_err(|e| e.to_string())?
+    catalog_json(&app, "/api/v1/ai/plugins", &[
+        ("keyword", keyword), ("page", page.to_string()), ("category", category),
+        ("source", source), ("sortBy", sort_by),
+    ]).await
+}
+
+// Product catalog traffic goes through the configured Xiaoban website. Skill inspection and
+// installation still use the existing publisher/version/file-hash checks against SkillHub.
+async fn catalog_json(app: &tauri::AppHandle, path: &str, pairs: &[(&str, String)]) -> Result<Value, String> {
+    let origin = crate::website::site_url(&crate::settings(app).website_url)?;
+    let mut response = reqwest::Client::builder().timeout(std::time::Duration::from_secs(20))
+        .build().map_err(|e| e.to_string())?
+        .get(format!("{origin}{path}")).query(pairs).send().await
+        .map_err(|_| "暂时无法连接小伴插件市场，请检查网站连接设置".to_string())?;
+    let status = response.status();
+    let mut bytes = Vec::new();
+    while let Some(chunk) = response.chunk().await.map_err(|_| "插件目录读取失败")? {
+        if bytes.len() + chunk.len() > 2 * 1024 * 1024 { return Err("插件目录响应过大".into()); }
+        bytes.extend_from_slice(&chunk);
+    }
+    let body: Value = serde_json::from_slice(&bytes).map_err(|_| {
+        if status.as_u16() == 404 { "网站尚未提供插件市场，请先更新服务端" } else { "插件市场返回了无效数据" }
+    })?;
+    if !status.is_success() {
+        return Err(body["error"].as_str().unwrap_or("插件市场暂不可用，请稍后重试").to_string());
+    }
+    if !body["results"].is_array() { return Err("插件目录格式发生变化，请更新客户端".into()); }
+    Ok(body)
 }
 
 #[tauri::command]
@@ -176,3 +201,4 @@ mod tests {
         fs::remove_dir_all(root).unwrap();
     }
 }
+

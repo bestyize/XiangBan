@@ -2,6 +2,8 @@
 
 ## AI 商店：SkillHub 专家包与 MCP
 
+技能分类与在线技能目录通过设置中网站地址的 `/api/v1/ai/plugins`、`/api/v1/ai/plugins/categories` 读取，复用服务端 SkillHub API 代理与短期缓存；服务端先部署相应接口后再发布客户端。审查、安装和文件校验继续直接使用原有 SkillHub 流程，本地技能不受目录离线影响。官网 `/plugins` 也可浏览技能和复制安装指令，网页不会自动安装或执行代码。
+
 专家包和连接器目录读取 SkillHub 实际数据，支持搜索与分页；请求失败显示错误与重试。专家包按工作流审查、固定各依赖的发布者、版本和文件哈希，确认后事务安装，不运行脚本。已安装工作流可带入新聊天，移除时保留共用技能；WorkBuddy 专属注册与调度包暂不兼容。
 
 MCP 连接器使用服务 README 中的标准配置，支持本机 stdio 与远程 Streamable HTTP。默认以表单填写凭据，JSON 放在高级配置；支持标准 MCP OAuth 浏览器授权、PKCE、本机回调与自动刷新，也可填写 API Key。暂不支持旧式 SSE，WorkBuddy 私有身份及服务专属登录仍需独立接入。用户确认后才连接，初始化与工具发现成功才显示已连接。配置保存在本机，退出关闭连接，下次使用时恢复已启用配置；断开后旧任务中的工具也会失效。外部 MCP 工具逐次确认，新任务获取最新工具列表。
@@ -309,3 +311,4 @@ Mac 实机还需检查：原角色的发光与连续表情、桌宠拖动、空�
 针对性检查：`npm run test:computer-use`；工具包接口、校验规则及真实 MCP 握手命令见 [Computer Use 工具包](../../libs/agent-tools/computer-use/README.md)。macOS 主应用仍支持原有最低系统版本，但电脑控制引擎需要 macOS 14+；旧系统启用时给出明确错误。首次使用仍需系统权限，以系统显示的小伴或 Open Computer Use 授权条目为准。
 
 Agent 的 `computer_use_diagnose` 可检查开关、内置路径、真实权限、稳定签名和当前引擎近期 TCC 日志中的旧签名冲突；`request_accessibility_permission` 启动原生授权引导并在 Finder 选中当前引擎。`computer_use_repair_permissions` 经每次确认后，仅重置固定引擎标识所选的旧无障碍或屏幕录制记录，保留已有效权限，再打开设置和重新授权入口；完全信任模式也必须确认。同标识独立安装版也受所选权限重置影响。最终系统授权仍由用户点击，复查后继续；不提供全局 TCC 重置。每次电脑操作先检查真实授权，不把 MCP 连接当成权限有效。`invalid arguments` 表示未执行工具，要按 schema 修正原调用；`list_apps` 最简参数 `{}`，不能加 `reason` 或 `command`，不因参数错误重置权限或转用 Python/AppKit/AppleScript。旧的 `System Events` 探测已移除；引擎仍是独立 App，相同证书不会自动合并系统身份。小伴截图仍有独立屏幕录制用途，归属以系统实际显示为准。
+
