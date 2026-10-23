@@ -27,6 +27,8 @@ export interface Settings {
   assistantEnabled: boolean;
   assistantShortcut: string;
   assistantBall: boolean;
+  /** Resting the pointer on the ball opens the capsule without taking the keyboard focus. */
+  assistantHover: boolean;
   /** `voice` listens as soon as the capsule opens, `type` waits for typing. */
   assistantOpen: "voice" | "type";
   /** `voice` reads answers to spoken questions only. */
@@ -303,6 +305,7 @@ export const defaults: Settings = {
   assistantEnabled: true,
   assistantShortcut: "Alt+Space",
   assistantBall: true,
+  assistantHover: true,
   assistantOpen: "voice",
   assistantRead: "voice",
   effects: { selected: "", params: {} },

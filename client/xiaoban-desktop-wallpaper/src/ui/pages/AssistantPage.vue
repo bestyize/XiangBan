@@ -7,12 +7,12 @@ import type { ControlStore } from '../control-types.ts';
 
 interface Status {
   enabled: boolean; shortcut: string; shortcutLabel: string; shortcuts: { value: string; label: string }[];
-  ball: boolean; open: 'voice' | 'type'; read: 'voice' | 'always' | 'never'; hintSeen: boolean; registered: boolean; error: string;
+  ball: boolean; hover: boolean; open: 'voice' | 'type'; read: 'voice' | 'always' | 'never'; hintSeen: boolean; registered: boolean; error: string;
 }
 const props = withDefaults(defineProps<{ store: ControlStore; embedded?: boolean }>(), { embedded: false });
 const status = ref<Status>({
   enabled: props.store.settings.assistantEnabled, shortcut: props.store.settings.assistantShortcut, shortcutLabel: props.store.settings.assistantShortcut,
-  shortcuts: [], ball: props.store.settings.assistantBall, open: props.store.settings.assistantOpen, read: props.store.settings.assistantRead,
+  shortcuts: [], ball: props.store.settings.assistantBall, hover: props.store.settings.assistantHover, open: props.store.settings.assistantOpen, read: props.store.settings.assistantRead,
   hintSeen: true, registered: false, error: '',
 });
 const busy = ref('');
@@ -107,6 +107,8 @@ onMounted(() => { void read(); void asr.value.init(); });
         <NSelect class="select" :value="status.shortcut" :options="shortcutOptions" :disabled="!store.desktop || !status.enabled || busy === 'assistant'" aria-label="呼出快捷键" data-testid="assistant-shortcut" @update:value="change({ shortcut: $event })" /></div>
       <div class="xb-row"><div class="xb-row-text"><b>悬浮球</b><span>点击展开，按住拖动。关闭后用快捷键呼出。</span></div>
         <NSwitch :value="status.ball" :disabled="!store.desktop || !status.enabled || busy === 'assistant'" aria-label="屏幕边缘的悬浮球" data-testid="assistant-ball-switch" @update:value="change({ ball: $event })" /></div>
+      <div class="xb-row"><div class="xb-row-text"><b>鼠标停留时展开</b><span>鼠标在悬浮球上停一下就展开，不打断正在输入的应用；移开后自动收起，点进对话框后则保持打开。</span></div>
+        <NSwitch :value="status.hover" :disabled="!store.desktop || !status.enabled || !status.ball || busy === 'assistant'" aria-label="鼠标停留在悬浮球上时展开" data-testid="assistant-hover-switch" @update:value="change({ hover: $event })" /></div>
       <div class="xb-row"><div class="xb-row-text"><b>悬浮位置</b><span>将悬浮球与对话框恢复到初始位置。</span></div>
         <button type="button" class="xb-btn is-sm" :disabled="!store.desktop || !status.enabled || busy === 'assistant'" data-testid="assistant-reset" @click="change({ resetPosition: true })"><RotateCcw :size="14" />重置位置</button></div>
     </div>

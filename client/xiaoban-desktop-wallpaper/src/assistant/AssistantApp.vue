@@ -6,85 +6,106 @@ import MarkdownView from '../ui/chat/MarkdownView.ts';
 import SelectionCopyMenu from '../ui/chat/SelectionCopyMenu.vue';
 import type { AsrStore } from '../ui/asr/store.ts';
 import type { ApprovalRequest, ChatItem } from '../ui/chat/types.ts';
-import { invoke, listen } from '../bridge.ts';
-import { morphGeometry, MORPH_DURATION } from './morph.ts';
+import { invoke } from '../bridge.ts';
+import { ballDisc, BALL_DIAMETER, boxOf, glassFrame, HoverIntent, MORPH_DURATION, MORPH_EASING, orbFrame, type Box } from './morph.ts';
 import { isDark } from '../ui/appearance.ts';
 import Orb from './Orb.vue';
 import { hitRegion, type HitRegion } from './hit-regions.ts';
-import type { AssistantStore } from './assistant-store.ts';
+import type { AssistantStore, StageLayout } from './assistant-store.ts';
 
-const morphing = ref(false), morphShell = ref<HTMLElement>();
-const morphStyle = ref<Record<string, string>>({});
-const morphVisible = ref(false);
-interface MorphEvent { id: number; target: 'capsule' | 'ball'; step: 'leave' | 'enter' | 'show' | 'cancel'; right: boolean }
-let offMorph: (() => void) | undefined, morphDisposed = false, morphId = 0;
-let morphStep = '';
-let morphFallback: ReturnType<typeof setTimeout> | undefined;
-let morphAnimations: Animation[] = [];
-let enterMorph: (() => Promise<void>) | undefined;
+/* ── Ball ⇄ capsule ──────────────────────────────────────────────────
+ * Both live in one window that stays put. The glass grows out of the ball into the capsule while a copy of the mark
+ * travels to the capsule's voice button; going back plays the same in reverse. Asked to go the other way halfway,
+ * the running animations simply turn around. */
+type MorphKind = 'expand' | 'collapse';
+const morph = ref<MorphKind | null>(null);
+const morphing = computed(() => morph.value !== null);
+const glass = ref<HTMLElement>(), travellingOrb = ref<HTMLElement>();
+let morphAnimations: Animation[] = [], morphToken = 0;
 const reducedMotion = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
-function resetMorph() {
-  clearTimeout(morphFallback);
-  morphAnimations.splice(0).forEach(a => a.cancel());
-  morphing.value = false; morphVisible.value = false; enterMorph = undefined;
-  void nextTick(() => { queueHitRegions(); fit(); });
+function capsuleBoxes(): { capsule: Box; orb: Box } | null {
+  const composer = document.querySelector<HTMLElement>('.composer'), orb = composer?.querySelector<HTMLElement>('.orb-button > :first-child');
+  if (!composer || !orb) return null;
+  return { capsule: boxOf(composer.getBoundingClientRect()), orb: boxOf(orb.getBoundingClientRect()) };
 }
-async function animateMorph(el: Element | undefined | null, frames: Keyframe[], duration = MORPH_DURATION, delay = 0) {
-  if (!el?.animate || reducedMotion()) return;
-  const animation = el.animate(frames, { duration, delay, easing: 'cubic-bezier(.22,.75,.2,1)', fill: 'both' });
-  morphAnimations.push(animation);
-  try { await animation.finished; } catch { /* superseded or unmounted */ }
+function stopMorph() {
+  morphToken++;
+  morphAnimations.splice(0).forEach(animation => animation.cancel());
+  morph.value = null;
 }
-async function prepareMorph(right: boolean) {
-  const composer = document.querySelector<HTMLElement>('.composer');
-  if (!composer) return null;
-  const { full, ball } = morphGeometry(composer.getBoundingClientRect(), right);
-  morphStyle.value = { left: `${full.left}px`, top: `${full.top}px`, width: `${full.width}px`, height: `${full.height}px` };
-  morphVisible.value = true;
+async function runMorph(kind: MorphKind, frames: { glass: Keyframe[]; orb: Keyframe[]; card?: Keyframe[] }) {
+  const token = ++morphToken;
+  morphAnimations.splice(0).forEach(animation => animation.cancel());
+  morph.value = kind;
   await nextTick();
-  return { full, ball };
+  if (token !== morphToken) return;
+  const timing: KeyframeAnimationOptions = { duration: MORPH_DURATION, easing: MORPH_EASING, fill: 'both' };
+  const card = document.querySelector('.card');
+  morphAnimations = [
+    glass.value?.animate?.(frames.glass, timing),
+    travellingOrb.value?.animate?.(frames.orb, timing),
+    frames.card ? card?.animate?.(frames.card, { duration: 150, easing: 'ease-out', fill: 'both' }) : undefined,
+  ].filter((animation): animation is Animation => Boolean(animation));
+  await settleMorph(token);
 }
-const morphFrame = (frame: ReturnType<typeof morphGeometry>['full']) => ({ left: `${frame.left}px`, top: `${frame.top}px`, width: `${frame.width}px`, height: `${frame.height}px`, borderRadius: frame.borderRadius });
-async function handleMorph(event: MorphEvent) {
-  if (morphDisposed || event.id < morphId) return;
-  morphStep = event.step;
-  if (event.step === 'leave') {
-    resetMorph(); morphId = event.id; closeMenus(); morphing.value = true;
-    morphFallback = setTimeout(resetMorph, 1800);
-    try {
-      const frames = event.target === 'ball' ? await prepareMorph(event.right) : null;
-      if (frames) await Promise.all([
-        animateMorph(morphShell.value, [morphFrame(frames.full), morphFrame(frames.ball)]),
-        animateMorph(document.querySelector('.card'), [{ opacity: 1, transform: 'translateY(0)' }, { opacity: 0, transform: 'translateY(6px)' }], 140),
-      ]);
-      else await animateMorph(document.querySelector('.ball'), [{ opacity: 1, transform: 'scale(1)' }, { opacity: 0, transform: 'scale(.92)' }], 100);
-    } finally { if (!morphDisposed && event.id === morphId && morphStep === 'leave') await invoke('assistant_transition_ready', { id: event.id, step: 'leave' }); }
-  } else if (event.step === 'enter') {
-    morphAnimations.splice(0).forEach(a => a.cancel()); morphVisible.value = false;
-    await nextTick();
-    if (event.target === 'capsule' && inner.value) {
-      await invoke('assistant_fit', { height: Math.max(156, Math.ceil(inner.value.getBoundingClientRect().height)) });
-      if (event.id !== morphId || morphStep !== 'enter') return;
-      await nextTick();
+/**
+ * Waits for the running animations, then shows the real thing. A WebView may pause animations while its window is
+ * covered, so the real thing shows in any case a little after the animation should have ended.
+ */
+async function settleMorph(token: number) {
+  const limit = new Promise<void>(resolve => setTimeout(resolve, MORPH_DURATION + 250));
+  try { await Promise.race([Promise.all(morphAnimations.map(animation => animation.finished)), limit]); } catch { return; }
+  if (token !== morphToken) return;
+  const finished = morph.value;
+  morphAnimations.splice(0).forEach(animation => animation.cancel());
+  morph.value = null;
+  void nextTick(() => {
+    queueHitRegions();
+    if (finished === 'expand') {
+      // The glass was the capsule's surface all along; only what sits on it fades in.
+      document.querySelectorAll('.capsule > :not(.orb-button), .chips').forEach(el => el.animate?.([{ opacity: 0 }, { opacity: 1 }], { duration: 140, easing: 'ease-out' }));
+      document.querySelector('.card')?.animate?.([{ opacity: 0, transform: 'translateY(6px)' }, { opacity: 1, transform: 'none' }], { duration: 160, easing: 'ease-out' });
+      if (!props.store.peek) field.value?.focus();
     }
-    if (event.id !== morphId || morphStep !== 'enter') return;
-    // The native window has its final rectangle, but remains hidden until this acknowledgement.
-    const frames = event.target === 'capsule' && props.store.open ? await prepareMorph(event.right) : null;
-    if (frames) {
-      morphStyle.value = morphFrame(frames.ball);
-      enterMorph = async () => {
-        await Promise.all([
-          animateMorph(morphShell.value, [morphFrame(frames.ball), morphFrame(frames.full)]),
-          animateMorph(document.querySelector('.card'), [{ opacity: 0, transform: 'translateY(6px)' }, { opacity: 1, transform: 'translateY(0)' }], 150, 110),
-        ]);
-      };
-    } else enterMorph = () => animateMorph(document.querySelector('.ball'), [{ opacity: 0, transform: 'scale(.92)' }, { opacity: 1, transform: 'scale(1)' }], 140);
-    await nextTick();
-    await invoke('assistant_transition_ready', { id: event.id, step: 'enter' });
-  } else if (event.step === 'show') {
-    try { await enterMorph?.(); } finally { if (event.id === morphId) { resetMorph(); if (props.store.open) field.value?.focus(); } }
-  } else resetMorph();
+  });
 }
+/** Runs the other way from wherever the current animations are. */
+function turnAround(kind: MorphKind) {
+  if (morph.value === kind || !morphAnimations.length) return false;
+  morph.value = kind;
+  morphAnimations.forEach(animation => animation.reverse());
+  void settleMorph(++morphToken);
+  return true;
+}
+function expandFromBall(ball: NonNullable<StageLayout['ball']>) {
+  if (turnAround('expand')) return;
+  const disc = ballDisc(ball);
+  morph.value = 'expand';
+  void nextTick(() => {
+    const target = capsuleBoxes();
+    if (!target || morph.value !== 'expand') { stopMorph(); return; }
+    void runMorph('expand', {
+      glass: [glassFrame(disc, BALL_DIAMETER / 2, 0), glassFrame(target.capsule, 26, 1)],
+      orb: [orbFrame(disc), orbFrame(target.orb)],
+    });
+  });
+}
+/** Called before the capsule leaves the page, while it can still be measured. */
+function collapseToBall(ball: NonNullable<StageLayout['ball']>) {
+  if (turnAround('collapse')) return;
+  const from = capsuleBoxes();
+  if (!from) { stopMorph(); return; }
+  const disc = ballDisc(ball);
+  void runMorph('collapse', {
+    glass: [glassFrame(from.capsule, 26, 1), glassFrame(disc, BALL_DIAMETER / 2, 0)],
+    orb: [orbFrame(from.orb), orbFrame(disc)],
+    card: [{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'translateY(6px)' }],
+  });
+}
+
+/* ── Moving the window under a showing ball (after a drag, or to a new screen) ── */
+const movingBall = ref(false);
+let movingFallback: ReturnType<typeof setTimeout> | undefined, movingGiveUp: ReturnType<typeof setTimeout> | undefined;
 
 const props = defineProps<{ store: AssistantStore; asr: AsrStore }>();
 const orbLabel = computed(() => {
@@ -289,21 +310,15 @@ const ballRing = computed(() => ['thinking', 'answering'].includes(props.store.p
 const ballLabel = computed(() => ({ attention: '超级小伴 · 等你确认', error: '超级小伴 · 出错了', unread: '超级小伴 · 有新回答' } as Record<string, string>)[ballBadge.value]
   ?? (ballRing.value ? '超级小伴 · 正在回答' : '打开超级小伴'));
 /** The notice sits on the side of the ball that faces the middle of the screen; null while none shows. */
-const bubbleLeft = ref<boolean | null>(null);
-let bubbleTimer: ReturnType<typeof setTimeout> | undefined, bubbleVersion = 0;
-const bubbleWanted = computed(() => Boolean(props.store.ball && !props.store.open && props.store.notice && !dragging.value && !morphing.value));
-watch(bubbleWanted, async wanted => {
-  const version = ++bubbleVersion;
+const bubbleOn = ref(false);
+const bubbleLeft = computed(() => bubbleOn.value ? props.store.layout.right : null);
+let bubbleTimer: ReturnType<typeof setTimeout> | undefined;
+const bubbleWanted = computed(() => Boolean(props.store.ball && !props.store.open && props.store.notice && !dragging.value && !morphing.value && !movingBall.value));
+watch(bubbleWanted, wanted => {
   clearTimeout(bubbleTimer);
-  if (!wanted) {
-    if (bubbleLeft.value !== null) { bubbleLeft.value = null; await invoke('assistant_ball_bubble', { open: false }).catch(() => {}); }
-    return;
-  }
-  const left = await invoke<boolean | null>('assistant_ball_bubble', { open: true }).catch(() => null);
-  if (version !== bubbleVersion) return;
-  bubbleLeft.value = typeof left === 'boolean' ? left : true;
+  bubbleOn.value = wanted;
   // A finished answer says so briefly, then the unread dot is enough. Waiting and errors stay until seen.
-  if (props.store.notice?.kind === 'done') bubbleTimer = setTimeout(() => props.store.dismissNotice(), 3000);
+  if (wanted && props.store.notice?.kind === 'done') bubbleTimer = setTimeout(() => props.store.dismissNotice(), 3000);
   void nextTick(queueHitRegions);
 }, { immediate: true });
 watch(() => props.store.notice?.text, () => {
@@ -325,6 +340,8 @@ function onBlur() {
 let hitRaf=0,lastRegions='';
 function syncHitRegions(){
   const regions:HitRegion[]=[];
+  // Mid-morph the stand-ins are what shows; the real surfaces take over when it settles.
+  if(morphing.value)return;
   document.querySelectorAll<HTMLElement>('.composer,.card,.ball,.bubble,.chip,.session-menu,.selection-copy-menu').forEach(el=>{
     const radius=el.classList.contains('composer')?26:el.classList.contains('ball')?22:el.classList.contains('card')?18:el.classList.contains('bubble')||el.classList.contains('chip')?18:el.classList.contains('session-menu')?12:9;
     const region=hitRegion(el.getBoundingClientRect(),window.innerHeight,radius);
@@ -336,31 +353,37 @@ function syncHitRegions(){
 function queueHitRegions(){cancelAnimationFrame(hitRaf);hitRaf=requestAnimationFrame(syncHitRegions);}
 watch([sessionsOpen,()=>props.store.open,()=>props.store.ball,hasCard,chipsShown,bubbleLeft],()=>void nextTick(queueHitRegions));
 
-let fitted = 0, raf = 0;
+// The window keeps its size; only the parts that take the mouse change with the content.
 let observer: ResizeObserver | undefined;
-function fit() {
-  queueHitRegions();
-  cancelAnimationFrame(raf);
-  if(dragging.value || capturing.value || morphing.value)return;
-  raf = requestAnimationFrame(() => {
-    if(dragging.value || capturing.value || morphing.value)return;
-    const el = inner.value;
-    if (!el) return;
-    const height = Math.max(156, Math.ceil(el.getBoundingClientRect().height));
-    if (height === fitted) return;
-    fitted = height;
-    void invoke('assistant_fit', { height }).catch(() => {});
-  });
-}
 watch(inner, el => {
   observer?.disconnect();
-  if (el) { observer = new ResizeObserver(fit); observer.observe(el); fit(); }
+  if (el) { observer = new ResizeObserver(queueHitRegions); observer.observe(el); queueHitRegions(); }
 });
 function toBottom() { void nextTick(() => { if (scroller.value) scroller.value.scrollTop = scroller.value.scrollHeight; }); }
 watch(() => props.store.open, open => {
   if (!open) return;
-  fitted = 0;
-  void nextTick(() => { fit(); grow(); field.value?.focus(); toBottom(); });
+  // A glance on hover leaves the caret alone; the morph focuses the text box when it settles.
+  void nextTick(() => { grow(); if (!morphing.value && !props.store.peek) field.value?.focus(); toBottom(); });
+});
+// Before the DOM changes, so a closing capsule can still be measured.
+watch(() => props.store.open, (open, was) => {
+  if (open === was) return;
+  const ball = props.store.layout.ball;
+  if (!ball || reducedMotion()) { stopMorph(); return; }
+  if (open) expandFromBall(ball); else collapseToBall(ball);
+}, { flush: 'pre' });
+watch(() => props.store.reanchoring, id => {
+  clearTimeout(movingFallback); clearTimeout(movingGiveUp);
+  if (id) {
+    // Fade the ball out, then let the host move the window under it. Should the host never say it is done, the
+    // ball comes back anyway rather than staying invisible.
+    movingBall.value = true; hover.cancel();
+    movingFallback = setTimeout(() => props.store.reanchorReady(id), 100);
+    movingGiveUp = setTimeout(() => { movingBall.value = false; queueHitRegions(); }, 1200);
+    return;
+  }
+  // Moved: the page has the new layout; show the ball once it has been drawn there.
+  requestAnimationFrame(() => requestAnimationFrame(() => { movingBall.value = false; queueHitRegions(); }));
 });
 watch(hasCard, shown => { if (shown) toBottom(); });
 watch(() => [props.store.answer, turns.value.length, props.store.ask?.id, props.store.approval?.id], toBottom);
@@ -390,32 +413,54 @@ function dragMove(event:PointerEvent){
   if(!press||event.pointerId!==press.id)return;
   if(event.buttons===0){releasePress();return;}
   if(Math.hypot(event.clientX-press.x,event.clientY-press.y)<6)return;
-  pulled=true;dragging.value=true;cancelAnimationFrame(raf);releasePress();
-  // A widened ball window narrows back before it moves, so the saved spot is the ball's own.
+  pulled=true;dragging.value=true;releasePress();hover.cancel();hoverBlocked=true;
   if(bubbleLeft.value!==null)props.store.dismissNotice();
-  void invoke('assistant_drag').catch(()=>{dragging.value=false;fit();});
+  void invoke('assistant_drag').catch(()=>{dragging.value=false;queueHitRegions();});
 }
 function dragUp(event:PointerEvent){if(press?.id===event.pointerId)releasePress();}
 function captureClick(event:MouseEvent){if(pulled&&event.detail!==0){event.preventDefault();event.stopImmediatePropagation();pulled=false;}}
-function dragEnded(){dragging.value=false;releasePress();fit();}
-function ballClick(){void props.store.unfold();}
+function dragEnded(){dragging.value=false;releasePress();queueHitRegions();}
+function ballClick(){hover.cancel();hoverBlocked=true;void props.store.unfold();}
+
+/* ── Resting the pointer on the ball opens the capsule for a glance ──
+ * It does not take the keyboard focus and folds away once the pointer has been gone a moment, unless the user
+ * clicks or types in it. Crossing the ball on the way somewhere else does nothing. */
+let hoverBlocked = false, peekTimer: ReturnType<typeof setTimeout> | undefined;
+const PEEK_LINGER = 600;
+const hoverAllowed = () => props.store.prefs.hover && props.store.ball && !props.store.open && Boolean(props.store.layout.ball)
+  && !hoverBlocked && !dragging.value && !press && !morphing.value && !movingBall.value && !capturing.value;
+const hover = new HoverIntent(() => { if (hoverAllowed()) void props.store.unfold(true); });
+function ballEnter(event: PointerEvent) { if (hoverAllowed()) hover.enter(event.clientX, event.clientY); }
+function ballMove(event: PointerEvent) { if (hoverAllowed()) hover.move(event.clientX, event.clientY); else hover.cancel(); }
+function ballLeave() { hover.cancel(); hoverBlocked = false; }
+// Closed with the pointer still on the ball, or dropped after a drag: it has to leave before resting counts again.
+watch(() => props.store.open, open => { if (!open) { hoverBlocked = true; clearTimeout(peekTimer); } });
+watch(() => props.store.hovering, inside => {
+  clearTimeout(peekTimer);
+  if (inside) return;
+  hover.cancel(); hoverBlocked = false;
+  if (props.store.open && props.store.peek) peekTimer = setTimeout(() => {
+    if (props.store.open && props.store.peek && !props.store.hovering && !pinned.value && !dragging.value) void props.store.hide();
+  }, PEEK_LINGER);
+});
+function engage() { if (props.store.peek) { clearTimeout(peekTimer); props.store.engage(); } }
 const onFocus=()=>{picking.value=false;clearTimeout(blurTimer);if(props.store.open&&!dragging.value&&!press&&!morphing.value)field.value?.focus();};
 onMounted(()=>{
-  void listen<MorphEvent>('assistant-transition', event => { void handleMorph(event).catch(() => resetMorph()); }).then(off => { if (morphDisposed) off(); else offMorph = off; });
   void nextTick(queueHitRegions);window.addEventListener('resize',queueHitRegions);window.addEventListener('resize',grow);
   document.addEventListener('pointerdown',outsideMenus);document.addEventListener('keydown',onAskShortcut);window.addEventListener('blur',onBlur);window.addEventListener('focus',onFocus);window.addEventListener('pointermove',dragMove);window.addEventListener('pointerup',dragUp);window.addEventListener('pointercancel',dragUp);window.addEventListener('blur',releasePress);window.addEventListener('assistant-drag-end',dragEnded);
 });
 onBeforeUnmount(()=>{
-  morphDisposed = true; clearTimeout(morphFallback); offMorph?.(); morphAnimations.splice(0).forEach(a => a.cancel());
-  cancelAnimationFrame(hitRaf);window.removeEventListener('resize',queueHitRegions);window.removeEventListener('resize',grow);clearTimeout(blurTimer);clearTimeout(bubbleTimer);clearTimeout(copyTimer);bubbleVersion++;
-  window.removeEventListener('blur',onBlur);document.removeEventListener('pointerdown',outsideMenus);document.removeEventListener('keydown',onAskShortcut);imageVersion++; releasePress();window.removeEventListener('focus',onFocus);window.removeEventListener('pointermove',dragMove);window.removeEventListener('pointerup',dragUp);window.removeEventListener('pointercancel',dragUp);window.removeEventListener('blur',releasePress);window.removeEventListener('assistant-drag-end',dragEnded);observer?.disconnect();cancelAnimationFrame(raf);
+  stopMorph(); hover.cancel(); clearTimeout(peekTimer); clearTimeout(movingFallback); clearTimeout(movingGiveUp);
+  cancelAnimationFrame(hitRaf);window.removeEventListener('resize',queueHitRegions);window.removeEventListener('resize',grow);clearTimeout(blurTimer);clearTimeout(bubbleTimer);clearTimeout(copyTimer);
+  window.removeEventListener('blur',onBlur);document.removeEventListener('pointerdown',outsideMenus);document.removeEventListener('keydown',onAskShortcut);imageVersion++; releasePress();window.removeEventListener('focus',onFocus);window.removeEventListener('pointermove',dragMove);window.removeEventListener('pointerup',dragUp);window.removeEventListener('pointercancel',dragUp);window.removeEventListener('blur',releasePress);window.removeEventListener('assistant-drag-end',dragEnded);observer?.disconnect();
 });
 </script>
 
 <template>
-  <div class="stage" :class="{ light: !isDark, dragging, morphing }" @dragover="dragOver" @drop="dropImages" @keydown.esc.prevent.stop="escape" @pointerdown="dragDown" @click.capture="captureClick">
-    <div v-if="store.ball && !store.open" class="ball-stage" :class="{ 'has-bubble': bubbleLeft !== null, 'bubble-left': bubbleLeft === true }" data-testid="assistant-ball-stage">
-      <button type="button" class="ball" :data-phase="store.phase" :data-badge="ballBadge || undefined" title="点一下打开，按住可以拖动，右键打开设置" :aria-label="ballLabel" data-testid="assistant-ball" data-drag-handle @click="ballClick" @contextmenu.prevent="store.openSettings('assistant')">
+  <div class="stage" :class="{ light: !isDark, dragging, [`morph-${morph}`]: morphing, 'moving-ball': movingBall }" @dragover="dragOver" @drop="dropImages" @keydown.esc.prevent.stop="escape" @pointerdown.capture="engage" @keydown.capture="engage" @pointerdown="dragDown" @click.capture="captureClick">
+    <Transition name="ball-in">
+    <div v-if="store.ball && !store.open && store.layout.ball" class="ball-stage" :class="{ 'bubble-left': bubbleLeft === true }" :style="{ left: `${store.layout.ball.x}px`, top: `${store.layout.ball.y}px`, width: `${store.layout.ball.size}px`, height: `${store.layout.ball.size}px` }" data-testid="assistant-ball-stage">
+      <button type="button" class="ball" @pointerenter="ballEnter" @pointermove="ballMove" @pointerleave="ballLeave" :data-phase="store.phase" :data-badge="ballBadge || undefined" title="点一下打开，按住可以拖动，右键打开设置" :aria-label="ballLabel" data-testid="assistant-ball" data-drag-handle @click="ballClick" @contextmenu.prevent="store.openSettings('assistant')">
         <Orb :phase="store.phase === 'attention' ? 'idle' : store.phase" :active="store.ball && !store.open" :muted="ballBadge === 'error'" :size="44" />
         <svg v-if="ballRing" class="ball-ring" viewBox="0 0 50 50" aria-hidden="true" data-testid="assistant-ball-ring"><circle cx="25" cy="25" r="23" class="ring-track" /><circle cx="25" cy="25" r="23" class="ring-arc" /></svg>
         <span v-if="ballBadge" class="badge" :class="ballBadge" aria-hidden="true" data-testid="assistant-ball-badge"><template v-if="ballBadge === 'attention'">!</template><X v-else-if="ballBadge === 'error'" :size="9" :stroke-width="3.4" /></span>
@@ -430,8 +475,9 @@ onBeforeUnmount(()=>{
         </button>
       </Transition>
     </div>
-    <Transition name="pop" appear @after-enter="queueHitRegions" @after-leave="queueHitRegions">
-      <div v-if="store.open" ref="inner" class="inner" role="dialog" aria-label="超级小伴" data-testid="assistant">
+    </Transition>
+    <Transition :name="store.layout.ball ? 'none' : 'pop'" appear @after-enter="queueHitRegions" @after-leave="queueHitRegions">
+      <div v-if="store.open || morph === 'collapse'" ref="inner" class="inner" role="dialog" aria-label="超级小伴" data-testid="assistant">
         <Transition name="rise" @after-enter="queueHitRegions" @after-leave="queueHitRegions">
           <section v-if="hasCard" class="card" data-testid="assistant-card">
             <header class="card-head">
@@ -520,7 +566,10 @@ onBeforeUnmount(()=>{
         <span class="sr" aria-live="polite">{{ store.status }}</span>
       </div>
     </Transition>
-    <div v-if="morphVisible" ref="morphShell" class="morph-shell" :style="morphStyle" aria-hidden="true"><Orb phase="idle" :size="38" /></div>
+    <template v-if="morphing">
+      <div ref="glass" class="morph-glass" aria-hidden="true" />
+      <div ref="travellingOrb" class="morph-orb" aria-hidden="true"><Orb phase="idle" :active="false" :size="44" /></div>
+    </template>
     <SelectionCopyMenu :scope="scroller" @visibility-change="queueHitRegions" />
   </div>
 </template>
@@ -539,9 +588,11 @@ button{font:inherit}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 
 /* Ball */
-.ball-stage{display:flex;align-items:center;height:100vh;padding:0 14px;box-sizing:border-box;gap:10px}
-.ball-stage:not(.has-bubble){justify-content:center;padding:0}
-.ball-stage.bubble-left{flex-direction:row-reverse}
+/* The ball sits where the host says in the stage; a notice opens beside it toward the middle of the screen. */
+.ball-stage{position:absolute;display:grid;place-items:center;transition:opacity .09s ease}
+.moving-ball .ball-stage{opacity:0}
+.ball-in-enter-active{transition:opacity .18s ease,transform .18s ease}
+.ball-in-enter-from{opacity:0;transform:scale(.9)}
 .ball{pointer-events:auto;touch-action:none;position:relative;flex:none;display:grid;place-items:center;width:44px;height:44px;padding:0;border:0;border-radius:50%;background:none;box-shadow:0 0 0 .5px var(--edge),0 1px 3px rgba(0,0,0,.2),0 3px 8px rgba(0,0,0,.18);cursor:grab;transition:transform .2s}
 .stage.light .ball{box-shadow:0 0 0 .5px var(--edge),0 1px 3px rgba(0,0,0,.1),0 3px 8px rgba(0,0,0,.12)}
 .ball:hover{transform:scale(1.06)}
@@ -554,7 +605,8 @@ button{font:inherit}
 .badge.attention{background:#D98A0B;animation:nudge .5s ease-out 1}
 .badge.error{background:#D93025}
 .badge.unread{top:1px;right:1px;min-width:10px;width:10px;height:10px;background:var(--accent-dot)}
-.bubble{pointer-events:auto;display:flex;align-items:center;gap:8px;min-width:0;max-width:330px;height:40px;padding:0 6px 0 14px;border:0;border-radius:20px;background:var(--glass);backdrop-filter:blur(20px) saturate(1.6);box-shadow:0 0 0 .5px var(--edge),var(--shadow);color:var(--text);font-size:13px;cursor:pointer;white-space:nowrap}
+.bubble{position:absolute;top:50%;margin-top:-20px;left:calc(100% + 2px);width:max-content;white-space:nowrap;pointer-events:auto;display:flex;align-items:center;gap:8px;min-width:0;max-width:330px;height:40px;padding:0 6px 0 14px;border:0;border-radius:20px;background:var(--glass);backdrop-filter:blur(20px) saturate(1.6);box-shadow:0 0 0 .5px var(--edge),var(--shadow);color:var(--text);font-size:13px;cursor:pointer;white-space:nowrap}
+.bubble-left .bubble{left:auto;right:calc(100% + 2px)}
 .bubble b{font-weight:500;flex:none}
 .bubble-icon{flex:none;color:var(--accent)}
 .bubble.attention .bubble-icon{color:#D98A0B}.bubble.error .bubble-icon{color:var(--fail)}
@@ -627,7 +679,7 @@ button{font:inherit}
 .head-btn:hover:not(:disabled){background:var(--hover);color:var(--text)}
 .head-btn.on{background:var(--accent-soft);color:var(--accent-ink)}
 .head-btn:disabled{opacity:.4;cursor:default}
-.card-body{cursor:auto;display:flex;flex-direction:column;gap:12px;max-height:340px;overflow-y:auto;padding:14px 16px 12px;box-sizing:border-box;user-select:text;scrollbar-width:thin;scrollbar-color:var(--scroll) transparent}
+.card-body{cursor:auto;display:flex;flex-direction:column;gap:12px;max-height:min(340px,calc(100vh - 250px));overflow-y:auto;padding:14px 16px 12px;box-sizing:border-box;user-select:text;scrollbar-width:thin;scrollbar-color:var(--scroll) transparent}
 /* While an answer streams the body keeps one height: the text grows inside it and scrolls,
    so the card, the composer and the native window do not resize while it arrives. */
 .card-body.fixed{height:340px}
@@ -688,10 +740,12 @@ button{font:inherit}
 @keyframes spin{to{transform:rotate(360deg)}}
 @keyframes nudge{0%{transform:translateY(0)}40%{transform:translateY(-3px)}100%{transform:translateY(0)}}
 @media(prefers-reduced-motion:reduce){.pop-enter-active,.rise-enter-active,.bubble-enter-active,.bubble-leave-active{transition:none}.dots i,.cursor,.ball-ring,.badge{animation:none}}
-.morph-shell{position:fixed;z-index:20;display:flex;align-items:center;justify-content:center;overflow:hidden;pointer-events:none;border-radius:26px;background:var(--glass);box-shadow:0 0 0 .5px var(--edge),var(--shadow)}
-.morph-shell :deep(.orb-frame){position:absolute;left:3px}
-.morphing .composer,.morphing .chips{opacity:0;pointer-events:none}
-.morphing .card,.morphing .ball{opacity:0;pointer-events:none}
-.morphing .inner{transform:none!important;transition:none!important}
-.morphing .pop-enter-from{opacity:1}
+/* Stand-ins for the morph: the capsule's glass and the travelling mark, drawn above everything. */
+.morph-glass{position:fixed;left:0;top:0;z-index:20;pointer-events:none;background:var(--glass);backdrop-filter:blur(24px) saturate(1.6);box-shadow:0 0 0 .5px var(--edge),var(--shadow)}
+.morph-orb{position:fixed;left:0;top:0;z-index:21;width:44px;height:44px;pointer-events:none;will-change:transform}
+.morph-expand .composer,.morph-expand .chips,.morph-expand .card,.morph-collapse .composer,.morph-collapse .chips{opacity:0}
+.morph-collapse .ball-stage{opacity:0!important}
+.morph-expand .inner,.morph-collapse .inner{pointer-events:none}
+.pop-leave-active{transition:opacity .18s ease,transform .18s ease}
+.pop-leave-to{opacity:0;transform:translateY(10px) scale(.98)}
 </style>

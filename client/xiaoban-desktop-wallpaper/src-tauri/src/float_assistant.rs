@@ -3,7 +3,7 @@
 //! that talks to the same chat, speech and recognition commands as the control window, with a narrower set of
 //! permissions. One window serves both shapes; the host decides which one is showing.
 
-mod transition;
+mod reanchor;
 
 use serde::Deserialize;
 use serde_json::{json, Value};
@@ -26,18 +26,22 @@ pub const OPEN_MODES: &[&str] = &["voice", "type"];
 /// When answers are read aloud.
 pub const READ_MODES: &[&str] = &["voice", "always", "never"];
 
+/// The stage: one transparent window that holds the ball, the capsule and its card, in logical pixels. Going from
+/// the ball to the capsule and back is drawn inside it, so the native window never moves or resizes on the way.
 const WIDTH: f64 = 480.0;
-// Reserve toolbar headroom from the start; hover must never resize the native window.
-const MIN_HEIGHT: f64 = 156.0;
-// The reply card keeps a fixed body height and scrolls, so the capsule only needs room for its
-// tallest state (answer card, question block, attachment tray) — no streaming growth beyond it.
-const MAX_HEIGHT: f64 = 600.0;
+// The reply card keeps a fixed body height and scrolls, so the stage only needs room for the capsule's tallest
+// state (answer card, question block, attachment tray).
+const STAGE_HEIGHT: f64 = 600.0;
+/// How far below the ball's centre the stage ends: the capsule's centre lines up with the ball's.
+const BALL_TO_BOTTOM: f64 = 44.0;
+/// A capsule closed without a ball fades out for this long before the window hides or moves.
+const FADE_OUT: Duration = Duration::from_millis(220);
+/// The ball morph ends before this; only then may the stage be moved to suit where the ball now is.
+const MORPH_SETTLE: Duration = Duration::from_millis(340);
 /// Space kept between the capsule and the bottom of the usable screen (above the Dock or taskbar).
 const BOTTOM_GAP: f64 = 56.0;
-/// The ball's window, in logical pixels. The ball itself is drawn a little smaller inside it.
+/// The ball's square, in logical pixels. The ball itself is drawn a little smaller inside it.
 const BALL_WINDOW: f64 = 72.0;
-/// Extra width the ball's window takes while a one-line notice ("已完成…") shows beside the ball.
-const BUBBLE_WIDTH: f64 = 340.0;
 /// Where the ball starts: close to the right edge, a little above the Dock.
 const BALL_RIGHT_GAP: f64 = 16.0;
 const BALL_BOTTOM_GAP: f64 = 160.0;
@@ -70,6 +74,18 @@ struct Offset {
     dy: f64,
 }
 
+/// The window's rectangle while it shows, and where the ball sits in it.
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct Stage {
+    rect: Area,
+    scale: f64,
+    /// The ball's square relative to the stage's top-left corner; `None` for a capsule opened without the ball.
+    ball: Option<(i32, i32)>,
+    size: i32,
+    /// The ball is on the right half of its screen, so the capsule and notices open to its left.
+    right: bool,
+}
+
 /// What the one assistant window is showing.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 enum Mode {
@@ -96,11 +112,13 @@ pub struct AssistantState {
     dragging: AtomicBool,
     capturing: AtomicBool,
     drag_epoch: AtomicU64,
-    pending_height: Mutex<Option<f64>>,
     companion_session: Mutex<Option<String>>,
-    transition: transition::State,
-    /// The ball's window is widened for a notice: `Some(true)` when the notice sits to the ball's left.
-    bubble: Mutex<Option<bool>>,
+    stage: Mutex<Option<Stage>>,
+    reanchor: reanchor::State,
+    /// The capsule was opened by hovering over the ball: it has not taken the keyboard focus.
+    peek: AtomicBool,
+    /// Counts openings and closings, so a delayed step from an earlier one does nothing.
+    turn: AtomicU64,
     /// The shortcut is held down. Key repeat sends more presses while it is; they are ignored.
     held: AtomicBool,
     /// Counts presses, so a hold timer from an earlier press does nothing.
@@ -131,7 +149,7 @@ fn shortcut_pressed(app: &tauri::AppHandle) {
         state.talking.store(true, Ordering::SeqCst);
         let main = app.clone();
         let _ = app.run_on_main_thread(move || {
-            if mode(&main) != Mode::Capsule { let _ = expand(&main); }
+            if mode(&main) != Mode::Capsule { let _ = expand(&main, false); }
             if let Some(window) = main.get_webview_window(LABEL) { let _ = window.emit("assistant-ptt", "start"); }
         });
     });
@@ -149,9 +167,8 @@ fn shortcut_released(app: &tauri::AppHandle) {
 
 const WINDOW_COMMANDS: &[&str] = &[
     "assistant_take_companion_session",
-    "assistant_ready", "assistant_hide", "assistant_fit", "assistant_drag", "assistant_unfold", "assistant_prefs",
-    "assistant_open_chat", "assistant_open_settings", "assistant_screenshot", "assistant_set_regions", "assistant_transition_ready",
-    "assistant_ball_bubble",
+    "assistant_ready", "assistant_hide", "assistant_drag", "assistant_unfold", "assistant_focus", "assistant_prefs",
+    "assistant_open_chat", "assistant_open_settings", "assistant_screenshot", "assistant_set_regions", "assistant_reanchor_ready",
 ];
 const CONTROL_COMMANDS: &[&str] = &["assistant_status", "assistant_configure", "assistant_try"];
 /// What the capsule may ask of the host besides its own window commands: ask and answer, speak, listen.
@@ -258,6 +275,7 @@ fn status(app: &tauri::AppHandle) -> Value {
         "shortcut": settings.assistant_shortcut,
         "shortcutLabel": shortcut_label(&settings.assistant_shortcut),
         "ball": settings.assistant_ball,
+        "hover": settings.assistant_hover,
         "open": settings.assistant_open,
         "read": settings.assistant_read,
         "hintSeen": settings.assistant_hint_seen,
@@ -276,7 +294,7 @@ fn build(app: &tauri::AppHandle) -> Result<WebviewWindow, String> {
         .always_on_top(true).transparent(true).visible(false).focused(false)
         // The ball sits over other apps, which are the active ones: the click that lands on it must reach the page.
         .accept_first_mouse(true)
-        .inner_size(WIDTH, MIN_HEIGHT);
+        .inner_size(WIDTH, STAGE_HEIGHT);
     #[cfg(windows)]
     let builder = builder.data_directory(crate::storage::webview(&crate::storage::root(app)?));
     #[cfg(target_os = "macos")]
@@ -321,12 +339,6 @@ fn anchor(area: Area, scale: f64, width: i32, min_height: i32, offset: Offset) -
     (x.clamp(area.x, (area.right() - width).max(area.x)), bottom.clamp(area.y + min_height, area.bottom()))
 }
 
-/// Where the top edge goes when the capsule changes to `height` with its bottom edge held in place; if that would
-/// push it off the top of the screen it is pulled back down instead.
-fn top_for(area: Area, bottom: i32, height: i32) -> i32 {
-    (bottom - height).clamp(area.y, (area.bottom() - height).max(area.y))
-}
-
 /// How far the capsule's bottom centre is from the default spot of the screen it is on.
 fn offset_of(area: Area, scale: f64, x: i32, width: i32, bottom: i32) -> Offset {
     let gap = (BOTTOM_GAP * scale).round() as i32;
@@ -360,68 +372,122 @@ fn ball_offset(area: Area, scale: f64, size: i32, x: i32, y: i32) -> Offset {
     Offset { dx: f64::from(x - default_x) / scale, dy: f64::from(y - default_y) / scale }
 }
 
-/// Expand inward from the ball, clamped to the same screen's usable area.
-fn capsule_from_ball(area: Area, scale: f64, x: i32, y: i32, size: i32) -> (i32, i32, i32, i32) {
-    let width = ((WIDTH * scale).round() as i32).min(area.w).max(1);
-    let height = ((MIN_HEIGHT * scale).round() as i32).min(area.h).max(1);
-    let center = x + size / 2;
-    let inset = (36.0 * scale).round() as i32;
-    let start = if center >= area.x + area.w / 2 { center - width + inset } else { center - inset };
-    let top = y + size / 2 + (44.0 * scale).round() as i32 - height;
-    (start.clamp(area.x, (area.right() - width).max(area.x)), top.clamp(area.y, (area.bottom() - height).max(area.y)), width, height)
-}
-fn place_from_ball(app: &tauri::AppHandle, window: &WebviewWindow) -> Result<(), String> {
-    let (x, y, size) = ball_target(app)?;
-    let monitor = monitor_at_physical_point(app, f64::from(x + size / 2), f64::from(y + size / 2))
-        .ok().flatten()
-        .or_else(|| window.current_monitor().ok().flatten())
-        .or_else(|| app.primary_monitor().ok().flatten())
-        .ok_or("没有找到可用显示器")?;
-    let (x, y, width, height) = capsule_from_ball(area_of(&monitor), monitor.scale_factor(), x, y, size);
-    window.set_position(PhysicalPosition::new(x, y)).map_err(|e| e.to_string())?;
-    window.set_size(PhysicalSize::new(width as u32, height as u32)).map_err(|e| e.to_string())?;
-    window.set_position(PhysicalPosition::new(x, y)).map_err(|e| e.to_string())
+fn stage_size(area: Area, scale: f64, ball: i32) -> (i32, i32) {
+    (((WIDTH * scale).round() as i32).min(area.w).max(ball).max(1), ((STAGE_HEIGHT * scale).round() as i32).min(area.h).max(ball).max(1))
 }
 
-/// Puts the capsule on the screen the pointer is on, at its default spot or where the user last left it.
-fn place(app: &tauri::AppHandle, window: &WebviewWindow) -> Result<(), String> {
-    let monitor = app
-        .cursor_position()
-        .ok()
-        .and_then(|point| monitor_at_physical_point(app, point.x, point.y).ok().flatten())
-        .or_else(|| app.get_webview_window(LABEL).and_then(|window| window.current_monitor().ok().flatten()))
-        .or_else(|| app.primary_monitor().ok().flatten())
-        .ok_or("没有找到显示器")?;
-    let scale = monitor.scale_factor();
-    let width = (WIDTH * scale).round() as i32;
-    let height = (MIN_HEIGHT * scale).round() as i32;
-    let offset = *app.state::<AssistantState>().moved.lock().unwrap_or_else(|e| e.into_inner());
-    let (x, bottom) = anchor(area_of(&monitor), scale, width, height, offset);
-    // Move first so a window arriving on another screen takes that screen's scale before it is sized.
-    let top = bottom - height;
-    window.set_position(PhysicalPosition::new(x, top)).map_err(|e| e.to_string())?;
-    window.set_size(PhysicalSize::new(width as u32, height as u32)).map_err(|e| e.to_string())?;
-    window.set_position(PhysicalPosition::new(x, top)).map_err(|e| e.to_string())
+/// Keeps `start` within the screen, yet never so far that the span `[inner, inner + size)` leaves `[start, start + len)`.
+fn place_span(start: i32, len: i32, low: i32, high: i32, inner: i32, size: i32) -> i32 {
+    let start = start.clamp(low, (high - len).max(low));
+    start.clamp(inner + size - len, inner)
 }
 
-/// Sets the height in logical pixels. The bottom edge stays wherever the capsule is now (the user may have dragged
-/// it), so it grows upward.
-fn resize(window: &WebviewWindow, height: f64) -> Result<(), String> {
-    let scale = window.scale_factor().map_err(|e| e.to_string())?;
-    let position = window.outer_position().map_err(|e| e.to_string())?;
-    let size = window.outer_size().map_err(|e| e.to_string())?;
-    let monitor = window.current_monitor().map_err(|e| e.to_string())?;
-    let available = monitor.as_ref().map(|m| area_of(m).h).unwrap_or(i32::MAX);
-    let target = ((height.clamp(MIN_HEIGHT, MAX_HEIGHT) * scale).round() as i32).min(available).max(1);
-    if size.height == target as u32 { return Ok(()); }
-    let bottom = position.y + size.height as i32;
-    let top = match monitor {
-        Some(monitor) => top_for(area_of(&monitor), bottom, target),
-        None => bottom - target,
+/// The stage around a ball: the ball in the corner nearest its screen edge, the capsule opening inward from it with
+/// its centre level with the ball's, all on the ball's screen.
+fn stage_for_ball(area: Area, scale: f64, x: i32, y: i32, size: i32) -> Stage {
+    let (width, height) = stage_size(area, scale, size);
+    let (x, y) = keep_inside(area, x, y, size);
+    let right = x + size / 2 >= area.x + area.w / 2;
+    let left = if right { x + size - width } else { x };
+    let top = y + size / 2 + (BALL_TO_BOTTOM * scale).round() as i32 - height;
+    let left = place_span(left, width, area.x, area.right(), x, size);
+    let top = place_span(top, height, area.y, area.bottom(), y, size);
+    Stage { rect: Area { x: left, y: top, w: width, h: height }, scale, ball: Some((x - left, y - top)), size, right }
+}
+
+/// The stage for a capsule opened without the ball: its bottom centre at the default spot or where it was left.
+fn stage_for_capsule(area: Area, scale: f64, offset: Offset) -> Stage {
+    let (width, height) = stage_size(area, scale, 1);
+    let (x, bottom) = anchor(area, scale, width, height, offset);
+    Stage { rect: Area { x, y: bottom - height, w: width, h: height }, scale, ball: None, size: 0, right: false }
+}
+
+/// Where the ball is on the screen now, with its square size.
+fn ball_on_screen(stage: &Stage, x: i32, y: i32) -> Option<(i32, i32, i32)> {
+    stage.ball.map(|(dx, dy)| (x + dx, y + dy, stage.size))
+}
+
+/// The screen a physical point is on, else the window's, else the main one.
+fn screen_at(app: &tauri::AppHandle, window: Option<&WebviewWindow>, x: i32, y: i32) -> Result<tauri::Monitor, String> {
+    monitor_at_physical_point(app, f64::from(x), f64::from(y)).ok().flatten()
+        .or_else(|| window.and_then(|window| window.current_monitor().ok().flatten()))
+        .or_else(|| app.primary_monitor().ok().flatten())
+        .ok_or_else(|| "没有找到显示器".to_string())
+}
+
+/// The capsule's stage on the screen the pointer is on, at its default spot or where the user last left it.
+fn capsule_stage(app: &tauri::AppHandle, window: &WebviewWindow) -> Result<Stage, String> {
+    let point = app.cursor_position().ok().map(|p| (p.x as i32, p.y as i32));
+    let monitor = match point {
+        Some((x, y)) => screen_at(app, Some(window), x, y)?,
+        None => screen_at(app, Some(window), i32::MIN, i32::MIN)?,
     };
-    window.set_position(PhysicalPosition::new(position.x, top)).map_err(|e| e.to_string())?;
-    window.set_size(PhysicalSize::new(size.width, target as u32)).map_err(|e| e.to_string())?;
-    window.set_position(PhysicalPosition::new(position.x, top)).map_err(|e| e.to_string())
+    let offset = *app.state::<AssistantState>().moved.lock().unwrap_or_else(|e| e.into_inner());
+    Ok(stage_for_capsule(area_of(&monitor), monitor.scale_factor(), offset))
+}
+
+/// The ball's stage for where the ball should be now.
+fn ball_stage(app: &tauri::AppHandle) -> Result<Stage, String> {
+    let (x, y, size) = ball_target(app)?;
+    let monitor = screen_at(app, app.get_webview_window(LABEL).as_ref(), x + size / 2, y + size / 2)?;
+    Ok(stage_for_ball(area_of(&monitor), monitor.scale_factor(), x, y, size))
+}
+
+/// Gives the window the stage's rectangle and tells the page where the ball is. Only call it while nothing that
+/// would move is visible: the window hidden, or the page faded out for a re-anchor.
+fn set_stage(app: &tauri::AppHandle, window: &WebviewWindow, stage: Stage) -> Result<(), String> {
+    let r = stage.rect;
+    let same = matches!((window.outer_position(), window.outer_size()), (Ok(p), Ok(s)) if p.x == r.x && p.y == r.y && s.width as i32 == r.w && s.height as i32 == r.h);
+    if !same {
+        // Move first so a window arriving on another screen takes that screen's scale before it is sized.
+        window.set_position(PhysicalPosition::new(r.x, r.y)).map_err(|e| e.to_string())?;
+        window.set_size(PhysicalSize::new(r.w as u32, r.h as u32)).map_err(|e| e.to_string())?;
+        window.set_position(PhysicalPosition::new(r.x, r.y)).map_err(|e| e.to_string())?;
+    }
+    *app.state::<AssistantState>().stage.lock().unwrap_or_else(|e| e.into_inner()) = Some(stage);
+    emit_stage(app, window);
+    Ok(())
+}
+
+fn current_stage(app: &tauri::AppHandle) -> Option<Stage> {
+    *app.state::<AssistantState>().stage.lock().unwrap_or_else(|e| e.into_inner())
+}
+
+/// The stage in the page's terms: logical pixels from the window's top-left corner.
+fn stage_json(stage: Option<Stage>) -> Value {
+    match stage {
+        Some(stage) => {
+            let logical = |v: i32| f64::from(v) / stage.scale;
+            json!({
+                "ball": stage.ball.map(|(x, y)| json!({ "x": logical(x), "y": logical(y), "size": logical(stage.size) })),
+                "right": stage.right,
+            })
+        }
+        None => json!({ "ball": null, "right": false }),
+    }
+}
+
+fn emit_stage(app: &tauri::AppHandle, window: &WebviewWindow) {
+    if app.state::<AssistantState>().ready.load(Ordering::SeqCst) {
+        let _ = window.emit("assistant-stage", stage_json(current_stage(app)));
+    }
+}
+
+/// After the ball has settled somewhere new (dragged, or brought back by a capsule that was moved), puts the stage
+/// where it belongs for that spot: on the ball's screen, opening toward the middle. The page fades the ball out
+/// while the window moves, so nothing is seen to jump.
+fn settle_ball(app: &tauri::AppHandle) {
+    let state = app.state::<AssistantState>();
+    if mode(app) != Mode::Ball || state.dragging.load(Ordering::SeqCst) { return; }
+    let Some(window) = app.get_webview_window(LABEL) else { return };
+    let (Some(stage), Ok(position)) = (current_stage(app), window.outer_position()) else { return };
+    let Some((x, y, size)) = ball_on_screen(&stage, position.x, position.y) else { return };
+    let Ok(monitor) = screen_at(app, Some(&window), x + size / 2, y + size / 2) else { return };
+    let scale = monitor.scale_factor();
+    let size = (BALL_WINDOW * scale).round() as i32;
+    let ideal = stage_for_ball(area_of(&monitor), scale, x, y, size);
+    let placed = Stage { rect: Area { x: position.x, y: position.y, ..stage.rect }, ..stage };
+    if ideal != placed { reanchor::begin(app, ideal); }
 }
 
 /// Remembers where the user left the capsule, so the next time it opens it is there and not back at the default.
@@ -457,10 +523,11 @@ fn announce(app: &tauri::AppHandle, window: &WebviewWindow) {
     if !app.state::<AssistantState>().ready.load(Ordering::SeqCst) {
         return;
     }
+    emit_stage(app, window);
     let current = mode(app);
     let _ = window.emit("assistant-ball", current == Mode::Ball);
     match current {
-        Mode::Capsule => { let _ = window.emit("assistant-open", ()); }
+        Mode::Capsule => { let _ = window.emit("assistant-open", json!({ "peek": app.state::<AssistantState>().peek.load(Ordering::SeqCst) })); }
         Mode::Ball => { let _ = window.emit("assistant-close", ()); }
         Mode::Hidden => {}
     }
@@ -485,25 +552,39 @@ fn ball_target(app: &tauri::AppHandle) -> Result<(i32, i32, i32), String> {
     Ok((x, y, size))
 }
 
-fn show_ball(app: &tauri::AppHandle) -> Result<(), String> { show_ball_surface(app, true) }
+/// A new opening or closing: any delayed step of an earlier one is dropped.
+fn next_turn(app: &tauri::AppHandle) -> u64 {
+    app.state::<AssistantState>().turn.fetch_add(1, Ordering::SeqCst) + 1
+}
 
-fn show_ball_surface(app: &tauri::AppHandle, visible: bool) -> Result<(), String> {
+/// Runs `step` on the main thread after `delay`, unless another opening or closing came first.
+fn after(app: &tauri::AppHandle, delay: Duration, step: impl FnOnce(&tauri::AppHandle) + Send + 'static) {
+    let turn = app.state::<AssistantState>().turn.load(Ordering::SeqCst);
+    let app = app.clone();
+    std::thread::spawn(move || {
+        std::thread::sleep(delay);
+        let main = app.clone();
+        let _ = app.run_on_main_thread(move || {
+            if main.state::<AssistantState>().turn.load(Ordering::SeqCst) == turn { step(&main); }
+        });
+    });
+}
+
+fn show_ball(app: &tauri::AppHandle) -> Result<(), String> {
     let window = window(app)?;
-    let (x, y, size) = ball_target(app)?;
+    next_turn(app);
     set_mode(app, Mode::Ball);
-    *app.state::<AssistantState>().bubble.lock().unwrap_or_else(|e| e.into_inner()) = None;
-    // Move first so a window arriving on another screen takes that screen's scale before it is sized.
-    window.set_position(PhysicalPosition::new(x, y)).map_err(|e| e.to_string())?;
-    window.set_size(PhysicalSize::new(size as u32, size as u32)).map_err(|e| e.to_string())?;
-    window.set_position(PhysicalPosition::new(x, y)).map_err(|e| e.to_string())?;
+    // Placed while nothing of it shows: hidden, or a capsule that has already faded out.
+    set_stage(app, &window, ball_stage(app)?)?;
     // Shown without taking the focus: the ball appears over whatever the user is doing.
     crate::window_control::apply_saved(app, &window, "topmost")?;
-    if visible { window.show().map_err(|e| e.to_string())?; }
+    window.show().map_err(|e| e.to_string())?;
     announce(app, &window);
     Ok(())
 }
 
 fn hide_window(app: &tauri::AppHandle) -> Result<(), String> {
+    next_turn(app);
     let was = mode(app);
     set_mode(app, Mode::Hidden);
     let Some(window) = app.get_webview_window(LABEL) else { return Ok(()) };
@@ -516,52 +597,69 @@ fn hide_window(app: &tauri::AppHandle) -> Result<(), String> {
 
 pub(crate) fn hide_surface(app: &tauri::AppHandle) -> Result<(), String> { hide_window(app) }
 
-/// Opens the capsule, from the ball or from nothing.
-pub fn expand(app: &tauri::AppHandle) -> Result<(), String> {
-    // The morph starts from the ball's own square, never from a window widened for a notice.
-    if let Some(window) = app.get_webview_window(LABEL) { let _ = set_bubble(app, &window, false); }
-    if mode(app) == Mode::Ball && crate::settings(app).assistant_enabled && transition::begin(app, "capsule")? { return Ok(()); }
-    expand_surface(app, true)
-}
-fn expand_surface(app: &tauri::AppHandle, visible: bool) -> Result<(), String> {
-    if !crate::settings(app).assistant_enabled {
+/// Opens the capsule, from the ball or from nothing. A `peek` (the pointer resting on the ball) leaves the keyboard
+/// focus where it is; a click or the shortcut takes it.
+pub fn expand(app: &tauri::AppHandle, peek: bool) -> Result<(), String> {
+    let state = app.state::<AssistantState>();
+    if !crate::settings(app).assistant_enabled || state.capturing.load(Ordering::SeqCst) || state.dragging.load(Ordering::SeqCst) {
         return Ok(());
     }
     let window = window(app)?;
-    if mode(app) == Mode::Ball {
-        // The ball may have been moved a moment ago; keep that spot for when it comes back.
-        save_ball(app, &window);
+    match mode(app) {
+        Mode::Capsule => {
+            if !peek && state.peek.swap(false, Ordering::SeqCst) { window.set_focus().map_err(|e| e.to_string())?; }
+            return Ok(());
+        }
+        Mode::Ball if current_stage(app).is_some_and(|stage| stage.ball.is_some()) => {
+            // The ball may have been moved a moment ago; keep that spot for when it comes back. The window stays
+            // exactly where it is: the page turns the ball into the capsule inside it.
+            save_ball(app, &window);
+        }
+        _ => {
+            // From nothing (or a ball still being placed): set up the capsule's own stage while hidden.
+            window.hide().map_err(|e| e.to_string())?;
+            set_stage(app, &window, capsule_stage(app, &window)?)?;
+        }
     }
-    if mode(app) == Mode::Ball { place_from_ball(app, &window)?; }
-    else { place(app, &window)?; }
+    next_turn(app);
+    state.peek.store(peek, Ordering::SeqCst);
     set_mode(app, Mode::Capsule);
     crate::window_control::apply_saved(app, &window, "topmost")?;
-    if visible {
-        window.show().map_err(|e| e.to_string())?;
-        window.set_focus().map_err(|e| e.to_string())?;
-    }
+    window.show().map_err(|e| e.to_string())?;
+    if !peek { window.set_focus().map_err(|e| e.to_string())?; }
     announce(app, &window);
     Ok(())
 }
 
 /// Puts the capsule away: back to the ball when there is one, otherwise out of sight.
 pub fn collapse(app: &tauri::AppHandle) -> Result<(), String> {
-    if mode(app) == Mode::Capsule && transition::begin(app, "ball")? { return Ok(()); }
-    collapse_surface(app, true)
-}
-fn collapse_surface(app: &tauri::AppHandle, visible: bool) -> Result<(), String> {
     if mode(app) != Mode::Capsule {
         return Ok(());
     }
     let Some(window) = app.get_webview_window(LABEL) else { return Ok(()) };
     remember(app, &window);
-    let _ = window.emit("assistant-close", ());
+    next_turn(app);
+    app.state::<AssistantState>().peek.store(false, Ordering::SeqCst);
     let settings = crate::settings(app);
-    if settings.assistant_enabled && settings.assistant_ball {
-        show_ball_surface(app, visible)
-    } else {
-        hide_window(app)
+    let wanted = settings.assistant_enabled && settings.assistant_ball;
+    if wanted && current_stage(app).is_some_and(|stage| stage.ball.is_some()) {
+        // The page shrinks the capsule back into the ball, in the same window. If the capsule was dragged, the ball
+        // comes back where the capsule left it; once the morph is over the stage is fitted around that spot.
+        set_mode(app, Mode::Ball);
+        save_ball(app, &window);
+        announce(app, &window);
+        after(app, MORPH_SETTLE, settle_ball);
+        return Ok(());
     }
+    // A capsule opened without the ball fades out first; then the window hides, or moves to where the ball lives.
+    set_mode(app, if wanted { Mode::Ball } else { Mode::Hidden });
+    let _ = window.emit("assistant-close", ());
+    let _ = window.emit("assistant-ball", false);
+    after(app, FADE_OUT, move |app| {
+        let result = if wanted { show_ball(app) } else { app.get_webview_window(LABEL).map_or(Ok(()), |w| w.hide().map_err(|e| e.to_string())) };
+        if let Err(error) = result { eprintln!("超级小伴：{error}"); }
+    });
+    Ok(())
 }
 
 /// Makes the window match the settings: a ball when it is wanted and nothing else is showing, nothing when the
@@ -581,7 +679,7 @@ pub fn toggle(app: &tauri::AppHandle) {
     if !crate::settings(app).assistant_enabled {
         return;
     }
-    let result = if mode(app) == Mode::Capsule { collapse(app) } else { expand(app) };
+    let result = if mode(app) == Mode::Capsule { collapse(app) } else { expand(app, false) };
     if let Err(error) = result {
         eprintln!("超级小伴：{error}");
     }
@@ -606,48 +704,17 @@ fn save_ball(app: &tauri::AppHandle, window: &WebviewWindow) {
     if mode(app) != Mode::Ball {
         return;
     }
-    let (Some((x, y, size)), Ok(Some(monitor)), Ok(scale)) = (ball_rect(app, window), window.current_monitor(), window.scale_factor())
-    else {
-        return;
-    };
+    let Some((x, y, size)) = ball_rect(app, window) else { return };
+    // The stage may reach onto another screen; the ball belongs to the one under its centre.
+    let Ok(monitor) = screen_at(app, Some(window), x + size / 2, y + size / 2) else { return };
     *app.state::<AssistantState>().ball_at.lock().unwrap_or_else(|e| e.into_inner()) = Some((x, y));
-    persist_ball(app, ball_offset(area_of(&monitor), scale, size, x, y));
+    persist_ball(app, ball_offset(area_of(&monitor), monitor.scale_factor(), size, x, y));
 }
 
-/// The ball's own square in physical pixels, also while its window is widened for a notice.
+/// The ball's own square in physical pixels: where it sits in the stage, wherever the stage is now.
 fn ball_rect(app: &tauri::AppHandle, window: &WebviewWindow) -> Option<(i32, i32, i32)> {
-    let (position, size) = (window.outer_position().ok()?, window.outer_size().ok()?);
-    let ball = size.height as i32;
-    let left = *app.state::<AssistantState>().bubble.lock().unwrap_or_else(|e| e.into_inner()) == Some(true);
-    Some((if left { position.x + size.width as i32 - ball } else { position.x }, position.y, ball))
-}
-
-/// Widens the ball's window toward the middle of the screen for a notice, or narrows it back; the ball stays put.
-/// Returns whether the notice sits to the left of the ball, or `None` when nothing is widened.
-fn set_bubble(app: &tauri::AppHandle, window: &WebviewWindow, open: bool) -> Result<Option<bool>, String> {
-    let state = app.state::<AssistantState>();
-    let current = *state.bubble.lock().unwrap_or_else(|e| e.into_inner());
-    if mode(app) != Mode::Ball || current.is_some() == open { return Ok(if open { current } else { None }); }
-    let (x, y, size) = ball_rect(app, window).ok_or("没有找到悬浮球位置")?;
-    if !open {
-        *state.bubble.lock().unwrap_or_else(|e| e.into_inner()) = None;
-        window.set_position(PhysicalPosition::new(x, y)).map_err(|e| e.to_string())?;
-        window.set_size(PhysicalSize::new(size as u32, size as u32)).map_err(|e| e.to_string())?;
-        window.set_position(PhysicalPosition::new(x, y)).map_err(|e| e.to_string())?;
-        return Ok(None);
-    }
-    let monitor = monitor_at_physical_point(app, f64::from(x + size / 2), f64::from(y + size / 2))?
-        .or_else(|| window.current_monitor().ok().flatten())
-        .ok_or("没有找到显示器")?;
-    let area = area_of(&monitor);
-    let left = x + size / 2 >= area.x + area.w / 2;
-    let wide = size + (BUBBLE_WIDTH * monitor.scale_factor()).round() as i32;
-    let start = if left { x + size - wide } else { x };
-    *state.bubble.lock().unwrap_or_else(|e| e.into_inner()) = Some(left);
-    window.set_position(PhysicalPosition::new(start, y)).map_err(|e| e.to_string())?;
-    window.set_size(PhysicalSize::new(wide as u32, size as u32)).map_err(|e| e.to_string())?;
-    window.set_position(PhysicalPosition::new(start, y)).map_err(|e| e.to_string())?;
-    Ok(Some(left))
+    let position = window.outer_position().ok()?;
+    ball_on_screen(&current_stage(app)?, position.x, position.y)
 }
 
 /// The window moved. A ball being dragged moves many times a second; its spot is saved once it has been still.
@@ -695,6 +762,7 @@ pub struct Patch {
     enabled: Option<bool>,
     shortcut: Option<String>,
     ball: Option<bool>,
+    hover: Option<bool>,
     open: Option<String>,
     read: Option<String>,
     hint_seen: Option<bool>,
@@ -727,6 +795,9 @@ pub fn assistant_configure(app: tauri::AppHandle, patch: Patch) -> Result<Value,
     if let Some(ball) = patch.ball {
         next.assistant_ball = ball;
     }
+    if let Some(hover) = patch.hover {
+        next.assistant_hover = hover;
+    }
     if let Some(open) = patch.open {
         next.assistant_open = open;
     }
@@ -748,13 +819,9 @@ pub fn assistant_configure(app: tauri::AppHandle, patch: Patch) -> Result<Value,
         *app.state::<AssistantState>().ball_at.lock().unwrap_or_else(|e| e.into_inner()) = None;
         *app.state::<AssistantState>().moved.lock().unwrap_or_else(|e| e.into_inner()) = Offset::default();
         match mode(&app) {
-            Mode::Ball => show_ball(&app)?,
-            Mode::Capsule => {
-                if let Some(window) = app.get_webview_window(LABEL) {
-                    place(&app, &window)?;
-                }
-            }
-            Mode::Hidden => {}
+            Mode::Ball => reanchor::begin(&app, ball_stage(&app)?),
+            // An open capsule keeps its place until it is put away; the next opening uses the default spot.
+            Mode::Capsule | Mode::Hidden => {}
         }
     }
     sync(&app)?;
@@ -765,33 +832,32 @@ pub fn assistant_configure(app: tauri::AppHandle, patch: Patch) -> Result<Value,
 /// Opens the capsule now, so the settings page can show what the shortcut does.
 #[tauri::command]
 pub fn assistant_try(app: tauri::AppHandle) -> Result<(), String> {
-    expand(&app)
+    expand(&app, false)
 }
 
 /// What the capsule needs to know before it opens.
 #[tauri::command]
 pub fn assistant_prefs(app: tauri::AppHandle) -> Value {
     let settings = crate::settings(&app);
-    json!({ "open": settings.assistant_open, "read": settings.assistant_read, "appearance": settings.appearance, "accent": settings.accent })
+    json!({ "open": settings.assistant_open, "read": settings.assistant_read, "hover": settings.assistant_hover, "appearance": settings.appearance, "accent": settings.accent })
 }
 
-/// The ball was clicked.
+/// The page has faded the ball out for a re-anchor; the window may move.
 #[tauri::command]
-pub fn assistant_transition_ready(window: WebviewWindow, id: u64, step: String) -> Result<(), String> {
-    transition::ready(&window, id, &step)
+pub fn assistant_reanchor_ready(window: WebviewWindow, id: u64) -> Result<(), String> {
+    reanchor::ready(&window, id)
 }
 
-/// The page shows (or clears) a one-line notice beside the ball.
+/// The ball was clicked (`peek: false`) or the pointer rested on it (`peek: true`).
 #[tauri::command]
-pub fn assistant_ball_bubble(window: WebviewWindow, open: bool) -> Result<Option<bool>, String> {
-    if window.label() != LABEL { return Err("只有超级小伴可以显示提示".into()); }
-    if window.app_handle().state::<AssistantState>().dragging.load(Ordering::SeqCst) { return Ok(None); }
-    set_bubble(window.app_handle(), &window, open)
+pub fn assistant_unfold(app: tauri::AppHandle, peek: Option<bool>) -> Result<(), String> {
+    expand(&app, peek.unwrap_or(false))
 }
 
+/// The user clicked or typed in a capsule that opened on hover: it takes the keyboard focus and stays open.
 #[tauri::command]
-pub fn assistant_unfold(app: tauri::AppHandle) -> Result<(), String> {
-    expand(&app)
+pub fn assistant_focus(app: tauri::AppHandle) -> Result<(), String> {
+    expand(&app, false)
 }
 
 #[tauri::command]
@@ -807,23 +873,7 @@ pub fn assistant_hide(app: tauri::AppHandle) -> Result<(), String> {
     collapse(&app)
 }
 
-#[tauri::command]
-pub fn assistant_fit(window: WebviewWindow, height: f64) -> Result<(), String> {
-    if transition::active(window.app_handle()) && !transition::fitting_allowed(window.app_handle()) { return Ok(()); }
-    if !height.is_finite() {
-        return Err("高度不对".into());
-    }
-    // The page asks to grow while the user may already have put it away, or while the ball is showing.
-    if mode(window.app_handle()) != Mode::Capsule || (!window.is_visible().unwrap_or(false) && !transition::fitting_allowed(window.app_handle())) {
-        return Ok(());
-    }
-    let state=window.app_handle().state::<AssistantState>();
-    if state.dragging.load(Ordering::SeqCst){*state.pending_height.lock().unwrap_or_else(|e| e.into_inner())=Some(height);return Ok(());}
-    resize(&window, height)
-}
-
-/// Native dragging owns the pointer until release, so WebView pointerup is not reliable.
-/// Defer streamed-response resizing until the native mouse button is released.
+/// Native dragging owns the pointer until release, so WebView pointerup is not reliable: a thread watches the button.
 #[tauri::command]
 pub fn assistant_drag(window: WebviewWindow) -> Result<(), String> {
     if window.label() != LABEL { return Err("只有超级小伴的窗口可以拖动".into()); }
@@ -842,9 +892,7 @@ pub fn assistant_drag(window: WebviewWindow) -> Result<(), String> {
             if !down||!state.dragging.load(Ordering::SeqCst)||mode(app)==Mode::Hidden{break;}
         }
         state.dragging.store(false,Ordering::SeqCst);
-        match mode(app){Mode::Capsule=>remember(app,&target),Mode::Ball=>save_ball(app,&target),_=>{}}
-        let pending=state.pending_height.lock().unwrap_or_else(|e| e.into_inner()).take();
-        if let Some(height)=pending{if mode(app)==Mode::Capsule{let _=resize(&target,height);}}
+        match mode(app){Mode::Capsule=>remember(app,&target),Mode::Ball=>{save_ball(app,&target);settle_ball(app);},_=>{}}
         let _=target.eval("window.dispatchEvent(new Event('assistant-drag-end'));".to_string());
     });
     let result=window.start_dragging().map_err(|e|e.to_string());
@@ -896,7 +944,7 @@ pub async fn assistant_screenshot(window: WebviewWindow) -> Result<Option<String
 pub(crate) fn open_companion_session(app: &tauri::AppHandle, session: String) -> Result<(), String> {
     if !crate::settings(app).assistant_enabled { return assistant_open_chat(app.clone(), Some(session)); }
     *app.state::<AssistantState>().companion_session.lock().unwrap_or_else(|e| e.into_inner()) = Some(session.clone());
-    if expand(app).is_err() {
+    if expand(app, false).is_err() {
         app.state::<AssistantState>().companion_session.lock().unwrap_or_else(|e| e.into_inner()).take();
         return assistant_open_chat(app.clone(), Some(session));
     }
@@ -947,7 +995,7 @@ pub async fn smoke(app: &tauri::AppHandle) -> Value {
     let _ = sync(app);
     let _ = wait().await;
     steps.push(describe("start"));
-    let opened = expand(app);
+    let opened = expand(app, false);
     let _ = wait().await;
     steps.push(describe("expanded"));
     let closed = collapse(app);
@@ -988,19 +1036,56 @@ mod tests {
     }
 
     #[test]
-    fn expanding_from_any_edge_stays_on_the_balls_screen() {
+    fn the_stage_holds_the_ball_and_stays_on_the_balls_screen_from_any_edge() {
         for area in [SCREEN, RETINA, Area { x: -1920, y: -1080, w: 1920, h: 1040 }, Area { x: 0, y: 0, w: 320, h: 140 }] {
             for scale in [1.0, 2.0] {
                 let size = (BALL_WINDOW * scale) as i32;
-                for bx in [area.x, area.right() - size] {
-                    for by in [area.y, area.bottom() - size] {
-                        let (x, y, width, height) = capsule_from_ball(area, scale, bx, by, size);
-                        assert!(x >= area.x && y >= area.y);
-                        assert!(x + width <= area.right() && y + height <= area.bottom());
+                // A screen smaller than the ball itself cannot hold anything whole.
+                if size > area.w.min(area.h) { continue; }
+                for bx in [area.x, area.x + area.w / 3, area.right() - size] {
+                    for by in [area.y, area.y + area.h / 2, area.bottom() - size] {
+                        let stage = stage_for_ball(area, scale, bx, by, size);
+                        let r = stage.rect;
+                        assert!(r.x >= area.x && r.y >= area.y && r.right() <= area.right() && r.bottom() <= area.bottom(), "{area:?} {bx},{by}");
+                        // The ball stays where it was (pulled fully onto the screen), drawn inside the stage.
+                        let (dx, dy) = stage.ball.unwrap();
+                        let (bx, by) = keep_inside(area, bx, by, size);
+                        assert_eq!((r.x + dx, r.y + dy), (bx, by));
+                        assert!(dx >= 0 && dy >= 0 && dx + size <= r.w && dy + size <= r.h);
+                        assert_eq!(stage.right, bx + size / 2 >= area.x + area.w / 2);
                     }
                 }
             }
         }
+    }
+
+    #[test]
+    fn the_capsule_opens_inward_from_the_ball_level_with_it() {
+        // The default spot: right half, so the stage reaches left and the ball sits in its bottom-right corner.
+        let (bx, by) = ball_anchor(SCREEN, 1.0, 72, Offset::default());
+        let stage = stage_for_ball(SCREEN, 1.0, bx, by, 72);
+        assert!(stage.right);
+        assert_eq!(stage.rect, Area { x: bx + 72 - 480, y: by + 36 + 44 - 600, w: 480, h: 600 });
+        assert_eq!(stage.ball, Some((480 - 72, 600 - 44 - 36)));
+        // On the left half it reaches right, from the ball's left edge.
+        let stage = stage_for_ball(SCREEN, 1.0, 40, 500, 72);
+        assert!(!stage.right);
+        assert_eq!((stage.rect.x, stage.ball.unwrap().0), (40, 0));
+        // Near the top there is no room above: the stage stops at the top and the ball sits higher in it.
+        let stage = stage_for_ball(RETINA, 2.0, 200, 60, 144);
+        assert_eq!(stage.rect.y, RETINA.y);
+        assert_eq!(stage.ball.unwrap().1, 10);
+    }
+
+    #[test]
+    fn a_capsule_without_the_ball_has_its_stage_bottom_at_the_capsule_spot() {
+        let stage = stage_for_capsule(SCREEN, 1.0, Offset::default());
+        assert_eq!(stage.ball, None);
+        assert_eq!(stage.rect, Area { x: (1440 - 480) / 2, y: 900 - 56 - 600, w: 480, h: 600 });
+        // A spot saved low on a big screen is pulled up so the whole stage fits a small one.
+        let small = Area { x: 0, y: 0, w: 1024, h: 500 };
+        let stage = stage_for_capsule(small, 1.0, Offset { dx: 0.0, dy: 400.0 });
+        assert_eq!((stage.rect.y, stage.rect.h), (0, 500));
     }
 
     #[test]
@@ -1030,18 +1115,6 @@ mod tests {
     }
 
     #[test]
-    fn growing_keeps_the_bottom_edge_and_never_leaves_the_screen() {
-        assert_eq!(top_for(SCREEN, 800, 300), 500);
-        // taller than the room above the bottom edge: it stops at the top of the usable area
-        assert_eq!(top_for(SCREEN, 300, 620), 25);
-        // dragged to the very top: it grows downward instead of going off the screen
-        assert_eq!(top_for(SCREEN, 137, 700), 25);
-        // and never past the bottom edge
-        assert_eq!(top_for(SCREEN, 899, 600), 299);
-        assert_eq!(top_for(SCREEN, 880, 100), 780);
-    }
-
-    #[test]
     fn the_ball_starts_near_the_right_edge_above_the_dock_and_stays_on_the_screen() {
         // 72px window on a 1440x875 usable area: 16px from the right edge, 160px above the bottom
         assert_eq!(ball_anchor(SCREEN, 1.0, 72, Offset::default()), (1440 - 72 - 16, 900 - 72 - 160));
@@ -1064,7 +1137,7 @@ mod tests {
 
     #[test]
     fn the_new_commands_belong_to_the_right_windows() {
-        for command in ["assistant_unfold", "assistant_prefs"] {
+        for command in ["assistant_unfold", "assistant_focus", "assistant_reanchor_ready", "assistant_prefs"] {
             assert_eq!(permitted(LABEL, command), Some(true), "{command}");
             assert_eq!(permitted("control", command), Some(false), "{command}");
         }
@@ -1096,7 +1169,7 @@ mod tests {
 
     #[test]
     fn the_capsule_may_chat_speak_and_listen_but_not_manage_conversations_or_voice_settings() {
-        for command in ["chat_send", "chat_cancel", "chat_answer_approval", "tts_synthesize", "asr_transcribe", "assistant_fit"] {
+        for command in ["chat_send", "chat_cancel", "chat_answer_approval", "tts_synthesize", "asr_transcribe", "assistant_set_regions"] {
             assert_eq!(permitted(LABEL, command), Some(true), "{command}");
         }
         for command in ["chat_delete_session", "chat_set_permission_mode", "chat_compact", "asr_set_enabled", "tts_save_settings", "get_ai_config", "assistant_configure", "quit"] {

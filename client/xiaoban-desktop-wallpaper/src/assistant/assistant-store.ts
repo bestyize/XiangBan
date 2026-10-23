@@ -40,13 +40,30 @@ export interface AssistantDeps {
 /** A line shown beside the ball while the capsule is away: an answer finished, or something needs the user. */
 export interface BallNotice { kind: 'done' | 'attention' | 'error'; text: string }
 
+/**
+ * Where things sit in the assistant's window (the stage), in CSS pixels from its top-left corner. `ball` is the
+ * ball's square; it is null for a capsule opened without the ball. `right`: the ball is on the right half of its
+ * screen, so the capsule and notices open to its left.
+ */
+export interface StageLayout { ball: { x: number; y: number; size: number } | null; right: boolean }
+
 export interface AssistantStore {
   /** The capsule is showing. */
   open: boolean;
   /** The small ball is showing instead. */
   ball: boolean;
-  /** What the capsule does when it opens, and when answers are read aloud. Set in the assistant's settings page. */
-  prefs: { open: OpenMode; read: ReadMode };
+  /** What the capsule does when it opens, when answers are read aloud, and whether resting the pointer on the ball
+   * opens it. Set in the assistant's settings page. */
+  prefs: { open: OpenMode; read: ReadMode; hover: boolean };
+  layout: StageLayout;
+  /** The capsule opened because the pointer rested on the ball: it has not taken the keyboard focus, and folds
+   * away again when the pointer leaves unless the user starts using it. */
+  peek: boolean;
+  /** The pointer is over something of the assistant's (reported by the host, which sees it leave). */
+  hovering: boolean;
+  /** A re-anchor in progress: the host waits for the ball to fade out before moving the window. 0 when none. */
+  reanchoring: number;
+  reanchorReady(id: number): void;
   /** The text box. Voice fills it as words are recognised, then sends it. */
   input: string;
   /** Images staged for the next question, as data URLs. */
@@ -89,7 +106,7 @@ export interface AssistantStore {
   /** Asks the last question again. */
   retry(): Promise<void>;
   init(): Promise<void>;
-  opened(): Promise<void>;
+  opened(peek?: boolean): Promise<void>;
   closed(): void;
   submit(text?: string, spoken?: boolean): Promise<void>;
   readonly changingSession: boolean;
@@ -112,8 +129,10 @@ export interface AssistantStore {
   /** Push to talk: the shortcut went down (`true`, start listening) or up (`false`, send what was heard). */
   pushToTalk(down: boolean): Promise<void>;
   hide(): Promise<void>;
-  /** The ball was clicked: open the capsule. */
-  unfold(): Promise<void>;
+  /** The ball was clicked (or, with `peek`, the pointer rested on it): open the capsule. */
+  unfold(peek?: boolean): Promise<void>;
+  /** A capsule opened on hover is being used: it takes the keyboard focus and stays. */
+  engage(): void;
   /** Carries the conversation over to the full chat page. */
   openChat(): Promise<void>;
   openSettings(tab: SettingsTarget): Promise<void>;
@@ -214,9 +233,10 @@ export function createAssistantStore(deps: AssistantDeps): AssistantStore {
     } else if (store.open && !store.hint) store.note(MODEL_REQUIRED, 'ai');
   }
 
-  function readPrefs(open?: string, read?: string) {
+  function readPrefs(open?: string, read?: string, hover?: boolean) {
     if (open === 'voice' || open === 'type') store.prefs.open = open;
     if (read === 'voice' || read === 'always' || read === 'never') store.prefs.read = read;
+    if (typeof hover === 'boolean') store.prefs.hover = hover;
   }
   function clearTimers() { clearTimer(listenTimer); clearTimer(sendTimer); listenTimer = sendTimer = undefined; flags.partial = ''; }
   function noteVoice(message: string) {
@@ -329,7 +349,9 @@ export function createAssistantStore(deps: AssistantDeps): AssistantStore {
   }
 
   const store: AssistantStore = reactive({
-    open: false, ball: false, prefs: { open: 'voice', read: 'voice' }, input: '', attachments: [], hint: '', hintTab: '',
+    open: false, ball: false, prefs: { open: 'voice', read: 'voice', hover: true }, input: '', attachments: [], hint: '', hintTab: '',
+    layout: { ball: null, right: true }, peek: false, hovering: false, reanchoring: 0,
+    reanchorReady(id) { if (store.reanchoring === id) void deps.invoke('assistant_reanchor_ready', { id }).catch(() => {}); },
     unread: false, notice: null,
     get items() { return view()?.items ?? []; },
     get currentId() { return chat.currentId; },
@@ -393,18 +415,22 @@ export function createAssistantStore(deps: AssistantDeps): AssistantStore {
       starting ??= (async () => {
         if (!deps.desktop) return;
         unsubscribers.push(
-          await deps.listen('assistant-open', () => { void store.opened(); }),
+          await deps.listen<{ peek?: boolean } | null>('assistant-open', value => { void store.opened(Boolean(value?.peek)); }),
+          await deps.listen<StageLayout>('assistant-stage', value => { if (value) store.layout = { ball: value.ball ?? null, right: Boolean(value.right) }; }),
+          await deps.listen<boolean>('assistant-hover', inside => { store.hovering = Boolean(inside); }),
+          await deps.listen<{ id: number }>('assistant-reanchor', value => { store.reanchoring = value?.id ?? 0; }),
+          await deps.listen<{ id: number }>('assistant-reanchor-done', value => { if (!value || value.id === store.reanchoring) store.reanchoring = 0; }),
           await deps.listen('assistant-companion-session', () => { if (store.open) void adoptCompanionSession(); else void store.opened(); }),
           await deps.listen('assistant-close', () => store.closed()),
           await deps.listen<string>('assistant-ptt', state => { void store.pushToTalk(state === 'start'); }),
           await deps.listen('ai-config-changed', () => { if (!disposed) void refreshModel(); }),
           await deps.listen<boolean>('assistant-ball', shown => { store.ball = Boolean(shown); }),
           // The settings page lives in another window; its choices arrive with every settings change.
-          await deps.listen<{ assistantOpen?: string; assistantRead?: string; appearance?: string; accent?: string }>('settings-changed', value => { readPrefs(value.assistantOpen, value.assistantRead); if (value.appearance) deps.onAppearance?.(value.appearance); if (value.accent) deps.onAccent?.(value.accent); }),
+          await deps.listen<{ assistantOpen?: string; assistantRead?: string; assistantHover?: boolean; appearance?: string; accent?: string }>('settings-changed', value => { readPrefs(value.assistantOpen, value.assistantRead, value.assistantHover); if (value.appearance) deps.onAppearance?.(value.appearance); if (value.accent) deps.onAccent?.(value.accent); }),
         );
         try {
-          const saved = await deps.invoke<{ open?: string; read?: string; appearance?: string; accent?: string }>('assistant_prefs');
-          readPrefs(saved?.open, saved?.read);
+          const saved = await deps.invoke<{ open?: string; read?: string; hover?: boolean; appearance?: string; accent?: string }>('assistant_prefs');
+          readPrefs(saved?.open, saved?.read, saved?.hover);
           if (saved?.appearance) deps.onAppearance?.(saved.appearance);
           if (saved?.accent) deps.onAccent?.(saved.accent);
         } catch { /* the defaults stand */ }
@@ -413,10 +439,12 @@ export function createAssistantStore(deps: AssistantDeps): AssistantStore {
       })();
       return starting;
     },
-    async opened() {
-      // Native transitions re-announce state after showing the WebView.
+    async opened(peek = false) {
+      // The host re-announces state after showing the WebView.
       // A duplicate event must never erase a draft or restart voice capture.
-      if (disposed || store.open) return;
+      if (disposed) return;
+      if (store.open) { if (!peek) store.peek = false; return; }
+      store.peek = peek;
       noteVoice('');
       clearTimers();
       // A draft and its attachments wait while the capsule is folded away; only voice capture starts afresh.
@@ -436,8 +464,8 @@ export function createAssistantStore(deps: AssistantDeps): AssistantStore {
         await chat.select(null);
       }
       if (pendingPtt) { await beginTalk(); return; }
-      // Typing first: the capsule waits, and a tap on the ball starts listening.
-      if (store.open && asr.enabled && store.prefs.open === 'voice' && !store.input && !store.attachments.length) { voiceTurn = await startListening(); }
+      // Typing first: the capsule waits, and a tap on the ball starts listening. A glance on hover never listens.
+      if (store.open && !store.peek && asr.enabled && store.prefs.open === 'voice' && !store.input && !store.attachments.length) { voiceTurn = await startListening(); }
     },
     closed() {
       noteVoice('');
@@ -445,7 +473,7 @@ export function createAssistantStore(deps: AssistantDeps): AssistantStore {
       draftVersion++;
       clearTimers();
       asr.deactivate(); void speech.stop();
-      store.open = false; store.note(''); heard = ''; voiceTurn = false; flags.awaitingSpeech = false;
+      store.open = false; store.peek = false; store.note(''); heard = ''; voiceTurn = false; flags.awaitingSpeech = false;
     },
     async newConversation() {
       if (flags.changingSession || flags.submitting) return;
@@ -565,7 +593,8 @@ export function createAssistantStore(deps: AssistantDeps): AssistantStore {
       else noteVoice('没听清，按住快捷键再说一次。');
     },
     hide() { return deps.invoke<void>('assistant_hide').catch(() => {}); },
-    async unfold() { await deps.invoke('assistant_unfold'); },
+    async unfold(peek = false) { await deps.invoke('assistant_unfold', { peek }); },
+    engage() { if (!store.peek) return; store.peek = false; void deps.invoke('assistant_focus').catch(() => {}); },
     async openChat() { await deps.invoke('assistant_open_chat', { session: chat.currentId }); },
     async openSettings(tab) { await deps.invoke('assistant_open_settings', { tab }); },
     dispose() {

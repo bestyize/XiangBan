@@ -563,7 +563,41 @@ describe('floating assistant', () => {
   it('tells the host to open the capsule when the ball is clicked', async () => {
     const { store, invoke } = setup({ voice: false });
     await store.unfold();
-    expect(invoke).toHaveBeenCalledWith('assistant_unfold');
+    expect(invoke).toHaveBeenCalledWith('assistant_unfold', { peek: false });
+    await store.unfold(true);
+    expect(invoke).toHaveBeenCalledWith('assistant_unfold', { peek: true });
+  });
+
+  it('opens for a glance without listening, and takes the focus once used', async () => {
+    const { store, asr, invoke, emit } = setup();
+    await store.init();
+    emit('assistant-stage', { ball: { x: 408, y: 520, size: 72 }, right: true });
+    expect(store.layout).toEqual({ ball: { x: 408, y: 520, size: 72 }, right: true });
+    emit('assistant-open', { peek: true });
+    await vi.waitFor(() => expect(store.open).toBe(true));
+    expect(store.peek).toBe(true);
+    await flushPromises();
+    expect(asr.activate).not.toHaveBeenCalled();
+    store.engage();
+    expect(store.peek).toBe(false);
+    expect(invoke).toHaveBeenCalledWith('assistant_focus');
+    emit('assistant-close', null);
+    expect(store.peek).toBe(false);
+  });
+
+  it('passes on where the pointer is and asks before the window moves under the ball', async () => {
+    const { store, invoke, emit } = setup();
+    await store.init();
+    emit('assistant-hover', true);
+    expect(store.hovering).toBe(true);
+    emit('assistant-reanchor', { id: 3 });
+    expect(store.reanchoring).toBe(3);
+    store.reanchorReady(2);
+    expect(invoke).not.toHaveBeenCalledWith('assistant_reanchor_ready', { id: 2 });
+    store.reanchorReady(3);
+    expect(invoke).toHaveBeenCalledWith('assistant_reanchor_ready', { id: 3 });
+    emit('assistant-reanchor-done', { id: 3 });
+    expect(store.reanchoring).toBe(0);
   });
 
   it('waits for typing when the user chose to type first, and listens when they tap the ball', async () => {
@@ -579,11 +613,11 @@ describe('floating assistant', () => {
   it('follows a change of the open and read choices made in the settings window', async () => {
     const { store, asr, emit } = setup();
     await store.init();
-    expect(store.prefs).toEqual({ open: 'voice', read: 'voice' });
-    emit('settings-changed', { assistantOpen: 'type', assistantRead: 'always', other: 1 });
-    expect(store.prefs).toEqual({ open: 'type', read: 'always' });
+    expect(store.prefs).toEqual({ open: 'voice', read: 'voice', hover: true });
+    emit('settings-changed', { assistantOpen: 'type', assistantRead: 'always', assistantHover: false, other: 1 });
+    expect(store.prefs).toEqual({ open: 'type', read: 'always', hover: false });
     emit('settings-changed', { assistantOpen: 'nonsense', assistantRead: undefined });
-    expect(store.prefs).toEqual({ open: 'type', read: 'always' });
+    expect(store.prefs).toEqual({ open: 'type', read: 'always', hover: false });
     await store.opened();
     expect(asr.activate).not.toHaveBeenCalled();
   });

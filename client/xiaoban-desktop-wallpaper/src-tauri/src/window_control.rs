@@ -228,7 +228,7 @@ pub fn update(app: &tauri::AppHandle, change: &Change) -> Result<Value, String> 
     } else if let Some(action) = change.action.as_deref() {
         match label.as_str() {
             "assistant" => match action {
-                "show" => crate::float_assistant::expand(app)?,
+                "show" => crate::float_assistant::expand(app, false)?,
                 "hide" => crate::float_assistant::hide_surface(app)?,
                 _ => crate::float_assistant::collapse(app)?,
             },

@@ -72,6 +72,8 @@ pub struct Settings {
     pub assistant_shortcut: String,
     /// A small ball stays on screen; clicking it opens the capsule. Without it the capsule only appears on the shortcut.
     pub assistant_ball: bool,
+    /// Resting the pointer on the ball opens the capsule without taking the keyboard focus.
+    pub assistant_hover: bool,
     /// Where the ball was left, relative to its default spot on the screen it is on, in logical pixels.
     pub assistant_ball_dx: f64,
     pub assistant_ball_dy: f64,
@@ -111,6 +113,7 @@ impl Default for Settings {
             assistant_enabled: true,
             assistant_shortcut: crate::float_assistant::DEFAULT_SHORTCUT.into(),
             assistant_ball: true,
+            assistant_hover: true,
             assistant_ball_dx: 0.0,
             assistant_ball_dy: 0.0,
             // Voice is push to talk (hold the shortcut), so the capsule waits for typing by default.
@@ -319,7 +322,7 @@ mod tests {
     #[test]
     fn the_assistant_ball_and_its_voice_preferences_default_on_and_repair_bad_values() {
         let defaults = Settings::default();
-        assert!(defaults.assistant_ball && !defaults.assistant_hint_seen);
+        assert!(defaults.assistant_ball && defaults.assistant_hover && !defaults.assistant_hint_seen);
         assert_eq!((defaults.assistant_open.as_str(), defaults.assistant_read.as_str()), ("type", "voice"));
         let mut chosen: Preferences = serde_json::from_str(
             r#"{"settings":{"assistantBall":false,"assistantBallDx":-120.5,"assistantBallDy":30,"assistantOpen":"type","assistantRead":"never"}}"#,
