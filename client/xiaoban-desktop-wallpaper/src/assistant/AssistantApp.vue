@@ -57,9 +57,12 @@ async function settleMorph(token: number) {
   try { await Promise.race([Promise.all(morphAnimations.map(animation => animation.finished)), limit]); } catch { return; }
   if (token !== morphToken) return;
   const finished = morph.value;
-  morphAnimations.splice(0).forEach(animation => animation.cancel());
+  // The real surfaces swap in (or, collapsing, leave) in the same render that removes the stand-ins. Only then are
+  // the animations let go: cancelling first would put a faded card back on screen for a frame.
+  const done = morphAnimations.splice(0);
   morph.value = null;
   void nextTick(() => {
+    done.forEach(animation => animation.cancel());
     queueHitRegions();
     if (finished === 'expand') {
       // The glass was the capsule's surface all along; only what sits on it fades in.
@@ -483,7 +486,8 @@ onBeforeUnmount(()=>{
       </Transition>
     </div>
     </Transition>
-    <Transition :name="store.layout.ball ? 'none' : 'pop'" appear @after-enter="queueHitRegions" @after-leave="queueHitRegions">
+    <!-- With a ball, the morph's stand-ins do the showing; the capsule must come and go in the same frame as them. -->
+    <Transition name="pop" :css="!store.layout.ball" appear @after-enter="queueHitRegions" @after-leave="queueHitRegions">
       <div v-if="store.open || morph === 'collapse'" ref="inner" class="inner" role="dialog" aria-label="超级小伴" data-testid="assistant">
         <Transition name="rise" @after-enter="queueHitRegions" @after-leave="queueHitRegions">
           <section v-if="hasCard" class="card" data-testid="assistant-card">

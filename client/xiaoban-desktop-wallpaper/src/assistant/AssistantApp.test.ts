@@ -18,7 +18,7 @@ const conversation = () => [
   { kind: 'user', id: 'u1', text: '今天如何放松', images: [] as string[] },
   { kind: 'assistant', id: 'a1', text: '可以先休息片刻。', streaming: false },
 ];
-function setup(overrides: Record<string, unknown> = {}) {
+function setup(overrides: Record<string, unknown> = {}, stubs: Record<string, unknown> = {}) {
   const store = reactive({ open: true, ball: false, phase: 'answering', hint: '', hintTab: '', question: '今天如何放松', answer: '可以先休息片刻。', working: '', failure: '', approval: null as null | { id: string; arguments: {}; tool: string }, ask: null as null | { id: string; question: string; options: string[] },
     items: conversation() as unknown[], title: '放松一下', currentId: 's1' as string | null, recent: [{ id: 's1', title: '放松一下', createdAt: 1, updatedAt: 2 }, { id: 's2', title: '周报整理', createdAt: 1, updatedAt: 1 }],
     unread: false, notice: null as null | { kind: string; text: string }, dismissNotice: vi.fn(), switchSession: vi.fn(async () => {}), retry: vi.fn(async () => {}), decide: vi.fn(), reply: vi.fn(),
@@ -26,7 +26,7 @@ function setup(overrides: Record<string, unknown> = {}) {
     layout: { ball: null as null | { x: number; y: number; size: number }, right: true }, prefs: { open: 'type', read: 'voice', hover: true }, peek: false, hovering: false, reanchoring: 0, reanchorReady: vi.fn(), engage: vi.fn(), ...overrides });
   store.dismissNotice.mockImplementation(() => { store.notice = null; });
   const asr=reactive({level:0,enabled:true,microphoneSupported:true,listening:false,preparing:false,recordingRequested:false,microphoneError:''});
-  const wrapper=mount(AssistantApp,{attachTo:document.body,props:{store:store as unknown as AssistantStore,asr:asr as AsrStore},global:{stubs:{MarkdownView:true}}});
+  const wrapper=mount(AssistantApp,{attachTo:document.body,props:{store:store as unknown as AssistantStore,asr:asr as AsrStore},global:{stubs:{MarkdownView:true,...stubs}}});
   wrappers.push(wrapper);
   return {store,asr,wrapper};
 }
@@ -403,6 +403,21 @@ describe('ball and capsule in one window',()=>{
     // The stand-ins are gone in the same frame, so the ball shows at once: no fade-in, no blink.
     expect(wrapper.get('.stage').classes()).not.toContain('ball-fade');
     for (const command of ['assistant_fit','assistant_transition_ready']) expect(vi.mocked(invoke).mock.calls.map(([name])=>name)).not.toContain(command);
+    spy.mockRestore();
+  });
+  it('takes the capsule away in the same frame the ball comes back, never showing it alone',async()=>{
+    const {spy,finishAll}=animations();
+    // The real <Transition>, not the test stub: its leave is what used to keep the capsule a frame too long.
+    const {store,wrapper}=setup({open:true,phase:'idle',layout:{ball:BALL,right:true}},{transition:false});await nextTick();
+    store.open=false;store.ball=true;await nextTick();await flushPromises();
+    expect(wrapper.get('.stage').classes()).toContain('morph-collapse');
+    const seen:boolean[]=[];
+    const observer=new MutationObserver(()=>{ if(!wrapper.get('.stage').classes().includes('morph-collapse')) seen.push(wrapper.find('[data-testid="assistant"]').exists()); });
+    observer.observe(wrapper.get('.stage').element,{attributes:true,attributeFilter:['class']});
+    finishAll();await flushPromises();await nextTick();await new Promise(resolve=>setTimeout(resolve,50));
+    observer.disconnect();
+    expect(seen.length).toBeGreaterThan(0);
+    expect(seen.every(capsuleStillThere=>!capsuleStillThere)).toBe(true);
     spy.mockRestore();
   });
   it('turns around halfway instead of starting over',async()=>{
