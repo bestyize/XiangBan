@@ -37,6 +37,7 @@ struct PartialCall {
     id: String,
     name: String,
     arguments: String,
+    extra_content: Option<Value>,
 }
 
 /// Rebuilds one assistant reply from OpenAI-style streaming chunks.
@@ -44,6 +45,8 @@ struct PartialCall {
 pub struct StreamAccumulator {
     text: String,
     reasoning: String,
+    reasoning_fields: serde_json::Map<String, Value>,
+    reasoning_details: Vec<Value>,
     calls: Vec<PartialCall>,
     usage: Option<Usage>,
     finish_reason: Option<String>,
@@ -79,9 +82,40 @@ impl StreamAccumulator {
         }
         let Some(choice) = chunk.get("choices").and_then(|c| c.get(0)) else { return Ok(()) };
         if let Some(delta) = choice.get("delta") {
-            if let Some(text) = delta.get("reasoning_content").and_then(Value::as_str).filter(|text| !text.is_empty()) {
-                self.reasoning.push_str(text);
-                on_reasoning(crate::ReasoningKind::Text, text);
+            let mut displayed = false;
+            for field in ["reasoning_content", "reasoning", "reasoning_text"] {
+                if let Some(text) = delta[field].as_str().filter(|s| !s.is_empty()) {
+                    let value = self.reasoning_fields.entry(field.to_string()).or_insert_with(|| Value::String(String::new()));
+                    if let Some(previous) = value.as_str() { *value = Value::String(format!("{previous}{text}")); }
+                    if !displayed {
+                        self.reasoning.push_str(text);
+                        on_reasoning(crate::ReasoningKind::Text, text);
+                        displayed = true;
+                    }
+                }
+            }
+            for detail in delta["reasoning_details"].as_array().into_iter().flatten() {
+                let index = detail["index"].as_u64();
+                let slot = self.reasoning_details.iter().position(|v| index.is_some() && v["index"].as_u64() == index && v["type"] == detail["type"]);
+                if !displayed {
+                    for field in ["text", "summary"] {
+                        if let Some(text) = detail[field].as_str() {
+                            on_reasoning(if field == "summary" { crate::ReasoningKind::Summary } else { crate::ReasoningKind::Text }, text);
+                        }
+                    }
+                }
+                if let Some(slot) = slot {
+                    if let (Some(target), Some(fields)) = (self.reasoning_details[slot].as_object_mut(), detail.as_object()) {
+                        for (key, value) in fields {
+                            if ["text", "summary", "signature"].contains(&key.as_str()) {
+                                if let Some(fragment) = value.as_str() {
+                                    let previous = target.get(key).and_then(Value::as_str).unwrap_or("");
+                                    target.insert(key.clone(), Value::String(format!("{previous}{fragment}")));
+                                }
+                            } else { target.insert(key.clone(), value.clone()); }
+                        }
+                    }
+                } else { self.reasoning_details.push(detail.clone()); }
             }
             if let Some(text) = delta.get("content").and_then(Value::as_str).filter(|t| !t.is_empty()) {
                 self.text.push_str(text);
@@ -102,7 +136,7 @@ impl StreamAccumulator {
         let id = call.get("id").and_then(Value::as_str).filter(|s| !s.is_empty());
         let index = match call.get("index").and_then(Value::as_u64) {
             Some(i) => i as usize,
-            None if id.is_some() => self.calls.len(),
+            None if id.is_some() => self.calls.iter().position(|c| Some(c.id.as_str()) == id).unwrap_or(self.calls.len()),
             None => self.calls.len().saturating_sub(1),
         };
         if index >= MAX_TOOL_CALLS {
@@ -112,6 +146,11 @@ impl StreamAccumulator {
             self.calls.push(PartialCall::default());
         }
         let slot = &mut self.calls[index];
+        if let Some(extra) = call.get("extra_content") {
+            if let (Some(target), Some(fields)) = (slot.extra_content.as_mut().and_then(Value::as_object_mut), extra.as_object()) {
+                for (key, value) in fields { target.insert(key.clone(), value.clone()); }
+            } else { slot.extra_content = Some(extra.clone()); }
+        }
         if let (Some(id), true) = (id, slot.id.is_empty()) {
             slot.id = id.to_string();
         }
@@ -134,7 +173,10 @@ impl StreamAccumulator {
         self.finished
     }
 
-    pub fn finish(self) -> Reply {
+    pub fn finish(mut self) -> Reply {
+        let extras: serde_json::Map<String, Value> = self.calls.iter().enumerate().filter_map(|(i, call)| {
+            call.extra_content.clone().map(|extra| (if call.id.is_empty() { format!("call_{i}") } else { call.id.clone() }, extra))
+        }).collect();
         let tool_calls: Vec<ToolCall> = self
             .calls
             .into_iter()
@@ -148,9 +190,55 @@ impl StreamAccumulator {
             .collect();
         let finish = chat_finish(self.finish_reason.as_deref()).settle(!tool_calls.is_empty());
         let mut message = Message::assistant(self.text, tool_calls);
-        if !self.reasoning.is_empty() {
-            message.provider_state = Some(serde_json::json!({"protocol":"chat", "reasoning_content": self.reasoning}));
+        if !self.reasoning_fields.is_empty() || !self.reasoning_details.is_empty() || !extras.is_empty() {
+            let mut state = serde_json::json!({"protocol":"chat", "tool_extra_content": extras});
+            for (key, value) in self.reasoning_fields { state[&key] = value; }
+            if !self.reasoning_details.is_empty() {
+                for detail in &mut self.reasoning_details {
+                    if let Some(fields) = detail.as_object_mut() { fields.remove("index"); }
+                }
+                state["reasoning_details"] = Value::Array(self.reasoning_details);
+            }
+            message.provider_state = Some(state);
         }
         Reply { message, usage: self.usage, finish }
+    }
+}
+
+#[cfg(test)]
+mod protocol_regression_tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn reasoning_aliases_and_gemini_signature_round_trip() {
+        let mut stream = StreamAccumulator::default();
+        let mut thinking = String::new();
+        stream.push_with_reasoning(&json!({"choices":[{"delta":{
+            "reasoning":"checking", "tool_calls":[{"index":0,"id":"call_a","function":{"name":"lookup","arguments":"{}"},"extra_content":{"google":{"thought_signature":"opaque"}}}]
+        }}]}), &mut |_| {}, &mut |_, s| thinking.push_str(s)).unwrap();
+        assert_eq!(thinking, "checking");
+        let reply = stream.finish();
+        let wire = super::super::wire::message_to_wire(&reply.message);
+        assert_eq!(wire["reasoning"], "checking");
+        assert_eq!(wire["tool_calls"][0]["extra_content"]["google"]["thought_signature"], "opaque");
+    }
+
+    #[test]
+    fn structured_reasoning_merges_fragments_without_exposing_encrypted_data() {
+        let mut stream = StreamAccumulator::default();
+        let mut thinking = String::new();
+        for details in [
+            json!([{"index":0,"type":"reasoning.text","text":"one","id":"r"}]),
+            json!([{"index":0,"type":"reasoning.text","text":" two","signature":"sig"}]),
+            json!([{"index":1,"type":"reasoning.encrypted","data":"secret","id":"e"}]),
+        ] {
+            stream.push_with_reasoning(&json!({"choices":[{"delta":{"reasoning_details":details}}]}), &mut |_| {}, &mut |_, s| thinking.push_str(s)).unwrap();
+        }
+        assert_eq!(thinking, "one two");
+        let wire = super::super::wire::message_to_wire(&stream.finish().message);
+        assert_eq!(wire["reasoning_details"][0]["text"], "one two");
+        assert!(wire["reasoning_details"][0].get("index").is_none());
+        assert_eq!(wire["reasoning_details"][1]["data"], "secret");
     }
 }

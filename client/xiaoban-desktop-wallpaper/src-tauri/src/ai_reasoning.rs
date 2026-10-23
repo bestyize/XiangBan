@@ -17,6 +17,24 @@ impl ReplyPreference {
         match self { Self::Default => None, Self::Faster => Some("low"), Self::Medium => Some("medium"), Self::Deeper => Some("high"), Self::Xhigh => Some("xhigh"), Self::Max => Some("max") }
     }
 }
+/// Independent of effort levels: aliases can declare a thinking wire format without
+/// claiming to support any effort knob. Budget mode is for legacy Messages models.
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum ThinkingMode {
+    Disabled,
+    Adaptive,
+    Enabled { budget_tokens: u32 },
+}
+
+pub fn validate_thinking(mode: Option<&ThinkingMode>, max_output: Option<u32>) -> bool {
+    match mode {
+        Some(ThinkingMode::Enabled { budget_tokens }) => *budget_tokens >= 1024
+            && *budget_tokens < max_output.unwrap_or(2_000_000),
+        _ => true,
+    }
+}
+
 pub const EFFORTS: &[&str] = &["low", "medium", "high", "xhigh", "max"];
 pub fn validate(levels: &[String]) -> Result<(), String> {
     if levels.len() > EFFORTS.len() || levels.iter().enumerate().any(|(i, s)| !EFFORTS.contains(&s.as_str()) || levels[..i].contains(s)) {
@@ -52,28 +70,46 @@ pub fn levels(model: &str, protocol: &str, declared: Option<&[String]>) -> Vec<S
 }
 pub fn supported(_base_url: &str, model: &str, protocol: &str) -> bool { !levels(model, protocol, None).is_empty() }
 pub fn body(protocol: &str, preference: ReplyPreference, levels: &[String]) -> Map<String, Value> {
+    body_with_capabilities(protocol, preference, levels, None, None)
+}
+
+pub fn body_with_capabilities(
+    protocol: &str, preference: ReplyPreference, levels: &[String],
+    summary: Option<bool>, thinking: Option<&ThinkingMode>,
+) -> Map<String, Value> {
     let effort = preference.effort().filter(|e| levels.iter().any(|v| v == e));
     match protocol {
-        // Request a public reasoning summary for models whose capability is known,
-        // independently of whether the user adjusted the inference effort.
-        // Unknown-compatible endpoints are not sent an unsupported summary field.
-        "responses" if !levels.is_empty() => {
-            let mut reasoning = json!({"summary": "auto"});
-            if let Some(effort) = effort { reasoning["effort"] = json!(effort); }
-            Map::from_iter([("reasoning".into(), reasoning)])
+        "responses" => {
+            // An explicit summary capability is independent of effort levels. Keep
+            // the legacy inference only as a fallback; unknown non-reasoning models
+            // must not receive an unsupported reasoning parameter by default.
+            let mut reasoning = Map::new();
+            if summary.unwrap_or(!levels.is_empty()) { reasoning.insert("summary".into(), json!("auto")); }
+            if let Some(effort) = effort { reasoning.insert("effort".into(), json!(effort)); }
+            if reasoning.is_empty() { Map::new() }
+            else { Map::from_iter([("reasoning".into(), Value::Object(reasoning))]) }
         }
         "chat" => effort.map_or_else(Map::new, |effort|
             Map::from_iter([("reasoning_effort".into(), json!(effort))])),
-        // Adaptive thinking with a readable summary (the default display leaves thinking text empty, so the
-        // reasoning panel would stay blank); the kernel sends the signed blocks back during tool use.
-        "anthropic" if !levels.is_empty() => {
-            let mut body = Map::from_iter([("thinking".into(), json!({"type": "adaptive", "display": "summarized"}))]);
-            if let Some(effort) = effort { body.insert("output_config".into(), json!({"effort": effort})); }
+        "anthropic" => {
+            let inferred = if levels.is_empty() { ThinkingMode::Disabled } else { ThinkingMode::Adaptive };
+            let explicit = thinking.is_some();
+            let thinking = thinking.unwrap_or(&inferred);
+            let wire = match thinking {
+                ThinkingMode::Disabled => return if !explicit && levels.is_empty() {
+                    Map::new()
+                } else { Map::from_iter([("thinking".into(), json!({"type":"disabled"}))]) },
+                ThinkingMode::Adaptive => json!({"type":"adaptive", "display":"summarized"}),
+                ThinkingMode::Enabled { budget_tokens } => json!({"type":"enabled", "budget_tokens":budget_tokens}),
+            };
+            let mut body = Map::from_iter([("thinking".into(), wire)]);
+            if let Some(effort) = effort { body.insert("output_config".into(), json!({"effort":effort})); }
             body
         }
         _ => Map::new(),
     }
 }
+
 #[cfg(test)]
 mod claude_tests {
     use super::*;
@@ -137,5 +173,37 @@ mod tests {
         assert_eq!(serde_json::from_str::<ReplyPreference>("\"faster\"").unwrap(), ReplyPreference::Faster);
         assert_eq!(serde_json::from_str::<ReplyPreference>("\"high\"").unwrap(), ReplyPreference::Deeper);
         assert_eq!(serde_json::from_str::<ReplyPreference>("\"max\"").unwrap().effort(), Some("max"));
+    }
+}
+
+#[cfg(test)]
+mod independent_capability_tests {
+    use super::*;
+
+    #[test]
+    fn responses_summary_does_not_depend_on_effort_levels() {
+        let alias = body_with_capabilities("responses", ReplyPreference::Default, &[], Some(true), None);
+        assert!(body("responses", ReplyPreference::Default, &[]).is_empty());
+        assert_eq!(alias["reasoning"]["summary"], "auto");
+        assert!(alias["reasoning"].get("effort").is_none());
+        let effort_only = body_with_capabilities("responses", ReplyPreference::Deeper, &["high".into()], Some(false), None);
+        assert_eq!(effort_only["reasoning"], json!({"effort":"high"}));
+        assert!(body_with_capabilities("responses", ReplyPreference::Default, &[], Some(false), None).is_empty());
+    }
+
+    #[test]
+    fn messages_alias_can_declare_adaptive_or_budget_thinking_without_effort_knob() {
+        let adaptive = body_with_capabilities("anthropic", ReplyPreference::Max, &[], None, Some(&ThinkingMode::Adaptive));
+        assert_eq!(adaptive["thinking"]["type"], "adaptive");
+        assert!(!adaptive.contains_key("output_config"));
+        let enabled = ThinkingMode::Enabled { budget_tokens: 4096 };
+        let budget = body_with_capabilities("anthropic", ReplyPreference::Default, &[], None, Some(&enabled));
+        assert_eq!(budget["thinking"], json!({"type":"enabled","budget_tokens":4096}));
+        assert!(validate_thinking(Some(&enabled), Some(8192)));
+        assert!(!validate_thinking(Some(&enabled), Some(4096)));
+        assert!(!validate_thinking(Some(&ThinkingMode::Enabled { budget_tokens: 100 }), None));
+        let disabled = body_with_capabilities("anthropic", ReplyPreference::Max, &["max".into()], None, Some(&ThinkingMode::Disabled));
+        assert_eq!(disabled["thinking"]["type"], "disabled");
+        assert!(!disabled.contains_key("output_config"));
     }
 }

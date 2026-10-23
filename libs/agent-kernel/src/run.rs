@@ -238,7 +238,7 @@ impl Agent {
                 mw.before_model(&mut turn)?;
             }
             let mut request = ChatRequest { messages: turn.messages, tools: turn.tools };
-            let mut reply = self.chat_with_retry(&mut request, &mut recovered_context_budget, on_event, cancel)?;
+            let mut reply = self.chat_with_retry(session, &mut request, &mut recovered_context_budget, on_event, cancel)?;
             let turn = Turn { session: turn.session, index, messages: request.messages, tools: request.tools };
             for mw in &self.middleware {
                 mw.after_model(&turn, &mut reply.message)?;
@@ -338,6 +338,7 @@ impl Agent {
     /// Retries only when nothing was streamed yet, so the UI never sees a half answer replayed.
     fn chat_with_retry(
         &self,
+        session: &str,
         request: &mut ChatRequest,
         recovered_budget: &mut Option<usize>,
         on_event: &mut dyn FnMut(Event),
@@ -355,12 +356,15 @@ impl Agent {
         loop {
             let streamed_flag = std::cell::Cell::new(false);
             let mut visible_reasoning: Vec<crate::ReasoningSegment> = Vec::new();
+            let mut visible_text = String::new();
             // Both provider callbacks share one observer without aliasing two &mut borrows.
             let result = {
                 let sink = std::cell::RefCell::new(&mut *on_event);
                 self.provider.chat_with_reasoning(
                     request,
                     &mut |text| {
+                        if text.is_empty() { return; }
+                        visible_text.push_str(text);
                         streamed_flag.set(true);
                         (*sink.borrow_mut())(Event::TextDelta { text: text.to_string() });
                     },
@@ -405,8 +409,67 @@ impl Agent {
                     if !visible_reasoning.is_empty() { reply.message.reasoning = visible_reasoning; }
                     return Ok(reply);
                 }
-                other => return other,
+                Err(error) => {
+                    // A failed decoder has no safe, complete tool calls or opaque continuation
+                    // state. Persist only what was already exposed to the user. This also
+                    // prevents retry_last from silently replaying a partially answered turn.
+                    if streamed {
+                        let mut partial = Message::assistant(visible_text, Vec::new());
+                        partial.reasoning = visible_reasoning;
+                        partial.structured_content = Some(serde_json::json!({"interrupted": true}));
+                        self.store.append(session, &[partial])?;
+                    }
+                    return Err(error);
+                }
             }
+        }
+    }
+}
+
+#[cfg(test)]
+mod interrupted_output_tests {
+    use super::*;
+    use crate::store::SessionStore;
+    use crate::provider::ModelProvider;
+    use std::sync::atomic::AtomicUsize;
+
+    struct InterruptedProvider {
+        cancelled: bool,
+        attempts: AtomicUsize,
+    }
+    impl ModelProvider for InterruptedProvider {
+        fn chat(&self, request: &ChatRequest, on_text: &mut dyn FnMut(&str), cancel: &AtomicBool) -> Result<Reply, HarnessError> {
+            self.chat_with_reasoning(request, on_text, &mut |_, _| {}, cancel)
+        }
+        fn chat_with_reasoning(&self, _: &ChatRequest, on_text: &mut dyn FnMut(&str), on_reasoning: &mut dyn FnMut(crate::ReasoningKind, &str), _: &AtomicBool) -> Result<Reply, HarnessError> {
+            self.attempts.fetch_add(1, Ordering::SeqCst);
+            on_reasoning(crate::ReasoningKind::Text, "checking ");
+            on_reasoning(crate::ReasoningKind::Text, "state");
+            on_text("partial answer");
+            Err(if self.cancelled { HarnessError::Cancelled } else { HarnessError::provider("connection reset", true) })
+        }
+    }
+
+    #[test]
+    fn cancelled_and_failed_output_survive_reload_without_automatic_replay() {
+        for cancelled in [false, true] {
+            let dir = std::env::temp_dir().join(format!("agent-interrupted-{}-{}-{}", std::process::id(), cancelled,
+                std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()));
+            let store = Arc::new(crate::JsonlStore::new(&dir));
+            let provider = Arc::new(InterruptedProvider { cancelled, attempts: AtomicUsize::new(0) });
+            let agent = Agent::builder(provider.clone(), store.clone()).build().unwrap();
+            let cancel = Arc::new(AtomicBool::new(false));
+            assert!(agent.run("s", "question", &mut |_| {}, &cancel).is_err());
+            let saved = crate::JsonlStore::new(&dir).load("s").unwrap();
+            assert_eq!(saved.len(), 2);
+            assert_eq!(saved[1].text(), "partial answer");
+            assert_eq!(saved[1].reasoning[0].text, "checking state");
+            assert_eq!(saved[1].structured_content.as_ref().unwrap()["interrupted"], true);
+            assert!(saved[1].tool_calls.is_empty());
+            assert!(saved[1].provider_state.is_none());
+            assert!(agent.retry_last("s", &mut |_| {}, &cancel).is_err());
+            assert_eq!(provider.attempts.load(Ordering::SeqCst), 1);
+            std::fs::remove_dir_all(dir).unwrap();
         }
     }
 }

@@ -40,6 +40,7 @@ export interface Settings {
 /** `chat` is /chat/completions, `responses` is /responses and `anthropic` is /v1/messages. */
 export type AiProtocol = "chat" | "responses" | "anthropic";
 export type AiReplyPreference = "default" | "faster" | "medium" | "deeper" | "xhigh" | "max";
+export type AiThinkingMode = { type: "disabled" } | { type: "adaptive" } | { type: "enabled"; budget_tokens: number };
 export type AiReasoningEffort = "low" | "medium" | "high" | "xhigh" | "max";
 
 export type ProviderType = "third" | "free" | "paid" | "custom";
@@ -49,7 +50,7 @@ export interface ProviderConfigView {
   type?: ProviderType;
   remote?: boolean; available?: boolean; description?: string;
   defaultModel?: string;
-  models?: { id: string; name: string; description?: string; reasoningEfforts?: AiReasoningEffort[] | null; maxOutputTokens?: number | null; contextWindowTokens?: number | null; supportsTools?: boolean | null; supportsVision?: boolean | null }[];
+  models?: { id: string; name: string; description?: string; reasoningSummary?: boolean | null; thinkingMode?: AiThinkingMode | null; reasoningEfforts?: AiReasoningEffort[] | null; maxOutputTokens?: number | null; contextWindowTokens?: number | null; supportsTools?: boolean | null; supportsVision?: boolean | null }[];
   endpoints?: Partial<Record<AiProtocol, string>>;
   consoleUrl?: string; consoleText?: string;
   selectionMode?: "manual" | "recommended";

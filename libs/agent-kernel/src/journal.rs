@@ -163,6 +163,12 @@ impl JsonlRunLog {
         Ok(out)
     }
 
+    /// Visit a validated trace in one pass without buffering it. A partial final
+    /// record is ignored just as in read_after; no tools or observers are invoked.
+    pub fn visit(&self, run_id: &str, mut accept: impl FnMut(RunEvent)) -> Result<(), HarnessError> {
+        self.scan(run_id, |event| { accept(event); true })
+    }
+
     pub fn inspect(&self, run_id: &str) -> Result<RunInspection, HarnessError> {
         let mut inspection = RunInspection {
             last_sequence: 0,
