@@ -9,6 +9,7 @@ import type { ControlPage } from './control-types.ts';
 import type { SessionSummary } from './chat/types.ts';
 import SettingsDialog from './components/SettingsDialog.vue';
 import ChatNameDialog from './components/ChatNameDialog.vue';
+import { useWorkspaceSort } from './workspace-sort.ts';
 const pageLoaders = {
   'new-task': () => import('./pages/NewTaskPage.vue'),
   chat: () => import('./pages/ChatPage.vue'),
@@ -68,6 +69,20 @@ const COMPANIONS = '__companions__';
 const WORKSPACE_NAMES_KEY = 'xiaoban.workspace-names';
 const WORKSPACES_OPEN_KEY = 'xiaoban.workspaces-open';
 const REMOVED_WORKSPACES_KEY = 'xiaoban.removed-workspaces';
+const WORKSPACE_ORDER_KEY = 'xiaoban.workspace-order';
+const workspaceOrder = ref<string[]>((() => {
+  try {
+    const saved: unknown = JSON.parse(localStorage.getItem(WORKSPACE_ORDER_KEY) || '[]');
+    if (Array.isArray(saved)) return [...new Set(saved.filter((path): path is string => typeof path === 'string' && !!path))];
+  } catch { /* Ignore a damaged ordering preference. */ }
+  return [];
+})());
+function saveWorkspaceOrder(paths: string[]) {
+  try {
+    localStorage.setItem(WORKSPACE_ORDER_KEY, JSON.stringify(paths));
+    workspaceOrder.value = paths;
+  } catch { store.notify('项目排序保存失败，请重试', 'error'); }
+}
 function readRemovedWorkspaces(): string[] {
   try {
     const saved: unknown = JSON.parse(localStorage.getItem(REMOVED_WORKSPACES_KEY) || '[]');
@@ -127,8 +142,14 @@ const spaces = computed<Space[]>(() => {
   }
   const pending = store.chat.pendingWorkspace;
   if (pending && !removedWorkspaces.value.has(pending) && !byPath.has(pending)) byPath.set(pending, { key: pending, name: folderName(pending), path: pending, sessions: [] });
-  return [recent, ...(companions.sessions.length ? [companions] : []), ...byPath.values()];
+  const positions = new Map(workspaceOrder.value.map((path, index) => [path, index]));
+  const projects = [...byPath.values()].sort((a, b) => (positions.get(a.path) ?? Infinity) - (positions.get(b.path) ?? Infinity));
+  return [recent, ...(companions.sessions.length ? [companions] : []), ...projects];
 });
+const workspaceTree = ref<HTMLElement | null>(null);
+const { dragging: draggingWorkspace, target: workspaceDropTarget, start: startWorkspaceSort, click: workspaceSortClick, cancel: cancelWorkspaceSort } = useWorkspaceSort(
+  workspaceTree, () => spaces.value.filter(space => space.path).map(space => space.path), saveWorkspaceOrder,
+);
 const expanded = reactive(new Set<string>([RECENT, COMPANIONS]));
 function toggleSpace(key: string) { if (expanded.has(key)) expanded.delete(key); else expanded.add(key); }
 /** Keep the folder of the open conversation unfolded. */
@@ -160,6 +181,7 @@ const renamingWorkspaceTitle = computed(() => renamingWorkspace.value ? folderNa
 function closeWorkspaceMenu() { workspaceMenu.value = null; }
 async function openWorkspaceMenu(space: Space, event: MouseEvent, anchor?: EventTarget | null) {
   if (!space.path) return;
+  cancelWorkspaceSort();
   closeMenu();
   closeSessionMenu();
   if (workspaceMenu.value?.key === space.key && anchor) { closeWorkspaceMenu(); return; }
@@ -178,6 +200,21 @@ async function placeWorkspaceMenu() {
 function startWorkspaceRename() {
   renamingWorkspace.value = workspaceMenu.value?.key || '';
   closeWorkspaceMenu();
+}
+const creatingWorkspaceSession = ref(false);
+async function newWorkspaceSession() {
+  const path = menuWorkspace.value?.path;
+  if (!path || creatingWorkspaceSession.value) return;
+  creatingWorkspaceSession.value = true;
+  closeWorkspaceMenu();
+  try {
+    await store.chat.select(null);
+    if (await store.chat.switchWorkspace(path) !== 'done') return;
+    workspacesOpen.value = true;
+    expanded.add(path);
+    navigate('new-task');
+  } catch { store.notify('新建会话失败，请重试', 'error'); }
+  finally { creatingWorkspaceSession.value = false; }
 }
 function deleteWorkspace() {
   const space = menuWorkspace.value;
@@ -428,10 +465,10 @@ const fixedPages = ['new-task', 'chat', 'ai-store', 'library', 'studio', 'games'
             <component :is="item.icon" :size="16" class="nav-icon" /><span class="nav-label">{{ item.label }}</span><span v-if="item.hint" class="nav-hint">{{ item.hint }}</span>
           </button>
           <div class="nav-caption"><button type="button" class="workspace-toggle" :aria-expanded="workspacesOpen" aria-controls="workspace-tree" data-testid="nav-workspaces-toggle" @click="toggleWorkspaces"><span>工作空间</span><ChevronDown :size="12" class="nav-chevron" :class="{ shut: !workspacesOpen }" /></button><button type="button" class="xb-icon-btn is-sm" aria-label="新建工作区" title="新建工作区" data-testid="nav-new-workspace" @click="addWorkspace"><Plus :size="14" :stroke-width="2" /></button></div>
-          <div v-show="workspacesOpen" id="workspace-tree">
-          <template v-for="space in spaces" :key="space.key">
-            <div class="nav-space-row" :class="{ 'menu-open': workspaceMenu?.key === space.key }" @contextmenu.prevent="openWorkspaceMenu(space, $event)">
-            <button type="button" class="nav-item space-row" :aria-expanded="expanded.has(space.key)" :title="space.path || space.name" :data-testid="space.key === '__recent__' ? 'space-recent' : `space-${space.name}`" @click="toggleSpace(space.key)">
+          <div v-show="workspacesOpen" id="workspace-tree" ref="workspaceTree" :class="{ 'is-sorting': draggingWorkspace }" @click.capture="workspaceSortClick">
+          <div v-for="space in spaces" :key="space.key" class="nav-space-group" :data-workspace-path="space.path || undefined" :class="{ 'is-dragging': !!space.path && draggingWorkspace === space.path, 'drop-before': workspaceDropTarget?.path === space.path && !workspaceDropTarget.after, 'drop-after': workspaceDropTarget?.path === space.path && workspaceDropTarget.after }">
+            <div class="nav-space-row" :class="{ 'menu-open': workspaceMenu?.key === space.key }" @contextmenu.prevent="openWorkspaceMenu(space, $event)" @dragstart.prevent>
+            <button type="button" class="nav-item space-row" :class="{ 'is-sortable': space.path }" :aria-expanded="expanded.has(space.key)" :title="space.path ? `${space.path}（拖动排序）` : space.name" :data-testid="space.key === '__recent__' ? 'space-recent' : `space-${space.name}`" @pointerdown="startWorkspaceSort(space.path, $event)" @click="toggleSpace(space.key)">
               <component :is="space.key === '__recent__' ? Inbox : space.key === '__companions__' ? Sparkles : Folder" :size="16" class="nav-icon" /><span class="nav-label">{{ space.name }}</span>
               <i v-if="!expanded.has(space.key) && spaceWaiting(space)" class="xb-dot"></i>
               <span class="nav-hint">{{ space.sessions.length || '' }}</span>
@@ -447,7 +484,7 @@ const fixedPages = ['new-task', 'chat', 'ai-store', 'library', 'studio', 'games'
               </div>
               <p v-if="!space.sessions.length" class="nav-empty">{{ space.key === '__recent__' ? '还没有任务' : '新任务会出现在这里' }}</p>
             </template>
-          </template>
+          </div>
           </div>
         </div>
         <div class="nav-sep"></div>
@@ -458,18 +495,18 @@ const fixedPages = ['new-task', 'chat', 'ai-store', 'library', 'studio', 'games'
 
       <div ref="menuRoot" class="sidebar-bottom">
         <button type="button" class="account-chip" data-testid="account-entry" :aria-label="store.account ? `账号菜单：${displayName}` : '账号菜单（未登录）'" aria-haspopup="menu" :aria-expanded="menuOpen" @click="toggleMenu">
-          <span class="account-avatar" :class="{ 'is-signed-in': store.account }"><img v-if="store.account?.user.avatarUrl" class="brand-avatar" :src="store.account.user.avatarUrl" alt="" /><img v-else src="/xiaoban.svg" alt="" class="mascot" /></span>
+          <span class="account-avatar" :class="{ 'is-signed-in': store.account, 'is-placeholder': !store.account?.user.avatarUrl }"><img v-if="store.account?.user.avatarUrl" class="brand-avatar" :src="store.account.user.avatarUrl" alt="" /><Sparkles v-else :size="18" :stroke-width="2" aria-hidden="true" /></span>
           <span class="nav-label account-name">{{ displayName }}</span>
         </button>
         <button type="button" class="xb-icon-btn notices" aria-label="通知" :title="hasUpdate ? '有新版本' : unread ? `${unread} 条未读公告` : '通知'" data-testid="nav-notices" @click="openSettings('about')"><Bell :size="16" /><i v-if="hasUpdate || unread" class="xb-dot notices-dot"></i></button>
 
         <div v-if="menuOpen" class="xb-menu account-menu" role="menu" aria-label="账号菜单" data-testid="account-menu">
           <div v-if="store.account" class="account-head" data-testid="account-info">
-            <span class="account-avatar lg"><img v-if="store.account.user.avatarUrl" :src="store.account.user.avatarUrl" alt="" /><img v-else src="/xiaoban.svg" alt="" class="mascot" /></span>
+            <span class="account-avatar lg" :class="{ 'is-placeholder': !store.account.user.avatarUrl }"><img v-if="store.account.user.avatarUrl" :src="store.account.user.avatarUrl" alt="" /><Sparkles v-else :size="22" :stroke-width="2" aria-hidden="true" /></span>
             <div><b data-testid="account-username">{{ store.account.user.username }}</b><span>账号 ID <span data-testid="account-uid">{{ store.account.user.uid }}</span></span></div>
           </div>
           <button v-else type="button" class="xb-menu-item account-login" role="menuitem" data-testid="account-login" @click="login">
-            <span class="account-avatar lg"><img src="/xiaoban.svg" alt="" class="mascot" /></span>
+            <span class="account-avatar lg is-placeholder"><Sparkles :size="22" :stroke-width="2" aria-hidden="true" /></span>
             <span class="login-copy"><b>登录 / 注册</b><small>登录后即可使用小伴 AI</small></span><LogIn :size="15" class="xb-menu-hint" />
           </button>
           <div class="xb-menu-sep"></div>
@@ -490,6 +527,7 @@ const fixedPages = ['new-task', 'chat', 'ai-store', 'library', 'studio', 'games'
     </aside>
     <div v-if="workspaceMenu" ref="workspaceMenuEl" class="xb-menu session-menu" role="menu" aria-label="工作空间项目" data-testid="workspace-menu" :style="{ left: `${workspaceMenu.x}px`, top: `${workspaceMenu.y}px` }">
       <template v-if="!workspaceMenu.confirming">
+      <button type="button" class="xb-menu-item" role="menuitem" data-testid="workspace-menu-new-session" :disabled="creatingWorkspaceSession" @click="newWorkspaceSession"><SquarePen :size="15" />新建会话</button>
       <button type="button" class="xb-menu-item" role="menuitem" data-testid="workspace-menu-rename" @click="startWorkspaceRename"><Pencil :size="15" />重命名</button>
       <div class="xb-menu-sep"></div>
       <button type="button" class="xb-menu-item is-danger" role="menuitem" data-testid="workspace-menu-delete" @click="workspaceMenu.confirming = true; placeWorkspaceMenu()"><Trash2 :size="15" />删除</button>
@@ -574,6 +612,13 @@ const fixedPages = ['new-task', 'chat', 'ai-store', 'library', 'studio', 'games'
 .workspace-toggle:hover{color:var(--ui-text-primary)}
 .workspace-toggle .nav-chevron{margin-left:0}
 .nav-space-row{position:relative;display:flex;align-items:center}
+.space-row.is-sortable{cursor:grab;touch-action:pan-y;user-select:none}
+#workspace-tree.is-sorting,#workspace-tree.is-sorting *{cursor:grabbing;user-select:none}
+.nav-space-group{position:relative}
+.nav-space-group.is-dragging{opacity:.4}
+.nav-space-group.drop-before::before,.nav-space-group.drop-after::after{content:'';position:absolute;left:10px;right:4px;height:2px;border-radius:2px;background:var(--ui-btn);pointer-events:none;z-index:1}
+.nav-space-group.drop-before::before{top:0}
+.nav-space-group.drop-after::after{bottom:0}
 .nav-space-row .space-row{flex:1;min-width:0}
 .nav-space-more{position:absolute;right:4px;opacity:0;pointer-events:none;background:var(--ui-surface);color:var(--ui-text-secondary)}
 .is-collapsed .nav-space-more{display:none}
@@ -609,9 +654,8 @@ const fixedPages = ['new-task', 'chat', 'ai-store', 'library', 'studio', 'games'
 .account-avatar{width:30px;height:30px;flex-shrink:0;border-radius:50%;overflow:hidden;background:#fff;box-shadow:0 0 0 1px rgba(0,0,0,.08);display:grid;place-items:center}
 .account-avatar.is-signed-in{box-shadow:0 0 0 2px var(--ui-btn)}
 .account-avatar img{width:100%;height:100%;object-fit:cover}
-.account-avatar img.mascot{width:26px;height:26px;object-fit:contain}
+.account-avatar.is-placeholder{color:#fff;background:linear-gradient(160deg,var(--ui-btn-hi),var(--ui-btn));box-shadow:inset 0 1px 0 rgba(255,255,255,.3),0 2px 6px rgba(0,0,0,.12)}
 .account-avatar.lg{width:38px;height:38px}
-.account-avatar.lg img.mascot{width:32px;height:32px}
 .notices-dot{position:absolute;top:6px;right:6px;width:6px;height:6px}
 .account-menu{position:absolute;left:-2px;bottom:52px;width:300px;padding:8px;z-index:50}
 .account-head{display:flex;align-items:center;gap:10px;padding:8px 10px 12px}
