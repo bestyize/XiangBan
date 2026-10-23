@@ -1,6 +1,7 @@
 import { reactive } from 'vue';
 import { speechText } from './text.ts';
 import { createStreamPlayer, type StreamPlayer } from '../../voice/stream-player.ts';
+import { ACK_PHRASES, chooseAck } from '../../voice/ack.ts';
 export interface VoiceOptions { voice: string; rate: number; volume: number; pitch: number }
 /** Where speech comes from; online voices fall back to the system voice when they fail. */
 export type SpeechProvider = 'edge' | 'gateway' | 'system';
@@ -38,6 +39,10 @@ export interface SpeechStore {
   speak(source: string, key: string, options?: VoiceOptions, automatic?: boolean): Promise<void>;
   /** Reads an answer while it is still being written, sentence by sentence. `stop()` ends it too. */
   stream?(key: string, options?: VoiceOptions, events?: SpeechStreamEvents): SpeechStream;
+  /** Synthesises the short acknowledgements for the current voice, once; later calls with the same voice do nothing. */
+  prepareAck?(): Promise<void>;
+  /** Plays one acknowledgement ("好的") unless something is being read already. Returns whether it started. */
+  ack?(): boolean;
   stop(): Promise<void>; dispose(): void;
 }
 export function createSpeechStore(deps: SpeechDeps): SpeechStore {
@@ -46,9 +51,16 @@ export function createSpeechStore(deps: SpeechDeps): SpeechStore {
   let audio: AudioHandle | null = null, objectUrl = '';
   let streaming: StreamPlayer | null = null;
   let cancelQueue = Promise.resolve(), saveQueue = Promise.resolve();
+  /** Synthesised acknowledgements, by voice. */
+  const acks = new Map<string, Uint8Array | ArrayBuffer>();
+  let ackBusy: Promise<void> | null = null, ackClip: { done: Promise<void>; stop(): void } | null = null, lastAck: string | undefined;
+  const ackKey = (phrase: string) => `${store.settings.provider}|${store.settings.voice}|${store.settings.rate}|${phrase}`;
+  const playable = () => store.settings.provider !== 'system';
   const createUrl = deps.url ?? (blob => URL.createObjectURL(blob));
   const revoke = deps.revoke ?? (url => URL.revokeObjectURL(url));
+  function stopAck() { ackClip?.stop(); ackClip = null; }
   function release() {
+    stopAck();
     streaming?.stop(); streaming = null;
     if (audio) { audio.pause(); audio.onended = null; audio.onerror = null; audio.src = ''; audio = null; }
     if (objectUrl) { revoke(objectUrl); objectUrl = ''; }
@@ -117,6 +129,8 @@ export function createSpeechStore(deps: SpeechDeps): SpeechStore {
       const ticket = generation;
       store.currentKey = key; store.error = '';
       const player = createStreamPlayer({
+        // The first sentence waits for an acknowledgement that is still playing instead of talking over it.
+        beforeFirst: () => ackClip?.done,
         async synthesize(text) {
           // A reading stopped just before must not cancel this one's sentences on the host.
           await cancelQueue;
@@ -149,6 +163,38 @@ export function createSpeechStore(deps: SpeechDeps): SpeechStore {
         get spoken() { return player.spoken; },
         get active() { return player.active; },
       };
+    },
+    prepareAck() {
+      if (!deps.desktop || disposed || !playable()) return Promise.resolve();
+      const missing = ACK_PHRASES.filter(phrase => !acks.has(ackKey(phrase)));
+      if (!missing.length) return Promise.resolve();
+      return ackBusy ??= (async () => {
+        for (const phrase of missing) {
+          const key = ackKey(phrase);
+          try {
+            const bytes = await deps.invoke<ArrayBuffer | number[]>('tts_synthesize_part', { text: phrase, options: null });
+            const data = bytes instanceof ArrayBuffer ? bytes : new Uint8Array(bytes);
+            if (data.byteLength && !disposed) acks.set(key, data);
+          } catch { /* the acknowledgement is a courtesy; the answer is read regardless */ }
+        }
+      })().finally(() => { ackBusy = null; });
+    },
+    ack() {
+      if (!deps.desktop || disposed || !playable() || store.status !== 'idle' || ackClip) return false;
+      const phrases = ACK_PHRASES.filter(phrase => acks.has(ackKey(phrase)));
+      const phrase = chooseAck(phrases, lastAck);
+      const data = phrase && acks.get(ackKey(phrase));
+      if (!phrase || !data) return false;
+      lastAck = phrase;
+      const url = createUrl(new Blob([data as BlobPart], { type: audioType(data) }));
+      const element = deps.audio ? deps.audio(url) : new Audio(url);
+      let settle!: () => void;
+      const done = new Promise<void>(resolve => { settle = resolve; });
+      const clip = { done, stop: () => { element.onended = null; element.onerror = null; element.pause(); revoke(url); if (ackClip === clip) ackClip = null; settle(); } };
+      element.onended = clip.stop; element.onerror = clip.stop;
+      ackClip = clip;
+      void Promise.resolve(element.play()).catch(clip.stop);
+      return true;
     },
     stop() {
       generation++; release();

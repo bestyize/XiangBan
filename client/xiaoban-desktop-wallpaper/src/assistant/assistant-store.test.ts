@@ -1,7 +1,8 @@
 import { nextTick, reactive } from 'vue';
 import { flushPromises } from '@vue/test-utils';
 import { describe, expect, it, vi } from 'vitest';
-import { createAssistantStore, LISTEN_IDLE_MS, SESSION_KEY, SEND_GRACE_MS } from './assistant-store.ts';
+import { createAssistantStore, LISTEN_IDLE_MS, SESSION_KEY, SEND_GRACE_MS, SETTLED_GRACE_MS } from './assistant-store.ts';
+import { ACK_DELAY_MS } from '../voice/ack.ts';
 import { createChatStore } from '../ui/chat/chat-store.ts';
 import type { AsrActivationOptions, TranscriptContext } from '../ui/asr/store.ts';
 import { createAsrStore } from '../ui/asr/store.ts';
@@ -47,6 +48,8 @@ function setup(options: { configured?: boolean; voice?: boolean; prefs?: { open:
     init: vi.fn(async () => {}),
     speak: vi.fn(async () => { speech.status = 'playing'; }),
     stop: vi.fn(async () => { speech.status = 'idle'; }),
+    ack: vi.fn(() => true), prepareAck: vi.fn(async () => {}),
+    stream: undefined as any,
   });
   const handlers = new Map<string, (payload: unknown) => void>();
   let fresh=0;
@@ -153,7 +156,8 @@ describe('assistant barge-in', () => {
     expect(h.store.phase).toBe('listening');expect(h.store.input).toBe('');
     h.say('等等，我想换一个问题，明天会下雨吗',{playbackText:story});
     h.advance(SEND_GRACE_MS+1);await Promise.resolve();
-    expect(h.chat.send).toHaveBeenLastCalledWith('等等，我想换一个问题，明天会下雨吗');h.store.dispose();
+    // The model is told, out of the user's sight, that the answer was cut off.
+    expect(h.chat.send).toHaveBeenLastCalledWith('等等，我想换一个问题，明天会下雨吗', [], expect.stringContaining('【语音打断】'));h.store.dispose();
   });
   it('filters a delayed echo result after playback ends while retaining new speech',async()=>{
     const h=await reading(); h.speech.status='idle';await nextTick();
@@ -814,5 +818,116 @@ describe('reading along while the answer is written', () => {
     h.asr.deactivate.mockClear(); h.store.stopped();
     expect(h.asr.deactivate).not.toHaveBeenCalled(); expect(h.asr.recordingRequested).toBe(true);
     expect(h.store.input).toBe('等一下，换一个'); h.store.dispose();
+  });
+});
+
+describe('answering faster', () => {
+  it('sends sooner when the speaker was judged to have finished', async () => {
+    const h = setup({ prefs: { open: 'type', read: 'never' } });
+    await h.store.init(); await h.store.opened(); await h.store.toggleListening();
+    h.say('明天会下雨吗', { playbackText: '', settled: true });
+    h.advance(SETTLED_GRACE_MS + 1); await flushPromises();
+    expect(h.chat.send).toHaveBeenCalledWith('明天会下雨吗');
+    expect(SETTLED_GRACE_MS).toBeLessThan(SEND_GRACE_MS);
+    h.store.dispose();
+  });
+  it('still waits the full grace when the pause was only a long silence', async () => {
+    const h = setup({ prefs: { open: 'type', read: 'never' } });
+    await h.store.init(); await h.store.opened(); await h.store.toggleListening();
+    h.say('明天会下雨吗');
+    h.advance(SETTLED_GRACE_MS + 1); await flushPromises();
+    expect(h.chat.send).not.toHaveBeenCalled();
+    h.advance(SEND_GRACE_MS); await flushPromises();
+    expect(h.chat.send).toHaveBeenCalledWith('明天会下雨吗');
+    h.store.dispose();
+  });
+  it('does not take a listening sound for a question', async () => {
+    const h = setup({ prefs: { open: 'type', read: 'never' } });
+    await h.store.init(); await h.store.opened(); await h.store.toggleListening();
+    h.say('嗯'); h.say('哈哈哈');
+    h.advance(SEND_GRACE_MS + 1); await flushPromises();
+    expect(h.store.input).toBe(''); expect(h.chat.send).not.toHaveBeenCalled();
+    h.store.dispose();
+  });
+});
+
+describe('acknowledging a spoken question', () => {
+  async function asked(text = '帮我整理一下下载文件夹', spoken = true) {
+    const h = setup({ prefs: { open: 'type', read: 'voice' } });
+    await h.store.init(); await h.store.opened();
+    await h.store.submit(text, spoken);
+    return h;
+  }
+  it('prepares the acknowledgements and says one when the answer takes a moment', async () => {
+    const h = await asked();
+    expect(h.speech.prepareAck).toHaveBeenCalled();
+    h.advance(ACK_DELAY_MS - 1); expect(h.speech.ack).not.toHaveBeenCalled();
+    h.advance(2); expect(h.speech.ack).toHaveBeenCalledOnce();
+    h.store.dispose();
+  });
+  it('says nothing when the answer has already started', async () => {
+    const h = await asked();
+    h.chat.views.s1.items.push({ kind: 'assistant', id: 'a', text: '好，我先看一下', streaming: true });
+    h.advance(ACK_DELAY_MS + 1);
+    expect(h.speech.ack).not.toHaveBeenCalled();
+    h.store.dispose();
+  });
+  it('says nothing for a typed question, once the answer is done, or after being interrupted', async () => {
+    const typed = await asked('你好', false);
+    typed.advance(ACK_DELAY_MS + 1); expect(typed.speech.ack).not.toHaveBeenCalled(); typed.store.dispose();
+    const done = await asked();
+    finishAnswer(done.chat); done.advance(ACK_DELAY_MS + 1); expect(done.speech.ack).not.toHaveBeenCalled(); done.store.dispose();
+    const stopped = await asked();
+    stopped.store.interrupt(); stopped.advance(ACK_DELAY_MS + 1); expect(stopped.speech.ack).not.toHaveBeenCalled(); stopped.store.dispose();
+  });
+  it('says nothing when reading is off', async () => {
+    const h = setup({ prefs: { open: 'type', read: 'never' } });
+    await h.store.init(); await h.store.opened(); await h.store.submit('你好', true);
+    h.advance(ACK_DELAY_MS + 1); expect(h.speech.ack).not.toHaveBeenCalled(); expect(h.speech.prepareAck).not.toHaveBeenCalled();
+    h.store.dispose();
+  });
+});
+
+describe('remembering how far the user listened', () => {
+  async function interrupted() {
+    const h = setup({ prefs: { open: 'type', read: 'voice' } });
+    let started!: () => void;
+    h.speech.stream = vi.fn((_key: string, _options: unknown, events: { onStart?: () => void }) => {
+      started = () => events.onStart?.();
+      return { push: vi.fn(), end: vi.fn(async () => {}), spoken: '从前有座山，山上有座庙。', active: true };
+    });
+    await h.store.init(); await h.store.opened(); await h.store.submit('讲个故事', true);
+    started(); await flushPromises();
+    return h;
+  }
+  it('tells the model, out of sight, what was heard when the user talks over the answer', async () => {
+    const h = await interrupted();
+    h.preview('等等，换一个'); await nextTick();
+    h.chat.views.s1.running = false; // the cancelled answer has stopped
+    h.say('等等，换一个科幻的', { playbackText: '' });
+    h.advance(SEND_GRACE_MS + 1); await flushPromises();
+    const [text, , note] = h.chat.send.mock.calls.at(-1) as unknown as [string, unknown[], string];
+    expect(text).toBe('等等，换一个科幻的');
+    expect(note).toContain('「从前有座山，山上有座庙。」');
+    h.store.dispose();
+  });
+  it('tells it once, and only for the next question', async () => {
+    const h = await interrupted();
+    h.store.interrupt();
+    finishAnswer(h.chat, '');
+    await h.store.submit('换一个科幻的', true);
+    expect((h.chat.send.mock.calls.at(-1) as unknown as unknown[])[2]).toContain('【语音打断】');
+    finishAnswer(h.chat, '');
+    await h.store.submit('再短一点', true);
+    expect(h.chat.send).toHaveBeenLastCalledWith('再短一点');
+    h.store.dispose();
+  });
+  it('does not mention an interruption when the answer was read to the end', async () => {
+    const h = setup({ prefs: { open: 'type', read: 'voice' } });
+    await h.store.init(); await h.store.opened(); await h.store.submit('讲个故事', true);
+    finishAnswer(h.chat, '一个故事。');
+    await h.store.submit('谢谢', true);
+    expect(h.chat.send).toHaveBeenLastCalledWith('谢谢');
+    h.store.dispose();
   });
 });

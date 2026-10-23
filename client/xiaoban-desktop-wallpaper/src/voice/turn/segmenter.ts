@@ -10,6 +10,15 @@ export interface Segmenter {
   preview(): Float32Array | null;
   /** The utterance so far, for live captions while the user is still talking. */
   partial?(): Float32Array | null;
+  /**
+   * Once per pause, as soon as the pause is long enough to ask whether the speaker has finished: the utterance
+   * so far, to be recognised while that question is still being answered. `mark` identifies the utterance.
+   */
+  speculative?(): { audio: Float32Array; mark: string } | null;
+  /** What the last returned utterance was: its `mark`, and whether the speaker was judged to have finished. */
+  readonly lastCut?: { mark: string; settled: boolean } | null;
+  /** Set while the assistant is talking: its own voice leaking into the microphone must not count as speech. */
+  strict?: boolean;
   readonly pending: boolean;
   readonly active: boolean;
 }
@@ -17,6 +26,8 @@ export interface Segmenter {
 const RATE = 16000;
 /** Speech probability at which Silero counts a window as voiced. */
 const VOICED = 0.5;
+/** The same, while the assistant is talking: only clearly voiced windows count, so its echo is not mistaken for the user. */
+const VOICED_STRICT = 0.75;
 /** Audio kept from before speech starts, so the first syllable is not clipped. */
 const PRE_ROLL = 4000;
 /** A pause this long asks Smart Turn whether the speaker has finished. */
@@ -27,6 +38,8 @@ const ASK_AGAIN_AFTER = 0.8 * RATE;
 const GIVE_UP_AFTER = 1.6 * RATE;
 /** Speech shorter than this is a cough or a click, not a turn. */
 const MIN_SPEECH = 0.25 * RATE;
+/** The same, while the assistant is talking. */
+const MIN_SPEECH_STRICT = 0.4 * RATE;
 const MAX_UTTERANCE = 20 * RATE;
 
 /**
@@ -48,12 +61,17 @@ export class SmartSegmenter implements Segmenter {
   private ready = false;
   private chain: Promise<void> = Promise.resolve();
   private broken = false;
+  private speculated = '';
+  strict = false;
+  lastCut: { mark: string; settled: boolean } | null = null;
 
   constructor(private vad: Vad, private judge: TurnJudge, private onError: (error: unknown) => void = () => {}) {}
 
   get pending() { return this.speechStart !== null; }
   get active() { return this.speechStart !== null && this.silence < GIVE_UP_AFTER; }
   private get silence() { return this.analysed - this.lastVoiced; }
+  private get minSpeech() { return this.strict ? MIN_SPEECH_STRICT : MIN_SPEECH; }
+  private get mark() { return `${this.speechStart}:${this.lastVoiced}`; }
 
   push(frame: Float32Array): Float32Array | null {
     if (!frame.length) return null;
@@ -83,11 +101,19 @@ export class SmartSegmenter implements Segmenter {
     return this.slice(this.speechStart - PRE_ROLL, this.total);
   }
 
+  speculative(): { audio: Float32Array; mark: string } | null {
+    if (this.speechStart === null || this.ready || this.voicedSamples < this.minSpeech || this.silence < ASK_AFTER) return null;
+    const mark = this.mark;
+    if (mark === this.speculated) return null;
+    this.speculated = mark;
+    return { audio: this.slice(this.speechStart - PRE_ROLL, this.analysed), mark };
+  }
+
   private async analyse(frame: Float32Array) {
     const probabilities = await this.vad.process(frame);
     for (const p of probabilities) {
       this.analysed += 512;
-      if (p >= VOICED) {
+      if (p >= (this.strict ? VOICED_STRICT : VOICED)) {
         if (this.speechStart === null) { this.speechStart = Math.max(0, this.analysed - 512); this.voicedSamples = 0; }
         this.lastVoiced = this.analysed; this.voicedSamples += 512;
         // Talking again: any verdict about the pause before is stale.
@@ -101,10 +127,10 @@ export class SmartSegmenter implements Segmenter {
     if (this.speechStart === null || this.ready) return;
     const silence = this.silence;
     if (silence >= GIVE_UP_AFTER) {
-      if (this.voicedSamples >= MIN_SPEECH) this.ready = true; else this.reset(false);
+      if (this.voicedSamples >= this.minSpeech) this.ready = true; else this.reset(false);
       return;
     }
-    if (this.voicedSamples < MIN_SPEECH || this.verdict === 'pending') return;
+    if (this.voicedSamples < this.minSpeech || this.verdict === 'pending') return;
     if (this.verdict === 'complete') { this.ready = true; return; }
     const due = this.asked === 0 ? ASK_AFTER : this.asked === 1 ? ASK_AGAIN_AFTER : Infinity;
     if (silence < due) return;
@@ -125,6 +151,7 @@ export class SmartSegmenter implements Segmenter {
   private cut(end: number, continuing = false): Float32Array | null {
     const start = this.speechStart!;
     const audio = this.slice(start - PRE_ROLL, end);
+    this.lastCut = { mark: continuing ? '' : this.mark, settled: !continuing && this.verdict === 'complete' };
     this.reset(false);
     // A 20-second monologue goes on: the next utterance starts where this one was cut.
     if (continuing) { this.speechStart = end; this.lastVoiced = Math.max(this.lastVoiced, this.analysed); this.voicedSamples = MIN_SPEECH; }
@@ -133,7 +160,7 @@ export class SmartSegmenter implements Segmenter {
 
   private reset(all = true) {
     this.speechStart = null; this.voicedSamples = 0; this.asked = 0; this.verdict = 'none'; this.ready = false; this.ticket++;
-    if (all) { this.frames = []; this.vad.reset(); this.chain = Promise.resolve(); this.total = this.analysed = this.lastVoiced = 0; }
+    if (all) { this.frames = []; this.vad.reset(); this.chain = Promise.resolve(); this.total = this.analysed = this.lastVoiced = 0; this.speculated = ''; this.lastCut = null; }
   }
 
   /** Drops audio that can no longer belong to an utterance. */

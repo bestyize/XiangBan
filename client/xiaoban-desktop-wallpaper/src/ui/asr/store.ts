@@ -6,7 +6,11 @@ import { captureMicrophone, MICROPHONE_UNSUPPORTED, supportsMicrophone, type Cap
 
 interface HostStatus { enabled: boolean; modelReady: boolean; engineReady: boolean; warming?: boolean; microphoneError?: string }
 interface Progress { requestId: string; phase: 'downloading' | 'loading'; file: string; downloaded: number; total: number }
-export interface TranscriptContext { playbackText: string }
+export interface TranscriptContext {
+  playbackText: string;
+  /** The speaker was judged to have finished, so nothing more is expected to follow this utterance. */
+  settled?: boolean;
+}
 export interface AsrActivationOptions {
   noiseGuard?: boolean;
   /** Snapshot at capture time, so delayed results retain their echo reference. */
@@ -60,7 +64,17 @@ export function createAsrStore(deps: AsrDeps): AsrStore {
   let receiver: ((text: string, context?: TranscriptContext) => void) | undefined;
   let options: AsrActivationOptions = {};
   let segmenter: Segmenter | undefined;
-  let queue: { audio: Float32Array; context?: TranscriptContext; preview?: boolean; partial?: boolean }[] = [];
+  type Item = { audio: Float32Array; context?: TranscriptContext; preview?: boolean; partial?: boolean; speculative?: boolean; mark?: string };
+  let queue: Item[] = [];
+  /** The utterance recognised while the end-of-turn question was still being answered; reused if nothing more is said. */
+  let speculation: { mark: string; text: Promise<string | null>; settle(text: string | null): void } | undefined;
+  function speculate(mark: string, audio: Float32Array, ticket: number) {
+    let settle!: (text: string | null) => void;
+    const text = new Promise<string | null>(resolve => { settle = resolve; });
+    speculation = { mark, text, settle };
+    queue.push({ audio, speculative: true, mark });
+    void drain(ticket);
+  }
   let playbackText = '', previewSamples = 0, previewTicket: number | undefined, partialSamples = 0;
   /** The endpointing models, once they have loaded in this window; loading never delays listening. */
   let modelsReady = false, modelsLoading: Promise<TurnModels | null> | undefined;
@@ -71,7 +85,7 @@ export function createAsrStore(deps: AsrDeps): AsrStore {
   let draining: Promise<void> | undefined;
   let starting: number | undefined;
   function stopCapture() {
-    recording++; starting = undefined; capture?.stop(); capture = undefined; queue = []; segmenter = undefined;
+    recording++; starting = undefined; capture?.stop(); capture = undefined; queue = []; segmenter = undefined; speculation = undefined;
     playbackText = ''; previewSamples = 0; previewTicket = undefined; partialSamples = 0;
     store.recordingRequested = false; store.listening = false; store.recognizing = false; store.level = 0; store.speechActive = false;
   }
@@ -93,7 +107,17 @@ export function createAsrStore(deps: AsrDeps): AsrStore {
           const item = queue.shift()!;
           store.recognizing = true;
           try {
-            const text = await deps.invoke<string>('asr_transcribe', { samples: Array.from(item.audio) });
+            const transcribe = () => deps.invoke<string>('asr_transcribe', { samples: Array.from(item.audio) });
+            if (item.speculative) {
+              // Only a guess: its failure is not the turn's failure, the final utterance is recognised again.
+              const guess = speculation?.mark === item.mark ? speculation : undefined;
+              try { guess?.settle(await transcribe()); } catch { guess?.settle(null); }
+              continue;
+            }
+            // A pause long enough to ask "has the speaker finished?" was recognised while that was being decided;
+            // if the answer was yes and nothing was added since, that text is the utterance.
+            const early = item.mark && speculation?.mark === item.mark ? await speculation.text : null;
+            const text = early ?? await transcribe();
             if (ticket === recording && store.enabled && !disposed && text.trim()) {
               if (item.partial) options.onPartial?.(text.trim());
               else if (item.preview) options.onPreview?.(text.trim(), item.context!);
@@ -129,12 +153,18 @@ export function createAsrStore(deps: AsrDeps): AsrStore {
         if (now - levelAt >= 66) { levelAt = now; store.level = loudness(frame); }
         const reference = options.playbackText?.() ?? '';
         if (reference) playbackText = reference;
+        activeSegmenter.strict = Boolean(reference);
         const audio = activeSegmenter.push(frame);
         store.speechActive = activeSegmenter.active;
         previewSamples += frame.length;
         partialSamples += frame.length;
         if (!audio) {
           if (!activeSegmenter.pending) { playbackText = ''; partialSamples = 0; }
+          // Recognise the pause's utterance now, while Smart Turn decides whether it is the end.
+          if (!reference && !queue.length && activeSegmenter.speculative) {
+            const guess = activeSegmenter.speculative();
+            if (guess) speculate(guess.mark, guess.audio, ticket);
+          }
           // Live captions: re-recognise the utterance so far about once a second, when nothing else is waiting.
           if (!reference && options.onPartial && activeSegmenter.partial && previewTicket === undefined && !queue.length && partialSamples >= 16000) {
             const partial = activeSegmenter.partial();
@@ -155,7 +185,9 @@ export function createAsrStore(deps: AsrDeps): AsrStore {
           return;
         }
         if (queue.length >= 5) { fail('语音处理暂时跟不上，请稍后点击重试'); return; }
-        queue.push({ audio, ...(playbackText ? { context: { playbackText } } : {}) });
+        const cut = activeSegmenter.lastCut;
+        const context: TranscriptContext | undefined = playbackText || cut?.settled ? { playbackText, ...(cut?.settled ? { settled: true } : {}) } : undefined;
+        queue.push({ audio, ...(cut?.mark ? { mark: cut.mark } : {}), ...(context ? { context } : {}) });
         playbackText = ''; previewSamples = 0; partialSamples = 0;
         void drain(ticket);
       }, error => { if (ticket === recording && !disposed) captureFailed(error); });

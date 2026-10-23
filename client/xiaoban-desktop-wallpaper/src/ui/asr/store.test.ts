@@ -179,3 +179,78 @@ describe('cross-window ASR settings',()=>{
     expect(h.store.enabled).toBe(true);expect(h.store.engineReady).toBe(true);expect(h.capture).not.toHaveBeenCalled();h.store.dispose();
   });
 });
+
+describe('recognising ahead of the end-of-turn decision', () => {
+  const FRAME = 640;
+  const speech = () => new Float32Array(FRAME).fill(0.2);
+  const quiet = () => new Float32Array(FRAME);
+  function rig(transcribe: () => string = () => '帮我查一下天气') {
+    let feed!: (frame: Float32Array) => void, answer!: (probability: number) => void;
+    let pending: number[] = [];
+    const vad = { reset: vi.fn(), process: vi.fn(async (samples: Float32Array) => {
+      pending.push(...samples); const out: number[] = [];
+      while (pending.length >= 512) { const w = pending.splice(0, 512); out.push(Math.abs(w[0]) > 0.05 ? 0.9 : 0.05); }
+      return out;
+    }) };
+    const turn = { predict: vi.fn(() => new Promise<number>(resolve => { answer = resolve; })) };
+    const invoke = vi.fn(async (command: string) => {
+      if (command === 'asr_get_status') return { enabled: true, modelReady: true, engineReady: true };
+      if (command === 'asr_transcribe') return transcribe();
+      throw new Error(command);
+    });
+    const store = createAsrStore({ desktop: true, invoke: invoke as AsrDeps['invoke'], notify: vi.fn(), listen: async () => () => {},
+      capture: async cb => { feed = cb; return { stop: vi.fn() }; }, turnModels: async () => ({ vad, turn }) });
+    const transcriptions = () => invoke.mock.calls.filter(([command]) => command === 'asr_transcribe').length;
+    return { store, feed: (frame: Float32Array) => feed(frame), answer: (p: number) => answer(p), transcriptions, turn };
+  }
+  async function pause(h: ReturnType<typeof rig>) {
+    for (let i = 0; i < 25; i++) h.feed(speech());
+    await flushPromises();
+    // Frames arrive 40 ms apart, so the model has answered about the previous one by the time the next comes.
+    for (let i = 0; i < 6; i++) { h.feed(quiet()); await flushPromises(); }
+  }
+
+  it('recognises the utterance during the pause and reuses it when the speaker has finished', async () => {
+    const h = rig(), text = vi.fn();
+    await h.store.activate(text); await flushPromises();
+    await pause(h);
+    expect(h.transcriptions()).toBe(1); expect(text).not.toHaveBeenCalled();
+    h.answer(0.9); await flushPromises();
+    h.feed(quiet()); await flushPromises();
+    expect(h.transcriptions()).toBe(1);
+    expect(text).toHaveBeenCalledExactlyOnceWith('帮我查一下天气', { playbackText: '', settled: true });
+    h.store.dispose();
+  });
+  it('recognises again when more was said after the pause', async () => {
+    let n = 0; const h = rig(() => (++n === 1 ? '帮我查一下' : '帮我查一下天气')), text = vi.fn();
+    await h.store.activate(text); await flushPromises();
+    await pause(h);
+    expect(h.transcriptions()).toBe(1);
+    h.answer(0.1); await flushPromises(); // not finished
+    for (let i = 0; i < 10; i++) h.feed(speech());
+    await flushPromises();
+    for (let i = 0; i < 6; i++) { h.feed(quiet()); await flushPromises(); }
+    h.answer(0.9); await flushPromises();
+    h.feed(quiet()); await flushPromises();
+    expect(text).toHaveBeenCalledExactlyOnceWith('帮我查一下天气', { playbackText: '', settled: true });
+    h.store.dispose();
+  });
+  it('recognises the final utterance itself when the guess failed', async () => {
+    let n = 0; const h = rig(() => { if (++n === 1) throw new Error('busy'); return '帮我查一下天气'; }), text = vi.fn();
+    await h.store.activate(text); await flushPromises();
+    await pause(h);
+    h.answer(0.9); await flushPromises();
+    h.feed(quiet()); await flushPromises();
+    expect(h.transcriptions()).toBe(2);
+    expect(text).toHaveBeenCalledExactlyOnceWith('帮我查一下天气', { playbackText: '', settled: true });
+    expect(h.store.error).toBe('');
+    h.store.dispose();
+  });
+  it('does not guess while the assistant is talking', async () => {
+    const h = rig();
+    await h.store.activate(vi.fn(), { playbackText: () => '正在朗读' }); await flushPromises();
+    await pause(h);
+    expect(h.transcriptions()).toBe(0);
+    h.store.dispose();
+  });
+});
