@@ -61,6 +61,12 @@ pub struct ProviderConfig {
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 pub struct ModelConfig {
+    /// Request visible Responses summaries independently of effort selection.
+    #[serde(alias = "reasoning_summary", skip_serializing_if = "Option::is_none")]
+    pub reasoning_summary: Option<bool>,
+    /// Explicit Messages thinking protocol for private aliases and legacy budget models.
+    #[serde(alias = "thinking_mode", skip_serializing_if = "Option::is_none")]
+    pub thinking_mode: Option<ai_reasoning::ThinkingMode>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub reasoning_efforts: Option<Vec<String>>,
     pub id: String, pub name: String, pub description: String,
@@ -281,6 +287,17 @@ impl AiConfig {
         self.providers.iter().find(|p| p.id == self.active_provider
             && p.base_url == self.base_url && p.model == self.model && p.protocol == self.protocol)
             .map(|p| p.reply_preference).unwrap_or_default()
+    }
+
+    pub(crate) fn reasoning_body(&self) -> serde_json::Map<String, serde_json::Value> {
+        // Gateway models use their server-managed capabilities, never local overrides.
+        let declared = if self.active_provider == crate::ai_gateway::GATEWAY_ID { None } else {
+            self.providers.iter().find(|p| p.id == self.active_provider
+                && p.base_url == self.base_url && p.model == self.model && p.protocol == self.protocol)
+                .and_then(|p| p.models.iter().find(|m| m.id == self.model))
+        };
+        ai_reasoning::body_with_capabilities(&self.protocol, self.reply_preference(), &self.reasoning_levels(),
+            declared.and_then(|m| m.reasoning_summary), declared.and_then(|m| m.thinking_mode.as_ref()))
     }
 
     pub(crate) fn reasoning_levels(&self) -> Vec<String> {
@@ -669,7 +686,8 @@ fn selecting_after_save(config: &AiConfig, provider_id: &str, activate: bool) ->
 
 /// Whether the facts a model carries are sane; shared by the one discovered model and the edited list.
 fn model_facts_valid(model: &ModelConfig) -> bool {
-    !(model.id.len() > MAX_MODEL
+    !(!ai_reasoning::validate_thinking(model.thinking_mode.as_ref(), model.max_output_tokens)
+        || model.id.len() > MAX_MODEL
         || model.max_output_tokens.is_some_and(|n| n == 0 || n > 2_000_000)
         || model.context_window_tokens.is_some_and(|n| n == 0 || n > 16_000_000)
         || model.name.len() > 250 || model.description.len() > 500
@@ -1008,6 +1026,13 @@ pub fn parse_model_details_json(raw: &str, protocol: &str) -> Result<Vec<ModelCo
         model.context_window_tokens = number(item, context_keys, 16_000_000).map(|n| n as usize);
         model.supports_tools = flag(item, &["supports_tools", "supportsTools", "tool_calling", "toolCalling"]);
         model.supports_vision = flag(item, &["supports_vision", "supportsVision", "vision"]);
+        model.reasoning_summary = flag(item, &["reasoning_summary", "reasoningSummary"]);
+        model.reasoning_efforts = item.get("reasoning_efforts").or_else(|| item.get("reasoningEfforts"))
+            .and_then(|v| serde_json::from_value::<Vec<String>>(v.clone()).ok())
+            .filter(|levels| ai_reasoning::validate(levels).is_ok());
+        model.thinking_mode = item.get("thinking_mode").or_else(|| item.get("thinkingMode"))
+            .and_then(|v| serde_json::from_value::<ai_reasoning::ThinkingMode>(v.clone()).ok())
+            .filter(|mode| ai_reasoning::validate_thinking(Some(mode), model.max_output_tokens));
         // Models APIs may also expose a nested capabilities object.
         if let Some(capabilities) = item.get("capabilities") {
             model.supports_tools = model.supports_tools.or_else(|| capabilities.get("tool_use")
@@ -1704,4 +1729,40 @@ mod output_budget_tests {
         assert_eq!(config.model_capabilities().output_source, CapabilitySource::ProviderMetadata);
         assert_eq!(config.model_capabilities().request_output_limit(), Some(65_536));
     }
+}
+
+#[cfg(test)]
+mod reasoning_metadata_tests {
+    use super::*;
+
+    #[test]
+    fn model_discovery_preserves_independent_reasoning_metadata() {
+        let models = parse_model_details_json(r#"{"data":[{"id":"private-alias","reasoningSummary":false,"reasoningEfforts":[],"thinkingMode":{"type":"enabled","budget_tokens":2048},"max_output_tokens":8192}]}"#, "anthropic").unwrap();
+        let model = &models[0];
+        assert_eq!(model.reasoning_summary, Some(false));
+        assert_eq!(model.reasoning_efforts, Some(vec![]));
+        assert_eq!(model.thinking_mode, Some(ai_reasoning::ThinkingMode::Enabled { budget_tokens: 2048 }));
+        let restored: ModelConfig = serde_json::from_value(serde_json::to_value(model).unwrap()).unwrap();
+        assert_eq!(&restored, model);
+        assert!(!model_facts_valid(&ModelConfig { thinking_mode: Some(ai_reasoning::ThinkingMode::Enabled { budget_tokens: 8192 }), ..model.clone() }));
+    }
+    #[test]
+    fn alias_summary_capability_is_scoped_to_the_selected_endpoint() {
+        let mut config = AiConfig::default();
+        config.active_provider = "alias-provider".into();
+        config.protocol = "responses".into();
+        config.base_url = "https://gateway.example/v1".into();
+        config.model = "private-alias".into();
+        config.providers = vec![ProviderConfig {
+            id: config.active_provider.clone(), protocol: config.protocol.clone(),
+            base_url: config.base_url.clone(), model: config.model.clone(),
+            models: vec![ModelConfig { id: config.model.clone(), reasoning_summary: Some(true), reasoning_efforts: Some(vec![]), ..Default::default() }],
+            ..Default::default()
+        }];
+        assert!(config.reasoning_levels().is_empty());
+        assert_eq!(config.reasoning_body()["reasoning"]["summary"], "auto");
+        config.base_url = "https://other.example/v1".into();
+        assert!(config.reasoning_body().is_empty());
+    }
+
 }
