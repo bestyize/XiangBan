@@ -75,7 +75,7 @@ fn error_body(api: Api, status: StatusCode, code: &str, message: &str) -> Value 
     json!({ "error": { "message": message, "type": kind, "code": code } })
 }
 
-fn error_response(api: Api, err: AppError) -> Response {
+pub(crate) fn error_response(api: Api, err: AppError) -> Response {
     let (status, code, message) = err.parts();
     (status, Json(error_body(api, status, code, &message))).into_response()
 }
@@ -150,7 +150,7 @@ async fn handle(api: Api, state: &AppState, auth: Result<AuthUser, AppError>, he
     respond(upstream, &tier.tier).await
 }
 
-async fn require_quota(state: &AppState, binding_id: i64) -> Result<(), AppError> {
+pub(crate) async fn require_quota(state: &AppState, binding_id: i64) -> Result<(), AppError> {
     let total = {
         let mut conn = state.pool.acquire().await?;
         quota::live_total(&mut conn, binding_id).await?
@@ -326,7 +326,7 @@ async fn respond(upstream: reqwest::Response, tier: &str) -> Result<Response, Ap
 }
 
 /// 上游的报错原文可能带真实模型名或渠道信息，只按状态归类成通用文案。
-fn map_upstream_error(status: StatusCode, body: &str) -> AppError {
+pub(crate) fn map_upstream_error(status: StatusCode, body: &str) -> AppError {
     let lower = body.to_lowercase();
     if status == StatusCode::TOO_MANY_REQUESTS {
         return AppError::Coded { status, code: "rate_limited", message: "请求过于频繁，请稍后再试".into() };
@@ -355,7 +355,7 @@ fn map_upstream_error(status: StatusCode, body: &str) -> AppError {
     AppError::BadGateway("AI 服务暂时不可用，请稍后再试".into())
 }
 
-fn map_body_error(status: StatusCode) -> AppError {
+pub(crate) fn map_body_error(status: StatusCode) -> AppError {
     if status == StatusCode::PAYLOAD_TOO_LARGE {
         AppError::Coded { status, code: "request_too_large", message: "请求体积过大，请减少图片、降低截图尺寸或压缩会话后继续".into() }
     } else {

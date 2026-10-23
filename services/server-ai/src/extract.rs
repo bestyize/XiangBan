@@ -34,16 +34,23 @@ pub struct AuthUser {
     pub product: Product,
 }
 
-impl FromRequestParts<AppState> for AuthUser {
-    type Rejection = AppError;
-
-    async fn from_request_parts(parts: &mut Parts, state: &AppState) -> Result<Self, Self::Rejection> {
-        let token = bearer_or_api_key(parts).ok_or_else(|| AppError::Unauthorized("请先登录".into()))?;
+impl AuthUser {
+    /// Checks a login token from wherever it came (a header, or a WebSocket subprotocol for browsers).
+    pub async fn from_token(state: &AppState, token: &str) -> Result<Self, AppError> {
         let verified = state.verifier.verify(token).await?;
         let product = products::for_client(&state.pool, &verified.client_id)
             .await?
             .ok_or_else(|| AppError::Forbidden("该应用暂未开通 AI 功能".into()))?;
         Ok(AuthUser { uid: verified.uid, product })
+    }
+}
+
+impl FromRequestParts<AppState> for AuthUser {
+    type Rejection = AppError;
+
+    async fn from_request_parts(parts: &mut Parts, state: &AppState) -> Result<Self, Self::Rejection> {
+        let token = bearer_or_api_key(parts).ok_or_else(|| AppError::Unauthorized("请先登录".into()))?;
+        AuthUser::from_token(state, token).await
     }
 }
 

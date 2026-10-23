@@ -78,7 +78,7 @@ src/voice/
 
 0. 先把级联编排从 `assistant-store.ts` 抽到 `engines/cascade.ts`，与实时引擎共用 `VoiceSession` 接口。
 
-1. `server-ai` 新增 `/v1/realtime` WebSocket 中转与按分钟计费，服务端适配 Qwen-Omni Realtime（先接），再接 Seeduplex、GPT-Live-1、Gemini Live；客户端 `RealtimeEngine` 只对接网关这一种协议。
+1. （网关部分已完成，2026-10-24：`server-ai` 的 `GET /v1/realtime` 经 New API 转发 OpenAI Realtime 事件，隐藏模型名、单次时长上限、每分钟复查额度，按 New API 倍率计费，见 `services/server-ai/README.md`；接哪家实时模型在 New API 渠道里配。）原计划：`server-ai` 新增 `/v1/realtime` WebSocket 中转与按分钟计费，服务端适配 Qwen-Omni Realtime（先接），再接 Seeduplex、GPT-Live-1、Gemini Live；客户端 `RealtimeEngine` 只对接网关这一种协议。
 2. 委托桥：前台模型调用 `delegate_task(描述)` → 在小伴聊天智能体里新建或继续任务（沿用工具、审批、会话）→ 进度与结果作为工具结果回传，前台模型播报；用户可随时问进度、取消。
 3. 审批与危险操作仍走现有审批卡，不由语音模型代为确认。
 4. 设置：「标准（本地优先）/ 实时（云端）」切换、单次会话时长上限；实时模式需要登录并消耗小伴 AI 额度。

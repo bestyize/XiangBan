@@ -230,6 +230,64 @@ async fn mock_chat(State(m): State<Arc<Mock>>, headers: HeaderMap, Json(body): J
 
 /// 假的 /v1/responses 与 /v1/messages：和对话补全一样按 Key 扣钱，响应里把真实模型放在协议规定的位置，
 /// 并故意在用户数据（工具参数）里也放一个叫 model 的字段，用来确认代理不会误改。
+fn mock_caller(m: &Mock, headers: &HeaderMap) -> Option<i64> {
+    let authorization = headers.get(header::AUTHORIZATION).and_then(|v| v.to_str().ok()).unwrap_or_default();
+    let key = authorization.strip_prefix("Bearer sk-")?;
+    m.0.lock().unwrap().users.iter().find(|(_, u)| u.key == key).map(|(id, _)| *id)
+}
+
+fn record(m: &Mock, path: &str, headers: &HeaderMap, body: Value) {
+    m.0.lock().unwrap().relayed.push(Relayed {
+        path: path.into(),
+        header_names: headers.keys().map(|k| k.as_str().to_string()).collect(),
+        anthropic_version: None,
+        authorization: headers.get(header::AUTHORIZATION).and_then(|v| v.to_str().ok()).unwrap_or_default().into(),
+        body,
+    });
+}
+
+async fn mock_images(State(m): State<Arc<Mock>>, headers: HeaderMap, Json(body): Json<Value>) -> Response {
+    let Some(id) = mock_caller(&m, &headers) else { return StatusCode::UNAUTHORIZED.into_response() };
+    record(&m, "/v1/images/generations", &headers, body.clone());
+    m.consume(id, 2_000);
+    Json(json!({ "created": 1, "model": body["model"], "data": [{ "b64_json": "iVBORw0K", "revised_prompt": "一只猫" }], "usage": { "total_tokens": 10 } })).into_response()
+}
+
+async fn mock_transcribe(State(m): State<Arc<Mock>>, headers: HeaderMap, mut form: axum::extract::Multipart) -> Response {
+    let Some(id) = mock_caller(&m, &headers) else { return StatusCode::UNAUTHORIZED.into_response() };
+    let mut seen = serde_json::Map::new();
+    while let Some(field) = form.next_field().await.unwrap() {
+        let name = field.name().unwrap_or_default().to_string();
+        if name == "file" {
+            seen.insert("file_name".into(), json!(field.file_name()));
+            seen.insert("content_type".into(), json!(field.content_type()));
+            seen.insert("file_bytes".into(), json!(field.bytes().await.unwrap().len()));
+        } else {
+            seen.insert(name, json!(field.text().await.unwrap()));
+        }
+    }
+    record(&m, "/v1/audio/transcriptions", &headers, Value::Object(seen));
+    m.consume(id, 1_000);
+    Json(json!({ "text": " 你好，小伴 " })).into_response()
+}
+
+/// Says which model it was opened for, then echoes every event back.
+async fn mock_realtime(State(m): State<Arc<Mock>>, headers: HeaderMap, Query(query): Query<HashMap<String, String>>, ws: axum::extract::ws::WebSocketUpgrade) -> Response {
+    use axum::extract::ws::Message;
+    if mock_caller(&m, &headers).is_none() { return StatusCode::UNAUTHORIZED.into_response() }
+    record(&m, "/v1/realtime", &headers, json!({ "model": query.get("model") }));
+    let model = query.get("model").cloned().unwrap_or_default();
+    ws.on_upgrade(move |mut socket| async move {
+        let created = json!({ "type": "session.created", "session": { "id": "sess_1", "model": model } });
+        if socket.send(Message::Text(created.to_string().into())).await.is_err() { return; }
+        while let Some(Ok(message)) = socket.recv().await {
+            let Message::Text(text) = message else { continue };
+            let got: Value = serde_json::from_str(text.as_str()).unwrap_or(Value::Null);
+            if socket.send(Message::Text(json!({ "type": "echo", "got": got }).to_string().into())).await.is_err() { break; }
+        }
+    })
+}
+
 async fn mock_relay(State(m): State<Arc<Mock>>, uri: axum::http::Uri, headers: HeaderMap, Json(body): Json<Value>) -> Response {
     let path = uri.path().to_string();
     let authorization = headers.get(header::AUTHORIZATION).and_then(|v| v.to_str().ok()).unwrap_or_default().to_string();
@@ -297,6 +355,9 @@ async fn start_mock() -> (Arc<Mock>, String) {
         .route("/v1/chat/completions", post(mock_chat))
         .route("/v1/responses", post(mock_relay))
         .route("/v1/messages", post(mock_relay))
+        .route("/v1/images/generations", post(mock_images))
+        .route("/v1/audio/transcriptions", post(mock_transcribe).layer(axum::extract::DefaultBodyLimit::disable()))
+        .route("/v1/realtime", get(mock_realtime))
         .with_state(mock.clone());
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let base = format!("http://{}", listener.local_addr().unwrap());
@@ -1686,5 +1747,138 @@ async fn web_search_answers_in_deepseek_shape_and_charges_only_what_found_someth
     let binding_id = h.only_binding().await;
     sync::sync_binding(&h.state, binding_id).await.unwrap();
     assert_eq!(h.balance(binding_id).await, h.mock.quota_of(user_id), "search use is settled into the buckets like any other use");
+    h.cleanup().await;
+}
+
+// ---- 图片、语音识别、实时语音 ----
+
+const REAL_IMAGE: &str = "gpt-image-2";
+const REAL_TRANSCRIBE: &str = "whisper-3";
+const REAL_REALTIME: &str = "qwen-omni-realtime";
+
+impl Harness {
+    /// Turns on images, recognition and realtime voice with these upstream models.
+    fn with_media(&mut self) {
+        let mut config = (*self.state.config).clone();
+        config.image_model = Some(REAL_IMAGE.into());
+        config.image_sizes = vec!["1024x1024".into(), "1536x1024".into()];
+        config.transcribe_model = Some(REAL_TRANSCRIBE.into());
+        config.realtime_model = Some(REAL_REALTIME.into());
+        self.state.config = Arc::new(config);
+        self.app = build_router(self.state.clone());
+    }
+
+    async fn upload(&self, token: &str, parts: &[(&str, Option<&str>, &str, Vec<u8>)]) -> (StatusCode, Value) {
+        let boundary = "xbboundary";
+        let mut body = Vec::new();
+        for (name, file, content_type, data) in parts {
+            body.extend_from_slice(format!("--{boundary}\r\nContent-Disposition: form-data; name=\"{name}\"").as_bytes());
+            if let Some(file) = file { body.extend_from_slice(format!("; filename=\"{file}\"\r\nContent-Type: {content_type}").as_bytes()); }
+            body.extend_from_slice(b"\r\n\r\n");
+            body.extend_from_slice(data);
+            body.extend_from_slice(b"\r\n");
+        }
+        body.extend_from_slice(format!("--{boundary}--\r\n").as_bytes());
+        let request = Request::builder().method(Method::POST).uri("/v1/audio/transcriptions")
+            .header(header::CONTENT_TYPE, format!("multipart/form-data; boundary={boundary}"))
+            .header(header::AUTHORIZATION, format!("Bearer {token}"))
+            .body(Body::from(body)).unwrap();
+        let response = self.app.clone().oneshot(request).await.unwrap();
+        let status = response.status();
+        let bytes = to_bytes(response.into_body(), 1 << 20).await.unwrap();
+        (status, serde_json::from_slice(&bytes).unwrap_or(Value::Null))
+    }
+}
+
+#[tokio::test]
+async fn images_use_the_configured_model_and_return_images_only() {
+    let mut h = harness!();
+    h.seed_wallpaper().await;
+    let token = h.token(Uuid::new_v4(), CLIENT);
+    let (status, body) = h.call(Method::POST, "/v1/images/generations", Some(&token), json!({ "prompt": "一只猫" })).await;
+    assert_eq!((status, body["error"]["code"].as_str()), (StatusCode::SERVICE_UNAVAILABLE, Some("image_unavailable")), "{body}");
+
+    h.with_media();
+    let (status, body) = h.call(Method::POST, "/v1/images/generations", Some(&token), json!({ "prompt": "一只猫", "model": "something-else", "size": "1536x1024" })).await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    assert_eq!(body, json!({ "created": 1, "data": [{ "b64_json": "iVBORw0K", "revised_prompt": "一只猫" }] }));
+    let sent = h.mock.relayed("/v1/images/generations");
+    assert_eq!(sent[0].body, json!({ "model": REAL_IMAGE, "prompt": "一只猫", "n": 1, "size": "1536x1024" }));
+    let (status, _) = h.call(Method::POST, "/v1/images/generations", Some(&token), json!({ "prompt": "x", "size": "8x8" })).await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+    let (user_id, wallet) = h.mock.only_user();
+    assert_eq!(wallet, TRIAL - 2_000, "New API charged the wallet");
+    let binding_id = h.only_binding().await;
+    sync::sync_binding(&h.state, binding_id).await.unwrap();
+    assert_eq!(h.balance(binding_id).await, h.mock.quota_of(user_id));
+    h.cleanup().await;
+}
+
+#[tokio::test]
+async fn recordings_are_recognised_by_the_configured_model_even_above_the_usual_body_limit() {
+    let mut h = harness!();
+    h.seed_wallpaper().await;
+    let token = h.token(Uuid::new_v4(), CLIENT);
+    let audio = |size: usize| vec![7u8; size];
+    let (status, body) = h.upload(&token, &[("file", Some("a.wav"), "audio/wav", audio(10))]).await;
+    assert_eq!((status, body["error"]["code"].as_str()), (StatusCode::SERVICE_UNAVAILABLE, Some("transcribe_unavailable")));
+
+    h.with_media();
+    let big = 9 * 1024 * 1024;
+    let (status, body) = h.upload(&token, &[
+        ("model", None, "", b"evil".to_vec()),
+        ("language", None, "", b"zh".to_vec()),
+        ("file", Some("会议 录音.m4a"), "audio/mp4", audio(big)),
+    ]).await;
+    assert_eq!((status, &body), (StatusCode::OK, &json!({ "text": "你好，小伴" })));
+    let sent = &h.mock.relayed("/v1/audio/transcriptions")[0].body;
+    assert_eq!((sent["model"].as_str(), sent["language"].as_str(), sent["file_bytes"].as_u64(), sent["content_type"].as_str()), (Some(REAL_TRANSCRIBE), Some("zh"), Some(big as u64), Some("audio/mp4")));
+    assert_eq!(sent["file_name"], "会议录音.m4a", "the file name is cleaned");
+
+    let (status, _) = h.upload(&token, &[("file", Some("x.exe"), "application/x-msdownload", audio(10))]).await;
+    assert_eq!(status, StatusCode::BAD_REQUEST, "only audio");
+    let (status, _) = h.upload(&token, &[("language", None, "", b"zh".to_vec())]).await;
+    assert_eq!(status, StatusCode::BAD_REQUEST, "a file is required");
+    let (status, _) = h.upload(&token, &[("file", Some("a.wav"), "audio/wav", audio(crate::media::TRANSCRIBE_MAX_FILE + 1))]).await;
+    assert_eq!(status, StatusCode::PAYLOAD_TOO_LARGE);
+    h.cleanup().await;
+}
+
+#[tokio::test]
+async fn realtime_relays_events_both_ways_with_the_model_kept_out_of_sight() {
+    use futures_util::{SinkExt, StreamExt};
+    use tokio_tungstenite::tungstenite::{client::IntoClientRequest, Message};
+    let mut h = harness!();
+    h.seed_wallpaper().await;
+    h.with_media();
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr = listener.local_addr().unwrap();
+    let app = build_router(h.state.clone());
+    tokio::spawn(async move { axum::serve(listener, app.into_make_service_with_connect_info::<std::net::SocketAddr>()).await.unwrap() });
+    let token = h.token(Uuid::new_v4(), CLIENT);
+
+    // A browser: the token rides in the subprotocol list.
+    let mut request = format!("ws://{addr}/v1/realtime").into_client_request().unwrap();
+    request.headers_mut().insert("sec-websocket-protocol", format!("realtime, xiaoban-token.{token}").parse().unwrap());
+    let (mut socket, response) = tokio_tungstenite::connect_async(request).await.unwrap();
+    assert_eq!(response.headers().get("sec-websocket-protocol").and_then(|v| v.to_str().ok()), Some("realtime"));
+    let first = socket.next().await.unwrap().unwrap();
+    let created: Value = serde_json::from_str(first.to_text().unwrap()).unwrap();
+    assert_eq!((created["type"].as_str(), created["session"]["model"].as_str()), (Some("session.created"), Some("realtime")), "the real model is not shown");
+    assert!(!first.to_text().unwrap().contains(REAL_REALTIME));
+
+    socket.send(Message::Text(json!({ "type": "session.update", "session": { "model": "gpt-other", "voice": "alloy" } }).to_string().into())).await.unwrap();
+    let echo: Value = serde_json::from_str(socket.next().await.unwrap().unwrap().to_text().unwrap()).unwrap();
+    assert_eq!(echo["got"], json!({ "type": "session.update", "session": { "voice": "alloy" } }), "the client cannot pick the model");
+    assert_eq!(h.mock.relayed("/v1/realtime")[0].body["model"], REAL_REALTIME);
+    socket.close(None).await.unwrap();
+
+    let (status, _) = h.call(Method::GET, "/v1/realtime", Some(&token), json!({})).await;
+    assert_eq!(status, StatusCode::BAD_REQUEST, "a plain GET is not a WebSocket");
+    let anonymous = format!("ws://{addr}/v1/realtime").into_client_request().unwrap();
+    match tokio_tungstenite::connect_async(anonymous).await {
+        Err(tokio_tungstenite::tungstenite::Error::Http(response)) => assert_eq!(response.status(), StatusCode::UNAUTHORIZED),
+        other => panic!("an anonymous socket must be refused: {:?}", other.map(|_| ())),
+    }
     h.cleanup().await;
 }
