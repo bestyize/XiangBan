@@ -4,9 +4,13 @@ use serde_json::Value;
 /// `None` means this server returned HTTP 404 and the caller may use legacy discovery.
 /// Transport, authorization, rate-limit and malformed-response errors remain errors.
 pub(super) async fn fetch(origin: &str, path: &str, pairs: &[(&str, String)]) -> Result<Option<Value>, String> {
+    // reqwest 0.13 gates RequestBuilder::query behind an optional feature. Use the
+    // existing URL dependency so this also compiles with the desktop's minimal features.
+    let url = url::Url::parse_with_params(&format!("{origin}{path}"), pairs)
+        .map_err(|_| "插件市场地址无效".to_string())?;
     let mut response = reqwest::Client::builder().timeout(std::time::Duration::from_secs(20))
         .build().map_err(|e| e.to_string())?
-        .get(format!("{origin}{path}")).query(pairs).send().await
+        .get(url).send().await
         .map_err(|_| "暂时无法连接小伴插件市场，请检查网站连接设置".to_string())?;
     let status = response.status().as_u16();
     // Old backends and reverse proxies may send plain text or HTML for missing routes.
@@ -79,5 +83,38 @@ mod tests {
         let origin = format!("http://{}", listener.local_addr().unwrap());
         drop(listener);
         assert!(fetch(&origin, "/api/v1/ai/plugins", &[]).await.is_err());
+    }
+
+    #[tokio::test]
+    async fn query_parameters_preserve_unicode_and_reserved_characters() {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let origin = format!("http://{}", listener.local_addr().unwrap());
+        let server = thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            stream.set_read_timeout(Some(std::time::Duration::from_secs(5))).unwrap();
+            let mut request = Vec::new();
+            let mut chunk = [0; 1024];
+            while !request.windows(4).any(|v| v == b"\r\n\r\n") {
+                let count = stream.read(&mut chunk).unwrap();
+                assert!(count > 0 && request.len() + count <= 8192);
+                request.extend_from_slice(&chunk[..count]);
+            }
+            let request = std::str::from_utf8(&request).unwrap();
+            let target = request.lines().next().unwrap().split_whitespace().nth(1).unwrap();
+            let url = url::Url::parse(&format!("http://localhost{target}")).unwrap();
+            let pairs = url.query_pairs().collect::<std::collections::BTreeMap<_, _>>();
+            assert_eq!(url.path(), "/api/v1/ai/plugins");
+            assert_eq!(pairs.get("keyword").unwrap(), "写作 & C++");
+            assert_eq!(pairs.get("category").unwrap(), "content-creation");
+            assert_eq!(pairs.get("page").unwrap(), "3");
+            let body = r#"{"results":[]}"#;
+            let response = format!("HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}", body.len());
+            stream.write_all(response.as_bytes()).unwrap();
+        });
+        let result = fetch(&origin, "/api/v1/ai/plugins", &[
+            ("keyword", "写作 & C++".into()), ("category", "content-creation".into()), ("page", "3".into()),
+        ]).await;
+        server.join().unwrap();
+        assert!(result.unwrap().is_some());
     }
 }
