@@ -68,6 +68,8 @@ pub trait Desktop: Send + Sync {
     fn export_pack(&self, kind: &str, id: &str) -> Result<Option<(String, u64)>, String>;
     /// Opens an https address in the system browser.
     fn open_url(&self, url: &str) -> Result<(), String>;
+    /// Brings the console forward on `page` (and its `tab`). `page`/`tab` are already validated by `app_guide`.
+    fn open_page(&self, _page: &str, _tab: Option<&str>) -> Result<(), String> { Err("当前宿主不支持打开页面".into()) }
 }
 
 pub struct TauriDesktop {
@@ -97,6 +99,12 @@ impl Desktop for TauriDesktop {
 
     fn open_url(&self, url: &str) -> Result<(), String> {
         crate::content::open_download_url(url.to_string())
+    }
+
+    fn open_page(&self, page: &str, tab: Option<&str>) -> Result<(), String> {
+        use tauri::Emitter;
+        crate::present_control(&self.app)?;
+        self.app.emit_to("control", "control-navigate", json!({ "page": page, "tab": tab })).map_err(|e| e.to_string())
     }
 
     fn request_permissions(&self) -> Result<Value, String> {
@@ -965,6 +973,17 @@ pub fn tools_in_workspace(desktop: Arc<dyn Desktop>, workspace: &std::path::Path
     let none = || object(json!({}), &[]);
     let status_run = |d: &dyn Desktop, _: &Value| -> Result<String, String> { Ok(d.status()?.to_string()) };
     vec![
+        tool(&desktop, ToolSpec::new("app_guide", "查小伴桌面的功能清单：每项功能能做什么、在控制台哪个页面、对应哪些工具、哪些要用户自己在页面里操作。用户问“能不能…”“在哪里…”“怎么设置…”，或你想说“不支持”之前先调用。topic 可填功能名、页面名、工具名或关键词（如 置顶、代理、提醒）；不填则返回完整目录。", object(json!({"topic":{"type":"string"}}), &[])).risk(Risk::Read).parallel(), |_, a| Ok(super::app_guide::describe(optional_text(a, "topic")?))),
+        tool(&desktop, ToolSpec::new("open_page", "把小伴控制台带到前台并打开指定页面，用来带用户去对话里做不了、或用户想自己操作的地方（如代理、API 密钥、权限、插件商店）。page: new-task 新建任务、ai-store AI 插件、library 资料库、studio 装扮、games 游玩、care 提醒、settings 设置。studio 的 tab: wallpapers 壁纸、effects 特效、widgets 组件、pets 伙伴；settings 的 tab: general、appearance、ai、assistant、voice、network、safety、about。具体页面对应什么功能见 app_guide。", object(json!({
+            "page":{"type":"string","enum":super::app_guide::PAGES},
+            "tab":{"type":"string","description":"studio 或 settings 的子页，其他页面不要填"}
+        }), &["page"])).risk(Risk::Write).self_managed().serial(), |d, a| {
+            let page = text_arg(a, "page")?;
+            let tab = optional_text(a, "tab")?.filter(|t| !t.is_empty());
+            super::app_guide::validate_page(page, tab)?;
+            d.open_page(page, tab)?;
+            Ok(match tab { Some(tab) => format!("已打开 {page} 页面的 {tab}"), None => format!("已打开 {page} 页面") })
+        }),
         tool(&desktop, ToolSpec::new("desktop_windows", "查看小伴自己的窗口和显示器：盆栽 companion、超级小伴 assistant、控制台 control、桌面组件 widget:<id> 的位置、显示状态和层级。移动前用本工具确认目标与显示器。", none()).risk(Risk::Read).parallel(), |d, _| d.windows().map(|v| v.to_string())),
         tool(&desktop, ToolSpec::new("desktop_window_set", "调整小伴自己窗口的位置、层级（置顶/贴桌面）、显示/隐藏，不操作其他应用。target: companion 是盆栽，assistant 是超级小伴悬浮条（用户让你收起来时用 action=collapse），control 是设置控制台，widget:<id> 是组件。移动 x/y 使用屏内比例（0 左/上，0.5 中间，1 右/下），可指定 desktop_windows 返回的 monitor。layer: desktop 贴桌面、normal 普通窗口（组件只能 desktop/topmost）、topmost 置顶；组件的层级会保存，其他窗口的层级本次运行有效。隐藏盆栽或组件会保存开关；收起助手不退出应用、不取消任务。", object(json!({
             "target":{"type":"string"},"action":{"type":"string","enum":["show","hide","collapse"]},
@@ -1455,6 +1474,9 @@ mod tests {
         fn open_url(&self, url: &str) -> Result<(), String> {
             self.log(format!("open-url {url}"))
         }
+        fn open_page(&self, page: &str, tab: Option<&str>) -> Result<(), String> {
+            self.log(format!("open-page {page} {}", tab.unwrap_or("-")))
+        }
         fn request_permissions(&self) -> Result<Value, String> {
             self.log("request-permissions".to_string())?;
             Ok(json!({"ok": true, "message": "已申请系统权限"}))
@@ -1477,7 +1499,7 @@ mod tests {
         let mut unique = names.clone();
         unique.dedup();
         assert_eq!(names, unique);
-        assert_eq!(names.len(), 41);
+        assert_eq!(names.len(), 43);
         for tool in &all {
             let spec = tool.spec();
             assert!(spec.name.len() <= 64 && spec.name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_'), "{}", spec.name);
@@ -1487,7 +1509,7 @@ mod tests {
         let read: Vec<&str> = all.iter().filter(|t| t.spec().risk == Risk::Read).map(|t| t.spec().name.as_str()).collect();
         let mut read = read;
         read.sort();
-        assert_eq!(read, vec!["care_list", "computer_use_diagnose", "desktop_status", "desktop_windows", "effect_list", "effect_read_format", "game_list", "game_read_format", "pet_catalog", "pet_read_format", "wallpaper_list", "widget_list", "widget_read_format"]);
+        assert_eq!(read, vec!["app_guide", "care_list", "computer_use_diagnose", "desktop_status", "desktop_windows", "effect_list", "effect_read_format", "game_list", "game_read_format", "pet_catalog", "pet_read_format", "wallpaper_list", "widget_list", "widget_read_format"]);
         for tool in all.iter().filter(|t| t.spec().risk == Risk::Write) {
             assert!(!tool.spec().parallel_safe, "{} changes shared settings, so it runs alone", tool.spec().name);
         }
@@ -1781,6 +1803,27 @@ mod tests {
         assert!(call(&fake, "widget_update", json!({"id": "wgt-1", "scale": 0.5})).unwrap_err().contains("缩放范围"));
         assert!(call(&fake, "widget_update", json!({"id": "wgt-1", "x": 1.5})).unwrap_err().contains("x 坐标范围"));
         assert!(call(&fake, "widget_update", json!({"id": "wgt-1"})).unwrap_err().contains("至少指定"));
+    }
+
+    #[test]
+    fn app_guide_covers_every_tool_so_the_model_can_find_each_one() {
+        let fake: Arc<dyn Desktop> = Arc::new(Fake::default());
+        let covered = super::super::app_guide::covered_tools();
+        let missing: Vec<String> = tools(fake).iter().map(|t| t.spec().name.clone()).filter(|name| !covered.contains(name.as_str())).collect();
+        assert!(missing.is_empty(), "add these tools to chat/app_guide.rs: {missing:?}");
+    }
+
+    #[test]
+    fn open_page_validates_and_app_guide_answers_without_the_app() {
+        let fake = Arc::new(Fake::default());
+        assert_eq!(call(&fake, "open_page", json!({"page":"settings","tab":"network"})).unwrap(), "已打开 settings 页面的 network");
+        assert_eq!(call(&fake, "open_page", json!({"page":"care"})).unwrap(), "已打开 care 页面");
+        assert_eq!(fake.calls(), vec!["open-page settings network", "open-page care -"]);
+        assert!(call(&fake, "open_page", json!({"page":"chat"})).is_err());
+        assert!(call(&fake, "open_page", json!({"page":"studio","tab":"network"})).is_err());
+        assert_eq!(fake.calls().len(), 2, "a rejected page opens nothing");
+        assert!(call(&fake, "app_guide", json!({"topic":"置顶"})).unwrap().contains("widget_update"));
+        assert!(call(&fake, "app_guide", json!({})).unwrap().contains("settings-network"));
     }
 
     #[test]

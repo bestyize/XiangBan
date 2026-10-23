@@ -5,7 +5,7 @@ import { Bell, BookOpen, Check, ChevronDown, Ellipsis, Folder, FolderPlus, Gamep
 import { invoke, listen } from '../bridge.ts';
 import { accent, accents, isDark, appearanceMode, appearanceModes, publishAccentTo, publishAppearanceTo, reconcile, setAccent } from './appearance.ts';
 import { createControlStore } from './control-store.ts';
-import type { ControlPage } from './control-types.ts';
+import type { ControlPage, SettingsTab } from './control-types.ts';
 import type { SessionSummary } from './chat/types.ts';
 import SettingsDialog from './components/SettingsDialog.vue';
 import ChatNameDialog from './components/ChatNameDialog.vue';
@@ -395,12 +395,20 @@ async function introduceAssistant() {
     await invoke('assistant_configure', { patch: { hintSeen: true } });
   } catch { /* the hint is a courtesy; it can wait for the next start */ }
 }
+/** The assistant's `open_page` tool: a page of the sidebar, a tab of 装扮, or a category of the settings dialog. */
+function openPageFromAssistant(page: string, tab?: string) {
+  if (page === 'settings') { store.openSettings(tab as SettingsTab | undefined); return; }
+  store.closeSettings();
+  if (page === 'studio' && tab) navigate(tab === 'pets' ? 'companion' : tab as ControlPage);
+  else navigate(page as ControlPage);
+}
 const assistantListeners: (() => void)[] = [];
 async function listenForAssistant() {
   const off = await Promise.all([
     listen<{ session: string | null }>('assistant-open-chat', ({ session }) => { if (session) void openSession(session); else void newTask(); }),
     listen<{ tab: 'ai' | 'assistant' }>('assistant-open-settings', ({ tab }) => { store.openSettings(tab); }),
     listen<unknown>('games-open', () => { navigate('games'); }),
+    listen<{ page: string; tab?: string | null }>('control-navigate', ({ page, tab }) => openPageFromAssistant(page, tab ?? undefined)),
   ]);
   assistantListeners.push(...off);
 }

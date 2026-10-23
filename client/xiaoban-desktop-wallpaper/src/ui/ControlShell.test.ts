@@ -225,6 +225,26 @@ describe('ControlShell sidebar', () => {
     } finally { wrapper.unmount(); }
   });
 
+  it('opens the page the assistant asks for: a sidebar page, a 装扮 tab, or a settings category', async () => {
+    const wrapper = mount(ControlShell, { attachTo: document.body });
+    try {
+      await flushPromises();
+      const store = storeOf(wrapper);
+      const open = vi.mocked(listen).mock.calls.find(([name]) => name === 'control-navigate')![1];
+      open({ page: 'studio', tab: 'pets' });
+      expect(store.page).toBe('studio');
+      expect(store.studioTab).toBe('pets');
+      open({ page: 'care', tab: null });
+      expect(store.page).toBe('care');
+      open({ page: 'settings', tab: 'network' });
+      expect(store.settingsOpen).toBe(true);
+      expect(store.settingsTab).toBe('network');
+      open({ page: 'games' });
+      expect(store.settingsOpen).toBe(false);
+      expect(store.page).toBe('games');
+    } finally { wrapper.unmount(); }
+  });
+
   it('switches the theme colour from the account menu', async () => {
     const wrapper = mount(ControlShell, { attachTo: document.body });
     try {

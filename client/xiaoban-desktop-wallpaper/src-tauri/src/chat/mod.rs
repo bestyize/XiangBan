@@ -4,6 +4,7 @@
 //! window only (one `emit_filter`): wallpaper pages run content from outside and must not see a chat.
 
 mod agent_settings;
+mod app_guide;
 mod broker;
 mod checkpoints;
 mod git_snapshot;
