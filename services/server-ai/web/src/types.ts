@@ -22,6 +22,20 @@ export interface Tier {
   enabled: boolean;
 }
 
+export type Capability = 'speech' | 'image' | 'transcribe' | 'realtime';
+
+export interface MediaSetting {
+  product_id: string;
+  capability: Capability;
+  model: string;
+  enabled: boolean;
+  requires_paid: boolean;
+  voices: string[];
+  sizes: string[];
+  max_secs: number;
+  updated_at: string;
+}
+
 export interface ModelOption {
   model_name: string;
   model_ratio: number;

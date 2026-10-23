@@ -84,6 +84,8 @@ export const auditLabels: Record<string, string> = {
   'product.save': '保存产品',
   'tier.save': '保存档位',
   'tier.delete': '删除档位',
+  'media.save': '保存媒体能力',
+  'media.delete': '关闭媒体能力',
   'binding.grant': '补发额度',
   'bucket.void': '扣回额度',
   'anomaly.resolve': '处理异常',

@@ -1,11 +1,13 @@
-//! 图片生成、语音识别与实时语音。三者都经 New API 转发到后台配置的模型：客户端不传也看不到真实模型名，
+//! 图片生成、语音识别与实时语音。三者都经 New API 转发到后台按产品配置的模型：客户端不传也看不到真实模型名，
 //! 鉴权和额度检查与对话接口相同，用量由 New API 按模型倍率从钱包扣，对账时结算进额度桶。
 
 use crate::{
     binding,
     error::AppError,
     extract::AuthUser,
+    products::{self, Capability, MediaSetting},
     proxy::{error_response, map_body_error, map_upstream_error, require_quota, Api},
+    quota,
     state::AppState,
 };
 use axum::{
@@ -25,14 +27,28 @@ use serde_json::{json, Value};
 use std::time::Duration;
 use tokio_tungstenite::tungstenite::{self, client::IntoClientRequest};
 
-fn unavailable(code: &'static str, what: &str) -> AppError {
-    AppError::Coded { status: StatusCode::SERVICE_UNAVAILABLE, code, message: format!("小伴 AI {what}暂未开放") }
+fn unavailable(capability: Capability) -> AppError {
+    let code = match capability {
+        Capability::Speech => "speech_unavailable",
+        Capability::Image => "image_unavailable",
+        Capability::Transcribe => "transcribe_unavailable",
+        Capability::Realtime => "realtime_unavailable",
+    };
+    AppError::Coded { status: StatusCode::SERVICE_UNAVAILABLE, code, message: format!("小伴 AI {}暂未开放", capability.label()) }
 }
 
-/// The caller's binding, once their login and quota check out.
-async fn caller(state: &AppState, auth: AuthUser) -> Result<binding::ActiveBinding, AppError> {
+/// What the caller's product set up for this capability in the admin; none, or switched off, means not offered.
+pub(crate) async fn setting(state: &AppState, auth: &AuthUser, capability: Capability) -> Result<MediaSetting, AppError> {
+    products::media(&state.pool, &auth.product.product_id, capability).await?.ok_or_else(|| unavailable(capability))
+}
+
+/// The caller's binding, once their login and quota check out, and their paid quota if the capability needs it.
+pub(crate) async fn caller(state: &AppState, auth: AuthUser, setting: &MediaSetting) -> Result<binding::ActiveBinding, AppError> {
     let active = binding::ensure_active(state, auth.uid, &auth.product).await?;
     require_quota(state, active.id).await?;
+    if setting.requires_paid && quota::paid_total(&state.pool, active.id).await? <= 0 {
+        return Err(AppError::Coded { status: StatusCode::FORBIDDEN, code: "paid_required", message: "这项功能需要先兑换额度才能使用".into() });
+    }
     sqlx::query("UPDATE bindings SET last_used_at = now() WHERE id = $1").bind(active.id).execute(&state.pool).await?;
     Ok(active)
 }
@@ -81,9 +97,9 @@ pub async fn image_generations(State(state): State<AppState>, auth: Result<AuthU
     let result = async {
         let body = body.map_err(|error| map_body_error(error.status()))?;
         let auth = auth?;
-        let model = state.config.image_model.clone().ok_or_else(|| unavailable("image_unavailable", "图片生成"))?;
-        let payload = image_payload(&model, &state.config.image_sizes, &body)?;
-        let active = caller(&state, auth).await?;
+        let setting = setting(&state, &auth, Capability::Image).await?;
+        let payload = image_payload(&setting.model, &setting.sizes, &body)?;
+        let active = caller(&state, auth, &setting).await?;
         let payload = serde_json::to_vec(&payload).map_err(|e| AppError::Internal(e.to_string()))?;
         let upstream = state.newapi.relay("/v1/images/generations", &active.key, payload, &[]).await?;
         let status = upstream.status();
@@ -164,13 +180,13 @@ async fn read_recording(mut multipart: Multipart) -> Result<Recording, AppError>
 pub async fn transcriptions(State(state): State<AppState>, auth: Result<AuthUser, AppError>, multipart: Result<Multipart, MultipartRejection>) -> Response {
     let result = async {
         let auth = auth?;
-        let model = state.config.transcribe_model.clone().ok_or_else(|| unavailable("transcribe_unavailable", "语音识别"))?;
+        let setting = setting(&state, &auth, Capability::Transcribe).await?;
         let multipart = multipart.map_err(|_| AppError::BadRequest("请用 multipart/form-data 上传音频".into()))?;
         let recording = read_recording(multipart).await?;
-        let active = caller(&state, auth).await?;
+        let active = caller(&state, auth, &setting).await?;
         let part = reqwest::multipart::Part::bytes(recording.file).file_name(recording.file_name).mime_str(&recording.content_type)
             .map_err(|_| AppError::BadRequest("音频类型无效".into()))?;
-        let mut form = reqwest::multipart::Form::new().text("model", model).text("response_format", "json").part("file", part);
+        let mut form = reqwest::multipart::Form::new().text("model", setting.model).text("response_format", "json").part("file", part);
         if let Some(language) = recording.language { form = form.text("language", language); }
         if let Some(prompt) = recording.prompt { form = form.text("prompt", prompt); }
         let upstream = state.newapi.relay_multipart("/v1/audio/transcriptions", &active.key, form).await?;
@@ -226,16 +242,16 @@ fn realtime_token(headers: &HeaderMap) -> Option<String> {
 
 /// `GET /v1/realtime` (WebSocket): OpenAI Realtime events, relayed to the configured model through New API.
 /// The login token comes in `Authorization: Bearer …` or, from a browser, as the subprotocol `xiaoban-token.<token>`
-/// alongside `realtime`. One conversation lasts at most `AI_REALTIME_MAX_SECS` and ends when the quota runs out.
+/// alongside `realtime`. One conversation lasts at most the product's configured time and ends when the quota runs out.
 pub async fn realtime(State(state): State<AppState>, headers: HeaderMap, ws: Result<WebSocketUpgrade, axum::extract::ws::rejection::WebSocketUpgradeRejection>) -> Response {
     let result = async {
         let ws = ws.map_err(|_| AppError::BadRequest("请用 WebSocket 连接".into()))?;
         let token = realtime_token(&headers).ok_or_else(|| AppError::Unauthorized("请先登录".into()))?;
         let auth = AuthUser::from_token(&state, &token).await?;
-        let model = state.config.realtime_model.clone().ok_or_else(|| unavailable("realtime_unavailable", "实时语音"))?;
-        let active = caller(&state, auth).await?;
+        let setting = setting(&state, &auth, Capability::Realtime).await?;
+        let active = caller(&state, auth, &setting).await?;
         // Connect upstream first, so a failure is an ordinary HTTP error rather than a socket that opens and dies.
-        let mut request = format!("{}?model={}", state.newapi.ws_url("/v1/realtime"), urlencode(&model)).into_client_request()
+        let mut request = format!("{}?model={}", state.newapi.ws_url("/v1/realtime"), urlencode(&setting.model)).into_client_request()
             .map_err(|e| AppError::Internal(e.to_string()))?;
         request.headers_mut().insert(header::AUTHORIZATION, format!("Bearer sk-{}", active.key).parse().map_err(|_| AppError::Internal("bad key".into()))?);
         request.headers_mut().insert("openai-beta", "realtime=v1".parse().unwrap());
@@ -247,7 +263,7 @@ pub async fn realtime(State(state): State<AppState>, headers: HeaderMap, ws: Res
                 _ => AppError::BadGateway("实时语音暂时不可用".into()),
             }
         })?;
-        let limit = Duration::from_secs(state.config.realtime_max_secs);
+        let limit = Duration::from_secs(setting.max_secs.clamp(*products::REALTIME_SECS.start(), *products::REALTIME_SECS.end()) as u64);
         let binding_id = active.id;
         Ok::<_, AppError>(ws.protocols(["realtime"]).max_message_size(REALTIME_MAX_MESSAGE).on_upgrade(move |client| pump(state, binding_id, client, upstream, limit)))
     }

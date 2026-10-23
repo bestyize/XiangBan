@@ -16,6 +16,8 @@ const icons: Record<string, IconName> = {
   'product.save': 'layers',
   'tier.save': 'layers',
   'tier.delete': 'trash',
+  'media.save': 'layers',
+  'media.delete': 'trash',
   'binding.grant': 'plus',
   'bucket.void': 'undo',
   'anomaly.resolve': 'circle-check',

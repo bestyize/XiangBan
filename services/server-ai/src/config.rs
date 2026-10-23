@@ -21,20 +21,6 @@ pub struct AppConfig {
     pub cors_origins: Vec<String>,
     pub web_dir: PathBuf,
     pub max_body_bytes: usize,
-    /// The upstream model behind `/v1/audio/speech` (as named in New API); unset means speech is not offered.
-    pub speech_model: Option<String>,
-    /// Voices clients may ask for; the first is used when they ask for none.
-    pub speech_voices: Vec<String>,
-    /// The upstream model behind `/v1/images/generations`; unset means images are not offered.
-    pub image_model: Option<String>,
-    /// Sizes clients may ask for; the first is used when they ask for none.
-    pub image_sizes: Vec<String>,
-    /// The upstream model behind `/v1/audio/transcriptions`; unset means cloud recognition is not offered.
-    pub transcribe_model: Option<String>,
-    /// The upstream model behind `/v1/realtime`; unset means realtime voice is not offered.
-    pub realtime_model: Option<String>,
-    /// The longest one realtime conversation may last.
-    pub realtime_max_secs: u64,
     /// Search providers behind `/v1/search` and `/v1/fetch`, tried in this order. One without a key is skipped.
     pub search_providers: Vec<String>,
     /// One or more keys, comma-separated in `AI_DEEPSEEK_API_KEY`; requests take turns and pass over a failing one.
@@ -83,18 +69,6 @@ impl AppConfig {
                 .unwrap_or_default(),
             web_dir: PathBuf::from(get("AI_WEB_DIR").unwrap_or_else(|| "services/server-ai/web/dist".into())),
             max_body_bytes: num("AI_MAX_BODY_BYTES", 8 * 1024 * 1024).max(1024) as usize,
-            speech_model: get("AI_SPEECH_MODEL"),
-            speech_voices: get("AI_SPEECH_VOICES")
-                .map(|v| v.split(',').map(|s| s.trim().to_string()).filter(|s| !s.is_empty()).collect())
-                .unwrap_or_default(),
-            image_model: get("AI_IMAGE_MODEL"),
-            image_sizes: get("AI_IMAGE_SIZES")
-                .map(|v| v.split(',').map(|s| s.trim().to_string()).filter(|s| !s.is_empty()).collect::<Vec<_>>())
-                .filter(|v| !v.is_empty())
-                .unwrap_or_else(|| vec!["1024x1024".into()]),
-            transcribe_model: get("AI_TRANSCRIBE_MODEL"),
-            realtime_model: get("AI_REALTIME_MODEL"),
-            realtime_max_secs: num("AI_REALTIME_MAX_SECS", 1800).clamp(60, 4 * 3600) as u64,
             search_providers: get("AI_SEARCH_PROVIDERS")
                 .unwrap_or_else(|| "newapi,deepseek".into())
                 .split(',')

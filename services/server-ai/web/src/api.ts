@@ -1,5 +1,5 @@
 import { session, signOut } from './session';
-import type { Anomaly, AuditRow, Batch, BindingDetail, BindingRow, CodeLookup, GatewaySettings, ModelOption, Overview, Product, Tier } from './types';
+import type { Anomaly, AuditRow, Batch, BindingDetail, BindingRow, Capability, CodeLookup, GatewaySettings, MediaSetting, ModelOption, Overview, Product, Tier } from './types';
 
 export class ApiError extends Error {
   constructor(message: string, public status: number) {
@@ -27,6 +27,7 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
 }
 
 export type TierInput = Omit<Tier, 'product_id' | 'tier'>;
+export type MediaInput = Pick<MediaSetting, 'model' | 'enabled' | 'requires_paid' | 'voices' | 'sizes' | 'max_secs'>;
 export type ProductInput = Pick<Product, 'name' | 'client_ids' | 'trial_quota' | 'trial_days' | 'enabled'>;
 
 export const api = {
@@ -41,6 +42,10 @@ export const api = {
   saveTier: (productId: string, tier: string, body: TierInput) =>
     request<{ ok: true; warnings: string[] }>('PUT', `/admin/products/${productId}/tiers/${tier}`, body),
   deleteTier: (productId: string, tier: string) => request<{ ok: true }>('DELETE', `/admin/products/${productId}/tiers/${tier}`),
+  media: (productId: string) => request<{ items: MediaSetting[] }>('GET', `/admin/products/${productId}/media`),
+  saveMedia: (productId: string, capability: Capability, body: MediaInput) =>
+    request<{ ok: true; warnings: string[] }>('PUT', `/admin/products/${productId}/media/${capability}`, body),
+  deleteMedia: (productId: string, capability: Capability) => request<{ ok: true }>('DELETE', `/admin/products/${productId}/media/${capability}`),
   models: () => request<{ items: ModelOption[]; default_ratio: number }>('GET', '/admin/models'),
   bindings: (params: { q: string; productId: string; page: number }) => {
     const query = new URLSearchParams({ page: String(params.page), page_size: '20' });
