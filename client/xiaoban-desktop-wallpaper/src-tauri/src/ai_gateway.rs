@@ -84,11 +84,11 @@ fn failure_from(status: reqwest::StatusCode, body: &str) -> AccountFailure {
 
 async fn call(app: &tauri::AppHandle, method: reqwest::Method, path: &str, payload: Option<Value>) -> Result<Value, AccountFailure> {
     let token = account::fresh_access_token(app).await?;
-    let client = reqwest::Client::builder()
+    let client = crate::network::async_builder(reqwest::Client::builder()
         .timeout(Duration::from_secs(15))
         .connect_timeout(Duration::from_secs(8))
         .redirect(reqwest::redirect::Policy::none())
-        .user_agent(concat!("XiaoBanDesktop/", env!("CARGO_PKG_VERSION")))
+        .user_agent(concat!("XiaoBanDesktop/", env!("CARGO_PKG_VERSION"))))?
         .build()
         .map_err(|e| format!("创建网络连接失败：{e}"))?;
     let mut request = client.request(method, format!("{}{}", ai_base_url(), path)).bearer_auth(token);
