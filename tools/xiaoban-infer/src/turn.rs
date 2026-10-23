@@ -1,7 +1,7 @@
-//! Turn detection (`--turn` mode): Silero VAD ("is someone speaking") and Smart Turn v3 ("have they finished").
+//! `turn`: turn detection with Silero VAD ("is someone speaking") and Smart Turn v3 ("have they finished").
 //! Both run on the onnxruntime that sherpa-onnx already links into this program, through `ort`'s
 //! alternative-backend mode, so there is one onnxruntime and nothing extra to ship.
-use crate::features;
+use crate::{features, protocol::{pcm, Request, Response, MAX_SAMPLES}};
 use ort::{session::Session, value::Tensor};
 use std::{collections::HashMap, path::Path};
 
@@ -15,7 +15,7 @@ pub const SILERO_FILE: &str = "silero_vad.onnx";
 pub const SMART_TURN_FILE: &str = "smart-turn-v3.2.onnx";
 
 /// Points `ort` at the onnxruntime linked in through sherpa-onnx. Must run before any session is created.
-pub fn use_linked_onnxruntime() -> Result<(), String> {
+fn use_linked_onnxruntime() -> Result<(), String> {
     unsafe {
         let base = ort::sys::OrtGetApiBase();
         if base.is_null() { return Err("onnxruntime 不可用".into()); }
@@ -41,11 +41,24 @@ fn session(path: &Path) -> Result<Session, String> {
 
 impl Turn {
     pub fn load(directory: &Path) -> Result<Self, String> {
+        use_linked_onnxruntime()?;
         Ok(Self { silero: session(&directory.join(SILERO_FILE))?, smart_turn: session(&directory.join(SMART_TURN_FILE))?, streams: HashMap::new(), tick: 0 })
     }
 
+    pub fn handle(&mut self, request: Request) -> Response {
+        match request {
+            Request::Vad { stream, pcm: samples } if !stream.is_empty() && stream.len() <= 64 && samples.len() <= 32000 =>
+                self.vad(&stream, &pcm(&samples)).map(|values| Response::Probabilities { values }).unwrap_or_else(Response::error),
+            Request::VadReset { stream } => { self.reset(&stream); Response::Pong }
+            Request::Turn { pcm: samples } if (1600..=MAX_SAMPLES).contains(&samples.len()) =>
+                self.complete(&pcm(&samples)).map(|value| Response::Probability { value }).unwrap_or_else(Response::error),
+            Request::Vad { .. } | Request::Turn { .. } => Response::error("语音数据无效"),
+            _ => Response::error("判停进程不支持该请求"),
+        }
+    }
+
     /// Speech probabilities for the next 16 kHz samples of a listener; one per 512-sample window.
-    pub fn vad(&mut self, stream: &str, samples: &[f32]) -> Result<Vec<f32>, String> {
+    fn vad(&mut self, stream: &str, samples: &[f32]) -> Result<Vec<f32>, String> {
         self.tick += 1;
         if !self.streams.contains_key(stream) && self.streams.len() >= MAX_STREAMS {
             if let Some(oldest) = self.streams.iter().min_by_key(|(_, s)| s.used).map(|(k, _)| k.clone()) { self.streams.remove(&oldest); }
@@ -77,10 +90,10 @@ impl Turn {
         Ok(out)
     }
 
-    pub fn reset(&mut self, stream: &str) { self.streams.remove(stream); }
+    fn reset(&mut self, stream: &str) { self.streams.remove(stream); }
 
     /// The probability, 0..1, that the speaker has finished their turn, judged from the last 8 s of audio.
-    pub fn complete(&mut self, audio: &[f32]) -> Result<f32, String> {
+    fn complete(&mut self, audio: &[f32]) -> Result<f32, String> {
         let input = features::log_mel(&features::last_eight_seconds(audio));
         let mut run = || -> ort::Result<f32> {
             let outputs = self.smart_turn.run(ort::inputs![

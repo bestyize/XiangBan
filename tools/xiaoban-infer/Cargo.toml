@@ -1,8 +1,8 @@
 [package]
-name = "xiaoban-asr"
-version = "2.0.0"
+name = "xiaoban-infer"
+version = "1.0.0"
 edition = "2021"
-description = "Xiaoban standalone offline ASR companion runtime: SenseVoice recognition and Silero/Smart Turn turn detection"
+description = "小伴桌面的本地推理引擎：语音识别（SenseVoice）、判停（Silero VAD / Smart Turn），后续能力按模块加入"
 
 [dependencies]
 sherpa-onnx = "=1.13.8"

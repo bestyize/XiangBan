@@ -1,8 +1,8 @@
-name: BuildXiaoBanAsr
+name: BuildXiaoBanInfer
 
-# Builds the xiaoban-asr runtime (SenseVoice recognition + Silero/Smart Turn turn detection) for macOS arm64 and
-# Windows x64 and uploads both as one artifact. Publishing stays manual: upload the files to the ModelScope
-# repository bestyize/xiaoban-asr (see tools/xiaoban-asr/README.md). Run it from the Actions tab.
+# Builds xiaoban-infer, 小伴桌面's local inference engine (speech recognition, turn detection, …), for macOS arm64 and
+# Windows x64 and uploads each as an artifact. Publishing stays manual: upload the files to ModelScope as described in
+# tools/xiaoban-infer/README.md. Run it from the Actions tab.
 on:
   workflow_dispatch:
 
@@ -15,16 +15,16 @@ jobs:
       matrix:
         include:
           - os: macos-14
-            binary: xiaoban-asr
-            published: xiaoban-asr-v2-macos-arm64
+            binary: xiaoban-infer
+            published: xiaoban-infer-macos-arm64
           - os: windows-latest
-            binary: xiaoban-asr.exe
-            published: xiaoban-asr-v2.exe
+            binary: xiaoban-infer.exe
+            published: xiaoban-infer.exe
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     defaults:
       run:
-        working-directory: tools/xiaoban-asr
+        working-directory: tools/xiaoban-infer
         shell: bash
     steps:
       - uses: actions/checkout@v4
