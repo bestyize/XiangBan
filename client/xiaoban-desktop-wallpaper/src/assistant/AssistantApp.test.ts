@@ -150,6 +150,20 @@ describe('assistant conversation card', () => {
     await wrapper.get('[data-testid="assistant-new-chat"]').trigger('click');await flushPromises();expect(store.newConversation).toHaveBeenCalledOnce();
     store.items=conversation();await nextTick();wrapper.vm.$forceUpdate();
   });
+  it('shows recent conversations inside the card in place of the conversation, and brings it back', async () => {
+    const {store,wrapper}=setup();store.phase='idle';await nextTick();
+    const body=wrapper.get('[data-testid="assistant-card-body"]').element as HTMLElement;
+    const menu=()=>wrapper.find('[data-testid="assistant-session-menu"]');
+    await wrapper.get('[data-testid="assistant-sessions"]').trigger('click');
+    // In the card's flow, not floating over the capsule below it.
+    expect(menu().element.parentElement).toBe(wrapper.get('[data-testid="assistant-card"]').element);
+    expect(body.style.display).toBe('none');
+    // Pressing inside the list keeps it open; pressing elsewhere closes it and the conversation comes back.
+    menu().element.dispatchEvent(new PointerEvent('pointerdown',{bubbles:true}));await nextTick();
+    expect(menu().exists()).toBe(true);
+    document.body.dispatchEvent(new PointerEvent('pointerdown',{bubbles:true}));await nextTick();
+    expect(menu().exists()).toBe(false);expect(body.style.display).toBe('');
+  });
   it('continues in the main window and folds away from the header', async () => {
     const {store,wrapper}=setup();store.phase='idle';await nextTick();
     await wrapper.get('[data-testid="assistant-expand"]').trigger('click');await flushPromises();expect(store.openChat).toHaveBeenCalledOnce();
