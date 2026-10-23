@@ -277,6 +277,7 @@ declare global {
           event: string,
           callback: (event: { payload: T }) => void,
         ) => Promise<() => void>;
+        emit: (event: string, payload?: unknown) => Promise<void>;
       };
     };
   }
@@ -318,6 +319,10 @@ export function invoke<T>(
   if (!window.__TAURI__)
     return Promise.reject(new Error("请通过桌面程序运行这个功能"));
   return window.__TAURI__.core.invoke<T>(command, args);
+}
+/** Tells every window; the others hear it through `listen`. */
+export async function emit(event: string, payload?: unknown): Promise<void> {
+  await window.__TAURI__?.event.emit(event, payload);
 }
 export async function listen<T>(
   event: string,

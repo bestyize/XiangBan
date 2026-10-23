@@ -908,3 +908,29 @@ describe('sequenced session snapshots', () => {
     expect(h.store.current()!.items.at(-1)).toMatchObject({ text: 'hello world' });
   });
 });
+
+describe('which window asked', () => {
+  it('knows the question was asked here until its answer is done, and not for a question the other window asked', async () => {
+    const onReply = vi.fn();
+    const h = harness({ chat_overview: () => overview({ sessions: [summary('s1')] }), chat_load_session: () => [], chat_send: () => summary('s1') });
+    const store = createChatStore({ ...h.deps, onReply });
+    await store.init(); await store.select('s1');
+    expect(store.sentHere('s1')).toBe(false);
+    await store.send('你好');
+    expect(store.sentHere('s1')).toBe(true);
+    const emit = (event: KernelEvent) => (h.deps.listen as ReturnType<typeof vi.fn>).mock.calls.filter(([name]) => name === 'chat-event').forEach(([, callback]) => (callback as (payload: unknown) => void)({ session: 's1', event }));
+    emit({ type: 'text_delta', text: '你好呀' } as KernelEvent);
+    emit({ type: 'done' } as KernelEvent);
+    expect(onReply).toHaveBeenCalledWith('s1', '你好呀', expect.any(String));
+    expect(store.sentHere('s1')).toBe(true); // still true while the reply is handed over…
+    await Promise.resolve();
+    expect(store.sentHere('s1')).toBe(false); // …and over once it is done
+    store.dispose();
+  });
+  it('forgets the question when the host refuses it', async () => {
+    const h = harness({ chat_overview: () => overview({ sessions: [summary('s1')] }), chat_load_session: () => [], chat_send: () => { throw new Error('busy'); } });
+    await h.store.init(); await h.store.select('s1');
+    expect(await h.store.send('你好')).toBe(false);
+    expect(h.store.sentHere('s1')).toBe(false);
+  });
+});

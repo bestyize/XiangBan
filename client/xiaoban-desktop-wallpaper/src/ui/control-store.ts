@@ -1,7 +1,7 @@
 import { createSpeechStore } from './speech/store.ts';
 import { createAsrStore } from './asr/store.ts';
 import { reactive } from "vue";
-import { desktop, defaults, invoke, listen, toAccountError, type AiConfigView, type Settings, type WallpaperEntry, type WallpaperLibrary, type AppInfo, type AccountSession, type SendCodeResult, type CodeLoginOutcome, type UsernameCheck, type SignupMethods, type LoginResult } from "../bridge.ts";
+import { desktop, defaults, emit, invoke, listen, toAccountError, type AiConfigView, type Settings, type WallpaperEntry, type WallpaperLibrary, type AppInfo, type AccountSession, type SendCodeResult, type CodeLoginOutcome, type UsernameCheck, type SignupMethods, type LoginResult } from "../bridge.ts";
 import type { WebsiteStatus } from "./website-types.ts";
 import { loadBuiltinCatalog, readCatalog } from "../games/catalog.ts";
 import { loadBuiltinPacks, noPacks, readImported, readList } from "../effects/catalog.ts";
@@ -9,6 +9,7 @@ import type { ControlPage, ControlStore, StudioTab } from "./control-types.ts";
 import { createChatStore } from "./chat/chat-store.ts";
 import { loadTurnModels } from '../voice/turn/models.ts';
 import { createLiveTalk } from '../voice/live-talk.ts';
+import { createVoiceOwner } from '../voice/owner.ts';
 
 export const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value));
 
@@ -40,6 +41,8 @@ const chatLike = (page: ControlPage) => page === "chat" || page === "new-task";
 export function createControlStore(notify: ControlStore["notify"]): ControlStore {
   let disposed = false;
   const unsubscribers: (() => void)[] = [];
+  // The floating assistant has its own microphone and voice; whichever window uses them last has them (`voice/owner.ts`).
+  const voice = createVoiceOwner({ me: 'control', emit, listen, onLost: () => { store.live?.end(); store.asr.deactivate(); void store.speech.stop(); } });
   // Serialize partial appearance updates so a fast sequence cannot overwrite another setting.
   let appearanceQueue = Promise.resolve();
   // Same for the effect choice: sliders send many updates in a row, and only the last may win.
@@ -54,9 +57,9 @@ export function createControlStore(notify: ControlStore["notify"]): ControlStore
     effectList: noPacks(),
     account: null,
     showLoginModal: false,
-    page: "new-task", creationDraft: null, creationAttachments: null, settingsTab: "general", settingsOpen: false, studioTab: "wallpapers", asr: createAsrStore({ desktop, invoke, listen, notify, turnModels: () => loadTurnModels(invoke) }), speech: createSpeechStore({ desktop, invoke, notify }), chat: createChatStore({ desktop, invoke, listen, notify,
+    page: "new-task", creationDraft: null, creationAttachments: null, settingsTab: "general", settingsOpen: false, studioTab: "wallpapers", asr: createAsrStore({ desktop, invoke, listen, notify, claimVoice: () => voice.claim(), turnModels: () => loadTurnModels(invoke) }), speech: createSpeechStore({ desktop, invoke, notify, claimVoice: () => voice.claim() }), chat: createChatStore({ desktop, invoke, listen, notify,
       onActivity: () => { if (store.live?.activity()) return; store.asr.deactivate(); void store.speech.stop(); },
-      onReply: (session, text, key) => { if (store.live?.active) { store.live.replied(session, text, key); return; } if (chatLike(store.page) && store.speech.settings.autoRead && document.visibilityState !== 'hidden') void store.speech.speak(text, key ?? 'auto:' + session, undefined, true); },
+      onReply: (session, text, key) => { if (!store.chat.sentHere(session)) return; if (store.live?.active) { store.live.replied(session, text, key); return; } if (chatLike(store.page) && store.speech.settings.autoRead && document.visibilityState !== 'hidden') void store.speech.speak(text, key ?? 'auto:' + session, undefined, true); },
     }), ready: false, initialError: "", desktop, notify,
     navigate(page) {
       if (page === 'assistant' || page === 'settings') { store.openSettings(page === 'assistant' ? 'assistant' : undefined); return; }
@@ -139,7 +142,7 @@ export function createControlStore(notify: ControlStore["notify"]): ControlStore
       } catch (error) { store.initialError = String(error); }
       finally { if (!disposed) store.ready = true; }
     },
-    dispose() { disposed = true; store.chat.dispose(); store.speech.dispose(); store.asr.dispose(); unsubscribers.splice(0).forEach((unlisten) => unlisten()); },
+    dispose() { disposed = true; voice.dispose(); store.chat.dispose(); store.speech.dispose(); store.asr.dispose(); unsubscribers.splice(0).forEach((unlisten) => unlisten()); },
     async refreshSettings() {
       if (!desktop || disposed) return;
       store.settings = await invoke<Settings>("get_settings");

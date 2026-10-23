@@ -33,6 +33,7 @@ function setup(options: { configured?: boolean; voice?: boolean; prefs?: { open:
       return true;
     }),
     cancel: vi.fn(async () => {}), answerApproval: vi.fn(async () => {}), answerQuestion: vi.fn(async () => {}),
+    sentHere: undefined as undefined | ((session: string) => boolean),
   });
   let heard: (text: string, context?: TranscriptContext) => void = () => {};
   let captureOptions: AsrActivationOptions = {};
@@ -1012,5 +1013,44 @@ describe('实时对话', () => {
     store.closed();
     expect(store.live).toBe(false); expect(asr.recordingRequested).toBe(false);
     store.dispose();
+  });
+});
+
+describe('sharing the voice with the console', () => {
+  it('stops listening and reading when the other window takes the voice, and does not start again on its own', async () => {
+    const h = setup({ prefs: { open: 'type', read: 'always' } });
+    let started!: () => void;
+    h.speech.stream = vi.fn((_key: string, _options: unknown, events: { onStart?: () => void }) => { started = () => events.onStart?.(); return { push: vi.fn(), end: vi.fn(async () => {}), spoken: '先读一句。', active: true }; });
+    await h.store.init(); await h.store.opened(); await h.store.submit('讲个故事', true);
+    started(); await flushPromises();
+    h.speech.stop.mockClear(); h.asr.deactivate.mockClear();
+    h.store.yieldVoice();
+    expect(h.asr.deactivate).toHaveBeenCalled(); expect(h.speech.stop).toHaveBeenCalled();
+    expect(h.store.phase).not.toBe('speaking');
+    // The answer that finishes afterwards is shown, not read.
+    h.chat.views.s1.items.push({ kind: 'assistant', id: 'a', text: '后面的内容。', streaming: false }); h.chat.views.s1.running = false;
+    h.speech.speak.mockClear(); h.store.replied('s1', '后面的内容。', 'a');
+    expect(h.speech.speak).not.toHaveBeenCalled();
+    h.store.dispose();
+  });
+  it('ends a live conversation when the other window takes the voice', async () => {
+    const h = setup();
+    await h.store.init(); await h.store.opened(); await h.store.startLive();
+    expect(h.store.live).toBe(true);
+    h.store.yieldVoice();
+    expect(h.store.live).toBe(false); expect(h.asr.deactivate).toHaveBeenCalled();
+    h.store.dispose();
+  });
+  it('shows but does not read an answer to a question the other window asked', async () => {
+    const h = setup({ prefs: { open: 'type', read: 'always' } });
+    await h.store.init(); await h.store.opened(); await h.store.submit('你好');
+    h.chat.sentHere = vi.fn(() => false);
+    finishAnswer(h.chat, '你好呀。'); h.speech.speak.mockClear();
+    h.store.replied('s1', '你好呀。', 'a');
+    expect(h.speech.speak).not.toHaveBeenCalled();
+    h.chat.sentHere = vi.fn(() => true);
+    h.store.replied('s1', '你好呀。', 'a');
+    expect(h.speech.speak).toHaveBeenCalled();
+    h.store.dispose();
   });
 });

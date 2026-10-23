@@ -79,6 +79,8 @@ export interface AssistantStore {
   readonly liveStatus: string;
   startLive(): Promise<void>;
   endLive(): void;
+  /** Another window took over the microphone and the voice: stop listening and speaking here. */
+  yieldVoice(): void;
   toggleMute(): Promise<void>;
   /** The text box. Voice fills it as words are recognised, then sends it. */
   input: string;
@@ -404,6 +406,15 @@ export function createAssistantStore(deps: AssistantDeps): AssistantStore {
     asr.deactivate(); void speech.stop();
   }
 
+  /** Another window (the console's conversation) took over the microphone and the voice. The answer being read here is
+   * left unread, so it does not start talking again once the other window is done. */
+  function yieldVoice() {
+    if (store.live) { endLive(); return; }
+    turnInterrupted = true; speechVersion++; listenVersion++; reading = null;
+    clearTimers(); heard = ''; voiceTurn = false; flags.awaitingSpeech = false; flags.ptt = false; pendingPtt = false; flags.partial = '';
+    asr.deactivate(); void speech.stop();
+  }
+
   const store: AssistantStore = reactive({
     open: false, ball: false, prefs: { open: 'voice', read: 'voice', hover: true }, input: '', attachments: [], hint: '', hintTab: '',
     layout: { ball: null, right: true }, peek: false, hovering: false, reanchoring: 0,
@@ -430,6 +441,7 @@ export function createAssistantStore(deps: AssistantDeps): AssistantStore {
       if (!voiceTurn && !store.muted) endLive();
     },
     endLive,
+    yieldVoice,
     async toggleMute() {
       if (!store.live) return;
       if (store.muted) {
@@ -637,6 +649,8 @@ export function createAssistantStore(deps: AssistantDeps): AssistantStore {
     async decide(decision) { const request = store.approval; if (request) await chat.answerApproval(request, decision); },
     async reply(answer) { const request = store.ask; if (request) await chat.answerQuestion(request, answer); },
     replied(session, text, key) {
+      // Both windows hear every answer; the one that was asked reads it, the other only shows it.
+      if (chat.sentHere && !chat.sentHere(session)) return;
       if (!store.open && session === chat.currentId && !turnInterrupted) {
         store.unread = true;
         store.notice = { kind: 'done', text: noticeLine(text) || '回答好了' };

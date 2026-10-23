@@ -268,3 +268,15 @@ describe('stray recognition results', () => {
     h.store.dispose();
   });
 });
+
+describe('sharing the microphone with another window', () => {
+  it('claims the voice when the microphone is about to be used', async () => {
+    const claimVoice = vi.fn();
+    const invoke = vi.fn(async (command: string) => ({ asr_get_status: { enabled: true, modelReady: true, engineReady: true } } as Record<string, unknown>)[command]);
+    const store = createAsrStore({ desktop: true, invoke: invoke as AsrDeps['invoke'], notify: vi.fn(), listen: async () => () => {}, claimVoice, capture: async () => ({ stop: vi.fn() }) });
+    expect(claimVoice).not.toHaveBeenCalled();
+    await store.activate(vi.fn());
+    expect(claimVoice).toHaveBeenCalledOnce();
+    store.dispose();
+  });
+});

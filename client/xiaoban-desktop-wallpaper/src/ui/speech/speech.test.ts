@@ -143,3 +143,16 @@ describe('opening phrases', () => {
     expect(store.status).toBe('playing');
   });
 });
+
+describe('sharing the voice with another window', () => {
+  it('claims the voice when something is about to be read, not when it is only stopped', async () => {
+    const claimVoice = vi.fn();
+    const store = createSpeechStore({ desktop: true, invoke: (async (command: string) => (command === 'tts_get_settings' ? { ...speechDefaults } : [1, 2, 3])) as SpeechDeps['invoke'], notify: vi.fn(), url: () => 'blob:x', revoke: vi.fn(), claimVoice,
+      audio: () => ({ play: vi.fn(async () => {}), pause: vi.fn(), src: '', onended: null, onerror: null }) });
+    await store.init(); await store.stop();
+    expect(claimVoice).not.toHaveBeenCalled();
+    store.stream!('a1'); expect(claimVoice).toHaveBeenCalledTimes(1);
+    await store.speak('你好', 'a2', undefined, true); expect(claimVoice).toHaveBeenCalledTimes(2);
+    store.dispose();
+  });
+});

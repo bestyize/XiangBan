@@ -1,5 +1,6 @@
 import { createApp, watchEffect } from 'vue';
-import { desktop, invoke, listen } from '../bridge.ts';
+import { desktop, emit, invoke, listen } from '../bridge.ts';
+import { createVoiceOwner } from '../voice/owner.ts';
 import { createAsrStore } from '../ui/asr/store.ts';
 import { loadTurnModels } from '../voice/turn/models.ts';
 import { createChatStore } from '../ui/chat/chat-store.ts';
@@ -21,19 +22,21 @@ export async function mountAssistant() {
     if (type !== 'success') assistant.note(message instanceof Error ? message.message : String(message));
   };
   let assistant!: AssistantStore;
+  // The console's conversation has its own microphone and voice; whichever window uses them last has them.
+  const voice = createVoiceOwner({ me: 'assistant', emit, listen, onLost: () => assistant.yieldVoice() });
   const chat = createChatStore({
     desktop, invoke, listen, notify,
     onReply: (session, text, key) => assistant.replied(session, text, key),
     onActivity: () => assistant.stopped(),
   });
-  const asr = createAsrStore({ desktop, invoke, listen, turnModels: () => loadTurnModels(invoke), notify: (message, type = 'success') => {
+  const asr = createAsrStore({ desktop, invoke, listen, claimVoice: voice.claim, turnModels: () => loadTurnModels(invoke), notify: (message, type = 'success') => {
     if (type !== 'success') assistant.noteVoice(message instanceof Error ? message.message : String(message));
   } });
-  const speech = createSpeechStore({ desktop, invoke, notify });
+  const speech = createSpeechStore({ desktop, invoke, notify, claimVoice: voice.claim });
   assistant = createAssistantStore({ desktop, invoke, listen, chat, asr, speech, onAppearance: followHost, onAccent: followAccent });
   const app = createApp(AssistantApp, { store: assistant, asr });
   app.mount(host);
-  window.addEventListener('beforeunload', () => { assistant.dispose(); app.unmount(); }, { once: true });
+  window.addEventListener('beforeunload', () => { voice.dispose(); assistant.dispose(); app.unmount(); }, { once: true });
   await assistant.init();
 }
 
