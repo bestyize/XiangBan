@@ -209,7 +209,7 @@ describe('ControlShell sidebar', () => {
       expect(store.page).toBe('games');
       expect(wrapper.find('[data-testid="account-menu"]').exists()).toBe(false);
       const labels = [...document.querySelectorAll('.xb-settings-tab')].map(tab => tab.textContent?.trim());
-      expect(labels).toEqual(['通用', '外观', 'AI 模型', '超级小伴', '声音', '安全与权限', '关于与更新']);
+      expect(labels).toEqual(['通用', '外观', 'AI 模型', '超级小伴', '声音', '连接与网络', '安全与权限', '关于与更新']);
       // Native settings links switch the category while the dialog is open.
       const handler = vi.mocked(listen).mock.calls.find(([name]) => name === 'assistant-open-settings')![1];
       handler({ tab: 'assistant' });

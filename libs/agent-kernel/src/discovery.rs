@@ -5,6 +5,7 @@ use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, Mutex};
 
 const CATALOG_BYTES: usize = 6000;
+const NAME_BYTES: usize = 1500;
 
 /// Used by installed-skill search too. Unicode substring tokens support Chinese descriptions
 /// without a remote embedding dependency; exact names get priority.
@@ -47,17 +48,27 @@ impl ToolDiscovery {
 
     pub fn catalog(&self) -> String {
         let mut out = String::from("## Additional tools\nThese tools are registered but their argument schemas are deferred. Before claiming a capability is unavailable or using a workaround, check this directory or call tool_search. Search only the tools available to this agent; this does not search a store, install software or connect accounts. tool_search loads matching schemas for the next model call. If you know the exact name, use tool_load. Then call the real named tool normally; all existing permissions still apply. Loaded schemas remain available for this task.\n");
-        let mut shown = 0;
+        let mut unsummarized = Vec::new();
         for schema in &self.schemas {
             // Only a short, single-line summary, never full schemas or credentials.
             let summary: String = schema.description.split_whitespace().collect::<Vec<_>>().join(" ").chars().take(72).collect();
             let line = format!("- {}: {}\n", schema.name, summary);
-            if out.len() + line.len() > CATALOG_BYTES { continue; }
+            if out.len() + line.len() > CATALOG_BYTES { unsummarized.push(schema.name.as_str()); continue; }
             out.push_str(&line);
-            shown += 1;
         }
-        if shown < self.schemas.len() {
-            out.push_str(&format!("{} additional tools omitted from this directory; tool_search searches the full registered catalog.\n", self.schemas.len() - shown));
+        if unsummarized.is_empty() { return out; }
+        // A name costs a few bytes, so a tool whose summary does not fit can still be loaded by name.
+        let mut names = String::new();
+        let mut listed = 0;
+        for name in &unsummarized {
+            if names.len() + name.len() + 2 > NAME_BYTES { break; }
+            if listed > 0 { names.push_str(", "); }
+            names.push_str(name);
+            listed += 1;
+        }
+        if listed > 0 { out.push_str(&format!("Summaries omitted for {listed} more tools: {names}.\n")); }
+        if listed < unsummarized.len() {
+            out.push_str(&format!("{} additional tools omitted from this directory; tool_search searches the full registered catalog.\n", unsummarized.len() - listed));
         }
         out
     }
