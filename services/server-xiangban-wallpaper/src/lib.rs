@@ -1,5 +1,6 @@
 pub mod admin;
 pub mod ai_providers;
+pub mod ai_plugins;
 pub mod app_packages;
 pub mod api;
 pub mod auth;
@@ -15,3 +16,4 @@ pub mod runtime;
 pub mod services;
 pub mod store;
 pub mod web;
+

@@ -7,6 +7,9 @@ use std::{fs, path::Path, sync::Mutex};
 
 static MUTATIONS: Mutex<()> = Mutex::new(());
 
+#[path = "store_catalog.rs"]
+mod catalog;
+
 #[tauri::command]
 pub async fn ai_store_catalog(window:tauri::WebviewWindow,kind:String,keyword:String,page:u32,category:String)->Result<Value,String>{
     control(&window)?;
@@ -117,20 +120,37 @@ pub async fn ai_store_installed(app: tauri::AppHandle, window: tauri::WebviewWin
 }
 
 #[tauri::command]
-pub async fn ai_store_skill_categories(window: tauri::WebviewWindow) -> Result<Value, String> {
+pub async fn ai_store_skill_categories(app: tauri::AppHandle, window: tauri::WebviewWindow) -> Result<Value, String> {
     control(&window)?;
-    tauri::async_runtime::spawn_blocking(SkillDiscovery::categories)
-        .await.map_err(|e| e.to_string())?
+    match catalog_json(&app, "/api/v1/ai/plugins/categories", &[]).await? {
+        Some(value) => Ok(value),
+        None => tauri::async_runtime::spawn_blocking(SkillDiscovery::categories)
+            .await.map_err(|e| e.to_string())?,
+    }
 }
 
 #[tauri::command]
 pub async fn ai_store_browse(
-    window: tauri::WebviewWindow, keyword: String, page: u32,
+    app: tauri::AppHandle, window: tauri::WebviewWindow, keyword: String, page: u32,
     category: String, source: String, sort_by: String,
 ) -> Result<Value, String> {
     control(&window)?;
-    tauri::async_runtime::spawn_blocking(move || SkillDiscovery::browse(&keyword, page, &category, &source, &sort_by))
-        .await.map_err(|e| e.to_string())?
+    match catalog_json(&app, "/api/v1/ai/plugins", &[
+        ("keyword", keyword.clone()), ("page", page.to_string()), ("category", category.clone()),
+        ("source", source.clone()), ("sortBy", sort_by.clone()),
+    ]).await? {
+        Some(value) => Ok(value),
+        None => tauri::async_runtime::spawn_blocking(move ||
+            SkillDiscovery::browse(&keyword, page, &category, &source, &sort_by))
+            .await.map_err(|e| e.to_string())?,
+    }
+}
+
+// Prefer the configured Xiaoban website. Only an explicit HTTP 404 permits legacy discovery;
+// other errors propagate through `?`, including 403/429 and invalid successful responses.
+async fn catalog_json(app: &tauri::AppHandle, path: &str, pairs: &[(&str, String)]) -> Result<Option<Value>, String> {
+    let origin = crate::website::site_url(&crate::settings(app).website_url)?;
+    catalog::fetch(&origin, path, pairs).await
 }
 
 #[tauri::command]
@@ -176,3 +196,4 @@ mod tests {
         fs::remove_dir_all(root).unwrap();
     }
 }
+

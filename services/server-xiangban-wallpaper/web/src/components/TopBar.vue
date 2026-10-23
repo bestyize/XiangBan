@@ -13,6 +13,7 @@ const links = [
   { to: '/images', tab: 'home', label: '图片' },
   { to: '/videos', tab: 'videos', label: '视频' },
   { to: '/guide', tab: 'guide', label: '玩法指南' },
+  { to: '/plugins', tab: 'plugins', label: 'AI 插件' },
 ]
 </script>
 
@@ -223,3 +224,4 @@ const links = [
   }
 }
 </style>
+

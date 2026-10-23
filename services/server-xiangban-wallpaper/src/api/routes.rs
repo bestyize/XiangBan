@@ -21,6 +21,7 @@ use axum::{
 
 pub fn create_api_router(state: AppState) -> Router {
     Router::new()
+        .merge(crate::ai_plugins::router())
         .route("/api/v1/desktop/product", get(crate::desktop::product))
         .route("/api/v1/desktop/updates", get(crate::desktop::updates))
         .route("/api/v1/desktop/announcements", get(crate::desktop::announcements))
@@ -53,3 +54,4 @@ pub fn create_api_router(state: AppState) -> Router {
         .route("/health", get(health_check))
         .with_state(state)
 }
+
