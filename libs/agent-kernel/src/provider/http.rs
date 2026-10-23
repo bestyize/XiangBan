@@ -10,6 +10,7 @@ use std::sync::mpsc::{self, RecvTimeoutError};
 use std::time::{Duration, Instant};
 
 const ERROR_BODY_LIMIT: u64 = 2000;
+const RESPONSE_HEADER_TIMEOUT: Duration = Duration::from_secs(45);
 const STREAM_IDLE_TIMEOUT: Duration = Duration::from_secs(90);
 
 pub(crate) struct Call {
@@ -32,11 +33,11 @@ pub(crate) trait Decoder {
 }
 
 pub(crate) fn new_client() -> Result<Client, HarnessError> {
-    // The blocking client defaults to a 30s total timeout, which would cut long streams.
-    // Stalls are caught by STREAM_IDLE_TIMEOUT; this is only a backstop for leaked reader threads.
+    // Allow long reasoning streams, but bound a blocking worker that no longer has a consumer.
+    // The first response header and SSE idle have separate, shorter watchdogs below.
     Client::builder()
         .connect_timeout(Duration::from_secs(15))
-        .timeout(Duration::from_secs(900))
+        .timeout(Duration::from_secs(300))
         .build()
         .map_err(|e| HarnessError::Config(format!("http client: {e}")))
 }
@@ -116,7 +117,8 @@ pub(crate) fn post_stream_with_reasoning(
     });
 
     let mut parser = SseParser::default();
-    let mut last_activity = Instant::now();
+    let requested_at = Instant::now();
+    let mut last_activity = requested_at;
     let mut started = false;
     loop {
         if cancel.load(Ordering::Relaxed) {
@@ -130,6 +132,11 @@ pub(crate) fn post_stream_with_reasoning(
             }
             Ok(Incoming::Failed(message, retryable)) => return Err(HarnessError::provider(message, retryable)),
             Err(RecvTimeoutError::Timeout) => {
+                // A server can accept TCP/TLS but never send an HTTP response. The idle
+                // SSE timeout cannot catch that case until Incoming::Started arrives.
+                if !started && requested_at.elapsed() > RESPONSE_HEADER_TIMEOUT {
+                    return Err(HarnessError::provider("模型服务在 45 秒内没有响应，请检查供应商状态或代理连接", true));
+                }
                 if started && last_activity.elapsed() > STREAM_IDLE_TIMEOUT {
                     return Err(HarnessError::provider("stream stalled", true));
                 }
