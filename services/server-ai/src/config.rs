@@ -21,6 +21,10 @@ pub struct AppConfig {
     pub cors_origins: Vec<String>,
     pub web_dir: PathBuf,
     pub max_body_bytes: usize,
+    /// The upstream model behind `/v1/audio/speech` (as named in New API); unset means speech is not offered.
+    pub speech_model: Option<String>,
+    /// Voices clients may ask for; the first is used when they ask for none.
+    pub speech_voices: Vec<String>,
 }
 
 impl AppConfig {
@@ -61,6 +65,10 @@ impl AppConfig {
                 .unwrap_or_default(),
             web_dir: PathBuf::from(get("AI_WEB_DIR").unwrap_or_else(|| "services/server-ai/web/dist".into())),
             max_body_bytes: num("AI_MAX_BODY_BYTES", 8 * 1024 * 1024).max(1024) as usize,
+            speech_model: get("AI_SPEECH_MODEL"),
+            speech_voices: get("AI_SPEECH_VOICES")
+                .map(|v| v.split(',').map(|s| s.trim().to_string()).filter(|s| !s.is_empty()).collect())
+                .unwrap_or_default(),
         }
     }
 }
