@@ -96,7 +96,7 @@ impl AppConfig {
             realtime_model: get("AI_REALTIME_MODEL"),
             realtime_max_secs: num("AI_REALTIME_MAX_SECS", 1800).clamp(60, 4 * 3600) as u64,
             search_providers: get("AI_SEARCH_PROVIDERS")
-                .unwrap_or_else(|| "deepseek".into())
+                .unwrap_or_else(|| "newapi,deepseek".into())
                 .split(',')
                 .map(|s| s.trim().to_ascii_lowercase())
                 .filter(|s| !s.is_empty())

@@ -240,7 +240,7 @@ async fn charge(state: &AppState, binding_id: i64, cost: i64) {
 }
 
 /// Checks the caller and their quota before a search or fetch, as for any other call.
-async fn search_caller(state: &AppState, auth: Result<AuthUser, AppError>) -> Result<i64, AppError> {
+async fn search_caller(state: &AppState, auth: Result<AuthUser, AppError>) -> Result<binding::ActiveBinding, AppError> {
     let auth = auth?;
     if !state.search.available() {
         return Err(AppError::Coded { status: StatusCode::SERVICE_UNAVAILABLE, code: "search_unavailable", message: "小伴 AI 联网搜索暂未开放".into() });
@@ -248,7 +248,7 @@ async fn search_caller(state: &AppState, auth: Result<AuthUser, AppError>) -> Re
     let active = binding::ensure_active(state, auth.uid, &auth.product).await?;
     require_quota(state, active.id).await?;
     sqlx::query("UPDATE bindings SET last_used_at = now() WHERE id = $1").bind(active.id).execute(&state.pool).await?;
-    Ok(active.id)
+    Ok(active)
 }
 
 /// `POST /v1/search`: DeepSeek-shaped request and results whatever provider answers. Only a search that found
@@ -257,9 +257,9 @@ pub async fn web_search(State(state): State<AppState>, auth: Result<AuthUser, Ap
     let result = async {
         let body = body.map_err(|error| map_body_error(error.status()))?;
         let request = search::parse_search(&body)?;
-        let binding = search_caller(&state, auth).await?;
-        let results = state.search.search(&request).await?;
-        if !results.is_empty() { charge(&state, binding, state.config.search_cost).await; }
+        let caller = search_caller(&state, auth).await?;
+        let (results, ours) = state.search.search(&request, Some(&caller.key)).await?;
+        if ours && !results.is_empty() { charge(&state, caller.id, state.config.search_cost).await; }
         Ok::<_, AppError>(Json(json!({ "results": results })).into_response())
     }
     .await;
@@ -271,9 +271,9 @@ pub async fn web_fetch(State(state): State<AppState>, auth: Result<AuthUser, App
     let result = async {
         let body = body.map_err(|error| map_body_error(error.status()))?;
         let url = search::parse_fetch(&body)?;
-        let binding = search_caller(&state, auth).await?;
-        let page = state.search.fetch(&url).await?;
-        charge(&state, binding, state.config.fetch_cost).await;
+        let caller = search_caller(&state, auth).await?;
+        let (page, ours) = state.search.fetch(&url, Some(&caller.key)).await?;
+        if ours { charge(&state, caller.id, state.config.fetch_cost).await; }
         Ok::<_, AppError>(Json(page).into_response())
     }
     .await;

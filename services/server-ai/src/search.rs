@@ -146,15 +146,18 @@ pub fn normalize_page(value: &Value, url: &Url) -> Option<FetchedPage> {
 #[derive(Debug)]
 pub struct ProviderError {
     pub retry: bool,
+    /// The caller's quota ran out (New API said 402): not worth trying anyone else.
+    pub out_of_quota: bool,
     pub message: String,
 }
 
 impl ProviderError {
-    fn next(message: impl Into<String>) -> Self { Self { retry: true, message: message.into() } }
+    fn next(message: impl Into<String>) -> Self { Self { retry: true, out_of_quota: false, message: message.into() } }
     fn status(status: StatusCode, body: &str) -> Self {
         let message = format!("{status}: {}", body.chars().take(300).collect::<String>());
         // 400/422 是查询本身不被接受；401/403/429/5xx 是我们这边或对方的问题，换一家可能就好。
-        Self { retry: !matches!(status.as_u16(), 400 | 422), message }
+        let code = status.as_u16();
+        Self { retry: !matches!(code, 400 | 402 | 422), out_of_quota: code == 402, message }
     }
 }
 
@@ -162,11 +165,25 @@ impl ProviderError {
 pub enum Provider {
     /// `POST {base}/v1/tools/search`、`POST {base}/v1/tools/fetch`，格式即我们的格式。
     DeepSeek { base: String, key: String },
+    /// 同样的两个接口经 New API 转发（它按 `deepseek-search` / `deepseek-fetch` 两个模型名选渠道、按次计费），
+    /// 用调用者自己的 New API 令牌，所以用量记在 New API 里，网关不再另扣。
+    NewApi { base: String },
 }
 
 impl Provider {
     pub fn name(&self) -> &'static str {
-        match self { Provider::DeepSeek { .. } => "deepseek" }
+        match self { Provider::DeepSeek { .. } => "deepseek", Provider::NewApi { .. } => "newapi" }
+    }
+
+    /// New API bills these calls itself; the gateway charges only for providers it pays directly.
+    pub fn billed_upstream(&self) -> bool { matches!(self, Provider::NewApi { .. }) }
+
+    /// Where to send it and with which key. A New API call needs the caller's own key.
+    fn target(&self, caller_key: Option<&str>) -> Result<(&str, String), ProviderError> {
+        match self {
+            Provider::DeepSeek { base, key } => Ok((base, key.clone())),
+            Provider::NewApi { base } => caller_key.map(|key| (base.as_str(), format!("sk-{key}"))).ok_or_else(|| ProviderError::next("没有调用者的 New API 令牌")),
+        }
     }
 
     async fn post(client: &reqwest::Client, url: String, key: &str, body: &impl Serialize, timeout: Duration) -> Result<Value, ProviderError> {
@@ -177,22 +194,17 @@ impl Provider {
         serde_json::from_str(&text).map_err(|_| ProviderError::next("返回的不是 JSON"))
     }
 
-    async fn search(&self, client: &reqwest::Client, request: &SearchRequest) -> Result<Vec<SearchHit>, ProviderError> {
-        match self {
-            Provider::DeepSeek { base, key } => {
-                let value = Self::post(client, format!("{base}/v1/tools/search"), key, request, SEARCH_TIMEOUT).await?;
-                normalize_hits(&value, request.count).ok_or_else(|| ProviderError::next("返回里没有 results"))
-            }
-        }
+    async fn search(&self, client: &reqwest::Client, request: &SearchRequest, caller_key: Option<&str>) -> Result<Vec<SearchHit>, ProviderError> {
+        // Both speak DeepSeek's format; only where and with which key differ.
+        let (base, key) = self.target(caller_key)?;
+        let value = Self::post(client, format!("{base}/v1/tools/search"), &key, request, SEARCH_TIMEOUT).await?;
+        normalize_hits(&value, request.count).ok_or_else(|| ProviderError::next("返回里没有 results"))
     }
 
-    async fn fetch(&self, client: &reqwest::Client, url: &Url) -> Result<FetchedPage, ProviderError> {
-        match self {
-            Provider::DeepSeek { base, key } => {
-                let value = Self::post(client, format!("{base}/v1/tools/fetch"), key, &json!({ "url": url.as_str() }), FETCH_TIMEOUT).await?;
-                normalize_page(&value, url).ok_or_else(|| ProviderError::next("返回里没有网页正文"))
-            }
-        }
+    async fn fetch(&self, client: &reqwest::Client, url: &Url, caller_key: Option<&str>) -> Result<FetchedPage, ProviderError> {
+        let (base, key) = self.target(caller_key)?;
+        let value = Self::post(client, format!("{base}/v1/tools/fetch"), &key, &json!({ "url": url.as_str() }), FETCH_TIMEOUT).await?;
+        normalize_page(&value, url).ok_or_else(|| ProviderError::next("返回里没有网页正文"))
     }
 }
 
@@ -231,8 +243,10 @@ impl Search {
     }
 
     /// `AI_SEARCH_PROVIDERS` 按顺序列出服务商；每家的密钥可以有多个（逗号分隔），没配密钥的那家跳过。
+    /// `newapi` 不需要密钥：用调用者自己的 New API 令牌。
     pub fn from_config(config: &AppConfig) -> Self {
         let groups = config.search_providers.iter().map(|name| match name.as_str() {
+            "newapi" => vec![Provider::NewApi { base: config.newapi_base_url.clone() }],
             "deepseek" => config.deepseek_api_keys.iter().map(|key| Provider::DeepSeek { base: config.deepseek_base_url.clone(), key: key.clone() }).collect(),
             other => { tracing::warn!("未知的搜索服务商 {other}，已忽略"); Vec::new() }
         }).collect();
@@ -241,13 +255,16 @@ impl Search {
 
     pub fn available(&self) -> bool { !self.groups.is_empty() }
 
-    pub async fn search(&self, request: &SearchRequest) -> Result<Vec<SearchHit>, AppError> {
+    /// The results, and whether the gateway should charge for them (false when New API already did).
+    /// `caller_key` is the caller's New API key, for the `newapi` provider.
+    pub async fn search(&self, request: &SearchRequest, caller_key: Option<&str>) -> Result<(Vec<SearchHit>, bool), AppError> {
         let mut tried = false;
         for provider in self.groups.iter().flat_map(Group::order) {
-            match provider.search(&self.client, request).await {
-                Ok(hits) => return Ok(hits),
+            match provider.search(&self.client, request, caller_key).await {
+                Ok(hits) => return Ok((hits, !provider.billed_upstream())),
                 Err(error) => {
                     tracing::warn!("搜索服务商 {} 失败：{}", provider.name(), error.message);
+                    if error.out_of_quota { return Err(out_of_quota()); }
                     if !error.retry { return Err(AppError::BadRequest("这个搜索词没法查询，请换个说法".into())); }
                     tried = true;
                 }
@@ -256,13 +273,14 @@ impl Search {
         Err(unavailable(tried))
     }
 
-    pub async fn fetch(&self, url: &Url) -> Result<FetchedPage, AppError> {
+    pub async fn fetch(&self, url: &Url, caller_key: Option<&str>) -> Result<(FetchedPage, bool), AppError> {
         let mut tried = false;
         for provider in self.groups.iter().flat_map(Group::order) {
-            match provider.fetch(&self.client, url).await {
-                Ok(page) => return Ok(page),
+            match provider.fetch(&self.client, url, caller_key).await {
+                Ok(page) => return Ok((page, !provider.billed_upstream())),
                 Err(error) => {
                     tracing::warn!("抓取服务商 {} 失败：{}", provider.name(), error.message);
+                    if error.out_of_quota { return Err(out_of_quota()); }
                     if !error.retry { return Err(AppError::BadRequest("这个网页没法抓取".into())); }
                     tried = true;
                 }
@@ -270,6 +288,10 @@ impl Search {
         }
         Err(unavailable(tried))
     }
+}
+
+fn out_of_quota() -> AppError {
+    AppError::Coded { status: StatusCode::PAYMENT_REQUIRED, code: "insufficient_quota", message: "额度暂时不足，若刚兑换过请稍候几秒再试".into() }
 }
 
 fn unavailable(tried: bool) -> AppError {
@@ -356,7 +378,8 @@ mod tests {
         let second = upstream(200, json!({ "results": [{ "title": "A", "url": "https://a.example/", "snippet": "s" }] }), up.clone(), seen.clone()).await;
         let search = Search::new(vec![Provider::DeepSeek { base: first, key: "k1".into() }, Provider::DeepSeek { base: second, key: "k2".into() }]);
         let request = parse_search(r#"{"query":"天气","count":3}"#.as_bytes()).unwrap();
-        let hits = search.search(&request).await.unwrap();
+        let (hits, ours) = search.search(&request, None).await.unwrap();
+        assert!(ours, "a direct provider is charged by the gateway");
         assert_eq!(hits.len(), 1);
         assert_eq!((down.load(Ordering::SeqCst), up.load(Ordering::SeqCst)), (1, 1));
         assert_eq!(seen.lock().unwrap()[1], json!({ "query": "天气", "count": 3, "need_content": false }));
@@ -370,11 +393,11 @@ mod tests {
         let second = upstream(200, json!({ "results": [] }), second_hits.clone(), seen.clone()).await;
         let search = Search::new(vec![Provider::DeepSeek { base: first, key: "k".into() }, Provider::DeepSeek { base: second, key: "k".into() }]);
         let request = parse_search(r#"{"query":"x"}"#.as_bytes()).unwrap();
-        assert!(matches!(search.search(&request).await, Err(AppError::BadRequest(_))));
+        assert!(matches!(search.search(&request, None).await, Err(AppError::BadRequest(_))));
         assert_eq!(second_hits.load(Ordering::SeqCst), 0);
         let none = Search::new(vec![]);
         assert!(!none.available());
-        assert!(matches!(none.search(&request).await, Err(AppError::Coded { code: "search_unavailable", .. })));
+        assert!(matches!(none.search(&request, None).await, Err(AppError::Coded { code: "search_unavailable", .. })));
     }
 
     #[tokio::test]
@@ -387,7 +410,7 @@ mod tests {
         let search = Search::grouped(vec![vec![keys("k1", &base), keys("k2", &dead), keys("k3", &base)]]);
         let request = parse_search(r#"{"query":"x"}"#.as_bytes()).unwrap();
         // Round one starts at k1, round two at k2 (dead, so k3 answers), round three at k3.
-        for _ in 0..3 { assert_eq!(search.search(&request).await.unwrap().len(), 1); }
+        for _ in 0..3 { assert_eq!(search.search(&request, None).await.unwrap().0.len(), 1); }
         assert_eq!(hits.load(Ordering::SeqCst), 3, "every round was answered by a working key");
         assert_eq!(seen.lock().unwrap().len(), 4, "the dead key was tried once and passed over");
     }
@@ -398,7 +421,7 @@ mod tests {
         let seen = Arc::new(std::sync::Mutex::new(Vec::new()));
         let base = upstream(200, json!({ "title": "标题", "content": "# 正文" }), hits, seen.clone()).await;
         let search = Search::new(vec![Provider::DeepSeek { base, key: "k".into() }]);
-        let page = search.fetch(&Url::parse("https://example.com/x").unwrap()).await.unwrap();
+        let (page, _) = search.fetch(&Url::parse("https://example.com/x").unwrap(), None).await.unwrap();
         assert_eq!((page.title.as_str(), page.content.as_str(), page.truncated), ("标题", "# 正文", false));
         assert_eq!(seen.lock().unwrap()[0], json!({ "url": "https://example.com/x" }));
     }

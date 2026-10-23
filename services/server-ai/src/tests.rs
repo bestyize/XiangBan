@@ -60,6 +60,8 @@ struct MockInner {
     admin_token: String,
     /// 每次转发到 /v1/* 收到的 (路径, 全部请求头名, Authorization, 请求体)。
     relayed: Vec<Relayed>,
+    /// New API has no channel for the search models.
+    tools_down: bool,
 }
 
 struct Relayed {
@@ -271,6 +273,17 @@ async fn mock_transcribe(State(m): State<Arc<Mock>>, headers: HeaderMap, mut for
     Json(json!({ "text": " 你好，小伴 " })).into_response()
 }
 
+/// New API's relay of DeepSeek Search / Fetch: bills the caller's wallet itself. Answers 503 (no channel for
+/// `deepseek-search`) while `tools_down` is set.
+async fn mock_tools(State(m): State<Arc<Mock>>, uri: axum::http::Uri, headers: HeaderMap, Json(body): Json<Value>) -> Response {
+    let Some(id) = mock_caller(&m, &headers) else { return StatusCode::UNAUTHORIZED.into_response() };
+    if m.0.lock().unwrap().tools_down { return (StatusCode::SERVICE_UNAVAILABLE, "no available channel for model deepseek-search").into_response(); }
+    record(&m, uri.path(), &headers, body.clone());
+    m.consume(id, 375);
+    if uri.path() == "/v1/tools/fetch" { return Json(json!({ "url": body["url"], "title": "经网关的页面", "content": "# 正文" })).into_response(); }
+    Json(json!({ "results": [{ "title": "经 New API", "url": "https://example.com/n", "snippet": "s", "date": null }] })).into_response()
+}
+
 /// Says which model it was opened for, then echoes every event back.
 async fn mock_realtime(State(m): State<Arc<Mock>>, headers: HeaderMap, Query(query): Query<HashMap<String, String>>, ws: axum::extract::ws::WebSocketUpgrade) -> Response {
     use axum::extract::ws::Message;
@@ -344,6 +357,7 @@ async fn start_mock() -> (Arc<Mock>, String) {
         chat_requests: Vec::new(),
         admin_token: ADMIN_TOKEN.to_string(),
         relayed: Vec::new(),
+        tools_down: false,
     })));
     let app = Router::new()
         .route("/api/user/", post(mock_create))
@@ -358,6 +372,8 @@ async fn start_mock() -> (Arc<Mock>, String) {
         .route("/v1/images/generations", post(mock_images))
         .route("/v1/audio/transcriptions", post(mock_transcribe).layer(axum::extract::DefaultBodyLimit::disable()))
         .route("/v1/realtime", get(mock_realtime))
+        .route("/v1/tools/search", post(mock_tools))
+        .route("/v1/tools/fetch", post(mock_tools))
         .with_state(mock.clone());
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let base = format!("http://{}", listener.local_addr().unwrap());
@@ -1709,44 +1725,55 @@ async fn fake_search() -> String {
 }
 
 #[tokio::test]
-async fn web_search_answers_in_deepseek_shape_and_charges_only_what_found_something() {
+async fn web_search_goes_through_new_api_first_and_the_gateway_charges_only_what_it_paid_for() {
     let mut h = harness!();
     h.seed_wallpaper().await;
     let uid = Uuid::new_v4();
     let token = h.token(uid, CLIENT);
 
-    let (status, body) = h.call(Method::POST, "/v1/search", Some(&token), json!({ "query": "天气" })).await;
-    assert_eq!((status, body["error"]["code"].as_str()), (StatusCode::SERVICE_UNAVAILABLE, Some("search_unavailable")), "no provider configured: {body}");
-
-    let base = fake_search().await;
-    h.state.search = Arc::new(crate::search::Search::new(vec![crate::search::Provider::DeepSeek { base, key: "sk-test".into() }]));
-    h.app = build_router(h.state.clone());
-
+    // Default order: New API first, which bills the caller's wallet itself.
     let (status, _) = h.call(Method::POST, "/v1/search", None, json!({ "query": "天气" })).await;
     assert_eq!(status, StatusCode::UNAUTHORIZED);
     let (status, body) = h.call(Method::POST, "/v1/search", Some(&token), json!({ "query": "", "count": 5 })).await;
     assert_eq!(status, StatusCode::BAD_REQUEST, "{body}");
-
     let (status, body) = h.call(Method::POST, "/v1/search", Some(&token), json!({ "query": "天气", "count": 3 })).await;
     assert_eq!(status, StatusCode::OK, "{body}");
-    assert_eq!(body, json!({ "results": [{ "title": "结果", "url": "https://example.com/r", "snippet": "摘要", "date": "2026-10-20", "rerank_score": 2.0, "authority": 3.0 }] }));
-    assert!(!body.to_string().contains("deepseek"), "the provider is not named");
+    assert_eq!(body, json!({ "results": [{ "title": "经 New API", "url": "https://example.com/n", "snippet": "s", "date": null }] }));
     let (user_id, wallet) = h.mock.only_user();
-    assert_eq!(wallet, TRIAL - 500, "a search that found something costs AI_SEARCH_COST");
+    let sent = &h.mock.relayed("/v1/tools/search")[0];
+    assert_eq!(sent.body, json!({ "query": "天气", "count": 3, "need_content": false }), "forwarded in DeepSeek's format");
+    assert!(sent.authorization.starts_with("Bearer sk-"), "with the caller's own New API key");
+    assert_eq!(wallet, TRIAL - 375, "New API's charge only; the gateway adds nothing");
+    let (status, body) = h.call(Method::POST, "/v1/fetch", Some(&token), json!({ "url": "https://example.com/a" })).await;
+    assert_eq!((status, body["title"].as_str()), (StatusCode::OK, Some("经网关的页面")), "{body}");
+    assert_eq!(h.mock.quota_of(user_id), TRIAL - 750);
 
+    // New API without a search channel: DeepSeek direct answers, and the gateway charges for it.
+    h.mock.0.lock().unwrap().tools_down = true;
+    let base = fake_search().await;
+    h.state.search = Arc::new(crate::search::Search::grouped(vec![
+        vec![crate::search::Provider::NewApi { base: h.state.config.newapi_base_url.clone() }],
+        vec![crate::search::Provider::DeepSeek { base, key: "sk-test".into() }],
+    ]));
+    h.app = build_router(h.state.clone());
+    let (status, body) = h.call(Method::POST, "/v1/search", Some(&token), json!({ "query": "天气" })).await;
+    assert_eq!((status, body["results"][0]["title"].as_str()), (StatusCode::OK, Some("结果")), "{body}");
+    assert!(!body.to_string().contains("deepseek"), "the provider is not named");
+    assert_eq!(h.mock.quota_of(user_id), TRIAL - 750 - 500, "a direct search costs AI_SEARCH_COST");
     let (status, body) = h.call(Method::POST, "/v1/search", Some(&token), json!({ "query": "空" })).await;
     assert_eq!((status, body["results"].as_array().map(Vec::len)), (StatusCode::OK, Some(0)));
-    assert_eq!(h.mock.quota_of(user_id), TRIAL - 500, "nothing found, nothing charged");
-
-    let (status, body) = h.call(Method::POST, "/v1/fetch", Some(&token), json!({ "url": "https://example.com/a" })).await;
-    assert_eq!((status, body["title"].as_str(), body["content"].as_str()), (StatusCode::OK, Some("页面"), Some("# 正文")), "{body}");
-    assert_eq!(h.mock.quota_of(user_id), TRIAL - 1000);
+    assert_eq!(h.mock.quota_of(user_id), TRIAL - 750 - 500, "nothing found, nothing charged");
     let (status, _) = h.call(Method::POST, "/v1/fetch", Some(&token), json!({ "url": "file:///etc/passwd" })).await;
     assert_eq!(status, StatusCode::BAD_REQUEST);
 
     let binding_id = h.only_binding().await;
     sync::sync_binding(&h.state, binding_id).await.unwrap();
     assert_eq!(h.balance(binding_id).await, h.mock.quota_of(user_id), "search use is settled into the buckets like any other use");
+
+    h.state.search = Arc::new(crate::search::Search::grouped(vec![]));
+    h.app = build_router(h.state.clone());
+    let (status, body) = h.call(Method::POST, "/v1/search", Some(&token), json!({ "query": "天气" })).await;
+    assert_eq!((status, body["error"]["code"].as_str()), (StatusCode::SERVICE_UNAVAILABLE, Some("search_unavailable")), "no provider configured: {body}");
     h.cleanup().await;
 }
 

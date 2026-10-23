@@ -50,8 +50,9 @@
 - 搜索请求：`{ "query": "1–128 字，可带 site: 等语法", "count"?: 1–50（默认 10）, "need_content"?: false, "ori_question"?: "用户原本的问题" }`。
 - 搜索返回：`{ "results": [{ "title", "url", "snippet", "summary"?, "date"（可为 null）, "content"?, "rerank_score"?（0–3，≥1.5 为高相关）, "authority"?（0–4，≥3 为权威） }] }`。没找到时 `results` 为空数组，不算错误。没有 http(s) 网址的条目会被丢掉，单条正文最多 8000 字。
 - 抓取请求：`{ "url": "http(s) 网址，最长 8192 字符，不能带账号密码" }`；返回 `{ "url", "title", "content"（Markdown，最多 60000 字）, "truncated" }`。
+- 默认先走 **New API**（`newapi`）：它把 `/v1/tools/search`、`/v1/tools/fetch` 按 `deepseek-search`、`deepseek-fetch` 两个模型名转给 DeepSeek 渠道，并按次计费（内置参考价每千次 0.75 美元）。要启用，在 New API 里建一个 DeepSeek 渠道、模型列表加上这两个名字并设好按次价格。这条路用调用者自己的 New API 令牌，用量记在 New API，**网关不再另扣**。New API 没配渠道或不可用时，换到下一家（如直连 `deepseek`）。
 - 服务商按 `AI_SEARCH_PROVIDERS` 的顺序尝试：前一家超时、5xx、限流、密钥失效或返回格式不对就换下一家；400/422（查询本身不被接受）不换，直接返回 400。都没配时返回 503 `search_unavailable`，都失败时返回 502。
-- 鉴权、额度检查与对话接口相同。**只有搜到结果的搜索和成功的抓取才计费**：直接从该用户的 New API 钱包扣 `AI_SEARCH_COST` / `AI_FETCH_COST` 点，下一次对账照常按消耗结算进额度桶和流水。扣费失败只记日志，不影响已经返回的结果。
+- 鉴权、额度检查与对话接口相同。走直连服务商时，**只有搜到结果的搜索和成功的抓取才计费**：直接从该用户的 New API 钱包扣 `AI_SEARCH_COST` / `AI_FETCH_COST` 点，下一次对账照常按消耗结算进额度桶和流水。扣费失败只记日志，不影响已经返回的结果。
 
 ## 运行与验证
 
@@ -88,9 +89,9 @@ cargo test --locked --manifest-path services/server-ai/Cargo.toml
 | `AI_IMAGE_MODEL` / `AI_IMAGE_SIZES` | 空 / `1024x1024` | 图片生成的上游模型与可选尺寸（逗号分隔，第一个为默认） |
 | `AI_TRANSCRIBE_MODEL` | 空 | 云端语音识别的上游模型 |
 | `AI_REALTIME_MODEL` / `AI_REALTIME_MAX_SECS` | 空 / `1800` | 实时语音的上游模型与单次最长秒数（60–14400） |
-| `AI_SEARCH_PROVIDERS` | `deepseek` | 联网搜索的服务商，逗号分隔，按顺序尝试；没配密钥的跳过 |
+| `AI_SEARCH_PROVIDERS` | `newapi,deepseek` | 联网搜索的服务商，逗号分隔，按顺序尝试；`newapi` 经 New API 转发并由它计费，其余没配密钥的跳过 |
 | `AI_DEEPSEEK_API_KEY` / `AI_DEEPSEEK_BASE_URL` | 空 / `https://api.deepseek.com` | DeepSeek Search / Fetch 的密钥与地址；不填密钥则不启用。密钥可以填多个（逗号分隔）：请求轮流使用以分摊限流，某个密钥失效、限流或超时就换下一个，全部不行再换下一家服务商 |
-| `AI_SEARCH_COST` / `AI_FETCH_COST` | `500` / `500` | 一次有结果的搜索、一次成功的抓取扣多少 New API 额度点数 |
+| `AI_SEARCH_COST` / `AI_FETCH_COST` | `500` / `500` | 走直连服务商时，一次有结果的搜索、一次成功的抓取扣多少 New API 额度点数（走 New API 时按它的价格，不用这两项） |
 
 ## 接口
 
