@@ -104,7 +104,14 @@ function collapseToBall(ball: NonNullable<StageLayout['ball']>) {
 }
 
 /* ── Moving the window under a showing ball (after a drag, or to a new screen) ── */
+function showMovedBall() {
+  movingBall.value = false; queueHitRegions();
+  clearTimeout(fadeEnd); fadeEnd = setTimeout(() => { ballFade.value = false; }, 150);
+}
 const movingBall = ref(false);
+/** The ball fades only around a window move; after a morph it must appear at once, the stand-ins being gone. */
+const ballFade = ref(false);
+let fadeEnd: ReturnType<typeof setTimeout> | undefined;
 let movingFallback: ReturnType<typeof setTimeout> | undefined, movingGiveUp: ReturnType<typeof setTimeout> | undefined;
 
 const props = defineProps<{ store: AssistantStore; asr: AsrStore }>();
@@ -377,13 +384,13 @@ watch(() => props.store.reanchoring, id => {
   if (id) {
     // Fade the ball out, then let the host move the window under it. Should the host never say it is done, the
     // ball comes back anyway rather than staying invisible.
-    movingBall.value = true; hover.cancel();
+    clearTimeout(fadeEnd); ballFade.value = true; movingBall.value = true; hover.cancel();
     movingFallback = setTimeout(() => props.store.reanchorReady(id), 100);
-    movingGiveUp = setTimeout(() => { movingBall.value = false; queueHitRegions(); }, 1200);
+    movingGiveUp = setTimeout(showMovedBall, 1200);
     return;
   }
   // Moved: the page has the new layout; show the ball once it has been drawn there.
-  requestAnimationFrame(() => requestAnimationFrame(() => { movingBall.value = false; queueHitRegions(); }));
+  requestAnimationFrame(() => requestAnimationFrame(showMovedBall));
 });
 watch(hasCard, shown => { if (shown) toBottom(); });
 watch(() => [props.store.answer, turns.value.length, props.store.ask?.id, props.store.approval?.id], toBottom);
@@ -450,14 +457,14 @@ onMounted(()=>{
   document.addEventListener('pointerdown',outsideMenus);document.addEventListener('keydown',onAskShortcut);window.addEventListener('blur',onBlur);window.addEventListener('focus',onFocus);window.addEventListener('pointermove',dragMove);window.addEventListener('pointerup',dragUp);window.addEventListener('pointercancel',dragUp);window.addEventListener('blur',releasePress);window.addEventListener('assistant-drag-end',dragEnded);
 });
 onBeforeUnmount(()=>{
-  stopMorph(); hover.cancel(); clearTimeout(peekTimer); clearTimeout(movingFallback); clearTimeout(movingGiveUp);
+  stopMorph(); hover.cancel(); clearTimeout(peekTimer); clearTimeout(movingFallback); clearTimeout(movingGiveUp); clearTimeout(fadeEnd);
   cancelAnimationFrame(hitRaf);window.removeEventListener('resize',queueHitRegions);window.removeEventListener('resize',grow);clearTimeout(blurTimer);clearTimeout(bubbleTimer);clearTimeout(copyTimer);
   window.removeEventListener('blur',onBlur);document.removeEventListener('pointerdown',outsideMenus);document.removeEventListener('keydown',onAskShortcut);imageVersion++; releasePress();window.removeEventListener('focus',onFocus);window.removeEventListener('pointermove',dragMove);window.removeEventListener('pointerup',dragUp);window.removeEventListener('pointercancel',dragUp);window.removeEventListener('blur',releasePress);window.removeEventListener('assistant-drag-end',dragEnded);observer?.disconnect();
 });
 </script>
 
 <template>
-  <div class="stage" :class="{ light: !isDark, dragging, [`morph-${morph}`]: morphing, 'moving-ball': movingBall }" @dragover="dragOver" @drop="dropImages" @keydown.esc.prevent.stop="escape" @pointerdown.capture="engage" @keydown.capture="engage" @pointerdown="dragDown" @click.capture="captureClick">
+  <div class="stage" :class="{ light: !isDark, dragging, [`morph-${morph}`]: morphing, 'moving-ball': movingBall, 'ball-fade': ballFade }" @dragover="dragOver" @drop="dropImages" @keydown.esc.prevent.stop="escape" @pointerdown.capture="engage" @keydown.capture="engage" @pointerdown="dragDown" @click.capture="captureClick">
     <Transition name="ball-in">
     <div v-if="store.ball && !store.open && store.layout.ball" class="ball-stage" :class="{ 'bubble-left': bubbleLeft === true }" :style="{ left: `${store.layout.ball.x}px`, top: `${store.layout.ball.y}px`, width: `${store.layout.ball.size}px`, height: `${store.layout.ball.size}px` }" data-testid="assistant-ball-stage">
       <button type="button" class="ball" @pointerenter="ballEnter" @pointermove="ballMove" @pointerleave="ballLeave" :data-phase="store.phase" :data-badge="ballBadge || undefined" title="点一下打开，按住可以拖动，右键打开设置" :aria-label="ballLabel" data-testid="assistant-ball" data-drag-handle @click="ballClick" @contextmenu.prevent="store.openSettings('assistant')">
@@ -589,7 +596,8 @@ button{font:inherit}
 
 /* Ball */
 /* The ball sits where the host says in the stage; a notice opens beside it toward the middle of the screen. */
-.ball-stage{position:absolute;display:grid;place-items:center;transition:opacity .09s ease}
+.ball-stage{position:absolute;display:grid;place-items:center}
+.ball-fade .ball-stage{transition:opacity .09s ease}
 .moving-ball .ball-stage{opacity:0}
 .ball-in-enter-active{transition:opacity .18s ease,transform .18s ease}
 .ball-in-enter-from{opacity:0;transform:scale(.9)}

@@ -119,6 +119,8 @@ pub struct AssistantState {
     peek: AtomicBool,
     /// Counts openings and closings, so a delayed step from an earlier one does nothing.
     turn: AtomicU64,
+    /// The open capsule was dragged, so the ball it folds back into may need its stage fitted again.
+    dragged_open: AtomicBool,
     /// The shortcut is held down. Key repeat sends more presses while it is; they are ignored.
     held: AtomicBool,
     /// Counts presses, so a hold timer from an earlier press does nothing.
@@ -485,9 +487,22 @@ fn settle_ball(app: &tauri::AppHandle) {
     let Ok(monitor) = screen_at(app, Some(&window), x + size / 2, y + size / 2) else { return };
     let scale = monitor.scale_factor();
     let size = (BALL_WINDOW * scale).round() as i32;
-    let ideal = stage_for_ball(area_of(&monitor), scale, x, y, size);
+    let area = area_of(&monitor);
     let placed = Stage { rect: Area { x: position.x, y: position.y, ..stage.rect }, ..stage };
-    if ideal != placed { reanchor::begin(app, ideal); }
+    if !still_fits(&placed, area, scale, x, y, size) { reanchor::begin(app, stage_for_ball(area, scale, x, y, size)); }
+}
+
+/// Whether a stage that has been moved still works where the ball now is: same screen scale, opening toward the
+/// middle, on the screen and around the whole ball. A pixel or two off is fine: the window is only moved (with a
+/// fade) when it has to be.
+fn still_fits(stage: &Stage, area: Area, scale: f64, x: i32, y: i32, size: i32) -> bool {
+    let r = stage.rect;
+    let slack = (2.0 * scale).round() as i32;
+    (stage.scale - scale).abs() < 0.01
+        && stage.size == size
+        && stage.right == (x + size / 2 >= area.x + area.w / 2)
+        && r.x >= area.x - slack && r.y >= area.y - slack && r.right() <= area.right() + slack && r.bottom() <= area.bottom() + slack
+        && x >= r.x && y >= r.y && x + size <= r.right() && y + size <= r.bottom()
 }
 
 /// Remembers where the user left the capsule, so the next time it opens it is there and not back at the default.
@@ -623,6 +638,7 @@ pub fn expand(app: &tauri::AppHandle, peek: bool) -> Result<(), String> {
     }
     next_turn(app);
     state.peek.store(peek, Ordering::SeqCst);
+    state.dragged_open.store(false, Ordering::SeqCst);
     set_mode(app, Mode::Capsule);
     crate::window_control::apply_saved(app, &window, "topmost")?;
     window.show().map_err(|e| e.to_string())?;
@@ -648,7 +664,8 @@ pub fn collapse(app: &tauri::AppHandle) -> Result<(), String> {
         set_mode(app, Mode::Ball);
         save_ball(app, &window);
         announce(app, &window);
-        after(app, MORPH_SETTLE, settle_ball);
+        // Only a capsule that was dragged can leave the ball somewhere its stage no longer suits.
+        if app.state::<AssistantState>().dragged_open.swap(false, Ordering::SeqCst) { after(app, MORPH_SETTLE, settle_ball); }
         return Ok(());
     }
     // A capsule opened without the ball fades out first; then the window hides, or moves to where the ball lives.
@@ -892,7 +909,7 @@ pub fn assistant_drag(window: WebviewWindow) -> Result<(), String> {
             if !down||!state.dragging.load(Ordering::SeqCst)||mode(app)==Mode::Hidden{break;}
         }
         state.dragging.store(false,Ordering::SeqCst);
-        match mode(app){Mode::Capsule=>remember(app,&target),Mode::Ball=>{save_ball(app,&target);settle_ball(app);},_=>{}}
+        match mode(app){Mode::Capsule=>{remember(app,&target);state.dragged_open.store(true,Ordering::SeqCst);},Mode::Ball=>{save_ball(app,&target);settle_ball(app);},_=>{}}
         let _=target.eval("window.dispatchEvent(new Event('assistant-drag-end'));".to_string());
     });
     let result=window.start_dragging().map_err(|e|e.to_string());
@@ -1075,6 +1092,21 @@ mod tests {
         let stage = stage_for_ball(RETINA, 2.0, 200, 60, 144);
         assert_eq!(stage.rect.y, RETINA.y);
         assert_eq!(stage.ball.unwrap().1, 10);
+    }
+
+    #[test]
+    fn a_stage_off_by_a_pixel_is_left_alone_but_a_wrong_one_is_moved() {
+        let (bx, by) = ball_anchor(SCREEN, 1.0, 72, Offset::default());
+        let stage = stage_for_ball(SCREEN, 1.0, bx, by, 72);
+        assert!(still_fits(&stage, SCREEN, 1.0, bx, by, 72));
+        // The system reported the window a pixel away from where it was put: no move, no fade.
+        let nudged = Stage { rect: Area { x: stage.rect.x + 1, y: stage.rect.y - 1, ..stage.rect }, ..stage };
+        assert!(still_fits(&nudged, SCREEN, 1.0, bx + 1, by - 1, 72));
+        // Dragged to the left half: the capsule would open off the screen's edge, so the stage is refitted.
+        let left = Stage { rect: Area { x: 40 + 72 - 480, ..stage.rect }, ..stage };
+        assert!(!still_fits(&left, SCREEN, 1.0, 40, by, 72));
+        // Onto a screen with another scale.
+        assert!(!still_fits(&stage, RETINA, 2.0, bx * 2, by * 2, 144));
     }
 
     #[test]

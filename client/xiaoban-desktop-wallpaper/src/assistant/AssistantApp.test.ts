@@ -400,6 +400,8 @@ describe('ball and capsule in one window',()=>{
     finishAll();await flushPromises();await nextTick();
     expect(wrapper.find('[data-testid="assistant"]').exists()).toBe(false);
     expect(wrapper.find('[data-testid="assistant-ball"]').exists()).toBe(true);
+    // The stand-ins are gone in the same frame, so the ball shows at once: no fade-in, no blink.
+    expect(wrapper.get('.stage').classes()).not.toContain('ball-fade');
     for (const command of ['assistant_fit','assistant_transition_ready']) expect(vi.mocked(invoke).mock.calls.map(([name])=>name)).not.toContain(command);
     spy.mockRestore();
   });
@@ -417,11 +419,13 @@ describe('ball and capsule in one window',()=>{
     vi.useFakeTimers();
     const {store,wrapper}=folded();await nextTick();
     store.reanchoring=7;await nextTick();
-    expect(wrapper.get('.stage').classes()).toContain('moving-ball');
+    expect(wrapper.get('.stage').classes()).toEqual(expect.arrayContaining(['moving-ball','ball-fade']));
     await vi.advanceTimersByTimeAsync(100);expect(store.reanchorReady).toHaveBeenCalledWith(7);
     store.layout={ball:{x:0,y:520,size:72},right:false};store.reanchoring=0;await nextTick();
     await vi.advanceTimersByTimeAsync(50);
     expect(wrapper.get('.stage').classes()).not.toContain('moving-ball');
+    await vi.advanceTimersByTimeAsync(150);
+    expect(wrapper.get('.stage').classes()).not.toContain('ball-fade');
     expect(wrapper.get('[data-testid="assistant-ball-stage"]').attributes('style')).toContain('left: 0px');
   });
 });
