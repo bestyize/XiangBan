@@ -9,6 +9,7 @@ mod handlers;
 mod jwks;
 mod keys;
 mod ledger;
+mod media;
 mod newapi;
 mod password;
 mod products;
@@ -82,7 +83,11 @@ pub fn build_router(state: AppState) -> Router {
         .route("/audio/speech", post(proxy::audio_speech))
         .route("/search", post(proxy::web_search))
         .route("/fetch", post(proxy::web_fetch))
-        .layer(DefaultBodyLimit::max(state.config.max_body_bytes));
+        .route("/images/generations", post(media::image_generations))
+        .route("/realtime", get(media::realtime))
+        .layer(DefaultBodyLimit::max(state.config.max_body_bytes))
+        // A recording is bigger than any other request, so its route has its own limit.
+        .route("/audio/transcriptions", post(media::transcriptions).layer(DefaultBodyLimit::max(media::TRANSCRIBE_BODY_LIMIT)));
 
     // 凭证只走 Authorization 头，不使用 Cookie，因此跨域放开不构成 CSRF 面。
     let origins: Vec<HeaderValue> = state.config.cors_origins.iter().filter_map(|o| o.parse().ok()).collect();

@@ -20,6 +20,29 @@
 - 鉴权、额度检查与对话接口相同，用量随 New API 钱包对账结算。单次最多 1000 字，返回音频不超过 8 MiB。
 - 未配置模型时返回 503 `speech_unavailable`，客户端会自动改用系统朗读。
 
+## 图片生成
+
+`POST /v1/images/generations`：请求体 `{ "prompt": "1–4000 字", "n"?: 1–4, "size"?: "AI_IMAGE_SIZES 里的一个" }`，返回 `{ "created", "data": [{ "b64_json" | "url", "revised_prompt"? }] }`。
+
+- 真实模型由 `AI_IMAGE_MODEL` 指定（New API 里 OpenAI 兼容的图片渠道），客户端传的 `model` 和其他字段一律不转发；尺寸只能从 `AI_IMAGE_SIZES` 里选，不传用第一个。
+- 返回只保留图片本身（`b64_json` 或 `url`、`revised_prompt`），不带模型名和用量。上游返回超过 48 MiB 视为失败。
+- 鉴权、额度检查与对话接口相同，价格按 New API 里该模型的倍率，用量随对账结算。未配置模型时返回 503 `image_unavailable`。
+
+## 语音识别
+
+`POST /v1/audio/transcriptions`：`multipart/form-data`，字段 `file`（音频，最大 25 MiB）、`language`?（语言代码，如 `zh`）、`prompt`?（提示词，最多 1000 字）；返回 `{ "text" }`。小伴本地识别不可用时的云端兜底。
+
+- 真实模型由 `AI_TRANSCRIBE_MODEL` 指定（New API 里 OpenAI 兼容的识别渠道）。客户端传的 `model` 被忽略；只接受 `audio/*`、`video/*` 或 `application/octet-stream`，文件名只保留字母数字和 `.-_`。
+- 这个接口单独放宽了请求体上限（26 MiB），不受 `AI_MAX_BODY_BYTES` 限制。未配置模型时返回 503 `transcribe_unavailable`。
+
+## 实时语音
+
+`GET /v1/realtime`（WebSocket）：OpenAI Realtime 协议的事件，经 New API 转到 `AI_REALTIME_MODEL`（需要 New API 有对应的实时渠道）。给小伴的「实时对话」云端引擎用。
+
+- 登录令牌放在 `Authorization: Bearer …`；浏览器里没法设请求头时，改放在子协议里：`new WebSocket(url, ["realtime", "xiaoban-token.<令牌>"])`，服务端回应 `realtime`。
+- 网关先连通上游再接受连接，连不上直接返回 HTTP 错误。客户端事件必须是 JSON 对象，`session.model`、`response.model` 会被去掉（模型由网关决定）；上游事件里的 `session.model`、`response.model` 改写成 `realtime`。单条事件最大 4 MiB。
+- 单次对话最长 `AI_REALTIME_MAX_SECS`（默认 1800 秒），到时先发 `{"type":"error","error":{"code":"session_time_limit"}}` 再以 4000 关闭；每 60 秒复查一次额度，用完先发 `insufficient_quota` 错误事件再以 4002 关闭。用量按 New API 里该模型的倍率扣，随对账结算。未配置模型时返回 503 `realtime_unavailable`。
+
 ## 联网搜索与网页抓取
 
 `POST /v1/search` 和 `POST /v1/fetch`：给小伴的联网搜索用。**对外格式以 DeepSeek 的 Search / Fetch 为准**，客户端只认这一种；后面接格式不同的服务商时，在 `src/search.rs` 的 `Provider` 里加一个分支，把它的请求和结果改写成这个格式。响应里不出现服务商名字，密钥只在服务端。
@@ -62,6 +85,9 @@ cargo test --locked --manifest-path services/server-ai/Cargo.toml
 | `AI_SYNC_INTERVAL_SECS` | `60` | 对账间隔，最小 5 |
 | `AI_MAX_BODY_BYTES` | `8388608` | 转发请求体上限 |
 | `AI_TRUST_PROXY` / `AI_CORS_ORIGINS` / `AI_WEB_DIR` | 见 `.env.example` | 同账号中心 |
+| `AI_IMAGE_MODEL` / `AI_IMAGE_SIZES` | 空 / `1024x1024` | 图片生成的上游模型与可选尺寸（逗号分隔，第一个为默认） |
+| `AI_TRANSCRIBE_MODEL` | 空 | 云端语音识别的上游模型 |
+| `AI_REALTIME_MODEL` / `AI_REALTIME_MAX_SECS` | 空 / `1800` | 实时语音的上游模型与单次最长秒数（60–14400） |
 | `AI_SEARCH_PROVIDERS` | `deepseek` | 联网搜索的服务商，逗号分隔，按顺序尝试；没配密钥的跳过 |
 | `AI_DEEPSEEK_API_KEY` / `AI_DEEPSEEK_BASE_URL` | 空 / `https://api.deepseek.com` | DeepSeek Search / Fetch 的密钥与地址；不填密钥则不启用。密钥可以填多个（逗号分隔）：请求轮流使用以分摊限流，某个密钥失效、限流或超时就换下一个，全部不行再换下一家服务商 |
 | `AI_SEARCH_COST` / `AI_FETCH_COST` | `500` / `500` | 一次有结果的搜索、一次成功的抓取扣多少 New API 额度点数 |
@@ -75,6 +101,10 @@ cargo test --locked --manifest-path services/server-ai/Cargo.toml
 | `POST /v1/chat/completions` | OpenAI 兼容。`model` 填档位名，省略则用默认档。支持流式。余额为 0 返回 402 `insufficient_quota`；档位要求付费而用户只有试用额度返回 403 `paid_required`；错误体为 OpenAI 格式 |
 | `POST /v1/responses` | OpenAI Responses 协议，规则同上（档位、余额、流式、错误格式）。`response.model` 也会回写成档位名 |
 | `POST /v1/messages` | Anthropic Messages 协议。密钥放 `x-api-key`（Anthropic SDK 默认）或 `Authorization: Bearer` 都行，值是账号中心的登录令牌；只透传 `anthropic-version`、`anthropic-beta`；`message_start` 里的 `message.model` 回写成档位名；错误体是 Anthropic 格式（`{"type":"error","error":{"type":"billing_error",…}}`）。这三个协议能否真正跑通，还取决于档位对应的模型在 New API 里有没有渠道，以及 New API 的协议转换 |
+| `POST /v1/audio/speech` | 语音合成，见上文 |
+| `POST /v1/images/generations` | 图片生成，见上文 |
+| `POST /v1/audio/transcriptions` | 语音识别（上传音频），见上文 |
+| `GET /v1/realtime` | 实时语音（WebSocket），见上文 |
 | `POST /v1/search`、`POST /v1/fetch` | 联网搜索与网页抓取，格式以 DeepSeek 为准，见上文「联网搜索与网页抓取」 |
 | `GET /v1/models` | 当前产品启用的档位名 |
 | `GET /api/ai/tiers` | 档位的展示名、说明、对当前用户是否可用；不含真实模型名 |

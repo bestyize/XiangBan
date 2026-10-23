@@ -206,6 +206,24 @@ impl NewApi {
     }
 }
 
+impl NewApi {
+    /// Like [`relay`](Self::relay), for an upload (`multipart/form-data`).
+    pub async fn relay_multipart(&self, path: &str, key: &str, form: reqwest::multipart::Form) -> Result<Response, AppError> {
+        self.stream_http.post(format!("{}{}", self.base, path)).bearer_auth(format!("sk-{key}")).multipart(form).send().await.map_err(|e| {
+            tracing::warn!("转发到 New API 失败 {path}: {e}");
+            AppError::BadGateway("AI 服务暂时不可用".into())
+        })
+    }
+
+    /// The WebSocket address of a New API path (`ws://` for `http://`, `wss://` for `https://`).
+    pub fn ws_url(&self, path: &str) -> String {
+        let base = if let Some(rest) = self.base.strip_prefix("https://") { format!("wss://{rest}") }
+            else if let Some(rest) = self.base.strip_prefix("http://") { format!("ws://{rest}") }
+            else { self.base.clone() };
+        format!("{base}{path}")
+    }
+}
+
 fn truncate(text: &str) -> String {
     text.chars().take(300).collect()
 }

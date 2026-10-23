@@ -6,11 +6,12 @@ description = "相伴 AI 网关与额度系统：按产品隔离的试用与额�
 license = "MIT OR Apache-2.0"
 
 [dependencies]
-axum = "0.8"
+axum = { version = "0.8", features = ["multipart", "ws"] }
 tower = { version = "0.5", features = ["util"] }
 tower-http = { version = "0.6", features = ["cors", "trace", "fs"] }
 tokio = { version = "1.40", features = ["full"] }
 futures-util = "0.3"
+tokio-tungstenite = { version = "0.29", default-features = false, features = ["connect", "rustls-tls-webpki-roots"] }
 bytes = "1"
 
 serde = { version = "1.0", features = ["derive"] }
@@ -20,7 +21,7 @@ uuid = { version = "1.10", features = ["v4", "serde"] }
 dotenvy = "0.15"
 base64 = "0.22"
 
-reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "stream"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "stream", "multipart"] }
 
 sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio", "tls-rustls", "postgres", "chrono", "uuid", "derive"] }
 
