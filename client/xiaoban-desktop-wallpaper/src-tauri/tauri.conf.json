@@ -4,8 +4,8 @@
   "version": "2.1.0",
   "identifier": "xyz.xiaban.desktop-wallpaper",
   "build": {
-    "beforeDevCommand": "npm run computer-use:prepare && npm run dev",
-    "beforeBuildCommand": "npm run computer-use:prepare && npm run build",
+    "beforeDevCommand": "node scripts/generate-icon.mjs && npm run computer-use:prepare && npm run dev",
+    "beforeBuildCommand": "node scripts/generate-icon.mjs && npm run computer-use:prepare && npm run build",
     "devUrl": "http://127.0.0.1:1420",
     "frontendDist": "../dist"
   },
