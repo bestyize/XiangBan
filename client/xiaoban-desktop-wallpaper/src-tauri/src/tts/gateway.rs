@@ -6,7 +6,7 @@ const MAX_AUDIO: u64 = 8 * 1024 * 1024;
 
 pub fn speak(app: &tauri::AppHandle, text: &str, rate: i32) -> Result<Vec<u8>, String> {
     let token = tauri::async_runtime::block_on(crate::account::fresh_access_token(app)).map_err(|f| f.message)?;
-    let client = reqwest::blocking::Client::builder().connect_timeout(Duration::from_secs(8)).timeout(Duration::from_secs(30)).build().map_err(|_| "无法连接小伴 AI 语音")?;
+    let client = crate::network::blocking_builder(reqwest::blocking::Client::builder().connect_timeout(Duration::from_secs(8)).timeout(Duration::from_secs(30)))?.build().map_err(|_| "无法连接小伴 AI 语音")?;
     let speed = (1.0 + rate as f64 / 100.0).clamp(0.5, 2.0);
     let response = client.post(format!("{}/v1/audio/speech", crate::ai_gateway::ai_base_url()))
         .bearer_auth(token)
