@@ -111,10 +111,12 @@ struct PartialCall {
 #[derive(Default)]
 pub struct ResponsesStream {
     text: String,
+    displayed_text: std::collections::BTreeMap<(usize, usize), String>,
     calls: Vec<Option<PartialCall>>,
     reasoning: std::collections::BTreeMap<usize, Value>,
     /// Summary text already emitted to the UI, keyed by output/summary part.
     displayed_summaries: std::collections::BTreeMap<(usize, usize), String>,
+    displayed_reasoning: std::collections::BTreeMap<(usize, usize), String>,
     usage: Option<Usage>,
     finish: FinishReason,
     done: bool,
@@ -153,11 +155,53 @@ impl ResponsesStream {
         &mut self, event: &Value, on_text: &mut dyn FnMut(&str),
         on_reasoning: &mut dyn FnMut(crate::ReasoningKind, &str),
     ) -> Result<bool, HarnessError> {
+        if self.done { return Ok(true); }
         match event.get("type").and_then(Value::as_str).unwrap_or("") {
             "response.output_text.delta" | "response.refusal.delta" => {
                 if let Some(delta) = event.get("delta").and_then(Value::as_str).filter(|d| !d.is_empty()) {
+                    let key = (event["output_index"].as_u64().unwrap_or(0) as usize,
+                        event["content_index"].as_u64().unwrap_or(0) as usize);
+                    self.displayed_text.entry(key).or_default().push_str(delta);
                     self.text.push_str(delta);
                     on_text(delta);
+                }
+            }
+            "response.output_text.done" | "response.refusal.done" => {
+                let key = (event["output_index"].as_u64().unwrap_or(0) as usize,
+                    event["content_index"].as_u64().unwrap_or(0) as usize);
+                if let Some(full) = event["text"].as_str().or_else(|| event["refusal"].as_str()) {
+                    self.emit_text_snapshot(key, full, on_text);
+                }
+            }
+            "response.content_part.done" => {
+                let key = (event["output_index"].as_u64().unwrap_or(0) as usize,
+                    event["content_index"].as_u64().unwrap_or(0) as usize);
+                let part = &event["part"];
+                if matches!(part["type"].as_str(), Some("output_text" | "refusal")) {
+                    if let Some(full) = part["text"].as_str().or_else(|| part["refusal"].as_str()) {
+                        self.emit_text_snapshot(key, full, on_text);
+                    }
+                }
+            }
+            "response.reasoning_summary_part.done" => {
+                let key = (event["output_index"].as_u64().unwrap_or(0) as usize,
+                    event["summary_index"].as_u64().unwrap_or(0) as usize);
+                if let Some(full) = event["part"]["text"].as_str() { self.emit_summary_suffix(key, full, on_reasoning); }
+            }
+            "response.reasoning_text.delta" | "response.reasoning_text.done" => {
+                let key = (event["output_index"].as_u64().unwrap_or(0) as usize,
+                    event["content_index"].as_u64().unwrap_or(0) as usize);
+                let previous = self.displayed_reasoning.entry(key).or_default();
+                if event["type"] == "response.reasoning_text.delta" {
+                    if let Some(delta) = event["delta"].as_str() {
+                        previous.push_str(delta);
+                        on_reasoning(crate::ReasoningKind::Text, delta);
+                    }
+                } else if let Some(full) = event["text"].as_str() {
+                    if let Some(suffix) = full.strip_prefix(previous.as_str()) {
+                        on_reasoning(crate::ReasoningKind::Text, suffix);
+                        previous.push_str(suffix);
+                    }
                 }
             }
             "response.reasoning_summary_text.delta" => {
@@ -204,10 +248,16 @@ impl ResponsesStream {
             }
             "response.output_item.done" => {
                 let item = event.get("item").unwrap_or(&Value::Null);
+                if item["type"] == "message" {
+                    let index = event["output_index"].as_u64().unwrap_or(0) as usize;
+                    self.emit_item_text(index, item, on_text);
+                }
                 if item["type"] == "reasoning" {
                     if let Some(i) = event["output_index"].as_u64().filter(|i| *i < MAX_ITEMS as u64) {
                         self.emit_item_summaries(i as usize, item, on_reasoning);
-                        self.reasoning.insert(i as usize, item.clone());
+                        if item["status"] != "in_progress" && item["status"] != "incomplete" {
+                            self.reasoning.insert(i as usize, item.clone());
+                        }
                     }
                 }
                 if item.get("type").and_then(Value::as_str) == Some("function_call") {
@@ -255,6 +305,25 @@ impl ResponsesStream {
         Ok(false)
     }
 
+    fn emit_text_snapshot(&mut self, key: (usize, usize), full: &str, on_text: &mut dyn FnMut(&str)) {
+        let previous = self.displayed_text.entry(key).or_default();
+        if let Some(suffix) = full.strip_prefix(previous.as_str()).filter(|s| !s.is_empty()) {
+            previous.push_str(suffix);
+            self.text.push_str(suffix);
+            on_text(suffix);
+        }
+    }
+
+    fn emit_item_text(&mut self, index: usize, item: &Value, on_text: &mut dyn FnMut(&str)) {
+        for (part_index, part) in item["content"].as_array().into_iter().flatten().enumerate() {
+            if matches!(part["type"].as_str(), Some("output_text" | "refusal")) {
+                if let Some(full) = part["text"].as_str().or_else(|| part["refusal"].as_str()) {
+                    self.emit_text_snapshot((index, part_index), full, on_text);
+                }
+            }
+        }
+    }
+
     fn emit_summary_suffix(
         &mut self, key: (usize, usize), full: &str,
         on_reasoning: &mut dyn FnMut(crate::ReasoningKind, &str),
@@ -273,6 +342,17 @@ impl ResponsesStream {
         &mut self, output_index: usize, item: &Value,
         on_reasoning: &mut dyn FnMut(crate::ReasoningKind, &str),
     ) {
+        for (index, part) in item.get("content").and_then(Value::as_array).into_iter().flatten().enumerate() {
+            if part["type"] == "reasoning_text" {
+                if let Some(full) = part["text"].as_str() {
+                    let previous = self.displayed_reasoning.entry((output_index, index)).or_default();
+                    if let Some(suffix) = full.strip_prefix(previous.as_str()) {
+                        if !suffix.is_empty() { on_reasoning(crate::ReasoningKind::Text, suffix); }
+                        previous.push_str(suffix);
+                    }
+                }
+            }
+        }
         for (summary_index, part) in item.get("summary").and_then(Value::as_array)
             .into_iter().flatten().enumerate()
         {
@@ -299,36 +379,27 @@ impl ResponsesStream {
         self.usage = Some(Usage { prompt_tokens: get("input_tokens"), completion_tokens: get("output_tokens") });
     }
 
-    /// Some gateways only send the final `response` object. If nothing arrived incrementally,
-    /// take the content from its `output` list.
+    /// Reconcile each output item independently; one streamed item must not hide
+    /// another item's final-only text or tool call.
     fn reconcile(&mut self, response: &Value, on_text: &mut dyn FnMut(&str), on_reasoning: &mut dyn FnMut(crate::ReasoningKind, &str)) {
         for (i, item) in response.get("output").and_then(Value::as_array).into_iter().flatten().take(MAX_ITEMS).enumerate() {
-            if item["type"] == "reasoning" && item["status"] != "in_progress" && item["status"] != "incomplete" {
+            if item["type"] == "reasoning" {
                 self.emit_item_summaries(i, item, on_reasoning);
-                self.reasoning.insert(i, item.clone());
+                if item["status"] != "in_progress" && item["status"] != "incomplete" {
+                    self.reasoning.insert(i, item.clone());
+                }
             }
         }
-        let has_calls = self.calls.iter().any(Option::is_some);
-        if !self.text.is_empty() || has_calls {
-            return;
-        }
-        for item in response.get("output").and_then(Value::as_array).into_iter().flatten() {
-            match item.get("type").and_then(Value::as_str) {
-                Some("message") => {
-                    for part in item.get("content").and_then(Value::as_array).into_iter().flatten() {
-                        if let Some(text) = part.get("text").and_then(Value::as_str).filter(|t| !t.is_empty()) {
-                            self.text.push_str(text);
-                            on_text(text);
+        for (index, item) in response.get("output").and_then(Value::as_array).into_iter().flatten().take(MAX_ITEMS).enumerate() {
+            match item["type"].as_str() {
+                Some("message") => self.emit_item_text(index, item, on_text),
+                Some("function_call") => {
+                    let event = json!({"output_index": index});
+                    if let Some(call) = self.call_slot(&event) {
+                        for (field, key) in [(&mut call.item_id, "id"), (&mut call.call_id, "call_id"), (&mut call.name, "name"), (&mut call.arguments, "arguments")] {
+                            if let Some(value) = item[key].as_str() { *field = value.to_string(); }
                         }
                     }
-                }
-                Some("function_call") if self.calls.len() < MAX_ITEMS => {
-                    self.calls.push(Some(PartialCall {
-                        item_id: str_of(item, "id"),
-                        call_id: str_of(item, "call_id"),
-                        name: str_of(item, "name"),
-                        arguments: str_of(item, "arguments"),
-                    }));
                 }
                 _ => {}
             }
@@ -429,5 +500,80 @@ mod client {
             super::super::wire::bind_state(&mut reply.message, &self.profile);
             Ok(reply)
         }
+    }
+}
+
+#[cfg(test)]
+mod protocol_regression_tests {
+    use super::*;
+
+    #[test]
+    fn deepseek_reasoning_snapshots_do_not_duplicate_deltas() {
+        let mut stream = ResponsesStream::default();
+        let mut thinking = String::new();
+        let mut text = String::new();
+        for event in [
+            json!({"type":"response.reasoning_text.delta","output_index":0,"content_index":0,"delta":"分析"}),
+            json!({"type":"response.reasoning_text.done","output_index":0,"content_index":0,"text":"分析问题"}),
+            json!({"type":"response.completed","response":{"output":[{"type":"reasoning","content":[{"type":"reasoning_text","text":"分析问题"}]},{"type":"message","content":[{"type":"output_text","text":"回答"}]}]}}),
+        ] {
+            stream.push_event_with_reasoning(&event, &mut |s| text.push_str(s), &mut |_, s| thinking.push_str(s)).unwrap();
+        }
+        assert_eq!(thinking, "分析问题");
+        assert_eq!(text, "回答");
+        assert!(stream.finish().message.provider_state.is_some());
+    }
+
+    #[test]
+    fn completed_snapshot_fills_text_suffix_and_missing_parallel_call() {
+        let mut stream = ResponsesStream::default();
+        let mut text = String::new();
+        for event in [
+            json!({"type":"response.output_text.delta","output_index":0,"delta":"hello"}),
+            json!({"type":"response.output_item.added","output_index":1,"item":{"type":"function_call","call_id":"a","name":"first","arguments":""}}),
+            json!({"type":"response.completed","response":{"output":[
+                {"type":"message","content":[{"type":"output_text","text":"hello world"}]},
+                {"type":"function_call","call_id":"a","name":"first","arguments":"{}"},
+                {"type":"function_call","call_id":"b","name":"second","arguments":"{\"x\":1}"}
+            ]}}),
+        ] { stream.push_event(&event, &mut |s| text.push_str(s)).unwrap(); }
+        assert_eq!(text, "hello world");
+        let reply = stream.finish();
+        assert_eq!(reply.message.tool_calls.len(), 2);
+        assert_eq!(reply.message.tool_calls[1].arguments, "{\"x\":1}");
+    }
+}
+
+#[cfg(test)]
+mod final_snapshot_tests {
+    use super::*;
+
+    #[test]
+    fn text_done_part_done_item_done_and_completed_share_one_dedup_key() {
+        let mut stream = ResponsesStream::default();
+        let mut text = String::new();
+        for event in [
+            json!({"type":"response.output_text.delta","output_index":0,"content_index":0,"delta":"hello"}),
+            json!({"type":"response.output_text.done","output_index":0,"content_index":0,"text":"hello world"}),
+            json!({"type":"response.content_part.done","output_index":0,"content_index":0,"part":{"type":"output_text","text":"hello world"}}),
+            json!({"type":"response.output_item.done","output_index":0,"item":{"type":"message","content":[{"type":"output_text","text":"hello world"}]}}),
+            json!({"type":"response.completed","response":{"output":[{"type":"message","content":[{"type":"output_text","text":"hello world"}]}]}}),
+        ] { stream.push_event(&event, &mut |s| text.push_str(s)).unwrap(); }
+        assert_eq!(text, "hello world");
+        assert_eq!(stream.finish().message.text(), text);
+    }
+
+    #[test]
+    fn incomplete_reasoning_is_displayed_but_not_replayed_as_complete_state() {
+        let mut stream = ResponsesStream::default();
+        let mut thinking = String::new();
+        stream.push_event_with_reasoning(&json!({"type":"response.incomplete","response":{
+            "incomplete_details":{"reason":"max_output_tokens"},
+            "output":[{"type":"reasoning","status":"incomplete","content":[{"type":"reasoning_text","text":"partial thought"}]}]
+        }}), &mut |_| {}, &mut |_, s| thinking.push_str(s)).unwrap();
+        assert_eq!(thinking, "partial thought");
+        let reply = stream.finish();
+        assert_eq!(reply.finish, FinishReason::Length);
+        assert!(reply.message.provider_state.is_none());
     }
 }

@@ -92,14 +92,22 @@ pub fn message_to_wire(message: &Message) -> Value {
         Role::Assistant => {
             let text = message.text();
             let mut wire = json!({ "role": "assistant", "content": if text.is_empty() { Value::Null } else { Value::String(text) } });
-            if let Some(reasoning) = message.provider_state.as_ref().filter(|s| s["protocol"] == "chat").and_then(|s| s.get("reasoning_content")).filter(|v| v.is_string()) {
-                wire["reasoning_content"] = reasoning.clone();
+            if let Some(state) = message.provider_state.as_ref().filter(|s| s["protocol"] == "chat") {
+                for key in ["reasoning_content", "reasoning", "reasoning_text", "reasoning_details"] {
+                    if let Some(value) = state.get(key) { wire[key] = value.clone(); }
+                }
             }
             if !message.tool_calls.is_empty() {
                 wire["tool_calls"] = message
                     .tool_calls
                     .iter()
-                    .map(|c| json!({ "id": c.id, "type": "function", "function": { "name": c.name, "arguments": c.arguments } }))
+                    .map(|c| {
+                        let mut call = json!({ "id": c.id, "type": "function", "function": { "name": c.name, "arguments": c.arguments } });
+                        if let Some(extra) = message.provider_state.as_ref().filter(|s| s["protocol"] == "chat").and_then(|s| s["tool_extra_content"].get(&c.id)) {
+                            call["extra_content"] = extra.clone();
+                        }
+                        call
+                    })
                     .collect();
             }
             wire
@@ -133,8 +141,9 @@ pub fn build_request_body(profile: &ProviderProfile, request: &ChatRequest) -> V
         if message.role != Role::Tool && !media.is_empty() {
             messages.push(json!({"role": "user", "content": std::mem::take(&mut media)}));
         }
-        let mut wire = message_to_wire(message);
-        if matching_state(message, profile, "chat").is_none() { wire.as_object_mut().unwrap().remove("reasoning_content"); }
+        let mut scoped = message.clone();
+        if matching_state(message, profile, "chat").is_none() { scoped.provider_state = None; }
+        let wire = message_to_wire(&scoped);
         messages.push(wire);
         for part in &message.parts {
             if let (Role::Tool, Part::Image { url }) = (message.role, part) {
