@@ -15,8 +15,8 @@ const open = ref(false);
 /** A folder chosen for a conversation that already has messages: the dialog asks how to switch. */
 const asking = ref<string | null>(null);
 
-const nameOf = (path: string) => path.replace(/\\/g, '/').split('/').filter(Boolean).at(-1) || path;
-const current = computed(() => props.chat.currentWorkspace);
+const nameOf = (path: string) => path.trim().replace(/\\/g, '/').split('/').filter(Boolean).at(-1) || path;
+const current = computed(() => props.chat.currentWorkspace?.trim() || '');
 const same = (a: string, b: string) => a.replace(/[\\/]+$/, '') === b.replace(/[\\/]+$/, '');
 const currentName = computed(() => !current.value || same(current.value, props.chat.workspace)
   ? '默认工作区' : nameOf(current.value));
@@ -86,13 +86,13 @@ function reveal() { close(); void props.chat.revealWorkspace(); }
 </template>
 
 <style scoped>
-.ws-anchor{position:relative;display:flex;align-items:center;min-width:0}
+.ws-anchor{position:relative;display:flex;align-items:center;min-width:0;max-width:100%}
 .ws-trigger{display:flex;align-items:center;gap:5px;height:28px;padding:0 9px;border:0;border-radius:8px;background:none;color:var(--ui-text-secondary);font:inherit;font-size:12.5px;cursor:pointer;white-space:nowrap;min-width:0;max-width:160px}
 .ws-trigger:hover,.ws-trigger[aria-expanded="true"]{background:var(--ui-control);color:var(--ui-text-primary)}
 .ws-trigger:disabled,.ws-icon:disabled{opacity:.5;cursor:not-allowed}
 .ws-trigger svg{flex:none}
 .ws-icon[aria-expanded="true"]{background:var(--ui-control);color:var(--ui-text-primary)}
-.ws-name{overflow:hidden;text-overflow:ellipsis}
+.ws-name{display:block;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .ws-menu{position:absolute;left:0;bottom:calc(100% + 8px);width:290px;max-width:calc(100vw - 32px);box-sizing:border-box}
 .ws-menu.is-icon{left:auto;right:0;bottom:auto;top:calc(100% + 6px)}
 .ws-path{font-size:11.5px;color:var(--ui-text-tertiary);margin:6px 10px 4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;direction:rtl;text-align:left}

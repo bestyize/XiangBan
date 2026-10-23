@@ -64,7 +64,29 @@ const attention = computed(() => store.chat.attention);
 
 interface Space { key: string; name: string; path: string; sessions: SessionSummary[] }
 const RECENT = '__recent__';
-const folderName = (path: string) => path === store.chat.workspace ? '默认分组' : path.split(/[\\/]+/).filter(Boolean).pop() || path;
+const WORKSPACE_NAMES_KEY = 'xiaoban.workspace-names';
+const WORKSPACES_OPEN_KEY = 'xiaoban.workspaces-open';
+function readWorkspaceNames(): Record<string, string> {
+  try {
+    const saved: unknown = JSON.parse(localStorage.getItem(WORKSPACE_NAMES_KEY) || '{}');
+    if (saved && typeof saved === 'object' && !Array.isArray(saved)) {
+      return Object.fromEntries(Object.entries(saved).filter((entry): entry is [string, string] => typeof entry[1] === 'string' && !!entry[1].trim()));
+    }
+  } catch { /* A damaged preference must not prevent opening the sidebar. */ }
+  return {};
+}
+const workspaceNames = ref(readWorkspaceNames());
+const workspacesOpen = ref((() => { try { return localStorage.getItem(WORKSPACES_OPEN_KEY) !== 'false'; } catch { return true; } })());
+watch(workspacesOpen, value => {
+  try { localStorage.setItem(WORKSPACES_OPEN_KEY, String(value)); } catch { /* Keep the current window usable. */ }
+});
+function toggleWorkspaces() {
+  workspacesOpen.value = !workspacesOpen.value;
+  closeWorkspaceMenu();
+  closeSessionMenu();
+}
+const folderName = (path: string) => Object.hasOwn(workspaceNames.value, path) ? workspaceNames.value[path]!
+  : path === store.chat.workspace ? '默认分组' : path.split(/[\\/]+/).filter(Boolean).pop() || path;
 /** 空间: 最近任务 (conversations without a folder) first, then one entry per working folder, named after the folder. */
 const spaces = computed<Space[]>(() => {
   const recent: Space = { key: RECENT, name: '最近任务', path: '', sessions: [] };
@@ -101,7 +123,40 @@ async function addWorkspace() {
   const path = await store.chat.pickWorkspace();
   if (!path) return;
   if (store.chat.currentId) await store.chat.select(null);
-  if (await store.chat.switchWorkspace(path) === 'done') { expanded.add(path); navigate('new-task'); }
+  if (await store.chat.switchWorkspace(path) === 'done') { workspacesOpen.value = true; expanded.add(path); navigate('new-task'); }
+}
+const workspaceMenu = ref<{ key: string; x: number; y: number } | null>(null);
+const workspaceMenuEl = ref<HTMLElement | null>(null);
+const renamingWorkspace = ref('');
+const renamingWorkspaceTitle = computed(() => renamingWorkspace.value ? folderName(renamingWorkspace.value) : '');
+function closeWorkspaceMenu() { workspaceMenu.value = null; }
+async function openWorkspaceMenu(space: Space, event: MouseEvent, anchor?: EventTarget | null) {
+  if (!space.path) return;
+  closeMenu();
+  closeSessionMenu();
+  if (workspaceMenu.value?.key === space.key && anchor) { closeWorkspaceMenu(); return; }
+  const box = anchor instanceof HTMLElement ? anchor.getBoundingClientRect() : null;
+  workspaceMenu.value = { key: space.key, x: box ? box.left : event.clientX, y: box ? box.bottom + 4 : event.clientY };
+  await nextTick();
+  const menu = workspaceMenu.value, el = workspaceMenuEl.value;
+  if (!menu || !el) return;
+  const { width, height } = el.getBoundingClientRect();
+  menu.x = Math.max(8, Math.min(menu.x, window.innerWidth - width - 8));
+  menu.y = Math.max(8, Math.min(menu.y, window.innerHeight - height - 8));
+}
+function startWorkspaceRename() {
+  renamingWorkspace.value = workspaceMenu.value?.key || '';
+  closeWorkspaceMenu();
+}
+function submitWorkspaceRename(value: string) {
+  const path = renamingWorkspace.value, name = value.trim();
+  if (!path || !name) return;
+  const names = { ...workspaceNames.value, [path]: name };
+  try {
+    localStorage.setItem(WORKSPACE_NAMES_KEY, JSON.stringify(names));
+    workspaceNames.value = names;
+    renamingWorkspace.value = '';
+  } catch { store.notify('名称保存失败，请重试', 'error'); }
 }
 /*
  * A conversation's menu in the space tree (hover ⋯ or right click): rename, move to a working folder, delete.
@@ -115,6 +170,7 @@ const menuBusy = computed(() => !!(sessionMenu.value && store.chat.views[session
 const workspaceTargets = computed(() => spaces.value.filter(space => space.path));
 function openSessionMenu(id: string, event: MouseEvent, anchor?: EventTarget | null) {
   closeMenu();
+  closeWorkspaceMenu();
   if (sessionMenu.value?.id === id && anchor) { sessionMenu.value = null; return; }
   const box = anchor instanceof HTMLElement ? anchor.getBoundingClientRect() : null;
   sessionMenu.value = { id, x: box ? box.left : event.clientX, y: box ? box.bottom + 4 : event.clientY, confirming: false };
@@ -171,6 +227,7 @@ function onPointerDown(event: PointerEvent) {
   if (menuOpen.value && menuRoot.value && !menuRoot.value.contains(event.target as Node)) closeMenu();
   const target = event.target as Element | null;
   if (sessionMenu.value && !sessionMenuEl.value?.contains(target) && !target?.closest?.('.nav-session-more')) closeSessionMenu();
+  if (workspaceMenu.value && !workspaceMenuEl.value?.contains(target) && !target?.closest?.('.nav-space-more')) closeWorkspaceMenu();
 }
 const displayName = computed(() => store.account?.user.username ?? '未登录');
 const modeLabel = computed(() => appearanceModes.find(mode => mode.value === appearanceMode.value)?.label ?? '');
@@ -269,6 +326,7 @@ async function listenForAssistant() {
   assistantListeners.push(...off);
 }
 function onKeydown(event: KeyboardEvent) {
+  if (event.key === 'Escape' && workspaceMenu.value) { closeWorkspaceMenu(); return; }
   if (event.key === 'Escape' && sessionMenu.value) { closeSessionMenu(); return; }
   if (event.key === 'Escape' && menuOpen.value) { closeMenu(); return; }
   if (!(event.metaKey || event.ctrlKey) || event.altKey || event.shiftKey) return;
@@ -327,13 +385,17 @@ const fixedPages = ['new-task', 'chat', 'ai-store', 'library', 'studio', 'games'
           <button v-for="item in aiItems" :key="item.id" type="button" class="nav-item" :class="{ selected: isCurrent(item.id) }" :aria-current="isCurrent(item.id) ? 'page' : undefined" :data-testid="`nav-${item.id}`" :title="item.label" @pointerenter="preload(item.id)" @focus="preload(item.id)" @click="item.id === 'new-task' ? newTask() : navigate(item.id)">
             <component :is="item.icon" :size="16" class="nav-icon" /><span class="nav-label">{{ item.label }}</span><span v-if="item.hint" class="nav-hint">{{ item.hint }}</span>
           </button>
-          <div class="nav-caption"><span>空间</span><button type="button" class="xb-icon-btn is-sm" aria-label="新建工作区" title="新建工作区" data-testid="nav-new-workspace" @click="addWorkspace"><Plus :size="14" :stroke-width="2" /></button></div>
+          <div class="nav-caption"><button type="button" class="workspace-toggle" :aria-expanded="workspacesOpen" aria-controls="workspace-tree" data-testid="nav-workspaces-toggle" @click="toggleWorkspaces"><span>工作空间</span><ChevronDown :size="12" class="nav-chevron" :class="{ shut: !workspacesOpen }" /></button><button type="button" class="xb-icon-btn is-sm" aria-label="新建工作区" title="新建工作区" data-testid="nav-new-workspace" @click="addWorkspace"><Plus :size="14" :stroke-width="2" /></button></div>
+          <div v-show="workspacesOpen" id="workspace-tree">
           <template v-for="space in spaces" :key="space.key">
+            <div class="nav-space-row" :class="{ 'menu-open': workspaceMenu?.key === space.key }" @contextmenu.prevent="openWorkspaceMenu(space, $event)">
             <button type="button" class="nav-item space-row" :aria-expanded="expanded.has(space.key)" :title="space.path || space.name" :data-testid="space.key === '__recent__' ? 'space-recent' : `space-${space.name}`" @click="toggleSpace(space.key)">
               <component :is="space.key === '__recent__' ? Inbox : Folder" :size="16" class="nav-icon" /><span class="nav-label">{{ space.name }}</span>
               <i v-if="!expanded.has(space.key) && spaceWaiting(space)" class="xb-dot"></i>
               <span class="nav-hint">{{ space.sessions.length || '' }}</span>
             </button>
+            <button v-if="space.path" type="button" class="xb-icon-btn is-sm nav-space-more" aria-haspopup="menu" :aria-expanded="workspaceMenu?.key === space.key" :aria-label="`更多操作：${space.name}`" title="更多" :data-testid="`space-more-${space.name}`" @click.stop="openWorkspaceMenu(space, $event, $event.currentTarget)"><Ellipsis :size="14" /></button>
+            </div>
             <template v-if="expanded.has(space.key)">
               <div v-for="session in space.sessions" :key="session.id" class="nav-session-row" :class="{ 'menu-open': sessionMenu?.id === session.id }" @contextmenu.prevent="openSessionMenu(session.id, $event)">
                 <button type="button" class="nav-session" :class="{ selected: store.page === 'chat' && store.chat.currentId === session.id }" :aria-current="store.page === 'chat' && store.chat.currentId === session.id ? 'page' : undefined" :data-testid="`session-${session.id}`" :title="session.title" @click="openSession(session.id)">
@@ -344,6 +406,7 @@ const fixedPages = ['new-task', 'chat', 'ai-store', 'library', 'studio', 'games'
               <p v-if="!space.sessions.length" class="nav-empty">{{ space.key === '__recent__' ? '还没有任务' : '新任务会出现在这里' }}</p>
             </template>
           </template>
+          </div>
         </div>
         <div class="nav-sep"></div>
         <button v-for="item in bottomItems" :key="item.id" type="button" class="nav-item" :class="{ selected: isCurrent(item.id) }" :aria-current="isCurrent(item.id) ? 'page' : undefined" :data-testid="`nav-${item.id}`" :title="item.label" @pointerenter="preload(item.id)" @focus="preload(item.id)" @click="navigate(item.id)">
@@ -383,6 +446,9 @@ const fixedPages = ['new-task', 'chat', 'ai-store', 'library', 'studio', 'games'
         </div>
       </div>
     </aside>
+    <div v-if="workspaceMenu" ref="workspaceMenuEl" class="xb-menu session-menu" role="menu" aria-label="工作空间项目" data-testid="workspace-menu" :style="{ left: `${workspaceMenu.x}px`, top: `${workspaceMenu.y}px` }">
+      <button type="button" class="xb-menu-item" role="menuitem" data-testid="workspace-menu-rename" @click="startWorkspaceRename"><Pencil :size="15" />重命名</button>
+    </div>
     <div v-if="sessionMenu" ref="sessionMenuEl" class="xb-menu session-menu" role="menu" :aria-label="`对话：${menuSession?.title || '新对话'}`" data-testid="session-menu" :style="{ left: `${sessionMenu.x}px`, top: `${sessionMenu.y}px` }">
       <template v-if="!sessionMenu.confirming">
         <button type="button" class="xb-menu-item" role="menuitem" data-testid="session-menu-rename" @click="startRename"><Pencil :size="15" />重命名</button>
@@ -404,7 +470,7 @@ const fixedPages = ['new-task', 'chat', 'ai-store', 'library', 'studio', 'games'
         </div>
       </div>
     </div>
-    <ChatNameDialog :show="!!renamingId" title="重命名对话" placeholder="给这个对话起个名字" :initial="renamingTitle" :max-length="60" confirm-text="保存" :busy="renameBusy" @close="renamingId = ''" @submit="submitRename" />
+    <ChatNameDialog :show="!!renamingId || !!renamingWorkspace" :title="renamingWorkspace ? '重命名项目' : '重命名对话'" :placeholder="renamingWorkspace ? '给这个项目起个名字' : '给这个对话起个名字'" :initial="renamingWorkspace ? renamingWorkspaceTitle : renamingTitle" :max-length="60" confirm-text="保存" :busy="renameBusy" @close="renamingId = ''; renamingWorkspace = ''" @submit="value => renamingWorkspace ? submitWorkspaceRename(value) : submitRename(value)" />
     <div class="control-main">
       <main class="control-workspace" :class="{ 'fixed-page-workspace': fixedPages.includes(store.page) }">
         <NAlert v-if="store.initialError" class="workspace-alert" type="error" title="桌面配置暂时无法读取">{{ store.initialError }} <NButton size="small" @click="store.initialize()">重试</NButton></NAlert>
@@ -450,6 +516,16 @@ const fixedPages = ['new-task', 'chat', 'ai-store', 'library', 'studio', 'games'
 .nav-sub{display:flex;flex-direction:column;gap:1px;padding-left:10px}
 .nav-caption{display:flex;align-items:center;height:30px;margin-top:6px;padding:0 4px 0 10px;font-size:12px;font-weight:500;color:var(--ui-text-secondary)}
 .nav-caption .xb-icon-btn{margin-left:auto}
+.workspace-toggle{display:flex;align-items:center;gap:6px;flex:1;align-self:stretch;padding:0;border:0;background:none;color:inherit;font:inherit;text-align:left;cursor:pointer}
+.workspace-toggle:hover{color:var(--ui-text-primary)}
+.workspace-toggle .nav-chevron{margin-left:0}
+.nav-space-row{position:relative;display:flex;align-items:center}
+.nav-space-row .space-row{flex:1;min-width:0}
+.nav-space-more{position:absolute;right:4px;opacity:0;pointer-events:none;background:var(--ui-surface);color:var(--ui-text-secondary)}
+.is-collapsed .nav-space-more{display:none}
+.nav-space-row:hover .nav-space-more,.nav-space-row:focus-within .nav-space-more,.nav-space-row.menu-open .nav-space-more{opacity:1;pointer-events:auto}
+.nav-space-row:hover .space-row,.nav-space-row:focus-within .space-row,.nav-space-row.menu-open .space-row{padding-right:32px}
+.nav-space-row:hover .nav-hint,.nav-space-row:focus-within .nav-hint,.nav-space-row.menu-open .nav-hint{display:none}
 .space-row .xb-dot{margin-left:auto}
 .space-row .xb-dot+.nav-hint{margin-left:6px}
 .nav-session{display:flex;align-items:center;gap:8px;width:100%;height:30px;flex-shrink:0;padding:0 10px 0 36px;border:0;border-radius:8px;background:transparent;color:var(--ui-text-primary);opacity:.86;font-size:13px;text-align:left;cursor:pointer}
