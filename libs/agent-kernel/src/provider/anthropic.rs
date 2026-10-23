@@ -521,7 +521,7 @@ mod client {
             if profile.base_url.trim().is_empty() || profile.model.trim().is_empty() {
                 return Err(HarnessError::Config("base_url and model are required".into()));
             }
-            Ok(Self { profile, client: http::new_client()?, learned_output_limit: AtomicU32::new(u32::MAX) })
+            Ok(Self { client: http::new_client(&profile)?, profile, learned_output_limit: AtomicU32::new(u32::MAX) })
         }
     }
 
