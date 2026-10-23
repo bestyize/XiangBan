@@ -204,8 +204,8 @@ async fn refresh_inner(app: tauri::AppHandle, force: Option<bool>) -> Result<AiC
     if origin != crate::website::DEFAULT_SITE && !app.state::<crate::DesktopState>().isolated {
         return Err("登录模型配置只能从官方站点获取".into());
     }
-    let client = reqwest::Client::builder().timeout(Duration::from_secs(10))
-        .redirect(reqwest::redirect::Policy::none()).build().map_err(|_| "无法创建模型配置连接")?;
+    let client = crate::network::async_builder(reqwest::Client::builder().timeout(Duration::from_secs(10))
+        .redirect(reqwest::redirect::Policy::none()))?.build().map_err(|_| "无法创建模型配置连接")?;
     let mut request = client.get(format!("{origin}/api/v1/ai/providers"));
     if let Some(session) = crate::account::get_account_session(app.clone()) { request = request.bearer_auth(session.access_token); }
     if !current.catalogue_etag.is_empty() { request = request.header(reqwest::header::IF_NONE_MATCH, &current.catalogue_etag); }
