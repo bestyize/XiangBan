@@ -32,7 +32,7 @@ fn validate(mode: String, proxy_url: String) -> Result<NetworkConfig, String> {
             || url.username() != "" || url.password().is_some()
             || url.query().is_some() || url.fragment().is_some() || url.path() != "/"
         { return Err("代理只支持 HTTP、HTTPS、SOCKS5/SOCKS5H，且地址不能包含凭据或路径".into()); }
-        reqwest::Proxy::all(&proxy_url).map_err(|_| "无法识别代理服务器".to_string())?;
+        reqwest::Proxy::all(proxy_url.as_str()).map_err(|_| "无法识别代理服务器".to_string())?;
     }
     Ok(NetworkConfig { mode, proxy_url: if mode == "manual" { proxy_url } else { String::new() } })
 }
@@ -41,21 +41,23 @@ fn path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
 }
 pub fn initialize(app: &tauri::AppHandle) -> Result<(), String> {
     let config = match fs::read(path(app)?) {
-        Ok(data) => {
-            let parsed: NetworkConfig = serde_json::from_slice(&data).map_err(|e| format!("网络配置损坏：{e}"))?;
-            validate(parsed.mode, parsed.proxy_url)?
-        }
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => NetworkConfig::default(),
-        Err(error) => return Err(format!("无法读取网络配置：{error}")),
+        Ok(data) => serde_json::from_slice::<NetworkConfig>(&data).map_err(|e| e.to_string())
+            .and_then(|parsed| validate(parsed.mode, parsed.proxy_url)),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(NetworkConfig::default()),
+        Err(error) => Err(format!("无法读取网络配置：{error}")),
     };
-    *active().write().unwrap_or_else(|e| e.into_inner()) = config;
+    // A damaged optional network preference must never prevent the desktop from opening.
+    *active().write().unwrap_or_else(|e| e.into_inner()) = config.unwrap_or_else(|error| {
+        eprintln!("[network] invalid saved settings, using system proxy: {error}");
+        NetworkConfig::default()
+    });
     Ok(())
 }
 pub fn async_builder(builder: reqwest::ClientBuilder) -> Result<reqwest::ClientBuilder, String> {
     let config = current();
     Ok(match config.mode.as_str() {
         "direct" => builder.no_proxy(),
-        "manual" => builder.no_proxy().proxy(reqwest::Proxy::all(&config.proxy_url).map_err(|e| e.to_string())?),
+        "manual" => builder.no_proxy().proxy(reqwest::Proxy::all(config.proxy_url.as_str()).map_err(|e| e.to_string())?),
         _ => builder,
     })
 }
@@ -63,7 +65,7 @@ pub fn blocking_builder(builder: reqwest::blocking::ClientBuilder) -> Result<req
     let config = current();
     Ok(match config.mode.as_str() {
         "direct" => builder.no_proxy(),
-        "manual" => builder.no_proxy().proxy(reqwest::Proxy::all(&config.proxy_url).map_err(|e| e.to_string())?),
+        "manual" => builder.no_proxy().proxy(reqwest::Proxy::all(config.proxy_url.as_str()).map_err(|e| e.to_string())?),
         _ => builder,
     })
 }
