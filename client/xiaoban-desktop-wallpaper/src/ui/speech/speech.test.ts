@@ -16,6 +16,28 @@ function fixture() {
   });
   return { store, invoke, audios, revoke, notify };
 }
+describe('emoji are not read out', () => {
+  it('drops emoji, flags, skin tones and joined sequences, but keeps digits and text', () => {
+    expect(speechText('好的😊，我来看看👍🏽。')).toBe('好的，我来看看。');
+    expect(speechText('今天 🎉 发布了 🇨🇳 版本')).toBe('今天 发布了 版本');
+    expect(speechText('一家人 👨‍👩‍👧 出门')).toBe('一家人 出门');
+    expect(speechText('第 1️⃣ 步，共 3 步 ✅')).toBe('第 1 步，共 3 步');
+    expect(speechText('❤️')).toBe('');
+    expect(speechText('价格是 100 元 (含税) #1 *重点*')).toBe('价格是 100 元 (含税) #1 重点');
+  });
+});
+describe('symbols are not read out', () => {
+  it('drops quotation marks of every kind, keeping the words', () => {
+    expect(speechText('他说“你好”，她说"再见"，还有‘好’和「行」、『可以』。')).toBe('他说你好，她说再见，还有好和行、可以。');
+    expect(speechText("'开始' 然后 don't stop 'now'")).toBe('开始 然后 don\'t stop now');
+  });
+  it('turns stray asterisks, underscores and similar marks into a gap', () => {
+    expect(speechText('2 * 3 等于 6')).toBe('2 3 等于 6');
+    expect(speechText('文件 report_final_v2 已保存')).toBe('文件 report final v2 已保存');
+    expect(speechText('A | B ~ C ^ D')).toBe('A B C D');
+    expect(speechText('**重点**和*强调*')).toBe('重点和强调');
+  });
+});
 describe('speech lifecycle', () => {
   it('reads link labels and prose while omitting fenced commands and destination URLs', () => {
     const plain = speechText('# 你好\n\n**小伴**，打开[这里](https://private.example/token)。\n\n```sh\nrm -rf /test\n```');

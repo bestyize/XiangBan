@@ -14,7 +14,7 @@ describe('assistant playback echo', () => {
     expect(isPlaybackEcho('不是，我想问另外一个问题', '我想问明天的天气')).toBe(false);
   });
   it('ignores punctuation and recognizer noise labels', () => {
-    for (const text of ['……', '[noise]', '（音乐）', '<|nospeech|>', '🎵']) expect(isSpeechText(text)).toBe(false);
+    for (const text of ['……', '[noise]', '（音乐）', '<|nospeech|>', '🎵', 'The', 'The.']) expect(isSpeechText(text)).toBe(false);
     for (const text of ['停', '你好', '帮我播放音乐']) expect(isSpeechText(text)).toBe(true);
   });
 });

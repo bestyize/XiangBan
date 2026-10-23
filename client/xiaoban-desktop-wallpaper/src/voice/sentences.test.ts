@@ -44,4 +44,7 @@ describe('SentenceChunker', () => {
   it('keeps later sentences whole', () => {
     expect(feed(['好的。我先看一下天气，再看一下时间，然后告诉你。'])).toEqual(['好的。', '我先看一下天气，再看一下时间，然后告诉你。']);
   });
+  it('does not read emoji, and does not read a sentence made only of them', () => {
+    expect(feed(['好的😊，我来看看。', '😄', '再见👋！'])).toEqual(['好的，我来看看。', '再见！']);
+  });
 });
