@@ -17,8 +17,9 @@ const asking = ref<string | null>(null);
 
 const nameOf = (path: string) => path.replace(/\\/g, '/').split('/').filter(Boolean).at(-1) || path;
 const current = computed(() => props.chat.currentWorkspace);
-const currentName = computed(() => (current.value ? nameOf(current.value) : '工作区'));
 const same = (a: string, b: string) => a.replace(/[\\/]+$/, '') === b.replace(/[\\/]+$/, '');
+const currentName = computed(() => !current.value || same(current.value, props.chat.workspace)
+  ? '默认工作区' : nameOf(current.value));
 const recent = computed(() => props.chat.recentWorkspaces.filter(w => w.exists));
 const defaultListed = computed(() => recent.value.some(w => same(w.path, props.chat.workspace)));
 
