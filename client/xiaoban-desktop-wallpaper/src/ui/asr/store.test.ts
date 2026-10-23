@@ -254,3 +254,17 @@ describe('recognising ahead of the end-of-turn decision', () => {
     h.store.dispose();
   });
 });
+
+describe('stray recognition results', () => {
+  it('drops a stray "The" instead of passing it on, and still delivers real speech', async () => {
+    let answer = 'The.';
+    const h = setup({ enabled: true, transcribe: async () => answer }), text = vi.fn();
+    await h.store.activate(text);
+    h.phrase(); await flushPromises();
+    expect(text).not.toHaveBeenCalled();
+    answer = '帮我查一下天气。';
+    h.phrase(); await flushPromises();
+    expect(text).toHaveBeenCalledExactlyOnceWith('帮我查一下天气。');
+    h.store.dispose();
+  });
+});

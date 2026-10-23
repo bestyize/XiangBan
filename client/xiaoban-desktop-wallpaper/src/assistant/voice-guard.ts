@@ -1,4 +1,5 @@
 import { speechText } from '../ui/speech/text.ts';
+import { isStray } from '../voice/stray.ts';
 
 function words(text: string): string {
   return speechText(text.replace(/<\|[^>]*\|>/g, '')).normalize('NFKC').toLowerCase().replace(/[^\p{L}\p{N}]/gu, '');
@@ -6,7 +7,7 @@ function words(text: string): string {
 
 /** Reject non-speech labels and punctuation without banning ordinary short replies. */
 export function isSpeechText(text: string): boolean {
-  return Boolean(words(text.replace(/<\|[^>]*\|>/g, '').replace(/^\s*[（(\[]\s*(?:noise|music|silence|杂音|噪音|音乐|静音)\s*[）)\]]\s*$/i, '')));
+  return !isStray(text) && Boolean(words(text.replace(/<\|[^>]*\|>/g, '').replace(/^\s*[（(\[]\s*(?:noise|music|silence|杂音|噪音|音乐|静音)\s*[）)\]]\s*$/i, '')));
 }
 
 /** Compare against the actual read-out text, including small ASR substitutions.

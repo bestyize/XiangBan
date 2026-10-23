@@ -2,6 +2,7 @@ import { reactive } from 'vue';
 import { UtteranceSegmenter } from './audio.ts';
 import { SmartSegmenter, type Segmenter } from '../../voice/turn/segmenter.ts';
 import type { TurnModels } from '../../voice/turn/models.ts';
+import { isStray } from '../../voice/stray.ts';
 import { captureMicrophone, MICROPHONE_UNSUPPORTED, supportsMicrophone, type Capture } from './capture.ts';
 
 interface HostStatus { enabled: boolean; modelReady: boolean; engineReady: boolean; warming?: boolean; microphoneError?: string }
@@ -118,7 +119,8 @@ export function createAsrStore(deps: AsrDeps): AsrStore {
             // if the answer was yes and nothing was added since, that text is the utterance.
             const early = item.mark && speculation?.mark === item.mark ? await speculation.text : null;
             const text = early ?? await transcribe();
-            if (ticket === recording && store.enabled && !disposed && text.trim()) {
+            // A stray "The" on noise or echo is not speech: drop it here, before any caller can act on it.
+            if (ticket === recording && store.enabled && !disposed && text.trim() && !isStray(text)) {
               if (item.partial) options.onPartial?.(text.trim());
               else if (item.preview) options.onPreview?.(text.trim(), item.context!);
               else if (item.context) receiver?.(text.trim(), item.context);
