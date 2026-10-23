@@ -331,6 +331,9 @@ fn provider_profile(config: &AiConfig) -> ProviderProfile {
     let mut profile = ProviderProfile::new(config.base_url.clone(), config.api_key.clone(), config.model.clone());
     profile.extra_body = config.reasoning_body();
     profile.max_request_bytes = Some(8 * 1024 * 1024);
+    let network = crate::network::current();
+    profile.proxy_mode = network.mode;
+    profile.proxy_url = network.proxy_url;
     // Central model policy: compatible APIs use endpoint defaults; Anthropic
     // receives a required model/endpoint-specific max_tokens value.
     let capabilities = config.model_capabilities();
