@@ -224,7 +224,8 @@ pub fn update(app: &tauri::AppHandle, change: &Change) -> Result<Value, String> 
                 return Err(format!("布局已保存，但窗口应用失败：{}", json!(errors)));
             }
         }
-        return Ok(json!({"ok":true,"target":change.target,"action":change.action,"x":change.x,"y":change.y,"layer":change.layer}));
+        // A widget's layer is written to its saved layout, so it is still there after a restart.
+        return Ok(json!({"ok":true,"target":change.target,"action":change.action,"x":change.x,"y":change.y,"layer":change.layer,"saved":true}));
     } else if let Some(action) = change.action.as_deref() {
         match label.as_str() {
             "assistant" => match action {
@@ -289,8 +290,9 @@ pub fn update(app: &tauri::AppHandle, change: &Change) -> Result<Value, String> 
             crate::widgets::sync(app);
         }
     }
+    // Other windows keep the layer only until the app quits.
     Ok(
-        json!({"ok":true,"target":change.target,"action":change.action,"x":change.x,"y":change.y,"layer":change.layer}),
+        json!({"ok":true,"target":change.target,"action":change.action,"x":change.x,"y":change.y,"layer":change.layer,"saved":change.layer.is_none(),"layerLastsUntilQuit":change.layer.is_some()}),
     )
 }
 
