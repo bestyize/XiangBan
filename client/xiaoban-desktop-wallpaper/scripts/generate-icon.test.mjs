@@ -24,3 +24,13 @@ test('Tauri runs icon generation before building and includes Windows/Linux imag
   assert.ok(config.bundle.icon.includes('icons/icon.ico'));
   assert.ok(config.bundle.icon.includes('icons/icon.png'));
 });
+
+test('checked-in native icons are generated from the current source, not left from an older design', async () => {
+  const red = appearance.match(/id: 'red', name: '小伴红',[\s\S]*?light: \{ btn: '#([0-9A-Fa-f]{6})'/)[1];
+  const tray = await readFile(fileURLToPath(new URL('../src-tauri/icons/tray.rgba', import.meta.url)));
+  assert.equal(tray.length, 64 * 64 * 4);
+  // The Sparkles mark leaves the left-middle of the rounded square plain theme red.
+  const at = (32 * 64 + 6) * 4;
+  assert.equal(tray.subarray(at, at + 3).toString('hex').toUpperCase(), red.toUpperCase(),
+    'Run `node scripts/generate-icon.mjs` and commit icon.icns, icon.ico, icon.png and tray.rgba');
+});

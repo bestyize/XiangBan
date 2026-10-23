@@ -1,0 +1,7 @@
+# `node scripts/generate-icon.mjs` (Tauri's icon command) also writes sizes this app
+# does not bundle. Only icon.icns, icon.ico, icon.png and tray.rgba are kept.
+/android/
+/ios/
+/*x*.png
+/Square*Logo.png
+/StoreLogo.png
