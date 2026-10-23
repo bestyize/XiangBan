@@ -102,9 +102,12 @@ const filePicker = ref<HTMLInputElement>();
 const imageReading = ref(false), submitting = ref(false), dropActive = ref(false), capturing = ref(false), picking = ref(false);
 /** Pinned: a click elsewhere does not fold the capsule away. */
 const pinned = ref(false);
-const sessionsOpen = ref(false), sessionsHost = ref<HTMLElement>();
+const sessionsOpen = ref(false), sessionsHost = ref<HTMLElement>(), sessionsPanel = ref<HTMLElement>();
 function closeMenus() { sessionsOpen.value = false; }
-function outsideMenus(event: PointerEvent) { if (sessionsOpen.value && !sessionsHost.value?.contains(event.target as Node)) closeMenus(); }
+function outsideMenus(event: PointerEvent) {
+  const target = event.target as Node;
+  if (sessionsOpen.value && !sessionsHost.value?.contains(target) && !sessionsPanel.value?.contains(target)) closeMenus();
+}
 function escape() {
   if (sessionsOpen.value) { closeMenus(); return; }
   if (capturing.value) return;
@@ -434,17 +437,6 @@ onBeforeUnmount(()=>{
             <header class="card-head">
               <div ref="sessionsHost" class="session-host" data-no-drag>
                 <button type="button" class="session-title" :aria-expanded="sessionsOpen" aria-haspopup="menu" title="切换最近的会话" data-testid="assistant-sessions" @click="sessionsOpen = !sessionsOpen"><span>{{ store.title || '新对话' }}</span><ChevronDown :size="13" :stroke-width="2.2" /></button>
-                <div v-if="sessionsOpen" class="session-menu" role="menu" aria-label="最近会话" data-testid="assistant-session-menu">
-                  <p class="menu-label">最近会话</p>
-                  <button v-for="session in store.recent" :key="session.id" type="button" class="menu-item" role="menuitemradio" :aria-checked="session.id === store.currentId" :disabled="store.changingSession || busy" @click="pickSession(session.id)">
-                    <Check v-if="session.id === store.currentId" :size="14" :stroke-width="2.2" class="menu-check" /><span v-else class="menu-check" />
-                    <span class="menu-text">{{ session.title || '新对话' }}</span>
-                  </button>
-                  <p v-if="!store.recent.length" class="menu-empty">还没有会话</p>
-                  <div class="menu-sep" />
-                  <button type="button" class="menu-item" role="menuitem" @click="act(() => store.openChat())"><ArrowUpRight :size="14" :stroke-width="1.8" class="menu-check" />在主窗口查看全部</button>
-                  <button type="button" class="menu-item" role="menuitem" data-testid="assistant-settings" @click="act(() => store.openSettings('assistant'))"><Settings :size="14" :stroke-width="1.8" class="menu-check" />超级小伴设置…</button>
-                </div>
               </div>
               <span class="head-gap" />
               <button type="button" class="head-btn" title="新对话" aria-label="新对话" data-testid="assistant-new-chat" :disabled="imageReading || submitting || capturing || store.changingSession" @click="newChat"><SquarePen :size="16" :stroke-width="1.75" /></button>
@@ -452,7 +444,19 @@ onBeforeUnmount(()=>{
               <button type="button" class="head-btn" :class="{ on: pinned }" :title="pinned ? '取消固定' : '固定，点别处也不收起'" :aria-label="pinned ? '取消固定' : '固定'" :aria-pressed="pinned" data-testid="assistant-pin" @click="pinned = !pinned"><Pin :size="16" :stroke-width="1.75" :fill="pinned ? 'currentColor' : 'none'" /></button>
               <button type="button" class="head-btn" title="收成小球 · Esc" aria-label="收成小球" data-testid="assistant-close" @click="act(() => store.hide())"><Minus :size="16" :stroke-width="1.9" /></button>
             </header>
-            <div ref="scroller" class="card-body" :class="{ fixed: fixedBody }" data-testid="assistant-card-body">
+            <!-- The switcher takes the conversation's place inside the card: a dropdown would hide under the capsule and run off the window. -->
+            <div v-if="sessionsOpen" ref="sessionsPanel" class="session-menu" data-no-drag role="menu" aria-label="最近会话" data-testid="assistant-session-menu">
+              <p class="menu-label">最近会话</p>
+              <button v-for="session in store.recent" :key="session.id" type="button" class="menu-item" role="menuitemradio" :aria-checked="session.id === store.currentId" :disabled="store.changingSession || busy" @click="pickSession(session.id)">
+                <Check v-if="session.id === store.currentId" :size="14" :stroke-width="2.2" class="menu-check" /><span v-else class="menu-check" />
+                <span class="menu-text">{{ session.title || '新对话' }}</span>
+              </button>
+              <p v-if="!store.recent.length" class="menu-empty">还没有会话</p>
+              <div class="menu-sep" />
+              <button type="button" class="menu-item" role="menuitem" @click="act(() => store.openChat())"><ArrowUpRight :size="14" :stroke-width="1.8" class="menu-check" />在主窗口查看全部</button>
+              <button type="button" class="menu-item" role="menuitem" data-testid="assistant-settings" @click="act(() => store.openSettings('assistant'))"><Settings :size="14" :stroke-width="1.8" class="menu-check" />超级小伴设置…</button>
+            </div>
+            <div v-show="!sessionsOpen" ref="scroller" class="card-body" :class="{ fixed: fixedBody }" data-testid="assistant-card-body">
               <template v-for="item in turns" :key="item.id">
                 <div v-if="item.kind === 'user'" class="you-row">
                   <div v-if="item.files?.length" class="sent-files"><span v-for="(file, n) in item.files" :key="n" class="file-chip" :title="file.name">{{ file.name }}</span></div>
@@ -605,9 +609,10 @@ button{font:inherit}
 .session-host{position:relative;min-width:0}
 .session-title{display:inline-flex;align-items:center;gap:5px;max-width:220px;height:28px;padding:0 8px;border:0;border-radius:8px;background:transparent;color:var(--text);font-size:13px;font-weight:600;cursor:pointer}
 .session-title span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.session-title svg{flex:none;color:var(--text-3)}
+.session-title svg{flex:none;color:var(--text-3);transition:transform .15s}
+.session-title[aria-expanded=true] svg{transform:rotate(180deg)}
 .session-title:hover,.session-title[aria-expanded=true]{background:var(--hover)}
-.session-menu{position:absolute;z-index:10;top:calc(100% + 4px);left:0;width:264px;padding:5px;box-sizing:border-box;border-radius:12px;background:var(--glass-card);backdrop-filter:blur(20px);box-shadow:0 0 0 .5px var(--edge),0 14px 36px rgba(0,0,0,.22);cursor:default}
+.session-menu{max-height:340px;overflow-y:auto;padding:6px 8px 8px;box-sizing:border-box;cursor:default;scrollbar-width:thin;scrollbar-color:var(--scroll) transparent}
 .menu-label{margin:0;padding:6px 9px 3px;font-size:11.5px;color:var(--text-3)}
 .menu-empty{margin:0;padding:6px 9px;font-size:12.5px;color:var(--text-3)}
 .menu-item{display:flex;align-items:center;gap:9px;width:100%;height:32px;padding:0 9px;border:0;border-radius:7px;background:transparent;color:var(--text);font-size:13px;text-align:left;cursor:pointer}
