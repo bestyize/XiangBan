@@ -9,8 +9,8 @@ import type { AsrStore, TranscriptContext } from '../ui/asr/store.ts';
 import type { SpeechStore, SpeechStream } from '../ui/speech/store.ts';
 import type { ChatItem } from '../ui/chat/types.ts';
 import { isFiller, isPlaybackEcho, isSpeechText } from '../assistant/voice-guard.ts';
-import { interruptionNote } from './interruption.ts';
-import { ACK_DELAY_MS } from './ack.ts';
+import { interruptionNote, spokenNote } from './interruption.ts';
+import { ACK_PHRASES, ackDelay, ackKind, chooseAck, type AckKind } from './ack.ts';
 
 /** How long a pause lasts before what was heard is sent, and after the recogniser marked the sentence finished. */
 export const LIVE_SEND_GRACE_MS = 300;
@@ -72,6 +72,7 @@ export function createLiveTalk(deps: LiveTalkDeps): LiveTalk {
   /** The current answer was talked over; when it arrives it is not read. */
   let interrupted = false;
   let interruption: { session: string | null; note: string } | null = null;
+  let lastAck: string | undefined;
 
   const answerText = () => {
     const items = chat.current()?.items ?? [];
@@ -131,18 +132,21 @@ export function createLiveTalk(deps: LiveTalkDeps): LiveTalk {
     if (!value || !live.active) return;
     sending = true; listenVersion++; speechVersion++; clearTimers();
     asr.deactivate();
-    let sent = false;
+    let sent = false, kind: AckKind | null = null, phrase: string | undefined;
     try {
       await speech.stop();
       interrupted = false;
-      const note = interruption && interruption.session === chat.currentId ? interruption.note : '';
+      // What is said first has to be decided before sending, so the model can be told not to say it again.
+      kind = ackKind(value);
+      phrase = kind ? chooseAck(ACK_PHRASES[kind].filter(item => speech.ackReady?.(item)), lastAck) : undefined;
+      const note = (interruption && interruption.session === chat.currentId ? interruption.note : '') + (phrase ? spokenNote(phrase) : '');
       sent = note ? await chat.send(value, [], note) : await chat.send(value);
       if (sent) interruption = null;
     } finally { sending = false; }
     if (!live.active) return;
     if (!sent) { await resume(); return; }
     beginReading();
-    scheduleAck();
+    if (kind && phrase) { lastAck = phrase; scheduleAck(kind, phrase); }
     // Keep listening while 小伴 thinks, so the user can add to the question or take it back.
     void resume();
   }
@@ -164,15 +168,15 @@ export function createLiveTalk(deps: LiveTalkDeps): LiveTalk {
     const text = answerText();
     if (text) reading.push(text);
   }
-  /** An answer that takes a moment gets a short "好的" first, so the wait is not silent. */
-  function scheduleAck() {
+  /** What is said first, fitted to what the user said: a greeting at once, a request or question after a short wait. */
+  function scheduleAck(kind: AckKind, phrase: string) {
     clearTimer(ackTimer);
     const ticket = speechVersion;
     ackTimer = setTimer(() => {
       ackTimer = undefined;
       if (ticket !== speechVersion || !live.active || flags.speaking || !chat.current()?.running || answerText()) return;
-      speech.ack?.();
-    }, ACK_DELAY_MS);
+      speech.ack?.(phrase);
+    }, ackDelay(kind));
   }
   /** After an answer, or when one could not start: listen again. */
   async function resume() {

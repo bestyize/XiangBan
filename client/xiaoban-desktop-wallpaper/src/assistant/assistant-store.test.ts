@@ -2,7 +2,7 @@ import { nextTick, reactive } from 'vue';
 import { flushPromises } from '@vue/test-utils';
 import { describe, expect, it, vi } from 'vitest';
 import { createAssistantStore, LISTEN_IDLE_MS, SESSION_KEY, SEND_GRACE_MS, SETTLED_GRACE_MS } from './assistant-store.ts';
-import { ACK_DELAY_MS } from '../voice/ack.ts';
+import { ACK_DELAY_MS, ACK_PHRASES } from '../voice/ack.ts';
 import { createChatStore } from '../ui/chat/chat-store.ts';
 import type { AsrActivationOptions, TranscriptContext } from '../ui/asr/store.ts';
 import { createAsrStore } from '../ui/asr/store.ts';
@@ -48,7 +48,7 @@ function setup(options: { configured?: boolean; voice?: boolean; prefs?: { open:
     init: vi.fn(async () => {}),
     speak: vi.fn(async () => { speech.status = 'playing'; }),
     stop: vi.fn(async () => { speech.status = 'idle'; }),
-    ack: vi.fn(() => true), prepareAck: vi.fn(async () => {}),
+    ack: vi.fn(() => true), ackReady: vi.fn(() => false), prepareAck: vi.fn(async () => {}),
     stream: undefined as any,
   });
   const handlers = new Map<string, (payload: unknown) => void>();
@@ -851,18 +851,46 @@ describe('answering faster', () => {
   });
 });
 
-describe('acknowledging a spoken question', () => {
+describe('saying something first', () => {
   async function asked(text = '帮我整理一下下载文件夹', spoken = true) {
     const h = setup({ prefs: { open: 'type', read: 'voice' } });
+    h.speech.ackReady.mockReturnValue(true); // the phrases are prepared
     await h.store.init(); await h.store.opened();
     await h.store.submit(text, spoken);
     return h;
   }
-  it('prepares the acknowledgements and says one when the answer takes a moment', async () => {
+  const said = (h: Awaited<ReturnType<typeof asked>>) => (h.speech.ack.mock.calls as unknown as string[][]).map(call => call[0]);
+  const noteOf = (h: Awaited<ReturnType<typeof asked>>) => (h.chat.send.mock.calls.at(-1) as unknown as unknown[])[2] as string | undefined;
+
+  it('takes up a request after a short wait, and tells the model what was said', async () => {
     const h = await asked();
     expect(h.speech.prepareAck).toHaveBeenCalled();
     h.advance(ACK_DELAY_MS - 1); expect(h.speech.ack).not.toHaveBeenCalled();
-    h.advance(2); expect(h.speech.ack).toHaveBeenCalledOnce();
+    h.advance(2); expect(said(h)).toHaveLength(1); expect(ACK_PHRASES.task).toContain(said(h)[0]);
+    expect(noteOf(h)).toContain(`「${said(h)[0]}」`); expect(noteOf(h)).toContain('不要重复');
+    h.store.dispose();
+  });
+  it('answers a question with "I\'ll think", and a greeting at once with a greeting', async () => {
+    const question = await asked('明天北京会下雨吗');
+    question.advance(ACK_DELAY_MS + 1); expect(ACK_PHRASES.question).toContain(said(question)[0]); question.store.dispose();
+    for (const [text, kind] of [['你好', 'hello'], ['谢谢你', 'thanks'], ['晚安', 'goodnight']] as const) {
+      const social = await asked(text);
+      social.advance(0); // no wait: a greeting is answered at once
+      expect(ACK_PHRASES[kind]).toContain(said(social)[0]);
+      expect(noteOf(social)).toContain(`「${said(social)[0]}」`);
+      social.store.dispose();
+    }
+  });
+  it('says nothing to a feeling, a plain statement or bare agreement, and sends no note', async () => {
+    for (const text of ['今天好累', '今天天气不错', '好的']) {
+      const h = await asked(text);
+      h.advance(ACK_DELAY_MS + 1); expect(h.speech.ack).not.toHaveBeenCalled(); expect(h.chat.send).toHaveBeenLastCalledWith(text); h.store.dispose();
+    }
+  });
+  it('says nothing, and claims nothing, when the phrase is not ready to be played', async () => {
+    const h = setup({ prefs: { open: 'type', read: 'voice' } });
+    await h.store.init(); await h.store.opened(); await h.store.submit('你好', true);
+    h.advance(ACK_DELAY_MS + 1); expect(h.speech.ack).not.toHaveBeenCalled(); expect(h.chat.send).toHaveBeenLastCalledWith('你好');
     h.store.dispose();
   });
   it('says nothing when the answer has already started', async () => {
@@ -882,6 +910,7 @@ describe('acknowledging a spoken question', () => {
   });
   it('says nothing when reading is off', async () => {
     const h = setup({ prefs: { open: 'type', read: 'never' } });
+    h.speech.ackReady.mockReturnValue(true);
     await h.store.init(); await h.store.opened(); await h.store.submit('你好', true);
     h.advance(ACK_DELAY_MS + 1); expect(h.speech.ack).not.toHaveBeenCalled(); expect(h.speech.prepareAck).not.toHaveBeenCalled();
     h.store.dispose();

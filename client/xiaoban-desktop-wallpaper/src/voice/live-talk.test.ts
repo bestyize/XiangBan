@@ -3,6 +3,7 @@ import { flushPromises } from '@vue/test-utils';
 import { describe, expect, it, vi } from 'vitest';
 import type { AsrActivationOptions, TranscriptContext } from '../ui/asr/store.ts';
 import { createLiveTalk, LIVE_SEND_GRACE_MS } from './live-talk.ts';
+import { ACK_DELAY_MS, ACK_PHRASES } from './ack.ts';
 
 function setup() {
   let clock = 1_000_000;
@@ -38,7 +39,7 @@ function setup() {
     status: 'idle' as 'idle' | 'synthesizing' | 'playing',
     speak: vi.fn(async () => { speech.status = 'playing'; }),
     stop: vi.fn(async () => { speech.status = 'idle'; }),
-    ack: vi.fn(() => true), prepareAck: vi.fn(async () => {}),
+    ack: vi.fn(() => true), ackReady: vi.fn(() => false), prepareAck: vi.fn(async () => {}),
     stream: undefined as any,
   });
   const notify = vi.fn();
@@ -121,5 +122,40 @@ describe('实时对话 in the conversation', () => {
     await live.start();
     expect(live.active).toBe(false); expect(notify).toHaveBeenCalledWith(expect.stringContaining('语音识别'), 'info');
     live.dispose();
+  });
+});
+
+describe('实时对话 saying something first', () => {
+  const ready = (speech: ReturnType<typeof setup>['speech']) => speech.ackReady.mockReturnValue(true);
+  const noteOf = (chat: ReturnType<typeof setup>['chat']) => (chat.send.mock.calls.at(-1) as unknown as unknown[])[2] as string | undefined;
+  it('greets back at once and tells the model what was said', async () => {
+    const { live, chat, speech, advance, say } = setup(); ready(speech);
+    await live.start();
+    say('你好'); advance(LIVE_SEND_GRACE_MS + 5); await flushPromises();
+    advance(0);
+    const phrase = (speech.ack.mock.calls as unknown as string[][])[0][0];
+    expect(ACK_PHRASES.hello).toContain(phrase);
+    expect(noteOf(chat)).toContain(`「${phrase}」`);
+    live.dispose();
+  });
+  it('takes up a request only after a short wait', async () => {
+    const { live, chat, speech, advance, say } = setup(); ready(speech);
+    await live.start();
+    say('帮我查一下明天的会'); advance(LIVE_SEND_GRACE_MS + 5); await flushPromises();
+    expect(speech.ack).not.toHaveBeenCalled();
+    advance(ACK_DELAY_MS + 1);
+    expect(ACK_PHRASES.task).toContain((speech.ack.mock.calls as unknown as string[][])[0][0]);
+    expect(noteOf(chat)).toContain('不要重复');
+    live.dispose();
+  });
+  it('says nothing, and claims nothing, to a remark that needs no acknowledgement or when the phrases are not ready', async () => {
+    const quiet = setup(); ready(quiet.speech);
+    await quiet.live.start();
+    quiet.say('今天天气不错'); quiet.advance(LIVE_SEND_GRACE_MS + 5); await flushPromises(); quiet.advance(ACK_DELAY_MS + 1);
+    expect(quiet.speech.ack).not.toHaveBeenCalled(); expect(quiet.chat.send).toHaveBeenLastCalledWith('今天天气不错'); quiet.live.dispose();
+    const notReady = setup();
+    await notReady.live.start();
+    notReady.say('你好'); notReady.advance(LIVE_SEND_GRACE_MS + 5); await flushPromises(); notReady.advance(ACK_DELAY_MS + 1);
+    expect(notReady.speech.ack).not.toHaveBeenCalled(); expect(notReady.chat.send).toHaveBeenLastCalledWith('你好'); notReady.live.dispose();
   });
 });
