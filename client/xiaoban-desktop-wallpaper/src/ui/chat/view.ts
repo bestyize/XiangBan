@@ -70,6 +70,11 @@ export function itemsFromHistory(view: SessionView, messages: WireMessage[]): Ch
         tools.set(call.id, item);
         items.push(item);
       }
+      const metadata = message.structured_content;
+      if (metadata && typeof metadata === 'object' && 'interrupted' in metadata && metadata.interrupted === true) {
+        items.push({ kind: 'notice', id: nextId(view), tone: 'warning',
+          text: '这段回答在中途中断，已保留生成的内容。', canContinue: true });
+      }
     } else if (message.role === 'tool' && message.tool_call_id) {
       const item = tools.get(message.tool_call_id);
       if (item) { item.output = toolOutput(textOf(message), message.structured_content); item.status = message.is_error ? 'error' : 'done'; }
@@ -223,5 +228,3 @@ export function describeCall(name: string, argumentsJson: string): string {
   const line = (text ?? '').split('\n')[0].trim();
   return line.length > 90 ? `${line.slice(0, 90)}…` : line;
 }
-
-

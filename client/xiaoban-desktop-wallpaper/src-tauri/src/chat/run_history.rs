@@ -47,6 +47,71 @@ pub(super) fn forward(
     Ok(())
 }
 
+/// Recover only displayable text from the final model attempt. Tool dispatch boundaries
+/// prove the preceding assistant message was already saved; never recreate tool calls,
+/// signatures or encrypted state from a partially written run log.
+#[derive(Default)]
+struct VisibleTail {
+    text: String,
+    reasoning: Vec<agent_kernel::ReasoningSegment>,
+}
+
+impl VisibleTail {
+    fn push(&mut self, event: &Event) {
+        match event {
+            Event::TextDelta { text } => self.text.push_str(text),
+            Event::ReasoningDelta { kind, text } => {
+                if let Some(last) = self.reasoning.last_mut().filter(|part| part.kind == *kind) {
+                    last.text.push_str(text);
+                } else if !text.is_empty() {
+                    self.reasoning.push(agent_kernel::ReasoningSegment { kind: *kind, text: text.clone() });
+                }
+            }
+            Event::ToolStart { .. } | Event::ToolEnd { .. } | Event::Continuing { .. } | Event::Done => {
+                *self = Self::default();
+            }
+            _ => {}
+        }
+    }
+
+    fn message(self, saved: &[agent_kernel::Message]) -> Option<agent_kernel::Message> {
+        if self.text.is_empty() && self.reasoning.is_empty() { return None; }
+        if saved.last().is_some_and(|last| last.role == agent_kernel::Role::Assistant
+            && last.text() == self.text && last.reasoning == self.reasoning) {
+            return None;
+        }
+        let mut message = agent_kernel::Message::assistant(self.text, Vec::new());
+        message.reasoning = self.reasoning;
+        message.structured_content = Some(json!({"interrupted": true}));
+        Some(message)
+    }
+}
+
+/// Presentation-only recovery: persisted protocol history is not rewritten when opening
+/// a conversation, and no tools or model requests are replayed.
+pub(super) fn recover_visible_tail(
+    dir: &std::path::Path, session: &str, saved: &[agent_kernel::Message],
+) -> Result<Option<agent_kernel::Message>, HarnessError> {
+    let entries = match std::fs::read_dir(dir) {
+        Ok(entries) => entries,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(error) => return Err(HarnessError::Store(error.to_string())),
+    };
+    let newest = entries.flatten().filter_map(|entry| {
+        let name = entry.file_name().to_string_lossy().into_owned();
+        let run = name.strip_prefix("run-")?.strip_suffix(".jsonl")?.to_owned();
+        Some((entry.metadata().ok()?.modified().ok()?, run))
+    }).max();
+    let Some((_, run)) = newest else { return Ok(None); };
+    let log = JsonlRunLog::new(dir);
+    let mut tail = VisibleTail::default();
+    log.visit(&run, |record| {
+        if record.session_id != session || record.parent_run_id.is_some() { return; }
+        if let RunEventBody::Event { event } = record.body { tail.push(&event); }
+    })?;
+    Ok(tail.message(saved))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -81,5 +146,62 @@ mod tests {
         assert!(status.terminal);
         assert_eq!(status.state, Some(RunState::Failed));
         let _ = std::fs::remove_dir_all(dir);
+    }
+}
+
+#[cfg(test)]
+mod visible_recovery_tests {
+    use super::*;
+    use agent_kernel::{Message, ReasoningKind};
+
+    #[test]
+    fn failed_tail_is_visible_but_not_recovered_twice_or_as_tool_state() {
+        let mut tail = VisibleTail::default();
+        tail.push(&Event::ReasoningDelta { kind: ReasoningKind::Text, text: "checking".into() });
+        tail.push(&Event::TextDelta { text: "answer prefix".into() });
+        tail.push(&Event::Error { message: "network".into() });
+        let recovered = tail.message(&[]).unwrap();
+        assert_eq!(recovered.text(), "answer prefix");
+        assert_eq!(recovered.reasoning[0].text, "checking");
+        assert!(recovered.tool_calls.is_empty());
+        assert!(recovered.provider_state.is_none());
+        let mut duplicate = VisibleTail::default();
+        duplicate.push(&Event::ReasoningDelta { kind: ReasoningKind::Text, text: "checking".into() });
+        duplicate.push(&Event::TextDelta { text: "answer prefix".into() });
+        assert!(duplicate.message(&[recovered]).is_none());
+    }
+
+    #[test]
+    fn saved_tool_round_is_not_recovered_as_another_assistant_message() {
+        let mut tail = VisibleTail::default();
+        tail.push(&Event::TextDelta { text: "before tool".into() });
+        tail.push(&Event::ToolStart { id: "t".into(), name: "lookup".into(), arguments: "{}".into() });
+        tail.push(&Event::ReasoningDelta { kind: ReasoningKind::Summary, text: "next round".into() });
+        let recovered = tail.message(&[Message::assistant("before tool", vec![])]).unwrap();
+        assert!(recovered.text().is_empty());
+        assert_eq!(recovered.reasoning[0].text, "next round");
+        let mut done = VisibleTail::default();
+        done.push(&Event::TextDelta { text: "complete".into() });
+        done.push(&Event::Done);
+        assert!(done.message(&[]).is_none());
+    }
+
+    #[test]
+    fn recovery_reads_long_trace_and_ignores_a_partial_final_record() {
+        let dir = std::env::temp_dir().join(format!("xiaoban-visible-recovery-{}-{}", std::process::id(),
+            std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()));
+        let journal = JsonlRunLog::new(&dir);
+        for sequence in 1..=270 {
+            journal.append(&RunEvent { run_id: "r".into(), session_id: "s".into(), parent_run_id: None,
+                sequence, timestamp_ms: sequence,
+                body: RunEventBody::Event { event: Event::TextDelta { text: "x".into() } } }).unwrap();
+        }
+        use std::io::Write;
+        std::fs::OpenOptions::new().append(true).open(dir.join("run-r.jsonl")).unwrap().write_all(b"{unfinished").unwrap();
+        let recovered = recover_visible_tail(&dir, "s", &[]).unwrap().unwrap();
+        assert_eq!(recovered.text().len(), 270);
+        assert!(recover_visible_tail(&dir, "other-session", &[]).unwrap().is_none());
+        drop(journal);
+        std::fs::remove_dir_all(dir).unwrap();
     }
 }

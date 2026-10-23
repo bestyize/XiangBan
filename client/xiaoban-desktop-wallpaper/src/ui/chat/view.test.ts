@@ -327,3 +327,15 @@ describe('the tokens of an answer', () => {
     expect(view.items.at(-1)).not.toHaveProperty('usage');
   });
 });
+
+
+it('restores interrupted reasoning and answer with an explicit continuation notice', () => {
+  const view = newView('recovered', true);
+  const messages: WireMessage[] = [{ role: 'assistant', parts: [{ type: 'text', text: 'answer prefix' }],
+    reasoning: [{ kind: 'text', text: 'checking' }], structured_content: { interrupted: true } }];
+  const items = itemsFromHistory(view, messages);
+  expect(items.map(item => item.kind)).toEqual(['reasoning', 'assistant', 'notice']);
+  expect(items[0]).toMatchObject({ text: 'checking', streaming: false });
+  expect(items[1]).toMatchObject({ text: 'answer prefix', streaming: false });
+  expect(items[2]).toMatchObject({ tone: 'warning', canContinue: true });
+});

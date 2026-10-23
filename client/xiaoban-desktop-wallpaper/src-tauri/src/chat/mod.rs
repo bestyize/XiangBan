@@ -328,7 +328,7 @@ pub(crate) fn provider(config: &AiConfig) -> Result<Arc<dyn ModelProvider>, Stri
 
 fn provider_profile(config: &AiConfig) -> ProviderProfile {
     let mut profile = ProviderProfile::new(config.base_url.clone(), config.api_key.clone(), config.model.clone());
-    profile.extra_body = crate::ai_reasoning::body(&config.protocol, config.reply_preference(), &config.reasoning_levels());
+    profile.extra_body = config.reasoning_body();
     profile.max_request_bytes = Some(8 * 1024 * 1024);
     // Central model policy: compatible APIs use endpoint defaults; Anthropic
     // receives a required model/endpoint-specific max_tokens value.
@@ -343,6 +343,14 @@ fn provider_profile(config: &AiConfig) -> ProviderProfile {
 
 fn provider_with(config: &AiConfig, key_source: Option<KeySource>) -> Result<Arc<dyn ModelProvider>, String> {
     let mut profile = provider_profile(config);
+    if config.protocol == "anthropic" {
+        if let Some(budget) = profile.extra_body.get("thinking").and_then(|v| v["budget_tokens"].as_u64()) {
+            let limit = profile.max_output_tokens.unwrap_or_else(|| agent_kernel::provider::anthropic::model_max_output_tokens(&profile.model));
+            if budget < 1024 || budget >= u64::from(limit) {
+                return Err("思考预算必须至少为 1024，且小于此模型的单次输出上限".into());
+            }
+        }
+    }
     if let Some(source) = key_source {
         profile = profile.with_api_key_source(source);
     }
@@ -800,7 +808,14 @@ pub fn chat_load_session(app: tauri::AppHandle, window: tauri::WebviewWindow, se
             emit(&app, "chat-run-interrupted", json!({ "session": session_id, "runId": run_id, "tools": tools }));
         }
     }
-    JsonlStore::new(dirs.sessions()).load(&session_id).map_err(|e| e.to_string())
+    let mut messages = JsonlStore::new(dirs.sessions()).load(&session_id).map_err(|e| e.to_string())?;
+    if !running {
+        if let Some(partial) = run_history::recover_visible_tail(&dirs.runs().join(&session_id), &session_id, &messages)
+            .map_err(|e| e.to_string())? {
+            messages.push(partial);
+        }
+    }
+    Ok(messages)
 }
 
 /// The conversation's last answer, when it never finished (the app quit or crashed while it ran) and has not been
