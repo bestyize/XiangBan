@@ -345,6 +345,7 @@ impl Harness {
             redeem_user_limiter,
             redeem_ip_limiter,
             newapi: Arc::new(NewApi::new(base, Some(ADMIN_TOKEN.to_string()))),
+            search: Arc::new(crate::search::Search::from_config(&config)),
             config: Arc::new(config),
             keys: Arc::new(Keys::ephemeral()),
             verifier: Arc::new(verifier),
@@ -1626,5 +1627,64 @@ async fn consumption_shows_up_in_the_overview_series_and_per_product_figures() {
     // 发放 = 用掉 + 作废/过期 + 还剩：这条恒等式成立，概览页的「去向」条才可信。
     let conserved = overview["consumed_total"].as_i64().unwrap() + overview["lapsed_total"].as_i64().unwrap() + overview["balance"].as_i64().unwrap();
     assert_eq!(conserved, overview["granted_total"].as_i64().unwrap());
+    h.cleanup().await;
+}
+
+// ---- 联网搜索 ----
+
+/// A stand-in for DeepSeek's Search and Fetch: replies with `results` for any query except "空" (none found).
+async fn fake_search() -> String {
+    use axum::routing::post;
+    let search = |axum::Json(body): axum::Json<Value>| async move {
+        if body["query"] == "空" { return axum::Json(json!({ "results": [] })); }
+        axum::Json(json!({ "results": [{ "title": "结果", "url": "https://example.com/r", "snippet": "摘要", "date": "2026-10-20", "rerank_score": 2.0, "authority": 3 }] }))
+    };
+    let fetch = |axum::Json(body): axum::Json<Value>| async move { axum::Json(json!({ "url": body["url"], "title": "页面", "content": "# 正文" })) };
+    let app = Router::new().route("/v1/tools/search", post(search)).route("/v1/tools/fetch", post(fetch));
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let base = format!("http://{}", listener.local_addr().unwrap());
+    tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+    base
+}
+
+#[tokio::test]
+async fn web_search_answers_in_deepseek_shape_and_charges_only_what_found_something() {
+    let mut h = harness!();
+    h.seed_wallpaper().await;
+    let uid = Uuid::new_v4();
+    let token = h.token(uid, CLIENT);
+
+    let (status, body) = h.call(Method::POST, "/v1/search", Some(&token), json!({ "query": "天气" })).await;
+    assert_eq!((status, body["error"]["code"].as_str()), (StatusCode::SERVICE_UNAVAILABLE, Some("search_unavailable")), "no provider configured: {body}");
+
+    let base = fake_search().await;
+    h.state.search = Arc::new(crate::search::Search::new(vec![crate::search::Provider::DeepSeek { base, key: "sk-test".into() }]));
+    h.app = build_router(h.state.clone());
+
+    let (status, _) = h.call(Method::POST, "/v1/search", None, json!({ "query": "天气" })).await;
+    assert_eq!(status, StatusCode::UNAUTHORIZED);
+    let (status, body) = h.call(Method::POST, "/v1/search", Some(&token), json!({ "query": "", "count": 5 })).await;
+    assert_eq!(status, StatusCode::BAD_REQUEST, "{body}");
+
+    let (status, body) = h.call(Method::POST, "/v1/search", Some(&token), json!({ "query": "天气", "count": 3 })).await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    assert_eq!(body, json!({ "results": [{ "title": "结果", "url": "https://example.com/r", "snippet": "摘要", "date": "2026-10-20", "rerank_score": 2.0, "authority": 3.0 }] }));
+    assert!(!body.to_string().contains("deepseek"), "the provider is not named");
+    let (user_id, wallet) = h.mock.only_user();
+    assert_eq!(wallet, TRIAL - 500, "a search that found something costs AI_SEARCH_COST");
+
+    let (status, body) = h.call(Method::POST, "/v1/search", Some(&token), json!({ "query": "空" })).await;
+    assert_eq!((status, body["results"].as_array().map(Vec::len)), (StatusCode::OK, Some(0)));
+    assert_eq!(h.mock.quota_of(user_id), TRIAL - 500, "nothing found, nothing charged");
+
+    let (status, body) = h.call(Method::POST, "/v1/fetch", Some(&token), json!({ "url": "https://example.com/a" })).await;
+    assert_eq!((status, body["title"].as_str(), body["content"].as_str()), (StatusCode::OK, Some("页面"), Some("# 正文")), "{body}");
+    assert_eq!(h.mock.quota_of(user_id), TRIAL - 1000);
+    let (status, _) = h.call(Method::POST, "/v1/fetch", Some(&token), json!({ "url": "file:///etc/passwd" })).await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+
+    let binding_id = h.only_binding().await;
+    sync::sync_binding(&h.state, binding_id).await.unwrap();
+    assert_eq!(h.balance(binding_id).await, h.mock.quota_of(user_id), "search use is settled into the buckets like any other use");
     h.cleanup().await;
 }

@@ -17,6 +17,7 @@ mod proxy;
 mod quota;
 mod ratelimit;
 mod redeem;
+mod search;
 mod settings;
 mod state;
 mod sync;
@@ -79,6 +80,8 @@ pub fn build_router(state: AppState) -> Router {
         .route("/responses", post(proxy::responses))
         .route("/messages", post(proxy::messages))
         .route("/audio/speech", post(proxy::audio_speech))
+        .route("/search", post(proxy::web_search))
+        .route("/fetch", post(proxy::web_fetch))
         .layer(DefaultBodyLimit::max(state.config.max_body_bytes));
 
     // 凭证只走 Authorization 头，不使用 Cookie，因此跨域放开不构成 CSRF 面。
@@ -144,6 +147,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         redeem_ip_limiter,
         verifier: Arc::new(jwks::JwksVerifier::new(config.account_issuer.clone(), config.account_jwks_url.clone())),
         newapi,
+        search: Arc::new(search::Search::from_config(&config)),
         config: Arc::new(config),
         keys: Arc::new(keys),
         dummy_password_hash: Arc::new(dummy_password_hash),

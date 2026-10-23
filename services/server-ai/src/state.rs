@@ -1,4 +1,4 @@
-use crate::{config::AppConfig, jwks::JwksVerifier, keys::Keys, newapi::NewApi, ratelimit::FailureLimiter};
+use crate::{config::AppConfig, jwks::JwksVerifier, keys::Keys, newapi::NewApi, ratelimit::FailureLimiter, search::Search};
 use sqlx::PgPool;
 use std::{sync::Arc, time::Duration};
 
@@ -15,6 +15,8 @@ pub struct AppState {
     pub keys: Arc<Keys>,
     pub verifier: Arc<JwksVerifier>,
     pub newapi: Arc<NewApi>,
+    /// 联网搜索与抓取的服务商。
+    pub search: Arc<Search>,
     /// 管理员不存在时用于抹平密码校验耗时。
     pub dummy_password_hash: Arc<String>,
     pub redeem_user_limiter: Arc<FailureLimiter>,

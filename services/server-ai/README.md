@@ -20,6 +20,16 @@
 - 鉴权、额度检查与对话接口相同，用量随 New API 钱包对账结算。单次最多 1000 字，返回音频不超过 8 MiB。
 - 未配置模型时返回 503 `speech_unavailable`，客户端会自动改用系统朗读。
 
+## 联网搜索与网页抓取
+
+`POST /v1/search` 和 `POST /v1/fetch`：给小伴的联网搜索用。**对外格式以 DeepSeek 的 Search / Fetch 为准**，客户端只认这一种；后面接格式不同的服务商时，在 `src/search.rs` 的 `Provider` 里加一个分支，把它的请求和结果改写成这个格式。响应里不出现服务商名字，密钥只在服务端。
+
+- 搜索请求：`{ "query": "1–128 字，可带 site: 等语法", "count"?: 1–50（默认 10）, "need_content"?: false, "ori_question"?: "用户原本的问题" }`。
+- 搜索返回：`{ "results": [{ "title", "url", "snippet", "summary"?, "date"（可为 null）, "content"?, "rerank_score"?（0–3，≥1.5 为高相关）, "authority"?（0–4，≥3 为权威） }] }`。没找到时 `results` 为空数组，不算错误。没有 http(s) 网址的条目会被丢掉，单条正文最多 8000 字。
+- 抓取请求：`{ "url": "http(s) 网址，最长 8192 字符，不能带账号密码" }`；返回 `{ "url", "title", "content"（Markdown，最多 60000 字）, "truncated" }`。
+- 服务商按 `AI_SEARCH_PROVIDERS` 的顺序尝试：前一家超时、5xx、限流、密钥失效或返回格式不对就换下一家；400/422（查询本身不被接受）不换，直接返回 400。都没配时返回 503 `search_unavailable`，都失败时返回 502。
+- 鉴权、额度检查与对话接口相同。**只有搜到结果的搜索和成功的抓取才计费**：直接从该用户的 New API 钱包扣 `AI_SEARCH_COST` / `AI_FETCH_COST` 点，下一次对账照常按消耗结算进额度桶和流水。扣费失败只记日志，不影响已经返回的结果。
+
 ## 运行与验证
 
 ```sh
@@ -52,6 +62,9 @@ cargo test --locked --manifest-path services/server-ai/Cargo.toml
 | `AI_SYNC_INTERVAL_SECS` | `60` | 对账间隔，最小 5 |
 | `AI_MAX_BODY_BYTES` | `8388608` | 转发请求体上限 |
 | `AI_TRUST_PROXY` / `AI_CORS_ORIGINS` / `AI_WEB_DIR` | 见 `.env.example` | 同账号中心 |
+| `AI_SEARCH_PROVIDERS` | `deepseek` | 联网搜索的服务商，逗号分隔，按顺序尝试；没配密钥的跳过 |
+| `AI_DEEPSEEK_API_KEY` / `AI_DEEPSEEK_BASE_URL` | 空 / `https://api.deepseek.com` | DeepSeek Search / Fetch 的密钥与地址；不填密钥则不启用 |
+| `AI_SEARCH_COST` / `AI_FETCH_COST` | `500` / `500` | 一次有结果的搜索、一次成功的抓取扣多少 New API 额度点数 |
 
 ## 接口
 
@@ -62,6 +75,7 @@ cargo test --locked --manifest-path services/server-ai/Cargo.toml
 | `POST /v1/chat/completions` | OpenAI 兼容。`model` 填档位名，省略则用默认档。支持流式。余额为 0 返回 402 `insufficient_quota`；档位要求付费而用户只有试用额度返回 403 `paid_required`；错误体为 OpenAI 格式 |
 | `POST /v1/responses` | OpenAI Responses 协议，规则同上（档位、余额、流式、错误格式）。`response.model` 也会回写成档位名 |
 | `POST /v1/messages` | Anthropic Messages 协议。密钥放 `x-api-key`（Anthropic SDK 默认）或 `Authorization: Bearer` 都行，值是账号中心的登录令牌；只透传 `anthropic-version`、`anthropic-beta`；`message_start` 里的 `message.model` 回写成档位名；错误体是 Anthropic 格式（`{"type":"error","error":{"type":"billing_error",…}}`）。这三个协议能否真正跑通，还取决于档位对应的模型在 New API 里有没有渠道，以及 New API 的协议转换 |
+| `POST /v1/search`、`POST /v1/fetch` | 联网搜索与网页抓取，格式以 DeepSeek 为准，见上文「联网搜索与网页抓取」 |
 | `GET /v1/models` | 当前产品启用的档位名 |
 | `GET /api/ai/tiers` | 档位的展示名、说明、对当前用户是否可用；不含真实模型名 |
 | `GET /api/ai/balance` | 各有效额度桶、合计、付费部分、试用是否还可领取。只读，不会触发开通 |
