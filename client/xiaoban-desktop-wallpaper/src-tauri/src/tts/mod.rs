@@ -144,3 +144,13 @@ pub async fn tts_synthesize(app: tauri::AppHandle, text: String, options: Option
     tauri::async_runtime::spawn_blocking(move || synthesize(&app, id, &text, &options).map(tauri::ipc::Response::new))
         .await.map_err(|_| "语音合成任务失败")?
 }
+
+/// One sentence of a reading that follows a streamed answer. Unlike `tts_synthesize` it does not cancel the
+/// sentences already being synthesised for the same reading; `tts_cancel` still stops them all at once.
+#[tauri::command]
+pub async fn tts_synthesize_part(app: tauri::AppHandle, text: String, options: Option<Options>) -> Result<tauri::ipc::Response, String> {
+    let options = options.unwrap_or(tts_get_settings(app.clone())?.options);
+    let id = app.state::<TtsState>().generation.load(Ordering::SeqCst);
+    tauri::async_runtime::spawn_blocking(move || synthesize(&app, id, &text, &options).map(tauri::ipc::Response::new))
+        .await.map_err(|_| "语音合成任务失败")?
+}

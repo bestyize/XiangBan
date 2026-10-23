@@ -109,7 +109,7 @@ describe('assistant barge-in', () => {
       if(command==='asr_get_status')return {enabled:true,modelReady:true,engineReady:true};
       if(command==='asr_transcribe')return transcript;
       if(command==='tts_get_settings')return {...speechDefaults};
-      if(command==='tts_synthesize')return [1,2,3];
+      if(command==='tts_synthesize'||command==='tts_synthesize_part')return [1,2,3];
       return undefined;
     });
     const notify=vi.fn(), listen=async()=>()=>{};
@@ -718,5 +718,58 @@ describe('while only the ball shows', () => {
     chat.sessions = [{ id: 's1', title: '打招呼', updatedAt: 1 }, { id: 's2', title: '周报', updatedAt: 5 }];
     expect(store.recent.map(session => session.id)).toEqual(['s2', 's1']); expect(store.title).toBe('打招呼');
     await store.switchSession('s2'); expect(chat.select).toHaveBeenLastCalledWith('s2'); expect(store.currentId).toBe('s2'); store.dispose();
+  });
+});
+
+describe('push to talk', () => {
+  it('listens while the shortcut is held and sends what was heard on release, never on a pause', async () => {
+    const h = setup({ prefs: { open: 'type', read: 'never' } }); await h.store.init(); await h.store.opened();
+    expect(h.asr.activate).not.toHaveBeenCalled();
+    await h.store.pushToTalk(true); expect(h.asr.activate).toHaveBeenCalledOnce();
+    expect(h.store.voiceStatus).toBe('正在听，松开快捷键发送');
+    h.say('明天十点提醒我开会'); h.advance(SEND_GRACE_MS * 4); await Promise.resolve();
+    expect(h.chat.send).not.toHaveBeenCalled();
+    await h.store.pushToTalk(false);
+    expect(h.asr.finish).toHaveBeenCalled(); expect(h.chat.send).toHaveBeenCalledWith('明天十点提醒我开会'); h.store.dispose();
+  });
+  it('starts once the capsule has opened when the shortcut is held from the ball', async () => {
+    const h = setup({ prefs: { open: 'type', read: 'never' } }); await h.store.init();
+    await h.store.pushToTalk(true); expect(h.asr.activate).not.toHaveBeenCalled();
+    await h.store.opened(); expect(h.asr.activate).toHaveBeenCalledOnce(); h.store.dispose();
+  });
+  it('says so when nothing was heard, and sends nothing', async () => {
+    const h = setup({ prefs: { open: 'type', read: 'never' } }); await h.store.init(); await h.store.opened();
+    await h.store.pushToTalk(true); await h.store.pushToTalk(false);
+    expect(h.chat.send).not.toHaveBeenCalled(); expect(h.store.voiceStatus).toContain('没听清'); h.store.dispose();
+  });
+});
+
+describe('reading along while the answer is written', () => {
+  function withStream(h: ReturnType<typeof setup>) {
+    const pushed: string[] = []; const end = vi.fn(async () => {}); let events: { onStart?(): void } = {};
+    (h.speech as Record<string, unknown>).stream = vi.fn((_key: string, _options: unknown, e: { onStart?(): void }) => { events = e; return { push: (t: string) => pushed.push(t), end, spoken: '', active: true }; });
+    return { pushed, end, start: () => events.onStart?.() };
+  }
+  it('reads the first sentence before the answer is complete and finishes the rest after it', async () => {
+    const h = setup({ prefs: { open: 'type', read: 'always' } }); const s = withStream(h);
+    await h.store.init(); await h.store.opened(); await h.store.submit('讲个故事');
+    h.chat.views.s1.items.push({ kind: 'assistant', id: 'a', text: '从前有座山。', streaming: true }); await nextTick();
+    expect(s.pushed.at(-1)).toBe('从前有座山。');
+    s.start(); expect(h.store.phase).toBe('speaking');
+    await vi.waitFor(() => expect(h.asr.activate).toHaveBeenCalled());
+    h.chat.views.s1.items[1].text = '从前有座山。山上有座庙。'; h.chat.views.s1.running = false;
+    h.store.replied('s1', '从前有座山。山上有座庙。');
+    expect(s.end).toHaveBeenCalledWith('从前有座山。山上有座庙。'); expect(h.speech.speak).not.toHaveBeenCalled(); h.store.dispose();
+  });
+  it('stops the answer being written when the user talks over it, keeping the microphone that heard them', async () => {
+    const h = setup({ prefs: { open: 'type', read: 'always' } }); const s = withStream(h);
+    await h.store.init(); await h.store.opened(); await h.store.submit('讲个故事');
+    h.chat.views.s1.items.push({ kind: 'assistant', id: 'a', text: '从前有座山。', streaming: true }); await nextTick();
+    s.start(); await vi.waitFor(() => expect(h.asr.activate).toHaveBeenCalled());
+    h.say('等一下，换一个');
+    expect(h.speech.stop).toHaveBeenCalled(); expect(h.chat.cancel).toHaveBeenCalledOnce();
+    h.asr.deactivate.mockClear(); h.store.stopped();
+    expect(h.asr.deactivate).not.toHaveBeenCalled(); expect(h.asr.recordingRequested).toBe(true);
+    expect(h.store.input).toBe('等一下，换一个'); h.store.dispose();
   });
 });

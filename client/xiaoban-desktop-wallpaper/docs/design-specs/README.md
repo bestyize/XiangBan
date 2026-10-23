@@ -7,6 +7,7 @@
 | 文件 | 用途 |
 | --- | --- |
 | [超级小伴设计规范](super-assistant.md) | 小球 / 胶囊 / 卡片三种形态、截图工具的交互约定与代码位置 |
+| [语音引擎方案](voice-engine.md) | 级联与全双工两条语音路线、模块结构、云端能力经小伴 AI 网关、分期计划 |
 | [悬浮按钮 HTML 设计稿](prototypes/assistant-floating-tools.html) | 旧版：右侧单按钮、横排工具浮层（已被方案四取代） |
 | [对话框与停止按钮设计稿](prototypes/assistant-conversation.html) | 月白 / 夜银配色、彩虹球、可打断回复的最终视觉参考 |
 | [生命球动效设计稿](prototypes/assistant-living-orb.html) | 彩虹配色与待机、聆听、思考、说话动效参考 |

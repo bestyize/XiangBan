@@ -2,7 +2,7 @@ import type { AttachmentCard, PendingAttachment } from '../ui/chat/attachments.t
 import { reactive, watch } from 'vue';
 import type { ChatStore } from '../ui/chat/chat-store.ts';
 import type { AsrStore, TranscriptContext } from '../ui/asr/store.ts';
-import type { SpeechStore } from '../ui/speech/store.ts';
+import type { SpeechStore, SpeechStream } from '../ui/speech/store.ts';
 import { isPlaybackEcho, isSpeechText } from './voice-guard.ts';
 import type { ApprovalDecision, ApprovalRequest, ChatItem, QuestionRequest, SessionSummary } from '../ui/chat/types.ts';
 
@@ -15,7 +15,7 @@ export type Phase = 'idle' | 'listening' | 'thinking' | 'answering' | 'speaking'
 /** Only the assistant window uses this pointer; conversation history remains with the host. */
 export const SESSION_KEY = 'xiaoban.assistant.session.v1';
 /** Voice text is sent this long after the last words were recognised, in case more follows. */
-export const SEND_GRACE_MS = 600;
+export const SEND_GRACE_MS = 300;
 /** The microphone is released when nothing was heard for this long. The capsule itself stays until it is dismissed. */
 export const LISTEN_IDLE_MS = 15_000;
 const MODEL_REQUIRED = '还没有配置模型。先到设置里添加一个，我才能回答。';
@@ -109,6 +109,8 @@ export interface AssistantStore {
   note(message: string, tab?: '' | SettingsTarget): void;
   /** Short-lived voice notices leave the text input and conversation card available. */
   noteVoice(message: string): void;
+  /** Push to talk: the shortcut went down (`true`, start listening) or up (`false`, send what was heard). */
+  pushToTalk(down: boolean): Promise<void>;
   hide(): Promise<void>;
   /** The ball was clicked: open the capsule. */
   unfold(): Promise<void>;
@@ -150,7 +152,13 @@ export function createAssistantStore(deps: AssistantDeps): AssistantStore {
   /** The last question was spoken, so the answer is read aloud and listening resumes afterwards. */
   let voiceTurn = false;
   /** Reactive, because the phase shows `speaking` from the moment a reply is handed to the voice until it ends. */
-  const flags = reactive({ awaitingSpeech: false, submitting: false, changingSession: false, voiceNotice: '' });
+  const flags = reactive({ awaitingSpeech: false, submitting: false, changingSession: false, voiceNotice: '', ptt: false });
+  /** The shortcut went down before the capsule had opened; start talking once it has. */
+  let pendingPtt = false;
+  /** The answer being read aloud while it is still being written. */
+  let reading: SpeechStream | null = null;
+  /** A spoken interruption cancelled the answer: keep the microphone that heard it. */
+  let keepListening = false;
   let draftVersion = 0, speechVersion = 0, listenVersion = 0;
   let turnInterrupted = false;
   let readingText = '', echoTailUntil = 0;
@@ -195,7 +203,7 @@ export function createAssistantStore(deps: AssistantDeps): AssistantStore {
   function armListenTimer() {
     clearTimer(listenTimer);
     listenTimer = setTimer(() => {
-      if (disposed || !store.open || heard || !asr.recordingRequested || flags.awaitingSpeech) return;
+      if (disposed || !store.open || heard || !asr.recordingRequested || flags.awaitingSpeech || flags.ptt) return;
       if (asr.speechActive || asr.recognizing) { armListenTimer(); return; }
       asr.deactivate(); voiceTurn = false;
       noteVoice('没听到声音，点击生命球可重新开始。');
@@ -203,9 +211,38 @@ export function createAssistantStore(deps: AssistantDeps): AssistantStore {
   }
   function stopReading() {
     turnInterrupted = true; speechVersion++;
-    flags.awaitingSpeech = false;
+    flags.awaitingSpeech = false; reading = null;
     echoTailUntil = now() + 500;
     void speech.stop();
+  }
+  /** The user talks over an answer that is still being written: stop it too, or the next question would wait. */
+  function bargeIn() {
+    stopReading();
+    if (view()?.running) { keepListening = true; void chat.cancel(); }
+  }
+  /** Reads the answer of this turn sentence by sentence while it is written. */
+  function beginReading() {
+    if (!speech.stream) return;
+    const ticket = speechVersion;
+    readingText = ''; echoTailUntil = 0;
+    reading = speech.stream(`assistant:${chat.currentId ?? ''}`, undefined, {
+      onStart: () => {
+        if (ticket !== speechVersion || !store.open) return;
+        flags.awaitingSpeech = true;
+        // Listen while reading so the user can talk over it.
+        if (asr.enabled && asr.microphoneSupported !== false && !asr.recordingRequested) void startListening(true);
+      },
+      onSentence: text => { if (ticket === speechVersion) readingText += text; },
+    });
+    if (store.answer) reading.push(store.answer);
+  }
+  async function beginTalk() {
+    pendingPtt = false; flags.ptt = true; noteVoice('');
+    if (flags.awaitingSpeech || reading) bargeIn();
+    clearTimers(); heard = '';
+    if (asr.recordingRequested) { voiceTurn = true; return; }
+    voiceTurn = await startListening();
+    if (!voiceTurn) flags.ptt = false;
   }
   function externalSpeech(text: string, context?: TranscriptContext): boolean {
     return isSpeechText(text) && !(context?.playbackText && isPlaybackEcho(text, context.playbackText));
@@ -228,7 +265,7 @@ export function createAssistantStore(deps: AssistantDeps): AssistantStore {
         if (!current() || !store.open || !flags.awaitingSpeech || !externalSpeech(text, context)) return;
         // Keep this microphone and its full utterance buffer: stopping TTS must
         // not discard the beginning of the user's interruption.
-        clearTimers(); voiceTurn = true; stopReading(); armListenTimer();
+        clearTimers(); voiceTurn = true; bargeIn(); armListenTimer();
       },
     });
     if (!current()) return false;
@@ -238,11 +275,13 @@ export function createAssistantStore(deps: AssistantDeps): AssistantStore {
   }
   function onHeard(text: string, context?: TranscriptContext) {
     if (!externalSpeech(text, context)) return;
-    if (flags.awaitingSpeech) stopReading();
+    if (flags.awaitingSpeech) bargeIn();
     voiceTurn = true;
     clearTimer(listenTimer);
     heard = heard ? `${heard} ${text}` : text;
     store.input = heard;
+    // Push to talk sends on release, never on a pause.
+    if (flags.ptt) return;
     clearTimer(sendTimer);
     sendTimer = setTimer(function flush() {
       if (!store.open) return;
@@ -318,6 +357,7 @@ export function createAssistantStore(deps: AssistantDeps): AssistantStore {
     },
     get voiceStatus() {
       if (flags.voiceNotice) return flags.voiceNotice;
+      if (flags.ptt) return asr.listening ? '正在听，松开快捷键发送' : '正在启动麦克风…';
       if (asr.enabled && (asr.preparing || asr.warming)) return '正在准备语音引擎…';
       if (asr.recordingRequested && !asr.listening) return '正在启动麦克风…';
       return '';
@@ -328,6 +368,7 @@ export function createAssistantStore(deps: AssistantDeps): AssistantStore {
         unsubscribers.push(
           await deps.listen('assistant-open', () => { void store.opened(); }),
           await deps.listen('assistant-close', () => store.closed()),
+          await deps.listen<string>('assistant-ptt', state => { void store.pushToTalk(state === 'start'); }),
           await deps.listen('ai-config-changed', () => { if (!disposed) void refreshModel(); }),
           await deps.listen<boolean>('assistant-ball', shown => { store.ball = Boolean(shown); }),
           // The settings page lives in another window; its choices arrive with every settings change.
@@ -365,11 +406,13 @@ export function createAssistantStore(deps: AssistantDeps): AssistantStore {
         rememberSession(null);
         await chat.select(null);
       }
+      if (pendingPtt) { await beginTalk(); return; }
       // Typing first: the capsule waits, and a tap on the ball starts listening.
       if (store.open && asr.enabled && store.prefs.open === 'voice' && !store.input && !store.attachments.length) { voiceTurn = await startListening(); }
     },
     closed() {
       noteVoice('');
+      pendingPtt = false; flags.ptt = false; reading = null;
       draftVersion++;
       clearTimers();
       asr.deactivate(); void speech.stop();
@@ -413,6 +456,7 @@ export function createAssistantStore(deps: AssistantDeps): AssistantStore {
         // New capsule conversations start in full trust; resumed ones keep their saved mode.
         if (!chat.currentId) chat.permissionMode = 'auto';
         const sent = images.length ? await chat.send(value, images) : await chat.send(value);
+        if (sent && store.open && (store.prefs.read === 'always' || (store.prefs.read === 'voice' && spoken))) beginReading();
         if (!sent && version === draftVersion) {
           if (!store.input) store.input = value;
           store.attachments = [...images, ...store.attachments].slice(0, 8);
@@ -430,7 +474,7 @@ export function createAssistantStore(deps: AssistantDeps): AssistantStore {
     },
     interrupt() {
       // Stop both channels, including a reply that finishes while cancellation is in flight.
-      turnInterrupted = true; speechVersion++; listenVersion++;
+      turnInterrupted = true; speechVersion++; listenVersion++; reading = null; flags.ptt = false;
       clearTimers(); heard = ''; voiceTurn = false; flags.awaitingSpeech = false;
       asr.deactivate(); void speech.stop();
       if (view()?.running) void chat.cancel();
@@ -444,6 +488,16 @@ export function createAssistantStore(deps: AssistantDeps): AssistantStore {
         return;
       }
       if (!store.open || session !== chat.currentId || turnInterrupted) return;
+      if (reading) {
+        // Already reading along: read the rest, then carry on as after any readout.
+        const stream = reading, version = speechVersion; reading = null;
+        void stream.end(text).then(() => {
+          if (version !== speechVersion) return;
+          if (flags.awaitingSpeech) { flags.awaitingSpeech = false; afterTurn(); }
+          else if (!stream.spoken) afterTurn();
+        });
+        return;
+      }
       const version = ++speechVersion;
       if (store.prefs.read === 'always' || (store.prefs.read === 'voice' && voiceTurn)) {
         readingText = text; echoTailUntil = 0;
@@ -457,20 +511,41 @@ export function createAssistantStore(deps: AssistantDeps): AssistantStore {
     stopped() {
       const failure = turn().failure;
       if (!store.open && failure && !turnInterrupted) { store.unread = true; store.notice = { kind: 'error', text: noticeLine(failure) }; }
+      reading = null;
+      // Cancelled because the user started talking: the microphone that heard them stays on.
+      if (keepListening) { keepListening = false; speechVersion++; flags.awaitingSpeech = false; void speech.stop(); return; }
       speechVersion++; listenVersion++; flags.awaitingSpeech = false; clearTimers(); asr.deactivate(); void speech.stop();
     },
     note(message, tab = '') { store.hint = message; store.hintTab = message ? tab : ''; },
     noteVoice,
+    async pushToTalk(down) {
+      if (down) {
+        if (!store.open) { pendingPtt = true; return; }
+        await beginTalk();
+        return;
+      }
+      pendingPtt = false;
+      if (!flags.ptt) return;
+      flags.ptt = false; clearTimers();
+      // The last words are still being recognised: let them arrive before sending.
+      if (asr.recordingRequested || asr.listening) await asr.finish();
+      listenVersion++;
+      if (asr.recordingRequested) asr.deactivate();
+      const text = heard.trim(); heard = '';
+      if (text) await store.submit(text, true);
+      else noteVoice('没听清，按住快捷键再说一次。');
+    },
     hide() { return deps.invoke<void>('assistant_hide').catch(() => {}); },
     async unfold() { await deps.invoke('assistant_unfold'); },
     async openChat() { await deps.invoke('assistant_open_chat', { session: chat.currentId }); },
     async openSettings(tab) { await deps.invoke('assistant_open_settings', { tab }); },
     dispose() {
-      disposed = true; clearTimers(); noteVoice(''); stopWatch(); stopSessionWatch(); stopVoiceWatch(); stopVoiceErrorWatch(); stopAttentionWatch();
+      disposed = true; clearTimers(); noteVoice(''); stopWatch(); stopSessionWatch(); stopVoiceWatch(); stopVoiceErrorWatch(); stopAttentionWatch(); stopReadAlongWatch();
       unsubscribers.splice(0).forEach(off => off());
       asr.deactivate(); void speech.stop();
     },
   });
+  const stopReadAlongWatch = watch(() => turn().answer, text => { if (reading && text) reading.push(text); });
   const stopWatch = watch(() => speech.status, (status, before) => {
     if (flags.awaitingSpeech && status === 'idle' && before !== 'idle') {
       echoTailUntil = now() + 500; flags.awaitingSpeech = false; afterTurn();

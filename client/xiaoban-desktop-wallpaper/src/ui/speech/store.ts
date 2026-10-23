@@ -1,5 +1,6 @@
 import { reactive } from 'vue';
 import { speechText } from './text.ts';
+import { createStreamPlayer, type StreamPlayer } from '../../voice/stream-player.ts';
 export interface VoiceOptions { voice: string; rate: number; volume: number; pitch: number }
 export interface SpeechSettings extends VoiceOptions { autoRead: boolean }
 export interface Voice { shortName: string; gender: string; locale: string; friendlyName: string }
@@ -20,21 +21,28 @@ export interface SpeechDeps {
   url?(bytes: Blob): string;
   revoke?(url: string): void;
 }
+export interface SpeechStreamEvents { onStart?(): void; onSentence?(text: string): void }
+/** A reading that follows a streamed answer: push the text so far, end it when the answer is complete. */
+export type SpeechStream = Pick<StreamPlayer, 'push' | 'end' | 'spoken' | 'active'>;
 export interface SpeechStore {
   ready: boolean; saving: boolean; settings: SpeechSettings; voices: Voice[];
   loadingVoices: boolean; status: 'idle' | 'synthesizing' | 'playing'; currentKey: string; error: string;
   init(): Promise<void>; save(patch: Partial<SpeechSettings>): Promise<void>; loadVoices(): Promise<void>;
   speak(source: string, key: string, options?: VoiceOptions, automatic?: boolean): Promise<void>;
+  /** Reads an answer while it is still being written, sentence by sentence. `stop()` ends it too. */
+  stream?(key: string, options?: VoiceOptions, events?: SpeechStreamEvents): SpeechStream;
   stop(): Promise<void>; dispose(): void;
 }
 export function createSpeechStore(deps: SpeechDeps): SpeechStore {
   let initialized: Promise<void> | null = null;
   let generation = 0, disposed = false, pendingSaves = 0;
   let audio: AudioHandle | null = null, objectUrl = '';
+  let streaming: StreamPlayer | null = null;
   let cancelQueue = Promise.resolve(), saveQueue = Promise.resolve();
   const createUrl = deps.url ?? (blob => URL.createObjectURL(blob));
   const revoke = deps.revoke ?? (url => URL.revokeObjectURL(url));
   function release() {
+    streaming?.stop(); streaming = null;
     if (audio) { audio.pause(); audio.onended = null; audio.onerror = null; audio.src = ''; audio = null; }
     if (objectUrl) { revoke(objectUrl); objectUrl = ''; }
     store.currentKey = ''; store.status = 'idle';
@@ -96,6 +104,44 @@ export function createSpeechStore(deps: SpeechDeps): SpeechStore {
         release(); store.error = String(e instanceof Error ? e.message : e);
         deps.notify(automatic ? '语音暂不可用，文字回复已保留；可点击消息旁的朗读重试。' : store.error, automatic ? 'info' : 'error');
       }
+    },
+    stream(key, options, events = {}) {
+      void store.stop();
+      const ticket = generation;
+      store.currentKey = key; store.error = '';
+      const player = createStreamPlayer({
+        async synthesize(text) {
+          // A reading stopped just before must not cancel this one's sentences on the host.
+          await cancelQueue;
+          if (ticket !== generation || disposed) throw new Error('朗读已停止');
+          if (store.status === 'idle') store.status = 'synthesizing';
+          const bytes = await deps.invoke<ArrayBuffer | number[]>('tts_synthesize_part', { text, options: options ?? null });
+          const data = bytes instanceof ArrayBuffer ? bytes : new Uint8Array(bytes);
+          if (!data.byteLength) throw new Error('语音服务没有返回音频');
+          return data;
+        },
+        async play(data) {
+          const url = createUrl(new Blob([data as BlobPart], { type: 'audio/mpeg' }));
+          const clip = deps.audio ? deps.audio(url) : new Audio(url);
+          let settle!: () => void;
+          const done = new Promise<void>(resolve => { settle = resolve; });
+          const end = () => { clip.onended = null; clip.onerror = null; clip.pause(); revoke(url); settle(); };
+          clip.onended = end; clip.onerror = end;
+          await clip.play();
+          return { done, stop: end };
+        },
+      }, {
+        onStart() { if (ticket === generation) store.status = 'playing'; events.onStart?.(); },
+        onSentence(text) { if (ticket === generation) store.status = 'playing'; events.onSentence?.(text); },
+        onError(error) { if (ticket === generation) store.error = String(error instanceof Error ? error.message : error); },
+      });
+      streaming = player;
+      return {
+        push: full => player.push(full),
+        end: full => player.end(full).then(() => { if (ticket === generation && streaming === player) { streaming = null; release(); } }),
+        get spoken() { return player.spoken; },
+        get active() { return player.active; },
+      };
     },
     stop() {
       generation++; release();

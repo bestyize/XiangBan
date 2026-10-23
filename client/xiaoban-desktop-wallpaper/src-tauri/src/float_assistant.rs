@@ -100,6 +100,50 @@ pub struct AssistantState {
     transition: transition::State,
     /// The ball's window is widened for a notice: `Some(true)` when the notice sits to the ball's left.
     bubble: Mutex<Option<bool>>,
+    /// The shortcut is held down. Key repeat sends more presses while it is; they are ignored.
+    held: AtomicBool,
+    /// Counts presses, so a hold timer from an earlier press does nothing.
+    press: AtomicU64,
+    /// The capsule was already open when the shortcut went down: a short press closes it.
+    open_at_press: AtomicBool,
+    /// The shortcut has been held long enough to talk; releasing it sends what was said.
+    talking: AtomicBool,
+}
+
+/// Holding the shortcut at least this long talks (push to talk); a shorter press opens or closes the capsule.
+const HOLD_TO_TALK: Duration = Duration::from_millis(350);
+
+fn shortcut_pressed(app: &tauri::AppHandle) {
+    let state = app.state::<AssistantState>();
+    if state.held.swap(true, Ordering::SeqCst) { return; }
+    if state.capturing.load(Ordering::SeqCst) || !crate::settings(app).assistant_enabled { return; }
+    let press = state.press.fetch_add(1, Ordering::SeqCst) + 1;
+    let open = mode(app) == Mode::Capsule;
+    state.open_at_press.store(open, Ordering::SeqCst);
+    // Opening does not wait for the release: the capsule is up by the time a hold turns into talking.
+    if !open { toggle(app); }
+    let app = app.clone();
+    std::thread::spawn(move || {
+        std::thread::sleep(HOLD_TO_TALK);
+        let state = app.state::<AssistantState>();
+        if !state.held.load(Ordering::SeqCst) || state.press.load(Ordering::SeqCst) != press { return; }
+        state.talking.store(true, Ordering::SeqCst);
+        let main = app.clone();
+        let _ = app.run_on_main_thread(move || {
+            if mode(&main) != Mode::Capsule { let _ = expand(&main); }
+            if let Some(window) = main.get_webview_window(LABEL) { let _ = window.emit("assistant-ptt", "start"); }
+        });
+    });
+}
+
+fn shortcut_released(app: &tauri::AppHandle) {
+    let state = app.state::<AssistantState>();
+    if !state.held.swap(false, Ordering::SeqCst) { return; }
+    if state.talking.swap(false, Ordering::SeqCst) {
+        if let Some(window) = app.get_webview_window(LABEL) { let _ = window.emit("assistant-ptt", "end"); }
+    } else if state.open_at_press.load(Ordering::SeqCst) {
+        toggle(app);
+    }
 }
 
 const WINDOW_COMMANDS: &[&str] = &[
@@ -113,7 +157,7 @@ const CONTROL_COMMANDS: &[&str] = &["assistant_status", "assistant_configure", "
 const SHARED_COMMANDS: &[&str] = &[
     "chat_overview", "chat_load_session", "chat_new_session", "chat_send", "chat_cancel", "chat_context",
     "chat_answer_approval", "chat_answer_question",
-    "tts_get_settings", "tts_synthesize", "tts_cancel",
+    "tts_get_settings", "tts_synthesize", "tts_synthesize_part", "tts_cancel",
     "asr_get_status", "asr_prepare", "asr_transcribe", "asr_report_microphone",
     "open_download_url",
 ];
@@ -134,10 +178,9 @@ pub fn permitted(label: &str, command: &str) -> Option<bool> {
 
 pub fn plugin() -> tauri::plugin::TauriPlugin<tauri::Wry> {
     tauri_plugin_global_shortcut::Builder::new()
-        .with_handler(|app, _shortcut, event| {
-            if event.state == tauri_plugin_global_shortcut::ShortcutState::Pressed {
-                toggle(app);
-            }
+        .with_handler(|app, _shortcut, event| match event.state {
+            tauri_plugin_global_shortcut::ShortcutState::Pressed => shortcut_pressed(app),
+            tauri_plugin_global_shortcut::ShortcutState::Released => shortcut_released(app),
         })
         .build()
 }
