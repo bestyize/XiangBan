@@ -63,7 +63,7 @@ cargo test --locked --manifest-path services/server-ai/Cargo.toml
 | `AI_MAX_BODY_BYTES` | `8388608` | 转发请求体上限 |
 | `AI_TRUST_PROXY` / `AI_CORS_ORIGINS` / `AI_WEB_DIR` | 见 `.env.example` | 同账号中心 |
 | `AI_SEARCH_PROVIDERS` | `deepseek` | 联网搜索的服务商，逗号分隔，按顺序尝试；没配密钥的跳过 |
-| `AI_DEEPSEEK_API_KEY` / `AI_DEEPSEEK_BASE_URL` | 空 / `https://api.deepseek.com` | DeepSeek Search / Fetch 的密钥与地址；不填密钥则不启用 |
+| `AI_DEEPSEEK_API_KEY` / `AI_DEEPSEEK_BASE_URL` | 空 / `https://api.deepseek.com` | DeepSeek Search / Fetch 的密钥与地址；不填密钥则不启用。密钥可以填多个（逗号分隔）：请求轮流使用以分摊限流，某个密钥失效、限流或超时就换下一个，全部不行再换下一家服务商 |
 | `AI_SEARCH_COST` / `AI_FETCH_COST` | `500` / `500` | 一次有结果的搜索、一次成功的抓取扣多少 New API 额度点数 |
 
 ## 接口

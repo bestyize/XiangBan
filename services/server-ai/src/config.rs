@@ -27,7 +27,8 @@ pub struct AppConfig {
     pub speech_voices: Vec<String>,
     /// Search providers behind `/v1/search` and `/v1/fetch`, tried in this order. One without a key is skipped.
     pub search_providers: Vec<String>,
-    pub deepseek_api_key: Option<String>,
+    /// One or more keys, comma-separated in `AI_DEEPSEEK_API_KEY`; requests take turns and pass over a failing one.
+    pub deepseek_api_keys: Vec<String>,
     pub deepseek_base_url: String,
     /// What one search or one fetch that found something costs, in New API quota points.
     pub search_cost: i64,
@@ -82,7 +83,9 @@ impl AppConfig {
                 .map(|s| s.trim().to_ascii_lowercase())
                 .filter(|s| !s.is_empty())
                 .collect(),
-            deepseek_api_key: get("AI_DEEPSEEK_API_KEY"),
+            deepseek_api_keys: get("AI_DEEPSEEK_API_KEY")
+                .map(|v| v.split(',').map(|s| s.trim().to_string()).filter(|s| !s.is_empty()).collect())
+                .unwrap_or_default(),
             deepseek_base_url: get("AI_DEEPSEEK_BASE_URL")
                 .unwrap_or_else(|| "https://api.deepseek.com".into())
                 .trim_end_matches('/')

@@ -10,7 +10,7 @@ use crate::{config::AppConfig, error::AppError};
 use reqwest::{StatusCode, Url};
 use serde::Serialize;
 use serde_json::{json, Value};
-use std::time::Duration;
+use std::{sync::atomic::{AtomicUsize, Ordering}, time::Duration};
 
 /// DeepSeek 的查询上限，也是我们的。
 pub const MAX_QUERY_CHARS: usize = 128;
@@ -196,31 +196,54 @@ impl Provider {
     }
 }
 
+/// 同一家服务商的一组密钥。每次请求从下一个密钥开始，把流量分摊开（DeepSeek 每个密钥每秒限 5 次）；
+/// 某个密钥失效、限流或超时，就换同组的下一个，整组都不行再换下一家。
+struct Group {
+    members: Vec<Provider>,
+    next: AtomicUsize,
+}
+
+impl Group {
+    /// 这一轮尝试密钥的顺序。
+    fn order(&self) -> impl Iterator<Item = &Provider> {
+        let len = self.members.len();
+        let start = self.next.fetch_add(1, Ordering::Relaxed) % len.max(1);
+        (0..len).map(move |i| &self.members[(start + i) % len])
+    }
+}
+
 /// 配置好的服务商，按顺序尝试。
 pub struct Search {
     client: reqwest::Client,
-    providers: Vec<Provider>,
+    groups: Vec<Group>,
 }
 
 impl Search {
+    /// 每个服务商一组，各一个密钥。
     pub fn new(providers: Vec<Provider>) -> Self {
-        Self { client: reqwest::Client::new(), providers }
+        Self::grouped(providers.into_iter().map(|p| vec![p]).collect())
     }
 
-    /// `AI_SEARCH_PROVIDERS` 按顺序列出服务商；没配密钥的那家跳过。
+    /// 每组是同一家服务商的多个密钥，组按顺序尝试。空组忽略。
+    pub fn grouped(groups: Vec<Vec<Provider>>) -> Self {
+        let groups = groups.into_iter().filter(|g| !g.is_empty()).map(|members| Group { members, next: AtomicUsize::new(0) }).collect();
+        Self { client: reqwest::Client::new(), groups }
+    }
+
+    /// `AI_SEARCH_PROVIDERS` 按顺序列出服务商；每家的密钥可以有多个（逗号分隔），没配密钥的那家跳过。
     pub fn from_config(config: &AppConfig) -> Self {
-        let providers = config.search_providers.iter().filter_map(|name| match name.as_str() {
-            "deepseek" => config.deepseek_api_key.clone().map(|key| Provider::DeepSeek { base: config.deepseek_base_url.clone(), key }),
-            other => { tracing::warn!("未知的搜索服务商 {other}，已忽略"); None }
+        let groups = config.search_providers.iter().map(|name| match name.as_str() {
+            "deepseek" => config.deepseek_api_keys.iter().map(|key| Provider::DeepSeek { base: config.deepseek_base_url.clone(), key: key.clone() }).collect(),
+            other => { tracing::warn!("未知的搜索服务商 {other}，已忽略"); Vec::new() }
         }).collect();
-        Self::new(providers)
+        Self::grouped(groups)
     }
 
-    pub fn available(&self) -> bool { !self.providers.is_empty() }
+    pub fn available(&self) -> bool { !self.groups.is_empty() }
 
     pub async fn search(&self, request: &SearchRequest) -> Result<Vec<SearchHit>, AppError> {
         let mut tried = false;
-        for provider in &self.providers {
+        for provider in self.groups.iter().flat_map(Group::order) {
             match provider.search(&self.client, request).await {
                 Ok(hits) => return Ok(hits),
                 Err(error) => {
@@ -235,7 +258,7 @@ impl Search {
 
     pub async fn fetch(&self, url: &Url) -> Result<FetchedPage, AppError> {
         let mut tried = false;
-        for provider in &self.providers {
+        for provider in self.groups.iter().flat_map(Group::order) {
             match provider.fetch(&self.client, url).await {
                 Ok(page) => return Ok(page),
                 Err(error) => {
@@ -258,7 +281,7 @@ fn unavailable(tried: bool) -> AppError {
 mod tests {
     use super::*;
     use axum::{routing::post, Json, Router};
-    use std::sync::{atomic::{AtomicUsize, Ordering}, Arc};
+    use std::sync::Arc;
 
     #[test]
     fn requests_use_deepseek_fields_and_limits() {
@@ -352,6 +375,21 @@ mod tests {
         let none = Search::new(vec![]);
         assert!(!none.available());
         assert!(matches!(none.search(&request).await, Err(AppError::Coded { code: "search_unavailable", .. })));
+    }
+
+    #[tokio::test]
+    async fn several_keys_take_turns_and_a_bad_key_hands_over_to_the_next() {
+        let hits = Arc::new(AtomicUsize::new(0));
+        let seen = Arc::new(std::sync::Mutex::new(Vec::new()));
+        let base = upstream(200, json!({ "results": [{ "title": "A", "url": "https://a.example/", "snippet": "s" }] }), hits.clone(), seen.clone()).await;
+        let dead = upstream(401, json!({ "error": "invalid key" }), Arc::new(AtomicUsize::new(0)), seen.clone()).await;
+        let keys = |k: &str, b: &str| Provider::DeepSeek { base: b.to_string(), key: k.into() };
+        let search = Search::grouped(vec![vec![keys("k1", &base), keys("k2", &dead), keys("k3", &base)]]);
+        let request = parse_search(r#"{"query":"x"}"#.as_bytes()).unwrap();
+        // Round one starts at k1, round two at k2 (dead, so k3 answers), round three at k3.
+        for _ in 0..3 { assert_eq!(search.search(&request).await.unwrap().len(), 1); }
+        assert_eq!(hits.load(Ordering::SeqCst), 3, "every round was answered by a working key");
+        assert_eq!(seen.lock().unwrap().len(), 4, "the dead key was tried once and passed over");
     }
 
     #[tokio::test]
