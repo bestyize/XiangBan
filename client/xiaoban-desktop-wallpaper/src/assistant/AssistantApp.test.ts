@@ -4,7 +4,7 @@ import { reactive, nextTick } from 'vue';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import AssistantApp from './AssistantApp.vue';
 import type { AssistantStore } from './assistant-store.ts';
-import {invoke,listen} from '../bridge.ts';
+import {invoke} from '../bridge.ts';
 import type { AsrStore } from '../ui/asr/store.ts';
 
 vi.mock('../bridge.ts', () => ({ invoke: vi.fn(async () => {}), listen: vi.fn(async () => () => {}) }));
@@ -22,7 +22,8 @@ function setup(overrides: Record<string, unknown> = {}) {
   const store = reactive({ open: true, ball: false, phase: 'answering', hint: '', hintTab: '', question: '今天如何放松', answer: '可以先休息片刻。', working: '', failure: '', approval: null as null | { id: string; arguments: {}; tool: string }, ask: null as null | { id: string; question: string; options: string[] },
     items: conversation() as unknown[], title: '放松一下', currentId: 's1' as string | null, recent: [{ id: 's1', title: '放松一下', createdAt: 1, updatedAt: 2 }, { id: 's2', title: '周报整理', createdAt: 1, updatedAt: 1 }],
     unread: false, notice: null as null | { kind: string; text: string }, dismissNotice: vi.fn(), switchSession: vi.fn(async () => {}), retry: vi.fn(async () => {}), decide: vi.fn(), reply: vi.fn(),
-    attachments: [] as unknown[], questionImages: [] as string[], prepareImages: vi.fn(), inputStarted: vi.fn(), note: vi.fn(), input: '草稿', status: '正在回答…', hide: vi.fn(), submit: vi.fn(), interrupt: vi.fn(), openChat: vi.fn(),newConversation:vi.fn(),openSettings:vi.fn(),toggleListening:vi.fn(),unfold:vi.fn(), ...overrides });
+    attachments: [] as unknown[], questionImages: [] as string[], prepareImages: vi.fn(), inputStarted: vi.fn(), note: vi.fn(), input: '草稿', status: '正在回答…', hide: vi.fn(), submit: vi.fn(), interrupt: vi.fn(), openChat: vi.fn(),newConversation:vi.fn(),openSettings:vi.fn(),toggleListening:vi.fn(),unfold:vi.fn(),
+    layout: { ball: null as null | { x: number; y: number; size: number }, right: true }, prefs: { open: 'type', read: 'voice', hover: true }, peek: false, hovering: false, reanchoring: 0, reanchorReady: vi.fn(), engage: vi.fn(), ...overrides });
   store.dismissNotice.mockImplementation(() => { store.notice = null; });
   const asr=reactive({level:0,enabled:true,microphoneSupported:true,listening:false,preparing:false,recordingRequested:false,microphoneError:''});
   const wrapper=mount(AssistantApp,{attachTo:document.body,props:{store:store as unknown as AssistantStore,asr:asr as AsrStore},global:{stubs:{MarkdownView:true}}});
@@ -198,9 +199,12 @@ describe('folding away on a click elsewhere', () => {
   });
 });
 
+const BALL={x:408,y:520,size:72};
+const folded=(overrides:Record<string,unknown>={})=>setup({open:false,ball:true,phase:'idle',layout:{ball:BALL,right:true},...overrides});
 describe('the folded ball', () => {
-  it('shows a ring while answering and a badge while waiting', async () => {
-    const {store,wrapper}=setup();store.open=false;store.ball=true;store.phase='answering';await nextTick();
+  it('sits where the host placed it and shows a ring while answering and a badge while waiting', async () => {
+    const {store,wrapper}=folded({phase:'answering'});await nextTick();
+    expect(wrapper.get('[data-testid="assistant-ball-stage"]').attributes('style')).toContain('left: 408px; top: 520px; width: 72px; height: 72px');
     const ball=wrapper.get('[data-testid="assistant-ball"]');
     expect(ball.attributes('data-phase')).toBe('answering');expect(wrapper.find('[data-testid="assistant-ball-ring"]').exists()).toBe(true);
     store.phase='attention';await nextTick();
@@ -209,25 +213,64 @@ describe('the folded ball', () => {
     expect(wrapper.get('[data-testid="assistant-ball-badge"]').classes()).toContain('unread');
     expect(wrapper.find('[data-testid="assistant-primary"]').exists()).toBe(false);
   });
-  it('widens for a finished answer, says so for three seconds, then narrows', async () => {
+  it('is not drawn until the host says where it is', async () => {
+    const {wrapper}=folded({layout:{ball:null,right:true}});await nextTick();
+    expect(wrapper.find('[data-testid="assistant-ball-stage"]').exists()).toBe(false);
+  });
+  it('says a finished answer beside itself, toward the middle of the screen, for three seconds', async () => {
     vi.useFakeTimers();
-    vi.mocked(invoke).mockImplementation(async command=>command==='assistant_ball_bubble'?true:undefined);
-    const {store,wrapper}=setup();store.open=false;store.ball=true;store.phase='idle';await nextTick();
-    store.notice={kind:'done',text:'周报初稿整理好了'};await flushPromises();await nextTick();
-    expect(invoke).toHaveBeenCalledWith('assistant_ball_bubble',{open:true});
+    const {store,wrapper}=folded();await nextTick();
+    store.notice={kind:'done',text:'周报初稿整理好了'};await nextTick();
     expect(wrapper.get('[data-testid="assistant-bubble"]').text()).toContain('周报初稿整理好了');
     expect(wrapper.get('[data-testid="assistant-ball-stage"]').classes()).toContain('bubble-left');
+    // Drawn inside the stage: the window is not widened for it.
+    expect(vi.mocked(invoke).mock.calls.map(([command])=>command)).not.toContain('assistant_ball_bubble');
     await wrapper.get('[data-testid="assistant-bubble"]').trigger('click');expect(store.unfold).toHaveBeenCalledOnce();
-    await vi.advanceTimersByTimeAsync(3000);await flushPromises();
-    expect(store.notice).toBeNull();expect(invoke).toHaveBeenCalledWith('assistant_ball_bubble',{open:false});
+    await vi.advanceTimersByTimeAsync(3000);
+    expect(store.notice).toBeNull();
   });
   it('keeps a waiting notice until it is seen', async () => {
     vi.useFakeTimers();
-    vi.mocked(invoke).mockImplementation(async command=>command==='assistant_ball_bubble'?false:undefined);
-    const {store,wrapper}=setup();store.open=false;store.ball=true;store.phase='attention';await nextTick();
-    store.notice={kind:'attention',text:'shell 需要你许可'};await flushPromises();await nextTick();
+    const {store,wrapper}=folded({phase:'attention',layout:{ball:BALL,right:false}});await nextTick();
+    store.notice={kind:'attention',text:'shell 需要你许可'};await nextTick();
     await vi.advanceTimersByTimeAsync(10000);
     expect(store.dismissNotice).not.toHaveBeenCalled();expect(wrapper.get('[data-testid="assistant-bubble"]').text()).toContain('去处理');
+    expect(wrapper.get('[data-testid="assistant-ball-stage"]').classes()).not.toContain('bubble-left');
+  });
+});
+
+describe('resting the pointer on the ball', () => {
+  it('opens the capsule for a glance once the pointer rests, not while it passes', async () => {
+    vi.useFakeTimers();
+    const {store,wrapper}=folded();await nextTick();
+    const ball=wrapper.get('[data-testid="assistant-ball"]');
+    await ball.trigger('pointerenter',{clientX:10,clientY:10});await vi.advanceTimersByTimeAsync(200);
+    await ball.trigger('pointermove',{clientX:40,clientY:12});await vi.advanceTimersByTimeAsync(200);
+    expect(store.unfold).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(80);expect(store.unfold).toHaveBeenCalledWith(true);
+  });
+  it('waits for the pointer to leave after the capsule closes over it, and stays off when switched off', async () => {
+    vi.useFakeTimers();
+    const {store,wrapper}=setup({open:true,phase:'idle',layout:{ball:BALL,right:true}});await nextTick();
+    store.open=false;store.ball=true;await nextTick();await flushPromises();
+    const ball=wrapper.get('[data-testid="assistant-ball"]');
+    await ball.trigger('pointerenter',{clientX:10,clientY:10});await vi.advanceTimersByTimeAsync(1000);
+    expect(store.unfold).not.toHaveBeenCalled();
+    await ball.trigger('pointerleave');await ball.trigger('pointerenter',{clientX:10,clientY:10});await vi.advanceTimersByTimeAsync(300);
+    expect(store.unfold).toHaveBeenCalledWith(true);
+    vi.mocked(store.unfold).mockClear();store.prefs.hover=false;
+    await ball.trigger('pointerleave');await ball.trigger('pointerenter',{clientX:10,clientY:10});await vi.advanceTimersByTimeAsync(1000);
+    expect(store.unfold).not.toHaveBeenCalled();
+  });
+  it('folds a glance away soon after the pointer leaves, but not once it has been used', async () => {
+    vi.useFakeTimers();
+    const {store,wrapper}=setup({open:true,phase:'idle',peek:true,hovering:true,layout:{ball:BALL,right:true}});await nextTick();
+    store.hovering=false;await nextTick();await vi.advanceTimersByTimeAsync(599);expect(store.hide).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1);expect(store.hide).toHaveBeenCalledOnce();
+    vi.mocked(store.hide).mockClear();store.hovering=true;await nextTick();
+    vi.mocked(store.engage).mockImplementation(()=>{store.peek=false;});
+    await wrapper.get('[data-testid="assistant-input"]').trigger('pointerdown',{button:0});expect(store.engage).toHaveBeenCalledOnce();
+    store.hovering=false;await nextTick();await vi.advanceTimersByTimeAsync(2000);expect(store.hide).not.toHaveBeenCalled();
   });
 });
 
@@ -237,7 +280,7 @@ describe('assistant drag gestures',()=>{
  it('keeps a small orb movement as a click',async()=>{const {store,wrapper}=setup();const orb=wrapper.get('[data-testid="assistant-orb"]');await orb.trigger('pointerdown',{button:0,pointerId:1,clientX:10,clientY:10});move(13,12);window.dispatchEvent(new PointerEvent('pointerup',{pointerId:1}));await orb.trigger('click',{detail:1});expect(invoke).not.toHaveBeenCalledWith('assistant_drag');expect(store.toggleListening).toHaveBeenCalledOnce();});
  it('drags the orb after the threshold without toggling voice or losing the draft',async()=>{const {store,wrapper}=setup();const orb=wrapper.get('[data-testid="assistant-orb"]');await orb.trigger('pointerdown',{button:0,pointerId:1,clientX:10,clientY:10});move(18,10);await nextTick();expect(invoke).toHaveBeenCalledWith('assistant_drag');expect(wrapper.get('.stage').classes()).toContain('dragging');await orb.trigger('click',{detail:1});expect(store.toggleListening).not.toHaveBeenCalled();expect(store.interrupt).not.toHaveBeenCalled();expect(store.input).toBe('草稿');finish();await nextTick();expect(wrapper.get('.stage').classes()).not.toContain('dragging');});
  it('keeps text selection and control presses out of window dragging',async()=>{const {wrapper}=setup();for(const selector of ['[data-testid="assistant-input"]','.card-body','[data-testid="assistant-expand"]','[data-testid="assistant-screenshot"]']){await wrapper.get(selector).trigger('pointerdown',{button:0,pointerId:1,clientX:10,clientY:10});move(100,100);window.dispatchEvent(new PointerEvent('pointerup',{pointerId:1}));}expect(invoke).not.toHaveBeenCalledWith('assistant_drag');});
- it('uses the same threshold on the capsule edge and the folded ball',async()=>{const {store,wrapper}=setup();await wrapper.get('.capsule').trigger('pointerdown',{button:0,pointerId:1,clientX:10,clientY:10});move(17,10);expect(invoke).toHaveBeenCalledWith('assistant_drag');finish();store.open=false;store.ball=true;await nextTick();vi.mocked(invoke).mockClear();const ball=wrapper.get('[data-testid="assistant-ball"]');await ball.trigger('pointerdown',{button:0,pointerId:1,clientX:10,clientY:10});move(18,10);await ball.trigger('click',{detail:1});expect(invoke).toHaveBeenCalledWith('assistant_drag');expect(store.unfold).not.toHaveBeenCalled();finish();});
+ it('uses the same threshold on the capsule edge and the folded ball',async()=>{const {store,wrapper}=setup({layout:{ball:BALL,right:true}});await wrapper.get('.capsule').trigger('pointerdown',{button:0,pointerId:1,clientX:10,clientY:10});move(17,10);expect(invoke).toHaveBeenCalledWith('assistant_drag');finish();store.open=false;store.ball=true;await nextTick();await flushPromises();vi.mocked(invoke).mockClear();const ball=wrapper.get('[data-testid="assistant-ball"]');await ball.trigger('pointerdown',{button:0,pointerId:1,clientX:10,clientY:10});move(18,10);await ball.trigger('click',{detail:1});expect(invoke).toHaveBeenCalledWith('assistant_drag');expect(store.unfold).not.toHaveBeenCalled();finish();});
  it('never starts dragging from transparent headroom or the gap around the surfaces',async()=>{const {wrapper}=setup();for(const selector of ['.stage','.inner']){await wrapper.get(selector).trigger('pointerdown',{button:0,pointerId:1,clientX:30,clientY:20});move(80,80);window.dispatchEvent(new PointerEvent('pointerup',{pointerId:1}));}expect(invoke).not.toHaveBeenCalledWith('assistant_drag');});
  it('does not treat a new input click after dragging as part of the drag',async()=>{const {wrapper}=setup();await wrapper.get('[data-testid="assistant-orb"]').trigger('pointerdown',{button:0,pointerId:1,clientX:10,clientY:10});move(20,10);finish();const field=wrapper.get('[data-testid="assistant-input"]');await field.trigger('pointerdown',{button:0,pointerId:2});const event=new MouseEvent('click',{bubbles:true,cancelable:true,detail:1});field.element.dispatchEvent(event);expect(event.defaultPrevented).toBe(false);});
 });
@@ -327,17 +370,59 @@ describe('assistant region screenshots',()=>{
   });
 });
 
-describe('assistant native morph coordination',()=>{
-  it('acknowledges the outgoing shape before preparing and revealing the incoming shape',async()=>{
-    const animation=vi.spyOn(HTMLElement.prototype,'animate').mockReturnValue({finished:Promise.resolve(),cancel:vi.fn()} as unknown as Animation);
-    const {store,wrapper}=setup();await flushPromises();
-    const callback=vi.mocked(listen).mock.calls.find(([event])=>event==='assistant-transition')![1] as (value:any)=>void;
-    callback({id:1,target:'ball',step:'leave',right:true});await flushPromises();
-    expect(wrapper.get('.stage').classes()).toContain('morphing');
-    expect(invoke).toHaveBeenCalledWith('assistant_transition_ready',{id:1,step:'leave'});
-    store.open=false;store.ball=true;await nextTick();callback({id:1,target:'ball',step:'enter',right:true});await flushPromises();
-    expect(invoke).toHaveBeenCalledWith('assistant_transition_ready',{id:1,step:'enter'});
-    callback({id:1,target:'ball',step:'show',right:true});await flushPromises();expect(wrapper.get('.stage').classes()).not.toContain('morphing');animation.mockRestore();
+describe('ball and capsule in one window',()=>{
+  function animations(){
+    const runs:{el:Element;frames:Keyframe[];finish:()=>void;reverse:ReturnType<typeof vi.fn>}[]=[];
+    const spy=vi.spyOn(HTMLElement.prototype,'animate').mockImplementation(function(this:HTMLElement,frames){
+      let finish!:()=>void;const finished=new Promise<void>(resolve=>{finish=resolve;});
+      const reverse=vi.fn();runs.push({el:this,frames:frames as Keyframe[],finish,reverse});
+      return {finished,cancel:vi.fn(),reverse} as unknown as Animation;
+    });
+    return {runs,spy,finishAll:()=>runs.splice(0).forEach(run=>run.finish())};
+  }
+  it('grows the capsule out of the ball and back without moving the window',async()=>{
+    const {runs,spy,finishAll}=animations();
+    const {store,wrapper}=folded();await nextTick();
+    store.ball=false;store.open=true;await nextTick();await nextTick();await flushPromises();
+    expect(wrapper.get('.stage').classes()).toContain('morph-expand');
+    const glass=runs.find(run=>run.el.classList.contains('morph-glass'))!;
+    // From the ball's own disc: 44px in the middle of its 72px square.
+    expect(glass.frames[0]).toMatchObject({left:'422px',top:'534px',width:'44px',height:'44px',opacity:0});
+    expect(glass.frames[1]).toMatchObject({borderRadius:'26px',opacity:1});
+    expect(runs.find(run=>run.el.classList.contains('morph-orb'))!.frames[0]).toEqual({transform:'translate(422px, 534px) scale(1)'});
+    finishAll();await flushPromises();await nextTick();
+    expect(wrapper.get('.stage').classes()).not.toContain('morph-expand');
+    store.open=false;store.ball=true;await nextTick();
+    // The capsule stays until the glass has shrunk back into the ball, which is hidden till then.
+    expect(wrapper.get('.stage').classes()).toContain('morph-collapse');
+    expect(wrapper.find('[data-testid="assistant"]').exists()).toBe(true);
+    await flushPromises();expect(runs.find(run=>run.el.classList.contains('morph-glass'))!.frames[1]).toMatchObject({left:'422px',width:'44px',opacity:0});
+    finishAll();await flushPromises();await nextTick();
+    expect(wrapper.find('[data-testid="assistant"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="assistant-ball"]').exists()).toBe(true);
+    for (const command of ['assistant_fit','assistant_transition_ready']) expect(vi.mocked(invoke).mock.calls.map(([name])=>name)).not.toContain(command);
+    spy.mockRestore();
+  });
+  it('turns around halfway instead of starting over',async()=>{
+    const {runs,spy}=animations();
+    const {store,wrapper}=folded();await nextTick();
+    store.ball=false;store.open=true;await nextTick();await nextTick();await flushPromises();
+    const running=[...runs];expect(running.length).toBeGreaterThan(0);
+    store.open=false;store.ball=true;await nextTick();
+    expect(running.every(run=>run.reverse.mock.calls.length===1)).toBe(true);
+    expect(wrapper.get('.stage').classes()).toContain('morph-collapse');
+    spy.mockRestore();
+  });
+  it('fades the ball out before the host moves the window under it, then back in',async()=>{
+    vi.useFakeTimers();
+    const {store,wrapper}=folded();await nextTick();
+    store.reanchoring=7;await nextTick();
+    expect(wrapper.get('.stage').classes()).toContain('moving-ball');
+    await vi.advanceTimersByTimeAsync(100);expect(store.reanchorReady).toHaveBeenCalledWith(7);
+    store.layout={ball:{x:0,y:520,size:72},right:false};store.reanchoring=0;await nextTick();
+    await vi.advanceTimersByTimeAsync(50);
+    expect(wrapper.get('.stage').classes()).not.toContain('moving-ball');
+    expect(wrapper.get('[data-testid="assistant-ball-stage"]').attributes('style')).toContain('left: 0px');
   });
 });
 

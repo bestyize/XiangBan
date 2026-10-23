@@ -835,9 +835,9 @@ fn main() {
             chat::store::ai_store_connector_auth_status, chat::store::ai_store_connector_auth_cancel,
             float_assistant::assistant_status, float_assistant::assistant_configure, float_assistant::assistant_ready, float_assistant::assistant_hide,
             assistant_hit_test::assistant_set_regions, capture_editor::capture_frame, capture_editor::capture_show, capture_editor::capture_finish,
-            chat_screenshot, float_assistant::assistant_screenshot, float_assistant::assistant_fit, float_assistant::assistant_drag, float_assistant::assistant_unfold, float_assistant::assistant_ball_bubble,
+            chat_screenshot, float_assistant::assistant_screenshot, float_assistant::assistant_drag, float_assistant::assistant_unfold, float_assistant::assistant_focus,
              assistant_capture::reset_screen_capture_permission, assistant_capture::open_screen_capture_settings,
-            float_assistant::assistant_transition_ready, float_assistant::assistant_prefs, float_assistant::assistant_try, float_assistant::assistant_open_chat, float_assistant::assistant_open_settings]);
+            float_assistant::assistant_reanchor_ready, float_assistant::assistant_prefs, float_assistant::assistant_try, float_assistant::assistant_open_chat, float_assistant::assistant_open_settings]);
     let app = builder.manage(state).manage(content::ContentState::default()).manage(website::WebsiteState::default())
         .manage(games::GameState::default()).manage(desk_game::DeskState::default()).manage(rituals::RitualState::default()).manage(widgets::WidgetState::default()).manage(pets::PetState::default()).manage(reminders::ReminderState::default()).manage(proactivity::ProactivityState::default()).manage(companion_dialogue::DialogueState::default()).manage(account::AccountState::default()).manage(ai_config::AiConfigState::default()).manage(tts::TtsState::default()).manage(asr::AsrState::default()).manage(ai_catalogue::CatalogueState::default()).manage(float_assistant::AssistantState::default()).manage(capture_editor::CaptureState::default()).manage(assistant_hit_test::HitState::default()).manage(window_control::WindowState::default()).manage(voice_turn::VoiceTurnState::default())
         .register_uri_scheme_protocol("wallpaper-asset", |context, request| library::serve(context.app_handle(), request))

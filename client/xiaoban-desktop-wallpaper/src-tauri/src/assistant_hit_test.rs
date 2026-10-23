@@ -1,6 +1,6 @@
 //! Transparent assistant headroom must not obstruct the application underneath it.
 use std::{sync::Mutex, time::Duration};
-use tauri::{Manager, WebviewWindow};
+use tauri::{Emitter, Manager, WebviewWindow};
 
 #[derive(Clone, Debug, serde::Deserialize)]
 pub struct Region { left: f64, bottom: f64, width: f64, height: f64, radius: f64 }
@@ -19,7 +19,7 @@ impl Region {
     }
 }
 #[derive(Default)]
-pub struct HitState { regions: Mutex<Vec<Region>>, ignored: Mutex<Option<bool>> }
+pub struct HitState { regions: Mutex<Vec<Region>>, ignored: Mutex<Option<bool>>, hovering: Mutex<Option<bool>> }
 
 #[tauri::command]
 pub fn assistant_set_regions(window:WebviewWindow,regions:Vec<Region>)->Result<(),String>{
@@ -52,6 +52,9 @@ pub fn start(app:&tauri::AppHandle){
         let Ok((x,y,height,down))=pointer(&window) else {continue;};
         let state=app.state::<HitState>();
         let hit=state.regions.lock().unwrap_or_else(|e| e.into_inner()).iter().any(|r|r.contains(x,y,height));
+        // The page cannot see the pointer leave once the window lets it through, so it is told here.
+        {let mut hovering=state.hovering.lock().unwrap_or_else(|e| e.into_inner());
+        if *hovering!=Some(hit){*hovering=Some(hit);let _=window.emit("assistant-hover",hit);}}
         let ignored=!hit;
         // Do not release an assistant press, selection or native drag before mouse-up.
         // Entering a visible surface stays possible during an external image drag.

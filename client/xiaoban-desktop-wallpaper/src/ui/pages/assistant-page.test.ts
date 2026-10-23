@@ -8,7 +8,7 @@ import { defaults } from '../../bridge.ts';
 import type { ControlPage, ControlStore } from '../control-types.ts';
 
 const status = {
-  enabled: true, shortcut: 'Alt+Space', shortcutLabel: '⌥ Space', ball: true, open: 'voice', read: 'voice', hintSeen: true, registered: true, error: '',
+  enabled: true, shortcut: 'Alt+Space', shortcutLabel: '⌥ Space', ball: true, hover: true, open: 'voice', read: 'voice', hintSeen: true, registered: true, error: '',
   shortcuts: [{ value: 'Alt+Space', label: '⌥ Space' }, { value: 'Ctrl+Alt+Space', label: '⌃ ⌥ Space' }],
 };
 const invoke = vi.fn();
@@ -29,6 +29,18 @@ const click = async (wrapper: ReturnType<typeof setup>['wrapper'], id: string) =
 
 describe('assistant page', () => {
   beforeEach(() => { invoke.mockReset(); invoke.mockImplementation(async (command: string) => (command === 'assistant_status' || command === 'assistant_configure' ? status : undefined)); });
+
+  it('turns opening on hover off and on, and only while the ball is shown', async () => {
+    const { wrapper } = setup();
+    await flushPromises();
+    const hover = () => wrapper.get('[data-testid="assistant-hover-switch"]').findComponent(NSwitch);
+    expect(hover().props('value')).toBe(true);
+    hover().vm.$emit('update:value', false); await flushPromises();
+    expect(invoke).toHaveBeenCalledWith('assistant_configure', { patch: { hover: false } });
+    invoke.mockImplementation(async (command: string) => (command === 'assistant_status' || command === 'assistant_configure' ? { ...status, ball: false } : undefined));
+    wrapper.get('[data-testid="assistant-ball-switch"]').findComponent(NSwitch).vm.$emit('update:value', false); await flushPromises();
+    expect(hover().props('disabled')).toBe(true);
+  });
 
   it('only offers the reset fallback on macOS and does not run tccutil without confirmation', async () => {
     const windows = setup({}, {}, 'windows');
