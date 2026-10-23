@@ -20,7 +20,7 @@ export type ControlPage = MainPage | LegacyPage;
 /** The tabs of 装扮. */
 export type StudioTab = "wallpapers" | "effects" | "widgets" | "pets";
 /** The categories of the settings dialog. */
-export type SettingsTab = "general" | "appearance" | "ai" | "assistant" | "voice" | "safety" | "about";
+export type SettingsTab = "general" | "appearance" | "ai" | "assistant" | "voice" | "network" | "safety" | "about";
 export interface ControlStore {
   settings: Settings;
   info: AppInfo;
