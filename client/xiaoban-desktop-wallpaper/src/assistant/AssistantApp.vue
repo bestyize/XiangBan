@@ -210,7 +210,7 @@ const fixedBody = computed(() => turns.value.length > 0 && busy.value);
 /** Quick actions above a capsule that has no card. */
 const continueTitle = computed(() => (turns.value.length ? props.store.title || '上次的对话' : ''));
 const otherRecent = computed(() => props.store.recent.find(session => session.id !== props.store.currentId && session.title));
-const chipsShown = computed(() => props.store.open && !hasCard.value && !busy.value && !props.store.input && !props.store.attachments.length);
+const chipsShown = computed(() => props.store.open && !hasCard.value && !busy.value && !props.store.input && !props.store.attachments.length && Boolean(continueTitle.value || otherRecent.value));
 async function continueOther(id: string) { await props.store.switchSession(id); cardShown.value = true; void nextTick(() => field.value?.focus()); }
 
 const canSend = computed(() => (!busy.value || props.store.phase === 'speaking') && !props.store.approval && !imageReading.value && !submitting.value && !capturing.value && !props.store.changingSession && Boolean(props.store.input.trim() || props.store.attachments.length));
@@ -489,7 +489,6 @@ onBeforeUnmount(()=>{
           </section>
         </Transition>
         <div v-if="chipsShown" class="chips" data-testid="assistant-chips">
-          <button type="button" class="chip" data-testid="assistant-chip-screenshot" :disabled="!canAttach" @click="takeScreenshot"><SquareDashed :size="14" :stroke-width="1.75" />截图问一下</button>
           <button v-if="continueTitle" type="button" class="chip" data-testid="assistant-chip-continue" @click="revealCard"><History :size="14" :stroke-width="1.75" /><span class="chip-text">继续「{{ continueTitle }}」</span></button>
           <button v-else-if="otherRecent" type="button" class="chip" data-testid="assistant-chip-recent" @click="continueOther(otherRecent.id)"><History :size="14" :stroke-width="1.75" /><span class="chip-text">继续「{{ otherRecent.title }}」</span></button>
         </div>
@@ -523,11 +522,11 @@ html,body,#app{background:transparent!important}
 </style>
 <style scoped>
 /* Glass surfaces in the console's language; the theme colour comes from --ui-btn / --ui-soft / --ui-ink / --ui-dot. */
-.stage{--glass:rgba(42,43,48,.9);--glass-card:rgba(38,39,44,.95);--edge:rgba(255,255,255,.13);--line:rgba(255,255,255,.08);--text:#F2F2F4;--text-2:#C7C7CC;--text-3:#A1A1A8;--icon:#B4B4BA;--hover:rgba(255,255,255,.08);--control:rgba(255,255,255,.08);--you:rgba(255,255,255,.08);--shadow:0 12px 34px rgba(0,0,0,.45);--code:rgba(255,255,255,.06);--warn-bg:rgba(224,154,43,.12);--warn-line:rgba(224,154,43,.3);--warn-text:#F0B65A;--fail:#FF8A8F;--scroll:rgba(255,255,255,.18);
+.stage{--glass:rgba(42,43,48,.9);--glass-card:rgba(38,39,44,.95);--edge:rgba(255,255,255,.13);--line:rgba(255,255,255,.08);--text:#F2F2F4;--text-2:#C7C7CC;--text-3:#A1A1A8;--icon:#B4B4BA;--hover:rgba(255,255,255,.08);--control:rgba(255,255,255,.08);--you:rgba(255,255,255,.08);--shadow:0 1px 3px rgba(0,0,0,.28),0 4px 12px rgba(0,0,0,.3);--code:rgba(255,255,255,.06);--warn-bg:rgba(224,154,43,.12);--warn-line:rgba(224,154,43,.3);--warn-text:#F0B65A;--fail:#FF8A8F;--scroll:rgba(255,255,255,.18);
   --accent:var(--ui-btn,#E5484D);--accent-hi:var(--ui-btn-hi,#F06A6F);--accent-soft:var(--ui-soft,#3A2225);--accent-ink:var(--ui-ink,#FF8C91);--accent-dot:var(--ui-dot,#FF6369);
   --ui-line:var(--line);--ui-surface-alt:var(--code);--ui-text-primary:var(--text);--ui-text-secondary:var(--text-2);--ui-text-tertiary:var(--text-3);--ui-primary:var(--accent-ink);
   position:relative;display:flex;flex-direction:column;justify-content:flex-end;height:100vh;color:var(--text);font:14px/1.6 -apple-system,BlinkMacSystemFont,'SF Pro Text','PingFang SC','Segoe UI','Microsoft YaHei UI',sans-serif;-webkit-font-smoothing:antialiased;user-select:none;cursor:default;pointer-events:none;color-scheme:dark}
-.stage.light{--glass:rgba(255,255,255,.9);--glass-card:rgba(255,255,255,.95);--edge:rgba(0,0,0,.13);--line:rgba(0,0,0,.06);--text:#1D1D1F;--text-2:#3A3A3F;--text-3:#6E6E73;--icon:#5A5A60;--hover:rgba(0,0,0,.055);--control:#F2F2F4;--you:#F2F2F4;--shadow:0 10px 30px rgba(0,0,0,.14);--code:rgba(0,0,0,.045);--warn-bg:#FDF6EA;--warn-line:#F1DDB8;--warn-text:#7A4A00;--fail:#C4323A;--scroll:rgba(0,0,0,.18);color-scheme:light}
+.stage.light{--glass:rgba(255,255,255,.9);--glass-card:rgba(255,255,255,.95);--edge:rgba(0,0,0,.13);--line:rgba(0,0,0,.06);--text:#1D1D1F;--text-2:#3A3A3F;--text-3:#6E6E73;--icon:#5A5A60;--hover:rgba(0,0,0,.055);--control:#F2F2F4;--you:#F2F2F4;--shadow:0 1px 3px rgba(0,0,0,.07),0 4px 12px rgba(0,0,0,.08);--code:rgba(0,0,0,.045);--warn-bg:#FDF6EA;--warn-line:#F1DDB8;--warn-text:#7A4A00;--fail:#C4323A;--scroll:rgba(0,0,0,.18);color-scheme:light}
 button{font:inherit}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 
@@ -535,8 +534,8 @@ button{font:inherit}
 .ball-stage{display:flex;align-items:center;height:100vh;padding:0 14px;box-sizing:border-box;gap:10px}
 .ball-stage:not(.has-bubble){justify-content:center;padding:0}
 .ball-stage.bubble-left{flex-direction:row-reverse}
-.ball{pointer-events:auto;touch-action:none;position:relative;flex:none;display:grid;place-items:center;width:44px;height:44px;padding:0;border:0;border-radius:50%;background:var(--glass);backdrop-filter:blur(20px) saturate(1.6);box-shadow:0 0 0 .5px var(--edge),0 6px 18px rgba(0,0,0,.16),inset 0 1px 0 rgba(255,255,255,.12);cursor:grab;transition:transform .2s}
-.stage.light .ball{box-shadow:0 0 0 .5px var(--edge),0 6px 18px rgba(0,0,0,.14),inset 0 1px 0 rgba(255,255,255,.9)}
+.ball{pointer-events:auto;touch-action:none;position:relative;flex:none;display:grid;place-items:center;width:44px;height:44px;padding:0;border:0;border-radius:50%;background:var(--glass);backdrop-filter:blur(20px) saturate(1.6);box-shadow:0 0 0 .5px var(--edge),0 1px 3px rgba(0,0,0,.2),0 3px 8px rgba(0,0,0,.18),inset 0 1px 0 rgba(255,255,255,.12);cursor:grab;transition:transform .2s}
+.stage.light .ball{box-shadow:0 0 0 .5px var(--edge),0 1px 3px rgba(0,0,0,.08),0 3px 8px rgba(0,0,0,.1),inset 0 1px 0 rgba(255,255,255,.9)}
 .ball:hover{transform:scale(1.06)}
 .ball:active{transform:scale(.96)}
 .ball:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
@@ -558,7 +557,8 @@ button{font:inherit}
 .bubble-enter-from,.bubble-leave-to{opacity:0;transform:scale(.96)}
 
 /* Capsule */
-.inner{pointer-events:none;display:flex;flex-direction:column;gap:10px;padding:12px}
+/* The native window is transparent and clips at its edges: shadows stay within this margin. */
+.inner{pointer-events:none;display:flex;flex-direction:column;gap:10px;padding:14px 16px 20px}
 .composer{pointer-events:auto;cursor:grab;position:relative;border-radius:26px;background:var(--glass);backdrop-filter:blur(24px) saturate(1.6);box-shadow:0 0 0 .5px var(--edge),var(--shadow),inset 0 1px 0 rgba(255,255,255,.08);transition:box-shadow .2s}
 .stage.light .composer{box-shadow:0 0 0 .5px var(--edge),var(--shadow),inset 0 1px 0 rgba(255,255,255,.95)}
 .composer[data-phase=listening]{box-shadow:0 0 0 .5px var(--edge),0 0 0 4px var(--accent-soft),var(--shadow)}
@@ -588,7 +588,7 @@ button{font:inherit}
 
 /* Quick actions */
 .chips{pointer-events:none;display:flex;gap:8px;padding-left:4px}
-.chip{pointer-events:auto;display:inline-flex;align-items:center;gap:6px;max-width:260px;height:30px;padding:0 12px;border:0;border-radius:15px;background:var(--glass);backdrop-filter:blur(20px);box-shadow:0 0 0 .5px var(--edge),0 4px 12px rgba(0,0,0,.1);color:var(--text-2);font-size:12.5px;cursor:pointer}
+.chip{pointer-events:auto;display:inline-flex;align-items:center;gap:6px;max-width:260px;height:30px;padding:0 12px;border:0;border-radius:15px;background:var(--glass);backdrop-filter:blur(20px);box-shadow:0 0 0 .5px var(--edge),0 1px 3px rgba(0,0,0,.06),0 3px 8px rgba(0,0,0,.07);color:var(--text-2);font-size:12.5px;cursor:pointer}
 .chip svg{flex:none;color:var(--icon)}
 .chip:hover:not(:disabled){color:var(--text)}
 .chip:disabled{opacity:.5;cursor:default}
