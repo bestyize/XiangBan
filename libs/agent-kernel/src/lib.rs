@@ -4,6 +4,7 @@
 //! else (permissions, context trimming, budgets) plugs in as [`Middleware`].
 
 mod agent;
+mod discovery;
 #[allow(dead_code)]
 mod child_env;
 pub mod sandbox;

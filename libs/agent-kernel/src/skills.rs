@@ -57,6 +57,13 @@ impl Skills {
     }
 
     pub fn list(&self) -> Vec<SkillInfo> {
+        let mut found = self.scan();
+        found.truncate(MAX_SKILLS);
+        found
+    }
+
+    /// Search must include skills omitted from the bounded initial listing.
+    fn scan(&self) -> Vec<SkillInfo> {
         let mut found: Vec<SkillInfo> = Vec::new();
         for root in &self.roots {
             let Ok(read) = fs::read_dir(&root.path) else { continue };
@@ -77,7 +84,6 @@ impl Skills {
             }
         }
         found.sort_by(|a, b| a.name.cmp(&b.name));
-        found.truncate(MAX_SKILLS);
         found
     }
 
@@ -113,13 +119,15 @@ impl Skills {
     pub fn prompt_section(self: &Arc<Self>) -> impl Fn() -> String + Send + Sync + 'static {
         let skills = self.clone();
         move || {
-            let list = skills.list();
+            let list = skills.scan();
             if list.is_empty() {
                 return String::new();
             }
             let mut out = String::from(
                 "## Skills\nSkills are instructions for specific kinds of tasks. When a task matches a skill, \
-                 call `load_skill` with its name before starting, then follow it.",
+                 call `load_skill` with its name before starting, then follow it. Use `skill_find` \
+                 to search all installed skills, including any omitted from this index. \
+                 `skill_find` is local; `skill_search` searches the online store.",
             );
             let mut hidden = 0;
             for skill in &list {
@@ -131,7 +139,7 @@ impl Skills {
                 }
             }
             if hidden > 0 {
-                out.push_str(&format!("\n({hidden} more skills not listed; `load_skill` still works for them.)"));
+                out.push_str(&format!("\n({hidden} more skills not listed; use `skill_find` to discover them.)"));
             }
             out
         }
@@ -139,7 +147,7 @@ impl Skills {
 
     /// `load_skill`, plus `skill_manage` when a writable root was configured.
     pub fn tools(self: &Arc<Self>) -> Vec<Arc<dyn Tool>> {
-        let mut tools: Vec<Arc<dyn Tool>> = vec![Arc::new(LoadSkill::new(self.clone()))];
+        let mut tools: Vec<Arc<dyn Tool>> = vec![Arc::new(LoadSkill::new(self.clone())), Arc::new(FindSkill::new(self.clone()))];
         if self.roots.iter().any(|r| r.writable) {
             tools.push(Arc::new(SkillManage::new(self.clone())));
         }
@@ -275,7 +283,7 @@ struct LoadSkill {
 impl LoadSkill {
     fn new(skills: Arc<Skills>) -> Self {
         let schema = json!({ "type": "object", "properties": { "name": { "type": "string" } }, "required": ["name"] });
-        let description = "Load the full instructions of a skill listed under Skills in the system prompt.";
+        let description = "Load the full instructions of an installed skill from the Skills index or skill_find results.";
         Self { spec: ToolSpec::new("load_skill", description, schema).risk(Risk::Read).parallel(), skills }
     }
 }
@@ -287,6 +295,43 @@ impl Tool for LoadSkill {
 
     fn execute(&self, args: Value, _ctx: &ToolCtx) -> Result<String, String> {
         self.skills.load(str_arg(&args, "name")?.trim())
+    }
+}
+
+struct FindSkill {
+    spec: ToolSpec,
+    skills: Arc<Skills>,
+}
+
+impl FindSkill {
+    fn new(skills: Arc<Skills>) -> Self {
+        let schema = json!({"type":"object","properties":{
+            "query":{"type":"string","minLength":1,"maxLength":200},
+            "page":{"type":"integer","minimum":1},
+            "limit":{"type":"integer","minimum":1,"maximum":20}
+        },"required":["query"],"additionalProperties":false});
+        Self { spec: ToolSpec::new("skill_find", "Search names and descriptions of all installed skills, including skills omitted from the prompt index. Local metadata only: no network, installation, body loading or script execution. Use load_skill on the selected name.", schema).risk(Risk::Read).parallel(), skills }
+    }
+}
+
+impl Tool for FindSkill {
+    fn spec(&self) -> &ToolSpec { &self.spec }
+
+    fn execute(&self, args: Value, ctx: &ToolCtx) -> Result<String, String> {
+        if ctx.is_cancelled() { return Err("cancelled".into()); }
+        let query = str_arg(&args, "query")?.trim();
+        if query.is_empty() { return Err("query must not be blank".into()); }
+        let limit = args["limit"].as_u64().unwrap_or(10).clamp(1, 20) as usize;
+        let page = args["page"].as_u64().unwrap_or(1).max(1);
+        let offset = page.saturating_sub(1).saturating_mul(limit as u64).min(usize::MAX as u64) as usize;
+        let mut matches: Vec<_> = self.skills.scan().into_iter().filter_map(|skill| {
+            let score = crate::discovery::relevance(query, &skill.name, &skill.description);
+            (score > 0).then_some((score, skill))
+        }).collect();
+        matches.sort_by(|a, b| b.0.cmp(&a.0).then_with(|| a.1.name.cmp(&b.1.name)));
+        let total = matches.len();
+        let results: Vec<_> = matches.into_iter().skip(offset).take(limit).map(|(_, s)| json!({"name":s.name,"description":s.description.chars().take(160).collect::<String>()})).collect();
+        Ok(json!({"skills":results,"total":total,"page":page,"hasMore":offset.saturating_add(limit)<total,"next_step":"Use load_skill with an exact returned name before following that skill."}).to_string())
     }
 }
 

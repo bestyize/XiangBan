@@ -127,6 +127,18 @@ agent.run("session-1", "你好", &mut |event| { /* 转给 UI */ }, &Arc::new(Ato
 
 ## 内置工具
 
+### 已有能力的按需发现
+
+宿主用 `AgentBuilder::deferred_tool_arc(tool)` 注册低频工具，其余工具继续用 `tool` / `tool_arc`。没有延后加载工具时行为不变；有延后加载工具时，内核提供 `tool_search(query, limit?)` 和 `tool_load(names)`，并在每次模型请求的系统上下文中加入有体积预算的名称/用途目录。目录放不下的工具仍可检索；查找范围仅为当前 Agent 已注册的工具，不搜索商店，不安装软件，不发起连接或授权。
+
+搜索命中或按准确名称加载后，下一次模型请求携带对应工具的原始函数定义；后续仍以真实工具名称调用，经原有参数校验、权限、hook、超时、取消与日志处理，不使用通用执行代理，不依赖某家服务商的 tool-search 协议。任务内保留加载状态；成功、失败、取消均清理，状态不跨会话共享。检索采用名称和描述的本地词项匹配，支持中文片段；没有语义向量检索，未命中时应尝试简短关键词或准确名称，不能直接断定能力不存在。
+
+`tool_schemas()` 仍返回完整注册表，供兼容旧宿主及诊断；`initial_tool_schemas()` 返回冷启动可见定义，`tool_catalog()` 返回简短目录。首次开销估算需同时计入两者；运行时的 ContextTrim 在按需过滤后计入实际已加载定义。
+
+已安装技能新增 `skill_find(query, page?, limit?)`：检索完整本地元数据，包括因 200 项列表上限或初始目录预算而未显示的技能；不搜索正文、不联网、不执行脚本。随后用 `load_skill(name)` 读取选中技能。现有 `skill_search` 是在线商店检索，二者职责不同。
+
+针对性验证：`cargo test --locked --manifest-path libs/agent-kernel/Cargo.toml --features skills --test discovery --test skill_find`。
+
 | 工具 | feature | 风险 | 说明 |
 | --- | --- | --- | --- |
 | `time_now` | 默认 | Read | 内核没有时区库，宿主用 `utc_offset_minutes` 传偏移，默认 UTC |

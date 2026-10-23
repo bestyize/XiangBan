@@ -11,6 +11,7 @@ mod community;
 mod compact;
 mod danger;
 mod desktop_tools;
+mod tool_discovery;
 mod game_draft;
 mod hooks;
 // Public so `generate_handler!` can reach the commands by their own module path: a `pub use` re-export of a command
@@ -574,15 +575,22 @@ fn assemble_with_connectors(parts: Parts<'_>, attachments: Vec<Attachment>, conn
     readable.retain(|tool| tool.spec().name != "read_file");
     readable.push(Arc::new(ReadFile::new(roots, AttachmentStore::new(dirs.chat.join("attachments"))).map_err(|e| e.to_string())?));
     let writable = fs_write_tools(vec![workspace.to_path_buf()]).map_err(|e| e.to_string())?;
-    for tool in readable.into_iter().chain(writable).chain(skills.tools()).chain(memory.tools()).chain(discovery.tools()).chain(desktop_tools::tools_in_workspace(desktop.clone(), workspace)) {
+    for tool in readable.into_iter().chain(writable).chain(skills.tools()).chain(memory.tools()).chain(discovery.tools()) {
         builder = builder.tool_arc(tool);
+    }
+    // Product-specific desktop actions are discoverable without paying for every schema
+    // on ordinary chat turns. Files, commands, questions and skill discovery stay eager.
+    for tool in desktop_tools::tools_in_workspace(desktop.clone(), workspace) {
+        builder = if tool_discovery::defer_desktop_tool(&tool.spec().name) {
+            builder.deferred_tool_arc(tool)
+        } else { builder.tool_arc(tool) };
     }
     if let Some(Ok(mcp_client)) = &computer_use {
         for tool in agent_computer_use_tools::checked_tools(mcp_client, &desktop.computer_use_runtime_root()?) {
-            builder = builder.tool_arc(tool);
+            builder = builder.deferred_tool_arc(tool);
         }
     }
-    for tool in connector_tools { builder = builder.tool_arc(tool); }
+    for tool in connector_tools { builder = builder.deferred_tool_arc(tool); }
     for tool in processes.iter().flat_map(|manager| manager.tools()) { builder = builder.tool_arc(tool); }
     builder.build().map_err(|e| e.to_string())
 }
@@ -728,7 +736,8 @@ fn build_agent(app: &tauri::AppHandle, config: &AiConfig, key_source: Option<Key
             })
         }),
     }, attachments, connector_manager(app).map(|m|m.tools()).unwrap_or_default())?;
-    let tokens = agent_kernel::estimate_tool_tokens(&agent.tool_schemas());
+    let tokens = agent_kernel::estimate_tool_tokens(&agent.initial_tool_schemas())
+        + agent_kernel::estimate_tokens(&[Message::system(agent.tool_catalog())]);
     lock(&state.tool_tokens).insert(config.open_computer_use, tokens);
     if let Ok(dirs) = Dirs::of(app) {
         save_tool_tokens(&dirs, config.open_computer_use, tokens);
@@ -1295,10 +1304,10 @@ pub fn chat_delete_session(app: tauri::AppHandle, window: tauri::WebviewWindow, 
     })
 }
 
-/// Estimated tokens of the tool definitions before any answer has measured them: the built-in tool set is about
-/// 7,900 (62 tools, mostly the desktop's own), plus room for connectors. A test keeps it close to the real size.
+/// Conservative cold-start allowance until assembly measures eager definitions plus the
+/// compact directory. ContextTrim separately counts every schema loaded during a task.
 const TOOL_TOKENS_BEFORE_FIRST_ANSWER: usize = 9_500;
-const TOOL_TOKENS_FILE: &str = "tool-tokens.json";
+const TOOL_TOKENS_FILE: &str = "tool-tokens-v2-discovery.json";
 
 /// What the latest answer measured, kept so the ring is right after a restart too.
 fn saved_tool_tokens(dirs: &Dirs, computer_use: bool) -> Option<usize> {
