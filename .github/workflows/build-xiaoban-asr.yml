@@ -1,0 +1,43 @@
+name: BuildXiaoBanAsr
+
+# Builds the xiaoban-asr runtime (SenseVoice recognition + Silero/Smart Turn turn detection) for macOS arm64 and
+# Windows x64 and uploads both as one artifact. Publishing stays manual: upload the files to the ModelScope
+# repository bestyize/xiaoban-asr (see tools/xiaoban-asr/README.md). Run it from the Actions tab.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: macos-14
+            binary: xiaoban-asr
+            published: xiaoban-asr-v2-macos-arm64
+          - os: windows-latest
+            binary: xiaoban-asr.exe
+            published: xiaoban-asr-v2.exe
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: tools/xiaoban-asr
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo test --locked --release
+      - run: cargo build --locked --release
+      - name: Name the file as the app downloads it
+        run: |
+          mkdir -p ../../out
+          cp "target/release/${{ matrix.binary }}" "../../out/${{ matrix.published }}"
+          cd ../../out && (shasum -a 256 "${{ matrix.published }}" || sha256sum "${{ matrix.published }}") | tee "${{ matrix.published }}.sha256"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.published }}
+          path: out/
+          retention-days: 14

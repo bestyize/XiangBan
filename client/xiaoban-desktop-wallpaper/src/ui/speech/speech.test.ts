@@ -75,3 +75,11 @@ describe('reading a streamed answer', () => {
     expect(store.status).toBe('idle'); expect(stream.active).toBe(false);
   });
 });
+
+describe('audio formats', () => {
+  it('plays the system voice as WAV and online voices as MP3', async () => {
+    const { audioType } = await import('./store.ts');
+    expect(audioType(Uint8Array.from([0x52, 0x49, 0x46, 0x46, 0, 0]))).toBe('audio/wav');
+    expect(audioType(Uint8Array.from([0xff, 0xf3, 0x44]).buffer)).toBe('audio/mpeg');
+  });
+});

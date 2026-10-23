@@ -1,6 +1,7 @@
 import { createApp, watchEffect } from 'vue';
 import { desktop, invoke, listen } from '../bridge.ts';
 import { createAsrStore } from '../ui/asr/store.ts';
+import { loadTurnModels } from '../voice/turn/models.ts';
 import { createChatStore } from '../ui/chat/chat-store.ts';
 import { followAccent, followHost, isDark } from '../ui/appearance.ts';
 import { applyUiTokens } from '../ui/design-tokens.ts';
@@ -25,7 +26,7 @@ export async function mountAssistant() {
     onReply: (session, text, key) => assistant.replied(session, text, key),
     onActivity: () => assistant.stopped(),
   });
-  const asr = createAsrStore({ desktop, invoke, listen, notify: (message, type = 'success') => {
+  const asr = createAsrStore({ desktop, invoke, listen, turnModels: () => loadTurnModels(invoke), notify: (message, type = 'success') => {
     if (type !== 'success') assistant.noteVoice(message instanceof Error ? message.message : String(message));
   } });
   const speech = createSpeechStore({ desktop, invoke, notify });

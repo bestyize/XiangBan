@@ -1,4 +1,4 @@
-mod engine;
+pub(crate) mod engine;
 use serde::{Deserialize, Serialize};
 use std::{sync::{Mutex, atomic::{AtomicBool, AtomicU64, Ordering}}, time::Duration};
 use tauri::{Emitter, Manager};

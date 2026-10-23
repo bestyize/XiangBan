@@ -54,14 +54,16 @@ src/voice/
 4. **打断即停**：朗读或生成中被说话打断，同时停止朗读和当前生成，避免下一句被挡住。
 5. 默认唤起方式改为「等待输入」（不自动开麦），语音靠按住说话或点生命球。
 
-### 第二期：判停与兜底
+### 第二期：判停与兜底（已完成）
 
-1. VAD 换成 Silero（约 2 MB），再加 Smart Turn v3（约 8 MB，CPU 约 12 ms，支持中文）做语义判停；两级判停：VAD 预判即开始生成，Smart Turn 确认再播放。
-2. 伪流式实时字幕：说话中每约 1 秒对已录音频做一次识别，灰字显示，句末定稿。
-3. 合成供应商抽象：小伴 AI 网关 / 用户自配（火山、MiniMax、阿里）/ 系统朗读兜底（macOS `say`、Windows SAPI），逐步替换 Edge 非公开接口。
-4. 把级联编排从 `assistant-store.ts` 抽到 `engines/cascade.ts`，对外统一为 `VoiceSession`。
+1. **两级判停**：Silero VAD（约 2 MB）判断有没有人说话；停顿 0.15 秒时问 Smart Turn v3（约 8.7 MB，支持中文）这句是否说完——说完立即结束，没说完继续等（0.8 秒再问一次），最长 1.6 秒。两个模型由本地语音运行时 `xiaoban-asr` 以 `--turn` 模式在单独进程里运行，复用它内置的 onnxruntime（sherpa-onnx 自带 1.28），主程序不链接 onnxruntime、安装包不变大；模型与 SenseVoice 一起从魔搭按需下载。一次判停约 63 ms（发布构建，4 核测试机，含进程间传输），每帧语音检测约 0.7 ms。运行时或模型不在时自动退回按音量判停；语音识别仍是 SenseVoice。详见 `tools/xiaoban-asr/README.md`。
+2. **实时字幕**：说话中约每秒把已说内容识别一次，在悬浮窗状态行灰字显示，句末以最终识别为准。
+3. **语音来源**：设置里可选 Edge（默认）/ 小伴 AI / 系统朗读；Edge 或小伴 AI 失败时同一句自动改用系统朗读（macOS `say`、Windows SAPI，离线）。小伴 AI 走 `server-ai` 新增的 `POST /v1/audio/speech`，模型与音色在网关配置（`AI_SPEECH_MODEL`、`AI_SPEECH_VOICES`）。
+4. **调整**：「把级联编排抽成统一的 VoiceSession」移到第三期开头，与 RealtimeEngine 一起按两种实现的共同点设计，避免只凭一种实现定接口。
 
 ### 第三期：全双工实时模式
+
+0. 先把级联编排从 `assistant-store.ts` 抽到 `engines/cascade.ts`，与实时引擎共用 `VoiceSession` 接口。
 
 1. `server-ai` 新增 `/v1/realtime` WebSocket 中转与按分钟计费，服务端适配 Qwen-Omni Realtime（先接），再接 Seeduplex、GPT-Live-1、Gemini Live；客户端 `RealtimeEngine` 只对接网关这一种协议。
 2. 委托桥：前台模型调用 `delegate_task(描述)` → 在小伴聊天智能体里新建或继续任务（沿用工具、审批、会话）→ 进度与结果作为工具结果回传，前台模型播报；用户可随时问进度、取消。

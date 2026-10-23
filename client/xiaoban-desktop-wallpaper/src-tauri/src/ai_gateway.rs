@@ -18,7 +18,7 @@ const GATEWAY_PROTOCOL: &str = "responses";
 /// 聊天每发一次模型请求就来取一次的密钥，让超过令牌有效期的长对话也能继续。
 pub type KeySource = Arc<dyn Fn() -> String + Send + Sync>;
 
-fn ai_base_url() -> String {
+pub(crate) fn ai_base_url() -> String {
     std::env::var("XIAOBAN_AI_URL").unwrap_or_else(|_| DEFAULT_AI_URL.to_string()).trim_end_matches('/').to_string()
 }
 

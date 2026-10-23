@@ -159,6 +159,7 @@ const SHARED_COMMANDS: &[&str] = &[
     "chat_answer_approval", "chat_answer_question",
     "tts_get_settings", "tts_synthesize", "tts_synthesize_part", "tts_cancel",
     "asr_get_status", "asr_prepare", "asr_transcribe", "asr_report_microphone",
+    "voice_turn_ready", "voice_vad", "voice_vad_reset", "voice_turn_complete",
     "open_download_url",
 ];
 

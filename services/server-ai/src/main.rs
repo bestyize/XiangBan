@@ -78,6 +78,7 @@ pub fn build_router(state: AppState) -> Router {
         .route("/chat/completions", post(proxy::chat_completions))
         .route("/responses", post(proxy::responses))
         .route("/messages", post(proxy::messages))
+        .route("/audio/speech", post(proxy::audio_speech))
         .layer(DefaultBodyLimit::max(state.config.max_body_bytes));
 
     // 凭证只走 Authorization 头，不使用 Cookie，因此跨域放开不构成 CSRF 面。

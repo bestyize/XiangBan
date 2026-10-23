@@ -128,18 +128,7 @@ async fn handle(api: Api, state: &AppState, auth: Result<AuthUser, AppError>, he
     })?;
 
     let active = binding::ensure_active(state, auth.uid, &auth.product).await?;
-
-    let total = {
-        let mut conn = state.pool.acquire().await?;
-        quota::live_total(&mut conn, active.id).await?
-    };
-    if total <= 0 {
-        return Err(AppError::Coded {
-            status: StatusCode::PAYMENT_REQUIRED,
-            code: "insufficient_quota",
-            message: "额度已用完，请兑换额度后继续使用".into(),
-        });
-    }
+    require_quota(state, active.id).await?;
     if tier.requires_paid && quota::paid_total(&state.pool, active.id).await? <= 0 {
         return Err(AppError::Coded {
             status: StatusCode::FORBIDDEN,
@@ -155,6 +144,82 @@ async fn handle(api: Api, state: &AppState, auth: Result<AuthUser, AppError>, he
     let payload = serde_json::to_vec(&request).map_err(|e| AppError::Internal(e.to_string()))?;
     let upstream = state.newapi.relay(api.path(), &active.key, payload, &forwarded_headers(api, headers)).await?;
     respond(upstream, &tier.tier).await
+}
+
+async fn require_quota(state: &AppState, binding_id: i64) -> Result<(), AppError> {
+    let total = {
+        let mut conn = state.pool.acquire().await?;
+        quota::live_total(&mut conn, binding_id).await?
+    };
+    if total <= 0 {
+        return Err(AppError::Coded {
+            status: StatusCode::PAYMENT_REQUIRED,
+            code: "insufficient_quota",
+            message: "额度已用完，请兑换额度后继续使用".into(),
+        });
+    }
+    Ok(())
+}
+
+/// The longest text one speech request may carry. Clients read answers sentence by sentence.
+const SPEECH_MAX_CHARS: usize = 1000;
+/// The largest audio relayed back for one request.
+const SPEECH_MAX_AUDIO: usize = 8 * 1024 * 1024;
+
+/// OpenAI-style speech request for the configured upstream model. The client never names the model; it may
+/// ask for one of the offered voices.
+fn speech_payload(model: &str, voices: &[String], body: &[u8]) -> Result<Value, AppError> {
+    let request: Value = serde_json::from_slice(body).map_err(|_| AppError::BadRequest("请求体不是有效的 JSON".into()))?;
+    let input = request.get("input").and_then(Value::as_str).map(str::trim).unwrap_or_default();
+    if input.is_empty() {
+        return Err(AppError::BadRequest("请提供要朗读的文字".into()));
+    }
+    if input.chars().count() > SPEECH_MAX_CHARS {
+        return Err(AppError::Coded { status: StatusCode::PAYLOAD_TOO_LARGE, code: "request_too_large", message: "一次朗读的文字太长，请分句发送".into() });
+    }
+    let voice = match request.get("voice").and_then(Value::as_str) {
+        Some(asked) => voices.iter().find(|v| *v == asked).cloned().ok_or_else(|| AppError::BadRequest("没有这个音色".into()))?,
+        None => voices.first().cloned().unwrap_or_else(|| "alloy".into()),
+    };
+    let speed = request.get("speed").and_then(Value::as_f64).unwrap_or(1.0).clamp(0.5, 2.0);
+    Ok(json!({ "model": model, "input": input, "voice": voice, "speed": speed, "response_format": "mp3" }))
+}
+
+/// `POST /v1/audio/speech`: one sentence to MP3, billed to the caller's account like any other call.
+pub async fn audio_speech(State(state): State<AppState>, auth: Result<AuthUser, AppError>, body: Result<Bytes, BytesRejection>) -> Response {
+    let result = async {
+        let body = body.map_err(|error| map_body_error(error.status()))?;
+        let auth = auth?;
+        let model = state.config.speech_model.clone().ok_or(AppError::Coded {
+            status: StatusCode::SERVICE_UNAVAILABLE,
+            code: "speech_unavailable",
+            message: "小伴 AI 语音暂未开放".into(),
+        })?;
+        let payload = speech_payload(&model, &state.config.speech_voices, &body)?;
+        let active = binding::ensure_active(&state, auth.uid, &auth.product).await?;
+        require_quota(&state, active.id).await?;
+        sqlx::query("UPDATE bindings SET last_used_at = now() WHERE id = $1").bind(active.id).execute(&state.pool).await?;
+        let payload = serde_json::to_vec(&payload).map_err(|e| AppError::Internal(e.to_string()))?;
+        let upstream = state.newapi.relay("/v1/audio/speech", &active.key, payload, &[]).await?;
+        let status = upstream.status();
+        if !status.is_success() {
+            let text = upstream.text().await.unwrap_or_default();
+            tracing::warn!("语音上游返回 {status}: {}", text.chars().take(300).collect::<String>());
+            return Err(map_upstream_error(status, &text));
+        }
+        let audio = upstream.bytes().await.map_err(|_| AppError::BadGateway("AI 语音暂时不可用".into()))?;
+        if audio.is_empty() || audio.len() > SPEECH_MAX_AUDIO {
+            return Err(AppError::BadGateway("AI 语音没有返回可用的音频".into()));
+        }
+        Response::builder()
+            .status(StatusCode::OK)
+            .header(header::CONTENT_TYPE, "audio/mpeg")
+            .header(header::CACHE_CONTROL, "no-store")
+            .body(Body::from(audio))
+            .map_err(|e| AppError::Internal(e.to_string()))
+    }
+    .await;
+    result.unwrap_or_else(|e| error_response(Api::ChatCompletions, e))
 }
 
 fn validate_reasoning(api: Api, fields: &Map<String, Value>, levels: &[String]) -> Result<(), AppError> {
@@ -504,5 +569,31 @@ mod reasoning_tests {
         }
         assert!(validate_reasoning(Api::Responses, json!({}).as_object().unwrap(), &[]).is_ok());
         assert!(validate_reasoning(Api::ChatCompletions, json!({"reasoning_effort":123}).as_object().unwrap(), &levels).is_err());
+    }
+}
+
+#[cfg(test)]
+mod speech_tests {
+    use super::*;
+    fn voices() -> Vec<String> { vec!["zh_female".into(), "zh_male".into()] }
+
+    #[test]
+    fn the_gateway_names_the_model_and_defaults_the_voice() {
+        let payload = speech_payload("tts-1", &voices(), r#"{"input":" 你好。 ","model":"gpt-anything"}"#.as_bytes()).unwrap();
+        assert_eq!(payload, json!({ "model": "tts-1", "input": "你好。", "voice": "zh_female", "speed": 1.0, "response_format": "mp3" }));
+    }
+
+    #[test]
+    fn only_offered_voices_are_accepted_and_speed_is_bounded() {
+        let payload = speech_payload("tts-1", &voices(), r#"{"input":"好","voice":"zh_male","speed":9}"#.as_bytes()).unwrap();
+        assert_eq!((payload["voice"].as_str(), payload["speed"].as_f64()), (Some("zh_male"), Some(2.0)));
+        assert!(speech_payload("tts-1", &voices(), r#"{"input":"好","voice":"someone_else"}"#.as_bytes()).is_err());
+    }
+
+    #[test]
+    fn empty_or_overlong_text_is_refused() {
+        assert!(speech_payload("tts-1", &voices(), r#"{"input":"   "}"#.as_bytes()).is_err());
+        let long = format!(r#"{{"input":"{}"}}"#, "字".repeat(SPEECH_MAX_CHARS + 1));
+        assert!(matches!(speech_payload("tts-1", &voices(), long.as_bytes()), Err(AppError::Coded { code: "request_too_large", .. })));
     }
 }
