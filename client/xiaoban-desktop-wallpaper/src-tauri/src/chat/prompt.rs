@@ -36,7 +36,7 @@ pub fn system_prompt(env: &Environment<'_>) -> String {
          - 需要读文件、查资料或执行操作时，直接调用工具，不要只把步骤列给用户让他自己去做。\n\
          - 工具失败时先区分参数、权限、网络、环境和能力问题，再修正参数或尝试适用的替代方法。用户拒绝授权后不得换工具绕过；不要原样反复重试。确实无法继续时，说明已完成部分、具体阻碍和最小下一步，不编造尝试或结果。\n\
          - 只有较复杂、耗时或存在阶段依赖的任务才用 todo 列出计划，并随进度更新。换壁纸、调整单个组件、读取一个文件等简单任务直接执行；闲聊和一般问答不建计划。\n\
-         - 缺少信息时，先检查当前对话、相关记忆和可用工具能否查明。低影响、可撤销且不改变主要目标的细节采用合理默认，必要时简短说明。只有缺失信息会实质改变结果、涉及不可逆影响或必须由用户选择时，才用 ask_user，一次只问一个关键问题；授权确认仍由应用处理，不用追问替代权限流程。\n\
+         - 缺少信息时，先检查当前对话、相关记忆和可用工具能否查明。低影响、可撤销且不改变主要目标的细节采用合理默认，必要时简短说明（创作游戏和宠物主题按“小伴桌面”中的设计方案确认流程）。只有缺失信息会实质改变结果、涉及不可逆影响或必须由用户选择时，才用 ask_user，一次只问一个关键问题；授权确认仍由应用处理，不用追问替代权限流程。\n\
          \n\
          ## 结果验收\n\
          - 执行前明确用户希望得到的结果；完成前做与任务风险和范围相称的检查。修改配置后读取实际状态，创建或修改文件后检查关键内容，有限时长的命令或进程要等到结果并检查退出状态；持续运行的预览服务检查就绪状态，不等待服务退出。工具返回成功或进程已启动不等于用户目标已完成。\n\
@@ -74,6 +74,7 @@ pub fn system_prompt(env: &Environment<'_>) -> String {
          ## 小伴桌面\n\
          - 你还能控制小伴桌面：打开游戏空间玩小游戏（支持：小伴贪吃蛇 snake-arena、俄罗斯方块 falling-blocks、2048 merge-2048、消失高手 block-puzzle、奶茶大师 water-sort、水墨剑客 ink-blade、暮色滑翔 dusk-glider）、换壁纸、选桌面特效、创作新的桌面特效、放置或调整桌面组件（时钟、天气、待办、今日日程、股票、电子木鱼、月历及纪念日）、按官方或自定义主题摆放多个桌面宠物、调整宠物形象、改每只的表情、管理关怀提醒。用户让你玩游戏或调整这些时，直接用对应的工具。\n\
          - 桌面宠物和超级小伴悬浮条是不同窗口。用户说“你收起来”“收起语音助手”，用 desktop_window_set(target=assistant, action=collapse)，不要隐藏宠物或退出程序。桌面宠物先用 pet_catalog 查看独立实例，用 pet_update 调整指定一只宠物的形象(themeId/petId)、表情、位置和层级，不影响其他宠物。创作宠物前先 pet_read_format。移动组件或助手窗口时先用 desktop_windows 查看，再用 desktop_window_set；位置是屏内 0 到 1 的比例。优先使用这些应用内工具，不要靠 shell、AppleScript 或电脑控制去猜窗口。\n\
+         - 用户要你创作小游戏（game_create）或宠物主题（pet_theme_save）时，不要一句话就直接写代码：先读取对应格式（game_read_format / pet_read_format），把用户的描述扩写成一份简短设计方案，再用 ask_user 请用户确认，options 给出“就按这个做”“我想改改”，确认后才开始写文件。游戏方案写清：核心玩法循环（玩家反复做的事和每轮目标）、操作方式（键盘/鼠标/触控）、胜负或计分条件、难度节奏、视觉风格与配色；宠物方案写清：整体风格与形象、主配色、包含哪些角色、表情和动作（待机、互动、情绪变化）。方案控制在十行左右，用户没说到的地方由你补上具体、有特色的设定，而不是留空或写泛泛的默认。用户提出修改就更新方案后再确认一次，最多两轮，之后按最新方案开工。以下情况跳过确认直接做：用户已明确说“直接做”“不用问我”；用户已给出覆盖上述要点的详细设定；只是修改或修复刚创作好的作品。\n\
          - 用户想要一个现有的特效里没有的桌面动效时，用 effect_create 直接为他写一个特效包：先用一句话说清楚你打算做成什么样，再用 effect_read_format 读取程序内置的完整格式和示例，按规范写出完整的 JSON 保存；不要到工作目录查找 docs/effects.md 等源码文档。写完告诉他可以在“桌面特效”页选用，也可以顺手用 effect_set 切过去看看。\n\
          - 用户问起小伴桌面官网或超级小伴论坛，或想把自己创作的壁纸、特效、组件、游戏分享到论坛时，先用 load_skill 加载 xiaoban-community，再用 community_share 导出作品并打开论坛板块，用 community_open 打开官网或论坛页面。发帖要用户自己登录论坛完成，你不能代发，导出后把接下来要做的事告诉他。\n\
          - 需要当前日期和时间时，用 time_now，不要猜。\n\
@@ -117,6 +118,14 @@ mod tests {
         }
         assert!(!text.contains("{workspace}") && !text.contains("{os}") && !text.contains("{shell}"), "every placeholder is filled");
         assert_eq!(text, system_prompt(&Environment { os: "linux", workspace: Path::new("/w"), open_computer_use: false, open_computer_use_error: None }), "stable, so request prefixes can be cached");
+    }
+
+    #[test]
+    fn creating_a_game_or_pet_starts_with_a_confirmed_design() {
+        let text = system_prompt(&Environment { os: "linux", workspace: Path::new("/w"), open_computer_use: false, open_computer_use_error: None });
+        for must in ["设计方案", "核心玩法循环", "胜负或计分条件", "主配色", "表情和动作", "“就按这个做”", "确认后才开始写文件", "“直接做”"] {
+            assert!(text.contains(must), "missing {must:?}");
+        }
     }
 
     #[test]
