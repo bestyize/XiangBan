@@ -4,6 +4,7 @@ import { NAlert, NInput, NModal, NPopconfirm, NSelect, NSwitch } from 'naive-ui'
 import { Check, ChevronsUpDown, ExternalLink, FolderOpen, Plus, RefreshCw, SlidersHorizontal, Star, Trash2, X, Zap } from 'lucide-vue-next';
 import { GATEWAY_PROVIDER, invoke, listen, type AiConfigView, type AiProtocol, type AiReplyPreference, type AiReasoningEffort, type ProviderConfigView } from '../../bridge.ts';
 import AiGatewayCard from './AiGatewayCard.vue';
+import { modelFacts, modelFactsPayload, type ModelFacts } from '../model-capabilities.ts';
 import type { ControlStore } from '../control-types.ts';
 import {
   aiProtocols,
@@ -50,7 +51,7 @@ type DiscoveredModel = NonNullable<ProviderConfigView['models']>[number];
 interface ModelDraft {
   id: string; name: string; description: string;
   mode: ReasoningMode; levels: AiReasoningEffort[];
-  facts: Pick<DiscoveredModel, 'maxOutputTokens' | 'contextWindowTokens' | 'supportsTools' | 'supportsVision'>;
+  facts: ModelFacts;
 }
 const DEFAULT_LEVELS: AiReasoningEffort[] = ['low', 'high', 'max'];
 
@@ -91,6 +92,7 @@ watch([modalBaseUrl, modalProtocol], () => {
   if (modalVisible.value) {
     fetchedModels.value = [];
     fetchedFor.value = '';
+    for (const model of modalModels.value) { model.facts = {}; model.mode = 'auto'; model.levels = [...DEFAULT_LEVELS]; }
     testState.value = { kind: 'idle', text: '' };
   }
 }, { flush: 'sync' });
@@ -119,7 +121,7 @@ function draftFrom(model: Pick<DiscoveredModel, 'id'> & Partial<DiscoveredModel>
     description: model.description ?? '',
     mode: declared == null ? 'auto' : declared.length ? 'manual' : 'off',
     levels: declared?.length ? [...declared] : [...DEFAULT_LEVELS],
-    facts: { maxOutputTokens: model.maxOutputTokens, contextWindowTokens: model.contextWindowTokens, supportsTools: model.supportsTools, supportsVision: model.supportsVision },
+    facts: modelFacts(model),
   };
 }
 function initialDrafts(p: ProviderConfigView | undefined, meta: ProviderMeta): ModelDraft[] {
@@ -146,7 +148,7 @@ const replyPreferenceOptions = computed(() => preferenceOptions(modalLevels.valu
 watch(replyPreferenceOptions, options => { if (!options.some(o => o.value === modalReplyPreference.value)) modalReplyPreference.value = 'default'; });
 const modalOption = computed(() => protocolOption(modalProtocol.value));
 const modalPreview = computed(() => validateBaseUrl(modalBaseUrl.value) ? '' : endpointPreview(modalProtocol.value, modalBaseUrl.value));
-const thinkingEditable = computed(() => !isManaged.value && modalProtocol.value !== 'anthropic');
+const thinkingEditable = computed(() => !isManaged.value);
 const modelChips = computed(() => {
   const have = new Set(modalModels.value.map(d => d.id));
   const fetched = fetchedModels.value.filter(m => !have.has(m.id));
@@ -165,7 +167,9 @@ function addModel(id: string, found?: DiscoveredModel): boolean {
   if (!clean) return false;
   if (clean.length > 200 || /[\u0000-\u001f\u007f]/.test(clean)) { props.store.notify('模型名不对，请按服务商给出的名字填写', 'info'); return false; }
   if (modalModels.value.some(d => d.id === clean)) { modelDraft.value = ''; return true; }
-  const known = found ?? fetchedModels.value.find(m => m.id === clean) ?? currentMeta.value.models?.find(m => m.id === clean);
+  const previous = getProviderSaved(editingId.value);
+  const sameEndpoint = previous?.protocol === modalProtocol.value && normalizeBaseUrl(previous.baseUrl) === normalizeBaseUrl(modalBaseUrl.value);
+  const known = found ?? fetchedModels.value.find(m => m.id === clean) ?? (sameEndpoint ? currentMeta.value.models?.find(m => m.id === clean) : undefined);
   modalModels.value = [...modalModels.value, draftFrom(known ?? { id: clean })];
   if (!modalModel.value) modalModel.value = clean;
   modelDraft.value = '';
@@ -182,6 +186,14 @@ function makeDefault(id: string) {
 }
 function toggleLevel(draft: ModelDraft, level: AiReasoningEffort) {
   draft.levels = draft.levels.includes(level) ? draft.levels.filter(l => l !== level) : reasoningEfforts.filter(l => draft.levels.includes(l) || l === level);
+}
+function setThinkingMode(draft: ModelDraft, value: string) {
+  draft.facts.thinkingMode = value === 'auto' ? undefined
+    : value === 'enabled' ? { type: 'enabled', budget_tokens: 4096 }
+      : { type: value as 'adaptive' | 'disabled' };
+}
+function setReasoningSummary(draft: ModelDraft, value: string) {
+  draft.facts.reasoningSummary = value === 'auto' ? undefined : value === 'on';
 }
 function setRecommended(value: boolean) {
   modalSelectionMode.value = value ? 'recommended' : 'manual';
@@ -290,6 +302,12 @@ function rowSummary(row: ProviderRow): string {
 }
 
 const modalFormError = computed(() => {
+  const invalidBudget = modalModels.value.some(model => {
+    const mode = model.facts.thinkingMode;
+    return mode?.type === 'enabled' && (!Number.isInteger(mode.budget_tokens) || mode.budget_tokens < 1024
+      || mode.budget_tokens >= (model.facts.maxOutputTokens ?? 2_000_000));
+  });
+  if (invalidBudget) return '思考预算必须是至少 1024 的整数，且小于单次输出上限';
   if (isEditingCustom.value && !modalName.value.trim()) return '请填写自定义供应商名称';
   return validateAiForm({ baseUrl: modalBaseUrl.value, model: pendingDefault.value }) || validateKey(modalApiKey.value);
 });
@@ -440,12 +458,12 @@ async function activateProvider(id: string) {
 }
 
 /** The list as the host stores it. Facts a service reported about another address must not follow a changed endpoint. */
-function modelPayload(endpointChanged: boolean) {
+function modelPayload() {
   return modalModels.value.map(d => ({
     id: d.id,
     name: d.name || d.id,
     description: d.description,
-    ...(endpointChanged ? {} : Object.fromEntries(Object.entries(d.facts).filter(([, v]) => v != null))),
+    ...modelFactsPayload(d.facts, false),
     ...(d.mode === 'manual' ? { reasoningEfforts: [...d.levels] } : d.mode === 'off' ? { reasoningEfforts: [] } : {}),
   }));
 }
@@ -460,8 +478,6 @@ async function saveProvider(activate: boolean) {
   busy.value = 'save-provider';
   // 保存前是否已在生效；用于区分“本次保存让它生效”和“它本来就在用”。
   const wasInUse = isProviderInUse(editingId.value);
-  const previous = getProviderSaved(editingId.value);
-  const endpointChanged = !previous || normalizeBaseUrl(previous.baseUrl) !== normalizeBaseUrl(modalBaseUrl.value) || previous.protocol !== modalProtocol.value;
   const model = modalModel.value.trim();
   try {
     const updated = await invoke<AiConfigView>('save_ai_provider', {
@@ -474,7 +490,7 @@ async function saveProvider(activate: boolean) {
       clearKey: false,
       activate,
       selectionMode: modalSelectionMode.value,
-      ...(!isManaged.value ? { models: modelPayload(endpointChanged), clearReasoningEfforts: true } : {}),
+      ...(!isManaged.value ? { models: modelPayload(), clearReasoningEfforts: true } : {}),
       replyPreference: canSetReplyPreference.value ? modalReplyPreference.value : 'default',
       discoveredModel: fetchedFor.value === `${modalProtocol.value}\n${modalBaseUrl.value.trim()}`
         ? fetchedModels.value.find(m => m.id === model) ?? null
@@ -757,6 +773,17 @@ function openExternal(url?: string) {
                   </div>
                   <div v-if="model.mode === 'manual'" class="mpanel-row levels" role="group" aria-label="支持的思考等级" data-testid="ai-reasoning-levels">
                     <button v-for="level in reasoningEfforts" :key="level" type="button" role="checkbox" class="xb-chip level" :class="{ on: model.levels.includes(level) }" :aria-checked="model.levels.includes(level)" :data-testid="`ai-reasoning-level-${level}`" @click="toggleLevel(model, level)"><Check v-if="model.levels.includes(level)" :size="10" :stroke-width="3" />{{ reasoningLevelLabels[level] }}</button>
+                  </div>
+                  <div v-if="modalProtocol === 'responses'" class="mpanel-row"><label class="mpanel-label">思考摘要</label>
+                    <select :value="model.facts.reasoningSummary == null ? 'auto' : model.facts.reasoningSummary ? 'on' : 'off'" aria-label="思考摘要能力" @change="setReasoningSummary(model, ($event.target as HTMLSelectElement).value)">
+                      <option value="auto">自动</option><option value="on">支持摘要</option><option value="off">不请求摘要</option>
+                    </select>
+                  </div>
+                  <div v-if="modalProtocol === 'anthropic'" class="mpanel-row"><label class="mpanel-label">思考模式</label>
+                    <select :value="model.facts.thinkingMode?.type ?? 'auto'" aria-label="Messages 思考模式" @change="setThinkingMode(model, ($event.target as HTMLSelectElement).value)">
+                      <option value="auto">自动</option><option value="adaptive">自适应</option><option value="enabled">预算模式</option><option value="disabled">关闭</option>
+                    </select>
+                    <input v-if="model.facts.thinkingMode?.type === 'enabled'" v-model.number="model.facts.thinkingMode.budget_tokens" type="number" min="1024" :max="(model.facts.maxOutputTokens ?? 2000000) - 1" aria-label="思考预算 token" />
                   </div>
                   <span class="mpanel-hint">{{ reasoningModes.find(m => m.value === model.mode)?.hint }}</span>
                 </div>

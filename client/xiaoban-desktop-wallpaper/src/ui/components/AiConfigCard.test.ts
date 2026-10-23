@@ -551,8 +551,9 @@ describe('reply preferences', () => {
     expect(q('ai-reply-advanced')).not.toBeNull();
     expect(q('ai-max-output-tokens')).toBeNull();
     expect(q('ai-reply-preference')).toBeNull();
-    expect(q('ai-model-expand-gpt-6.1-sol')).toBeNull();
-    expect(q('ai-reasoning-mode')).toBeNull();
+    expect(q('ai-model-expand-gpt-6.1-sol')).not.toBeNull();
+    await expandModel('gpt-6.1-sol');
+    expect(document.querySelector('[aria-label="Messages 思考模式"]')).not.toBeNull();
   });
 
   it('never saves a manual output limit, even when loading a legacy configuration', async () => {
