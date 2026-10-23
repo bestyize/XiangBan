@@ -250,8 +250,9 @@ async function continueOther(id: string) { await props.store.switchSession(id); 
 
 const canSend = computed(() => (!busy.value || props.store.phase === 'speaking') && !props.store.approval && !imageReading.value && !submitting.value && !capturing.value && !props.store.changingSession && Boolean(props.store.input.trim() || props.store.attachments.length));
 const stopping = computed(() => busy.value && !canSend.value);
-/** With nothing typed and nothing running, the send button starts a 实时对话 instead. */
-const offersLive = computed(() => !canSend.value && !stopping.value && props.store.voiceAvailable && !imageReading.value && !capturing.value && !submitting.value && !props.store.changingSession);
+/** 实时对话 sits beside send while voice is available; it waits while an answer is being written. */
+const offersLive = computed(() => props.store.voiceAvailable);
+const liveDisabled = computed(() => busy.value || imageReading.value || capturing.value || submitting.value || props.store.changingSession);
 
 /* ── 实时对话 ─────────────────────────────────────────────────────── */
 const liveNow = ref(Date.now());
@@ -610,8 +611,8 @@ onBeforeUnmount(()=>{
             <textarea ref="field" v-model="store.input" rows="1" :disabled="store.changingSession" class="field" autocomplete="off" spellcheck="false" :placeholder="store.phase === 'idle' ? '问小伴，或点左边的球说话…' : store.status" aria-label="向小伴提问" data-testid="assistant-input" @beforeinput="store.inputStarted()" @input="store.inputStarted(); grow()" @keydown.enter="onEnter" @compositionstart="composing = true; store.inputStarted()" @compositionend="composing = false" />
             <button type="button" class="tool" title="添加文件 · 也可以拖入或粘贴" aria-label="添加文件" data-testid="assistant-add-image" :disabled="!canAttach || store.attachments.length >= 8" @click="openPicker"><Plus :size="18" :stroke-width="1.75" /></button>
             <button type="button" class="tool" title="截图提问" aria-label="截图" data-testid="assistant-screenshot" :disabled="!canAttach || store.attachments.length >= 8" @click="takeScreenshot"><SquareDashed :size="17" :stroke-width="1.75" /></button>
-            <button v-if="offersLive" type="button" class="send has-action" aria-label="实时对话" title="实时对话：像打电话一样和小伴说，随时可以打断" data-testid="assistant-live-start" @click="startLive"><AudioLines :size="17" :stroke-width="2.1" /></button>
-            <button v-else type="button" class="send" :class="{ 'has-action': canSend, 'is-stop': stopping }" :aria-label="canSend ? '发送' : stopping ? '停止' : '发送'" :title="canSend ? (store.phase === 'speaking' ? '发送并停止当前朗读' : '发送 · Enter') : stopping ? '停止回答' : '输入后发送'" :disabled="imageReading || capturing || (submitting && !busy) || (!canSend && !stopping)" data-testid="assistant-primary" @click="primary"><svg v-if="stopping" width="11" height="11" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="4" fill="currentColor" /></svg><ArrowUp v-else :size="17" :stroke-width="2.1" /></button>
+            <button v-if="offersLive" type="button" class="tool live-start" aria-label="实时对话" title="实时对话：像打电话一样和小伴说，随时可以打断" data-testid="assistant-live-start" :disabled="liveDisabled" @click="startLive"><AudioLines :size="18" :stroke-width="2" /></button>
+            <button type="button" class="send" :class="{ 'has-action': canSend, 'is-stop': stopping }" :aria-label="canSend ? '发送' : stopping ? '停止' : '发送'" :title="canSend ? (store.phase === 'speaking' ? '发送并停止当前朗读' : '发送 · Enter') : stopping ? '停止回答' : '输入后发送'" :disabled="imageReading || capturing || (submitting && !busy) || (!canSend && !stopping)" data-testid="assistant-primary" @click="primary"><svg v-if="stopping" width="11" height="11" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="4" fill="currentColor" /></svg><ArrowUp v-else :size="17" :stroke-width="2.1" /></button>
           </div>
           <p v-if="dropActive || imageReading || capturing" class="image-status" aria-live="polite">{{ capturing ? '截图中，按 Esc 可以取消' : imageReading ? '正在读取附件…' : '松开添加附件' }}</p>
           <p v-else-if="store.voiceStatus && !store.live" class="image-status" data-testid="assistant-voice-status" role="status">{{ store.voiceStatus }}</p>
@@ -692,6 +693,8 @@ button{font:inherit}
 .send.is-stop{background:var(--control);color:var(--text);cursor:pointer}
 .send.is-stop:hover{background:var(--hover)}
 .send:disabled:not(.is-stop){opacity:.8}
+.tool.live-start{color:var(--accent-ink)}
+.tool.live-start:hover:not(:disabled){background:var(--accent-soft);color:var(--accent-ink)}
 .capsule.live{align-items:center;gap:10px;padding:8px 8px 8px 9px}
 .live-orb{flex:none;display:grid;place-items:center;width:36px;height:36px;cursor:grab}
 .live-text{flex:1;min-width:0;display:flex;flex-direction:column;line-height:1.35;cursor:grab}

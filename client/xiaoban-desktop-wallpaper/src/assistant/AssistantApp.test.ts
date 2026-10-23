@@ -67,14 +67,17 @@ describe('assistant capsule', () => {
     expect(wrapper.get('.capsule').findAll('button').map(b=>b.attributes('data-testid'))).toEqual(['assistant-orb','assistant-add-image','assistant-screenshot','assistant-primary']);
     expect(wrapper.find('[role="toolbar"]').exists()).toBe(false);
   });
-  it('offers 实时对话 in place of send while nothing is typed, and turns the capsule into a voice bar', async () => {
+  it('offers 实时对话 beside send, and turns the capsule into a voice bar', async () => {
     const {store,wrapper}=setup({input:'',phase:'idle',voiceAvailable:true});await nextTick();
-    expect(wrapper.find('[data-testid="assistant-primary"]').exists()).toBe(false);
+    expect(wrapper.get('[data-testid="assistant-primary"]').attributes('aria-label')).toBe('发送');
     await wrapper.get('[data-testid="assistant-live-start"]').trigger('click');await flushPromises();
     expect(store.startLive).toHaveBeenCalledOnce();
     store.input='打字';await nextTick();
-    expect(wrapper.find('[data-testid="assistant-live-start"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="assistant-live-start"]').exists()).toBe(true);
     expect(wrapper.get('[data-testid="assistant-primary"]').attributes('aria-label')).toBe('发送');
+    store.phase='answering';await nextTick();
+    expect(wrapper.get<HTMLButtonElement>('[data-testid="assistant-live-start"]').element.disabled).toBe(true);
+    store.phase='idle';
     store.input='';store.live=true;store.liveStatus='在听';store.liveSince=Date.now();await nextTick();
     expect(wrapper.find('[data-testid="assistant-input"]').exists()).toBe(false);
     expect(wrapper.get('[data-testid="assistant-live-status"]').text()).toContain('在听');

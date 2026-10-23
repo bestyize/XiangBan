@@ -217,19 +217,19 @@ describe('the chat page before a conversation', () => {
 });
 
 describe('实时对话', () => {
-  it('takes the send button\'s place while the box is empty and turns the box into a voice bar', async () => {
+  it('sits beside send and turns the box into a voice bar', async () => {
     const asr = reactive({ enabled: true, ready: true, microphoneSupported: true, listening: false, recordingRequested: false, saving: false, init: vi.fn(async () => {}), deactivate: vi.fn() });
     const live = reactive({ active: false, muted: false, since: 0, partial: '', heard: '', status: '', start: vi.fn(async () => { live.active = true; live.status = '在听'; live.since = Date.now(); }), end: vi.fn(() => { live.active = false; }), toggleMute: vi.fn(async () => {}) });
     await open({}, { extra: { asr, live } });
-    expect(q('chat-send')).toBeNull();
+    expect(q('chat-send')).not.toBeNull();
     await click('chat-live-start');
     expect(live.start).toHaveBeenCalledOnce();
     expect(q('chat-input')).toBeNull();
     expect(q('chat-live-status')!.textContent).toContain('在听');
     await click('chat-live-mute'); expect(live.toggleMute).toHaveBeenCalledOnce();
     await click('chat-live-end'); expect(live.end).toHaveBeenCalledOnce();
-    await type('打字就变回发送');
-    expect(q('chat-live-start')).toBeNull(); expect(q('chat-send')).not.toBeNull();
+    await type('打字后两个按钮都在');
+    expect(q('chat-live-start')).not.toBeNull(); expect(q<HTMLButtonElement>('chat-send')!.disabled).toBe(false);
   });
 });
 

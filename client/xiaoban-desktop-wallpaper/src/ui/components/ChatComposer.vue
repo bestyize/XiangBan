@@ -97,9 +97,9 @@ watch(() => chat.currentId, (id, before) => {
 }, { flush: 'sync' });
 watch(microphoneAllowed, allowed => { if (!allowed && shown.value && !liveActive.value) asr?.deactivate(); }, { flush: 'sync' });
 watch(shown, now => { if (!now && !liveActive.value) asr?.deactivate(); else if (now) void readModelLabel(); }, { flush: 'sync' });
-/** With nothing typed and nothing running, the send button starts a 实时对话 instead. */
-const offersLive = computed(() => Boolean(live && asr) && props.store.desktop && chat.configured && !running.value && !compacting.value && !attachmentReading.value
-  && !draft.value.trim() && !attachments.value.length && !asr!.recordingRequested && !finishingVoice.value && asr!.microphoneSupported !== false);
+/** 实时对话 sits beside send; it waits while an answer is being written or a dictation is under way. */
+const offersLive = computed(() => Boolean(live && asr) && props.store.desktop && asr!.microphoneSupported !== false);
+const liveDisabled = computed(() => !chat.configured || running.value || compacting.value || attachmentReading.value || Boolean(asr?.recordingRequested) || finishingVoice.value);
 const liveNow = ref(Date.now());
 let liveClockTimer: ReturnType<typeof setInterval> | undefined;
 watch(liveActive, active => {
@@ -120,7 +120,7 @@ const liveHint = computed(() => {
     default: return live?.heard || live?.partial ? `${[live.heard, live.partial].filter(Boolean).join(' ')}…` : '说完停一下就会回答';
   }
 });
-async function startLive() { if (offersLive.value) await live?.start(); }
+async function startLive() { if (offersLive.value && !liveDisabled.value) await live?.start(); }
 async function toggleVoice() {
   if (!asr || finishingVoice.value) return;
   if (asr.recordingRequested) {
@@ -280,8 +280,8 @@ defineExpose({ setDraft, insertPrompt, refreshModel: readModelLabel, draft });
         <button v-if="finishingVoice" type="button" class="voice-finish" data-testid="chat-asr-toggle" aria-label="正在转写并发送" aria-pressed="false" disabled><LoaderCircle class="spin" :size="13" aria-hidden="true" />正在发送</button>
         <button v-else-if="asr?.recordingRequested" type="button" class="voice-finish" data-testid="chat-asr-toggle" :aria-label="asr.listening ? '结束录音并发送' : '取消准备'" aria-pressed="true" @click="toggleVoice"><span v-if="asr.listening" class="recording-dot" aria-hidden="true" /><LoaderCircle v-else class="spin" :size="13" aria-hidden="true" />{{ asr.listening ? '结束并发送' : '取消准备' }}</button>
         <button v-else-if="asr" type="button" class="xb-icon-btn voice" data-testid="chat-asr-toggle" aria-label="开始语音输入" aria-pressed="false" title="开始语音输入" :disabled="!store.desktop || !asr.ready || asr.microphoneSupported === false || !microphoneAllowed || asr.saving" @click="toggleVoice"><Mic :size="17" /></button>
+        <button v-if="offersLive" type="button" class="xb-icon-btn live-start" data-testid="chat-live-start" aria-label="实时对话" title="实时对话：像打电话一样和小伴说，随时可以打断" :disabled="liveDisabled" @click="startLive"><AudioLines :size="18" :stroke-width="2" /></button>
         <button v-if="running" type="button" class="send-btn is-stop" data-testid="chat-stop" aria-label="停止" title="停止" @click="chat.cancel()"><Square :size="12" fill="currentColor" /></button>
-        <button v-else-if="offersLive" type="button" class="send-btn" data-testid="chat-live-start" aria-label="实时对话" title="实时对话：像打电话一样和小伴说，随时可以打断" @click="startLive"><AudioLines :size="17" :stroke-width="2.2" /></button>
         <button v-else type="button" class="send-btn" data-testid="chat-send" aria-label="发送" title="发送（Enter）" :disabled="!canSend" @click="submit"><ArrowUp :size="17" :stroke-width="2.4" /></button>
       </div>
     </div>
@@ -305,6 +305,9 @@ html[data-theme=dark] .composer-box{background:var(--ui-surface-alt);box-shadow:
 .composer-spacer{flex:1;min-width:4px}
 .voice{color:var(--ui-text-secondary)}
 .voice:disabled{opacity:.45;cursor:not-allowed}
+.live-start{color:var(--ui-ink)}
+.live-start:hover:not(:disabled){background:var(--ui-soft);color:var(--ui-ink)}
+.live-start:disabled{opacity:.45;cursor:not-allowed}
 .send-btn{flex:none;width:34px;height:34px;margin-left:4px;border-radius:50%;border:0;display:grid;place-items:center;cursor:pointer;color:var(--ui-text-on-btn);background:linear-gradient(var(--ui-btn-hi),var(--ui-btn));box-shadow:inset 0 1px 0 rgba(255,255,255,.3),0 2px 6px rgba(0,0,0,.15)}
 .page-chat .send-btn{width:32px;height:32px}
 .send-btn:hover:not(:disabled){filter:brightness(1.05)}
