@@ -47,10 +47,10 @@ pub fn present(directory: &Path, files: &[&ModelFile]) -> bool {
 /// being fetched and the bytes done so far across all of `files`; `check` can stop the work between chunks.
 pub fn ensure(directory: &Path, files: &[&ModelFile], check: impl Fn() -> Result<(), String>, progress: impl Fn(&str, u64)) -> Result<(), String> {
     fs::create_dir_all(directory).map_err(|e| format!("无法创建模型目录：{e}"))?;
-    let client = reqwest::blocking::Client::builder()
+    let client = crate::network::blocking_builder(reqwest::blocking::Client::builder()
         .user_agent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36 XiaoBan/1.0")
         .https_only(true).connect_timeout(Duration::from_secs(15))
-        .timeout(Duration::from_secs(600)).build().map_err(|e| e.to_string())?;
+        .timeout(Duration::from_secs(600)))?.build().map_err(|e| e.to_string())?;
     let mut completed = 0;
     for spec in files { fetch_model(&client, directory, spec, &check, &progress, &mut completed)?; }
     if engine(directory).is_none() { fetch_engine(&client, directory, &check, &progress, completed)?; }
