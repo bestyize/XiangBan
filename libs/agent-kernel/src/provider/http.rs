@@ -40,7 +40,7 @@ pub(crate) fn new_client(profile: &super::wire::ProviderProfile) -> Result<Clien
         .timeout(Duration::from_secs(300));
     let builder = match profile.proxy_mode.as_str() {
         "direct" => builder.no_proxy(),
-        "manual" => builder.no_proxy().proxy(reqwest::Proxy::all(&profile.proxy_url)
+        "manual" => builder.no_proxy().proxy(reqwest::Proxy::all(profile.proxy_url.as_str())
             .map_err(|e| HarnessError::Config(format!("invalid model proxy: {e}")))?),
         _ => builder,
     };
