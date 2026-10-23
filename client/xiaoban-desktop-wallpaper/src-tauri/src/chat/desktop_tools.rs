@@ -566,7 +566,8 @@ fn widget_list(desktop: &dyn Desktop, _: &Value) -> Result<String, String> {
         let enabled = w["enabled"].as_bool().unwrap_or(true);
         let city = w.get("city").and_then(|c| c.get("name")).and_then(Value::as_str).map(|n| format!(" | 城市: {n}")).unwrap_or_default();
         let state = if enabled { "显示中" } else { "已隐藏" };
-        lines.push(format!("{id} | {} ({kind}) | {}风格 ({theme}) | 缩放 {scale:.2}{city} | {state} | 位置 ({}, {}) | 显示器 {}", widget_kind_label(kind), widget_theme_label(theme), w["x"], w["y"], w["monitor"]));
+        let layer = if w["layer"].as_str() == Some("topmost") { "始终置顶" } else { "贴桌面" };
+        lines.push(format!("{id} | {} ({kind}) | {}风格 ({theme}) | 缩放 {scale:.2}{city} | {state} | {layer} | 位置 ({}, {}) | 显示器 {}", widget_kind_label(kind), widget_theme_label(theme), w["x"], w["y"], w["monitor"]));
     }
     let templates = desktop.custom_widgets()?;
     if let Some(templates) = templates.as_array().filter(|items| !items.is_empty()) {
@@ -588,10 +589,17 @@ fn widget_add(desktop: &dyn Desktop, args: &Value) -> Result<String, String> {
     if theme.is_some_and(|theme| !["ivory"].contains(&theme)) {
         return Err("theme 必须是 ivory（设计稿材质）".into());
     }
+    let layer = optional_text(args, "layer")?;
+    if layer.is_some_and(|layer| !["desktop", "topmost"].contains(&layer)) {
+        return Err("layer 只能是 desktop（贴在桌面）或 topmost（始终置顶）".into());
+    }
     let res = desktop.widget_add(kind)?;
     let id = res["widgets"].as_array().and_then(|w| w.last()).and_then(|w| w.get("id")).and_then(Value::as_str).ok_or("组件创建结果没有返回 id")?;
     if let Some(theme) = theme {
         desktop.widget_update(id, json!({ "theme": theme })).map_err(|e| format!("组件已添加（id: {id}），但设置外观失败：{e}"))?;
+    }
+    if let Some(layer) = layer {
+        desktop.widget_update(id, json!({ "layer": layer })).map_err(|e| format!("组件已添加（id: {id}），但设置层级失败：{e}"))?;
     }
     Ok(format!("已在桌面添加组件：{}（id: {id}）", widget_kind_label(kind)))
 }
@@ -604,6 +612,13 @@ fn parse_widget_patch(args: &Value) -> Result<Value, String> {
             return Err("theme 必须是 ivory（设计稿材质）".into());
         }
         obj.insert("theme".into(), json!(theme));
+    }
+    if let Some(v) = args.get("layer").filter(|v| !v.is_null()) {
+        let layer = v.as_str().ok_or("layer 必须是字符串")?;
+        if !["desktop", "topmost"].contains(&layer) {
+            return Err("layer 只能是 desktop（贴在桌面）或 topmost（始终置顶）".into());
+        }
+        obj.insert("layer".into(), json!(layer));
     }
     if let Some(v) = args.get("scale").filter(|v| !v.is_null()) {
         let s = v.as_f64().ok_or("scale 必须是数字")?;
@@ -639,7 +654,7 @@ fn parse_widget_patch(args: &Value) -> Result<Value, String> {
         obj.insert("city".into(), serde_json::to_value(&city).map_err(|e| e.to_string())?);
     }
     if obj.is_empty() {
-        return Err("请至少指定 theme、scale、x、y、enabled 或 city 之一".into());
+        return Err("请至少指定 theme、layer、scale、x、y、enabled 或 city 之一".into());
     }
     Ok(Value::Object(obj))
 }
@@ -951,7 +966,7 @@ pub fn tools_in_workspace(desktop: Arc<dyn Desktop>, workspace: &std::path::Path
     let status_run = |d: &dyn Desktop, _: &Value| -> Result<String, String> { Ok(d.status()?.to_string()) };
     vec![
         tool(&desktop, ToolSpec::new("desktop_windows", "查看小伴自己的窗口和显示器：盆栽 companion、超级小伴 assistant、控制台 control、桌面组件 widget:<id> 的位置、显示状态和层级。移动前用本工具确认目标与显示器。", none()).risk(Risk::Read).parallel(), |d, _| d.windows().map(|v| v.to_string())),
-        tool(&desktop, ToolSpec::new("desktop_window_set", "控制小伴自己的窗口，不操作其他应用。target: companion 是盆栽，assistant 是超级小伴悬浮条（用户让你收起来时用 action=collapse），control 是设置控制台，widget:<id> 是组件。移动 x/y 使用屏内比例（0 左/上，0.5 中间，1 右/下），可指定 desktop_windows 返回的 monitor。layer: desktop 贴桌面、normal 普通窗口、topmost 置顶；层级本次运行有效。隐藏盆栽或组件会保存开关；收起助手不退出应用、不取消任务。", object(json!({
+        tool(&desktop, ToolSpec::new("desktop_window_set", "调整小伴自己窗口的位置、层级（置顶/贴桌面）、显示/隐藏，不操作其他应用。target: companion 是盆栽，assistant 是超级小伴悬浮条（用户让你收起来时用 action=collapse），control 是设置控制台，widget:<id> 是组件。移动 x/y 使用屏内比例（0 左/上，0.5 中间，1 右/下），可指定 desktop_windows 返回的 monitor。layer: desktop 贴桌面、normal 普通窗口（组件只能 desktop/topmost）、topmost 置顶；组件的层级会保存，其他窗口的层级本次运行有效。隐藏盆栽或组件会保存开关；收起助手不退出应用、不取消任务。", object(json!({
             "target":{"type":"string"},"action":{"type":"string","enum":["show","hide","collapse"]},
             "x":{"type":"number","minimum":0,"maximum":1},"y":{"type":"number","minimum":0,"maximum":1},
             "monitor":{"type":"string"},"layer":{"type":"string","enum":["desktop","normal","topmost"]}
@@ -1093,11 +1108,12 @@ pub fn tools_in_workspace(desktop: Arc<dyn Desktop>, workspace: &std::path::Path
             &desktop,
             ToolSpec::new(
                 "widget_add",
-                "在桌面放置新版时钟、天气、待办、今日日程、股票、电子木鱼、月历或纪念日组件。固定 ivory 材质，支持多实例，不设组件数量上限。",
+                "在桌面放置新版时钟、天气、待办、今日日程、股票、电子木鱼、月历或纪念日组件，可同时设层级（layer=topmost 置顶）。固定 ivory 材质，支持多实例，不设组件数量上限。",
                 object(
                     json!({
                         "kind": {"type": "string", "enum": crate::widgets::KINDS, "description": "组件类型"},
                         "theme": {"type": "string", "enum": ["ivory"], "description": "可选外观风格，固定 ivory（设计稿材质）"},
+                        "layer": {"type": "string", "enum": ["desktop", "topmost"], "description": "可选层级：desktop 贴在桌面（默认），topmost 始终置顶（浮在其他窗口上方）"},
                     }),
                     &["kind"],
                 ),
@@ -1137,11 +1153,12 @@ pub fn tools_in_workspace(desktop: Arc<dyn Desktop>, workspace: &std::path::Path
             &desktop,
             ToolSpec::new(
                 "widget_update",
-                "修改已有的桌面组件：外观风格、缩放大小（0.75-1.5）、位置（x, y 为 0.0-1.0 比例）、显示/隐藏或城市。至少给一项修改。",
+                "修改已有的桌面组件：层级/置顶（layer）、外观风格、缩放大小（0.75-1.5）、位置（x, y 为 0.0-1.0 比例）、显示/隐藏或城市。至少给一项修改。",
                 object(
                     json!({
                         "id": {"type": "string", "description": "组件 id，来自 widget_list"},
                         "theme": {"type": "string", "enum": ["ivory"]},
+                        "layer": {"type": "string", "enum": ["desktop", "topmost"], "description": "desktop 贴在桌面，topmost 始终置顶（浮在其他窗口上方）"},
                         "scale": {"type": "number", "minimum": 0.75, "maximum": 1.5, "description": "缩放比例"},
                         "enabled": {"type": "boolean", "description": "true 显示，false 隐藏"},
                         "x": {"type": "number", "minimum": 0.0, "maximum": 1.0, "description": "水平位置比例"},
@@ -1764,6 +1781,17 @@ mod tests {
         assert!(call(&fake, "widget_update", json!({"id": "wgt-1", "scale": 0.5})).unwrap_err().contains("缩放范围"));
         assert!(call(&fake, "widget_update", json!({"id": "wgt-1", "x": 1.5})).unwrap_err().contains("x 坐标范围"));
         assert!(call(&fake, "widget_update", json!({"id": "wgt-1"})).unwrap_err().contains("至少指定"));
+    }
+
+    #[test]
+    fn widget_layer_can_be_set_on_add_and_update() {
+        let fake = Arc::new(Fake::default());
+        call(&fake, "widget_add", json!({"kind":"clock","layer":"topmost"})).unwrap();
+        assert_eq!(fake.calls(), vec!["widget-add clock", r#"widget-update wgt-new {"layer":"topmost"}"#]);
+        assert!(call(&fake, "widget_add", json!({"kind":"clock","layer":"normal"})).unwrap_err().contains("layer 只能是"));
+        call(&fake, "widget_update", json!({"id":"wgt-1","layer":"desktop"})).unwrap();
+        assert_eq!(fake.calls().last().unwrap(), r#"widget-update wgt-1 {"layer":"desktop"}"#);
+        assert!(call(&fake, "widget_update", json!({"id":"wgt-1","layer":"normal"})).unwrap_err().contains("layer 只能是"));
     }
 
     #[test]
