@@ -16,6 +16,16 @@ function fixture() {
   });
   return { store, invoke, audios, revoke, notify };
 }
+describe('emoji are not read out', () => {
+  it('drops emoji, flags, skin tones and joined sequences, but keeps digits and text', () => {
+    expect(speechText('好的😊，我来看看👍🏽。')).toBe('好的，我来看看。');
+    expect(speechText('今天 🎉 发布了 🇨🇳 版本')).toBe('今天 发布了 版本');
+    expect(speechText('一家人 👨‍👩‍👧 出门')).toBe('一家人 出门');
+    expect(speechText('第 1️⃣ 步，共 3 步 ✅')).toBe('第 1 步，共 3 步');
+    expect(speechText('❤️')).toBe('');
+    expect(speechText('价格是 100 元 (含税) #1 *重点*')).toBe('价格是 100 元 (含税) #1 重点');
+  });
+});
 describe('speech lifecycle', () => {
   it('reads link labels and prose while omitting fenced commands and destination URLs', () => {
     const plain = speechText('# 你好\n\n**小伴**，打开[这里](https://private.example/token)。\n\n```sh\nrm -rf /test\n```');
