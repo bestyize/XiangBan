@@ -38,4 +38,10 @@ describe('SentenceChunker', () => {
   it('does not read a list number on its own', () => {
     expect(feed(['1.', ' 先打开设置。'])).toEqual(['先打开设置。']);
   });
+  it('cuts the first sentence at its first comma once it is long enough, so the first words come sooner', () => {
+    expect(feed(['好的，我来帮你查一下今天的天气，然后告诉你结果。'])).toEqual(['好的，我来帮你查一下今天的天气，', '然后告诉你结果。']);
+  });
+  it('keeps later sentences whole', () => {
+    expect(feed(['好的。我先看一下天气，再看一下时间，然后告诉你。'])).toEqual(['好的。', '我先看一下天气，再看一下时间，然后告诉你。']);
+  });
 });

@@ -54,8 +54,11 @@ export interface ChatStore {
   refresh(): Promise<void>;
   dispose(): void;
   select(id: string | null): Promise<void>;
-  /** Returns false when nothing was sent, so the caller can give the text back to the user. */
-  send(text: string, attachments?: PendingAttachment[]): Promise<boolean>;
+  /**
+   * Returns false when nothing was sent, so the caller can give the text back to the user.
+   * `note` goes to the model at the front of the message and is not shown (see `voice/interruption.ts`).
+   */
+  send(text: string, attachments?: PendingAttachment[], note?: string): Promise<boolean>;
   retry(): Promise<boolean>;
   cancel(): Promise<void>;
   remove(id: string): Promise<void>;
@@ -300,7 +303,7 @@ export function createChatStore(deps: ChatDeps): ChatStore {
       if (!viewOf(id, false).loaded) await loadView(id);
     },
 
-    async send(text, attachments = []) {
+    async send(text, attachments = [], note = '') {
       const images = attachments.filter((item): item is string => typeof item === "string");
       const files = attachments.filter(item => typeof item !== "string");
       deps.onActivity?.();
@@ -331,7 +334,7 @@ export function createChatStore(deps: ChatDeps): ChatStore {
       view.status = '';
       try {
         // Images are left out entirely when there are none, so a plain message keeps its old shape.
-        const args = { sessionId: id, text, ...(images.length ? { images } : {}), ...(files.length ? { attachments: files.map(({name,dataUrl}) => ({name,dataUrl})) } : {}) };
+        const args = { sessionId: id, text: note ? note + text : text, ...(images.length ? { images } : {}), ...(files.length ? { attachments: files.map(({name,dataUrl}) => ({name,dataUrl})) } : {}) };
         upsert(await deps.invoke<SessionSummary>('chat_send', args));
         return true;
       } catch (error) {

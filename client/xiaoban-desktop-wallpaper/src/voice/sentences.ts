@@ -6,6 +6,8 @@ const ENDS = new Set(['。', '！', '？', '!', '?', '；', ';', '…', '\n']);
 const PAUSES = new Set(['，', ',', '、', '：', ':']);
 /** A clause longer than this is cut at the next pause instead of waiting for the sentence end. */
 const LONG = 48;
+/** The first sentence is what the listener waits for, so it is cut at a pause much sooner. */
+const FIRST_LONG = 8;
 
 /**
  * Cuts a streamed Markdown answer into sentences that can be synthesised one by one.
@@ -17,6 +19,7 @@ export class SentenceChunker {
   private pending = '';
   private line = '';
   private fence = false;
+  private spoken = 0;
 
   push(full: string): string[] {
     if (full.length <= this.seen) return [];
@@ -40,7 +43,7 @@ export class SentenceChunker {
       this.pending += ch;
       const next = added[i + 1];
       const end = ENDS.has(ch) || (ch === '.' && (next === ' ' || next === '\n'));
-      const pause = PAUSES.has(ch) && this.pending.length >= LONG;
+      const pause = PAUSES.has(ch) && this.pending.length >= (this.spoken ? LONG : FIRST_LONG);
       if (end || pause) this.take(out);
     }
     return out;
@@ -58,7 +61,7 @@ export class SentenceChunker {
     const text = speechText(this.pending).replace(/\|/g, '，').trim();
     // Too little to say on its own ("1." of a list, a lone emoji): keep it for the next sentence.
     if (!last && text.length < 2 && !/\n$/.test(this.pending)) return;
-    if (text) out.push(text);
+    if (text) { out.push(text); this.spoken++; }
     this.pending = '';
   }
 }

@@ -10,6 +10,8 @@ export interface StreamPlayerDeps {
   play(audio: ArrayBuffer | Uint8Array): Promise<Clip>;
   /** Sentences synthesised ahead of the one playing. */
   ahead?: number;
+  /** Awaited before the first sentence is played, e.g. to let a short acknowledgement finish instead of talking over it. */
+  beforeFirst?(): Promise<void> | void;
 }
 
 export interface StreamPlayerEvents {
@@ -72,6 +74,7 @@ export function createStreamPlayer(deps: StreamPlayerDeps, events: StreamPlayerE
       const audio = await item.audio!;
       if (stopped) return;
       if (audio instanceof Error) { events.onError?.(audio); return; }
+      if (!started) { await deps.beforeFirst?.(); if (stopped) return; }
       clip = await deps.play(audio);
       if (stopped) { clip.stop(); return; }
       playing = true; spoken += item.text;

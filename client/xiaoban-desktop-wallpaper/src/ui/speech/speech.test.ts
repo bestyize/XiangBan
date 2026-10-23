@@ -83,3 +83,39 @@ describe('audio formats', () => {
     expect(audioType(Uint8Array.from([0xff, 0xf3, 0x44]).buffer)).toBe('audio/mpeg');
   });
 });
+
+describe('acknowledgements', () => {
+  const synthesized = (invoke: ReturnType<typeof fixture>['invoke']) => invoke.mock.calls.filter(([command]) => command === 'tts_synthesize_part').map(([, args]) => (args as { text: string }).text);
+  it('prepares each phrase once per voice and plays one without touching the reading status', async () => {
+    const { store, invoke, audios } = fixture(); await store.init();
+    expect(store.ack!()).toBe(false); // nothing prepared yet
+    await store.prepareAck!(); await store.prepareAck!();
+    expect(synthesized(invoke)).toEqual(['好的', '嗯，我看看', '我想想']);
+    expect(store.ack!()).toBe(true);
+    expect(audios).toHaveLength(1); expect(store.status).toBe('idle');
+    expect(store.ack!()).toBe(false); // already playing one
+    (audios[0].onended as () => void)();
+    expect(store.ack!()).toBe(true); expect(audios).toHaveLength(2);
+  });
+  it('keeps quiet with the system voice, which would sound like someone else', async () => {
+    const { store, invoke } = fixture(); await store.init(); await store.save({ provider: 'system' });
+    await store.prepareAck!(); expect(synthesized(invoke)).toEqual([]); expect(store.ack!()).toBe(false);
+  });
+  it('is stopped by stop()', async () => {
+    const { store, audios } = fixture(); await store.init(); await store.prepareAck!();
+    store.ack!(); await store.stop();
+    expect(audios[0].pause).toHaveBeenCalled();
+  });
+  it('lets the first sentence wait until the acknowledgement has finished', async () => {
+    const { store, audios } = fixture(); await store.init(); await store.prepareAck!();
+    const stream = store.stream!('a1');
+    expect(store.ack!()).toBe(true);
+    stream.push('第一句。');
+    await vi.waitFor(() => expect(store.status).toBe('synthesizing'));
+    await new Promise(resolve => setTimeout(resolve, 20));
+    expect(audios).toHaveLength(1); // only the acknowledgement so far
+    (audios[0].onended as () => void)();
+    await vi.waitFor(() => expect(audios).toHaveLength(2));
+    expect(store.status).toBe('playing');
+  });
+});

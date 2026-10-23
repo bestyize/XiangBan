@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isPlaybackEcho, isSpeechText } from './voice-guard.ts';
+import { isFiller, isPlaybackEcho, isSpeechText } from './voice-guard.ts';
 
 describe('assistant playback echo', () => {
   it('matches partial readout with punctuation, case and small ASR mistakes', () => {
@@ -16,5 +16,12 @@ describe('assistant playback echo', () => {
   it('ignores punctuation and recognizer noise labels', () => {
     for (const text of ['……', '[noise]', '（音乐）', '<|nospeech|>', '🎵']) expect(isSpeechText(text)).toBe(false);
     for (const text of ['停', '你好', '帮我播放音乐']) expect(isSpeechText(text)).toBe(true);
+  });
+});
+
+describe('listening sounds', () => {
+  it('treats sounds of listening as fillers but not words that answer a question', () => {
+    for (const text of ['嗯', '嗯嗯。', '啊', '哦哦', '哈哈哈', '呃…', '嗯哼']) expect(isFiller(text)).toBe(true);
+    for (const text of ['好', '对', '好的', '停', '不是', '嗯，换一个']) expect(isFiller(text)).toBe(false);
   });
 });

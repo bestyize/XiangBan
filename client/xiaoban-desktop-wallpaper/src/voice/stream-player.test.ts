@@ -70,4 +70,23 @@ describe('createStreamPlayer', () => {
     player.push('没有句号的回答'); expect(h.synthesized).toEqual([]);
     void player.end('没有句号的回答'); expect(h.synthesized).toEqual(['没有句号的回答']);
   });
+  it('lets an acknowledgement finish before the first sentence, but only the first', async () => {
+    const h = harness(); let releaseAck!: () => void;
+    const beforeFirst = vi.fn(() => new Promise<void>(resolve => { releaseAck = resolve; }));
+    const player = createStreamPlayer({ ...h.deps, beforeFirst });
+    player.push('第一句。第二句。');
+    h.ready('第一句。'); await flushPromises();
+    expect(h.played).toEqual([]); expect(beforeFirst).toHaveBeenCalledOnce();
+    releaseAck(); await flushPromises();
+    expect(h.played).toEqual(['第一句。']);
+    h.clips[0].end(); h.ready('第二句。'); await flushPromises();
+    expect(h.played).toEqual(['第一句。', '第二句。']); expect(beforeFirst).toHaveBeenCalledOnce();
+  });
+  it('does not play after being stopped while waiting for the acknowledgement', async () => {
+    const h = harness(); let releaseAck!: () => void;
+    const player = createStreamPlayer({ ...h.deps, beforeFirst: () => new Promise<void>(resolve => { releaseAck = resolve; }) });
+    player.push('第一句。'); h.ready('第一句。'); await flushPromises();
+    player.stop(); releaseAck(); await flushPromises();
+    expect(h.played).toEqual([]);
+  });
 });

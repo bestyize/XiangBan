@@ -72,3 +72,16 @@ it('releases the microphone if audio processing fails after the fallback succeed
   await expect(captureMicrophone(vi.fn(), vi.fn())).rejects.toThrow('Worklet unavailable');
   expect(h.track.stop).toHaveBeenCalledOnce(); expect(h.context.close).toHaveBeenCalledOnce();
 });
+
+it('asks for the system voice isolation when it is offered, and falls back to ordinary processing without it', async () => {
+  const h = setup({ echoCancellation: true, noiseSuppression: true, voiceIsolation: true } as MediaTrackSupportedConstraints);
+  const capture = await captureMicrophone(vi.fn(), vi.fn());
+  expect(h.getUserMedia).toHaveBeenCalledExactlyOnceWith({ audio: { echoCancellation: true, noiseSuppression: true, voiceIsolation: true }, video: false });
+  capture.stop();
+  const refused = setup({ echoCancellation: true, noiseSuppression: true, voiceIsolation: true } as MediaTrackSupportedConstraints);
+  refused.getUserMedia.mockRejectedValueOnce(new TypeError('Invalid constraint'));
+  const second = await captureMicrophone(vi.fn(), vi.fn());
+  expect(refused.getUserMedia).toHaveBeenCalledTimes(2);
+  expect(refused.getUserMedia).toHaveBeenNthCalledWith(2, { audio: { echoCancellation: true, noiseSuppression: true }, video: false });
+  second.stop();
+});

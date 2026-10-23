@@ -30,3 +30,9 @@ export function isPlaybackEcho(text: string, playback: string): boolean {
   }
   return previous.some(distance => distance <= allowance);
 }
+
+/** A sound of listening rather than a sentence ("嗯", "哦", a laugh): it must neither interrupt the assistant nor be sent as a question. */
+const FILLER = /^(?:[嗯啊哦噢喔哎唉呃额欸诶嘿哈呵]+|嗯哼|哈哈+|呵呵+)$/;
+export function isFiller(text: string): boolean {
+  return FILLER.test(words(text));
+}

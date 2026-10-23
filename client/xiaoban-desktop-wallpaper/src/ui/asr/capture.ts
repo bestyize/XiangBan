@@ -24,14 +24,20 @@ async function openMicrophone(): Promise<MediaStream> {
   for (const key of ['echoCancellation', 'noiseSuppression', 'autoGainControl'] as const) {
     if (supported[key]) audio[key] = true;
   }
-  const options: MediaStreamConstraints = { audio: Object.keys(audio).length ? audio : true, video: false };
-  try { return await media.getUserMedia(options); }
-  catch (error) {
-    // Some desktop WebViews reject constraints they report as supported. Retry once with defaults.
+  const plain: MediaStreamConstraints = { audio: Object.keys(audio).length ? audio : true, video: false };
+  // The system's own voice isolation (where the WebView offers it) separates the user from the speakers' sound best;
+  // it is tried first, and a device that refuses it still gets the ordinary processing.
+  const isolated = (supported as Record<string, unknown>).voiceIsolation
+    ? [{ audio: { ...audio, voiceIsolation: true } as MediaTrackConstraints, video: false } as MediaStreamConstraints] : [];
+  let refused: unknown;
+  for (const options of [...isolated, plain]) {
+    try { return await media.getUserMedia(options); }
     // Permission and device-access errors must retain their original meaning and never trigger a retry.
-    if (options.audio === true || !constraintError(error)) throw error;
-    return media.getUserMedia({ audio: true, video: false });
+    catch (error) { if (!constraintError(error)) throw error; refused = error; }
   }
+  // Some desktop WebViews reject constraints they report as supported. Retry once with defaults.
+  if (plain.audio === true) throw refused;
+  return media.getUserMedia({ audio: true, video: false });
 }
 export async function captureMicrophone(onFrame: (frame: Float32Array) => void, onError: (error: string) => void): Promise<Capture> {
   if (!supportsMicrophone()) throw new Error(MICROPHONE_UNSUPPORTED);
