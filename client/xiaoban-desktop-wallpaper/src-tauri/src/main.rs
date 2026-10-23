@@ -54,6 +54,7 @@ mod capture_editor;
 mod assistant_hit_test;
 mod window_control;
 mod voice_turn;
+mod inference;
 
 use preferences::{Preferences, Settings};
 use serde::Serialize;

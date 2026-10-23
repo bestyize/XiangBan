@@ -1,4 +1,4 @@
-pub(crate) mod engine;
+mod engine;
 use serde::{Deserialize, Serialize};
 use std::{sync::{Mutex, atomic::{AtomicBool, AtomicU64, Ordering}}, time::Duration};
 use tauri::{Emitter, Manager};
@@ -41,7 +41,7 @@ pub fn asr_get_status(app: tauri::AppHandle) -> Result<Status, String> {
     let state = app.state::<AsrState>();
     let _io = state.settings_io.lock().unwrap_or_else(|e| e.into_inner());
     let microphone_error = state.microphone_error.lock().unwrap_or_else(|e| e.into_inner()).clone();
-    Ok(Status { enabled: settings(&app)?.enabled, model_ready: engine::present(&crate::storage::root(&app)?.join("asr")), engine_ready: state.engine_ready.load(Ordering::SeqCst), warming: state.warming.load(Ordering::SeqCst), microphone_error })
+    Ok(Status { enabled: settings(&app)?.enabled, model_ready: engine::present(&crate::inference::directory(&app)?), engine_ready: state.engine_ready.load(Ordering::SeqCst), warming: state.warming.load(Ordering::SeqCst), microphone_error })
 }
 #[tauri::command]
 pub fn asr_report_microphone(app: tauri::AppHandle, error: String) -> Result<(), String> {
@@ -63,7 +63,7 @@ fn prepare_blocking(handle: &tauri::AppHandle, generation: u64, request_id: Opti
     check(handle, generation)?;
     if !settings(handle)?.enabled { return Err("请先开启语音识别".into()); }
     if state.engine_ready.load(Ordering::SeqCst) { return Ok(()); }
-    let directory = crate::storage::root(handle)?.join("asr");
+    let directory = crate::inference::directory(handle)?;
     engine::ensure_model(&directory, || check(handle, generation), |file, downloaded| {
         if let Some(request_id) = request_id {
             let _ = handle.emit_to("control", "asr-progress", Progress { request_id, phase: "downloading", file, downloaded, total: engine::TOTAL_BYTES });
@@ -122,7 +122,7 @@ fn next_step(enabled: bool, model_present: bool, engine_ready: bool) -> Step {
 fn fetch_blocking(handle: &tauri::AppHandle) -> Result<(), String> {
     let state = handle.state::<AsrState>();
     let _prepare = state.prepare.lock().unwrap_or_else(|e| e.into_inner());
-    let directory = crate::storage::root(handle)?.join("asr");
+    let directory = crate::inference::directory(handle)?;
     engine::ensure_model(&directory, || {
         if state.urgent.load(Ordering::SeqCst) { Err("有页面正在使用语音识别，后台下载让路".into()) } else { Ok(()) }
     }, |_, _| {})
@@ -142,7 +142,7 @@ fn warm_up(app: &tauri::AppHandle, waits: &[u64]) {
         std::thread::sleep(Duration::from_secs(*wait));
         let state = app.state::<AsrState>();
         let enabled = settings(app).map(|s| s.enabled).unwrap_or(false);
-        let present = crate::storage::root(app).map(|root| engine::present(&root.join("asr"))).unwrap_or(false);
+        let present = crate::inference::directory(app).map(|dir| engine::present(&dir)).unwrap_or(false);
         let step = next_step(enabled, present, state.engine_ready.load(Ordering::SeqCst));
         if step == Step::Done { return; }
         let generation = state.generation.load(Ordering::SeqCst);

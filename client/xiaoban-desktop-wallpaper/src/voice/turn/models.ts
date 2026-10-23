@@ -1,5 +1,5 @@
 /**
- * Endpointing models: Silero VAD and Smart Turn v3, run by the xiaoban-asr runtime (`--turn`) through the host.
+ * Endpointing models: Silero VAD and Smart Turn v3, run by the local inference engine (`turn` capability) through the host.
  * The page only streams audio to them; audio crosses the IPC as 16-bit samples.
  */
 type Invoke = <T>(command: string, args?: Record<string, unknown>) => Promise<T>;
