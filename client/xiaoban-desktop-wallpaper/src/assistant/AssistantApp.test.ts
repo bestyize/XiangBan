@@ -23,7 +23,8 @@ function setup(overrides: Record<string, unknown> = {}, stubs: Record<string, un
     items: conversation() as unknown[], title: '放松一下', currentId: 's1' as string | null, recent: [{ id: 's1', title: '放松一下', createdAt: 1, updatedAt: 2 }, { id: 's2', title: '周报整理', createdAt: 1, updatedAt: 1 }],
     unread: false, notice: null as null | { kind: string; text: string }, dismissNotice: vi.fn(), switchSession: vi.fn(async () => {}), retry: vi.fn(async () => {}), decide: vi.fn(), reply: vi.fn(),
     attachments: [] as unknown[], questionImages: [] as string[], prepareImages: vi.fn(), inputStarted: vi.fn(), note: vi.fn(), input: '草稿', status: '正在回答…', hide: vi.fn(), submit: vi.fn(), interrupt: vi.fn(), openChat: vi.fn(),newConversation:vi.fn(),openSettings:vi.fn(),toggleListening:vi.fn(),unfold:vi.fn(),
-    layout: { ball: null as null | { x: number; y: number; size: number }, right: true }, prefs: { open: 'type', read: 'voice', hover: true }, peek: false, hovering: false, reanchoring: 0, reanchorReady: vi.fn(), engage: vi.fn(), saveAnswer: vi.fn(async () => true), ...overrides });
+    layout: { ball: null as null | { x: number; y: number; size: number }, right: true }, prefs: { open: 'type', read: 'voice', hover: true }, peek: false, hovering: false, reanchoring: 0, reanchorReady: vi.fn(), engage: vi.fn(), saveAnswer: vi.fn(async () => true),
+    voiceAvailable: false, voiceStatus: '', live: false, muted: false, liveSince: 0, liveStatus: '', startLive: vi.fn(async () => {}), endLive: vi.fn(), toggleMute: vi.fn(async () => {}), ...overrides });
   store.dismissNotice.mockImplementation(() => { store.notice = null; });
   const asr=reactive({level:0,enabled:true,microphoneSupported:true,listening:false,preparing:false,recordingRequested:false,microphoneError:''});
   const wrapper=mount(AssistantApp,{attachTo:document.body,props:{store:store as unknown as AssistantStore,asr:asr as AsrStore},global:{stubs:{MarkdownView:true,...stubs}}});
@@ -65,6 +66,23 @@ describe('assistant capsule', () => {
     const {store,wrapper}=setup();store.phase='idle';await nextTick();
     expect(wrapper.get('.capsule').findAll('button').map(b=>b.attributes('data-testid'))).toEqual(['assistant-orb','assistant-add-image','assistant-screenshot','assistant-primary']);
     expect(wrapper.find('[role="toolbar"]').exists()).toBe(false);
+  });
+  it('offers 实时对话 beside send, and turns the capsule into a voice bar', async () => {
+    const {store,wrapper}=setup({input:'',phase:'idle',voiceAvailable:true});await nextTick();
+    expect(wrapper.get('[data-testid="assistant-primary"]').attributes('aria-label')).toBe('发送');
+    await wrapper.get('[data-testid="assistant-live-start"]').trigger('click');await flushPromises();
+    expect(store.startLive).toHaveBeenCalledOnce();
+    store.input='打字';await nextTick();
+    expect(wrapper.find('[data-testid="assistant-live-start"]').exists()).toBe(true);
+    expect(wrapper.get('[data-testid="assistant-primary"]').attributes('aria-label')).toBe('发送');
+    store.phase='answering';await nextTick();
+    expect(wrapper.get<HTMLButtonElement>('[data-testid="assistant-live-start"]').element.disabled).toBe(true);
+    store.phase='idle';
+    store.input='';store.live=true;store.liveStatus='在听';store.liveSince=Date.now();await nextTick();
+    expect(wrapper.find('[data-testid="assistant-input"]').exists()).toBe(false);
+    expect(wrapper.get('[data-testid="assistant-live-status"]').text()).toContain('在听');
+    await wrapper.get('[data-testid="assistant-live-mute"]').trigger('click');expect(store.toggleMute).toHaveBeenCalledOnce();
+    await wrapper.get('[data-testid="assistant-live-end"]').trigger('click');expect(store.endLive).toHaveBeenCalledOnce();
   });
   it('keeps the empty text box one line high and refits a draft when the window widens', async () => {
     const {store,wrapper}=setup({input:''});await nextTick();

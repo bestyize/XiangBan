@@ -68,6 +68,18 @@ export interface AssistantStore {
   /** A re-anchor in progress: the host waits for the ball to fade out before moving the window. 0 when none. */
   reanchoring: number;
   reanchorReady(id: number): void;
+  /** 实时对话: a hands-free conversation that keeps listening after every answer until the user ends it. Every
+   * answer is read aloud and can be talked over. */
+  live: boolean;
+  /** In a live conversation, the microphone is off until the user switches it back on. */
+  muted: boolean;
+  /** When the live conversation started, for its clock. 0 when none. */
+  liveSince: number;
+  /** One or two words for where a live conversation is: 正在连接…, 在听, 在想, 在说, 已静音. Empty when not live. */
+  readonly liveStatus: string;
+  startLive(): Promise<void>;
+  endLive(): void;
+  toggleMute(): Promise<void>;
   /** The text box. Voice fills it as words are recognised, then sends it. */
   input: string;
   /** Images staged for the next question, as data URLs. */
@@ -254,6 +266,8 @@ export function createAssistantStore(deps: AssistantDeps): AssistantStore {
 
   function armListenTimer() {
     clearTimer(listenTimer);
+    // A live conversation waits as long as the user likes; only 结束 ends it.
+    if (store.live) return;
     listenTimer = setTimer(() => {
       if (disposed || !store.open || heard || !asr.recordingRequested || flags.awaitingSpeech || flags.ptt) return;
       if (asr.speechActive || asr.recognizing) { armListenTimer(); return; }
@@ -299,7 +313,7 @@ export function createAssistantStore(deps: AssistantDeps): AssistantStore {
         clearTimer(ackTimer); ackTimer = undefined;
         flags.awaitingSpeech = true;
         // Listen while reading so the user can talk over it.
-        if (asr.enabled && asr.microphoneSupported !== false && !asr.recordingRequested) void startListening(true);
+        if (asr.enabled && asr.microphoneSupported !== false && !asr.recordingRequested && !store.muted) void startListening(true);
       },
       onSentence: text => { if (ticket === speechVersion) readingText += text; },
     });
@@ -363,6 +377,12 @@ export function createAssistantStore(deps: AssistantDeps): AssistantStore {
   /** What happens once an answer is complete and has been read: listen again if the user is talking. */
   function afterTurn() {
     if (!store.open || !asr.enabled) return;
+    if (store.live) {
+      if (store.muted) return;
+      voiceTurn = true;
+      if (!asr.recordingRequested) void startListening();
+      return;
+    }
     if (voiceTurn) {
       if (asr.recordingRequested) armListenTimer();
       else void startListening();
@@ -373,10 +393,53 @@ export function createAssistantStore(deps: AssistantDeps): AssistantStore {
     } else listenVersion++; // Do not open a late monitoring microphone after a typed readout ends.
   }
 
+  /** Ends a live conversation: the microphone and the voice stop; a task it started carries on and its answer
+   * stays in the card. */
+  function endLive() {
+    if (!store.live) return;
+    store.live = false; store.muted = false; store.liveSince = 0;
+    listenVersion++; speechVersion++; reading = null;
+    clearTimers(); heard = ''; voiceTurn = false; flags.awaitingSpeech = false; store.input = '';
+    asr.deactivate(); void speech.stop();
+  }
+
   const store: AssistantStore = reactive({
     open: false, ball: false, prefs: { open: 'voice', read: 'voice', hover: true }, input: '', attachments: [], hint: '', hintTab: '',
     layout: { ball: null, right: true }, peek: false, hovering: false, reanchoring: 0,
     reanchorReady(id) { if (store.reanchoring === id) void deps.invoke('assistant_reanchor_ready', { id }).catch(() => {}); },
+    live: false, muted: false, liveSince: 0,
+    get liveStatus() {
+      if (!store.live) return '';
+      if (store.muted) return '已静音';
+      switch (store.phase) {
+        case 'speaking': return '在说';
+        case 'thinking': case 'answering': return '在想';
+        case 'attention': return '等你确认';
+      }
+      if (asr.preparing || asr.warming || (asr.recordingRequested && !asr.listening) || !asr.recordingRequested) return '正在连接…';
+      return '在听';
+    },
+    async startLive() {
+      if (store.live || flags.changingSession) return;
+      if (!asr.enabled || asr.microphoneSupported === false) { await startListening(); return; }
+      store.live = true; store.muted = false; store.liveSince = now();
+      draftVersion++; clearTimers(); heard = '';
+      if (!view()?.running) { await speech.stop(); flags.awaitingSpeech = false; }
+      voiceTurn = await startListening();
+      if (!voiceTurn && !store.muted) endLive();
+    },
+    endLive,
+    async toggleMute() {
+      if (!store.live) return;
+      if (store.muted) {
+        store.muted = false;
+        voiceTurn = await startListening(flags.awaitingSpeech);
+        return;
+      }
+      store.muted = true;
+      listenVersion++; clearTimers(); heard = ''; store.input = '';
+      asr.deactivate();
+    },
     unread: false, notice: null,
     get items() { return view()?.items ?? []; },
     get currentId() { return chat.currentId; },
@@ -385,7 +448,7 @@ export function createAssistantStore(deps: AssistantDeps): AssistantStore {
     dismissNotice() { store.notice = null; },
     async switchSession(id) {
       if (flags.changingSession || flags.submitting || id === chat.currentId || !chat.sessions.some(session => session.id === id)) return;
-      noteVoice(''); flags.changingSession = true; draftVersion++;
+      endLive(); noteVoice(''); flags.changingSession = true; draftVersion++;
       clearTimers(); heard = ''; voiceTurn = false; flags.awaitingSpeech = false; asr.deactivate(); interruption = null;
       try { await speech.stop(); await chat.select(id); store.note(''); }
       catch (error) { store.note(error instanceof Error ? error.message : String(error)); }
@@ -499,11 +562,12 @@ export function createAssistantStore(deps: AssistantDeps): AssistantStore {
       draftVersion++;
       clearTimers();
       asr.deactivate(); void speech.stop(); interruption = null;
+      store.live = false; store.muted = false; store.liveSince = 0;
       store.open = false; store.peek = false; store.note(''); heard = ''; voiceTurn = false; flags.awaitingSpeech = false;
     },
     async newConversation() {
       if (flags.changingSession || flags.submitting) return;
-      noteVoice('');
+      endLive(); noteVoice('');
       flags.changingSession = true;draftVersion++;
       clearTimers(); heard = ''; voiceTurn = false; flags.awaitingSpeech = false; asr.deactivate(); interruption = null;
       try {
@@ -541,8 +605,8 @@ export function createAssistantStore(deps: AssistantDeps): AssistantStore {
         const note = interruption && interruption.session === chat.currentId ? interruption.note : '';
         const sent = note ? await chat.send(value, images, note) : images.length ? await chat.send(value, images) : await chat.send(value);
         if (sent) interruption = null;
-        if (sent && store.open && (store.prefs.read === 'always' || (store.prefs.read === 'voice' && spoken))) beginReading();
-        if (sent && store.open && spoken && store.prefs.read !== 'never') { void speech.prepareAck?.(); scheduleAck(); }
+        if (sent && store.open && (store.live || store.prefs.read === 'always' || (store.prefs.read === 'voice' && spoken))) beginReading();
+        if (sent && store.open && spoken && (store.live || store.prefs.read !== 'never')) { void speech.prepareAck?.(); scheduleAck(); }
         if (!sent && version === draftVersion) {
           if (!store.input) store.input = value;
           store.attachments = [...images, ...store.attachments].slice(0, 8);
@@ -586,10 +650,10 @@ export function createAssistantStore(deps: AssistantDeps): AssistantStore {
         return;
       }
       const version = ++speechVersion;
-      if (store.prefs.read === 'always' || (store.prefs.read === 'voice' && voiceTurn)) {
+      if (store.live || store.prefs.read === 'always' || (store.prefs.read === 'voice' && voiceTurn)) {
         readingText = text; echoTailUntil = 0;
         flags.awaitingSpeech = true;
-        if (asr.enabled && asr.microphoneSupported !== false) void startListening(true);
+        if (asr.enabled && asr.microphoneSupported !== false && !store.muted) void startListening(true);
         void speech.speak(text, key ?? `assistant:${session}`, undefined, true).then(() => {
           if (version === speechVersion && flags.awaitingSpeech && speech.status === 'idle') { flags.awaitingSpeech = false; afterTurn(); }
         });
@@ -602,6 +666,7 @@ export function createAssistantStore(deps: AssistantDeps): AssistantStore {
       // Cancelled because the user started talking: the microphone that heard them stays on.
       if (keepListening) { keepListening = false; speechVersion++; flags.awaitingSpeech = false; void speech.stop(); return; }
       speechVersion++; listenVersion++; flags.awaitingSpeech = false; clearTimers(); asr.deactivate(); void speech.stop();
+      if (store.live && !store.muted && store.open) void startListening().then(ok => { voiceTurn = ok; });
     },
     note(message, tab = '') { store.hint = message; store.hintTab = message ? tab : ''; },
     noteVoice,
@@ -644,7 +709,7 @@ export function createAssistantStore(deps: AssistantDeps): AssistantStore {
     }
   });
   const stopVoiceWatch = watch(() => asr.enabled, enabled => {
-    if (!enabled) { clearTimers(); heard = ''; voiceTurn = false; asr.deactivate(); }
+    if (!enabled) { endLive(); clearTimers(); heard = ''; voiceTurn = false; asr.deactivate(); }
   }, { flush: 'sync' });
   const stopVoiceErrorWatch = watch(() => [asr.error, asr.microphoneError], (errors, before) => {
     if (!store.open || disposed) return;

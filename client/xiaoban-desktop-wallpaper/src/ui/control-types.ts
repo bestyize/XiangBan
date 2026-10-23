@@ -1,5 +1,6 @@
 import type { SpeechStore } from './speech/store.ts';
 import type { AsrStore } from './asr/store.ts';
+import type { LiveTalk } from '../voice/live-talk.ts';
 import type { AccountSession, AppInfo, CodeLoginOutcome, LoginResult, SendCodeResult, Settings, SignupMethods, UsernameCheck, WallpaperLibrary, WallpaperOptions } from "../bridge.ts";
 import type { EffectsChoice } from "../effects/types.ts";
 import type { ImportOutcome, LoadedPacks } from "../effects/catalog.ts";
@@ -48,6 +49,8 @@ export interface ControlStore {
   chat: ChatStore;
   speech: SpeechStore;
   asr: AsrStore;
+  /** 实时对话 in the conversation's composer. */
+  live?: LiveTalk;
   ready: boolean;
   initialError: string;
   desktop: boolean;

@@ -931,3 +931,57 @@ describe('remembering how far the user listened', () => {
     h.store.dispose();
   });
 });
+
+describe('实时对话', () => {
+  it('keeps listening through silence, reads every answer even when reading is off, and listens again afterwards', async () => {
+    const { store, chat, asr, speech, advance, say } = setup({ prefs: { open: 'type', read: 'never' } });
+    await store.init(); await store.opened();
+    await store.startLive();
+    expect(store.live).toBe(true);
+    expect(store.liveStatus).toBe('在听');
+    advance(LISTEN_IDLE_MS + 1000);
+    expect(asr.recordingRequested).toBe(true);
+    say('明天几点开会');
+    advance(SEND_GRACE_MS + 10); await flushPromises();
+    expect(chat.send).toHaveBeenCalledWith('明天几点开会');
+    expect(store.liveStatus).toBe('在想');
+    finishAnswer(chat, '明天上午十点。');
+    store.replied('s1', '明天上午十点。');
+    expect(speech.speak).toHaveBeenCalled();
+    expect(store.liveStatus).toBe('在说');
+    speech.status = 'idle'; await nextTick(); await flushPromises();
+    expect(asr.recordingRequested).toBe(true);
+    expect(store.liveStatus).toBe('在听');
+    store.dispose();
+  });
+
+  it('mutes the microphone without ending, and 结束 stops listening and speaking but not the task', async () => {
+    const { store, chat, asr, speech, say, advance } = setup();
+    await store.init(); await store.opened();
+    await store.startLive();
+    await store.toggleMute();
+    expect(store.muted).toBe(true); expect(store.liveStatus).toBe('已静音');
+    expect(asr.recordingRequested).toBe(false);
+    await store.toggleMute();
+    expect(store.muted).toBe(false); expect(asr.recordingRequested).toBe(true);
+    say('帮我查一下天气'); advance(SEND_GRACE_MS + 10); await flushPromises();
+    store.endLive();
+    expect(store.live).toBe(false); expect(asr.recordingRequested).toBe(false);
+    expect(speech.stop).toHaveBeenCalled();
+    expect(chat.cancel).not.toHaveBeenCalled();
+    finishAnswer(chat, '晴。');
+    speech.speak.mockClear();
+    store.replied('s1', '晴。');
+    expect(speech.speak).not.toHaveBeenCalled();
+    store.dispose();
+  });
+
+  it('ends when the capsule folds away', async () => {
+    const { store, asr } = setup();
+    await store.init(); await store.opened();
+    await store.startLive();
+    store.closed();
+    expect(store.live).toBe(false); expect(asr.recordingRequested).toBe(false);
+    store.dispose();
+  });
+});
