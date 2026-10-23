@@ -682,6 +682,7 @@ button{font:inherit}
 .capsule{display:flex;align-items:flex-end;gap:2px;padding:8px}
 .orb-button{touch-action:none;flex:none;display:grid;place-items:center;width:36px;height:36px;padding:0;border:0;border-radius:50%;background:none;cursor:grab}
 .orb-button:disabled{opacity:.6}
+.field:placeholder-shown{overflow:hidden}
 .field{cursor:text;flex:1;min-width:0;height:36px;max-height:96px;margin:0;padding:8px 6px;box-sizing:border-box;border:0;outline:0;resize:none;background:transparent;color:var(--text);font:inherit;font-size:14px;line-height:20px;caret-color:var(--accent);user-select:text;scrollbar-width:thin;scrollbar-color:var(--scroll) transparent}
 .field::placeholder{color:var(--text-3)}
 .tool{flex:none;display:grid;place-items:center;width:32px;height:32px;margin-bottom:2px;padding:0;border:0;border-radius:9px;background:transparent;color:var(--icon);cursor:pointer;transition:background .15s,color .15s}
