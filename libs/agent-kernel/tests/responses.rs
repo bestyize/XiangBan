@@ -335,7 +335,7 @@ mod over_http {
         assert_eq!((tool["name"].clone(), tool["strict"].clone()), (json!("echo"), json!(false)));
         let input = body_json(&seen[1])["input"].clone();
         assert_eq!(input[1]["encrypted_content"], "encrypted-test-state");
-        assert_eq!(input[2], json!({"type": "function_call", "call_id": "call_77", "name": "echo", "arguments": "{\"x\":5}"}));
+        assert_eq!(input[2], json!({"type": "function_call", "id": "fc_1", "call_id": "call_77", "name": "echo", "arguments": "{\"x\":5}"}));
         assert_eq!(input[3], json!({"type": "function_call_output", "call_id": "call_77", "output": "echoed 5"}));
     }
 }

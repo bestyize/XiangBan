@@ -54,6 +54,12 @@ pub fn build_request_body(profile: &ProviderProfile, request: &ChatRequest) -> V
             }
             Role::Assistant => {
                 if let Some(items) = super::wire::matching_state(message, profile, "responses").and_then(|s| s["items"].as_array()) {
+                    if replay_matches(message, items) {
+                        input.extend(items.iter().cloned());
+                        continue;
+                    }
+                }
+                if let Some(items) = super::wire::matching_state(message, profile, "responses").and_then(|s| s["items"].as_array()) {
                     input.extend(items.iter().filter(|item| item["type"] == "reasoning").cloned());
                 }
                 let text = message.text();
@@ -99,6 +105,18 @@ pub fn build_request_body(profile: &ProviderProfile, request: &ChatRequest) -> V
     body
 }
 
+/// Only replay original output objects when middleware did not edit the visible
+/// message or tool arguments. This preserves phase and cross-item ordering.
+fn replay_matches(message: &Message, items: &[Value]) -> bool {
+    let text: String = items.iter().filter(|item| item["type"] == "message")
+        .flat_map(|item| item["content"].as_array().into_iter().flatten())
+        .filter_map(|part| part["text"].as_str().or_else(|| part["refusal"].as_str())).collect();
+    let calls: Vec<_> = items.iter().filter(|item| item["type"] == "function_call").collect();
+    text == message.text() && calls.len() == message.tool_calls.len()
+        && calls.iter().zip(&message.tool_calls).all(|(raw, call)| raw["call_id"] == call.id && raw["name"] == call.name
+            && raw["arguments"].as_str().unwrap_or("{}").trim() == call.arguments.trim())
+}
+
 #[derive(Default)]
 struct PartialCall {
     item_id: String,
@@ -114,6 +132,8 @@ pub struct ResponsesStream {
     displayed_text: std::collections::BTreeMap<(usize, usize), String>,
     calls: Vec<Option<PartialCall>>,
     reasoning: std::collections::BTreeMap<usize, Value>,
+    output_items: std::collections::BTreeMap<usize, Value>,
+    inconsistent_snapshot: bool,
     /// Summary text already emitted to the UI, keyed by output/summary part.
     displayed_summaries: std::collections::BTreeMap<(usize, usize), String>,
     displayed_reasoning: std::collections::BTreeMap<(usize, usize), String>,
@@ -248,6 +268,9 @@ impl ResponsesStream {
             }
             "response.output_item.done" => {
                 let item = event.get("item").unwrap_or(&Value::Null);
+                if let Some(index) = event["output_index"].as_u64().filter(|i| *i < MAX_ITEMS as u64) {
+                    self.capture_item(index as usize, item);
+                }
                 if item["type"] == "message" {
                     let index = event["output_index"].as_u64().unwrap_or(0) as usize;
                     self.emit_item_text(index, item, on_text);
@@ -287,10 +310,14 @@ impl ResponsesStream {
                 };
                 self.read_usage(response.get("usage"));
                 self.reconcile(response, on_text, on_reasoning);
+                if self.inconsistent_snapshot { return Err(HarnessError::provider("Responses final snapshot disagrees with streamed text; the partial answer was preserved", false)); }
                 self.done = true;
                 return Ok(true);
             }
             "response.failed" => {
+                let response = event.get("response").unwrap_or(&Value::Null);
+                self.read_usage(response.get("usage"));
+                self.reconcile(response, on_text, on_reasoning);
                 let error = event.pointer("/response/error").unwrap_or(&Value::Null);
                 let message = error.get("message").and_then(Value::as_str).unwrap_or("the response failed").to_string();
                 return Err(failure(error.get("code").and_then(Value::as_str).unwrap_or(""), message));
@@ -302,7 +329,17 @@ impl ResponsesStream {
             }
             _ => {}
         }
+        if self.inconsistent_snapshot {
+            return Err(HarnessError::provider("Responses final snapshot disagrees with streamed text; the partial answer was preserved", false));
+        }
         Ok(false)
+    }
+
+    fn capture_item(&mut self, index: usize, item: &Value) {
+        if matches!(item["type"].as_str(), Some("message" | "function_call" | "reasoning"))
+            && !(item["type"] == "reasoning" && matches!(item["status"].as_str(), Some("incomplete" | "in_progress"))) {
+            self.output_items.insert(index, item.clone());
+        }
     }
 
     fn emit_text_snapshot(&mut self, key: (usize, usize), full: &str, on_text: &mut dyn FnMut(&str)) {
@@ -311,7 +348,7 @@ impl ResponsesStream {
             previous.push_str(suffix);
             self.text.push_str(suffix);
             on_text(suffix);
-        }
+        } else if !full.starts_with(previous.as_str()) { self.inconsistent_snapshot = true; }
     }
 
     fn emit_item_text(&mut self, index: usize, item: &Value, on_text: &mut dyn FnMut(&str)) {
@@ -383,6 +420,7 @@ impl ResponsesStream {
     /// another item's final-only text or tool call.
     fn reconcile(&mut self, response: &Value, on_text: &mut dyn FnMut(&str), on_reasoning: &mut dyn FnMut(crate::ReasoningKind, &str)) {
         for (i, item) in response.get("output").and_then(Value::as_array).into_iter().flatten().take(MAX_ITEMS).enumerate() {
+            self.capture_item(i, item);
             if item["type"] == "reasoning" {
                 self.emit_item_summaries(i, item, on_reasoning);
                 if item["status"] != "in_progress" && item["status"] != "incomplete" {
@@ -424,8 +462,10 @@ impl ResponsesStream {
             .collect();
         let finish = self.finish.settle(!calls.is_empty());
         let mut message = Message::assistant(self.text, calls);
-        if !self.reasoning.is_empty() {
-            message.provider_state = Some(json!({"protocol":"responses", "items":self.reasoning.into_values().collect::<Vec<_>>()}));
+        let mut items = self.reasoning;
+        items.extend(self.output_items);
+        if !items.is_empty() {
+            message.provider_state = Some(json!({"protocol":"responses", "items":items.into_values().collect::<Vec<_>>()}));
         }
         Reply { message, usage: self.usage, finish }
     }
@@ -575,5 +615,49 @@ mod final_snapshot_tests {
         let reply = stream.finish();
         assert_eq!(reply.finish, FinishReason::Length);
         assert!(reply.message.provider_state.is_none());
+    }
+}
+
+#[cfg(test)]
+mod reliability_tests {
+    use super::*;
+
+    #[test]
+    fn ordered_output_and_phase_survive_the_next_tool_request() {
+        let mut stream = ResponsesStream::default();
+        let output = json!([
+            {"type":"message","id":"m1","role":"assistant","phase":"commentary","content":[{"type":"output_text","text":"before"}]},
+            {"type":"reasoning","id":"r1","summary":[{"type":"summary_text","text":"checking"}],"encrypted_content":"opaque"},
+            {"type":"function_call","id":"f1","call_id":"c1","name":"lookup","arguments":"{}"}
+        ]);
+        stream.push_event(&json!({"type":"response.completed","response":{"output":output}}), &mut |_| {}).unwrap();
+        let reply = stream.finish();
+        let profile = ProviderProfile::new("https://local/v1", "", "model");
+        let request = ChatRequest { messages: vec![Message::user_text("question"), reply.message, Message::tool("c1", "result")], tools: vec![] };
+        let body = build_request_body(&profile, &request);
+        assert_eq!(body["input"][1], output[0]);
+        assert_eq!(body["input"][2], output[1]);
+        assert_eq!(body["input"][3], output[2]);
+        let mut edited = request;
+        edited.messages[1].tool_calls[0].arguments = "{\"changed\":true}".into();
+        assert_eq!(build_request_body(&profile, &edited)["input"][3]["arguments"], "{\"changed\":true}", "stale raw calls must never override middleware edits");
+    }
+
+    #[test]
+    fn failed_terminal_snapshot_still_exposes_safe_partial_text() {
+        let mut stream = ResponsesStream::default(); let mut text = String::new();
+        let result = stream.push_event(&json!({"type":"response.failed","response":{
+            "error":{"code":"server_error","message":"failed"},
+            "output":[{"type":"message","content":[{"type":"output_text","text":"partial"}]}]
+        }}), &mut |s| text.push_str(s));
+        assert!(result.is_err()); assert_eq!(text, "partial");
+    }
+
+    #[test]
+    fn inconsistent_final_snapshot_is_not_silently_reported_as_success() {
+        let mut stream = ResponsesStream::default();
+        stream.push_event(&json!({"type":"response.output_text.delta","output_index":0,"delta":"wrong"}), &mut |_| {}).unwrap();
+        assert!(stream.push_event(&json!({"type":"response.completed","response":{"output":[
+            {"type":"message","content":[{"type":"output_text","text":"correct"}]}]}}), &mut |_| {}).is_err());
     }
 }

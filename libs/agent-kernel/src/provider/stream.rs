@@ -45,12 +45,24 @@ struct PartialCall {
 pub struct StreamAccumulator {
     text: String,
     reasoning: String,
+    reasoning_channel: Option<String>,
+    answer_content: String,
+    refusal: String,
     reasoning_fields: serde_json::Map<String, Value>,
     reasoning_details: Vec<Value>,
     calls: Vec<PartialCall>,
     usage: Option<Usage>,
     finish_reason: Option<String>,
     finished: bool,
+}
+
+fn merge_metadata(target: &mut Value, incoming: &Value) {
+    if let (Some(target), Some(incoming)) = (target.as_object_mut(), incoming.as_object()) {
+        for (key, value) in incoming {
+            if let Some(previous) = target.get_mut(key) { merge_metadata(previous, value); }
+            else { target.insert(key.clone(), value.clone()); }
+        }
+    } else if !incoming.is_null() { *target = incoming.clone(); }
 }
 
 fn chat_finish(reason: Option<&str>) -> FinishReason {
@@ -87,7 +99,8 @@ impl StreamAccumulator {
                 if let Some(text) = delta[field].as_str().filter(|s| !s.is_empty()) {
                     let value = self.reasoning_fields.entry(field.to_string()).or_insert_with(|| Value::String(String::new()));
                     if let Some(previous) = value.as_str() { *value = Value::String(format!("{previous}{text}")); }
-                    if !displayed {
+                    if self.reasoning_channel.is_none() { self.reasoning_channel = Some(field.into()); }
+                    if !displayed && self.reasoning_channel.as_deref() == Some(field) {
                         self.reasoning.push_str(text);
                         on_reasoning(crate::ReasoningKind::Text, text);
                         displayed = true;
@@ -96,8 +109,20 @@ impl StreamAccumulator {
             }
             for detail in delta["reasoning_details"].as_array().into_iter().flatten() {
                 let index = detail["index"].as_u64();
-                let slot = self.reasoning_details.iter().position(|v| index.is_some() && v["index"].as_u64() == index && v["type"] == detail["type"]);
-                if !displayed {
+                let id = detail["id"].as_str().filter(|s| !s.is_empty());
+                let encrypted = detail["type"] == "reasoning.encrypted";
+                // Encrypted objects are opaque, discrete records. Never concatenate
+                // or overwrite their payload based only on a streaming index.
+                let slot = if encrypted { None } else { self.reasoning_details.iter().position(|v| {
+                    if v["type"] != detail["type"] { return false; }
+                    match (id, v["id"].as_str().filter(|s| !s.is_empty())) {
+                        (Some(a), Some(b)) => a == b,
+                        _ => index.is_some() && v["index"].as_u64() == index,
+                    }
+                }) };
+                let readable = detail["text"].as_str().or_else(|| detail["summary"].as_str()).is_some_and(|s| !s.is_empty());
+                if readable && self.reasoning_channel.is_none() { self.reasoning_channel = Some("details".into()); }
+                if !displayed && self.reasoning_channel.as_deref() == Some("details") {
                     for field in ["text", "summary"] {
                         if let Some(text) = detail[field].as_str() {
                             on_reasoning(if field == "summary" { crate::ReasoningKind::Summary } else { crate::ReasoningKind::Text }, text);
@@ -107,17 +132,23 @@ impl StreamAccumulator {
                 if let Some(slot) = slot {
                     if let (Some(target), Some(fields)) = (self.reasoning_details[slot].as_object_mut(), detail.as_object()) {
                         for (key, value) in fields {
-                            if ["text", "summary", "signature"].contains(&key.as_str()) {
+                            if ["text", "summary"].contains(&key.as_str()) {
                                 if let Some(fragment) = value.as_str() {
                                     let previous = target.get(key).and_then(Value::as_str).unwrap_or("");
                                     target.insert(key.clone(), Value::String(format!("{previous}{fragment}")));
                                 }
-                            } else { target.insert(key.clone(), value.clone()); }
+                            } else if !value.is_null() { target.insert(key.clone(), value.clone()); }
                         }
                     }
                 } else { self.reasoning_details.push(detail.clone()); }
             }
             if let Some(text) = delta.get("content").and_then(Value::as_str).filter(|t| !t.is_empty()) {
+                self.answer_content.push_str(text);
+                self.text.push_str(text);
+                on_text(text);
+            }
+            if let Some(text) = delta["refusal"].as_str().filter(|s| !s.is_empty()) {
+                self.refusal.push_str(text);
                 self.text.push_str(text);
                 on_text(text);
             }
@@ -148,7 +179,10 @@ impl StreamAccumulator {
         let slot = &mut self.calls[index];
         if let Some(extra) = call.get("extra_content") {
             if let (Some(target), Some(fields)) = (slot.extra_content.as_mut().and_then(Value::as_object_mut), extra.as_object()) {
-                for (key, value) in fields { target.insert(key.clone(), value.clone()); }
+                for (key, value) in fields {
+                    if let Some(existing) = target.get_mut(key) { merge_metadata(existing, value); }
+                    else { target.insert(key.clone(), value.clone()); }
+                }
             } else { slot.extra_content = Some(extra.clone()); }
         }
         if let (Some(id), true) = (id, slot.id.is_empty()) {
@@ -190,8 +224,12 @@ impl StreamAccumulator {
             .collect();
         let finish = chat_finish(self.finish_reason.as_deref()).settle(!tool_calls.is_empty());
         let mut message = Message::assistant(self.text, tool_calls);
-        if !self.reasoning_fields.is_empty() || !self.reasoning_details.is_empty() || !extras.is_empty() {
+        if !self.reasoning_fields.is_empty() || !self.reasoning_details.is_empty() || !extras.is_empty() || !self.refusal.is_empty() {
             let mut state = serde_json::json!({"protocol":"chat", "tool_extra_content": extras});
+            if !self.refusal.is_empty() {
+                state["refusal"] = Value::String(self.refusal);
+                state["content"] = if self.answer_content.is_empty() { Value::Null } else { Value::String(self.answer_content) };
+            }
             for (key, value) in self.reasoning_fields { state[&key] = value; }
             if !self.reasoning_details.is_empty() {
                 for detail in &mut self.reasoning_details {
@@ -240,5 +278,38 @@ mod protocol_regression_tests {
         assert_eq!(wire["reasoning_details"][0]["text"], "one two");
         assert!(wire["reasoning_details"][0].get("index").is_none());
         assert_eq!(wire["reasoning_details"][1]["data"], "secret");
+    }
+}
+
+#[cfg(test)]
+mod reliability_tests {
+    use super::*;
+    use serde_json::json;
+    #[test]
+    fn refusal_is_visible_and_replayed_as_a_refusal() {
+        let mut stream = StreamAccumulator::default(); let mut text = String::new();
+        stream.push(&json!({"choices":[{"delta":{"refusal":"cannot comply"},"finish_reason":"stop"}]}), &mut |s|text.push_str(s)).unwrap();
+        let reply = stream.finish(); assert_eq!(text, "cannot comply"); assert_eq!(reply.message.text(), text);
+        let wire = super::super::wire::message_to_wire(&reply.message);
+        assert_eq!(wire["refusal"], text); assert!(wire["content"].is_null());
+    }
+    #[test]
+    fn missing_indices_merge_text_by_identity_but_keep_encrypted_objects_distinct() {
+        let mut stream=StreamAccumulator::default(); let mut thinking=String::new();
+        for detail in [json!({"id":"r","type":"reasoning.text","text":"a","signature":"sig"}),
+            json!({"id":"r","type":"reasoning.text","text":"b","signature":null}),
+            json!({"id":"e1","index":1,"type":"reasoning.encrypted","data":"one"}),
+            json!({"id":"e2","index":1,"type":"reasoning.encrypted","data":"two"})] {
+            stream.push_with_reasoning(&json!({"choices":[{"delta":{"reasoning_details":[detail]}}]}), &mut |_|{}, &mut |_,s|thinking.push_str(s)).unwrap();
+        }
+        let reply=stream.finish(); let details=&reply.message.provider_state.unwrap()["reasoning_details"];
+        assert_eq!(thinking,"ab"); assert_eq!(details[0]["text"],"ab"); assert_eq!(details[0]["signature"],"sig");
+        assert_eq!(details.as_array().unwrap().len(),3); assert_eq!(details[1]["data"],"one"); assert_eq!(details[2]["data"],"two");
+    }
+    #[test]
+    fn tool_metadata_merges_nested_fields_without_losing_signature() {
+        let mut target=json!({"google":{"thought_signature":"opaque","first":1}});
+        merge_metadata(&mut target,&json!({"google":{"second":2}}));
+        assert_eq!(target["google"]["thought_signature"],"opaque"); assert_eq!(target["google"]["second"],2);
     }
 }

@@ -4,6 +4,10 @@
 //! 三种协议共用同一条处理链（验签、选档位、查余额、转发），区别只有转发路径、要透传的协议头、
 //! 响应里 `model` 所在的位置，以及错误体的格式（SDK 要能直接读出 message）。
 
+#[path = "protocol_limits.rs"]
+mod protocol_limits;
+use protocol_limits::output_limit_error;
+
 use crate::{binding, error::AppError, extract::AuthUser, products, quota, state::AppState};
 use axum::{
     body::Body,
@@ -286,6 +290,11 @@ fn map_upstream_error(status: StatusCode, body: &str) -> AppError {
     if status == StatusCode::BAD_REQUEST {
         if ["context_length_exceeded", "context_window_exceeded", "maximum context length", "prompt is too long", "input token count exceeds", "too many input tokens"].iter().any(|needle| lower.contains(needle)) {
             return AppError::Coded { status, code: "context_length_exceeded", message: "对话超过模型的上下文上限，请压缩会话或调低上下文上限后继续".into() };
+        }
+        if let Some(limit) = output_limit_error(&lower) {
+            let message = limit.map_or_else(|| "max_tokens exceeds upstream output limit".to_string(),
+                |limit| format!("max_tokens exceeds output limit of {limit}"));
+            return AppError::Coded { status, code: "output_limit_exceeded", message };
         }
         return AppError::Coded { status, code: "bad_request", message: "请求参数与模型不兼容，请检查模型协议、工具和图片支持".into() };
     }

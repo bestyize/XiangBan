@@ -93,6 +93,13 @@ pub fn message_to_wire(message: &Message) -> Value {
             let text = message.text();
             let mut wire = json!({ "role": "assistant", "content": if text.is_empty() { Value::Null } else { Value::String(text) } });
             if let Some(state) = message.provider_state.as_ref().filter(|s| s["protocol"] == "chat") {
+                if let Some(refusal) = state["refusal"].as_str() {
+                    let content = state["content"].as_str().unwrap_or("");
+                    if message.text() == format!("{content}{refusal}") {
+                        wire["content"] = state["content"].clone();
+                        wire["refusal"] = Value::String(refusal.into());
+                    }
+                }
                 for key in ["reasoning_content", "reasoning", "reasoning_text", "reasoning_details"] {
                     if let Some(value) = state.get(key) { wire[key] = value.clone(); }
                 }

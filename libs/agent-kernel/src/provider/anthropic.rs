@@ -88,6 +88,27 @@ impl Parts {
     }
 }
 
+fn blocks_match(message: &Message, blocks: &[Value]) -> bool {
+    let text: String = blocks.iter().filter(|b| b["type"] == "text").filter_map(|b| b["text"].as_str()).collect();
+    let tools: Vec<_> = blocks.iter().filter(|b| b["type"] == "tool_use").collect();
+    text == message.text() && tools.len() == message.tool_calls.len()
+        && tools.iter().zip(&message.tool_calls).all(|(raw, call)| raw["id"] == call.id && raw["name"] == call.name
+            && serde_json::from_str::<Value>(&call.arguments).is_ok_and(|v| v == raw["input"]))
+}
+
+/// Re-evaluate manual thinking against the actual (possibly learned) ceiling.
+pub fn fit_thinking_budget(extra: &mut serde_json::Map<String, Value>, max_tokens: u32) -> Result<(), HarnessError> {
+    if let Some(thinking) = extra.get_mut("thinking").filter(|v| v["type"] == "enabled") {
+        if let Some(budget) = thinking["budget_tokens"].as_u64() {
+            if max_tokens <= 1024 { return Err(HarnessError::Config("output ceiling is too small for manual thinking (requires more than 1024 tokens)".into())); }
+            if budget >= u64::from(max_tokens) {
+                thinking["budget_tokens"] = json!((max_tokens / 2).max(1024).min(max_tokens - 1));
+            }
+        }
+    }
+    Ok(())
+}
+
 fn build_parts(profile: &ProviderProfile, request: &ChatRequest) -> Parts {
     let system: Vec<String> = request.messages.iter().filter(|m| m.role == Role::System).map(Message::text).filter(|t| !t.trim().is_empty()).collect();
     let tools: Value = if profile.supports_tools && !request.tools.is_empty() {
@@ -117,6 +138,10 @@ fn build_parts(profile: &ProviderProfile, request: &ChatRequest) -> Parts {
                 // blocks are left out (the reply's reasoning is lost, the request is not refused).
                 let unchanged = super::wire::matching_state(message, profile, "anthropic")
                     .filter(|state| state["prefix"].as_str() == Some(parts.prefix(&turns).as_str()));
+                if let Some(blocks) = unchanged.and_then(|state| state["ordered_blocks"].as_array()).filter(|blocks| blocks_match(message, blocks)) {
+                    push_turn(&mut turns, "assistant", blocks.clone());
+                    continue;
+                }
                 let thinking = unchanged
                     .and_then(|state| state["blocks"].as_array())
                     .into_iter()
@@ -230,6 +255,7 @@ enum Block {
 #[derive(Default)]
 pub struct AnthropicStream {
     blocks: Vec<Option<Block>>,
+    raw_blocks: std::collections::BTreeMap<usize, Value>,
     input_tokens: u32,
     cache_tokens: u32,
     output_tokens: u32,
@@ -328,6 +354,9 @@ impl AnthropicStream {
 
     fn block_start(&mut self, event: &Value, on_text: &mut dyn FnMut(&str), on_reasoning: &mut dyn FnMut(crate::ReasoningKind, &str)) {
         let Some(block) = event.get("content_block").cloned() else { return };
+        if let Some(index) = event["index"].as_u64().filter(|i| *i < MAX_BLOCKS as u64) {
+            self.raw_blocks.insert(index as usize, block.clone());
+        }
         let Some(slot) = self.slot(event) else { return };
         let text_of = |key: &str| block.get(key).and_then(Value::as_str).unwrap_or("").to_string();
         *slot = Some(match block.get("type").and_then(Value::as_str) {
@@ -356,6 +385,19 @@ impl AnthropicStream {
 
     fn block_delta(&mut self, event: &Value, on_text: &mut dyn FnMut(&str), on_reasoning: &mut dyn FnMut(crate::ReasoningKind, &str)) {
         let Some(delta) = event.get("delta") else { return };
+        if let Some(raw) = event["index"].as_u64().and_then(|i| self.raw_blocks.get_mut(&(i as usize))) {
+            let field = match delta["type"].as_str() {
+                Some("text_delta") => Some("text"), Some("thinking_delta") => Some("thinking"), Some("signature_delta") => Some("signature"), _ => None,
+            };
+            if let Some(field) = field {
+                if let Some(fragment) = delta[field].as_str() {
+                    let mut value = raw[field].as_str().unwrap_or("").to_string(); value.push_str(fragment); raw[field] = json!(value);
+                }
+            } else if delta["type"] == "citations_delta" {
+                if raw["citations"].is_null() { raw["citations"] = json!([]); }
+                if let Some(citations) = raw["citations"].as_array_mut() { citations.push(delta["citation"].clone()); }
+            }
+        }
         let Some(slot) = self.slot(event) else { return };
         match delta.get("type").and_then(Value::as_str) {
             Some("text_delta") => {
@@ -393,7 +435,7 @@ impl AnthropicStream {
     }
 
     /// Prompt tokens include cache reads and writes, which the API reports separately.
-    pub fn finish(self) -> Reply {
+    pub fn finish(mut self) -> Reply {
         let mut text = String::new();
         let mut calls = Vec::new();
         let mut thinking = Vec::new();
@@ -412,6 +454,9 @@ impl AnthropicStream {
                     } else {
                         "{}".to_string()
                     };
+                    if let Ok(input) = serde_json::from_str::<Value>(&arguments) {
+                        if let Some(raw) = self.raw_blocks.get_mut(&i) { raw["input"] = input; }
+                    } else { self.raw_blocks.remove(&i); }
                     calls.push(ToolCall { id: if id.is_empty() { format!("call_{i}") } else { id }, name, arguments });
                 }
                 _ => {}
@@ -423,8 +468,10 @@ impl AnthropicStream {
         });
         let finish = anthropic_finish(self.stop_reason.as_deref()).settle(!calls.is_empty());
         let mut message = Message::assistant(text, calls);
+        self.raw_blocks.retain(|_, block| block["type"] != "thinking" || block["signature"].as_str().is_some_and(|s| !s.is_empty()));
+        let ordered_blocks: Vec<_> = self.raw_blocks.into_values().collect();
         if !thinking.is_empty() {
-            message.provider_state = Some(json!({ "protocol": "anthropic", "blocks": thinking }));
+            message.provider_state = Some(json!({ "protocol": "anthropic", "blocks": thinking, "ordered_blocks": ordered_blocks }));
         }
         Reply { message, usage, finish }
     }
@@ -496,6 +543,7 @@ mod client {
             // Retry only explicit output-limit errors, and only before any text is streamed.
             for attempt in 0..=4 {
                 profile.max_output_tokens = Some(max_tokens);
+                fit_thinking_budget(&mut profile.extra_body, max_tokens)?;
                 let body = super::super::budget::encode(&profile, request, build_request_body)?;
                 let mut headers = vec![
                     ("Content-Type".to_string(), "application/json".to_string()),
@@ -544,5 +592,27 @@ mod client {
             }
             unreachable!("bounded Anthropic output-limit attempts always return")
         }
+    }
+}
+
+#[cfg(test)]
+mod reliability_tests {
+    use super::*;
+    #[test]
+    fn signed_content_blocks_keep_their_original_order() {
+        let profile=ProviderProfile::new("https://local","","model");
+        let base=ChatRequest {messages:vec![Message::user_text("question")],tools:vec![]};
+        let mut stream=AnthropicStream::default();
+        let blocks=vec![json!({"type":"text","text":"before"}),json!({"type":"thinking","thinking":"thought","signature":"sig"}),json!({"type":"text","text":"after"})];
+        for (index, block) in blocks.iter().enumerate() {stream.push_event(&json!({"type":"content_block_start","index":index,"content_block":block}),&mut |_|{}).unwrap();}
+        let mut reply=stream.finish(); reply.message.provider_state.as_mut().unwrap()["prefix"]=json!(request_prefix(&profile,&base));
+        let request=ChatRequest {messages:vec![base.messages[0].clone(),reply.message],tools:vec![]};
+        assert_eq!(build_request_body(&profile,&request)["messages"][1]["content"],json!(blocks));
+    }
+    #[test]
+    fn learned_output_ceiling_keeps_a_valid_thinking_and_answer_budget() {
+        let mut extra=serde_json::Map::from_iter([("thinking".into(),json!({"type":"enabled","budget_tokens":16384}))]);
+        fit_thinking_budget(&mut extra,8192).unwrap(); assert_eq!(extra["thinking"]["budget_tokens"],4096);
+        assert!(fit_thinking_budget(&mut extra,1024).is_err());
     }
 }
