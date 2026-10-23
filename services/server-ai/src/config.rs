@@ -25,6 +25,14 @@ pub struct AppConfig {
     pub speech_model: Option<String>,
     /// Voices clients may ask for; the first is used when they ask for none.
     pub speech_voices: Vec<String>,
+    /// Search providers behind `/v1/search` and `/v1/fetch`, tried in this order. One without a key is skipped.
+    pub search_providers: Vec<String>,
+    /// One or more keys, comma-separated in `AI_DEEPSEEK_API_KEY`; requests take turns and pass over a failing one.
+    pub deepseek_api_keys: Vec<String>,
+    pub deepseek_base_url: String,
+    /// What one search or one fetch that found something costs, in New API quota points.
+    pub search_cost: i64,
+    pub fetch_cost: i64,
 }
 
 impl AppConfig {
@@ -69,6 +77,21 @@ impl AppConfig {
             speech_voices: get("AI_SPEECH_VOICES")
                 .map(|v| v.split(',').map(|s| s.trim().to_string()).filter(|s| !s.is_empty()).collect())
                 .unwrap_or_default(),
+            search_providers: get("AI_SEARCH_PROVIDERS")
+                .unwrap_or_else(|| "deepseek".into())
+                .split(',')
+                .map(|s| s.trim().to_ascii_lowercase())
+                .filter(|s| !s.is_empty())
+                .collect(),
+            deepseek_api_keys: get("AI_DEEPSEEK_API_KEY")
+                .map(|v| v.split(',').map(|s| s.trim().to_string()).filter(|s| !s.is_empty()).collect())
+                .unwrap_or_default(),
+            deepseek_base_url: get("AI_DEEPSEEK_BASE_URL")
+                .unwrap_or_else(|| "https://api.deepseek.com".into())
+                .trim_end_matches('/')
+                .to_string(),
+            search_cost: num("AI_SEARCH_COST", 500).max(0),
+            fetch_cost: num("AI_FETCH_COST", 500).max(0),
         }
     }
 }

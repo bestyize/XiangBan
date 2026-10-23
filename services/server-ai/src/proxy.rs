@@ -8,7 +8,7 @@
 mod protocol_limits;
 use protocol_limits::output_limit_error;
 
-use crate::{binding, error::AppError, extract::AuthUser, products, quota, state::AppState};
+use crate::{binding, error::AppError, extract::AuthUser, newapi::QuotaMode, products, quota, search, state::AppState};
 use axum::{
     body::Body,
     extract::{rejection::BytesRejection, State},
@@ -221,6 +221,60 @@ pub async fn audio_speech(State(state): State<AppState>, auth: Result<AuthUser, 
             .header(header::CACHE_CONTROL, "no-store")
             .body(Body::from(audio))
             .map_err(|e| AppError::Internal(e.to_string()))
+    }
+    .await;
+    result.unwrap_or_else(|e| error_response(Api::ChatCompletions, e))
+}
+
+/// Takes what a search or a fetch cost out of the caller's New API wallet; the next reconciliation settles it
+/// against their buckets like any other use. A failure here is logged, never shown: the user already has the answer.
+async fn charge(state: &AppState, binding_id: i64, cost: i64) {
+    if cost <= 0 { return; }
+    let user = sqlx::query_scalar::<_, Option<i64>>("SELECT newapi_user_id FROM bindings WHERE id = $1").bind(binding_id).fetch_one(&state.pool).await;
+    let result = match user {
+        Ok(Some(user)) => state.newapi.adjust_quota(user, QuotaMode::Subtract, cost).await,
+        Ok(None) => Ok(()),
+        Err(error) => Err(error.into()),
+    };
+    if let Err(error) = result { tracing::warn!("binding {binding_id}: 联网用量扣费失败：{error}"); }
+}
+
+/// Checks the caller and their quota before a search or fetch, as for any other call.
+async fn search_caller(state: &AppState, auth: Result<AuthUser, AppError>) -> Result<i64, AppError> {
+    let auth = auth?;
+    if !state.search.available() {
+        return Err(AppError::Coded { status: StatusCode::SERVICE_UNAVAILABLE, code: "search_unavailable", message: "小伴 AI 联网搜索暂未开放".into() });
+    }
+    let active = binding::ensure_active(state, auth.uid, &auth.product).await?;
+    require_quota(state, active.id).await?;
+    sqlx::query("UPDATE bindings SET last_used_at = now() WHERE id = $1").bind(active.id).execute(&state.pool).await?;
+    Ok(active.id)
+}
+
+/// `POST /v1/search`: DeepSeek-shaped request and results whatever provider answers. Only a search that found
+/// something is charged.
+pub async fn web_search(State(state): State<AppState>, auth: Result<AuthUser, AppError>, body: Result<Bytes, BytesRejection>) -> Response {
+    let result = async {
+        let body = body.map_err(|error| map_body_error(error.status()))?;
+        let request = search::parse_search(&body)?;
+        let binding = search_caller(&state, auth).await?;
+        let results = state.search.search(&request).await?;
+        if !results.is_empty() { charge(&state, binding, state.config.search_cost).await; }
+        Ok::<_, AppError>(Json(json!({ "results": results })).into_response())
+    }
+    .await;
+    result.unwrap_or_else(|e| error_response(Api::ChatCompletions, e))
+}
+
+/// `POST /v1/fetch`: one public page as Markdown.
+pub async fn web_fetch(State(state): State<AppState>, auth: Result<AuthUser, AppError>, body: Result<Bytes, BytesRejection>) -> Response {
+    let result = async {
+        let body = body.map_err(|error| map_body_error(error.status()))?;
+        let url = search::parse_fetch(&body)?;
+        let binding = search_caller(&state, auth).await?;
+        let page = state.search.fetch(&url).await?;
+        charge(&state, binding, state.config.fetch_cost).await;
+        Ok::<_, AppError>(Json(page).into_response())
     }
     .await;
     result.unwrap_or_else(|e| error_response(Api::ChatCompletions, e))
