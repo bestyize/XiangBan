@@ -4,8 +4,8 @@ import type { ChatStore } from '../ui/chat/chat-store.ts';
 import type { AsrStore, TranscriptContext } from '../ui/asr/store.ts';
 import type { SpeechStore, SpeechStream } from '../ui/speech/store.ts';
 import { isFiller, isPlaybackEcho, isSpeechText } from './voice-guard.ts';
-import { ACK_DELAY_MS, ackKind, type AckKind } from '../voice/ack.ts';
-import { interruptionNote } from '../voice/interruption.ts';
+import { ACK_PHRASES, ackDelay, ackKind, chooseAck, type AckKind } from '../voice/ack.ts';
+import { interruptionNote, spokenNote } from '../voice/interruption.ts';
 import type { ApprovalDecision, ApprovalRequest, ChatItem, QuestionRequest, SessionSummary } from '../ui/chat/types.ts';
 
 export type OpenMode = 'voice' | 'type';
@@ -266,15 +266,16 @@ export function createAssistantStore(deps: AssistantDeps): AssistantStore {
     if (!reading && !flags.awaitingSpeech) return;
     interruption = { session: chat.currentId, note: interruptionNote(reading ? reading.spoken : null) };
   }
-  /** A request whose answer takes a moment gets a short acknowledgement that fits it first, so the wait is not silent. */
-  function scheduleAck(kind: AckKind) {
+  let lastAck: string | undefined;
+  /** What is said first, fitted to what the user said: a greeting at once, a request or question after a short wait. */
+  function scheduleAck(kind: AckKind, phrase: string) {
     clearTimer(ackTimer);
     const ticket = speechVersion;
     ackTimer = setTimer(() => {
       ackTimer = undefined;
       if (ticket !== speechVersion || disposed || !store.open || flags.awaitingSpeech || !view()?.running || turn().answer) return;
-      speech.ack?.(kind);
-    }, ACK_DELAY_MS);
+      speech.ack?.(phrase);
+    }, ackDelay(kind));
   }
   function stopReading() {
     noteInterruption();
@@ -538,12 +539,14 @@ export function createAssistantStore(deps: AssistantDeps): AssistantStore {
         voiceTurn = spoken;
         // New capsule conversations start in full trust; resumed ones keep their saved mode.
         if (!chat.currentId) chat.permissionMode = 'auto';
-        const note = interruption && interruption.session === chat.currentId ? interruption.note : '';
+        // What is said first has to be decided before sending, so the model can be told not to say it again.
+        const kind = spoken && store.prefs.read !== 'never' ? ackKind(value) : null;
+        const phrase = kind ? chooseAck(ACK_PHRASES[kind].filter(item => speech.ackReady?.(item)), lastAck) : undefined;
+        const note = (interruption && interruption.session === chat.currentId ? interruption.note : '') + (phrase ? spokenNote(phrase) : '');
         const sent = note ? await chat.send(value, images, note) : images.length ? await chat.send(value, images) : await chat.send(value);
         if (sent) interruption = null;
         if (sent && store.open && (store.prefs.read === 'always' || (store.prefs.read === 'voice' && spoken))) beginReading();
-        const kind = spoken && store.prefs.read !== 'never' ? ackKind(value) : null;
-        if (sent && store.open && kind) { void speech.prepareAck?.(); scheduleAck(kind); }
+        if (sent && store.open && kind) { void speech.prepareAck?.(); if (phrase) { lastAck = phrase; scheduleAck(kind, phrase); } }
         if (!sent && version === draftVersion) {
           if (!store.input) store.input = value;
           store.attachments = [...images, ...store.attachments].slice(0, 8);

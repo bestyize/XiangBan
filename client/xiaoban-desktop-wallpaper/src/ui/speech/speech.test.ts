@@ -84,36 +84,38 @@ describe('audio formats', () => {
   });
 });
 
-describe('acknowledgements', () => {
+describe('opening phrases', () => {
   const synthesized = (invoke: ReturnType<typeof fixture>['invoke']) => invoke.mock.calls.filter(([command]) => command === 'tts_synthesize_part').map(([, args]) => (args as { text: string }).text);
-  it('prepares each phrase once per voice and plays one without touching the reading status', async () => {
+  it('prepares every phrase once per voice and plays a given one without touching the reading status', async () => {
     const { store, invoke, audios } = fixture(); await store.init();
-    expect(store.ack!('task')).toBe(false); // nothing prepared yet
+    expect(store.ackReady!('你好呀，我在')).toBe(false); expect(store.ack!('你好呀，我在')).toBe(false); // nothing prepared yet
     await store.prepareAck!(); await store.prepareAck!();
-    expect(synthesized(invoke)).toEqual(['好的，我来看看', '好，我来处理', '我想想', '嗯，我想想']);
-    expect(store.ack!('task')).toBe(true);
+    expect(synthesized(invoke)).toContain('你好呀，我在'); expect(synthesized(invoke)).toContain('我想想');
+    expect(new Set(synthesized(invoke)).size).toBe(synthesized(invoke).length); // each once
+    expect(store.ackReady!('你好呀，我在')).toBe(true); expect(store.ackReady!('没有这句')).toBe(false);
+    expect(store.ack!('你好呀，我在')).toBe(true);
     expect(audios).toHaveLength(1); expect(store.status).toBe('idle');
-    expect(store.ack!('task')).toBe(false); // already playing one
+    expect(store.ack!('我想想')).toBe(false); // already playing one
     (audios[0].onended as () => void)();
-    expect(store.ack!('question')).toBe(true); expect(audios).toHaveLength(2);
+    expect(store.ack!('我想想')).toBe(true); expect(audios).toHaveLength(2);
   });
   it('keeps quiet with the system voice, which would sound like someone else', async () => {
     const { store, invoke } = fixture(); await store.init(); await store.save({ provider: 'system' });
-    await store.prepareAck!(); expect(synthesized(invoke)).toEqual([]); expect(store.ack!('task')).toBe(false);
+    await store.prepareAck!(); expect(synthesized(invoke)).toEqual([]); expect(store.ackReady!('我想想')).toBe(false); expect(store.ack!('我想想')).toBe(false);
   });
   it('is stopped by stop()', async () => {
     const { store, audios } = fixture(); await store.init(); await store.prepareAck!();
-    store.ack!('task'); await store.stop();
+    store.ack!('我想想'); await store.stop();
     expect(audios[0].pause).toHaveBeenCalled();
   });
-  it('lets the first sentence wait until the acknowledgement has finished', async () => {
+  it('lets the first sentence wait until the phrase has finished', async () => {
     const { store, audios } = fixture(); await store.init(); await store.prepareAck!();
     const stream = store.stream!('a1');
-    expect(store.ack!('task')).toBe(true);
+    expect(store.ack!('你好呀，我在')).toBe(true);
     stream.push('第一句。');
     await vi.waitFor(() => expect(store.status).toBe('synthesizing'));
     await new Promise(resolve => setTimeout(resolve, 20));
-    expect(audios).toHaveLength(1); // only the acknowledgement so far
+    expect(audios).toHaveLength(1); // only the phrase so far
     (audios[0].onended as () => void)();
     await vi.waitFor(() => expect(audios).toHaveLength(2));
     expect(store.status).toBe('playing');

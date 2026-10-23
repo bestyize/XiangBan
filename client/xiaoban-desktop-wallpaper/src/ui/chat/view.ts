@@ -1,6 +1,6 @@
 import { attachmentCards } from './attachments.ts';
 import { modelFailure } from './model-errors.ts';
-import { withoutInterruptionNote } from '../../voice/interruption.ts';
+import { withoutVoiceNotes } from '../../voice/interruption.ts';
 import type { ChatItem, KernelEvent, SessionView, WireMessage } from './types.ts';
 
 export function newView(id: string, loaded = false): SessionView {
@@ -54,7 +54,7 @@ export function itemsFromHistory(view: SessionView, messages: WireMessage[]): Ch
     }
     if (message.role === 'user') {
       const images = (message.parts ?? []).filter(part => part.type === 'image').map(part => (part as { url: string }).url);
-      const text = withoutInterruptionNote(textOf(message));
+      const text = withoutVoiceNotes(textOf(message));
       const files = attachmentCards(message.structured_content);
       if (text || images.length || files.length) items.push({ kind: 'user', id: nextId(view), text, images, ...(files.length ? { files } : {}) });
     } else if (message.role === 'assistant') {
