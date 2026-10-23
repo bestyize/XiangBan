@@ -28,6 +28,8 @@ export interface SpeechDeps {
   audio?(url: string): AudioHandle;
   url?(bytes: Blob): string;
   revoke?(url: string): void;
+  /** Called when something is about to be read aloud, so another window talking stops (`voice/owner.ts`). */
+  claimVoice?(): void;
 }
 export interface SpeechStreamEvents { onStart?(): void; onSentence?(text: string): void }
 /** A reading that follows a streamed answer: push the text so far, end it when the answer is complete. */
@@ -103,6 +105,7 @@ export function createSpeechStore(deps: SpeechDeps): SpeechStore {
     },
     async speak(source, key, options, automatic = false) {
       if (!deps.desktop || disposed) { if (!automatic) deps.notify('请在桌面应用中使用朗读', 'info'); return; }
+      deps.claimVoice?.();
       const text = speechText(source);
       if (!text) { if (!automatic) deps.notify('这条消息没有可朗读的文字', 'info'); return; }
       const stopping = store.stop(), ticket = generation;
@@ -127,6 +130,7 @@ export function createSpeechStore(deps: SpeechDeps): SpeechStore {
       }
     },
     stream(key, options, events = {}) {
+      deps.claimVoice?.();
       void store.stop();
       const ticket = generation;
       store.currentKey = key; store.error = '';

@@ -51,37 +51,39 @@ async function open(options: { enabled?: boolean; prepare?: () => Promise<unknow
 
 it('keeps the microphone off when entering a chat with global ASR already enabled', async () => {
   const h = await open(); expect(h.asr.enabled).toBe(true); expect(h.pressed()).toBe('false');
-  expect(h.page().get('[data-testid="chat-asr-toggle"]').attributes('aria-label')).toBe('开始语音输入');
+  expect(h.page().get('[data-testid="chat-asr-toggle"]').attributes('aria-label')).toBe('开始录音');
   expect(h.page().find('[data-testid="asr-status"]').exists()).toBe(false);
   expect(h.capture).not.toHaveBeenCalled(); expect(h.invoke.mock.calls.map(([c]) => c)).not.toContain('asr_prepare');
 });
 
-it('sends recognized text after ending the recording', async () => {
+it('puts recognized text in the box after ending the recording, and leaves sending to the user', async () => {
   const h = await open({ enabled: false });
   await h.settings.get('[data-testid="asr-settings-switch"]').trigger('click'); await flushPromises();
   expect(h.asr.engineReady).toBe(true); expect(h.pressed()).toBe('false'); expect(h.capture).not.toHaveBeenCalled();
   await h.clickMic(); expect(h.asr.listening).toBe(true);
-  expect(h.page().get('[data-testid="chat-asr-toggle"]').text()).toBe('结束并发送');
-  expect(h.page().get('[data-testid="asr-status"]').text()).toContain('正在倾听');
+  expect(h.page().get('[data-testid="chat-asr-toggle"]').text()).toBe('结束录音');
+  expect(h.page().get('[data-testid="asr-status"]').text()).toContain('正在录音');
   expect(h.page().get('.composer-box').classes()).toContain('voice-active');
   h.phrase(); await flushPromises(); expect(h.input()).toBe('帮我查一下天气。');
   expect(h.invoke.mock.calls.map(([command]) => command)).not.toContain('chat_send');
   await h.clickMic(); expect(h.pressed()).toBe('false'); expect(h.asr.enabled).toBe(true);
-  expect(h.invoke).toHaveBeenCalledWith('chat_send', { sessionId: 'A', text: '帮我查一下天气。' });
-  expect(h.input()).toBe('');
+  // The text stays in the box for the user to read and send; ending a recording never sends.
+  expect(h.invoke.mock.calls.map(([command]) => command)).not.toContain('chat_send');
+  expect(h.input()).toBe('帮我查一下天气。');
   expect(h.page().find('[data-testid="asr-status"]').exists()).toBe(false);
   expect(h.settings.get('[data-testid="asr-settings-switch"]').attributes('aria-checked')).toBe('true');
   expect(h.stop).toHaveBeenCalledOnce();
 });
 
-it('waits for an in-flight transcription before sending', async () => {
+it('waits for an in-flight transcription before the text reaches the box', async () => {
   const pending = deferred<string>(); const h = await open({ transcribe: () => pending.promise });
   await h.clickMic(); h.phrase(); await flushPromises();
   await h.clickMic();
-  expect(h.page().get('[data-testid="chat-asr-toggle"]').text()).toBe('正在发送');
-  expect(h.invoke.mock.calls.map(([command]) => command)).not.toContain('chat_send');
+  expect(h.page().get('[data-testid="chat-asr-toggle"]').text()).toBe('正在转写');
+  expect(h.input()).toBe('');
   pending.resolve('稍后完成的语音'); await flushPromises();
-  expect(h.invoke).toHaveBeenCalledWith('chat_send', { sessionId: 'A', text: '稍后完成的语音' });
+  expect(h.input()).toBe('稍后完成的语音');
+  expect(h.invoke.mock.calls.map(([command]) => command)).not.toContain('chat_send');
 });
 
 it('keeps an existing draft when no speech was recognized', async () => {
@@ -160,7 +162,7 @@ it('keeps microphone failures in sound settings across repeated attempts and all
   expect(h.page().find('[data-testid="asr-status"]').exists()).toBe(false);
   expect(h.input()).toBe('保留这段草稿');
   expect(h.invoke.mock.calls.map(([command]) => command)).not.toContain('chat_send');
-  expect(h.page().get('[data-testid="chat-asr-toggle"]').attributes('title')).toBe('开始语音输入');
+  expect(h.page().get('[data-testid="chat-asr-toggle"]').attributes('title')).toBe('录音：说完转成文字，留在输入框，由你确认后发送');
   expect(h.settings.get('[data-testid="microphone-status"]').text()).toContain(error);
   await h.clickMic();
   expect(h.notify).not.toHaveBeenCalled();
@@ -169,7 +171,7 @@ it('keeps microphone failures in sound settings across repeated attempts and all
   await h.clickMic();
   expect(h.pressed()).toBe('true');
   expect(h.asr.error).toBe('');
-  expect(h.page().get('[data-testid="asr-status"]').text()).toContain('正在倾听');
+  expect(h.page().get('[data-testid="asr-status"]').text()).toContain('正在录音');
   expect(h.notify).not.toHaveBeenCalled();
   expect(h.settings.find('[data-testid="microphone-status"]').exists()).toBe(false);
 });

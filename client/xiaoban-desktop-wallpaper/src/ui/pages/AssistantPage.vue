@@ -22,8 +22,8 @@ const repairBusy = ref(false);
 const permissionResetDone = ref(false);
 const asr = computed(() => props.store.asr);
 const shortcutOptions = computed(() => status.value.shortcuts.map(item => ({ label: item.label, value: item.value })));
-const openOptions = [{ label: '直接开始听', value: 'voice' }, { label: '先打字', value: 'type' }];
-const readOptions = [{ label: '仅语音提问时', value: 'voice' }, { label: '每次回答都朗读', value: 'always' }, { label: '不朗读', value: 'never' }];
+const openOptions = [{ label: '直接开始录音', value: 'voice' }, { label: '先打字', value: 'type' }];
+const readOptions = [{ label: '仅按住说话和实时对话时', value: 'voice' }, { label: '每次回答都朗读', value: 'always' }, { label: '不朗读', value: 'never' }];
 const percent = computed(() => Math.min(100, Math.floor(asr.value.downloaded / Math.max(1, asr.value.total) * 100)));
 
 /** One line about the speech engine, in the words a person would use. */

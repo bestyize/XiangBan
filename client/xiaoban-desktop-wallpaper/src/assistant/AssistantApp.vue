@@ -120,13 +120,13 @@ let movingFallback: ReturnType<typeof setTimeout> | undefined, movingGiveUp: Ret
 const props = defineProps<{ store: AssistantStore; asr: AsrStore }>();
 const orbLabel = computed(() => {
   if (props.store.phase === 'speaking') return '停止朗读';
-  if (props.asr.listening) return '停止聆听';
+  if (props.asr.listening) return '结束录音';
   if (props.asr.recordingRequested) return '取消语音启动';
   if (props.asr.preparing) return '正在准备语音输入';
   if (props.asr.microphoneSupported === false) return '当前设备不支持语音输入';
   if (props.asr.enabled === false) return '开启语音输入';
   if (props.asr.microphoneError) return '重试语音输入';
-  return '点击开始说话';
+  return '点击开始录音';
 });
 const field = ref<HTMLTextAreaElement>();
 const filePicker = ref<HTMLInputElement>();
@@ -608,7 +608,7 @@ onBeforeUnmount(()=>{
             <button type="button" class="orb-button" :title="orbLabel + ' · 拖动可移动'" :aria-label="orbLabel" data-testid="assistant-orb" :disabled="imageReading || submitting || capturing || (asr.preparing && store.phase !== 'speaking')" data-drag-handle @click="onOrb">
               <Orb :phase="store.phase" :level="asr.level" :active="store.open" :size="32" />
             </button>
-            <textarea ref="field" v-model="store.input" rows="1" :disabled="store.changingSession" class="field" autocomplete="off" spellcheck="false" :placeholder="store.phase === 'idle' ? '问小伴，或点左边的球说话…' : store.status" aria-label="向小伴提问" data-testid="assistant-input" @beforeinput="store.inputStarted()" @input="store.inputStarted(); grow()" @keydown.enter="onEnter" @compositionstart="composing = true; store.inputStarted()" @compositionend="composing = false" />
+            <textarea ref="field" v-model="store.input" rows="1" :disabled="store.changingSession" class="field" autocomplete="off" spellcheck="false" :placeholder="store.phase === 'idle' ? '问小伴，或点左边的球录音…' : store.status" aria-label="向小伴提问" data-testid="assistant-input" @beforeinput="store.inputStarted()" @input="store.inputStarted(); grow()" @keydown.enter="onEnter" @compositionstart="composing = true; store.inputStarted()" @compositionend="composing = false" />
             <button type="button" class="tool" title="添加文件 · 也可以拖入或粘贴" aria-label="添加文件" data-testid="assistant-add-image" :disabled="!canAttach || store.attachments.length >= 8" @click="openPicker"><Plus :size="18" :stroke-width="1.75" /></button>
             <button type="button" class="tool" title="截图提问" aria-label="截图" data-testid="assistant-screenshot" :disabled="!canAttach || store.attachments.length >= 8" @click="takeScreenshot"><SquareDashed :size="17" :stroke-width="1.75" /></button>
             <button v-if="offersLive" type="button" class="tool live-start" aria-label="实时对话" title="实时对话：像打电话一样和小伴说，随时可以打断" data-testid="assistant-live-start" :disabled="liveDisabled" @click="startLive"><AudioLines :size="18" :stroke-width="2" /></button>

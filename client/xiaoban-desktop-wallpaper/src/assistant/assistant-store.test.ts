@@ -33,6 +33,7 @@ function setup(options: { configured?: boolean; voice?: boolean; prefs?: { open:
       return true;
     }),
     cancel: vi.fn(async () => {}), answerApproval: vi.fn(async () => {}), answerQuestion: vi.fn(async () => {}),
+    sentHere: undefined as undefined | ((session: string) => boolean),
   });
   let heard: (text: string, context?: TranscriptContext) => void = () => {};
   let captureOptions: AsrActivationOptions = {};
@@ -78,7 +79,7 @@ describe('truthful voice prompts', () => {
     const starting=store.toggleListening();await flushPromises();
     expect(store.phase).toBe('idle');expect(store.status).toBe('问点什么…');expect(store.voiceStatus).toBe('正在启动麦克风…');
     captured();await starting;
-    expect(store.phase).toBe('listening');expect(store.status).toBe('正在聆听…');
+    expect(store.phase).toBe('listening');expect(store.status).toBe('正在录音，再点一下结束，文字留在输入框');
     await store.toggleListening();expect(store.status).toBe('问点什么…');store.dispose();
   });
   it('keeps preparation separate and cancels pending voice activation when the user types',async()=>{
@@ -155,7 +156,10 @@ describe('assistant barge-in', () => {
     expect(h.speech.stop).toHaveBeenCalledOnce();expect(h.asr.deactivate).not.toHaveBeenCalled();
     expect(h.store.phase).toBe('listening');expect(h.store.input).toBe('');
     h.say('等等，我想换一个问题，明天会下雨吗',{playbackText:story});
+    // Recording only fills the box: nothing is sent until the user sends it.
     h.advance(SEND_GRACE_MS+1);await Promise.resolve();
+    expect(h.store.input).toBe('等等，我想换一个问题，明天会下雨吗');expect(h.chat.send).toHaveBeenCalledTimes(1);
+    await h.store.submit();
     // The model is told, out of the user's sight, that the answer was cut off.
     expect(h.chat.send).toHaveBeenLastCalledWith('等等，我想换一个问题，明天会下雨吗', [], expect.stringContaining('【语音打断】'));h.store.dispose();
   });
@@ -221,7 +225,7 @@ describe('floating assistant', () => {
     expect(chat.select).toHaveBeenCalledWith(null);
     expect(asr.activate).toHaveBeenCalledTimes(1);
     expect(store.phase).toBe('listening');
-    expect(store.status).toBe('正在聆听…');
+    expect(store.status).toBe('正在录音，再点一下结束，文字留在输入框');
   });
 
   it.each([true, false])('creates capsule conversations in full trust (spoken: %s)', async spoken => {
@@ -284,23 +288,40 @@ describe('floating assistant', () => {
     expect(chat.select).not.toHaveBeenCalled();
   });
 
-  it('sends what was heard once speaking pauses, and stops the microphone while it answers', async () => {
+  it('fills the box with what was heard and never sends on a pause; the user sends it', async () => {
     const { store, chat, asr, say, advance } = setup();
     await store.opened();
     say('今天天气'); advance(200); say('怎么样');
-    expect(chat.send).not.toHaveBeenCalled();
     expect(store.input).toBe('今天天气 怎么样');
-    advance(SEND_GRACE_MS + 1);
+    advance(SEND_GRACE_MS + 1); advance(LISTEN_IDLE_MS * 2);
     await Promise.resolve();
+    expect(chat.send).not.toHaveBeenCalled();
+    expect(asr.recordingRequested).toBe(true); // still recording until the user ends it
+    await store.submit();
     expect(chat.send).toHaveBeenCalledWith('今天天气 怎么样');
     expect(asr.deactivate).toHaveBeenCalled();
     expect(store.phase).toBe('thinking');
   });
+  it('ends a recording by finishing it, so the last words reach the box, and keeps the text', async () => {
+    const { store, chat, asr, say } = setup();
+    await store.opened();
+    say('帮我查一下');
+    await store.toggleListening();
+    expect(asr.finish).toHaveBeenCalled(); expect(asr.recordingRequested).toBe(false);
+    expect(store.input).toBe('帮我查一下'); expect(chat.send).not.toHaveBeenCalled();
+  });
+  it('adds spoken words after what was already typed', async () => {
+    const { store, say } = setup({ prefs: { open: 'type', read: 'voice' } });
+    await store.init(); await store.opened(); store.input = '请帮我';
+    await store.toggleListening();
+    say('查一下天气');
+    expect(store.input).toBe('请帮我 查一下天气');
+  });
 
-  it('reads a spoken question\'s answer aloud and listens again afterwards, but stays quiet for typed ones', async () => {
+  it('reads a spoken question\'s answer aloud and then stops listening (only a live conversation carries on), but stays quiet for typed ones', async () => {
     const spoken = setup();
     await spoken.store.opened();
-    spoken.say('讲个笑话'); spoken.advance(SEND_GRACE_MS + 1); await Promise.resolve(); await Promise.resolve();
+    await spoken.store.submit('讲个笑话', true); // pressed and held: sent on release
     finishAnswer(spoken.chat, '从前有座山。');
     spoken.asr.activate.mockClear();
     spoken.store.replied('s1', '从前有座山。', 'a');
@@ -308,8 +329,9 @@ describe('floating assistant', () => {
     expect(spoken.speech.speak).toHaveBeenCalledWith('从前有座山。', 'a', undefined, true);
     expect(spoken.store.phase).toBe('speaking');
     spoken.speech.status = 'idle'; await nextTick();
-    await vi.waitFor(() => expect(spoken.asr.activate).toHaveBeenCalledTimes(1));
-    expect(spoken.store.phase).toBe('listening');
+    await vi.waitFor(() => expect(spoken.asr.finish).toHaveBeenCalled());
+    expect(spoken.asr.activate).toHaveBeenCalledTimes(1); // only the one that let it be talked over
+    expect(spoken.store.phase).toBe('idle');
 
     const typed = setup({ voice: false });
     await typed.store.opened();
@@ -496,23 +518,20 @@ describe('floating assistant', () => {
     expect(store.hint).toBe('');
   });
 
-  it('keeps the microphone while the user is talking, and releases it once more after the next silence', async () => {
-    const { store, asr, speech, say, advance, chat } = setup();
-    await store.opened();
-    advance(LISTEN_IDLE_MS - 1000);
-    say('你好');
-    advance(LISTEN_IDLE_MS * 2);
-    // what was heard was sent, so the microphone is off while the answer is written
-    await vi.waitFor(() => expect(chat.send).toHaveBeenCalledWith('你好'));
-    expect(asr.recordingRequested).toBe(false);
-    finishAnswer(chat, '你好呀');
-    store.replied('s1', '你好呀', 'a');
-    await nextTick();
-    speech.status = 'idle'; await nextTick();
-    await vi.waitFor(() => expect(asr.activate).toHaveBeenCalledTimes(2));
-    advance(LISTEN_IDLE_MS + 1000);
-    expect(asr.recordingRequested).toBe(false);
-    expect(store.open).toBe(true);
+  it('releases the microphone when nothing is said, but keeps recording once the user has spoken', async () => {
+    const quiet = setup(); await quiet.store.opened();
+    quiet.advance(LISTEN_IDLE_MS + 1000);
+    expect(quiet.asr.recordingRequested).toBe(false);
+    expect(quiet.store.open).toBe(true);
+    const talking = setup(); await talking.store.opened();
+    talking.advance(LISTEN_IDLE_MS - 1000);
+    talking.say('你好');
+    talking.advance(LISTEN_IDLE_MS * 2);
+    // Nothing is sent and the microphone stays on until the user ends the recording.
+    expect(talking.asr.recordingRequested).toBe(true);
+    expect(talking.chat.send).not.toHaveBeenCalled();
+    expect(talking.store.input).toBe('你好');
+    quiet.store.dispose(); talking.store.dispose();
   });
 
   it('stops listening and speaking when it closes, and can hand the conversation to the full chat', async () => {
@@ -645,8 +664,8 @@ describe('floating assistant', () => {
 
       const spoken = setup({ prefs: { open: 'voice', read } });
       await spoken.store.init(); await spoken.store.opened();
-      spoken.say('说着问'); spoken.advance(SEND_GRACE_MS + 1);
-      await vi.waitFor(() => expect(spoken.chat.send).toHaveBeenCalled());
+      await spoken.store.submit('说着问', true); // pressed and held, sent on release
+      expect(spoken.chat.send).toHaveBeenCalled();
       finishAnswer(spoken.chat); spoken.store.replied('s1', '回答', 'a');
       expect(spoken.speech.speak.mock.calls.length > 0, `spoken, ${read}`).toBe(spokenReads);
     }
@@ -822,9 +841,9 @@ describe('reading along while the answer is written', () => {
 });
 
 describe('answering faster', () => {
-  it('sends sooner when the speaker was judged to have finished', async () => {
+  it('sends sooner in a live conversation when the speaker was judged to have finished', async () => {
     const h = setup({ prefs: { open: 'type', read: 'never' } });
-    await h.store.init(); await h.store.opened(); await h.store.toggleListening();
+    await h.store.init(); await h.store.opened(); await h.store.startLive();
     h.say('明天会下雨吗', { playbackText: '', settled: true });
     h.advance(SETTLED_GRACE_MS + 1); await flushPromises();
     expect(h.chat.send).toHaveBeenCalledWith('明天会下雨吗');
@@ -833,7 +852,7 @@ describe('answering faster', () => {
   });
   it('still waits the full grace when the pause was only a long silence', async () => {
     const h = setup({ prefs: { open: 'type', read: 'never' } });
-    await h.store.init(); await h.store.opened(); await h.store.toggleListening();
+    await h.store.init(); await h.store.opened(); await h.store.startLive();
     h.say('明天会下雨吗');
     h.advance(SETTLED_GRACE_MS + 1); await flushPromises();
     expect(h.chat.send).not.toHaveBeenCalled();
@@ -934,7 +953,8 @@ describe('remembering how far the user listened', () => {
     h.preview('等等，换一个'); await nextTick();
     h.chat.views.s1.running = false; // the cancelled answer has stopped
     h.say('等等，换一个科幻的', { playbackText: '' });
-    h.advance(SEND_GRACE_MS + 1); await flushPromises();
+    expect(h.store.input).toBe('等等，换一个科幻的'); // recording only fills the box
+    await h.store.submit();
     const [text, , note] = h.chat.send.mock.calls.at(-1) as unknown as [string, unknown[], string];
     expect(text).toBe('等等，换一个科幻的');
     expect(note).toContain('「从前有座山，山上有座庙。」');
@@ -1012,5 +1032,44 @@ describe('实时对话', () => {
     store.closed();
     expect(store.live).toBe(false); expect(asr.recordingRequested).toBe(false);
     store.dispose();
+  });
+});
+
+describe('sharing the voice with the console', () => {
+  it('stops listening and reading when the other window takes the voice, and does not start again on its own', async () => {
+    const h = setup({ prefs: { open: 'type', read: 'always' } });
+    let started!: () => void;
+    h.speech.stream = vi.fn((_key: string, _options: unknown, events: { onStart?: () => void }) => { started = () => events.onStart?.(); return { push: vi.fn(), end: vi.fn(async () => {}), spoken: '先读一句。', active: true }; });
+    await h.store.init(); await h.store.opened(); await h.store.submit('讲个故事', true);
+    started(); await flushPromises();
+    h.speech.stop.mockClear(); h.asr.deactivate.mockClear();
+    h.store.yieldVoice();
+    expect(h.asr.deactivate).toHaveBeenCalled(); expect(h.speech.stop).toHaveBeenCalled();
+    expect(h.store.phase).not.toBe('speaking');
+    // The answer that finishes afterwards is shown, not read.
+    h.chat.views.s1.items.push({ kind: 'assistant', id: 'a', text: '后面的内容。', streaming: false }); h.chat.views.s1.running = false;
+    h.speech.speak.mockClear(); h.store.replied('s1', '后面的内容。', 'a');
+    expect(h.speech.speak).not.toHaveBeenCalled();
+    h.store.dispose();
+  });
+  it('ends a live conversation when the other window takes the voice', async () => {
+    const h = setup();
+    await h.store.init(); await h.store.opened(); await h.store.startLive();
+    expect(h.store.live).toBe(true);
+    h.store.yieldVoice();
+    expect(h.store.live).toBe(false); expect(h.asr.deactivate).toHaveBeenCalled();
+    h.store.dispose();
+  });
+  it('shows but does not read an answer to a question the other window asked', async () => {
+    const h = setup({ prefs: { open: 'type', read: 'always' } });
+    await h.store.init(); await h.store.opened(); await h.store.submit('你好');
+    h.chat.sentHere = vi.fn(() => false);
+    finishAnswer(h.chat, '你好呀。'); h.speech.speak.mockClear();
+    h.store.replied('s1', '你好呀。', 'a');
+    expect(h.speech.speak).not.toHaveBeenCalled();
+    h.chat.sentHere = vi.fn(() => true);
+    h.store.replied('s1', '你好呀。', 'a');
+    expect(h.speech.speak).toHaveBeenCalled();
+    h.store.dispose();
   });
 });

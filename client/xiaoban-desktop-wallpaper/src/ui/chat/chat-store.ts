@@ -59,6 +59,11 @@ export interface ChatStore {
    * `note` goes to the model at the front of the message and is not shown (see `voice/interruption.ts`).
    */
   send(text: string, attachments?: PendingAttachment[], note?: string): Promise<boolean>;
+  /**
+   * Whether this window sent the question being answered in the conversation. Both windows hear every chat event,
+   * and only the one the user spoke or typed into should read the answer aloud.
+   */
+  sentHere(session: string): boolean;
   retry(): Promise<boolean>;
   cancel(): Promise<void>;
   remove(id: string): Promise<void>;
@@ -208,6 +213,7 @@ export function createChatStore(deps: ChatDeps): ChatStore {
     compactingId: null as string | null,
     views: {} as Record<string, SessionView>,
     currentId: null as string | null,
+    sentHere(session) { return sent.has(session); },
     get attention() {
       return Object.values(store.views).reduce((sum, view) => sum + view.approvals.length + view.questions.length, 0);
     },
@@ -335,10 +341,12 @@ export function createChatStore(deps: ChatDeps): ChatStore {
       try {
         // Images are left out entirely when there are none, so a plain message keeps its old shape.
         const args = { sessionId: id, text: note ? note + text : text, ...(images.length ? { images } : {}), ...(files.length ? { attachments: files.map(({name,dataUrl}) => ({name,dataUrl})) } : {}) };
+        sent.add(id);
         upsert(await deps.invoke<SessionSummary>('chat_send', args));
         return true;
       } catch (error) {
         // The host refused before starting, so nothing of this message happened.
+        sent.delete(id);
         view.items = view.items.filter(i => i.id !== item.id);
         view.running = false;
         deps.notify(error, 'error');
@@ -359,11 +367,12 @@ export function createChatStore(deps: ChatDeps): ChatStore {
       view.running = true; view.status = '';
       const previousFailure = [...view.items].reverse().find(i => i.kind === 'notice' && i.canRetry)?.id;
       try {
+        sent.add(id);
         upsert(await deps.invoke<SessionSummary>('chat_send', { sessionId: id, text: '', retry: true }));
         // Keep the original user message and drop only the now-resolved failure notice.
         view.items = view.items.filter(i => i.id !== previousFailure);
         return true;
-      } catch (e) { view.running = false; deps.notify(e, 'error'); return false; }
+      } catch (e) { sent.delete(id); view.running = false; deps.notify(e, 'error'); return false; }
     },
 
     async cancel() {
@@ -510,6 +519,8 @@ export function createChatStore(deps: ChatDeps): ChatStore {
     present(view, payload);
   }
 
+  /** Conversations whose current answer was asked from this window. */
+  const sent = new Set<string>();
   function present(view: SessionView, { session, event }: ChatEventPayload) {
     applyEvent(view, event);
     if (event.type === 'done' && store.currentId === session) {
@@ -517,6 +528,7 @@ export function createChatStore(deps: ChatDeps): ChatStore {
       if (last?.kind === 'assistant' && last.text.trim()) deps.onReply?.(session, last.text, last.id);
     }
     if ((event.type === 'cancelled' || event.type === 'error') && store.currentId === session) deps.onActivity?.();
+    if (event.type === 'done' || event.type === 'cancelled' || event.type === 'error') queueMicrotask(() => sent.delete(session));
     if ((event.type === 'done' || event.type === 'cancelled' || event.type === 'error') && store.currentId === session) void store.refreshContext();
     if (event.type === 'error' && modelFailure(event.message).refresh && Date.now() - refreshedAfterErrorAt > 300000) {
       refreshedAfterErrorAt = Date.now();

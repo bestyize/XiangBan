@@ -29,6 +29,8 @@ export interface AsrDeps {
   capture?: typeof captureMicrophone;
   /** Silero VAD + Smart Turn endpointing. Without it (or until it has loaded) pauses are judged by loudness. */
   turnModels?(): Promise<TurnModels | null>;
+  /** Called when the microphone is about to be used, so another window using it stops (`voice/owner.ts`). */
+  claimVoice?(): void;
 }
 export interface AsrStore extends HostStatus {
   microphoneSupported: boolean;
@@ -278,6 +280,7 @@ export function createAsrStore(deps: AsrDeps): AsrStore {
     },
     async activate(onText, activationOptions = {}) {
       if (!deps.desktop || disposed) return;
+      deps.claimVoice?.();
       if (!store.microphoneSupported) { reportMicrophone(MICROPHONE_UNSUPPORTED); return; }
       store.deactivate(); store.error = ''; receiver = onText; store.recordingRequested = true;
       options = activationOptions;

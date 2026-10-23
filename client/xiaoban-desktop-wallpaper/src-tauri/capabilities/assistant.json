@@ -1,6 +1,6 @@
 {
   "identifier": "assistant",
-  "description": "The floating assistant listens to chat and window events from the host. Every command it may call is checked by its window label.",
+  "description": "The floating assistant listens to chat and window events from the host, and tells the other windows when it takes over the microphone and the voice. Every command it may call is checked by its window label.",
   "windows": ["assistant"],
-  "permissions": ["core:event:allow-listen", "core:event:allow-unlisten"]
+  "permissions": ["core:event:allow-listen", "core:event:allow-unlisten", "core:event:allow-emit"]
 }

@@ -38,7 +38,7 @@ describe('assistant capsule', () => {
    asr.enabled=false;await nextTick();expect(orb.attributes('aria-label')).toBe('开启语音输入');
    asr.enabled=true;asr.preparing=true;await nextTick();expect(orb.attributes('aria-label')).toBe('正在准备语音输入');expect(wrapper.get('[data-testid="assistant-input"]').attributes('disabled')).toBeUndefined();
    asr.preparing=false;asr.recordingRequested=true;await nextTick();expect(orb.attributes('aria-label')).toBe('取消语音启动');
-   asr.listening=true;await nextTick();expect(orb.attributes('aria-label')).toBe('停止聆听');
+   asr.listening=true;await nextTick();expect(orb.attributes('aria-label')).toBe('结束录音');
  });
   it.each(['enter','button'])('can send during readout using %s without stopping on edit',async method=>{
     const {store,wrapper}=setup();store.phase='speaking';store.input='';await nextTick();

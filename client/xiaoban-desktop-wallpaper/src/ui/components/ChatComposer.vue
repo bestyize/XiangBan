@@ -129,9 +129,10 @@ async function toggleVoice() {
     finishingVoice.value = true;
     try {
       await asr.finish();
-      if (!wasListening || asr.error || !shown.value || !foreground.value || chat.currentId !== sessionId || running.value) return;
-      if (!voiceHasText.value) { props.store.notify('没有识别到语音，请重试', 'info'); return; }
-      await submit();
+      asr.deactivate();
+      if (!wasListening || asr.error || !shown.value || !foreground.value || chat.currentId !== sessionId) return;
+      // Recording only fills the box: the user reads what was heard and sends it. Sending on its own is the live conversation.
+      if (!voiceHasText.value) props.store.notify('没有识别到语音，请重试', 'info');
     } finally { finishingVoice.value = false; }
     return;
   }
@@ -277,9 +278,9 @@ defineExpose({ setDraft, insertPrompt, refreshModel: readModelLabel, draft });
         <span class="composer-spacer" />
         <ChatContextRing v-if="store.desktop" :inert="!chat.currentId && page === 'new-task'" :used="chat.context.used" :limit="chat.context.limit" :can-compact="chat.context.canCompact" :compacting="compacting" :busy="running" :disabled="!chat.currentId" @compact="chat.compact()" @resize="chat.setContextSize($event)" />
         <ChatComposerModel :label="modelLabel" :provider="modelProvider" :gateway="modelGateway" :disabled="!store.desktop || running" @switched="modelSwitched" @settings="emit('settings')" />
-        <button v-if="finishingVoice" type="button" class="voice-finish" data-testid="chat-asr-toggle" aria-label="正在转写并发送" aria-pressed="false" disabled><LoaderCircle class="spin" :size="13" aria-hidden="true" />正在发送</button>
-        <button v-else-if="asr?.recordingRequested" type="button" class="voice-finish" data-testid="chat-asr-toggle" :aria-label="asr.listening ? '结束录音并发送' : '取消准备'" aria-pressed="true" @click="toggleVoice"><span v-if="asr.listening" class="recording-dot" aria-hidden="true" /><LoaderCircle v-else class="spin" :size="13" aria-hidden="true" />{{ asr.listening ? '结束并发送' : '取消准备' }}</button>
-        <button v-else-if="asr" type="button" class="xb-icon-btn voice" data-testid="chat-asr-toggle" aria-label="开始语音输入" aria-pressed="false" title="开始语音输入" :disabled="!store.desktop || !asr.ready || asr.microphoneSupported === false || !microphoneAllowed || asr.saving" @click="toggleVoice"><Mic :size="17" /></button>
+        <button v-if="finishingVoice" type="button" class="voice-finish" data-testid="chat-asr-toggle" aria-label="正在转写" aria-pressed="false" disabled><LoaderCircle class="spin" :size="13" aria-hidden="true" />正在转写</button>
+        <button v-else-if="asr?.recordingRequested" type="button" class="voice-finish" data-testid="chat-asr-toggle" :aria-label="asr.listening ? '结束录音' : '取消准备'" aria-pressed="true" @click="toggleVoice"><span v-if="asr.listening" class="recording-dot" aria-hidden="true" /><LoaderCircle v-else class="spin" :size="13" aria-hidden="true" />{{ asr.listening ? '结束录音' : '取消准备' }}</button>
+        <button v-else-if="asr" type="button" class="xb-icon-btn voice" data-testid="chat-asr-toggle" aria-label="开始录音" aria-pressed="false" title="录音：说完转成文字，留在输入框，由你确认后发送" :disabled="!store.desktop || !asr.ready || asr.microphoneSupported === false || !microphoneAllowed || asr.saving" @click="toggleVoice"><Mic :size="17" /></button>
         <button v-if="offersLive" type="button" class="xb-icon-btn live-start" data-testid="chat-live-start" aria-label="实时对话" title="实时对话：像打电话一样和小伴说，随时可以打断" :disabled="liveDisabled" @click="startLive"><AudioLines :size="18" :stroke-width="2" /></button>
         <button v-if="running" type="button" class="send-btn is-stop" data-testid="chat-stop" aria-label="停止" title="停止" @click="chat.cancel()"><Square :size="12" fill="currentColor" /></button>
         <button v-else type="button" class="send-btn" data-testid="chat-send" aria-label="发送" title="发送（Enter）" :disabled="!canSend" @click="submit"><ArrowUp :size="17" :stroke-width="2.4" /></button>
