@@ -283,6 +283,8 @@ export function createAssistantStore(deps: AssistantDeps): AssistantStore {
     interruption = { session: chat.currentId, note: interruptionNote(reading ? reading.spoken : null) };
   }
   let lastAck: string | undefined;
+  /** What was already in the box when recording started: spoken words are added after it. */
+  let inputBase = '';
   /** What is said first, fitted to what the user said: a greeting at once, a request or question after a short wait. */
   function scheduleAck(kind: AckKind, phrase: string) {
     clearTimer(ackTimer);
@@ -343,7 +345,7 @@ export function createAssistantStore(deps: AssistantDeps): AssistantStore {
     const prepared = await asr.prepare();
     if (!store.open || !current()) return false;
     if (!prepared) { noteVoice(asr.error || '语音识别还没准备好，可以继续打字。'); return false; }
-    noteVoice(''); heard = '';
+    noteVoice(''); heard = ''; inputBase = store.input;
     await asr.activate((text, context)=>{if(current())onHeard(text, context);}, {
       noiseGuard: true,
       onPartial: text => { if (current() && store.open && !flags.awaitingSpeech) flags.partial = text; },
@@ -367,6 +369,8 @@ export function createAssistantStore(deps: AssistantDeps): AssistantStore {
     voiceTurn = true;
     clearTimer(listenTimer);
     heard = heard ? `${heard} ${text}` : text;
+    // Recording outside a live conversation only fills the box: the user reads it and sends it. A pause never sends.
+    if (!store.live && !flags.ptt) { store.input = inputBase && !/\s$/.test(inputBase) ? `${inputBase} ${heard}` : inputBase + heard; voiceTurn = false; return; }
     store.input = heard;
     // Push to talk sends on release, never on a pause.
     if (flags.ptt) return;
@@ -386,10 +390,8 @@ export function createAssistantStore(deps: AssistantDeps): AssistantStore {
       if (!asr.recordingRequested) void startListening();
       return;
     }
-    if (voiceTurn) {
-      if (asr.recordingRequested) armListenTimer();
-      else void startListening();
-    } else if (asr.recordingRequested) {
+    // Only a live conversation carries on listening; otherwise the voice is done once the answer has been read.
+    if (asr.recordingRequested) {
       // A typed turn does not leave hands-free recording on. Flush any speech
       // that overlapped the end of playback before releasing the microphone.
       void asr.finish();
@@ -500,7 +502,7 @@ export function createAssistantStore(deps: AssistantDeps): AssistantStore {
         case 'thinking': return store.working || '思考中…';
         case 'answering': return store.working || '正在回答…';
         case 'speaking': return asr.listening ? '正在朗读，说话或发送可打断' : '正在朗读，发送可打断';
-        case 'listening': return '正在聆听…';
+        case 'listening': return store.live ? '正在聆听…' : '正在录音，再点一下结束，文字留在输入框';
         default: return '问点什么…';
       }
     },
@@ -630,7 +632,12 @@ export function createAssistantStore(deps: AssistantDeps): AssistantStore {
       } finally { flags.submitting = false; }
     },
     async toggleListening() {
-      if (asr.listening || asr.recordingRequested) { asr.deactivate(); voiceTurn = false; heard = ''; return; }
+      if (asr.listening || asr.recordingRequested) {
+        // Ending a recording: the last words are still being recognised, let them reach the box before it closes.
+        if (!store.live && !flags.ptt) await asr.finish();
+        asr.deactivate(); voiceTurn = false; heard = ''; flags.partial = '';
+        return;
+      }
       await speech.stop(); flags.awaitingSpeech = false;
       voiceTurn = await startListening();
     },
