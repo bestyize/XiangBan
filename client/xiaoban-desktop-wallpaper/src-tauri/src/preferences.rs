@@ -9,6 +9,8 @@ pub const SKINS: &[&str] = &["pot", "pot-white-flower"];
 /// The console's colour scheme. It lives here, not only in the console's page storage, because the other windows (the
 /// floating assistant) cannot read that storage and still have to match.
 pub const APPEARANCES: &[&str] = &["system", "light", "dark"];
+/// The theme colours the console offers.
+pub const ACCENTS: &[&str] = &["red", "green", "blue", "purple", "amber", "graphite"];
 pub const EXPRESSIONS: &[&str] = &[
     "idle",
     "happy",
@@ -45,6 +47,8 @@ pub struct Settings {
     /// The host has been given a choice (by the user, or carried over from before the host kept one). Until then the
     /// console's own saved choice is the one to keep.
     pub appearance_kept: bool,
+    /// The console's theme colour. Kept here so windows that cannot share page storage (Windows) follow it too.
+    pub accent: String,
     pub expression: String,
     pub size: f64,
     pub theme: String,
@@ -87,6 +91,7 @@ impl Default for Settings {
             mode: "floating".into(),
             appearance: "system".into(),
             appearance_kept: false,
+            accent: "red".into(),
             expression: "idle".into(),
             size: 260.0,
             theme: "night".into(),
@@ -124,6 +129,9 @@ impl Settings {
         }
         if !APPEARANCES.contains(&self.appearance.as_str()) {
             self.appearance = defaults.appearance;
+        }
+        if !ACCENTS.contains(&self.accent.as_str()) {
+            self.accent = defaults.accent;
         }
         if !SKINS.contains(&self.companion_skin.as_str()) {
             self.companion_skin = defaults.companion_skin;

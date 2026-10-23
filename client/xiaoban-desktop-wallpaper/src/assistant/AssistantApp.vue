@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import { ATTACHMENT_ACCEPT, MAX_TOTAL_BYTES, attachmentBytes, attachmentImage, attachmentName, readAttachment } from '../ui/chat/attachments.ts';
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
-import { ArrowUp, Square, X, Copy, Check, Paperclip, Settings, ChevronDown, ChevronRight, PanelsTopLeft, SquarePen, Scissors, Plus } from 'lucide-vue-next';
+import { ArrowUp, ArrowUpRight, Check, ChevronDown, Copy, Minus, Pin, Plus, RotateCcw, Settings, SquareDashed, SquarePen, TriangleAlert, X, History } from 'lucide-vue-next';
 import MarkdownView from '../ui/chat/MarkdownView.ts';
 import SelectionCopyMenu from '../ui/chat/SelectionCopyMenu.vue';
 import type { AsrStore } from '../ui/asr/store.ts';
-import type { ApprovalRequest } from '../ui/chat/types.ts';
+import type { ApprovalRequest, ChatItem } from '../ui/chat/types.ts';
 import { invoke, listen } from '../bridge.ts';
 import { morphGeometry, MORPH_DURATION } from './morph.ts';
 import { isDark } from '../ui/appearance.ts';
@@ -49,7 +49,7 @@ async function handleMorph(event: MorphEvent) {
   if (morphDisposed || event.id < morphId) return;
   morphStep = event.step;
   if (event.step === 'leave') {
-    resetMorph(); morphId = event.id; closeTools(); morphing.value = true;
+    resetMorph(); morphId = event.id; closeMenus(); morphing.value = true;
     morphFallback = setTimeout(resetMorph, 1800);
     try {
       const frames = event.target === 'ball' ? await prepareMorph(event.right) : null;
@@ -97,48 +97,19 @@ const orbLabel = computed(() => {
   if (props.asr.microphoneError) return '重试语音输入';
   return '点击开始说话';
 });
-const field = ref<HTMLInputElement>();
+const field = ref<HTMLTextAreaElement>();
 const filePicker = ref<HTMLInputElement>();
-const imageReading = ref(false), submitting = ref(false), dropActive = ref(false), capturing = ref(false);
-const toolsOpen = ref(false), toolsPinned = ref(false);
-const toolsHost = ref<HTMLElement>(), toolbar = ref<HTMLElement>(), primaryButton = ref<HTMLButtonElement>();
-let toolsOpenTimer: ReturnType<typeof setTimeout> | undefined, toolsCloseTimer: ReturnType<typeof setTimeout> | undefined;
-function clearToolTimers() { clearTimeout(toolsOpenTimer); clearTimeout(toolsCloseTimer); }
-function closeTools() { clearToolTimers(); toolsPinned.value = false; toolsOpen.value = false; }
-function showTools() { clearToolTimers(); if (!capturing.value) toolsOpen.value = true; }
-function enterTools() { clearTimeout(toolsCloseTimer); if (!toolsOpen.value) { clearTimeout(toolsOpenTimer); toolsOpenTimer = setTimeout(showTools, 220); } }
-function leaveTools() {
-  clearTimeout(toolsOpenTimer);
-  if (!toolsPinned.value && !toolsHost.value?.contains(document.activeElement)) toolsCloseTimer = setTimeout(closeTools, 400);
-}
-function focusTools() { clearToolTimers(); }
-function toolsFocusOut() { void nextTick(() => { if (!toolsHost.value?.contains(document.activeElement) && !toolsPinned.value) closeTools(); }); }
-function outsideTools(event: PointerEvent) { if (!toolsHost.value?.contains(event.target as Node)) closeTools(); }
+const imageReading = ref(false), submitting = ref(false), dropActive = ref(false), capturing = ref(false), picking = ref(false);
+/** Pinned: a click elsewhere does not fold the capsule away. */
+const pinned = ref(false);
+const sessionsOpen = ref(false), sessionsHost = ref<HTMLElement>();
+function closeMenus() { sessionsOpen.value = false; }
+function outsideMenus(event: PointerEvent) { if (sessionsOpen.value && !sessionsHost.value?.contains(event.target as Node)) closeMenus(); }
 function escape() {
-  if (toolsOpen.value) { closeTools(); primaryButton.value?.focus(); return; }
-  if (!capturing.value) void props.store.hide();
-}
-function toolbarKeys(event: KeyboardEvent) {
-  const buttons = Array.from(toolbar.value?.querySelectorAll<HTMLButtonElement>('button:not(:disabled)') ?? []);
-  if (!buttons.length) return;
-  let at = buttons.indexOf(document.activeElement as HTMLButtonElement);
-  if (event.key === 'ArrowRight' || event.key === 'ArrowLeft') { event.preventDefault(); at = (at + (event.key === 'ArrowRight' ? 1 : -1) + buttons.length) % buttons.length; buttons[at].focus(); }
-  if (event.key === 'Home' || event.key === 'End') { event.preventDefault(); buttons[event.key === 'Home' ? 0 : buttons.length - 1].focus(); }
-}
-async function primaryKeys(event: KeyboardEvent) {
-  if (!['ArrowUp', 'ArrowDown'].includes(event.key)) return;
-  event.preventDefault(); showTools(); await nextTick(); toolbar.value?.querySelector<HTMLButtonElement>('button:not(:disabled)')?.focus();
-}
-async function toolAction(action: 'settings' | 'hide' | 'new' | 'chat' | 'image' | 'screenshot') {
-  closeTools();
-  if (action === 'image') { openPicker(); return; }
-  if (action === 'screenshot') { await takeScreenshot(); return; }
-  try {
-    if (action === 'settings') await props.store.openSettings('assistant');
-    if (action === 'hide') await props.store.hide();
-    if (action === 'new') await props.store.newConversation();
-    if (action === 'chat') await props.store.openChat();
-  } catch (error) { props.store.note(error instanceof Error ? error.message : String(error)); }
+  if (sessionsOpen.value) { closeMenus(); return; }
+  if (capturing.value) return;
+  if (props.store.input) { props.store.input = ''; return; }
+  void props.store.hide();
 }
 async function takeScreenshot() {
   if (!canAttach.value || props.store.attachments.length >= 8) return;
@@ -148,7 +119,7 @@ async function takeScreenshot() {
   try {
     await nextTick();
     const image = await invoke<string | null>('assistant_screenshot');
-    if (image && props.store.open && version === imageVersion) props.store.attachments.push(image);
+    if (image && props.store.open && version === imageVersion) { props.store.attachments.push(image); }
   } catch (error) {
     if (version === imageVersion) {
       const message = error instanceof Error ? error.message : String(error);
@@ -160,15 +131,14 @@ async function takeScreenshot() {
   }
   finally { capturing.value = false; void nextTick(() => field.value?.focus()); }
 }
-// Toolbar visibility never changes native window geometry. Headroom is reserved on open.
 let imageVersion = 0, dropDepth = 0;
 
 const canAttach = computed(() => !busy.value && !props.store.ask && !props.store.approval && !imageReading.value && !submitting.value && !capturing.value && !props.store.changingSession);
-watch(() => props.store.open, () => { imageVersion++; dropDepth = 0; dropActive.value = false; closeTools(); });
+watch(() => props.store.open, () => { imageVersion++; dropDepth = 0; dropActive.value = false; closeMenus(); });
 watch(() => props.store.changingSession, changing => { if (changing) imageVersion++; });
 function openPicker() {
   if (!canAttach.value) return;
-  props.store.prepareImages(); filePicker.value?.click();
+  props.store.prepareImages(); picking.value = true; filePicker.value?.click();
 }
 async function addImages(files: File[]) {
   if (!files.length || !props.store.open) return;
@@ -192,6 +162,7 @@ async function addImages(files: File[]) {
 }
 function onPick(event: Event) {
   const input = event.target as HTMLInputElement;
+  picking.value = false;
   void addImages(Array.from(input.files ?? [])); input.value = '';
 }
 function hasFiles(event: DragEvent) { return Array.from(event.dataTransfer?.types ?? []).includes('Files'); }
@@ -209,21 +180,39 @@ function pasteImages(event: ClipboardEvent) {
 const inner = ref<HTMLElement>();
 const scroller = ref<HTMLElement>();
 const composing = ref(false);
-const dragging=ref(false),copyState=ref<'idle'|'copying'|'copied'|'failed'>('idle');
-let copyTimer:ReturnType<typeof setTimeout>|undefined,copyVersion=0;
-const cardDismissed = ref(false);
-watch(() => props.store.question, () => { cardDismissed.value = false;copyVersion++;copyState.value='idle';clearTimeout(copyTimer); });
-watch(() => props.store.phase, (phase, before) => {
-  if (phase === 'thinking' && !['thinking', 'answering'].includes(before)) cardDismissed.value = false;
-});
-watch(() => props.store.open, open => { if (open) cardDismissed.value = false; });
-watch(() => [props.store.approval?.id, props.store.ask?.id, props.store.hint, props.store.failure], () => { cardDismissed.value = false; });
+const dragging = ref(false);
 
 const busy = computed(() => ['thinking', 'answering', 'speaking'].includes(props.store.phase));
-const hasCard = computed(() => !cardDismissed.value && Boolean(
-  props.store.hint || props.store.question || props.store.questionImages?.length || props.store.questionFiles?.length || props.store.answer || props.store.working || props.store.failure
-  || props.store.approval || props.store.ask || props.store.phase === 'thinking',
-));
+
+/** What the card shows of the open conversation: questions, answers and errors, in order. */
+type Turn = Extract<ChatItem, { kind: 'user' | 'assistant' | 'notice' }>;
+const turns = computed(() => props.store.items.filter((item): item is Turn =>
+  item.kind === 'user' || (item.kind === 'assistant' && Boolean(item.text.trim())) || (item.kind === 'notice' && item.tone !== 'info')));
+const lastAnswer = computed(() => { for (let i = turns.value.length - 1; i >= 0; i--) { const t = turns.value[i]; if (t.kind === 'user') return null; if (t.kind === 'assistant') return t; } return null; });
+
+/** The conversation card. Opening the capsule shows only the capsule unless an answer waits unread or something needs the user. */
+const cardShown = ref(false);
+let unreadWhenFolded = false;
+watch(() => props.store.unread, unread => { if (unread) unreadWhenFolded = true; }, { immediate: true });
+const needsUser = computed(() => Boolean(props.store.approval || props.store.ask || props.store.hint));
+function revealCard() { cardShown.value = true; }
+watch(() => props.store.open, open => {
+  if (!open) return;
+  cardShown.value = unreadWhenFolded || busy.value || needsUser.value;
+  unreadWhenFolded = false;
+}, { immediate: true });
+watch(needsUser, need => { if (need) cardShown.value = true; });
+watch(() => props.store.phase, phase => { if (phase === 'thinking') cardShown.value = true; });
+const hasCard = computed(() => cardShown.value && (turns.value.length > 0 || needsUser.value || props.store.phase === 'thinking' || Boolean(props.store.working)));
+/** While an answer streams the card body keeps one height, so the text scrolls instead of resizing the window. */
+const fixedBody = computed(() => turns.value.length > 0 && busy.value);
+
+/** Quick actions above a capsule that has no card. */
+const continueTitle = computed(() => (turns.value.length ? props.store.title || '上次的对话' : ''));
+const otherRecent = computed(() => props.store.recent.find(session => session.id !== props.store.currentId && session.title));
+const chipsShown = computed(() => props.store.open && !hasCard.value && !busy.value && !props.store.input && !props.store.attachments.length);
+async function continueOther(id: string) { await props.store.switchSession(id); cardShown.value = true; void nextTick(() => field.value?.focus()); }
+
 const canSend = computed(() => (!busy.value || props.store.phase === 'speaking') && !props.store.approval && !imageReading.value && !submitting.value && !capturing.value && !props.store.changingSession && Boolean(props.store.input.trim() || props.store.attachments.length));
 const stopping = computed(() => busy.value && !canSend.value);
 
@@ -237,7 +226,7 @@ async function send() {
   if (!canSend.value) return;
   if (props.store.ask) { if (text) { props.store.input = ''; void props.store.reply(text); } return; }
   if ((busy.value && props.store.phase !== 'speaking') || props.store.approval) return;
-  cardDismissed.value = false; submitting.value = true;
+  cardShown.value = true; submitting.value = true;
   try { await props.store.submit(); } finally { submitting.value = false; }
 }
 // Number shortcuts apply only to the active Ask User question, never to text inputs.
@@ -251,15 +240,13 @@ function onAskShortcut(event: KeyboardEvent) {
   void props.store.reply(option);
 }
 function onEnter(event: KeyboardEvent) {
-  if (event.isComposing || composing.value) return;
+  if (event.isComposing || composing.value || event.shiftKey) return;
   event.preventDefault();
-  send();
+  void send();
 }
 function primary() {
-  if (canSend.value) { closeTools(); void send(); }
-  else if (busy.value) { closeTools(); props.store.interrupt(); }
-  else if (toolsOpen.value) closeTools();
-  else { showTools(); toolsPinned.value = true; }
+  if (canSend.value) void send();
+  else if (busy.value) props.store.interrupt();
 }
 function onOrb() {
   if (props.store.phase === 'speaking') props.store.interrupt();
@@ -268,25 +255,79 @@ function onOrb() {
 async function openLink(href: string) {
   try { await invoke('open_download_url', { url: href.split('#')[0] }); } catch { props.store.note('这个地址不能直接打开。'); }
 }
+async function act(action: () => Promise<void> | void) {
+  closeMenus();
+  try { await action(); } catch (error) { props.store.note(error instanceof Error ? error.message : String(error)); }
+}
+async function newChat() { await act(() => props.store.newConversation()); cardShown.value = false; void nextTick(() => field.value?.focus()); }
+async function pickSession(id: string) { await act(() => props.store.switchSession(id)); cardShown.value = true; }
+
+/** The text box grows with its text, up to four lines, then scrolls. */
+function grow() {
+  const el = field.value;
+  if (!el) return;
+  el.style.height = 'auto';
+  el.style.height = `${Math.min(el.scrollHeight, 96)}px`;
+}
+watch(() => props.store.input, () => void nextTick(grow), { immediate: true });
+
+/* ── The ball and the line beside it ─────────────────────────────── */
+const ballBadge = computed(() => {
+  if (props.store.phase === 'attention') return 'attention';
+  if (props.store.notice?.kind === 'error') return 'error';
+  if (props.store.unread) return 'unread';
+  return '';
+});
+const ballRing = computed(() => ['thinking', 'answering'].includes(props.store.phase));
+const ballLabel = computed(() => ({ attention: '超级小伴 · 等你确认', error: '超级小伴 · 出错了', unread: '超级小伴 · 有新回答' } as Record<string, string>)[ballBadge.value]
+  ?? (ballRing.value ? '超级小伴 · 正在回答' : '打开超级小伴'));
+/** The notice sits on the side of the ball that faces the middle of the screen; null while none shows. */
+const bubbleLeft = ref<boolean | null>(null);
+let bubbleTimer: ReturnType<typeof setTimeout> | undefined, bubbleVersion = 0;
+const bubbleWanted = computed(() => Boolean(props.store.ball && !props.store.open && props.store.notice && !dragging.value && !morphing.value));
+watch(bubbleWanted, async wanted => {
+  const version = ++bubbleVersion;
+  clearTimeout(bubbleTimer);
+  if (!wanted) {
+    if (bubbleLeft.value !== null) { bubbleLeft.value = null; await invoke('assistant_ball_bubble', { open: false }).catch(() => {}); }
+    return;
+  }
+  const left = await invoke<boolean | null>('assistant_ball_bubble', { open: true }).catch(() => null);
+  if (version !== bubbleVersion) return;
+  bubbleLeft.value = typeof left === 'boolean' ? left : true;
+  // A finished answer says so briefly, then the unread dot is enough. Waiting and errors stay until seen.
+  if (props.store.notice?.kind === 'done') bubbleTimer = setTimeout(() => props.store.dismissNotice(), 3000);
+  void nextTick(queueHitRegions);
+}, { immediate: true });
+watch(() => props.store.notice?.text, () => {
+  if (bubbleLeft.value === null || props.store.notice?.kind !== 'done') return;
+  clearTimeout(bubbleTimer); bubbleTimer = setTimeout(() => props.store.dismissNotice(), 3000);
+});
+
+/* ── Click elsewhere folds the capsule away, unless something would be lost or is waiting ─── */
+const canAutoHide = computed(() => props.store.open && !pinned.value && props.store.phase === 'idle' && !props.store.input.trim()
+  && !props.store.attachments.length && !capturing.value && !picking.value && !imageReading.value && !submitting.value
+  && !dragging.value && !morphing.value && !props.store.changingSession && !props.asr.recordingRequested);
+let blurTimer: ReturnType<typeof setTimeout> | undefined;
+function onBlur() {
+  closeMenus();
+  clearTimeout(blurTimer);
+  blurTimer = setTimeout(() => { if (!document.hasFocus() && canAutoHide.value) void props.store.hide(); }, 160);
+}
 
 let hitRaf=0,lastRegions='';
 function syncHitRegions(){
   const regions:HitRegion[]=[];
-  document.querySelectorAll<HTMLElement>('.composer,.card,.ball,.tools-toolbar,.selection-copy-menu').forEach(el=>{
-    const radius=el.classList.contains('composer')?32:el.classList.contains('ball')?24:el.classList.contains('card')?18:el.classList.contains('selection-copy-menu')?9:16;
+  document.querySelectorAll<HTMLElement>('.composer,.card,.ball,.bubble,.chip,.session-menu,.selection-copy-menu').forEach(el=>{
+    const radius=el.classList.contains('composer')?26:el.classList.contains('ball')?22:el.classList.contains('card')?18:el.classList.contains('bubble')||el.classList.contains('chip')?18:el.classList.contains('session-menu')?12:9;
     const region=hitRegion(el.getBoundingClientRect(),window.innerHeight,radius);
     if(region)regions.push(region);
   });
-  // Only a narrow corridor beneath the visible toolbar is interactive while crossing to it.
-  if(toolsOpen.value&&toolbar.value&&primaryButton.value){
-    const bar=toolbar.value.getBoundingClientRect(),button=primaryButton.value.getBoundingClientRect();
-    if(bar.width&&button.width){const gap=hitRegion({left:button.left,bottom:button.top,width:button.width,height:Math.max(0,button.top-bar.bottom)},window.innerHeight,0,2);if(gap)regions.push(gap);}
-  }
   const signature=JSON.stringify(regions);if(signature===lastRegions)return;lastRegions=signature;
   void invoke('assistant_set_regions',{regions}).catch(()=>{lastRegions='';});
 }
 function queueHitRegions(){cancelAnimationFrame(hitRaf);hitRaf=requestAnimationFrame(syncHitRegions);}
-watch([toolsOpen,()=>props.store.open,()=>props.store.ball,hasCard],()=>void nextTick(queueHitRegions));
+watch([sessionsOpen,()=>props.store.open,()=>props.store.ball,hasCard,chipsShown,bubbleLeft],()=>void nextTick(queueHitRegions));
 
 let fitted = 0, raf = 0;
 let observer: ResizeObserver | undefined;
@@ -298,8 +339,6 @@ function fit() {
     if(dragging.value || capturing.value || morphing.value)return;
     const el = inner.value;
     if (!el) return;
-    // Keep enough space for the toolbar even before hovering. Measuring its animated
-    // top caused a resize/reposition loop, so toolsOpen is deliberately absent here.
     const height = Math.max(156, Math.ceil(el.getBoundingClientRect().height));
     if (height === fitted) return;
     fitted = height;
@@ -310,23 +349,26 @@ watch(inner, el => {
   observer?.disconnect();
   if (el) { observer = new ResizeObserver(fit); observer.observe(el); fit(); }
 });
+function toBottom() { void nextTick(() => { if (scroller.value) scroller.value.scrollTop = scroller.value.scrollHeight; }); }
 watch(() => props.store.open, open => {
   if (!open) return;
   fitted = 0;
-  void nextTick(() => { fit(); field.value?.focus(); });
+  void nextTick(() => { fit(); grow(); field.value?.focus(); toBottom(); });
 });
-watch(() => props.store.answer, () => { void nextTick(() => { if (scroller.value) scroller.value.scrollTop = scroller.value.scrollHeight; }); });
-watch(() => props.store.ask?.id, id => { if (id) void nextTick(() => { if (scroller.value) scroller.value.scrollTop = scroller.value.scrollHeight; }); });
+watch(hasCard, shown => { if (shown) toBottom(); });
+watch(() => [props.store.answer, turns.value.length, props.store.ask?.id, props.store.approval?.id], toBottom);
 
-async function copyAnswer(){
-  const text=props.store.answer;if(!text.trim()||copyState.value==='copying')return;
-  const version=++copyVersion;clearTimeout(copyTimer);copyState.value='copying';
-  try{await navigator.clipboard.writeText(text);if(version===copyVersion)copyState.value='copied';}
-  catch{if(version===copyVersion)copyState.value='failed';}
-  finally{if(version===copyVersion)copyTimer=setTimeout(()=>copyState.value='idle',2000);}
+const copied = ref(''), copyFailed = ref('');
+let copyTimer: ReturnType<typeof setTimeout> | undefined;
+async function copyText(id: string, text: string) {
+  if (!text.trim()) return;
+  clearTimeout(copyTimer);
+  try { await navigator.clipboard.writeText(text); copied.value = id; copyFailed.value = ''; }
+  catch { copyFailed.value = id; copied.value = ''; }
+  finally { copyTimer = setTimeout(() => { copied.value = ''; copyFailed.value = ''; }, 2000); }
 }
 
-// Only the orb and empty chrome are drag handles; text and controls retain native selection.
+// Only the orb, the ball and empty chrome are drag handles; text and controls retain native selection.
 let press:{id:number;x:number;y:number;capture:Element}|null=null,pulled=false;
 function releasePress(){const p=press;press=null;if(p?.capture.hasPointerCapture?.(p.id))p.capture.releasePointerCapture(p.id);}
 function dragDown(event:PointerEvent){
@@ -342,107 +384,136 @@ function dragMove(event:PointerEvent){
   if(event.buttons===0){releasePress();return;}
   if(Math.hypot(event.clientX-press.x,event.clientY-press.y)<6)return;
   pulled=true;dragging.value=true;cancelAnimationFrame(raf);releasePress();
+  // A widened ball window narrows back before it moves, so the saved spot is the ball's own.
+  if(bubbleLeft.value!==null)props.store.dismissNotice();
   void invoke('assistant_drag').catch(()=>{dragging.value=false;fit();});
 }
 function dragUp(event:PointerEvent){if(press?.id===event.pointerId)releasePress();}
 function captureClick(event:MouseEvent){if(pulled&&event.detail!==0){event.preventDefault();event.stopImmediatePropagation();pulled=false;}}
 function dragEnded(){dragging.value=false;releasePress();fit();}
 function ballClick(){void props.store.unfold();}
-const onFocus=()=>{if(props.store.open&&!dragging.value&&!press&&!morphing.value)field.value?.focus();};
+const onFocus=()=>{picking.value=false;clearTimeout(blurTimer);if(props.store.open&&!dragging.value&&!press&&!morphing.value)field.value?.focus();};
 onMounted(()=>{
   void listen<MorphEvent>('assistant-transition', event => { void handleMorph(event).catch(() => resetMorph()); }).then(off => { if (morphDisposed) off(); else offMorph = off; });
   void nextTick(queueHitRegions);window.addEventListener('resize',queueHitRegions);
-  document.addEventListener('pointerdown',outsideTools);document.addEventListener('keydown',onAskShortcut);window.addEventListener('blur',closeTools);window.addEventListener('focus',onFocus);window.addEventListener('pointermove',dragMove);window.addEventListener('pointerup',dragUp);window.addEventListener('pointercancel',dragUp);window.addEventListener('blur',releasePress);window.addEventListener('assistant-drag-end',dragEnded);
+  document.addEventListener('pointerdown',outsideMenus);document.addEventListener('keydown',onAskShortcut);window.addEventListener('blur',onBlur);window.addEventListener('focus',onFocus);window.addEventListener('pointermove',dragMove);window.addEventListener('pointerup',dragUp);window.addEventListener('pointercancel',dragUp);window.addEventListener('blur',releasePress);window.addEventListener('assistant-drag-end',dragEnded);
 });
 onBeforeUnmount(()=>{
   morphDisposed = true; clearTimeout(morphFallback); offMorph?.(); morphAnimations.splice(0).forEach(a => a.cancel());
-  cancelAnimationFrame(hitRaf);window.removeEventListener('resize',queueHitRegions);
-  clearToolTimers();window.removeEventListener('blur',closeTools);document.removeEventListener('pointerdown',outsideTools);document.removeEventListener('keydown',onAskShortcut);imageVersion++; releasePress();copyVersion++;clearTimeout(copyTimer);window.removeEventListener('focus',onFocus);window.removeEventListener('pointermove',dragMove);window.removeEventListener('pointerup',dragUp);window.removeEventListener('pointercancel',dragUp);window.removeEventListener('blur',releasePress);window.removeEventListener('assistant-drag-end',dragEnded);observer?.disconnect();cancelAnimationFrame(raf);
+  cancelAnimationFrame(hitRaf);window.removeEventListener('resize',queueHitRegions);clearTimeout(blurTimer);clearTimeout(bubbleTimer);clearTimeout(copyTimer);bubbleVersion++;
+  window.removeEventListener('blur',onBlur);document.removeEventListener('pointerdown',outsideMenus);document.removeEventListener('keydown',onAskShortcut);imageVersion++; releasePress();window.removeEventListener('focus',onFocus);window.removeEventListener('pointermove',dragMove);window.removeEventListener('pointerup',dragUp);window.removeEventListener('pointercancel',dragUp);window.removeEventListener('blur',releasePress);window.removeEventListener('assistant-drag-end',dragEnded);observer?.disconnect();cancelAnimationFrame(raf);
 });
 </script>
 
 <template>
-  <div class="stage" :class="{ light: !isDark,dragging,morphing }" @dragover="dragOver" @drop="dropImages" @keydown.esc.prevent.stop="escape" @pointerdown="dragDown" @click.capture="captureClick">
-    <div v-if="store.ball && !store.open" class="ball-stage" data-testid="assistant-ball-stage">
-      <button type="button" class="ball" data-phase="idle" title="点一下提问，按住可以拖动，右键打开设置" aria-label="打开超级小伴" data-testid="assistant-ball" data-drag-handle @click="ballClick" @contextmenu.prevent="store.openSettings('assistant')">
-        <Orb phase="idle" :active="store.ball && !store.open" :size="38" />
+  <div class="stage" :class="{ light: !isDark, dragging, morphing }" @dragover="dragOver" @drop="dropImages" @keydown.esc.prevent.stop="escape" @pointerdown="dragDown" @click.capture="captureClick">
+    <div v-if="store.ball && !store.open" class="ball-stage" :class="{ 'has-bubble': bubbleLeft !== null, 'bubble-left': bubbleLeft === true }" data-testid="assistant-ball-stage">
+      <button type="button" class="ball" :data-phase="store.phase" :data-badge="ballBadge || undefined" title="点一下打开，按住可以拖动，右键打开设置" :aria-label="ballLabel" data-testid="assistant-ball" data-drag-handle @click="ballClick" @contextmenu.prevent="store.openSettings('assistant')">
+        <Orb :phase="store.phase === 'attention' ? 'idle' : store.phase" :active="store.ball && !store.open" :size="34" />
+        <svg v-if="ballRing" class="ball-ring" viewBox="0 0 50 50" aria-hidden="true" data-testid="assistant-ball-ring"><circle cx="25" cy="25" r="23" class="ring-track" /><circle cx="25" cy="25" r="23" class="ring-arc" /></svg>
+        <span v-if="ballBadge" class="badge" :class="ballBadge" aria-hidden="true" data-testid="assistant-ball-badge"><template v-if="ballBadge === 'attention'">!</template><X v-else-if="ballBadge === 'error'" :size="9" :stroke-width="3.4" /></span>
       </button>
+      <Transition name="bubble">
+        <button v-if="bubbleLeft !== null && store.notice" type="button" class="bubble" :class="store.notice.kind" data-testid="assistant-bubble" @click="ballClick">
+          <Check v-if="store.notice.kind === 'done'" :size="15" :stroke-width="2.2" class="bubble-icon" />
+          <TriangleAlert v-else :size="15" :stroke-width="2" class="bubble-icon" />
+          <b>{{ store.notice.kind === 'done' ? '已完成' : store.notice.kind === 'attention' ? '需要你处理' : '没有完成' }}</b>
+          <span class="bubble-text">{{ store.notice.text }}</span>
+          <span class="bubble-go">{{ store.notice.kind === 'done' ? '查看' : '去处理' }}</span>
+        </button>
+      </Transition>
     </div>
     <Transition name="pop" appear @after-enter="queueHitRegions" @after-leave="queueHitRegions">
       <div v-if="store.open" ref="inner" class="inner" role="dialog" aria-label="超级小伴" data-testid="assistant">
         <Transition name="rise" @after-enter="queueHitRegions" @after-leave="queueHitRegions">
           <section v-if="hasCard" class="card" data-testid="assistant-card">
-            <button type="button" class="round card-close" title="暂时关闭对话框" aria-label="暂时关闭对话框" data-testid="assistant-card-close" @click="cardDismissed = true"><X :size="15" /></button>
-            <div ref="scroller" class="card-body" :class="{ 'answer-body': store.answer && !store.ask }">
+            <header class="card-head">
+              <div ref="sessionsHost" class="session-host" data-no-drag>
+                <button type="button" class="session-title" :aria-expanded="sessionsOpen" aria-haspopup="menu" title="切换最近的会话" data-testid="assistant-sessions" @click="sessionsOpen = !sessionsOpen"><span>{{ store.title || '新对话' }}</span><ChevronDown :size="13" :stroke-width="2.2" /></button>
+                <div v-if="sessionsOpen" class="session-menu" role="menu" aria-label="最近会话" data-testid="assistant-session-menu">
+                  <p class="menu-label">最近会话</p>
+                  <button v-for="session in store.recent" :key="session.id" type="button" class="menu-item" role="menuitemradio" :aria-checked="session.id === store.currentId" :disabled="store.changingSession || busy" @click="pickSession(session.id)">
+                    <Check v-if="session.id === store.currentId" :size="14" :stroke-width="2.2" class="menu-check" /><span v-else class="menu-check" />
+                    <span class="menu-text">{{ session.title || '新对话' }}</span>
+                  </button>
+                  <p v-if="!store.recent.length" class="menu-empty">还没有会话</p>
+                  <div class="menu-sep" />
+                  <button type="button" class="menu-item" role="menuitem" @click="act(() => store.openChat())"><ArrowUpRight :size="14" :stroke-width="1.8" class="menu-check" />在主窗口查看全部</button>
+                  <button type="button" class="menu-item" role="menuitem" data-testid="assistant-settings" @click="act(() => store.openSettings('assistant'))"><Settings :size="14" :stroke-width="1.8" class="menu-check" />超级小伴设置…</button>
+                </div>
+              </div>
+              <span class="head-gap" />
+              <button type="button" class="head-btn" title="新对话" aria-label="新对话" data-testid="assistant-new-chat" :disabled="imageReading || submitting || capturing || store.changingSession" @click="newChat"><SquarePen :size="16" :stroke-width="1.75" /></button>
+              <button type="button" class="head-btn" title="在主窗口继续" aria-label="在主窗口继续" data-testid="assistant-expand" @click="act(() => store.openChat())"><ArrowUpRight :size="16" :stroke-width="1.75" /></button>
+              <button type="button" class="head-btn" :class="{ on: pinned }" :title="pinned ? '取消固定' : '固定，点别处也不收起'" :aria-label="pinned ? '取消固定' : '固定'" :aria-pressed="pinned" data-testid="assistant-pin" @click="pinned = !pinned"><Pin :size="16" :stroke-width="1.75" :fill="pinned ? 'currentColor' : 'none'" /></button>
+              <button type="button" class="head-btn" title="收成小球 · Esc" aria-label="收成小球" data-testid="assistant-close" @click="act(() => store.hide())"><Minus :size="16" :stroke-width="1.9" /></button>
+            </header>
+            <div ref="scroller" class="card-body" :class="{ fixed: fixedBody }" data-testid="assistant-card-body">
+              <template v-for="item in turns" :key="item.id">
+                <div v-if="item.kind === 'user'" class="you-row">
+                  <div v-if="item.files?.length" class="sent-files"><span v-for="(file, n) in item.files" :key="n" class="file-chip" :title="file.name">{{ file.name }}</span></div>
+                  <div v-if="item.images.length" class="sent-images"><img v-for="(image, index) in item.images" :key="index" :src="image" :alt="`已发送的图片 ${index + 1}`" draggable="false" /></div>
+                  <p v-if="item.text" class="you">{{ item.text }}</p>
+                </div>
+                <div v-else-if="item.kind === 'assistant'" class="reply">
+                  <MarkdownView :source="item.text" @open="openLink" /><span v-if="item.streaming" class="cursor" aria-hidden="true"></span>
+                  <div v-if="!item.streaming" class="reply-actions" :class="{ last: item === lastAnswer }">
+                    <button type="button" class="reply-btn" :data-testid="item === lastAnswer ? 'assistant-copy' : undefined" :aria-label="copied === item.id ? '已复制回复' : copyFailed === item.id ? '复制失败，点击重试' : '复制回复'" @pointerdown.prevent @click="copyText(item.id, item.text)"><Check v-if="copied === item.id" :size="13" /><Copy v-else :size="13" :stroke-width="1.8" /><span aria-live="polite">{{ copied === item.id ? '已复制' : copyFailed === item.id ? '复制失败，重试' : '复制' }}</span></button>
+                    <button v-if="item === lastAnswer && !busy" type="button" class="reply-btn" aria-label="重新生成" title="重新生成" data-testid="assistant-retry" @click="act(() => store.retry())"><RotateCcw :size="13" :stroke-width="1.8" /></button>
+                  </div>
+                </div>
+                <p v-else class="failure" :class="{ warn: item.tone === 'warning' }">{{ item.text }}</p>
+              </template>
+              <p v-if="store.phase === 'thinking' || store.working" class="working"><span class="dots" aria-hidden="true"><i></i><i></i><i></i></span><template v-if="store.working">{{ store.working }}…</template></p>
               <p v-if="store.hint" class="hint" data-testid="assistant-hint">
                 {{ store.hint }}
                 <button v-if="store.hintTab" type="button" class="link" @click="store.openSettings(store.hintTab)">{{ store.hintTab === 'ai' ? '去配置' : '去设置' }}</button>
               </p>
-              <div v-if="store.questionFiles?.length" class="sent-files"><span v-for="(file, n) in store.questionFiles" :key="n" class="file-chip" :title="file.name">📄 {{ file.name }}</span></div>
-              <div v-if="store.questionImages?.length" class="sent-images"><img v-for="(image, index) in store.questionImages" :key="index" :src="image" :alt="`已发送的图片 ${index + 1}`" draggable="false" /></div>
-              <p v-if="store.question" class="you">{{ store.question }}</p>
-              <div v-if="store.answer" class="reply"><MarkdownView :source="store.answer" @open="openLink" /><span v-if="store.phase === 'answering'" class="cursor" aria-hidden="true"></span></div>
-              <p v-else-if="store.failure" class="failure">{{ store.failure }}</p>
-              <p v-else-if="store.phase === 'thinking' || store.working" class="working"><span class="dots" aria-hidden="true"><i></i><i></i><i></i></span><template v-if="store.working">{{ store.working }}…</template></p>
-              <p v-if="store.answer && store.failure" class="failure">{{ store.failure }}</p>
               <div v-if="store.approval" class="gate" data-testid="assistant-approval">
-                <p class="gate-title">{{ store.approval.danger ? `这个操作有风险：${store.approval.danger}` : '这一步需要你许可' }}</p>
+                <p class="gate-title"><TriangleAlert :size="15" :stroke-width="2" />{{ store.approval.danger ? `这个操作有风险：${store.approval.danger}` : '这一步需要你许可' }}</p>
                 <p class="gate-tool">{{ approvalLine(store.approval) }}</p>
-                <div class="gate-actions"><button type="button" class="ghost" @click="store.decide('deny')">拒绝</button><button type="button" class="solid" @click="store.decide('once')">允许这一次</button></div>
+                <div class="gate-actions"><button type="button" class="ghost" @click="store.decide('deny')">拒绝</button><button type="button" class="ghost" @click="store.decide('always')">本次会话都允许</button><button type="button" class="solid" @click="store.decide('once')">允许这一次</button></div>
               </div>
               <div v-if="store.ask" class="ask-user" data-testid="assistant-question" role="group" :aria-label="store.ask.question">
-                <div class="ask-user-overline">
-                  <span class="ask-user-tag"><span class="ask-user-mark" aria-hidden="true">✦</span>需要你的选择</span>
-                  <span class="ask-user-type">{{ store.ask.options.length ? '单选问题' : '自由回答' }}</span>
-                </div>
-                <p class="ask-user-question">{{ store.ask.question }}</p>
+                <p class="ask-user-question">{{ store.ask.question }}<span v-if="store.ask.options.length" class="ask-user-tip">按 <kbd>1–{{ Math.min(9, store.ask.options.length) }}</kbd> 快捷选择</span></p>
                 <div v-if="store.ask.options.length" class="ask-user-options" role="group" aria-label="回答选项">
                   <button v-for="(option, index) in store.ask.options" :key="`${index}-${option}`" type="button" class="ask-user-option" @click="store.reply(option)">
-                    <span class="ask-user-index" aria-hidden="true">{{ index < 26 ? 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'[index] : index + 1 }}</span>
+                    <span class="ask-user-index" aria-hidden="true">{{ index + 1 }}</span>
                     <span class="ask-user-option-text">{{ option }}</span>
-                    <ChevronRight class="ask-user-option-arrow" :size="15" :stroke-width="1.8" aria-hidden="true" />
                   </button>
                 </div>
                 <p v-else class="ask-user-help">可以直接在下方输入你的回答。</p>
-                <div class="ask-user-footer">
-                  <span v-if="store.ask.options.length" class="ask-user-tip">按 <kbd>1–{{ Math.min(9, store.ask.options.length) }}</kbd> 快捷选择 · 或在下方输入</span>
-                  <span v-else class="ask-user-tip">支持自由输入回答</span>
-                  <button type="button" class="ask-user-skip" @click="store.reply(null)">跳过此问题 <span aria-hidden="true">→</span></button>
-                </div>
+                <button type="button" class="ask-user-skip" @click="store.reply(null)">跳过此问题 →</button>
               </div>
             </div>
-            <footer v-if="store.answer.trim()" class="card-footer"><button type="button" class="copy-answer" data-testid="assistant-copy" :disabled="copyState==='copying'" :aria-label="copyState==='copied'?'已复制回复':copyState==='failed'?'复制失败，点击重试':'复制回复'" title="复制 AI 回复" @pointerdown.prevent @click="copyAnswer"><Check v-if="copyState==='copied'" :size="14"/><Copy v-else :size="14"/><span aria-live="polite">{{ copyState==='copied'?'已复制':copyState==='failed'?'复制失败，重试':copyState==='copying'?'复制中…':'复制' }}</span></button></footer>
           </section>
         </Transition>
-        <div class="composer" :class="{ 'drop-active': dropActive }" @dragenter="dragEnter" @dragleave="dragLeave" @dragover="dragOver" @drop.stop="dropImages" @paste="pasteImages">
-        <input ref="filePicker" class="sr" type="file" :accept="ATTACHMENT_ACCEPT" multiple tabindex="-1" aria-label="选择要发送的附件" data-testid="assistant-image-input" @change="onPick" />
-        <div v-if="store.attachments.length" class="image-tray" data-no-drag data-testid="assistant-attachments">
-          <div v-for="(image, index) in store.attachments" :key="index" class="image-thumb"><img v-if="attachmentImage(image)" :src="attachmentImage(image)!" :alt="`待发送的图片 ${index + 1}`" draggable="false" /><span v-if="!attachmentImage(image)" class="file-chip" :title="attachmentName(image)">📄 {{ attachmentName(image) }}</span><button type="button" :aria-label="`移除附件 ${index + 1}`" :disabled="submitting || imageReading" @click="store.attachments.splice(index, 1)"><X :size="11" /></button></div>
+        <div v-if="chipsShown" class="chips" data-testid="assistant-chips">
+          <button type="button" class="chip" data-testid="assistant-chip-screenshot" :disabled="!canAttach" @click="takeScreenshot"><SquareDashed :size="14" :stroke-width="1.75" />截图问一下</button>
+          <button v-if="continueTitle" type="button" class="chip" data-testid="assistant-chip-continue" @click="revealCard"><History :size="14" :stroke-width="1.75" /><span class="chip-text">继续「{{ continueTitle }}」</span></button>
+          <button v-else-if="otherRecent" type="button" class="chip" data-testid="assistant-chip-recent" @click="continueOther(otherRecent.id)"><History :size="14" :stroke-width="1.75" /><span class="chip-text">继续「{{ otherRecent.title }}」</span></button>
         </div>
-        <div class="capsule" :data-phase="store.phase">
-          <button type="button" class="orb-button" :title="orbLabel + ' · 拖动可移动'" :aria-label="orbLabel" data-testid="assistant-orb" :disabled="imageReading || submitting || capturing || (asr.preparing && store.phase !== 'speaking')" data-drag-handle @click="onOrb">
-            <Orb :phase="store.phase" :level="asr.level" :active="store.open" :size="34" :dark="isDark" />
-          </button>
-          <input ref="field" v-model="store.input" :disabled="store.changingSession" class="field" type="text" autocomplete="off" spellcheck="false" :placeholder="store.status" aria-label="向小伴提问" data-testid="assistant-input" @beforeinput="store.inputStarted()" @input="store.inputStarted()" @keydown.enter="onEnter" @compositionstart="composing = true; store.inputStarted()" @compositionend="composing = false" />
-          <div ref="toolsHost" class="tools-host" data-no-drag @pointerenter="enterTools" @pointerleave="leaveTools" @focusin="focusTools" @focusout="toolsFocusOut">
-            <div v-if="toolsOpen" ref="toolbar" id="assistant-toolbar" class="tools-toolbar" role="toolbar" aria-label="小伴工具" aria-orientation="horizontal" data-testid="assistant-toolbar" @animationend="queueHitRegions" @keydown="toolbarKeys" @pointerenter="focusTools" @pointerleave="leaveTools">
-              <button type="button" class="tool-button" title="去超级小伴设置页" aria-label="去超级小伴设置页" data-testid="assistant-settings" @click="toolAction('settings')"><Settings :size="16" :stroke-width="1.7" /></button>
-              <button type="button" class="tool-button" title="收起小伴" aria-label="收起小伴" data-testid="assistant-close" @click="toolAction('hide')"><ChevronDown :size="16" :stroke-width="1.7" /></button>
-              <button type="button" class="tool-button" title="新会话" aria-label="新会话" data-testid="assistant-new-chat" :disabled="imageReading || submitting || capturing || store.changingSession" @click="toolAction('new')"><SquarePen :size="16" :stroke-width="1.7" /></button>
-              <button type="button" class="tool-button" title="去聊天详情页" aria-label="去聊天详情页" data-testid="assistant-expand" @click="toolAction('chat')"><PanelsTopLeft :size="16" :stroke-width="1.7" /></button>
-              <button type="button" class="tool-button" title="选择文件" aria-label="选择文件" data-testid="assistant-add-image" :disabled="!canAttach || store.attachments.length >= 8" @click="toolAction('image')"><Paperclip :size="16" :stroke-width="1.7" /></button>
-              <button type="button" class="tool-button" title="截图" aria-label="截图" data-testid="assistant-screenshot" :disabled="!canAttach || store.attachments.length >= 8" @click="toolAction('screenshot')"><Scissors :size="16" :stroke-width="1.7" /></button>
-            </div>
-            <button ref="primaryButton" type="button" class="round main-action" :class="{ 'has-action': canSend, 'is-stop': stopping, 'tools-open': toolsOpen && !canSend && !busy }" :aria-label="canSend ? '发送' : stopping ? '停止' : toolsOpen ? '收起工具' : '展开工具'" :title="canSend ? (store.phase === 'speaking' ? '发送并停止当前朗读' : '发送 · 悬停展开工具') : stopping ? '停止回复 · 悬停展开工具' : '展开工具'" :aria-expanded="toolsOpen" aria-controls="assistant-toolbar" aria-keyshortcuts="ArrowUp ArrowDown" :disabled="imageReading || capturing || (submitting && !busy)" data-testid="assistant-primary" @keydown="primaryKeys" @click="primary"><ArrowUp v-if="canSend" :size="18" /><Square v-else-if="stopping" :size="12" fill="currentColor" :stroke-width="0" /><Plus v-else :size="18" /></button>
+        <div class="composer" :class="{ 'drop-active': dropActive }" :data-phase="store.phase" @dragenter="dragEnter" @dragleave="dragLeave" @dragover="dragOver" @drop.stop="dropImages" @paste="pasteImages">
+          <input ref="filePicker" class="sr" type="file" :accept="ATTACHMENT_ACCEPT" multiple tabindex="-1" aria-label="选择要发送的附件" data-testid="assistant-image-input" @change="onPick" @cancel="picking = false" />
+          <div v-if="store.attachments.length" class="image-tray" data-no-drag data-testid="assistant-attachments">
+            <div v-for="(image, index) in store.attachments" :key="index" class="image-thumb"><img v-if="attachmentImage(image)" :src="attachmentImage(image)!" :alt="`待发送的图片 ${index + 1}`" draggable="false" /><span v-if="!attachmentImage(image)" class="file-chip" :title="attachmentName(image)">{{ attachmentName(image) }}</span><button type="button" :aria-label="`移除附件 ${index + 1}`" :disabled="submitting || imageReading" @click="store.attachments.splice(index, 1)"><X :size="11" /></button></div>
           </div>
-        </div>
-        <p v-if="dropActive || imageReading || capturing" class="image-status" aria-live="polite">{{ capturing ? '截图中，按 Esc 可以取消' : imageReading ? '正在读取附件…' : '松开添加附件' }}</p>
-        <p v-else-if="store.voiceStatus" class="image-status" data-testid="assistant-voice-status" role="status">{{ store.voiceStatus }}</p>
+          <div class="capsule">
+            <button type="button" class="orb-button" :title="orbLabel + ' · 拖动可移动'" :aria-label="orbLabel" data-testid="assistant-orb" :disabled="imageReading || submitting || capturing || (asr.preparing && store.phase !== 'speaking')" data-drag-handle @click="onOrb">
+              <Orb :phase="store.phase" :level="asr.level" :active="store.open" :size="32" :dark="isDark" />
+            </button>
+            <textarea ref="field" v-model="store.input" rows="1" :disabled="store.changingSession" class="field" autocomplete="off" spellcheck="false" :placeholder="store.phase === 'idle' ? '问小伴，或点左边的球说话…' : store.status" aria-label="向小伴提问" data-testid="assistant-input" @beforeinput="store.inputStarted()" @input="store.inputStarted(); grow()" @keydown.enter="onEnter" @compositionstart="composing = true; store.inputStarted()" @compositionend="composing = false" />
+            <button type="button" class="tool" title="添加文件 · 也可以拖入或粘贴" aria-label="添加文件" data-testid="assistant-add-image" :disabled="!canAttach || store.attachments.length >= 8" @click="openPicker"><Plus :size="18" :stroke-width="1.75" /></button>
+            <button type="button" class="tool" title="截图提问" aria-label="截图" data-testid="assistant-screenshot" :disabled="!canAttach || store.attachments.length >= 8" @click="takeScreenshot"><SquareDashed :size="17" :stroke-width="1.75" /></button>
+            <button type="button" class="send" :class="{ 'has-action': canSend, 'is-stop': stopping }" :aria-label="canSend ? '发送' : stopping ? '停止' : '发送'" :title="canSend ? (store.phase === 'speaking' ? '发送并停止当前朗读' : '发送 · Enter') : stopping ? '停止回答' : '输入后发送'" :disabled="imageReading || capturing || (submitting && !busy) || (!canSend && !stopping)" data-testid="assistant-primary" @click="primary"><svg v-if="stopping" width="11" height="11" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="4" fill="currentColor" /></svg><ArrowUp v-else :size="17" :stroke-width="2.1" /></button>
+          </div>
+          <p v-if="dropActive || imageReading || capturing" class="image-status" aria-live="polite">{{ capturing ? '截图中，按 Esc 可以取消' : imageReading ? '正在读取附件…' : '松开添加附件' }}</p>
+          <p v-else-if="store.voiceStatus" class="image-status" data-testid="assistant-voice-status" role="status">{{ store.voiceStatus }}</p>
         </div>
         <span class="sr" aria-live="polite">{{ store.status }}</span>
       </div>
     </Transition>
-    <div v-if="morphVisible" ref="morphShell" class="morph-shell" :style="morphStyle" aria-hidden="true"><Orb phase="idle" :size="38" flowing /></div>
+    <div v-if="morphVisible" ref="morphShell" class="morph-shell" :style="morphStyle" aria-hidden="true"><Orb phase="idle" :size="34" flowing /></div>
     <SelectionCopyMenu :scope="scroller" @visibility-change="queueHitRegions" />
   </div>
 </template>
@@ -451,138 +522,167 @@ onBeforeUnmount(()=>{
 html,body,#app{background:transparent!important}
 </style>
 <style scoped>
-.file-chip{display:inline-block;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;padding:10px 14px;border-radius:8px;background:var(--button)}.image-thumb:has(.file-chip){width:auto;max-width:190px}.sent-files{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
-.stage{--card:#292C31;--capsule:linear-gradient(175deg,#3E4147 0%,#35383E 48%,#2F3238 100%);--line:#A6B5CB22;--text:#DFE3E9;--text-soft:#878E99;--working:#A4AEBD;--placeholder:#919CAB;--field:#DFE3E9;--button:#353A43;--button-hover:#434750;--button-fg:#BAC4D1;--button-fg-hover:#DFE3E9;--code:#FFFFFF0B;--link:#B0C4D7;--hint:#D7BE92;--failure:#EEA5AD;--gate-bg:#C6AE7D0F;--gate-line:#C6AE7D30;--gate-title:#DDC8A5;--gate-tool:#BCC4CF;--ghost:#FFFFFF0D;--ghost-fg:#DFE3E9;--scroll:#FFFFFF25;--dot:#A8B6C6;--listen:#B2C8EA50;--busy:#A6B5CB30;--attention:#C6AE7D60;--panel-shadow:0 5px 14px #00000014,0 1px 2px #00000016;--capsule-shadow:inset 0 1px 0 #E8F0FF15,inset 0 -1px 0 #11182126,0 8px 25px #00000025;--stop:#484E56;--stop-fg:#B1BBC7;--stop-hover:#535B65;--stop-fg-hover:#CCD5DF;--ui-line:var(--line);--ui-surface-alt:var(--code);--ui-text-primary:var(--text);--ui-text-secondary:var(--working);--ui-text-tertiary:var(--text-soft);--ui-primary:var(--link);position:relative;display:flex;flex-direction:column;justify-content:flex-end;height:100vh;color:var(--text);font:14px/1.6 -apple-system,BlinkMacSystemFont,"PingFang SC","Segoe UI","Microsoft YaHei UI",sans-serif;-webkit-font-smoothing:antialiased;user-select:none;cursor:default;pointer-events:none;color-scheme:dark}
-.stage.light{--card:#FFFFFF;--capsule:linear-gradient(175deg,#FEFFFF 0%,#F3F6F9 45%,#EAF0F5 100%);--line:#D5DDE6;--text:#414851;--text-soft:#929BA7;--working:#718092;--placeholder:#A0A9B4;--field:#414851;--button:#EAEFF4;--button-hover:#DFE6ED;--button-fg:#657181;--button-fg-hover:#414851;--code:#71849A0D;--link:#657F95;--hint:#947445;--failure:#B95264;--gate-bg:#B9944B0B;--gate-line:#B9944B30;--gate-title:#886B3E;--gate-tool:#657181;--ghost:#71849A0D;--ghost-fg:#414851;--scroll:#71849A35;--dot:#899BAE;--listen:#B3C2D3;--busy:#C4CFDA;--attention:#C6AE7D;--panel-shadow:0 3px 12px #68788A07,0 1px 2px #58677805;--capsule-shadow:inset 0 1px 0 #FFFFFFF2,inset 0 -1px 0 #8F9DAC0C,0 7px 24px #71849A12;--stop:#E6EBEF;--stop-fg:#778491;--stop-hover:#DDE4EA;--stop-fg-hover:#5F7080;color-scheme:light}
-.ball-stage{display:grid;place-items:center;height:100vh}
-.ball{pointer-events:auto;touch-action:none;display:grid;place-items:center;width:48px;height:48px;padding:0;border-radius:50%;background:var(--capsule);box-shadow:var(--capsule-shadow);border:1px solid var(--line);cursor:pointer;transition:border-color .3s,transform .2s}
+/* Glass surfaces in the console's language; the theme colour comes from --ui-btn / --ui-soft / --ui-ink / --ui-dot. */
+.stage{--glass:rgba(42,43,48,.9);--glass-card:rgba(38,39,44,.95);--edge:rgba(255,255,255,.13);--line:rgba(255,255,255,.08);--text:#F2F2F4;--text-2:#C7C7CC;--text-3:#A1A1A8;--icon:#B4B4BA;--hover:rgba(255,255,255,.08);--control:rgba(255,255,255,.08);--you:rgba(255,255,255,.08);--shadow:0 12px 34px rgba(0,0,0,.45);--code:rgba(255,255,255,.06);--warn-bg:rgba(224,154,43,.12);--warn-line:rgba(224,154,43,.3);--warn-text:#F0B65A;--fail:#FF8A8F;--scroll:rgba(255,255,255,.18);
+  --accent:var(--ui-btn,#E5484D);--accent-hi:var(--ui-btn-hi,#F06A6F);--accent-soft:var(--ui-soft,#3A2225);--accent-ink:var(--ui-ink,#FF8C91);--accent-dot:var(--ui-dot,#FF6369);
+  --ui-line:var(--line);--ui-surface-alt:var(--code);--ui-text-primary:var(--text);--ui-text-secondary:var(--text-2);--ui-text-tertiary:var(--text-3);--ui-primary:var(--accent-ink);
+  position:relative;display:flex;flex-direction:column;justify-content:flex-end;height:100vh;color:var(--text);font:14px/1.6 -apple-system,BlinkMacSystemFont,'SF Pro Text','PingFang SC','Segoe UI','Microsoft YaHei UI',sans-serif;-webkit-font-smoothing:antialiased;user-select:none;cursor:default;pointer-events:none;color-scheme:dark}
+.stage.light{--glass:rgba(255,255,255,.9);--glass-card:rgba(255,255,255,.95);--edge:rgba(0,0,0,.13);--line:rgba(0,0,0,.06);--text:#1D1D1F;--text-2:#3A3A3F;--text-3:#6E6E73;--icon:#5A5A60;--hover:rgba(0,0,0,.055);--control:#F2F2F4;--you:#F2F2F4;--shadow:0 10px 30px rgba(0,0,0,.14);--code:rgba(0,0,0,.045);--warn-bg:#FDF6EA;--warn-line:#F1DDB8;--warn-text:#7A4A00;--fail:#C4323A;--scroll:rgba(0,0,0,.18);color-scheme:light}
+button{font:inherit}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+
+/* Ball */
+.ball-stage{display:flex;align-items:center;height:100vh;padding:0 14px;box-sizing:border-box;gap:10px}
+.ball-stage:not(.has-bubble){justify-content:center;padding:0}
+.ball-stage.bubble-left{flex-direction:row-reverse}
+.ball{pointer-events:auto;touch-action:none;position:relative;flex:none;display:grid;place-items:center;width:44px;height:44px;padding:0;border:0;border-radius:50%;background:var(--glass);backdrop-filter:blur(20px) saturate(1.6);box-shadow:0 0 0 .5px var(--edge),0 6px 18px rgba(0,0,0,.16),inset 0 1px 0 rgba(255,255,255,.12);cursor:grab;transition:transform .2s}
+.stage.light .ball{box-shadow:0 0 0 .5px var(--edge),0 6px 18px rgba(0,0,0,.14),inset 0 1px 0 rgba(255,255,255,.9)}
 .ball:hover{transform:scale(1.06)}
 .ball:active{transform:scale(.96)}
-.ball:focus-visible{outline:2px solid var(--link);outline-offset:2px}
-.ball[data-phase=listening]{border-color:var(--listen)}
-.ball[data-phase=thinking],.ball[data-phase=answering],.ball[data-phase=speaking]{border-color:var(--busy)}
-.ball[data-phase=attention]{border-color:var(--attention)}
-.inner{pointer-events:none;display:flex;flex-direction:column;gap:12px;padding:12px}
-.card{pointer-events:auto;cursor:grab;position:relative;border-radius:18px;background:var(--card);border:1px solid var(--line);box-shadow:var(--panel-shadow);overflow:hidden}
-.card .card-close{position:absolute;z-index:1;top:8px;right:8px;width:28px;height:28px}
-/* The answer box has a fixed height on purpose: a streamed answer grows inside it and scrolls,
-   so the card, the composer and the native window never resize while the text arrives. Other
-   card states (question, approval, hint) size to their content, which changes only in steps. */
-.card-body{cursor:auto;max-height:280px;overflow-y:auto;padding:16px 44px 18px 20px;user-select:text;scrollbar-width:thin;scrollbar-color:var(--scroll) transparent}
-.card-body.answer-body{height:192px;max-height:192px}
-.you{margin:0 0 8px;font-size:12.5px;color:var(--text-soft);display:-webkit-box;-webkit-line-clamp:2;line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-.reply{font-size:15px;line-height:1.75;color:var(--text);overflow-wrap:anywhere}
-.reply :deep(p){margin:0 0 .7em}
+.ball:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+.ball-ring{position:absolute;inset:-3px;width:50px;height:50px;pointer-events:none;animation:spin 1.1s linear infinite}
+.ring-track{fill:none;stroke:var(--line);stroke-width:2.5}
+.ring-arc{fill:none;stroke:var(--accent);stroke-width:2.5;stroke-linecap:round;stroke-dasharray:44 101}
+.badge{position:absolute;top:-3px;right:-3px;display:grid;place-items:center;min-width:16px;height:16px;border-radius:8px;color:#fff;font-size:10.5px;font-weight:600;line-height:1;box-shadow:0 0 0 2px var(--glass)}
+.badge.attention{background:#D98A0B;animation:nudge .5s ease-out 1}
+.badge.error{background:#D93025}
+.badge.unread{top:1px;right:1px;min-width:10px;width:10px;height:10px;background:var(--accent-dot)}
+.bubble{pointer-events:auto;display:flex;align-items:center;gap:8px;min-width:0;max-width:330px;height:40px;padding:0 6px 0 14px;border:0;border-radius:20px;background:var(--glass);backdrop-filter:blur(20px) saturate(1.6);box-shadow:0 0 0 .5px var(--edge),var(--shadow);color:var(--text);font-size:13px;cursor:pointer;white-space:nowrap}
+.bubble b{font-weight:500;flex:none}
+.bubble-icon{flex:none;color:var(--accent)}
+.bubble.attention .bubble-icon{color:#D98A0B}.bubble.error .bubble-icon{color:var(--fail)}
+.bubble-text{min-width:0;overflow:hidden;text-overflow:ellipsis;color:var(--text-3)}
+.bubble-go{flex:none;height:28px;padding:0 12px;border-radius:14px;display:grid;place-items:center;background:var(--accent-soft);color:var(--accent-ink);font-size:12.5px;font-weight:500}
+.bubble.attention .bubble-go{background:var(--warn-bg);color:var(--warn-text)}
+.bubble-enter-active,.bubble-leave-active{transition:opacity .2s,transform .2s}
+.bubble-enter-from,.bubble-leave-to{opacity:0;transform:scale(.96)}
+
+/* Capsule */
+.inner{pointer-events:none;display:flex;flex-direction:column;gap:10px;padding:12px}
+.composer{pointer-events:auto;cursor:grab;position:relative;border-radius:26px;background:var(--glass);backdrop-filter:blur(24px) saturate(1.6);box-shadow:0 0 0 .5px var(--edge),var(--shadow),inset 0 1px 0 rgba(255,255,255,.08);transition:box-shadow .2s}
+.stage.light .composer{box-shadow:0 0 0 .5px var(--edge),var(--shadow),inset 0 1px 0 rgba(255,255,255,.95)}
+.composer[data-phase=listening]{box-shadow:0 0 0 .5px var(--edge),0 0 0 4px var(--accent-soft),var(--shadow)}
+.composer[data-phase=attention]{box-shadow:0 0 0 1px #D98A0B80,var(--shadow)}
+.composer.drop-active{box-shadow:0 0 0 2px var(--accent),var(--shadow)}
+.capsule{display:flex;align-items:flex-end;gap:2px;padding:8px}
+.orb-button{touch-action:none;flex:none;display:grid;place-items:center;width:36px;height:36px;padding:0;border:0;border-radius:50%;background:none;cursor:grab}
+.orb-button:disabled{opacity:.6}
+.field{cursor:text;flex:1;min-width:0;height:36px;max-height:96px;margin:0;padding:8px 6px;box-sizing:border-box;border:0;outline:0;resize:none;background:transparent;color:var(--text);font:inherit;font-size:14px;line-height:20px;caret-color:var(--accent);user-select:text;scrollbar-width:thin;scrollbar-color:var(--scroll) transparent}
+.field::placeholder{color:var(--text-3)}
+.tool{flex:none;display:grid;place-items:center;width:32px;height:32px;margin-bottom:2px;padding:0;border:0;border-radius:9px;background:transparent;color:var(--icon);cursor:pointer;transition:background .15s,color .15s}
+.tool:hover:not(:disabled){background:var(--hover);color:var(--text)}
+.tool:disabled{opacity:.35;cursor:default}
+.send{flex:none;display:grid;place-items:center;width:32px;height:32px;margin:0 2px 2px 4px;padding:0;border:0;border-radius:50%;background:var(--control);color:var(--text-3);cursor:default;transition:filter .15s}
+.send.has-action{background:linear-gradient(var(--accent-hi),var(--accent));color:#fff;box-shadow:inset 0 1px 0 rgba(255,255,255,.28),0 1px 2px rgba(0,0,0,.18);cursor:pointer}
+.send.has-action:hover{filter:brightness(1.06)}
+.send.is-stop{background:var(--control);color:var(--text);cursor:pointer}
+.send.is-stop:hover{background:var(--hover)}
+.send:disabled:not(.is-stop){opacity:.8}
+.tool:focus-visible,.send:focus-visible,.orb-button:focus-visible,.head-btn:focus-visible,.chip:focus-visible,.session-title:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.image-tray{display:flex;gap:6px;flex-wrap:wrap;padding:10px 12px 0;cursor:default}
+.image-thumb{position:relative;flex:none;height:42px}
+.image-thumb img{width:56px;height:42px;object-fit:cover;border-radius:9px;box-shadow:0 0 0 .5px var(--edge)}
+.image-thumb button{position:absolute;right:-4px;top:-4px;width:17px;height:17px;box-sizing:border-box;padding:0;display:grid;place-items:center;border:0;border-radius:50%;background:rgba(0,0,0,.6);color:#fff;cursor:pointer}
+.file-chip{display:inline-flex;align-items:center;max-width:180px;height:42px;padding:0 12px;box-sizing:border-box;border-radius:9px;background:var(--control);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.image-status{margin:0;padding:0 18px 8px;font-size:11.5px;color:var(--text-3);cursor:default}
+
+/* Quick actions */
+.chips{pointer-events:none;display:flex;gap:8px;padding-left:4px}
+.chip{pointer-events:auto;display:inline-flex;align-items:center;gap:6px;max-width:260px;height:30px;padding:0 12px;border:0;border-radius:15px;background:var(--glass);backdrop-filter:blur(20px);box-shadow:0 0 0 .5px var(--edge),0 4px 12px rgba(0,0,0,.1);color:var(--text-2);font-size:12.5px;cursor:pointer}
+.chip svg{flex:none;color:var(--icon)}
+.chip:hover:not(:disabled){color:var(--text)}
+.chip:disabled{opacity:.5;cursor:default}
+.chip-text{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* Card */
+.card{pointer-events:auto;position:relative;border-radius:18px;background:var(--glass-card);backdrop-filter:blur(24px) saturate(1.6);box-shadow:0 0 0 .5px var(--edge),var(--shadow);cursor:grab}
+.card-head{display:flex;align-items:center;gap:4px;height:44px;padding:0 8px 0 8px;border-bottom:1px solid var(--line)}
+.head-gap{flex:1}
+.session-host{position:relative;min-width:0}
+.session-title{display:inline-flex;align-items:center;gap:5px;max-width:220px;height:28px;padding:0 8px;border:0;border-radius:8px;background:transparent;color:var(--text);font-size:13px;font-weight:600;cursor:pointer}
+.session-title span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.session-title svg{flex:none;color:var(--text-3)}
+.session-title:hover,.session-title[aria-expanded=true]{background:var(--hover)}
+.session-menu{position:absolute;z-index:10;top:calc(100% + 4px);left:0;width:264px;padding:5px;box-sizing:border-box;border-radius:12px;background:var(--glass-card);backdrop-filter:blur(20px);box-shadow:0 0 0 .5px var(--edge),0 14px 36px rgba(0,0,0,.22);cursor:default}
+.menu-label{margin:0;padding:6px 9px 3px;font-size:11.5px;color:var(--text-3)}
+.menu-empty{margin:0;padding:6px 9px;font-size:12.5px;color:var(--text-3)}
+.menu-item{display:flex;align-items:center;gap:9px;width:100%;height:32px;padding:0 9px;border:0;border-radius:7px;background:transparent;color:var(--text);font-size:13px;text-align:left;cursor:pointer}
+.menu-item:hover:not(:disabled){background:var(--hover)}
+.menu-item[aria-checked=true]{background:var(--accent-soft);color:var(--accent-ink)}
+.menu-item:disabled{opacity:.5;cursor:default}
+.menu-check{flex:none;width:14px;color:var(--icon)}
+.menu-item[aria-checked=true] .menu-check{color:var(--accent-ink)}
+.menu-text{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.menu-sep{height:1px;margin:4px 8px;background:var(--line)}
+.head-btn{flex:none;display:grid;place-items:center;width:28px;height:28px;padding:0;border:0;border-radius:8px;background:transparent;color:var(--icon);cursor:pointer}
+.head-btn:hover:not(:disabled){background:var(--hover);color:var(--text)}
+.head-btn.on{background:var(--accent-soft);color:var(--accent-ink)}
+.head-btn:disabled{opacity:.4;cursor:default}
+.card-body{cursor:auto;display:flex;flex-direction:column;gap:12px;max-height:340px;overflow-y:auto;padding:14px 16px 12px;box-sizing:border-box;user-select:text;scrollbar-width:thin;scrollbar-color:var(--scroll) transparent}
+/* While an answer streams the body keeps one height: the text grows inside it and scrolls,
+   so the card, the composer and the native window do not resize while it arrives. */
+.card-body.fixed{height:340px}
+.you-row{align-self:flex-end;max-width:84%;display:flex;flex-direction:column;align-items:flex-end;gap:6px}
+.you{margin:0;padding:7px 12px;border-radius:14px 14px 4px 14px;background:var(--you);font-size:13px;line-height:1.55;color:var(--text);overflow-wrap:anywhere;white-space:pre-wrap}
+.you-row:last-of-type .you{background:var(--accent-soft);color:var(--accent-ink)}
+.sent-files,.sent-images{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.sent-images img{width:56px;height:42px;object-fit:cover;border-radius:8px}
+.reply{position:relative;font-size:13.5px;line-height:1.7;color:var(--text);overflow-wrap:anywhere}
+.reply :deep(p){margin:0 0 .6em}
 .reply :deep(p:last-child){margin-bottom:0}
 .reply :deep(.md-code){background:var(--code);border-radius:5px;padding:1px 6px;font-size:.88em;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
-.reply :deep(.md-link){color:var(--link);cursor:pointer;text-decoration:underline;text-underline-offset:2px}
-.reply :deep(.md-heading){margin:1em 0 .4em;font-size:15px}
-.reply :deep(ul),.reply :deep(ol){margin:.3em 0 .7em;padding-left:1.4em}
-.cursor{display:inline-block;width:7px;height:15px;margin-left:3px;vertical-align:-2px;border-radius:2px;background:var(--link);animation:blink 1s steps(2,start) infinite}
-.working{margin:0;display:flex;align-items:center;gap:10px;color:var(--working);font-size:13.5px}
+.reply :deep(.md-link){color:var(--accent-ink);cursor:pointer;text-decoration:underline;text-underline-offset:2px}
+.reply :deep(.md-heading){margin:.8em 0 .3em;font-size:14px}
+.reply :deep(ul),.reply :deep(ol){margin:.2em 0 .6em;padding-left:1.4em}
+.reply-actions{display:flex;gap:2px;margin-top:4px;opacity:0;transition:opacity .15s}
+.reply:hover .reply-actions,.reply-actions.last,.reply-actions:focus-within{opacity:1}
+/* Earlier answers keep their actions in a small floating bar, so the conversation has no empty rows. */
+.reply-actions:not(.last){position:absolute;top:-8px;right:0;margin:0;padding:2px;border-radius:9px;background:var(--glass-card);box-shadow:0 0 0 .5px var(--edge),0 4px 12px rgba(0,0,0,.08)}
+.reply-btn{display:inline-flex;align-items:center;gap:5px;height:26px;padding:0 8px;border:0;border-radius:7px;background:transparent;color:var(--text-3);font-size:12px;cursor:pointer}
+.reply-btn:hover{background:var(--hover);color:var(--text)}
+.cursor{display:inline-block;width:7px;height:15px;margin-left:2px;vertical-align:-2px;border-radius:2px;background:var(--accent-dot);animation:blink 1s steps(2,start) infinite}
+.working{margin:0;display:flex;align-items:center;gap:10px;color:var(--text-3);font-size:13px}
 .dots{display:inline-flex;gap:4px}
-.dots i{width:6px;height:6px;border-radius:50%;background:var(--dot);animation:dot 1.2s ease-in-out infinite}
+.dots i{width:6px;height:6px;border-radius:50%;background:var(--text-3);animation:dot 1.2s ease-in-out infinite}
 .dots i:nth-child(2){animation-delay:.15s}.dots i:nth-child(3){animation-delay:.3s}
-.hint{margin:0 0 10px;color:var(--hint);font-size:13.5px}
-.failure{margin:0;color:var(--failure);font-size:13.5px}
-.link{margin-left:8px;padding:0;border:0;background:none;color:var(--link);font:inherit;text-decoration:underline;text-underline-offset:2px;cursor:pointer}
-.gate{margin-top:14px;padding:14px;border-radius:14px;background:var(--gate-bg);border:1px solid var(--gate-line)}
-.gate-title{margin:0 0 6px;font-size:13.5px;color:var(--gate-title)}
-.gate-tool{margin:0 0 12px;font:12px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:var(--gate-tool);overflow-wrap:anywhere}
-.gate-actions{display:flex;gap:8px;justify-content:flex-end}
-.gate-actions.wrap{flex-wrap:wrap;justify-content:flex-start}
-.gate button{height:32px;padding:0 14px;border-radius:16px;border:1px solid transparent;font:inherit;font-size:13px;cursor:pointer}
-.gate .ghost{background:var(--ghost);color:var(--ghost-fg)}
-.gate .ghost.dim{color:var(--text-soft)}
-.gate .solid{background:var(--button);color:var(--text);font-weight:600}
-/* Isolated Ask User styling: the approval gate and composer retain their existing appearance. */
-.stage{--ask-accent:#EC9DA3;--ask-accent-bg:#4D383E;--ask-divider:#FFFFFF1E;--ask-border:#40454D;--ask-row:#292C31;--ask-hover:#3C4149;--ask-key-bg:#34383F;--ask-key-border:#4A5057;--ask-key-fg:#9EA7AD;--ask-arrow:#8D969E}
-.stage.light{--ask-accent:#D75D64;--ask-accent-bg:#FAEDED;--ask-divider:#E8EAE9;--ask-border:#E3E6E4;--ask-row:#FFFFFF;--ask-hover:#F7F8F7;--ask-key-bg:#F7F8F7;--ask-key-border:#E4E7E5;--ask-key-fg:#929A9A;--ask-arrow:#B7BEBC}
-.ask-user{margin-top:16px;padding-top:16px;border-top:1px solid var(--ask-divider)}
-.ask-user:first-child{margin-top:0;padding-top:0;border-top:0}
-.ask-user-overline{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:9px;font-size:11px}
-.ask-user-tag{display:inline-flex;align-items:center;gap:6px;color:var(--ask-accent);font-weight:650}
-.ask-user-mark{display:grid;place-items:center;width:15px;height:15px;border-radius:5px;background:var(--ask-accent-bg);color:var(--ask-accent);font-size:11px;line-height:1}
-.ask-user-type{font-size:10px;color:var(--text-soft)}
-.ask-user-question{margin:0 0 15px;color:var(--text);font-size:15px;font-weight:650;line-height:1.5;letter-spacing:-.02em;overflow-wrap:anywhere}
-.ask-user-options{display:flex;flex-direction:column;gap:7px}
-.ask-user-option{box-sizing:border-box;display:flex;align-items:center;gap:11px;width:100%;min-height:46px;padding:10px 11px;text-align:left;border:1px solid var(--ask-border);border-radius:11px;background:var(--ask-row);color:var(--text);font:inherit;cursor:pointer;transition:background .15s,border-color .15s}
-.ask-user-option:hover{background:var(--ask-hover);border-color:var(--ask-accent)}
-.ask-user-option:active{background:var(--ask-accent-bg)}
-.ask-user-option:focus-visible{outline:2px solid var(--ask-accent);outline-offset:2px}
-.ask-user-index{box-sizing:border-box;display:grid;place-items:center;flex:none;width:24px;height:24px;border:1px solid var(--ask-key-border);border-radius:7px;background:var(--ask-key-bg);color:var(--ask-key-fg);font-size:11px;font-weight:700}
-.ask-user-option:hover .ask-user-index{border-color:var(--ask-accent);color:var(--ask-accent)}
-.ask-user-option-text{flex:1;min-width:0;overflow-wrap:anywhere;font-size:12.8px;font-weight:550;line-height:1.45}
-.ask-user-option-arrow{flex:none;color:var(--ask-arrow);transition:color .15s,transform .15s}
-.ask-user-option:hover .ask-user-option-arrow{color:var(--ask-accent);transform:translateX(2px)}
-.ask-user-help{margin:0;color:var(--working);font-size:12.5px;line-height:1.75}
-.ask-user-footer{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:22px;margin-top:13px}
-.ask-user-tip{color:var(--text-soft);font-size:10.5px;line-height:1.5}
-.ask-user-tip kbd{padding:0 4px;border:1px solid var(--ask-border);border-radius:4px;font:inherit;font-size:10px}
-.ask-user-skip{flex:none;padding:4px 0 4px 8px;border:0;border-radius:5px;background:transparent;color:var(--text-soft);font:inherit;font-size:11px;cursor:pointer}
+.hint{margin:0;color:var(--warn-text);font-size:13px}
+.failure{margin:0;color:var(--fail);font-size:13px}
+.failure.warn{color:var(--warn-text)}
+.link{margin-left:8px;padding:0;border:0;background:none;color:var(--accent-ink);text-decoration:underline;text-underline-offset:2px;cursor:pointer}
+.gate{padding:12px 14px;border-radius:12px;background:var(--warn-bg);box-shadow:inset 0 0 0 1px var(--warn-line)}
+.gate-title{display:flex;align-items:center;gap:7px;margin:0;font-size:13px;font-weight:600;color:var(--warn-text)}
+.gate-tool{margin:8px 0 10px;padding:7px 10px;border-radius:8px;background:var(--code);font:12px/1.5 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:var(--text-2);overflow-wrap:anywhere}
+.gate-actions{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
+.gate button{height:30px;padding:0 14px;border:0;border-radius:8px;font-size:12.5px;font-weight:500;cursor:pointer}
+.gate .ghost{background:var(--glass-card);color:var(--text);box-shadow:0 0 0 1px var(--edge)}
+.gate .solid{background:linear-gradient(var(--accent-hi),var(--accent));color:#fff;box-shadow:inset 0 1px 0 rgba(255,255,255,.28),0 1px 2px rgba(0,0,0,.18)}
+.ask-user{display:flex;flex-direction:column;gap:6px}
+.ask-user-question{margin:0;font-size:13.5px;font-weight:600;line-height:1.5;color:var(--text);overflow-wrap:anywhere}
+.ask-user-tip{margin-left:8px;font-size:12px;font-weight:400;color:var(--text-3)}
+.ask-user-tip kbd{padding:0 4px;border-radius:4px;background:var(--control);font:inherit;font-size:11px}
+.ask-user-options{display:flex;flex-direction:column;gap:6px}
+.ask-user-option{display:flex;align-items:center;gap:10px;width:100%;min-height:36px;padding:6px 10px;box-sizing:border-box;border:0;border-radius:9px;background:var(--control);color:var(--text);font-size:13px;text-align:left;cursor:pointer}
+.ask-user-option:hover{background:var(--accent-soft);color:var(--accent-ink)}
+.ask-user-index{flex:none;display:grid;place-items:center;width:20px;height:20px;border-radius:6px;background:var(--glass-card);box-shadow:0 0 0 .5px var(--edge);font-size:11px;font-weight:600;color:var(--text-3)}
+.ask-user-option-text{flex:1;min-width:0;overflow-wrap:anywhere}
+.ask-user-help{margin:0;font-size:12.5px;color:var(--text-3)}
+.ask-user-skip{align-self:flex-end;padding:4px 6px;border:0;border-radius:6px;background:transparent;color:var(--text-3);font-size:12px;cursor:pointer}
 .ask-user-skip:hover{color:var(--text)}
-.ask-user-skip:focus-visible{outline:2px solid var(--ask-accent);outline-offset:2px}
-@media(prefers-reduced-motion:reduce){.ask-user-option,.ask-user-option-arrow{transition:none}}
-.composer{pointer-events:auto;cursor:grab;position:relative;border-radius:32px;background:var(--capsule);border:1px solid var(--line);box-shadow:var(--capsule-shadow);transition:border-color .2s}
-.composer.drop-active{border-color:var(--link);box-shadow:inset 0 0 0 1px var(--link)}
-.tools-host{position:relative;flex:none;cursor:default}
-.tools-toolbar{position:absolute;right:-3px;bottom:calc(100% + 9px);display:flex;align-items:center;gap:4px;padding:6px;border-radius:16px;background:var(--card);border:1px solid var(--line);box-shadow:var(--panel-shadow);z-index:5;animation:toolbar-in .16s ease-out;cursor:default}
-.tools-toolbar::after{content:"";position:absolute;top:100%;left:0;right:0;height:12px}
-.tool-button{display:grid;place-items:center;width:32px;height:32px;flex:none;padding:0;border:0;border-radius:10px;background:transparent;color:var(--button-fg);cursor:pointer;transition:background .15s,color .15s}
-.tool-button:hover:not(:disabled){background:var(--button-hover);color:var(--button-fg-hover)}
-.tool-button:focus-visible{outline:2px solid var(--link);outline-offset:1px}
-.tool-button:disabled{opacity:.35;cursor:default}
-.round.main-action{background:var(--button);color:var(--button-fg)}
-.round.main-action.has-action{background:var(--text);color:var(--card)}
-.round.main-action.is-stop{background:var(--stop);color:var(--stop-fg);box-shadow:inset 0 0 0 1px #8593A00D}
-.round.main-action.is-stop:hover{background:var(--stop-hover);color:var(--stop-fg-hover)}
-.main-action.is-stop :deep(svg){width:12px;height:12px;fill:currentColor;stroke:none}
-.main-action svg{transition:transform .18s}
-.main-action.tools-open svg{transform:rotate(45deg)}
-.main-action:disabled{opacity:.45;cursor:default}
-@keyframes toolbar-in{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
-.image-tray{display:flex;gap:8px;flex-wrap:wrap;padding:12px 16px 2px;cursor:default}
-.image-thumb{position:relative;width:44px;height:44px;flex:none}
-.image-thumb img,.sent-images img{width:44px;height:44px;object-fit:cover;border-radius:8px;background:var(--button)}
-.image-thumb button{position:absolute;right:-4px;top:-4px;width:17px;height:17px;box-sizing:border-box;padding:0;line-height:1;display:grid;place-items:center;border:1px solid var(--line);border-radius:50%;background:var(--card);color:var(--text);cursor:pointer}
-.image-thumb button :deep(svg){display:block;width:11px;height:11px;flex-shrink:0}
-.image-thumb button:focus-visible{outline:2px solid var(--link)}
-.sent-images{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
-.image-status{font-size:11px;color:var(--link);margin:0;padding:0 20px 8px;cursor:default}
-.capsule{display:flex;align-items:center;gap:8px;height:64px;padding:0 15px 0 13px;border-radius:34px;background:transparent;border:0;transition:border-color .3s}
-.composer:has(.capsule[data-phase=listening]){border-color:var(--listen)}
-.composer:has(.capsule[data-phase=thinking]),.composer:has(.capsule[data-phase=answering]),.composer:has(.capsule[data-phase=speaking]){border-color:var(--busy)}
-.composer:has(.capsule[data-phase=attention]){border-color:var(--attention)}
-.round,.gate button,.link{cursor:pointer}.orb-button,.ball{cursor:grab}.stage.dragging,.stage.dragging *{cursor:grabbing!important}
-.orb-button{touch-action:none;flex:none;width:34px;height:34px;padding:0;border:0;border-radius:50%;background:none;cursor:pointer}
-.orb-button:focus-visible,.round:focus-visible{outline:2px solid var(--link);outline-offset:2px}
-.field{cursor:text;flex:1;min-width:0;height:44px;padding:0 4px;border:0;outline:0;background:transparent;color:var(--field);font:inherit;font-size:14px;caret-color:var(--field);user-select:text}
-.field:focus,.field:focus-visible{outline:none;box-shadow:none}
-.field::placeholder{color:var(--placeholder)}
-.round{flex:none;width:36px;height:36px;display:grid;place-items:center;padding:0;border:0;border-radius:50%;background:var(--button);color:var(--button-fg);cursor:pointer;transition:background .2s,color .2s}
-.round:hover{background:var(--button-hover);color:var(--button-fg-hover)}
-.round.primary{background:linear-gradient(135deg,#5ad7ff,#7a86ff);color:#06101f}
-.round.primary:hover{filter:brightness(1.1)}
-.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+
+.stage.dragging,.stage.dragging *{cursor:grabbing!important}
 .pop-enter-active{transition:opacity .2s ease,transform .28s cubic-bezier(.2,.9,.3,1.12)}
 .pop-enter-from{opacity:0;transform:translateY(14px) scale(.97)}
 .rise-enter-active{transition:opacity .22s ease,transform .26s ease}
 .rise-enter-from{opacity:0;transform:translateY(8px)}
 @keyframes blink{to{visibility:hidden}}
 @keyframes dot{0%,80%,100%{opacity:.3;transform:translateY(0)}40%{opacity:1;transform:translateY(-3px)}}
-@media(prefers-reduced-motion:reduce){.pop-enter-active,.rise-enter-active{transition:none}.tools-toolbar{animation:none}.main-action svg{transition:none}.dots i,.cursor{animation:none}}
-.morph-shell{position:fixed;z-index:20;display:flex;align-items:center;justify-content:center;overflow:hidden;pointer-events:none;border-radius:32px;border:1px solid var(--line);background:var(--capsule);box-shadow:var(--capsule-shadow)}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes nudge{0%{transform:translateY(0)}40%{transform:translateY(-3px)}100%{transform:translateY(0)}}
+@media(prefers-reduced-motion:reduce){.pop-enter-active,.rise-enter-active,.bubble-enter-active,.bubble-leave-active{transition:none}.dots i,.cursor,.ball-ring,.badge{animation:none}}
+.morph-shell{position:fixed;z-index:20;display:flex;align-items:center;justify-content:center;overflow:hidden;pointer-events:none;border-radius:26px;background:var(--glass);box-shadow:0 0 0 .5px var(--edge),var(--shadow)}
 .morph-shell :deep(.orb-frame){position:absolute;left:5px}
-.morphing .composer{opacity:0;pointer-events:none}
+.morphing .composer,.morphing .chips{opacity:0;pointer-events:none}
 .morphing .card,.morphing .ball{opacity:0;pointer-events:none}
 .morphing .inner{transform:none!important;transition:none!important}
 .morphing .pop-enter-from{opacity:1}
-.morphing .tools-toolbar{display:none}
 </style>
-
-
-<style scoped>
-.card-footer{display:flex;justify-content:flex-end;padding:0 12px 9px}.copy-answer{display:inline-flex;align-items:center;gap:5px;padding:4px 7px;border:0;border-radius:7px;background:transparent;color:var(--text-soft);font:inherit;font-size:11px;line-height:1.5;cursor:pointer}.copy-answer:hover{background:var(--button-hover);color:var(--text)}.copy-answer:focus-visible{outline:2px solid var(--link);outline-offset:1px}.copy-answer:disabled{opacity:.5;cursor:default}
-</style>
-
-

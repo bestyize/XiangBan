@@ -445,6 +445,21 @@ fn set_appearance(app: tauri::AppHandle, mode: String) -> Result<Settings, Strin
     Ok(next)
 }
 
+/// The console picked a theme colour; the other windows hear it through `settings-changed`.
+#[tauri::command]
+fn set_accent(app: tauri::AppHandle, accent: String) -> Result<Settings, String> {
+    if !preferences::ACCENTS.contains(&accent.as_str()) { return Err(format!("没有这个主题色：{accent}")); }
+    let state = app.state::<DesktopState>();
+    let _update = state.update_lock.lock().unwrap_or_else(|e| e.into_inner());
+    let mut next = settings(&app);
+    if next.accent == accent { return Ok(next); }
+    next.accent = accent;
+    persist(&app, &next)?;
+    *state.settings.lock().unwrap_or_else(|e| e.into_inner()) = next.clone();
+    publish(&app);
+    Ok(next)
+}
+
 /// What the host has for the colour scheme, and whether it was ever given one.
 #[tauri::command]
 fn get_appearance(app: tauri::AppHandle) -> serde_json::Value {
@@ -779,7 +794,7 @@ fn main() {
         }));
     #[cfg(target_os = "macos")]
     let builder = builder.plugin(tauri_plugin_autostart::Builder::new().app_name(startup_name).arg("--autostart").build());
-    let command_handler: Box<dyn Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Sync> = Box::new(tauri::generate_handler![resource_packs::export_resource_pack, resource_packs::import_resource_pack, get_platform, get_settings, set_mode, update_settings, set_desktop_effects, effects::list_desktop_effects, effects::open_effects_directory, effects::import_effect_pack, effects::delete_desktop_effect, set_companion_enabled, set_appearance, get_appearance, set_companion_links, set_companion_skin, poke,
+    let command_handler: Box<dyn Fn(tauri::ipc::Invoke<tauri::Wry>) -> bool + Send + Sync> = Box::new(tauri::generate_handler![resource_packs::export_resource_pack, resource_packs::import_resource_pack, get_platform, get_settings, set_mode, update_settings, set_desktop_effects, effects::list_desktop_effects, effects::open_effects_directory, effects::import_effect_pack, effects::delete_desktop_effect, set_companion_enabled, set_appearance, set_accent, get_appearance, set_companion_links, set_companion_skin, poke,
             scene_ready, set_hit_test, start_drag, hide_control, show_control, quit, get_diagnostics, ui_smoke_report,
             get_startup_status, set_autostart, content::get_wallpaper_library, content::import_wallpaper_catalog, content::delete_local_wallpaper,
             desk_game::open_desktop_game, desk_game::close_desktop_game, desk_game::desk_set_regions,
@@ -815,7 +830,7 @@ fn main() {
             chat::store::ai_store_connector_auth_status, chat::store::ai_store_connector_auth_cancel,
             float_assistant::assistant_status, float_assistant::assistant_configure, float_assistant::assistant_ready, float_assistant::assistant_hide,
             assistant_hit_test::assistant_set_regions, capture_editor::capture_frame, capture_editor::capture_show, capture_editor::capture_finish,
-            chat_screenshot, float_assistant::assistant_screenshot, float_assistant::assistant_fit, float_assistant::assistant_drag, float_assistant::assistant_unfold,
+            chat_screenshot, float_assistant::assistant_screenshot, float_assistant::assistant_fit, float_assistant::assistant_drag, float_assistant::assistant_unfold, float_assistant::assistant_ball_bubble,
              assistant_capture::reset_screen_capture_permission, assistant_capture::open_screen_capture_settings,
             float_assistant::assistant_transition_ready, float_assistant::assistant_prefs, float_assistant::assistant_try, float_assistant::assistant_open_chat, float_assistant::assistant_open_settings]);
     let app = builder.manage(state).manage(content::ContentState::default()).manage(website::WebsiteState::default())
@@ -831,7 +846,7 @@ fn main() {
             let allowed=capture_editor::permitted(label,command).or_else(||pets::permitted(label,command)).or_else(||float_assistant::permitted(label,command)).or_else(|| desk_game::permitted(label,command)).or_else(|| widgets::permitted(label,command)).or_else(|| rituals::permitted(label,command)).or_else(|| games::permitted(label,command)).unwrap_or_else(|| {
                 if matches!(command, "reset_screen_capture_permission" | "open_screen_capture_settings") { return label=="control"; }
                  if command=="ui_smoke_report" || command=="chat_screenshot" {return label=="control";}
-                if command=="set_appearance" || command=="get_appearance" || command=="set_companion_enabled" || command=="set_companion_links" || command=="set_companion_skin" || command=="set_desktop_effects" || command=="list_desktop_effects" || command=="open_effects_directory" || command=="import_effect_pack" {return label=="control";}
+                if command=="set_appearance" || command=="set_accent" || command=="get_appearance" || command=="set_companion_enabled" || command=="set_companion_links" || command=="set_companion_skin" || command=="set_desktop_effects" || command=="list_desktop_effects" || command=="open_effects_directory" || command=="import_effect_pack" {return label=="control";}
                 if label=="care" { return ["get_care_delivery","care_ready","dismiss_care","snooze_care","care_synthesize"].contains(&command); }
                 if command.contains("care") { return label=="control"; }
                 content::permitted(label,command)

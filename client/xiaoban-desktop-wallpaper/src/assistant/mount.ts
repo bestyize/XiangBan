@@ -2,7 +2,7 @@ import { createApp, watchEffect } from 'vue';
 import { desktop, invoke, listen } from '../bridge.ts';
 import { createAsrStore } from '../ui/asr/store.ts';
 import { createChatStore } from '../ui/chat/chat-store.ts';
-import { followHost, isDark } from '../ui/appearance.ts';
+import { followAccent, followHost, isDark } from '../ui/appearance.ts';
 import { applyUiTokens } from '../ui/design-tokens.ts';
 import { createSpeechStore } from '../ui/speech/store.ts';
 import AssistantApp from './AssistantApp.vue';
@@ -29,7 +29,7 @@ export async function mountAssistant() {
     if (type !== 'success') assistant.noteVoice(message instanceof Error ? message.message : String(message));
   } });
   const speech = createSpeechStore({ desktop, invoke, notify });
-  assistant = createAssistantStore({ desktop, invoke, listen, chat, asr, speech, onAppearance: followHost });
+  assistant = createAssistantStore({ desktop, invoke, listen, chat, asr, speech, onAppearance: followHost, onAccent: followAccent });
   const app = createApp(AssistantApp, { store: assistant, asr });
   app.mount(host);
   window.addEventListener('beforeunload', () => { assistant.dispose(); app.unmount(); }, { once: true });

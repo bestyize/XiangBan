@@ -628,10 +628,11 @@ describe('assistant image messages', () => {
     chat.send.mockResolvedValueOnce(false); store.input = '看看这个'; store.attachments = ['image'];
     await store.submit(); expect(store.input).toBe('看看这个'); expect(store.attachments).toEqual(['image']); store.dispose();
   });
-  it('keeps the image draft if a model is missing and clears it on close', async () => {
-    const { store, chat } = setup({ voice: false, configured: false }); await store.opened(); store.attachments = ['image'];
+  it('keeps the image draft if a model is missing, and across folding away and back', async () => {
+    const { store, chat } = setup({ voice: false, configured: false }); await store.opened(); store.attachments = ['image']; store.input = '看看这个';
     await store.submit(); expect(chat.send).not.toHaveBeenCalled(); expect(store.attachments).toEqual(['image']);
-    store.closed(); expect(store.attachments).toEqual([]); store.dispose();
+    store.closed(); expect(store.attachments).toEqual(['image']); expect(store.input).toBe('看看这个');
+    await store.opened(); expect(store.attachments).toEqual(['image']); expect(store.input).toBe('看看这个'); store.dispose();
   });
   it('pauses voice auto-send when the user starts attaching an image', async () => {
     const { store, chat, asr, say, advance } = setup(); await store.opened(); say('看看这张图');
@@ -693,5 +694,29 @@ describe('assistant voice settings synchronization',()=>{
     const {store,asr,chat,say,advance}=setup();await store.opened();say('还没有发送的话');expect(store.input).toBe('还没有发送的话');
     asr.enabled=false;advance(SEND_GRACE_MS+1);await nextTick();
     expect(chat.send).not.toHaveBeenCalled();expect(asr.recordingRequested).toBe(false);expect(store.phase).toBe('idle');expect(store.input).toBe('还没有发送的话');
+  });
+});
+
+describe('while only the ball shows', () => {
+  it('marks a finished answer unread and says what it was', async () => {
+    const { store, chat } = setup({ voice: false }); await store.init(); await store.opened();
+    await store.submit('写个周报'); store.closed();
+    finishAnswer(chat, '# 周报初稿\n\n本周完成了三件事'); store.replied('s1', '周报初稿');
+    expect(store.unread).toBe(true); expect(store.notice).toEqual({ kind: 'done', text: '周报初稿' });
+    await store.opened(); expect(store.unread).toBe(false); expect(store.notice).toBeNull(); store.dispose();
+  });
+  it('says when something waits for the user', async () => {
+    const { store, chat } = setup({ voice: false }); await store.init(); await store.opened();
+    await store.submit('整理桌面'); store.closed();
+    chat.views.s1.approvals.push({ id: 'p1', session: 's1', tool: 'move_files', arguments: {} }); await nextTick();
+    expect(store.notice).toEqual({ kind: 'attention', text: 'move_files 需要你许可' }); store.dispose();
+  });
+  it('lists every turn and the latest conversations, and switches between them', async () => {
+    const { store, chat } = setup({ voice: false }); await store.init(); await store.opened();
+    await store.submit('你好'); finishAnswer(chat);
+    expect(store.items.map(item => item.kind)).toEqual(['user', 'assistant']);
+    chat.sessions = [{ id: 's1', title: '打招呼', updatedAt: 1 }, { id: 's2', title: '周报', updatedAt: 5 }];
+    expect(store.recent.map(session => session.id)).toEqual(['s2', 's1']); expect(store.title).toBe('打招呼');
+    await store.switchSession('s2'); expect(chat.select).toHaveBeenLastCalledWith('s2'); expect(store.currentId).toBe('s2'); store.dispose();
   });
 });
