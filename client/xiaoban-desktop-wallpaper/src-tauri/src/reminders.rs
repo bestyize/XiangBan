@@ -23,6 +23,8 @@ const AGENT_PROMPT_CHARS: usize = 1000;
 pub struct CareConfig {
     pub enabled: bool,
     pub sound: bool,
+    /// One-time reminders sound even when `sound` is off: they are the ones that must not be missed.
+    pub once_sound: bool,
     pub voice: bool,
     pub quiet_enabled: bool,
     pub quiet_start: String,
@@ -30,7 +32,7 @@ pub struct CareConfig {
     pub weather_source: Source,
 }
 impl Default for CareConfig {
-    fn default() -> Self { Self { enabled: true, sound: false, voice: false, quiet_enabled: false, quiet_start: "22:00".into(), quiet_end: "08:00".into(), weather_source: Source::default() } }
+    fn default() -> Self { Self { enabled: true, sound: false, once_sound: true, voice: false, quiet_enabled: false, quiet_start: "22:00".into(), quiet_end: "08:00".into(), weather_source: Source::default() } }
 }
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
@@ -176,6 +178,8 @@ fn quiet(config: &CareConfig, now: NaiveTime) -> bool {
     if start == end { return true; }
     if start < end { now >= start && now < end } else { now >= start || now < end }
 }
+/// Whether a bubble beeps: when sounds are on, or when it holds a one-time reminder and those are set to.
+fn plays_sound(config: &CareConfig, sticky: bool) -> bool { config.sound || (sticky && config.once_sound) }
 /// Whether a rule is a one-time reminder, which is kept up until the user answers it.
 fn lasts(rule: &Rule) -> bool { rule.repeat == "once" && rule.kind == "custom" }
 fn local_due(rule: &Rule, now: DateTime<Local>) -> Vec<(String, i64)> {
@@ -389,7 +393,7 @@ fn show(app: &tauri::AppHandle, items: Vec<Pending>) -> Result<(), String> {
     let state = app.state::<ReminderState>();
     let config = state.store.lock().unwrap_or_else(|e| e.into_inner()).config.clone();
     let sticky = items.iter().any(|item| item.sticky && !item.preview);
-    let delivery = Delivery { id: format!("bubble-{}", Local::now().timestamp_millis()), items, sound: config.sound, voice: config.voice,
+    let delivery = Delivery { id: format!("bubble-{}", Local::now().timestamp_millis()), items, sound: plays_sound(&config, sticky), voice: config.voice,
         display_seconds: if sticky { STICKY_SECONDS } else if config.voice { 30 } else { BUBBLE_SECONDS } };
     { let mut runtime = state.runtime.lock().unwrap_or_else(|e| e.into_inner()); runtime.active = Some(delivery.clone()); runtime.shown_at = if runtime.ready { Some(Local::now().timestamp()) } else { None }; }
     if let Err(error) = open_bubble(app) { close_active(app); return Err(error); }
@@ -908,6 +912,16 @@ mod tests {
         assert!(local_due(&rule, hours_later).is_empty());
         let mut daily = Store { rules: vec![rule], ..Store::default() };
         assert!(collect(&mut daily, date(), 0.0) && !daily.pending[0].sticky);
+    }
+    #[test] fn one_time_reminders_beep_by_default_and_everything_else_stays_quiet() {
+        let config = CareConfig::default();
+        assert!(!config.sound && config.once_sound);
+        assert!(plays_sound(&config, true) && !plays_sound(&config, false));
+        assert!(!plays_sound(&CareConfig { once_sound: false, ..CareConfig::default() }, true), "it can be switched off");
+        assert!(plays_sound(&CareConfig { sound: true, once_sound: false, ..CareConfig::default() }, false));
+        // A settings file written before this option existed gets the default, on.
+        let old: CareConfig = serde_json::from_str(r#"{"enabled":true,"sound":false,"voice":false}"#).unwrap();
+        assert!(old.once_sound);
     }
     #[test] fn once_and_midnight_catchup_work() {
         let mut rule = scheduled(); rule.repeat = "once".into(); rule.once_at = "2026-10-09T15:05".into(); assert_eq!(local_due(&rule, date()).len(), 1);

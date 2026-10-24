@@ -13,6 +13,8 @@ export interface CareSource {
 export interface CareConfig {
   enabled: boolean;
   sound: boolean;
+  /** One-time reminders sound even when `sound` is off. */
+  onceSound: boolean;
   voice: boolean;
   quietEnabled: boolean;
   quietStart: string;

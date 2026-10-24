@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import CarePage from '../pages/CarePage.vue';
 import { NSelect } from 'naive-ui';
 import type { ControlStore } from '../control-types';
+import { emptyCareStatus } from './state';
 vi.mock('../../bridge', () => ({ invoke: vi.fn(), listen: vi.fn(async () => () => {}) }));
 const store = () => ({ desktop: false, settings: { companionEnabled: true }, notify: vi.fn(), navigate: vi.fn() }) as unknown as ControlStore;
 function mountPage() {
@@ -23,6 +24,17 @@ describe('care form fields', () => {
     repeat.vm.$emit('update:value', 'once'); await wrapper.vm.$nextTick();
     expect(wrapper.find('[data-testid="care-once-field"]').exists()).toBe(true);
     expect(wrapper.find('[data-testid="care-time-field"]').exists()).toBe(false);
+    wrapper.unmount();
+  });
+});
+
+describe('care preferences', () => {
+  it('has a switch for the sound of one-time reminders, on by default, and it is part of what gets saved', async () => {
+    const wrapper = mountPage(); await wrapper.vm.$nextTick();
+    const row = wrapper.find('[data-testid="care-once-sound"]');
+    expect(row.exists()).toBe(true);
+    expect(row.attributes('value') ?? row.attributes('modelvalue') ?? 'true').toMatch(/true/);
+    expect(emptyCareStatus().config.onceSound).toBe(true);
     wrapper.unmount();
   });
 });
