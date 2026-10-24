@@ -30,8 +30,8 @@ impl AskUser {
         let schema = json!({
             "type": "object",
             "properties": {
-                "question": { "type": "string" },
-                "options": { "type": "array", "items": { "type": "string" }, "description": "Optional suggested answers." }
+                "question": { "type": "string", "description": format!("At most {MAX_QUESTION_CHARS} characters.") },
+                "options": { "type": "array", "items": { "type": "string" }, "description": format!("Optional suggested answers, at most {MAX_OPTIONS}.") }
             },
             "required": ["question"]
         });

@@ -166,9 +166,15 @@ fn normalize_skill_categories(raw: &Value) -> Result<Value, String> {
     Ok(json!({"results": result}))
 }
 
-pub struct SkillDiscovery { root: PathBuf, workspace: PathBuf }
+/// Searches the product's own catalog (keyword, page, sort). `Ok(None)` means that server has no such route, and only then
+/// does `skill_search` go to SkillHub directly; any other failure is reported, as in the AI plugin page.
+pub type CatalogSearch = Arc<dyn Fn(&str, u32, &str) -> Result<Option<Value>, String> + Send + Sync>;
+
+pub struct SkillDiscovery { root: PathBuf, workspace: PathBuf, gateway: Option<CatalogSearch> }
 impl SkillDiscovery {
-    pub fn new(root: PathBuf, workspace: PathBuf) -> Self { Self { root, workspace } }
+    pub fn new(root: PathBuf, workspace: PathBuf) -> Self { Self { root, workspace, gateway: None } }
+    /// Makes `skill_search` ask the product's own catalog first.
+    pub fn with_catalog(mut self, search: CatalogSearch) -> Self { self.gateway = Some(search); self }
     /// Product UI browsing; no model invocation or installation is involved.
     pub fn browse(keyword: &str, page: u32, category: &str, source: &str, sort_by: &str) -> Result<Value, String> {
         let keyword = keyword.trim();
@@ -217,7 +223,7 @@ impl SkillDiscovery {
         Ok(())
     }
     fn ui_tool(&self, name: &str) -> DiscoveryTool {
-        DiscoveryTool { root: self.root.clone(), spec: ToolSpec::new(name, "", json!({"type":"object"})) }
+        DiscoveryTool { root: self.root.clone(), spec: ToolSpec::new(name, "", json!({"type":"object"})), gateway: None }
     }
     pub fn acquisition_policy(&self) -> acquisition::AcquisitionPolicy {
         acquisition::AcquisitionPolicy::default()
@@ -247,14 +253,24 @@ impl SkillDiscovery {
                     .risk(if name == "skill_install" { Risk::Write } else { Risk::Network });
                 let spec = if name == "skill_install" { spec.always_ask() }
                     else { spec.untrusted_output() };
-                Arc::new(DiscoveryTool { root: self.root.clone(), spec }) as Arc<dyn Tool>
+                Arc::new(DiscoveryTool { root: self.root.clone(), spec, gateway: self.gateway.clone() }) as Arc<dyn Tool>
             }).collect();
         tools.push(Arc::new(runner::SkillRead::new(self.root.clone())));
         tools.push(Arc::new(runner::SkillRun::new(self.root.clone(), self.workspace.clone())));
         tools
     }
 }
-struct DiscoveryTool { spec: ToolSpec, root: PathBuf }
+/// The product catalog's answer, in the shape `skill_search` returns from SkillHub.
+fn gateway_results(found: &Value, page: u64) -> Result<String, String> {
+    let items = found["results"].as_array().ok_or("invalid catalog search response")?;
+    Ok(json!({"provider":"skillhub","page":page,"total":found["total"].as_u64(),
+        "hasMore":found["hasMore"].as_bool().unwrap_or(false),
+        "results":items.iter().take(20).map(|s|json!({
+            "slug":s["slug"],"name":s["name"],"version":s["version"],"namespace":s["namespace"],
+            "source":s["source"],"description":s["description"],"homepage":s["homepage"]
+        })).collect::<Vec<_>>()}).to_string())
+}
+struct DiscoveryTool { spec: ToolSpec, root: PathBuf, gateway: Option<CatalogSearch> }
 impl Tool for DiscoveryTool {
     fn spec(&self) -> &ToolSpec { &self.spec }
     fn execute(&self, args: Value, ctx: &ToolCtx) -> Result<String, String> {
@@ -271,6 +287,9 @@ impl DiscoveryTool {
                 .filter(|p| (1..=5).contains(p)).ok_or("Skill search page must be 1–5")?;
             let sort_by = args["sortBy"].as_str().unwrap_or("score");
             validate_browse_filters("", "", sort_by)?;
+            if let Some(search) = &self.gateway {
+                if let Some(found) = search(keyword, page as u32, sort_by)? { return gateway_results(&found, page); }
+            }
             let page_text = page.to_string();
             let url = endpoint("/api/skills", &[("keyword", keyword), ("page", &page_text),
                 ("pageSize", "20"), ("sortBy", sort_by), ("order", "desc")])?;
@@ -361,6 +380,28 @@ fn browse_result(result: &Value, page: u32) -> Result<Value, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    fn search_tool(search: CatalogSearch) -> Arc<dyn Tool> {
+        let found = SkillDiscovery::new(std::env::temp_dir(), std::env::temp_dir()).with_catalog(search).tools();
+        found.into_iter().find(|t| t.spec().name == "skill_search").unwrap()
+    }
+    #[test]
+    fn the_product_catalog_answers_skill_search_first_and_its_failures_are_reported() {
+        let seen = Arc::new(std::sync::Mutex::new(Vec::new()));
+        let log = seen.clone();
+        let tool = search_tool(Arc::new(move |keyword, page, sort| {
+            log.lock().unwrap().push(format!("{keyword}|{page}|{sort}"));
+            Ok(Some(json!({"results":[{"slug":"docx-helper","name":"Word 文档","version":"1.2.0","namespace":"acme","description":"处理 Word","iconUrl":"https://x/y.png"}],"total":1,"hasMore":false})))
+        }));
+        let out: Value = serde_json::from_str(&tool.execute(json!({"keyword":"word","page":2,"sortBy":"downloads"}), &agent_kernel::ToolCtx::detached("s")).unwrap()).unwrap();
+        assert_eq!(out["results"][0]["slug"], "docx-helper");
+        assert_eq!((out["page"].as_u64(), out["total"].as_u64(), out["hasMore"].as_bool()), (Some(2), Some(1), Some(false)));
+        assert!(out["results"][0].get("iconUrl").is_none());
+        assert_eq!(seen.lock().unwrap().clone(), vec!["word|2|downloads"]);
+        // A catalog that is down is an error, not a silent switch to SkillHub.
+        let down = search_tool(Arc::new(|_, _, _| Err("暂时无法连接小伴插件市场".into())));
+        assert_eq!(down.execute(json!({"keyword":"word"}), &agent_kernel::ToolCtx::detached("s")).unwrap_err(), "暂时无法连接小伴插件市场");
+        assert!(gateway_results(&json!({"error":"x"}), 1).is_err());
+    }
     #[test]
     fn rejects_incomplete_or_corrupt_registry_file_counts() {
         let full=json!({"count":2,"files":[{"path":"SKILL.md"},{"path":"references/readme.md"}]});

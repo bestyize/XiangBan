@@ -168,7 +168,7 @@ impl MemoryWrite {
             "properties": {
                 "name": { "type": "string", "description": "1 to 64 lowercase ASCII letters, digits and hyphens, not starting or ending with a hyphen, e.g. `favorite-drinks`. Never Chinese or spaces: write the topic in English words here and put the user's own language in `content`." },
                 "action": { "type": "string", "enum": ["write", "append", "delete"], "description": "write replaces the whole note. Default: write." },
-                "content": { "type": "string" }
+                "content": { "type": "string", "description": format!("The note text, 1 to {MAX_NOTE_BYTES} bytes. At most {MAX_NOTES} notes are kept; delete one first when the limit is reached.") }
             },
             "required": ["name"]
         });

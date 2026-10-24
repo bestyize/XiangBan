@@ -32,3 +32,7 @@
 ## 本轮验证
 
 针对组件运行 Vitest，使用 `vue-tsc --noEmit` 检查类型。已实测空气质量、自选报价及腾讯曲线接口能返回有效数据；Windows/macOS 原生运行及截图视觉检查仍需对应环境验证。
+
+## 小伴 AI 设置组件内容
+
+`widget_add` 和 `widget_update` 的 `content` 参数让 AI 直接填组件里的内容，不必让用户去组件上手动输入：待办（`notes`：条目、完成状态、日期时间、提醒、重复）、纪念日（`countdown`：标题、日期、倒数或已过去、每年重复）、今日日程（`reminders`）、股票（`stocks`：自选代码，沪市 `1.600519`、深市 `0.000001`、港股 `116.00700`）。`items` 默认整体替换，`append=true` 追加；改某一条前先 `widget_list`，它会列出每条的 id，替换时带上 id。逻辑在 `src-tauri/src/chat/widget_content.rs`，同样的长度和格式限制在这里先检查并给出中文提示，最终仍由布局保存时的校验兜底。`widget_add` 的 `content` 有误时不会创建组件。

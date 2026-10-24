@@ -5,6 +5,7 @@
 
 mod agent_settings;
 mod app_guide;
+mod widget_content;
 mod broker;
 mod checkpoints;
 mod git_snapshot;
@@ -531,7 +532,10 @@ fn assemble_with_connectors(parts: Parts<'_>, attachments: Vec<Attachment>, conn
     let memory = Arc::new(Memory::new(dirs.memory()));
     // 资料库 → 记忆 can switch remembering off: no notes in the prompt, no note tools, nothing recalled.
     let remember = memory_center::remembering(&dirs);
-    let discovery = SkillDiscovery::new(dirs.skills(), workspace.to_path_buf());
+    // Skill search asks the product's own catalog first, like the AI 插件 page; only a missing route reaches SkillHub.
+    let catalog_desktop = desktop.clone();
+    let discovery = SkillDiscovery::new(dirs.skills(), workspace.to_path_buf())
+        .with_catalog(Arc::new(move |keyword, page, sort_by| catalog_desktop.skill_catalog(keyword, page, sort_by)));
     // Started before the prompt is written, so the prompt can say honestly whether the tools exist.
     let computer_use = if open_computer_use { Some(spawn_computer_use()) } else { None };
     let computer_use_error = match &computer_use { Some(Err(error)) => Some(error.to_string()), _ => None };
@@ -1318,7 +1322,7 @@ pub fn chat_delete_session(app: tauri::AppHandle, window: tauri::WebviewWindow, 
 
 /// Conservative cold-start allowance until assembly measures eager definitions plus the
 /// compact directory. ContextTrim separately counts every schema loaded during a task.
-const TOOL_TOKENS_BEFORE_FIRST_ANSWER: usize = 9_500;
+const TOOL_TOKENS_BEFORE_FIRST_ANSWER: usize = 10_000;
 const TOOL_TOKENS_FILE: &str = "tool-tokens-v2-discovery.json";
 
 /// What the latest answer measured, kept so the ring is right after a restart too.

@@ -36,11 +36,11 @@ impl Todo {
             "properties": {
                 "todos": {
                     "type": "array",
-                    "description": "The complete list, replacing the previous one.",
+                    "description": format!("The complete list, replacing the previous one. At most {MAX_ITEMS} items."),
                     "items": {
                         "type": "object",
                         "properties": {
-                            "content": { "type": "string", "description": "One concrete step." },
+                            "content": { "type": "string", "description": format!("One concrete step, at most {MAX_CONTENT_CHARS} characters.") },
                             "status": { "type": "string", "enum": ["pending", "in_progress", "completed"] }
                         },
                         "required": ["content", "status"]
