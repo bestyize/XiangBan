@@ -68,6 +68,10 @@ pub trait Desktop: Send + Sync {
     fn export_pack(&self, kind: &str, id: &str) -> Result<Option<(String, u64)>, String>;
     /// Opens an https address in the system browser.
     fn open_url(&self, url: &str) -> Result<(), String>;
+    /// Light/dark/system look, theme colour and pausing the animation; returns the values now in effect.
+    fn set_display(&self, _appearance: Option<&str>, _accent: Option<&str>, _paused: Option<bool>) -> Result<Value, String> { Err("当前宿主不支持显示设置".into()) }
+    /// The product catalog's skill search. `Ok(None)` when the website has no such route, so the search goes to SkillHub.
+    fn skill_catalog(&self, _keyword: &str, _page: u32, _sort_by: &str) -> Result<Option<Value>, String> { Ok(None) }
     /// Brings the console forward on `page` (and its `tab`). `page`/`tab` are already validated by `app_guide`.
     fn open_page(&self, _page: &str, _tab: Option<&str>) -> Result<(), String> { Err("当前宿主不支持打开页面".into()) }
 }
@@ -101,6 +105,21 @@ impl Desktop for TauriDesktop {
         crate::content::open_download_url(url.to_string())
     }
 
+    fn set_display(&self, appearance: Option<&str>, accent: Option<&str>, paused: Option<bool>) -> Result<Value, String> {
+        if let Some(mode) = appearance { crate::set_appearance(self.app.clone(), mode.to_string())?; }
+        if let Some(accent) = accent { crate::set_accent(self.app.clone(), accent.to_string())?; }
+        if let Some(paused) = paused {
+            let s = crate::settings(&self.app);
+            crate::update_settings(self.app.clone(), s.expression, s.size, s.theme, paused, s.fps)?;
+        }
+        let s = crate::settings(&self.app);
+        Ok(json!({ "appearance": s.appearance, "accent": s.accent, "animationPaused": s.paused }))
+    }
+
+    fn skill_catalog(&self, keyword: &str, page: u32, sort_by: &str) -> Result<Option<Value>, String> {
+        tauri::async_runtime::block_on(super::store::search_skills(&self.app, keyword, page, sort_by))
+    }
+
     fn open_page(&self, page: &str, tab: Option<&str>) -> Result<(), String> {
         use tauri::Emitter;
         crate::present_control(&self.app)?;
@@ -118,7 +137,7 @@ impl Desktop for TauriDesktop {
         Ok(json!({
             "mode": s.mode, "wallpaper": s.wallpaper_id, "effect": s.effects.selected,
             "companionEnabled": s.companion_enabled, "companionSkin": s.companion_skin,
-            "expression": s.expression, "animationPaused": s.paused,
+            "expression": s.expression, "animationPaused": s.paused, "appearance": s.appearance, "accent": s.accent,
         }))
     }
 
@@ -577,6 +596,7 @@ fn widget_list(desktop: &dyn Desktop, _: &Value) -> Result<String, String> {
         let state = if enabled { "显示中" } else { "已隐藏" };
         let layer = if w["layer"].as_str() == Some("topmost") { "始终置顶" } else { "贴桌面" };
         lines.push(format!("{id} | {} ({kind}) | {}风格 ({theme}) | 缩放 {scale:.2}{city} | {state} | {layer} | 位置 ({}, {}) | 显示器 {}", widget_kind_label(kind), widget_theme_label(theme), w["x"], w["y"], w["monitor"]));
+        lines.extend(super::widget_content::summary(w));
     }
     let templates = desktop.custom_widgets()?;
     if let Some(templates) = templates.as_array().filter(|items| !items.is_empty()) {
@@ -586,6 +606,10 @@ fn widget_list(desktop: &dyn Desktop, _: &Value) -> Result<String, String> {
         }
     }
     Ok(lines.join("\n"))
+}
+
+fn widget_content_schema() -> Value {
+    json!({"type": "object", "additionalProperties": true, "description": "组件内容，按类型：notes {title?, items: [文字 或 {text, done?, date?, time?, notify?, repeat?, id?}], append?}；countdown {title, date: YYYY-MM-DD, mode?: countdown|elapsed, repeat?: none|yearly}；reminders {items: [{title, at: YYYY-MM-DDTHH:MM, end?, location?, notify?, repeat?, done?, id?}], append?}；stocks {symbols: [1.600519 沪, 0.000001 深, 116.00700 港，≤8], symbol?}。items 默认整体替换，append=true 追加；改某条先 widget_list 看 id，替换时带上。"})
 }
 
 fn widget_add(desktop: &dyn Desktop, args: &Value) -> Result<String, String> {
@@ -602,6 +626,10 @@ fn widget_add(desktop: &dyn Desktop, args: &Value) -> Result<String, String> {
     if layer.is_some_and(|layer| !["desktop", "topmost"].contains(&layer)) {
         return Err("layer 只能是 desktop（贴在桌面）或 topmost（始终置顶）".into());
     }
+    // A bad `content` is refused before the widget exists, checked against what a new widget of this kind holds.
+    if let Some(content) = args.get("content").filter(|v| !v.is_null()) {
+        super::widget_content::patch(&json!({ "kind": kind }), content)?;
+    }
     let res = desktop.widget_add(kind)?;
     let id = res["widgets"].as_array().and_then(|w| w.last()).and_then(|w| w.get("id")).and_then(Value::as_str).ok_or("组件创建结果没有返回 id")?;
     if let Some(theme) = theme {
@@ -610,10 +638,24 @@ fn widget_add(desktop: &dyn Desktop, args: &Value) -> Result<String, String> {
     if let Some(layer) = layer {
         desktop.widget_update(id, json!({ "layer": layer })).map_err(|e| format!("组件已添加（id: {id}），但设置层级失败：{e}"))?;
     }
+    if let Some(content) = args.get("content").filter(|v| !v.is_null()) {
+        let added = res["widgets"].as_array().and_then(|w| w.last()).cloned().unwrap_or_default();
+        let patch = super::widget_content::patch(&added, content).map_err(|e| format!("组件已添加（id: {id}），但内容没有设置：{e}"))?;
+        desktop.widget_update(id, patch).map_err(|e| format!("组件已添加（id: {id}），但内容没有设置：{e}"))?;
+    }
     Ok(format!("已在桌面添加组件：{}（id: {id}）", widget_kind_label(kind)))
 }
 
 fn parse_widget_patch(args: &Value) -> Result<Value, String> {
+    let obj = widget_patch_fields(args)?;
+    if obj.is_empty() {
+        return Err("请至少指定 theme、layer、scale、x、y、enabled、city 或 content 之一".into());
+    }
+    Ok(Value::Object(obj))
+}
+
+/// The fields of a `widget_update` call that become the layout patch; may be empty.
+fn widget_patch_fields(args: &Value) -> Result<serde_json::Map<String, Value>, String> {
     let mut obj = serde_json::Map::new();
     if let Some(v) = args.get("theme").filter(|v| !v.is_null()) {
         let theme = v.as_str().ok_or("theme 必须是字符串")?;
@@ -662,16 +704,21 @@ fn parse_widget_patch(args: &Value) -> Result<Value, String> {
         city.validate()?;
         obj.insert("city".into(), serde_json::to_value(&city).map_err(|e| e.to_string())?);
     }
-    if obj.is_empty() {
-        return Err("请至少指定 theme、layer、scale、x、y、enabled 或 city 之一".into());
-    }
-    Ok(Value::Object(obj))
+    Ok(obj)
 }
 
 fn widget_update(desktop: &dyn Desktop, args: &Value) -> Result<String, String> {
     let id = text_arg(args, "id")?;
-    let patch = parse_widget_patch(args)?;
-    desktop.widget_update(id, patch)?;
+    let mut fields = widget_patch_fields(args)?;
+    if let Some(content) = args.get("content").filter(|v| !v.is_null()) {
+        let widgets = desktop.widgets()?;
+        let widget = widgets["widgets"].as_array().and_then(|all| all.iter().find(|w| w["id"].as_str() == Some(id))).ok_or_else(|| format!("没有 id 为 {id} 的组件，可先用 widget_list 查看"))?;
+        if let Value::Object(content_fields) = super::widget_content::patch(widget, content)? { fields.extend(content_fields); }
+    }
+    if fields.is_empty() {
+        return Err("请至少指定 theme、layer、scale、x、y、enabled、city 或 content 之一".into());
+    }
+    desktop.widget_update(id, Value::Object(fields))?;
     Ok(format!("已更新桌面组件 {id}"))
 }
 
@@ -985,6 +1032,19 @@ pub fn tools_in_workspace(desktop: Arc<dyn Desktop>, workspace: &std::path::Path
             d.open_page(page, tab)?;
             Ok(match tab { Some(tab) => format!("已打开 {page} 页面的 {tab}"), None => format!("已打开 {page} 页面") })
         }),
+        tool(&desktop, ToolSpec::new("desktop_settings_set", "切换小伴桌面的外观：深色/浅色/跟随系统（appearance）、主题色（accent）、暂停或恢复桌面动画（animationPaused，省电、专心时用）。至少给一项；当前值用 desktop_status 查看。", object(json!({
+            "appearance":{"type":"string","enum":crate::preferences::APPEARANCES,"description":"system 跟随系统，light 浅色，dark 深色"},
+            "accent":{"type":"string","enum":crate::preferences::ACCENTS,"description":"主题色：red 红、green 绿、blue 蓝、purple 紫、amber 琥珀、graphite 石墨"},
+            "animationPaused":{"type":"boolean","description":"true 暂停桌面动画，false 恢复"}
+        }), &[])).risk(Risk::Write).self_managed().serial(), |d, a| {
+            let appearance = optional_text(a, "appearance")?;
+            let accent = optional_text(a, "accent")?;
+            let paused = optional_bool(a, "animationPaused")?;
+            if appearance.is_none() && accent.is_none() && paused.is_none() { return Err("请至少给 appearance、accent 或 animationPaused 之一".into()); }
+            if appearance.is_some_and(|v| !crate::preferences::APPEARANCES.contains(&v)) { return Err(format!("appearance 只能是 {}", crate::preferences::APPEARANCES.join("、"))); }
+            if accent.is_some_and(|v| !crate::preferences::ACCENTS.contains(&v)) { return Err(format!("accent 只能是 {}", crate::preferences::ACCENTS.join("、"))); }
+            d.set_display(appearance, accent, paused).map(|v| v.to_string())
+        }),
         tool(&desktop, ToolSpec::new("desktop_windows", "查看小伴自己的窗口和显示器：盆栽 companion、超级小伴 assistant、控制台 control、桌面组件 widget:<id> 的位置、显示状态和层级。移动前用本工具确认目标与显示器。", none()).risk(Risk::Read).parallel(), |d, _| d.windows().map(|v| v.to_string())),
         tool(&desktop, ToolSpec::new("desktop_window_set", "调整小伴自己窗口的位置、层级（置顶/贴桌面）、显示/隐藏，不操作其他应用。target: companion 是盆栽，assistant 是超级小伴悬浮条（用户让你收起来时用 action=collapse），control 是设置控制台，widget:<id> 是组件。移动 x/y 使用屏内比例（0 左/上，0.5 中间，1 右/下），可指定 desktop_windows 返回的 monitor。layer: desktop 贴桌面、normal 普通窗口（组件只能 desktop/topmost）、topmost 置顶；组件（widget:<id>）的层级会保存、重启后仍保持；盆栽、超级小伴、控制台的层级只在本次运行有效。隐藏盆栽或组件会保存开关；收起助手不退出应用、不取消任务。", object(json!({
             "target":{"type":"string"},"action":{"type":"string","enum":["show","hide","collapse"]},
@@ -1123,17 +1183,18 @@ pub fn tools_in_workspace(desktop: Arc<dyn Desktop>, workspace: &std::path::Path
             care_set,
         ),
         tool(&desktop, ToolSpec::new("care_delete", "删除一条关怀提醒，id 来自 care_list。", object(json!({"id": {"type": "string"}}), &["id"])).risk(Risk::Write).self_managed().serial(), care_delete),
-        tool(&desktop, ToolSpec::new("widget_list", "列出新版桌面组件的 id、类型、缩放和显示状态。", none()).risk(Risk::Read).parallel(), widget_list),
+        tool(&desktop, ToolSpec::new("widget_list", "列出新版桌面组件的 id、类型、缩放、层级和显示状态，并列出待办、日程、纪念日、股票的内容（含条目 id）。", none()).risk(Risk::Read).parallel(), widget_list),
         tool(
             &desktop,
             ToolSpec::new(
                 "widget_add",
-                "在桌面放置新版时钟、天气、待办、今日日程、股票、电子木鱼、月历或纪念日组件。kind 必填；用户没说要哪种时先用 ask_user 问，不要空参数调用。可同时设层级（layer=topmost 置顶）。固定 ivory 材质，支持多实例，不设组件数量上限。",
+                "在桌面放置新版时钟、天气、待办、今日日程、股票、电子木鱼、月历或纪念日组件。kind 必填；用户没说要哪种时先用 ask_user 问，不要空参数调用。可用 content 同时填内容（待办、纪念日、日程、股票），如“加个待办：买花”。可设层级（layer=topmost 置顶）。固定 ivory 材质，支持多实例，不设组件数量上限。",
                 object(
                     json!({
                         "kind": {"type": "string", "enum": crate::widgets::KINDS, "description": "组件类型"},
                         "theme": {"type": "string", "enum": ["ivory"], "description": "可选外观风格，固定 ivory（设计稿材质）"},
                         "layer": {"type": "string", "enum": ["desktop", "topmost"], "description": "可选层级：desktop 贴在桌面（默认），topmost 始终置顶（浮在其他窗口上方）。会保存，重启后仍保持，不是临时的"},
+                        "content": widget_content_schema(),
                     }),
                     &["kind"],
                 ),
@@ -1173,12 +1234,13 @@ pub fn tools_in_workspace(desktop: Arc<dyn Desktop>, workspace: &std::path::Path
             &desktop,
             ToolSpec::new(
                 "widget_update",
-                "修改已有的桌面组件：层级/置顶（layer）、外观风格、缩放大小（0.75-1.5）、位置（x, y 为 0.0-1.0 比例）、显示/隐藏或城市。至少给一项修改。",
+                "修改已有的桌面组件：内容（content，改前先 widget_list 看 id）、层级/置顶（layer）、外观风格、缩放大小（0.75-1.5）、位置（x, y 为 0.0-1.0 比例）、显示/隐藏或城市。至少给一项修改。",
                 object(
                     json!({
                         "id": {"type": "string", "description": "组件 id，来自 widget_list"},
                         "theme": {"type": "string", "enum": ["ivory"]},
                         "layer": {"type": "string", "enum": ["desktop", "topmost"], "description": "desktop 贴在桌面，topmost 始终置顶（浮在其他窗口上方）。会保存，重启后仍保持，不是临时的"},
+                        "content": widget_content_schema(),
                         "scale": {"type": "number", "minimum": 0.75, "maximum": 1.5, "description": "缩放比例"},
                         "enabled": {"type": "boolean", "description": "true 显示，false 隐藏"},
                         "x": {"type": "number", "minimum": 0.0, "maximum": 1.0, "description": "水平位置比例"},
@@ -1346,6 +1408,7 @@ mod tests {
         rules: Mutex<Vec<Value>>,
         templates: Mutex<Vec<Value>>,
         fail_widget_update: Mutex<Option<String>>,
+        extra_widgets: Mutex<Vec<Value>>,
         fail: Mutex<Option<String>>,
         saved: Mutex<Option<(String, u64)>>,
     }
@@ -1419,10 +1482,12 @@ mod tests {
             self.log(format!("delete {id}"))
         }
         fn widgets(&self) -> Result<Value, String> {
-            Ok(json!({"widgets": [
-                {"id": "wgt-1", "kind": "clock", "theme": "ivory", "scale": 1.0, "x": 0.5, "y": 0.1, "enabled": true},
-                {"id": "wgt-2", "kind": "weather", "theme": "ivory", "scale": 1.2, "x": 0.8, "y": 0.1, "enabled": false, "city": {"name": "上海"}},
-            ]}))
+            let mut widgets = vec![
+                json!({"id": "wgt-1", "kind": "clock", "theme": "ivory", "scale": 1.0, "x": 0.5, "y": 0.1, "enabled": true}),
+                json!({"id": "wgt-2", "kind": "weather", "theme": "ivory", "scale": 1.2, "x": 0.8, "y": 0.1, "enabled": false, "city": {"name": "上海"}}),
+            ];
+            widgets.extend(self.extra_widgets.lock().unwrap_or_else(|e| e.into_inner()).clone());
+            Ok(json!({"widgets": widgets}))
         }
         fn widget_add(&self, kind: &str) -> Result<Value, String> {
             self.log(format!("widget-add {kind}"))?;
@@ -1478,6 +1543,10 @@ mod tests {
         fn open_page(&self, page: &str, tab: Option<&str>) -> Result<(), String> {
             self.log(format!("open-page {page} {}", tab.unwrap_or("-")))
         }
+        fn set_display(&self, appearance: Option<&str>, accent: Option<&str>, paused: Option<bool>) -> Result<Value, String> {
+            self.log(format!("display {} {} {}", appearance.unwrap_or("-"), accent.unwrap_or("-"), paused.map_or("-".to_string(), |p| p.to_string())))?;
+            Ok(json!({"appearance": appearance.unwrap_or("system"), "accent": accent.unwrap_or("blue"), "animationPaused": paused.unwrap_or(false)}))
+        }
         fn request_permissions(&self) -> Result<Value, String> {
             self.log("request-permissions".to_string())?;
             Ok(json!({"ok": true, "message": "已申请系统权限"}))
@@ -1500,7 +1569,7 @@ mod tests {
         let mut unique = names.clone();
         unique.dedup();
         assert_eq!(names, unique);
-        assert_eq!(names.len(), 43);
+        assert_eq!(names.len(), 44);
         for tool in &all {
             let spec = tool.spec();
             assert!(spec.name.len() <= 64 && spec.name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_'), "{}", spec.name);
@@ -1815,6 +1884,19 @@ mod tests {
     }
 
     #[test]
+    fn display_settings_switch_the_look_and_pause_the_animation() {
+        let fake = Arc::new(Fake::default());
+        let out: Value = serde_json::from_str(&call(&fake, "desktop_settings_set", json!({"appearance": "dark", "animationPaused": true})).unwrap()).unwrap();
+        assert_eq!((out["appearance"].as_str(), out["animationPaused"].as_bool()), (Some("dark"), Some(true)));
+        call(&fake, "desktop_settings_set", json!({"accent": "green"})).unwrap();
+        assert_eq!(fake.calls(), vec!["display dark - true", "display - green -"]);
+        assert!(call(&fake, "desktop_settings_set", json!({})).unwrap_err().contains("至少"));
+        assert!(call(&fake, "desktop_settings_set", json!({"appearance": "neon"})).unwrap_err().contains("appearance 只能是"));
+        assert!(call(&fake, "desktop_settings_set", json!({"accent": "pink"})).unwrap_err().contains("accent 只能是"));
+        assert_eq!(fake.calls().len(), 2, "a refused call changes nothing");
+    }
+
+    #[test]
     fn open_page_validates_and_app_guide_answers_without_the_app() {
         let fake = Arc::new(Fake::default());
         assert_eq!(call(&fake, "open_page", json!({"page":"settings","tab":"network"})).unwrap(), "已打开 settings 页面的 network");
@@ -1825,6 +1907,32 @@ mod tests {
         assert_eq!(fake.calls().len(), 2, "a rejected page opens nothing");
         assert!(call(&fake, "app_guide", json!({"topic":"置顶"})).unwrap().contains("widget_update"));
         assert!(call(&fake, "app_guide", json!({})).unwrap().contains("settings-network"));
+    }
+
+    #[test]
+    fn widget_content_is_set_on_add_and_on_update_and_listed_with_ids() {
+        let fake = Arc::new(Fake::default());
+        fake.extra_widgets.lock().unwrap_or_else(|e| e.into_inner()).push(json!({"id": "wgt-3", "kind": "notes", "theme": "ivory", "scale": 1.0, "x": 0.5, "y": 0.1, "enabled": true,
+            "note": {"title": "今日待办", "mode": "todo", "text": "", "items": [{"id": "a1", "text": "买花", "done": false, "time": "", "date": "", "notify": false, "repeat": "none", "completedOn": ""}]}}));
+        let listed = call(&fake, "widget_list", json!({})).unwrap();
+        assert!(listed.contains("[a1] 买花"), "{listed}");
+
+        call(&fake, "widget_update", json!({"id": "wgt-3", "content": {"items": [{"id": "a1", "text": "买花", "done": true}]}})).unwrap();
+        let last = fake.calls().last().unwrap().clone();
+        assert!(last.starts_with("widget-update wgt-3 ") && last.contains(r#""done":true"#) && last.contains(r#""mode":"todo""#), "{last}");
+
+        call(&fake, "widget_add", json!({"kind": "notes", "content": {"items": ["喝水"]}})).unwrap();
+        let last = fake.calls().last().unwrap().clone();
+        assert!(last.starts_with("widget-update wgt-new ") && last.contains("喝水"), "{last}");
+
+        let before = fake.calls().len();
+        assert!(call(&fake, "widget_add", json!({"kind": "notes", "content": {"items": [{"text": "x", "date": "明天"}]}})).unwrap_err().contains("YYYY-MM-DD"));
+        assert!(call(&fake, "widget_add", json!({"kind": "clock", "content": {"title": "x"}})).is_err());
+        assert_eq!(fake.calls().len(), before, "a bad content creates nothing");
+        assert!(call(&fake, "widget_update", json!({"id": "wgt-1", "content": {"title": "x"}})).unwrap_err().contains("notes"));
+        assert!(call(&fake, "widget_update", json!({"id": "nope", "content": {"title": "x"}})).unwrap_err().contains("widget_list"));
+        assert!(call(&fake, "widget_update", json!({"id": "wgt-3", "content": {"items": ["x"]}, "layer": "topmost"})).unwrap().contains("wgt-3"));
+        assert!(fake.calls().last().unwrap().contains(r#""layer":"topmost""#));
     }
 
     #[test]

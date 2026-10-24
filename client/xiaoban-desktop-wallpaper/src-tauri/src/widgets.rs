@@ -58,7 +58,7 @@ fn valid_date(v:&str)->bool {chrono::NaiveDate::parse_from_str(v,"%Y-%m-%d").is_
 fn valid_schedule(repeat:&str,notify:bool,date:&str,time:&str,completed:&str)->bool {
  ["none","daily","weekdays","weekly"].contains(&repeat)&& (completed.is_empty()||valid_date(completed)) && (!(notify||repeat!="none")||(valid_date(date)&&valid_time(time)))
 }
-fn valid_stock_symbol(symbol:&str)->bool{
+pub(crate) fn valid_stock_symbol(symbol:&str)->bool{
     let Some((market,code))=symbol.split_once('.') else{return false;};
     if market=="116" {return code.len()==5 && code.bytes().all(|b|b.is_ascii_digit());}
     code.len()==6 && code.bytes().all(|b|b.is_ascii_digit()) &&

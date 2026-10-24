@@ -347,8 +347,8 @@ impl SkillManage {
             "properties": {
                 "action": { "type": "string", "enum": ["create", "patch", "delete"] },
                 "name": { "type": "string", "description": "Lowercase letters, digits and hyphens, at most 64 characters." },
-                "description": { "type": "string", "description": "One line saying what the skill does and when to use it. Required for create." },
-                "content": { "type": "string", "description": "Markdown instructions. Required for create." },
+                "description": { "type": "string", "description": format!("One line saying what the skill does and when to use it, at most {MAX_DESCRIPTION_CHARS} characters. Required for create.") },
+                "content": { "type": "string", "description": format!("Markdown instructions, 1 to {MAX_BODY_BYTES} bytes. Required for create.") },
                 "old_string": { "type": "string", "description": "For patch: exact text in the body to replace; must occur once." },
                 "new_string": { "type": "string", "description": "For patch: the replacement text." }
             },

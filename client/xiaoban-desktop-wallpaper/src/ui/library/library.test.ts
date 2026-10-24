@@ -66,7 +66,7 @@ function setup(overrides: Record<string, unknown> = {}) {
     if (command === 'chat_memory_set_remembering') { mem = { ...mem, remembering: Boolean(args.enabled) }; return; }
     return undefined;
   });
-  const chat = reactive({ sessions: [{ id: 'chat-1', title: '整理计划' }], select: vi.fn(async () => {}) });
+  const chat = reactive({ sessions: [{ id: 'chat-1', title: '整理计划' }], views: {} as Record<string, { items: unknown[] }>, select: vi.fn(async () => {}) });
   const store = reactive({ desktop: true, notify: vi.fn(), navigate: vi.fn(), chat, creationDraft: null as string | null, creationAttachments: null as unknown[] | null, ...overrides });
   const wrapper = mount(LibraryPage, { attachTo: document.body, props: { store: store as never } });
   return { wrapper, store, chat };
@@ -82,6 +82,19 @@ describe('资料库 page', () => {
     expect(wrapper.findAll('[role="tab"]').map(t => t.text())).toEqual(['我的文档4', '云文档1', '收藏1', '记忆4']);
     await wrapper.get('[data-testid="library-search"]').setValue('预算');
     expect(wrapper.get('[data-testid="library-tab-docs"]').text()).toBe('我的文档1');
+  });
+
+  it('refreshes 记忆 when the assistant saves a note, but not when the save failed', async () => {
+    const { chat } = setup();
+    await flushPromises();
+    const reads = () => invoke.mock.calls.filter(([command]) => command === 'chat_memory_overview').length;
+    const before = reads();
+    chat.views['chat-1'] = { items: [{ kind: 'tool', id: 't1', name: 'memory_write', status: 'error' }] };
+    await flushPromises();
+    expect(reads()).toBe(before);
+    chat.views['chat-1'].items.push({ kind: 'tool', id: 't2', name: 'memory_write', status: 'done' });
+    await flushPromises();
+    expect(reads()).toBe(before + 1);
   });
 
   it('opens folders, shows a folder’s subfolders first, and moves a document', async () => {

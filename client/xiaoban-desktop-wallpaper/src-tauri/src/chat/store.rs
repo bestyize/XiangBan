@@ -153,6 +153,14 @@ async fn catalog_json(app: &tauri::AppHandle, path: &str, pairs: &[(&str, String
     catalog::fetch(&origin, path, pairs).await
 }
 
+/// The assistant's `skill_search` asks the same catalog as this page. `None` only when the website has no such route.
+pub(super) async fn search_skills(app: &tauri::AppHandle, keyword: &str, page: u32, sort_by: &str) -> Result<Option<Value>, String> {
+    catalog_json(app, "/api/v1/ai/plugins", &[
+        ("keyword", keyword.to_string()), ("page", page.to_string()), ("category", String::new()),
+        ("source", String::new()), ("sortBy", sort_by.to_string()),
+    ]).await
+}
+
 #[tauri::command]
 pub async fn ai_store_inspect(app: tauri::AppHandle, window: tauri::WebviewWindow, slug: String, version: String, namespace: Option<String>) -> Result<Value, String> {
     control(&window)?;

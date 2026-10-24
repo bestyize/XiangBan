@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { FolderUp, Plus, Search, Upload } from 'lucide-vue-next';
 import { invoke, listen } from '../../bridge.ts';
 import type { ControlStore } from '../control-types.ts';
@@ -15,6 +15,9 @@ const notify = (message: unknown, type: 'success' | 'error' | 'info' = 'success'
 const library = createLibraryStore({ desktop: props.store.desktop, invoke, listen, notify });
 onMounted(() => { void library.init(); });
 onBeforeUnmount(() => library.dispose());
+/** A note the assistant has just saved shows up in 记忆 without leaving and re-entering the page. */
+const notesSaved = computed(() => Object.values(props.store.chat?.views ?? {}).reduce((sum, view) => sum + view.items.filter(item => item.kind === 'tool' && item.name === 'memory_write' && item.status === 'done').length, 0));
+watch(notesSaved, () => { void library.refreshMemory(); });
 
 type Tab = 'docs' | 'cloud' | 'saved' | 'memory';
 const TAB_KEY = 'xiaoban.library-tab';

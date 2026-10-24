@@ -39,7 +39,7 @@ impl Shell {
     pub fn new(cwd: impl Into<PathBuf>) -> Self {
         let schema = json!({
             "type": "object",
-            "properties": { "command": { "type": "string", "description": "One command line, run by the system shell." } },
+            "properties": { "command": { "type": "string", "description": format!("One command line, run by the system shell, at most {MAX_COMMAND_CHARS} characters. Put a long script in a file instead.") } },
             "required": ["command"]
         });
         let description = "Run a shell command in the working directory and return its combined output and exit code. \
