@@ -62,7 +62,7 @@ pub(super) const FEATURES: &[Feature] = &[
         does: "开始或关闭小游戏，创作和删除自己的游戏；桌面层游戏直接浮在桌面上。", by_hand: "",
         tools: &["game_list", "game_open", "game_close", "game_read_format", "game_create", "game_delete"] },
     Feature { id: "care", name: "提醒与定时任务", path: "侧栏「提醒」", page: Some(("care", None)),
-        does: "管理关怀提醒（下班、休息、自定义）和定时任务，设置时间、重复规则。", by_hand: "天气来源等提醒设置在页面里改。",
+        does: "到点提醒：用户说“X点提醒我”“到时候叫我”“定个闹钟”“每天…提醒我”都用它。能管理关怀提醒（下班、休息、自定义；一次性、每天、每周几）和定时任务（到点由小伴在后台做事），小伴运行时到点会在桌面弹出提醒气泡。", by_hand: "天气来源等提醒设置在页面里改。",
         tools: &["care_list", "care_set", "care_delete"] },
     Feature { id: "windows", name: "小伴窗口位置与层级", path: "对话里直接说，没有单独页面", page: None,
         does: "查看和移动小伴自己的窗口（盆栽、超级小伴悬浮条、组件、宠物、控制台），设置置顶或贴桌面，收起悬浮条、显示或隐藏。组件和宠物的层级会保存；盆栽、超级小伴、控制台的层级只在本次运行有效。不能操作其他应用的窗口。",
