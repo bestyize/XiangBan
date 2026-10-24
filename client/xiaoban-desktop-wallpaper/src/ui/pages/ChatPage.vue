@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
-import { NButton, NInput } from 'naive-ui';
+import { NButton, NInput, NModal } from 'naive-ui';
 import { ArrowDown, ArrowUpRight, Check, ChevronDown, ChevronRight, ChevronUp, Copy, Ellipsis, FileText, LoaderCircle, PanelRight, Pencil, RefreshCw, Search, Settings, ShieldAlert, ShieldCheck, Sparkles, Sprout, Star, Target, Trash2, Volume2, X } from 'lucide-vue-next';
 import { invoke } from '../../bridge.ts';
 import type { ControlStore } from '../control-types.ts';
@@ -28,6 +28,7 @@ const composer = ref<InstanceType<typeof ChatComposer> | null>(null);
 const modelDialog = ref(false);
 const guideDialog = ref(false);
 const goalOpen = ref(false);
+const goalBusy = ref(false);
 const retryAfterSwitch = ref(false);
 function chooseModel(retry = false) { retryAfterSwitch.value = retry; modelDialog.value = true; }
 async function modelSwitched() {
@@ -157,7 +158,7 @@ function closeMore() { moreOpen.value = false; }
 function onOutside(event: PointerEvent) { if (moreRoot.value && !moreRoot.value.contains(event.target as Node)) closeMore(); }
 watch(moreOpen, open => { if (open) document.addEventListener('pointerdown', onOutside); else document.removeEventListener('pointerdown', onOutside); });
 onBeforeUnmount(() => document.removeEventListener('pointerdown', onOutside));
-function toggleGoal() { closeMore(); goalOpen.value = !goalOpen.value; }
+function toggleGoal() { closeMore(); goalOpen.value = true; }
 function openGuide() { closeMore(); guideDialog.value = true; }
 
 const renaming = ref(false);
@@ -239,6 +240,14 @@ async function openLink(href: string) {
 <template>
   <ModelSwitchDialog v-model:show="modelDialog" :retry="retryAfterSwitch" @switched="modelSwitched" @settings="openAiSettings" />
   <GuideModal v-model:show="guideDialog" :desktop="store.desktop" @select-prompt="useExample" @open-settings="openAiSettings" />
+  <NModal v-model:show="goalOpen" :mask-closable="!goalBusy" :close-on-esc="!goalBusy">
+    <div class="goal-modal-content">
+      <ChatGoalPanel v-if="goalOpen" :session-id="chat.currentId" :running="running"
+        :configured="chat.configured" :desktop="store.desktop" :permission-mode="chat.permissionMode"
+        :session-title="title" @busy-change="goalBusy = $event"
+        @close="goalOpen = false" @session-created="goalSessionCreated" @changed="chat.refresh()" />
+    </div>
+  </NModal>
   <ChatNameDialog :show="renaming" title="重命名对话" placeholder="给这个对话起个名字" :initial="session?.title ?? ''" :max-length="60" confirm-text="保存" :busy="renameBusy" @close="renaming = false" @submit="submitRename" />
   <section class="chat-page" data-testid="chat-page">
     <div class="chat-main">
@@ -264,7 +273,7 @@ async function openLink(href: string) {
             <button type="button" class="xb-icon-btn" data-testid="chat-more" aria-haspopup="menu" :aria-expanded="moreOpen" aria-label="更多" title="更多" @click="moreOpen = !moreOpen"><Ellipsis :size="16" /></button>
             <div v-show="moreOpen" class="xb-menu more-menu" role="menu" aria-label="更多">
               <button type="button" class="xb-menu-item" role="menuitem" data-testid="chat-menu-rename" :disabled="!session" @click="startRename"><Pencil :size="15" />重命名</button>
-              <button type="button" class="xb-menu-item" role="menuitemcheckbox" data-testid="chat-goal-toggle" :aria-checked="goalOpen" :aria-expanded="goalOpen" @click="toggleGoal"><Target :size="15" />长期目标<Check v-if="goalOpen" :size="14" class="xb-menu-check" /></button>
+              <button type="button" class="xb-menu-item" role="menuitem" data-testid="chat-goal-toggle" aria-haspopup="dialog" @click="toggleGoal"><Target :size="15" />长期目标</button>
               <button type="button" class="xb-menu-item" role="menuitem" data-testid="chat-open-guide" title="查看小伴 AI 玩法指南与提示词手册" @click="openGuide"><Sparkles :size="15" />玩法指南</button>
               <button type="button" class="xb-menu-item" role="menuitem" data-testid="chat-ai-config" title="设置 → AI 模型：选择小伴 AI，或配置自己的模型服务" @click="openAiSettings"><Settings :size="15" />AI 模型配置</button>
               <div class="xb-menu-sep" />
@@ -278,10 +287,6 @@ async function openLink(href: string) {
         <button type="button" class="xb-btn is-sm" @click="confirmingDelete = ''">取消</button>
         <button type="button" class="xb-btn is-sm is-danger" :data-testid="`chat-delete-yes-${confirmingDelete}`" @click="remove(confirmingDelete)">删除</button>
       </div>
-      <ChatGoalPanel v-if="goalOpen" class="goal-panel" :session-id="chat.currentId" :running="running"
-        :configured="chat.configured" :desktop="store.desktop"
-        :permission-mode="chat.permissionMode"
-        @session-created="goalSessionCreated" @changed="chat.refresh()" />
 
       <div ref="scroller" class="chat-scroll" data-testid="chat-messages" @scroll.passive="onScroll">
         <div class="chat-column">
@@ -431,6 +436,7 @@ async function openLink(href: string) {
 </template>
 
 <style scoped>
+.goal-modal-content{width:fit-content;max-width:100%;outline:none}
 .chat-page{flex:1;min-height:0;min-width:0;display:flex;background:var(--ui-surface);position:relative}
 .chat-main{flex:1;display:flex;flex-direction:column;min-height:0;min-width:0;position:relative}
 
@@ -456,7 +462,6 @@ async function openLink(href: string) {
 .more-menu .xb-menu-item:disabled:hover{background:transparent}
 .delete-bar{display:flex;align-items:center;gap:8px;margin:0 24px 8px;padding:8px 10px 8px 14px;border-radius:10px;background:color-mix(in srgb,var(--ui-danger) 8%,var(--ui-surface));font-size:13px;color:var(--ui-text-primary)}
 .delete-bar span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.goal-panel{margin:0 24px 8px}
 
 /* Messages */
 .chat-scroll{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;scrollbar-width:thin;scrollbar-color:var(--ui-scrollbar) transparent;overscroll-behavior:contain}

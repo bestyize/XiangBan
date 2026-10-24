@@ -2,7 +2,7 @@
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import ChatGoalPanel from './ChatGoalPanel.vue';
-import { NCheckbox } from 'naive-ui';
+import { NSwitch } from 'naive-ui';
 
 vi.mock('../../bridge.ts', () => ({ invoke: vi.fn(), listen: vi.fn(async () => () => {}) }));
 import { invoke } from '../../bridge.ts';
@@ -37,9 +37,11 @@ describe('durable goal workbench', () => {
     });
     const wrapper = open();
     await flushPromises();
+    expect((wrapper.get('[data-testid="goal-options"]').element as HTMLDetailsElement).open).toBe(false);
+    wrapper.get('[data-testid="goal-options"]').element.setAttribute('open', '');
     await wrapper.get('[data-testid="goal-outcome"] textarea').setValue('修复构建');
     await wrapper.get('[data-testid="goal-verification-command"] input').setValue('npm test -- --run');
-    wrapper.findComponent(NCheckbox).vm.$emit('update:checked', true);
+    wrapper.findComponent(NSwitch).vm.$emit('update:value', true);
     await wrapper.findAll('button').find(b => b.text().includes('保存目标'))!.trigger('click');
     await flushPromises();
     expect(invoke).toHaveBeenCalledWith('chat_goal_set', expect.objectContaining({
@@ -87,7 +89,7 @@ describe('durable goal workbench', () => {
     const wrapper = open();
     await flushPromises();
     expect(wrapper.get('[data-testid="goal-state"]').text()).toContain('需人工核验');
-    expect(wrapper.text()).not.toContain('继续目标（新回合）');
+    expect(wrapper.text()).not.toContain('继续执行');
     await wrapper.get('[data-testid="goal-evidence"] textarea').setValue('检查了外部状态');
     await wrapper.findAll('button').find(b => b.text().includes('已核验中断现场'))!.trigger('click');
     await flushPromises();
@@ -95,6 +97,42 @@ describe('durable goal workbench', () => {
       sessionId: 's1', evidence: '检查了外部状态',
     });
     expect(wrapper.get('[data-testid="goal-state"]').text()).toContain('已暂停');
-    expect(wrapper.text()).toContain('继续目标（新回合）');
+    expect(wrapper.text()).toContain('继续执行');
+  });
+
+  it('requires evidence before completing a goal and offers a clean new goal after acceptance', async () => {
+    vi.mocked(invoke).mockImplementation(async command => {
+      if (command === 'chat_goal_get') return goal('awaiting_verification') as never;
+      if (command === 'chat_goal_finish') return goal('completed') as never;
+      throw new Error('unexpected ' + command);
+    });
+    const wrapper = open();
+    await flushPromises();
+    expect((wrapper.get('[data-testid="goal-finish"]').element as HTMLButtonElement).disabled).toBe(true);
+    await wrapper.get('[data-testid="goal-evidence"] textarea').setValue('测试通过，已检查报告');
+    await wrapper.get('[data-testid="goal-finish"]').trigger('click');
+    await flushPromises();
+    expect(invoke).toHaveBeenCalledWith('chat_goal_finish', { sessionId: 's1', evidence: '测试通过，已检查报告' });
+    expect(wrapper.get('[data-testid="goal-completed"]').text()).toContain('目标已确认完成');
+    expect(wrapper.find('[data-testid="goal-outcome"]').exists()).toBe(false);
+    await wrapper.findAll('button').find(b => b.text() === '新建目标')!.trigger('click');
+    expect((wrapper.get('[data-testid="goal-outcome"] textarea').element as HTMLTextAreaElement).value).toBe('');
+  });
+
+  it('closing the dialog leaves a running goal active while the pause action explicitly stops it', async () => {
+    vi.mocked(invoke).mockImplementation(async command => {
+      if (command === 'chat_goal_get') return goal('running') as never;
+      if (command === 'chat_goal_pause') return goal('paused') as never;
+      throw new Error('unexpected ' + command);
+    });
+    const wrapper = open({ running: true });
+    await flushPromises();
+    await wrapper.get('[data-testid="goal-close"]').trigger('click');
+    expect(wrapper.emitted('close')).toHaveLength(1);
+    expect(invoke).not.toHaveBeenCalledWith('chat_goal_pause', expect.anything());
+    await wrapper.findAll('button').find(b => b.text() === '暂停执行')!.trigger('click');
+    await flushPromises();
+    expect(invoke).toHaveBeenCalledWith('chat_goal_pause', { sessionId: 's1' });
+    expect(wrapper.get('[data-testid="goal-state"]').text()).toContain('已暂停');
   });
 });

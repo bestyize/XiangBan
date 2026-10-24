@@ -207,12 +207,22 @@ describe('the chat page before a conversation', () => {
     expect(document.body.textContent).toContain('小伴桌面 · AI 玩法指南');
   });
 
-  it('toggles the long-term goal panel from the more menu', async () => {
+  it('opens long-term goals in a separate dialog and closes it without changing the chat', async () => {
     await open();
-    expect(q('chat-goal-toggle')!.getAttribute('aria-checked')).toBe('false');
+    expect(inBody('chat-goal-panel')).toBeNull();
     await click('chat-more');
+    expect(q('chat-goal-toggle')!.getAttribute('aria-haspopup')).toBe('dialog');
     await click('chat-goal-toggle');
-    expect(q('chat-goal-toggle')!.getAttribute('aria-checked')).toBe('true');
+    const dialog = inBody('chat-goal-panel')!;
+    expect(dialog.getAttribute('role')).toBe('dialog');
+    expect(dialog.getAttribute('aria-modal')).toBe('true');
+    expect(dialog.textContent).toContain('想完成什么');
+    expect(q('chat-goal-panel')).toBeNull();
+    expect(q('chat-more')!.getAttribute('aria-expanded')).toBe('false');
+    expect(q('chat-input')).not.toBeNull();
+    await clickBody('goal-close');
+    expect(inBody('chat-goal-panel')).toBeNull();
+    expect(q('chat-input')).not.toBeNull();
   });
 });
 
