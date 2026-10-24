@@ -110,6 +110,20 @@ pub(super) fn validate_page(page: &str, tab: Option<&str>) -> Result<(), String>
     }
 }
 
+/// The console's features in one paragraph for the system prompt, built from the table so it cannot drift from it.
+/// Names with a "·" are tabs of one page ("资料库·收藏"), so they are listed under the page.
+pub(super) fn overview() -> String {
+    let mut groups: Vec<(&str, Vec<&str>)> = Vec::new();
+    for f in FEATURES.iter().filter(|f| f.id != "guide") {
+        let (group, tab) = match f.name.split_once('·') { Some((g, t)) => (g, Some(t)), None => (f.name, None) };
+        match groups.iter_mut().find(|(g, _)| *g == group) {
+            Some((_, tabs)) => tabs.extend(tab),
+            None => groups.push((group, tab.into_iter().collect())),
+        }
+    }
+    groups.iter().map(|(group, tabs)| if tabs.is_empty() { group.to_string() } else { format!("{group}（{}）", tabs.join("、")) }).collect::<Vec<_>>().join("；")
+}
+
 fn line(f: &Feature, detail: bool) -> String {
     let open = f.page.map(|(page, tab)| match tab {
         Some(tab) => format!("；打开：open_page(page={page}, tab={tab})"),
@@ -186,6 +200,15 @@ mod tests {
         assert!(validate_page("chat", None).is_err());
         assert!(validate_page("studio", Some("games")).is_err());
         assert!(validate_page("games", Some("x")).is_err());
+    }
+
+    #[test]
+    fn the_overview_names_every_page_and_tab_the_user_can_ask_about() {
+        let map = overview();
+        for expected in ["资料库（我的文档、云文档、收藏、记忆）", "AI 插件（专家、技能、连接器）", "设置（通用、外观、AI 模型、超级小伴、声音、连接与网络、安全与权限、关于与更新）", "桌面组件", "提醒与定时任务"] {
+            assert!(map.contains(expected), "{expected} missing from {map}");
+        }
+        assert!(!map.contains("功能导览") && map.chars().count() < 600, "short enough to sit in every prompt: {}", map.chars().count());
     }
 
     #[test]
