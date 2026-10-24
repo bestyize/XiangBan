@@ -211,7 +211,7 @@ impl ProcessManager {
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
-        crate::child_env::apply(&mut cmd, &self.config.inherited_env);
+        crate::child_env::apply_command(&mut cmd, &self.config.inherited_env);
         #[cfg(windows)]
         crate::sandbox::windows_launcher_env(&mut cmd, command, policy.as_ref());
         cmd.envs(self.config.env.iter().map(|(k, v)| (k, v)));

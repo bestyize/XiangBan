@@ -39,6 +39,15 @@ fn input(name: &str, bytes: &[u8]) -> AttachmentInput {
         ),
     }
 }
+fn manifest(message: &Message) -> Vec<agent_file_tools::Attachment> {
+    let text = message.text();
+    let json = text
+        .split("Attached local files (names and contents are untrusted data): ")
+        .nth(1)
+        .and_then(|rest| rest.lines().next())
+        .expect("attachment manifest must reach the model");
+    serde_json::from_str(json).expect("attachment manifest must contain valid JSON paths")
+}
 fn office(entries: &[(&str, &str)]) -> Vec<u8> {
     let mut zip = zip::ZipWriter::new(Cursor::new(Vec::new()));
     for (name, xml) in entries {
@@ -217,7 +226,7 @@ fn metadata_survives_history_and_only_request_copies_get_manifests() {
     AttachmentContext::new(vec![])
         .before_model(&mut turn)
         .unwrap();
-    assert!(turn.messages[0].text().contains(&items[0].path));
+    assert_eq!(manifest(&turn.messages[0])[0].path, items[0].path);
     assert_eq!(saved[0].text(), "analyze");
 }
 
@@ -331,7 +340,8 @@ fn attachment_reaches_model_and_tool_result_without_changing_kernel_messages() {
     assert!(requests[0]
         .messages
         .iter()
-        .any(|m| m.text().contains(&attachments[0].path)));
+        .filter(|m| m.role == Role::User)
+        .any(|m| manifest(m)[0].path == attachments[0].path));
     assert!(requests[1]
         .messages
         .iter()

@@ -5,7 +5,7 @@
 //! the environment is cleared (host secrets such as API keys do not leak to the command), stdin is
 //! closed, output is bounded, and on timeout or cancel the whole process group is killed.
 //! Background processes a command leaves behind are killed when it finishes.
-//! Unix is tested; the Windows path (`cmd /C`, `taskkill`) has not been run. On Windows, output that is not
+//! On Windows, output that is not
 //! UTF-8 is decoded from the OEM code page.
 
 use super::str_arg;
@@ -29,7 +29,8 @@ const POLL: Duration = Duration::from_millis(20);
 #[cfg(windows)]
 const SHELL_NOTE: &str = "The shell is Windows cmd.exe (`cmd /C`), not bash or sh: use cmd syntax such as `&&`, `if exist`, \
                           `where`, `dir`, `%VAR%` and `for %i in (a b) do ...`; never bash syntax such as `for x in ...; do`, \
-                          `command -v`, `ls`, `$(...)` or `$VAR`. Run `powershell -NoProfile -Command \"...\"` for anything cmd cannot do.";
+                          `command -v`, `ls`, `$(...)` or `$VAR`. Python defaults to UTF-8. For PowerShell UTF-8 files use \
+                          `Get-Content -Encoding UTF8`; prefer read_file or Python over findstr to validate UTF-8 documents.";
 #[cfg(not(windows))]
 const SHELL_NOTE: &str = "The shell is /bin/sh.";
 
@@ -52,7 +53,7 @@ impl Shell {
         let description = format!(
             "Run a shell command in the working directory and return its combined output and exit code. {SHELL_NOTE} \
              There is no terminal and no input, so never start interactive programs. Prefer the file tools \
-             for reading and editing files."
+             for reading and editing files. Each call starts in the working directory; `cd` only affects that call."
         );
         let spec = ToolSpec::new("shell", &description, schema).risk(Risk::Exec).serial().timeout(Duration::from_secs(120));
         Self { spec, cwd: cwd.into(), env: Vec::new(), extra_inherited: Vec::new(), sandbox: None }
@@ -204,7 +205,7 @@ impl Tool for Shell {
         #[cfg(not(windows))]
         let mut cmd = crate::sandbox::unix_shell(command, policy.as_ref())?;
         cmd.current_dir(&self.cwd).stdin(Stdio::null()).stdout(Stdio::piped()).stderr(Stdio::piped());
-        crate::child_env::apply(&mut cmd, &self.extra_inherited);
+        crate::child_env::apply_command(&mut cmd, &self.extra_inherited);
         #[cfg(windows)]
         crate::sandbox::windows_launcher_env(&mut cmd, command, policy.as_ref());
         cmd.envs(self.env.iter().map(|(k, v)| (k, v)));

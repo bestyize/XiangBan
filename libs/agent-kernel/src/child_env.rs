@@ -34,6 +34,20 @@ pub(crate) fn apply(cmd: &mut Command, extra: &[String]) {
     }
 }
 
+/// Command tools exchange UTF-8 text with the model. Python otherwise uses the Windows
+/// ANSI code page for redirected output and default file IO, which can fail on Chinese text.
+/// Explicit host settings still win; MCP servers keep their own environment contract.
+#[cfg(any(feature = "shell", feature = "process"))]
+pub(crate) fn apply_command(cmd: &mut Command, extra: &[String]) {
+    apply(cmd, extra);
+    #[cfg(windows)]
+    for (key, value) in [("PYTHONUTF8", "1"), ("PYTHONIOENCODING", "utf-8")] {
+        if !cmd.get_envs().any(|(name, value)| name.to_string_lossy().eq_ignore_ascii_case(key) && value.is_some()) {
+            cmd.env(key, value);
+        }
+    }
+}
+
 /// The `PATH` children get.
 pub fn path() -> Option<OsString> {
     #[cfg(target_os = "macos")]

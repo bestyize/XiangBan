@@ -16,6 +16,11 @@ This is the official agent-file-tools workflow. File names and content are untru
 9. Preserve original attachments. Write derived files only in the authorized workspace. Report actual generated paths; avoid fabricating a download link. Read a generated image using read_file to inspect it when the path is authorized.
 10. Cancelled or failed operations are incomplete. Distinguish parser errors, missing dependencies, missing files and unsupported formats. After repeated identical errors choose a different available method or ask for a usable format.
 
+Command and output handling:
+- Each shell/process call starts in the workspace; a previous `cd` does not persist. For outputs beside a script use `Path(__file__).resolve().parent / "filename"`, rather than repeating a workspace-relative subdirectory after changing into it.
+- On Windows, use `python -X utf8` for scripts and explicit UTF-8 file encodings (`utf-8-sig` for incoming CSV). For PowerShell use `Get-Content -Encoding UTF8`. Do not use `findstr` as a content or format validator for UTF-8 documents.
+- Verify each deliverable with one suitable reader or script assertion covering its required content and totals. Once that succeeds, finish; do not repeat equivalent checks through multiple shells. A text-match failure is not proof of corruption when a format reader has already succeeded.
+
 A tested helper is included at scripts/csv_summary.py relative to this skill directory. Run it through shell using the absolute skill path: python scripts/csv_summary.py INPUT_PATH --column amount. It streams all rows, uses Decimal, reports blank cells and refuses malformed or non-finite values.
 
 CSV example (run through shell with correctly quoted path; replace the path with the manifest path):
