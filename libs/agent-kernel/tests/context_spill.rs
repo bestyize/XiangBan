@@ -84,6 +84,43 @@ fn oldest_exchanges_are_dropped_at_user_boundaries_keeping_system_and_pairs() {
 }
 
 #[test]
+fn a_long_dropped_question_is_kept_only_at_its_start_so_the_conversation_still_fits() {
+    let long = format!("FIRST-CONSTRAINT {}", "字".repeat(30_000));
+    let mut messages = vec![Message::user_text(long.clone()), Message::assistant("a", vec![])];
+    for n in 2..=3 {
+        messages.extend([Message::user_text(format!("question {n}")), Message::assistant(format!("answer {n}"), vec![])]);
+    }
+    messages.push(Message::user_text("latest question"));
+    let mut t = turn(messages);
+    ContextTrim::new(6_000).keep_recent(1000).before_model(&mut t).unwrap();
+    let pinned = t.messages[0].text();
+    assert!(pinned.contains("FIRST-CONSTRAINT"), "the start of the long question is kept");
+    assert!(pinned.contains("more characters omitted"), "the cut is marked: {}", pinned.chars().count());
+    assert!(!pinned.contains(&"字".repeat(2_100)), "the long question is not kept whole");
+    assert!(pinned.chars().count() < 3_000);
+    assert_eq!(t.messages.last().unwrap().text(), "latest question");
+}
+
+#[test]
+fn many_dropped_questions_keep_the_newest_and_say_how_many_were_left_out() {
+    let mut messages = Vec::new();
+    for n in 1..=60 {
+        messages.extend([Message::user_text(format!("request {n:02} {}", "字".repeat(300))), Message::assistant("ok", vec![])]);
+    }
+    messages.push(Message::user_text("latest question"));
+    let mut t = turn(messages);
+    ContextTrim::new(9_000).keep_recent(1000).before_model(&mut t).unwrap();
+    let pinned = t.messages[0].text();
+    assert!(pinned.contains("earlier requests omitted"), "{}", pinned.chars().take(300).collect::<String>());
+    let live: Vec<String> = t.messages[1..].iter().map(|m| m.text()).collect();
+    let dropped: Vec<usize> = (1..=60).filter(|n| !live.iter().any(|m| m.starts_with(&format!("request {n:02} ")))).collect();
+    let newest = dropped.iter().max().unwrap();
+    assert!(pinned.contains(&format!("request {newest:02}")), "the newest dropped request is kept");
+    assert!(!pinned.contains("request 01"), "the oldest are the ones left out");
+    assert!(pinned.chars().count() < 9_000);
+}
+
+#[test]
 fn the_current_exchange_is_never_dropped() {
     let mut t = turn(vec![Message::user_text("x".repeat(40_000)), Message::assistant("", vec![call("c")]), Message::tool("c", "y".repeat(40_000))]);
     assert!(ContextTrim::new(100).before_model(&mut t).is_err());

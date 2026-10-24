@@ -888,12 +888,14 @@ fn the_context_size_from_settings_is_what_the_agent_trims_to() {
         .unwrap();
         let file = JsonlStore::new(dirs.sessions());
         let long = "字".repeat(30_000);
-        file.append("s8", &[Message::user_text("第一个问题"), Message::assistant(long.clone(), vec![]), Message::user_text("第二个问题"), Message::assistant("第二个回答", vec![])]).unwrap();
+        file.append("s8", &[Message::user_text(format!("第一个问题{long}")), Message::assistant(long.clone(), vec![]), Message::user_text("第二个问题"), Message::assistant("第二个回答", vec![])]).unwrap();
         agent.run("s8", "第三个问题", &mut |_| {}, &Arc::new(AtomicBool::new(false))).unwrap();
         provider.requests()[0].messages.iter().map(|m| m.text()).collect::<Vec<_>>()
     };
-    assert!(!tiny.iter().any(|t| t.contains(&"字".repeat(1000))), "a small limit drops old assistant output: {}", tiny.len());
-    assert!(tiny.iter().any(|t| t.contains("第一个问题")), "original user constraints remain pinned");
+    // A small limit drops the oldest exchange. The user's own words are kept, but a very long question only at its start,
+    // so it can no longer keep the conversation over the limit.
+    assert!(!tiny.iter().any(|t| t.contains(&"字".repeat(3_000))), "the long first question is not sent whole: {}", tiny.len());
+    assert!(tiny.iter().any(|t| t.contains("第一个问题") && t.contains("more characters omitted")), "its start is kept, marked as cut");
     assert!(tiny.iter().any(|t| t.contains("第三个问题")) && tiny.iter().any(|t| t.contains("第二个问题")));
 }
 

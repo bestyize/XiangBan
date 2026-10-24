@@ -97,10 +97,12 @@ fn overflow_recovery_preserves_user_requests_and_never_retries_generic_400_or_pa
     for _ in 0..4 { h.store.append("s1", &[Message::user_text("x".repeat(20_000)), Message::assistant("old answer", vec![])]).unwrap(); }
     let (result, _) = run(&h.agent, "continue");
     assert!(result.unwrap_err().is_context_limit());
-    // Old user requests are now pinned constraints. If they alone exceed the
-    // reduced budget, fail without deleting them or retrying an unchanged request.
-    assert_eq!(h.provider.requests().len(), 1);
-    assert_eq!(h.provider.requests()[0].messages.iter().filter(|m| m.role == Role::User && !m.synthetic).count(), 5);
+    // Old user requests are pinned as constraints, each cut to its start when very long, so a recovery really
+    // shrinks the request. An unchanged request is never sent again, and the error is reported when recoveries run out.
+    let requests = h.provider.requests();
+    assert_eq!(requests.len(), 3, "two recoveries, then the error is reported");
+    let sizes: Vec<usize> = requests.iter().map(|r| estimate_tokens(&r.messages)).collect();
+    assert!(sizes[0] > sizes[1] && sizes[1] > sizes[2], "every retry is smaller than the one before: {sizes:?}");
     for step in [Step::error(HarnessError::provider("HTTP 400: bad_request", false)), Step::text("partial").then_fail(HarnessError::provider("context_length_exceeded", false))] {
         let h = harness(vec![step, Step::text("must not run")], |b| b);
         assert!(run(&h.agent, "continue").0.is_err());

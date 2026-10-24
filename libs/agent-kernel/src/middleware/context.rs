@@ -8,6 +8,10 @@ const OMITTED: &str = "[Earlier messages in this conversation were omitted to fi
 // A conservative, size-sensitive allowance, not a provider tokenizer. Compressed images
 // and remote URLs can still cost more; explicit upstream overflow has a bounded recovery.
 const IMAGE_TOKENS: usize = 4096;
+// A dropped question is kept word for word so a constraint the user set is not lost, but only up to a size: a long
+// pasted document in an early message must not keep the conversation over budget for good.
+const PINNED_REQUEST_CHARS: usize = 2_000;
+const PINNED_TOTAL_CHARS: usize = 8_000;
 const MESSAGE_OVERHEAD: usize = 4;
 
 /// Rough token count: ASCII at about four bytes per token, everything else at one per character.
@@ -29,6 +33,27 @@ fn estimate_message(message: &Message) -> usize {
     let structured = message.structured_content.as_ref().map_or(0, |v| estimate_text(&v.to_string()));
     let state = message.provider_state.as_ref().map_or(0, |v| estimate_text(&v.to_string()));
     MESSAGE_OVERHEAD + parts + calls + structured + state
+}
+
+/// The start of a long question; what was left out is counted so the model knows the text is cut.
+fn shortened(text: &str) -> String {
+    let total = text.chars().count();
+    if total <= PINNED_REQUEST_CHARS { return text.to_string(); }
+    format!("{}…[this request was longer; {} more characters omitted]", text.chars().take(PINNED_REQUEST_CHARS).collect::<String>(), total - PINNED_REQUEST_CHARS)
+}
+
+/// The requests that fit the allowance, newest first kept: when there are too many, the oldest are named as omitted.
+fn pinned_text(requests: &[String]) -> String {
+    let mut kept = 0;
+    let mut chars = 0;
+    for request in requests.iter().rev() {
+        chars += request.chars().count();
+        if kept > 0 && chars > PINNED_TOTAL_CHARS { break; }
+        kept += 1;
+    }
+    let skipped = requests.len() - kept;
+    let note = if skipped > 0 { format!("({skipped} earlier requests omitted)\n\n") } else { String::new() };
+    format!("{OMITTED}\nOriginal user requests, in order; later corrections take precedence:\n{note}{}", requests[skipped..].join("\n\n"))
 }
 
 pub fn estimate_tokens(messages: &[Message]) -> usize {
@@ -99,13 +124,15 @@ impl Middleware for ContextTrim {
         let mut dropped = false;
         let mut requests=Vec::new();
         let pinned = |requests:&[String]| {
-            let mut m=Message::reminder(format!("{OMITTED}\nOriginal user requests, in order; later corrections take precedence:\n{}",requests.join("\n\n")));
+            let mut m=Message::reminder(pinned_text(requests));
             m.structured_content=Some(serde_json::json!({"harness_context":"user_requests"}));m
         };
         while total.saturating_add(if dropped {estimate_message(&pinned(&requests))}else{0})>budget {
             let Some(offset)=messages.get(first+1..).and_then(|rest|rest.iter().position(|m|m.role==Role::User&&!m.synthetic))else{break;};
             let removed:usize=messages.drain(first..first+1+offset).map(|m|{
-                if m.role==Role::User&&(!m.synthetic||m.structured_content.as_ref().is_some_and(|v|v["harness_context"]=="user_requests")){requests.push(m.text());}estimate_message(&m)
+                if m.role==Role::User&&!m.synthetic{requests.push(shortened(&m.text()));}
+                else if m.role==Role::User&&m.structured_content.as_ref().is_some_and(|v|v["harness_context"]=="user_requests"){requests.push(m.text());}
+                estimate_message(&m)
             }).sum();total=total.saturating_sub(removed);dropped=true;
         }
         if dropped{messages.insert(first,pinned(&requests));}
