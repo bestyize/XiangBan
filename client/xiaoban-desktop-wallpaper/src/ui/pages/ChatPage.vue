@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { NButton, NInput, NModal } from 'naive-ui';
-import { ArrowDown, ArrowUpRight, Check, ChevronDown, ChevronRight, ChevronUp, Copy, Ellipsis, FileText, LoaderCircle, PanelRight, Pencil, RefreshCw, Search, Settings, ShieldAlert, ShieldCheck, Sparkles, Sprout, Star, Target, Trash2, Volume2, X } from 'lucide-vue-next';
+import { ArrowDown, ArrowUpRight, Check, ChevronDown, ChevronRight, ChevronUp, Copy, Ellipsis, FileText, FolderOpen, LoaderCircle, PanelRight, Pencil, RefreshCw, Search, Settings, ShieldAlert, ShieldCheck, Sparkles, Sprout, Star, Target, Trash2, Volume2, X } from 'lucide-vue-next';
 import { invoke } from '../../bridge.ts';
 import type { ControlStore } from '../control-types.ts';
 import ModelSwitchDialog from '../components/ModelSwitchDialog.vue';
@@ -345,13 +345,17 @@ async function openLink(href: string) {
                     </template>
                   </div>
                 </template>
-                <div v-if="finished(block) && filesOf(block.calls).length" class="file-cards">
-                  <div v-for="file in filesOf(block.calls)" :key="file.path" class="file-card" data-testid="chat-file-card" :title="file.path">
-                    <span class="file-ext" aria-hidden="true">{{ file.ext }}</span>
-                    <span class="file-text"><b>{{ file.name }}</b><small>{{ file.changed ? '已修改' : '已写入' }} · {{ spaceName }}</small></span>
-                    <button v-if="store.desktop" type="button" class="xb-btn is-sm" @click="chat.revealWorkspace()">打开文件夹</button>
+                <details v-if="finished(block) && filesOf(block.calls).length" class="file-cards" data-testid="chat-files">
+                  <summary class="file-summary" data-testid="chat-files-toggle"><ChevronRight :size="14" class="file-chevron" /><FileText :size="14" /><span>文件变更</span><span class="file-count">{{ filesOf(block.calls).length }}</span><small>{{ spaceName }}</small></summary>
+                  <div class="file-list" role="list" aria-label="本轮变更的文件">
+                    <div v-for="file in filesOf(block.calls)" :key="file.path" class="file-card" data-testid="chat-file-card" :title="file.path" role="listitem">
+                      <span class="file-ext" aria-hidden="true">{{ file.ext }}</span>
+                      <span class="file-name">{{ file.name }}</span>
+                      <small class="file-status">{{ file.changed ? '已修改' : '已写入' }}</small>
+                      <button v-if="store.desktop" type="button" class="xb-icon-btn is-sm" aria-label="打开文件夹" title="打开文件夹" @click="chat.revealWorkspace()"><FolderOpen :size="14" /></button>
+                    </div>
                   </div>
-                </div>
+                </details>
                 <div v-if="finished(block) && replyText(block)" class="reply-actions">
                   <button type="button" class="act" data-testid="chat-copy-reply" aria-label="复制" title="复制" @click="copyReply(block)"><Copy :size="15" /></button>
                   <button type="button" class="act" :class="{ 'is-on': savedReplies.has(block.id) }" :disabled="!store.desktop" :aria-label="savedReplies.has(block.id) ? '已存到资料库' : '存到资料库'" :title="savedReplies.has(block.id) ? '已存到资料库' : '存到资料库'" data-testid="chat-save-reply" @click="saveReply(block)"><Star :size="15" :fill="savedReplies.has(block.id) ? 'currentColor' : 'none'" /></button>
@@ -500,12 +504,16 @@ async function openLink(href: string) {
 @keyframes blink{to{visibility:hidden}}
 .bubble.is-hit,.answer.is-hit{box-shadow:0 0 0 2px var(--ui-btn);border-radius:12px}
 .answer.is-hit{background:var(--ui-soft)}
-.file-cards{display:flex;flex-direction:column;gap:8px}
-.file-card{display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:12px;background:var(--ui-surface-sunken);box-shadow:inset 0 0 0 1px var(--ui-line);max-width:420px;box-sizing:border-box}
-.file-ext{flex:none;width:36px;height:36px;border-radius:9px;background:var(--ui-surface);box-shadow:0 0 0 1px var(--ui-border);display:grid;place-items:center;color:var(--ui-ink);font-size:10px;font-weight:600}
-.file-text{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
-.file-text b{font-size:13.5px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.file-text small{font-size:12px;color:var(--ui-text-secondary)}
+.file-cards{max-width:520px;min-width:0;border-radius:9px;background:var(--ui-surface-sunken);box-shadow:inset 0 0 0 1px var(--ui-line)}
+.file-summary{display:flex;align-items:center;gap:7px;min-height:34px;padding:7px 10px;list-style:none;cursor:pointer;font-size:12px;color:var(--ui-text-secondary);user-select:none}
+.file-summary::-webkit-details-marker{display:none}.file-summary>svg{flex:none;color:var(--ui-text-tertiary)}.file-summary:focus-visible{outline:2px solid var(--ui-btn);outline-offset:2px;border-radius:9px}
+.file-summary small{margin-left:auto;min-width:0;max-width:40%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:10.5px;color:var(--ui-text-tertiary)}
+.file-count{min-width:18px;padding:0 5px;border-radius:5px;background:var(--ui-surface);color:var(--ui-text-secondary);font-size:10px;text-align:center;font-variant-numeric:tabular-nums}.file-chevron{transition:transform .15s}.file-cards[open] .file-chevron{transform:rotate(90deg)}
+.file-list{max-height:240px;overflow:auto;overscroll-behavior:contain;scrollbar-width:thin;border-top:1px solid var(--ui-line)}
+.file-card{display:flex;align-items:center;gap:9px;min-height:36px;padding:5px 10px;box-sizing:border-box}.file-card+.file-card{border-top:1px solid var(--ui-line)}
+.file-ext{flex:none;width:26px;height:22px;border-radius:5px;background:var(--ui-surface);display:grid;place-items:center;color:var(--ui-ink);font-size:8px;font-weight:600}
+.file-name{flex:1;min-width:0;font-size:12px;color:var(--ui-text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.file-status{flex:none;font-size:10.5px;color:var(--ui-text-tertiary)}.file-card .xb-icon-btn{flex:none}
+@media(prefers-reduced-motion:reduce){.file-chevron{transition:none}}
 .reply-actions{display:flex;align-items:center;gap:2px;margin-top:-4px}
 .act{width:28px;height:28px;border:0;border-radius:7px;background:transparent;color:var(--ui-text-tertiary);display:grid;place-items:center;cursor:pointer;padding:0}
 .act:hover:not(:disabled){background:var(--ui-surface-hover);color:var(--ui-text-primary)}

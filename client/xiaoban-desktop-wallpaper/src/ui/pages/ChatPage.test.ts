@@ -588,6 +588,38 @@ describe('a conversation in the page', () => {
     expect(q('chat-file-card')!.textContent).toContain('周计划.md');
     expect(localStorage.getItem('xiaoban.chat.exec-panel')).toBe('1');
   });
+
+  it('collapses file changes by default, deduplicates paths and keeps the folder action available', async () => {
+    const h = await open({ ...startChat, chat_reveal_workspace: () => undefined });
+    await type('修改两个文件');
+    await click('chat-send');
+    await h.events('s1',
+      { type: 'tool_start', id: 'f1', name: 'write_file', arguments: '{"path":"/w/index.html","content":"x"}' },
+      { type: 'tool_end', id: 'f1', output: 'ok', is_error: false },
+      { type: 'tool_start', id: 'f2', name: 'edit_file', arguments: '{"path":"/w/index.html","old_text":"x","new_text":"y"}' },
+      { type: 'tool_end', id: 'f2', output: 'ok', is_error: false },
+      { type: 'tool_start', id: 'f3', name: 'write_file', arguments: '{"path":"/w/check.mjs","content":"z"}' },
+      { type: 'tool_end', id: 'f3', output: 'ok', is_error: false },
+      { type: 'tool_start', id: 'f4', name: 'write_file', arguments: '{"path":"/w/failed.txt","content":"z"}' },
+      { type: 'tool_end', id: 'f4', output: 'denied', is_error: true },
+      { type: 'done' },
+    );
+    const disclosure = q<HTMLDetailsElement>('chat-files')!;
+    expect(disclosure.open).toBe(false);
+    expect(q('chat-files-toggle')!.querySelector('.file-count')!.textContent).toBe('2');
+    await click('chat-files-toggle');
+    expect(disclosure.open).toBe(true);
+    const files = all('[data-testid="chat-file-card"]');
+    expect(files).toHaveLength(2);
+    expect(files[0].textContent).toContain('index.html');
+    expect(files[0].textContent).toContain('已修改');
+    expect(files[1].textContent).toContain('已写入');
+    files[0].querySelector<HTMLButtonElement>('button[aria-label="打开文件夹"]')!.click();
+    await flushPromises();
+    expect(h.calls).toContainEqual(['chat_reveal_workspace', { sessionId: 's1' }]);
+    await click('chat-files-toggle');
+    expect(disclosure.open).toBe(false);
+  });
 });
 
 /** A host that keeps the list in memory and answers the way the real one does, errors included. */
