@@ -322,6 +322,8 @@ fn reading_and_planning_need_no_confirmation_but_writing_a_file_does() {
     let steps = vec![
         call("1", "todo", json!({"todos": [{"content": "写笔记", "status": "in_progress"}]})).and_tool_call("2", "list_dir", "{}").and_tool_call("3", "time_now", "{}"),
         call("4", "write_file", json!({"path": "notes/今天.md", "content": "# 今天\n喝水"})),
+        // An unfinished todo list makes the harness ask the model to keep going, so the plan is closed before the answer.
+        call("5", "todo", json!({"todos": [{"content": "写笔记", "status": "completed"}]})),
         Step::text("写好了"),
     ];
     let rig = rig("write", steps, Approval::Once);
@@ -331,8 +333,9 @@ fn reading_and_planning_need_no_confirmation_but_writing_a_file_does() {
     assert_eq!(fs::read_to_string(rig.workspace.join("notes/今天.md")).unwrap(), "# 今天\n喝水");
     assert_eq!(rig.todo.snapshot("s1").len(), 1);
     let results = tool_results(&rig);
-    assert_eq!(results.len(), 4);
+    assert_eq!(results.len(), 5);
     assert!(results[3].starts_with("Created notes/今天.md"), "{}", results[3]);
+    assert!(results[4].contains("[x] 写笔记"), "the plan is closed: {}", results[4]);
     assert!(results[0].contains("[~] 写笔记") && results[2].contains("UTC+08:00"), "the offset given by the app is used: {}", results[2]);
 }
 
@@ -845,11 +848,13 @@ fn a_compacted_conversation_is_sent_as_summary_then_the_kept_turn_then_the_new_q
     rig.agent.run("s9", "新问题", &mut |_| {}, &Arc::new(AtomicBool::new(false))).unwrap();
 
     let sent: Vec<String> = rig.provider.requests()[0].messages.iter().map(|m| m.text()).collect();
-    assert_eq!(sent.len(), 5, "{sent:?}");
+    assert_eq!(sent.len(), 6, "{sent:?}");
     assert!(sent[0].len() > 100, "the instructions come first");
     assert!(sent[1].contains("摘要正文") && !sent[1].contains(compact::MARK));
-    assert_eq!(&sent[2..], ["最近的问题", "最近的回答", "新问题"]);
-    assert!(!sent.iter().any(|t| t.contains("旧问题") || t.contains("旧回答")), "the summarized messages are not sent");
+    // The user's own earlier words are kept word for word after the summary (so a constraint they set is never lost);
+    // the assistant's summarized answers are not sent.
+    assert_eq!(&sent[2..], ["旧问题", "最近的问题", "最近的回答", "新问题"]);
+    assert!(!sent.iter().any(|t| t.contains("旧回答")), "the summarized answers are not sent");
 
     let saved = file.load("s9").unwrap();
     assert_eq!(saved.len(), 7, "the file keeps every message, the summary and the new exchange");
@@ -1028,6 +1033,8 @@ fn an_answer_that_wrote_files_can_be_undone() {
     assert_eq!(fs::read_to_string(rig.workspace.join("notes.md")).unwrap(), "小伴改过");
     let runs = checkpoints::list(&rig.dirs.checkpoints(), "s1");
     assert_eq!(runs.len(), 1);
+    // A finished run is sealed (its files fingerprinted) so undo can refuse to overwrite a later edit.
+    checkpoints::seal(&rig.dirs.checkpoints(), "s1", &runs[0].run_id).unwrap();
     let report = checkpoints::undo(&rig.dirs.checkpoints(), "s1", &runs[0].run_id).unwrap();
     assert_eq!((report.restored, report.removed), (vec!["notes.md".to_string()], vec!["new/plan.md".to_string()]));
     assert_eq!(fs::read_to_string(rig.workspace.join("notes.md")).unwrap(), "我自己写的");
