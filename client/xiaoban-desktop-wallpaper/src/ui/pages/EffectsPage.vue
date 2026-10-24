@@ -11,15 +11,15 @@ import EffectPreview from '../components/EffectPreview.vue';
 const props = defineProps<{ store: ControlStore }>();
 
 const choice = computed(() => normalizeChoice(props.store.settings.effects));
-const category=ref<'builtin'|'custom'>('builtin');
+const filter=ref<'all'|'desk'|'mine'>('all');
 const packs = computed(() => props.store.effectList.packs);
-const counts=computed(()=>({builtin:packs.value.filter(pack=>pack.source!=='user').length,custom:packs.value.filter(pack=>pack.source==='user').length}));
-const visiblePacks=computed(()=>packs.value.filter(pack=>category.value==='custom'?pack.source==='user':pack.source!=='user'));
+const visiblePacks=computed(()=>packs.value.filter(pack=>filter.value==='mine'?pack.source==='user':filter.value==='desk'?pack.id===choice.value.selected:true));
 const chosen = computed(() => packs.value.find(pack => pack.id === choice.value.selected) ?? null);
 // A saved desktop selection does not autoplay when this page opens.
 const previewId = ref('');
 const hoveredId = ref('');
 const playingId = computed(() => hoveredId.value || previewId.value);
+watch(filter,()=>{hoveredId.value='';previewId.value='';});
 // While the list is still loading nothing can be missing; afterwards a chosen effect that is gone is worth saying.
 const missing = computed(() => choice.value.selected !== '' && packs.value.length > 0 && !chosen.value);
 const message = (error: unknown) => error instanceof Error ? error.message : String(error);
@@ -65,7 +65,7 @@ async function reload(announce: boolean) {
 async function importPack() {
   try {
     const outcome = await props.store.importEffectPack();
-    if (outcome.status === 'imported') {category.value='custom';props.store.notify(`已导入特效「${outcome.name}」，可以选用了`, 'success');}
+    if (outcome.status === 'imported') {filter.value='mine';props.store.notify(`已导入特效「${outcome.name}」，可以选用了`, 'success');}
     else if (outcome.status === 'declined') props.store.notify(`特效「${outcome.id}」已经存在，没有替换`, 'info');
   } catch (error) { props.store.notify(message(error), 'error'); }
 }
@@ -89,14 +89,14 @@ onBeforeUnmount(() => { if (timer) { clearTimeout(timer); commit(); } });
     </StudioActions>
     <div class="fx-browser">
       <div class="fx-toolbar">
-        <div class="xb-seg" role="group" aria-label="特效来源"><button type="button" :aria-pressed="category === 'builtin'" data-testid="effects-scope-builtin" @click="category = 'builtin'">官方 {{ counts.builtin }}</button><button type="button" :aria-pressed="category === 'custom'" data-testid="effects-scope-custom" @click="category = 'custom'">我的 {{ counts.custom }}</button></div>
+        <div class="xb-seg" role="group" aria-label="特效筛选"><button type="button" :aria-pressed="filter === 'all'" data-testid="effects-filter-all" @click="filter = 'all'">全部</button><button type="button" :aria-pressed="filter === 'desk'" data-testid="effects-filter-desk" @click="filter = 'desk'">在桌面上 <b class="cnt">{{ chosen ? 1 : 0 }}</b></button><button type="button" :aria-pressed="filter === 'mine'" data-testid="effects-filter-mine" @click="filter = 'mine'">我的</button></div>
         <span class="fx-hint">特效叠在任何壁纸之上，点一下立即生效</span>
       </div>
       <div class="fx-main">
       <NAlert v-if="missing" type="warning" :show-icon="false" data-testid="effect-missing">所选的特效「{{ choice.selected }}」已经找不到（可能被移出了特效文件夹），桌面上暂时没有特效。重新选一个即可。</NAlert>
       <NAlert v-if="store.effectList.errors.length" type="warning" :show-icon="false" data-testid="effect-errors">有 {{ store.effectList.errors.length }} 个自定义特效无法使用：{{ store.effectList.errors.join('；') }}</NAlert>
-      <div class="effect-grid" role="group" aria-label="特效">
-        <button class="effect-card none" :class="{ on: !chosen }" :aria-pressed="!chosen" data-testid="effect-none" @click="choose('')">
+      <div v-if="filter === 'all' || visiblePacks.length" class="effect-grid" role="group" aria-label="特效">
+        <button v-if="filter !== 'mine'" class="effect-card none" :class="{ on: !chosen }" :aria-pressed="!chosen" data-testid="effect-none" @click="choose('')">
           <span class="effect-stage"><Ban :size="26" :stroke-width="1.6" /><i v-if="!chosen" class="lb">使用中</i></span>
           <span class="effect-name"><b>无特效</b></span>
         </button>
@@ -114,7 +114,8 @@ onBeforeUnmount(() => { if (timer) { clearTimeout(timer); commit(); } });
           </div>
         </div>
       </div>
-      <div v-if="category === 'custom' && !visiblePacks.length" class="xb-empty" data-testid="custom-effects-empty"><span class="xb-empty-icon"><Sparkles :size="24" /></span><h3>还没有自定义特效</h3><p>点右上角“导入”选一个特效包文件（JSON），也可以直接在聊天里让小伴为你写一个。</p></div>
+      <div v-if="filter === 'mine' && !visiblePacks.length" class="xb-empty" data-testid="custom-effects-empty"><span class="xb-empty-icon"><Sparkles :size="24" /></span><h3>还没有自定义特效</h3><p>点右上角“导入”选一个特效包文件（JSON），也可以直接在聊天里让小伴为你写一个。</p></div>
+      <div v-if="filter === 'desk' && !visiblePacks.length" class="xb-empty" data-testid="desktop-effects-empty"><span class="xb-empty-icon"><Sparkles :size="24" /></span><h3>当前没有使用特效</h3><p>挑选喜欢的特效，点一下即可应用到桌面。</p><button type="button" class="xb-link" @click="filter = 'all'">去挑选特效</button></div>
       <p class="fx-notes">特效显示在桌面图片之上、桌面图标和其他窗口之下，鼠标可以穿过它。{{ store.settings.paused ? '桌面动画目前已暂停，特效会静止。' : '' }}{{ store.game.active ? '游戏空间打开期间特效会先隐藏，退出后自动回来。' : '' }}</p>
     </div>
     </div>
@@ -139,7 +140,8 @@ onBeforeUnmount(() => { if (timer) { clearTimeout(timer); commit(); } });
 .fx-browser{flex:1;min-height:0;min-width:0;display:flex;flex-direction:column}
 .fx-main{flex:1;min-width:0;min-height:0;display:flex;flex-direction:column;gap:12px;padding:0 24px 28px 28px;overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--ui-scrollbar) transparent;overscroll-behavior:contain}
 .fx-main>*{flex-shrink:0}
-.fx-toolbar{flex:none;display:flex;align-items:center;gap:8px;padding:0 24px 12px 28px;background:var(--ui-surface)}
+.fx-toolbar{flex:none;display:flex;align-items:center;flex-wrap:wrap;gap:8px;padding:0 24px 12px 28px;background:var(--ui-surface)}
+.fx-toolbar .cnt{font-weight:600;color:var(--ui-ink)}
 .fx-hint{margin-left:auto;font-size:12px;color:var(--ui-text-secondary)}
 .effect-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px 14px;margin-top:2px}
 .effect-card-wrapper{position:relative;min-width:0}

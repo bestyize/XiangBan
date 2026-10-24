@@ -14,6 +14,32 @@ async function addWith(v:ReturnType<typeof mount>,kind:string,layer:'desktop'|'t
 }
 describe('replacement widget library',()=>{
  beforeEach(()=>localStorage.clear());
+ it('filters all definitions, desktop instances and only custom definitions like the companion page',async()=>{
+  localStorage.setItem('xiaoban.widgets.v2',JSON.stringify({version:2,widgets:[{id:'clock1',kind:'clock',theme:'ivory',scale:1,x:0,y:0,enabled:false,city:null}]}));
+  localStorage.setItem('xiaoban.custom_widgets.v1',JSON.stringify([{schemaVersion:1,id:'kitty',name:'Kitty',html:'<p>Kitty</p>'}]));
+  const v=mount(WidgetsPage,{props:{store:store()},attachTo:document.body});await flushPromises();
+  expect(v.findAll('.xb-widget-slot')).toHaveLength(8);
+  expect(v.find('[data-testid="custom-card-kitty"]').exists()).toBe(true);
+  expect(v.find('[data-testid="widgets-on-desktop"]').exists()).toBe(false);
+  expect(v.get('[data-testid="widgets-filter-desk"]').text()).toContain('1');
+  await v.get('[data-testid="widgets-filter-desk"]').trigger('click');
+  expect(v.find('[data-testid="desk-widget-clock1"]').exists()).toBe(true);
+  expect(v.get('[data-testid="desk-widget-clock1"]').text()).toContain('已隐藏');
+  expect(v.find('.gallery').exists()).toBe(false);
+  await v.get('[data-testid="widgets-filter-mine"]').trigger('click');
+  expect(v.find('[data-testid="custom-card-kitty"]').exists()).toBe(true);
+  expect(v.findAll('.xb-widget-slot')).toHaveLength(0);
+  expect(v.find('[data-testid="widgets-on-desktop"]').exists()).toBe(false);
+  v.unmount();
+ });
+ it('switches to desktop instances for a native widget settings request',async()=>{
+  localStorage.setItem('xiaoban.widgets.v2',JSON.stringify({version:2,widgets:[{id:'clock1',kind:'clock',theme:'ivory',scale:1,x:0,y:0,enabled:true,city:null}]}));
+  const v=mount(WidgetsPage,{props:{store:store(),settingsRequest:{id:'clock1'}},attachTo:document.body});await flushPromises();
+  expect(v.get('[data-testid="widgets-filter-desk"]').attributes('aria-pressed')).toBe('true');
+  expect(v.find('[data-testid="desk-widget-clock1"]').exists()).toBe(true);
+  expect(v.emitted('settingsOpened')).toHaveLength(1);
+  v.unmount();
+ });
  it('allows both built-in and custom additions after twelve widgets are already on the desktop',async()=>{
   localStorage.setItem('xiaoban.widgets.v2',JSON.stringify({version:2,widgets:Array.from({length:12},(_,i)=>({id:`clock${i}`,kind:'clock',theme:'ivory',scale:1,x:0,y:0,enabled:true,city:null}))}));
   localStorage.setItem('xiaoban.custom_widgets.v1',JSON.stringify([{schemaVersion:1,id:'kitty',name:'Kitty',html:'<p>Kitty</p>'}]));
@@ -21,7 +47,7 @@ describe('replacement widget library',()=>{
   expect(v.get('[data-testid="add-clock"]').attributes('disabled')).toBeUndefined();
   await addWith(v,'clock','desktop');
   expect(JSON.parse(localStorage.getItem('xiaoban.widgets.v2')!).widgets).toHaveLength(13);
-  await v.get('[data-testid="widgets-scope-custom"]').trigger('click');await flushPromises();
+  await v.get('[data-testid="widgets-filter-mine"]').trigger('click');await flushPromises();
   const button=v.get('[data-testid="add-custom-kitty"]');expect(button.attributes('disabled')).toBeUndefined();
   await button.trigger('click');await flushPromises();
   (document.body.querySelector('[data-testid="layer-topmost-kitty"]') as HTMLElement).click();await flushPromises();
@@ -67,8 +93,8 @@ describe('replacement widget library',()=>{
  it('switches to custom category and shows empty state',async()=>{
   const s=store(),v=mount(WidgetsPage,{props:{store:s},attachTo:document.body});
   await flushPromises();
-  expect(v.findAll('.add-section .xb-seg button').map(b=>b.text())).toEqual(['官方','我的']);
-  await v.get('[data-testid="widgets-scope-custom"]').trigger('click');
+  expect(v.findAll('.wd-toolbar .xb-seg button').map(b=>b.text().replace(/\s+/g,' ').trim())).toEqual(['全部','在桌面上 0','我的']);
+  await v.get('[data-testid="widgets-filter-mine"]').trigger('click');
   await flushPromises();
   expect(v.find('[data-testid="custom-empty"]').exists()).toBe(true);
   expect(v.text()).toContain('还没有自定义组件');
@@ -88,6 +114,7 @@ describe('widgets on the desktop',()=>{
  it('lists every widget on the desktop with its own layer switch and a more menu',async()=>{
   localStorage.setItem('xiaoban.widgets.v2',JSON.stringify({version:2,widgets:[{id:'clock1',kind:'clock',theme:'ivory',scale:1,x:0,y:0,enabled:true,city:null,layer:'desktop'}]}));
   const v=mount(WidgetsPage,{props:{store:store()},attachTo:document.body});await flushPromises();
+  await v.get('[data-testid="widgets-filter-desk"]').trigger('click');
   expect(v.find('[data-testid="desk-widget-clock1"]').exists()).toBe(true);
   expect(v.get('[data-testid="widgets-on-desktop"]').text()).toContain('1 个');
   await v.get('[data-testid="desk-layer-topmost-clock1"]').trigger('click');await flushPromises();

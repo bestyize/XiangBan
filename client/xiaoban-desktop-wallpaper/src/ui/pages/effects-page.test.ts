@@ -57,7 +57,7 @@ describe('desktop effects page', () => {
     const { wrapper } = setup({ selected: 'rain', params: {} });
     const previews = () => cards(wrapper);
     const playing = () => previews().filter(preview => preview.props('playing')).map(preview => preview.props('pack').id);
-    expect(previews()).toHaveLength(2);
+    expect(previews()).toHaveLength(3);
     expect(playing()).toEqual([]);
     await wrapper.get('[data-testid="effect-rain"]').trigger('click');
     expect(playing()).toEqual(['rain']);
@@ -70,20 +70,36 @@ describe('desktop effects page', () => {
     expect(cards(reopened.wrapper).every(preview => !preview.props('playing'))).toBe(true);
     reopened.wrapper.unmount();
   });
-  it('separates official and custom effects without changing the desktop selection', async () => {
+  it('shows all effects and filters custom effects without changing the desktop selection', async () => {
     const { wrapper, store } = setup();
     for (const id of ['none', 'rain', 'maple']) expect(wrapper.find(`[data-testid="effect-${id}"]`).exists(), id).toBe(true);
     expect(wrapper.get('[data-testid="effect-none"]').attributes('aria-pressed')).toBe('true');
-    expect(wrapper.find('[data-testid="effect-glitter"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="effect-glitter"]').exists()).toBe(true);
     expect(wrapper.get('[data-testid="effect-rain"]').text()).not.toContain('我的');
     expect(wrapper.find('[data-testid="effect-tuning"]').exists()).toBe(false);
     expect(wrapper.find('h1').exists()).toBe(false);
-    expect(wrapper.findAll('.xb-seg button').map(button => button.text())).toEqual(['官方 2', '我的 1']);
+    expect(wrapper.findAll('.xb-seg button').map(button => button.text())).toEqual(['全部', '在桌面上 0', '我的']);
     expect(store.loadEffects).toHaveBeenCalledOnce();
-    await wrapper.get('[data-testid="effects-scope-custom"]').trigger('click');await flushPromises();
+    await wrapper.get('[data-testid="effects-filter-mine"]').trigger('click');await flushPromises();
     expect(wrapper.get('[data-testid="effect-glitter"]').text()).toContain('星尘');
     expect(wrapper.find('[data-testid="effect-rain"]').exists()).toBe(false);
     expect(store.setEffects).not.toHaveBeenCalled();
+    wrapper.unmount();
+  });
+  it.each(['rain', 'glitter'])('shows only the selected %s effect on the desktop and can turn it off', async id => {
+    const params = { [id]: { density: 1.5, speed: 1, size: 1 } };
+    const { wrapper, store, sent } = setup({ selected: id, params });
+    await wrapper.get('[data-testid="effects-filter-desk"]').trigger('click');
+    expect(cards(wrapper).map(preview => preview.props('pack').id)).toEqual([id]);
+    expect(wrapper.get('[data-testid="effects-filter-desk"]').text()).toContain('1');
+    expect(store.setEffects).not.toHaveBeenCalled();
+    await wrapper.get('[data-testid="effect-none"]').trigger('click'); await flushPromises();
+    expect(sent[0]).toEqual({ selected: '', params });
+    expect(wrapper.get('[data-testid="desktop-effects-empty"]').text()).toContain('当前没有使用特效');
+    expect(cards(wrapper)).toHaveLength(0);
+    await wrapper.get('[data-testid="desktop-effects-empty"] button').trigger('click');
+    expect(wrapper.get('[data-testid="effects-filter-all"]').attributes('aria-pressed')).toBe('true');
+    expect(cards(wrapper)).toHaveLength(3);
     wrapper.unmount();
   });
   it('applies an effect at once, without any wallpaper being involved', async () => {
@@ -141,6 +157,8 @@ describe('desktop effects page', () => {
     await wrapper.get('[data-testid="effects-import"]').trigger('click'); await flushPromises();
     expect(store.importEffectPack).toHaveBeenCalledOnce();
     expect(store.notify).toHaveBeenCalledWith('已导入特效「星尘」，可以选用了', 'success');
+    expect(wrapper.get('[data-testid="effects-filter-mine"]').attributes('aria-pressed')).toBe('true');
+    expect(cards(wrapper).map(preview => preview.props('pack').id)).toEqual(['glitter']);
     expect(store.loadEffects).toHaveBeenCalledTimes(1);
     wrapper.unmount();
   });

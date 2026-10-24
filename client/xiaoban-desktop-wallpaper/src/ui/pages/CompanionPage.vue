@@ -15,7 +15,7 @@ import {invoke} from '../../bridge.ts';
 const props=defineProps<{store:ControlStore;settingsRequest?:{id:string}|null}>();
 const emit=defineEmits<{settingsOpened:[]}>();
 const client=createPetClient(),{catalog,ready,busy,error}=client;
-/** 全部 shows every theme, 在桌面上 one card per pet on the desktop, 我的主题 only the user's own themes. */
+/** 全部 shows every theme, 在桌面上 one card per pet on the desktop, 我的 only the user's own themes. */
 const filter=ref<'all'|'desk'|'mine'>('all'),hover=ref(''),editing=ref<string|null>(null);
 const adding=ref<{themeId:string;petId:string;name:string}|null>(null),proactivityOpen=ref(false);
 const themes=computed(()=>filter.value==='mine'?catalog.value.themes.filter(t=>t.source==='custom'):catalog.value.themes);
@@ -87,7 +87,7 @@ onBeforeUnmount(()=>{client.dispose();window.removeEventListener('pets-manage',m
   <div class="xb-seg" role="group" aria-label="筛选">
    <button type="button" :aria-pressed="filter==='all'" data-testid="pet-filter-all" @click="filter='all'">全部</button>
    <button type="button" :aria-pressed="filter==='desk'" data-testid="pet-filter-desk" @click="filter='desk'">在桌面上 <b class="cnt">{{ instances.length }}</b></button>
-   <button type="button" :aria-pressed="filter==='mine'" data-testid="pet-filter-mine" @click="filter='mine'">我的主题</button>
+   <button type="button" :aria-pressed="filter==='mine'" data-testid="pet-filter-mine" @click="filter='mine'">我的</button>
   </div>
   <div class="pt-tools">
    <button v-if="store.desktop" type="button" class="xb-btn-ghost" aria-haspopup="dialog" data-testid="pet-proactivity-open" @click="proactivityOpen=true"><HeartHandshake :size="14"/>主动陪伴</button>

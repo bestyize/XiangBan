@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { flushPromises, mount } from '@vue/test-utils';
 import { reactive } from 'vue';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { folderPath, folderTree, formatWhen, guessPlatform, inView, pathOf, type LibraryData, type MemoryOverview } from './library-store.ts';
 import LibraryPage from '../pages/LibraryPage.vue';
 
@@ -59,6 +59,22 @@ function setup(overrides: Record<string, unknown> = {}) {
   invoke.mockImplementation(async (command: string, args: Record<string, unknown> = {}) => {
     if (command === 'library_state') return library;
     if (command === 'chat_memory_overview') return mem;
+    if (command === 'library_import_data') {
+      const bytes = Uint8Array.from(atob((args.dataUrl as string).split(',')[1]), c => c.charCodeAt(0));
+      const text = new TextDecoder().decode(bytes);
+      library = { ...library, docs: [{ id: 'manual-doc', name: args.name as string, ext: (args.name as string).split('.').pop()!, size: bytes.length, folder: args.folder as string | null, importedMs: NOW + 1, origin: '', status: 'ready', note: '', preview: text.slice(0, 280), tags: [] }, ...library.docs] };
+      return library;
+    }
+    if (command === 'library_save') {
+      const item = args.item as { title: string; text: string };
+      library = { ...library, saved: [{ id: 'manual-saved', kind: 'text', title: item.title || item.text.split('\n')[0], text: item.text, sessionId: null, sessionTitle: '', source: 'main', savedMs: NOW + 1 }, ...library.saved] };
+      return 'manual-saved';
+    }
+    if (command === 'chat_memory_write_note') {
+      const text = args.text as string;
+      mem = { ...mem, notes: [{ name: 'manual-note', text, preview: text.slice(0, 80), bytes: new TextEncoder().encode(text).length }, ...mem.notes] };
+      return 'manual-note';
+    }
     if (command === 'library_move') { library = { ...library, docs: library.docs.map(d => (args.ids as string[]).includes(d.id) ? { ...d, folder: args.folder as string | null } : d) }; return library; }
     if (command === 'library_add_link') { library = { ...library, links: [{ id: 'l2', url: args.url as string, title: args.title as string || '文档', platform: 'feishu', kind: '文档', code: null, folder: args.folder as string | null, addedMs: NOW }, ...library.links] }; return library; }
     if (command === 'library_attachment') return { name: '预算.xlsx', size: 286_000, mime: 'application/vnd', dataUrl: 'data:application/vnd;base64,AA==' };
@@ -73,6 +89,68 @@ function setup(overrides: Record<string, unknown> = {}) {
 }
 const tab = async (wrapper: ReturnType<typeof setup>['wrapper'], id: string) => { await wrapper.get(`[data-testid="library-tab-${id}"]`).trigger('click'); await flushPromises(); };
 
+describe('manual library creation', () => {
+  let wrapper: ReturnType<typeof setup>['wrapper'];
+  beforeEach(async () => { invoke.mockReset(); localStorage.clear(); wrapper = setup().wrapper; await flushPromises(); });
+  afterEach(() => wrapper.unmount());
+  const form = () => document.querySelector<HTMLFormElement>('[data-testid="library-create-form"]')!;
+  async function fill(id: string, value: string) {
+    const root = document.querySelector(`[data-testid="${id}"]`)!;
+    const input = root.querySelector<HTMLInputElement | HTMLTextAreaElement>('input,textarea')!;
+    input.value = value; input.dispatchEvent(new Event('input', { bubbles: true })); await flushPromises();
+  }
+  async function submit() { form().dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })); await flushPromises(); }
+
+  it('creates a real UTF-8 document in the current folder from a modal', async () => {
+    await wrapper.get('[data-testid="library-folder-fin"]').trigger('click');
+    await wrapper.get('[data-testid="library-create-doc"]').trigger('click'); await flushPromises();
+    expect(form()).not.toBeNull();
+    expect(form().querySelector<HTMLButtonElement>('[data-testid="library-create-save"]')!.disabled).toBe(true);
+    await fill('library-create-title', '新计划'); await fill('library-create-text', '# 计划\n\n中文与 emoji 🙂'); await submit();
+    const args = invoke.mock.calls.find(([command]) => command === 'library_import_data')![1];
+    expect(args).toMatchObject({ name: '新计划.md', folder: 'fin' });
+    const bytes = Uint8Array.from(atob(args.dataUrl.split(',')[1]), (c: string) => c.charCodeAt(0));
+    expect(new TextDecoder().decode(bytes)).toBe('# 计划\n\n中文与 emoji 🙂');
+    expect(form()).toBeNull();
+    expect(wrapper.get('[data-testid="library-doc-manual-doc"]').text()).toContain('新计划.md');
+  });
+
+  it('creates a text favorite without inventing a source conversation', async () => {
+    await tab(wrapper, 'saved');
+    await wrapper.get('[data-testid="library-create-saved"]').trigger('click'); await flushPromises();
+    await fill('library-create-title', '随手记'); await fill('library-create-text', '<script>这是文字</script>'); await submit();
+    expect(invoke).toHaveBeenCalledWith('library_save', { item: { kind: 'text', title: '随手记', text: '<script>这是文字</script>', sessionId: null, sessionTitle: '' } });
+    const card = wrapper.get('[data-testid="library-saved-manual-saved"]');
+    expect(card.text()).toContain('手动创建'); expect(card.text()).toContain('<script>这是文字</script>');
+    expect(card.find('script').exists()).toBe(false); expect(card.text()).not.toContain('回到对话');
+    expect(form()).toBeNull();
+  });
+
+  it('creates a memory note through its modal and clears search so the new entry is visible', async () => {
+    await wrapper.get('[data-testid="library-search"]').setValue('预算'); await tab(wrapper, 'memory');
+    await wrapper.get('[data-testid="memory-write"]').trigger('click'); await flushPromises();
+    await fill('memory-text', '回答先给结论，再给理由');
+    (document.querySelector('[data-testid="memory-save"]') as HTMLButtonElement).click(); await flushPromises();
+    expect(invoke).toHaveBeenCalledWith('chat_memory_write_note', { name: null, text: '回答先给结论，再给理由' });
+    expect(wrapper.get('[data-testid="memory-note-manual-note"]').text()).toContain('回答先给结论');
+    expect((wrapper.get('[data-testid="library-search"]').element as HTMLInputElement).value).toBe('');
+  });
+
+  it('rejects paths, preserves drafts on failed save and allows cancelling without writing', async () => {
+    await wrapper.get('[data-testid="library-create-doc"]').trigger('click'); await flushPromises();
+    await fill('library-create-title', '../错误'); await fill('library-create-text', '保留这段草稿'); await submit();
+    expect(invoke.mock.calls.some(([command]) => command === 'library_import_data')).toBe(false);
+    expect(form().querySelector('[role="alert"]')!.textContent).toContain('文档名称');
+    const normal = invoke.getMockImplementation()!;
+    invoke.mockImplementation(async (command: string, args: Record<string, unknown>) => { if (command === 'library_import_data') throw new Error('磁盘写入失败'); return normal(command, args); });
+    await fill('library-create-title', '有效名称'); await submit();
+    expect(form().querySelector('textarea')!.value).toBe('保留这段草稿');
+    const writes = invoke.mock.calls.filter(([command]) => command === 'library_import_data').length;
+    [...form().querySelectorAll('button')].find(button => button.textContent?.trim() === '取消')!.click(); await flushPromises();
+    expect(form()).toBeNull(); expect(invoke.mock.calls.filter(([command]) => command === 'library_import_data')).toHaveLength(writes);
+  });
+});
+
 describe('资料库 page', () => {
   beforeEach(() => { invoke.mockReset(); try { localStorage.clear(); } catch { /* not needed */ } });
 
@@ -82,6 +160,27 @@ describe('资料库 page', () => {
     expect(wrapper.findAll('[role="tab"]').map(t => t.text())).toEqual(['我的文档4', '云文档1', '收藏1', '记忆4']);
     await wrapper.get('[data-testid="library-search"]').setValue('预算');
     expect(wrapper.get('[data-testid="library-tab-docs"]').text()).toBe('我的文档1');
+  });
+
+  it('uses labeled icon-only actions and expands or clears search from its icon', async () => {
+    const { wrapper } = setup(); await flushPromises();
+    const actions = wrapper.findAll('.library-head .library-action');
+    expect(actions.map(button => button.attributes('aria-label'))).toEqual(['搜索资料库', '导入文件夹', '导入文档', '新建文档']);
+    for (const button of actions) { expect(button.text()).toBe(''); expect(button.attributes('title')).toBeTruthy(); }
+    expect(wrapper.get('[data-testid="library-search"]').isVisible()).toBe(false);
+    await wrapper.get('[data-testid="library-search-toggle"]').trigger('click'); await flushPromises();
+    expect(wrapper.get('[data-testid="library-search"]').isVisible()).toBe(true);
+    await wrapper.get('[data-testid="library-search"]').setValue('预算');
+    expect(wrapper.get('[data-testid="library-tab-docs"]').text()).toBe('我的文档1');
+    await wrapper.get('[data-testid="library-search"]').trigger('keydown', { key: 'Escape' });
+    expect(wrapper.get('[data-testid="library-search"]').isVisible()).toBe(false);
+    expect(wrapper.get('[data-testid="library-tab-docs"]').text()).toBe('我的文档4');
+    for (const [id, action] of [['cloud', 'library-add-link'], ['saved', 'library-create-saved'], ['memory', 'memory-write']]) {
+      await tab(wrapper, id);
+      expect(wrapper.get(`[data-testid="${action}"]`).text()).toBe('');
+      expect(wrapper.get(`[data-testid="${action}"]`).attributes('aria-label')).toBeTruthy();
+    }
+    wrapper.unmount();
   });
 
   it('refreshes 记忆 when the assistant saves a note, but not when the save failed', async () => {

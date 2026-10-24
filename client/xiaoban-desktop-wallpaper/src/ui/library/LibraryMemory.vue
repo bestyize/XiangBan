@@ -6,7 +6,7 @@ import { Flag, Lightbulb, NotebookPen, Pencil, ShieldCheck, Sparkles, Trash2 } f
 import { formatWhen, searchText, type Experience, type MemoryGoal, type MemoryNote, type LibraryStore } from './library-store.ts';
 
 const props = defineProps<{ library: LibraryStore; query: string; desktop: boolean; sessionTitle: (id: string) => string }>();
-const emit = defineEmits<{ openSession: [id: string] }>();
+const emit = defineEmits<{ openSession: [id: string]; created: [] }>();
 const confirm = useConfirm();
 
 const memory = computed(() => props.library.memory);
@@ -26,11 +26,11 @@ function editExperience(experience: Experience, approveAfter = false) { editing.
 const limit = computed(() => editing.value?.mode === 'note' ? 2000 : 500);
 async function saveEdit() {
   const job = editing.value;
-  if (!job || !text.value.trim()) return;
+  if (!job || !text.value.trim() || props.library.busy) return;
   const ok = job.mode === 'note'
     ? await props.library.writeNote(job.note?.name ?? null, text.value)
     : await props.library.editExperience(job.experience.id, text.value) && (!job.approveAfter || await props.library.review(job.experience.id, true));
-  if (ok) editing.value = null;
+  if (ok) { editing.value = null; if (job.mode === 'note' && !job.note) emit('created'); }
 }
 function forgetNote(note: MemoryNote) {
   confirm({ title: '忘掉这条记忆？', content: note.preview, positiveText: '忘掉', negativeText: '取消', onPositiveClick: () => props.library.deleteNote(note.name) });
@@ -72,7 +72,7 @@ defineExpose({ write: () => editNote(null) });
               <button type="button" class="lib-icon-btn" aria-label="修改这条记忆" @click="editNote(note)"><Pencil :size="14" /></button>
               <button type="button" class="lib-icon-btn" aria-label="忘掉这条记忆" @click="forgetNote(note)"><Trash2 :size="14" /></button>
             </div>
-            <p v-if="!notes.length" class="lib-muted empty">{{ query.trim() ? '没有找到' : '还没有。小伴会在对话里记下值得长期记住的事，你也可以点「写一条」告诉它。' }}</p>
+            <p v-if="!notes.length" class="lib-muted empty">{{ query.trim() ? '没有找到' : '还没有。小伴会在对话里记下值得长期记住的事，你也可以点「新建记忆」手动添加。' }}</p>
           </section>
 
           <section class="group" aria-label="做事经验">
@@ -112,12 +112,13 @@ defineExpose({ write: () => editNote(null) });
       </aside>
     </div>
 
-    <NModal :show="!!editing" preset="card" :title="editing?.mode === 'note' ? (editing.note ? '修改记忆' : '写一条记忆') : '修改经验'" style="max-width: 480px; width: 92vw;" @update:show="value => { if (!value) editing = null; }">
+    <NModal :show="!!editing" preset="card" :title="editing?.mode === 'note' ? (editing.note ? '修改记忆' : '新建记忆') : '修改经验'" :mask-closable="!library.busy" :close-on-esc="!library.busy" :closable="!library.busy" style="max-width:480px;width:92vw;max-height:calc(100dvh - 48px);overflow:auto" @update:show="value => { if (!value && !library.busy) editing = null; }">
       <form class="lib-form" @submit.prevent="saveEdit">
-        <NInput v-model:value="text" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }" :maxlength="limit" show-count :placeholder="editing?.mode === 'note' ? '比如：回答先给结论，再给理由' : ''" data-testid="memory-text" />
+        <NInput v-model:value="text" type="textarea" :autosize="{ minRows: 3, maxRows: 8 }" :maxlength="limit" :disabled="library.busy" show-count :placeholder="editing?.mode === 'note' ? '比如：回答先给结论，再给理由' : ''" data-testid="memory-text" />
+        <p v-if="editing?.mode === 'note' && memory?.remembering === false" class="lib-muted">记忆开关目前关闭。笔记仍会保存，重新开启后才用于回答。</p>
         <div class="lib-form-actions">
-          <NButton @click="editing = null">取消</NButton>
-          <NButton type="primary" attr-type="submit" :loading="library.busy" :disabled="!text.trim()" data-testid="memory-save">{{ editing?.mode === 'experience' && editing.approveAfter ? '改好并记住' : '保存' }}</NButton>
+          <NButton :disabled="library.busy" @click="editing = null">取消</NButton>
+          <NButton type="primary" attr-type="submit" :loading="library.busy" :disabled="library.busy || !text.trim()" data-testid="memory-save">{{ editing?.mode === 'experience' && editing.approveAfter ? '改好并记住' : '保存' }}</NButton>
         </div>
       </form>
     </NModal>

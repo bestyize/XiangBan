@@ -16,7 +16,7 @@ const props=defineProps<{store:ControlStore;settingsRequest?:{id:string}|null}>(
 const emit=defineEmits<{settingsOpened:[]}>();
 const client=createWidgetClient(),{layout,ready,busy,error}=client;
 const selected=ref(''),settingsOpen=ref(false),flash=ref('');
-const activeCategory=ref<'builtin'|'custom'>('builtin');
+const filter=ref<'all'|'desk'|'mine'>('all');
 const customWidgets=ref<CustomWidgetPack[]>([]);
 
 /** The widget kind or 'custom' whose add-button menu is open. */
@@ -101,7 +101,7 @@ async function removeCustomPack(id:string,name:string){
 
 async function onImported(){
   await loadCustom();
-  activeCategory.value='custom';
+  filter.value='mine';
 }
 
 function openSettings(id:string){selected.value=id;settingsOpen.value=true;}
@@ -111,6 +111,7 @@ async function remove(){if(chosen.value){await client.remove(chosen.value.id);se
 watch([()=>props.settingsRequest,ready],([request,loaded])=>{
   if(!request||!loaded)return;
   if(layout.value.widgets.some(w=>w.id===request.id)){
+    filter.value='desk';
     openSettings(request.id);
   } else props.store.notify('这个组件已不在桌面上','info');
   emit('settingsOpened');
@@ -135,13 +136,20 @@ onBeforeUnmount(()=>{window.removeEventListener('keydown',onKey);observer?.disco
   <ResourceShareActions :store="store" kind="widget" variant="xb" import-label="导入" :disabled="busy" @imported="onImported"/>
   <button type="button" class="xb-btn-primary" :disabled="!store.desktop" data-testid="widgets-create" @click="store.startCreation('widget')"><Sparkles :size="14"/>让小伴创作</button>
  </StudioActions>
+ <div class="wd-toolbar">
+  <div class="xb-seg" role="group" aria-label="组件筛选">
+   <button type="button" :aria-pressed="filter==='all'" data-testid="widgets-filter-all" @click="filter='all';moreFor=''">全部</button>
+   <button type="button" :aria-pressed="filter==='desk'" data-testid="widgets-filter-desk" @click="filter='desk';moreFor=''">在桌面上 <b class="cnt">{{ desktopWidgets.length }}</b></button>
+   <button type="button" :aria-pressed="filter==='mine'" data-testid="widgets-filter-mine" @click="filter='mine';moreFor=''">我的</button>
+  </div>
+ </div>
  <div ref="body" class="wd-body">
  <NAlert v-if="error" type="error" :show-icon="false" class="wd-alert">{{ error }}<button v-if="!ready" type="button" class="xb-link" @click="client.load">重新读取</button></NAlert>
  <NAlert v-if="layout.errors.length" type="warning" :show-icon="false" class="wd-alert">{{ layout.errors.join('；') }}</NAlert>
 
- <section aria-label="桌面上的组件" data-testid="widgets-on-desktop">
+ <section v-if="filter==='desk'" aria-label="桌面上的组件" data-testid="widgets-on-desktop">
   <div class="sec">桌面上<span class="sub">{{ desktopWidgets.length }} 个 · 拖动可在桌面上调整位置</span><button v-if="desktopWidgets.length" type="button" class="sec-link" data-testid="widgets-toggle-all" @click="setAllEnabled(visibleCount===0)">{{ visibleCount===0?'全部显示':'全部隐藏' }}</button></div>
-  <div v-if="!desktopWidgets.length" class="desk-empty" data-testid="widgets-desktop-empty">桌面上还没有组件，从下方挑一个添加吧。</div>
+  <div v-if="!desktopWidgets.length" class="desk-empty" data-testid="widgets-desktop-empty">桌面上还没有组件。<button type="button" class="xb-link" @click="filter='all'">去挑选组件</button></div>
   <div v-else class="desk-grid">
    <article v-for="widget in desktopWidgets" :key="widget.id" class="on-desk" :class="{hidden:!widget.enabled}" :data-testid="`desk-widget-${widget.id}`">
     <div class="stage" :style="{height:`${deskStage.h}px`}"><div class="stage-inner" :style="fitStyle(widget.kind,deskStage,widget.custom)"><WidgetSurface :widget="widget" preview/></div><span v-if="!widget.enabled" class="hidden-tag">已隐藏</span></div>
@@ -159,24 +167,21 @@ onBeforeUnmount(()=>{window.removeEventListener('keydown',onKey);observer?.disco
   </div>
  </section>
 
- <section aria-label="添加组件" class="add-section">
-  <div class="sec">添加组件<div class="xb-seg" role="group" aria-label="组件来源"><button type="button" :aria-pressed="activeCategory==='builtin'" data-testid="widgets-scope-builtin" @click="activeCategory='builtin'">官方</button><button type="button" :aria-pressed="activeCategory==='custom'" data-testid="widgets-scope-custom" @click="activeCategory='custom'">{{ customWidgets.length ? `我的 ${customWidgets.length}` : '我的' }}</button></div></div>
-
-  <div v-if="activeCategory==='builtin'" class="gallery">
-   <div v-for="item in widgetKinds" :key="item.kind" class="gt xb-widget-slot" :class="item.kind" :title="item.description">
-    <div class="pv"><div class="stage-inner" :style="fitStyle(item.kind,galleryStage)"><WidgetSurface :widget="demo(item.kind)" preview demo/></div></div>
-    <div class="ft"><b>{{ item.title }}</b><button class="add" :class="{added:flash===item.kind}" :disabled="!ready||busy" :data-testid="`add-${item.kind}`" :aria-label="`添加${item.title}到桌面`" aria-haspopup="dialog" :aria-expanded="layerFor===item.kind" @click="askLayer(item.kind)"><Check v-if="flash===item.kind" :size="14"/><Plus v-else :size="14"/></button></div>
-   </div>
-  </div>
-
-  <template v-else>
-   <div v-if="!customWidgets.length" class="xb-empty" data-testid="custom-empty">
+ <section v-if="filter!=='desk'" aria-label="添加组件" class="add-section">
+  <div class="sec">{{ filter==='mine'?'我的组件':'全部组件' }}</div>
+   <div v-if="filter==='mine'&&!customWidgets.length" class="xb-empty" data-testid="custom-empty">
     <span class="xb-empty-icon"><Sparkles :size="24"/></span>
     <h3>还没有自定义组件</h3>
     <p>点击右上角的“导入”导入资源包，或点击“让小伴创作”让小伴为你编写。</p>
     <button v-if="store.desktop" type="button" class="xb-btn" @click="store.startCreation('widget')">让小伴写一个组件</button>
    </div>
-   <div v-else class="gallery" data-testid="custom-widgets">
+   <div v-else class="gallery" :data-testid="filter==='mine'?'custom-widgets':'widget-gallery'">
+    <template v-if="filter==='all'">
+     <div v-for="item in widgetKinds" :key="item.kind" class="gt xb-widget-slot" :class="item.kind" :title="item.description">
+      <div class="pv"><div class="stage-inner" :style="fitStyle(item.kind,galleryStage)"><WidgetSurface :widget="demo(item.kind)" preview demo/></div></div>
+      <div class="ft"><b>{{ item.title }}</b><button class="add" :class="{added:flash===item.kind}" :disabled="!ready||busy" :data-testid="`add-${item.kind}`" :aria-label="`添加${item.title}到桌面`" aria-haspopup="dialog" :aria-expanded="layerFor===item.kind" @click="askLayer(item.kind)"><Check v-if="flash===item.kind" :size="14"/><Plus v-else :size="14"/></button></div>
+     </div>
+    </template>
     <div v-for="pack in customWidgets" :key="pack.id" class="gt" :data-testid="`custom-card-${pack.id}`">
      <div class="pv"><div class="stage-inner" :style="fitStyle('custom',galleryStage,pack)"><WidgetSurface :widget="customDemo(pack)" preview demo/></div>
       <div class="card-tools"><ResourceShareActions :store="store" kind="widget" :id="pack.id" icons/>
@@ -184,8 +189,7 @@ onBeforeUnmount(()=>{window.removeEventListener('keydown',onKey);observer?.disco
      <div class="ft"><b>{{ pack.name }}</b><button class="add" :class="{added:flash===pack.id}" :disabled="!ready||busy" :data-testid="`add-custom-${pack.id}`" :aria-label="`添加${pack.name}到桌面`" @click="askCustomLayer(pack)"><Check v-if="flash===pack.id" :size="14"/><Plus v-else :size="14"/></button></div>
     </div>
    </div>
-  </template>
-  <p class="wd-hint">添加时先选择放在哪一层 · 缩略图为示例，添加后使用真实时间、天气和行情。</p>
+  <p v-if="filter==='all'||customWidgets.length" class="wd-hint">添加时先选择放在哪一层 · 缩略图为示例，添加后使用真实时间、天气和行情。</p>
  </section>
  </div>
 
@@ -205,12 +209,12 @@ onBeforeUnmount(()=>{window.removeEventListener('keydown',onKey);observer?.disco
 
 <style scoped>
 .widgets-page{height:100%;min-height:0;display:flex;flex-direction:column}
+.wd-toolbar{flex:none;display:flex;align-items:center;gap:10px;padding:16px 28px 0}.wd-toolbar .cnt{font-weight:600;color:var(--ui-ink)}
 .wd-body{flex:1;min-height:0;overflow-y:auto;padding:22px 28px 28px;scrollbar-width:thin;scrollbar-color:var(--ui-scrollbar) transparent;overscroll-behavior:contain}
 .wd-alert{margin-bottom:14px;border-radius:10px}
 .sec{display:flex;align-items:center;gap:10px;font-size:15px;font-weight:600}
 .sec .sub{font-size:12px;font-weight:400;color:var(--ui-text-secondary)}
 .sec-link{margin-left:auto;border:0;background:none;padding:0;font-size:12.5px;font-weight:500;color:var(--ui-ink);cursor:pointer}
-.sec .xb-seg{margin-left:auto}
 .desk-empty{margin-top:12px;padding:26px;border-radius:14px;background:var(--ui-surface-sunken);font-size:13px;color:var(--ui-text-secondary);text-align:center}
 .desk-grid{margin-top:12px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
 .on-desk{min-width:0;border-radius:14px;background:var(--ui-surface);box-shadow:0 0 0 1px var(--ui-line),var(--ui-shadow-card);padding:8px 8px 6px}
@@ -225,7 +229,7 @@ onBeforeUnmount(()=>{window.removeEventListener('keydown',onKey);observer?.disco
 .more-wrap{position:relative;flex:none}
 .menu-dismiss{position:fixed;inset:0;z-index:30}
 .more-menu{position:absolute;right:0;top:28px;z-index:31;min-width:160px}
-.add-section{margin-top:26px}
+.add-section{margin-top:0}
 .gallery{margin-top:12px;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px}
 .gt{min-width:0;border-radius:12px;background:var(--ui-surface);box-shadow:0 0 0 1px var(--ui-line);padding:6px 6px 4px;transition:box-shadow .15s}
 .gt:hover{box-shadow:0 0 0 1px var(--ui-border-strong),0 4px 12px var(--ui-shadow-hover)}

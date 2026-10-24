@@ -119,7 +119,10 @@ async function dropFiles(event: DragEvent) {
 }
 
 async function importFrom(directory: boolean) { await props.library.pickImport(realFolder.value, directory); }
-defineExpose({ importFrom, newFolder: () => { naming.value = { mode: 'create', initial: '' }; } });
+defineExpose({ importFrom, newFolder: () => { naming.value = { mode: 'create', initial: '' }; },
+  currentFolder: () => realFolder.value,
+  showCreated: (id: string, folder: string | null) => { view.value = folder ?? 'all'; filter.value = '全部'; sort.value = 'recent'; selected.value = id; },
+});
 </script>
 
 <template>
@@ -164,7 +167,7 @@ defineExpose({ importFrom, newFolder: () => { naming.value = { mode: 'create', i
         <div v-if="empty" class="xb-empty first">
           <span class="xb-empty-icon"><FileText :size="24" /></span>
           <h3>把常用文件放进来</h3>
-          <p>拖入文件，或导入一个文件夹（会保留原来的层级）。资料库里存的是副本，小伴读完后就能在回答里参考。</p>
+          <p>可以新建文档、拖入文件，或导入一个文件夹（保留原来的层级）。小伴读完后就能在回答里参考。</p>
           <div class="first-actions"><button type="button" class="xb-btn" :disabled="!desktop" @click="importFrom(true)">导入文件夹</button><button type="button" class="xb-btn-primary" :disabled="!desktop" @click="importFrom(false)">导入文档</button></div>
         </div>
         <template v-else>

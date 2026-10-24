@@ -9,7 +9,7 @@ export interface LibraryDoc {
 }
 export type Platform = 'feishu' | 'tencent' | 'baidu' | 'shimo' | 'yuque' | 'wps' | 'other';
 export interface LibraryLink { id: string; url: string; title: string; platform: Platform; kind: string; code: string | null; folder: string | null; addedMs: number }
-export type SavedKind = 'answer' | 'file' | 'image' | 'shot';
+export type SavedKind = 'answer' | 'text' | 'file' | 'image' | 'shot';
 export interface LibrarySaved { id: string; kind: SavedKind; title: string; text: string; sessionId: string | null; sessionTitle: string; source: 'main' | 'assistant'; savedMs: number }
 export interface LibraryData { folders: LibraryFolder[]; docs: LibraryDoc[]; links: LibraryLink[]; saved: LibrarySaved[] }
 
@@ -114,7 +114,7 @@ export function guessPlatform(url: string): Platform | null {
   return host.includes('.') ? 'other' : null;
 }
 
-export const SAVED_KINDS: Record<SavedKind, string> = { answer: '回答', file: '文件', image: '图片', shot: '截图' };
+export const SAVED_KINDS: Record<SavedKind, string> = { answer: '回答', text: '文本', file: '文件', image: '图片', shot: '截图' };
 
 export function formatSize(bytes: number) {
   if (bytes < 1024) return `${bytes} B`;
@@ -159,6 +159,20 @@ export function createLibraryStore(deps: LibraryDeps) {
     },
     async importFile(name: string, dataUrl: string, folder: string | null) {
       await run(async () => { store.data = asLibrary(await deps.invoke<LibraryData>('library_import_data', { name, dataUrl, folder })); });
+    },
+    async createDocument(name: string, text: string, folder: string | null) {
+      const previous = new Set(store.data.docs.map(doc => doc.id));
+      const bytes = new TextEncoder().encode(text);
+      let binary = '';
+      for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+      const ok = await run(async () => { store.data = asLibrary(await deps.invoke<LibraryData>('library_import_data', { name, dataUrl: `data:text/plain;base64,${btoa(binary)}`, folder })); });
+      return ok ? store.data.docs.find(doc => !previous.has(doc.id))?.id ?? null : null;
+    },
+    async createSaved(title: string, text: string) {
+      return run(async () => {
+        await deps.invoke('library_save', { item: { kind: 'text', title, text, sessionId: null, sessionTitle: '' } });
+        store.data = asLibrary(await deps.invoke<LibraryData>('library_state'));
+      });
     },
     async createFolder(name: string, parent: string | null) {
       let id: string | null = null;
