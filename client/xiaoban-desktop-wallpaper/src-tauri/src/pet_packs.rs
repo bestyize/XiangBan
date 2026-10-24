@@ -62,7 +62,7 @@ struct Catalog {
 pub fn builtin() -> Vec<Theme> {
     static THEMES: std::sync::OnceLock<Vec<Theme>> = std::sync::OnceLock::new();
     THEMES.get_or_init(|| {
-    let mut catalog = serde_json::from_str::<Catalog>(include_str!("../../public/pets/catalog.json"))
+    let mut catalog = serde_json::from_str::<Catalog>(include_str!("../../src/pets/catalog.json"))
         .expect("shipped pet themes")
         .themes;
     let assets: [(String, Vec<u8>); 5] = [

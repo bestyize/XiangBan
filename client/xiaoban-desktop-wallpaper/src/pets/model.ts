@@ -1,4 +1,4 @@
-import official from '../../public/pets/catalog.json';
+import official from './catalog.json';
 import { imageSource, validateImage } from './images.ts';
 const builtinImages = import.meta.glob<string>('./assets/*.webp', { eager: true, query: '?inline', import: 'default' });
 import { EXPRESSION_NAMES, type ExpressionName } from '../companion/expressions.ts';
