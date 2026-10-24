@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>小伴桌面 · 工作空间检索设计稿</title>
+  <style>
+    :root{color-scheme:light;--canvas:#f4f1f2;--surface:#fff;--raised:#f8f8fa;--ink:#27272b;--secondary:#76767e;--muted:#a1a1a9;--line:#ececef;--border:#e2e2e7;--brand:#bf5362;--soft:#fbf0f2;--mark:#f7e0b9;--overlay:#25232b30;--shadow:0 32px 100px -18px #19151d38,0 8px 28px -12px #19151d24,0 0 0 1px #00000007}
+    [data-theme=dark]{color-scheme:dark;--canvas:#1b191c;--surface:#262628;--raised:#2c2c2f;--ink:#eeeef0;--secondary:#aaaab3;--muted:#7d7d87;--line:#39393e;--border:#44444b;--brand:#d27c89;--soft:#3a2c31;--mark:#68512a;--overlay:#05050870;--shadow:0 32px 100px -10px #0008,0 0 0 1px #ffffff0b}
+    *{box-sizing:border-box}html,body{margin:0;height:100%;font:13px/1.6 Inter,-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;color:var(--ink);background:var(--canvas);-webkit-font-smoothing:antialiased}button,input,select{font:inherit}button{cursor:pointer;color:inherit}button:focus-visible,summary:focus-visible,select:focus-visible{outline:2px solid var(--brand);outline-offset:3px}svg{display:block;width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;flex:none}[hidden]{display:none!important}button:disabled{cursor:not-allowed}mark{padding:0 1px;border-radius:2px;background:var(--mark);color:inherit}kbd{font:10px/1.5 inherit;border:1px solid var(--border);border-radius:4px;background:var(--surface);padding:1px 4px;color:var(--secondary)}
+    .preview-bar{position:relative;z-index:30;height:62px;display:flex;align-items:center;justify-content:space-between;gap:20px;padding:0 28px;border-bottom:1px solid var(--line);background:var(--surface)}.preview-brand{display:flex;align-items:center;gap:10px;font-weight:600;white-space:nowrap}.brand-mark{display:grid;place-items:center;width:27px;height:27px;border-radius:9px;background:var(--brand);color:white}.preview-brand small{color:var(--muted);font-size:12px;font-weight:400;margin-left:2px}.preview-tools{display:flex;align-items:center;gap:18px}.preview-tools button{display:flex;align-items:center;gap:6px;background:none;border:0;padding:5px 0;color:var(--secondary);font-size:12px}.preview-tools svg{width:15px;height:15px}
+    .app{display:grid;grid-template-columns:246px minmax(0,1fr);height:calc(100dvh - 62px);max-width:1600px;margin:auto;padding:8px 8px 8px 0}.sidebar{display:flex;flex-direction:column;min-height:0;padding:23px 15px 14px}.app-brand{display:flex;align-items:center;gap:10px;margin:0 12px 25px;font-size:16px;font-weight:620}.app-brand .brand-mark{width:32px;height:32px;border-radius:11px}.app-brand small{display:block;font-weight:400;font-size:10px;color:var(--muted);line-height:1}.primary-nav{display:grid;gap:3px}.nav-item{display:flex;align-items:center;gap:10px;padding:9px 12px;border:0;border-radius:8px;background:none;text-align:left;color:var(--secondary);font-size:12px}.nav-item.active{color:var(--brand);background:var(--soft)}.nav-item svg{width:16px;height:16px}.workspace-heading{display:flex;align-items:center;justify-content:space-between;padding:0 9px 0 12px;margin-top:27px;color:var(--secondary);font-size:11px}.workspace-label{display:flex;align-items:center;gap:5px}.workspace-label svg{width:11px;height:11px}.workspace-tools{display:flex;align-items:center;gap:3px}.icon-button{display:grid;place-items:center;width:25px;height:25px;padding:0;border:0;border-radius:7px;color:var(--secondary);background:none}.icon-button svg{width:15px;height:15px}.icon-button:hover{background:var(--surface);color:var(--ink)}.icon-button.search{color:var(--brand)}.icon-button.spotlight{background:var(--surface);box-shadow:0 0 0 2px var(--brand),0 0 0 5px var(--soft)}.workspace-tree{flex:1;min-height:0;overflow-y:auto;margin-top:10px;scrollbar-width:thin;scrollbar-color:var(--border) transparent}.tree-project{margin:3px 0}.tree-project>summary{display:flex;align-items:center;gap:8px;cursor:pointer;list-style:none;padding:8px 10px;border-radius:8px;font-size:12px}.tree-project>summary::-webkit-details-marker{display:none}.tree-project>summary:hover{background:var(--surface)}.tree-chevron{width:11px;height:11px;color:var(--muted)}.tree-project[open] .tree-chevron{transform:rotate(90deg)}.tree-project>summary>.folder{width:15px;height:15px;color:var(--secondary)}.tree-project>summary>span{flex:1}.tree-project>summary small{color:var(--muted);font-size:10px;font-variant-numeric:tabular-nums}.tree-sessions{display:grid;gap:2px;margin:0 0 6px 29px;padding-left:9px;border-left:1px solid var(--border)}.tree-chat{display:block;width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:7px 9px;text-align:left;background:none;border:0;border-radius:6px;font-size:11px;color:var(--secondary)}.tree-chat:hover{background:var(--surface)}.tree-chat.selected{background:var(--soft);color:var(--brand)}.sidebar-bottom{display:flex;align-items:center;gap:9px;margin:13px 9px 0;padding-top:15px;border-top:1px solid var(--border);font-size:11px;color:var(--secondary)}.avatar{width:25px;height:25px;border:1px solid var(--border);border-radius:50%;display:grid;place-items:center;font-size:10px;background:var(--surface);color:var(--brand)}
+    .chat{display:flex;flex-direction:column;min-height:0;background:var(--surface);border-radius:13px;box-shadow:0 0 0 1px #00000005}.chat-heading{display:flex;align-items:center;gap:11px;min-height:71px;padding:0 28px;font-size:12px}.chat-heading>span:first-child{color:var(--muted)}.chat-heading>svg{width:12px;height:12px;color:var(--muted)}.chat-heading b{font-weight:550;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.chat-heading .icon-button{margin-left:auto}.chat-body{flex:1;overflow:auto;scrollbar-width:thin;padding:48px 9% 30px}.chat-message-user{margin:0 0 35px auto;max-width:540px;padding:13px 18px;border-radius:15px 15px 4px 15px;background:var(--raised);font-size:13px;line-height:1.9}.assistant-label{display:flex;align-items:center;gap:8px;margin-bottom:12px;font-size:12px;font-weight:550}.assistant-label .brand-mark{width:23px;height:23px;border-radius:8px}.assistant-label svg{width:14px;height:14px}.assistant-text{font-size:13px;line-height:2;color:var(--secondary);white-space:pre-wrap}.match-note{display:inline-flex;align-items:center;gap:6px;margin-top:20px;font-size:11px;color:var(--brand)}.match-note svg{width:13px;height:13px}.composer{flex:none;margin:20px 8% 32px;border:1px solid var(--border);border-radius:15px;padding:16px 18px;color:var(--muted);font-size:12px}.composer-bottom{display:flex;align-items:center;justify-content:space-between;margin-top:28px;font-size:10px}.composer-bottom span{display:flex;align-items:center;gap:8px}.composer-bottom svg{width:15px;height:15px}
+    .overlay{position:fixed;inset:62px 0 0;z-index:20;display:flex;align-items:center;justify-content:center;padding:26px 18px 40px;background:var(--overlay);backdrop-filter:blur(3px)}.search-dialog{display:flex;flex-direction:column;width:690px;max-height:min(620px,calc(100dvh - 126px));border-radius:17px;background:var(--surface);box-shadow:var(--shadow);overflow:hidden;outline:none;animation:enter .18s ease-out}.dialog-heading{display:flex;align-items:center;justify-content:space-between;padding:22px 24px 15px}.dialog-heading h1{margin:0;font-size:17px;line-height:1.5;letter-spacing:-.2px;font-weight:600}.dialog-heading .icon-button{color:var(--muted);margin-right:-5px}.search-field{display:flex;align-items:center;gap:10px;margin:0 24px;padding:0 12px;border:1px solid var(--border);border-radius:9px;background:var(--raised);flex:none}.search-field:focus-within{border-color:var(--brand);box-shadow:0 0 0 3px var(--soft);background:var(--surface)}.search-field>svg{color:var(--secondary);width:17px;height:17px}.search-field input{min-width:0;flex:1;height:43px;padding:0;background:none;border:0;outline:none;color:var(--ink);font-size:13px}.search-field input::placeholder{color:var(--muted);font-size:12px}.search-field .icon-button{width:22px;height:22px;flex:none;color:var(--muted)}.search-field .icon-button svg{width:14px;height:14px}.search-filters{display:flex;align-items:center;gap:14px;padding:16px 24px 12px;flex:none}.filter-tabs{display:flex;gap:4px}.filter-tabs button{padding:4px 11px;border:0;border-radius:6px;background:none;color:var(--secondary);font-size:11px;white-space:nowrap}.filter-tabs button[aria-pressed=true]{background:var(--soft);color:var(--brand);font-weight:550}.scope{margin-left:auto;display:flex;align-items:center;gap:6px;color:var(--muted)}.scope svg{width:13px;height:13px}.scope select{max-width:180px;padding:4px 16px 4px 1px;border:0;background:var(--surface);color:var(--secondary);font-size:11px;cursor:pointer}.result-meta{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:0 25px 9px;font-size:10px;color:var(--muted);flex:none}.result-meta b{color:var(--secondary);font-weight:500}.results{height:336px;max-height:336px;min-height:80px;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:var(--border) transparent;border-top:1px solid var(--line);padding:5px 8px}.result{display:flex;align-items:center;gap:12px;width:100%;min-height:65px;padding:10px 15px;border:0;border-radius:9px;text-align:left;background:none;color:inherit}.result[aria-selected=true]{background:var(--raised)}.result[aria-selected=true] .result-icon{color:var(--brand);border-color:var(--border);background:var(--surface)}.result-icon{display:grid;place-items:center;width:29px;height:29px;flex:none;border:1px solid var(--line);border-radius:8px;color:var(--muted)}.result-icon svg{width:14px;height:14px}.result-main{flex:1;min-width:0}.result-title-row{display:flex;align-items:center;gap:8px;min-width:0;margin-bottom:5px}.result-title{font-size:12px;font-weight:500;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.hit-type{color:var(--muted);background:var(--surface);border:1px solid var(--line);padding:0 4px;border-radius:4px;font-size:9px;white-space:nowrap;font-weight:400;flex:none}.result-time{margin-left:auto;padding-left:12px;white-space:nowrap;font-size:10px;color:var(--muted);flex:none}.result-context{display:flex;align-items:center;gap:7px;font-size:11px;color:var(--muted);min-width:0}.result-project{color:var(--secondary);white-space:nowrap;flex:none;max-width:110px;overflow:hidden;text-overflow:ellipsis}.result-separator{width:2px;height:2px;background:var(--muted);border-radius:50%;flex:none}.result-excerpt{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}.result-enter{flex:none;width:14px;height:14px;color:var(--muted);opacity:0}.result[aria-selected=true] .result-enter{opacity:1}.empty{min-height:260px;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:9px;color:var(--muted);text-align:center;padding:26px}.empty>svg{width:29px;height:29px;stroke-width:1.2;margin-bottom:5px}.empty h2{margin:0;font-size:13px;font-weight:500;color:var(--secondary)}.empty p{margin:0;font-size:11px;line-height:1.8}.empty button{background:none;border:0;color:var(--brand);font-size:11px;margin-top:3px}.dialog-footer{display:flex;align-items:center;justify-content:space-between;gap:15px;padding:13px 24px;border-top:1px solid var(--line);flex:none;font-size:10px;color:var(--muted)}.keyboard-hints{display:flex;gap:12px;align-items:center}.keyboard-hints span{display:flex;align-items:center;gap:4px}.footer-note{font-size:10px;white-space:nowrap}.design-note{position:fixed;left:0;right:0;bottom:10px;z-index:25;pointer-events:none;text-align:center;font-size:10px;letter-spacing:.02em;color:var(--secondary)}.toast{position:fixed;z-index:40;left:50%;bottom:35px;transform:translateX(-50%);padding:9px 16px;border-radius:9px;background:var(--ink);color:var(--surface);font-size:12px;box-shadow:0 5px 25px #0002;max-width:90vw;text-align:center}
+    .tree-more{display:flex;align-items:center;gap:6px;min-height:28px;width:100%;padding:5px 9px;border:0;border-radius:6px;background:none;color:var(--secondary);font-size:10.5px;text-align:left}.tree-more:hover{background:var(--surface);color:var(--ink)}.tree-more>svg{width:11px;height:11px;color:var(--muted)}.tree-more[aria-expanded=true]>svg{transform:rotate(180deg)}.tree-more small{margin-left:auto;color:var(--muted);font-size:9px;white-space:nowrap}.tree-more-projects{margin:5px 0 4px 24px;width:calc(100% - 24px)}
+    @keyframes enter{from{opacity:0;transform:translateY(6px) scale(.994)}to{opacity:1;transform:none}}
+    @media(max-width:760px){.preview-bar{padding-inline:18px}.preview-brand small{display:none}.preview-tools{gap:13px}.preview-tools button{font-size:11px}.app{grid-template-columns:206px minmax(0,1fr)}.sidebar{padding-inline:10px}.chat-heading{padding-inline:20px}.chat-body{padding-inline:7%}.search-dialog{width:650px}.search-filters{gap:6px}.scope select{max-width:150px}}
+    @media(max-width:480px){.app{grid-template-columns:158px minmax(0,1fr)}.app-brand{font-size:13px;margin-inline:4px;gap:7px}.app-brand .brand-mark{width:27px;height:27px}.sidebar{padding-inline:5px}.workspace-heading{padding-inline:7px}.tree-project>summary{gap:5px;padding-inline:6px;font-size:11px}.tree-sessions{margin-left:17px;padding-left:5px}.tree-chat{font-size:10px}.nav-item{padding-inline:8px;font-size:11px}.preview-brand{font-size:12px}.preview-bar{padding-inline:14px}.preview-tools{gap:11px}.preview-tools button>span{display:none}.overlay{padding:18px 10px 35px}.search-dialog{width:100%;max-height:calc(100dvh - 115px);border-radius:14px}.dialog-heading{padding:19px 18px 14px}.dialog-heading h1{font-size:16px}.search-field{margin-inline:18px}.search-filters{padding:14px 17px 11px}.filter-tabs button{padding:4px 9px}.scope{gap:3px}.scope svg{display:none}.scope select{max-width:105px;font-size:10px}.result-meta{padding-inline:19px}.results{padding-inline:5px}.result{padding:10px 12px;gap:9px}.result-icon{width:25px;height:25px;border-radius:7px}.result-time{font-size:9px;padding-left:5px}.result-title{font-size:11.5px}.result-context{gap:5px;font-size:10px}.result-project{max-width:72px}.hit-type{font-size:8px}.result-enter{display:none}.dialog-footer{padding:12px 18px;gap:7px}.keyboard-hints{gap:8px}.keyboard-hints .esc-hint{display:none}.footer-note{white-space:normal;text-align:right;max-width:130px;font-size:9px}.design-note{font-size:9px}.chat-heading{padding-inline:12px}.chat-heading>span:first-child,.chat-heading>svg{display:none}}
+    @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;scroll-behavior:auto!important}}
+  </style>
+</head>
+<body>
+  <svg style="position:absolute;width:0;height:0;overflow:hidden" aria-hidden="true"><defs>
+    <symbol id="spark" viewBox="0 0 24 24"><path d="m12 3 2.4 6.6L21 12l-6.6 2.4L12 21l-2.4-6.6L3 12l6.6-2.4L12 3Z"/></symbol>
+    <symbol id="search" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 4 4"/></symbol>
+    <symbol id="chat" viewBox="0 0 24 24"><path d="M20 11.5a8.5 8.5 0 0 1-8.5 8.5H4l-2 2V11.5A8.5 8.5 0 1 1 20 11.5Z" transform="translate(1 -1) scale(.95)"/></symbol>
+    <symbol id="folder" viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v10H3V7Z"/></symbol>
+    <symbol id="plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="chevron" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></symbol>
+    <symbol id="down" viewBox="0 0 24 24"><path d="m7 10 5 5 5-5"/></symbol>
+    <symbol id="x" viewBox="0 0 24 24"><path d="m6 6 12 12M6 18 18 6"/></symbol>
+    <symbol id="moon" viewBox="0 0 24 24"><path d="M20.5 13a8.5 8.5 0 0 1-9.5-9.5A8.5 8.5 0 1 0 20.5 13Z"/></symbol>
+    <symbol id="enter" viewBox="0 0 24 24"><path d="M20 5v7a3 3 0 0 1-3 3H4m5-5-5 5 5 5"/></symbol>
+    <symbol id="more" viewBox="0 0 24 24"><circle cx="5" cy="12" r=".8"/><circle cx="12" cy="12" r=".8"/><circle cx="19" cy="12" r=".8"/></symbol>
+  </defs></svg>
+
+  <header class="preview-bar"><div class="preview-brand"><div class="brand-mark"><svg><use href="#spark"/></svg></div>小伴桌面<small>/ 工作空间检索 · HTML 设计稿</small></div><div class="preview-tools"><button id="show-entry"><svg><use href="#folder"/></svg>查看入口</button><button id="theme" aria-label="切换深浅色"><svg><use href="#moon"/></svg><span>深色预览</span></button></div></header>
+  <main class="app">
+    <aside class="sidebar">
+      <div class="app-brand"><div class="brand-mark"><svg><use href="#spark"/></svg></div><div>小伴桌面<small>v2.1.0</small></div></div>
+      <nav class="primary-nav"><button class="nav-item active"><svg><use href="#chat"/></svg>小伴 AI</button><button class="nav-item" id="new-task"><svg><use href="#plus"/></svg>新建任务</button><button class="nav-item"><svg><use href="#folder"/></svg>资料库</button></nav>
+      <div class="workspace-heading"><span class="workspace-label">工作空间<svg><use href="#down"/></svg></span><div class="workspace-tools"><button class="icon-button search" id="workspace-search" title="搜索工作空间" aria-label="搜索工作空间"><svg><use href="#search"/></svg></button><button class="icon-button" id="new-workspace" title="新建工作区" aria-label="新建工作区"><svg><use href="#plus"/></svg></button></div></div>
+      <div class="workspace-tree" id="workspace-tree"></div>
+      <div class="sidebar-bottom"><div class="avatar">小</div>小伴的工作空间</div>
+    </aside>
+    <section class="chat" aria-label="会话内容"><header class="chat-heading"><span id="chat-project">小伴桌面</span><svg><use href="#chevron"/></svg><b id="chat-title">文档任务能力验证</b><button class="icon-button" aria-label="会话更多操作"><svg><use href="#more"/></svg></button></header><div class="chat-body" id="chat-body"></div><div class="composer">继续说，或交给小伴去办<div class="composer-bottom"><span><svg><use href="#plus"/></svg>默认权限</span><span>小伴 AI · 日常<svg><use href="#enter"/></svg></span></div></div></section>
+  </main>
+
+  <div class="overlay" id="overlay">
+    <section class="search-dialog" role="dialog" aria-modal="true" aria-labelledby="search-title">
+      <header class="dialog-heading"><h1 id="search-title">搜索工作空间</h1><button class="icon-button" id="close" aria-label="关闭搜索"><svg><use href="#x"/></svg></button></header>
+      <div class="search-field"><svg><use href="#search"/></svg><input id="query" role="combobox" aria-label="搜索会话标题、内容或工作区" aria-autocomplete="list" aria-controls="results" aria-expanded="true" autocomplete="off" placeholder="搜索会话标题、内容或工作区…" value="文档"><button class="icon-button" id="clear" aria-label="清空关键词" title="清空"><svg><use href="#x"/></svg></button></div>
+      <div class="search-filters"><nav class="filter-tabs" aria-label="检索范围"><button data-filter="all" aria-pressed="true">全部</button><button data-filter="title" aria-pressed="false">标题</button><button data-filter="content" aria-pressed="false">内容</button></nav><label class="scope"><svg><use href="#folder"/></svg><select id="scope" aria-label="筛选工作区"><option value="all">所有工作区</option></select></label></div>
+      <div class="result-meta"><span id="result-count" aria-live="polite"></span><span id="sort-label">按相关度排序</span></div>
+      <div class="results" id="results" role="listbox" aria-label="检索到的会话"></div>
+      <footer class="dialog-footer"><div class="keyboard-hints"><span><kbd>↑</kbd><kbd>↓</kbd>选择</span><span><kbd>↵</kbd>打开</span><span class="esc-hint"><kbd>Esc</kbd>关闭</span></div><span class="footer-note">自动展开工作区，定位到会话</span></footer>
+    </section>
+  </div>
+  <div class="design-note">交互设计稿 · 项目与会话默认各显示 6 项 · 搜索覆盖全部会话</div>
+  <div class="toast" id="toast" role="status" hidden></div>
+
+  <script>
+    const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
+    const icon=name=>'<svg aria-hidden="true"><use href="#'+name+'"/></svg>';
+    const escape=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    const projects=[
+      {id:'desktop',name:'小伴桌面',entries:[
+        ['文档任务能力验证','读取 Word 文档和 CSV 表格，核对去重、退款及净收入。文档报告与 Excel 汇总已生成，下一步检查交付文件。'],
+        ['Windows 编码异常修复','修复文档处理中的 UTF-8 与 GBK 编码问题，保留宿主显式编码设置，并补充中文文件路径回归测试。'],
+        ['聊天文件列表折叠','将本轮修改的文件汇总为默认折叠的清单。展开后每个文件使用紧凑单行展示，保留打开文件夹入口。'],
+        ['长期目标弹窗优化','根据确认的 HTML 设计稿，将长期目标改为独立弹窗。保留目标保存、执行、暂停与验收操作。'],
+        ['工作空间检索设计','为侧栏增加搜索入口，支持检索会话标题、聊天内容和工作区。点击结果后展开所属项目并定位会话。'],
+        ['文档工具回归测试','DOCX、PPTX、XLSX 与 PDF 文本层读取测试通过。扫描 PDF 不包含 OCR，需要明确显示能力边界。'],
+        ['打包与版本检查','核对 Windows 安装包及版本信息。本次不触发远端构建，只整理需要人工执行的检查项。'],
+        ['扫描 PDF 的读取方案','扫描文档没有可提取的文本层，应说明 OCR 或图像识别能力的依赖，不能把未读取内容当作已经读到。']
+      ]},
+      {id:'web',name:'相伴网页',entries:[
+        ['本周工作记录整理','根据这周的工作文档整理周报，区分已完成、进行中与待决定的事项，保留原始记录中的不确定性。'],
+        ['管理后台交互调整','缩短用户列表的行高，统一筛选控件的间距，修复窄屏下按钮挤压和表格溢出的问题。'],
+        ['接口调用文档补充','补齐注册与登录接口的请求示例、返回字段和错误处理文档，核对网页调用方是否一致。'],
+        ['小游戏页面布局','优化游戏空间首页和卡片列表，保持每款游戏的独立入口以及暂停、继续和重新开始操作。'],
+        ['网页样式检查','检查浅色与深色配色，修复标题换行、按钮状态和小屏窗口中出现的内容截断。']
+      ]},
+      {id:'wallpaper',name:'壁纸网站',entries:[
+        ['壁纸搜索与分类','检查分类、分页及关键词搜索，统一网站与桌面客户端展示的标题和素材信息。'],
+        ['客户端对接文档','更新壁纸订阅接口的字段说明与文档，列出资源校验、下载失败和版本兼容的处理方式。'],
+        ['动态壁纸上传流程','优化上传后的预览与封面选择，区分保存到壁纸库与立即应用到桌面的动作。'],
+        ['公告与版本发布','整理本次公告文案及更新说明，检查用户关闭已读公告后是否仍会重复弹出。']
+      ]},
+      {id:'account',name:'账号中心',entries:[
+        ['注册与登录流程','核对验证码、登录状态和刷新令牌，补充异常反馈，确保旧客户端仍可使用现有协议。'],
+        ['账号接口联调记录','整理跨产品登录过程中的接口文档与字段边界，保存本次联调中已确认的结果。'],
+        ['验证码提示优化','区分验证码错误、过期和发送频率限制。提示尽量短，帮助用户知道下一步该做什么。'],
+        ['用户管理页面','调整后台用户详情与筛选功能。保持权限验证，不对生产数据执行批量修改。']
+      ]},
+      {id:'gateway',name:'AI 网关',entries:[
+        ['模型服务配置','核对不同协议的请求地址、模型名称与额度反馈，客户端只显示日常和深入两种使用模式。'],
+        ['额度系统说明文档','整理体验额度、月卡与加油包的说明文档，核对用户可见文案，不展示内部模型映射。'],
+        ['请求错误排查','区分网络故障、限流与额度不足，减少无效重试，并显示实际服务端返回的错误原因。'],
+        ['用量统计核验','检查输入、缓存命中和输出的用量字段，比较长任务每轮重复上下文带来的统计差异。']
+      ]},
+      {id:'docs',name:'产品文档',entries:[
+        ['桌面产品需求整理','整理桌面客户端的职责、当前能力和规划范围。文档中的规划项需要与已实现功能明确区分。'],
+        ['搜索交互评审','搜索结果采用紧凑行展示，默认跨项目查询，可按标题和内容缩小范围，列表高度固定并支持滚动。'],
+        ['新用户上手说明','从新建工作区、开始会话到查看交付文件，说明最常见的操作，不把实现细节放进用户流程。'],
+        ['发布前验收清单','保留真实的验收记录，区分命令执行成功、文件内容正确与视觉效果已经检查。'],
+        ['设计稿归档','将已确认的交互稿与对应说明放在设计目录，HTML 设计稿可直接打开，不依赖在线素材。']
+      ]},
+      {id:'study',name:'我的学习',entries:[
+        ['费曼学习法练习','用简单的语言解释 Rust 所有权，再用一个小例子检查概念有没有理解到位。'],
+        ['研究论文阅读笔记','按问题、方法、实验和局限整理 PDF 文档，引用具体段落，避免把推断写成原文结论。'],
+        ['本月阅读计划','把阅读任务拆成每天可完成的小步骤，记录读过的章节、疑问和下一步要验证的想法。'],
+        ['每周复盘','整理本周学到的知识与尚未弄明白的地方，用具体例子检查记忆是否准确。']
+      ]}
+    ];
+    const records=projects.flatMap((p,pi)=>p.entries.map(([title,content],i)=>({id:p.id+'-'+i,project:p.id,projectName:p.name,title,content,age:(pi*6+i+1)*17})));
+    let selected='desktop-0',filter='all',active=0,visible=[],isComposing=false,toastTimer;
+    const expanded=new Set(['desktop']),overlay=$('#overlay'),query=$('#query'),results=$('#results');
+    const displayLimit=6,expandedSessionLists=new Set();
+    let allProjectsExpanded=false;
+    function terms(){return [...new Set(query.value.trim().toLocaleLowerCase().split(/\s+/).filter(Boolean))]}
+    function highlight(text){const t=terms();if(!t.length)return escape(text);const positions=[];const lower=text.toLocaleLowerCase();for(const word of t){let start=0,at;while((at=lower.indexOf(word,start))!==-1){positions.push([at,at+word.length]);start=at+Math.max(word.length,1)}}positions.sort((a,b)=>a[0]-b[0]);const merged=[];for(const [a,b] of positions){const last=merged.at(-1);if(last&&a<=last[1])last[1]=Math.max(last[1],b);else merged.push([a,b])}let cursor=0,out='';for(const [a,b] of merged){out+=escape(text.slice(cursor,a))+'<mark>'+escape(text.slice(a,b))+'</mark>';cursor=b}return out+escape(text.slice(cursor))}
+    function excerpt(text){const t=terms(),lower=text.toLocaleLowerCase();const starts=t.map(w=>lower.indexOf(w)).filter(n=>n>=0);const start=starts.length?Math.max(0,Math.min(...starts)-16):0;return (start?'…':'')+text.slice(start,start+110)+(text.length>start+110?'…':'')}
+    function ageLabel(age){return age<60?age+' 分钟前':age<1440?Math.floor(age/60)+' 小时前':Math.floor(age/1440)+' 天前'}
+    function toast(message){clearTimeout(toastTimer);$('#toast').textContent=message;$('#toast').hidden=false;toastTimer=setTimeout(()=>$('#toast').hidden=true,2300)}
+    function renderTree(){
+      const tree=$('#workspace-tree');tree.replaceChildren();
+      const projectList=document.createElement('div');projectList.id='workspace-projects';tree.append(projectList);
+      for(const project of allProjectsExpanded?projects:projects.slice(0,displayLimit)){
+        const group=document.createElement('details');group.className='tree-project';group.dataset.project=project.id;group.open=expanded.has(project.id);
+        const summary=document.createElement('summary');summary.innerHTML=icon('chevron').replace('<svg ','<svg class="tree-chevron" ')+icon('folder').replace('<svg ','<svg class="folder" ')+'<span>'+escape(project.name)+'</span><small>'+project.entries.length+'</small>';group.append(summary);
+        const list=document.createElement('div');list.className='tree-sessions';list.id='sessions-'+project.id;
+        const sessions=records.filter(r=>r.project===project.id),showAll=expandedSessionLists.has(project.id);
+        for(const record of showAll?sessions:sessions.slice(0,displayLimit)){
+          const button=document.createElement('button');button.className='tree-chat'+(selected===record.id?' selected':'');button.textContent=record.title;button.title=record.title;button.dataset.session=record.id;button.onclick=()=>openSession(record,false);list.append(button);
+        }
+        if(sessions.length>displayLimit){
+          const more=document.createElement('button');more.className='tree-more';more.dataset.sessionsMore=project.id;more.setAttribute('aria-expanded',String(showAll));more.setAttribute('aria-controls',list.id);
+          more.innerHTML=icon('down')+'<span>'+(showAll?'收起会话':'展开全部会话')+'</span><small>'+(showAll?'显示 '+displayLimit+' 个':'还有 '+(sessions.length-displayLimit)+' 个')+'</small>';
+          more.onclick=()=>{if(showAll)expandedSessionLists.delete(project.id);else expandedSessionLists.add(project.id);renderTree();$('[data-sessions-more="'+project.id+'"]').focus({preventScroll:true})};list.append(more);
+        }
+        group.append(list);group.addEventListener('toggle',()=>{if(group.open)expanded.add(project.id);else expanded.delete(project.id)});projectList.append(group);
+      }
+      if(projects.length>displayLimit){
+        const more=document.createElement('button');more.id='projects-more';more.className='tree-more tree-more-projects';more.setAttribute('aria-expanded',String(allProjectsExpanded));more.setAttribute('aria-controls',projectList.id);
+        more.innerHTML=icon('down')+'<span>'+(allProjectsExpanded?'收起项目':'展开全部项目')+'</span><small>'+(allProjectsExpanded?'显示 '+displayLimit+' 个':'还有 '+(projects.length-displayLimit)+' 个')+'</small>';
+        more.onclick=()=>{allProjectsExpanded=!allProjectsExpanded;renderTree();$('#projects-more').focus({preventScroll:true})};tree.append(more);
+      }
+    }
+    function renderConversation(record,matched=false){$('#chat-project').textContent=record.projectName;$('#chat-title').textContent=record.title;$('#chat-body').innerHTML='<div class="chat-message-user">'+escape(record.title)+'</div><div class="assistant-label"><div class="brand-mark">'+icon('spark')+'</div>小伴</div><div class="assistant-text">'+(matched?highlight(record.content):escape(record.content))+'</div>'+(matched?'<div class="match-note">'+icon('search')+'已打开搜索结果对应的会话</div>':'')}
+    function closeSearch(){overlay.hidden=true;query.setAttribute('aria-expanded','false');$('#workspace-search').focus()}
+    function openSearch(){overlay.hidden=false;$('#workspace-search').classList.remove('spotlight');query.setAttribute('aria-expanded','true');renderResults();requestAnimationFrame(()=>query.focus())}
+    function openSession(record,fromSearch=true){selected=record.id;expanded.add(record.project);if(projects.findIndex(p=>p.id===record.project)>=displayLimit)allProjectsExpanded=true;if(records.filter(r=>r.project===record.project).findIndex(r=>r.id===record.id)>=displayLimit)expandedSessionLists.add(record.project);renderTree();renderConversation(record,fromSearch);closeSearch();requestAnimationFrame(()=>{const row=$('.tree-chat[data-session="'+record.id+'"]');row.scrollIntoView({block:'nearest'});row.focus({preventScroll:true})});if(fromSearch)toast('已展开「'+record.projectName+'」并定位会话')}
+    function syncActive(scroll=false){const options=$$('.result');options.forEach((row,i)=>row.setAttribute('aria-selected',String(i===active)));if(options[active]){query.setAttribute('aria-activedescendant',options[active].id);if(scroll)options[active].scrollIntoView({block:'nearest'})}else query.removeAttribute('aria-activedescendant')}
+    function renderResults(){
+      const t=terms(),scope=$('#scope').value;$('#clear').hidden=!query.value;active=0;
+      visible=records.filter(r=>scope==='all'||r.project===scope).map(r=>{const fields=filter==='title'?[r.title]:filter==='content'?[r.content]:[r.title,r.content,r.projectName];const searchable=fields.join(' ').toLocaleLowerCase();const matches=t.every(word=>searchable.includes(word));const titleHit=t.some(w=>r.title.toLocaleLowerCase().includes(w)),contentHit=t.some(w=>r.content.toLocaleLowerCase().includes(w));const score=t.reduce((n,w)=>n+(r.title.toLocaleLowerCase().includes(w)?12:0)+(r.content.toLocaleLowerCase().includes(w)?4:0)+(r.projectName.toLocaleLowerCase().includes(w)?6:0),0);return {...r,matches,score,hit:filter==='title'?'标题':filter==='content'?'内容':titleHit?'标题':contentHit?'内容':'工作区'}}).filter(r=>r.matches).sort((a,b)=>b.score-a.score||a.age-b.age);
+      if(!t.length)visible=visible.slice(0,8);
+      $('#result-count').innerHTML=t.length?'找到 <b>'+visible.length+'</b> 个会话':'最近更新的会话';$('#sort-label').textContent=t.length?'按相关度排序':'输入关键词查找全部 '+records.length+' 个会话';results.replaceChildren();results.scrollTop=0;
+      if(!visible.length){const empty=document.createElement('div');empty.className='empty';empty.innerHTML=icon('search')+'<h2>没有找到相关会话</h2><p>试试更短的关键词，或切换到所有工作区。</p><button type="button" id="reset-search">清空搜索条件</button>';results.append(empty);$('#reset-search').onclick=()=>{query.value='';$('#scope').value='all';setFilter('all');query.focus()};syncActive();return}
+      visible.forEach((record,index)=>{const row=document.createElement('button');row.type='button';row.className='result';row.id='result-'+record.id;row.setAttribute('role','option');row.setAttribute('aria-selected',String(index===active));row.tabIndex=-1;row.dataset.session=record.id;row.innerHTML='<span class="result-icon">'+icon('chat')+'</span><span class="result-main"><span class="result-title-row"><span class="result-title">'+highlight(record.title)+'</span>'+(t.length?'<span class="hit-type">'+record.hit+'</span>':'')+'<span class="result-time">'+ageLabel(record.age)+'</span></span><span class="result-context"><span class="result-project">'+highlight(record.projectName)+'</span><i class="result-separator"></i><span class="result-excerpt">'+highlight(excerpt(record.content))+'</span></span></span>'+icon('enter').replace('<svg ','<svg class="result-enter" ');row.onclick=()=>openSession(record);row.onpointermove=()=>{if(active!==index){active=index;syncActive()}};row.onmousedown=e=>e.preventDefault();results.append(row)});syncActive();
+    }
+    function setFilter(value){filter=value;$$('[data-filter]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.filter===value)));renderResults()}
+    for(const project of projects){const option=document.createElement('option');option.value=project.id;option.textContent=project.name;$('#scope').append(option)}
+    $$('[data-filter]').forEach(b=>b.onclick=()=>setFilter(b.dataset.filter));$('#scope').onchange=renderResults;query.oninput=()=>{if(!isComposing)renderResults()};query.oncompositionstart=()=>isComposing=true;query.oncompositionend=()=>{isComposing=false;renderResults()};$('#clear').onclick=()=>{query.value='';renderResults();query.focus()};$('#close').onclick=closeSearch;$('#workspace-search').onclick=openSearch;overlay.onclick=e=>{if(e.target===overlay)closeSearch()};$('#show-entry').onclick=()=>{closeSearch();$('#workspace-search').classList.add('spotlight');toast('搜索入口位于“新建工作区”左侧')};$('#theme').onclick=()=>{const dark=document.documentElement.dataset.theme!=='dark';document.documentElement.dataset.theme=dark?'dark':'light';$('#theme span').textContent=dark?'浅色预览':'深色预览'};$('#new-workspace').onclick=()=>toast('设计演示：这里会打开新建工作区流程');$('#new-task').onclick=()=>toast('设计演示：这里会新建会话');
+    query.onkeydown=e=>{if(e.isComposing||isComposing)return;if(e.key==='ArrowDown'||e.key==='ArrowUp'){e.preventDefault();if(visible.length){active=(active+(e.key==='ArrowDown'?1:-1)+visible.length)%visible.length;syncActive(true)}}else if(e.key==='Enter'&&visible[active]){e.preventDefault();openSession(visible[active])}};
+    document.addEventListener('keydown',e=>{if(e.isComposing)return;if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='k'){e.preventDefault();openSearch();return}if(overlay.hidden)return;if(e.key==='Escape'){e.preventDefault();closeSearch()}else if(e.key==='Tab'){const nodes=$$('.search-dialog button,.search-dialog input,.search-dialog select').filter(n=>n.tabIndex>=0&&n.getClientRects().length);const first=nodes[0],last=nodes.at(-1);if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus()}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus()}}});
+    const params=new URLSearchParams(location.search);if(params.get('theme')==='dark')$('#theme').click();renderTree();renderConversation(records[0]);renderResults();if(params.get('entry')==='1'){$('#show-entry').click()}else{openSearch()}
+  </script>
+</body>
+</html>

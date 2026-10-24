@@ -39,6 +39,7 @@ pub mod memory_center;
 mod skill_evolution;
 pub(crate) mod store;
 mod sessions;
+pub mod search;
 
 use agent_computer_use_tools::{SKILL as COMPUTER_USE_SKILL, SKILL_NAME as COMPUTER_USE_SKILL_NAME, SKILL_ORIGIN_MARKER};
 use agent_kernel::builtin::fs::{fs_tools, fs_write_tools};

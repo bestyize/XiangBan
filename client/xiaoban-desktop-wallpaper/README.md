@@ -44,6 +44,14 @@ Windows / macOS 桌面应用：一个可拖动、透明处点击穿透的悬浮�
 
 针对性验证：`cargo test --locked --manifest-path libs/agent-kernel/Cargo.toml --features journal --test long_tasks --test guards`、`cargo test --locked --manifest-path tools/agent-reliability-checks/Cargo.toml`，以及本目录的 `npx vitest run src/ui/chat/ChatGoalPanel.test.ts src/ui/components/AgentSafetyCard.test.ts src/ui/chat/chat-store.test.ts src/ui/chat/view.test.ts`。机制回归使用脚本模型与隔离临时目录，不代表真实模型长程任务成功率。
 
+## 工作空间检索
+
+工作空间标题右侧、新建工作区左侧的搜索图标可打开会话检索弹窗，也可按 Ctrl+K / Command+K。支持按标题、聊天正文或工作区名称搜索，按工作区筛选；结果按相关度和更新时间排序，列表限高滚动。没有关键词时显示最近更新的 8 个会话。点击结果会展开所属项目并定位会话。
+
+侧栏默认最多显示 6 个项目，每个分组内默认最多显示 6 个会话，超过后可展开全部或收起；“最近任务”和“伙伴”作为固定分组保留。折叠只影响展示，检索仍覆盖全部已保存会话。检索在本机后台读取用户与小伴的消息正文，不调用模型，不检索隐藏推理、工具输出或附件文件的内部内容；运行中的会话只搜索已保存部分。读取失败会显示提示，连续输入产生的过期结果不会覆盖当前结果。
+
+验证：`npx vitest run src/ui/ControlShell.test.ts src/ui/ControlShell.projects.test.ts src/ui/components/WorkspaceSearchDialog.test.ts`；原生运行 `cargo test --locked --manifest-path src-tauri/Cargo.toml --bin xiaoban-desktop-wallpaper chat::search::tests`。
+
 ## 在 Windows 上运行
 
 需要 Node.js 22.12+（或 24）、Rust MSVC 工具链、Visual Studio C++ 构建工具和 WebView2 Runtime。在仓库根执行：

@@ -10,6 +10,7 @@ vi.mock('../bridge.ts', () => ({ invoke: vi.fn().mockResolvedValue(null), listen
 vi.mock('./components/SettingsDialog.vue', () => ({ __esModule: true, default: { template: '<div />' } }));
 vi.mock('./components/ChatNameDialog.vue', () => ({ __esModule: true, default: { template: '<div />' } }));
 vi.mock('./components/LoginModal.vue', () => ({ __esModule: true, default: { template: '<div />' } }));
+vi.mock('./components/WorkspaceSearchDialog.vue', () => ({ default: { props: ['show', 'spaces'], emits: ['select', 'update:show'], template: '<div v-if="show" data-testid="workspace-search-dialog" />' } }));
 vi.mock('naive-ui', () => ({ NAlert: { template: '<div />' }, NButton: { template: '<button />' }, NSkeleton: { template: '<div />' }, useMessage: () => ({ success: vi.fn(), error: vi.fn(), info: vi.fn() }) }));
 
 let wrapper: VueWrapper | undefined;
@@ -49,6 +50,32 @@ afterEach(() => { wrapper?.unmount(); wrapper = undefined; vi.restoreAllMocks();
 function render() { wrapper = mount(ControlShell, { attachTo: document.body }); return wrapper; }
 
 describe('workspace project actions', () => {
+  it('limits projects and sessions to six and reveals a hidden search result', async () => {
+    fixture.store.chat.sessions = Array.from({ length: 8 }, (_, project) => Array.from({ length: 8 }, (_, row) => ({ id: `p${project}s${row}`, title: `会话 ${project}-${row}`, workspace: `/项目${project}` }))).flat();
+    fixture.store.chat.currentId = null;
+    fixture.store.chat.views = { p0s7: { approvals: [{}], questions: [] }, p7s7: { approvals: [{}], questions: [] } };
+    render();
+    expect(projectPaths()).toHaveLength(6);
+    expect(button('workspace-projects-more').find('.xb-dot').exists()).toBe(true);
+    await button('space-项目0').trigger('click');
+    expect(wrapper!.findAll('[data-workspace-path="/项目0"] .nav-session')).toHaveLength(6);
+    expect(button('sessions-more-/项目0').find('.xb-dot').exists()).toBe(true);
+    await button('sessions-more-/项目0').trigger('click');
+    expect(wrapper!.findAll('[data-workspace-path="/项目0"] .nav-session')).toHaveLength(8);
+    await button('sessions-more-/项目0').trigger('click');
+    expect(wrapper!.findAll('[data-workspace-path="/项目0"] .nav-session')).toHaveLength(6);
+    await button('workspace-projects-more').trigger('click'); expect(projectPaths()).toHaveLength(8);
+    await button('workspace-projects-more').trigger('click'); expect(projectPaths()).toHaveLength(6);
+    await button('nav-workspace-search').trigger('click');
+    const dialog = wrapper!.findComponent({ name: 'WorkspaceSearchDialog' });
+    // All sessions, including those outside the rendered six rows, remain searchable.
+    expect(dialog.props('spaces').flatMap((space: any) => space.sessions)).toHaveLength(64);
+    dialog.vm.$emit('select', 'p7s7'); await flushPromises();
+    expect(projectPaths()).toHaveLength(8);
+    expect(button('session-p7s7').text()).toContain('会话 7-7');
+    expect(button('space-项目7').attributes('aria-expanded')).toBe('true');
+    expect(fixture.store.chat.select).toHaveBeenCalledWith('p7s7');
+  });
   it.each(['contextmenu', 'more'])('starts a fresh conversation in the chosen project from %s', async entry => {
     render();
     if (entry === 'contextmenu') await button('space-B').trigger('contextmenu', { clientX: 30, clientY: 150 });

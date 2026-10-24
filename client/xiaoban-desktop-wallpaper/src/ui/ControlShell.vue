@@ -9,6 +9,7 @@ import type { ControlPage, SettingsTab } from './control-types.ts';
 import type { SessionSummary } from './chat/types.ts';
 import SettingsDialog from './components/SettingsDialog.vue';
 import ChatNameDialog from './components/ChatNameDialog.vue';
+import WorkspaceSearchDialog from './components/WorkspaceSearchDialog.vue';
 import { useWorkspaceSort } from './workspace-sort.ts';
 const pageLoaders = {
   'new-task': () => import('./pages/NewTaskPage.vue'),
@@ -151,14 +152,34 @@ const { dragging: draggingWorkspace, target: workspaceDropTarget, start: startWo
   workspaceTree, () => spaces.value.filter(space => space.path).map(space => space.path), saveWorkspaceOrder,
 );
 const expanded = reactive(new Set<string>([RECENT, COMPANIONS]));
+const searchOpen = ref(false);
+const displayLimit = 6;
+const showAllProjects = ref(false);
+const expandedSessionLists = reactive(new Set<string>());
+const projectSpaces = computed(() => spaces.value.filter(space => !!space.path));
+const visibleSpaces = computed(() => spaces.value.filter(space => !space.path || showAllProjects.value || projectSpaces.value.indexOf(space) < displayLimit));
+function visibleSessions(space: Space) { return expandedSessionLists.has(space.key) ? space.sessions : space.sessions.slice(0, displayLimit); }
+function revealSession(id: string | null) {
+  const space = spaces.value.find(item => item.sessions.some(session => session.id === id));
+  if (!space) return;
+  expanded.add(space.key);
+  if (space.path && projectSpaces.value.indexOf(space) >= displayLimit) showAllProjects.value = true;
+  if (space.sessions.findIndex(session => session.id === id) >= displayLimit) expandedSessionLists.add(space.key);
+}
+function openSearch() { cancelWorkspaceSort(); closeWorkspaceMenu(); closeSessionMenu(); closeMenu(); searchOpen.value = true; }
+async function selectSearchResult(id: string) {
+  aiOpen.value = true; workspacesOpen.value = true; revealSession(id);
+  await openSession(id); await nextTick();
+  const row = [...(workspaceTree.value?.querySelectorAll<HTMLElement>('[data-session-id]') ?? [])].find(row => row.dataset.sessionId === id);
+  row?.scrollIntoView?.({ block: 'nearest' }); row?.focus({ preventScroll: true });
+}
 function toggleSpace(key: string) { if (expanded.has(key)) expanded.delete(key); else expanded.add(key); }
 /** Keep the folder of the open conversation unfolded. */
-watch(() => store.chat.currentId, id => {
-  const space = spaces.value.find(item => item.sessions.some(session => session.id === id));
-  if (space) expanded.add(space.key);
-});
+watch(() => store.chat.currentId, revealSession);
 function waiting(id: string) { const view = store.chat.views[id]; return !!view && view.approvals.length + view.questions.length > 0; }
 function spaceWaiting(space: Space) { return space.sessions.some(session => waiting(session.id)); }
+function hiddenSessionsWaiting(space: Space) { return !expandedSessionLists.has(space.key) && space.sessions.slice(displayLimit).some(session => waiting(session.id)); }
+const hiddenProjectsWaiting = computed(() => !showAllProjects.value && projectSpaces.value.slice(displayLimit).some(spaceWaiting));
 
 function navigate(page: ControlPage) { store.navigate(page); document.querySelector('.control-workspace')?.scrollTo(0, 0); }
 function preload(page: string) {
@@ -171,7 +192,7 @@ async function addWorkspace() {
   const path = await store.chat.pickWorkspace();
   if (!path) return;
   if (store.chat.currentId) await store.chat.select(null);
-  if (await store.chat.switchWorkspace(path) === 'done') { restoreWorkspace(path); workspacesOpen.value = true; expanded.add(path); navigate('new-task'); }
+  if (await store.chat.switchWorkspace(path) === 'done') { restoreWorkspace(path); workspacesOpen.value = true; expanded.add(path); if (projectSpaces.value.findIndex(space => space.path === path) >= displayLimit) showAllProjects.value = true; navigate('new-task'); }
 }
 const workspaceMenu = ref<{ key: string; x: number; y: number; confirming: boolean } | null>(null);
 const workspaceMenuEl = ref<HTMLElement | null>(null);
@@ -418,6 +439,7 @@ function onKeydown(event: KeyboardEvent) {
   if (event.key === 'Escape' && menuOpen.value) { closeMenu(); return; }
   if (!(event.metaKey || event.ctrlKey) || event.altKey || event.shiftKey) return;
   if (event.key === ',') { event.preventDefault(); openSettings(); }
+  else if (event.key.toLowerCase() === 'k') { event.preventDefault(); openSearch(); }
   else if (event.key.toLowerCase() === 'n') { event.preventDefault(); void newTask(); }
 }
 const focus = () => store.refreshSettings().catch(error => store.notify(error, 'error'));
@@ -472,9 +494,9 @@ const fixedPages = ['new-task', 'chat', 'ai-store', 'library', 'studio', 'games'
           <button v-for="item in aiItems" :key="item.id" type="button" class="nav-item" :class="{ selected: isCurrent(item.id) }" :aria-current="isCurrent(item.id) ? 'page' : undefined" :data-testid="`nav-${item.id}`" :title="item.label" @pointerenter="preload(item.id)" @focus="preload(item.id)" @click="item.id === 'new-task' ? newTask() : navigate(item.id)">
             <component :is="item.icon" :size="16" class="nav-icon" /><span class="nav-label">{{ item.label }}</span><span v-if="item.hint" class="nav-hint">{{ item.hint }}</span>
           </button>
-          <div class="nav-caption"><button type="button" class="workspace-toggle" :aria-expanded="workspacesOpen" aria-controls="workspace-tree" data-testid="nav-workspaces-toggle" @click="toggleWorkspaces"><span>工作空间</span><ChevronDown :size="12" class="nav-chevron" :class="{ shut: !workspacesOpen }" /></button><button type="button" class="xb-icon-btn is-sm" aria-label="新建工作区" title="新建工作区" data-testid="nav-new-workspace" @click="addWorkspace"><Plus :size="14" :stroke-width="2" /></button></div>
+          <div class="nav-caption"><button type="button" class="workspace-toggle" :aria-expanded="workspacesOpen" aria-controls="workspace-tree" data-testid="nav-workspaces-toggle" @click="toggleWorkspaces"><span>工作空间</span><ChevronDown :size="12" class="nav-chevron" :class="{ shut: !workspacesOpen }" /></button><span class="workspace-tools"><button type="button" class="xb-icon-btn is-sm" aria-label="搜索工作空间" title="搜索工作空间" data-testid="nav-workspace-search" @click="openSearch"><Search :size="14" /></button><button type="button" class="xb-icon-btn is-sm" aria-label="新建工作区" title="新建工作区" data-testid="nav-new-workspace" @click="addWorkspace"><Plus :size="14" :stroke-width="2" /></button></span></div>
           <div v-show="workspacesOpen" id="workspace-tree" ref="workspaceTree" :class="{ 'is-sorting': draggingWorkspace }" @click.capture="workspaceSortClick">
-          <div v-for="space in spaces" :key="space.key" class="nav-space-group" :data-workspace-path="space.path || undefined" :class="{ 'is-dragging': !!space.path && draggingWorkspace === space.path, 'drop-before': workspaceDropTarget?.path === space.path && !workspaceDropTarget.after, 'drop-after': workspaceDropTarget?.path === space.path && workspaceDropTarget.after }">
+          <div v-for="space in visibleSpaces" :key="space.key" class="nav-space-group" :data-workspace-path="space.path || undefined" :class="{ 'is-dragging': !!space.path && draggingWorkspace === space.path, 'drop-before': workspaceDropTarget?.path === space.path && !workspaceDropTarget.after, 'drop-after': workspaceDropTarget?.path === space.path && workspaceDropTarget.after }">
             <div class="nav-space-row" :class="{ 'menu-open': workspaceMenu?.key === space.key }" @contextmenu.prevent="openWorkspaceMenu(space, $event)" @dragstart.prevent>
             <button type="button" class="nav-item space-row" :class="{ 'is-sortable': space.path }" :aria-expanded="expanded.has(space.key)" :title="space.path ? `${space.path}（拖动排序）` : space.name" :data-testid="space.key === '__recent__' ? 'space-recent' : `space-${space.name}`" @pointerdown="startWorkspaceSort(space.path, $event)" @click="toggleSpace(space.key)">
               <component :is="space.key === '__recent__' ? Inbox : space.key === '__companions__' ? Sparkles : Folder" :size="16" class="nav-icon" /><span class="nav-label">{{ space.name }}</span>
@@ -484,15 +506,17 @@ const fixedPages = ['new-task', 'chat', 'ai-store', 'library', 'studio', 'games'
             <button v-if="space.path" type="button" class="xb-icon-btn is-sm nav-space-more" aria-haspopup="menu" :aria-expanded="workspaceMenu?.key === space.key" :aria-label="`更多操作：${space.name}`" title="更多" :data-testid="`space-more-${space.name}`" @click.stop="openWorkspaceMenu(space, $event, $event.currentTarget)"><Ellipsis :size="14" /></button>
             </div>
             <template v-if="expanded.has(space.key)">
-              <div v-for="session in space.sessions" :key="session.id" class="nav-session-row" :class="{ 'menu-open': sessionMenu?.id === session.id }" @contextmenu.prevent="openSessionMenu(session.id, $event)">
-                <button type="button" class="nav-session" :class="{ selected: store.page === 'chat' && store.chat.currentId === session.id }" :aria-current="store.page === 'chat' && store.chat.currentId === session.id ? 'page' : undefined" :data-testid="`session-${session.id}`" :title="session.title" @click="openSession(session.id)">
+              <div v-for="session in visibleSessions(space)" :key="session.id" class="nav-session-row" :class="{ 'menu-open': sessionMenu?.id === session.id }" @contextmenu.prevent="openSessionMenu(session.id, $event)">
+                <button type="button" class="nav-session" :class="{ selected: store.page === 'chat' && store.chat.currentId === session.id }" :aria-current="store.page === 'chat' && store.chat.currentId === session.id ? 'page' : undefined" :data-testid="`session-${session.id}`" :data-session-id="session.id" :title="session.title" @click="openSession(session.id)">
                   <span>{{ session.title || '新对话' }}</span><i v-if="waiting(session.id)" class="xb-dot" aria-label="等你确认"></i>
                 </button>
                 <button type="button" class="xb-icon-btn is-sm nav-session-more" aria-haspopup="menu" :aria-expanded="sessionMenu?.id === session.id" :aria-label="`更多操作：${session.title || '新对话'}`" title="更多" :data-testid="`session-more-${session.id}`" @click.stop="openSessionMenu(session.id, $event, $event.currentTarget)"><Ellipsis :size="14" /></button>
               </div>
+              <button v-if="space.sessions.length > displayLimit" type="button" class="workspace-more sessions-more" :aria-expanded="expandedSessionLists.has(space.key)" :data-testid="`sessions-more-${space.key}`" @click="expandedSessionLists.has(space.key) ? expandedSessionLists.delete(space.key) : expandedSessionLists.add(space.key)"><ChevronDown :size="12" /><span>{{ expandedSessionLists.has(space.key) ? '收起会话' : '展开全部会话' }}</span><i v-if="hiddenSessionsWaiting(space)" class="xb-dot" aria-label="折叠的会话中有待确认操作" /><small>{{ expandedSessionLists.has(space.key) ? `显示 ${displayLimit} 个` : `还有 ${space.sessions.length - displayLimit} 个` }}</small></button>
               <p v-if="!space.sessions.length" class="nav-empty">{{ space.key === '__recent__' ? '还没有任务' : '新任务会出现在这里' }}</p>
             </template>
           </div>
+          <button v-if="projectSpaces.length > displayLimit" type="button" class="workspace-more" :aria-expanded="showAllProjects" aria-controls="workspace-tree" data-testid="workspace-projects-more" @click="cancelWorkspaceSort(); showAllProjects = !showAllProjects"><ChevronDown :size="12" /><span>{{ showAllProjects ? '收起项目' : '展开全部项目' }}</span><i v-if="hiddenProjectsWaiting" class="xb-dot" aria-label="折叠的项目中有待确认操作" /><small>{{ showAllProjects ? `显示 ${displayLimit} 个` : `还有 ${projectSpaces.length - displayLimit} 个` }}</small></button>
           </div>
         </div>
         <div class="nav-sep"></div>
@@ -588,10 +612,13 @@ const fixedPages = ['new-task', 'chat', 'ai-store', 'library', 'studio', 'games'
       </main>
     </div>
     <SettingsDialog :store="store" @open-site="openOfficialSite" />
+    <WorkspaceSearchDialog v-model:show="searchOpen" :desktop="store.desktop" :spaces="spaces" @select="selectSearchResult" />
     <LoginModal :store="store" />
   </div>
 </template>
 <style>
+.workspace-tools{display:flex;align-items:center;gap:3px}
+.workspace-more{display:flex;align-items:center;gap:6px;min-height:28px;width:calc(100% - 28px);margin:4px 0 4px 22px;padding:5px 9px;border:0;border-radius:6px;background:none;color:var(--ui-text-secondary);font:inherit;font-size:11px;text-align:left;cursor:pointer}.workspace-more:hover{background:var(--ui-surface);color:var(--ui-text-primary)}.workspace-more svg{flex:none;color:var(--ui-text-tertiary)}.workspace-more[aria-expanded=true] svg{transform:rotate(180deg)}.workspace-more small{margin-left:auto;white-space:nowrap;font-size:10px;color:var(--ui-text-tertiary)}.sessions-more{margin-left:35px;width:calc(100% - 41px)}
 /* Sidebar (方案四): tint background, 264 wide, soft + ink selection. */
 .control-sidebar{position:relative;display:flex;flex-direction:column;min-height:0;padding:0 12px 12px;background:var(--ui-tint);color:var(--ui-text-primary)}
 .sidebar-top{height:48px;flex-shrink:0;display:flex;align-items:center;justify-content:flex-end;gap:2px}
