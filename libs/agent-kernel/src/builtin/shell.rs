@@ -5,7 +5,8 @@
 //! the environment is cleared (host secrets such as API keys do not leak to the command), stdin is
 //! closed, output is bounded, and on timeout or cancel the whole process group is killed.
 //! Background processes a command leaves behind are killed when it finishes.
-//! Unix is tested; the Windows path (`cmd /C`, `taskkill`) has not been run.
+//! Unix is tested; the Windows path (`cmd /C`, `taskkill`) has not been run. On Windows, output that is not
+//! UTF-8 is decoded from the OEM code page.
 
 use super::str_arg;
 use crate::tool::{Risk, Tool, ToolCtx, ToolSpec};
@@ -25,6 +26,12 @@ const TAIL_BYTES: usize = 192 * 1024;
 const MAX_COMMAND_CHARS: usize = 8000;
 const READER_GRACE: Duration = Duration::from_millis(500);
 const POLL: Duration = Duration::from_millis(20);
+#[cfg(windows)]
+const SHELL_NOTE: &str = "The shell is Windows cmd.exe (`cmd /C`), not bash or sh: use cmd syntax such as `&&`, `if exist`, \
+                          `where`, `dir`, `%VAR%` and `for %i in (a b) do ...`; never bash syntax such as `for x in ...; do`, \
+                          `command -v`, `ls`, `$(...)` or `$VAR`. Run `powershell -NoProfile -Command \"...\"` for anything cmd cannot do.";
+#[cfg(not(windows))]
+const SHELL_NOTE: &str = "The shell is /bin/sh.";
 
 
 pub struct Shell {
@@ -42,10 +49,12 @@ impl Shell {
             "properties": { "command": { "type": "string", "description": format!("One command line, run by the system shell, at most {MAX_COMMAND_CHARS} characters. Put a long script in a file instead.") } },
             "required": ["command"]
         });
-        let description = "Run a shell command in the working directory and return its combined output and exit code. \
-                           There is no terminal and no input, so never start interactive programs. Prefer the file tools \
-                           for reading and editing files.";
-        let spec = ToolSpec::new("shell", description, schema).risk(Risk::Exec).serial().timeout(Duration::from_secs(120));
+        let description = format!(
+            "Run a shell command in the working directory and return its combined output and exit code. {SHELL_NOTE} \
+             There is no terminal and no input, so never start interactive programs. Prefer the file tools \
+             for reading and editing files."
+        );
+        let spec = ToolSpec::new("shell", &description, schema).risk(Risk::Exec).serial().timeout(Duration::from_secs(120));
         Self { spec, cwd: cwd.into(), env: Vec::new(), extra_inherited: Vec::new(), sandbox: None }
     }
 
@@ -102,15 +111,41 @@ impl Capture {
     }
 
     fn text(&self) -> String {
-        let head = String::from_utf8_lossy(&self.head);
+        let head = decode(&self.head);
         let tail_bytes: Vec<u8> = self.tail.iter().copied().collect();
-        let tail = String::from_utf8_lossy(&tail_bytes);
+        let tail = decode(&tail_bytes);
         if self.dropped > 0 {
             format!("{head}\n[... {} bytes of output omitted ...]\n{tail}", self.dropped)
         } else {
             format!("{head}{tail}")
         }
     }
+}
+
+/// UTF-8 when the bytes are UTF-8. Otherwise, on Windows, the OEM code page that `cmd` and console programs
+/// write to a pipe (GBK on Chinese systems), so their messages are not turned into replacement characters.
+fn decode(bytes: &[u8]) -> String {
+    match std::str::from_utf8(bytes) {
+        Ok(text) => text.to_string(),
+        #[cfg(windows)]
+        Err(_) => oem_decode(bytes).unwrap_or_else(|| String::from_utf8_lossy(bytes).into_owned()),
+        #[cfg(not(windows))]
+        Err(_) => String::from_utf8_lossy(bytes).into_owned(),
+    }
+}
+
+#[cfg(windows)]
+fn oem_decode(bytes: &[u8]) -> Option<String> {
+    use windows_sys::Win32::Globalization::{MultiByteToWideChar, CP_OEMCP};
+    let len = i32::try_from(bytes.len()).ok()?;
+    // SAFETY: the pointers and lengths describe live buffers; a null output asks for the needed size.
+    let needed = unsafe { MultiByteToWideChar(CP_OEMCP, 0, bytes.as_ptr(), len, std::ptr::null_mut(), 0) };
+    if needed <= 0 {
+        return None;
+    }
+    let mut wide = vec![0u16; needed as usize];
+    let written = unsafe { MultiByteToWideChar(CP_OEMCP, 0, bytes.as_ptr(), len, wide.as_mut_ptr(), needed) };
+    (written > 0).then(|| String::from_utf16_lossy(&wide[..written as usize]))
 }
 
 fn spawn_reader(mut source: impl Read + Send + 'static, capture: Arc<Mutex<Capture>>) -> JoinHandle<()> {
