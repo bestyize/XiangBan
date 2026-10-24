@@ -181,6 +181,13 @@ impl Tool for Shell {
         Duration::from_secs(4)
     }
 
+    /// Commands take no shared mutation lease, so conversations can run commands at the same time.
+    /// Like Claude Code and Hermes, shell isolation is left to the working folder (use a worktree) and the
+    /// permission prompt; file writes still take their per-file lease.
+    fn resource(&self, _args: &Value) -> Result<Option<crate::ToolResource>, String> {
+        Ok(None)
+    }
+
     fn execute(&self, args: Value, ctx: &ToolCtx) -> Result<String, String> {
         let command = str_arg(&args, "command")?;
         if command.trim().is_empty() || command.chars().count() > MAX_COMMAND_CHARS {

@@ -436,6 +436,11 @@ impl Tool for ProcessTool {
         &self.spec
     }
 
+    /// Same as `shell`: running commands in the background takes no cross-conversation lease.
+    fn resource(&self, _args: &Value) -> Result<Option<crate::ToolResource>, String> {
+        Ok(None)
+    }
+
     fn execute_result(&self, args: Value, ctx: &ToolCtx) -> ToolResult {
         let result = (|| -> Result<Value, String> {
             let id = || {
