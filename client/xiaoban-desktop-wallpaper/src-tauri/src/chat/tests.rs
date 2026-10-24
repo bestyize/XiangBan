@@ -892,7 +892,10 @@ fn the_context_size_from_settings_is_what_the_agent_trims_to() {
         agent.run("s8", "第三个问题", &mut |_| {}, &Arc::new(AtomicBool::new(false))).unwrap();
         provider.requests()[0].messages.iter().map(|m| m.text()).collect::<Vec<_>>()
     };
-    assert!(!tiny.iter().any(|t| t.contains("第一个问题")), "a small limit drops the oldest exchange: {}", tiny.len());
+    // A small limit drops the oldest exchange. The user's own words are kept, but a very long question only at its start,
+    // so it can no longer keep the conversation over the limit.
+    assert!(!tiny.iter().any(|t| t.contains(&"字".repeat(3_000))), "the long first question is not sent whole: {}", tiny.len());
+    assert!(tiny.iter().any(|t| t.contains("第一个问题") && t.contains("more characters omitted")), "its start is kept, marked as cut");
     assert!(tiny.iter().any(|t| t.contains("第三个问题")) && tiny.iter().any(|t| t.contains("第二个问题")));
 }
 
