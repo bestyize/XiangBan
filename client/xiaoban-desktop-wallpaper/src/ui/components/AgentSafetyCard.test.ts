@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { flushPromises, mount } from '@vue/test-utils';
-import { NSwitch } from 'naive-ui';
+import { NInputNumber, NSwitch } from 'naive-ui';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { reactive } from 'vue';
 import AgentSafetyCard from './AgentSafetyCard.vue';
@@ -32,6 +32,21 @@ async function open(settings = view()) {
 
 describe('安全与权限', () => {
   beforeEach(() => ipc.mockReset());
+
+  it('keeps legacy time/token protection and lets the user choose unlimited execution', async () => {
+    const { wrapper } = await open();
+    const inputs = wrapper.findAllComponents(NInputNumber);
+    expect(inputs.map(input => input.props('value'))).toEqual([null, null, 45, 1_000_000]);
+    inputs[2]!.vm.$emit('update:value', null);
+    inputs[3]!.vm.$emit('update:value', null);
+    await flushPromises();
+    await wrapper.get('[data-testid="execution-save"]').trigger('click');
+    await flushPromises();
+    expect(ipc).toHaveBeenCalledWith('chat_set_execution_limits', { limits: {
+      maxTurns: null, maxToolCalls: null, maxMinutes: null, maxReportedTokens: null,
+    } });
+    wrapper.unmount();
+  });
 
   it('lists saved grants by kind and revokes one', async () => {
     const { wrapper } = await open();

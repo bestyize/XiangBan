@@ -283,7 +283,7 @@ impl ProcessManager {
         wait: Duration,
     ) -> Result<ProcessSnapshot, String> {
         let process = self.owned(ctx, id)?;
-        let end = Instant::now() + wait.min(Duration::from_secs(10));
+        let end = Instant::now() + wait.min(Duration::from_secs(60));
         let mut state = lock(&process.state);
         while state.status == ProcessState::Running && Instant::now() < end && !ctx.is_cancelled() {
             let result = process
@@ -389,8 +389,8 @@ impl ProcessManager {
         let start = ToolSpec::new("process_start", "Start a foreground shell command and return its process id immediately. Read incremental logs with process_read. No PTY. Default run scope stops at the end of this answer; keep_alive=true retains it for this conversation after a successful answer. Cancellation and timeout still stop it.", json!({
             "type":"object", "properties":{"command":{"type":"string"},"keep_alive":{"type":"boolean"},"timeout_seconds":{"type":"integer","minimum":1,"maximum":self.config.max_runtime.as_secs()}},"required":["command"],"additionalProperties":false
         }));
-        let read = ToolSpec::new("process_read", "Collect a process's new output and status. Reuse next_cursor to avoid duplicate logs. wait_ms collects output for up to ten seconds, returning early when the process exits; use 10000 for long builds to avoid rapid polling. dropped_bytes reports evicted output.", json!({
-            "type":"object","properties":{"id":{"type":"string"},"cursor":{"type":"integer","minimum":0},"limit":{"type":"integer","minimum":4,"maximum":32000},"wait_ms":{"type":"integer","minimum":0,"maximum":10000}},"required":["id"],"additionalProperties":false
+        let read = ToolSpec::new("process_read", "Collect a process's new output and status. Reuse next_cursor to avoid duplicate logs. wait_ms waits up to 60000 ms, returning early when the process exits; prefer 60000 for long builds instead of rapid polling. Waiting remains cancellable. dropped_bytes reports evicted output.", json!({
+            "type":"object","properties":{"id":{"type":"string"},"cursor":{"type":"integer","minimum":0},"limit":{"type":"integer","minimum":4,"maximum":32000},"wait_ms":{"type":"integer","minimum":0,"maximum":60000}},"required":["id"],"additionalProperties":false
         })).risk(Risk::Read).parallel().max_output(64_000);
         let write = ToolSpec::new("process_write", "Send up to 8 KiB of pipe input to a process. Include a newline if needed. close_stdin=true sends EOF. This executes input in another process and requires execution permission.", json!({
             "type":"object","properties":{"id":{"type":"string"},"input":{"type":"string"},"close_stdin":{"type":"boolean"}},"required":["id","input"],"additionalProperties":false

@@ -195,6 +195,10 @@ export function applyEvent(view: SessionView, event: KernelEvent): void {
           : invalid ? '模型返回了不完整或无效的终态，本批操作未执行。请调整请求或模型后再继续。'
           : event.message.endsWith(': resources_busy') ? '另一个任务仍占用共享工具，当前任务已暂停。等它结束后再继续。'
           : event.message.endsWith(': no_progress_tool_rounds') ? '连续工具调用未取得新结果，已暂停。请调整方案后继续。'
+          : event.message.endsWith(': verification_required') ? '目标尚未通过指定命令验收，已保存进展并暂停。可处理验收问题后继续。'
+          : event.message.endsWith(': unfinished_milestones') ? '还有未完成的里程碑，已保存计划和交接说明。可调整任务后继续。'
+          : event.message.endsWith(': progress_store_unavailable') ? '任务进度暂时无法读取，已暂停。请检查本机存储后继续。'
+          : event.message.endsWith(': permission_denied') ? '你已拒绝本次操作，任务已暂停。小伴不会自动重试或换工具绕过。'
           : event.message.endsWith(': output_length_limit')
           ? '连续多次生成的工具参数超过输出上限，小伴已暂停。已完成的操作已保留，点“继续”可以接着处理。'
           : event.message.endsWith(': no_progress')

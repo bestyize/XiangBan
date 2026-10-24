@@ -219,7 +219,7 @@ impl Agent {
         let mut usage = Usage::default();
         let mut continuations = 0;
         let mut continuations_without_progress = 0;
-        let mut successful_calls = Vec::new();
+        let mut successful_calls = HashSet::new();
         let mut truncated_tool_retries = 0usize;
         let mut tool_calls = 0usize;
         // Shared with sub-agents this run starts, so their calls count against `max_tool_calls` too.
@@ -228,7 +228,7 @@ impl Agent {
         let mut recovered_context_budget = None;
         let control=options.control.clone().unwrap_or_default();
         let mut idle_rounds=0;
-        for index in 0..self.max_turns {
+        for index in 0..self.max_turns.unwrap_or(usize::MAX) {
             control.check()?;
             if cancel.load(Ordering::Relaxed) {
                 return Err(HarnessError::Cancelled);
@@ -305,7 +305,7 @@ impl Agent {
                         return Ok(RunSummary { run_id: run_id.to_string(), text, turns: index + 1, usage, finish });
                     }
                     StopDecision::Pause(reason) => return Err(HarnessError::Paused(reason)),
-                    StopDecision::Continue(_) if index + 1 == self.max_turns => return Err(HarnessError::MaxTurns(self.max_turns)),
+                    StopDecision::Continue(_) if self.max_turns == Some(index + 1) => return Err(HarnessError::MaxTurns(index + 1)),
                     StopDecision::Continue(nudge) => nudge,
                 };
                 let reminder = Message::reminder(nudge.message);
@@ -338,7 +338,7 @@ impl Agent {
                 if truncated_tool_retries >= self.max_truncated_tool_retries {
                     return Err(HarnessError::Paused("output_length_limit".into()));
                 }
-                if index + 1 == self.max_turns { return Err(HarnessError::MaxTurns(self.max_turns)); }
+                if self.max_turns == Some(index + 1) { return Err(HarnessError::MaxTurns(index + 1)); }
                 truncated_tool_retries += 1;
                 on_event(Event::Continuing { reason: "tool_call_length".into() });
                 continue;
@@ -354,19 +354,26 @@ impl Agent {
                 result.output.hash(&mut hash);
                 if let Some(v)=&result.structured_content{v.to_string().hash(&mut hash);}
                 let key = (call.name.clone(), args,hash.finish());
-                if !successful_calls.contains(&key) {
-                    successful_calls.push(key);
+                if successful_calls.insert(key) {
                     continuations_without_progress = 0;
                     truncated_tool_retries = 0;
                 }
             }
-            idle_rounds=if previous_successes==successful_calls.len(){idle_rounds+1}else{0};
+            // Waiting for a live owned process is not failed work. Require a real
+            // bounded wait so zero-delay polling cannot evade the idle guard.
+            let waiting = !calls.is_empty() && calls.iter().zip(&results).all(|(call, result)| {
+                call.name == "process_read" && !result.is_error
+                    && serde_json::from_str::<serde_json::Value>(&call.arguments).ok()
+                        .and_then(|args| args["wait_ms"].as_u64()).is_some_and(|ms| ms >= 1000)
+                    && result.structured_content.as_ref().is_some_and(|v| v["state"] == "running")
+            });
+            idle_rounds=if previous_successes!=successful_calls.len(){0}else if waiting{idle_rounds}else{idle_rounds+1};
             if options.max_no_progress_rounds.is_some_and(|limit|idle_rounds>=limit){return Err(HarnessError::Paused("no_progress_tool_rounds".into()));}
         }
         if cancel.load(Ordering::Relaxed) {
             return Err(HarnessError::Cancelled);
         }
-        Err(HarnessError::MaxTurns(self.max_turns))
+        Err(HarnessError::MaxTurns(self.max_turns.unwrap_or(usize::MAX)))
     }
 
     /// Retries only when nothing was streamed yet, so the UI never sees a half answer replayed.

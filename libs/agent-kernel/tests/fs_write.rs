@@ -64,9 +64,9 @@ impl Ws {
 #[test]
 fn write_file_creates_nested_files_and_replaces_existing_ones() {
     let ws = Ws::new("fsw-basic");
-    assert_eq!(ws.write("a/b/new.txt", "hello"), "Created a/b/new.txt (5 bytes).");
+    assert_eq!(ws.write("a/b/new.txt", "hello").replace('\\', "/"), "Created a/b/new.txt (5 bytes).");
     assert_eq!(std::fs::read_to_string(ws.root("a/b/new.txt")).unwrap(), "hello");
-    assert_eq!(ws.write("a/b/new.txt", "替换"), "Replaced a/b/new.txt (6 bytes).");
+    assert_eq!(ws.write("a/b/new.txt", "替换").replace('\\', "/"), "Replaced a/b/new.txt (6 bytes).");
     assert_eq!(std::fs::read_to_string(ws.root("a/b/new.txt")).unwrap(), "替换");
     let absolute = ws.root("abs.txt").display().to_string();
     assert!(ws.write(&absolute, "x").starts_with("Created abs.txt"));

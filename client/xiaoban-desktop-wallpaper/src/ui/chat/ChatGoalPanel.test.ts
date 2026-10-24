@@ -2,6 +2,7 @@
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import ChatGoalPanel from './ChatGoalPanel.vue';
+import { NCheckbox } from 'naive-ui';
 
 vi.mock('../../bridge.ts', () => ({ invoke: vi.fn(), listen: vi.fn(async () => () => {}) }));
 import { invoke } from '../../bridge.ts';
@@ -28,6 +29,33 @@ beforeEach(() => vi.resetAllMocks());
 afterEach(() => { wrappers.splice(0).forEach(w => w.unmount()); });
 
 describe('durable goal workbench', () => {
+  it('saves the exact user-selected acceptance command and optional restart permission', async () => {
+    vi.mocked(invoke).mockImplementation(async command => {
+      if (command === 'chat_goal_get') return null as never;
+      if (command === 'chat_goal_set') return goal('draft') as never;
+      throw new Error('unexpected ' + command);
+    });
+    const wrapper = open();
+    await flushPromises();
+    await wrapper.get('[data-testid="goal-outcome"] textarea').setValue('修复构建');
+    await wrapper.get('[data-testid="goal-verification-command"] input').setValue('npm test -- --run');
+    wrapper.findComponent(NCheckbox).vm.$emit('update:checked', true);
+    await wrapper.findAll('button').find(b => b.text().includes('保存目标'))!.trigger('click');
+    await flushPromises();
+    expect(invoke).toHaveBeenCalledWith('chat_goal_set', expect.objectContaining({
+      contract: expect.objectContaining({ verificationCommand: 'npm test -- --run', autoResume: true }),
+    }));
+  });
+
+  it('clears reconciliation evidence when switching conversations', async () => {
+    vi.mocked(invoke).mockImplementation(async () => goal('needs_review') as never);
+    const wrapper = open();
+    await flushPromises();
+    await wrapper.get('[data-testid="goal-evidence"] textarea').setValue('old session evidence');
+    await wrapper.setProps({ sessionId: 's2' });
+    await flushPromises();
+    expect((wrapper.get('[data-testid="goal-evidence"] textarea').element as HTMLTextAreaElement).value).toBe('');
+  });
   it('requires a saved contract and never presents model completion as verified success', async () => {
     vi.mocked(invoke).mockImplementation(async command => {
       if (command === 'chat_goal_get') return null as never;

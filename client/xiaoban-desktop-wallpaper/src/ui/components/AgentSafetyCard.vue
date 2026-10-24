@@ -1,15 +1,22 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue';
-import { NAlert, NInput, NSwitch } from 'naive-ui';
+import { NAlert, NInput, NInputNumber, NSwitch } from 'naive-ui';
 import { invoke } from '../../bridge.ts';
 import type { ControlStore } from '../control-types.ts';
 import { toolLabel } from '../chat/format.ts';
 
 interface SavedGrant { session: string; title: string; tool: string; kind?: string | null }
 interface AgentSettingsView {
+  execution?: ExecutionLimits;
   sandboxAvailable: boolean; sandboxNetwork: boolean; hooks: string; hooksPath: string; grants: SavedGrant[];
   platform?: string; windowsSandbox?: boolean;
 }
+interface ExecutionLimits {
+  maxTurns: number | null; maxToolCalls: number | null;
+  maxMinutes: number | null; maxReportedTokens: number | null;
+}
+const limits = ref<ExecutionLimits>({ maxTurns: null, maxToolCalls: null, maxMinutes: 45, maxReportedTokens: 1_000_000 });
+const limitsChanged = computed(() => !!view.value && JSON.stringify(limits.value) !== JSON.stringify(view.value.execution ?? { maxTurns: null, maxToolCalls: null, maxMinutes: 45, maxReportedTokens: 1_000_000 }));
 
 const props = defineProps<{ store: ControlStore }>();
 const view = ref<AgentSettingsView | null>(null);
@@ -26,6 +33,7 @@ async function load() {
   try {
     view.value = await invoke<AgentSettingsView>('chat_agent_settings');
     hooks.value = view.value.hooks;
+    limits.value = { ...(view.value.execution ?? { maxTurns: null, maxToolCalls: null, maxMinutes: 45, maxReportedTokens: 1_000_000 }) };
   } catch (error) { props.store.notify(error, 'error'); }
 }
 
@@ -39,6 +47,7 @@ async function act(key: string, action: () => Promise<unknown>, success?: string
 }
 
 const setNetwork = (allowed: boolean) => act('network', () => invoke('chat_set_sandbox_network', { allowed }));
+const saveLimits = () => act('limits', () => invoke('chat_set_execution_limits', { limits: { ...limits.value } }), '执行预算已保存，下次开始或继续时生效');
 const setWindowsSandbox = (enabled: boolean) => act('windows', () => invoke('chat_set_windows_sandbox', { enabled }),
   enabled ? '已开启 Windows 沙箱，完全信任下的命令改为低完整性运行' : '已关闭 Windows 沙箱');
 const saveHooks = () => act('hooks', async () => {
@@ -56,6 +65,18 @@ onMounted(load);
   <section class="agent-safety" data-testid="agent-safety">
     <NAlert v-if="!store.desktop" type="info" :show-icon="false">请在桌面应用中设置。</NAlert>
     <template v-else-if="view">
+      <div class="xb-group-title">任务执行</div>
+      <div class="xb-group">
+        <div class="xb-row"><div class="xb-row-text"><b>持续执行与预算</b><span>默认不限制执行轮数和工具次数。留空表示不限制；长期目标的时间与用量按多次继续累计，停止按钮始终可用。</span></div></div>
+        <div class="xb-row execution-limits">
+          <label>执行轮数<NInputNumber v-model:value="limits.maxTurns" :min="1" :max="1000000" :precision="0" clearable placeholder="不限制" aria-label="执行轮数上限" data-testid="execution-turns" /></label>
+          <label>工具调用次数<NInputNumber v-model:value="limits.maxToolCalls" :min="1" :max="10000000" :precision="0" clearable placeholder="不限制" aria-label="工具调用次数上限" /></label>
+          <label>执行时间（分钟）<NInputNumber v-model:value="limits.maxMinutes" :min="1" :max="43200" :precision="0" clearable placeholder="不限制" aria-label="执行时间上限" /></label>
+          <label>累计模型用量（token）<NInputNumber v-model:value="limits.maxReportedTokens" :min="1" :max="1000000000" :precision="0" clearable placeholder="不限制" aria-label="模型用量上限" /></label>
+        </div>
+        <div class="xb-row"><div class="xb-row-text"><span>模型用量依据服务商回传，包含重复输入和子任务，并非精确费用上限。后台定时任务保留独立预算。</span></div><button type="button" class="xb-btn-primary is-sm" :disabled="!limitsChanged || !!busy" data-testid="execution-save" @click="saveLimits">{{ busy === 'limits' ? '保存中…' : '保存执行预算' }}</button></div>
+      </div>
+
       <div class="xb-group-title">完全信任时的沙箱</div>
       <div class="xb-group">
         <div v-if="view.sandboxAvailable" class="xb-row">
@@ -99,6 +120,7 @@ onMounted(load);
 
 <style scoped>
 .hooks-row{display:block}
+.execution-limits{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.execution-limits label{display:grid;gap:6px;font-size:12px}
 .hooks-editor{width:100%}
 .hooks-editor :deep(textarea){font-family:var(--ui-font-mono);font-size:12px}
 .xb-row-text code{font-family:var(--ui-font-mono);font-size:11.5px;overflow-wrap:anywhere}

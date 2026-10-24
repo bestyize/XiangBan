@@ -189,6 +189,11 @@ impl Tool for ReadFile {
         let path = self.roots.resolve(str_arg(&args, "path")?)?;
         let offset = opt_uint_arg(&args, "offset")?.unwrap_or(1).max(1);
         let limit = opt_uint_arg(&args, "limit")?.unwrap_or(READ_DEFAULT_LINES).clamp(1, READ_MAX_LINES);
+        // Windows cannot open directories as ordinary files; return the same
+        // actionable tool error before File::open on every platform.
+        if fs::metadata(&path).map_err(|e| format!("cannot access file: {e}"))?.is_dir() {
+            return Err("this is a directory; use list_dir".into());
+        }
         let file = File::open(&path).map_err(|e| format!("cannot open file: {e}"))?;
         if file.metadata().map_err(|e| e.to_string())?.is_dir() {
             return Err("this is a directory; use list_dir".to_string());

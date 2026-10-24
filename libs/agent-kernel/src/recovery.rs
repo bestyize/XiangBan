@@ -25,6 +25,13 @@ pub fn classify(inspection: &RunInspection) -> RecoveryDecision {
     }
 }
 
+/// Explicitly opted-in work may restart only when no dispatched action is unresolved.
+/// Paused/completed goals never acquire an automatic continuation through this path.
+pub fn resume_authorized(goal: &GoalRecord, trace: Option<&RunInspection>) -> bool {
+    goal.state == GoalState::Running && goal.contract.auto_resume
+        && trace.is_some_and(|trace| classify(trace) == RecoveryDecision::Interrupted)
+}
+
 /// Reconcile a GoalRecord that was still Running when its host stopped.
 /// This is called on the next host load, *never* from a concurrent live run.
 pub fn reconcile(goal: &mut GoalRecord, trace: Option<&RunInspection>, now_ms: u64) -> RecoveryDecision {
@@ -64,6 +71,7 @@ mod tests {
         let mut g = GoalRecord::draft("session-1".into(), GoalContract {
             outcome:"build".into(), verification:"cargo test".into(), constraints:String::new(),
             boundaries:String::new(), stop_when:String::new(),
+            verification_command:String::new(), auto_resume:false,
         }, 1).unwrap();
         g.begin(2).unwrap();
         g
@@ -104,5 +112,19 @@ mod tests {
         let mut g = goal();
         assert_eq!(reconcile(&mut g, None, 3), RecoveryDecision::NeedsReview);
         assert_eq!(g.state, GoalState::NeedsReview);
+    }
+
+    #[test]
+    fn automatic_resume_requires_opt_in_and_never_replays_uncertain_or_paused_work() {
+        let mut goal = goal();
+        let safe = inspection(false, Some(RunState::Running), false);
+        assert!(!resume_authorized(&goal, Some(&safe)));
+        goal.contract.auto_resume = true;
+        assert!(resume_authorized(&goal, Some(&safe)));
+        assert!(!resume_authorized(&goal, None));
+        assert!(!resume_authorized(&goal, Some(&inspection(false, Some(RunState::Running), true))));
+        assert!(!resume_authorized(&goal, Some(&inspection(true, Some(RunState::Completed), false))));
+        goal.pause(4).unwrap();
+        assert!(!resume_authorized(&goal, Some(&safe)));
     }
 }

@@ -30,6 +30,16 @@ Windows / macOS 桌面应用：一个可拖动、透明处点击穿透的悬浮�
 
 工程内的设计文档入口见 [设计规范目录](docs/design-specs/README.md)。超级小伴的 [悬浮按钮设计稿](docs/design-specs/prototypes/assistant-floating-tools.html) 与 [截图工具设计稿](docs/design-specs/prototypes/assistant-capture-overlay.html) 均可直接用浏览器打开；交互约定及正式代码对应关系见 [超级小伴设计规范](docs/design-specs/super-assistant.md)。
 
+## 长程任务执行
+
+交互聊天默认不再设置固定模型轮数或工具调用次数。设置 → 安全与权限 → 任务执行可分别设置轮数、工具次数、时间和累计模型用量，留空表示不限制；保留原有默认 45 分钟/100 万 reported tokens 保护，停止、权限、重复调用和无进展检测继续生效。长期目标的活跃时间与用量跨继续累计，原“继续”按钮沿用目标预算；只读定时任务仍保留独立预算。
+
+复杂任务的 `todo` 清单、里程碑证据和 `handoff` 交接说明独立保存在 `chat/progress`，重启后恢复，并在模型请求中按数据处理。长期目标的“自动验收与恢复”可选项支持指定验收命令：通过原有 Shell 权限执行，在最后一次修改后实际成功、无未完成里程碑或未解决错误时，才自动完成。没有命令时仍由用户验收；命令成功只证明用户选择的检查通过，不保证任务的全部语义质量。
+
+启用“重新打开小伴后继续”后，下次启动会检查之前正在执行的目标，仅对日志完整且没有结果不明动作的安全中断启动新回合。主动暂停、缺失日志和不确定外部动作不自动继续；应用完全退出期间不执行。长命令的 `process_read` 可等待最多 60 秒，保持可取消，减少模型空轮询。
+
+针对性验证：`cargo test --locked --manifest-path libs/agent-kernel/Cargo.toml --features journal --test long_tasks --test guards`、`cargo test --locked --manifest-path tools/agent-reliability-checks/Cargo.toml`，以及本目录的 `npx vitest run src/ui/chat/ChatGoalPanel.test.ts src/ui/components/AgentSafetyCard.test.ts src/ui/chat/chat-store.test.ts src/ui/chat/view.test.ts`。机制回归使用脚本模型与隔离临时目录，不代表真实模型长程任务成功率。
+
 ## 在 Windows 上运行
 
 需要 Node.js 22.12+（或 24）、Rust MSVC 工具链、Visual Studio C++ 构建工具和 WebView2 Runtime。在仓库根执行：

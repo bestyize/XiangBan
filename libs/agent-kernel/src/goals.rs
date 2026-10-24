@@ -18,6 +18,12 @@ pub struct GoalContract {
     pub boundaries: String,
     #[serde(default)]
     pub stop_when: String,
+    /// Optional user-selected command. The host still routes it through normal permissions.
+    #[serde(default)]
+    pub verification_command: String,
+    /// Explicit permission to resume safely interrupted work when the host starts again.
+    #[serde(default)]
+    pub auto_resume: bool,
 }
 impl GoalContract {
     pub fn validate(&self) -> Result<(), String> {
@@ -27,6 +33,7 @@ impl GoalContract {
             ("constraints", &self.constraints, 2_000),
             ("boundaries", &self.boundaries, 2_000),
             ("stop_when", &self.stop_when, 2_000),
+            ("verification_command", &self.verification_command, 8_000),
         ];
         for (label, value, max) in fields {
             if value.chars().count() > max || value.chars().any(|c| c == '\0') {
@@ -62,6 +69,16 @@ pub struct GoalRecord {
     pub updated_at_ms: u64,
     #[serde(default)]
     pub note: String,
+    #[serde(default)]
+    pub spent_tokens: u64,
+    #[serde(default)]
+    pub elapsed_ms: u64,
+    #[serde(default)]
+    pub accounted_run_tokens: u64,
+    #[serde(default)]
+    pub accounted_run_elapsed_ms: u64,
+    #[serde(default)]
+    pub run_started_at_ms: u64,
 }
 
 fn valid_id(id: &str) -> bool {
@@ -100,6 +117,23 @@ fn replace_atomically(from: &Path, to: &Path) -> Result<(), String> {
 pub struct GoalStore { root: PathBuf }
 impl GoalStore {
     pub fn new(root: impl Into<PathBuf>) -> Self { Self { root: root.into() } }
+    /// Invalid records are reported, never silently started or treated as missing.
+    pub fn list(&self) -> Result<Vec<GoalRecord>, String> {
+        let entries = match fs::read_dir(&self.root) {
+            Ok(entries) => entries,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
+            Err(e) => return Err(e.to_string()),
+        };
+        let mut goals = Vec::new();
+        for entry in entries {
+            let path = entry.map_err(|e| e.to_string())?.path();
+            if path.extension().and_then(|s| s.to_str()) != Some("json") { continue; }
+            let id = path.file_stem().and_then(|s| s.to_str()).ok_or("invalid goal file")?;
+            if let Some(goal) = self.load(id)? { goals.push(goal); }
+        }
+        goals.sort_by(|a, b| a.session_id.cmp(&b.session_id));
+        Ok(goals)
+    }
     fn path(&self, id: &str) -> Result<PathBuf, String> {
         if !valid_id(id) { return Err("invalid session id".into()); }
         Ok(self.root.join(format!("{id}.json")))
@@ -167,7 +201,9 @@ impl GoalRecord {
         if !valid_id(&session_id) { return Err("invalid session id".into()); }
         contract.validate()?;
         Ok(Self { version: 1, session_id, contract, state: GoalState::Draft,
-            attempts: 0, last_run_id: None, updated_at_ms: now_ms, note: String::new() })
+            attempts: 0, last_run_id: None, updated_at_ms: now_ms, note: String::new(),
+            spent_tokens: 0, elapsed_ms: 0, accounted_run_tokens: 0,
+            accounted_run_elapsed_ms: 0, run_started_at_ms: 0 })
     }
     pub fn begin(&mut self, now_ms: u64) -> Result<(), String> {
         if !matches!(self.state, GoalState::Draft | GoalState::Paused | GoalState::AwaitingVerification) {
@@ -177,7 +213,22 @@ impl GoalRecord {
         self.updated_at_ms = now_ms;
         self.attempts = self.attempts.saturating_add(1);
         self.last_run_id = None;
+        self.accounted_run_tokens = 0;
+        self.accounted_run_elapsed_ms = 0;
+        self.run_started_at_ms = now_ms;
         self.note.clear();
+        Ok(())
+    }
+    /// Account cumulative shared parent/child usage snapshots exactly once per run.
+    pub fn account(&mut self, run_id: &str, tokens: u64, now_ms: u64) -> Result<(), String> {
+        if !valid_id(run_id) { return Err("invalid run id".into()); }
+        if self.state != GoalState::Running && !(self.state == GoalState::Paused && self.last_run_id.as_deref() == Some(run_id)) { return Ok(()); }
+        if self.last_run_id.as_deref().is_some_and(|id| id != run_id) { return Err("goal usage run identity changed".into()); }
+        let elapsed = now_ms.saturating_sub(self.run_started_at_ms);
+        self.spent_tokens = self.spent_tokens.saturating_add(tokens.saturating_sub(self.accounted_run_tokens));
+        self.elapsed_ms = self.elapsed_ms.saturating_add(elapsed.saturating_sub(self.accounted_run_elapsed_ms));
+        self.accounted_run_tokens = self.accounted_run_tokens.max(tokens);
+        self.accounted_run_elapsed_ms = self.accounted_run_elapsed_ms.max(elapsed);
         Ok(())
     }
     pub fn observe(&mut self, run_id: &str, state: crate::RunState, now_ms: u64) -> Result<(), String> {
@@ -218,7 +269,30 @@ mod tests {
     fn contract() -> GoalContract {
         GoalContract { outcome: "修复测试失败".into(), verification: "测试全部通过".into(),
             constraints: "不修改公开接口".into(), boundaries: "libs/agent-kernel".into(),
-            stop_when: "需要新的密钥".into() }
+            stop_when: "需要新的密钥".into(), verification_command: String::new(), auto_resume: false }
+    }
+
+    #[test]
+    fn cumulative_budget_survives_pause_resume_and_duplicate_snapshots() {
+        let mut goal = GoalRecord::draft("s".into(), contract(), 10).unwrap();
+        goal.begin(100).unwrap();
+        goal.observe("r1", crate::RunState::Running, 100).unwrap();
+        goal.account("r1", 200, 150).unwrap();
+        goal.account("r1", 200, 150).unwrap();
+        goal.pause(160).unwrap();
+        goal.account("r1", 250, 170).unwrap();
+        assert_eq!((goal.spent_tokens, goal.elapsed_ms), (250, 70));
+        let root = dir();
+        let store = GoalStore::new(&root);
+        store.save(&goal).unwrap();
+        assert_eq!(store.list().unwrap().len(), 1);
+        goal = store.load("s").unwrap().unwrap();
+        goal.begin(1000).unwrap();
+        goal.observe("r2", crate::RunState::Running, 1000).unwrap();
+        goal.account("r2", 100, 1050).unwrap();
+        assert_eq!((goal.spent_tokens, goal.elapsed_ms), (350, 120));
+        assert!(goal.account("old-run", 999, 1100).is_err());
+        fs::remove_dir_all(root).unwrap();
     }
     fn dir() -> PathBuf {
         let name = format!("agent-goal-test-{}-{}",

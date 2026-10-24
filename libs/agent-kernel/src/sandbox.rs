@@ -360,7 +360,9 @@ mod tests {
         let policy = SandboxPolicy::for_workspace(Path::new("/work"));
         assert_eq!(policy.writable[0], PathBuf::from("/work"));
         let text: Vec<String> = policy.writable.iter().map(|p| p.to_string_lossy().into_owned()).collect();
-        assert!(text.iter().any(|p| p.ends_with(".npm")));
+        if std::env::var_os("HOME").is_some() {
+            assert!(text.iter().any(|p| p.ends_with(".npm")));
+        }
         assert!(!text.iter().any(|p| p.ends_with(".cargo/bin") || p.ends_with(".cargo")), "{text:?}");
         if std::env::var_os("HOME").is_some() {
             assert!(policy.unreadable.iter().any(|p| p.ends_with(".ssh")));

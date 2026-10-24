@@ -24,7 +24,7 @@ pub use shell::Shell;
 #[cfg(feature = "web")]
 pub use web::WebFetch;
 pub use time::TimeNow;
-pub use todo::{Todo, TodoItem, TodoStatus};
+pub use todo::{Todo, TodoItem, TodoSnapshot, TodoStatus};
 
 pub(crate) fn str_arg<'a>(args: &'a Value, key: &str) -> Result<&'a str, String> {
     args.get(key)

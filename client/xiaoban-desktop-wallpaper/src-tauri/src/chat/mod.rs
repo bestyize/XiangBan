@@ -4,6 +4,7 @@
 //! window only (one `emit_filter`): wallpaper pages run content from outside and must not see a chat.
 
 mod agent_settings;
+mod task_runtime;
 mod app_guide;
 mod widget_content;
 mod broker;
@@ -84,9 +85,6 @@ const MAX_IMAGE_CHARS: usize = 4 * 1024 * 1024;
 /// Image types the three protocols accept. SVG and friends are rejected: providers either refuse
 /// them or need them rasterised first.
 const IMAGE_MEDIA_TYPES: &[&str] = &["image/png", "image/jpeg", "image/gif", "image/webp"];
-/// Model calls in one answer. Building something real (a game, a set of files) can take dozens of steps;
-/// `RepeatGuard` and `ContinueGuard`'s own cap keep a stuck model from using them all.
-const MAX_TURNS: usize = 60;
 const SPILL_KEEP: Duration = Duration::from_secs(7 * 86_400);
 const ARGUMENT_PREVIEW_CHARS: usize = 2_000;
 
@@ -180,7 +178,11 @@ impl ChatState {
             // Each conversation carries its own mode and sets it again before every run.
             permission: Arc::new(permission_with_danger_check(PermissionMode::Ask, approver, workspaces.clone())),
             workspaces,
-            todo: Arc::new(Todo::new()),
+            todo: Arc::new(match Dirs::of(app) {
+                Ok(dirs) => Todo::new().persistent(dirs.chat.join("progress")),
+                // build_agent rejects the missing data directory before execution.
+                Err(_) => Todo::new(),
+            }),
             runs: Mutex::new(HashMap::new()),
             leases: Mutex::new(HashMap::new()),
             index: Mutex::new(None),
@@ -564,6 +566,7 @@ fn assemble_with_connectors(parts: Parts<'_>, attachments: Vec<Attachment>, conn
             move || project_rules::section(&workspace)
         })
         .tool(TimeNow::new().utc_offset_minutes(utc_offset_minutes))
+        .middleware(todo.clone())
         .tool_arc(todo)
         .tool(ask)
         .tool(Shell::new(workspace).sandbox(sandbox_gate::hook(permission.clone(), workspace)))
@@ -587,9 +590,10 @@ fn assemble_with_connectors(parts: Parts<'_>, attachments: Vec<Attachment>, conn
     builder = builder
         .middleware(ContextTrim::new(budget.context_limit).reserve_output(budget.trim_headroom))
         .middleware(ContinueGuard::new())
-        // An offline provider should fail promptly rather than repeat the same 45s wait four times.
-        .retry(RetryPolicy { max_retries: 1, ..Default::default() })
-        .max_turns(MAX_TURNS);
+        // Bounded transient-error recovery; cancellation and the shared run budget still apply.
+        .retry(RetryPolicy { max_retries: 3, ..Default::default() })
+        .unlimited_turns();
+    builder = agent_settings::load_execution(&dirs.chat)?.apply(builder);
     let roots = vec![workspace.to_path_buf(), dirs.spill()];
     builder = builder.tool(research_subagent(provider.clone(), &roots, budget, dirs.runs(), research_events)?);
     let mut readable = fs_tools(roots.clone()).map_err(|e| e.to_string())?;
@@ -744,7 +748,7 @@ fn build_agent(app: &tauri::AppHandle, config: &AiConfig, key_source: Option<Key
             emit(&app, "chat-compacting", payload);
         })
     };
-    let agent = assemble_with_connectors(Parts {
+    let mut agent = assemble_with_connectors(Parts {
         provider,
         dirs: &Dirs::of(app)?,
         workspace,
@@ -768,6 +772,14 @@ fn build_agent(app: &tauri::AppHandle, config: &AiConfig, key_source: Option<Key
             })
         }),
     }, attachments, connector_tools)?;
+    if let Some(goal) = agent_kernel::goals::GoalStore::new(Dirs::of(app)?.chat.join("goals")).load(session)? {
+        if goal.state == agent_kernel::goals::GoalState::Running {
+            agent = agent.with_middleware(task_runtime::GoalProgressGuard(state.todo.clone()));
+            if !goal.contract.verification_command.trim().is_empty() {
+                agent = agent.with_middleware(task_runtime::VerificationGuard { command: goal.contract.verification_command });
+            }
+        }
+    }
     let tokens = agent_kernel::estimate_tool_tokens(&agent.initial_tool_schemas())
         + agent_kernel::estimate_tokens(&[Message::system(agent.tool_catalog())]);
     lock(&state.tool_tokens).insert(config.open_computer_use, tokens);
@@ -938,6 +950,17 @@ pub fn chat_new_session(app: tauri::AppHandle, window: tauri::WebviewWindow, per
 #[tauri::command]
 pub fn chat_send(app: tauri::AppHandle, window: tauri::WebviewWindow, session_id: String, text: String, images: Option<Vec<String>>, retry: Option<bool>, attachments: Option<Vec<AttachmentInput>>) -> Result<SessionSummary, String> {
     chat_window(&window)?;
+    // The existing Continue button must resume the saved goal and its cumulative
+    // budget, rather than silently starting a fresh ordinary-chat budget.
+    if matches!(text.trim(), "请接着上面的内容继续写完。" | "继续" | "继续目标" | "继续任务" | "继续执行" | "接着做") && retry != Some(true)
+        && images.as_ref().is_none_or(Vec::is_empty) && attachments.as_ref().is_none_or(Vec::is_empty) {
+        if let Some(goal) = agent_kernel::goals::GoalStore::new(Dirs::of(&app)?.chat.join("goals")).load(&session_id)? {
+            if goal.state != agent_kernel::goals::GoalState::Completed {
+                goals::start_saved(&app, session_id.clone())?;
+                return mutate(&app, |index| index.get(&session_id).cloned())?.ok_or("会话不存在".into());
+            }
+        }
+    }
     send(app, session_id, text, images, retry, attachments)
 }
 
@@ -1015,6 +1038,13 @@ pub(crate) fn send(app: tauri::AppHandle, session_id: String, text: String, imag
     }
     lock(&state.workspaces).insert(summary.id.clone(), workspace.clone());
 
+    let execution = agent_settings::load_execution(&Dirs::of(&app)?.chat)?;
+    let goal = agent_kernel::goals::GoalStore::new(Dirs::of(&app)?.chat.join("goals")).load(&summary.id)?;
+    let is_goal = goal.as_ref().is_some_and(|g| g.state == agent_kernel::goals::GoalState::Running);
+    let (spent, elapsed) = goal.filter(|g| g.state == agent_kernel::goals::GoalState::Running)
+        .map_or((0, 0), |g| (g.spent_tokens, g.elapsed_ms));
+    let control = execution.control(spent, elapsed)?;
+
     let history_dir = Dirs::of(&app)?.sessions();
     let attachment_store = AttachmentStore::new(Dirs::of(&app)?.chat.join("attachments"));
     let cancel = Arc::new(AtomicBool::new(false));
@@ -1046,7 +1076,6 @@ pub(crate) fn send(app: tauri::AppHandle, session_id: String, text: String, imag
     let (handle, id, parts_owned, config_owned, workspace_owned) = (app.clone(), summary.id.clone(), parts, config, workspace);
     let started = std::thread::Builder::new().name(format!("chat-{id}")).spawn(move || {
         let _cleanup=HostRunCleanup{app:handle.clone(),session:id.clone()};
-        let control=agent_kernel::RunControl::bounded(Duration::from_secs(45*60),1_000_000);
         let _watch=control.watch(cancel.clone());
         let sender = handle.clone();
         let session = id.clone();
@@ -1064,6 +1093,7 @@ pub(crate) fn send(app: tauri::AppHandle, session_id: String, text: String, imag
         });
         if cancel.load(Ordering::SeqCst) {
             attachment_store.rollback(&saved_for_thread);
+            let _ = goals::failed_before_run(&handle, &id, "任务已取消");
             emit(&sender, "chat-event", json!({ "session": session, "event": { "type": "cancelled" } }));
             return;
         }
@@ -1071,6 +1101,7 @@ pub(crate) fn send(app: tauri::AppHandle, session_id: String, text: String, imag
             Ok(ready) => ready,
             Err(error) => {
                 attachment_store.rollback(&saved_for_thread);
+                let _ = goals::failed_before_run(&handle, &id, &error);
                 emit(&sender, "chat-event", json!({ "session": session, "event": { "type": "error", "message": error } }));
                 return;
             }
@@ -1082,7 +1113,7 @@ pub(crate) fn send(app: tauri::AppHandle, session_id: String, text: String, imag
         let answered = match Dirs::of(&handle) {
             Ok(dirs) => {
                 let journal = JsonlRunLog::new(dirs.runs().join(&id));
-                let options = RunOptions { control:Some(control.clone()),max_no_progress_rounds:Some(6),max_tool_calls: Some(256), ..Default::default() };
+                let options = RunOptions { control:Some(control.clone()),max_no_progress_rounds:Some(6),max_tool_calls: execution.max_tool_calls, ..Default::default() };
                 let mut observed_run_id: Option<String> = None;
                 let mut observe = |mut record: agent_kernel::RunEvent| {
                     observed_run_id = Some(record.run_id.clone());
@@ -1102,7 +1133,7 @@ pub(crate) fn send(app: tauri::AppHandle, session_id: String, text: String, imag
                     run_history::forward(&journal, record.clone(), &config_owned.api_key, |channel, payload| {
                         emit(&sender, channel, payload);
                     })?;
-                    goals::observe(&handle, &record).map_err(agent_kernel::HarnessError::Store)?;
+                    goals::observe(&handle, &record, control.reported_tokens()).map_err(agent_kernel::HarnessError::Store)?;
                     if terminal { terminal_delivered = true; }
                     Ok(())
                 };
@@ -1115,7 +1146,15 @@ pub(crate) fn send(app: tauri::AppHandle, session_id: String, text: String, imag
                 // a verified business success automatically.
                 if let Some(run) = observed_run_id {
                     if journal.inspect(&run).is_ok_and(|i|!i.incomplete_tools.is_empty()){if let Err(e)=handle.state::<ChatState>().permission.require_review(&id){eprintln!("无法保存结果复核要求：{e}");}}
-                    if let Ok(outcome) = task_outcome::inspect(&journal, &id, &run) {
+                    if let Ok(mut outcome) = task_outcome::inspect(&journal, &id, &run) {
+                        if let Ok(Some(goal)) = agent_kernel::goals::GoalStore::new(dirs.chat.join("goals")).load(&id) {
+                            if goal.state == agent_kernel::goals::GoalState::Completed && goal.last_run_id.as_deref() == Some(&run) {
+                                outcome.status = task_outcome::Status::Succeeded;
+                                outcome.validator = "user_defined_command".into();
+                                outcome.evidence = goal.note;
+                                outcome.verified_at_ms = Some(goal.updated_at_ms);
+                            }
+                        }
                         let _ = task_outcome::save(&dirs.outcomes(), &outcome);
                         if let Ok(db) = LearningDb::open(&dirs.learning_db()) {
                             let _ = db.record_outcome(&outcome.run_id, &outcome.session_id,
@@ -1152,7 +1191,9 @@ pub(crate) fn send(app: tauri::AppHandle, session_id: String, text: String, imag
                 emit(&sender, "chat-run-state", json!({ "session": session, "state": "failed", "reason": message }));
             }
         }
-        if answered.is_ok() {
+        // Goals already compact before model calls. Avoid a second, unaccounted model
+        // request after their terminal/acceptance record has been committed.
+        if answered.is_ok() && !is_goal {
             auto_compact(&handle, &id, &config_owned, key_source, &cancel,&control);
         }
         // Keep files if their user message was saved, including failed model calls that can be retried.
@@ -1345,7 +1386,7 @@ pub fn chat_delete_session(app: tauri::AppHandle, window: tauri::WebviewWindow, 
     if settings.forget_session(&session_id) {
         let _ = agent_settings::save(&chat_dir, &settings);
     }
-    state.todo.clear_session(&session_id);
+    state.todo.remove_session(&session_id).map_err(|e| e.to_string())?;
     state.auto_compact.forget(&session_id);
     mutate(&app, |index| {
         index.remove(&session_id);
@@ -1585,7 +1626,18 @@ pub fn chat_agent_settings(app: tauri::AppHandle, window: tauri::WebviewWindow) 
         "hooks": fs::read_to_string(&hooks_file).unwrap_or_default(),
         "hooksPath": hooks_file.display().to_string(),
         "grants": grants,
+        "execution": agent_settings::load_execution(&dirs.chat)?,
     }))
+}
+
+#[tauri::command]
+pub fn chat_set_execution_limits(app: tauri::AppHandle, window: tauri::WebviewWindow, limits: task_runtime::ExecutionLimits) -> Result<(), String> {
+    if window.label() != "control" { return Err("只能在设置里修改".into()); }
+    limits.validate()?;
+    let chat = Dirs::of(&app)?.chat;
+    let mut settings = agent_settings::load(&chat);
+    settings.execution = limits;
+    agent_settings::save(&chat, &settings)
 }
 
 #[tauri::command]

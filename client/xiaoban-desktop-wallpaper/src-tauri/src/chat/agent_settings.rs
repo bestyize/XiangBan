@@ -19,6 +19,7 @@ pub struct Grant {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 pub struct AgentSettings {
+    pub execution: super::task_runtime::ExecutionLimits,
     /// Commands in the full-trust sandbox may reach the network (installing dependencies needs it).
     pub sandbox_network: bool,
     /// Saved grants, by conversation.
@@ -35,7 +36,7 @@ pub struct AgentSettings {
 
 impl Default for AgentSettings {
     fn default() -> Self {
-        Self { sandbox_network: true, grants: BTreeMap::new(), windows_sandbox: false, labelled: Vec::new(), scheduled_sessions: BTreeMap::new(), recent_workspaces: Vec::new() }
+        Self { execution: Default::default(), sandbox_network: true, grants: BTreeMap::new(), windows_sandbox: false, labelled: Vec::new(), scheduled_sessions: BTreeMap::new(), recent_workspaces: Vec::new() }
     }
 }
 
@@ -45,6 +46,23 @@ pub const RECENT_WORKSPACES: usize = 8;
 /// A missing or unreadable file gives the defaults: settings are conveniences, never needed to run.
 pub fn load(chat: &Path) -> AgentSettings {
     fs::read(chat.join(FILE)).ok().and_then(|bytes| serde_json::from_slice(&bytes).ok()).unwrap_or_default()
+}
+
+/// Execution limits are user budget decisions, not disposable UI preferences.
+pub fn load_execution(chat: &Path) -> Result<super::task_runtime::ExecutionLimits, String> {
+    let bytes = match fs::read(chat.join(FILE)) {
+        Ok(bytes) => bytes,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(Default::default()),
+        Err(error) => return Err(format!("无法读取执行预算：{error}")),
+    };
+    let value: serde_json::Value = serde_json::from_slice(&bytes).map_err(|e| format!("执行设置已损坏：{e}"))?;
+    if !value.is_object() { return Err("执行设置必须为对象".into()); }
+    let limits: super::task_runtime::ExecutionLimits = match value.get("execution") {
+        Some(value) => serde_json::from_value(value.clone()).map_err(|e| format!("执行预算无效：{e}"))?,
+        None => Default::default(),
+    };
+    limits.validate()?;
+    Ok(limits)
 }
 
 pub fn save(chat: &Path, settings: &AgentSettings) -> Result<(), String> {
@@ -92,6 +110,19 @@ impl AgentSettings {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn missing_legacy_limits_use_defaults_but_corrupt_budgets_fail_closed() {
+        let root = std::env::temp_dir().join(format!("xiaoban-budget-settings-{}", std::process::id()));
+        fs::create_dir_all(&root).unwrap();
+        fs::write(root.join(FILE), b"{}").unwrap();
+        assert_eq!(load_execution(&root).unwrap(), Default::default());
+        fs::write(root.join(FILE), br#"{"execution":{"maxTurns":0}}"#).unwrap();
+        assert!(load_execution(&root).is_err());
+        fs::write(root.join(FILE), b"invalid JSON").unwrap();
+        assert!(load_execution(&root).is_err());
+        fs::remove_dir_all(root).unwrap();
+    }
 
     #[test]
     fn grants_are_kept_once_per_conversation_and_survive_a_reload() {

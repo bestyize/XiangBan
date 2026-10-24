@@ -14,3 +14,7 @@ mod git_snapshot;
 mod checkpoints;
 #[path = "../../../client/xiaoban-desktop-wallpaper/src-tauri/src/chat/task_outcome.rs"]
 mod task_outcome;
+#[path = "../../../client/xiaoban-desktop-wallpaper/src-tauri/src/chat/task_runtime.rs"]
+mod task_runtime;
+#[path = "../../../client/xiaoban-desktop-wallpaper/src-tauri/src/chat/agent_settings.rs"]
+mod agent_settings;

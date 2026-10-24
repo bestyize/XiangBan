@@ -8,6 +8,7 @@ use common::*;
 use std::fs;
 use std::sync::Arc;
 use serde_json::json;
+const PYTHON: &str = if cfg!(windows) { "python" } else { "python3" };
 
 fn fake_mcp_server_script() -> TempDir {
     let dir = TempDir::new("mcp-fake");
@@ -109,7 +110,7 @@ fn test_mcp_handshake_and_tool_execution() {
     let script = temp.path("mcp_server.py");
     let script_str = script.display().to_string();
 
-    let config = McpConfig::new("python3", &["-u", &script_str])
+    let config = McpConfig::new(PYTHON, &["-u", &script_str])
         .tool_prefix("mcp_")
         .default_risk(Risk::Write);
 
@@ -146,7 +147,7 @@ fn test_mcp_handshake_and_tool_execution() {
 #[test]
 fn mcp_media_json_and_error_flags_reach_the_harness_and_history() {
     let temp = fake_mcp_server_script();
-    let client = McpClient::spawn(McpConfig::new("python3", &["-u", &temp.path("mcp_server.py").display().to_string()])).unwrap();
+    let client = McpClient::spawn(McpConfig::new(PYTHON, &["-u", &temp.path("mcp_server.py").display().to_string()])).unwrap();
     let store=Arc::new(MemoryStore::new());
     let provider=Arc::new(agent_kernel::provider::scripted::ScriptedProvider::new(vec![Step::tool_call("c", "echo_test", r#"{"text":"rich"}"#), Step::text("done")]));
     let mut builder=Agent::builder(provider.clone(),store.clone());
@@ -175,7 +176,7 @@ fn mcp_environment_is_allowlisted() {
     let temp=fake_mcp_server_script();
     let script=temp.path("mcp_server.py").display().to_string();
     for inherit in [false,true] {
-        let mut config=McpConfig::new("python3",&["-u",&script]).env("KERNEL_TEST_EXPLICIT","configured");
+        let mut config=McpConfig::new(PYTHON,&["-u",&script]).env("KERNEL_TEST_EXPLICIT","configured");
         if inherit { config=config.inherit_env("KERNEL_TEST_SECRET"); }
         let client=McpClient::spawn(config).unwrap();
         let result=client.call_tool_result("echo_test",json!({"text":"environment"}),&ToolCtx::detached("s")).unwrap();

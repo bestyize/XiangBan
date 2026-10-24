@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref, watch } from 'vue';
-import { NButton, NInput } from 'naive-ui';
+import { NButton, NCheckbox, NInput } from 'naive-ui';
 import { invoke, listen } from '../../bridge.ts';
 import type { SessionSummary } from './types.ts';
 
 type GoalState = 'draft' | 'running' | 'awaiting_verification' | 'paused' | 'interrupted' | 'needs_review' | 'completed';
 interface GoalContract {
   outcome: string; verification: string; constraints: string; boundaries: string; stopWhen: string;
+  verificationCommand?: string; autoResume?: boolean;
 }
 interface GoalRecord {
   sessionId: string; contract: GoalContract; state: GoalState; attempts: number;
@@ -26,6 +27,8 @@ const verification = ref('');
 const constraints = ref('');
 const boundaries = ref('');
 const stopWhen = ref('');
+const verificationCommand = ref('');
+const autoResume = ref(false);
 const evidence = ref('');
 const busy = ref(false);
 let disposed = false;
@@ -56,10 +59,12 @@ async function refresh() {
       constraints.value = value.contract.constraints;
       boundaries.value = value.contract.boundaries;
       stopWhen.value = value.contract.stopWhen;
+      verificationCommand.value = value.contract.verificationCommand ?? '';
+      autoResume.value = value.contract.autoResume ?? false;
     }
   } catch (e) { if (props.sessionId === id) error.value = String(e); }
 }
-watch(() => props.sessionId, () => { void refresh(); }, { immediate: true });
+watch(() => props.sessionId, () => { evidence.value = ''; void refresh(); }, { immediate: true });
 watch(() => props.running, (running, wasRunning) => {
   if (wasRunning && !running) void refresh();
 });
@@ -67,8 +72,13 @@ async function act<T>(work: () => Promise<T>, apply: (value: T) => void) {
   if (busy.value) return;
   busy.value = true;
   error.value = '';
-  try { apply(await work()); emit('changed'); }
-  catch (e) { error.value = String(e); }
+  const session = props.sessionId;
+  try {
+    const result = await work();
+    if (session !== null && session !== props.sessionId) return;
+    apply(result); emit('changed');
+  }
+  catch (e) { if (session === props.sessionId) error.value = String(e); }
   finally { busy.value = false; }
 }
 async function save() {
@@ -83,6 +93,7 @@ async function save() {
     return invoke<GoalRecord>('chat_goal_set', { sessionId: id, contract: {
       outcome: outcome.value.trim(), verification: verification.value.trim(), constraints: constraints.value.trim(),
       boundaries: boundaries.value.trim(), stopWhen: stopWhen.value.trim(),
+      verificationCommand: verificationCommand.value.trim(), autoResume: autoResume.value,
     } });
   }, record => { goal.value = record; });
 }
@@ -123,7 +134,7 @@ async function clear() {
       <div>
         <strong>长期目标</strong>
         <span v-if="goal" class="state" data-testid="goal-state">{{ stateLabel[goal.state] }}</span>
-        <p>目标与验收条件会保存到此对话；当前版本每次继续都需要你明确启动。</p>
+        <p>目标、里程碑和交接说明会保存到此对话；没有自动验收证据时，仍由你确认完成。</p>
       </div>
       <NButton size="tiny" quaternary :disabled="busy || !sessionId" @click="refresh">刷新</NButton>
     </header>
@@ -137,6 +148,13 @@ async function clear() {
         <NInput v-model:value="constraints" placeholder="约束：不能破坏的功能" :disabled="!!goal && goal.state === 'draft'"/>
         <NInput v-model:value="stopWhen" placeholder="停止条件：例如需要新密钥时" :disabled="!!goal && goal.state === 'draft'"/>
       </div>
+      <details class="goal-options">
+        <summary>自动验收与恢复（可选）</summary>
+        <NInput v-model:value="verificationCommand" placeholder="验收命令：例如 npm test；留空由你确认完成" data-testid="goal-verification-command" :disabled="!!goal && goal.state === 'draft'" />
+        <p>小伴通过原有权限流程执行此命令，最后一次修改后成功执行才算通过；请选择能够验证目标的命令。</p>
+        <NCheckbox v-model:checked="autoResume" :disabled="!!goal && goal.state === 'draft'" data-testid="goal-auto-resume">重新打开小伴后，继续安全中断的已启动目标</NCheckbox>
+        <p>主动暂停不会自动继续；结果不明的外部操作仍需核验。应用关闭期间不执行任务。</p>
+      </details>
       <NButton v-if="!goal || goal.state === 'completed'" type="primary" size="small" :disabled="busy || !desktop || !configured || !outcome.trim()" @click="save">保存目标</NButton>
       <NButton v-if="goal?.state === 'draft'" type="primary" size="small" :disabled="busy || !desktop || !configured" data-testid="goal-start" @click="start">开始执行</NButton>
     </template>
@@ -167,6 +185,7 @@ async function clear() {
 .two-cols{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .contract{font-size:12px;margin:0;overflow-wrap:anywhere;color:var(--ui-text-secondary,#666)}
 .note{margin:0;font-size:12px;color:var(--ui-text-secondary,#666)}
+.goal-options{font-size:12px}.goal-options summary{cursor:pointer;margin-bottom:8px}.goal-options p{color:var(--ui-text-tertiary,#888);margin:7px 0}
 .actions{display:flex;flex-wrap:wrap;gap:7px}.error{margin:0;color:var(--ui-error,#c33);font-size:12px}
 @media(max-width:700px){.two-cols{grid-template-columns:1fr}}
 </style>

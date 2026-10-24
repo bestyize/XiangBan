@@ -12,11 +12,14 @@ pub struct GoalInput {
     #[serde(default)] pub constraints: String,
     #[serde(default)] pub boundaries: String,
     #[serde(default)] pub stop_when: String,
+    #[serde(default)] pub verification_command: String,
+    #[serde(default)] pub auto_resume: bool,
 }
 impl From<GoalInput> for GoalContract {
     fn from(input: GoalInput) -> Self {
         Self { outcome: input.outcome, verification: input.verification,
-            constraints: input.constraints, boundaries: input.boundaries, stop_when: input.stop_when }
+            constraints: input.constraints, boundaries: input.boundaries, stop_when: input.stop_when,
+            verification_command: input.verification_command, auto_resume: input.auto_resume }
     }
 }
 
@@ -57,6 +60,23 @@ fn ensure_not_owned_elsewhere(app: &tauri::AppHandle, id: &str) -> Result<(), St
 fn changed(app: &tauri::AppHandle, id: &str, record: Option<&GoalRecord>) {
     emit(app, "chat-goal-changed", json!({"session": id, "goal": record}));
 }
+
+pub(super) fn failed_before_run(app: &tauri::AppHandle, id: &str, error: &str) -> Result<(), String> {
+    let state = app.state::<ChatState>();
+    let _write = lock(&state.goal_io);
+    let _lease = metadata_lease(app, id)?;
+    let db = store(app)?;
+    if let Some(mut goal) = db.load(id)? {
+        if goal.state == GoalState::Running && goal.last_run_id.is_none() {
+            goal.state = GoalState::Paused;
+            goal.note = error.chars().take(2000).collect();
+            goal.updated_at_ms = millis();
+            db.save(&goal)?;
+            changed(app, id, Some(&goal));
+        }
+    }
+    Ok(())
+}
 /// Called at startup/first read to reconcile records abandoned by the previous
 /// application process. An unverified dispatch never gets replayed automatically.
 fn current(app: &tauri::AppHandle, id: &str) -> Result<Option<GoalRecord>, String> {
@@ -74,6 +94,46 @@ fn current(app: &tauri::AppHandle, id: &str) -> Result<Option<GoalRecord>, Strin
         changed(app, id, Some(&goal));
     }
     Ok(Some(goal))
+}
+
+/// One startup reconciliation pass. The saved contract must explicitly allow
+/// resumption; a deliberate pause, uncertain dispatch or missing log never qualifies.
+pub fn resume_pending(app: &tauri::AppHandle) {
+    let app = app.clone();
+    let _ = std::thread::Builder::new().name("goal-recovery".into()).spawn(move || {
+        let attempt = || -> Result<(), String> {
+            let records = store(&app)?.list()?;
+            for saved in records {
+                if saved.state != GoalState::Running || !saved.contract.auto_resume { continue; }
+                if !mutate(&app, |index| index.get(&saved.session_id).is_some())? { continue; }
+                let state = app.state::<ChatState>();
+                let _write = lock(&state.goal_io);
+                let _metadata_lease = metadata_lease(&app, &saved.session_id)?;
+                if running(&app, &saved.session_id) || agent_kernel::supervisor::SessionLease::held(Dirs::of(&app)?.leases(), &saved.session_id)? { continue; }
+                let log = JsonlRunLog::new(Dirs::of(&app)?.runs().join(&saved.session_id));
+                let trace = saved.last_run_id.as_deref().and_then(|run| log.inspect(run).ok());
+                let authorized = recovery::resume_authorized(&saved, trace.as_ref());
+                let Some(mut goal) = current(&app, &saved.session_id)? else { continue; };
+                // Terminal states and needs_review are always left for their normal workflow.
+                if !authorized || goal.state != GoalState::Interrupted { continue; }
+                let previous = goal.clone();
+                goal.state = GoalState::Paused;
+                goal.begin(millis())?;
+                store(&app)?.save(&goal)?;
+                if let Err(error) = super::send(app.clone(), goal.session_id.clone(), prompt(&goal), None, Some(false), None) {
+                    let mut paused = previous;
+                    paused.state = GoalState::Paused;
+                    paused.note = format!("自动继续未启动：{error}").chars().take(2000).collect();
+                    store(&app)?.save(&paused)?;
+                    changed(&app, &paused.session_id, Some(&paused));
+                } else {
+                    changed(&app, &goal.session_id, Some(&goal));
+                }
+            }
+            Ok(())
+        };
+        if let Err(error) = attempt() { eprintln!("长期目标恢复失败：{error}"); }
+    });
 }
 
 #[tauri::command]
@@ -105,6 +165,7 @@ pub fn chat_goal_set(
         return Err("当前目标尚未结束，请先继续、核验或清除它".into());
     }
     let goal = GoalRecord::draft(session_id.clone(), contract.into(), millis())?;
+    state.todo.remove_session(&session_id).map_err(|e| e.to_string())?;
     store(&app)?.save(&goal)?;
     changed(&app, &session_id, Some(&goal));
     Ok(goal)
@@ -114,10 +175,14 @@ fn prompt(goal: &GoalRecord) -> String {
     let c = &goal.contract;
     let mut text = format!("请按照以下长期目标工作。目标：{}\n", c.outcome);
     if !c.verification.trim().is_empty() { text.push_str(&format!("验收条件：{}\n", c.verification)); }
+    if !c.verification_command.trim().is_empty() {
+        text.push_str(&format!("用户指定验收命令（最后一次修改后原样执行；普通检查用 shell，长检查用 process_start/process_read 等待退出码为 0）：{}\n", c.verification_command));
+    }
     if !c.constraints.trim().is_empty() { text.push_str(&format!("约束：{}\n", c.constraints)); }
     if !c.boundaries.trim().is_empty() { text.push_str(&format!("范围：{}\n", c.boundaries)); }
     if !c.stop_when.trim().is_empty() { text.push_str(&format!("遇到以下情况请停止并询问：{}\n", c.stop_when)); }
     text.push_str("执行中请使用实际工具核验结果，不要仅凭口头说明宣称成功。");
+    text.push_str("复杂任务使用 todo 保存里程碑、实际证据和 handoff（当前阻塞、决定和下一步），以便压缩或重启后接手。不要把所有步骤一次标记完成。");
     if goal.attempts > 1 {
         text.push_str("这是新的继续回合。请先检查当前文件、任务及外部状态，从现场继续；不要盲目重放上次可能成功的写入操作。");
     }
@@ -131,6 +196,10 @@ pub fn chat_goal_start(
     app: tauri::AppHandle, window: tauri::WebviewWindow, session_id: String,
 ) -> Result<GoalRecord, String> {
     require_control(&window)?;
+    start_saved(&app, session_id)
+}
+
+pub(super) fn start_saved(app: &tauri::AppHandle, session_id: String) -> Result<GoalRecord, String> {
     exists(&app, &session_id)?;
     ensure_not_owned_elsewhere(&app, &session_id)?;
     // Hold the goal lock until chat_send has registered the run or refused it.
@@ -222,6 +291,14 @@ pub fn chat_goal_finish(
     let mut goal = current(&app, &session_id)?.ok_or("没有长期目标")?;
     goal.finish_verified(&evidence, millis())?;
     store(&app)?.save(&goal)?;
+    if let Some(run) = &goal.last_run_id {
+        let outcome = task_outcome::TaskOutcome {
+            run_id: run.clone(), session_id: session_id.clone(), status: task_outcome::Status::Succeeded,
+            validator: "user_confirmation".into(), evidence: goal.note.clone(), verified_at_ms: Some(goal.updated_at_ms),
+        };
+        task_outcome::save(&Dirs::of(&app)?.outcomes(), &outcome)?;
+        emit(&app, "chat-task-outcome", json!({"session":session_id,"outcome":outcome}));
+    }
     changed(&app, &session_id, Some(&goal));
     Ok(goal)
 }
@@ -244,15 +321,29 @@ pub fn chat_goal_delete(
 
 /// Called only after the corresponding RunEvent has been durably appended
 /// to JsonlRunLog. If updating a goal fails, the observer fails closed.
-pub(super) fn observe(app: &tauri::AppHandle, record: &RunEvent) -> Result<(), String> {
-    let RunEventBody::State { state, .. } = &record.body else { return Ok(()) };
+pub(super) fn observe(app: &tauri::AppHandle, record: &RunEvent, tokens: u64) -> Result<(), String> {
+    if !matches!(&record.body, RunEventBody::State { .. } | RunEventBody::Event { event: agent_kernel::Event::Usage { .. } | agent_kernel::Event::ToolEnd { .. } }) { return Ok(()); }
     let chat = app.state::<ChatState>();
     let _write = lock(&chat.goal_io);
     let _metadata_lease = metadata_lease(app, &record.session_id)?;
     let db = store(app)?;
     if let Some(mut goal) = db.load(&record.session_id)? {
-        if goal.state == GoalState::Running {
-            goal.observe(&record.run_id, *state, record.timestamp_ms)?;
+        if goal.state == GoalState::Running || (goal.state == GoalState::Paused && goal.last_run_id.as_deref() == Some(&record.run_id)) {
+            goal.account(&record.run_id, tokens, record.timestamp_ms)?;
+            if let RunEventBody::State { state, reason } = &record.body {
+                goal.observe(&record.run_id, *state, record.timestamp_ms)?;
+                if let Some(reason) = reason { goal.note = reason.chars().take(2000).collect(); }
+                if goal.state == GoalState::AwaitingVerification && *state == agent_kernel::RunState::Completed && !goal.contract.verification_command.trim().is_empty() {
+                    let log = JsonlRunLog::new(Dirs::of(app)?.runs().join(&record.session_id));
+                    let outcome = task_outcome::inspect(&log, &record.session_id, &record.run_id)?;
+                    let plan = chat.todo.load_snapshot(&record.session_id).map_err(|e| e.to_string())?;
+                    if outcome.status == task_outcome::Status::Unknown && plan.todos.iter().all(|item| item.status == agent_kernel::builtin::TodoStatus::Completed) {
+                        if let Some(evidence) = task_runtime::trace_evidence(&log, &record.session_id, &record.run_id, &goal.contract.verification_command)? {
+                            goal.finish_verified(&evidence, record.timestamp_ms)?;
+                        }
+                    }
+                }
+            }
             db.save(&goal)?;
             changed(app, &record.session_id, Some(&goal));
         }

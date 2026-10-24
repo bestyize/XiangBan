@@ -5,6 +5,17 @@ import type { WireMessage } from './types.ts';
 const text = (value: string) => [{ type: 'text' as const, text: value }];
 
 describe('history to chat items', () => {
+  it.each([
+    ['verification_required', '目标尚未通过指定命令验收'],
+    ['unfinished_milestones', '还有未完成的里程碑'],
+    ['permission_denied', '你已拒绝本次操作'],
+    ['progress_store_unavailable', '任务进度暂时无法读取'],
+  ])('explains the %s pause without suggesting a model switch', (reason, expected) => {
+    const view = newView('s1');
+    applyEvent(view, { type: 'error', message: `run paused by continuation guard: ${reason}` });
+    expect(view.items[0]).toMatchObject({ kind: 'notice', tone: 'warning', text: expect.stringContaining(expected) });
+    expect(view.items[0]).not.toHaveProperty('canSwitchModel');
+  });
   it('shows an exhausted run budget as a pause with a continue action', () => {
     const view = newView('s1');
     applyEvent(view, { type: 'error', message: 'run budget exceeded: tool calls' });

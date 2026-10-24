@@ -149,7 +149,9 @@ impl Agent {
         }
         for mw in &self.middleware {
             if let ToolGate::Block(reason) = mw.before_tool(&ctx, call, &args, tool.spec()) {
-                return Prepared::Done(ToolResult::error(reason));
+                let denied = reason.starts_with("The user denied permission to run `");
+                let result = ToolResult::error(reason);
+                return Prepared::Done(if denied { result.with_structured_content(serde_json::json!({"harness_status":"permission_denied"})) } else { result });
             }
         }
         if cancel.load(Ordering::Relaxed) {

@@ -544,10 +544,12 @@ export function createChatStore(deps: ChatDeps): ChatStore {
   }
 
   function applyOutcome(session:string,outcome:Outcome){
+    // An unverified outcome is internal bookkeeping, not a user-facing warning.
+    // Actual errors and uncertain operations have their own execution events.
+    if(outcome.status!=='succeeded'||outcome.validator!=='expected_file_sha256')return;
     const v=viewOf(session,true);if(!v.items.some(i=>i.kind==='tool'))return;
     const id=`outcome:${outcome.runId}`;if(v.items.some(i=>i.id===id))return;
-    const succeeded=outcome.status==='succeeded'&&outcome.validator==='expected_file_sha256';
-    v.items.push({kind:'notice',id,tone:succeeded?'info':'warning',text:succeeded?'指定文件已通过 SHA256 验收。':'本轮执行已结束，任务结果尚未通过验收。请核对交付物；遇到结果未知的操作，勿直接重复执行。',details:outcome.evidence,detailsLabel:'查看执行依据'});
+    v.items.push({kind:'notice',id,tone:'info',text:'指定文件已通过 SHA256 验收。',details:outcome.evidence,detailsLabel:'查看执行依据'});
   }
 
   function applyPending(id:string,p:PendingSnapshot) {

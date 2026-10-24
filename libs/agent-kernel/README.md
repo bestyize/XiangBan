@@ -4,11 +4,13 @@
 
 状态：0.3.0，已接入小伴桌面。内核循环、三种模型协议（chat completions、Responses、Claude Messages）、权限/上下文/输出落盘中间件、JSONL 存储、文件/网页/Shell、skills、记忆、子 Agent、MCP 与 stdio；支持工具 Schema 校验、结构化结果与图片。0.3 增加运行身份、可失败观察者、可选执行日志和进程管理。演进设计见 [框架审视](../../docs/architecture/agent-framework-review.md)，已实现架构图与使用约定见 [运行与进程基础](../../docs/architecture/agent-runtime.md)。
 
-## 长期目标与运行监督（第一阶段）
+## 长期目标与运行监督
 
 可选的宿主目标调度无需污染 Agent Loop：新增无 Tauri 依赖的 `goals::GoalContract`、`GoalRecord`、`GoalStore`，保存目标、验收条件和目标运行状态；`recovery::reconcile`（`journal` feature）依据既有 `JsonlRunLog::inspect` 判断异常中断，以及是否存在已派发但结果未知的工具；`supervisor::SessionLease` 使用操作系统文件锁，在同机多个进程之间互斥一段会话的运行。
 
-这是**安全的手动恢复底座**：目标的 `Completed` 必须由外部验证证据或用户确认产生，模型 `RunState::Completed` 仅意味着进入 `AwaitingVerification`。已派发但无工具结果的调用绝不自动重放。桌面端目前在聊天工作台提供创建、开始、暂停、核验与继续；没有独立后台守护调度器、自动质量门禁和跨设备的任务锁。完整约定见 [长期目标架构](../../docs/architecture/durable-goals.md)。
+目标的 `Completed` 必须由外部验证证据或用户确认产生，模型 `RunState::Completed` 仅意味着进入 `AwaitingVerification`。桌面可用用户指定的实际成功命令验收，并可在明确授权后于下次启动恢复安全中断的目标；已派发但无工具结果的调用绝不自动重放。累计用量与活跃时间跨继续保留，没有独立后台守护服务或跨设备锁。完整约定见 [长期目标架构](../../docs/architecture/durable-goals.md)。
+
+`AgentBuilder::unlimited_turns()` 显式取消轮数上限；现有宿主默认 25 轮与 `max_turns(n)` 语义保持。`RunControl::limits` 可分别设置或取消时间/token 预算，同时保留资源互斥。`Todo::persistent(directory)` 与 `.middleware(todo.clone())` 配合，将计划、证据和交接说明独立落盘，在新运行开始时恢复；证据是模型记录，不能替代外部验收。
 
 ## 0.3 运行与进程
 
@@ -17,11 +19,11 @@
 - `ToolCtx.run_id()` 关联资源；`Tool::on_run_end` 在终止事件前清理，必须幂等，终止记录失败时可能重试清理。缺失历史结果会明确提示“动作可能已经发生”，不自动重放。
 - 可选 `journal`：`JsonlRunLog` 保存独立的 v1 执行记录，支持 `read_after` 补读和 `inspect` 检查未完成工具。仅包含日志和单 run 写入约束；没有自动恢复、跨进程会话锁或授权恢复。
 - 可选 `process`：宿主为工作区持有 `ProcessManager`，注入 process_start/read/write/stop。支持立即返回、日志游标、管道输入、超时、取消和受管进程清理；默认 run scope，keep_alive 显式保留到 session。宿主关闭会话和应用时主动清理。不含 PTY 或沙箱。
-- `Subagent.observe_run` 提供带父 run 身份的子任务记录；临时子任务会释放 session 运行资源，对话保留仍由宿主决定。父子用量预算尚未共享。
+- `Subagent.observe_run` 提供带父 run 身份的子任务记录；临时子任务会释放 session 运行资源，对话保留仍由宿主决定。子任务沿用父级 RunControl 与工具调用预算。
 - stdio hello 增加可选 capabilities。请求加 `observed: true` 切换到 run_event 帧，并可带 max_tool_calls；默认请求的 event/run_end 格式保持原样，协议版本仍为 v1。
 - 独立 stdio 示例可通过 feature `process` 和 AGENT_ALLOW_PROCESSES=1 显式启用进程工具，仍由客户端批准，无 Tauri 依赖。
 
-进程默认最多同时运行 8 个、保留 64 个记录、缓冲最近 256 KiB 输出；日志读取可聚合等待 10 秒，使用 next_cursor 避免重复。安装 RepeatGuard 时建议 `.ignore_tool("process_read")`，轮询仍受本轮调用预算限制。完整权限、生命周期、平台限制和示例见 [运行文档](../../docs/architecture/agent-runtime.md)。
+进程默认最多同时运行 8 个、保留 64 个记录、缓冲最近 256 KiB 输出；日志读取可聚合等待 60 秒，使用 next_cursor 避免重复。安装 RepeatGuard 时建议 `.ignore_tool("process_read")`，轮询仍受本轮调用预算限制。无进展检测允许有等待时长的运行中进程读取，零等待空轮询不豁免。完整权限、生命周期、平台限制和示例见 [运行文档](../../docs/architecture/agent-runtime.md)。
 
 ## 0.2 接入与迁移
 
@@ -31,7 +33,7 @@
 - `Message` 新增可选 `is_error`、`structured_content`、`context_summary`；`ToolEnd` 新增可选 `parts`、`structured_content`。工具错误写入历史后仍保留；Claude 使用 `is_error`，Chat Completions/Responses 使用错误文本标记。Claude 原生传图片结果；Responses 与 Chat Completions 在一组工具结果之后追加带调用标识的用户图片消息，避免部分兼容网关将工具结果中的图片数组转成含 Base64 的文本，导致上下文异常膨胀。是否能识图仍取决于模型，宿主按模型能力选择工具。
 - `Turn` 新增 `tools`，中间件可看到本轮工具定义。`ContextTrim` 将其计入估算，可用 `.reserve_output(tokens)` 为输出和估算误差留余量；当前轮仍超限会在请求模型前返回错误。图片按保守基数和内嵌编码长度估算，不再固定按 800 token；估算不等于实际 tokenizer，不保证任意 Provider 都不会报上下文错误。
 - `McpConfig` 默认只继承启动所需环境变量（PATH、HOME/USERPROFILE、系统路径、语言与临时目录等），通过 `.env(k, v)` 配置服务变量，或 `.inherit_env(k)` 显式放行已有变量。默认不继承模型、云服务等密钥；它不限制子进程读取磁盘。结果默认标记不可信。文本、图片、文本资源与资源链接可用，其他块明确报错；图片最多 4 MiB，单行 JSON 最大 8 MiB。图片与 `structuredContent` 会保留到模型请求和历史中。无字节内容的资源链接只展示 URI，不自动读取。
-- `Subagent` 默认串行，需要并发委派时由宿主调用 `.parallel()` 并确保子任务可共享工作区。父子共享预算仍待实现。
+- `Subagent` 默认串行，需要并发委派时由宿主调用 `.parallel()` 并确保子任务可共享工作区。父子共享 RunControl 与工具预算。
 - JSONL 与 stdio 的新增字段可选，线协议仍为 v1；Rust 结构体字面量和精确枚举匹配需补字段或使用构造器及 `..`。旧历史可读，旧版错误记录无法补出原本未保存的错误状态；降级程序可能忽略新元数据。`context_summary` 只供可信宿主写入，核心不从用户正文推断摘要，也不自动对其做压缩。
 
 结果格式核对来源：[OpenAI function calling](https://developers.openai.com/api/docs/guides/function-calling)、[Claude tool results](https://platform.claude.com/docs/en/agents-and-tools/tool-use/handle-tool-calls)。Schema 实现与草案支持见 [jsonschema 0.33 文档](https://docs.rs/jsonschema/0.33.0/jsonschema/)。协议转换已做本地测试，真实兼容端点仍需分别验证。

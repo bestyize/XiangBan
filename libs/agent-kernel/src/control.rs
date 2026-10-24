@@ -39,6 +39,20 @@ impl Default for RunControl {
     }
 }
 impl RunControl {
+    /// No time/token cap, while retaining mutation-domain isolation.
+    pub fn unlimited() -> Self {
+        Self(Arc::new(Inner { isolate: true, deadline: None,
+            tokens: AtomicU64::new(0), limit: u64::MAX }))
+    }
+
+    pub fn limits(duration: Option<Duration>, tokens: Option<u64>) -> Self {
+        Self(Arc::new(Inner { isolate: true,
+            deadline: duration.map(|d| Instant::now() + d),
+            tokens: AtomicU64::new(0), limit: tokens.unwrap_or(u64::MAX) }))
+    }
+
+    pub fn reported_tokens(&self) -> u64 { self.0.tokens.load(Ordering::SeqCst) }
+
     pub fn bounded(duration: Duration, tokens: u64) -> Self {
         Self(Arc::new(Inner {
             isolate: true,

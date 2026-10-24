@@ -150,7 +150,8 @@ mod tests {
         let dir = std::env::temp_dir();
         assert_eq!(checked(&format!("  {}  ", dir.display())).unwrap(), dir.display().to_string());
         assert!(checked("relative/folder").is_err());
-        assert!(checked("/no/such/folder/xiaoban").unwrap_err().contains("找不到"));
+        let missing = dir.join(format!("no-such-xiaoban-folder-{}", std::process::id())).join("missing");
+        assert!(checked(&missing.display().to_string()).unwrap_err().contains("找不到"));
         assert!(checked("").is_err());
     }
 

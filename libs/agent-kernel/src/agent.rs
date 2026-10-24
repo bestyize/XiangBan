@@ -31,7 +31,7 @@ pub struct Agent {
     pub(crate) middleware: Vec<Arc<dyn Middleware>>,
     pub(crate) system_prompt: String,
     pub(crate) prompt_sections: Vec<PromptSection>,
-    pub(crate) max_turns: usize,
+    pub(crate) max_turns: Option<usize>,
     pub(crate) max_truncated_tool_retries: usize,
     pub(crate) retry: RetryPolicy,
     pub(crate) running: Mutex<HashSet<String>>,
@@ -39,6 +39,12 @@ pub struct Agent {
 }
 
 impl Agent {
+    /// Add a host policy before existing middleware, before starting this agent.
+    pub fn with_middleware(mut self, middleware: impl Middleware + 'static) -> Self {
+        self.middleware.insert(0, Arc::new(middleware));
+        self
+    }
+
     pub fn builder(provider: Arc<dyn ModelProvider>, store: Arc<dyn SessionStore>) -> AgentBuilder {
         AgentBuilder {
             provider,
@@ -48,7 +54,7 @@ impl Agent {
             middleware: Vec::new(),
             system_prompt: String::new(),
             prompt_sections: Vec::new(),
-            max_turns: 25,
+            max_turns: Some(25),
             max_truncated_tool_retries: 3,
             retry: RetryPolicy::default(),
         }
@@ -94,7 +100,7 @@ pub struct AgentBuilder {
     middleware: Vec<Arc<dyn Middleware>>,
     system_prompt: String,
     prompt_sections: Vec<PromptSection>,
-    max_turns: usize,
+    max_turns: Option<usize>,
     max_truncated_tool_retries: usize,
     retry: RetryPolicy,
 }
@@ -136,7 +142,14 @@ impl AgentBuilder {
     }
 
     pub fn max_turns(mut self, max_turns: usize) -> Self {
-        self.max_turns = max_turns;
+        self.max_turns = Some(max_turns);
+        self
+    }
+
+    /// Let productive work continue until completion, cancellation or a host budget.
+    /// Finite max_turns remains the default for existing embedders.
+    pub fn unlimited_turns(mut self) -> Self {
+        self.max_turns = None;
         self
     }
 
@@ -183,7 +196,7 @@ impl AgentBuilder {
                 .map_err(|e| HarnessError::Config(format!("invalid schema for tool `{name}`: {e}")))?;
             validators.push(validator);
         }
-        if self.max_turns == 0 {
+        if self.max_turns == Some(0) {
             return Err(HarnessError::Config("max_turns must be at least 1".into()));
         }
         Ok(Agent {
