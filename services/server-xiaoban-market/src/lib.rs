@@ -1,4 +1,5 @@
 //! 小伴市场：专家、技能、连接器的自建目录服务。
+pub mod account;
 pub mod auth;
 pub mod config;
 pub mod crawler;
@@ -36,7 +37,8 @@ pub async fn build_state(config: Config) -> Result<AppState> {
     db::seed(&pool, &config).await?;
     crawler::recover(&pool).await?;
     let (http, objects) = upstream::build_clients().map_err(|e| AppError::Internal(format!("HTTP 客户端初始化失败：{e}")))?;
-    Ok(AppState { pool, config: Arc::new(config), http, objects, runner: Arc::new(crawler::Runner::new()) })
+    let account = config.account_issuer.clone().map(|issuer| Arc::new(account::AccountVerifier::new(issuer, config.account_jwks_url.clone(), config.account_client_id.clone())));
+    Ok(AppState { pool, config: Arc::new(config), http, objects, runner: Arc::new(crawler::Runner::new()), account })
 }
 
 async fn health() -> impl IntoResponse {

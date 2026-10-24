@@ -142,6 +142,16 @@ SHA-256 只保证内容与清单一致，**不代表安全**；脚本不在沙�
 
 采集任务参数（`POST /sources/{id}/jobs` 的请求体，下划线命名）：`keyword`、`category`、`source`、`sort_by`、`max_pages`（缺省取来源配置，默认 5，最多 200）。
 
+## 相伴账号登录
+
+后台默认只有本地管理员（`MARKET_ADMIN_USER` / `MARKET_ADMIN_PASS`）。设置 `MARKET_ACCOUNT_ISSUER` 后，登录页多出「相伴账号」登录，复用统一账号中心（`services/server-account`）的账号：
+
+1. 在账号中心登记应用：给账号中心配置 `ACCOUNT_CLIENTS=…,xiaoban-market:小伴市场`（或在它的后台「应用」里新增），`client_id` 要和 `MARKET_ACCOUNT_CLIENT_ID` 一致。
+2. 给小伴市场配置 `MARKET_ACCOUNT_ISSUER=https://account.xiangban.xyz`（必须等于账号中心的 `ACCOUNT_ISSUER`）。可选：`MARKET_ACCOUNT_JWKS_URL`（默认 `<issuer>/.well-known/jwks.json`）、`MARKET_ACCOUNT_URL`（浏览器访问账号中心 API 的地址，默认同 issuer）、`MARKET_ACCOUNT_CLIENT_ID`（默认 `xiaoban-market`）。账号中心需允许小伴市场的来源跨域（`ACCOUNT_CORS_ORIGINS`，留空即不限制）。
+3. 用本地管理员登录，在「设置 → 相伴账号管理员」里填入要授权的账号和它的密码，点「绑定为管理员」。之后这个账号就可以用相伴账号登录。
+
+工作方式：浏览器用账号 + 密码直接向账号中心换访问令牌（密码不经过小伴市场）；小伴市场用 JWKS 公钥离线验签，要求 `iss` 匹配、`aud` 等于本应用的 `client_id`，并且账号 ID 已被绑定才签发后台令牌（8 小时）。**解绑后，该账号已签发的后台令牌在下一次请求就会失效**；本地管理员始终可用，不依赖账号中心。账号中心不可达时，相伴账号登录会提示稍后重试，本地登录不受影响。
+
 ## 已知限制
 
 - 后台登录没有限流，部署时请放在反向代理后并限制来源。

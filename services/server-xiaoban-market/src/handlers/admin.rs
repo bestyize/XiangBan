@@ -21,7 +21,11 @@ use uuid::Uuid;
 
 pub fn router() -> Router<AppState> {
     Router::new()
+        .route("/config", get(public_config))
         .route("/login", post(login))
+        .route("/login/account", post(login_with_account))
+        .route("/account/bindings", get(list_bindings).post(bind_account))
+        .route("/account/bindings/{id}", axum::routing::delete(unbind_account))
         .route("/me", get(me))
         .route("/account", put(change_password))
         .route("/stats", get(stats))
@@ -81,6 +85,72 @@ async fn login(State(state): State<AppState>, Json(body): Json<LoginBody>) -> Re
         }
         _ => Err(AppError::Unauthorized("用户名或密码错误".into())),
     }
+}
+
+/// 登录页需要的公开配置：是否启用相伴账号登录，以及浏览器该访问哪个账号中心。
+async fn public_config(State(state): State<AppState>) -> Json<Value> {
+    let c = &state.config;
+    Json(json!({ "account": { "enabled": state.account.is_some(), "url": c.account_url, "clientId": c.account_client_id } }))
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct AccountTokenBody {
+    access_token: String,
+    #[serde(default)]
+    label: String,
+}
+
+fn verifier(state: &AppState) -> Result<&crate::account::AccountVerifier> {
+    state.account.as_deref().ok_or_else(|| AppError::BadRequest("未启用相伴账号登录".into()))
+}
+
+/// 账号中心登录：令牌验签通过，且该账号已被绑定为管理员才签发后台令牌（8 小时）。
+async fn login_with_account(State(state): State<AppState>, Json(body): Json<AccountTokenBody>) -> Result<Json<Value>> {
+    let account_id = verifier(&state)?.verify(&body.access_token).await?;
+    let label: Option<String> = sqlx::query_scalar("SELECT label FROM admin_accounts WHERE account_id = $1").bind(account_id).fetch_optional(&state.pool).await?;
+    let label = label.ok_or_else(|| AppError::Unauthorized("这个相伴账号还不是后台管理员，请先用本地管理员登录并在「设置」里绑定".into()))?;
+    let token = auth::issue_token_for(&label, &state.config.jwt_secret, 8 * 3600, Some(account_id.to_string()))?;
+    Ok(Json(json!({ "token": token, "username": label })))
+}
+
+async fn list_bindings(State(state): State<AppState>, _admin: Admin) -> Result<Json<Value>> {
+    let rows = unwrap(
+        sqlx::query_scalar::<_, PgJson<Value>>(
+            "SELECT to_jsonb(x) FROM (SELECT id, account_id AS \"accountId\", label, bound_by AS \"boundBy\", created_at AS \"createdAt\" FROM admin_accounts ORDER BY created_at) x",
+        )
+        .fetch_all(&state.pool)
+        .await?,
+    );
+    Ok(Json(json!({ "enabled": state.account.is_some(), "results": rows })))
+}
+
+/// 绑定：调用者提交要绑定的账号的访问令牌（在账号中心登录得到），服务端验签后登记。
+async fn bind_account(State(state): State<AppState>, Admin(claims): Admin, Json(body): Json<AccountTokenBody>) -> Result<Json<Value>> {
+    let account_id = verifier(&state)?.verify(&body.access_token).await?;
+    let label: String = body.label.trim().chars().take(40).collect();
+    if label.is_empty() {
+        return Err(AppError::BadRequest("请填写一个便于识别的名称".into()));
+    }
+    sqlx::query(
+        "INSERT INTO admin_accounts (account_id, label, bound_by) VALUES ($1, $2, $3)
+         ON CONFLICT (account_id) DO UPDATE SET label = EXCLUDED.label",
+    )
+    .bind(account_id)
+    .bind(&label)
+    .bind(&claims.sub)
+    .execute(&state.pool)
+    .await?;
+    Ok(Json(json!({ "ok": true })))
+}
+
+/// 解绑后，该账号已有的后台会话在下一次请求就会失效（见 `Admin` 提取器）。本地管理员不受影响。
+async fn unbind_account(State(state): State<AppState>, _admin: Admin, Path(id): Path<Uuid>) -> Result<Json<Value>> {
+    let n = sqlx::query("DELETE FROM admin_accounts WHERE id = $1").bind(id).execute(&state.pool).await?.rows_affected();
+    if n == 0 {
+        return Err(AppError::NotFound("绑定不存在".into()));
+    }
+    Ok(Json(json!({ "ok": true })))
 }
 
 async fn me(Admin(claims): Admin) -> Json<Value> {

@@ -93,7 +93,12 @@ async fn spawn_mock() -> (String, Mock) {
 
 // ───────────── 测试应用 ─────────────
 
+struct Account {
+    key: jsonwebtoken::EncodingKey,
+}
+
 struct App {
+    account: Account,
     base: String,
     upstream: String,
     mock: Mock,
@@ -105,12 +110,32 @@ struct App {
 }
 
 async fn setup() -> Option<App> {
+    setup_with(false).await
+}
+
+/// 在本机起一个只提供 JWKS 的「账号中心」，并返回它的地址和签名密钥。
+async fn spawn_account() -> (String, Account) {
+    use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
+    use ring::signature::{Ed25519KeyPair, KeyPair};
+    let pkcs8 = Ed25519KeyPair::generate_pkcs8(&ring::rand::SystemRandom::new()).unwrap();
+    let pair = Ed25519KeyPair::from_pkcs8(pkcs8.as_ref()).unwrap();
+    let x = URL_SAFE_NO_PAD.encode(pair.public_key().as_ref());
+    let jwks = json!({"keys": [{"kty": "OKP", "crv": "Ed25519", "alg": "EdDSA", "use": "sig", "kid": "test-key", "x": x}]});
+    let app = Router::new().route("/.well-known/jwks.json", get(move || { let j = jwks.clone(); async move { Json(j) } }));
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let url = format!("http://{}", listener.local_addr().unwrap());
+    tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+    (url, Account { key: jsonwebtoken::EncodingKey::from_ed_der(pkcs8.as_ref()) })
+}
+
+async fn setup_with(account_enabled: bool) -> Option<App> {
     let admin_url = std::env::var("TEST_DATABASE_URL").ok()?;
     let db_name = format!("mkt_{}", uuid::Uuid::new_v4().simple());
     let admin = sqlx::PgPool::connect(&admin_url).await.unwrap();
     sqlx::query(&format!("CREATE DATABASE \"{db_name}\"")).execute(&admin).await.unwrap();
     let (prefix, _) = admin_url.rsplit_once('/').unwrap();
     let data = std::env::temp_dir().join(&db_name);
+    let (account_url, account) = spawn_account().await;
     let config = Config {
         host: "127.0.0.1".into(),
         port: 0,
@@ -121,6 +146,10 @@ async fn setup() -> Option<App> {
         data_dir: data.clone(),
         web_dir: "does-not-exist".into(),
         allow_private_upstream: true,
+        account_issuer: account_enabled.then(|| "https://account.test".to_string()),
+        account_jwks_url: format!("{account_url}/.well-known/jwks.json"),
+        account_url: account_url.clone(),
+        account_client_id: "xiaoban-market".into(),
     };
     let state = build_state(config).await.unwrap();
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
@@ -130,10 +159,18 @@ async fn setup() -> Option<App> {
     let http = reqwest::Client::new();
     let login: Value = http.post(format!("{base}/api/v1/admin/login")).json(&json!({"username": "admin", "password": "test-pass-123"})).send().await.unwrap().json().await.unwrap();
     let token = login["token"].as_str().unwrap().to_string();
-    Some(App { base, upstream, mock, http, token, admin_url, db_name, _data: data })
+    Some(App { account, base, upstream, mock, http, token, admin_url, db_name, _data: data })
 }
 
 impl App {
+    /// 以账号中心的身份签发一个访问令牌（可指定受众、发行方和过期时间）。
+    fn account_token(&self, sub: uuid::Uuid, iss: &str, aud: &str, ttl: i64) -> String {
+        let exp = (std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs() as i64 + ttl) as usize;
+        let mut header = jsonwebtoken::Header::new(jsonwebtoken::Algorithm::EdDSA);
+        header.kid = Some("test-key".into());
+        jsonwebtoken::encode(&header, &json!({"sub": sub, "iss": iss, "aud": aud, "exp": exp}), &self.account.key).unwrap()
+    }
+
     async fn call(&self, method: reqwest::Method, path: &str, body: Option<Value>, auth: bool) -> (u16, Value) {
         let mut req = self.http.request(method, format!("{}{}", self.base, path));
         if auth {
@@ -198,6 +235,18 @@ impl App {
 macro_rules! app {
     () => {
         match setup().await {
+            Some(app) => app,
+            None => {
+                eprintln!("TEST_DATABASE_URL 未设置，跳过");
+                return;
+            }
+        }
+    };
+}
+
+macro_rules! app_with_account {
+    () => {
+        match setup_with(true).await {
             Some(app) => app,
             None => {
                 eprintln!("TEST_DATABASE_URL 未设置，跳过");
@@ -528,4 +577,74 @@ async fn upstream_urls_must_be_public_https_unless_tests_allow_private() {
         assert!(validate_url(bad, false).is_err(), "{bad} 应被拒绝");
     }
     assert!(validate_url("http://127.0.0.1:8080/a", true).is_ok());
+}
+
+#[tokio::test]
+async fn account_login_requires_binding_and_unbinding_revokes_sessions() {
+    let app = app_with_account!();
+    let iss = "https://account.test";
+    let me = uuid::Uuid::new_v4();
+
+    // 登录页配置。
+    let (_, cfg) = app.call(reqwest::Method::GET, "/api/v1/admin/config", None, false).await;
+    assert_eq!((cfg["account"]["enabled"].as_bool(), cfg["account"]["clientId"].as_str()), (Some(true), Some("xiaoban-market")));
+
+    // 1. 账号有效但没有被绑定：不能登录。
+    let good = app.account_token(me, iss, "xiaoban-market", 600);
+    let login = |token: String| app.call(reqwest::Method::POST, "/api/v1/admin/login/account", Some(json!({"accessToken": token})), false);
+    let (status, body) = login(good.clone()).await;
+    assert_eq!(status, 401, "{body}");
+    assert!(body["message"].as_str().unwrap().contains("绑定"));
+
+    // 2. 本地管理员绑定。必须是本应用的令牌，别的应用的令牌不能被绑定。
+    let (status, _) = app.call(reqwest::Method::POST, "/api/v1/admin/account/bindings", Some(json!({"accessToken": app.account_token(me, iss, "other-app", 600), "label": "x"})), true).await;
+    assert_eq!(status, 401);
+    let (status, _) = app.call(reqwest::Method::POST, "/api/v1/admin/account/bindings", Some(json!({"accessToken": good, "label": "   "})), true).await;
+    assert_eq!(status, 400);
+    app.post("/api/v1/admin/account/bindings", json!({"accessToken": good, "label": "张三"})).await;
+    let bindings = app.get("/api/v1/admin/account/bindings").await;
+    assert_eq!(bindings["results"].as_array().unwrap().len(), 1);
+    assert_eq!(bindings["results"][0]["boundBy"], "admin");
+
+    // 3. 绑定后可以登录，并能访问后台接口。
+    let (status, session) = login(good.clone()).await;
+    assert_eq!(status, 200, "{session}");
+    assert_eq!(session["username"], "张三");
+    let acct_token = session["token"].as_str().unwrap().to_string();
+    let with_acct = |path: &'static str| {
+        let (http, url, t) = (app.http.clone(), format!("{}{}", app.base, path), acct_token.clone());
+        async move { http.get(url).bearer_auth(t).send().await.unwrap().status().as_u16() }
+    };
+    assert_eq!(with_acct("/api/v1/admin/stats").await, 200);
+
+    // 4. 受众、发行方、过期、伪造都不行。
+    for (name, token) in [
+        ("错误受众", app.account_token(me, iss, "other-app", 600)),
+        ("错误发行方", app.account_token(me, "https://evil.example", "xiaoban-market", 600)),
+        ("已过期", app.account_token(me, iss, "xiaoban-market", -600)),
+        ("乱码", "not-a-token".to_string()),
+    ] {
+        let (status, _) = login(token).await;
+        assert_eq!(status, 401, "{name} 应被拒绝");
+    }
+    // 用服务自己的密钥伪造（HS256）的令牌，也不能当作账号令牌。
+    let forged = jsonwebtoken::encode(&jsonwebtoken::Header::default(), &json!({"sub": me, "iss": iss, "aud": "xiaoban-market", "exp": 4102444800u64}), &jsonwebtoken::EncodingKey::from_secret(b"test-secret-test-secret-test-secret")).unwrap();
+    assert_eq!(login(forged).await.0, 401);
+
+    // 5. 解绑后，已经签发的后台令牌在下一次请求就失效；重新登录也不行。本地管理员不受影响。
+    app.call(reqwest::Method::DELETE, &format!("/api/v1/admin/account/bindings/{}", bindings["results"][0]["id"].as_str().unwrap()), None, true).await;
+    assert_eq!(with_acct("/api/v1/admin/stats").await, 401);
+    assert_eq!(login(good).await.0, 401);
+    assert_eq!(app.call(reqwest::Method::GET, "/api/v1/admin/stats", None, true).await.0, 200);
+    app.cleanup().await;
+}
+
+#[tokio::test]
+async fn account_login_is_off_unless_configured() {
+    let app = app!();
+    let (_, cfg) = app.call(reqwest::Method::GET, "/api/v1/admin/config", None, false).await;
+    assert_eq!(cfg["account"]["enabled"], false);
+    let (status, _) = app.call(reqwest::Method::POST, "/api/v1/admin/login/account", Some(json!({"accessToken": "x"})), false).await;
+    assert_eq!(status, 400);
+    app.cleanup().await;
 }

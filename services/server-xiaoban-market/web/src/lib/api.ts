@@ -88,10 +88,49 @@ export const market = {
   detail: (kind: Plural, ns: string, slug: string) => request<ItemDetail>('GET', `/market/${kind}/${encodeURIComponent(ns)}/${encodeURIComponent(slug)}`),
 };
 
+export interface LoginConfig {
+  account: { enabled: boolean; url: string; clientId: string };
+}
+
+export interface AccountBinding {
+  id: string;
+  accountId: string;
+  label: string;
+  boundBy: string;
+  createdAt: string;
+}
+
+/**
+ * 直接向相伴账号中心用「账号 / 邮箱 / 手机号 + 密码」登录，拿到访问令牌。
+ * 密码只发给账号中心；小伴市场后台只收到令牌，并在服务端用 JWKS 验签。
+ */
+export async function accountPasswordLogin(accountUrl: string, clientId: string, identifier: string, password: string): Promise<string> {
+  let resp: Response;
+  try {
+    resp = await fetch(`${accountUrl.replace(/\/+$/, '')}/api/auth/password/login`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ identifier: identifier.trim(), password, client_id: clientId, device_name: '小伴市场后台' }),
+    });
+  } catch {
+    throw new ApiError(0, '无法连接账号中心，请检查网络后重试');
+  }
+  const data = await resp.json().catch(() => null);
+  if (!resp.ok || !data?.access_token) {
+    throw new ApiError(resp.status, data?.message ?? data?.error ?? `账号中心登录失败（HTTP ${resp.status}）`);
+  }
+  return data.access_token as string;
+}
+
 type Paged<T> = { total: number; page: number; pageSize: number; results: T[] };
 const a = { admin: true };
 
 export const admin = {
+  config: () => request<LoginConfig>('GET', '/admin/config'),
+  loginWithAccount: (accessToken: string) => request<{ token: string; username: string }>('POST', '/admin/login/account', { body: { accessToken } }),
+  bindings: () => request<{ enabled: boolean; results: AccountBinding[] }>('GET', '/admin/account/bindings', a),
+  bindAccount: (accessToken: string, label: string) => request<{ ok: boolean }>('POST', '/admin/account/bindings', { ...a, body: { accessToken, label } }),
+  unbindAccount: (id: string) => request<{ ok: boolean }>('DELETE', `/admin/account/bindings/${id}`, a),
   login: (username: string, password: string) => request<{ token: string; username: string }>('POST', '/admin/login', { body: { username, password } }),
   me: () => request<{ username: string }>('GET', '/admin/me', a),
   changePassword: (currentPassword: string, newPassword: string) => request<{ ok: boolean }>('PUT', '/admin/account', { ...a, body: { currentPassword, newPassword } }),

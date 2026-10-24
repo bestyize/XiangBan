@@ -1,4 +1,4 @@
-use crate::{config::Config, crawler::Runner, upstream::Ctx};
+use crate::{account::AccountVerifier, config::Config, crawler::Runner, upstream::Ctx};
 use sqlx::PgPool;
 use std::sync::Arc;
 
@@ -9,6 +9,7 @@ pub struct AppState {
     pub http: reqwest::Client,
     pub objects: reqwest::Client,
     pub runner: Arc<Runner>,
+    pub account: Option<Arc<AccountVerifier>>,
 }
 
 impl AppState {
