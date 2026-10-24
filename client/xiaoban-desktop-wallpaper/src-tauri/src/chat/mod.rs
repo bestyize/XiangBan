@@ -6,6 +6,7 @@
 mod agent_settings;
 mod task_runtime;
 mod app_guide;
+mod feature_hints;
 mod widget_content;
 mod broker;
 mod checkpoints;
@@ -588,6 +589,8 @@ fn assemble_with_connectors(parts: Parts<'_>, attachments: Vec<Attachment>, conn
         builder = builder.middleware(mid_run);
     }
     builder = builder
+        // Facts about the app's own features that match the request, before trimming so their size is counted.
+        .middleware(feature_hints::FeatureHints)
         .middleware(ContextTrim::new(budget.context_limit).reserve_output(budget.trim_headroom))
         .middleware(ContinueGuard::new())
         // Bounded transient-error recovery; cancellation and the shared run budget still apply.

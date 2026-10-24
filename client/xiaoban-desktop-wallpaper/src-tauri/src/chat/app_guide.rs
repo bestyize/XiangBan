@@ -110,6 +110,20 @@ pub(super) fn validate_page(page: &str, tab: Option<&str>) -> Result<(), String>
     }
 }
 
+/// The console's features in one paragraph for the system prompt, built from the table so it cannot drift from it.
+/// Names with a "·" are tabs of one page ("资料库·收藏"), so they are listed under the page.
+pub(super) fn overview() -> String {
+    let mut groups: Vec<(&str, Vec<&str>)> = Vec::new();
+    for f in FEATURES.iter().filter(|f| f.id != "guide") {
+        let (group, tab) = match f.name.split_once('·') { Some((g, t)) => (g, Some(t)), None => (f.name, None) };
+        match groups.iter_mut().find(|(g, _)| *g == group) {
+            Some((_, tabs)) => tabs.extend(tab),
+            None => groups.push((group, tab.into_iter().collect())),
+        }
+    }
+    groups.iter().map(|(group, tabs)| if tabs.is_empty() { group.to_string() } else { format!("{group}（{}）", tabs.join("、")) }).collect::<Vec<_>>().join("；")
+}
+
 fn line(f: &Feature, detail: bool) -> String {
     let open = f.page.map(|(page, tab)| match tab {
         Some(tab) => format!("；打开：open_page(page={page}, tab={tab})"),
@@ -122,6 +136,56 @@ fn line(f: &Feature, detail: bool) -> String {
 }
 
 /// `topic` empty → the whole index; otherwise the features that mention it, in full.
+/// What users say for each feature, space separated; matched in the request so the right facts reach the model without
+/// it having to think of looking them up. A new way of asking that was missed becomes a word here and a row in the test.
+const ALIASES: &[(&str, &str)] = &[
+    ("chat", ""),
+    ("ai-store-experts", "专家 专家角色"),
+    ("ai-store-skills", "技能 skill skillhub 找技能 装技能 卸载技能"),
+    ("ai-store-connectors", "连接器 mcp 电脑控制 屏幕控制 操作电脑 辅助功能 屏幕录制"),
+    ("library-docs", "资料库 我的文档 导入文档 导入文件 文件夹 参考资料 用这份资料"),
+    ("library-cloud", "云文档 飞书 腾讯文档 语雀 石墨 网盘"),
+    ("library-favorites", "收藏 存到资料库 存起来 取消收藏"),
+    ("library-memory", "记忆 记住 记下 笔记 别忘 忘掉 你记得 清空记忆"),
+    ("wallpaper", "壁纸 桌面背景 动态壁纸"),
+    ("effect", "特效 下雪 下雨 花瓣 粒子 飘雪 樱花"),
+    ("widget", "组件 小组件 待办 纪念日 倒数日 今日日程 股票 时钟 天气组件 木鱼 月历 置顶 层级 最上面 贴桌面 贴在桌面 标记完成"),
+    ("pet", "宠物 桌宠 伙伴 盆栽 换形象 表情"),
+    ("games", "游戏 贪吃蛇 俄罗斯方块 2048 消失高手 奶茶大师 水墨剑客 暮色滑翔 游玩"),
+    ("care", "提醒 闹钟 到点 叫我 定时 下班提醒 休息提醒"),
+    ("windows", "移动 挪到 左上角 右上角 左下角 右下角 居中 收起 悬浮条 悬浮球 显示器"),
+    ("settings-general", "开机启动 开机自启 暂停动画 恢复动画 动画 帧率 数据目录"),
+    ("settings-appearance", "深色 浅色 暗色 夜间模式 黑暗模式 主题色 外观 跟随系统"),
+    ("settings-ai", "模型 供应商 密钥 apikey api网关"),
+    ("settings-assistant", "快捷键 呼出 超级小伴 截图"),
+    ("settings-voice", "朗读 语音 声音 麦克风 音色 语速 识别"),
+    ("settings-network", "代理 网络设置 vpn socks5 连不上 联网"),
+    ("settings-safety", "权限设置 沙箱 命令权限 文件权限 安全设置"),
+    ("settings-about", "更新 版本 公告"),
+    ("community", "论坛 官网 分享到论坛 发布作品 导出资源包"),
+    ("guide", ""),
+];
+
+/// The features a request is about, most specific first: each word found counts as many points as it has characters.
+pub(super) fn related(request: &str, limit: usize) -> Vec<&'static Feature> {
+    let request = request.to_lowercase();
+    let mut scored: Vec<(usize, &'static Feature)> = FEATURES.iter().filter_map(|f| {
+        let words = ALIASES.iter().find(|(id, _)| *id == f.id).map_or("", |(_, words)| words);
+        let score: usize = words.split_whitespace().filter(|w| request.contains(*w)).map(|w| w.chars().count()).sum();
+        (score >= 2).then_some((score, f))
+    }).collect();
+    scored.sort_by(|a, b| b.0.cmp(&a.0));
+    scored.into_iter().take(limit).map(|(_, f)| f).collect()
+}
+
+/// What is put before the model when a request is about some features; `None` when it is about none.
+pub(super) fn hint_for(request: &str) -> Option<String> {
+    let found = related(request, 3);
+    if found.is_empty() { return None; }
+    let details: Vec<String> = found.iter().map(|f| line(f, true)).collect();
+    Some(format!("【小伴功能提示（来自功能地图，不是用户说的话）】这条请求涉及下面的功能，请据此回答，不要说没有这个功能；要用到的工具先用 tool_load 加载；需要用户自己在页面操作的，可以用 open_page 带他过去。\n{}", details.join("\n")))
+}
+
 pub(super) fn describe(topic: Option<&str>) -> String {
     let topic = topic.map(|t| t.trim().to_lowercase()).filter(|t| !t.is_empty());
     let Some(topic) = topic else {
@@ -186,6 +250,59 @@ mod tests {
         assert!(validate_page("chat", None).is_err());
         assert!(validate_page("studio", Some("games")).is_err());
         assert!(validate_page("games", Some("x")).is_err());
+    }
+
+    #[test]
+    fn the_overview_names_every_page_and_tab_the_user_can_ask_about() {
+        let map = overview();
+        for expected in ["资料库（我的文档、云文档、收藏、记忆）", "AI 插件（专家、技能、连接器）", "设置（通用、外观、AI 模型、超级小伴、声音、连接与网络、安全与权限、关于与更新）", "桌面组件", "提醒与定时任务"] {
+            assert!(map.contains(expected), "{expected} missing from {map}");
+        }
+        assert!(!map.contains("功能导览") && map.chars().count() < 600, "short enough to sit in every prompt: {}", map.chars().count());
+    }
+
+    /// Things people really said (or could) and the feature the model must be told about. Add a row whenever the assistant
+    /// answers "not supported" to something the app can do.
+    #[test]
+    fn requests_reach_the_features_they_are_about() {
+        let cases: &[(&str, &[&str])] = &[
+            ("把时钟组件置顶", &["widget"]),
+            ("帮我加个待办：买花", &["widget"]),
+            ("9点提醒我买花", &["care"]),
+            ("到时候叫我一声", &["care"]),
+            ("你知道资料库的我的文档和收藏吗", &["library-docs", "library-favorites"]),
+            ("存到资料库", &["library-favorites", "library-docs"]),
+            ("切换成深色模式", &["settings-appearance"]),
+            ("暂停动画", &["settings-general"]),
+            ("帮我找个word处理的技能", &["ai-store-skills"]),
+            ("记住我喜欢喝茶", &["library-memory"]),
+            ("宠物放到右下角", &["pet", "windows"]),
+            ("把悬浮条收起来", &["windows"]),
+            ("代理怎么设置", &["settings-network"]),
+            ("来个下雪特效", &["effect"]),
+            ("换个壁纸", &["wallpaper"]),
+            ("我想玩2048", &["games"]),
+            ("朗读的声音太小", &["settings-voice"]),
+            ("API 密钥在哪填", &["settings-ai"]),
+            ("检查更新", &["settings-about"]),
+            ("分享到论坛", &["community"]),
+            ("连接器怎么用", &["ai-store-connectors"]),
+        ];
+        for (request, expected) in cases {
+            let found: Vec<&str> = related(request, 3).iter().map(|f| f.id).collect();
+            for id in *expected { assert!(found.contains(id), "「{request}」should reach {id}, reached {found:?}"); }
+        }
+        for chatter in ["你好", "帮我写一份周报", "今天天气怎么样", "把这段话翻译成英文", "解释一下什么是递归", "谢谢你"] {
+            assert!(related(chatter, 3).is_empty(), "「{chatter}」is plain conversation but reached {:?}", related(chatter, 3).iter().map(|f| f.id).collect::<Vec<_>>());
+        }
+    }
+
+    #[test]
+    fn every_feature_has_its_words_and_the_hint_names_tools_and_the_page() {
+        for f in FEATURES { assert!(ALIASES.iter().any(|(id, _)| *id == f.id), "{} has no entry in ALIASES", f.id); }
+        let hint = hint_for("9点提醒我买花").unwrap();
+        assert!(hint.contains("care_set") && hint.contains("open_page(page=care)") && hint.contains("tool_load"), "{hint}");
+        assert!(hint_for("你好").is_none());
     }
 
     #[test]
