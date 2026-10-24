@@ -47,7 +47,7 @@ pub trait Desktop: Send + Sync {
     fn care_upsert(&self, rule: Rule) -> Result<(), String>;
     fn care_delete(&self, id: &str) -> Result<(), String>;
     fn widgets(&self) -> Result<Value, String>;
-    fn widget_add(&self, kind: &str) -> Result<Value, String>;
+    fn widget_add(&self, kind: &str, custom_id: Option<&str>) -> Result<Value, String>;
     fn widget_update(&self, id: &str, patch: Value) -> Result<Value, String>;
     fn widget_remove(&self, id: &str) -> Result<(), String>;
     fn custom_widgets(&self) -> Result<Value, String>;
@@ -206,10 +206,11 @@ impl Desktop for TauriDesktop {
         crate::widgets::get_desktop_widgets(self.app.clone())
     }
 
-    fn widget_add(&self, kind: &str) -> Result<Value, String> {
+    fn widget_add(&self, kind: &str, custom_id: Option<&str>) -> Result<Value, String> {
         let app = self.app.clone();
         let kind = kind.to_string();
-        tauri::async_runtime::block_on(crate::widgets::add_desktop_widget(app, kind, None, None))
+        let custom_id = custom_id.map(str::to_string);
+        tauri::async_runtime::block_on(crate::widgets::add_desktop_widget(app, kind, None, custom_id))
     }
 
     fn widget_update(&self, id: &str, patch: Value) -> Result<Value, String> {
@@ -630,7 +631,7 @@ fn widget_list(desktop: &dyn Desktop, _: &Value) -> Result<String, String> {
     }
     let templates = desktop.custom_widgets()?;
     if let Some(templates) = templates.as_array().filter(|items| !items.is_empty()) {
-        lines.push("自创组件模板（可在组件库添加到桌面，删除模板用 widget_delete_custom）：".into());
+        lines.push("自创组件模板（放到桌面用 widget_add(kind=\"custom\", custom_id=行首的 id)，删除模板用 widget_delete_custom）：".into());
         for template in templates {
             lines.push(format!("{} | {}", template["id"].as_str().unwrap_or("?"), template["name"].as_str().unwrap_or("自创组件")));
         }
@@ -645,7 +646,15 @@ fn widget_content_schema() -> Value {
 fn widget_add(desktop: &dyn Desktop, args: &Value) -> Result<String, String> {
     let kind = text_arg(args, "kind")?;
     if !crate::widgets::KINDS.contains(&kind) {
-        return Err("kind 只能是 clock（时钟）、weather（天气）、notes（待办）、reminders（日程）、stocks（股票）、woodfish（木鱼）、calendar（月历）或 countdown（纪念日）".into());
+        return Err("kind 只能是 clock（时钟）、weather（天气）、notes（待办）、reminders（日程）、stocks（股票）、woodfish（木鱼）、calendar（月历）、countdown（纪念日）或 custom（自创组件，需同时给 custom_id）".into());
+    }
+    // A custom widget is placed from a saved template, named by `custom_id` (listed at the end of widget_list).
+    let custom_id = optional_text(args, "custom_id")?.filter(|id| !id.is_empty());
+    if kind == "custom" && custom_id.is_none() {
+        return Err("添加自创组件必须给 custom_id：先用 widget_list 查看「自创组件模板」里每行开头的 id，再调用 widget_add(kind=\"custom\", custom_id=该 id)".into());
+    }
+    if kind != "custom" && custom_id.is_some() {
+        return Err("custom_id 只用于 kind=custom；其他类型不需要它".into());
     }
     // Validate all options before creating anything, and never hide a failed theme update.
     let theme = optional_text(args, "theme")?;
@@ -660,7 +669,7 @@ fn widget_add(desktop: &dyn Desktop, args: &Value) -> Result<String, String> {
     if let Some(content) = args.get("content").filter(|v| !v.is_null()) {
         super::widget_content::patch(&json!({ "kind": kind }), content)?;
     }
-    let res = desktop.widget_add(kind)?;
+    let res = desktop.widget_add(kind, custom_id)?;
     let id = res["widgets"].as_array().and_then(|w| w.last()).and_then(|w| w.get("id")).and_then(Value::as_str).ok_or("组件创建结果没有返回 id")?;
     if let Some(theme) = theme {
         desktop.widget_update(id, json!({ "theme": theme })).map_err(|e| format!("组件已添加（id: {id}），但设置外观失败：{e}"))?;
@@ -1221,7 +1230,8 @@ pub fn tools_in_workspace(desktop: Arc<dyn Desktop>, workspace: &std::path::Path
                 "在桌面放置新版时钟、天气、待办、今日日程、股票、电子木鱼、月历或纪念日组件。kind 必填；用户没说要哪种时先用 ask_user 问，不要空参数调用。可用 content 同时填内容（待办、纪念日、日程、股票），如“加个待办：买花”。可设层级（layer=topmost 置顶）。固定 ivory 材质，支持多实例，不设组件数量上限。",
                 object(
                     json!({
-                        "kind": {"type": "string", "enum": crate::widgets::KINDS, "description": "组件类型"},
+                        "kind": {"type": "string", "enum": crate::widgets::KINDS, "description": "组件类型；custom 表示放置一个已保存的自创组件，此时必须同时给 custom_id"},
+                        "custom_id": {"type": "string", "description": "仅 kind=custom 时必填：自创组件模板的 id，取自 widget_list 输出里「自创组件模板」每行开头的 id"},
                         "theme": {"type": "string", "enum": ["ivory"], "description": "可选外观风格，固定 ivory（设计稿材质）"},
                         "layer": {"type": "string", "enum": ["desktop", "topmost"], "description": "可选层级：desktop 贴在桌面（默认），topmost 始终置顶（浮在其他窗口上方）。会保存，重启后仍保持，不是临时的"},
                         "content": widget_content_schema(),
@@ -1519,8 +1529,8 @@ mod tests {
             widgets.extend(self.extra_widgets.lock().unwrap_or_else(|e| e.into_inner()).clone());
             Ok(json!({"widgets": widgets}))
         }
-        fn widget_add(&self, kind: &str) -> Result<Value, String> {
-            self.log(format!("widget-add {kind}"))?;
+        fn widget_add(&self, kind: &str, custom_id: Option<&str>) -> Result<Value, String> {
+            self.log(match custom_id { Some(id) => format!("widget-add {kind} {id}"), None => format!("widget-add {kind}") })?;
             Ok(json!({"widgets": [{"id": "wgt-new", "kind": kind}]}))
         }
         fn widget_update(&self, id: &str, patch: Value) -> Result<Value, String> {
@@ -1884,6 +1894,20 @@ mod tests {
         assert_eq!(update.schema["properties"]["city"]["required"], json!(["name", "latitude", "longitude"]));
         assert!(parse_widget_patch(&json!({"city":{"name":"上海"}})).is_err());
         assert!(parse_widget_patch(&json!({"city":{"name":"上海","latitude":31.23,"longitude":121.47}})).is_ok());
+    }
+
+    #[test]
+    fn a_custom_widget_is_added_by_template_id_and_the_error_names_the_missing_parameter() {
+        let fake = Arc::new(Fake::default());
+        let all = tools(fake.clone());
+        let add = all.iter().find(|tool| tool.spec().name == "widget_add").unwrap().spec();
+        assert_eq!(add.schema["properties"]["custom_id"]["type"], "string", "the model must be able to see the parameter");
+        let missing = call(&fake, "widget_add", json!({"kind":"custom"})).unwrap_err();
+        assert!(missing.contains("custom_id") && missing.contains("widget_list"), "{missing}");
+        assert!(call(&fake, "widget_add", json!({"kind":"clock","custom_id":"x"})).unwrap_err().contains("只用于 kind=custom"));
+        assert!(fake.calls().is_empty(), "nothing is created when the arguments are wrong");
+        call(&fake, "widget_add", json!({"kind":"custom","custom_id":"hello-kitty-clock","layer":"topmost"})).unwrap();
+        assert_eq!(fake.calls(), vec!["widget-add custom hello-kitty-clock", r#"widget-update wgt-new {"layer":"topmost"}"#]);
     }
 
     #[test]

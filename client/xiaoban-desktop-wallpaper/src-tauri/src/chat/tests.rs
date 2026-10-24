@@ -75,7 +75,7 @@ impl Desktop for FakeDesktop {
         Ok(())
     }
     fn widgets(&self) -> Result<Value, String> { Ok(json!({"widgets": []})) }
-    fn widget_add(&self, kind: &str) -> Result<Value, String> {
+    fn widget_add(&self, kind: &str, _custom_id: Option<&str>) -> Result<Value, String> {
         lock(&self.calls).push(format!("widget-add {kind}"));
         Ok(json!({"widgets": [{"id": "wgt-1"}]}))
     }

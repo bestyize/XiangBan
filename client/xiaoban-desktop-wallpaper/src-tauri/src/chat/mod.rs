@@ -610,7 +610,7 @@ fn assemble_with_connectors(parts: Parts<'_>, attachments: Vec<Attachment>, conn
     // on ordinary chat turns. Files, commands, questions and skill discovery stay eager.
     for tool in desktop_tools::tools_in_workspace(desktop.clone(), workspace) {
         builder = if tool_discovery::defer_desktop_tool(&tool.spec().name) {
-            builder.deferred_tool_arc(tool)
+            builder.deferred_trusted_tool_arc(tool)
         } else { builder.tool_arc(tool) };
     }
     if let Some(Ok(mcp_client)) = &computer_use {
@@ -1399,7 +1399,7 @@ pub fn chat_delete_session(app: tauri::AppHandle, window: tauri::WebviewWindow, 
 
 /// Conservative cold-start allowance until assembly measures eager definitions plus the
 /// compact directory. ContextTrim separately counts every schema loaded during a task.
-const TOOL_TOKENS_BEFORE_FIRST_ANSWER: usize = 10_000;
+const TOOL_TOKENS_BEFORE_FIRST_ANSWER: usize = 10_500;
 const TOOL_TOKENS_FILE: &str = "tool-tokens-v2-discovery.json";
 
 /// What the latest answer measured, kept so the ring is right after a restart too.

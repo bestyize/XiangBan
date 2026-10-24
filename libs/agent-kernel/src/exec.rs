@@ -16,6 +16,7 @@ struct Inflight {
     deadline: Option<Instant>,
 
     call_cancel: Arc<AtomicBool>,
+    grace: Duration,
 }
 
 enum Prepared {
@@ -26,6 +27,7 @@ enum Prepared {
 fn spawn(index: usize, tool: Arc<dyn Tool>, args: Value, ctx: ToolCtx) -> Result<Inflight, ToolResult> {
     let timeout = tool.spec().timeout;
     let call_cancel = ctx.call_cancel.clone();
+    let grace = tool.cancel_grace();
     let (tx, rx) = mpsc::channel();
     std::thread::Builder::new()
         .name(format!("tool-{}", tool.spec().name))
@@ -33,13 +35,13 @@ fn spawn(index: usize, tool: Arc<dyn Tool>, args: Value, ctx: ToolCtx) -> Result
             let _ = tx.send(tool.execute_result(args, &ctx));
         })
         .map_err(|e| ToolResult::error(format!("could not start tool: {e}")))?;
-    Ok(Inflight { index, rx, deadline: Instant::now().checked_add(timeout), call_cancel })
+    Ok(Inflight { index, rx, deadline: Instant::now().checked_add(timeout), call_cancel, grace })
 }
 
 fn await_call(call:&Inflight,cancel:&AtomicBool)->ToolResult{
  loop{match call.rx.recv_timeout(POLL){Ok(result)=>return result,Err(RecvTimeoutError::Disconnected)=>return ToolResult::unknown("worker crashed without a result"),Err(RecvTimeoutError::Timeout)=>{
   if cancel.load(Ordering::Relaxed)||call.deadline.is_some_and(|d|Instant::now()>=d){call.call_cancel.store(true,Ordering::SeqCst);let timed_out=!cancel.load(Ordering::Relaxed);
-                    return match call.rx.recv_timeout(Duration::from_millis(250)){Ok(mut result)=>{if timed_out {result.output=format!("Tool timed out; final worker report (action may have completed): {}",result.output);}result},Err(_)=>ToolResult::unknown("worker did not acknowledge cancellation/deadline")};}
+                    return match call.rx.recv_timeout(call.grace){Ok(mut result)=>{if timed_out {result.output=format!("Tool timed out; final worker report (action may have completed): {}",result.output);}result},Err(_)=>ToolResult::unknown("worker did not acknowledge cancellation/deadline")};}
  }}}
 }
 
@@ -119,6 +121,8 @@ impl Agent {
         } else {
             match serde_json::from_str(&call.arguments) {
                 Ok(args) => args,
+                Err(e) if e.is_eof() => return Prepared::Done(ToolResult::error(format!(
+                    "arguments are not valid JSON: {e}. They end mid-way, so the reply was probably cut off by the output length limit.                      Send smaller calls (write files separately, use targeted edits) instead of repeating the same large call."))),
                 Err(e) => return Prepared::Done(ToolResult::error(format!("arguments are not valid JSON: {e}"))),
             }
         };

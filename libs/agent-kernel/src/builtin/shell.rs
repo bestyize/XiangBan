@@ -174,6 +174,13 @@ impl Tool for Shell {
         &self.spec
     }
 
+    /// Killing the process tree (`taskkill` twice on Windows) and draining the pipes can take a couple of
+    /// seconds, but it always finishes. Reporting "outcome unknown" for a command we just killed would
+    /// pause the run for no reason.
+    fn cancel_grace(&self) -> Duration {
+        Duration::from_secs(4)
+    }
+
     fn execute(&self, args: Value, ctx: &ToolCtx) -> Result<String, String> {
         let command = str_arg(&args, "command")?;
         if command.trim().is_empty() || command.chars().count() > MAX_COMMAND_CHARS {

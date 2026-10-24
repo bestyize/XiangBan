@@ -51,6 +51,7 @@ impl Agent {
             store,
             tools: Vec::new(),
             deferred: HashSet::new(),
+            auto_load: HashSet::new(),
             middleware: Vec::new(),
             system_prompt: String::new(),
             prompt_sections: Vec::new(),
@@ -97,6 +98,7 @@ pub struct AgentBuilder {
     store: Arc<dyn SessionStore>,
     tools: Vec<Arc<dyn Tool>>,
     deferred: HashSet<String>,
+    auto_load: HashSet<String>,
     middleware: Vec<Arc<dyn Middleware>>,
     system_prompt: String,
     prompt_sections: Vec<PromptSection>,
@@ -136,6 +138,14 @@ impl AgentBuilder {
         self
     }
 
+    /// Like [`deferred_tool_arc`](Self::deferred_tool_arc), for first-party tools: a call that already
+    /// passed the real schema is loaded on the spot instead of being refused until `tool_load`.
+    /// Permission middleware still decides whether it runs. Third-party tools (MCP) keep the strict path.
+    pub fn deferred_trusted_tool_arc(mut self, tool: Arc<dyn Tool>) -> Self {
+        self.auto_load.insert(tool.spec().name.clone());
+        self.deferred_tool_arc(tool)
+    }
+
     pub fn middleware(mut self, middleware: impl Middleware + 'static) -> Self {
         self.middleware.push(Arc::new(middleware));
         self
@@ -171,7 +181,7 @@ impl AgentBuilder {
                 let s = t.spec();
                 ToolSchema { name: s.name.clone(), description: s.description.clone(), parameters: s.schema.clone() }
             }).collect();
-            let discovery = Arc::new(crate::discovery::ToolDiscovery::new(schemas));
+            let discovery = Arc::new(crate::discovery::ToolDiscovery::new(schemas, std::mem::take(&mut self.auto_load)));
             self.tools.extend(discovery.tools());
             // Filter and add the directory before hooks, compaction and ContextTrim.
             self.middleware.insert(0, discovery.clone());

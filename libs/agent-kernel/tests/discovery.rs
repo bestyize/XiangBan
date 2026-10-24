@@ -168,3 +168,30 @@ fn provider_failure_and_cancellation_clear_activation_before_the_next_task() {
         assert!(!requests[2].tools.iter().any(|s| s.name == "mcp_ext_calendar_list"));
     }
 }
+
+#[test]
+fn a_trusted_deferred_tool_runs_on_its_first_call_and_its_schema_follows() {
+    let count = Arc::new(AtomicUsize::new(0));
+    let h = harness(vec![
+        Step::tool_call("first", "mcp_ext_calendar_list", r#"{"day":"Monday"}"#),
+        Step::text("done"),
+    ], |b| b.deferred_trusted_tool_arc(deferred(count.clone())));
+    assert!(run(&h.agent, "go").0.is_ok());
+    assert_eq!(count.load(Ordering::SeqCst), 1, "called once, not refused");
+    assert!(tool_messages(&h)[0].1.contains("events for"), "{:?}", tool_messages(&h));
+    let requests = h.provider.requests();
+    assert!(!requests[0].tools.iter().any(|s| s.name == "mcp_ext_calendar_list"), "not in the first request");
+    assert!(requests[1].tools.iter().any(|s| s.name == "mcp_ext_calendar_list"), "real schema from then on");
+}
+
+#[test]
+fn a_trusted_deferred_call_with_bad_arguments_is_still_rejected_by_its_schema() {
+    let count = Arc::new(AtomicUsize::new(0));
+    let h = harness(vec![
+        Step::tool_call("bad", "mcp_ext_calendar_list", r#"{"date":"Monday"}"#),
+        Step::text("done"),
+    ], |b| b.deferred_trusted_tool_arc(deferred(count.clone())));
+    assert!(run(&h.agent, "go").0.is_ok());
+    assert_eq!(count.load(Ordering::SeqCst), 0);
+    assert!(tool_messages(&h)[0].1.contains("invalid arguments"));
+}

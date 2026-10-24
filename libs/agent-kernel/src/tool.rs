@@ -153,6 +153,9 @@ pub trait Tool: Send + Sync {
         })
     }
     fn spec(&self) -> &ToolSpec;
+    /// How long a cancelled or timed-out call may take to report before its outcome is declared unknown.
+    /// Tools that always finish their own cleanup (such as killing a process tree) may ask for longer.
+    fn cancel_grace(&self) -> std::time::Duration { std::time::Duration::from_millis(250) }
     /// `Ok` and `Err` both go back to the model; `Err` is flagged as an error result.
     fn execute(&self, _args: Value, _ctx: &ToolCtx) -> Result<String, String> {
         Err("this tool requires the structured execute_result entry point".into())

@@ -32,14 +32,16 @@ pub(crate) fn relevance(query: &str, name: &str, description: &str) -> usize {
 pub(crate) struct ToolDiscovery {
     schemas: Vec<ToolSchema>,
     names: HashSet<String>,
+    // First-party tools whose first call loads them instead of being refused.
+    auto_load: HashSet<String>,
     // A run owns one session; cleanup clears this on every terminal path.
     loaded: Mutex<HashMap<String, HashSet<String>>>,
 }
 
 impl ToolDiscovery {
-    pub fn new(schemas: Vec<ToolSchema>) -> Self {
+    pub fn new(schemas: Vec<ToolSchema>, auto_load: HashSet<String>) -> Self {
         let names = schemas.iter().map(|s| s.name.clone()).collect();
-        Self { schemas, names, loaded: Mutex::new(HashMap::new()) }
+        Self { schemas, names, auto_load, loaded: Mutex::new(HashMap::new()) }
     }
 
     pub fn initial_schemas(&self, schemas: &mut Vec<ToolSchema>) {
@@ -103,6 +105,12 @@ impl Middleware for ToolDiscovery {
 
     fn before_tool(&self, ctx: &ToolCtx, call: &ToolCall, _args: &Value, _spec: &ToolSpec) -> ToolGate {
         if self.names.contains(&call.name) && !self.loaded.lock().unwrap_or_else(|e| e.into_inner()).get(ctx.session()).is_some_and(|set| set.contains(&call.name)) {
+            if self.auto_load.contains(&call.name) {
+                // The arguments already passed this tool's real schema in `exec`, so refusing would only cost
+                // a round trip (models repeated the refused call up to four times). Load it for the next request.
+                self.loaded.lock().unwrap_or_else(|e| e.into_inner()).entry(ctx.session().into()).or_default().insert(call.name.clone());
+                return ToolGate::Proceed;
+            }
             return ToolGate::Block(format!("Tool `{}` is deferred. Use tool_load with this exact name or tool_search first, then call it using its loaded schema. No tool was executed.", call.name));
         }
         ToolGate::Proceed

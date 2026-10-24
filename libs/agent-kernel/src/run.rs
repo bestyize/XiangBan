@@ -258,7 +258,13 @@ impl Agent {
             let finish = reply.finish;
             let mut assistant = reply.message;
             let cut_off = finish == FinishReason::Length;
-            let cut_calls = cut_off && !assistant.tool_calls.is_empty();
+            // Some providers (DeepSeek over Responses) end a length-limited reply as a normal tool call.
+            // Arguments that stop mid-JSON can only be a cut-off reply, so they get the same handling.
+            let eof_cut = assistant.tool_calls.iter().any(|c| {
+                !c.arguments.trim().is_empty()
+                    && serde_json::from_str::<serde_json::Value>(&c.arguments).is_err_and(|e| e.is_eof())
+            });
+            let cut_calls = (cut_off || eof_cut) && !assistant.tool_calls.is_empty();
             if cut_calls {
                 // Half-written arguments would be sent back to the model as history; keep them parseable.
                 for call in &mut assistant.tool_calls {
