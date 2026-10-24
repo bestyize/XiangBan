@@ -85,10 +85,7 @@ impl RunControl {
         Ok(())
     }
     pub fn record(&self, u: crate::Usage) {
-        self.0.tokens.fetch_add(
-            u64::from(u.prompt_tokens) + u64::from(u.completion_tokens),
-            Ordering::SeqCst,
-        );
+        self.0.tokens.fetch_add(u.budget_units(), Ordering::SeqCst);
     }
     pub fn check(&self) -> Result<(), crate::HarnessError> {
         if self.0.deadline.is_some_and(|d| Instant::now() >= d) {

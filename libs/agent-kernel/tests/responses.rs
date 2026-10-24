@@ -191,7 +191,7 @@ fn text_and_fragmented_function_calls_are_assembled_with_usage() {
     let calls = reply.message.tool_calls;
     assert_eq!((calls[0].id.as_str(), calls[0].name.as_str(), calls[0].arguments.as_str()), ("call_abc", "get_weather", r#"{"city":"Paris"}"#));
     assert_eq!((calls[1].id.as_str(), calls[1].arguments.as_str()), ("call_def", "{}"));
-    assert_eq!(reply.usage, Some(Usage { prompt_tokens: 120, completion_tokens: 30 }));
+    assert_eq!(reply.usage, Some(Usage { prompt_tokens: 120, completion_tokens: 30, ..Default::default() }));
 }
 
 #[test]
@@ -224,7 +224,7 @@ fn a_gateway_that_only_sends_the_final_response_still_works() {
     assert_eq!(streamed, "Hello world");
     let reply = stream.finish();
     assert_eq!(reply.message.tool_calls[0].id, "call_z");
-    assert_eq!(reply.usage, Some(Usage { prompt_tokens: 3, completion_tokens: 4 }));
+    assert_eq!(reply.usage, Some(Usage { prompt_tokens: 3, completion_tokens: 4, ..Default::default() }));
 }
 
 #[test]
@@ -277,7 +277,7 @@ mod over_http {
         let (result, seen, streamed) = chat(profile(), vec![sse_events(&TEXT_REPLY)]);
         let reply = result.unwrap();
         assert_eq!((streamed.as_str(), reply.message.text().as_str()), ("Hi there", "Hi there"));
-        assert_eq!(reply.usage, Some(Usage { prompt_tokens: 6, completion_tokens: 2 }));
+        assert_eq!(reply.usage, Some(Usage { prompt_tokens: 6, completion_tokens: 2, ..Default::default() }));
         assert_eq!(request_path(&seen[0]), "/v1/responses");
         assert_eq!(header_values(&seen[0], "authorization"), vec!["Bearer sk-secret"]);
         assert_eq!(body_json(&seen[0])["input"][0], json!({"role": "system", "content": "be brief"}));

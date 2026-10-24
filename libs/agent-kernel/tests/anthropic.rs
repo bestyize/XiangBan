@@ -195,7 +195,7 @@ fn a_full_stream_with_text_and_two_fragmented_tool_calls_is_assembled() {
     let calls = reply.message.tool_calls;
     assert_eq!((calls[0].id.as_str(), calls[0].name.as_str(), calls[0].arguments.as_str()), ("toolu_1", "get_weather", "{\"city\": \"Paris\"}"));
     assert_eq!((calls[1].id.as_str(), calls[1].arguments.as_str()), ("toolu_2", "{}"));
-    assert_eq!(reply.usage, Some(Usage { prompt_tokens: 175, completion_tokens: 42 }), "prompt tokens include cache reads and writes");
+    assert_eq!(reply.usage, Some(Usage { prompt_tokens: 175, completion_tokens: 42, cached_prompt_tokens: 50 }), "prompt tokens include cache reads and writes");
 }
 
 #[test]
@@ -267,7 +267,7 @@ mod over_http {
         let (result, seen, streamed) = chat(profile(), vec![sse_events(&TEXT_REPLY)]);
         let reply = result.unwrap();
         assert_eq!((streamed.as_str(), reply.message.text().as_str()), ("Hi there", "Hi there"));
-        assert_eq!(reply.usage, Some(Usage { prompt_tokens: 9, completion_tokens: 4 }));
+        assert_eq!(reply.usage, Some(Usage { prompt_tokens: 9, completion_tokens: 4, ..Default::default() }));
         let req = &seen[0];
         assert_eq!(request_path(req), "/v1/messages");
         assert_eq!(header_values(req, "x-api-key"), vec!["sk-ant-secret"]);
@@ -358,7 +358,7 @@ fn cumulative_usage_never_goes_backwards() {
         json!({"type": "message_delta", "delta": {}, "usage": {"output_tokens": 20}}),
     ]);
     let reply = stream.finish();
-    assert_eq!(reply.usage, Some(Usage { prompt_tokens: 4090, completion_tokens: 55 }), "input grows, cache is kept, output never shrinks");
+    assert_eq!(reply.usage, Some(Usage { prompt_tokens: 4090, completion_tokens: 55, cached_prompt_tokens: 90 }), "input grows, cache is kept, output never shrinks");
 }
 
 fn anthropic_finish(stop_reason: &str, with_tool: bool) -> FinishReason {

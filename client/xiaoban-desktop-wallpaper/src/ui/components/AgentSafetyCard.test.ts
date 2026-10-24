@@ -33,17 +33,18 @@ async function open(settings = view()) {
 describe('安全与权限', () => {
   beforeEach(() => ipc.mockReset());
 
-  it('keeps legacy time/token protection and lets the user choose unlimited execution', async () => {
+  it('starts with no execution limits and saves the ones the user sets', async () => {
     const { wrapper } = await open();
     const inputs = wrapper.findAllComponents(NInputNumber);
-    expect(inputs.map(input => input.props('value'))).toEqual([null, null, 45, 1_000_000]);
-    inputs[2]!.vm.$emit('update:value', null);
-    inputs[3]!.vm.$emit('update:value', null);
+    expect(inputs.map(input => input.props('value'))).toEqual([null, null, null, null]);
+    expect(wrapper.get('[data-testid="execution-save"]').attributes('disabled')).toBeDefined();
+    inputs[2]!.vm.$emit('update:value', 45);
+    inputs[3]!.vm.$emit('update:value', 1_000_000);
     await flushPromises();
     await wrapper.get('[data-testid="execution-save"]').trigger('click');
     await flushPromises();
     expect(ipc).toHaveBeenCalledWith('chat_set_execution_limits', { limits: {
-      maxTurns: null, maxToolCalls: null, maxMinutes: null, maxReportedTokens: null,
+      maxTurns: null, maxToolCalls: null, maxMinutes: 45, maxReportedTokens: 1_000_000,
     } });
     wrapper.unmount();
   });

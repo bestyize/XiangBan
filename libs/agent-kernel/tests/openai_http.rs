@@ -31,7 +31,7 @@ fn streams_a_reply_and_sends_auth_and_body() {
     let mut streamed = String::new();
     let reply = provider(&url).chat(&request("hi"), &mut |t| streamed.push_str(t), &AtomicBool::new(false)).unwrap();
     assert_eq!((streamed.as_str(), reply.message.text().as_str()), ("Hello", "Hello"));
-    assert_eq!(reply.usage, Some(Usage { prompt_tokens: 7, completion_tokens: 2 }));
+    assert_eq!(reply.usage, Some(Usage { prompt_tokens: 7, completion_tokens: 2, ..Default::default() }));
     let seen = server.join().unwrap().remove(0);
     assert!(seen.starts_with("POST /v1/chat/completions"));
     assert!(seen.to_lowercase().contains("authorization: bearer sk-test"));

@@ -258,6 +258,7 @@ pub struct AnthropicStream {
     raw_blocks: std::collections::BTreeMap<usize, Value>,
     input_tokens: u32,
     cache_tokens: u32,
+    cache_read_tokens: u32,
     output_tokens: u32,
     usage_seen: bool,
     stop_reason: Option<String>,
@@ -336,6 +337,7 @@ impl AnthropicStream {
         }
         let cache = get("cache_creation_input_tokens").unwrap_or(0).saturating_add(get("cache_read_input_tokens").unwrap_or(0));
         self.cache_tokens = self.cache_tokens.max(cache);
+        self.cache_read_tokens = self.cache_read_tokens.max(get("cache_read_input_tokens").unwrap_or(0));
         if let Some(n) = get("output_tokens") {
             self.output_tokens = self.output_tokens.max(n);
         }
@@ -465,6 +467,7 @@ impl AnthropicStream {
         let usage = self.usage_seen.then_some(Usage {
             prompt_tokens: self.input_tokens.saturating_add(self.cache_tokens),
             completion_tokens: self.output_tokens,
+            cached_prompt_tokens: self.cache_read_tokens,
         });
         let finish = anthropic_finish(self.stop_reason.as_deref()).settle(!calls.is_empty());
         let mut message = Message::assistant(text, calls);

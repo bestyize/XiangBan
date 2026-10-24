@@ -90,7 +90,11 @@ impl StreamAccumulator {
         }
         if let Some(usage) = chunk.get("usage").filter(|u| u.is_object()) {
             let read = |key: &str| usage.get(key).and_then(Value::as_u64).unwrap_or(0).min(u32::MAX as u64) as u32;
-            self.usage = Some(Usage { prompt_tokens: read("prompt_tokens"), completion_tokens: read("completion_tokens") });
+            // OpenAI-style `prompt_tokens_details.cached_tokens`, or DeepSeek's `prompt_cache_hit_tokens`.
+            let cached = usage.get("prompt_tokens_details").and_then(|d| d.get("cached_tokens")).and_then(Value::as_u64)
+                .or_else(|| usage.get("prompt_cache_hit_tokens").and_then(Value::as_u64))
+                .unwrap_or(0).min(u32::MAX as u64) as u32;
+            self.usage = Some(Usage { prompt_tokens: read("prompt_tokens"), completion_tokens: read("completion_tokens"), cached_prompt_tokens: cached });
         }
         let Some(choice) = chunk.get("choices").and_then(|c| c.get(0)) else { return Ok(()) };
         if let Some(delta) = choice.get("delta") {

@@ -413,7 +413,9 @@ impl ResponsesStream {
     fn read_usage(&mut self, usage: Option<&Value>) {
         let Some(usage) = usage.filter(|u| u.is_object()) else { return };
         let get = |key: &str| usage.get(key).and_then(Value::as_u64).unwrap_or(0).min(u64::from(u32::MAX)) as u32;
-        self.usage = Some(Usage { prompt_tokens: get("input_tokens"), completion_tokens: get("output_tokens") });
+        let cached = usage.get("input_tokens_details").and_then(|d| d.get("cached_tokens")).and_then(Value::as_u64)
+            .unwrap_or(0).min(u64::from(u32::MAX)) as u32;
+        self.usage = Some(Usage { prompt_tokens: get("input_tokens"), completion_tokens: get("output_tokens"), cached_prompt_tokens: cached });
     }
 
     /// Reconcile each output item independently; one streamed item must not hide

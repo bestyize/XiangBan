@@ -970,7 +970,7 @@ mod tests {
         let mut store = Store { rules: vec![task, scheduled()], ..Store::default() };
         store.agent_runs.insert("deleted".into(), AgentRun::default());
         let done = crate::chat::scheduled::Outcome { ok: true, bubble: "三个文件改过".into(), session: Some("s1".into()),
-            usage: agent_kernel::Usage { prompt_tokens: 1200, completion_tokens: 80 } };
+            usage: agent_kernel::Usage { prompt_tokens: 1200, completion_tokens: 80, ..Default::default() } };
         record_agent_run(&mut store, "task", &done, 100);
         record_agent_run(&mut store, "task", &crate::chat::scheduled::Outcome { bubble: "定时任务没有完成：没有模型".into(), ..Default::default() }, 200);
         let run = &store.agent_runs["task"];

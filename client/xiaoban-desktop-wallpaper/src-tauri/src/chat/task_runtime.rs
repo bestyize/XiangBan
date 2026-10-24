@@ -17,8 +17,8 @@ impl Default for ExecutionLimits {
         Self {
             max_turns: None,
             max_tool_calls: None,
-            max_minutes: Some(45),
-            max_reported_tokens: Some(1_000_000),
+            max_minutes: None,
+            max_reported_tokens: None,
         }
     }
 }
@@ -378,13 +378,17 @@ mod tests {
         );
     }
     #[test]
-    fn budgets_are_cumulative_and_legacy_defaults_keep_time_and_token_protection() {
+    fn budgets_are_cumulative_and_unset_by_default_like_claude_code() {
         let limits: ExecutionLimits = serde_json::from_str("{}").unwrap();
         assert_eq!(limits, ExecutionLimits::default());
         assert_eq!(limits.max_turns, None);
         assert_eq!(limits.max_tool_calls, None);
-        assert!(limits.control(1_000_000, 0).is_err());
-        assert!(limits.control(0, 45 * 60_000).is_err());
+        assert_eq!(limits.max_minutes, None);
+        assert_eq!(limits.max_reported_tokens, None);
+        assert!(limits.control(u64::MAX / 2, u64::MAX / 2).is_ok(), "no default cap");
+        let capped = ExecutionLimits { max_minutes: Some(45), max_reported_tokens: Some(1_000_000), ..limits.clone() };
+        assert!(capped.control(1_000_000, 0).is_err());
+        assert!(capped.control(0, 45 * 60_000).is_err());
         assert!(ExecutionLimits {
             max_turns: Some(0),
             ..limits.clone()

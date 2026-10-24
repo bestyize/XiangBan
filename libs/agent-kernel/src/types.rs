@@ -170,12 +170,28 @@ impl FinishReason {
 pub struct Usage {
     pub prompt_tokens: u32,
     pub completion_tokens: u32,
+    /// Part of `prompt_tokens` that was served from the provider's prompt cache.
+    #[serde(default)]
+    pub cached_prompt_tokens: u32,
+}
+
+impl Usage {
+    /// Tokens charged against a run budget. Like Claude Code, which budgets estimated spend rather
+    /// than raw tokens, a cache hit costs a tenth of fresh input (the common provider discount), so
+    /// the history re-sent on every turn of a long run doesn't exhaust the budget on its own.
+    /// Output is not re-weighted: its price ratio differs per model and there is no price table here.
+    pub fn budget_units(&self) -> u64 {
+        let cached = self.cached_prompt_tokens.min(self.prompt_tokens);
+        let fresh = u64::from(self.prompt_tokens - cached);
+        fresh + u64::from(cached) / 10 + u64::from(self.completion_tokens)
+    }
 }
 
 impl AddAssign for Usage {
     fn add_assign(&mut self, rhs: Self) {
         self.prompt_tokens = self.prompt_tokens.saturating_add(rhs.prompt_tokens);
         self.completion_tokens = self.completion_tokens.saturating_add(rhs.completion_tokens);
+        self.cached_prompt_tokens = self.cached_prompt_tokens.saturating_add(rhs.cached_prompt_tokens);
     }
 }
 

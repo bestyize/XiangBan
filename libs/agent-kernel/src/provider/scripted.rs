@@ -39,7 +39,7 @@ impl Step {
     }
 
     pub fn with_usage(mut self, prompt_tokens: u32, completion_tokens: u32) -> Self {
-        self.usage = Some(Usage { prompt_tokens, completion_tokens });
+        self.usage = Some(Usage { prompt_tokens, completion_tokens, ..Default::default() });
         self
     }
 

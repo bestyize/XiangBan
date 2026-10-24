@@ -15,8 +15,8 @@ interface ExecutionLimits {
   maxTurns: number | null; maxToolCalls: number | null;
   maxMinutes: number | null; maxReportedTokens: number | null;
 }
-const limits = ref<ExecutionLimits>({ maxTurns: null, maxToolCalls: null, maxMinutes: 45, maxReportedTokens: 1_000_000 });
-const limitsChanged = computed(() => !!view.value && JSON.stringify(limits.value) !== JSON.stringify(view.value.execution ?? { maxTurns: null, maxToolCalls: null, maxMinutes: 45, maxReportedTokens: 1_000_000 }));
+const limits = ref<ExecutionLimits>({ maxTurns: null, maxToolCalls: null, maxMinutes: null, maxReportedTokens: null });
+const limitsChanged = computed(() => !!view.value && JSON.stringify(limits.value) !== JSON.stringify(view.value.execution ?? { maxTurns: null, maxToolCalls: null, maxMinutes: null, maxReportedTokens: null }));
 
 const props = defineProps<{ store: ControlStore }>();
 const view = ref<AgentSettingsView | null>(null);
@@ -33,7 +33,7 @@ async function load() {
   try {
     view.value = await invoke<AgentSettingsView>('chat_agent_settings');
     hooks.value = view.value.hooks;
-    limits.value = { ...(view.value.execution ?? { maxTurns: null, maxToolCalls: null, maxMinutes: 45, maxReportedTokens: 1_000_000 }) };
+    limits.value = { ...(view.value.execution ?? { maxTurns: null, maxToolCalls: null, maxMinutes: null, maxReportedTokens: null }) };
   } catch (error) { props.store.notify(error, 'error'); }
 }
 
@@ -74,7 +74,7 @@ onMounted(load);
           <label>执行时间（分钟）<NInputNumber v-model:value="limits.maxMinutes" :min="1" :max="43200" :precision="0" clearable placeholder="不限制" aria-label="执行时间上限" /></label>
           <label>累计模型用量（token）<NInputNumber v-model:value="limits.maxReportedTokens" :min="1" :max="1000000000" :precision="0" clearable placeholder="不限制" aria-label="模型用量上限" /></label>
         </div>
-        <div class="xb-row"><div class="xb-row-text"><span>模型用量依据服务商回传，包含重复输入和子任务，并非精确费用上限。后台定时任务保留独立预算。</span></div><button type="button" class="xb-btn-primary is-sm" :disabled="!limitsChanged || !!busy" data-testid="execution-save" @click="saveLimits">{{ busy === 'limits' ? '保存中…' : '保存执行预算' }}</button></div>
+        <div class="xb-row"><div class="xb-row-text"><span>模型用量依据服务商回传，包含子任务；命中提示词缓存的输入按 1/10 计入（与 Claude Code 按费用估算一致），并非精确费用上限。后台定时任务保留独立预算。</span></div><button type="button" class="xb-btn-primary is-sm" :disabled="!limitsChanged || !!busy" data-testid="execution-save" @click="saveLimits">{{ busy === 'limits' ? '保存中…' : '保存执行预算' }}</button></div>
       </div>
 
       <div class="xb-group-title">完全信任时的沙箱</div>

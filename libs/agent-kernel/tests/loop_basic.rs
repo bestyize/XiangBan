@@ -14,7 +14,7 @@ fn plain_reply_streams_text_and_persists_history() {
     let summary = result.unwrap();
     assert_eq!(summary.text, "Hello");
     assert_eq!(summary.turns, 1);
-    assert_eq!(summary.usage, Usage { prompt_tokens: 10, completion_tokens: 2 });
+    assert_eq!(summary.usage, Usage { prompt_tokens: 10, completion_tokens: 2, ..Default::default() });
     assert_eq!(
         events,
         vec![

@@ -37,7 +37,7 @@ fn accumulator_assembles_fragmented_tool_calls_and_trailing_usage() {
     assert!(acc.is_finished());
     let reply = acc.finish();
     assert_eq!(reply.message.text(), "Hi there");
-    assert_eq!(reply.usage, Some(Usage { prompt_tokens: 10, completion_tokens: 5 }));
+    assert_eq!(reply.usage, Some(Usage { prompt_tokens: 10, completion_tokens: 5, ..Default::default() }));
     let calls = reply.message.tool_calls;
     assert_eq!((calls[0].id.as_str(), calls[0].name.as_str(), calls[0].arguments.as_str()), ("call_a", "get", r#"{"city":"X"}"#));
     assert_eq!((calls[1].id.as_str(), calls[1].name.as_str()), ("call_b", "ping"));
