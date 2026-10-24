@@ -28,6 +28,7 @@ pub fn router() -> Router<AppState> {
         .route("/updates", post(updates))
         .route("/{kind}", get(list))
         .route("/{kind}/{namespace}/{slug}", get(detail))
+        .route("/{kind}/{namespace}/{slug}/versions/{version}", get(version_manifest))
         .route("/{kind}/{namespace}/{slug}/versions/{version}/download", get(download))
 }
 
@@ -350,6 +351,36 @@ async fn detail(State(state): State<AppState>, Path((kind, namespace, slug)): Pa
         })).collect::<Vec<_>>(),
         "files": latest.map(|v| v.manifest["files"].clone()).unwrap_or(json!([])),
         "members": members,
+    })))
+}
+
+/// 指定版本的文件清单，供客户端在安装前逐文件审查并锁定 `manifestSha256`。
+async fn version_manifest(
+    State(state): State<AppState>,
+    Path((kind, namespace, slug, version)): Path<(String, String, String, String)>,
+) -> Result<Json<Value>> {
+    let kind = kind_of(&kind)?;
+    let row: Option<(String, Option<String>, PgJson<Value>, String, String, i64, bool)> = sqlx::query_as(
+        "SELECT i.name, NULLIF(i.summary, ''), v.manifest, v.manifest_sha256, v.package_sha256, v.package_size, v.yanked
+         FROM versions v JOIN items i ON i.id = v.item_id
+         WHERE i.kind = $1 AND i.namespace = $2 AND i.slug = $3 AND v.version = $4 AND i.status = 'published'",
+    )
+    .bind(kind)
+    .bind(&namespace)
+    .bind(&slug)
+    .bind(&version)
+    .fetch_optional(&state.pool)
+    .await?;
+    let (name, summary, manifest, manifest_sha, package_sha, size, yanked) =
+        row.ok_or_else(|| AppError::NotFound("版本不存在".into()))?;
+    if yanked {
+        return Err(AppError::NotFound("该版本已撤回，请使用更新的版本".into()));
+    }
+    Ok(Json(json!({
+        "kind": kind, "namespace": namespace, "slug": slug, "name": name, "summary": summary, "version": version,
+        "manifestSha256": manifest_sha, "packageSha256": package_sha, "size": size,
+        "files": manifest["files"],
+        "downloadUrl": format!("/api/v1/market/{}/{namespace}/{slug}/versions/{version}/download", plural(kind)),
     })))
 }
 

@@ -46,8 +46,12 @@ fn safe_path(name: &str) -> Result<(), String> {
     if name.chars().any(|c| c.is_control()) {
         return Err(bad());
     }
+    // 与客户端 skill-discovery 的 valid_path 一致：深度 ≤ 8，单段 ≤ 100，且不允许以 . 开头的隐藏文件。
+    if name.split('/').count() > 8 {
+        return Err(bad());
+    }
     for part in name.split('/') {
-        if part.is_empty() || part == "." || part == ".." || part.ends_with('.') || part.ends_with(' ') {
+        if part.is_empty() || part.len() > 100 || part.starts_with('.') || part.ends_with('.') || part.ends_with(' ') {
             return Err(bad());
         }
         let stem = part.split('.').next().unwrap_or("").to_ascii_uppercase();
@@ -179,10 +183,12 @@ pub mod tests {
 
     #[test]
     fn rejects_what_the_desktop_client_would_reject() {
-        for bad in ["../evil.txt", "a/../b.txt", "/abs.txt", "C:/x.txt", "dir\\x.txt", "CON.txt", "trail.", "a//b"] {
+        for bad in ["../evil.txt", "a/../b.txt", "/abs.txt", "C:/x.txt", "dir\\x.txt", "CON.txt", "trail.", "a//b", ".hidden", "dir/.env", "a/b/c/d/e/f/g/h/i.txt"] {
             let err = inspect_zip(&build(&[("SKILL.md", b"x"), (bad, b"x")]));
             assert!(err.is_err(), "{bad} should be rejected");
         }
+        let long = format!("{}.txt", "n".repeat(101));
+        assert!(inspect_zip(&build(&[("SKILL.md", b"x"), (long.as_str(), b"x")])).is_err());
         assert!(inspect_zip(&build(&[("README.md", b"x")])).unwrap_err().contains("SKILL.md"));
         assert!(inspect_zip(&build(&[("SKILL.md", b"x"), ("A.txt", b"1"), ("a.TXT", b"2")])).unwrap_err().contains("大小写"));
         let big = vec![0u8; MAX_SKILL_MD_BYTES as usize + 1];

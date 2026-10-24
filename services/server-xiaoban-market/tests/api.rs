@@ -326,6 +326,14 @@ async fn skillhub_crawl_stage_import_search_download_and_update_flow() {
     let files: Vec<&str> = detail["files"].as_array().unwrap().iter().map(|f| f["path"].as_str().unwrap()).collect();
     assert_eq!(files, vec!["SKILL.md", "scripts/run.py"]);
     let sha = detail["versions"][0]["packageSha256"].as_str().unwrap().to_string();
+    // 版本清单：客户端据此逐文件审查，并用 manifestSha256 锁定版本。
+    let (st, vm) = app.call(reqwest::Method::GET, "/api/v1/market/skills/user_1/pdf-toolkit/versions/1.0.0", None, false).await;
+    assert_eq!(st, 200);
+    assert_eq!(vm["manifestSha256"], detail["versions"][0]["manifestSha256"]);
+    assert_eq!(vm["files"], detail["files"]);
+    assert_eq!(vm["downloadUrl"], detail["versions"][0]["downloadUrl"]);
+    let (st, _) = app.call(reqwest::Method::GET, "/api/v1/market/skills/user_1/pdf-toolkit/versions/9.9.9", None, false).await;
+    assert_eq!(st, 404);
 
     // 6. 下载：校验头、去重计数、Range。
     let url = format!("{}{}", app.base, detail["versions"][0]["downloadUrl"].as_str().unwrap());
