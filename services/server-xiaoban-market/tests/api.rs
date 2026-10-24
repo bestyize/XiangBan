@@ -648,3 +648,94 @@ async fn account_login_is_off_unless_configured() {
     assert_eq!(status, 400);
     app.cleanup().await;
 }
+
+#[tokio::test]
+async fn expert_teams_and_skill_bundles_reference_published_members() {
+    let app = app!();
+    let make = |kind: &str, slug: &str, extra: Value| {
+        let mut body = json!({"kind": kind, "slug": slug, "name": format!("名称-{slug}"), "summary": "示例", "status": "published"});
+        body.as_object_mut().unwrap().extend(extra.as_object().unwrap().clone());
+        app.call(reqwest::Method::POST, "/api/v1/admin/items", Some(body), true)
+    };
+    // 两个专家直接上架；一个草稿专家。
+    assert_eq!(make("expert", "pm", json!({})).await.0, 200);
+    assert_eq!(make("expert", "dev", json!({})).await.0, 200);
+    let (_, draft) = make("expert", "wip", json!({"status": "draft"})).await;
+    let wip_id = draft["id"].as_str().unwrap().to_string();
+
+    // 校验：成员必须存在、类型匹配、不重复、数量合法；团队只能是专家，套件只能是技能。
+    let team = |members: Value| make("expert", "dream-team", json!({"variant": "team", "members": members}));
+    assert_eq!(team(json!([])).await.0, 400);
+    assert_eq!(team(json!([{"namespace": "xiaoban", "slug": "ghost"}])).await.0, 400);
+    assert_eq!(team(json!([{"namespace": "xiaoban", "slug": "pm"}, {"namespace": "xiaoban", "slug": "pm"}])).await.0, 400);
+    let (status, body) = team(json!([{"namespace": "xiaoban", "slug": "wip"}])).await;
+    assert_eq!(status, 400, "未上架的成员不能让团队上架：{body}");
+    assert!(body["message"].as_str().unwrap().contains("xiaoban/wip"));
+    assert_eq!(make("skill", "bad-team", json!({"variant": "team", "members": [{"namespace": "xiaoban", "slug": "pm"}]})).await.0, 400);
+    assert_eq!(make("expert", "single-with-members", json!({"members": [{"namespace": "xiaoban", "slug": "pm"}]})).await.0, 400);
+
+    // 成功创建，顺序按登记的来。
+    let (status, _) = team(json!([{"namespace": "xiaoban", "slug": "dev"}, {"namespace": "xiaoban", "slug": "pm"}])).await;
+    assert_eq!(status, 200);
+    // 团队不能再当成员（不嵌套）。
+    assert_eq!(make("expert", "super-team", json!({"variant": "team", "members": [{"namespace": "xiaoban", "slug": "dream-team"}]})).await.0, 400);
+
+    // 公开列表：variant 过滤，团队带成员数。
+    let (_, all) = app.call(reqwest::Method::GET, "/api/v1/market/experts", None, false).await;
+    assert_eq!(all["total"], 3);
+    let (_, teams) = app.call(reqwest::Method::GET, "/api/v1/market/experts?variant=team", None, false).await;
+    assert_eq!((teams["total"].as_i64(), teams["results"][0]["slug"].as_str(), teams["results"][0]["memberCount"].as_i64()), (Some(1), Some("dream-team"), Some(2)));
+    let (_, singles) = app.call(reqwest::Method::GET, "/api/v1/market/experts?variant=single", None, false).await;
+    assert_eq!(singles["total"], 2);
+    assert!(singles["results"].as_array().unwrap().iter().all(|i| i["variant"] == "single"));
+
+    // 详情：成员解析成最新信息，顺序保持。
+    let (_, detail) = app.call(reqwest::Method::GET, "/api/v1/market/experts/xiaoban/dream-team", None, false).await;
+    assert_eq!(detail["item"]["variant"], "team");
+    let slugs: Vec<&str> = detail["members"].as_array().unwrap().iter().map(|m| m["slug"].as_str().unwrap()).collect();
+    assert_eq!(slugs, vec!["dev", "pm"]);
+    assert_eq!(detail["members"][0]["name"], "名称-dev");
+
+    // 成员下架后，前台详情不再展示它（不会出现打不开的成员）；已上架的团队改成员也要求成员已上架。
+    let admin_items = app.get("/api/v1/admin/items?kind=expert&keyword=dev").await;
+    let dev_id = admin_items["results"].as_array().unwrap().iter().find(|i| i["slug"] == "dev").unwrap()["id"].as_str().unwrap().to_string();
+    app.post(&format!("/api/v1/admin/items/{dev_id}/status"), json!({"status": "offline"})).await;
+    let (_, detail) = app.call(reqwest::Method::GET, "/api/v1/market/experts/xiaoban/dream-team", None, false).await;
+    assert_eq!(detail["members"].as_array().unwrap().len(), 1);
+    let team_id = app.get("/api/v1/admin/items?kind=expert&variant=team").await["results"][0]["id"].as_str().unwrap().to_string();
+    let (status, _) = app.call(reqwest::Method::PUT, &format!("/api/v1/admin/items/{team_id}"), Some(json!({"members": [{"namespace": "xiaoban", "slug": "wip"}]})), true).await;
+    assert_eq!(status, 400);
+    let (status, _) = app.call(reqwest::Method::PUT, &format!("/api/v1/admin/items/{team_id}"), Some(json!({"members": [{"namespace": "xiaoban", "slug": "pm"}]})), true).await;
+    assert_eq!(status, 200);
+    let admin = app.get(&format!("/api/v1/admin/items/{team_id}")).await;
+    assert_eq!(admin["members"].as_array().unwrap().len(), 1);
+    assert_eq!(admin["members"][0]["status"], "published");
+    // 成员上架后再重新上架 wip 与团队。
+    app.post(&format!("/api/v1/admin/items/{wip_id}/status"), json!({"status": "published"})).await;
+
+    // 套件：成员是技能，套件本身没有安装包也能上架；按来源过滤。
+    assert_eq!(make("skill", "s1", json!({"status": "draft"})).await.0, 200);
+    let (status, body) = make("skill", "kit", json!({"variant": "bundle", "members": [{"namespace": "xiaoban", "slug": "s1"}]})).await;
+    assert_eq!(status, 400, "{body}");
+    let (_, s1) = app.call(reqwest::Method::GET, "/api/v1/admin/items?kind=skill&keyword=s1", None, true).await;
+    let s1_id = s1["results"][0]["id"].as_str().unwrap().to_string();
+    // 单个技能没有版本不能上架……
+    let (status, _) = app.call(reqwest::Method::POST, &format!("/api/v1/admin/items/{s1_id}/status"), Some(json!({"status": "published"})), true).await;
+    assert_eq!(status, 400);
+    // ……上传安装包后可以。
+    let form = reqwest::multipart::Form::new().text("version", "1.0.0").part("file", reqwest::multipart::Part::bytes(zip_bytes(&[("SKILL.md", b"# s1")])).file_name("s.zip"));
+    assert_eq!(app.http.post(format!("{}/api/v1/admin/items/{s1_id}/versions", app.base)).bearer_auth(&app.token).multipart(form).send().await.unwrap().status(), 200);
+    app.post(&format!("/api/v1/admin/items/{s1_id}/status"), json!({"status": "published"})).await;
+    let (status, _) = make("skill", "kit", json!({"variant": "bundle", "members": [{"namespace": "xiaoban", "slug": "s1"}]})).await;
+    assert_eq!(status, 200);
+    let (_, bundles) = app.call(reqwest::Method::GET, "/api/v1/market/skills?variant=bundle", None, false).await;
+    assert_eq!((bundles["total"].as_i64(), bundles["results"][0]["slug"].as_str()), (Some(1), Some("kit")));
+    let (_, kit) = app.call(reqwest::Method::GET, "/api/v1/market/skills/xiaoban/kit", None, false).await;
+    assert_eq!(kit["members"][0]["slug"], "s1");
+    assert!(kit["versions"].as_array().unwrap().is_empty(), "套件本身没有安装包");
+    let (_, manual) = app.call(reqwest::Method::GET, "/api/v1/market/skills?origin=manual&variant=single", None, false).await;
+    assert_eq!(manual["total"], 1);
+    let (_, none) = app.call(reqwest::Method::GET, "/api/v1/market/skills?origin=skillhub", None, false).await;
+    assert_eq!(none["total"], 0);
+    app.cleanup().await;
+}

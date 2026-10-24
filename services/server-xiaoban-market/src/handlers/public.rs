@@ -62,6 +62,8 @@ pub struct ItemRow {
     icon_url: Option<String>,
     source: String,
     origin: String,
+    variant: String,
+    member_count: Option<i32>,
     latest_version: Option<String>,
     download_count: i64,
     favorite_count: i64,
@@ -74,8 +76,8 @@ fn item_json(r: &ItemRow) -> Value {
     json!({
         "id": r.id, "kind": r.kind, "namespace": r.namespace, "slug": r.slug, "name": r.name, "summary": r.summary,
         "category": r.category_slug.as_ref().map(|s| json!({"slug": s, "name": r.category_name})),
-        "tags": r.tags, "iconUrl": r.icon_url, "source": r.source, "origin": r.origin, "version": r.latest_version,
-        "downloads": r.download_count, "favorites": r.favorite_count, "heat": r.download_count + r.favorite_count * 5,
+        "tags": r.tags, "iconUrl": r.icon_url, "source": r.source, "origin": r.origin, "variant": r.variant, "memberCount": r.member_count,
+        "version": r.latest_version, "downloads": r.download_count, "favorites": r.favorite_count, "heat": r.download_count + r.favorite_count * 5,
         "featured": r.featured, "updatedAt": r.updated_at,
     })
 }
@@ -87,6 +89,8 @@ pub struct ListQuery {
     category: String,
     source: String,
     sort_by: String,
+    variant: String,
+    origin: String,
     page: i64,
     page_size: i64,
 }
@@ -108,17 +112,20 @@ pub struct SearchArgs {
     pub category: Option<String>,
     pub source: Option<String>,
     pub sort: String,
+    pub variant: Option<String>,
+    pub origin: Option<String>,
     pub limit: i64,
     pub offset: i64,
     pub exclude: Vec<Uuid>,
 }
 
 const SELECT: &str = "SELECT i.id, i.kind, i.namespace, i.slug, i.name, i.summary, c.slug AS category_slug, c.name AS category_name,
-  i.tags, i.icon_url, i.source, i.origin, i.latest_version, i.download_count, i.favorite_count, i.featured, i.updated_at,
+  i.tags, i.icon_url, i.source, i.origin, i.variant, jsonb_array_length(i.metadata->'members') AS member_count,
+  i.latest_version, i.download_count, i.favorite_count, i.featured, i.updated_at,
   count(*) OVER() AS total
   FROM items i LEFT JOIN categories c ON c.id = i.category_id
   WHERE i.status = 'published' AND i.kind = $1 AND ($2::text IS NULL OR c.slug = $2) AND ($3::text IS NULL OR i.source = $3)
-    AND NOT (i.id = ANY($4::uuid[]))";
+    AND NOT (i.id = ANY($4::uuid[])) AND ($5::text IS NULL OR i.variant = $5) AND ($6::text IS NULL OR i.origin = $6)";
 
 const HEAT: &str = "(i.download_count + i.favorite_count * 5)";
 
@@ -126,34 +133,38 @@ pub async fn search(pool: &PgPool, kind: &str, a: &SearchArgs, fuzzy: bool) -> R
     let first = a.keyword.split_whitespace().next().unwrap_or("").to_lowercase();
     let rows = if fuzzy {
         let sql = format!(
-            "{SELECT} AND (similarity(i.search_text, $7) > 0.15 OR word_similarity($7, i.search_text) > 0.4)
-             ORDER BY GREATEST(similarity(i.search_text, $7), word_similarity($7, i.search_text)) DESC, {HEAT} DESC LIMIT $5 OFFSET $6"
+            "{SELECT} AND (similarity(i.search_text, $9) > 0.15 OR word_similarity($9, i.search_text) > 0.4)
+             ORDER BY GREATEST(similarity(i.search_text, $9), word_similarity($9, i.search_text)) DESC, {HEAT} DESC LIMIT $7 OFFSET $8"
         );
         sqlx::query_as::<_, ItemRow>(&sql)
             .bind(kind)
             .bind(&a.category)
             .bind(&a.source)
             .bind(&a.exclude)
+            .bind(&a.variant)
+            .bind(&a.origin)
             .bind(a.limit)
             .bind(a.offset)
             .bind(a.keyword.to_lowercase())
             .fetch_all(pool)
             .await?
     } else {
-        let rank = "CASE WHEN lower(i.name) = $8 THEN 0 WHEN strpos(lower(i.name), $8) = 1 THEN 1 WHEN strpos(lower(i.name), $8) > 0 THEN 2
-                    WHEN strpos(lower(array_to_string(i.tags, ' ')), $8) > 0 THEN 3 ELSE 4 END";
+        let rank = "CASE WHEN lower(i.name) = $10 THEN 0 WHEN strpos(lower(i.name), $10) = 1 THEN 1 WHEN strpos(lower(i.name), $10) > 0 THEN 2
+                    WHEN strpos(lower(array_to_string(i.tags, ' ')), $10) > 0 THEN 3 ELSE 4 END";
         let order = match a.sort.as_str() {
             "hot" | "downloads" => format!("{HEAT} DESC, i.updated_at DESC"),
             "new" | "updated" => "i.published_at DESC NULLS LAST, i.updated_at DESC".to_string(),
             _ if !first.is_empty() => format!("{rank}, i.featured DESC, {HEAT} DESC"),
             _ => format!("i.featured DESC, {HEAT} DESC, i.updated_at DESC"),
         };
-        let sql = format!("{SELECT} AND i.search_text ILIKE ALL($7::text[]) AND $8::text IS NOT NULL ORDER BY {order} LIMIT $5 OFFSET $6");
+        let sql = format!("{SELECT} AND i.search_text ILIKE ALL($9::text[]) AND $10::text IS NOT NULL ORDER BY {order} LIMIT $7 OFFSET $8");
         sqlx::query_as::<_, ItemRow>(&sql)
             .bind(kind)
             .bind(&a.category)
             .bind(&a.source)
             .bind(&a.exclude)
+            .bind(&a.variant)
+            .bind(&a.origin)
             .bind(a.limit)
             .bind(a.offset)
             .bind(patterns(&a.keyword))
@@ -174,6 +185,8 @@ async fn list(State(state): State<AppState>, Path(kind): Path<String>, Query(q):
         category: Some(q.category.trim().to_string()).filter(|s| !s.is_empty() && s != "all"),
         source: Some(q.source.trim().to_string()).filter(|s| matches!(s.as_str(), "official" | "community" | "enterprise")),
         sort: q.sort_by.clone(),
+        variant: Some(q.variant.trim().to_string()).filter(|s| matches!(s.as_str(), "single" | "team" | "bundle")),
+        origin: Some(q.origin.trim().to_string()).filter(|s| !s.is_empty() && s.len() <= 40),
         limit: page_size,
         offset: (page - 1) * page_size,
         exclude: vec![],
@@ -254,6 +267,7 @@ struct DetailRow {
     origin: String,
     origin_url: Option<String>,
     license: Option<String>,
+    variant: String,
     latest_version: Option<String>,
     download_count: i64,
     favorite_count: i64,
@@ -280,7 +294,7 @@ async fn detail(State(state): State<AppState>, Path((kind, namespace, slug)): Pa
     let kind = kind_of(&kind)?;
     let r: DetailRow = sqlx::query_as(
         "SELECT i.id, i.kind, i.namespace, i.slug, i.name, i.summary, i.description, c.slug AS category_slug, c.name AS category_name,
-           i.tags, i.icon_url, i.source, i.origin, i.origin_url, i.license, i.latest_version, i.download_count, i.favorite_count,
+           i.tags, i.icon_url, i.source, i.origin, i.origin_url, i.license, i.variant, i.latest_version, i.download_count, i.favorite_count,
            i.featured, i.prompts, i.metadata, i.updated_at, i.published_at
          FROM items i LEFT JOIN categories c ON c.id = i.category_id
          WHERE i.kind = $1 AND i.namespace = $2 AND i.slug = $3 AND i.status = 'published'",
@@ -298,6 +312,26 @@ async fn detail(State(state): State<AppState>, Path((kind, namespace, slug)): Pa
     .bind(r.id)
     .fetch_all(&state.pool)
     .await?;
+    let members = if r.variant == "single" {
+        vec![]
+    } else {
+        // 团队的成员是专家，套件的成员是技能；只展示已上架的，并保持登记的顺序。
+        let member_kind = if r.variant == "team" { "expert" } else { "skill" };
+        sqlx::query_scalar::<_, PgJson<Value>>(
+            "SELECT to_jsonb(x) FROM (
+               SELECT i.kind, i.namespace, i.slug, i.name, i.summary, i.icon_url AS \"iconUrl\", i.latest_version AS version, i.variant
+               FROM jsonb_array_elements($1::jsonb) WITH ORDINALITY AS m(v, n)
+               JOIN items i ON i.kind = $2 AND i.namespace = m.v->>'namespace' AND i.slug = m.v->>'slug' AND i.status = 'published'
+               ORDER BY m.n) x",
+        )
+        .bind(PgJson(r.metadata.0["members"].clone()))
+        .bind(member_kind)
+        .fetch_all(&state.pool)
+        .await?
+        .into_iter()
+        .map(|j| j.0)
+        .collect()
+    };
     let base = format!("/api/v1/market/{}/{}/{}", plural(&r.kind), r.namespace, r.slug);
     let latest = versions.iter().find(|v| !v.yanked);
     Ok(Json(json!({
@@ -305,7 +339,7 @@ async fn detail(State(state): State<AppState>, Path((kind, namespace, slug)): Pa
             "id": r.id, "kind": r.kind, "namespace": r.namespace, "slug": r.slug, "name": r.name, "summary": r.summary,
             "description": r.description, "category": r.category_slug.as_ref().map(|s| json!({"slug": s, "name": r.category_name})),
             "tags": r.tags, "iconUrl": r.icon_url, "source": r.source, "origin": r.origin, "originUrl": r.origin_url,
-            "license": r.license, "version": r.latest_version, "downloads": r.download_count, "favorites": r.favorite_count,
+            "license": r.license, "variant": r.variant, "version": r.latest_version, "downloads": r.download_count, "favorites": r.favorite_count,
             "heat": r.download_count + r.favorite_count * 5, "featured": r.featured, "prompts": r.prompts.0, "metadata": r.metadata.0,
             "updatedAt": r.updated_at, "publishedAt": r.published_at,
         },
@@ -315,6 +349,7 @@ async fn detail(State(state): State<AppState>, Path((kind, namespace, slug)): Pa
             "downloadUrl": (!v.yanked).then(|| format!("{base}/versions/{}/download", v.version)),
         })).collect::<Vec<_>>(),
         "files": latest.map(|v| v.manifest["files"].clone()).unwrap_or(json!([])),
+        "members": members,
     })))
 }
 

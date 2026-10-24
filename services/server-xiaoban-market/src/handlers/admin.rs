@@ -516,13 +516,14 @@ async fn restore_many(State(state): State<AppState>, _admin: Admin, Json(body): 
 struct ItemQuery {
     kind: Option<String>,
     status: Option<String>,
+    variant: Option<String>,
     category_id: Option<i32>,
     keyword: String,
     page: Option<i64>,
     page_size: Option<i64>,
 }
 
-const ITEM_COLUMNS: &str = "i.id, i.kind, i.namespace, i.slug, i.name, i.summary, i.status, i.source, i.origin, i.featured, i.latest_version AS version,
+const ITEM_COLUMNS: &str = "i.id, i.kind, i.namespace, i.slug, i.name, i.summary, i.status, i.source, i.origin, i.variant, i.featured, i.latest_version AS version,
   i.download_count AS downloads, i.favorite_count AS favorites, i.tags, i.icon_url AS \"iconUrl\", i.category_id AS \"categoryId\",
   c.name AS \"categoryName\", i.updated_at AS \"updatedAt\", i.published_at AS \"publishedAt\"";
 
@@ -531,7 +532,7 @@ async fn list_items(State(state): State<AppState>, _admin: Admin, Query(q): Quer
     let sql = format!(
         "SELECT to_jsonb(x) FROM (SELECT {ITEM_COLUMNS}, count(*) OVER() AS total FROM items i LEFT JOIN categories c ON c.id = i.category_id
          WHERE ($1::text IS NULL OR i.kind = $1) AND ($2::text IS NULL OR i.status = $2) AND ($3::int IS NULL OR i.category_id = $3)
-           AND i.search_text ILIKE ALL($4::text[]) ORDER BY i.updated_at DESC, i.id LIMIT $5 OFFSET $6) x"
+           AND i.search_text ILIKE ALL($4::text[]) AND ($7::text IS NULL OR i.variant = $7) ORDER BY i.updated_at DESC, i.id LIMIT $5 OFFSET $6) x"
     );
     let rows = unwrap(
         sqlx::query_scalar::<_, PgJson<Value>>(&sql)
@@ -541,10 +542,56 @@ async fn list_items(State(state): State<AppState>, _admin: Admin, Query(q): Quer
             .bind(super::public::patterns(&q.keyword))
             .bind(size)
             .bind(offset)
+            .bind(q.variant.filter(|v| matches!(v.as_str(), "single" | "team" | "bundle")))
             .fetch_all(&state.pool)
             .await?,
     );
     Ok(Json(json!({ "total": total_of(&rows), "page": page, "pageSize": size, "results": rows })))
+}
+
+#[derive(Deserialize, Clone)]
+struct MemberRef {
+    namespace: String,
+    slug: String,
+}
+
+const MAX_MEMBERS: usize = 24;
+
+fn member_kind(variant: &str) -> &'static str {
+    if variant == "team" { "expert" } else { "skill" }
+}
+
+/// 团队 / 套件的成员必须已存在、是单个条目（不嵌套）、不是自己，且不重复。返回规范化后的引用列表。
+async fn validate_members(state: &AppState, variant: &str, members: &[MemberRef], own: Option<Uuid>) -> Result<Vec<Value>> {
+    if variant == "single" {
+        return if members.is_empty() { Ok(vec![]) } else { Err(AppError::BadRequest("只有专家团和套件可以设置成员".into())) };
+    }
+    if members.is_empty() || members.len() > MAX_MEMBERS {
+        return Err(AppError::BadRequest(format!("{}需要 1–{MAX_MEMBERS} 个成员", if variant == "team" { "专家团" } else { "套件" })));
+    }
+    let mut seen = std::collections::HashSet::new();
+    let mut out = Vec::new();
+    for m in members {
+        let key = (m.namespace.trim().to_string(), m.slug.trim().to_string());
+        if !seen.insert(key.clone()) {
+            return Err(AppError::BadRequest(format!("成员 {}/{} 重复", key.0, key.1)));
+        }
+        let row: Option<(Uuid, String)> = sqlx::query_as("SELECT id, variant FROM items WHERE kind = $1 AND namespace = $2 AND slug = $3")
+            .bind(member_kind(variant))
+            .bind(&key.0)
+            .bind(&key.1)
+            .fetch_optional(&state.pool)
+            .await?;
+        let (id, v) = row.ok_or_else(|| AppError::BadRequest(format!("成员 {}/{} 不存在（需要是{}）", key.0, key.1, if variant == "team" { "专家" } else { "技能" })))?;
+        if Some(id) == own {
+            return Err(AppError::BadRequest("成员不能包含自己".into()));
+        }
+        if v != "single" {
+            return Err(AppError::BadRequest(format!("成员 {}/{} 本身是{}，不能嵌套", key.0, key.1, if v == "team" { "专家团" } else { "套件" })));
+        }
+        out.push(json!({ "namespace": key.0, "slug": key.1 }));
+    }
+    Ok(out)
 }
 
 async fn get_item(State(state): State<AppState>, _admin: Admin, Path(id): Path<Uuid>) -> Result<Json<Value>> {
@@ -563,13 +610,28 @@ async fn get_item(State(state): State<AppState>, _admin: Admin, Path(id): Path<U
         .fetch_all(&state.pool)
         .await?,
     );
-    Ok(Json(json!({ "item": item.0, "versions": versions })))
+    let members = unwrap(
+        sqlx::query_scalar::<_, PgJson<Value>>(
+            "SELECT to_jsonb(x) FROM (
+               SELECT m.v->>'namespace' AS namespace, m.v->>'slug' AS slug, i.id, i.name, i.status
+               FROM items me CROSS JOIN LATERAL jsonb_array_elements(COALESCE(me.metadata->'members', '[]'::jsonb)) WITH ORDINALITY AS m(v, n)
+               LEFT JOIN items i ON i.namespace = m.v->>'namespace' AND i.slug = m.v->>'slug' AND i.kind = CASE WHEN me.variant = 'team' THEN 'expert' ELSE 'skill' END
+               WHERE me.id = $1 ORDER BY m.n) x",
+        )
+        .bind(id)
+        .fetch_all(&state.pool)
+        .await?,
+    );
+    Ok(Json(json!({ "item": item.0, "versions": versions, "members": members })))
 }
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct NewItem {
     kind: String,
+    variant: Option<String>,
+    #[serde(default)]
+    members: Vec<MemberRef>,
     namespace: Option<String>,
     slug: String,
     name: String,
@@ -637,11 +699,24 @@ async fn create_item(State(state): State<AppState>, _admin: Admin, Json(b): Json
     let status = b.status.unwrap_or_else(|| "draft".into());
     check_status(&status)?;
     check_icon(&b.icon_url)?;
+    let variant = b.variant.unwrap_or_else(|| "single".into());
+    let allowed = matches!((kind, variant.as_str()), (_, "single") | ("expert", "team") | ("skill", "bundle"));
+    if !allowed {
+        return Err(AppError::BadRequest("专家团只能是专家类型，套件只能是技能类型".into()));
+    }
+    let members = validate_members(&state, &variant, &b.members, None).await?;
+    let mut metadata = if b.metadata.is_object() { b.metadata } else { json!({}) };
+    if variant != "single" {
+        metadata["members"] = json!(members);
+        if status == "published" {
+            check_members_published(&state, &variant, &members).await?;
+        }
+    }
     let tags = clean_tags(b.tags);
     let search = items::search_text(&b.name, &b.slug, &namespace, &b.summary, &tags, &category_name(&state, b.category_id).await?);
     let id: Uuid = sqlx::query_scalar(
-        "INSERT INTO items (kind, namespace, slug, name, summary, description, category_id, tags, icon_url, source, license, status, prompts, metadata, search_text, published_at)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15, CASE WHEN $12='published' THEN now() END) RETURNING id",
+        "INSERT INTO items (kind, namespace, slug, name, summary, description, category_id, tags, icon_url, source, license, status, prompts, metadata, search_text, published_at, variant)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15, CASE WHEN $12='published' THEN now() END, $16) RETURNING id",
     )
     .bind(kind)
     .bind(&namespace)
@@ -656,8 +731,9 @@ async fn create_item(State(state): State<AppState>, _admin: Admin, Json(b): Json
     .bind(b.license)
     .bind(&status)
     .bind(PgJson(json!(b.prompts)))
-    .bind(PgJson(if b.metadata.is_object() { b.metadata } else { json!({}) }))
+    .bind(PgJson(metadata))
     .bind(&search)
+    .bind(&variant)
     .fetch_one(&state.pool)
     .await
     .map_err(|e| match e {
@@ -680,6 +756,7 @@ struct ItemUpdate {
     source: Option<String>,
     featured: Option<bool>,
     prompts: Option<Vec<String>>,
+    members: Option<Vec<MemberRef>>,
 }
 
 async fn update_item(State(state): State<AppState>, _admin: Admin, Path(id): Path<Uuid>, Json(b): Json<ItemUpdate>) -> Result<Json<Value>> {
@@ -691,8 +768,10 @@ async fn update_item(State(state): State<AppState>, _admin: Admin, Path(id): Pat
         summary: String,
         tags: Vec<String>,
         category_id: Option<i32>,
+        variant: String,
+        status: String,
     }
-    let cur: Cur = sqlx::query_as("SELECT namespace, slug, name, summary, tags, category_id FROM items WHERE id = $1")
+    let cur: Cur = sqlx::query_as("SELECT namespace, slug, name, summary, tags, category_id, variant, status FROM items WHERE id = $1")
         .bind(id)
         .fetch_optional(&state.pool)
         .await?
@@ -704,6 +783,16 @@ async fn update_item(State(state): State<AppState>, _admin: Admin, Path(id): Pat
     if b.name.as_deref().is_some_and(|n| n.trim().is_empty()) {
         return Err(AppError::BadRequest("名称不能为空".into()));
     }
+    let members = match &b.members {
+        Some(list) => {
+            let checked = validate_members(&state, &cur.variant, list, Some(id)).await?;
+            if cur.status == "published" {
+                check_members_published(&state, &cur.variant, &checked).await?;
+            }
+            Some(checked)
+        }
+        None => None,
+    };
     let name = b.name.map(|n| n.trim().to_string()).unwrap_or(cur.name);
     let summary = b.summary.unwrap_or(cur.summary);
     let tags = b.tags.map(clean_tags).unwrap_or(cur.tags);
@@ -712,7 +801,8 @@ async fn update_item(State(state): State<AppState>, _admin: Admin, Path(id): Pat
     sqlx::query(
         "UPDATE items SET name=$2, summary=$3, tags=$4, category_id=$5, search_text=$6, description=COALESCE($7, description),
            icon_url=COALESCE($8, icon_url), license=COALESCE($9, license), source=COALESCE($10, source), featured=COALESCE($11, featured),
-           prompts=COALESCE($12, prompts), updated_at=now() WHERE id=$1",
+           prompts=COALESCE($12, prompts), metadata = CASE WHEN $13::jsonb IS NULL THEN metadata ELSE jsonb_set(metadata, '{members}', $13::jsonb) END,
+           updated_at=now() WHERE id=$1",
     )
     .bind(id)
     .bind(&name)
@@ -726,6 +816,7 @@ async fn update_item(State(state): State<AppState>, _admin: Admin, Path(id): Pat
     .bind(b.source)
     .bind(b.featured)
     .bind(b.prompts.map(|p| PgJson(json!(p.into_iter().map(|s| s.trim().to_string()).filter(|s| !s.is_empty()).take(8).collect::<Vec<_>>()))))
+    .bind(members.map(|m| PgJson(json!(m))))
     .execute(&state.pool)
     .await?;
     Ok(Json(json!({ "ok": true })))
@@ -736,10 +827,36 @@ struct StatusBody {
     status: String,
 }
 
+/// 团队 / 套件上架前，所有成员都必须已上架，否则前台会出现打不开的成员。
+async fn check_members_published(state: &AppState, variant: &str, members: &[Value]) -> Result<()> {
+    let missing: Vec<String> = sqlx::query_scalar(
+        "SELECT (m.v->>'namespace') || '/' || (m.v->>'slug') FROM jsonb_array_elements($1::jsonb) AS m(v)
+         WHERE NOT EXISTS (SELECT 1 FROM items i WHERE i.kind = $2 AND i.namespace = m.v->>'namespace' AND i.slug = m.v->>'slug' AND i.status = 'published')",
+    )
+    .bind(PgJson(json!(members)))
+    .bind(member_kind(variant))
+    .fetch_all(&state.pool)
+    .await?;
+    if missing.is_empty() {
+        Ok(())
+    } else {
+        Err(AppError::BadRequest(format!("这些成员还没有上架：{}", missing.join("、"))))
+    }
+}
+
 async fn set_status(State(state): State<AppState>, _admin: Admin, Path(id): Path<Uuid>, Json(b): Json<StatusBody>) -> Result<Json<Value>> {
     check_status(&b.status)?;
-    let kind: String = sqlx::query_scalar("SELECT kind FROM items WHERE id = $1").bind(id).fetch_optional(&state.pool).await?.ok_or_else(|| AppError::NotFound("条目不存在".into()))?;
-    if b.status == "published" && kind == "skill" {
+    let (kind, variant, members): (String, String, Option<PgJson<Value>>) = sqlx::query_as("SELECT kind, variant, metadata->'members' FROM items WHERE id = $1")
+        .bind(id)
+        .fetch_optional(&state.pool)
+        .await?
+        .ok_or_else(|| AppError::NotFound("条目不存在".into()))?;
+    if b.status == "published" && variant != "single" {
+        let list: Vec<Value> = members.and_then(|m| m.0.as_array().cloned()).unwrap_or_default();
+        check_members_published(&state, &variant, &list).await?;
+    }
+    // 套件没有自己的安装包，由成员各自安装；单个技能才要求有可用版本。
+    if b.status == "published" && kind == "skill" && variant == "single" {
         let usable: bool = sqlx::query_scalar("SELECT EXISTS (SELECT 1 FROM versions WHERE item_id = $1 AND NOT yanked)").bind(id).fetch_one(&state.pool).await?;
         if !usable {
             return Err(AppError::BadRequest("技能需要至少一个未撤回的版本才能上架".into()));

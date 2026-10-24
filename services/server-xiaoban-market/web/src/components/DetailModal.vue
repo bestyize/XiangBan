@@ -2,6 +2,8 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { ApiError, market } from '@/lib/api';
 import { deepLink, formatCount, formatSize, formatTime, shortHash } from '@/lib/format';
+import { PLURAL } from '@/lib/format';
+import { memberText, VARIANT_LABEL } from '@/lib/tabs';
 import type { ItemDetail, Plural } from '@/lib/types';
 import Avatar from './Avatar.vue';
 import Icon from './Icon.vue';
@@ -56,7 +58,7 @@ const action = computed(() => {
   if (!it) return null;
   const kind = it.kind;
   const verb = kind === 'skill' ? 'install' : kind === 'connector' ? 'connect' : 'open';
-  const label = kind === 'skill' ? '在小伴桌面中安装' : kind === 'connector' ? '在小伴桌面中连接' : '在小伴桌面中打开';
+  const label = it.variant === 'bundle' ? '在小伴桌面中安装整套' : kind === 'skill' ? '在小伴桌面中安装' : kind === 'connector' ? '在小伴桌面中连接' : '在小伴桌面中打开';
   return { href: deepLink(verb, kind, it.namespace, it.slug, latest.value?.version, latest.value?.manifestSha256), label };
 });
 
@@ -80,7 +82,7 @@ const configJson = computed(() => {
         <header class="head">
           <Avatar :name="item.name" :seed="item.slug" :icon-url="item.iconUrl" :size="item.kind === 'connector' ? 76 : 88" />
           <div class="head-main">
-            <h1>{{ item.name }}</h1>
+            <h1>{{ item.name }}<span v-if="item.variant !== 'single'" class="vtag">{{ VARIANT_LABEL[item.variant] }}</span></h1>
             <div class="actions">
               <a v-if="action" class="btn btn-primary" :href="action.href">{{ action.label }}</a>
               <a v-if="item.kind === 'skill' && latest?.downloadUrl" class="btn" :href="latest.downloadUrl" download>
@@ -108,7 +110,7 @@ const configJson = computed(() => {
             </div>
           </div>
 
-          <section v-if="item.kind === 'skill'">
+          <section v-if="item.kind === 'skill' && item.variant === 'single'">
             <h2><Icon name="shield" :size="20" />安装前请知道</h2>
             <div class="notice">
               <template v-if="scripts.length">包含 <b>{{ scripts.length }} 个脚本</b>（{{ scripts.map((s) => s.path).join('、') }}）。脚本不在沙箱中运行，可能访问你的文件和网络；运行前小伴桌面会逐次向你确认。</template>
@@ -119,6 +121,20 @@ const configJson = computed(() => {
               <div><dt>清单摘要</dt><dd class="mono">{{ latest.manifestSha256 }}</dd></div>
               <div><dt>ZIP 摘要</dt><dd class="mono">{{ latest.packageSha256 }}</dd></div>
             </dl>
+          </section>
+
+          <section v-if="detail && detail.members.length">
+            <h2 class="split"><span><Icon :name="item.variant === 'team' ? 'expert' : 'skill'" :size="20" />{{ item.variant === 'team' ? '团队成员' : '套件包含' }}</span><small>{{ memberText(item.variant, detail.members.length) }}</small></h2>
+            <ul class="members">
+              <li v-for="m in detail.members" :key="m.slug">
+                <RouterLink :to="{ name: 'store-detail', params: { kind: PLURAL[m.kind], ns: m.namespace, slug: m.slug } }">
+                  <Avatar :name="m.name" :seed="m.slug" :icon-url="m.iconUrl" :size="44" />
+                  <span class="mi"><b>{{ m.name }}</b><small>{{ m.summary || '暂无简介' }}</small></span>
+                  <Icon name="chevron" :size="18" />
+                </RouterLink>
+              </li>
+            </ul>
+            <p v-if="item.variant === 'bundle'" class="hint">套件本身没有安装包，安装时小伴桌面会逐个安装并校验上面的技能。</p>
           </section>
 
           <section v-if="item.prompts.length">
@@ -135,14 +151,14 @@ const configJson = computed(() => {
           </section>
 
           <section v-if="item.kind === 'expert' && item.description">
-            <h2><Icon name="list" :size="20" />工作流</h2>
+            <h2><Icon name="list" :size="20" />{{ item.variant === 'team' ? '团队说明' : '工作流' }}</h2>
             <pre class="text">{{ item.description }}</pre>
             <div v-if="item.metadata.dependencies?.length" class="deps">
               依赖技能：<span v-for="d in item.metadata.dependencies" :key="d.slug" class="chip mono">{{ d.slug }}</span>
             </div>
           </section>
 
-          <section v-if="item.kind === 'skill' && detail && detail.files.length">
+          <section v-if="item.kind === 'skill' && item.variant === 'single' && detail && detail.files.length">
             <h2 class="split"><span><Icon name="file" :size="20" />文件清单</span><small>{{ detail.files.length }} 个文件</small></h2>
             <ul class="files">
               <li v-for="f in detail.files" :key="f.path"><span class="mono path">{{ f.path }}</span><span class="size">{{ formatSize(f.size) }}</span><span class="mono sha">{{ shortHash(f.sha256, 6) }}</span></li>
@@ -150,7 +166,7 @@ const configJson = computed(() => {
             <details v-if="item.description" class="skill-md"><summary>查看 SKILL.md</summary><pre class="text">{{ item.description }}</pre></details>
           </section>
 
-          <section v-if="item.kind === 'skill' && detail && detail.versions.length">
+          <section v-if="item.kind === 'skill' && item.variant === 'single' && detail && detail.versions.length">
             <h2><Icon name="refresh" :size="20" />版本历史</h2>
             <ul class="versions">
               <li v-for="v in detail.versions" :key="v.version" :class="{ yanked: v.yanked }">
@@ -185,7 +201,15 @@ const configJson = computed(() => {
 .state { padding: 72px 24px; text-align: center; color: var(--ink-3); display: flex; gap: 10px; justify-content: center; align-items: center; }
 .head { flex: 0 0 auto; display: flex; flex-wrap: wrap; align-items: center; gap: 20px 28px; padding: 40px 72px 24px 44px; border-bottom: 1px solid var(--line); }
 .head-main { display: flex; flex-direction: column; align-items: flex-start; gap: 14px; min-width: 0; }
-h1 { font-size: 26px; font-weight: 600; letter-spacing: -0.01em; overflow-wrap: anywhere; }
+h1 { font-size: 26px; font-weight: 600; letter-spacing: -0.01em; overflow-wrap: anywhere; display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
+.vtag { padding: 2px 10px; border-radius: 8px; background: #141414; color: #fff; font-size: 13px; font-weight: 500; letter-spacing: 0; }
+.members { list-style: none; margin: 0; padding: 0; border: 1px solid var(--line); border-radius: 16px; overflow: hidden; }
+.members li + li { border-top: 1px solid var(--line); }
+.members a { display: flex; align-items: center; gap: 14px; padding: 12px 18px; color: inherit; }
+.members a:hover { background: var(--soft); }
+.mi { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.mi b { font-weight: 600; font-size: 15px; }
+.mi small { color: var(--ink-2); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .actions { display: flex; flex-wrap: wrap; gap: 10px; }
 .local-note { font-size: 13px; color: var(--ink-3); }
 .body { flex: 1 1 auto; min-height: 0; overflow-y: auto; scrollbar-width: thin; padding: 24px 44px 44px; display: flex; flex-direction: column; gap: 4px; }

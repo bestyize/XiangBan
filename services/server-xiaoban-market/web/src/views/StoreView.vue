@@ -3,6 +3,7 @@ import { computed, ref, watch } from 'vue';
 import { useRoute, useRouter, type LocationQueryRaw } from 'vue-router';
 import { market } from '@/lib/api';
 import { KIND_NAME, SINGULAR } from '@/lib/format';
+import { SUBTABS, subTabFor } from '@/lib/tabs';
 import type { CategoryCount, ListResponse, Plural } from '@/lib/types';
 import DetailModal from '@/components/DetailModal.vue';
 import Icon from '@/components/Icon.vue';
@@ -28,9 +29,11 @@ const q = computed(() => ({
   keyword: String(route.query.keyword ?? ''),
   category: String(route.query.category ?? ''),
   sort: (String(route.query.sort ?? 'relevance') || 'relevance') as (typeof SORTS)[number]['value'],
+  tab: String(route.query.tab ?? ''),
   page: Math.max(1, Number(route.query.page ?? 1) || 1),
 }));
 
+const subTab = computed(() => subTabFor(props.kind, q.value.tab));
 const data = ref<ListResponse | null>(null);
 const categories = ref<CategoryCount[]>([]);
 const loading = ref(true);
@@ -43,7 +46,7 @@ async function loadList() {
   loading.value = true;
   error.value = '';
   try {
-    const res = await market.list(props.kind, { keyword: q.value.keyword, category: q.value.category, sortBy: q.value.sort, page: q.value.page });
+    const res = await market.list(props.kind, { keyword: q.value.keyword, category: q.value.category, sortBy: q.value.sort, page: q.value.page, variant: subTab.value?.variant, origin: subTab.value?.origin });
     if (id === seq) data.value = res;
   } catch (e) {
     if (id === seq) error.value = (e as Error).message;
@@ -61,7 +64,7 @@ async function loadCategories() {
 }
 
 watch(() => props.kind, () => { keywordInput.value = q.value.keyword; loadCategories(); }, { immediate: true });
-watch(() => [props.kind, q.value.keyword, q.value.category, q.value.sort, q.value.page], loadList, { immediate: true });
+watch(() => [props.kind, q.value.keyword, q.value.category, q.value.sort, q.value.page, q.value.tab], loadList, { immediate: true });
 watch(() => q.value.keyword, (v) => (keywordInput.value = v));
 
 function go(patch: Record<string, string | number | undefined>) {
@@ -73,6 +76,7 @@ function go(patch: Record<string, string | number | undefined>) {
 const search = () => go({ keyword: keywordInput.value.trim(), page: undefined });
 const setSort = (v: string) => go({ sort: v === 'relevance' ? undefined : v, page: undefined });
 const setCategory = (slug: string) => go({ category: slug, page: undefined });
+const setTab = (key: string) => go({ tab: key, page: undefined, category: undefined });
 
 const detailTo = (it: { namespace: string; slug: string }) => ({ name: 'store-detail', params: { kind: props.kind, ns: it.namespace, slug: it.slug }, query: route.query });
 const closeDetail = () => router.push({ name: 'store', params: { kind: props.kind }, query: route.query });
@@ -115,6 +119,10 @@ const categoryName = computed(() => categories.value.find((c) => c.slug === q.va
         </form>
       </div>
 
+      <nav v-if="SUBTABS[kind].length" class="subtabs" aria-label="子分类">
+        <button v-for="t in SUBTABS[kind]" :key="t.key" type="button" class="subtab" :class="{ on: subTab?.key === t.key }" :aria-current="subTab?.key === t.key ? 'true' : undefined" @click="setTab(t.key)">{{ t.label }}</button>
+      </nav>
+
       <div class="bar">
         <p class="count" aria-live="polite">
           <template v-if="q.keyword && data">“{{ q.keyword }}”{{ categoryName ? `在「${categoryName}」中` : `在${KIND_NAME[SINGULAR[kind]]}中` }}找到 <b>{{ data.total }}</b> 个结果</template>
@@ -136,8 +144,8 @@ const categoryName = computed(() => categories.value.find((c) => c.slug === q.va
           <ItemCard v-for="it in data.results" :key="it.id" :item="it" :to="detailTo(it)" :keyword="q.keyword" />
         </div>
         <div v-else-if="!data.near.length" class="empty">
-          <template v-if="q.keyword || q.category">没有找到匹配的{{ KIND_NAME[SINGULAR[kind]] }}，换个关键词或分类试试。</template>
-          <template v-else>这里还没有{{ KIND_NAME[SINGULAR[kind]] }}。</template>
+          <template v-if="q.keyword || q.category">没有找到匹配的{{ subTab?.label ?? KIND_NAME[SINGULAR[kind]] }}，换个关键词或分类试试。</template>
+          <template v-else>这里还没有{{ subTab?.label ?? KIND_NAME[SINGULAR[kind]] }}。</template>
         </div>
 
         <template v-if="data.near.length">
@@ -178,6 +186,10 @@ const categoryName = computed(() => categories.value.find((c) => c.slug === q.va
 .search:focus-within { background: #fff; border-color: var(--ink); box-shadow: 0 0 0 3px rgba(20, 20, 20, 0.06); color: var(--ink); }
 .search input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; font-size: 15px; }
 .clear { width: 32px; height: 32px; border: 0; border-radius: 999px; background: var(--wash); color: var(--ink-2); display: flex; align-items: center; justify-content: center; cursor: pointer; }
+.subtabs { display: flex; gap: 24px; margin-bottom: -8px; }
+.subtab { min-height: 44px; border: 0; background: transparent; padding: 0; font-size: 18px; font-weight: 500; letter-spacing: -0.005em; color: var(--ink-3); cursor: pointer; }
+.subtab.on { color: var(--ink); font-weight: 600; }
+.subtab:hover { color: var(--ink); }
 .bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; min-height: 44px; }
 .count { font-size: 15px; color: var(--ink-2); }
 .count b { color: var(--ink); font-weight: 600; }

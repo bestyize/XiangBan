@@ -56,7 +56,17 @@ TEST_DATABASE_URL=postgres://market:market@127.0.0.1:5432/postgres cargo test
 - **后台** `/admin`：登录后可用。采集来源页有结构化配置表单（SkillHub / 通用 JSON 各一套）、字段映射编辑和「试采预览」；暂存区支持批量入库 / 忽略、与已入库内容对比；采集任务页每 2 秒刷新进度和日志。
 - 网页版**不显示**「已安装 / 召唤 / 我的专家」这类依赖桌面端本地状态的按钮；详情弹窗的主按钮通过深链 `xiaoban://market/{open|install|connect}/{skills|experts|connectors}/{namespace}/{slug}?version=&sha256=` 唤起小伴桌面。**桌面客户端目前没有注册这个协议**，接入时需要对齐。
 - 管理员令牌保存在浏览器 `localStorage`；任何接口返回 401 都会回到登录页。
-- 暂未做：专家团、套件、收藏 / 评分、深色模式。
+- 暂未做：收藏 / 评分、深色模式。
+
+## 专家团与套件
+
+仍属于「专家」「技能」两个类型，用 `variant` 区分：`single`（单个，默认）、`team`（专家团，只能是专家）、`bundle`（套件，只能是技能）。成员以 `命名空间/标识` 引用其它条目，存在 `metadata.members`，读取时解析成最新的名称、简介和版本。
+
+- 成员必须已存在、是单个条目（不嵌套）、不能是自己、不重复，数量 1–24。
+- 上架前所有成员都必须已上架；已上架的团队 / 套件改成员时同样要求。成员事后被下架，前台详情只是不再展示它。
+- 套件本身**没有安装包**，也不要求版本才能上架；安装时由桌面客户端按成员逐个安装并校验。
+- 采集来的条目都是 `single`；团队和套件只能在后台「内容库 → 手动新建」里组装。
+- 前台商店页的子标签：专家 / 专家团；推荐 / SkillHub（`origin=skillhub`）/ 套件。
 
 ## 数据流
 
@@ -120,10 +130,10 @@ SHA-256 只保证内容与清单一致，**不代表安全**；脚本不在沙�
 
 | 接口 | 说明 |
 | --- | --- |
-| `GET /{kind}?keyword&category&source&sortBy&page&pageSize` | 列表 + 搜索。`sortBy`: `relevance`（默认）/ `hot` / `new`；每页默认 24，最多 50。精确结果少于 5 条时，第一页额外返回 `near`（相近匹配） |
+| `GET /{kind}?keyword&category&source&variant&origin&sortBy&page&pageSize` | 列表 + 搜索。`sortBy`: `relevance`（默认）/ `hot` / `new`；每页默认 24，最多 50。`variant`: `single` / `team` / `bundle`；`origin`: 采集来源，如 `skillhub`。精确结果少于 5 条时，第一页额外返回 `near`（相近匹配） |
 | `GET /categories?kind=` | 分类及已上架数量 |
 | `GET /suggest?kind=&q=` | 搜索联想 |
-| `GET /{kind}/{namespace}/{slug}` | 详情：描述、示例提问、元数据、版本、最新版文件清单 |
+| `GET /{kind}/{namespace}/{slug}` | 详情：描述、示例提问、元数据、版本、最新版文件清单；专家团 / 套件另有 `members`（只含已上架的成员，保持登记顺序） |
 | `GET /{kind}/{namespace}/{slug}/versions/{version}/download` | 下载 ZIP；支持 Range；响应头 `x-content-sha256`；同一来源同一天同一版本只计一次下载 |
 | `POST /updates` | 客户端上报已安装的 `[{kind,namespace,slug,version}]`（≤200），返回哪些有更新 |
 

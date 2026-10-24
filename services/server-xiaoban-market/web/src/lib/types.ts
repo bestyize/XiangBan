@@ -20,6 +20,8 @@ export interface Item {
   iconUrl: string | null;
   source: SourceLabel;
   origin: string;
+  variant: 'single' | 'team' | 'bundle';
+  memberCount: number | null;
   version: string | null;
   downloads: number;
   favorites: number;
@@ -54,6 +56,16 @@ export interface VersionInfo {
   downloadUrl: string | null;
 }
 
+export interface Member {
+  kind: Kind;
+  namespace: string;
+  slug: string;
+  name: string;
+  summary: string;
+  iconUrl: string | null;
+  version: string | null;
+}
+
 export interface ItemDetail {
   item: Item & {
     description: string;
@@ -65,6 +77,7 @@ export interface ItemDetail {
   };
   versions: VersionInfo[];
   files: FileEntry[];
+  members: Member[];
 }
 
 export interface CategoryCount extends CategoryRef {
@@ -194,6 +207,7 @@ export interface AdminItem {
   status: ItemStatus;
   source: SourceLabel;
   origin: string;
+  variant: 'single' | 'team' | 'bundle';
   featured: boolean;
   version: string | null;
   downloads: number;
@@ -209,6 +223,14 @@ export interface AdminItem {
   originUrl?: string | null;
   prompts?: string[];
   metadata?: Record<string, unknown>;
+}
+
+export interface AdminMember {
+  namespace: string;
+  slug: string;
+  id: string | null;
+  name: string | null;
+  status: ItemStatus | null;
 }
 
 export interface AdminVersion {

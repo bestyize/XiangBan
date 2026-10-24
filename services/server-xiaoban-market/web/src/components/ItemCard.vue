@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { RouteLocationRaw } from 'vue-router';
 import { formatCount, highlight } from '@/lib/format';
+import { memberText, VARIANT_LABEL } from '@/lib/tabs';
 import type { Item } from '@/lib/types';
 import Avatar from './Avatar.vue';
 import Icon from './Icon.vue';
@@ -14,10 +15,13 @@ defineProps<{ item: Item; to: RouteLocationRaw; keyword?: string; muted?: boolea
       <Avatar :name="item.name" :seed="item.slug" :icon-url="item.iconUrl" :size="muted ? 48 : 56" />
       <div class="main">
         <div class="name">
-          <template v-for="(s, i) in highlight(item.name, keyword ?? '')" :key="i">
-            <mark v-if="s.hit">{{ s.text }}</mark>
-            <template v-else>{{ s.text }}</template>
-          </template>
+          <span class="nm">
+            <template v-for="(s, i) in highlight(item.name, keyword ?? '')" :key="i">
+              <mark v-if="s.hit">{{ s.text }}</mark>
+              <template v-else>{{ s.text }}</template>
+            </template>
+          </span>
+          <span v-if="item.variant !== 'single'" class="vtag">{{ VARIANT_LABEL[item.variant] }}</span>
         </div>
         <div class="summary">{{ item.summary || '暂无简介' }}</div>
       </div>
@@ -28,6 +32,7 @@ defineProps<{ item: Item; to: RouteLocationRaw; keyword?: string; muted?: boolea
     <div v-if="!muted" class="meta">
       <span class="stat"><Icon name="bolt" :size="16" />{{ formatCount(item.heat) }}</span>
       <span v-if="item.kind === 'skill'" class="stat"><Icon name="download" :size="16" />{{ formatCount(item.downloads) }}</span>
+      <span v-if="memberText(item.variant, item.memberCount)" class="stat">{{ memberText(item.variant, item.memberCount) }}</span>
       <span class="slug mono">{{ item.slug }}</span>
     </div>
   </RouterLink>
@@ -39,7 +44,9 @@ defineProps<{ item: Item; to: RouteLocationRaw; keyword?: string; muted?: boolea
 .card.muted { background: #fcfcfb; border-style: dashed; border-color: #dededc; box-shadow: none; padding: 18px 22px; gap: 0; }
 .top { display: flex; align-items: center; gap: 16px; min-width: 0; }
 .main { flex: 1; min-width: 0; }
-.name { font-size: 17px; font-weight: 600; letter-spacing: -0.005em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.name { display: flex; align-items: center; gap: 8px; font-size: 17px; font-weight: 600; letter-spacing: -0.005em; min-width: 0; }
+.nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.vtag { flex: 0 0 auto; padding: 1px 8px; border-radius: 6px; background: #141414; color: #fff; font-size: 12px; font-weight: 500; }
 .summary { color: var(--ink-2); font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tags { display: flex; flex-wrap: wrap; gap: 8px; }
 .meta { display: flex; align-items: center; gap: 18px; color: var(--ink-3); font-size: 14px; font-variant-numeric: tabular-nums; }
