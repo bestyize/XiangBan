@@ -140,7 +140,7 @@ pub fn build_clients() -> Result<(reqwest::Client, reqwest::Client), reqwest::Er
     Ok((http, objects))
 }
 
-fn allowed_object(url: &Url) -> bool {
+pub fn allowed_object(url: &Url) -> bool {
     url.scheme() == "https"
         && url.port_or_known_default() == Some(443)
         && url.host_str().is_some_and(|h| h.contains(".cos.") && h.ends_with(".myqcloud.com"))
@@ -170,6 +170,22 @@ pub fn validate_url(raw: &str, allow_private: bool) -> Result<Url, String> {
         }
     }
     Ok(url)
+}
+
+/// 把 reqwest 错误展开成「外层: 内层」的因果链，方便管理员判断是 DNS、证书还是连接被拒。
+fn describe(e: reqwest::Error) -> String {
+    use std::error::Error;
+    let e = e.without_url();
+    let mut parts = vec![e.to_string()];
+    let mut source = e.source();
+    while let Some(inner) = source {
+        let text = inner.to_string();
+        if !parts.contains(&text) {
+            parts.push(text);
+        }
+        source = inner.source();
+    }
+    parts.join(": ")
 }
 
 const JSON_LIMIT: usize = 4 * 1024 * 1024;
@@ -207,7 +223,7 @@ pub async fn send_json(req: reqwest::RequestBuilder) -> UpstreamResult<Value> {
         .timeout(Duration::from_secs(20))
         .send()
         .await
-        .map_err(|e| UpstreamError::transient(format!("无法连接上游：{}", e.without_url())))?;
+        .map_err(|e| UpstreamError::transient(format!("无法连接上游：{}", describe(e))))?;
     if let Some(err) = classify(&resp) {
         return Err(err);
     }
@@ -215,12 +231,35 @@ pub async fn send_json(req: reqwest::RequestBuilder) -> UpstreamResult<Value> {
     serde_json::from_slice(&body).map_err(|_| UpstreamError::permanent("上游返回的不是有效 JSON"))
 }
 
+/// 下载安装包：API 域名可带密钥；若被重定向，只跟随到腾讯 COS 的 HTTPS 地址，且不再携带密钥。
+pub async fn fetch_object(ctx: &Ctx, url: Url, api_key: Option<&str>, max: usize) -> UpstreamResult<Vec<u8>> {
+    let mut req = ctx.http.get(url).timeout(Duration::from_secs(60));
+    if let Some(key) = api_key {
+        req = req.header("X-API-Key", key);
+    }
+    let resp = req.send().await.map_err(|e| UpstreamError::transient(format!("无法连接上游：{}", describe(e))))?;
+    if resp.status().is_redirection() {
+        let location = resp
+            .headers()
+            .get(reqwest::header::LOCATION)
+            .and_then(|v| v.to_str().ok())
+            .and_then(|v| Url::parse(v).ok())
+            .filter(allowed_object)
+            .ok_or_else(|| UpstreamError::permanent("上游把下载重定向到了不被允许的地址"))?;
+        return send_bytes(ctx.objects.get(location), max).await;
+    }
+    if let Some(err) = classify(&resp) {
+        return Err(err);
+    }
+    read_limited(resp, max).await
+}
+
 pub async fn send_bytes(req: reqwest::RequestBuilder, max: usize) -> UpstreamResult<Vec<u8>> {
     let resp = req
         .timeout(Duration::from_secs(60))
         .send()
         .await
-        .map_err(|e| UpstreamError::transient(format!("无法连接上游：{}", e.without_url())))?;
+        .map_err(|e| UpstreamError::transient(format!("无法连接上游：{}", describe(e))))?;
     if let Some(err) = classify(&resp) {
         return Err(err);
     }

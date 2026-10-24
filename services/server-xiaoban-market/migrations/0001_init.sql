@@ -20,6 +20,14 @@ CREATE TABLE categories (
     UNIQUE (kind, slug)
 );
 
+-- 上游分类名到本地分类的记忆映射：入库时管理员选过一次，之后同名上游分类自动归入。
+CREATE TABLE category_aliases (
+    kind        TEXT NOT NULL,
+    alias       TEXT NOT NULL,
+    category_id INT NOT NULL REFERENCES categories(id) ON DELETE CASCADE,
+    PRIMARY KEY (kind, alias)
+);
+
 CREATE TABLE items (
     id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     kind           TEXT NOT NULL CHECK (kind IN ('skill', 'expert', 'connector')),
@@ -42,6 +50,8 @@ CREATE TABLE items (
     favorite_count BIGINT NOT NULL DEFAULT 0,
     latest_version TEXT,
     metadata       JSONB NOT NULL DEFAULT '{}'::jsonb,
+    -- 详情页「试试这样用」的示例提问，字符串数组。
+    prompts        JSONB NOT NULL DEFAULT '[]'::jsonb,
     search_text    TEXT NOT NULL DEFAULT '',
     created_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
