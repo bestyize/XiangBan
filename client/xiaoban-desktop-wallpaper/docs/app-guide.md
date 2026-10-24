@@ -14,3 +14,9 @@
 - `app_guide::every_console_page_and_settings_category_is_in_the_guide`：读取 `src/ui/control-types.ts`，页面、装扮标签、设置分类缺一不可（`chat` 与无侧栏入口的 `interactive` 除外）。
 
 前端由 `ControlShell.vue` 监听 `control-navigate` 事件完成跳转。
+
+## 按请求自动提示（不再靠模型自己想起来查）
+
+`chat/feature_hints.rs` 在每次调用模型前，用用户最新一句话去匹配功能地图（`app_guide.rs` 里的 `ALIASES`：每项功能的常见说法），命中的功能（最多 3 项）会作为一条临时提示紧跟在这句话后面：能做什么、对应工具、怎么打开页面、哪些要用户自己操作。提示只加在本次请求里，不写进聊天记录。普通闲聊不命中，不增加开销。
+
+**以后小伴又对某件事说“不支持”时的处理办法**：把用户的原话加进 `app_guide.rs` 测试 `requests_reach_the_features_they_are_about` 的表里，让它失败，再给对应功能的 `ALIASES` 补上缺的词，测试变绿即可。不要再去改提示词。
