@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import { NButton, NModal } from 'naive-ui';
-import { Check, ChevronDown, Folder, FolderInput, FolderOpen, FolderPlus, House, TriangleAlert } from 'lucide-vue-next';
+import { Check, ChevronDown, Folder, FolderInput, FolderOpen, FolderPlus, GitBranch, GitMerge, House, Trash2, TriangleAlert } from 'lucide-vue-next';
 import type { ChatStore } from '../chat/chat-store.ts';
+import type { WorktreeInfo } from '../chat/types.ts';
 
 /** The folder the open conversation works in, under the message box next to the permission mode: recent folders,
  *  another one from the system picker, and showing it in Finder or Explorer. */
@@ -18,8 +19,13 @@ const asking = ref<string | null>(null);
 const nameOf = (path: string) => path.trim().replace(/\\/g, '/').split('/').filter(Boolean).at(-1) || path;
 const current = computed(() => props.chat.currentWorkspace?.trim() || '');
 const same = (a: string, b: string) => a.replace(/[\\/]+$/, '') === b.replace(/[\\/]+$/, '');
-const currentName = computed(() => !current.value || same(current.value, props.chat.workspace)
-  ? '默认工作区' : nameOf(current.value));
+const copy = computed(() => props.chat.currentWorktree);
+const currentName = computed(() => copy.value ? `${nameOf(copy.value.origin)} · 独立副本`
+  : !current.value || same(current.value, props.chat.workspace) ? '默认工作区' : nameOf(current.value));
+/** How the open conversation stands with its isolated copy; read each time the menu opens. */
+const worktree = ref<WorktreeInfo | null>(null);
+const confirmingDiscard = ref(false);
+const busy = ref(false);
 const recent = computed(() => props.chat.recentWorkspaces.filter(w => w.exists));
 const defaultListed = computed(() => recent.value.some(w => same(w.path, props.chat.workspace)));
 
@@ -27,6 +33,7 @@ function close() { open.value = false; }
 function onOutside(e: PointerEvent) { if (root.value && !root.value.contains(e.target as Node)) close(); }
 function onKey(e: KeyboardEvent) { if (e.key === 'Escape') close(); }
 watch(open, value => {
+  if (value) void props.chat.worktreeInfo().then(info => { worktree.value = info; });
   if (value) { document.addEventListener('pointerdown', onOutside, true); document.addEventListener('keydown', onKey); }
   else { document.removeEventListener('pointerdown', onOutside, true); document.removeEventListener('keydown', onKey); }
 });
@@ -48,6 +55,19 @@ async function decide(how: 'new' | 'here') {
   if (path) await props.chat.switchWorkspace(path, how);
 }
 function reveal() { close(); void props.chat.revealWorkspace(); }
+async function startCopy() {
+  if (busy.value) return;
+  busy.value = true;
+  close();
+  try { await props.chat.startWorktree(); } finally { busy.value = false; }
+}
+async function finishCopy(action: 'merge' | 'keep' | 'discard') {
+  if (busy.value) return;
+  busy.value = true;
+  close();
+  confirmingDiscard.value = false;
+  try { await props.chat.finishWorktree(action); } finally { busy.value = false; }
+}
 </script>
 
 <template>
@@ -74,7 +94,27 @@ function reveal() { close(); void props.chat.revealWorkspace(); }
       <div class="ws-separator" />
       <button type="button" class="ws-item" role="menuitem" data-testid="chat-workspace-pick" @click="pick"><FolderPlus :size="14" /><span>选择文件夹…</span></button>
       <button type="button" class="ws-item" role="menuitem" data-testid="chat-workspace-reveal" @click="reveal"><FolderOpen :size="14" /><span>在文件管理器中打开</span></button>
+      <template v-if="worktree">
+        <div class="ws-separator" />
+        <template v-if="worktree.active">
+          <div class="ws-section">独立副本</div>
+          <p class="ws-copy" data-testid="chat-worktree-state">分支 {{ worktree.link.branch }} · {{ worktree.status.changedCount }} 个文件未提交 · {{ worktree.status.ahead }} 个提交</p>
+          <p v-if="!worktree.status.originClean" class="ws-copy is-warning" data-testid="chat-worktree-origin-dirty">原文件夹里有没提交的改动，合并前要先提交或暂存。</p>
+          <button type="button" class="ws-item" role="menuitem" data-testid="chat-worktree-merge" :disabled="disabled || busy" @click="finishCopy('merge')"><GitMerge :size="14" /><span class="ws-item-text"><strong>合并回原文件夹</strong><small>把副本的改动并入“{{ worktree.status.originBranch || '当前分支' }}”并清理副本</small></span></button>
+          <button type="button" class="ws-item" role="menuitem" data-testid="chat-worktree-keep" :disabled="disabled || busy" @click="finishCopy('keep')"><Folder :size="14" /><span class="ws-item-text"><strong>保留副本，回到原文件夹</strong><small>不合并，副本留在磁盘上</small></span></button>
+          <button type="button" class="ws-item" role="menuitem" data-testid="chat-worktree-discard" :disabled="disabled || busy" @click="confirmingDiscard = true; close()"><Trash2 :size="14" /><span class="ws-item-text"><strong>丢弃副本</strong><small>删除副本和里面的改动</small></span></button>
+        </template>
+        <button v-else-if="worktree.available" type="button" class="ws-item" role="menuitem" data-testid="chat-worktree-start" :disabled="disabled || busy" @click="startCopy"><GitBranch :size="14" /><span class="ws-item-text"><strong>在独立副本中工作</strong><small>改动先留在 git 副本里，合并后才影响原文件夹</small></span></button>
+        <p v-else-if="worktree.reason" class="ws-copy" data-testid="chat-worktree-unavailable">独立副本不可用：{{ worktree.reason }}</p>
+      </template>
     </div>
+    <NModal :show="confirmingDiscard" preset="card" title="丢弃独立副本" :style="{ width: '400px', maxWidth: 'calc(100vw - 32px)' }" data-testid="chat-worktree-discard-ask" @update:show="value => { if (!value) confirmingDiscard = false; }">
+      <p class="ws-ask">副本里的所有改动（包括还没提交的）都会被删除，原文件夹不受影响。这个操作不能撤销。</p>
+      <div class="ws-ask-actions">
+        <NButton data-testid="chat-worktree-discard-cancel" @click="confirmingDiscard = false">取消</NButton>
+        <NButton type="error" data-testid="chat-worktree-discard-confirm" @click="finishCopy('discard')">丢弃</NButton>
+      </div>
+    </NModal>
     <NModal :show="asking !== null" preset="card" title="切换工作区" :style="{ width: '400px', maxWidth: 'calc(100vw - 32px)' }" data-testid="chat-workspace-ask" @update:show="value => { if (!value) asking = null; }">
       <p class="ws-ask">这个对话已经在“{{ currentName }}”里聊过了。要在“{{ asking ? nameOf(asking) : '' }}”里继续，建议新开一个对话，免得前后两个文件夹的内容混在一起。</p>
       <div class="ws-ask-actions">
@@ -107,6 +147,9 @@ function reveal() { close(); void props.chat.revealWorkspace(); }
 .ws-item-text strong{font-size:13px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .ws-item-text small{font-size:11px;color:var(--ui-text-tertiary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .ws-item>svg.ws-wide{color:var(--ui-warning)}
+.ws-copy{margin:2px 10px 6px;font-size:11.5px;line-height:1.6;color:var(--ui-text-tertiary)}
+.ws-copy.is-warning{color:var(--ui-warning)}
+.ws-item:disabled{opacity:.5;cursor:not-allowed}
 .ws-ask{font-size:13px;line-height:1.7;margin:0 0 16px;color:var(--ui-text-secondary)}
 .ws-ask-actions{display:flex;justify-content:flex-end;gap:8px}
 </style>

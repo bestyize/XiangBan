@@ -852,6 +852,51 @@ describe('each conversation works in its own folder', () => {
     expect(h.calls.filter(([c]) => c === 'chat_set_workspace')).toHaveLength(2);
   });
 
+  it('moves the open conversation into an isolated copy and back, telling the page each time', async () => {
+    const link = { origin: '/p/site', path: '/data/worktrees/site-1', branch: 'xiaoban/1', base: 'abc' };
+    const h = harness({
+      chat_overview: () => overview({ sessions: [{ ...summary('used'), workspace: '/p/site' }] }),
+      chat_load_session: () => withHistory,
+      chat_worktree_status: () => ({ active: false, available: true }),
+      chat_worktree_start: () => ({ session: { ...summary('used'), workspace: '/data/worktrees/site-1', worktree: link } }),
+      chat_worktree_finish: args => ({ session: { ...summary('used'), workspace: '/p/site', worktree: null }, message: args?.action === 'merge' ? '已合并' : '已保留' }),
+    });
+    await h.store.init();
+    await h.store.select('used');
+    expect(h.store.currentWorktree).toBeNull();
+    expect(await h.store.worktreeInfo()).toEqual({ active: false, available: true });
+    expect(await h.store.startWorktree()).toBe(true);
+    expect(h.calls.find(([c]) => c === 'chat_worktree_start')?.[1]).toEqual({ sessionId: 'used' });
+    expect(h.store.currentWorktree).toEqual(link);
+    expect(h.store.currentWorkspace).toBe('/data/worktrees/site-1');
+    let last = h.store.views.used.items.at(-1);
+    expect(last?.kind === 'notice' && last.text).toContain('xiaoban/1');
+    expect(await h.store.finishWorktree('merge')).toBe(true);
+    expect(h.calls.find(([c]) => c === 'chat_worktree_finish')?.[1]).toEqual({ sessionId: 'used', action: 'merge' });
+    expect(h.store.currentWorktree).toBeNull();
+    expect(h.store.currentWorkspace).toBe('/p/site');
+    last = h.store.views.used.items.at(-1);
+    expect(last?.kind === 'notice' && last.text).toContain('已合并');
+  });
+
+  it('does not touch the copy while the conversation is answering, and keeps the state when the host refuses', async () => {
+    const h = harness({
+      chat_overview: () => overview({ sessions: [{ ...summary('used'), workspace: '/p/site' }] }),
+      chat_load_session: () => withHistory,
+      chat_worktree_start: () => { throw new Error('这个仓库还没有任何提交'); },
+    });
+    await h.store.init();
+    await h.store.select('used');
+    expect(await h.store.startWorktree()).toBe(false);
+    expect(h.store.currentWorktree).toBeNull();
+    expect(h.store.sessions.find(s => s.id === 'used')?.workspace).toBe('/p/site');
+    h.store.views.used.running = true;
+    expect(await h.store.finishWorktree('discard')).toBe(false);
+    expect(await h.store.startWorktree()).toBe(false);
+    expect(h.calls.filter(([c]) => c === 'chat_worktree_start')).toHaveLength(1);
+    expect(h.calls.some(([c]) => c === 'chat_worktree_finish')).toBe(false);
+  });
+
   it('“新开对话” leaves the old conversation where it was', async () => {
     const h = harness({
       chat_overview: () => overview({ sessions: [{ ...summary('used'), workspace: '/p/site' }] }),

@@ -26,6 +26,7 @@ mod project_rules;
 mod sandbox_gate;
 pub mod scheduled;
 pub mod workspace;
+pub mod worktree;
 
 /// A folder chosen as the default working folder in the settings is where the next new conversation starts.
 pub fn remember_workspace(app: &tauri::AppHandle, folder: &str) {
@@ -1361,6 +1362,10 @@ pub fn chat_delete_session(app: tauri::AppHandle, window: tauri::WebviewWindow, 
     let state = app.state::<ChatState>();
     if lock(&state.runs).contains_key(&session_id) {
         return Err("这个对话正在当前窗口运行，请先停止再删除".into());
+    }
+    // Deleting would orphan the copy and strand its unmerged changes; make the user choose what happens to them.
+    if mutate(&app, |index| index.get(&session_id).and_then(|s| s.worktree.clone()))?.is_some() {
+        return Err("这个对话还在独立副本里工作。先在工作区菜单里选择“合并回原文件夹”“保留副本”或“丢弃副本”，再删除对话".into());
     }
     // Keep ownership across the *entire* destructive deletion, not merely a
     // probe followed by a time-of-check/time-of-use race with another host.

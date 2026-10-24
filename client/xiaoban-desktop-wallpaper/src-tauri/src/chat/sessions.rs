@@ -37,6 +37,22 @@ pub struct SessionSummary {
     pub companion_id: String,
     pub companion_name: String,
     pub companion_cursor: u64,
+    /// Set while this conversation works in an isolated git worktree. `workspace` is then the copy's folder
+    /// and `origin` below is where the user's own files are.
+    pub worktree: Option<WorktreeLink>,
+}
+
+/// The link between a conversation and the git worktree it works in (see `worktree`).
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WorktreeLink {
+    /// The folder the user was in when the copy was made; the conversation goes back to it afterwards.
+    pub origin: String,
+    /// The root of the copy.
+    pub path: String,
+    pub branch: String,
+    /// The commit the copy started from.
+    pub base: String,
 }
 
 impl Default for SessionSummary {
@@ -50,6 +66,7 @@ impl Default for SessionSummary {
             group: String::new(),
             workspace: String::new(),
             companion_id: String::new(), companion_name: String::new(), companion_cursor: 0,
+            worktree: None,
         }
     }
 }
@@ -259,6 +276,17 @@ impl Index {
     pub fn set_workspace(&mut self, id: &str, workspace: &str) -> bool {
         if let Some(s) = self.sessions.iter_mut().find(|s| s.id == id) {
             s.workspace = workspace.to_string();
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Moves a conversation into (`Some`) or out of a worktree together with its folder.
+    pub fn set_worktree(&mut self, id: &str, workspace: &str, link: Option<WorktreeLink>) -> bool {
+        if let Some(s) = self.sessions.iter_mut().find(|s| s.id == id) {
+            s.workspace = workspace.to_string();
+            s.worktree = link;
             true
         } else {
             false

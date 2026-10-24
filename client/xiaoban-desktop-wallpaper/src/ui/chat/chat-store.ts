@@ -1,7 +1,7 @@
 import type { PendingAttachment } from './attachments.ts';
 import { modelFailure } from './model-errors.ts';
 import { reactive } from 'vue';
-import type { ApprovalDecision, ApprovalRequest, ChatEventPayload, ChatGroup, ChatItem, ContextInfo, Library, Overview, QuestionRequest, RecentWorkspace, SessionSummary, SessionView, WireMessage } from './types.ts';
+import type { ApprovalDecision, ApprovalRequest, ChatEventPayload, ChatGroup, ChatItem, ContextInfo, Library, Overview, QuestionRequest, RecentWorkspace, SessionSummary, SessionView, WireMessage, WorktreeInfo, WorktreeLink } from './types.ts';
 import { applyEvent, checkpointNotice, interruptedNotice, itemsFromHistory, newView, nextId, summaryNotice, workspaceNotice } from './view.ts';
 import { toolLabel } from './format.ts';
 
@@ -38,6 +38,14 @@ export interface ChatStore {
   pickWorkspace(): Promise<string | null>;
   /** Shows the open conversation's folder in Finder or Explorer. */
   revealWorkspace(): Promise<void>;
+  /** The isolated copy of the folder the open conversation works in, if it is in one. */
+  readonly currentWorktree: WorktreeLink | null;
+  /** How the open conversation stands with its copy; `null` when there is nothing to ask (no desktop, no saved conversation). */
+  worktreeInfo(): Promise<WorktreeInfo | null>;
+  /** Moves the open conversation into a new isolated copy of its folder. Returns whether it worked (the reason is shown if not). */
+  startWorktree(): Promise<boolean>;
+  /** Ends the copy: `merge` brings its changes back into the original folder, `keep` leaves it on disk, `discard` deletes it. */
+  finishWorktree(action: 'merge' | 'keep' | 'discard'): Promise<boolean>;
   permissionMode: 'ask' | 'auto';
   setPermissionMode(mode: 'ask' | 'auto'): Promise<void>;
   hideToolCalls: boolean;
@@ -185,6 +193,54 @@ export function createChatStore(deps: ChatDeps): ChatStore {
       } catch (error) {
         deps.notify(error, 'error');
         return null;
+      }
+    },
+    get currentWorktree() {
+      return store.currentId ? store.sessions.find(s => s.id === store.currentId)?.worktree ?? null : null;
+    },
+    async worktreeInfo() {
+      const id = store.currentId;
+      if (!deps.desktop || !id) return null;
+      try {
+        return await deps.invoke<WorktreeInfo>('chat_worktree_status', { sessionId: id });
+      } catch (error) {
+        deps.notify(error, 'error');
+        return null;
+      }
+    },
+    async startWorktree() {
+      const id = store.currentId;
+      if (!deps.desktop || !id) { deps.notify('先发一条消息开始对话，再切换到独立副本', 'info'); return false; }
+      if (store.views[id]?.running) { deps.notify('这个对话还在回答，请等它结束或先停止', 'error'); return false; }
+      try {
+        const result = await deps.invoke<{ session: SessionSummary }>('chat_worktree_start', { sessionId: id });
+        if (disposed) return false;
+        store.sessions = store.sessions.map(s => s.id === result.session.id ? result.session : s);
+        const view = store.views[id];
+        if (view?.items.length) view.items.push({ kind: 'notice', id: nextId(view), tone: 'info', text: `已切换到独立副本（分支 ${result.session.worktree?.branch ?? ''}）。之后的改动先留在副本里，不会影响原文件夹，直到你选择合并。` });
+        if (id === store.currentId) void store.refreshContext();
+        return true;
+      } catch (error) {
+        deps.notify(error, 'error');
+        return false;
+      }
+    },
+    async finishWorktree(action: 'merge' | 'keep' | 'discard') {
+      const id = store.currentId;
+      if (!deps.desktop || !id) return false;
+      if (store.views[id]?.running) { deps.notify('这个对话还在回答，请等它结束或先停止', 'error'); return false; }
+      try {
+        const result = await deps.invoke<{ session: SessionSummary; message: string }>('chat_worktree_finish', { sessionId: id, action });
+        if (disposed) return false;
+        store.sessions = store.sessions.map(s => s.id === result.session.id ? result.session : s);
+        const view = store.views[id];
+        if (view?.items.length) view.items.push({ kind: 'notice', id: nextId(view), tone: 'info', text: `${result.message}。对话回到原文件夹继续。` });
+        deps.notify(result.message, 'success');
+        if (id === store.currentId) void store.refreshContext();
+        return true;
+      } catch (error) {
+        deps.notify(error, 'error');
+        return false;
       }
     },
     async revealWorkspace() {

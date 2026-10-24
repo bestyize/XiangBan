@@ -1,9 +1,15 @@
 import type { AttachmentCard } from './attachments.ts';
 /** What the host sends and accepts for the chat. Field names are the host's own (snake_case for kernel events). */
 
-export interface SessionSummary { id: string; title: string; createdAt: number; updatedAt: number; permissionMode?: 'ask' | 'auto'; /** The group it was moved into; empty or missing when it is not in one. */ group?: string; /** The folder it works in; empty or missing for an old conversation, which uses the default folder. */ workspace?: string; companionId?: string; companionName?: string; companionCursor?: number }
+export interface SessionSummary { id: string; title: string; createdAt: number; updatedAt: number; permissionMode?: 'ask' | 'auto'; /** The group it was moved into; empty or missing when it is not in one. */ group?: string; /** The folder it works in; empty or missing for an old conversation, which uses the default folder. */ workspace?: string; companionId?: string; companionName?: string; companionCursor?: number; /** Set while it works in an isolated copy of its folder; `workspace` is then the copy. */ worktree?: WorktreeLink | null }
 
 /** A working folder in the chat page's folder menu. `wide` is a home folder or a disk's root. */
+/** The isolated git copy a conversation works in (see `worktree.rs`): `origin` is where the user's own files are. */
+export interface WorktreeLink { origin: string; path: string; branch: string; base: string }
+/** How the open conversation stands with its copy: `active`, or whether it could make one. */
+export type WorktreeInfo =
+  | { active: true; link: WorktreeLink; status: { exists: boolean; branch: string; ahead: number; changed: string[]; changedCount: number; originBranch: string; originClean: boolean } }
+  | { active: false; available: boolean; reason?: string };
 export interface RecentWorkspace { path: string; name: string; exists: boolean; wide: boolean }
 
 /** How much of the context the next request would use. The numbers are estimates, in tokens. */

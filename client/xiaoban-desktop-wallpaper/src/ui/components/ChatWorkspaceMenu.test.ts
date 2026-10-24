@@ -5,7 +5,9 @@ import { reactive } from 'vue';
 import ChatWorkspaceMenu from './ChatWorkspaceMenu.vue';
 import type { ChatStore } from '../chat/chat-store.ts';
 
-function setup(answer: 'done' | 'ask' = 'done', picked: string | null = '/p/picked') {
+import type { WorktreeInfo } from '../chat/types.ts';
+
+function setup(answer: 'done' | 'ask' = 'done', picked: string | null = '/p/picked', worktree: WorktreeInfo | null = null, link: { origin: string; path: string; branch: string; base: string } | null = null) {
   const chat = reactive({
     workspace: '/default',
     currentWorkspace: '/p/site',
@@ -17,6 +19,10 @@ function setup(answer: 'done' | 'ask' = 'done', picked: string | null = '/p/pick
     switchWorkspace: vi.fn(async (_path: string, how?: string) => (how ? 'done' : answer)),
     pickWorkspace: vi.fn(async () => picked),
     revealWorkspace: vi.fn(async () => {}),
+    currentWorktree: link,
+    worktreeInfo: vi.fn(async () => worktree),
+    startWorktree: vi.fn(async () => true),
+    finishWorktree: vi.fn(async () => true),
   }) as unknown as ChatStore;
   const wrapper = mount(ChatWorkspaceMenu, { props: { chat }, attachTo: document.body, global: { stubs: {
     Modal: { name: 'Modal', props: ['show'], template: '<div v-if="show"><slot /></div>' },
@@ -84,5 +90,66 @@ describe('the folder menu under the message box', () => {
     await click(wrapper, 'chat-workspace-reveal');
     expect(chat.revealWorkspace).toHaveBeenCalled();
     wrapper.unmount();
+  });
+  describe('the isolated copy (git worktree)', () => {
+    const link = { origin: '/p/site', path: '/data/worktrees/site-ab12cd34', branch: 'xiaoban/ab12cd34', base: 'abc' };
+    const active = (over: Partial<Extract<WorktreeInfo, { active: true }>['status']> = {}): WorktreeInfo => ({
+      active: true, link, status: { exists: true, branch: link.branch, ahead: 2, changed: [' M a.txt'], changedCount: 1, originBranch: 'main', originClean: true, ...over },
+    });
+
+    it('offers a copy when the folder is a repository, and starts one on click', async () => {
+      const { wrapper, chat } = setup('done', null, { active: false, available: true });
+      await click(wrapper, 'chat-workspace-menu');
+      expect(chat.worktreeInfo).toHaveBeenCalled();
+      await click(wrapper, 'chat-worktree-start');
+      expect(chat.startWorktree).toHaveBeenCalledTimes(1);
+      wrapper.unmount();
+    });
+
+    it('says why a copy is not possible instead of hiding the option', async () => {
+      const { wrapper } = setup('done', null, { active: false, available: false, reason: '这个文件夹不在 git 仓库里' });
+      await click(wrapper, 'chat-workspace-menu');
+      expect(wrapper.find('[data-testid="chat-worktree-start"]').exists()).toBe(false);
+      expect(wrapper.get('[data-testid="chat-worktree-unavailable"]').text()).toContain('不在 git 仓库里');
+      wrapper.unmount();
+    });
+
+    it('shows the copy state, names it in the folder button, and merges or keeps on click', async () => {
+      for (const [id, action] of [['chat-worktree-merge', 'merge'], ['chat-worktree-keep', 'keep']] as const) {
+        const { wrapper, chat } = setup('done', null, active(), link);
+        expect(wrapper.get('[data-testid="chat-workspace-menu"]').text()).toContain('site · 独立副本');
+        await click(wrapper, 'chat-workspace-menu');
+        const state = wrapper.get('[data-testid="chat-worktree-state"]').text();
+        expect(state).toContain('xiaoban/ab12cd34');
+        expect(state).toContain('1 个文件未提交');
+        expect(state).toContain('2 个提交');
+        expect(wrapper.find('[data-testid="chat-worktree-origin-dirty"]').exists()).toBe(false);
+        await click(wrapper, id);
+        expect(chat.finishWorktree).toHaveBeenCalledWith(action);
+        wrapper.unmount();
+      }
+    });
+
+    it('warns when the original folder cannot take a merge yet', async () => {
+      const { wrapper } = setup('done', null, active({ originClean: false }), link);
+      await click(wrapper, 'chat-workspace-menu');
+      expect(wrapper.get('[data-testid="chat-worktree-origin-dirty"]').text()).toContain('没提交的改动');
+      wrapper.unmount();
+    });
+
+    it('asks before discarding and only then deletes', async () => {
+      const { wrapper, chat } = setup('done', null, active(), link);
+      await click(wrapper, 'chat-workspace-menu');
+      await click(wrapper, 'chat-worktree-discard');
+      expect(chat.finishWorktree).not.toHaveBeenCalled();
+      expect(wrapper.find('[data-testid="chat-worktree-discard-ask"]').exists()).toBe(true);
+      await click(wrapper, 'chat-worktree-discard-cancel');
+      expect(chat.finishWorktree).not.toHaveBeenCalled();
+      await click(wrapper, 'chat-workspace-menu');
+      await click(wrapper, 'chat-worktree-discard');
+      await click(wrapper, 'chat-worktree-discard-confirm');
+      expect(chat.finishWorktree).toHaveBeenCalledWith('discard');
+      wrapper.unmount();
+    });
   });
 });
