@@ -11,6 +11,10 @@ const SNOOZE_SECONDS: i64 = 10 * 60;
 /// A scheduled agent task's result may wait this long for the user (away, quiet hours) before it is dropped; the
 /// whole answer stays in its conversation either way.
 const AGENT_VALID_SECONDS: i64 = 12 * 3600;
+/// A one-time reminder is something the user must not miss: it is still delivered this long after its time (the
+/// screen was locked, the app was closed), and its bubble stays up until it is closed or snoozed.
+const ONCE_VALID_SECONDS: i64 = 12 * 3600;
+const STICKY_SECONDS: i64 = 12 * 3600;
 /// What one agent task may ask of the assistant.
 const AGENT_PROMPT_CHARS: usize = 1000;
 
@@ -63,6 +67,9 @@ pub struct Pending {
     pub weather_ready: bool,
     #[serde(default)]
     pub weather_at: Option<i64>,
+    /// A one-time reminder: its bubble does not go away by itself.
+    #[serde(default)]
+    pub sticky: bool,
 }
 #[derive(Clone, Default, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
@@ -169,6 +176,8 @@ fn quiet(config: &CareConfig, now: NaiveTime) -> bool {
     if start == end { return true; }
     if start < end { now >= start && now < end } else { now >= start || now < end }
 }
+/// Whether a rule is a one-time reminder, which is kept up until the user answers it.
+fn lasts(rule: &Rule) -> bool { rule.repeat == "once" && rule.kind == "custom" }
 fn local_due(rule: &Rule, now: DateTime<Local>) -> Vec<(String, i64)> {
     if rule.kind == "rest" { return vec![]; }
     let mut candidates = Vec::new();
@@ -185,7 +194,8 @@ fn local_due(rule: &Rule, now: DateTime<Local>) -> Vec<(String, i64)> {
         // On the repeated DST hour choose the first occurrence. The dedup key
         // deliberately excludes UTC offset, so a clock/timezone rollback cannot replay it.
         let due = Local.from_local_datetime(&date).earliest()?.timestamp();
-        if due > now.timestamp() || now.timestamp() - due > VALID_SECONDS || due < rule.not_before { return None; }
+        let valid = if lasts(rule) { ONCE_VALID_SECONDS } else { VALID_SECONDS };
+        if due > now.timestamp() || now.timestamp() - due > valid || due < rule.not_before { return None; }
         Some((format!("{}:{}:{}", rule.id, rule.revision, date.format("%Y-%m-%dT%H:%M")), due))
     }).collect()
 }
@@ -217,9 +227,9 @@ fn collect_with_widgets(store: &mut Store, now: DateTime<Local>, active_seconds:
             store.seen.insert(key.clone(), timestamp);
             if rule.kind == "rest" && store.pending.iter().any(|item| item.kind == "rest") { changed = true; continue; }
             // Weather and agent items wait for their text (`weather_ready`); an agent's result may wait longer to be seen.
-            let expires_at = due + if rule.kind == "agent" { AGENT_VALID_SECONDS } else { VALID_SECONDS };
+            let expires_at = due + if rule.kind == "agent" { AGENT_VALID_SECONDS } else if lasts(&rule) { ONCE_VALID_SECONDS } else { VALID_SECONDS };
             store.pending.push(Pending { key, rule_id: rule.id.clone(), revision: rule.revision, kind: rule.kind.clone(), text: rule.text.clone(),
-                due_at: due, available_at: due, expires_at, preview: false, weather_ready: !matches!(rule.kind.as_str(), "weather" | "agent"), weather_at: None });
+                due_at: due, available_at: due, expires_at, preview: false, weather_ready: !matches!(rule.kind.as_str(), "weather" | "agent"), weather_at: None, sticky: lasts(&rule) });
             changed = true;
         }
     }
@@ -378,8 +388,9 @@ fn cancel_active_rule(app: &tauri::AppHandle, id: &str) {
 fn show(app: &tauri::AppHandle, items: Vec<Pending>) -> Result<(), String> {
     let state = app.state::<ReminderState>();
     let config = state.store.lock().unwrap_or_else(|e| e.into_inner()).config.clone();
+    let sticky = items.iter().any(|item| item.sticky && !item.preview);
     let delivery = Delivery { id: format!("bubble-{}", Local::now().timestamp_millis()), items, sound: config.sound, voice: config.voice,
-        display_seconds: if config.voice { 30 } else { BUBBLE_SECONDS } };
+        display_seconds: if sticky { STICKY_SECONDS } else if config.voice { 30 } else { BUBBLE_SECONDS } };
     { let mut runtime = state.runtime.lock().unwrap_or_else(|e| e.into_inner()); runtime.active = Some(delivery.clone()); runtime.shown_at = if runtime.ready { Some(Local::now().timestamp()) } else { None }; }
     if let Err(error) = open_bubble(app) { close_active(app); return Err(error); }
     if blocked(app, &care_system::activity()) { defer_active(app); return Ok(()); }
@@ -443,7 +454,7 @@ pub fn snooze_care(window: tauri::WebviewWindow, id: String) -> Result<(), Strin
     let delivery = state.runtime.lock().unwrap_or_else(|e| e.into_inner()).active.clone().filter(|d| d.id == id).ok_or("这条提醒已关闭")?;
     let now = Local::now().timestamp(); let mut store = state.store.lock().unwrap_or_else(|e| e.into_inner()); let mut next = store.clone();
     for mut item in delivery.items.into_iter().filter(|p| !p.preview) {
-        item.available_at = now + SNOOZE_SECONDS; item.expires_at = item.available_at + VALID_SECONDS;
+        item.available_at = now + SNOOZE_SECONDS; item.expires_at = item.available_at + if item.sticky { ONCE_VALID_SECONDS } else { VALID_SECONDS };
         next.pending.retain(|p| p.key != item.key); next.pending.push(item);
     }
     save(app, &next)?; *store = next; drop(store); close_active(app); publish(app); Ok(())
@@ -463,7 +474,7 @@ pub async fn preview_care_rule(window: tauri::WebviewWindow, mut rule: Rule) -> 
     if rule.kind == "agent" { rule.text = format!("到时小伴会去做：{}", rule.text.chars().take(80).collect::<String>()); }
     let now = Local::now().timestamp();
     show(&app, vec![Pending { key: "preview".into(), rule_id: rule.id, revision: rule.revision, kind: rule.kind, text: rule.text,
-        due_at: now, available_at: now, expires_at: now + VALID_SECONDS, preview: true, weather_ready: true, weather_at: None }])
+        due_at: now, available_at: now, expires_at: now + VALID_SECONDS, preview: true, weather_ready: true, weather_at: None, sticky: false }])
 }
 #[tauri::command]
 pub async fn search_care_cities(window: tauri::WebviewWindow, query: String) -> Result<Vec<City>, String> {
@@ -569,10 +580,15 @@ fn tick(app: &tauri::AppHandle, elapsed: f64, checkpoint: bool) {
     if blocked(app, &activity) { defer_active(app); if changed { publish(app); } return; }
     let active = state.runtime.lock().unwrap_or_else(|e| e.into_inner()).active.clone();
     if let Some(active) = active {
-        let shown_at = state.runtime.lock().unwrap_or_else(|e| e.into_inner()).shown_at;
-        if shown_at.is_some_and(|at| now.timestamp() - at >= active.display_seconds) { close_active(app); }
-        else if let Some(window) = app.get_webview_window("care") { let _ = position(app, &window); }
-        return;
+        // A bubble that stays up must not hold back a reminder that has come due since: fold it back and show both.
+        let waiting = active.items.iter().any(|item| item.sticky && !item.preview)
+            && state.store.lock().unwrap_or_else(|e| e.into_inner()).pending.iter().any(|p| p.available_at <= now.timestamp() && !active.items.iter().any(|item| item.key == p.key));
+        if waiting { defer_active(app); } else {
+            let shown_at = state.runtime.lock().unwrap_or_else(|e| e.into_inner()).shown_at;
+            if shown_at.is_some_and(|at| now.timestamp() - at >= active.display_seconds) { close_active(app); }
+            else if let Some(window) = app.get_webview_window("care") { let _ = position(app, &window); }
+            return;
+        }
     }
     let pending = state.store.lock().unwrap_or_else(|e| e.into_inner()).pending.iter().find(|p| p.available_at <= now.timestamp()).cloned();
     if let Some(pending) = pending.filter(|p| p.kind == "weather" && !p.weather_ready) {
@@ -763,7 +779,7 @@ fn smoke_sync(app: &tauri::AppHandle) -> Result<serde_json::Value, String> {
         let disk: Store = serde_json::from_slice(&std::fs::read(&disk_path).map_err(|e| e.to_string())?).map_err(|e| e.to_string())?;
         if disk.rules.len() != 1 || disk.rules[0].text != rule.text { return Err("关怀规则没有正确持久化".into()); }
         let pending = |preview: bool| Pending { key: if preview { "smoke-preview".into() } else { "smoke-due".into() }, rule_id: rule.id.clone(), revision: disk.rules[0].revision,
-            kind: "custom".into(), text: rule.text.clone(), due_at: now.timestamp(), available_at: now.timestamp(), expires_at: now.timestamp() + VALID_SECONDS, preview, weather_ready: true, weather_at: None };
+            kind: "custom".into(), text: rule.text.clone(), due_at: now.timestamp(), available_at: now.timestamp(), expires_at: now.timestamp() + VALID_SECONDS, preview, weather_ready: true, weather_at: None, sticky: false };
         show(app, vec![pending(true)])?;
         let deadline = Instant::now() + Duration::from_secs(20);
         while !state.runtime.lock().unwrap_or_else(|e| e.into_inner()).ready {
@@ -877,6 +893,21 @@ mod tests {
     #[test] fn explicit_workdays_are_respected() {
         let mut rule = scheduled(); rule.repeat = "weekdays".into(); rule.weekdays = vec![1, 3]; assert!(local_due(&rule, date()).is_empty());
         rule.weekdays = vec![5]; assert_eq!(local_due(&rule, date()).len(), 1);
+    }
+    #[test] fn a_one_time_reminder_is_kept_for_hours_and_its_bubble_stays_until_answered() {
+        let mut rule = scheduled(); rule.repeat = "once".into(); rule.once_at = "2026-10-09T15:05".into();
+        let hours_later = Local.with_ymd_and_hms(2026, 10, 9, 21, 0, 0).earliest().unwrap();
+        assert_eq!(local_due(&rule, hours_later).len(), 1, "still delivered after a long absence");
+        assert!(local_due(&rule, hours_later + CalendarDuration::hours(7)).is_empty(), "but not a day later");
+        let mut store = Store { rules: vec![rule.clone()], ..Store::default() };
+        assert!(collect(&mut store, hours_later, 0.0));
+        let item = &store.pending[0];
+        assert!(item.sticky && item.expires_at - item.due_at == ONCE_VALID_SECONDS);
+        // A repeating reminder is as before: shown briefly, and only for half an hour.
+        rule.repeat = "daily".into(); rule.time = "15:05".into();
+        assert!(local_due(&rule, hours_later).is_empty());
+        let mut daily = Store { rules: vec![rule], ..Store::default() };
+        assert!(collect(&mut daily, date(), 0.0) && !daily.pending[0].sticky);
     }
     #[test] fn once_and_midnight_catchup_work() {
         let mut rule = scheduled(); rule.repeat = "once".into(); rule.once_at = "2026-10-09T15:05".into(); assert_eq!(local_due(&rule, date()).len(), 1);

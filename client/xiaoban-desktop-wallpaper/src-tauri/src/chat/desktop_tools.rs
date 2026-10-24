@@ -534,6 +534,32 @@ fn rule_from_args(args: &Value, existing: Option<Rule>) -> Result<Rule, String> 
     Ok(rule)
 }
 
+/// How a reminder will reach the user, from the rule and the care settings, for the assistant to tell them as it is.
+fn how_it_reminds(rule: &Rule, config: &Value) -> String {
+    if config["enabled"].as_bool() == Some(false) {
+        return "注意：关怀提醒的总开关现在是关的，到点不会弹出，需要用户在「提醒」页打开".into();
+    }
+    let on = |key: &str| config[key].as_bool().unwrap_or(false);
+    let when = if rule.kind == "rest" { format!("使用电脑每满 {} 分钟", rule.interval_minutes) } else {
+        match rule.repeat.as_str() {
+            "once" => rule.once_at.replace('T', " "),
+            "weekdays" => format!("每周{}的 {}", rule.weekdays.iter().map(|d| ["一", "二", "三", "四", "五", "六", "日"].get(*d as usize - 1).copied().unwrap_or("?")).collect::<Vec<_>>().join("、"), rule.time),
+            _ => format!("每天 {}", rule.time),
+        }
+    };
+    if rule.kind == "agent" {
+        return format!("{when}到点，小伴会在后台去做这件事，结果显示在提醒气泡里；小伴需要在运行");
+    }
+    let stays = if rule.repeat == "once" && rule.kind == "custom" {
+        "一次性提醒的气泡会一直留着，直到点掉，或点「稍后提醒」（10 分钟后再弹）"
+    } else {
+        "气泡显示约 10 秒（开了语音播报是 30 秒），可点「稍后提醒」10 分钟后再弹"
+    };
+    let quiet = if on("quietEnabled") { format!("安静时段（{}–{}）、", config["quietStart"].as_str().unwrap_or("22:00"), config["quietEnd"].as_str().unwrap_or("08:00")) } else { String::new() };
+    format!("{when}到点会在屏幕右上角弹出提醒气泡，{stays}；提示音{}、语音播报{}（可在「提醒」页打开）；小伴需要在运行，{quiet}屏幕锁定、专注模式、玩游戏时先压住，之后补弹",
+        if on("sound") { "已开" } else { "关" }, if on("voice") { "已开" } else { "关" })
+}
+
 fn care_set(desktop: &dyn Desktop, args: &Value) -> Result<String, String> {
     let id = optional_text(args, "id")?.filter(|s| !s.is_empty());
     let existing = match id {
@@ -551,7 +577,8 @@ fn care_set(desktop: &dyn Desktop, args: &Value) -> Result<String, String> {
     let creating = existing.is_none();
     let rule = rule_from_args(args, existing)?;
     desktop.care_upsert(rule.clone())?;
-    Ok(if creating { format!("已添加提醒：{}", rule.text) } else { format!("已更新提醒：{}", rule.text) })
+    let how = how_it_reminds(&rule, &desktop.care().map(|v| v["config"].clone()).unwrap_or_default());
+    Ok(format!("{}：{}。{how}", if creating { "已添加提醒" } else { "已更新提醒" }, rule.text))
 }
 
 
@@ -1720,9 +1747,9 @@ mod tests {
     fn a_new_reminder_gets_defaults_and_only_the_fields_given() {
         let fake = Arc::new(Fake::default());
         let out = call(&fake, "care_set", json!({"text": "喝水", "time": "15:30"})).unwrap();
-        assert_eq!(out, "已添加提醒：喝水");
+        assert!(out.starts_with("已添加提醒：喝水。每天 "), "{out}");
         let out = call(&fake, "care_set", json!({"text": "开会", "repeat": "weekdays", "weekdays": [1, 3, 5], "time": "09:00"})).unwrap();
-        assert_eq!(out, "已添加提醒：开会");
+        assert!(out.starts_with("已添加提醒：开会。"), "{out}");
         assert_eq!(fake.calls(), vec!["upsert  custom daily \"15:30\" [] 喝水 true", "upsert  custom weekdays \"09:00\" [1, 3, 5] 开会 true"]);
     }
 
@@ -1732,7 +1759,7 @@ mod tests {
         let saved = Rule { id: "care-1".into(), text: "喝水".into(), time: "15:00".into(), revision: 4, ..Default::default() };
         fake.rules.lock().unwrap_or_else(|e| e.into_inner()).push(serde_json::to_value(&saved).unwrap());
         let out = call(&fake, "care_set", json!({"id": "care-1", "time": "16:00", "enabled": false})).unwrap();
-        assert_eq!(out, "已更新提醒：喝水");
+        assert!(out.starts_with("已更新提醒：喝水。"), "{out}");
         assert_eq!(fake.calls(), vec!["upsert care-1 custom daily \"16:00\" [] 喝水 false"]);
         assert!(call(&fake, "care_set", json!({"id": "care-404", "text": "x"})).unwrap_err().contains("care_list"));
     }
@@ -1767,13 +1794,14 @@ mod tests {
     #[test]
     fn a_scheduled_task_is_set_with_kind_agent_and_changed_only_by_saying_so() {
         let fake = Arc::new(Fake::default());
-        assert_eq!(call(&fake, "care_set", json!({"text": "总结昨天改过的文件", "kind": "agent", "time": "08:00"})).unwrap(), "已添加提醒：总结昨天改过的文件");
+        let out = call(&fake, "care_set", json!({"text": "总结昨天改过的文件", "kind": "agent", "time": "08:00"})).unwrap();
+        assert!(out.starts_with("已添加提醒：总结昨天改过的文件。每天 08:00到点，小伴会在后台去做这件事"), "{out}");
         assert_eq!(fake.calls(), vec!["upsert  agent daily \"08:00\" [] 总结昨天改过的文件 true"]);
         let saved = Rule { id: "task".into(), kind: "agent".into(), text: "看待办".into(), time: "09:00".into(), ..Default::default() };
         fake.rules.lock().unwrap_or_else(|e| e.into_inner()).push(serde_json::to_value(&saved).unwrap());
         assert!(call(&fake, "care_set", json!({"id": "task", "text": "删掉所有文件"})).unwrap_err().contains("kind=agent"), "the confirmation must see it");
         assert!(call(&fake, "care_set", json!({"id": "task", "kind": "custom", "text": "x"})).unwrap_err().contains("kind=agent"));
-        assert_eq!(call(&fake, "care_set", json!({"id": "task", "kind": "agent", "time": "10:00"})).unwrap(), "已更新提醒：看待办");
+        assert!(call(&fake, "care_set", json!({"id": "task", "kind": "agent", "time": "10:00"})).unwrap().starts_with("已更新提醒：看待办。"));
         assert!(call(&fake, "care_list", json!({})).unwrap().contains("task | 每天 09:00 | 定时任务：看待办"));
     }
 
@@ -1894,6 +1922,23 @@ mod tests {
         assert!(call(&fake, "desktop_settings_set", json!({"appearance": "neon"})).unwrap_err().contains("appearance 只能是"));
         assert!(call(&fake, "desktop_settings_set", json!({"accent": "pink"})).unwrap_err().contains("accent 只能是"));
         assert_eq!(fake.calls().len(), 2, "a refused call changes nothing");
+    }
+
+    #[test]
+    fn a_new_reminder_says_how_it_will_reach_the_user() {
+        let once = Rule { kind: "custom".into(), repeat: "once".into(), once_at: "2026-10-24T09:57".into(), text: "买花".into(), ..Default::default() };
+        let quiet = json!({"enabled": true, "sound": false, "voice": true, "quietEnabled": true, "quietStart": "22:00", "quietEnd": "08:00"});
+        let how = how_it_reminds(&once, &quiet);
+        assert!(how.starts_with("2026-10-24 09:57到点会在屏幕右上角弹出提醒气泡"), "{how}");
+        assert!(how.contains("一直留着") && how.contains("提示音关、语音播报已开") && how.contains("安静时段（22:00–08:00）"), "{how}");
+        let daily = Rule { time: "15:30".into(), ..Default::default() };
+        let how = how_it_reminds(&daily, &json!({"enabled": true}));
+        assert!(how.starts_with("每天 15:30") && how.contains("约 10 秒") && !how.contains("一直留着") && !how.contains("安静时段"), "{how}");
+        let days = Rule { repeat: "weekdays".into(), weekdays: vec![1, 3, 5], time: "09:00".into(), ..Default::default() };
+        assert!(how_it_reminds(&days, &json!({})).starts_with("每周一、三、五的 09:00"));
+        let rest = Rule { kind: "rest".into(), interval_minutes: 45, ..Default::default() };
+        assert!(how_it_reminds(&rest, &json!({})).starts_with("使用电脑每满 45 分钟"));
+        assert!(how_it_reminds(&once, &json!({"enabled": false})).contains("总开关现在是关的"));
     }
 
     #[test]
