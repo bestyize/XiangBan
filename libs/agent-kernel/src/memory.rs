@@ -166,7 +166,7 @@ impl MemoryWrite {
         let schema = json!({
             "type": "object",
             "properties": {
-                "name": { "type": "string" },
+                "name": { "type": "string", "description": "1 to 64 lowercase ASCII letters, digits and hyphens, not starting or ending with a hyphen, e.g. `favorite-drinks`. Never Chinese or spaces: write the topic in English words here and put the user's own language in `content`." },
                 "action": { "type": "string", "enum": ["write", "append", "delete"], "description": "write replaces the whole note. Default: write." },
                 "content": { "type": "string" }
             },
