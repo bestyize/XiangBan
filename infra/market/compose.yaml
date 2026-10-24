@@ -1,0 +1,66 @@
+# 小伴市场独立部署栈：自带 PostgreSQL，与主站 infra/compose.yaml、账号中心互不依赖，数据卷与备份各自独立。
+# 镜像由 .github/workflows/market.yml 构建并加载到服务器，这里不 build。
+name: xiangban-market
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: xiaoban_market
+      POSTGRES_USER: market
+      POSTGRES_PASSWORD: ${MARKET_DB_PASSWORD:?在服务器端 .env 中设置 MARKET_DB_PASSWORD}
+    volumes:
+      - market_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U market -d xiaoban_market"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - backend
+
+  market:
+    image: xiangban-market:${MARKET_IMAGE_TAG:-latest}
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgres://market:${MARKET_DB_PASSWORD}@postgres:5432/xiaoban_market
+      MARKET_JWT_SECRET: ${MARKET_JWT_SECRET:?设置 MARKET_JWT_SECRET（至少 32 位随机字符，用 openssl rand -hex 32 生成）}
+      MARKET_ADMIN_USER: ${MARKET_ADMIN_USER:-admin}
+      # 仅在库里还没有管理员时用来创建初始管理员；首次登录后请在后台改密码并从 .env 删除。
+      MARKET_ADMIN_PASS: ${MARKET_ADMIN_PASS:-}
+      # 相伴账号登录：设置 issuer 才启用，见 services/server-xiaoban-market/README.md。
+      MARKET_ACCOUNT_ISSUER: ${MARKET_ACCOUNT_ISSUER:-}
+      MARKET_ACCOUNT_JWKS_URL: ${MARKET_ACCOUNT_JWKS_URL:-}
+      MARKET_ACCOUNT_URL: ${MARKET_ACCOUNT_URL:-}
+      MARKET_ACCOUNT_CLIENT_ID: ${MARKET_ACCOUNT_CLIENT_ID:-xiaoban-market}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      # 服务只绑定本机回环，唯一入口是宿主机 Nginx。
+      - "${MARKET_BIND_ADDRESS:-127.0.0.1}:55010:55010"
+    volumes:
+      - market_data:/data
+    # 运行期只写 /data（安装包），根文件系统只读。
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - backend
+      - edge
+
+volumes:
+  market_pg_data:
+  # 安装包按内容哈希存放，没有它们已发布的技能无法下载：和数据库一起备份。
+  market_data:
+
+networks:
+  # 数据库所在网络不能出网；小伴市场额外接入 edge，才能发布端口并采集 SkillHub / 魔搭。
+  backend:
+    internal: true
+  edge:

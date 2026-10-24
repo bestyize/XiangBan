@@ -13,7 +13,7 @@
 | 采集：魔搭社区（MCP / 技能 / 智能体） | **通用 JSON 适配器已实现，但三个来源的接口地址与字段映射尚未配置**。开发环境访问不到 modelscope.cn，真实接口只能由能访问的人在后台「试采」后填写 |
 | 采集工作台后端 API（来源、试采、任务、暂存区、入库、内容库、分类、版本上传） | 已实现 |
 | 前端：公开网页（专家 / 技能 / 连接器、搜索、详情弹窗）与后台工作台（总览、采集来源与试采、采集任务、暂存区、内容库、分类、设置） | 已实现（Vue 3 + Vite + TypeScript），在 `web/` |
-| 部署栈（`infra/`）、定时备份 | 未实现 |
+| 部署栈（`infra/market`）、手动触发的测试 / 打包 / 部署工作流 | 已写好，compose 配置和 YAML 已本地校验；**镜像构建、容器冒烟和 SSH 部署尚未在真实环境运行**，见 [部署文档](../../docs/deployment/MARKET_DEPLOYMENT.md) |
 
 ## 目录
 
@@ -46,7 +46,7 @@ TEST_DATABASE_URL=postgres://market:market@127.0.0.1:5432/postgres cargo test
 
 首次启动会创建管理员；没设 `MARKET_ADMIN_PASS` 时，随机密码**只在日志里出现一次**。
 
-按仓库规范，服务器上不要现场编译：在本地构建好二进制和前端静态资源再上传。
+按仓库规范，服务器上不要现场编译：由 `.github/workflows/market.yml`（手动触发）构建镜像并部署，流程见 [docs/deployment/MARKET_DEPLOYMENT.md](../../docs/deployment/MARKET_DEPLOYMENT.md)，配置模板在 [infra/market](../../infra/market/compose.yaml)。
 
 ## 前端
 

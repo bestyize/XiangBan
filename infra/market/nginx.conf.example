@@ -1,0 +1,72 @@
+# 宿主机 Nginx 反代示例，放进 /etc/nginx/conf.d/ 或 sites-available。
+# 把 market.xiangban.xyz 换成你的域名；证书用 certbot 签发。
+# limit_req_zone 必须位于 http 上下文，conf.d 下的文件已经在 http 里。
+
+limit_req_status 429;
+limit_req_zone $binary_remote_addr zone=market_login:10m rate=6r/m;
+limit_req_zone $binary_remote_addr zone=market_admin:10m rate=5r/s;
+limit_req_zone $binary_remote_addr zone=market_api:10m rate=20r/s;
+
+server {
+    listen 80;
+    server_name market.xiangban.xyz;
+    return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl;
+    http2 on;
+    server_name market.xiangban.xyz;
+
+    ssl_certificate     /etc/letsencrypt/live/market.xiangban.xyz/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/market.xiangban.xyz/privkey.pem;
+
+    server_tokens off;
+    add_header Strict-Transport-Security "max-age=31536000" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header Referrer-Policy "same-origin" always;
+
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    # 服务用 X-Forwarded-For 的第一段给下载计数去重，所以这里必须覆盖客户端自带的同名请求头，
+    # 不能用 $proxy_add_x_forwarded_for（它会把客户端伪造的值放在最前面）。
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $remote_addr;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_connect_timeout 5s;
+    proxy_read_timeout 60s;
+
+    # 后台登录：每个 IP 每分钟 6 次（服务本身没有登录限流）。
+    location = /api/v1/admin/login {
+        limit_req zone=market_login burst=3 nodelay;
+        client_max_body_size 4k;
+        proxy_pass http://127.0.0.1:55010;
+    }
+    location = /api/v1/admin/login/account {
+        limit_req zone=market_login burst=3 nodelay;
+        client_max_body_size 8k;
+        proxy_pass http://127.0.0.1:55010;
+    }
+
+    # 上传技能安装包（ZIP，最大 12 MiB）需要放宽请求体。
+    location ~ ^/api/v1/admin/items/[^/]+/versions$ {
+        limit_req zone=market_admin burst=10 nodelay;
+        client_max_body_size 14m;
+        proxy_pass http://127.0.0.1:55010;
+    }
+
+    # 后台页面与接口。公网不需要时，用 allow/deny 只放行办公网络或 VPN 出口。
+    location ~ ^/(admin|api/v1/admin)(/|$) {
+        # allow 203.0.113.0/24;
+        # deny all;
+        limit_req zone=market_admin burst=20 nodelay;
+        client_max_body_size 1m;
+        proxy_pass http://127.0.0.1:55010;
+    }
+
+    location / {
+        limit_req zone=market_api burst=40 nodelay;
+        client_max_body_size 64k;
+        proxy_pass http://127.0.0.1:55010;
+    }
+}

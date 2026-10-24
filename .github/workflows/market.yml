@@ -1,0 +1,174 @@
+name: Market
+
+# 小伴市场（services/server-xiaoban-market）的测试、打包与部署。只能手动运行：Actions 页选 “Market” → Run workflow。
+# 勾选 deploy 且分支是 main 时，打包成功后才会部署到服务器；不勾选只测试和打包。
+on:
+  workflow_dispatch:
+    inputs:
+      deploy:
+        description: 打包成功后部署到服务器（仅 main 分支有效）
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: market-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: always
+  WEB: services/server-xiaoban-market/web
+  MANIFEST: services/server-xiaoban-market/Cargo.toml
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: market
+          POSTGRES_PASSWORD: market
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U market"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: services/server-xiaoban-market/web/package-lock.json
+      - run: npm --prefix "$WEB" ci
+      - run: npm --prefix "$WEB" test
+      - run: npm --prefix "$WEB" run build
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: services/server-xiaoban-market
+      # 端到端测试每个用例建一个临时库，结束时删除；账号需要 CREATEDB（这里的 POSTGRES_USER 是超级用户）。
+      - run: cargo test --locked --manifest-path "$MANIFEST"
+        env:
+          TEST_DATABASE_URL: postgres://market:market@127.0.0.1:5432/postgres
+      - name: Validate the compose file
+        run: docker compose --env-file infra/market/.env.production.example -f infra/market/compose.yaml config -q
+
+  package:
+    needs: verify
+    runs-on: ubuntu-24.04 # 二进制动态链接 glibc，必须与运行时镜像 ubuntu:24.04 一致
+    timeout-minutes: 40
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: tag
+        run: echo "tag=$(echo "$GITHUB_SHA" | cut -c1-12)" >> "$GITHUB_OUTPUT"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: services/server-xiaoban-market/web/package-lock.json
+      - run: npm --prefix "$WEB" ci
+      - run: npm --prefix "$WEB" run build
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: services/server-xiaoban-market
+      - run: cargo build --locked --release --manifest-path "$MANIFEST"
+      - name: Assemble the image context
+        run: |
+          mkdir -p ctx/web out
+          cp services/server-xiaoban-market/target/release/server-xiaoban-market ctx/
+          cp -r "$WEB"/dist/. ctx/web/
+          cp services/server-xiaoban-market/Dockerfile ctx/
+      - name: Build the image
+        run: |
+          docker build -t "xiangban-market:${{ steps.tag.outputs.tag }}" -t xiangban-market:latest ctx
+      - name: Smoke test (read-only root filesystem, real PostgreSQL)
+        run: |
+          set -euo pipefail
+          docker network create smoke
+          docker run -d --name smoke-pg --network smoke -e POSTGRES_PASSWORD=smoke -e POSTGRES_DB=xiaoban_market postgres:17-alpine
+          for i in $(seq 1 30); do docker exec smoke-pg pg_isready -U postgres -d xiaoban_market && break; sleep 2; done
+          docker run -d --name smoke-market --network smoke --read-only --tmpfs /tmp -v smoke_data:/data -p 55010:55010 \
+            -e DATABASE_URL=postgres://postgres:smoke@smoke-pg:5432/xiaoban_market \
+            -e MARKET_JWT_SECRET=smoke-secret-smoke-secret-smoke-secret -e MARKET_ADMIN_PASS=smoke-pass-12345 \
+            "xiangban-market:${{ steps.tag.outputs.tag }}"
+          for i in $(seq 1 30); do curl -fsS http://127.0.0.1:55010/api/health && break; sleep 2; done
+          curl -fsS http://127.0.0.1:55010/api/health | grep -q '"status":"ok"'
+          curl -fsS http://127.0.0.1:55010/api/v1/market/skills | grep -q '"total":0'
+          curl -fsS http://127.0.0.1:55010/ | grep -q 'id="app"'
+          curl -fsS http://127.0.0.1:55010/api/v1/admin/config | grep -q '"enabled":false'
+          curl -fsS -X POST -H 'content-type: application/json' -d '{"username":"admin","password":"smoke-pass-12345"}' \
+            http://127.0.0.1:55010/api/v1/admin/login | grep -q '"token"'
+      - name: Smoke test logs
+        if: failure()
+        run: docker logs smoke-market || true
+      - name: Export artifacts
+        run: |
+          tag='${{ steps.tag.outputs.tag }}'
+          docker save "xiangban-market:$tag" xiangban-market:latest | gzip > "out/xiangban-market-image-$tag.tar.gz"
+          tar -czf "out/xiangban-market-linux-x64-$tag.tar.gz" -C ctx server-xiaoban-market web
+          (cd out && sha256sum * > SHA256SUMS)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: market-image
+          path: out/xiangban-market-image-*.tar.gz
+          retention-days: 14
+      - uses: actions/upload-artifact@v4
+        with:
+          name: market-binary-linux-x64
+          path: |
+            out/xiangban-market-linux-x64-*.tar.gz
+            out/SHA256SUMS
+          retention-days: 14
+
+  deploy:
+    needs: package
+    if: ${{ inputs.deploy && github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      TAG: ${{ needs.package.outputs.tag }}
+      DEPLOY_HOST: ${{ vars.DEPLOY_HOST }}
+      DEPLOY_USER: ${{ vars.DEPLOY_USER }}
+      DEPLOY_PORT: ${{ vars.DEPLOY_PORT || '22' }}
+      DEPLOY_PATH: ${{ vars.MARKET_DEPLOY_PATH }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: market-image
+          path: out
+      - name: Check configuration
+        run: |
+          for v in DEPLOY_HOST DEPLOY_USER DEPLOY_PATH; do
+            [ -n "${!v}" ] || { echo "缺少 Actions 变量：$v（路径变量名为 MARKET_DEPLOY_PATH）"; exit 1; }
+          done
+      - name: Prepare SSH
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy_key && chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
+      - name: Upload and restart
+        run: |
+          set -euo pipefail
+          ssh_opts=(-i ~/.ssh/deploy_key -p "$DEPLOY_PORT" -o StrictHostKeyChecking=yes -o UserKnownHostsFile=$HOME/.ssh/known_hosts)
+          target="$DEPLOY_USER@$DEPLOY_HOST"
+          ssh "${ssh_opts[@]}" "$target" "mkdir -p '$DEPLOY_PATH'"
+          scp -P "$DEPLOY_PORT" -i ~/.ssh/deploy_key -o StrictHostKeyChecking=yes -o UserKnownHostsFile=$HOME/.ssh/known_hosts \
+            "out/xiangban-market-image-$TAG.tar.gz" infra/market/compose.yaml "$target:$DEPLOY_PATH/"
+          ssh "${ssh_opts[@]}" "$target" "set -e; cd '$DEPLOY_PATH'; test -f .env || { echo '服务器缺少 .env，请先按部署文档创建'; exit 1; }; \
+            gunzip -c 'xiangban-market-image-$TAG.tar.gz' | docker load; rm -f 'xiangban-market-image-$TAG.tar.gz'; \
+            MARKET_IMAGE_TAG='$TAG' docker compose --env-file .env -f compose.yaml up -d --wait"
