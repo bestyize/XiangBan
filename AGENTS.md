@@ -44,3 +44,15 @@
 - 简单任务不启动多 agent；复杂开发仅在用户明确要求或适用仓库规则要求时使用。
 - 只有合并冲突、权限问题或远端明确要求的检查阻挡操作时，才做针对性处理；不要主动展开 CI 排查。
 - 工具输出只保留与当前决策有关的摘要，避免重复读取说明和输出大段日志。优先节省用户时间与额度。
+
+---
+
+# 前端依赖安装（npm 镜像源）
+
+- 各前端子项目的 `package-lock.json` 里 `resolved` 地址固定为 `https://registry.npmmirror.com`（npmmirror 镜像）。**云端沙箱 / 受限网络的代理通常不放行 npmmirror**，直接 `npm ci` 会长时间卡住或失败（表现为 `connect_rejected`、`MaxListenersExceededWarning` 后无进展）。
+- 这种环境里改走官方源安装，**不要修改或重新生成 `package-lock.json`**：
+
+      npm ci --replace-registry-host=always --registry=https://registry.npmjs.org/ --no-audit --no-fund
+
+  `--replace-registry-host=always` 只替换下载主机，`integrity` 校验仍然有效。
+- 能访问 npmmirror 的本机环境照常使用 `npm ci`。
