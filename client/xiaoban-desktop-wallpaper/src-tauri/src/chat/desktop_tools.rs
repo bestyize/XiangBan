@@ -1207,7 +1207,7 @@ pub fn tools_in_workspace(desktop: Arc<dyn Desktop>, workspace: &std::path::Path
                         "id": {"type": "string", "description": "要修改的提醒 id，添加时不填"},
                         "text": {"type": "string", "description": "提醒的文字，最多 240 字；定时任务写要小伴做的事，最多 1000 字"},
                         "kind": {"type": "string", "enum": ["custom", "off-work", "rest", "agent"], "description": "custom 普通提醒（默认），off-work 下班提醒，rest 每隔一段时间提醒休息，agent 定时任务（修改定时任务时也要带上）"},
-                        "repeat": {"type": "string", "enum": ["daily", "weekdays", "once"], "description": "每天 / 每周的指定几天 / 只提醒一次"},
+                        "repeat": {"type": "string", "enum": ["daily", "weekdays", "once"], "description": "daily 每天 / weekdays 每周的指定几天（必须同时给 weekdays 数组，工作日写 [1,2,3,4,5]）/ once 只提醒一次"},
                         "time": {"type": "string", "description": "HH:MM，例如 15:00"},
                         "onceAt": {"type": "string", "description": "repeat 为 once 时的本地日期时间，格式 YYYY-MM-DDTHH:MM，必须是未来的时间"},
                         "weekdays": {"type": "array", "items": {"type": "integer", "minimum": 1, "maximum": 7}, "description": "repeat 为 weekdays 时用，1 是周一，7 是周日"},

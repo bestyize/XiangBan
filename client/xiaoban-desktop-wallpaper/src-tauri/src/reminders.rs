@@ -168,6 +168,7 @@ fn validate(rule: &Rule) -> Result<(), String> {
             "once" => { NaiveDateTime::parse_from_str(&rule.once_at, "%Y-%m-%dT%H:%M").map_err(|_| "请选择一次提醒的日期和时间")?; },
             "daily" => {},
             "weekdays" if !rule.weekdays.is_empty() && rule.weekdays.iter().all(|day| (1..=7).contains(day)) => {},
+            "weekdays" => return Err("按星期重复需要至少选一天：weekdays 填 1（周一）到 7（周日），例如工作日是 [1,2,3,4,5]".into()),
             _ => return Err("请选择每天、一次或有效的星期".into()),
         }
     }
@@ -883,6 +884,15 @@ mod tests {
         assert!(collect_with_widgets(&mut restarted,now,0.,&[]));assert!(restarted.pending.is_empty());
     }
     use super::*;
+    #[test]
+    fn a_weekday_repeat_without_days_says_which_field_to_fill() {
+        let base = Rule { text: "看日程".into(), time: "09:30".into(), repeat: "weekdays".into(), ..Rule::default() };
+        let error = validate(&base).unwrap_err();
+        assert!(error.contains("weekdays") && error.contains("[1,2,3,4,5]"), "{error}");
+        assert!(validate(&Rule { weekdays: vec![1, 2, 3, 4, 5], ..base.clone() }).is_ok());
+        assert!(validate(&Rule { weekdays: vec![0], ..base.clone() }).unwrap_err().contains("weekdays"));
+        assert_eq!(validate(&Rule { repeat: "monthly".into(), ..base }).unwrap_err(), "请选择每天、一次或有效的星期");
+    }
     #[test]
     fn old_care_config_keeps_voice_off() {
         let config: CareConfig = serde_json::from_str(r#"{"enabled":true,"sound":true}"#).unwrap();
