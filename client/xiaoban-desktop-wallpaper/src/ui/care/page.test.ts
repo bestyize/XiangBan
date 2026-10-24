@@ -34,7 +34,9 @@ describe('care preferences', () => {
     const row = wrapper.find('[data-testid="care-once-sound"]');
     expect(row.exists()).toBe(true);
     expect(row.attributes('value') ?? row.attributes('modelvalue') ?? 'true').toMatch(/true/);
+    expect(wrapper.find('[data-testid="care-once-voice"]').exists()).toBe(true);
     expect(emptyCareStatus().config.onceSound).toBe(true);
+    expect(emptyCareStatus().config.onceVoice).toBe(true);
     wrapper.unmount();
   });
 });

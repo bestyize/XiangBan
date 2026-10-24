@@ -16,6 +16,8 @@ export interface CareConfig {
   /** One-time reminders sound even when `sound` is off. */
   onceSound: boolean;
   voice: boolean;
+  /** One-time reminders are read aloud even when `voice` is off. */
+  onceVoice: boolean;
   quietEnabled: boolean;
   quietStart: string;
   quietEnd: string;

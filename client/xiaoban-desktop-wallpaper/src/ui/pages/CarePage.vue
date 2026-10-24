@@ -157,6 +157,7 @@ onUnmounted(() => { if (clockTimer) clearInterval(clockTimer); care.dispose(); }
           <div class="xb-row"><div class="xb-row-text"><b>开启关怀提醒</b><span>关闭后暂停全部关怀提醒。</span></div><NSwitch v-model:value="preferences.enabled" @update:value="preferencesDirty = true" /></div>
           <div class="xb-row"><div class="xb-row-text"><b>提示音</b><span>所有提醒到点都响一声。</span></div><NSwitch v-model:value="preferences.sound" @update:value="preferencesDirty = true" /></div>
           <div class="xb-row"><div class="xb-row-text"><b>一次性提醒带提示音</b><span>只提醒一次的事不想错过，所以默认响一声，即使上面的提示音关着。</span></div><NSwitch v-model:value="preferences.onceSound" data-testid="care-once-sound" @update:value="preferencesDirty = true" /></div>
+          <div class="xb-row"><div class="xb-row-text"><b>一次性提醒朗读出来</b><span>只提醒一次的事到点会把提醒内容读出来，即使下面的语音播报关着。用“设置 → 声音”的音色；选了在线音色时，朗读会把提醒文字发给在线语音服务，在线失败会自动换成系统朗读。</span></div><NSwitch v-model:value="preferences.onceVoice" data-testid="care-once-voice" @update:value="preferencesDirty = true" /></div>
           <div class="xb-row"><div class="xb-row-text"><b>语音播报</b><span>使用“设置 → 声音”的音色；播报时会把提醒文案发送给在线语音服务。默认关闭。</span></div><NSwitch v-model:value="preferences.voice" data-testid="care-voice-switch" @update:value="preferencesDirty = true" /></div>
           <div class="xb-row"><div class="xb-row-text"><b>免打扰时段</b><span>支持跨午夜，期间的有效提醒会延后。</span></div><NSwitch v-model:value="preferences.quietEnabled" @update:value="preferencesDirty = true" /></div>
           <div v-if="preferences.quietEnabled" class="care-time-pair">

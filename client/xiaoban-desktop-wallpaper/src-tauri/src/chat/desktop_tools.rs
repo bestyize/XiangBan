@@ -542,6 +542,7 @@ fn how_it_reminds(rule: &Rule, config: &Value) -> String {
     let on = |key: &str| config[key].as_bool().unwrap_or(false);
     let once = rule.repeat == "once" && rule.kind == "custom";
     let sound = on("sound") || (once && config["onceSound"].as_bool().unwrap_or(true));
+    let speaks = on("voice") || (once && config["onceVoice"].as_bool().unwrap_or(true));
     let when = if rule.kind == "rest" { format!("使用电脑每满 {} 分钟", rule.interval_minutes) } else {
         match rule.repeat.as_str() {
             "once" => rule.once_at.replace('T', " "),
@@ -558,8 +559,8 @@ fn how_it_reminds(rule: &Rule, config: &Value) -> String {
         "气泡显示约 10 秒（开了语音播报是 30 秒），可点「稍后提醒」10 分钟后再弹"
     };
     let quiet = if on("quietEnabled") { format!("安静时段（{}–{}）、", config["quietStart"].as_str().unwrap_or("22:00"), config["quietEnd"].as_str().unwrap_or("08:00")) } else { String::new() };
-    format!("{when}到点会在屏幕右上角弹出提醒气泡，{stays}；提示音{}、语音播报{}（可在「提醒」页调整）；小伴需要在运行，{quiet}屏幕锁定、专注模式、玩游戏时先压住，之后补弹",
-        if sound { "已开" } else { "关" }, if on("voice") { "已开" } else { "关" })
+    format!("{when}到点会在屏幕右上角弹出提醒气泡，{stays}；提示音{}、朗读提醒内容{}（可在「提醒」页调整）；小伴需要在运行，{quiet}屏幕锁定、专注模式、玩游戏时先压住，之后补弹",
+        if sound { "已开" } else { "关" }, if speaks { "已开" } else { "关" })
 }
 
 fn care_set(desktop: &dyn Desktop, args: &Value) -> Result<String, String> {
@@ -1932,9 +1933,9 @@ mod tests {
         let quiet = json!({"enabled": true, "sound": false, "voice": true, "quietEnabled": true, "quietStart": "22:00", "quietEnd": "08:00"});
         let how = how_it_reminds(&once, &quiet);
         assert!(how.starts_with("2026-10-24 09:57到点会在屏幕右上角弹出提醒气泡"), "{how}");
-        assert!(how.contains("一直留着") && how.contains("提示音已开、语音播报已开") && how.contains("安静时段（22:00–08:00）"), "{how}");
-        let silenced = how_it_reminds(&once, &json!({"enabled": true, "sound": false, "onceSound": false}));
-        assert!(silenced.contains("提示音关"), "{silenced}");
+        assert!(how.contains("一直留着") && how.contains("提示音已开、朗读提醒内容已开") && how.contains("安静时段（22:00–08:00）"), "{how}");
+        let silenced = how_it_reminds(&once, &json!({"enabled": true, "sound": false, "onceSound": false, "onceVoice": false}));
+        assert!(silenced.contains("提示音关、朗读提醒内容关"), "{silenced}");
         assert!(how_it_reminds(&once, &json!({"enabled": true})).contains("提示音已开"), "a setting that is missing counts as the default, on");
         let daily = Rule { time: "15:30".into(), ..Default::default() };
         let how = how_it_reminds(&daily, &json!({"enabled": true}));

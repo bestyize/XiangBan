@@ -26,13 +26,15 @@ pub struct CareConfig {
     /// One-time reminders sound even when `sound` is off: they are the ones that must not be missed.
     pub once_sound: bool,
     pub voice: bool,
+    /// One-time reminders are read aloud even when `voice` is off.
+    pub once_voice: bool,
     pub quiet_enabled: bool,
     pub quiet_start: String,
     pub quiet_end: String,
     pub weather_source: Source,
 }
 impl Default for CareConfig {
-    fn default() -> Self { Self { enabled: true, sound: false, once_sound: true, voice: false, quiet_enabled: false, quiet_start: "22:00".into(), quiet_end: "08:00".into(), weather_source: Source::default() } }
+    fn default() -> Self { Self { enabled: true, sound: false, once_sound: true, voice: false, once_voice: true, quiet_enabled: false, quiet_start: "22:00".into(), quiet_end: "08:00".into(), weather_source: Source::default() } }
 }
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
@@ -177,6 +179,15 @@ fn quiet(config: &CareConfig, now: NaiveTime) -> bool {
     let (Ok(start), Ok(end)) = (time(&config.quiet_start), time(&config.quiet_end)) else { return false; };
     if start == end { return true; }
     if start < end { now >= start && now < end } else { now >= start || now < end }
+}
+/// Whether a bubble is read aloud: when voice is on, or when it holds a one-time reminder and those are set to.
+fn speaks(config: &CareConfig, sticky: bool) -> bool { config.voice || (sticky && config.once_voice) }
+/// What is said for a bubble: the reminders themselves, led in by a word so a bare "买花" is understood as a reminder.
+fn spoken(items: &[Pending]) -> String {
+    let texts: Vec<&str> = items.iter().map(|item| item.text.trim()).filter(|text| !text.is_empty()).collect();
+    let body = if texts.len() > 2 { format!("{}。还有 {} 条到期提醒。", texts[..2].join("。"), texts.len() - 2) } else { texts.join("。") };
+    let own_words = items.iter().all(|item| matches!(item.kind.as_str(), "custom" | "off-work" | "rest"));
+    if body.is_empty() || !own_words { body } else { format!("提醒：{body}") }
 }
 /// Whether a bubble beeps: when sounds are on, or when it holds a one-time reminder and those are set to.
 fn plays_sound(config: &CareConfig, sticky: bool) -> bool { config.sound || (sticky && config.once_sound) }
@@ -393,7 +404,7 @@ fn show(app: &tauri::AppHandle, items: Vec<Pending>) -> Result<(), String> {
     let state = app.state::<ReminderState>();
     let config = state.store.lock().unwrap_or_else(|e| e.into_inner()).config.clone();
     let sticky = items.iter().any(|item| item.sticky && !item.preview);
-    let delivery = Delivery { id: format!("bubble-{}", Local::now().timestamp_millis()), items, sound: plays_sound(&config, sticky), voice: config.voice,
+    let delivery = Delivery { id: format!("bubble-{}", Local::now().timestamp_millis()), items, sound: plays_sound(&config, sticky), voice: speaks(&config, sticky),
         display_seconds: if sticky { STICKY_SECONDS } else if config.voice { 30 } else { BUBBLE_SECONDS } };
     { let mut runtime = state.runtime.lock().unwrap_or_else(|e| e.into_inner()); runtime.active = Some(delivery.clone()); runtime.shown_at = if runtime.ready { Some(Local::now().timestamp()) } else { None }; }
     if let Err(error) = open_bubble(app) { close_active(app); return Err(error); }
@@ -434,11 +445,7 @@ pub async fn care_synthesize(window: tauri::WebviewWindow, id: String) -> Result
     let delivery = app.state::<ReminderState>().runtime.lock().unwrap_or_else(|e| e.into_inner()).active.clone()
         .filter(|delivery| delivery.id == id && delivery.voice).ok_or("提醒已关闭或未开启语音播报")?;
     if blocked(&app, &care_system::activity()) { return Err("当前不适合播报提醒".into()); }
-    let texts: Vec<_> = delivery.items.iter().filter_map(|item| {
-        let text = item.text.trim(); if text.is_empty() { None } else { Some(text) }
-    }).collect();
-    let text = if texts.len() > 2 { format!("{}。还有 {} 条到期提醒。", texts[..2].join("。"), texts.len() - 2) }
-        else { texts.join("。") };
+    let text = spoken(&delivery.items);
     if text.is_empty() { return Err("提醒没有可播报的文字".into()); }
     let audio = crate::tts::tts_synthesize(app.clone(), text, None).await?;
     if app.state::<ReminderState>().runtime.lock().unwrap_or_else(|e| e.into_inner()).active.as_ref().is_none_or(|active| active.id != id)
@@ -912,6 +919,20 @@ mod tests {
         assert!(local_due(&rule, hours_later).is_empty());
         let mut daily = Store { rules: vec![rule], ..Store::default() };
         assert!(collect(&mut daily, date(), 0.0) && !daily.pending[0].sticky);
+    }
+    #[test] fn one_time_reminders_are_read_aloud_by_default_and_led_in_by_a_word() {
+        let config = CareConfig::default();
+        assert!(!config.voice && config.once_voice);
+        assert!(speaks(&config, true) && !speaks(&config, false));
+        assert!(!speaks(&CareConfig { once_voice: false, ..CareConfig::default() }, true));
+        assert!(speaks(&CareConfig { voice: true, once_voice: false, ..CareConfig::default() }, false));
+        let old: CareConfig = serde_json::from_str(r#"{"enabled":true,"voice":false}"#).unwrap();
+        assert!(old.once_voice);
+        let item = |kind: &str, text: &str| Pending { key: text.into(), rule_id: "r".into(), revision: 1, kind: kind.into(), text: text.into(), due_at: 0, available_at: 0, expires_at: 0, preview: false, weather_ready: true, weather_at: None, sticky: true };
+        assert_eq!(spoken(&[item("custom", "买花")]), "提醒：买花");
+        assert_eq!(spoken(&[item("custom", "买花"), item("custom", "喝水"), item("rest", "站起来")]), "提醒：买花。喝水。还有 1 条到期提醒。");
+        assert_eq!(spoken(&[item("agent", "今天有 3 封新邮件")]), "今天有 3 封新邮件", "a task's result is not led in as a reminder");
+        assert_eq!(spoken(&[item("custom", "  ")]), "");
     }
     #[test] fn one_time_reminders_beep_by_default_and_everything_else_stays_quiet() {
         let config = CareConfig::default();
