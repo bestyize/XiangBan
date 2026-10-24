@@ -84,7 +84,7 @@ impl WebFetch {
         if addrs.is_empty() {
             return Err(format!("`{domain}` has no addresses"));
         }
-        if !self.trusted_hosts.contains(&domain) && addrs.iter().any(|a| is_blocked_ip(a.ip())) {
+        if !self.trusted_hosts.contains(&domain) && addrs.iter().any(|a| is_blocked_ip(a.ip()) && !is_fake_ip(a.ip())) {
             return Err(format!("`{domain}` resolves to a private or reserved address, which is not allowed"));
         }
         Ok(Some((domain, addrs)))
@@ -129,6 +129,14 @@ fn is_blocked_v6(ip: Ipv6Addr) -> bool {
         || (s[0] == 0x0064 && s[1] == 0xFF9B && s[2..6] == [0, 0, 0, 0] && embedded(s[6], s[7]))
         || (s[0..6] == [0, 0, 0, 0, 0, 0] && embedded(s[6], s[7]))
         || (s[0] == 0x2002 && embedded(s[1], s[2]))
+}
+
+/// Clash, Mihomo, sing-box and Surge in "fake-ip" mode answer every host name with an address from
+/// 198.18.0.0/15 (RFC 2544 benchmarking space) and resolve the real host inside the proxy. Refusing that
+/// range would make every fetch fail for anyone running such a proxy. It is accepted only as the answer for
+/// a host name: a URL that names an address in this range directly is still refused.
+fn is_fake_ip(ip: IpAddr) -> bool {
+    matches!(ip, IpAddr::V4(v4) if { let o = v4.octets(); o[0] == 198 && (o[1] & 0xFE) == 18 })
 }
 
 pub(crate) fn is_blocked_ip(ip: IpAddr) -> bool {
@@ -367,5 +375,22 @@ mod tests {
         assert_eq!(html_to_text("<script>never closed"), "");
         assert_eq!(html_to_text("plain text only"), "plain text only");
         assert_eq!(html_to_text("你好<br>世界&unknown;&"), "你好\n世界&unknown;&");
+    }
+}
+
+#[cfg(test)]
+mod fake_ip_tests {
+    use super::*;
+
+    #[test]
+    fn only_the_fake_ip_range_is_exempt_and_only_for_resolved_names() {
+        for ip in ["198.18.0.17", "198.19.255.254"] {
+            let ip: IpAddr = ip.parse().unwrap();
+            assert!(is_fake_ip(ip));
+            assert!(is_blocked_ip(ip), "a literal address in the range stays refused");
+        }
+        for ip in ["198.17.255.255", "198.20.0.1", "10.0.0.1", "127.0.0.1", "169.254.169.254", "192.168.1.1", "100.64.0.1", "::1", "fc00::1"] {
+            assert!(!is_fake_ip(ip.parse().unwrap()), "{ip}");
+        }
     }
 }
