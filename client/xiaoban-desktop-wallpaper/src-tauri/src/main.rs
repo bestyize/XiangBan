@@ -793,6 +793,7 @@ fn main() {
             .js_init_script_on_all_frames(include_str!("webview_context_menu.js"))
             .build())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_deep_link::init())
         .plugin(float_assistant::plugin())
         .plugin(tauri_plugin_single_instance::init(|app, arguments, _| {
             if !arguments.iter().any(|arg| arg == "--autostart") { let _ = present_control(app); }
@@ -835,13 +836,16 @@ fn main() {
             chat::store::ai_store_installed, chat::store::ai_store_browse, chat::store::ai_store_skill_categories, chat::store::ai_store_inspect, chat::store::ai_store_install, chat::store::ai_store_uninstall,
             chat::store::ai_store_catalog, chat::store::ai_store_experts_installed, chat::store::ai_store_expert_review, chat::store::ai_store_expert_install, chat::store::ai_store_expert_remove, chat::store::ai_store_connector_detail, chat::store::ai_store_connector_status, chat::store::ai_store_connector_connect, chat::store::ai_store_connector_disconnect, chat::store::ai_store_connector_reconnect,
             chat::store::ai_store_connector_auth_status, chat::store::ai_store_connector_auth_cancel,
+            chat::store_market::ai_market_take_link, chat::store_market::ai_market_info, chat::store_market::ai_market_browse, chat::store_market::ai_market_categories, chat::store_market::ai_market_detail,
+            chat::store_market::ai_market_inspect, chat::store_market::ai_market_install, chat::store_market::ai_market_group_inspect, chat::store_market::ai_market_group_install,
+            chat::store_market::ai_market_updates, chat::store_market::ai_market_update,
             float_assistant::assistant_status, float_assistant::assistant_configure, float_assistant::assistant_ready, float_assistant::assistant_hide,
             assistant_hit_test::assistant_set_regions, data_library::library_state, data_library::library_pick_import, data_library::library_import_data, data_library::library_create_folder, data_library::library_rename_folder, data_library::library_delete_folder, data_library::library_move, data_library::library_update_doc, data_library::library_remove, data_library::library_reveal, data_library::library_attachment, data_library::library_add_link, data_library::library_rename_link, data_library::library_save, chat::memory_center::chat_memory_overview, chat::memory_center::chat_memory_set_remembering, chat::memory_center::chat_memory_edit_experience, chat::memory_center::chat_memory_forget_experience, chat::memory_center::chat_memory_write_note, chat::memory_center::chat_memory_delete_note, chat::memory_center::chat_memory_clear, capture_editor::capture_frame, capture_editor::capture_show, capture_editor::capture_finish,
             chat_screenshot, float_assistant::assistant_screenshot, float_assistant::assistant_drag, float_assistant::assistant_unfold, float_assistant::assistant_focus,
              assistant_capture::reset_screen_capture_permission, assistant_capture::open_screen_capture_settings,
             float_assistant::assistant_reanchor_ready, float_assistant::assistant_prefs, float_assistant::assistant_try, float_assistant::assistant_open_chat, float_assistant::assistant_open_settings]);
     let app = builder.manage(state).manage(content::ContentState::default()).manage(website::WebsiteState::default())
-        .manage(games::GameState::default()).manage(desk_game::DeskState::default()).manage(rituals::RitualState::default()).manage(widgets::WidgetState::default()).manage(pets::PetState::default()).manage(reminders::ReminderState::default()).manage(proactivity::ProactivityState::default()).manage(companion_dialogue::DialogueState::default()).manage(account::AccountState::default()).manage(ai_config::AiConfigState::default()).manage(tts::TtsState::default()).manage(asr::AsrState::default()).manage(ai_catalogue::CatalogueState::default()).manage(float_assistant::AssistantState::default()).manage(capture_editor::CaptureState::default()).manage(assistant_hit_test::HitState::default()).manage(data_library::LibraryState::default()).manage(window_control::WindowState::default()).manage(voice_turn::VoiceTurnState::default())
+        .manage(games::GameState::default()).manage(desk_game::DeskState::default()).manage(rituals::RitualState::default()).manage(widgets::WidgetState::default()).manage(pets::PetState::default()).manage(reminders::ReminderState::default()).manage(proactivity::ProactivityState::default()).manage(companion_dialogue::DialogueState::default()).manage(account::AccountState::default()).manage(ai_config::AiConfigState::default()).manage(tts::TtsState::default()).manage(asr::AsrState::default()).manage(ai_catalogue::CatalogueState::default()).manage(float_assistant::AssistantState::default()).manage(capture_editor::CaptureState::default()).manage(assistant_hit_test::HitState::default()).manage(data_library::LibraryState::default()).manage(window_control::WindowState::default()).manage(chat::store_market::PendingLink::default()).manage(voice_turn::VoiceTurnState::default())
         .register_uri_scheme_protocol("wallpaper-asset", |context, request| library::serve(context.app_handle(), request))
         .register_uri_scheme_protocol("game-pack", |context, request| game_packs::serve(context.app_handle(), request))
         .invoke_handler(move |invoke| {
@@ -872,6 +876,18 @@ fn main() {
             network::initialize(app.handle()).map_err(std::io::Error::other)?;
             if let Some(session) = account::load_session(app.handle()) {
                 *app.state::<account::AccountState>().session.lock().unwrap_or_else(|e| e.into_inner()) = Some(session);
+            }
+            {
+                // `xiaoban://market/...` links from the market website. They only ask the console to show a
+                // dialog; the console validates and the user confirms. A link that started the app is read here.
+                use tauri_plugin_deep_link::DeepLinkExt;
+                let handle = app.handle().clone();
+                app.deep_link().on_open_url(move |event| {
+                    for url in event.urls() { chat::store_market::receive_link(&handle, url.as_str()); }
+                });
+                if let Ok(Some(urls)) = app.deep_link().get_current() {
+                    for url in urls { chat::store_market::receive_link(app.handle(), url.as_str()); }
+                }
             }
             app.manage(chat::ChatState::new(app.handle()));
             chat::goals::resume_pending(app.handle());

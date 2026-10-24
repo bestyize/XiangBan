@@ -2,6 +2,10 @@
 
 ## AI 商店：SkillHub 专家包与 MCP
 
+**小伴市场（默认来源）**：AI 插件页默认从自建的小伴市场获取专家、技能和连接器，筛选行右侧可切换到 SkillHub；市场连不上时自动先显示 SkillHub，已安装的插件不受影响。市场地址随应用内置（`src-tauri/src/chat/store_market.rs` 的 `DEFAULT_MARKET`，**部署时需改为真实域名**；仅调试版可用环境变量 `XIAOBAN_MARKET_URL` 指向本机）。安装前展示说明、文件清单、逐文件 SHA256 和脚本预览，并按清单摘要锁定版本；已安装的市场插件有新版本时提示更新，更新前展示文件差异，旧版本保留备份（`chat/skill-backups`）；专家团、技能套件一次审查、整组安装、失败整组回滚。网页上的「在小伴中安装」通过 `xiaoban://market/...` 唤起本应用，只弹出确认窗口，不会静默安装；协议关联由 `tauri-plugin-deep-link` 在打包安装版里注册（`tauri.conf.json` 的 `plugins.deep-link`）。「插件来源」设置里可关闭 SkillHub 补充来源和自动检查更新（保存在本机界面偏好中）。
+
+验证：`npx vitest run src/ui/pages/AiStoreMarket.test.ts src/ui/ai-store/market.test.ts`；`cargo test --manifest-path libs/agent-tools/skill-discovery/Cargo.toml market`。
+
 技能分类与在线技能目录优先通过设置中网站地址的 `/api/v1/ai/plugins`、`/api/v1/ai/plugins/categories` 读取，复用服务端 SkillHub API 代理与短期缓存。旧服务端明确返回 HTTP 404 时，回退到原有 SkillHub 直连流程；403、429、服务错误、网络故障或无效响应不会触发回退，空列表也保持服务端结果。每次查询都会优先尝试本站接口，服务端部署后自动切回，无需重启客户端。审查、安装和文件校验继续直接使用原有 SkillHub 流程，本地技能不受目录离线影响。官网 `/plugins` 也可浏览技能和复制安装指令，网页不会自动安装或执行代码。
 
 目录兼容测试：在本目录执行 `cargo test --locked --manifest-path src-tauri/Cargo.toml chat::store::catalog::`，覆盖旧站纯文本 / HTML / JSON 404、正常空列表、权限与限流、异常响应和网络失败。

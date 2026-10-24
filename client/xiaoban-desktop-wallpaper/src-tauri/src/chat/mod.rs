@@ -38,6 +38,7 @@ mod learning;
 pub mod memory_center;
 mod skill_evolution;
 pub(crate) mod store;
+pub(crate) mod store_market;
 mod sessions;
 pub mod search;
 

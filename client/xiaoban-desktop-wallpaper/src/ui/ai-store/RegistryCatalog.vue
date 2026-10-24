@@ -9,14 +9,16 @@ import ConnectorConfig from './ConnectorConfig.vue';
 import { categoryIcon, hueStyle } from './hues.ts';
 import './store-cards.css';
 
-interface Entry { slug: string; name: string; description: string; category?: string; iconUrl?: string | null; skillCount?: number }
+interface Entry { slug: string; name: string; description: string; category?: string; iconUrl?: string | null; skillCount?: number; namespace?: string }
 interface Page { results: Entry[]; page: number; total: number; hasMore: boolean }
 interface Pack { slug: string; name: string; description: string; entrySkill: string; ready: boolean; sha256: string; dependencies: { slug: string; namespace?: string; version: string; sha256: string }[] }
 interface PackReview extends Pack { content: string; skills: SkillReview[] }
 interface Connection { id: string; name: string; connected: boolean; enabled: boolean; toolCount: number; error?: string }
 interface ConnectorDetail { readme: string; configs: { name: string; config: Record<string, unknown> }[] }
 interface ConnectionResult { status?:string; connected?:boolean; flowId?:string; authorizationUrl?:string }
-const props = withDefaults(defineProps<{ kind: 'experts' | 'connectors'; query: string; category: string; store: ControlStore; installedOnly?: boolean }>(), { installedOnly: false });
+const props = withDefaults(defineProps<{ kind: 'experts' | 'connectors'; query: string; category: string; store: ControlStore; installedOnly?: boolean; source?: 'market' | 'hub' }>(), { installedOnly: false, source: 'hub' });
+const emit = defineEmits<{ unavailable: [message: string] }>();
+const fromMarket = () => props.source === 'market' && props.kind === 'connectors';
 const data = ref<Page>({ results: [], page: 1, total: 0, hasMore: false });
 const page = ref(1), loading = ref(false), error = ref(''), localError = ref('');
 const installedOnly = computed(() => props.installedOnly);
@@ -64,15 +66,20 @@ async function refresh() {
   loading.value = true; error.value = '';
   data.value = { results: [], page: page.value, total: 0, hasMore: false };
   try {
-    const result = await invoke<Page>('ai_store_catalog', {
-      kind: props.kind, keyword: props.query.trim().slice(0, 80), page: page.value,
-      category: props.category === '全部' ? '' : props.kind === 'experts' ? (scene[props.category] || props.category) : props.category,
-    });
+    const keyword = props.query.trim().slice(0, 80), category = props.category === '全部' ? '' : props.kind === 'experts' ? (scene[props.category] || props.category) : props.category;
+    const result = fromMarket()
+      ? await invoke<Page>('ai_market_browse', { kind: 'connectors', keyword, page: page.value, category, source: '', sortBy: '', variant: '' })
+      : await invoke<Page>('ai_store_catalog', { kind: props.kind, keyword, page: page.value, category });
     if (id === requestId) data.value = result;
-  } catch (e) { if (id === requestId) error.value = '暂时无法加载 SkillHub：' + String(e); }
+  } catch (e) {
+    if (id === requestId) {
+      error.value = (fromMarket() ? '暂时无法加载小伴市场：' : '暂时无法加载 SkillHub：') + String(e);
+      if (fromMarket()) emit('unavailable', String(e));
+    }
+  }
   finally { if (id === requestId) loading.value = false; }
 }
-watch(() => [props.kind, props.query, props.category, installedOnly.value], () => {
+watch(() => [props.kind, props.query, props.category, installedOnly.value, props.source], () => {
   ++requestId; page.value = 1; clearTimeout(timer); error.value = '';
   data.value = { results: [], page: 1, total: 0, hasMore: false };
   loading.value = props.store.desktop && !installedOnly.value && props.category !== '本机';
@@ -98,11 +105,17 @@ async function open(entry: Entry) {
       const review = await invoke<PackReview>('ai_store_expert_review', { slug: entry.slug });
       if (id === detailId) packReview.value = review;
     } else {
-      const detail = await invoke<ConnectorDetail>('ai_store_connector_detail', { slug: entry.slug });
+      const detail = fromMarket() && entry.namespace
+        ? await marketConnector(entry)
+        : await invoke<ConnectorDetail>('ai_store_connector_detail', { slug: entry.slug });
       if (id === detailId) { connectorDetail.value = detail; configIndex.value = 0; chooseConfig(); }
     }
   } catch (e) { if (id === detailId) detailError.value = String(e); }
   finally { if (id === detailId) detailLoading.value = false; }
+}
+async function marketConnector(entry: Entry): Promise<ConnectorDetail> {
+  const detail = await invoke<{ item: { description?: string; metadata?: { configs?: ConnectorDetail['configs'] } } }>('ai_market_detail', { kind: 'connectors', namespace: entry.namespace, slug: entry.slug });
+  return { readme: detail.item.description || entry.description, configs: detail.item.metadata?.configs ?? [] };
 }
 function chooseConfig() {
   configText.value = JSON.stringify(connectorDetail.value?.configs[configIndex.value]?.config || { url: '' }, null, 2);
@@ -195,7 +208,7 @@ async function connectionAction(action: 'disconnect' | 'reconnect') {
   } catch (e) { detailError.value = String(e); }
   finally { busy.value = false; }
 }
-defineExpose({ refresh, refreshLocal, installedCount });
+defineExpose({ refresh, refreshLocal, installedCount, open });
 </script>
 
 <template>
@@ -212,7 +225,7 @@ defineExpose({ refresh, refreshLocal, installedCount });
           <div class="xc-main"><div class="xc-title"><h3>{{ entry.name }}</h3></div><p class="xc-desc">{{ entry.description }}</p></div>
         </div>
         <div class="xc-foot">
-          <span class="xc-tag">{{ entry.category || 'SkillHub' }}</span>
+          <span class="xc-tag">{{ entry.category || (source === 'market' && kind === 'connectors' ? '小伴市场' : 'SkillHub') }}</span>
           <span v-if="kind === 'experts' && entry.skillCount !== undefined" class="xc-meta"><Sparkles :size="13" aria-hidden="true" />{{ entry.skillCount }} 个技能</span>
           <span v-if="kind === 'connectors'" class="connection-status" :class="{ 'xb-ok': connection(entry.slug)?.connected }">{{ connection(entry.slug)?.connected ? '已连接 · ' + connection(entry.slug)?.toolCount + ' 个工具' : connection(entry.slug) ? '未连接' : '未配置' }}</span>
           <div class="xc-act">

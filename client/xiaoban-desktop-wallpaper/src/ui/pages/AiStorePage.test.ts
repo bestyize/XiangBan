@@ -7,7 +7,7 @@ import { invoke } from '../../bridge.ts';
 import type { ControlStore } from '../control-types.ts';
 import type { Skill } from '../ai-store/catalog.ts';
 
-vi.mock('../../bridge.ts', () => ({ invoke: vi.fn() }));
+vi.mock('../../bridge.ts', () => ({ invoke: vi.fn(), listen: vi.fn().mockResolvedValue(() => {}) }));
 vi.mock('naive-ui', async () => {
   const { defineComponent } = await import('vue');
   return {
@@ -42,7 +42,11 @@ async function skills(wrapper: ReturnType<typeof mount>) { await wrapper.get('#s
 
 beforeEach(() => {
   vi.useFakeTimers(); local = []; enabled = false; localPacks = []; connected = false;
+  // These cases cover the SkillHub path; the market has its own cases below.
+  localStorage.setItem('xb.market.source', 'hub');
   vi.mocked(invoke).mockReset().mockImplementation(async (command, args) => {
+    if (command === 'ai_market_take_link') return null;
+    if (command === 'ai_market_updates') return { results: [] };
     if (command === 'ai_store_installed') return local;
     if (command === 'ai_store_skill_categories') return { results: [
       { key: 'office-efficiency', name: '办公效率' },

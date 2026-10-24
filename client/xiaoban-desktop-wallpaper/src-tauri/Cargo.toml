@@ -20,7 +20,8 @@ sha2 = "0.10"
 tungstenite = { version = "=0.28.0", default-features = false, features = ["handshake", "native-tls"] }
 semver = "1"
 url = "2"
-tauri-plugin-single-instance = "2"
+tauri-plugin-single-instance = { version = "2", features = ["deep-link"] }
+tauri-plugin-deep-link = "2"
 tauri-plugin-dialog = "2"
 tauri-plugin-global-shortcut = "=2.4.1"
 dirs = "6"

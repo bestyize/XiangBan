@@ -1,4 +1,10 @@
-export interface Skill { slug: string; name: string; description: string; version: string; namespace?: string; iconUrl?: string | null; source?: string; downloads?: number; stars?: number; removable?: boolean }
+export interface Skill {
+  slug: string; name: string; description: string; version: string; namespace?: string; iconUrl?: string | null; source?: string; downloads?: number; stars?: number; removable?: boolean;
+  /** Only from the market: a team or bundle installs several packages at once. */
+  variant?: 'single' | 'team' | 'bundle'; memberCount?: number | null; category?: string | null;
+  /** Only on installed entries that came from the market. */
+  market?: boolean; marketKind?: 'skill' | 'expert' | null; manifestSha256?: string | null; files?: { path: string; sha256: string }[] | null;
+}
 export interface SkillPage { results: Skill[]; page: number; total: number | null; hasMore: boolean }
 export interface SkillReview {
   slug: string; namespace?: string; sha256: string; content: string;

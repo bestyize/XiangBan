@@ -5,7 +5,7 @@ use agent_skill_discovery::SkillDiscovery;
 use serde_json::{json, Value};
 use std::{fs, path::Path, sync::Mutex};
 
-static MUTATIONS: Mutex<()> = Mutex::new(());
+pub(super) static MUTATIONS: Mutex<()> = Mutex::new(());
 
 #[path = "store_catalog.rs"]
 mod catalog;
@@ -82,7 +82,7 @@ pub async fn ai_store_connector_auth_cancel(app:tauri::AppHandle,window:tauri::W
     tauri::async_runtime::spawn_blocking(move||super::connector_manager(&app)?.cancel_authorization(&flow_id)).await.map_err(|e|e.to_string())?
 }
 
-fn control(window: &tauri::WebviewWindow) -> Result<(), String> {
+pub(super) fn control(window: &tauri::WebviewWindow) -> Result<(), String> {
     if window.label() == "control" { Ok(()) } else { Err("仅控制台可以管理 AI 商店".into()) }
 }
 fn discovery(app: &tauri::AppHandle) -> Result<SkillDiscovery, String> {
@@ -112,9 +112,11 @@ pub async fn ai_store_installed(app: tauri::AppHandle, window: tauri::WebviewWin
             let managed = s.writable && removable(&s.dir, &s.name);
             let lock = fs::read_to_string(s.dir.join(".skillhub-lock.json")).ok()
                 .and_then(|s| serde_json::from_str::<Value>(&s).ok()).unwrap_or(Value::Null);
+            let market = managed && super::store_market::lock_summary(&lock)["market"] == true;
             json!({"slug":s.name,"name":s.name,"description":s.description,
                 "version":lock["version"].as_str().unwrap_or(""),"namespace":lock["namespace"],"iconUrl":lock["iconUrl"],"removable":managed,
-                "source":if managed {"SkillHub"} else if s.agent_created {"自建"} else {"本地"}})
+                "market":market,"marketKind":if market {lock["origin"]["kind"].clone()} else {Value::Null},"files":if market {lock["files"].clone()} else {Value::Null},"manifestSha256":if market {lock["manifestSha256"].clone()} else {Value::Null},
+                "source":if market {"小伴市场"} else if managed {"SkillHub"} else if s.agent_created {"自建"} else {"本地"}})
         }).collect::<Vec<_>>()))
     }).await.map_err(|e| e.to_string())?
 }

@@ -31,6 +31,10 @@ vi.mock('../bridge.ts', async (importOriginal) => {
       if (command === 'ai_store_browse') return Promise.resolve({ results: [], page: 1, hasMore: false, total: 0 });
       if (command === 'ai_store_catalog') return Promise.resolve({ results: [], page: 1, hasMore: false, total: 0 });
       if (command === 'ai_store_skill_categories') return Promise.resolve({ results: [] });
+      if (command === 'ai_market_browse') return Promise.resolve({ results: [], page: 1, hasMore: false, total: 0 });
+      if (command === 'ai_market_categories') return Promise.resolve({ results: [] });
+      if (command === 'ai_market_updates') return Promise.resolve({ results: [] });
+      if (command === 'ai_market_take_link') return Promise.resolve(null);
       if (command === 'ai_store_experts_installed' || command === 'ai_store_connector_status') return Promise.resolve([]);
       if (command === 'assistant_status') return Promise.resolve({enabled:true,shortcut:'default',shortcutLabel:'⌥ Space',shortcuts:[],ball:true,open:'type',read:'never',hintSeen:true,registered:true,error:''});
       return Promise.resolve();
