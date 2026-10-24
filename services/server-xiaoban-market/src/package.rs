@@ -182,6 +182,13 @@ pub mod tests {
     }
 
     #[test]
+    fn manifest_digest_matches_the_desktop_client_vector() {
+        // The desktop client asserts the same value in skill-discovery's market tests.
+        let info = inspect_zip(&build(&[("SKILL.md", b"# hi"), ("scripts/run.py", b"print(1)")])).unwrap();
+        assert_eq!(info.manifest_sha256, "ec97286e918f9e7ff5b49adfef3d8f61a1a502409ed93201e5046588cf0a427f");
+    }
+
+    #[test]
     fn rejects_what_the_desktop_client_would_reject() {
         for bad in ["../evil.txt", "a/../b.txt", "/abs.txt", "C:/x.txt", "dir\\x.txt", "CON.txt", "trail.", "a//b", ".hidden", "dir/.env", "a/b/c/d/e/f/g/h/i.txt"] {
             let err = inspect_zip(&build(&[("SKILL.md", b"x"), (bad, b"x")]));

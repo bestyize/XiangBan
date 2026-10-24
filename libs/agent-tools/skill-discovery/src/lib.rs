@@ -4,6 +4,7 @@ mod acquisition;
 mod package;
 mod runner;
 pub mod catalog;
+pub mod market;
 pub mod packs;
 use agent_kernel::{Risk, Tool, ToolCtx, ToolSpec};
 use package::{is_script, plan, Plan};

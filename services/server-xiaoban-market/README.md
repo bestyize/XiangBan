@@ -54,7 +54,7 @@ TEST_DATABASE_URL=postgres://market:market@127.0.0.1:5432/postgres cargo test
 
 - **公开网页** `/experts` `/skills` `/connectors`：分类、排序、关键词搜索（命中高亮；精确结果少时补「相近匹配」）、分页；点击条目以弹窗展示详情（`/skills/{namespace}/{slug}`，可直接分享链接）。弹窗标题区固定，内容区滚动。
 - **后台** `/admin`：登录后可用。采集来源页有结构化配置表单（SkillHub / 通用 JSON 各一套）、字段映射编辑和「试采预览」；暂存区支持批量入库 / 忽略、与已入库内容对比；采集任务页每 2 秒刷新进度和日志。
-- 网页版**不显示**「已安装 / 召唤 / 我的专家」这类依赖桌面端本地状态的按钮；详情弹窗的主按钮通过深链 `xiaoban://market/{open|install|connect}/{skills|experts|connectors}/{namespace}/{slug}?version=&sha256=` 唤起小伴桌面。**桌面客户端目前没有注册这个协议**，接入时需要对齐。
+- 网页版**不显示**「已安装 / 召唤 / 我的专家」这类依赖桌面端本地状态的按钮；详情弹窗的主按钮通过深链 `xiaoban://market/{open|install|connect}/{skills|experts|connectors}/{namespace}/{slug}?version=&sha256=` 唤起小伴桌面。桌面客户端已在代码中注册 `xiaoban://` 并按这个格式处理（见 `libs/agent-tools/skill-discovery` 的 `market` 模块）：链接只会唤起确认窗口，永远不会静默安装；**协议关联需要打包后的 Windows / macOS 安装版才能验证，尚未在真机上验证**。
 - 管理员令牌保存在浏览器 `localStorage`；任何接口返回 401 都会回到登录页。
 - 暂未做：收藏 / 评分、深色模式。
 
@@ -120,7 +120,7 @@ SkillHub 可在 `config.api_key` 填团队密钥；密钥只发给 SkillHub 的 
 
 与桌面客户端 `libs/agent-tools/skill-discovery` 对齐，上架时就拒绝客户端会拒绝的包：最多 512 个文件，解压后 12 MiB，单文件 4 MiB，`SKILL.md` 100 KiB；拒绝路径穿越、绝对路径、符号链接、Windows 保留名、大小写重复路径；允许一个顶层包装目录；根目录必须有 `SKILL.md`。
 
-清单摘要 `manifestSha256` 是**本服务自有算法**：按路径排序后，对每行 `"<文件 sha256>  <路径>\n"` 求 SHA-256。它和 SkillHub 的 `manifest.sha256` 算法不同，桌面客户端接入时需要对齐。包文件按内容哈希存放在 `MARKET_DATA_DIR/packages/`，删除条目不会删除包文件（可能被其它版本共用）。
+清单摘要 `manifestSha256` 是**本服务自有算法**：按路径排序后，对每行 `"<文件 sha256>  <路径>\n"` 求 SHA-256。它和 SkillHub 的 `manifest.sha256` 算法不同；桌面客户端对市场来源的包使用同一算法（两边的测试断言同一个固定向量 `ec97286e…a427f`）。包文件按内容哈希存放在 `MARKET_DATA_DIR/packages/`，删除条目不会删除包文件（可能被其它版本共用）。
 
 SHA-256 只保证内容与清单一致，**不代表安全**；脚本不在沙箱中运行。
 
@@ -135,6 +135,7 @@ SHA-256 只保证内容与清单一致，**不代表安全**；脚本不在沙�
 | `GET /suggest?kind=&q=` | 搜索联想 |
 | `GET /{kind}/{namespace}/{slug}` | 详情：描述、示例提问、元数据、版本、最新版文件清单；专家团 / 套件另有 `members`（只含已上架的成员，保持登记顺序） |
 | `GET /{kind}/{namespace}/{slug}/versions/{version}/download` | 下载 ZIP；支持 Range；响应头 `x-content-sha256`；同一来源同一天同一版本只计一次下载 |
+| `GET /{kind}/{ns}/{slug}/versions/{version}` | 指定版本的文件清单（路径、大小、sha256）、`manifestSha256`、`packageSha256`；客户端据此逐文件审查并锁定版本 |
 | `POST /updates` | 客户端上报已安装的 `[{kind,namespace,slug,version}]`（≤200），返回哪些有更新 |
 
 关键词按空格拆成最多 5 个词，每个词做不区分大小写的子串匹配（中文可用），`%` `_` `\` 会被转义。热度 `heat = 下载量 + 收藏量 × 5`。

@@ -32,6 +32,8 @@ pub(crate) struct Plan {
     pub metadata: Option<Value>,
     // Display metadata only; changing an icon does not invalidate reviewed package bytes.
     pub icon_url: Option<String>,
+    /// Which service the package came from; recorded in the lock file for display and update checks.
+    pub origin: Option<Value>,
     pub files: Vec<Item>,
     pub sha256: String,
 }
@@ -111,7 +113,21 @@ pub(crate) fn plan(version: &str, values: &[Value]) -> Result<Plan, String> {
         hash.update(f.sha256.as_bytes());
         hash.update(b"\n");
     }
-    Ok(Plan { version: version.to_string(), namespace: None, metadata: None, icon_url: None, files, sha256: format!("{:x}", hash.finalize()) })
+    Ok(Plan { version: version.to_string(), namespace: None, metadata: None, icon_url: None, origin: None, files, sha256: format!("{:x}", hash.finalize()) })
+}
+
+/// The 小伴市场 pins a version with its own manifest digest: SHA-256 over the sorted lines
+/// `"<file sha256>  <path>\n"`. The server computes the same value when a package is listed,
+/// so a web link, the review dialog and the installed lock all show one comparable string.
+pub(crate) fn market_plan(version: &str, files: &[Value]) -> Result<Plan, String> {
+    let mut plan = plan(version, files)?;
+    let mut hash = Sha256::new();
+    for f in &plan.files {
+        hash.update(format!("{}  {}\n", f.sha256, f.path).as_bytes());
+    }
+    plan.sha256 = format!("{:x}", hash.finalize());
+    plan.origin = Some(json!({"service":"xiaoban-market"}));
+    Ok(plan)
 }
 
 impl Plan {
@@ -229,12 +245,20 @@ pub(crate) fn canonical_files(plan:&Plan,mut read:impl FnMut(&Item)->Result<Vec<
     Ok(files)
 }
 pub(crate) fn install(root: &Path, slug: &str, plan: &Plan, files: &BTreeMap<String,Vec<u8>>) -> Result<(), String> {
+    install_with(root, slug, plan, files, None)
+}
+/// Swap an installed package for a newer verified one. The old directory is moved (not deleted)
+/// into `backups`, and moved back if the swap fails, so an update can never leave the skill missing.
+pub(crate) fn replace(root: &Path, slug: &str, plan: &Plan, files: &BTreeMap<String,Vec<u8>>, backups: &Path) -> Result<(), String> {
+    install_with(root, slug, plan, files, Some(backups))
+}
+fn install_with(root: &Path, slug: &str, plan: &Plan, files: &BTreeMap<String,Vec<u8>>, backups: Option<&Path>) -> Result<(), String> {
     if files.len()!=plan.files.len(){return Err("incomplete SkillHub package".into());}
     // Validate the entire set again before any filesystem writes, independent of transport.
     canonical_files(plan,|item|files.get(&item.path).cloned().ok_or("missing SkillHub file".into()))?;
     fs::create_dir_all(root).map_err(|e| e.to_string())?;
     let destination = root.join(slug);
-    if destination.exists() {
+    if destination.exists() && backups.is_none() {
         return Err("skill already exists; no overwrite permitted".into());
     }
     let nonce = SystemTime::now().duration_since(UNIX_EPOCH).map_err(|e| e.to_string())?.as_nanos();
@@ -249,13 +273,30 @@ pub(crate) fn install(root: &Path, slug: &str, plan: &Plan, files: &BTreeMap<Str
         fs::write(target, data).map_err(|e| e.to_string())?;
     }
     let lock = json!({"provider":"skillhub","slug":slug,"version":plan.version,
-        "namespace":plan.namespace,"metadata":plan.metadata,"iconUrl":plan.icon_url,"manifestSha256":plan.sha256,
+        "namespace":plan.namespace,"metadata":plan.metadata,"iconUrl":plan.icon_url,"origin":plan.origin,"manifestSha256":plan.sha256,
         "files":plan.files.iter().map(|i|json!({"path":i.path,"sha256":i.sha256})).collect::<Vec<_>>()});
     fs::write(stage.0.join(".skillhub-lock.json"), lock.to_string()).map_err(|e| e.to_string())?;
-    if destination.exists() {
-        return Err("skill already exists; no overwrite permitted".into());
+    let Some(backups) = backups else {
+        if destination.exists() {
+            return Err("skill already exists; no overwrite permitted".into());
+        }
+        fs::rename(&stage.0, &destination).map_err(|e| e.to_string())?;
+        return Ok(());
+    };
+    // Only a package this app installed from the market may be replaced.
+    let old_lock = fs::read(destination.join(".skillhub-lock.json")).ok()
+        .and_then(|v| serde_json::from_slice::<Value>(&v).ok())
+        .ok_or("the installed skill is not managed by the store; it will not be replaced")?;
+    if old_lock["slug"] != slug || old_lock["origin"]["service"] != "xiaoban-market" {
+        return Err("the installed skill did not come from the market; it will not be replaced".into());
     }
-    fs::rename(&stage.0, &destination).map_err(|e| e.to_string())?;
+    fs::create_dir_all(backups).map_err(|e| e.to_string())?;
+    let backup = backups.join(format!("{slug}-{}-{nonce}", old_lock["version"].as_str().unwrap_or("old")));
+    fs::rename(&destination, &backup).map_err(|e| e.to_string())?;
+    if let Err(e) = fs::rename(&stage.0, &destination) {
+        let _ = fs::rename(&backup, &destination);
+        return Err(e.to_string());
+    }
     Ok(())
 }
 

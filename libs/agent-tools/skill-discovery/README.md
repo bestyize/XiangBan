@@ -72,3 +72,16 @@ MCP 目录读取详情与 README，并在平台提供摘要时校验 README SHA2
 只读线上验证（可选专家包标识）：
 
     cargo run --manifest-path libs/agent-tools/skill-discovery/Cargo.toml --example catalog-smoke -- tech-test-automation
+
+## 小伴市场
+
+`market` 模块对接自建的小伴市场（`services/server-xiaoban-market`），用于专家、技能、连接器的浏览，以及技能 / 专家的审查、安装、更新。
+
+- **版本锁定**：版本以清单摘要锁定，算法为对按路径排序的每行 `"<文件 sha256>  <路径>\n"` 求 SHA-256（与服务端相同，两边的测试断言同一个固定向量）。客户端从文件清单重新计算摘要，与市场记录和用户审查时看到的摘要逐一比对；下载的 ZIP 还要核对包哈希，并按清单逐文件校验大小与哈希。任何一项不一致都拒绝安装。
+- **专家**与技能一样是带 `SKILL.md` 的安装包，装进同一个技能目录；锁文件记录 `origin: {service: "xiaoban-market", kind}`，`provider` 仍为 `skillhub`，所以现有的加载、卸载逻辑照常工作。
+- **专家团 / 技能套件**：先逐个校验全部成员，再统一写入；任何一个失败，撤销本次新增的成员；已按相同版本和摘要安装的成员跳过。整组摘要由各成员的坐标和摘要计算。
+- **更新**：只替换由市场安装的包；新版本完整校验后才替换，旧目录移到 `chat/skill-backups/` 作为备份，替换失败时自动还原。更新只提示，不自动执行。
+- **网页链接**：`parse_link` 严格解析 `xiaoban://market/{open|install|connect}/{skills|experts|connectors}/{namespace}/{slug}?version=&sha256=`，拒绝多余的路径、端口、用户信息和非法参数；链接只能请求展示，审查与确认仍由用户完成。
+- 市场地址必须是 `https` 站点根地址（本机回环可用 `http`，仅用于开发和测试），不跟随重定向。
+
+验证：`cargo test --manifest-path libs/agent-tools/skill-discovery/Cargo.toml market`（用进程内的模拟市场覆盖浏览、审查、安装、被篡改的清单、更新备份、整组回滚）。
