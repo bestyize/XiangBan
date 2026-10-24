@@ -146,8 +146,13 @@ function escape() {
   if (props.store.input) { props.store.input = ''; return; }
   void props.store.hide();
 }
-async function takeScreenshot() {
+const awaitingCapturePermission = ref(false);
+const CAPTURE_PERMISSION_WAIT = '已打开系统截图授权设置。允许小伴录制屏幕后返回，将自动继续截图。';
+let capturePermissionRetryUsed = false, capturePermissionVersion = 0;
+async function takeScreenshot(permissionRetry = false) {
   if (!canAttach.value || props.store.attachments.length >= 8) return;
+  if (!permissionRetry) { capturePermissionRetryUsed = false; awaitingCapturePermission.value = false; }
+  if (props.store.hint === CAPTURE_PERMISSION_WAIT) props.store.note('');
   props.store.prepareImages();
   const version = imageVersion;
   capturing.value = true;
@@ -158,6 +163,27 @@ async function takeScreenshot() {
   } catch (error) {
     if (version === imageVersion) {
       const message = error instanceof Error ? error.message : String(error);
+      const permissionPrefix = 'SCREEN_CAPTURE_PERMISSION_REQUIRED:';
+      if (message.startsWith(permissionPrefix)) {
+        if (!capturePermissionRetryUsed && props.store.open) {
+          awaitingCapturePermission.value = true;
+          capturePermissionVersion = version;
+          try {
+            await invoke('open_screen_capture_settings');
+            if (version === imageVersion && props.store.open) {
+              props.store.note(CAPTURE_PERMISSION_WAIT, 'assistant');
+            }
+          } catch (permissionError) {
+            if (version === imageVersion && props.store.open) {
+              awaitingCapturePermission.value = false;
+              props.store.note(`无法打开系统授权设置：${String(permissionError)}。请在系统设置的隐私与安全性中允许小伴录制屏幕。`, 'assistant');
+            }
+          }
+        } else {
+          props.store.note('截图授权尚未生效。请完成屏幕录制授权；若已允许，请完全退出小伴后重新打开。', 'assistant');
+        }
+        return;
+      }
       // A failed capture is not always a permission failure. Show the repair link only
       // for macOS permission or screencapture failures; never reset automatically.
       const permissionIssue = /macOS 截图失败|屏幕录制权限|截图权限|could not create image from rect|could not create image from display/i.test(message);
@@ -169,7 +195,8 @@ async function takeScreenshot() {
 let imageVersion = 0, dropDepth = 0;
 
 const canAttach = computed(() => !busy.value && !props.store.ask && !props.store.approval && !imageReading.value && !submitting.value && !capturing.value && !props.store.changingSession);
-watch(() => props.store.open, () => { imageVersion++; dropDepth = 0; dropActive.value = false; closeMenus(); });
+watch(() => props.store.open, () => { imageVersion++; awaitingCapturePermission.value = false; dropDepth = 0; dropActive.value = false; closeMenus(); });
+watch(() => props.store.currentId, () => { imageVersion++; awaitingCapturePermission.value = false; });
 watch(() => props.store.changingSession, changing => { if (changing) imageVersion++; });
 function openPicker() {
   if (!canAttach.value) return;
@@ -367,7 +394,7 @@ watch(() => props.store.notice?.text, () => {
 
 /* ── Click elsewhere folds the capsule away, unless something would be lost or is waiting ─── */
 const canAutoHide = computed(() => props.store.open && !pinned.value && !props.store.live && props.store.phase === 'idle' && !props.store.input.trim()
-  && !props.store.attachments.length && !capturing.value && !picking.value && !imageReading.value && !submitting.value
+  && !props.store.attachments.length && !capturing.value && !awaitingCapturePermission.value && !picking.value && !imageReading.value && !submitting.value
   && !dragging.value && !morphing.value && !props.store.changingSession && !props.asr.recordingRequested);
 let blurTimer: ReturnType<typeof setTimeout> | undefined;
 function onBlur() {
@@ -488,7 +515,15 @@ watch(() => props.store.hovering, inside => {
   }, PEEK_LINGER);
 });
 function engage() { if (props.store.peek) { clearTimeout(peekTimer); props.store.engage(); } }
-const onFocus=()=>{picking.value=false;clearTimeout(blurTimer);if(props.store.open&&!dragging.value&&!press&&!morphing.value)field.value?.focus();};
+const onFocus=()=>{
+  picking.value=false;clearTimeout(blurTimer);
+  if(props.store.open&&!dragging.value&&!press&&!morphing.value)field.value?.focus();
+  if(awaitingCapturePermission.value && !capturing.value && canAttach.value && props.store.open && capturePermissionVersion === imageVersion) {
+    awaitingCapturePermission.value = false;
+    capturePermissionRetryUsed = true;
+    void takeScreenshot(true);
+  }
+};
 onMounted(()=>{
   void nextTick(queueHitRegions);window.addEventListener('resize',queueHitRegions);window.addEventListener('resize',grow);
   document.addEventListener('pointerdown',outsideMenus);document.addEventListener('keydown',onAskShortcut);window.addEventListener('blur',onBlur);window.addEventListener('focus',onFocus);window.addEventListener('pointermove',dragMove);window.addEventListener('pointerup',dragUp);window.addEventListener('pointercancel',dragUp);window.addEventListener('blur',releasePress);window.addEventListener('assistant-drag-end',dragEnded);
@@ -610,7 +645,7 @@ onBeforeUnmount(()=>{
             </button>
             <textarea ref="field" v-model="store.input" rows="1" :disabled="store.changingSession" class="field" autocomplete="off" spellcheck="false" :placeholder="store.phase === 'idle' ? '问小伴，或点左边的球录音…' : store.status" aria-label="向小伴提问" data-testid="assistant-input" @beforeinput="store.inputStarted()" @input="store.inputStarted(); grow()" @keydown.enter="onEnter" @compositionstart="composing = true; store.inputStarted()" @compositionend="composing = false" />
             <button type="button" class="tool" title="添加文件 · 也可以拖入或粘贴" aria-label="添加文件" data-testid="assistant-add-image" :disabled="!canAttach || store.attachments.length >= 8" @click="openPicker"><Plus :size="18" :stroke-width="1.75" /></button>
-            <button type="button" class="tool" title="截图提问" aria-label="截图" data-testid="assistant-screenshot" :disabled="!canAttach || store.attachments.length >= 8" @click="takeScreenshot"><SquareDashed :size="17" :stroke-width="1.75" /></button>
+            <button type="button" class="tool" title="截图提问" aria-label="截图" data-testid="assistant-screenshot" :disabled="!canAttach || store.attachments.length >= 8" @click="takeScreenshot()"><SquareDashed :size="17" :stroke-width="1.75" /></button>
             <button v-if="offersLive" type="button" class="tool live-start" aria-label="实时对话" title="实时对话：像打电话一样和小伴说，随时可以打断" data-testid="assistant-live-start" :disabled="liveDisabled" @click="startLive"><AudioLines :size="18" :stroke-width="2" /></button>
             <button type="button" class="send" :class="{ 'has-action': canSend, 'is-stop': stopping }" :aria-label="canSend ? '发送' : stopping ? '停止' : '发送'" :title="canSend ? (store.phase === 'speaking' ? '发送并停止当前朗读' : '发送 · Enter') : stopping ? '停止回答' : '输入后发送'" :disabled="imageReading || capturing || (submitting && !busy) || (!canSend && !stopping)" data-testid="assistant-primary" @click="primary"><svg v-if="stopping" width="11" height="11" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="4" fill="currentColor" /></svg><ArrowUp v-else :size="17" :stroke-width="2.1" /></button>
           </div>

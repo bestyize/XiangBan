@@ -391,6 +391,65 @@ describe('assistant region screenshots',()=>{
     expect(vi.mocked(invoke).mock.calls.filter(([command])=>command==='assistant_screenshot')).toHaveLength(1);
     store.open=false;await nextTick();finish('data:image/jpeg;base64,/9j/');await flushPromises();expect(store.attachments).toEqual([]);
   });
+  it('opens system permission settings and resumes capture once when the user returns',async()=>{
+    const {store,wrapper}=setup();store.phase='idle';await nextTick();
+    store.note.mockImplementation((message:string)=>{store.hint=message;});
+    let attempts=0;
+    vi.mocked(invoke).mockImplementation(async command=>{
+      if(command==='assistant_screenshot'){
+        if(++attempts===1)throw new Error('SCREEN_CAPTURE_PERMISSION_REQUIRED:请授权');
+        return 'data:image/jpeg;base64,/9j/';
+      }
+    });
+    await wrapper.get('[data-testid="assistant-screenshot"]').trigger('click');await flushPromises();
+    expect(invoke).toHaveBeenCalledWith('open_screen_capture_settings');
+    expect(store.note).toHaveBeenCalledWith(expect.stringContaining('自动继续截图'),'assistant');
+    expect(store.attachments).toEqual([]);
+    window.dispatchEvent(new Event('focus'));await flushPromises();
+    expect(attempts).toBe(2);expect(store.attachments).toEqual(['data:image/jpeg;base64,/9j/']);
+    expect(store.hint).toBe('');
+    expect(store.input).toBe('草稿');expect(store.submit).not.toHaveBeenCalled();
+  });
+  it('does not repeatedly prompt or retry when screen permission remains denied',async()=>{
+    const {store,wrapper}=setup();store.phase='idle';await nextTick();
+    vi.mocked(invoke).mockImplementation(async command=>{
+      if(command==='assistant_screenshot')throw new Error('SCREEN_CAPTURE_PERMISSION_REQUIRED:请授权');
+    });
+    await wrapper.get('[data-testid="assistant-screenshot"]').trigger('click');await flushPromises();
+    window.dispatchEvent(new Event('focus'));await flushPromises();
+    window.dispatchEvent(new Event('focus'));await flushPromises();
+    expect(vi.mocked(invoke).mock.calls.filter(([name])=>name==='assistant_screenshot')).toHaveLength(2);
+    expect(vi.mocked(invoke).mock.calls.filter(([name])=>name==='open_screen_capture_settings')).toHaveLength(1);
+    expect(store.note).toHaveBeenLastCalledWith(expect.stringContaining('授权尚未生效'),'assistant');
+  });
+  it('cancels the pending permission retry when the conversation changes',async()=>{
+    const {store,wrapper}=setup();store.phase='idle';await nextTick();
+    vi.mocked(invoke).mockImplementation(async command=>{
+      if(command==='assistant_screenshot')throw new Error('SCREEN_CAPTURE_PERMISSION_REQUIRED:请授权');
+    });
+    await wrapper.get('[data-testid="assistant-screenshot"]').trigger('click');await flushPromises();
+    store.currentId='s2';await nextTick();window.dispatchEvent(new Event('focus'));await flushPromises();
+    expect(vi.mocked(invoke).mock.calls.filter(([name])=>name==='assistant_screenshot')).toHaveLength(1);
+  });
+  it('does not put a late permission-settings error into a different conversation',async()=>{
+    const {store,wrapper}=setup();store.phase='idle';await nextTick();
+    let fail!:(error:Error)=>void;
+    vi.mocked(invoke).mockImplementation(async command=>{
+      if(command==='assistant_screenshot')throw new Error('SCREEN_CAPTURE_PERMISSION_REQUIRED:请授权');
+      if(command==='open_screen_capture_settings')return await new Promise((_,reject)=>{fail=reject;});
+    });
+    await wrapper.get('[data-testid="assistant-screenshot"]').trigger('click');await flushPromises();
+    store.currentId='s2';await nextTick();fail(new Error('settings unavailable'));await flushPromises();
+    expect(store.note).not.toHaveBeenCalledWith(expect.stringContaining('无法打开系统授权设置'),'assistant');
+  });
+  it('does not request unrelated permissions for a native Windows capture error',async()=>{
+    const {store,wrapper}=setup();store.phase='idle';await nextTick();
+    const message='Windows 截图失败（读取屏幕画面）：设备不可用。';
+    vi.mocked(invoke).mockImplementation(async command=>{if(command==='assistant_screenshot')throw new Error(message);});
+    await wrapper.get('[data-testid="assistant-screenshot"]').trigger('click');await flushPromises();
+    expect(invoke).not.toHaveBeenCalledWith('open_screen_capture_settings');
+    expect(store.note).toHaveBeenCalledWith(message,'');
+  });
   it('disables screenshot at the eight-image limit',async()=>{
     const {store,wrapper}=setup();store.phase='idle';store.attachments=Array(8).fill('image');await nextTick();
     expect(wrapper.get<HTMLButtonElement>('[data-testid="assistant-screenshot"]').element.disabled).toBe(true);

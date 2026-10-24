@@ -160,8 +160,8 @@ HTML 是可交互的视觉与行为参考，使用模拟桌面和对话。正式
 实现位置：
 
 - `src/capture/`：独立截图场景、样式、选区几何与标注导出。
-- `src-tauri/src/assistant_capture.rs`、`assistant_capture_windows.ps1`：系统桌面快照、权限与临时文件处理。
+- `src-tauri/src/assistant_capture.rs`、`assistant_capture_windows.rs`：系统桌面快照与权限处理；Windows 用 GDI/WIC 在进程内截图并编码，不启动 PowerShell；macOS 使用系统截图命令并清理临时文件。
 - `src-tauri/src/capture_editor.rs`：截图窗口、会话结果、取消及关闭清理；窗口仅允许截图所需命令。
 - `src-tauri/src/float_assistant.rs`：隐藏助手、启动截图、恢复原对话。
 
-截图与助手相关前端测试、类型检查按各次变更针对性运行；鼠标区域另有几何和透明留白拖动回归用例。Windows/macOS 原生截图及鼠标穿透仍需实机验证，此记录不代表完成原生构建验收。
+截图与助手相关前端测试、类型检查按各次变更针对性运行；鼠标区域另有几何和透明留白拖动回归用例。Windows 原生快照链路已在本机实测，macOS 缺权限时先请求系统授权，失败后打开授权设置，用户返回时自动重试一次；拒绝授权不循环弹窗，切换会话或关闭助手会取消待重试操作。macOS 权限实机、完整选区操作和鼠标穿透仍需对应平台验证。

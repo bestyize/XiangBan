@@ -1,13 +1,20 @@
 //! User-initiated region capture. Fixed OS commands only; no model-facing command or arbitrary paths.
 //! The assistant window is hidden by the caller. Temporary macOS files are removed on every exit.
+#[cfg(target_os = "macos")]
 use std::{io::Read, process::{Command, Output, Stdio}, time::{Duration, Instant}};
 
+#[cfg(windows)]
+#[path = "assistant_capture_windows.rs"]
+mod windows_capture;
+
 const MAX_BYTES: usize = 3 * 1024 * 1024;
+#[cfg(target_os = "macos")]
 const MAX_SNAPSHOT_OUTPUT: usize = 48 * 1024 * 1024;
 
 #[derive(Clone, serde::Serialize, serde::Deserialize)]
 pub struct Frame { pub x: f64, pub y: f64, pub width: f64, pub height: f64, pub image: String }
 
+#[cfg(target_os = "macos")]
 fn run(mut command: Command, seconds: u64) -> Result<Output, String> {
     command.stdin(Stdio::null()).stdout(Stdio::piped()).stderr(Stdio::piped());
     #[cfg(windows)] {
@@ -109,7 +116,9 @@ pub fn reset_screen_capture_permission(window: tauri::WebviewWindow) -> Result<(
 /// Open the exact privacy pane; never change another app's permissions.
 #[tauri::command]
 pub fn open_screen_capture_settings(window: tauri::WebviewWindow) -> Result<(), String> {
-    if window.label() != "control" { return Err("只能从小伴设置页打开截图权限设置。".into()); }
+    if window.label() != "control" && window.label() != crate::float_assistant::LABEL {
+        return Err("只能从小伴设置页或截图入口打开权限设置。".into());
+    }
     #[cfg(target_os = "macos")]
     {
         let status = Command::new("/usr/bin/open")
@@ -125,6 +134,9 @@ pub fn open_screen_capture_settings(window: tauri::WebviewWindow) -> Result<(), 
 #[cfg(any(target_os = "macos", test))]
 fn macos_capture_outcome(success: bool, code: Option<i32>, stderr: &[u8], has_image: bool, permission: bool) -> Result<bool, String> {
     if success && has_image { return Ok(true); }
+    if !permission && !has_image {
+        return Err("SCREEN_CAPTURE_PERMISSION_REQUIRED:请允许小伴录制屏幕，完成授权后返回小伴将自动重试截图；若系统要求重启，请完全退出小伴后重新打开。".into());
+    }
     let detail = String::from_utf8_lossy(stderr).trim().chars().take(400).collect::<String>();
     if !detail.is_empty() {
         return Err(format!("macOS 截图失败：{detail}。如刚授予权限，请从托盘完全退出小伴后重新打开再试。"));
@@ -173,15 +185,7 @@ pub fn capture(app: &tauri::AppHandle) -> Result<Vec<Frame>, String> {
 
 #[cfg(windows)]
 pub fn capture(_app: &tauri::AppHandle) -> Result<Vec<Frame>, String> {
-    let system = std::env::var_os("SystemRoot").ok_or("无法找到 Windows 系统目录")?;
-    let exe = std::path::PathBuf::from(system).join("System32/WindowsPowerShell/v1.0/powershell.exe");
-    let mut command = Command::new(exe);
-    command.args(["-NoLogo", "-NoProfile", "-NonInteractive", "-STA", "-Command", include_str!("assistant_capture_windows.ps1")]);
-    let output = run(command, 30)?;
-    if !output.status.success() { return Err("无法获取屏幕画面，请检查系统截图权限或策略。".into()); }
-    let frames: Vec<Frame> = serde_json::from_slice(&output.stdout).map_err(|_| "截图结果格式错误")?;
-    if frames.is_empty() || frames.len() > 16 || frames.iter().any(|f| !f.image.starts_with("data:image/jpeg;base64,") || !f.width.is_finite() || !f.height.is_finite() || f.width <= 0.0 || f.height <= 0.0) { return Err("屏幕画面无效".into()); }
-    Ok(frames)
+    windows_capture::capture()
 }
 
 #[cfg(not(any(windows, target_os = "macos")))]
@@ -196,7 +200,7 @@ pub fn validate_data_url(value: &str) -> Result<(), String> {
     Ok(())
 }
 
-#[cfg(any(target_os = "macos", test))]
+#[cfg(any(target_os = "macos", windows, test))]
 fn encode_base64(bytes: &[u8]) -> String {
     const TABLE: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
     let mut out = String::with_capacity((bytes.len() + 2) / 3 * 4);
@@ -217,6 +221,11 @@ mod tests {
     }
     #[test] fn macos_permission_cache_never_overrides_a_successful_capture() {
         assert_eq!(macos_capture_outcome(true, Some(0), b"", true, false), Ok(true));
+    }
+    #[test] fn missing_macos_permission_requests_authorization_before_reporting_a_failure() {
+        let error = macos_capture_outcome(false, Some(1), b"could not create image from display", false, false).unwrap_err();
+        assert!(error.starts_with("SCREEN_CAPTURE_PERMISSION_REQUIRED:"));
+        assert!(error.contains("自动重试"));
     }
     #[test] fn macos_reports_diagnostics_instead_of_silently_cancelling() {
         let error = macos_capture_outcome(false, Some(1), b"could not create image from display", false, true).unwrap_err();
