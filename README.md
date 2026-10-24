@@ -17,7 +17,7 @@
 | [services/server-pan](services/server-pan/README.md) | 已实现 | PanDown 自托管网盘，Rust Axum + SQLite 后端与 React 前端，独立于主 API |
 | [services/server-xiangban-wallpaper](services/server-xiangban-wallpaper/README.md) | 已实现 | 正式壁纸网站 wallpaper.xiangban.xyz，图片/视频采集与上传、小伴桌面下载、版本与公告；桌面客户端接入此服务 |
 | [services/server-xiaoban-appstore](services/server-xiaoban-appstore/README.md) | 已实现 | 小伴优质应用商店，Rust Axum + PostgreSQL 后端与 Vue 3 + Vite 前端，腾讯柠檬精选美学与管理后台 |
-| [services/server-xiaoban-market](services/server-xiaoban-market/README.md) | 后端已实现，前端未实现 | 小伴市场：专家、技能、连接器的自建目录服务，公开目录 / 下载 / 更新检测 API，以及 SkillHub、魔搭社区的采集工作台后端；Rust Axum + PostgreSQL，前端规划 Vue 3 + Vite |
+| [services/server-xiaoban-market](services/server-xiaoban-market/README.md) | 已实现 | 小伴市场：专家、技能、连接器的自建目录服务，公开网页、下载 / 更新检测 API，以及 SkillHub、魔搭社区的采集工作台；Rust Axum + PostgreSQL + Vue 3 + Vite |
 | [services/server-forum](services/server-forum/README.md) | 一期已实现，已部署 | 超级小伴论坛（chat.xiangban.xyz）：技术交流、资源分享、福利羊毛与闲聊的社区，Rust Axum + PostgreSQL + Vue 3，登录走统一账号中心，带管理后台和 SEO 页面 |
 | [services/server-ai](services/server-ai/README.md) | 一期已实现，未部署 | AI 网关与额度系统：账号中心验签，经 New API 调用上游模型；按「账号 × 产品」隔离的试用、月卡与加油包额度，档位对用户隐藏真实模型；Rust Axum + PostgreSQL + Vue 3 管理后台。设计见 [docs/architecture/ai-gateway.md](docs/architecture/ai-gateway.md) |
 | [services/server-account](services/server-account/README.md) | 已实现 | 统一账号中心与管理后台，邮箱/手机号验证码注册登录，Rust Axum + PostgreSQL + Vue 3，签发 EdDSA JWT；壁纸网站与相伴网页（xiaban.xyz，经主后端换票）已接入 |
@@ -71,6 +71,10 @@ npm --prefix services/server-xiangban-wallpaper/web run build
 cargo test --locked --manifest-path services/server-xiangban-wallpaper/Cargo.toml
 npm --prefix services/server-xiaoban-appstore/web run build
 cargo check --manifest-path services/server-xiaoban-appstore/Cargo.toml
+npm --prefix services/server-xiaoban-market/web ci
+npm --prefix services/server-xiaoban-market/web test
+npm --prefix services/server-xiaoban-market/web run build
+cargo test --manifest-path services/server-xiaoban-market/Cargo.toml
 npm --prefix services/server-account/web ci
 npm --prefix services/server-account/web run build
 cargo test --locked --manifest-path services/server-account/Cargo.toml

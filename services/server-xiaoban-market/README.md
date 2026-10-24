@@ -12,13 +12,14 @@
 | 采集：SkillHub（技能 / 专家 / 连接器） | 已实现；接口形状取自客户端与壁纸站已验证的用法，**未对真实线上接口做过联调** |
 | 采集：魔搭社区（MCP / 技能 / 智能体） | **通用 JSON 适配器已实现，但三个来源的接口地址与字段映射尚未配置**。开发环境访问不到 modelscope.cn，真实接口只能由能访问的人在后台「试采」后填写 |
 | 采集工作台后端 API（来源、试采、任务、暂存区、入库、内容库、分类、版本上传） | 已实现 |
-| 前端：公开网页、后台工作台（Vue 3 + Vite） | **未实现**，设计稿已确认 |
+| 前端：公开网页（专家 / 技能 / 连接器、搜索、详情弹窗）与后台工作台（总览、采集来源与试采、采集任务、暂存区、内容库、分类、设置） | 已实现（Vue 3 + Vite + TypeScript），在 `web/` |
 | 部署栈（`infra/`）、定时备份 | 未实现 |
 
 ## 目录
 
 ```text
 migrations/     PostgreSQL 迁移（启动时自动执行）
+web/            Vue 3 + Vite 前端：公开网页在 `/`，后台工作台在 `/admin`
 src/
   upstream/     上游适配器：skillhub.rs、generic.rs（配置驱动的 JSON 适配器）
   crawler.rs    采集任务：每来源同时只跑一个，支持取消、重试退避、定时、自动入库
@@ -34,6 +35,10 @@ tests/api.rs    真实 PostgreSQL + 本机模拟上游的端到端测试
 cp .env.example .env     # 填 DATABASE_URL 等
 cargo run                # 默认 http://0.0.0.0:55010，首次启动自动迁移并建种子数据
 
+npm --prefix web ci && npm --prefix web run build   # 前端构建到 web/dist，由后端静态托管
+npm --prefix web test    # 前端单元测试
+# 前端开发：先 cargo run，再 npm --prefix web run dev（http://localhost:5175，/api 代理到 55010）
+
 cargo test --lib         # 单元测试，不需要数据库
 # 端到端测试需要一个有 CREATEDB 权限的账号；每个用例会建一个临时库并在结束时删除
 TEST_DATABASE_URL=postgres://market:market@127.0.0.1:5432/postgres cargo test
@@ -42,6 +47,16 @@ TEST_DATABASE_URL=postgres://market:market@127.0.0.1:5432/postgres cargo test
 首次启动会创建管理员；没设 `MARKET_ADMIN_PASS` 时，随机密码**只在日志里出现一次**。
 
 按仓库规范，服务器上不要现场编译：在本地构建好二进制和前端静态资源再上传。
+
+## 前端
+
+公开网页和后台是同一个单页应用（`web/`），按已确认的设计稿实现：
+
+- **公开网页** `/experts` `/skills` `/connectors`：分类、排序、关键词搜索（命中高亮；精确结果少时补「相近匹配」）、分页；点击条目以弹窗展示详情（`/skills/{namespace}/{slug}`，可直接分享链接）。弹窗标题区固定，内容区滚动。
+- **后台** `/admin`：登录后可用。采集来源页有结构化配置表单（SkillHub / 通用 JSON 各一套）、字段映射编辑和「试采预览」；暂存区支持批量入库 / 忽略、与已入库内容对比；采集任务页每 2 秒刷新进度和日志。
+- 网页版**不显示**「已安装 / 召唤 / 我的专家」这类依赖桌面端本地状态的按钮；详情弹窗的主按钮通过深链 `xiaoban://market/{open|install|connect}/{skills|experts|connectors}/{namespace}/{slug}?version=&sha256=` 唤起小伴桌面。**桌面客户端目前没有注册这个协议**，接入时需要对齐。
+- 管理员令牌保存在浏览器 `localStorage`；任何接口返回 401 都会回到登录页。
+- 暂未做：专家团、套件、收藏 / 评分、深色模式。
 
 ## 数据流
 
