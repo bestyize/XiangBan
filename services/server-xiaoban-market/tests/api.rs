@@ -1052,8 +1052,11 @@ async fn connector_plugins_import_present_validate_and_download() {
     assert_eq!(downloaded.as_ref(),bytes.as_slice());
     assert_eq!(upload(bytes,"published").await.unwrap().status(),200);
     assert_eq!(upload(make("1.0.0","<svg/>"),"published").await.unwrap().status(),409);
-    assert_eq!(upload(make("2.0.0","<svg onload='evil()'/>"),"published").await.unwrap().status(),400);
-    assert_eq!(upload(make("2.0.0",svg),"published").await.unwrap().status(),200);
+    // An unsafe icon is dropped, not served and not a reason to refuse the plugin.
+    let unsafe_icon = "<svg onload='evil()'/>";
+    assert_eq!(upload(make("2.0.0",unsafe_icon),"published").await.unwrap().status(),200);
+    let unsafe_sha = server_xiaoban_market::package::sha256_hex(unsafe_icon.as_bytes());
+    assert_eq!(app.http.get(format!("{}/api/v1/market/assets/{unsafe_sha}",app.base)).send().await.unwrap().status(),404);
     assert_eq!(app.get(base).await["versions"].as_array().unwrap().len(),2);
     app.cleanup().await;
 }

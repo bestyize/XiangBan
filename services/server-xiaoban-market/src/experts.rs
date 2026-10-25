@@ -58,13 +58,16 @@ async fn store_avatar(state: &AppState, path: &str, bytes: &[u8]) -> Result<Stri
     Ok(format!("/api/v1/market/assets/{sha}"))
 }
 
-async fn store_connector_icon(state: &AppState, path: &str, bytes: &[u8]) -> Result<String> {
+/// 连接器图标：位图直接存；SVG 只存通过清洗的。不安全或不是图片的图标不存、不展示，但不拒绝整个插件
+/// （图标是装饰，包本身照常可用；包里的原文件不会被服务端当作资源提供）。
+async fn store_connector_icon(state: &AppState, path: &str, bytes: &[u8]) -> Result<Option<String>> {
     if image_kind(bytes).is_none() && !connectors::safe_svg(bytes) {
-        return Err(AppError::BadRequest(format!("{path} 不是图片或包含不安全的 SVG 内容")));
+        tracing::warn!("{path} 不是图片或包含不安全的 SVG 内容，已忽略这个图标");
+        return Ok(None);
     }
     let sha = package::sha256_hex(bytes);
     storage::store_asset(&state.config.data_dir, &sha, bytes).await.map_err(|e| AppError::Internal(format!("保存图标失败：{e}")))?;
-    Ok(format!("/api/v1/market/assets/{sha}"))
+    Ok(Some(format!("/api/v1/market/assets/{sha}")))
 }
 
 fn text(b: &Option<plugin::Bilingual>) -> (String, String) {
@@ -127,7 +130,7 @@ pub async fn import_plugin(state: &AppState, bytes: &[u8], opts: &ImportOpts) ->
 
     let avatar_url = if kind == "connector" {
         match connectors::icon(&pkg.unpacked.contents) {
-            Some((path, bytes)) => Some(store_connector_icon(state, path, bytes).await?),
+            Some((path, bytes)) => store_connector_icon(state, path, bytes).await?,
             None => None,
         }
     } else { match pkg.unpacked.contents.get(m.avatar.strip_prefix("./").unwrap_or(&m.avatar)) {
