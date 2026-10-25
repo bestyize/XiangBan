@@ -946,8 +946,18 @@ async fn the_old_expert_categories_are_folded_into_workbenchs_twelve() {
     // 早先版本的状态：自建的 8 类，其中一个专家挂在 engineering 下。
     sqlx::query("INSERT INTO categories (kind, slug, name, sort_order) VALUES ('expert', 'engineering', '技术工程', 1) ON CONFLICT DO NOTHING").execute(&pool).await.unwrap();
     sqlx::query("INSERT INTO items (kind, namespace, slug, name, category_id) VALUES ('expert', 'ns', 'old-expert', 'old', (SELECT id FROM categories WHERE kind='expert' AND slug='engineering'))").execute(&pool).await.unwrap();
+    // 以及早先自动建出的英文名分类（SkillHub 的场景名），其中一个有对照，另一个没有。
+    for slug in ["ecommerce", "never-seen-before"] {
+        sqlx::query("INSERT INTO categories (kind, slug, name, sort_order) VALUES ('expert', $1, $1, 1000)").bind(slug).execute(&pool).await.unwrap();
+        sqlx::query("INSERT INTO items (kind, namespace, slug, name, category_id) VALUES ('expert', 'ns', $2, $2, (SELECT id FROM categories WHERE kind='expert' AND slug=$1))").bind(slug).bind(format!("e-{slug}")).execute(&pool).await.unwrap();
+    }
+    // 管理员自己建的、改过名的专家分类不动。
+    sqlx::query("INSERT INTO categories (kind, slug, name, sort_order) VALUES ('expert', 'my-own', '我的分类', 1000)").execute(&pool).await.unwrap();
     server_xiaoban_market::items::normalize_categories(&pool).await.unwrap();
-    let slugs: Vec<String> = sqlx::query_scalar("SELECT slug FROM categories WHERE kind = 'expert' ORDER BY sort_order, id").fetch_all(&pool).await.unwrap();
+    let mapped: String = sqlx::query_scalar("SELECT c.slug FROM items i JOIN categories c ON c.id = i.category_id WHERE i.slug = 'e-ecommerce'").fetch_one(&pool).await.unwrap();
+    let swept: String = sqlx::query_scalar("SELECT c.slug FROM items i JOIN categories c ON c.id = i.category_id WHERE i.slug = 'e-never-seen-before'").fetch_one(&pool).await.unwrap();
+    assert_eq!((mapped.as_str(), swept.as_str()), ("07-SalesCommerce", "12-IndustryConsultant"));
+    let slugs: Vec<String> = sqlx::query_scalar("SELECT slug FROM categories WHERE kind = 'expert' AND slug <> 'my-own' ORDER BY sort_order, id").fetch_all(&pool).await.unwrap();
     assert_eq!(slugs.len(), 12, "{slugs:?}");
     assert_eq!(slugs[0], "01-ProductDesign");
     let moved: String = sqlx::query_scalar("SELECT c.slug FROM items i JOIN categories c ON c.id = i.category_id WHERE i.slug = 'old-expert'").fetch_one(&pool).await.unwrap();

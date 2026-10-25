@@ -37,6 +37,16 @@ pub const KNOWN_CATEGORIES: &[(&str, &str, &str, &str)] = &[
     ("expert", "academic", "12-IndustryConsultant", "行业顾问"),
     ("expert", "education", "12-IndustryConsultant", "行业顾问"),
     ("expert", "healthcare", "12-IndustryConsultant", "行业顾问"),
+    ("expert", "ecommerce", "07-SalesCommerce", "销售商务"),
+    ("expert", "sales", "07-SalesCommerce", "销售商务"),
+    ("expert", "marketing", "05-MarketingGrowth", "营销增长"),
+    ("expert", "design", "01-ProductDesign", "产品设计"),
+    ("expert", "content-creation", "06-ContentCreative", "内容创作"),
+    ("expert", "data", "04-DataAI", "数据智能"),
+    ("expert", "ai", "04-DataAI", "数据智能"),
+    ("expert", "game", "03-GameSpatial", "游戏空间"),
+    ("expert", "project", "10-ProjectQuality", "项目质量"),
+    ("expert", "security", "11-SecurityCompliance", "法务安全"),
     ("expert", "mysticism", "12-IndustryConsultant", "行业顾问"),
     ("connector", "开发者工具", "dev", "开发协作"),
     ("connector", "文档工具", "docs", "办公文档"),
@@ -98,6 +108,17 @@ pub async fn normalize_categories(pool: &PgPool) -> Result<()> {
             sqlx::query("DELETE FROM categories WHERE id = $1").bind(src).execute(pool).await?;
         }
     }
+    // 早先版本按上游原名自动建出的专家分类（名字还等于 slug，管理员没改过）：并入「行业顾问」。
+    let twelve: Vec<&str> = crate::plugin::CATEGORIES.iter().map(|(id, _, _)| *id).collect();
+    let target = ensure_category(pool, "expert", "12-IndustryConsultant", "行业顾问").await?;
+    let leftovers: Vec<i32> = sqlx::query_scalar("SELECT id FROM categories WHERE kind = 'expert' AND name = slug AND NOT (slug = ANY($1))")
+        .bind(&twelve)
+        .fetch_all(pool)
+        .await?;
+    for src in leftovers {
+        sqlx::query("UPDATE items SET category_id = $2, search_text = search_text || ' 行业顾问' WHERE category_id = $1").bind(src).bind(target).execute(pool).await?;
+        sqlx::query("DELETE FROM categories WHERE id = $1").bind(src).execute(pool).await?;
+    }
     Ok(())
 }
 
@@ -120,6 +141,10 @@ pub async fn resolve_category(pool: &PgPool, kind: &str, label: Option<&str>, ex
     }
     if let Some((slug, name)) = known_category(kind, label) {
         return Ok(Some(ensure_category(pool, kind, slug, name).await?));
+    }
+    // 专家分类是 WorkBuddy 的 12 个行业分类，是封闭的：没见过的上游场景归到「行业顾问」，不再自动新建分类。
+    if kind == "expert" {
+        return Ok(Some(ensure_category(pool, kind, "12-IndustryConsultant", "行业顾问").await?));
     }
     let slug = slugify(label, label);
     if let Some(id) = sqlx::query_scalar::<_, i32>("SELECT id FROM categories WHERE kind = $1 AND (slug = $2 OR lower(name) = $3) ORDER BY id LIMIT 1")
