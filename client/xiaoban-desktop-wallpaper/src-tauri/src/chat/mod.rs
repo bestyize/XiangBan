@@ -329,6 +329,7 @@ fn ask_question(app: &tauri::AppHandle, broker: &Broker, session: &str, question
     answer
 }
 
+#[derive(Clone)]
 struct Dirs {
     chat: PathBuf,
 }
@@ -822,7 +823,7 @@ fn build_agent(app: &tauri::AppHandle, config: &AiConfig, key_source: Option<Key
     };
     let team_charter = team_setup.as_ref().map(|setup| team::charter(&setup.lead, &setup.members));
     let team_tools = match team_setup {
-        Some(setup) => team::tools(app, setup, provider.clone(), workspace.to_path_buf(), config.token_budget(), Some(research_events.clone()))?,
+        Some(setup) => team::tools(&team::Env { dirs: Dirs::of(app)?, permission: state.permission.clone() }, setup, provider.clone(), workspace.to_path_buf(), config.token_budget(), Some(research_events.clone()))?,
         None => Vec::new(),
     };
     let statuses: Arc<dyn Fn() -> Value + Send + Sync> = {

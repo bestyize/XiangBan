@@ -103,16 +103,22 @@ pub fn charter(lead: &TeamMember, members: &[Member]) -> String {
     text
 }
 
+/// 成员 agent 要用到的应用资源：数据目录和与主对话共用的权限检查。
+#[derive(Clone)]
+pub struct Env {
+    pub dirs: Dirs,
+    pub permission: Arc<Permission>,
+}
+
 /// 主理人的四个团队工具。成员 agent 在第一次被调度时才建。
 pub fn tools(
-    app: &tauri::AppHandle, setup: Setup, provider: Arc<dyn ModelProvider>, workspace: PathBuf, budget: agent_kernel::model::TokenBudget,
+    env: &Env, setup: Setup, provider: Arc<dyn ModelProvider>, workspace: PathBuf, budget: agent_kernel::model::TokenBudget,
     events: Option<Arc<dyn Fn(&str, &agent_kernel::Event) + Send + Sync>>,
 ) -> Result<Vec<Arc<dyn agent_kernel::Tool>>, String> {
     let Setup { lead, members } = setup;
     let infos: Vec<TeamMember> = members.iter().map(|m| m.info.clone()).collect();
     let by_id: HashMap<String, (String, Option<u32>)> = members.into_iter().map(|m| (m.info.id.clone(), (m.persona, m.max_turns))).collect();
-    let dirs = Dirs::of(app)?;
-    let runs = dirs.runs();
+    let runs = env.dirs.runs();
     let logs: Mutex<HashMap<String, JsonlRunLog>> = Mutex::new(HashMap::new());
     let journal = move |record: &agent_kernel::RunEvent| -> Result<(), agent_kernel::HarnessError> {
         let parent = record.session_id.split('#').next().unwrap_or_default();
@@ -121,14 +127,14 @@ pub fn tools(
         }
         lock(&logs).entry(parent.to_string()).or_insert_with(|| JsonlRunLog::new(runs.join(parent))).append(record)
     };
-    let (build_app, release_app) = (app.clone(), app.clone());
+    let (build_env, release_env) = (env.clone(), env.clone());
     let factory = move |member: &TeamMember, outbox: &Outbox| -> Result<Agent, String> {
         let (persona, max_turns) = by_id.get(&member.id).cloned().ok_or("成员不在团队里")?;
-        member_agent(&build_app, provider.clone(), &workspace, budget, &persona, max_turns, outbox)
+        member_agent(&build_env, provider.clone(), &workspace, budget, &persona, max_turns, outbox)
     };
     let team = Team::new(lead, infos, factory)
         .observe_run(journal)
-        .on_finish(move |session| release_app.state::<ChatState>().permission.forget_session(session));
+        .on_finish(move |session| release_env.permission.forget_session(session));
     let team = Arc::new(match events {
         Some(events) => team.observe(move |session, _member, event| events(session, event)),
         None => team,
@@ -138,23 +144,23 @@ pub fn tools(
 
 /// 一个成员的 agent：人设做系统提示词，文件、命令、联网和技能工具与主对话一样，同一个权限检查。
 fn member_agent(
-    app: &tauri::AppHandle, provider: Arc<dyn ModelProvider>, workspace: &Path, budget: agent_kernel::model::TokenBudget, persona: &str, max_turns: Option<u32>,
+    env: &Env, provider: Arc<dyn ModelProvider>, workspace: &Path, budget: agent_kernel::model::TokenBudget, persona: &str, max_turns: Option<u32>,
     outbox: &Outbox,
 ) -> Result<Agent, String> {
-    let state = app.state::<ChatState>();
-    let dirs = Dirs::of(app)?;
-    let skills = Arc::new(skills_for(&dirs, dirs.chat.join("bundled-skills")));
+    let dirs = &env.dirs;
+    let skills = Arc::new(skills_for(dirs, dirs.chat.join("bundled-skills")));
+    fs::create_dir_all(dirs.spill()).map_err(|e| format!("无法创建 {}：{e}", dirs.spill().display()))?;
     let roots = vec![workspace.to_path_buf(), dirs.spill()];
     let system = format!("{persona}\n\n## 工作环境\n操作系统：{}；工作目录：{}。", std::env::consts::OS, workspace.display());
     let mut builder = Agent::builder(provider, Arc::new(agent_kernel::MemoryStore::new()))
         .system_prompt(system)
         .prompt_section(skills.prompt_section())
-        .tool(Shell::new(workspace).sandbox(sandbox_gate::hook(state.permission.clone(), workspace)))
+        .tool(Shell::new(workspace).sandbox(sandbox_gate::hook(env.permission.clone(), workspace)))
         .tool(WebFetch::new())
         .tool_arc(outbox.tool())
         // 与主对话同一套检查：先是用户自己的钩子，再是权限（确认卡片出现在主对话里），然后是检查点、防重复和长输出落盘。
         .middleware(hooks::Hooks::new(dirs.chat.join("hooks.json"), workspace))
-        .middleware(state.permission.clone())
+        .middleware(env.permission.clone())
         .middleware(checkpoints::Checkpoints::new(dirs.checkpoints(), workspace))
         .middleware(RepeatGuard::new().ignore_tool("process_read"))
         .middleware(SpillOutput::new(dirs.spill()))
@@ -224,6 +230,63 @@ mod tests {
         let empty = install(&root, false);
         assert!(load(&root.join("plugins"), &empty).is_none());
         let _ = fs::remove_dir_all(&root);
+    }
+
+    /// 整条链路：主理人建团队、调度成员，成员是用同一套工具和权限建出来的真 agent，把产出发回主理人。
+    #[test]
+    fn a_lead_calls_a_member_built_from_the_real_tools_and_the_report_comes_back() {
+        use agent_kernel::provider::scripted::{ScriptedProvider, Step};
+        let root = std::env::temp_dir().join(format!("team-run-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&root);
+        let (work, data) = (root.join("work"), root.join("data"));
+        fs::create_dir_all(&work).unwrap();
+        fs::create_dir_all(&data).unwrap();
+        let env = Env { dirs: Dirs { chat: data.join("chat") }, permission: Arc::new(Permission::new(PermissionMode::Auto, |_: &ApprovalRequest<'_>| Approval::Once).children_inherit()) };
+        let dirs = env.dirs.clone();
+        let binding = install(&root.join("unused"), true);
+        // 同一份插件装进应用的插件目录。
+        fs::create_dir_all(dirs.plugins()).unwrap();
+        copy_dir(&root.join("unused/plugins/dev-team"), &dirs.plugins().join("dev-team"));
+        let setup = load(&dirs.plugins(), &binding).unwrap();
+        let provider = Arc::new(ScriptedProvider::new(vec![
+            Step::tool_call("c1", "TeamCreate", r#"{"team_name":"交付团队"}"#),
+            Step::tool_call("c2", "Agent", r#"{"name":"xu-pm","subagent_type":"xu-pm","prompt":"请澄清需求：做登录页"}"#),
+            // 成员自己的两步：先把产出发给主理人，再收尾。
+            Step::tool_call("m1", "SendMessage", r#"{"to":"lead","message":"需求已澄清：邮箱登录、找回密码、记住我。"}"#),
+            Step::text("已发给主理人"),
+            Step::text("团队已完成"),
+        ]));
+        let tools = tools(&env, setup, provider.clone(), work.clone(), agent_kernel::model::TokenBudget::resolve(200_000, None), None).unwrap();
+        assert_eq!(tools.iter().map(|t| t.spec().name.clone()).collect::<Vec<_>>(), ["TeamCreate", "Agent", "SendMessage", "TeamDelete"]);
+        let mut builder = Agent::builder(provider.clone(), Arc::new(agent_kernel::MemoryStore::new())).max_turns(10);
+        for tool in tools {
+            builder = builder.tool_arc(tool);
+        }
+        let lead = builder.build().unwrap();
+        let summary = lead.run("s1", "做一个登录页", &mut |_| {}, &Arc::new(AtomicBool::new(false))).unwrap();
+        assert_eq!(summary.text, "团队已完成");
+        let requests = provider.requests();
+        // 成员那次请求：系统提示词是它的人设，工具是真的文件/命令/联网工具加上发给主理人的 SendMessage，不含团队工具。
+        let member = requests.iter().find(|r| r.messages.iter().any(|m| m.text().contains("请澄清需求"))&& r.messages[0].role == agent_kernel::Role::System && r.messages[0].text().contains("许清楚")).expect("a request by the member");
+        let names: Vec<&str> = member.tools.iter().map(|t| t.name.as_str()).collect();
+        for expected in ["SendMessage", "shell", "write_file", "read_file", "web_fetch"] {
+            assert!(names.contains(&expected), "{expected} in {names:?}");
+        }
+        assert!(!names.contains(&"TeamCreate") && !names.contains(&"Agent"), "{names:?}");
+        assert!(member.messages[0].text().contains("先澄清需求") && member.messages[0].text().contains(&work.display().to_string()));
+        // 回到主理人的是成员发来的产出。
+        let last = requests.last().unwrap();
+        let report = last.messages.iter().rev().find(|m| m.role == agent_kernel::Role::Tool).unwrap().text();
+        assert!(report.contains("[Report from 许清楚（产品经理）]") && report.contains("邮箱登录、找回密码、记住我"), "{report}");
+        let _ = fs::remove_dir_all(&root);
+    }
+
+    fn copy_dir(from: &Path, to: &Path) {
+        fs::create_dir_all(to).unwrap();
+        for entry in fs::read_dir(from).unwrap().flatten() {
+            let target = to.join(entry.file_name());
+            if entry.file_type().unwrap().is_dir() { copy_dir(&entry.path(), &target) } else { fs::copy(entry.path(), target).unwrap(); }
+        }
     }
 
     #[test]
