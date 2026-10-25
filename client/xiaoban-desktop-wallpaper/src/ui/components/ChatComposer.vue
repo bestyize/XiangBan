@@ -11,6 +11,7 @@ import { ArrowUp, AudioLines, LoaderCircle, Mic, MicOff, Square, X } from 'lucid
 import { GATEWAY_PROVIDER, invoke, type AiConfigView, type AiTier } from '../../bridge.ts';
 import type { ControlPage, ControlStore } from '../control-types.ts';
 import ChatWorkbenchTools from './ChatWorkbenchTools.vue';
+import ChatSlashMenu from './ChatSlashMenu.vue';
 import ChatComposerPet from './ChatComposerPet.vue';
 import ChatComposerModel from './ChatComposerModel.vue';
 import ChatWorkspaceMenu from './ChatWorkspaceMenu.vue';
@@ -19,6 +20,7 @@ import ChatContextRing from './ChatContextRing.vue';
 import AsrStatus from './AsrStatus.vue';
 import { ATTACHMENT_ACCEPT, MAX_ATTACHMENTS, MAX_TOTAL_BYTES, attachmentBytes, attachmentImage, attachmentName, readAttachment, type PendingAttachment } from '../chat/attachments.ts';
 import { isImeEnter } from '../chat/format.ts';
+import { applySlash, filterSkills, slashToken, withLeadingSlash, type SlashSkill } from '../chat/slash.ts';
 
 const props = withDefaults(defineProps<{
   store: ControlStore;
@@ -172,7 +174,41 @@ async function submit() {
   await nextTick();
   emit('sent');
 }
+/* ── `/` menu: skills the user can start by name ───────────────────── */
+const slashSkills = ref<SlashSkill[]>([]);
+let slashLoaded = false;
+const slashIndex = ref(0);
+const slashDismissed = ref('');
+const token = computed(() => slashToken(draft.value));
+const slashItems = computed(() => (token.value && props.store.desktop ? filterSkills(slashSkills.value, token.value.query) : []));
+const slashOpen = computed(() => !!token.value && slashItems.value.length > 0 && slashDismissed.value !== draft.value);
+async function loadSlashSkills() {
+  if (slashLoaded || !props.store.desktop) return;
+  slashLoaded = true;
+  try { slashSkills.value = await invoke<SlashSkill[]>('chat_invocable_skills'); } catch { slashLoaded = false; }
+}
+watch(token, (now) => { slashIndex.value = 0; if (now) void loadSlashSkills(); });
+watch(slashItems, (items) => { if (slashIndex.value >= items.length) slashIndex.value = 0; });
+function pickSkill(name: string) {
+  const at = token.value;
+  if (!at) return;
+  draft.value = applySlash(draft.value, at, name);
+  slashDismissed.value = '';
+  void nextTick(() => input.value?.focus());
+}
+function onSlashKey(event: KeyboardEvent): boolean {
+  if (!slashOpen.value || isImeEnter(event, composing.value)) return false;
+  const count = slashItems.value.length;
+  if (event.key === 'ArrowDown') slashIndex.value = (slashIndex.value + 1) % count;
+  else if (event.key === 'ArrowUp') slashIndex.value = (slashIndex.value + count - 1) % count;
+  else if (event.key === 'Enter' || event.key === 'Tab') pickSkill(slashItems.value[slashIndex.value].name);
+  else if (event.key === 'Escape') slashDismissed.value = draft.value;
+  else return false;
+  event.preventDefault();
+  return true;
+}
 function onKeydown(event: KeyboardEvent) {
+  if (onSlashKey(event)) return;
   if (event.key !== 'Enter' || event.shiftKey || isImeEnter(event, composing.value)) return;
   event.preventDefault();
   void submit();
@@ -231,7 +267,8 @@ const input = ref<InstanceType<typeof NInput> | null>(null);
 function setDraft(text: string) { draft.value = text; void nextTick(() => input.value?.focus()); }
 function insertPrompt(instruction: string) { draft.value = draft.value.trim() ? instruction + '\n\n' + draft.value : instruction; }
 const useExpert = (entrySkill: string, name: string) => insertPrompt(`请先使用 load_skill 加载已安装专家「${name}」的工作流（${entrySkill}），再帮助我完成以下任务：`);
-const useSkill = (slug: string, name: string) => insertPrompt(`请先使用 load_skill 加载已安装技能「${name}」（${slug}），然后完成以下任务：`);
+/** 从“＋”选了技能：和在输入框里打 `/名称` 一样，发送时后端会把这个技能的说明交给小伴。 */
+const useSkill = (slug: string) => { draft.value = withLeadingSlash(draft.value, slug); void nextTick(() => input.value?.focus()); };
 const useConnector = (name: string) => insertPrompt(`请在本次任务中优先使用已连接的「${name}」工具，完成以下任务：`);
 /** A prompt handed over by another page (装扮 → 用 AI 创作…) lands in the box that is shown, unsent. */
 watch([() => props.store.creationDraft, () => chat.configured, shown], ([text, configured, now]) => {
@@ -268,6 +305,7 @@ defineExpose({ setDraft, insertPrompt, refreshModel: readModelLabel, draft });
         <small class="attach-hint">{{ attachments.length }}/{{ MAX_IMAGES }} 个附件 · 发送时会一起交给小伴</small>
       </div>
       <input ref="filePicker" type="file" :accept="ATTACHMENT_ACCEPT" multiple hidden data-testid="chat-image-input" @change="onPick" />
+      <ChatSlashMenu v-if="slashOpen" :items="slashItems" :active="slashIndex" @pick="pickSkill" @hover="slashIndex = $event" />
       <div class="composer-editor">
         <NInput ref="input" v-model:value="draft" type="textarea" :autosize="{ minRows, maxRows: 8 }" :disabled="!store.desktop || !chat.configured" :placeholder="placeholderText" data-testid="chat-input" @keydown="onKeydown" />
       </div>

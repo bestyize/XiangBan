@@ -89,7 +89,8 @@ async function refreshInstalled() {
   const id = ++requestId;
   const results = await Promise.allSettled([
     invoke<Expert[]>('ai_store_experts_installed'),
-    invoke<Skill[]>('ai_store_installed'),
+    // The skills the user may start by name: installed, bundled and the ones plugins carry.
+    invoke<{ name: string; displayName: string; description: string }[]>('chat_invocable_skills').then(list => list.map(i => ({ slug: i.name, name: i.displayName, description: i.description }) as unknown as Skill)),
     invoke<Connector[]>('ai_store_connector_status'),
   ]);
   if (id !== requestId) return;

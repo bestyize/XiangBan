@@ -21,7 +21,7 @@ function setup() {
 beforeEach(() => {
   vi.mocked(invoke).mockReset();
   vi.mocked(invoke).mockImplementation((async (command: string) => {
-    if (command === 'ai_store_experts_installed' || command === 'ai_store_installed' || command === 'ai_store_connector_status') return [];
+    if (command === 'ai_store_experts_installed' || command === 'ai_store_installed' || command === 'chat_invocable_skills' || command === 'ai_store_connector_status') return [];
     return { results: [] };
   }) as typeof invoke);
 });

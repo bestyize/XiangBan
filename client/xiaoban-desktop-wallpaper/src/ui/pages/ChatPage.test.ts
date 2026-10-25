@@ -81,7 +81,7 @@ describe('chat workbench composer actions', () => {
   it('keeps capability menus in the composer and uses the desktop AI Store inventories', async () => {
     const h = await open({
       ai_store_experts_installed: () => [{ slug: 'reviewer', name: '代码专家', description: '代码审阅', entrySkill: 'code-review', ready: true }],
-      ai_store_installed: () => [{ slug: 'check', name: '质量检查', description: '分析测试' }],
+      chat_invocable_skills: () => [{ name: 'check', displayName: '质量检查', description: '分析测试', source: 'installed' }],
       ai_store_connector_status: () => [{ id: 'github', name: 'GitHub', connected: true, enabled: true, toolCount: 8 }],
     });
     await click('chat-add-menu');
@@ -96,12 +96,48 @@ describe('chat workbench composer actions', () => {
     await click('chat-add-menu');
     await click('chat-add-skills');
     await click('chat-installed-check');
-    expect(textarea().value).toContain('质量检查');
+    expect(textarea().value.startsWith('/check ')).toBe(true);
     await click('chat-add-menu');
     await click('chat-add-connectors');
     await click('chat-installed-github');
     expect(textarea().value).toContain('GitHub');
     expect(h.commands()).toContain('ai_store_connector_status');
+  });
+
+  it('offers the skills the user may start when a /name is typed, and inserts the chosen one', async () => {
+    const h = await open({
+      chat_invocable_skills: () => [
+        { name: 'pptx', displayName: 'PPT 演示文稿', description: '做幻灯片', source: 'builtin' },
+        { name: 'xlsx', displayName: 'Excel 表格', description: '处理表格', source: 'plugin', plugin: 'office-suite' },
+        { name: 'pdf-tools', displayName: 'pdf-tools', description: '处理 PDF', source: 'installed' },
+      ],
+    });
+    await type('先做 /');
+    expect(h.commands()).toContain('chat_invocable_skills');
+    expect(all('.slash-item').map(e => e.dataset.testid)).toEqual(['chat-slash-pdf-tools', 'chat-slash-pptx', 'chat-slash-xlsx']);
+    expect(q('chat-slash-xlsx')?.textContent).toContain('office-suite');
+    await type('先做 /p');
+    expect(all('.slash-item').map(e => e.dataset.testid)).toEqual(['chat-slash-pdf-tools', 'chat-slash-pptx']);
+    // Down moves the highlight, Enter inserts it instead of sending.
+    expect((await press({ key: 'ArrowDown' })).defaultPrevented).toBe(true);
+    expect((await press({ key: 'Enter' })).defaultPrevented).toBe(true);
+    expect(textarea().value).toBe('先做 /pptx ');
+    expect(q('chat-slash-menu')).toBeNull();
+    expect(h.commands()).not.toContain('chat_send');
+    // A finished name or a path opens nothing; Escape closes the menu and leaves the text alone.
+    await type('看 /etc/hosts');
+    expect(q('chat-slash-menu')).toBeNull();
+    await type('/x');
+    expect(q('chat-slash-menu')).not.toBeNull();
+    await press({ key: 'Escape' });
+    expect(q('chat-slash-menu')).toBeNull();
+    expect(textarea().value).toBe('/x');
+  });
+
+  it('keeps the slash menu away when nothing matches or the app is not the desktop one', async () => {
+    await open({ chat_invocable_skills: () => [{ name: 'pptx', displayName: 'PPT', description: '', source: 'builtin' }] });
+    await type('/zzz');
+    expect(q('chat-slash-menu')).toBeNull();
   });
 
   it('uses a dedicated control-window screenshot command and adds the result without sending', async () => {

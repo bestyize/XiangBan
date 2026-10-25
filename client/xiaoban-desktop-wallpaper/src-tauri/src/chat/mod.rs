@@ -7,6 +7,7 @@ mod agent_settings;
 mod task_runtime;
 mod app_guide;
 mod feature_hints;
+mod skill_invocation;
 mod widget_content;
 mod broker;
 mod checkpoints;
@@ -526,6 +527,21 @@ fn assemble(parts: Parts<'_>) -> Result<Agent, String> {
     assemble_with_files(parts, Vec::new())
 }
 
+/// 对话能读到的全部技能：随应用带的、用户自己装的，最后是已装插件自带的（同名时用户自己装的优先）。
+fn skills_for(dirs: &Dirs, bundled: PathBuf) -> Skills {
+    agent_skill_discovery::plugin::skill_roots(&dirs.plugins()).into_iter()
+        .fold(Skills::new().read_only_root(bundled).writable_root(dirs.skills()), |skills, root| skills.read_only_root(root))
+}
+
+/// 输入框 `/` 菜单：用户可以用 `/名称` 启动的技能，带来源、版本和中文名。
+#[tauri::command]
+pub fn chat_invocable_skills(app: tauri::AppHandle, window: tauri::WebviewWindow) -> Result<Vec<Value>, String> {
+    chat_window(&window)?;
+    let dirs = Dirs::of(&app)?;
+    let skills = skills_for(&dirs, dirs.chat.join("bundled-skills"));
+    Ok(skill_invocation::menu(&skills, &dirs.plugins(), &dirs.skills()))
+}
+
 fn assemble_with_files(parts: Parts<'_>, attachments: Vec<Attachment>) -> Result<Agent, String> {
     assemble_with_connectors(parts, attachments, Vec::new())
 }
@@ -543,9 +559,7 @@ fn assemble_with_connectors(parts: Parts<'_>, attachments: Vec<Attachment>, conn
     fs::write(file_skill.join("SKILL.md"), agent_file_tools::ANALYSIS_SKILL).map_err(|e| e.to_string())?;
     fs::create_dir_all(file_skill.join("scripts")).map_err(|e| e.to_string())?;
     fs::write(file_skill.join("scripts/csv_summary.py"), agent_file_tools::CSV_SUMMARY_SCRIPT).map_err(|e| e.to_string())?;
-    // 插件自带的技能放在最后：同名时用户自己装的技能优先。
-    let skills = Arc::new(agent_skill_discovery::plugin::skill_roots(&dirs.plugins()).into_iter()
-        .fold(Skills::new().read_only_root(bundled).writable_root(dirs.skills()), |skills, root| skills.read_only_root(root)));
+    let skills = Arc::new(skills_for(&dirs, bundled));
     let memory = Arc::new(Memory::new(dirs.memory()));
     // 资料库 → 记忆 can switch remembering off: no notes in the prompt, no note tools, nothing recalled.
     let remember = memory_center::remembering(&dirs);
@@ -600,6 +614,8 @@ fn assemble_with_connectors(parts: Parts<'_>, attachments: Vec<Attachment>, conn
     builder = builder
         // Facts about the app's own features that match the request, before trimming so their size is counted.
         .middleware(feature_hints::FeatureHints)
+        // `/技能名`：把用户点名的技能说明放到这条请求后面。
+        .middleware(skill_invocation::SkillInvocation::new(skills.clone()))
         .middleware(ContextTrim::new(budget.context_limit).reserve_output(budget.trim_headroom))
         .middleware(ContinueGuard::new())
         // Bounded transient-error recovery; cancellation and the shared run budget still apply.
