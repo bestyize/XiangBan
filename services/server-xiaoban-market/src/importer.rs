@@ -54,6 +54,7 @@ async fn import_inner(state: &AppState, id: Uuid, opts: &ImportOpts) -> Result<U
     let mut package_row = None;
     match enrichment {
         Enrichment::Package { version, changelog, bytes } => {
+            let bytes = package::strip_registry_metadata(&bytes).map_err(|e| AppError::BadRequest(format!("安装包未通过校验：{e}")))?;
             let info = package::inspect_zip(&bytes).map_err(|e| AppError::BadRequest(format!("安装包未通过校验：{e}")))?;
             let (_, front_description) = package::frontmatter(&info.skill_md);
             if summary.is_empty() {

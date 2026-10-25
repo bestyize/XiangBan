@@ -62,6 +62,38 @@ fn safe_path(name: &str) -> Result<(), String> {
     Ok(())
 }
 
+/// 上游注册表在包里附带的元数据目录（如 ClawHub 的 `.clawhub/origin.json`），不属于技能本身。
+const REGISTRY_METADATA_DIRS: [&str; 1] = [".clawhub"];
+
+fn is_registry_metadata(name: &str) -> bool {
+    name.split('/').any(|part| REGISTRY_METADATA_DIRS.contains(&part))
+}
+
+/// 入库前剔除上游注册表的元数据目录。没有这类条目时原样返回，保持字节和摘要不变；
+/// 其余条目按原样（含压缩数据）复制，客户端的安全校验不放宽。
+pub fn strip_registry_metadata(bytes: &[u8]) -> Result<Vec<u8>, String> {
+    let mut archive = zip::ZipArchive::new(Cursor::new(bytes)).map_err(|e| format!("不是有效的 ZIP：{e}"))?;
+    let mut keep = Vec::new();
+    let mut dropped = false;
+    for i in 0..archive.len() {
+        let f = archive.by_index_raw(i).map_err(|e| format!("无法读取 ZIP 条目：{e}"))?;
+        if is_registry_metadata(f.name()) {
+            dropped = true;
+        } else {
+            keep.push(i);
+        }
+    }
+    if !dropped {
+        return Ok(bytes.to_vec());
+    }
+    let mut writer = zip::ZipWriter::new(Cursor::new(Vec::new()));
+    for i in keep {
+        let f = archive.by_index_raw(i).map_err(|e| format!("无法读取 ZIP 条目：{e}"))?;
+        writer.raw_copy_file(f).map_err(|e| format!("重新打包失败：{e}"))?;
+    }
+    writer.finish().map(Cursor::into_inner).map_err(|e| format!("重新打包失败：{e}"))
+}
+
 pub fn inspect_zip(bytes: &[u8]) -> Result<Inspected, String> {
     if bytes.len() > MAX_ZIP_BYTES {
         return Err("安装包超过 12 MiB".into());
@@ -201,6 +233,28 @@ pub mod tests {
         let big = vec![0u8; MAX_SKILL_MD_BYTES as usize + 1];
         assert!(inspect_zip(&build(&[("SKILL.md", &big)])).is_err());
         assert!(inspect_zip(b"not a zip").is_err());
+    }
+
+    #[test]
+    fn registry_metadata_is_stripped_before_inspection() {
+        let raw = build(&[("SKILL.md", b"# hi"), (".clawhub/origin.json", b"{}"), ("scripts/run.py", b"print(1)")]);
+        assert!(inspect_zip(&raw).is_err());
+        let clean = strip_registry_metadata(&raw).unwrap();
+        let info = inspect_zip(&clean).unwrap();
+        assert_eq!(info.files.iter().map(|f| f.path.as_str()).collect::<Vec<_>>(), ["SKILL.md", "scripts/run.py"]);
+        let plain = inspect_zip(&build(&[("SKILL.md", b"# hi"), ("scripts/run.py", b"print(1)")])).unwrap();
+        assert_eq!(info.manifest_sha256, plain.manifest_sha256);
+        let wrapped = build(&[("pkg/SKILL.md", b"# hi"), ("pkg/.clawhub/origin.json", b"{}")]);
+        assert_eq!(inspect_zip(&strip_registry_metadata(&wrapped).unwrap()).unwrap().files.len(), 1);
+    }
+
+    #[test]
+    fn packages_without_registry_metadata_pass_through_unchanged() {
+        let raw = build(&[("SKILL.md", b"# hi"), ("scripts/run.py", b"print(1)")]);
+        assert_eq!(strip_registry_metadata(&raw).unwrap(), raw);
+        // 其他点开头的文件仍然拒绝。
+        let hidden = strip_registry_metadata(&build(&[("SKILL.md", b"x"), (".env", b"x")])).unwrap();
+        assert!(inspect_zip(&hidden).is_err());
     }
 
     #[test]

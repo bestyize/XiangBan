@@ -897,6 +897,7 @@ async fn upload_version(State(state): State<AppState>, _admin: Admin, Path(id): 
         return Err(AppError::BadRequest("版本号只能含字母、数字、. - +，最长 44 位".into()));
     }
     let bytes = file.ok_or_else(|| AppError::BadRequest("缺少 file 字段（ZIP 安装包）".into()))?;
+    let bytes = package::strip_registry_metadata(&bytes).map_err(|e| AppError::BadRequest(format!("安装包未通过校验：{e}")))?;
     let info = package::inspect_zip(&bytes).map_err(|e| AppError::BadRequest(format!("安装包未通过校验：{e}")))?;
     let sha = package::sha256_hex(&bytes);
     storage::store_package(&state.config.data_dir, &sha, &bytes).await.map_err(|e| AppError::Internal(format!("保存安装包失败：{e}")))?;
