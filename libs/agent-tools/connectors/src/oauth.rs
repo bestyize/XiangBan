@@ -246,6 +246,27 @@ pub struct Session {
     client: Client,
     data: Mutex<Credentials>,
     retired: AtomicBool,
+    encrypted: bool,
+}
+fn session_vault(path: &Path) -> Result<(super::vault::Vault, String), String> {
+    let vault = super::vault::Vault::open(path.parent().ok_or("授权路径无效")?.join("vault"))?;
+    Ok((vault, format!("oauth/{}", path.file_name().and_then(|s| s.to_str()).ok_or("授权路径无效")?)))
+}
+fn write_credentials(path: &Path, data: &Credentials, encrypted: bool) -> Result<(), String> {
+    if encrypted {
+        let (vault, key) = session_vault(path)?;
+        vault.set(&key, "credentials", &serde_json::to_string(data).map_err(|_| "无法保存授权凭据")?)?;
+        super::vault::atomic_write(path, br#"{"vault":true}"#)
+    } else { private_write(path, &serde_json::to_vec(data).map_err(|_| "无法保存授权凭据")?) }
+}
+fn remove_credentials(path: &Path) {
+    let encrypted = fs::read(path).ok().and_then(|b| serde_json::from_slice::<Value>(&b).ok()).is_some_and(|v| v["vault"] == true);
+    if encrypted { if let Ok((vault, key)) = session_vault(path) { let _ = vault.remove_connector(&key); } }
+    let _ = fs::remove_file(path);
+}
+pub(crate) fn retire_credentials(path: &Path) {
+    let existing = cache().lock().unwrap_or_else(|e| e.into_inner()).get(path).and_then(Weak::upgrade);
+    if let Some(session) = existing { session.retire(); } else { remove_credentials(path); }
 }
 static SESSIONS: OnceLock<Mutex<HashMap<PathBuf, Weak<Session>>>> = OnceLock::new();
 fn cache() -> &'static Mutex<HashMap<PathBuf, Weak<Session>>> {
@@ -270,9 +291,12 @@ impl Session {
         if !metadata.is_file() || metadata.file_type().is_symlink() || metadata.len() > 128 * 1024 {
             return Err("授权凭据文件无效".into());
         }
-        let data: Credentials =
-            serde_json::from_slice(&fs::read(&path).map_err(|_| AUTH_REQUIRED)?)
-                .map_err(|_| "授权凭据文件无效")?;
+        let stored: Value = serde_json::from_slice(&fs::read(&path).map_err(|_| AUTH_REQUIRED)?).map_err(|_| "授权凭据文件无效")?;
+        let encrypted = stored["vault"] == true;
+        let data: Credentials = if encrypted {
+            let (vault, key) = session_vault(&path)?;
+            serde_json::from_str(&vault.get(&key, "credentials")?.ok_or(AUTH_REQUIRED)?).map_err(|_| "授权凭据文件无效")?
+        } else { serde_json::from_value(stored).map_err(|_| "授权凭据文件无效")? };
         let target = Url::parse(server).map_err(|_| "服务地址无效")?;
         let local = loopback(&target);
         endpoint(&data.token_endpoint, local)?;
@@ -285,6 +309,7 @@ impl Session {
             client: client()?,
             data: Mutex::new(data),
             retired: AtomicBool::new(false),
+            encrypted,
         });
         sessions.insert(path, Arc::downgrade(&session));
         Ok(session)
@@ -292,7 +317,7 @@ impl Session {
     pub fn retire(&self) {
         self.retired.store(true, Ordering::SeqCst);
         let _guard = self.data.lock().unwrap_or_else(|e| e.into_inner());
-        let _ = fs::remove_file(&self.path);
+        remove_credentials(&self.path);
     }
 }
 impl HttpAuthorization for Session {
@@ -321,10 +346,7 @@ impl HttpAuthorization for Session {
             if self.retired.load(Ordering::SeqCst) {
                 return Err(AUTH_REQUIRED.into());
             }
-            private_write(
-                &self.path,
-                &serde_json::to_vec(&next).map_err(|_| "无法保存授权凭据")?,
-            )?;
+            write_credentials(&self.path, &next, self.encrypted)?;
             *data = next;
         }
         Ok(data.access_token.clone())
@@ -343,6 +365,7 @@ pub struct Flow {
     client: Client,
     credentials: Credentials,
     path: PathBuf,
+    pub encrypt_credentials: bool,
 }
 impl Flow {
     pub fn begin(config: &Value, root: &Path, id: &str) -> Result<Self, String> {
@@ -535,6 +558,7 @@ impl Flow {
                 scope,
             },
             path,
+            encrypt_credentials: false,
         })
     }
     pub fn complete(self, cancel: &AtomicBool) -> Result<Arc<Session>, String> {
@@ -584,10 +608,7 @@ impl Flow {
         if cancel.load(Ordering::SeqCst) {
             return Err("授权已取消".into());
         }
-        private_write(
-            &self.path,
-            &serde_json::to_vec(&data).map_err(|_| "无法保存授权凭据")?,
-        )?;
+        write_credentials(&self.path, &data, self.encrypt_credentials)?;
         Session::load(self.path, &data.server)
     }
 }

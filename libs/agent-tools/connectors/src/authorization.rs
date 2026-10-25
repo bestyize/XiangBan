@@ -29,6 +29,7 @@ impl ConnectorManager {
             return Err("连接前需要确认服务和配置".into());
         }
         let config = normalized_config(&config)?;
+        let (effective, _, _) = self.resolve_plugin_config(id, &config)?;
         self.cancel_for_connector(id);
         let error = match self.connect(id, name, config.clone(), true) {
             Ok(mut status) => {
@@ -37,18 +38,19 @@ impl ConnectorManager {
             }
             Err(e) => e,
         };
-        let mode = config["authMode"].as_str().unwrap_or("auto");
-        let explicit_key = config["headers"]
+        let mode = effective["authMode"].as_str().unwrap_or("auto");
+        let explicit_key = effective["headers"]
             .as_object()
             .is_some_and(|m| m.keys().any(|k| k.eq_ignore_ascii_case("authorization")));
-        if config["url"].as_str().is_none()
+        if effective["url"].as_str().is_none()
             || !matches!(mode, "auto" | "oauth")
             || (mode == "auto" && explicit_key)
             || !(error.starts_with("MCP HTTP 401") || error.contains(oauth::AUTH_REQUIRED))
         {
             return Err(error);
         }
-        let flow = oauth::Flow::begin(&config, &self.root, id)?;
+        let mut flow = oauth::Flow::begin(&effective, &self.root, id)?;
+        flow.encrypt_credentials = config.get("connectorPlugin").is_some();
         let flow_id = oauth::random()?;
         let pending = Arc::new(Pending {
             id: id.into(),
@@ -114,7 +116,7 @@ impl ConnectorManager {
                     }
                     Err(error) => {
                         if let Ok(path) = oauth::token_path(&manager.root, &id, &sid) {
-                            let _ = std::fs::remove_file(path);
+                            oauth::retire_credentials(&path);
                         }
                         *status = if task.cancel.load(Ordering::SeqCst) {
                             json!({"status":"cancelled"})
@@ -142,6 +144,7 @@ impl ConnectorManager {
             .find(|r| r.id == id)
             .cloned()
             .ok_or("连接器未配置")?;
+        if record.config.get("connectorPlugin").is_some() { self.enable_plugin_state(id)?; }
         self.begin_connect(id, &record.name, record.config, true)
     }
     pub fn authorization_status(&self, flow: &str) -> Result<Value, String> {

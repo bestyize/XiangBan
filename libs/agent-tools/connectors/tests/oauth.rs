@@ -104,6 +104,8 @@ fn send(stream: &mut TcpStream, status: &str, body: Value, extra: &str) {
     write!(stream,"HTTP/1.1 {status}\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n{extra}\r\n{body}",body.len()).unwrap();
 }
 fn handle(mut stream: TcpStream, base: &str, state: &Mutex<State>) {
+    // Windows may inherit the listener's nonblocking mode on accept.
+    stream.set_nonblocking(false).unwrap();
     stream
         .set_read_timeout(Some(Duration::from_secs(3)))
         .unwrap();
@@ -426,5 +428,57 @@ fn refuses_resource_metadata_for_another_service() {
     assert!(error.contains("不匹配"));
     assert!(manager.tools().is_empty());
     manager.shutdown();
+    fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
+fn plugin_oauth_encrypts_rotates_restores_and_unbinds_credentials() {
+    use agent_connector_tools::plugin::{AuthSpec, ConnectorPlugin, Display, ServerSpec, Transport};
+    let server = Server::new();
+    let root = root();
+    let plugin = ConnectorPlugin {
+        name: "oauth-plugin".into(), version: "1".into(),
+        display: Display { name: "OAuth plugin".into(), ..Default::default() },
+        servers: vec![ServerSpec {
+            name: "service".into(), transport: Transport::StreamableHttp,
+            url: Some(format!("{}/mcp",server.base)), command: None, args: vec![],
+            env: Default::default(), headers: Default::default(), auth: AuthSpec::None,
+            disabled_tools: vec![], timeout_ms: Some(2000),
+        }], skills_dir: None, icon: None,
+    };
+    let id = plugin.connection_id("service");
+    let manager = Arc::new(ConnectorManager::new(root.clone(), root.clone()).unwrap());
+    let flow = manager.begin_connect_plugin(&plugin, "service", &Default::default(), true).unwrap();
+    assert_eq!(flow["status"], "authorization_required");
+    assert_eq!(server.callback(&flow, true), 200);
+    assert_eq!(finish(&manager, &flow)["status"], "connected");
+    server.state.lock().unwrap().expire = true;
+    assert_eq!(manager.tools()[0].execute(json!({}), &ToolCtx::detached("plugin")).unwrap(), "authorized result");
+    assert_eq!(server.state.lock().unwrap().refreshes, 1);
+    fn no_plaintext(dir: &std::path::Path) {
+        for entry in fs::read_dir(dir).unwrap().map(Result::unwrap) {
+            if entry.path().is_dir() { no_plaintext(&entry.path()); }
+            else {
+                let bytes = fs::read(entry.path()).unwrap();
+                let text = String::from_utf8_lossy(&bytes);
+                assert!(!text.contains("access-secret")); assert!(!text.contains("refresh-secret"));
+            }
+        }
+    }
+    no_plaintext(&root);
+    manager.shutdown(); drop(manager);
+    let restored = Arc::new(ConnectorManager::new(root.clone(), root.clone()).unwrap());
+    assert_eq!(restored.tools().len(), 1);
+    server.state.lock().unwrap().expire = false;
+    let next = restored.begin_connect_plugin(&plugin, "service", &Default::default(), true).unwrap();
+    assert_eq!(next["status"], "authorization_required");
+    server.callback(&next, true);
+    assert_eq!(finish(&restored, &next)["status"], "connected");
+    assert_eq!(fs::read_dir(&root).unwrap().map(Result::unwrap).filter(|e| e.file_name().to_string_lossy().starts_with("oauth-")).count(), 1);
+    no_plaintext(&root);
+    restored.unbind_plugin(&id).unwrap();
+    assert!(restored.tools().is_empty());
+    assert_eq!(fs::read_dir(root.join("vault")).unwrap().map(Result::unwrap).filter(|e| e.path().extension().is_some_and(|s| s == "json")).count(), 0);
+    restored.shutdown();
     fs::remove_dir_all(root).unwrap();
 }
