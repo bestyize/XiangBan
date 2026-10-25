@@ -36,6 +36,7 @@ mod run_history;
 pub(crate) mod task_outcome;
 mod learning;
 pub mod memory_center;
+pub mod plugins;
 mod skill_evolution;
 pub(crate) mod store;
 pub(crate) mod store_market;
@@ -334,6 +335,9 @@ impl Dirs {
     fn spill(&self) -> PathBuf { self.chat.join("spill") }
     fn memory(&self) -> PathBuf { self.chat.join("memory") }
     fn skills(&self) -> PathBuf { self.chat.join("skills") }
+    /// WorkBuddy 格式的插件（专家、专家团、连接器、技能包）：`plugins/<名称>/`。
+    fn plugins(&self) -> PathBuf { self.chat.join("plugins") }
+    fn plugin_backups(&self) -> PathBuf { self.chat.join("plugin-backups") }
     fn checkpoints(&self) -> PathBuf { self.chat.join("checkpoints") }
 }
 
@@ -539,7 +543,9 @@ fn assemble_with_connectors(parts: Parts<'_>, attachments: Vec<Attachment>, conn
     fs::write(file_skill.join("SKILL.md"), agent_file_tools::ANALYSIS_SKILL).map_err(|e| e.to_string())?;
     fs::create_dir_all(file_skill.join("scripts")).map_err(|e| e.to_string())?;
     fs::write(file_skill.join("scripts/csv_summary.py"), agent_file_tools::CSV_SUMMARY_SCRIPT).map_err(|e| e.to_string())?;
-    let skills = Arc::new(Skills::new().read_only_root(bundled).writable_root(dirs.skills()));
+    // 插件自带的技能放在最后：同名时用户自己装的技能优先。
+    let skills = Arc::new(agent_skill_discovery::plugin::skill_roots(&dirs.plugins()).into_iter()
+        .fold(Skills::new().read_only_root(bundled).writable_root(dirs.skills()), |skills, root| skills.read_only_root(root)));
     let memory = Arc::new(Memory::new(dirs.memory()));
     // 资料库 → 记忆 can switch remembering off: no notes in the prompt, no note tools, nothing recalled.
     let remember = memory_center::remembering(&dirs);

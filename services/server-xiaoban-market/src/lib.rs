@@ -9,6 +9,7 @@ pub mod handlers;
 pub mod importer;
 pub mod items;
 pub mod package;
+pub mod plugin;
 pub mod state;
 pub mod storage;
 pub mod upstream;

@@ -33,6 +33,13 @@ pub fn sha256_hex(bytes: &[u8]) -> String {
     format!("{:x}", Sha256::digest(bytes))
 }
 
+/// WorkBuddy 插件的清单目录：`.codebuddy-plugin` 是市场插件，`.workbuddy-plugin` 是它的内置插件。
+pub const MANIFEST_DIRS: [&str; 2] = [".codebuddy-plugin", ".workbuddy-plugin"];
+/// 连接器插件根目录的 `.mcp.json`（实测 WorkBuddy 官方连接器里有 7 个这样写）。
+pub const ROOT_HIDDEN_FILES: [&str; 1] = [".mcp.json"];
+/// WorkBuddy 插件可以很大（实测最多 635 个文件、5.5 MB）；解压后总大小仍限制 12 MiB。
+pub const MAX_PLUGIN_FILES: usize = 2048;
+
 const RESERVED: [&str; 22] = [
     "CON", "PRN", "AUX", "NUL", "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9", "LPT1", "LPT2",
     "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9",
@@ -46,12 +53,15 @@ fn safe_path(name: &str) -> Result<(), String> {
     if name.chars().any(|c| c.is_control()) {
         return Err(bad());
     }
-    // 与客户端 skill-discovery 的 valid_path 一致：深度 ≤ 8，单段 ≤ 100，且不允许以 . 开头的隐藏文件。
-    if name.split('/').count() > 8 {
+    // 与客户端 skill-discovery 的 valid_path 一致：深度 ≤ 12（实测 WorkBuddy 插件有 9 层），单段 ≤ 100，且不允许以 . 开头的隐藏文件。
+    if name.split('/').count() > 12 {
         return Err(bad());
     }
-    for part in name.split('/') {
-        if part.is_empty() || part.len() > 100 || part.starts_with('.') || part.ends_with('.') || part.ends_with(' ') {
+    let depth = name.split('/').count();
+    for (index, part) in name.split('/').enumerate() {
+        // WorkBuddy 插件的清单目录（`.codebuddy-plugin/plugin.json`）和根目录的 `.mcp.json` 只在最外层放行，其余点开头的路径照旧拒绝。
+        let hidden_ok = index == 0 && (MANIFEST_DIRS.contains(&part) || (depth == 1 && ROOT_HIDDEN_FILES.contains(&part)));
+        if part.is_empty() || part.len() > 100 || (part.starts_with('.') && !hidden_ok) || part.ends_with('.') || part.ends_with(' ') {
             return Err(bad());
         }
         let stem = part.split('.').next().unwrap_or("").to_ascii_uppercase();
@@ -192,12 +202,35 @@ pub fn expert_version(md: &str, package_sha256: &str, stored_sha256: Option<&str
     }
 }
 
+/// 解包并校验后的内容：文件清单、清单摘要和每个文件的字节（路径已去掉顶层包装目录）。
+#[derive(Debug)]
+pub struct Unpacked {
+    pub files: Vec<FileEntry>,
+    pub manifest_sha256: String,
+    pub contents: std::collections::BTreeMap<String, Vec<u8>>,
+}
+
+/// 技能包：根目录必须有 SKILL.md。
 pub fn inspect_zip(bytes: &[u8]) -> Result<Inspected, String> {
+    let Unpacked { files, manifest_sha256, contents } = unpack_zip(bytes)?;
+    let raw = contents.get("SKILL.md").ok_or("安装包根目录缺少 SKILL.md")?;
+    let skill_md = String::from_utf8(raw.clone()).map_err(|_| "SKILL.md 不是 UTF-8".to_string())?;
+    Ok(Inspected { files, manifest_sha256, skill_md })
+}
+
+/// 任何 ZIP 包共用的校验：路径规则、大小与数量限制、大小写冲突、符号链接；不要求有 SKILL.md。
+/// 技能包和 WorkBuddy 插件包（专家、专家团、连接器）都从这里进。
+pub fn unpack_zip(bytes: &[u8]) -> Result<Unpacked, String> {
+    unpack_zip_limited(bytes, MAX_FILES)
+}
+
+/// 同 `unpack_zip`，文件数上限可调（插件包用 `MAX_PLUGIN_FILES`）。
+pub fn unpack_zip_limited(bytes: &[u8], max_files: usize) -> Result<Unpacked, String> {
     if bytes.len() > MAX_ZIP_BYTES {
         return Err("安装包超过 12 MiB".into());
     }
     let mut archive = zip::ZipArchive::new(Cursor::new(bytes)).map_err(|e| format!("不是有效的 ZIP：{e}"))?;
-    if archive.len() > MAX_FILES * 2 {
+    if archive.len() > max_files * 2 {
         return Err("安装包条目过多".into());
     }
     let mut names = Vec::new();
@@ -214,8 +247,8 @@ pub fn inspect_zip(bytes: &[u8]) -> Result<Inspected, String> {
     if names.is_empty() {
         return Err("安装包为空".into());
     }
-    if names.len() > MAX_FILES {
-        return Err("安装包文件数超过 512".into());
+    if names.len() > max_files {
+        return Err(format!("安装包文件数超过 {max_files}"));
     }
     // 允许单个顶层包装目录。
     let first_dir = |n: &str| n.split_once('/').map(|(d, _)| d.to_string());
@@ -223,7 +256,7 @@ pub fn inspect_zip(bytes: &[u8]) -> Result<Inspected, String> {
     let mut seen = HashSet::new();
     let mut total = 0u64;
     let mut files = Vec::new();
-    let mut skill_md = None;
+    let mut contents = std::collections::BTreeMap::new();
     for (i, name) in &names {
         let path = match &wrapper {
             Some(d) => name[d.len() + 1..].to_string(),
@@ -248,18 +281,15 @@ pub fn inspect_zip(bytes: &[u8]) -> Result<Inspected, String> {
         if total > MAX_TOTAL_BYTES {
             return Err("解压后总大小超过 12 MiB".into());
         }
-        if path == "SKILL.md" {
-            skill_md = Some(String::from_utf8(buf.clone()).map_err(|_| "SKILL.md 不是 UTF-8".to_string())?);
-        }
-        files.push(FileEntry { path, size: buf.len() as u64, sha256: sha256_hex(&buf) });
+        files.push(FileEntry { path: path.clone(), size: buf.len() as u64, sha256: sha256_hex(&buf) });
+        contents.insert(path, buf);
     }
-    let skill_md = skill_md.ok_or("安装包根目录缺少 SKILL.md")?;
     files.sort_by(|a, b| a.path.cmp(&b.path));
     let mut manifest = Sha256::new();
     for f in &files {
         manifest.update(format!("{}  {}\n", f.sha256, f.path));
     }
-    Ok(Inspected { files, manifest_sha256: format!("{:x}", manifest.finalize()), skill_md })
+    Ok(Unpacked { files, manifest_sha256: format!("{:x}", manifest.finalize()), contents })
 }
 
 /// 读取 SKILL.md 头部的 `name` / `description`；没有头部时返回 `None`。
@@ -320,7 +350,7 @@ pub mod tests {
 
     #[test]
     fn rejects_what_the_desktop_client_would_reject() {
-        for bad in ["../evil.txt", "a/../b.txt", "/abs.txt", "C:/x.txt", "dir\\x.txt", "CON.txt", "trail.", "a//b", ".hidden", "dir/.env", "a/b/c/d/e/f/g/h/i.txt"] {
+        for bad in ["../evil.txt", "a/../b.txt", "/abs.txt", "C:/x.txt", "dir\\x.txt", "CON.txt", "trail.", "a//b", ".hidden", "dir/.env", "a/b/c/d/e/f/g/h/i/j/k/l/m.txt"] {
             let err = inspect_zip(&build(&[("SKILL.md", b"x"), (bad, b"x")]));
             assert!(err.is_err(), "{bad} should be rejected");
         }
@@ -399,6 +429,16 @@ pub mod tests {
         assert_eq!(expert_version(md, &sha, Some(&"b".repeat(64))), "2.1.0+aaaaaaaa");
         assert_eq!(expert_version("# 没有头部", &sha, None), "1.0.0");
         assert_eq!(expert_version("---\nversion: bad version!\n---\n", &sha, None), "1.0.0");
+    }
+
+    #[test]
+    fn workbuddy_manifest_paths_are_allowed_only_where_workbuddy_puts_them() {
+        for ok in [".codebuddy-plugin/plugin.json", ".workbuddy-plugin/plugin.json", ".mcp.json", "ai.workbuddy/token-schema.json", "a/b/c/d/e/f/g/h/i.md"] {
+            assert!(safe_path(ok).is_ok(), "{ok}");
+        }
+        for bad in ["a/.mcp.json", "a/.codebuddy-plugin/plugin.json", ".codebuddy-plugin/.env", ".env", ".mcp.json/x", "a/b/c/d/e/f/g/h/i/j/k/l/m.md"] {
+            assert!(safe_path(bad).is_err(), "{bad}");
+        }
     }
 
     #[test]

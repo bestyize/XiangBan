@@ -6,6 +6,7 @@ mod runner;
 pub mod catalog;
 pub mod market;
 pub mod packs;
+pub mod plugin;
 use agent_kernel::{Risk, Tool, ToolCtx, ToolSpec};
 use package::{is_script, plan, Plan};
 use reqwest::{blocking::Client, redirect::Policy, Url};

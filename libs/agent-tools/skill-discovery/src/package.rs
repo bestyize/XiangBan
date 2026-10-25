@@ -13,10 +13,17 @@ use zip::ZipArchive;
 
 // Guard against oversized manifests without rejecting ordinary multi-file skill packs.
 // Byte, path and hash limits below remain independent of this count limit.
-const MAX_FILES: usize = 512;
-const MAX_FILE: u64 = 4 * 1024 * 1024;
-const MAX_TOTAL: u64 = 12 * 1024 * 1024;
-const MAX_ARCHIVE: usize = 12 * 1024 * 1024;
+pub(crate) const MAX_FILES: usize = 512;
+pub(crate) const MAX_FILE: u64 = 4 * 1024 * 1024;
+pub(crate) const MAX_TOTAL: u64 = 12 * 1024 * 1024;
+pub(crate) const MAX_ARCHIVE: usize = 12 * 1024 * 1024;
+
+/// WorkBuddy plugin manifest directories. With the root `.mcp.json` of connector plugins they are the only
+/// hidden paths a package may contain, and only as the first path component (`.codebuddy-plugin/plugin.json`).
+pub(crate) const MANIFEST_DIRS: [&str; 2] = [".codebuddy-plugin", ".workbuddy-plugin"];
+pub(crate) const ROOT_HIDDEN_FILES: [&str; 1] = [".mcp.json"];
+/// WorkBuddy plugins can be large (measured: up to 635 files / 5.5 MB); total bytes stay capped at 12 MiB.
+pub(crate) const MAX_PLUGIN_FILES: usize = 2048;
 
 #[derive(Clone, Debug)]
 pub(crate) struct Item {
@@ -44,12 +51,14 @@ pub(crate) fn valid_path(path: &str) -> bool {
         return false;
     }
     let parts: Vec<_> = path.split('/').collect();
-    if parts.len() > 8 {
+    // WorkBuddy plugins nest references deeper than 8 levels (measured: 9); 12 is still a sane bound.
+    if parts.len() > 12 {
         return false;
     }
-    parts.iter().all(|p| {
+    parts.iter().enumerate().all(|(index, p)| {
+        let hidden_ok = index == 0 && (MANIFEST_DIRS.contains(p) || (parts.len() == 1 && ROOT_HIDDEN_FILES.contains(p)));
         if p.is_empty() || *p == "." || *p == ".." || p.len() > 100
-            || (p.ends_with(' ') || p.ends_with('.')) || p.starts_with('.') {
+            || (p.ends_with(' ') || p.ends_with('.')) || (p.starts_with('.') && !hidden_ok) {
             return false;
         }
         let stem = p.split('.').next().unwrap_or("").to_ascii_uppercase();
@@ -381,6 +390,16 @@ mod tests {
         let archive = writer.finish().unwrap().into_inner();
         let extracted = verified_files("demo-skill", &plan, &archive).unwrap();
         assert_eq!(extracted.len(), plan.files.len());
+    }
+
+    #[test]
+    fn workbuddy_manifest_paths_are_allowed_only_where_workbuddy_puts_them() {
+        for ok in [".codebuddy-plugin/plugin.json", ".workbuddy-plugin/plugin.json", ".mcp.json", "ai.workbuddy/token-schema.json", "a/b/c/d/e/f/g/h/i.md"] {
+            assert!(valid_path(ok), "{ok}");
+        }
+        for bad in ["a/.mcp.json", "a/.codebuddy-plugin/plugin.json", ".codebuddy-plugin/.env", ".env", ".mcp.json/x", "a/b/c/d/e/f/g/h/i/j/k/l/m.md"] {
+            assert!(!valid_path(bad), "{bad}");
+        }
     }
 
     #[test]
