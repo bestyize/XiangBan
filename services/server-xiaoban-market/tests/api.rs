@@ -1013,3 +1013,124 @@ async fn skillhub_experts_become_workbuddy_plugins_with_their_skills_packed_insi
     assert_eq!(detail["versions"].as_array().unwrap().len(), 1, "{detail}");
     app.cleanup().await;
 }
+
+#[tokio::test]
+async fn connector_plugins_import_present_validate_and_download() {
+    let app = app!();
+    let make = |version: &str, icon: &str| {
+        let m = json!({"name":"example-connector", "version":version, "keywords":["github"], "extensions":{"ai.workbuddy":{
+            "display":{"name":"示例连接器", "name_en":"Example", "examples_zh":["帮我查看仓库"]},
+            "setup":{"mcpServers":{"a":{"auth":{"type":"token","schema":"./ai.workbuddy/token-schema.json", "headers":{"Authorization":{"field":"KEY"}}}}}},
+            "policy":{"mcpServers":{"a":{"disabledTools":["delete"]}}}
+        }}}).to_string();
+        zip_bytes(&[(".codebuddy-plugin/plugin.json",m.as_bytes()),
+            (".mcp.json",br#"{"mcpServers":{"a":{"type":"sse","url":"https://example.com/sse"}}}"#),
+            ("ai.workbuddy/token-schema.json",br#"{"fields":[{"key":"KEY","type":"password","required":true,"default":"PRIVATE_DEFAULT"}]}"#),
+            ("skills/helper/SKILL.md",b"# helper"),("ai.workbuddy/assets/icon.svg",icon.as_bytes())])
+    };
+    let upload = |bytes: Vec<u8>, status: &str| app.http.post(format!("{}/api/v1/admin/plugins/import",app.base)).bearer_auth(&app.token)
+        .multipart(reqwest::multipart::Form::new().text("status",status.to_string()).part("file", reqwest::multipart::Part::bytes(bytes).file_name("connector.zip"))).send();
+    let svg = "<svg xmlns='http://www.w3.org/2000/svg'><path d='M0 0'/></svg>";
+    let bytes = make("1.0.0",svg);
+    let res = upload(bytes.clone(), "published").await.unwrap();
+    assert_eq!(res.status(),200,"{}",res.text().await.unwrap());
+    let list = app.get("/api/v1/market/connectors").await;
+    let item = list["results"].as_array().unwrap().iter().find(|v| v["slug"]=="example-connector").unwrap();
+    assert_eq!(item["connector"]["authTypes"],json!(["token"]));
+    assert_eq!(item["connector"]["skillCount"],1);
+    assert_eq!(item["category"]["slug"],"dev");
+    assert!(!item.to_string().contains("PRIVATE_DEFAULT"));
+    let icon = app.http.get(format!("{}{}",app.base,item["iconUrl"].as_str().unwrap())).send().await.unwrap();
+    assert_eq!(icon.headers()["content-type"],"image/svg+xml");
+    assert_eq!(icon.headers()["content-security-policy"],"default-src 'none'; style-src 'unsafe-inline'");
+    assert_eq!(icon.headers()["x-content-type-options"],"nosniff");
+    let base = "/api/v1/market/connectors/xiaoban/example-connector";
+    let detail = app.get(base).await;
+    assert_eq!(detail["item"]["connector"],item["connector"]);
+    assert_eq!(detail["item"]["prompts"],json!(["帮我查看仓库"]));
+    let downloaded = app.http.get(format!("{}{base}/versions/1.0.0/download",app.base)).send().await.unwrap().bytes().await.unwrap();
+    assert_eq!(downloaded.as_ref(),bytes.as_slice());
+    assert_eq!(upload(bytes,"published").await.unwrap().status(),200);
+    assert_eq!(upload(make("1.0.0","<svg/>"),"published").await.unwrap().status(),409);
+    assert_eq!(upload(make("2.0.0","<svg onload='evil()'/>"),"published").await.unwrap().status(),400);
+    assert_eq!(upload(make("2.0.0",svg),"published").await.unwrap().status(),200);
+    assert_eq!(app.get(base).await["versions"].as_array().unwrap().len(),2);
+    app.cleanup().await;
+}
+
+#[tokio::test]
+async fn official_marketplace_imports_persist_drafts_provenance_license_and_filter_them() {
+    let app = app!();
+    let upload = |bytes: Vec<u8>, license: &str, attribution: Value| {
+        let form = reqwest::multipart::Form::new()
+            // Official origin must enforce draft even when a caller requests publishing.
+            .text("status", "published").text("origin", "workbuddy-official").text("source", "official")
+            .text("lenient", "true").text("license", license.to_string()).text("attribution", attribution.to_string())
+            .part("file", reqwest::multipart::Part::bytes(bytes).file_name("plugin.zip"));
+        app.http.post(format!("{}/api/v1/admin/plugins/import", app.base)).bearer_auth(&app.token).multipart(form).send()
+    };
+    let bytes = expert_plugin("1.0.0",3);
+    let response = upload(bytes.clone(), "", json!({"author":"Marketplace author", "homepage":"https://example.com/expert"})).await.unwrap();
+    assert_eq!(response.status(),200);
+    let report: Value = response.json().await.unwrap();
+    assert_eq!(report["created"],true);
+    assert_eq!(report["skipped"],false);
+    let id = report["itemId"].as_str().unwrap();
+    let detail = app.get(&format!("/api/v1/admin/items/{id}")).await;
+    assert_eq!(detail["item"]["status"],"draft");
+    assert_eq!(detail["item"]["origin"],"workbuddy-official");
+    assert_eq!(detail["item"]["license"],"unknown");
+    assert_eq!(detail["item"]["attribution"]["author"],"Marketplace author");
+    assert_eq!(detail["item"]["metadata"]["attribution"]["homepage"],"https://example.com/expert");
+    let public = app.get("/api/v1/market/experts").await;
+    assert!(!public["results"].as_array().unwrap().iter().any(|i| i["id"] == id));
+
+    // A reviewed item can be published individually; importing it again requires review again.
+    app.post(&format!("/api/v1/admin/items/{id}/status"),json!({"status":"published"})).await;
+    let repeat: Value = upload(bytes,"",json!({"author":"Marketplace author"})).await.unwrap().json().await.unwrap();
+    assert_eq!(repeat["skipped"],true);
+    let detail = app.get(&format!("/api/v1/admin/items/{id}")).await;
+    assert_eq!(detail["item"]["status"],"draft");
+    assert_eq!(detail["versions"].as_array().unwrap().len(),1);
+    let next: Value = upload(expert_plugin("1.1.0",3),"",json!({})).await.unwrap().json().await.unwrap();
+    assert_eq!(next["created"],false); assert_eq!(next["skipped"],false);
+    let detail = app.get(&format!("/api/v1/admin/items/{id}")).await;
+    assert_eq!(detail["versions"].as_array().unwrap().len(),2);
+    assert_eq!(detail["item"]["version"],"1.1.0");
+    assert_eq!(upload(expert_plugin("1.1.0",2),"MIT",json!({})).await.unwrap().status(),409);
+    assert_eq!(app.get(&format!("/api/v1/admin/items/{id}")).await["item"]["license"],"unknown", "conflict rolls back provenance changes");
+
+    let make_connector = |name: &str, license: Option<&str>| {
+        let mut manifest = json!({"name":name,"version":"1.0.0","author":{"name":"Plugin author"},"repository":{"url":"https://example.com/repo"}});
+        if let Some(license) = license { manifest["license"] = json!(license); }
+        zip_bytes(&[(".codebuddy-plugin/plugin.json",manifest.to_string().as_bytes()),
+            ("mcp.json",br#"{"mcpServers":{"example":{"url":"https://example.com/mcp"}}}"#)])
+    };
+    let response = upload(make_connector("licensed-connector",Some("MIT")),"Apache-2.0",json!({"author":"Market author", "homepage":"https://example.com"})).await.unwrap();
+    assert_eq!(response.status(),200);
+    let c: Value = response.json().await.unwrap();
+    let connector = app.get(&format!("/api/v1/admin/items/{}",c["itemId"].as_str().unwrap())).await;
+    assert_eq!(connector["item"]["kind"],"connector");
+    assert_eq!(connector["item"]["status"],"draft");
+    assert_eq!(connector["item"]["license"],"MIT");
+    assert_eq!(connector["item"]["attribution"]["author"]["name"],"Plugin author");
+    assert_eq!(connector["item"]["attribution"]["homepage"],"https://example.com");
+    assert_eq!(connector["item"]["attribution"]["repository"]["url"],"https://example.com/repo");
+    let response = upload(make_connector("fallback-connector",None),"BSD-3-Clause",json!({})).await.unwrap();
+    assert_eq!(response.status(),200);
+    let c: Value = response.json().await.unwrap();
+    assert_eq!(app.get(&format!("/api/v1/admin/items/{}",c["itemId"].as_str().unwrap())).await["item"]["license"],"BSD-3-Clause");
+    let response = upload(make_connector("unknown-connector",None),"unknown",json!({})).await.unwrap();
+    assert_eq!(response.status(),200);
+
+    let filtered = app.get("/api/v1/admin/items?origin=workbuddy-official&license=unknown").await;
+    assert_eq!(filtered["total"],2);
+    for row in filtered["results"].as_array().unwrap() {
+        assert_eq!(row["origin"],"workbuddy-official"); assert_eq!(row["license"],"unknown"); assert_eq!(row["status"],"draft");
+    }
+    let connector_only = app.get("/api/v1/admin/items?kind=connector&origin=workbuddy-official&license=unknown").await;
+    assert_eq!(connector_only["total"],1);
+    assert_eq!(connector_only["results"][0]["slug"],"unknown-connector");
+    assert_eq!(app.get("/api/v1/admin/items?origin=upload&license=unknown").await["total"],0);
+    app.cleanup().await;
+}

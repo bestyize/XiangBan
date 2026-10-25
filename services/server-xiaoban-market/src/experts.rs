@@ -4,7 +4,7 @@
 //! 桌面端安装后把它当插件读取（见 libs/agent-tools/skill-discovery/src/plugin.rs）。
 use crate::{
     error::{AppError, Result},
-    items, package,
+    connectors, items, package,
     plugin::{self, Issue, Manifest, PluginPackage},
     state::AppState,
     storage,
@@ -21,6 +21,9 @@ pub struct ImportOpts {
     pub source: Option<String>,
     /// 导入别处发布的插件时用宽松模式：展示规范（3 个标签、3 条提问、字数）只给警告。
     pub lenient: bool,
+    pub origin: Option<String>,
+    pub attribution: Value,
+    pub license: Option<String>,
 }
 
 #[derive(Debug)]
@@ -28,6 +31,7 @@ pub struct Report {
     pub item_id: Uuid,
     pub version: String,
     pub created: bool,
+    pub skipped: bool,
     pub issues: Vec<Issue>,
 }
 
@@ -51,6 +55,15 @@ async fn store_avatar(state: &AppState, path: &str, bytes: &[u8]) -> Result<Stri
     }
     let sha = package::sha256_hex(bytes);
     storage::store_asset(&state.config.data_dir, &sha, bytes).await.map_err(|e| AppError::Internal(format!("保存头像失败：{e}")))?;
+    Ok(format!("/api/v1/market/assets/{sha}"))
+}
+
+async fn store_connector_icon(state: &AppState, path: &str, bytes: &[u8]) -> Result<String> {
+    if image_kind(bytes).is_none() && !connectors::safe_svg(bytes) {
+        return Err(AppError::BadRequest(format!("{path} 不是图片或包含不安全的 SVG 内容")));
+    }
+    let sha = package::sha256_hex(bytes);
+    storage::store_asset(&state.config.data_dir, &sha, bytes).await.map_err(|e| AppError::Internal(format!("保存图标失败：{e}")))?;
     Ok(format!("/api/v1/market/assets/{sha}"))
 }
 
@@ -98,7 +111,8 @@ pub(crate) async fn presentation(state: &AppState, pkg: &PluginPackage, avatar_u
 pub async fn import_plugin(state: &AppState, bytes: &[u8], opts: &ImportOpts) -> Result<Report> {
     let pkg = plugin::inspect_plugin_zip(bytes).map_err(|e| AppError::BadRequest(format!("插件包未通过校验：{e}")))?;
     let m = &pkg.manifest;
-    let issues = plugin::validate_expert(m, &pkg.unpacked.contents, opts.lenient);
+    let kind = connectors::kind(m, &pkg.unpacked.contents).map_err(AppError::BadRequest)?;
+    let issues = if kind == "connector" { connectors::validate(m, &pkg.unpacked.contents) } else { plugin::validate_expert(m, &pkg.unpacked.contents, opts.lenient) };
     let errors: Vec<&str> = issues.iter().filter(|i| i.error).map(|i| i.message.as_str()).collect();
     if !errors.is_empty() {
         return Err(AppError::BadRequest(format!("插件包未通过校验：{}", errors.join("；"))));
@@ -111,17 +125,29 @@ pub async fn import_plugin(state: &AppState, bytes: &[u8], opts: &ImportOpts) ->
         return Err(AppError::BadRequest("版本号只能含字母、数字、. - +，最长 44 位".into()));
     }
 
-    let avatar_url = match pkg.unpacked.contents.get(m.avatar.strip_prefix("./").unwrap_or(&m.avatar)) {
+    let avatar_url = if kind == "connector" {
+        match connectors::icon(&pkg.unpacked.contents) {
+            Some((path, bytes)) => Some(store_connector_icon(state, path, bytes).await?),
+            None => None,
+        }
+    } else { match pkg.unpacked.contents.get(m.avatar.strip_prefix("./").unwrap_or(&m.avatar)) {
         Some(bytes) if !m.avatar.is_empty() => Some(store_avatar(state, &m.avatar, bytes).await?),
         _ => None,
-    };
-    let expert = presentation(state, &pkg, avatar_url.as_deref()).await?;
+    }};
+    let display = if kind == "connector" { connectors::presentation(m, &pkg.unpacked.contents) } else { presentation(state, &pkg, avatar_url.as_deref()).await? };
 
-    let (name_zh, name_en) = text(&m.display_name);
+    let (name_zh, name_en) = if kind == "connector" {
+        (display["displayName"]["zh"].as_str().unwrap_or_default().into(), display["displayName"]["en"].as_str().unwrap_or_default().into())
+    } else { text(&m.display_name) };
     let (profession_zh, profession_en) = text(&m.profession);
-    let (summary, summary_en) = text(&m.display_description);
-    let tags: Vec<String> = m.tags.iter().map(|t| if t.zh.is_empty() { t.en.clone() } else { t.zh.clone() }).collect();
-    let prompts: Vec<String> = m.quick_prompts.iter().map(|t| if t.zh.is_empty() { t.en.clone() } else { t.zh.clone() }).collect();
+    let (summary, summary_en) = if kind == "connector" {
+        (display["displayDescription"]["zh"].as_str().unwrap_or_default().into(), display["displayDescription"]["en"].as_str().unwrap_or_default().into())
+    } else { text(&m.display_description) };
+    let tags: Vec<String> = if kind == "connector" { m.keywords.clone() } else { m.tags.iter().map(|t| if t.zh.is_empty() { t.en.clone() } else { t.zh.clone() }).collect() };
+    let prompts: Vec<String> = if kind == "connector" {
+        let examples = &display["examples"];
+        examples["zh"].as_array().filter(|a| !a.is_empty()).or_else(|| examples["en"].as_array()).map(|a| a.iter().filter_map(|v| v.as_str().map(str::to_string)).collect()).unwrap_or_default()
+    } else { m.quick_prompts.iter().map(|t| if t.zh.is_empty() { t.en.clone() } else { t.zh.clone() }).collect() };
     let description = pkg
         .unpacked
         .contents
@@ -130,8 +156,9 @@ pub async fn import_plugin(state: &AppState, bytes: &[u8], opts: &ImportOpts) ->
         .filter(|s| !s.trim().is_empty())
         .unwrap_or_else(|| summary.clone());
     let name = if name_zh.is_empty() { m.name.clone() } else { name_zh };
-    let category: Option<(i32, String)> = sqlx::query_as("SELECT id, name FROM categories WHERE kind = 'expert' AND slug = $1")
-        .bind(&m.category_id)
+    let category: Option<(i32, String)> = sqlx::query_as("SELECT id, name FROM categories WHERE kind = $1 AND slug = $2")
+        .bind(kind)
+        .bind(if kind == "connector" { connectors::category(m) } else { &m.category_id })
         .fetch_optional(&state.pool)
         .await?;
     let search = items::search_text(
@@ -139,22 +166,26 @@ pub async fn import_plugin(state: &AppState, bytes: &[u8], opts: &ImportOpts) ->
         &m.name,
         &opts.namespace,
         &format!("{summary} {summary_en}"),
-        &m.tags.iter().flat_map(|t| [t.zh.clone(), t.en.clone()]).collect::<Vec<_>>(),
+        &tags,
         category.as_ref().map(|c| c.1.as_str()).unwrap_or(""),
     );
-    let variant = if m.expert_type == "team" { "team" } else { "single" };
+    let variant = if kind == "expert" && m.expert_type == "team" { "team" } else { "single" };
     let source = opts.source.clone().unwrap_or_else(|| "community".into());
-    let status = opts.status.clone();
+    // Official marketplace imports always require individual review, including reimports.
+    let status = if opts.origin.as_deref() == Some("workbuddy-official") { Some("draft".into()) } else { opts.status.clone() };
+    let (license, attribution) = crate::marketplace::provenance(m, &opts.attribution, opts.license.as_deref());
+    let mut metadata = if kind == "connector" { json!({ "connector": display }) } else { json!({ "expert": display, "members": [] }) };
+    metadata["attribution"] = attribution;
 
     let mut tx = state.pool.begin().await?;
     let (item_id, inserted): (Uuid, bool) = sqlx::query_as(
         "INSERT INTO items (kind, namespace, slug, name, summary, description, category_id, tags, icon_url, source, origin, license,
            status, latest_version, metadata, prompts, search_text, variant, published_at)
-         VALUES ('expert', $1, $2, $3, $4, $5, $6, $7, $8, $9, 'upload', $10, COALESCE($11, 'draft'), $12, $13, $14, $15, $16,
+         VALUES ($17, $1, $2, $3, $4, $5, $6, $7, $8, $9, COALESCE($18, 'upload'), $10, COALESCE($11, 'draft'), $12, $13, $14, $15, $16,
            CASE WHEN $11 = 'published' THEN now() END)
          ON CONFLICT (kind, namespace, slug) DO UPDATE SET
            name = EXCLUDED.name, summary = EXCLUDED.summary, description = EXCLUDED.description, category_id = EXCLUDED.category_id,
-           tags = EXCLUDED.tags, icon_url = EXCLUDED.icon_url, license = EXCLUDED.license, metadata = EXCLUDED.metadata,
+           tags = EXCLUDED.tags, icon_url = EXCLUDED.icon_url, origin = COALESCE($18, items.origin), license = EXCLUDED.license, metadata = EXCLUDED.metadata,
            prompts = EXCLUDED.prompts, search_text = EXCLUDED.search_text, variant = EXCLUDED.variant, updated_at = now(),
            status = COALESCE($11, items.status),
            published_at = CASE WHEN COALESCE($11, items.status) = 'published' THEN COALESCE(items.published_at, now()) ELSE items.published_at END
@@ -169,13 +200,15 @@ pub async fn import_plugin(state: &AppState, bytes: &[u8], opts: &ImportOpts) ->
     .bind(&tags)
     .bind(&avatar_url)
     .bind(&source)
-    .bind(&m.license)
+    .bind(&license)
     .bind(&status)
     .bind(&version)
-    .bind(Json(json!({ "expert": expert, "members": [] })))
+    .bind(Json(metadata))
     .bind(Json(json!(prompts)))
     .bind(&search)
     .bind(variant)
+    .bind(kind)
+    .bind(&opts.origin)
     .fetch_one(&mut *tx)
     .await?;
 
@@ -185,6 +218,7 @@ pub async fn import_plugin(state: &AppState, bytes: &[u8], opts: &ImportOpts) ->
         .bind(&version)
         .fetch_optional(&mut *tx)
         .await?;
+    let skipped = existing.as_deref() == Some(&sha);
     match existing {
         Some(old) if old != sha => return Err(AppError::Conflict("该版本号已存在且内容不同，请提高版本号后再上传".into())),
         Some(_) => {}
@@ -204,8 +238,11 @@ pub async fn import_plugin(state: &AppState, bytes: &[u8], opts: &ImportOpts) ->
             .await?;
         }
     }
+    if !skipped {
+        sqlx::query("UPDATE items SET latest_version = $2 WHERE id = $1").bind(item_id).bind(&version).execute(&mut *tx).await?;
+    }
     tx.commit().await?;
-    Ok(Report { item_id, version, created: inserted, issues })
+    Ok(Report { item_id, version, created: inserted, skipped, issues })
 }
 
 #[cfg(test)]

@@ -2,6 +2,7 @@
 import type { RouteLocationRaw } from 'vue-router';
 import { formatCount, highlight } from '@/lib/format';
 import { memberText, VARIANT_LABEL } from '@/lib/tabs';
+import { CONNECTOR_AUTH } from '@/lib/labels';
 import type { Item } from '@/lib/types';
 import Avatar from './Avatar.vue';
 import Icon from './Icon.vue';
@@ -24,6 +25,8 @@ defineProps<{ item: Item; to: RouteLocationRaw; keyword?: string; muted?: boolea
           <span v-if="item.variant !== 'single'" class="vtag">{{ VARIANT_LABEL[item.variant] }}</span>
         </div>
         <div v-if="item.expert?.profession?.zh" class="profession">{{ item.expert.profession.zh }}<template v-if="item.expert.skills?.length"> · {{ item.expert.skills.length }} 个技能</template></div>
+        <div v-if="item.connector" class="profession">{{ item.connector.authTypes.map(a => CONNECTOR_AUTH[a]).join(' · ') }} · {{ item.connector.skillCount }} 个随包技能</div>
+        <div v-if="item.connector" class="summary">{{ (item.connector.examples.zh.length ? item.connector.examples.zh : item.connector.examples.en)[0] }}</div>
         <div class="summary">{{ item.summary || '暂无简介' }}</div>
       </div>
     </div>

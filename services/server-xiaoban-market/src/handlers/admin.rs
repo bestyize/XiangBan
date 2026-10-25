@@ -516,6 +516,8 @@ async fn restore_many(State(state): State<AppState>, _admin: Admin, Json(body): 
 #[serde(rename_all = "camelCase", default)]
 struct ItemQuery {
     kind: Option<String>,
+    origin: Option<String>,
+    license: Option<String>,
     status: Option<String>,
     variant: Option<String>,
     category_id: Option<i32>,
@@ -524,7 +526,7 @@ struct ItemQuery {
     page_size: Option<i64>,
 }
 
-const ITEM_COLUMNS: &str = "i.id, i.kind, i.namespace, i.slug, i.name, i.summary, i.status, i.source, i.origin, i.variant, i.featured, i.latest_version AS version,
+const ITEM_COLUMNS: &str = "i.id, i.kind, i.namespace, i.slug, i.name, i.summary, i.status, i.source, i.origin, i.license, i.metadata->'attribution' AS attribution, i.variant, i.featured, i.latest_version AS version,
   i.download_count AS downloads, i.favorite_count AS favorites, i.tags, i.icon_url AS \"iconUrl\", i.category_id AS \"categoryId\",
   c.name AS \"categoryName\", i.updated_at AS \"updatedAt\", i.published_at AS \"publishedAt\"";
 
@@ -533,7 +535,7 @@ async fn list_items(State(state): State<AppState>, _admin: Admin, Query(q): Quer
     let sql = format!(
         "SELECT to_jsonb(x) FROM (SELECT {ITEM_COLUMNS}, count(*) OVER() AS total FROM items i LEFT JOIN categories c ON c.id = i.category_id
          WHERE ($1::text IS NULL OR i.kind = $1) AND ($2::text IS NULL OR i.status = $2) AND ($3::int IS NULL OR i.category_id = $3)
-           AND i.search_text ILIKE ALL($4::text[]) AND ($7::text IS NULL OR i.variant = $7) ORDER BY i.updated_at DESC, i.id LIMIT $5 OFFSET $6) x"
+           AND i.search_text ILIKE ALL($4::text[]) AND ($7::text IS NULL OR i.variant = $7) AND ($8::text IS NULL OR i.origin = $8) AND ($9::text IS NULL OR i.license = $9) ORDER BY i.updated_at DESC, i.id LIMIT $5 OFFSET $6) x"
     );
     let rows = unwrap(
         sqlx::query_scalar::<_, PgJson<Value>>(&sql)
@@ -544,6 +546,8 @@ async fn list_items(State(state): State<AppState>, _admin: Admin, Query(q): Quer
             .bind(size)
             .bind(offset)
             .bind(q.variant.filter(|v| matches!(v.as_str(), "single" | "team" | "bundle")))
+            .bind(q.origin.filter(|v| !v.is_empty()))
+            .bind(q.license.filter(|v| !v.is_empty()))
             .fetch_all(&state.pool)
             .await?,
     );
@@ -597,7 +601,7 @@ async fn validate_members(state: &AppState, variant: &str, members: &[MemberRef]
 
 async fn get_item(State(state): State<AppState>, _admin: Admin, Path(id): Path<Uuid>) -> Result<Json<Value>> {
     let sql = format!(
-        "SELECT to_jsonb(x) FROM (SELECT {ITEM_COLUMNS}, i.description, i.license, i.origin_url AS \"originUrl\", i.prompts, i.metadata
+        "SELECT to_jsonb(x) FROM (SELECT {ITEM_COLUMNS}, i.description, i.origin_url AS \"originUrl\", i.prompts, i.metadata
          FROM items i LEFT JOIN categories c ON c.id = i.category_id WHERE i.id = $1) x"
     );
     let item: PgJson<Value> = sqlx::query_scalar(&sql).bind(id).fetch_optional(&state.pool).await?.ok_or_else(|| AppError::NotFound("条目不存在".into()))?;
@@ -1054,7 +1058,7 @@ async fn import_plugin_package(State(state): State<AppState>, _admin: Admin, mut
         let name = field.name().unwrap_or("").to_string();
         match name.as_str() {
             "file" => file = Some(field.bytes().await.map_err(|e| AppError::BadRequest(format!("读取文件失败：{e}")))?),
-            "status" | "namespace" | "source" | "lenient" => {
+            "status" | "namespace" | "source" | "lenient" | "origin" | "attribution" | "license" => {
                 let value = field.text().await.map_err(|e| AppError::BadRequest(e.to_string()))?.trim().to_string();
                 match name.as_str() {
                     "status" if !value.is_empty() => {
@@ -1069,6 +1073,13 @@ async fn import_plugin_package(State(state): State<AppState>, _admin: Admin, mut
                         opts.source = Some(value);
                     }
                     "lenient" => opts.lenient = value == "true",
+                    "origin" if !value.is_empty() => opts.origin = Some(value),
+                    "license" if !value.is_empty() => opts.license = Some(value),
+                    "attribution" => {
+                        let v: Value = serde_json::from_str(&value).map_err(|_| AppError::BadRequest("attribution 必须是 JSON 对象".into()))?;
+                        if !v.is_object() { return Err(AppError::BadRequest("attribution 必须是 JSON 对象".into())); }
+                        opts.attribution = v;
+                    }
                     _ => {}
                 }
             }
@@ -1077,5 +1088,5 @@ async fn import_plugin_package(State(state): State<AppState>, _admin: Admin, mut
     }
     let bytes = file.ok_or_else(|| AppError::BadRequest("缺少 file 字段（插件 ZIP 包）".into()))?;
     let report = crate::experts::import_plugin(&state, &bytes, &opts).await?;
-    Ok(Json(json!({ "itemId": report.item_id, "version": report.version, "created": report.created, "issues": report.issues })))
+    Ok(Json(json!({ "itemId": report.item_id, "version": report.version, "created": report.created, "skipped": report.skipped, "issues": report.issues })))
 }

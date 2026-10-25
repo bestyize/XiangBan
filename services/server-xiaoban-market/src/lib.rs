@@ -2,6 +2,7 @@
 pub mod account;
 pub mod auth;
 pub mod config;
+pub mod connectors;
 pub mod convert;
 pub mod crawler;
 pub mod db;
@@ -10,6 +11,7 @@ pub mod experts;
 pub mod handlers;
 pub mod importer;
 pub mod items;
+pub mod marketplace;
 pub mod package;
 pub mod plugin;
 pub mod state;

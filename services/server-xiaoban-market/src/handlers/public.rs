@@ -67,6 +67,7 @@ pub struct ItemRow {
     variant: String,
     member_count: Option<i32>,
     expert: Option<PgJson<Value>>,
+    connector: Option<PgJson<Value>>,
     latest_version: Option<String>,
     download_count: i64,
     favorite_count: i64,
@@ -81,6 +82,7 @@ fn item_json(r: &ItemRow) -> Value {
         "category": r.category_slug.as_ref().map(|s| json!({"slug": s, "name": r.category_name})),
         "tags": r.tags, "iconUrl": r.icon_url, "source": r.source, "origin": r.origin, "variant": r.variant, "memberCount": r.member_count,
         "expert": r.expert.as_ref().map(|e| &e.0),
+        "connector": r.connector.as_ref().map(|e| &e.0),
         "version": r.latest_version, "downloads": r.download_count, "favorites": r.favorite_count, "heat": r.download_count + r.favorite_count * 5,
         "featured": r.featured, "updatedAt": r.updated_at,
     })
@@ -125,7 +127,7 @@ pub struct SearchArgs {
 
 const SELECT: &str = "SELECT i.id, i.kind, i.namespace, i.slug, i.name, i.summary, c.slug AS category_slug, c.name AS category_name,
   i.tags, i.icon_url, i.source, i.origin, i.variant, COALESCE(jsonb_array_length(i.metadata->'expert'->'members'), jsonb_array_length(i.metadata->'members')) AS member_count,
-  i.metadata->'expert' AS expert, i.latest_version, i.download_count, i.favorite_count, i.featured, i.updated_at,
+  i.metadata->'expert' AS expert, i.metadata->'connector' AS connector, i.latest_version, i.download_count, i.favorite_count, i.featured, i.updated_at,
   count(*) OVER() AS total
   FROM items i LEFT JOIN categories c ON c.id = i.category_id
   WHERE i.status = 'published' AND i.kind = $1 AND ($2::text IS NULL OR c.slug = $2) AND ($3::text IS NULL OR i.source = $3)
@@ -345,6 +347,7 @@ async fn detail(State(state): State<AppState>, Path((kind, namespace, slug)): Pa
             "tags": r.tags, "iconUrl": r.icon_url, "source": r.source, "origin": r.origin, "originUrl": r.origin_url,
             "license": r.license, "variant": r.variant, "version": r.latest_version, "downloads": r.download_count, "favorites": r.favorite_count,
             "heat": r.download_count + r.favorite_count * 5, "featured": r.featured, "prompts": r.prompts.0, "metadata": r.metadata.0,
+            "connector": r.metadata.0.get("connector"),
             "updatedAt": r.updated_at, "publishedAt": r.published_at,
         },
         "versions": versions.iter().map(|v| json!({
@@ -542,9 +545,10 @@ async fn asset(State(state): State<AppState>, Path(sha): Path<String>) -> Result
     let bytes = tokio::fs::read(crate::storage::asset_path(&state.config.data_dir, &sha.to_ascii_lowercase()))
         .await
         .map_err(|_| AppError::NotFound("资源不存在".into()))?;
-    let kind = crate::experts::image_kind(&bytes).ok_or_else(|| AppError::NotFound("资源不存在".into()))?;
+    let kind = crate::experts::image_kind(&bytes).or_else(|| crate::connectors::safe_svg(&bytes).then_some("image/svg+xml")).ok_or_else(|| AppError::NotFound("资源不存在".into()))?;
     Ok((
-        [(header::CONTENT_TYPE, kind), (header::CACHE_CONTROL, "public, max-age=31536000, immutable"), (header::X_CONTENT_TYPE_OPTIONS, "nosniff")],
+        [(header::CONTENT_TYPE, kind), (header::CACHE_CONTROL, "public, max-age=31536000, immutable"), (header::X_CONTENT_TYPE_OPTIONS, "nosniff"),
+         (header::CONTENT_SECURITY_POLICY, "default-src 'none'; style-src 'unsafe-inline'")],
         bytes,
     )
         .into_response())
