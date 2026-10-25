@@ -146,8 +146,9 @@ jobs:
           security import "$p12" -k "$keychain" -P "$password" -f pkcs12 -T /usr/bin/codesign
           security set-key-partition-list -S apple-tool:,apple: -s -k "$keychain_password" "$keychain"
           security list-keychains -d user -s "$keychain"
-          # Trust only on this ephemeral CI machine; end users must not install this as a system root.
-          security add-trusted-cert -r trustAsRoot -k "$keychain" "$cert"
+          # This certificate is self-signed: trustAsRoot only applies to non-self-signed certificates.
+          # Limit trust to code signing on this ephemeral runner, matching the local signing setup.
+          security add-trusted-cert -r trustRoot -p codeSign -k "$keychain" "$cert"
 
           identity="$(security find-identity -v -p codesigning "$keychain" | awk '/XiangBan Self-Signed Code Signing 2026/ {print $2; exit}')"
           if [ -z "$identity" ]; then
