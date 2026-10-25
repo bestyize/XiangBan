@@ -92,13 +92,25 @@ pub fn widget_parent() -> Result<usize,String> {
     unsafe { let mut host: HWND=null_mut();EnumWindows(Some(find_icon_host),&mut host as *mut HWND as LPARAM);
         if host.is_null(){return Err("找不到桌面图标层，请确认 Explorer 正常运行".into());}Ok(host as usize) }
 }
+
+/// Styles that must be stripped when reparenting a Tao window into Explorer so
+/// DefWindowProc does not render an MDI-style caption, sysmenu buttons, or 3D borders.
+const DESKTOP_CHILD_CLEAR_STYLES: isize = (WS_POPUP
+    | WS_CAPTION
+    | WS_BORDER
+    | WS_DLGFRAME
+    | WS_THICKFRAME
+    | WS_MINIMIZEBOX
+    | WS_MAXIMIZEBOX
+    | WS_SYSMENU) as isize;
+
 /// Host small interactive windows above Explorer's icon list, below application windows.
 pub fn attach_widget(window: &tauri::WebviewWindow) -> Result<(),String> {
     let hwnd=window.hwnd().map_err(|e|e.to_string())?.0 as HWND;
     unsafe {
         let host=widget_parent()? as HWND;
         let style=GetWindowLongPtrW(hwnd,GWL_STYLE);
-        SetWindowLongPtrW(hwnd,GWL_STYLE,(style&!(WS_POPUP as isize))|WS_CHILD as isize);
+        SetWindowLongPtrW(hwnd,GWL_STYLE,(style & !DESKTOP_CHILD_CLEAR_STYLES) | WS_CHILD as isize);
         SetLastError(0);SetParent(hwnd,host);
         if GetParent(hwnd)!=host{return Err(format!("组件嵌入桌面失败：{}",GetLastError()));}
         if SetWindowPos(hwnd,HWND_TOP,0,0,0,0,SWP_NOMOVE|SWP_NOSIZE|SWP_NOACTIVATE|SWP_FRAMECHANGED)==0{return Err("组件层级设置失败".into());}
@@ -138,7 +150,7 @@ fn attach_desktop(
         SetWindowLongPtrW(
             hwnd,
             GWL_STYLE,
-            (style & !(WS_POPUP as isize)) | WS_CHILD as isize,
+            (style & !DESKTOP_CHILD_CLEAR_STYLES) | WS_CHILD as isize,
         );
         SetLastError(0);
         SetParent(hwnd, parent);

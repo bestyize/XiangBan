@@ -49,8 +49,8 @@ export function binaryArchitectures(data, platform) {
   throw new Error('Expected a macOS Mach-O executable');
 }
 
-function run(command, args) {
-  const result = spawnSync(command, args, { stdio: 'inherit', windowsHide: true, timeout: 120_000 });
+function run(command, args, options = {}) {
+  const result = spawnSync(command, args, { stdio: 'inherit', windowsHide: true, timeout: 120_000, ...options });
   if (result.error || result.status !== 0) throw new Error(`${command} failed: ${result.error?.message || result.status}`);
 }
 
@@ -167,7 +167,9 @@ export async function prepareRuntime(args = process.argv.slice(2)) {
   const unpack = await mkdtemp(path.join(cache, 'extract-'));
   try {
     // Extract only the selected native artifact plus attribution. Never run npm lifecycle scripts.
-    run('tar', ['-xzf', archive, '-C', unpack, `package/${spec.source}`, 'package/LICENSE', 'package/THIRD_PARTY_NOTICES.md']);
+    // Use relative archive path, forward slashes and cwd to avoid Windows drive colon (e.g. C:)
+    // and backslashes being parsed as escape sequences by GNU tar.
+    run('tar', ['-xzf', path.basename(archive), '-C', unpack.replaceAll('\\', '/'), `package/${spec.source}`, 'package/LICENSE', 'package/THIRD_PARTY_NOTICES.md'], { cwd: cache });
     await stageRuntime(path.join(unpack, 'package'), output, spec);
     console.log(`Bundled Open Computer Use ${lock.version}: ${spec.key}`);
   } finally { await rm(unpack, { recursive: true, force: true }); }

@@ -366,8 +366,14 @@ pub fn sync(app: &tauri::AppHandle) {
                     tauri::utils::config::BackgroundThrottlingPolicy::Disabled,
                 );
                 #[cfg(windows)]
-                let builder =
-                    builder.data_directory(crate::storage::webview(&crate::storage::root(app)?));
+                let builder = {
+                    let builder = if p.layer == "desktop" {
+                        builder.parent_raw(::windows::Win32::Foundation::HWND(crate::windows::widget_parent()? as _))
+                    } else {
+                        builder
+                    };
+                    builder.data_directory(crate::storage::webview(&crate::storage::root(app)?))
+                };
                 let w = builder.build().map_err(|e| e.to_string())?;
                 w.set_ignore_cursor_events(true)
                     .map_err(|e| e.to_string())?;
