@@ -300,7 +300,7 @@ steps".to_string())];
         assert_eq!(feishu["auth"]["configured"], json!([]));
         assert_eq!((feishu["examples"][0].as_str(), feishu["skills"][0].as_str(), feishu["unsupported"].is_null()), (Some("总结本周文档"), Some("feishu-usage"), true));
         let legacy = list.iter().find(|e| e.plugin.name == "legacy").map(|e| entry_json(&manager, e, &statuses, false)).unwrap();
-        assert_eq!(legacy["unsupported"], "旧式 SSE 暂不支持");
+        assert!(legacy["unsupported"].is_null(), "legacy SSE servers connect now: {legacy}");
         assert!(find(&root.join("plugins"), &list[0].id).is_ok() && find(&root.join("plugins"), "plugin-nope").is_err());
         let _ = fs::remove_dir_all(&root);
     }
