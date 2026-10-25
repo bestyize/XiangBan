@@ -45,6 +45,14 @@ impl Agent {
         self
     }
 
+    /// Allow at most `turns` model calls per run on top of whatever limit the agent was built with: the stricter wins,
+    /// and an agent built without a limit takes this one. A persona's `maxTurns` is applied this way.
+    pub fn limit_turns(mut self, turns: usize) -> Self {
+        let turns = turns.max(1);
+        self.max_turns = Some(self.max_turns.map_or(turns, |current| current.min(turns)));
+        self
+    }
+
     pub fn builder(provider: Arc<dyn ModelProvider>, store: Arc<dyn SessionStore>) -> AgentBuilder {
         AgentBuilder {
             provider,

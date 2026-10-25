@@ -12,6 +12,7 @@ import { GATEWAY_PROVIDER, invoke, type AiConfigView, type AiTier } from '../../
 import type { ControlPage, ControlStore } from '../control-types.ts';
 import ChatWorkbenchTools from './ChatWorkbenchTools.vue';
 import ChatSlashMenu from './ChatSlashMenu.vue';
+import ChatExpertChip from './ChatExpertChip.vue';
 import ChatComposerPet from './ChatComposerPet.vue';
 import ChatComposerModel from './ChatComposerModel.vue';
 import ChatWorkspaceMenu from './ChatWorkspaceMenu.vue';
@@ -266,7 +267,17 @@ async function takeScreenshot() {
 const input = ref<InstanceType<typeof NInput> | null>(null);
 function setDraft(text: string) { draft.value = text; void nextTick(() => input.value?.focus()); }
 function insertPrompt(instruction: string) { draft.value = draft.value.trim() ? instruction + '\n\n' + draft.value : instruction; }
-const useExpert = (entrySkill: string, name: string) => insertPrompt(`请先使用 load_skill 加载已安装专家「${name}」的工作流（${entrySkill}），再帮助我完成以下任务：`);
+/** 召唤专家：专家是一场对话的身份，所以总是开一个新对话；已经开始的对话不会中途换人。
+ *  老的 SkillHub 专家包没有人设，仍然是把它的工作流交给小伴去读。 */
+async function useExpert(entrySkill: string, name: string, expert?: { slug: string; name: string; profession?: string; description?: string; agent?: string | null; quickPrompts?: string[]; tags?: string[]; hasAvatar?: boolean; kind?: 'agent' | 'team'; plugin?: string }) {
+  if (!expert?.plugin) { insertPrompt(`请先使用 load_skill 加载已安装专家「${name}」的工作流（${entrySkill}），再帮助我完成以下任务：`); return; }
+  if (running.value) { props.store.notify('这个对话还在回答，请等它结束或先停止，再召唤专家', 'info'); return; }
+  if (chat.currentId) await chat.select(null);
+  chat.pendingExpert = { plugin: expert.plugin, name: expert.name, profession: expert.profession ?? '', description: expert.description, agent: expert.agent, quickPrompts: expert.quickPrompts, tags: expert.tags, hasAvatar: expert.hasAvatar, kind: expert.kind };
+  props.store.navigate('new-task');
+  await nextTick();
+  input.value?.focus();
+}
 /** 从“＋”选了技能：和在输入框里打 `/名称` 一样，发送时后端会把这个技能的说明交给小伴。 */
 const useSkill = (slug: string) => { draft.value = withLeadingSlash(draft.value, slug); void nextTick(() => input.value?.focus()); };
 const useConnector = (name: string) => insertPrompt(`请在本次任务中优先使用已连接的「${name}」工具，完成以下任务：`);
@@ -305,6 +316,7 @@ defineExpose({ setDraft, insertPrompt, refreshModel: readModelLabel, draft });
         <small class="attach-hint">{{ attachments.length }}/{{ MAX_IMAGES }} 个附件 · 发送时会一起交给小伴</small>
       </div>
       <input ref="filePicker" type="file" :accept="ATTACHMENT_ACCEPT" multiple hidden data-testid="chat-image-input" @change="onPick" />
+      <ChatExpertChip v-if="chat.currentExpert" class="composer-expert" :expert="chat.currentExpert" :removable="!chat.currentId" :desktop="store.desktop" @clear="chat.pendingExpert = null" />
       <ChatSlashMenu v-if="slashOpen" :items="slashItems" :active="slashIndex" @pick="pickSkill" @hover="slashIndex = $event" />
       <div class="composer-editor">
         <NInput ref="input" v-model:value="draft" type="textarea" :autosize="{ minRows, maxRows: 8 }" :disabled="!store.desktop || !chat.configured" :placeholder="placeholderText" data-testid="chat-input" @keydown="onKeydown" />
@@ -334,6 +346,7 @@ html[data-theme=dark] .composer-box{background:var(--ui-surface-alt);box-shadow:
 .composer-box:focus-within{box-shadow:0 0 0 1px var(--ui-border-strong),0 2px 4px rgba(0,0,0,.03),0 12px 32px rgba(0,0,0,.09)}
 .composer-box.voice-active{box-shadow:0 0 0 1.5px var(--ui-btn),0 0 0 4px var(--ui-soft),0 12px 32px rgba(0,0,0,.07)}
 .page-new-task .composer-box{padding:16px 14px 10px 18px}
+.composer-expert{align-self:flex-start;margin:0 0 6px 2px}
 .composer-editor{display:flex;min-width:0;padding:0 2px 2px}
 .composer-editor :deep(.n-input){flex:1;min-width:0;width:100%;--n-border:none;--n-border-hover:none;--n-border-focus:none;--n-box-shadow-focus:none;--n-color:transparent;--n-color-focus:transparent;--n-color-disabled:transparent;background:transparent;font-size:14.5px}
 .page-new-task .composer-editor :deep(.n-input){font-size:15px}

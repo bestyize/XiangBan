@@ -7,7 +7,7 @@
 use crate::{
     catalog::valid_namespace,
     package::{self, is_script, market_plan, Plan},
-    valid_slug, valid_version, validate_registry_skill,
+    plugin, valid_slug, valid_version, validate_registry_skill,
 };
 use agent_kernel::net::blocking_builder;
 use reqwest::{blocking::Client, redirect::Policy, Url};
@@ -104,7 +104,7 @@ impl Market {
             Ok(raw[key].as_array().ok_or("小伴市场目录格式发生变化，请更新客户端")?.iter().map(normalize).collect())
         };
         Ok(json!({
-            "results": list("results")?, "near": raw["near"].as_array().map(|a| a.iter().map(normalize).collect::<Vec<_>>()).unwrap_or_default(),
+            "results": list("results")?.into_iter().map(|i| self.absolute(i)).collect::<Vec<_>>(), "near": raw["near"].as_array().map(|a| a.iter().map(normalize).map(|i| self.absolute(i)).collect::<Vec<_>>()).unwrap_or_default(),
             "page": page, "total": raw["total"].as_u64(), "hasMore": raw["hasMore"].as_bool().unwrap_or(false),
         }))
     }
@@ -118,11 +118,37 @@ impl Market {
     /// The listing detail: description, versions, members of a team or bundle, connector configs.
     pub fn detail(&self, kind: &str, namespace: &str, slug: &str) -> Result<Value, String> {
         check_coordinate(namespace, slug)?;
-        self.get_json(&format!("/{}/{namespace}/{slug}", plural(kind)?), &[])
+        let mut detail = self.get_json(&format!("/{}/{namespace}/{slug}", plural(kind)?), &[])?;
+        for path in ["/item/iconUrl", "/item/metadata/expert/avatarUrl"] {
+            if let Some(v) = detail.pointer_mut(path) { *v = self.absolute_url(v); }
+        }
+        for key in ["/members", "/item/metadata/expert/members"] {
+            for member in detail.pointer_mut(key).and_then(Value::as_array_mut).into_iter().flatten() {
+                for field in ["iconUrl", "avatarUrl"] {
+                    if let Some(v) = member.get_mut(field) { *v = self.absolute_url(v); }
+                }
+            }
+        }
+        Ok(detail)
+    }
+
+    /// Avatars the market stores itself come back as `/api/v1/market/assets/...`; make them loadable from the app.
+    fn absolute_url(&self, v: &Value) -> Value {
+        match v.as_str() {
+            Some(path) if path.starts_with("/api/v1/market/assets/") => json!(format!("{}{path}", self.origin)),
+            _ => v.clone(),
+        }
+    }
+
+    fn absolute(&self, mut item: Value) -> Value {
+        if let Some(v) = item.get_mut("iconUrl") { *v = self.absolute_url(v); }
+        if let Some(v) = item.pointer_mut("/expert/avatarUrl") { *v = self.absolute_url(v); }
+        item
     }
 
     /// Downloads and fully verifies one version. Nothing is written to disk.
-    fn fetch(&self, p: &Package) -> Result<Verified, String> {
+    /// The version manifest the market lists for one version, checked against what was asked for.
+    fn version_manifest(&self, p: &Package) -> Result<(&'static str, Value), String> {
         let kind = plural(&p.kind)?;
         if kind == "connectors" { return Err("连接器不是安装包".into()); }
         check_coordinate(&p.namespace, &p.slug)?;
@@ -131,6 +157,82 @@ impl Market {
         if manifest["namespace"] != p.namespace.as_str() || manifest["slug"] != p.slug.as_str() || manifest["version"] != p.version.as_str() {
             return Err("小伴市场返回的版本与请求不一致".into());
         }
+        Ok((kind, manifest))
+    }
+
+    /// Experts are WorkBuddy plugins (a persona, optional bundled skills); skills and older experts are `SKILL.md` packages.
+    pub fn is_plugin(&self, p: &Package) -> Result<bool, String> {
+        Ok(has_plugin_manifest(&self.version_manifest(p)?.1))
+    }
+
+    /// Downloads and fully verifies a plugin version. Nothing is written to disk.
+    fn fetch_plugin(&self, p: &Package, kind: &str, manifest: &Value) -> Result<plugin::Package, String> {
+        let files = manifest["files"].as_array().ok_or("小伴市场缺少文件清单")?;
+        let url = self.url(&format!("/{kind}/{}/{}/versions/{}/download", p.namespace, p.slug, p.version), &[])?;
+        let archive = self.read(http()?.get(url), MAX_ZIP)?;
+        if let Some(expected) = manifest["packageSha256"].as_str() {
+            if format!("{:x}", Sha256::digest(&archive)) != expected.to_ascii_lowercase() {
+                return Err("下载的安装包与小伴市场记录不一致，已拒绝".into());
+            }
+        }
+        let pkg = plugin::inspect_zip(&archive)?;
+        let declared = manifest["manifestSha256"].as_str().unwrap_or("").to_ascii_lowercase();
+        if pkg.manifest_sha256 != declared {
+            return Err("清单摘要与小伴市场记录不一致，已拒绝".into());
+        }
+        if pkg.name != p.slug {
+            return Err("插件名与小伴市场标识不一致，已拒绝".into());
+        }
+        let listed: BTreeMap<&str, &str> = files.iter().filter_map(|f| Some((f["path"].as_str()?, f["sha256"].as_str()?))).collect();
+        let same = listed.len() == pkg.files.len() && pkg.files.iter().all(|f| listed.get(f.path.as_str()).is_some_and(|s| s.eq_ignore_ascii_case(&f.sha256)));
+        if !same {
+            return Err("文件清单与下载的安装包不一致，已拒绝".into());
+        }
+        Ok(pkg)
+    }
+
+    /// The review of a plugin expert: the persona, the skills it carries, scripts to read before trusting it.
+    fn inspect_plugin(&self, p: &Package, kind: &str, manifest: &Value) -> Result<Value, String> {
+        let pkg = self.fetch_plugin(p, kind, manifest)?;
+        let docs = pkg.agent_docs();
+        let lead = pkg.manifest["agentName"].as_str().and_then(|n| docs.values().find(|d| d.name == n)).or_else(|| docs.values().next());
+        let scripts: Vec<Value> = pkg.files.iter().filter(|f| is_plugin_script(&f.path)).map(|f| {
+            let preview = String::from_utf8(pkg.contents[&f.path].clone()).ok().map(|s| s.chars().take(8000).collect::<String>());
+            json!({"path": f.path, "sha256": f.sha256, "preview": preview, "previewTruncated": f.size > 8000})
+        }).collect();
+        let mut summary = pkg.summary();
+        let files: Vec<Value> = pkg.files.iter().map(|f| json!({"path": f.path, "size": f.size, "sha256": f.sha256, "executableScript": is_plugin_script(&f.path)})).collect();
+        summary["files"] = json!(files);
+        summary["sha256"] = json!(pkg.manifest_sha256);
+        Ok(json!({
+            "provider": "xiaoban-market", "slug": p.slug, "namespace": p.namespace, "kind": "plugin", "pluginKind": pkg.kind.as_str(),
+            "name": manifest["name"].as_str().unwrap_or(&p.slug), "description": manifest["summary"].as_str().unwrap_or(""),
+            "manifest": summary, "sha256": pkg.manifest_sha256,
+            "content": lead.map(|d| d.body.trim().to_string()).unwrap_or_default(),
+            "agents": docs.values().map(|d| json!({"name": d.name, "displayName": d.display_name.as_ref().map(|b| b.pick(true)), "profession": d.profession.as_ref().map(|b| b.pick(true)), "maxTurns": d.max_turns})).collect::<Vec<_>>(),
+            "skills": pkg.manifest["skills"].as_array().map(|a| a.iter().filter_map(Value::as_str).map(|s| s.trim_start_matches("./skills/").to_string()).collect::<Vec<_>>()).unwrap_or_default(),
+            "scripts": scripts, "warnings": pkg.warnings,
+            "requiresInstallationApproval": true, "requiresExecutionApproval": true,
+            "warning": "SHA256 只能证明内容与审查时一致，不代表安全。专家自带的脚本以本机账户权限运行，没有沙箱；专家不会增加你没有授权的工具或权限。",
+        }))
+    }
+
+    /// Installs (or replaces, keeping the old copy in `backups`) a reviewed plugin version. `sha256` is the digest the user saw.
+    pub fn install_plugin(&self, plugins: &Path, backups: &Path, p: &Package, sha256: &str) -> Result<Value, String> {
+        let (kind, manifest) = self.version_manifest(p)?;
+        let pkg = self.fetch_plugin(p, kind, &manifest)?;
+        if !hex64(sha256) || pkg.manifest_sha256 != sha256.to_ascii_lowercase() {
+            return Err("清单摘要与审查时不一致，已拒绝安装".into());
+        }
+        plugin::install(plugins, backups, &pkg, "xiaoban-market", json!({
+            "service": "xiaoban-market", "kind": kind.trim_end_matches('s'), "namespace": p.namespace, "slug": p.slug,
+        }))
+    }
+
+    /// Downloads and fully verifies one version. Nothing is written to disk.
+    fn fetch(&self, p: &Package) -> Result<Verified, String> {
+        let (kind, manifest) = self.version_manifest(p)?;
+        if has_plugin_manifest(&manifest) { return Err("这是插件包，不是技能包".into()); }
         let files = manifest["files"].as_array().ok_or("小伴市场缺少文件清单")?;
         let mut plan = market_plan(&p.version, files)?;
         let declared = manifest["manifestSha256"].as_str().unwrap_or("").to_ascii_lowercase();
@@ -159,6 +261,8 @@ impl Market {
 
     /// Everything the review dialog shows; same shape as the SkillHub review.
     pub fn inspect(&self, p: &Package) -> Result<Value, String> {
+        let (kind, manifest) = self.version_manifest(p)?;
+        if has_plugin_manifest(&manifest) { return self.inspect_plugin(p, kind, &manifest); }
         let v = self.fetch(p)?;
         let markdown = String::from_utf8_lossy(&v.files["SKILL.md"]).into_owned();
         let scripts: Vec<Value> = v.plan.files.iter().filter(|f| is_script(&f.path)).map(|item| {
@@ -248,7 +352,17 @@ impl Market {
 
     /// Asks the market whether installed market packages have newer versions.
     pub fn check_updates(&self, root: &Path) -> Result<Value, String> {
-        let installed = installed_packages(root);
+        self.updates_for(installed_packages(root))
+    }
+
+    /// Like `check_updates`, for the skills directory and the plugins directory together.
+    pub fn check_updates_all(&self, skills: &Path, plugins: &Path) -> Result<Value, String> {
+        let mut installed = installed_packages(skills);
+        installed.extend(installed_plugin_packages(plugins));
+        self.updates_for(installed)
+    }
+
+    fn updates_for(&self, installed: Vec<Value>) -> Result<Value, String> {
         if installed.is_empty() { return Ok(json!({"results": []})); }
         let items: Vec<Value> = installed.iter().take(200)
             .map(|i| json!({"kind": i["kind"], "namespace": i["namespace"], "slug": i["slug"], "version": i["version"]})).collect();
@@ -259,6 +373,17 @@ impl Market {
         let results = value["results"].as_array().ok_or("小伴市场更新数据格式发生变化")?;
         Ok(json!({"results": results.iter().filter(|r| r["hasUpdate"] == true).collect::<Vec<_>>()}))
     }
+}
+
+const PLUGIN_MANIFESTS: [&str; 2] = [".codebuddy-plugin/plugin.json", ".workbuddy-plugin/plugin.json"];
+
+fn has_plugin_manifest(manifest: &Value) -> bool {
+    manifest["files"].as_array().is_some_and(|files| files.iter().any(|f| f["path"].as_str().is_some_and(|p| PLUGIN_MANIFESTS.contains(&p))))
+}
+
+/// Scripts a plugin or the skills it carries may run: anything in a `scripts` folder with a runnable extension.
+fn is_plugin_script(path: &str) -> bool {
+    path.split('/').any(|part| part == "scripts") && matches!(path.rsplit('.').next(), Some("py" | "js" | "mjs" | "cjs" | "sh" | "ps1" | "rb" | "bat" | "cmd"))
 }
 
 fn pinned(v: &Verified, sha256: &str) -> Result<(), String> {
@@ -273,7 +398,7 @@ fn normalize(item: &Value) -> Value {
         "slug": item["slug"], "name": item["name"], "description": item["summary"], "version": item["version"],
         "namespace": item["namespace"], "iconUrl": item["iconUrl"], "source": item["source"], "origin": item["origin"],
         "downloads": item["downloads"], "stars": item["favorites"], "variant": item["variant"], "memberCount": item["memberCount"],
-        "category": item["category"]["name"], "kind": item["kind"],
+        "category": item["category"]["name"], "categorySlug": item["category"]["slug"], "kind": item["kind"], "expert": item["expert"],
     })
 }
 
@@ -299,6 +424,14 @@ pub fn installed_packages(root: &Path) -> Vec<Value> {
     }
     result.sort_by(|a, b| a["slug"].as_str().cmp(&b["slug"].as_str()));
     result
+}
+
+/// Plugins installed from the market (their receipts), shaped like `installed_packages` for the update check.
+pub fn installed_plugin_packages(plugins: &Path) -> Vec<Value> {
+    plugin::installed(plugins).into_iter().filter(|r| r["source"]["service"] == "xiaoban-market").filter_map(|r| {
+        Some(json!({"kind": r["source"]["kind"].as_str().unwrap_or("expert"), "namespace": r["source"]["namespace"].as_str()?, "slug": r["name"].as_str()?,
+            "version": r["version"].as_str()?, "manifestSha256": r["manifestSha256"]}))
+    }).collect()
 }
 
 /// A request from the market website: `xiaoban://market/{open|install|connect}/{kind}/{namespace}/{slug}?version=&sha256=`.
@@ -431,6 +564,28 @@ mod tests {
         (json!({"kind": "skill", "namespace": "acme", "slug": name, "name": name, "summary": "demo skill", "version": "1.0.0",
             "manifestSha256": plan.sha256, "packageSha256": format!("{:x}", Sha256::digest(&zip)), "size": zip.len(), "files": manifest_of(&files)}), zip)
     }
+    const PERSONA: &str = "---\nname: accounting-supervisor\ndescription: Senior accountant.\ndisplayName:\n  en: AI Accounting Supervisor\n  zh: AI 会计主管\nprofession:\n  en: Accounting Supervisor\n  zh: 会计主管\nmaxTurns: 50\n---\n# AI 会计主管\n\n你是会计主管。\n";
+    fn plugin_files() -> Vec<(String, Vec<u8>)> {
+        let manifest = json!({"name": "accounting-supervisor", "version": "1.0.0", "description": "Accountant.", "agents": ["./agents/accounting-supervisor.md"],
+            "skills": ["./skills/ledger-check"], "expertType": "agent", "agentName": "accounting-supervisor"});
+        vec![
+            (".codebuddy-plugin/plugin.json".into(), manifest.to_string().into_bytes()),
+            ("agents/accounting-supervisor.md".into(), PERSONA.as_bytes().to_vec()),
+            ("skills/ledger-check/SKILL.md".into(), b"---\nname: ledger-check\ndescription: d\n---\nCheck the ledger.".to_vec()),
+            ("skills/ledger-check/scripts/check.py".into(), b"print('ok')\n".to_vec()),
+        ]
+    }
+    fn plugin_doc() -> (Value, Vec<u8>) {
+        let owned = plugin_files();
+        let files: Vec<(&str, &[u8])> = owned.iter().map(|(p, b)| (p.as_str(), b.as_slice())).collect();
+        let zip = zip_of(&files);
+        let mut sorted = manifest_of(&files);
+        sorted.sort_by(|a, b| a["path"].as_str().cmp(&b["path"].as_str()));
+        let mut hash = Sha256::new();
+        for f in &sorted { hash.update(format!("{}  {}\n", f["sha256"].as_str().unwrap(), f["path"].as_str().unwrap()).as_bytes()); }
+        (json!({"kind": "expert", "namespace": "acme", "slug": "accounting-supervisor", "name": "AI 会计主管", "summary": "会计核算", "version": "1.0.0",
+            "manifestSha256": format!("{:x}", hash.finalize()), "packageSha256": format!("{:x}", Sha256::digest(&zip)), "size": zip.len(), "files": sorted}), zip)
+    }
     fn route(path: &str, request: &str, tamper: bool) -> (u16, &'static str, Vec<u8>) {
         let json_ok = |v: Value| (200, "application/json", v.to_string().into_bytes());
         match path {
@@ -448,6 +603,10 @@ mod tests {
                 (200, "application/zip", zip)
             }
             "/api/v1/market/skills/acme/gone/versions/1.0.0" => (404, "application/json", json!({"error": "not_found", "message": "该版本已撤回，请使用更新的版本"}).to_string().into_bytes()),
+            "/api/v1/market/experts/acme/accounting-supervisor" => json_ok(json!({"item": {"name": "AI 会计主管", "variant": "single", "version": "1.0.0", "iconUrl": "/api/v1/market/assets/abc",
+                "metadata": {"expert": {"avatarUrl": "/api/v1/market/assets/abc", "members": [{"avatarUrl": "https://example.com/a.png"}]}}}, "members": []})),
+            "/api/v1/market/experts/acme/accounting-supervisor/versions/1.0.0" => json_ok(plugin_doc().0),
+            "/api/v1/market/experts/acme/accounting-supervisor/versions/1.0.0/download" => (200, "application/zip", plugin_doc().1),
             "/api/v1/market/experts/acme/team-a" => json_ok(json!({"item": {"name": "小组", "variant": "team", "version": "1.0.0"},
                 "members": [{"namespace": "acme", "slug": "member-one", "version": "1.0.0"}, {"namespace": "acme", "slug": "member-two", "version": "1.0.0"}]})),
             p if p.starts_with("/api/v1/market/experts/acme/member-") && p.ends_with("/versions/1.0.0") => {
@@ -461,7 +620,7 @@ mod tests {
                 (200, "application/zip", version_doc(slug, slug).1)
             }
             "/api/v1/market/updates" => {
-                assert!(request.contains("pdf-kit"), "the installed package must be reported");
+                assert!(request.contains("pdf-kit") || request.contains("accounting-supervisor"), "an installed package must be reported");
                 json_ok(json!({"results": [{"kind": "skill", "namespace": "acme", "slug": "pdf-kit", "installed": "1.0.0", "available": true, "latest": "1.1.0", "hasUpdate": true},
                     {"kind": "skill", "namespace": "acme", "slug": "other", "installed": "1", "available": true, "hasUpdate": false}]}))
             }
@@ -474,6 +633,37 @@ mod tests {
         dir
     }
     fn skill(slug: &str) -> Package { Package { kind: "skills".into(), namespace: "acme".into(), slug: slug.into(), version: "1.0.0".into() } }
+
+    fn expert(slug: &str) -> Package { Package { kind: "experts".into(), namespace: "acme".into(), slug: slug.into(), version: "1.0.0".into() } }
+
+    #[test]
+    fn a_plugin_expert_is_reviewed_pinned_and_installed_as_a_plugin() {
+        let fx = serve();
+        let market = Market::new(&fx.origin).unwrap();
+        assert!(market.is_plugin(&expert("accounting-supervisor")).unwrap());
+        assert!(!market.is_plugin(&skill("pdf-kit")).unwrap());
+        let review = market.inspect(&expert("accounting-supervisor")).unwrap();
+        assert_eq!((review["kind"].as_str(), review["pluginKind"].as_str(), review["manifest"]["fileCount"].as_u64()), (Some("plugin"), Some("agent"), Some(4)));
+        assert!(review["content"].as_str().unwrap().contains("你是会计主管"));
+        assert_eq!((review["skills"][0].as_str(), review["scripts"][0]["path"].as_str()), (Some("ledger-check"), Some("skills/ledger-check/scripts/check.py")));
+        assert_eq!(review["agents"][0]["profession"], "会计主管");
+        let (plugins, backups, skills) = (temp("plugins"), temp("plugin-backups"), temp("skills"));
+        let sha = review["sha256"].as_str().unwrap().to_string();
+        assert!(market.install_plugin(&plugins, &backups, &expert("accounting-supervisor"), &"0".repeat(64)).unwrap_err().contains("不一致"));
+        assert!(plugin::installed(&plugins).is_empty());
+        let receipt = market.install_plugin(&plugins, &backups, &expert("accounting-supervisor"), &sha).unwrap();
+        assert_eq!((receipt["source"]["namespace"].as_str(), receipt["kind"].as_str()), (Some("acme"), Some("agent")));
+        assert!(plugins.join("accounting-supervisor/skills/ledger-check/SKILL.md").is_file());
+        assert_eq!(plugin::read_agent(&plugins, "accounting-supervisor", "accounting-supervisor").unwrap().max_turns, Some(50));
+        // The update check sees plugins too; a skill package is not mistaken for one.
+        assert_eq!(installed_plugin_packages(&plugins)[0]["slug"], "accounting-supervisor");
+        assert_eq!(market.check_updates_all(&skills, &plugins).unwrap()["results"][0]["slug"], "pdf-kit");
+        // Avatars the market keeps itself are made loadable; remote ones are left alone.
+        let detail = market.detail("experts", "acme", "accounting-supervisor").unwrap();
+        assert_eq!(detail["item"]["iconUrl"], format!("{}/api/v1/market/assets/abc", fx.origin).as_str());
+        assert_eq!(detail["item"]["metadata"]["expert"]["members"][0]["avatarUrl"], "https://example.com/a.png");
+        for dir in [plugins, backups, skills] { let _ = fs::remove_dir_all(dir); }
+    }
 
     #[test]
     fn browse_and_categories_use_the_store_page_shape() {

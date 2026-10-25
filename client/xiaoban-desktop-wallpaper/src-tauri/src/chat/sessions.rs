@@ -40,6 +40,20 @@ pub struct SessionSummary {
     /// Set while this conversation works in an isolated git worktree. `workspace` is then the copy's folder
     /// and `origin` below is where the user's own files are.
     pub worktree: Option<WorktreeLink>,
+    /// The expert (a WorkBuddy-style agent persona) this conversation was started with; `None` for an ordinary task.
+    pub expert: Option<ExpertBinding>,
+}
+
+/// The installed expert a conversation is bound to: the plugin it lives in and the agent inside it, plus the
+/// name and profession the page shows. Binding only decides whose persona is put in front of the model;
+/// tools and permissions stay what the conversation already has.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ExpertBinding {
+    pub plugin: String,
+    pub agent: String,
+    pub name: String,
+    pub profession: String,
 }
 
 /// The link between a conversation and the git worktree it works in (see `worktree`).
@@ -67,6 +81,7 @@ impl Default for SessionSummary {
             workspace: String::new(),
             companion_id: String::new(), companion_name: String::new(), companion_cursor: 0,
             worktree: None,
+            expert: None,
         }
     }
 }
@@ -271,6 +286,15 @@ impl Index {
         };
         self.sessions.push(summary.clone());
         Ok(summary)
+    }
+
+    pub fn set_expert(&mut self, id: &str, expert: Option<ExpertBinding>) -> bool {
+        if let Some(s) = self.sessions.iter_mut().find(|s| s.id == id) {
+            s.expert = expert;
+            true
+        } else {
+            false
+        }
     }
 
     pub fn set_workspace(&mut self, id: &str, workspace: &str) -> bool {

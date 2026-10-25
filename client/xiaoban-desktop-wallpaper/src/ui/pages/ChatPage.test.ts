@@ -140,6 +140,53 @@ describe('chat workbench composer actions', () => {
     expect(q('chat-slash-menu')).toBeNull();
   });
 
+  it('summons an installed expert for a new conversation, shows it, and creates the conversation bound to it', async () => {
+    const expert = { slug: 'accounting-supervisor', plugin: 'accounting-supervisor', name: 'AI 会计主管', profession: '会计主管', description: '会计核算与财务分析', agent: 'accounting-supervisor', quickPrompts: ['请审核这笔分录', '编制本月报表', '做比率分析'], tags: ['税务'], hasAvatar: false, kind: 'agent', ready: true };
+    const bound = { id: 's9', title: '新对话', createdAt: 1, updatedAt: 1, expert: { plugin: 'accounting-supervisor', agent: 'accounting-supervisor', name: 'AI 会计主管', profession: '会计主管' } };
+    const h = await open({
+      ai_store_experts_installed: () => [expert],
+      ai_store_installed: () => [], chat_invocable_skills: () => [], ai_store_connector_status: () => [],
+      chat_new_session: () => bound, chat_send: () => ({ ...bound, title: '请审核这笔分录' }),
+    });
+    await click('chat-add-menu');
+    await click('chat-add-experts');
+    expect(q('chat-installed-accounting-supervisor')?.textContent).toContain('会计主管');
+    await click('chat-installed-accounting-supervisor');
+    // The expert is picked for the next conversation: the chip shows it and the page asks to go to 新建任务.
+    expect(h.chat.pendingExpert?.plugin).toBe('accounting-supervisor');
+    expect(h.store.navigate).toHaveBeenCalledWith('new-task');
+    expect(q('chat-expert')?.textContent).toContain('AI 会计主管');
+    expect(q('chat-expert-clear')).not.toBeNull();
+    // The first message creates the conversation with the expert, and the pick is used up.
+    await type('请审核这笔分录');
+    await click('chat-send');
+    const created = h.calls.find(([command]) => command === 'chat_new_session');
+    expect(created?.[1]).toMatchObject({ expert: { plugin: 'accounting-supervisor', agent: 'accounting-supervisor' } });
+    expect(h.chat.pendingExpert).toBeNull();
+    // From then on the conversation itself carries the expert; it can no longer be dropped from the box.
+    expect(h.chat.currentExpert?.name).toBe('AI 会计主管');
+    expect(q('chat-expert-clear')).toBeNull();
+  });
+
+  it('lets the pick be cancelled before the first message, and ignores experts without a persona', async () => {
+    const h = await open({
+      ai_store_experts_installed: () => [{ slug: 'old-pack', name: '老专家包', description: '工作流', entrySkill: 'expert-old-pack-abcd1234', ready: true }],
+      ai_store_installed: () => [], chat_invocable_skills: () => [], ai_store_connector_status: () => [],
+    });
+    await click('chat-add-menu');
+    await click('chat-add-experts');
+    await click('chat-installed-old-pack');
+    // A SkillHub pack has no persona: it still just hands its workflow to the assistant through the draft.
+    expect(h.chat.pendingExpert).toBeNull();
+    expect(textarea().value).toContain('load_skill');
+    h.chat.pendingExpert = { plugin: 'x', name: '临时专家', profession: '' };
+    await flushPromises();
+    expect(q('chat-expert')).not.toBeNull();
+    await click('chat-expert-clear');
+    expect(h.chat.pendingExpert).toBeNull();
+    expect(q('chat-expert')).toBeNull();
+  });
+
   it('uses a dedicated control-window screenshot command and adds the result without sending', async () => {
     const shot = 'data:image/png;base64,iVBORw0KGgo=';
     const h = await open({ chat_screenshot: () => shot });

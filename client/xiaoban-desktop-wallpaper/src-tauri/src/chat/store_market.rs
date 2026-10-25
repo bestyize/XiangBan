@@ -80,7 +80,13 @@ pub async fn ai_market_install(app: tauri::AppHandle, window: tauri::WebviewWind
     store::control(&window)?;
     tauri::async_runtime::spawn_blocking(move || {
         let _guard = store::MUTATIONS.lock().map_err(|e| e.to_string())?;
-        market()?.install(&Dirs::of(&app)?.skills(), &package(kind, namespace, slug, version), &sha256)
+        let (market, dirs, pkg) = (market()?, Dirs::of(&app)?, package(kind, namespace, slug, version));
+        // Experts are WorkBuddy plugins; skills and older experts are SKILL.md packages.
+        if market.is_plugin(&pkg)? {
+            market.install_plugin(&dirs.plugins(), &dirs.plugin_backups(), &pkg, &sha256).map(|_| ())
+        } else {
+            market.install(&dirs.skills(), &pkg, &sha256)
+        }
     }).await.map_err(|e| e.to_string())?
 }
 #[tauri::command]
@@ -101,7 +107,7 @@ pub async fn ai_market_group_install(app: tauri::AppHandle, window: tauri::Webvi
 #[tauri::command]
 pub async fn ai_market_updates(app: tauri::AppHandle, window: tauri::WebviewWindow) -> Result<Value, String> {
     store::control(&window)?;
-    tauri::async_runtime::spawn_blocking(move || market()?.check_updates(&Dirs::of(&app)?.skills()))
+    tauri::async_runtime::spawn_blocking(move || { let dirs = Dirs::of(&app)?; market()?.check_updates_all(&dirs.skills(), &dirs.plugins()) })
         .await.map_err(|e| e.to_string())?
 }
 #[tauri::command]
@@ -109,7 +115,12 @@ pub async fn ai_market_update(app: tauri::AppHandle, window: tauri::WebviewWindo
     store::control(&window)?;
     tauri::async_runtime::spawn_blocking(move || {
         let _guard = store::MUTATIONS.lock().map_err(|e| e.to_string())?;
-        market()?.update(&Dirs::of(&app)?.skills(), &backups(&app)?, &package(kind, namespace, slug, version), &sha256)
+        let (market, dirs, pkg) = (market()?, Dirs::of(&app)?, package(kind, namespace, slug, version));
+        if market.is_plugin(&pkg)? {
+            market.install_plugin(&dirs.plugins(), &dirs.plugin_backups(), &pkg, &sha256).map(|_| ())
+        } else {
+            market.update(&dirs.skills(), &backups(&app)?, &pkg, &sha256)
+        }
     }).await.map_err(|e| e.to_string())?
 }
 /// Fields of the lock file that the installed list shows for a package from the market.

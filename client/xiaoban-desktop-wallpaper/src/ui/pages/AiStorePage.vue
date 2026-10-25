@@ -241,7 +241,22 @@ async function startConversation(text: string) {
   } catch (e) { props.store.notify(e, 'error'); }
   finally { busy.value = false; }
 }
-function useSkill(s: Skill) { return startConversation(`请读取已安装的技能「${s.slug}」，按其中的流程帮助我完成以下任务：`); }
+/** 已安装的 WorkBuddy 式专家：召唤它开一个新对话；技能和老的专家包仍是让小伴去读它的说明。 */
+async function summon(s: Skill) {
+  const local = installed(s.slug) ?? s;
+  if (busy.value) return;
+  await props.store.chat.select(null);
+  props.store.chat.pendingExpert = {
+    plugin: local.slug, name: local.name, profession: local.profession ?? '', description: local.description, agent: local.agent,
+    quickPrompts: local.quickPrompts, tags: local.tags, hasAvatar: local.hasAvatar, kind: local.pluginKind,
+  };
+  skill.value = null;
+  props.store.navigate('new-task');
+}
+function useSkill(s: Skill) {
+  if (installed(s.slug)?.plugin) return summon(s);
+  return startConversation(`请读取已安装的技能「${s.slug}」，按其中的流程帮助我完成以下任务：`);
+}
 async function openSkill(s: Skill, via: 'market' | 'hub' = effMarket.value ? 'market' : 'hub', kind: 'skills' | 'experts' = tab.value === 'experts' ? 'experts' : 'skills') {
   skill.value = s; review.value = null; reviewError.value = ''; reviewed.value = false; removing.value = false;
   reviewVia.value = via; reviewKind.value = kind;
@@ -399,9 +414,9 @@ const bytes = (n: number) => n < 1024 ? `${n} B` : `${(n / 1024).toFixed(1)} KB`
           <p class="detail-note">安装不会执行脚本。脚本运行时需单独确认，并使用本机账户权限；文件校验不代表安全认证。</p>
           <label class="review-confirm"><input v-model="reviewed" type="checkbox" :disabled="busy" />我已查看此版本的说明、文件清单和脚本预览，同意安装。</label>
         </template>
-        <div v-if="installed(skill.slug)" class="installed-detail"><Check :size="17" /><p>此技能已安装，可在聊天中新建任务使用。</p></div>
+        <div v-if="installed(skill.slug)" class="installed-detail"><Check :size="17" /><p>{{ installed(skill.slug)?.plugin ? '这位专家已安装，召唤后会开一个由 TA 负责的新对话。' : '此技能已安装，可在聊天中新建任务使用。' }}</p></div>
         <p v-if="removing" class="detail-note">确认卸载此技能？卸载后新任务将无法加载它，进行中的任务可能受影响。</p>
-        <div class="dialog-actions"><template v-if="installed(skill.slug)"><button v-if="installed(skill.slug)?.removable" class="store-secondary" :disabled="busy" @click="removing ? uninstallSkill() : (removing = true)">{{ busy ? '正在卸载…' : removing ? '确认卸载' : '卸载' }}</button><button class="store-primary" :disabled="busy" @click="useSkill(skill)">使用技能 <ArrowRight :size="14" /></button></template><button v-else class="store-primary" :disabled="!review || !reviewed || reviewing || busy || !localReady" @click="installSkill">{{ busy ? '正在安装…' : '确认安装' }}<Download :size="14" /></button></div>
+        <div class="dialog-actions"><template v-if="installed(skill.slug)"><button v-if="installed(skill.slug)?.removable" class="store-secondary" :disabled="busy" @click="removing ? uninstallSkill() : (removing = true)">{{ busy ? '正在卸载…' : removing ? '确认卸载' : '卸载' }}</button><button class="store-primary" :disabled="busy" @click="useSkill(skill)">{{ installed(skill.slug)?.plugin ? '召唤这位专家' : '使用技能' }} <ArrowRight :size="14" /></button></template><button v-else class="store-primary" :disabled="!review || !reviewed || reviewing || busy || !localReady" @click="installSkill">{{ busy ? '正在安装…' : '确认安装' }}<Download :size="14" /></button></div>
       </template>
     </NModal>
     <NModal v-model:show="computerOpen" preset="card" title="本机电脑控制" class="store-dialog" :mask-closable="!busy" :closable="!busy" style="width:460px;max-width:calc(100vw - 36px)">

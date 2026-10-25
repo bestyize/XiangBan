@@ -137,3 +137,23 @@ describe('新建任务', () => {
     expect(h.store.openSettings).toHaveBeenCalledWith('ai');
   });
 });
+
+describe('a summoned expert', () => {
+  it('replaces the greeting and scenes with its own introduction and three starter prompts, and fills the box from them', async () => {
+    const { chat } = await open();
+    chat.pendingExpert = { plugin: 'accounting-supervisor', name: 'AI 会计主管', profession: '会计主管', description: '聚焦会计核算与财务分析', tags: ['税务核算', '财务分析'], quickPrompts: ['请审核这笔分录', '编制本月报表', '做比率分析', '多余的第四条'] };
+    await flushPromises();
+    expect(q('new-task-expert')?.textContent).toContain('AI 会计主管');
+    expect(q('new-task-expert')?.textContent).toContain('会计主管');
+    expect(q('new-task-expert')?.textContent).toContain('税务核算');
+    expect(q('new-task-greeting')).toBeNull();
+    expect(q('new-task-scene-work')).toBeNull();
+    expect(wrapper!.element.querySelectorAll('[data-testid^="new-task-try-"]')).toHaveLength(3);
+    await click('new-task-try-0');
+    expect(textarea().value).toBe('请审核这笔分录');
+    // Cancelling the pick brings the ordinary page back.
+    await click('chat-expert-clear');
+    expect(q('new-task-greeting')).not.toBeNull();
+    expect(q('new-task-scene-work')).not.toBeNull();
+  });
+});

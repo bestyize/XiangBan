@@ -7,6 +7,7 @@ import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { ArrowUpRight } from 'lucide-vue-next';
 import type { ControlStore } from '../control-types.ts';
 import ChatComposer from '../components/ChatComposer.vue';
+import ChatExpertChip from '../components/ChatExpertChip.vue';
 
 const props = defineProps<{ store: ControlStore }>();
 const chat = props.store.chat;
@@ -63,18 +64,27 @@ const sceneId = ref<SceneId>(savedScene());
 const scene = computed(() => scenes.find(s => s.id === sceneId.value) ?? scenes[0]);
 function pickScene(id: SceneId) { sceneId.value = id; try { localStorage.setItem(SCENE_KEY, id); } catch { /* remembered for this visit only */ } }
 const fill = (text: string) => composer.value?.setDraft(text);
+/** 召唤了专家时，页面换成它的介绍和它自己的三条推荐提问（WorkBuddy 的 quickPrompts），第一条就是默认引导语。 */
+const expert = computed(() => chat.pendingExpert);
+const expertPrompts = computed(() => (expert.value?.quickPrompts ?? []).slice(0, 3));
 function openAiSettings() { props.store.openSettings('ai'); }
 </script>
 
 <template>
   <div class="new-task-page" data-testid="new-task-page" data-tauri-drag-region>
     <div class="hero">
-      <h1 class="greeting" data-testid="new-task-greeting">{{ greeting }}，今天让小伴帮你做点什么？</h1>
-      <div class="scenes" role="tablist" aria-label="场景">
+      <section v-if="expert" class="expert-intro" data-testid="new-task-expert">
+        <ChatExpertChip :expert="expert" :removable="true" :desktop="store.desktop" @clear="chat.pendingExpert = null" />
+        <h1 class="greeting">{{ expert.name }}<small v-if="expert.profession">{{ expert.profession }}</small></h1>
+        <p v-if="expert.description" class="expert-desc">{{ expert.description }}</p>
+        <div v-if="expert.tags?.length" class="expert-tags"><span v-for="tag in expert.tags" :key="tag">{{ tag }}</span></div>
+      </section>
+      <h1 v-else class="greeting" data-testid="new-task-greeting">{{ greeting }}，今天让小伴帮你做点什么？</h1>
+      <div v-if="!expert" class="scenes" role="tablist" aria-label="场景">
         <button v-for="item in scenes" :key="item.id" type="button" role="tab" :aria-selected="item.id === sceneId" :data-testid="`new-task-scene-${item.id}`" @click="pickScene(item.id)">{{ item.label }}</button>
       </div>
 
-      <div class="chips" role="tabpanel" :aria-label="scene.label">
+      <div v-if="!expert" class="chips" role="tabpanel" :aria-label="scene.label">
         <button v-for="chip in scene.chips" :key="chip.label" type="button" class="quick-chip" :data-testid="`new-task-chip-${chip.label}`" :disabled="!store.desktop || !chat.configured" @click="fill(chip.prompt)">{{ chip.label }}</button>
       </div>
 
@@ -84,8 +94,8 @@ function openAiSettings() { props.store.openSettings('ai'); }
       <p v-else-if="chat.ready && !chat.configured" class="setup-note" data-testid="new-task-unconfigured">先给小伴接上一个模型：登录后可直接用小伴 AI，也可以配置自己的模型服务。<button type="button" class="xb-link" data-testid="new-task-go-settings" @click="openAiSettings">去设置</button></p>
 
       <div class="tries">
-        <span class="tries-cap">试试这样问</span>
-        <button v-for="(text, n) in scene.tries" :key="text" type="button" class="try" :data-testid="`new-task-try-${n}`" :disabled="!store.desktop || !chat.configured" @click="fill(text)">{{ text }}<ArrowUpRight :size="14" :stroke-width="2" /></button>
+        <span class="tries-cap">{{ expert ? '试试这样问我' : '试试这样问' }}</span>
+        <button v-for="(text, n) in (expert ? expertPrompts : scene.tries)" :key="text" type="button" class="try" :data-testid="`new-task-try-${n}`" :disabled="!store.desktop || !chat.configured" @click="fill(text)">{{ text }}<ArrowUpRight :size="14" :stroke-width="2" /></button>
       </div>
     </div>
     <p class="disclaimer">内容由 AI 生成，请核对重要信息</p>
@@ -107,6 +117,11 @@ html[data-theme=dark] .scenes button[aria-selected=true]{background:#48484C}
 .quick-chip:disabled{color:var(--ui-text-disabled);cursor:not-allowed}
 html[data-theme=dark] .quick-chip{background:var(--ui-surface-alt)}
 .hero-composer{margin-top:14px}
+.expert-intro{display:flex;flex-direction:column;align-items:center;gap:10px;margin-bottom:6px}
+.expert-intro .greeting small{display:block;margin-top:6px;font-size:14px;font-weight:400;letter-spacing:0;color:var(--ui-text-secondary)}
+.expert-desc{margin:0;max-width:560px;text-align:center;font-size:13.5px;line-height:1.7;color:var(--ui-text-secondary)}
+.expert-tags{display:flex;flex-wrap:wrap;justify-content:center;gap:6px}
+.expert-tags span{padding:2px 10px;border-radius:999px;background:var(--ui-control);font-size:12px;color:var(--ui-text-secondary)}
 .setup-note{align-self:stretch;margin:12px 0 0;padding:9px 14px;border-radius:10px;background:var(--ui-surface-sunken);font-size:12.5px;line-height:1.6;color:var(--ui-text-secondary)}
 .setup-note .xb-link{margin-left:6px;font-weight:500}
 .tries{align-self:stretch;margin-top:36px;display:flex;flex-direction:column;align-items:flex-start;gap:2px}

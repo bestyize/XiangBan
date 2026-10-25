@@ -348,3 +348,14 @@ fn a_changed_argument_or_a_new_message_resets_the_streak() {
     let (_, events) = run(&h.agent, "second");
     assert!(events.iter().all(|e| !matches!(e, Event::ToolEnd { output, .. } if output.contains("in a row"))), "streaks do not carry across messages");
 }
+
+#[test]
+fn a_persona_can_only_tighten_the_turn_limit_after_the_agent_is_built() {
+    // Built without a limit, the persona's limit applies; built with a stricter one, that one stays.
+    let open = harness(vec![Step::text("让我继续：")], |b| b.middleware(ContinueGuard::new()).unlimited_turns());
+    let (result, _) = run(&open.agent.limit_turns(1), "go");
+    assert_eq!(result, Err(HarnessError::MaxTurns(1)));
+    let strict = harness(vec![Step::text("让我继续：")], |b| b.middleware(ContinueGuard::new()).max_turns(1));
+    let (result, _) = run(&strict.agent.limit_turns(50), "go");
+    assert_eq!(result, Err(HarnessError::MaxTurns(1)));
+}

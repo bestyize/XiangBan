@@ -21,7 +21,11 @@ pub async fn ai_store_experts_installed(app:tauri::AppHandle,window:tauri::Webvi
     tauri::async_runtime::spawn_blocking(move||{
         let _guard=MUTATIONS.lock().map_err(|e|e.to_string())?;
         let dirs=Dirs::of(&app)?;
-        agent_skill_discovery::packs::installed(&dirs.skills(),&dirs.chat.join("expert-packs"))
+        let mut experts=agent_skill_discovery::packs::installed(&dirs.skills(),&dirs.chat.join("expert-packs"))?;
+        // WorkBuddy-style experts (agent personas) come first: they are what "summon" starts a conversation with.
+        let mut listed=super::plugins::installed_experts(&dirs.plugins());
+        if let Some(old)=experts.as_array_mut(){listed.append(old);}
+        Ok(Value::Array(listed))
     }).await.map_err(|e|e.to_string())?
 }
 #[tauri::command]
@@ -107,8 +111,9 @@ pub async fn ai_store_installed(app: tauri::AppHandle, window: tauri::WebviewWin
         let config = crate::ai_config::current(&app)?;
         sync_community_skill(&dirs.skills());
         sync_computer_use_skill(&dirs.skills(), config.open_computer_use);
-        let skills = Skills::new().read_only_root(dirs.chat.join("bundled-skills")).writable_root(dirs.skills());
-        Ok(json!(skills.list().iter().map(|s| {
+        let skills = super::skills_for(&dirs, dirs.chat.join("bundled-skills"));
+        let plugins = dirs.plugins();
+        let mut entries: Vec<Value> = skills.list().iter().map(|s| {
             let managed = s.writable && removable(&s.dir, &s.name);
             let lock = fs::read_to_string(s.dir.join(".skillhub-lock.json")).ok()
                 .and_then(|s| serde_json::from_str::<Value>(&s).ok()).unwrap_or(Value::Null);
@@ -116,8 +121,11 @@ pub async fn ai_store_installed(app: tauri::AppHandle, window: tauri::WebviewWin
             json!({"slug":s.name,"name":s.name,"description":s.description,
                 "version":lock["version"].as_str().unwrap_or(""),"namespace":lock["namespace"],"iconUrl":lock["iconUrl"],"removable":managed,
                 "market":market,"marketKind":if market {lock["origin"]["kind"].clone()} else {Value::Null},"files":if market {lock["files"].clone()} else {Value::Null},"manifestSha256":if market {lock["manifestSha256"].clone()} else {Value::Null},
-                "source":if market {"小伴市场"} else if managed {"SkillHub"} else if s.agent_created {"自建"} else {"本地"}})
-        }).collect::<Vec<_>>()))
+                "source":if market {"小伴市场".to_string()} else if managed {"SkillHub".to_string()} else if s.agent_created {"自建".to_string()}
+                    else if let Some(owner) = s.dir.strip_prefix(&plugins).ok().and_then(|r| r.components().next()) {format!("插件 · {}", owner.as_os_str().to_string_lossy())} else {"本地".to_string()}})
+        }).collect();
+        entries.extend(super::plugins::installed_experts(&plugins).into_iter().map(super::plugins::as_installed_entry));
+        Ok(Value::Array(entries))
     }).await.map_err(|e| e.to_string())?
 }
 
@@ -184,7 +192,12 @@ pub async fn ai_store_uninstall(app: tauri::AppHandle, window: tauri::WebviewWin
     control(&window)?;
     tauri::async_runtime::spawn_blocking(move || {
         let _guard = MUTATIONS.lock().map_err(|e| e.to_string())?;
-        let root = Dirs::of(&app)?.skills();
+        let dirs = Dirs::of(&app)?;
+        // A plugin expert is removed as a whole, with the skills it carried.
+        if agent_skill_discovery::plugin::read_receipt(&dirs.plugins(), &slug).is_ok() {
+            return agent_skill_discovery::plugin::remove(&dirs.plugins(), &slug);
+        }
+        let root = dirs.skills();
         let skill = Skills::new().writable_root(root.clone()).find(&slug).ok_or("技能不存在")?;
         if !removable(&skill.dir, &slug) { return Err("只能卸载通过 SkillHub 安装的技能".into()); }
         fs::remove_dir_all(skill.dir).map_err(|e| e.to_string())

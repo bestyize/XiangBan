@@ -7,6 +7,7 @@ import type { ControlStore } from '../control-types.ts';
 import ModelSwitchDialog from '../components/ModelSwitchDialog.vue';
 import ChatComposer from '../components/ChatComposer.vue';
 import ChatWorkspaceMenu from '../components/ChatWorkspaceMenu.vue';
+import ChatExpertChip from '../components/ChatExpertChip.vue';
 import ChatNameDialog from '../components/ChatNameDialog.vue';
 import ChatActivity from '../chat/ChatActivity.vue';
 import ChatReasoning from '../chat/ChatReasoning.vue';
@@ -256,6 +257,7 @@ async function openLink(href: string) {
           <button type="button" class="crumb-space" data-testid="chat-workspace" :disabled="!store.desktop" :title="'工作区：' + (chat.currentWorkspace || '默认工作目录') + (store.desktop ? '。点击在文件管理器中打开' : '')" @click="chat.revealWorkspace()">{{ spaceName }}</button>
           <ChevronRight :size="12" :stroke-width="2.2" class="crumb-sep" aria-hidden="true" />
           <h1 data-testid="chat-title">{{ title }}</h1>
+          <ChatExpertChip v-if="chat.currentExpert && session?.expert" class="head-expert" :expert="chat.currentExpert" :desktop="store.desktop" />
         </nav>
         <div class="head-actions">
           <button v-if="store.speech && store.speech.status !== 'idle'" type="button" class="head-link" data-testid="chat-speech-status" @click="store.speech.stop()"><Volume2 :size="14" />{{ store.speech.status === 'synthesizing' ? '取消合成' : '停止朗读' }}</button>
@@ -446,6 +448,7 @@ async function openLink(href: string) {
 
 /* Title bar */
 .chat-head{height:52px;flex-shrink:0;display:flex;align-items:center;gap:12px;padding:0 14px 0 24px;box-sizing:border-box}
+.head-expert{margin-left:10px;flex:none}
 .head-crumbs{display:flex;align-items:center;gap:8px;min-width:0;flex:1}
 .crumb-space{flex:none;max-width:180px;border:0;background:none;padding:2px 4px;margin-left:-4px;border-radius:6px;font:inherit;font-size:13px;color:var(--ui-text-secondary);cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .crumb-space:hover:not(:disabled){background:var(--ui-surface-hover);color:var(--ui-text-primary)}

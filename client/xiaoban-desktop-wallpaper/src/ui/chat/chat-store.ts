@@ -1,7 +1,7 @@
 import type { PendingAttachment } from './attachments.ts';
 import { modelFailure } from './model-errors.ts';
 import { reactive } from 'vue';
-import type { ApprovalDecision, ApprovalRequest, ChatEventPayload, ChatGroup, ChatItem, ContextInfo, Library, Overview, QuestionRequest, RecentWorkspace, SessionSummary, SessionView, WireMessage, WorktreeInfo, WorktreeLink } from './types.ts';
+import type { ApprovalDecision, ApprovalRequest, ChatEventPayload, ChatGroup, ChatItem, ContextInfo, ExpertView, Library, Overview, QuestionRequest, RecentWorkspace, SessionSummary, SessionView, WireMessage, WorktreeInfo, WorktreeLink } from './types.ts';
 import { applyEvent, checkpointNotice, interruptedNotice, itemsFromHistory, newView, nextId, summaryNotice, workspaceNotice } from './view.ts';
 import { toolLabel } from './format.ts';
 
@@ -25,6 +25,10 @@ export interface ChatStore {
   recentWorkspaces: RecentWorkspace[];
   /** The folder chosen for the new conversation the page shows, before its first message; empty when none was. */
   pendingWorkspace: string;
+  /** The expert summoned for the new conversation the page shows, before its first message; `null` when none was. */
+  pendingExpert: ExpertView | null;
+  /** The expert the open conversation is bound to, or the one summoned for the new one. */
+  readonly currentExpert: ExpertView | null;
   /** The folder the open conversation works in, or a new one would. */
   readonly currentWorkspace: string;
   /** Moves the open conversation to `path`. A conversation with messages is not moved unless `how` says how:
@@ -131,6 +135,12 @@ export function createChatStore(deps: ChatDeps): ChatStore {
     workspace: '',
     recentWorkspaces: [] as RecentWorkspace[],
     pendingWorkspace: '',
+    pendingExpert: null as ExpertView | null,
+    get currentExpert() {
+      const bound = store.currentId ? store.sessions.find(s => s.id === store.currentId)?.expert : null;
+      if (bound) return { plugin: bound.plugin, name: bound.name, profession: bound.profession, agent: bound.agent, hasAvatar: true };
+      return store.currentId ? null : store.pendingExpert;
+    },
     get currentWorkspace() {
       if (store.currentId) return store.sessions.find(s => s.id === store.currentId)?.workspace || store.workspace;
       return store.pendingWorkspace || store.recentWorkspaces.find(w => w.exists)?.path || store.workspace;
@@ -383,8 +393,12 @@ export function createChatStore(deps: ChatDeps): ChatStore {
         if (!id) {
           // The host runs each conversation in the mode saved with it, so a new one must be created in the
           // mode the top bar shows now; otherwise "完全信任" would be displayed but not applied.
-          const summary = await deps.invoke<SessionSummary>('chat_new_session', { permissionMode: store.permissionMode, ...(store.pendingWorkspace ? { workspace: store.pendingWorkspace } : {}) });
+          const summary = await deps.invoke<SessionSummary>('chat_new_session', {
+            permissionMode: store.permissionMode, ...(store.pendingWorkspace ? { workspace: store.pendingWorkspace } : {}),
+            ...(store.pendingExpert ? { expert: { plugin: store.pendingExpert.plugin, ...(store.pendingExpert.agent ? { agent: store.pendingExpert.agent } : {}) } } : {}),
+          });
           store.pendingWorkspace = '';
+          store.pendingExpert = null;
           id = summary.id;
           created = true;
           upsert(summary);

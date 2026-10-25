@@ -6,16 +6,16 @@ import type { ControlStore } from '../control-types.ts';
 import type { Skill, SkillPage } from '../ai-store/catalog.ts';
 
 type Kind = 'experts' | 'skills' | 'connectors';
-interface Expert { slug: string; name: string; description: string; entrySkill?: string; ready?: boolean }
+interface Expert { slug: string; name: string; description: string; entrySkill?: string; ready?: boolean; plugin?: string; profession?: string; agent?: string | null; quickPrompts?: string[]; tags?: string[]; hasAvatar?: boolean; kind?: 'agent' | 'team' }
 interface Connector { id: string; name: string; connected: boolean; enabled: boolean; toolCount: number }
 interface CatalogEntry { slug: string; name: string; description: string }
 interface CatalogPage { results: CatalogEntry[] }
-type Entry = { id: string; title: string; detail: string; installed: boolean; ready: boolean; entrySkill?: string };
+type Entry = { id: string; title: string; detail: string; installed: boolean; ready: boolean; entrySkill?: string; expert?: Expert };
 
 const props = defineProps<{ store: ControlStore; disabled?: boolean; fileDisabled?: boolean; screenshotDisabled?: boolean }>();
 const emit = defineEmits<{
   file: []; screenshot: [];
-  'use-expert': [entrySkill: string, name: string];
+  'use-expert': [entrySkill: string, name: string, expert?: Expert];
   'use-skill': [slug: string, name: string];
   'use-connector': [name: string];
 }>();
@@ -38,7 +38,7 @@ const installedEntries = computed<Entry[]>(() => {
   const q = term.value.trim().toLowerCase();
   const matches = (value: string) => value.toLowerCase().includes(q);
   if (kind.value === 'experts') return experts.value.filter(e => matches(e.name + ' ' + e.description)).map(e => ({
-    id: e.slug, title: e.name, detail: e.description, installed: true, ready: e.ready !== false, entrySkill: e.entrySkill,
+    id: e.slug, title: e.name, detail: [e.profession, e.description].filter(Boolean).join(' · '), installed: true, ready: e.ready !== false, entrySkill: e.entrySkill, expert: e.plugin ? e : undefined,
   }));
   if (kind.value === 'skills') return skills.value.filter(e => matches(e.name + ' ' + e.slug + ' ' + e.description)).map(e => ({
     id: e.slug, title: e.name, detail: e.description, installed: true, ready: true,
@@ -124,7 +124,7 @@ function scheduleSearch() {
 function useEntry(e: Entry) {
   if (!e.installed) { openStore(); return; }
   if (!e.ready) { props.store.notify('该能力尚未就绪，请先到 AI 插件完成配置', 'info'); openStore(); return; }
-  if (kind.value === 'experts') emit('use-expert', e.entrySkill || e.id, e.title);
+  if (kind.value === 'experts') emit('use-expert', e.entrySkill || e.id, e.title, e.expert);
   if (kind.value === 'skills') emit('use-skill', e.id, e.title);
   if (kind.value === 'connectors') emit('use-connector', e.title);
   close();

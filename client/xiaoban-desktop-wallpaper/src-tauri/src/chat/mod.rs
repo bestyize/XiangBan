@@ -8,6 +8,7 @@ mod task_runtime;
 mod app_guide;
 mod feature_hints;
 mod skill_invocation;
+mod persona;
 mod widget_content;
 mod broker;
 mod checkpoints;
@@ -800,6 +801,15 @@ fn build_agent(app: &tauri::AppHandle, config: &AiConfig, key_source: Option<Key
             })
         }),
     }, attachments, connector_tools)?;
+    // 对话绑定了专家：把它的人设放进每次请求，并按它的 `maxTurns` 收紧轮数上限。
+    if let Some(expert) = mutate(app, |index| index.get(session).and_then(|s| s.expert.clone()))? {
+        if let Some(persona) = persona::load(&Dirs::of(app)?.plugins(), &expert) {
+            agent = agent.with_middleware(persona::PersonaPrompt::new(persona.text));
+            if let Some(turns) = persona.max_turns {
+                agent = agent.limit_turns(turns as usize);
+            }
+        }
+    }
     if let Some(goal) = agent_kernel::goals::GoalStore::new(Dirs::of(app)?.chat.join("goals")).load(session)? {
         if goal.state == agent_kernel::goals::GoalState::Running {
             agent = agent.with_middleware(task_runtime::GoalProgressGuard(state.todo.clone()));
@@ -955,7 +965,7 @@ fn interrupted_run(journal_dir: &Path, session: &str) -> Option<(String, Vec<Str
 /// An empty conversation. The chat page makes one when the first message is sent, so the page
 /// already knows the id when the answer's events start to arrive.
 #[tauri::command]
-pub fn chat_new_session(app: tauri::AppHandle, window: tauri::WebviewWindow, permission_mode: Option<String>, workspace: Option<String>) -> Result<SessionSummary, String> {
+pub fn chat_new_session(app: tauri::AppHandle, window: tauri::WebviewWindow, permission_mode: Option<String>, workspace: Option<String>, expert: Option<ExpertPick>) -> Result<SessionSummary, String> {
     chat_window(&window)?;
     let mode = match permission_mode.as_deref() {
         None => "ask",
@@ -967,12 +977,52 @@ pub fn chat_new_session(app: tauri::AppHandle, window: tauri::WebviewWindow, per
         Some(raw) => workspace::checked(raw)?,
         None => workspace::for_new_conversation(&app)?,
     };
+    // 召唤专家开的对话：先确认专家装着、agent 在，再把名称和职业记在对话上。
+    let binding = match expert {
+        Some(pick) => Some(bind_expert(&Dirs::of(&app)?.plugins(), &pick)?),
+        None => None,
+    };
     let (seconds, millis) = now();
-    let summary = mutate(&app, |index| index.create_in(seconds, millis, mode, &folder))??;
+    let mut summary = mutate(&app, |index| index.create_in(seconds, millis, mode, &folder))??;
+    if let Some(binding) = binding {
+        let id = summary.id.clone();
+        mutate(&app, |index| index.set_expert(&id, Some(binding.clone())))?;
+        summary.expert = Some(binding);
+    }
     if !folder.is_empty() {
         workspace::remember(&app, &folder);
     }
     Ok(summary)
+}
+
+/// 新对话想召唤的专家：哪个插件、其中哪个 agent（专家团用主理人）。
+#[derive(serde::Deserialize)]
+pub struct ExpertPick {
+    pub plugin: String,
+    pub agent: Option<String>,
+}
+
+/// 校验并补全绑定：专家必须是本机已安装的，agent 缺省时取插件清单里的 `agentName`（专家团取主理人）。
+fn bind_expert(plugins: &Path, pick: &ExpertPick) -> Result<sessions::ExpertBinding, String> {
+    let receipt = agent_skill_discovery::plugin::read_receipt(plugins, &pick.plugin).map_err(|_| "这个专家没有安装，或已被卸载".to_string())?;
+    if !matches!(receipt["kind"].as_str(), Some("agent" | "team")) {
+        return Err("这个插件不是专家".into());
+    }
+    let manifest: Value = fs::read(plugins.join(&pick.plugin).join(".codebuddy-plugin/plugin.json"))
+        .or_else(|_| fs::read(plugins.join(&pick.plugin).join(".workbuddy-plugin/plugin.json")))
+        .ok().and_then(|b| serde_json::from_slice(&b).ok()).unwrap_or(Value::Null);
+    let agent = pick.agent.clone()
+        .or_else(|| manifest["teamInfo"]["leadAgent"].as_str().map(String::from))
+        .or_else(|| manifest["agentName"].as_str().map(String::from))
+        .ok_or("找不到这个专家的 agent")?;
+    let doc = agent_skill_discovery::plugin::read_agent(plugins, &pick.plugin, &agent)?;
+    let pair = |v: &Option<agent_skill_discovery::plugin::Bilingual>| v.as_ref().map(|b| b.pick(true).to_string()).unwrap_or_default();
+    let name = pair(&doc.display_name);
+    Ok(sessions::ExpertBinding {
+        plugin: pick.plugin.clone(), agent,
+        name: if name.is_empty() { pick.plugin.clone() } else { name },
+        profession: pair(&doc.profession),
+    })
 }
 
 #[tauri::command]
