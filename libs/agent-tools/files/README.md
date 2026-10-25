@@ -11,6 +11,8 @@ The model receives one extended `read_file` tool rather than a tool per file typ
 
 `AttachmentStore` imports files into per-session copies, validates format/size, generates random names and rolls back failed batches. `ReadFile` permits the host's declared roots and only the current ToolCtx session's attachment directory. The existing shell remains a powerful host capability, not an attachment sandbox.
 
+Hosts can use `with_file_authorizer` to authorize individual canonical files, such as verified installed skill references. The callback runs on each out-of-workspace read; errors remain tool errors. This does not grant persistent directory access or change write/search permissions.
+
 `AttachmentHistory<S>` records attachment cards using existing Message.structured_content. `AttachmentContext` injects a request-only manifest before ContextTrim, including the current newly appended message. No new kernel message type, Provider-specific file API, or sentinel parsing is introduced.
 
 The bundled file-analysis Skill explains partial extraction, calculations, dependency checks and source citations. Its CSV helper uses only Python's standard library. Python is optional for complex scripted operations; basic document reading uses the native Rust libraries above.

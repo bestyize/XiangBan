@@ -18,6 +18,8 @@
 4. 全部验证成功后写入临时目录，并原子移动到用户的 chat/skills/<slug>。没有覆盖操作。
 5. load_skill 按需加载 SKILL.md；skill_read 读取引用文件；只有用户再次批准 skill_run 才调用本机解释器。运行前复核整包内容与锁文件一致。
 
+桌面端的普通 `read_file` 也可按绝对路径分页读取已安装技能的清单文件：宿主使用 `authorize_installed_file` 逐次核对目录边界、安装清单和整包哈希。未列入清单、被修改或逃逸技能目录的文件仍会被拒绝；这不会开放整个用户数据目录或写权限。
+
 SkillHub API 文档：https://github.com/Tencent/skillhub/blob/main/docs/api/README.md
 
 ## 当前支持

@@ -174,6 +174,19 @@ fn verified_script(root: &Path, skill: &str, path: &str) -> Result<PathBuf, Stri
     verified_package_file(root, skill, path)
 }
 
+/// Authorize one installed package file for the host's ordinary read_file tool, after manifest and hash checks.
+pub fn authorize_installed_file(root: &Path, requested: &Path) -> Result<bool, String> {
+    let Ok(root) = root.canonicalize() else { return Ok(false) };
+    let file = requested.canonicalize().map_err(|e| format!("file unavailable: {e}"))?;
+    let Ok(relative) = file.strip_prefix(&root) else { return Ok(false) };
+    let mut parts = relative.components();
+    let Some(skill) = parts.next().and_then(|p| p.as_os_str().to_str()) else { return Ok(false) };
+    if !crate::valid_slug(skill) { return Ok(false) }
+    let path = parts.as_path().to_str().ok_or("invalid skill file path")?.replace('\\', "/");
+    let verified = verified_package_file(&root, skill, &path)?;
+    Ok(verified == file)
+}
+
 pub(crate) fn verified_package_file(root: &Path, skill: &str, path: &str) -> Result<PathBuf, String> {
     if !valid_path(path) { return Err("invalid skill file path".into()); }
     let dir = root.join(skill);
@@ -219,6 +232,25 @@ fn terminate_tree(pid: u32) { agent_kernel::process_tree::terminate(pid); }
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn ordinary_reads_only_authorize_listed_unchanged_installed_skill_files() {
+        let temp = std::env::temp_dir().join(format!("skill-read-authorize-{}-{}", std::process::id(), std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()));
+        let root = temp.join("skills");
+        let dir = root.join("demo");
+        fs::create_dir_all(dir.join("references")).unwrap();
+        let file = dir.join("references/prompt-guide.md");
+        fs::write(&file, "Writing guide").unwrap();
+        let sha = format!("{:x}", Sha256::digest(b"Writing guide"));
+        fs::write(dir.join(".skillhub-lock.json"), json!({"provider":"skillhub","slug":"demo","files":[{"path":"references/prompt-guide.md","sha256":sha}]}).to_string()).unwrap();
+        assert!(authorize_installed_file(&root, &file).unwrap());
+        fs::write(dir.join("unlisted.txt"), "not registered").unwrap();
+        assert!(authorize_installed_file(&root, &dir.join("unlisted.txt")).unwrap_err().contains("not listed"));
+        fs::write(temp.join("other.txt"), "outside").unwrap();
+        assert!(!authorize_installed_file(&root, &temp.join("other.txt")).unwrap());
+        fs::write(&file, "Changed after installation").unwrap();
+        assert!(authorize_installed_file(&root, &file).unwrap_err().contains("changed after installation"));
+        fs::remove_dir_all(temp).unwrap();
+    }
     #[test]
     fn path_gate_blocks_unlisted_and_escaped_scripts() {
         let temp = std::env::temp_dir().join(format!("skill-run-test-{}", std::process::id()));

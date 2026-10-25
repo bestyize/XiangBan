@@ -104,6 +104,29 @@ fn prevents_cross_session_reads_but_allows_the_selected_attachment() {
             .is_error
     );
 }
+#[test]
+fn extra_file_authorization_preserves_pagination_and_does_not_grant_sibling_access() {
+    let temp = Temp::new();
+    let workspace = temp.0.join("work");
+    let skill = temp.0.join("skills/demo/references");
+    fs::create_dir_all(&workspace).unwrap();
+    fs::create_dir_all(&skill).unwrap();
+    let file = skill.join("prompt-guide.md");
+    fs::write(&file, "first\nsecond\nthird").unwrap();
+    fs::write(skill.join("private.txt"), "private").unwrap();
+    let allowed = file.canonicalize().unwrap();
+    let reader = ReadFile::new(vec![workspace], AttachmentStore::new(temp.0.join("attachments"))).unwrap()
+        .with_file_authorizer(move |path| Ok(path == allowed));
+    let result = reader.execute_result(json!({"path":file,"offset":2,"limit":1}), &ToolCtx::detached("s"));
+    assert!(!result.is_error, "{}", result.output);
+    assert!(result.output.contains("second") && !result.output.contains("first") && !result.output.contains("third"));
+    let denied = reader.execute_result(json!({"path":skill.join("private.txt")}), &ToolCtx::detached("s"));
+    assert!(denied.is_error && denied.output.contains("outside the authorized workspace"));
+    let denied = ReadFile::new(vec![temp.0.join("work")], AttachmentStore::new(temp.0.join("attachments"))).unwrap()
+        .with_file_authorizer(|_| Err("installed file checksum mismatch".into()))
+        .execute_result(json!({"path":file}), &ToolCtx::detached("s"));
+    assert!(denied.is_error && denied.output.contains("checksum mismatch"));
+}
 #[cfg(unix)]
 #[test]
 fn rejects_symlink_escape() {

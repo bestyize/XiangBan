@@ -3,6 +3,7 @@
 mod acquisition;
 mod package;
 mod runner;
+pub use runner::authorize_installed_file;
 pub mod catalog;
 pub mod market;
 pub mod packs;

@@ -12,6 +12,7 @@ use std::{
     fs,
     io::Read,
     path::{Path, PathBuf},
+    sync::Arc,
 };
 pub use storage::{
     Attachment, AttachmentContext, AttachmentHistory, AttachmentInput, AttachmentStore,
@@ -20,11 +21,13 @@ pub use storage::{
 
 pub const CSV_SUMMARY_SCRIPT: &str = include_str!("../scripts/csv_summary.py");
 pub const ANALYSIS_SKILL: &str = include_str!("../skills/file-analysis/SKILL.md");
+type FileAuthorizer = dyn Fn(&Path) -> Result<bool, String> + Send + Sync;
 /// Replaces only read_file; directory/search/write tools remain the host's own tools.
 pub struct ReadFile {
     spec: ToolSpec,
     roots: Vec<PathBuf>,
     attachments: AttachmentStore,
+    file_authorizer: Option<Arc<FileAuthorizer>>,
 }
 impl ReadFile {
     pub fn new(roots: Vec<PathBuf>, attachments: AttachmentStore) -> Result<Self, HarnessError> {
@@ -34,8 +37,14 @@ impl ReadFile {
             spec: ToolSpec::new("read_file", "Read a file. Text, PDF, DOCX, PPTX and XLSX return numbered extracted lines; offset/limit page through them. PNG/JPEG/GIF/WebP return visual content. Extraction is not OCR or spreadsheet calculation; use file-analysis skill and shell for complex work.",
                 json!({"type":"object","properties":{"path":{"type":"string"},"offset":{"type":"integer","minimum":1},"limit":{"type":"integer","minimum":1,"maximum":500}},"required":["path"]}))
                 .risk(Risk::Read).untrusted_output().max_output(48_000),
-            roots, attachments,
+            roots, attachments, file_authorizer: None,
         })
+    }
+    /// Authorize an individual canonical file outside the workspace, e.g. a hash-verified installed skill reference.
+    /// This grants no directory access to other tools and is evaluated again on every read.
+    pub fn with_file_authorizer(mut self, authorize: impl Fn(&Path) -> Result<bool, String> + Send + Sync + 'static) -> Self {
+        self.file_authorizer = Some(Arc::new(authorize));
+        self
     }
     fn read(&self, args: Value, ctx: &ToolCtx) -> Result<ToolResult, String> {
         if ctx.is_cancelled() {
@@ -59,9 +68,11 @@ impl ReadFile {
             .filter_map(|p| p.canonicalize().ok())
             .any(|r| path.starts_with(r))
         {
-            return Err(
-                "file is outside the authorized workspace and this session's attachments".into(),
-            );
+            if !self.file_authorizer.as_ref().map(|authorize| authorize(&path)).transpose()?.unwrap_or(false) {
+                return Err("file is outside the authorized workspace and this session's attachments".into());
+            }
+            // This request reads exactly the authorized canonical file. Never retain its parent as a shared root.
+            roots.push(path.parent().ok_or("file has no parent")?.to_path_buf());
         }
         let meta = fs::metadata(&path).map_err(|e| e.to_string())?;
         if !meta.is_file() {
@@ -103,6 +114,8 @@ impl ReadFile {
             .into_iter()
             .find(|t| t.spec().name == "read_file")
             .ok_or("text reader unavailable")?;
+        let mut args = args;
+        args["path"] = json!(path);
         Ok(reader.execute_result(args, ctx))
     }
 }

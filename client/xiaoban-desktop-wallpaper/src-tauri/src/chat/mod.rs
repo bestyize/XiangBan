@@ -655,7 +655,9 @@ fn assemble_with_connectors(parts: Parts<'_>, attachments: Vec<Attachment>, conn
     builder = builder.tool(research_subagent(provider.clone(), &roots, budget, dirs.runs(), research_events)?);
     let mut readable = fs_tools(roots.clone()).map_err(|e| e.to_string())?;
     readable.retain(|tool| tool.spec().name != "read_file");
-    readable.push(Arc::new(ReadFile::new(roots, AttachmentStore::new(dirs.chat.join("attachments"))).map_err(|e| e.to_string())?));
+    let installed_skills = dirs.skills();
+    readable.push(Arc::new(ReadFile::new(roots, AttachmentStore::new(dirs.chat.join("attachments"))).map_err(|e| e.to_string())?
+        .with_file_authorizer(move |path| agent_skill_discovery::authorize_installed_file(&installed_skills, path))));
     let writable = fs_write_tools(vec![workspace.to_path_buf()]).map_err(|e| e.to_string())?;
     for tool in readable.into_iter().chain(writable).chain(skills.tools()).chain(if remember { memory.tools() } else { Vec::new() }).chain(discovery.tools()) {
         builder = builder.tool_arc(tool);
