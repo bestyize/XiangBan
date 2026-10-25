@@ -5,7 +5,7 @@ pub mod plugin;
 pub mod vault;
 mod plugin_manager;
 pub use plugin_manager::ConnectorState;
-use agent_kernel::mcp::{HttpMcpClient, HttpMcpConfig, McpClient, McpConfig};
+use agent_kernel::mcp::{HttpMcpClient, HttpMcpConfig, McpClient, McpConfig, SseMcpClient};
 use agent_kernel::{Risk, Tool, ToolCtx, ToolResult, ToolSpec};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -31,27 +31,31 @@ struct Record {
 enum Client {
     Stdio(Arc<McpClient>),
     Http(Arc<HttpMcpClient>),
+    Sse(Arc<SseMcpClient>),
 }
 impl Client {
     fn needs_review(&self) -> bool {
-        matches!(self, Self::Http(client) if client.needs_review())
+        match self { Self::Http(c) => c.needs_review(), Self::Sse(c) => c.needs_review(), _ => false }
     }
     fn close(&self) {
         match self {
             Self::Stdio(c) => c.close(),
             Self::Http(c) => c.close(),
+            Self::Sse(c) => c.close(),
         }
     }
     fn is_connected(&self) -> bool {
         match self {
             Self::Stdio(c) => c.is_connected(),
             Self::Http(c) => c.is_connected(),
+            Self::Sse(c) => c.is_connected(),
         }
     }
     fn tools(&self) -> Vec<Arc<dyn Tool>> {
         match self {
             Self::Stdio(c) => c.tools(),
             Self::Http(c) => c.tools(),
+            Self::Sse(c) => c.tools(),
         }
     }
 }
@@ -141,8 +145,8 @@ fn normalized_config(value: &Value) -> Result<Value, String> {
         .or(obj.get("transport"))
         .and_then(Value::as_str)
         .unwrap_or("");
-    if transport == "sse" {
-        return Err("旧式 SSE 暂不支持，请选择 stdio 或 Streamable HTTP 配置".into());
+    if !matches!(transport, "" | "stdio" | "sse" | "streamable-http" | "streamableHttp") {
+        return Err("未知的 MCP 传输方式".into());
     }
     let url = obj
         .get("url")
@@ -173,7 +177,7 @@ fn normalized_config(value: &Value) -> Result<Value, String> {
             return Err("授权会话无效".into());
         }
         return Ok(
-            json!({"url":url,"headers":string_map(obj.get("headers"))?,"authMode":mode,"clientId":client_id,"scope":scope,"oauthSession":session}),
+            json!({"url":url,"headers":string_map(obj.get("headers"))?,"authMode":mode,"clientId":client_id,"scope":scope,"oauthSession":session,"transport":if transport == "sse" {"sse"} else {"streamable-http"}}),
         );
     }
     let command = obj
@@ -305,11 +309,19 @@ impl ConnectorManager {
                     .as_str()
                     .ok_or(oauth::AUTH_REQUIRED)?;
                 let auth = oauth::Session::load(oauth::token_path(&self.root, id, key)?, url)?;
-                let client = HttpMcpClient::connect_cancellable(http, Some(auth.clone()),cancel.clone())?;
+                let client = if config["transport"] == "sse" {
+                    Client::Sse(SseMcpClient::connect_cancellable(http, Some(auth.clone()), cancel.clone())?)
+                } else {
+                    Client::Http(HttpMcpClient::connect_cancellable(http, Some(auth.clone()), cancel.clone())?)
+                };
                 session = Some(auth);
-                Client::Http(client)
+                client
             } else {
-                Client::Http(HttpMcpClient::connect_cancellable(http,None,cancel.clone())?)
+                if config["transport"] == "sse" {
+                    Client::Sse(SseMcpClient::connect_cancellable(http, None, cancel.clone())?)
+                } else {
+                    Client::Http(HttpMcpClient::connect_cancellable(http,None,cancel.clone())?)
+                }
             }
         } else {
             let mut mcp = McpConfig::new(config["command"].as_str().unwrap(), &[])
@@ -602,7 +614,7 @@ mod tests {
     fn config_import_and_placeholders() {
         assert_eq!(normalized_config(&json!({"mcpServers":{"test":{"command":"python3","args":["server.py"],"env":{"TOKEN":"abc"}}}})).unwrap()["env"]["TOKEN"],"abc");
         assert!(normalized_config(&json!({"url":"https://example.com/mcp?key=YOUR_KEY"})).is_err());
-        assert!(normalized_config(&json!({"type":"sse","url":"https://example.com/sse"})).is_err());
+        assert_eq!(normalized_config(&json!({"type":"sse","url":"https://example.com/sse"})).unwrap()["transport"], "sse");
         assert!(normalized_config(&json!({"command":"echo","args":"bad"})).is_err());
         assert!(normalized_config(&json!({"mcpServers":{"one":{},"two":{}}})).is_err());
     }

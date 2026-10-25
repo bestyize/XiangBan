@@ -90,9 +90,9 @@ pub struct ServerSpec {
     pub timeout_ms: Option<u64>,
 }
 impl ServerSpec {
-    /// Old HTTP+SSE must never silently fall back to Streamable HTTP POST.
+    /// Known transports are supported; legacy SSE uses its own GET stream.
     pub fn unsupported(&self) -> Option<&'static str> {
-        (self.transport == Transport::Sse).then_some("旧式 SSE 暂不支持")
+        None
     }
     pub fn schema(&self) -> Option<&TokenSchema> {
         match &self.auth {
@@ -325,6 +325,7 @@ impl ConnectorPlugin {
         } else {
             json!({"url":spec.url,"headers":spec.headers,"authMode":match spec.auth { AuthSpec::Token {..} => "token", AuthSpec::OAuth => "oauth", _ => "auto" }})
         };
+        if spec.transport == Transport::Sse { config["transport"] = json!("sse"); }
         substitute(&mut config, spec, values)?;
         if let AuthSpec::Token { headers, .. } = &spec.auth {
             for (header, field, prefix) in headers {
