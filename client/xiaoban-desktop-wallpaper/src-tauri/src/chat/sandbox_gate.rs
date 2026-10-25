@@ -76,7 +76,8 @@ pub fn hook(permission: Arc<Permission>, workspace: &Path) -> SandboxHook {
     SandboxHook::new(move |session, command| {
         let policy = SandboxPolicy { network: NETWORK.load(std::sync::atomic::Ordering::Relaxed), ..policy.clone() };
         let available = sandbox::available() || WINDOWS.load(std::sync::atomic::Ordering::Relaxed);
-        decide(available, permission.mode_for(session), || take(session, command), &policy)
+        // 专家团成员的会话按主对话算：用户在主对话里放行的那一次命令，成员的 shell 也认。
+        decide(available, permission.mode_for(session), || take(permission.root_session(session), command), &policy)
     })
 }
 

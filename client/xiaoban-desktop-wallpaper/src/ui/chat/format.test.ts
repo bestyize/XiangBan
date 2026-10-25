@@ -11,6 +11,7 @@ describe('what the cards say', () => {
     expect(toolLabel('game_open')).toBe('打开游戏');
     expect(toolLabel('click')).toBe('模拟点击');
     expect(toolLabel('type_text')).toBe('模拟键盘打字');
+    expect(['TeamCreate', 'Agent', 'SendMessage', 'TeamDelete'].map(toolLabel)).toEqual(['组建专家团', '调度团队成员', '与团队成员沟通', '解散专家团']);
     expect(toolLabel('some_new_tool')).toBe('some_new_tool');
     expect(toolLabel('')).toBe('工具');
     expect(['read', 'write', 'network', 'exec'].map(r => riskVerb(r as never))).toEqual(['读取', '修改', '联网', '运行命令']);

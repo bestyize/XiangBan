@@ -10,6 +10,7 @@ const TOOL_LABELS: Record<string, string> = {
   widget_list: '查看桌面组件', widget_add: '添加桌面组件', widget_update: '调整桌面组件', widget_remove: '移除桌面组件', widget_read_format: '读取组件格式', widget_create: '创作桌面组件', widget_delete_custom: '删除自创组件',
   pet_read_format: '读取宠物格式', pet_catalog: '查看宠物', pet_theme_save: '保存宠物主题', pet_theme_delete: '删除宠物主题',
   pet_add: '添加桌面宠物', pet_update: '调整桌面宠物', pet_remove: '移除桌面宠物',
+  TeamCreate: '组建专家团', Agent: '调度团队成员', SendMessage: '与团队成员沟通', TeamDelete: '解散专家团',
   research: '调研子任务', process_start: '启动后台命令', process_read: '查看后台输出', process_write: '向后台命令输入', process_stop: '停止后台命令',
   game_list: '查看游戏列表', game_open: '打开游戏', game_close: '退出游戏', game_read_format: '读取游戏格式', game_create: '创作游戏', game_delete: '删除游戏',
   community_share: '分享到论坛', community_open: '打开官网或论坛',

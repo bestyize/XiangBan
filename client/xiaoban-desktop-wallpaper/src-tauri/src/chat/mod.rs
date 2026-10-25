@@ -9,6 +9,7 @@ mod app_guide;
 mod feature_hints;
 mod skill_invocation;
 mod persona;
+mod team;
 mod widget_content;
 mod broker;
 mod checkpoints;
@@ -231,6 +232,8 @@ fn permission_with_danger_check(mode: PermissionMode, approver: impl agent_kerne
     })
     // "这类命令都允许" for one kind of simple command (`npm test`), never for commands in general.
     .remember_exec_as(danger::remember_key)
+    // 专家团成员的会话（`<对话>#team-…`）沿用主对话的权限模式、授权和确认卡片。
+    .children_inherit()
 }
 
 fn emit<R: tauri::Runtime>(app: &tauri::AppHandle<R>, name: &str, payload: Value) {
@@ -544,9 +547,10 @@ pub fn chat_invocable_skills(app: tauri::AppHandle, window: tauri::WebviewWindow
 }
 
 fn assemble_with_files(parts: Parts<'_>, attachments: Vec<Attachment>) -> Result<Agent, String> {
-    assemble_with_connectors(parts, attachments, Vec::new())
+    assemble_with_connectors(parts, attachments, Vec::new(), Vec::new())
 }
-fn assemble_with_connectors(parts: Parts<'_>, attachments: Vec<Attachment>, connector_tools: Vec<Arc<dyn agent_kernel::Tool>>) -> Result<Agent, String> {
+/// `connector_tools` are discovered on demand; `team_tools` (the lead of an expert team) are always visible.
+fn assemble_with_connectors(parts: Parts<'_>, attachments: Vec<Attachment>, connector_tools: Vec<Arc<dyn agent_kernel::Tool>>, team_tools: Vec<Arc<dyn agent_kernel::Tool>>) -> Result<Agent, String> {
     let Parts { provider, dirs, workspace, permission, todo, ask, desktop, utc_offset_minutes, open_computer_use, spawn_computer_use, budget, processes, mid_run, research_events } = parts;
     for dir in [dirs.sessions(), dirs.spill(), dirs.memory(), dirs.skills()] {
         fs::create_dir_all(&dir).map_err(|e| format!("无法创建 {}：{e}", dir.display()))?;
@@ -645,6 +649,7 @@ fn assemble_with_connectors(parts: Parts<'_>, attachments: Vec<Attachment>, conn
         }
     }
     for tool in connector_tools { builder = builder.deferred_tool_arc(tool); }
+    for tool in team_tools { builder = builder.tool_arc(tool); }
     for tool in processes.iter().flat_map(|manager| manager.tools()) { builder = builder.tool_arc(tool); }
     builder.build().map_err(|e| e.to_string())
 }
@@ -765,6 +770,12 @@ fn build_agent(app: &tauri::AppHandle, config: &AiConfig, key_source: Option<Key
     if connectors.statuses().as_array().is_some_and(|a|!a.is_empty()){connector_tools.push(connectors.status_tool());}
     if cancel.load(Ordering::SeqCst){return Err("任务已取消".into());}
     let provider = provider_with(config, key_source)?;
+    // 对话绑定的专家；专家团的主理人在这里拿到团队工具。
+    let expert = mutate(app, |index| index.get(session).and_then(|s| s.expert.clone()))?;
+    let team_setup = match &expert {
+        Some(binding) => team::load(&Dirs::of(app)?.plugins(), binding),
+        None => None,
+    };
     let mid_run = {
         let (app, session) = (app.clone(), session.to_string());
         compact::MidRunCompact::new(Arc::new(agent_kernel::provider::MeteredProvider{provider:provider.clone(),control:control.clone()}), config.token_budget().context_limit, cancel.clone(), move |state, detail| {
@@ -776,6 +787,20 @@ fn build_agent(app: &tauri::AppHandle, config: &AiConfig, key_source: Option<Key
             }
             emit(&app, "chat-compacting", payload);
         })
+    };
+    let research_events: Arc<dyn Fn(&str, &agent_kernel::Event) + Send + Sync> = {
+        let app = app.clone();
+        // Only the token counts: the helper's text and tool calls stay out of the conversation shown.
+        Arc::new(move |session: &str, event: &agent_kernel::Event| {
+            if matches!(event, agent_kernel::Event::Usage { .. }) {
+                emit(&app, "chat-event", json!({ "session": session, "event": event }));
+            }
+        })
+    };
+    let team_charter = team_setup.as_ref().map(|setup| team::charter(&setup.lead, &setup.members));
+    let team_tools = match team_setup {
+        Some(setup) => team::tools(app, setup, provider.clone(), workspace.to_path_buf(), config.token_budget(), Some(research_events.clone()))?,
+        None => Vec::new(),
     };
     let mut agent = assemble_with_connectors(Parts {
         provider,
@@ -791,20 +816,16 @@ fn build_agent(app: &tauri::AppHandle, config: &AiConfig, key_source: Option<Key
         budget: config.token_budget(),
         processes: Some(process_manager(app, workspace)?),
         mid_run: Some(mid_run),
-        research_events: Some({
-            let app = app.clone();
-            // Only the token counts: the helper's text and tool calls stay out of the conversation shown.
-            Arc::new(move |session: &str, event: &agent_kernel::Event| {
-                if matches!(event, agent_kernel::Event::Usage { .. }) {
-                    emit(&app, "chat-event", json!({ "session": session, "event": event }));
-                }
-            })
-        }),
-    }, attachments, connector_tools)?;
+        research_events: Some(research_events),
+    }, attachments, connector_tools, team_tools)?;
     // 对话绑定了专家：把它的人设放进每次请求，并按它的 `maxTurns` 收紧轮数上限。
-    if let Some(expert) = mutate(app, |index| index.get(session).and_then(|s| s.expert.clone()))? {
+    if let Some(expert) = expert {
         if let Some(persona) = persona::load(&Dirs::of(app)?.plugins(), &expert) {
-            agent = agent.with_middleware(persona::PersonaPrompt::new(persona.text));
+            // 专家团的主理人：人设后面接上团队章程（协作铁律、工具用法、成员名单）。
+            let text = match team_charter { Some(charter) => format!("{}
+
+{charter}", persona.text), None => persona.text };
+            agent = agent.with_middleware(persona::PersonaPrompt::new(text));
             if let Some(turns) = persona.max_turns {
                 agent = agent.limit_turns(turns as usize);
             }
