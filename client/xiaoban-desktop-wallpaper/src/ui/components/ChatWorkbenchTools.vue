@@ -17,7 +17,7 @@ const emit = defineEmits<{
   file: []; screenshot: [];
   'use-expert': [entrySkill: string, name: string, expert?: Expert];
   'use-skill': [slug: string, name: string];
-  'use-connector': [name: string];
+  'use-connector': [name: string, id: string];
 }>();
 const root = ref<HTMLElement | null>(null);
 let closeTimer: ReturnType<typeof setTimeout> | undefined;
@@ -126,7 +126,7 @@ function useEntry(e: Entry) {
   if (!e.ready) { props.store.notify('该能力尚未就绪，请先到 AI 插件完成配置', 'info'); openStore(); return; }
   if (kind.value === 'experts') emit('use-expert', e.entrySkill || e.id, e.title, e.expert);
   if (kind.value === 'skills') emit('use-skill', e.id, e.title);
-  if (kind.value === 'connectors') emit('use-connector', e.title);
+  if (kind.value === 'connectors') emit('use-connector', e.title, e.id);
   close();
 }
 function openStore() { close(); props.store.navigate('ai-store'); }
