@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Cargo target runner: launch a real app bundle with a stable identity after each rebuild.
-import { spawn } from 'node:child_process';
-import { copyFileSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { spawn, spawnSync } from 'node:child_process';
+import { copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { signMacos } from '../../../.github/signing/identity.mjs';
@@ -15,7 +15,13 @@ export function stageDevApp(binary) {
   mkdirSync(path.join(contents, 'Resources'), { recursive: true });
   const executable = path.join(contents, 'MacOS/xiaoban-desktop-wallpaper');
   copyFileSync(binary, executable);
-  copyFileSync(path.join(tauri, 'icons/icon.icns'), path.join(contents, 'Resources/icon.icns'));
+  // icon.icns is generated, not tracked; `tauri dev` does not run the generator, so make it on first use.
+  const icns = path.join(tauri, 'icons/icon.icns');
+  if (!existsSync(icns)) {
+    const made = spawnSync(process.execPath, [fileURLToPath(new URL('./generate-icon.mjs', import.meta.url))], { stdio: 'inherit' });
+    if (made.status !== 0) throw new Error('icon.icns is missing and scripts/generate-icon.mjs failed');
+  }
+  copyFileSync(icns, path.join(contents, 'Resources/icon.icns'));
   const config = JSON.parse(readFileSync(path.join(tauri, 'tauri.conf.json'), 'utf8'));
   const extra = readFileSync(path.join(tauri, 'Info.plist'), 'utf8');
   // Keep privacy purpose strings from the release bundle. Development data remains isolated in Rust.

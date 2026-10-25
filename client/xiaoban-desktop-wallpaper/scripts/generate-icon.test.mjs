@@ -20,7 +20,6 @@ test('desktop app icon reuses the 小伴 AI Sparkles mark and current theme red'
 
 test('Tauri runs icon generation before building and includes Windows/Linux images', () => {
   assert.match(config.build.beforeBuildCommand, /generate-icon\.mjs/);
-  assert.match(config.build.beforeDevCommand, /generate-icon\.mjs/);
   assert.ok(config.bundle.icon.includes('icons/icon.ico'));
   assert.ok(config.bundle.icon.includes('icons/icon.png'));
 });
