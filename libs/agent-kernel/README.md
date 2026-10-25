@@ -203,6 +203,6 @@ cargo test --manifest-path libs/agent-kernel/Cargo.toml --locked --all-features
 
 ## MCP HTTP 与宿主连接器
 
-启用 `mcp` 和 `native-tls`（或其他提供 reqwest 的网络 feature）后，可通过 `HttpMcpClient` 连接 Streamable HTTP 服务，支持 JSON / 响应 SSE、会话头、协议协商与工具分页。可选的 `HttpAuthorization` 由宿主提供动态令牌，HTTP 请求取得当前令牌并在 401 时触发一次刷新重试；内核不执行 OAuth 发现或存储凭据。旧式 HTTP+SSE 暂不支持，返回明确错误。连接器的保存、恢复、撤销和凭据管理由 `libs/agent-tools/connectors` 负责；不进入内核。
+启用 `mcp` 和 `native-tls`（或其他提供 reqwest 的网络 feature）后，可通过 `HttpMcpClient` 连接 Streamable HTTP 服务，支持 JSON / 响应 SSE、会话头、协议协商与工具分页；`SseMcpClient` 使用同一 `HttpMcpConfig` 和公开方法连接 MCP 2024-11-05 旧式 HTTP+SSE 服务，先 GET 事件流，再向其同源 endpoint POST 请求，按 ID 分发响应。两者共用握手、分页、工具策略和 `needs_review`；SSE 单事件上限 8 MiB，断流、取消或超时关闭连接，需显式重连。可选的 `HttpAuthorization` 由宿主提供动态令牌，GET / POST 取得当前令牌并在 401 时触发一次刷新重试；内核不执行 OAuth 发现或存储凭据。连接器的保存、恢复、撤销和凭据管理由 `libs/agent-tools/connectors` 负责；不进入内核。
 
 `McpClient::close` 可以主动终止仍被旧 Agent 工具引用的本地连接；HTTP 客户端同样支持关闭。宿主还应为外部工具设置名称空间、权限与断开后的调用门禁。

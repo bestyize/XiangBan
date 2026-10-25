@@ -377,10 +377,8 @@ impl Flow {
             return Err("网页授权的服务地址不可携带查询凭据，请使用不含密钥的 MCP 地址".into());
         }
         let client = client()?;
-        let mut probe = client
-            .post(server)
-            .header("Accept", "application/json, text/event-stream")
-            .header("Content-Type", "application/json");
+        let legacy = config["transport"] == "sse" || config["type"] == "sse";
+        let mut routing = reqwest::header::HeaderMap::new();
         // Tenant routing headers belong only to the resource probe, never to its authorization server.
         for (key, value) in super::string_map(config.get("headers"))? {
             if !matches!(
@@ -393,11 +391,51 @@ impl Flow {
                     | "mcp-session-id"
                     | "mcp-protocol-version"
             ) {
-                probe = probe.header(key, value);
+                routing.insert(
+                    reqwest::header::HeaderName::from_bytes(key.as_bytes()).map_err(|_| "请求头无效")?,
+                    value.parse().map_err(|_| "请求头无效")?,
+                );
             }
         }
-        let probe=probe
-            .body(json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"xiaoban","version":env!("CARGO_PKG_VERSION")}}}).to_string()).send().map_err(|_|"无法检测服务授权方式")?;
+        let initialize = json!({"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":if legacy {"2024-11-05"} else {"2025-06-18"},"capabilities":{},"clientInfo":{"name":"xiaoban","version":env!("CARGO_PKG_VERSION")}}}).to_string();
+        let probe = if legacy {
+            let response = client.get(server).headers(routing.clone()).header("Accept", "text/event-stream")
+                .send().map_err(|_| "无法检测服务授权方式")?;
+            if response.status().is_success() {
+                // GET may be public while the advertised POST endpoint requires OAuth.
+                // Bound the endpoint probe and validate its origin before forwarding headers.
+                let mut reader = BufReader::new(response.take(64 * 1024));
+                let mut event = String::new();
+                let mut data = String::new();
+                let post = loop {
+                    let mut line = String::new();
+                    if reader.read_line(&mut line).map_err(|_| "无法读取 SSE 授权端点")? == 0 {
+                        return Err("SSE 授权探测缺少 endpoint".into());
+                    }
+                    let line = line.trim_end_matches(['\r', '\n']);
+                    if line.is_empty() {
+                        if event == "endpoint" && !data.is_empty() {
+                            let post = target.join(data.trim()).map_err(|_| "SSE endpoint 无效")?;
+                            if post.origin() != target.origin() || !post.username().is_empty() || post.password().is_some() || post.fragment().is_some() {
+                                return Err("SSE endpoint 必须同源".into());
+                            }
+                            break post;
+                        }
+                        event.clear(); data.clear();
+                    } else if let Some(value) = line.strip_prefix("event:") {
+                        event = value.strip_prefix(' ').unwrap_or(value).into();
+                    } else if let Some(value) = line.strip_prefix("data:") {
+                        data.push_str(value.strip_prefix(' ').unwrap_or(value)); data.push('\n');
+                    }
+                };
+                // Keep the stream alive until the POST challenge has been read.
+                client.post(post).headers(routing).header("Content-Type", "application/json")
+                    .body(initialize).send().map_err(|_| "无法检测服务授权方式")?
+            } else { response }
+        } else {
+            client.post(server).headers(routing).header("Accept", "application/json, text/event-stream")
+                .header("Content-Type", "application/json").body(initialize).send().map_err(|_| "无法检测服务授权方式")?
+        };
         let bearer_challenge = probe
             .headers()
             .get_all("www-authenticate")

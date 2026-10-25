@@ -11,6 +11,8 @@ use std::{
     path::{Path, PathBuf},
     time::Duration,
 };
+#[path = "../../../agent-kernel/tests/legacy_sse_support/mod.rs"]
+mod legacy_sse_support;
 
 struct Temp(PathBuf);
 impl Temp {
@@ -98,14 +100,9 @@ fn templates_schema_auth_and_safe_paths() {
     plugin.servers[0].url = Some("https://example.com/${UNKNOWN}".into());
     assert!(plugin.build_config("service", &values()).is_err());
     plugin.servers[0].transport = Transport::Sse;
-    assert!(plugin.servers[0]
-        .unsupported()
-        .unwrap()
-        .contains("暂不支持"));
-    assert!(plugin
-        .build_config("service", &values())
-        .unwrap_err()
-        .contains("暂不支持"));
+    plugin.servers[0].url = Some("https://example.com/sse".into());
+    assert!(plugin.servers[0].unsupported().is_none());
+    assert_eq!(plugin.build_config("service", &values()).unwrap()["transport"], "sse");
     let path = plugin_dir.join(".codebuddy-plugin/plugin.json");
     let mut manifest: Value = serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
     manifest["extensions"]["ai.workbuddy"]["setup"]["mcpServers"]["service"]["auth"]["schema"] =
@@ -305,18 +302,16 @@ fn real_workbuddy_marketplace_oracle() {
                     .map(|f| (f.key.clone(), "fixture-value-1234".into()))
                     .collect();
                 let result = plugin.build_config(&spec.name, &values);
-                if spec.unsupported().is_some() {
-                    assert!(result.unwrap_err().contains("暂不支持"));
-                } else {
-                    let config =
-                        result.unwrap_or_else(|e| panic!("{} / {}: {e}", plugin.name, spec.name));
-                    assert!(config.get("url").is_some() || config.get("command").is_some());
-                    built += 1;
-                }
+                let config =
+                    result.unwrap_or_else(|e| panic!("{} / {}: {e}", plugin.name, spec.name));
+                assert!(spec.unsupported().is_none());
+                assert!(config.get("url").is_some() || config.get("command").is_some());
+                if spec.transport == Transport::Sse { assert_eq!(config["transport"], "sse"); }
+                built += 1;
             }
         }
     }
-    eprintln!("WorkBuddy oracle: loaded={loaded}, skill-only={skills_only}, token={token}, built={built}, SSE unsupported={sse}");
+    eprintln!("WorkBuddy oracle: loaded={loaded}, skill-only={skills_only}, token={token}, built={built}, SSE supported={sse}");
     assert!(loaded > 0);
     assert!(token > 0);
 }
@@ -405,25 +400,32 @@ fn http_plugin_uses_token_headers_and_call_timeout() {
 }
 
 #[test]
-fn legacy_sse_is_explicitly_unsupported_without_network_or_credential_writes() {
+fn legacy_sse_plugin_connects_with_vault_token_policy_and_revocation() {
     let tmp = Temp::new();
-    let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
-    listener.set_nonblocking(true).unwrap();
+    let server = legacy_sse_support::Server::new(legacy_sse_support::Options {
+        token: Some(values()["TOKEN"].clone()), ..Default::default()
+    });
     let plugin = fixture(
         &tmp.0.join("plugin"),
-        json!({"type":"sse","url":format!("http://{}/sse",listener.local_addr().unwrap())}),
-        json!({}),
+        json!({"type":"sse","url":server.url(),"headers":{"Authorization":"Bearer ${TOKEN}"}}),
+        json!({"disabledTools":["write"],"timeout":2000}),
     );
     let root = tmp.0.join("config");
     let manager = ConnectorManager::new(root.clone(), tmp.0.clone()).unwrap();
-    let error = manager
-        .connect_plugin(&plugin, "service", &values(), true)
-        .unwrap_err();
-    assert!(error.contains("暂不支持"));
-    assert!(!root.join("vault").exists());
-    assert!(manager.statuses().as_array().unwrap().is_empty());
-    assert_eq!(
-        listener.accept().unwrap_err().kind(),
-        std::io::ErrorKind::WouldBlock
-    );
+    manager.connect_plugin(&plugin, "service", &values(), true).unwrap();
+    let tools = manager.tools();
+    assert_eq!(tools.len(), 1);
+    assert_eq!(tools[0].spec().timeout, Duration::from_millis(2000));
+    assert_eq!(tools[0].execute(json!({"text":"legacy result"}), &ToolCtx::detached("sse")).unwrap(), "legacy result");
+    assert!(!fs::read_to_string(root.join("connections.json")).unwrap().contains(&values()["TOKEN"]));
+    assert!(!manager.statuses().to_string().contains(&values()["TOKEN"]));
+    manager.disconnect(&plugin.connection_id("service")).unwrap();
+    assert!(tools[0].execute(json!({}), &ToolCtx::detached("old")).is_err());
+    let deadline = std::time::Instant::now() + Duration::from_secs(2);
+    while !server.stream_closed.load(std::sync::atomic::Ordering::SeqCst) {
+        assert!(std::time::Instant::now() < deadline);
+        std::thread::sleep(Duration::from_millis(5));
+    }
+    assert!(server.requests.lock().unwrap().iter().any(|(line, _)| line.starts_with("POST /legacy/messages")));
+    manager.shutdown();
 }

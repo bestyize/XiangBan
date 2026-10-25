@@ -1,4 +1,4 @@
-//! Streamable HTTP transport (JSON and response SSE). Legacy HTTP+SSE is explicit unsupported.
+//! Shared MCP handshake/tool layer with Streamable HTTP and legacy SSE transports.
 use super::{decode_result, MAX_FRAME_BYTES};
 use crate::{Risk, Tool, ToolCtx, ToolResult, ToolSpec};
 use reqwest::{
@@ -36,7 +36,9 @@ pub struct HttpMcpClient {
     session: Mutex<Option<String>>,
     protocol: Mutex<String>,
     next: AtomicU64,
-    closed: AtomicBool,
+    closed: Arc<AtomicBool>,
+    legacy: Option<super::sse::Stream>,
+    timeout: Duration,
     specs: Vec<(String, ToolSpec)>,
     startup_cancel:Option<Arc<AtomicBool>>,
     startup_deadline:Option<std::time::Instant>,
@@ -47,19 +49,23 @@ pub struct HttpMcpClient {
 }
 impl HttpMcpClient {
     pub fn connect(config: HttpMcpConfig) -> Result<Arc<Self>, String> {
-        Self::connect_inner(config, None, None)
+        Self::connect_inner(config, None, None, false)
     }
     pub fn connect_with_authorization(
         config: HttpMcpConfig,
         authorization: Arc<dyn HttpAuthorization>,
     ) -> Result<Arc<Self>, String> {
-        Self::connect_inner(config, Some(authorization), None)
+        Self::connect_inner(config, Some(authorization), None, false)
     }
-    pub fn connect_cancellable(config:HttpMcpConfig,auth:Option<Arc<dyn HttpAuthorization>>,cancel:Arc<AtomicBool>)->Result<Arc<Self>,String>{Self::connect_inner(config,auth,Some(cancel))}
+    pub fn connect_cancellable(config:HttpMcpConfig,auth:Option<Arc<dyn HttpAuthorization>>,cancel:Arc<AtomicBool>)->Result<Arc<Self>,String>{Self::connect_inner(config,auth,Some(cancel),false)}
+    pub(super) fn connect_legacy(config: HttpMcpConfig, auth: Option<Arc<dyn HttpAuthorization>>, cancel: Option<Arc<AtomicBool>>) -> Result<Arc<Self>, String> {
+        Self::connect_inner(config, auth, cancel, true)
+    }
     fn connect_inner(
         config: HttpMcpConfig,
         authorization: Option<Arc<dyn HttpAuthorization>>,
         startup_cancel:Option<Arc<AtomicBool>>,
+        legacy: bool,
     ) -> Result<Arc<Self>, String> {
         let url = reqwest::Url::parse(&config.url).map_err(|_| "MCP 地址无效")?;
         if !(url.scheme() == "https"
@@ -97,38 +103,45 @@ impl HttpMcpClient {
         }
         let client = crate::net::async_builder(Client::builder()
             .redirect(Policy::none())
-            .connect_timeout(Duration::from_secs(10))
-            .timeout(config.timeout))?
+            .connect_timeout(Duration::from_secs(10)))?
             .build()
             .map_err(|_| "无法创建 MCP HTTP 客户端")?;
         if authorization.is_some() {
             headers.remove("authorization");
         }
+        let closed = Arc::new(AtomicBool::new(false));
+        let deadline = std::time::Instant::now() + config.timeout.min(Duration::from_secs(45));
+        let stream = if legacy {
+            Some(super::sse::Stream::open(client.clone(), url, headers.clone(), authorization.clone(), closed.clone(), config.timeout,
+                || startup_cancel.as_ref().is_some_and(|c| c.load(Ordering::SeqCst)) || std::time::Instant::now() >= deadline)? )
+        } else { None };
         let mut this = Self {
             client,
             url: config.url,
             headers,
             authorization,
             session: Mutex::new(None),
-            protocol: Mutex::new("2025-06-18".into()),
+            protocol: Mutex::new(if legacy { "2024-11-05" } else { "2025-06-18" }.into()),
             next: AtomicU64::new(1),
-            closed: AtomicBool::new(false),
+            closed,
+            legacy: stream,
+            timeout: config.timeout,
             specs: Vec::new(),
             startup_cancel,
-            startup_deadline:Some(std::time::Instant::now()+Duration::from_secs(45)),
+            startup_deadline:Some(deadline),
             uncertain: Mutex::new(None),
             revoked: AtomicBool::new(false),
         };
         let result = this.request(
             "initialize",
-            json!({"protocolVersion":"2025-06-18","capabilities":{},
+            json!({"protocolVersion":if legacy { "2024-11-05" } else { "2025-06-18" },"capabilities":{},
             "clientInfo":{"name":"xiaoban","version":env!("CARGO_PKG_VERSION")}}),
             false, None,
         )?;
         let version = result["protocolVersion"]
             .as_str()
             .ok_or("MCP 初始化缺少协议版本")?;
-        if !matches!(version, "2025-06-18" | "2025-03-26") {
+        if !(matches!(version, "2025-06-18" | "2025-03-26") || (legacy && version == "2024-11-05")) {
             return Err("此 MCP 协议版本暂不支持，请选择 Streamable HTTP 或 stdio 配置".into());
         }
         *this.protocol.lock().unwrap_or_else(|e| e.into_inner()) = version.into();
@@ -164,6 +177,7 @@ impl HttpMcpClient {
             }
             cursor = result["nextCursor"].as_str().map(str::to_string);
             if cursor.is_none() {
+                if this.closed.load(Ordering::SeqCst) { return Err("MCP 已断开".into()); }
                 this.startup_cancel=None;
                 this.startup_deadline=None;
                 return Ok(Arc::new(this));
@@ -175,6 +189,7 @@ impl HttpMcpClient {
         if self.closed.load(Ordering::SeqCst) {
             return Err("MCP 已断开".into());
         }
+        let deadline = std::time::Instant::now() + self.timeout;
         let id = self.next.fetch_add(1, Ordering::Relaxed);
         let mut request = json!({"jsonrpc":"2.0","method":method,"params":params});
         if !notification {
@@ -183,70 +198,83 @@ impl HttpMcpClient {
         let body = serde_json::to_vec(&request).map_err(|_| "MCP 请求序列化失败")?;
         let runtime=tokio::runtime::Builder::new_current_thread().enable_all().build().map_err(|e|e.to_string())?;
         let cancelled=||self.startup_deadline.is_some_and(|d|std::time::Instant::now()>=d)||self.closed.load(Ordering::SeqCst)||self.startup_cancel.as_ref().is_some_and(|c|c.load(Ordering::SeqCst))||ctx.is_some_and(ToolCtx::is_cancelled);
-        // Authorization may use a blocking HTTP client. Resolve/refresh credentials
-        // outside the async runtime; reqwest's blocking runtime cannot be dropped there.
-        for attempt in 0..2 {
-            let mut builder = self
-                .client
-                .post(&self.url)
-                .headers(self.headers.clone())
-                .header("Accept", "application/json, text/event-stream")
-                .header("Content-Type", "application/json");
-            if let Some(auth) = &self.authorization {
-                let token = auth.access_token(attempt != 0).map_err(|e| {
-                    self.closed.store(true, Ordering::SeqCst);
-                    e
-                })?;
-                builder = builder.bearer_auth(token);
-            }
-            if method != "initialize" {
-                builder = builder.header(
-                    "MCP-Protocol-Version",
-                    self.protocol
-                        .lock()
-                        .unwrap_or_else(|e| e.into_inner())
-                        .as_str(),
-                );
-            }
-            if let Some(session) = self
-                .session
-                .lock()
-                .unwrap_or_else(|e| e.into_inner())
-                .as_ref()
-            {
-                builder = builder.header("Mcp-Session-Id", session);
-            }
-            if matches!(method, "initialize" | "tools/list") {
-                builder = builder.timeout(Duration::from_secs(15));
-            }
-            let response = runtime.block_on(async {
-                crate::net::wait(builder.body(body.clone()).send(), &cancelled, Duration::from_secs(45)).await
-            }).map_err(|e|e.to_string())?.map_err(|_| {
-                self.closed.store(true, Ordering::SeqCst);
-                "MCP 网络请求失败或超时，请检查地址和凭据"
-            })?;
-            if response.status().as_u16() == 401 && self.authorization.is_some() && attempt == 0 {
-                continue;
-            }
-            if !response.status().is_success() {
-                self.closed.store(true, Ordering::SeqCst);
-                return Err(format!(
-                    "MCP HTTP {}；请检查鉴权与传输方式，旧式 SSE 暂不支持",
-                    response.status().as_u16()
-                ));
-            }
-            if method == "initialize" {
-                if let Some(session) = response.headers().get("Mcp-Session-Id") {
-                    *self.session.lock().unwrap_or_else(|e| e.into_inner()) =
-                        Some(session.to_str().map_err(|_| "MCP 会话头无效")?.to_string());
+        let receiver = if !notification { self.legacy.as_ref().map(|s| s.register(id)).transpose()? } else { None };
+        let result = (|| {
+            // Authorization may use a blocking HTTP client. Resolve/refresh credentials
+            // outside the async runtime; reqwest's blocking runtime cannot be dropped there.
+            for attempt in 0..2 {
+                let mut builder = self
+                    .client
+                    .post(self.legacy.as_ref().map(|s| s.endpoint.as_str()).unwrap_or(&self.url))
+                    .headers(self.headers.clone())
+                    .header("Accept", "application/json, text/event-stream")
+                    .header("Content-Type", "application/json");
+                if let Some(auth) = &self.authorization {
+                    let token = auth.access_token(attempt != 0).map_err(|e| {
+                        self.closed.store(true, Ordering::SeqCst);
+                        e
+                    })?;
+                    builder = builder.bearer_auth(token);
                 }
+                if self.legacy.is_none() && method != "initialize" {
+                    builder = builder.header(
+                        "MCP-Protocol-Version",
+                        self.protocol
+                            .lock()
+                            .unwrap_or_else(|e| e.into_inner())
+                            .as_str(),
+                    );
+                }
+                if let Some(session) = self
+                    .session
+                    .lock()
+                    .unwrap_or_else(|e| e.into_inner())
+                    .as_ref()
+                {
+                    builder = builder.header("Mcp-Session-Id", session);
+                }
+                let remaining = deadline.saturating_duration_since(std::time::Instant::now());
+                if remaining.is_zero() || cancelled() { return Err("MCP request cancelled or timed out".into()); }
+                builder = builder.timeout(remaining);
+                let response = runtime.block_on(async {
+                    crate::net::wait(builder.body(body.clone()).send(), &cancelled, deadline.saturating_duration_since(std::time::Instant::now())).await
+                }).map_err(|e|e.to_string())?.map_err(|_| {
+                    self.closed.store(true, Ordering::SeqCst);
+                    "MCP 网络请求失败或超时，请检查地址和凭据"
+                })?;
+                if response.status().as_u16() == 401 && self.authorization.is_some() && attempt == 0 {
+                    continue;
+                }
+                if !response.status().is_success() {
+                    self.closed.store(true, Ordering::SeqCst);
+                    return Err(format!(
+                        "MCP HTTP {}；请检查鉴权与传输方式",
+                        response.status().as_u16()
+                    ));
+                }
+                if self.legacy.is_none() && method == "initialize" {
+                    if let Some(session) = response.headers().get("Mcp-Session-Id") {
+                        *self.session.lock().unwrap_or_else(|e| e.into_inner()) =
+                            Some(session.to_str().map_err(|_| "MCP 会话头无效")?.to_string());
+                    }
+                }
+                if notification {
+                    return Ok(Value::Null);
+                }
+                if let (Some(stream), Some(receiver)) = (&self.legacy, &receiver) {
+                    return stream.wait(receiver, &cancelled, deadline);
+                }
+                return runtime.block_on(read_response(response, id, &cancelled));
             }
-            if notification {
-                return Ok(Value::Null);
+            Err("MCP 授权失效，请重新连接并授权".into())
+        })();
+        if let Some(stream) = &self.legacy {
+            stream.remove(id);
+            if result.is_err() && (cancelled() || std::time::Instant::now() >= deadline) {
+                self.closed.store(true, Ordering::SeqCst);
             }
-            return runtime.block_on(read_response(response, id, &cancelled));
         }
-        Err("MCP 授权失效，请重新连接并授权".into())
+        result
     }
 
     pub fn is_connected(&self) -> bool {
@@ -302,7 +330,7 @@ impl HttpMcpClient {
 }
 impl Drop for HttpMcpClient{fn drop(&mut self){self.close();}}
 
-fn rpc_result(value: Value, id: u64) -> Result<Value, String> {
+pub(super) fn rpc_result(value: Value, id: u64) -> Result<Value, String> {
     if value["id"].as_u64() != Some(id) {
         return Err("MCP 响应请求编号不匹配".into());
     }
@@ -349,6 +377,9 @@ impl Tool for HttpTool {
     }
     fn execute_result(&self, args: Value, ctx: &ToolCtx) -> ToolResult {
         if ctx.is_cancelled() || !self.client.is_connected() {
+            if ctx.is_cancelled() && self.client.legacy.is_some() {
+                self.client.closed.store(true, Ordering::SeqCst);
+            }
             return ToolResult::error("cancelled");
         }
         self.client

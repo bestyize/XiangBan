@@ -2,7 +2,7 @@
 
 用户配置的 MCP 连接管理，供小伴桌面 AI 商店与 Agent 共用。基于 agent-kernel，不依赖 Tauri。
 
-- 支持本地 stdio 和远程 Streamable HTTP（JSON / 响应 SSE），暂不支持旧式 HTTP+SSE。
+- 支持本地 stdio、远程 Streamable HTTP（JSON / 响应 SSE）和旧式 HTTP+SSE（`transport: "sse"`）。旧式 SSE 先 GET 事件流，再向同源 endpoint POST 请求；断流、取消或超时后关闭连接，需显式重连。
 - 接收单个服务配置或只含一个服务的标准 mcpServers JSON；配置模板来自 SkillHub README，读取模板不会启动服务。
 - 用户确认后才连接或启动本地命令。Node/Python 等依赖需本机提供；npx 自身的下载行为由用户确认的命令决定。
 - 完成 initialize、initialized 和 tools/list 后才报告连接成功。配置落盘失败会关闭刚创建的连接。
@@ -19,7 +19,7 @@
 
 OAuth 令牌提前 30 秒刷新，收到 401 时再刷新并重试一次；刷新令牌轮换保存到原授权会话。取消或失败会清理未完成会话，更换配置会废弃旧授权。断开连接关闭工具并保留本机凭据供手动重连；此操作不等同于服务商撤销授权。应用重启只尝试恢复连接，不主动打开浏览器；需要重新登录时由用户点击连接。
 
-服务需提供标准 MCP OAuth 元数据，并支持公共客户端的本机回调；不支持动态注册时需服务商预先分配客户端 ID。WorkBuddy 的私有身份、云端代授权与服务专属 CLI 登录不能直接复用，仍需服务商独立接入；旧式 HTTP+SSE 暂不支持。
+服务需提供标准 MCP OAuth 元数据，并支持公共客户端的本机回调；不支持动态注册时需服务商预先分配客户端 ID。WorkBuddy 的私有身份、云端代授权与服务专属 CLI 登录不能直接复用，仍需服务商独立接入。旧式 SSE 的 GET 或 POST 返回 401 均可进入授权发现流程。
 
 ## 验证
 
@@ -29,7 +29,7 @@ OAuth 令牌提前 30 秒刷新，收到 401 时再刷新并重试一次；刷�
 
 ## WorkBuddy 插件 API
 
-`plugin::ConnectorPlugin::load(&dir)` 读取插件清单、`mcp.json` / `.mcp.json`、令牌 schema、策略及技能/图标路径，不启动服务。只带技能的目录可以加载，其 `servers` 为空。`ServerSpec::unsupported()` 对旧式 SSE 返回“暂不支持”；宿主应把原因传到 UI 的 `unsupported` 字段，避免尝试连接。`streamableHttp` 和 `streamable-http` 统一为 `Transport::StreamableHttp`。
+`plugin::ConnectorPlugin::load(&dir)` 读取插件清单、`mcp.json` / `.mcp.json`、令牌 schema、策略及技能/图标路径，不启动服务。只带技能的目录可以加载，其 `servers` 为空。`ServerSpec::unsupported()` 对已知传输（含 SSE）返回 `None`；SSE 的 `build_config` 保留 `transport: "sse"`。`streamableHttp` 和 `streamable-http` 统一为 `Transport::StreamableHttp`。
 
 `build_config(server, &values)` 校验字段并替换模板，返回单服务配置；插件实际连接请使用 `ConnectorManager::connect_plugin(&plugin, server, &values, confirmed)`，让管理器从 vault 合并已存字段并加密保存新字段。需要 OAuth 时用 `Arc<ConnectorManager>::begin_connect_plugin(...)`，复用 `authorization_status` / `cancel_authorization`；显式重新授权也可再次调用此入口。
 

@@ -26,6 +26,9 @@ struct State {
     short_lived: bool,
     wrong_resource: bool,
     refuse_refresh: bool,
+    legacy: bool,
+    post_auth: bool,
+    stream: Option<TcpStream>,
 }
 struct Server {
     base: String,
@@ -62,7 +65,9 @@ impl Server {
         }
     }
     fn config(&self) -> Value {
-        json!({"url":format!("{}/mcp",self.base)})
+        let mut config = json!({"url":format!("{}/mcp",self.base)});
+        if self.state.lock().unwrap().legacy { config["transport"] = json!("sse"); }
+        config
     }
     fn callback(&self, result: &Value, valid: bool) -> u16 {
         let url = Url::parse(result["authorizationUrl"].as_str().unwrap()).unwrap();
@@ -136,6 +141,15 @@ fn handle(mut stream: TcpStream, base: &str, state: &Mutex<State>) {
     reader.read_exact(&mut bytes).unwrap();
     let mut state = state.lock().unwrap();
     match (method, path) {
+        ("GET", "/mcp") => {
+            assert!(state.legacy);
+            if !state.post_auth && (auth.is_empty() || (state.expire && auth == "Bearer access-secret-1")) {
+                send(&mut stream,"401 Unauthorized",json!({}),&format!("WWW-Authenticate: Bearer resource_metadata=\"{base}/resource\", scope=\"read\"\r\n"));
+            } else {
+                stream.write_all(b"HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nConnection: close\r\n\r\nevent: endpoint\ndata: /messages\n\n").unwrap();
+                state.stream = Some(stream);
+            }
+        }
         ("GET", "/resource") => {
             let resource = if state.wrong_resource {
                 "https://other.invalid/mcp".into()
@@ -219,7 +233,8 @@ fn handle(mut stream: TcpStream, base: &str, state: &Mutex<State>) {
             assert!(auth.starts_with("Bearer access-secret-"));
             send(&mut stream, "200 OK", json!({}), "");
         }
-        ("POST", "/mcp") => {
+        ("POST", "/mcp" | "/messages") => {
+            assert_eq!(path == "/messages", state.legacy);
             if auth.is_empty()
                 || (state.expire && (auth == "Bearer access-secret-1" || state.refuse_refresh))
             {
@@ -230,7 +245,7 @@ fn handle(mut stream: TcpStream, base: &str, state: &Mutex<State>) {
             let body: Value = serde_json::from_slice(&bytes).unwrap();
             let result = match body["method"].as_str().unwrap() {
                 "initialize" => {
-                    json!({"protocolVersion":"2025-06-18","serverInfo":{"name":"oauth-test","version":"1"},"capabilities":{"tools":{}}})
+                    json!({"protocolVersion":if state.legacy {"2024-11-05"} else {"2025-06-18"},"serverInfo":{"name":"oauth-test","version":"1"},"capabilities":{"tools":{}}})
                 }
                 "notifications/initialized" => {
                     send(&mut stream, "202 Accepted", json!({}), "");
@@ -240,12 +255,15 @@ fn handle(mut stream: TcpStream, base: &str, state: &Mutex<State>) {
                 "tools/call" => json!({"content":[{"type":"text","text":"authorized result"}]}),
                 _ => panic!("unexpected RPC"),
             };
-            send(
+            if state.legacy {
+                send(&mut stream, "202 Accepted", json!({}), "");
+                write!(state.stream.as_mut().unwrap(), "event: message\ndata: {}\n\n", json!({"jsonrpc":"2.0","id":body["id"],"result":result})).unwrap();
+            } else { send(
                 &mut stream,
                 "200 OK",
                 json!({"jsonrpc":"2.0","id":body["id"],"result":result}),
                 "",
-            );
+            ); }
         }
         _ => send(&mut stream, "404 Not Found", json!({}), ""),
     }
@@ -274,6 +292,37 @@ fn finish(manager: &ConnectorManager, flow: &Value) -> Value {
         }
         assert!(start.elapsed() < Duration::from_secs(10));
         std::thread::sleep(Duration::from_millis(10));
+    }
+}
+#[test]
+fn legacy_sse_get_and_post_401_discover_authorize_refresh_and_restore() {
+    for post_auth in [false, true] {
+        let server = Server::new();
+        { let mut state = server.state.lock().unwrap(); state.legacy = true; state.post_auth = post_auth; }
+        let root = root();
+        let manager = Arc::new(ConnectorManager::new(root.clone(), root.clone()).unwrap());
+        let flow = manager.begin_connect("legacy-oauth", "Legacy OAuth", server.config(), true).unwrap();
+        assert_eq!(flow["status"], "authorization_required");
+        assert_eq!(server.callback(&flow, true), 200);
+        let status = finish(&manager, &flow);
+        assert_eq!(status["status"], "connected", "{status}");
+        let tools = manager.tools();
+        assert_eq!(tools[0].execute(json!({}), &ToolCtx::detached("legacy-oauth")).unwrap(), "authorized result");
+        server.state.lock().unwrap().expire = true;
+        if post_auth {
+            assert_eq!(tools[0].execute(json!({}), &ToolCtx::detached("refresh-post")).unwrap(), "authorized result");
+        } else {
+            manager.disconnect("legacy-oauth").unwrap();
+            manager.reconnect_with_authorization("legacy-oauth").unwrap();
+        }
+        assert_eq!(server.state.lock().unwrap().refreshes, 1);
+        assert!(!manager.statuses().to_string().contains("secret"));
+        manager.shutdown();
+        let restored = ConnectorManager::new(root.clone(), root.clone()).unwrap();
+        assert_eq!(restored.tools().len(), 1);
+        assert_eq!(restored.tools()[0].execute(json!({}), &ToolCtx::detached("restore")).unwrap(), "authorized result");
+        restored.shutdown();
+        fs::remove_dir_all(root).unwrap();
     }
 }
 #[test]
