@@ -2,6 +2,7 @@
 pub mod account;
 pub mod auth;
 pub mod config;
+pub mod connectors;
 pub mod convert;
 pub mod crawler;
 pub mod db;

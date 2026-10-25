@@ -27,7 +27,20 @@ export interface ExpertInfo {
   missingSkills?: string[];
 }
 
+export interface ConnectorInfo {
+  displayName: Bilingual;
+  displayDescription: Bilingual;
+  examples: { zh: string[]; en: string[] };
+  authTypes: ('none' | 'token' | 'oauth' | 'env')[];
+  tokenFields: { server: string; key: string; label: string; type: string; required: boolean }[];
+  transports: string[];
+  skills: string[];
+  skillCount: number;
+  disabledToolCount: number;
+}
+
 export interface Item {
+  connector?: ConnectorInfo | null;
   id: string;
   expert?: ExpertInfo | null;
   kind: Kind;

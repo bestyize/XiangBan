@@ -34,3 +34,5 @@ export const AUTO_IMPORT: [string, string][] = [['none', '仅进暂存区'], ['d
 export function intervalLabel(minutes: number): string {
   return INTERVALS.find(([m]) => m === minutes)?.[1] ?? `每 ${minutes} 分钟`;
 }
+
+export const CONNECTOR_AUTH: Record<string, string> = { none: "无需认证", token: "令牌认证", oauth: "OAuth（自动发现）", env: "环境 / CLI 认证" };

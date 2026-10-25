@@ -1013,3 +1013,47 @@ async fn skillhub_experts_become_workbuddy_plugins_with_their_skills_packed_insi
     assert_eq!(detail["versions"].as_array().unwrap().len(), 1, "{detail}");
     app.cleanup().await;
 }
+
+#[tokio::test]
+async fn connector_plugins_import_present_validate_and_download() {
+    let app = app!();
+    let make = |version: &str, icon: &str| {
+        let m = json!({"name":"example-connector", "version":version, "keywords":["github"], "extensions":{"ai.workbuddy":{
+            "display":{"name":"示例连接器", "name_en":"Example", "examples_zh":["帮我查看仓库"]},
+            "setup":{"mcpServers":{"a":{"auth":{"type":"token","schema":"./ai.workbuddy/token-schema.json", "headers":{"Authorization":{"field":"KEY"}}}}}},
+            "policy":{"mcpServers":{"a":{"disabledTools":["delete"]}}}
+        }}}).to_string();
+        zip_bytes(&[(".codebuddy-plugin/plugin.json",m.as_bytes()),
+            (".mcp.json",br#"{"mcpServers":{"a":{"type":"sse","url":"https://example.com/sse"}}}"#),
+            ("ai.workbuddy/token-schema.json",br#"{"fields":[{"key":"KEY","type":"password","required":true,"default":"PRIVATE_DEFAULT"}]}"#),
+            ("skills/helper/SKILL.md",b"# helper"),("ai.workbuddy/assets/icon.svg",icon.as_bytes())])
+    };
+    let upload = |bytes: Vec<u8>, status: &str| app.http.post(format!("{}/api/v1/admin/plugins/import",app.base)).bearer_auth(&app.token)
+        .multipart(reqwest::multipart::Form::new().text("status",status.to_string()).part("file", reqwest::multipart::Part::bytes(bytes).file_name("connector.zip"))).send();
+    let svg = "<svg xmlns='http://www.w3.org/2000/svg'><path d='M0 0'/></svg>";
+    let bytes = make("1.0.0",svg);
+    let res = upload(bytes.clone(), "published").await.unwrap();
+    assert_eq!(res.status(),200,"{}",res.text().await.unwrap());
+    let list = app.get("/api/v1/market/connectors").await;
+    let item = list["results"].as_array().unwrap().iter().find(|v| v["slug"]=="example-connector").unwrap();
+    assert_eq!(item["connector"]["authTypes"],json!(["token"]));
+    assert_eq!(item["connector"]["skillCount"],1);
+    assert_eq!(item["category"]["slug"],"dev");
+    assert!(!item.to_string().contains("PRIVATE_DEFAULT"));
+    let icon = app.http.get(format!("{}{}",app.base,item["iconUrl"].as_str().unwrap())).send().await.unwrap();
+    assert_eq!(icon.headers()["content-type"],"image/svg+xml");
+    assert_eq!(icon.headers()["content-security-policy"],"default-src 'none'; style-src 'unsafe-inline'");
+    assert_eq!(icon.headers()["x-content-type-options"],"nosniff");
+    let base = "/api/v1/market/connectors/xiaoban/example-connector";
+    let detail = app.get(base).await;
+    assert_eq!(detail["item"]["connector"],item["connector"]);
+    assert_eq!(detail["item"]["prompts"],json!(["帮我查看仓库"]));
+    let downloaded = app.http.get(format!("{}{base}/versions/1.0.0/download",app.base)).send().await.unwrap().bytes().await.unwrap();
+    assert_eq!(downloaded.as_ref(),bytes.as_slice());
+    assert_eq!(upload(bytes,"published").await.unwrap().status(),200);
+    assert_eq!(upload(make("1.0.0","<svg/>"),"published").await.unwrap().status(),409);
+    assert_eq!(upload(make("2.0.0","<svg onload='evil()'/>"),"published").await.unwrap().status(),400);
+    assert_eq!(upload(make("2.0.0",svg),"published").await.unwrap().status(),200);
+    assert_eq!(app.get(base).await["versions"].as_array().unwrap().len(),2);
+    app.cleanup().await;
+}

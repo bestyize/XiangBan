@@ -84,6 +84,9 @@ pub struct Manifest {
     pub description: String,
     pub author: Option<Value>,
     pub license: Option<String>,
+    pub keywords: Vec<String>,
+    pub homepage: Option<Value>,
+    pub repository: Option<Value>,
     /// 生命周期钩子。只解析不执行。
     pub hooks: Option<Value>,
     pub agents: Vec<String>,

@@ -180,7 +180,7 @@ async function uploadPlugin(event: Event) {
     form.append('lenient', String(lenient));
     const r = await admin.importPlugin(form);
     const warnings = r.issues.filter((i) => !i.error);
-    toast(`${r.created ? '已创建' : '已更新'}专家，版本 ${r.version}${warnings.length ? `；${warnings.length} 条提示：${warnings[0].message}` : ''}`);
+    toast(`${r.created ? '已创建' : '已更新'}插件，版本 ${r.version}${warnings.length ? `；${warnings.length} 条提示：${warnings[0].message}` : ''}`);
     await load();
     await open(r.itemId);
   } catch (e) {
@@ -213,7 +213,7 @@ onMounted(() => { loadCategories(); load(); });
     <div class="page-h">
       <div><h1>内容库</h1><div class="sub">已入库的技能、专家和连接器；前台只展示「已上架」</div></div>
       <div class="row">
-        <button v-if="kind === 'expert'" class="btn" type="button" :disabled="uploading" @click="pluginInput?.click()">{{ uploading ? '上传中…' : '上传专家插件包' }}</button>
+        <button v-if="kind === 'expert' || kind === 'connector'" class="btn" type="button" :disabled="uploading" @click="pluginInput?.click()">{{ uploading ? '上传中…' : '上传插件包' }}</button>
         <input ref="pluginInput" type="file" accept=".zip,application/zip" hidden data-testid="plugin-input" @change="uploadPlugin" />
         <button class="btn btn-primary" type="button" @click="creating = !creating">手动新建</button>
       </div>

@@ -3,6 +3,7 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { ApiError, market } from '@/lib/api';
 import { deepLink, formatCount, formatSize, formatTime, shortHash } from '@/lib/format';
 import { PLURAL } from '@/lib/format';
+import { CONNECTOR_AUTH } from '@/lib/labels';
 import { memberText, VARIANT_LABEL } from '@/lib/tabs';
 import type { ItemDetail, Plural } from '@/lib/types';
 import Avatar from './Avatar.vue';
@@ -144,6 +145,15 @@ const configJson = computed(() => {
               <span v-for="skill in item.metadata.expert.skills ?? []" :key="skill" class="chip">{{ skill.replace('./skills/', '') }}</span>
             </div>
             <p v-if="item.metadata.expert.missingSkills?.length" class="hint">有 {{ item.metadata.expert.missingSkills.length }} 个技能暂时没有带上：{{ item.metadata.expert.missingSkills.join('、') }}</p>
+          </section>
+
+          <section v-if="item.connector">
+            <h2>连接器信息</h2>
+            <p>{{ item.connector.authTypes.map(a => CONNECTOR_AUTH[a]).join(' · ') }}</p>
+            <p>传输：{{ item.connector.transports.join('、') }} · 隐藏 {{ item.connector.disabledToolCount }} 个工具</p>
+            <h3>随包技能 · {{ item.connector.skillCount }} 个</h3>
+            <div class="deps"><span v-for="skill in item.connector.skills" :key="skill" class="chip">{{ skill }}</span></div>
+            <p v-if="!item.connector.skillCount" class="hint">没有随包技能</p>
           </section>
 
           <section v-if="item.prompts.length">
