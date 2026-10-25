@@ -5,6 +5,7 @@ use serde_json::Value;
 mod ask;
 mod search;
 mod subagent;
+mod team;
 mod time;
 mod todo;
 
@@ -19,6 +20,7 @@ pub mod fs;
 pub use ask::{AskUser, Question};
 pub use search::{SearchBackend, SearchHit, WebSearch};
 pub use subagent::Subagent;
+pub use team::{Outbox, Team, TeamMember};
 #[cfg(feature = "shell")]
 pub use shell::Shell;
 #[cfg(feature = "web")]
