@@ -28,12 +28,21 @@ const READER_GRACE: Duration = Duration::from_millis(500);
 const POLL: Duration = Duration::from_millis(20);
 #[cfg(windows)]
 const SHELL_NOTE: &str = "The shell is Windows cmd.exe (`cmd /C`), not bash or sh: use cmd syntax such as `&&`, `if exist`, \
-                          `where`, `dir`, `%VAR%` and `for %i in (a b) do ...`; never bash syntax such as `for x in ...; do`, \
+                          `where`, `dir`, `%VAR%` and `for %i in (a b) do ...`; a call must be ONE line (cmd ignores everything after the first newline, so never send a multi-line `python -c`; write a file and run it); never bash syntax such as `for x in ...; do`, \
                           `command -v`, `ls`, `$(...)` or `$VAR`. Python defaults to UTF-8. For PowerShell UTF-8 files use \
                           `Get-Content -Encoding UTF8`; prefer read_file or Python over findstr to validate UTF-8 documents.";
 #[cfg(not(windows))]
 const SHELL_NOTE: &str = "The shell is /bin/sh.";
 
+
+/// `cmd /C` runs only the first line of a command: everything after the first newline is silently dropped and the call
+/// still reports success, so a multi-line `python -c "…"` looks like it ran. Refuse it, and say what to do instead.
+#[cfg_attr(not(windows), allow(dead_code))]
+fn multi_line_error(command: &str) -> Option<String> {
+    command.trim_end().contains(['\n', '\r']).then(|| {
+        "The command has several lines, but cmd.exe runs only the first one and ignores the rest, so nothing useful would run. Nothing was executed. Write the script to a file with write_file and run that file (for example `python script.py`), or join steps on one line with `&&`.".to_string()
+    })
+}
 
 pub struct Shell {
     spec: ToolSpec,
@@ -195,6 +204,10 @@ impl Tool for Shell {
             return Err(format!("`command` must be 1 to {MAX_COMMAND_CHARS} characters"));
         }
 
+        #[cfg(windows)]
+        if let Some(error) = multi_line_error(command) {
+            return Err(error);
+        }
         let policy = self.sandbox.as_ref().and_then(|hook| hook.policy(ctx.session(), command));
         #[cfg(windows)]
         let mut cmd = {
@@ -260,5 +273,19 @@ impl Tool for Shell {
             Some(status) if status.success() => Ok(if output.is_empty() { "(no output)\n[exit code: 0]".to_string() } else { format!("{output}\n[exit code: 0]") }),
             Some(status) => Err(format!("{output}\n[{}]", describe(status)).trim_start().to_string()),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::multi_line_error;
+
+    #[test]
+    fn a_command_with_a_second_line_is_refused_but_a_trailing_newline_is_fine() {
+        assert!(multi_line_error("python -c \"\nprint(1)\n\"").unwrap().contains("Nothing was executed"));
+        assert!(multi_line_error("dir\r\ndir").is_some());
+        assert!(multi_line_error("python script.py").is_none());
+        assert!(multi_line_error("python script.py\n").is_none());
+        assert!(multi_line_error("a && b").is_none());
     }
 }

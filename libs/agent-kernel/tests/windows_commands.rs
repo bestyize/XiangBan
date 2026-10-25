@@ -72,3 +72,19 @@ fn explicit_host_encoding_settings_override_the_defaults() {
     assert!(!result.is_error, "{}", result.output);
     assert!(result.output.contains("0 ascii"), "{}", result.output);
 }
+
+/// cmd.exe runs only a command's first line and still reports success; the tool must refuse such a command instead.
+#[test]
+fn a_multi_line_command_is_refused_and_nothing_runs() {
+    let root = std::env::temp_dir().join(format!("agent-multiline-{}", std::process::id()));
+    fs::create_dir_all(&root).unwrap();
+    let marker = root.join("ran.txt");
+    let shell = Shell::new(&root);
+    let command = format!("echo first > first.txt\necho second > \"{}\"", marker.display());
+    let error = shell.execute(json!({ "command": command }), &ToolCtx::detached("s")).unwrap_err();
+    assert!(error.contains("Nothing was executed") && error.contains("write_file"), "{error}");
+    assert!(!root.join("first.txt").exists() && !marker.exists(), "not even the first line ran");
+    let ok = shell.execute(json!({ "command": "echo done" }), &ToolCtx::detached("s")).unwrap();
+    assert!(ok.contains("done"), "{ok}");
+    let _ = fs::remove_dir_all(&root);
+}

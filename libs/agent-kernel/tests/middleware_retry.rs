@@ -159,3 +159,53 @@ fn cancel_interrupts_retry_backoff() {
     assert_eq!(result.unwrap_err(), HarnessError::Cancelled);
     assert!(started.elapsed() < Duration::from_secs(5));
 }
+
+/// A model that thinks aloud and then goes quiet: the first call streams some reasoning and stalls, the next answers.
+struct StallsAfterThinking {
+    calls: std::sync::atomic::AtomicUsize,
+    stall_after_text: bool,
+}
+
+impl ModelProvider for StallsAfterThinking {
+    fn chat(&self, request: &ChatRequest, on_text: &mut dyn FnMut(&str), cancel: &AtomicBool) -> Result<Reply, HarnessError> {
+        self.chat_with_reasoning(request, on_text, &mut |_, _| {}, cancel)
+    }
+
+    fn chat_with_reasoning(
+        &self, _request: &ChatRequest, on_text: &mut dyn FnMut(&str), on_reasoning: &mut dyn FnMut(ReasoningKind, &str), _cancel: &AtomicBool,
+    ) -> Result<Reply, HarnessError> {
+        if self.calls.fetch_add(1, std::sync::atomic::Ordering::SeqCst) == 0 {
+            on_reasoning(ReasoningKind::Summary, "先想想怎么写脚本");
+            if self.stall_after_text {
+                on_text("部分回答");
+            }
+            return Err(HarnessError::provider("HTTP transport timed out", true));
+        }
+        on_text("写好了");
+        Ok(Reply { message: Message::assistant("写好了", vec![]), usage: None, finish: FinishReason::Stop })
+    }
+}
+
+#[test]
+fn a_stall_after_reasoning_but_before_any_text_is_retried_and_only_the_successful_attempt_is_kept() {
+    let provider = Arc::new(StallsAfterThinking { calls: Default::default(), stall_after_text: false });
+    let store = Arc::new(MemoryStore::new());
+    let agent = Agent::builder(provider.clone(), store.clone()).retry(fast_retry()).build().unwrap();
+    let (result, events) = run(&agent, "hi");
+    assert_eq!(result.unwrap().text, "写好了");
+    assert_eq!(provider.calls.load(std::sync::atomic::Ordering::SeqCst), 2);
+    assert!(events.iter().any(|e| matches!(e, Event::Retrying { attempt: 1, .. })), "the page is told, so it can drop the reasoning shown");
+    let saved = store.load("s1").unwrap();
+    let answer = saved.last().unwrap();
+    assert_eq!(answer.text(), "写好了");
+    assert!(answer.reasoning.is_empty(), "the failed attempt's reasoning is not stored: {:?}", answer.reasoning);
+}
+
+#[test]
+fn a_stall_after_answer_text_is_still_never_replayed() {
+    let provider = Arc::new(StallsAfterThinking { calls: Default::default(), stall_after_text: true });
+    let agent = Agent::builder(provider.clone(), Arc::new(MemoryStore::new())).retry(fast_retry()).build().unwrap();
+    let (result, _) = run(&agent, "hi");
+    assert!(result.is_err());
+    assert_eq!(provider.calls.load(std::sync::atomic::Ordering::SeqCst), 1);
+}

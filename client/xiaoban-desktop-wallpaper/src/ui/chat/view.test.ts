@@ -143,6 +143,18 @@ describe('events while an answer is running', () => {
     expect(view.status).toBe('');
   });
 
+  it('drops the reasoning of an attempt that stalled when the retry starts, and keeps earlier steps', () => {
+    const view = newView('s1', true);
+    applyEvent(view, { type: 'tool_start', id: 't1', name: 'shell', arguments: '{}' });
+    applyEvent(view, { type: 'tool_end', id: 't1', output: 'ok', is_error: false });
+    applyEvent(view, { type: 'reasoning_delta', kind: 'summary', text: '先想想怎么写脚本' });
+    expect(view.items.map(i => i.kind)).toEqual(['tool', 'reasoning']);
+    applyEvent(view, { type: 'retrying', attempt: 1, delay_ms: 500, message: 'HTTP transport timed out' });
+    expect(view.items.map(i => i.kind)).toEqual(['tool']);
+    applyEvent(view, { type: 'reasoning_delta', kind: 'summary', text: '重新来' });
+    expect(view.items.map(i => i.kind)).toEqual(['tool', 'reasoning']);
+  });
+
   it('ends cleanly on done, cancel and error, dropping any open questions and showing the outcome', () => {
     for (const [event, tone, text] of [
       [{ type: 'done' }, undefined, undefined],

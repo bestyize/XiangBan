@@ -382,7 +382,8 @@ impl Agent {
         Err(HarnessError::MaxTurns(self.max_turns.unwrap_or(usize::MAX)))
     }
 
-    /// Retries only when nothing was streamed yet, so the UI never sees a half answer replayed.
+    /// Retries only while no answer text has been streamed: reasoning shown so far is dropped by the page on `Retrying`,
+    /// but a half answer is never replayed.
     fn chat_with_retry(
         &self,
         session: &str,
@@ -403,6 +404,7 @@ impl Agent {
         if let Some(budget) = *recovered_budget { reduce(request, budget)?; }
         loop {
             let streamed_flag = std::cell::Cell::new(false);
+            let text_flag = std::cell::Cell::new(false);
             let mut visible_reasoning: Vec<crate::ReasoningSegment> = Vec::new();
             let mut visible_text = String::new();
             // Both provider callbacks share one observer without aliasing two &mut borrows.
@@ -414,11 +416,12 @@ impl Agent {
                         if text.is_empty() { return; }
                         visible_text.push_str(text);
                         streamed_flag.set(true);
+                        text_flag.set(true);
                         (*sink.borrow_mut())(Event::TextDelta { text: text.to_string() });
                     },
                     &mut |kind, text| {
                         if text.is_empty() { return; }
-                        streamed_flag.set(true); // Do not replay a partially displayed reasoning stream.
+                        streamed_flag.set(true); // Persisted as interrupted if the call fails for good; a retry before any text discards it.
                         if let Some(last) = visible_reasoning.last_mut().filter(|part| part.kind == kind) {
                             last.text.push_str(text);
                         } else {
@@ -446,7 +449,10 @@ impl Agent {
                     return Err(HarnessError::provider("context_length_exceeded: 缩减旧内容后仍超过模型窗口，请调低上下文上限或手动压缩会话后继续。", false));
                 }
                 Err(HarnessError::Provider { message, retryable: true })
-                    if !streamed && attempt < self.retry.max_retries =>
+                    // Reasoning shown so far is thrown away with the failed attempt (the page drops it on `Retrying`), so a stall
+                    // before any answer text is as safe to retry as a failure before anything arrived. Text, and with it any
+                    // call the model had started, is never replayed.
+                    if !text_flag.get() && attempt < self.retry.max_retries =>
                 {
                     attempt += 1;
                     let delay = backoff(&self.retry, attempt);

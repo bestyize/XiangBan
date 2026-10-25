@@ -150,17 +150,19 @@ impl Market {
     /// The version manifest the market lists for one version, checked against what was asked for.
     fn version_manifest(&self, p: &Package) -> Result<(&'static str, Value), String> {
         let kind = plural(&p.kind)?;
-        if kind == "connectors" { return Err("连接器不是安装包".into()); }
         check_coordinate(&p.namespace, &p.slug)?;
         if !valid_version(&p.version) { return Err("无效的版本号".into()); }
         let manifest = self.get_json(&format!("/{kind}/{}/{}/versions/{}", p.namespace, p.slug, p.version), &[])?;
         if manifest["namespace"] != p.namespace.as_str() || manifest["slug"] != p.slug.as_str() || manifest["version"] != p.version.as_str() {
             return Err("小伴市场返回的版本与请求不一致".into());
         }
+        if kind == "connectors" && !has_plugin_manifest(&manifest) {
+            return Err("此连接器没有可安装的插件包，请使用连接配置".into());
+        }
         Ok((kind, manifest))
     }
 
-    /// Experts are WorkBuddy plugins (a persona, optional bundled skills); skills and older experts are `SKILL.md` packages.
+    /// Connectors and newer experts are WorkBuddy plugins; skills and older experts are `SKILL.md` packages.
     pub fn is_plugin(&self, p: &Package) -> Result<bool, String> {
         Ok(has_plugin_manifest(&self.version_manifest(p)?.1))
     }
@@ -176,6 +178,9 @@ impl Market {
             }
         }
         let pkg = plugin::inspect_zip(&archive)?;
+        if kind == "connectors" && pkg.kind != plugin::Kind::Connector {
+            return Err("下载的包不是连接器插件，已拒绝".into());
+        }
         let declared = manifest["manifestSha256"].as_str().unwrap_or("").to_ascii_lowercase();
         if pkg.manifest_sha256 != declared {
             return Err("清单摘要与小伴市场记录不一致，已拒绝".into());
@@ -191,7 +196,7 @@ impl Market {
         Ok(pkg)
     }
 
-    /// The review of a plugin expert: the persona, the skills it carries, scripts to read before trusting it.
+    /// Plugin review: MCP servers, persona, bundled skills and scripts to read before trusting it.
     fn inspect_plugin(&self, p: &Package, kind: &str, manifest: &Value) -> Result<Value, String> {
         let pkg = self.fetch_plugin(p, kind, manifest)?;
         let docs = pkg.agent_docs();
@@ -587,6 +592,18 @@ mod tests {
         (json!({"kind": "expert", "namespace": "acme", "slug": "accounting-supervisor", "name": "AI 会计主管", "summary": "会计核算", "version": "1.0.0",
             "manifestSha256": format!("{:x}", hash.finalize()), "packageSha256": format!("{:x}", Sha256::digest(&zip)), "size": zip.len(), "files": sorted}), zip)
     }
+    fn connector_doc() -> (Value, Vec<u8>) {
+        let manifest = br#"{"name":"demo-connector","version":"1.0.0","description":"Demo connector"}"#;
+        let mcp = br#"{"mcpServers":{"legacy":{"type":"sse","url":"https://example.com/sse","headers":{"Authorization":"Bearer ${TOKEN}"}},"http":{"type":"streamable-http","url":"https://example.com/mcp"},"local":{"command":"npx","args":["-y","demo-mcp"],"env":{"TOKEN":"${TOKEN}"}}}}"#;
+        let files = [(".workbuddy-plugin/plugin.json", &manifest[..]), ("mcp.json", &mcp[..])];
+        let zip = zip_of(&files);
+        let mut sorted = manifest_of(&files);
+        sorted.sort_by(|a, b| a["path"].as_str().cmp(&b["path"].as_str()));
+        let mut hash = Sha256::new();
+        for f in &sorted { hash.update(format!("{}  {}\n", f["sha256"].as_str().unwrap(), f["path"].as_str().unwrap()).as_bytes()); }
+        (json!({"kind": "connector", "namespace": "acme", "slug": "demo-connector", "version": "1.0.0",
+            "manifestSha256": format!("{:x}", hash.finalize()), "packageSha256": format!("{:x}", Sha256::digest(&zip)), "files": sorted}), zip)
+    }
     fn route(path: &str, request: &str, tamper: bool) -> (u16, &'static str, Vec<u8>) {
         let json_ok = |v: Value| (200, "application/json", v.to_string().into_bytes());
         match path {
@@ -608,6 +625,15 @@ mod tests {
                 "metadata": {"expert": {"avatarUrl": "/api/v1/market/assets/abc", "members": [{"avatarUrl": "https://example.com/a.png"}]}}}, "members": []})),
             "/api/v1/market/experts/acme/accounting-supervisor/versions/1.0.0" => json_ok(plugin_doc().0),
             "/api/v1/market/experts/acme/accounting-supervisor/versions/1.0.0/download" => (200, "application/zip", plugin_doc().1),
+            "/api/v1/market/connectors/acme/demo-connector/versions/1.0.0" => json_ok(connector_doc().0),
+            "/api/v1/market/connectors/acme/demo-connector/versions/1.0.0/download" => {
+                let (_, mut zip) = connector_doc();
+                if tamper { let n = zip.len(); zip[n / 2] ^= 0xff; }
+                (200, "application/zip", zip)
+            }
+            "/api/v1/market/connectors/acme/config-only/versions/1.0.0" => json_ok(version_doc("config-only", "a").0),
+            "/api/v1/market/connectors/acme/accounting-supervisor/versions/1.0.0" => json_ok(plugin_doc().0),
+            "/api/v1/market/connectors/acme/accounting-supervisor/versions/1.0.0/download" => (200, "application/zip", plugin_doc().1),
             "/api/v1/market/experts/acme/team-a" => json_ok(json!({"item": {"name": "小组", "variant": "team", "version": "1.0.0"},
                 "members": [{"namespace": "acme", "slug": "member-one", "version": "1.0.0"}, {"namespace": "acme", "slug": "member-two", "version": "1.0.0"}]})),
             p if p.starts_with("/api/v1/market/experts/acme/member-") && p.ends_with("/versions/1.0.0") => {
@@ -636,6 +662,44 @@ mod tests {
     fn skill(slug: &str) -> Package { Package { kind: "skills".into(), namespace: "acme".into(), slug: slug.into(), version: "1.0.0".into() } }
 
     fn expert(slug: &str) -> Package { Package { kind: "experts".into(), namespace: "acme".into(), slug: slug.into(), version: "1.0.0".into() } }
+
+    fn connector(slug: &str) -> Package { Package { kind: "connectors".into(), namespace: "acme".into(), slug: slug.into(), version: "1.0.0".into() } }
+
+    #[test]
+    fn a_market_connector_is_reviewed_and_installed_with_its_pinned_digest() {
+        let fx = serve();
+        let market = Market::new(&fx.origin).unwrap();
+        let p = connector("demo-connector");
+        assert!(market.is_plugin(&p).unwrap());
+        let review = market.inspect(&p).unwrap();
+        assert_eq!(review["pluginKind"], "connector");
+        assert_eq!(review["manifest"]["connectorCount"], 3);
+        let servers = review["manifest"]["servers"].as_array().unwrap();
+        assert!(servers.iter().any(|s| s["transport"] == "sse" && s["headerKeys"][0] == "Authorization"));
+        assert!(servers.iter().any(|s| s["transport"] == "stdio" && s["envKeys"][0] == "TOKEN"));
+        assert!(!review["manifest"]["servers"].to_string().contains("${TOKEN}"));
+        let (plugins, backups) = (temp("connector-plugins"), temp("connector-backups"));
+        let sha = review["sha256"].as_str().unwrap();
+        assert!(market.install_plugin(&plugins, &backups, &p, &"0".repeat(64)).unwrap_err().contains("不一致"));
+        assert!(plugin::installed(&plugins).is_empty());
+        let receipt = market.install_plugin(&plugins, &backups, &p, sha).unwrap();
+        assert_eq!(receipt["kind"], "connector");
+        assert_eq!(receipt["source"]["kind"], "connector");
+        assert!(plugins.join("demo-connector/mcp.json").is_file());
+        assert_eq!(installed_plugin_packages(&plugins)[0]["kind"], "connector");
+        *fx.tamper.lock().unwrap() = true;
+        assert!(market.inspect(&p).unwrap_err().contains("不一致"));
+        assert!(market.install_plugin(&plugins, &backups, &p, sha).unwrap_err().contains("不一致"));
+        for dir in [plugins, backups] { let _ = fs::remove_dir_all(dir); }
+    }
+
+    #[test]
+    fn connector_coordinates_cannot_install_config_only_or_expert_packages() {
+        let fx = serve();
+        let market = Market::new(&fx.origin).unwrap();
+        assert!(market.inspect(&connector("config-only")).unwrap_err().contains("没有可安装的插件包"));
+        assert!(market.inspect(&connector("accounting-supervisor")).unwrap_err().contains("不是连接器插件"));
+    }
 
     #[test]
     fn a_plugin_expert_is_reviewed_pinned_and_installed_as_a_plugin() {

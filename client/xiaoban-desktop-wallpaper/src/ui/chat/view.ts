@@ -158,6 +158,8 @@ export function applyEvent(view: SessionView, event: KernelEvent): void {
       break;
     }
     case 'retrying':
+      // 重试会重新生成：失败那一次已经流出的思考内容作废，不留在界面上和新的思考重复。
+      while (view.items[view.items.length - 1]?.kind === 'reasoning' && (view.items[view.items.length - 1] as { streaming?: boolean }).streaming) view.items.pop();
       view.status = `连接不太稳，正在第 ${event.attempt} 次重试…`;
       break;
     case 'truncated':

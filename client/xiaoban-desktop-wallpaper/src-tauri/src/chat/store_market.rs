@@ -81,7 +81,7 @@ pub async fn ai_market_install(app: tauri::AppHandle, window: tauri::WebviewWind
     tauri::async_runtime::spawn_blocking(move || {
         let _guard = store::MUTATIONS.lock().map_err(|e| e.to_string())?;
         let (market, dirs, pkg) = (market()?, Dirs::of(&app)?, package(kind, namespace, slug, version));
-        // Experts are WorkBuddy plugins; skills and older experts are SKILL.md packages.
+        // Connectors and newer experts are WorkBuddy plugins; skills and older experts are SKILL.md packages.
         if market.is_plugin(&pkg)? {
             market.install_plugin(&dirs.plugins(), &dirs.plugin_backups(), &pkg, &sha256).map(|_| ())
         } else {
