@@ -40,11 +40,18 @@ pub fn invoked(text: &str) -> Vec<String> {
 
 pub struct SkillInvocation {
     skills: Arc<Skills>,
+    /// 输入框里用 `@` 点名的技能（结构化字段，不在消息文本里），和 `/名称` 一样展开。
+    mentioned: Vec<String>,
 }
 
 impl SkillInvocation {
     pub fn new(skills: Arc<Skills>) -> Self {
-        Self { skills }
+        Self { skills, mentioned: Vec::new() }
+    }
+
+    pub fn mentioning(mut self, names: Vec<String>) -> Self {
+        self.mentioned = names;
+        self
     }
 }
 
@@ -53,7 +60,9 @@ impl Middleware for SkillInvocation {
         // Right after the user's own message, so a tool call keeps its result next to it.
         let Some(at) = turn.messages.iter().rposition(|m| m.role == Role::User && !m.synthetic) else { return Ok(()) };
         let text = turn.messages[at].text();
-        let loaded: Vec<(String, String)> = invoked(&text)
+        let mut names = self.mentioned.clone();
+        names.extend(invoked(&text).into_iter().filter(|n| !self.mentioned.contains(n)));
+        let loaded: Vec<(String, String)> = names
             .into_iter()
             .filter_map(|name| self.skills.load_for_user(&name).ok().map(|body| (name, body)))
             .take(MAX_INVOKED)
@@ -64,7 +73,7 @@ impl Middleware for SkillInvocation {
         let mut reminder = String::new();
         for (name, body) in &loaded {
             reminder.push_str(&format!(
-                "用户在这条消息里用 /{name} 调用了技能「{name}」。下面是它的完整说明，请照着完成用户的请求；技能只提供做法，不增加本轮没有的工具、权限或记忆。\n\n{body}\n\n"
+                "用户在这条消息里点名调用了技能「{name}」。下面是它的完整说明，请照着完成用户的请求；技能只提供做法，不增加本轮没有的工具、权限或记忆。\n\n{body}\n\n"
             ));
         }
         turn.messages.insert(at + 1, Message::reminder(reminder.trim_end().to_string()));

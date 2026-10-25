@@ -10,6 +10,7 @@ mod feature_hints;
 mod skill_invocation;
 mod persona;
 mod team;
+mod mentions;
 mod widget_content;
 mod broker;
 mod checkpoints;
@@ -165,6 +166,8 @@ pub struct ChatState {
     /// Actual schemas from the latest registration, keyed by whether native GUI tools are enabled.
     tool_tokens: Mutex<HashMap<bool, usize>>,
     connectors: Mutex<Option<Arc<agent_connector_tools::ConnectorManager>>>,
+    /// What the next message of a conversation `@`-mentioned; taken when its agent is built.
+    mentions: Mutex<HashMap<String, Vec<mentions::Mention>>>,
     /// Background processes (dev servers, long builds), one manager per working folder; kept across answers so a
     /// `keep_alive` process outlives the answer that started it, and switching folders stops nothing.
     processes: Mutex<HashMap<PathBuf, Arc<ProcessManager>>>,
@@ -198,6 +201,7 @@ impl ChatState {
             auto_compact: compact::AutoCooldown::default(),
             tool_tokens: Mutex::new(HashMap::new()),
             connectors: Mutex::new(None),
+            mentions: Mutex::new(HashMap::new()),
             processes: Mutex::new(HashMap::new()),
             computer_use: Mutex::new(None),
         }
@@ -547,10 +551,23 @@ pub fn chat_invocable_skills(app: tauri::AppHandle, window: tauri::WebviewWindow
 }
 
 fn assemble_with_files(parts: Parts<'_>, attachments: Vec<Attachment>) -> Result<Agent, String> {
-    assemble_with_connectors(parts, attachments, Vec::new(), Vec::new())
+    assemble_with_connectors(parts, attachments, Vec::new(), Extras::default())
 }
-/// `connector_tools` are discovered on demand; `team_tools` (the lead of an expert team) are always visible.
-fn assemble_with_connectors(parts: Parts<'_>, attachments: Vec<Attachment>, connector_tools: Vec<Arc<dyn agent_kernel::Tool>>, team_tools: Vec<Arc<dyn agent_kernel::Tool>>) -> Result<Agent, String> {
+
+/// What one message adds to the agent beyond the common parts.
+#[derive(Default)]
+struct Extras {
+    /// The lead of an expert team: always visible tools.
+    team_tools: Vec<Arc<dyn agent_kernel::Tool>>,
+    /// What the message `@`-mentioned.
+    mentions: Vec<mentions::Mention>,
+    /// Current connector statuses, noted in every request.
+    connector_status: Option<Arc<dyn Fn() -> Value + Send + Sync>>,
+}
+
+/// `connector_tools` are discovered on demand.
+fn assemble_with_connectors(parts: Parts<'_>, attachments: Vec<Attachment>, connector_tools: Vec<Arc<dyn agent_kernel::Tool>>, extras: Extras) -> Result<Agent, String> {
+    let Extras { team_tools, mentions, connector_status } = extras;
     let Parts { provider, dirs, workspace, permission, todo, ask, desktop, utc_offset_minutes, open_computer_use, spawn_computer_use, budget, processes, mid_run, research_events } = parts;
     for dir in [dirs.sessions(), dirs.spill(), dirs.memory(), dirs.skills()] {
         fs::create_dir_all(&dir).map_err(|e| format!("无法创建 {}：{e}", dir.display()))?;
@@ -616,11 +633,16 @@ fn assemble_with_connectors(parts: Parts<'_>, attachments: Vec<Attachment>, conn
     if let Some(mid_run) = mid_run {
         builder = builder.middleware(mid_run);
     }
+    // 连接器状态和 `@` 点名的连接器：加在用户这条消息后面，只进这一次请求。
+    if connector_status.is_some() || mentions.iter().any(|m| m.kind == "connector") {
+        let statuses = connector_status.unwrap_or_else(|| Arc::new(|| json!([])));
+        builder = builder.middleware(mentions::ConnectorContext::new(statuses, &mentions));
+    }
     builder = builder
         // Facts about the app's own features that match the request, before trimming so their size is counted.
         .middleware(feature_hints::FeatureHints)
         // `/技能名`：把用户点名的技能说明放到这条请求后面。
-        .middleware(skill_invocation::SkillInvocation::new(skills.clone()))
+        .middleware(skill_invocation::SkillInvocation::new(skills.clone()).mentioning(mentions::skill_names(&mentions)))
         .middleware(ContextTrim::new(budget.context_limit).reserve_output(budget.trim_headroom))
         .middleware(ContinueGuard::new())
         // Bounded transient-error recovery; cancellation and the shared run budget still apply.
@@ -802,6 +824,11 @@ fn build_agent(app: &tauri::AppHandle, config: &AiConfig, key_source: Option<Key
         Some(setup) => team::tools(app, setup, provider.clone(), workspace.to_path_buf(), config.token_budget(), Some(research_events.clone()))?,
         None => Vec::new(),
     };
+    let statuses: Arc<dyn Fn() -> Value + Send + Sync> = {
+        let connectors = connectors.clone();
+        Arc::new(move || connectors.statuses())
+    };
+    let mentions = lock(&state.mentions).remove(session).unwrap_or_default();
     let mut agent = assemble_with_connectors(Parts {
         provider,
         dirs: &Dirs::of(app)?,
@@ -817,7 +844,7 @@ fn build_agent(app: &tauri::AppHandle, config: &AiConfig, key_source: Option<Key
         processes: Some(process_manager(app, workspace)?),
         mid_run: Some(mid_run),
         research_events: Some(research_events),
-    }, attachments, connector_tools, team_tools)?;
+    }, attachments, connector_tools, Extras { team_tools, mentions, connector_status: Some(statuses) })?;
     // 对话绑定了专家：把它的人设放进每次请求，并按它的 `maxTurns` 收紧轮数上限。
     if let Some(expert) = expert {
         if let Some(persona) = persona::load(&Dirs::of(app)?.plugins(), &expert) {
@@ -1047,7 +1074,7 @@ fn bind_expert(plugins: &Path, pick: &ExpertPick) -> Result<sessions::ExpertBind
 }
 
 #[tauri::command]
-pub fn chat_send(app: tauri::AppHandle, window: tauri::WebviewWindow, session_id: String, text: String, images: Option<Vec<String>>, retry: Option<bool>, attachments: Option<Vec<AttachmentInput>>) -> Result<SessionSummary, String> {
+pub fn chat_send(app: tauri::AppHandle, window: tauri::WebviewWindow, session_id: String, text: String, images: Option<Vec<String>>, retry: Option<bool>, attachments: Option<Vec<AttachmentInput>>, mentions: Option<Vec<mentions::Mention>>) -> Result<SessionSummary, String> {
     chat_window(&window)?;
     // The existing Continue button must resume the saved goal and its cumulative
     // budget, rather than silently starting a fresh ordinary-chat budget.
@@ -1059,6 +1086,12 @@ pub fn chat_send(app: tauri::AppHandle, window: tauri::WebviewWindow, session_id
                 return mutate(&app, |index| index.get(&session_id).cloned())?.ok_or("会话不存在".into());
             }
         }
+    }
+    // 点名只对这一条消息有效；先放好，构建 agent 时取走。
+    let mentions: Vec<mentions::Mention> = mentions.unwrap_or_default().into_iter().take(mentions::MAX_MENTIONS).collect();
+    if sessions::valid_id(&session_id) {
+        let state = app.state::<ChatState>();
+        if mentions.is_empty() { lock(&state.mentions).remove(&session_id); } else { lock(&state.mentions).insert(session_id.clone(), mentions); }
     }
     send(app, session_id, text, images, retry, attachments)
 }
