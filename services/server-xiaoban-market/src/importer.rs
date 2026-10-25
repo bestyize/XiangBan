@@ -52,6 +52,7 @@ async fn import_inner(state: &AppState, id: Uuid, opts: &ImportOpts) -> Result<U
     let mut metadata = n.metadata.clone();
     let mut latest_version = n.version.clone();
     let mut package_row = None;
+    let origin = source.config["origin"].as_str().map(str::to_string).unwrap_or_else(|| source.key.clone());
     match enrichment {
         Enrichment::Package { version, changelog, bytes } => {
             let bytes = package::prepare_package(&bytes, &n.slug).map_err(|e| AppError::BadRequest(format!("安装包未通过校验：{e}")))?;
@@ -67,8 +68,26 @@ async fn import_inner(state: &AppState, id: Uuid, opts: &ImportOpts) -> Result<U
             package_row = Some((version, changelog, bytes.len() as i64, sha, info));
         }
         Enrichment::Expert { content, dependencies } => {
+            // 专家按技能的方式安装：正文打成只含 SKILL.md 的包，依赖清单留在元数据里。
+            let bytes = package::expert_package(&content, &n.slug).map_err(|e| AppError::BadRequest(format!("安装包未通过校验：{e}")))?;
+            let info = package::inspect_zip(&bytes).map_err(|e| AppError::BadRequest(format!("安装包未通过校验：{e}")))?;
+            let sha = package::sha256_hex(&bytes);
+            let declared = package::expert_version(&info.skill_md, &sha, None);
+            let stored: Option<String> = sqlx::query_scalar(
+                "SELECT v.package_sha256 FROM versions v JOIN items i ON i.id = v.item_id WHERE i.kind = $1 AND i.origin = $2 AND i.origin_ref = $3 AND v.version = $4",
+            )
+            .bind(&n.kind)
+            .bind(&origin)
+            .bind(&n.upstream_id)
+            .bind(&declared)
+            .fetch_optional(pool)
+            .await?;
+            let version = package::expert_version(&info.skill_md, &sha, stored.as_deref());
+            storage::store_package(&state.config.data_dir, &sha, &bytes).await.map_err(|e| AppError::Internal(format!("保存安装包失败：{e}")))?;
+            latest_version = Some(version.clone());
             description = content;
             metadata["dependencies"] = dependencies;
+            package_row = Some((version, String::new(), bytes.len() as i64, sha, info));
         }
         Enrichment::Connector { readme, configs } => {
             description = readme;
@@ -82,7 +101,6 @@ async fn import_inner(state: &AppState, id: Uuid, opts: &ImportOpts) -> Result<U
         Some(cid) => sqlx::query_scalar("SELECT name FROM categories WHERE id = $1").bind(cid).fetch_one(pool).await?,
         None => String::new(),
     };
-    let origin = source.config["origin"].as_str().map(str::to_string).unwrap_or_else(|| source.key.clone());
     let search = items::search_text(&n.name, &n.slug, &n.namespace, &summary, &n.tags, &category_name);
 
     let mut tx = pool.begin().await?;
@@ -226,4 +244,46 @@ pub async fn align_stored_packages(pool: &sqlx::PgPool, data_dir: &std::path::Pa
         fixed += 1;
     }
     Ok(fixed)
+}
+
+/// 给还没有安装包的专家补上包（早先只存了正文和依赖清单，桌面端提示“暂未提供可安装的版本”）。幂等。
+pub async fn backfill_expert_packages(pool: &sqlx::PgPool, data_dir: &std::path::Path) -> Result<usize> {
+    let rows: Vec<(Uuid, String, String)> = sqlx::query_as(
+        "SELECT i.id, i.slug, i.description FROM items i
+         WHERE i.kind = 'expert' AND i.variant = 'single' AND length(trim(i.description)) > 0
+           AND NOT EXISTS (SELECT 1 FROM versions v WHERE v.item_id = i.id)",
+    )
+    .fetch_all(pool)
+    .await?;
+    let mut done = 0;
+    for (id, slug, content) in rows {
+        let built = package::expert_package(&content, &slug).and_then(|bytes| package::inspect_zip(&bytes).map(|info| (bytes, info)));
+        let (bytes, info) = match built {
+            Ok(v) => v,
+            Err(e) => {
+                tracing::warn!("专家 {slug} 无法打成安装包，跳过：{e}");
+                continue;
+            }
+        };
+        let sha = package::sha256_hex(&bytes);
+        let version = package::expert_version(&info.skill_md, &sha, None);
+        storage::store_package(data_dir, &sha, &bytes).await.map_err(|e| AppError::Internal(format!("保存安装包失败：{e}")))?;
+        let mut tx = pool.begin().await?;
+        sqlx::query(
+            "INSERT INTO versions (item_id, version, changelog, manifest, manifest_sha256, package_sha256, package_size)
+             VALUES ($1, $2, '', $3, $4, $5, $6) ON CONFLICT (item_id, version) DO NOTHING",
+        )
+        .bind(id)
+        .bind(&version)
+        .bind(Json(json!({ "files": info.files })))
+        .bind(&info.manifest_sha256)
+        .bind(&sha)
+        .bind(bytes.len() as i64)
+        .execute(&mut *tx)
+        .await?;
+        sqlx::query("UPDATE items SET latest_version = $2 WHERE id = $1").bind(id).bind(&version).execute(&mut *tx).await?;
+        tx.commit().await?;
+        done += 1;
+    }
+    Ok(done)
 }

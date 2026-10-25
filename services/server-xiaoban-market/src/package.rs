@@ -164,6 +164,34 @@ pub fn prepare_package(bytes: &[u8], slug: &str) -> Result<Vec<u8>, String> {
     writer.finish().map(Cursor::into_inner).map_err(|e| format!("重新打包失败：{e}"))
 }
 
+/// 把专家的工作流正文打成只含 SKILL.md 的安装包：SkillHub 的专家本身就是一份 meta-skill，
+/// 桌面端按技能的方式安装它（版本、清单、下载一套流程）。头部 name 会对齐 slug。
+pub fn expert_package(content: &str, slug: &str) -> Result<Vec<u8>, String> {
+    let mut writer = zip::ZipWriter::new(Cursor::new(Vec::new()));
+    let opts = zip::write::SimpleFileOptions::default().compression_method(zip::CompressionMethod::Deflated);
+    writer.start_file("SKILL.md", opts).map_err(|e| format!("打包失败：{e}"))?;
+    std::io::Write::write_all(&mut writer, content.as_bytes()).map_err(|e| format!("打包失败：{e}"))?;
+    let raw = writer.finish().map(Cursor::into_inner).map_err(|e| format!("打包失败：{e}"))?;
+    prepare_package(&raw, slug)
+}
+
+/// 专家包的版本号：取 SKILL.md 头部的 `version`（没有或不合法就用 1.0.0）。
+/// 上游改了正文却没改版本号时，加上内容摘要前 8 位作后缀，让客户端能发现更新。
+pub fn expert_version(md: &str, package_sha256: &str, stored_sha256: Option<&str>) -> String {
+    let declared = md
+        .strip_prefix("---\n")
+        .or_else(|| md.strip_prefix("---\r\n"))
+        .and_then(|rest| rest.split("\n---").next())
+        .and_then(|header| header.lines().find_map(|l| l.strip_prefix("version:")))
+        .map(|v| v.trim().trim_matches(|c| c == '"' || c == '\'').to_string())
+        .filter(|v| !v.is_empty() && v.len() <= 30 && v.bytes().all(|b| b.is_ascii_alphanumeric() || matches!(b, b'.' | b'-')));
+    let base = declared.unwrap_or_else(|| "1.0.0".into());
+    match stored_sha256 {
+        Some(stored) if stored != package_sha256 => format!("{base}+{}", &package_sha256[..8]),
+        _ => base,
+    }
+}
+
 pub fn inspect_zip(bytes: &[u8]) -> Result<Inspected, String> {
     if bytes.len() > MAX_ZIP_BYTES {
         return Err("安装包超过 12 MiB".into());
@@ -347,6 +375,30 @@ pub mod tests {
         let bare = build(&[("SKILL.md", b"# no header")]);
         assert_eq!(prepare_package(&bare, "demo").unwrap(), bare);
         assert_eq!(set_frontmatter_name("---\ndescription: d\n---\n", "demo"), None);
+    }
+
+    #[test]
+    fn expert_content_becomes_an_installable_package() {
+        let md = "---\nname: tech-test-automation\ndescription: 自动化测试\nversion: 1.0.0\n---\n# 流程\n";
+        let zip = expert_package(md, "tech-test-automation").unwrap();
+        let info = inspect_zip(&zip).unwrap();
+        assert_eq!(info.files.iter().map(|f| f.path.as_str()).collect::<Vec<_>>(), ["SKILL.md"]);
+        assert_eq!(info.skill_md, md);
+        // 头部 name 与 slug 不一致时对齐；没有头部的正文也能打包。
+        let renamed = inspect_zip(&expert_package(md, "other-slug").unwrap()).unwrap();
+        assert_eq!(frontmatter(&renamed.skill_md).0.as_deref(), Some("other-slug"));
+        assert!(inspect_zip(&expert_package("# 没有头部", "demo").unwrap()).is_ok());
+    }
+
+    #[test]
+    fn expert_versions_follow_the_header_and_change_with_the_content() {
+        let md = "---\nname: x\nversion: 2.1.0\n---\nbody";
+        let sha = "a".repeat(64);
+        assert_eq!(expert_version(md, &sha, None), "2.1.0");
+        assert_eq!(expert_version(md, &sha, Some(&sha)), "2.1.0", "同一内容重复入库不换版本");
+        assert_eq!(expert_version(md, &sha, Some(&"b".repeat(64))), "2.1.0+aaaaaaaa");
+        assert_eq!(expert_version("# 没有头部", &sha, None), "1.0.0");
+        assert_eq!(expert_version("---\nversion: bad version!\n---\n", &sha, None), "1.0.0");
     }
 
     #[test]

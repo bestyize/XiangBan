@@ -39,6 +39,11 @@ pub async fn build_state(config: Config) -> Result<AppState> {
     if let Err(e) = importer::align_stored_packages(&pool, &config.data_dir).await {
         tracing::warn!("整理已入库的技能包失败，稍后重启会再试：{e}");
     }
+    match importer::backfill_expert_packages(&pool, &config.data_dir).await {
+        Ok(0) => {}
+        Ok(n) => tracing::info!("已为 {n} 个专家补上安装包"),
+        Err(e) => tracing::warn!("为专家补安装包失败，稍后重启会再试：{e}"),
+    }
     let (http, objects) = upstream::build_clients().map_err(|e| AppError::Internal(format!("HTTP 客户端初始化失败：{e}")))?;
     let account = config.account_issuer.clone().map(|issuer| Arc::new(account::AccountVerifier::new(issuer, config.account_jwks_url.clone(), config.account_client_id.clone())));
     Ok(AppState { pool, config: Arc::new(config), http, objects, runner: Arc::new(crawler::Runner::new()), account })
