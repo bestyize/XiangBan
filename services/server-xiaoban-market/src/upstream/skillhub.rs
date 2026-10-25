@@ -257,7 +257,8 @@ pub async fn enrich(ctx: &Ctx, source: &SourceRow, n: &Normalized) -> UpstreamRe
             if detail["slug"] != json!(slug) || detail["banned"] == true {
                 return Err(UpstreamError::permanent("连接器不可用"));
             }
-            let raw = send_bytes(get(ctx, source, endpoint(&base, &format!("/api/v1/mcp/servers/{slug}/readme"), &[])?), 512 * 1024).await?;
+            // README 接口会 302 到腾讯 COS 的文件地址，必须走会处理重定向的下载函数。
+            let raw = fetch_object(ctx, endpoint(&base, &format!("/api/v1/mcp/servers/{slug}/readme"), &[])?, api_key(source), 512 * 1024).await?;
             if let Some(expected) = detail["readme"]["sha256"].as_str() {
                 if format!("{:x}", Sha256::digest(&raw)) != expected {
                     return Err(UpstreamError::permanent("MCP README 的 SHA-256 与上游声明不一致"));

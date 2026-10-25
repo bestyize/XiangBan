@@ -747,3 +747,47 @@ async fn expert_teams_and_skill_bundles_reference_published_members() {
     assert_eq!(none["total"], 0);
     app.cleanup().await;
 }
+
+#[tokio::test]
+async fn english_upstream_categories_are_merged_into_the_chinese_ones() {
+    let app = app!();
+    let (prefix, _) = app.admin_url.rsplit_once('/').unwrap();
+    let pool = sqlx::PgPool::connect(&format!("{prefix}/{}", app.db_name)).await.unwrap();
+    // 早先版本按上游原名自动建出的英文分类，各挂一个条目。
+    for (slug, name) in [("content-creation", "content-creation"), ("ai-agent", "ai-agent"), ("my-own", "my-own")] {
+        sqlx::query("INSERT INTO categories (kind, slug, name, sort_order) VALUES ('skill', $1, $2, 1000) ON CONFLICT (kind, slug) DO UPDATE SET name = EXCLUDED.name").bind(slug).bind(name).execute(&pool).await.unwrap();
+        sqlx::query("INSERT INTO items (kind, namespace, slug, name, category_id) VALUES ('skill', 'ns', $1, $1, (SELECT id FROM categories WHERE kind='skill' AND slug=$1))")
+            .bind(slug)
+            .execute(&pool)
+            .await
+            .unwrap();
+    }
+    // 管理员改过名的分类不动。
+    sqlx::query("UPDATE categories SET name = '我的分类' WHERE slug = 'my-own'").execute(&pool).await.unwrap();
+
+    for _ in 0..2 {
+        server_xiaoban_market::items::normalize_categories(&pool).await.unwrap(); // 幂等
+    }
+
+    let count = |slug: &'static str| {
+        let pool = pool.clone();
+        async move {
+            sqlx::query_scalar::<_, i64>("SELECT count(*) FROM items i JOIN categories c ON c.id = i.category_id WHERE c.kind = 'skill' AND c.slug = $1")
+                .bind(slug)
+                .fetch_one(&pool)
+                .await
+                .unwrap()
+        }
+    };
+    assert_eq!(count("content").await, 1, "并入预置的中文分类");
+    let gone: i64 = sqlx::query_scalar("SELECT count(*) FROM categories WHERE slug = 'content-creation'").fetch_one(&pool).await.unwrap();
+    assert_eq!(gone, 0);
+    let name: String = sqlx::query_scalar("SELECT name FROM categories WHERE kind = 'skill' AND slug = 'ai-agent'").fetch_one(&pool).await.unwrap();
+    assert_eq!(name, "AI 智能体", "没有预置对应项的改成中文名");
+    assert_eq!(count("ai-agent").await, 1);
+    assert_eq!(count("my-own").await, 1);
+    let kept: String = sqlx::query_scalar("SELECT name FROM categories WHERE slug = 'my-own'").fetch_one(&pool).await.unwrap();
+    assert_eq!(kept, "我的分类");
+    pool.close().await;
+    app.cleanup().await;
+}

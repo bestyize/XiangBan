@@ -83,6 +83,8 @@ pub async fn seed(pool: &PgPool, config: &Config) -> Result<()> {
         }
     }
 
+    crate::items::normalize_categories(pool).await?;
+
     // 采集来源默认只手动触发：定时间隔为 0，不会在未配置时访问外网。
     let skillhub = json!({ "base_url": "https://api.skillhub.cn", "origin": "skillhub" });
     let modelscope = |page: &str| json!({ "origin": "modelscope", "origin_page": page, "verified": false, "source_label": "community" });
