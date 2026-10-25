@@ -156,7 +156,7 @@ export const admin = {
   ignoreStaged: (ids: string[]) => request<{ updated: number }>('POST', '/admin/staged/ignore', { ...a, body: { ids } }),
   restoreStaged: (ids: string[]) => request<{ updated: number }>('POST', '/admin/staged/restore', { ...a, body: { ids } }),
 
-  items: (q: { kind?: Kind; status?: string; variant?: string; categoryId?: number; keyword?: string; page?: number } = {}) => request<Paged<AdminItem>>('GET', '/admin/items', { ...a, query: q }),
+  items: (q: { kind?: Kind; status?: string; variant?: string; origin?: string; license?: string; categoryId?: number; keyword?: string; page?: number } = {}) => request<Paged<AdminItem>>('GET', '/admin/items', { ...a, query: q }),
   item: (id: string) => request<{ item: AdminItem; versions: AdminVersion[]; members: AdminMember[] }>('GET', `/admin/items/${id}`, a),
   createItem: (body: Record<string, unknown>) => request<{ id: string }>('POST', '/admin/items', { ...a, body }),
   updateItem: (id: string, body: Record<string, unknown>) => request<{ ok: boolean }>('PUT', `/admin/items/${id}`, { ...a, body }),

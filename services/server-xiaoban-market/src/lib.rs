@@ -11,6 +11,7 @@ pub mod experts;
 pub mod handlers;
 pub mod importer;
 pub mod items;
+pub mod marketplace;
 pub mod package;
 pub mod plugin;
 pub mod state;

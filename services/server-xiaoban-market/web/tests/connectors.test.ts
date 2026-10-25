@@ -45,3 +45,25 @@ it('allows uploading a connector plugin from the library', async () => {
   expect(upload.mock.calls[0][0].get('file')).toBe(file);
   w.unmount();
 });
+
+
+it('shows official provenance and unknown license and combines both library filters', async () => {
+  const official = { ...item, origin: 'workbuddy-official', license: 'unknown', status: 'draft', attribution: { author: 'Original author' } };
+  const query = vi.spyOn(admin, 'items').mockResolvedValue({ results: [official], total: 1, page: 1, pageSize: 50 } as unknown as Awaited<ReturnType<typeof admin.items>>);
+  vi.spyOn(admin, 'categories').mockResolvedValue({ results: [] });
+  vi.spyOn(admin, 'item').mockResolvedValue({ item: official, versions: [], members: [] } as unknown as Awaited<ReturnType<typeof admin.item>>);
+  const w = mount(LibraryView);
+  await flushPromises();
+  expect(w.get('table').text()).toContain('WorkBuddy 官方市场');
+  expect(w.get('table').text()).toContain('许可未知');
+  await w.get('select[aria-label="来源"]').setValue('workbuddy-official');
+  await w.get('select[aria-label="许可"]').setValue('unknown');
+  await flushPromises();
+  expect(query).toHaveBeenLastCalledWith(expect.objectContaining({ origin: 'workbuddy-official', license: 'unknown' }));
+  await w.get('tbody tr').trigger('click');
+  await flushPromises();
+  expect(w.get('[data-testid="attribution"]').text()).toContain('Original author');
+  expect(w.text()).toContain('逐个确认来源和许可后上架');
+  expect(w.findAll('button').some(b => /全部发布|全部上架|一键.*发布/.test(b.text()))).toBe(false);
+  w.unmount();
+});

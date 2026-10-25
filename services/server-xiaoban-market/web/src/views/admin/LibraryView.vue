@@ -10,7 +10,7 @@ import StatusBadge from '@/components/StatusBadge.vue';
 
 const KINDS: Kind[] = ['skill', 'expert', 'connector'];
 const kind = ref<Kind>('skill');
-const filter = ref({ status: '', variant: '', categoryId: '' as number | '', keyword: '' });
+const filter = ref({ status: '', variant: '', origin: '', license: '', categoryId: '' as number | '', keyword: '' });
 const page = ref(1);
 const items = ref<AdminItem[]>([]);
 const total = ref(0);
@@ -19,6 +19,15 @@ const categories = ref<AdminCategory[]>([]);
 const current = ref<{ item: AdminItem; versions: AdminVersion[]; members: AdminMember[] } | null>(null);
 const busy = ref(false);
 let kwTimer: ReturnType<typeof setTimeout> | undefined;
+
+function attributionText(value: unknown): string {
+  if (typeof value === 'string') return value || '—';
+  if (value && typeof value === 'object') {
+    const v = value as { name?: unknown; url?: unknown };
+    return attributionText(v.name ?? v.url);
+  }
+  return '—';
+}
 
 interface Form { name: string; summary: string; description: string; categoryId: number | ''; tags: string; license: string; iconUrl: string; source: string; featured: boolean; prompts: string; members: string }
 const form = ref<Form>({ name: '', summary: '', description: '', categoryId: '', tags: '', license: '', iconUrl: '', source: 'official', featured: false, prompts: '', members: '' });
@@ -38,7 +47,7 @@ const variantOptions = computed(() => (kind.value === 'expert' ? [['single', '�
 async function load() {
   loading.value = true;
   try {
-    const r = await admin.items({ kind: kind.value, status: filter.value.status || undefined, variant: filter.value.variant || undefined, categoryId: filter.value.categoryId || undefined, keyword: filter.value.keyword.trim() || undefined, page: page.value });
+    const r = await admin.items({ kind: kind.value, status: filter.value.status || undefined, origin: filter.value.origin || undefined, license: filter.value.license || undefined, variant: filter.value.variant || undefined, categoryId: filter.value.categoryId || undefined, keyword: filter.value.keyword.trim() || undefined, page: page.value });
     items.value = r.results;
     total.value = r.total;
   } catch (e) {
@@ -201,8 +210,8 @@ const statusActions = computed(() => {
   ].filter(Boolean) as { to: string; label: string; disabled?: boolean }[];
 });
 
-watch(kind, () => { page.value = 1; filter.value = { status: '', variant: '', categoryId: '', keyword: '' }; current.value = null; creating.value = false; loadCategories(); load(); });
-watch([() => filter.value.status, () => filter.value.variant, () => filter.value.categoryId], () => { page.value = 1; load(); });
+watch(kind, () => { page.value = 1; filter.value = { status: '', variant: '', origin: '', license: '', categoryId: '', keyword: '' }; current.value = null; creating.value = false; loadCategories(); load(); });
+watch([() => filter.value.status, () => filter.value.variant, () => filter.value.origin, () => filter.value.license, () => filter.value.categoryId], () => { page.value = 1; load(); });
 watch(() => filter.value.keyword, () => { clearTimeout(kwTimer); kwTimer = setTimeout(() => { page.value = 1; load(); }, 300); });
 watch(page, load);
 onMounted(() => { loadCategories(); load(); });
@@ -236,6 +245,8 @@ onMounted(() => { loadCategories(); load(); });
       <select v-model="filter.status" class="select" aria-label="状态"><option value="">全部状态</option><option value="published">已上架</option><option value="draft">草稿</option><option value="review">待审</option><option value="offline">已下架</option></select>
       <select v-if="variantOptions.length > 1" v-model="filter.variant" class="select" aria-label="形态"><option value="">全部形态</option><option v-for="[v, l] in variantOptions" :key="v" :value="v">{{ l }}</option></select>
       <select v-model.number="filter.categoryId" class="select" aria-label="分类"><option value="">全部分类</option><option v-for="c in categories" :key="c.id" :value="c.id">{{ c.name }}</option></select>
+      <select v-model="filter.origin" class="select" aria-label="来源"><option value="">全部来源</option><option v-for="(label, value) in ORIGIN_LABEL" :key="value" :value="value">{{ label }}</option></select>
+      <select v-model="filter.license" class="select" aria-label="许可"><option value="">全部许可</option><option value="unknown">许可未知</option></select>
       <input v-model="filter.keyword" class="input grow" type="search" placeholder="按名称、标识、标签搜索" aria-label="搜索内容库" />
     </div>
 
@@ -245,12 +256,13 @@ onMounted(() => { loadCategories(); load(); });
         <div v-else-if="!items.length" class="empty">这里还没有{{ KIND_NAME[kind] }}。到「暂存区」入库，或手动新建。</div>
         <div v-else class="tbl-wrap">
           <table class="tbl">
-            <thead><tr><th>名称</th><th>状态</th><th>来源</th><th>版本</th><th style="text-align: right">安装</th></tr></thead>
+            <thead><tr><th>名称</th><th>状态</th><th>来源</th><th>许可</th><th>版本</th><th style="text-align: right">安装</th></tr></thead>
             <tbody>
               <tr v-for="it in items" :key="it.id" class="click" :class="{ on: current?.item.id === it.id }" tabindex="0" @click="open(it.id)" @keydown.enter="open(it.id)">
                 <td><div class="nm">{{ it.name }}<span v-if="it.variant !== 'single'" class="vt">{{ VARIANT_LABEL[it.variant] }}</span><span v-if="it.featured" class="star">精选</span></div><div class="sub mono">{{ it.slug }}</div></td>
                 <td><StatusBadge type="item" :value="it.status" /></td>
                 <td class="muted">{{ ORIGIN_LABEL[it.origin] ?? it.origin }}</td>
+                <td class="muted">{{ it.license === 'unknown' ? '许可未知' : (it.license || '—') }}</td>
                 <td class="num muted">{{ it.version ?? '—' }}</td>
                 <td class="num muted" style="text-align: right">{{ formatCount(it.downloads) }}</td>
               </tr>
@@ -270,6 +282,12 @@ onMounted(() => { loadCategories(); load(); });
           </div>
           <div class="sub mono">{{ current.item.namespace }} / {{ current.item.slug }} · {{ ORIGIN_LABEL[current.item.origin] ?? current.item.origin }} · 更新 {{ formatTime(current.item.updatedAt) }}</div>
 
+          <div v-if="current.item.attribution" class="hint" data-testid="attribution">
+            <div>原作者：{{ attributionText(current.item.attribution.author) }}</div>
+            <div>主页：{{ attributionText(current.item.attribution.homepage) }}</div>
+            <div>仓库：{{ attributionText(current.item.attribution.repository) }}</div>
+          </div>
+          <div v-if="current.item.origin === 'workbuddy-official'" class="hint">官方市场导入均为草稿，请逐个确认来源和许可后上架。</div>
           <div class="field"><label for="en">名称</label><input id="en" v-model="form.name" class="input" /></div>
           <div class="field"><label for="es">摘要</label><textarea id="es" v-model="form.summary" class="textarea" rows="2" /></div>
           <div class="row">

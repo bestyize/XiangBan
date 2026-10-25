@@ -24,7 +24,7 @@ export const CHANGE: Record<string, [string, Tone]> = {
   failed: ['入库失败', 'bad'],
 };
 export const SOURCE_LABEL: Record<string, string> = { official: '官方', community: '社区', enterprise: '企业' };
-export const ORIGIN_LABEL: Record<string, string> = { skillhub: 'SkillHub', modelscope: '魔搭', manual: '手动' };
+export const ORIGIN_LABEL: Record<string, string> = { 'workbuddy-official': 'WorkBuddy 官方市场', skillhub: 'SkillHub', modelscope: '魔搭', manual: '手动' };
 export const TRIGGER_LABEL: Record<string, string> = { manual: '手动', schedule: '定时' };
 export const INTERVALS: [number, string][] = [
   [0, '仅手动'], [60, '每 1 小时'], [180, '每 3 小时'], [360, '每 6 小时'], [720, '每 12 小时'], [1440, '每天'], [10080, '每周'],

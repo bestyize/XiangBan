@@ -240,6 +240,7 @@ export interface AdminItem {
   status: ItemStatus;
   source: SourceLabel;
   origin: string;
+  attribution?: { author?: unknown; homepage?: unknown; repository?: unknown };
   variant: 'single' | 'team' | 'bundle';
   featured: boolean;
   version: string | null;

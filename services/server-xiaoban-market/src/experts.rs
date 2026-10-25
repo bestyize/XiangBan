@@ -21,6 +21,9 @@ pub struct ImportOpts {
     pub source: Option<String>,
     /// 导入别处发布的插件时用宽松模式：展示规范（3 个标签、3 条提问、字数）只给警告。
     pub lenient: bool,
+    pub origin: Option<String>,
+    pub attribution: Value,
+    pub license: Option<String>,
 }
 
 #[derive(Debug)]
@@ -28,6 +31,7 @@ pub struct Report {
     pub item_id: Uuid,
     pub version: String,
     pub created: bool,
+    pub skipped: bool,
     pub issues: Vec<Issue>,
 }
 
@@ -167,17 +171,21 @@ pub async fn import_plugin(state: &AppState, bytes: &[u8], opts: &ImportOpts) ->
     );
     let variant = if kind == "expert" && m.expert_type == "team" { "team" } else { "single" };
     let source = opts.source.clone().unwrap_or_else(|| "community".into());
-    let status = opts.status.clone();
+    // Official marketplace imports always require individual review, including reimports.
+    let status = if opts.origin.as_deref() == Some("workbuddy-official") { Some("draft".into()) } else { opts.status.clone() };
+    let (license, attribution) = crate::marketplace::provenance(m, &opts.attribution, opts.license.as_deref());
+    let mut metadata = if kind == "connector" { json!({ "connector": display }) } else { json!({ "expert": display, "members": [] }) };
+    metadata["attribution"] = attribution;
 
     let mut tx = state.pool.begin().await?;
     let (item_id, inserted): (Uuid, bool) = sqlx::query_as(
         "INSERT INTO items (kind, namespace, slug, name, summary, description, category_id, tags, icon_url, source, origin, license,
            status, latest_version, metadata, prompts, search_text, variant, published_at)
-         VALUES ($17, $1, $2, $3, $4, $5, $6, $7, $8, $9, 'upload', $10, COALESCE($11, 'draft'), $12, $13, $14, $15, $16,
+         VALUES ($17, $1, $2, $3, $4, $5, $6, $7, $8, $9, COALESCE($18, 'upload'), $10, COALESCE($11, 'draft'), $12, $13, $14, $15, $16,
            CASE WHEN $11 = 'published' THEN now() END)
          ON CONFLICT (kind, namespace, slug) DO UPDATE SET
            name = EXCLUDED.name, summary = EXCLUDED.summary, description = EXCLUDED.description, category_id = EXCLUDED.category_id,
-           tags = EXCLUDED.tags, icon_url = EXCLUDED.icon_url, license = EXCLUDED.license, metadata = EXCLUDED.metadata,
+           tags = EXCLUDED.tags, icon_url = EXCLUDED.icon_url, origin = COALESCE($18, items.origin), license = EXCLUDED.license, metadata = EXCLUDED.metadata,
            prompts = EXCLUDED.prompts, search_text = EXCLUDED.search_text, variant = EXCLUDED.variant, updated_at = now(),
            status = COALESCE($11, items.status),
            published_at = CASE WHEN COALESCE($11, items.status) = 'published' THEN COALESCE(items.published_at, now()) ELSE items.published_at END
@@ -192,14 +200,15 @@ pub async fn import_plugin(state: &AppState, bytes: &[u8], opts: &ImportOpts) ->
     .bind(&tags)
     .bind(&avatar_url)
     .bind(&source)
-    .bind(&m.license)
+    .bind(&license)
     .bind(&status)
     .bind(&version)
-    .bind(Json(if kind == "connector" { json!({ "connector": display }) } else { json!({ "expert": display, "members": [] }) }))
+    .bind(Json(metadata))
     .bind(Json(json!(prompts)))
     .bind(&search)
     .bind(variant)
     .bind(kind)
+    .bind(&opts.origin)
     .fetch_one(&mut *tx)
     .await?;
 
@@ -209,6 +218,7 @@ pub async fn import_plugin(state: &AppState, bytes: &[u8], opts: &ImportOpts) ->
         .bind(&version)
         .fetch_optional(&mut *tx)
         .await?;
+    let skipped = existing.as_deref() == Some(&sha);
     match existing {
         Some(old) if old != sha => return Err(AppError::Conflict("该版本号已存在且内容不同，请提高版本号后再上传".into())),
         Some(_) => {}
@@ -228,8 +238,11 @@ pub async fn import_plugin(state: &AppState, bytes: &[u8], opts: &ImportOpts) ->
             .await?;
         }
     }
+    if !skipped {
+        sqlx::query("UPDATE items SET latest_version = $2 WHERE id = $1").bind(item_id).bind(&version).execute(&mut *tx).await?;
+    }
     tx.commit().await?;
-    Ok(Report { item_id, version, created: inserted, issues })
+    Ok(Report { item_id, version, created: inserted, skipped, issues })
 }
 
 #[cfg(test)]
