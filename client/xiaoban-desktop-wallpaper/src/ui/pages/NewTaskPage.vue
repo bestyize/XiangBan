@@ -7,7 +7,6 @@ import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { ArrowUpRight } from 'lucide-vue-next';
 import type { ControlStore } from '../control-types.ts';
 import ChatComposer from '../components/ChatComposer.vue';
-import ChatExpertChip from '../components/ChatExpertChip.vue';
 
 const props = defineProps<{ store: ControlStore }>();
 const chat = props.store.chat;
@@ -74,7 +73,6 @@ function openAiSettings() { props.store.openSettings('ai'); }
   <div class="new-task-page" data-testid="new-task-page" data-tauri-drag-region>
     <div class="hero">
       <section v-if="expert" class="expert-intro" data-testid="new-task-expert">
-        <ChatExpertChip :expert="expert" :removable="true" :desktop="store.desktop" @clear="chat.pendingExpert = null" />
         <h1 class="greeting">{{ expert.name }}<small v-if="expert.profession">{{ expert.profession }}</small></h1>
         <p v-if="expert.description" class="expert-desc">{{ expert.description }}</p>
         <div v-if="expert.tags?.length" class="expert-tags"><span v-for="tag in expert.tags" :key="tag">{{ tag }}</span></div>
