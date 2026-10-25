@@ -195,6 +195,7 @@ pub async fn ai_store_uninstall(app: tauri::AppHandle, window: tauri::WebviewWin
         let dirs = Dirs::of(&app)?;
         // A plugin expert is removed as a whole, with the skills it carried.
         if agent_skill_discovery::plugin::read_receipt(&dirs.plugins(), &slug).is_ok() {
+            super::connectors::forget_plugin(&app, &slug);
             return agent_skill_discovery::plugin::remove(&dirs.plugins(), &slug);
         }
         let root = dirs.skills();

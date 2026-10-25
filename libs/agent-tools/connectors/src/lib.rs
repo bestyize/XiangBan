@@ -530,6 +530,19 @@ impl ConnectorManager {
             })
             .collect()
     }
+    /// One connector's tools as the server named them, with its policy applied: for the connector center to show.
+    pub fn tool_list(&self, id: &str) -> Vec<(String, String)> {
+        let state = self.state.lock().unwrap_or_else(|e| e.into_inner());
+        state
+            .active
+            .get(id)
+            .filter(|a| a.client.is_connected())
+            .map(|a| {
+                let prefix = format!("mcp_ext_{}_", id.replace('-', "_"));
+                a.tools(id).iter().map(|t| (t.spec().name.strip_prefix(&prefix).unwrap_or(&t.spec().name).to_string(), t.spec().description.clone())).collect()
+            })
+            .unwrap_or_default()
+    }
     pub fn shutdown(&self) {
         self.shutting_down.store(true, Ordering::SeqCst);
         self.generation.fetch_add(1,Ordering::SeqCst);

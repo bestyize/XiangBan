@@ -10,6 +10,7 @@ mod feature_hints;
 mod skill_invocation;
 mod persona;
 mod team;
+pub mod connectors;
 mod mentions;
 mod widget_content;
 mod broker;

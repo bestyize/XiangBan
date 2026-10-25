@@ -74,6 +74,7 @@ pub async fn ai_plugin_remove(app: tauri::AppHandle, window: tauri::WebviewWindo
     store::control(&window)?;
     tauri::async_runtime::spawn_blocking(move || {
         let _guard = store::MUTATIONS.lock().map_err(|e| e.to_string())?;
+        super::connectors::forget_plugin(&app, &name);
         plugin::remove(&Dirs::of(&app)?.plugins(), &name)
     })
     .await
