@@ -22,8 +22,11 @@ Tauri's **before-dev / before-build** commands run the generator automatically;
 this also updates the Windows NSIS installer icon because
 `tauri.windows.conf.json` references `icons/icon.ico`.
 
-The checked-in `.ico`, `.icns`, `.png`, and `tray.rgba` files are generated
-artifacts, **not** design sources. Re-run the command before any direct Cargo
+The checked-in `.ico`, `.png`, and `tray.rgba` files are generated
+artifacts, **not** design sources. `icon.icns` is generated too but is **not**
+tracked by git (its bytes change on every run); `tauri build`/`tauri dev` and
+`macos-dev-runner.mjs` get it from the before-build/before-dev command, so run
+`node scripts/generate-icon.mjs` first when using it any other way. Re-run the command before any direct Cargo
 build, or use the standard Tauri entry points, so the generated native icons
 cannot remain from an earlier design. Do not edit them independently.
 

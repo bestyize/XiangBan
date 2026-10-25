@@ -32,5 +32,5 @@ test('checked-in native icons are generated from the current source, not left fr
   // The Sparkles mark leaves the left-middle of the rounded square plain theme red.
   const at = (32 * 64 + 6) * 4;
   assert.equal(tray.subarray(at, at + 3).toString('hex').toUpperCase(), red.toUpperCase(),
-    'Run `node scripts/generate-icon.mjs` and commit icon.icns, icon.ico, icon.png and tray.rgba');
+    'Run `node scripts/generate-icon.mjs` and commit icon.ico, icon.png and tray.rgba (icon.icns is untracked)');
 });
