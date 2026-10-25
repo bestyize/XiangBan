@@ -6,6 +6,8 @@ import { invoke, listen, type AiConfigView } from '../../bridge.ts';
 import type { ControlStore } from '../control-types.ts';
 import { type Skill, type SkillPage, type SkillReview } from '../ai-store/catalog.ts';
 import RegistryCatalog from '../ai-store/RegistryCatalog.vue';
+import ConnectorCenter from '../ai-store/ConnectorCenter.vue';
+import LocalPluginInstaller from '../ai-store/LocalPluginInstaller.vue';
 import { hueStyle } from '../ai-store/hues.ts';
 import MarketGroupDialog from '../ai-store/MarketGroupDialog.vue';
 import MarketUpdateDialog, { type InstalledPackage } from '../ai-store/MarketUpdateDialog.vue';
@@ -58,6 +60,14 @@ const localError = ref('');
 const computerEnabled = ref(false);
 const localReady = ref(false);
 const registry = ref<InstanceType<typeof RegistryCatalog> | null>(null);
+const connectorCenter = ref<InstanceType<typeof ConnectorCenter> | null>(null);
+const connectorRevision = ref(0);
+async function localPluginInstalled() {
+  connectorRevision.value++;
+  await refreshLocal();
+  await registry.value?.refresh();
+  props.store.notify('插件包已安装', 'success');
+}
 const skill = ref<Skill | null>(null);
 const computerOpen = ref(false);
 const review = ref<SkillReview | null>(null);
@@ -161,7 +171,7 @@ function scheduleBrowse() {
   }
 }
 function switchTab(value: Tab) { tab.value = value; category.value = '全部'; page.value = 1; installedOnly.value = false; }
-const installedCount = computed(() => packageTab.value ? localForTab.value.length : (registry.value?.installedCount ?? 0));
+const installedCount = computed(() => packageTab.value ? localForTab.value.length : (registry.value?.installedCount ?? 0) + (tab.value === 'connectors' ? connectorCenter.value?.count ?? 0 : 0));
 function pickSource(value: 'market' | 'hub') {
   if (value === 'hub' && !skillhubOn.value) return;
   source.value = value; marketDown.value = false; writePref(MARKET_SOURCE_KEY, value);
@@ -321,6 +331,7 @@ const bytes = (n: number) => n < 1024 ? `${n} B` : `${(n / 1024).toFixed(1)} KB`
           <Search :size="14" aria-hidden="true" /><input v-model="query" maxlength="70" aria-label="搜索专家、技能或连接器" :placeholder="`搜索${tabs.find(t => t.id === tab)?.label}`" />
           <button v-if="query" type="button" class="clear" aria-label="清空搜索" @click="query = ''">×</button>
         </form>
+        <LocalPluginInstaller :desktop="store.desktop" @installed="localPluginInstalled" />
         <button type="button" class="xb-btn installed-filter" :class="{ selected: installedOnly }" :aria-pressed="installedOnly" @click="installedOnly = !installedOnly; category = '全部'">{{ tab === 'connectors' ? '已配置' : '已安装' }}<span class="count">{{ installedCount }}</span><i v-if="packageTab && updatable.length" class="update-dot" role="img" aria-label="有可用更新" /></button>
         <button type="button" class="xb-icon-btn source-settings" aria-label="插件来源设置" @click="settingsOpen = true"><SlidersHorizontal :size="16" /></button>
       </div>
@@ -384,7 +395,8 @@ const bytes = (n: number) => n < 1024 ? `${n} B` : `${(n / 1024).toFixed(1)} KB`
         </div>
         <div v-if="!installedOnly && !error && !loading && store.desktop && (page > 1 || remote.hasMore)" class="store-pagination"><button :disabled="page <= 1" aria-label="上一页" @click="page--"><ChevronLeft :size="16" /></button><span>第 {{ page }} 页</span><button :disabled="!remote.hasMore" aria-label="下一页" @click="page++"><ChevronRight :size="16" /></button></div>
       </template>
-      <RegistryCatalog v-else ref="registry" :kind="tab as 'experts' | 'connectors'" :query="query" :category="category" :store="store" :installed-only="installedOnly" :source="effMarket ? 'market' : 'hub'" @unavailable="onMarketError">
+      <ConnectorCenter v-if="tab === 'connectors'" :key="connectorRevision" ref="connectorCenter" :store="store" :query="query" />
+      <RegistryCatalog v-if="!packageTab" ref="registry" :kind="tab as 'experts' | 'connectors'" :query="query" :category="category" :store="store" :installed-only="installedOnly" :source="effMarket ? 'market' : 'hub'" @unavailable="onMarketError">
         <template v-if="tab === 'connectors' && showComputer" #prefix>
         <article v-if="showComputer" class="xc store-card connector-card" style="--h-hi:#7C8CF8;--h:#4A57D0">
           <div class="xc-top">

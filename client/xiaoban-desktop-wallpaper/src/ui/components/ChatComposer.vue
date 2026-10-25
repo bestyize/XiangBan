@@ -12,6 +12,8 @@ import { GATEWAY_PROVIDER, invoke, type AiConfigView, type AiTier } from '../../
 import type { ControlPage, ControlStore } from '../control-types.ts';
 import ChatWorkbenchTools from './ChatWorkbenchTools.vue';
 import ChatSlashMenu from './ChatSlashMenu.vue';
+import ChatMentionMenu from './ChatMentionMenu.vue';
+import { useComposerMentions, type MentionItem } from '../chat/mentions.ts';
 import ChatExpertChip from './ChatExpertChip.vue';
 import ChatComposerPet from './ChatComposerPet.vue';
 import ChatComposerModel from './ChatComposerModel.vue';
@@ -80,7 +82,7 @@ const attachmentReading = ref(false);
 let attachmentVersion = 0;
 const filePicker = ref<HTMLInputElement | null>(null);
 const MAX_IMAGES = MAX_ATTACHMENTS;
-const canSend = computed(() => chat.configured && !running.value && !compacting.value && !attachmentReading.value && (draft.value.trim() !== '' || attachments.value.length > 0));
+const canSend = computed(() => chat.configured && !running.value && !compacting.value && !attachmentReading.value && !mentions.selecting.value && (draft.value.trim() !== '' || attachments.value.length > 0));
 
 /* ── Voice ───────────────────────────────────────────────────────────── */
 const voiceHasText = ref(false);
@@ -97,6 +99,7 @@ watch(() => chat.currentId, (id, before) => {
   if (before && id !== before) live?.end();
   if (shown.value && !liveActive.value) asr?.deactivate();
   attachmentVersion++; attachments.value = [];
+  mentions.selected.value = [];
 }, { flush: 'sync' });
 watch(microphoneAllowed, allowed => { if (!allowed && shown.value && !liveActive.value) asr?.deactivate(); }, { flush: 'sync' });
 watch(shown, now => { if (!now && !liveActive.value) asr?.deactivate(); else if (now) void readModelLabel(); }, { flush: 'sync' });
@@ -164,13 +167,16 @@ async function submit() {
   if ((!text && !attachments.value.length) || !canSend.value) return;
   asr?.deactivate();
   const images = [...attachments.value];
+  const references = [...mentions.selected.value];
+  mentions.selected.value = [];
   draft.value = '';
   attachments.value = [];
   emit('sending');
-  if (!(await chat.send(text, images)) && !draft.value) {
+  if (!(await chat.send(text, images, undefined, references.map(({ kind, id }) => ({ kind, id })))) && !draft.value) {
     // The host refused, so nothing was sent: hand the whole message back untouched.
     draft.value = text;
     attachments.value = images;
+    mentions.selected.value = references;
   }
   await nextTick();
   emit('sent');
@@ -209,6 +215,7 @@ function onSlashKey(event: KeyboardEvent): boolean {
   return true;
 }
 function onKeydown(event: KeyboardEvent) {
+  if (mentions.keydown(event, composing.value)) return;
   if (onSlashKey(event)) return;
   if (event.key !== 'Enter' || event.shiftKey || isImeEnter(event, composing.value)) return;
   event.preventDefault();
@@ -280,7 +287,21 @@ async function useExpert(entrySkill: string, name: string, expert?: { slug: stri
 }
 /** 从“＋”选了技能：和在输入框里打 `/名称` 一样，发送时后端会把这个技能的说明交给小伴。 */
 const useSkill = (slug: string) => { draft.value = withLeadingSlash(draft.value, slug); void nextTick(() => input.value?.focus()); };
-const useConnector = (name: string) => insertPrompt(`请在本次任务中优先使用已连接的「${name}」工具，完成以下任务：`);
+const useConnector = (name: string, id: string) => {
+  if (!mentions.selected.value.some(item => item.id === id)) mentions.selected.value.push({ kind: 'connector', id, name, description: '' });
+};
+const mentions = useComposerMentions(draft, () => props.store.desktop && shown.value, async (item: MentionItem) => {
+  if (item.kind === 'skill') { useSkill(item.id); return true; }
+  if (item.kind === 'expert') {
+    if (running.value) { props.store.notify('这个对话还在回答，请等它结束或先停止，再召唤专家', 'info'); return false; }
+    type Expert = NonNullable<Parameters<typeof useExpert>[2]> & { entrySkill?: string };
+    const experts = await invoke<Expert[]>('ai_store_experts_installed');
+    const expert = experts.find(e => e.slug === item.id || e.plugin === item.id);
+    if (!expert) throw new Error('这位专家已不可用，请刷新后重试');
+    await useExpert(expert.entrySkill || expert.slug, expert.name, expert);
+  }
+  return true;
+}, error => props.store.notify(String(error), 'error'));
 /** A prompt handed over by another page (装扮 → 用 AI 创作…) lands in the box that is shown, unsent. */
 watch([() => props.store.creationDraft, () => chat.configured, shown], ([text, configured, now]) => {
   if (!text || !configured || !now) return;
@@ -318,6 +339,8 @@ defineExpose({ setDraft, insertPrompt, refreshModel: readModelLabel, draft });
       <input ref="filePicker" type="file" :accept="ATTACHMENT_ACCEPT" multiple hidden data-testid="chat-image-input" @change="onPick" />
       <ChatExpertChip v-if="chat.currentExpert" class="composer-expert" :expert="chat.currentExpert" :removable="!chat.currentId" :desktop="store.desktop" @clear="chat.pendingExpert = null" />
       <ChatSlashMenu v-if="slashOpen" :items="slashItems" :active="slashIndex" @pick="pickSkill" @hover="slashIndex = $event" />
+      <ChatMentionMenu v-if="mentions.open.value" :items="mentions.items.value" :active="mentions.index.value" :loading="mentions.loading.value" @pick="mentions.pick" @hover="mentions.index.value = $event" />
+      <div v-if="mentions.selected.value.length" class="mention-tags"><button v-for="item in mentions.selected.value" :key="item.id" type="button" class="xb-btn is-sm" :aria-label="`移除连接器 ${item.name}`" @click="mentions.selected.value = mentions.selected.value.filter(i => i.id !== item.id)">本次优先使用 {{ item.name }} <X :size="12" /></button></div>
       <div class="composer-editor">
         <NInput ref="input" v-model:value="draft" type="textarea" :autosize="{ minRows, maxRows: 8 }" :disabled="!store.desktop || !chat.configured" :placeholder="placeholderText" data-testid="chat-input" @keydown="onKeydown" />
       </div>
@@ -340,6 +363,7 @@ defineExpose({ setDraft, insertPrompt, refreshModel: readModelLabel, draft });
 </template>
 
 <style scoped>
+.mention-tags{display:flex;flex-wrap:wrap;gap:6px;padding:8px 14px 0}
 .composer{position:relative;width:100%;box-sizing:border-box}
 .composer-box{position:relative;display:flex;flex-direction:column;gap:4px;background:var(--ui-surface);border-radius:18px;box-shadow:0 0 0 1px var(--ui-border),0 2px 4px rgba(0,0,0,.03),0 12px 32px rgba(0,0,0,.07);padding:14px 12px 8px 16px;transition:box-shadow .15s}
 html[data-theme=dark] .composer-box{background:var(--ui-surface-alt);box-shadow:0 0 0 1px var(--ui-border-strong),0 12px 32px rgba(0,0,0,.35)}

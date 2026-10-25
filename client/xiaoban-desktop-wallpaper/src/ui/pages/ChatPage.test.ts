@@ -100,7 +100,8 @@ describe('chat workbench composer actions', () => {
     await click('chat-add-menu');
     await click('chat-add-connectors');
     await click('chat-installed-github');
-    expect(textarea().value).toContain('GitHub');
+    expect(textarea().value).not.toContain('GitHub');
+    expect(q('chat-input')?.closest('.composer')?.textContent).toContain('本次优先使用 GitHub');
     expect(h.commands()).toContain('ai_store_connector_status');
   });
 
