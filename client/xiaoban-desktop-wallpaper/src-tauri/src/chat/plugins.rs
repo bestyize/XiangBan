@@ -30,6 +30,20 @@ pub async fn ai_plugin_installed(app: tauri::AppHandle, window: tauri::WebviewWi
 }
 
 /// 审查本地插件包：返回名称、版本、类型、文件清单、提示和清单摘要，不写任何文件。
+/// 选择要安装的插件包（.zip）。WebView 的文件输入拿不到绝对路径，所以走系统对话框；取消时返回 `None`。
+#[tauri::command]
+pub async fn ai_plugin_pick_file(app: tauri::AppHandle, window: tauri::WebviewWindow) -> Result<Option<String>, String> {
+    store::control(&window)?;
+    use tauri_plugin_dialog::DialogExt;
+    tauri::async_runtime::spawn_blocking(move || {
+        let chosen = app.dialog().file().set_parent(&window).set_title("选择插件包").add_filter("插件包", &["zip"]).blocking_pick_file();
+        let Some(chosen) = chosen else { return Ok(None) };
+        Ok(Some(chosen.into_path().map_err(|e| e.to_string())?.display().to_string()))
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
 #[tauri::command]
 pub async fn ai_plugin_inspect_file(window: tauri::WebviewWindow, path: String) -> Result<Value, String> {
     store::control(&window)?;

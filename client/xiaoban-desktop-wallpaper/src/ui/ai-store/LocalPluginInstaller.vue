@@ -11,7 +11,7 @@ interface PluginReview {
 const props = defineProps<{ desktop: boolean }>();
 const emit = defineEmits<{ installed: [] }>();
 const show = ref(false), busy = ref(false), confirmed = ref(false), error = ref('');
-const path = ref(''), review = ref<PluginReview | null>(null), picker = ref<HTMLInputElement | null>(null);
+const path = ref(''), review = ref<PluginReview | null>(null);
 let reviewedPath = '';
 let unlisten: (() => void) | undefined;
 let alive = true;
@@ -27,16 +27,17 @@ async function open() {
       if (alive) unlisten = off; else off();
     } catch { /* The explicit path input also works when native events are unavailable. */ }
   }
-  if (alive && show.value) picker.value?.click();
+  if (alive && show.value) await pick();
 }
-function picked(event: Event) {
-  const input = event.target as HTMLInputElement;
-  const file = input.files?.[0] as (File & { path?: string }) | undefined;
-  input.value = '';
-  if (!file) return;
-  review.value = null; confirmed.value = false;
-  if (file.path) { path.value = file.path; void inspect(); }
-  else { path.value = ''; error.value = `已选择 ${file.name}。请拖入该 ZIP 文件，或粘贴它的完整路径后审查。`; }
+/** The system file dialog: a WebView file input never exposes the absolute path the review command needs. */
+async function pick() {
+  if (busy.value) return;
+  try {
+    const chosen = await invoke<string | null>('ai_plugin_pick_file');
+    if (!alive || !chosen) return;
+    review.value = null; confirmed.value = false; path.value = chosen;
+    await inspect();
+  } catch (e) { if (alive) error.value = String(e); }
 }
 async function inspect() {
   if (busy.value) return;
@@ -66,12 +67,11 @@ onBeforeUnmount(() => { alive = false; unlisten?.(); });
 
 <template>
   <button class="xb-btn" :disabled="!desktop" @click="open">从本地插件包安装</button>
-  <input ref="picker" hidden type="file" accept=".zip" aria-label="选择本地 ZIP 插件包" @change="picked" />
   <NModal :show="show" preset="card" title="从本地插件包安装" class="store-dialog" :mask-closable="!busy" :closable="!busy" style="width:600px;max-width:calc(100vw - 36px)" @update:show="!$event && !busy && (show = false)">
     <form class="local-plugin-form" @submit.prevent="inspect">
       <p>选择或拖入 ZIP 插件包，先查看审查结果再安装。</p>
       <label>插件包完整路径<input v-model="path" aria-label="插件包完整路径" :disabled="busy" placeholder="粘贴 ZIP 文件的完整路径" @input="review = null; confirmed = false" /></label>
-      <div><button type="button" class="xb-btn" :disabled="busy" @click="picker?.click()">选择 ZIP 文件</button> <button class="xb-btn" type="submit" :disabled="busy">{{ busy ? '正在处理…' : '审查插件包' }}</button></div>
+      <div><button type="button" class="xb-btn" :disabled="busy" @click="pick">选择 ZIP 文件</button> <button class="xb-btn" type="submit" :disabled="busy">{{ busy ? '正在处理…' : '审查插件包' }}</button></div>
     </form>
     <p v-if="error" role="alert">{{ error }}</p>
     <template v-if="review">

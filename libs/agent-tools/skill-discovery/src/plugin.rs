@@ -192,7 +192,18 @@ impl Package {
             "files": self.files.iter().map(|f| json!({"path": f.path, "size": f.size, "sha256": f.sha256})).collect::<Vec<_>>(),
             "agents": list("agents"), "skills": list("skills"),
             "hasMcp": self.contents.contains_key("mcp.json") || self.contents.contains_key(".mcp.json"),
+            "connectorCount": self.mcp_servers(),
         })
+    }
+
+    /// 清单里声明的 MCP 服务个数（mcp.json 或根目录的 .mcp.json），读不出来按 0。
+    pub fn mcp_servers(&self) -> usize {
+        ["mcp.json", ".mcp.json"]
+            .iter()
+            .find_map(|key| self.contents.get(*key))
+            .and_then(|bytes| serde_json::from_slice::<Value>(bytes).ok())
+            .map(|v| v.get("mcpServers").and_then(Value::as_object).map_or_else(|| v.as_object().map_or(0, |m| m.len()), |m| m.len()))
+            .unwrap_or(0)
     }
 
     pub fn agent_docs(&self) -> BTreeMap<String, AgentDoc> {

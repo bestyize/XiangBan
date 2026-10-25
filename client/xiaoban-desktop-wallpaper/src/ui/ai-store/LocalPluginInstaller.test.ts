@@ -32,14 +32,21 @@ it('reviews before installation and locks the installed package to its digest', 
   expect(invoke).toHaveBeenCalledWith('ai_plugin_install_file', { path: 'C:\\plugins\\repository.zip', sha256: review.manifestSha256, confirmed: true });
   expect(wrapper.emitted('installed')).toHaveLength(1);
 });
-it('does not invent a path from the HTML filename or fakepath', async () => {
+it('opens the system file dialog on open and reviews what was chosen; cancelling reviews nothing', async () => {
   await open();
-  const picker = wrapper.get('input[type=file]');
-  expect(picker.attributes('accept')).toBe('.zip');
-  Object.defineProperty(picker.element, 'files', { value: [new File(['zip'], 'repository.zip')], configurable: true });
-  await picker.trigger('change'); await flushPromises();
-  expect(wrapper.text()).toContain('完整路径'); expect(invoke).not.toHaveBeenCalled();
-  await inspect('C:\\fakepath\\repository.txt'); expect(invoke).not.toHaveBeenCalled();
+  expect(invoke).toHaveBeenCalledWith('ai_plugin_pick_file');
+  expect(invoke).not.toHaveBeenCalledWith('ai_plugin_inspect_file', expect.anything());
+  expect(wrapper.find('input[type=file]').exists()).toBe(false);
+  vi.mocked(invoke).mockImplementation(async command => command === 'ai_plugin_pick_file' ? 'D:/downloads/repository.zip' : command === 'ai_plugin_inspect_file' ? review : null);
+  await wrapper.findAll('button').find(b => b.text() === '选择 ZIP 文件')!.trigger('click'); await flushPromises();
+  expect(invoke).toHaveBeenCalledWith('ai_plugin_inspect_file', { path: 'D:/downloads/repository.zip' });
+  expect(wrapper.text()).toContain('repository · v1.0');
+});
+it('only reviews ZIP files with a full path', async () => {
+  await open();
+  await inspect('C:\fakepath\repository.txt');
+  expect(invoke).not.toHaveBeenCalledWith('ai_plugin_inspect_file', expect.anything());
+  expect(wrapper.text()).toContain('完整路径');
 });
 it('accepts native dropped ZIP paths and removes the listener when destroyed', async () => {
   await open(); drop({ paths: ['/Users/me/repository.zip'] }); await flushPromises();
