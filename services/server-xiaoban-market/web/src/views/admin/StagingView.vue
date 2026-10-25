@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 import { admin } from '@/lib/api';
 import { formatTime, KIND_NAME } from '@/lib/format';
+import { runPool } from '@/lib/pool';
 import { ITEM_STATUS } from '@/lib/labels';
 import { toast, toastError } from '@/lib/toast';
 import type { AdminCategory, Source, StagedDetail, StagedRow } from '@/lib/types';
@@ -26,8 +27,8 @@ const TABS = [['pending', '待处理'], ['imported', '已入库'], ['ignored', '
 const allChecked = computed(() => rows.value.length > 0 && rows.value.every((r) => checked.value.has(r.id)));
 const tabCount = (s: string) => (s ? counts.value[s] ?? 0 : Object.values(counts.value).reduce((a, b) => a + b, 0));
 
-async function load() {
-  loading.value = true;
+async function load(silent = false) {
+  if (!silent) loading.value = true;
   try {
     const r = await admin.staged({ status: filter.value.status || undefined, sourceId: filter.value.sourceId || undefined, change: filter.value.change || undefined, keyword: filter.value.keyword.trim() || undefined, page: page.value });
     rows.value = r.results;
@@ -67,33 +68,50 @@ function toggle(id: string) {
 }
 const toggleAll = () => (checked.value = allChecked.value ? new Set() : new Set(rows.value.map((r) => r.id)));
 
-/** 已存在的条目（有更新）保持当前状态，只有新条目套用所选状态。 */
-async function importMany(ids: string[], status: string, categoryId?: number) {
-  const isExisting = (id: string) => {
+interface ImportProgress { total: number; done: number; ok: number; bad: number; stopped: boolean; errors: { name: string; error: string }[] }
+const progress = ref<ImportProgress | null>(null);
+const importing = ref(false);
+const rowState = ref<Record<string, 'running' | 'ok' | 'fail'>>({});
+const pct = computed(() => (progress.value && progress.value.total ? Math.round((progress.value.done / progress.value.total) * 100) : 0));
+const markRow = (id: string, state: 'running' | 'ok' | 'fail') => { rowState.value = { ...rowState.value, [id]: state }; };
+const IMPORT_CONCURRENCY = 3;
+const warnLeave = (e: BeforeUnloadEvent) => { if (importing.value) e.preventDefault(); };
+
+/** 逐项并发提交入库，页面实时显示进度；已存在的条目（有更新）保持当前状态，只有新条目套用所选状态。 */
+async function runImport(ids: string[], status: string, categoryId?: number) {
+  if (importing.value || !ids.length) return;
+  const existingIds = new Set(ids.filter((id) => {
     const r = rows.value.find((x) => x.id === id);
     return r ? !!r.itemId : detail.value?.id === id && !!detail.value.existing;
-  };
-  const fresh = ids.filter((id) => !isExisting(id));
-  const existing = ids.filter(isExisting);
-  const results: { id: string; ok: boolean; error?: string }[] = [];
-  if (fresh.length) results.push(...(await admin.importStaged(fresh, { status, categoryId })).results);
-  if (existing.length) results.push(...(await admin.importStaged(existing, { categoryId })).results);
-  return results;
-}
-
-async function runImport(ids: string[], status: string, categoryId?: number) {
+  }));
+  const names = new Map(ids.map((id) => [id, rows.value.find((x) => x.id === id)?.name ?? (detail.value?.id === id ? detail.value.normalized.name : id)]));
+  const p = reactive<ImportProgress>({ total: ids.length, done: 0, ok: 0, bad: 0, stopped: false, errors: [] });
+  progress.value = p;
+  rowState.value = {};
+  importing.value = true;
+  window.addEventListener('beforeunload', warnLeave);
   try {
-    const results = await importMany(ids, status, categoryId);
-    const ok = results.filter((r) => r.ok).length;
-    const bad = results.filter((r) => !r.ok);
-    if (ok) toast(`已入库 ${ok} 项`);
-    if (bad.length) toast(`${bad.length} 项入库失败：${bad[0].error}${bad.length > 1 ? ' 等' : ''}`, 'bad');
-    checked.value = new Set();
-    await load();
-    if (detail.value && ids.includes(detail.value.id)) await open(detail.value.id);
-  } catch (e) {
-    toastError(e);
+    await runPool(ids, IMPORT_CONCURRENCY, async (id) => {
+      markRow(id, 'running');
+      try {
+        const r = (await admin.importStaged([id], existingIds.has(id) ? { categoryId } : { status, categoryId })).results[0];
+        if (r.ok) { p.ok++; markRow(id, 'ok'); } else { p.bad++; markRow(id, 'fail'); p.errors.push({ name: names.get(id) ?? id, error: r.error ?? '入库失败' }); }
+      } catch (e) {
+        p.bad++; markRow(id, 'fail');
+        p.errors.push({ name: names.get(id) ?? id, error: e instanceof Error ? e.message : String(e) });
+      }
+      p.done++;
+      if (p.done % 5 === 0) void load(true);
+    }, () => p.stopped);
+  } finally {
+    importing.value = false;
+    window.removeEventListener('beforeunload', warnLeave);
   }
+  checked.value = new Set();
+  await load(true);
+  if (detail.value && ids.includes(detail.value.id)) await open(detail.value.id);
+  if (p.bad) toast(`入库完成：成功 ${p.ok} 项，失败 ${p.bad} 项`, 'bad');
+  else toast(`${p.stopped ? '已停止，' : ''}已入库 ${p.ok} 项`);
 }
 
 async function bulkIgnore() {
@@ -121,16 +139,7 @@ async function bulkRestore(ids: string[]) {
 async function importDetail() {
   const d = detail.value;
   if (!d) return;
-  const status = opts.value.status === 'keep' ? undefined : opts.value.status;
-  try {
-    const r = (await admin.importStaged([d.id], { status, categoryId: opts.value.categoryId || undefined })).results[0];
-    if (r.ok) toast(d.existing ? '已同步到内容库' : '已入库');
-    else toast(r.error ?? '入库失败', 'bad');
-    await load();
-    await open(d.id);
-  } catch (e) {
-    toastError(e);
-  }
+  await runImport([d.id], opts.value.status === 'keep' ? 'draft' : opts.value.status, opts.value.categoryId || undefined);
 }
 
 interface Diff { label: string; from: string; to: string }
@@ -150,7 +159,11 @@ const diffs = computed<Diff[]>(() => {
 const configCount = computed(() => ((detail.value?.normalized.metadata as any)?.configs?.length ?? 0) as number);
 watch([() => filter.value.status, () => filter.value.sourceId, () => filter.value.change], () => { page.value = 1; load(); });
 watch(() => filter.value.keyword, () => { clearTimeout(kwTimer); kwTimer = setTimeout(() => { page.value = 1; load(); }, 300); });
-watch(page, load);
+watch(page, () => load());
+onBeforeUnmount(() => {
+  if (progress.value) progress.value.stopped = true;
+  window.removeEventListener('beforeunload', warnLeave);
+});
 onMounted(async () => {
   try { sources.value = (await admin.sources()).results; } catch (e) { toastError(e); }
   load();
@@ -170,12 +183,29 @@ onMounted(async () => {
       <input v-model="filter.keyword" class="input grow" type="search" placeholder="按名称、标识、标签搜索" aria-label="搜索暂存内容" />
     </div>
 
+    <div v-if="progress" class="import-progress" role="status" aria-live="polite">
+      <div class="ip-head">
+        <b>{{ importing ? (progress.stopped ? '正在停止…' : '正在入库') : progress.stopped ? '已停止' : '入库完成' }}</b>
+        <span>{{ progress.done }} / {{ progress.total }}</span>
+        <span v-if="progress.ok" class="ok">成功 {{ progress.ok }}</span>
+        <span v-if="progress.bad" class="bad">失败 {{ progress.bad }}</span>
+        <span class="grow" />
+        <button v-if="importing" class="btn btn-sm" type="button" :disabled="progress.stopped" @click="progress.stopped = true">停止</button>
+        <button v-else class="btn btn-sm" type="button" @click="progress = null">关闭</button>
+      </div>
+      <div class="bar" role="progressbar" aria-label="入库进度" aria-valuemin="0" :aria-valuemax="progress.total" :aria-valuenow="progress.done"><i :style="{ width: pct + '%' }" /></div>
+      <ul v-if="progress.errors.length" class="ip-errors">
+        <li v-for="(e, i) in progress.errors.slice(0, 5)" :key="i"><b>{{ e.name }}</b>：{{ e.error }}</li>
+        <li v-if="progress.errors.length > 5">另有 {{ progress.errors.length - 5 }} 项失败，原因见列表中的红字。</li>
+      </ul>
+    </div>
+
     <div v-if="checked.size" class="bulk" role="region" aria-label="批量操作">
       <b>已选 {{ checked.size }} 项</b><span class="grow" />
       <template v-if="filter.status === 'ignored'"><button class="btn" type="button" @click="bulkRestore([...checked])">恢复到待处理</button></template>
       <template v-else>
-        <button class="btn" type="button" @click="runImport([...checked], 'draft')">入库为草稿</button>
-        <button class="btn btn-primary" type="button" @click="runImport([...checked], 'published')">入库并上架</button>
+        <button class="btn" type="button" :disabled="importing" @click="runImport([...checked], 'draft')">入库为草稿</button>
+        <button class="btn btn-primary" type="button" :disabled="importing" @click="runImport([...checked], 'published')">入库并上架</button>
         <button class="btn" type="button" @click="bulkIgnore">忽略</button>
       </template>
     </div>
@@ -200,7 +230,7 @@ onMounted(async () => {
                 </td>
                 <td class="muted">{{ r.sourceName }}<div class="sub">{{ KIND_NAME[r.kind] }}</div></td>
                 <td class="muted">{{ r.category ?? '—' }}</td>
-                <td><StatusBadge v-if="r.change" type="change" :value="r.change" /><StatusBadge v-else type="staged" :value="r.status" /></td>
+                <td><span v-if="rowState[r.id] === 'running'" class="row-state"><span class="spinner" /> 入库中…</span><span v-else-if="rowState[r.id] === 'ok'" class="row-state ok">✓ 已入库</span><span v-else-if="rowState[r.id] === 'fail'" class="row-state bad">入库失败</span><StatusBadge v-else-if="r.change" type="change" :value="r.change" /><StatusBadge v-else type="staged" :value="r.status" /></td>
                 <td class="muted nowrap">{{ formatTime(r.lastSeenAt) }}</td>
               </tr>
             </tbody>
@@ -268,7 +298,7 @@ onMounted(async () => {
           </div>
 
           <div class="row">
-            <button v-if="detail.status !== 'ignored'" class="btn btn-primary grow" type="button" @click="importDetail">{{ detail.existing ? '同步到内容库' : '入库' }}</button>
+            <button v-if="detail.status !== 'ignored'" class="btn btn-primary grow" type="button" :disabled="importing" @click="importDetail">{{ importing ? '入库中…' : detail.existing ? '同步到内容库' : '入库' }}</button>
             <button v-if="detail.status === 'pending'" class="btn" type="button" @click="admin.ignoreStaged([detail.id]).then(() => { toast('已忽略'); load(); detail = null; }).catch(toastError)">{{ detail.existing ? '忽略此次更新' : '忽略' }}</button>
             <button v-if="detail.status === 'ignored'" class="btn" type="button" @click="bulkRestore([detail.id])">恢复到待处理</button>
           </div>
@@ -279,6 +309,15 @@ onMounted(async () => {
 </template>
 
 <style scoped>
+.import-progress { display: flex; flex-direction: column; gap: 8px; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--line); background: var(--soft); }
+.ip-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; font-size: 14px; }
+.ip-head .ok, .row-state.ok { color: #0b6b52; }
+.ip-head .bad, .row-state.bad { color: #b3321c; }
+.row-state { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; white-space: nowrap; }
+.bar { height: 6px; border-radius: 999px; background: var(--wash); overflow: hidden; }
+.bar i { display: block; height: 100%; background: var(--ink); border-radius: 999px; transition: width 0.25s ease; }
+.ip-errors { margin: 0; padding-left: 18px; font-size: 13px; color: #6f1f11; display: flex; flex-direction: column; gap: 2px; }
+@media (prefers-reduced-motion: reduce) { .bar i { transition: none; } }
 .bulk { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 12px; padding: 10px 14px; border-radius: 12px; background: #f2f2f0; }
 .grow { flex: 1 1 120px; }
 .name { border: 0; background: transparent; padding: 0; font-weight: 500; text-align: left; cursor: pointer; text-decoration: underline; text-decoration-color: transparent; text-underline-offset: 3px; }
