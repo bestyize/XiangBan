@@ -10,9 +10,13 @@ use std::{
     fs,
     io::{BufRead, BufReader, Read, Write},
     path::{Path, PathBuf},
-    process::{Child, ChildStdin, ChildStdout, Command, Stdio},
+    process::{ChildStdin, ChildStdout, Command, Stdio},
     time::{Duration, Instant},
 };
+#[cfg(not(windows))]
+use std::process::Child;
+#[cfg(windows)]
+use agent_kernel::process_tree::ChildTree as Child;
 
 /// Where the engine and the models are fetched from (a ModelScope repository).
 pub const SOURCE: &str = "https://modelscope.cn/api/v1/models/bestyize/xiaoban-asr/repo?Revision=master&FilePath=";
@@ -181,6 +185,11 @@ impl Engine {
             use std::os::windows::process::CommandExt;
             command.creation_flags(0x08000000); // No console window.
         }
+        // The Windows job also reaps the engine if the quit watchdog must end
+        // the host without running Rust destructors.
+        #[cfg(windows)]
+        let mut child = Child::spawn(&mut command).map_err(|e| format!("启动推理引擎失败：{e}"))?;
+        #[cfg(not(windows))]
         let mut child = command.spawn().map_err(|e| format!("启动推理引擎失败：{e}"))?;
         let stdin = child.stdin.take().ok_or("无法连接推理引擎")?;
         let stdout = BufReader::new(child.stdout.take().ok_or("无法连接推理引擎")?);

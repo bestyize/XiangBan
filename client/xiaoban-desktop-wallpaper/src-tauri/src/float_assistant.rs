@@ -12,7 +12,7 @@ use std::{
         atomic::{AtomicBool, AtomicU64, Ordering},
         Mutex,
     },
-    time::Duration,
+    time::{Duration, Instant},
 };
 use tauri::{Emitter, Manager, PhysicalPosition, PhysicalSize, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
 use tauri_plugin_global_shortcut::GlobalShortcutExt;
@@ -97,6 +97,7 @@ enum Mode {
 
 #[derive(Default)]
 pub struct AssistantState {
+    window_creation: Mutex<()>,
     registered: Mutex<Option<String>>,
     error: Mutex<String>,
     /// Where the capsule was left, for this run.
@@ -142,18 +143,18 @@ fn shortcut_pressed(app: &tauri::AppHandle) {
     let open = mode(app) == Mode::Capsule;
     state.open_at_press.store(open, Ordering::SeqCst);
     // Opening does not wait for the release: the capsule is up by the time a hold turns into talking.
-    if !open { toggle(app); }
     let app = app.clone();
+    let talk_at = Instant::now() + HOLD_TO_TALK;
     std::thread::spawn(move || {
-        std::thread::sleep(HOLD_TO_TALK);
+        // Lazily creating the assistant from a shortcut callback can deadlock
+        // WebView2. Keep both window creation and the hold timer off that thread.
+        if !open { toggle(&app); }
+        std::thread::sleep(talk_at.saturating_duration_since(Instant::now()));
         let state = app.state::<AssistantState>();
         if !state.held.load(Ordering::SeqCst) || state.press.load(Ordering::SeqCst) != press { return; }
         state.talking.store(true, Ordering::SeqCst);
-        let main = app.clone();
-        let _ = app.run_on_main_thread(move || {
-            if mode(&main) != Mode::Capsule { let _ = expand(&main, false); }
-            if let Some(window) = main.get_webview_window(LABEL) { let _ = window.emit("assistant-ptt", "start"); }
-        });
+        if mode(&app) != Mode::Capsule { let _ = expand(&app, false); }
+        if let Some(window) = app.get_webview_window(LABEL) { let _ = window.emit("assistant-ptt", "start"); }
     });
 }
 
@@ -163,7 +164,8 @@ fn shortcut_released(app: &tauri::AppHandle) {
     if state.talking.swap(false, Ordering::SeqCst) {
         if let Some(window) = app.get_webview_window(LABEL) { let _ = window.emit("assistant-ptt", "end"); }
     } else if state.open_at_press.load(Ordering::SeqCst) {
-        toggle(app);
+        let handle = app.clone();
+        tauri::async_runtime::spawn_blocking(move || toggle(&handle));
     }
 }
 
@@ -549,6 +551,9 @@ fn set_mode(app: &tauri::AppHandle, mode: Mode) {
 }
 
 fn window(app: &tauri::AppHandle) -> Result<WebviewWindow, String> {
+    if let Some(window) = app.get_webview_window(LABEL) { return Ok(window); }
+    let state = app.state::<AssistantState>();
+    let _creation = state.window_creation.lock().unwrap_or_else(|e| e.into_inner());
     match app.get_webview_window(LABEL) {
         Some(window) => Ok(window),
         None => build(app),
@@ -594,16 +599,22 @@ fn next_turn(app: &tauri::AppHandle) -> u64 {
     app.state::<AssistantState>().turn.fetch_add(1, Ordering::SeqCst) + 1
 }
 
-/// Runs `step` on the main thread after `delay`, unless another opening or closing came first.
+/// Runs a delayed step unless another opening or closing came first. On Windows
+/// the step may recreate a WebView, so it must remain outside native callbacks.
 fn after(app: &tauri::AppHandle, delay: Duration, step: impl FnOnce(&tauri::AppHandle) + Send + 'static) {
     let turn = app.state::<AssistantState>().turn.load(Ordering::SeqCst);
     let app = app.clone();
     std::thread::spawn(move || {
         std::thread::sleep(delay);
+        #[cfg(windows)]
+        if app.state::<AssistantState>().turn.load(Ordering::SeqCst) == turn { step(&app); }
+        #[cfg(not(windows))]
+        {
         let main = app.clone();
         let _ = app.run_on_main_thread(move || {
             if main.state::<AssistantState>().turn.load(Ordering::SeqCst) == turn { step(&main); }
         });
+        }
     });
 }
 
@@ -810,7 +821,7 @@ pub struct Patch {
 }
 
 #[tauri::command]
-pub fn assistant_configure(app: tauri::AppHandle, patch: Patch) -> Result<Value, String> {
+pub async fn assistant_configure(app: tauri::AppHandle, patch: Patch) -> Result<Value, String> {
     if let Some(shortcut) = &patch.shortcut {
         if !SHORTCUTS.contains(&shortcut.as_str()) {
             return Err(format!("不支持的快捷键：{shortcut}"));
@@ -870,7 +881,7 @@ pub fn assistant_configure(app: tauri::AppHandle, patch: Patch) -> Result<Value,
 
 /// Opens the capsule now, so the settings page can show what the shortcut does.
 #[tauri::command]
-pub fn assistant_try(app: tauri::AppHandle) -> Result<(), String> {
+pub async fn assistant_try(app: tauri::AppHandle) -> Result<(), String> {
     expand(&app, false)
 }
 
@@ -889,13 +900,13 @@ pub fn assistant_reanchor_ready(window: WebviewWindow, id: u64) -> Result<(), St
 
 /// The ball was clicked (`peek: false`) or the pointer rested on it (`peek: true`).
 #[tauri::command]
-pub fn assistant_unfold(app: tauri::AppHandle, peek: Option<bool>) -> Result<(), String> {
+pub async fn assistant_unfold(app: tauri::AppHandle, peek: Option<bool>) -> Result<(), String> {
     expand(&app, peek.unwrap_or(false))
 }
 
 /// The user clicked or typed in a capsule that opened on hover: it takes the keyboard focus and stays open.
 #[tauri::command]
-pub fn assistant_focus(app: tauri::AppHandle) -> Result<(), String> {
+pub async fn assistant_focus(app: tauri::AppHandle) -> Result<(), String> {
     expand(&app, false)
 }
 

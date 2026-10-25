@@ -57,6 +57,7 @@ mod window_control;
 mod voice_turn;
 mod inference;
 mod network;
+mod shutdown;
 
 use preferences::{Preferences, Settings};
 use serde::Serialize;
@@ -160,7 +161,10 @@ fn publish(app: &tauri::AppHandle) {
     let _ = app.emit("settings-changed", settings);
     content::sync(app);
     effects::sync(app);
-    pets::sync_preferences(app);
+    // Preference updates may recreate a pet WebView. Never do that inside a
+    // synchronous IPC/menu callback on Windows.
+    let handle = app.clone();
+    tauri::async_runtime::spawn_blocking(move || pets::sync_preferences(&handle));
 }
 
 fn persist(app: &tauri::AppHandle, settings: &Settings) -> Result<(), String> {
@@ -592,7 +596,7 @@ pub(crate) fn present_control(app: &tauri::AppHandle) -> Result<(), String> {
 
 #[tauri::command]
 fn quit(app: tauri::AppHandle) {
-    app.exit(0);
+    shutdown::request(&app);
 }
 
 #[tauri::command]
@@ -726,7 +730,10 @@ fn setup_tray(app: &tauri::App) -> tauri::Result<()> {
             "control" => {
                 let _ = present_control(app);
             }
-            "assistant" => float_assistant::toggle(app),
+            "assistant" => {
+                let handle = app.clone();
+                tauri::async_runtime::spawn_blocking(move || float_assistant::toggle(&handle));
+            }
             "poke" => {
                 let _ = app.emit("pet-poke", ());
             }
@@ -744,7 +751,7 @@ fn setup_tray(app: &tauri::App) -> tauri::Result<()> {
                     let _ = app.emit("desktop-error", error);
                 }
             }
-            "exit" => app.exit(0),
+            "exit" => shutdown::request(app),
             _ => {}
         });
     #[cfg(windows)]
@@ -789,6 +796,7 @@ fn main() {
     #[cfg(target_os = "macos")]
     for window in &mut context.config_mut().app.windows { window.incognito = true; }
     let builder = tauri::Builder::default()
+        .manage(shutdown::ExitState::default())
         .plugin(tauri::plugin::Builder::<tauri::Wry, ()>::new("app-context-menu")
             .js_init_script_on_all_frames(include_str!("webview_context_menu.js"))
             .build())
@@ -959,7 +967,7 @@ fn main() {
                     if let Ok(path) = std::env::var("XIAOBAN_SMOKE_REPORT") {
                         let _ = std::fs::write(path, serde_json::to_string_pretty(&report).unwrap());
                     }
-                    handle.exit(0);
+                    shutdown::request(&handle);
                 });
             }
             Ok(())
@@ -1005,7 +1013,10 @@ fn main() {
     #[cfg(not(windows))]
     let app = app.expect("小伴启动失败");
     app.run(|_handle, _event| {
-        if matches!(_event, tauri::RunEvent::Exit) { chat::shutdown_connectors(_handle); }
+        if matches!(_event, tauri::RunEvent::Exit) {
+            shutdown::guard(_handle);
+            chat::shutdown_connectors(_handle);
+        }
         if matches!(_event, tauri::RunEvent::Exit) && _handle.state::<DesktopState>().isolated {
             let _ = startup::set(_handle, false);
         }

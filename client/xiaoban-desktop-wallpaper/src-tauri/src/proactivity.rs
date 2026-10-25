@@ -363,7 +363,7 @@ fn show_bubble(app: &tauri::AppHandle, pet: &tauri::WebviewWindow) -> Result<(),
 /// Called only from a pet window after the real pointer has remained over its hit region.
 /// Does not accept a client-supplied pet id or any text.
 #[tauri::command]
-pub fn pet_proactive_hover(window: tauri::WebviewWindow, duration_ms: u64) -> Result<bool, String> {
+pub async fn pet_proactive_hover(window: tauri::WebviewWindow, duration_ms: u64) -> Result<bool, String> {
     if !crate::pets::is_pet(window.label()) { return Err("仅桌宠可提交悬停事件".into()); }
     let p = crate::pets::own(&window)?;
     if !p.enabled || !p.links || duration_ms < 800 || duration_ms > 10_000 { return Ok(false); }
