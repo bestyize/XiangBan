@@ -1,6 +1,10 @@
 //! Connection lifecycle and consent belong to the host; tools share kernel permissions.
 mod authorization;
 mod oauth;
+pub mod plugin;
+pub mod vault;
+mod plugin_manager;
+pub use plugin_manager::ConnectorState;
 use agent_kernel::mcp::{HttpMcpClient, HttpMcpConfig, McpClient, McpConfig};
 use agent_kernel::{Risk, Tool, ToolCtx, ToolResult, ToolSpec};
 use serde::{Deserialize, Serialize};
@@ -55,8 +59,16 @@ struct Active {
     client: Client,
     valid: Arc<AtomicBool>,
     oauth: Option<Arc<oauth::Session>>,
+    disabled_tools: Vec<String>,
 }
 impl Active {
+    fn tools(&self, id: &str) -> Vec<Arc<dyn Tool>> {
+        let prefix = format!("mcp_ext_{}_", id.replace('-', "_"));
+        self.client.tools().into_iter().filter(|tool| {
+            let name = tool.spec().name.strip_prefix(&prefix).unwrap_or(&tool.spec().name);
+            !self.disabled_tools.iter().any(|disabled| disabled == name)
+        }).collect()
+    }
     fn close(&self) {
         self.valid.store(false, Ordering::SeqCst);
         self.client.close();
@@ -81,6 +93,8 @@ pub struct ConnectorManager {
     shutting_down: AtomicBool,
     generation:AtomicU64,
     restoring:Mutex<()>,
+    plugin_states: Mutex<std::collections::BTreeMap<String, ConnectorState>>,
+    plugin_operations: Mutex<()>,
 }
 fn valid_id(id: &str) -> bool {
     !id.is_empty()
@@ -90,6 +104,18 @@ fn valid_id(id: &str) -> bool {
             .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-')
 }
 fn normalized_config(value: &Value) -> Result<Value, String> {
+    if value.get("connectorPlugin").is_some() {
+        let binding: plugin_manager::Binding = serde_json::from_value(value["connectorPlugin"].clone())
+            .map_err(|_| "插件连接配置无效")?;
+        if serde_json::to_vec(value).map_err(|_| "插件连接配置无效")?.len() > 512 * 1024 { return Err("插件连接配置过大".into()); }
+        let mut config = json!({"connectorPlugin":binding});
+        if let Some(session) = value.get("oauthSession") {
+            if !session.as_str().is_some_and(oauth::valid_session) { return Err("授权会话无效".into()); }
+            config["oauthSession"] = session.clone();
+            config["authMode"] = json!("oauth");
+        }
+        return Ok(config);
+    }
     let config = if let Some(map) = value["mcpServers"].as_object() {
         if map.len() != 1 {
             return Err("每次请选择或导入一个 MCP 服务".into());
@@ -232,6 +258,8 @@ impl ConnectorManager {
             Vec::new()
         };
         let this = Self {
+            plugin_states: Mutex::new(plugin_manager::load_states(&root)?),
+            plugin_operations: Mutex::new(()),
             root,
             workspace,
             state: Mutex::new(State {
@@ -261,7 +289,8 @@ impl ConnectorManager {
         }Ok(())
     }
     fn start(&self, id: &str, config: &Value,cancel:Arc<AtomicBool>) -> Result<Active, String> {
-        let config = normalized_config(config)?;
+        let (config, disabled_tools, timeout) = self.resolve_plugin_config(id, config)?;
+        let config = normalized_config(&config)?;
         let prefix = format!("mcp_ext_{}_", id.replace('-', "_"));
         let mut session = None;
         let client = if let Some(url) = config["url"].as_str() {
@@ -269,7 +298,7 @@ impl ConnectorManager {
                 url: url.into(),
                 headers: string_map(config.get("headers"))?.into_iter().collect(),
                 tool_prefix: prefix,
-                timeout: Duration::from_secs(45),
+                timeout,
             };
             if config["authMode"] == "oauth" {
                 let key = config["oauthSession"]
@@ -286,7 +315,7 @@ impl ConnectorManager {
             let mut mcp = McpConfig::new(config["command"].as_str().unwrap(), &[])
                 .tool_prefix(prefix)
                 .default_risk(Risk::Exec)
-                .timeout(Duration::from_secs(45))
+                .timeout(timeout)
                 .cwd(&self.workspace);
             mcp.args = config["args"]
                 .as_array()
@@ -308,6 +337,7 @@ impl ConnectorManager {
             client,
             valid: Arc::new(AtomicBool::new(true)),
             oauth: session,
+            disabled_tools,
         })
     }
     fn save(&self, records: &[Record]) -> Result<(), String> {
@@ -353,7 +383,7 @@ impl ConnectorManager {
             return Err("连接器标识或名称无效".into());
         }
         let config = normalized_config(&config)?;
-        let mut state = self.state.lock().unwrap_or_else(|e| e.into_inner());
+        let state = self.state.lock().unwrap_or_else(|e| e.into_inner());
         if self.shutting_down.load(Ordering::SeqCst) {
             return Err("应用正在退出".into());
         }
@@ -386,6 +416,11 @@ impl ConnectorManager {
         // A disconnected saved session can still be retained by old task tools.
         if !same_session {
             if let Some(record) = previous {
+                if record.config.get("connectorPlugin").is_some() {
+                    if let Some(key) = record.config["oauthSession"].as_str() {
+                        if let Ok(path) = oauth::token_path(&self.root, id, key) { oauth::retire_credentials(&path); }
+                    }
+                }
                 if let (Some(key), Some(server)) = (
                     record.config["oauthSession"].as_str(),
                     record.config["url"].as_str(),
@@ -421,6 +456,9 @@ impl ConnectorManager {
             .find(|r| r.id == id)
             .cloned()
             .ok_or("连接器未配置")?;
+        if record.config.get("connectorPlugin").is_some() {
+            self.enable_plugin_state(id)?;
+        }
         self.connect(id, &record.name, record.config, true)
     }
     pub fn disconnect(&self, id: &str) -> Result<(), String> {
@@ -433,6 +471,9 @@ impl ConnectorManager {
             .find(|r| r.id == id)
             .ok_or("连接器未配置")?;
         record.enabled = false;
+        if record.config.get("connectorPlugin").is_some() {
+            self.disable_plugin_state(id)?;
+        }
         self.save(&records)?;
         if let Some(active) = state.active.remove(id) {
             active.close();
@@ -461,7 +502,7 @@ impl ConnectorManager {
             .iter()
             .filter(|(_, a)| a.client.is_connected())
             .flat_map(|(id, a)| {
-                a.client.tools().into_iter().map(move |tool| {
+                a.tools(id).into_iter().map(move |tool| {
                     let mut spec = tool.spec().clone().always_ask().untrusted_output();
                     let hash = format!(
                         "{:x}",
@@ -510,7 +551,7 @@ fn status(state: &State, id: &str) -> Value {
     let record = state.records.iter().find(|r| r.id == id);
     let active = state.active.get(id);
     json!({"id":id,"name":record.map(|r|r.name.as_str()).unwrap_or(id),"connected":active.is_some_and(|a|a.client.is_connected()),
-        "enabled":record.is_some_and(|r|r.enabled),"authMode":record.and_then(|r|r.config["authMode"].as_str()).unwrap_or("auto"),"toolCount":active.map(|a|a.client.tools().len()).unwrap_or(0),
+        "enabled":record.is_some_and(|r|r.enabled),"authMode":record.and_then(|r|r.config["authMode"].as_str()).unwrap_or("auto"),"toolCount":active.map(|a|a.tools(id).len()).unwrap_or(0),
         "needsReview":active.is_some_and(|a| a.client.needs_review()),
         "error":if active.is_some_and(|a| a.client.needs_review()) { Some("上次远程操作结果未知；核对服务端状态后，请断开并重新连接。") } else { state.errors.get(id).map(String::as_str) }})
 }
@@ -575,7 +616,8 @@ for line in sys.stdin:
  print(json.dumps({'jsonrpc':'2.0','id':r['id'],'result':v}),flush=True)
 "#).unwrap();
         let manager = ConnectorManager::new(root.join("config"), root.clone()).unwrap();
-        let config = json!({"command":"python3","args":[script.to_str().unwrap()],"env":{"TEST_TOKEN":"must-not-be-in-status"}});
+        let python = if cfg!(windows) { "python" } else { "python3" };
+        let config = json!({"command":python,"args":[script.to_str().unwrap()],"env":{"TEST_TOKEN":"must-not-be-in-status"}});
         assert!(manager
             .connect("test", "Test", config.clone(), false)
             .is_err());

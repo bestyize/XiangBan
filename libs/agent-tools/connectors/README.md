@@ -6,7 +6,7 @@
 - 接收单个服务配置或只含一个服务的标准 mcpServers JSON；配置模板来自 SkillHub README，读取模板不会启动服务。
 - 用户确认后才连接或启动本地命令。Node/Python 等依赖需本机提供；npx 自身的下载行为由用户确认的命令决定。
 - 完成 initialize、initialized 和 tools/list 后才报告连接成功。配置落盘失败会关闭刚创建的连接。
-- API Key / 环境变量保存在本机连接配置；OAuth access/refresh token 按授权会话单独保存。凭据不出现在状态列表、工具描述或系统提示词。Unix 配置目录权限 0700、文件权限 0600；Windows 使用用户数据目录的继承 ACL，并非系统钥匙串或额外加密存储。
+- 旧配置 API 的 API Key / 环境变量保存在本机连接配置，OAuth access/refresh token 按授权会话单独保存；此兼容行为保持不变。插件 API 的表单凭据、覆盖值和 OAuth 凭据使用下述加密保险箱。凭据不出现在状态列表、工具描述或系统提示词。
 - 工具名称经过隔离和长度规范化，保留原工具调用映射。默认 Exec、结果不可信、逐次确认；宿主 Auto danger_check 也必须识别 mcp_ext_ 前缀。
 - 断开连接会关闭客户端并撤销旧工具的调用门禁；进行中的远程操作不能回滚。重连时新任务取得新的工具列表。
 - 应用退出调用 shutdown；保留用户已启用的配置，下次启动恢复连接。普通聊天不因连接器配置损坏而无法运行。
@@ -23,6 +23,20 @@ OAuth 令牌提前 30 秒刷新，收到 401 时再刷新并重试一次；刷�
 
 ## 验证
 
-    cargo test --manifest-path libs/agent-tools/connectors/Cargo.toml
+    cargo test --offline --manifest-path libs/agent-tools/connectors/Cargo.toml
 
 测试使用本机 Python stdio 服务与 Rust TCP 模拟 HTTP 服务，不访问真实第三方账户，覆盖连接、分页、SSE 返回、凭据隐藏、持久化和断开后的旧工具撤销，以及 OAuth 发现、注册、PKCE 回调、错误 state、取消、令牌刷新、刷新失败后的重新授权与资源绑定校验。
+
+## WorkBuddy 插件 API
+
+`plugin::ConnectorPlugin::load(&dir)` 读取插件清单、`mcp.json` / `.mcp.json`、令牌 schema、策略及技能/图标路径，不启动服务。只带技能的目录可以加载，其 `servers` 为空。`ServerSpec::unsupported()` 对旧式 SSE 返回“暂不支持”；宿主应把原因传到 UI 的 `unsupported` 字段，避免尝试连接。`streamableHttp` 和 `streamable-http` 统一为 `Transport::StreamableHttp`。
+
+`build_config(server, &values)` 校验字段并替换模板，返回单服务配置；插件实际连接请使用 `ConnectorManager::connect_plugin(&plugin, server, &values, confirmed)`，让管理器从 vault 合并已存字段并加密保存新字段。需要 OAuth 时用 `Arc<ConnectorManager>::begin_connect_plugin(...)`，复用 `authorization_status` / `cancel_authorization`；显式重新授权也可再次调用此入口。
+
+`connection_id(server)` 返回稳定的插件/服务 ID。多服务插件逐服务连接；凭据按此 ID 隔离。`configured_plugin_fields(id)` 只返回已保存字段名；`plugin_state(id)` 返回状态；`set_plugin_enabled` 启停；`unbind_plugin` 断开并删除表单凭据、覆盖凭据和当前 OAuth 会话。`set_plugin_overrides(id, &headers, &env)` 加密保存覆盖项并断开，需再显式重连。状态文件 `connector-states.json` 的 `header_overrides` / `env_overrides` 保存 vault 引用，使用时再取实际值，不能把引用字符串当作真实凭据展示。
+
+插件记录保存确认过的模板快照与会话引用，恢复时重新从 vault 构造配置，不保存表单填写后的配置。工具策略在名称隔离前过滤，`toolCount` 也排除被禁用工具；策略 timeout 按毫秒传给 stdio / HTTP 客户端。
+
+`vault::Vault` 使用 ring 的 AES-256-GCM 与 HKDF-SHA256，按连接器和字段派生密钥、每次写入生成随机 nonce，并认证连接器/字段身份。Windows 主密钥用当前用户 DPAPI 保护；Unix 目录 0700、文件 0600。`has` 返回 `Result<Vec<String>, String>`，以便将密文损坏报告为错误。不要删除或替换主密钥，否则已有凭据无法解密。
+
+新增测试直接读取本机 WorkBuddy 官方市场（不存在时跳过），不会复制其文件到仓库。Unix 权限代码需要在对应平台验证；本机 Windows 测试覆盖 DPAPI、密文篡改和更换主密钥。
