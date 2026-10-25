@@ -44,6 +44,7 @@ pub fn router() -> Router<AppState> {
         .route("/items", get(list_items).post(create_item))
         .route("/items/{id}", get(get_item).put(update_item).delete(delete_item))
         .route("/items/{id}/status", post(set_status))
+        .route("/plugins/import", post(import_plugin_package).layer(DefaultBodyLimit::max(14 * 1024 * 1024)))
         .route("/items/{id}/versions", post(upload_version).layer(DefaultBodyLimit::max(14 * 1024 * 1024)))
         .route("/versions/{id}", put(update_version))
         .route("/categories", get(list_categories).post(create_category))
@@ -1043,4 +1044,38 @@ async fn delete_category(State(state): State<AppState>, _admin: Admin, Path(id):
         return Err(AppError::NotFound("分类不存在".into()));
     }
     Ok(Json(json!({ "ok": true })))
+}
+
+/// 上传 WorkBuddy 专家插件包（ZIP）：校验、写入条目、头像和版本。表单字段：`file`，可选 `status`
+/// （draft / published）、`namespace`（默认 xiaoban）、`source`、`lenient`（true 时展示规范只给警告）。
+async fn import_plugin_package(State(state): State<AppState>, _admin: Admin, mut multipart: Multipart) -> Result<Json<Value>> {
+    let (mut file, mut opts) = (None, crate::experts::ImportOpts { namespace: "xiaoban".into(), ..Default::default() });
+    while let Some(field) = multipart.next_field().await.map_err(|e| AppError::BadRequest(format!("上传内容无效：{e}")))? {
+        let name = field.name().unwrap_or("").to_string();
+        match name.as_str() {
+            "file" => file = Some(field.bytes().await.map_err(|e| AppError::BadRequest(format!("读取文件失败：{e}")))?),
+            "status" | "namespace" | "source" | "lenient" => {
+                let value = field.text().await.map_err(|e| AppError::BadRequest(e.to_string()))?.trim().to_string();
+                match name.as_str() {
+                    "status" if !value.is_empty() => {
+                        check_status(&value)?;
+                        opts.status = Some(value);
+                    }
+                    "namespace" if !value.is_empty() => opts.namespace = value,
+                    "source" if !value.is_empty() => {
+                        if !matches!(value.as_str(), "official" | "community" | "enterprise") {
+                            return Err(AppError::BadRequest("source 只能是 official / community / enterprise".into()));
+                        }
+                        opts.source = Some(value);
+                    }
+                    "lenient" => opts.lenient = value == "true",
+                    _ => {}
+                }
+            }
+            _ => {}
+        }
+    }
+    let bytes = file.ok_or_else(|| AppError::BadRequest("缺少 file 字段（插件 ZIP 包）".into()))?;
+    let report = crate::experts::import_plugin(&state, &bytes, &opts).await?;
+    Ok(Json(json!({ "itemId": report.item_id, "version": report.version, "created": report.created, "issues": report.issues })))
 }

@@ -50,8 +50,27 @@ async fn mock_skills(State(m): State<Mock>) -> Json<Value> {
     ]}}))
 }
 
+const EXPERT_CONTENT: &str = "---\nname: tech-test-automation\ndescription: x\nversion: 1.0.0\n---\n# 自动化测试工作流\n\n## 步骤 1\n使用 **pdf-toolkit** 读取文档。\n";
+
+fn mock_expert() -> Value {
+    json!({
+        "slug": "tech-test-automation", "displayName": "自动化测试", "displayNameEn": "Test Automation", "published": 1, "scene": "tech",
+        "summary": "从 TDD 到 E2E 与 API 测试自动化，再到 QA 测试计划的完整自动化测试工作流。",
+        "iconUrl": "https://example.com/icons/test.avif", "content": EXPERT_CONTENT,
+        "skills": [{"slug": "pdf-toolkit", "namespace": "user_1"}, {"slug": "web-to-md", "namespace": "user_1"}, {"slug": "gone-skill"}],
+    })
+}
+
+async fn mock_skillsets() -> Json<Value> {
+    Json(json!({"skillSets": [mock_expert()], "total": 1}))
+}
+
+async fn mock_skillset_detail(Path(slug): Path<String>) -> Result<Json<Value>, StatusCode> {
+    (slug == "tech-test-automation").then(|| Json(mock_expert())).ok_or(StatusCode::NOT_FOUND)
+}
+
 async fn mock_skill_detail(Path(slug): Path<String>) -> Json<Value> {
-    Json(json!({"skill": {"slug": slug, "banned": false}, "namespace": {"handle": "user_1"},
+    Json(json!({"skill": {"slug": slug, "banned": slug == "gone-skill"}, "namespace": {"handle": "user_1"},
         "latestVersion": {"version": "1.0.0", "changelog": "首发"}}))
 }
 
@@ -82,6 +101,8 @@ async fn spawn_mock() -> (String, Mock) {
     let app = Router::new()
         .route("/api/skills", get(mock_skills))
         .route("/api/v1/skills/{slug}", get(mock_skill_detail))
+        .route("/api/v1/skillsets", get(mock_skillsets))
+        .route("/api/v1/skillsets/{slug}", get(mock_skillset_detail))
         .route("/api/v1/download", get(mock_download))
         .route("/list", post(mock_generic_list))
         .with_state(mock.clone());
@@ -835,5 +856,150 @@ description: 配图
     let manifest = app.get("/api/v1/market/skills/ns/long-article-illustration-by-hongzhua/versions/1.0.1").await;
     assert_eq!(manifest["manifestSha256"], json!(manifest_sha));
     pool.close().await;
+    app.cleanup().await;
+}
+
+/// 一个符合 WorkBuddy 规范的专家插件包。
+fn expert_plugin(version: &str, tags: usize) -> Vec<u8> {
+    let all_tags = vec![json!({"en": "Accounting", "zh": "会计核算"}), json!({"en": "Tax", "zh": "税务核算"}), json!({"en": "Analysis", "zh": "财务分析"})];
+    let manifest = json!({
+        "name": "accounting-supervisor", "version": version, "description": "AI accounting supervisor.",
+        "agents": ["./agents/accounting-supervisor.md"], "expertType": "agent", "agentName": "accounting-supervisor",
+        "displayName": {"en": "AI Accounting Supervisor", "zh": "AI 会计主管"},
+        "profession": {"en": "Accounting Supervisor", "zh": "会计主管"},
+        "displayDescription": {"en": "Senior accountant.", "zh": "聚焦会计核算（凭证/账簿/报表/税务）与财务分析（比率/趋势/预算/经营诊断），输出严谨可落地成果。"},
+        "avatar": "avatars/expert.png", "categoryId": "08-FinanceInvestment",
+        "defaultInitPrompt": {"zh": "请审核这笔分录", "en": "Review this entry"}, "plugin": "accounting-supervisor",
+        "tags": all_tags[..tags],
+        "quickPrompts": [{"en": "Review this entry", "zh": "请审核这笔分录"}, {"en": "Prepare statements", "zh": "编制本月报表"}, {"en": "Ratio analysis", "zh": "做比率分析"}],
+    })
+    .to_string();
+    let agent = "---\nname: accounting-supervisor\ndescription: Senior accountant.\ndisplayName:\n  en: AI Accounting Supervisor\n  zh: AI 会计主管\nprofession:\n  en: Accounting Supervisor\n  zh: 会计主管\nmaxTurns: 50\n---\n# AI 会计主管\n\n你是会计主管。\n";
+    let mut png = vec![0x89, b'P', b'N', b'G', 0x0D, 0x0A, 0x1A, 0x0A];
+    png.extend_from_slice(&[0u8; 64]);
+    zip_bytes(&[
+        (".codebuddy-plugin/plugin.json", manifest.as_bytes()),
+        ("agents/accounting-supervisor.md", agent.as_bytes()),
+        ("avatars/expert.png", &png),
+        ("README.md", "# 会计主管\n负责核算与分析。".as_bytes()),
+    ])
+}
+
+#[tokio::test]
+async fn workbuddy_expert_plugins_upload_publish_serve_their_avatar_and_download_whole() {
+    let app = app!();
+    let upload = |bytes: Vec<u8>, extra: &[(&str, &str)]| {
+        let mut form = reqwest::multipart::Form::new().part("file", reqwest::multipart::Part::bytes(bytes).file_name("expert.zip"));
+        for (k, v) in extra {
+            form = form.text(k.to_string(), v.to_string());
+        }
+        app.http.post(format!("{}/api/v1/admin/plugins/import", app.base)).bearer_auth(&app.token).multipart(form).send()
+    };
+
+    // 规范不全的包（只有 2 个标签）：严格模式拒绝并说明，宽松模式放行并带警告。
+    let strict = upload(expert_plugin("1.0.0", 2), &[]).await.unwrap();
+    assert_eq!(strict.status(), 400);
+    assert!(strict.text().await.unwrap().contains("tags"));
+    let lenient: Value = upload(expert_plugin("1.0.0", 2), &[("lenient", "true")]).await.unwrap().json().await.unwrap();
+    assert_eq!(lenient["created"], true);
+    assert!(lenient["issues"].as_array().unwrap().iter().any(|i| i["message"].as_str().unwrap().contains("tags") && i["error"] == false));
+
+    // 符合规范的新版本覆盖同一个条目；相同内容再传一遍是幂等的，同版本不同内容是冲突。
+    let v2 = expert_plugin("1.1.0", 3);
+    let done: Value = upload(v2.clone(), &[("status", "published")]).await.unwrap().json().await.unwrap();
+    assert_eq!((done["created"].clone(), done["version"].clone()), (json!(false), json!("1.1.0")));
+    assert_eq!(upload(v2, &[]).await.unwrap().status(), 200);
+    assert_eq!(upload(expert_plugin("1.1.0", 2), &[("lenient", "true")]).await.unwrap().status(), 409);
+    // 不是图片的头像、没有清单的包都被拒绝。
+    assert_eq!(upload(zip_bytes(&[("agents/a.md", b"x")]), &[]).await.unwrap().status(), 400);
+
+    // 公开列表：带展示字段、WorkBuddy 分类和头像地址。
+    let list = app.get("/api/v1/market/experts").await;
+    let item = list["results"].as_array().unwrap().iter().find(|i| i["slug"] == "accounting-supervisor").unwrap().clone();
+    assert_eq!(item["name"], "AI 会计主管");
+    assert_eq!(item["category"]["slug"], "08-FinanceInvestment");
+    assert_eq!((item["expert"]["profession"]["zh"].clone(), item["expert"]["tags"].as_array().unwrap().len()), (json!("会计主管"), 3));
+    let icon = item["iconUrl"].as_str().unwrap().to_string();
+    assert!(icon.starts_with("/api/v1/market/assets/"), "{icon}");
+    let image = app.http.get(format!("{}{icon}", app.base)).send().await.unwrap();
+    assert_eq!(image.headers()["content-type"], "image/png");
+    assert!(image.headers()["cache-control"].to_str().unwrap().contains("immutable"));
+    assert_eq!(app.http.get(format!("{}/api/v1/market/assets/{}", app.base, "0".repeat(64))).send().await.unwrap().status(), 404);
+    assert_eq!(app.http.get(format!("{}/api/v1/market/assets/not-a-sha", app.base)).send().await.unwrap().status(), 404);
+
+    // 版本清单带清单目录，下载的包和清单摘要一致。
+    let base = "/api/v1/market/experts/xiaoban/accounting-supervisor";
+    let manifest = app.get(&format!("{base}/versions/1.1.0")).await;
+    let paths: Vec<&str> = manifest["files"].as_array().unwrap().iter().map(|f| f["path"].as_str().unwrap()).collect();
+    assert!(paths.contains(&".codebuddy-plugin/plugin.json") && paths.contains(&"agents/accounting-supervisor.md"), "{paths:?}");
+    let bytes = app.http.get(format!("{}{base}/versions/1.1.0/download", app.base)).send().await.unwrap().bytes().await.unwrap();
+    let unpacked = server_xiaoban_market::package::unpack_zip(&bytes).unwrap();
+    assert_eq!(json!(unpacked.manifest_sha256), manifest["manifestSha256"]);
+    app.cleanup().await;
+}
+
+#[tokio::test]
+async fn the_old_expert_categories_are_folded_into_workbenchs_twelve() {
+    let app = app!();
+    let (prefix, _) = app.admin_url.rsplit_once('/').unwrap();
+    let pool = sqlx::PgPool::connect(&format!("{prefix}/{}", app.db_name)).await.unwrap();
+    // 早先版本的状态：自建的 8 类，其中一个专家挂在 engineering 下。
+    sqlx::query("INSERT INTO categories (kind, slug, name, sort_order) VALUES ('expert', 'engineering', '技术工程', 1) ON CONFLICT DO NOTHING").execute(&pool).await.unwrap();
+    sqlx::query("INSERT INTO items (kind, namespace, slug, name, category_id) VALUES ('expert', 'ns', 'old-expert', 'old', (SELECT id FROM categories WHERE kind='expert' AND slug='engineering'))").execute(&pool).await.unwrap();
+    server_xiaoban_market::items::normalize_categories(&pool).await.unwrap();
+    let slugs: Vec<String> = sqlx::query_scalar("SELECT slug FROM categories WHERE kind = 'expert' ORDER BY sort_order, id").fetch_all(&pool).await.unwrap();
+    assert_eq!(slugs.len(), 12, "{slugs:?}");
+    assert_eq!(slugs[0], "01-ProductDesign");
+    let moved: String = sqlx::query_scalar("SELECT c.slug FROM items i JOIN categories c ON c.id = i.category_id WHERE i.slug = 'old-expert'").fetch_one(&pool).await.unwrap();
+    assert_eq!(moved, "02-Engineering");
+    let names: Vec<String> = sqlx::query_scalar("SELECT name_en FROM categories WHERE kind = 'expert' AND name_en <> ''").fetch_all(&pool).await.unwrap();
+    assert_eq!(names.len(), 12, "每个分类都带英文名");
+    pool.close().await;
+    app.cleanup().await;
+}
+
+#[tokio::test]
+async fn skillhub_experts_become_workbuddy_plugins_with_their_skills_packed_inside() {
+    let app = app!();
+    let source = app.source_id("skillhub-experts").await;
+    app.put(&format!("/api/v1/admin/sources/{source}"), json!({"config": {"base_url": app.upstream, "origin": "skillhub", "request_interval_ms": 0}})).await;
+    let done = app.run_job(source, json!({})).await;
+    assert_eq!(done["job"]["status"], "succeeded", "{done}");
+    let staged = app.staged("status=pending").await;
+    assert_eq!(staged.len(), 1, "{staged:?}");
+
+    let ids: Vec<Value> = staged.iter().map(|s| s["id"].clone()).collect();
+    let imported = app.post("/api/v1/admin/staged/import", json!({"ids": ids, "status": "published"})).await;
+    assert!(imported["results"][0]["ok"] == true, "{imported}");
+
+    // 条目：中文名、WorkBuddy 分类、展示字段；子技能带上了两个，下架的那个记在 missingSkills 里。
+    let list = app.get("/api/v1/market/experts").await;
+    let item = list["results"][0].clone();
+    assert_eq!((item["slug"].clone(), item["name"].clone(), item["category"]["slug"].clone()), (json!("tech-test-automation"), json!("自动化测试"), json!("02-Engineering")));
+    assert_eq!(item["iconUrl"], "https://example.com/icons/test.avif");
+    let expert = &item["expert"];
+    assert_eq!((expert["generated"].clone(), expert["profession"]["zh"].clone()), (json!(true), json!("自动化测试")));
+    assert_eq!(expert["skills"], json!(["./skills/pdf-toolkit", "./skills/web-to-md"]));
+    assert!(expert["missingSkills"][0].as_str().unwrap().starts_with("gone-skill"), "{expert}");
+    assert_eq!(expert["quickPrompts"].as_array().unwrap().len(), 3);
+
+    // 包：插件清单、人设、两个技能（含脚本）、README。
+    let base = "/api/v1/market/experts/skillhub/tech-test-automation";
+    let manifest = app.get(&format!("{base}/versions/1.0.0")).await;
+    let bytes = app.http.get(format!("{}{base}/versions/1.0.0/download", app.base)).send().await.unwrap().bytes().await.unwrap();
+    let pkg = server_xiaoban_market::plugin::inspect_plugin_zip(&bytes).unwrap();
+    assert_eq!(json!(pkg.unpacked.manifest_sha256), manifest["manifestSha256"]);
+    for path in [".codebuddy-plugin/plugin.json", "agents/tech-test-automation.md", "README.md", "skills/pdf-toolkit/SKILL.md", "skills/pdf-toolkit/scripts/run.py", "skills/web-to-md/SKILL.md"] {
+        assert!(pkg.unpacked.contents.contains_key(path), "缺少 {path}");
+    }
+    let agent = &pkg.agents["agents/tech-test-automation.md"];
+    assert!(agent.body.contains("## 工作流程") && agent.body.contains("使用 **pdf-toolkit**"));
+    assert!(String::from_utf8_lossy(&pkg.unpacked.contents["README.md"]).contains("gone-skill"));
+
+    // 再同步一次：上游没变，不产生新版本。
+    let again = app.post("/api/v1/admin/staged/import", json!({"ids": [staged[0]["id"].clone()]})).await;
+    assert!(again["results"][0]["ok"] == true, "{again}");
+    let detail = app.get(&format!("{base}")).await;
+    assert_eq!(detail["versions"].as_array().unwrap().len(), 1, "{detail}");
     app.cleanup().await;
 }

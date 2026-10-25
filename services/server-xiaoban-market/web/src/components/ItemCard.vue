@@ -23,6 +23,7 @@ defineProps<{ item: Item; to: RouteLocationRaw; keyword?: string; muted?: boolea
           </span>
           <span v-if="item.variant !== 'single'" class="vtag">{{ VARIANT_LABEL[item.variant] }}</span>
         </div>
+        <div v-if="item.expert?.profession?.zh" class="profession">{{ item.expert.profession.zh }}<template v-if="item.expert.skills?.length"> · {{ item.expert.skills.length }} 个技能</template></div>
         <div class="summary">{{ item.summary || '暂无简介' }}</div>
       </div>
     </div>
@@ -47,6 +48,7 @@ defineProps<{ item: Item; to: RouteLocationRaw; keyword?: string; muted?: boolea
 .name { display: flex; align-items: center; gap: 8px; font-size: 17px; font-weight: 600; letter-spacing: -0.005em; min-width: 0; }
 .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .vtag { flex: 0 0 auto; padding: 1px 8px; border-radius: 6px; background: #141414; color: #fff; font-size: 12px; font-weight: 500; }
+.profession { color: var(--ink-3); font-size: 13px; margin-bottom: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .summary { color: var(--ink-2); font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tags { display: flex; flex-wrap: wrap; gap: 8px; }
 .meta { display: flex; align-items: center; gap: 18px; color: var(--ink-3); font-size: 14px; font-variant-numeric: tabular-nums; }

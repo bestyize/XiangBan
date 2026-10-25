@@ -22,15 +22,22 @@ pub const KNOWN_CATEGORIES: &[(&str, &str, &str, &str)] = &[
     ("skill", "business-ops", "business-ops", "商业运营"),
     ("skill", "professional", "professional", "专业领域"),
     ("skill", "life-service", "life-service", "生活服务"),
-    ("expert", "tech", "engineering", "技术工程"),
-    ("expert", "finance", "finance", "金融投资"),
-    ("expert", "legal", "legal", "法务合规"),
-    ("expert", "lifestyle", "life", "生活服务"),
-    ("expert", "media", "content", "内容创作"),
-    ("expert", "academic", "education", "教育学习"),
-    ("expert", "hr", "office", "办公行政"),
-    ("expert", "healthcare", "healthcare", "医疗健康"),
-    ("expert", "mysticism", "mysticism", "命理玄学"),
+    // 专家分类用 WorkBuddy 的 12 个行业分类。SkillHub 的场景和我们早先自建的 8 类都归到它们下面。
+    ("expert", "tech", "02-Engineering", "技术工程"),
+    ("expert", "engineering", "02-Engineering", "技术工程"),
+    ("expert", "finance", "08-FinanceInvestment", "金融投资"),
+    ("expert", "legal", "11-SecurityCompliance", "法务安全"),
+    ("expert", "media", "06-ContentCreative", "内容创作"),
+    ("expert", "content", "06-ContentCreative", "内容创作"),
+    ("expert", "hr", "09-OperationsHR", "运营人力"),
+    ("expert", "office", "09-OperationsHR", "运营人力"),
+    ("expert", "product", "01-ProductDesign", "产品设计"),
+    ("expert", "lifestyle", "12-IndustryConsultant", "行业顾问"),
+    ("expert", "life", "12-IndustryConsultant", "行业顾问"),
+    ("expert", "academic", "12-IndustryConsultant", "行业顾问"),
+    ("expert", "education", "12-IndustryConsultant", "行业顾问"),
+    ("expert", "healthcare", "12-IndustryConsultant", "行业顾问"),
+    ("expert", "mysticism", "12-IndustryConsultant", "行业顾问"),
     ("connector", "开发者工具", "dev", "开发协作"),
     ("connector", "文档工具", "docs", "办公文档"),
     ("connector", "数据库与文件", "database", "数据库"),
@@ -134,7 +141,7 @@ mod tests {
     #[test]
     fn upstream_labels_map_to_chinese_categories() {
         assert_eq!(known_category("skill", "Content-Creation"), Some(("content", "内容创作")));
-        assert_eq!(known_category("expert", "tech"), Some(("engineering", "技术工程")));
+        assert_eq!(known_category("expert", "tech"), Some(("02-Engineering", "技术工程")));
         assert_eq!(known_category("connector", "浏览器自动化"), Some(("web", "搜索与网页")));
         // 类型不同不串：技能的 media 不是专家的 media。
         assert_eq!(known_category("skill", "media"), None);

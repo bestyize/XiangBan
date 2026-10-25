@@ -26,6 +26,7 @@ pub fn router() -> Router<AppState> {
         .route("/categories", get(categories))
         .route("/suggest", get(suggest))
         .route("/updates", post(updates))
+        .route("/assets/{sha}", get(asset))
         .route("/{kind}", get(list))
         .route("/{kind}/{namespace}/{slug}", get(detail))
         .route("/{kind}/{namespace}/{slug}/versions/{version}", get(version_manifest))
@@ -65,6 +66,7 @@ pub struct ItemRow {
     origin: String,
     variant: String,
     member_count: Option<i32>,
+    expert: Option<PgJson<Value>>,
     latest_version: Option<String>,
     download_count: i64,
     favorite_count: i64,
@@ -78,6 +80,7 @@ fn item_json(r: &ItemRow) -> Value {
         "id": r.id, "kind": r.kind, "namespace": r.namespace, "slug": r.slug, "name": r.name, "summary": r.summary,
         "category": r.category_slug.as_ref().map(|s| json!({"slug": s, "name": r.category_name})),
         "tags": r.tags, "iconUrl": r.icon_url, "source": r.source, "origin": r.origin, "variant": r.variant, "memberCount": r.member_count,
+        "expert": r.expert.as_ref().map(|e| &e.0),
         "version": r.latest_version, "downloads": r.download_count, "favorites": r.favorite_count, "heat": r.download_count + r.favorite_count * 5,
         "featured": r.featured, "updatedAt": r.updated_at,
     })
@@ -121,8 +124,8 @@ pub struct SearchArgs {
 }
 
 const SELECT: &str = "SELECT i.id, i.kind, i.namespace, i.slug, i.name, i.summary, c.slug AS category_slug, c.name AS category_name,
-  i.tags, i.icon_url, i.source, i.origin, i.variant, jsonb_array_length(i.metadata->'members') AS member_count,
-  i.latest_version, i.download_count, i.favorite_count, i.featured, i.updated_at,
+  i.tags, i.icon_url, i.source, i.origin, i.variant, COALESCE(jsonb_array_length(i.metadata->'expert'->'members'), jsonb_array_length(i.metadata->'members')) AS member_count,
+  i.metadata->'expert' AS expert, i.latest_version, i.download_count, i.favorite_count, i.featured, i.updated_at,
   count(*) OVER() AS total
   FROM items i LEFT JOIN categories c ON c.id = i.category_id
   WHERE i.status = 'published' AND i.kind = $1 AND ($2::text IS NULL OR c.slug = $2) AND ($3::text IS NULL OR i.source = $3)
@@ -528,4 +531,21 @@ mod tests {
         assert_eq!(kind_of("connector").unwrap(), "connector");
         assert!(kind_of("apps").is_err());
     }
+}
+
+/// 头像等资源：按内容摘要访问，内容不会变，所以可以长期缓存。只发图片，文件头不对就当不存在。
+async fn asset(State(state): State<AppState>, Path(sha): Path<String>) -> Result<axum::response::Response> {
+    use axum::{http::header, response::IntoResponse};
+    if sha.len() != 64 || !sha.bytes().all(|b| b.is_ascii_hexdigit()) {
+        return Err(AppError::NotFound("资源不存在".into()));
+    }
+    let bytes = tokio::fs::read(crate::storage::asset_path(&state.config.data_dir, &sha.to_ascii_lowercase()))
+        .await
+        .map_err(|_| AppError::NotFound("资源不存在".into()))?;
+    let kind = crate::experts::image_kind(&bytes).ok_or_else(|| AppError::NotFound("资源不存在".into()))?;
+    Ok((
+        [(header::CONTENT_TYPE, kind), (header::CACHE_CONTROL, "public, max-age=31536000, immutable"), (header::X_CONTENT_TYPE_OPTIONS, "nosniff")],
+        bytes,
+    )
+        .into_response())
 }

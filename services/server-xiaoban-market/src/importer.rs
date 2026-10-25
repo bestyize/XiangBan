@@ -1,7 +1,7 @@
 //! 暂存项入库：二次抓取详情 / 安装包、校验、解析分类，并在一个事务里写入条目与版本。
 use crate::{
     error::{AppError, Result},
-    items, package, storage,
+    convert, experts, items, package, plugin, storage,
     state::AppState,
     upstream::{self, Enrichment, Normalized, SourceRow},
 };
@@ -65,29 +65,50 @@ async fn import_inner(state: &AppState, id: Uuid, opts: &ImportOpts) -> Result<U
             latest_version = Some(version.clone());
             let sha = package::sha256_hex(&bytes);
             storage::store_package(&state.config.data_dir, &sha, &bytes).await.map_err(|e| AppError::Internal(format!("保存安装包失败：{e}")))?;
-            package_row = Some((version, changelog, bytes.len() as i64, sha, info));
+            package_row = Some((version, changelog, bytes.len() as i64, sha, info.files.clone(), info.manifest_sha256.clone()));
         }
-        Enrichment::Expert { content, dependencies } => {
-            // 专家按技能的方式安装：正文打成只含 SKILL.md 的包，依赖清单留在元数据里。
-            let bytes = package::expert_package(&content, &n.slug).map_err(|e| AppError::BadRequest(format!("安装包未通过校验：{e}")))?;
-            let info = package::inspect_zip(&bytes).map_err(|e| AppError::BadRequest(format!("安装包未通过校验：{e}")))?;
-            let sha = package::sha256_hex(&bytes);
-            let declared = package::expert_version(&info.skill_md, &sha, None);
+        Enrichment::Expert { content, dependencies, detail, children, missing } => {
+            // 专家转成 WorkBuddy 插件：工作流成为人设，依赖的子技能打进 `skills/`。
+            let category_id = items::resolve_category(pool, &n.kind, n.category.as_deref(), None).await?;
+            let category_slug: String = match category_id {
+                Some(id) => sqlx::query_scalar("SELECT slug FROM categories WHERE id = $1").bind(id).fetch_one(pool).await?,
+                None => "12-IndustryConsultant".into(),
+            };
+            let category_slug = if crate::plugin::CATEGORIES.iter().any(|(c, _, _)| *c == category_slug) { category_slug } else { "12-IndustryConsultant".to_string() };
+            let name_en = detail["displayNameEn"].as_str().unwrap_or("").to_string();
+            let summary_en = detail["summaryEn"].as_str().unwrap_or("").to_string();
+            let base_version = package::expert_version(&content, "", None);
+            let mut bytes = convert::skillhub_expert(&expert_source(&n, &name_en, &summary_en, &content, &category_slug, &base_version), &children, &missing).map_err(|e| AppError::BadRequest(format!("转换专家包失败：{e}")))?;
+            let mut version = base_version.clone();
+            // 同一个版本号下内容变了（上游改了正文或子技能），用内容摘要作后缀开一个新版本，客户端才能发现更新。
             let stored: Option<String> = sqlx::query_scalar(
                 "SELECT v.package_sha256 FROM versions v JOIN items i ON i.id = v.item_id WHERE i.kind = $1 AND i.origin = $2 AND i.origin_ref = $3 AND v.version = $4",
             )
             .bind(&n.kind)
             .bind(&origin)
             .bind(&n.upstream_id)
-            .bind(&declared)
+            .bind(&version)
             .fetch_optional(pool)
             .await?;
-            let version = package::expert_version(&info.skill_md, &sha, stored.as_deref());
+            if stored.as_deref().is_some_and(|s| s != package::sha256_hex(&bytes)) {
+                version = format!("{base_version}+{}", &package::sha256_hex(&bytes)[..8]);
+                bytes = convert::skillhub_expert(&expert_source(&n, &name_en, &summary_en, &content, &category_slug, &version), &children, &missing).map_err(|e| AppError::BadRequest(format!("转换专家包失败：{e}")))?;
+            }
+            let pkg = plugin::inspect_plugin_zip(&bytes).map_err(|e| AppError::BadRequest(format!("转换后的插件包未通过校验：{e}")))?;
+            let issues = plugin::validate_expert(&pkg.manifest, &pkg.unpacked.contents, true);
+            if let Some(error) = issues.iter().find(|i| i.error && !i.message.contains("头像")) {
+                return Err(AppError::BadRequest(format!("转换后的插件包未通过校验：{}", error.message)));
+            }
+            let sha = package::sha256_hex(&bytes);
             storage::store_package(&state.config.data_dir, &sha, &bytes).await.map_err(|e| AppError::Internal(format!("保存安装包失败：{e}")))?;
-            latest_version = Some(version.clone());
-            description = content;
+            let mut expert = experts::presentation(state, &pkg, n.icon_url.as_deref()).await?;
+            expert["generated"] = json!(true);
+            expert["missingSkills"] = json!(missing);
+            metadata["expert"] = expert;
             metadata["dependencies"] = dependencies;
-            package_row = Some((version, String::new(), bytes.len() as i64, sha, info));
+            description = content.clone();
+            latest_version = Some(version.clone());
+            package_row = Some((version, String::new(), bytes.len() as i64, sha, pkg.unpacked.files.clone(), pkg.unpacked.manifest_sha256.clone()));
         }
         Enrichment::Connector { readme, configs } => {
             description = readme;
@@ -180,7 +201,7 @@ async fn import_inner(state: &AppState, id: Uuid, opts: &ImportOpts) -> Result<U
         .await?
     };
 
-    if let Some((version, changelog, size, sha, info)) = &package_row {
+    if let Some((version, changelog, size, sha, files, manifest_sha256)) = &package_row {
         sqlx::query(
             "INSERT INTO versions (item_id, version, changelog, manifest, manifest_sha256, package_sha256, package_size)
              VALUES ($1,$2,$3,$4,$5,$6,$7) ON CONFLICT (item_id, version) DO NOTHING",
@@ -188,8 +209,8 @@ async fn import_inner(state: &AppState, id: Uuid, opts: &ImportOpts) -> Result<U
         .bind(item_id)
         .bind(version)
         .bind(changelog)
-        .bind(Json(json!({ "files": info.files })))
-        .bind(&info.manifest_sha256)
+        .bind(Json(json!({ "files": files })))
+        .bind(manifest_sha256)
         .bind(sha)
         .bind(size)
         .execute(&mut *tx)
@@ -286,4 +307,8 @@ pub async fn backfill_expert_packages(pool: &sqlx::PgPool, data_dir: &std::path:
         done += 1;
     }
     Ok(done)
+}
+
+fn expert_source<'a>(n: &'a Normalized, name_en: &'a str, summary_en: &'a str, content: &'a str, category_id: &'a str, version: &'a str) -> convert::Source<'a> {
+    convert::Source { slug: &n.slug, name_zh: &n.name, name_en, summary: &n.summary, summary_en, content, category_id, version }
 }

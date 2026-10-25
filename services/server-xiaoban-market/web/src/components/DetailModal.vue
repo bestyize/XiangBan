@@ -83,6 +83,7 @@ const configJson = computed(() => {
           <Avatar :name="item.name" :seed="item.slug" :icon-url="item.iconUrl" :size="item.kind === 'connector' ? 76 : 88" />
           <div class="head-main">
             <h1>{{ item.name }}<span v-if="item.variant !== 'single'" class="vtag">{{ VARIANT_LABEL[item.variant] }}</span></h1>
+            <div v-if="item.metadata.expert?.profession?.zh" class="profession">{{ item.metadata.expert.profession.zh }}<template v-if="item.metadata.expert.profession.en"> · {{ item.metadata.expert.profession.en }}</template></div>
             <div class="actions">
               <a v-if="action" class="btn btn-primary" :href="action.href">{{ action.label }}</a>
               <a v-if="item.kind === 'skill' && latest?.downloadUrl" class="btn" :href="latest.downloadUrl" download>
@@ -135,6 +136,14 @@ const configJson = computed(() => {
               </li>
             </ul>
             <p v-if="item.variant === 'bundle'" class="hint">套件本身没有安装包，安装时小伴桌面会逐个安装并校验上面的技能。</p>
+          </section>
+
+          <section v-if="item.metadata.expert?.skills?.length || item.metadata.expert?.missingSkills?.length">
+            <h2><Icon name="skill" :size="20" />随专家安装的技能<small>{{ item.metadata.expert.skills?.length ?? 0 }} 个</small></h2>
+            <div class="deps">
+              <span v-for="skill in item.metadata.expert.skills ?? []" :key="skill" class="chip">{{ skill.replace('./skills/', '') }}</span>
+            </div>
+            <p v-if="item.metadata.expert.missingSkills?.length" class="hint">有 {{ item.metadata.expert.missingSkills.length }} 个技能暂时没有带上：{{ item.metadata.expert.missingSkills.join('、') }}</p>
           </section>
 
           <section v-if="item.prompts.length">
@@ -202,6 +211,7 @@ const configJson = computed(() => {
 .head { flex: 0 0 auto; display: flex; flex-wrap: wrap; align-items: center; gap: 20px 28px; padding: 40px 72px 24px 44px; border-bottom: 1px solid var(--line); }
 .head-main { display: flex; flex-direction: column; align-items: flex-start; gap: 14px; min-width: 0; }
 h1 { font-size: 26px; font-weight: 600; letter-spacing: -0.01em; overflow-wrap: anywhere; display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
+.profession { color: var(--ink-2); font-size: 15px; }
 .vtag { padding: 2px 10px; border-radius: 8px; background: #141414; color: #fff; font-size: 13px; font-weight: 500; letter-spacing: 0; }
 .members { list-style: none; margin: 0; padding: 0; border: 1px solid var(--line); border-radius: 16px; overflow: hidden; }
 .members li + li { border-top: 1px solid var(--line); }

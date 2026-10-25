@@ -8,8 +8,28 @@ export interface CategoryRef {
   name: string;
 }
 
+/** WorkBuddy 专家插件的展示字段（条目的 `expert`）。 */
+export interface Bilingual { en: string; zh: string }
+export interface ExpertInfo {
+  expertType?: 'agent' | 'team';
+  agentName?: string;
+  displayName?: Bilingual;
+  profession?: Bilingual;
+  displayDescription?: Bilingual;
+  categoryId?: string;
+  tags?: Bilingual[];
+  quickPrompts?: Bilingual[];
+  avatarUrl?: string | null;
+  skills?: string[];
+  members?: { id: string; name: Bilingual; profession: Bilingual; role: string; avatarUrl?: string | null }[];
+  /** 从别处转换而来，推荐提问和标签是生成的，可以在后台再改。 */
+  generated?: boolean;
+  missingSkills?: string[];
+}
+
 export interface Item {
   id: string;
+  expert?: ExpertInfo | null;
   kind: Kind;
   namespace: string;
   slug: string;
@@ -72,7 +92,7 @@ export interface ItemDetail {
     originUrl: string | null;
     license: string | null;
     prompts: string[];
-    metadata: { configs?: { name: string; config: unknown }[]; dependencies?: { slug: string; namespace?: string; version?: string }[] };
+    metadata: { configs?: { name: string; config: unknown }[]; dependencies?: { slug: string; namespace?: string; version?: string }[]; expert?: ExpertInfo };
     publishedAt: string | null;
   };
   versions: VersionInfo[];

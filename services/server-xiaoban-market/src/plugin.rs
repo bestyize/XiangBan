@@ -341,7 +341,7 @@ pub fn validate_expert(m: &Manifest, files: &BTreeMap<String, Vec<u8>>, lenient:
     }
 
     match m.avatar.as_str() {
-        "" => err("缺少 avatar".into()),
+        "" => err("缺少 avatar（头像）".into()),
         path => match files.get(rel(path)) {
             None => err(format!("找不到头像：{path}")),
             // 实测 WorkBuddy 自己发布的专家头像也有超过 500 KB 的，所以这条只是展示规范，不是硬限制。

@@ -164,6 +164,32 @@ async function createItem() {
   }
 }
 
+const pluginInput = ref<HTMLInputElement | null>(null);
+const uploading = ref(false);
+/** 上传 WorkBuddy 专家插件包：先按完整规范校验，不通过时说明原因；勾选宽松模式可放行展示规范上的小问题。 */
+async function uploadPlugin(event: Event) {
+  const input = event.target as HTMLInputElement;
+  const file = input.files?.[0];
+  input.value = '';
+  if (!file) return;
+  const lenient = confirm('按 WorkBuddy 的完整展示规范校验（标签、提问各 3 个，描述 40–50 字等）。\n\n如果这是别处发布的插件，点「确定」用宽松模式导入（这些规范只给警告）；点「取消」用严格模式。');
+  uploading.value = true;
+  try {
+    const form = new FormData();
+    form.append('file', file);
+    form.append('lenient', String(lenient));
+    const r = await admin.importPlugin(form);
+    const warnings = r.issues.filter((i) => !i.error);
+    toast(`${r.created ? '已创建' : '已更新'}专家，版本 ${r.version}${warnings.length ? `；${warnings.length} 条提示：${warnings[0].message}` : ''}`);
+    await load();
+    await open(r.itemId);
+  } catch (e) {
+    toastError(e);
+  } finally {
+    uploading.value = false;
+  }
+}
+
 const hasVersion = computed(() => current.value?.versions.some((v) => !v.yanked) ?? false);
 const statusActions = computed(() => {
   const s = current.value?.item.status;
@@ -186,7 +212,11 @@ onMounted(() => { loadCategories(); load(); });
   <div class="admin-page">
     <div class="page-h">
       <div><h1>内容库</h1><div class="sub">已入库的技能、专家和连接器；前台只展示「已上架」</div></div>
-      <button class="btn btn-primary" type="button" @click="creating = !creating">手动新建</button>
+      <div class="row">
+        <button v-if="kind === 'expert'" class="btn" type="button" :disabled="uploading" @click="pluginInput?.click()">{{ uploading ? '上传中…' : '上传专家插件包' }}</button>
+        <input ref="pluginInput" type="file" accept=".zip,application/zip" hidden data-testid="plugin-input" @change="uploadPlugin" />
+        <button class="btn btn-primary" type="button" @click="creating = !creating">手动新建</button>
+      </div>
     </div>
 
     <form v-if="creating" class="panel create" @submit.prevent="createItem">

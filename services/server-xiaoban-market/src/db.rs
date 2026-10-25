@@ -29,19 +29,8 @@ const CATEGORIES: [(&str, &[(&str, &str)]); 3] = [
             ("media", "图像媒体"),
         ],
     ),
-    (
-        "expert",
-        &[
-            ("product", "产品设计"),
-            ("engineering", "技术工程"),
-            ("content", "内容创作"),
-            ("finance", "金融投资"),
-            ("office", "办公行政"),
-            ("education", "教育学习"),
-            ("life", "生活服务"),
-            ("legal", "法务合规"),
-        ],
-    ),
+    // 专家分类用 WorkBuddy 的 12 个行业分类，见下面的 `seed`。
+    ("expert", &[]),
     (
         "connector",
         &[
@@ -83,6 +72,19 @@ pub async fn seed(pool: &PgPool, config: &Config) -> Result<()> {
         }
     }
 
+    // WorkBuddy 的 12 个行业分类：slug 就是它的 categoryId，带英文名。已有的同名分类只补英文名。
+    for (i, (id, zh, en)) in crate::plugin::CATEGORIES.iter().enumerate() {
+        sqlx::query(
+            "INSERT INTO categories (kind, slug, name, name_en, sort_order) VALUES ('expert', $1, $2, $3, $4)
+             ON CONFLICT (kind, slug) DO UPDATE SET name_en = CASE WHEN categories.name_en = '' THEN EXCLUDED.name_en ELSE categories.name_en END",
+        )
+        .bind(id)
+        .bind(zh)
+        .bind(en)
+        .bind(i as i32)
+        .execute(pool)
+        .await?;
+    }
     crate::items::normalize_categories(pool).await?;
 
     // 采集来源默认只手动触发：定时间隔为 0，不会在未配置时访问外网。

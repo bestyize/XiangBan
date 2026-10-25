@@ -162,6 +162,8 @@ export const admin = {
   updateItem: (id: string, body: Record<string, unknown>) => request<{ ok: boolean }>('PUT', `/admin/items/${id}`, { ...a, body }),
   setItemStatus: (id: string, status: string) => request<{ ok: boolean }>('POST', `/admin/items/${id}/status`, { ...a, body: { status } }),
   deleteItem: (id: string) => request<{ ok: boolean }>('DELETE', `/admin/items/${id}`, a),
+  /** 上传 WorkBuddy 专家插件包（ZIP）。 */
+  importPlugin: (form: FormData) => request<{ itemId: string; version: string; created: boolean; issues: { error: boolean; message: string }[] }>('POST', '/admin/plugins/import', { ...a, form }),
   uploadVersion: (id: string, form: FormData) => request<{ version: string; files: number }>('POST', `/admin/items/${id}/versions`, { ...a, form }),
   yankVersion: (id: string, yanked: boolean) => request<{ ok: boolean }>('PUT', `/admin/versions/${id}`, { ...a, body: { yanked } }),
 

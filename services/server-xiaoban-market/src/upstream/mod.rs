@@ -353,7 +353,9 @@ pub async fn fetch_page(ctx: &Ctx, source: &SourceRow, params: &Params, page: u3
 pub enum Enrichment {
     None,
     Package { version: String, changelog: String, bytes: Vec<u8> },
-    Expert { content: String, dependencies: Value },
+    /// SkillHub 专家：工作流正文、依赖清单、上游详情，以及已经下载并校验过的子技能。
+    /// `missing` 是没能带上的子技能（下架、下载失败或超出大小上限）。
+    Expert { content: String, dependencies: Value, detail: Value, children: Vec<crate::convert::Child>, missing: Vec<String> },
     Connector { readme: String, configs: Value },
 }
 

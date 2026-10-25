@@ -217,6 +217,49 @@ pub fn extract_configs(readme: &str) -> Value {
     Value::Array(out)
 }
 
+/// 专家依赖的子技能最多带这么多，打进插件后仍受 12 MiB 总大小和文件数的限制。
+const MAX_CHILDREN: usize = 24;
+const CHILD_BUDGET: u64 = 10 * 1024 * 1024;
+
+/// 逐个下载并校验专家依赖的子技能。任何一个失败都只记进 `missing`，不影响专家本身入库。
+async fn fetch_children(ctx: &Ctx, source: &SourceRow, base: &Url, dependencies: &Value) -> (Vec<crate::convert::Child>, Vec<String>) {
+    let (mut children, mut missing, mut used, mut files) = (Vec::new(), Vec::new(), 0u64, 0usize);
+    for dep in dependencies.as_array().into_iter().flatten().take(MAX_CHILDREN) {
+        let Some(slug) = dep["slug"].as_str().filter(|s| valid_slug(s)) else { continue };
+        let namespace = dep["namespace"].as_str().unwrap_or("").to_string();
+        match fetch_child(ctx, source, base, slug, &namespace).await {
+            Ok(child) => {
+                let bytes: u64 = child.files.values().map(|f| f.len() as u64).sum();
+                if used + bytes > CHILD_BUDGET || files + child.files.len() > crate::package::MAX_PLUGIN_FILES - 16 {
+                    missing.push(format!("{slug}（超出插件大小上限）"));
+                } else {
+                    used += bytes;
+                    files += child.files.len();
+                    children.push(child);
+                }
+            }
+            Err(e) => missing.push(format!("{slug}（{}）", e.message)),
+        }
+    }
+    (children, missing)
+}
+
+async fn fetch_child(ctx: &Ctx, source: &SourceRow, base: &Url, slug: &str, namespace: &str) -> UpstreamResult<crate::convert::Child> {
+    let detail = send_json(get(ctx, source, endpoint(base, &format!("/api/v1/skills/{slug}"), &[("namespace", namespace.to_string())])?)).await?;
+    if detail["skill"]["slug"] != json!(slug) || detail["skill"]["banned"] == true {
+        return Err(UpstreamError::permanent("技能不可用"));
+    }
+    let version = detail["latestVersion"]["version"].as_str().filter(|v| valid_version(v)).ok_or_else(|| UpstreamError::permanent("缺少最新版本"))?;
+    let url = endpoint(base, "/api/v1/download", &[("slug", slug.to_string()), ("version", version.to_string()), ("namespace", namespace.to_string())])?;
+    let bytes = fetch_object(ctx, url, api_key(source), crate::package::MAX_ZIP_BYTES).await?;
+    let bytes = crate::package::prepare_package(&bytes, slug).map_err(UpstreamError::permanent)?;
+    let unpacked = crate::package::unpack_zip(&bytes).map_err(UpstreamError::permanent)?;
+    if !unpacked.contents.contains_key("SKILL.md") {
+        return Err(UpstreamError::permanent("安装包缺少 SKILL.md"));
+    }
+    Ok(crate::convert::Child { slug: slug.to_string(), files: unpacked.contents })
+}
+
 pub async fn enrich(ctx: &Ctx, source: &SourceRow, n: &Normalized) -> UpstreamResult<Enrichment> {
     let base = base(ctx, source)?;
     let slug = &n.slug;
@@ -250,7 +293,9 @@ pub async fn enrich(ctx: &Ctx, source: &SourceRow, n: &Normalized) -> UpstreamRe
             if content.contains("register_expert.py") || content.contains("~/.workbuddy/") {
                 return Err(UpstreamError::permanent("此专家包依赖 WorkBuddy 专属注册，与小伴不兼容"));
             }
-            Ok(Enrichment::Expert { content: content.to_string(), dependencies: dependencies(&detail) })
+            let dependencies = dependencies(&detail);
+            let (children, missing) = fetch_children(ctx, source, &base, &dependencies).await;
+            Ok(Enrichment::Expert { content: content.to_string(), dependencies, detail, children, missing })
         }
         _ => {
             let detail = send_json(get(ctx, source, endpoint(&base, &format!("/api/v1/mcp/servers/{slug}"), &[])?)).await?;
