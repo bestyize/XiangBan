@@ -69,27 +69,97 @@ fn is_registry_metadata(name: &str) -> bool {
     name.split('/').any(|part| REGISTRY_METADATA_DIRS.contains(&part))
 }
 
-/// 入库前剔除上游注册表的元数据目录。没有这类条目时原样返回，保持字节和摘要不变；
-/// 其余条目按原样（含压缩数据）复制，客户端的安全校验不放宽。
-pub fn strip_registry_metadata(bytes: &[u8]) -> Result<Vec<u8>, String> {
+/// 把 SKILL.md 头部的 `name` 改成 `slug`。已经一致、没有头部或没有 `name` 行时返回 `None`。
+/// 桌面端要求头部 name 与市场 slug 一致（安装目录和技能名都按它走），而上游改过 slug 的技能
+/// （例如重名时加了作者后缀）文件里还是原名。只改这一行，其余字节不动。
+pub fn set_frontmatter_name(md: &str, slug: &str) -> Option<String> {
+    let (bom, body) = match md.strip_prefix('\u{feff}') {
+        Some(rest) => ("\u{feff}", rest),
+        None => ("", md),
+    };
+    let mut lines = body.split_inclusive('\n');
+    let first = lines.next()?;
+    if first.trim_end() != "---" {
+        return None;
+    }
+    let mut out = String::from(bom);
+    out.push_str(first);
+    let mut changed = false;
+    let mut closed = false;
+    for line in lines {
+        if closed {
+            out.push_str(line);
+        } else if line.trim_end() == "---" {
+            closed = true;
+            out.push_str(line);
+        } else if !changed && !line.starts_with(char::is_whitespace) && line.starts_with("name:") {
+            let value = line["name:".len()..].trim().trim_matches(|c| c == '"' || c == '\'');
+            if value == slug {
+                return None;
+            }
+            let eol = if line.ends_with("\r\n") { "\r\n" } else if line.ends_with('\n') { "\n" } else { "" };
+            out.push_str(&format!("name: {slug}{eol}"));
+            changed = true;
+        } else {
+            out.push_str(line);
+        }
+    }
+    (closed && changed).then_some(out)
+}
+
+/// 入库前整理安装包：剔除上游注册表的元数据目录，并让 SKILL.md 头部的 name 与 slug 一致。
+/// 都不需要改时原样返回，保持字节和摘要不变；其余条目按原样（含压缩数据）复制，客户端的安全校验不放宽。
+pub fn prepare_package(bytes: &[u8], slug: &str) -> Result<Vec<u8>, String> {
     let mut archive = zip::ZipArchive::new(Cursor::new(bytes)).map_err(|e| format!("不是有效的 ZIP：{e}"))?;
     let mut keep = Vec::new();
     let mut dropped = false;
+    let mut skill_entry: Option<(usize, String)> = None;
     for i in 0..archive.len() {
         let f = archive.by_index_raw(i).map_err(|e| format!("无法读取 ZIP 条目：{e}"))?;
-        if is_registry_metadata(f.name()) {
+        let name = f.name().to_string();
+        if is_registry_metadata(&name) {
             dropped = true;
-        } else {
-            keep.push(i);
+            continue;
+        }
+        let at_root = name == "SKILL.md";
+        let in_wrapper = name.ends_with("/SKILL.md") && name.matches('/').count() == 1;
+        if (at_root || (in_wrapper && skill_entry.is_none())) && !f.is_dir() {
+            skill_entry = Some((i, name));
+        }
+        keep.push(i);
+    }
+    let mut renamed: Option<(usize, String, String)> = None;
+    if let Some((i, name)) = skill_entry {
+        let mut buf = Vec::new();
+        archive
+            .by_index(i)
+            .map_err(|e| format!("无法读取 {name}：{e}"))?
+            .take(MAX_SKILL_MD_BYTES + 1)
+            .read_to_end(&mut buf)
+            .map_err(|e| format!("无法解压 {name}：{e}"))?;
+        // 过大或不是 UTF-8 的交给后面的校验报错。
+        if buf.len() as u64 <= MAX_SKILL_MD_BYTES {
+            if let Some(fixed) = String::from_utf8(buf).ok().and_then(|md| set_frontmatter_name(&md, slug)) {
+                renamed = Some((i, name, fixed));
+            }
         }
     }
-    if !dropped {
+    if !dropped && renamed.is_none() {
         return Ok(bytes.to_vec());
     }
     let mut writer = zip::ZipWriter::new(Cursor::new(Vec::new()));
     for i in keep {
-        let f = archive.by_index_raw(i).map_err(|e| format!("无法读取 ZIP 条目：{e}"))?;
-        writer.raw_copy_file(f).map_err(|e| format!("重新打包失败：{e}"))?;
+        match &renamed {
+            Some((ri, name, content)) if *ri == i => {
+                let opts = zip::write::SimpleFileOptions::default().compression_method(zip::CompressionMethod::Deflated);
+                writer.start_file(name.as_str(), opts).map_err(|e| format!("重新打包失败：{e}"))?;
+                std::io::Write::write_all(&mut writer, content.as_bytes()).map_err(|e| format!("重新打包失败：{e}"))?;
+            }
+            _ => {
+                let f = archive.by_index_raw(i).map_err(|e| format!("无法读取 ZIP 条目：{e}"))?;
+                writer.raw_copy_file(f).map_err(|e| format!("重新打包失败：{e}"))?;
+            }
+        }
     }
     writer.finish().map(Cursor::into_inner).map_err(|e| format!("重新打包失败：{e}"))
 }
@@ -239,22 +309,44 @@ pub mod tests {
     fn registry_metadata_is_stripped_before_inspection() {
         let raw = build(&[("SKILL.md", b"# hi"), (".clawhub/origin.json", b"{}"), ("scripts/run.py", b"print(1)")]);
         assert!(inspect_zip(&raw).is_err());
-        let clean = strip_registry_metadata(&raw).unwrap();
+        let clean = prepare_package(&raw, "demo").unwrap();
         let info = inspect_zip(&clean).unwrap();
         assert_eq!(info.files.iter().map(|f| f.path.as_str()).collect::<Vec<_>>(), ["SKILL.md", "scripts/run.py"]);
         let plain = inspect_zip(&build(&[("SKILL.md", b"# hi"), ("scripts/run.py", b"print(1)")])).unwrap();
         assert_eq!(info.manifest_sha256, plain.manifest_sha256);
         let wrapped = build(&[("pkg/SKILL.md", b"# hi"), ("pkg/.clawhub/origin.json", b"{}")]);
-        assert_eq!(inspect_zip(&strip_registry_metadata(&wrapped).unwrap()).unwrap().files.len(), 1);
+        assert_eq!(inspect_zip(&prepare_package(&wrapped, "demo").unwrap()).unwrap().files.len(), 1);
     }
 
     #[test]
     fn packages_without_registry_metadata_pass_through_unchanged() {
         let raw = build(&[("SKILL.md", b"# hi"), ("scripts/run.py", b"print(1)")]);
-        assert_eq!(strip_registry_metadata(&raw).unwrap(), raw);
+        assert_eq!(prepare_package(&raw, "demo").unwrap(), raw);
         // 其他点开头的文件仍然拒绝。
-        let hidden = strip_registry_metadata(&build(&[("SKILL.md", b"x"), (".env", b"x")])).unwrap();
+        let hidden = prepare_package(&build(&[("SKILL.md", b"x"), (".env", b"x")]), "demo").unwrap();
         assert!(inspect_zip(&hidden).is_err());
+    }
+
+    #[test]
+    fn skill_name_is_aligned_with_the_slug() {
+        let md = "---\nname: long-article-illustration\ndescription: 配图\n---\n# body\nname: not-header\n";
+        let raw = build(&[("SKILL.md", md.as_bytes()), ("scripts/run.py", b"print(1)")]);
+        let fixed = prepare_package(&raw, "long-article-illustration-by-hongzhua").unwrap();
+        let info = inspect_zip(&fixed).unwrap();
+        assert_eq!(frontmatter(&info.skill_md).0.as_deref(), Some("long-article-illustration-by-hongzhua"));
+        assert_eq!(frontmatter(&info.skill_md).1.as_deref(), Some("配图"));
+        assert!(info.skill_md.ends_with("# body\nname: not-header\n"), "只改头部的 name 行");
+        assert_eq!(info.files.len(), 2);
+        // 包着一层目录、CRLF 和带引号的 name 也能对齐；一致时不动。
+        let crlf = "---\r\nname: \"old\"\r\ndescription: d\r\n---\r\nbody";
+        let wrapped = prepare_package(&build(&[("pkg/SKILL.md", crlf.as_bytes())]), "new-slug").unwrap();
+        assert_eq!(inspect_zip(&wrapped).unwrap().skill_md, "---\r\nname: new-slug\r\ndescription: d\r\n---\r\nbody");
+        let same = build(&[("SKILL.md", b"---\nname: demo\ndescription: d\n---\n")]);
+        assert_eq!(prepare_package(&same, "demo").unwrap(), same);
+        // 没有头部的交给注册表元数据，不改。
+        let bare = build(&[("SKILL.md", b"# no header")]);
+        assert_eq!(prepare_package(&bare, "demo").unwrap(), bare);
+        assert_eq!(set_frontmatter_name("---\ndescription: d\n---\n", "demo"), None);
     }
 
     #[test]

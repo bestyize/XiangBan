@@ -54,7 +54,7 @@ async fn import_inner(state: &AppState, id: Uuid, opts: &ImportOpts) -> Result<U
     let mut package_row = None;
     match enrichment {
         Enrichment::Package { version, changelog, bytes } => {
-            let bytes = package::strip_registry_metadata(&bytes).map_err(|e| AppError::BadRequest(format!("安装包未通过校验：{e}")))?;
+            let bytes = package::prepare_package(&bytes, &n.slug).map_err(|e| AppError::BadRequest(format!("安装包未通过校验：{e}")))?;
             let info = package::inspect_zip(&bytes).map_err(|e| AppError::BadRequest(format!("安装包未通过校验：{e}")))?;
             let (_, front_description) = package::frontmatter(&info.skill_md);
             if summary.is_empty() {
@@ -188,4 +188,42 @@ async fn import_inner(state: &AppState, id: Uuid, opts: &ImportOpts) -> Result<U
     sqlx::query("UPDATE staged_items SET status='imported', item_id=$2, import_error=NULL WHERE id=$1").bind(id).bind(item_id).execute(&mut *tx).await?;
     tx.commit().await?;
     Ok(item_id)
+}
+
+/// 启动时把已入库的技能包整理成当前规则（剔除注册表元数据、SKILL.md 的 name 对齐 slug），幂等。
+/// 内容变了就换成新包并更新清单摘要；旧包文件保留，不影响其他引用。返回修正的版本数。
+pub async fn align_stored_packages(pool: &sqlx::PgPool, data_dir: &std::path::Path) -> Result<usize> {
+    let rows: Vec<(Uuid, String, String)> = sqlx::query_as(
+        "SELECT v.id, i.slug, v.package_sha256 FROM versions v JOIN items i ON i.id = v.item_id WHERE i.kind = 'skill'",
+    )
+    .fetch_all(pool)
+    .await?;
+    let mut fixed = 0;
+    for (id, slug, sha) in rows {
+        let Ok(bytes) = tokio::fs::read(storage::package_path(data_dir, &sha)).await else { continue };
+        let Ok(next) = package::prepare_package(&bytes, &slug) else { continue };
+        if next == bytes {
+            continue;
+        }
+        let info = match package::inspect_zip(&next) {
+            Ok(info) => info,
+            Err(e) => {
+                tracing::warn!("技能包 {slug} 整理后仍未通过校验，保持原样：{e}");
+                continue;
+            }
+        };
+        let new_sha = package::sha256_hex(&next);
+        storage::store_package(data_dir, &new_sha, &next).await.map_err(|e| AppError::Internal(format!("保存安装包失败：{e}")))?;
+        sqlx::query("UPDATE versions SET manifest = $2, manifest_sha256 = $3, package_sha256 = $4, package_size = $5 WHERE id = $1")
+            .bind(id)
+            .bind(Json(json!({ "files": info.files })))
+            .bind(&info.manifest_sha256)
+            .bind(&new_sha)
+            .bind(next.len() as i64)
+            .execute(pool)
+            .await?;
+        tracing::info!("已整理技能包 {slug}（SKILL.md 的 name、注册表元数据）");
+        fixed += 1;
+    }
+    Ok(fixed)
 }

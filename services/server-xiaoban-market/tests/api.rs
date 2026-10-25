@@ -791,3 +791,49 @@ async fn english_upstream_categories_are_merged_into_the_chinese_ones() {
     pool.close().await;
     app.cleanup().await;
 }
+
+#[tokio::test]
+async fn stored_packages_get_the_slug_as_their_skill_name() {
+    let app = app!();
+    let (prefix, _) = app.admin_url.rsplit_once('/').unwrap();
+    let pool = sqlx::PgPool::connect(&format!("{prefix}/{}", app.db_name)).await.unwrap();
+    let raw = zip_bytes(&[("SKILL.md", "---
+name: long-article-illustration
+description: 配图
+---
+# 配图
+".as_bytes()), ("scripts/run.py", b"print(1)")]);
+    let sha = server_xiaoban_market::package::sha256_hex(&raw);
+    server_xiaoban_market::storage::store_package(&app._data, &sha, &raw).await.unwrap();
+    let info = server_xiaoban_market::package::inspect_zip(&raw).unwrap();
+    let item: uuid::Uuid = sqlx::query_scalar("INSERT INTO items (kind, namespace, slug, name, status, published_at) VALUES ('skill', 'ns', 'long-article-illustration-by-hongzhua', '长文配图助手', 'published', now()) RETURNING id")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    sqlx::query("INSERT INTO versions (item_id, version, manifest, manifest_sha256, package_sha256, package_size) VALUES ($1, '1.0.1', $2, $3, $4, $5)")
+        .bind(item)
+        .bind(sqlx::types::Json(json!({"files": info.files})))
+        .bind(&info.manifest_sha256)
+        .bind(&sha)
+        .bind(raw.len() as i64)
+        .execute(&pool)
+        .await
+        .unwrap();
+
+    for expected in [1, 0] {
+        let fixed = server_xiaoban_market::importer::align_stored_packages(&pool, &app._data).await.unwrap();
+        assert_eq!(fixed, expected, "第二次不再有要修的（幂等）");
+    }
+    let (manifest_sha, package_sha): (String, String) = sqlx::query_as("SELECT manifest_sha256, package_sha256 FROM versions WHERE item_id = $1").bind(item).fetch_one(&pool).await.unwrap();
+    assert_ne!(manifest_sha, info.manifest_sha256);
+    let bytes = std::fs::read(server_xiaoban_market::storage::package_path(&app._data, &package_sha)).unwrap();
+    let fixed = server_xiaoban_market::package::inspect_zip(&bytes).unwrap();
+    assert_eq!(fixed.manifest_sha256, manifest_sha);
+    assert!(fixed.skill_md.contains("name: long-article-illustration-by-hongzhua
+"));
+    // 对外的版本清单也是新的摘要。
+    let manifest = app.get("/api/v1/market/skills/ns/long-article-illustration-by-hongzhua/versions/1.0.1").await;
+    assert_eq!(manifest["manifestSha256"], json!(manifest_sha));
+    pool.close().await;
+    app.cleanup().await;
+}

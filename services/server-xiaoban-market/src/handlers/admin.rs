@@ -879,7 +879,7 @@ async fn delete_item(State(state): State<AppState>, _admin: Admin, Path(id): Pat
 }
 
 async fn upload_version(State(state): State<AppState>, _admin: Admin, Path(id): Path<Uuid>, mut multipart: Multipart) -> Result<Json<Value>> {
-    let kind: String = sqlx::query_scalar("SELECT kind FROM items WHERE id = $1").bind(id).fetch_optional(&state.pool).await?.ok_or_else(|| AppError::NotFound("条目不存在".into()))?;
+    let (kind, item_slug): (String, String) = sqlx::query_as("SELECT kind, slug FROM items WHERE id = $1").bind(id).fetch_optional(&state.pool).await?.ok_or_else(|| AppError::NotFound("条目不存在".into()))?;
     if kind != "skill" {
         return Err(AppError::BadRequest("只有技能可以上传安装包".into()));
     }
@@ -897,7 +897,7 @@ async fn upload_version(State(state): State<AppState>, _admin: Admin, Path(id): 
         return Err(AppError::BadRequest("版本号只能含字母、数字、. - +，最长 44 位".into()));
     }
     let bytes = file.ok_or_else(|| AppError::BadRequest("缺少 file 字段（ZIP 安装包）".into()))?;
-    let bytes = package::strip_registry_metadata(&bytes).map_err(|e| AppError::BadRequest(format!("安装包未通过校验：{e}")))?;
+    let bytes = package::prepare_package(&bytes, &item_slug).map_err(|e| AppError::BadRequest(format!("安装包未通过校验：{e}")))?;
     let info = package::inspect_zip(&bytes).map_err(|e| AppError::BadRequest(format!("安装包未通过校验：{e}")))?;
     let sha = package::sha256_hex(&bytes);
     storage::store_package(&state.config.data_dir, &sha, &bytes).await.map_err(|e| AppError::Internal(format!("保存安装包失败：{e}")))?;
