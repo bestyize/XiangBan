@@ -1,7 +1,7 @@
 //! Product policy only. The kernel owns generic discovery, never desktop tool names.
 pub(super) fn defer_desktop_tool(name: &str) -> bool {
     // Web retrieval is a common path even when provided by the desktop adapter.
-    !matches!(name, "web_search" | "web_fetch" | "web_extract")
+    !matches!(name, "web_search" | "web_fetch" | "web_extract" | "connector_search" | "connector_request")
 }
 
 #[cfg(test)]

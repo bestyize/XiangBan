@@ -405,7 +405,7 @@ const bytes = (n: number) => n < 1024 ? `${n} B` : `${(n / 1024).toFixed(1)} KB`
         <div v-if="!installedOnly && !error && !loading && store.desktop && (page > 1 || remote.hasMore)" class="store-pagination"><button :disabled="page <= 1" aria-label="上一页" @click="page--"><ChevronLeft :size="16" /></button><span>第 {{ page }} 页</span><button :disabled="!remote.hasMore" aria-label="下一页" @click="page++"><ChevronRight :size="16" /></button></div>
       </template>
       <ConnectorCenter v-if="tab === 'connectors'" :key="connectorRevision" ref="connectorCenter" :store="store" :query="query" />
-      <RegistryCatalog v-if="!packageTab" ref="registry" :kind="tab as 'experts' | 'connectors'" :query="query" :category="category" :store="store" :installed-only="installedOnly" :source="effMarket ? 'market' : 'hub'" :updates="updates" @unavailable="onMarketError" @installed="marketConnectorInstalled" @center="showConnectorCenter">
+      <RegistryCatalog v-if="!packageTab" ref="registry" :kind="tab as 'experts' | 'connectors'" :query="query" :category="category" :store="store" :installed-only="installedOnly" :source="effMarket ? 'market' : 'hub'" :updates="updates" @unavailable="onMarketError" @installed="marketConnectorInstalled" @changed="connectorCenter?.refresh()" @center="showConnectorCenter">
         <template v-if="tab === 'connectors' && showComputer" #prefix>
         <article v-if="showComputer" class="xc store-card connector-card" style="--h-hi:#7C8CF8;--h:#4A57D0">
           <div class="xc-top">

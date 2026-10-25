@@ -4,17 +4,16 @@ import { NModal } from 'naive-ui';
 import { Plug } from 'lucide-vue-next';
 import { invoke } from '../../bridge.ts';
 import type { ControlStore } from '../control-types.ts';
-import ConnectorTokenForm from './ConnectorTokenForm.vue';
-import { connectorAuth, connectorStatus, type ConnectorAuthorization, type InstalledConnector } from './connector-plugins.ts';
+import ConnectorConnection from './ConnectorConnection.vue';
+import { connectorAuth, connectorStatus, type InstalledConnector } from './connector-plugins.ts';
 
 const props = defineProps<{ store: ControlStore; query?: string }>();
 const items = ref<InstalledConnector[]>([]);
 const selected = ref<InstalledConnector | null>(null);
 const loading = ref(false), busy = ref(false), error = ref(''), detailError = ref(''), unbinding = ref(false);
-const authorization = ref<{ flowId: string; authorizationUrl: string } | null>(null);
+const connectionBusy = ref(false);
 let alive = true;
-let authTimer: ReturnType<typeof setTimeout> | undefined;
-let polling = false;
+let refreshTimer: ReturnType<typeof setTimeout> | undefined;
 let pendingPlugin: string | undefined;
 const visible = computed(() => items.value.filter(c => `${c.name} ${c.nameEn ?? ''} ${c.description}`.toLowerCase().includes((props.query ?? '').trim().toLowerCase())));
 async function refresh() {
@@ -25,6 +24,8 @@ async function refresh() {
     if (!alive) return;
     const result = Array.isArray(listed) ? listed : [];
     items.value = result;
+    clearTimeout(refreshTimer);
+    if (result.some(c => c.status === 'connecting')) refreshTimer = setTimeout(() => void refresh(), 1500);
     if (selected.value) selected.value = result.find(c => c.id === selected.value!.id) ?? null;
     if (pendingPlugin) {
       const item = result.find(c => c.plugin === pendingPlugin);
@@ -61,55 +62,11 @@ async function useExample(text: string) {
   props.store.navigate('new-task');
   selected.value = null;
 }
-async function openAuthorizationPage() {
-  if (!authorization.value) return;
-  try { await invoke('open_download_url', { url: authorization.value.authorizationUrl }); }
-  catch (e) { detailError.value = `无法打开授权页面：${String(e)}`; }
-}
-async function pollAuthorization() {
-  clearTimeout(authTimer);
-  const flow = authorization.value;
-  if (!flow || !alive || polling) return;
-  polling = true;
-  try {
-    const result = await invoke<{ status: string; error?: string }>('ai_store_connector_auth_status', { flowId: flow.flowId });
-    if (!alive || authorization.value?.flowId !== flow.flowId) return;
-    if (result.status === 'connected') { authorization.value = null; await refresh(); }
-    else if (['error', 'cancelled'].includes(result.status)) { authorization.value = null; detailError.value = result.error || '授权已取消，可重新授权。'; }
-    else authTimer = setTimeout(() => void pollAuthorization(), 1000);
-  } catch (e) { if (alive && authorization.value?.flowId === flow.flowId) detailError.value = `检查授权状态失败：${String(e)}`; }
-  finally { polling = false; }
-}
-async function reauthorize() {
-  if (!selected.value || busy.value || authorization.value) return;
-  busy.value = true; detailError.value = '';
-  try {
-    const result = await invoke<ConnectorAuthorization>('ai_connector_reauthorize', { id: selected.value.id });
-    if (result.status === 'authorization_required' && result.flowId && result.authorizationUrl) {
-      if (!alive) { await invoke('ai_store_connector_auth_cancel', { flowId: result.flowId }); return; }
-      authorization.value = { flowId: result.flowId, authorizationUrl: result.authorizationUrl };
-      await openAuthorizationPage();
-      authTimer = setTimeout(() => void pollAuthorization(), 1000);
-    } else if (result.status === 'connected' || result.connected) await refresh();
-    else throw new Error('授权未返回成功状态，请重试。');
-  } catch (e) { detailError.value = String(e); }
-  finally { busy.value = false; }
-}
-async function cancelAuthorization() {
-  if (!authorization.value || busy.value) return;
-  busy.value = true;
-  try {
-    await invoke('ai_store_connector_auth_cancel', { flowId: authorization.value.flowId });
-    authorization.value = null; clearTimeout(authTimer);
-  } catch (e) { detailError.value = `取消授权失败：${String(e)}`; }
-  finally { busy.value = false; }
-}
-function close() { if (!busy.value && !authorization.value) selected.value = null; }
+function close() { if (!busy.value && !connectionBusy.value) selected.value = null; }
 onMounted(refresh);
 onActivated(refresh);
 onBeforeUnmount(() => {
-  alive = false; clearTimeout(authTimer);
-  if (authorization.value) void invoke('ai_store_connector_auth_cancel', { flowId: authorization.value.flowId }).catch(() => {});
+  alive = false; clearTimeout(refreshTimer);
 });
 async function reveal(plugin: string) {
   pendingPlugin = plugin;
@@ -131,21 +88,15 @@ defineExpose({ refresh, reveal, count: computed(() => items.value.length) });
         <div class="xc-foot"><span class="state" :class="item.status"><i />{{ item.unsupported ? '暂不支持' : connectorStatus[item.status] }}</span><span class="xc-meta">v{{ item.version }} · {{ connectorAuth[item.auth.type] }} · {{ item.tools.length }} 个工具</span><button class="xc-pill" @click="open(item)">管理</button></div>
       </article>
     </div>
-    <NModal :show="!!selected" preset="card" :title="selected?.name" class="store-dialog" :mask-closable="!busy && !authorization" :closable="!busy && !authorization" style="width:640px;max-width:calc(100vw - 36px)" @update:show="!$event && close()">
+    <NModal :show="!!selected" preset="card" :title="selected?.name" class="store-dialog" :mask-closable="!busy && !connectionBusy" :closable="!busy && !connectionBusy" style="width:640px;max-width:calc(100vw - 36px)" @update:show="!$event && close()">
       <template v-if="selected">
         <p>{{ selected.description }}</p><p>v{{ selected.version }} · {{ selected.source === 'local' ? '本地安装' : '小伴市场' }} · {{ connectorAuth[selected.auth.type] }} · {{ connectorStatus[selected.status] }}</p>
-        <p v-if="selected.unsupported" role="alert">暂不支持：{{ selected.unsupported }}</p>
-        <p v-if="selected.error" role="alert">{{ selected.error }}</p><p v-if="detailError" role="alert">{{ detailError }}</p>
-        <template v-if="authorization"><p role="status">请在浏览器完成授权，完成后会自动更新连接状态。</p><button class="xb-btn" :disabled="busy" @click="openAuthorizationPage">打开授权页面</button><button class="xb-btn" :disabled="busy" @click="pollAuthorization">检查授权状态</button><button class="xb-btn" :disabled="busy" @click="cancelAuthorization">取消授权</button></template>
-        <template v-else>
-          <div class="center-actions"><button class="xb-btn" :disabled="busy || !!selected.unsupported || selected.status === 'connecting'" @click="action('ai_connector_set_enabled', { enabled: !selected.enabled })">{{ selected.enabled ? '停用' : '启用' }}</button><button class="xb-btn" :disabled="busy" @click="unbind">{{ unbinding ? '确认断开并清除凭据' : '断开并清除凭据' }}</button><button v-if="selected.auth.type === 'oauth'" class="xb-btn" :disabled="busy || !!selected.unsupported" @click="reauthorize">重新授权</button></div>
-          <p v-if="unbinding">确认断开此服务并删除已保存的凭据？再次连接需要重新配置。</p>
-          <ConnectorTokenForm v-if="!selected.unsupported && selected.auth.type !== 'oauth' && selected.auth.type !== 'cli' && (selected.auth.schema || selected.auth.type === 'none')" :key="selected.id" :schema="selected.auth.schema" :configured="selected.auth.configured" :busy="busy" @connect="action('ai_connector_configure', { values: $event, confirmed: true })" />
-          <p v-else-if="!selected.unsupported && ['token', 'env'].includes(selected.auth.type)">此连接器缺少配置表单，请更新插件后重试。</p>
-          <p v-if="selected.auth.type === 'cli'">请先按服务商说明完成命令行登录，再启用连接器。</p>
-        </template>
+        <p v-if="detailError" role="alert">{{ detailError }}</p>
+        <div class="center-actions"><button v-if="selected.enabled" class="xb-btn" :disabled="busy || connectionBusy" @click="action('ai_connector_set_enabled', { enabled: false })">停用</button><button class="xb-btn" :disabled="busy || connectionBusy" @click="unbind">{{ unbinding ? '确认断开并清除凭据' : '断开并清除凭据' }}</button></div>
+        <p v-if="unbinding">确认断开此服务并删除已保存的凭据？再次连接需要重新配置。</p>
+        <ConnectorConnection :key="selected.id" :connector="selected" @updated="update" @busy="connectionBusy = $event" />
         <h4>工具（{{ selected.tools.length }}）</h4><ul><li v-for="tool in selected.tools" :key="tool.name"><b>{{ tool.name }}</b> {{ tool.description }}</li></ul>
-        <h4>示例提问</h4><div class="examples"><button v-for="example in selected.examples" :key="example" class="xb-btn" :disabled="busy || !!authorization" @click="useExample(example)">{{ example }}</button></div>
+        <h4>示例提问</h4><div class="examples"><button v-for="example in selected.examples" :key="example" class="xb-btn" :disabled="busy || connectionBusy || selected.status !== 'connected'" @click="useExample(example)">{{ example }}</button></div>
         <h4>随包技能（{{ selected.skills.length }}）</h4><ul><li v-for="skill in selected.skills" :key="skill">{{ skill }}</li></ul>
       </template>
     </NModal>

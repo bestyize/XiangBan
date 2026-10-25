@@ -23,8 +23,12 @@ export interface InstalledConnector {
   description: string;
   version: string;
   source: 'market' | 'local';
+  namespace?: string;
   iconUrl: string | null;
-  auth: { type: 'none' | 'token' | 'oauth' | 'env' | 'cli'; schema?: TokenSchema; configured: string[] };
+  transport?: 'stdio' | 'streamable-http' | 'sse';
+  command?: string;
+  args?: string[];
+  auth: { type: 'none' | 'auto' | 'token' | 'oauth' | 'env' | 'cli'; schema?: TokenSchema; configured: string[] };
   status: 'disconnected' | 'connecting' | 'connected' | 'needs_auth' | 'error' | 'disabled';
   enabled: boolean;
   error?: string;
@@ -54,5 +58,5 @@ export const connectorStatus: Record<InstalledConnector['status'], string> = {
   disconnected: '未连接', connecting: '连接中', connected: '已连接', needs_auth: '需要授权', error: '连接失败', disabled: '已停用',
 };
 export const connectorAuth: Record<InstalledConnector['auth']['type'], string> = {
-  none: '无需认证', token: '令牌认证', oauth: '网页登录授权', env: '环境变量', cli: '命令行登录',
+  none: '无需填写凭据', auto: '自动检测授权', token: '令牌认证', oauth: '网页登录授权', env: '环境变量', cli: '命令行登录',
 };

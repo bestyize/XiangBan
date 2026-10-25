@@ -2,7 +2,7 @@
 import { computed, ref, watch } from 'vue';
 import type { TokenSchema } from './connector-plugins.ts';
 
-const props = defineProps<{ schema?: TokenSchema; configured: string[]; busy?: boolean }>();
+const props = withDefaults(defineProps<{ schema?: TokenSchema; configured: string[]; busy?: boolean; confirmationRequired?: boolean; submitLabel?: string }>(), { confirmationRequired: true, submitLabel: '确认连接' });
 const emit = defineEmits<{ connect: [values: Record<string, string>] }>();
 const values = ref<Record<string, string>>({});
 const confirmed = ref(false);
@@ -13,7 +13,7 @@ watch(() => [props.schema, props.configured], () => { values.value = {}; confirm
 watch(values, () => { confirmed.value = false; }, { deep: true });
 function submit() {
   attempted.value = true;
-  if (props.busy || !confirmed.value || missing.value.length) return;
+  if (props.busy || (props.confirmationRequired && !confirmed.value) || missing.value.length) return;
   const submitted = Object.fromEntries(Object.entries(values.value).filter(([, value]) => value.trim() !== ''));
   emit('connect', submitted);
   // Never retain credentials after handing them to the host, including a failed connection.
@@ -33,8 +33,8 @@ function submit() {
     </label>
     <p v-if="attempted && missing.length" role="alert">请填写必填字段：{{ missing.map(f => f.label || f.key).join('、') }}</p>
     <p>连接后小伴可在任务中调用此服务的工具。请确认服务来源及访问权限。</p>
-    <label class="confirmation"><input v-model="confirmed" type="checkbox" :disabled="busy" />我已查看配置，同意连接此服务。</label>
-    <button class="store-primary" type="submit" :disabled="busy || !confirmed || missing.length > 0">{{ busy ? '正在连接…' : '确认连接' }}</button>
+    <label v-if="confirmationRequired" class="confirmation"><input v-model="confirmed" type="checkbox" :disabled="busy" />我已查看配置，同意连接此服务。</label>
+    <button class="store-primary" type="submit" :disabled="busy || (confirmationRequired && !confirmed) || missing.length > 0">{{ busy ? '正在连接…' : submitLabel }}</button>
   </form>
 </template>
 

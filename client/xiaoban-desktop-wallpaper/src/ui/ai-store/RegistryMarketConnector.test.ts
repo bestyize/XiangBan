@@ -26,7 +26,7 @@ const connector: MarketConnector = {
 };
 const entry = { slug: 'docs-plugin', name: 'Docs', description: 'Description', namespace: 'acme', version: '1.2.0', connector };
 const installedItem: InstalledConnector = {
-  id: 'docs-plugin:docs', plugin: entry.slug, name: '文档连接器', description: '连接团队文档', version: '1.2.0', source: 'market', iconUrl: null,
+  id: 'docs-plugin:docs', plugin: entry.slug, namespace: 'acme', name: '文档连接器', description: '连接团队文档', version: '1.2.0', source: 'market', iconUrl: null,
   auth: { type: 'token', configured: [], schema: { title: '文档令牌', fields: [{ key: 'TOKEN', label: '访问令牌', type: 'password', required: true }] } },
   status: 'needs_auth', enabled: true, tools: [], skills: ['docs-search'], examples: ['查找团队周报'],
 };
@@ -78,7 +78,7 @@ describe('市场连接器插件', () => {
     const { wrapper } = setup(); await settle();
     const card = wrapper.get('.registry .connector-card');
     expect(card.text()).toContain('文档连接器'); expect(card.text()).toContain('令牌认证');
-    expect(card.text()).toContain('网页登录授权'); expect(card.text()).toContain('环境变量'); expect(card.text()).toContain('无需认证');
+    expect(card.text()).toContain('网页登录授权'); expect(card.text()).toContain('环境变量'); expect(card.text()).toContain('无需填写凭据');
     expect(card.text()).toContain('1 个随包技能');
     await open(wrapper);
     const modal = wrapper.get('.test-modal');
@@ -101,8 +101,8 @@ describe('市场连接器插件', () => {
     await modal.get('.store-primary').trigger('click'); expect(invoke).not.toHaveBeenCalledWith('ai_market_install', expect.anything());
     await modal.get('.review-confirm input').setValue(true); await modal.get('.store-primary').trigger('click'); await flushPromises();
     expect(invoke).toHaveBeenCalledWith('ai_market_install', { kind: 'connectors', namespace: 'acme', slug: entry.slug, version: '1.2.0', sha256: sha });
-    expect(wrapper.text()).toContain('已安装，下一步到连接器中心填写令牌并连接');
-    expect(store.notify).toHaveBeenCalledWith('已安装，下一步到连接器中心填写令牌并连接');
+    expect(wrapper.text()).toContain('已安装，在此完成连接即可使用');
+    expect(store.notify).not.toHaveBeenCalled();
     expect(wrapper.get('.registry .small-action').text()).toBe('已安装');
     expect(invoke).not.toHaveBeenCalledWith('ai_connector_configure', expect.anything());
     expect(invoke).not.toHaveBeenCalledWith('ai_store_connector_connect', expect.anything());
@@ -141,7 +141,7 @@ describe('市场连接器插件', () => {
     await wrapper.get('.review-confirm input').setValue(true);
     await wrapper.get('.market-connector-detail .store-primary').trigger('click'); await flushPromises();
     expect(invoke).toHaveBeenCalledWith('ai_market_install', { kind: 'connectors', namespace: 'acme', slug: entry.slug, version: '1.2.0', sha256: sha });
-    expect(wrapper.text()).toContain('已安装，下一步到连接器中心填写令牌并连接');
+    expect(wrapper.text()).toContain('已安装，在此完成连接即可使用');
     expect(invoke).not.toHaveBeenCalledWith('ai_connector_configure', expect.anything());
     expect(invoke).not.toHaveBeenCalledWith('ai_store_connector_connect', expect.anything());
   });
@@ -153,7 +153,7 @@ describe('市场连接器插件', () => {
     expect(wrapper.text()).toContain('操作失败'); expect(store.notify).not.toHaveBeenCalled();
     fail = false; await wrapper.get('.market-connector-detail .store-primary').trigger('click'); await flushPromises();
     if (command === 'ai_market_inspect') expect(wrapper.find('.review-confirm').exists()).toBe(true);
-    else expect(store.notify).toHaveBeenCalled();
+    else expect(wrapper.text()).toContain('已安装，在此完成连接即可使用');
   });
   it.each([{ sha256: '' }, { manifest: { ...review.manifest, version: '9.9.9' } }])('rejects an incomplete digest or a different reviewed version', async invalid => {
     const original = vi.mocked(invoke).getMockImplementation()!;
@@ -241,9 +241,9 @@ describe('市场连接器插件', () => {
     });
     const { wrapper } = setup(true); await settle(); await wrapper.get('#store-tab-connectors').trigger('click'); await settle();
     await inspect(wrapper); await wrapper.get('.review-confirm input').setValue(true); await wrapper.get('.market-connector-detail .store-primary').trigger('click'); await flushPromises();
-    await wrapper.get('.market-connector-detail .store-secondary').trigger('click'); await flushPromises();
-    expect(wrapper.find('.connector-center input[type="password"]').exists()).toBe(false);
+    expect(wrapper.get('.market-connector-detail .store-secondary').attributes('disabled')).toBeDefined();
     delay = false; resolvers.forEach(resolve => resolve([installedItem])); await flushPromises();
+    await wrapper.get('.market-connector-detail .store-secondary').trigger('click'); await flushPromises();
     expect(wrapper.get('.connector-center .test-modal').text()).toContain('文档令牌');
   });
 });

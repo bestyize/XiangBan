@@ -508,11 +508,18 @@ impl ConnectorManager {
         Arc::new(StatusTool{manager:self.clone(),spec:ToolSpec::new("connector_status",format!("Inspect configured MCP availability and initialization errors. {unavailable} enabled connector(s) currently unavailable. Do not assume unavailable tools can be called."),json!({"type":"object","properties":{},"additionalProperties":false})).risk(Risk::Read).untrusted_output()})
     }
     pub fn tools(&self) -> Vec<Arc<dyn Tool>> {
+        self.selected_tools(None)
+    }
+    /// Current, gated tools for the chosen connections, including connections added during a run.
+    pub fn tools_for(&self, ids: &[String]) -> Vec<Arc<dyn Tool>> {
+        self.selected_tools(Some(ids))
+    }
+    fn selected_tools(&self, ids: Option<&[String]>) -> Vec<Arc<dyn Tool>> {
         let state = self.state.lock().unwrap_or_else(|e| e.into_inner());
         state
             .active
             .iter()
-            .filter(|(_, a)| a.client.is_connected())
+            .filter(|(id, a)| a.client.is_connected() && ids.is_none_or(|ids| ids.contains(id)))
             .flat_map(|(id, a)| {
                 a.tools(id).into_iter().map(move |tool| {
                     let mut spec = tool.spec().clone().always_ask().untrusted_output();
@@ -649,6 +656,8 @@ for line in sys.stdin:
         manager.connect("test", "Test", config, true).unwrap();
         let tools = manager.tools();
         assert_eq!(tools.len(), 1);
+        assert_eq!(manager.tools_for(&["test".into()])[0].spec().name, tools[0].spec().name);
+        assert!(manager.tools_for(&["another-service".into()]).is_empty());
         assert!(tools[0].spec().always_ask && tools[0].spec().untrusted_output);
         assert!(tools[0].spec().name.starts_with("mcp_ext_"));
         assert!(tools[0].spec().name.len() <= 64);

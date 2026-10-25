@@ -20,7 +20,7 @@ interface Connection { id: string; name: string; connected: boolean; enabled: bo
 interface ConnectorDetail { readme: string; configs: { name: string; config: Record<string, unknown> }[]; connector?: MarketConnector; version?: string }
 interface ConnectionResult { status?:string; connected?:boolean; flowId?:string; authorizationUrl?:string }
 const props = withDefaults(defineProps<{ kind: 'experts' | 'connectors'; query: string; category: string; store: ControlStore; installedOnly?: boolean; source?: 'market' | 'hub'; updates?: Record<string, UpdateInfo> }>(), { installedOnly: false, source: 'hub' });
-const emit = defineEmits<{ unavailable: [message: string]; installed: []; center: [plugin: string] }>();
+const emit = defineEmits<{ unavailable: [message: string]; installed: []; changed: []; center: [plugin: string] }>();
 const fromMarket = () => props.source === 'market' && props.kind === 'connectors';
 const data = ref<Page>({ results: [], page: 1, total: 0, hasMore: false });
 const page = ref(1), loading = ref(false), error = ref(''), localError = ref('');
@@ -140,8 +140,8 @@ async function marketConnector(entry: Entry): Promise<ConnectorDetail> {
 }
 function pluginInstalled() {
   void refreshLocal(); emit('installed');
-  props.store.notify('已安装，下一步到连接器中心填写令牌并连接');
 }
+function pluginConnectionChanged() { void refreshLocal(); emit('changed'); }
 function goToCenter() {
   if (!selected.value || busy.value) return;
   const slug = selected.value.slug;
@@ -295,7 +295,7 @@ defineExpose({ refresh, refreshLocal, installedCount, open });
           </template>
         </template>
         <template v-else-if="marketPlugin">
-          <MarketConnectorDetail v-if="connectorDetail && !detailLoading" :key="selected.slug + (selected.version || '')" :connector="marketPlugin" :slug="selected.slug" :namespace="selected.namespace" :version="connectorDetail.version" :installed="!!plugin(selected.slug)" :update-version="pluginUpdate(selected)" :local-error="pluginError || (!pluginReady ? '正在读取已安装连接器…' : '')" @busy="busy = $event" @installed="pluginInstalled" @center="goToCenter" />
+          <MarketConnectorDetail v-if="connectorDetail && !detailLoading" :key="selected.slug + (selected.version || '')" :connector="marketPlugin" :slug="selected.slug" :namespace="selected.namespace" :version="connectorDetail.version" :installed="!!plugin(selected.slug)" :update-version="pluginUpdate(selected)" :local-error="pluginError || (!pluginReady ? '正在读取已安装连接器…' : '')" @busy="busy = $event" @installed="pluginInstalled" @changed="pluginConnectionChanged" @center="goToCenter" />
         </template>
         <template v-else>
           <div v-if="authorization" class="authorization-wait" role="status"><h4>等待网页授权</h4><p>请在服务商页面登录并确认权限。完成后会自动检测连接结果。</p><div class="dialog-actions"><button class="store-secondary" :disabled="busy" @click="cancelAuthorization">取消授权</button><button class="store-secondary" :disabled="busy" @click="pollAuthorization">检查结果</button><button class="store-primary" :disabled="busy" @click="openAuthorizationPage">重新打开授权页</button></div></div>

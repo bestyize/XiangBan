@@ -20,6 +20,9 @@ pub struct CompanionChange {
 }
 
 pub trait Desktop: Send + Sync {
+    fn connector_search(&self, _keyword: &str) -> Result<Value, String> { Err("当前宿主不支持连接器目录".into()) }
+    fn connector_request(&self, _references: &[String], _ctx: &ToolCtx) -> Result<Value, String> { Err("当前宿主不支持连接器授权".into()) }
+    fn connector_call(&self, _name: &str, _args: Value, _ctx: &ToolCtx) -> agent_kernel::ToolResult { agent_kernel::ToolResult::error("当前宿主不支持连接器调用") }
     fn pet_catalog(&self)->Result<Value,String>{Err("当前宿主不支持宠物库".into())}
     fn pet_save_theme(&self,_theme:crate::pet_packs::Theme,_overwrite:bool)->Result<Value,String>{Err("当前宿主不支持宠物创作".into())}
     fn pet_delete_theme(&self,_id:String)->Result<Value,String>{Err("当前宿主不支持宠物主题".into())}
@@ -87,6 +90,17 @@ impl TauriDesktop {
 }
 
 impl Desktop for TauriDesktop {
+    fn connector_search(&self, keyword: &str) -> Result<Value, String> { super::connectors::search(&self.app, keyword) }
+    fn connector_request(&self, references: &[String], ctx: &ToolCtx) -> Result<Value, String> { super::connectors::request(&self.app, references, ctx) }
+    fn connector_call(&self, name: &str, args: Value, ctx: &ToolCtx) -> agent_kernel::ToolResult {
+        match super::connector_manager(&self.app) {
+            Ok(manager) => match manager.tools().into_iter().find(|t| t.spec().name == name) {
+                Some(tool) => tool.execute_result(args, ctx),
+                None => agent_kernel::ToolResult::error("连接器工具当前不可用，请检查连接状态"),
+            },
+            Err(error) => agent_kernel::ToolResult::error(error),
+        }
+    }
     fn pet_catalog(&self)->Result<Value,String>{crate::pets::catalog(&self.app)}
     fn pet_save_theme(&self,mut theme:crate::pet_packs::Theme,overwrite:bool)->Result<Value,String>{crate::pet_packs::resolve_image_refs(&mut theme,&crate::pets::themes(&self.app)?)?;crate::pets::save_theme(&self.app,theme,overwrite)}
     fn pet_delete_theme(&self,id:String)->Result<Value,String>{crate::pets::delete_pet_theme(self.app.clone(),id)}
@@ -1598,6 +1612,19 @@ mod tests {
         let all = tools(desktop);
         let found = all.iter().find(|t| t.spec().name == name).unwrap_or_else(|| panic!("no tool {name}"));
         found.execute(args, &ToolCtx::detached("s1"))
+    }
+
+    #[test]
+    fn connector_discovery_waits_for_user_action_and_external_calls_keep_their_gate() {
+        let all = super::super::connector_tools::tools(Arc::new(Fake::default()));
+        let request = all.iter().find(|t| t.spec().name == "connector_request").unwrap();
+        assert_eq!(request.spec().risk, Risk::Read);
+        assert!(request.execute(json!({"references":[]}), &ToolCtx::detached("s1")).unwrap_err().contains("1 至 3"));
+        assert!(request.execute(json!({"references":["a","b","c","d"]}), &ToolCtx::detached("s1")).is_err());
+        let call = all.iter().find(|t| t.spec().name == "connector_call").unwrap();
+        assert_eq!(call.spec().risk, Risk::Exec);
+        assert!(call.spec().always_ask && call.spec().untrusted_output);
+        assert!(call.execute_result(json!({"tool":"x","arguments":"invalid"}), &ToolCtx::detached("s1")).is_error);
     }
 
     #[test]

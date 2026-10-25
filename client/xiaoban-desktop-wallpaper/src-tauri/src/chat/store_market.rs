@@ -14,7 +14,7 @@ fn market_origin() -> String {
     if let Ok(url) = std::env::var("XIAOBAN_MARKET_URL") { return url; }
     DEFAULT_MARKET.into()
 }
-fn market() -> Result<Market, String> { Market::new(&market_origin()) }
+pub(super) fn market() -> Result<Market, String> { Market::new(&market_origin()) }
 fn package(kind: String, namespace: String, slug: String, version: String) -> Package {
     Package { kind, namespace, slug, version }
 }

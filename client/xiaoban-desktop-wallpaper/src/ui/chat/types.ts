@@ -1,4 +1,5 @@
 import type { AttachmentCard } from './attachments.ts';
+import type { InstalledConnector, MarketConnector } from '../ai-store/connector-plugins.ts';
 /** What the host sends and accepts for the chat. Field names are the host's own (snake_case for kernel events). */
 
 /** The installed expert a conversation was started with (a WorkBuddy-style agent persona). */
@@ -94,7 +95,12 @@ export interface ApprovalRequest {
 }
 export type ApprovalDecision = 'once' | 'always' | 'deny';
 
-export interface QuestionRequest { id: string; session: string; question: string; options: string[] }
+export interface ConnectorSuggestion {
+  reference: string; name: string; description: string;
+  installed?: InstalledConnector;
+  namespace?: string; slug?: string; version?: string; connector?: MarketConnector;
+}
+export interface QuestionRequest { id: string; session: string; question: string; options: string[]; connectors?: ConnectorSuggestion[] }
 
 export type ChatItem =
   | { kind: 'user'; id: string; text: string; images: string[]; files?: AttachmentCard[] }

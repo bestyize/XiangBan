@@ -12,6 +12,7 @@ import ChatNameDialog from '../components/ChatNameDialog.vue';
 import ChatActivity from '../chat/ChatActivity.vue';
 import ChatReasoning from '../chat/ChatReasoning.vue';
 import ChatGoalPanel from '../chat/ChatGoalPanel.vue';
+import ChatConnectorRequest from '../chat/ChatConnectorRequest.vue';
 import GuideModal from '../components/GuideModal.vue';
 import MarkdownView from '../chat/MarkdownView.ts';
 import SelectionCopyMenu from '../chat/SelectionCopyMenu.vue';
@@ -382,8 +383,9 @@ async function openLink(href: string) {
 
             <section v-for="request in view.questions" :key="request.id" class="card question" data-testid="chat-question" role="alertdialog" aria-label="小伴想问你">
               <header><span>{{ request.question }}</span></header>
-              <div v-if="request.options.length" class="options"><NButton v-for="(option, n) in request.options" :key="option" size="small" :data-testid="`question-option-${n}`" @click="answer(request, option)">{{ option }}</NButton></div>
-              <footer @compositionstart="composing = true" @compositionend="composing = false">
+              <ChatConnectorRequest v-if="request.connectors" :request="request" @answer="answer(request, $event)" />
+              <div v-else-if="request.options.length" class="options"><NButton v-for="(option, n) in request.options" :key="option" size="small" :data-testid="`question-option-${n}`" @click="answer(request, option)">{{ option }}</NButton></div>
+              <footer v-if="!request.connectors" @compositionstart="composing = true" @compositionend="composing = false">
                 <button type="button" class="xb-link" :disabled="running" @click="chooseModel()">切换模型</button>
                 <NInput v-model:value="answerText" size="small" placeholder="或者自己回答" data-testid="question-input" @keydown.enter="!isImeEnter($event, composing) && answerText.trim() && answer(request, answerText)" />
                 <NButton type="primary" size="small" :disabled="!answerText.trim()" data-testid="question-submit" @click="answer(request, answerText)">回答</NButton>

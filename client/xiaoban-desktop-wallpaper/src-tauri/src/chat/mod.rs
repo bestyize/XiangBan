@@ -11,6 +11,7 @@ mod skill_invocation;
 mod persona;
 mod team;
 pub mod connectors;
+mod connector_tools;
 mod mentions;
 mod widget_content;
 mod broker;
@@ -224,7 +225,7 @@ fn permission_with_danger_check(mode: PermissionMode, approver: impl agent_kerne
     Permission::new(mode, approver).danger_check_in_session(move |session, tool, args| {
         // In Auto mode, always_ask alone does not trigger approval when a danger
         // policy is installed; third-party skill installation must be flagged here.
-        if tool == "skill_install" || tool == "skill_run" || tool.starts_with("mcp_ext_") {
+        if tool == "skill_install" || tool == "skill_run" || tool == "connector_call" || tool.starts_with("mcp_ext_") {
             return Some("安装第三方 Skill、执行脚本或调用外部 MCP 工具必须逐次经过用户确认".to_string());
         }
         if tool == "care_set" && args["kind"] == "agent" {
@@ -664,7 +665,7 @@ fn assemble_with_connectors(parts: Parts<'_>, attachments: Vec<Attachment>, conn
     }
     // Product-specific desktop actions are discoverable without paying for every schema
     // on ordinary chat turns. Files, commands, questions and skill discovery stay eager.
-    for tool in desktop_tools::tools_in_workspace(desktop.clone(), workspace) {
+    for tool in desktop_tools::tools_in_workspace(desktop.clone(), workspace).into_iter().chain(connector_tools::tools(desktop.clone())) {
         builder = if tool_discovery::defer_desktop_tool(&tool.spec().name) {
             builder.deferred_trusted_tool_arc(tool)
         } else { builder.tool_arc(tool) };

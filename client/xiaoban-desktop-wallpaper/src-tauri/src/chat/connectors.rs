@@ -2,7 +2,7 @@
 //! 以及输入框 `@` 菜单的数据。插件装在 `<存储>/chat/plugins/<name>/`，连接、凭据保险箱和 OAuth 都由 `ConnectorManager` 管；
 //! 这里只把它们拼成界面要的样子，列表里永远不含令牌的值，只有已保存的字段名。
 use super::*;
-use agent_connector_tools::plugin::{AuthSpec, ConnectorPlugin, ServerSpec};
+use agent_connector_tools::plugin::{AuthSpec, ConnectorPlugin, ServerSpec, Transport};
 use agent_skill_discovery::plugin;
 use std::collections::BTreeMap;
 use std::sync::atomic::AtomicBool as Flag;
@@ -50,6 +50,7 @@ struct Entry {
     server: String,
     id: String,
     market: bool,
+    namespace: Option<String>,
 }
 
 fn entries(plugins: &Path) -> Vec<Entry> {
@@ -62,7 +63,7 @@ fn entries(plugins: &Path) -> Vec<Entry> {
         let Ok(loaded) = ConnectorPlugin::load(&plugins.join(name)) else { continue };
         let market = receipt["source"]["service"] == "xiaoban-market";
         for spec in &loaded.servers {
-            out.push(Entry { id: loaded.connection_id(&spec.name), server: spec.name.clone(), plugin: loaded.clone(), market });
+            out.push(Entry { id: loaded.connection_id(&spec.name), server: spec.name.clone(), plugin: loaded.clone(), market, namespace: receipt["source"]["namespace"].as_str().map(String::from) });
         }
     }
     out
@@ -96,6 +97,7 @@ fn entry_json(manager: &agent_connector_tools::ConnectorManager, e: &Entry, stat
     let skills: Vec<String> = e.plugin.skills_dir.as_ref().and_then(|dir| fs::read_dir(dir).ok()).into_iter().flatten().flatten()
         .filter(|f| f.path().join("SKILL.md").is_file()).filter_map(|f| f.file_name().to_str().map(String::from)).collect();
     let auth = match &spec.auth {
+        AuthSpec::None if spec.transport != Transport::Stdio => "auto",
         AuthSpec::None => "none",
         AuthSpec::Token { .. } => "token",
         AuthSpec::OAuth => "oauth",
@@ -108,7 +110,9 @@ fn entry_json(manager: &agent_connector_tools::ConnectorManager, e: &Entry, stat
         "nameEn": first(&[&d.name_en, &d.name]),
         "description": first(&[&d.description_zh, &d.description_en]),
         "version": e.plugin.version, "source": if e.market { "market" } else { "local" },
+        "namespace": e.namespace,
         "iconUrl": icon_data_url(&e.plugin),
+        "transport": spec.transport, "command": spec.command, "args": spec.args,
         "auth": { "type": auth, "schema": schema_json(spec), "configured": manager.configured_plugin_fields(&e.id).unwrap_or_default() },
         "status": state, "enabled": enabled, "error": error,
         "tools": manager.tool_list(&e.id).into_iter().map(|(name, description)| json!({"name": name, "description": description})).collect::<Vec<_>>(),
@@ -125,6 +129,77 @@ fn one(app: &tauri::AppHandle, id: &str) -> Result<Value, String> {
     let manager = super::connector_manager(app)?;
     let e = find(&Dirs::of(app)?.plugins(), id)?;
     Ok(entry_json(&manager, &e, &manager.statuses(), false))
+}
+
+fn installed_suggestion(item: Value) -> Value {
+    json!({"reference":format!("installed:{}", item["id"].as_str().unwrap_or("")), "name":item["name"], "description":item["description"], "installed":item})
+}
+fn market_suggestion(item: &Value) -> Option<Value> {
+    let (namespace, slug, version) = (item["namespace"].as_str()?, item["slug"].as_str()?, item["version"].as_str()?);
+    if version.is_empty() || !item["connector"].is_object() { return None; }
+    Some(json!({"reference":format!("market:{namespace}/{slug}"), "name":item["name"], "description":item["description"], "namespace":namespace, "slug":slug, "version":version, "connector":item["connector"]}))
+}
+pub(super) fn search(app: &tauri::AppHandle, keyword: &str) -> Result<Value, String> {
+    let keyword: String = keyword.chars().take(80).collect();
+    let manager = super::connector_manager(app)?;
+    let statuses = manager.statuses();
+    let list = entries(&Dirs::of(app)?.plugins());
+    let mut results: Vec<Value> = list.iter().filter_map(|e| {
+        let item = entry_json(&manager, e, &statuses, false);
+        format!("{} {} {}", item["name"], item["nameEn"], item["description"]).to_lowercase().contains(&keyword.to_lowercase()).then(|| installed_suggestion(item))
+    }).take(3).collect();
+    let mut warning = None;
+    if results.len() < 3 && !keyword.is_empty() {
+        match super::store_market::market()?.browse("connectors", &keyword, 1, "", "", "", "") {
+            Ok(page) => for item in page["results"].as_array().into_iter().flatten() {
+                if list.iter().any(|e| Some(e.plugin.name.as_str()) == item["slug"].as_str() && e.namespace.as_deref() == item["namespace"].as_str()) { continue; }
+                if let Some(item) = market_suggestion(item) { results.push(item); }
+                if results.len() == 3 { break; }
+            },
+            Err(error) => warning = Some(format!("市场暂不可用：{error}")),
+        }
+    }
+    Ok(json!({"results":results,"warning":warning}))
+}
+pub(super) fn request(app: &tauri::AppHandle, references: &[String], ctx: &ToolCtx) -> Result<Value, String> {
+    let manager = super::connector_manager(app)?;
+    let dirs = Dirs::of(app)?;
+    let mut candidates = Vec::new();
+    for reference in references {
+        if candidates.iter().any(|c: &Value| c["reference"] == *reference) { continue; }
+        if let Some(id) = reference.strip_prefix("installed:") {
+            candidates.push(installed_suggestion(one(app, id)?));
+        } else if let Some(path) = reference.strip_prefix("market:") {
+            let (namespace, slug) = path.split_once('/').ok_or("市场连接器引用无效")?;
+            let detail = super::store_market::market()?.detail("connectors", namespace, slug)?;
+            let candidate = market_suggestion(&detail["item"]).ok_or("此连接器暂未提供可安装版本")?;
+            if candidate["reference"] != *reference { return Err("连接器来源不匹配".into()); }
+            candidates.push(candidate);
+        } else { return Err("请使用 connector_search 返回的 reference".into()); }
+    }
+    if ctx.is_cancelled() { return Err("连接请求已取消".into()); }
+    let state = app.state::<ChatState>();
+    let broker = &state.broker;
+    let (id, rx) = broker.open_question_payload(ctx.session(), json!({"question":"连接服务后继续当前任务", "options":[], "connectors":candidates}));
+    emit(app, "chat-pending-changed", json!({"session":ctx.session(), "pending":broker.snapshot(ctx.session())}));
+    let answer = ctx.wait_for(&rx).flatten();
+    broker.close_question(&id);
+    emit(app, "chat-pending-changed", json!({"session":ctx.session(), "pending":broker.snapshot(ctx.session())}));
+    let Some(answer) = answer else { return Ok(json!({"status":"skipped"})); };
+    let candidate = candidates.iter().find(|c| c["reference"] == answer).ok_or("连接器选择无效")?;
+    let statuses = manager.statuses();
+    let connected: Vec<Value> = entries(&dirs.plugins()).iter().filter(|e| {
+        if candidate["installed"].is_object() {
+            candidate["installed"]["id"] == e.id && candidate["installed"]["namespace"].as_str() == e.namespace.as_deref()
+        } else {
+            candidate["slug"] == e.plugin.name && candidate["namespace"].as_str() == e.namespace.as_deref()
+        }
+    }).map(|e| entry_json(&manager, e, &statuses, false)).filter(|c| c["status"] == "connected").collect();
+    if connected.is_empty() { return Err("连接尚未成功，请完成连接后再继续".into()); }
+    let ids = connected.iter().filter_map(|c| c["id"].as_str().map(String::from)).collect::<Vec<_>>();
+    let tools: Vec<Value> = manager.tools_for(&ids).into_iter()
+        .map(|t| json!({"name":t.spec().name,"description":t.spec().description,"schema":t.spec().schema})).collect();
+    Ok(json!({"status":"connected", "connectors":connected, "tools":tools}))
 }
 
 #[tauri::command]
@@ -150,7 +225,7 @@ pub async fn ai_connector_installed(app: tauri::AppHandle, window: tauri::Webvie
     .map_err(|e| e.to_string())?
 }
 
-/// 保存令牌并连接。留空的已存字段保持原值；需要网页授权的连接器返回“需要授权”，由界面走重新授权。
+/// 保存令牌并连接；自动发现 OAuth 时直接返回浏览器授权流程。
 #[tauri::command]
 pub async fn ai_connector_configure(app: tauri::AppHandle, window: tauri::WebviewWindow, id: String, values: BTreeMap<String, String>, confirmed: bool) -> Result<Value, String> {
     super::store::control(&window)?;
@@ -159,10 +234,11 @@ pub async fn ai_connector_configure(app: tauri::AppHandle, window: tauri::Webvie
         let manager = super::connector_manager(&app)?;
         let e = find(&Dirs::of(&app)?.plugins(), &id)?;
         let values: BTreeMap<String, String> = values.into_iter().filter(|(_, v)| !v.is_empty()).collect();
-        match manager.connect_plugin(&e.plugin, &e.server, &values, confirmed) {
-            Ok(_) => one(&app, &id),
-            Err(error) if error.starts_with("MCP HTTP 401") || error.contains("需要授权") => one(&app, &id),
-            Err(error) => Err(error),
+        let result = manager.begin_connect_plugin(&e.plugin, &e.server, &values, confirmed)?;
+        if result["status"] == "authorization_required" {
+            Ok(result)
+        } else {
+            one(&app, &id)
         }
     })
     .await
@@ -300,9 +376,24 @@ steps".to_string())];
         assert_eq!(feishu["auth"]["configured"], json!([]));
         assert_eq!((feishu["examples"][0].as_str(), feishu["skills"][0].as_str(), feishu["unsupported"].is_null()), (Some("总结本周文档"), Some("feishu-usage"), true));
         let legacy = list.iter().find(|e| e.plugin.name == "legacy").map(|e| entry_json(&manager, e, &statuses, false)).unwrap();
+        assert_eq!(legacy["auth"]["type"], "auto");
+        assert_eq!(legacy["transport"], "sse");
         assert!(legacy["unsupported"].is_null(), "legacy SSE servers connect now: {legacy}");
         assert!(find(&root.join("plugins"), &list[0].id).is_ok() && find(&root.join("plugins"), "plugin-nope").is_err());
         let _ = fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn market_suggestions_require_an_installable_version_and_keep_the_source_identity() {
+        let item = json!({"namespace":"acme", "slug":"docs", "version":"1.0", "name":"文档", "description":"查找文档", "connector":{}, "metadata":{"internal":"not-for-the-card"}});
+        let suggestion = market_suggestion(&item).unwrap();
+        assert_eq!(suggestion["reference"], "market:acme/docs");
+        assert_eq!(suggestion["namespace"], "acme");
+        assert!(suggestion.get("metadata").is_none());
+        let mut missing_version = item.clone(); missing_version["version"] = json!("");
+        assert!(market_suggestion(&missing_version).is_none());
+        let mut legacy_template = item; legacy_template["connector"] = Value::Null;
+        assert!(market_suggestion(&legacy_template).is_none());
     }
 
     #[test]
