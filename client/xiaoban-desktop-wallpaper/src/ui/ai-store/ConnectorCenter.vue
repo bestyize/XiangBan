@@ -15,6 +15,7 @@ const authorization = ref<{ flowId: string; authorizationUrl: string } | null>(n
 let alive = true;
 let authTimer: ReturnType<typeof setTimeout> | undefined;
 let polling = false;
+let pendingPlugin: string | undefined;
 const visible = computed(() => items.value.filter(c => `${c.name} ${c.nameEn ?? ''} ${c.description}`.toLowerCase().includes((props.query ?? '').trim().toLowerCase())));
 async function refresh() {
   if (!props.store.desktop || loading.value) return;
@@ -25,6 +26,10 @@ async function refresh() {
     const result = Array.isArray(listed) ? listed : [];
     items.value = result;
     if (selected.value) selected.value = result.find(c => c.id === selected.value!.id) ?? null;
+    if (pendingPlugin) {
+      const item = result.find(c => c.plugin === pendingPlugin);
+      if (item) { pendingPlugin = undefined; open(item); }
+    }
   } catch (e) { if (alive) error.value = `无法读取已安装连接器：${String(e)}`; }
   finally { loading.value = false; }
 }
@@ -106,7 +111,11 @@ onBeforeUnmount(() => {
   alive = false; clearTimeout(authTimer);
   if (authorization.value) void invoke('ai_store_connector_auth_cancel', { flowId: authorization.value.flowId }).catch(() => {});
 });
-defineExpose({ refresh, count: computed(() => items.value.length) });
+async function reveal(plugin: string) {
+  pendingPlugin = plugin;
+  await refresh();
+}
+defineExpose({ refresh, reveal, count: computed(() => items.value.length) });
 </script>
 
 <template>

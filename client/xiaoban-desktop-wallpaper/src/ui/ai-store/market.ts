@@ -1,10 +1,12 @@
 // 小伴市场：界面用到的类型和不依赖界面的判断。
 import type { SkillReview } from './catalog.ts';
+import type { MarketConnector } from './connector-plugins.ts';
 
 export type MarketKind = 'skills' | 'experts' | 'connectors';
 export type Variant = 'single' | 'team' | 'bundle';
 
 export interface MarketItem {
+  connector?: MarketConnector;
   slug: string; name: string; description: string; version: string; namespace: string; kind?: string;
   iconUrl?: string | null; source?: string; origin?: string; downloads?: number; stars?: number;
   variant?: Variant; memberCount?: number | null; category?: string | null;
