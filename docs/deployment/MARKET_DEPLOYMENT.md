@@ -2,7 +2,7 @@
 
 服务说明见 [services/server-xiaoban-market](../../services/server-xiaoban-market/README.md)，配置模板在 [infra/market](../../infra/market/compose.yaml)，测试、打包与部署由 [.github/workflows/market.yml](../../.github/workflows/market.yml) 完成。
 
-小伴市场是独立部署栈：自带 PostgreSQL，数据卷、备份和发布节奏都与主站、账号中心分开。服务只绑定服务器回环地址 `127.0.0.1:55010`，对外由宿主机 Nginx 反代并终结 HTTPS。
+小伴市场是独立部署栈：自带 PostgreSQL，数据卷、备份和发布节奏都与主站、账号中心分开。服务只绑定服务器回环地址 `127.0.0.1:55011`（容器内端口仍是 55010；宿主机 55010 在香港已被论坛占用，可用 `MARKET_HOST_PORT` 调整），对外由宿主机 Nginx 反代并终结 HTTPS。
 
 > 状态：配置和工作流已按账号中心的做法写好，并在本地校验过 compose 配置与 YAML 语法；**镜像构建、容器冒烟和 SSH 部署还没有在真实环境里运行过**，第一次用请先只跑「不勾选 deploy」的流程，确认测试与打包都通过。
 

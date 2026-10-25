@@ -39,7 +39,7 @@ services:
         condition: service_healthy
     ports:
       # 服务只绑定本机回环，唯一入口是宿主机 Nginx。
-      - "${MARKET_BIND_ADDRESS:-127.0.0.1}:55010:55010"
+      - "${MARKET_BIND_ADDRESS:-127.0.0.1}:${MARKET_HOST_PORT:-55011}:55010"
     volumes:
       - market_data:/data
     # 运行期只写 /data（安装包），根文件系统只读。
