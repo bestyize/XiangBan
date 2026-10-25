@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { NButton, NInput, NModal, NSelect } from 'naive-ui';
-import { BookmarkPlus, FilePlus2, FolderUp, Link2, NotebookPen, Search, Upload, X } from 'lucide-vue-next';
+import { FolderDown, Plus, Search, Download, X } from 'lucide-vue-next';
 import { invoke, listen } from '../../bridge.ts';
 import type { ControlStore } from '../control-types.ts';
 import { createLibraryStore, folderPath, folderTree, searchText, type LibraryDoc, type LibrarySaved } from '../library/library-store.ts';
@@ -127,13 +127,13 @@ const openUrl = (url: string) => { void invoke('open_download_url', { url }).cat
           <button v-if="query" type="button" class="xb-icon-btn is-sm" aria-label="清空搜索" title="清空搜索" @click="query = ''; searchBox?.focus()"><X :size="12" /></button>
         </label>
         <template v-if="tab === 'docs'">
-          <button type="button" class="xb-icon-btn library-action" :disabled="!store.desktop" aria-label="导入文件夹" title="导入文件夹" data-testid="library-import-folder" @click="docsTab?.importFrom(true)"><FolderUp :size="17" /></button>
-          <button type="button" class="xb-icon-btn library-action" :disabled="!store.desktop" aria-label="导入文档" title="导入文档" data-testid="library-import" @click="docsTab?.importFrom(false)"><Upload :size="17" /></button>
-          <button type="button" class="xb-icon-btn library-action" :disabled="!store.desktop || library.busy" aria-label="新建文档" title="新建文档" data-testid="library-create-doc" @click="openCreate('doc')"><FilePlus2 :size="17" /></button>
+          <button type="button" class="xb-icon-btn library-action" :disabled="!store.desktop" aria-label="导入文件夹" title="导入文件夹" data-testid="library-import-folder" @click="docsTab?.importFrom(true)"><FolderDown :size="17" /></button>
+          <button type="button" class="xb-icon-btn library-action" :disabled="!store.desktop" aria-label="导入文档" title="导入文档" data-testid="library-import" @click="docsTab?.importFrom(false)"><Download :size="17" /></button>
+          <button type="button" class="xb-icon-btn library-action" :disabled="!store.desktop || library.busy" aria-label="新建文档" title="新建文档" data-testid="library-create-doc" @click="openCreate('doc')"><Plus :size="17" /></button>
         </template>
-        <button v-else-if="tab === 'cloud'" type="button" class="xb-icon-btn library-action" :disabled="!store.desktop" aria-label="添加链接" title="添加链接" data-testid="library-add-link" @click="cloudTab?.openAdd()"><Link2 :size="17" /></button>
-        <button v-else-if="tab === 'saved'" type="button" class="xb-icon-btn library-action" :disabled="!store.desktop || library.busy" aria-label="添加收藏" title="添加收藏" data-testid="library-create-saved" @click="openCreate('saved')"><BookmarkPlus :size="17" /></button>
-        <button v-else-if="tab === 'memory'" type="button" class="xb-icon-btn library-action" :disabled="!store.desktop || !library.memory || library.busy" aria-label="新建记忆" title="新建记忆" data-testid="memory-write" @click="memoryTab?.write()"><NotebookPen :size="17" /></button>
+        <button v-else-if="tab === 'cloud'" type="button" class="xb-icon-btn library-action" :disabled="!store.desktop" aria-label="添加链接" title="添加链接" data-testid="library-add-link" @click="cloudTab?.openAdd()"><Plus :size="17" /></button>
+        <button v-else-if="tab === 'saved'" type="button" class="xb-icon-btn library-action" :disabled="!store.desktop || library.busy" aria-label="添加收藏" title="添加收藏" data-testid="library-create-saved" @click="openCreate('saved')"><Plus :size="17" /></button>
+        <button v-else-if="tab === 'memory'" type="button" class="xb-icon-btn library-action" :disabled="!store.desktop || !library.memory || library.busy" aria-label="新建记忆" title="新建记忆" data-testid="memory-write" @click="memoryTab?.write()"><Plus :size="17" /></button>
       </div>
     </header>
     <div :id="`library-panel-${tab}`" class="library-body" role="tabpanel" :aria-labelledby="`library-tab-${tab}`">

@@ -4,7 +4,7 @@ import { computed, onActivated, onMounted, ref } from "vue";
 import { Save, Sparkles, Square, Trash2 } from "lucide-vue-next";
 import { NAlert, NPopconfirm, NSkeleton } from "naive-ui";
 import type { ControlStore } from "../control-types.ts";
-import { coverUrl } from "../../games/catalog.ts";
+import { coverUrl, fallbackCoverUrl } from "../../games/catalog.ts";
 import type { GameManifest } from "../../games/protocol.ts";
 
 defineOptions({name:'GamesPage'});
@@ -24,6 +24,11 @@ const tabs: { id: 'builtin' | 'custom'; label: string }[] = [{ id: 'builtin', la
 function descriptionFor(game: GameManifest) {
   if (game.id === "snake-arena") return "无尽成长或三分钟冲分，吃糖果长成大蛇，反击 AI。";
   return game.description;
+}
+function onCoverError(event: Event, game: GameManifest) {
+  const image = event.currentTarget as HTMLImageElement;
+  const fallback = fallbackCoverUrl(game);
+  if (image.getAttribute('src') !== fallback) image.src = fallback;
 }
 const message = (error: unknown, fallback: string) => (error instanceof Error ? error.message : typeof error === "string" ? error : fallback);
 
@@ -101,7 +106,7 @@ onActivated(() => { if (opened) void loadGames(); else opened = true; });
           <div v-for="game in visibleGames" :key="game.id" class="game-card-wrapper">
             <article class="game-card" role="button" tabindex="0" :data-testid="game.source==='user'?`user-game-${game.id}`:undefined" :aria-label="`开始${game.name}`" :aria-disabled="opening||!store.desktop" @click="openGameSpace(game.id)" @keydown.enter.prevent="openGameSpace(game.id)" @keydown.space.prevent="openGameSpace(game.id)">
               <div class="game-cover">
-                <img :src="coverUrl(game)" :alt="`${game.name}封面`" loading="lazy"/>
+                <img :src="coverUrl(game)" :alt="`${game.name}封面`" loading="lazy" @error="onCoverError($event, game)"/>
                 <span class="game-kind">{{ game.source==='user'?(game.layer==='desktop'?'桌面层':'自定义'):(game.orientation==='landscape'?'横屏':game.orientation==='portrait'?'竖屏':'轻松益智') }}</span>
               </div>
               <div class="game-content">

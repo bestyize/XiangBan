@@ -1,4 +1,5 @@
 import type { GameManifest } from './protocol.ts';
+import { generatedCover } from './cover.ts';
 
 export interface GameCatalog { games: GameManifest[]; errors: string[]; directory: string | null }
 
@@ -16,7 +17,8 @@ export function validBase(id: string, base: string): boolean {
 export const gameBase = (game: Pick<GameManifest, 'id' | 'base'>) => game.base ?? builtinBase(game.id);
 const encodePath = (path: string) => path.split('/').map(encodeURIComponent).join('/');
 export const entryUrl = (game: GameManifest) => `${gameBase(game)}${encodePath(game.entry)}`;
-export const coverUrl = (game: GameManifest) => (game.cover ? `${gameBase(game)}${encodePath(game.cover)}` : DEFAULT_COVER);
+export const fallbackCoverUrl = (game: GameManifest) => game.source === 'user' ? generatedCover(game) : DEFAULT_COVER;
+export const coverUrl = (game: GameManifest) => (game.cover ? `${gameBase(game)}${encodePath(game.cover)}` : fallbackCoverUrl(game));
 
 /** Keeps the entries that look like games; one bad entry never hides the rest. */
 export function readGames(raw: unknown): GameManifest[] {

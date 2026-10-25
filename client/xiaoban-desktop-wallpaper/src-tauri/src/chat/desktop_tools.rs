@@ -989,12 +989,12 @@ fn game_delete(desktop: &dyn Desktop, args: &Value) -> Result<String, String> {
 
 const GAME_CREATE_DESCRIPTION: &str = "为用户创作一款离线小游戏，保存成游戏文件夹（文件夹即游戏）。先调用 game_read_format 阅读游戏包规范（文件、脚本、运行环境、握手、成绩、存档）再写。\
 优先在工作目录的草稿子目录（如 game-drafts/<id>/）用 write_file 分文件写、edit_file 局部改，完成后用 source_dir 安装；files 仅适合简短作品，二者必须二选一。\
-安装失败不会改动已有游戏。保存后不会自动打开，试玩用 game_open(id)。";
+创作时同时提供与游戏玩法、名称相匹配的 cover.svg 封面（640×360、16:9，纯 SVG，不引用外部资源）。安装失败不会改动已有游戏。保存后不会自动打开，试玩用 game_open(id)。";
 
 /// What `game_read_format` returns: the full game pack rules, read only when a game is being made.
 const GAME_FORMAT: &str = "游戏包规范（小伴程序内置，无需查找本地文件）：\n\
 0. 创作方式：在当前工作目录的专用子目录（如 game-drafts/<id>/）使用 write_file 逐个写入 index.html、style.css、game.js 等，较长脚本继续拆分；用 edit_file 局部修改，保留已完成文件。完成后调用 game_create，source_dir 指向该草稿目录，无需在参数中重传源码。安装失败不会改动已有游戏，修正草稿后再安装。不要通过缩减玩法或反复重写整包来应付输出超限。游戏保存在用户数据目录 games/packs/<id>/；可用 game_list 查看、game_delete 删除。\n\
-1. 文件：files 必须包含 index.html 作为入口，其余文件用相对路径引用（如 <script src=\"game.js\"></script>、<link rel=\"stylesheet\" href=\"style.css\">）。只能写 html、js、css、json、svg、md、txt 文本文件，最多 40 个，单个不超过 1 MB，合计不超过 4 MB；路径只用字母数字和 . _ -，用 / 分层，最多 4 层，不以 . 开头。不要写 manifest.json（由 game_create 生成）；若包含 cover.svg 会用作封面。\n\
+1. 文件：files 必须包含 index.html 作为入口，其余文件用相对路径引用（如 <script src=\"game.js\"></script>、<link rel=\"stylesheet\" href=\"style.css\">）。只能写 html、js、css、json、svg、md、txt 文本文件，最多 40 个，单个不超过 1 MB，合计不超过 4 MB；路径只用字母数字和 . _ -，用 / 分层，最多 4 层，不以 . 开头。不要写 manifest.json（由 game_create 生成）。创作时同时写入 cover.svg：640×360、16:9，以游戏玩法插画与名称构图，纯 SVG，不引用外部资源；安装时自动登记为封面。旧游戏未提供封面时，客户端会按名称和类型生成默认插画。\n\
 2. 脚本：用普通经典脚本（<script src>），不要 ES modules（type=module、import/export），所有资源用相对路径，不联网、不引用任何外部 CDN、字体或图片；图片用内联 SVG 或 canvas 绘制。\n\
 3. 运行环境：游戏在沙盒 iframe 里运行，没有网络、localStorage、cookie、IndexedDB 和任何系统权限。画布与布局适配 100vw × 100vh，同时支持键盘和鼠标/触摸。宿主会自动注入 desktop-host.js，由它处理 Esc 退出，游戏不要自己再处理 Esc，也不要自己引用它。\n\
 4. 握手协议（宿主注入的 desktop-host.js 会在收到 host.init 时自动回复 game.ready，所以不读存档的游戏可以不写；需要存档或成绩时按下面实现）：在页面脚本顶层同步监听 window 的 message。宿主在 iframe 加载完成后发送 {channel:'xiaban.game-host', protocol:1, type:'host.init', nonce, save, safeArea}，其中 save 是上次存档对象或 null。只接受 event.source === window.parent 且 channel、protocol、nonce 都匹配的消息；nonce 与地址栏参数 hostNonce 相同（new URLSearchParams(location.search).get('hostNonce')）。收到 host.init 后回复 window.parent.postMessage({channel:'xiaban.game-pack', protocol:1, nonce, type:'game.ready'}, '*')；game.ready 之前发出的其它消息会被忽略。\n\

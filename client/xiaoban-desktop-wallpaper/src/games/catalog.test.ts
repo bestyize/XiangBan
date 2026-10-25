@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { DEFAULT_COVER, coverUrl, entryUrl, loadBuiltinCatalog, readCatalog, readGames, validBase } from './catalog.ts';
+import { DEFAULT_COVER, coverUrl, fallbackCoverUrl, entryUrl, loadBuiltinCatalog, readCatalog, readGames, validBase } from './catalog.ts';
 
 const game = (over: Record<string, unknown> = {}) => ({ id: 'my-game', name: '我的游戏', description: '简介', entry: 'index.html', runtimeProtocol: 1, ...over });
 
@@ -23,9 +23,12 @@ describe('game catalog', () => {
     expect(windows.source).toBe('user');
   });
 
-  it('uses the default cover when a game has none', () => {
+  it('uses personalized artwork for user games and keeps the shipped fallback', () => {
     const [plain] = readGames([game({ source: 'user', base: 'game-pack://localhost/my-game/' })]);
-    expect(coverUrl(plain)).toBe(DEFAULT_COVER);
+    expect(coverUrl(plain)).toBe(fallbackCoverUrl(plain));
+    expect(coverUrl(plain)).not.toBe(DEFAULT_COVER);
+    expect(decodeURIComponent(coverUrl(plain))).toContain('我的游戏');
+    expect(coverUrl(readGames([game()])[0])).toBe(DEFAULT_COVER);
     expect(DEFAULT_COVER.startsWith('data:image/svg+xml,')).toBe(true);
     expect(decodeURIComponent(DEFAULT_COVER)).toContain('<svg');
   });

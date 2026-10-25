@@ -4,7 +4,7 @@ import { it, expect, vi } from 'vitest';
 import { NPopconfirm } from 'naive-ui';
 import GamesPage from './pages/GamesPage.vue';
 import type { ControlStore } from './control-types';
-import { DEFAULT_COVER } from '../games/catalog.ts';
+import { fallbackCoverUrl } from '../games/catalog.ts';
 
 const builtin = { id: 'merge-2048', name: '2048', description: '合成数字', entry: 'index.html', cover: 'cover.svg', runtimeProtocol: 1, source: 'builtin' as const, base: '/game-packs/merge-2048/' };
 const mine = { id: 'star-catcher', name: '接星星', description: '接住落下的星星', entry: 'index.html', runtimeProtocol: 1, save: true, source: 'user' as const, base: 'game-pack://localhost/star-catcher/' };
@@ -43,12 +43,26 @@ it('shows the user games in their own section with the default cover, and starts
     await customTab(wrapper);
     const section = wrapper.get('[data-testid="user-games"]');
     expect(section.findAll('.game-card')).toHaveLength(1);
-    expect(section.get('img').attributes('src')).toBe(DEFAULT_COVER);
+    expect(section.get('img').attributes('src')).toBe(fallbackCoverUrl(mine));
     expect(section.text()).toContain('接星星');
     expect(section.get('[data-testid="user-game-errors"]').text()).toContain('broken');
     expect(wrapper.findAll('.game-card')).toHaveLength(1);
     await section.get('.game-card').trigger('click'); await flushPromises();
     expect(openGames).toHaveBeenCalledWith('star-catcher');
+  } finally { wrapper.unmount(); }
+});
+
+it('falls back when a custom cover fails to load without retrying the broken asset', async () => {
+  const { wrapper } = setup({ games: [{ ...mine, cover: 'cover.svg' }] });
+  try {
+    await flushPromises();
+    await customTab(wrapper);
+    const image = wrapper.get('img');
+    expect(image.attributes('src')).toBe(`${mine.base}cover.svg`);
+    await image.trigger('error');
+    expect(image.attributes('src')).toBe(fallbackCoverUrl(mine));
+    await image.trigger('error');
+    expect(image.attributes('src')).toBe(fallbackCoverUrl(mine));
   } finally { wrapper.unmount(); }
 });
 
