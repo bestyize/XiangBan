@@ -105,6 +105,8 @@ pub struct Permission {
     trust_dir: Mutex<Option<std::path::PathBuf>>,
     /// Modes set for single sessions. They win over `mode`, so concurrent sessions never see each other's choice.
     session_modes: Mutex<HashMap<String, PermissionMode>>,
+    /// Child sessions (`<session>#<job>`) follow their parent's mode, grants, taint and trust.
+    children_inherit: bool,
 }
 
 impl Permission {
@@ -120,7 +122,21 @@ impl Permission {
             tainted: Mutex::new(HashSet::new()),
             trust_dir: Mutex::new(None),
             session_modes: Mutex::new(HashMap::new()),
+            children_inherit: false,
         }
+    }
+
+    /// Sessions of delegated jobs (`<session>#<job>`, such as a team member's) count as their parent session:
+    /// same mode, same "always" grants, same taint, and approval cards that appear in the parent conversation.
+    /// Off by default, because a host may use `#` in its own session ids.
+    pub fn children_inherit(mut self) -> Self {
+        self.children_inherit = true;
+        self
+    }
+
+    /// The session whose settings apply to `session`.
+    pub fn root_session<'a>(&self, session: &'a str) -> &'a str {
+        if self.children_inherit { session.split('#').next().unwrap_or(session) } else { session }
     }
 
     /// Never asks for this tool in `Ask` mode. Has no effect in `ReadOnly` mode.
@@ -171,6 +187,7 @@ impl Permission {
 
     /// The mode that applies to `session`: its own when one was set, the default otherwise.
     pub fn mode_for(&self, session: &str) -> PermissionMode {
+        let session = self.root_session(session);
         self.session_modes.lock().unwrap_or_else(|e| e.into_inner()).get(session).copied().unwrap_or_else(|| self.mode())
     }
 
@@ -217,7 +234,7 @@ impl Permission {
         *self.trust_dir.lock().unwrap_or_else(|e|e.into_inner())=Some(dir.into());
         if self.is_tainted(session){self.tainted.lock().unwrap_or_else(|e|e.into_inner()).insert(session.into());}Ok(())
     }
-    pub fn needs_review(&self,session:&str)->bool{self.trust_dir.lock().unwrap_or_else(|e|e.into_inner()).as_ref().is_some_and(|d|!matches!(std::fs::read(d.join(session)).ok().as_deref(),Some(b"clean" | b"tainted")))}
+    pub fn needs_review(&self,session:&str)->bool{let session=self.root_session(session);self.trust_dir.lock().unwrap_or_else(|e|e.into_inner()).as_ref().is_some_and(|d|!matches!(std::fs::read(d.join(session)).ok().as_deref(),Some(b"clean" | b"tainted")))}
     pub fn require_review(&self,session:&str)->Result<(),String>{
         use std::io::Write;
         let root=self.trust_dir.lock().unwrap_or_else(|e|e.into_inner());let dir=root.as_ref().ok_or("trust store not initialized")?;
@@ -235,6 +252,7 @@ impl Permission {
         self.tainted.lock().unwrap_or_else(|e|e.into_inner()).insert(session.into());Ok(())
     }
     pub fn is_tainted(&self,session:&str)->bool{
+        let session=self.root_session(session);
         self.tainted.lock().unwrap_or_else(|e|e.into_inner()).contains(session) || self.trust_dir.lock().unwrap_or_else(|e|e.into_inner()).as_ref().is_some_and(|d|std::fs::read(d.join(session)).ok().as_deref()!=Some(b"clean"))
     }
 
@@ -242,7 +260,7 @@ impl Permission {
 
 impl Middleware for Permission {
     fn before_tool(&self, ctx: &ToolCtx, _call: &ToolCall, args: &Value, spec: &ToolSpec) -> ToolGate {
-        let session = ctx.session();
+        let session = self.root_session(ctx.session());
         let name = spec.name.as_str();
         if self.deny.contains(name) {
             return ToolGate::Block(format!("`{name}` is disabled by policy."));

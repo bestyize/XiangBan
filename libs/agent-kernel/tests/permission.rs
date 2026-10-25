@@ -409,3 +409,25 @@ fn two_conversations_waiting_for_answers_at_once_get_their_own_answers_and_modes
  let count=Arc::new(AtomicUsize::new(0));let c=count.clone();let h=harness(vec![Step::tool_call("c","write","{}"),Step::text("blocked")],|b|b.middleware(p.clone()).tool(FnTool::new(spec("write").risk(Risk::Write),move|_,_|{c.fetch_add(1,Ordering::SeqCst);Ok("changed".into())})));
  run(&h.agent,"resume").0.unwrap();assert_eq!(count.load(Ordering::SeqCst),0);assert!(p.needs_review("s1"));let _=std::fs::remove_dir_all(dir);
 }
+
+#[test]
+fn child_sessions_follow_their_parent_only_when_asked_to() {
+    // Off: a delegated job's session is a stranger, so it gets the default mode and its own approvals.
+    let (fx, p) = setup(PermissionMode::Ask, vec![Approval::Once], |p| p);
+    p.set_session_mode("s1", PermissionMode::Auto);
+    run_calls(&fx, &p, "s1#team-dev-1", &["writer"]);
+    assert_eq!(fx.asked.lock().unwrap().clone(), vec![("s1#team-dev-1".into(), "writer".into(), Risk::Write)]);
+
+    // On: the parent's mode applies, grants made for the parent hold, and a card names the parent.
+    let (fx, p) = setup(PermissionMode::Ask, vec![Approval::Deny], |p| p.children_inherit());
+    p.set_session_mode("s1", PermissionMode::Auto);
+    assert_eq!(run_calls(&fx, &p, "s1#team-dev-1", &["writer"]), vec!["ran"]);
+    assert!(fx.asked.lock().unwrap().is_empty(), "the parent's full-trust mode covers the child");
+    p.set_session_mode("s1", PermissionMode::Ask);
+    p.grant("s1", "writer", None);
+    assert_eq!(run_calls(&fx, &p, "s1#team-dev-2", &["writer"]), vec!["ran"], "an always-grant for the parent holds");
+    let out = run_calls(&fx, &p, "s1#team-dev-2", &["runner"]);
+    assert!(out[0].contains("denied permission"));
+    assert_eq!(fx.asked.lock().unwrap().clone(), vec![("s1".into(), "runner".into(), Risk::Exec)], "the card is for the parent conversation");
+    assert_eq!(p.root_session("s1#team-dev-2"), "s1");
+}
