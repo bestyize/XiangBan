@@ -62,6 +62,15 @@ const localReady = ref(false);
 const registry = ref<InstanceType<typeof RegistryCatalog> | null>(null);
 const connectorCenter = ref<InstanceType<typeof ConnectorCenter> | null>(null);
 const connectorRevision = ref(0);
+async function marketConnectorInstalled() {
+  connectorRevision.value++;
+  await refreshLocal(); await checkUpdates();
+}
+async function showConnectorCenter(plugin: string) {
+  switchTab('connectors'); query.value = '';
+  await nextTick();
+  await connectorCenter.value?.reveal(plugin);
+}
 async function localPluginInstalled() {
   connectorRevision.value++;
   await refreshLocal();
@@ -234,7 +243,7 @@ async function followLink(detail: MarketDetail, version: string | null) {
   link.value = null;
   if (!request) return;
   const item: MarketItem = { ...detail.item, version: version ?? detail.item.version };
-  if (request.kind === 'connectors') { await nextTick(); void registry.value?.open({ slug: item.slug, name: item.name, description: item.description, namespace: item.namespace, iconUrl: item.iconUrl }); return; }
+  if (request.kind === 'connectors') { await nextTick(); void registry.value?.open({ ...item, category: item.category ?? undefined }); return; }
   const entry: Skill = { ...item, source: item.source, variant: item.variant };
   if (item.variant && item.variant !== 'single') { group.value = entry; return; }
   void openSkill(entry, 'market', request.kind);
@@ -396,7 +405,7 @@ const bytes = (n: number) => n < 1024 ? `${n} B` : `${(n / 1024).toFixed(1)} KB`
         <div v-if="!installedOnly && !error && !loading && store.desktop && (page > 1 || remote.hasMore)" class="store-pagination"><button :disabled="page <= 1" aria-label="上一页" @click="page--"><ChevronLeft :size="16" /></button><span>第 {{ page }} 页</span><button :disabled="!remote.hasMore" aria-label="下一页" @click="page++"><ChevronRight :size="16" /></button></div>
       </template>
       <ConnectorCenter v-if="tab === 'connectors'" :key="connectorRevision" ref="connectorCenter" :store="store" :query="query" />
-      <RegistryCatalog v-if="!packageTab" ref="registry" :kind="tab as 'experts' | 'connectors'" :query="query" :category="category" :store="store" :installed-only="installedOnly" :source="effMarket ? 'market' : 'hub'" @unavailable="onMarketError">
+      <RegistryCatalog v-if="!packageTab" ref="registry" :kind="tab as 'experts' | 'connectors'" :query="query" :category="category" :store="store" :installed-only="installedOnly" :source="effMarket ? 'market' : 'hub'" :updates="updates" @unavailable="onMarketError" @installed="marketConnectorInstalled" @center="showConnectorCenter">
         <template v-if="tab === 'connectors' && showComputer" #prefix>
         <article v-if="showComputer" class="xc store-card connector-card" style="--h-hi:#7C8CF8;--h:#4A57D0">
           <div class="xc-top">

@@ -15,6 +15,8 @@ export interface TokenSchema {
   fields: TokenField[];
 }
 export interface InstalledConnector {
+  /** Market slug; several MCP services can belong to the same plugin. */
+  plugin?: string;
   id: string;
   name: string;
   nameEn?: string;
@@ -30,6 +32,17 @@ export interface InstalledConnector {
   examples: string[];
   skills: string[];
   unsupported?: string;
+}
+export interface MarketConnector {
+  displayName: { zh?: string; en?: string };
+  displayDescription: { zh?: string; en?: string };
+  examples: { zh?: string[]; en?: string[] };
+  authTypes: InstalledConnector['auth']['type'][];
+  tokenFields: { server: string; key: string; label: string; type: string; required: boolean }[];
+  transports: string[];
+  skills: string[];
+  skillCount: number;
+  disabledToolCount: number;
 }
 export interface ConnectorAuthorization {
   status?: string;
