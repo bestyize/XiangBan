@@ -24,12 +24,11 @@ const review = ref<ConnectorReview | null>(null);
 const loading = ref(false), busy = ref(false), confirmed = ref(false), error = ref(''), done = ref(false);
 let alive = true;
 onBeforeUnmount(() => { alive = false; });
-const unsupported = computed(() => props.connector.transports.includes('sse') || review.value?.manifest.servers.some(s => s.transport === 'sse'));
 const warnings = computed(() => [...new Set([...(review.value?.manifest.warnings ?? []), ...(review.value?.warnings ?? [])])]);
 const targetVersion = computed(() => props.updateVersion || props.version);
 let reviewId = 0;
 watch(targetVersion, () => { ++reviewId; review.value = null; confirmed.value = false; loading.value = false; error.value = ''; });
-const canInstall = computed(() => !unsupported.value && !props.localError && !!props.namespace && !!targetVersion.value && (!props.installed || !!props.updateVersion) && !done.value);
+const canInstall = computed(() => !props.localError && !!props.namespace && !!targetVersion.value && (!props.installed || !!props.updateVersion) && !done.value);
 async function inspect() {
   if (!canInstall.value || loading.value || busy.value) return;
   loading.value = true; error.value = ''; confirmed.value = false; review.value = null;
@@ -63,7 +62,6 @@ async function install() {
     <h4>需要填写的令牌字段</h4>
     <ul v-if="connector.tokenFields.length"><li v-for="field in connector.tokenFields" :key="field.server + ':' + field.key">{{ field.label || field.key }} · {{ field.required ? '必填' : '选填' }}</li></ul><p v-else>无需填写令牌字段。</p>
     <h4>传输方式</h4><p>{{ connector.transports.join('、') }}</p>
-    <NAlert v-if="unsupported" type="warning" :show-icon="false">旧式 SSE 暂不支持，暂时无法连接</NAlert>
     <p>被策略禁用的工具：{{ connector.disabledToolCount }} 个</p>
     <h4>随包技能 · {{ connector.skillCount }} 个</h4><ul><li v-for="name in connector.skills" :key="name">{{ name }}</li></ul>
     <NAlert v-if="localError" type="warning" :show-icon="false">{{ localError }}</NAlert>
@@ -84,7 +82,7 @@ async function install() {
       <p class="version-lock">版本锁定 · 清单摘要 <code>{{ review.sha256 }}</code></p>
       <details v-for="script in review.scripts" :key="script.path" class="script-preview"><summary>{{ script.path }} · 脚本预览{{ script.previewTruncated ? '（已截断）' : '' }}</summary><pre class="review-content">{{ script.preview || '此脚本暂无文本预览，请在确认来源后再安装。' }}</pre></details>
       <p class="detail-note">安装不会执行脚本。脚本运行时需单独确认，并使用本机账户权限；文件校验不代表安全认证。安装后需要你确认并配置才会连接。</p>
-      <label class="review-confirm"><input v-model="confirmed" type="checkbox" :disabled="busy || unsupported" />我已查看此版本的说明、MCP 服务、文件清单和脚本预览，同意安装。</label>
+      <label class="review-confirm"><input v-model="confirmed" type="checkbox" :disabled="busy" />我已查看此版本的说明、MCP 服务、文件清单和脚本预览，同意安装。</label>
     </template>
     <p v-if="done" role="status">已安装，下一步到连接器中心填写令牌并连接</p>
     <p v-else-if="!namespace || !targetVersion" class="detail-note">此连接器暂未提供可安装的版本或市场来源。</p>

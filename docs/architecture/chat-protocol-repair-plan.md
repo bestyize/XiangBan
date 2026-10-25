@@ -1,5 +1,7 @@
 # 聊天协议可靠性修复方案
 
+> 历史修复记录：四阶段已实施；下列测试结果仅对应记录时基线，当前实现与验证入口见 [内核 README](../../libs/agent-kernel/README.md) 和 [桌面 README](../../client/xiaoban-desktop-wallpaper/README.md)。
+
 基线：e3a81c83d667c14ad71003779997d106e3d9faa4。
 
 | 阶段 | 实施内容 | 验收条件 |

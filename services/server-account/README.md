@@ -25,7 +25,7 @@ TEST_DATABASE_URL=postgres://postgres:test@localhost:55432/account_test cargo te
 
 ## 打包与部署
 
-`.github/workflows/account-center.yml` 在 ubuntu-24.04 x64 上构建 release 二进制，连同管理后台打成镜像（[Dockerfile](Dockerfile) 只含运行时），并导出镜像包与独立二进制包。独立部署栈在 [infra/account](../../infra/account/compose.yaml)，完整流程见 [docs/deployment/ACCOUNT_CENTER_DEPLOYMENT.md](../../docs/deployment/ACCOUNT_CENTER_DEPLOYMENT.md)。
+当前没有账号中心专用构建工作流。在本地 Ubuntu 24.04 x64 或匹配服务器的平台构建 release 二进制和管理后台，再使用只含运行时的 [Dockerfile](Dockerfile) 打包镜像并上传。独立部署栈在 [infra/account](../../infra/account/compose.yaml)，完整流程见 [docs/deployment/ACCOUNT_CENTER_DEPLOYMENT.md](../../docs/deployment/ACCOUNT_CENTER_DEPLOYMENT.md)。
 
 生成生产密钥（二进制自带，不要用 openssl，它生成的 Ed25519 私钥格式服务读不了）：
 
@@ -33,7 +33,7 @@ TEST_DATABASE_URL=postgres://postgres:test@localhost:55432/account_test cargo te
 cargo run --manifest-path services/server-account/Cargo.toml -- gen-keys
 ```
 
-不用 Docker 时，解压 `server-account-linux-x64-*.tar.gz` 得到 `server-account` 和 `dist/`，把环境变量写好后设置 `ACCOUNT_WEB_DIR` 指向 `dist` 运行即可。
+不用 Docker 时，一并上传构建好的 `server-account` 二进制和 `web/dist/`，配置环境变量并将 `ACCOUNT_WEB_DIR` 指向静态目录。仓库当前不提供上述产物的自动下载入口。
 
 ## 配置
 

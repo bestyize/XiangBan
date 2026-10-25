@@ -95,7 +95,7 @@ describe('installed connector center', () => {
     await click('确认断开并清除凭据'); expect(invoke).toHaveBeenCalledWith('ai_connector_unbind', { id: 'repo' });
   });
   it('displays unsupported transports without allowing connection', async () => {
-    await open({ unsupported: 'SSE 暂不可用' });
+    await open({ unsupported: '未知传输暂不可用' });
     expect(wrapper.text()).toContain('暂不支持'); expect(wrapper.findComponent(ConnectorTokenForm).exists()).toBe(false);
     expect(wrapper.findAll('button').find(b => b.text() === '启用')!.attributes('disabled')).toBeDefined();
   });

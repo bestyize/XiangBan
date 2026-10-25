@@ -1,5 +1,5 @@
 # 账号中心独立部署栈：自带 PostgreSQL，与主站 infra/compose.yaml 互不依赖，数据卷与备份各自独立。
-# 镜像由 .github/workflows/account-center.yml 构建并加载到服务器，这里不 build。
+# 镜像在本地或构建机打包后加载到服务器，这里不 build；见 docs/deployment/ACCOUNT_CENTER_DEPLOYMENT.md。
 name: xiangban-account
 
 services:

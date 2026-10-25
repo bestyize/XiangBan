@@ -1,8 +1,8 @@
 # 部署说明
 
-- [DEPLOYMENT.md](DEPLOYMENT.md)：生产部署流程。
-- [VMWARE_HANDOFF_PROMPT.md](VMWARE_HANDOFF_PROMPT.md)：VMware 环境交接与历史验证。
+- [DEPLOYMENT.md](DEPLOYMENT.md)：主站部署配置；现有工作流仍在远端构建，使用前须按文中限制处理。
 - [ACCOUNT_DATA_MODEL.md](ACCOUNT_DATA_MODEL.md)：账户和数据模型。
-- [ACCOUNT_CENTER_DEPLOYMENT.md](ACCOUNT_CENTER_DEPLOYMENT.md)：统一账号中心的独立部署、打包工作流与回滚。
+- [ACCOUNT_CENTER_DEPLOYMENT.md](ACCOUNT_CENTER_DEPLOYMENT.md)：统一账号中心的本地打包、独立部署与回滚；当前没有账号中心专用工作流。
+- [MARKET_DEPLOYMENT.md](MARKET_DEPLOYMENT.md)：小伴市场的手动测试、打包、部署与备份。
 
-模板位于 infra。说明已使用新大仓路径；历史环境、备份与操作只用于追溯，不是再次操作的授权。生产工作流仍为手动触发，源码整理不会自动部署。
+模板位于 [infra](../../infra/README.md)。云服务器使用本地或构建机构建好的产物，不在远端执行大型编译。现存 GitHub Actions 均仅手动触发；推送代码或标签不会启动构建、部署。旧 VMware 机器地址与会话交接提示词已移除；预构建配置仍保留在 `infra/deploy/compose.vmware-prebuilt.yaml`。

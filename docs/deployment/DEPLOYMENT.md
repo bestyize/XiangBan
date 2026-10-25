@@ -1,5 +1,7 @@
 # Tencent Cloud deployment
 
+> 当前限制（2026-10-25）：现存 `.github/workflows/deploy.yml` 名称为 **Deploy XiaBan.xyz**，虽只手动触发，仍上传源码并在服务器构建镜像，与仓库“云端使用预构建产物”的规范冲突。本文保留主站环境、Nginx 和密钥配置供维护；下面的工作流部署方式属于旧流程，在改为本地或构建机构建、上传镜像前不要作为推荐部署入口。VMware 预构建叠加配置仅覆盖后端，不代表前端也免编译。
+
 The deployment workflow is manual and only deploys the `main` branch. It sends a source archive over SSH to the Linux server, builds the containers there, then updates the Compose stack. No server password is used; the workflow authenticates with a dedicated SSH key.
 
 This deployment is designed to reuse an existing host Nginx and Certbot setup. The Compose stack does not bind ports 80 or 443. It publishes the XiangBan web container only on `127.0.0.1:18080`; the existing host Nginx remains the public entry point and handles HTTPS certificates.
@@ -116,7 +118,7 @@ Obtain the host key from a trusted network and verify its fingerprint against th
 
 ## 4. Deploy
 
-Open **Actions → Deploy to Tencent Cloud → Run workflow**, select `main`, and start it. The workflow checks SSH host keys, copies the source archive, builds the images on the server, and runs `docker compose up -d`.
+Legacy workflow: **Actions → Deploy XiaBan.xyz → Run workflow**, select `main`, and start it. The workflow checks SSH host keys, copies the source archive, builds the images on the server, and runs `docker compose up -d`.
 
 The image build explicitly targets only `server` and `web`: the backend runs `:backend:installDist -x test` (including its JVM API-contract dependency), and the web runs its own `npm run build`. Desktop pets, mobile apps, iOS targets, and planned capability services are not compiled. PostgreSQL and Redis use published images. The archive contains the repository source; uploading another project's source does not build it.
 

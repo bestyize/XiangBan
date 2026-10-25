@@ -2,6 +2,8 @@
 
 > 版本 v1.6 · 2026-10-15
 >
+> 历史产品规划：下文测试数量、发布状态与分阶段验收属于编制时快照；当前状态以桌面工程 README 为准，本文保留需求与验收设计。
+>
 > 状态：第 1–3 项（游戏空间、关怀提醒、桌面特效）及桌面小组件（第 9 项升级）已实现；自包含 HTML 动态小组件、自包含 Web 动态壁纸与 Agent 现场创作能力（`widget_create`、`wallpaper_create`、`effect_create`）已全线打通，形成“一核多态”的桌面轻游戏与动态交互生态。控制台已改为红色主色的白色/浅灰布局，支持浅色、深色和跟随系统；桌面特效为独立于壁纸的桌面层，内置十二种特效与自定义特效包。前端 346 tests / 43 files、Rust 65 tests、类型检查与全量构建均已通过。第 3a 项素材替换与第 4–8 项仍为规划。
 >
 > 产品工程：[client/xiaoban-desktop-wallpaper](../../client/xiaoban-desktop-wallpaper/README.md)。开发前结合该 README 核实实现状态、平台限制与验证命令。
@@ -49,7 +51,7 @@
 
 本轮规划继续面向当前支持的 Windows 和 Apple 芯片 macOS。沿用主显示器范围，不把多显示器、账户同步、聊天、视频转码或自动安装更新纳入本轮。商业企划中的账号与 App 引流属于其他规划，不构成本轮依赖。
 
-第 1–3 项已实现但尚未发布；自动化与人工验收结果以桌面工程 [feature-validation.md](../../client/xiaoban-desktop-wallpaper/docs/feature-validation.md) 为准。第 4–8 项没有纳入本轮实现。
+第 1–3 项已实现。早期验证见 [历史功能验证记录](../../client/xiaoban-desktop-wallpaper/docs/feature-validation.md)，该记录不代表当前版本验收；发布与能力现状以桌面工程 README 为准。第 4–8 项没有纳入本版规划的实现范围。
 
 ## 3. 用户场景
 

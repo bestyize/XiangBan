@@ -1,8 +1,8 @@
-# 小伴桌宠 / 动态壁纸原型
+# 小伴桌面：桌宠、动态壁纸与 Agent
 
 ## AI 商店：SkillHub 专家包与 MCP
 
-**小伴市场（默认来源）**：AI 插件页默认从自建的小伴市场获取专家、技能和连接器，筛选行右侧可切换到 SkillHub；市场连不上时自动先显示 SkillHub，已安装的插件不受影响。市场地址随应用内置（`src-tauri/src/chat/store_market.rs` 的 `DEFAULT_MARKET`，**部署时需改为真实域名**；仅调试版可用环境变量 `XIAOBAN_MARKET_URL` 指向本机）。安装前展示说明、文件清单、逐文件 SHA256 和脚本预览，并按清单摘要锁定版本；已安装的市场插件有新版本时提示更新，更新前展示文件差异，旧版本保留备份（`chat/skill-backups`）；专家团、技能套件一次审查、整组安装、失败整组回滚。网页上的「在小伴中安装」通过 `xiaoban://market/...` 唤起本应用，只弹出确认窗口，不会静默安装；协议关联由 `tauri-plugin-deep-link` 在打包安装版里注册（`tauri.conf.json` 的 `plugins.deep-link`）。「插件来源」设置里可关闭 SkillHub 补充来源和自动检查更新（保存在本机界面偏好中）。
+**小伴市场（默认来源）**：AI 插件页默认从自建的小伴市场获取专家、技能和连接器，筛选行右侧可切换到 SkillHub；市场连不上时自动先显示 SkillHub，已安装的插件不受影响。市场地址随应用内置（`src-tauri/src/chat/store_market.rs` 的 `DEFAULT_MARKET`，当前为 `https://market.xiangban.xyz`；仅调试版可用环境变量 `XIAOBAN_MARKET_URL` 指向本机）。安装前展示说明、文件清单、逐文件 SHA256 和脚本预览，并按清单摘要锁定版本；已安装的市场插件有新版本时提示更新，更新前展示文件差异，旧版本保留备份（`chat/skill-backups`）；专家团、技能套件一次审查、整组安装、失败整组回滚。网页上的「在小伴中安装」通过 `xiaoban://market/...` 唤起本应用，只弹出确认窗口，不会静默安装；协议关联由 `tauri-plugin-deep-link` 在打包安装版里注册（`tauri.conf.json` 的 `plugins.deep-link`）。「插件来源」设置里可关闭 SkillHub 补充来源和自动检查更新（保存在本机界面偏好中）。
 
 验证：`npx vitest run src/ui/pages/AiStoreMarket.test.ts src/ui/ai-store/market.test.ts`；`cargo test --manifest-path libs/agent-tools/skill-discovery/Cargo.toml market`。
 
@@ -12,7 +12,7 @@
 
 专家包和连接器目录读取 SkillHub 实际数据，支持搜索与分页；请求失败显示错误与重试。专家包按工作流审查、固定各依赖的发布者、版本和文件哈希，确认后事务安装，不运行脚本。已安装工作流可带入新聊天，移除时保留共用技能；WorkBuddy 专属注册与调度包暂不兼容。
 
-MCP 连接器使用服务 README 中的标准配置，支持本机 stdio 与远程 Streamable HTTP。默认以表单填写凭据，JSON 放在高级配置；支持标准 MCP OAuth 浏览器授权、PKCE、本机回调与自动刷新，也可填写 API Key。暂不支持旧式 SSE，WorkBuddy 私有身份及服务专属登录仍需独立接入。用户确认后才连接，初始化与工具发现成功才显示已连接。配置保存在本机，退出关闭连接，下次使用时恢复已启用配置；断开后旧任务中的工具也会失效。外部 MCP 工具逐次确认，新任务获取最新工具列表。
+MCP 连接器使用服务 README 中的标准配置，支持本机 stdio、远程 Streamable HTTP 与旧式 HTTP+SSE。默认以表单填写凭据，JSON 放在高级配置；支持标准 MCP OAuth 浏览器授权、PKCE、本机回调与自动刷新，也可填写 API Key。旧式 SSE 插件可在市场中审查并按摘要锁定安装，安装后到连接器中心配置和确认连接。WorkBuddy 私有身份及服务专属登录仍需独立接入。用户确认后才连接，初始化与工具发现成功才显示已连接。配置保存在本机，退出关闭连接，下次使用时恢复已启用配置；断开后旧任务中的工具也会失效。外部 MCP 工具逐次确认，新任务获取最新工具列表。
 
 运行时分别位于 [skill-discovery](../../libs/agent-tools/skill-discovery/README.md) 与 [connectors](../../libs/agent-tools/connectors/README.md)。针对性验证：`cargo test --manifest-path libs/agent-tools/skill-discovery/Cargo.toml`、`cargo test --manifest-path libs/agent-tools/connectors/Cargo.toml`（仓库根目录），以及本目录 `npx vitest run src/ui/pages/AiStorePage.test.ts src/ui/ai-store/RegistryCatalog.test.ts`。真实目录及临时安装联调：`cargo run --manifest-path libs/agent-tools/skill-discovery/Cargo.toml --example catalog-smoke -- tech-test-automation --install`，不执行包内脚本。
 
@@ -22,15 +22,13 @@ Windows / macOS 桌面应用：一个可拖动、透明处点击穿透的悬浮�
 
 2026-10-20 **2.0.0 正式版（重新出包）**：Windows x64 一键安装包 `XiaoBan-Setup-2.0.0-Windows-x64.exe`（12,196,799 bytes；SHA-256 `eb5ec63491d8fba3a6a143ecaf6c39e817b4a4b66fc7430b3406585488e6a80c`），macOS aarch64 dmg `XiaoBanWallpaper-2.0.0-MacOS-aarch64.dmg`（19,700,610 bytes；SHA-256 `8722b71b1f55c62673154db8971aca9ac79a3cf9fc58b68c96c7c0daf7e4e794`，固定自签名证书、未公证）。已上架 `wallpaper.xiangban.xyz`（含客户端更新接口）与 GitHub Release `xiaoban-wallpaper-v2.0.0`，下载后 SHA-256 与构建产物一致。
 
-此前 1.1.0 发布记录：2026-10-10 最新 Windows x64 网络恢复修复包：XiaoBan-UI-NetworkFix-Windows-x64.exe（本地：`artifacts/XiaoBan-UI-NetworkFix-Windows-x64.exe`）（6,017,024 bytes，约 5.74 MiB；SHA-256 `AC52792F39CAF2B239867E0B4AD84EB07C90A632A785F46332F0B0E528E58454`）。若先前版本仍在托盘运行，请退出旧实例再启动新版；单实例行为可能会唤起旧进程。此前 UI 版和 P0 版作为历史包保留：UI 版（本地：`artifacts/XiaoBan-UI-Windows-x64.exe`）（6,014,464 bytes；SHA-256 `7EF780BABBA7F2D545EDBF56D7018D3F80E1E58E65CE0DD0CDE1A388B2420278`）、P0 版（本地：`artifacts/XiaoBan-P0-Windows-x64.exe`）（5,814,272 bytes；SHA-256 `71AC7CFDB01BC65A2949400D047503F3B86D2F58739D542ABD1A452B3E8D04D0`）。2026-10-10 Rust 测试 60 项通过；本轮 UI 前端测试此前 51 tests / 11 files 通过，本次网络修复未修改前端且未重跑。自动化及人工验收状态见 [功能验证清单](docs/feature-validation.md)。
-
-历史原型构建记录：早期 Windows x64 EXE 约 4.80MB，原生切换测试曾在主屏 2880×1800、175% 缩放下通过。该体积和验证报告只描述早期原型，不代表本轮构建或人工验收结果。
+旧原型包、临时 EXE 路径与逐包校验值不再作为运行入口维护。当前打包方式见下文；历史测试记录见 [功能验证清单](docs/feature-validation.md)，仅代表对应日期的基线。
 
 角色核心在本工程的 `src/companion` 内维护，最初从网页纯角色代码原样复制，保留既有 SVG、发光、表情、弹簧参数和互动行为。允许独立演进，不再导入另一个客户端源码。`src/pet.ts` 适配 DOM 与桌面输入；暖光维持原 RobotStage 的尺寸与渐变。
 
 ## 设计规范与交互稿
 
-超级小伴已采用月白 / 夜银两套配色与品牌标志小球（主题色圆底 + 白色 Sparkles），收起球使用待机动效；思考、文字回复及语音播放均可通过右侧方块停止。最终视觉参考见 [对话框设计稿](docs/design-specs/prototypes/assistant-conversation.html) 与 [生命球演示](docs/design-specs/prototypes/assistant-living-orb.html)。
+超级小伴已采用月白 / 夜银两套配色与品牌标志小球（主题色圆底 + 白色 Sparkles），收起球使用待机动效；思考、文字回复及语音播放均可通过右侧方块停止。当前形态与品牌标志以 [超级小伴设计规范](docs/design-specs/super-assistant.md) 为准；[对话框设计稿](docs/design-specs/prototypes/assistant-conversation.html) 提供配色与回复交互参考，[旧生命球演示](docs/design-specs/prototypes/assistant-living-orb.html) 仅供历史追溯。
 
 工程内的设计文档入口见 [设计规范目录](docs/design-specs/README.md)。超级小伴的 [悬浮按钮设计稿](docs/design-specs/prototypes/assistant-floating-tools.html) 与 [截图工具设计稿](docs/design-specs/prototypes/assistant-capture-overlay.html) 均可直接用浏览器打开；交互约定及正式代码对应关系见 [超级小伴设计规范](docs/design-specs/super-assistant.md)。
 
@@ -150,7 +148,7 @@ macOS 悬浮窗口使用 AppKit 浮动层；壁纸使用 Core Graphics 的 deskt
 
 内置壁纸在 `public/wallpapers/builtin/`，目录 `catalog.json` 记录每个文件的大小和 SHA-256。除早期的晴山、晨潮、浮光和一池心灯外，新增六张程序绘制的 Canvas 壁纸，离线可用、不依赖任何外部素材：暮海、极光之夜、云海、山水（宣纸水墨）、糖霜微光（弥散光与玻璃球）、枫林暖阳。它们的共同做法是：静态层只在窗口尺寸或参数变化时画到离屏画布，每帧只绘制流动的部分，最后叠一层颗粒来增加质感；不使用 `ctx.filter`、`roundRect`、圆锥渐变等较新的画布接口，兼容 macOS 12 的 WebKit；参数只用滑块、取色器和开关，因为壁纸页的参数面板不渲染下拉选项。在没有 GPU 的无头浏览器里按 2872×1716 逐帧计时，六张约 12–50 毫秒一帧，不比原有的浮光重；真机帧率和耗电未测。新增或修改素材后运行 `node scripts/check-builtin-assets.mjs --write` 刷新校验值，`all_builtin_wallpapers_are_valid` 会校验整份目录。封面是用真实场景渲染出的 WebP，改动画面后需要重新生成。
 
-### 本轮已实现能力（1–3，尚未发布）
+### 已实现能力（PRD 第 1–3 项）
 
 - **游戏空间**：设置页和托盘/菜单栏的“玩一玩”打开游戏空间页；点任意游戏卡片会打开一个只运行这一款游戏的普通窗口（默认不全屏，可用系统标题栏切换全屏），退出即关闭窗口。离线展示七款本地游戏包。资源协议沿用网页发布包的 manifest 与 v1 消息格式；桌面使用自己的宿主，iframe 仅授予脚本权限并校验消息来源、nonce、游戏 ID 和回合状态。桌面不接账户分享；网页专属分享和钱包入口由本地 adapter 隐藏。内置游戏只有水墨剑客保存进度，位于用户数据目录 `games/saves/ink-blade.json`，上限 32 KiB；用户自创游戏（“文件夹即游戏”，放在 `games/packs/<id>/`，由 `game-pack:` 协议提供，聊天里的 `game_create`/`game_delete` 可创建与删除）在 manifest 声明 `save: true` 时存为 `games/saves/user-<id>.json`，同样上限；读取或保存失败会保留原文件并提示处理。Windows 原生 smoke 已验证七包 ready、存档往返、Esc、IPC 隔离和桌面状态恢复。桌面空白双击入口仅 Windows 可用，默认关闭；只读低级鼠标钩子将事件交给异步队列并判断 Explorer 桌面列表空白区域，不吞鼠标输入。Windows 真实图标交互尚待人工验收。macOS 暂无可靠桌面空白双击判断，使用显式入口。
 - **小伴显示**：小伴设置中可单独关闭角色显示，默认开启。关闭时仍可使用壁纸、图片特效与关怀提醒；提醒气泡独立显示在当前应用上方。
@@ -163,7 +161,7 @@ macOS 悬浮窗口使用 AppKit 浮动层；壁纸使用 Core Graphics 的 deskt
 - **桌面特效**：控制台的“桌面特效”页选一种特效——雨、雪、萤火虫、花瓣飘落、枫叶飘落、流星划过、繁星，或“无特效”——每种特效各自记住密度、速度、大小三个滑块，选择立即生效并保存。它是桌面上独立的一层透明、鼠标可穿过的窗口（窗口标签 `effects`，页面 `?scene=effects`），不属于任何壁纸：换壁纸、用系统桌面、壁纸是互动动画时都照常显示，也不会随壁纸保存。macOS 上它在动态壁纸窗口上方一级、仍在桌面图标之下；Windows 上它是置于所有应用窗口之下的顶层透明窗口。游戏空间打开期间隐藏，退出后恢复；全局“暂停桌面动画”和帧率同样适用。
 - **特效包**：每种特效是一个 JSON 文件（“特效包”），描述有几层粒子、数量、大小、速度、风与摇摆、翻转、闪烁、颜色，甚至形状（SVG 路径），由统一的引擎读取并绘制，包里不能写代码。内置十二个在 `public/effects/`；自己的特效包有三种进法：在“桌面特效”页点“导入特效”选一个 JSON 文件（先检查再落盘，id 与已有特效重名时会先问是否替换，取消则不写入）、打开特效文件夹手动放进去再点“重新载入”，或者直接在聊天里让小伴写一个（`effect_create`），三种方式都不用重启。格式和限制见 [docs/effects.md](docs/effects.md)，示例见 [docs/effect-pack-example.json](docs/effect-pack-example.json)。引擎在 `src/effects/`（格式与检查 `types.ts`/`parse.ts`、模拟 `sim.ts`、绘制 `draw.ts`、画布 `layer.ts`），窗口与文件夹管理在 `src-tauri/src/effects.rs`、`effect_packs.rs`（导入、结构校验与落盘都在这里，`validate` 是唯一的检查点），选择的数据模型在 `effect_choice.rs`。旧版本保存在每张壁纸里的特效，在首次启动时迁移为这个全局选择（旧的“树叶”变成“枫叶”）。Windows 上的覆盖窗口和 effects smoke（`XIAOBAN_EFFECTS_SMOKE=1`，已改为验证覆盖窗口和全部内置特效）尚未在实机验证。
 
-PRD 第 1–3 项已实现并通过 Windows 自动化检查，尚未发布。专注、玩具互动、场景收藏、昼夜变化和音乐联动（第 4–8 项）仍是规划。真实图标双击、天气 live 查询、网站服务联调、视觉与性能验收仍待完成；逐项结果见 [feature-validation.md](docs/feature-validation.md)。
+PRD 第 1–3 项已实现；2026-10-10 的 Windows 自动化检查记录不代表当前版本的完整验收。专注、玩具互动、场景收藏、昼夜变化和音乐联动（第 4–8 项）仍是规划。真实图标双击、天气 live 查询、网站服务联调、视觉与性能验收仍待完成；逐项结果见 [feature-validation.md](docs/feature-validation.md)。
 
 “导入图片 / 视频”通过 Windows/macOS 原生文件选择器添加自定义壁纸，“我的导入”筛选自己的内容。支持 PNG/JPEG/WebP/GIF/BMP 图片（最多 64 MiB）与 MP4/M4V/WebM 视频（最多 1 GiB），视频推荐 H.264 MP4，其他编码由系统 WebView 决定。导入保存副本并按内容去重，移动原文件后仍能使用；可预览、应用、选择画面适配和调整视频速度，不需要制作 JSON 清单，不内置转码器。
 
@@ -238,7 +236,7 @@ Mac 实机还需检查：原角色的发光与连续表情、桌宠拖动、空�
 
 ## 当前范围与限制
 
-新增功能规划见 [小伴桌面 PRD](../../docs/product/PRD_小伴桌面.md)。本轮第 1–3 项已实现并通过 Windows 自动化检查，尚未发布；第 4–8 项仍规划中。实际能力及平台限制以本文和代码为准。
+新增功能规划见 [小伴桌面 PRD](../../docs/product/PRD_小伴桌面.md)。第 1–3 项已实现；早期 Windows 自动化结果见历史验证记录，第 4–8 项仍规划中。实际能力及平台限制以本文和代码为准。
 
 启动流程另有四个 Rust 测试，覆盖已安装时不调用安装器、安装后重新检测、虚假成功退出码与失败重试。Windows CI 构建 NSIS 一键安装包；内部原生准备窗口的成功/失败/取消模拟仍需单独验证；本地 `-VerifyDownload` 还验证内嵌下载工具、进程清理及真实微软签名，不执行安装。真实缺组件的首次安装需在干净 Windows 虚拟机上验证。
 
@@ -339,5 +337,3 @@ Mac 实机还需检查：原角色的发光与连续表情、桌宠拖动、空�
 针对性检查：`npm run test:computer-use`；工具包接口、校验规则及真实 MCP 握手命令见 [Computer Use 工具包](../../libs/agent-tools/computer-use/README.md)。macOS 主应用仍支持原有最低系统版本，但电脑控制引擎需要 macOS 14+；旧系统启用时给出明确错误。首次使用仍需系统权限，以系统显示的小伴或 Open Computer Use 授权条目为准。
 
 Agent 的 `computer_use_diagnose` 可检查开关、内置路径、真实权限、稳定签名和当前引擎近期 TCC 日志中的旧签名冲突；`request_accessibility_permission` 启动原生授权引导并在 Finder 选中当前引擎。`computer_use_repair_permissions` 经每次确认后，仅重置固定引擎标识所选的旧无障碍或屏幕录制记录，保留已有效权限，再打开设置和重新授权入口；完全信任模式也必须确认。同标识独立安装版也受所选权限重置影响。最终系统授权仍由用户点击，复查后继续；不提供全局 TCC 重置。每次电脑操作先检查真实授权，不把 MCP 连接当成权限有效。`invalid arguments` 表示未执行工具，要按 schema 修正原调用；`list_apps` 最简参数 `{}`，不能加 `reason` 或 `command`，不因参数错误重置权限或转用 Python/AppKit/AppleScript。旧的 `System Events` 探测已移除；引擎仍是独立 App，相同证书不会自动合并系统身份。小伴截图仍有独立屏幕录制用途，归属以系统实际显示为准。
-
-

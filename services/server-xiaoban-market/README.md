@@ -124,6 +124,23 @@ SkillHub 可在 `config.api_key` 填团队密钥；密钥只发给 SkillHub 的 
 
 SHA-256 只保证内容与清单一致，**不代表安全**；脚本不在沙箱中运行。
 
+## WorkBuddy 插件与官方市场导入
+
+后台 `POST /api/v1/admin/plugins/import` 接收专家与连接器插件包，沿用内容寻址存储、版本与清单摘要；仅技能插件当前返回不支持。连接器目录格式和客户端接入见 [连接器规范](../../docs/architecture/connector-plugins.md)。下方“安装包规则”的根 `SKILL.md` 与 512 文件限制适用于普通技能包；WorkBuddy 插件使用独立校验，允许 2048 个文件、12 层路径、总解压大小 12 MiB。
+
+在本服务目录运行导入工具（`--server` 是服务根地址，不含 `/api/v1`）：
+
+```sh
+cargo run --locked --bin import-marketplace -- --dir <市场目录> --server https://<市场服务> --token <管理员令牌> --dry-run
+# 审查结果后去掉 --dry-run；可用 --only name-one,name-two 筛选条目。
+```
+
+支持 `.codebuddy-plugin/marketplace.json`、根 `marketplace.json` 和 `connectors/<name>/` 布局。ZIP 路径排序、时间戳和权限固定，排除本机 `.downloaded_at` 标记，不向源目录写文件。`--dry-run` 只校验打包；逐项失败继续处理，汇总新增/更新/跳过/失败，有失败时退出码为 1。
+
+官方导入强制 `origin=workbuddy-official`、`status=draft`，记录原作者、主页、仓库与许可；许可优先读插件，其次市场条目，没有则为 `unknown`。后台可按来源与许可筛选并逐个审核发布。重新导入已上架条目也会回到草稿；相同内容不新增版本，但会刷新来源等元数据。同版本不同内容返回 409，不自动改版本。
+
+当前不支持仅通过 `extensions["ai.workbuddy"].urlTemplatedMcpServers` 声明服务的包（历史样本 `tencent-map`），会明确失败，不按仅技能跳过。真实市场导入和 PostgreSQL 端到端验证须单独执行；历史只读 dry-run 不代表已经入库或上线。
+
 ## API
 
 公开接口（不需要登录）在 `/api/v1/market`，`{kind}` 取 `skills` / `experts` / `connectors`：
