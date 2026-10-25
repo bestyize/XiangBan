@@ -34,6 +34,14 @@
 
 /* 弹窗：白底分组 + 主按钮渐变 */
 .store-dialog,.registry-dialog{--dlg-line:var(--ui-line)}
+/* 弹窗限制最大高度：标题栏固定，只有内容区滚动；操作按钮贴在内容区底部。 */
+.store-dialog.n-card,.registry-dialog.n-card{display:flex;flex-direction:column;max-height:min(760px,calc(100vh - 56px));max-height:min(760px,calc(100dvh - 56px))}
+.store-dialog.n-card>.n-card-header,.registry-dialog.n-card>.n-card-header{flex:none}
+.store-dialog.n-card>.n-card-content,.registry-dialog.n-card>.n-card-content{flex:1 1 auto;min-height:0;overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--ui-scrollbar) transparent}
+.store-dialog .dialog-actions,.registry-dialog .dialog-actions{position:sticky;bottom:0;z-index:1;margin-bottom:-2px;padding:12px 0 2px;background:linear-gradient(to bottom,transparent,var(--ui-surface) 12px)}
+/* 不要像浏览器那样能拖过边界：整个 AI 插件页和它的弹窗都关掉过度滚动与滚动链，也不让图片、链接被拖走。 */
+.ai-store-page,.ai-store-page *,.store-dialog,.store-dialog *,.registry-dialog,.registry-dialog *{overscroll-behavior:none}
+.ai-store-page img,.ai-store-page a,.store-dialog img,.store-dialog a,.registry-dialog img,.registry-dialog a{-webkit-user-drag:none;user-drag:none}
 .store-dialog p,.registry-dialog p,.registry-dialog li{font-size:13px;line-height:1.8;color:var(--ui-text-secondary);margin:10px 0;overflow-wrap:anywhere}
 .store-dialog h4,.registry-dialog h4{font-size:12.5px;font-weight:600;color:var(--ui-text-primary);margin:20px 0 8px}
 .store-dialog h4 small{font-size:11.5px;font-weight:400;margin-left:8px;color:var(--ui-text-tertiary)}
