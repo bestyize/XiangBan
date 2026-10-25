@@ -20,8 +20,9 @@ async function refresh() {
   if (!props.store.desktop || loading.value) return;
   loading.value = true; error.value = '';
   try {
-    const result = await invoke<InstalledConnector[]>('ai_connector_installed');
+    const listed = await invoke<InstalledConnector[]>('ai_connector_installed');
     if (!alive) return;
+    const result = Array.isArray(listed) ? listed : [];
     items.value = result;
     if (selected.value) selected.value = result.find(c => c.id === selected.value!.id) ?? null;
   } catch (e) { if (alive) error.value = `无法读取已安装连接器：${String(e)}`; }
