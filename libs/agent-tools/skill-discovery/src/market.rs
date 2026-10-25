@@ -399,6 +399,7 @@ fn normalize(item: &Value) -> Value {
         "namespace": item["namespace"], "iconUrl": item["iconUrl"], "source": item["source"], "origin": item["origin"],
         "downloads": item["downloads"], "stars": item["favorites"], "variant": item["variant"], "memberCount": item["memberCount"],
         "category": item["category"]["name"], "categorySlug": item["category"]["slug"], "kind": item["kind"], "expert": item["expert"],
+        "connector": item["connector"],
     })
 }
 

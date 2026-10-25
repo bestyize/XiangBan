@@ -193,6 +193,7 @@ impl Package {
             "agents": list("agents"), "skills": list("skills"),
             "hasMcp": self.contents.contains_key("mcp.json") || self.contents.contains_key(".mcp.json"),
             "connectorCount": self.mcp_servers(),
+            "servers": self.mcp_summary(),
         })
     }
 
@@ -204,6 +205,23 @@ impl Package {
             .and_then(|bytes| serde_json::from_slice::<Value>(bytes).ok())
             .map(|v| v.get("mcpServers").and_then(Value::as_object).map_or_else(|| v.as_object().map_or(0, |m| m.len()), |m| m.len()))
             .unwrap_or(0)
+    }
+
+    /// 审查时给用户看的 MCP 服务：名称、传输方式和会连到哪里或会运行什么命令。环境变量和请求头只列名字，不列值。
+    pub fn mcp_summary(&self) -> Vec<Value> {
+        let Some(root) = ["mcp.json", ".mcp.json"].iter().find_map(|key| self.contents.get(*key)).and_then(|bytes| serde_json::from_slice::<Value>(bytes).ok()) else { return Vec::new() };
+        let servers = root.get("mcpServers").and_then(Value::as_object).or_else(|| root.as_object());
+        servers.into_iter().flatten().filter(|(_, v)| v.is_object()).map(|(name, v)| {
+            let command = v["command"].as_str().map(|c| {
+                let args: Vec<&str> = v["args"].as_array().into_iter().flatten().filter_map(Value::as_str).collect();
+                if args.is_empty() { c.to_string() } else { format!("{c} {}", args.join(" ")) }
+            });
+            let keys = |field: &str| -> Vec<String> { v[field].as_object().map(|m| m.keys().cloned().collect()).unwrap_or_default() };
+            json!({
+                "name": name, "transport": v["type"].as_str().or(v["transport"].as_str()).unwrap_or(if command.is_some() { "stdio" } else { "streamable-http" }),
+                "url": v["url"], "command": command, "envKeys": keys("env"), "headerKeys": keys("headers"),
+            })
+        }).collect()
     }
 
     pub fn agent_docs(&self) -> BTreeMap<String, AgentDoc> {
@@ -508,6 +526,22 @@ mod tests {
         let folded = parse_agent_md("---\nname: x\ndescription: >-\n  a\n  b\nskills: [p, \"q\"]\ntools: [Bash]\n---\nbody").unwrap();
         assert_eq!((folded.description.as_str(), folded.skills.len(), folded.declares_tools), ("a b", 2, true));
         assert!(parse_agent_md("no header").is_err() && parse_agent_md("---\ndescription: x\n---\n").is_err());
+    }
+
+    #[test]
+    fn a_connector_review_lists_where_each_server_connects_or_what_it_runs_without_any_secret_value() {
+        let mcp = br#"{"mcpServers":{"remote":{"type":"streamable-http","url":"https://mcp.example.com/x","headers":{"Authorization":"Bearer ${TOKEN}"}},"local":{"command":"npx","args":["-y","some-mcp"],"env":{"API_KEY":"${API_KEY}"}}}}"#;
+        let manifest = br#"{"name":"demo-connector","version":"1.0.0","description":"d"}"#;
+        let pkg = inspect_zip(&zip(&[(".codebuddy-plugin/plugin.json", manifest), ("mcp.json", mcp)])).unwrap();
+        assert_eq!(pkg.kind, Kind::Connector);
+        let summary = pkg.summary();
+        assert_eq!(summary["connectorCount"], 2);
+        let servers = summary["servers"].as_array().unwrap();
+        let local = servers.iter().find(|s| s["name"] == "local").unwrap();
+        assert_eq!((local["transport"].as_str(), local["command"].as_str(), local["envKeys"][0].as_str()), (Some("stdio"), Some("npx -y some-mcp"), Some("API_KEY")));
+        let remote = servers.iter().find(|s| s["name"] == "remote").unwrap();
+        assert_eq!((remote["url"].as_str(), remote["headerKeys"][0].as_str()), (Some("https://mcp.example.com/x"), Some("Authorization")));
+        assert!(!summary["servers"].to_string().contains("${TOKEN}"), "values are never listed");
     }
 
     #[test]
