@@ -260,20 +260,21 @@ async function startConversation(text: string) {
   } catch (e) { props.store.notify(e, 'error'); }
   finally { busy.value = false; }
 }
-/** 已安装的 WorkBuddy 式专家：召唤它开一个新对话；技能和老的专家包仍是让小伴去读它的说明。 */
+/** 插件专家和工作流型专家都召唤到新对话，后端按其来源加载人设或工作流。 */
 async function summon(s: Skill) {
   const local = installed(s.slug) ?? s;
   if (busy.value) return;
   await props.store.chat.select(null);
   props.store.chat.pendingExpert = {
-    plugin: local.slug, name: local.name, profession: local.profession ?? '', description: local.description, agent: local.agent,
+    plugin: local.plugin ? local.slug : '', workflow: local.plugin ? undefined : local.slug,
+    name: local.name, profession: local.profession ?? '', description: local.description, agent: local.agent,
     quickPrompts: local.quickPrompts, tags: local.tags, hasAvatar: local.hasAvatar, kind: local.pluginKind,
   };
   skill.value = null;
   props.store.navigate('new-task');
 }
 function useSkill(s: Skill) {
-  if (installed(s.slug)?.plugin) return summon(s);
+  if (installed(s.slug)?.plugin || installed(s.slug)?.marketKind === 'expert') return summon(s);
   return startConversation(`请读取已安装的技能「${s.slug}」，按其中的流程帮助我完成以下任务：`);
 }
 async function openSkill(s: Skill, via: 'market' | 'hub' = effMarket.value ? 'market' : 'hub', kind: 'skills' | 'experts' = tab.value === 'experts' ? 'experts' : 'skills') {

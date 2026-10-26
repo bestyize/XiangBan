@@ -4,10 +4,10 @@ import { Check, ChevronRight, Camera, FilePlus2, Plus, Search, Sparkles, Wrench,
 import { invoke } from '../../bridge.ts';
 import type { ControlStore } from '../control-types.ts';
 import type { Skill, SkillPage } from '../ai-store/catalog.ts';
+import { loadConnectorInventory, type ConnectorInventoryEntry } from '../chat/connector-inventory.ts';
 
 type Kind = 'experts' | 'skills' | 'connectors';
 interface Expert { slug: string; name: string; description: string; entrySkill?: string; ready?: boolean; plugin?: string; profession?: string; agent?: string | null; quickPrompts?: string[]; tags?: string[]; hasAvatar?: boolean; kind?: 'agent' | 'team' }
-interface Connector { id: string; name: string; connected: boolean; enabled: boolean; toolCount: number }
 interface CatalogEntry { slug: string; name: string; description: string }
 interface CatalogPage { results: CatalogEntry[] }
 type Entry = { id: string; title: string; detail: string; installed: boolean; ready: boolean; entrySkill?: string; expert?: Expert };
@@ -25,12 +25,16 @@ const panel = ref<'add' | null>(null);
 const kind = ref<Kind | null>(null);
 const term = ref('');
 const loading = ref(false);
-const error = ref('');
+const searchError = ref('');
+const installedErrors = ref<Partial<Record<Kind, string>>>({});
+const installedLoading = ref<Record<Kind, boolean>>({ experts: false, skills: false, connectors: false });
+const error = computed(() => [kind.value ? installedErrors.value[kind.value] : '', searchError.value].filter(Boolean).join('；'));
 const experts = ref<Expert[]>([]);
 const skills = ref<Skill[]>([]);
-const connectors = ref<Connector[]>([]);
+const connectors = ref<ConnectorInventoryEntry[]>([]);
 const discovered = ref<CatalogEntry[]>([]);
 let requestId = 0;
+let installedId = 0;
 let searchTimer: ReturnType<typeof setTimeout> | undefined;
 const labels: Record<Kind, string> = { experts: '专家', skills: '技能', connectors: '连接器' };
 
@@ -44,7 +48,7 @@ const installedEntries = computed<Entry[]>(() => {
     id: e.slug, title: e.name, detail: e.description, installed: true, ready: true,
   }));
   if (kind.value === 'connectors') return connectors.value.filter(e => matches(e.name + ' ' + e.id)).map(e => ({
-    id: e.id, title: e.name, detail: e.connected && e.enabled ? `已连接 · ${e.toolCount} 个工具` : '尚未连接或未启用',
+    id: e.id, title: e.name, detail: e.detail || (e.connected && e.enabled ? `已连接 · ${e.toolCount} 个工具` : '尚未连接或未启用'),
     installed: true, ready: e.connected && e.enabled,
   }));
   return [];
@@ -70,14 +74,14 @@ function onFocusOut(event: FocusEvent) {
   if (event.relatedTarget instanceof Node && root.value?.contains(event.relatedTarget)) return;
   scheduleClose();
 }
-function close() { cancelClose(); panel.value = null; kind.value = null; term.value = ''; ++requestId; clearTimeout(searchTimer); }
+function close() { cancelClose(); panel.value = null; kind.value = null; term.value = ''; ++requestId; ++installedId; loading.value = false; clearTimeout(searchTimer); }
 function onOutside(e: PointerEvent) { if (root.value && !root.value.contains(e.target as Node)) close(); }
 function onKey(e: KeyboardEvent) { if (e.key === 'Escape') close(); }
 watch(panel, p => {
   if (p) { document.addEventListener('pointerdown', onOutside); document.addEventListener('keydown', onKey); }
   else { document.removeEventListener('pointerdown', onOutside); document.removeEventListener('keydown', onKey); }
 });
-onBeforeUnmount(() => { ++requestId; clearTimeout(searchTimer); cancelClose(); document.removeEventListener('pointerdown', onOutside); document.removeEventListener('keydown', onKey); });
+onBeforeUnmount(() => { ++requestId; ++installedId; clearTimeout(searchTimer); cancelClose(); document.removeEventListener('pointerdown', onOutside); document.removeEventListener('keydown', onKey); });
 function openAddMenu() {
   cancelClose();
   if (props.disabled || panel.value === 'add') return;
@@ -86,28 +90,29 @@ function openAddMenu() {
 }
 async function refreshInstalled() {
   if (!props.store.desktop) return;
-  const id = ++requestId;
-  const results = await Promise.allSettled([
-    invoke<Expert[]>('ai_store_experts_installed'),
-    // The skills the user may start by name: installed, bundled and the ones plugins carry.
-    invoke<{ name: string; displayName: string; description: string }[]>('chat_invocable_skills').then(list => list.map(i => ({ slug: i.name, name: i.displayName, description: i.description }) as unknown as Skill)),
-    invoke<Connector[]>('ai_store_connector_status'),
+  const id = ++installedId;
+  installedLoading.value = { experts: true, skills: true, connectors: true }; installedErrors.value = {};
+  experts.value = []; skills.value = []; connectors.value = [];
+  async function read(k: Kind, fetch: () => Promise<void>) {
+    try { await fetch(); }
+    catch { if (id === installedId) installedErrors.value[k] = `读取已安装${labels[k]}失败，请重试`; }
+    finally { if (id === installedId) installedLoading.value[k] = false; }
+  }
+  await Promise.all([
+    read('experts', async () => { const result = await invoke<Expert[]>('ai_store_experts_installed'); if (!Array.isArray(result)) throw new Error(); if (id === installedId) experts.value = result; }),
+    read('skills', async () => { const result = await invoke<{ name: string; displayName: string; description: string }[]>('chat_invocable_skills'); if (!Array.isArray(result)) throw new Error(); if (id === installedId) skills.value = result.map(i => ({ slug: i.name, name: i.displayName, description: i.description }) as Skill); }),
+    read('connectors', async () => { const result = await loadConnectorInventory(); if (id === installedId) { connectors.value = result.items; installedErrors.value.connectors = result.warning; } }),
   ]);
-  if (id !== requestId) return;
-  if (results[0].status === 'fulfilled') experts.value = results[0].value;
-  if (results[1].status === 'fulfilled') skills.value = results[1].value;
-  if (results[2].status === 'fulfilled') connectors.value = results[2].value;
-  error.value = results.every(r => r.status === 'rejected') ? '读取已安装能力失败，请重试' : '';
 }
 function chooseKind(next: Kind) {
   if (kind.value === next) return;
-  kind.value = next; term.value = ''; discovered.value = []; error.value = '';
+  kind.value = next; term.value = ''; discovered.value = []; searchError.value = ''; loading.value = false;
   ++requestId; clearTimeout(searchTimer);
 }
 function scheduleSearch() {
   clearTimeout(searchTimer);
   const id = ++requestId, q = term.value.trim().slice(0,80), selected = kind.value;
-  discovered.value = []; error.value = ''; loading.value = false;
+  discovered.value = []; searchError.value = ''; loading.value = false;
   if (!selected || !q || !props.store.desktop) return;
   searchTimer = setTimeout(async () => {
     loading.value = true;
@@ -117,7 +122,7 @@ function scheduleSearch() {
         : await invoke<CatalogPage>('ai_store_catalog', { kind: selected, keyword: q, page: 1, category: '' });
       if (id === requestId) discovered.value = result.results.map(e => ({ slug: e.slug, name: e.name, description: e.description }));
     } catch {
-      if (id === requestId) error.value = '搜索暂时不可用，可以前往 AI 插件查找';
+      if (id === requestId) searchError.value = '搜索暂时不可用，可以前往 AI 插件查找';
     } finally { if (id === requestId) loading.value = false; }
   }, 250);
 }
@@ -153,15 +158,16 @@ function takeScreenshot() { close(); emit('screenshot'); }
               <span class="wb-result-text"><strong>{{ entry.title }}</strong><small>{{ entry.detail || entry.id }}</small></span>
               <Check v-if="entry.ready" :size="14" /><ChevronRight v-else :size="14" />
             </button>
-            <div v-if="!installedEntries.length" class="wb-empty">{{ term ? '没有匹配的已安装能力' : '暂无已安装能力' }}</div>
+            <div v-if="installedLoading[kind]" class="wb-empty" role="status">正在读取已安装的{{ labels[kind] }}…</div>
+            <div v-else-if="!installedEntries.length && !installedErrors[kind]" class="wb-empty">{{ term ? '没有匹配的已安装能力' : '暂无已安装能力' }}</div>
+            <div v-if="error" class="wb-empty" role="alert">{{ error }} <button v-if="installedErrors[kind]" type="button" class="wb-store-link" @click="refreshInstalled">重试</button></div>
             <template v-if="term">
               <div class="wb-section">发现更多</div>
               <div v-if="loading" class="wb-empty">搜索中…</div>
               <button v-for="entry in remoteEntries" :key="'r-'+entry.id" type="button" class="wb-result" @click="openStore">
                 <span class="wb-result-text"><strong>{{ entry.title }}</strong><small>{{ entry.detail || '前往 AI 插件查看' }}</small></span><ArrowUpRight :size="14" />
               </button>
-              <div v-if="error" class="wb-empty">{{ error }}</div>
-              <div v-else-if="!loading && !remoteEntries.length && term" class="wb-empty">可在 AI 插件中继续查找</div>
+              <div v-if="!error && !loading && !remoteEntries.length && term" class="wb-empty">可在 AI 插件中继续查找</div>
             </template>
           </div>
           <button type="button" class="wb-store-link" data-testid="chat-open-ai-store" @click="openStore">打开 AI 插件 <ArrowUpRight :size="13" /></button>

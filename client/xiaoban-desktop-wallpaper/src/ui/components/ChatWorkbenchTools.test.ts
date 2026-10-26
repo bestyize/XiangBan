@@ -21,13 +21,53 @@ function setup() {
 beforeEach(() => {
   vi.mocked(invoke).mockReset();
   vi.mocked(invoke).mockImplementation((async (command: string) => {
-    if (command === 'ai_store_experts_installed' || command === 'ai_store_installed' || command === 'chat_invocable_skills' || command === 'ai_store_connector_status') return [];
+    if (command === 'ai_store_experts_installed' || command === 'ai_store_installed' || command === 'chat_invocable_skills' || command === 'ai_store_connector_status' || command === 'ai_connector_installed') return [];
     return { results: [] };
   }) as typeof invoke);
 });
 afterEach(() => { vi.useRealTimers(); });
 
 describe('add-capability menu hover interaction', () => {
+  it('keeps in-flight inventory when opening a submenu or typing a search', async () => {
+    let resolve!: (value: unknown) => void;
+    const original=vi.mocked(invoke).getMockImplementation()!;
+    vi.mocked(invoke).mockImplementation(async (command,args)=>command==='ai_store_experts_installed' ? new Promise(r=>{resolve=r;}) : original(command,args));
+    const {wrapper}=setup();
+    await wrapper.get('[data-testid=chat-add-menu]').trigger('mouseenter');
+    await wrapper.get('[data-testid=chat-add-experts]').trigger('mouseenter');
+    expect(wrapper.text()).toContain('正在读取已安装的专家');
+    expect(wrapper.text()).not.toContain('暂无已安装能力');
+    await wrapper.get('[data-testid=chat-capability-search]').setValue('健康');
+    resolve([{slug:'health-report',name:'健康报告',description:'报告解读',entrySkill:'health-report',ready:true}]);await flushPromises();
+    expect(wrapper.get('[data-testid=chat-installed-health-report]').text()).toContain('健康报告');
+    await wrapper.get('[data-testid=chat-installed-health-report]').trigger('click');
+    expect(wrapper.emitted('use-expert')).toEqual([['health-report','健康报告',undefined]]);wrapper.unmount();
+  });
+  it('shows installed unconfigured plugins and deduplicates configured plugin services',async()=>{
+    const original=vi.mocked(invoke).getMockImplementation()!;
+    vi.mocked(invoke).mockImplementation(async(command,args)=>{
+      if(command==='ai_connector_installed')return [{id:'pan:main',name:'百度网盘',enabled:false,status:'disconnected',tools:[]},{id:'repo:main',name:'GitHub',enabled:true,status:'connected',tools:[{name:'search'}]}];
+      if(command==='ai_store_connector_status')return [{id:'repo:main',name:'Old name',enabled:true,connected:true,toolCount:1}];
+      return original(command,args);
+    });
+    const {wrapper}=setup();await wrapper.get('[data-testid=chat-add-menu]').trigger('click');
+    await wrapper.get('[data-testid=chat-add-connectors]').trigger('click');await flushPromises();
+    expect(wrapper.get('[data-testid="chat-installed-pan:main"]').text()).toContain('未连接');
+    expect(wrapper.findAll('[data-testid="chat-installed-repo:main"]')).toHaveLength(1);
+    await wrapper.get('[data-testid="chat-installed-repo:main"]').trigger('click');
+    expect(wrapper.emitted('use-connector')).toEqual([['GitHub','repo:main']]);wrapper.unmount();
+  });
+  it('reports a category failure even when other inventories succeed and supports retry',async()=>{
+    const original=vi.mocked(invoke).getMockImplementation()!;let fail=true;
+    vi.mocked(invoke).mockImplementation(async(command,args)=>{
+      if(command==='ai_store_experts_installed'){if(fail)throw new Error('read failure');return [{slug:'expert',name:'我的专家',description:'说明'}];}
+      return original(command,args);
+    });
+    const {wrapper}=setup();await wrapper.get('[data-testid=chat-add-menu]').trigger('click');await wrapper.get('[data-testid=chat-add-experts]').trigger('click');await flushPromises();
+    expect(wrapper.get('[role=alert]').text()).toContain('读取已安装专家失败');expect(wrapper.text()).not.toContain('暂无已安装能力');
+    fail=false;await wrapper.get('[role=alert] button').trigger('click');await flushPromises();
+    expect(wrapper.get('[data-testid=chat-installed-expert]').text()).toContain('我的专家');wrapper.unmount();
+  });
   it('opens on hover and stays open while crossing the gap into the menu', async () => {
     vi.useFakeTimers();
     const { wrapper } = setup();

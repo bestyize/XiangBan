@@ -25,8 +25,25 @@ pub async fn ai_store_experts_installed(app:tauri::AppHandle,window:tauri::Webvi
         // WorkBuddy-style experts (agent personas) come first: they are what "summon" starts a conversation with.
         let mut listed=super::plugins::installed_experts(&dirs.plugins());
         if let Some(old)=experts.as_array_mut(){listed.append(old);}
+        for expert in market_workflow_experts(&dirs.skills()) {
+            if !listed.iter().any(|e|e["slug"]==expert["slug"]) { listed.push(expert); }
+        }
         Ok(Value::Array(listed))
     }).await.map_err(|e|e.to_string())?
+}
+/// Older market experts are verified SKILL.md workflows, rather than persona plugins or packs.
+pub(super) fn market_workflow_experts(root:&Path)->Vec<Value> {
+    let skills=Skills::new().writable_root(root); let mut entries=Vec::new();
+    for dir in fs::read_dir(root).into_iter().flatten().flatten() {
+        let Some(name)=dir.file_name().to_str().map(str::to_string) else {continue};
+        let Some(skill)=skills.find(&name) else {continue};
+        if !removable(&skill.dir,&skill.name) {continue;}
+        let lock=fs::read(skill.dir.join(".skillhub-lock.json")).ok().and_then(|b|serde_json::from_slice::<Value>(&b).ok()).unwrap_or(Value::Null);
+        if lock["origin"]["service"]!="xiaoban-market" || lock["origin"]["kind"]!="expert" {continue;}
+        entries.push(json!({"slug":skill.name,"name":skill.display_name.as_deref().unwrap_or(&skill.name),"description":skill.description,
+            "entrySkill":skill.name,"ready":skill.user_invocable,"version":lock["version"],"namespace":lock["namespace"]}));
+    }
+    entries.sort_by(|a,b|a["slug"].as_str().cmp(&b["slug"].as_str())); entries
 }
 #[tauri::command]
 pub async fn ai_store_expert_review(app:tauri::AppHandle,window:tauri::WebviewWindow,slug:String)->Result<Value,String>{
@@ -208,6 +225,20 @@ pub async fn ai_store_uninstall(app: tauri::AppHandle, window: tauri::WebviewWin
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn verified_market_workflow_experts_are_listed_with_their_skill_entry() {
+        use sha2::{Digest,Sha256};
+        let root=std::env::temp_dir().join(format!("market-workflow-experts-{}-{}",std::process::id(),std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()));
+        let dir=root.join("health-report");fs::create_dir_all(&dir).unwrap();
+        let text="---\nname: health-report\ndisplayName: 健康报告\ndescription: 解读报告\n---\nInstructions";
+        fs::write(dir.join("SKILL.md"),text).unwrap();
+        let mut lock=json!({"provider":"skillhub","slug":"health-report","version":"1.0","origin":{"service":"xiaoban-market","kind":"expert"},"files":[{"path":"SKILL.md","sha256":format!("{:x}",Sha256::digest(text.as_bytes()))}]});
+        fs::write(dir.join(".skillhub-lock.json"),lock.to_string()).unwrap();
+        let list=market_workflow_experts(&root);assert_eq!(list.len(),1);assert_eq!(list[0]["name"],"健康报告");assert_eq!(list[0]["entrySkill"],"health-report");assert_eq!(list[0]["ready"],true);
+        lock["origin"]["kind"]=json!("skill");fs::write(dir.join(".skillhub-lock.json"),lock.to_string()).unwrap();assert!(market_workflow_experts(&root).is_empty());
+        lock["origin"]["kind"]=json!("expert");fs::write(dir.join(".skillhub-lock.json"),lock.to_string()).unwrap();fs::write(dir.join("SKILL.md"),"changed").unwrap();assert!(market_workflow_experts(&root).is_empty());
+        fs::remove_dir_all(root).unwrap();
+    }
     #[test]
     fn only_owned_registry_packages_can_be_removed() {
         let root = std::env::temp_dir().join(format!("xiaoban-store-{}", std::process::id()));

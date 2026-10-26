@@ -50,6 +50,16 @@ async function pick(name: string) {
   await item.trigger('click'); await flushPromises();
 }
 describe('composer mentions', () => {
+  it('binds workflow experts instead of adding a one-message skill chip',async()=>{
+    await open();
+    const menu=wrapper.findComponent({name:'ChatWorkbenchTools'});
+    menu.vm.$emit('use-expert','healthcare-health-report','健康报告');await flushPromises();
+    expect(store.chat.pendingExpert).toMatchObject({workflow:'healthcare-health-report',name:'健康报告'});
+    expect(wrapper.find('[data-testid=chat-skill-healthcare-health-report]').exists()).toBe(false);
+    await type('解读这份报告');await wrapper.get('[data-testid=chat-send]').trigger('click');await flushPromises();
+    expect(host).toHaveBeenCalledWith('chat_new_session',expect.objectContaining({expert:{workflow:'healthcare-health-report'}}));
+    expect(host).toHaveBeenCalledWith('chat_send',{sessionId:'s1',text:'解读这份报告'});
+  });
   it('does not match email addresses and accepts Chinese queries', () => {
     expect(mentionToken('me@example.com')).toBeNull(); expect(mentionToken('看 @仓库')).toEqual({ start: 2, query: '仓库' });
   });

@@ -91,8 +91,9 @@ describe('chat workbench composer actions', () => {
     await click('chat-add-experts');
     expect(q('chat-installed-reviewer')?.textContent).toContain('代码专家');
     await click('chat-installed-reviewer');
-    expect(textarea().value).toContain('load_skill');
-    expect(textarea().value).toContain('code-review');
+    expect(h.chat.pendingExpert).toMatchObject({workflow:'code-review',name:'代码专家'});
+    expect(document.querySelector('.composer-ctx [data-testid=chat-expert]')?.textContent).toContain('代码专家');
+    expect(q('chat-skill-code-review')).toBeNull();
     await click('chat-add-menu');
     await click('chat-add-skills');
     await click('chat-installed-check');
@@ -171,7 +172,7 @@ describe('chat workbench composer actions', () => {
     expect(q('chat-expert-clear')).toBeNull();
   });
 
-  it('lets the pick be cancelled before the first message, and ignores experts without a persona', async () => {
+  it('lets workflow experts be cancelled before the first message and keeps them in the expert slot', async () => {
     const h = await open({
       ai_store_experts_installed: () => [{ slug: 'old-pack', name: '老专家包', description: '工作流', entrySkill: 'expert-old-pack-abcd1234', ready: true }],
       ai_store_installed: () => [], chat_invocable_skills: () => [], ai_store_connector_status: () => [],
@@ -179,9 +180,9 @@ describe('chat workbench composer actions', () => {
     await click('chat-add-menu');
     await click('chat-add-experts');
     await click('chat-installed-old-pack');
-    // A SkillHub pack has no persona: it still just hands its workflow to the assistant through the draft.
-    expect(h.chat.pendingExpert).toBeNull();
-    expect(textarea().value).toContain('load_skill');
+    expect(h.chat.pendingExpert).toMatchObject({workflow:'expert-old-pack-abcd1234',name:'老专家包'});
+    expect(q('chat-expert')?.textContent).toContain('老专家包');
+    expect(q('chat-skill-expert-old-pack-abcd1234')).toBeNull();
     h.chat.pendingExpert = { plugin: 'x', name: '临时专家', profession: '' };
     await flushPromises();
     expect(q('chat-expert')).not.toBeNull();

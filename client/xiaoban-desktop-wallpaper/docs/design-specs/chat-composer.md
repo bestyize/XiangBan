@@ -21,5 +21,6 @@
 - 顶部一行没有任何内容时不占位；技能放不下会自己换行，右侧的专家名先用省略号截断。
 - 连接器弹层在新建任务页往下展开，在会话页往上展开。
 - 专家是对话的身份，所以不能中途更换；要换人，在新建任务里重新召唤。
+- 工作流型专家（市场中的 SKILL.md 专家和旧专家包）同样占用右上角的专家位置，并以 `workflow` 保存到会话绑定；不会转成左侧的一次性技能。每次模型请求加载已验证的工作流说明，重新打开会话时恢复绑定；卸载、依赖未就绪或完整性校验失败时不再加载。说明作为参考数据加入请求，不提升为系统人设，也不增加工具权限。普通技能仍只作用于选中的消息。
 
 验证：`npx vitest run src/ui/components/ChatConnectorCluster.test.ts src/ui/components/ChatConnectorMentions.test.ts src/ui/chat/slash.test.ts src/ui/pages/ChatPage.test.ts src/ui/pages/NewTaskPage.test.ts`。

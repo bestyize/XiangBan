@@ -90,9 +90,9 @@ describe('AI 商店', () => {
     const { wrapper, store } = setup(); await settle();
     await wrapper.get('.expert-card .small-action').trigger('click'); await flushPromises();
     expect(store.chat.select).toHaveBeenCalledWith(null);
-    expect(store.creationDraft).toContain('load_skill');
-    expect(store.creationDraft).toContain('expert-tech-test-automation');
-    expect(store.navigate).toHaveBeenCalledWith('chat');
+    expect(store.chat.pendingExpert).toMatchObject({workflow:'expert-tech-test-automation'});
+    expect(store.creationDraft).toBeNull();
+    expect(store.navigate).toHaveBeenCalledWith('new-task');
   });
   it('requires review before installing the exact pinned package and refreshes real state', async () => {
     const { wrapper } = setup(); await skills(wrapper);

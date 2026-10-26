@@ -206,7 +206,7 @@ mod tests {
         }
         let pkg = plugin::inspect_zip(&w.finish().unwrap().into_inner()).unwrap();
         plugin::install(&root.join("plugins"), &root.join("backups"), &pkg, "local", json!({})).unwrap();
-        sessions::ExpertBinding { plugin: "dev-team".into(), agent: "dev-team-lead".into(), name: "齐活林".into(), profession: "交付总监".into() }
+        sessions::ExpertBinding { plugin: "dev-team".into(), agent: "dev-team-lead".into(), name: "齐活林".into(), profession: "交付总监".into(), workflow: None }
     }
 
     #[test]

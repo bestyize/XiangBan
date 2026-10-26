@@ -21,6 +21,13 @@ beforeEach(() => { vi.mocked(invoke).mockReset().mockImplementation(async comman
 afterEach(() => wrapper?.unmount());
 
 describe('connector cluster', () => {
+  it('includes plugin services that have never had a connection record',async()=>{
+    const original=vi.mocked(invoke).getMockImplementation()!;
+    vi.mocked(invoke).mockImplementation(async(command,args)=>command==='ai_connector_installed' ? [{id:'pan:main',name:'百度网盘',enabled:false,status:'disconnected',tools:[]}] : original(command,args));
+    open();await wrapper.get('[data-testid=chat-connectors-toggle]').trigger('click');await flushPromises();
+    expect(wrapper.get('[data-testid="chat-connector-pan:main"]').text()).toContain('未连接');
+    expect(wrapper.get('[data-testid="chat-connector-pan:main"] .row-link').text()).toBe('去连接');
+  });
   it('shows nothing until a connector is chosen', () => {
     open([]);
     expect(wrapper.find('[data-testid=chat-connectors]').exists()).toBe(false);

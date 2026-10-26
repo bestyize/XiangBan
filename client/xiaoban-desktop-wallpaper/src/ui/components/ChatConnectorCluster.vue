@@ -5,12 +5,11 @@
  */
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import { Plug } from 'lucide-vue-next';
-import { invoke } from '../../bridge.ts';
+import { loadConnectorInventory, type ConnectorInventoryEntry } from '../chat/connector-inventory.ts';
 import { connectorIcon } from '../ai-store/connector-icons.ts';
 import { hueStyle } from '../ai-store/hues.ts';
 
 interface Picked { id: string; name: string; iconUrl?: string | null }
-interface Status { id: string; name: string; connected: boolean; enabled: boolean; toolCount: number }
 
 const props = defineProps<{ selected: Picked[]; desktop: boolean; disabled?: boolean; down?: boolean }>();
 const emit = defineEmits<{ toggle: [item: { id: string; name: string }]; manage: [] }>();
@@ -19,7 +18,8 @@ const root = ref<HTMLElement | null>(null);
 const open = ref(false);
 const loading = ref(false);
 const failed = ref(false);
-const status = ref<Status[]>([]);
+const warning = ref('');
+const status = ref<ConnectorInventoryEntry[]>([]);
 let generation = 0;
 
 const VISIBLE = 3;
@@ -36,7 +36,7 @@ const label = computed(() => (props.selected.length ? `已选 ${props.selected.l
 const picked = computed(() => new Set(props.selected.map(item => item.id)));
 const rows = computed(() => {
   const known = new Set(status.value.map(s => s.id));
-  const listed = status.value.map(s => ({ id: s.id, name: s.name, ready: s.connected && s.enabled, detail: s.connected && s.enabled ? `已连接 · ${s.toolCount} 个工具` : s.enabled ? '尚未连接' : '已停用' }));
+  const listed = status.value.map(s => ({ id: s.id, name: s.name, ready: s.connected && s.enabled, detail: s.detail || (s.connected && s.enabled ? `已连接 · ${s.toolCount} 个工具` : s.enabled ? '尚未连接' : '已停用') }));
   // A connector chosen earlier and since removed stays listed, so it can still be dropped from the choice.
   const gone = props.selected.filter(item => !known.has(item.id)).map(item => ({ id: item.id, name: item.name, ready: false, detail: '已不可用' }));
   return [...listed, ...gone].map(row => ({ ...row, on: picked.value.has(row.id), src: iconOf(row), style: hueStyle(undefined, row.id) }));
@@ -44,10 +44,10 @@ const rows = computed(() => {
 
 async function load() {
   const current = ++generation;
-  loading.value = true; failed.value = false;
+  loading.value = true; failed.value = false; warning.value = '';
   try {
-    const result = props.desktop ? await invoke<Status[]>('ai_store_connector_status') : [];
-    if (current === generation) status.value = Array.isArray(result) ? result : [];
+    const result = props.desktop ? await loadConnectorInventory() : { items: [], warning: '' };
+    if (current === generation) { status.value = result.items; warning.value = result.warning; }
   } catch { if (current === generation) { status.value = []; failed.value = true; } }
   finally { if (current === generation) loading.value = false; }
 }
@@ -75,9 +75,10 @@ function manage() { close(); emit('manage'); }
     <div v-if="open" class="cluster-pop" :class="{ down }" role="dialog" aria-label="连接器" data-testid="chat-connectors-panel">
       <div class="pop-head"><b>连接器</b><span>已选 {{ selected.length }} 个</span></div>
       <div class="pop-list">
-        <div v-if="failed" class="pop-empty" role="status">读取连接器失败，请稍后重试</div>
+        <div v-if="failed" class="pop-empty" role="status">读取连接器失败，请稍后重试 <button type="button" class="row-link" @click="load">重试</button></div>
         <div v-else-if="loading && !rows.length" class="pop-empty" role="status">正在读取…</div>
         <div v-else-if="!rows.length" class="pop-empty">还没有连接器，到 AI 插件里添加</div>
+        <div v-if="warning" class="pop-empty" role="status">{{ warning }} <button type="button" class="row-link" @click="load">重试</button></div>
         <div v-for="row in rows" :key="row.id" class="pop-row" :data-testid="`chat-connector-${row.id}`">
           <span class="tile big" :style="row.style" aria-hidden="true"><img v-if="row.src" :src="row.src" alt="" /><template v-else>{{ row.name.slice(0, 1) }}</template></span>
           <span class="row-text"><strong>{{ row.name }}</strong><small>{{ row.detail }}</small></span>

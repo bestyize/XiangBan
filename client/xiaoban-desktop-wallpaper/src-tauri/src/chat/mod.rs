@@ -560,6 +560,7 @@ fn assemble_with_files(parts: Parts<'_>, attachments: Vec<Attachment>) -> Result
 /// What one message adds to the agent beyond the common parts.
 #[derive(Default)]
 struct Extras {
+    workflow: Option<persona::WorkflowPrompt>,
     /// The lead of an expert team: always visible tools.
     team_tools: Vec<Arc<dyn agent_kernel::Tool>>,
     /// What the message `@`-mentioned.
@@ -570,7 +571,7 @@ struct Extras {
 
 /// `connector_tools` are discovered on demand.
 fn assemble_with_connectors(parts: Parts<'_>, attachments: Vec<Attachment>, connector_tools: Vec<Arc<dyn agent_kernel::Tool>>, extras: Extras) -> Result<Agent, String> {
-    let Extras { team_tools, mentions, connector_status } = extras;
+    let Extras { team_tools, mentions, connector_status, workflow } = extras;
     let Parts { provider, dirs, workspace, permission, todo, ask, desktop, utc_offset_minutes, open_computer_use, spawn_computer_use, budget, processes, mid_run, research_events } = parts;
     for dir in [dirs.sessions(), dirs.spill(), dirs.memory(), dirs.skills()] {
         fs::create_dir_all(&dir).map_err(|e| format!("无法创建 {}：{e}", dir.display()))?;
@@ -641,6 +642,8 @@ fn assemble_with_connectors(parts: Parts<'_>, attachments: Vec<Attachment>, conn
         let statuses = connector_status.unwrap_or_else(|| Arc::new(|| json!([])));
         builder = builder.middleware(mentions::ConnectorContext::new(statuses, &mentions));
     }
+    // Session-bound workflows are user-authorized data; inject before context budgeting, never as a system persona.
+    if let Some(workflow) = workflow { builder = builder.middleware(workflow); }
     builder = builder
         // Facts about the app's own features that match the request, before trimming so their size is counted.
         .middleware(feature_hints::FeatureHints)
@@ -800,8 +803,8 @@ fn build_agent(app: &tauri::AppHandle, config: &AiConfig, key_source: Option<Key
     // 对话绑定的专家；专家团的主理人在这里拿到团队工具。
     let expert = mutate(app, |index| index.get(session).and_then(|s| s.expert.clone()))?;
     let team_setup = match &expert {
-        Some(binding) => team::load(&Dirs::of(app)?.plugins(), binding),
-        None => None,
+        Some(binding) if binding.workflow.is_none() => team::load(&Dirs::of(app)?.plugins(), binding),
+        _ => None,
     };
     let mid_run = {
         let (app, session) = (app.clone(), session.to_string());
@@ -834,9 +837,10 @@ fn build_agent(app: &tauri::AppHandle, config: &AiConfig, key_source: Option<Key
         Arc::new(move || connectors.statuses())
     };
     let mentions = lock(&state.mentions).remove(session).unwrap_or_default();
+    let dirs=Dirs::of(app)?;
     let mut agent = assemble_with_connectors(Parts {
         provider,
-        dirs: &Dirs::of(app)?,
+        dirs: &dirs,
         workspace,
         permission: state.permission.clone(),
         todo: state.todo.clone(),
@@ -849,7 +853,8 @@ fn build_agent(app: &tauri::AppHandle, config: &AiConfig, key_source: Option<Key
         processes: Some(process_manager(app, workspace)?),
         mid_run: Some(mid_run),
         research_events: Some(research_events),
-    }, attachments, connector_tools, Extras { team_tools, mentions, connector_status: Some(statuses) })?;
+    }, attachments, connector_tools, Extras { team_tools, mentions, connector_status: Some(statuses),
+        workflow: expert.as_ref().filter(|e|e.workflow.is_some()).map(|e|persona::WorkflowPrompt::new(dirs.skills(),dirs.chat.join("expert-packs"),e.clone())) })?;
     // 对话绑定了专家：把它的人设放进每次请求，并按它的 `maxTurns` 收紧轮数上限。
     if let Some(expert) = expert {
         if let Some(persona) = persona::load(&Dirs::of(app)?.plugins(), &expert) {
@@ -1032,7 +1037,13 @@ pub fn chat_new_session(app: tauri::AppHandle, window: tauri::WebviewWindow, per
     };
     // 召唤专家开的对话：先确认专家装着、agent 在，再把名称和职业记在对话上。
     let binding = match expert {
-        Some(pick) => Some(bind_expert(&Dirs::of(&app)?.plugins(), &pick)?),
+        Some(pick) => {
+            let dirs=Dirs::of(&app)?;
+            if let Some(workflow)=&pick.workflow {
+                if !pick.plugin.is_empty() || pick.agent.is_some() {return Err("专家来源不能同时指定插件和工作流".into());}
+                Some(persona::bind_workflow(&dirs.skills(),&dirs.chat.join("expert-packs"),workflow)?)
+            } else {Some(bind_expert(&dirs.plugins(), &pick)?)}
+        },
         None => None,
     };
     let (seconds, millis) = now();
@@ -1051,8 +1062,10 @@ pub fn chat_new_session(app: tauri::AppHandle, window: tauri::WebviewWindow, per
 /// 新对话想召唤的专家：哪个插件、其中哪个 agent（专家团用主理人）。
 #[derive(serde::Deserialize)]
 pub struct ExpertPick {
+    #[serde(default)]
     pub plugin: String,
     pub agent: Option<String>,
+    pub workflow: Option<String>,
 }
 
 /// 校验并补全绑定：专家必须是本机已安装的，agent 缺省时取插件清单里的 `agentName`（专家团取主理人）。
@@ -1075,6 +1088,7 @@ fn bind_expert(plugins: &Path, pick: &ExpertPick) -> Result<sessions::ExpertBind
         plugin: pick.plugin.clone(), agent,
         name: if name.is_empty() { pick.plugin.clone() } else { name },
         profession: pair(&doc.profession),
+        workflow: None,
     })
 }
 

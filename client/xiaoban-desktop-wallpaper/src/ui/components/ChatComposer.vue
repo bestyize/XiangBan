@@ -284,12 +284,13 @@ const input = ref<InstanceType<typeof NInput> | null>(null);
 function setDraft(text: string) { draft.value = text; void nextTick(() => input.value?.focus()); }
 function insertPrompt(instruction: string) { draft.value = draft.value.trim() ? instruction + '\n\n' + draft.value : instruction; }
 /** 召唤专家：专家是一场对话的身份，所以总是开一个新对话；已经开始的对话不会中途换人。
- *  老的 SkillHub 专家包没有人设，仍然是把它的工作流交给小伴去读。 */
+ *  工作流型专家通过 workflow 绑定，后端在整个对话中加载已验证的工作流。 */
 async function useExpert(entrySkill: string, name: string, expert?: { slug: string; name: string; profession?: string; description?: string; agent?: string | null; quickPrompts?: string[]; tags?: string[]; hasAvatar?: boolean; kind?: 'agent' | 'team'; plugin?: string }) {
-  if (!expert?.plugin) { insertPrompt(`请先使用 load_skill 加载已安装专家「${name}」的工作流（${entrySkill}），再帮助我完成以下任务：`); return; }
   if (running.value) { props.store.notify('这个对话还在回答，请等它结束或先停止，再召唤专家', 'info'); return; }
   if (chat.currentId) await chat.select(null);
-  chat.pendingExpert = { plugin: expert.plugin, name: expert.name, profession: expert.profession ?? '', description: expert.description, agent: expert.agent, quickPrompts: expert.quickPrompts, tags: expert.tags, hasAvatar: expert.hasAvatar, kind: expert.kind };
+  chat.pendingExpert = expert?.plugin
+    ? { plugin: expert.plugin, name: expert.name, profession: expert.profession ?? '', description: expert.description, agent: expert.agent, quickPrompts: expert.quickPrompts, tags: expert.tags, hasAvatar: expert.hasAvatar, kind: expert.kind }
+    : { plugin: '', workflow: entrySkill, name, profession: '', description: expert?.description, hasAvatar: false };
   props.store.navigate('new-task');
   await nextTick();
   input.value?.focus();

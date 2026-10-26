@@ -3,10 +3,11 @@ import type { InstalledConnector, MarketConnector } from '../ai-store/connector-
 /** What the host sends and accepts for the chat. Field names are the host's own (snake_case for kernel events). */
 
 /** The installed expert a conversation was started with (a WorkBuddy-style agent persona). */
-export interface ExpertBinding { plugin: string; agent: string; name: string; profession: string }
+export interface ExpertBinding { plugin: string; agent: string; name: string; profession: string; workflow?: string }
 /** An installed expert as the pickers and the new-task page show it. */
 export interface ExpertView {
   plugin: string; name: string; profession: string; description?: string; agent?: string | null;
+  workflow?: string;
   quickPrompts?: string[]; tags?: string[]; hasAvatar?: boolean; kind?: 'agent' | 'team';
 }
 export interface SessionSummary { expert?: ExpertBinding | null; id: string; title: string; createdAt: number; updatedAt: number; permissionMode?: 'ask' | 'auto'; /** The group it was moved into; empty or missing when it is not in one. */ group?: string; /** The folder it works in; empty or missing for an old conversation, which uses the default folder. */ workspace?: string; companionId?: string; companionName?: string; companionCursor?: number; /** Set while it works in an isolated copy of its folder; `workspace` is then the copy. */ worktree?: WorktreeLink | null }

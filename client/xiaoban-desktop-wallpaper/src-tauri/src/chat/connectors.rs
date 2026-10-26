@@ -314,7 +314,7 @@ pub async fn ai_mentions(app: tauri::AppHandle, window: tauri::WebviewWindow) ->
                 items.push(json!({"kind": "connector", "id": s["id"], "name": s["name"], "description": "", "iconUrl": null}));
             }
         }
-        for e in super::plugins::installed_experts(&dirs.plugins()) {
+        for e in super::plugins::installed_experts(&dirs.plugins()).into_iter().chain(super::store::market_workflow_experts(&dirs.skills())) {
             let profession = e["profession"].as_str().unwrap_or("");
             let description = e["description"].as_str().unwrap_or("");
             items.push(json!({"kind": "expert", "id": e["slug"], "name": e["name"], "description": if profession.is_empty() { description.to_string() } else { format!("{profession} · {description}") }, "iconUrl": null}));

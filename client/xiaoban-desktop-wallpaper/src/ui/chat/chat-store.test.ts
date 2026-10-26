@@ -10,6 +10,20 @@ const question = (id: string, session = 's1'): QuestionRequest => ({ id, session
 
 type Responder = (args: Record<string, unknown> | undefined) => unknown;
 
+it('persists a workflow expert through sending, continuing and reopening the conversation',async()=>{
+  const bound={plugin:'',agent:'',workflow:'health-report',name:'健康报告',profession:''};
+  const session={...summary('workflow-session','报告'),expert:bound};
+  const h=harness({chat_new_session:()=>session,chat_send:()=>session,chat_history:()=>[]});
+  await h.store.init();h.store.pendingExpert={plugin:'',workflow:'health-report',name:'健康报告',profession:''};
+  expect(await h.store.send('解读报告')).toBe(true);
+  expect(h.calls.find(([c])=>c==='chat_new_session')?.[1]).toMatchObject({expert:{workflow:'health-report'}});
+  expect(h.store.currentExpert).toMatchObject({workflow:'health-report',name:'健康报告',hasAvatar:false});
+  h.events('workflow-session',{type:'done'});expect(await h.store.send('继续解释')).toBe(true);
+  expect(h.calls.filter(([c])=>c==='chat_new_session')).toHaveLength(1);
+  h.events('workflow-session',{type:'done'});await h.store.select(null);await h.store.select('workflow-session');
+  expect(h.store.currentExpert?.workflow).toBe('health-report');h.store.dispose();
+});
+
 function harness(responders: Record<string, Responder> = {}, desktop = true) {
   const handlers = new Map<string, (payload: never) => void>();
   const stopped: string[] = [];

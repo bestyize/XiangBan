@@ -54,6 +54,8 @@ pub struct ExpertBinding {
     pub agent: String,
     pub name: String,
     pub profession: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub workflow: Option<String>,
 }
 
 /// The link between a conversation and the git worktree it works in (see `worktree`).

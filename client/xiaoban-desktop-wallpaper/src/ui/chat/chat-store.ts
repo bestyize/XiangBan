@@ -139,7 +139,7 @@ export function createChatStore(deps: ChatDeps): ChatStore {
     pendingExpert: null as ExpertView | null,
     get currentExpert() {
       const bound = store.currentId ? store.sessions.find(s => s.id === store.currentId)?.expert : null;
-      if (bound) return { plugin: bound.plugin, name: bound.name, profession: bound.profession, agent: bound.agent, hasAvatar: true };
+      if (bound) return { plugin: bound.plugin, name: bound.name, profession: bound.profession, agent: bound.agent, workflow: bound.workflow, hasAvatar: !bound.workflow };
       return store.currentId ? null : store.pendingExpert;
     },
     get currentWorkspace() {
@@ -396,7 +396,7 @@ export function createChatStore(deps: ChatDeps): ChatStore {
           // mode the top bar shows now; otherwise "完全信任" would be displayed but not applied.
           const summary = await deps.invoke<SessionSummary>('chat_new_session', {
             permissionMode: store.permissionMode, ...(store.pendingWorkspace ? { workspace: store.pendingWorkspace } : {}),
-            ...(store.pendingExpert ? { expert: { plugin: store.pendingExpert.plugin, ...(store.pendingExpert.agent ? { agent: store.pendingExpert.agent } : {}) } } : {}),
+            ...(store.pendingExpert ? { expert: store.pendingExpert.workflow ? { workflow: store.pendingExpert.workflow } : { plugin: store.pendingExpert.plugin, ...(store.pendingExpert.agent ? { agent: store.pendingExpert.agent } : {}) } } : {}),
           });
           store.pendingWorkspace = '';
           store.pendingExpert = null;

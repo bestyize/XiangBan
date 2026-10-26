@@ -210,8 +210,8 @@ async function usePack(entry: Entry) {
   busy.value = true;
   try {
     await props.store.chat.select(null);
-    props.store.creationDraft = '请先用 load_skill 加载已安装的专家工作流「' + installed.entrySkill + '」，再按需加载其中的依赖技能，帮助我完成以下任务：';
-    props.store.navigate('chat'); selected.value = null;
+    props.store.chat.pendingExpert = { plugin: '', workflow: installed.entrySkill, name: installed.name, profession: '', description: installed.description, hasAvatar: false };
+    props.store.navigate('new-task'); selected.value = null;
   } catch (e) { props.store.notify(e, 'error'); }
   finally { busy.value = false; }
 }
