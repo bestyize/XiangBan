@@ -108,6 +108,7 @@ pub fn charter(lead: &TeamMember, members: &[Member]) -> String {
 pub struct Env {
     pub dirs: Dirs,
     pub permission: Arc<Permission>,
+    pub path_approve: Option<Arc<dyn Fn(&str, &Path, Risk, &Value, &ToolCtx) -> bool + Send + Sync>>,
 }
 
 /// 主理人的四个团队工具。成员 agent 在第一次被调度时才建。
@@ -151,7 +152,7 @@ fn member_agent(
     let skills = Arc::new(skills_for(dirs, dirs.chat.join("bundled-skills")));
     fs::create_dir_all(dirs.spill()).map_err(|e| format!("无法创建 {}：{e}", dirs.spill().display()))?;
     let roots = vec![workspace.to_path_buf(), dirs.spill()];
-    let system = format!("{persona}\n\n## 工作环境\n操作系统：{}；工作目录：{}。", std::env::consts::OS, workspace.display());
+    let system = format!("{persona}\n\n## 工作环境\n操作系统：{}；工作目录：{}。文件默认只能访问工作目录和会话附件；任务明确要求工作区外文件时，文件工具会按指定路径逐次请求主会话用户授权，拒绝后不可换工具绕过。", std::env::consts::OS, workspace.display());
     let mut builder = Agent::builder(provider, Arc::new(agent_kernel::MemoryStore::new()))
         .system_prompt(system)
         .prompt_section(skills.prompt_section())
@@ -171,7 +172,13 @@ fn member_agent(
     readable.retain(|tool| tool.spec().name != "read_file");
     readable.push(Arc::new(ReadFile::new(roots, AttachmentStore::new(dirs.chat.join("attachments"))).map_err(|e| e.to_string())?));
     let writable = fs_write_tools(vec![workspace.to_path_buf()]).map_err(|e| e.to_string())?;
-    for tool in readable.into_iter().chain(writable).chain(skills.tools()) {
+    let file_tools: Vec<Arc<dyn agent_kernel::Tool>> = readable.into_iter().chain(writable).map(|tool| {
+        if let Some(approve) = &env.path_approve {
+            let roots = if tool.spec().risk == Risk::Write { vec![workspace.to_path_buf()] } else { vec![workspace.to_path_buf(), dirs.spill()] };
+            Arc::new(file_access::ScopedFileTool::new(tool, workspace, roots, dirs.chat.join("attachments"), approve.clone())) as Arc<dyn agent_kernel::Tool>
+        } else { tool }
+    }).collect();
+    for tool in file_tools.into_iter().chain(skills.tools()) {
         builder = builder.tool_arc(tool);
     }
     builder.build().map_err(|e| e.to_string())
@@ -241,7 +248,7 @@ mod tests {
         let (work, data) = (root.join("work"), root.join("data"));
         fs::create_dir_all(&work).unwrap();
         fs::create_dir_all(&data).unwrap();
-        let env = Env { dirs: Dirs { chat: data.join("chat") }, permission: Arc::new(Permission::new(PermissionMode::Auto, |_: &ApprovalRequest<'_>| Approval::Once).children_inherit()) };
+        let env = Env { dirs: Dirs { chat: data.join("chat") }, permission: Arc::new(Permission::new(PermissionMode::Auto, |_: &ApprovalRequest<'_>| Approval::Once).children_inherit()), path_approve: None };
         let dirs = env.dirs.clone();
         let binding = install(&root.join("unused"), true);
         // 同一份插件装进应用的插件目录。

@@ -52,6 +52,10 @@ pub struct ApprovalRequest<'a> {
 }
 
 impl ApprovalRequest<'_> {
+    /// Identifies the run that is waiting for this approval, for single-call host grants.
+    pub fn run_id(&self) -> &str {
+        self.ctx.run_id()
+    }
     /// True once the run was cancelled. The answer is then ignored, so a dialog can be closed.
     pub fn is_cancelled(&self) -> bool {
         self.ctx.is_cancelled()

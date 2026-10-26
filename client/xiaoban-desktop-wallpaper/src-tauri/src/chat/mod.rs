@@ -7,6 +7,7 @@ mod agent_settings;
 mod task_runtime;
 mod app_guide;
 mod feature_hints;
+mod file_access;
 mod skill_invocation;
 mod persona;
 mod team;
@@ -231,6 +232,9 @@ fn permission_with_danger_check(mode: PermissionMode, approver: impl agent_kerne
         if tool == "care_set" && args["kind"] == "agent" {
             return Some("定时任务会在你不在时自动运行，添加或修改都需要你确认".to_string());
         }
+        if folder_for(&workspaces, session).as_deref().is_some_and(|workspace| file_access::is_external_write(tool, args, workspace)) {
+            return Some(file_access::EXTERNAL_WRITE_NOTICE.to_string());
+        }
                 if tool == "computer_use_repair_permissions" {
             return Some("清除 com.ifuryst.opencomputeruse 的所选旧授权（同标识独立安装版也受影响），之后需重新授权；每次都需确认".to_string());
         }
@@ -280,7 +284,16 @@ fn ask_approval(app: &tauri::AppHandle, broker: &Broker, request: &ApprovalReque
     let can_remember = (request.risk != Risk::Exec || request.remember_as.is_some()) && request.tool != "skill_manage" && request.danger.is_none() && !app.state::<ChatState>().permission.needs_review(request.session);
     // In full trust a tainted conversation is not asked because of the taint, so the card must not say it is.
     let tainted_by_policy = request.tainted && app.state::<ChatState>().permission.mode_for(request.session) != PermissionMode::Auto;
-    let payload=json!({"tool":request.tool,"risk":risk_name(request.risk),"arguments":shorten(request.arguments,0),"tainted":tainted_by_policy,"danger":request.danger,"canRemember":can_remember,"rememberAs":request.remember_as});
+    let external_path = request.danger == Some(file_access::EXTERNAL_WRITE_NOTICE);
+    let approved_target = if external_path {
+        folder_for(&app.state::<ChatState>().workspaces, request.session).and_then(|workspace| {
+            request.arguments.get("path").and_then(Value::as_str)
+                .and_then(|path| file_access::resolve_requested(&workspace, request.tool, path).ok())
+        })
+    } else { None };
+    let mut shown_args = shorten(request.arguments, 0);
+    if let Some(path) = &approved_target { shown_args["path"] = json!(path.display().to_string()); }
+    let payload=json!({"tool":request.tool,"risk":risk_name(request.risk),"arguments":shown_args.clone(),"tainted":tainted_by_policy,"danger":request.danger,"canRemember":can_remember,"rememberAs":request.remember_as,"externalPath":external_path});
     let (id, rx) = broker.open_approval_payload(request.session,payload);
     emit(app,"chat-pending-changed",json!({"session":request.session,"pending":broker.snapshot(request.session)}));
     crate::proactivity::observe_task_state(app, agent_proactivity::context::TaskState::AwaitingUser);
@@ -289,13 +302,19 @@ fn ask_approval(app: &tauri::AppHandle, broker: &Broker, request: &ApprovalReque
         "chat-approval",
         json!({
             "id": id, "session": request.session, "tool": request.tool, "risk": risk_name(request.risk),
-            "arguments": shorten(request.arguments, 0), "tainted": tainted_by_policy, "danger": request.danger,
+            "arguments": shown_args, "tainted": tainted_by_policy, "danger": request.danger,
             "canRemember": can_remember,
             "rememberAs": request.remember_as,
+            "externalPath": external_path,
         }),
     );
     let decision = request.wait_for(&rx).unwrap_or(Approval::Deny);
     broker.close_approval(&id);
+    if external_path && decision != Approval::Deny && !request.is_cancelled() {
+        if let Some(path) = approved_target {
+            file_access::allow_write_once(request.session, request.run_id(), request.tool, path);
+        }
+    }
     emit(app,"chat-pending-changed",json!({"session":request.session,"pending":broker.snapshot(request.session)}));
     // Kept on disk so "这段对话都允许" still holds after the app restarts.
     if decision == Approval::Always && can_remember {
@@ -567,11 +586,13 @@ struct Extras {
     mentions: Vec<mentions::Mention>,
     /// Current connector statuses, noted in every request.
     connector_status: Option<Arc<dyn Fn() -> Value + Send + Sync>>,
+    /// Only the real desktop host can show path-specific approval cards.
+    path_approve: Option<Arc<dyn Fn(&str, &Path, Risk, &Value, &ToolCtx) -> bool + Send + Sync>>,
 }
 
 /// `connector_tools` are discovered on demand.
 fn assemble_with_connectors(parts: Parts<'_>, attachments: Vec<Attachment>, connector_tools: Vec<Arc<dyn agent_kernel::Tool>>, extras: Extras) -> Result<Agent, String> {
-    let Extras { team_tools, mentions, connector_status, workflow } = extras;
+    let Extras { team_tools, mentions, connector_status, workflow, path_approve } = extras;
     let Parts { provider, dirs, workspace, permission, todo, ask, desktop, utc_offset_minutes, open_computer_use, spawn_computer_use, budget, processes, mid_run, research_events } = parts;
     for dir in [dirs.sessions(), dirs.spill(), dirs.memory(), dirs.skills()] {
         fs::create_dir_all(&dir).map_err(|e| format!("无法创建 {}：{e}", dir.display()))?;
@@ -663,7 +684,13 @@ fn assemble_with_connectors(parts: Parts<'_>, attachments: Vec<Attachment>, conn
     readable.push(Arc::new(ReadFile::new(roots, AttachmentStore::new(dirs.chat.join("attachments"))).map_err(|e| e.to_string())?
         .with_file_authorizer(move |path| agent_skill_discovery::authorize_installed_file(&installed_skills, path))));
     let writable = fs_write_tools(vec![workspace.to_path_buf()]).map_err(|e| e.to_string())?;
-    for tool in readable.into_iter().chain(writable).chain(skills.tools()).chain(if remember { memory.tools() } else { Vec::new() }).chain(discovery.tools()) {
+    let file_tools: Vec<Arc<dyn agent_kernel::Tool>> = readable.into_iter().chain(writable).map(|tool| {
+        if let Some(approve) = &path_approve {
+            let roots = if tool.spec().risk == Risk::Write { vec![workspace.to_path_buf()] } else { vec![workspace.to_path_buf(), dirs.spill()] };
+            Arc::new(file_access::ScopedFileTool::new(tool, workspace, roots, dirs.chat.join("attachments"), approve.clone())) as Arc<dyn agent_kernel::Tool>
+        } else { tool }
+    }).collect();
+    for tool in file_tools.into_iter().chain(skills.tools()).chain(if remember { memory.tools() } else { Vec::new() }).chain(discovery.tools()) {
         builder = builder.tool_arc(tool);
     }
     // Product-specific desktop actions are discoverable without paying for every schema
@@ -762,6 +789,28 @@ fn process_manager(app: &tauri::AppHandle, workspace: &Path) -> Result<Arc<Proce
 
 fn build_agent(app: &tauri::AppHandle, config: &AiConfig, key_source: Option<KeySource>, workspace: &Path, attachments: Vec<Attachment>, session: &str, cancel: &Arc<AtomicBool>, control:&agent_kernel::RunControl) -> Result<Agent, String> {
     let state = app.state::<ChatState>();
+    let path_approve: Arc<dyn Fn(&str, &Path, Risk, &Value, &ToolCtx) -> bool + Send + Sync> = {
+        let (app, broker, permission) = (app.clone(), state.broker.clone(), state.permission.clone());
+        Arc::new(move |tool, path, risk, args, ctx| {
+            let session = permission.root_session(ctx.session());
+            // A write just approved by the kernel middleware carries a one-use, run-bound ticket.
+            // Without a matching ticket (for example after a symlink changed) ask again.
+            if risk == Risk::Write && file_access::take_write_approval(session, ctx.run_id(), tool, path) { return true; }
+            let mut shown_args = shorten(args, 0);
+            shown_args["path"] = json!(path.display().to_string());
+            let payload = json!({
+                "tool": tool, "risk": risk_name(risk), "arguments": shown_args,
+                "tainted": false, "canRemember": false, "externalPath": true,
+            });
+            let (id, rx) = broker.open_approval_payload(session, payload.clone());
+            emit(&app, "chat-pending-changed", json!({"session":session,"pending":broker.snapshot(session)}));
+            emit(&app, "chat-approval", json!({"id":id,"session":session,"tool":tool,"risk":risk_name(risk),"arguments":payload["arguments"],"tainted":false,"canRemember":false,"externalPath":true}));
+            let allowed = matches!(ctx.wait_for(&rx), Some(Approval::Once | Approval::Always));
+            broker.close_approval(&id);
+            emit(&app, "chat-pending-changed", json!({"session":session,"pending":broker.snapshot(session)}));
+            allowed && !ctx.is_cancelled()
+        })
+    };
     let ask = {
         let (app, broker) = (app.clone(), state.broker.clone());
         AskUser::new(move |session, question, ctx| ask_question(&app, &broker, session, question, ctx))
@@ -829,7 +878,7 @@ fn build_agent(app: &tauri::AppHandle, config: &AiConfig, key_source: Option<Key
     };
     let team_charter = team_setup.as_ref().map(|setup| team::charter(&setup.lead, &setup.members));
     let team_tools = match team_setup {
-        Some(setup) => team::tools(&team::Env { dirs: Dirs::of(app)?, permission: state.permission.clone() }, setup, provider.clone(), workspace.to_path_buf(), config.token_budget(), Some(research_events.clone()))?,
+        Some(setup) => team::tools(&team::Env { dirs: Dirs::of(app)?, permission: state.permission.clone(), path_approve: Some(path_approve.clone()) }, setup, provider.clone(), workspace.to_path_buf(), config.token_budget(), Some(research_events.clone()))?,
         None => Vec::new(),
     };
     let statuses: Arc<dyn Fn() -> Value + Send + Sync> = {
@@ -853,7 +902,7 @@ fn build_agent(app: &tauri::AppHandle, config: &AiConfig, key_source: Option<Key
         processes: Some(process_manager(app, workspace)?),
         mid_run: Some(mid_run),
         research_events: Some(research_events),
-    }, attachments, connector_tools, Extras { team_tools, mentions, connector_status: Some(statuses),
+    }, attachments, connector_tools, Extras { team_tools, mentions, connector_status: Some(statuses), path_approve: Some(path_approve),
         workflow: expert.as_ref().filter(|e|e.workflow.is_some()).map(|e|persona::WorkflowPrompt::new(dirs.skills(),dirs.chat.join("expert-packs"),e.clone())) })?;
     // 对话绑定了专家：把它的人设放进每次请求，并按它的 `maxTurns` 收紧轮数上限。
     if let Some(expert) = expert {
@@ -1535,6 +1584,7 @@ pub fn chat_delete_session(app: tauri::AppHandle, window: tauri::WebviewWindow, 
         let _ = manager.forget_session(&session_id);
     }
     lock(&state.workspaces).remove(&session_id);
+    file_access::forget_session(&session_id);
     state.permission.forget_session(&session_id);
     let chat_dir = Dirs::of(&app)?.chat;
     let mut settings = agent_settings::load(&chat_dir);

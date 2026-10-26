@@ -66,6 +66,11 @@ const str = (value: unknown) => (typeof value === 'string' ? value : '');
 export function approvalPreview(request: Pick<ApprovalRequest, 'tool' | 'arguments'>): string {
   const args = request.arguments && typeof request.arguments === 'object' ? request.arguments as Record<string, unknown> : {};
   switch (request.tool) {
+    case 'read_file':
+    case 'list_dir':
+      return str(args.path) || '（当前工作区）';
+    case 'grep':
+      return `目录：${str(args.path) || '（当前工作区）'}\n搜索：${str(args.pattern)}`;
     case 'shell':
       return str(args.command) || '（没有命令内容）';
     case 'write_file':

@@ -565,6 +565,21 @@ describe('asking the user', () => {
     expect(q('chat-approval')).toBeNull();
   });
 
+  it('asks for one exact outside-workspace file path without offering a permanent grant', async () => {
+    const h = await running();
+    h.emit('chat-approval', approval({
+      id: 'outside1', tool: 'read_file', risk: 'read', externalPath: true,
+      arguments: { path: '/Users/read/Documents/note.md' }, canRemember: false,
+    }));
+    await flushPromises();
+    expect(q('chat-approval')!.textContent).toContain('工作区外路径');
+    expect(q('approval-preview')!.textContent).toBe('/Users/read/Documents/note.md');
+    expect(q('chat-approval')!.textContent).toContain('不保存长期权限');
+    expect(q('approval-always')).toBeNull();
+    await click('approval-once');
+    expect(h.calls.at(-1)).toEqual(['chat_answer_approval', { id: 'outside1', decision: 'once' }]);
+  });
+
   it('undoes an answer\'s file changes only after a second, explicit confirmation', async () => {
     const h = await open({ ...startChat, chat_undo_run: () => ({ restored: ['a.md'], removed: [], failed: [] }) });
     await type('干活');
