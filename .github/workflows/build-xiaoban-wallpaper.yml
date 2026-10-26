@@ -125,6 +125,7 @@ jobs:
       # Use one unchanged certificate across releases so TCC can compare a stable signing requirement.
       # No Apple Developer ID or notarization; Gatekeeper will still require user approval.
       - name: Import persistent self-signed signing identity
+        timeout-minutes: 2
         shell: bash
         run: |
           set -euo pipefail
@@ -136,26 +137,38 @@ jobs:
           password="$(cat "$signing_dir/macos-xiaoban.p12.password")"
           keychain_password="$(openssl rand -hex 24)"
 
+          echo "Preparing persistent signing certificate"
           base64 --decode -i "$signing_dir/macos-xiaoban.p12.base64" -o "$p12"
           openssl pkcs12 -in "$p12" -passin "pass:$password" -nokeys -clcerts -out "$cert_raw"
           openssl x509 -in "$cert_raw" -out "$cert"
 
+          echo "Creating and unlocking temporary build keychain"
           security create-keychain -p "$keychain_password" "$keychain"
           security set-keychain-settings -lut 21600 "$keychain"
           security unlock-keychain -p "$keychain_password" "$keychain"
+          echo "Importing signing identity and granting codesign key access"
           security import "$p12" -k "$keychain" -P "$password" -f pkcs12 -T /usr/bin/codesign
-          security set-key-partition-list -S apple-tool:,apple: -s -k "$keychain_password" "$keychain"
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$keychain_password" "$keychain" > /dev/null
           security list-keychains -d user -s "$keychain"
           # This certificate is self-signed: trustAsRoot only applies to non-self-signed certificates.
-          # Limit trust to code signing on this ephemeral runner, matching the local signing setup.
-          security add-trusted-cert -r trustRoot -p codeSign -k "$keychain" "$cert"
+          # User-domain trust opens an authentication dialog and hangs unattended runners.
+          # Use admin-domain code-signing trust only on this ephemeral runner; fail if sudo needs input.
+          echo "Trusting certificate for code signing without interactive authentication"
+          sudo -n security add-trusted-cert -d -r trustRoot -p codeSign -k "$keychain" "$cert"
 
+          echo "Checking signing identity and non-interactive private-key access"
           identity="$(security find-identity -v -p codesigning "$keychain" | awk '/XiangBan Self-Signed Code Signing 2026/ {print $2; exit}')"
           if [ -z "$identity" ]; then
             echo "::error::Persistent code signing identity is unavailable; refusing to publish an ad-hoc build."
             exit 1
           fi
+          probe="$RUNNER_TEMP/xiaban-signing-probe"
+          cp /usr/bin/true "$probe"
+          codesign --force --timestamp=none --keychain "$keychain" --sign "$identity" "$probe"
+          codesign --verify --strict "$probe"
+          rm -f "$probe"
           echo "APPLE_SIGNING_IDENTITY=$identity" >> "$GITHUB_ENV"
+          echo "Persistent signing identity is ready"
 
       - name: Build app and dmg
         # tauri.macos.conf.json -> beforeBundleCommand runs the Swift AppKit renderer.
