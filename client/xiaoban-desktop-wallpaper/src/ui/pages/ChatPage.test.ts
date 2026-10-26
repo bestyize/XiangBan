@@ -1219,6 +1219,8 @@ describe('design deliveries in the original conversation', () => {
     await openSession('s1');
     expect(wrapper!.find('.design-deliveries').text()).toContain('2 个画板');
     expect(wrapper!.findAll('.artboard')).toHaveLength(2);
+    await wrapper!.get('[role="separator"]').trigger('keydown', { key: 'ArrowLeft' });
+    expect(wrapper!.get('[role="separator"]').attributes('aria-valuenow')).toBe('66');
     await wrapper!.get('[aria-label="关闭设计画布"]').trigger('click'); await flushPromises();
     expect(wrapper!.find('[data-testid="design-workbench"]').exists()).toBe(false);
     await wrapper!.get('.design-deliveries button').trigger('click'); await flushPromises();
@@ -1227,5 +1229,18 @@ describe('design deliveries in the original conversation', () => {
     expect(h.invoke.mock.calls.some(([command]) => command === 'design_save')).toBe(false);
     await h.chat.select(null); await flushPromises();
     expect(wrapper!.find('.design-deliveries').exists()).toBe(false);
+  });
+});
+
+describe('library design continuation in a new conversation', () => {
+  it('accepts a linked project event whose original session has been deleted', async () => {
+    const project = { id: 'design-012345678901234567890123', title: '继续设计', sessionId: 'deleted', sessionIds: ['s1'], revision: 2, updatedMs: 2, canvas: { v: 3, boards: { 'Main.dc.html': { w: 390, h: 844 } }, order: ['Main.dc.html'] }, files: { 'Main.dc.html': '<x-dc>同一份源文件</x-dc>' } };
+    const h = await open({ chat_overview: () => overview({ sessions: [summary('s1', '继续修改')] }), chat_load_session: () => [], design_read: () => ({ project, origin: 'design-preview://localhost' }) });
+    await openSession('s1');
+    expect(wrapper!.find('.design-deliveries').exists()).toBe(false);
+    h.emit('design-changed', { ...project, artboards: 1 }); await flushPromises();
+    expect(wrapper!.find('.design-deliveries').text()).toContain('继续设计');
+    expect(h.invoke).toHaveBeenCalledWith('design_read', { id: project.id });
+    expect(wrapper!.findAll('.artboard')).toHaveLength(1);
   });
 });

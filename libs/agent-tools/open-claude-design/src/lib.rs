@@ -19,6 +19,8 @@ pub struct Project {
     pub id: String,
     pub title: String,
     pub session_id: String,
+    #[serde(default)]
+    pub session_ids: Vec<String>,
     pub revision: u64,
     pub updated_ms: u64,
     pub canvas: Value,
@@ -78,7 +80,9 @@ pub fn boards(canvas: &Value) -> Result<Vec<(String, Value)>, String> {
 }
 pub fn validate(project: &Project) -> Result<(), String> {
     if project.title.trim().is_empty() || project.title.chars().count() > 120 { return Err("标题需要 1 到 120 个字".into()); }
-    if project.files.len() > 300 { return Err("设计稿文件过多".into()); }
+    if project.session_ids.len()>64 || project.session_ids.iter().any(|id|id.is_empty()||id.len()>200||id.chars().any(char::is_control)){return Err("关联会话无效或超过 64 个".into());}
+    let source_count=project.files.iter().filter(|(name,text)|!((name.as_str()=="support.js"||name.ends_with("/support.js"))&&text.as_str()==RUNTIME)).count();
+    if source_count > 300 || project.files.len()>400 { return Err("设计稿文件过多".into()); }
     for (name, text) in &project.files {
         if !file_name(name) { return Err(format!("不支持的设计文件路径：{name}")); }
         if text.len() > MAX_FILE { return Err(format!("{name} 超过 2MiB")); }
@@ -115,7 +119,7 @@ impl Store {
             let id = entry.file_name().to_string_lossy().to_string();
             if safe_id(&id) {
                 let Ok(project) = self.load(&id) else { continue };
-                if session == "*" || project.session_id == session { list.push(project); }
+                if session == "*" || (project.session_id == session || project.session_ids.iter().any(|id|id==session)) { list.push(project); }
             }
         }
         list.sort_by_key(|p| std::cmp::Reverse(p.updated_ms));
@@ -128,7 +132,7 @@ impl Store {
         let path = dir.join("project.json");
         let current = if path.exists() { Some(self.load(&project.id)?) } else { None };
         if current.as_ref().map_or(0, |p| p.revision) != expected { return Err("设计稿已更新，请重新读取后再修改，避免覆盖新改动".into()); }
-        if let Some(old) = &current { project.session_id = old.session_id.clone(); project.request_id = old.request_id.clone(); }
+        if let Some(old) = &current { project.session_id = old.session_id.clone(); for id in &old.session_ids { if !project.session_ids.contains(id){project.session_ids.push(id.clone());} } project.request_id = old.request_id.clone(); }
         project.revision = expected.checked_add(1).ok_or("版本号超出范围")?;
         project.updated_ms = now();
         validate(&project)?;
@@ -188,7 +192,7 @@ impl Store {
         out.sort_by_key(|p|std::cmp::Reverse(p.revision));Ok(out)
     }
     pub fn create(&self, title: String, session: &str, canvas: Value, files: BTreeMap<String, String>) -> Result<Project, String> {
-        self.save(Project { id: format!("design-{}", nonce()?), title, session_id: session.into(), revision: 0, updated_ms: 0, canvas, files, request_id: String::new() }, 0)
+        self.save(Project { id: format!("design-{}", nonce()?), title, session_id: session.into(), session_ids: Vec::new(), revision: 0, updated_ms: 0, canvas, files, request_id: String::new() }, 0)
     }
 }
 
@@ -212,7 +216,12 @@ impl DesignTool {
             "format" => Ok(json!({"format": FORMAT})),
             "list" => Ok(json!(self.store.list(ctx.session())?.iter().map(summary).collect::<Vec<_>>())),
             "read" => {
-                let p = self.store.load(get_id()?)?;
+                let mut p = self.store.load(get_id()?)?;
+                if p.session_id!=ctx.session()&&!p.session_ids.iter().any(|id|id==ctx.session()) {
+                    p.session_ids.push(ctx.session().into());let rev=p.revision;p=self.store.save(p,rev)?;
+                }
+                // Opening a library project in a new conversation links the same source, never a copy.
+                (self.saved)(&p)?;
                 let file = args["file"].as_str().map(|name| p.files.get(name).map(|text| json!({"name":name,"text":text})).ok_or("设计文件不存在")).transpose()?;
                 Ok(json!({"project":summary(&p),"canvas":p.canvas,"files":p.files.keys().collect::<Vec<_>>(),"file":file}))
             }
@@ -222,7 +231,7 @@ impl DesignTool {
                     let key=args["request_id"].as_str().filter(|k| !k.is_empty() && k.len()<=120).ok_or("create 需要稳定的 request_id，重试时沿用")?;
                     let _lock=CREATE_LOCK.lock().map_err(|_|"创建锁不可用")?;
                     if let Some(existing)=self.store.list(ctx.session())?.into_iter().find(|p|p.request_id==key) { existing } else {
-                        let p=Project{id:format!("design-{}",nonce()?),title:args["title"].as_str().ok_or("缺少 title")?.into(),session_id:ctx.session().into(),revision:0,updated_ms:0,canvas:args["canvas"].clone(),files,request_id:key.into()};
+                        let p=Project{id:format!("design-{}",nonce()?),title:args["title"].as_str().ok_or("缺少 title")?.into(),session_id:ctx.session().into(),session_ids:Vec::new(),revision:0,updated_ms:0,canvas:args["canvas"].clone(),files,request_id:key.into()};
                         self.store.save(p,0)?
                     }
                 } else {
@@ -239,7 +248,7 @@ impl DesignTool {
         }
     }
 }
-pub fn summary(p: &Project) -> Value { json!({"id":p.id,"title":p.title,"sessionId":p.session_id,"revision":p.revision,"updatedMs":p.updated_ms,"artboards":boards(&p.canvas).map(|b|b.len()).unwrap_or(0)}) }
+pub fn summary(p: &Project) -> Value { json!({"id":p.id,"title":p.title,"sessionId":p.session_id,"sessionIds":p.session_ids,"revision":p.revision,"updatedMs":p.updated_ms,"artboards":boards(&p.canvas).map(|b|b.len()).unwrap_or(0)}) }
 impl Tool for DesignTool {
     fn spec(&self) -> &ToolSpec { &self.spec }
     fn execute_result(&self, args: Value, ctx: &ToolCtx) -> ToolResult {
@@ -322,6 +331,15 @@ mod tests {
         let mut first=p.clone();first.title="unsaved".into();store.save_draft(&first).unwrap();assert_eq!(Store::new(&root).draft(&p.id).unwrap(),Some(first.clone()));assert_eq!(store.load(&p.id).unwrap().title,"demo");
         let mut newer=first.clone();newer.title="newer draft".into();store.save_draft(&newer).unwrap();store.clear_draft(&first).unwrap();assert_eq!(store.draft(&p.id).unwrap(),Some(newer.clone()));
         store.clear_draft(&newer).unwrap();assert!(store.draft(&p.id).unwrap().is_none());fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test] fn library_project_continues_in_a_new_conversation_without_duplication() {
+        let (store,root)=fixture();let p=store.create("demo".into(),"deleted-session",canvas(),files()).unwrap();let tool=DesignTool::new(store.clone(),|_|Ok(()));
+        let read=tool.call(json!({"action":"read","id":p.id}),&ToolCtx::detached("new-session")).unwrap();assert_eq!(read["project"]["revision"],2);
+        assert_eq!(store.list("new-session").unwrap()[0].id,p.id);assert_eq!(store.list("*").unwrap().len(),1);
+        let latest=store.load(&p.id).unwrap();assert_eq!(latest.files,p.files);assert_eq!(latest.canvas,p.canvas);
+        tool.call(json!({"action":"read","id":p.id}),&ToolCtx::detached("new-session")).unwrap();assert_eq!(store.load(&p.id).unwrap().revision,2);
+        let mut stale=p;stale.revision=2;let saved=store.save(stale,2).unwrap();assert!(saved.session_ids.contains(&"new-session".into()));fs::remove_dir_all(root).unwrap();
     }
 
 }

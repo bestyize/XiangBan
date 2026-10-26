@@ -1,5 +1,12 @@
 # 小伴桌面：桌宠、动态壁纸与 Agent
 
+## 内置设计工具：open-claude-design
+
+真实用户消息包含“设计稿”时进入调试入口；一份作品支持多个 DC HTML 画板。聊天右侧画布支持拖动分栏、缩放与抓手、选择/Play、属性与源码编辑、批注交给小伴修改、撤销重做和历史恢复。作品保存在「资料库 → 我的文档」，聊天与资料库读取同一份源数据；可导入 ZIP / HTML，导出 ZIP 源包或独立 HTML。
+
+保存有版本检查和恢复草稿，保留 30 个历史版本。兼容 v3 boards/order 与旧版 artboards；当前只支持独立 DC HTML 运行时子集，React、dc-import 和二进制素材导入尚不支持。详见 [模块说明](../../libs/agent-tools/open-claude-design/README.md) 与 [实施和验证记录](../../docs/agent/open-claude-design.md)。
+
+
 ## AI 商店：SkillHub 专家包与 MCP
 
 **小伴市场（默认来源）**：AI 插件页默认从自建的小伴市场获取专家、技能和连接器，筛选行右侧可切换到 SkillHub；市场连不上时自动先显示 SkillHub，已安装的插件不受影响。市场地址随应用内置（`src-tauri/src/chat/store_market.rs` 的 `DEFAULT_MARKET`，当前为 `https://market.xiangban.xyz`；仅调试版可用环境变量 `XIAOBAN_MARKET_URL` 指向本机）。安装前展示说明、文件清单、逐文件 SHA256 和脚本预览，并按清单摘要锁定版本；已安装的市场插件有新版本时提示更新，更新前展示文件差异，旧版本保留备份（`chat/skill-backups`）；专家团、技能套件一次审查、整组安装、失败整组回滚。网页上的「在小伴中安装」通过 `xiaoban://market/...` 唤起本应用，只弹出确认窗口，不会静默安装；协议关联由 `tauri-plugin-deep-link` 在打包安装版里注册（`tauri.conf.json` 的 `plugins.deep-link`）。「插件来源」设置里可关闭 SkillHub 补充来源和自动检查更新（保存在本机界面偏好中）。

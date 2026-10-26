@@ -312,6 +312,7 @@ fn the_assistant_has_every_tool_it_needs_and_no_others() {
     let mut registered: Vec<String> = rig.agent.tool_schemas().into_iter().map(|t| t.name).collect();
     registered.sort();
     let mut all: Vec<String> = expected.iter().chain(deferred.iter()).map(|n| n.to_string()).collect();
+    all.push(open_claude_design::NAME.to_string());
     all.sort();
     assert_eq!(registered, all, "and nothing else is registered");
     assert!(system.contains("小伴") && system.contains(&rig.workspace.display().to_string()), "the prompt names the working folder");
@@ -1166,4 +1167,15 @@ fn two_conversations_in_different_folders_are_each_checked_against_their_own() {
     assert!(check("sa", &delete_in(&b.0)).is_some(), "b's folder is outside a's");
     assert_eq!(check("sb", &delete_in(&b.0)), None);
     assert_eq!(check("sa#research-1", &delete_in(&a.0)), None, "a research helper works in its parent's folder");
+}
+
+
+#[test]
+fn design_schema_is_exposed_by_the_debug_keyword_in_the_assembled_agent() {
+    let triggered=rig("design-trigger",vec![Step::text("ready")],Approval::Once);
+    let _=run(&triggered,"请做一份设计稿");
+    assert!(triggered.provider.requests()[0].tools.iter().any(|t|t.name==open_claude_design::NAME));
+    let ordinary=rig("design-no-trigger",vec![Step::text("hello")],Approval::Once);
+    let _=run(&ordinary,"你好");
+    assert!(!ordinary.provider.requests()[0].tools.iter().any(|t|t.name==open_claude_design::NAME));
 }

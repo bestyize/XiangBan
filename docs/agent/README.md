@@ -40,6 +40,8 @@
 
 ## 当前实现入口
 
+- [open-claude-design](open-claude-design.md)：内置多画板设计工具、资料库同源保存、格式兼容范围与验证记录。
+
 早期 WP0、WP1–WP5 临时交接记录已移除，其中“没有经验库”“单轮固定 256 次工具”“只安装单个 SKILL.md”“锁文件待生成”等阶段结论不能继续作为当前能力说明。
 
 - [桌面 README](../../client/xiaoban-desktop-wallpaper/README.md)：运行轨迹、任务预算、长期目标、恢复、插件审查与实际验证命令。

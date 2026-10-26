@@ -12,7 +12,7 @@
     if (match) return evaluate(match[1], scope);
     return text.replace(/{{([\s\S]*?)}}/g, (_, code) => String(evaluate(code, scope) ?? ''));
   };
-  const bool = v => !(v === false || v == null || v === 'false' || v === '');
+  const bool = v => v !== 'false' && Boolean(v);
   function expand(node, scope) {
     if (node.nodeType === Node.TEXT_NODE) { node.textContent = String(expr(node.textContent || '',scope) ?? ''); return; }
     if (!(node instanceof Element)) return;

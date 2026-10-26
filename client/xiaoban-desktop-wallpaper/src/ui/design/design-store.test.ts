@@ -26,3 +26,18 @@ describe('shared versioned design store',()=>{
   const ds=createDesignStore(vi.fn()),old=ds.open('slow');await ds.open('next');resolve({project:fixture(),origin:'preview:'});await old;expect(ds.project?.id).toBe('next');
  });
 });
+
+describe('failed project navigation',()=>{
+ it('clears the previous project before reading another id so edits cannot target the wrong source',async()=>{
+  mocks.invoke.mockImplementation(async(_,args)=>{if(args.id==='missing')throw Error('不存在');return {project:fixture(),origin:'preview:'};});const ds=createDesignStore(vi.fn());await ds.open(fixture().id);await expect(ds.open('missing')).rejects.toThrow('不存在');expect(ds.project).toBeNull();expect(await ds.commit(p=>{p.title='错误的作品';})).toBe(false);
+ });
+});
+
+describe('updates arriving while a save is completing',()=>{
+ it('refreshes a newer AI revision after acknowledging its own save',async()=>{
+  let changed:(s:Summary)=>void=()=>{},finish:(p:unknown)=>void=()=>{};let saved=fixture();mocks.listen.mockImplementation(async(_,cb)=>{changed=cb;return ()=>{};});
+  mocks.invoke.mockImplementation(async(command)=>{if(command==='design_read')return {project:saved,origin:'preview:'};if(command==='design_save')return await new Promise(resolve=>{finish=resolve;});});
+  const remote=vi.fn(),ds=createDesignStore(vi.fn());await ds.open(saved.id);await ds.init(remote);const saving=ds.commit(p=>{p.title='手改';});await Promise.resolve();await Promise.resolve();
+  changed({...fixture(),revision:2,artboards:1});changed({...fixture(),revision:3,artboards:1});saved={...fixture(),revision:3,title:'最新 AI 版本'};finish({project:{...fixture(),revision:2,title:'手改'},origin:'preview:'});await saving;await Promise.resolve();await Promise.resolve();expect(ds.project?.revision).toBe(3);expect(ds.project?.title).toBe('最新 AI 版本');expect(ds.dirty).toBe(false);expect(remote).toHaveBeenCalledWith(expect.objectContaining({revision:3}));ds.dispose();
+ });
+});

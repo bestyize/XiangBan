@@ -16,7 +16,11 @@ fn payload(p:Project)->Value{json!({"project":p,"origin":if cfg!(windows){"http:
 pub fn design_list(app:tauri::AppHandle,window:tauri::WebviewWindow,session:String)->Result<Vec<Value>,String>{guard(&window)?;Ok(store(&app)?.list(&session)?.iter().map(open_claude_design::summary).collect())}
 #[tauri::command]
 pub fn design_read(app:tauri::AppHandle,window:tauri::WebviewWindow,id:String)->Result<Value,String>{guard(&window)?;let s=store(&app)?;let p=s.load(&id)?;let mut result=payload(p.clone());
-    if let Some(draft)=s.draft(&id)? { if draft.files!=p.files||draft.canvas!=p.canvas||draft.title!=p.title {result["draft"]=json!(draft);} }
+    match s.draft(&id) {
+        Ok(Some(draft)) if draft.files!=p.files||draft.canvas!=p.canvas||draft.title!=p.title => result["draft"]=json!(draft),
+        Err(e) => result["draftError"]=json!(format!("恢复草稿损坏，已打开最后保存版本：{e}")),
+        _ => ()
+    }
     Ok(result)}
 #[tauri::command]
 pub fn design_draft_save(app:tauri::AppHandle,window:tauri::WebviewWindow,project:Project)->Result<(),String>{guard(&window)?;store(&app)?.save_draft(&project)}
@@ -54,7 +58,7 @@ pub async fn design_import(window:tauri::WebviewWindow,session:String)->Result<O
         let path=file.into_path().map_err(|_|"请选择本机文件")?;
         let bytes=fs::File::open(&path).map_err(|e|e.to_string())?.take(16*1024*1024+1).bytes().collect::<Result<Vec<_>,_>>().map_err(|e|e.to_string())?;
         if bytes.len()>16*1024*1024{return Err("设计源包超过 16MiB".into());}
-        let (canvas,files)=if path.extension().is_some_and(|e|e=="zip") {open_claude_design::archive::from_zip(&bytes)?}else{
+        let (canvas,files)=if path.extension().and_then(|e|e.to_str()).is_some_and(|e|e.eq_ignore_ascii_case("zip")) {open_claude_design::archive::from_zip(&bytes)?}else{
             let source=String::from_utf8(bytes).map_err(|_|"HTML 需要使用 UTF-8 编码")?;
             (json!({"v":3,"boards":{"Main.dc.html":{"title":"导入画板","x":0,"y":0,"w":1280,"h":800}},"order":["Main.dc.html"],"notes":{}}),BTreeMap::from([("Main.dc.html".into(),source)]))
         };

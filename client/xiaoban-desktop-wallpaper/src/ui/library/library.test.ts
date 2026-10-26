@@ -4,6 +4,8 @@ import { reactive } from 'vue';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { folderPath, folderTree, formatWhen, guessPlatform, inView, pathOf, type LibraryData, type MemoryOverview } from './library-store.ts';
 import LibraryPage from '../pages/LibraryPage.vue';
+import LibraryDocs from './LibraryDocs.vue';
+import DesignWorkbench from '../design/DesignWorkbench.vue';
 
 const invoke = vi.fn();
 vi.mock('../../bridge.ts', async importOriginal => ({ ...(await importOriginal<typeof import('../../bridge.ts')>()), invoke: (...args: unknown[]) => invoke(...args), listen: vi.fn(async () => () => {}) }));
@@ -282,5 +284,23 @@ describe('资料库 page', () => {
     await flushPromises();
     expect(invoke).toHaveBeenCalledWith('chat_memory_set_remembering', { enabled: false });
     expect(wrapper.text()).toContain('已关闭');
+  });
+});
+
+
+describe('design documents in My Documents', () => {
+  it('opens the same project from its single document record instead of attaching a rendered copy', async () => {
+    localStorage.clear();const { wrapper } = setup();await flushPromises();
+    const original = invoke.getMockImplementation()!;
+    const id = 'design-012345678901234567890123';
+    const project = { id, title: '多画板作品', sessionId: 'chat-1', revision: 1, updatedMs: NOW, canvas: { v: 3, boards: { 'Main.dc.html': { w: 390, h: 844 }, 'More.dc.html': { w: 390, h: 844 } }, order: ['Main.dc.html', 'More.dc.html'] }, files: { 'Main.dc.html': '<x-dc>首页</x-dc>', 'More.dc.html': '<x-dc>更多</x-dc>' } };
+    invoke.mockImplementation(async (command, args) => {
+      if (command === 'library_state') return { ...data(), docs: [{ id, designId: id, name: project.title, ext: 'design', folder: null, size: 100, importedMs: NOW, origin: '', status: 'ready', note: '', preview: '2 个画板', tags: ['设计稿'] }] };
+      if (command === 'design_read') return { project, origin: 'design-preview://localhost' };
+      return original(command, args);
+    });
+    await wrapper.findComponent(LibraryDocs).props('library').refresh();await flushPromises();
+    await wrapper.get(`[data-testid="library-doc-${id}"]`).trigger('click');await wrapper.get('[data-testid="library-open-design"]').trigger('click');await flushPromises();
+    expect(wrapper.findComponent(DesignWorkbench).props('projectId')).toBe(id);expect(invoke).toHaveBeenCalledWith('design_read', { id });expect(invoke.mock.calls.some(([command]) => command === 'library_attachment')).toBe(false);wrapper.unmount();
   });
 });

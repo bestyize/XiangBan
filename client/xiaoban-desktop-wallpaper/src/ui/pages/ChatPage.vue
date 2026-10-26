@@ -29,7 +29,17 @@ import type { ApprovalDecision, ApprovalRequest, ChatItem, QuestionRequest } fro
 
 const props = defineProps<{ store: ControlStore }>();
 const chat = props.store.chat;
-const designs = ref<DesignSummary[]>([]), designId = ref(''), designClosed = ref(false);
+const designs = ref<DesignSummary[]>([]), designId = ref(''), designClosed = ref(false), designWidth = ref(64);
+let designSplit: { x: number; width: number; value: number } | null = null;
+function startDesignSplit(event: PointerEvent) {
+  if (event.button !== 0) return;
+  const element = event.currentTarget as HTMLElement, parent = element.parentElement!;
+  designSplit = { x: event.clientX, width: parent.clientWidth, value: designWidth.value };
+  element.setPointerCapture(event.pointerId); event.preventDefault();
+}
+function moveDesignSplit(event: PointerEvent) { if (designSplit) designWidth.value = Math.max(35, Math.min(85, designSplit.value + (designSplit.x - event.clientX) / designSplit.width * 100)); }
+function finishDesignSplit() { designSplit = null; }
+function designSplitKey(event: KeyboardEvent) { if (!['ArrowLeft', 'ArrowRight'].includes(event.key)) return; event.preventDefault(); designWidth.value = Math.max(35, Math.min(85, designWidth.value + (event.key === 'ArrowLeft' ? 2 : -2))); }
 let designOff: (() => void) | undefined, designDisposed = false;
 async function loadDesigns() {
   const id = chat.currentId;
@@ -37,7 +47,9 @@ async function loadDesigns() {
   try {
     const rows = await invoke<DesignSummary[]>('design_list', { session: id });
     if (chat.currentId !== id || designDisposed) return;
-    designs.value = Array.isArray(rows) ? rows : [];
+    const merged = new Map(designs.value.map(row => [row.id, row]));
+    for (const row of Array.isArray(rows) ? rows : []) if (!merged.has(row.id) || merged.get(row.id)!.revision <= row.revision) merged.set(row.id, row);
+    designs.value = [...merged.values()].sort((a, b) => b.updatedMs - a.updatedMs);
     if (!designClosed.value && !designId.value) designId.value = designs.value[0]?.id ?? '';
   } catch (e) { props.store.notify(e, 'error'); }
 }
@@ -45,7 +57,7 @@ watch(() => chat.currentId, () => { designId.value = ''; designClosed.value = fa
 onMounted(async () => {
   if (!props.store.desktop) return;
   const off = await listen<DesignSummary>('design-changed', row => {
-    if (row.sessionId !== chat.currentId) return;
+    if (row.sessionId !== chat.currentId && !row.sessionIds?.includes(chat.currentId ?? '')) return;
     designs.value = [row, ...designs.value.filter(p => p.id !== row.id)];
     if (!designClosed.value) { designId.value = row.id; panelOpen.value = false; }
   });
@@ -525,14 +537,16 @@ async function openLink(href: string) {
       <img :src="preview" alt="图片预览" />
       <button type="button" class="lightbox-close" data-testid="chat-image-preview-close" aria-label="关闭预览" @click="preview = null"><X :size="18" /></button>
     </div>
-    <aside v-if="designId" class="design-dock" aria-label="设计工作台"><DesignWorkbench :project-id="designId" :notify="store.notify" @close="closeDesign" @request="designRequest" /></aside>
+    <div v-if="designId" class="design-splitter" role="separator" tabindex="0" aria-label="调整聊天和画布宽度" aria-orientation="vertical" :aria-valuenow="Math.round(designWidth)" :aria-valuemin="35" :aria-valuemax="85" @pointerdown="startDesignSplit" @pointermove="moveDesignSplit" @pointerup="finishDesignSplit" @pointercancel="finishDesignSplit" @keydown="designSplitKey" />
+    <aside v-if="designId" :style="{ width: designWidth + '%' }" class="design-dock" aria-label="设计工作台"><DesignWorkbench :project-id="designId" :notify="store.notify" @close="closeDesign" @request="designRequest" /></aside>
     <SelectionCopyMenu :scope="scroller" />
   </section>
 </template>
 
 <style scoped>
 .design-deliveries{display:flex;gap:6px;overflow:auto;padding:4px 18px 8px;flex:none}.design-deliveries button{display:flex;align-items:center;gap:6px;padding:6px 9px;background:var(--ui-control);border:1px solid var(--ui-line);border-radius:7px;color:var(--ui-text-secondary);font-size:11px;cursor:pointer;white-space:nowrap}.design-deliveries b{font-weight:500}.design-deliveries small{font-size:10px;color:var(--ui-text-tertiary)}.design-deliveries .active{border-color:var(--ui-ink);color:var(--ui-ink)}
-.design-dock{width:64%;min-width:420px;max-width:calc(100% - 250px);border-left:1px solid var(--ui-line);flex:none;min-height:0;display:flex}@media(max-width:900px){.design-dock{position:absolute;inset:0;width:100%;min-width:0;max-width:none;z-index:8;background:var(--ui-surface)}}
+.design-splitter{width:4px;flex:none;cursor:col-resize;touch-action:none;background:transparent}.design-splitter:hover,.design-splitter:focus-visible{background:var(--ui-soft);outline:0}
+.design-dock{width:64%;min-width:420px;max-width:calc(100% - 250px);border-left:1px solid var(--ui-line);flex:none;min-height:0;display:flex}@media(max-width:900px){.design-splitter{display:none}.design-dock{position:absolute;inset:0;width:100%!important;min-width:0;max-width:none;z-index:8;background:var(--ui-surface)}}
 .plan-editor-note{margin:0 0 12px;color:var(--ui-text-secondary);font-size:12px;line-height:1.7}
 .plan-editor-steps{list-style:none;margin:0 0 15px;padding:0;display:grid;gap:8px;color:var(--ui-text-primary);font-size:12px}
 .plan-editor-steps li{display:flex;align-items:center;gap:8px;overflow-wrap:anywhere}.plan-editor-steps li>span{width:12px;flex:none;color:var(--ui-text-tertiary);font-size:10px}.plan-editor-steps .done{color:var(--ui-text-tertiary)}.plan-editor-steps .done svg{flex:none;color:var(--ui-ink)}.plan-editor-actions{display:flex;justify-content:flex-end;gap:8px}

@@ -1,8 +1,8 @@
 export interface Board { file:string; title:string; x:number; y:number; w:number; h:number; page?:string; [key:string]:unknown }
 export interface Comment { id:string; file:string; node?:string; text:string; revision:number; status:'saved'|'sent'|'resolved' }
-export interface Project { id:string; title:string; sessionId:string; revision:number; updatedMs:number; canvas:Record<string,any>; files:Record<string,string>; requestId?:string }
-export interface Summary { id:string; title:string; sessionId:string; revision:number; updatedMs:number; artboards:number }
-export interface Payload { project:Project; origin:string; draft?:Project }
+export interface Project { id:string; title:string; sessionId:string; sessionIds?:string[]; revision:number; updatedMs:number; canvas:Record<string,any>; files:Record<string,string>; requestId?:string }
+export interface Summary { id:string; title:string; sessionId:string; sessionIds?:string[]; revision:number; updatedMs:number; artboards:number }
+export interface Payload { project:Project; origin:string; draft?:Project; draftError?:string }
 export function boardsOf(canvas:Project['canvas']):Board[]{
   const raw=canvas.boards ? (canvas.order as string[]).map(file=>({file,...canvas.boards[file]})) : (canvas.artboards??[]);
   return raw.map((b:any)=>({...b,file:b.file,title:b.title||b.file,x:b.x??0,y:b.y??0,w:b.w,h:b.h}));
