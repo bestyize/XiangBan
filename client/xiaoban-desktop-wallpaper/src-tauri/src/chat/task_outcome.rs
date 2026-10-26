@@ -93,15 +93,19 @@ pub fn inspect(journal: &JsonlRunLog, session: &str, run: &str) -> Result<TaskOu
                             .unwrap_or_else(|_| serde_json::Value::String(arguments.clone()));
                         calls.insert(id.clone(), (name.clone(), arguments));
                     }
-                    Event::ToolEnd { id, is_error, .. } => {
+                    Event::ToolEnd { id, is_error, structured_content, output, .. } => {
                         let key = calls.remove(id).unwrap_or_else(|| (id.clone(), serde_json::Value::Null));
                         if *is_error {
                             failed_tools += 1;
-                            if !unresolved.contains(&key) { unresolved.push(key); }
+                            let validation = structured_content.as_ref().is_some_and(|v| v["harness_status"] == "invalid_arguments")
+                                || output.starts_with("invalid arguments for `");
+                            let failure = (key, validation);
+                            if !unresolved.contains(&failure) { unresolved.push(failure); }
                         } else {
                             // A later successful retry of the same operation can repair a
                             // failed attempt. A different tool/target is not proof of repair.
-                            unresolved.retain(|old| old != &key);
+                            unresolved.retain(|(old, validation)| old != &key && !(*validation && old.0 == key.0
+                                && old.1.as_object().is_some_and(|args| args.iter().all(|(name, value)| key.1.get(name) == Some(value)))));
                         }
                     }
                     _ => {}
@@ -219,6 +223,47 @@ mod tests {
         assert_ne!(outcome.status,Status::Succeeded,"successful tool execution is not business verification");
         let _=fs::remove_dir_all(base);
     }
+ }
+
+ #[test]
+ fn completing_missing_required_arguments_repairs_prior_validation_failures() {
+    use agent_kernel::{RunEvent, ToolSpec, Tool, ToolCtx, ToolResult, Part, Risk, Agent, MemoryStore, RunOptions};
+    use agent_kernel::provider::scripted::{ScriptedProvider, Step};
+    use std::sync::{Arc, atomic::AtomicBool};
+    struct CreateGameTool { spec: ToolSpec }
+    impl Tool for CreateGameTool {
+        fn spec(&self) -> &ToolSpec { &self.spec }
+        fn execute_result(&self, _: serde_json::Value, _: &ToolCtx) -> ToolResult { ToolResult::ok("installed") }
+    }
+    let base = std::env::temp_dir().join(format!("xiaoban-outcome-validation-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&base);
+    let journal = JsonlRunLog::new(base.join("runs"));
+    let provider = Arc::new(ScriptedProvider::new(vec![
+        Step::tool_call("c1", "game_create", r#"{"source_dir":"game-drafts/ant"}"#),
+        Step::tool_call("c2", "game_create", r#"{"id":"ant","source_dir":"game-drafts/ant"}"#),
+        Step::tool_call("c3", "game_create", r#"{"id":"ant","name":"蚂蚁骑车","description":"横版闯关","source_dir":"game-drafts/ant"}"#),
+        Step::text("done"),
+    ]));
+    let schema = serde_json::json!({
+        "type": "object",
+        "properties": {
+            "id": { "type": "string" },
+            "name": { "type": "string" },
+            "description": { "type": "string" },
+            "source_dir": { "type": "string" }
+        },
+        "required": ["id", "name", "description", "source_dir"]
+    });
+    let agent = Agent::builder(provider, Arc::new(MemoryStore::new())).tool(CreateGameTool {
+        spec: ToolSpec::new("game_create", "install game", schema).risk(Risk::Write),
+    }).build().unwrap();
+    let mut observe = |record: RunEvent| journal.append(&record);
+    let summary = agent.run_parts_observed("s1", vec![Part::Text { text: "create".into() }], RunOptions::default(),
+        &mut observe, &Arc::new(AtomicBool::new(false))).unwrap();
+    let outcome = inspect(&journal, "s1", &summary.run_id).unwrap();
+    assert_eq!(outcome.status, Status::Unknown, "{}", outcome.evidence);
+    assert!(outcome.evidence.contains("tool_errors=2; unresolved_tool_errors=0"), "{}", outcome.evidence);
+    let _ = fs::remove_dir_all(base);
  }
 }
 

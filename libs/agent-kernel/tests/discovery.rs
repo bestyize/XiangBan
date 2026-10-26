@@ -91,7 +91,7 @@ fn guesses_and_unknown_batch_names_do_not_execute_or_partially_activate() {
 }
 
 #[test]
-fn activation_is_isolated_between_sessions_and_cleared_at_run_end() {
+fn activation_is_restored_for_a_continuation_but_isolated_between_sessions() {
     let h = harness(vec![
         Step::tool_call("l", "tool_load", r#"{"names":["mcp_ext_calendar_list"]}"#),
         Step::text("done"), Step::text("another session"), Step::text("new task"),
@@ -101,8 +101,20 @@ fn activation_is_isolated_between_sessions_and_cleared_at_run_end() {
     h.agent.run("s2", "second", &mut |_| {}, &cancel).unwrap();
     assert!(run(&h.agent, "third").0.is_ok());
     let requests = h.provider.requests();
-    for i in [0, 2, 3] { assert!(!requests[i].tools.iter().any(|s| s.name == "mcp_ext_calendar_list")); }
+    for i in [0, 2] { assert!(!requests[i].tools.iter().any(|s| s.name == "mcp_ext_calendar_list")); }
     assert!(requests[1].tools.iter().any(|s| s.name == "mcp_ext_calendar_list"));
+    assert!(requests[3].tools.iter().any(|s| s.name == "mcp_ext_calendar_list"));
+}
+
+#[test]
+fn a_fresh_agent_restores_schemas_from_saved_discovery_results() {
+    let h = harness(vec![Step::tool_call("load", "tool_load", r#"{"names":["mcp_ext_calendar_list"]}"#), Step::text("ready")],
+        |b| b.deferred_tool_arc(deferred(Arc::new(AtomicUsize::new(0)))));
+    run(&h.agent, "prepare").0.unwrap();
+    let provider = Arc::new(agent_kernel::provider::scripted::ScriptedProvider::new(vec![Step::text("continued")]));
+    let agent = Agent::builder(provider.clone(), h.store.clone()).deferred_tool_arc(deferred(Arc::new(AtomicUsize::new(0)))).build().unwrap();
+    run(&agent, "continue").0.unwrap();
+    assert!(provider.requests()[0].tools.iter().any(|tool| tool.name == "mcp_ext_calendar_list" && tool.parameters["required"] == json!(["day"])));
 }
 
 #[test]
@@ -155,7 +167,7 @@ fn deferred_schemas_reduce_initial_budget_for_a_large_catalog() {
 }
 
 #[test]
-fn provider_failure_and_cancellation_clear_activation_before_the_next_task() {
+fn provider_failure_and_cancellation_preserve_disclosure_for_continuation() {
     for error in [HarnessError::provider("offline", false), HarnessError::Cancelled] {
         let h = harness(vec![
             Step::tool_call("l", "tool_load", r#"{"names":["mcp_ext_calendar_list"]}"#),
@@ -165,7 +177,7 @@ fn provider_failure_and_cancellation_clear_activation_before_the_next_task() {
         assert!(run(&h.agent, "next").0.is_ok());
         let requests = h.provider.requests();
         assert!(requests[1].tools.iter().any(|s| s.name == "mcp_ext_calendar_list"));
-        assert!(!requests[2].tools.iter().any(|s| s.name == "mcp_ext_calendar_list"));
+        assert!(requests[2].tools.iter().any(|s| s.name == "mcp_ext_calendar_list"));
     }
 }
 

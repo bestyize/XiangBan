@@ -162,11 +162,13 @@ impl Agent {
         if !args.is_object() {
             return Prepared::Done(ToolResult::error("arguments must be a JSON object"));
         }
-        if let Err(error) = self.validators[index].validate(&args) {
+        let errors: Vec<_> = self.validators[index].iter_errors(&args).take(16)
+            .map(|error| format!("at ${}: {}", error.instance_path, error)).collect();
+        if !errors.is_empty() {
             return Prepared::Done(ToolResult::error(format!(
-                "invalid arguments for `{}` at ${}: {}. No tool was executed.",
-                call.name, error.instance_path, error
-            )));
+                "invalid arguments for `{}`: {}. No tool was executed. Correct all listed errors using the tool schema before calling again. Required properties: {}.",
+                call.name, errors.join("; "), tool.spec().schema.get("required").unwrap_or(&Value::Null)
+            )).with_structured_content(serde_json::json!({"harness_status":"invalid_arguments","executed":false})));
         }
         let ctx = ToolCtx {
             session: session.to_string(),

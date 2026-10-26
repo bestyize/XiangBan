@@ -12,6 +12,17 @@ const question = (id: string, session = 's1'): QuestionRequest => ({ id, session
 
 type Responder = (args: Record<string, unknown> | undefined) => unknown;
 
+it('does not turn ordinary unverified execution outcomes into warnings', async () => {
+  const h = harness({chat_overview:()=>overview({sessions:[summary('s1')]}),chat_load_session:()=>[]});
+  await h.store.init(); await h.store.select('s1');
+  h.events('s1',{type:'tool_start',id:'write',name:'write_file',arguments:'{}'});
+  h.events('s1',{type:'tool_end',id:'write',output:'saved',is_error:false});
+  h.events('s1',{type:'done'});
+  for (const status of ['unknown','partial']) h.emit('chat-task-outcome',{session:'s1',outcome:{runId:'r1',status,validator:'run_trace_only',evidence:'terminal=true; tool_errors=0'}});
+  expect(h.store.current()?.items.some(i=>i.kind==='notice')).toBe(false);
+  h.store.dispose();
+});
+
 it('persists a workflow expert through sending, continuing and reopening the conversation',async()=>{
   const bound={plugin:'',agent:'',workflow:'health-report',name:'健康报告',profession:''};
   const session={...summary('workflow-session','报告'),expert:bound};

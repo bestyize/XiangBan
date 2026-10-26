@@ -42,7 +42,7 @@ export function checkpointNotice(view: SessionView, runId: string, files: string
 export function itemsFromHistory(view: SessionView, messages: WireMessage[]): ChatItem[] {
   const items: ChatItem[] = [];
   const tools = new Map<string, Extract<ChatItem, { kind: 'tool' }>>();
-  for (const message of messages) {
+  for (const [index, message] of messages.entries()) {
     if (message.role === 'user' && message.synthetic && message.context_summary) {
       items.push(summaryNotice(view, message.context_summary.text));
       continue;
@@ -72,7 +72,13 @@ export function itemsFromHistory(view: SessionView, messages: WireMessage[]): Ch
         items.push(item);
       }
       const metadata = message.structured_content;
-      if (metadata && typeof metadata === 'object' && 'interrupted' in metadata && metadata.interrupted === true) {
+      const next = messages[index + 1];
+      const recovery = next?.synthetic ? next.structured_content : null;
+      const recovered = metadata && typeof metadata === 'object' && 'recovery_run_id' in metadata
+        && recovery && typeof recovery === 'object' && 'stream_recovery_run_id' in recovery
+        && metadata.recovery_run_id === recovery.stream_recovery_run_id;
+      if (metadata && typeof metadata === 'object' && 'interrupted' in metadata && metadata.interrupted === true
+        && !recovered) {
         items.push({ kind: 'notice', id: nextId(view), tone: 'warning',
           text: '这段回答在中途中断，已保留生成的内容。', canContinue: true });
       }
@@ -172,6 +178,7 @@ export function applyEvent(view: SessionView, event: KernelEvent): void {
       clearRecoveredCutoff(view);
       view.status = event.reason === 'tool_call_length'
         ? '代码生成超过单次输出上限，小伴正在调整步骤重试…'
+        : event.reason === 'provider_interrupted' ? '模型连接中断，已保存进展，小伴正在接着处理…'
         : event.reason === 'length' ? '回答达到单次输出上限，小伴正在接着写…'
           : '还没做完，小伴继续处理中…';
       break;
@@ -216,7 +223,7 @@ export function applyEvent(view: SessionView, event: KernelEvent): void {
         break;
       }
       view.items.push({ kind: 'notice', id: nextId(view), tone: 'error', text: modelFailure(event.message).message,
-        canSwitchModel: true, canRetry: lastUser >= 0 && !partial, details: event.message });
+        canSwitchModel: true, canRetry: lastUser >= 0 && !partial, canContinue: lastUser >= 0 && partial, details: event.message });
       break;
     }
     case 'usage':

@@ -229,6 +229,7 @@ impl Agent {
         let budget = options.shared_budget.clone().or_else(|| options.max_tool_calls.map(|limit| Arc::new(crate::ToolBudget::new(limit))));
         let own_limit = options.max_tool_calls.filter(|_| options.shared_budget.is_some());
         let mut recovered_context_budget = None;
+        let mut stream_continuations = 0;
         let control=options.control.clone().unwrap_or_default();
         let mut idle_rounds=0;
         for index in 0..self.max_turns.unwrap_or(usize::MAX) {
@@ -247,7 +248,30 @@ impl Agent {
                 mw.before_model(&mut turn)?;
             }
             let mut request = ChatRequest { messages: turn.messages, tools: turn.tools };
-            let mut reply = self.chat_with_retry(session, run_id, &mut request, &mut recovered_context_budget, on_event, cancel)?;
+            let mut reply = match self.chat_with_retry(session, run_id, &mut request, &mut recovered_context_budget, &control, on_event, cancel) {
+                Ok(reply) => reply,
+                Err(error @ HarnessError::Provider { retryable: true, .. }) => {
+                    // The failed model request has dispatched no tools. Preserve its
+                    // visible output and continue from history, never replay that request.
+                    let saved = self.store.load(session)?;
+                    let partial = saved.last().filter(|m| m.structured_content.as_ref()
+                        .is_some_and(|v| v["interrupted"] == true && v["recovery_run_id"] == run_id));
+                    if partial.is_none() || stream_continuations >= self.retry.max_retries.min(3)
+                        || !dangling_tool_results(&saved).is_empty() { return Err(error); }
+                    control.check()?;
+                    if cancel.load(Ordering::Relaxed) { return Err(HarnessError::Cancelled); }
+                    stream_continuations += 1;
+                    let mut reminder = Message::reminder("The previous model stream was interrupted by a temporary provider failure. Its incomplete tool arguments were discarded and no tools from that failed request ran. Continue the original task from the saved progress; do not repeat completed actions or the partial answer. Inspect existing files before editing. For long code, write a working structure first, then complete it with smaller targeted edits. Do not claim completion without evidence.");
+                    reminder.structured_content = Some(serde_json::json!({"stream_recovery_run_id": run_id}));
+                    self.store.append(session, std::slice::from_ref(&reminder))?;
+                    history = saved;
+                    history.push(reminder);
+                    on_event(Event::Continuing { reason: "provider_interrupted".into() });
+                    sleep_unless_cancelled(backoff(&self.retry, stream_continuations), cancel)?;
+                    continue;
+                }
+                Err(error) => return Err(error),
+            };
             let turn = Turn { session: turn.session, index, messages: request.messages, tools: request.tools };
             for mw in &self.middleware {
                 mw.after_model(&turn, &mut reply.message)?;
@@ -401,6 +425,7 @@ impl Agent {
         run_id: &str,
         request: &mut ChatRequest,
         recovered_budget: &mut Option<usize>,
+        control: &crate::RunControl,
         on_event: &mut dyn FnMut(Event),
         cancel: &AtomicBool,
     ) -> Result<Reply, HarnessError> {
@@ -414,6 +439,7 @@ impl Agent {
         };
         if let Some(budget) = *recovered_budget { reduce(request, budget)?; }
         loop {
+            control.check()?;
             let streamed_flag = std::cell::Cell::new(false);
             let text_flag = std::cell::Cell::new(false);
             let mut visible_reasoning: Vec<crate::ReasoningSegment> = Vec::new();
@@ -444,6 +470,14 @@ impl Agent {
                 )
             };
             let streamed = streamed_flag.get();
+            // Failed streams often omit usage. Charge a conservative estimate to
+            // the shared budget, without presenting it as provider-reported usage.
+            if result.is_err() && streamed {
+                let input = estimate_tokens(&request.messages) + estimate_tool_tokens(&request.tools);
+                let output = visible_text.chars().count() + visible_reasoning.iter().map(|r| r.text.chars().count()).sum::<usize>();
+                control.record(Usage { prompt_tokens: input.min(u32::MAX as usize) as u32,
+                    completion_tokens: output.div_ceil(3).min(u32::MAX as usize) as u32, ..Default::default() });
+            }
             match result {
                 Err(error) if !streamed && error.is_context_limit() && recoveries < 2 => {
                     let used = estimate_tokens(&request.messages) + estimate_tool_tokens(&request.tools);
@@ -522,7 +556,7 @@ mod interrupted_output_tests {
                 std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos()));
             let store = Arc::new(crate::JsonlStore::new(&dir));
             let provider = Arc::new(InterruptedProvider { cancelled, attempts: AtomicUsize::new(0) });
-            let agent = Agent::builder(provider.clone(), store.clone()).build().unwrap();
+            let agent = Agent::builder(provider.clone(), store.clone()).retry(RetryPolicy { max_retries: 0, ..Default::default() }).build().unwrap();
             let cancel = Arc::new(AtomicBool::new(false));
             assert!(agent.run("s", "question", &mut |_| {}, &cancel).is_err());
             let saved = crate::JsonlStore::new(&dir).load("s").unwrap();

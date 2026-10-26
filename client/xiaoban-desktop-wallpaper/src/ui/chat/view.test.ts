@@ -364,6 +364,15 @@ it('restores interrupted reasoning and answer with an explicit continuation noti
 });
 
 describe('reliability pause reasons', () => {
+  it('keeps only the final unrecovered interruption notice after reload', () => {
+    const partial = { role: 'assistant' as const, parts: [{type:'text' as const,text:'progress'}], structured_content: {interrupted:true,recovery_run_id:'r1'} };
+    const reminder = { role:'user' as const, synthetic:true, parts:[], structured_content:{stream_recovery_run_id:'r1'} };
+    const view = newView('s1');
+    const items = itemsFromHistory(view, [partial, reminder, partial]);
+    expect(items.filter(i => i.kind === 'notice')).toHaveLength(1);
+    applyEvent(view, {type:'continuing',reason:'provider_interrupted'});
+    expect(view.status).toContain('已保存进展');
+  });
   it('requires inspecting unknown actions instead of offering blind continuation', () => {
     const view = newView('s1');
     applyEvent(view, { type: 'error', message: 'run paused by continuation guard: tool_outcome_needs_review' });

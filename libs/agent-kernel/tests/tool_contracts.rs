@@ -87,6 +87,10 @@ fn validation_blocks_invalid_arguments_before_approval_or_execution() {
         .filter(|m| m.role == Role::Tool)
         .all(|m| m.is_error));
     assert!(tool_messages(&h)[2].1.contains("/items/0"));
+    let first = &tool_messages(&h)[0].1;
+    assert!(first.contains("\"items\" is a required property") && first.contains("\"mode\" is a required property"));
+    let invalid = h.store.load("s1").unwrap().into_iter().find(|m| m.tool_call_id.as_deref() == Some("c0")).unwrap();
+    assert_eq!(invalid.structured_content.unwrap()["harness_status"], "invalid_arguments");
 }
 
 #[test]

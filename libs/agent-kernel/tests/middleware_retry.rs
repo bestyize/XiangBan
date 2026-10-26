@@ -134,13 +134,45 @@ fn non_retryable_errors_and_exhausted_retries_fail() {
 }
 
 #[test]
-fn no_retry_once_text_has_been_streamed() {
+fn interrupted_text_is_preserved_and_continued_instead_of_replayed() {
     let drop = Step::text("par").then_fail(HarnessError::provider("connection dropped", true));
     let h = harness(vec![drop, Step::text("ok")], |b| b);
     let (result, events) = run(&h.agent, "hi");
-    assert!(result.is_err());
-    assert_eq!(h.provider.requests().len(), 1);
+    assert_eq!(result.unwrap().text, "ok");
+    let requests = h.provider.requests();
+    assert_eq!(requests.len(), 2);
+    assert!(requests[1].messages.iter().any(|m| m.role == Role::Assistant && m.text() == "par"));
+    assert!(events.iter().any(|e| matches!(e, Event::Continuing { reason } if reason == "provider_interrupted")));
     assert!(events.contains(&Event::TextDelta { text: "par".into() }));
+}
+
+#[test]
+fn interrupted_streams_have_a_run_wide_limit_and_never_replay_finished_tools() {
+    let executed = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    let count = executed.clone();
+    let mut steps = vec![Step::tool_call("saved", "write", "{}")];
+    steps.extend((0..5).map(|_| Step::text("working").then_fail(HarnessError::provider("idle timeout", true))));
+    let h = harness(steps, |b| b.tool(FnTool::new(spec("write"), move |_, _| {
+        count.fetch_add(1, Ordering::SeqCst); Ok("saved".into())
+    })));
+    let (result, events) = run(&h.agent, "finish");
+    assert!(result.is_err());
+    assert_eq!(executed.load(Ordering::SeqCst), 1);
+    assert_eq!(h.provider.requests().len(), 5, "one tool request, four stream attempts");
+    assert_eq!(events.iter().filter(|e| matches!(e, Event::Continuing {reason} if reason == "provider_interrupted")).count(), 3);
+    let saved = h.store.load("s1").unwrap();
+    assert!(saved.last().unwrap().structured_content.as_ref().unwrap()["interrupted"] == true);
+}
+
+#[test]
+fn interrupted_stream_continuation_keeps_the_original_token_budget() {
+    let h = harness(vec![Step::text("partial").then_fail(HarnessError::provider("timeout", true)), Step::text("must not run")], |b| b);
+    let control = RunControl::bounded(Duration::from_secs(5), 1);
+    let result = h.agent.run_parts_observed("s1", vec![Part::Text { text: "finish".into() }],
+        RunOptions {control:Some(control.clone()), ..Default::default()}, &mut |_| Ok(()), &Arc::new(AtomicBool::new(false)));
+    assert!(matches!(result, Err(HarnessError::BudgetExceeded(_))));
+    assert_eq!(h.provider.requests().len(), 1);
+    assert!(control.reported_tokens() > 1);
 }
 
 #[test]
@@ -202,10 +234,10 @@ fn a_stall_after_reasoning_but_before_any_text_is_retried_and_only_the_successfu
 }
 
 #[test]
-fn a_stall_after_answer_text_is_still_never_replayed() {
+fn a_stall_after_answer_text_continues_from_saved_output() {
     let provider = Arc::new(StallsAfterThinking { calls: Default::default(), stall_after_text: true });
     let agent = Agent::builder(provider.clone(), Arc::new(MemoryStore::new())).retry(fast_retry()).build().unwrap();
     let (result, _) = run(&agent, "hi");
-    assert!(result.is_err());
-    assert_eq!(provider.calls.load(std::sync::atomic::Ordering::SeqCst), 1);
+    assert_eq!(result.unwrap().text, "写好了");
+    assert_eq!(provider.calls.load(std::sync::atomic::Ordering::SeqCst), 2);
 }

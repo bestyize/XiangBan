@@ -108,8 +108,12 @@ pub(super) fn recover_visible_tail(
         if record.session_id != session || record.parent_run_id.is_some() { return; }
         if let RunEventBody::Event { event } = record.body { tail.push(&event); }
     })?;
-    if saved.iter().any(|message| message.structured_content.as_ref()
-        .and_then(|v| v["recovery_run_id"].as_str()) == Some(run.as_str())) { return Ok(None); }
+    let already_saved = saved.iter().enumerate().any(|(i, message)| {
+        message.structured_content.as_ref().and_then(|v| v["recovery_run_id"].as_str()) == Some(run.as_str())
+            && saved.get(i + 1).and_then(|next| next.structured_content.as_ref())
+                .and_then(|v| v["stream_recovery_run_id"].as_str()) != Some(run.as_str())
+    });
+    if already_saved { return Ok(None); }
     Ok(tail.message(saved).map(|mut message| {
         message.structured_content.as_mut().unwrap()["recovery_run_id"] = json!(run);
         message

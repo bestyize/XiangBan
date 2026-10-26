@@ -86,7 +86,7 @@ impl StreamAccumulator {
     ) -> Result<(), HarnessError> {
         if let Some(error) = chunk.get("error").filter(|e| !e.is_null()) {
             let message = error.get("message").and_then(Value::as_str).map_or_else(|| error.to_string(), str::to_string);
-            return Err(HarnessError::provider(message, false));
+            return Err(HarnessError::stream_failure(&error["code"], message));
         }
         if let Some(usage) = chunk.get("usage").filter(|u| u.is_object()) {
             let read = |key: &str| usage.get(key).and_then(Value::as_u64).unwrap_or(0).min(u32::MAX as u64) as u32;

@@ -92,6 +92,27 @@ impl ToolDiscovery {
 
 impl Middleware for ToolDiscovery {
     fn before_model(&self, turn: &mut Turn) -> Result<(), HarnessError> {
+        // A continuation builds a fresh agent. Restore disclosure from successful
+        // historical calls; this restores schemas, never execution permission.
+        let mut restored = HashSet::new();
+        let results: HashMap<_, _> = turn.messages.iter().filter(|m| m.role == crate::Role::Tool && !m.is_error)
+            .filter_map(|m| m.tool_call_id.as_deref().map(|id| (id, m))).collect();
+        for message in &turn.messages {
+            for call in &message.tool_calls {
+                let Some(result) = results.get(call.id.as_str()) else { continue };
+                if self.names.contains(&call.name) { restored.insert(call.name.clone()); }
+                if matches!(call.name.as_str(), "tool_load" | "tool_search") {
+                    if let Ok(value) = serde_json::from_str::<Value>(&result.text()) {
+                        for name in value["loaded"].as_array().into_iter().flatten().filter_map(Value::as_str) {
+                            if self.names.contains(name) { restored.insert(name.to_string()); }
+                        }
+                    }
+                }
+            }
+        }
+        if !restored.is_empty() {
+            self.loaded.lock().unwrap_or_else(|e| e.into_inner()).entry(turn.session.clone()).or_default().extend(restored);
+        }
         let loaded = self.loaded.lock().unwrap_or_else(|e| e.into_inner());
         let active = loaded.get(&turn.session);
         turn.tools.retain(|s| !self.names.contains(&s.name) || active.is_some_and(|names| names.contains(&s.name)));

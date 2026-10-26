@@ -146,11 +146,8 @@ fn str_of(value: &Value, key: &str) -> String {
     value.get(key).and_then(Value::as_str).unwrap_or("").to_string()
 }
 
-fn failure(code: &str, message: String) -> HarnessError {
-    if matches!(code, "context_length_exceeded" | "context_window_exceeded") {
-        return HarnessError::provider(format!("{code}: {message}"), false);
-    }
-    HarnessError::provider(message, matches!(code, "server_error" | "rate_limit_exceeded"))
+fn failure(code: &Value, message: String) -> HarnessError {
+    HarnessError::stream_failure(code, message)
 }
 
 impl ResponsesStream {
@@ -320,12 +317,12 @@ impl ResponsesStream {
                 self.reconcile(response, on_text, on_reasoning);
                 let error = event.pointer("/response/error").unwrap_or(&Value::Null);
                 let message = error.get("message").and_then(Value::as_str).unwrap_or("the response failed").to_string();
-                return Err(failure(error.get("code").and_then(Value::as_str).unwrap_or(""), message));
+                return Err(failure(&error["code"], message));
             }
             "error" => {
                 let error = event.get("error").unwrap_or(event);
                 let message = error.get("message").and_then(Value::as_str).map_or_else(|| event.to_string(), str::to_string);
-                return Err(failure(error.get("code").and_then(Value::as_str).unwrap_or(""), message));
+                return Err(failure(&error["code"], message));
             }
             _ => {}
         }
