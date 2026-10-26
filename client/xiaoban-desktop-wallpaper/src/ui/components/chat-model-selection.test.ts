@@ -190,8 +190,11 @@ describe('hovering a model to choose thinking strength', () => {
     useConfig();
     const view = await composer();
     await view.get('[data-testid="chat-model-my-openai-gpt-6.1-sol"]').trigger('mouseenter');
-    expect(panel()?.textContent).toContain('思考强度');
-    expect(strength('default').getAttribute('aria-checked')).toBe('true');
+    expect(panel()?.textContent).not.toContain('思考强度');
+    expect(panel()?.textContent).not.toContain('编程模型');
+    expect(panel()?.querySelectorAll(':scope > *').length).toBe(5);
+    expect(strength('default')).toBeNull();
+    expect(strength('medium').getAttribute('aria-checked')).toBe('true');
     expect(strength('faster').textContent).toContain('低');
     expect(strength('deeper').textContent).toContain('高');
     expect(ipc.mock.calls.some(([command]) => command === 'save_ai_provider')).toBe(false);
@@ -246,15 +249,44 @@ describe('hovering a model to choose thinking strength', () => {
     expect(panel()).toBeNull();
   });
 
-  it('explains undeclared model and old gateway capabilities', async () => {
+  it('omits empty submenus for models and gateway modes without declared levels', async () => {
     const view = await composer();
-    await view.get('[data-testid="chat-model-local-local-model"]').trigger('mouseenter');
-    expect(strength('default')).not.toBeNull();
-    expect(strength('deeper')).toBeNull();
-    expect(panel()?.textContent).toContain('尚未识别');
+    const local = view.get('[data-testid="chat-model-local-local-model"]');
+    await local.trigger('mouseenter');
+    expect(panel()).toBeNull();
+    expect(local.attributes('aria-haspopup')).toBeUndefined();
+    const gateway = view.get('[data-testid="chat-model-xiaoban-ai-standard"]');
+    await gateway.trigger('mouseenter');
+    expect(panel()).toBeNull();
+    expect(gateway.attributes('aria-haspopup')).toBeUndefined();
+  });
+
+  it('uses a concrete supported default when medium is unavailable', async () => {
+    ipc.mockImplementation(async command => {
+      if (command === 'ai_gateway_tiers') return [{ ...tiers[0], reasoningEfforts: ['low', 'high', 'max'] }] as never;
+      return { ...structuredClone(config), gatewayReplyPreference: 'default' } as never;
+    });
+    const view = await composer();
     await view.get('[data-testid="chat-model-xiaoban-ai-standard"]').trigger('mouseenter');
-    expect(panel()?.textContent).toContain('尚未提供可选等级');
-    expect(strength('faster')).toBeNull();
+    expect(strength('default')).toBeNull();
+    expect(strength('deeper').getAttribute('aria-checked')).toBe('true');
+    expect(panel()?.querySelectorAll('[aria-checked="true"]')).toHaveLength(1);
+    strength('deeper').click();
+    await flushPromises();
+    expect(ipc).toHaveBeenCalledWith('use_ai_gateway', { tier: 'standard', replyPreference: 'deeper' });
+  });
+
+  it('preserves a saved level for an inactive provider and defaults other models separately', async () => {
+    ipc.mockImplementation(async command => {
+      if (command === 'ai_gateway_tiers') return structuredClone(tiers) as never;
+      return { ...structuredClone(config), providers: [{ ...provider, replyPreference: 'max' }] } as never;
+    });
+    const view = await composer();
+    await view.get('[data-testid="chat-model-my-openai-gpt-6.1-sol"]').trigger('mouseenter');
+    expect(strength('max').getAttribute('aria-checked')).toBe('true');
+    await view.get('[data-testid="chat-model-my-openai-gpt-6-luna"]').trigger('mouseenter');
+    expect(strength('medium').getAttribute('aria-checked')).toBe('true');
+    expect(panel()?.querySelectorAll('[aria-checked="true"]')).toHaveLength(1);
   });
 
   it('lets the active gateway mode change strength using server capabilities', async () => {
@@ -290,7 +322,7 @@ describe('hovering a model to choose thinking strength', () => {
     useConfig();
     const view = await composer();
     await view.get('[data-testid="chat-model-my-openai-gpt-6.1-sol"]').trigger('keydown', { key: 'ArrowRight' });
-    expect(document.activeElement).toBe(strength('default'));
+    expect(document.activeElement).toBe(strength('faster'));
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
     await flushPromises();
     expect(panel()).toBeNull();

@@ -43,19 +43,20 @@ const reasoningPosition = ref({ left: '0px', top: '0px', width: '210px', maxHeig
 const canTune = (entry: ModelChoice) => providerReasoningLevels(entry.provider, entry.model).length > 0;
 const reasoningOptions = computed(() => preferenceOptions(reasoningTarget.value?.kind === 'model'
   ? providerReasoningLevels(reasoningTarget.value.entry.provider, reasoningTarget.value.entry.model)
-  : reasoningTarget.value?.tier.reasoningEfforts ?? []));
-const reasoningNote = computed(() => reasoningOptions.value.length === 1
-  ? reasoningTarget.value?.kind === 'gateway' ? '此模式尚未提供可选等级，请更新网关或由管理员配置。'
-    : reasoningTarget.value?.entry.provider.protocol === 'anthropic' ? '此协议暂未接入思考等级，可切换为 OpenAI 兼容协议。'
-    : '尚未识别此模型的等级，可在模型设置的高级设置中声明。'
-  : '默认沿用服务商设置。更高等级可能耗时更久、消耗更多额度。');
+  : reasoningTarget.value?.tier.reasoningEfforts ?? []).filter(option => option.value !== 'default'));
 const targetModel = (entry: ModelChoice) => reasoningTarget.value?.kind === 'model'
   && reasoningTarget.value.entry.provider.id === entry.provider.id && reasoningTarget.value.entry.model === entry.model;
 const targetTier = (tier: AiTier) => reasoningTarget.value?.kind === 'gateway' && reasoningTarget.value.tier.tier === tier.tier;
 function selectedStrength(value: AiReplyPreference) {
   const target = reasoningTarget.value;
-  return target?.kind === 'gateway' ? currentTier(target.tier) && value === (config.value?.gatewayReplyPreference ?? 'default')
-    : !!target && current(target.entry) && (canTune(target.entry) ? target.entry.provider.replyPreference ?? 'default' : 'default') === value;
+  if (!target) return false;
+  const saved = target.kind === 'gateway'
+    ? (config.value?.gatewayTier || config.value?.model) === target.tier.tier ? config.value?.gatewayReplyPreference : undefined
+    : target.entry.provider.model === target.entry.model ? target.entry.provider.replyPreference : undefined;
+  // Match the native request's balanced fallback, including old saved defaults.
+  const selected = [saved, 'medium', 'deeper', 'faster', 'xhigh', 'max']
+    .find(preference => reasoningOptions.value.some(option => option.value === preference));
+  return value === selected;
 }
 let hoverTimer: ReturnType<typeof setTimeout> | undefined;
 function keepReasoning() { clearTimeout(hoverTimer); }
@@ -63,6 +64,7 @@ function hideReasoning() { keepReasoning(); reasoningTarget.value = null; }
 function leaveReasoning() { keepReasoning(); hoverTimer = setTimeout(hideReasoning, 180); }
 async function showReasoning(target: ReasoningTarget, event: Event, focus = false) {
   if (busy.value || props.disabled) return;
+  if (target.kind === 'model' ? !canTune(target.entry) : !target.tier.reasoningEfforts?.length) { hideReasoning(); return; }
   keepReasoning();
   const anchor = event.currentTarget as HTMLElement;
   const rect = anchor.getBoundingClientRect();
@@ -174,8 +176,8 @@ function settings() { close(); emit('settings'); }
       <div v-if="loading && !config" class="model-state">读取已配置模型…</div>
       <div v-if="gatewayEnabled" class="model-group" data-testid="chat-model-gateway">
         <div class="provider-name"><i class="model-badge brand" aria-hidden="true">伴</i>小伴 AI</div>
-        <button v-for="tier in tiers" :key="tier.tier" type="button" class="model-choice" :title="tier.description" :disabled="busy || loading || loadingTiers || !tier.available" :class="{ selected: currentTier(tier) }" :data-testid="`chat-model-xiaoban-ai-${tier.tier}`" aria-haspopup="menu" :aria-expanded="targetTier(tier)" @mouseenter="showReasoning({ kind: 'gateway', tier }, $event)" @mouseleave="leaveReasoning" @focus="showReasoning({ kind: 'gateway', tier }, $event)" @keydown.right.prevent="showReasoning({ kind: 'gateway', tier }, $event, true)" @click="chooseGateway(tier)">
-          <span>{{ tier.displayName }}{{ !tier.available ? '（暂不可用）' : '' }}</span><Check v-if="currentTier(tier)" :size="14" /><ChevronRight :size="12" />
+        <button v-for="tier in tiers" :key="tier.tier" type="button" class="model-choice" :title="tier.description" :disabled="busy || loading || loadingTiers || !tier.available" :class="{ selected: currentTier(tier) }" :data-testid="`chat-model-xiaoban-ai-${tier.tier}`" :aria-haspopup="tier.reasoningEfforts?.length ? 'menu' : undefined" :aria-expanded="targetTier(tier)" @mouseenter="showReasoning({ kind: 'gateway', tier }, $event)" @mouseleave="leaveReasoning" @focus="showReasoning({ kind: 'gateway', tier }, $event)" @keydown.right.prevent="showReasoning({ kind: 'gateway', tier }, $event, true)" @click="chooseGateway(tier)">
+          <span>{{ tier.displayName }}{{ !tier.available ? '（暂不可用）' : '' }}</span><Check v-if="currentTier(tier)" :size="14" /><ChevronRight v-if="tier.reasoningEfforts?.length" :size="12" />
         </button>
         <p v-if="gatewayError" class="model-state error">{{ gatewayError }}</p>
         <div v-else-if="!tiers.length && loadingTiers" class="mode-skeleton" role="status" aria-label="正在加载使用模式"><div v-for="row in 2" :key="row" class="model-choice" aria-hidden="true"><span></span></div></div>
@@ -183,8 +185,8 @@ function settings() { close(); emit('settings'); }
       </div>
       <div v-for="group in providers" :key="group.provider.id" class="model-group">
         <div class="provider-name"><i class="model-badge" aria-hidden="true">{{ providerBadge(group.provider.name) }}</i>{{ group.provider.name }}</div>
-        <button v-for="item in group.models" :key="item.model" type="button" class="model-choice" :title="item.model" :disabled="busy || loading" :class="{ selected: current(item) }" :data-testid="`chat-model-${group.provider.id}-${item.model}`" aria-haspopup="menu" :aria-expanded="targetModel(item)" @mouseenter="showReasoning({ kind: 'model', entry: item }, $event)" @mouseleave="leaveReasoning" @focus="showReasoning({ kind: 'model', entry: item }, $event)" @keydown.right.prevent="showReasoning({ kind: 'model', entry: item }, $event, true)" @click="choose(item)">
-          <span>{{ item.name }}</span><Check v-if="current(item)" :size="14" /><ChevronRight :size="12" />
+        <button v-for="item in group.models" :key="item.model" type="button" class="model-choice" :title="item.model" :disabled="busy || loading" :class="{ selected: current(item) }" :data-testid="`chat-model-${group.provider.id}-${item.model}`" :aria-haspopup="canTune(item) ? 'menu' : undefined" :aria-expanded="targetModel(item)" @mouseenter="showReasoning({ kind: 'model', entry: item }, $event)" @mouseleave="leaveReasoning" @focus="showReasoning({ kind: 'model', entry: item }, $event)" @keydown.right.prevent="showReasoning({ kind: 'model', entry: item }, $event, true)" @click="choose(item)">
+          <span>{{ item.name }}</span><Check v-if="current(item)" :size="14" /><ChevronRight v-if="canTune(item)" :size="12" />
         </button>
       </div>
       <p v-if="error" class="model-state error">{{ error }}</p>
@@ -194,12 +196,9 @@ function settings() { close(); emit('settings'); }
   </div>
   <Teleport to="body">
     <div v-if="open && reasoningTarget" ref="reasoningPanel" class="reasoning-panel xb-menu" :style="reasoningPosition" role="menu" aria-label="思考强度" data-testid="chat-model-reasoning" @mouseenter="keepReasoning" @mouseleave="leaveReasoning" @keydown.left.prevent="hideReasoning">
-      <div class="model-heading">思考强度</div>
-      <div class="reasoning-model">{{ reasoningTarget.kind === 'model' ? reasoningTarget.entry.name : `小伴 AI · ${reasoningTarget.tier.displayName}` }}</div>
       <button v-for="option in reasoningOptions" :key="option.value" type="button" class="model-choice" role="menuitemradio" :aria-checked="selectedStrength(option.value)" :disabled="busy" :data-testid="`chat-model-strength-${option.value}`" @click="chooseStrength(option.value)">
         <span>{{ option.label }}</span><Check v-if="selectedStrength(option.value)" :size="14" />
       </button>
-      <p class="model-state">{{ reasoningNote }}</p>
     </div>
   </Teleport>
 </template>
@@ -227,7 +226,6 @@ function settings() { close(); emit('settings'); }
 .model-state.error{color:var(--ui-danger)}
 .mode-skeleton .model-choice{cursor:default}.mode-skeleton .model-choice>span{flex:none;width:88px;height:12px;border-radius:4px;background:var(--ui-control)}
 .reasoning-panel{position:fixed;z-index:1000;overflow-y:auto;box-sizing:border-box}
-.reasoning-model{padding:0 10px 6px;color:var(--ui-text-tertiary);font-size:11.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .model-settings{display:flex;align-items:center;gap:8px;width:100%;min-height:32px;padding:0 10px;margin-top:4px;border:0;border-top:1px solid var(--ui-line);border-radius:0 0 8px 8px;background:none;color:var(--ui-text-secondary);cursor:pointer;font:inherit;font-size:12.5px}
 .model-settings:hover{color:var(--ui-text-primary)}
 @media(max-width:680px){.composer-model{max-width:110px}.composer-model span{max-width:60px}}

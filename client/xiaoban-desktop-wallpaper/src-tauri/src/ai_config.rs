@@ -296,7 +296,8 @@ impl AiConfig {
                 && p.base_url == self.base_url && p.model == self.model && p.protocol == self.protocol)
                 .and_then(|p| p.models.iter().find(|m| m.id == self.model))
         };
-        ai_reasoning::body_with_capabilities(&self.protocol, self.reply_preference(), &self.reasoning_levels(),
+        let levels = self.reasoning_levels();
+        ai_reasoning::body_with_capabilities(&self.protocol, self.reply_preference().resolved(&levels), &levels,
             declared.and_then(|m| m.reasoning_summary), declared.and_then(|m| m.thinking_mode.as_ref()))
     }
 

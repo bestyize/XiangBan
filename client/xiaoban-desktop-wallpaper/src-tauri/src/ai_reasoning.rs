@@ -13,6 +13,14 @@ pub enum ReplyPreference {
     Max,
 }
 impl ReplyPreference {
+    /// A concrete supported level for the compact picker and outgoing requests.
+    /// Legacy defaults prefer medium, then high; models without effort stay untouched.
+    pub fn resolved(self, levels: &[String]) -> Self {
+        [self, Self::Medium, Self::Deeper, Self::Faster, Self::Xhigh, Self::Max]
+            .into_iter().find(|preference| preference.effort().is_some_and(|effort|
+                levels.iter().any(|level| level == effort))).unwrap_or(Self::Default)
+    }
+
     pub fn effort(self) -> Option<&'static str> {
         match self { Self::Default => None, Self::Faster => Some("low"), Self::Medium => Some("medium"), Self::Deeper => Some("high"), Self::Xhigh => Some("xhigh"), Self::Max => Some("max") }
     }
@@ -136,6 +144,21 @@ mod claude_tests {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn picker_defaults_match_concrete_supported_request_levels() {
+        let all = vec!["low".into(), "medium".into(), "high".into()];
+        assert_eq!(ReplyPreference::Default.resolved(&all), ReplyPreference::Medium);
+        assert_eq!(ReplyPreference::Deeper.resolved(&all), ReplyPreference::Deeper);
+        let sparse = vec!["low".into(), "high".into(), "max".into()];
+        let preference = ReplyPreference::Default.resolved(&sparse);
+        assert_eq!(preference, ReplyPreference::Deeper);
+        assert_eq!(body("responses", preference, &sparse)["reasoning"]["effort"], "high");
+        assert_eq!(body("chat", preference, &sparse)["reasoning_effort"], "high");
+        assert_eq!(body("anthropic", preference, &sparse)["output_config"]["effort"], "high");
+        assert_eq!(ReplyPreference::Max.resolved(&["low".into()]), ReplyPreference::Faster);
+        assert_eq!(ReplyPreference::Default.resolved(&[]), ReplyPreference::Default);
+    }
+
     #[test]
     fn gateways_and_third_party_models_are_not_rejected_by_domain() {
         for model in ["gpt-6.1-sol", "deepseek-flash", "moonshot/kimi-k3", "glm-5.3"] {
