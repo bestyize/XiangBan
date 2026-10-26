@@ -1,6 +1,7 @@
 import type { ApprovalRequest, Risk } from './types.ts';
 
 const TOOL_LABELS: Record<string, string> = {
+  "open-claude-design": "设计工作台",
   connector_search: '查找连接器', connector_request: '连接服务', connector_call: '调用连接器工具',
   skill_review_read: '读取技能审查详情',
   shell: '运行命令', read_file: '读取文件', write_file: '写入文件', edit_file: '修改文件', list_dir: '查看文件夹', grep: '搜索文件',

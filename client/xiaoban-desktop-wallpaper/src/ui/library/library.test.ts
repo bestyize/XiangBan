@@ -165,7 +165,7 @@ describe('资料库 page', () => {
   it('uses labeled icon-only actions and expands or clears search from its icon', async () => {
     const { wrapper } = setup(); await flushPromises();
     const actions = wrapper.findAll('.library-head .library-action');
-    expect(actions.map(button => button.attributes('aria-label'))).toEqual(['搜索资料库', '导入文件夹', '导入文档', '新建文档']);
+    expect(actions.map(button => button.attributes('aria-label'))).toEqual(['搜索资料库', '导入设计稿', '导入文件夹', '导入文档', '新建文档']);
     for (const button of actions) { expect(button.text()).toBe(''); expect(button.attributes('title')).toBeTruthy(); }
     expect(wrapper.get('[data-testid="library-search"]').isVisible()).toBe(false);
     await wrapper.get('[data-testid="library-search-toggle"]').trigger('click'); await flushPromises();

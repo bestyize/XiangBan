@@ -51,6 +51,10 @@
   addEventListener('DOMContentLoaded', () => {
     const root=document.querySelector('x-dc');
     let instance, render, mounted=false;
+    {
+      const host=root||document.body,used=new Set([...host.querySelectorAll('[data-ocd-node]')].map(el=>el.getAttribute('data-ocd-node')));let n=0;
+      host.querySelectorAll('*').forEach(el=>{if(!el.hasAttribute('data-ocd-node')){while(used.has('n'+n))n++;el.setAttribute('data-ocd-node','n'+n);used.add('n'+n++);}});
+    }
     if(root) {
       try {
         const template=root.cloneNode(true), script=document.querySelector('script[data-dc-script]');
